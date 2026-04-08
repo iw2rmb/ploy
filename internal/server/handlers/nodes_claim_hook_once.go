@@ -2,14 +2,9 @@ package handlers
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/url"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -46,37 +41,145 @@ func resolveHookRuntimeDecision(
 	}
 	hookSpec, err := loadRuntimeHookSpec(source)
 	if err != nil {
-		// Relative hook sources are valid in mig specs but may not be resolvable
-		// from the control-plane filesystem at claim time. Do not block claims
-		// in that case; use deterministic source hash as persistence key so hook-once
-		// ledger checks and writes still apply.
-		if isRelativeLocalHookSource(source) && errors.Is(err, os.ErrNotExist) {
-			hash := unresolvedRelativeHookSourceHash(source)
-			decision := &contracts.HookRuntimeDecision{
-				HookHash:      hash,
-				HookShouldRun: true,
-			}
-			return applyHookOnceLedgerDecision(ctx, st, job, decision)
-		}
 		return nil, fmt.Errorf("load hook spec for source %q: %w", source, err)
 	}
-	match, err := hook.Match(hookSpec, hook.MatchInput{})
+	matchInput, err := buildHookMatchInput(ctx, st, job)
+	if err != nil {
+		return nil, err
+	}
+	match, err := hook.Match(hookSpec, matchInput)
 	if err != nil {
 		return nil, fmt.Errorf("evaluate hook matcher for source %q: %w", source, err)
 	}
-	hash := strings.TrimSpace(match.HookHash)
+	hash := strings.TrimSpace(match.Once.PersistenceKey)
+	if hash == "" {
+		hash = strings.TrimSpace(match.HookHash)
+	}
 	if hash == "" {
 		return nil, fmt.Errorf("hook matcher returned empty hash for source %q", source)
 	}
 
 	decision := &contracts.HookRuntimeDecision{
 		HookHash:      hash,
-		HookShouldRun: true,
+		HookShouldRun: match.ShouldRun,
 	}
-	if !match.Once.Enabled {
+	if !match.Once.Enabled || !match.Once.Eligible {
 		return decision, nil
 	}
 	return applyHookOnceLedgerDecision(ctx, st, job, decision)
+}
+
+func buildHookMatchInput(ctx context.Context, st store.Store, job store.Job) (hook.MatchInput, error) {
+	jobs, err := st.ListJobsByRunRepoAttempt(ctx, store.ListJobsByRunRepoAttemptParams{
+		RunID:   job.RunID,
+		RepoID:  job.RepoID,
+		Attempt: job.Attempt,
+	})
+	if err != nil {
+		return hook.MatchInput{}, fmt.Errorf("list jobs for hook runtime input: %w", err)
+	}
+
+	current, previous, err := resolveHookSBOMSnapshots(ctx, st, jobs)
+	if err != nil {
+		return hook.MatchInput{}, err
+	}
+
+	return hook.MatchInput{
+		Stack:        resolveHookRuntimeStack(jobs),
+		CurrentSBOM:  current,
+		PreviousSBOM: previous,
+	}, nil
+}
+
+func resolveHookRuntimeStack(jobs []store.Job) hook.RuntimeStack {
+	var (
+		selected store.Job
+		found    bool
+		stack    hook.RuntimeStack
+	)
+	for _, candidate := range jobs {
+		if !isGateJobTypeForClaim(domaintypes.JobType(candidate.JobType)) || candidate.Status != domaintypes.JobStatusSuccess || len(candidate.Meta) == 0 {
+			continue
+		}
+		meta, err := contracts.UnmarshalJobMeta(candidate.Meta)
+		if err != nil || meta.GateMetadata == nil {
+			continue
+		}
+		exp := meta.GateMetadata.DetectedStackExpectation()
+		if exp == nil {
+			continue
+		}
+		if !found || sbomJobIsMoreRecent(candidate, selected) {
+			selected = candidate
+			stack = hook.RuntimeStack{
+				Language: strings.TrimSpace(exp.Language),
+				Tool:     strings.TrimSpace(exp.Tool),
+				Release:  strings.TrimSpace(exp.Release),
+			}
+			found = true
+		}
+	}
+	return stack
+}
+
+func resolveHookSBOMSnapshots(
+	ctx context.Context,
+	st store.Store,
+	jobs []store.Job,
+) ([]hook.SBOMPackage, []hook.SBOMPackage, error) {
+	latest, previous := latestTwoSuccessfulSBOMJobs(jobs)
+	if latest == nil {
+		return nil, nil, nil
+	}
+
+	currentRows, err := st.ListSBOMRowsByJob(ctx, latest.ID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("list current sbom rows for job %s: %w", latest.ID, err)
+	}
+	current := toHookSBOMPackages(currentRows)
+
+	if previous == nil {
+		return current, nil, nil
+	}
+	previousRows, err := st.ListSBOMRowsByJob(ctx, previous.ID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("list previous sbom rows for job %s: %w", previous.ID, err)
+	}
+	return current, toHookSBOMPackages(previousRows), nil
+}
+
+func latestTwoSuccessfulSBOMJobs(jobs []store.Job) (*store.Job, *store.Job) {
+	var latest *store.Job
+	var previous *store.Job
+	for i := range jobs {
+		if jobs[i].JobType != domaintypes.JobTypeSBOM || jobs[i].Status != domaintypes.JobStatusSuccess {
+			continue
+		}
+		candidate := &jobs[i]
+		if latest == nil || sbomJobIsMoreRecent(*candidate, *latest) {
+			previous = latest
+			latest = candidate
+			continue
+		}
+		if previous == nil || sbomJobIsMoreRecent(*candidate, *previous) {
+			previous = candidate
+		}
+	}
+	return latest, previous
+}
+
+func toHookSBOMPackages(rows []store.Sbom) []hook.SBOMPackage {
+	if len(rows) == 0 {
+		return nil
+	}
+	out := make([]hook.SBOMPackage, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, hook.SBOMPackage{
+			Name:    strings.TrimSpace(row.Lib),
+			Version: strings.TrimSpace(row.Ver),
+		})
+	}
+	return out
 }
 
 func applyHookOnceLedgerDecision(
@@ -118,11 +221,6 @@ func applyHookOnceLedgerDecision(
 	return decision, nil
 }
 
-func unresolvedRelativeHookSourceHash(source string) string {
-	sum := sha256.Sum256([]byte("relative-hook-source:" + strings.TrimSpace(source)))
-	return hex.EncodeToString(sum[:])
-}
-
 func hookIndexFromJobName(jobName string, hooksLen int) (int, error) {
 	name := strings.TrimSpace(jobName)
 	if hooksLen <= 0 {
@@ -154,26 +252,4 @@ func loadRuntimeHookSpec(source string) (hook.Spec, error) {
 		return hook.Spec{}, fmt.Errorf("expected exactly 1 resolved hook spec, got %d", len(specs))
 	}
 	return specs[0], nil
-}
-
-func isRelativeLocalHookSource(source string) bool {
-	trimmed := strings.TrimSpace(source)
-	if trimmed == "" {
-		return false
-	}
-	if filepathLikeRemoteURL(trimmed) {
-		return false
-	}
-	return !filepath.IsAbs(trimmed)
-}
-
-func filepathLikeRemoteURL(raw string) bool {
-	u, err := url.Parse(raw)
-	if err != nil || u == nil {
-		return false
-	}
-	if (u.Scheme != "http" && u.Scheme != "https") || strings.TrimSpace(u.Host) == "" {
-		return false
-	}
-	return true
 }
