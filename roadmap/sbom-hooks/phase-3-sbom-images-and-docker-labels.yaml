@@ -43,7 +43,9 @@ items:
     cfp: 8
     commit: acd73404
   - done: false
-    reviews: []
+    reviews:
+      - gaps: ["`Build one representative image from each image family and inspect final image labels` is not verifiable in the current environment: all representative builds failed (`no space left on device`), and `images/amata/Dockerfile` additionally failed in dependency install (`npm install -g ...` exit 1), so final-image label inspection could not be completed for [/Users/vk/@iw2rmb/ploy/images/amata/Dockerfile](/Users/vk/@iw2rmb/ploy/images/amata/Dockerfile), [/Users/vk/@iw2rmb/ploy/images/node/Dockerfile](/Users/vk/@iw2rmb/ploy/images/node/Dockerfile), [/Users/vk/@iw2rmb/ploy/images/server/Dockerfile](/Users/vk/@iw2rmb/ploy/images/server/Dockerfile), [/Users/vk/@iw2rmb/ploy/images/shell/Dockerfile](/Users/vk/@iw2rmb/ploy/images/shell/Dockerfile), [/Users/vk/@iw2rmb/ploy/images/gates/gradle/Dockerfile.jdk17](/Users/vk/@iw2rmb/ploy/images/gates/gradle/Dockerfile.jdk17), [/Users/vk/@iw2rmb/ploy/images/sbom/gradle/Dockerfile](/Users/vk/@iw2rmb/ploy/images/sbom/gradle/Dockerfile), [/Users/vk/@iw2rmb/ploy/images/orw/orw-cli-maven/Dockerfile](/Users/vk/@iw2rmb/ploy/images/orw/orw-cli-maven/Dockerfile)."]
+        commit: null
     label: "2"
     summary: "Add standard OCI labels for source description and license to every repository Dockerfile."
     classification: "determined"
