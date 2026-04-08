@@ -155,7 +155,7 @@ redundancy-check: ## Check for LOC and duplication regressions in hotspot packag
 	@bash scripts/redundancy-check.sh
 
 .PHONY: roadmap-verify
-roadmap-verify: ## Verify done roadmaps have closed review gaps and completed evidence checks
+roadmap-verify: ## Verify targeted roadmap phases are done and have closed gaps/evidence checks
 	@if [ -z "$(strip $(ROADMAP_VERIFY_PHASES))" ]; then \
 		echo "roadmap verification skipped: ROADMAP_VERIFY_PHASES is empty"; \
 		exit 0; \
