@@ -301,23 +301,15 @@ func loadHookSpecFromBundleHash(
 		return hook.Spec{}, fmt.Errorf("bundle_map[%q] is missing", hash)
 	}
 
-	bundle, err := st.GetSpecBundle(ctx, bundleID)
+	bundle, err := probeSpecBundleIntegrity(ctx, st, bs, bundleID)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return hook.Spec{}, fmt.Errorf("spec bundle %q not found for hash %q", bundleID, hash)
-		}
-		return hook.Spec{}, fmt.Errorf("get spec bundle %q for hash %q: %w", bundleID, hash, err)
-	}
-	if bundle.ObjectKey == nil || strings.TrimSpace(*bundle.ObjectKey) == "" {
-		return hook.Spec{}, fmt.Errorf("spec bundle %q has no object key", bundleID)
+		return hook.Spec{}, fmt.Errorf("verify spec bundle for hash %q: %w", hash, err)
 	}
 
-	reader, _, err := bs.Get(ctx, *bundle.ObjectKey)
+	key := strings.TrimSpace(*bundle.ObjectKey)
+	reader, _, err := bs.Get(ctx, key)
 	if err != nil {
-		if errors.Is(err, blobstore.ErrNotFound) {
-			return hook.Spec{}, fmt.Errorf("spec bundle blob %q is missing from object storage", *bundle.ObjectKey)
-		}
-		return hook.Spec{}, fmt.Errorf("download spec bundle blob %q: %w", *bundle.ObjectKey, err)
+		return hook.Spec{}, fmt.Errorf("download spec bundle blob %q: %w", key, err)
 	}
 	defer func() { _ = reader.Close() }()
 
