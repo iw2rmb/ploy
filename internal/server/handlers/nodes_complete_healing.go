@@ -67,6 +67,25 @@ func maybeCreateHealingJobs(
 	if err != nil {
 		return fmt.Errorf("resolve hook sources: %w", err)
 	}
+	reGateHookPlans, err := resolveCycleHookPlans(
+		ctx,
+		st,
+		failedJob.RunID,
+		failedJob.RepoID,
+		failedJob.Attempt,
+		spec,
+		resolvedHooks,
+		"re-gate",
+	)
+	if err != nil {
+		return fmt.Errorf("plan re-gate hooks: %w", err)
+	}
+	runnableReGateHooks := make([]plannedHookSource, 0, len(reGateHookPlans))
+	for _, plan := range reGateHookPlans {
+		if plan.Decision.ShouldRun() {
+			runnableReGateHooks = append(runnableReGateHooks, plan)
+		}
+	}
 
 	var heal *contracts.HealSpec
 	if spec.BuildGate != nil {
@@ -112,7 +131,7 @@ func maybeCreateHealingJobs(
 
 	reGateName := fmt.Sprintf("re-gate-%d", chain.AttemptNumber)
 	reGateSBOMID := domaintypes.NewJobID()
-	hookIDs := make([]domaintypes.JobID, len(resolvedHooks))
+	hookIDs := make([]domaintypes.JobID, len(runnableReGateHooks))
 	for i := range hookIDs {
 		hookIDs[i] = domaintypes.NewJobID()
 	}
@@ -140,7 +159,8 @@ func maybeCreateHealingJobs(
 			nextID = hookIDs[i+1]
 		}
 		hookMeta := contracts.NewMigJobMeta()
-		hookMeta.HookSource = resolvedHooks[i]
+		hookMeta.HookSource = runnableReGateHooks[i].Source
+		hookMeta.ActionSummary = summarizeHookPlanningDecision(runnableReGateHooks[i].Decision)
 		hookMetaBytes, hookMetaErr := contracts.MarshalJobMeta(hookMeta)
 		if hookMetaErr != nil {
 			return fmt.Errorf("marshal re-gate hook job meta %d: %w", i, hookMetaErr)
@@ -151,7 +171,7 @@ func maybeCreateHealingJobs(
 			RepoID:      failedJob.RepoID,
 			RepoBaseRef: failedJob.RepoBaseRef,
 			Attempt:     failedJob.Attempt,
-			Name:        fmt.Sprintf("%s-hook-%03d", reGateName, i),
+			Name:        fmt.Sprintf("%s-hook-%03d", reGateName, runnableReGateHooks[i].SourceIndex),
 			JobType:     domaintypes.JobTypeHook,
 			Status:      domaintypes.JobStatusCreated,
 			NextID:      &nextID,

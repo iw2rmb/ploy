@@ -20,6 +20,7 @@ import (
 	migsapi "github.com/iw2rmb/ploy/internal/migs/api"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
+	"github.com/iw2rmb/ploy/internal/workflow/hook"
 )
 
 // NOTE: This file uses KSUID-backed string IDs for runs and jobs.
@@ -192,15 +193,31 @@ func getRunStatusHandler(st store.Store) http.HandlerFunc {
 }
 
 type plannedJob struct {
-	ID         domaintypes.JobID
-	Name       string
-	JobType    domaintypes.JobType
-	JobImage   string
-	Status     domaintypes.JobStatus
-	StepName   string
-	HookSource string
-	NextID     *domaintypes.JobID
-	RepoSHAIn  string
+	ID           domaintypes.JobID
+	Name         string
+	JobType      domaintypes.JobType
+	JobImage     string
+	Status       domaintypes.JobStatus
+	StepName     string
+	HookSource   string
+	HookDecision *hookPlanningDecision
+	NextID       *domaintypes.JobID
+	RepoSHAIn    string
+}
+
+type hookPlanningDecision struct {
+	Evaluated bool
+	Match     hook.MatchDecision
+}
+
+func (d hookPlanningDecision) ShouldRun() bool {
+	return d.Match.ShouldRun
+}
+
+type plannedHookSource struct {
+	SourceIndex int
+	Source      string
+	Decision    hookPlanningDecision
 }
 
 type preGateCreationBinding struct {
@@ -236,28 +253,42 @@ func createJobsFromSpec(
 	if err != nil {
 		return fmt.Errorf("resolve hook sources: %w", err)
 	}
+	preGateHookPlans, err := resolveCycleHookPlans(ctx, st, runID, repoID, attempt, migsSpec, resolvedHooks, "pre-gate")
+	if err != nil {
+		return fmt.Errorf("plan pre-gate hooks: %w", err)
+	}
+	postGateHookPlans, err := resolveCycleHookPlans(ctx, st, runID, repoID, attempt, migsSpec, resolvedHooks, "post-gate")
+	if err != nil {
+		return fmt.Errorf("plan post-gate hooks: %w", err)
+	}
 
 	type draft struct {
-		name       string
-		jobType    domaintypes.JobType
-		jobImage   string
-		stepName   string
-		hookSource string
+		name         string
+		jobType      domaintypes.JobType
+		jobImage     string
+		stepName     string
+		hookSource   string
+		hookDecision *hookPlanningDecision
 	}
-	appendGatePreludeDrafts := func(drafts []draft, cycleName string) []draft {
+	appendGatePreludeDrafts := func(drafts []draft, cycleName string, hookPlans []plannedHookSource) []draft {
 		drafts = append(drafts, draft{name: cycleName + "-sbom", jobType: domaintypes.JobTypeSBOM})
-		for i, source := range resolvedHooks {
+		for _, hookPlan := range hookPlans {
+			if !hookPlan.Decision.ShouldRun() {
+				continue
+			}
+			decision := hookPlan.Decision
 			drafts = append(drafts, draft{
-				name:       fmt.Sprintf("%s-hook-%03d", cycleName, i),
-				jobType:    domaintypes.JobTypeHook,
-				hookSource: source,
+				name:         fmt.Sprintf("%s-hook-%03d", cycleName, hookPlan.SourceIndex),
+				jobType:      domaintypes.JobTypeHook,
+				hookSource:   hookPlan.Source,
+				hookDecision: &decision,
 			})
 		}
 		return drafts
 	}
 
 	drafts := make([]draft, 0, len(migsSpec.Steps)+len(resolvedHooks)*2+5)
-	drafts = appendGatePreludeDrafts(drafts, "pre-gate")
+	drafts = appendGatePreludeDrafts(drafts, "pre-gate", preGateHookPlans)
 	drafts = append(drafts, draft{name: "pre-gate", jobType: domaintypes.JobTypePreGate})
 
 	if len(migsSpec.Steps) > 1 {
@@ -289,7 +320,7 @@ func createJobsFromSpec(
 			stepName: stepName,
 		})
 	}
-	drafts = appendGatePreludeDrafts(drafts, "post-gate")
+	drafts = appendGatePreludeDrafts(drafts, "post-gate", postGateHookPlans)
 	drafts = append(drafts, draft{name: "post-gate", jobType: domaintypes.JobTypePostGate})
 
 	planned := make([]plannedJob, 0, len(drafts))
@@ -303,13 +334,14 @@ func createJobsFromSpec(
 			jobImage = strings.TrimSpace(preGateBinding.JobImage)
 		}
 		planned = append(planned, plannedJob{
-			ID:         domaintypes.NewJobID(),
-			Name:       d.name,
-			JobType:    d.jobType,
-			JobImage:   jobImage,
-			Status:     status,
-			StepName:   d.stepName,
-			HookSource: d.hookSource,
+			ID:           domaintypes.NewJobID(),
+			Name:         d.name,
+			JobType:      d.jobType,
+			JobImage:     jobImage,
+			Status:       status,
+			StepName:     d.stepName,
+			HookSource:   d.hookSource,
+			HookDecision: d.hookDecision,
 		})
 	}
 	// Seed deterministic SHA chain from run_repos.repo_sha0 at chain head.
@@ -429,6 +461,9 @@ func createPlannedJob(ctx context.Context, st store.Store, runID domaintypes.Run
 		meta = contracts.NewMigJobMeta()
 	}
 	meta.HookSource = strings.TrimSpace(planned.HookSource)
+	if planned.HookDecision != nil {
+		meta.ActionSummary = summarizeHookPlanningDecision(*planned.HookDecision)
+	}
 	metaBytes, err := contracts.MarshalJobMeta(meta)
 	if err != nil {
 		return fmt.Errorf("marshal job meta: %w", err)
@@ -449,6 +484,154 @@ func createPlannedJob(ctx context.Context, st store.Store, runID domaintypes.Run
 		RepoShaIn:   planned.RepoSHAIn,
 	})
 	return err
+}
+
+func resolveCycleHookPlans(
+	ctx context.Context,
+	st store.Store,
+	runID domaintypes.RunID,
+	repoID domaintypes.RepoID,
+	attempt int32,
+	spec *contracts.MigSpec,
+	resolvedHooks []string,
+	cycleName string,
+) ([]plannedHookSource, error) {
+	if len(resolvedHooks) == 0 {
+		return nil, nil
+	}
+	matchInput, err := buildCycleHookMatchInput(ctx, st, runID, repoID, attempt, spec, cycleName)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]plannedHookSource, 0, len(resolvedHooks))
+	for i, source := range resolvedHooks {
+		decision, decisionErr := resolvePlannableHookDecision(source, matchInput)
+		if decisionErr != nil {
+			return nil, fmt.Errorf("source[%d] %q: %w", i, source, decisionErr)
+		}
+		out = append(out, plannedHookSource{
+			SourceIndex: i,
+			Source:      source,
+			Decision:    decision,
+		})
+	}
+	return out, nil
+}
+
+func buildCycleHookMatchInput(
+	ctx context.Context,
+	st store.Store,
+	runID domaintypes.RunID,
+	repoID domaintypes.RepoID,
+	attempt int32,
+	spec *contracts.MigSpec,
+	cycleName string,
+) (hook.MatchInput, error) {
+	input, err := buildHookMatchInput(ctx, st, store.Job{
+		RunID:   runID,
+		RepoID:  repoID,
+		Attempt: attempt,
+	})
+	if err != nil {
+		return hook.MatchInput{}, err
+	}
+	input.Stack = mergeHookRuntimeStackWithFallback(input.Stack, hookRuntimeFallbackStack(spec, cycleName))
+	return input, nil
+}
+
+func hookRuntimeFallbackStack(spec *contracts.MigSpec, cycleName string) hook.RuntimeStack {
+	if spec == nil || spec.BuildGate == nil {
+		return hook.RuntimeStack{}
+	}
+	var phase *contracts.BuildGatePhaseConfig
+	switch cycleName {
+	case "pre-gate":
+		phase = spec.BuildGate.Pre
+	case "post-gate", "re-gate":
+		phase = spec.BuildGate.Post
+	}
+	if phase == nil || phase.Stack == nil || !phase.Stack.Enabled {
+		return hook.RuntimeStack{}
+	}
+	return hook.RuntimeStack{
+		Language: strings.TrimSpace(phase.Stack.Language),
+		Tool:     strings.TrimSpace(phase.Stack.Tool),
+		Release:  strings.TrimSpace(phase.Stack.Release),
+	}
+}
+
+func mergeHookRuntimeStackWithFallback(current hook.RuntimeStack, fallback hook.RuntimeStack) hook.RuntimeStack {
+	if strings.TrimSpace(current.Language) == "" {
+		current.Language = fallback.Language
+	}
+	if strings.TrimSpace(current.Tool) == "" {
+		current.Tool = fallback.Tool
+	}
+	if strings.TrimSpace(current.Release) == "" {
+		current.Release = fallback.Release
+	}
+	return current
+}
+
+func resolvePlannableHookDecision(source string, matchInput hook.MatchInput) (hookPlanningDecision, error) {
+	specDoc, evaluable, err := loadHookSpecForPlanning(source)
+	if err != nil {
+		return hookPlanningDecision{}, err
+	}
+	if !evaluable {
+		return deferredBundleHookPlanningDecision(source), nil
+	}
+	match, err := hook.Match(specDoc, matchInput)
+	if err != nil {
+		return hookPlanningDecision{}, fmt.Errorf("evaluate hook matcher: %w", err)
+	}
+	return hookPlanningDecision{
+		Evaluated: true,
+		Match:     match,
+	}, nil
+}
+
+func loadHookSpecForPlanning(source string) (hook.Spec, bool, error) {
+	trimmed := strings.TrimSpace(source)
+	if isHTTPSHookSource(trimmed) {
+		specDoc, err := loadRuntimeHookSpecFromLoader(trimmed, ".")
+		if err != nil {
+			return hook.Spec{}, false, fmt.Errorf("load hook spec: %w", err)
+		}
+		return specDoc, true, nil
+	}
+	if canonicalHookSourcePattern.MatchString(trimmed) {
+		return hook.Spec{}, false, nil
+	}
+	return hook.Spec{}, false, fmt.Errorf("unsupported hook source %q: local hook sources must be precompiled by CLI into hash entries", source)
+}
+
+func deferredBundleHookPlanningDecision(source string) hookPlanningDecision {
+	return hookPlanningDecision{
+		Evaluated: false,
+		Match: hook.MatchDecision{
+			ShouldRun:    true,
+			StackMatched: true,
+			SBOMMatched:  true,
+			HookHash:     strings.TrimSpace(source),
+		},
+	}
+}
+
+func summarizeHookPlanningDecision(decision hookPlanningDecision) string {
+	if !decision.Evaluated {
+		return "hook_match eval=deferred should_run=true reason=bundle_source"
+	}
+	return fmt.Sprintf(
+		"hook_match eval=planned should_run=%t stack=%t sbom=%t on_match=%t on_add=%t on_remove=%t on_change=%t",
+		decision.Match.ShouldRun,
+		decision.Match.StackMatched,
+		decision.Match.SBOMMatched,
+		decision.Match.Predicates.OnMatch,
+		decision.Match.Predicates.OnAdd,
+		decision.Match.Predicates.OnRemove,
+		decision.Match.Predicates.OnChange,
+	)
 }
 
 func resolveHookManifestSources(spec contracts.MigSpec) ([]string, error) {

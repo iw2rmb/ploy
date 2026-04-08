@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -14,6 +15,7 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	migsapi "github.com/iw2rmb/ploy/internal/migs/api"
 	"github.com/iw2rmb/ploy/internal/store"
+	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
 const testRepoSHA0 = "0123456789abcdef0123456789abcdef01234567"
@@ -334,6 +336,108 @@ func TestCreateJobsFromSpec_PostGatePreludeWithHooks_DeterministicOrder(t *testi
 	}
 	if postGate.NextID != nil {
 		t.Fatalf("post-gate next_id = %v, want nil", *postGate.NextID)
+	}
+}
+
+func TestCreateJobsFromSpec_ConditionalHooks_MixedCycleMatches(t *testing.T) {
+	t.Parallel()
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/hook-java.yaml", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`
+id: hook-java
+stack:
+  language: java
+steps:
+  - image: hook:latest
+`))
+	})
+	server := httptest.NewServer(mux)
+	t.Cleanup(server.Close)
+
+	st := &jobStore{}
+	spec := []byte(fmt.Sprintf(
+		`{"hooks":["%s/hook-java.yaml"],"steps":[{"image":"a"}],"build_gate":{"pre":{"stack":{"enabled":true,"language":"java","release":"17"}},"post":{"stack":{"enabled":true,"language":"go","release":"1.22"}}}}`,
+		server.URL,
+	))
+	err := createJobsFromSpec(context.Background(), st, domaintypes.RunID("run_conditional_123"), domaintypes.RepoID("repo_conditional"), "main", 1, testRepoSHA0, spec)
+	if err != nil {
+		t.Fatalf("createJobsFromSpec failed: %v", err)
+	}
+
+	byName := createJobsByName(st.createJob.calls)
+	preHook, ok := byName["pre-gate-hook-000"]
+	if !ok {
+		t.Fatal("expected pre-gate-hook-000 to be planned")
+	}
+	if _, exists := byName["post-gate-hook-000"]; exists {
+		t.Fatal("did not expect post-gate-hook-000 when matcher returns false for post-gate cycle")
+	}
+
+	preSBOM := byName["pre-gate-sbom"]
+	preGate := byName["pre-gate"]
+	mig0 := byName["mig-0"]
+	postSBOM := byName["post-gate-sbom"]
+	postGate := byName["post-gate"]
+
+	if preSBOM.NextID == nil || *preSBOM.NextID != preHook.ID {
+		t.Fatalf("pre-gate-sbom next_id = %v, want %s", preSBOM.NextID, preHook.ID)
+	}
+	if preHook.NextID == nil || *preHook.NextID != preGate.ID {
+		t.Fatalf("pre-gate-hook-000 next_id = %v, want %s", preHook.NextID, preGate.ID)
+	}
+	if mig0.NextID == nil || *mig0.NextID != postSBOM.ID {
+		t.Fatalf("mig-0 next_id = %v, want %s", mig0.NextID, postSBOM.ID)
+	}
+	if postSBOM.NextID == nil || *postSBOM.NextID != postGate.ID {
+		t.Fatalf("post-gate-sbom next_id = %v, want %s", postSBOM.NextID, postGate.ID)
+	}
+
+	meta, err := contracts.UnmarshalJobMeta(preHook.Meta)
+	if err != nil {
+		t.Fatalf("unmarshal pre-gate hook meta: %v", err)
+	}
+	if got, want := meta.HookSource, server.URL+"/hook-java.yaml"; got != want {
+		t.Fatalf("hook_source=%q, want %q", got, want)
+	}
+	if !strings.Contains(meta.ActionSummary, "eval=planned") || !strings.Contains(meta.ActionSummary, "should_run=true") {
+		t.Fatalf("expected planned matcher summary in action_summary, got %q", meta.ActionSummary)
+	}
+}
+
+func TestCreateJobsFromSpec_ConditionalHooks_AllFalseCreatesNoHooks(t *testing.T) {
+	t.Parallel()
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/hook-ruby.yaml", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`
+id: hook-ruby
+stack:
+  language: ruby
+steps:
+  - image: hook:latest
+`))
+	})
+	server := httptest.NewServer(mux)
+	t.Cleanup(server.Close)
+
+	st := &jobStore{}
+	spec := []byte(fmt.Sprintf(
+		`{"hooks":["%s/hook-ruby.yaml"],"steps":[{"image":"a"}],"build_gate":{"pre":{"stack":{"enabled":true,"language":"java","release":"17"}},"post":{"stack":{"enabled":true,"language":"go","release":"1.22"}}}}`,
+		server.URL,
+	))
+	err := createJobsFromSpec(context.Background(), st, domaintypes.RunID("run_conditional_false_123"), domaintypes.RepoID("repo_conditional_false"), "main", 1, testRepoSHA0, spec)
+	if err != nil {
+		t.Fatalf("createJobsFromSpec failed: %v", err)
+	}
+
+	if len(st.createJob.calls) != 5 {
+		t.Fatalf("expected 5 jobs (no hooks), got %d", len(st.createJob.calls))
+	}
+	for _, created := range st.createJob.calls {
+		if strings.Contains(created.Name, "-hook-") {
+			t.Fatalf("did not expect hook job %q when all matcher decisions are false", created.Name)
+		}
 	}
 }
 
