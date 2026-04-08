@@ -7,7 +7,9 @@ documentation:
   - "docs/schemas/mig.example.yaml"
   - "docs/api/OpenAPI.yaml"
 done: false
-reviews: []
+reviews:
+  - gaps: ["\"Evaluate on_match on_add on_remove and on_change against current and previous sbom snapshots with normalized version comparison.\" is not wired into runtime decisions: claim-time matching is called with empty runtime input (`hook.MatchInput{}`) and the returned `match.ShouldRun`/predicate outcomes are ignored, while `HookShouldRun` is hardcoded `true` unless ledger skip exists (`internal/server/handlers/nodes_claim_hook_once.go:63-79`, matcher semantics in `internal/workflow/hook/matcher.go:71-91`).", "\"Compute deterministic hook hash from canonical hook content and return once eligibility metadata for persistence keying.\" is not implemented end-to-end for unresolved relative hook sources: claim-time fallback hashes only the source path prefix and bypasses canonical spec hashing/once-eligibility semantics (`internal/server/handlers/nodes_claim_hook_once.go:49-59`, `internal/server/handlers/nodes_claim_hook_once.go:121-123`)."]
+    commit: null
 items:
   - done: true
     reviews: []
