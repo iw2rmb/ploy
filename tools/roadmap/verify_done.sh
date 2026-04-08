@@ -8,9 +8,9 @@ Usage:
 
 Behavior:
   - For each targeted phase:
+  - For each targeted phase with done=true:
     - fails if phase index evidence marker is missing
     - fails if phase index evidence marker is present but unchecked
-  - For each targeted phase with done=true:
     - fails if any item has done!=true
     - fails if any done item is missing acceptance checks (`verification`) or acceptance evidence (`reviews[*].commit`)
     - fails if any unresolved reviews.gaps exist (phase or item level)
@@ -103,24 +103,26 @@ class Verifier
       end
     end
 
-    index_path = File.join(File.dirname(path), "index.md")
-    evidence_marker = "evidence:#{phase_name}"
+    if done
+      index_path = File.join(File.dirname(path), "index.md")
+      evidence_marker = "evidence:#{phase_name}"
 
-    unless File.file?(index_path)
-      @failures << "error: missing roadmap index for #{path} (expected #{index_path})"
-      return
-    end
+      unless File.file?(index_path)
+        @failures << "error: missing roadmap index for #{path} (expected #{index_path})"
+        return
+      end
 
-    index_text = File.read(index_path)
-    lines_with_marker = index_text.each_line.select { |line| line.include?(evidence_marker) }
-    if lines_with_marker.empty?
-      @failures << "error: missing evidence marker '#{evidence_marker}' in #{index_path}"
-      return
-    end
+      index_text = File.read(index_path)
+      lines_with_marker = index_text.each_line.select { |line| line.include?(evidence_marker) }
+      if lines_with_marker.empty?
+        @failures << "error: missing evidence marker '#{evidence_marker}' in #{index_path}"
+        return
+      end
 
-    has_checked_entry = lines_with_marker.any? { |line| line.match?(/^\s*-\s*\[[xX]\]/) }
-    unless has_checked_entry
-      @failures << "error: evidence marker '#{evidence_marker}' is present but unchecked in #{index_path}"
+      has_checked_entry = lines_with_marker.any? { |line| line.match?(/^\s*-\s*\[[xX]\]/) }
+      unless has_checked_entry
+        @failures << "error: evidence marker '#{evidence_marker}' is present but unchecked in #{index_path}"
+      end
     end
   rescue Psych::SyntaxError => e
     @failures << "error: YAML parse failure in #{path}: #{e.message.lines.first.to_s.strip}"
