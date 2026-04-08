@@ -23,6 +23,7 @@ OCI Labeling Policy
   - `org.opencontainers.image.licenses="MIT"`
 - Keep existing image-specific OCI metadata (for example `org.opencontainers.image.title` and `org.opencontainers.image.created`) intact when present.
 - Do not duplicate OCI label keys in a Dockerfile; normalize to one final value per key.
+- Verify policy compliance with: `go test ./tests/guards -run TestDockerfilesOCIRequiredLabels`.
 
 Contract
 
