@@ -12,12 +12,13 @@ from a single queue with chain progression driven by `next_id`. There is no dedi
 queue or separate worker mode—all nodes pull from the same jobs queue.
 
 **Key characteristics:**
-- **Single queue:** Gate jobs (`pre-gate`, `post-gate`, `re-gate`) are stored in the
-  `jobs` table with the same schema as mig jobs.
+- **Single queue:** Gate-adjacent jobs (`sbom`, `hook`, `pre-gate`, `post-gate`,
+  `re-gate`) are stored in the `jobs` table with the same schema as mig jobs.
 - **Docker-based execution:** Gates execute locally on the claiming node via Docker
   containers. There is no remote HTTP Build Gate mode.
-- **Chain progression:** Jobs advance through `next_id` successor links, ensuring
-  sequential execution of pre-gate → mig → post-gate flows.
+- **Chain progression:** Jobs advance through `next_id` successor links. For every
+  gate cycle, scheduling is deterministic: `sbom` runs first, optional `hook`
+  jobs run next, and the gate job runs last for that cycle.
 - **Workspace semantics:** Gate validation runs against the local workspace on the
   node. For re-gates after healing, the workspace already contains accumulated changes.
 
@@ -51,12 +52,17 @@ Gate validation is orchestrated by the node agent as part of the Migs run lifecy
 ```
 
 **Flow:**
-1. Control plane creates gate jobs (`pre-gate`, `post-gate`) in the `jobs` table.
+1. Control plane creates a unified job chain in `jobs` that includes gate-adjacent
+   phases (`sbom`, `hook`, `pre-gate`, `post-gate`, `re-gate`) plus `mig` and
+   optional healing phases.
 2. Node agent claims the next queued job via `/v1/nodes/{id}/claim`.
-3. For gate jobs, the node executes validation using the Docker gate executor.
-4. Gate runs inside a Docker container with the workspace mounted at `/workspace`.
-5. Results are captured as `BuildGateStageMetadata` (passed/failed, duration, logs).
-6. Node reports completion via `/v1/jobs/{job_id}/complete`.
+3. For `sbom` jobs, the node writes canonical `/out/sbom.spdx.json` for that gate cycle.
+4. For `hook` jobs, the node stages `/in/sbom.spdx.json` and `/out/sbom.spdx.json`
+   snapshots for the hook index in that cycle.
+5. For gate jobs (`pre-gate`, `post-gate`, `re-gate`), the node executes validation
+   using the Docker gate executor against the cycle snapshot.
+6. Gate results are captured as `BuildGateStageMetadata` (passed/failed, duration, logs).
+7. Node reports completion via `/v1/jobs/{job_id}/complete`.
 
 ## Gate Executor
 
