@@ -538,26 +538,30 @@ func TestCompleteJob_GateFailure_HealingInsertionRewiresNextChain(t *testing.T) 
 	if len(st.createJob.calls) != 3 {
 		t.Fatalf("expected 3 healing jobs, got %d", len(st.createJob.calls))
 	}
-	reGate := st.createJob.calls[0]
-	reGateSBOM := st.createJob.calls[1]
-	heal := st.createJob.calls[2]
-	if reGate.Name != "re-gate-1" {
-		t.Fatalf("expected first created healing job to be re-gate-1, got %q", reGate.Name)
+	byName := createJobsByName(st.createJob.calls)
+	reGate := byName["re-gate-1"]
+	heal := byName["heal-1-0"]
+	if reGate.Name != "re-gate-1" || heal.Name != "heal-1-0" {
+		t.Fatalf("expected re-gate-1 and heal-1-0 jobs, got %+v", st.createJob.calls)
 	}
-	if reGateSBOM.Name != "re-gate-1-sbom" {
-		t.Fatalf("expected second created healing job to be re-gate-1-sbom, got %q", reGateSBOM.Name)
+	if heal.NextID == nil || *heal.NextID != reGate.ID {
+		t.Fatalf("expected heal.NextID to point to re-gate job")
 	}
-	if heal.Name != "heal-1-0" {
-		t.Fatalf("expected third created healing job to be heal-1-0, got %q", heal.Name)
+	var finalSBOM *store.CreateJobParams
+	for i := range st.createJob.calls {
+		if st.createJob.calls[i].JobType == domaintypes.JobTypeSBOM {
+			finalSBOM = &st.createJob.calls[i]
+			break
+		}
 	}
-	if heal.NextID == nil || *heal.NextID != reGateSBOM.ID {
-		t.Fatalf("expected heal.NextID to point to re-gate sbom job")
+	if finalSBOM == nil {
+		t.Fatal("expected final sbom job")
 	}
-	if reGateSBOM.NextID == nil || *reGateSBOM.NextID != reGate.ID {
-		t.Fatalf("expected re-gate sbom to point to re-gate job")
+	if reGate.NextID == nil || *reGate.NextID != finalSBOM.ID {
+		t.Fatalf("expected re-gate.NextID to point to final sbom")
 	}
-	if reGate.NextID == nil || *reGate.NextID != gf.Successor.ID {
-		t.Fatalf("expected re-gate.NextID to preserve old successor %s", gf.Successor.ID)
+	if finalSBOM.NextID == nil || *finalSBOM.NextID != gf.Successor.ID {
+		t.Fatalf("expected final sbom.NextID to preserve old successor %s", gf.Successor.ID)
 	}
 	if len(st.updateJobNextIDParams) != 1 {
 		t.Fatalf("expected one next_id rewiring update, got %d", len(st.updateJobNextIDParams))

@@ -20,10 +20,11 @@ func (s *CompleteJobService) planAndInsertCycleHookJobs(ctx context.Context, sta
 	if state == nil || state.serviceType != completeJobServiceTypeSBOM || state.job.NextID == nil {
 		return nil, nil
 	}
-	cycleName, ok := cycleNameFromSBOMJobName(state.job.Name)
+	sbomCtx, ok := sbomCycleContextFromJob(state.job)
 	if !ok {
 		return nil, nil
 	}
+	cycleName := sbomCycleNameFromContext(sbomCtx)
 
 	run, runOK := s.loadRunForPostCompletion(ctx, state, "runtime hook planning")
 	if !runOK {
@@ -114,18 +115,6 @@ func (s *CompleteJobService) planAndInsertCycleHookJobs(ctx context.Context, sta
 	}
 	state.job.NextID = &firstHookID
 	return &firstHookID, nil
-}
-
-func cycleNameFromSBOMJobName(jobName string) (string, bool) {
-	name := strings.TrimSpace(jobName)
-	if !strings.HasSuffix(name, "-sbom") {
-		return "", false
-	}
-	cycleName := strings.TrimSpace(strings.TrimSuffix(name, "-sbom"))
-	if cycleName == "" {
-		return "", false
-	}
-	return cycleName, true
 }
 
 func fallbackCycleName(cycleName string) string {

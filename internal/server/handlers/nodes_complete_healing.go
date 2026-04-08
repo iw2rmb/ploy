@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/iw2rmb/ploy/internal/blobstore"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
@@ -64,11 +65,6 @@ func maybeCreateHealingJobs(
 	if err != nil {
 		return fmt.Errorf("parse run spec: %w", err)
 	}
-	resolvedHooks, err := resolveHookManifestSources(*spec)
-	if err != nil {
-		return fmt.Errorf("resolve hook sources: %w", err)
-	}
-	_ = resolvedHooks
 
 	var heal *contracts.HealSpec
 	if spec.BuildGate != nil {
@@ -99,10 +95,6 @@ func maybeCreateHealingJobs(
 			ctx, bp, run.ID, failedJob, jobsByID, detectedExpectation, chain.ReGateMeta.RecoveryMetadata)
 	}
 
-	preludeMetaBytes, err := contracts.MarshalJobMeta(contracts.NewMigJobMeta())
-	if err != nil {
-		return fmt.Errorf("marshal sbom/hook job meta: %w", err)
-	}
 	reGateMetaBytes, err := contracts.MarshalJobMeta(chain.ReGateMeta)
 	if err != nil {
 		return fmt.Errorf("marshal re-gate job meta: %w", err)
@@ -113,7 +105,40 @@ func maybeCreateHealingJobs(
 	}
 
 	reGateName := fmt.Sprintf("re-gate-%d", chain.AttemptNumber)
-	reGateSBOMID := domaintypes.NewJobID()
+	nextAfterReGate := chain.OldSuccessorID
+	finalSBOMCreated := false
+	var finalSBOMID domaintypes.JobID
+	finalPhase := finalSBOMPhaseForGateFailure(jobType)
+	if finalPhase != "" {
+		finalSBOMID = domaintypes.NewJobID()
+		nextAfterReGate = &finalSBOMID
+		finalSBOMMeta := contracts.NewMigJobMeta()
+		finalSBOMMeta.SBOM = sbomCycleContextMeta(sbomCycleContext{
+			Phase:     finalPhase,
+			Role:      contracts.SBOMRoleFinal,
+			RootJobID: finalSBOMID,
+		})
+		finalSBOMMetaBytes, finalMetaErr := contracts.MarshalJobMeta(finalSBOMMeta)
+		if finalMetaErr != nil {
+			return fmt.Errorf("marshal final sbom job meta: %w", finalMetaErr)
+		}
+		_, err = st.CreateJob(ctx, store.CreateJobParams{
+			ID:          finalSBOMID,
+			RunID:       failedJob.RunID,
+			RepoID:      failedJob.RepoID,
+			RepoBaseRef: failedJob.RepoBaseRef,
+			Attempt:     failedJob.Attempt,
+			Name:        fmt.Sprintf("sbom-final-%s-%s", finalPhase, finalSBOMID),
+			JobType:     domaintypes.JobTypeSBOM,
+			Status:      domaintypes.JobStatusCreated,
+			NextID:      chain.OldSuccessorID,
+			Meta:        finalSBOMMetaBytes,
+		})
+		if err != nil {
+			return fmt.Errorf("create final sbom job: %w", err)
+		}
+		finalSBOMCreated = true
+	}
 
 	_, err = st.CreateJob(ctx, store.CreateJobParams{
 		ID:          chain.ReGateID,
@@ -125,27 +150,11 @@ func maybeCreateHealingJobs(
 		JobType:     domaintypes.JobTypeReGate,
 		JobImage:    "",
 		Status:      domaintypes.JobStatusCreated,
-		NextID:      chain.OldSuccessorID,
+		NextID:      nextAfterReGate,
 		Meta:        reGateMetaBytes,
 	})
 	if err != nil {
 		return fmt.Errorf("create re-gate job: %w", err)
-	}
-
-	_, err = st.CreateJob(ctx, store.CreateJobParams{
-		ID:          reGateSBOMID,
-		RunID:       failedJob.RunID,
-		RepoID:      failedJob.RepoID,
-		RepoBaseRef: failedJob.RepoBaseRef,
-		Attempt:     failedJob.Attempt,
-		Name:        reGateName + "-sbom",
-		JobType:     domaintypes.JobTypeSBOM,
-		Status:      domaintypes.JobStatusCreated,
-		NextID:      &chain.ReGateID,
-		Meta:        preludeMetaBytes,
-	})
-	if err != nil {
-		return fmt.Errorf("create re-gate sbom job: %w", err)
 	}
 
 	_, err = st.CreateJob(ctx, store.CreateJobParams{
@@ -158,7 +167,7 @@ func maybeCreateHealingJobs(
 		JobType:     domaintypes.JobTypeHeal,
 		JobImage:    chain.HealImage,
 		Status:      domaintypes.JobStatusQueued,
-		NextID:      &reGateSBOMID,
+		NextID:      &chain.ReGateID,
 		Meta:        healMetaBytes,
 		RepoShaIn:   chain.HealRepoSHAIn,
 	})
@@ -179,7 +188,128 @@ func maybeCreateHealingJobs(
 		"attempt", chain.AttemptNumber,
 		"error_kind", recoveryMeta.ErrorKind,
 		"strategy_id", recoveryMeta.StrategyID,
+		"final_sbom_created", finalSBOMCreated,
 	)
+	return nil
+}
+
+func finalSBOMPhaseForGateFailure(jobType domaintypes.JobType) string {
+	switch jobType {
+	case domaintypes.JobTypePreGate:
+		return contracts.SBOMPhasePre
+	case domaintypes.JobTypePostGate:
+		return contracts.SBOMPhasePost
+	default:
+		return ""
+	}
+}
+
+func maybeCreateSBOMHealingJobs(
+	ctx context.Context,
+	st store.Store,
+	run store.Run,
+	failedJob store.Job,
+) error {
+	jobs, err := st.ListJobsByRunRepoAttempt(ctx, store.ListJobsByRunRepoAttemptParams{
+		RunID:   failedJob.RunID,
+		RepoID:  failedJob.RepoID,
+		Attempt: failedJob.Attempt,
+	})
+	if err != nil {
+		return fmt.Errorf("list jobs for repo attempt: %w", err)
+	}
+	jobsByID := make(map[domaintypes.JobID]store.Job, len(jobs))
+	for _, job := range jobs {
+		jobsByID[job.ID] = job
+	}
+	if refreshed, ok := jobsByID[failedJob.ID]; ok {
+		failedJob = refreshed
+	}
+
+	specRow, err := st.GetSpec(ctx, run.SpecID)
+	if err != nil {
+		return fmt.Errorf("get spec: %w", err)
+	}
+	spec, err := contracts.ParseMigSpecJSON(specRow.Spec)
+	if err != nil {
+		return fmt.Errorf("parse run spec: %w", err)
+	}
+
+	var heal *contracts.HealSpec
+	if spec.BuildGate != nil {
+		heal = spec.BuildGate.Heal
+	}
+	decision, decisionErr := lifecycle.EvaluateSBOMFailureTransition(
+		failedJob,
+		jobsByID,
+		heal,
+		contracts.MigStackUnknown,
+		domaintypes.NewJobID,
+	)
+	if decisionErr != nil {
+		return fmt.Errorf("evaluate sbom failure transition: %w", decisionErr)
+	}
+	if decision.Outcome == lifecycle.SBOMFailureOutcomeCancel {
+		slog.Info("maybeCreateSBOMHealingJobs: canceling remaining linked jobs",
+			"run_id", failedJob.RunID,
+			"job_id", failedJob.ID,
+			"reason", decision.CancelReason,
+		)
+		return cancelRemainingJobsAfterFailure(ctx, st, failedJob)
+	}
+	chain := decision.Chain
+	healMeta := contracts.NewMigJobMeta()
+	healMetaBytes, err := contracts.MarshalJobMeta(healMeta)
+	if err != nil {
+		return fmt.Errorf("marshal heal job meta: %w", err)
+	}
+	failedCtx, _ := sbomCycleContextFromJob(failedJob)
+	retrySBOMMeta := contracts.NewMigJobMeta()
+	retrySBOMMeta.SBOM = sbomCycleContextMeta(sbomCycleContext{
+		Phase:     failedCtx.Phase,
+		Role:      contracts.SBOMRoleRetry,
+		RootJobID: chain.RootSBOMID,
+	})
+	retrySBOMMetaBytes, err := contracts.MarshalJobMeta(retrySBOMMeta)
+	if err != nil {
+		return fmt.Errorf("marshal retry sbom job meta: %w", err)
+	}
+
+	_, err = st.CreateJob(ctx, store.CreateJobParams{
+		ID:          chain.RetrySBOMID,
+		RunID:       failedJob.RunID,
+		RepoID:      failedJob.RepoID,
+		RepoBaseRef: failedJob.RepoBaseRef,
+		Attempt:     failedJob.Attempt,
+		Name:        fmt.Sprintf("sbom-retry-%d-%s", chain.AttemptNumber, chain.RetrySBOMID),
+		JobType:     domaintypes.JobTypeSBOM,
+		Status:      domaintypes.JobStatusCreated,
+		NextID:      chain.OldSuccessorID,
+		Meta:        retrySBOMMetaBytes,
+	})
+	if err != nil {
+		return fmt.Errorf("create retry sbom job: %w", err)
+	}
+	_, err = st.CreateJob(ctx, store.CreateJobParams{
+		ID:          chain.HealID,
+		RunID:       failedJob.RunID,
+		RepoID:      failedJob.RepoID,
+		RepoBaseRef: failedJob.RepoBaseRef,
+		Attempt:     failedJob.Attempt,
+		Name:        fmt.Sprintf("heal-sbom-%d-0", chain.AttemptNumber),
+		JobType:     domaintypes.JobTypeHeal,
+		JobImage:    chain.HealImage,
+		Status:      domaintypes.JobStatusQueued,
+		NextID:      &chain.RetrySBOMID,
+		Meta:        healMetaBytes,
+		RepoShaIn:   strings.TrimSpace(chain.HealRepoSHAIn),
+	})
+	if err != nil {
+		return fmt.Errorf("create heal job: %w", err)
+	}
+	if err := st.UpdateJobNextID(ctx, store.UpdateJobNextIDParams{ID: failedJob.ID, NextID: &chain.HealID}); err != nil {
+		return fmt.Errorf("rewire failed sbom next_id: %w", err)
+	}
 	return nil
 }
 
