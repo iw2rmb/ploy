@@ -2,8 +2,6 @@ package handlers
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"os"
 	"path/filepath"
 	"strings"
@@ -33,6 +31,14 @@ steps:
 	spec := []byte(`{"steps":[{"image":"test:latest"}],"hooks":["` + source + `"]}`)
 	st := &jobStore{}
 	st.hasHookOnceLedger.val = false
+	st.listJobsByRunRepoAttempt.val = []store.Job{{
+		ID:      domaintypes.NewJobID(),
+		RunID:   runID,
+		RepoID:  repoID,
+		Attempt: job.Attempt,
+		JobType: domaintypes.JobTypeSBOM,
+		Status:  domaintypes.JobStatusSuccess,
+	}}
 
 	got, err := resolveHookRuntimeDecision(context.Background(), st, job, spec, domaintypes.JobTypeHook)
 	if err != nil {
@@ -91,6 +97,14 @@ steps:
 		FirstSuccessJobID: &firstSuccessID,
 		OnceSkipMarked:    false,
 	}
+	st.listJobsByRunRepoAttempt.val = []store.Job{{
+		ID:      domaintypes.NewJobID(),
+		RunID:   runID,
+		RepoID:  repoID,
+		Attempt: job.Attempt,
+		JobType: domaintypes.JobTypeSBOM,
+		Status:  domaintypes.JobStatusSuccess,
+	}}
 
 	got, err := resolveHookRuntimeDecision(context.Background(), st, job, spec, domaintypes.JobTypeHook)
 	if err != nil {
@@ -129,6 +143,14 @@ steps:
 `)
 	spec := []byte(`{"steps":[{"image":"test:latest"}],"hooks":["` + source + `"]}`)
 	st := &jobStore{}
+	st.listJobsByRunRepoAttempt.val = []store.Job{{
+		ID:      domaintypes.NewJobID(),
+		RunID:   runID,
+		RepoID:  repoID,
+		Attempt: job.Attempt,
+		JobType: domaintypes.JobTypeSBOM,
+		Status:  domaintypes.JobStatusSuccess,
+	}}
 
 	got, err := resolveHookRuntimeDecision(context.Background(), st, job, spec, domaintypes.JobTypeHook)
 	if err != nil {
@@ -153,8 +175,6 @@ func TestResolveHookRuntimeDecision_CanonicalHashIgnoresSourcePath(t *testing.T)
 
 	runID := domaintypes.NewRunID()
 	repoID := domaintypes.NewRepoID()
-	st := &jobStore{}
-
 	firstSource := writeHookManifest(t, `id: canonical
 once: false
 steps:
@@ -169,9 +189,19 @@ steps:
 		ID:      domaintypes.NewJobID(),
 		RunID:   runID,
 		RepoID:  repoID,
+		Attempt: 1,
 		JobType: domaintypes.JobTypeHook,
 		Name:    "pre-gate-hook-000",
 	}
+	st := &jobStore{}
+	st.listJobsByRunRepoAttempt.val = []store.Job{{
+		ID:      domaintypes.NewJobID(),
+		RunID:   runID,
+		RepoID:  repoID,
+		Attempt: baseJob.Attempt,
+		JobType: domaintypes.JobTypeSBOM,
+		Status:  domaintypes.JobStatusSuccess,
+	}}
 
 	firstSpec := []byte(`{"steps":[{"image":"test:latest"}],"hooks":["` + firstSource + `"]}`)
 	first, err := resolveHookRuntimeDecision(context.Background(), st, baseJob, firstSpec, domaintypes.JobTypeHook)
@@ -193,7 +223,7 @@ steps:
 	}
 }
 
-func TestResolveHookRuntimeDecision_RelativeSourceNotFoundDoesNotBlockClaim(t *testing.T) {
+func TestResolveHookRuntimeDecision_MatcherShouldRunFalseSkipsLedger(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
@@ -202,57 +232,30 @@ func TestResolveHookRuntimeDecision_RelativeSourceNotFoundDoesNotBlockClaim(t *t
 		ID:      domaintypes.NewJobID(),
 		RunID:   runID,
 		RepoID:  repoID,
+		Attempt: 1,
 		JobType: domaintypes.JobTypeHook,
 		Name:    "pre-gate-hook-000",
 	}
-	spec := []byte(`{"steps":[{"image":"test:latest"}],"hooks":["./hooks/lint.yaml"]}`)
+	source := writeHookManifest(t, `id: sbom-remove-only
+once: true
+sbom:
+  on_remove:
+    - name: lib-a
+steps:
+  - image: test:latest
+`)
+	spec := []byte(`{"steps":[{"image":"test:latest"}],"hooks":["` + source + `"]}`)
 	st := &jobStore{}
-	st.hasHookOnceLedger.val = false
-
-	got, err := resolveHookRuntimeDecision(context.Background(), st, job, spec, domaintypes.JobTypeHook)
-	if err != nil {
-		t.Fatalf("resolveHookRuntimeDecision() error: %v", err)
-	}
-	if got == nil {
-		t.Fatal("resolveHookRuntimeDecision() returned nil decision")
-	}
-	if !got.HookShouldRun {
-		t.Fatal("HookShouldRun=false, want true")
-	}
-	wantHash := fallbackHookSourceHash("./hooks/lint.yaml")
-	if got.HookHash != wantHash {
-		t.Fatalf("HookHash=%q, want %q for unresolved relative source", got.HookHash, wantHash)
-	}
-	if !st.hasHookOnceLedger.called {
-		t.Fatal("expected HasHookOnceLedger() for unresolved relative source")
-	}
-	if st.getHookOnceLedger.called {
-		t.Fatal("did not expect GetHookOnceLedger() when no ledger row exists")
-	}
-}
-
-func TestResolveHookRuntimeDecision_RelativeSourceNotFoundSkipsAfterRecordedSuccess(t *testing.T) {
-	t.Parallel()
-
-	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewRepoID()
-	firstSuccessID := domaintypes.NewJobID()
-	job := store.Job{
+	st.listJobsByRunRepoAttempt.val = []store.Job{{
 		ID:      domaintypes.NewJobID(),
 		RunID:   runID,
 		RepoID:  repoID,
-		JobType: domaintypes.JobTypeHook,
-		Name:    "pre-gate-hook-000",
-	}
-	spec := []byte(`{"steps":[{"image":"test:latest"}],"hooks":["./hooks/lint.yaml"]}`)
-	st := &jobStore{}
-	st.hasHookOnceLedger.val = true
-	st.getHookOnceLedger.val = store.HooksOnce{
-		RunID:             runID,
-		RepoID:            repoID,
-		HookHash:          fallbackHookSourceHash("./hooks/lint.yaml"),
-		FirstSuccessJobID: &firstSuccessID,
-		OnceSkipMarked:    false,
+		Attempt: 1,
+		JobType: domaintypes.JobTypeSBOM,
+		Status:  domaintypes.JobStatusSuccess,
+	}}
+	st.listSBOMRowsByJob.val = []store.Sbom{
+		{JobID: domaintypes.NewJobID(), RepoID: repoID, Lib: "lib-a", Ver: "1.0.0"},
 	}
 
 	got, err := resolveHookRuntimeDecision(context.Background(), st, job, spec, domaintypes.JobTypeHook)
@@ -263,16 +266,34 @@ func TestResolveHookRuntimeDecision_RelativeSourceNotFoundSkipsAfterRecordedSucc
 		t.Fatal("resolveHookRuntimeDecision() returned nil decision")
 	}
 	if got.HookShouldRun {
-		t.Fatal("HookShouldRun=true, want false")
+		t.Fatal("HookShouldRun=true, want false when matcher predicates do not match")
 	}
-	if !got.HookOnceSkipMarked {
-		t.Fatal("HookOnceSkipMarked=false, want true")
+	if st.hasHookOnceLedger.called || st.getHookOnceLedger.called {
+		t.Fatal("did not expect hook-once ledger checks when once is not eligible")
 	}
-	if !st.hasHookOnceLedger.called {
-		t.Fatal("expected HasHookOnceLedger() for unresolved relative source")
+}
+
+func TestResolveHookRuntimeDecision_RelativeSourceNotFoundReturnsError(t *testing.T) {
+	t.Parallel()
+
+	runID := domaintypes.NewRunID()
+	repoID := domaintypes.NewRepoID()
+	job := store.Job{
+		ID:      domaintypes.NewJobID(),
+		RunID:   runID,
+		RepoID:  repoID,
+		JobType: domaintypes.JobTypeHook,
+		Name:    "pre-gate-hook-000",
 	}
-	if !st.getHookOnceLedger.called {
-		t.Fatal("expected GetHookOnceLedger() after ledger hit")
+	spec := []byte(`{"steps":[{"image":"test:latest"}],"hooks":["./hooks/lint.yaml"]}`)
+	st := &jobStore{}
+
+	got, err := resolveHookRuntimeDecision(context.Background(), st, job, spec, domaintypes.JobTypeHook)
+	if err == nil {
+		t.Fatalf("resolveHookRuntimeDecision() error=nil, want not found error, got decision=%+v", got)
+	}
+	if st.hasHookOnceLedger.called || st.getHookOnceLedger.called {
+		t.Fatal("did not expect hook-once ledger calls when hook source resolution fails")
 	}
 }
 
@@ -284,9 +305,4 @@ func writeHookManifest(t *testing.T, body string) string {
 		t.Fatalf("write hook manifest %s: %v", path, err)
 	}
 	return path
-}
-
-func fallbackHookSourceHash(source string) string {
-	sum := sha256.Sum256([]byte("relative-hook-source:" + strings.TrimSpace(source)))
-	return hex.EncodeToString(sum[:])
 }
