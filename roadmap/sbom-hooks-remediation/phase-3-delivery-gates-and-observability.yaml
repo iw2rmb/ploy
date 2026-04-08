@@ -44,6 +44,8 @@ reviews:
     commit: 71857b62
   - gaps: ["\"CI passes when roadmap done state and evidence are consistent.\" has leftover contradictory guard coverage: `tests/guards/roadmap_verify_guard_test.go:28-52` still asserts failure for unchecked evidence in remediation phases, but current state has checked evidence for done phases and `tools/roadmap/verify_done.sh` now passes (`make roadmap-verify ROADMAP_VERIFY_PHASES='roadmap/sbom-hooks-remediation/phase-1-conditional-planning-and-preflight.yaml roadmap/sbom-hooks-remediation/phase-2-runtime-execution-and-ingestion.yaml roadmap/sbom-hooks-remediation/phase-3-delivery-gates-and-observability.yaml'` -> `roadmap verification passed (2 phases checked, 1 skipped)`)."]
     commit: 6ecf4c26
+  - gaps: ["\"Add CI guardrails so roadmap completion cannot be marked done while runtime acceptance checks or review gaps remain.\" is not closed end-to-end for this phase state: [`roadmap/sbom-hooks-remediation/phase-3-delivery-gates-and-observability.yaml`](/Users/vk/@iw2rmb/ploy/roadmap/sbom-hooks-remediation/phase-3-delivery-gates-and-observability.yaml):11 remains `done: false`, [`roadmap/sbom-hooks-remediation/index.md`](/Users/vk/@iw2rmb/ploy/roadmap/sbom-hooks-remediation/index.md):12 keeps `evidence:phase-3-delivery-gates-and-observability` unchecked, and verifier logic skips non-done phases ([`tools/roadmap/verify_done.sh`](/Users/vk/@iw2rmb/ploy/tools/roadmap/verify_done.sh):68), with guard coverage explicitly asserting that skip ([`tests/guards/roadmap_verify_guard_test.go`](/Users/vk/@iw2rmb/ploy/tests/guards/roadmap_verify_guard_test.go):11)."]
+    commit: null
 items:
   - done: true
     reviews:
