@@ -13,7 +13,7 @@ Behavior:
     - fails if any done item is missing acceptance checks (`verification`) or acceptance evidence (`reviews[*].commit`)
     - fails if any unresolved reviews.gaps exist (phase or item level)
     - fails when phase index evidence marker is missing
-    - warns when phase index evidence marker is present but unchecked
+    - fails when phase index evidence marker is present but unchecked
 
 Evidence marker convention:
   - Marker text: evidence:<phase-basename-without-.yaml>
@@ -125,7 +125,7 @@ class Verifier
 
     has_checked_entry = lines_with_marker.any? { |line| line.match?(/^\s*-\s*\[[xX]\]/) }
     unless has_checked_entry
-      @warnings << "warning: evidence marker '#{evidence_marker}' is present but unchecked in #{index_path}"
+      @failures << "error: evidence marker '#{evidence_marker}' is present but unchecked in #{index_path}"
     end
   rescue Psych::SyntaxError => e
     @failures << "error: YAML parse failure in #{path}: #{e.message.lines.first.to_s.strip}"
