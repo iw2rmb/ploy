@@ -299,10 +299,6 @@ The gate does not modify the repository; it validates the current working tree.
 - **Gradle test reports:** Gate Gradle images force test reports into `/out/gradle-test-results` (JUnit XML)
   and `/out/gradle-test-report` (HTML) via image init script. Node uploads these bundles to object storage
   and records artifact links in `BuildGateStageMetadata.report_links`.
-- **Gradle SBOM (always attempted):** Gate Gradle init script always attempts to write fallback SPDX output
-  to `/out/sbom.spdx.json` from resolved Gradle dependencies, independent of project plugins.
-- **Gradle CycloneDX integration (optional):** When task `cyclonedxBom` exists, the init script also wires it
-  after `build`/`test`, forces JSON output, and writes it under `/out` (for example `sbom.cyclonedx.json`).
 - **API exposure:** Gate status is surfaced via `GET /v1/runs/{id}/status` and `Metadata["gate_summary"]` on the run.
   - Format: `Gate: passed duration=1234ms` or `Gate: failed pre-gate duration=567ms`.
   - Accessible via `Metadata["gate_summary"]` in `GET /v1/runs/{id}/status` responses.
@@ -311,11 +307,10 @@ The gate does not modify the repository; it validates the current working tree.
 
 - Gate-generated files must be written under `/out/*` (no repository writes required for artifacts).
 - Node artifact upload treats gate `/out/*` as first-class output and preserves deterministic `out/` archive-relative paths.
-- SBOM files found in uploaded gate artifacts are parsed into normalized package rows (`lib`, `ver`) keyed by producing `job_id` and `repo_id`.
-- SBOM rows are persisted only for successful gate jobs (`pre_gate`, `post_gate`, `re_gate`).
+- SBOM rows are persisted from successful `sbom` jobs for successful repo attempts.
 - Compatibility lookup contract for `deps` healing:
   - `GET /v1/sboms/compat?lang=<lang>&release=<release>&tool=<tool>&libs=<name>:<ver>,<name>`
-  - Returns per-lib minimum successful version evidence for the resolved stack.
+  - Returns per-lib minimum successful version evidence from the latest successful sbom snapshot of each successful repo run.
   - Returns `null` when no successful SBOM evidence exists for the requested stack.
 
 ## Notes

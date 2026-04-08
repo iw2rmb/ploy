@@ -671,6 +671,11 @@ and, when not writable, the node falls back to `${TMPDIR:-/tmp}/ploy/gates`.
   the active cache directory (`<language>/<tool>/<release>`) from oldest to newest
   until free space reaches `2 GiB` or the directory is exhausted.
 
+**SBOM Gradle image (`sbom-gradle`)**: Uses the same Gradle init script and
+centralized cache-root policy as Gradle gate jobs. Runtime mounts
+`$PLOY_BUILDGATE_CACHE_ROOT/java/gradle/17` to `/home/gradle/.gradle` (with the
+same fallback root and prune policy when `PLOY_BUILDGATE_CACHE_ROOT` is unset).
+
 **ORW images (`orw-cli-maven`, `orw-cli-gradle`)**: Same Hydra `ca` materialization behavior as
 build-gate, ensuring OpenRewrite can fetch dependencies from internal artifact repositories while
 staying isolated from Maven/Gradle project task execution.

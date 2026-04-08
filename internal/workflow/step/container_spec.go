@@ -97,6 +97,12 @@ func buildContainerSpec(runID types.RunID, jobID types.JobID, manifest contracts
 		return ContainerSpec{}, fmt.Errorf("prepare orw tool cache mounts: %w", err)
 	}
 	mounts = appendMountsIfTargetMissing(mounts, orwCacheMounts)
+	// SBOM Gradle image reuses the centralized gate cache root for /home/gradle/.gradle.
+	sbomCacheMounts, err := buildSBOMToolCacheMounts(manifest.Image)
+	if err != nil {
+		return ContainerSpec{}, fmt.Errorf("prepare sbom tool cache mounts: %w", err)
+	}
+	mounts = appendMountsIfTargetMissing(mounts, sbomCacheMounts)
 
 	// Mount Hydra materialized resources from the staging directory.
 	// Each entry references a shortHash; staged content lives at stagingDir/<shortHash>.

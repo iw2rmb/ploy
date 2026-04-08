@@ -7,22 +7,25 @@ import (
 	"github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-func TestHasSBOMEvidenceForStack_IncludesSuccessfulSBOMJobsAndLegacyGateRows(t *testing.T) {
+func TestHasSBOMEvidenceForStack_UsesLatestSuccessfulSBOMFromSuccessfulRuns(t *testing.T) {
 	ctx, db := openStoreForCancelBulkTests(t)
 
 	fx := newV1Fixture(t, ctx, db, "https://github.com/test/sbom-compat-has", "main", "feature", []byte(`{"type":"sbom-compat-has"}`))
+	setRunRepoStatusForSBOMCompatTest(t, ctx, db, fx, types.RunRepoStatusSuccess)
 
 	mavenStackID := upsertStackForSBOMCompatTest(t, ctx, db, "java", "17", "maven", "example.com/java:17-maven")
-	gradleStackID := upsertStackForSBOMCompatTest(t, ctx, db, "java", "17", "gradle", "example.com/java:17-gradle")
-
 	mavenProfileID := upsertGateProfileForSBOMCompatTest(t, ctx, db, fx.RunRepo.RepoID, mavenStackID, "1111111111111111111111111111111111111111")
-	gradleProfileID := upsertGateProfileForSBOMCompatTest(t, ctx, db, fx.RunRepo.RepoID, gradleStackID, "2222222222222222222222222222222222222222")
+	// Legacy gate rows must not count anymore.
+	createGateJobAndSBOMRowForSBOMCompatTest(t, ctx, db, fx, mavenProfileID, types.JobTypePreGate, types.JobStatusSuccess, "legacy", "9.9.9")
+	// Latest successful sbom snapshot in the successful run carries evidence.
+	createSBOMJobAndSBOMRowForSBOMCompatTest(t, ctx, db, fx, mavenProfileID, "pre-gate", types.JobTypePreGate, types.JobStatusSuccess, types.JobStatusSuccess, "alpha", "1.0.0")
+	createSBOMJobAndSBOMRowForSBOMCompatTest(t, ctx, db, fx, mavenProfileID, "post-gate", types.JobTypePostGate, types.JobStatusSuccess, types.JobStatusSuccess, "alpha", "1.1.0")
 
-	createGateJobAndSBOMRowForSBOMCompatTest(t, ctx, db, fx, mavenProfileID, types.JobTypePreGate, types.JobStatusFail, "alpha", "1.0.0")
-	createGateJobAndSBOMRowForSBOMCompatTest(t, ctx, db, fx, mavenProfileID, types.JobTypeMig, types.JobStatusSuccess, "alpha", "1.1.0")
-	createGateJobAndSBOMRowForSBOMCompatTest(t, ctx, db, fx, gradleProfileID, types.JobTypePreGate, types.JobStatusSuccess, "alpha", "2.0.0")
-	createSBOMJobAndSBOMRowForSBOMCompatTest(t, ctx, db, fx, mavenProfileID, "pre-gate", types.JobTypePreGate, types.JobStatusFail, types.JobStatusSuccess, "gamma", "3.0.0")
-	createSBOMJobAndSBOMRowForSBOMCompatTest(t, ctx, db, fx, mavenProfileID, "post-gate", types.JobTypePostGate, types.JobStatusSuccess, types.JobStatusFail, "ignored", "0.0.1")
+	// Failed run must be ignored even when sbom job succeeds.
+	fxFailed := newV1Fixture(t, ctx, db, "https://github.com/test/sbom-compat-has-failed", "main", "feature", []byte(`{"type":"sbom-compat-has-failed"}`))
+	setRunRepoStatusForSBOMCompatTest(t, ctx, db, fxFailed, types.RunRepoStatusFail)
+	mavenFailedProfileID := upsertGateProfileForSBOMCompatTest(t, ctx, db, fxFailed.RunRepo.RepoID, mavenStackID, "2222222222222222222222222222222222222222")
+	createSBOMJobAndSBOMRowForSBOMCompatTest(t, ctx, db, fxFailed, mavenFailedProfileID, "post-gate", types.JobTypePostGate, types.JobStatusSuccess, types.JobStatusSuccess, "ignored", "0.0.1")
 
 	has, err := db.HasSBOMEvidenceForStack(ctx, HasSBOMEvidenceForStackParams{
 		Lang:    "java",
@@ -49,29 +52,35 @@ func TestHasSBOMEvidenceForStack_IncludesSuccessfulSBOMJobsAndLegacyGateRows(t *
 	}
 }
 
-func TestListSBOMCompatRows_IncludesSuccessfulSBOMJobsAndLegacyGateRows(t *testing.T) {
+func TestListSBOMCompatRows_UsesLatestSuccessfulSBOMFromSuccessfulRuns(t *testing.T) {
 	ctx, db := openStoreForCancelBulkTests(t)
 
 	fx := newV1Fixture(t, ctx, db, "https://github.com/test/sbom-compat-list", "main", "feature", []byte(`{"type":"sbom-compat-list"}`))
+	setRunRepoStatusForSBOMCompatTest(t, ctx, db, fx, types.RunRepoStatusSuccess)
 
 	mavenStackID := upsertStackForSBOMCompatTest(t, ctx, db, "java", "17", "maven", "example.com/java:17-maven")
-	gradleStackID := upsertStackForSBOMCompatTest(t, ctx, db, "java", "17", "gradle", "example.com/java:17-gradle")
 
 	mavenProfileID := upsertGateProfileForSBOMCompatTest(t, ctx, db, fx.RunRepo.RepoID, mavenStackID, "3333333333333333333333333333333333333333")
-	gradleProfileID := upsertGateProfileForSBOMCompatTest(t, ctx, db, fx.RunRepo.RepoID, gradleStackID, "4444444444444444444444444444444444444444")
+	// Legacy gate rows must not count.
+	createGateJobAndSBOMRowForSBOMCompatTest(t, ctx, db, fx, mavenProfileID, types.JobTypePreGate, types.JobStatusSuccess, "legacy", "9.9.9")
+	// Earlier sbom snapshot in the same successful run.
+	createSBOMJobAndSBOMRowForSBOMCompatTest(t, ctx, db, fx, mavenProfileID, "pre-gate", types.JobTypePreGate, types.JobStatusSuccess, types.JobStatusSuccess, "alpha", "1.0.0")
+	// Latest sbom snapshot in the same successful run (must win).
+	createSBOMJobAndSBOMRowForSBOMCompatTest(t, ctx, db, fx, mavenProfileID, "post-gate", types.JobTypePostGate, types.JobStatusSuccess, types.JobStatusSuccess, "alpha", "1.4.0")
+	createSBOMJobAndSBOMRowForSBOMCompatTest(t, ctx, db, fx, mavenProfileID, "post-gate", types.JobTypePostGate, types.JobStatusSuccess, types.JobStatusSuccess, "beta", "2.1.0")
+	createSBOMJobAndSBOMRowForSBOMCompatTest(t, ctx, db, fx, mavenProfileID, "post-gate", types.JobTypePostGate, types.JobStatusSuccess, types.JobStatusSuccess, "org:lib", "3.1.0")
 
-	createGateJobAndSBOMRowForSBOMCompatTest(t, ctx, db, fx, mavenProfileID, types.JobTypePreGate, types.JobStatusSuccess, "alpha", "1.2.0")
-	createGateJobAndSBOMRowForSBOMCompatTest(t, ctx, db, fx, mavenProfileID, types.JobTypePostGate, types.JobStatusSuccess, "alpha", "1.3.0")
-	createGateJobAndSBOMRowForSBOMCompatTest(t, ctx, db, fx, mavenProfileID, types.JobTypeReGate, types.JobStatusSuccess, "alpha", "1.2.0")
-	createGateJobAndSBOMRowForSBOMCompatTest(t, ctx, db, fx, mavenProfileID, types.JobTypePreGate, types.JobStatusSuccess, "beta", "2.0.0")
-	createGateJobAndSBOMRowForSBOMCompatTest(t, ctx, db, fx, mavenProfileID, types.JobTypePreGate, types.JobStatusSuccess, "org:lib", "3.1.0")
-	createSBOMJobAndSBOMRowForSBOMCompatTest(t, ctx, db, fx, mavenProfileID, "pre-gate", types.JobTypePreGate, types.JobStatusFail, types.JobStatusSuccess, "alpha", "1.4.0")
-	createSBOMJobAndSBOMRowForSBOMCompatTest(t, ctx, db, fx, mavenProfileID, "re-gate-1", types.JobTypeReGate, types.JobStatusSuccess, types.JobStatusSuccess, "beta", "2.1.0")
-	createSBOMJobAndSBOMRowForSBOMCompatTest(t, ctx, db, fx, mavenProfileID, "post-gate", types.JobTypePostGate, types.JobStatusSuccess, types.JobStatusFail, "ignored", "0.0.1")
+	// Another successful run contributes its own latest sbom snapshot.
+	fx2 := newV1Fixture(t, ctx, db, "https://github.com/test/sbom-compat-list-2", "main", "feature", []byte(`{"type":"sbom-compat-list-2"}`))
+	setRunRepoStatusForSBOMCompatTest(t, ctx, db, fx2, types.RunRepoStatusSuccess)
+	mavenProfileID2 := upsertGateProfileForSBOMCompatTest(t, ctx, db, fx2.RunRepo.RepoID, mavenStackID, "4444444444444444444444444444444444444444")
+	createSBOMJobAndSBOMRowForSBOMCompatTest(t, ctx, db, fx2, mavenProfileID2, "post-gate", types.JobTypePostGate, types.JobStatusSuccess, types.JobStatusSuccess, "alpha", "1.3.0")
 
-	createGateJobAndSBOMRowForSBOMCompatTest(t, ctx, db, fx, mavenProfileID, types.JobTypeMig, types.JobStatusSuccess, "alpha", "9.9.9")
-	createGateJobAndSBOMRowForSBOMCompatTest(t, ctx, db, fx, mavenProfileID, types.JobTypePreGate, types.JobStatusFail, "beta", "9.9.9")
-	createGateJobAndSBOMRowForSBOMCompatTest(t, ctx, db, fx, gradleProfileID, types.JobTypePreGate, types.JobStatusSuccess, "alpha", "8.0.0")
+	// Failed run must be ignored.
+	fxFailed := newV1Fixture(t, ctx, db, "https://github.com/test/sbom-compat-list-failed", "main", "feature", []byte(`{"type":"sbom-compat-list-failed"}`))
+	setRunRepoStatusForSBOMCompatTest(t, ctx, db, fxFailed, types.RunRepoStatusFail)
+	mavenFailedProfileID := upsertGateProfileForSBOMCompatTest(t, ctx, db, fxFailed.RunRepo.RepoID, mavenStackID, "5555555555555555555555555555555555555555")
+	createSBOMJobAndSBOMRowForSBOMCompatTest(t, ctx, db, fxFailed, mavenFailedProfileID, "post-gate", types.JobTypePostGate, types.JobStatusSuccess, types.JobStatusSuccess, "alpha", "0.0.1")
 
 	rows, err := db.ListSBOMCompatRows(ctx, ListSBOMCompatRowsParams{
 		Lang:    "java",
@@ -83,14 +92,12 @@ func TestListSBOMCompatRows_IncludesSuccessfulSBOMJobsAndLegacyGateRows(t *testi
 		t.Fatalf("ListSBOMCompatRows() failed: %v", err)
 	}
 
-	if len(rows) != 6 {
-		t.Fatalf("ListSBOMCompatRows() returned %d rows, want 6", len(rows))
+	if len(rows) != 4 {
+		t.Fatalf("ListSBOMCompatRows() returned %d rows, want 4", len(rows))
 	}
 	want := []ListSBOMCompatRowsRow{
-		{Lib: "alpha", Ver: "1.2.0"},
 		{Lib: "alpha", Ver: "1.3.0"},
 		{Lib: "alpha", Ver: "1.4.0"},
-		{Lib: "beta", Ver: "2.0.0"},
 		{Lib: "beta", Ver: "2.1.0"},
 		{Lib: "org:lib", Ver: "3.1.0"},
 	}
@@ -111,6 +118,17 @@ func TestListSBOMCompatRows_IncludesSuccessfulSBOMJobsAndLegacyGateRows(t *testi
 	}
 	if len(emptyRows) != 0 {
 		t.Fatalf("ListSBOMCompatRows(nil libs) returned %d rows, want 0", len(emptyRows))
+	}
+}
+
+func setRunRepoStatusForSBOMCompatTest(t *testing.T, ctx context.Context, db Store, fx v1Fixture, status types.RunRepoStatus) {
+	t.Helper()
+	if err := db.UpdateRunRepoStatus(ctx, UpdateRunRepoStatusParams{
+		RunID:  fx.Run.ID,
+		RepoID: fx.RunRepo.RepoID,
+		Status: status,
+	}); err != nil {
+		t.Fatalf("UpdateRunRepoStatus(%s, %s): %v", fx.Run.ID, status, err)
 	}
 }
 
