@@ -35,10 +35,18 @@ class Verifier
     @paths = paths
     @failures = []
     @checked = 0
+    @targeted_not_done = []
   end
 
   def run
     @paths.each { |path| verify_phase(path) }
+
+    if @checked == 0 && @targeted_not_done.any?
+      @targeted_not_done.each do |path|
+        @failures << "error: targeted phase is not done in #{path} (done!=true)"
+      end
+      @failures << "error: roadmap verification checked 0 targeted done phases"
+    end
 
     if @failures.any?
       @failures.each { |line| warn(line) }
@@ -66,63 +74,64 @@ class Verifier
 
     phase_name = File.basename(path, ".yaml")
     done = data["done"] == true
-    if done
-      @checked += 1
-      unresolved = []
-      incomplete_items = []
-      acceptance_gaps = []
+    unless done
+      @targeted_not_done << path
+      return
+    end
 
-      unresolved.concat(find_unresolved_reviews(data["reviews"], "phase"))
+    @checked += 1
+    unresolved = []
+    incomplete_items = []
+    acceptance_gaps = []
 
-      items = data["items"]
-      if items.is_a?(Array)
-        items.each_with_index do |item, idx|
-          next unless item.is_a?(Hash)
+    unresolved.concat(find_unresolved_reviews(data["reviews"], "phase"))
 
-          label = item["label"].to_s.strip
-          marker = label.empty? ? "item[#{idx}]" : "item #{label}"
-          incomplete_items << marker unless item["done"] == true
-          acceptance_gaps.concat(find_acceptance_gaps(item, marker))
-          unresolved.concat(find_unresolved_reviews(item["reviews"], marker))
-        end
-      end
+    items = data["items"]
+    if items.is_a?(Array)
+      items.each_with_index do |item, idx|
+        next unless item.is_a?(Hash)
 
-      if incomplete_items.any?
-        @failures << "error: phase marked done but contains incomplete items in #{path}"
-        incomplete_items.each { |label| @failures << "  - #{label} has done!=true" }
-      end
-
-      if unresolved.any?
-        @failures << "error: unresolved reviews.gaps in #{path}"
-        unresolved.each { |msg| @failures << "  - #{msg}" }
-      end
-
-      if acceptance_gaps.any?
-        @failures << "error: missing acceptance completion/evidence in #{path}"
-        acceptance_gaps.each { |msg| @failures << "  - #{msg}" }
+        label = item["label"].to_s.strip
+        marker = label.empty? ? "item[#{idx}]" : "item #{label}"
+        incomplete_items << marker unless item["done"] == true
+        acceptance_gaps.concat(find_acceptance_gaps(item, marker))
+        unresolved.concat(find_unresolved_reviews(item["reviews"], marker))
       end
     end
 
-    if done
-      index_path = File.join(File.dirname(path), "index.md")
-      evidence_marker = "evidence:#{phase_name}"
+    if incomplete_items.any?
+      @failures << "error: phase marked done but contains incomplete items in #{path}"
+      incomplete_items.each { |label| @failures << "  - #{label} has done!=true" }
+    end
 
-      unless File.file?(index_path)
-        @failures << "error: missing roadmap index for #{path} (expected #{index_path})"
-        return
-      end
+    if unresolved.any?
+      @failures << "error: unresolved reviews.gaps in #{path}"
+      unresolved.each { |msg| @failures << "  - #{msg}" }
+    end
 
-      index_text = File.read(index_path)
-      lines_with_marker = index_text.each_line.select { |line| line.include?(evidence_marker) }
-      if lines_with_marker.empty?
-        @failures << "error: missing evidence marker '#{evidence_marker}' in #{index_path}"
-        return
-      end
+    if acceptance_gaps.any?
+      @failures << "error: missing acceptance completion/evidence in #{path}"
+      acceptance_gaps.each { |msg| @failures << "  - #{msg}" }
+    end
 
-      has_checked_entry = lines_with_marker.any? { |line| line.match?(/^\s*-\s*\[[xX]\]/) }
-      unless has_checked_entry
-        @failures << "error: evidence marker '#{evidence_marker}' is present but unchecked in #{index_path}"
-      end
+    index_path = File.join(File.dirname(path), "index.md")
+    evidence_marker = "evidence:#{phase_name}"
+
+    unless File.file?(index_path)
+      @failures << "error: missing roadmap index for #{path} (expected #{index_path})"
+      return
+    end
+
+    index_text = File.read(index_path)
+    lines_with_marker = index_text.each_line.select { |line| line.include?(evidence_marker) }
+    if lines_with_marker.empty?
+      @failures << "error: missing evidence marker '#{evidence_marker}' in #{index_path}"
+      return
+    end
+
+    has_checked_entry = lines_with_marker.any? { |line| line.match?(/^\s*-\s*\[[xX]\]/) }
+    unless has_checked_entry
+      @failures << "error: evidence marker '#{evidence_marker}' is present but unchecked in #{index_path}"
     end
   rescue Psych::SyntaxError => e
     @failures << "error: YAML parse failure in #{path}: #{e.message.lines.first.to_s.strip}"
