@@ -591,7 +591,8 @@ StageStatus:
 # Build Gate HTTP schemas removed: gate runs as jobs in the Migs pipeline.
 # Nodes claim gate work via the unified /v1/nodes/{id}/claim endpoint.
 # The buildgate_jobs table and related HTTP endpoints have been removed;
-# all gate execution now uses the jobs table with job_type='pre_gate'|'re_gate'|'post_gate'.
+# all gate execution now uses the jobs table with job_type
+# in 'sbom'|'hook'|'pre_gate'|'re_gate'|'post_gate'.
 
 # Response returned by POST /v1/nodes/{id}/claim
 # Schema aligned with claimJobHandler response — exposes job-centric fields.
@@ -617,7 +618,7 @@ NodeClaimResponse:
       description: Logical job name (e.g., "pre-gate", "mig-0", "post-gate")
     job_type:
       type: string
-      description: Job phase (`pre_gate`, `mig`, `post_gate`, `heal`, `re_gate`)
+      description: Job phase (`pre_gate`, `sbom`, `hook`, `mig`, `post_gate`, `heal`, `re_gate`, `mr`)
     job_image:
       type: string
       description: Container image for this job (may be empty for non-container jobs)
@@ -943,7 +944,7 @@ WorkflowGraphNode:
     type:
       type: string
       description: Job phase type derived from jobs.job_type
-      enum: [pre_gate, mig, heal, re_gate, post_gate]
+      enum: [pre_gate, sbom, hook, mig, heal, re_gate, post_gate, mr]
     next_id:
       type: string
       nullable: true
