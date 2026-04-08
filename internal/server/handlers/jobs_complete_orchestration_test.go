@@ -204,8 +204,14 @@ func TestCompleteJob_PostAndReGatePreludeSuccessPromoteLinkedNextJob(t *testing.
 		name    string
 		jobType domaintypes.JobType
 		jobName string
+		spec    []byte
 	}{
-		{name: "post_gate_sbom", jobType: domaintypes.JobTypeSBOM, jobName: "post-gate-sbom"},
+		{
+			name:    "post_gate_sbom",
+			jobType: domaintypes.JobTypeSBOM,
+			jobName: "post-gate-sbom",
+			spec:    []byte(`{"steps":[{"image":"mig:latest"}]}`),
+		},
 		{name: "regate_hook", jobType: domaintypes.JobTypeHook, jobName: "re-gate-1-hook-000"},
 	}
 
@@ -225,10 +231,14 @@ func TestCompleteJob_PostAndReGatePreludeSuccessPromoteLinkedNextJob(t *testing.
 				Status: domaintypes.JobStatusCreated,
 			}
 
-			st := newJobStoreForFixture(f,
+			opts := []func(*jobStore){
 				withListJobsByRun([]store.Job{f.Job, nextJob}),
 				withPromoteResult(nextJob),
-			)
+			}
+			if len(tc.spec) > 0 {
+				opts = append(opts, withSpec(domaintypes.NewSpecID(), tc.spec))
+			}
+			st := newJobStoreForFixture(f, opts...)
 
 			handler := completeJobHandler(st, nil, nil)
 
