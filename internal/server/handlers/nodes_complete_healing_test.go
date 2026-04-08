@@ -165,6 +165,11 @@ func TestMaybeCreateHealingJobs_ReGateHooksScheduledOncePerCycle(t *testing.T) {
 			t.Helper()
 			spec := map[string]any{
 				"hooks": []any{hookHashDirect, hookHashA, hookHashB},
+				"bundle_map": map[string]any{
+					hookHashDirect: "bundle_heal_hooks",
+					hookHashA:      "bundle_heal_hooks",
+					hookHashB:      "bundle_heal_hooks",
+				},
 				"steps": []any{map[string]any{"image": "migs-orw:latest"}},
 				"build_gate": map[string]any{
 					"heal": map[string]any{
@@ -180,8 +185,15 @@ func TestMaybeCreateHealingJobs_ReGateHooksScheduledOncePerCycle(t *testing.T) {
 			return raw
 		}),
 	)
+	bs := bsmock.New()
+	seedPlanningHookBundle(t, hc.Store, bs, "bundle_heal_hooks", `
+id: hook-bundle
+steps:
+  - image: hook:latest
+`)
+	bp := blobpersist.New(hc.Store, bs)
 
-	if err := maybeCreateHealingJobs(ctx, hc.Store, nil, hc.Run, hc.FailedJob); err != nil {
+	if err := maybeCreateHealingJobs(ctx, hc.Store, bp, hc.Run, hc.FailedJob); err != nil {
 		t.Fatalf("maybeCreateHealingJobs returned error: %v", err)
 	}
 
@@ -375,6 +387,65 @@ steps:
 	)
 
 	if err := maybeCreateHealingJobs(ctx, hc.Store, nil, hc.Run, hc.FailedJob); err != nil {
+		t.Fatalf("maybeCreateHealingJobs returned error: %v", err)
+	}
+
+	if len(hc.Store.createJob.calls) != 3 {
+		t.Fatalf("expected 3 CreateJob calls (heal + sbom + re-gate), got %d", len(hc.Store.createJob.calls))
+	}
+	for _, created := range hc.Store.createJob.calls {
+		if strings.Contains(created.Name, "-hook-") {
+			t.Fatalf("did not expect hook job %q when all re-gate matcher decisions are false", created.Name)
+		}
+	}
+}
+
+func TestMaybeCreateHealingJobs_ReGateHashHooksConditionalPlanning_AllFalse(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	const hookHash = "deafbeefcafe"
+
+	hc := newHealingChain(t,
+		withHealingSpec(func(t *testing.T) []byte {
+			t.Helper()
+			spec := map[string]any{
+				"hooks": []any{hookHash},
+				"bundle_map": map[string]any{
+					hookHash: "bundle_heal_hash_false",
+				},
+				"steps": []any{map[string]any{"image": "migs-orw:latest"}},
+				"build_gate": map[string]any{
+					"post": map[string]any{
+						"stack": map[string]any{
+							"enabled":  true,
+							"language": "go",
+							"release":  "1.22",
+						},
+					},
+					"heal": map[string]any{
+						"retries": float64(2),
+						"image":   "amata:latest",
+					},
+				},
+			}
+			raw, err := json.Marshal(spec)
+			if err != nil {
+				t.Fatalf("marshal healing spec with hash all-false hooks: %v", err)
+			}
+			return raw
+		}),
+	)
+	bs := bsmock.New()
+	seedPlanningHookBundle(t, hc.Store, bs, "bundle_heal_hash_false", `
+id: hook-ruby
+stack:
+  language: ruby
+steps:
+  - image: hook:latest
+`)
+	bp := blobpersist.New(hc.Store, bs)
+
+	if err := maybeCreateHealingJobs(ctx, hc.Store, bp, hc.Run, hc.FailedJob); err != nil {
 		t.Fatalf("maybeCreateHealingJobs returned error: %v", err)
 	}
 

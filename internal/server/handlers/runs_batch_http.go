@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	"github.com/iw2rmb/ploy/internal/blobstore"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
@@ -289,7 +290,11 @@ func cancelRunRepoHandlerV1(st store.Store) http.HandlerFunc {
 
 // restartRunRepoHandler restarts a repo execution by incrementing attempt and creating new repo-scoped jobs.
 // POST /v1/runs/{id}/repos/{repo_id}/restart
-func restartRunRepoHandler(st store.Store) http.HandlerFunc {
+func restartRunRepoHandler(st store.Store, hookBlobstores ...blobstore.Store) http.HandlerFunc {
+	var bs blobstore.Store
+	if len(hookBlobstores) > 0 {
+		bs = hookBlobstores[0]
+	}
 	return func(w http.ResponseWriter, r *http.Request) {
 		runID, err := parseRequiredPathID[domaintypes.RunID](r, "id")
 		if err != nil {
@@ -385,7 +390,7 @@ func restartRunRepoHandler(st store.Store) http.HandlerFunc {
 			writeHTTPError(w, http.StatusInternalServerError, "failed to load spec: %v", err)
 			return
 		}
-		if err := createJobsFromSpec(r.Context(), st, runID, runRepo.RepoID, runRepo.RepoBaseRef, runRepo.Attempt, runRepo.RepoSha0, spec.Spec); err != nil {
+		if err := createJobsFromSpec(r.Context(), st, runID, runRepo.RepoID, runRepo.RepoBaseRef, runRepo.Attempt, runRepo.RepoSha0, spec.Spec, bs); err != nil {
 			writeHTTPError(w, http.StatusInternalServerError, "failed to create jobs: %v", err)
 			return
 		}
@@ -430,8 +435,8 @@ type StartRunResponse struct {
 
 // startRunHandler delegates to BatchRepoStarter.StartPendingRepos (shared with the background scheduler).
 // POST /v1/runs/{id}/start
-func startRunHandler(st store.Store) http.HandlerFunc {
-	starter := NewBatchRepoStarter(st)
+func startRunHandler(st store.Store, hookBlobstores ...blobstore.Store) http.HandlerFunc {
+	starter := NewBatchRepoStarter(st, hookBlobstores...)
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		runID, err := parseRequiredPathID[domaintypes.RunID](r, "id")

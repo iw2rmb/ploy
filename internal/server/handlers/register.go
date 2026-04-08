@@ -84,12 +84,12 @@ func RegisterRoutes(s *server.HTTPServer, st store.Store, bs blobstore.Store, bp
 	s.RegisterRouteFuncAllowQueryToken("GET /v1/runs/{id}/logs", getRunLogsHandler(st, bs, eventsService), auth.RoleControlPlane)
 	// v1 API: POST /v1/runs/{id}/cancel — cancels the run, all repos (Queued/Running → Cancelled), and cancels/removes Created/Queued/Running jobs.
 	s.RegisterRouteFunc("POST /v1/runs/{id}/cancel", cancelRunHandlerV1(st), auth.RoleControlPlane)
-	s.RegisterRouteFunc("POST /v1/runs/{id}/start", startRunHandler(st), auth.RoleControlPlane)
+	s.RegisterRouteFunc("POST /v1/runs/{id}/start", startRunHandler(st, bs), auth.RoleControlPlane)
 
 	// RunRepo — manage repos within a batch (add/restart/list).
 	s.RegisterRouteFunc("POST /v1/runs/{id}/repos", addRunRepoHandler(st), auth.RoleControlPlane)
 	s.RegisterRouteFunc("GET /v1/runs/{id}/repos", listRunReposHandler(st), auth.RoleControlPlane)
-	s.RegisterRouteFunc("POST /v1/runs/{id}/repos/{repo_id}/restart", restartRunRepoHandler(st), auth.RoleControlPlane)
+	s.RegisterRouteFunc("POST /v1/runs/{id}/repos/{repo_id}/restart", restartRunRepoHandler(st, bs), auth.RoleControlPlane)
 	// Repo-scoped diffs listing.
 	s.RegisterRouteFuncAllowQueryToken("GET /v1/runs/{run_id}/repos/{repo_id}/diffs", listRunRepoDiffsHandler(st, bs), auth.RoleControlPlane, auth.RoleWorker)
 	// Repo-scoped logs SSE stream (filtered view of GET /v1/runs/{id}/logs).

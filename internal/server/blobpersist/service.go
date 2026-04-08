@@ -40,6 +40,14 @@ func New(st store.Store, bs blobstore.Store) *Service {
 	}
 }
 
+// BlobStore returns the underlying blob store used by the service.
+func (s *Service) BlobStore() blobstore.Store {
+	if s == nil {
+		return nil
+	}
+	return s.blobstore
+}
+
 func (s *Service) validate() error {
 	if s == nil {
 		return errors.New("blobpersist: service is nil")
