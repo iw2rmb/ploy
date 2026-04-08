@@ -2,8 +2,6 @@ package handlers
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -15,6 +13,7 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
+	"github.com/iw2rmb/ploy/internal/workflow/hook"
 )
 
 func resolveHookRuntimeDecision(
@@ -40,11 +39,25 @@ func resolveHookRuntimeDecision(
 	if source == "" {
 		return nil, fmt.Errorf("hook source is empty for index %d", hookIndex)
 	}
-	hash := hookSourceHash(source)
+	hookSpec, err := loadRuntimeHookSpec(source)
+	if err != nil {
+		return nil, fmt.Errorf("load hook spec for source %q: %w", source, err)
+	}
+	match, err := hook.Match(hookSpec, hook.MatchInput{})
+	if err != nil {
+		return nil, fmt.Errorf("evaluate hook matcher for source %q: %w", source, err)
+	}
+	hash := strings.TrimSpace(match.HookHash)
+	if hash == "" {
+		return nil, fmt.Errorf("hook matcher returned empty hash for source %q", source)
+	}
 
 	decision := &contracts.HookRuntimeDecision{
 		HookHash:      hash,
 		HookShouldRun: true,
+	}
+	if !match.Once.Enabled {
+		return decision, nil
 	}
 
 	exists, err := st.HasHookOnceLedger(ctx, store.HasHookOnceLedgerParams{
@@ -100,7 +113,15 @@ func hookIndexFromJobName(jobName string, hooksLen int) (int, error) {
 	return hookIndex, nil
 }
 
-func hookSourceHash(source string) string {
-	sum := sha256.Sum256([]byte(strings.TrimSpace(source)))
-	return hex.EncodeToString(sum[:])
+func loadRuntimeHookSpec(source string) (hook.Spec, error) {
+	specs, err := hook.NewLoader(nil).LoadFromMigSpec(contracts.MigSpec{
+		Hooks: []string{source},
+	}, ".")
+	if err != nil {
+		return hook.Spec{}, err
+	}
+	if len(specs) != 1 {
+		return hook.Spec{}, fmt.Errorf("expected exactly 1 resolved hook spec, got %d", len(specs))
+	}
+	return specs[0], nil
 }
