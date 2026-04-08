@@ -85,6 +85,10 @@ type JobMeta struct {
 	// RecoveryMetadata stores universal recovery loop metadata.
 	// Allowed for gate and mig jobs; rejected for build jobs.
 	RecoveryMetadata *RecoveryJobMetadata `json:"recovery,omitempty"`
+
+	// SBOM stores cycle context for sbom jobs and related runtime planning.
+	// Allowed for mig jobs (sbom/hook job types are mig-kind metadata).
+	SBOM *SBOMJobMetadata `json:"sbom,omitempty"`
 }
 
 // RecoveryJobMetadata captures loop context persisted at job level.
@@ -95,6 +99,33 @@ type HealJobMetadata struct {
 	BugSummary    string `json:"bug_summary,omitempty"`
 	ActionSummary string `json:"action_summary,omitempty"`
 	ErrorKind     string `json:"error_kind,omitempty"`
+}
+
+const (
+	// SBOMPhasePre identifies pre-gate sbom cycle context.
+	SBOMPhasePre = "pre"
+	// SBOMPhasePost identifies post/re-gate sbom cycle context.
+	SBOMPhasePost = "post"
+)
+
+const (
+	// SBOMRoleInitial is the initial sbom before pre/post gate.
+	SBOMRoleInitial = "initial"
+	// SBOMRoleRetry is a retry sbom after sbom-heal recovery.
+	SBOMRoleRetry = "retry"
+	// SBOMRoleFinal is the final sbom placed after recovered gate flow.
+	SBOMRoleFinal = "final"
+)
+
+// SBOMJobMetadata captures sbom cycle context so runtime logic does not depend
+// on job naming patterns.
+type SBOMJobMetadata struct {
+	// Phase is one of: pre, post.
+	Phase string `json:"phase,omitempty"`
+	// Role is one of: initial, retry, final.
+	Role string `json:"role,omitempty"`
+	// RootJobID is the stable sbom chain root used for retry accounting.
+	RootJobID string `json:"root_job_id,omitempty"`
 }
 
 // BuildMeta captures metadata for build tool invocations stored in jobs.meta.
@@ -153,6 +184,14 @@ func (m JobMeta) Validate() error {
 	if m.HookSource != "" && m.Kind != JobKindMig {
 		return fmt.Errorf("hook_source present but kind is %q (only allowed for %q)", m.Kind, JobKindMig)
 	}
+	if m.SBOM != nil {
+		if m.Kind != JobKindMig {
+			return fmt.Errorf("sbom metadata present but kind is %q (only allowed for %q)", m.Kind, JobKindMig)
+		}
+		if err := m.SBOM.Validate(); err != nil {
+			return fmt.Errorf("sbom metadata invalid: %w", err)
+		}
+	}
 	if m.Heal != nil {
 		if m.Kind != JobKindMig {
 			return fmt.Errorf("heal metadata present but kind is %q (only allowed for %q)", m.Kind, JobKindMig)
@@ -160,6 +199,20 @@ func (m JobMeta) Validate() error {
 		if err := m.Heal.Validate(); err != nil {
 			return fmt.Errorf("heal metadata invalid: %w", err)
 		}
+	}
+	return nil
+}
+
+// Validate ensures SBOMJobMetadata is well-formed.
+func (m SBOMJobMetadata) Validate() error {
+	if m.Phase != "" && m.Phase != SBOMPhasePre && m.Phase != SBOMPhasePost {
+		return fmt.Errorf("phase invalid: %q", m.Phase)
+	}
+	if m.Role != "" && m.Role != SBOMRoleInitial && m.Role != SBOMRoleRetry && m.Role != SBOMRoleFinal {
+		return fmt.Errorf("role invalid: %q", m.Role)
+	}
+	if strings.ContainsAny(m.RootJobID, "\n\r\t ") {
+		return fmt.Errorf("root_job_id: must not contain whitespace")
 	}
 	return nil
 }

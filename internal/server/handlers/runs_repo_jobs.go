@@ -82,6 +82,7 @@ func listRunRepoJobsHandler(st store.Store) http.HandlerFunc {
 		}
 		hookJobsByCycle := make(map[string]int)
 		hookConditionsByCycle := make(map[string][]json.RawMessage)
+		sbomCycleByJobID := make(map[domaintypes.JobID]string)
 
 		for _, job := range jobs {
 			jr := migsapi.RunRepoJob{
@@ -153,6 +154,10 @@ func listRunRepoJobsHandler(st store.Store) http.HandlerFunc {
 			}
 
 			if job.JobType == domaintypes.JobTypeSBOM {
+				jr.Name = "sbom"
+				if sbomCtx, ok := sbomCycleContextFromJob(job); ok {
+					sbomCycleByJobID[job.ID] = sbomCycleNameFromContext(sbomCtx)
+				}
 				jr.SBOMEvidence = loadSBOMEvidence(r, st, runID, job.ID)
 			}
 
@@ -177,7 +182,7 @@ func listRunRepoJobsHandler(st store.Store) http.HandlerFunc {
 
 			resp.Jobs = append(resp.Jobs, jr)
 		}
-		attachSBOMHookPlanningEvidence(resp.Jobs, hookJobsByCycle, hookConditionsByCycle)
+		attachSBOMHookPlanningEvidence(resp.Jobs, hookJobsByCycle, hookConditionsByCycle, sbomCycleByJobID)
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
@@ -222,14 +227,15 @@ func attachSBOMHookPlanningEvidence(
 	jobs []migsapi.RunRepoJob,
 	hookJobsByCycle map[string]int,
 	hookConditionsByCycle map[string][]json.RawMessage,
+	sbomCycleByJobID map[domaintypes.JobID]string,
 ) {
 	for i := range jobs {
 		job := &jobs[i]
 		if job.JobType != domaintypes.JobTypeSBOM || job.Status != domaintypes.JobStatusSuccess {
 			continue
 		}
-		cycleName, ok := cycleNameFromSBOMJobName(job.Name)
-		if !ok {
+		cycleName := strings.TrimSpace(sbomCycleByJobID[job.JobID])
+		if cycleName == "" {
 			continue
 		}
 		plannedHookJobs := hookJobsByCycle[cycleName]

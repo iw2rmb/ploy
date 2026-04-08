@@ -87,6 +87,24 @@ func (s *CompleteJobService) onFail(ctx context.Context, state *completeJobState
 				)
 			}
 		}
+	case lifecycle.CompletionChainEvaluateSBOMFailure:
+		run, ok := s.loadRunForPostCompletion(ctx, state, "sbom healing insertion")
+		if ok {
+			if healErr := maybeCreateSBOMHealingJobs(ctx, s.store, run, state.job); healErr != nil {
+				slog.Error("complete job: failed to create sbom healing jobs",
+					"job_id", state.job.ID,
+					"next_id", state.job.NextID,
+					"err", healErr,
+				)
+				if cancelErr := cancelRemainingJobsAfterFailure(ctx, s.store, state.job); cancelErr != nil {
+					slog.Error("complete job: failed to cancel remaining jobs after sbom healing insertion failure",
+						"job_id", state.job.ID,
+						"next_id", state.job.NextID,
+						"err", cancelErr,
+					)
+				}
+			}
+		}
 	case lifecycle.CompletionChainCancelRemainder:
 		if err := cancelRemainingJobsAfterFailure(ctx, s.store, state.job); err != nil {
 			slog.Error("complete job: failed to cancel remaining jobs after non-gate failure",

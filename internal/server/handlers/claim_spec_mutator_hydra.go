@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
@@ -60,7 +61,7 @@ func applyHydraOverlayMutator(m map[string]any, in claimSpecMutatorInput) error 
 	mergeHydraIntoBlock(m, overlay)
 	// Ensure typed fields are injected into canonical schema locations consumed
 	// by node parsing for each job phase.
-	applyCanonicalHydraOverlay(m, in.jobType, in.job.Name, overlay)
+	applyCanonicalHydraOverlay(m, in.jobType, in.job, overlay)
 
 	if err := applyHealOverlay(m, in); err != nil {
 		return err
@@ -69,7 +70,7 @@ func applyHydraOverlayMutator(m map[string]any, in claimSpecMutatorInput) error 
 	return nil
 }
 
-func applyCanonicalHydraOverlay(spec map[string]any, jobType domaintypes.JobType, jobName string, overlay *HydraJobConfig) {
+func applyCanonicalHydraOverlay(spec map[string]any, jobType domaintypes.JobType, job store.Job, overlay *HydraJobConfig) {
 	if spec == nil || overlay == nil {
 		return
 	}
@@ -81,7 +82,7 @@ func applyCanonicalHydraOverlay(spec map[string]any, jobType domaintypes.JobType
 	case domaintypes.JobTypePostGate, domaintypes.JobTypeReGate:
 		mergeCABlock(ensureBuildGatePhase(spec, "post"), overlay.CA)
 	case domaintypes.JobTypeSBOM, domaintypes.JobTypeHook:
-		switch hydraPhaseForAuxBuildGateJob(jobName) {
+		switch hydraPhaseForAuxBuildGateJob(jobType, job) {
 		case "pre":
 			mergeCABlock(ensureBuildGatePhase(spec, "pre"), overlay.CA)
 		case "post":
@@ -90,8 +91,17 @@ func applyCanonicalHydraOverlay(spec map[string]any, jobType domaintypes.JobType
 	}
 }
 
-func hydraPhaseForAuxBuildGateJob(jobName string) string {
-	name := strings.TrimSpace(jobName)
+func hydraPhaseForAuxBuildGateJob(jobType domaintypes.JobType, job store.Job) string {
+	if jobType == domaintypes.JobTypeSBOM {
+		sbomCtx, _ := sbomCycleContextFromJob(job)
+		if sbomCtx.Phase == contracts.SBOMPhasePre {
+			return "pre"
+		}
+		if sbomCtx.Phase == contracts.SBOMPhasePost {
+			return "post"
+		}
+	}
+	name := strings.TrimSpace(job.Name)
 	switch {
 	case strings.HasPrefix(name, "pre-gate-"):
 		return "pre"

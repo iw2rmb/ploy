@@ -59,6 +59,8 @@ const (
 	CompletionChainAdvanceNext
 	// CompletionChainEvaluateGateFailure requires full gate failure evaluation (cancel or insert heal chain).
 	CompletionChainEvaluateGateFailure
+	// CompletionChainEvaluateSBOMFailure requires full sbom failure evaluation (cancel or insert heal chain).
+	CompletionChainEvaluateSBOMFailure
 )
 
 // CompletionDecision is the pure output of completion transition evaluation.
@@ -83,6 +85,9 @@ func EvaluateCompletionDecision(
 	case domaintypes.JobStatusFail, domaintypes.JobStatusError, domaintypes.JobStatusCancelled:
 		if jobStatus == domaintypes.JobStatusFail && IsGateJobType(jobType) {
 			return CompletionDecision{ChainAction: CompletionChainEvaluateGateFailure}
+		}
+		if jobStatus == domaintypes.JobStatusFail && jobType == domaintypes.JobTypeSBOM {
+			return CompletionDecision{ChainAction: CompletionChainEvaluateSBOMFailure}
 		}
 		return CompletionDecision{ChainAction: CompletionChainCancelRemainder}
 	default:
@@ -135,8 +140,40 @@ type GateFailureDecision struct {
 	Chain        *HealChainSpec // non-nil when Outcome == GateFailureOutcomeHealChain
 }
 
+// SBOMFailureOutcome is the kind of action required after a sbom job fails.
+type SBOMFailureOutcome int
+
+const (
+	// SBOMFailureOutcomeCancel cancels remaining jobs in the successor chain.
+	SBOMFailureOutcomeCancel SBOMFailureOutcome = iota
+	// SBOMFailureOutcomeHealChain inserts a heal + retry-sbom chain.
+	SBOMFailureOutcomeHealChain
+)
+
+// SBOMHealChainSpec contains parameters for creating a heal + retry sbom pair.
+type SBOMHealChainSpec struct {
+	HealID         domaintypes.JobID
+	RetrySBOMID    domaintypes.JobID
+	RootSBOMID     domaintypes.JobID
+	AttemptNumber  int
+	HealImage      string
+	HealRepoSHAIn  string
+	OldSuccessorID *domaintypes.JobID
+}
+
+// SBOMFailureDecision is the pure result of sbom failure transition evaluation.
+type SBOMFailureDecision struct {
+	Outcome      SBOMFailureOutcome
+	CancelReason string             // non-empty when Outcome == SBOMFailureOutcomeCancel
+	Chain        *SBOMHealChainSpec // non-nil when Outcome == SBOMFailureOutcomeHealChain
+}
+
 func cancelDecision(reason string) (GateFailureDecision, error) {
 	return GateFailureDecision{Outcome: GateFailureOutcomeCancel, CancelReason: reason}, nil
+}
+
+func cancelSBOMDecision(reason string) (SBOMFailureDecision, error) {
+	return SBOMFailureDecision{Outcome: SBOMFailureOutcomeCancel, CancelReason: reason}, nil
 }
 
 // EvaluateGateFailureTransition computes what to do after a gate job fails.
@@ -217,6 +254,55 @@ func EvaluateGateFailureTransition(
 				RecoveryMetadata: reGateRecoveryMeta,
 			},
 			ShouldAttachCandidate: shouldAttachCandidate,
+		},
+	}, nil
+}
+
+// EvaluateSBOMFailureTransition computes what to do after a sbom job fails.
+// It is pure: all inputs are pre-loaded and no I/O is performed.
+func EvaluateSBOMFailureTransition(
+	failedJob store.Job,
+	jobsByID map[domaintypes.JobID]store.Job,
+	heal *contracts.HealSpec,
+	detectedStack contracts.MigStack,
+	newJobID func() domaintypes.JobID,
+) (SBOMFailureDecision, error) {
+	if heal == nil {
+		return cancelSBOMDecision("no healing config")
+	}
+
+	retries := heal.Retries
+	if retries <= 0 {
+		retries = 1
+	}
+
+	rootSBOMID := resolveSBOMRootID(failedJob)
+	healingAttempts := countExistingSBOMHealingAttempts(rootSBOMID, jobsByID)
+	attemptNumber := healingAttempts + 1
+	if attemptNumber > retries {
+		return cancelSBOMDecision("healing retries exhausted")
+	}
+
+	healImage, err := heal.Image.ResolveImage(detectedStack)
+	if err != nil {
+		return SBOMFailureDecision{}, fmt.Errorf("resolve healing image for stack %q: %w", detectedStack, err)
+	}
+
+	healRepoSHAIn := strings.TrimSpace(strings.ToLower(failedJob.RepoShaIn))
+	if !sha40Pattern.MatchString(healRepoSHAIn) {
+		return cancelSBOMDecision("invalid failed job repo_sha_in")
+	}
+
+	return SBOMFailureDecision{
+		Outcome: SBOMFailureOutcomeHealChain,
+		Chain: &SBOMHealChainSpec{
+			HealID:         newJobID(),
+			RetrySBOMID:    newJobID(),
+			RootSBOMID:     rootSBOMID,
+			AttemptNumber:  attemptNumber,
+			HealImage:      healImage,
+			HealRepoSHAIn:  healRepoSHAIn,
+			OldSuccessorID: failedJob.NextID,
 		},
 	}, nil
 }
@@ -318,6 +404,17 @@ func resolveBaseGateID(failedJob store.Job, jobsByID map[domaintypes.JobID]store
 	return currentID
 }
 
+func resolveSBOMRootID(failedJob store.Job) domaintypes.JobID {
+	if len(failedJob.Meta) > 0 {
+		if meta, err := contracts.UnmarshalJobMeta(failedJob.Meta); err == nil && meta.SBOM != nil {
+			if root := strings.TrimSpace(meta.SBOM.RootJobID); root != "" {
+				return domaintypes.JobID(root)
+			}
+		}
+	}
+	return failedJob.ID
+}
+
 func countExistingHealingAttempts(baseGateID domaintypes.JobID, jobsByID map[domaintypes.JobID]store.Job) int {
 	base, ok := jobsByID[baseGateID]
 	if !ok {
@@ -342,6 +439,37 @@ func countExistingHealingAttempts(baseGateID domaintypes.JobID, jobsByID map[dom
 			attempts++
 		}
 		if jobType != domaintypes.JobTypeHeal && jobType != domaintypes.JobTypeReGate {
+			break
+		}
+		nextID = job.NextID
+	}
+	return attempts
+}
+
+func countExistingSBOMHealingAttempts(rootSBOMID domaintypes.JobID, jobsByID map[domaintypes.JobID]store.Job) int {
+	root, ok := jobsByID[rootSBOMID]
+	if !ok {
+		return 0
+	}
+
+	attempts := 0
+	seen := map[domaintypes.JobID]struct{}{}
+	nextID := root.NextID
+	for nextID != nil {
+		if _, dup := seen[*nextID]; dup {
+			break
+		}
+		seen[*nextID] = struct{}{}
+
+		job, ok := jobsByID[*nextID]
+		if !ok {
+			break
+		}
+		jobType := domaintypes.JobType(job.JobType)
+		if jobType == domaintypes.JobTypeHeal {
+			attempts++
+		}
+		if jobType != domaintypes.JobTypeHeal && jobType != domaintypes.JobTypeSBOM {
 			break
 		}
 		nextID = job.NextID

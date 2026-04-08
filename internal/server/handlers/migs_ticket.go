@@ -458,6 +458,13 @@ func createPlannedJob(ctx context.Context, st store.Store, runID domaintypes.Run
 	if planned.HookDecision != nil {
 		meta.ActionSummary = summarizeHookPlanningDecision(*planned.HookDecision)
 	}
+	if planned.JobType == domaintypes.JobTypeSBOM {
+		ctx, _ := inferLegacySBOMCycleContext(store.Job{
+			ID:   planned.ID,
+			Name: planned.Name,
+		})
+		meta.SBOM = sbomCycleContextMeta(ctx)
+	}
 	metaBytes, err := contracts.MarshalJobMeta(meta)
 	if err != nil {
 		return fmt.Errorf("marshal job meta: %w", err)
