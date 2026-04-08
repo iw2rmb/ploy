@@ -63,6 +63,10 @@ func maybeCreateHealingJobs(
 	if err != nil {
 		return fmt.Errorf("parse run spec: %w", err)
 	}
+	resolvedHooks, err := resolveHookManifestSources(*spec)
+	if err != nil {
+		return fmt.Errorf("resolve hook sources: %w", err)
+	}
 
 	var heal *contracts.HealSpec
 	if spec.BuildGate != nil {
@@ -108,7 +112,7 @@ func maybeCreateHealingJobs(
 
 	reGateName := fmt.Sprintf("re-gate-%d", chain.AttemptNumber)
 	reGateSBOMID := domaintypes.NewJobID()
-	hookIDs := make([]domaintypes.JobID, len(spec.Hooks))
+	hookIDs := make([]domaintypes.JobID, len(resolvedHooks))
 	for i := range hookIDs {
 		hookIDs[i] = domaintypes.NewJobID()
 	}
@@ -135,6 +139,12 @@ func maybeCreateHealingJobs(
 		if i+1 < len(hookIDs) {
 			nextID = hookIDs[i+1]
 		}
+		hookMeta := contracts.NewMigJobMeta()
+		hookMeta.HookSource = resolvedHooks[i]
+		hookMetaBytes, hookMetaErr := contracts.MarshalJobMeta(hookMeta)
+		if hookMetaErr != nil {
+			return fmt.Errorf("marshal re-gate hook job meta %d: %w", i, hookMetaErr)
+		}
 		_, err = st.CreateJob(ctx, store.CreateJobParams{
 			ID:          hookIDs[i],
 			RunID:       failedJob.RunID,
@@ -145,7 +155,7 @@ func maybeCreateHealingJobs(
 			JobType:     domaintypes.JobTypeHook,
 			Status:      domaintypes.JobStatusCreated,
 			NextID:      &nextID,
-			Meta:        preludeMetaBytes,
+			Meta:        hookMetaBytes,
 		})
 		if err != nil {
 			return fmt.Errorf("create re-gate hook job %d: %w", i, err)
