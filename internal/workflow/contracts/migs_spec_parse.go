@@ -40,12 +40,20 @@ func ParseMigSpecJSON(data []byte) (*MigSpec, error) {
 		spec.GitLabDomain = "gitlab.com"
 	}
 	normalizeHealingDefaults(&spec)
+	normalizeHooks(&spec)
 
 	if err := spec.Validate(); err != nil {
 		return nil, err
 	}
 
 	return &spec, nil
+}
+
+// normalizeHooks trims whitespace from hook source entries.
+func normalizeHooks(spec *MigSpec) {
+	for i := range spec.Hooks {
+		spec.Hooks[i] = strings.TrimSpace(spec.Hooks[i])
+	}
 }
 
 // normalizeHealingDefaults sets default values for the heal spec

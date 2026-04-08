@@ -1,6 +1,7 @@
 package contracts
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -286,6 +287,109 @@ func TestParseMigSpecJSON_RequiresStepsEvenWithExtraFields(t *testing.T) {
 	wantErr := "steps: required"
 	if err.Error() != wantErr {
 		t.Errorf("error = %q, want %q", err.Error(), wantErr)
+	}
+}
+
+// TestParseMigSpecJSON_Hooks tests parsing of root-level hooks array.
+func TestParseMigSpecJSON_Hooks(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		wantErr string
+		check   func(t *testing.T, spec *MigSpec)
+	}{
+		{
+			name: "valid hooks",
+			input: `{
+				"hooks": ["./hooks/lint.yaml", "https://hooks.example.com/v1.yaml"],
+				"steps": [{"image": "test:latest"}]
+			}`,
+			check: func(t *testing.T, spec *MigSpec) {
+				if len(spec.Hooks) != 2 {
+					t.Fatalf("len(hooks) = %d, want 2", len(spec.Hooks))
+				}
+				if spec.Hooks[0] != "./hooks/lint.yaml" {
+					t.Errorf("hooks[0] = %q, want %q", spec.Hooks[0], "./hooks/lint.yaml")
+				}
+				if spec.Hooks[1] != "https://hooks.example.com/v1.yaml" {
+					t.Errorf("hooks[1] = %q, want %q", spec.Hooks[1], "https://hooks.example.com/v1.yaml")
+				}
+			},
+		},
+		{
+			name: "hooks whitespace normalized",
+			input: `{
+				"hooks": ["  ./hooks/lint.yaml  "],
+				"steps": [{"image": "test:latest"}]
+			}`,
+			check: func(t *testing.T, spec *MigSpec) {
+				if spec.Hooks[0] != "./hooks/lint.yaml" {
+					t.Errorf("hooks[0] = %q, want trimmed %q", spec.Hooks[0], "./hooks/lint.yaml")
+				}
+			},
+		},
+		{
+			name: "no hooks field is valid",
+			input: `{
+				"steps": [{"image": "test:latest"}]
+			}`,
+			check: func(t *testing.T, spec *MigSpec) {
+				if len(spec.Hooks) != 0 {
+					t.Errorf("len(hooks) = %d, want 0", len(spec.Hooks))
+				}
+			},
+		},
+		{
+			name: "empty hooks array is valid",
+			input: `{
+				"hooks": [],
+				"steps": [{"image": "test:latest"}]
+			}`,
+			check: func(t *testing.T, spec *MigSpec) {
+				if len(spec.Hooks) != 0 {
+					t.Errorf("len(hooks) = %d, want 0", len(spec.Hooks))
+				}
+			},
+		},
+		{
+			name:    "empty string hook rejected",
+			input:   `{"hooks": [""], "steps": [{"image": "test:latest"}]}`,
+			wantErr: "String length must be greater than or equal to 1",
+		},
+		{
+			name:    "whitespace-only hook rejected",
+			input:   `{"hooks": ["  "], "steps": [{"image": "test:latest"}]}`,
+			wantErr: "hooks[0]: empty hook source",
+		},
+		{
+			name:    "duplicate hooks rejected",
+			input:   `{"hooks": ["./a.yaml", "./a.yaml"], "steps": [{"image": "test:latest"}]}`,
+			wantErr: `hooks[1]: duplicate hook source "./a.yaml"`,
+		},
+		{
+			name:    "hooks non-array rejected by schema",
+			input:   `{"hooks": "not-an-array", "steps": [{"image": "test:latest"}]}`,
+			wantErr: "hooks: Invalid type",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			spec, err := ParseMigSpecJSON([]byte(tt.input))
+			if tt.wantErr != "" {
+				if err == nil {
+					t.Fatalf("expected error containing %q, got nil", tt.wantErr)
+				}
+				if !strings.Contains(err.Error(), tt.wantErr) {
+					t.Fatalf("error = %q, want containing %q", err.Error(), tt.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			tt.check(t, spec)
+		})
 	}
 }
 
