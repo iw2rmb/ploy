@@ -457,13 +457,6 @@ func materializeGateSBOMForGate(runID types.RunID, cycleName string, hooks []str
 	gateOutDir := filepath.Join(workspace, step.BuildGateWorkspaceOutDir)
 	sbomOutPath := filepath.Join(gateOutDir, preGateCanonicalSBOMFileName)
 	if err := copyFileBytes(snapshotPath, sbomOutPath); err != nil {
-		// Keep re-gate rerun/root execution backward-safe when cycle-specific
-		// sbom jobs are not inserted by older schedulers.
-		if os.IsNotExist(err) && cycleName != preGateCycleName {
-			if fallbackErr := copyFileBytes(preGateFinalSnapshotPath(runID, hooks), sbomOutPath); fallbackErr == nil {
-				return nil
-			}
-		}
 		return fmt.Errorf("materialize %s sbom for gate /out: %w", cycleName, err)
 	}
 	return nil

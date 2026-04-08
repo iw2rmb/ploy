@@ -2,6 +2,8 @@ package nodeagent
 
 import (
 	"encoding/json"
+	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
@@ -392,5 +394,38 @@ func TestMaterializeGateSBOMForGate_UsesPostAndReGateCycleSnapshots(t *testing.T
 	}
 	if string(reGateOut) != string(reGateSnapshot) {
 		t.Fatalf("re-gate snapshot mismatch: got %q want %q", string(reGateOut), string(reGateSnapshot))
+	}
+}
+
+func TestMaterializeGateSBOMForGate_RequiresCycleSnapshot(t *testing.T) {
+	cacheHome := t.TempDir()
+	t.Setenv("PLOYD_CACHE_HOME", cacheHome)
+
+	runID := types.RunID("run-cycle-snapshot-required")
+	preSnapshot := []byte(`{"spdxVersion":"SPDX-2.3","name":"pre-gate-cycle"}`)
+	preGateOut := preGateSBOMOutPath(runID)
+	if err := os.MkdirAll(filepath.Dir(preGateOut), 0o755); err != nil {
+		t.Fatalf("mkdir pre-gate sbom dir: %v", err)
+	}
+	if err := os.WriteFile(preGateOut, preSnapshot, 0o644); err != nil {
+		t.Fatalf("write pre-gate sbom snapshot: %v", err)
+	}
+
+	postWorkspace := t.TempDir()
+	err := materializeGateSBOMForGate(runID, postGateCycleName, nil, postWorkspace)
+	if err == nil {
+		t.Fatalf("expected error when post-gate snapshot is missing")
+	}
+	if !errors.Is(err, fs.ErrNotExist) {
+		t.Fatalf("expected os.IsNotExist for missing post-gate snapshot, got: %v", err)
+	}
+
+	reGateWorkspace := t.TempDir()
+	err = materializeGateSBOMForGate(runID, "re-gate-1", nil, reGateWorkspace)
+	if err == nil {
+		t.Fatalf("expected error when re-gate snapshot is missing")
+	}
+	if !errors.Is(err, fs.ErrNotExist) {
+		t.Fatalf("expected os.IsNotExist for missing re-gate snapshot, got: %v", err)
 	}
 }
