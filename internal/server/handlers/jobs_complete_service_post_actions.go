@@ -157,6 +157,9 @@ func (s *CompleteJobService) onSuccess(ctx context.Context, state *completeJobSt
 				"attempt", state.job.Attempt,
 				"err", hookPlanErr,
 			)
+			// Fail closed: do not advance to the original successor when hook planning
+			// encountered an error, otherwise runnable hooks can be skipped.
+			nextIDToPromote = nil
 		} else if hookNextID != nil {
 			nextIDToPromote = hookNextID
 		}
