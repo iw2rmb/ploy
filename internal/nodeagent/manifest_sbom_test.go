@@ -124,3 +124,52 @@ func TestDetectSBOMStackFromWorkspace(t *testing.T) {
 		t.Fatalf("gradle workspace detection=%q, want %q", got, contracts.MigStackJavaGradle)
 	}
 }
+
+func TestBuildSBOMManifest_IncludesPhaseCA(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		cycleName string
+		wantCA    []string
+	}{
+		{name: "pre gate cycle uses pre phase CA", cycleName: preGateCycleName, wantCA: []string{"ca-pre"}},
+		{name: "post gate cycle uses post phase CA", cycleName: postGateCycleName, wantCA: []string{"ca-post"}},
+		{name: "re gate cycle uses post phase CA", cycleName: "re-gate-1", wantCA: []string{"ca-post"}},
+		{name: "unknown cycle has no phase CA", cycleName: "other-cycle", wantCA: nil},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			req := StartRunRequest{
+				RunID:     "run-123",
+				JobID:     "job-123",
+				RepoURL:   "https://example.com/repo.git",
+				BaseRef:   "main",
+				TargetRef: "main",
+				TypedOptions: RunOptions{
+					BuildGate: BuildGateOptions{
+						Pre: &contracts.BuildGatePhaseConfig{CA: []string{"ca-pre"}},
+						Post: &contracts.BuildGatePhaseConfig{
+							CA: []string{"ca-post"},
+						},
+					},
+				},
+			}
+
+			manifest, err := buildSBOMManifest(req, tc.cycleName, contracts.MigStackJavaMaven)
+			if err != nil {
+				t.Fatalf("buildSBOMManifest: %v", err)
+			}
+			if len(manifest.CA) != len(tc.wantCA) {
+				t.Fatalf("manifest.CA len=%d, want %d (%v)", len(manifest.CA), len(tc.wantCA), manifest.CA)
+			}
+			for i := range tc.wantCA {
+				if manifest.CA[i] != tc.wantCA[i] {
+					t.Fatalf("manifest.CA[%d]=%q, want %q", i, manifest.CA[i], tc.wantCA[i])
+				}
+			}
+		})
+	}
+}

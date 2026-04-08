@@ -59,7 +59,7 @@ func listConfigCABySectionHandler(holder *ConfigHolder) http.HandlerFunc {
 			writeHTTPError(w, http.StatusBadRequest, "%s", err)
 			return
 		}
-		if err := ValidateHydraSection(section); err != nil {
+		if err := contracts.ValidateCAConfigSection(section); err != nil {
 			writeHTTPError(w, http.StatusBadRequest, "%s", err)
 			return
 		}
@@ -100,7 +100,7 @@ func putConfigCAHandler(holder *ConfigHolder, st store.Store) http.HandlerFunc {
 			return
 		}
 
-		if err := ValidateHydraSection(req.Section); err != nil {
+		if err := contracts.ValidateCAConfigSection(req.Section); err != nil {
 			writeHTTPError(w, http.StatusBadRequest, "%s", err)
 			return
 		}
@@ -176,7 +176,7 @@ func deleteConfigCAHandler(holder *ConfigHolder, st store.Store) http.HandlerFun
 			writeHTTPError(w, http.StatusBadRequest, "section query parameter is required")
 			return
 		}
-		if err := ValidateHydraSection(section); err != nil {
+		if err := contracts.ValidateCAConfigSection(section); err != nil {
 			writeHTTPError(w, http.StatusBadRequest, "%s", err)
 			return
 		}

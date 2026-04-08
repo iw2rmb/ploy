@@ -81,12 +81,12 @@ func TestHandleConfigCASet_Validation(t *testing.T) {
 		{
 			name:    "invalid section unknown",
 			args:    []string{"--hash", "abcdef1234567", "--section", "unknown"},
-			wantErr: "invalid hydra section",
+			wantErr: "invalid config ca section",
 		},
 		{
 			name:    "invalid section server",
 			args:    []string{"--hash", "abcdef1234567", "--section", "server"},
-			wantErr: "invalid hydra section",
+			wantErr: "invalid config ca section",
 		},
 	}
 	for _, tt := range tests {
@@ -137,12 +137,12 @@ func TestHandleConfigCAUnset_Validation(t *testing.T) {
 		{
 			name:    "invalid section unknown",
 			args:    []string{"--hash", "abcdef1234567", "--section", "unknown"},
-			wantErr: "invalid hydra section",
+			wantErr: "invalid config ca section",
 		},
 		{
 			name:    "invalid section server",
 			args:    []string{"--hash", "abcdef1234567", "--section", "server"},
-			wantErr: "invalid hydra section",
+			wantErr: "invalid config ca section",
 		},
 	}
 	for _, tt := range tests {
@@ -156,5 +156,20 @@ func TestHandleConfigCAUnset_Validation(t *testing.T) {
 				t.Fatalf("error = %v, want containing %q", err, tt.wantErr)
 			}
 		})
+	}
+}
+
+func TestConfigCAUsage_ListsAuxSections(t *testing.T) {
+	t.Parallel()
+
+	buf := &bytes.Buffer{}
+	printConfigCAListUsage(buf)
+	printConfigCASetUsage(buf)
+	printConfigCAUnsetUsage(buf)
+	out := buf.String()
+	for _, token := range []string{"sbom", "hook"} {
+		if !strings.Contains(out, token) {
+			t.Fatalf("usage output missing %q: %s", token, out)
+		}
 	}
 }
