@@ -1,0 +1,102 @@
+---
+policy: "~/.codex/policies/composing-roadmaps.md"
+schema: "~/.codex/policies/roadmap.schema.json"
+title: "SBOM Hooks Remediation: Phase 3 Delivery Gates and Observability"
+scope: >-
+  Prevent repeat regressions by enforcing behavior-based completion gates
+  and exposing explicit runtime evidence for sbom and hook behavior.
+documentation:
+  - "research/sbom-hooks-incident-2026-04-08.md"
+  - "docs/build-gate/README.md"
+  - "docs/api/OpenAPI.yaml"
+done: false
+reviews: []
+items:
+  - done: false
+    reviews: []
+    label: "1"
+    summary: >-
+      Add CI guardrails so roadmap completion cannot be marked done while
+      runtime acceptance checks or review gaps remain.
+    classification: "determined"
+    components:
+      - "tools/roadmap/verify_done.sh"
+      - "Makefile"
+      - ".github/workflows/ci.yml"
+      - "roadmap/sbom-hooks-remediation/index.md"
+    baseline:
+      - "Makefile"
+      - ".github/workflows/ci.yml"
+    delta:
+      - >-
+        [additive] manual roadmap done signaling -> automated done verification
+        tied to review gap and acceptance evidence checks
+    implementation:
+      - >-
+        Create a roadmap verifier script that fails when a targeted phase has
+        done=true with unresolved reviews.gaps or missing evidence markers.
+      - >-
+        Add a Makefile target to run roadmap verification locally and in CI.
+      - >-
+        Wire CI to execute roadmap verification on pull requests touching
+        roadmap files and sbom/hook runtime components.
+      - >-
+        Keep verifier generic so future roadmaps can opt in without custom
+        code forks.
+    verification:
+      - >-
+        CI fails when a roadmap phase is marked done while reviews.gaps exist
+        without closing commits.
+      - >-
+        CI passes when roadmap done state and evidence are consistent.
+      - >-
+        Existing non-roadmap CI checks remain unchanged for unrelated pull
+        requests.
+    reasoning: "medium"
+    cfp: 8
+
+  - done: false
+    reviews: []
+    label: "2"
+    summary: >-
+      Expose explicit run evidence for conditional hook planning and real
+      sbom work in API and docs.
+    classification: "determined"
+    components:
+      - "internal/server/handlers/runs_repo_jobs.go"
+      - "internal/server/handlers/runs_repo_jobs_test.go"
+      - "docs/build-gate/README.md"
+      - "docs/api/components/schemas/controlplane.yaml"
+      - "docs/api/OpenAPI.yaml"
+    baseline:
+      - "internal/server/handlers/runs_repo_jobs.go"
+      - "docs/api/components/schemas/controlplane.yaml"
+    delta:
+      - >-
+        [additive] generic job status visibility -> explicit fields for
+        hook condition evaluation and sbom execution evidence
+    implementation:
+      - >-
+        Add serialized fields for hook_condition_result and hook_plan_reason
+        so run status explains why a hook was or was not planned.
+      - >-
+        Expose sbom evidence metadata, including artifact presence and parsed
+        package count, in run job payloads.
+      - >-
+        Document sbom and hook lifecycle states with examples for true-match,
+        false-match, and terminal preflight failures.
+      - >-
+        Keep existing API fields stable while adding new optional evidence
+        fields.
+    verification:
+      - >-
+        Run status output makes hook-not-planned and hook-planned decisions
+        distinguishable without reading server logs.
+      - >-
+        Run status output shows sbom evidence metadata for successful sbom
+        jobs.
+      - >-
+        Existing API clients continue to parse responses when new fields are
+        absent.
+    reasoning: "high"
+    cfp: 9
