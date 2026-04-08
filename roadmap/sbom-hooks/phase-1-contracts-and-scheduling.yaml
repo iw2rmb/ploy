@@ -92,7 +92,7 @@ items:
     reasoning: "high"
     cfp: 6
     commit: 6f9ba623
-  - done: false
+  - done: true
     reviews: []
     label: "4"
     summary: "Extend deterministic sbom and hook scheduling to post-gate and re-gate, then lock behavior with orchestrator and completion tests."
