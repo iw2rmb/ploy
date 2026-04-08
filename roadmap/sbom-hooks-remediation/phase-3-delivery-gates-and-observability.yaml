@@ -49,7 +49,7 @@ items:
     reasoning: "medium"
     cfp: 8
     commit: a21bd7c6
-  - done: false
+  - done: true
     reviews:
       - gaps: ["\"Run status output makes hook-not-planned and hook-planned decisions distinguishable without reading server logs.\" and \"Run status output shows sbom evidence metadata for successful sbom jobs.\" are not fully delivered end-to-end: the `ploy run status` report contract does not include `hook_condition_result`, `hook_plan_reason`, or `sbom_evidence` (`internal/cli/runs/report_contract.go:36`), and the report builder does not map those fields from repo jobs into status output (`internal/cli/runs/report_builder.go:120`), so `ploy run status --json` cannot expose this evidence despite API support."]
         commit: dae2042d
