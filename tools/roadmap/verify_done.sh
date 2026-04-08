@@ -8,7 +8,7 @@ Usage:
 
 Behavior:
   - For each targeted phase:
-    - skips checks when done!=true
+    - fails when done!=true
     - fails if any item has done!=true
     - fails if any done item is missing acceptance checks (`verification`) or acceptance evidence (`reviews[*].commit`)
     - fails if any unresolved reviews.gaps exist (phase or item level)
@@ -68,7 +68,7 @@ class Verifier
     phase_name = File.basename(path, ".yaml")
     done = data["done"] == true
     unless done
-      @skipped += 1
+      @failures << "error: targeted phase not done in #{path}"
       return
     end
 
