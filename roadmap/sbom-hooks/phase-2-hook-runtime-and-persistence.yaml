@@ -34,7 +34,7 @@ items:
       - "Malformed hook manifests fail with deterministic validation errors."
     reasoning: "medium"
     cfp: 8
-
+    commit: 140c00dd
   - done: false
     reviews: []
     label: "2"
@@ -60,7 +60,6 @@ items:
       - "Repeated evaluation of unchanged hook content yields the same hook hash and once decision inputs across runs."
     reasoning: "high"
     cfp: 10
-
   - done: false
     reviews: []
     label: "3"
