@@ -58,30 +58,19 @@ func resolveHookRuntimeDecision(
 			Err:     err,
 		}
 	}
-	matchInput, err := buildHookMatchInput(ctx, st, job)
+	hash, err := hook.DeterministicHookHash(hookSpec)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("compute deterministic hook hash for source %q: %w", source, err)
 	}
-	match, err := hook.Match(hookSpec, matchInput)
-	if err != nil {
-		return nil, fmt.Errorf("evaluate hook matcher for source %q: %w", source, err)
-	}
-	hash := strings.TrimSpace(match.Once.PersistenceKey)
+	hash = strings.TrimSpace(hash)
 	if hash == "" {
-		hash = strings.TrimSpace(match.HookHash)
-	}
-	if hash == "" {
-		return nil, fmt.Errorf("hook matcher returned empty hash for source %q", source)
+		return nil, fmt.Errorf("hook hash is empty for source %q", source)
 	}
 
-	decision := &contracts.HookRuntimeDecision{
+	return &contracts.HookRuntimeDecision{
 		HookHash:      hash,
-		HookShouldRun: match.ShouldRun,
-	}
-	if !match.Once.Enabled || !match.Once.Eligible {
-		return decision, nil
-	}
-	return applyHookOnceLedgerDecision(ctx, st, job, decision)
+		HookShouldRun: true,
+	}, nil
 }
 
 func buildHookMatchInput(ctx context.Context, st store.Store, job store.Job) (hook.MatchInput, error) {

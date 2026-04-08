@@ -212,6 +212,28 @@ func TestMaterializePreGateSBOMForGate_UsesLastHookOutput(t *testing.T) {
 	}
 }
 
+func TestGateCycleHookInputSnapshotPath_FallsBackToLatestExistingHookOutput(t *testing.T) {
+	cacheHome := t.TempDir()
+	t.Setenv("PLOYD_CACHE_HOME", cacheHome)
+
+	runID := types.RunID("run-hook-sparse-input")
+	cycleName := "pre-gate"
+	sbomPath := gateCycleSBOMOutPath(runID, cycleName)
+	writeCanonicalSBOMFixture(t, sbomPath, "base-sbom")
+	hookZeroOut := gateCycleHookOutPath(runID, cycleName, 0)
+	writeCanonicalSBOMFixture(t, hookZeroOut, "hook-0")
+
+	got := gateCycleHookInputSnapshotPath(runID, cycleName, 2)
+	if got != hookZeroOut {
+		t.Fatalf("gateCycleHookInputSnapshotPath()=%q, want latest existing %q", got, hookZeroOut)
+	}
+
+	got = gateCycleHookInputSnapshotPath(runID, cycleName, 1)
+	if got != hookZeroOut {
+		t.Fatalf("gateCycleHookInputSnapshotPath()=%q, want previous hook output %q", got, hookZeroOut)
+	}
+}
+
 func TestPreGateHookIndexFromJobName(t *testing.T) {
 	idx, err := preGateHookIndexFromJobName("pre-gate-hook-001", 2)
 	if err != nil {

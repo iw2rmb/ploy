@@ -16,7 +16,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
-func TestResolveHookRuntimeDecision_NoLedgerRecordRunsHook(t *testing.T) {
+func TestResolveHookRuntimeDecision_ReturnsDeterministicHashWithoutLedgerChecks(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
@@ -38,15 +38,6 @@ once: true
 steps:
   - image: test:latest
 `)
-	st.hasHookOnceLedger.val = false
-	st.listJobsByRunRepoAttempt.val = []store.Job{{
-		ID:      domaintypes.NewJobID(),
-		RunID:   runID,
-		RepoID:  repoID,
-		Attempt: job.Attempt,
-		JobType: domaintypes.JobTypeSBOM,
-		Status:  domaintypes.JobStatusSuccess,
-	}}
 	spec := specWithHooksAndBundleMap([]string{hash}, map[string]string{hash: bundleID})
 
 	got, err := resolveHookRuntimeDecision(context.Background(), st, bs, job, spec, domaintypes.JobTypeHook)
@@ -65,15 +56,12 @@ steps:
 	if len(got.HookHash) != 64 {
 		t.Fatalf("HookHash length=%d, want 64", len(got.HookHash))
 	}
-	if !st.hasHookOnceLedger.called {
-		t.Fatal("expected HasHookOnceLedger() to be called")
-	}
-	if st.getHookOnceLedger.called {
-		t.Fatal("did not expect GetHookOnceLedger() when no ledger row exists")
+	if st.hasHookOnceLedger.called || st.getHookOnceLedger.called {
+		t.Fatal("did not expect hook-once ledger checks for claim-time runtime decision")
 	}
 }
 
-func TestResolveHookRuntimeDecision_LedgerSuccessSkipsAndMarksOnce(t *testing.T) {
+func TestResolveHookRuntimeDecision_IgnoresLedgerSkipStateAtClaimTime(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
@@ -125,14 +113,14 @@ steps:
 	if got == nil {
 		t.Fatal("resolveHookRuntimeDecision() returned nil decision")
 	}
-	if got.HookShouldRun {
-		t.Fatal("HookShouldRun=true, want false")
+	if !got.HookShouldRun {
+		t.Fatal("HookShouldRun=false, want true")
 	}
-	if !got.HookOnceSkipMarked {
-		t.Fatal("HookOnceSkipMarked=false, want true")
+	if got.HookOnceSkipMarked {
+		t.Fatal("HookOnceSkipMarked=true, want false")
 	}
-	if !st.getHookOnceLedger.called {
-		t.Fatal("expected GetHookOnceLedger() to be called")
+	if st.hasHookOnceLedger.called || st.getHookOnceLedger.called {
+		t.Fatal("did not expect hook-once ledger checks for claim-time runtime decision")
 	}
 }
 
@@ -248,7 +236,7 @@ steps:
 	}
 }
 
-func TestResolveHookRuntimeDecision_MatcherShouldRunFalseSkipsLedger(t *testing.T) {
+func TestResolveHookRuntimeDecision_DoesNotFlipClaimDecisionFromMatcherState(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
@@ -274,17 +262,6 @@ sbom:
 steps:
   - image: test:latest
 `)
-	st.listJobsByRunRepoAttempt.val = []store.Job{{
-		ID:      domaintypes.NewJobID(),
-		RunID:   runID,
-		RepoID:  repoID,
-		Attempt: 1,
-		JobType: domaintypes.JobTypeSBOM,
-		Status:  domaintypes.JobStatusSuccess,
-	}}
-	st.listSBOMRowsByJob.val = []store.Sbom{
-		{JobID: domaintypes.NewJobID(), RepoID: repoID, Lib: "lib-a", Ver: "1.0.0"},
-	}
 	spec := specWithHooksAndBundleMap([]string{hash}, map[string]string{hash: bundleID})
 
 	got, err := resolveHookRuntimeDecision(context.Background(), st, bs, job, spec, domaintypes.JobTypeHook)
@@ -294,11 +271,11 @@ steps:
 	if got == nil {
 		t.Fatal("resolveHookRuntimeDecision() returned nil decision")
 	}
-	if got.HookShouldRun {
-		t.Fatal("HookShouldRun=true, want false when matcher predicates do not match")
+	if !got.HookShouldRun {
+		t.Fatal("HookShouldRun=false, want true for already planned hook jobs")
 	}
 	if st.hasHookOnceLedger.called || st.getHookOnceLedger.called {
-		t.Fatal("did not expect hook-once ledger checks when once is not eligible")
+		t.Fatal("did not expect hook-once ledger checks for claim-time runtime decision")
 	}
 }
 

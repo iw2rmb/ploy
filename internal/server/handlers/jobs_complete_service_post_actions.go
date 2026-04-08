@@ -140,6 +140,7 @@ func (s *CompleteJobService) onSuccess(ctx context.Context, state *completeJobSt
 				"attempt", state.job.Attempt,
 				"err", sbomErr,
 			)
+			return
 		} else if sbomRowsPersisted > 0 {
 			slog.Info("complete job: persisted sbom rows for completed sbom job",
 				"job_id", state.job.ID,

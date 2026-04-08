@@ -58,6 +58,10 @@ func (s *CompleteJobService) planAndInsertCycleHookJobs(ctx context.Context, sta
 		if decisionErr != nil {
 			return nil, fmt.Errorf("evaluate cycle hook source[%d] %q: %w", i, source, decisionErr)
 		}
+		decision, decisionErr = applyHookOncePlanningDecision(ctx, s.store, state.job, decision)
+		if decisionErr != nil {
+			return nil, fmt.Errorf("apply hook once planning decision source[%d] %q: %w", i, source, decisionErr)
+		}
 		if !decision.ShouldRun() {
 			continue
 		}
@@ -130,4 +134,32 @@ func fallbackCycleName(cycleName string) string {
 		return "re-gate"
 	}
 	return cycleName
+}
+
+func applyHookOncePlanningDecision(
+	ctx context.Context,
+	st store.Store,
+	job store.Job,
+	decision hookPlanningDecision,
+) (hookPlanningDecision, error) {
+	if !decision.Match.Once.Enabled || !decision.Match.Once.Eligible {
+		return decision, nil
+	}
+	hash := strings.TrimSpace(decision.Match.Once.PersistenceKey)
+	if hash == "" {
+		hash = strings.TrimSpace(decision.Match.HookHash)
+	}
+	if hash == "" {
+		return hookPlanningDecision{}, fmt.Errorf("hook once persistence key is empty")
+	}
+
+	runtimeDecision, err := applyHookOnceLedgerDecision(ctx, st, job, &contracts.HookRuntimeDecision{
+		HookHash:      hash,
+		HookShouldRun: decision.Match.ShouldRun,
+	})
+	if err != nil {
+		return hookPlanningDecision{}, err
+	}
+	decision.Match.ShouldRun = runtimeDecision.HookShouldRun
+	return decision, nil
 }
