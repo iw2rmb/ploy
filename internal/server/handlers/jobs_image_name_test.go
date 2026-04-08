@@ -189,6 +189,74 @@ func TestSaveJobImageName_SuccessGateJob(t *testing.T) {
 	}
 }
 
+func TestSaveJobImageName_SuccessSBOMJob(t *testing.T) {
+	t.Parallel()
+
+	nodeIDStr := domaintypes.NewNodeKey()
+	nodeID := domaintypes.NodeID(nodeIDStr)
+	runID := domaintypes.NewRunID()
+	jobID := domaintypes.NewJobID()
+
+	job := store.Job{
+		ID:      jobID,
+		RunID:   runID,
+		NodeID:  &nodeID,
+		Status:  domaintypes.JobStatusRunning,
+		JobType: "sbom",
+	}
+
+	st := &jobStore{getJobResult: job}
+	handler := saveJobImageNameHandler(st)
+
+	body, _ := json.Marshal(map[string]any{"image": "docker.io/example/sbom:latest"})
+	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/image", bytes.NewReader(body))
+	req.SetPathValue("job_id", jobID.String())
+	req.Header.Set(nodeUUIDHeader, nodeIDStr)
+	req = req.WithContext(auth.ContextWithIdentity(req.Context(), auth.Identity{Role: auth.RoleWorker, CommonName: nodeIDStr}))
+
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+
+	assertStatus(t, rr, http.StatusNoContent)
+	if !st.updateJobImageName.called {
+		t.Fatalf("expected UpdateJobImageName to be called")
+	}
+}
+
+func TestSaveJobImageName_SuccessHookJob(t *testing.T) {
+	t.Parallel()
+
+	nodeIDStr := domaintypes.NewNodeKey()
+	nodeID := domaintypes.NodeID(nodeIDStr)
+	runID := domaintypes.NewRunID()
+	jobID := domaintypes.NewJobID()
+
+	job := store.Job{
+		ID:      jobID,
+		RunID:   runID,
+		NodeID:  &nodeID,
+		Status:  domaintypes.JobStatusRunning,
+		JobType: "hook",
+	}
+
+	st := &jobStore{getJobResult: job}
+	handler := saveJobImageNameHandler(st)
+
+	body, _ := json.Marshal(map[string]any{"image": "docker.io/example/hook:latest"})
+	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/image", bytes.NewReader(body))
+	req.SetPathValue("job_id", jobID.String())
+	req.Header.Set(nodeUUIDHeader, nodeIDStr)
+	req = req.WithContext(auth.ContextWithIdentity(req.Context(), auth.Identity{Role: auth.RoleWorker, CommonName: nodeIDStr}))
+
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+
+	assertStatus(t, rr, http.StatusNoContent)
+	if !st.updateJobImageName.called {
+		t.Fatalf("expected UpdateJobImageName to be called")
+	}
+}
+
 func TestSaveJobImageName_ConflictWrongJobType(t *testing.T) {
 	t.Parallel()
 
