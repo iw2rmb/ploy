@@ -35,7 +35,6 @@ class Verifier
     @paths = paths
     @failures = []
     @checked = 0
-    @skipped = 0
   end
 
   def run
@@ -47,7 +46,7 @@ class Verifier
       return 1
     end
 
-    puts("roadmap verification passed (#{@checked} phase#{@checked == 1 ? "" : "s"} checked, #{@skipped} skipped)")
+    puts("roadmap verification passed (#{@checked} phase#{@checked == 1 ? "" : "s"} checked)")
     0
   end
 
@@ -68,8 +67,7 @@ class Verifier
     phase_name = File.basename(path, ".yaml")
     done = data["done"] == true
     unless done
-      @skipped += 1
-      verify_evidence_marker(path, phase_name, require_checked: false)
+      @failures << "error: targeted phase not done in #{path} (done!=true)"
       return
     end
 
@@ -108,12 +106,12 @@ class Verifier
       acceptance_gaps.each { |msg| @failures << "  - #{msg}" }
     end
 
-    verify_evidence_marker(path, phase_name, require_checked: true)
+    verify_evidence_marker(path, phase_name)
   rescue Psych::SyntaxError => e
     @failures << "error: YAML parse failure in #{path}: #{e.message.lines.first.to_s.strip}"
   end
 
-  def verify_evidence_marker(path, phase_name, require_checked:)
+  def verify_evidence_marker(path, phase_name)
     index_path = File.join(File.dirname(path), "index.md")
     evidence_marker = "evidence:#{phase_name}"
 
@@ -130,15 +128,8 @@ class Verifier
     end
 
     has_checked_entry = lines_with_marker.any? { |line| line.match?(/^\s*-\s*\[[xX]\]/) }
-    if require_checked
-      unless has_checked_entry
-        @failures << "error: evidence marker '#{evidence_marker}' is present but unchecked in #{index_path}"
-      end
-      return
-    end
-
-    if has_checked_entry
-      @failures << "error: evidence marker '#{evidence_marker}' is checked but phase is not done in #{path}"
+    unless has_checked_entry
+      @failures << "error: evidence marker '#{evidence_marker}' is present but unchecked in #{index_path}"
     end
   end
 
