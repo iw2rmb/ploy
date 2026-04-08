@@ -3,8 +3,7 @@ policy: "~/.codex/policies/composing-roadmaps.md"
 schema: "~/.codex/policies/roadmap.schema.json"
 title: "SBOM Hooks Remediation: Phase 1 Conditional Planning and Preflight"
 scope: >-
-  Plan hook jobs only when hook conditions evaluate true for a gate cycle,
-  and fail early when referenced hook bundles are unavailable.
+  Plan hook jobs only when hook conditions evaluate true for a gate cycle, and fail early when referenced hook bundles are unavailable.
 documentation:
   - "research/sbom-hooks-incident-2026-04-08.md"
   - "docs/build-gate/README.md"
@@ -16,8 +15,7 @@ items:
     reviews: []
     label: "1"
     summary: >-
-      Move hook condition evaluation to planning and create hook jobs only
-      for positive matches in each gate cycle.
+      Move hook condition evaluation to planning and create hook jobs only for positive matches in each gate cycle.
     classification: "determined"
     components:
       - "internal/server/handlers/migs_ticket.go"
@@ -29,40 +27,31 @@ items:
       - "internal/server/handlers/nodes_complete_healing.go"
     delta:
       - >-
-        [replace] unconditional hook draft creation per resolved source ->
-        cycle-scoped conditional hook job creation from matcher decision
+        [replace] unconditional hook draft creation per resolved source -> cycle-scoped conditional hook job creation from matcher decision
     implementation:
       - >-
-        Build cycle-specific hook match input before job drafting and evaluate
-        each resolved hook spec condition there.
+        Build cycle-specific hook match input before job drafting and evaluate each resolved hook spec condition there.
       - >-
-        Create hook jobs only for sources with HookShouldRun=true; do not
-        create placeholder hook jobs for false conditions.
+        Create hook jobs only for sources with HookShouldRun=true; do not create placeholder hook jobs for false conditions.
       - >-
-        Apply the same conditional planning logic to healing and re-gate
-        scheduling so all cycles share identical semantics.
+        Apply the same conditional planning logic to healing and re-gate scheduling so all cycles share identical semantics.
       - >-
-        Persist matcher decision metadata on planned hook jobs for auditability
-        and deterministic UI and state exposure.
+        Persist matcher decision metadata on planned hook jobs for auditability and deterministic UI and state exposure.
     verification:
       - >-
-        A run with all hook conditions false shows no hook jobs in plan for
-        pre-gate, post-gate, and re-gate cycles.
+        A run with all hook conditions false shows no hook jobs in plan for pre-gate, post-gate, and re-gate cycles.
       - >-
-        A run with mixed hook conditions creates hook jobs only for true
-        matches and preserves pre-gate and mig ordering semantics.
+        A run with mixed hook conditions creates hook jobs only for true matches and preserves pre-gate and mig ordering semantics.
       - >-
-        A run with hooks omitted keeps existing non-hook scheduling behavior
-        unchanged.
+        A run with hooks omitted keeps existing non-hook scheduling behavior unchanged.
     reasoning: "high"
     cfp: 12
-
+    commit: d9a50381
   - done: false
     reviews: []
     label: "2"
     summary: >-
-      Add preflight integrity checks for hook bundle references so missing
-      blobs fail before queueing jobs.
+      Add preflight integrity checks for hook bundle references so missing blobs fail before queueing jobs.
     classification: "determined"
     components:
       - "internal/server/handlers/nodes_claim_hook_once.go"
@@ -74,30 +63,22 @@ items:
       - "internal/server/handlers/spec_bundles.go"
     delta:
       - >-
-        [additive] claim-time bundle existence failure only -> plan-time and
-        claim-time bundle integrity checks with deterministic terminal errors
+        [additive] claim-time bundle existence failure only -> plan-time and claim-time bundle integrity checks with deterministic terminal errors
     implementation:
       - >-
-        Add a reusable bundle integrity probe for checking DB metadata and
-        object-store blob existence by bundle id.
+        Add a reusable bundle integrity probe for checking DB metadata and object-store blob existence by bundle id.
       - >-
-        Run preflight bundle checks for all bundle_map entries used by
-        resolved hooks before inserting planned jobs.
+        Run preflight bundle checks for all bundle_map entries used by resolved hooks before inserting planned jobs.
       - >-
-        Return deterministic user-facing terminal errors when bundle metadata
-        exists but blob is missing.
+        Return deterministic user-facing terminal errors when bundle metadata exists but blob is missing.
       - >-
-        Keep claim-time check as a safety net with the same error taxonomy to
-        avoid divergent failure semantics.
+        Keep claim-time check as a safety net with the same error taxonomy to avoid divergent failure semantics.
     verification:
       - >-
-        When bundle metadata exists but blob is missing, migration fails
-        before first job is queued.
+        When bundle metadata exists but blob is missing, migration fails before first job is queued.
       - >-
-        When bundle exists, planning and claim proceed without extra retries
-        or status loops.
+        When bundle exists, planning and claim proceed without extra retries or status loops.
       - >-
-        Hook execution behavior for valid bundle sources remains unchanged
-        aside from earlier failure detection.
+        Hook execution behavior for valid bundle sources remains unchanged aside from earlier failure detection.
     reasoning: "medium"
     cfp: 8
