@@ -86,3 +86,4 @@ items:
         Hook execution behavior for valid bundle sources remains unchanged aside from earlier failure detection.
     reasoning: "medium"
     cfp: 8
+    commit: 2a5d979c
