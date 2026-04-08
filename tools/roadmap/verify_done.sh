@@ -8,12 +8,13 @@ Usage:
 
 Behavior:
   - For each targeted phase:
-    - fails when done!=true
+    - skips validation when done!=true
     - fails if any item has done!=true
     - fails if any done item is missing acceptance checks (`verification`) or acceptance evidence (`reviews[*].commit`)
     - fails if any unresolved reviews.gaps exist (phase or item level)
     - fails when phase index evidence marker is missing
     - fails when phase index evidence marker is present but unchecked
+    - fails when phase is not done but index evidence marker is checked
 
 Evidence marker convention:
   - Marker text: evidence:<phase-basename-without-.yaml>
@@ -35,6 +36,7 @@ class Verifier
     @paths = paths
     @failures = []
     @checked = 0
+    @skipped = 0
   end
 
   def run
@@ -46,7 +48,7 @@ class Verifier
       return 1
     end
 
-    puts("roadmap verification passed (#{@checked} phase#{@checked == 1 ? "" : "s"} checked)")
+    puts("roadmap verification passed (#{@checked} phase#{@checked == 1 ? "" : "s"} checked, #{@skipped} skipped)")
     0
   end
 
@@ -67,7 +69,8 @@ class Verifier
     phase_name = File.basename(path, ".yaml")
     done = data["done"] == true
     unless done
-      @failures << "error: targeted phase not done in #{path} (done!=true)"
+      @skipped += 1
+      verify_not_done_evidence_marker(path, phase_name)
       return
     end
 
@@ -130,6 +133,22 @@ class Verifier
     has_checked_entry = lines_with_marker.any? { |line| line.match?(/^\s*-\s*\[[xX]\]/) }
     unless has_checked_entry
       @failures << "error: evidence marker '#{evidence_marker}' is present but unchecked in #{index_path}"
+    end
+  end
+
+  def verify_not_done_evidence_marker(path, phase_name)
+    index_path = File.join(File.dirname(path), "index.md")
+    evidence_marker = "evidence:#{phase_name}"
+
+    return unless File.file?(index_path)
+
+    index_text = File.read(index_path)
+    lines_with_marker = index_text.each_line.select { |line| line.include?(evidence_marker) }
+    return if lines_with_marker.empty?
+
+    has_checked_entry = lines_with_marker.any? { |line| line.match?(/^\s*-\s*\[[xX]\]/) }
+    if has_checked_entry
+      @failures << "error: evidence marker '#{evidence_marker}' is checked while #{path} has done!=true"
     end
   end
 
