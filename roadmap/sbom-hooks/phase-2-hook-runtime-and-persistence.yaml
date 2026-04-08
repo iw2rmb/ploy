@@ -96,3 +96,4 @@ items:
       - "Existing gate-only runs remain queryable without schema regressions."
     reasoning: "high"
     cfp: 12
+    commit: fe585b9f
