@@ -123,6 +123,18 @@ type GateProfile struct {
 	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
 }
 
+type HooksOnce struct {
+	RunID             types.RunID        `json:"run_id"`
+	RepoID            types.RepoID       `json:"repo_id"`
+	HookHash          string             `json:"hook_hash"`
+	FirstSuccessJobID *types.JobID       `json:"first_success_job_id"`
+	LastSuccessJobID  *types.JobID       `json:"last_success_job_id"`
+	LastSkipJobID     *types.JobID       `json:"last_skip_job_id"`
+	OnceSkipMarked    bool               `json:"once_skip_marked"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+}
+
 type Job struct {
 	ID          types.JobID        `json:"id"`
 	RunID       types.RunID        `json:"run_id"`

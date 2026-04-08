@@ -639,6 +639,7 @@ const listJobsForTUI = `-- name: ListJobsForTUI :many
 SELECT
   jobs.id AS job_id,
   jobs.name,
+  jobs.job_type,
   jobs.status,
   jobs.duration_ms,
   jobs.job_image,
@@ -663,6 +664,7 @@ type ListJobsForTUIParams struct {
 type ListJobsForTUIRow struct {
 	JobID      types.JobID     `json:"job_id"`
 	Name       string          `json:"name"`
+	JobType    types.JobType   `json:"job_type"`
 	Status     types.JobStatus `json:"status"`
 	DurationMs int64           `json:"duration_ms"`
 	JobImage   string          `json:"job_image"`
@@ -687,6 +689,7 @@ func (q *Queries) ListJobsForTUI(ctx context.Context, arg ListJobsForTUIParams) 
 		if err := rows.Scan(
 			&i.JobID,
 			&i.Name,
+			&i.JobType,
 			&i.Status,
 			&i.DurationMs,
 			&i.JobImage,

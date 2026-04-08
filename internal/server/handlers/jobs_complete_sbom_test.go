@@ -10,23 +10,28 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-func TestMaybePersistGateSuccessSBOMRows_PersistsRowsForSuccessfulGate(t *testing.T) {
+func TestMaybePersistLatestSuccessfulCycleSBOMRows_PersistsRowsFromLatestSuccessfulGate(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
-	jobID := domaintypes.NewJobID()
 	repoID := domaintypes.NewRepoID()
-	objKey := "artifacts/run/" + runID.String() + "/bundle/sbom.tar.gz"
-	job := store.Job{
-		ID:      jobID,
-		RunID:   runID,
-		RepoID:  repoID,
-		JobType: domaintypes.JobTypePreGate,
-	}
+	attempt := int32(1)
+	preGateID := domaintypes.JobID("job-pre-gate")
+	postGateID := domaintypes.JobID("job-post-gate")
+	reGateID := domaintypes.JobID("job-re-gate")
+	migID := domaintypes.JobID("job-mig")
 
 	st := &jobStore{}
+	st.listJobsByRunRepoAttempt.val = []store.Job{
+		{ID: preGateID, RunID: runID, RepoID: repoID, Attempt: attempt, JobType: domaintypes.JobTypePreGate, Status: domaintypes.JobStatusSuccess},
+		{ID: migID, RunID: runID, RepoID: repoID, Attempt: attempt, JobType: domaintypes.JobTypeMig, Status: domaintypes.JobStatusSuccess},
+		{ID: postGateID, RunID: runID, RepoID: repoID, Attempt: attempt, JobType: domaintypes.JobTypePostGate, Status: domaintypes.JobStatusFail},
+		{ID: reGateID, RunID: runID, RepoID: repoID, Attempt: attempt, JobType: domaintypes.JobTypeReGate, Status: domaintypes.JobStatusSuccess},
+	}
+
+	objKey := "artifacts/run/" + runID.String() + "/bundle/sbom.tar.gz"
 	st.listArtifactBundlesByRunAndJob.val = []store.ArtifactBundle{
-		{RunID: runID, JobID: &jobID, ObjectKey: &objKey},
+		{RunID: runID, JobID: &reGateID, ObjectKey: &objKey},
 	}
 	bs := bsmock.New()
 	bundle := mustTarGzPayload(t, map[string][]byte{
@@ -40,46 +45,43 @@ func TestMaybePersistGateSuccessSBOMRows_PersistsRowsForSuccessfulGate(t *testin
 	}
 	bp := blobpersist.New(st, bs)
 
-	count, err := maybePersistGateSuccessSBOMRows(context.Background(), st, bp, job, domaintypes.JobStatusSuccess)
+	count, err := maybePersistLatestSuccessfulCycleSBOMRows(context.Background(), st, bp, runID, repoID, attempt)
 	if err != nil {
-		t.Fatalf("maybePersistGateSuccessSBOMRows error: %v", err)
+		t.Fatalf("maybePersistLatestSuccessfulCycleSBOMRows error: %v", err)
 	}
 	if count != 1 {
 		t.Fatalf("persisted row count = %d, want 1", count)
 	}
+
 	assertCalled(t, "DeleteSBOMRowsByJob", st.deleteSBOMRowsByJob.called)
-	if st.deleteSBOMRowsByJob.params != jobID {
-		t.Fatalf("deleteSBOMRowsByJob job_id = %q, want %q", st.deleteSBOMRowsByJob.params, jobID)
+	if len(st.deleteSBOMRowsByJob.calls) != 3 {
+		t.Fatalf("DeleteSBOMRowsByJob calls = %d, want 3 (pre/post/re gate jobs)", len(st.deleteSBOMRowsByJob.calls))
 	}
+
 	if len(st.upsertSBOMRow.calls) != 1 {
 		t.Fatalf("upsertSBOMRow params count = %d, want 1", len(st.upsertSBOMRow.calls))
 	}
 	got := st.upsertSBOMRow.calls[0]
-	if got.JobID != jobID || got.RepoID != repoID || got.Lib != "org.example:lib-a" || got.Ver != "1.0.0" {
+	if got.JobID != reGateID || got.RepoID != repoID || got.Lib != "org.example:lib-a" || got.Ver != "1.0.0" {
 		t.Fatalf("unexpected upsert row: %+v", got)
 	}
 }
 
-func TestMaybePersistGateSuccessSBOMRows_SkipsNonGateOrNonSuccess(t *testing.T) {
+func TestMaybePersistLatestSuccessfulCycleSBOMRows_SkipsWhenNoSuccessfulGate(t *testing.T) {
 	t.Parallel()
 
-	job := store.Job{
-		ID:      domaintypes.NewJobID(),
-		RunID:   domaintypes.NewRunID(),
-		RepoID:  domaintypes.NewRepoID(),
-		JobType: domaintypes.JobTypeMig,
-	}
+	runID := domaintypes.NewRunID()
+	repoID := domaintypes.NewRepoID()
+	attempt := int32(1)
+
 	st := &jobStore{}
-
-	count, err := maybePersistGateSuccessSBOMRows(context.Background(), st, nil, job, domaintypes.JobStatusSuccess)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if count != 0 {
-		t.Fatalf("count = %d, want 0", count)
+	st.listJobsByRunRepoAttempt.val = []store.Job{
+		{ID: domaintypes.JobID("job-pre-gate"), RunID: runID, RepoID: repoID, Attempt: attempt, JobType: domaintypes.JobTypePreGate, Status: domaintypes.JobStatusFail},
+		{ID: domaintypes.JobID("job-post-gate"), RunID: runID, RepoID: repoID, Attempt: attempt, JobType: domaintypes.JobTypePostGate, Status: domaintypes.JobStatusCancelled},
+		{ID: domaintypes.JobID("job-mig"), RunID: runID, RepoID: repoID, Attempt: attempt, JobType: domaintypes.JobTypeMig, Status: domaintypes.JobStatusSuccess},
 	}
 
-	count, err = maybePersistGateSuccessSBOMRows(context.Background(), st, nil, job, domaintypes.JobStatusFail)
+	count, err := maybePersistLatestSuccessfulCycleSBOMRows(context.Background(), st, nil, runID, repoID, attempt)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

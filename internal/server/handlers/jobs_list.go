@@ -54,6 +54,7 @@ func listJobsHandler(st store.Store) http.HandlerFunc {
 		type jobItem struct {
 			JobID      domaintypes.JobID     `json:"job_id"`
 			Name       string                `json:"name"`
+			JobType    domaintypes.JobType   `json:"job_type"`
 			Status     domaintypes.JobStatus `json:"status"`
 			DurationMs int64                 `json:"duration_ms"`
 			JobImage   string                `json:"job_image"`
@@ -68,6 +69,7 @@ func listJobsHandler(st store.Store) http.HandlerFunc {
 			items = append(items, jobItem{
 				JobID:      j.JobID,
 				Name:       j.Name,
+				JobType:    j.JobType,
 				Status:     j.Status,
 				DurationMs: j.DurationMs,
 				JobImage:   j.JobImage,

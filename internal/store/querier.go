@@ -130,6 +130,7 @@ type Querier interface {
 	// Retrieves a single environment entry by key and target.
 	// Returns pgx.ErrNoRows if the (key, target) pair does not exist.
 	GetGlobalEnv(ctx context.Context, arg GetGlobalEnvParams) (ConfigEnv, error)
+	GetHookOnceLedger(ctx context.Context, arg GetHookOnceLedgerParams) (HooksOnce, error)
 	GetJob(ctx context.Context, id types.JobID) (Job, error)
 	GetLatestDiffByJob(ctx context.Context, jobID *types.JobID) (Diff, error)
 	GetLatestRepoGateProfile(ctx context.Context, arg GetLatestRepoGateProfileParams) (GetLatestRepoGateProfileRow, error)
@@ -157,6 +158,7 @@ type Querier interface {
 	// Used for deduplication: callers should check by CID before uploading.
 	GetSpecBundleByCID(ctx context.Context, cid string) (SpecBundle, error)
 	GetStepByJob(ctx context.Context, jobID string) (Step, error)
+	HasHookOnceLedger(ctx context.Context, arg HasHookOnceLedgerParams) (bool, error)
 	// Checks if a mig_repo has any historical executions (run_repos references).
 	// Returns true if the repo cannot be deleted due to history, false otherwise.
 	HasMigRepoHistory(ctx context.Context, repoID types.RepoID) (bool, error)
@@ -220,6 +222,7 @@ type Querier interface {
 	// Returns all global environment entries, ordered by key then target for consistent iteration.
 	// Used by ConfigHolder initialization and HTTP list endpoint.
 	ListGlobalEnv(ctx context.Context) ([]ConfigEnv, error)
+	ListHookOnceLedgerByRunRepo(ctx context.Context, arg ListHookOnceLedgerByRunRepoParams) ([]HooksOnce, error)
 	ListJobsByRun(ctx context.Context, runID types.RunID) ([]Job, error)
 	ListJobsByRunRepoAttempt(ctx context.Context, arg ListJobsByRunRepoAttemptParams) ([]Job, error)
 	// Lists jobs with optional run_id filter, ordered newest-to-oldest by job id.
@@ -272,6 +275,7 @@ type Querier interface {
 	// Rows are grouped by (run_id, repo_id, attempt) for deterministic recovery processing.
 	ListStaleRunningJobs(ctx context.Context, lastHeartbeat pgtype.Timestamptz) ([]ListStaleRunningJobsRow, error)
 	MarkBootstrapTokenCertIssued(ctx context.Context, tokenID string) error
+	MarkHookOnceSkipped(ctx context.Context, arg MarkHookOnceSkippedParams) error
 	// Atomically promote a specific linked successor job: Created -> Queued.
 	// The candidate is eligible only when every predecessor that points to it is Success.
 	PromoteJobByIDIfUnblocked(ctx context.Context, id types.JobID) (Job, error)
@@ -345,6 +349,7 @@ type Querier interface {
 	// Updates value, secret, and refreshes updated_at on conflict.
 	// This ensures idempotent set operations from the CLI or API.
 	UpsertGlobalEnv(ctx context.Context, arg UpsertGlobalEnvParams) error
+	UpsertHookOnceSuccess(ctx context.Context, arg UpsertHookOnceSuccessParams) error
 	UpsertJobMetric(ctx context.Context, arg UpsertJobMetricParams) error
 	// Bulk upsert a mig_repo by normalized repo_url.
 	// Uniqueness is on (mig_id, repo_id) to prevent duplicate repo membership per mig.

@@ -70,9 +70,11 @@ type jobStore struct {
 	// SBOM
 	listSBOMRowsByJob       mockResult[[]store.Sbom]
 	hasSBOMEvidenceForStack mockResult[bool]
-	deleteSBOMRowsByJob     mockCall[types.JobID, struct{}]
+	deleteSBOMRowsByJob     mockCallSlice[types.JobID, struct{}]
 
-	upsertSBOMRow mockCallSlice[store.UpsertSBOMRowParams, struct{}]
+	upsertSBOMRow         mockCallSlice[store.UpsertSBOMRowParams, struct{}]
+	upsertHookOnceSuccess mockCall[store.UpsertHookOnceSuccessParams, struct{}]
+	markHookOnceSkipped   mockCall[store.MarkHookOnceSkippedParams, struct{}]
 
 	// Stack/Gate profile resolution
 	resolveStackRowByImage           mockResult[store.ResolveStackRowByImageRow]
@@ -148,8 +150,8 @@ type jobStore struct {
 	createEvent mockResult[store.Event]
 
 	// Ingest (logs)
-	createLog      mockResult[store.Log]
-	listLogsByRun  mockCall[string, []store.Log]
+	createLog     mockResult[store.Log]
+	listLogsByRun mockCall[string, []store.Log]
 
 	// Spec creation (for migs_ticket flow)
 	createSpecCalled bool
@@ -418,6 +420,16 @@ func (m *jobStore) DeleteSBOMRowsByJob(ctx context.Context, jobID types.JobID) e
 
 func (m *jobStore) UpsertSBOMRow(ctx context.Context, arg store.UpsertSBOMRowParams) error {
 	_, err := m.upsertSBOMRow.record(arg)
+	return err
+}
+
+func (m *jobStore) UpsertHookOnceSuccess(ctx context.Context, arg store.UpsertHookOnceSuccessParams) error {
+	_, err := m.upsertHookOnceSuccess.record(arg)
+	return err
+}
+
+func (m *jobStore) MarkHookOnceSkipped(ctx context.Context, arg store.MarkHookOnceSkippedParams) error {
+	_, err := m.markHookOnceSkipped.record(arg)
 	return err
 }
 

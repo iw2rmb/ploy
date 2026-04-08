@@ -29,7 +29,7 @@ func TestListJobsForTUI(t *testing.T) {
 	fxA := newV1Fixture(t, ctx, db, "https://github.com/test/tui-a", "main", "feat-a", []byte(`{"type":"test"}`))
 	fxB := newV1Fixture(t, ctx, db, "https://github.com/test/tui-b", "main", "feat-b", []byte(`{"type":"test"}`))
 
-	createJob := func(fx v1Fixture, name string, id types.JobID) types.JobID {
+	createJob := func(fx v1Fixture, name string, id types.JobID, jobType types.JobType) types.JobID {
 		t.Helper()
 		_, err := db.CreateJob(ctx, CreateJobParams{
 			ID:          id,
@@ -39,7 +39,7 @@ func TestListJobsForTUI(t *testing.T) {
 			Attempt:     fx.RunRepo.Attempt,
 			Name:        name,
 			Status:      types.JobStatusQueued,
-			JobType:     "mig",
+			JobType:     jobType,
 			JobImage:    "",
 			NextID:      nil,
 			Meta:        []byte(`{}`),
@@ -74,9 +74,14 @@ func TestListJobsForTUI(t *testing.T) {
 		}
 	})
 
-	jobA1 := createJob(fxA, "job-a1", idA1)
-	jobA2 := createJob(fxA, "job-a2", idA2)
-	jobB1 := createJob(fxB, "job-b1", idB1)
+	jobA1 := createJob(fxA, "job-a1", idA1, types.JobTypeMig)
+	jobA2 := createJob(fxA, "job-a2", idA2, types.JobTypeHook)
+	jobB1 := createJob(fxB, "job-b1", idB1, types.JobTypeSBOM)
+	expectedTypeByJobID := map[types.JobID]types.JobType{
+		jobA1: types.JobTypeMig,
+		jobA2: types.JobTypeHook,
+		jobB1: types.JobTypeSBOM,
+	}
 
 	t.Run("NewestToOldestOrdering", func(t *testing.T) {
 		rows, err := db.ListJobsForTUI(ctx, ListJobsForTUIParams{
@@ -96,6 +101,15 @@ func TestListJobsForTUI(t *testing.T) {
 		for _, id := range []types.JobID{jobA1, jobA2, jobB1} {
 			if _, ok := pos[id]; !ok {
 				t.Fatalf("job %s not found in ListJobsForTUI results", id)
+			}
+		}
+		for _, row := range rows {
+			expected, ok := expectedTypeByJobID[row.JobID]
+			if !ok {
+				continue
+			}
+			if row.JobType != expected {
+				t.Fatalf("row %s job_type=%q, want %q", row.JobID, row.JobType, expected)
 			}
 		}
 		// Newer jobs (higher KSUID) must appear before older ones.
