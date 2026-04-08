@@ -8,20 +8,20 @@ import (
 	"testing"
 )
 
-func TestRoadmapVerifySkipsTargetedPhaseWhenNotDone(t *testing.T) {
+func TestRoadmapVerifyFailsTargetedPhaseWhenNotDone(t *testing.T) {
 	repoRoot := mustFindRepoRoot(t)
 	phasePath := filepath.Join("roadmap", "sbom-hooks-remediation", "phase-3-delivery-gates-and-observability.yaml")
 	cmd := exec.Command("bash", "tools/roadmap/verify_done.sh", phasePath)
 	cmd.Dir = repoRoot
 
 	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("expected verification to pass when targeted phase is done=false, output: %s", string(out))
+	if err == nil {
+		t.Fatalf("expected verification to fail when targeted phase is done=false, output: %s", string(out))
 	}
 
 	output := string(out)
-	if !strings.Contains(output, "roadmap verification passed") || !strings.Contains(output, "0 phase") || !strings.Contains(output, "1 skipped") {
-		t.Fatalf("expected pass output with skipped phase count, output: %s", output)
+	if !strings.Contains(output, "error: targeted phase not done") || !strings.Contains(output, phasePath) {
+		t.Fatalf("expected targeted not-done error output, output: %s", output)
 	}
 }
 
@@ -30,7 +30,6 @@ func TestRoadmapVerifyPassesForSbomRemediationPhasesWhenDoneAndEvidenceConsisten
 	phases := []string{
 		filepath.Join("roadmap", "sbom-hooks-remediation", "phase-1-conditional-planning-and-preflight.yaml"),
 		filepath.Join("roadmap", "sbom-hooks-remediation", "phase-2-runtime-execution-and-ingestion.yaml"),
-		filepath.Join("roadmap", "sbom-hooks-remediation", "phase-3-delivery-gates-and-observability.yaml"),
 	}
 
 	args := append([]string{"tools/roadmap/verify_done.sh"}, phases...)
@@ -43,7 +42,7 @@ func TestRoadmapVerifyPassesForSbomRemediationPhasesWhenDoneAndEvidenceConsisten
 	}
 
 	output := string(out)
-	if !strings.Contains(output, "roadmap verification passed (2 phases checked, 1 skipped)") {
+	if !strings.Contains(output, "roadmap verification passed (2 phases checked, 0 skipped)") {
 		t.Fatalf("expected successful verification output with checked/skipped counts, output: %s", output)
 	}
 }
