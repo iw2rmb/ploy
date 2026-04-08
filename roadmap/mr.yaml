@@ -2,12 +2,10 @@
 policy: "~/.codex/policies/composing-roadmaps.md"
 schema: "~/.codex/policies/roadmap.schema.json"
 title: >-
-  MR Workflow Simplification: Accumulated Rehydration and Action Queue
+  MR Workflow Simplification: Accumulated Rehydration and Action-Flow Closure
 scope: >-
-  Replace per-diff workspace replay and dedicated job_type=mr with
-  accumulated rehydration and explicit MR actions, with runtime-parity
-  gates that prevent contract-surface rollout before executable behavior is
-  proven.
+  Finish accumulated rehydration simplification and close remaining action-flow
+  contract parity and documentation work for MR creation.
 documentation:
   - "research/sbom-hooks-incident-2026-04-08.md"
   - "docs/how-to/create-mr.md"
@@ -110,114 +108,45 @@ items:
     reviews: []
     label: "3"
     summary: >-
-      Introduce run_repo_actions queue and node claim or execute path for
-      mr_create as an action, not a job type.
+      Close remaining MR action-flow parity and documentation updates.
     classification: "determined"
     components:
-      - "internal/store/schema.sql"
-      - "internal/store/queries/actions.sql"
-      - "internal/store/querier.go"
-      - "internal/server/handlers/nodes_claim_service.go"
-      - "internal/nodeagent/claimer_loop.go"
-      - "internal/nodeagent/handlers.go"
-    baseline:
-      - "internal/store/schema.sql"
-      - "internal/server/handlers/nodes_claim_service.go"
-      - "internal/nodeagent/claimer_loop.go"
-      - "internal/nodeagent/handlers.go"
-    delta:
-      - >-
-        [replace] mr execution encoded as jobs.job_type=mr -> mr execution
-        encoded as run_repo_actions action_type=mr_create
-    implementation:
-      - >-
-        Add run_repo_actions persistence with status lifecycle,
-        run/repo/attempt keys, node assignment, and action metadata payload.
-      - >-
-        Extend claim service and node claim loop to support claiming
-        executable action work alongside jobs with deterministic priority and
-        isolation.
-      - >-
-        Add explicit action payload contract for mr_create including repo
-        identity, branch refs, and merged run options.
-      - >-
-        Do not expose action as success until node reports terminal
-        completion metadata.
-    verification:
-      - >-
-        Node can claim and start action work without changing existing
-        non-MR job claim behavior.
-      - >-
-        Action status lifecycle transitions are deterministic under normal
-        execution and retry scenarios.
-      - >-
-        Runs without MR triggers keep existing queue and run status behavior
-        unchanged.
-    reasoning: "high"
-    cfp: 15
-
-  - done: false
-    reviews: []
-    label: "4"
-    summary: >-
-      Move MR trigger semantics to auto plus manual action creation, remove
-      JobTypeMR from lifecycle routing, and add runtime-parity acceptance
-      checks.
-    classification: "determined"
-    components:
-      - "internal/nodeagent/execution_mr.go"
-      - "internal/workflow/lifecycle/orchestrator.go"
-      - "internal/server/handlers/jobs_complete_service_post_actions.go"
-      - "internal/server/handlers/runs_repo_actions.go"
-      - "internal/server/handlers/runs_batch_scheduler.go"
-      - "internal/domain/types/migs.go"
+      - "internal/server/handlers/register.go"
+      - "internal/server/handlers/register_routes_coverage_test.go"
+      - "internal/server/handlers/cross_path_parity_test.go"
       - "docs/how-to/create-mr.md"
       - "docs/api/OpenAPI.yaml"
     baseline:
-      - "internal/nodeagent/execution_mr.go"
-      - "internal/workflow/lifecycle/orchestrator.go"
-      - "internal/server/handlers/jobs_complete_service_post_actions.go"
-      - "internal/server/handlers/runs_batch_scheduler.go"
-      - "internal/domain/types/migs.go"
+      - "internal/server/handlers/register.go"
+      - "internal/server/handlers/cross_path_parity_test.go"
+      - "docs/how-to/create-mr.md"
+      - "docs/api/OpenAPI.yaml"
     delta:
       - >-
-        [replace] MR orchestration through job completion and job_type
-        routing -> MR orchestration through run_repo_actions with auto and
-        manual triggers
+        [replace] partial MR runtime rollout notes -> validated action-flow
+        contract and documented API behavior
     implementation:
       - >-
-        Auto-trigger mr_create action from repo terminal outcome using
-        mr_on_success and mr_on_fail without introducing job_type=mr.
+        Align OpenAPI with shipped MR action endpoints and payloads,
+        including manual create and action completion routes.
       - >-
-        Add manual endpoint POST /v1/runs/{run_id}/repos/{repo_id}/mr that
-        ignores auto flags and is idempotent by returning existing MR URL
-        when present.
+        Add or adjust parity and route-coverage tests so advertised MR
+        contract surface is backed by executable runtime behavior.
       - >-
-        Execute MR creation from action executor path reusing existing push
-        and create logic, and merge mr_url into run stats only from actual
-        action completion.
+        Update MR how-to and lifecycle docs to reflect action-based trigger
+        flow (auto and manual) and status propagation semantics.
       - >-
-        Remove JobTypeMR from domain validation, claim decisions, and
-        completion chain branching.
-      - >-
-        Add acceptance tests that block rollout if MR contract surface
-        exists without executable runtime path, mirroring incident
-        containment lessons.
-      - >-
-        Update API and how-to docs to describe action-based MR flow and
-        manual plus auto trigger semantics.
+        Keep non-MR lifecycle contracts unchanged while tightening MR-specific
+        assertions.
     verification:
       - >-
-        Auto MR trigger creates action only for outcomes enabled by run flags
-        and stores mr_url on success.
+        Route coverage passes with the MR action endpoints present in both
+        server registration and OpenAPI spec.
       - >-
-        Manual MR endpoint called repeatedly for same run or repo returns
-        existing MR URL without duplicate action creation.
+        Contract parity tests fail when MR API surface diverges from runtime
+        action execution behavior.
       - >-
-        Lifecycle behavior for non-MR job types remains unchanged after
-        JobTypeMR removal.
-      - >-
-        Contract-surface tests fail when MR API advertises behavior that is
-        not backed by executable action runtime.
-    reasoning: "xhigh"
-    cfp: 20
+        User-facing docs describe the shipped MR action flow without referring
+        to legacy job_type=mr behavior.
+    reasoning: "medium"
+    cfp: 8
