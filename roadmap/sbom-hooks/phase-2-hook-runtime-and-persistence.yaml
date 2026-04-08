@@ -9,7 +9,7 @@ documentation:
 done: false
 reviews: []
 items:
-  - done: false
+  - done: true
     reviews: []
     label: "1"
     summary: "Implement hook spec model and source loading for local and remote hook manifests."
