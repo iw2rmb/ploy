@@ -3,10 +3,18 @@ package nodeagent
 import (
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
+)
+
+const (
+	sbomDependencyOutputFileName = "sbom.dependencies.txt"
+	sbomImageRegistryEnvKey      = "PLOY_CONTAINER_REGISTRY"
+	sbomImageRegistryDefault     = "ghcr.io/iw2rmb/ploy"
 )
 
 // --- Shared manifest helpers ---
@@ -42,6 +50,181 @@ func injectRepoMetadataEnv(env map[string]string, req StartRunRequest) {
 	}
 	if v := strings.TrimSpace(req.CommitSHA.String()); v != "" {
 		env["PLOY_COMMIT_SHA"] = v
+	}
+}
+
+func buildSBOMManifest(req StartRunRequest, cycleName string, persistedStack contracts.MigStack) (contracts.StepManifest, error) {
+	if req.RunID.IsZero() {
+		return contracts.StepManifest{}, errors.New("run_id required")
+	}
+	if req.JobID.IsZero() {
+		return contracts.StepManifest{}, errors.New("job_id required")
+	}
+	if strings.TrimSpace(req.RepoURL.String()) == "" {
+		return contracts.StepManifest{}, errors.New("repo_url required")
+	}
+
+	targetRef := strings.TrimSpace(req.TargetRef.String())
+	if targetRef == "" && strings.TrimSpace(req.BaseRef.String()) != "" {
+		targetRef = strings.TrimSpace(req.BaseRef.String())
+	}
+	repo := contracts.RepoMaterialization{
+		URL:       req.RepoURL,
+		BaseRef:   req.BaseRef,
+		TargetRef: types.GitRef(targetRef),
+		Commit:    req.CommitSHA,
+	}
+
+	stack := resolveSBOMStackForCycle(cycleName, persistedStack, req.TypedOptions)
+	env := make(map[string]string, len(req.Env)+5)
+	for k, v := range req.Env {
+		env[k] = v
+	}
+	injectRepoMetadataEnv(env, req)
+	env["PLOY_SBOM_CYCLE"] = strings.TrimSpace(cycleName)
+	env["PLOY_SBOM_STACK"] = string(stack)
+	env["PLOY_SBOM_DEPENDENCY_OUTPUT"] = "/out/" + sbomDependencyOutputFileName
+
+	manifest := contracts.StepManifest{
+		ID:         types.StepID(req.JobID),
+		Name:       fmt.Sprintf("SBOM %s for run %s", strings.TrimSpace(cycleName), req.RunID),
+		WorkingDir: "/workspace",
+		Envs:       env,
+		Gate:       &contracts.StepGateSpec{Enabled: false},
+		Inputs: []contracts.StepInput{
+			{
+				Name:      "workspace",
+				MountPath: "/workspace",
+				Mode:      contracts.StepInputModeReadWrite,
+				Hydration: &contracts.StepInputHydration{Repo: &repo},
+			},
+		},
+	}
+	if phase := sbomPhaseConfigForCycle(cycleName, req.TypedOptions); phase != nil {
+		manifest.CA = append(manifest.CA, phase.CA...)
+	}
+	if err := applySBOMRuntimeForStack(&manifest, stack); err != nil {
+		return contracts.StepManifest{}, err
+	}
+	return manifest, nil
+}
+
+func resolveSBOMStackForCycle(cycleName string, persistedStack contracts.MigStack, typedOpts RunOptions) contracts.MigStack {
+	stack := normalizeSBOMStack(persistedStack)
+	if stack != contracts.MigStackUnknown {
+		return stack
+	}
+	return sbomStackHintFromPhase(sbomPhaseConfigForCycle(cycleName, typedOpts))
+}
+
+func sbomPhaseConfigForCycle(cycleName string, typedOpts RunOptions) *contracts.BuildGatePhaseConfig {
+	switch strings.TrimSpace(cycleName) {
+	case preGateCycleName:
+		return typedOpts.BuildGate.Pre
+	case postGateCycleName:
+		return typedOpts.BuildGate.Post
+	}
+	if strings.HasPrefix(strings.TrimSpace(cycleName), "re-gate") {
+		return typedOpts.BuildGate.Post
+	}
+	return nil
+}
+
+func sbomStackHintFromPhase(phase *contracts.BuildGatePhaseConfig) contracts.MigStack {
+	if phase == nil || phase.Stack == nil || !phase.Stack.Enabled {
+		return contracts.MigStackUnknown
+	}
+	switch strings.ToLower(strings.TrimSpace(phase.Stack.Tool)) {
+	case "maven":
+		return contracts.MigStackJavaMaven
+	case "gradle":
+		return contracts.MigStackJavaGradle
+	}
+	if strings.EqualFold(strings.TrimSpace(phase.Stack.Language), "java") {
+		return contracts.MigStackJava
+	}
+	return contracts.MigStackUnknown
+}
+
+func detectSBOMStackFromWorkspace(workspace string, fallback contracts.MigStack) contracts.MigStack {
+	stack := normalizeSBOMStack(fallback)
+	trimmedWorkspace := strings.TrimSpace(workspace)
+	if trimmedWorkspace == "" {
+		return stack
+	}
+
+	if fileExists(filepath.Join(trimmedWorkspace, "pom.xml")) {
+		return contracts.MigStackJavaMaven
+	}
+	if fileExists(filepath.Join(trimmedWorkspace, "build.gradle")) ||
+		fileExists(filepath.Join(trimmedWorkspace, "build.gradle.kts")) ||
+		fileExists(filepath.Join(trimmedWorkspace, "settings.gradle")) ||
+		fileExists(filepath.Join(trimmedWorkspace, "settings.gradle.kts")) ||
+		fileExists(filepath.Join(trimmedWorkspace, "gradlew")) {
+		return contracts.MigStackJavaGradle
+	}
+	return stack
+}
+
+func applySBOMRuntimeForStack(manifest *contracts.StepManifest, stack contracts.MigStack) error {
+	if manifest == nil {
+		return errors.New("sbom manifest required")
+	}
+	normalizedStack := normalizeSBOMStack(stack)
+	image, err := resolveImage(sbomJobImageSpec(), normalizedStack, "sbom")
+	if err != nil {
+		return err
+	}
+	manifest.Image = image
+	manifest.Command = sbomCommandForStack(normalizedStack).ToSlice()
+	if len(manifest.Command) == 0 {
+		return fmt.Errorf("sbom stack %q command required", normalizedStack)
+	}
+	if manifest.Envs == nil {
+		manifest.Envs = map[string]string{}
+	}
+	manifest.Envs["PLOY_SBOM_STACK"] = string(normalizedStack)
+	return nil
+}
+
+func sbomJobImageSpec() contracts.JobImage {
+	prefix := strings.TrimRight(strings.TrimSpace(os.Getenv(sbomImageRegistryEnvKey)), "/")
+	if prefix == "" {
+		prefix = sbomImageRegistryDefault
+	}
+	return contracts.JobImage{
+		ByStack: map[contracts.MigStack]string{
+			contracts.MigStackJavaMaven:  prefix + "/sbom-maven:latest",
+			contracts.MigStackJavaGradle: prefix + "/sbom-gradle:latest",
+			contracts.MigStackDefault:    prefix + "/sbom-maven:latest",
+		},
+	}
+}
+
+func sbomCommandForStack(stack contracts.MigStack) contracts.CommandSpec {
+	rawOutputPath := "/out/" + sbomDependencyOutputFileName
+	switch normalizeSBOMStack(stack) {
+	case contracts.MigStackJavaGradle:
+		return contracts.CommandSpec{
+			Shell: "set -eu; if [ -x /workspace/gradlew ]; then /workspace/gradlew -q -p /workspace dependencies > " + rawOutputPath + "; else gradle -q -p /workspace dependencies > " + rawOutputPath + "; fi",
+		}
+	case contracts.MigStackJavaMaven:
+		return contracts.CommandSpec{
+			Shell: "set -eu; if [ ! -f /workspace/pom.xml ]; then echo \"missing /workspace/pom.xml\" >&2; exit 1; fi; mvn -B -q -f /workspace/pom.xml -DoutputFile=" + rawOutputPath + " dependency:list",
+		}
+	default:
+		return contracts.CommandSpec{
+			Shell: "set -eu; : > " + rawOutputPath,
+		}
+	}
+}
+
+func normalizeSBOMStack(stack contracts.MigStack) contracts.MigStack {
+	switch stack {
+	case contracts.MigStackJavaMaven, contracts.MigStackJavaGradle, contracts.MigStackJava:
+		return stack
+	default:
+		return contracts.MigStackUnknown
 	}
 }
 

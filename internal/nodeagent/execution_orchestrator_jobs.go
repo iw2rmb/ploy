@@ -3,12 +3,15 @@
 package nodeagent
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
+	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -28,20 +31,6 @@ const (
 	hookJobNameDelimiter     = "-hook-"
 	preGateHookJobNamePrefix = "pre-gate-hook-"
 )
-
-var canonicalEmptySPDXDocument = []byte(`{
-  "spdxVersion": "SPDX-2.3",
-  "dataLicense": "CC0-1.0",
-  "SPDXID": "SPDXRef-DOCUMENT",
-  "name": "ploy-empty-sbom",
-  "documentNamespace": "https://ploy.dev/sbom/empty",
-  "creationInfo": {
-    "created": "1970-01-01T00:00:00Z",
-    "creators": ["Tool: ploy-nodeagent"]
-  },
-  "packages": []
-}
-`)
 
 func gateCycleRootDir(runID types.RunID, cycleName string) string {
 	return filepath.Join(runCacheDir(runID), "gate-cycles", strings.TrimSpace(cycleName))
@@ -162,7 +151,8 @@ func preGateHookIndexFromJobName(jobName string, hooksLen int) (int, error) {
 	return idx, nil
 }
 
-// executeSBOMJob writes a deterministic SPDX file for the current gate cycle.
+// executeSBOMJob runs SBOM collection in a container and materializes a
+// validated canonical SPDX snapshot for the current gate cycle.
 func (r *runController) executeSBOMJob(ctx context.Context, req StartRunRequest) {
 	startTime := time.Now()
 
@@ -173,31 +163,35 @@ func (r *runController) executeSBOMJob(ctx context.Context, req StartRunRequest)
 		return
 	}
 
-	sbomPath := gateCycleSBOMOutPath(req.RunID, cycleName)
-	if err := writeCanonicalSBOMOutput(sbomPath); err != nil {
-		err = fmt.Errorf("write %s sbom output: %w", cycleName, err)
-		slog.Error("failed to execute sbom job", "run_id", req.RunID, "job_id", req.JobID, "error", err)
+	initialStack := resolveSBOMStackForCycle(cycleName, r.loadPersistedStack(req.RunID), req.TypedOptions)
+	manifest, err := buildSBOMManifest(req, cycleName, initialStack)
+	if err != nil {
+		slog.Error("failed to build sbom manifest", "run_id", req.RunID, "job_id", req.JobID, "cycle_name", cycleName, "error", err)
 		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
 		return
 	}
 
-	duration := time.Since(startTime)
-	stats := types.NewRunStatsBuilder().
-		DurationMs(duration.Milliseconds()).
-		MustBuild()
-	var exitCodeZero int32
-	repoSHAOut := strings.TrimSpace(req.RepoSHAIn.String())
-	if uploadErr := r.uploadStatus(ctx, req.RunID.String(), types.JobStatusSuccess.String(), &exitCodeZero, stats, req.JobID, repoSHAOut); uploadErr != nil {
-		slog.Error("failed to upload sbom job status", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)
+	stackForManifest := initialStack
+	sbomSnapshotPath := gateCycleSBOMOutPath(req.RunID, cycleName)
+	cfg := standardJobConfig{
+		Manifest:      manifest,
+		DiffType:      types.DiffJobTypeMig,
+		OutDirPattern: "ploy-sbom-out-*",
+		PrepareManifest: func(m *contracts.StepManifest, workspace string) error {
+			detectedStack := detectSBOMStackFromWorkspace(workspace, stackForManifest)
+			if detectedStack == stackForManifest {
+				return nil
+			}
+			stackForManifest = detectedStack
+			return applySBOMRuntimeForStack(m, stackForManifest)
+		},
+		ValidateOutputs: func(outDir, _ string) error {
+			return materializeValidatedSBOMOutput(outDir, sbomSnapshotPath)
+		},
+		WorkspacePolicy: workspaceChangePolicyIgnore,
+		StartTime:       startTime,
 	}
-	slog.Info("sbom job succeeded",
-		"run_id", req.RunID,
-		"job_id", req.JobID,
-		"job_name", req.JobName,
-		"cycle_name", cycleName,
-		"sbom_output", "/out/"+preGateCanonicalSBOMFileName,
-		"duration", duration,
-	)
+	r.executeStandardJob(ctx, req, cfg)
 }
 
 // executeHookJob stages /in and /out SBOM snapshots for a deterministic hook chain.
@@ -459,9 +453,10 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 		PopulateInDir: func(inDir string) error {
 			return r.populateHealingInDir(req.RunID, inDir, req.RecoveryContext, schemaJSON)
 		},
-		PrepareManifest: func(m *contracts.StepManifest, ws string) {
+		PrepareManifest: func(m *contracts.StepManifest, ws string) error {
 			r.injectHealingEnvVars(m, ws)
 			r.mountHealingTLSCerts(m)
+			return nil
 		},
 		WorkspacePolicy: workspacePolicy,
 		UploadDiff: func(ctx context.Context, runID types.RunID, jobID types.JobID, jobName string, diffGen step.DiffGenerator, baseDir, workspace string, result step.Result) {
@@ -513,17 +508,213 @@ func materializePreGateSBOMForGate(runID types.RunID, hooks []string, workspace 
 	return materializeGateSBOMForGate(runID, preGateCycleName, hooks, workspace)
 }
 
-func writeCanonicalSBOMOutput(sbomOutPath string) error {
-	if err := os.MkdirAll(filepath.Dir(sbomOutPath), 0o755); err != nil {
-		return fmt.Errorf("mkdir sbom out dir: %w", err)
+type canonicalSBOMDocument struct {
+	SPDXVersion       string                 `json:"spdxVersion"`
+	DataLicense       string                 `json:"dataLicense"`
+	SPDXID            string                 `json:"SPDXID"`
+	Name              string                 `json:"name"`
+	DocumentNamespace string                 `json:"documentNamespace"`
+	CreationInfo      canonicalCreationInfo  `json:"creationInfo"`
+	Packages          []canonicalSBOMPackage `json:"packages"`
+}
+
+type canonicalCreationInfo struct {
+	Created  string   `json:"created"`
+	Creators []string `json:"creators"`
+}
+
+type canonicalSBOMPackage struct {
+	SPDXID      string `json:"SPDXID,omitempty"`
+	Name        string `json:"name"`
+	VersionInfo string `json:"versionInfo"`
+}
+
+var (
+	gradleDependencyPattern = regexp.MustCompile(`([A-Za-z0-9_.-]+:[A-Za-z0-9_.-]+):([A-Za-z0-9][A-Za-z0-9+_.-]*)`)
+	gradleOverridePattern   = regexp.MustCompile(`->\s*([A-Za-z0-9][A-Za-z0-9+_.-]*)`)
+	sbomNameTokenPattern    = regexp.MustCompile(`^[A-Za-z0-9_.-]+$`)
+	sbomVersionTokenPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9+_.-]*$`)
+)
+
+func materializeValidatedSBOMOutput(outDir string, snapshotPath string) error {
+	rawOutputPath := filepath.Join(outDir, sbomDependencyOutputFileName)
+	raw, err := os.ReadFile(rawOutputPath)
+	if err != nil {
+		return fmt.Errorf("read /out/%s: %w", sbomDependencyOutputFileName, err)
 	}
-	if err := os.WriteFile(sbomOutPath, canonicalEmptySPDXDocument, 0o644); err != nil {
-		return fmt.Errorf("write canonical sbom output: %w", err)
+
+	canonicalRaw, err := canonicalSBOMFromDependencyOutput(raw)
+	if err != nil {
+		return fmt.Errorf("build canonical sbom from /out/%s: %w", sbomDependencyOutputFileName, err)
+	}
+	if err := validateCanonicalSBOMDocument(canonicalRaw); err != nil {
+		return fmt.Errorf("validate canonical sbom payload: %w", err)
+	}
+
+	canonicalPath := filepath.Join(outDir, preGateCanonicalSBOMFileName)
+	if err := os.WriteFile(canonicalPath, canonicalRaw, 0o644); err != nil {
+		return fmt.Errorf("write /out/%s: %w", preGateCanonicalSBOMFileName, err)
+	}
+	if err := validateCanonicalSBOMPath(canonicalPath); err != nil {
+		return fmt.Errorf("validate /out/%s: %w", preGateCanonicalSBOMFileName, err)
+	}
+	if err := copyFileBytes(canonicalPath, snapshotPath); err != nil {
+		return fmt.Errorf("stage cycle sbom snapshot: %w", err)
+	}
+	if err := validateCanonicalSBOMPath(snapshotPath); err != nil {
+		return fmt.Errorf("validate staged cycle sbom snapshot: %w", err)
 	}
 	return nil
 }
 
-// standardJobConfig configures the execution of a standard container job (mig/heal).
+func canonicalSBOMFromDependencyOutput(raw []byte) ([]byte, error) {
+	packages := collectSBOMPackages(raw)
+	doc := canonicalSBOMDocument{
+		SPDXVersion:       "SPDX-2.3",
+		DataLicense:       "CC0-1.0",
+		SPDXID:            "SPDXRef-DOCUMENT",
+		Name:              "ploy-generated-sbom",
+		DocumentNamespace: "https://ploy.dev/sbom/generated",
+		CreationInfo: canonicalCreationInfo{
+			Created:  "1970-01-01T00:00:00Z",
+			Creators: []string{"Tool: ploy-nodeagent"},
+		},
+		Packages: make([]canonicalSBOMPackage, len(packages)),
+	}
+	copy(doc.Packages, packages)
+	for i := range doc.Packages {
+		doc.Packages[i].SPDXID = fmt.Sprintf("SPDXRef-Package-%06d", i+1)
+	}
+	return json.MarshalIndent(doc, "", "  ")
+}
+
+func collectSBOMPackages(raw []byte) []canonicalSBOMPackage {
+	lines := strings.Split(string(raw), "\n")
+	packages := make([]canonicalSBOMPackage, 0)
+	seen := make(map[string]struct{})
+	for _, line := range lines {
+		if name, version, ok := parseMavenDependencyLine(line); ok {
+			packages = appendUniqueSBOMPackage(packages, seen, name, version)
+			continue
+		}
+		if name, version, ok := parseGradleDependencyLine(line); ok {
+			packages = appendUniqueSBOMPackage(packages, seen, name, version)
+		}
+	}
+	sort.Slice(packages, func(i, j int) bool {
+		if packages[i].Name == packages[j].Name {
+			return packages[i].VersionInfo < packages[j].VersionInfo
+		}
+		return packages[i].Name < packages[j].Name
+	})
+	return packages
+}
+
+func appendUniqueSBOMPackage(
+	packages []canonicalSBOMPackage,
+	seen map[string]struct{},
+	name string,
+	version string,
+) []canonicalSBOMPackage {
+	key := name + "\x00" + version
+	if _, exists := seen[key]; exists {
+		return packages
+	}
+	seen[key] = struct{}{}
+	return append(packages, canonicalSBOMPackage{
+		Name:        name,
+		VersionInfo: version,
+	})
+}
+
+func parseMavenDependencyLine(line string) (string, string, bool) {
+	fields := strings.Fields(line)
+	for _, field := range fields {
+		token := strings.Trim(strings.TrimSpace(field), ",;")
+		if strings.Count(token, ":") < 4 {
+			continue
+		}
+		parts := strings.Split(token, ":")
+		if len(parts) < 5 {
+			continue
+		}
+		nameGroup := strings.TrimSpace(parts[0])
+		nameArtifact := strings.TrimSpace(parts[1])
+		version := strings.TrimSpace(parts[len(parts)-2])
+		scope := strings.TrimSpace(parts[len(parts)-1])
+		if !sbomNameTokenPattern.MatchString(nameGroup) || !sbomNameTokenPattern.MatchString(nameArtifact) {
+			continue
+		}
+		if !sbomVersionTokenPattern.MatchString(version) || scope == "" {
+			continue
+		}
+		return nameGroup + ":" + nameArtifact, version, true
+	}
+	return "", "", false
+}
+
+func parseGradleDependencyLine(line string) (string, string, bool) {
+	if !strings.Contains(line, "---") {
+		return "", "", false
+	}
+	matches := gradleDependencyPattern.FindStringSubmatch(line)
+	if len(matches) != 3 {
+		return "", "", false
+	}
+
+	name := strings.TrimSpace(matches[1])
+	version := strings.TrimSpace(matches[2])
+	if override := gradleOverridePattern.FindStringSubmatch(line); len(override) == 2 {
+		version = strings.TrimSpace(override[1])
+	}
+	parts := strings.Split(name, ":")
+	if len(parts) != 2 {
+		return "", "", false
+	}
+	if !sbomNameTokenPattern.MatchString(parts[0]) || !sbomNameTokenPattern.MatchString(parts[1]) {
+		return "", "", false
+	}
+	if !sbomVersionTokenPattern.MatchString(version) {
+		return "", "", false
+	}
+	return name, version, true
+}
+
+func validateCanonicalSBOMPath(path string) error {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	return validateCanonicalSBOMDocument(raw)
+}
+
+func validateCanonicalSBOMDocument(raw []byte) error {
+	if len(bytes.TrimSpace(raw)) == 0 {
+		return fmt.Errorf("sbom payload is empty")
+	}
+	var doc canonicalSBOMDocument
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		return fmt.Errorf("parse json: %w", err)
+	}
+	if strings.TrimSpace(doc.SPDXVersion) != "SPDX-2.3" {
+		return fmt.Errorf("spdxVersion must be SPDX-2.3")
+	}
+	if doc.Packages == nil {
+		return fmt.Errorf("packages array is required")
+	}
+	for i, pkg := range doc.Packages {
+		if strings.TrimSpace(pkg.Name) == "" {
+			return fmt.Errorf("packages[%d].name is required", i)
+		}
+		if strings.TrimSpace(pkg.VersionInfo) == "" {
+			return fmt.Errorf("packages[%d].versionInfo is required", i)
+		}
+	}
+	return nil
+}
+
+// standardJobConfig configures the execution of a standard container job
+// (mig/heal/sbom).
 type standardJobConfig struct {
 	Manifest      contracts.StepManifest
 	DiffType      types.DiffJobType
@@ -531,7 +722,8 @@ type standardJobConfig struct {
 	InDirPattern  string
 
 	PopulateInDir   func(inDir string) error
-	PrepareManifest func(manifest *contracts.StepManifest, workspace string)
+	PrepareManifest func(manifest *contracts.StepManifest, workspace string) error
+	ValidateOutputs func(outDir, workspace string) error
 
 	WorkspacePolicy           workspaceChangePolicy
 	UploadConfiguredArtifacts bool
@@ -542,7 +734,8 @@ type standardJobConfig struct {
 	StartTime time.Time
 }
 
-// executeStandardJob orchestrates the common lifecycle of a container job (mig/heal):
+// executeStandardJob orchestrates the common lifecycle of a container job
+// (mig/heal/sbom):
 // runtime init, rehydration, snapshots, directory prep, execution, and uploading.
 func (r *runController) executeStandardJob(ctx context.Context, req StartRunRequest, cfg standardJobConfig) {
 	startTime := cfg.StartTime
@@ -610,7 +803,9 @@ func (r *runController) runContainerJob(
 	clearManifestHydration(&manifest)
 
 	if cfg.PrepareManifest != nil {
-		cfg.PrepareManifest(&manifest, workspace)
+		if err := cfg.PrepareManifest(&manifest, workspace); err != nil {
+			return fmt.Errorf("prepare manifest: %w", err)
+		}
 	}
 
 	imageName := strings.TrimSpace(manifest.Image)
@@ -655,6 +850,13 @@ func (r *runController) runContainerJob(
 	}); bundleErr != nil {
 		return bundleErr
 	}
+
+	if runErr == nil && result.ExitCode == 0 && cfg.ValidateOutputs != nil {
+		if validateErr := cfg.ValidateOutputs(outDir, workspace); validateErr != nil {
+			runErr = fmt.Errorf("validate job outputs: %w", validateErr)
+		}
+	}
+	duration = time.Since(startTime)
 
 	if runErr != nil || result.ExitCode != 0 {
 		if preserveRoot, preserveErr := preserveFailureArtifacts(req.RunID, req.JobID, workspace, outDir, inDir); preserveErr != nil {
