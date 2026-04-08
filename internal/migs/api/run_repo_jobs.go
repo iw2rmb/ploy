@@ -21,6 +21,14 @@ type RunRepoJobRecovery struct {
 	CandidatePromoted         *bool           `json:"candidate_promoted,omitempty"`
 }
 
+// RunRepoJobSBOMEvidence summarizes persisted SBOM outputs for an sbom job.
+type RunRepoJobSBOMEvidence struct {
+	// ArtifactPresent reports whether at least one artifact bundle exists for this sbom job.
+	ArtifactPresent *bool `json:"artifact_present,omitempty"`
+	// ParsedPackageCount reports the number of normalized package rows persisted for this sbom job.
+	ParsedPackageCount *int `json:"parsed_package_count,omitempty"`
+}
+
 // RunRepoJob represents a job within a repo execution.
 type RunRepoJob struct {
 	JobID         domaintypes.JobID     `json:"job_id"`
@@ -41,6 +49,13 @@ type RunRepoJob struct {
 	BugSummary    string                `json:"bug_summary,omitempty"`
 	ErrorKind     string                `json:"error_kind,omitempty"`
 	Recovery      *RunRepoJobRecovery   `json:"recovery,omitempty"`
+	// Hook execution/planning evidence fields.
+	// hook_condition_result is a serialized JSON payload describing evaluated conditions.
+	HookConditionResult string `json:"hook_condition_result,omitempty"`
+	// hook_plan_reason is a human-readable planner summary describing why a hook was or was not planned.
+	HookPlanReason string `json:"hook_plan_reason,omitempty"`
+	// sbom_evidence exposes artifact + parsed-row evidence for sbom jobs.
+	SBOMEvidence *RunRepoJobSBOMEvidence `json:"sbom_evidence,omitempty"`
 	// Build-gate stack detection fields (gate jobs only).
 	// Populated from gate metadata's detected_stack when present.
 	Lang    string `json:"lang,omitempty"`

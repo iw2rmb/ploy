@@ -141,6 +141,191 @@ func TestListRunRepoJobsHandler_ExposesSBOMAndHookJobTypes(t *testing.T) {
 	}
 }
 
+func TestListRunRepoJobsHandler_ExposesHookAndSBOMEvidence(t *testing.T) {
+	t.Parallel()
+
+	runID := domaintypes.NewRunID()
+	repoID := domaintypes.NewRepoID()
+	sbomID := domaintypes.NewJobID()
+	hookID := domaintypes.NewJobID()
+	hookSummary := "hook_match eval=planned should_run=true stack=true sbom=true on_match=true on_add=false on_remove=false on_change=false"
+
+	st := &runStore{
+		getRunRepoResult: store.RunRepo{
+			RunID:   runID,
+			RepoID:  repoID,
+			Attempt: 1,
+		},
+	}
+	st.listJobsByRunRepoAttempt.val = []store.Job{
+		{
+			ID:      sbomID,
+			RunID:   runID,
+			RepoID:  repoID,
+			Attempt: 1,
+			Name:    "pre-gate-sbom",
+			JobType: domaintypes.JobTypeSBOM,
+			Status:  domaintypes.JobStatusSuccess,
+			Meta:    []byte(`{"kind":"mig"}`),
+		},
+		{
+			ID:      hookID,
+			RunID:   runID,
+			RepoID:  repoID,
+			Attempt: 1,
+			Name:    "pre-gate-hook-000",
+			JobType: domaintypes.JobTypeHook,
+			Status:  domaintypes.JobStatusSuccess,
+			Meta:    []byte(`{"kind":"mig","action_summary":"` + hookSummary + `"}`),
+		},
+	}
+	st.listArtifactBundlesByRunAndJob.val = []store.ArtifactBundle{{}}
+	st.listSBOMRowsByJob.val = []store.Sbom{
+		{JobID: sbomID, RepoID: repoID, Lib: "org.slf4j:slf4j-api", Ver: "1.7.36"},
+		{JobID: sbomID, RepoID: repoID, Lib: "junit:junit", Ver: "4.13.2"},
+	}
+
+	handler := listRunRepoJobsHandler(st)
+	rr := doRequest(t, handler, http.MethodGet, "/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/jobs", nil, "run_id", runID.String(), "repo_id", repoID.String())
+	assertStatus(t, rr, http.StatusOK)
+
+	var resp struct {
+		Jobs []struct {
+			Name                string `json:"name"`
+			JobType             string `json:"job_type"`
+			HookConditionResult string `json:"hook_condition_result"`
+			HookPlanReason      string `json:"hook_plan_reason"`
+			SBOMEvidence        *struct {
+				ArtifactPresent    *bool `json:"artifact_present"`
+				ParsedPackageCount *int  `json:"parsed_package_count"`
+			} `json:"sbom_evidence"`
+		} `json:"jobs"`
+	}
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if len(resp.Jobs) != 2 {
+		t.Fatalf("expected 2 jobs, got %d", len(resp.Jobs))
+	}
+
+	sbomIndex := -1
+	hookIndex := -1
+	for i := range resp.Jobs {
+		switch resp.Jobs[i].JobType {
+		case "sbom":
+			sbomIndex = i
+		case "hook":
+			hookIndex = i
+		}
+	}
+	if hookIndex < 0 {
+		t.Fatal("expected hook job in response")
+	}
+	if sbomIndex < 0 {
+		t.Fatal("expected sbom job in response")
+	}
+	hookJob := resp.Jobs[hookIndex]
+	sbomJob := resp.Jobs[sbomIndex]
+	if got, want := hookJob.HookPlanReason, hookSummary; got != want {
+		t.Fatalf("hook_plan_reason = %q, want %q", got, want)
+	}
+	var hookCondition struct {
+		Evaluated bool `json:"evaluated"`
+		ShouldRun bool `json:"should_run"`
+	}
+	if err := json.Unmarshal([]byte(hookJob.HookConditionResult), &hookCondition); err != nil {
+		t.Fatalf("unmarshal hook_condition_result: %v", err)
+	}
+	if !hookCondition.Evaluated || !hookCondition.ShouldRun {
+		t.Fatalf("hook_condition_result = %+v, want evaluated=true and should_run=true", hookCondition)
+	}
+	if got, want := sbomJob.HookPlanReason, `planned 1 hook job(s) for cycle "pre-gate"`; got != want {
+		t.Fatalf("sbom hook_plan_reason = %q, want %q", got, want)
+	}
+	if sbomJob.SBOMEvidence == nil {
+		t.Fatal("expected sbom_evidence for sbom job")
+	}
+	if sbomJob.SBOMEvidence.ArtifactPresent == nil || !*sbomJob.SBOMEvidence.ArtifactPresent {
+		t.Fatalf("sbom_evidence.artifact_present = %#v, want true", sbomJob.SBOMEvidence.ArtifactPresent)
+	}
+	if sbomJob.SBOMEvidence.ParsedPackageCount == nil || *sbomJob.SBOMEvidence.ParsedPackageCount != 2 {
+		t.Fatalf("sbom_evidence.parsed_package_count = %#v, want 2", sbomJob.SBOMEvidence.ParsedPackageCount)
+	}
+}
+
+func TestListRunRepoJobsHandler_ExposesSBOMHookNotPlannedEvidence(t *testing.T) {
+	t.Parallel()
+
+	runID := domaintypes.NewRunID()
+	repoID := domaintypes.NewRepoID()
+	sbomID := domaintypes.NewJobID()
+
+	st := &runStore{
+		getRunRepoResult: store.RunRepo{
+			RunID:   runID,
+			RepoID:  repoID,
+			Attempt: 1,
+		},
+	}
+	st.listJobsByRunRepoAttempt.val = []store.Job{
+		{
+			ID:      sbomID,
+			RunID:   runID,
+			RepoID:  repoID,
+			Attempt: 1,
+			Name:    "pre-gate-sbom",
+			JobType: domaintypes.JobTypeSBOM,
+			Status:  domaintypes.JobStatusSuccess,
+			Meta:    []byte(`{"kind":"mig"}`),
+		},
+	}
+	st.listArtifactBundlesByRunAndJob.val = []store.ArtifactBundle{}
+	st.listSBOMRowsByJob.val = []store.Sbom{}
+
+	handler := listRunRepoJobsHandler(st)
+	rr := doRequest(t, handler, http.MethodGet, "/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/jobs", nil, "run_id", runID.String(), "repo_id", repoID.String())
+	assertStatus(t, rr, http.StatusOK)
+
+	var resp struct {
+		Jobs []struct {
+			HookConditionResult string `json:"hook_condition_result"`
+			HookPlanReason      string `json:"hook_plan_reason"`
+			SBOMEvidence        *struct {
+				ArtifactPresent    *bool `json:"artifact_present"`
+				ParsedPackageCount *int  `json:"parsed_package_count"`
+			} `json:"sbom_evidence"`
+		} `json:"jobs"`
+	}
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if len(resp.Jobs) != 1 {
+		t.Fatalf("expected 1 job, got %d", len(resp.Jobs))
+	}
+	if got, want := resp.Jobs[0].HookPlanReason, `no hook jobs planned for cycle "pre-gate"`; got != want {
+		t.Fatalf("hook_plan_reason = %q, want %q", got, want)
+	}
+	var condition struct {
+		Evaluated   bool `json:"evaluated"`
+		PlannedJobs int  `json:"planned_jobs"`
+	}
+	if err := json.Unmarshal([]byte(resp.Jobs[0].HookConditionResult), &condition); err != nil {
+		t.Fatalf("unmarshal hook_condition_result: %v", err)
+	}
+	if !condition.Evaluated || condition.PlannedJobs != 0 {
+		t.Fatalf("hook_condition_result = %+v, want evaluated=true planned_jobs=0", condition)
+	}
+	if resp.Jobs[0].SBOMEvidence == nil {
+		t.Fatal("expected sbom_evidence")
+	}
+	if resp.Jobs[0].SBOMEvidence.ArtifactPresent == nil || *resp.Jobs[0].SBOMEvidence.ArtifactPresent {
+		t.Fatalf("artifact_present = %#v, want false", resp.Jobs[0].SBOMEvidence.ArtifactPresent)
+	}
+	if resp.Jobs[0].SBOMEvidence.ParsedPackageCount == nil || *resp.Jobs[0].SBOMEvidence.ParsedPackageCount != 0 {
+		t.Fatalf("parsed_package_count = %#v, want 0", resp.Jobs[0].SBOMEvidence.ParsedPackageCount)
+	}
+}
+
 func TestListRunRepoJobsHandler_AttemptQueryOverride(t *testing.T) {
 	t.Parallel()
 
