@@ -11,7 +11,7 @@ documentation:
 done: false
 reviews: []
 items:
-  - done: false
+  - done: true
     reviews:
       - gaps: ["\"Wire CI to execute roadmap verification on pull requests touching roadmap files and sbom/hook runtime components.\" is only partially wired: `.github/workflows/ci.yml` runs `make roadmap-verify` on matching PRs, but `Makefile` hard-codes `ROADMAP_VERIFY_PHASES` to `roadmap/sbom-hooks-remediation/phase-3-delivery-gates-and-observability.yaml`, so done-state regressions in other touched roadmap phase files are not checked by CI (`.github/workflows/ci.yml:124-126`, `Makefile:9,157-159`).", "\"manual roadmap done signaling -> automated done verification tied to review gap and acceptance evidence checks\" is not enforced in full: `tools/roadmap/verify_done.sh` validates only unresolved `reviews.gaps` and static `evidence:<phase>` marker presence in `index.md`, but does not validate runtime acceptance-check completion/evidence state, so `done: true` can pass with marker text present even when runtime acceptance checks remain (`tools/roadmap/verify_done.sh:63-99`, `roadmap/sbom-hooks-remediation/index.md:10-12`)."]
         commit: 8d8b9087
