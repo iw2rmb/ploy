@@ -1116,7 +1116,7 @@ RepoJobItem:
       description: Job name (e.g., "mig-0", "pre-gate", "heal")
     job_type:
       type: string
-      description: Job phase type (pre_gate, mig, post_gate, heal, re_gate, mr)
+      description: Job phase type (pre_gate, sbom, hook, mig, post_gate, heal, re_gate, mr)
     job_image:
       type: string
       description: Container image used for this job (may be empty)
