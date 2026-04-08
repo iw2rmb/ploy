@@ -3,11 +3,13 @@ package handlers
 import (
 	"context"
 	"testing"
+	"time"
 
 	bsmock "github.com/iw2rmb/ploy/internal/blobstore/mock"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/server/blobpersist"
 	"github.com/iw2rmb/ploy/internal/store"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 func TestMaybePersistLatestSuccessfulCycleSBOMRows_PersistsRowsFromLatestSuccessfulSBOMJob(t *testing.T) {
@@ -16,6 +18,7 @@ func TestMaybePersistLatestSuccessfulCycleSBOMRows_PersistsRowsFromLatestSuccess
 	runID := domaintypes.NewRunID()
 	repoID := domaintypes.NewRepoID()
 	attempt := int32(1)
+	now := time.Now().UTC()
 	sbomOldSuccessID := domaintypes.JobID("job-pre-sbom")
 	sbomFailID := domaintypes.JobID("job-post-sbom")
 	sbomLatestSuccessID := domaintypes.JobID("job-regate-sbom")
@@ -23,10 +26,22 @@ func TestMaybePersistLatestSuccessfulCycleSBOMRows_PersistsRowsFromLatestSuccess
 
 	st := &jobStore{}
 	st.listJobsByRunRepoAttempt.val = []store.Job{
-		{ID: sbomOldSuccessID, RunID: runID, RepoID: repoID, Attempt: attempt, JobType: domaintypes.JobTypeSBOM, Status: domaintypes.JobStatusSuccess},
+		{
+			ID: sbomOldSuccessID, RunID: runID, RepoID: repoID, Attempt: attempt,
+			JobType: domaintypes.JobTypeSBOM, Status: domaintypes.JobStatusSuccess,
+			FinishedAt: pgtype.Timestamptz{Time: now.Add(-2 * time.Minute), Valid: true},
+		},
 		{ID: migID, RunID: runID, RepoID: repoID, Attempt: attempt, JobType: domaintypes.JobTypeMig, Status: domaintypes.JobStatusSuccess},
-		{ID: sbomFailID, RunID: runID, RepoID: repoID, Attempt: attempt, JobType: domaintypes.JobTypeSBOM, Status: domaintypes.JobStatusFail},
-		{ID: sbomLatestSuccessID, RunID: runID, RepoID: repoID, Attempt: attempt, JobType: domaintypes.JobTypeSBOM, Status: domaintypes.JobStatusSuccess},
+		{
+			ID: sbomFailID, RunID: runID, RepoID: repoID, Attempt: attempt,
+			JobType: domaintypes.JobTypeSBOM, Status: domaintypes.JobStatusFail,
+			FinishedAt: pgtype.Timestamptz{Time: now.Add(-1 * time.Minute), Valid: true},
+		},
+		{
+			ID: sbomLatestSuccessID, RunID: runID, RepoID: repoID, Attempt: attempt,
+			JobType: domaintypes.JobTypeSBOM, Status: domaintypes.JobStatusSuccess,
+			FinishedAt: pgtype.Timestamptz{Time: now, Valid: true},
+		},
 	}
 
 	objKey := "artifacts/run/" + runID.String() + "/bundle/sbom.tar.gz"
@@ -90,5 +105,65 @@ func TestMaybePersistLatestSuccessfulCycleSBOMRows_SkipsWhenNoSuccessfulSBOMJob(
 	}
 	if st.deleteSBOMRowsByJob.called || st.upsertSBOMRow.called {
 		t.Fatal("expected no sbom persistence calls")
+	}
+}
+
+func TestLatestSuccessfulSBOMJob_PrefersMostRecentFinishedAtOverLexicographicID(t *testing.T) {
+	t.Parallel()
+
+	now := time.Now().UTC()
+	olderLexicographicallyGreaterID := domaintypes.JobID("job-z-older")
+	newerLexicographicallySmallerID := domaintypes.JobID("job-a-newer")
+
+	got, ok := latestSuccessfulSBOMJob([]store.Job{
+		{
+			ID: olderLexicographicallyGreaterID,
+			JobType: domaintypes.JobTypeSBOM,
+			Status:  domaintypes.JobStatusSuccess,
+			FinishedAt: pgtype.Timestamptz{
+				Time:  now.Add(-1 * time.Minute),
+				Valid: true,
+			},
+		},
+		{
+			ID: newerLexicographicallySmallerID,
+			JobType: domaintypes.JobTypeSBOM,
+			Status:  domaintypes.JobStatusSuccess,
+			FinishedAt: pgtype.Timestamptz{
+				Time:  now,
+				Valid: true,
+			},
+		},
+	})
+	if !ok {
+		t.Fatal("expected successful sbom job")
+	}
+	if got.ID != newerLexicographicallySmallerID {
+		t.Fatalf("selected job id = %s, want %s", got.ID, newerLexicographicallySmallerID)
+	}
+}
+
+func TestLatestSuccessfulSBOMJob_UsesIDAsDeterministicTieBreak(t *testing.T) {
+	t.Parallel()
+
+	finishedAt := time.Now().UTC()
+	lowID := domaintypes.JobID("job-a")
+	highID := domaintypes.JobID("job-z")
+
+	got, ok := latestSuccessfulSBOMJob([]store.Job{
+		{
+			ID: lowID, JobType: domaintypes.JobTypeSBOM, Status: domaintypes.JobStatusSuccess,
+			FinishedAt: pgtype.Timestamptz{Time: finishedAt, Valid: true},
+		},
+		{
+			ID: highID, JobType: domaintypes.JobTypeSBOM, Status: domaintypes.JobStatusSuccess,
+			FinishedAt: pgtype.Timestamptz{Time: finishedAt, Valid: true},
+		},
+	})
+	if !ok {
+		t.Fatal("expected successful sbom job")
+	}
+	if got.ID != highID {
+		t.Fatalf("selected job id = %s, want %s", got.ID, highID)
 	}
 }
