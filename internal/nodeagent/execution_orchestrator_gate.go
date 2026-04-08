@@ -92,8 +92,8 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 	}()
 
 	if req.JobType == types.JobTypePreGate {
-		if err := r.schedulePreGateSBOMAndHooks(req, workspace); err != nil {
-			slog.Error("failed to schedule pre-gate sbom and hooks", "run_id", req.RunID, "job_id", req.JobID, "error", err)
+		if err := materializePreGateSBOMForGate(req.RunID, req.TypedOptions.Hooks, workspace); err != nil {
+			slog.Error("failed to materialize pre-gate sbom snapshot", "run_id", req.RunID, "job_id", req.JobID, "error", err)
 			r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
 			return
 		}

@@ -23,10 +23,10 @@ func TestBatchRepoStarter_StartPendingRepos_CreatesJobsWhenNone(t *testing.T) {
 	st.getSpec.val = store.Spec{ID: specID, Spec: []byte(`{"steps":[{"image":"a"}]}`)}
 	st.listRunReposByRun.val = []store.RunRepo{
 		{RunID: runID, RepoID: repoID, Status: domaintypes.RunRepoStatusQueued, RepoBaseRef: "main", RepoSha0: testRunRepoSHA0, Attempt: 1},
-		}
+	}
 	st.listQueuedRunReposByRun.val = []store.RunRepo{
 		{RunID: runID, RepoID: repoID, Status: domaintypes.RunRepoStatusQueued, RepoBaseRef: "main", RepoSha0: testRunRepoSHA0, Attempt: 1},
-		}
+	}
 	st.listJobsByRunRepoAttempt.val = []store.Job{}
 
 	starter := NewBatchRepoStarter(st)
@@ -40,8 +40,8 @@ func TestBatchRepoStarter_StartPendingRepos_CreatesJobsWhenNone(t *testing.T) {
 	if got.Started != 1 {
 		t.Fatalf("expected started=1, got %d", got.Started)
 	}
-	if st.createJobCallCount != 3 {
-		t.Fatalf("expected 3 jobs to be created, got %d", st.createJobCallCount)
+	if st.createJobCallCount != 4 {
+		t.Fatalf("expected 4 jobs to be created, got %d", st.createJobCallCount)
 	}
 	if st.createRunCalled {
 		t.Fatalf("expected CreateRun not to be called (no child runs per repo)")
@@ -64,14 +64,14 @@ func TestBatchRepoStarter_StartPendingRepos_SchedulesNextJobWhenNoActive(t *test
 	st.getSpec.val = store.Spec{ID: specID, Spec: []byte(`{"steps":[{"image":"a"}]}`)}
 	st.listRunReposByRun.val = []store.RunRepo{
 		{RunID: runID, RepoID: repoID, Status: domaintypes.RunRepoStatusQueued, RepoBaseRef: "main", RepoSha0: testRunRepoSHA0, Attempt: 1},
-		}
+	}
 	st.listQueuedRunReposByRun.val = []store.RunRepo{
 		{RunID: runID, RepoID: repoID, Status: domaintypes.RunRepoStatusQueued, RepoBaseRef: "main", RepoSha0: testRunRepoSHA0, Attempt: 1},
-		}
+	}
 	st.listJobsByRunRepoAttempt.val = []store.Job{
 		{ID: domaintypes.JobID("job_1"), RunID: runID, RepoID: repoID, Attempt: 1, Status: domaintypes.JobStatusCreated},
 		{ID: domaintypes.JobID("job_2"), RunID: runID, RepoID: repoID, Attempt: 1, Status: domaintypes.JobStatusCreated},
-		}
+	}
 
 	starter := NewBatchRepoStarter(st)
 	got, err := starter.StartPendingRepos(ctx, runID)

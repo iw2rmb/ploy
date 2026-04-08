@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -19,6 +20,7 @@ import (
 )
 
 const preGateCanonicalSBOMFileName = "sbom.spdx.json"
+const preGateHookJobNamePrefix = "pre-gate-hook-"
 
 var canonicalEmptySPDXDocument = []byte(`{
   "spdxVersion": "SPDX-2.3",
@@ -33,6 +35,146 @@ var canonicalEmptySPDXDocument = []byte(`{
   "packages": []
 }
 `)
+
+func preGateSBOMOutPath(runID types.RunID) string {
+	return filepath.Join(runCacheDir(runID), "pre-gate-sbom", "out", preGateCanonicalSBOMFileName)
+}
+
+func preGateHookDir(runID types.RunID, hookIndex int) string {
+	return filepath.Join(runCacheDir(runID), "pre-gate-hooks", fmt.Sprintf("%03d", hookIndex))
+}
+
+func preGateHookInPath(runID types.RunID, hookIndex int) string {
+	return filepath.Join(preGateHookDir(runID, hookIndex), "in", preGateCanonicalSBOMFileName)
+}
+
+func preGateHookOutPath(runID types.RunID, hookIndex int) string {
+	return filepath.Join(preGateHookDir(runID, hookIndex), "out", preGateCanonicalSBOMFileName)
+}
+
+func preGateHookInputSnapshotPath(runID types.RunID, hookIndex int) string {
+	if hookIndex <= 0 {
+		return preGateSBOMOutPath(runID)
+	}
+	return preGateHookOutPath(runID, hookIndex-1)
+}
+
+func preGateFinalSnapshotPath(runID types.RunID, hooks []string) string {
+	if len(hooks) == 0 {
+		return preGateSBOMOutPath(runID)
+	}
+	return preGateHookOutPath(runID, len(hooks)-1)
+}
+
+func preGateHookIndexFromJobName(jobName string, hooksLen int) (int, error) {
+	name := strings.TrimSpace(jobName)
+	if !strings.HasPrefix(name, preGateHookJobNamePrefix) {
+		return 0, fmt.Errorf("hook job_name must start with %q, got %q", preGateHookJobNamePrefix, name)
+	}
+	raw := strings.TrimPrefix(name, preGateHookJobNamePrefix)
+	idx, err := strconv.Atoi(raw)
+	if err != nil {
+		return 0, fmt.Errorf("parse hook index from job_name %q: %w", name, err)
+	}
+	if idx < 0 || idx >= hooksLen {
+		return 0, fmt.Errorf("hook index out of range for job_name %q: idx=%d hooks_len=%d", name, idx, hooksLen)
+	}
+	return idx, nil
+}
+
+// executeSBOMJob writes a deterministic SPDX file for the current pre-gate cycle.
+func (r *runController) executeSBOMJob(ctx context.Context, req StartRunRequest) {
+	startTime := time.Now()
+
+	sbomPath := preGateSBOMOutPath(req.RunID)
+	if err := writeCanonicalSBOMOutput(sbomPath); err != nil {
+		err = fmt.Errorf("write pre-gate sbom output: %w", err)
+		slog.Error("failed to execute sbom job", "run_id", req.RunID, "job_id", req.JobID, "error", err)
+		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
+		return
+	}
+
+	duration := time.Since(startTime)
+	stats := types.NewRunStatsBuilder().
+		DurationMs(duration.Milliseconds()).
+		MustBuild()
+	var exitCodeZero int32
+	repoSHAOut := strings.TrimSpace(req.RepoSHAIn.String())
+	if uploadErr := r.uploadStatus(ctx, req.RunID.String(), types.JobStatusSuccess.String(), &exitCodeZero, stats, req.JobID, repoSHAOut); uploadErr != nil {
+		slog.Error("failed to upload sbom job status", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)
+	}
+	slog.Info("sbom job succeeded",
+		"run_id", req.RunID,
+		"job_id", req.JobID,
+		"job_name", req.JobName,
+		"sbom_output", "/out/"+preGateCanonicalSBOMFileName,
+		"duration", duration,
+	)
+}
+
+// executeHookJob stages /in and /out SBOM snapshots for a deterministic hook chain.
+func (r *runController) executeHookJob(ctx context.Context, req StartRunRequest) {
+	startTime := time.Now()
+	if len(req.TypedOptions.Hooks) == 0 {
+		err := fmt.Errorf("hook job requires at least one declared hook source")
+		slog.Error("failed to execute hook job", "run_id", req.RunID, "job_id", req.JobID, "error", err)
+		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
+		return
+	}
+
+	hookIndex, err := preGateHookIndexFromJobName(req.JobName, len(req.TypedOptions.Hooks))
+	if err != nil {
+		slog.Error("failed to derive hook index", "run_id", req.RunID, "job_id", req.JobID, "job_name", req.JobName, "error", err)
+		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
+		return
+	}
+
+	hookSource := strings.TrimSpace(req.TypedOptions.Hooks[hookIndex])
+	if hookSource == "" {
+		err = fmt.Errorf("hook source is empty for index %d", hookIndex)
+		slog.Error("failed to execute hook job", "run_id", req.RunID, "job_id", req.JobID, "hook_index", hookIndex, "error", err)
+		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
+		return
+	}
+
+	inputSnapshotPath := preGateHookInputSnapshotPath(req.RunID, hookIndex)
+	inPath := preGateHookInPath(req.RunID, hookIndex)
+	outPath := preGateHookOutPath(req.RunID, hookIndex)
+
+	if err := copyFileBytes(inputSnapshotPath, inPath); err != nil {
+		err = fmt.Errorf("hook[%d] stage /in/%s: %w", hookIndex, preGateCanonicalSBOMFileName, err)
+		slog.Error("failed to execute hook job", "run_id", req.RunID, "job_id", req.JobID, "hook_index", hookIndex, "error", err)
+		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
+		return
+	}
+	if err := copyFileBytes(inputSnapshotPath, outPath); err != nil {
+		err = fmt.Errorf("hook[%d] stage /out/%s: %w", hookIndex, preGateCanonicalSBOMFileName, err)
+		slog.Error("failed to execute hook job", "run_id", req.RunID, "job_id", req.JobID, "hook_index", hookIndex, "error", err)
+		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
+		return
+	}
+
+	duration := time.Since(startTime)
+	stats := types.NewRunStatsBuilder().
+		DurationMs(duration.Milliseconds()).
+		MetadataEntry("hook_index", strconv.Itoa(hookIndex)).
+		MetadataEntry("hook_source", hookSource).
+		MustBuild()
+	var exitCodeZero int32
+	repoSHAOut := strings.TrimSpace(req.RepoSHAIn.String())
+	if uploadErr := r.uploadStatus(ctx, req.RunID.String(), types.JobStatusSuccess.String(), &exitCodeZero, stats, req.JobID, repoSHAOut); uploadErr != nil {
+		slog.Error("failed to upload hook job status", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)
+	}
+	slog.Info("hook job succeeded",
+		"run_id", req.RunID,
+		"job_id", req.JobID,
+		"job_name", req.JobName,
+		"hook_index", hookIndex,
+		"hook_source", hookSource,
+		"sbom_input", "/in/"+preGateCanonicalSBOMFileName,
+		"duration", duration,
+	)
+}
 
 // executeMigJob runs a mig container job.
 // Executes the container, uploads diff, and reports status.
@@ -218,30 +360,14 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 	r.executeStandardJob(ctx, req, cfg)
 }
 
-// schedulePreGateSBOMAndHooks executes deterministic pre-gate prelude scheduling.
-// Phase-1 scope:
-//   - materialize canonical SBOM output at /out/sbom.spdx.json
-//   - stage optional hooks in declaration order with /in/sbom.spdx.json input
-func (r *runController) schedulePreGateSBOMAndHooks(req StartRunRequest, workspace string) error {
+// materializePreGateSBOMForGate copies the final pre-gate SBOM snapshot to
+// build-gate /out so gate jobs expose a stable output contract.
+func materializePreGateSBOMForGate(runID types.RunID, hooks []string, workspace string) error {
+	snapshotPath := preGateFinalSnapshotPath(runID, hooks)
 	gateOutDir := filepath.Join(workspace, step.BuildGateWorkspaceOutDir)
 	sbomOutPath := filepath.Join(gateOutDir, preGateCanonicalSBOMFileName)
-	if err := writeCanonicalSBOMOutput(sbomOutPath); err != nil {
-		return fmt.Errorf("schedule pre-gate sbom: %w", err)
-	}
-	slog.Info("scheduled pre-gate sbom job",
-		"run_id", req.RunID,
-		"job_id", req.JobID,
-		"sbom_output", "/out/"+preGateCanonicalSBOMFileName,
-	)
-
-	finalSnapshotPath, err := schedulePreGateHookChain(req.RunID, req.TypedOptions.Hooks, sbomOutPath)
-	if err != nil {
-		return fmt.Errorf("schedule pre-gate hook chain: %w", err)
-	}
-	if filepath.Clean(finalSnapshotPath) != filepath.Clean(sbomOutPath) {
-		if err := copyFileBytes(finalSnapshotPath, sbomOutPath); err != nil {
-			return fmt.Errorf("sync final sbom snapshot to gate out dir: %w", err)
-		}
+	if err := copyFileBytes(snapshotPath, sbomOutPath); err != nil {
+		return fmt.Errorf("materialize pre-gate sbom for gate /out: %w", err)
 	}
 	return nil
 }
@@ -254,38 +380,6 @@ func writeCanonicalSBOMOutput(sbomOutPath string) error {
 		return fmt.Errorf("write canonical sbom output: %w", err)
 	}
 	return nil
-}
-
-func schedulePreGateHookChain(runID types.RunID, hookSources []string, snapshotPath string) (string, error) {
-	currentSnapshot := snapshotPath
-	for i, src := range hookSources {
-		source := strings.TrimSpace(src)
-		if source == "" {
-			continue
-		}
-
-		hookDir := filepath.Join(runCacheDir(runID), "pre-gate-hooks", fmt.Sprintf("%03d", i))
-		inPath := filepath.Join(hookDir, "in", preGateCanonicalSBOMFileName)
-		outPath := filepath.Join(hookDir, "out", preGateCanonicalSBOMFileName)
-
-		if err := copyFileBytes(currentSnapshot, inPath); err != nil {
-			return "", fmt.Errorf("hook[%d] stage /in/%s: %w", i, preGateCanonicalSBOMFileName, err)
-		}
-		// Phase-1 hook runtime is scheduling-only: preserve the current snapshot
-		// as the staged hook output until hook execution semantics land.
-		if err := copyFileBytes(currentSnapshot, outPath); err != nil {
-			return "", fmt.Errorf("hook[%d] stage /out/%s: %w", i, preGateCanonicalSBOMFileName, err)
-		}
-		currentSnapshot = outPath
-
-		slog.Info("scheduled pre-gate hook step",
-			"run_id", runID,
-			"hook_index", i,
-			"hook_source", source,
-			"sbom_input", "/in/"+preGateCanonicalSBOMFileName,
-		)
-	}
-	return currentSnapshot, nil
 }
 
 // standardJobConfig configures the execution of a standard container job (mig/heal).
