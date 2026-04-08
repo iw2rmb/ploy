@@ -15,13 +15,13 @@ func TestRoadmapVerifyFailsTargetedPhaseWhenNotDone(t *testing.T) {
 	cmd.Dir = repoRoot
 
 	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("expected verification to skip done=false phase with unchecked evidence, output: %s", string(out))
+	if err == nil {
+		t.Fatalf("expected verification to fail for targeted done=false phase, output: %s", string(out))
 	}
 
 	output := string(out)
-	if !strings.Contains(output, "roadmap verification passed (0 phases checked, 1 skipped)") {
-		t.Fatalf("expected successful skip output for done=false targeted phase, output: %s", output)
+	if !strings.Contains(output, "error: targeted phase not done") {
+		t.Fatalf("expected targeted-phase-not-done error, output: %s", output)
 	}
 }
 
@@ -55,12 +55,12 @@ items:
 
 	out, err := cmd.CombinedOutput()
 	if err == nil {
-		t.Fatalf("expected verification to fail when evidence is checked before done=true, output: %s", string(out))
+		t.Fatalf("expected verification to fail when targeted phase is not done, output: %s", string(out))
 	}
 
 	output := string(out)
-	if !strings.Contains(output, "is checked but phase is not done") {
-		t.Fatalf("expected checked-evidence-before-done error output, output: %s", output)
+	if !strings.Contains(output, "error: targeted phase not done") {
+		t.Fatalf("expected targeted-phase-not-done error output, output: %s", output)
 	}
 }
 
@@ -81,8 +81,8 @@ func TestRoadmapVerifyPassesForSbomRemediationPhasesWhenDoneAndEvidenceConsisten
 	}
 
 	output := string(out)
-	if !strings.Contains(output, "roadmap verification passed (2 phases checked, 0 skipped)") {
-		t.Fatalf("expected successful verification output with checked/skipped counts, output: %s", output)
+	if !strings.Contains(output, "roadmap verification passed (2 phases checked)") {
+		t.Fatalf("expected successful verification output with checked count, output: %s", output)
 	}
 }
 
@@ -125,7 +125,7 @@ items:
 	}
 
 	output := string(out)
-	if !strings.Contains(output, "roadmap verification passed (1 phase checked, 0 skipped)") {
+	if !strings.Contains(output, "roadmap verification passed (1 phase checked)") {
 		t.Fatalf("expected successful verification output, got: %s", output)
 	}
 }
