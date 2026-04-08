@@ -8,6 +8,7 @@ Purpose
 Deterministic Tooling
 - Gradle `8.8` via `gradle:8.8-jdk17`.
 - JDK `17` from the base image.
+- Reuses the shared Gradle cache init/config from `images/gates/gradle/`.
 
 Runtime Contract
 - Workspace: `/workspace`

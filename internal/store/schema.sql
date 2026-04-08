@@ -304,7 +304,7 @@ CREATE TABLE IF NOT EXISTS gates (
 );
 CREATE INDEX IF NOT EXISTS gates_profile_idx ON gates(profile_id);
 
--- SBOM package rows extracted from successful gate artifact bundles.
+-- SBOM package rows extracted from successful sbom job artifact bundles.
 -- Stack/time attribution is resolved via joins:
 --   sboms.job_id -> jobs -> (created_at)
 --   sboms.job_id -> gates -> gate_profiles -> stacks
