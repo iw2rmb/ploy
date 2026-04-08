@@ -191,6 +191,42 @@ steps:
 	}
 }
 
+func TestResolveHookRuntimeDecision_RelativeSourceNotFoundDoesNotBlockClaim(t *testing.T) {
+	t.Parallel()
+
+	runID := domaintypes.NewRunID()
+	repoID := domaintypes.NewRepoID()
+	job := store.Job{
+		ID:      domaintypes.NewJobID(),
+		RunID:   runID,
+		RepoID:  repoID,
+		JobType: domaintypes.JobTypeHook,
+		Name:    "pre-gate-hook-000",
+	}
+	spec := []byte(`{"steps":[{"image":"test:latest"}],"hooks":["./hooks/lint.yaml"]}`)
+	st := &jobStore{}
+
+	got, err := resolveHookRuntimeDecision(context.Background(), st, job, spec, domaintypes.JobTypeHook)
+	if err != nil {
+		t.Fatalf("resolveHookRuntimeDecision() error: %v", err)
+	}
+	if got == nil {
+		t.Fatal("resolveHookRuntimeDecision() returned nil decision")
+	}
+	if !got.HookShouldRun {
+		t.Fatal("HookShouldRun=false, want true")
+	}
+	if got.HookHash != "" {
+		t.Fatalf("HookHash=%q, want empty for unresolved relative source", got.HookHash)
+	}
+	if st.hasHookOnceLedger.called {
+		t.Fatal("did not expect HasHookOnceLedger() for unresolved relative source")
+	}
+	if st.getHookOnceLedger.called {
+		t.Fatal("did not expect GetHookOnceLedger() for unresolved relative source")
+	}
+}
+
 func writeHookManifest(t *testing.T, body string) string {
 	t.Helper()
 	root := t.TempDir()

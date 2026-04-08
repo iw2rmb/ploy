@@ -229,6 +229,40 @@ func (r *runController) executeHookJob(ctx context.Context, req StartRunRequest)
 	inPath := gateCycleHookInPath(req.RunID, cycleName, hookIndex)
 	outPath := gateCycleHookOutPath(req.RunID, cycleName, hookIndex)
 
+	if req.HookRuntime != nil && !req.HookRuntime.HookShouldRun {
+		if err := copyFileBytes(inputSnapshotPath, outPath); err != nil {
+			err = fmt.Errorf("hook[%d] stage /out/%s for skip pass-through: %w", hookIndex, preGateCanonicalSBOMFileName, err)
+			slog.Error("failed to execute hook job", "run_id", req.RunID, "job_id", req.JobID, "hook_index", hookIndex, "error", err)
+			r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
+			return
+		}
+
+		duration := time.Since(startTime)
+		statsBuilder := types.NewRunStatsBuilder().
+			DurationMs(duration.Milliseconds()).
+			MetadataEntry("cycle_name", cycleName).
+			MetadataEntry("hook_index", strconv.Itoa(hookIndex)).
+			MetadataEntry("hook_source", hookSource)
+		addHookRuntimeMetadata(statsBuilder, req.HookRuntime)
+		stats := statsBuilder.MustBuild()
+		var exitCodeZero int32
+		repoSHAOut := strings.TrimSpace(req.RepoSHAIn.String())
+		if uploadErr := r.uploadStatus(ctx, req.RunID.String(), types.JobStatusSuccess.String(), &exitCodeZero, stats, req.JobID, repoSHAOut); uploadErr != nil {
+			slog.Error("failed to upload hook job status", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)
+		}
+		slog.Info("hook job skipped by runtime decision",
+			"run_id", req.RunID,
+			"job_id", req.JobID,
+			"job_name", req.JobName,
+			"cycle_name", cycleName,
+			"hook_index", hookIndex,
+			"hook_source", hookSource,
+			"sbom_output", "/out/"+preGateCanonicalSBOMFileName,
+			"duration", duration,
+		)
+		return
+	}
+
 	if err := copyFileBytes(inputSnapshotPath, inPath); err != nil {
 		err = fmt.Errorf("hook[%d] stage /in/%s: %w", hookIndex, preGateCanonicalSBOMFileName, err)
 		slog.Error("failed to execute hook job", "run_id", req.RunID, "job_id", req.JobID, "hook_index", hookIndex, "error", err)

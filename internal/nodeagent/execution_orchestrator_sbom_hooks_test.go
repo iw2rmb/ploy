@@ -1,9 +1,11 @@
 package nodeagent
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
@@ -137,5 +139,56 @@ func TestAddHookRuntimeMetadata_EmitsHookOnceKeys(t *testing.T) {
 	}
 	if got := meta["hook_once_skip_marked"]; got != "true" {
 		t.Fatalf("metadata.hook_once_skip_marked=%v, want true", got)
+	}
+}
+
+func TestExecuteHookJob_SkipsHookWorkWhenHookShouldRunFalse(t *testing.T) {
+	cacheHome := t.TempDir()
+	t.Setenv("PLOYD_CACHE_HOME", cacheHome)
+
+	runID := types.RunID("run-hook-skip")
+	jobID := types.NewJobID()
+	server, cap := newStatusCaptureServer(t, jobID.String())
+	rc := newTestController(t, newAgentConfig(server.URL))
+
+	input := []byte(`{"spdxVersion":"SPDX-2.3","name":"input"}`)
+	inputPath := preGateSBOMOutPath(runID)
+	if err := os.MkdirAll(filepath.Dir(inputPath), 0o755); err != nil {
+		t.Fatalf("mkdir input dir: %v", err)
+	}
+	if err := os.WriteFile(inputPath, input, 0o644); err != nil {
+		t.Fatalf("write input snapshot: %v", err)
+	}
+
+	rc.executeHookJob(context.Background(), StartRunRequest{
+		RunID:   runID,
+		JobID:   jobID,
+		JobType: types.JobTypeHook,
+		JobName: "pre-gate-hook-000",
+		HookRuntime: &contracts.HookRuntimeDecision{
+			HookHash:      strings.Repeat("a", 64),
+			HookShouldRun: false,
+		},
+		TypedOptions: RunOptions{
+			Hooks: []string{"./hooks/lint.yaml"},
+		},
+	})
+
+	if got := cap.Status; got != types.JobStatusSuccess.String() {
+		t.Fatalf("status=%q, want %q", got, types.JobStatusSuccess.String())
+	}
+
+	inPath := preGateHookInPath(runID, 0)
+	if _, err := os.Stat(inPath); !os.IsNotExist(err) {
+		t.Fatalf("expected skip path to avoid /in materialization, err=%v", err)
+	}
+
+	outPath := preGateHookOutPath(runID, 0)
+	out, err := os.ReadFile(outPath)
+	if err != nil {
+		t.Fatalf("read /out snapshot: %v", err)
+	}
+	if string(out) != string(input) {
+		t.Fatalf("/out snapshot mismatch: got %q want %q", string(out), string(input))
 	}
 }

@@ -5,6 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -41,6 +44,12 @@ func resolveHookRuntimeDecision(
 	}
 	hookSpec, err := loadRuntimeHookSpec(source)
 	if err != nil {
+		// Relative hook sources are valid in mig specs but may not be resolvable
+		// from the control-plane filesystem at claim time. Do not block claims
+		// in that case; execute hook job and collect completion metadata as usual.
+		if isRelativeLocalHookSource(source) && errors.Is(err, os.ErrNotExist) {
+			return &contracts.HookRuntimeDecision{HookShouldRun: true}, nil
+		}
 		return nil, fmt.Errorf("load hook spec for source %q: %w", source, err)
 	}
 	match, err := hook.Match(hookSpec, hook.MatchInput{})
@@ -124,4 +133,26 @@ func loadRuntimeHookSpec(source string) (hook.Spec, error) {
 		return hook.Spec{}, fmt.Errorf("expected exactly 1 resolved hook spec, got %d", len(specs))
 	}
 	return specs[0], nil
+}
+
+func isRelativeLocalHookSource(source string) bool {
+	trimmed := strings.TrimSpace(source)
+	if trimmed == "" {
+		return false
+	}
+	if filepathLikeRemoteURL(trimmed) {
+		return false
+	}
+	return !filepath.IsAbs(trimmed)
+}
+
+func filepathLikeRemoteURL(raw string) bool {
+	u, err := url.Parse(raw)
+	if err != nil || u == nil {
+		return false
+	}
+	if (u.Scheme != "http" && u.Scheme != "https") || strings.TrimSpace(u.Host) == "" {
+		return false
+	}
+	return true
 }
