@@ -6,8 +6,36 @@ import (
 	"strings"
 	"testing"
 
+	iversion "github.com/iw2rmb/ploy/internal/version"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
+
+func TestSBOMRuntimeImageTag(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		version string
+		want    string
+	}{
+		{name: "empty falls back to latest", version: "", want: "latest"},
+		{name: "whitespace falls back to latest", version: "   ", want: "latest"},
+		{name: "dev falls back to latest", version: "dev", want: "latest"},
+		{name: "uppercase dev falls back to latest", version: "DEV", want: "latest"},
+		{name: "semver uses runtime version", version: "v0.1.7", want: "v0.1.7"},
+		{name: "prerelease uses runtime version", version: "v1.2.3-rc.1", want: "v1.2.3-rc.1"},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if got := sbomRuntimeImageTag(tc.version); got != tc.want {
+				t.Fatalf("sbomRuntimeImageTag(%q)=%q, want %q", tc.version, got, tc.want)
+			}
+		})
+	}
+}
 
 func TestResolveSBOMRuntimeStack(t *testing.T) {
 	t.Parallel()
@@ -36,6 +64,7 @@ func TestResolveSBOMRuntimeStack(t *testing.T) {
 
 func TestApplySBOMRuntimeForStack_ConfiguresManifest(t *testing.T) {
 	t.Setenv(sbomImageRegistryEnvKey, "ghcr.io/acme")
+	tag := sbomRuntimeImageTag(iversion.Version)
 
 	tests := []struct {
 		name               string
@@ -47,21 +76,21 @@ func TestApplySBOMRuntimeForStack_ConfiguresManifest(t *testing.T) {
 		{
 			name:               "maven",
 			stack:              contracts.MigStackJavaMaven,
-			wantImage:          "ghcr.io/acme/sbom-maven:latest",
+			wantImage:          "ghcr.io/acme/sbom-maven:" + tag,
 			wantRuntimeStack:   contracts.MigStackJavaMaven,
 			wantCommandSnippet: "mvn -B -q -f /workspace/pom.xml",
 		},
 		{
 			name:               "gradle",
 			stack:              contracts.MigStackJavaGradle,
-			wantImage:          "ghcr.io/acme/sbom-gradle:latest",
+			wantImage:          "ghcr.io/acme/sbom-gradle:" + tag,
 			wantRuntimeStack:   contracts.MigStackJavaGradle,
 			wantCommandSnippet: "gradle -q -p /workspace dependencies",
 		},
 		{
 			name:               "unknown fallback collector path",
 			stack:              contracts.MigStackUnknown,
-			wantImage:          "ghcr.io/acme/sbom-maven:latest",
+			wantImage:          "ghcr.io/acme/sbom-maven:" + tag,
 			wantRuntimeStack:   contracts.MigStackJavaMaven,
 			wantCommandSnippet: "unable to resolve sbom collector",
 		},

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
+	iversion "github.com/iw2rmb/ploy/internal/version"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
@@ -192,13 +193,22 @@ func sbomJobImageSpec() contracts.JobImage {
 	if prefix == "" {
 		prefix = sbomImageRegistryDefault
 	}
+	tag := sbomRuntimeImageTag(iversion.Version)
 	return contracts.JobImage{
 		ByStack: map[contracts.MigStack]string{
-			contracts.MigStackJavaMaven:  prefix + "/sbom-maven:latest",
-			contracts.MigStackJavaGradle: prefix + "/sbom-gradle:latest",
-			contracts.MigStackDefault:    prefix + "/sbom-maven:latest",
+			contracts.MigStackJavaMaven:  prefix + "/sbom-maven:" + tag,
+			contracts.MigStackJavaGradle: prefix + "/sbom-gradle:" + tag,
+			contracts.MigStackDefault:    prefix + "/sbom-maven:" + tag,
 		},
 	}
+}
+
+func sbomRuntimeImageTag(runtimeVersion string) string {
+	tag := strings.TrimSpace(runtimeVersion)
+	if tag == "" || strings.EqualFold(tag, "dev") {
+		return "latest"
+	}
+	return tag
 }
 
 func sbomCommandForStack(stack contracts.MigStack) contracts.CommandSpec {
