@@ -102,6 +102,32 @@ jobs:
         run: |
           make redundancy-check || echo "warning: redundancy check unavailable"
 
+  roadmap-verify:
+    name: Roadmap Done Verification
+    runs-on: ubuntu-latest
+    needs: pre-commit
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Detect roadmap/sbom-hook runtime changes
+        id: changed
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            verify:
+              - 'roadmap/**/*.yaml'
+              - 'roadmap/**/*.md'
+              - 'tools/roadmap/**'
+              - 'internal/nodeagent/**'
+              - 'internal/server/handlers/**'
+              - 'internal/workflow/hook/**'
+      - name: Run roadmap verification
+        if: steps.changed.outputs.verify == 'true'
+        run: make roadmap-verify
+      - name: Skip roadmap verification (no relevant changes)
+        if: steps.changed.outputs.verify != 'true'
+        run: echo "No roadmap/sbom-hook runtime changes detected; skipping roadmap verification."
+
   build:
     name: Build Binaries
     runs-on: ubuntu-latest
