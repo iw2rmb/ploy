@@ -243,12 +243,13 @@ func (r *runController) executeHookJob(ctx context.Context, req StartRunRequest)
 	}
 
 	duration := time.Since(startTime)
-	stats := types.NewRunStatsBuilder().
+	statsBuilder := types.NewRunStatsBuilder().
 		DurationMs(duration.Milliseconds()).
 		MetadataEntry("cycle_name", cycleName).
 		MetadataEntry("hook_index", strconv.Itoa(hookIndex)).
-		MetadataEntry("hook_source", hookSource).
-		MustBuild()
+		MetadataEntry("hook_source", hookSource)
+	addHookRuntimeMetadata(statsBuilder, req.HookRuntime)
+	stats := statsBuilder.MustBuild()
 	var exitCodeZero int32
 	repoSHAOut := strings.TrimSpace(req.RepoSHAIn.String())
 	if uploadErr := r.uploadStatus(ctx, req.RunID.String(), types.JobStatusSuccess.String(), &exitCodeZero, stats, req.JobID, repoSHAOut); uploadErr != nil {
@@ -264,6 +265,17 @@ func (r *runController) executeHookJob(ctx context.Context, req StartRunRequest)
 		"sbom_input", "/in/"+preGateCanonicalSBOMFileName,
 		"duration", duration,
 	)
+}
+
+func addHookRuntimeMetadata(statsBuilder *types.RunStatsBuilder, decision *contracts.HookRuntimeDecision) {
+	if statsBuilder == nil || decision == nil {
+		return
+	}
+	if hash := strings.TrimSpace(decision.HookHash); hash != "" {
+		statsBuilder.MetadataEntry("hook_hash", hash)
+	}
+	statsBuilder.MetadataEntry("hook_should_run", strconv.FormatBool(decision.HookShouldRun))
+	statsBuilder.MetadataEntry("hook_once_skip_marked", strconv.FormatBool(decision.HookOnceSkipMarked))
 }
 
 // executeMigJob runs a mig container job.

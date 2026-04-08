@@ -268,6 +268,29 @@ func TestClaimLoop_FieldMapping(t *testing.T) {
 				}
 			},
 		},
+		{
+			name: "hook runtime decision propagation",
+			claimOpts: []claimOption{
+				withClaimJobName("pre-gate-hook-000"),
+				withClaimHookRuntime(&contracts.HookRuntimeDecision{
+					HookHash:           "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+					HookShouldRun:      false,
+					HookOnceSkipMarked: true,
+				}),
+			},
+			assertions: func(t *testing.T, got StartRunRequest, claim ClaimResponse) {
+				t.Helper()
+				if got.HookRuntime == nil {
+					t.Fatal("HookRuntime=nil, want non-nil")
+				}
+				if claim.HookRuntime == nil {
+					t.Fatal("claim HookRuntime=nil, want non-nil")
+				}
+				if *got.HookRuntime != *claim.HookRuntime {
+					t.Fatalf("HookRuntime mismatch: got %+v want %+v", *got.HookRuntime, *claim.HookRuntime)
+				}
+			},
+		},
 	}
 
 	for _, tt := range tests {

@@ -73,6 +73,8 @@ type jobStore struct {
 	deleteSBOMRowsByJob     mockCallSlice[types.JobID, struct{}]
 
 	upsertSBOMRow         mockCallSlice[store.UpsertSBOMRowParams, struct{}]
+	hasHookOnceLedger     mockCall[store.HasHookOnceLedgerParams, bool]
+	getHookOnceLedger     mockCall[store.GetHookOnceLedgerParams, store.HooksOnce]
 	upsertHookOnceSuccess mockCall[store.UpsertHookOnceSuccessParams, struct{}]
 	markHookOnceSkipped   mockCall[store.MarkHookOnceSkippedParams, struct{}]
 
@@ -421,6 +423,14 @@ func (m *jobStore) DeleteSBOMRowsByJob(ctx context.Context, jobID types.JobID) e
 func (m *jobStore) UpsertSBOMRow(ctx context.Context, arg store.UpsertSBOMRowParams) error {
 	_, err := m.upsertSBOMRow.record(arg)
 	return err
+}
+
+func (m *jobStore) HasHookOnceLedger(ctx context.Context, arg store.HasHookOnceLedgerParams) (bool, error) {
+	return m.hasHookOnceLedger.record(arg)
+}
+
+func (m *jobStore) GetHookOnceLedger(ctx context.Context, arg store.GetHookOnceLedgerParams) (store.HooksOnce, error) {
+	return m.getHookOnceLedger.record(arg)
 }
 
 func (m *jobStore) UpsertHookOnceSuccess(ctx context.Context, arg store.UpsertHookOnceSuccessParams) error {

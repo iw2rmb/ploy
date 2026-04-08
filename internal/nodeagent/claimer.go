@@ -63,6 +63,7 @@ type ClaimResponse struct {
 	RecoveryContext        *contracts.RecoveryClaimContext  `json:"recovery_context,omitempty"`
 	GateSkip               *contracts.BuildGateSkipMetadata `json:"gate_skip,omitempty"`
 	StepSkip               *contracts.MigStepSkipMetadata   `json:"step_skip,omitempty"`
+	HookRuntime            *contracts.HookRuntimeDecision   `json:"hook_runtime,omitempty"`
 }
 
 // NewClaimManager constructs a claim manager for the unified jobs queue.

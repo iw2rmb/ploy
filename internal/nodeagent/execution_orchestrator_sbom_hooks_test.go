@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"github.com/iw2rmb/ploy/internal/workflow/step"
 )
 
@@ -108,5 +109,33 @@ func TestPreGateHookIndexFromJobName(t *testing.T) {
 	}
 	if _, err := preGateHookIndexFromJobName("pre-gate-hook-2", 2); err == nil {
 		t.Fatal("expected out-of-range validation error")
+	}
+}
+
+func TestAddHookRuntimeMetadata_EmitsHookOnceKeys(t *testing.T) {
+	builder := types.NewRunStatsBuilder()
+	addHookRuntimeMetadata(builder, &contracts.HookRuntimeDecision{
+		HookHash:           "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		HookShouldRun:      false,
+		HookOnceSkipMarked: true,
+	})
+	stats := builder.MustBuild()
+
+	var decoded map[string]any
+	if err := json.Unmarshal(stats, &decoded); err != nil {
+		t.Fatalf("unmarshal stats: %v", err)
+	}
+	meta, ok := decoded["metadata"].(map[string]any)
+	if !ok {
+		t.Fatalf("metadata missing or wrong type: %T", decoded["metadata"])
+	}
+	if got := meta["hook_hash"]; got != "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" {
+		t.Fatalf("metadata.hook_hash=%v, want 64-char hash", got)
+	}
+	if got := meta["hook_should_run"]; got != "false" {
+		t.Fatalf("metadata.hook_should_run=%v, want false", got)
+	}
+	if got := meta["hook_once_skip_marked"]; got != "true" {
+		t.Fatalf("metadata.hook_once_skip_marked=%v, want true", got)
 	}
 }
