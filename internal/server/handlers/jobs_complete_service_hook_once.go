@@ -21,17 +21,10 @@ var hookShouldRunMetadataKeys = []string{
 	"hook_should_run",
 }
 
-var hookOnceSkipMetadataKeys = []string{
-	"hook_once_skip_marked",
-	"hook_once_skipped",
-	"hook_once_skip",
-}
-
 type hookCompletionMetadata struct {
 	Hash           string
 	ShouldRun      bool
 	ShouldRunKnown bool
-	OnceSkipMarked bool
 }
 
 func (s *CompleteJobService) recordHookOnceLedger(ctx context.Context, state *completeJobState) error {
@@ -46,20 +39,11 @@ func (s *CompleteJobService) recordHookOnceLedger(ctx context.Context, state *co
 	if meta.Hash == "" {
 		return nil
 	}
-
-	jobID := state.job.ID
-	if meta.OnceSkipMarked {
-		return s.store.MarkHookOnceSkipped(ctx, store.MarkHookOnceSkippedParams{
-			RunID:         state.job.RunID,
-			RepoID:        state.job.RepoID,
-			HookHash:      meta.Hash,
-			LastSkipJobID: &jobID,
-		})
-	}
 	if meta.ShouldRunKnown && !meta.ShouldRun {
 		return nil
 	}
 
+	jobID := state.job.ID
 	return s.store.UpsertHookOnceSuccess(ctx, store.UpsertHookOnceSuccessParams{
 		RunID:             state.job.RunID,
 		RepoID:            state.job.RepoID,
@@ -89,14 +73,6 @@ func parseHookCompletionMetadata(metadata map[string]string) (hookCompletionMeta
 		}
 		parsed.ShouldRun = b
 		parsed.ShouldRunKnown = true
-	}
-
-	if key, value, ok := firstMetadataValue(metadata, hookOnceSkipMetadataKeys...); ok {
-		b, err := parseMetadataBool(value)
-		if err != nil {
-			return hookCompletionMetadata{}, fmt.Errorf("invalid %s metadata value %q: %w", key, value, err)
-		}
-		parsed.OnceSkipMarked = b
 	}
 
 	return parsed, nil

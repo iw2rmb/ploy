@@ -2,6 +2,7 @@ package nodeagent
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"path/filepath"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
+	"github.com/iw2rmb/ploy/internal/workflow/hook"
 	"github.com/iw2rmb/ploy/internal/workflow/step"
 )
 
@@ -446,5 +448,64 @@ func TestRunController_reportTerminalStatus(t *testing.T) {
 				t.Errorf("status = %q, want %q", cap.Status, tt.wantStatus)
 			}
 		})
+	}
+}
+
+func TestEncodeHookConditionResult_EmitsStructuredJSON(t *testing.T) {
+	t.Parallel()
+
+	raw := encodeHookConditionResult(&contracts.HookRuntimeDecision{
+		HookHash:      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		HookShouldRun: true,
+	})
+
+	var decoded struct {
+		Evaluated bool   `json:"evaluated"`
+		ShouldRun bool   `json:"should_run"`
+		Hash      string `json:"hash"`
+	}
+	if err := json.Unmarshal([]byte(raw), &decoded); err != nil {
+		t.Fatalf("unmarshal condition result: %v", err)
+	}
+	if !decoded.Evaluated {
+		t.Fatalf("evaluated=%v, want true", decoded.Evaluated)
+	}
+	if !decoded.ShouldRun {
+		t.Fatalf("should_run=%v, want true", decoded.ShouldRun)
+	}
+	if decoded.Hash != "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" {
+		t.Fatalf("hash=%q, want hook hash", decoded.Hash)
+	}
+}
+
+func TestEncodeHookCommandIdentity_EmitsStructuredJSON(t *testing.T) {
+	t.Parallel()
+
+	raw := encodeHookCommandIdentity("aa11bb22", hook.Step{
+		Name:    "security-scan",
+		Image:   "hook:latest",
+		Command: []string{"scan", "--sbom", "/in/sbom.spdx.json", "--out", "/out/sbom.spdx.json"},
+	})
+
+	var decoded struct {
+		Source  string   `json:"source"`
+		Name    string   `json:"name"`
+		Image   string   `json:"image"`
+		Command []string `json:"command"`
+	}
+	if err := json.Unmarshal([]byte(raw), &decoded); err != nil {
+		t.Fatalf("unmarshal command identity: %v", err)
+	}
+	if decoded.Source != "aa11bb22" {
+		t.Fatalf("source=%q, want aa11bb22", decoded.Source)
+	}
+	if decoded.Name != "security-scan" {
+		t.Fatalf("name=%q, want security-scan", decoded.Name)
+	}
+	if decoded.Image != "hook:latest" {
+		t.Fatalf("image=%q, want hook:latest", decoded.Image)
+	}
+	if len(decoded.Command) != 5 {
+		t.Fatalf("command len=%d, want 5", len(decoded.Command))
 	}
 }

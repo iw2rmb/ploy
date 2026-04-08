@@ -6,6 +6,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"gopkg.in/yaml.v3"
 )
 
@@ -59,6 +60,19 @@ type Step struct {
 	In      []string          `json:"in,omitempty" yaml:"in,omitempty"`
 	Out     []string          `json:"out,omitempty" yaml:"out,omitempty"`
 	Home    []string          `json:"home,omitempty" yaml:"home,omitempty"`
+}
+
+// ToJobImage converts the hook step image to the shared runtime image contract.
+func (s Step) ToJobImage() contracts.JobImage {
+	return contracts.JobImage{Universal: strings.TrimSpace(s.Image)}
+}
+
+// ToCommandSpec converts the hook step command to the shared runtime command contract.
+func (s Step) ToCommandSpec() contracts.CommandSpec {
+	if len(s.Command) == 0 {
+		return contracts.CommandSpec{}
+	}
+	return contracts.CommandSpec{Exec: append([]string(nil), s.Command...)}
 }
 
 // LoadSpecYAML decodes a hook spec with strict unknown-field rejection.

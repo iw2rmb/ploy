@@ -227,7 +227,7 @@ func (s *CompleteJobService) reconcileRepoRun(ctx context.Context, state *comple
 		return
 	}
 
-	runRepo, runRepoErr := s.store.GetRunRepo(ctx, store.GetRunRepoParams{
+	_, runRepoErr := s.store.GetRunRepo(ctx, store.GetRunRepoParams{
 		RunID:  state.job.RunID,
 		RepoID: state.job.RepoID,
 	})
@@ -238,30 +238,6 @@ func (s *CompleteJobService) reconcileRepoRun(ctx context.Context, state *comple
 			"attempt", state.job.Attempt,
 			"err", runRepoErr,
 		)
-	} else if runRepo.Status == domaintypes.RunRepoStatusSuccess {
-		sbomRowsPersisted, sbomErr := maybePersistLatestSuccessfulCycleSBOMRows(
-			ctx,
-			s.store,
-			s.blobpersist,
-			state.job.RunID,
-			state.job.RepoID,
-			runRepo.Attempt,
-		)
-		if sbomErr != nil {
-			slog.Error("complete job: persist latest successful cycle sbom rows failed",
-				"job_id", state.job.ID,
-				"repo_id", state.job.RepoID,
-				"attempt", runRepo.Attempt,
-				"err", sbomErr,
-			)
-		} else if sbomRowsPersisted > 0 {
-			slog.Info("complete job: persisted latest successful cycle sbom rows",
-				"job_id", state.job.ID,
-				"repo_id", state.job.RepoID,
-				"attempt", runRepo.Attempt,
-				"row_count", sbomRowsPersisted,
-			)
-		}
 	}
 
 	run, ok := s.loadRunForPostCompletion(ctx, state, "run completion reconciliation")
