@@ -88,24 +88,32 @@ func TestGetRunReportCommandAssemblesCanonicalReport(t *testing.T) {
 					{
 						"job_id":       jobID1.String(),
 						"name":         "step-1",
-						"job_type":     "step",
+						"job_type":     "hook",
 						"job_image":    "ghcr.io/acme/runner:1",
 						"next_id":      jobID2.String(),
 						"node_id":      nil,
 						"status":       "Success",
 						"duration_ms":  50,
 						"display_name": "scan",
+						"hook_plan_reason": "hook_match eval=planned should_run=true",
+						"hook_condition_result": "{\"evaluated\":true,\"should_run\":true}",
 					},
 					{
 						"job_id":       jobID2.String(),
 						"name":         "step-2",
-						"job_type":     "step",
+						"job_type":     "sbom",
 						"job_image":    "ghcr.io/acme/runner:1",
 						"next_id":      nil,
 						"node_id":      nil,
 						"status":       "Running",
 						"duration_ms":  5,
 						"display_name": "apply",
+						"hook_plan_reason": "no hook jobs planned for cycle \"pre-gate\"",
+						"hook_condition_result": "{\"evaluated\":true,\"planned_jobs\":0}",
+						"sbom_evidence": map[string]any{
+							"artifact_present":     true,
+							"parsed_package_count": 184,
+						},
 						"recovery": map[string]any{
 							"loop_kind": "healing",
 						},
@@ -185,6 +193,12 @@ func TestGetRunReportCommandAssemblesCanonicalReport(t *testing.T) {
 	if len(job0.Artifacts) != 1 {
 		t.Fatalf("expected one artifact for job0, got %d", len(job0.Artifacts))
 	}
+	if got, want := job0.HookPlanReason, "hook_match eval=planned should_run=true"; got != want {
+		t.Fatalf("hook plan reason mismatch: got %q, want %q", got, want)
+	}
+	if got, want := job0.HookConditionResult, "{\"evaluated\":true,\"should_run\":true}"; got != want {
+		t.Fatalf("hook condition mismatch: got %q, want %q", got, want)
+	}
 	if job0.Artifacts[0].Name != "diff" || job0.Artifacts[0].CID != "bafy-step-1" {
 		t.Fatalf("unexpected job0 artifact payload: %#v", job0.Artifacts[0])
 	}
@@ -198,6 +212,21 @@ func TestGetRunReportCommandAssemblesCanonicalReport(t *testing.T) {
 	}
 	if job1.Recovery == nil || job1.Recovery.LoopKind != "healing" {
 		t.Fatalf("expected recovery.loop_kind to propagate, got %#v", job1.Recovery)
+	}
+	if got, want := job1.HookPlanReason, "no hook jobs planned for cycle \"pre-gate\""; got != want {
+		t.Fatalf("hook plan reason mismatch: got %q, want %q", got, want)
+	}
+	if got, want := job1.HookConditionResult, "{\"evaluated\":true,\"planned_jobs\":0}"; got != want {
+		t.Fatalf("hook condition mismatch: got %q, want %q", got, want)
+	}
+	if job1.SBOMEvidence == nil {
+		t.Fatal("expected sbom evidence for sbom job")
+	}
+	if job1.SBOMEvidence.ArtifactPresent == nil || !*job1.SBOMEvidence.ArtifactPresent {
+		t.Fatalf("expected sbom artifact_present=true, got %#v", job1.SBOMEvidence.ArtifactPresent)
+	}
+	if job1.SBOMEvidence.ParsedPackageCount == nil || *job1.SBOMEvidence.ParsedPackageCount != 184 {
+		t.Fatalf("expected sbom parsed_package_count=184, got %#v", job1.SBOMEvidence.ParsedPackageCount)
 	}
 	if len(job1.Artifacts) != 1 {
 		t.Fatalf("expected one artifact for job1, got %d", len(job1.Artifacts))
