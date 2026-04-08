@@ -1,0 +1,223 @@
+---
+policy: "~/.codex/policies/composing-roadmaps.md"
+schema: "~/.codex/policies/roadmap.schema.json"
+title: >-
+  MR Workflow Simplification: Accumulated Rehydration and Action Queue
+scope: >-
+  Replace per-diff workspace replay and dedicated job_type=mr with
+  accumulated rehydration and explicit MR actions, with runtime-parity
+  gates that prevent contract-surface rollout before executable behavior is
+  proven.
+documentation:
+  - "research/sbom-hooks-incident-2026-04-08.md"
+  - "docs/how-to/create-mr.md"
+  - "docs/migs-lifecycle.md"
+  - "docs/api/OpenAPI.yaml"
+done: false
+reviews: []
+items:
+  - done: false
+    reviews: []
+    label: "1"
+    summary: >-
+      Add direct accumulated patch API for run/repo/job context and stop
+      node-side list-and-replay selection.
+    classification: "determined"
+    components:
+      - "internal/server/handlers/diffs.go"
+      - "internal/cli/migs/status.go"
+      - "internal/nodeagent/difffetcher.go"
+    baseline:
+      - "internal/server/handlers/diffs.go"
+      - "internal/cli/migs/status.go"
+      - "internal/nodeagent/difffetcher.go"
+    delta:
+      - >-
+        [replace] node fetch path with list diffs plus N downloads -> node
+        fetch path with one accumulated download by context
+    implementation:
+      - >-
+        Add a direct download mode keyed by run_id, repo_id, and
+        current_job_id that returns one accumulated gzipped patch.
+      - >-
+        Keep existing diff-list endpoint behavior available for CLI
+        inspection use cases.
+      - >-
+        Add strict request validation and deterministic errors for missing
+        run/repo/job or missing blob content.
+      - >-
+        Keep ordering deterministic in server accumulation logic so repeated
+        requests produce identical patch bytes.
+    verification:
+      - >-
+        Node fetcher retrieves a single accumulated patch for the same run or
+        repo or job context where previous flow required multiple downloads.
+      - >-
+        CLI diff listing output and ordering remain unchanged for existing
+        list commands.
+      - >-
+        Repeated accumulated downloads for unchanged run state return
+        byte-identical gzip content.
+    reasoning: "medium"
+    cfp: 8
+
+  - done: false
+    reviews: []
+    label: "2"
+    summary: >-
+      Switch shared workspace rehydration to single accumulated patch apply
+      and retain deterministic repo_sha chaining.
+    classification: "determined"
+    components:
+      - "internal/nodeagent/execution_orchestrator_rehydrate.go"
+      - "internal/nodeagent/execution.go"
+      - "internal/nodeagent/execution_rehydrate_test.go"
+    baseline:
+      - "internal/nodeagent/execution_orchestrator_rehydrate.go"
+      - "internal/nodeagent/execution.go"
+      - "internal/nodeagent/execution_rehydrate_test.go"
+    delta:
+      - >-
+        [replace] rehydration with per-diff loop and apply sequence ->
+        rehydration with one accumulated patch apply per workspace
+    implementation:
+      - >-
+        Remove per-diff replay loop from rehydration path and consume one
+        accumulated patch artifact.
+      - >-
+        Preserve base clone hydration and baseline commit behavior used for
+        incremental diff generation.
+      - >-
+        Fail closed on patch-apply errors with explicit run and job
+        diagnostics; do not mark success without applied state.
+      - >-
+        Keep a deterministic no-diff path that produces base-only workspace
+        without synthetic content writes.
+    verification:
+      - >-
+        Rehydrated workspace content for representative multi-step run
+        matches previous expected final content.
+      - >-
+        No-diff runs keep existing execution behavior and do not create
+        unexpected file changes.
+      - >-
+        Patch-apply failure produces terminal error status and does not
+        report successful completion.
+    reasoning: "medium"
+    cfp: 8
+
+  - done: false
+    reviews: []
+    label: "3"
+    summary: >-
+      Introduce run_repo_actions queue and node claim or execute path for
+      mr_create as an action, not a job type.
+    classification: "determined"
+    components:
+      - "internal/store/schema.sql"
+      - "internal/store/queries/actions.sql"
+      - "internal/store/querier.go"
+      - "internal/server/handlers/nodes_claim_service.go"
+      - "internal/nodeagent/claimer_loop.go"
+      - "internal/nodeagent/handlers.go"
+    baseline:
+      - "internal/store/schema.sql"
+      - "internal/server/handlers/nodes_claim_service.go"
+      - "internal/nodeagent/claimer_loop.go"
+      - "internal/nodeagent/handlers.go"
+    delta:
+      - >-
+        [replace] mr execution encoded as jobs.job_type=mr -> mr execution
+        encoded as run_repo_actions action_type=mr_create
+    implementation:
+      - >-
+        Add run_repo_actions persistence with status lifecycle,
+        run/repo/attempt keys, node assignment, and action metadata payload.
+      - >-
+        Extend claim service and node claim loop to support claiming
+        executable action work alongside jobs with deterministic priority and
+        isolation.
+      - >-
+        Add explicit action payload contract for mr_create including repo
+        identity, branch refs, and merged run options.
+      - >-
+        Do not expose action as success until node reports terminal
+        completion metadata.
+    verification:
+      - >-
+        Node can claim and start action work without changing existing
+        non-MR job claim behavior.
+      - >-
+        Action status lifecycle transitions are deterministic under normal
+        execution and retry scenarios.
+      - >-
+        Runs without MR triggers keep existing queue and run status behavior
+        unchanged.
+    reasoning: "high"
+    cfp: 15
+
+  - done: false
+    reviews: []
+    label: "4"
+    summary: >-
+      Move MR trigger semantics to auto plus manual action creation, remove
+      JobTypeMR from lifecycle routing, and add runtime-parity acceptance
+      checks.
+    classification: "determined"
+    components:
+      - "internal/nodeagent/execution_mr.go"
+      - "internal/workflow/lifecycle/orchestrator.go"
+      - "internal/server/handlers/jobs_complete_service_post_actions.go"
+      - "internal/server/handlers/runs_repo_actions.go"
+      - "internal/server/handlers/runs_batch_scheduler.go"
+      - "internal/domain/types/migs.go"
+      - "docs/how-to/create-mr.md"
+      - "docs/api/OpenAPI.yaml"
+    baseline:
+      - "internal/nodeagent/execution_mr.go"
+      - "internal/workflow/lifecycle/orchestrator.go"
+      - "internal/server/handlers/jobs_complete_service_post_actions.go"
+      - "internal/server/handlers/runs_batch_scheduler.go"
+      - "internal/domain/types/migs.go"
+    delta:
+      - >-
+        [replace] MR orchestration through job completion and job_type
+        routing -> MR orchestration through run_repo_actions with auto and
+        manual triggers
+    implementation:
+      - >-
+        Auto-trigger mr_create action from repo terminal outcome using
+        mr_on_success and mr_on_fail without introducing job_type=mr.
+      - >-
+        Add manual endpoint POST /v1/runs/{run_id}/repos/{repo_id}/mr that
+        ignores auto flags and is idempotent by returning existing MR URL
+        when present.
+      - >-
+        Execute MR creation from action executor path reusing existing push
+        and create logic, and merge mr_url into run stats only from actual
+        action completion.
+      - >-
+        Remove JobTypeMR from domain validation, claim decisions, and
+        completion chain branching.
+      - >-
+        Add acceptance tests that block rollout if MR contract surface
+        exists without executable runtime path, mirroring incident
+        containment lessons.
+      - >-
+        Update API and how-to docs to describe action-based MR flow and
+        manual plus auto trigger semantics.
+    verification:
+      - >-
+        Auto MR trigger creates action only for outcomes enabled by run flags
+        and stores mr_url on success.
+      - >-
+        Manual MR endpoint called repeatedly for same run or repo returns
+        existing MR URL without duplicate action creation.
+      - >-
+        Lifecycle behavior for non-MR job types remains unchanged after
+        JobTypeMR removal.
+      - >-
+        Contract-surface tests fail when MR API advertises behavior that is
+        not backed by executable action runtime.
+    reasoning: "xhigh"
+    cfp: 20
