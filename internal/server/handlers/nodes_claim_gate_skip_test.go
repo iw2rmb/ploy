@@ -148,6 +148,7 @@ func TestBuildAndSendJobClaimResponse_GateSkipScenarios(t *testing.T) {
 				rr,
 				req,
 				&jobStore{},
+				nil,
 				&ConfigHolder{},
 				baseRun,
 				tc.spec,

@@ -45,6 +45,10 @@ func normalizeMigsSpecToJSON(ctx context.Context, base *url.URL, client *http.Cl
 		return nil, err
 	}
 
+	if err := compileHookSourcesInPlace(ctx, base, client, raw, specBaseDir); err != nil {
+		return nil, err
+	}
+
 	if err := compileHydraRecordsInPlace(ctx, base, client, raw, specBaseDir); err != nil {
 		return nil, err
 	}
@@ -389,6 +393,10 @@ func buildSpecPayload(
 	}
 
 	if err := applyConfigOverlayInPlace(specMap); err != nil {
+		return nil, err
+	}
+
+	if err := compileHookSourcesInPlace(ctx, base, client, specMap, specBaseDir); err != nil {
 		return nil, err
 	}
 

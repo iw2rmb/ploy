@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/iw2rmb/ploy/internal/blobstore"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/workflow/lifecycle"
@@ -18,13 +19,15 @@ type ClaimResult struct {
 // ClaimService orchestrates the claim pipeline.
 type ClaimService struct {
 	store        store.Store
+	blobStore    blobstore.Store
 	configHolder *ConfigHolder
 	gateResolver GateProfileResolver
 }
 
-func NewClaimService(st store.Store, configHolder *ConfigHolder, resolver GateProfileResolver) *ClaimService {
+func NewClaimService(st store.Store, bs blobstore.Store, configHolder *ConfigHolder, resolver GateProfileResolver) *ClaimService {
 	return &ClaimService{
 		store:        st,
+		blobStore:    bs,
 		configHolder: configHolder,
 		gateResolver: resolver,
 	}
@@ -118,7 +121,7 @@ func (s *ClaimService) Claim(ctx context.Context, nodeID domaintypes.NodeID) (Cl
 		return ClaimResult{}, claimInternal("failed to get spec for claimed job", err)
 	}
 
-	payload, err := buildClaimResponsePayload(ctx, s.store, s.configHolder, run, spec.Spec, rr, repoURL, job, s.gateResolver)
+	payload, err := buildClaimResponsePayload(ctx, s.store, s.blobStore, s.configHolder, run, spec.Spec, rr, repoURL, job, s.gateResolver)
 	if err != nil {
 		slog.Error("claim: failed to build response", "job_id", job.ID, "run_id", run.ID, "err", err)
 		if unclaimErr := s.store.UnclaimJob(ctx, store.UnclaimJobParams{

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/iw2rmb/ploy/internal/blobstore"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/server/config"
 	"github.com/iw2rmb/ploy/internal/store"
@@ -43,6 +44,7 @@ type claimResponsePayload struct {
 func buildClaimResponsePayload(
 	ctx context.Context,
 	st store.Store,
+	bs blobstore.Store,
 	configHolder *ConfigHolder,
 	run store.Run,
 	spec []byte,
@@ -115,7 +117,7 @@ func buildClaimResponsePayload(
 	if err != nil {
 		return claimResponsePayload{}, fmt.Errorf("build recovery context: %w", err)
 	}
-	hookRuntime, err := resolveHookRuntimeDecision(ctx, st, job, mergedSpec, jobType)
+	hookRuntime, err := resolveHookRuntimeDecision(ctx, st, bs, job, mergedSpec, jobType)
 	if err != nil {
 		return claimResponsePayload{}, fmt.Errorf("resolve hook runtime decision: %w", err)
 	}
@@ -163,6 +165,7 @@ func buildAndSendJobClaimResponse(
 	w http.ResponseWriter,
 	r *http.Request,
 	st store.Store,
+	bs blobstore.Store,
 	configHolder *ConfigHolder,
 	run store.Run,
 	spec []byte,
@@ -171,7 +174,7 @@ func buildAndSendJobClaimResponse(
 	job store.Job,
 	gateProfileResolver GateProfileResolver,
 ) error {
-	payload, err := buildClaimResponsePayload(r.Context(), st, configHolder, run, spec, runRepo, repoURL, job, gateProfileResolver)
+	payload, err := buildClaimResponsePayload(r.Context(), st, bs, configHolder, run, spec, runRepo, repoURL, job, gateProfileResolver)
 	if err != nil {
 		return err
 	}

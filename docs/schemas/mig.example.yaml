@@ -7,11 +7,18 @@ kind: MigRunSpec
 ################################################################################
 # HOOK SOURCES (root-level)
 ################################################################################
-# hooks declares external hook sources (file paths or URLs) evaluated before
-# gate stages. Each entry is a path to a local hook definition or a URL to a
-# remote hook manifest.
+# hooks declares external hook sources evaluated before gate stages.
+# Authoring sources can be:
+# - local file path (single hook manifest)
+# - local directory path (recursive hook.yaml discovery)
+# - remote http(s) URL
 #
-# Example:
+# CLI canonicalization:
+# - local sources are compiled to short-hash entries and uploaded as spec bundles
+# - bundle ids are written to bundle_map[shortHash]
+# - remote http(s) URLs remain unchanged
+#
+# Example (authoring form):
 # hooks:
 #   - ./hooks/security-scan.yaml
 #   - https://hooks.example.com/compliance/v1.yaml
@@ -20,6 +27,7 @@ kind: MigRunSpec
 # - Entries must be non-empty strings.
 # - Duplicate entries are rejected.
 # - Hooks execute in declaration order before each gate stage.
+# - Server scheduling expects canonical wire entries (shortHash or http(s) URL).
 hooks:
   - ./hooks/lint-check.yaml
   - https://hooks.example.com/sbom-policy/v1.yaml

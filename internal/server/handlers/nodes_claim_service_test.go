@@ -21,7 +21,7 @@ func TestClaimService_Claim_ReturnsNoWorkWhenQueueEmpty(t *testing.T) {
 	st.claimJob.err = pgx.ErrNoRows
 	st.getNode.val = store.Node{ID: nodeID}
 
-	svc := NewClaimService(st, &ConfigHolder{}, nil)
+	svc := NewClaimService(st, nil, &ConfigHolder{}, nil)
 	_, err := svc.Claim(context.Background(), nodeID)
 	var noWork *ClaimNoWork
 	if !errors.As(err, &noWork) {
@@ -71,7 +71,7 @@ func TestClaimService_Claim_SuccessBuildsPayloadAndTransitionsRepo(t *testing.T)
 		Meta:        []byte(`{}`),
 	}
 
-	svc := NewClaimService(st, &ConfigHolder{}, nil)
+	svc := NewClaimService(st, nil, &ConfigHolder{}, nil)
 	result, err := svc.Claim(context.Background(), nodeID)
 	if err != nil {
 		t.Fatalf("Claim() error = %v", err)
@@ -135,7 +135,7 @@ func TestClaimService_Claim_RequeuesClaimedJobWhenPayloadBuildFails(t *testing.T
 		Meta:        []byte(`{}`),
 	}
 
-	svc := NewClaimService(st, &ConfigHolder{}, nil)
+	svc := NewClaimService(st, nil, &ConfigHolder{}, nil)
 	_, err := svc.Claim(context.Background(), nodeID)
 	if err == nil {
 		t.Fatal("expected Claim() to fail")
