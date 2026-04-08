@@ -38,7 +38,7 @@ items:
     reasoning: "medium"
     cfp: 6
     commit: a4f29bc1
-  - done: false
+  - done: true
     reviews:
       - gaps: ["\"Wire service type routing so completion handling accepts sbom and hook job records.\" is not wired into completion handling: `routeCompleteJobServiceType` is added in `internal/server/handlers/jobs_complete_service_types.go:45` but is not used by `CompleteJobService.Complete` (`internal/server/handlers/jobs_complete_service.go:27`) or post-completion handlers (`internal/server/handlers/jobs_complete_service_post_actions.go`).", "\"Known job type routing accepts sbom and hook without changing existing completion semantics.\" is only validated as isolated mapping (`internal/server/handlers/jobs_complete_service_types_test.go:9`) and not verified in completion-path behavior, so acceptance/semantics are not proven in the actual service flow."]
         commit: 560d89f7
