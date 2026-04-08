@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"os"
 	"path/filepath"
 	"strings"
@@ -205,6 +207,7 @@ func TestResolveHookRuntimeDecision_RelativeSourceNotFoundDoesNotBlockClaim(t *t
 	}
 	spec := []byte(`{"steps":[{"image":"test:latest"}],"hooks":["./hooks/lint.yaml"]}`)
 	st := &jobStore{}
+	st.hasHookOnceLedger.val = false
 
 	got, err := resolveHookRuntimeDecision(context.Background(), st, job, spec, domaintypes.JobTypeHook)
 	if err != nil {
@@ -216,14 +219,60 @@ func TestResolveHookRuntimeDecision_RelativeSourceNotFoundDoesNotBlockClaim(t *t
 	if !got.HookShouldRun {
 		t.Fatal("HookShouldRun=false, want true")
 	}
-	if got.HookHash != "" {
-		t.Fatalf("HookHash=%q, want empty for unresolved relative source", got.HookHash)
+	wantHash := fallbackHookSourceHash("./hooks/lint.yaml")
+	if got.HookHash != wantHash {
+		t.Fatalf("HookHash=%q, want %q for unresolved relative source", got.HookHash, wantHash)
 	}
-	if st.hasHookOnceLedger.called {
-		t.Fatal("did not expect HasHookOnceLedger() for unresolved relative source")
+	if !st.hasHookOnceLedger.called {
+		t.Fatal("expected HasHookOnceLedger() for unresolved relative source")
 	}
 	if st.getHookOnceLedger.called {
-		t.Fatal("did not expect GetHookOnceLedger() for unresolved relative source")
+		t.Fatal("did not expect GetHookOnceLedger() when no ledger row exists")
+	}
+}
+
+func TestResolveHookRuntimeDecision_RelativeSourceNotFoundSkipsAfterRecordedSuccess(t *testing.T) {
+	t.Parallel()
+
+	runID := domaintypes.NewRunID()
+	repoID := domaintypes.NewRepoID()
+	firstSuccessID := domaintypes.NewJobID()
+	job := store.Job{
+		ID:      domaintypes.NewJobID(),
+		RunID:   runID,
+		RepoID:  repoID,
+		JobType: domaintypes.JobTypeHook,
+		Name:    "pre-gate-hook-000",
+	}
+	spec := []byte(`{"steps":[{"image":"test:latest"}],"hooks":["./hooks/lint.yaml"]}`)
+	st := &jobStore{}
+	st.hasHookOnceLedger.val = true
+	st.getHookOnceLedger.val = store.HooksOnce{
+		RunID:             runID,
+		RepoID:            repoID,
+		HookHash:          fallbackHookSourceHash("./hooks/lint.yaml"),
+		FirstSuccessJobID: &firstSuccessID,
+		OnceSkipMarked:    false,
+	}
+
+	got, err := resolveHookRuntimeDecision(context.Background(), st, job, spec, domaintypes.JobTypeHook)
+	if err != nil {
+		t.Fatalf("resolveHookRuntimeDecision() error: %v", err)
+	}
+	if got == nil {
+		t.Fatal("resolveHookRuntimeDecision() returned nil decision")
+	}
+	if got.HookShouldRun {
+		t.Fatal("HookShouldRun=true, want false")
+	}
+	if !got.HookOnceSkipMarked {
+		t.Fatal("HookOnceSkipMarked=false, want true")
+	}
+	if !st.hasHookOnceLedger.called {
+		t.Fatal("expected HasHookOnceLedger() for unresolved relative source")
+	}
+	if !st.getHookOnceLedger.called {
+		t.Fatal("expected GetHookOnceLedger() after ledger hit")
 	}
 }
 
@@ -235,4 +284,9 @@ func writeHookManifest(t *testing.T, body string) string {
 		t.Fatalf("write hook manifest %s: %v", path, err)
 	}
 	return path
+}
+
+func fallbackHookSourceHash(source string) string {
+	sum := sha256.Sum256([]byte("relative-hook-source:" + strings.TrimSpace(source)))
+	return hex.EncodeToString(sum[:])
 }

@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -46,9 +48,15 @@ func resolveHookRuntimeDecision(
 	if err != nil {
 		// Relative hook sources are valid in mig specs but may not be resolvable
 		// from the control-plane filesystem at claim time. Do not block claims
-		// in that case; execute hook job and collect completion metadata as usual.
+		// in that case; use deterministic source hash as persistence key so hook-once
+		// ledger checks and writes still apply.
 		if isRelativeLocalHookSource(source) && errors.Is(err, os.ErrNotExist) {
-			return &contracts.HookRuntimeDecision{HookShouldRun: true}, nil
+			hash := unresolvedRelativeHookSourceHash(source)
+			decision := &contracts.HookRuntimeDecision{
+				HookHash:      hash,
+				HookShouldRun: true,
+			}
+			return applyHookOnceLedgerDecision(ctx, st, job, decision)
 		}
 		return nil, fmt.Errorf("load hook spec for source %q: %w", source, err)
 	}
@@ -68,11 +76,19 @@ func resolveHookRuntimeDecision(
 	if !match.Once.Enabled {
 		return decision, nil
 	}
+	return applyHookOnceLedgerDecision(ctx, st, job, decision)
+}
 
+func applyHookOnceLedgerDecision(
+	ctx context.Context,
+	st store.Store,
+	job store.Job,
+	decision *contracts.HookRuntimeDecision,
+) (*contracts.HookRuntimeDecision, error) {
 	exists, err := st.HasHookOnceLedger(ctx, store.HasHookOnceLedgerParams{
 		RunID:    job.RunID,
 		RepoID:   job.RepoID,
-		HookHash: hash,
+		HookHash: decision.HookHash,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("check hook once ledger: %w", err)
@@ -84,7 +100,7 @@ func resolveHookRuntimeDecision(
 	ledger, err := st.GetHookOnceLedger(ctx, store.GetHookOnceLedgerParams{
 		RunID:    job.RunID,
 		RepoID:   job.RepoID,
-		HookHash: hash,
+		HookHash: decision.HookHash,
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -100,6 +116,11 @@ func resolveHookRuntimeDecision(
 	decision.HookShouldRun = false
 	decision.HookOnceSkipMarked = !ledger.OnceSkipMarked
 	return decision, nil
+}
+
+func unresolvedRelativeHookSourceHash(source string) string {
+	sum := sha256.Sum256([]byte("relative-hook-source:" + strings.TrimSpace(source)))
+	return hex.EncodeToString(sum[:])
 }
 
 func hookIndexFromJobName(jobName string, hooksLen int) (int, error) {
