@@ -50,7 +50,9 @@ items:
     cfp: 11
     commit: d9c3fb47
   - done: false
-    reviews: []
+    reviews:
+      - gaps: ["`Execute hook steps with the same manifest and runner path used by mig steps, including `ca`, `in`, `out`, and `home` fields.` is not completed in full: hook manifests can contain multiple steps (`internal/workflow/hook/spec.go:113`), but execution always uses only `specDoc.Steps[0]` (`internal/nodeagent/execution_orchestrator_jobs.go:275`), so additional configured hook steps are never executed.", "`Persist SBOM rows immediately after each successful SBOM job completion so hook condition evaluation uses current-cycle data.` / `SBOM-row-backed condition evaluation stays stable across pre-gate, post-gate, and re-gate cycles.` is not fully wired for pre/post planning: `createJobsFromSpec` resolves both pre-gate and post-gate hook plans up front (`internal/server/handlers/migs_ticket.go:258`, `internal/server/handlers/migs_ticket.go:262`, `internal/server/handlers/migs_ticket.go:325`) from planning-time snapshot input (`internal/server/handlers/migs_ticket.go:505-543`), before post-gate SBOM completion for that run cycle.", "`A hook with false condition is absent from plan and has no execution record for that cycle.` is not guaranteed end-to-end: runtime still uploads a successful hook completion when `HookShouldRun=false` (`internal/nodeagent/execution_orchestrator_jobs.go:233-265`), which creates a hook execution record whenever a false decision reaches node execution."]
+        commit: null
     label: "2"
     summary: >-
       Implement real hook step execution using shared step runtime contract and consume live SBOM snapshots for conditions.
