@@ -9,7 +9,7 @@ Usage:
 Behavior:
   - For each targeted phase:
     - fails if phase index evidence marker is missing
-    - warns if phase index evidence marker is present but unchecked
+    - fails if phase index evidence marker is present but unchecked
   - For each targeted phase with done=true:
     - fails if any item has done!=true
     - fails if any done item is missing acceptance checks (`verification`) or acceptance evidence (`reviews[*].commit`)
@@ -34,7 +34,6 @@ class Verifier
   def initialize(paths)
     @paths = paths
     @failures = []
-    @warnings = []
     @checked = 0
   end
 
@@ -47,7 +46,6 @@ class Verifier
       return 1
     end
 
-    @warnings.each { |line| warn(line) } if @warnings.any?
     puts("roadmap verification passed (#{@checked} phase#{@checked == 1 ? "" : "s"} checked)")
     0
   end
@@ -122,7 +120,7 @@ class Verifier
 
     has_checked_entry = lines_with_marker.any? { |line| line.match?(/^\s*-\s*\[[xX]\]/) }
     unless has_checked_entry
-      @warnings << "warning: evidence marker '#{evidence_marker}' is present but unchecked in #{index_path}"
+      @failures << "error: evidence marker '#{evidence_marker}' is present but unchecked in #{index_path}"
     end
   rescue Psych::SyntaxError => e
     @failures << "error: YAML parse failure in #{path}: #{e.message.lines.first.to_s.strip}"

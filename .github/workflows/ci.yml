@@ -144,7 +144,7 @@ EOF
             phase_files="$(printf '%s\n%s\n' "${phase_files}" "${discovered_phase_files}" | sed '/^$/d' | sort -u || true)"
           fi
 
-          if [ -n "${runtime_changed_files}" ] && [ -z "${phase_files}" ]; then
+          if [ -n "${runtime_changed_files}" ]; then
             runtime_phase_files="$(find roadmap/sbom-hooks-remediation -maxdepth 1 -type f -name 'phase-*.yaml' | sort || true)"
             phase_files="$(printf '%s\n%s\n' "${phase_files}" "${runtime_phase_files}" | sed '/^$/d' | sort -u || true)"
           fi
