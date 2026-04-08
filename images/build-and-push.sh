@@ -7,7 +7,6 @@ set -Eeuo pipefail
 # - server  -> server
 # - node    -> node
 # - amata   -> amata
-# - shell   -> shell
 # - sbom runners -> sbom-gradle, sbom-maven
 # - gate-gradle -> gate-gradle:jdk11, gate-gradle:jdk17
 # - maven mirrors -> maven:3-eclipse-temurin-11, maven:3-eclipse-temurin-17
@@ -134,9 +133,6 @@ build_push node images/node/Dockerfile .
 # amata
 bash images/amata/build-amata.sh
 build_push amata images/amata/Dockerfile .
-
-# shell
-build_push shell images/shell/Dockerfile images/shell
 
 # sbom runners
 build_push sbom-gradle images/sbom/gradle/Dockerfile .
