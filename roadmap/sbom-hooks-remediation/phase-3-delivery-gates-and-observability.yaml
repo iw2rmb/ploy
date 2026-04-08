@@ -49,7 +49,7 @@ reviews:
   - gaps: ["\"Add CI guardrails so roadmap completion cannot be marked done while runtime acceptance checks or review gaps remain.\" is not closed end-to-end for this phase state: `roadmap/sbom-hooks-remediation/phase-3-delivery-gates-and-observability.yaml:11` is still `done: false`, `roadmap/sbom-hooks-remediation/index.md:12` keeps `evidence:phase-3-delivery-gates-and-observability` unchecked, and targeted verification fails (`make roadmap-verify ROADMAP_VERIFY_PHASES='roadmap/sbom-hooks-remediation/phase-3-delivery-gates-and-observability.yaml'` -> `error: targeted phase not done ...`; verifier gate at `tools/roadmap/verify_done.sh:68-72`)."]
     commit: 67a69da5
   - gaps: ["\"Add CI guardrails so roadmap completion cannot be marked done while runtime acceptance checks or review gaps remain.\" is not closed end-to-end for this phase state: `roadmap/sbom-hooks-remediation/phase-3-delivery-gates-and-observability.yaml:11` remains `done: false`, `roadmap/sbom-hooks-remediation/index.md:12` keeps `evidence:phase-3-delivery-gates-and-observability` unchecked, and targeted verification skips the phase (`make roadmap-verify ROADMAP_VERIFY_PHASES='roadmap/sbom-hooks-remediation/phase-3-delivery-gates-and-observability.yaml'` -> `roadmap verification passed (0 phases checked, 1 skipped)`, with skip behavior from `tools/roadmap/verify_done.sh:68-71`)."]
-    commit: null
+    commit: 8d2810c6
 items:
   - done: true
     reviews:
