@@ -14,7 +14,7 @@ items:
   - done: false
     reviews:
       - gaps: ["\"Build cycle-specific hook match input before job drafting and evaluate each resolved hook spec condition there.\" is not fully implemented: canonical hash hook sources are not evaluated during planning in `internal/server/handlers/migs_ticket.go:576`-`619` (`loadHookSpecForPlanning` marks them non-evaluable and `deferredBundleHookPlanningDecision` hard-sets `ShouldRun=true`), so planning still creates hook jobs for those sources regardless of matcher outcome.", "\"A run with all hook conditions false shows no hook jobs in plan for pre-gate, post-gate, and re-gate cycles.\" is not fully verified/wired for the primary hash/bundle hook path: new tests only exercise HTTP hook sources in `internal/server/handlers/migs_ticket_test.go:342`-`442` and `internal/server/handlers/nodes_complete_healing_test.go:234`-`389`, while hash sources follow the deferred-always-true planning branch in `internal/server/handlers/migs_ticket.go:603`-`617`."]
-        commit: null
+        commit: d8ea235c
     label: "1"
     summary: >-
       Move hook condition evaluation to planning and create hook jobs only for positive matches in each gate cycle.
