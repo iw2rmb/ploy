@@ -9,6 +9,7 @@ Usage:
 Behavior:
   - For each phase with done=true:
     - fails if any item has done!=true
+    - fails if any done item is missing acceptance checks (`verification`) or acceptance evidence (`reviews[*].commit`)
     - fails if any unresolved reviews.gaps exist (phase or item level)
     - fails if the phase index evidence entry is missing or unchecked in sibling index.md
 
@@ -68,6 +69,7 @@ class Verifier
     phase_name = File.basename(path, ".yaml")
     unresolved = []
     incomplete_items = []
+    acceptance_gaps = []
 
     unresolved.concat(find_unresolved_reviews(data["reviews"], "phase"))
 
@@ -79,6 +81,7 @@ class Verifier
         label = item["label"].to_s.strip
         marker = label.empty? ? "item[#{idx}]" : "item #{label}"
         incomplete_items << marker unless item["done"] == true
+        acceptance_gaps.concat(find_acceptance_gaps(item, marker))
         unresolved.concat(find_unresolved_reviews(item["reviews"], marker))
       end
     end
@@ -91,6 +94,11 @@ class Verifier
     if unresolved.any?
       @failures << "error: unresolved reviews.gaps in #{path}"
       unresolved.each { |msg| @failures << "  - #{msg}" }
+    end
+
+    if acceptance_gaps.any?
+      @failures << "error: missing acceptance completion/evidence in #{path}"
+      acceptance_gaps.each { |msg| @failures << "  - #{msg}" }
     end
 
     index_path = File.join(File.dirname(path), "index.md")
@@ -133,6 +141,41 @@ class Verifier
     end
 
     unresolved
+  end
+
+  def find_acceptance_gaps(item, scope)
+    return [] unless item.is_a?(Hash)
+    return [] unless item["done"] == true
+
+    gaps = []
+    verification = item["verification"]
+    if !verification.is_a?(Array) || verification.empty?
+      gaps << "#{scope} has done=true but missing verification acceptance checks"
+    end
+
+    reviews = item["reviews"]
+    if !reviews.is_a?(Array) || reviews.empty?
+      gaps << "#{scope} has done=true but missing reviews acceptance evidence"
+      return gaps
+    end
+
+    review_commits = []
+    reviews.each_with_index do |review, idx|
+      next unless review.is_a?(Hash)
+
+      commit = review["commit"].to_s.strip
+      if commit.empty?
+        gaps << "#{scope} review[#{idx}] missing commit acceptance evidence"
+        next
+      end
+      review_commits << commit
+    end
+
+    if review_commits.empty?
+      gaps << "#{scope} has done=true but no review commit acceptance evidence"
+    end
+
+    gaps
   end
 end
 

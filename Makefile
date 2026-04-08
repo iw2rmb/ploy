@@ -6,7 +6,7 @@ REQUIRED_GO_TOOLCHAIN := go1.25.9
 VERSION_FILE := VERSION
 VERSION ?= $(shell tr -d '[:space:]' < $(VERSION_FILE) 2>/dev/null || echo "")
 PLOY_SIGN_BINARIES ?= 0
-ROADMAP_VERIFY_PHASES ?= $(shell find roadmap/sbom-hooks-remediation -type f -name 'phase-*.yaml' | sort)
+ROADMAP_VERIFY_PHASES ?= $(shell find roadmap -type f -name 'phase-*.yaml' | sort)
 
 # Version stamping
 GIT_COMMIT := $(shell git rev-parse --short=12 HEAD 2>/dev/null || echo unknown)
