@@ -85,3 +85,4 @@ items:
         Existing API clients continue to parse responses when new fields are absent.
     reasoning: "high"
     cfp: 9
+    commit: 05c20a1a
