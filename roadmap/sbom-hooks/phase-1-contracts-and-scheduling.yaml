@@ -9,7 +9,7 @@ documentation:
 done: false
 reviews: []
 items:
-  - done: false
+  - done: true
     reviews: []
     label: "1"
     summary: "Extend mig spec contracts to declare root-level hook sources and parse them deterministically."
