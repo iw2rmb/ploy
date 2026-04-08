@@ -4,6 +4,8 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -60,6 +62,15 @@ func TestCreateSingleRepoRunHandler_SingleRepo(t *testing.T) {
 
 func TestCreateJobsFromSpec(t *testing.T) {
 	t.Parallel()
+	hooksRoot := t.TempDir()
+	hookAPath := filepath.Join(hooksRoot, "lint-a.yaml")
+	hookBPath := filepath.Join(hooksRoot, "lint-b.yaml")
+	if err := os.WriteFile(hookAPath, []byte("id: hook-a\nsteps:\n  - image: test:latest\n"), 0o644); err != nil {
+		t.Fatalf("write hookAPath: %v", err)
+	}
+	if err := os.WriteFile(hookBPath, []byte("id: hook-b\nsteps:\n  - image: test:latest\n"), 0o644); err != nil {
+		t.Fatalf("write hookBPath: %v", err)
+	}
 
 	tests := []struct {
 		name        string
@@ -129,7 +140,7 @@ func TestCreateJobsFromSpec(t *testing.T) {
 			repoBaseRef: "main",
 			attempt:     1,
 			repoSHA0:    testRepoSHA0,
-			spec:        []byte(`{"hooks":["./hooks/lint.yaml","https://hooks.example.com/policy.yaml"],"steps":[{"image":"mig1:v1"}]}`),
+			spec:        []byte(`{"hooks":["` + hookAPath + `","` + hookBPath + `"],"steps":[{"image":"mig1:v1"}]}`),
 			expected: []expectedJob{
 				{"pre-gate-sbom", domaintypes.JobTypeSBOM, domaintypes.JobStatusQueued, "", testRepoSHA0},
 				{"pre-gate-hook-000", domaintypes.JobTypeHook, domaintypes.JobStatusCreated, "", ""},
@@ -273,8 +284,24 @@ func TestCreateJobsFromSpec_ChainIntegrity(t *testing.T) {
 func TestCreateJobsFromSpec_PostGatePreludeWithHooks_DeterministicOrder(t *testing.T) {
 	t.Parallel()
 
+	hooksRoot := t.TempDir()
+	hookAPath := filepath.Join(hooksRoot, "a", "hook.yaml")
+	hookBPath := filepath.Join(hooksRoot, "b", "hook.yaml")
+	if err := os.MkdirAll(filepath.Dir(hookAPath), 0o755); err != nil {
+		t.Fatalf("mkdir hook a dir: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Dir(hookBPath), 0o755); err != nil {
+		t.Fatalf("mkdir hook b dir: %v", err)
+	}
+	if err := os.WriteFile(hookAPath, []byte("id: hook-a\nsteps:\n  - image: test:latest\n"), 0o644); err != nil {
+		t.Fatalf("write hookAPath: %v", err)
+	}
+	if err := os.WriteFile(hookBPath, []byte("id: hook-b\nsteps:\n  - image: test:latest\n"), 0o644); err != nil {
+		t.Fatalf("write hookBPath: %v", err)
+	}
+
 	st := &jobStore{}
-	spec := []byte(`{"hooks":["./hooks/a.yaml","./hooks/b.yaml"],"steps":[{"image":"a"},{"image":"b"}]}`)
+	spec := []byte(`{"hooks":["` + hookAPath + `","` + hookBPath + `"],"steps":[{"image":"a"},{"image":"b"}]}`)
 
 	err := createJobsFromSpec(context.Background(), st, domaintypes.RunID("run_123"), domaintypes.RepoID("repo_456"), "main", 1, testRepoSHA0, spec)
 	if err != nil {
