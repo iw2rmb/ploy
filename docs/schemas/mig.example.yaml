@@ -5,6 +5,26 @@ apiVersion: ploy.mig/v1alpha1
 kind: MigRunSpec
 
 ################################################################################
+# HOOK SOURCES (root-level)
+################################################################################
+# hooks declares external hook sources (file paths or URLs) evaluated before
+# gate stages. Each entry is a path to a local hook definition or a URL to a
+# remote hook manifest.
+#
+# Example:
+# hooks:
+#   - ./hooks/security-scan.yaml
+#   - https://hooks.example.com/compliance/v1.yaml
+#
+# Rules:
+# - Entries must be non-empty strings.
+# - Duplicate entries are rejected.
+# - Hooks execute in declaration order before each gate stage.
+hooks:
+  - ./hooks/lint-check.yaml
+  - https://hooks.example.com/sbom-policy/v1.yaml
+
+################################################################################
 # CANONICAL MODS SHAPE (steps[])
 ################################################################################
 # Main container steps run against the hydrated repository at /workspace.

@@ -4,6 +4,13 @@
   "title": "MIG raw contract schema",
   "type": "object",
   "properties": {
+    "hooks": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
     "steps": {
       "type": "array",
       "items": {
