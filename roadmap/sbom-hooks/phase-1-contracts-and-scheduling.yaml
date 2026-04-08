@@ -9,7 +9,7 @@ documentation:
 done: false
 reviews:
   - gaps: ["\"Inject sbom scheduling before post_gate and re_gate execution paths.\" still carries compatibility leftover behavior in `internal/nodeagent/execution_orchestrator_jobs.go:460`: `materializeGateSBOMForGate` falls back to `preGateFinalSnapshotPath(...)` for non-pre cycles when cycle-specific snapshot is missing, so post_gate/re_gate can continue without their own cycle SBOM snapshot path being present."]
-    commit: null
+    commit: 89f3b2a2
 items:
   - done: true
     reviews: []
