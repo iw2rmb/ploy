@@ -62,7 +62,13 @@ func gateCycleHookInputSnapshotPath(runID types.RunID, cycleName string, hookInd
 	if hookIndex <= 0 {
 		return gateCycleSBOMOutPath(runID, cycleName)
 	}
-	return gateCycleHookOutPath(runID, cycleName, hookIndex-1)
+	for idx := hookIndex - 1; idx >= 0; idx-- {
+		candidate := gateCycleHookOutPath(runID, cycleName, idx)
+		if _, err := os.Stat(candidate); err == nil {
+			return candidate
+		}
+	}
+	return gateCycleSBOMOutPath(runID, cycleName)
 }
 
 func gateCycleFinalSnapshotPath(runID types.RunID, cycleName string, hooks []string) string {
