@@ -64,6 +64,54 @@ Gate validation is orchestrated by the node agent as part of the Migs run lifecy
 6. Gate results are captured as `BuildGateStageMetadata` (passed/failed, duration, logs).
 7. Node reports completion via `/v1/jobs/{job_id}/complete`.
 
+## Hook/SBOM Evidence in Run Job Status
+
+Repo-scoped job status (`GET /v1/runs/{run_id}/repos/{repo_id}/jobs`) now includes
+optional evidence fields that make sbom/hook planning decisions explicit:
+
+- `hook_plan_reason` — planner summary for why a hook was or was not planned.
+- `hook_condition_result` — serialized JSON condition payload.
+- `sbom_evidence` — sbom execution evidence:
+  - `artifact_present` (bool): whether sbom artifact bundles exist for the sbom job.
+  - `parsed_package_count` (int): number of normalized sbom package rows persisted.
+
+Examples:
+
+1. **True-match (hook planned and executed):**
+```json
+{
+  "name": "pre-gate-hook-000",
+  "job_type": "hook",
+  "hook_plan_reason": "hook_match eval=planned should_run=true stack=true sbom=true on_match=true on_add=false on_remove=false on_change=false",
+  "hook_condition_result": "{\"evaluated\":true,\"should_run\":true,\"stack_matched\":true,\"sbom_matched\":true,\"predicates\":{\"on_match\":true,\"on_add\":false,\"on_remove\":false,\"on_change\":false}}"
+}
+```
+
+2. **False-match (no hook jobs planned after sbom):**
+```json
+{
+  "name": "pre-gate-sbom",
+  "job_type": "sbom",
+  "hook_plan_reason": "no hook jobs planned for cycle \"pre-gate\"",
+  "hook_condition_result": "{\"evaluated\":true,\"planned_jobs\":0}",
+  "sbom_evidence": {
+    "artifact_present": true,
+    "parsed_package_count": 184
+  }
+}
+```
+
+3. **Terminal preflight failure (hook claim/runtime rejects execution):**
+```json
+{
+  "name": "post-gate-hook-001",
+  "job_type": "hook",
+  "status": "Error",
+  "hook_plan_reason": "hook preflight rejected by runtime decision",
+  "hook_condition_result": "{\"evaluated\":true,\"should_run\":false,\"hash\":\"4f8d...\"}"
+}
+```
+
 ## Gate Executor
 
 The `GateExecutor` interface (`internal/workflow/step`) provides a unified
