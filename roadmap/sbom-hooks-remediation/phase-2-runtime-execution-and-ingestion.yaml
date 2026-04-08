@@ -86,3 +86,4 @@ items:
         SBOM-row-backed condition evaluation stays stable across pre-gate, post-gate, and re-gate cycles.
     reasoning: "high"
     cfp: 13
+    commit: 5d49c92d
