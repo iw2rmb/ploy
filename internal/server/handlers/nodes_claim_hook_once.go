@@ -30,16 +30,22 @@ func resolveHookRuntimeDecision(
 	if err != nil {
 		return nil, fmt.Errorf("parse merged spec for hook runtime: %w", err)
 	}
-	hookIndex, err := hookIndexFromJobName(job.Name, len(migSpec.Hooks))
-	if err != nil {
-		return nil, err
+	source := hookSourceFromJobMeta(job.Meta)
+	hookIndex := -1
+	if source == "" {
+		var err error
+		hookIndex, err = hookIndexFromJobName(job.Name, len(migSpec.Hooks))
+		if err != nil {
+			return nil, err
+		}
 	}
-
-	source := strings.TrimSpace(migSpec.Hooks[hookIndex])
+	if source == "" {
+		source = strings.TrimSpace(migSpec.Hooks[hookIndex])
+	}
 	if source == "" {
 		return nil, fmt.Errorf("hook source is empty for index %d", hookIndex)
 	}
-	hookSpec, err := loadRuntimeHookSpec(source)
+	hookSpec, err := loadRuntimeHookSpec(source, ".")
 	if err != nil {
 		return nil, fmt.Errorf("load hook spec for source %q: %w", source, err)
 	}
@@ -241,15 +247,26 @@ func hookIndexFromJobName(jobName string, hooksLen int) (int, error) {
 	return hookIndex, nil
 }
 
-func loadRuntimeHookSpec(source string) (hook.Spec, error) {
+func loadRuntimeHookSpec(source string, specRoot string) (hook.Spec, error) {
 	specs, err := hook.NewLoader(nil).LoadFromMigSpec(contracts.MigSpec{
 		Hooks: []string{source},
-	}, ".")
+	}, specRoot)
 	if err != nil {
 		return hook.Spec{}, err
 	}
-	if len(specs) != 1 {
-		return hook.Spec{}, fmt.Errorf("expected exactly 1 resolved hook spec, got %d", len(specs))
+	if len(specs) == 0 {
+		return hook.Spec{}, fmt.Errorf("no resolved hook spec for source %q", source)
 	}
 	return specs[0], nil
+}
+
+func hookSourceFromJobMeta(metaRaw []byte) string {
+	if len(metaRaw) == 0 {
+		return ""
+	}
+	meta, err := contracts.UnmarshalJobMeta(metaRaw)
+	if err != nil || meta == nil {
+		return ""
+	}
+	return strings.TrimSpace(meta.HookSource)
 }

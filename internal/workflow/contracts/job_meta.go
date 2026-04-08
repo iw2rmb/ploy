@@ -68,6 +68,11 @@ type JobMeta struct {
 	// Only populated for mig jobs (kind="mig") when a step name is provided.
 	MigStepName string `json:"mig_step_name,omitempty"`
 
+	// HookSource stores the fully resolved hook manifest source for hook jobs.
+	// Populated for hook jobs (kind="mig") so claim-time runtime does not need to
+	// re-resolve source entries that may expand from directories.
+	HookSource string `json:"hook_source,omitempty"`
+
 	// ActionSummary is a short one-line description of what the healing mig did,
 	// produced by the healing container. Only allowed for mig jobs (kind="mig").
 	// Max 200 chars, no newlines.
@@ -144,6 +149,9 @@ func (m JobMeta) Validate() error {
 		if utf8.RuneCountInString(m.ActionSummary) > 200 {
 			return fmt.Errorf("action_summary: must be at most 200 characters, got %d", utf8.RuneCountInString(m.ActionSummary))
 		}
+	}
+	if m.HookSource != "" && m.Kind != JobKindMig {
+		return fmt.Errorf("hook_source present but kind is %q (only allowed for %q)", m.Kind, JobKindMig)
 	}
 	if m.Heal != nil {
 		if m.Kind != JobKindMig {

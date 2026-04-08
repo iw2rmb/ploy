@@ -9,6 +9,7 @@ import (
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
+	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
 func TestResolveHookRuntimeDecision_NoLedgerRecordRunsHook(t *testing.T) {
@@ -273,27 +274,48 @@ steps:
 	}
 }
 
-func TestResolveHookRuntimeDecision_RelativeSourceNotFoundReturnsError(t *testing.T) {
+func TestResolveHookRuntimeDecision_UsesResolvedHookSourceFromJobMeta(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
 	repoID := domaintypes.NewRepoID()
+	resolvedSource := writeHookManifest(t, `id: meta-source
+once: false
+steps:
+  - image: test:latest
+`)
+	metaBytes, err := contracts.MarshalJobMeta(&contracts.JobMeta{
+		Kind:       contracts.JobKindMig,
+		HookSource: resolvedSource,
+	})
+	if err != nil {
+		t.Fatalf("marshal hook job meta: %v", err)
+	}
 	job := store.Job{
 		ID:      domaintypes.NewJobID(),
 		RunID:   runID,
 		RepoID:  repoID,
 		JobType: domaintypes.JobTypeHook,
 		Name:    "pre-gate-hook-000",
+		Meta:    metaBytes,
 	}
 	spec := []byte(`{"steps":[{"image":"test:latest"}],"hooks":["./hooks/lint.yaml"]}`)
 	st := &jobStore{}
+	st.listJobsByRunRepoAttempt.val = []store.Job{{
+		ID:      domaintypes.NewJobID(),
+		RunID:   runID,
+		RepoID:  repoID,
+		Attempt: job.Attempt,
+		JobType: domaintypes.JobTypeSBOM,
+		Status:  domaintypes.JobStatusSuccess,
+	}}
 
 	got, err := resolveHookRuntimeDecision(context.Background(), st, job, spec, domaintypes.JobTypeHook)
-	if err == nil {
-		t.Fatalf("resolveHookRuntimeDecision() error=nil, want not found error, got decision=%+v", got)
+	if err != nil {
+		t.Fatalf("resolveHookRuntimeDecision() unexpected error: %v", err)
 	}
-	if st.hasHookOnceLedger.called || st.getHookOnceLedger.called {
-		t.Fatal("did not expect hook-once ledger calls when hook source resolution fails")
+	if !got.HookShouldRun {
+		t.Fatalf("HookShouldRun=false, want true; decision=%+v", got)
 	}
 }
 

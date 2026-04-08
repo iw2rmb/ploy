@@ -18,6 +18,7 @@ import (
 	migsapi "github.com/iw2rmb/ploy/internal/migs/api"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
+	"github.com/iw2rmb/ploy/internal/workflow/hook"
 )
 
 // NOTE: This file uses KSUID-backed string IDs for runs and jobs.
@@ -190,14 +191,15 @@ func getRunStatusHandler(st store.Store) http.HandlerFunc {
 }
 
 type plannedJob struct {
-	ID        domaintypes.JobID
-	Name      string
-	JobType   domaintypes.JobType
-	JobImage  string
-	Status    domaintypes.JobStatus
-	StepName  string
-	NextID    *domaintypes.JobID
-	RepoSHAIn string
+	ID         domaintypes.JobID
+	Name       string
+	JobType    domaintypes.JobType
+	JobImage   string
+	Status     domaintypes.JobStatus
+	StepName   string
+	HookSource string
+	NextID     *domaintypes.JobID
+	RepoSHAIn  string
 }
 
 type preGateCreationBinding struct {
@@ -229,25 +231,31 @@ func createJobsFromSpec(
 	if err != nil {
 		return fmt.Errorf("resolve pre-gate binding: %w", err)
 	}
+	resolvedHooks, err := resolveHookManifestSources(*migsSpec)
+	if err != nil {
+		return fmt.Errorf("resolve hook sources: %w", err)
+	}
 
 	type draft struct {
-		name     string
-		jobType  domaintypes.JobType
-		jobImage string
-		stepName string
+		name       string
+		jobType    domaintypes.JobType
+		jobImage   string
+		stepName   string
+		hookSource string
 	}
 	appendGatePreludeDrafts := func(drafts []draft, cycleName string) []draft {
 		drafts = append(drafts, draft{name: cycleName + "-sbom", jobType: domaintypes.JobTypeSBOM})
-		for i := range migsSpec.Hooks {
+		for i, source := range resolvedHooks {
 			drafts = append(drafts, draft{
-				name:    fmt.Sprintf("%s-hook-%03d", cycleName, i),
-				jobType: domaintypes.JobTypeHook,
+				name:       fmt.Sprintf("%s-hook-%03d", cycleName, i),
+				jobType:    domaintypes.JobTypeHook,
+				hookSource: source,
 			})
 		}
 		return drafts
 	}
 
-	drafts := make([]draft, 0, len(migsSpec.Steps)+len(migsSpec.Hooks)*2+5)
+	drafts := make([]draft, 0, len(migsSpec.Steps)+len(resolvedHooks)*2+5)
 	drafts = appendGatePreludeDrafts(drafts, "pre-gate")
 	drafts = append(drafts, draft{name: "pre-gate", jobType: domaintypes.JobTypePreGate})
 
@@ -294,12 +302,13 @@ func createJobsFromSpec(
 			jobImage = strings.TrimSpace(preGateBinding.JobImage)
 		}
 		planned = append(planned, plannedJob{
-			ID:       domaintypes.NewJobID(),
-			Name:     d.name,
-			JobType:  d.jobType,
-			JobImage: jobImage,
-			Status:   status,
-			StepName: d.stepName,
+			ID:         domaintypes.NewJobID(),
+			Name:       d.name,
+			JobType:    d.jobType,
+			JobImage:   jobImage,
+			Status:     status,
+			StepName:   d.stepName,
+			HookSource: d.hookSource,
 		})
 	}
 	// Seed deterministic SHA chain from run_repos.repo_sha0 at chain head.
@@ -418,6 +427,7 @@ func createPlannedJob(ctx context.Context, st store.Store, runID domaintypes.Run
 	} else {
 		meta = contracts.NewMigJobMeta()
 	}
+	meta.HookSource = strings.TrimSpace(planned.HookSource)
 	metaBytes, err := contracts.MarshalJobMeta(meta)
 	if err != nil {
 		return fmt.Errorf("marshal job meta: %w", err)
@@ -438,6 +448,21 @@ func createPlannedJob(ctx context.Context, st store.Store, runID domaintypes.Run
 		RepoShaIn:   planned.RepoSHAIn,
 	})
 	return err
+}
+
+func resolveHookManifestSources(spec contracts.MigSpec) ([]string, error) {
+	loaded, err := hook.LoadFromMigSpec(spec, ".")
+	if err != nil {
+		return nil, err
+	}
+	if len(loaded) == 0 {
+		return nil, nil
+	}
+	out := make([]string, 0, len(loaded))
+	for _, hs := range loaded {
+		out = append(out, strings.TrimSpace(hs.Source))
+	}
+	return out, nil
 }
 
 // helpers
