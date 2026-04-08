@@ -255,13 +255,8 @@ func createJobsFromSpec(
 	if err != nil {
 		return fmt.Errorf("resolve hook sources: %w", err)
 	}
-	preGateHookPlans, err := resolveCycleHookPlans(ctx, st, runID, repoID, attempt, migsSpec, resolvedHooks, "pre-gate", hookBlobstores...)
-	if err != nil {
-		return fmt.Errorf("plan pre-gate hooks: %w", err)
-	}
-	postGateHookPlans, err := resolveCycleHookPlans(ctx, st, runID, repoID, attempt, migsSpec, resolvedHooks, "post-gate", hookBlobstores...)
-	if err != nil {
-		return fmt.Errorf("plan post-gate hooks: %w", err)
+	if err := validateResolvedHookSources(ctx, st, migsSpec, resolvedHooks, hookBlobstores...); err != nil {
+		return err
 	}
 
 	type draft struct {
@@ -272,25 +267,13 @@ func createJobsFromSpec(
 		hookSource   string
 		hookDecision *hookPlanningDecision
 	}
-	appendGatePreludeDrafts := func(drafts []draft, cycleName string, hookPlans []plannedHookSource) []draft {
+	appendGatePreludeDrafts := func(drafts []draft, cycleName string) []draft {
 		drafts = append(drafts, draft{name: cycleName + "-sbom", jobType: domaintypes.JobTypeSBOM})
-		for _, hookPlan := range hookPlans {
-			if !hookPlan.Decision.ShouldRun() {
-				continue
-			}
-			decision := hookPlan.Decision
-			drafts = append(drafts, draft{
-				name:         fmt.Sprintf("%s-hook-%03d", cycleName, hookPlan.SourceIndex),
-				jobType:      domaintypes.JobTypeHook,
-				hookSource:   hookPlan.Source,
-				hookDecision: &decision,
-			})
-		}
 		return drafts
 	}
 
 	drafts := make([]draft, 0, len(migsSpec.Steps)+len(resolvedHooks)*2+5)
-	drafts = appendGatePreludeDrafts(drafts, "pre-gate", preGateHookPlans)
+	drafts = appendGatePreludeDrafts(drafts, "pre-gate")
 	drafts = append(drafts, draft{name: "pre-gate", jobType: domaintypes.JobTypePreGate})
 
 	if len(migsSpec.Steps) > 1 {
@@ -322,7 +305,7 @@ func createJobsFromSpec(
 			stepName: stepName,
 		})
 	}
-	drafts = appendGatePreludeDrafts(drafts, "post-gate", postGateHookPlans)
+	drafts = appendGatePreludeDrafts(drafts, "post-gate")
 	drafts = append(drafts, draft{name: "post-gate", jobType: domaintypes.JobTypePostGate})
 
 	planned := make([]plannedJob, 0, len(drafts))
@@ -368,6 +351,21 @@ func createJobsFromSpec(
 		}
 		if err := upsertPreGateCreationProfileLink(ctx, st, preGateJobID, preGateBinding.ProfileID); err != nil {
 			return fmt.Errorf("link pre-gate profile: %w", err)
+		}
+	}
+	return nil
+}
+
+func validateResolvedHookSources(
+	ctx context.Context,
+	st store.Store,
+	spec *contracts.MigSpec,
+	resolvedHooks []string,
+	hookBlobstores ...blobstore.Store,
+) error {
+	for i, source := range resolvedHooks {
+		if _, err := loadHookSpecForPlanning(ctx, st, spec, source, hookBlobstores...); err != nil {
+			return fmt.Errorf("validate hook source[%d] %q: %w", i, source, err)
 		}
 	}
 	return nil

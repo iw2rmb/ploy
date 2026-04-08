@@ -66,10 +66,33 @@ func gateCycleHookInputSnapshotPath(runID types.RunID, cycleName string, hookInd
 }
 
 func gateCycleFinalSnapshotPath(runID types.RunID, cycleName string, hooks []string) string {
-	if len(hooks) == 0 {
+	_ = hooks
+	hooksRoot := filepath.Join(gateCycleRootDir(runID, cycleName), "hooks")
+	entries, err := os.ReadDir(hooksRoot)
+	if err != nil {
 		return gateCycleSBOMOutPath(runID, cycleName)
 	}
-	return gateCycleHookOutPath(runID, cycleName, len(hooks)-1)
+	maxIdx := -1
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		idx, convErr := strconv.Atoi(strings.TrimSpace(entry.Name()))
+		if convErr != nil || idx < 0 {
+			continue
+		}
+		candidate := gateCycleHookOutPath(runID, cycleName, idx)
+		if _, statErr := os.Stat(candidate); statErr != nil {
+			continue
+		}
+		if idx > maxIdx {
+			maxIdx = idx
+		}
+	}
+	if maxIdx >= 0 {
+		return gateCycleHookOutPath(runID, cycleName, maxIdx)
+	}
+	return gateCycleSBOMOutPath(runID, cycleName)
 }
 
 func gateCycleNameFromSBOMJobName(jobName string) (string, error) {
@@ -272,52 +295,91 @@ func (r *runController) executeHookJob(ctx context.Context, req StartRunRequest)
 		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
 		return
 	}
-	execStep := specDoc.Steps[0]
-	commandIdentityJSON := encodeHookCommandIdentity(hookSource, execStep)
-	manifest, err := buildManifestFromRequest(req, hookStepRunOptions(execStep, req.TypedOptions.BundleMap), 0, contracts.MigStackUnknown)
-	if err != nil {
-		err = fmt.Errorf("hook[%d] build runtime manifest: %w", hookIndex, err)
-		slog.Error("failed to execute hook job", "run_id", req.RunID, "job_id", req.JobID, "hook_index", hookIndex, "error", err)
-		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
-		return
+	commandIdentityJSON := encodeHookCommandIdentityList(hookSource, specDoc.Steps)
+	stepInputPath := inputSnapshotPath
+	finalOutcome := standardJobOutcome{
+		runErr: fmt.Errorf("hook[%d] has no executable steps", hookIndex),
+	}
+	var completedStepName string
+	for stepIdx, execStep := range specDoc.Steps {
+		manifest, manifestErr := buildManifestFromRequest(req, hookStepRunOptions(execStep, req.TypedOptions.BundleMap), 0, contracts.MigStackUnknown)
+		if manifestErr != nil {
+			err = fmt.Errorf("hook[%d] step[%d] build runtime manifest: %w", hookIndex, stepIdx, manifestErr)
+			slog.Error("failed to execute hook job", "run_id", req.RunID, "job_id", req.JobID, "hook_index", hookIndex, "step_index", stepIdx, "error", err)
+			r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
+			return
+		}
+
+		stepOutPath := outPath
+		if stepIdx+1 < len(specDoc.Steps) {
+			stepOutPath = filepath.Join(gateCycleHookDir(req.RunID, cycleName, hookIndex), "steps", fmt.Sprintf("%03d", stepIdx), preGateCanonicalSBOMFileName)
+		}
+		cfg := standardJobConfig{
+			Manifest:      manifest,
+			DiffType:      types.DiffJobTypeMig,
+			OutDirPattern: "ploy-hook-out-*",
+			InDirPattern:  "ploy-hook-in-*",
+			PopulateInDir: func(inDir string) error {
+				inPath := filepath.Join(inDir, preGateCanonicalSBOMFileName)
+				if err := copyFileBytes(stepInputPath, inPath); err != nil {
+					return fmt.Errorf("stage /in/%s: %w", preGateCanonicalSBOMFileName, err)
+				}
+				return nil
+			},
+			ValidateOutputs: func(outDir, _ string) error {
+				return materializeValidatedHookSBOMOutput(outDir, stepOutPath)
+			},
+			WorkspacePolicy:        workspaceChangePolicyIgnore,
+			SuppressTerminalStatus: true,
+			SuppressOutBundle:      stepIdx+1 < len(specDoc.Steps),
+			StartTime:              startTime,
+		}
+		outcome, execErr := r.executeStandardJobWithOutcome(ctx, req, cfg)
+		if execErr != nil {
+			err = fmt.Errorf("hook[%d] step[%d] execute runtime step: %w", hookIndex, stepIdx, execErr)
+			slog.Error("failed to execute hook job", "run_id", req.RunID, "job_id", req.JobID, "hook_index", hookIndex, "step_index", stepIdx, "error", err)
+			r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
+			return
+		}
+		finalOutcome = outcome
+		completedStepName = strings.TrimSpace(execStep.Name)
+		if outcome.runErr != nil || outcome.result.ExitCode != 0 {
+			break
+		}
+		stepInputPath = stepOutPath
 	}
 
-	cfg := standardJobConfig{
-		Manifest:      manifest,
-		DiffType:      types.DiffJobTypeMig,
-		OutDirPattern: "ploy-hook-out-*",
-		InDirPattern:  "ploy-hook-in-*",
-		PopulateInDir: func(inDir string) error {
-			inPath := filepath.Join(inDir, preGateCanonicalSBOMFileName)
-			if err := copyFileBytes(inputSnapshotPath, inPath); err != nil {
-				return fmt.Errorf("stage /in/%s: %w", preGateCanonicalSBOMFileName, err)
-			}
-			return nil
-		},
-		ValidateOutputs: func(outDir, _ string) error {
-			return materializeValidatedHookSBOMOutput(outDir, outPath)
-		},
-		WorkspacePolicy: workspaceChangePolicyIgnore,
-		BuildMetadata: func(_ string) map[string]string {
-			metadata := map[string]string{
-				"cycle_name":            cycleName,
-				"hook_index":            strconv.Itoa(hookIndex),
-				"hook_source":           hookSource,
-				"hook_condition_result": conditionJSON,
-				"hook_command_identity": commandIdentityJSON,
-				"hook_command_executed": "true",
-			}
-			if req.HookRuntime != nil {
-				if hash := strings.TrimSpace(req.HookRuntime.HookHash); hash != "" {
-					metadata["hook_hash"] = hash
-				}
-				metadata["hook_should_run"] = strconv.FormatBool(req.HookRuntime.HookShouldRun)
-			}
-			return metadata
-		},
-		StartTime: startTime,
+	if finalOutcome.duration == 0 {
+		finalOutcome.duration = time.Since(startTime)
 	}
-	r.executeStandardJob(ctx, req, cfg)
+	statsBuilder := types.NewRunStatsBuilder().
+		ExitCode(finalOutcome.result.ExitCode).
+		DurationMs(finalOutcome.duration.Milliseconds()).
+		TimingsFromDurations(
+			time.Duration(finalOutcome.result.Timings.HydrationDuration).Milliseconds(),
+			time.Duration(finalOutcome.result.Timings.ExecutionDuration).Milliseconds(),
+			time.Duration(finalOutcome.result.Timings.DiffDuration).Milliseconds(),
+			time.Duration(finalOutcome.result.Timings.TotalDuration).Milliseconds(),
+		).
+		MetadataEntry("cycle_name", cycleName).
+		MetadataEntry("hook_index", strconv.Itoa(hookIndex)).
+		MetadataEntry("hook_source", hookSource).
+		MetadataEntry("hook_condition_result", conditionJSON).
+		MetadataEntry("hook_command_identity", commandIdentityJSON).
+		MetadataEntry("hook_command_executed", "true")
+	if completedStepName != "" {
+		statsBuilder.MetadataEntry("hook_step_name", completedStepName)
+	}
+	if req.HookRuntime != nil {
+		if hash := strings.TrimSpace(req.HookRuntime.HookHash); hash != "" {
+			statsBuilder.MetadataEntry("hook_hash", hash)
+		}
+		statsBuilder.MetadataEntry("hook_should_run", strconv.FormatBool(req.HookRuntime.HookShouldRun))
+	}
+	if resources := runStatsJobResourcesFromStepUsage(finalOutcome.result.ContainerResources); resources != nil {
+		statsBuilder.JobResources(resources)
+	}
+	r.reportTerminalStatus(ctx, req, finalOutcome.runErr, finalOutcome.result, statsBuilder.MustBuild(), finalOutcome.repoSHAOut, finalOutcome.duration)
 
 	slog.Info("hook job scheduled for runtime execution",
 		"run_id", req.RunID,
@@ -326,6 +388,7 @@ func (r *runController) executeHookJob(ctx context.Context, req StartRunRequest)
 		"cycle_name", cycleName,
 		"hook_index", hookIndex,
 		"hook_source", hookSource,
+		"hook_steps", len(specDoc.Steps),
 		"sbom_input", "/in/"+preGateCanonicalSBOMFileName,
 	)
 }
@@ -506,17 +569,26 @@ func encodeHookConditionResult(decision *contracts.HookRuntimeDecision) string {
 	return string(raw)
 }
 
-func encodeHookCommandIdentity(source string, stepSpec hook.Step) string {
-	payload := struct {
-		Source  string   `json:"source,omitempty"`
+func encodeHookCommandIdentityList(source string, steps []hook.Step) string {
+	type identityStep struct {
 		Name    string   `json:"name,omitempty"`
 		Image   string   `json:"image"`
 		Command []string `json:"command,omitempty"`
+	}
+	stepList := make([]identityStep, 0, len(steps))
+	for _, stepSpec := range steps {
+		stepList = append(stepList, identityStep{
+			Name:    strings.TrimSpace(stepSpec.Name),
+			Image:   strings.TrimSpace(stepSpec.Image),
+			Command: append([]string(nil), stepSpec.Command...),
+		})
+	}
+	payload := struct {
+		Source string         `json:"source,omitempty"`
+		Steps  []identityStep `json:"steps"`
 	}{
-		Source:  strings.TrimSpace(source),
-		Name:    strings.TrimSpace(stepSpec.Name),
-		Image:   strings.TrimSpace(stepSpec.Image),
-		Command: append([]string(nil), stepSpec.Command...),
+		Source: strings.TrimSpace(source),
+		Steps:  stepList,
 	}
 	raw, err := json.Marshal(payload)
 	if err != nil {
@@ -952,31 +1024,51 @@ type standardJobConfig struct {
 	BuildJobMeta  func(outDir string) json.RawMessage
 	BuildMetadata func(outDir string) map[string]string
 
+	SuppressTerminalStatus bool
+	SuppressOutBundle      bool
+
 	StartTime time.Time
+}
+
+type standardJobOutcome struct {
+	runErr     error
+	result     step.Result
+	repoSHAOut string
+	duration   time.Duration
 }
 
 // executeStandardJob orchestrates the common lifecycle of a container job
 // (mig/heal/sbom):
 // runtime init, rehydration, snapshots, directory prep, execution, and uploading.
 func (r *runController) executeStandardJob(ctx context.Context, req StartRunRequest, cfg standardJobConfig) {
+	_, execErr := r.executeStandardJobWithOutcome(ctx, req, cfg)
+	if execErr == nil {
+		return
+	}
 	startTime := cfg.StartTime
 	if startTime.IsZero() {
 		startTime = time.Now()
 	}
+	slog.Error("standard job execution failed", "run_id", req.RunID, "job_id", req.JobID, "error", execErr)
+	r.uploadFailureStatus(ctx, req, execErr, time.Since(startTime))
+}
+
+func (r *runController) executeStandardJobWithOutcome(ctx context.Context, req StartRunRequest, cfg standardJobConfig) (standardJobOutcome, error) {
+	startTime := cfg.StartTime
+	if startTime.IsZero() {
+		startTime = time.Now()
+	}
+	var outcome standardJobOutcome
 
 	execCtx, cleanup, err := r.initJobExecutionContext(ctx, req.RunID, req.JobID)
 	if err != nil {
-		slog.Error("failed to initialize runtime", "run_id", req.RunID, "error", err)
-		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
-		return
+		return outcome, fmt.Errorf("initialize runtime: %w", err)
 	}
 	defer cleanup()
 
 	wsResult, err := r.rehydrateWorkspaceWithCleanup(ctx, req, cfg.Manifest)
 	if err != nil {
-		slog.Error("failed to rehydrate workspace", "run_id", req.RunID, "error", err)
-		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
-		return
+		return outcome, fmt.Errorf("rehydrate workspace: %w", err)
 	}
 	defer wsResult.cleanup()
 	workspace := wsResult.path
@@ -996,16 +1088,26 @@ func (r *runController) executeStandardJob(ctx context.Context, req StartRunRequ
 						return fmt.Errorf("populate in dir: %w", err)
 					}
 				}
-				return r.runContainerJob(ctx, req, cfg, execCtx, baselineDir, workspace, startTime, outDir, inDir)
+				stepOutcome, err := r.runContainerJob(ctx, req, cfg, execCtx, baselineDir, workspace, startTime, outDir, inDir)
+				if err != nil {
+					return err
+				}
+				outcome = stepOutcome
+				return nil
 			})
 		}
-		return r.runContainerJob(ctx, req, cfg, execCtx, baselineDir, workspace, startTime, outDir, "")
+		stepOutcome, err := r.runContainerJob(ctx, req, cfg, execCtx, baselineDir, workspace, startTime, outDir, "")
+		if err != nil {
+			return err
+		}
+		outcome = stepOutcome
+		return nil
 	})
 
 	if outDirErr != nil {
-		slog.Error("failed to create temp directories", "run_id", req.RunID, "error", outDirErr)
-		r.uploadFailureStatus(ctx, req, outDirErr, time.Since(startTime))
+		return outcome, outDirErr
 	}
+	return outcome, nil
 }
 
 // runContainerJob executes the container, uploads artifacts/diffs, and reports terminal status.
@@ -1018,23 +1120,24 @@ func (r *runController) runContainerJob(
 	baselineDir, workspace string,
 	startTime time.Time,
 	outDir, inDir string,
-) error {
+) (standardJobOutcome, error) {
+	outcome := standardJobOutcome{}
 	manifest := cfg.Manifest
 	disableManifestGate(&manifest)
 	clearManifestHydration(&manifest)
 
 	if cfg.PrepareManifest != nil {
 		if err := cfg.PrepareManifest(&manifest, workspace); err != nil {
-			return fmt.Errorf("prepare manifest: %w", err)
+			return outcome, fmt.Errorf("prepare manifest: %w", err)
 		}
 	}
 
 	imageName := strings.TrimSpace(manifest.Image)
 	if imageName == "" {
-		return fmt.Errorf("resolved job image is empty")
+		return outcome, fmt.Errorf("resolved job image is empty")
 	}
 	if err := r.SaveJobImageName(ctx, req.JobID, imageName); err != nil {
-		return fmt.Errorf("save job image name: %w", err)
+		return outcome, fmt.Errorf("save job image name: %w", err)
 	}
 
 	var preStatus string
@@ -1069,7 +1172,7 @@ func (r *runController) runContainerJob(
 		duration = time.Since(startTime)
 		return nil
 	}); bundleErr != nil {
-		return bundleErr
+		return outcome, bundleErr
 	}
 
 	if runErr == nil && result.ExitCode == 0 && cfg.ValidateOutputs != nil {
@@ -1091,8 +1194,10 @@ func (r *runController) runContainerJob(
 		cfg.UploadDiff(ctx, req.RunID, req.JobID, req.JobName, execCtx.diffGenerator, baselineDir, workspace, result)
 	}
 
-	if err := r.uploadOutDirBundle(ctx, req.RunID, req.JobID, outDir, "mig-out"); err != nil {
-		slog.Warn("/out artifact upload failed", "run_id", req.RunID, "job_id", req.JobID, "next_id", req.NextID, "error", err)
+	if !cfg.SuppressOutBundle {
+		if err := r.uploadOutDirBundle(ctx, req.RunID, req.JobID, outDir, "mig-out"); err != nil {
+			slog.Warn("/out artifact upload failed", "run_id", req.RunID, "job_id", req.JobID, "next_id", req.NextID, "error", err)
+		}
 	}
 
 	if cfg.UploadConfiguredArtifacts {
@@ -1104,7 +1209,7 @@ func (r *runController) runContainerJob(
 		if postErr == nil {
 			if warning, violated := validateWorkspacePolicy(cfg.WorkspacePolicy, preStatus, postStatus); violated {
 				r.uploadHealingWorkspacePolicyFailure(ctx, req, warning, duration)
-				return nil
+				return outcome, nil
 			}
 		}
 	}
@@ -1146,9 +1251,16 @@ func (r *runController) runContainerJob(
 	}
 
 	stats := statsBuilder.MustBuild()
-
-	r.reportTerminalStatus(ctx, req, runErr, result, stats, repoSHAOut, duration)
-	return nil
+	outcome = standardJobOutcome{
+		runErr:     runErr,
+		result:     result,
+		repoSHAOut: repoSHAOut,
+		duration:   duration,
+	}
+	if !cfg.SuppressTerminalStatus {
+		r.reportTerminalStatus(ctx, req, runErr, result, stats, repoSHAOut, duration)
+	}
+	return outcome, nil
 }
 
 // withTempDir creates a temporary directory, calls fn, then removes the directory.

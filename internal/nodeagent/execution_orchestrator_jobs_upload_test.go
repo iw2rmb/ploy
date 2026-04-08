@@ -481,17 +481,19 @@ func TestEncodeHookConditionResult_EmitsStructuredJSON(t *testing.T) {
 func TestEncodeHookCommandIdentity_EmitsStructuredJSON(t *testing.T) {
 	t.Parallel()
 
-	raw := encodeHookCommandIdentity("aa11bb22", hook.Step{
+	raw := encodeHookCommandIdentityList("aa11bb22", []hook.Step{{
 		Name:    "security-scan",
 		Image:   "hook:latest",
 		Command: []string{"scan", "--sbom", "/in/sbom.spdx.json", "--out", "/out/sbom.spdx.json"},
-	})
+	}})
 
 	var decoded struct {
-		Source  string   `json:"source"`
-		Name    string   `json:"name"`
-		Image   string   `json:"image"`
-		Command []string `json:"command"`
+		Source string `json:"source"`
+		Steps  []struct {
+			Name    string   `json:"name"`
+			Image   string   `json:"image"`
+			Command []string `json:"command"`
+		} `json:"steps"`
 	}
 	if err := json.Unmarshal([]byte(raw), &decoded); err != nil {
 		t.Fatalf("unmarshal command identity: %v", err)
@@ -499,13 +501,16 @@ func TestEncodeHookCommandIdentity_EmitsStructuredJSON(t *testing.T) {
 	if decoded.Source != "aa11bb22" {
 		t.Fatalf("source=%q, want aa11bb22", decoded.Source)
 	}
-	if decoded.Name != "security-scan" {
-		t.Fatalf("name=%q, want security-scan", decoded.Name)
+	if len(decoded.Steps) != 1 {
+		t.Fatalf("steps len=%d, want 1", len(decoded.Steps))
 	}
-	if decoded.Image != "hook:latest" {
-		t.Fatalf("image=%q, want hook:latest", decoded.Image)
+	if decoded.Steps[0].Name != "security-scan" {
+		t.Fatalf("steps[0].name=%q, want security-scan", decoded.Steps[0].Name)
 	}
-	if len(decoded.Command) != 5 {
-		t.Fatalf("command len=%d, want 5", len(decoded.Command))
+	if decoded.Steps[0].Image != "hook:latest" {
+		t.Fatalf("steps[0].image=%q, want hook:latest", decoded.Steps[0].Image)
+	}
+	if len(decoded.Steps[0].Command) != 5 {
+		t.Fatalf("steps[0].command len=%d, want 5", len(decoded.Steps[0].Command))
 	}
 }
