@@ -328,6 +328,10 @@ func cloneSpec(s Spec) Spec {
 			Name:    s.Steps[i].Name,
 			Image:   s.Steps[i].Image,
 			Command: append([]string(nil), s.Steps[i].Command...),
+			CA:      append([]string(nil), s.Steps[i].CA...),
+			In:      append([]string(nil), s.Steps[i].In...),
+			Out:     append([]string(nil), s.Steps[i].Out...),
+			Home:    append([]string(nil), s.Steps[i].Home...),
 		}
 		if len(s.Steps[i].Envs) > 0 {
 			copySpec.Steps[i].Envs = make(map[string]string, len(s.Steps[i].Envs))

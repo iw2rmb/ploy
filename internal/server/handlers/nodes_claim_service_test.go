@@ -1,6 +1,9 @@
 package handlers
 
 import (
+	"archive/tar"
+	"bytes"
+	"compress/gzip"
 	"context"
 	"errors"
 	"testing"
@@ -9,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	bsmock "github.com/iw2rmb/ploy/internal/blobstore/mock"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
@@ -156,4 +160,120 @@ func TestClaimService_Claim_RequeuesClaimedJobWhenPayloadBuildFails(t *testing.T
 	if st.updateRunRepoStatus.called {
 		t.Fatal("expected UpdateRunRepoStatus to not be called when payload build fails")
 	}
+}
+
+func TestClaimService_Claim_TerminalPayloadErrorCompletesClaimedJob(t *testing.T) {
+	t.Parallel()
+
+	nodeID := domaintypes.NodeID(domaintypes.NewNodeKey())
+	runID := domaintypes.NewRunID()
+	repoID := domaintypes.NewRepoID()
+	specID := domaintypes.NewSpecID()
+	jobID := domaintypes.NewJobID()
+	now := time.Now().UTC()
+	hookHash := "aa11bb22cc33"
+	bundleID := "bundle_invalid_hook_for_claim"
+	objKey := "spec_bundles/" + bundleID + "/bundle.tar.gz"
+
+	st := &jobStore{
+		getRunRepoResult: store.RunRepo{
+			RunID:         runID,
+			RepoID:        repoID,
+			RepoBaseRef:   "main",
+			RepoTargetRef: "feature",
+			Status:        domaintypes.RunRepoStatusQueued,
+			Attempt:       1,
+		},
+	}
+	st.getNode.val = store.Node{ID: nodeID}
+	st.getRun.val = store.Run{
+		ID:        runID,
+		SpecID:    specID,
+		Status:    domaintypes.RunStatusStarted,
+		CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
+		StartedAt: pgtype.Timestamptz{Time: now, Valid: true},
+	}
+	st.getSpec.val = store.Spec{
+		ID:   specID,
+		Spec: []byte(`{"steps":[{"image":"img"}],"hooks":["` + hookHash + `"],"bundle_map":{"` + hookHash + `":"` + bundleID + `"}}`),
+	}
+	claimed := store.Job{
+		ID:          jobID,
+		RunID:       runID,
+		RepoID:      repoID,
+		RepoBaseRef: "main",
+		Attempt:     1,
+		NodeID:      &nodeID,
+		Name:        "pre-gate-hook-000",
+		Status:      domaintypes.JobStatusRunning,
+		JobType:     domaintypes.JobTypeHook,
+	}
+	st.claimJob.val = claimed
+	st.getJobResult = claimed
+	st.getSpecBundle.val = store.SpecBundle{
+		ID:        bundleID,
+		ObjectKey: &objKey,
+	}
+	st.listJobsByRunRepoAttempt.val = []store.Job{{
+		ID:      domaintypes.NewJobID(),
+		RunID:   runID,
+		RepoID:  repoID,
+		Attempt: claimed.Attempt,
+		JobType: domaintypes.JobTypeSBOM,
+		Status:  domaintypes.JobStatusSuccess,
+	}}
+
+	bs := bsmock.New()
+	if _, err := bs.Put(context.Background(), objKey, "application/gzip", makeDirectContentBundleForClaimServiceTest(t, `id: invalid-hook
+steps:
+  - image: test:latest
+    unknown_key: true
+`)); err != nil {
+		t.Fatalf("put invalid hook bundle: %v", err)
+	}
+
+	svc := NewClaimService(st, bs, &ConfigHolder{}, nil)
+	_, err := svc.Claim(context.Background(), nodeID)
+	var noWork *ClaimNoWork
+	if !errors.As(err, &noWork) {
+		t.Fatalf("expected ClaimNoWork after terminal payload error, got %T (%v)", err, err)
+	}
+	if st.unclaimJob.called {
+		t.Fatal("expected UnclaimJob to not be called for terminal payload errors")
+	}
+	if !st.updateJobCompletion.called {
+		t.Fatal("expected UpdateJobCompletion to be called for terminal payload errors")
+	}
+	if st.updateJobCompletion.params.Status != domaintypes.JobStatusError {
+		t.Fatalf("update status = %s, want %s", st.updateJobCompletion.params.Status, domaintypes.JobStatusError)
+	}
+	if !st.updateRunRepoError.called {
+		t.Fatal("expected UpdateRunRepoError to be called with terminal claim error details")
+	}
+}
+
+func makeDirectContentBundleForClaimServiceTest(t *testing.T, content string) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	gzw := gzip.NewWriter(&buf)
+	tw := tar.NewWriter(gzw)
+	body := []byte(content)
+	if err := tw.WriteHeader(&tar.Header{
+		Name:     "content",
+		Typeflag: tar.TypeReg,
+		Mode:     0o644,
+		Size:     int64(len(body)),
+	}); err != nil {
+		t.Fatalf("write tar header: %v", err)
+	}
+	if _, err := tw.Write(body); err != nil {
+		t.Fatalf("write tar body: %v", err)
+	}
+	if err := tw.Close(); err != nil {
+		t.Fatalf("close tar: %v", err)
+	}
+	if err := gzw.Close(); err != nil {
+		t.Fatalf("close gzip: %v", err)
+	}
+	return buf.Bytes()
 }
