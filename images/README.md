@@ -8,8 +8,8 @@ Image Catalog (selected)
 - `shell` (`images/shell`) - generic shell-based migration runner.
 - `orw-cli-maven` (`images/orw/orw-cli-maven`) - OpenRewrite Maven lane runtime.
 - `orw-cli-gradle` (`images/orw/orw-cli-gradle`) - OpenRewrite Gradle lane runtime.
-- `sbom-maven` (`images/sbom/maven`) - Maven SBOM collection runtime.
-- `sbom-gradle` (`images/sbom/gradle`) - Gradle SBOM collection runtime.
+- `ploy/sbom-maven` (`images/sbom/maven`) - Maven SBOM collection runtime.
+- `ploy/sbom-gradle` (`images/sbom/gradle`) - Gradle SBOM collection runtime.
 
 SBOM runner image details:
 - [`images/sbom/maven/README.md`](sbom/maven/README.md)

@@ -2,6 +2,7 @@
 
 Purpose
 - Dedicated Java/Gradle runtime for SBOM collection jobs.
+- Canonical image name: `ploy/sbom-gradle`.
 - Published as `ghcr.io/iw2rmb/ploy/sbom-gradle:<tag>`.
 
 Deterministic Tooling

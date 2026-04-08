@@ -2,6 +2,7 @@
 
 Purpose
 - Dedicated Java/Maven runtime for SBOM collection jobs.
+- Canonical image name: `ploy/sbom-maven`.
 - Published as `ghcr.io/iw2rmb/ploy/sbom-maven:<tag>`.
 
 Deterministic Tooling
