@@ -7,18 +7,19 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/iw2rmb/ploy/internal/blobstore"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
 // claimJobHandler allows nodes to claim a queued job for execution.
 // Returns the claimed job with its parent run metadata or 204 No Content if no work is available.
-func claimJobHandler(st store.Store, configHolder *ConfigHolder, gateProfileResolver ...GateProfileResolver) http.HandlerFunc {
+func claimJobHandler(st store.Store, bs blobstore.Store, configHolder *ConfigHolder, gateProfileResolver ...GateProfileResolver) http.HandlerFunc {
 	var resolver GateProfileResolver
 	if len(gateProfileResolver) > 0 {
 		resolver = gateProfileResolver[0]
 	}
-	service := NewClaimService(st, configHolder, resolver)
+	service := NewClaimService(st, bs, configHolder, resolver)
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		nodeID, err := parseRequiredPathID[domaintypes.NodeID](r, "id")

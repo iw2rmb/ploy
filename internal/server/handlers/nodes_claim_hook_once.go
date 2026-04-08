@@ -1,15 +1,20 @@
 package handlers
 
 import (
+	"archive/tar"
+	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"strconv"
 	"strings"
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/iw2rmb/ploy/internal/blobstore"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
@@ -19,6 +24,7 @@ import (
 func resolveHookRuntimeDecision(
 	ctx context.Context,
 	st store.Store,
+	bs blobstore.Store,
 	job store.Job,
 	mergedSpec json.RawMessage,
 	jobType domaintypes.JobType,
@@ -45,7 +51,7 @@ func resolveHookRuntimeDecision(
 	if source == "" {
 		return nil, fmt.Errorf("hook source is empty for index %d", hookIndex)
 	}
-	hookSpec, err := loadRuntimeHookSpec(source, ".")
+	hookSpec, err := loadRuntimeHookSpec(ctx, st, bs, source, migSpec.BundleMap)
 	if err != nil {
 		return nil, fmt.Errorf("load hook spec for source %q: %w", source, err)
 	}
@@ -247,7 +253,24 @@ func hookIndexFromJobName(jobName string, hooksLen int) (int, error) {
 	return hookIndex, nil
 }
 
-func loadRuntimeHookSpec(source string, specRoot string) (hook.Spec, error) {
+func loadRuntimeHookSpec(
+	ctx context.Context,
+	st store.Store,
+	bs blobstore.Store,
+	source string,
+	bundleMap map[string]string,
+) (hook.Spec, error) {
+	source = strings.TrimSpace(source)
+	if canonicalHookSourcePattern.MatchString(source) {
+		return loadHookSpecFromBundleHash(ctx, st, bs, source, bundleMap)
+	}
+	if isHTTPSHookSource(source) {
+		return loadRuntimeHookSpecFromLoader(source, ".")
+	}
+	return hook.Spec{}, fmt.Errorf("unsupported hook source %q: local hook sources must be precompiled into hash entries", source)
+}
+
+func loadRuntimeHookSpecFromLoader(source string, specRoot string) (hook.Spec, error) {
 	specs, err := hook.NewLoader(nil).LoadFromMigSpec(contracts.MigSpec{
 		Hooks: []string{source},
 	}, specRoot)
@@ -258,6 +281,113 @@ func loadRuntimeHookSpec(source string, specRoot string) (hook.Spec, error) {
 		return hook.Spec{}, fmt.Errorf("no resolved hook spec for source %q", source)
 	}
 	return specs[0], nil
+}
+
+func loadHookSpecFromBundleHash(
+	ctx context.Context,
+	st store.Store,
+	bs blobstore.Store,
+	hash string,
+	bundleMap map[string]string,
+) (hook.Spec, error) {
+	if bs == nil {
+		return hook.Spec{}, fmt.Errorf("blob store is required to load hook bundle %q", hash)
+	}
+	bundleID := strings.TrimSpace(bundleMap[hash])
+	if bundleID == "" {
+		return hook.Spec{}, fmt.Errorf("bundle_map[%q] is missing", hash)
+	}
+
+	bundle, err := st.GetSpecBundle(ctx, bundleID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return hook.Spec{}, fmt.Errorf("spec bundle %q not found for hash %q", bundleID, hash)
+		}
+		return hook.Spec{}, fmt.Errorf("get spec bundle %q for hash %q: %w", bundleID, hash, err)
+	}
+	if bundle.ObjectKey == nil || strings.TrimSpace(*bundle.ObjectKey) == "" {
+		return hook.Spec{}, fmt.Errorf("spec bundle %q has no object key", bundleID)
+	}
+
+	reader, _, err := bs.Get(ctx, *bundle.ObjectKey)
+	if err != nil {
+		if errors.Is(err, blobstore.ErrNotFound) {
+			return hook.Spec{}, fmt.Errorf("spec bundle blob %q is missing from object storage", *bundle.ObjectKey)
+		}
+		return hook.Spec{}, fmt.Errorf("download spec bundle blob %q: %w", *bundle.ObjectKey, err)
+	}
+	defer func() { _ = reader.Close() }()
+
+	data, err := io.ReadAll(reader)
+	if err != nil {
+		return hook.Spec{}, fmt.Errorf("read spec bundle %q: %w", bundleID, err)
+	}
+	manifestData, manifestSource, err := extractHookManifestFromBundle(data)
+	if err != nil {
+		return hook.Spec{}, fmt.Errorf("extract hook manifest from bundle %q: %w", bundleID, err)
+	}
+
+	specDoc, err := hook.LoadSpecYAML(manifestData, manifestSource)
+	if err != nil {
+		return hook.Spec{}, err
+	}
+	return specDoc, nil
+}
+
+func extractHookManifestFromBundle(data []byte) ([]byte, string, error) {
+	gzReader, err := gzip.NewReader(bytes.NewReader(data))
+	if err != nil {
+		return nil, "", fmt.Errorf("open gzip stream: %w", err)
+	}
+	defer func() { _ = gzReader.Close() }()
+
+	tarReader := tar.NewReader(gzReader)
+	var directManifest []byte
+	type manifestEntry struct {
+		path string
+		data []byte
+	}
+	var hookYAMLs []manifestEntry
+
+	for {
+		header, err := tarReader.Next()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return nil, "", fmt.Errorf("read tar header: %w", err)
+		}
+		if header == nil || header.Typeflag != tar.TypeReg {
+			continue
+		}
+
+		name := strings.TrimSpace(header.Name)
+		payload, readErr := io.ReadAll(tarReader)
+		if readErr != nil {
+			return nil, "", fmt.Errorf("read tar entry %q: %w", name, readErr)
+		}
+		if name == "content" {
+			directManifest = payload
+			continue
+		}
+		if strings.HasPrefix(name, "content/") && strings.HasSuffix(name, "/hook.yaml") {
+			hookYAMLs = append(hookYAMLs, manifestEntry{path: name, data: payload})
+		}
+	}
+
+	if len(directManifest) > 0 && len(hookYAMLs) > 0 {
+		return nil, "", fmt.Errorf("bundle contains both direct content manifest and directory hook.yaml files")
+	}
+	if len(directManifest) > 0 {
+		return directManifest, "bundle:content", nil
+	}
+	if len(hookYAMLs) == 0 {
+		return nil, "", fmt.Errorf("no hook manifest found in bundle")
+	}
+	if len(hookYAMLs) != 1 {
+		return nil, "", fmt.Errorf("expected exactly 1 hook.yaml in bundle, found %d", len(hookYAMLs))
+	}
+	return hookYAMLs[0].data, "bundle:" + hookYAMLs[0].path, nil
 }
 
 func hookSourceFromJobMeta(metaRaw []byte) string {

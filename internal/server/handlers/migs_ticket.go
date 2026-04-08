@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -18,7 +20,6 @@ import (
 	migsapi "github.com/iw2rmb/ploy/internal/migs/api"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
-	"github.com/iw2rmb/ploy/internal/workflow/hook"
 )
 
 // NOTE: This file uses KSUID-backed string IDs for runs and jobs.
@@ -451,18 +452,31 @@ func createPlannedJob(ctx context.Context, st store.Store, runID domaintypes.Run
 }
 
 func resolveHookManifestSources(spec contracts.MigSpec) ([]string, error) {
-	loaded, err := hook.LoadFromMigSpec(spec, ".")
-	if err != nil {
-		return nil, err
-	}
-	if len(loaded) == 0 {
+	if len(spec.Hooks) == 0 {
 		return nil, nil
 	}
-	out := make([]string, 0, len(loaded))
-	for _, hs := range loaded {
-		out = append(out, strings.TrimSpace(hs.Source))
+	out := make([]string, 0, len(spec.Hooks))
+	for i, raw := range spec.Hooks {
+		source := strings.TrimSpace(raw)
+		if source == "" {
+			return nil, fmt.Errorf("hooks[%d]: empty hook source", i)
+		}
+		if !canonicalHookSourcePattern.MatchString(source) && !isHTTPSHookSource(source) {
+			return nil, fmt.Errorf("hooks[%d] %q: local hook sources must be precompiled by CLI into hash entries", i, raw)
+		}
+		out = append(out, source)
 	}
 	return out, nil
+}
+
+var canonicalHookSourcePattern = regexp.MustCompile(`^[0-9a-f]{7,64}$`)
+
+func isHTTPSHookSource(source string) bool {
+	u, err := url.Parse(source)
+	if err != nil || u == nil {
+		return false
+	}
+	return (u.Scheme == "http" || u.Scheme == "https") && u.Host != ""
 }
 
 // helpers

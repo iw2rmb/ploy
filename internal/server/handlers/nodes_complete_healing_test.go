@@ -4,8 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"os"
-	"path/filepath"
 	"testing"
 
 	bsmock "github.com/iw2rmb/ploy/internal/blobstore/mock"
@@ -153,31 +151,17 @@ func TestMaybeCreateHealingJobs_SecondAttemptUsesExistingHealJobs(t *testing.T) 
 func TestMaybeCreateHealingJobs_ReGateHooksScheduledOncePerCycle(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	hooksDir := t.TempDir()
-	directHook := filepath.Join(hooksDir, "direct.yaml")
-	nestedHookA := filepath.Join(hooksDir, "nested", "a", "hook.yaml")
-	nestedHookB := filepath.Join(hooksDir, "nested", "b", "hook.yaml")
-	for _, dir := range []string{filepath.Dir(directHook), filepath.Dir(nestedHookA), filepath.Dir(nestedHookB)} {
-		if err := os.MkdirAll(dir, 0o755); err != nil {
-			t.Fatalf("mkdir %s: %v", dir, err)
-		}
-	}
-	writeHook := func(path string, id string) {
-		t.Helper()
-		body := "id: " + id + "\nsteps:\n  - image: test:latest\n"
-		if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
-			t.Fatalf("write hook %s: %v", path, err)
-		}
-	}
-	writeHook(directHook, "direct")
-	writeHook(nestedHookA, "nested-a")
-	writeHook(nestedHookB, "nested-b")
+	const (
+		hookHashDirect = "a1b2c3d4e5f6"
+		hookHashA      = "b1c2d3e4f5a6"
+		hookHashB      = "c1d2e3f4a5b6"
+	)
 
 	hc := newHealingChain(t,
 		withHealingSpec(func(t *testing.T) []byte {
 			t.Helper()
 			spec := map[string]any{
-				"hooks": []any{directHook, filepath.Join(hooksDir, "nested")},
+				"hooks": []any{hookHashDirect, hookHashA, hookHashB},
 				"steps": []any{map[string]any{"image": "migs-orw:latest"}},
 				"build_gate": map[string]any{
 					"heal": map[string]any{
@@ -239,9 +223,9 @@ func TestMaybeCreateHealingJobs_ReGateHooksScheduledOncePerCycle(t *testing.T) {
 			t.Fatalf("%s hook_source=%q, want %q", job.Name, got, want)
 		}
 	}
-	assertHookSource(hook0, directHook)
-	assertHookSource(hook1, nestedHookA)
-	assertHookSource(hook2, nestedHookB)
+	assertHookSource(hook0, hookHashDirect)
+	assertHookSource(hook1, hookHashA)
+	assertHookSource(hook2, hookHashB)
 }
 
 // TestMaybeCreateHealingJobs_CancelsRemaining covers cases where healing cannot proceed

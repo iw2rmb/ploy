@@ -27,7 +27,7 @@ func TestClaimJob_ClaimErrorWithPanickingIs_Panics(t *testing.T) {
 	st.claimJob.err = panicInIsError{}
 	st.getNode.val = store.Node{ID: nodeID}
 
-	handler := claimJobHandler(st, &ConfigHolder{})
+	handler := claimJobHandler(st, nil, &ConfigHolder{})
 	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/claim", nil)
 	req.SetPathValue("id", nodeID.String())
 	rr := httptest.NewRecorder()
@@ -48,7 +48,7 @@ func TestClaimJob_ClaimErrorWithPanickingErrorString_DoesNotPanic(t *testing.T) 
 	st.claimJob.err = panicInErrorString{}
 	st.getNode.val = store.Node{ID: nodeID}
 
-	handler := claimJobHandler(st, &ConfigHolder{})
+	handler := claimJobHandler(st, nil, &ConfigHolder{})
 	rr := doRequest(t, handler, http.MethodPost, "/v1/nodes/"+nodeID.String()+"/claim", nil, "id", nodeID.String())
 
 	assertStatus(t, rr, http.StatusInternalServerError)

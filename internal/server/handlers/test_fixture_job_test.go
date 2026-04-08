@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"errors"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -94,9 +95,10 @@ type jobStore struct {
 	listArtifactBundlesByRunAndJob mockResult[[]store.ArtifactBundle]
 
 	// Run queries (for orchestration)
-	getRun       mockCall[string, store.Run]
-	getSpec      mockCall[string, store.Spec]
-	getRunTiming mockCall[string, store.RunsTiming]
+	getRun        mockCall[string, store.Run]
+	getSpec       mockCall[string, store.Spec]
+	getSpecBundle mockCall[string, store.SpecBundle]
+	getRunTiming  mockCall[string, store.RunsTiming]
 
 	listRunsTimings mockResult[[]store.RunsTiming]
 
@@ -503,6 +505,17 @@ func (m *jobStore) GetRun(ctx context.Context, id types.RunID) (store.Run, error
 
 func (m *jobStore) GetSpec(ctx context.Context, id types.SpecID) (store.Spec, error) {
 	return m.getSpec.record(id.String())
+}
+
+func (m *jobStore) GetSpecBundle(ctx context.Context, id string) (store.SpecBundle, error) {
+	bundle, err := m.getSpecBundle.record(id)
+	if err != nil {
+		return store.SpecBundle{}, err
+	}
+	if bundle.ID == "" && bundle.ObjectKey == nil {
+		return store.SpecBundle{}, errors.New("mock GetSpecBundle not configured")
+	}
+	return bundle, nil
 }
 
 func (m *jobStore) GetRunTiming(ctx context.Context, id types.RunID) (store.RunsTiming, error) {

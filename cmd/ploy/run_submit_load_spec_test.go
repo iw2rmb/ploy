@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -288,5 +289,127 @@ build_gate:
 	}
 	if !strings.Contains(entry, ":/in/heal-config.txt") {
 		t.Fatalf("heal.in[0] = %q, want canonical /in destination", entry)
+	}
+}
+
+func TestLoadSpec_CompilesLocalHookDirectoryToHashesAndBundleMap(t *testing.T) {
+	_, base, client := newMockBundleSrvForLoadSpec(t)
+
+	tmpDir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(tmpDir, "hooks", "a"), 0o755); err != nil {
+		t.Fatalf("mkdir hooks a: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(tmpDir, "hooks", "b"), 0o755); err != nil {
+		t.Fatalf("mkdir hooks b: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(tmpDir, "hooks", "a", "hook.yaml"), []byte("id: a\nsteps:\n  - image: test:latest\n"), 0o644); err != nil {
+		t.Fatalf("write hook a: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(tmpDir, "hooks", "b", "hook.yaml"), []byte("id: b\nsteps:\n  - image: test:latest\n"), 0o644); err != nil {
+		t.Fatalf("write hook b: %v", err)
+	}
+	specPath := filepath.Join(tmpDir, "spec.yaml")
+	spec := []byte(`
+steps:
+  - image: docker.io/test/mig:latest
+hooks:
+  - ./hooks
+`)
+	if err := os.WriteFile(specPath, spec, 0o644); err != nil {
+		t.Fatalf("write spec file: %v", err)
+	}
+
+	payload, err := loadSpec(context.Background(), base, client, specPath)
+	if err != nil {
+		t.Fatalf("loadSpec() unexpected error: %v", err)
+	}
+	var result map[string]any
+	if err := json.Unmarshal(payload, &result); err != nil {
+		t.Fatalf("unmarshal payload: %v", err)
+	}
+
+	hooksRaw, ok := result["hooks"].([]any)
+	if !ok || len(hooksRaw) != 2 {
+		t.Fatalf("hooks=%v, want 2 compiled hook hashes", result["hooks"])
+	}
+	re := regexp.MustCompile(`^[0-9a-f]{12}$`)
+	bm, ok := result["bundle_map"].(map[string]any)
+	if !ok {
+		t.Fatalf("bundle_map type=%T, want map[string]any", result["bundle_map"])
+	}
+	for i, item := range hooksRaw {
+		hash, ok := item.(string)
+		if !ok {
+			t.Fatalf("hooks[%d] type=%T, want string", i, item)
+		}
+		if !re.MatchString(hash) {
+			t.Fatalf("hooks[%d]=%q, want short hash", i, hash)
+		}
+		if got, ok := bm[hash].(string); !ok || got == "" {
+			t.Fatalf("bundle_map[%q]=%v, want non-empty bundle id", hash, bm[hash])
+		}
+	}
+}
+
+func TestLoadSpec_CompilesLocalHookFileToHash(t *testing.T) {
+	_, base, client := newMockBundleSrvForLoadSpec(t)
+
+	tmpDir := t.TempDir()
+	hookFile := filepath.Join(tmpDir, "hook.yaml")
+	if err := os.WriteFile(hookFile, []byte("id: file-hook\nsteps:\n  - image: test:latest\n"), 0o644); err != nil {
+		t.Fatalf("write hook file: %v", err)
+	}
+	specPath := filepath.Join(tmpDir, "spec.yaml")
+	spec := []byte(`
+steps:
+  - image: docker.io/test/mig:latest
+hooks:
+  - ./hook.yaml
+`)
+	if err := os.WriteFile(specPath, spec, 0o644); err != nil {
+		t.Fatalf("write spec file: %v", err)
+	}
+
+	payload, err := loadSpec(context.Background(), base, client, specPath)
+	if err != nil {
+		t.Fatalf("loadSpec() unexpected error: %v", err)
+	}
+	var result map[string]any
+	if err := json.Unmarshal(payload, &result); err != nil {
+		t.Fatalf("unmarshal payload: %v", err)
+	}
+	hooks, ok := result["hooks"].([]any)
+	if !ok || len(hooks) != 1 {
+		t.Fatalf("hooks=%v, want one compiled hook hash", result["hooks"])
+	}
+	hash, _ := hooks[0].(string)
+	if ok := regexp.MustCompile(`^[0-9a-f]{12}$`).MatchString(hash); !ok {
+		t.Fatalf("hooks[0]=%q, want short hash", hash)
+	}
+}
+
+func TestLoadSpec_LocalHookSourcesRequireServerBaseAndClient(t *testing.T) {
+	tmpDir := t.TempDir()
+	hookFile := filepath.Join(tmpDir, "hook.yaml")
+	if err := os.WriteFile(hookFile, []byte("id: file-hook\nsteps:\n  - image: test:latest\n"), 0o644); err != nil {
+		t.Fatalf("write hook file: %v", err)
+	}
+	specPath := filepath.Join(tmpDir, "spec.yaml")
+	spec := []byte(`
+steps:
+  - image: docker.io/test/mig:latest
+hooks:
+  - ./hook.yaml
+`)
+	if err := os.WriteFile(specPath, spec, 0o644); err != nil {
+		t.Fatalf("write spec file: %v", err)
+	}
+
+	_, err := loadSpec(context.Background(), nil, nil, specPath)
+	if err == nil {
+		t.Fatal("expected error for local hook sources without base/client")
+	}
+	if !strings.Contains(err.Error(), "local hook sources found but no server base URL available for upload") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
