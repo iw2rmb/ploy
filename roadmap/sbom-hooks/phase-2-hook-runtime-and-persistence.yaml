@@ -60,6 +60,7 @@ items:
       - "Repeated evaluation of unchanged hook content yields the same hook hash and once decision inputs across runs."
     reasoning: "high"
     cfp: 10
+    commit: 4db3ec0b
   - done: false
     reviews: []
     label: "3"
