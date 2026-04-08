@@ -62,7 +62,9 @@ items:
     cfp: 10
     commit: 4db3ec0b
   - done: false
-    reviews: []
+    reviews:
+      - gaps: ["\"Repeated hook execution with same run repo and hook hash is skipped exactly once after first success.\" is not wired end-to-end: there is no runtime read path using `HasHookOnceLedger`/`GetHookOnceLedger` outside store/tests (`internal/store/hooks_once.sql.go`, `internal/store/hooks_once_queries_test.go`), and hook runtime completion metadata does not emit `hook_hash`/`hook_should_run`/`hook_once_skip_marked` (`internal/nodeagent/execution_orchestrator_jobs.go:246`), so `recordHookOnceLedger` often no-ops (`internal/server/handlers/jobs_complete_service_hook_once.go:42`).", "\"Successful MIG completion writes DB SBOM rows from the most recent successful sbom job and ignores stale failed snapshots.\" is not implemented as written: persistence source selection is `latestSuccessfulGateJob` filtered to `pre_gate`/`post_gate`/`re_gate` (`internal/server/handlers/jobs_complete_sbom.go:33`, `internal/server/handlers/jobs_complete_sbom.go:80`), not the most recent successful `sbom` job type."]
+        commit: null
     label: "3"
     summary: "Persist hook execution state and expose sbom and hook job types in run and job APIs."
     classification: "determined"
