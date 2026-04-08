@@ -60,6 +60,7 @@ items:
       - "Known job type routing accepts sbom and hook without changing existing completion semantics."
     reasoning: "medium"
     cfp: 5
+    commit: cb2888fe
   - done: false
     reviews: []
     label: "3"
