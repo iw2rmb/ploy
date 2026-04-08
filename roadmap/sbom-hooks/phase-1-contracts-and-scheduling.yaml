@@ -41,32 +41,74 @@ items:
   - done: false
     reviews: []
     label: "2"
-    summary: "Add sbom and hook job types and wire deterministic pre-gate scheduling for pre_gate post_gate and re_gate."
+    summary: "Introduce sbom and hook job types in domain contracts and service type routing."
     classification: "determined"
     components:
       - "internal/domain/types/migs.go"
+      - "internal/server/handlers/jobs_complete_service_types.go"
+    baseline:
+      - "internal/domain/types/migs.go"
+      - "internal/server/handlers/jobs_complete_service_types.go"
+    delta:
+      - "[additive] gate and step jobs only -> gate and step jobs plus explicit sbom and hook job types"
+    implementation:
+      - "Introduce new job types sbom and hook in domain type definitions and validation switch points."
+      - "Wire service type routing so completion handling accepts sbom and hook job records."
+      - "Keep existing job-type behavior unchanged for gate and step job families."
+    verification:
+      - "Unknown job type handling remains unchanged for existing job types."
+      - "Known job type routing accepts sbom and hook without changing existing completion semantics."
+    reasoning: "medium"
+    cfp: 5
+  - done: false
+    reviews: []
+    label: "3"
+    summary: "Wire deterministic pre-gate scheduling with sbom-first and optional hook chain."
+    classification: "determined"
+    components:
       - "internal/nodeagent/execution_orchestrator_jobs.go"
       - "internal/nodeagent/execution_orchestrator_gate.go"
-      - "internal/nodeagent/execution_orchestrator_test.go"
-      - "internal/server/handlers/jobs_complete.go"
-      - "internal/server/handlers/jobs_complete_service_types.go"
     baseline:
       - "internal/nodeagent/execution_orchestrator_jobs.go"
       - "internal/nodeagent/execution_orchestrator_gate.go"
-      - "internal/server/handlers/jobs_complete.go"
     delta:
-      - "[additive] gate stages scheduled directly -> gate stages preceded by sbom job and optional hook job evaluation for each gate cycle"
+      - "[additive] pre_gate scheduled directly -> pre_gate scheduled after sbom and optional hook evaluation"
     implementation:
-      - "Introduce new job types sbom and hook in domain type definitions and validation switch points."
-      - "Inject sbom scheduling before pre_gate post_gate and re_gate execution paths."
-      - "Inject hook scheduling after sbom and before the corresponding gate stage."
+      - "Inject sbom scheduling before pre_gate execution path."
+      - "Constrain initial scheduling change to pre_gate cycle only."
+      - "Inject hook scheduling after sbom and before the pre_gate stage."
       - "Define sbom artifact contract so sbom job always writes canonical output to /out/sbom.spdx.json."
       - "Define hook input contract so every hook step receives current snapshot as /in/sbom.spdx.json."
       - "Keep gate command resolution and runtime image selection unchanged."
     verification:
-      - "Runs without hooks still execute gate commands and statuses in the same order with added sbom no-op jobs."
-      - "Pre-gate and re-gate paths schedule sbom and hook once per gate cycle."
+      - "Runs without hooks keep pre-gate command ordering with an added sbom job before pre_gate."
+      - "Pre-gate path schedules sbom and hook at most once per gate cycle."
       - "Each successful sbom job produces /out/sbom.spdx.json and each hook step sees /in/sbom.spdx.json."
-      - "Unknown job type handling remains unchanged for existing job types."
     reasoning: "high"
-    cfp: 10
+    cfp: 6
+  - done: false
+    reviews: []
+    label: "4"
+    summary: "Extend deterministic sbom and hook scheduling to post-gate and re-gate, then lock behavior with orchestrator and completion tests."
+    classification: "determined"
+    components:
+      - "internal/nodeagent/execution_orchestrator_gate.go"
+      - "internal/nodeagent/execution_orchestrator_test.go"
+      - "internal/server/handlers/jobs_complete.go"
+    baseline:
+      - "internal/nodeagent/execution_orchestrator_gate.go"
+      - "internal/nodeagent/execution_orchestrator_test.go"
+      - "internal/server/handlers/jobs_complete.go"
+    delta:
+      - "[additive] pre_gate-only sbom and hook chain -> sbom and hook chain consistently applied to post_gate and re_gate cycles with verified completion behavior"
+    implementation:
+      - "Inject sbom scheduling before post_gate and re_gate execution paths."
+      - "Inject hook scheduling after sbom and before post_gate and re_gate stages."
+      - "Wire completion-path behavior so new job families preserve deterministic status transitions."
+      - "Add orchestrator tests for deterministic ordering and once-per-cycle scheduling across post_gate and re_gate."
+    verification:
+      - "Post-gate and re-gate paths schedule sbom and hook once per gate cycle."
+      - "Runs without hooks keep existing gate status semantics with deterministic sbom insertion."
+      - "Completion handling preserves existing gate outcome behavior while accepting sbom and hook completion updates."
+    reasoning: "high"
+    cfp: 8
