@@ -571,6 +571,16 @@ func TestCrashReconcile_RecoveredRunningMonitor_IsolatedFailures(t *testing.T) {
 	if controller.AcquireCalls() != 2 {
 		t.Fatalf("AcquireSlot calls = %d, want 2", controller.AcquireCalls())
 	}
+
+	releaseDeadline := time.After(2 * time.Second)
+	for controller.ReleaseCalls() != 2 {
+		select {
+		case <-releaseDeadline:
+			t.Fatalf("timeout waiting for ReleaseSlot calls, got %d", controller.ReleaseCalls())
+		default:
+			time.Sleep(10 * time.Millisecond)
+		}
+	}
 	if controller.ReleaseCalls() != 2 {
 		t.Fatalf("ReleaseSlot calls = %d, want 2", controller.ReleaseCalls())
 	}

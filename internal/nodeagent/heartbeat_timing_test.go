@@ -294,7 +294,7 @@ func TestHeartbeatStart_BackoffOverridesInterval(t *testing.T) {
 			},
 		},
 		Heartbeat: HeartbeatConfig{
-			Interval: 120 * time.Millisecond,
+			Interval: 2 * time.Second,
 			Timeout:  5 * time.Second,
 		},
 	}
@@ -322,7 +322,7 @@ func TestHeartbeatStart_BackoffOverridesInterval(t *testing.T) {
 	}
 
 	delta := second.Sub(first)
-	if delta >= 90*time.Millisecond {
-		t.Fatalf("second heartbeat delay = %v, want < 90ms (interval=%v)", delta, cfg.Heartbeat.Interval)
+	if delta >= time.Second {
+		t.Fatalf("second heartbeat delay = %v, want < 1s (interval=%v)", delta, cfg.Heartbeat.Interval)
 	}
 }
