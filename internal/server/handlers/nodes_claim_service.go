@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 
@@ -67,6 +68,33 @@ func (e *ClaimInternal) Error() string {
 
 func (e *ClaimInternal) Unwrap() error { return e.Err }
 
+// ClaimJobTerminalError marks claim-time payload errors that are deterministic
+// for the claimed job payload and must fail the job instead of requeueing it.
+type ClaimJobTerminalError struct {
+	Message string
+	Err     error
+}
+
+func (e *ClaimJobTerminalError) Error() string {
+	if e == nil {
+		return ""
+	}
+	if e.Err == nil {
+		return e.Message
+	}
+	if e.Message == "" {
+		return e.Err.Error()
+	}
+	return fmt.Sprintf("%s: %v", e.Message, e.Err)
+}
+
+func (e *ClaimJobTerminalError) Unwrap() error {
+	if e == nil {
+		return nil
+	}
+	return e.Err
+}
+
 func claimInternal(message string, err error) error {
 	return &ClaimInternal{
 		Message: message,
@@ -124,6 +152,32 @@ func (s *ClaimService) Claim(ctx context.Context, nodeID domaintypes.NodeID) (Cl
 	payload, err := buildClaimResponsePayload(ctx, s.store, s.blobStore, s.configHolder, run, spec.Spec, rr, repoURL, job, s.gateResolver)
 	if err != nil {
 		slog.Error("claim: failed to build response", "job_id", job.ID, "run_id", run.ID, "err", err)
+		var terminalErr *ClaimJobTerminalError
+		if errors.As(err, &terminalErr) {
+			completeSvc := NewCompleteJobService(s.store, nil, nil, nil)
+			_, completeErr := completeSvc.Complete(ctx, CompleteJobInput{
+				JobID:        job.ID,
+				NodeID:       nodeID,
+				Status:       domaintypes.JobStatusError,
+				StatsPayload: JobStatsPayload{Error: terminalErr.Error()},
+			})
+			if completeErr == nil {
+				slog.Error("claim: marked claimed job as Error due terminal claim payload error",
+					"job_id", job.ID,
+					"run_id", run.ID,
+					"node_id", nodeID,
+					"error", terminalErr.Error(),
+				)
+				return ClaimResult{}, &ClaimNoWork{}
+			}
+			slog.Error("claim: failed to mark claimed job as Error after terminal payload error",
+				"job_id", job.ID,
+				"run_id", run.ID,
+				"node_id", nodeID,
+				"claim_err", terminalErr.Error(),
+				"complete_err", completeErr,
+			)
+		}
 		if unclaimErr := s.store.UnclaimJob(ctx, store.UnclaimJobParams{
 			ID:     job.ID,
 			NodeID: nodeID,

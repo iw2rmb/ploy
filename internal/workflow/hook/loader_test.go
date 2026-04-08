@@ -100,6 +100,9 @@ steps:
 	if len(first[0].Steps) != 1 || first[0].Steps[0].Image != "ghcr.io/iw2rmb/hook/openapi-generator-cli:latest" {
 		t.Fatalf("local hook steps not preserved: %+v", first[0].Steps)
 	}
+	if len(first[0].Steps[0].In) != 1 || first[0].Steps[0].In[0] != "abcdef0:/in/amata.yaml" {
+		t.Fatalf("local hook step in entries not preserved: %+v", first[0].Steps[0].In)
+	}
 	if len(first[1].Steps) != 1 || first[1].Steps[0].Name != "publish" {
 		t.Fatalf("remote hook steps not preserved: %+v", first[1].Steps)
 	}

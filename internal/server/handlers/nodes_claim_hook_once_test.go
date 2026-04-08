@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -346,6 +347,50 @@ steps:
 	}
 	if !got.HookShouldRun {
 		t.Fatalf("HookShouldRun=false, want true; decision=%+v", got)
+	}
+}
+
+func TestResolveHookRuntimeDecision_InvalidHookSpecIsTerminalClaimError(t *testing.T) {
+	t.Parallel()
+
+	runID := domaintypes.NewRunID()
+	repoID := domaintypes.NewRepoID()
+	const (
+		hash     = "aa11bb22cc33"
+		bundleID = "bundle_invalid_hook"
+	)
+	st, bs := newHookBundleFixture(t, hash, bundleID, `id: invalid-hook
+steps:
+  - image: test:latest
+    unknown_key: true
+`)
+	job := store.Job{
+		ID:      domaintypes.NewJobID(),
+		RunID:   runID,
+		RepoID:  repoID,
+		JobType: domaintypes.JobTypeHook,
+		Name:    "pre-gate-hook-000",
+	}
+	st.listJobsByRunRepoAttempt.val = []store.Job{{
+		ID:      domaintypes.NewJobID(),
+		RunID:   runID,
+		RepoID:  repoID,
+		Attempt: job.Attempt,
+		JobType: domaintypes.JobTypeSBOM,
+		Status:  domaintypes.JobStatusSuccess,
+	}}
+	spec := specWithHooksAndBundleMap([]string{hash}, map[string]string{hash: bundleID})
+
+	_, err := resolveHookRuntimeDecision(context.Background(), st, bs, job, spec, domaintypes.JobTypeHook)
+	if err == nil {
+		t.Fatal("expected resolveHookRuntimeDecision error")
+	}
+	var terminalErr *ClaimJobTerminalError
+	if !errors.As(err, &terminalErr) {
+		t.Fatalf("expected ClaimJobTerminalError, got %T (%v)", err, err)
+	}
+	if !strings.Contains(err.Error(), "unknown_key") {
+		t.Fatalf("expected strict decode error in terminal message, got: %v", err)
 	}
 }
 

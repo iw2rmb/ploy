@@ -55,6 +55,10 @@ type Step struct {
 	Image   string            `json:"image" yaml:"image"`
 	Command []string          `json:"command,omitempty" yaml:"command,omitempty"`
 	Envs    map[string]string `json:"envs,omitempty" yaml:"envs,omitempty"`
+	CA      []string          `json:"ca,omitempty" yaml:"ca,omitempty"`
+	In      []string          `json:"in,omitempty" yaml:"in,omitempty"`
+	Out     []string          `json:"out,omitempty" yaml:"out,omitempty"`
+	Home    []string          `json:"home,omitempty" yaml:"home,omitempty"`
 }
 
 // LoadSpecYAML decodes a hook spec with strict unknown-field rejection.
@@ -162,6 +166,10 @@ func normalizeSpec(spec *Spec) {
 			}
 			spec.Steps[i].Envs = normalized
 		}
+		spec.Steps[i].CA = normalizeTrimmedStrings(spec.Steps[i].CA)
+		spec.Steps[i].In = normalizeTrimmedStrings(spec.Steps[i].In)
+		spec.Steps[i].Out = normalizeTrimmedStrings(spec.Steps[i].Out)
+		spec.Steps[i].Home = normalizeTrimmedStrings(spec.Steps[i].Home)
 	}
 
 	for i := range spec.SBOM.OnMatch {
@@ -183,4 +191,15 @@ func normalizeSpec(spec *Spec) {
 func normalizePackageCondition(cond *SBOMPackageCondition) {
 	cond.Name = strings.TrimSpace(cond.Name)
 	cond.Version = strings.TrimSpace(cond.Version)
+}
+
+func normalizeTrimmedStrings(values []string) []string {
+	if len(values) == 0 {
+		return values
+	}
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		out = append(out, strings.TrimSpace(value))
+	}
+	return out
 }

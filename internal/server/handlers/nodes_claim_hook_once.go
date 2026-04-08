@@ -53,7 +53,10 @@ func resolveHookRuntimeDecision(
 	}
 	hookSpec, err := loadRuntimeHookSpec(ctx, st, bs, source, migSpec.BundleMap)
 	if err != nil {
-		return nil, fmt.Errorf("load hook spec for source %q: %w", source, err)
+		return nil, &ClaimJobTerminalError{
+			Message: fmt.Sprintf("load hook spec for source %q", source),
+			Err:     err,
+		}
 	}
 	matchInput, err := buildHookMatchInput(ctx, st, job)
 	if err != nil {

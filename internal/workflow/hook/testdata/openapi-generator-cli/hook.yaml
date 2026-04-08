@@ -15,6 +15,7 @@ sbom:
 steps:
   - name: scan
     image: ghcr.io/iw2rmb/hook/openapi-generator-cli:latest
+    in: ["abcdef0:/in/amata.yaml"]
     command: ["scan", "--sbom", "/in/sbom.spdx.json", "--out", "/out/sbom.spdx.json"]
     envs:
       POLICY: strict
