@@ -89,6 +89,7 @@ items:
       - "Each successful sbom job produces /out/sbom.spdx.json and each hook step sees /in/sbom.spdx.json."
     reasoning: "high"
     cfp: 6
+    commit: 6f9ba623
   - done: false
     reviews: []
     label: "4"
