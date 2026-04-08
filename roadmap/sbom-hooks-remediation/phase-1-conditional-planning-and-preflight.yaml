@@ -51,7 +51,7 @@ items:
     reasoning: "high"
     cfp: 12
     commit: d9a50381
-  - done: false
+  - done: true
     reviews:
       - gaps: ["\"When bundle metadata exists but blob is missing, migration fails before first job is queued.\" is not fully verified/wired: there is no planning-path test in `internal/server/handlers/migs_ticket_test.go` asserting `createJobsFromSpec` returns an error and leaves `st.createJob.calls` empty when `GetSpecBundle` returns metadata but the referenced blob is missing; current coverage only validates the probe in `internal/server/handlers/spec_bundles_test.go` and claim-time behavior in `internal/server/handlers/nodes_claim_hook_once_test.go`."]
         commit: c035952c
