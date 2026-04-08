@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
+	"context"
 	"encoding/json"
 	"errors"
 	"log/slog"
@@ -505,4 +506,20 @@ func mustTarGzPayload(t *testing.T, files map[string][]byte) []byte {
 		t.Fatalf("close gzip: %v", err)
 	}
 	return b.Bytes()
+}
+
+func seedPlanningHookBundle(t *testing.T, st *jobStore, bs *bsmock.Store, bundleID string, hookYAML string) string {
+	t.Helper()
+	objKey := "spec_bundles/" + bundleID + "/bundle.tar.gz"
+	st.getSpecBundle.val = store.SpecBundle{
+		ID:        bundleID,
+		ObjectKey: ptr(objKey),
+	}
+	bundle := mustTarGzPayload(t, map[string][]byte{
+		"content": []byte(strings.TrimSpace(hookYAML) + "\n"),
+	})
+	if _, err := bs.Put(context.Background(), objKey, "application/gzip", bundle); err != nil {
+		t.Fatalf("put hook bundle blob: %v", err)
+	}
+	return bundleID
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/iw2rmb/ploy/internal/blobstore"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/server/blobpersist"
 	"github.com/iw2rmb/ploy/internal/store"
@@ -76,6 +77,7 @@ func maybeCreateHealingJobs(
 		spec,
 		resolvedHooks,
 		"re-gate",
+		blobStoreForPlanning(bp),
 	)
 	if err != nil {
 		return fmt.Errorf("plan re-gate hooks: %w", err)
@@ -235,4 +237,11 @@ func maybeCreateHealingJobs(
 		"strategy_id", recoveryMeta.StrategyID,
 	)
 	return nil
+}
+
+func blobStoreForPlanning(bp *blobpersist.Service) blobstore.Store {
+	if bp == nil {
+		return nil
+	}
+	return bp.BlobStore()
 }

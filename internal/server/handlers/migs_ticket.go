@@ -16,6 +16,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	"github.com/iw2rmb/ploy/internal/blobstore"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	migsapi "github.com/iw2rmb/ploy/internal/migs/api"
 	"github.com/iw2rmb/ploy/internal/store"
@@ -236,6 +237,7 @@ func createJobsFromSpec(
 	attempt int32,
 	repoSHA0 string,
 	spec []byte,
+	hookBlobstores ...blobstore.Store,
 ) error {
 	migsSpec, err := contracts.ParseMigSpecJSON(spec)
 	if err != nil {
@@ -253,11 +255,11 @@ func createJobsFromSpec(
 	if err != nil {
 		return fmt.Errorf("resolve hook sources: %w", err)
 	}
-	preGateHookPlans, err := resolveCycleHookPlans(ctx, st, runID, repoID, attempt, migsSpec, resolvedHooks, "pre-gate")
+	preGateHookPlans, err := resolveCycleHookPlans(ctx, st, runID, repoID, attempt, migsSpec, resolvedHooks, "pre-gate", hookBlobstores...)
 	if err != nil {
 		return fmt.Errorf("plan pre-gate hooks: %w", err)
 	}
-	postGateHookPlans, err := resolveCycleHookPlans(ctx, st, runID, repoID, attempt, migsSpec, resolvedHooks, "post-gate")
+	postGateHookPlans, err := resolveCycleHookPlans(ctx, st, runID, repoID, attempt, migsSpec, resolvedHooks, "post-gate", hookBlobstores...)
 	if err != nil {
 		return fmt.Errorf("plan post-gate hooks: %w", err)
 	}
@@ -495,6 +497,7 @@ func resolveCycleHookPlans(
 	spec *contracts.MigSpec,
 	resolvedHooks []string,
 	cycleName string,
+	hookBlobstores ...blobstore.Store,
 ) ([]plannedHookSource, error) {
 	if len(resolvedHooks) == 0 {
 		return nil, nil
@@ -505,7 +508,7 @@ func resolveCycleHookPlans(
 	}
 	out := make([]plannedHookSource, 0, len(resolvedHooks))
 	for i, source := range resolvedHooks {
-		decision, decisionErr := resolvePlannableHookDecision(source, matchInput)
+		decision, decisionErr := resolvePlannableHookDecision(ctx, st, spec, source, matchInput, hookBlobstores...)
 		if decisionErr != nil {
 			return nil, fmt.Errorf("source[%d] %q: %w", i, source, decisionErr)
 		}
@@ -573,13 +576,17 @@ func mergeHookRuntimeStackWithFallback(current hook.RuntimeStack, fallback hook.
 	return current
 }
 
-func resolvePlannableHookDecision(source string, matchInput hook.MatchInput) (hookPlanningDecision, error) {
-	specDoc, evaluable, err := loadHookSpecForPlanning(source)
+func resolvePlannableHookDecision(
+	ctx context.Context,
+	st store.Store,
+	spec *contracts.MigSpec,
+	source string,
+	matchInput hook.MatchInput,
+	hookBlobstores ...blobstore.Store,
+) (hookPlanningDecision, error) {
+	specDoc, err := loadHookSpecForPlanning(ctx, st, spec, source, hookBlobstores...)
 	if err != nil {
 		return hookPlanningDecision{}, err
-	}
-	if !evaluable {
-		return deferredBundleHookPlanningDecision(source), nil
 	}
 	match, err := hook.Match(specDoc, matchInput)
 	if err != nil {
@@ -591,37 +598,46 @@ func resolvePlannableHookDecision(source string, matchInput hook.MatchInput) (ho
 	}, nil
 }
 
-func loadHookSpecForPlanning(source string) (hook.Spec, bool, error) {
+func loadHookSpecForPlanning(
+	ctx context.Context,
+	st store.Store,
+	spec *contracts.MigSpec,
+	source string,
+	hookBlobstores ...blobstore.Store,
+) (hook.Spec, error) {
 	trimmed := strings.TrimSpace(source)
 	if isHTTPSHookSource(trimmed) {
 		specDoc, err := loadRuntimeHookSpecFromLoader(trimmed, ".")
 		if err != nil {
-			return hook.Spec{}, false, fmt.Errorf("load hook spec: %w", err)
+			return hook.Spec{}, fmt.Errorf("load hook spec: %w", err)
 		}
-		return specDoc, true, nil
+		return specDoc, nil
 	}
 	if canonicalHookSourcePattern.MatchString(trimmed) {
-		return hook.Spec{}, false, nil
+		specDoc, err := loadHookSpecFromBundleHash(ctx, st, firstHookBlobStore(hookBlobstores...), trimmed, planningBundleMap(spec))
+		if err != nil {
+			return hook.Spec{}, fmt.Errorf("load hook spec from hash: %w", err)
+		}
+		return specDoc, nil
 	}
-	return hook.Spec{}, false, fmt.Errorf("unsupported hook source %q: local hook sources must be precompiled by CLI into hash entries", source)
+	return hook.Spec{}, fmt.Errorf("unsupported hook source %q: local hook sources must be precompiled by CLI into hash entries", source)
 }
 
-func deferredBundleHookPlanningDecision(source string) hookPlanningDecision {
-	return hookPlanningDecision{
-		Evaluated: false,
-		Match: hook.MatchDecision{
-			ShouldRun:    true,
-			StackMatched: true,
-			SBOMMatched:  true,
-			HookHash:     strings.TrimSpace(source),
-		},
+func firstHookBlobStore(hookBlobstores ...blobstore.Store) blobstore.Store {
+	if len(hookBlobstores) == 0 {
+		return nil
 	}
+	return hookBlobstores[0]
+}
+
+func planningBundleMap(spec *contracts.MigSpec) map[string]string {
+	if spec == nil {
+		return nil
+	}
+	return spec.BundleMap
 }
 
 func summarizeHookPlanningDecision(decision hookPlanningDecision) string {
-	if !decision.Evaluated {
-		return "hook_match eval=deferred should_run=true reason=bundle_source"
-	}
 	return fmt.Sprintf(
 		"hook_match eval=planned should_run=%t stack=%t sbom=%t on_match=%t on_add=%t on_remove=%t on_change=%t",
 		decision.Match.ShouldRun,
