@@ -394,6 +394,54 @@ steps:
 	}
 }
 
+func TestResolveHookRuntimeDecision_MissingBundleBlobIsTerminalClaimError(t *testing.T) {
+	t.Parallel()
+
+	runID := domaintypes.NewRunID()
+	repoID := domaintypes.NewRepoID()
+	const (
+		hash     = "deadc0de1234"
+		bundleID = "bundle_missing_blob"
+	)
+	objKey := "spec_bundles/" + bundleID + "/bundle.tar.gz"
+	st := &jobStore{}
+	st.getSpecBundle.val = store.SpecBundle{
+		ID:        bundleID,
+		ObjectKey: &objKey,
+	}
+	st.listJobsByRunRepoAttempt.val = []store.Job{{
+		ID:      domaintypes.NewJobID(),
+		RunID:   runID,
+		RepoID:  repoID,
+		Attempt: 1,
+		JobType: domaintypes.JobTypeSBOM,
+		Status:  domaintypes.JobStatusSuccess,
+	}}
+	bs := bsmock.New() // intentionally empty so the blob is missing
+
+	job := store.Job{
+		ID:      domaintypes.NewJobID(),
+		RunID:   runID,
+		RepoID:  repoID,
+		JobType: domaintypes.JobTypeHook,
+		Name:    "pre-gate-hook-000",
+	}
+	spec := specWithHooksAndBundleMap([]string{hash}, map[string]string{hash: bundleID})
+
+	_, err := resolveHookRuntimeDecision(context.Background(), st, bs, job, spec, domaintypes.JobTypeHook)
+	if err == nil {
+		t.Fatal("expected resolveHookRuntimeDecision error")
+	}
+	var terminalErr *ClaimJobTerminalError
+	if !errors.As(err, &terminalErr) {
+		t.Fatalf("expected ClaimJobTerminalError, got %T (%v)", err, err)
+	}
+	want := `spec bundle "bundle_missing_blob" blob is missing from object storage`
+	if !strings.Contains(err.Error(), want) {
+		t.Fatalf("expected deterministic missing-blob message %q, got: %v", want, err)
+	}
+}
+
 func newHookBundleFixture(t *testing.T, hash string, bundleID string, hookYAML string) (*jobStore, *bsmock.Store) {
 	t.Helper()
 	st := &jobStore{}
