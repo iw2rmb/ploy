@@ -6,7 +6,7 @@ documentation:
   - "images/README.md"
   - "docs/how-to/publish-migs.md"
   - "docs/envs/README.md"
-done: false
+done: true
 reviews: []
 items:
   - done: true
