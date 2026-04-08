@@ -3,9 +3,9 @@ ARG NODE_IMAGE=node:22-alpine
 FROM ${NODE_IMAGE}
 
 LABEL org.opencontainers.image.title="ploy-amata" \
-    org.opencontainers.image.description="Ploy Migs: Amata runner image (with codex/cc/cc-router installed)" \
+    org.opencontainers.image.description="Ploy Migs runner image with Codex, Crush, Claude Code, and Claude Code Router installed" \
     org.opencontainers.image.source="https://github.com/iw2rmb/ploy" \
-    org.opencontainers.image.licenses="Apache-2.0"
+    org.opencontainers.image.licenses="MIT"
 
 RUN apk add --no-cache bash git ca-certificates curl jq && \
     if command -v update-ca-certificates >/dev/null 2>&1; then \

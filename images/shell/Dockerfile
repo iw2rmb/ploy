@@ -12,6 +12,7 @@ ARG BUILD_TS
 LABEL org.opencontainers.image.source="https://github.com/iw2rmb/ploy" \
     org.opencontainers.image.title="mig-shell" \
     org.opencontainers.image.description="Ploy Migs: generic shell script runner" \
+    org.opencontainers.image.licenses="MIT" \
     org.opencontainers.image.created="$BUILD_TS"
 
 WORKDIR /workspace
