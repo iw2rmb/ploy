@@ -91,6 +91,14 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 		}
 	}()
 
+	if req.JobType == types.JobTypePreGate {
+		if err := r.schedulePreGateSBOMAndHooks(req, workspace); err != nil {
+			slog.Error("failed to schedule pre-gate sbom and hooks", "run_id", req.RunID, "job_id", req.JobID, "error", err)
+			r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
+			return
+		}
+	}
+
 	// Run the build gate.
 	ctx = withGateExecutionLabels(ctx, req)
 	ctx = step.WithGateRuntimeImageObserver(ctx, func(obsCtx context.Context, image string) {

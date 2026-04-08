@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -16,6 +17,22 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"github.com/iw2rmb/ploy/internal/workflow/step"
 )
+
+const preGateCanonicalSBOMFileName = "sbom.spdx.json"
+
+var canonicalEmptySPDXDocument = []byte(`{
+  "spdxVersion": "SPDX-2.3",
+  "dataLicense": "CC0-1.0",
+  "SPDXID": "SPDXRef-DOCUMENT",
+  "name": "ploy-empty-sbom",
+  "documentNamespace": "https://ploy.dev/sbom/empty",
+  "creationInfo": {
+    "created": "1970-01-01T00:00:00Z",
+    "creators": ["Tool: ploy-nodeagent"]
+  },
+  "packages": []
+}
+`)
 
 // executeMigJob runs a mig container job.
 // Executes the container, uploads diff, and reports status.
@@ -199,6 +216,76 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 	}
 
 	r.executeStandardJob(ctx, req, cfg)
+}
+
+// schedulePreGateSBOMAndHooks executes deterministic pre-gate prelude scheduling.
+// Phase-1 scope:
+//   - materialize canonical SBOM output at /out/sbom.spdx.json
+//   - stage optional hooks in declaration order with /in/sbom.spdx.json input
+func (r *runController) schedulePreGateSBOMAndHooks(req StartRunRequest, workspace string) error {
+	gateOutDir := filepath.Join(workspace, step.BuildGateWorkspaceOutDir)
+	sbomOutPath := filepath.Join(gateOutDir, preGateCanonicalSBOMFileName)
+	if err := writeCanonicalSBOMOutput(sbomOutPath); err != nil {
+		return fmt.Errorf("schedule pre-gate sbom: %w", err)
+	}
+	slog.Info("scheduled pre-gate sbom job",
+		"run_id", req.RunID,
+		"job_id", req.JobID,
+		"sbom_output", "/out/"+preGateCanonicalSBOMFileName,
+	)
+
+	finalSnapshotPath, err := schedulePreGateHookChain(req.RunID, req.TypedOptions.Hooks, sbomOutPath)
+	if err != nil {
+		return fmt.Errorf("schedule pre-gate hook chain: %w", err)
+	}
+	if filepath.Clean(finalSnapshotPath) != filepath.Clean(sbomOutPath) {
+		if err := copyFileBytes(finalSnapshotPath, sbomOutPath); err != nil {
+			return fmt.Errorf("sync final sbom snapshot to gate out dir: %w", err)
+		}
+	}
+	return nil
+}
+
+func writeCanonicalSBOMOutput(sbomOutPath string) error {
+	if err := os.MkdirAll(filepath.Dir(sbomOutPath), 0o755); err != nil {
+		return fmt.Errorf("mkdir sbom out dir: %w", err)
+	}
+	if err := os.WriteFile(sbomOutPath, canonicalEmptySPDXDocument, 0o644); err != nil {
+		return fmt.Errorf("write canonical sbom output: %w", err)
+	}
+	return nil
+}
+
+func schedulePreGateHookChain(runID types.RunID, hookSources []string, snapshotPath string) (string, error) {
+	currentSnapshot := snapshotPath
+	for i, src := range hookSources {
+		source := strings.TrimSpace(src)
+		if source == "" {
+			continue
+		}
+
+		hookDir := filepath.Join(runCacheDir(runID), "pre-gate-hooks", fmt.Sprintf("%03d", i))
+		inPath := filepath.Join(hookDir, "in", preGateCanonicalSBOMFileName)
+		outPath := filepath.Join(hookDir, "out", preGateCanonicalSBOMFileName)
+
+		if err := copyFileBytes(currentSnapshot, inPath); err != nil {
+			return "", fmt.Errorf("hook[%d] stage /in/%s: %w", i, preGateCanonicalSBOMFileName, err)
+		}
+		// Phase-1 hook runtime is scheduling-only: preserve the current snapshot
+		// as the staged hook output until hook execution semantics land.
+		if err := copyFileBytes(currentSnapshot, outPath); err != nil {
+			return "", fmt.Errorf("hook[%d] stage /out/%s: %w", i, preGateCanonicalSBOMFileName, err)
+		}
+		currentSnapshot = outPath
+
+		slog.Info("scheduled pre-gate hook step",
+			"run_id", runID,
+			"hook_index", i,
+			"hook_source", source,
+			"sbom_input", "/in/"+preGateCanonicalSBOMFileName,
+		)
+	}
+	return currentSnapshot, nil
 }
 
 // standardJobConfig configures the execution of a standard container job (mig/heal).
