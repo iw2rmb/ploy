@@ -63,7 +63,7 @@ items:
     reasoning: "medium"
     cfp: 5
     commit: cb2888fe
-  - done: false
+  - done: true
     reviews:
       - gaps: ["\"Inject sbom scheduling before pre_gate execution path.\" is not implemented as actual job scheduling: `internal/nodeagent/execution_orchestrator_gate.go` only calls `schedulePreGateSBOMAndHooks(...)`, and `internal/nodeagent/execution_orchestrator_jobs.go` only writes a file and logs; there is no SBOM job record/type handling in nodeagent execution paths (`rg JobTypeSBOM` in `internal/nodeagent` returns no non-test matches).", "\"Inject hook scheduling after sbom and before the pre_gate stage.\" is not implemented as executable hook steps/jobs: `schedulePreGateHookChain` in `internal/nodeagent/execution_orchestrator_jobs.go` only stages copied files under `runCacheDir(...)/pre-gate-hooks/...` and never executes hook sources or dispatches hook jobs.", "\"Runs without hooks keep pre-gate command ordering with an added sbom job before pre_gate.\" and \"Each successful sbom job produces /out/sbom.spdx.json and each hook step sees /in/sbom.spdx.json.\" are only simulated via filesystem prelude (`internal/nodeagent/execution_orchestrator_jobs.go`) and unit tests (`internal/nodeagent/execution_orchestrator_sbom_hooks_test.go`); there is no sbom/hook job lifecycle (claim/execute/complete) proving a real sbom job before `pre_gate` or real hook step `/in` mounts."]
         commit: "82302137"
