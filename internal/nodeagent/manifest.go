@@ -170,20 +170,20 @@ func applySBOMRuntimeForStack(manifest *contracts.StepManifest, stack contracts.
 	if manifest == nil {
 		return errors.New("sbom manifest required")
 	}
-	normalizedStack := normalizeSBOMStack(stack)
-	image, err := resolveImage(sbomJobImageSpec(), normalizedStack, "sbom")
+	runtimeStack := resolveSBOMRuntimeStack(stack)
+	image, err := resolveImage(sbomJobImageSpec(), runtimeStack, "sbom")
 	if err != nil {
 		return err
 	}
 	manifest.Image = image
-	manifest.Command = sbomCommandForStack(normalizedStack).ToSlice()
+	manifest.Command = sbomCommandForStack(stack).ToSlice()
 	if len(manifest.Command) == 0 {
-		return fmt.Errorf("sbom stack %q command required", normalizedStack)
+		return fmt.Errorf("sbom stack %q command required", stack)
 	}
 	if manifest.Envs == nil {
 		manifest.Envs = map[string]string{}
 	}
-	manifest.Envs["PLOY_SBOM_STACK"] = string(normalizedStack)
+	manifest.Envs["PLOY_SBOM_STACK"] = string(runtimeStack)
 	return nil
 }
 
@@ -214,8 +214,19 @@ func sbomCommandForStack(stack contracts.MigStack) contracts.CommandSpec {
 		}
 	default:
 		return contracts.CommandSpec{
-			Shell: "set -eu; : > " + rawOutputPath,
+			Shell: "set -eu; if [ -f /workspace/pom.xml ]; then mvn -B -q -f /workspace/pom.xml -DoutputFile=" + rawOutputPath + " dependency:list; exit 0; fi; if [ -x /workspace/gradlew ]; then /workspace/gradlew -q -p /workspace dependencies > " + rawOutputPath + "; exit 0; fi; if [ -f /workspace/build.gradle ] || [ -f /workspace/build.gradle.kts ] || [ -f /workspace/settings.gradle ] || [ -f /workspace/settings.gradle.kts ]; then if command -v gradle >/dev/null 2>&1; then gradle -q -p /workspace dependencies > " + rawOutputPath + "; exit 0; fi; echo \"gradle build detected but no gradle wrapper and no gradle binary available\" >&2; exit 1; fi; echo \"unable to resolve sbom collector: expected pom.xml or gradle markers\" >&2; exit 1",
 		}
+	}
+}
+
+func resolveSBOMRuntimeStack(stack contracts.MigStack) contracts.MigStack {
+	switch normalizeSBOMStack(stack) {
+	case contracts.MigStackJavaGradle:
+		return contracts.MigStackJavaGradle
+	case contracts.MigStackJavaMaven:
+		return contracts.MigStackJavaMaven
+	default:
+		return contracts.MigStackJavaMaven
 	}
 }
 
