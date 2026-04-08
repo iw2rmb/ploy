@@ -37,7 +37,7 @@ items:
       - "Reject malformed hook declarations and surface deterministic validation errors."
     reasoning: "medium"
     cfp: 6
-
+    commit: a4f29bc1
   - done: false
     reviews: []
     label: "2"
