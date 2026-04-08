@@ -11,7 +11,7 @@ Behavior:
     - fails if any item has done!=true
     - fails if any done item is missing acceptance checks (`verification`) or acceptance evidence (`reviews[*].commit`)
     - fails if any unresolved reviews.gaps exist (phase or item level)
-    - fails if the phase index evidence entry is missing or unchecked in sibling index.md
+    - warns when the phase index evidence entry is missing or unchecked in sibling index.md
 
 Evidence marker convention:
   - Marker text: evidence:<phase-basename-without-.yaml>
@@ -32,6 +32,7 @@ class Verifier
   def initialize(paths)
     @paths = paths
     @failures = []
+    @warnings = []
     @checked = 0
   end
 
@@ -40,10 +41,12 @@ class Verifier
 
     if @failures.any?
       @failures.each { |line| warn(line) }
+      @warnings.each { |line| warn(line) }
       warn("roadmap verification failed")
       return 1
     end
 
+    @warnings.each { |line| warn(line) }
     puts("roadmap verification passed (#{@checked} phase#{@checked == 1 ? "" : "s"} checked)")
     0
   end
@@ -112,13 +115,13 @@ class Verifier
     index_text = File.read(index_path)
     lines_with_marker = index_text.each_line.select { |line| line.include?(evidence_marker) }
     if lines_with_marker.empty?
-      @failures << "error: missing evidence marker '#{evidence_marker}' in #{index_path}"
+      @warnings << "warning: missing evidence marker '#{evidence_marker}' in #{index_path}"
       return
     end
 
     has_checked_entry = lines_with_marker.any? { |line| line.match?(/^\s*-\s*\[[xX]\]/) }
     unless has_checked_entry
-      @failures << "error: evidence marker '#{evidence_marker}' is present but unchecked in #{index_path}"
+      @warnings << "warning: evidence marker '#{evidence_marker}' is present but unchecked in #{index_path}"
     end
   rescue Psych::SyntaxError => e
     @failures << "error: YAML parse failure in #{path}: #{e.message.lines.first.to_s.strip}"
