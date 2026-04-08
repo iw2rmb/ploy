@@ -113,6 +113,7 @@ jobs:
         id: changed
         uses: dorny/paths-filter@v3
         with:
+          list-files: shell
           filters: |
             verify:
               - 'roadmap/**/*.yaml'
@@ -123,7 +124,20 @@ jobs:
               - 'internal/workflow/hook/**'
       - name: Run roadmap verification
         if: steps.changed.outputs.verify == 'true'
-        run: make roadmap-verify
+        run: |
+          set -euo pipefail
+          changed_files="${{ steps.changed.outputs.verify_files }}"
+          phase_files="$(printf '%s\n' "${changed_files}" | tr ' ' '\n' | grep -E '^roadmap/.+/phase-.*\.yaml$' || true)"
+
+          if [ -z "${phase_files}" ]; then
+            echo "No changed roadmap phase YAML files detected; verifying all roadmap phases."
+            make roadmap-verify
+            exit 0
+          fi
+
+          phase_args="$(printf '%s\n' "${phase_files}" | tr '\n' ' ' | sed 's/[[:space:]]*$//')"
+          echo "Verifying changed roadmap phase files: ${phase_args}"
+          make roadmap-verify ROADMAP_VERIFY_PHASES="${phase_args}"
       - name: Skip roadmap verification (no relevant changes)
         if: steps.changed.outputs.verify != 'true'
         run: echo "No roadmap/sbom-hook runtime changes detected; skipping roadmap verification."

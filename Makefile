@@ -6,7 +6,7 @@ REQUIRED_GO_TOOLCHAIN := go1.25.9
 VERSION_FILE := VERSION
 VERSION ?= $(shell tr -d '[:space:]' < $(VERSION_FILE) 2>/dev/null || echo "")
 PLOY_SIGN_BINARIES ?= 0
-ROADMAP_VERIFY_PHASES ?= roadmap/sbom-hooks-remediation/phase-3-delivery-gates-and-observability.yaml
+ROADMAP_VERIFY_PHASES ?= $(shell find roadmap/sbom-hooks-remediation -type f -name 'phase-*.yaml' | sort)
 
 # Version stamping
 GIT_COMMIT := $(shell git rev-parse --short=12 HEAD 2>/dev/null || echo unknown)
@@ -155,7 +155,7 @@ redundancy-check: ## Check for LOC and duplication regressions in hotspot packag
 	@bash scripts/redundancy-check.sh
 
 .PHONY: roadmap-verify
-roadmap-verify: ## Verify done roadmaps have closed review gaps and evidence markers
+roadmap-verify: ## Verify done roadmaps have closed review gaps and completed evidence checks
 	@tools/roadmap/verify_done.sh $(ROADMAP_VERIFY_PHASES)
 
 .PHONY: ci-check
@@ -202,7 +202,7 @@ help: ## Show available targets
 	@echo "  make lint                       # Run golangci-lint"
 	@echo "  make staticcheck                # Run staticcheck"
 	@echo "  make redundancy-check           # Check LOC and duplication guardrails in hotspot packages"
-	@echo "  make roadmap-verify             # Verify done roadmap phases have closed gaps and evidence markers"
+	@echo "  make roadmap-verify             # Verify done roadmap phases have closed gaps and completed evidence checks"
 	@echo "  make ci-check                   # Run core CI checks locally"
 	@echo "  make pre-commit-install         # Install pre-commit hooks"
 	@echo "  make clean                      # Remove build artifacts"
