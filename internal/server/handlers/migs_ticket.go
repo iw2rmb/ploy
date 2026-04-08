@@ -236,13 +236,19 @@ func createJobsFromSpec(
 		jobImage string
 		stepName string
 	}
-	drafts := []draft{{name: "pre-gate-sbom", jobType: domaintypes.JobTypeSBOM}}
-	for i := range migsSpec.Hooks {
-		drafts = append(drafts, draft{
-			name:    fmt.Sprintf("pre-gate-hook-%03d", i),
-			jobType: domaintypes.JobTypeHook,
-		})
+	appendGatePreludeDrafts := func(drafts []draft, cycleName string) []draft {
+		drafts = append(drafts, draft{name: cycleName + "-sbom", jobType: domaintypes.JobTypeSBOM})
+		for i := range migsSpec.Hooks {
+			drafts = append(drafts, draft{
+				name:    fmt.Sprintf("%s-hook-%03d", cycleName, i),
+				jobType: domaintypes.JobTypeHook,
+			})
+		}
+		return drafts
 	}
+
+	drafts := make([]draft, 0, len(migsSpec.Steps)+len(migsSpec.Hooks)*2+5)
+	drafts = appendGatePreludeDrafts(drafts, "pre-gate")
 	drafts = append(drafts, draft{name: "pre-gate", jobType: domaintypes.JobTypePreGate})
 
 	if len(migsSpec.Steps) > 1 {
@@ -274,6 +280,7 @@ func createJobsFromSpec(
 			stepName: stepName,
 		})
 	}
+	drafts = appendGatePreludeDrafts(drafts, "post-gate")
 	drafts = append(drafts, draft{name: "post-gate", jobType: domaintypes.JobTypePostGate})
 
 	planned := make([]plannedJob, 0, len(drafts))

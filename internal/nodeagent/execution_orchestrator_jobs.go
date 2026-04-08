@@ -20,7 +20,14 @@ import (
 )
 
 const preGateCanonicalSBOMFileName = "sbom.spdx.json"
-const preGateHookJobNamePrefix = "pre-gate-hook-"
+
+const (
+	preGateCycleName         = "pre-gate"
+	postGateCycleName        = "post-gate"
+	sbomJobNameSuffix        = "-sbom"
+	hookJobNameDelimiter     = "-hook-"
+	preGateHookJobNamePrefix = "pre-gate-hook-"
+)
 
 var canonicalEmptySPDXDocument = []byte(`{
   "spdxVersion": "SPDX-2.3",
@@ -36,59 +43,139 @@ var canonicalEmptySPDXDocument = []byte(`{
 }
 `)
 
+func gateCycleRootDir(runID types.RunID, cycleName string) string {
+	return filepath.Join(runCacheDir(runID), "gate-cycles", strings.TrimSpace(cycleName))
+}
+
+func gateCycleSBOMOutPath(runID types.RunID, cycleName string) string {
+	return filepath.Join(gateCycleRootDir(runID, cycleName), "sbom", "out", preGateCanonicalSBOMFileName)
+}
+
+func gateCycleHookDir(runID types.RunID, cycleName string, hookIndex int) string {
+	return filepath.Join(gateCycleRootDir(runID, cycleName), "hooks", fmt.Sprintf("%03d", hookIndex))
+}
+
+func gateCycleHookInPath(runID types.RunID, cycleName string, hookIndex int) string {
+	return filepath.Join(gateCycleHookDir(runID, cycleName, hookIndex), "in", preGateCanonicalSBOMFileName)
+}
+
+func gateCycleHookOutPath(runID types.RunID, cycleName string, hookIndex int) string {
+	return filepath.Join(gateCycleHookDir(runID, cycleName, hookIndex), "out", preGateCanonicalSBOMFileName)
+}
+
+func gateCycleHookInputSnapshotPath(runID types.RunID, cycleName string, hookIndex int) string {
+	if hookIndex <= 0 {
+		return gateCycleSBOMOutPath(runID, cycleName)
+	}
+	return gateCycleHookOutPath(runID, cycleName, hookIndex-1)
+}
+
+func gateCycleFinalSnapshotPath(runID types.RunID, cycleName string, hooks []string) string {
+	if len(hooks) == 0 {
+		return gateCycleSBOMOutPath(runID, cycleName)
+	}
+	return gateCycleHookOutPath(runID, cycleName, len(hooks)-1)
+}
+
+func gateCycleNameFromSBOMJobName(jobName string) (string, error) {
+	name := strings.TrimSpace(jobName)
+	if !strings.HasSuffix(name, sbomJobNameSuffix) {
+		return "", fmt.Errorf("sbom job_name must end with %q, got %q", sbomJobNameSuffix, name)
+	}
+	cycleName := strings.TrimSpace(strings.TrimSuffix(name, sbomJobNameSuffix))
+	if cycleName == "" {
+		return "", fmt.Errorf("sbom cycle name is empty in job_name %q", name)
+	}
+	return cycleName, nil
+}
+
+func gateCycleHookIndexFromJobName(jobName string, hooksLen int) (string, int, error) {
+	name := strings.TrimSpace(jobName)
+	delimIdx := strings.LastIndex(name, hookJobNameDelimiter)
+	if delimIdx <= 0 {
+		return "", 0, fmt.Errorf("hook job_name must contain %q, got %q", hookJobNameDelimiter, name)
+	}
+	cycleName := strings.TrimSpace(name[:delimIdx])
+	if cycleName == "" {
+		return "", 0, fmt.Errorf("hook cycle name is empty in job_name %q", name)
+	}
+	raw := strings.TrimSpace(name[delimIdx+len(hookJobNameDelimiter):])
+	idx, err := strconv.Atoi(raw)
+	if err != nil {
+		return "", 0, fmt.Errorf("parse hook index from job_name %q: %w", name, err)
+	}
+	if idx < 0 || idx >= hooksLen {
+		return "", 0, fmt.Errorf("hook index out of range for job_name %q: idx=%d hooks_len=%d", name, idx, hooksLen)
+	}
+	return cycleName, idx, nil
+}
+
+func gateCycleNameFromGateJob(jobType types.JobType, jobName string) (string, error) {
+	switch jobType {
+	case types.JobTypePreGate:
+		return preGateCycleName, nil
+	case types.JobTypePostGate:
+		return postGateCycleName, nil
+	case types.JobTypeReGate:
+		name := strings.TrimSpace(jobName)
+		if name == "" {
+			return "", fmt.Errorf("re-gate job_name is empty")
+		}
+		return name, nil
+	default:
+		return "", fmt.Errorf("unsupported gate job_type %q", jobType)
+	}
+}
+
 func preGateSBOMOutPath(runID types.RunID) string {
-	return filepath.Join(runCacheDir(runID), "pre-gate-sbom", "out", preGateCanonicalSBOMFileName)
+	return gateCycleSBOMOutPath(runID, preGateCycleName)
 }
 
 func preGateHookDir(runID types.RunID, hookIndex int) string {
-	return filepath.Join(runCacheDir(runID), "pre-gate-hooks", fmt.Sprintf("%03d", hookIndex))
+	return gateCycleHookDir(runID, preGateCycleName, hookIndex)
 }
 
 func preGateHookInPath(runID types.RunID, hookIndex int) string {
-	return filepath.Join(preGateHookDir(runID, hookIndex), "in", preGateCanonicalSBOMFileName)
+	return gateCycleHookInPath(runID, preGateCycleName, hookIndex)
 }
 
 func preGateHookOutPath(runID types.RunID, hookIndex int) string {
-	return filepath.Join(preGateHookDir(runID, hookIndex), "out", preGateCanonicalSBOMFileName)
+	return gateCycleHookOutPath(runID, preGateCycleName, hookIndex)
 }
 
 func preGateHookInputSnapshotPath(runID types.RunID, hookIndex int) string {
-	if hookIndex <= 0 {
-		return preGateSBOMOutPath(runID)
-	}
-	return preGateHookOutPath(runID, hookIndex-1)
+	return gateCycleHookInputSnapshotPath(runID, preGateCycleName, hookIndex)
 }
 
 func preGateFinalSnapshotPath(runID types.RunID, hooks []string) string {
-	if len(hooks) == 0 {
-		return preGateSBOMOutPath(runID)
-	}
-	return preGateHookOutPath(runID, len(hooks)-1)
+	return gateCycleFinalSnapshotPath(runID, preGateCycleName, hooks)
 }
 
 func preGateHookIndexFromJobName(jobName string, hooksLen int) (int, error) {
-	name := strings.TrimSpace(jobName)
-	if !strings.HasPrefix(name, preGateHookJobNamePrefix) {
-		return 0, fmt.Errorf("hook job_name must start with %q, got %q", preGateHookJobNamePrefix, name)
-	}
-	raw := strings.TrimPrefix(name, preGateHookJobNamePrefix)
-	idx, err := strconv.Atoi(raw)
+	cycleName, idx, err := gateCycleHookIndexFromJobName(jobName, hooksLen)
 	if err != nil {
-		return 0, fmt.Errorf("parse hook index from job_name %q: %w", name, err)
+		return 0, err
 	}
-	if idx < 0 || idx >= hooksLen {
-		return 0, fmt.Errorf("hook index out of range for job_name %q: idx=%d hooks_len=%d", name, idx, hooksLen)
+	if cycleName != preGateCycleName {
+		return 0, fmt.Errorf("hook job_name must start with %q, got %q", preGateHookJobNamePrefix, strings.TrimSpace(jobName))
 	}
 	return idx, nil
 }
 
-// executeSBOMJob writes a deterministic SPDX file for the current pre-gate cycle.
+// executeSBOMJob writes a deterministic SPDX file for the current gate cycle.
 func (r *runController) executeSBOMJob(ctx context.Context, req StartRunRequest) {
 	startTime := time.Now()
 
-	sbomPath := preGateSBOMOutPath(req.RunID)
+	cycleName, err := gateCycleNameFromSBOMJobName(req.JobName)
+	if err != nil {
+		slog.Error("failed to derive sbom cycle", "run_id", req.RunID, "job_id", req.JobID, "job_name", req.JobName, "error", err)
+		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
+		return
+	}
+
+	sbomPath := gateCycleSBOMOutPath(req.RunID, cycleName)
 	if err := writeCanonicalSBOMOutput(sbomPath); err != nil {
-		err = fmt.Errorf("write pre-gate sbom output: %w", err)
+		err = fmt.Errorf("write %s sbom output: %w", cycleName, err)
 		slog.Error("failed to execute sbom job", "run_id", req.RunID, "job_id", req.JobID, "error", err)
 		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
 		return
@@ -107,6 +194,7 @@ func (r *runController) executeSBOMJob(ctx context.Context, req StartRunRequest)
 		"run_id", req.RunID,
 		"job_id", req.JobID,
 		"job_name", req.JobName,
+		"cycle_name", cycleName,
 		"sbom_output", "/out/"+preGateCanonicalSBOMFileName,
 		"duration", duration,
 	)
@@ -122,7 +210,7 @@ func (r *runController) executeHookJob(ctx context.Context, req StartRunRequest)
 		return
 	}
 
-	hookIndex, err := preGateHookIndexFromJobName(req.JobName, len(req.TypedOptions.Hooks))
+	cycleName, hookIndex, err := gateCycleHookIndexFromJobName(req.JobName, len(req.TypedOptions.Hooks))
 	if err != nil {
 		slog.Error("failed to derive hook index", "run_id", req.RunID, "job_id", req.JobID, "job_name", req.JobName, "error", err)
 		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
@@ -137,9 +225,9 @@ func (r *runController) executeHookJob(ctx context.Context, req StartRunRequest)
 		return
 	}
 
-	inputSnapshotPath := preGateHookInputSnapshotPath(req.RunID, hookIndex)
-	inPath := preGateHookInPath(req.RunID, hookIndex)
-	outPath := preGateHookOutPath(req.RunID, hookIndex)
+	inputSnapshotPath := gateCycleHookInputSnapshotPath(req.RunID, cycleName, hookIndex)
+	inPath := gateCycleHookInPath(req.RunID, cycleName, hookIndex)
+	outPath := gateCycleHookOutPath(req.RunID, cycleName, hookIndex)
 
 	if err := copyFileBytes(inputSnapshotPath, inPath); err != nil {
 		err = fmt.Errorf("hook[%d] stage /in/%s: %w", hookIndex, preGateCanonicalSBOMFileName, err)
@@ -157,6 +245,7 @@ func (r *runController) executeHookJob(ctx context.Context, req StartRunRequest)
 	duration := time.Since(startTime)
 	stats := types.NewRunStatsBuilder().
 		DurationMs(duration.Milliseconds()).
+		MetadataEntry("cycle_name", cycleName).
 		MetadataEntry("hook_index", strconv.Itoa(hookIndex)).
 		MetadataEntry("hook_source", hookSource).
 		MustBuild()
@@ -169,6 +258,7 @@ func (r *runController) executeHookJob(ctx context.Context, req StartRunRequest)
 		"run_id", req.RunID,
 		"job_id", req.JobID,
 		"job_name", req.JobName,
+		"cycle_name", cycleName,
 		"hook_index", hookIndex,
 		"hook_source", hookSource,
 		"sbom_input", "/in/"+preGateCanonicalSBOMFileName,
@@ -360,16 +450,28 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 	r.executeStandardJob(ctx, req, cfg)
 }
 
-// materializePreGateSBOMForGate copies the final pre-gate SBOM snapshot to
-// build-gate /out so gate jobs expose a stable output contract.
-func materializePreGateSBOMForGate(runID types.RunID, hooks []string, workspace string) error {
-	snapshotPath := preGateFinalSnapshotPath(runID, hooks)
+// materializeGateSBOMForGate copies the final cycle SBOM snapshot to build-gate
+// /out so gate jobs expose a stable output contract.
+func materializeGateSBOMForGate(runID types.RunID, cycleName string, hooks []string, workspace string) error {
+	snapshotPath := gateCycleFinalSnapshotPath(runID, cycleName, hooks)
 	gateOutDir := filepath.Join(workspace, step.BuildGateWorkspaceOutDir)
 	sbomOutPath := filepath.Join(gateOutDir, preGateCanonicalSBOMFileName)
 	if err := copyFileBytes(snapshotPath, sbomOutPath); err != nil {
-		return fmt.Errorf("materialize pre-gate sbom for gate /out: %w", err)
+		// Keep re-gate rerun/root execution backward-safe when cycle-specific
+		// sbom jobs are not inserted by older schedulers.
+		if os.IsNotExist(err) && cycleName != preGateCycleName {
+			if fallbackErr := copyFileBytes(preGateFinalSnapshotPath(runID, hooks), sbomOutPath); fallbackErr == nil {
+				return nil
+			}
+		}
+		return fmt.Errorf("materialize %s sbom for gate /out: %w", cycleName, err)
 	}
 	return nil
+}
+
+// materializePreGateSBOMForGate preserves existing pre-gate helper callers.
+func materializePreGateSBOMForGate(runID types.RunID, hooks []string, workspace string) error {
+	return materializeGateSBOMForGate(runID, preGateCycleName, hooks, workspace)
 }
 
 func writeCanonicalSBOMOutput(sbomOutPath string) error {

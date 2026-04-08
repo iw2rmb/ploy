@@ -330,8 +330,8 @@ func TestRestartRunRepoHandler_ReopensTerminalRunAndCreatesJobs(t *testing.T) {
 	if !st.incrementRunRepoAttempt.called {
 		t.Fatalf("expected IncrementRunRepoAttempt to be called")
 	}
-	if st.createJobCallCount != 4 {
-		t.Fatalf("expected 4 jobs for restarted repo, got %d", st.createJobCallCount)
+	if st.createJobCallCount != 5 {
+		t.Fatalf("expected 5 jobs for restarted repo, got %d", st.createJobCallCount)
 	}
 }
 
@@ -372,8 +372,8 @@ func TestStartRunHandler_StartsQueuedRepos(t *testing.T) {
 	startRunHandler(st).ServeHTTP(rr, req)
 
 	assertStatus(t, rr, http.StatusOK)
-	if st.createJobCallCount != 4 {
-		t.Fatalf("expected starter to create 4 jobs, got %d", st.createJobCallCount)
+	if st.createJobCallCount != 5 {
+		t.Fatalf("expected starter to create 5 jobs, got %d", st.createJobCallCount)
 	}
 
 	resp := decodeBody[StartRunResponse](t, rr)

@@ -93,6 +93,10 @@ func maybeCreateHealingJobs(
 			ctx, bp, run.ID, failedJob, jobsByID, detectedExpectation, chain.ReGateMeta.RecoveryMetadata)
 	}
 
+	preludeMetaBytes, err := contracts.MarshalJobMeta(contracts.NewMigJobMeta())
+	if err != nil {
+		return fmt.Errorf("marshal sbom/hook job meta: %w", err)
+	}
 	reGateMetaBytes, err := contracts.MarshalJobMeta(chain.ReGateMeta)
 	if err != nil {
 		return fmt.Errorf("marshal re-gate job meta: %w", err)
@@ -102,13 +106,20 @@ func maybeCreateHealingJobs(
 		return fmt.Errorf("marshal heal job meta: %w", err)
 	}
 
+	reGateName := fmt.Sprintf("re-gate-%d", chain.AttemptNumber)
+	reGateSBOMID := domaintypes.NewJobID()
+	hookIDs := make([]domaintypes.JobID, len(spec.Hooks))
+	for i := range hookIDs {
+		hookIDs[i] = domaintypes.NewJobID()
+	}
+
 	_, err = st.CreateJob(ctx, store.CreateJobParams{
 		ID:          chain.ReGateID,
 		RunID:       failedJob.RunID,
 		RepoID:      failedJob.RepoID,
 		RepoBaseRef: failedJob.RepoBaseRef,
 		Attempt:     failedJob.Attempt,
-		Name:        fmt.Sprintf("re-gate-%d", chain.AttemptNumber),
+		Name:        reGateName,
 		JobType:     domaintypes.JobTypeReGate,
 		JobImage:    "",
 		Status:      domaintypes.JobStatusCreated,
@@ -117,6 +128,48 @@ func maybeCreateHealingJobs(
 	})
 	if err != nil {
 		return fmt.Errorf("create re-gate job: %w", err)
+	}
+
+	for i := len(hookIDs) - 1; i >= 0; i-- {
+		nextID := chain.ReGateID
+		if i+1 < len(hookIDs) {
+			nextID = hookIDs[i+1]
+		}
+		_, err = st.CreateJob(ctx, store.CreateJobParams{
+			ID:          hookIDs[i],
+			RunID:       failedJob.RunID,
+			RepoID:      failedJob.RepoID,
+			RepoBaseRef: failedJob.RepoBaseRef,
+			Attempt:     failedJob.Attempt,
+			Name:        fmt.Sprintf("%s-hook-%03d", reGateName, i),
+			JobType:     domaintypes.JobTypeHook,
+			Status:      domaintypes.JobStatusCreated,
+			NextID:      &nextID,
+			Meta:        preludeMetaBytes,
+		})
+		if err != nil {
+			return fmt.Errorf("create re-gate hook job %d: %w", i, err)
+		}
+	}
+
+	sbomNextID := chain.ReGateID
+	if len(hookIDs) > 0 {
+		sbomNextID = hookIDs[0]
+	}
+	_, err = st.CreateJob(ctx, store.CreateJobParams{
+		ID:          reGateSBOMID,
+		RunID:       failedJob.RunID,
+		RepoID:      failedJob.RepoID,
+		RepoBaseRef: failedJob.RepoBaseRef,
+		Attempt:     failedJob.Attempt,
+		Name:        reGateName + "-sbom",
+		JobType:     domaintypes.JobTypeSBOM,
+		Status:      domaintypes.JobStatusCreated,
+		NextID:      &sbomNextID,
+		Meta:        preludeMetaBytes,
+	})
+	if err != nil {
+		return fmt.Errorf("create re-gate sbom job: %w", err)
 	}
 
 	_, err = st.CreateJob(ctx, store.CreateJobParams{
@@ -129,7 +182,7 @@ func maybeCreateHealingJobs(
 		JobType:     domaintypes.JobTypeHeal,
 		JobImage:    chain.HealImage,
 		Status:      domaintypes.JobStatusQueued,
-		NextID:      &chain.ReGateID,
+		NextID:      &reGateSBOMID,
 		Meta:        healMetaBytes,
 		RepoShaIn:   chain.HealRepoSHAIn,
 	})
