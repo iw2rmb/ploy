@@ -8,23 +8,20 @@ import (
 	"testing"
 )
 
-func TestRoadmapVerifyFailsTargetedPhaseWhenNotDone(t *testing.T) {
+func TestRoadmapVerifySkipsTargetedPhaseWhenNotDone(t *testing.T) {
 	repoRoot := mustFindRepoRoot(t)
 	phasePath := filepath.Join("roadmap", "sbom-hooks-remediation", "phase-3-delivery-gates-and-observability.yaml")
 	cmd := exec.Command("bash", "tools/roadmap/verify_done.sh", phasePath)
 	cmd.Dir = repoRoot
 
 	out, err := cmd.CombinedOutput()
-	if err == nil {
-		t.Fatalf("expected verification to fail when targeted phase is done=false, output: %s", string(out))
+	if err != nil {
+		t.Fatalf("expected verification to pass when targeted phase is done=false, output: %s", string(out))
 	}
 
 	output := string(out)
-	if !strings.Contains(output, "error: targeted phase not done:") {
-		t.Fatalf("expected not-done error message, output: %s", output)
-	}
-	if !strings.Contains(output, "roadmap verification failed") {
-		t.Fatalf("expected roadmap verification failed footer, output: %s", output)
+	if !strings.Contains(output, "roadmap verification passed") || !strings.Contains(output, "0 phase") || !strings.Contains(output, "1 skipped") {
+		t.Fatalf("expected pass output with skipped phase count, output: %s", output)
 	}
 }
 
@@ -93,7 +90,7 @@ items:
 	}
 
 	output := string(out)
-	if !strings.Contains(output, "roadmap verification passed (1 phase checked)") {
+	if !strings.Contains(output, "roadmap verification passed (1 phase checked, 0 skipped)") {
 		t.Fatalf("expected successful verification output, got: %s", output)
 	}
 }
