@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"os"
+	"path/filepath"
 	"testing"
 
 	bsmock "github.com/iw2rmb/ploy/internal/blobstore/mock"
@@ -151,12 +153,31 @@ func TestMaybeCreateHealingJobs_SecondAttemptUsesExistingHealJobs(t *testing.T) 
 func TestMaybeCreateHealingJobs_ReGateHooksScheduledOncePerCycle(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
+	hooksDir := t.TempDir()
+	directHook := filepath.Join(hooksDir, "direct.yaml")
+	nestedHookA := filepath.Join(hooksDir, "nested", "a", "hook.yaml")
+	nestedHookB := filepath.Join(hooksDir, "nested", "b", "hook.yaml")
+	for _, dir := range []string{filepath.Dir(directHook), filepath.Dir(nestedHookA), filepath.Dir(nestedHookB)} {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatalf("mkdir %s: %v", dir, err)
+		}
+	}
+	writeHook := func(path string, id string) {
+		t.Helper()
+		body := "id: " + id + "\nsteps:\n  - image: test:latest\n"
+		if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+			t.Fatalf("write hook %s: %v", path, err)
+		}
+	}
+	writeHook(directHook, "direct")
+	writeHook(nestedHookA, "nested-a")
+	writeHook(nestedHookB, "nested-b")
 
 	hc := newHealingChain(t,
 		withHealingSpec(func(t *testing.T) []byte {
 			t.Helper()
 			spec := map[string]any{
-				"hooks": []any{"./hooks/one.yaml", "./hooks/two.yaml"},
+				"hooks": []any{directHook, filepath.Join(hooksDir, "nested")},
 				"steps": []any{map[string]any{"image": "migs-orw:latest"}},
 				"build_gate": map[string]any{
 					"heal": map[string]any{
@@ -177,8 +198,8 @@ func TestMaybeCreateHealingJobs_ReGateHooksScheduledOncePerCycle(t *testing.T) {
 		t.Fatalf("maybeCreateHealingJobs returned error: %v", err)
 	}
 
-	if len(hc.Store.createJob.calls) != 5 {
-		t.Fatalf("expected 5 CreateJob calls (heal + sbom + 2 hooks + re-gate), got %d", len(hc.Store.createJob.calls))
+	if len(hc.Store.createJob.calls) != 6 {
+		t.Fatalf("expected 6 CreateJob calls (heal + sbom + 3 hooks + re-gate), got %d", len(hc.Store.createJob.calls))
 	}
 
 	byName := createJobsByName(hc.Store.createJob.calls)
@@ -186,6 +207,7 @@ func TestMaybeCreateHealingJobs_ReGateHooksScheduledOncePerCycle(t *testing.T) {
 	sbomJob := byName["re-gate-1-sbom"]
 	hook0 := byName["re-gate-1-hook-000"]
 	hook1 := byName["re-gate-1-hook-001"]
+	hook2 := byName["re-gate-1-hook-002"]
 	reGate := byName["re-gate-1"]
 
 	if healJob.NextID == nil || *healJob.NextID != sbomJob.ID {
@@ -197,12 +219,29 @@ func TestMaybeCreateHealingJobs_ReGateHooksScheduledOncePerCycle(t *testing.T) {
 	if hook0.NextID == nil || *hook0.NextID != hook1.ID {
 		t.Fatalf("expected hook-000 to point to hook-001")
 	}
-	if hook1.NextID == nil || *hook1.NextID != reGate.ID {
-		t.Fatalf("expected hook-001 to point to re-gate")
+	if hook1.NextID == nil || *hook1.NextID != hook2.ID {
+		t.Fatalf("expected hook-001 to point to hook-002")
+	}
+	if hook2.NextID == nil || *hook2.NextID != reGate.ID {
+		t.Fatalf("expected hook-002 to point to re-gate")
 	}
 	if reGate.NextID == nil || *reGate.NextID != hc.SuccessorID {
 		t.Fatalf("expected re-gate to preserve successor %s", hc.SuccessorID)
 	}
+
+	assertHookSource := func(job store.CreateJobParams, want string) {
+		t.Helper()
+		meta, err := contracts.UnmarshalJobMeta(job.Meta)
+		if err != nil {
+			t.Fatalf("unmarshal %s meta: %v", job.Name, err)
+		}
+		if got := meta.HookSource; got != want {
+			t.Fatalf("%s hook_source=%q, want %q", job.Name, got, want)
+		}
+	}
+	assertHookSource(hook0, directHook)
+	assertHookSource(hook1, nestedHookA)
+	assertHookSource(hook2, nestedHookB)
 }
 
 // TestMaybeCreateHealingJobs_CancelsRemaining covers cases where healing cannot proceed
