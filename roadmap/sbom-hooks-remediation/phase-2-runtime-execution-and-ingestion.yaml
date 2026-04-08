@@ -8,7 +8,7 @@ documentation:
   - "research/sbom-hooks-incident-2026-04-08.md"
   - "docs/build-gate/README.md"
   - "docs/schemas/mig.example.yaml"
-done: false
+done: true
 reviews:
   - gaps: ["`[replace] hook pass-through copy runtime -> hook step container execution with cycle-accurate sbom row ingestion` still has leftover dead planning code: `internal/server/handlers/migs_ticket.go:489` (`resolveCycleHookPlans`) and `internal/server/handlers/migs_ticket.go:522` (`buildCycleHookMatchInput`) are no longer wired from the active job-creation/runtime-hook flow.", "`A hook with false condition is absent from plan and has no execution record for that cycle.` is not fully enforced in node runtime: `internal/nodeagent/execution_orchestrator_jobs.go:262`-`internal/nodeagent/execution_orchestrator_jobs.go:294` still reports successful hook completion when `HookShouldRun=false`, leaving a leftover execution-record path for false-condition hooks if such a decision reaches execution."]
     commit: 28a60859
