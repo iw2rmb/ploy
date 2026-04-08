@@ -34,12 +34,18 @@ func TestRenderRunReportJSON(t *testing.T) {
 				PatchURL:  "https://example.test/patch",
 				Jobs: []RunJobEntry{
 					{
-						JobID:       jobID,
-						JobType:     "step",
-						JobImage:    "ghcr.io/acme/runner:1",
-						Status:      "Running",
-						DurationMs:  1234,
-						DisplayName: "step-1",
+						JobID:               jobID,
+						JobType:             "step",
+						JobImage:            "ghcr.io/acme/runner:1",
+						Status:              "Running",
+						DurationMs:          1234,
+						DisplayName:         "step-1",
+						HookPlanReason:      "hook planned",
+						HookConditionResult: "{\"evaluated\":true}",
+						SBOMEvidence: &RunJobSBOMEvidence{
+							ArtifactPresent:     boolPtr(true),
+							ParsedPackageCount: intPtr(42),
+						},
 						Artifacts: []RunJobArtifact{
 							{
 								Name:      "gate-report",
@@ -90,6 +96,22 @@ func TestRenderRunReportJSON(t *testing.T) {
 	if !ok || len(artifacts) != 1 {
 		t.Fatalf("expected one artifact in payload: %v", job0["artifacts"])
 	}
+	if got := job0["hook_plan_reason"]; got != "hook planned" {
+		t.Fatalf("unexpected hook_plan_reason: %#v", got)
+	}
+	if got := job0["hook_condition_result"]; got != "{\"evaluated\":true}" {
+		t.Fatalf("unexpected hook_condition_result: %#v", got)
+	}
+	sbomEvidence, ok := job0["sbom_evidence"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected sbom_evidence object in payload: %#v", job0["sbom_evidence"])
+	}
+	if got := sbomEvidence["artifact_present"]; got != true {
+		t.Fatalf("unexpected sbom_evidence.artifact_present: %#v", got)
+	}
+	if got := sbomEvidence["parsed_package_count"]; got != float64(42) {
+		t.Fatalf("unexpected sbom_evidence.parsed_package_count: %#v", got)
+	}
 }
 
 func TestRenderRunReportJSONOmitsEmptyOptionalFields(t *testing.T) {
@@ -118,11 +140,27 @@ func TestRenderRunReportJSONOmitsEmptyOptionalFields(t *testing.T) {
 	}
 
 	out := buf.String()
-	for _, field := range []string{"job_log_url", "patch_url", "last_error", "artifacts"} {
+	for _, field := range []string{
+		"job_log_url",
+		"patch_url",
+		"last_error",
+		"artifacts",
+		"hook_plan_reason",
+		"hook_condition_result",
+		"sbom_evidence",
+	} {
 		if strings.Contains(out, "\""+field+"\"") {
 			t.Fatalf("expected %q omitted for empty optional fields; got %q", field, out)
 		}
 	}
+}
+
+func boolPtr(v bool) *bool {
+	return &v
+}
+
+func intPtr(v int) *int {
+	return &v
 }
 
 func TestRenderRunReportJSONRequiresWriter(t *testing.T) {

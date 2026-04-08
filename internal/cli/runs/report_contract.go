@@ -34,27 +34,33 @@ type RunEntry struct {
 
 // RunJobEntry is one row in the follow-style job graph.
 type RunJobEntry struct {
-	JobID         domaintypes.JobID     `json:"job_id"`
-	JobType       domaintypes.JobType   `json:"job_type"`
-	JobImage      string                `json:"job_image"`
-	NodeID        *domaintypes.NodeID   `json:"node_id,omitempty"`
-	Status        domaintypes.JobStatus `json:"status"`
-	ExitCode      *int32                `json:"exit_code,omitempty"`
-	StartedAt     *time.Time            `json:"started_at,omitempty"`
-	FinishedAt    *time.Time            `json:"finished_at,omitempty"`
-	DurationMs    int64                 `json:"duration_ms"`
-	DisplayName   string                `json:"display_name,omitempty"`
-	ActionSummary string                `json:"action_summary,omitempty"`
-	BugSummary    string                `json:"bug_summary,omitempty"`
-	ErrorKind     string                `json:"error_kind,omitempty"`
-	Recovery      *RunJobRecovery       `json:"recovery,omitempty"`
-	Artifacts     []RunJobArtifact      `json:"artifacts,omitempty"`
-	JobLogURL     string                `json:"job_log_url,omitempty"`
-	PatchURL      string                `json:"patch_url,omitempty"`
+	JobID               domaintypes.JobID     `json:"job_id"`
+	JobType             domaintypes.JobType   `json:"job_type"`
+	JobImage            string                `json:"job_image"`
+	NodeID              *domaintypes.NodeID   `json:"node_id,omitempty"`
+	Status              domaintypes.JobStatus `json:"status"`
+	ExitCode            *int32                `json:"exit_code,omitempty"`
+	StartedAt           *time.Time            `json:"started_at,omitempty"`
+	FinishedAt          *time.Time            `json:"finished_at,omitempty"`
+	DurationMs          int64                 `json:"duration_ms"`
+	DisplayName         string                `json:"display_name,omitempty"`
+	ActionSummary       string                `json:"action_summary,omitempty"`
+	BugSummary          string                `json:"bug_summary,omitempty"`
+	ErrorKind           string                `json:"error_kind,omitempty"`
+	Recovery            *RunJobRecovery       `json:"recovery,omitempty"`
+	HookConditionResult string                `json:"hook_condition_result,omitempty"`
+	HookPlanReason      string                `json:"hook_plan_reason,omitempty"`
+	SBOMEvidence        *RunJobSBOMEvidence   `json:"sbom_evidence,omitempty"`
+	Artifacts           []RunJobArtifact      `json:"artifacts,omitempty"`
+	JobLogURL           string                `json:"job_log_url,omitempty"`
+	PatchURL            string                `json:"patch_url,omitempty"`
 }
 
 // RunJobRecovery projects recovery classifier fields surfaced by repo job APIs.
 type RunJobRecovery = migsapi.RunRepoJobRecovery
+
+// RunJobSBOMEvidence projects sbom artifact/parse evidence surfaced by repo job APIs.
+type RunJobSBOMEvidence = migsapi.RunRepoJobSBOMEvidence
 
 // RunJobArtifact is the per-job artifact view emitted by run status JSON.
 // It includes the CID plus a lookup URL that resolves artifact bundle metadata.
