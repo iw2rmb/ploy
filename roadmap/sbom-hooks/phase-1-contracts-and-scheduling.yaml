@@ -118,3 +118,4 @@ items:
       - "Completion handling preserves existing gate outcome behavior while accepting sbom and hook completion updates."
     reasoning: "high"
     cfp: 8
+    commit: 3f12a7b5
