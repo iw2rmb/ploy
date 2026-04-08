@@ -12,7 +12,7 @@ items:
   - done: false
     reviews:
       - gaps: ["\"Confirm image docs reference exact image names ploy/sbom-gradle and ploy/sbom-maven.\" is not met: documentation references `ghcr.io/iw2rmb/ploy/sbom-gradle:<tag>` / `ghcr.io/iw2rmb/ploy/sbom-maven:<tag>` or short names, but not the exact names `ploy/sbom-gradle` and `ploy/sbom-maven` (images/sbom/gradle/README.md, images/sbom/maven/README.md, images/README.md, docs/how-to/publish-migs.md)."]
-        commit: null
+        commit: 627127eb
     label: "1"
     summary: "Add buildable and publishable sbom-gradle and sbom-maven images and include them in image release pipeline."
     classification: "determined"
