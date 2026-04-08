@@ -69,12 +69,33 @@ func latestSuccessfulSBOMJob(jobs []store.Job) (store.Job, bool) {
 		if !isSBOMJobType(job.JobType) || job.Status != domaintypes.JobStatusSuccess {
 			continue
 		}
-		if !found || job.ID.String() > latest.ID.String() {
+		if !found || sbomJobIsMoreRecent(job, latest) {
 			latest = job
 			found = true
 		}
 	}
 	return latest, found
+}
+
+func sbomJobIsMoreRecent(candidate, current store.Job) bool {
+	// Prefer explicit completion recency for successful jobs.
+	if candidate.FinishedAt.Valid != current.FinishedAt.Valid {
+		return candidate.FinishedAt.Valid
+	}
+	if candidate.FinishedAt.Valid && !candidate.FinishedAt.Time.Equal(current.FinishedAt.Time) {
+		return candidate.FinishedAt.Time.After(current.FinishedAt.Time)
+	}
+
+	// Fall back to start time when finished_at is unavailable.
+	if candidate.StartedAt.Valid != current.StartedAt.Valid {
+		return candidate.StartedAt.Valid
+	}
+	if candidate.StartedAt.Valid && !candidate.StartedAt.Time.Equal(current.StartedAt.Time) {
+		return candidate.StartedAt.Time.After(current.StartedAt.Time)
+	}
+
+	// Deterministic tie-break when timestamps are equal.
+	return candidate.ID.String() > current.ID.String()
 }
 
 func isSBOMJobType(jobType domaintypes.JobType) bool {
