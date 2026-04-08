@@ -440,7 +440,7 @@ A common use case is dedicated OpenRewrite images for Maven and Gradle:
 image:
   java-maven: ghcr.io/iw2rmb/ploy/orw-cli-maven:latest
   java-gradle: ghcr.io/iw2rmb/ploy/orw-cli-gradle:latest
-env:
+envs:
   RECIPE_CLASSNAME: org.openrewrite.java.migrate.UpgradeToJava17
 ```
 
@@ -459,14 +459,14 @@ When the same spec runs against a Gradle project (`build.gradle` present):
 When OpenRewrite recipes require parameters, you can generate a `rewrite.yml`
 config as a code change, then let the stack-aware ORW Migs apply it.
 
-1. **Generate rewrite.yml with mig-shell** (scripts live in the repo):
+1. **Generate rewrite.yml with a script-runner image** (scripts live in the repo):
 
 ```yaml
 migs:
   - name: generate-rewrite-config
-    image: ghcr.io/iw2rmb/ploy/shell:latest
-    env:
-      MIG_SHELL_SCRIPT: ./generate-rewrite.sh
+    image: ghcr.io/your-org/migs-script-runner:latest
+    envs:
+      RUN_SCRIPT: ./generate-rewrite.sh
 ```
 
 `./generate-rewrite.sh` runs inside `/workspace` and writes a complete
@@ -485,14 +485,14 @@ recipeList:
 ```yaml
 migs:
   - name: generate-rewrite-config
-    image: ghcr.io/iw2rmb/ploy/shell:latest
-    env:
-      MIG_SHELL_SCRIPT: ./generate-rewrite.sh
+    image: ghcr.io/your-org/migs-script-runner:latest
+    envs:
+      RUN_SCRIPT: ./generate-rewrite.sh
   - name: apply-openrewrite
     image:
       java-maven: ghcr.io/iw2rmb/ploy/orw-cli-maven:latest
       java-gradle: ghcr.io/iw2rmb/ploy/orw-cli-gradle:latest
-    env:
+    envs:
       RECIPE_GROUP: org.openrewrite.recipe
       RECIPE_ARTIFACT: rewrite-migrate-java
       RECIPE_VERSION: 3.20.0

@@ -24,7 +24,7 @@
   - Optional: `migs-llm`, `migs-plan` as needed.
 - Push to local registry using the helper script:
   - `IMAGE_PREFIX=localhost:5000/ploy VERSION=v0.1.0 images/build-and-push.sh`
-  - The script pushes `amata`, `shell`, `orw-cli-maven`, `orw-cli-gradle`, plus `server` and `node`.
+  - The script pushes `amata`, `orw-cli-maven`, `orw-cli-gradle`, plus `server` and `node`.
   - Images publish as `$IMAGE_PREFIX/<name>:<tag>`.
 
 Notes:

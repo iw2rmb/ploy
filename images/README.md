@@ -5,7 +5,6 @@ This directory contains example Migs images (container build contexts). Ploy doe
 Image Catalog (selected)
 
 - `amata` (`images/amata`) - Amata-based migration runner image.
-- `shell` (`images/shell`) - generic shell-based migration runner.
 - `orw-cli-maven` (`images/orw/orw-cli-maven`) - OpenRewrite Maven lane runtime.
 - `orw-cli-gradle` (`images/orw/orw-cli-gradle`) - OpenRewrite Gradle lane runtime.
 - `ploy/sbom-maven` (`images/sbom/maven`) - Maven SBOM collection runtime.
