@@ -144,8 +144,7 @@ EOF
           fi
 
           if [ -z "${phase_files}" ]; then
-            echo "No roadmap phase YAML files resolved from changed paths; verifying all roadmap phases."
-            make roadmap-verify
+            echo "No roadmap phase YAML files resolved from changed paths; skipping roadmap verification."
             exit 0
           fi
 

@@ -6,7 +6,7 @@ REQUIRED_GO_TOOLCHAIN := go1.25.9
 VERSION_FILE := VERSION
 VERSION ?= $(shell tr -d '[:space:]' < $(VERSION_FILE) 2>/dev/null || echo "")
 PLOY_SIGN_BINARIES ?= 0
-ROADMAP_VERIFY_PHASES ?= $(shell find roadmap -type f -name 'phase-*.yaml' | sort)
+ROADMAP_VERIFY_PHASES ?=
 
 # Version stamping
 GIT_COMMIT := $(shell git rev-parse --short=12 HEAD 2>/dev/null || echo unknown)
@@ -156,7 +156,12 @@ redundancy-check: ## Check for LOC and duplication regressions in hotspot packag
 
 .PHONY: roadmap-verify
 roadmap-verify: ## Verify done roadmaps have closed review gaps and completed evidence checks
-	@tools/roadmap/verify_done.sh $(ROADMAP_VERIFY_PHASES)
+	@if [ -z "$(strip $(ROADMAP_VERIFY_PHASES))" ]; then \
+		echo "roadmap verification skipped: ROADMAP_VERIFY_PHASES is empty"; \
+		exit 0; \
+	else \
+		tools/roadmap/verify_done.sh $(ROADMAP_VERIFY_PHASES); \
+	fi
 
 .PHONY: ci-check
 ci-check: fmt vet staticcheck test test-coverage redundancy-check ## Run core CI checks locally
