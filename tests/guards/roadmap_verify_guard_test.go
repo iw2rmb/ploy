@@ -27,7 +27,7 @@ func TestRoadmapVerifySkipsTargetedPhaseWhenNotDone(t *testing.T) {
 	}
 }
 
-func TestRoadmapVerifyWarnsUncheckedEvidenceForDonePhases(t *testing.T) {
+func TestRoadmapVerifyFailsUncheckedEvidenceForDonePhases(t *testing.T) {
 	repoRoot := mustFindRepoRoot(t)
 	phases := []string{
 		filepath.Join("roadmap", "sbom-hooks-remediation", "phase-1-conditional-planning-and-preflight.yaml"),
@@ -40,12 +40,15 @@ func TestRoadmapVerifyWarnsUncheckedEvidenceForDonePhases(t *testing.T) {
 	cmd.Dir = repoRoot
 
 	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("expected verification to pass when evidence markers are unchecked, output: %s", string(out))
+	if err == nil {
+		t.Fatalf("expected verification to fail when evidence markers are unchecked, output: %s", string(out))
 	}
 
 	output := string(out)
-	if !strings.Contains(output, "warning: evidence marker") || !strings.Contains(output, "is present but unchecked") {
-		t.Fatalf("expected unchecked evidence marker warning, output: %s", output)
+	if !strings.Contains(output, "error: evidence marker") || !strings.Contains(output, "is present but unchecked") {
+		t.Fatalf("expected unchecked evidence marker failure, output: %s", output)
+	}
+	if !strings.Contains(output, "roadmap verification failed") {
+		t.Fatalf("expected roadmap verification failed footer, output: %s", output)
 	}
 }
