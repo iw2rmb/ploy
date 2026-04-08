@@ -12,6 +12,8 @@ reviews:
     commit: 89f3b2a2
   - gaps: ["\"documentation: \\\"docs/build-gate/README.md\\\"\" is not aligned with implemented sbom/hook scheduling: the doc still describes only gate jobs and pre-gate → mig → post-gate flow (`docs/build-gate/README.md:15`, `docs/build-gate/README.md:20`, `docs/build-gate/README.md:54`).", "\"documentation: \\\"docs/api/OpenAPI.yaml\\\"\" is not aligned with implemented job families: OpenAPI schemas/descriptions still omit `sbom` and `hook` from job phase contracts (`docs/api/components/schemas/controlplane.yaml:620`, `docs/api/components/schemas/controlplane.yaml:946`, `docs/api/paths/jobs_job_id_logs.yaml:70`)."]
     commit: 1771adda
+  - gaps: ["\"documentation: \\\"docs/api/OpenAPI.yaml\\\"\" is not fully aligned with implemented job families: `RepoJobItem.job_type` still omits `sbom` and `hook` in the documented phase list (`docs/api/components/schemas/controlplane.yaml:1119`)."]
+    commit: null
 items:
   - done: true
     reviews: []
