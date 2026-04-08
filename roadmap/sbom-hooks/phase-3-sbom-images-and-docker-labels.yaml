@@ -80,3 +80,4 @@ items:
       - "Confirm added labels do not change runtime entrypoints or build contexts."
     reasoning: "medium"
     cfp: 7
+    commit: 04ed9b2a
