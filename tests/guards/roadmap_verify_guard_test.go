@@ -15,13 +15,52 @@ func TestRoadmapVerifyFailsTargetedPhaseWhenNotDone(t *testing.T) {
 	cmd.Dir = repoRoot
 
 	out, err := cmd.CombinedOutput()
-	if err == nil {
-		t.Fatalf("expected verification to fail when targeted phase is done=false, output: %s", string(out))
+	if err != nil {
+		t.Fatalf("expected verification to skip done=false phase with unchecked evidence, output: %s", string(out))
 	}
 
 	output := string(out)
-	if !strings.Contains(output, "error: targeted phase not done") || !strings.Contains(output, phasePath) {
-		t.Fatalf("expected targeted not-done error output, output: %s", output)
+	if !strings.Contains(output, "roadmap verification passed (0 phases checked, 1 skipped)") {
+		t.Fatalf("expected successful skip output for done=false targeted phase, output: %s", output)
+	}
+}
+
+func TestRoadmapVerifyFailsWhenNotDonePhaseHasCheckedEvidence(t *testing.T) {
+	tmp := t.TempDir()
+	phasePath := filepath.Join(tmp, "phase-1-sample.yaml")
+	indexPath := filepath.Join(tmp, "index.md")
+
+	phase := strings.TrimSpace(`
+title: "Sample"
+done: false
+reviews: []
+items:
+  - done: false
+    label: "1"
+    summary: "item"
+`) + "\n"
+
+	index := "- [x] `phase-1-sample.yaml` <!-- evidence:phase-1-sample -->\n"
+
+	if err := os.WriteFile(phasePath, []byte(phase), 0o644); err != nil {
+		t.Fatalf("write phase: %v", err)
+	}
+	if err := os.WriteFile(indexPath, []byte(index), 0o644); err != nil {
+		t.Fatalf("write index: %v", err)
+	}
+
+	repoRoot := mustFindRepoRoot(t)
+	cmd := exec.Command("bash", "tools/roadmap/verify_done.sh", phasePath)
+	cmd.Dir = repoRoot
+
+	out, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatalf("expected verification to fail when evidence is checked before done=true, output: %s", string(out))
+	}
+
+	output := string(out)
+	if !strings.Contains(output, "is checked but phase is not done") {
+		t.Fatalf("expected checked-evidence-before-done error output, output: %s", output)
 	}
 }
 
