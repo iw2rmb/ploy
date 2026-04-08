@@ -96,9 +96,6 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 	case types.JobTypeHeal:
 		req.JobType = jobType
 		r.executeHealingJob(ctx, req)
-	case types.JobTypeMR:
-		req.JobType = jobType
-		r.executeMRJob(ctx, req)
 	default:
 		err := fmt.Errorf("invalid job_type %q", jobType)
 		slog.Error("cannot execute job with invalid type", "run_id", req.RunID, "job_id", req.JobID, "job_type", jobType, "error", err)

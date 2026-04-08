@@ -18,6 +18,7 @@ import (
 // RunController manages run lifecycle on the node.
 type RunController interface {
 	StartRun(ctx context.Context, req StartRunRequest) error
+	StartAction(ctx context.Context, req StartActionRequest) error
 	StopRun(ctx context.Context, req StopRunRequest) error
 
 	// AcquireSlot blocks until a concurrency slot is available or the context

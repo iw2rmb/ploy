@@ -68,6 +68,20 @@ type StartRunRequest struct {
 	Env          map[string]string `json:"env"` // Environment variables merged from spec
 }
 
+// StartActionRequest describes an action execution request from the server claim API.
+// Actions are terminal follow-up tasks and are not part of the jobs chain.
+type StartActionRequest struct {
+	ActionID    types.JobID     `json:"action_id,omitempty"`
+	ActionType  string          `json:"action_type,omitempty"`
+	RunID       types.RunID     `json:"run_id,omitempty"`
+	RepoID      types.MigRepoID `json:"repo_id,omitempty"`
+	RepoURL     types.RepoURL   `json:"repo_url,omitempty"`
+	BaseRef     types.GitRef    `json:"base_ref,omitempty"`
+	TargetRef   types.GitRef    `json:"target_ref,omitempty"`
+	TypedOptions RunOptions     `json:"-"`
+	Env         map[string]string `json:"env"`
+}
+
 // StartRunResponse is returned when a run is accepted.
 type StartRunResponse struct {
 	RunID  types.RunID `json:"run_id"`

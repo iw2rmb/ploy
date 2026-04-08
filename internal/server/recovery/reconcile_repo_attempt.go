@@ -26,11 +26,6 @@ func EvaluateRepoAttemptTerminalStatus(jobs []store.Job) (RepoAttemptReconcileEv
 	for i := range jobs {
 		job := &jobs[i]
 
-		mt := domaintypes.JobType(job.JobType)
-		if mt.Validate() == nil && mt == domaintypes.JobTypeMR {
-			continue
-		}
-
 		switch job.Status {
 		case domaintypes.JobStatusSuccess, domaintypes.JobStatusFail, domaintypes.JobStatusError, domaintypes.JobStatusCancelled:
 		default:

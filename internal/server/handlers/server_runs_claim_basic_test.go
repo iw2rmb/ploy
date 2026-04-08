@@ -70,35 +70,6 @@ func TestClaimJob_HappyPath(t *testing.T) {
 			},
 		},
 		{
-			name: "MR job does not update run repo status",
-			opts: claimJobFixtureOptions{
-				jobType:       domaintypes.JobTypeMR,
-				jobName:       "mr-0",
-				runStatus:     domaintypes.RunStatusFinished,
-				runRepoStatus: domaintypes.RunRepoStatusSuccess,
-			},
-			assert: func(t *testing.T, rr *httptest.ResponseRecorder, f *claimJobFixture) {
-				t.Helper()
-				if len(f.store.updateRunRepoStatus.calls) != 0 {
-					t.Fatalf("expected UpdateRunRepoStatus not to be called for MR jobs")
-				}
-
-				resp := decodeBody[map[string]any](t, rr)
-				if resp["status"] != "Finished" {
-					t.Fatalf("expected status Finished, got %v", resp["status"])
-				}
-				if resp["repo_url"] != "https://github.com/user/repo.git" {
-					t.Fatalf("expected repo_url, got %v", resp["repo_url"])
-				}
-				if resp["base_ref"] != "main" {
-					t.Fatalf("expected base_ref main, got %v", resp["base_ref"])
-				}
-				if resp["target_ref"] != "feature-branch" {
-					t.Fatalf("expected target_ref feature-branch, got %v", resp["target_ref"])
-				}
-			},
-		},
-		{
 			name: "response includes next_id",
 			opts: claimJobFixtureOptions{},
 			assert: func(t *testing.T, rr *httptest.ResponseRecorder, f *claimJobFixture) {

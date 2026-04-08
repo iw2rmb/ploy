@@ -15,6 +15,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/cli/httpx"
@@ -158,6 +159,36 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 	var claim ClaimResponse
 	if err := json.NewDecoder(resp.Body).Decode(&claim); err != nil {
 		return false, fmt.Errorf("decode claim response: %w", err)
+	}
+
+	workType := claim.WorkType
+	if workType == "" {
+		workType = "job"
+	}
+	if workType == "action" {
+		if claim.ActionID == nil || strings.TrimSpace(claim.ActionType) == "" {
+			return true, fmt.Errorf("invalid action claim payload")
+		}
+		envFromSpec, typedOpts, parseErr := parseSpec(claim.Spec)
+		if parseErr != nil {
+			return true, fmt.Errorf("parse action spec: %w", parseErr)
+		}
+		actionReq := StartActionRequest{
+			ActionID:    *claim.ActionID,
+			ActionType:  strings.TrimSpace(claim.ActionType),
+			RunID:       claim.RunID,
+			RepoID:      claim.RepoID,
+			RepoURL:     claim.RepoURL,
+			BaseRef:     claim.BaseRef,
+			TargetRef:   claim.TargetRef,
+			TypedOptions: typedOpts,
+			Env:         envFromSpec,
+		}
+		if err := c.controller.StartAction(ctx, actionReq); err != nil {
+			return true, fmt.Errorf("start action: %w", err)
+		}
+		slotHeld = false
+		return true, nil
 	}
 
 	slog.Info("claimed job", "run_id", claim.RunID, "job_id", claim.JobID, "job_name", claim.JobName, "repo_url", claim.RepoURL)

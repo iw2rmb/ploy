@@ -291,7 +291,7 @@ func (r *runController) executeHookJob(ctx context.Context, req StartRunRequest)
 		manifest, manifestErr := buildManifestFromRequest(req, hookStepRunOptions(runtimeStep, req.TypedOptions.BundleMap), 0, contracts.MigStackUnknown)
 		if manifestErr != nil {
 			err = fmt.Errorf("hook[%d] step[%d] build runtime manifest: %w", hookIndex, stepIdx, manifestErr)
-			slog.Error("failed to execute hook job", "run_id", req.RunID, "job_id", req.JobID, "hook_index", hookIndex, "step_index", stepIdx, "error", err)
+			slog.Error("failed to execute hook job", "run_id", req.RunID, "job_id", req.JobID, "hook_index", hookIndex, "step_idx", stepIdx, "error", err)
 			r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
 			return
 		}
@@ -323,7 +323,7 @@ func (r *runController) executeHookJob(ctx context.Context, req StartRunRequest)
 		outcome, execErr := r.executeStandardJobWithOutcome(ctx, req, cfg)
 		if execErr != nil {
 			err = fmt.Errorf("hook[%d] step[%d] execute runtime step: %w", hookIndex, stepIdx, execErr)
-			slog.Error("failed to execute hook job", "run_id", req.RunID, "job_id", req.JobID, "hook_index", hookIndex, "step_index", stepIdx, "error", err)
+			slog.Error("failed to execute hook job", "run_id", req.RunID, "job_id", req.JobID, "hook_index", hookIndex, "step_idx", stepIdx, "error", err)
 			r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
 			return
 		}

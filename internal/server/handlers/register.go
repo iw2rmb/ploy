@@ -100,6 +100,8 @@ func RegisterRoutes(s *server.HTTPServer, st store.Store, bs blobstore.Store, bp
 	s.RegisterRouteFunc("GET /v1/runs/{run_id}/repos/{repo_id}/jobs", listRunRepoJobsHandler(st), auth.RoleControlPlane)
 	// Repo-scoped cancel (replacement for DELETE /v1/runs/{id}/repos/{repo_id}).
 	s.RegisterRouteFunc("POST /v1/runs/{run_id}/repos/{repo_id}/cancel", cancelRunRepoHandlerV1(st), auth.RoleControlPlane)
+	// Manual MR-create action enqueue (idempotent per run/repo/attempt).
+	s.RegisterRouteFunc("POST /v1/runs/{run_id}/repos/{repo_id}/mr", createRunRepoMRActionHandler(st), auth.RoleControlPlane)
 	// Pull resolution for run repos.
 	s.RegisterRouteFunc("POST /v1/runs/{run_id}/pull", pullRunRepoHandler(st), auth.RoleControlPlane)
 
@@ -149,6 +151,8 @@ func RegisterRoutes(s *server.HTTPServer, st store.Store, bs blobstore.Store, bp
 	// Job-level completion endpoint — simplifies node → server contract by addressing jobs directly.
 	// Node identity is derived from mTLS certificate; no node_id in URL or body.
 	s.RegisterRouteFunc("POST /v1/jobs/{job_id}/complete", completeJobHandler(st, eventsService, bp, bs), auth.RoleWorker)
+	// Action-level completion endpoint for worker-executed repo actions (e.g. MR create).
+	s.RegisterRouteFunc("POST /v1/actions/{action_id}/complete", completeActionHandler(st), auth.RoleWorker)
 	// Job-level status polling endpoint — allows workers to stop local execution
 	// when control plane transitions a running job to Cancelled.
 	s.RegisterRouteFunc("GET /v1/jobs/{job_id}/status", getJobStatusHandler(st), auth.RoleWorker)

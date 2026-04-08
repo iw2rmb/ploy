@@ -115,6 +115,30 @@ func (r *runController) StartRun(ctx context.Context, req StartRunRequest) error
 	return nil
 }
 
+// StartAction accepts an action start request and initiates execution.
+func (r *runController) StartAction(ctx context.Context, req StartActionRequest) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if _, exists := r.jobs[req.ActionID]; exists {
+		return fmt.Errorf("action %s already exists", req.ActionID)
+	}
+
+	actionCtx, cancel := context.WithCancel(ctx)
+	r.jobs[req.ActionID] = &jobContext{
+		runID:  req.RunID,
+		jobID:  req.ActionID,
+		cancel: cancel,
+	}
+
+	go func() {
+		defer cancel()
+		r.executeAction(actionCtx, req)
+	}()
+
+	return nil
+}
+
 // StopRun cancels all jobs associated with a run_id.
 func (r *runController) StopRun(_ context.Context, req StopRunRequest) error {
 	r.mu.Lock()

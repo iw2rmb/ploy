@@ -11,10 +11,13 @@ type mockRunController struct {
 	mu sync.Mutex
 
 	startCalled  bool
+	startActionCalled bool
 	stopCalled   bool
 	startErr     error
+	startActionErr error
 	stopErr      error
 	lastStart    StartRunRequest
+	lastStartAction StartActionRequest
 	lastStop     StopRunRequest
 	acquireCalls int
 	releaseCalls int
@@ -30,6 +33,14 @@ func (m *mockRunController) StartRun(ctx context.Context, req StartRunRequest) e
 	m.startCalled = true
 	m.lastStart = req
 	return m.startErr
+}
+
+func (m *mockRunController) StartAction(ctx context.Context, req StartActionRequest) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.startActionCalled = true
+	m.lastStartAction = req
+	return m.startActionErr
 }
 
 func (m *mockRunController) StopRun(ctx context.Context, req StopRunRequest) error {
@@ -87,6 +98,10 @@ func (m *mockRunController) ReleaseCalls() int {
 type mockController struct{}
 
 func (m *mockController) StartRun(ctx context.Context, req StartRunRequest) error {
+	return nil
+}
+
+func (m *mockController) StartAction(ctx context.Context, req StartActionRequest) error {
 	return nil
 }
 

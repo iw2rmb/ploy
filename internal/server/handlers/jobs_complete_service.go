@@ -170,7 +170,6 @@ func (s *CompleteJobService) Complete(ctx context.Context, input CompleteJobInpu
 	s.onCancelled(ctx, state)
 	s.onSuccess(ctx, state)
 	s.reconcileRepoRun(ctx, state)
-	s.mergeMRURL(ctx, state)
 
 	return CompleteJobResult{}, nil
 }

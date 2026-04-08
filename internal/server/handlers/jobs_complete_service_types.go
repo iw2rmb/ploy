@@ -39,7 +39,6 @@ const (
 	completeJobServiceTypeStep completeJobServiceType = "step"
 	completeJobServiceTypeSBOM completeJobServiceType = "sbom"
 	completeJobServiceTypeHook completeJobServiceType = "hook"
-	completeJobServiceTypeMR   completeJobServiceType = "mr"
 )
 
 func routeCompleteJobServiceType(jobType domaintypes.JobType) (completeJobServiceType, bool) {
@@ -52,8 +51,6 @@ func routeCompleteJobServiceType(jobType domaintypes.JobType) (completeJobServic
 		return completeJobServiceTypeSBOM, true
 	case domaintypes.JobTypeHook:
 		return completeJobServiceTypeHook, true
-	case domaintypes.JobTypeMR:
-		return completeJobServiceTypeMR, true
 	default:
 		return "", false
 	}

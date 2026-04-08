@@ -30,15 +30,14 @@ type Querier interface {
 	// Atomically claim the next claimable job for a node (unified queue).
 	// v1:
 	// - claimable jobs have status='Queued'
-	// - normal jobs are claimable only when runs.status='Started'
-	// - MR jobs (job_type='mr') are claimable only when runs.status='Finished'
+	// - jobs are claimable only when runs.status='Started'
 	// - nodeID must be non-empty
 	ClaimJob(ctx context.Context, nodeID types.NodeID) (Job, error)
+	ClaimRunRepoAction(ctx context.Context, nodeID types.NodeID) (RunRepoAction, error)
 	CountJobsByRun(ctx context.Context, runID types.RunID) (int64, error)
 	CountJobsByRunAndStatus(ctx context.Context, arg CountJobsByRunAndStatusParams) (int64, error)
-	// Counts jobs by status for a specific repo attempt, excluding MR jobs.
+	// Counts jobs by status for a specific repo attempt.
 	// Used by repo-scoped terminal detection to determine run_repos.status.
-	// MR jobs (job_type='mr') are auxiliary and must not affect run_repos.status derivation.
 	CountJobsByRunRepoAttemptGroupByStatus(ctx context.Context, arg CountJobsByRunRepoAttemptGroupByStatusParams) ([]CountJobsByRunRepoAttemptGroupByStatusRow, error)
 	// Counts jobs with optional run_id filter.
 	// run_id: if non-null, count jobs for that run; if null, count all jobs.
@@ -70,6 +69,7 @@ type Querier interface {
 	// v1: Creates a new run_repos row scoped to (run_id, repo_id).
 	// Note: attempt defaults to 1; status defaults to 'Queued'.
 	CreateRunRepo(ctx context.Context, arg CreateRunRepoParams) (RunRepo, error)
+	CreateRunRepoAction(ctx context.Context, arg CreateRunRepoActionParams) (RunRepoAction, error)
 	CreateSpec(ctx context.Context, arg CreateSpecParams) (Spec, error)
 	// Creates a new spec bundle metadata row. Blob data is stored in object storage.
 	CreateSpecBundle(ctx context.Context, arg CreateSpecBundleParams) (SpecBundle, error)
@@ -150,6 +150,8 @@ type Querier interface {
 	GetRepo(ctx context.Context, id types.RepoID) (Repo, error)
 	GetRun(ctx context.Context, id types.RunID) (Run, error)
 	GetRunRepo(ctx context.Context, arg GetRunRepoParams) (RunRepo, error)
+	GetRunRepoAction(ctx context.Context, id types.JobID) (RunRepoAction, error)
+	GetRunRepoActionByKey(ctx context.Context, arg GetRunRepoActionByKeyParams) (RunRepoAction, error)
 	GetRunTiming(ctx context.Context, id types.RunID) (RunsTiming, error)
 	GetSpec(ctx context.Context, id types.SpecID) (Spec, error)
 	// Returns spec bundle metadata including object_key for object-storage retrieval.
@@ -248,6 +250,7 @@ type Querier interface {
 	ListNodeMetricsPartitions(ctx context.Context) ([]string, error)
 	ListNodes(ctx context.Context) ([]Node, error)
 	ListQueuedRunReposByRun(ctx context.Context, runID types.RunID) ([]RunRepo, error)
+	ListRunRepoActionsByRunRepoAttempt(ctx context.Context, arg ListRunRepoActionsByRunRepoAttemptParams) ([]RunRepoAction, error)
 	// Lists all repos associated with a run, ordered by creation time.
 	ListRunReposByRun(ctx context.Context, runID types.RunID) ([]RunRepo, error)
 	// Lists all run_repos for a run with their repo_url (from repos).
@@ -314,6 +317,7 @@ type Querier interface {
 	UpdateNodeDrained(ctx context.Context, arg UpdateNodeDrainedParams) error
 	UpdateNodeHeartbeat(ctx context.Context, arg UpdateNodeHeartbeatParams) error
 	UpdateRunCompletion(ctx context.Context, arg UpdateRunCompletionParams) error
+	UpdateRunRepoActionCompletion(ctx context.Context, arg UpdateRunRepoActionCompletionParams) error
 	UpdateRunRepoError(ctx context.Context, arg UpdateRunRepoErrorParams) error
 	// Updates snapshot refs for the run repo (used when restarting with new refs).
 	UpdateRunRepoRefs(ctx context.Context, arg UpdateRunRepoRefsParams) error

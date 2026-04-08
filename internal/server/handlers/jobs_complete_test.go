@@ -7,7 +7,6 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/server/auth"
 )
 
@@ -114,38 +113,6 @@ func TestCompleteJob_WithJobResources_PersistsJobMetrics(t *testing.T) {
 	}
 	if st.upsertJobMetric.params.MemConsumedBytes != 128*1024*1024 {
 		t.Fatalf("mem_consumed_bytes = %d, want %d", st.upsertJobMetric.params.MemConsumedBytes, int64(128*1024*1024))
-	}
-}
-
-// TestCompleteJob_MRJobUpdatesRunStatsMRURL verifies that when an MR job
-// completes with stats.metadata.mr_url, the handler merges that URL into
-// runs.stats via UpdateRunStatsMRURL.
-func TestCompleteJob_MRJobUpdatesRunStatsMRURL(t *testing.T) {
-	t.Parallel()
-
-	f := newJobFixture("mr")
-	mrURL := "https://gitlab.com/org/repo/-/merge_requests/42"
-
-	st := newJobStoreForFixture(f, withRunStatus(domaintypes.RunStatusFinished))
-
-	handler := completeJobHandler(st, nil, nil)
-	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
-		"status":    "Success",
-		"exit_code": 0,
-		"stats": map[string]any{
-			"duration_ms": 500,
-			"metadata":    map[string]any{"mr_url": mrURL},
-		},
-	}))
-
-	assertStatus(t, rr, http.StatusNoContent)
-	assertCalled(t, "UpdateRunStatsMRURL", st.updateRunStatsMRURL.called)
-	if st.updateRunStatsMRURL.params.ID != f.RunID {
-		t.Fatalf("expected UpdateRunStatsMRURL run_id %s, got %s", f.RunID, st.updateRunStatsMRURL.params.ID)
-	}
-	if st.updateRunStatsMRURL.params.MrUrl != mrURL {
-		t.Fatalf("expected UpdateRunStatsMRURL mr_url %q, got %q", mrURL, st.updateRunStatsMRURL.params.MrUrl)
 	}
 }
 

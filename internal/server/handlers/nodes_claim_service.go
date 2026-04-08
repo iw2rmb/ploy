@@ -116,8 +116,45 @@ func (s *ClaimService) Claim(ctx context.Context, nodeID domaintypes.NodeID) (Cl
 	job, err := s.store.ClaimJob(ctx, nodeID)
 	if err != nil {
 		if isNoRowsError(err) {
-			slog.Debug("claim: no work available", "node_id", nodeID)
-			return ClaimResult{}, &ClaimNoWork{}
+			action, actionErr := s.store.ClaimRunRepoAction(ctx, nodeID)
+			if actionErr != nil {
+				if isNoRowsError(actionErr) {
+					slog.Debug("claim: no work available", "node_id", nodeID)
+					return ClaimResult{}, &ClaimNoWork{}
+				}
+				slog.Error("claim: database action-claim error", "node_id", nodeID, "err_type", fmt.Sprintf("%T", actionErr), "err", safeErrorString(actionErr))
+				return ClaimResult{}, claimInternal("failed to claim action", actionErr)
+			}
+
+			run, getRunErr := s.store.GetRun(ctx, action.RunID)
+			if getRunErr != nil {
+				slog.Error("claim: get run failed for action", "node_id", nodeID, "action_id", action.ID, "err", getRunErr)
+				return ClaimResult{}, claimInternal("failed to get run for claimed action", getRunErr)
+			}
+			rr, getRunRepoErr := s.store.GetRunRepo(ctx, store.GetRunRepoParams{RunID: action.RunID, RepoID: action.RepoID})
+			if getRunRepoErr != nil {
+				slog.Error("claim: get run repo failed for action", "node_id", nodeID, "action_id", action.ID, "err", getRunRepoErr)
+				return ClaimResult{}, claimInternal("failed to get run repo for claimed action", getRunRepoErr)
+			}
+			repoURL, repoErr := repoURLForID(ctx, s.store, action.RepoID)
+			if repoErr != nil {
+				slog.Error("claim: get repo failed for action", "node_id", nodeID, "action_id", action.ID, "repo_id", action.RepoID, "err", repoErr)
+				return ClaimResult{}, claimInternal("failed to get repo for claimed action", repoErr)
+			}
+			spec, specErr := s.store.GetSpec(ctx, run.SpecID)
+			if specErr != nil {
+				slog.Error("claim: get spec failed for action", "node_id", nodeID, "action_id", action.ID, "spec_id", run.SpecID, "err", specErr)
+				return ClaimResult{}, claimInternal("failed to get spec for claimed action", specErr)
+			}
+
+			payload := buildActionClaimResponsePayload(run, spec.Spec, rr, repoURL, action)
+			slog.Info("action claimed",
+				"action_id", action.ID,
+				"action_type", action.ActionType,
+				"run_id", run.ID,
+				"node_id", nodeID,
+			)
+			return ClaimResult{Payload: payload}, nil
 		}
 		slog.Error("claim: database error", "node_id", nodeID, "err_type", fmt.Sprintf("%T", err), "err", safeErrorString(err))
 		return ClaimResult{}, claimInternal("failed to claim job", err)

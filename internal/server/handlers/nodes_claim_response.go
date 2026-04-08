@@ -16,6 +16,7 @@ import (
 )
 
 type claimResponsePayload struct {
+	WorkType               string                           `json:"work_type"`
 	RunID                  domaintypes.RunID                `json:"id"`
 	Name                   *string                          `json:"name,omitempty"`
 	RepoID                 domaintypes.RepoID               `json:"repo_id"`
@@ -23,6 +24,8 @@ type claimResponsePayload struct {
 	JobID                  domaintypes.JobID                `json:"job_id"`
 	JobName                string                           `json:"job_name"`
 	JobType                domaintypes.JobType              `json:"job_type"`
+	ActionID               *domaintypes.JobID               `json:"action_id,omitempty"`
+	ActionType             string                           `json:"action_type,omitempty"`
 	JobImage               string                           `json:"job_image"`
 	NextID                 *domaintypes.JobID               `json:"next_id"`
 	RepoURL                string                           `json:"repo_url"`
@@ -123,6 +126,7 @@ func buildClaimResponsePayload(
 	}
 
 	return claimResponsePayload{
+		WorkType:               "job",
 		RunID:                  run.ID,
 		Name:                   nil,
 		RepoID:                 job.RepoID,
@@ -130,6 +134,8 @@ func buildClaimResponsePayload(
 		JobID:                  job.ID,
 		JobName:                job.Name,
 		JobType:                jobType,
+		ActionID:               nil,
+		ActionType:             "",
 		JobImage:               job.JobImage,
 		NextID:                 job.NextID,
 		RepoURL:                repoURL,
@@ -147,6 +153,43 @@ func buildClaimResponsePayload(
 		StepSkip:               stepSkip,
 		HookRuntime:            hookRuntime,
 	}, nil
+}
+
+func buildActionClaimResponsePayload(
+	run store.Run,
+	spec []byte,
+	runRepo store.RunRepo,
+	repoURL string,
+	action store.RunRepoAction,
+) claimResponsePayload {
+	return claimResponsePayload{
+		WorkType:               "action",
+		RunID:                  run.ID,
+		Name:                   nil,
+		RepoID:                 action.RepoID,
+		Attempt:                action.Attempt,
+		JobID:                  "",
+		JobName:                "",
+		JobType:                "",
+		ActionID:               &action.ID,
+		ActionType:             action.ActionType,
+		JobImage:               "",
+		NextID:                 nil,
+		RepoURL:                repoURL,
+		RepoGateProfileMissing: false,
+		Status:                 run.Status,
+		NodeID:                 nodeIDPtrOrZero(action.NodeID),
+		BaseRef:                runRepo.RepoBaseRef,
+		TargetRef:              runRepo.RepoTargetRef,
+		RepoSHAIn:              "",
+		StartedAt:              run.StartedAt.Time.Format(time.RFC3339),
+		CreatedAt:              run.CreatedAt.Time.Format(time.RFC3339),
+		Spec:                   spec,
+		RecoveryContext:        nil,
+		GateSkip:               nil,
+		StepSkip:               nil,
+		HookRuntime:            nil,
+	}
 }
 
 func writeClaimResponse(w http.ResponseWriter, payload claimResponsePayload) error {

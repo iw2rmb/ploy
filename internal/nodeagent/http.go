@@ -143,6 +143,20 @@ func (b *baseUploader) UploadJobStatus(ctx context.Context, jobID types.JobID, s
 	)
 }
 
+// UploadActionStatus uploads terminal status and stats to the action-level endpoint.
+func (b *baseUploader) UploadActionStatus(ctx context.Context, actionID types.JobID, status string, stats types.RunStats) error {
+	return b.postJSONWithRetry(
+		ctx,
+		fmt.Sprintf("/v1/actions/%s/complete", actionID),
+		map[string]any{
+			"status": status,
+			"stats":  stats,
+		},
+		"upload action status",
+		postJSONRetryModeDefault,
+	)
+}
+
 // UploadJobStatusReconcile uploads terminal status during startup crash
 // reconciliation. This mode treats 409 conflicts as successful idempotent replay.
 func (b *baseUploader) UploadJobStatusReconcile(ctx context.Context, jobID types.JobID, status string, exitCode *int32, stats types.RunStats, repoSHAOut ...string) error {

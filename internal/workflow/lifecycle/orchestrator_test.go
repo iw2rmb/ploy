@@ -21,19 +21,13 @@ func TestEvaluateClaimDecision(t *testing.T) {
 		wantAdvance bool
 	}{
 		{
-			name:        "non-MR queued repo advances to running",
+			name:        "mig queued repo advances to running",
 			jobType:     domaintypes.JobTypeMig,
 			rrStatus:    domaintypes.RunRepoStatusQueued,
 			wantAdvance: true,
 		},
 		{
-			name:        "MR job does not advance repo",
-			jobType:     domaintypes.JobTypeMR,
-			rrStatus:    domaintypes.RunRepoStatusQueued,
-			wantAdvance: false,
-		},
-		{
-			name:        "non-MR running repo is not re-advanced",
+			name:        "running repo is not re-advanced",
 			jobType:     domaintypes.JobTypeMig,
 			rrStatus:    domaintypes.RunRepoStatusRunning,
 			wantAdvance: false,
@@ -92,13 +86,6 @@ func TestEvaluateCompletionDecision(t *testing.T) {
 		},
 		// Fail paths
 		{
-			name:       "failed MR job takes no chain action",
-			jobType:    domaintypes.JobTypeMR,
-			jobStatus:  domaintypes.JobStatusFail,
-			hasNext:    true,
-			wantAction: lifecycle.CompletionChainNoAction,
-		},
-		{
 			name:       "failed pre-gate triggers gate failure evaluation",
 			jobType:    domaintypes.JobTypePreGate,
 			jobStatus:  domaintypes.JobStatusFail,
@@ -147,23 +134,9 @@ func TestEvaluateCompletionDecision(t *testing.T) {
 			hasNext:    true,
 			wantAction: lifecycle.CompletionChainCancelRemainder,
 		},
-		{
-			name:       "errored MR job takes no chain action",
-			jobType:    domaintypes.JobTypeMR,
-			jobStatus:  domaintypes.JobStatusError,
-			hasNext:    true,
-			wantAction: lifecycle.CompletionChainNoAction,
-		},
 		// Cancelled paths
 		{
-			name:       "cancelled MR job takes no chain action",
-			jobType:    domaintypes.JobTypeMR,
-			jobStatus:  domaintypes.JobStatusCancelled,
-			hasNext:    true,
-			wantAction: lifecycle.CompletionChainNoAction,
-		},
-		{
-			name:       "cancelled non-MR job cancels remainder",
+			name:       "cancelled mig job cancels remainder",
 			jobType:    domaintypes.JobTypeMig,
 			jobStatus:  domaintypes.JobStatusCancelled,
 			hasNext:    true,
@@ -203,7 +176,6 @@ func TestIsGateJobType(t *testing.T) {
 		{domaintypes.JobTypeReGate, true},
 		{domaintypes.JobTypeMig, false},
 		{domaintypes.JobTypeHeal, false},
-		{domaintypes.JobTypeMR, false},
 	}
 
 	for _, tc := range cases {
