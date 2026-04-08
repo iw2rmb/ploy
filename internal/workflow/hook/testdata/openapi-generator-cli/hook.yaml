@@ -1,0 +1,20 @@
+id: openapi-generator-cli
+once: true
+stack:
+  language: java
+  tool: maven
+  release: "17"
+sbom:
+  on_match:
+    - name: org.openapitools:openapi-generator-cli
+      version: ">=7.0.0"
+  on_change:
+    - name: org.openapitools:openapi-generator-cli
+      from: "<7.0.0"
+      to: ">=7.0.0"
+steps:
+  - name: scan
+    image: ghcr.io/iw2rmb/hook/openapi-generator-cli:latest
+    command: ["scan", "--sbom", "/in/sbom.spdx.json", "--out", "/out/sbom.spdx.json"]
+    envs:
+      POLICY: strict

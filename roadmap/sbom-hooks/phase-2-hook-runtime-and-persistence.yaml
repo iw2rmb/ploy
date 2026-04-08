@@ -12,36 +12,58 @@ items:
   - done: false
     reviews: []
     label: "1"
-    summary: "Implement hook spec loading stack matching SBOM condition evaluation and once-by-hash semantics."
+    summary: "Implement hook spec model and source loading for local and remote hook manifests."
     classification: "determined"
     components:
       - "internal/workflow/hook/spec.go"
       - "internal/workflow/hook/loader.go"
-      - "internal/workflow/hook/matcher.go"
-      - "internal/workflow/hook/version_compare.go"
       - "internal/workflow/hook/loader_test.go"
-      - "internal/workflow/hook/matcher_test.go"
       - "internal/workflow/hook/testdata/openapi-generator-cli/hook.yaml"
     baseline:
-      - "internal/workflow/contracts/stack_match.go"
-      - "internal/server/sbom/version_compare.go"
+      - "internal/workflow/contracts/migs_spec.go"
+      - "internal/workflow/contracts/migs_spec_parse.go"
     delta:
-      - "[additive] no hook runtime conditions -> hook runtime with stack filter and sbom match add remove change predicates"
+      - "[additive] root-level hook source declarations without runtime hook manifests -> strict hook spec loading from file url and directory sources"
     implementation:
       - "Add hook spec model with id stack filter steps once and sbom conditions plus strict YAML loader."
-      - "Resolve hook sources from mig spec root hooks entries and recursively discover hook.yaml files in directories."
-      - "Implement matcher that evaluates on_match on_add on_remove and on_change against current and previous sbom snapshots."
-      - "Compute deterministic hook hash from canonical hook content for once semantics keying."
+      - "Resolve hook sources from mig spec root hooks entries for direct manifest files URLs and recursive hook.yaml discovery in directories."
+      - "Normalize loaded hook order and surface deterministic source and validation errors."
     verification:
       - "Hook discovery from directory sources finds nested hook.yaml files and ignores unrelated files."
-      - "SBOM condition evaluator returns stable decisions for add remove and version transition predicates."
-      - "Repeated evaluation with same run and hook hash skips execution when once is enabled."
-    reasoning: "xhigh"
-    cfp: 18
+      - "Direct file and URL hook sources load into stable hook specs with preserved ids and steps."
+      - "Malformed hook manifests fail with deterministic validation errors."
+    reasoning: "medium"
+    cfp: 8
 
   - done: false
     reviews: []
     label: "2"
+    summary: "Implement hook matching decisions with stack and SBOM predicates and deterministic once-by-hash keys."
+    classification: "determined"
+    components:
+      - "internal/workflow/hook/matcher.go"
+      - "internal/workflow/hook/version_compare.go"
+      - "internal/workflow/hook/matcher_test.go"
+    baseline:
+      - "internal/workflow/hook/spec.go"
+      - "internal/workflow/contracts/stack_match.go"
+      - "internal/server/sbom/version_compare.go"
+    delta:
+      - "[additive] loaded hook specs without runtime evaluation -> hook execution decisions from stack filters sbom transition predicates and deterministic once hashes"
+    implementation:
+      - "Reuse stack matching semantics from workflow contracts to evaluate hook stack filters against detected runtime stack."
+      - "Evaluate on_match on_add on_remove and on_change against current and previous sbom snapshots with normalized version comparison."
+      - "Compute deterministic hook hash from canonical hook content and return once eligibility metadata for persistence keying."
+    verification:
+      - "Stack filter evaluation matches existing stack_match semantics for exact wildcard and negative cases."
+      - "SBOM condition evaluator returns stable decisions for add remove and version transition predicates."
+      - "Repeated evaluation of unchanged hook content yields the same hook hash and once decision inputs across runs."
+    reasoning: "high"
+    cfp: 10
+
+  - done: false
+    reviews: []
+    label: "3"
     summary: "Persist hook execution state and expose sbom and hook job types in run and job APIs."
     classification: "determined"
     components:
