@@ -4,6 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 
 	bsmock "github.com/iw2rmb/ploy/internal/blobstore/mock"
@@ -226,6 +229,163 @@ func TestMaybeCreateHealingJobs_ReGateHooksScheduledOncePerCycle(t *testing.T) {
 	assertHookSource(hook0, hookHashDirect)
 	assertHookSource(hook1, hookHashA)
 	assertHookSource(hook2, hookHashB)
+}
+
+func TestMaybeCreateHealingJobs_ReGateHooksConditionalPlanning_Mixed(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/hook-go.yaml", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`
+id: hook-go
+stack:
+  language: go
+steps:
+  - image: hook:latest
+`))
+	})
+	mux.HandleFunc("/hook-java.yaml", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`
+id: hook-java
+stack:
+  language: java
+steps:
+  - image: hook:latest
+`))
+	})
+	server := httptest.NewServer(mux)
+	t.Cleanup(server.Close)
+
+	hc := newHealingChain(t,
+		withHealingSpec(func(t *testing.T) []byte {
+			t.Helper()
+			spec := map[string]any{
+				"hooks": []any{
+					server.URL + "/hook-go.yaml",
+					server.URL + "/hook-java.yaml",
+				},
+				"steps": []any{map[string]any{"image": "migs-orw:latest"}},
+				"build_gate": map[string]any{
+					"post": map[string]any{
+						"stack": map[string]any{
+							"enabled":  true,
+							"language": "go",
+							"release":  "1.22",
+						},
+					},
+					"heal": map[string]any{
+						"retries": float64(2),
+						"image":   "amata:latest",
+					},
+				},
+			}
+			raw, err := json.Marshal(spec)
+			if err != nil {
+				t.Fatalf("marshal healing spec with conditional hooks: %v", err)
+			}
+			return raw
+		}),
+	)
+
+	if err := maybeCreateHealingJobs(ctx, hc.Store, nil, hc.Run, hc.FailedJob); err != nil {
+		t.Fatalf("maybeCreateHealingJobs returned error: %v", err)
+	}
+
+	if len(hc.Store.createJob.calls) != 4 {
+		t.Fatalf("expected 4 CreateJob calls (heal + sbom + 1 hook + re-gate), got %d", len(hc.Store.createJob.calls))
+	}
+
+	byName := createJobsByName(hc.Store.createJob.calls)
+	healJob := byName["heal-1-0"]
+	sbomJob := byName["re-gate-1-sbom"]
+	hookJob := byName["re-gate-1-hook-000"]
+	reGate := byName["re-gate-1"]
+
+	if _, exists := byName["re-gate-1-hook-001"]; exists {
+		t.Fatal("did not expect re-gate-1-hook-001 when matcher returns false")
+	}
+	if healJob.NextID == nil || *healJob.NextID != sbomJob.ID {
+		t.Fatalf("expected heal to point to re-gate sbom")
+	}
+	if sbomJob.NextID == nil || *sbomJob.NextID != hookJob.ID {
+		t.Fatalf("expected re-gate sbom to point to conditional hook")
+	}
+	if hookJob.NextID == nil || *hookJob.NextID != reGate.ID {
+		t.Fatalf("expected conditional hook to point to re-gate")
+	}
+
+	hookMeta, err := contracts.UnmarshalJobMeta(hookJob.Meta)
+	if err != nil {
+		t.Fatalf("unmarshal hook meta: %v", err)
+	}
+	if got, want := hookMeta.HookSource, server.URL+"/hook-go.yaml"; got != want {
+		t.Fatalf("hook_source=%q, want %q", got, want)
+	}
+	if !strings.Contains(hookMeta.ActionSummary, "eval=planned") || !strings.Contains(hookMeta.ActionSummary, "should_run=true") {
+		t.Fatalf("expected planned matcher summary in action_summary, got %q", hookMeta.ActionSummary)
+	}
+}
+
+func TestMaybeCreateHealingJobs_ReGateHooksConditionalPlanning_AllFalse(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/hook-java.yaml", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`
+id: hook-java
+stack:
+  language: java
+steps:
+  - image: hook:latest
+`))
+	})
+	server := httptest.NewServer(mux)
+	t.Cleanup(server.Close)
+
+	hc := newHealingChain(t,
+		withHealingSpec(func(t *testing.T) []byte {
+			t.Helper()
+			spec := map[string]any{
+				"hooks": []any{
+					server.URL + "/hook-java.yaml",
+				},
+				"steps": []any{map[string]any{"image": "migs-orw:latest"}},
+				"build_gate": map[string]any{
+					"post": map[string]any{
+						"stack": map[string]any{
+							"enabled":  true,
+							"language": "go",
+							"release":  "1.22",
+						},
+					},
+					"heal": map[string]any{
+						"retries": float64(2),
+						"image":   "amata:latest",
+					},
+				},
+			}
+			raw, err := json.Marshal(spec)
+			if err != nil {
+				t.Fatalf("marshal healing spec with all-false hooks: %v", err)
+			}
+			return raw
+		}),
+	)
+
+	if err := maybeCreateHealingJobs(ctx, hc.Store, nil, hc.Run, hc.FailedJob); err != nil {
+		t.Fatalf("maybeCreateHealingJobs returned error: %v", err)
+	}
+
+	if len(hc.Store.createJob.calls) != 3 {
+		t.Fatalf("expected 3 CreateJob calls (heal + sbom + re-gate), got %d", len(hc.Store.createJob.calls))
+	}
+	for _, created := range hc.Store.createJob.calls {
+		if strings.Contains(created.Name, "-hook-") {
+			t.Fatalf("did not expect hook job %q when all re-gate matcher decisions are false", created.Name)
+		}
+	}
 }
 
 // TestMaybeCreateHealingJobs_CancelsRemaining covers cases where healing cannot proceed
