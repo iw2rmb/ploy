@@ -39,7 +39,7 @@ func TestListRunRepoJobsHandler_NextIDContract(t *testing.T) {
 			Status:     domaintypes.JobStatusQueued,
 			Meta:       []byte(`{"kind":"mig","mig_step_name":"hello"}`),
 		},
-		}
+	}
 
 	handler := listRunRepoJobsHandler(st)
 	rr := doRequest(t, handler, http.MethodGet, "/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/jobs", nil, "run_id", runID.String(), "repo_id", repoID.String())
@@ -73,6 +73,71 @@ func TestListRunRepoJobsHandler_NextIDContract(t *testing.T) {
 	}
 	if got := job["next_id"]; got != nextID.String() {
 		t.Fatalf("next_id = %v, want %q", got, nextID.String())
+	}
+}
+
+func TestListRunRepoJobsHandler_ExposesSBOMAndHookJobTypes(t *testing.T) {
+	t.Parallel()
+
+	runID := domaintypes.NewRunID()
+	repoID := domaintypes.NewRepoID()
+	sbomID := domaintypes.NewJobID()
+	hookID := domaintypes.NewJobID()
+
+	st := &runStore{
+		getRunRepoResult: store.RunRepo{
+			RunID:   runID,
+			RepoID:  repoID,
+			Attempt: 1,
+		},
+	}
+	st.listJobsByRunRepoAttempt.val = []store.Job{
+		{
+			ID:      sbomID,
+			RunID:   runID,
+			RepoID:  repoID,
+			Attempt: 1,
+			Name:    "pre-gate-sbom",
+			JobType: domaintypes.JobTypeSBOM,
+			Status:  domaintypes.JobStatusSuccess,
+			Meta:    []byte(`{"kind":"mig"}`),
+		},
+		{
+			ID:      hookID,
+			RunID:   runID,
+			RepoID:  repoID,
+			Attempt: 1,
+			Name:    "pre-gate-hook-000",
+			JobType: domaintypes.JobTypeHook,
+			Status:  domaintypes.JobStatusSuccess,
+			Meta:    []byte(`{"kind":"mig"}`),
+		},
+	}
+
+	handler := listRunRepoJobsHandler(st)
+	rr := doRequest(t, handler, http.MethodGet, "/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/jobs", nil, "run_id", runID.String(), "repo_id", repoID.String())
+	assertStatus(t, rr, http.StatusOK)
+
+	resp := decodeBody[map[string]any](t, rr)
+	jobs, ok := resp["jobs"].([]any)
+	if !ok || len(jobs) != 2 {
+		t.Fatalf("expected 2 jobs, got %T len=%d", resp["jobs"], len(jobs))
+	}
+	seen := map[string]bool{}
+	for _, raw := range jobs {
+		job, ok := raw.(map[string]any)
+		if !ok {
+			t.Fatalf("job payload type = %T, want object", raw)
+		}
+		if jt, ok := job["job_type"].(string); ok {
+			seen[jt] = true
+		}
+	}
+	if !seen["sbom"] {
+		t.Fatalf("expected job_type %q in response, got %+v", "sbom", seen)
+	}
+	if !seen["hook"] {
+		t.Fatalf("expected job_type %q in response, got %+v", "hook", seen)
 	}
 }
 
@@ -122,7 +187,7 @@ func TestListRunRepoJobsHandler_OrdersJobsByChain(t *testing.T) {
 		{ID: mig1, RunID: runID, RepoID: repoID, Attempt: 1, Name: "mig-1", JobType: "mig", NextID: &post, Status: domaintypes.JobStatusCreated},
 		{ID: mig0, RunID: runID, RepoID: repoID, Attempt: 1, Name: "mig-0", JobType: "mig", NextID: &mig1, Status: domaintypes.JobStatusCreated},
 		{ID: pre, RunID: runID, RepoID: repoID, Attempt: 1, Name: "pre-gate", JobType: "pre_gate", NextID: &mig0, Status: domaintypes.JobStatusQueued},
-		}
+	}
 
 	handler := listRunRepoJobsHandler(st)
 	rr := doRequest(t, handler, http.MethodGet, "/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/jobs", nil, "run_id", runID.String(), "repo_id", repoID.String())
@@ -232,7 +297,7 @@ func TestListRunRepoJobsHandler_ExposesJobLevelRecovery(t *testing.T) {
 	var resp struct {
 		Jobs []struct {
 			Recovery *struct {
-				LoopKind  string `json:"loop_kind"`
+				LoopKind string `json:"loop_kind"`
 			} `json:"recovery"`
 		} `json:"jobs"`
 	}

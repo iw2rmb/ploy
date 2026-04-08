@@ -22,6 +22,7 @@ func TestListJobsHandler_Success(t *testing.T) {
 		{
 			JobID:      jobID,
 			Name:       "mig-step",
+			JobType:    domaintypes.JobTypeMig,
 			Status:     domaintypes.JobStatusRunning,
 			DurationMs: 1234,
 			JobImage:   "ghcr.io/iw2rmb/ploy/migs-java17:latest",
@@ -56,6 +57,9 @@ func TestListJobsHandler_Success(t *testing.T) {
 	job := jobs[0].(map[string]any)
 	if got := job["name"]; got != "mig-step" {
 		t.Fatalf("name = %v, want %q", got, "mig-step")
+	}
+	if got := job["job_type"]; got != "mig" {
+		t.Fatalf("job_type = %v, want %q", got, "mig")
 	}
 	if got := job["mig_name"]; got != "java17-upgrade" {
 		t.Fatalf("mig_name = %v, want %q", got, "java17-upgrade")

@@ -318,6 +318,23 @@ CREATE TABLE IF NOT EXISTS sboms (
 CREATE INDEX IF NOT EXISTS sboms_repo_lib_ver_idx ON sboms(repo_id, lib, ver);
 CREATE INDEX IF NOT EXISTS sboms_job_idx ON sboms(job_id);
 
+-- Hook once-by-hash ledger keyed by run/repo and hook hash.
+-- Records successful hook execution and whether a once-skip marker was observed.
+CREATE TABLE IF NOT EXISTS hooks_once (
+  run_id               TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+  repo_id              TEXT NOT NULL REFERENCES repos(id) ON DELETE CASCADE,
+  hook_hash            TEXT NOT NULL CHECK (hook_hash ~ '^[0-9a-f]{64}$'),
+  first_success_job_id TEXT REFERENCES jobs(id) ON DELETE SET NULL,
+  last_success_job_id  TEXT REFERENCES jobs(id) ON DELETE SET NULL,
+  last_skip_job_id     TEXT REFERENCES jobs(id) ON DELETE SET NULL,
+  once_skip_marked     BOOLEAN NOT NULL DEFAULT false,
+  created_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (run_id, repo_id, hook_hash)
+);
+CREATE INDEX IF NOT EXISTS hooks_once_repo_idx ON hooks_once(repo_id);
+CREATE INDEX IF NOT EXISTS hooks_once_hash_idx ON hooks_once(hook_hash);
+
 -- Events (append-only)
 -- Note: run_id and job_id are TEXT (KSUID-backed) to match runs.id and jobs.id.
 -- events.id is BIGSERIAL for monotonic cursor semantics (since-id pagination).

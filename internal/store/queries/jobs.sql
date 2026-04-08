@@ -456,6 +456,7 @@ GROUP BY status;
 SELECT
   jobs.id AS job_id,
   jobs.name,
+  jobs.job_type,
   jobs.status,
   jobs.duration_ms,
   jobs.job_image,

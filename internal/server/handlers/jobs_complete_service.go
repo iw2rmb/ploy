@@ -69,25 +69,6 @@ func (s *CompleteJobService) Complete(ctx context.Context, input CompleteJobInpu
 			)
 			return CompleteJobResult{}, completeInternal("failed to clone skipped step diff", err)
 		}
-
-		sbomRowsPersisted, sbomErr := maybePersistGateSuccessSBOMRows(ctx, s.store, s.blobpersist, job, input.Status)
-		if sbomErr != nil {
-			slog.Error("complete job: persist gate sbom rows failed",
-				"job_id", input.JobID,
-				"repo_id", job.RepoID,
-				"job_type", job.JobType,
-				"err", sbomErr,
-			)
-			return CompleteJobResult{}, completeInternal("failed to persist gate sbom rows", sbomErr)
-		}
-		if sbomRowsPersisted > 0 {
-			slog.Info("complete job: persisted gate sbom rows",
-				"job_id", input.JobID,
-				"repo_id", job.RepoID,
-				"job_type", job.JobType,
-				"row_count", sbomRowsPersisted,
-			)
-		}
 	}
 
 	if input.StatsPayload.HasJobResources() {
