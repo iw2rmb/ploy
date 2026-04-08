@@ -197,50 +197,30 @@ steps:
 		t.Fatalf("maybeCreateHealingJobs returned error: %v", err)
 	}
 
-	if len(hc.Store.createJob.calls) != 6 {
-		t.Fatalf("expected 6 CreateJob calls (heal + sbom + 3 hooks + re-gate), got %d", len(hc.Store.createJob.calls))
+	if len(hc.Store.createJob.calls) != 3 {
+		t.Fatalf("expected 3 CreateJob calls (heal + sbom + re-gate), got %d", len(hc.Store.createJob.calls))
 	}
 
 	byName := createJobsByName(hc.Store.createJob.calls)
 	healJob := byName["heal-1-0"]
 	sbomJob := byName["re-gate-1-sbom"]
-	hook0 := byName["re-gate-1-hook-000"]
-	hook1 := byName["re-gate-1-hook-001"]
-	hook2 := byName["re-gate-1-hook-002"]
 	reGate := byName["re-gate-1"]
 
 	if healJob.NextID == nil || *healJob.NextID != sbomJob.ID {
 		t.Fatalf("expected heal to point to re-gate sbom")
 	}
-	if sbomJob.NextID == nil || *sbomJob.NextID != hook0.ID {
-		t.Fatalf("expected re-gate sbom to point to first hook")
-	}
-	if hook0.NextID == nil || *hook0.NextID != hook1.ID {
-		t.Fatalf("expected hook-000 to point to hook-001")
-	}
-	if hook1.NextID == nil || *hook1.NextID != hook2.ID {
-		t.Fatalf("expected hook-001 to point to hook-002")
-	}
-	if hook2.NextID == nil || *hook2.NextID != reGate.ID {
-		t.Fatalf("expected hook-002 to point to re-gate")
+	if sbomJob.NextID == nil || *sbomJob.NextID != reGate.ID {
+		t.Fatalf("expected re-gate sbom to point to re-gate")
 	}
 	if reGate.NextID == nil || *reGate.NextID != hc.SuccessorID {
 		t.Fatalf("expected re-gate to preserve successor %s", hc.SuccessorID)
 	}
 
-	assertHookSource := func(job store.CreateJobParams, want string) {
-		t.Helper()
-		meta, err := contracts.UnmarshalJobMeta(job.Meta)
-		if err != nil {
-			t.Fatalf("unmarshal %s meta: %v", job.Name, err)
-		}
-		if got := meta.HookSource; got != want {
-			t.Fatalf("%s hook_source=%q, want %q", job.Name, got, want)
+	for _, created := range hc.Store.createJob.calls {
+		if strings.Contains(created.Name, "-hook-") {
+			t.Fatalf("did not expect preplanned re-gate hook job %q", created.Name)
 		}
 	}
-	assertHookSource(hook0, hookHashDirect)
-	assertHookSource(hook1, hookHashA)
-	assertHookSource(hook2, hookHashB)
 }
 
 func TestMaybeCreateHealingJobs_ReGateHooksConditionalPlanning_Mixed(t *testing.T) {
@@ -304,38 +284,23 @@ steps:
 		t.Fatalf("maybeCreateHealingJobs returned error: %v", err)
 	}
 
-	if len(hc.Store.createJob.calls) != 4 {
-		t.Fatalf("expected 4 CreateJob calls (heal + sbom + 1 hook + re-gate), got %d", len(hc.Store.createJob.calls))
+	if len(hc.Store.createJob.calls) != 3 {
+		t.Fatalf("expected 3 CreateJob calls (heal + sbom + re-gate), got %d", len(hc.Store.createJob.calls))
 	}
 
 	byName := createJobsByName(hc.Store.createJob.calls)
 	healJob := byName["heal-1-0"]
 	sbomJob := byName["re-gate-1-sbom"]
-	hookJob := byName["re-gate-1-hook-000"]
 	reGate := byName["re-gate-1"]
 
-	if _, exists := byName["re-gate-1-hook-001"]; exists {
-		t.Fatal("did not expect re-gate-1-hook-001 when matcher returns false")
+	if _, exists := byName["re-gate-1-hook-000"]; exists {
+		t.Fatal("did not expect re-gate hook jobs to be preplanned")
 	}
 	if healJob.NextID == nil || *healJob.NextID != sbomJob.ID {
 		t.Fatalf("expected heal to point to re-gate sbom")
 	}
-	if sbomJob.NextID == nil || *sbomJob.NextID != hookJob.ID {
-		t.Fatalf("expected re-gate sbom to point to conditional hook")
-	}
-	if hookJob.NextID == nil || *hookJob.NextID != reGate.ID {
-		t.Fatalf("expected conditional hook to point to re-gate")
-	}
-
-	hookMeta, err := contracts.UnmarshalJobMeta(hookJob.Meta)
-	if err != nil {
-		t.Fatalf("unmarshal hook meta: %v", err)
-	}
-	if got, want := hookMeta.HookSource, server.URL+"/hook-go.yaml"; got != want {
-		t.Fatalf("hook_source=%q, want %q", got, want)
-	}
-	if !strings.Contains(hookMeta.ActionSummary, "eval=planned") || !strings.Contains(hookMeta.ActionSummary, "should_run=true") {
-		t.Fatalf("expected planned matcher summary in action_summary, got %q", hookMeta.ActionSummary)
+	if sbomJob.NextID == nil || *sbomJob.NextID != reGate.ID {
+		t.Fatalf("expected re-gate sbom to point to re-gate")
 	}
 }
 

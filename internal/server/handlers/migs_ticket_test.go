@@ -16,7 +16,6 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	migsapi "github.com/iw2rmb/ploy/internal/migs/api"
 	"github.com/iw2rmb/ploy/internal/store"
-	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
 const testRepoSHA0 = "0123456789abcdef0123456789abcdef01234567"
@@ -140,13 +139,9 @@ func TestCreateJobsFromSpec(t *testing.T) {
 			spec:        []byte(`{"hooks":["` + hookHashA + `","` + hookHashB + `"],"bundle_map":{"` + hookHashA + `":"bundle_hooks","` + hookHashB + `":"bundle_hooks"},"steps":[{"image":"mig1:v1"}]}`),
 			expected: []expectedJob{
 				{"pre-gate-sbom", domaintypes.JobTypeSBOM, domaintypes.JobStatusQueued, "", testRepoSHA0},
-				{"pre-gate-hook-000", domaintypes.JobTypeHook, domaintypes.JobStatusCreated, "", ""},
-				{"pre-gate-hook-001", domaintypes.JobTypeHook, domaintypes.JobStatusCreated, "", ""},
 				{"pre-gate", domaintypes.JobTypePreGate, domaintypes.JobStatusCreated, "", ""},
 				{"mig-0", domaintypes.JobTypeMig, domaintypes.JobStatusCreated, "", ""},
 				{"post-gate-sbom", domaintypes.JobTypeSBOM, domaintypes.JobStatusCreated, "", ""},
-				{"post-gate-hook-000", domaintypes.JobTypeHook, domaintypes.JobStatusCreated, "", ""},
-				{"post-gate-hook-001", domaintypes.JobTypeHook, domaintypes.JobStatusCreated, "", ""},
 				{"post-gate", domaintypes.JobTypePostGate, domaintypes.JobStatusCreated, "", ""},
 			},
 			useHashHook: true,
@@ -322,35 +317,19 @@ steps:
 
 	byName := createJobsByName(st.createJob.calls)
 	preSBOM := byName["pre-gate-sbom"]
-	preHook0 := byName["pre-gate-hook-000"]
-	preHook1 := byName["pre-gate-hook-001"]
 	preGate := byName["pre-gate"]
 	mig1 := byName["mig-1"]
 	postSBOM := byName["post-gate-sbom"]
-	postHook0 := byName["post-gate-hook-000"]
-	postHook1 := byName["post-gate-hook-001"]
 	postGate := byName["post-gate"]
 
-	if preSBOM.NextID == nil || *preSBOM.NextID != preHook0.ID {
-		t.Fatalf("pre-gate-sbom next_id = %v, want %s", preSBOM.NextID, preHook0.ID)
-	}
-	if preHook0.NextID == nil || *preHook0.NextID != preHook1.ID {
-		t.Fatalf("pre-gate-hook-000 next_id = %v, want %s", preHook0.NextID, preHook1.ID)
-	}
-	if preHook1.NextID == nil || *preHook1.NextID != preGate.ID {
-		t.Fatalf("pre-gate-hook-001 next_id = %v, want %s", preHook1.NextID, preGate.ID)
+	if preSBOM.NextID == nil || *preSBOM.NextID != preGate.ID {
+		t.Fatalf("pre-gate-sbom next_id = %v, want %s", preSBOM.NextID, preGate.ID)
 	}
 	if mig1.NextID == nil || *mig1.NextID != postSBOM.ID {
 		t.Fatalf("mig-1 next_id = %v, want %s", mig1.NextID, postSBOM.ID)
 	}
-	if postSBOM.NextID == nil || *postSBOM.NextID != postHook0.ID {
-		t.Fatalf("post-gate-sbom next_id = %v, want %s", postSBOM.NextID, postHook0.ID)
-	}
-	if postHook0.NextID == nil || *postHook0.NextID != postHook1.ID {
-		t.Fatalf("post-gate-hook-000 next_id = %v, want %s", postHook0.NextID, postHook1.ID)
-	}
-	if postHook1.NextID == nil || *postHook1.NextID != postGate.ID {
-		t.Fatalf("post-gate-hook-001 next_id = %v, want %s", postHook1.NextID, postGate.ID)
+	if postSBOM.NextID == nil || *postSBOM.NextID != postGate.ID {
+		t.Fatalf("post-gate-sbom next_id = %v, want %s", postSBOM.NextID, postGate.ID)
 	}
 	if postGate.NextID != nil {
 		t.Fatalf("post-gate next_id = %v, want nil", *postGate.NextID)
@@ -384,12 +363,11 @@ steps:
 	}
 
 	byName := createJobsByName(st.createJob.calls)
-	preHook, ok := byName["pre-gate-hook-000"]
-	if !ok {
-		t.Fatal("expected pre-gate-hook-000 to be planned")
+	if _, exists := byName["pre-gate-hook-000"]; exists {
+		t.Fatal("did not expect pre-gate hooks to be planned before pre-gate sbom completion")
 	}
 	if _, exists := byName["post-gate-hook-000"]; exists {
-		t.Fatal("did not expect post-gate-hook-000 when matcher returns false for post-gate cycle")
+		t.Fatal("did not expect post-gate hooks to be planned before post-gate sbom completion")
 	}
 
 	preSBOM := byName["pre-gate-sbom"]
@@ -398,11 +376,8 @@ steps:
 	postSBOM := byName["post-gate-sbom"]
 	postGate := byName["post-gate"]
 
-	if preSBOM.NextID == nil || *preSBOM.NextID != preHook.ID {
-		t.Fatalf("pre-gate-sbom next_id = %v, want %s", preSBOM.NextID, preHook.ID)
-	}
-	if preHook.NextID == nil || *preHook.NextID != preGate.ID {
-		t.Fatalf("pre-gate-hook-000 next_id = %v, want %s", preHook.NextID, preGate.ID)
+	if preSBOM.NextID == nil || *preSBOM.NextID != preGate.ID {
+		t.Fatalf("pre-gate-sbom next_id = %v, want %s", preSBOM.NextID, preGate.ID)
 	}
 	if mig0.NextID == nil || *mig0.NextID != postSBOM.ID {
 		t.Fatalf("mig-0 next_id = %v, want %s", mig0.NextID, postSBOM.ID)
@@ -411,16 +386,6 @@ steps:
 		t.Fatalf("post-gate-sbom next_id = %v, want %s", postSBOM.NextID, postGate.ID)
 	}
 
-	meta, err := contracts.UnmarshalJobMeta(preHook.Meta)
-	if err != nil {
-		t.Fatalf("unmarshal pre-gate hook meta: %v", err)
-	}
-	if got, want := meta.HookSource, server.URL+"/hook-java.yaml"; got != want {
-		t.Fatalf("hook_source=%q, want %q", got, want)
-	}
-	if !strings.Contains(meta.ActionSummary, "eval=planned") || !strings.Contains(meta.ActionSummary, "should_run=true") {
-		t.Fatalf("expected planned matcher summary in action_summary, got %q", meta.ActionSummary)
-	}
 }
 
 func TestCreateJobsFromSpec_ConditionalHooks_AllFalseCreatesNoHooks(t *testing.T) {
