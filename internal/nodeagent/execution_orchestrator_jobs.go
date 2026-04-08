@@ -3,11 +3,16 @@
 package nodeagent
 
 import (
+	"archive/tar"
 	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"log/slog"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -19,6 +24,7 @@ import (
 	types "github.com/iw2rmb/ploy/internal/domain/types"
 	gitpkg "github.com/iw2rmb/ploy/internal/nodeagent/git"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
+	"github.com/iw2rmb/ploy/internal/workflow/hook"
 	"github.com/iw2rmb/ploy/internal/workflow/step"
 )
 
@@ -194,7 +200,8 @@ func (r *runController) executeSBOMJob(ctx context.Context, req StartRunRequest)
 	r.executeStandardJob(ctx, req, cfg)
 }
 
-// executeHookJob stages /in and /out SBOM snapshots for a deterministic hook chain.
+// executeHookJob executes the resolved hook step through the shared standard
+// container runtime and stages canonical SBOM snapshots between hook jobs.
 func (r *runController) executeHookJob(ctx context.Context, req StartRunRequest) {
 	startTime := time.Now()
 	if len(req.TypedOptions.Hooks) == 0 {
@@ -220,8 +227,8 @@ func (r *runController) executeHookJob(ctx context.Context, req StartRunRequest)
 	}
 
 	inputSnapshotPath := gateCycleHookInputSnapshotPath(req.RunID, cycleName, hookIndex)
-	inPath := gateCycleHookInPath(req.RunID, cycleName, hookIndex)
 	outPath := gateCycleHookOutPath(req.RunID, cycleName, hookIndex)
+	conditionJSON := encodeHookConditionResult(req.HookRuntime)
 
 	if req.HookRuntime != nil && !req.HookRuntime.HookShouldRun {
 		if err := copyFileBytes(inputSnapshotPath, outPath); err != nil {
@@ -236,7 +243,8 @@ func (r *runController) executeHookJob(ctx context.Context, req StartRunRequest)
 			DurationMs(duration.Milliseconds()).
 			MetadataEntry("cycle_name", cycleName).
 			MetadataEntry("hook_index", strconv.Itoa(hookIndex)).
-			MetadataEntry("hook_source", hookSource)
+			MetadataEntry("hook_source", hookSource).
+			MetadataEntry("hook_condition_result", conditionJSON)
 		addHookRuntimeMetadata(statsBuilder, req.HookRuntime)
 		stats := statsBuilder.MustBuild()
 		var exitCodeZero int32
@@ -257,33 +265,61 @@ func (r *runController) executeHookJob(ctx context.Context, req StartRunRequest)
 		return
 	}
 
-	if err := copyFileBytes(inputSnapshotPath, inPath); err != nil {
-		err = fmt.Errorf("hook[%d] stage /in/%s: %w", hookIndex, preGateCanonicalSBOMFileName, err)
+	specDoc, err := r.loadHookSpecForExecution(ctx, req, hookSource)
+	if err != nil {
+		err = fmt.Errorf("hook[%d] load hook spec %q: %w", hookIndex, hookSource, err)
 		slog.Error("failed to execute hook job", "run_id", req.RunID, "job_id", req.JobID, "hook_index", hookIndex, "error", err)
 		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
 		return
 	}
-	if err := copyFileBytes(inputSnapshotPath, outPath); err != nil {
-		err = fmt.Errorf("hook[%d] stage /out/%s: %w", hookIndex, preGateCanonicalSBOMFileName, err)
+	execStep := specDoc.Steps[0]
+	commandIdentityJSON := encodeHookCommandIdentity(hookSource, execStep)
+	manifest, err := buildManifestFromRequest(req, hookStepRunOptions(execStep, req.TypedOptions.BundleMap), 0, contracts.MigStackUnknown)
+	if err != nil {
+		err = fmt.Errorf("hook[%d] build runtime manifest: %w", hookIndex, err)
 		slog.Error("failed to execute hook job", "run_id", req.RunID, "job_id", req.JobID, "hook_index", hookIndex, "error", err)
 		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
 		return
 	}
 
-	duration := time.Since(startTime)
-	statsBuilder := types.NewRunStatsBuilder().
-		DurationMs(duration.Milliseconds()).
-		MetadataEntry("cycle_name", cycleName).
-		MetadataEntry("hook_index", strconv.Itoa(hookIndex)).
-		MetadataEntry("hook_source", hookSource)
-	addHookRuntimeMetadata(statsBuilder, req.HookRuntime)
-	stats := statsBuilder.MustBuild()
-	var exitCodeZero int32
-	repoSHAOut := strings.TrimSpace(req.RepoSHAIn.String())
-	if uploadErr := r.uploadStatus(ctx, req.RunID.String(), types.JobStatusSuccess.String(), &exitCodeZero, stats, req.JobID, repoSHAOut); uploadErr != nil {
-		slog.Error("failed to upload hook job status", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)
+	cfg := standardJobConfig{
+		Manifest:      manifest,
+		DiffType:      types.DiffJobTypeMig,
+		OutDirPattern: "ploy-hook-out-*",
+		InDirPattern:  "ploy-hook-in-*",
+		PopulateInDir: func(inDir string) error {
+			inPath := filepath.Join(inDir, preGateCanonicalSBOMFileName)
+			if err := copyFileBytes(inputSnapshotPath, inPath); err != nil {
+				return fmt.Errorf("stage /in/%s: %w", preGateCanonicalSBOMFileName, err)
+			}
+			return nil
+		},
+		ValidateOutputs: func(outDir, _ string) error {
+			return materializeValidatedHookSBOMOutput(outDir, outPath)
+		},
+		WorkspacePolicy: workspaceChangePolicyIgnore,
+		BuildMetadata: func(_ string) map[string]string {
+			metadata := map[string]string{
+				"cycle_name":            cycleName,
+				"hook_index":            strconv.Itoa(hookIndex),
+				"hook_source":           hookSource,
+				"hook_condition_result": conditionJSON,
+				"hook_command_identity": commandIdentityJSON,
+				"hook_command_executed": "true",
+			}
+			if req.HookRuntime != nil {
+				if hash := strings.TrimSpace(req.HookRuntime.HookHash); hash != "" {
+					metadata["hook_hash"] = hash
+				}
+				metadata["hook_should_run"] = strconv.FormatBool(req.HookRuntime.HookShouldRun)
+			}
+			return metadata
+		},
+		StartTime: startTime,
 	}
-	slog.Info("hook job succeeded",
+	r.executeStandardJob(ctx, req, cfg)
+
+	slog.Info("hook job scheduled for runtime execution",
 		"run_id", req.RunID,
 		"job_id", req.JobID,
 		"job_name", req.JobName,
@@ -291,7 +327,6 @@ func (r *runController) executeHookJob(ctx context.Context, req StartRunRequest)
 		"hook_index", hookIndex,
 		"hook_source", hookSource,
 		"sbom_input", "/in/"+preGateCanonicalSBOMFileName,
-		"duration", duration,
 	)
 }
 
@@ -303,7 +338,191 @@ func addHookRuntimeMetadata(statsBuilder *types.RunStatsBuilder, decision *contr
 		statsBuilder.MetadataEntry("hook_hash", hash)
 	}
 	statsBuilder.MetadataEntry("hook_should_run", strconv.FormatBool(decision.HookShouldRun))
-	statsBuilder.MetadataEntry("hook_once_skip_marked", strconv.FormatBool(decision.HookOnceSkipMarked))
+}
+
+func (r *runController) loadHookSpecForExecution(ctx context.Context, req StartRunRequest, source string) (hook.Spec, error) {
+	source = strings.TrimSpace(source)
+	if source == "" {
+		return hook.Spec{}, fmt.Errorf("hook source is empty")
+	}
+	if hookBundleSourcePattern.MatchString(source) {
+		return r.loadHookSpecFromBundleHash(ctx, req, source)
+	}
+	if isHTTPSHookSource(source) {
+		specs, err := hook.NewLoader(nil).LoadFromMigSpec(contracts.MigSpec{
+			Hooks: []string{source},
+		}, ".")
+		if err != nil {
+			return hook.Spec{}, err
+		}
+		if len(specs) == 0 {
+			return hook.Spec{}, fmt.Errorf("no resolved hook spec for source %q", source)
+		}
+		return specs[0], nil
+	}
+	return hook.Spec{}, fmt.Errorf("unsupported hook source %q", source)
+}
+
+func (r *runController) loadHookSpecFromBundleHash(ctx context.Context, req StartRunRequest, hash string) (hook.Spec, error) {
+	if r.artifactUploader == nil {
+		return hook.Spec{}, fmt.Errorf("artifact uploader is required")
+	}
+	bundleID := strings.TrimSpace(req.TypedOptions.BundleMap[hash])
+	if bundleID == "" {
+		return hook.Spec{}, fmt.Errorf("bundle_map[%q] is missing", hash)
+	}
+	data, err := r.artifactUploader.DownloadSpecBundle(ctx, bundleID)
+	if err != nil {
+		return hook.Spec{}, fmt.Errorf("download spec bundle %q: %w", bundleID, err)
+	}
+	if err := verifyDigestPrefix(data, hash); err != nil {
+		return hook.Spec{}, fmt.Errorf("verify digest prefix for bundle %q: %w", bundleID, err)
+	}
+	manifestData, manifestSource, err := extractHookManifestFromBundle(data)
+	if err != nil {
+		return hook.Spec{}, fmt.Errorf("extract hook manifest from bundle %q: %w", bundleID, err)
+	}
+	specDoc, err := hook.LoadSpecYAML(manifestData, manifestSource)
+	if err != nil {
+		return hook.Spec{}, err
+	}
+	return specDoc, nil
+}
+
+func isHTTPSHookSource(source string) bool {
+	parsed, err := url.Parse(strings.TrimSpace(source))
+	if err != nil || parsed == nil {
+		return false
+	}
+	return (parsed.Scheme == "http" || parsed.Scheme == "https") && parsed.Host != ""
+}
+
+func extractHookManifestFromBundle(data []byte) ([]byte, string, error) {
+	gzReader, err := gzip.NewReader(bytes.NewReader(data))
+	if err != nil {
+		return nil, "", fmt.Errorf("open gzip stream: %w", err)
+	}
+	defer func() { _ = gzReader.Close() }()
+
+	tarReader := tar.NewReader(gzReader)
+	var directManifest []byte
+
+	type manifestEntry struct {
+		path string
+		data []byte
+	}
+	var hookYAMLs []manifestEntry
+
+	for {
+		header, err := tarReader.Next()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return nil, "", fmt.Errorf("read tar header: %w", err)
+		}
+		if header == nil || header.Typeflag != tar.TypeReg {
+			continue
+		}
+		name := strings.TrimSpace(header.Name)
+		payload, readErr := io.ReadAll(tarReader)
+		if readErr != nil {
+			return nil, "", fmt.Errorf("read tar entry %q: %w", name, readErr)
+		}
+		if name == "content" {
+			directManifest = payload
+			continue
+		}
+		if strings.HasPrefix(name, "content/") && strings.HasSuffix(name, "/hook.yaml") {
+			hookYAMLs = append(hookYAMLs, manifestEntry{path: name, data: payload})
+		}
+	}
+
+	if len(directManifest) > 0 && len(hookYAMLs) > 0 {
+		return nil, "", fmt.Errorf("bundle contains both direct content manifest and directory hook.yaml files")
+	}
+	if len(directManifest) > 0 {
+		return directManifest, "bundle:content", nil
+	}
+	if len(hookYAMLs) == 0 {
+		return nil, "", fmt.Errorf("no hook manifest found in bundle")
+	}
+	if len(hookYAMLs) != 1 {
+		return nil, "", fmt.Errorf("expected exactly 1 hook.yaml in bundle, found %d", len(hookYAMLs))
+	}
+	return hookYAMLs[0].data, "bundle:" + hookYAMLs[0].path, nil
+}
+
+func hookStepRunOptions(stepSpec hook.Step, bundleMap map[string]string) RunOptions {
+	return RunOptions{
+		Steps: []StepMig{
+			{
+				MigContainerSpec: MigContainerSpec{
+					Image:   stepSpec.ToJobImage(),
+					Command: stepSpec.ToCommandSpec(),
+					Env:     copyStringMap(stepSpec.Envs),
+					CA:      append([]string(nil), stepSpec.CA...),
+					In:      append([]string(nil), stepSpec.In...),
+					Out:     append([]string(nil), stepSpec.Out...),
+					Home:    append([]string(nil), stepSpec.Home...),
+				},
+			},
+		},
+		BundleMap: bundleMap,
+	}
+}
+
+func materializeValidatedHookSBOMOutput(outDir, snapshotPath string) error {
+	canonicalPath := filepath.Join(outDir, preGateCanonicalSBOMFileName)
+	raw, err := os.ReadFile(canonicalPath)
+	if err != nil {
+		return fmt.Errorf("read canonical hook sbom output %s: %w", canonicalPath, err)
+	}
+	if err := validateCanonicalSBOMDocument(raw); err != nil {
+		return fmt.Errorf("validate canonical hook sbom output %s: %w", canonicalPath, err)
+	}
+	if err := copyFileBytes(canonicalPath, snapshotPath); err != nil {
+		return fmt.Errorf("stage hook snapshot %s: %w", snapshotPath, err)
+	}
+	return nil
+}
+
+func encodeHookConditionResult(decision *contracts.HookRuntimeDecision) string {
+	payload := struct {
+		Evaluated bool   `json:"evaluated"`
+		ShouldRun bool   `json:"should_run"`
+		Hash      string `json:"hash,omitempty"`
+	}{
+		Evaluated: decision != nil,
+		ShouldRun: decision != nil && decision.HookShouldRun,
+	}
+	if decision != nil {
+		payload.Hash = strings.TrimSpace(decision.HookHash)
+	}
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Sprintf(`{"evaluated":%t,"should_run":%t}`, payload.Evaluated, payload.ShouldRun)
+	}
+	return string(raw)
+}
+
+func encodeHookCommandIdentity(source string, stepSpec hook.Step) string {
+	payload := struct {
+		Source  string   `json:"source,omitempty"`
+		Name    string   `json:"name,omitempty"`
+		Image   string   `json:"image"`
+		Command []string `json:"command,omitempty"`
+	}{
+		Source:  strings.TrimSpace(source),
+		Name:    strings.TrimSpace(stepSpec.Name),
+		Image:   strings.TrimSpace(stepSpec.Image),
+		Command: append([]string(nil), stepSpec.Command...),
+	}
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		return "{}"
+	}
+	return string(raw)
 }
 
 // executeMigJob runs a mig container job.
@@ -530,6 +749,7 @@ type canonicalSBOMPackage struct {
 }
 
 var (
+	hookBundleSourcePattern = regexp.MustCompile(`^[0-9a-f]{7,64}$`)
 	gradleDependencyPattern = regexp.MustCompile(`([A-Za-z0-9_.-]+:[A-Za-z0-9_.-]+):([A-Za-z0-9][A-Za-z0-9+_.-]*)`)
 	gradleOverridePattern   = regexp.MustCompile(`->\s*([A-Za-z0-9][A-Za-z0-9+_.-]*)`)
 	sbomNameTokenPattern    = regexp.MustCompile(`^[A-Za-z0-9_.-]+$`)
@@ -728,8 +948,9 @@ type standardJobConfig struct {
 	WorkspacePolicy           workspaceChangePolicy
 	UploadConfiguredArtifacts bool
 
-	UploadDiff   func(ctx context.Context, runID types.RunID, jobID types.JobID, jobName string, diffGen step.DiffGenerator, baselineDir, workspace string, result step.Result)
-	BuildJobMeta func(outDir string) json.RawMessage
+	UploadDiff    func(ctx context.Context, runID types.RunID, jobID types.JobID, jobName string, diffGen step.DiffGenerator, baselineDir, workspace string, result step.Result)
+	BuildJobMeta  func(outDir string) json.RawMessage
+	BuildMetadata func(outDir string) map[string]string
 
 	StartTime time.Time
 }
@@ -906,6 +1127,14 @@ func (r *runController) runContainerJob(
 	if cfg.BuildJobMeta != nil {
 		if meta := cfg.BuildJobMeta(outDir); len(meta) > 0 {
 			statsBuilder.JobMeta(meta)
+		}
+	}
+	if cfg.BuildMetadata != nil {
+		for k, v := range cfg.BuildMetadata(outDir) {
+			if strings.TrimSpace(k) == "" || strings.TrimSpace(v) == "" {
+				continue
+			}
+			statsBuilder.MetadataEntry(k, v)
 		}
 	}
 	if orwMeta, orwErr := parseORWFailureMetadata(outDir); orwErr != nil {

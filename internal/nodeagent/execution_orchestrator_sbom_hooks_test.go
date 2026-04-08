@@ -252,8 +252,8 @@ func TestAddHookRuntimeMetadata_EmitsHookOnceKeys(t *testing.T) {
 	if got := meta["hook_should_run"]; got != "false" {
 		t.Fatalf("metadata.hook_should_run=%v, want false", got)
 	}
-	if got := meta["hook_once_skip_marked"]; got != "true" {
-		t.Fatalf("metadata.hook_once_skip_marked=%v, want true", got)
+	if _, ok := meta["hook_once_skip_marked"]; ok {
+		t.Fatalf("metadata.hook_once_skip_marked must not be emitted")
 	}
 }
 

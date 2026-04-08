@@ -50,7 +50,7 @@ func TestRecordHookOnceLedger_UpsertsSuccessfulHookExecution(t *testing.T) {
 	}
 }
 
-func TestRecordHookOnceLedger_MarksOnceSkipWithoutUpsertingSuccess(t *testing.T) {
+func TestRecordHookOnceLedger_SkippedHookDoesNotPersistLedger(t *testing.T) {
 	t.Parallel()
 
 	st := &jobStore{}
@@ -79,17 +79,11 @@ func TestRecordHookOnceLedger_MarksOnceSkipWithoutUpsertingSuccess(t *testing.T)
 		t.Fatalf("recordHookOnceLedger error: %v", err)
 	}
 
-	assertCalled(t, "MarkHookOnceSkipped", st.markHookOnceSkipped.called)
+	if st.markHookOnceSkipped.called {
+		t.Fatal("did not expect MarkHookOnceSkipped to be called")
+	}
 	if st.upsertHookOnceSuccess.called {
-		t.Fatal("did not expect UpsertHookOnceSuccess to be called")
-	}
-	if st.markHookOnceSkipped.params.RunID != job.RunID ||
-		st.markHookOnceSkipped.params.RepoID != job.RepoID ||
-		st.markHookOnceSkipped.params.HookHash != strings.Repeat("b", 64) {
-		t.Fatalf("unexpected MarkHookOnceSkipped params: %+v", st.markHookOnceSkipped.params)
-	}
-	if st.markHookOnceSkipped.params.LastSkipJobID == nil || *st.markHookOnceSkipped.params.LastSkipJobID != job.ID {
-		t.Fatalf("last_skip_job_id = %v, want %s", st.markHookOnceSkipped.params.LastSkipJobID, job.ID)
+		t.Fatal("did not expect UpsertHookOnceSuccess to be called for skipped hook")
 	}
 }
 
