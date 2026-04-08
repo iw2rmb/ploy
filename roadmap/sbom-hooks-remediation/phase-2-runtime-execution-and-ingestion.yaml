@@ -1,0 +1,105 @@
+---
+policy: "~/.codex/policies/composing-roadmaps.md"
+schema: "~/.codex/policies/roadmap.schema.json"
+title: "SBOM Hooks Remediation: Phase 2 Runtime Execution and Ingestion"
+scope: >-
+  Replace SBOM and hook placeholder jobs with real container execution,
+  and keep SBOM ingest deterministic for hook conditions.
+documentation:
+  - "research/sbom-hooks-incident-2026-04-08.md"
+  - "docs/build-gate/README.md"
+  - "docs/schemas/mig.example.yaml"
+done: false
+reviews: []
+items:
+  - done: false
+    reviews: []
+    label: "1"
+    summary: >-
+      Implement real SBOM job execution via container runner and emit
+      validated SBOM artifact payloads.
+    classification: "determined"
+    components:
+      - "internal/nodeagent/execution_orchestrator_jobs.go"
+      - "internal/nodeagent/execution_orchestrator_sbom_hooks_test.go"
+      - "internal/nodeagent/manifest.go"
+      - "internal/nodeagent/agent_run_controller_test.go"
+    baseline:
+      - "internal/nodeagent/execution_orchestrator_jobs.go"
+      - "internal/nodeagent/manifest.go"
+    delta:
+      - >-
+        [replace] canonical file write sbom stub -> manifest-driven sbom
+        container execution with artifact validation
+    implementation:
+      - >-
+        Route SBOM jobs through the standard container job executor instead
+        of writeCanonicalSBOMOutput stub path.
+      - >-
+        Define SBOM manifest and image resolution rules per stack and ensure
+        runner writes canonical /out/sbom.spdx.json from container output.
+      - >-
+        Validate artifact existence and schema shape before reporting success;
+        return terminal error when SBOM output is absent or malformed.
+      - >-
+        Preserve existing mig and healing execution paths without changing
+        their runtime contracts.
+    verification:
+      - >-
+        SBOM jobs execute non-trivial container work and no longer finish in
+        placeholder-zero durations on unchanged repositories.
+      - >-
+        Invalid or missing SBOM output fails the SBOM job and blocks
+        downstream gate stages.
+      - >-
+        Mig and healing job execution behavior remains unchanged for runs
+        without sbom hooks enabled.
+    reasoning: "high"
+    cfp: 11
+
+  - done: false
+    reviews: []
+    label: "2"
+    summary: >-
+      Implement real hook step execution using shared step runtime contract
+      and consume live SBOM snapshots for conditions.
+    classification: "determined"
+    components:
+      - "internal/workflow/hook/spec.go"
+      - "internal/server/handlers/jobs_complete_sbom.go"
+      - "internal/server/handlers/jobs_complete_service_post_actions.go"
+      - "internal/nodeagent/execution_orchestrator_jobs_upload_test.go"
+      - "internal/server/handlers/jobs_complete_sbom_test.go"
+    baseline:
+      - "internal/workflow/hook/spec.go"
+      - "internal/server/handlers/jobs_complete_sbom.go"
+      - "internal/server/handlers/jobs_complete_service_post_actions.go"
+    delta:
+      - >-
+        [replace] hook pass-through copy runtime -> hook step container
+        execution with cycle-accurate sbom row ingestion
+    implementation:
+      - >-
+        Execute hook steps with the same manifest and runner path used by mig
+        steps, including `ca`, `in`, `out`, and `home` fields.
+      - >-
+        Persist SBOM rows immediately after each successful SBOM job completion
+        so hook condition evaluation uses current-cycle data.
+      - >-
+        Apply once-ledger semantics only after real successful hook execution,
+        never on skipped or failed hook attempts.
+      - >-
+        Emit structured hook runtime metadata with evaluated condition and
+        executed command identity in job stats.
+    verification:
+      - >-
+        A hook with true condition runs its configured step container and
+        produces observable output changes.
+      - >-
+        A hook with false condition is absent from plan and has no execution
+        record for that cycle.
+      - >-
+        SBOM-row-backed condition evaluation stays stable across pre-gate,
+        post-gate, and re-gate cycles.
+    reasoning: "high"
+    cfp: 13
