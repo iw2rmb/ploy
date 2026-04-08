@@ -6,8 +6,8 @@ Overview
   - `orw-cli-gradle` (`images/orw/orw-cli-gradle`) -> `orw-cli-gradle`
   - `amata` (`images/amata`) -> `amata`
   - `shell` (`images/shell`) -> `shell`
-  - `sbom-maven` (`images/sbom/maven`) -> `sbom-maven`
-  - `sbom-gradle` (`images/sbom/gradle`) -> `sbom-gradle`
+  - `sbom-maven` (`images/sbom/maven`) -> `ploy/sbom-maven`
+  - `sbom-gradle` (`images/sbom/gradle`) -> `ploy/sbom-gradle`
 - The runner resolves images as `$PLOY_CONTAINER_REGISTRY/<name>:latest`.
 
 Local Registry Prerequisites
@@ -79,8 +79,8 @@ Notes
 - Directory mapping:
   - `orw-cli-maven` -> `orw-cli-maven`
   - `orw-cli-gradle` -> `orw-cli-gradle`
-  - `sbom-maven` -> `sbom-maven`
-  - `sbom-gradle` -> `sbom-gradle`
+  - `sbom-maven` -> `ploy/sbom-maven`
+  - `sbom-gradle` -> `ploy/sbom-gradle`
 - To use a different registry/namespace, override:
   - `IMAGE_PREFIX=... images/build-and-push.sh`
 
