@@ -8,12 +8,13 @@ Usage:
 
 Behavior:
   - For each phase with done=true:
+    - fails if any item has done!=true
     - fails if any unresolved reviews.gaps exist (phase or item level)
-    - fails if the phase index marker is missing in sibling index.md
+    - fails if the phase index evidence entry is missing or unchecked in sibling index.md
 
 Evidence marker convention:
   - Marker text: evidence:<phase-basename-without-.yaml>
-  - Marker location: roadmap/<subject>/index.md
+  - Marker location: checklist entry in roadmap/<subject>/index.md
 USAGE
   exit 2
 fi
@@ -66,6 +67,7 @@ class Verifier
     @checked += 1
     phase_name = File.basename(path, ".yaml")
     unresolved = []
+    incomplete_items = []
 
     unresolved.concat(find_unresolved_reviews(data["reviews"], "phase"))
 
@@ -76,8 +78,14 @@ class Verifier
 
         label = item["label"].to_s.strip
         marker = label.empty? ? "item[#{idx}]" : "item #{label}"
+        incomplete_items << marker unless item["done"] == true
         unresolved.concat(find_unresolved_reviews(item["reviews"], marker))
       end
+    end
+
+    if incomplete_items.any?
+      @failures << "error: phase marked done but contains incomplete items in #{path}"
+      incomplete_items.each { |label| @failures << "  - #{label} has done!=true" }
     end
 
     if unresolved.any?
@@ -94,8 +102,15 @@ class Verifier
     end
 
     index_text = File.read(index_path)
-    unless index_text.include?(evidence_marker)
+    lines_with_marker = index_text.each_line.select { |line| line.include?(evidence_marker) }
+    if lines_with_marker.empty?
       @failures << "error: missing evidence marker '#{evidence_marker}' in #{index_path}"
+      return
+    end
+
+    has_checked_entry = lines_with_marker.any? { |line| line.match?(/^\s*-\s*\[[xX]\]/) }
+    unless has_checked_entry
+      @failures << "error: evidence marker '#{evidence_marker}' is present but unchecked in #{index_path}"
     end
   rescue Psych::SyntaxError => e
     @failures << "error: YAML parse failure in #{path}: #{e.message.lines.first.to_s.strip}"
