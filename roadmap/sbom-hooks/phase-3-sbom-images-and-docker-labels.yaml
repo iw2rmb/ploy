@@ -39,7 +39,7 @@ items:
       - "Confirm image docs reference exact image names ploy/sbom-gradle and ploy/sbom-maven."
     reasoning: "medium"
     cfp: 8
-
+    commit: acd73404
   - done: false
     reviews: []
     label: "2"
