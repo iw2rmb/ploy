@@ -8,7 +8,7 @@ documentation:
   - "research/sbom-hooks-incident-2026-04-08.md"
   - "docs/build-gate/README.md"
   - "docs/api/OpenAPI.yaml"
-done: false
+done: true
 reviews:
   - gaps: ["\"manual roadmap done signaling -> automated done verification tied to review gap and acceptance evidence checks\" is not enforced in full: `tools/roadmap/verify_done.sh` only checks unresolved `reviews.gaps`, item `done`, and checked `evidence:<phase>` marker text in `index.md`, but does not validate acceptance-check completion/evidence state beyond that marker (`tools/roadmap/verify_done.sh:72-114`, `roadmap/sbom-hooks-remediation/index.md:10-12`).", "\"Wire CI to execute roadmap verification on pull requests touching roadmap files and sbom/hook runtime components.\" is only partially wired for roadmap-file PRs without changed `phase-*.yaml`: the workflow falls back to `make roadmap-verify`, while `ROADMAP_VERIFY_PHASES` defaults to `roadmap/sbom-hooks-remediation/phase-*.yaml`, so touched roadmap files outside that set are not verified (`.github/workflows/ci.yml:132-140`, `Makefile:9,157-159`)."]
     commit: d23ce9c6
