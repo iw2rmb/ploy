@@ -12,6 +12,7 @@ import (
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
+	"github.com/iw2rmb/ploy/internal/workflow/hook"
 	"github.com/iw2rmb/ploy/internal/workflow/step"
 )
 
@@ -316,5 +317,51 @@ func TestExecuteHookJob_FailsWhenHookShouldRunFalseReachesExecution(t *testing.T
 	outPath := preGateHookOutPath(runID, 0)
 	if _, err := os.Stat(outPath); !os.IsNotExist(err) {
 		t.Fatalf("expected invariant-fail path to avoid /out materialization, err=%v", err)
+	}
+}
+
+func TestHookRuntimeStepCA_MergesCyclePhaseCA(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		cycleName string
+		wantCA    []string
+	}{
+		{name: "pre gate cycle merges pre phase CA", cycleName: preGateCycleName, wantCA: []string{"step-ca", "pre-ca"}},
+		{name: "post gate cycle merges post phase CA", cycleName: postGateCycleName, wantCA: []string{"step-ca", "post-ca"}},
+		{name: "re gate cycle merges post phase CA", cycleName: "re-gate-2", wantCA: []string{"step-ca", "post-ca"}},
+		{name: "unknown cycle keeps step CA only", cycleName: "other", wantCA: []string{"step-ca"}},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			typed := RunOptions{
+				BuildGate: BuildGateOptions{
+					Pre:  &contracts.BuildGatePhaseConfig{CA: []string{"pre-ca", "step-ca"}},
+					Post: &contracts.BuildGatePhaseConfig{CA: []string{"post-ca", "step-ca"}},
+				},
+			}
+
+			phase := sbomPhaseConfigForCycle(tc.cycleName, typed)
+			phaseCA := []string(nil)
+			if phase != nil {
+				phaseCA = append(phaseCA, phase.CA...)
+			}
+
+			stepSpec := hook.Step{CA: []string{"step-ca"}}
+			runtimeStep := stepSpec
+			runtimeStep.CA = mergeUniqueStringEntries(append([]string(nil), stepSpec.CA...), phaseCA)
+
+			if len(runtimeStep.CA) != len(tc.wantCA) {
+				t.Fatalf("runtime step ca len=%d, want %d (%v)", len(runtimeStep.CA), len(tc.wantCA), runtimeStep.CA)
+			}
+			for i := range tc.wantCA {
+				if runtimeStep.CA[i] != tc.wantCA[i] {
+					t.Fatalf("runtime step ca[%d]=%q, want %q (%v)", i, runtimeStep.CA[i], tc.wantCA[i], runtimeStep.CA)
+				}
+			}
+		})
 	}
 }

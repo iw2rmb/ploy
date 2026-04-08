@@ -370,7 +370,7 @@ func TestApplyHydraOverlay_DestinationCollision(t *testing.T) {
 		jobType   domaintypes.JobType
 		overlays  map[string]*HydraJobConfig
 		wantErr   bool
-		errSubstr string // required substring in error message
+		errSubstr string       // required substring in error message
 		slices    []sliceCheck // non-error: verify replacement behavior
 	}{
 		{
@@ -767,50 +767,119 @@ func TestMutateClaimSpec_HydraOverlayInPipeline(t *testing.T) {
 func TestApplyHydraOverlay_CanonicalCAInjection(t *testing.T) {
 	t.Parallel()
 
-	t.Run("mig_section_applies_to_steps", func(t *testing.T) {
-		m := map[string]any{
-			"steps": []any{
-				map[string]any{"image": "img:latest"},
-				map[string]any{"image": "img2:latest", "ca": []any{"111111111111"}},
-			},
-		}
-		err := applyHydraOverlayMutator(m, claimSpecMutatorInput{
-			job:     store.Job{Meta: []byte(`{}`)},
-			jobType: domaintypes.JobTypeMig,
-			hydraOverlays: map[string]*HydraJobConfig{
-				"mig": {CA: []string{"abcdef1234567"}},
-			},
+	tests := []struct {
+		name           string
+		jobType        domaintypes.JobType
+		jobName        string
+		overlaySection string
+		wantPhase      string
+		wantCA         string
+		wantOnSteps    bool
+	}{
+		{
+			name:           "mig_section_applies_to_steps",
+			jobType:        domaintypes.JobTypeMig,
+			overlaySection: "mig",
+			wantCA:         "abcdef1234567",
+			wantOnSteps:    true,
+		},
+		{
+			name:           "pre_gate_section_applies_to_build_gate_pre",
+			jobType:        domaintypes.JobTypePreGate,
+			overlaySection: "pre_gate",
+			wantPhase:      "pre",
+			wantCA:         "pregate1234567",
+		},
+		{
+			name:           "post_gate_section_applies_to_build_gate_post",
+			jobType:        domaintypes.JobTypePostGate,
+			overlaySection: "post_gate",
+			wantPhase:      "post",
+			wantCA:         "postgate1234567",
+		},
+		{
+			name:           "re_gate_section_applies_to_build_gate_post",
+			jobType:        domaintypes.JobTypeReGate,
+			overlaySection: "re_gate",
+			wantPhase:      "post",
+			wantCA:         "regate1234567ab",
+		},
+		{
+			name:           "sbom_section_applies_to_pre_gate_cycle",
+			jobType:        domaintypes.JobTypeSBOM,
+			jobName:        "pre-gate-sbom",
+			overlaySection: "sbom",
+			wantPhase:      "pre",
+			wantCA:         "sbompre1234567",
+		},
+		{
+			name:           "sbom_section_applies_to_post_gate_cycle",
+			jobType:        domaintypes.JobTypeSBOM,
+			jobName:        "post-gate-sbom",
+			overlaySection: "sbom",
+			wantPhase:      "post",
+			wantCA:         "sbompost123456",
+		},
+		{
+			name:           "hook_section_applies_to_pre_gate_cycle",
+			jobType:        domaintypes.JobTypeHook,
+			jobName:        "pre-gate-hook-000",
+			overlaySection: "hook",
+			wantPhase:      "pre",
+			wantCA:         "hookpre1234567",
+		},
+		{
+			name:           "hook_section_applies_to_post_gate_cycle",
+			jobType:        domaintypes.JobTypeHook,
+			jobName:        "post-gate-hook-000",
+			overlaySection: "hook",
+			wantPhase:      "post",
+			wantCA:         "hookpost123456",
+		},
+		{
+			name:           "hook_section_applies_to_re_gate_cycle",
+			jobType:        domaintypes.JobTypeHook,
+			jobName:        "re-gate-1-hook-000",
+			overlaySection: "hook",
+			wantPhase:      "post",
+			wantCA:         "hookre1234567a",
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			m := map[string]any{
+				"steps": []any{
+					map[string]any{"image": "img:latest"},
+					map[string]any{"image": "img2:latest", "ca": []any{"111111111111"}},
+				},
+			}
+			err := applyHydraOverlayMutator(m, claimSpecMutatorInput{
+				job:     store.Job{Name: tt.jobName, Meta: []byte(`{}`)},
+				jobType: tt.jobType,
+				hydraOverlays: map[string]*HydraJobConfig{
+					tt.overlaySection: {CA: []string{tt.wantCA}},
+				},
+			})
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if tt.wantOnSteps {
+				steps := m["steps"].([]any)
+				step0 := steps[0].(map[string]any)
+				step1 := steps[1].(map[string]any)
+				assertSlice(t, step0, "ca", 1, tt.wantCA)
+				assertSlice(t, step1, "ca", 2, "111111111111")
+				return
+			}
+
+			bg := m["build_gate"].(map[string]any)
+			phase := bg[tt.wantPhase].(map[string]any)
+			assertSlice(t, phase, "ca", 1, tt.wantCA)
 		})
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-
-		steps := m["steps"].([]any)
-		step0 := steps[0].(map[string]any)
-		step1 := steps[1].(map[string]any)
-		assertSlice(t, step0, "ca", 1, "abcdef1234567")
-		assertSlice(t, step1, "ca", 2, "111111111111")
-	})
-
-	t.Run("pre_gate_section_applies_to_build_gate_pre", func(t *testing.T) {
-		m := map[string]any{
-			"steps": []any{map[string]any{"image": "img:latest"}},
-		}
-		err := applyHydraOverlayMutator(m, claimSpecMutatorInput{
-			job:     store.Job{Meta: []byte(`{}`)},
-			jobType: domaintypes.JobTypePreGate,
-			hydraOverlays: map[string]*HydraJobConfig{
-				"pre_gate": {CA: []string{"abcdef1234567"}},
-			},
-		})
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-
-		bg := m["build_gate"].(map[string]any)
-		pre := bg["pre"].(map[string]any)
-		assertSlice(t, pre, "ca", 1, "abcdef1234567")
-	})
+	}
 }
 
 // ---------------------------------------------------------------------------

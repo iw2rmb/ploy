@@ -66,37 +66,50 @@ func TestConfigCAListBySectionInvalidSection(t *testing.T) {
 }
 
 // TestConfigCAPutUpsertsEntry verifies PUT /v1/config/ca/{hash}
-// persists to store and updates the holder.
+// persists to store and updates the holder for supported sections.
 func TestConfigCAPutUpsertsEntry(t *testing.T) {
-	st := &configStore{}
-	holder := NewConfigHolder(config.GitLabConfig{}, nil)
+	tests := []struct {
+		name    string
+		section string
+	}{
+		{name: "mig section", section: "mig"},
+		{name: "sbom section", section: "sbom"},
+		{name: "hook section", section: "hook"},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			st := &configStore{}
+			holder := NewConfigHolder(config.GitLabConfig{}, nil)
 
-	handler := putConfigCAHandler(holder, st)
-	reqBody := map[string]any{"section": "mig", "bundle_id": "AbCdEf12"}
-	rr := doRequest(t, handler, http.MethodPut, "/v1/config/ca/abcdef1234567", reqBody, "hash", "abcdef1234567")
+			handler := putConfigCAHandler(holder, st)
+			reqBody := map[string]any{"section": tt.section, "bundle_id": "AbCdEf12"}
+			rr := doRequest(t, handler, http.MethodPut, "/v1/config/ca/abcdef1234567", reqBody, "hash", "abcdef1234567")
 
-	assertStatus(t, rr, http.StatusOK)
+			assertStatus(t, rr, http.StatusOK)
 
-	if !st.upsertConfigCA.called {
-		t.Error("store.UpsertConfigCA was not called")
-	}
-	if st.upsertConfigCA.params.Hash != "abcdef1234567" {
-		t.Errorf("store Hash = %q, want abcdef1234567", st.upsertConfigCA.params.Hash)
-	}
-	if st.upsertConfigCA.params.Section != "mig" {
-		t.Errorf("store Section = %q, want mig", st.upsertConfigCA.params.Section)
-	}
-	if !st.upsertConfigBundleMap.called {
-		t.Error("store.UpsertConfigBundleMap was not called")
-	}
-	if st.upsertConfigBundleMap.params.BundleID != "AbCdEf12" {
-		t.Errorf("store BundleID = %q, want AbCdEf12", st.upsertConfigBundleMap.params.BundleID)
-	}
+			if !st.upsertConfigCA.called {
+				t.Error("store.UpsertConfigCA was not called")
+			}
+			if st.upsertConfigCA.params.Hash != "abcdef1234567" {
+				t.Errorf("store Hash = %q, want abcdef1234567", st.upsertConfigCA.params.Hash)
+			}
+			if st.upsertConfigCA.params.Section != tt.section {
+				t.Errorf("store Section = %q, want %s", st.upsertConfigCA.params.Section, tt.section)
+			}
+			if !st.upsertConfigBundleMap.called {
+				t.Error("store.UpsertConfigBundleMap was not called")
+			}
+			if st.upsertConfigBundleMap.params.BundleID != "AbCdEf12" {
+				t.Errorf("store BundleID = %q, want AbCdEf12", st.upsertConfigBundleMap.params.BundleID)
+			}
 
-	// Verify holder was updated.
-	hashes := holder.GetConfigCA("mig")
-	if len(hashes) != 1 || hashes[0] != "abcdef1234567" {
-		t.Errorf("holder CA = %v, want [abcdef1234567]", hashes)
+			// Verify holder was updated.
+			hashes := holder.GetConfigCA(tt.section)
+			if len(hashes) != 1 || hashes[0] != "abcdef1234567" {
+				t.Errorf("holder CA[%s] = %v, want [abcdef1234567]", tt.section, hashes)
+			}
+		})
 	}
 }
 

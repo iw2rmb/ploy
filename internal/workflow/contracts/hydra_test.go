@@ -332,6 +332,21 @@ func TestValidateHydraSection(t *testing.T) {
 	}
 }
 
+func TestValidateCAConfigSection(t *testing.T) {
+	t.Parallel()
+
+	for _, s := range []string{"pre_gate", "re_gate", "post_gate", "mig", "heal", "sbom", "hook"} {
+		if err := ValidateCAConfigSection(s); err != nil {
+			t.Errorf("ValidateCAConfigSection(%q) = %v, want nil", s, err)
+		}
+	}
+	for _, s := range []string{"", "unknown", "mr", "server", "node"} {
+		if err := ValidateCAConfigSection(s); err == nil {
+			t.Errorf("ValidateCAConfigSection(%q) = nil, want error", s)
+		}
+	}
+}
+
 func TestValidateHydraCAEntries_DuplicateHash(t *testing.T) {
 	err := ValidateHydraCAEntries([]string{"abcdef0", "abcdef0"}, "test")
 	if err == nil {

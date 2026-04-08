@@ -60,7 +60,7 @@ func applyHydraOverlayMutator(m map[string]any, in claimSpecMutatorInput) error 
 	mergeHydraIntoBlock(m, overlay)
 	// Ensure typed fields are injected into canonical schema locations consumed
 	// by node parsing for each job phase.
-	applyCanonicalHydraOverlay(m, in.jobType, overlay)
+	applyCanonicalHydraOverlay(m, in.jobType, in.job.Name, overlay)
 
 	if err := applyHealOverlay(m, in); err != nil {
 		return err
@@ -69,7 +69,7 @@ func applyHydraOverlayMutator(m map[string]any, in claimSpecMutatorInput) error 
 	return nil
 }
 
-func applyCanonicalHydraOverlay(spec map[string]any, jobType domaintypes.JobType, overlay *HydraJobConfig) {
+func applyCanonicalHydraOverlay(spec map[string]any, jobType domaintypes.JobType, jobName string, overlay *HydraJobConfig) {
 	if spec == nil || overlay == nil {
 		return
 	}
@@ -80,6 +80,25 @@ func applyCanonicalHydraOverlay(spec map[string]any, jobType domaintypes.JobType
 		mergeCABlock(ensureBuildGatePhase(spec, "pre"), overlay.CA)
 	case domaintypes.JobTypePostGate, domaintypes.JobTypeReGate:
 		mergeCABlock(ensureBuildGatePhase(spec, "post"), overlay.CA)
+	case domaintypes.JobTypeSBOM, domaintypes.JobTypeHook:
+		switch hydraPhaseForAuxBuildGateJob(jobName) {
+		case "pre":
+			mergeCABlock(ensureBuildGatePhase(spec, "pre"), overlay.CA)
+		case "post":
+			mergeCABlock(ensureBuildGatePhase(spec, "post"), overlay.CA)
+		}
+	}
+}
+
+func hydraPhaseForAuxBuildGateJob(jobName string) string {
+	name := strings.TrimSpace(jobName)
+	switch {
+	case strings.HasPrefix(name, "pre-gate-"):
+		return "pre"
+	case strings.HasPrefix(name, "post-gate-"), strings.HasPrefix(name, "re-gate-"):
+		return "post"
+	default:
+		return ""
 	}
 }
 

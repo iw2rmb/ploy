@@ -274,13 +274,21 @@ func (r *runController) executeHookJob(ctx context.Context, req StartRunRequest)
 		return
 	}
 	commandIdentityJSON := encodeHookCommandIdentityList(hookSource, specDoc.Steps)
+	phaseConfig := sbomPhaseConfigForCycle(cycleName, req.TypedOptions)
+	phaseCA := []string(nil)
+	if phaseConfig != nil {
+		phaseCA = append(phaseCA, phaseConfig.CA...)
+	}
 	stepInputPath := inputSnapshotPath
 	finalOutcome := standardJobOutcome{
 		runErr: fmt.Errorf("hook[%d] has no executable steps", hookIndex),
 	}
 	var completedStepName string
 	for stepIdx, execStep := range specDoc.Steps {
-		manifest, manifestErr := buildManifestFromRequest(req, hookStepRunOptions(execStep, req.TypedOptions.BundleMap), 0, contracts.MigStackUnknown)
+		runtimeStep := execStep
+		runtimeStep.CA = mergeUniqueStringEntries(append([]string(nil), execStep.CA...), phaseCA)
+
+		manifest, manifestErr := buildManifestFromRequest(req, hookStepRunOptions(runtimeStep, req.TypedOptions.BundleMap), 0, contracts.MigStackUnknown)
 		if manifestErr != nil {
 			err = fmt.Errorf("hook[%d] step[%d] build runtime manifest: %w", hookIndex, stepIdx, manifestErr)
 			slog.Error("failed to execute hook job", "run_id", req.RunID, "job_id", req.JobID, "hook_index", hookIndex, "step_index", stepIdx, "error", err)

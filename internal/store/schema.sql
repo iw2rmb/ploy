@@ -499,13 +499,13 @@ CREATE INDEX IF NOT EXISTS config_env_target_idx ON config_env(target);
 -- Global CA Entries (config_ca)
 -- Stores canonical CA certificate hash entries for injection into jobs.
 -- Each entry is a shortHash (7-64 hex chars) referencing a content-addressed bundle.
--- section controls which job phase receives the CA entry (pre_gate, re_gate, post_gate, mig, heal).
+-- section controls which job phase receives the CA entry (pre_gate, re_gate, post_gate, mig, heal, sbom, hook).
 -- Composite primary key on (hash, section) allows one hash to target multiple sections.
 -- Ordering within a section is deterministic by hash ASC.
 DROP TABLE IF EXISTS config_ca;
 CREATE TABLE IF NOT EXISTS config_ca (
   hash        TEXT NOT NULL CHECK (hash ~ '^[0-9a-f]{7,64}$'),  -- Canonical shortHash
-  section     TEXT NOT NULL CHECK (section IN ('pre_gate', 're_gate', 'post_gate', 'mig', 'heal')),
+  section     TEXT NOT NULL CHECK (section IN ('pre_gate', 're_gate', 'post_gate', 'mig', 'heal', 'sbom', 'hook')),
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (hash, section)
 );
