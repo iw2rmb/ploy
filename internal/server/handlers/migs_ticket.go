@@ -215,12 +215,6 @@ func (d hookPlanningDecision) ShouldRun() bool {
 	return d.Match.ShouldRun
 }
 
-type plannedHookSource struct {
-	SourceIndex int
-	Source      string
-	Decision    hookPlanningDecision
-}
-
 type preGateCreationBinding struct {
 	ProfileID int64
 	JobImage  string
@@ -484,60 +478,6 @@ func createPlannedJob(ctx context.Context, st store.Store, runID domaintypes.Run
 		RepoShaIn:   planned.RepoSHAIn,
 	})
 	return err
-}
-
-func resolveCycleHookPlans(
-	ctx context.Context,
-	st store.Store,
-	runID domaintypes.RunID,
-	repoID domaintypes.RepoID,
-	attempt int32,
-	spec *contracts.MigSpec,
-	resolvedHooks []string,
-	cycleName string,
-	hookBlobstores ...blobstore.Store,
-) ([]plannedHookSource, error) {
-	if len(resolvedHooks) == 0 {
-		return nil, nil
-	}
-	matchInput, err := buildCycleHookMatchInput(ctx, st, runID, repoID, attempt, spec, cycleName)
-	if err != nil {
-		return nil, err
-	}
-	out := make([]plannedHookSource, 0, len(resolvedHooks))
-	for i, source := range resolvedHooks {
-		decision, decisionErr := resolvePlannableHookDecision(ctx, st, spec, source, matchInput, hookBlobstores...)
-		if decisionErr != nil {
-			return nil, fmt.Errorf("source[%d] %q: %w", i, source, decisionErr)
-		}
-		out = append(out, plannedHookSource{
-			SourceIndex: i,
-			Source:      source,
-			Decision:    decision,
-		})
-	}
-	return out, nil
-}
-
-func buildCycleHookMatchInput(
-	ctx context.Context,
-	st store.Store,
-	runID domaintypes.RunID,
-	repoID domaintypes.RepoID,
-	attempt int32,
-	spec *contracts.MigSpec,
-	cycleName string,
-) (hook.MatchInput, error) {
-	input, err := buildHookMatchInput(ctx, st, store.Job{
-		RunID:   runID,
-		RepoID:  repoID,
-		Attempt: attempt,
-	})
-	if err != nil {
-		return hook.MatchInput{}, err
-	}
-	input.Stack = mergeHookRuntimeStackWithFallback(input.Stack, hookRuntimeFallbackStack(spec, cycleName))
-	return input, nil
 }
 
 func hookRuntimeFallbackStack(spec *contracts.MigSpec, cycleName string) hook.RuntimeStack {

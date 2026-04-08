@@ -279,7 +279,7 @@ func TestAddHookRuntimeMetadata_EmitsHookOnceKeys(t *testing.T) {
 	}
 }
 
-func TestExecuteHookJob_SkipsHookWorkWhenHookShouldRunFalse(t *testing.T) {
+func TestExecuteHookJob_FailsWhenHookShouldRunFalseReachesExecution(t *testing.T) {
 	cacheHome := t.TempDir()
 	t.Setenv("PLOYD_CACHE_HOME", cacheHome)
 
@@ -288,7 +288,7 @@ func TestExecuteHookJob_SkipsHookWorkWhenHookShouldRunFalse(t *testing.T) {
 	server, cap := newStatusCaptureServer(t, jobID.String())
 	rc := newTestController(t, newAgentConfig(server.URL))
 
-	input := writeCanonicalSBOMFixture(t, preGateSBOMOutPath(runID), "pre-gate-cycle")
+	writeCanonicalSBOMFixture(t, preGateSBOMOutPath(runID), "pre-gate-cycle")
 
 	rc.executeHookJob(context.Background(), StartRunRequest{
 		RunID:   runID,
@@ -304,21 +304,17 @@ func TestExecuteHookJob_SkipsHookWorkWhenHookShouldRunFalse(t *testing.T) {
 		},
 	})
 
-	if got := cap.Status; got != types.JobStatusSuccess.String() {
-		t.Fatalf("status=%q, want %q", got, types.JobStatusSuccess.String())
+	if got := cap.Status; got != types.JobStatusError.String() {
+		t.Fatalf("status=%q, want %q", got, types.JobStatusError.String())
 	}
 
 	inPath := preGateHookInPath(runID, 0)
 	if _, err := os.Stat(inPath); !os.IsNotExist(err) {
-		t.Fatalf("expected skip path to avoid /in materialization, err=%v", err)
+		t.Fatalf("expected invariant-fail path to avoid /in materialization, err=%v", err)
 	}
 
 	outPath := preGateHookOutPath(runID, 0)
-	out, err := os.ReadFile(outPath)
-	if err != nil {
-		t.Fatalf("read /out snapshot: %v", err)
-	}
-	if string(out) != string(input) {
-		t.Fatalf("/out snapshot mismatch: got %q want %q", string(out), string(input))
+	if _, err := os.Stat(outPath); !os.IsNotExist(err) {
+		t.Fatalf("expected invariant-fail path to avoid /out materialization, err=%v", err)
 	}
 }
