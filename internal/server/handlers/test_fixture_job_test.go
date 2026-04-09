@@ -138,10 +138,10 @@ type jobStore struct {
 	cancelActiveJobsByRunRepoAttempt mockCallSlice[store.CancelActiveJobsByRunRepoAttemptParams, int64]
 
 	getLatestRunRepoByMigAndRepoStatus mockCall[store.GetLatestRunRepoByMigAndRepoStatusParams, store.GetLatestRunRepoByMigAndRepoStatusRow]
-	createRunRepoAction               mockCall[store.CreateRunRepoActionParams, store.RunRepoAction]
-	getRunRepoAction                  mockCall[types.JobID, store.RunRepoAction]
-	getRunRepoActionByKey             mockCall[store.GetRunRepoActionByKeyParams, store.RunRepoAction]
-	updateRunRepoActionCompletion     mockCall[store.UpdateRunRepoActionCompletionParams, struct{}]
+	createRunRepoAction                mockCall[store.CreateRunRepoActionParams, store.RunRepoAction]
+	getRunRepoAction                   mockCall[types.JobID, store.RunRepoAction]
+	getRunRepoActionByKey              mockCall[store.GetRunRepoActionByKeyParams, store.RunRepoAction]
+	updateRunRepoActionCompletion      mockCall[store.UpdateRunRepoActionCompletionParams, struct{}]
 	listRunRepoActionsByRunRepoAttempt mockCall[store.ListRunRepoActionsByRunRepoAttemptParams, []store.RunRepoAction]
 
 	// Stale recovery
@@ -160,8 +160,9 @@ type jobStore struct {
 	createEvent mockResult[store.Event]
 
 	// Ingest (logs)
-	createLog     mockResult[store.Log]
-	listLogsByRun mockCall[string, []store.Log]
+	createLog           mockResult[store.Log]
+	listLogsByRun       mockCall[string, []store.Log]
+	listLogsByRunAndJob mockCall[store.ListLogsByRunAndJobParams, []store.Log]
 
 	// Spec creation (for migs_ticket flow)
 	createSpecCalled bool
@@ -774,6 +775,10 @@ func (m *jobStore) CreateLog(ctx context.Context, params store.CreateLogParams) 
 
 func (m *jobStore) ListLogsByRun(ctx context.Context, runID types.RunID) ([]store.Log, error) {
 	return m.listLogsByRun.record(runID.String())
+}
+
+func (m *jobStore) ListLogsByRunAndJob(ctx context.Context, arg store.ListLogsByRunAndJobParams) ([]store.Log, error) {
+	return m.listLogsByRunAndJob.record(arg)
 }
 
 // Spec creation (for migs_ticket flow)

@@ -116,7 +116,7 @@ func buildClaimResponsePayload(
 		}
 	}
 
-	recoveryCtx, err := buildRecoveryClaimContext(ctx, st, run.ID, job, jobType)
+	recoveryCtx, err := buildRecoveryClaimContext(ctx, st, bs, run.ID, job, jobType)
 	if err != nil {
 		return claimResponsePayload{}, fmt.Errorf("build recovery context: %w", err)
 	}

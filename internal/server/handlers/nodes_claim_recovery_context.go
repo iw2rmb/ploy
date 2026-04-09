@@ -3,11 +3,14 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/url"
 	"strings"
 
+	"github.com/iw2rmb/ploy/internal/blobstore"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/logchunk"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"github.com/iw2rmb/ploy/internal/workflow/lifecycle"
@@ -16,6 +19,7 @@ import (
 func buildRecoveryClaimContext(
 	ctx context.Context,
 	st store.Store,
+	bs blobstore.Store,
 	runID domaintypes.RunID,
 	job store.Job,
 	jobType domaintypes.JobType,
@@ -87,6 +91,19 @@ func buildRecoveryClaimContext(
 			if logPayload := gateLogPayloadFromClaimMetadata(gateMeta.GateMetadata); strings.TrimSpace(logPayload) != "" {
 				ctxPayload.BuildGateLog = logPayload
 			}
+		}
+	}
+	if strings.TrimSpace(ctxPayload.BuildGateLog) == "" && jobType == domaintypes.JobTypeHeal {
+		prev := lifecycle.RecoveryChainPredecessor(job.ID, jobsByID)
+		if prev != nil && domaintypes.JobType(prev.JobType) == domaintypes.JobTypeSBOM {
+			logPayload, logErr := sbomLogPayloadFromClaimLogs(ctx, st, bs, runID, prev.ID)
+			if logErr != nil {
+				return nil, &ClaimJobTerminalError{
+					Message: fmt.Sprintf("resolve sbom recovery log for predecessor job %s", prev.ID),
+					Err:     logErr,
+				}
+			}
+			ctxPayload.BuildGateLog = logPayload
 		}
 	}
 	if detectedExpectation == nil {
@@ -188,4 +205,55 @@ func buildDepsCompatEndpoint(stack *contracts.StackExpectation) string {
 		url.QueryEscape(release),
 		url.QueryEscape(tool),
 	)
+}
+
+func sbomLogPayloadFromClaimLogs(
+	ctx context.Context,
+	st store.Store,
+	bs blobstore.Store,
+	runID domaintypes.RunID,
+	jobID domaintypes.JobID,
+) (string, error) {
+	if bs == nil {
+		return "", errors.New("blob store is required")
+	}
+
+	jobIDCopy := jobID
+	logs, err := st.ListLogsByRunAndJob(ctx, store.ListLogsByRunAndJobParams{
+		RunID: runID,
+		JobID: &jobIDCopy,
+	})
+	if err != nil {
+		return "", fmt.Errorf("list sbom logs: %w", err)
+	}
+	if len(logs) == 0 {
+		return "", errors.New("no sbom logs found")
+	}
+
+	var out strings.Builder
+	for _, chunk := range logs {
+		if chunk.ObjectKey == nil || strings.TrimSpace(*chunk.ObjectKey) == "" {
+			return "", fmt.Errorf("log chunk %d has empty object_key", chunk.ID)
+		}
+		data, readErr := blobstore.ReadAll(ctx, bs, *chunk.ObjectKey)
+		if readErr != nil {
+			return "", fmt.Errorf("read sbom log chunk %d: %w", chunk.ID, readErr)
+		}
+		records, decodeErr := logchunk.DecodeGzip(data)
+		if decodeErr != nil {
+			return "", fmt.Errorf("decode sbom log chunk %d: %w", chunk.ID, decodeErr)
+		}
+		for _, record := range records {
+			line := strings.TrimRight(record.Line, "\r\n")
+			if strings.TrimSpace(line) == "" {
+				continue
+			}
+			out.WriteString(line)
+			out.WriteByte('\n')
+		}
+	}
+	if out.Len() == 0 {
+		return "", errors.New("sbom logs contain no non-empty lines")
+	}
+	return out.String(), nil
 }
