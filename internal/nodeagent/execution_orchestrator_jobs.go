@@ -228,7 +228,10 @@ func (r *runController) executeSBOMJob(ctx context.Context, req StartRunRequest)
 		DiffType:      types.DiffJobTypeMig,
 		OutDirPattern: "ploy-sbom-out-*",
 		PrepareManifest: func(m *contracts.StepManifest, workspace string) error {
-			detectedStack := detectSBOMStackFromWorkspace(workspace, stackForManifest)
+			detectedStack, detectErr := detectSBOMStackFromWorkspace(workspace)
+			if detectErr != nil {
+				return fmt.Errorf("resolve sbom stack from workspace: %w", detectErr)
+			}
 			if detectedStack == stackForManifest {
 				return nil
 			}
@@ -333,7 +336,7 @@ func (r *runController) executeHookJob(ctx context.Context, req StartRunRequest)
 			ValidateOutputs: func(_, _ string) error {
 				return materializeHookSnapshot(stepInputPath, stepOutPath)
 			},
-			WorkspacePolicy:        workspaceChangePolicyIgnore,
+			WorkspacePolicy: workspaceChangePolicyIgnore,
 			UploadDiff: func(ctx context.Context, runID types.RunID, jobID types.JobID, jobName string, diffGen step.DiffGenerator, baseDir, workspace string, result step.Result) {
 				r.uploadDiffWithBaseline(ctx, runID, jobID, jobName, diffGen, baseDir, workspace, result, types.DiffJobTypeMig, false)
 			},
