@@ -330,10 +330,13 @@ func (r *runController) executeHookJob(ctx context.Context, req StartRunRequest)
 				}
 				return nil
 			},
-			ValidateOutputs: func(outDir, _ string) error {
-				return materializeValidatedHookSBOMOutput(outDir, stepOutPath)
+			ValidateOutputs: func(_, _ string) error {
+				return materializeHookSnapshot(stepInputPath, stepOutPath)
 			},
 			WorkspacePolicy:        workspaceChangePolicyIgnore,
+			UploadDiff: func(ctx context.Context, runID types.RunID, jobID types.JobID, jobName string, diffGen step.DiffGenerator, baseDir, workspace string, result step.Result) {
+				r.uploadDiffWithBaseline(ctx, runID, jobID, jobName, diffGen, baseDir, workspace, result, types.DiffJobTypeMig, false)
+			},
 			SuppressTerminalStatus: true,
 			SuppressOutBundle:      stepIdx+1 < len(specDoc.Steps),
 			StartTime:              startTime,
@@ -539,16 +542,10 @@ func hookStepRunOptions(stepSpec hook.Step, bundleMap map[string]string) RunOpti
 	}
 }
 
-func materializeValidatedHookSBOMOutput(outDir, snapshotPath string) error {
-	canonicalPath := filepath.Join(outDir, preGateCanonicalSBOMFileName)
-	raw, err := os.ReadFile(canonicalPath)
-	if err != nil {
-		return fmt.Errorf("read canonical hook sbom output %s: %w", canonicalPath, err)
-	}
-	if err := validateCanonicalSBOMDocument(raw); err != nil {
-		return fmt.Errorf("validate canonical hook sbom output %s: %w", canonicalPath, err)
-	}
-	if err := copyFileBytes(canonicalPath, snapshotPath); err != nil {
+func materializeHookSnapshot(inputSnapshotPath, snapshotPath string) error {
+	// Hooks mutate /workspace and do not produce SBOM output artifacts.
+	// Preserve the input snapshot for downstream gate-cycle consumers.
+	if err := copyFileBytes(inputSnapshotPath, snapshotPath); err != nil {
 		return fmt.Errorf("stage hook snapshot %s: %w", snapshotPath, err)
 	}
 	return nil
