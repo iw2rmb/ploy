@@ -288,6 +288,7 @@ type Querier interface {
 	ResolveAnyStackID(ctx context.Context) (int64, error)
 	ResolvePreGateCreationBindingByRepoSHA(ctx context.Context, arg ResolvePreGateCreationBindingByRepoSHAParams) (ResolvePreGateCreationBindingByRepoSHARow, error)
 	ResolvePreGateCreationBindingByRepoSHAAndStack(ctx context.Context, arg ResolvePreGateCreationBindingByRepoSHAAndStackParams) (ResolvePreGateCreationBindingByRepoSHAAndStackRow, error)
+	ResolveReusableSBOMByRepoSHAAndStack(ctx context.Context, arg ResolveReusableSBOMByRepoSHAAndStackParams) (ResolveReusableSBOMByRepoSHAAndStackRow, error)
 	ResolveReusableStepByHash(ctx context.Context, arg ResolveReusableStepByHashParams) (ResolveReusableStepByHashRow, error)
 	ResolveStackIDByImage(ctx context.Context, image string) (int64, error)
 	ResolveStackIDByRepoSHA(ctx context.Context, arg ResolveStackIDByRepoSHAParams) (int64, error)
@@ -359,6 +360,7 @@ type Querier interface {
 	// Uniqueness is on (mig_id, repo_id) to prevent duplicate repo membership per mig.
 	UpsertMigRepo(ctx context.Context, arg UpsertMigRepoParams) (MigRepo, error)
 	UpsertSBOMRow(ctx context.Context, arg UpsertSBOMRowParams) error
+	UpsertSBOMStep(ctx context.Context, arg UpsertSBOMStepParams) error
 	UpsertStep(ctx context.Context, arg UpsertStepParams) error
 }
 

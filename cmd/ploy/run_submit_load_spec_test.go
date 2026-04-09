@@ -1,7 +1,12 @@
 package main
 
 import (
+	"archive/tar"
+	"bytes"
+	"compress/gzip"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -11,6 +16,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -45,6 +51,77 @@ func newMockBundleSrvForLoadSpec(t *testing.T) (*httptest.Server, *url.URL, *htt
 		t.Fatalf("parse server URL: %v", err)
 	}
 	return srv, u, srv.Client()
+}
+
+func newCapturingBundleSrvForLoadSpec(t *testing.T) (*httptest.Server, *url.URL, *http.Client, map[string][]byte) {
+	t.Helper()
+	uploads := make(map[string][]byte)
+	var mu sync.Mutex
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v1/spec-bundles" {
+			if r.Method == http.MethodHead {
+				w.WriteHeader(http.StatusNotFound)
+				return
+			}
+			if r.Method == http.MethodPost {
+				data, _ := io.ReadAll(r.Body)
+				hash := computeArchiveShortHash(data)
+				mu.Lock()
+				uploads[hash] = append([]byte(nil), data...)
+				mu.Unlock()
+				fullDigest := sha256.Sum256(data)
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusCreated)
+				_ = json.NewEncoder(w).Encode(map[string]any{
+					"bundle_id": "bundle-" + hash,
+					"cid":       computeSpecBundleCID(data),
+					"digest":    "sha256:" + hex.EncodeToString(fullDigest[:]),
+					"size":      len(data),
+				})
+				return
+			}
+		}
+		http.Error(w, "unexpected", http.StatusInternalServerError)
+	}))
+	t.Cleanup(srv.Close)
+	u, err := url.Parse(srv.URL)
+	if err != nil {
+		t.Fatalf("parse server URL: %v", err)
+	}
+	return srv, u, srv.Client(), uploads
+}
+
+func extractSingleContentFileFromArchive(t *testing.T, archive []byte) []byte {
+	t.Helper()
+	gr, err := gzip.NewReader(bytes.NewReader(archive))
+	if err != nil {
+		t.Fatalf("open gzip: %v", err)
+	}
+	defer func() { _ = gr.Close() }()
+
+	tr := tar.NewReader(gr)
+	for {
+		hdr, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatalf("read tar: %v", err)
+		}
+		if hdr == nil || hdr.Typeflag != tar.TypeReg {
+			continue
+		}
+		if hdr.Name != "content" {
+			continue
+		}
+		payload, readErr := io.ReadAll(tr)
+		if readErr != nil {
+			t.Fatalf("read content entry: %v", readErr)
+		}
+		return payload
+	}
+	t.Fatal("archive missing content file")
+	return nil
 }
 
 func TestLoadSpec_ResolvesStepHydraRecords(t *testing.T) {
@@ -411,5 +488,97 @@ hooks:
 	}
 	if !strings.Contains(err.Error(), "local hook sources found but no server base URL available for upload") {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestLoadSpec_LocalHookManifestCompilesHydraAndExpandsPlaceholders(t *testing.T) {
+	_, base, client, uploads := newCapturingBundleSrvForLoadSpec(t)
+
+	tmpDir := t.TempDir()
+	t.Setenv("PLOY_CONTAINER_REGISTRY", "ghcr.io/example")
+	t.Setenv("PLOY_VERSION", "v1.2.3")
+	t.Setenv("HOOK_TOKEN", "from-env")
+
+	if err := os.WriteFile(filepath.Join(tmpDir, "amata.yaml"), []byte("version: amata/v1\nname: test\nentry: main\n"), 0o644); err != nil {
+		t.Fatalf("write amata file: %v", err)
+	}
+	hookPath := filepath.Join(tmpDir, "hook.yaml")
+	hookSpec := []byte(`
+id: local-hook
+steps:
+  - image: $PLOY_CONTAINER_REGISTRY/amata:$PLOY_VERSION
+    envs:
+      TOKEN: $HOOK_TOKEN
+    in:
+      - ./amata.yaml:amata.yaml
+`)
+	if err := os.WriteFile(hookPath, hookSpec, 0o644); err != nil {
+		t.Fatalf("write hook file: %v", err)
+	}
+	specPath := filepath.Join(tmpDir, "spec.yaml")
+	spec := []byte(`
+steps:
+  - image: docker.io/test/mig:latest
+hooks:
+  - ./hook.yaml
+`)
+	if err := os.WriteFile(specPath, spec, 0o644); err != nil {
+		t.Fatalf("write spec file: %v", err)
+	}
+
+	payload, err := loadSpec(context.Background(), base, client, specPath)
+	if err != nil {
+		t.Fatalf("loadSpec() unexpected error: %v", err)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(payload, &result); err != nil {
+		t.Fatalf("unmarshal payload: %v", err)
+	}
+	hooksRaw, ok := result["hooks"].([]any)
+	if !ok || len(hooksRaw) != 1 {
+		t.Fatalf("hooks=%v, want one compiled hook hash", result["hooks"])
+	}
+	hookHash, ok := hooksRaw[0].(string)
+	if !ok || !regexp.MustCompile(`^[0-9a-f]{12}$`).MatchString(hookHash) {
+		t.Fatalf("hooks[0]=%v, want short hash string", hooksRaw[0])
+	}
+	if _, ok := uploads[hookHash]; !ok {
+		t.Fatalf("expected uploaded hook bundle for hash %q", hookHash)
+	}
+
+	hookPayload := extractSingleContentFileFromArchive(t, uploads[hookHash])
+	var hookMap map[string]any
+	if err := json.Unmarshal(hookPayload, &hookMap); err != nil {
+		t.Fatalf("unmarshal canonical hook payload: %v", err)
+	}
+	steps, ok := hookMap["steps"].([]any)
+	if !ok || len(steps) != 1 {
+		t.Fatalf("canonical hook steps=%v, want 1", hookMap["steps"])
+	}
+	step := steps[0].(map[string]any)
+	if got, want := step["image"], "ghcr.io/example/amata:v1.2.3"; got != want {
+		t.Fatalf("hook step image=%v, want %q", got, want)
+	}
+	envs, ok := step["envs"].(map[string]any)
+	if !ok {
+		t.Fatalf("hook step envs type=%T, want map[string]any", step["envs"])
+	}
+	if got, want := envs["TOKEN"], "from-env"; got != want {
+		t.Fatalf("hook step env TOKEN=%v, want %q", got, want)
+	}
+	inEntries, ok := step["in"].([]any)
+	if !ok || len(inEntries) != 1 {
+		t.Fatalf("hook step in=%v, want one canonical entry", step["in"])
+	}
+	inEntry, ok := inEntries[0].(string)
+	if !ok {
+		t.Fatalf("hook step in[0] type=%T, want string", inEntries[0])
+	}
+	if !strings.Contains(inEntry, ":/in/amata.yaml") {
+		t.Fatalf("hook step in[0]=%q, want canonical /in path", inEntry)
+	}
+	if strings.Contains(inEntry, "./amata.yaml:") {
+		t.Fatalf("hook step in[0]=%q, authoring source must be compiled out", inEntry)
 	}
 }

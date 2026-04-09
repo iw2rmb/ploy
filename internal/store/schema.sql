@@ -350,6 +350,20 @@ CREATE TABLE IF NOT EXISTS sboms (
 CREATE INDEX IF NOT EXISTS sboms_repo_lib_ver_idx ON sboms(repo_id, lib, ver);
 CREATE INDEX IF NOT EXISTS sboms_job_idx ON sboms(job_id);
 
+-- SBOM cache metadata keyed by sbom execution job.
+-- Stores resolved stack tuple and optional reference to a previously successful
+-- sbom job reused for this execution.
+CREATE TABLE IF NOT EXISTS sbom_steps (
+  job_id       TEXT PRIMARY KEY REFERENCES jobs(id) ON DELETE CASCADE,
+  lang         TEXT NOT NULL CHECK (lang <> ''),
+  tool         TEXT NOT NULL CHECK (tool <> ''),
+  release      TEXT NOT NULL CHECK (release <> ''),
+  ref_job_id   TEXT REFERENCES jobs(id) ON DELETE SET NULL,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS sbom_steps_stack_idx ON sbom_steps(lang, tool, release);
+CREATE INDEX IF NOT EXISTS sbom_steps_ref_job_idx ON sbom_steps(ref_job_id) WHERE ref_job_id IS NOT NULL;
+
 -- Hook once-by-hash ledger keyed by run/repo and hook hash.
 -- Records successful hook execution and whether a once-skip marker was observed.
 CREATE TABLE IF NOT EXISTS hooks_once (

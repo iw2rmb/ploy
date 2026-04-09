@@ -296,6 +296,15 @@ type Sbom struct {
 	Ver    string       `json:"ver"`
 }
 
+type SbomStep struct {
+	JobID     string             `json:"job_id"`
+	Lang      string             `json:"lang"`
+	Tool      string             `json:"tool"`
+	Release   string             `json:"release"`
+	RefJobID  *string            `json:"ref_job_id"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
 type Spec struct {
 	ID         types.SpecID       `json:"id"`
 	Name       string             `json:"name"`

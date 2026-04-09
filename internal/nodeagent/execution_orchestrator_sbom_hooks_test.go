@@ -1,6 +1,9 @@
 package nodeagent
 
 import (
+	"archive/tar"
+	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"errors"
@@ -15,6 +18,34 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/hook"
 	"github.com/iw2rmb/ploy/internal/workflow/step"
 )
+
+func mustTarGzEntries(t *testing.T, entries map[string][]byte) []byte {
+	t.Helper()
+
+	var buf bytes.Buffer
+	gz := gzip.NewWriter(&buf)
+	tw := tar.NewWriter(gz)
+	for name, payload := range entries {
+		hdr := &tar.Header{
+			Name: name,
+			Mode: 0o644,
+			Size: int64(len(payload)),
+		}
+		if err := tw.WriteHeader(hdr); err != nil {
+			t.Fatalf("write tar header %q: %v", name, err)
+		}
+		if _, err := tw.Write(payload); err != nil {
+			t.Fatalf("write tar payload %q: %v", name, err)
+		}
+	}
+	if err := tw.Close(); err != nil {
+		t.Fatalf("close tar writer: %v", err)
+	}
+	if err := gz.Close(); err != nil {
+		t.Fatalf("close gzip writer: %v", err)
+	}
+	return buf.Bytes()
+}
 
 func writeCanonicalSBOMFixture(t *testing.T, path string, name string) []byte {
 	t.Helper()
@@ -370,5 +401,59 @@ func TestHookRuntimeStepCA_MergesCyclePhaseCA(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestRestoreSBOMOutFilesFromBundle_RestoresSBOMOutputsOnly(t *testing.T) {
+	t.Parallel()
+
+	outDir := t.TempDir()
+	validCanonical := []byte(`{"spdxVersion":"SPDX-2.3","packages":[]}`)
+	bundle := mustTarGzEntries(t, map[string][]byte{
+		"out/sbom.spdx.json":        validCanonical,
+		"out/sbom.dependencies.txt": []byte("org.example:lib:1.0.0"),
+		"out/other.txt":             []byte("ignore"),
+	})
+
+	count, err := restoreSBOMOutFilesFromBundle(bundle, outDir)
+	if err != nil {
+		t.Fatalf("restoreSBOMOutFilesFromBundle() error = %v", err)
+	}
+	if count != 2 {
+		t.Fatalf("restored count = %d, want 2", count)
+	}
+	if _, err := os.Stat(filepath.Join(outDir, "sbom.spdx.json")); err != nil {
+		t.Fatalf("expected canonical sbom to be restored: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(outDir, "sbom.dependencies.txt")); err != nil {
+		t.Fatalf("expected dependency output to be restored: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(outDir, "other.txt")); !os.IsNotExist(err) {
+		t.Fatalf("expected non-sbom output not to be restored, err=%v", err)
+	}
+}
+
+func TestTryRestoreSBOMFromCache_ImageMismatchSkipsReuse(t *testing.T) {
+	t.Parallel()
+
+	rc := &runController{}
+	req := StartRunRequest{
+		RunID: "run-image-mismatch",
+		JobID: "job-image-mismatch",
+		SBOMSkip: &contracts.SBOMStepSkipMetadata{
+			Enabled:       true,
+			RefJobID:      "ref-job",
+			RefArtifactID: "123e4567-e89b-12d3-a456-426614174000",
+			RefJobImage:   "ghcr.io/iw2rmb/ploy/sbom-maven:latest",
+		},
+	}
+	manifest := contracts.StepManifest{Image: "ghcr.io/iw2rmb/ploy/sbom-gradle:latest"}
+
+	skipped, err := rc.tryRestoreSBOMFromCache(context.Background(), req, manifest, t.TempDir())
+	if err != nil {
+		t.Fatalf("tryRestoreSBOMFromCache() error = %v", err)
+	}
+	if skipped {
+		t.Fatal("expected no cache reuse when image differs")
 	}
 }

@@ -75,7 +75,7 @@ func RegisterRoutes(s *server.HTTPServer, st store.Store, bs blobstore.Store, bp
 
 	// Artifact download endpoints
 	s.RegisterRouteFunc("GET /v1/artifacts", listArtifactsByCIDHandler(st), auth.RoleControlPlane)
-	s.RegisterRouteFunc("GET /v1/artifacts/{id}", getArtifactHandler(st, bs), auth.RoleControlPlane)
+	s.RegisterRouteFunc("GET /v1/artifacts/{id}", getArtifactHandler(st, bs), auth.RoleControlPlane, auth.RoleWorker)
 
 	// Runs — batch lifecycle endpoints for listing, inspecting, cancelling, starting, and streaming logs/events.
 	s.RegisterRouteFunc("GET /v1/runs", listRunsHandler(st), auth.RoleControlPlane)

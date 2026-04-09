@@ -14,6 +14,7 @@ import (
 	"log/slog"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -196,6 +197,15 @@ func preGateHookIndexFromJobName(jobName string, hooksLen int) (int, error) {
 func (r *runController) executeSBOMJob(ctx context.Context, req StartRunRequest) {
 	startTime := time.Now()
 
+	if req.SBOMSkip != nil {
+		if err := req.SBOMSkip.Validate(); err != nil {
+			err = fmt.Errorf("invalid sbom_skip metadata: %w", err)
+			slog.Error("failed to apply sbom skip", "run_id", req.RunID, "job_id", req.JobID, "error", err)
+			r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
+			return
+		}
+	}
+
 	cycleName, err := gateCycleNameFromSBOMContext(req.SBOMContext)
 	if err != nil {
 		slog.Error("failed to derive sbom cycle", "run_id", req.RunID, "job_id", req.JobID, "job_name", req.JobName, "error", err)
@@ -227,6 +237,9 @@ func (r *runController) executeSBOMJob(ctx context.Context, req StartRunRequest)
 		},
 		ValidateOutputs: func(outDir, _ string) error {
 			return materializeValidatedSBOMOutput(outDir, sbomSnapshotPath)
+		},
+		TrySkip: func(ctx context.Context, manifest contracts.StepManifest, _, outDir string) (bool, error) {
+			return r.tryRestoreSBOMFromCache(ctx, req, manifest, outDir)
 		},
 		WorkspacePolicy: workspaceChangePolicyIgnore,
 		StartTime:       startTime,
@@ -1007,6 +1020,7 @@ type standardJobConfig struct {
 	PopulateInDir   func(inDir string) error
 	PrepareManifest func(manifest *contracts.StepManifest, workspace string) error
 	ValidateOutputs func(outDir, workspace string) error
+	TrySkip         func(ctx context.Context, manifest contracts.StepManifest, workspace, outDir string) (bool, error)
 
 	WorkspacePolicy           workspaceChangePolicy
 	UploadConfiguredArtifacts bool
@@ -1131,6 +1145,49 @@ func (r *runController) runContainerJob(
 		return outcome, fmt.Errorf("save job image name: %w", err)
 	}
 
+	var result step.Result
+	var runErr error
+	var duration time.Duration
+	if cfg.TrySkip != nil {
+		skipped, err := cfg.TrySkip(ctx, manifest, workspace, outDir)
+		if err != nil {
+			return outcome, fmt.Errorf("evaluate skip: %w", err)
+		}
+		if skipped {
+			duration := time.Since(startTime)
+			if runErr == nil && cfg.ValidateOutputs != nil {
+				if validateErr := cfg.ValidateOutputs(outDir, workspace); validateErr != nil {
+					runErr = fmt.Errorf("validate job outputs: %w", validateErr)
+				}
+			}
+			repoSHAOut := r.computeRepoSHAOut(ctx, req, workspace, "")
+			statsBuilder := types.NewRunStatsBuilder().
+				ExitCode(0).
+				DurationMs(duration.Milliseconds()).
+				MetadataEntry("sbom_skip", "true")
+			if req.SBOMSkip != nil {
+				statsBuilder.MetadataEntry("sbom_skip_ref_job_id", req.SBOMSkip.RefJobID.String()).
+					MetadataEntry("sbom_skip_ref_artifact_id", strings.TrimSpace(req.SBOMSkip.RefArtifactID))
+			}
+			stats := statsBuilder.MustBuild()
+			if !cfg.SuppressOutBundle {
+				if err := r.uploadOutDirBundle(ctx, req.RunID, req.JobID, outDir, "mig-out"); err != nil {
+					slog.Warn("/out artifact upload failed", "run_id", req.RunID, "job_id", req.JobID, "next_id", req.NextID, "error", err)
+				}
+			}
+			outcome = standardJobOutcome{
+				runErr:     runErr,
+				result:     step.Result{},
+				repoSHAOut: repoSHAOut,
+				duration:   duration,
+			}
+			if !cfg.SuppressTerminalStatus {
+				r.reportTerminalStatus(ctx, req, runErr, step.Result{}, stats, repoSHAOut, duration)
+			}
+			return outcome, nil
+		}
+	}
+
 	var preStatus string
 	var preStatusErr error
 	if cfg.WorkspacePolicy != workspaceChangePolicyIgnore {
@@ -1147,9 +1204,6 @@ func (r *runController) runContainerJob(
 	}
 
 	// Materialize Hydra resources into a staging directory for mount planning.
-	var result step.Result
-	var runErr error
-	var duration time.Duration
 	if bundleErr := r.withMaterializedResources(ctx, manifest, req.TypedOptions.BundleMap, "ploy-staging-*", func(stagingDir string) error {
 		result, runErr = execCtx.runner.Run(ctx, step.Request{
 			RunID:      req.RunID,
@@ -1252,6 +1306,120 @@ func (r *runController) runContainerJob(
 		r.reportTerminalStatus(ctx, req, runErr, result, stats, repoSHAOut, duration)
 	}
 	return outcome, nil
+}
+
+func (r *runController) tryRestoreSBOMFromCache(ctx context.Context, req StartRunRequest, manifest contracts.StepManifest, outDir string) (bool, error) {
+	if req.SBOMSkip == nil {
+		return false, nil
+	}
+	refImage := strings.TrimSpace(req.SBOMSkip.RefJobImage)
+	image := strings.TrimSpace(manifest.Image)
+	if refImage == "" || image == "" || refImage != image {
+		return false, nil
+	}
+	if r.artifactUploader == nil {
+		slog.Warn("sbom cache hit ignored: artifact uploader is unavailable", "run_id", req.RunID, "job_id", req.JobID)
+		return false, nil
+	}
+
+	bundle, err := r.artifactUploader.DownloadArtifactBundle(ctx, req.SBOMSkip.RefArtifactID)
+	if err != nil {
+		slog.Warn("sbom cache restore failed; falling back to runtime execution",
+			"run_id", req.RunID,
+			"job_id", req.JobID,
+			"ref_job_id", req.SBOMSkip.RefJobID,
+			"ref_artifact_id", req.SBOMSkip.RefArtifactID,
+			"error", err,
+		)
+		return false, nil
+	}
+
+	restoredCount, restoreErr := restoreSBOMOutFilesFromBundle(bundle, outDir)
+	if restoreErr != nil {
+		slog.Warn("sbom cache extraction failed; falling back to runtime execution",
+			"run_id", req.RunID,
+			"job_id", req.JobID,
+			"ref_job_id", req.SBOMSkip.RefJobID,
+			"ref_artifact_id", req.SBOMSkip.RefArtifactID,
+			"error", restoreErr,
+		)
+		return false, nil
+	}
+	slog.Info("sbom cache hit restored",
+		"run_id", req.RunID,
+		"job_id", req.JobID,
+		"ref_job_id", req.SBOMSkip.RefJobID,
+		"ref_artifact_id", req.SBOMSkip.RefArtifactID,
+		"image", image,
+		"restored_files", restoredCount,
+	)
+	return true, nil
+}
+
+func restoreSBOMOutFilesFromBundle(bundle []byte, outDir string) (int, error) {
+	if strings.TrimSpace(outDir) == "" {
+		return 0, fmt.Errorf("out dir is required")
+	}
+
+	gzReader, err := gzip.NewReader(bytes.NewReader(bundle))
+	if err != nil {
+		return 0, fmt.Errorf("open artifact gzip: %w", err)
+	}
+	defer func() { _ = gzReader.Close() }()
+
+	tarReader := tar.NewReader(gzReader)
+	restored := 0
+	for {
+		header, err := tarReader.Next()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return restored, fmt.Errorf("read artifact tar header: %w", err)
+		}
+		if header == nil || header.Typeflag != tar.TypeReg {
+			continue
+		}
+
+		entry := normalizeBundlePath(header.Name)
+		if entry == "" || !strings.HasPrefix(entry, "out/sbom.") {
+			continue
+		}
+		relative := strings.TrimPrefix(entry, "out/")
+		targetPath := filepath.Join(outDir, filepath.FromSlash(relative))
+		if err := os.MkdirAll(filepath.Dir(targetPath), 0o755); err != nil {
+			return restored, fmt.Errorf("mkdir sbom output dir: %w", err)
+		}
+		payload, readErr := io.ReadAll(tarReader)
+		if readErr != nil {
+			return restored, fmt.Errorf("read artifact entry %q: %w", entry, readErr)
+		}
+		if writeErr := os.WriteFile(targetPath, payload, 0o644); writeErr != nil {
+			return restored, fmt.Errorf("write sbom output %q: %w", targetPath, writeErr)
+		}
+		restored++
+	}
+
+	if restored == 0 {
+		return 0, fmt.Errorf("artifact bundle has no out/sbom.* entries")
+	}
+	canonicalPath := filepath.Join(outDir, preGateCanonicalSBOMFileName)
+	if err := validateCanonicalSBOMPath(canonicalPath); err != nil {
+		return restored, fmt.Errorf("validate restored canonical sbom output: %w", err)
+	}
+	return restored, nil
+}
+
+func normalizeBundlePath(name string) string {
+	n := strings.TrimSpace(name)
+	if n == "" {
+		return ""
+	}
+	cleaned := path.Clean("/" + strings.TrimPrefix(filepath.ToSlash(n), "/"))
+	if cleaned == "/" || strings.HasPrefix(cleaned, "/../") {
+		return ""
+	}
+	return strings.TrimPrefix(cleaned, "/")
 }
 
 // withTempDir creates a temporary directory, calls fn, then removes the directory.

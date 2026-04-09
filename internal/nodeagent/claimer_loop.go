@@ -245,6 +245,7 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 		RecoveryContext:        claim.RecoveryContext,
 		GateSkip:               claim.GateSkip,
 		StepSkip:               claim.StepSkip,
+		SBOMSkip:               claim.SBOMSkip,
 		HookRuntime:            claim.HookRuntime,
 		TypedOptions:           typedOpts, // Strongly-typed run options (canonical source of truth)
 		Env:                    envFromSpec,

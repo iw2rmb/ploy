@@ -127,6 +127,18 @@ func (s Spec) Validate() error {
 				return fmt.Errorf("steps[%d].envs: empty key", i)
 			}
 		}
+		if err := contracts.ValidateHydraCAEntries(step.CA, fmt.Sprintf("steps[%d].ca", i)); err != nil {
+			return err
+		}
+		if err := contracts.ValidateHydraInEntries(step.In, fmt.Sprintf("steps[%d].in", i)); err != nil {
+			return err
+		}
+		if err := contracts.ValidateHydraOutEntries(step.Out, fmt.Sprintf("steps[%d].out", i)); err != nil {
+			return err
+		}
+		if err := contracts.ValidateHydraHomeEntries(step.Home, fmt.Sprintf("steps[%d].home", i)); err != nil {
+			return err
+		}
 	}
 	if err := validatePackageConditions("sbom.on_match", s.SBOM.OnMatch); err != nil {
 		return err
