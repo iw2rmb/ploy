@@ -122,6 +122,9 @@ const (
 type SBOMJobMetadata struct {
 	// Phase is one of: pre, post.
 	Phase string `json:"phase,omitempty"`
+	// CycleName is the concrete gate cycle identifier used for sbom staging.
+	// Examples: pre-gate, post-gate, re-gate-1.
+	CycleName string `json:"cycle_name,omitempty"`
 	// Role is one of: initial, retry, final.
 	Role string `json:"role,omitempty"`
 	// RootJobID is the stable sbom chain root used for retry accounting.
@@ -207,6 +210,12 @@ func (m JobMeta) Validate() error {
 func (m SBOMJobMetadata) Validate() error {
 	if m.Phase != "" && m.Phase != SBOMPhasePre && m.Phase != SBOMPhasePost {
 		return fmt.Errorf("phase invalid: %q", m.Phase)
+	}
+	if strings.ContainsAny(m.CycleName, "\n\r\t") {
+		return fmt.Errorf("cycle_name: must not contain control whitespace")
+	}
+	if strings.TrimSpace(m.CycleName) != m.CycleName {
+		return fmt.Errorf("cycle_name: must not have leading or trailing whitespace")
 	}
 	if m.Role != "" && m.Role != SBOMRoleInitial && m.Role != SBOMRoleRetry && m.Role != SBOMRoleFinal {
 		return fmt.Errorf("role invalid: %q", m.Role)

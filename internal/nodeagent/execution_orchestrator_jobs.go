@@ -104,6 +104,9 @@ func gateCycleNameFromSBOMContext(sbomCtx *contracts.SBOMJobMetadata) (string, e
 	if sbomCtx == nil {
 		return "", fmt.Errorf("sbom context is required")
 	}
+	if cycleName := strings.TrimSpace(sbomCtx.CycleName); cycleName != "" {
+		return cycleName, nil
+	}
 	phase := strings.TrimSpace(sbomCtx.Phase)
 	switch phase {
 	case contracts.SBOMPhasePre:

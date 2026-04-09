@@ -74,6 +74,13 @@ func TestMaybeCreateHealingJobs_FirstAttemptCreatesJobs(t *testing.T) {
 	if reGateJob.NextID == nil || *reGateJob.NextID != hc.SuccessorID {
 		t.Fatalf("expected re-gate to preserve original successor %s", hc.SuccessorID)
 	}
+	retrySBOMMeta, err := contracts.UnmarshalJobMeta(retrySBOM.Meta)
+	if err != nil {
+		t.Fatalf("unmarshal retry sbom meta: %v", err)
+	}
+	if retrySBOMMeta.SBOM == nil || strings.TrimSpace(retrySBOMMeta.SBOM.CycleName) != "re-gate-1" {
+		t.Fatalf("expected retry sbom cycle_name=re-gate-1, got %#v", retrySBOMMeta.SBOM)
+	}
 	if len(hc.Store.updateJobNextIDParams) != 1 {
 		t.Fatalf("expected one next_id rewiring update, got %d", len(hc.Store.updateJobNextIDParams))
 	}
@@ -133,6 +140,13 @@ func TestMaybeCreateHealingJobs_SecondAttemptUsesExistingHealJobs(t *testing.T) 
 	}
 	if hc.Store.createJob.calls[1].JobType != domaintypes.JobTypeSBOM {
 		t.Fatalf("expected second job JobType=sbom, got %q", hc.Store.createJob.calls[1].JobType)
+	}
+	retrySBOMMeta, err := contracts.UnmarshalJobMeta(hc.Store.createJob.calls[1].Meta)
+	if err != nil {
+		t.Fatalf("unmarshal retry sbom meta: %v", err)
+	}
+	if retrySBOMMeta.SBOM == nil || strings.TrimSpace(retrySBOMMeta.SBOM.CycleName) != "re-gate-2" {
+		t.Fatalf("expected retry sbom cycle_name=re-gate-2, got %#v", retrySBOMMeta.SBOM)
 	}
 	if hc.Store.createJob.calls[2].Name != "heal-2-0" {
 		t.Fatalf("expected third healing job name heal-2-0, got %q", hc.Store.createJob.calls[2].Name)

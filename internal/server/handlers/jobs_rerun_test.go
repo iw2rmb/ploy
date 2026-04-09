@@ -8,6 +8,7 @@ import (
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
+	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
 func TestRerunJobHandler_HealCreatesNewAttemptAndTail(t *testing.T) {
@@ -182,6 +183,13 @@ func TestRerunJobHandler_ReGateSourceCreatesSBOMRoot(t *testing.T) {
 	}
 	if reGate.JobType != domaintypes.JobTypeReGate {
 		t.Fatalf("follow-up type=%s want re_gate", reGate.JobType)
+	}
+	sbomMeta, err := contracts.UnmarshalJobMeta(sbomRoot.Meta)
+	if err != nil {
+		t.Fatalf("unmarshal sbom root meta: %v", err)
+	}
+	if sbomMeta.SBOM == nil || sbomMeta.SBOM.CycleName != "re-gate-rerun-followup" {
+		t.Fatalf("expected sbom root cycle_name=re-gate-rerun-followup, got %#v", sbomMeta.SBOM)
 	}
 
 	var reGateMeta map[string]any

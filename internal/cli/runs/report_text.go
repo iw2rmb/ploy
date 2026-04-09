@@ -135,7 +135,9 @@ func RenderRunReportTextLayout(report RunReport, opts TextRenderOptions) (RunRep
 
 		repoFrame.Columns = nil
 		repoFrame.Rows = make([]FollowStepRow, 0, len(repo.Jobs))
+		repoErrorOwnerIdx := lastFailedOrCrashedJobIndex(repo.Jobs)
 		for _, job := range repo.Jobs {
+			jobIdx := len(repoFrame.Rows)
 			patchURL := strings.TrimSpace(job.PatchURL)
 			state := ColoredStatusGlyph(job.Status.String(), opts.SpinnerFrame)
 			step := renderStepName(job.JobType.String())
@@ -164,7 +166,7 @@ func RenderRunReportTextLayout(report RunReport, opts TextRenderOptions) (RunRep
 					renderArtifactsForStatus(job.Status.String(), patchURL, opts),
 					nodeIDCell,
 				},
-				ExitOneLiner: renderExitOneLiner(job, repo.LastError),
+				ExitOneLiner: renderExitOneLiner(job, repo.LastError, jobIdx == repoErrorOwnerIdx),
 				DetailLines:  renderJobIOPreviewLines(job, opts),
 			})
 		}
@@ -292,7 +294,7 @@ func boldBranchName(name string) string {
 	return lipgloss.NewStyle().Bold(true).Render(name)
 }
 
-func renderExitOneLiner(job RunJobEntry, repoLastError *string) string {
+func renderExitOneLiner(job RunJobEntry, repoLastError *string, useRepoLastError bool) string {
 	isHeal := normalizeStatus(job.JobType.String()) == "heal"
 	if isHeal {
 		exit := renderExitCode(job.ExitCode)
@@ -306,12 +308,18 @@ func renderExitOneLiner(job RunJobEntry, repoLastError *string) string {
 		return ""
 	}
 
-	if isGateJobType(job.JobType.String()) {
-		return ""
-	}
-
 	msg := strings.Join(strings.Fields(strings.TrimSpace(job.BugSummary)), " ")
-	if msg == "" {
+	if isGateJobType(job.JobType.String()) {
+		if !useRepoLastError || normalizeStatus(job.JobType.String()) != "re_gate" {
+			return ""
+		}
+		msg = FormatErrorOneLiner(repoLastError)
+		if msg == "" {
+			return ""
+		}
+		return renderWrappedExitOneLiner(renderExitCode(job.ExitCode), msg, true)
+	}
+	if msg == "" && useRepoLastError {
 		msg = FormatErrorOneLiner(repoLastError)
 	}
 	if msg == "" {
@@ -319,6 +327,16 @@ func renderExitOneLiner(job RunJobEntry, repoLastError *string) string {
 	}
 
 	return renderWrappedExitOneLiner(renderExitCode(job.ExitCode), msg, true)
+}
+
+func lastFailedOrCrashedJobIndex(jobs []RunJobEntry) int {
+	ownerIdx := -1
+	for i := range jobs {
+		if isFailedOrCrashedStatus(jobs[i].Status.String()) {
+			ownerIdx = i
+		}
+	}
+	return ownerIdx
 }
 
 func renderJobIOPreviewLines(job RunJobEntry, opts TextRenderOptions) []string {
