@@ -298,7 +298,7 @@ func SeedInDirFromStaging(manifest contracts.StepManifest, stagingDir, inDir str
 }
 
 // copyPath copies src to dst. If src is a directory, it copies recursively.
-// If src is a file, it copies the file preserving permissions.
+// If src is a file, it copies the file preserving permissions and timestamps.
 func copyPath(src, dst string) error {
 	info, err := os.Stat(src)
 	if err != nil {
@@ -307,11 +307,15 @@ func copyPath(src, dst string) error {
 	if info.IsDir() {
 		return copyDir(src, dst)
 	}
-	return copyFile(src, dst, info.Mode().Perm())
+	return copyFile(src, dst, info.Mode().Perm(), info.ModTime())
 }
 
 func copyDir(src, dst string) error {
-	if err := os.MkdirAll(dst, 0o755); err != nil {
+	srcInfo, err := os.Stat(src)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(dst, srcInfo.Mode().Perm()); err != nil {
 		return err
 	}
 	entries, err := os.ReadDir(src)
@@ -330,15 +334,21 @@ func copyDir(src, dst string) error {
 			if err != nil {
 				return err
 			}
-			if err := copyFile(s, d, info.Mode().Perm()); err != nil {
+			if err := copyFile(s, d, info.Mode().Perm(), info.ModTime()); err != nil {
 				return err
 			}
 		}
 	}
+	if err := os.Chmod(dst, srcInfo.Mode().Perm()); err != nil {
+		return err
+	}
+	if err := os.Chtimes(dst, srcInfo.ModTime(), srcInfo.ModTime()); err != nil {
+		return err
+	}
 	return nil
 }
 
-func copyFile(src, dst string, perm os.FileMode) error {
+func copyFile(src, dst string, perm os.FileMode, modTime time.Time) error {
 	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
 		return err
 	}
@@ -355,5 +365,11 @@ func copyFile(src, dst string, perm os.FileMode) error {
 		df.Close()
 		return err
 	}
-	return df.Close()
+	if err := df.Close(); err != nil {
+		return err
+	}
+	if err := os.Chmod(dst, perm); err != nil {
+		return err
+	}
+	return os.Chtimes(dst, modTime, modTime)
 }

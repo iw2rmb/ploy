@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
@@ -362,6 +363,13 @@ func TestSeedInDirFromStaging(t *testing.T) {
 	if err := os.WriteFile(fileContentPath, []byte("yaml"), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.Chmod(fileContentPath, 0o751); err != nil {
+		t.Fatal(err)
+	}
+	fileModTime := time.Unix(1_704_444_444, 0).UTC()
+	if err := os.Chtimes(fileContentPath, fileModTime, fileModTime); err != nil {
+		t.Fatal(err)
+	}
 
 	dirContentPath := filepath.Join(stagingDir, dirHash, "content")
 	if err := os.MkdirAll(dirContentPath, 0o755); err != nil {
@@ -388,6 +396,16 @@ func TestSeedInDirFromStaging(t *testing.T) {
 	}
 	if string(fileData) != "yaml" {
 		t.Errorf("seeded file content = %q, want %q", fileData, "yaml")
+	}
+	fileInfo, err := os.Stat(filepath.Join(inDir, "amata.yaml"))
+	if err != nil {
+		t.Fatalf("stat seeded file: %v", err)
+	}
+	if got, want := fileInfo.Mode().Perm(), os.FileMode(0o751); got != want {
+		t.Fatalf("seeded file mode = %o, want %o", got, want)
+	}
+	if !fileInfo.ModTime().UTC().Equal(fileModTime) {
+		t.Fatalf("seeded file modtime = %s, want %s", fileInfo.ModTime().UTC(), fileModTime)
 	}
 
 	dirData, err := os.ReadFile(filepath.Join(inDir, "amata", "route.yaml"))

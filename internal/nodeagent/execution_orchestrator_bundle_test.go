@@ -4,14 +4,15 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"context"
 	"testing"
+	"time"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
@@ -59,11 +60,15 @@ func buildTestTarGz(t *testing.T, entries map[string][]byte, typeflagOverrides m
 		if override, ok := typeflagOverrides[name]; ok {
 			typeflag = override
 		}
+		mode := int64(0o644)
+		if typeflag == tar.TypeDir {
+			mode = 0o755
+		}
 		hdr := &tar.Header{
 			Name:     name,
 			Typeflag: typeflag,
 			Size:     int64(len(content)),
-			Mode:     0o644,
+			Mode:     mode,
 		}
 		// Symlinks and hardlinks carry no file data.
 		if typeflag == tar.TypeSymlink || typeflag == tar.TypeLink {
@@ -94,7 +99,6 @@ func digestOf(data []byte) string {
 }
 
 // --- extractBundle tests ---
-
 
 func TestExtractBundle_Valid(t *testing.T) {
 	t.Parallel()
@@ -155,6 +159,51 @@ func TestExtractBundle_Valid(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestExtractBundle_PreservesModeAndModTime(t *testing.T) {
+	t.Parallel()
+
+	var buf bytes.Buffer
+	gw := gzip.NewWriter(&buf)
+	tw := tar.NewWriter(gw)
+	modTime := time.Unix(1_703_333_333, 0).UTC()
+
+	if err := tw.WriteHeader(&tar.Header{
+		Name:     "scripts/build.sh",
+		Typeflag: tar.TypeReg,
+		Size:     int64(len("#!/bin/sh\necho ok\n")),
+		Mode:     0o751,
+		ModTime:  modTime,
+	}); err != nil {
+		t.Fatalf("write header: %v", err)
+	}
+	if _, err := tw.Write([]byte("#!/bin/sh\necho ok\n")); err != nil {
+		t.Fatalf("write body: %v", err)
+	}
+	if err := tw.Close(); err != nil {
+		t.Fatalf("close tar: %v", err)
+	}
+	if err := gw.Close(); err != nil {
+		t.Fatalf("close gzip: %v", err)
+	}
+
+	stagingDir := t.TempDir()
+	if err := extractBundle(buf.Bytes(), stagingDir); err != nil {
+		t.Fatalf("extractBundle error: %v", err)
+	}
+
+	path := filepath.Join(stagingDir, "scripts", "build.sh")
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("stat extracted file: %v", err)
+	}
+	if got, want := info.Mode().Perm(), os.FileMode(0o751); got != want {
+		t.Fatalf("mode = %o, want %o", got, want)
+	}
+	if !info.ModTime().UTC().Equal(modTime) {
+		t.Fatalf("modtime = %s, want %s", info.ModTime().UTC(), modTime)
 	}
 }
 

@@ -1,6 +1,9 @@
 package main
 
 import (
+	"archive/tar"
+	"bytes"
+	"compress/gzip"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -13,6 +16,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // ---------------------------------------------------------------------------
@@ -261,6 +265,65 @@ func TestBuildSourceArchive_DirProducesDeterministicHash(t *testing.T) {
 	}
 }
 
+func TestBuildSourceArchive_PreservesModeAndModTime(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	dir := filepath.Join(tmpDir, "scripts")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	execPath := filepath.Join(dir, "build.sh")
+	plainPath := filepath.Join(dir, "config.json")
+	writeFile(t, execPath, "#!/usr/bin/env bash\necho ok\n")
+	writeFile(t, plainPath, `{"ok":true}`)
+
+	if err := os.Chmod(execPath, 0o751); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(plainPath, 0o640); err != nil {
+		t.Fatal(err)
+	}
+
+	execModTime := time.Unix(1_701_111_111, 0).UTC()
+	plainModTime := time.Unix(1_702_222_222, 0).UTC()
+	if err := os.Chtimes(execPath, execModTime, execModTime); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chtimes(plainPath, plainModTime, plainModTime); err != nil {
+		t.Fatal(err)
+	}
+
+	archiveBytes, err := buildSourceArchive(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	headers := readTarHeaders(t, archiveBytes)
+
+	execHeader, ok := headers["content/build.sh"]
+	if !ok {
+		t.Fatalf("missing header for content/build.sh")
+	}
+	if got, want := execHeader.FileInfo().Mode().Perm(), os.FileMode(0o751); got != want {
+		t.Fatalf("content/build.sh mode = %o, want %o", got, want)
+	}
+	if !execHeader.ModTime.Equal(execModTime) {
+		t.Fatalf("content/build.sh modtime = %s, want %s", execHeader.ModTime.UTC(), execModTime)
+	}
+
+	plainHeader, ok := headers["content/config.json"]
+	if !ok {
+		t.Fatalf("missing header for content/config.json")
+	}
+	if got, want := plainHeader.FileInfo().Mode().Perm(), os.FileMode(0o640); got != want {
+		t.Fatalf("content/config.json mode = %o, want %o", got, want)
+	}
+	if !plainHeader.ModTime.Equal(plainModTime) {
+		t.Fatalf("content/config.json modtime = %s, want %s", plainHeader.ModTime.UTC(), plainModTime)
+	}
+}
+
 func TestComputeArchiveShortHash(t *testing.T) {
 	t.Parallel()
 	data := []byte("test data for hashing")
@@ -351,12 +414,12 @@ func assertCanonicalHash(t *testing.T, s string) string {
 
 func TestCompileHydraRecordsInPlace_SingleField(t *testing.T) {
 	tests := []struct {
-		name       string
-		fileName   string
-		content    string
-		field      string           // "ca", "in", "out", "home"
-		entrySuffix string          // appended to file path for in/out/home
-		wantSuffix string           // expected suffix on compiled entry
+		name        string
+		fileName    string
+		content     string
+		field       string // "ca", "in", "out", "home"
+		entrySuffix string // appended to file path for in/out/home
+		wantSuffix  string // expected suffix on compiled entry
 	}{
 		{
 			name:     "ca entries",
@@ -460,14 +523,14 @@ func TestCompileHydraRecordsInPlace_InDirectoryRelativeDestination(t *testing.T)
 
 func TestCompileHydraRecordsInPlace_BuildGate(t *testing.T) {
 	tests := []struct {
-		name       string
-		fileName   string
-		content    string
-		field      string
+		name        string
+		fileName    string
+		content     string
+		field       string
 		entrySuffix string
-		spec       func(filePath string) map[string]any
-		digPath    []string
-		wantSuffix string
+		spec        func(filePath string) map[string]any
+		digPath     []string
+		wantSuffix  string
 	}{
 		{
 			name:     "heal ca compiled",
@@ -802,4 +865,29 @@ func TestCompileHydraRecordsInPlace_MixedCanonicalAndAuthoring_PreservesBundleMa
 			}
 		})
 	}
+}
+
+func readTarHeaders(t *testing.T, archiveBytes []byte) map[string]*tar.Header {
+	t.Helper()
+
+	gr, err := gzip.NewReader(bytes.NewReader(archiveBytes))
+	if err != nil {
+		t.Fatalf("gzip reader: %v", err)
+	}
+	defer gr.Close()
+
+	tr := tar.NewReader(gr)
+	headers := make(map[string]*tar.Header)
+	for {
+		hdr, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatalf("tar next: %v", err)
+		}
+		copied := *hdr
+		headers[hdr.Name] = &copied
+	}
+	return headers
 }

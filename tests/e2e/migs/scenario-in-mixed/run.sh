@@ -9,7 +9,7 @@ set -euo pipefail
 # Assertions:
 #   1. Run completes with status "Success".
 #   2. /in/config.json is present in the container (file entry).
-#   3. /in/scripts/build.sh is present in the container (directory entry).
+#   3. /in/scripts/build.sh is present and executable in the container.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=tests/e2e/lib/harness.sh
@@ -51,6 +51,7 @@ steps:
         test -f /in/config.json || { echo "FAIL: /in/config.json missing"; exit 1; };
         test -d /in/scripts     || { echo "FAIL: /in/scripts not a directory"; exit 1; };
         test -f /in/scripts/build.sh || { echo "FAIL: /in/scripts/build.sh missing"; exit 1; };
+        test -x /in/scripts/build.sh || { echo "FAIL: /in/scripts/build.sh not executable"; exit 1; };
         echo "OK: /in/config.json present (file entry)";
         echo "OK: /in/scripts/ present (directory entry)";
         echo "OK: /in/scripts/build.sh present";
