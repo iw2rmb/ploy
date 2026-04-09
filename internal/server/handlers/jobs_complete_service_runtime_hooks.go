@@ -141,6 +141,21 @@ func (s *CompleteJobService) planAndInsertCycleHookJobs(ctx context.Context, sta
 	if err := s.store.UpdateJobNextID(ctx, store.UpdateJobNextIDParams{ID: state.job.ID, NextID: &firstHookID}); err != nil {
 		return nil, fmt.Errorf("rewire sbom next_id to first hook: %w", err)
 	}
+	firstHookNextID := postHookSBOMID
+	if len(hookIDs) > 1 {
+		firstHookNextID = hookIDs[1]
+	}
+	firstHook := store.Job{
+		ID:      firstHookID,
+		RunID:   state.job.RunID,
+		RepoID:  state.job.RepoID,
+		Attempt: state.job.Attempt,
+		JobType: domaintypes.JobTypeHook,
+		NextID:  &firstHookNextID,
+	}
+	if err := applyInsertedHeadRepoSHA(ctx, s.store, firstHook, effectiveCompletedRepoSHAOut(state.job, state.input.RepoSHAOut)); err != nil {
+		return nil, fmt.Errorf("seed/clear repo sha for inserted hook chain: %w", err)
+	}
 	state.job.NextID = &firstHookID
 	return &firstHookID, nil
 }

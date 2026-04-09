@@ -84,7 +84,7 @@ UPDATE jobs
 SET status = 'Running', node_id = eligible.node_id, started_at = now()
 FROM eligible
 WHERE jobs.id = eligible.id
-RETURNING jobs.id, jobs.run_id, jobs.repo_id, jobs.repo_base_ref, jobs.attempt, jobs.name, jobs.status, jobs.job_type, jobs.job_image, jobs.next_id, jobs.node_id, jobs.exit_code, jobs.started_at, jobs.finished_at, jobs.duration_ms, jobs.repo_sha_in, jobs.repo_sha_out, jobs.repo_sha_in8, jobs.repo_sha_out8, jobs.meta
+RETURNING jobs.id, jobs.run_id, jobs.repo_id, jobs.repo_base_ref, jobs.attempt, jobs.name, jobs.status, jobs.job_type, jobs.job_image, jobs.next_id, jobs.node_id, jobs.exit_code, jobs.started_at, jobs.finished_at, jobs.duration_ms, jobs.repo_sha_in, jobs.repo_sha_out, jobs.repo_sha_in8, jobs.repo_sha_out8, jobs.cache_key, jobs.meta
 `
 
 // Atomically claim the next claimable job for a node (unified queue).
@@ -115,9 +115,57 @@ func (q *Queries) ClaimJob(ctx context.Context, nodeID types.NodeID) (Job, error
 		&i.RepoShaOut,
 		&i.RepoShaIn8,
 		&i.RepoShaOut8,
+		&i.CacheKey,
 		&i.Meta,
 	)
 	return i, err
+}
+
+const clearRepoSHAChainFromJob = `-- name: ClearRepoSHAChainFromJob :execrows
+WITH RECURSIVE chain AS (
+  SELECT j.id, j.next_id
+  FROM jobs j
+  WHERE j.id = $1
+    AND j.run_id = $2
+    AND j.repo_id = $3
+    AND j.attempt = $4
+    AND j.status IN ('Created', 'Queued')
+  UNION ALL
+  SELECT n.id, n.next_id
+  FROM jobs n
+  JOIN chain c ON n.id = c.next_id
+  WHERE n.run_id = $2
+    AND n.repo_id = $3
+    AND n.attempt = $4
+    AND n.status IN ('Created', 'Queued')
+)
+UPDATE jobs AS j
+SET repo_sha_in = '',
+    repo_sha_out = '',
+    repo_sha_in8 = '',
+    repo_sha_out8 = ''
+FROM chain
+WHERE j.id = chain.id
+`
+
+type ClearRepoSHAChainFromJobParams struct {
+	ID      types.JobID  `json:"id"`
+	RunID   types.RunID  `json:"run_id"`
+	RepoID  types.RepoID `json:"repo_id"`
+	Attempt int32        `json:"attempt"`
+}
+
+func (q *Queries) ClearRepoSHAChainFromJob(ctx context.Context, arg ClearRepoSHAChainFromJobParams) (int64, error) {
+	result, err := q.db.Exec(ctx, clearRepoSHAChainFromJob,
+		arg.ID,
+		arg.RunID,
+		arg.RepoID,
+		arg.Attempt,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const countJobsByRun = `-- name: CountJobsByRun :one
@@ -268,6 +316,7 @@ RETURNING
   repo_sha_out,
   repo_sha_in8,
   repo_sha_out8,
+  cache_key,
   meta
 `
 
@@ -323,6 +372,7 @@ func (q *Queries) CreateJob(ctx context.Context, arg CreateJobParams) (Job, erro
 		&i.RepoShaOut,
 		&i.RepoShaIn8,
 		&i.RepoShaOut8,
+		&i.CacheKey,
 		&i.Meta,
 	)
 	return i, err
@@ -380,6 +430,7 @@ SELECT
   repo_sha_out,
   repo_sha_in8,
   repo_sha_out8,
+  cache_key,
   meta
 FROM jobs
 WHERE id = $1
@@ -408,6 +459,7 @@ func (q *Queries) GetJob(ctx context.Context, id types.JobID) (Job, error) {
 		&i.RepoShaOut,
 		&i.RepoShaIn8,
 		&i.RepoShaOut8,
+		&i.CacheKey,
 		&i.Meta,
 	)
 	return i, err
@@ -434,6 +486,7 @@ SELECT
   repo_sha_out,
   repo_sha_in8,
   repo_sha_out8,
+  cache_key,
   meta
 FROM jobs
 WHERE run_id = $1 AND repo_id = $2 AND attempt = $3 AND status = 'Created'
@@ -475,6 +528,7 @@ func (q *Queries) ListCreatedJobsByRunRepoAttempt(ctx context.Context, arg ListC
 			&i.RepoShaOut,
 			&i.RepoShaIn8,
 			&i.RepoShaOut8,
+			&i.CacheKey,
 			&i.Meta,
 		); err != nil {
 			return nil, err
@@ -508,6 +562,7 @@ SELECT
   repo_sha_out,
   repo_sha_in8,
   repo_sha_out8,
+  cache_key,
   meta
 FROM jobs
 WHERE run_id = $1
@@ -543,6 +598,7 @@ func (q *Queries) ListJobsByRun(ctx context.Context, runID types.RunID) ([]Job, 
 			&i.RepoShaOut,
 			&i.RepoShaIn8,
 			&i.RepoShaOut8,
+			&i.CacheKey,
 			&i.Meta,
 		); err != nil {
 			return nil, err
@@ -576,6 +632,7 @@ SELECT
   repo_sha_out,
   repo_sha_in8,
   repo_sha_out8,
+  cache_key,
   meta
 FROM jobs
 WHERE run_id = $1 AND repo_id = $2 AND attempt = $3
@@ -617,6 +674,7 @@ func (q *Queries) ListJobsByRunRepoAttempt(ctx context.Context, arg ListJobsByRu
 			&i.RepoShaOut,
 			&i.RepoShaIn8,
 			&i.RepoShaOut8,
+			&i.CacheKey,
 			&i.Meta,
 		); err != nil {
 			return nil, err
@@ -793,6 +851,7 @@ RETURNING
   jobs.repo_sha_out,
   jobs.repo_sha_in8,
   jobs.repo_sha_out8,
+  jobs.cache_key,
   jobs.meta
 `
 
@@ -821,6 +880,51 @@ func (q *Queries) PromoteJobByIDIfUnblocked(ctx context.Context, id types.JobID)
 		&i.RepoShaOut,
 		&i.RepoShaIn8,
 		&i.RepoShaOut8,
+		&i.CacheKey,
+		&i.Meta,
+	)
+	return i, err
+}
+
+const resolveReusableJobByCacheKey = `-- name: ResolveReusableJobByCacheKey :one
+SELECT
+  id,
+  status,
+  exit_code,
+  repo_sha_out,
+  meta
+FROM jobs
+WHERE repo_id = $1
+  AND job_type = $2
+  AND cache_key = $3
+  AND cache_key <> ''
+  AND status IN ('Success', 'Fail')
+ORDER BY finished_at DESC NULLS LAST, id DESC
+LIMIT 1
+`
+
+type ResolveReusableJobByCacheKeyParams struct {
+	RepoID   types.RepoID  `json:"repo_id"`
+	JobType  types.JobType `json:"job_type"`
+	CacheKey string        `json:"cache_key"`
+}
+
+type ResolveReusableJobByCacheKeyRow struct {
+	ID         types.JobID     `json:"id"`
+	Status     types.JobStatus `json:"status"`
+	ExitCode   *int32          `json:"exit_code"`
+	RepoShaOut string          `json:"repo_sha_out"`
+	Meta       []byte          `json:"meta"`
+}
+
+func (q *Queries) ResolveReusableJobByCacheKey(ctx context.Context, arg ResolveReusableJobByCacheKeyParams) (ResolveReusableJobByCacheKeyRow, error) {
+	row := q.db.QueryRow(ctx, resolveReusableJobByCacheKey, arg.RepoID, arg.JobType, arg.CacheKey)
+	var i ResolveReusableJobByCacheKeyRow
+	err := row.Scan(
+		&i.ID,
+		&i.Status,
+		&i.ExitCode,
+		&i.RepoShaOut,
 		&i.Meta,
 	)
 	return i, err
@@ -872,6 +976,7 @@ RETURNING
   jobs.repo_sha_out,
   jobs.repo_sha_in8,
   jobs.repo_sha_out8,
+  jobs.cache_key,
   jobs.meta
 `
 
@@ -906,9 +1011,26 @@ func (q *Queries) ScheduleNextJob(ctx context.Context, arg ScheduleNextJobParams
 		&i.RepoShaOut,
 		&i.RepoShaIn8,
 		&i.RepoShaOut8,
+		&i.CacheKey,
 		&i.Meta,
 	)
 	return i, err
+}
+
+const updateJobCacheKey = `-- name: UpdateJobCacheKey :exec
+UPDATE jobs
+SET cache_key = $2
+WHERE id = $1
+`
+
+type UpdateJobCacheKeyParams struct {
+	ID       types.JobID `json:"id"`
+	CacheKey string      `json:"cache_key"`
+}
+
+func (q *Queries) UpdateJobCacheKey(ctx context.Context, arg UpdateJobCacheKeyParams) error {
+	_, err := q.db.Exec(ctx, updateJobCacheKey, arg.ID, arg.CacheKey)
+	return err
 }
 
 const updateJobCompletion = `-- name: UpdateJobCompletion :exec
@@ -1057,6 +1179,26 @@ type UpdateJobNextIDParams struct {
 
 func (q *Queries) UpdateJobNextID(ctx context.Context, arg UpdateJobNextIDParams) error {
 	_, err := q.db.Exec(ctx, updateJobNextID, arg.ID, arg.NextID)
+	return err
+}
+
+const updateJobRepoSHAIn = `-- name: UpdateJobRepoSHAIn :exec
+UPDATE jobs
+SET repo_sha_in = $2,
+    repo_sha_in8 = CASE
+      WHEN $2::TEXT = '' THEN ''
+      ELSE SUBSTRING($2::TEXT, 1, 8)
+    END
+WHERE id = $1
+`
+
+type UpdateJobRepoSHAInParams struct {
+	ID        types.JobID `json:"id"`
+	RepoShaIn string      `json:"repo_sha_in"`
+}
+
+func (q *Queries) UpdateJobRepoSHAIn(ctx context.Context, arg UpdateJobRepoSHAInParams) error {
+	_, err := q.db.Exec(ctx, updateJobRepoSHAIn, arg.ID, arg.RepoShaIn)
 	return err
 }
 

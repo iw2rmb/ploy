@@ -171,6 +171,17 @@ func maybeCreateHealingJobs(
 	if err := st.UpdateJobNextID(ctx, store.UpdateJobNextIDParams{ID: failedJob.ID, NextID: &chain.HealID}); err != nil {
 		return fmt.Errorf("rewire failed job next_id: %w", err)
 	}
+	healHead := store.Job{
+		ID:      chain.HealID,
+		RunID:   failedJob.RunID,
+		RepoID:  failedJob.RepoID,
+		Attempt: failedJob.Attempt,
+		JobType: domaintypes.JobTypeHeal,
+		NextID:  &chain.RetrySBOMID,
+	}
+	if err := applyInsertedHeadRepoSHA(ctx, st, healHead, effectiveCompletedRepoSHAOut(failedJob, "")); err != nil {
+		return fmt.Errorf("seed/clear repo sha for inserted healing chain: %w", err)
+	}
 
 	slog.Info("maybeCreateHealingJobs: rewired chain",
 		"run_id", failedJob.RunID,
@@ -291,6 +302,17 @@ func maybeCreateSBOMHealingJobs(
 	}
 	if err := st.UpdateJobNextID(ctx, store.UpdateJobNextIDParams{ID: failedJob.ID, NextID: &chain.HealID}); err != nil {
 		return fmt.Errorf("rewire failed sbom next_id: %w", err)
+	}
+	healHead := store.Job{
+		ID:      chain.HealID,
+		RunID:   failedJob.RunID,
+		RepoID:  failedJob.RepoID,
+		Attempt: failedJob.Attempt,
+		JobType: domaintypes.JobTypeHeal,
+		NextID:  &chain.RetrySBOMID,
+	}
+	if err := applyInsertedHeadRepoSHA(ctx, st, healHead, effectiveCompletedRepoSHAOut(failedJob, "")); err != nil {
+		return fmt.Errorf("seed/clear repo sha for inserted sbom-healing chain: %w", err)
 	}
 	return nil
 }

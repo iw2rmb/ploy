@@ -29,7 +29,8 @@ func TestOnSuccess_SBOMPersistenceFailureStopsChainAdvancement(t *testing.T) {
 	}
 	state := &completeJobState{
 		input: CompleteJobInput{
-			Status: domaintypes.JobStatusSuccess,
+			Status:     domaintypes.JobStatusSuccess,
+			RepoSHAOut: "0123456789abcdef0123456789abcdef01234567",
 		},
 		job:           job,
 		jobType:       domaintypes.JobTypeSBOM,
@@ -88,7 +89,8 @@ steps:
 	}
 	state := &completeJobState{
 		input: CompleteJobInput{
-			Status: domaintypes.JobStatusSuccess,
+			Status:     domaintypes.JobStatusSuccess,
+			RepoSHAOut: "0123456789abcdef0123456789abcdef01234567",
 		},
 		job:           job,
 		jobType:       domaintypes.JobTypeSBOM,
