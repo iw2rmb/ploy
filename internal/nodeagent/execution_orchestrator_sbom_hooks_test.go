@@ -51,6 +51,7 @@ func TestMaterializeValidatedSBOMOutput_WritesCanonicalDocument(t *testing.T) {
 	rawDeps := strings.Join([]string{
 		"[INFO]    com.fasterxml.jackson.core:jackson-databind:jar:2.17.2:compile",
 		"\\--- org.apache.commons:commons-lang3:3.17.0",
+		"+--- org.openapi.generator:org.openapi.generator.gradle.plugin:6.6.0",
 		"noise line that should be ignored",
 	}, "\n")
 	if err := os.WriteFile(filepath.Join(outDir, sbomDependencyOutputFileName), []byte(rawDeps), 0o644); err != nil {
@@ -77,8 +78,8 @@ func TestMaterializeValidatedSBOMOutput_WritesCanonicalDocument(t *testing.T) {
 	if got, want := doc.SPDXVersion, "SPDX-2.3"; got != want {
 		t.Fatalf("spdxVersion = %q, want %q", got, want)
 	}
-	if len(doc.Packages) != 2 {
-		t.Fatalf("packages len = %d, want 2", len(doc.Packages))
+	if len(doc.Packages) != 3 {
+		t.Fatalf("packages len = %d, want 3", len(doc.Packages))
 	}
 	if got, want := doc.Packages[0].Name, "com.fasterxml.jackson.core:jackson-databind"; got != want {
 		t.Fatalf("packages[0].name = %q, want %q", got, want)
@@ -91,6 +92,12 @@ func TestMaterializeValidatedSBOMOutput_WritesCanonicalDocument(t *testing.T) {
 	}
 	if got, want := doc.Packages[1].VersionInfo, "3.17.0"; got != want {
 		t.Fatalf("packages[1].versionInfo = %q, want %q", got, want)
+	}
+	if got, want := doc.Packages[2].Name, "org.openapi.generator:org.openapi.generator.gradle.plugin"; got != want {
+		t.Fatalf("packages[2].name = %q, want %q", got, want)
+	}
+	if got, want := doc.Packages[2].VersionInfo, "6.6.0"; got != want {
+		t.Fatalf("packages[2].versionInfo = %q, want %q", got, want)
 	}
 
 	stagedRaw, err := os.ReadFile(snapshotPath)

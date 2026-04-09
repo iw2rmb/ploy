@@ -72,6 +72,7 @@ func TestApplySBOMRuntimeForStack_ConfiguresManifest(t *testing.T) {
 		wantImage          string
 		wantRuntimeStack   contracts.MigStack
 		wantCommandSnippet string
+		wantExtraSnippet   string
 	}{
 		{
 			name:               "maven",
@@ -85,7 +86,8 @@ func TestApplySBOMRuntimeForStack_ConfiguresManifest(t *testing.T) {
 			stack:              contracts.MigStackJavaGradle,
 			wantImage:          "ghcr.io/acme/sbom-gradle:" + tag,
 			wantRuntimeStack:   contracts.MigStackJavaGradle,
-			wantCommandSnippet: "gradle -q -p /workspace dependencies",
+			wantCommandSnippet: "-q -p /workspace dependencies",
+			wantExtraSnippet:   "buildEnvironment",
 		},
 		{
 			name:               "unknown fallback collector path",
@@ -93,6 +95,7 @@ func TestApplySBOMRuntimeForStack_ConfiguresManifest(t *testing.T) {
 			wantImage:          "ghcr.io/acme/sbom-maven:" + tag,
 			wantRuntimeStack:   contracts.MigStackJavaMaven,
 			wantCommandSnippet: "unable to resolve sbom collector",
+			wantExtraSnippet:   "buildEnvironment",
 		},
 	}
 
@@ -115,6 +118,9 @@ func TestApplySBOMRuntimeForStack_ConfiguresManifest(t *testing.T) {
 			shell := manifest.Command[len(manifest.Command)-1]
 			if !strings.Contains(shell, tc.wantCommandSnippet) {
 				t.Fatalf("shell command missing %q: %q", tc.wantCommandSnippet, shell)
+			}
+			if tc.wantExtraSnippet != "" && !strings.Contains(shell, tc.wantExtraSnippet) {
+				t.Fatalf("shell command missing %q: %q", tc.wantExtraSnippet, shell)
 			}
 			if tc.stack == contracts.MigStackUnknown && strings.Contains(shell, ": > /out/"+sbomDependencyOutputFileName) {
 				t.Fatalf("unknown stack command uses placeholder output write: %q", shell)
