@@ -248,6 +248,7 @@ func firstAttemptCase() gateFailureCase {
 	baseGateID := domaintypes.NewJobID()
 	successorID := domaintypes.NewJobID()
 	healID := domaintypes.NewJobID()
+	retrySBOMID := domaintypes.NewJobID()
 	reGateID := domaintypes.NewJobID()
 	failedJob := store.Job{
 		ID: baseGateID, JobType: domaintypes.JobTypePreGate,
@@ -259,7 +260,7 @@ func firstAttemptCase() gateFailureCase {
 		jobsByID:     map[domaintypes.JobID]store.Job{baseGateID: failedJob},
 		recoveryMeta: &contracts.BuildGateRecoveryMetadata{ErrorKind: "infra", StrategyID: "infra-default"},
 		heal:         basicHealSpec(2),
-		newJobID:     newFixedIDSequence(healID, reGateID),
+		newJobID:     newFixedIDSequence(healID, retrySBOMID, reGateID),
 		wantOutcome:  lifecycle.GateFailureOutcomeHealChain,
 		assertChain: func(t *testing.T, chain *lifecycle.HealChainSpec) {
 			t.Helper()
@@ -268,6 +269,9 @@ func firstAttemptCase() gateFailureCase {
 			}
 			if chain.ReGateID != reGateID {
 				t.Fatalf("ReGateID = %s, want %s", chain.ReGateID, reGateID)
+			}
+			if chain.RetrySBOMID != retrySBOMID {
+				t.Fatalf("RetrySBOMID = %s, want %s", chain.RetrySBOMID, retrySBOMID)
 			}
 			if chain.AttemptNumber != 1 {
 				t.Fatalf("AttemptNumber = %d, want 1", chain.AttemptNumber)
@@ -300,6 +304,7 @@ func secondAttemptCase() gateFailureCase {
 	reGate1ID := domaintypes.NewJobID()
 	successorID := domaintypes.NewJobID()
 	heal2ID := domaintypes.NewJobID()
+	retrySBOM2ID := domaintypes.NewJobID()
 	reGate2ID := domaintypes.NewJobID()
 	return gateFailureCase{
 		name: "second attempt increases number",
@@ -315,7 +320,7 @@ func secondAttemptCase() gateFailureCase {
 		},
 		recoveryMeta: &contracts.BuildGateRecoveryMetadata{ErrorKind: "infra"},
 		heal:         basicHealSpec(3),
-		newJobID:     newFixedIDSequence(heal2ID, reGate2ID),
+		newJobID:     newFixedIDSequence(heal2ID, retrySBOM2ID, reGate2ID),
 		wantOutcome:  lifecycle.GateFailureOutcomeHealChain,
 		assertChain: func(t *testing.T, chain *lifecycle.HealChainSpec) {
 			t.Helper()
@@ -331,6 +336,7 @@ func rerunRootSecondAttemptCase() gateFailureCase {
 	heal1ID := domaintypes.NewJobID()
 	failedReGateID := domaintypes.NewJobID()
 	heal2ID := domaintypes.NewJobID()
+	retrySBOM2ID := domaintypes.NewJobID()
 	reGate2ID := domaintypes.NewJobID()
 	return gateFailureCase{
 		name: "rerun-root re-gate chain continues with second healing attempt",
@@ -344,7 +350,7 @@ func rerunRootSecondAttemptCase() gateFailureCase {
 		},
 		recoveryMeta: &contracts.BuildGateRecoveryMetadata{ErrorKind: "code", StrategyID: "code-default"},
 		heal:         basicHealSpec(3),
-		newJobID:     newFixedIDSequence(heal2ID, reGate2ID),
+		newJobID:     newFixedIDSequence(heal2ID, retrySBOM2ID, reGate2ID),
 		wantOutcome:  lifecycle.GateFailureOutcomeHealChain,
 		assertChain: func(t *testing.T, chain *lifecycle.HealChainSpec) {
 			t.Helper()

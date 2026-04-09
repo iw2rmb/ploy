@@ -117,6 +117,9 @@ const (
 // enrichment on ReGateMeta.Recovery before marshaling ReGateMeta.
 type HealChainSpec struct {
 	HealID         domaintypes.JobID
+	RetrySBOMID    domaintypes.JobID
+	RetrySBOMRoot  domaintypes.JobID
+	RetrySBOMPhase string
 	ReGateID       domaintypes.JobID
 	AttemptNumber  int
 	HealImage      string
@@ -234,12 +237,20 @@ func EvaluateGateFailureTransition(
 	}
 
 	healID := newJobID()
+	retrySBOMID := newJobID()
 	reGateID := newJobID()
+	retrySBOMRoot, retrySBOMPhase := resolveGateRetrySBOMContext(baseGateID, failedJob, jobsByID)
+	if retrySBOMRoot.IsZero() {
+		retrySBOMRoot = retrySBOMID
+	}
 
 	return GateFailureDecision{
 		Outcome: GateFailureOutcomeHealChain,
 		Chain: &HealChainSpec{
 			HealID:         healID,
+			RetrySBOMID:    retrySBOMID,
+			RetrySBOMRoot:  retrySBOMRoot,
+			RetrySBOMPhase: retrySBOMPhase,
 			ReGateID:       reGateID,
 			AttemptNumber:  attemptNumber,
 			HealImage:      healImage,
@@ -438,12 +449,63 @@ func countExistingHealingAttempts(baseGateID domaintypes.JobID, jobsByID map[dom
 		if jobType == domaintypes.JobTypeHeal {
 			attempts++
 		}
-		if jobType != domaintypes.JobTypeHeal && jobType != domaintypes.JobTypeReGate {
+		if jobType != domaintypes.JobTypeHeal &&
+			jobType != domaintypes.JobTypeSBOM &&
+			jobType != domaintypes.JobTypeHook &&
+			jobType != domaintypes.JobTypeReGate {
 			break
 		}
 		nextID = job.NextID
 	}
 	return attempts
+}
+
+func resolveGateRetrySBOMContext(
+	baseGateID domaintypes.JobID,
+	failedJob store.Job,
+	jobsByID map[domaintypes.JobID]store.Job,
+) (domaintypes.JobID, string) {
+	defaultPhase := contracts.SBOMPhasePost
+	if domaintypes.JobType(failedJob.JobType) == domaintypes.JobTypePreGate {
+		defaultPhase = contracts.SBOMPhasePre
+	}
+
+	base, ok := jobsByID[baseGateID]
+	if !ok {
+		return "", defaultPhase
+	}
+
+	current := RecoveryChainPredecessor(base.ID, jobsByID)
+	for current != nil {
+		jobType := domaintypes.JobType(current.JobType)
+		if jobType == domaintypes.JobTypeHook {
+			current = RecoveryChainPredecessor(current.ID, jobsByID)
+			continue
+		}
+		if jobType != domaintypes.JobTypeSBOM {
+			break
+		}
+		if len(current.Meta) > 0 {
+			if meta, err := contracts.UnmarshalJobMeta(current.Meta); err == nil && meta.SBOM != nil {
+				phase := strings.TrimSpace(meta.SBOM.Phase)
+				if phase != contracts.SBOMPhasePre && phase != contracts.SBOMPhasePost {
+					phase = defaultPhase
+				}
+				root := strings.TrimSpace(meta.SBOM.RootJobID)
+				if root != "" {
+					return domaintypes.JobID(root), phase
+				}
+				return current.ID, phase
+			}
+		}
+		phase := defaultPhase
+		if strings.HasPrefix(strings.TrimSpace(current.Name), "pre-gate-") {
+			phase = contracts.SBOMPhasePre
+		}
+		return current.ID, phase
+	}
+
+	return "", defaultPhase
 }
 
 func countExistingSBOMHealingAttempts(rootSBOMID domaintypes.JobID, jobsByID map[domaintypes.JobID]store.Job) int {
