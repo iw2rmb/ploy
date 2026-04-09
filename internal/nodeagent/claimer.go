@@ -42,15 +42,15 @@ type ClaimManager struct {
 // existing API schema while providing type clarity in Go code.
 type ClaimResponse struct {
 	WorkType               string                           `json:"work_type,omitempty"` // "job" or "action"
-	RunID                  types.RunID                      `json:"id"` // Run ID (KSUID identifying the parent run)
+	RunID                  types.RunID                      `json:"id"`                  // Run ID (KSUID identifying the parent run)
 	Name                   *string                          `json:"name,omitempty"`
-	RepoID                 types.MigRepoID                  `json:"repo_id"`   // Repo ID (NanoID identifying the repo execution)
-	JobID                  types.JobID                      `json:"job_id"`    // Claimed job ID
-	JobName                string                           `json:"job_name"`  // Job name (e.g., "pre-gate", "mig-0")
-	JobType                types.JobType                    `json:"job_type"`  // Job phase: pre_gate, mig, post_gate, heal, re_gate
+	RepoID                 types.MigRepoID                  `json:"repo_id"`               // Repo ID (NanoID identifying the repo execution)
+	JobID                  types.JobID                      `json:"job_id"`                // Claimed job ID
+	JobName                string                           `json:"job_name"`              // Job name (e.g., "pre-gate", "mig-0")
+	JobType                types.JobType                    `json:"job_type"`              // Job phase: pre_gate, mig, post_gate, heal, re_gate
 	ActionID               *types.JobID                     `json:"action_id,omitempty"`   // Claimed action ID
 	ActionType             string                           `json:"action_type,omitempty"` // Action type (e.g. mr_create)
-	JobImage               string                           `json:"job_image"` // Container image for mig/heal jobs
+	JobImage               string                           `json:"job_image"`             // Container image for mig/heal jobs
 	NextID                 *types.JobID                     `json:"next_id"`
 	RepoURL                types.RepoURL                    `json:"repo_url"`
 	RepoGateProfileMissing bool                             `json:"repo_gate_profile_missing"`
@@ -63,6 +63,7 @@ type ClaimResponse struct {
 	StartedAt              string                           `json:"started_at"`
 	CreatedAt              string                           `json:"created_at"`
 	Spec                   json.RawMessage                  `json:"spec,omitempty"`
+	SBOMContext            *contracts.SBOMJobMetadata       `json:"sbom_context,omitempty"`
 	RecoveryContext        *contracts.RecoveryClaimContext  `json:"recovery_context,omitempty"`
 	GateSkip               *contracts.BuildGateSkipMetadata `json:"gate_skip,omitempty"`
 	StepSkip               *contracts.MigStepSkipMetadata   `json:"step_skip,omitempty"`

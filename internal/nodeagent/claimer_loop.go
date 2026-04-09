@@ -174,15 +174,15 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 			return true, fmt.Errorf("parse action spec: %w", parseErr)
 		}
 		actionReq := StartActionRequest{
-			ActionID:    *claim.ActionID,
-			ActionType:  strings.TrimSpace(claim.ActionType),
-			RunID:       claim.RunID,
-			RepoID:      claim.RepoID,
-			RepoURL:     claim.RepoURL,
-			BaseRef:     claim.BaseRef,
-			TargetRef:   claim.TargetRef,
+			ActionID:     *claim.ActionID,
+			ActionType:   strings.TrimSpace(claim.ActionType),
+			RunID:        claim.RunID,
+			RepoID:       claim.RepoID,
+			RepoURL:      claim.RepoURL,
+			BaseRef:      claim.BaseRef,
+			TargetRef:    claim.TargetRef,
 			TypedOptions: typedOpts,
-			Env:         envFromSpec,
+			Env:          envFromSpec,
 		}
 		if err := c.controller.StartAction(ctx, actionReq); err != nil {
 			return true, fmt.Errorf("start action: %w", err)
@@ -241,6 +241,7 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 		JobImage:               claim.JobImage,
 		NextID:                 claim.NextID,
 		JobName:                claim.JobName, // Job name for branch identification
+		SBOMContext:            claim.SBOMContext,
 		RecoveryContext:        claim.RecoveryContext,
 		GateSkip:               claim.GateSkip,
 		StepSkip:               claim.StepSkip,

@@ -38,6 +38,7 @@ type claimResponsePayload struct {
 	StartedAt              string                           `json:"started_at"`
 	CreatedAt              string                           `json:"created_at"`
 	Spec                   json.RawMessage                  `json:"spec,omitempty"`
+	SBOMContext            *contracts.SBOMJobMetadata       `json:"sbom_context,omitempty"`
 	RecoveryContext        *contracts.RecoveryClaimContext  `json:"recovery_context,omitempty"`
 	GateSkip               *contracts.BuildGateSkipMetadata `json:"gate_skip,omitempty"`
 	StepSkip               *contracts.MigStepSkipMetadata   `json:"step_skip,omitempty"`
@@ -115,6 +116,24 @@ func buildClaimResponsePayload(
 			return claimResponsePayload{}, fmt.Errorf("resolve step skip metadata: %w", err)
 		}
 	}
+	var sbomContext *contracts.SBOMJobMetadata
+	if jobType == domaintypes.JobTypeSBOM {
+		jobMeta, metaErr := contracts.UnmarshalJobMeta(job.Meta)
+		if metaErr != nil {
+			return claimResponsePayload{}, &ClaimJobTerminalError{
+				Message: fmt.Sprintf("parse sbom job meta for job %s", job.ID),
+				Err:     metaErr,
+			}
+		}
+		if jobMeta.SBOM == nil {
+			return claimResponsePayload{}, &ClaimJobTerminalError{
+				Message: fmt.Sprintf("sbom job %s missing sbom meta context", job.ID),
+				Err:     fmt.Errorf("meta.sbom is required"),
+			}
+		}
+		ctx := *jobMeta.SBOM
+		sbomContext = &ctx
+	}
 
 	recoveryCtx, err := buildRecoveryClaimContext(ctx, st, bs, run.ID, job, jobType)
 	if err != nil {
@@ -148,6 +167,7 @@ func buildClaimResponsePayload(
 		StartedAt:              run.StartedAt.Time.Format(time.RFC3339),
 		CreatedAt:              run.CreatedAt.Time.Format(time.RFC3339),
 		Spec:                   mergedSpec,
+		SBOMContext:            sbomContext,
 		RecoveryContext:        recoveryCtx,
 		GateSkip:               gateSkip,
 		StepSkip:               stepSkip,
@@ -185,6 +205,7 @@ func buildActionClaimResponsePayload(
 		StartedAt:              run.StartedAt.Time.Format(time.RFC3339),
 		CreatedAt:              run.CreatedAt.Time.Format(time.RFC3339),
 		Spec:                   spec,
+		SBOMContext:            nil,
 		RecoveryContext:        nil,
 		GateSkip:               nil,
 		StepSkip:               nil,

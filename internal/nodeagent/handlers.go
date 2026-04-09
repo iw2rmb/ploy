@@ -52,6 +52,8 @@ type StartRunRequest struct {
 	JobImage  string          `json:"job_image,omitempty"` // Container image for this job (for heal job dispatch)
 	NextID    *types.JobID    `json:"next_id,omitempty"`   // Linked successor in run chain
 	JobName   string          `json:"job_name,omitempty"`  // Job name for branch identification (e.g., "heal-branch-a-1-0")
+	// SBOMContext carries explicit sbom cycle metadata from jobs.meta.sbom.
+	SBOMContext *contracts.SBOMJobMetadata `json:"sbom_context,omitempty"`
 	// RecoveryContext carries server-resolved recovery inputs for heal/re-gate jobs.
 	RecoveryContext *contracts.RecoveryClaimContext `json:"recovery_context,omitempty"`
 	// GateSkip carries optional skip metadata for gate jobs.
@@ -71,15 +73,15 @@ type StartRunRequest struct {
 // StartActionRequest describes an action execution request from the server claim API.
 // Actions are terminal follow-up tasks and are not part of the jobs chain.
 type StartActionRequest struct {
-	ActionID    types.JobID     `json:"action_id,omitempty"`
-	ActionType  string          `json:"action_type,omitempty"`
-	RunID       types.RunID     `json:"run_id,omitempty"`
-	RepoID      types.MigRepoID `json:"repo_id,omitempty"`
-	RepoURL     types.RepoURL   `json:"repo_url,omitempty"`
-	BaseRef     types.GitRef    `json:"base_ref,omitempty"`
-	TargetRef   types.GitRef    `json:"target_ref,omitempty"`
-	TypedOptions RunOptions     `json:"-"`
-	Env         map[string]string `json:"env"`
+	ActionID     types.JobID       `json:"action_id,omitempty"`
+	ActionType   string            `json:"action_type,omitempty"`
+	RunID        types.RunID       `json:"run_id,omitempty"`
+	RepoID       types.MigRepoID   `json:"repo_id,omitempty"`
+	RepoURL      types.RepoURL     `json:"repo_url,omitempty"`
+	BaseRef      types.GitRef      `json:"base_ref,omitempty"`
+	TargetRef    types.GitRef      `json:"target_ref,omitempty"`
+	TypedOptions RunOptions        `json:"-"`
+	Env          map[string]string `json:"env"`
 }
 
 // StartRunResponse is returned when a run is accepted.

@@ -272,37 +272,37 @@ func TestMigStepIndexFromJobName_MultiStep(t *testing.T) {
 	}
 }
 
-func TestGateCycleNameFromSBOMJobName(t *testing.T) {
+func TestGateCycleNameFromSBOMContext(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
 		name    string
-		jobName string
+		ctx     *contracts.SBOMJobMetadata
 		want    string
 		wantErr bool
 	}{
-		{name: "pre", jobName: "pre-gate-sbom", want: "pre-gate"},
-		{name: "post", jobName: "post-gate-sbom", want: "post-gate"},
-		{name: "regate", jobName: "re-gate-2-sbom", want: "re-gate-2"},
-		{name: "invalid", jobName: "post-gate", wantErr: true},
+		{name: "pre", ctx: &contracts.SBOMJobMetadata{Phase: contracts.SBOMPhasePre, Role: contracts.SBOMRoleInitial}, want: "pre-gate"},
+		{name: "post", ctx: &contracts.SBOMJobMetadata{Phase: contracts.SBOMPhasePost, Role: contracts.SBOMRoleRetry}, want: "post-gate"},
+		{name: "invalid phase", ctx: &contracts.SBOMJobMetadata{Phase: "oops"}, wantErr: true},
+		{name: "nil", ctx: nil, wantErr: true},
 	}
 
 	for _, tc := range cases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := gateCycleNameFromSBOMJobName(tc.jobName)
+			got, err := gateCycleNameFromSBOMContext(tc.ctx)
 			if tc.wantErr {
 				if err == nil {
-					t.Fatalf("expected error for job_name=%q", tc.jobName)
+					t.Fatalf("expected error for context=%#v", tc.ctx)
 				}
 				return
 			}
 			if err != nil {
-				t.Fatalf("gateCycleNameFromSBOMJobName(%q): %v", tc.jobName, err)
+				t.Fatalf("gateCycleNameFromSBOMContext(%#v): %v", tc.ctx, err)
 			}
 			if got != tc.want {
-				t.Fatalf("gateCycleNameFromSBOMJobName(%q)=%q want %q", tc.jobName, got, tc.want)
+				t.Fatalf("gateCycleNameFromSBOMContext(%#v)=%q want %q", tc.ctx, got, tc.want)
 			}
 		})
 	}
