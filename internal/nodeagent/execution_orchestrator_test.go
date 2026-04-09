@@ -281,6 +281,7 @@ func TestGateCycleNameFromSBOMContext(t *testing.T) {
 		want    string
 		wantErr bool
 	}{
+		{name: "explicit cycle name", ctx: &contracts.SBOMJobMetadata{CycleName: "re-gate-2", Phase: contracts.SBOMPhasePost, Role: contracts.SBOMRoleRetry}, want: "re-gate-2"},
 		{name: "pre", ctx: &contracts.SBOMJobMetadata{Phase: contracts.SBOMPhasePre, Role: contracts.SBOMRoleInitial}, want: "pre-gate"},
 		{name: "post", ctx: &contracts.SBOMJobMetadata{Phase: contracts.SBOMPhasePost, Role: contracts.SBOMRoleRetry}, want: "post-gate"},
 		{name: "invalid phase", ctx: &contracts.SBOMJobMetadata{Phase: "oops"}, wantErr: true},

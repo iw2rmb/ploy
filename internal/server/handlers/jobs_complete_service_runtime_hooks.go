@@ -80,6 +80,7 @@ func (s *CompleteJobService) planAndInsertCycleHookJobs(ctx context.Context, sta
 	postHookSBOMMeta := contracts.NewMigJobMeta()
 	postHookSBOMMeta.SBOM = sbomCycleContextMeta(sbomCycleContext{
 		Phase:     sbomCtx.Phase,
+		CycleName: cycleName,
 		Role:      contracts.SBOMRoleRetry,
 		RootJobID: sbomCtx.RootJobID,
 	})

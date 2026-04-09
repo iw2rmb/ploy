@@ -145,7 +145,8 @@ func rerunJobHandler(st store.Store) http.HandlerFunc {
 		}
 		if sourceType == domaintypes.JobTypeReGate {
 			rootType = domaintypes.JobTypeSBOM
-			rootMeta, err = buildRerunSBOMMeta(contracts.SBOMPhasePost, rootJobID)
+			reGateCycleName := "re-gate-rerun-followup"
+			rootMeta, err = buildRerunSBOMMeta(contracts.SBOMPhasePost, reGateCycleName, rootJobID)
 			if err != nil {
 				writeHTTPError(w, http.StatusInternalServerError, "failed to build rerun sbom metadata: %v", err)
 				return
@@ -204,10 +205,11 @@ func createRerunSBOMAndReGateSuccessors(
 	sbomID domaintypes.JobID,
 	reGateID domaintypes.JobID,
 ) error {
+	reGateCycleName := "re-gate-rerun-followup"
 	if err := createRerunReGateSuccessor(ctx, st, sourceJob, runRepo, reGateID, nil); err != nil {
 		return err
 	}
-	sbomMeta, err := buildRerunSBOMMeta(contracts.SBOMPhasePost, sbomID)
+	sbomMeta, err := buildRerunSBOMMeta(contracts.SBOMPhasePost, reGateCycleName, sbomID)
 	if err != nil {
 		return err
 	}
@@ -277,10 +279,11 @@ func rerunRootJobName(jobType domaintypes.JobType) string {
 	}
 }
 
-func buildRerunSBOMMeta(phase string, rootID domaintypes.JobID) ([]byte, error) {
+func buildRerunSBOMMeta(phase, cycleName string, rootID domaintypes.JobID) ([]byte, error) {
 	meta := contracts.NewMigJobMeta()
 	meta.SBOM = &contracts.SBOMJobMetadata{
 		Phase:     strings.TrimSpace(phase),
+		CycleName: strings.TrimSpace(cycleName),
 		Role:      contracts.SBOMRoleRetry,
 		RootJobID: strings.TrimSpace(rootID.String()),
 	}

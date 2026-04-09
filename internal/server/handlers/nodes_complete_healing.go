@@ -126,6 +126,7 @@ func maybeCreateHealingJobs(
 	retrySBOMMeta := contracts.NewMigJobMeta()
 	retrySBOMMeta.SBOM = sbomCycleContextMeta(sbomCycleContext{
 		Phase:     chain.RetrySBOMPhase,
+		CycleName: reGateName,
 		Role:      contracts.SBOMRoleRetry,
 		RootJobID: chain.RetrySBOMRoot,
 	})
@@ -247,6 +248,7 @@ func maybeCreateSBOMHealingJobs(
 	retrySBOMMeta := contracts.NewMigJobMeta()
 	retrySBOMMeta.SBOM = sbomCycleContextMeta(sbomCycleContext{
 		Phase:     failedCtx.Phase,
+		CycleName: sbomCycleNameFromContext(failedCtx),
 		Role:      contracts.SBOMRoleRetry,
 		RootJobID: chain.RootSBOMID,
 	})
