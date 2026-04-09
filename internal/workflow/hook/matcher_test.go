@@ -179,6 +179,44 @@ func TestMatch_OnChangeUsesNormalizedVersionComparison(t *testing.T) {
 	}
 }
 
+func TestMatch_OnChange_GradlePluginCoordinateTransition(t *testing.T) {
+	t.Parallel()
+
+	spec := Spec{
+		ID: "openapi-gradle-plugin-upgrade",
+		SBOM: SBOMConditions{
+			OnChange: []SBOMChangeCondition{{
+				Name: "org.openapi.generator:org.openapi.generator.gradle.plugin",
+				From: "<5.0.0",
+				To:   ">=5.0.0",
+			}},
+		},
+		Steps: []Step{{Image: "ghcr.io/example/hook:1"}},
+	}
+
+	got, err := Match(spec, MatchInput{
+		Stack: RuntimeStack{Language: "java", Tool: "gradle", Release: "17"},
+		CurrentSBOM: []SBOMPackage{
+			{Name: "org.openapi.generator:org.openapi.generator.gradle.plugin", Version: "6.6.0"},
+		},
+		PreviousSBOM: []SBOMPackage{
+			{Name: "org.openapi.generator:org.openapi.generator.gradle.plugin", Version: "4.3.0"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("Match() error = %v", err)
+	}
+	if !got.Predicates.OnChange {
+		t.Fatalf("Predicates.OnChange = false, want true")
+	}
+	if !got.SBOMMatched {
+		t.Fatalf("SBOMMatched = false, want true")
+	}
+	if !got.ShouldRun {
+		t.Fatalf("ShouldRun = false, want true")
+	}
+}
+
 func TestMatch_DeterministicHashAndOnceEligibility(t *testing.T) {
 	t.Parallel()
 

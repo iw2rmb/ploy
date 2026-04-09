@@ -216,7 +216,7 @@ func sbomCommandForStack(stack contracts.MigStack) contracts.CommandSpec {
 	switch normalizeSBOMStack(stack) {
 	case contracts.MigStackJavaGradle:
 		return contracts.CommandSpec{
-			Shell: "set -eu; if [ -x /workspace/gradlew ]; then /workspace/gradlew -q -p /workspace dependencies > " + rawOutputPath + "; else gradle -q -p /workspace dependencies > " + rawOutputPath + "; fi",
+			Shell: "set -eu; if [ -x /workspace/gradlew ]; then gradle_cmd=\"/workspace/gradlew\"; else gradle_cmd=\"gradle\"; fi; \"$gradle_cmd\" -q -p /workspace dependencies > " + rawOutputPath + "; if ! \"$gradle_cmd\" -q -p /workspace buildEnvironment >> " + rawOutputPath + " 2>/dev/null; then printf \"\\n# ploy: buildEnvironment unavailable\\n\" >> " + rawOutputPath + "; fi",
 		}
 	case contracts.MigStackJavaMaven:
 		return contracts.CommandSpec{
@@ -224,7 +224,7 @@ func sbomCommandForStack(stack contracts.MigStack) contracts.CommandSpec {
 		}
 	default:
 		return contracts.CommandSpec{
-			Shell: "set -eu; if [ -f /workspace/pom.xml ]; then mvn -B -q -f /workspace/pom.xml -DoutputFile=" + rawOutputPath + " dependency:list; exit 0; fi; if [ -x /workspace/gradlew ]; then /workspace/gradlew -q -p /workspace dependencies > " + rawOutputPath + "; exit 0; fi; if [ -f /workspace/build.gradle ] || [ -f /workspace/build.gradle.kts ] || [ -f /workspace/settings.gradle ] || [ -f /workspace/settings.gradle.kts ]; then if command -v gradle >/dev/null 2>&1; then gradle -q -p /workspace dependencies > " + rawOutputPath + "; exit 0; fi; echo \"gradle build detected but no gradle wrapper and no gradle binary available\" >&2; exit 1; fi; echo \"unable to resolve sbom collector: expected pom.xml or gradle markers\" >&2; exit 1",
+			Shell: "set -eu; if [ -f /workspace/pom.xml ]; then mvn -B -q -f /workspace/pom.xml -DoutputFile=" + rawOutputPath + " dependency:list; exit 0; fi; if [ -x /workspace/gradlew ]; then gradle_cmd=\"/workspace/gradlew\"; \"$gradle_cmd\" -q -p /workspace dependencies > " + rawOutputPath + "; if ! \"$gradle_cmd\" -q -p /workspace buildEnvironment >> " + rawOutputPath + " 2>/dev/null; then printf \"\\n# ploy: buildEnvironment unavailable\\n\" >> " + rawOutputPath + "; fi; exit 0; fi; if [ -f /workspace/build.gradle ] || [ -f /workspace/build.gradle.kts ] || [ -f /workspace/settings.gradle ] || [ -f /workspace/settings.gradle.kts ]; then if command -v gradle >/dev/null 2>&1; then gradle -q -p /workspace dependencies > " + rawOutputPath + "; if ! gradle -q -p /workspace buildEnvironment >> " + rawOutputPath + " 2>/dev/null; then printf \"\\n# ploy: buildEnvironment unavailable\\n\" >> " + rawOutputPath + "; fi; exit 0; fi; echo \"gradle build detected but no gradle wrapper and no gradle binary available\" >&2; exit 1; fi; echo \"unable to resolve sbom collector: expected pom.xml or gradle markers\" >&2; exit 1",
 		}
 	}
 }
