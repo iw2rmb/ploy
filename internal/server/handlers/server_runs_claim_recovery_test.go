@@ -187,7 +187,7 @@ func TestClaimJob_HealAfterSBOMFailure_ReconstructsBuildGateLogFromSBOMLogs(t *t
 			"steps":[{"image":"docker.io/acme/mig:latest"}],
 			"build_gate":{"heal":{"retries":2,"image":"docker.io/acme/heal:latest"}}
 		}`),
-		jobMeta: []byte(`{"kind":"mig","recovery":{"loop_kind":"healing","error_kind":"code","strategy_id":"code-default"}}`),
+		jobMeta: []byte(`{"kind":"mig"}`),
 	})
 	f.store.getJobResult = f.store.claimJob.val
 	f.store.listJobsByRunRepoAttempt.val = []store.Job{
@@ -255,7 +255,7 @@ func TestClaimJob_HealAfterSBOMFailure_MissingSBOMLogsFailsClosed(t *testing.T) 
 			"steps":[{"image":"docker.io/acme/mig:latest"}],
 			"build_gate":{"heal":{"retries":2,"image":"docker.io/acme/heal:latest"}}
 		}`),
-		jobMeta: []byte(`{"kind":"mig","recovery":{"loop_kind":"healing","error_kind":"code","strategy_id":"code-default"}}`),
+		jobMeta: []byte(`{"kind":"mig"}`),
 	})
 	f.store.getJobResult = f.store.claimJob.val
 	f.store.listJobsByRunRepoAttempt.val = []store.Job{

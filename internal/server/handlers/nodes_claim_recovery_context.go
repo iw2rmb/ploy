@@ -31,11 +31,41 @@ func buildRecoveryClaimContext(
 		return nil, nil
 	}
 	jobMeta, err := contracts.UnmarshalJobMeta(job.Meta)
-	if err != nil || jobMeta.RecoveryMetadata == nil {
+	if err != nil {
 		return nil, nil
 	}
 
+	jobs, err := st.ListJobsByRunRepoAttempt(ctx, store.ListJobsByRunRepoAttemptParams{
+		RunID:   runID,
+		RepoID:  job.RepoID,
+		Attempt: job.Attempt,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("list jobs for recovery context: %w", err)
+	}
+
+	jobsByID := make(map[domaintypes.JobID]store.Job, len(jobs))
+	for _, j := range jobs {
+		jobsByID[j.ID] = j
+	}
+
 	recovery := jobMeta.RecoveryMetadata
+	sbomPredecessor := (*store.Job)(nil)
+	if jobType == domaintypes.JobTypeHeal {
+		if prev := lifecycle.RecoveryChainPredecessor(job.ID, jobsByID); prev != nil && domaintypes.JobType(prev.JobType) == domaintypes.JobTypeSBOM {
+			sbomPredecessor = prev
+		}
+	}
+	if recovery == nil {
+		if sbomPredecessor == nil {
+			return nil, nil
+		}
+		recovery = &contracts.RecoveryJobMetadata{
+			LoopKind:  contracts.DefaultRecoveryLoopKind().String(),
+			ErrorKind: contracts.DefaultRecoveryErrorKind().String(),
+		}
+	}
+
 	kind, ok := contracts.ParseRecoveryErrorKind(recovery.ErrorKind)
 	if !ok {
 		kind = contracts.DefaultRecoveryErrorKind()
@@ -54,20 +84,6 @@ func buildRecoveryClaimContext(
 	}
 	if jobType == domaintypes.JobTypeHeal && strings.TrimSpace(job.JobImage) != "" {
 		ctxPayload.ResolvedHealingImage = strings.TrimSpace(job.JobImage)
-	}
-
-	jobs, err := st.ListJobsByRunRepoAttempt(ctx, store.ListJobsByRunRepoAttemptParams{
-		RunID:   runID,
-		RepoID:  job.RepoID,
-		Attempt: job.Attempt,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("list jobs for recovery context: %w", err)
-	}
-
-	jobsByID := make(map[domaintypes.JobID]store.Job, len(jobs))
-	for _, j := range jobs {
-		jobsByID[j.ID] = j
 	}
 
 	gateJob, healJob := resolveRecoverySourceJobs(job, jobsByID)
@@ -93,18 +109,15 @@ func buildRecoveryClaimContext(
 			}
 		}
 	}
-	if strings.TrimSpace(ctxPayload.BuildGateLog) == "" && jobType == domaintypes.JobTypeHeal {
-		prev := lifecycle.RecoveryChainPredecessor(job.ID, jobsByID)
-		if prev != nil && domaintypes.JobType(prev.JobType) == domaintypes.JobTypeSBOM {
-			logPayload, logErr := sbomLogPayloadFromClaimLogs(ctx, st, bs, runID, prev.ID)
-			if logErr != nil {
-				return nil, &ClaimJobTerminalError{
-					Message: fmt.Sprintf("resolve sbom recovery log for predecessor job %s", prev.ID),
-					Err:     logErr,
-				}
+	if strings.TrimSpace(ctxPayload.BuildGateLog) == "" && sbomPredecessor != nil {
+		logPayload, logErr := sbomLogPayloadFromClaimLogs(ctx, st, bs, runID, sbomPredecessor.ID)
+		if logErr != nil {
+			return nil, &ClaimJobTerminalError{
+				Message: fmt.Sprintf("resolve sbom recovery log for predecessor job %s", sbomPredecessor.ID),
+				Err:     logErr,
 			}
-			ctxPayload.BuildGateLog = logPayload
 		}
+		ctxPayload.BuildGateLog = logPayload
 	}
 	if detectedExpectation == nil {
 		detectedExpectation = lifecycle.StackExpectationFromMigStack(ctxPayload.DetectedStack)
