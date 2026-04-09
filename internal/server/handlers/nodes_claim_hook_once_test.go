@@ -371,6 +371,51 @@ steps:
 	}
 }
 
+func TestResolveHookRuntimeDecision_InvalidHookHydraEntryIsTerminalClaimError(t *testing.T) {
+	t.Parallel()
+
+	runID := domaintypes.NewRunID()
+	repoID := domaintypes.NewRepoID()
+	const (
+		hash     = "bb22cc33dd44"
+		bundleID = "bundle_invalid_hydra_hook"
+	)
+	st, bs := newHookBundleFixture(t, hash, bundleID, `id: invalid-hydra-hook
+steps:
+  - image: test:latest
+    in:
+      - ./amata.yaml:amata.yaml
+`)
+	job := store.Job{
+		ID:      domaintypes.NewJobID(),
+		RunID:   runID,
+		RepoID:  repoID,
+		JobType: domaintypes.JobTypeHook,
+		Name:    "pre-gate-hook-000",
+	}
+	st.listJobsByRunRepoAttempt.val = []store.Job{{
+		ID:      domaintypes.NewJobID(),
+		RunID:   runID,
+		RepoID:  repoID,
+		Attempt: job.Attempt,
+		JobType: domaintypes.JobTypeSBOM,
+		Status:  domaintypes.JobStatusSuccess,
+	}}
+	spec := specWithHooksAndBundleMap([]string{hash}, map[string]string{hash: bundleID})
+
+	_, err := resolveHookRuntimeDecision(context.Background(), st, bs, job, spec, domaintypes.JobTypeHook)
+	if err == nil {
+		t.Fatal("expected resolveHookRuntimeDecision error")
+	}
+	var terminalErr *ClaimJobTerminalError
+	if !errors.As(err, &terminalErr) {
+		t.Fatalf("expected ClaimJobTerminalError, got %T (%v)", err, err)
+	}
+	if !strings.Contains(err.Error(), "steps[0].in[0]") || !strings.Contains(err.Error(), "invalid short hash") {
+		t.Fatalf("expected hydra canonicalization validation error, got: %v", err)
+	}
+}
+
 func TestResolveHookRuntimeDecision_MissingBundleBlobIsTerminalClaimError(t *testing.T) {
 	t.Parallel()
 

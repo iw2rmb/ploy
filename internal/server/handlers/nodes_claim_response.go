@@ -42,6 +42,7 @@ type claimResponsePayload struct {
 	RecoveryContext        *contracts.RecoveryClaimContext  `json:"recovery_context,omitempty"`
 	GateSkip               *contracts.BuildGateSkipMetadata `json:"gate_skip,omitempty"`
 	StepSkip               *contracts.MigStepSkipMetadata   `json:"step_skip,omitempty"`
+	SBOMSkip               *contracts.SBOMStepSkipMetadata  `json:"sbom_skip,omitempty"`
 	HookRuntime            *contracts.HookRuntimeDecision   `json:"hook_runtime,omitempty"`
 }
 
@@ -116,6 +117,13 @@ func buildClaimResponsePayload(
 			return claimResponsePayload{}, fmt.Errorf("resolve step skip metadata: %w", err)
 		}
 	}
+	var sbomSkip *contracts.SBOMStepSkipMetadata
+	if jobType == domaintypes.JobTypeSBOM {
+		sbomSkip, err = resolveAndPersistSBOMStepSkip(ctx, st, job, mergedSpec)
+		if err != nil {
+			return claimResponsePayload{}, fmt.Errorf("resolve sbom skip metadata: %w", err)
+		}
+	}
 	var sbomContext *contracts.SBOMJobMetadata
 	if jobType == domaintypes.JobTypeSBOM {
 		jobMeta, metaErr := contracts.UnmarshalJobMeta(job.Meta)
@@ -171,6 +179,7 @@ func buildClaimResponsePayload(
 		RecoveryContext:        recoveryCtx,
 		GateSkip:               gateSkip,
 		StepSkip:               stepSkip,
+		SBOMSkip:               sbomSkip,
 		HookRuntime:            hookRuntime,
 	}, nil
 }
@@ -209,6 +218,7 @@ func buildActionClaimResponsePayload(
 		RecoveryContext:        nil,
 		GateSkip:               nil,
 		StepSkip:               nil,
+		SBOMSkip:               nil,
 		HookRuntime:            nil,
 	}
 }

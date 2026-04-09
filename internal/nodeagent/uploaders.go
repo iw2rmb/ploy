@@ -182,6 +182,16 @@ func (b *baseUploader) DownloadSpecBundle(ctx context.Context, bundleID string) 
 	return b.getBytesFromURL(ctx, MustBuildURL(b.cfg.ServerURL, apiPath), "download spec bundle "+bundleID)
 }
 
+// DownloadArtifactBundle fetches an artifact bundle archive by artifact ID.
+func (b *baseUploader) DownloadArtifactBundle(ctx context.Context, artifactID string) ([]byte, error) {
+	artifactID = strings.TrimSpace(artifactID)
+	if artifactID == "" {
+		return nil, fmt.Errorf("artifact_id is required")
+	}
+	apiPath := fmt.Sprintf("/v1/artifacts/%s?download=true", artifactID)
+	return b.getBytesFromURL(ctx, MustBuildURL(b.cfg.ServerURL, apiPath), "download artifact bundle "+artifactID)
+}
+
 // createTarGzBundle creates a gzipped tar archive from the given file paths.
 func createTarGzBundle(paths []string) ([]byte, error) {
 	entries := make([]ArtifactBundleEntry, 0, len(paths))

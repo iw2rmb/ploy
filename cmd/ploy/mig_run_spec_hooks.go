@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -17,8 +18,8 @@ import (
 //   - http(s) URL    (remote hook manifests kept as-is)
 //
 // Local directories are expanded by recursive hook.yaml discovery; each
-// discovered hook.yaml contributes one canonical hook entry by compiling the
-// hook's parent directory.
+// discovered hook.yaml contributes one canonical hook entry compiled from
+// canonicalized manifest content.
 func compileHookSourcesInPlace(ctx context.Context, base *url.URL, client *http.Client, spec map[string]any, specBaseDir string) error {
 	raw, ok := spec["hooks"]
 	if !ok {
@@ -74,7 +75,7 @@ func compileHookSourcesInPlace(ctx context.Context, base *url.URL, client *http.
 			return fmt.Errorf("hooks[%d] %q: stat source %q: %w", i, source, resolved, err)
 		}
 		if !info.IsDir() {
-			hash, err := compileFileRecord(ctx, base, client, resolved, "", seen, bundleMap)
+			hash, err := compileHookManifestSource(ctx, base, client, resolved, fmt.Sprintf("hooks[%d]", i), seen, bundleMap)
 			if err != nil {
 				return fmt.Errorf("hooks[%d] %q: compile hook source: %w", i, source, err)
 			}
@@ -89,11 +90,10 @@ func compileHookSourcesInPlace(ctx context.Context, base *url.URL, client *http.
 		if len(manifests) == 0 {
 			return fmt.Errorf("hooks[%d] %q: directory hook source %q: no hook.yaml files found", i, source, resolved)
 		}
-		for _, manifest := range manifests {
-			parentDir := filepath.Dir(manifest)
-			hash, err := compileFileRecord(ctx, base, client, parentDir, "", seen, bundleMap)
+		for j, manifest := range manifests {
+			hash, err := compileHookManifestSource(ctx, base, client, manifest, fmt.Sprintf("hooks[%d].manifest[%d]", i, j), seen, bundleMap)
 			if err != nil {
-				return fmt.Errorf("hooks[%d] %q: compile hook directory %q: %w", i, source, parentDir, err)
+				return fmt.Errorf("hooks[%d] %q: compile hook manifest %q: %w", i, source, manifest, err)
 			}
 			compiled = append(compiled, hash)
 		}
@@ -160,4 +160,120 @@ func collectBundleMapFromSpec(spec map[string]any) map[string]string {
 		}
 	}
 	return out
+}
+
+func compileHookManifestSource(
+	ctx context.Context,
+	base *url.URL,
+	client *http.Client,
+	manifestPath string,
+	prefix string,
+	seen map[string]string,
+	bundleMap map[string]string,
+) (string, error) {
+	data, err := os.ReadFile(manifestPath)
+	if err != nil {
+		return "", fmt.Errorf("read hook manifest %q: %w", manifestPath, err)
+	}
+	hookSpec, err := parseSpecInputToMap(data, filepath.Dir(manifestPath))
+	if err != nil {
+		return "", fmt.Errorf("parse hook manifest %q: %w", manifestPath, err)
+	}
+	if err := preprocessHookSpecInPlace(hookSpec, prefix); err != nil {
+		return "", err
+	}
+	if err := compileHookHydraInPlace(ctx, base, client, hookSpec, prefix, filepath.Dir(manifestPath), seen, bundleMap); err != nil {
+		return "", err
+	}
+
+	payload, err := json.Marshal(hookSpec)
+	if err != nil {
+		return "", fmt.Errorf("%s: marshal canonical hook spec: %w", prefix, err)
+	}
+	return compileInlineRecord(ctx, base, client, payload, seen, bundleMap)
+}
+
+func preprocessHookSpecInPlace(spec map[string]any, prefix string) error {
+	rawSteps, ok := spec["steps"].([]any)
+	if !ok {
+		return nil
+	}
+	for i, raw := range rawSteps {
+		step, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		stepPrefix := fmt.Sprintf("%s.steps[%d]", prefix, i)
+		if err := resolveImageInSection(step, stepPrefix); err != nil {
+			return err
+		}
+		if err := resolveEnvsInPlace(step); err != nil {
+			return fmt.Errorf("resolve envs (%s): %w", stepPrefix, err)
+		}
+	}
+	return nil
+}
+
+func compileHookHydraInPlace(
+	ctx context.Context,
+	base *url.URL,
+	client *http.Client,
+	spec map[string]any,
+	prefix string,
+	specBaseDir string,
+	seen map[string]string,
+	bundleMap map[string]string,
+) error {
+	rawSteps, ok := spec["steps"].([]any)
+	if !ok {
+		return nil
+	}
+	for i, raw := range rawSteps {
+		step, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		if err := compileHydraBlock(ctx, base, client, step, fmt.Sprintf("%s.steps[%d]", prefix, i), specBaseDir, seen, bundleMap); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func compileInlineRecord(
+	ctx context.Context,
+	base *url.URL,
+	client *http.Client,
+	content []byte,
+	seen map[string]string,
+	bundleMap map[string]string,
+) (string, error) {
+	archiveBytes, err := buildInlineContentArchive(content)
+	if err != nil {
+		return "", fmt.Errorf("build inline archive: %w", err)
+	}
+
+	hash := computeArchiveShortHash(archiveBytes)
+	cid := computeSpecBundleCID(archiveBytes)
+	if bundleID, ok := seen[cid]; ok {
+		bundleMap[hash] = bundleID
+		return hash, nil
+	}
+
+	probeBundleID, exists, err := probeSpecBundleByCID(ctx, base, client, cid)
+	if err != nil {
+		return "", fmt.Errorf("probe: %w", err)
+	}
+	bundleID := probeBundleID
+	if !exists || bundleID == "" {
+		var uploadErr error
+		bundleID, _, _, uploadErr = uploadSpecBundle(ctx, base, client, archiveBytes)
+		if uploadErr != nil {
+			return "", fmt.Errorf("upload: %w", uploadErr)
+		}
+	}
+
+	seen[cid] = bundleID
+	bundleMap[hash] = bundleID
+	return hash, nil
 }
