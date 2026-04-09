@@ -549,34 +549,32 @@ A successful single-step run creates a linear three-node chain:
 
 ### Healing run graph
 
-When a gate fails with healing configured, heal and re-gate jobs are inserted
+When a gate fails with healing configured, heal, retry-sbom, and re-gate jobs are inserted
 by rewiring `next_id` links:
 
 ```
-┌───────────┐     ┌───────────┐     ┌───────────┐     ┌───────────┐     ┌───────────┐
-│ pre-gate  │────▶│  heal-0   │────▶│  re-gate  │────▶│   mig-0   │────▶│ post-gate │
-│  FAILED   │     │           │     │  PASSED   │     │           │     │           │
-└───────────┘     └───────────┘     └───────────┘     └───────────┘     └───────────┘
+┌───────────┐     ┌───────────┐     ┌───────────┐     ┌───────────┐     ┌───────────┐     ┌───────────┐
+│ pre-gate  │────▶│  heal-0   │────▶│ sbom-rtry │────▶│  re-gate  │────▶│   mig-0   │────▶│ post-gate │
+│  FAILED   │     │           │     │           │     │  PASSED   │     │           │     │           │
+└───────────┘     └───────────┘     └───────────┘     └───────────┘     └───────────┘     └───────────┘
 ```
 
 Rewire example:
 - Before failure handling: `failed.next_id = old_next`
-- After insertion: `failed.next_id = heal.id`, `heal.next_id = re_gate.id`, `re_gate.next_id = old_next`
+- After insertion: `failed.next_id = heal.id`, `heal.next_id = retry_sbom.id`, `retry_sbom.next_id = re_gate.id`, `re_gate.next_id = old_next`
 - Healing SHA seeding: inserted `heal` jobs inherit `repo_sha_in` from the
   failed gate job.
 - If failed gate `repo_sha_in` is missing/invalid, remaining linked jobs are
   cancelled instead of inserting heal/re-gate jobs.
-- Persistence order is tail-first (`re-gate` row first, then `heal`, then failed-job rewire)
+- Persistence order is tail-first (`re-gate` row first, then retry sbom, then `heal`, then failed-job rewire)
   so each non-null `next_id` always points to an already existing row under the
   `jobs.next_id -> jobs.id` foreign key.
 - For recovery with expected artifact `schema=gate_profile_v1`, healing insertion
   validates candidate bytes from the previous heal artifact
   (`/out/gate-profile-candidate.json`) and records candidate schema/path/validation
   status in `re_gate` recovery metadata.
-- On `heal` success, before promoting the linked `re_gate`, the server refreshes that
-  `re_gate` recovery candidate metadata from the just-finished heal artifact. This
-  makes first-attempt `heal -> re_gate` use the current attempt candidate instead of
-  waiting for the next retry chain.
+- On `heal` success, before promoting the linked retry SBOM/re-gate segment, the server refreshes
+  the downstream `re_gate` recovery candidate metadata from the just-finished heal artifact.
 - Candidate outcomes are strict and non-blocking:
   - missing artifact -> `candidate_validation_status=missing`
   - unreadable artifact bundle -> `candidate_validation_status=unavailable`

@@ -3,7 +3,6 @@ package handlers
 import (
 	"bytes"
 	"context"
-	"errors"
 
 	"github.com/iw2rmb/ploy/internal/blobstore"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
@@ -11,7 +10,6 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"github.com/iw2rmb/ploy/internal/workflow/lifecycle"
-	"github.com/jackc/pgx/v5"
 )
 
 func maybePromoteReGateRecoveryCandidate(
@@ -76,16 +74,25 @@ func maybeRefreshNextReGateRecoveryCandidate(
 		return nil
 	}
 
-	reGateJob, err := st.GetJob(ctx, *healJob.NextID)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil
-	}
+	jobs, err := st.ListJobsByRunRepoAttempt(ctx, store.ListJobsByRunRepoAttemptParams{
+		RunID:   healJob.RunID,
+		RepoID:  healJob.RepoID,
+		Attempt: healJob.Attempt,
+	})
 	if err != nil {
 		return err
 	}
-	if domaintypes.JobType(reGateJob.JobType) != domaintypes.JobTypeReGate {
+
+	jobsByID := make(map[domaintypes.JobID]store.Job, len(jobs))
+	for _, item := range jobs {
+		jobsByID[item.ID] = item
+	}
+
+	reGateJobID, ok := findNextReGateAfterJob(healJob, jobsByID)
+	if !ok {
 		return nil
 	}
+	reGateJob := jobsByID[reGateJobID]
 
 	meta, err := contracts.UnmarshalJobMeta(reGateJob.Meta)
 	if err != nil {
@@ -103,28 +110,9 @@ func maybeRefreshNextReGateRecoveryCandidate(
 		return nil
 	}
 
-	jobs, err := st.ListJobsByRunRepoAttempt(ctx, store.ListJobsByRunRepoAttemptParams{
-		RunID:   reGateJob.RunID,
-		RepoID:  reGateJob.RepoID,
-		Attempt: reGateJob.Attempt,
-	})
-	if err != nil {
-		return err
-	}
-
-	jobsByID := make(map[domaintypes.JobID]store.Job, len(jobs))
-	for _, item := range jobs {
-		jobsByID[item.ID] = item
-	}
-	if refreshed, ok := jobsByID[reGateJob.ID]; ok {
-		reGateJob = refreshed
-	}
-
 	var detectedExpectation *contracts.StackExpectation
-	if prevHeal := lifecycle.RecoveryChainPredecessor(reGateJob.ID, jobsByID); prevHeal != nil {
-		if failedGate := lifecycle.RecoveryChainPredecessor(prevHeal.ID, jobsByID); failedGate != nil {
-			_, _, detectedExpectation = lifecycle.ResolveGateRecoveryContext(*failedGate)
-		}
+	if failedGate := findFailedGateForReGate(reGateJob.ID, jobsByID); failedGate != nil {
+		_, _, detectedExpectation = lifecycle.ResolveGateRecoveryContext(*failedGate)
 	}
 
 	updatedRecovery := lifecycle.CloneRecoveryMetadata(recovery)
@@ -147,4 +135,63 @@ func maybeRefreshNextReGateRecoveryCandidate(
 		ID:   reGateJob.ID,
 		Meta: updatedMeta,
 	})
+}
+
+func findNextReGateAfterJob(start store.Job, jobsByID map[domaintypes.JobID]store.Job) (domaintypes.JobID, bool) {
+	if start.NextID == nil {
+		return "", false
+	}
+	seen := make(map[domaintypes.JobID]struct{}, len(jobsByID))
+	currentID := *start.NextID
+	for {
+		if _, exists := seen[currentID]; exists {
+			return "", false
+		}
+		seen[currentID] = struct{}{}
+
+		job, ok := jobsByID[currentID]
+		if !ok {
+			return "", false
+		}
+		jobType := domaintypes.JobType(job.JobType)
+		if jobType == domaintypes.JobTypeReGate {
+			return job.ID, true
+		}
+		if jobType != domaintypes.JobTypeSBOM && jobType != domaintypes.JobTypeHook {
+			return "", false
+		}
+		if job.NextID == nil {
+			return "", false
+		}
+		currentID = *job.NextID
+	}
+}
+
+func findFailedGateForReGate(reGateID domaintypes.JobID, jobsByID map[domaintypes.JobID]store.Job) *store.Job {
+	prev := lifecycle.RecoveryChainPredecessor(reGateID, jobsByID)
+	for prev != nil {
+		jobType := domaintypes.JobType(prev.JobType)
+		switch jobType {
+		case domaintypes.JobTypeHook, domaintypes.JobTypeSBOM:
+			prev = lifecycle.RecoveryChainPredecessor(prev.ID, jobsByID)
+		case domaintypes.JobTypeHeal:
+			prev = lifecycle.RecoveryChainPredecessor(prev.ID, jobsByID)
+			for prev != nil {
+				switch domaintypes.JobType(prev.JobType) {
+				case domaintypes.JobTypeHook, domaintypes.JobTypeSBOM:
+					prev = lifecycle.RecoveryChainPredecessor(prev.ID, jobsByID)
+				case domaintypes.JobTypePreGate, domaintypes.JobTypePostGate, domaintypes.JobTypeReGate:
+					return prev
+				default:
+					return nil
+				}
+			}
+			return nil
+		case domaintypes.JobTypePreGate, domaintypes.JobTypePostGate, domaintypes.JobTypeReGate:
+			return prev
+		default:
+			return nil
+		}
+	}
+	return nil
 }

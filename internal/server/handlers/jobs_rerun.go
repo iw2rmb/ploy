@@ -15,6 +15,7 @@ import (
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
+	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
 const (
@@ -123,24 +124,41 @@ func rerunJobHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		rootMeta, _, err := buildRerunMeta(sourceJob.Meta, sourceJob.ID, alter)
+		rerunMeta, _, err := buildRerunMeta(sourceJob.Meta, sourceJob.ID, alter)
 		if err != nil {
 			writeHTTPError(w, http.StatusInternalServerError, "failed to build rerun metadata: %v", err)
 			return
 		}
 
 		rootJobID := domaintypes.NewJobID()
+		rootType := sourceType
+		rootMeta := rerunMeta
 		var rootNext *domaintypes.JobID
 		if sourceType == domaintypes.JobTypeHeal {
+			sbomID := domaintypes.NewJobID()
+			reGateID := domaintypes.NewJobID()
+			rootNext = &sbomID
+			if err := createRerunSBOMAndReGateSuccessors(r.Context(), st, sourceJob, runRepo, sbomID, reGateID); err != nil {
+				writeHTTPError(w, http.StatusInternalServerError, "failed to create sbom/re_gate successors: %v", err)
+				return
+			}
+		}
+		if sourceType == domaintypes.JobTypeReGate {
+			rootType = domaintypes.JobTypeSBOM
+			rootMeta, err = buildRerunSBOMMeta(contracts.SBOMPhasePost, rootJobID)
+			if err != nil {
+				writeHTTPError(w, http.StatusInternalServerError, "failed to build rerun sbom metadata: %v", err)
+				return
+			}
 			reGateID := domaintypes.NewJobID()
 			rootNext = &reGateID
-			if err := createRerunReGateSuccessor(r.Context(), st, sourceJob, runRepo, reGateID); err != nil {
+			if err := createRerunReGateSuccessor(r.Context(), st, sourceJob, runRepo, reGateID, rerunMeta); err != nil {
 				writeHTTPError(w, http.StatusInternalServerError, "failed to create re_gate successor: %v", err)
 				return
 			}
 		}
 
-		rootName := rerunRootJobName(sourceType)
+		rootName := rerunRootJobName(rootType)
 		rootImage := strings.TrimSpace(sourceJob.JobImage)
 		if alter.Image != "" {
 			rootImage = alter.Image
@@ -153,7 +171,7 @@ func rerunJobHandler(st store.Store) http.HandlerFunc {
 			Attempt:     runRepo.Attempt,
 			Name:        rootName,
 			Status:      domaintypes.JobStatusQueued,
-			JobType:     sourceType,
+			JobType:     rootType,
 			JobImage:    rootImage,
 			NextID:      rootNext,
 			Meta:        rootMeta,
@@ -178,9 +196,51 @@ func rerunJobHandler(st store.Store) http.HandlerFunc {
 	}
 }
 
-func createRerunReGateSuccessor(ctx context.Context, st store.Store, sourceJob store.Job, runRepo store.RunRepo, reGateID domaintypes.JobID) error {
+func createRerunSBOMAndReGateSuccessors(
+	ctx context.Context,
+	st store.Store,
+	sourceJob store.Job,
+	runRepo store.RunRepo,
+	sbomID domaintypes.JobID,
+	reGateID domaintypes.JobID,
+) error {
+	if err := createRerunReGateSuccessor(ctx, st, sourceJob, runRepo, reGateID, nil); err != nil {
+		return err
+	}
+	sbomMeta, err := buildRerunSBOMMeta(contracts.SBOMPhasePost, sbomID)
+	if err != nil {
+		return err
+	}
+	_, err = st.CreateJob(ctx, store.CreateJobParams{
+		ID:          sbomID,
+		RunID:       sourceJob.RunID,
+		RepoID:      sourceJob.RepoID,
+		RepoBaseRef: runRepo.RepoBaseRef,
+		Attempt:     runRepo.Attempt,
+		Name:        "sbom-rerun-followup",
+		Status:      domaintypes.JobStatusCreated,
+		JobType:     domaintypes.JobTypeSBOM,
+		NextID:      &reGateID,
+		Meta:        sbomMeta,
+	})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func createRerunReGateSuccessor(
+	ctx context.Context,
+	st store.Store,
+	sourceJob store.Job,
+	runRepo store.RunRepo,
+	reGateID domaintypes.JobID,
+	reGateMetaOverride []byte,
+) error {
 	reGateMeta := []byte(`{"kind":"gate"}`)
-	if sourceJob.NextID != nil {
+	if len(reGateMetaOverride) > 0 {
+		reGateMeta = reGateMetaOverride
+	} else if sourceJob.NextID != nil {
 		nextJob, err := st.GetJob(ctx, *sourceJob.NextID)
 		if err == nil && domaintypes.JobType(nextJob.JobType) == domaintypes.JobTypeReGate {
 			reGateMeta = nextJob.Meta
@@ -208,11 +268,23 @@ func rerunRootJobName(jobType domaintypes.JobType) string {
 	switch jobType {
 	case domaintypes.JobTypeHeal:
 		return "heal-rerun-root"
+	case domaintypes.JobTypeSBOM:
+		return "sbom-rerun-root"
 	case domaintypes.JobTypeReGate:
 		return "re-gate-rerun-root"
 	default:
 		return "rerun-root"
 	}
+}
+
+func buildRerunSBOMMeta(phase string, rootID domaintypes.JobID) ([]byte, error) {
+	meta := contracts.NewMigJobMeta()
+	meta.SBOM = &contracts.SBOMJobMetadata{
+		Phase:     strings.TrimSpace(phase),
+		Role:      contracts.SBOMRoleRetry,
+		RootJobID: strings.TrimSpace(rootID.String()),
+	}
+	return contracts.MarshalJobMeta(meta)
 }
 
 func normalizeRerunAlter(raw map[string]any) (rerunAlter, error) {

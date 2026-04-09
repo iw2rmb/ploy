@@ -64,10 +64,10 @@ func TestRerunJobHandler_HealCreatesNewAttemptAndTail(t *testing.T) {
 	if !st.updateRunStatus.called {
 		t.Fatal("expected terminal run to be reopened")
 	}
-	if got := len(st.createJob.calls); got != 2 {
-		t.Fatalf("expected 2 created jobs (re_gate + root), got %d", got)
+	if got := len(st.createJob.calls); got != 3 {
+		t.Fatalf("expected 3 created jobs (re_gate + sbom + root), got %d", got)
 	}
-	root := st.createJob.calls[1]
+	root := st.createJob.calls[2]
 	if root.Attempt != 3 {
 		t.Fatalf("root attempt=%d want 3", root.Attempt)
 	}
@@ -79,6 +79,17 @@ func TestRerunJobHandler_HealCreatesNewAttemptAndTail(t *testing.T) {
 	}
 	if root.JobImage != "docker.io/test/heal:debug" {
 		t.Fatalf("root image=%q", root.JobImage)
+	}
+	sbom := st.createJob.calls[1]
+	if sbom.JobType != domaintypes.JobTypeSBOM {
+		t.Fatalf("follow-up job type=%s want sbom", sbom.JobType)
+	}
+	if root.NextID == nil || *root.NextID != sbom.ID {
+		t.Fatalf("expected heal root NextID to point to sbom follow-up")
+	}
+	reGate := st.createJob.calls[0]
+	if sbom.NextID == nil || *sbom.NextID != reGate.ID {
+		t.Fatalf("expected sbom follow-up NextID to point to re_gate")
 	}
 
 	var rootMeta map[string]any
@@ -120,6 +131,65 @@ func TestRerunJobHandler_UnsupportedType(t *testing.T) {
 	}, "job_id", sourceID.String())
 	if rr.Code != http.StatusBadRequest {
 		t.Fatalf("status=%d body=%s", rr.Code, rr.Body.String())
+	}
+}
+
+func TestRerunJobHandler_ReGateSourceCreatesSBOMRoot(t *testing.T) {
+	runID := domaintypes.NewRunID()
+	repoID := domaintypes.NewRepoID()
+	sourceID := domaintypes.NewJobID()
+
+	st := &jobStore{}
+	st.getJobResult = store.Job{
+		ID:        sourceID,
+		RunID:     runID,
+		RepoID:    repoID,
+		Attempt:   4,
+		Status:    domaintypes.JobStatusFail,
+		JobType:   domaintypes.JobTypeReGate,
+		RepoShaIn: "0123456789abcdef0123456789abcdef01234567",
+		Meta:      []byte(`{"kind":"gate","recovery":{"loop_kind":"healing","error_kind":"infra","strategy_id":"infra-default"}}`),
+	}
+	st.getRun.val = store.Run{ID: runID, Status: domaintypes.RunStatusFinished}
+	st.getRunRepoResults = []store.RunRepo{
+		{RunID: runID, RepoID: repoID, RepoBaseRef: "main", Attempt: 4},
+		{RunID: runID, RepoID: repoID, RepoBaseRef: "main", Attempt: 5},
+	}
+
+	h := rerunJobHandler(st)
+	rr := doRequest(t, h, http.MethodPost, "/v1/jobs/"+sourceID.String()+"/rerun", map[string]any{
+		"alter": map[string]any{
+			"image": "docker.io/test/regate:debug",
+		},
+	}, "job_id", sourceID.String())
+
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("status=%d body=%s", rr.Code, rr.Body.String())
+	}
+	if got := len(st.createJob.calls); got != 2 {
+		t.Fatalf("expected 2 created jobs (re_gate + sbom root), got %d", got)
+	}
+	reGate := st.createJob.calls[0]
+	sbomRoot := st.createJob.calls[1]
+	if sbomRoot.JobType != domaintypes.JobTypeSBOM {
+		t.Fatalf("root type=%s want sbom", sbomRoot.JobType)
+	}
+	if sbomRoot.Status != domaintypes.JobStatusQueued {
+		t.Fatalf("root status=%s want queued", sbomRoot.Status)
+	}
+	if sbomRoot.NextID == nil || *sbomRoot.NextID != reGate.ID {
+		t.Fatalf("expected sbom root NextID to point to re_gate")
+	}
+	if reGate.JobType != domaintypes.JobTypeReGate {
+		t.Fatalf("follow-up type=%s want re_gate", reGate.JobType)
+	}
+
+	var reGateMeta map[string]any
+	if err := json.Unmarshal(reGate.Meta, &reGateMeta); err != nil {
+		t.Fatalf("unmarshal re-gate meta: %v", err)
+	}
+	if _, ok := reGateMeta[rerunMetaKey]; !ok {
+		t.Fatalf("expected %s metadata on re-gate follow-up", rerunMetaKey)
 	}
 }
 

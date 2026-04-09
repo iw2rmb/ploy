@@ -86,13 +86,17 @@ func resolvePreviousHealJob(
 	jobsByID map[domaintypes.JobID]store.Job,
 ) *store.Job {
 	prev := lifecycle.RecoveryChainPredecessor(failedJob.ID, jobsByID)
-	if prev == nil {
-		return nil
+	for prev != nil {
+		jobType := domaintypes.JobType(prev.JobType)
+		if jobType == domaintypes.JobTypeHeal {
+			return prev
+		}
+		if jobType != domaintypes.JobTypeSBOM && jobType != domaintypes.JobTypeHook {
+			return nil
+		}
+		prev = lifecycle.RecoveryChainPredecessor(prev.ID, jobsByID)
 	}
-	if domaintypes.JobType(prev.JobType) != domaintypes.JobTypeHeal {
-		return nil
-	}
-	return prev
+	return nil
 }
 
 func loadRecoveryArtifact(

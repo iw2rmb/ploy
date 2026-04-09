@@ -257,6 +257,79 @@ func TestCompleteJob_PostAndReGatePreludeSuccessPromoteLinkedNextJob(t *testing.
 	}
 }
 
+func TestCompleteJob_SBOMSuccessWithHooks_InsertsPostHookSBOMBeforeGate(t *testing.T) {
+	t.Parallel()
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/hook-any.yaml", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`
+id: hook-any
+steps:
+  - image: hook:latest
+`))
+	})
+	server := httptest.NewServer(mux)
+	t.Cleanup(server.Close)
+
+	f := newJobFixture(domaintypes.JobTypeSBOM)
+	f.Job.Name = "post-gate-sbom"
+	nextJobID := domaintypes.NewJobID()
+	f.Job.NextID = &nextJobID
+
+	nextJob := store.Job{
+		ID:      nextJobID,
+		RunID:   f.RunID,
+		Status:  domaintypes.JobStatusCreated,
+		JobType: domaintypes.JobTypePostGate,
+	}
+
+	specID := domaintypes.NewSpecID()
+	spec := []byte(`{"hooks":["` + server.URL + `/hook-any.yaml"],"steps":[{"image":"mig:latest"}]}`)
+	st := newJobStoreForFixture(f,
+		withSpec(specID, spec),
+		withListJobsByRun([]store.Job{f.Job, nextJob}),
+		withPromoteResult(nextJob),
+	)
+
+	handler := completeJobHandler(st, nil, nil)
+
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
+		"status":       "Success",
+		"repo_sha_out": "0123456789abcdef0123456789abcdef01234567",
+	}))
+
+	assertStatus(t, rr, http.StatusNoContent)
+
+	if got := len(st.createJob.calls); got != 2 {
+		t.Fatalf("expected 2 created jobs (post-hook sbom + hook), got %d", got)
+	}
+	var (
+		hookJob      *store.CreateJobParams
+		postHookSBOM *store.CreateJobParams
+	)
+	for i := range st.createJob.calls {
+		switch st.createJob.calls[i].JobType {
+		case domaintypes.JobTypeHook:
+			hookJob = &st.createJob.calls[i]
+		case domaintypes.JobTypeSBOM:
+			postHookSBOM = &st.createJob.calls[i]
+		}
+	}
+	if hookJob == nil || postHookSBOM == nil {
+		t.Fatalf("expected one hook and one sbom job, got %+v", st.createJob.calls)
+	}
+	if hookJob.NextID == nil || *hookJob.NextID != postHookSBOM.ID {
+		t.Fatalf("expected hook to point to post-hook sbom")
+	}
+	if postHookSBOM.NextID == nil || *postHookSBOM.NextID != nextJobID {
+		t.Fatalf("expected post-hook sbom to point to original gate successor")
+	}
+	if got := st.promoteJobByIDIfUnblocked.params; got != hookJob.ID {
+		t.Fatalf("expected first promotion to hook job %s, got %s", hookJob.ID, got)
+	}
+}
+
 // TestCompleteJob_FailedJobDoesNotScheduleNext verifies that a failed job
 // does not trigger scheduling of the next job.
 func TestCompleteJob_FailedJobDoesNotScheduleNext(t *testing.T) {
@@ -541,27 +614,27 @@ func TestCompleteJob_GateFailure_HealingInsertionRewiresNextChain(t *testing.T) 
 	byName := createJobsByName(st.createJob.calls)
 	reGate := byName["re-gate-1"]
 	heal := byName["heal-1-0"]
-	if reGate.Name != "re-gate-1" || heal.Name != "heal-1-0" {
-		t.Fatalf("expected re-gate-1 and heal-1-0 jobs, got %+v", st.createJob.calls)
-	}
-	if heal.NextID == nil || *heal.NextID != reGate.ID {
-		t.Fatalf("expected heal.NextID to point to re-gate job")
-	}
-	var finalSBOM *store.CreateJobParams
+	var retrySBOM *store.CreateJobParams
 	for i := range st.createJob.calls {
 		if st.createJob.calls[i].JobType == domaintypes.JobTypeSBOM {
-			finalSBOM = &st.createJob.calls[i]
+			retrySBOM = &st.createJob.calls[i]
 			break
 		}
 	}
-	if finalSBOM == nil {
-		t.Fatal("expected final sbom job")
+	if reGate.Name != "re-gate-1" || heal.Name != "heal-1-0" {
+		t.Fatalf("expected re-gate-1 and heal-1-0 jobs, got %+v", st.createJob.calls)
 	}
-	if reGate.NextID == nil || *reGate.NextID != finalSBOM.ID {
-		t.Fatalf("expected re-gate.NextID to point to final sbom")
+	if retrySBOM == nil {
+		t.Fatal("expected retry sbom job")
 	}
-	if finalSBOM.NextID == nil || *finalSBOM.NextID != gf.Successor.ID {
-		t.Fatalf("expected final sbom.NextID to preserve old successor %s", gf.Successor.ID)
+	if heal.NextID == nil || *heal.NextID != retrySBOM.ID {
+		t.Fatalf("expected heal.NextID to point to retry sbom job")
+	}
+	if retrySBOM.NextID == nil || *retrySBOM.NextID != reGate.ID {
+		t.Fatalf("expected retry sbom.NextID to point to re-gate")
+	}
+	if reGate.NextID == nil || *reGate.NextID != gf.Successor.ID {
+		t.Fatalf("expected re-gate.NextID to preserve old successor %s", gf.Successor.ID)
 	}
 	if len(st.updateJobNextIDParams) != 1 {
 		t.Fatalf("expected one next_id rewiring update, got %d", len(st.updateJobNextIDParams))

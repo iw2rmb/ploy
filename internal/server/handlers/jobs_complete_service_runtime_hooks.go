@@ -76,12 +76,39 @@ func (s *CompleteJobService) planAndInsertCycleHookJobs(ctx context.Context, sta
 		return nil, nil
 	}
 
+	postHookSBOMID := domaintypes.NewJobID()
+	postHookSBOMMeta := contracts.NewMigJobMeta()
+	postHookSBOMMeta.SBOM = sbomCycleContextMeta(sbomCycleContext{
+		Phase:     sbomCtx.Phase,
+		Role:      contracts.SBOMRoleRetry,
+		RootJobID: sbomCtx.RootJobID,
+	})
+	postHookSBOMMetaBytes, err := contracts.MarshalJobMeta(postHookSBOMMeta)
+	if err != nil {
+		return nil, fmt.Errorf("marshal post-hook sbom meta: %w", err)
+	}
+	_, err = s.store.CreateJob(ctx, store.CreateJobParams{
+		ID:          postHookSBOMID,
+		RunID:       state.job.RunID,
+		RepoID:      state.job.RepoID,
+		RepoBaseRef: state.job.RepoBaseRef,
+		Attempt:     state.job.Attempt,
+		Name:        fmt.Sprintf("%s-hook-sbom-%s", cycleName, postHookSBOMID),
+		JobType:     domaintypes.JobTypeSBOM,
+		Status:      domaintypes.JobStatusCreated,
+		NextID:      state.job.NextID,
+		Meta:        postHookSBOMMetaBytes,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("create post-hook sbom job: %w", err)
+	}
+
 	hookIDs := make([]domaintypes.JobID, len(plans))
 	for i := range plans {
 		hookIDs[i] = domaintypes.NewJobID()
 	}
 	for i := len(plans) - 1; i >= 0; i-- {
-		nextID := *state.job.NextID
+		nextID := postHookSBOMID
 		if i+1 < len(plans) {
 			nextID = hookIDs[i+1]
 		}

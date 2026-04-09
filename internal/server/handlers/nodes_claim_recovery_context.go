@@ -154,19 +154,32 @@ func resolveRecoverySourceJobs(
 		return nil, &heal
 	case domaintypes.JobTypeReGate:
 		prev := lifecycle.RecoveryChainPredecessor(current.ID, jobsByID)
-		if prev == nil {
-			return nil, nil
-		}
-		if domaintypes.JobType(prev.JobType) == domaintypes.JobTypeHeal {
-			heal := *prev
-			prevGate := lifecycle.RecoveryChainPredecessor(prev.ID, jobsByID)
-			if prevGate != nil && isGateJobTypeForClaim(domaintypes.JobType(prevGate.JobType)) {
-				return prevGate, &heal
+		for prev != nil {
+			prevType := domaintypes.JobType(prev.JobType)
+			switch {
+			case prevType == domaintypes.JobTypeSBOM || prevType == domaintypes.JobTypeHook:
+				prev = lifecycle.RecoveryChainPredecessor(prev.ID, jobsByID)
+				continue
+			case prevType == domaintypes.JobTypeHeal:
+				heal := *prev
+				prevGate := lifecycle.RecoveryChainPredecessor(prev.ID, jobsByID)
+				for prevGate != nil {
+					prevGateType := domaintypes.JobType(prevGate.JobType)
+					if prevGateType == domaintypes.JobTypeSBOM || prevGateType == domaintypes.JobTypeHook {
+						prevGate = lifecycle.RecoveryChainPredecessor(prevGate.ID, jobsByID)
+						continue
+					}
+					if isGateJobTypeForClaim(prevGateType) {
+						return prevGate, &heal
+					}
+					return nil, &heal
+				}
+				return nil, &heal
+			case isGateJobTypeForClaim(prevType):
+				return prev, nil
+			default:
+				return nil, nil
 			}
-			return nil, &heal
-		}
-		if isGateJobTypeForClaim(domaintypes.JobType(prev.JobType)) {
-			return prev, nil
 		}
 	}
 	return nil, nil
