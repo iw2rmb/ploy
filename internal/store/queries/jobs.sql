@@ -19,6 +19,7 @@ SELECT
   repo_sha_out,
   repo_sha_in8,
   repo_sha_out8,
+  cache_key,
   meta
 FROM jobs
 WHERE id = $1;
@@ -44,6 +45,7 @@ SELECT
   repo_sha_out,
   repo_sha_in8,
   repo_sha_out8,
+  cache_key,
   meta
 FROM jobs
 WHERE run_id = $1
@@ -70,6 +72,7 @@ SELECT
   repo_sha_out,
   repo_sha_in8,
   repo_sha_out8,
+  cache_key,
   meta
 FROM jobs
 WHERE run_id = $1 AND repo_id = $2 AND attempt = $3
@@ -115,6 +118,7 @@ RETURNING
   repo_sha_out,
   repo_sha_in8,
   repo_sha_out8,
+  cache_key,
   meta;
 
 -- name: UpdateJobStatus :exec
@@ -249,6 +253,7 @@ SELECT
   repo_sha_out,
   repo_sha_in8,
   repo_sha_out8,
+  cache_key,
   meta
 FROM jobs
 WHERE run_id = $1 AND repo_id = $2 AND attempt = $3 AND status = 'Created'
@@ -302,6 +307,7 @@ RETURNING
   jobs.repo_sha_out,
   jobs.repo_sha_in8,
   jobs.repo_sha_out8,
+  jobs.cache_key,
   jobs.meta;
 
 -- name: PromoteJobByIDIfUnblocked :one
@@ -345,12 +351,48 @@ RETURNING
   jobs.repo_sha_out,
   jobs.repo_sha_in8,
   jobs.repo_sha_out8,
+  jobs.cache_key,
   jobs.meta;
 
 -- name: UpdateJobNextID :exec
 UPDATE jobs
 SET next_id = $2
 WHERE id = $1;
+
+-- name: UpdateJobRepoSHAIn :exec
+UPDATE jobs
+SET repo_sha_in = $2,
+    repo_sha_in8 = CASE
+      WHEN $2::TEXT = '' THEN ''
+      ELSE SUBSTRING($2::TEXT, 1, 8)
+    END
+WHERE id = $1;
+
+-- name: ClearRepoSHAChainFromJob :execrows
+WITH RECURSIVE chain AS (
+  SELECT j.id, j.next_id
+  FROM jobs j
+  WHERE j.id = $1
+    AND j.run_id = $2
+    AND j.repo_id = $3
+    AND j.attempt = $4
+    AND j.status IN ('Created', 'Queued')
+  UNION ALL
+  SELECT n.id, n.next_id
+  FROM jobs n
+  JOIN chain c ON n.id = c.next_id
+  WHERE n.run_id = $2
+    AND n.repo_id = $3
+    AND n.attempt = $4
+    AND n.status IN ('Created', 'Queued')
+)
+UPDATE jobs AS j
+SET repo_sha_in = '',
+    repo_sha_out = '',
+    repo_sha_in8 = '',
+    repo_sha_out8 = ''
+FROM chain
+WHERE j.id = chain.id;
 
 -- name: CountJobsByRun :one
 SELECT COUNT(*) FROM jobs
@@ -401,6 +443,27 @@ WHERE id = $1;
 UPDATE jobs
 SET job_image = $2
 WHERE id = $1;
+
+-- name: UpdateJobCacheKey :exec
+UPDATE jobs
+SET cache_key = $2
+WHERE id = $1;
+
+-- name: ResolveReusableJobByCacheKey :one
+SELECT
+  id,
+  status,
+  exit_code,
+  repo_sha_out,
+  meta
+FROM jobs
+WHERE repo_id = sqlc.arg(repo_id)
+  AND job_type = sqlc.arg(job_type)
+  AND cache_key = sqlc.arg(cache_key)
+  AND cache_key <> ''
+  AND status IN ('Success', 'Fail')
+ORDER BY finished_at DESC NULLS LAST, id DESC
+LIMIT 1;
 
 -- name: UpdateJobCompletionWithMeta :exec
 WITH completed AS (

@@ -223,6 +223,19 @@ func (s *ClaimService) Claim(ctx context.Context, nodeID domaintypes.NodeID) (Cl
 		}
 		return ClaimResult{}, claimInternal("failed to build claim response", err)
 	}
+	replayed, replayErr := s.tryReplayCachedOutcome(ctx, nodeID, job, payload.Spec)
+	if replayErr != nil {
+		slog.Error("claim: cached outcome replay failed", "node_id", nodeID, "job_id", job.ID, "run_id", run.ID, "err", replayErr)
+		return ClaimResult{}, claimInternal("failed to replay cached outcome", replayErr)
+	}
+	if replayed {
+		slog.Info("job completed via cached outcome replay",
+			"job_id", job.ID,
+			"run_id", run.ID,
+			"node_id", nodeID,
+		)
+		return ClaimResult{}, &ClaimNoWork{}
+	}
 	if claimDecision.AdvanceRunRepoToRunning {
 		if err := s.store.UpdateRunRepoStatus(ctx, store.UpdateRunRepoStatusParams{
 			RunID:  job.RunID,

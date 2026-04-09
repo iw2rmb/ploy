@@ -34,6 +34,7 @@ type Querier interface {
 	// - nodeID must be non-empty
 	ClaimJob(ctx context.Context, nodeID types.NodeID) (Job, error)
 	ClaimRunRepoAction(ctx context.Context, nodeID types.NodeID) (RunRepoAction, error)
+	ClearRepoSHAChainFromJob(ctx context.Context, arg ClearRepoSHAChainFromJobParams) (int64, error)
 	CountJobsByRun(ctx context.Context, runID types.RunID) (int64, error)
 	CountJobsByRunAndStatus(ctx context.Context, arg CountJobsByRunAndStatusParams) (int64, error)
 	// Counts jobs by status for a specific repo attempt.
@@ -288,6 +289,7 @@ type Querier interface {
 	ResolveAnyStackID(ctx context.Context) (int64, error)
 	ResolvePreGateCreationBindingByRepoSHA(ctx context.Context, arg ResolvePreGateCreationBindingByRepoSHAParams) (ResolvePreGateCreationBindingByRepoSHARow, error)
 	ResolvePreGateCreationBindingByRepoSHAAndStack(ctx context.Context, arg ResolvePreGateCreationBindingByRepoSHAAndStackParams) (ResolvePreGateCreationBindingByRepoSHAAndStackRow, error)
+	ResolveReusableJobByCacheKey(ctx context.Context, arg ResolveReusableJobByCacheKeyParams) (ResolveReusableJobByCacheKeyRow, error)
 	ResolveReusableSBOMByRepoSHAAndStack(ctx context.Context, arg ResolveReusableSBOMByRepoSHAAndStackParams) (ResolveReusableSBOMByRepoSHAAndStackRow, error)
 	ResolveReusableStepByHash(ctx context.Context, arg ResolveReusableStepByHashParams) (ResolveReusableStepByHashRow, error)
 	ResolveStackIDByImage(ctx context.Context, image string) (int64, error)
@@ -304,6 +306,7 @@ type Querier interface {
 	UnarchiveMig(ctx context.Context, id types.MigID) error
 	UpdateAPITokenLastUsed(ctx context.Context, tokenID string) error
 	UpdateBootstrapTokenLastUsed(ctx context.Context, tokenID string) error
+	UpdateJobCacheKey(ctx context.Context, arg UpdateJobCacheKeyParams) error
 	UpdateJobCompletion(ctx context.Context, arg UpdateJobCompletionParams) error
 	UpdateJobCompletionWithMeta(ctx context.Context, arg UpdateJobCompletionWithMetaParams) error
 	// Persist the container image name used to execute a job.
@@ -311,6 +314,7 @@ type Querier interface {
 	UpdateJobImageName(ctx context.Context, arg UpdateJobImageNameParams) error
 	UpdateJobMeta(ctx context.Context, arg UpdateJobMetaParams) error
 	UpdateJobNextID(ctx context.Context, arg UpdateJobNextIDParams) error
+	UpdateJobRepoSHAIn(ctx context.Context, arg UpdateJobRepoSHAInParams) error
 	UpdateJobStatus(ctx context.Context, arg UpdateJobStatusParams) error
 	UpdateMigRepoRefs(ctx context.Context, arg UpdateMigRepoRefsParams) error
 	UpdateMigSpec(ctx context.Context, arg UpdateMigSpecParams) error

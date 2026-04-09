@@ -322,6 +322,12 @@ steps:
 	if hookJob.NextID == nil || *hookJob.NextID != postHookSBOM.ID {
 		t.Fatalf("expected hook to point to post-hook sbom")
 	}
+	if !st.updateJobRepoSHAIn.called {
+		t.Fatal("expected hook head repo_sha_in seeding update")
+	}
+	if got, want := st.updateJobRepoSHAIn.params.RepoShaIn, "0123456789abcdef0123456789abcdef01234567"; got != want {
+		t.Fatalf("hook repo_sha_in update = %q, want %q", got, want)
+	}
 	if postHookSBOM.NextID == nil || *postHookSBOM.NextID != nextJobID {
 		t.Fatalf("expected post-hook sbom to point to original gate successor")
 	}

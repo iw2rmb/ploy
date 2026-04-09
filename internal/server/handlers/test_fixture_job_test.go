@@ -38,6 +38,8 @@ type jobStore struct {
 	updateJobCompletion         mockCall[store.UpdateJobCompletionParams, struct{}]
 	updateJobCompletionWithMeta mockCall[store.UpdateJobCompletionWithMetaParams, struct{}]
 	updateJobMeta               mockCall[store.UpdateJobMetaParams, struct{}]
+	updateJobRepoSHAIn          mockCall[store.UpdateJobRepoSHAInParams, struct{}]
+	clearRepoSHAChainFromJob    mockCall[store.ClearRepoSHAChainFromJobParams, int64]
 	updateJobImageName          mockCall[store.UpdateJobImageNameParams, struct{}]
 	upsertJobMetric             mockCall[store.UpsertJobMetricParams, struct{}]
 
@@ -253,6 +255,15 @@ func (m *jobStore) UpdateJobCompletionWithMeta(ctx context.Context, params store
 func (m *jobStore) UpdateJobMeta(ctx context.Context, params store.UpdateJobMetaParams) error {
 	_, err := m.updateJobMeta.record(params)
 	return err
+}
+
+func (m *jobStore) UpdateJobRepoSHAIn(ctx context.Context, params store.UpdateJobRepoSHAInParams) error {
+	_, err := m.updateJobRepoSHAIn.record(params)
+	return err
+}
+
+func (m *jobStore) ClearRepoSHAChainFromJob(ctx context.Context, params store.ClearRepoSHAChainFromJobParams) (int64, error) {
+	return m.clearRepoSHAChainFromJob.record(params)
 }
 
 func (m *jobStore) UpdateJobImageName(ctx context.Context, params store.UpdateJobImageNameParams) error {

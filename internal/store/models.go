@@ -155,6 +155,7 @@ type Job struct {
 	RepoShaOut  string             `json:"repo_sha_out"`
 	RepoShaIn8  string             `json:"repo_sha_in8"`
 	RepoShaOut8 string             `json:"repo_sha_out8"`
+	CacheKey    string             `json:"cache_key"`
 	Meta        []byte             `json:"meta"`
 }
 

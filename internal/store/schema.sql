@@ -282,6 +282,7 @@ CREATE TABLE IF NOT EXISTS jobs (
   repo_sha_out    TEXT NOT NULL DEFAULT '',   -- Node-reported output SHA after this job.
   repo_sha_in8    TEXT NOT NULL DEFAULT '',   -- Short form of repo_sha_in.
   repo_sha_out8   TEXT NOT NULL DEFAULT '',   -- Short form of repo_sha_out.
+  cache_key       TEXT NOT NULL DEFAULT '',   -- SHA-256 cache identity key for claim-time replay.
   meta            JSONB NOT NULL DEFAULT '{}'::jsonb,  -- Structured metadata; see JobMeta type docs above.
   UNIQUE (run_id, repo_id, attempt, name)  -- unique job name per repo attempt.
 );
@@ -294,6 +295,9 @@ CREATE INDEX IF NOT EXISTS jobs_next_id_idx ON jobs(next_id) WHERE next_id IS NO
 CREATE INDEX IF NOT EXISTS jobs_predecessor_lookup_idx ON jobs(run_id, repo_id, attempt, next_id);
 -- Index for repo attribution queries (logs/diffs/events join via job_id → jobs.repo_id).
 CREATE INDEX IF NOT EXISTS jobs_repo_idx ON jobs(repo_id);
+CREATE INDEX IF NOT EXISTS jobs_cache_lookup_idx
+  ON jobs(repo_id, job_type, cache_key, finished_at DESC, id DESC)
+  WHERE cache_key <> '' AND status IN ('Success', 'Fail');
 
 -- Repo-scoped action queue for terminal follow-up work (e.g., MR creation).
 CREATE TABLE IF NOT EXISTS run_repo_actions (

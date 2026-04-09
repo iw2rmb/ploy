@@ -51,6 +51,13 @@ func (s *CompleteJobService) Complete(ctx context.Context, input CompleteJobInpu
 		)
 	}
 
+	if input.Status == domaintypes.JobStatusSuccess {
+		input.RepoSHAOut = normalizeRepoSHA(input.RepoSHAOut)
+		if input.RepoSHAOut == "" && isNonChangingJob(jobType) {
+			input.RepoSHAOut = normalizeRepoSHA(job.RepoShaIn)
+		}
+	}
+
 	if input.Status == domaintypes.JobStatusSuccess && job.NextID != nil {
 		if !sha40Pattern.MatchString(job.RepoShaIn) {
 			return CompleteJobResult{}, completeConflict("job repo_sha_in must match ^[0-9a-f]{40}$ for chain progression")
