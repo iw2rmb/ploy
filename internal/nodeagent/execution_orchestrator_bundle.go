@@ -13,7 +13,9 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"sort"
 	"strings"
+	"time"
 
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
@@ -161,6 +163,11 @@ func extractBundle(data []byte, stagingDir string) error {
 
 	tr := tar.NewReader(gr)
 	seen := make(map[string]struct{})
+	type dirMeta struct {
+		perm    os.FileMode
+		modTime time.Time
+	}
+	finalizeDirs := make(map[string]dirMeta)
 
 	for {
 		hdr, err := tr.Next()
@@ -209,6 +216,13 @@ func extractBundle(data []byte, stagingDir string) error {
 			if err := os.MkdirAll(dst, 0o755); err != nil {
 				return fmt.Errorf("create directory %q: %w", cleaned, err)
 			}
+			perm := hdr.FileInfo().Mode().Perm()
+			if perm == 0 {
+				perm = 0o755
+			}
+			// Apply final directory metadata after extraction to avoid blocking
+			// child creation when directory mode is restrictive (e.g. no execute bit).
+			finalizeDirs[dst] = dirMeta{perm: perm, modTime: hdr.ModTime}
 		case tar.TypeReg:
 			if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
 				return fmt.Errorf("create parent for %q: %w", cleaned, err)
@@ -229,7 +243,33 @@ func extractBundle(data []byte, stagingDir string) error {
 			if closeErr != nil {
 				return fmt.Errorf("close file %q: %w", cleaned, closeErr)
 			}
-		// Skip unknown entry types (devices, char files, FIFOs, etc.).
+			if err := os.Chmod(dst, perm); err != nil {
+				return fmt.Errorf("chmod file %q: %w", cleaned, err)
+			}
+			if err := os.Chtimes(dst, hdr.ModTime, hdr.ModTime); err != nil {
+				return fmt.Errorf("set file times %q: %w", cleaned, err)
+			}
+			// Skip unknown entry types (devices, char files, FIFOs, etc.).
+		}
+	}
+
+	// Finalize directory metadata deepest-first so children are already in place.
+	if len(finalizeDirs) > 0 {
+		dirPaths := make([]string, 0, len(finalizeDirs))
+		for p := range finalizeDirs {
+			dirPaths = append(dirPaths, p)
+		}
+		sort.Slice(dirPaths, func(i, j int) bool {
+			return len(dirPaths[i]) > len(dirPaths[j])
+		})
+		for _, p := range dirPaths {
+			meta := finalizeDirs[p]
+			if err := os.Chmod(p, meta.perm); err != nil {
+				return fmt.Errorf("chmod directory %q: %w", p, err)
+			}
+			if err := os.Chtimes(p, meta.modTime, meta.modTime); err != nil {
+				return fmt.Errorf("set directory times %q: %w", p, err)
+			}
 		}
 	}
 

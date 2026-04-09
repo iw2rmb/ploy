@@ -20,16 +20,15 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"time"
 )
 
 // buildSourceArchive creates a deterministic gzip-compressed tar archive from
 // a single file or directory at resolvedPath.
 //
 // For content-addressed determinism the archive uses a fixed root name "content"
-// so that identical file bytes always produce the same archive regardless of
-// source path. Timestamps are zeroed and permissions are canonical (0644 files,
-// 0755 directories).
+// so that identical source data and metadata produce the same archive regardless
+// of source path. File and directory permissions plus modification times are
+// preserved from the source.
 func buildSourceArchive(resolvedPath string) ([]byte, error) {
 	info, err := os.Stat(resolvedPath)
 	if err != nil {
@@ -44,8 +43,8 @@ func buildSourceArchive(resolvedPath string) ([]byte, error) {
 		dirHdr := &tar.Header{
 			Name:     "content/",
 			Typeflag: tar.TypeDir,
-			Mode:     0o755,
-			ModTime:  time.Time{},
+			Mode:     int64(info.Mode().Perm()),
+			ModTime:  info.ModTime(),
 		}
 		if err := tw.WriteHeader(dirHdr); err != nil {
 			return nil, fmt.Errorf("write dir header: %w", err)
@@ -61,9 +60,9 @@ func buildSourceArchive(resolvedPath string) ([]byte, error) {
 		hdr := &tar.Header{
 			Name:     "content",
 			Typeflag: tar.TypeReg,
-			Mode:     0o644,
+			Mode:     int64(info.Mode().Perm()),
 			Size:     int64(len(data)),
-			ModTime:  time.Time{},
+			ModTime:  info.ModTime(),
 		}
 		if err := tw.WriteHeader(hdr); err != nil {
 			return nil, fmt.Errorf("write header: %w", err)
@@ -111,8 +110,8 @@ func addDirToTar(tw *tar.Writer, dirPath, namePrefix string) error {
 			dirHdr := &tar.Header{
 				Name:     childName + "/",
 				Typeflag: tar.TypeDir,
-				Mode:     0o755,
-				ModTime:  time.Time{},
+				Mode:     int64(info.Mode().Perm()),
+				ModTime:  info.ModTime(),
 			}
 			if err := tw.WriteHeader(dirHdr); err != nil {
 				return fmt.Errorf("write dir header %s: %w", childName, err)
@@ -128,9 +127,9 @@ func addDirToTar(tw *tar.Writer, dirPath, namePrefix string) error {
 			hdr := &tar.Header{
 				Name:     childName,
 				Typeflag: tar.TypeReg,
-				Mode:     0o644,
+				Mode:     int64(info.Mode().Perm()),
 				Size:     int64(len(data)),
-				ModTime:  time.Time{},
+				ModTime:  info.ModTime(),
 			}
 			if err := tw.WriteHeader(hdr); err != nil {
 				return fmt.Errorf("write header %s: %w", childName, err)
