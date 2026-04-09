@@ -1,6 +1,7 @@
 package nodeagent
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -8,6 +9,7 @@ import (
 
 	iversion "github.com/iw2rmb/ploy/internal/version"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
+	"github.com/iw2rmb/ploy/internal/workflow/stackdetect"
 )
 
 func TestSBOMRuntimeImageTag(t *testing.T) {
@@ -133,8 +135,8 @@ func TestDetectSBOMStackFromWorkspace(t *testing.T) {
 	t.Parallel()
 
 	workspace := t.TempDir()
-	if got := detectSBOMStackFromWorkspace(workspace, contracts.MigStackUnknown); got != contracts.MigStackUnknown {
-		t.Fatalf("empty workspace detection=%q, want %q", got, contracts.MigStackUnknown)
+	if _, err := detectSBOMStackFromWorkspace(workspace); err == nil {
+		t.Fatal("empty workspace: expected detection error, got nil")
 	}
 
 	mavenWorkspace := filepath.Join(workspace, "maven")
@@ -144,8 +146,8 @@ func TestDetectSBOMStackFromWorkspace(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(mavenWorkspace, "pom.xml"), []byte("<project/>"), 0o644); err != nil {
 		t.Fatalf("write pom.xml: %v", err)
 	}
-	if got := detectSBOMStackFromWorkspace(mavenWorkspace, contracts.MigStackUnknown); got != contracts.MigStackJavaMaven {
-		t.Fatalf("maven workspace detection=%q, want %q", got, contracts.MigStackJavaMaven)
+	if got, err := detectSBOMStackFromWorkspace(mavenWorkspace); err != nil || got != contracts.MigStackJavaMaven {
+		t.Fatalf("maven workspace detection=%q err=%v, want %q", got, err, contracts.MigStackJavaMaven)
 	}
 
 	gradleWorkspace := filepath.Join(workspace, "gradle")
@@ -155,8 +157,63 @@ func TestDetectSBOMStackFromWorkspace(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(gradleWorkspace, "build.gradle.kts"), []byte("plugins {}"), 0o644); err != nil {
 		t.Fatalf("write build.gradle.kts: %v", err)
 	}
-	if got := detectSBOMStackFromWorkspace(gradleWorkspace, contracts.MigStackUnknown); got != contracts.MigStackJavaGradle {
-		t.Fatalf("gradle workspace detection=%q, want %q", got, contracts.MigStackJavaGradle)
+	if got, err := detectSBOMStackFromWorkspace(gradleWorkspace); err != nil || got != contracts.MigStackJavaGradle {
+		t.Fatalf("gradle workspace detection=%q err=%v, want %q", got, err, contracts.MigStackJavaGradle)
+	}
+
+	ambiguousWorkspace := filepath.Join(workspace, "ambiguous")
+	if err := os.MkdirAll(ambiguousWorkspace, 0o755); err != nil {
+		t.Fatalf("mkdir ambiguous workspace: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(ambiguousWorkspace, "pom.xml"), []byte("<project/>"), 0o644); err != nil {
+		t.Fatalf("write ambiguous pom.xml: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(ambiguousWorkspace, "build.gradle"), []byte("plugins {}"), 0o644); err != nil {
+		t.Fatalf("write ambiguous build.gradle: %v", err)
+	}
+	if _, err := detectSBOMStackFromWorkspace(ambiguousWorkspace); err == nil {
+		t.Fatal("ambiguous workspace: expected detection error, got nil")
+	} else {
+		var detErr *stackdetect.DetectionError
+		if !errors.As(err, &detErr) || !detErr.IsAmbiguous() {
+			t.Fatalf("ambiguous workspace: expected DetectionError ambiguous, got %v", err)
+		}
+	}
+
+	settingsOnlyWorkspace := filepath.Join(workspace, "settings-only")
+	if err := os.MkdirAll(settingsOnlyWorkspace, 0o755); err != nil {
+		t.Fatalf("mkdir settings-only workspace: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(settingsOnlyWorkspace, "settings.gradle.kts"), []byte("rootProject.name = \"x\""), 0o644); err != nil {
+		t.Fatalf("write settings.gradle.kts: %v", err)
+	}
+	if _, err := detectSBOMStackFromWorkspace(settingsOnlyWorkspace); err == nil {
+		t.Fatal("settings-only workspace: expected detection error, got nil")
+	}
+
+	gradlewOnlyWorkspace := filepath.Join(workspace, "gradlew-only")
+	if err := os.MkdirAll(gradlewOnlyWorkspace, 0o755); err != nil {
+		t.Fatalf("mkdir gradlew-only workspace: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(gradlewOnlyWorkspace, "gradlew"), []byte("#!/bin/sh"), 0o755); err != nil {
+		t.Fatalf("write gradlew: %v", err)
+	}
+	if _, err := detectSBOMStackFromWorkspace(gradlewOnlyWorkspace); err == nil {
+		t.Fatal("gradlew-only workspace: expected detection error, got nil")
+	}
+}
+
+func TestDetectSBOMStackFromWorkspace_UnsupportedTool(t *testing.T) {
+	t.Parallel()
+
+	goWorkspace := t.TempDir()
+	if err := os.WriteFile(filepath.Join(goWorkspace, "go.mod"), []byte("module example.com/x\ngo 1.24"), 0o644); err != nil {
+		t.Fatalf("write go.mod: %v", err)
+	}
+	if _, err := detectSBOMStackFromWorkspace(goWorkspace); err == nil {
+		t.Fatal("go workspace: expected unsupported-tool error, got nil")
+	} else if !strings.Contains(err.Error(), "unsupported sbom tool") {
+		t.Fatalf("go workspace: expected unsupported-tool error, got %v", err)
 	}
 }
 

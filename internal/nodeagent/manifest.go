@@ -1,15 +1,16 @@
 package nodeagent
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
 	iversion "github.com/iw2rmb/ploy/internal/version"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
+	"github.com/iw2rmb/ploy/internal/workflow/stackdetect"
 )
 
 const (
@@ -147,24 +148,20 @@ func sbomStackHintFromPhase(phase *contracts.BuildGatePhaseConfig) contracts.Mig
 	return contracts.MigStackUnknown
 }
 
-func detectSBOMStackFromWorkspace(workspace string, fallback contracts.MigStack) contracts.MigStack {
-	stack := normalizeSBOMStack(fallback)
+func detectSBOMStackFromWorkspace(workspace string) (contracts.MigStack, error) {
 	trimmedWorkspace := strings.TrimSpace(workspace)
 	if trimmedWorkspace == "" {
-		return stack
+		return contracts.MigStackUnknown, fmt.Errorf("workspace path is required for sbom stack detection")
 	}
-
-	if fileExists(filepath.Join(trimmedWorkspace, "pom.xml")) {
-		return contracts.MigStackJavaMaven
+	obs, err := stackdetect.DetectTool(context.Background(), trimmedWorkspace)
+	if err != nil {
+		return contracts.MigStackUnknown, fmt.Errorf("detect sbom tool: %w", err)
 	}
-	if fileExists(filepath.Join(trimmedWorkspace, "build.gradle")) ||
-		fileExists(filepath.Join(trimmedWorkspace, "build.gradle.kts")) ||
-		fileExists(filepath.Join(trimmedWorkspace, "settings.gradle")) ||
-		fileExists(filepath.Join(trimmedWorkspace, "settings.gradle.kts")) ||
-		fileExists(filepath.Join(trimmedWorkspace, "gradlew")) {
-		return contracts.MigStackJavaGradle
+	stack := contracts.ToolToMigStack(obs.Tool)
+	if stack == contracts.MigStackUnknown {
+		return contracts.MigStackUnknown, fmt.Errorf("unsupported sbom tool %q", strings.TrimSpace(obs.Tool))
 	}
-	return stack
+	return normalizeSBOMStack(stack), nil
 }
 
 func applySBOMRuntimeForStack(manifest *contracts.StepManifest, stack contracts.MigStack) error {
