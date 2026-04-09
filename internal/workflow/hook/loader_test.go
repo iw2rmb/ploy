@@ -53,7 +53,7 @@ steps:
 func TestLoadFromMigSpec_LoadsDirectFileAndURLInStableOrder(t *testing.T) {
 	root := t.TempDir()
 	localPath := filepath.Join(root, "local-hook.yaml")
-	localBody, err := os.ReadFile(filepath.Join("testdata", "openapi-generator-cli", "hook.yaml"))
+	localBody, err := os.ReadFile(filepath.Join("testdata", "openapi-generator-inline", "hook.yaml"))
 	if err != nil {
 		t.Fatalf("read local fixture hook: %v", err)
 	}
@@ -91,13 +91,13 @@ steps:
 	if len(first) != 2 {
 		t.Fatalf("len(first) = %d, want 2", len(first))
 	}
-	if first[0].ID != "openapi-generator-cli" {
-		t.Fatalf("first[0].ID = %q, want %q", first[0].ID, "openapi-generator-cli")
+	if first[0].ID != "openapi-generator-inline" {
+		t.Fatalf("first[0].ID = %q, want %q", first[0].ID, "openapi-generator-inline")
 	}
 	if first[1].ID != "remote-hook" {
 		t.Fatalf("first[1].ID = %q, want %q", first[1].ID, "remote-hook")
 	}
-	if len(first[0].Steps) != 1 || first[0].Steps[0].Image != "ghcr.io/iw2rmb/hook/openapi-generator-cli:latest" {
+	if len(first[0].Steps) != 1 || first[0].Steps[0].Image != "ghcr.io/iw2rmb/hook/openapi-generator-inline:latest" {
 		t.Fatalf("local hook steps not preserved: %+v", first[0].Steps)
 	}
 	if len(first[0].Steps[0].In) != 1 || first[0].Steps[0].In[0] != "abcdef0:/in/amata.yaml" {
