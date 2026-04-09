@@ -156,6 +156,27 @@ func TestMaterializeValidatedSBOMOutput_ErrorsWhenDependencyOutputMissing(t *tes
 	}
 }
 
+func TestMaterializeHookSnapshot_CopiesInputSnapshot(t *testing.T) {
+	inputSnapshotPath := filepath.Join(t.TempDir(), "hook-input", preGateCanonicalSBOMFileName)
+	snapshotPath := filepath.Join(t.TempDir(), "hook-output", preGateCanonicalSBOMFileName)
+
+	inputRaw := writeCanonicalSBOMFixture(t, inputSnapshotPath, "input-cycle")
+	if err := materializeHookSnapshot(inputSnapshotPath, snapshotPath); err != nil {
+		t.Fatalf("materializeHookSnapshot: %v", err)
+	}
+
+	got, err := os.ReadFile(snapshotPath)
+	if err != nil {
+		t.Fatalf("read snapshot: %v", err)
+	}
+	if string(got) != string(inputRaw) {
+		t.Fatalf("snapshot mismatch")
+	}
+	if err := validateCanonicalSBOMDocument(got); err != nil {
+		t.Fatalf("validate snapshot: %v", err)
+	}
+}
+
 func TestValidateCanonicalSBOMDocument_RejectsMalformedPayload(t *testing.T) {
 	cases := []struct {
 		name string
@@ -232,7 +253,7 @@ func TestMaterializePreGateSBOMForGate_UsesLastHookOutput(t *testing.T) {
 	runID := types.RunID("run-sbom-with-hooks")
 	writeCanonicalSBOMFixture(t, preGateSBOMOutPath(runID), "pre-gate-cycle")
 
-	// Simulate completed hook jobs where each writes /out/sbom.spdx.json.
+	// Simulate completed hook snapshots for each hook index.
 	lastHookOut := preGateHookOutPath(runID, 1)
 	wantSnapshot := writeCanonicalSBOMFixture(t, lastHookOut, "hook-cycle")
 
