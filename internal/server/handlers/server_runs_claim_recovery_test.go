@@ -1,12 +1,18 @@
 package handlers
 
 import (
+	"bytes"
+	"compress/gzip"
+	"context"
 	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
+	bsmock "github.com/iw2rmb/ploy/internal/blobstore/mock"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/logchunk"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
@@ -167,4 +173,144 @@ func TestClaimJob_DepsCompatRecoveryContextIncludesEndpointAndBumps(t *testing.T
 	if got, ok := depsBumps["legacy:shim"]; !ok || got != nil {
 		t.Fatalf("deps_bumps[legacy:shim]=%v (present=%v), want null", got, ok)
 	}
+}
+
+func TestClaimJob_HealAfterSBOMFailure_ReconstructsBuildGateLogFromSBOMLogs(t *testing.T) {
+	t.Parallel()
+
+	sbomJobID := domaintypes.NewJobID()
+	f := newClaimJobFixture(t, claimJobFixtureOptions{
+		jobType:  domaintypes.JobTypeHeal,
+		jobName:  "heal-sbom-1-0",
+		jobImage: "docker.io/acme/heal:latest",
+		specJSON: []byte(`{
+			"steps":[{"image":"docker.io/acme/mig:latest"}],
+			"build_gate":{"heal":{"retries":2,"image":"docker.io/acme/heal:latest"}}
+		}`),
+		jobMeta: []byte(`{"kind":"mig","recovery":{"loop_kind":"healing","error_kind":"code","strategy_id":"code-default"}}`),
+	})
+	f.store.getJobResult = f.store.claimJob.val
+	f.store.listJobsByRunRepoAttempt.val = []store.Job{
+		{
+			ID:      sbomJobID,
+			RunID:   f.runID,
+			RepoID:  f.repoID,
+			Attempt: 1,
+			JobType: domaintypes.JobTypeSBOM,
+			Status:  domaintypes.JobStatusFail,
+			NextID:  &f.jobID,
+		},
+		{
+			ID:      f.jobID,
+			RunID:   f.runID,
+			RepoID:  f.repoID,
+			Attempt: 1,
+			JobType: domaintypes.JobTypeHeal,
+			Status:  domaintypes.JobStatusRunning,
+		},
+	}
+
+	chunk1 := "logs/job/" + sbomJobID.String() + "/1.gz"
+	chunk2 := "logs/job/" + sbomJobID.String() + "/2.gz"
+	f.store.listLogsByRunAndJob.val = []store.Log{
+		{ID: 1, RunID: f.runID, JobID: &sbomJobID, ChunkNo: 1, ObjectKey: &chunk1},
+		{ID: 2, RunID: f.runID, JobID: &sbomJobID, ChunkNo: 2, ObjectKey: &chunk2},
+	}
+
+	bs := bsmock.New()
+	_, _ = bs.Put(context.Background(), chunk1, "application/gzip", gzipRecoveryFrames(t,
+		logchunk.Record{Stream: logchunk.StreamStdout, Line: "first-out"},
+		logchunk.Record{Stream: logchunk.StreamStderr, Line: "first-err"},
+	))
+	_, _ = bs.Put(context.Background(), chunk2, "application/gzip", gzipRecoveryFrames(t,
+		logchunk.Record{Stream: logchunk.StreamStdout, Line: "second-out"},
+	))
+
+	handler := claimJobHandler(f.store, bs, f.config)
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+f.nodeKey+"/claim", nil)
+	req.SetPathValue("id", f.nodeKey)
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+	assertStatus(t, rr, http.StatusOK)
+
+	resp := decodeBody[map[string]any](t, rr)
+	rc, ok := resp["recovery_context"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected recovery_context object, got %T", resp["recovery_context"])
+	}
+	if got, want := rc["build_gate_log"], "first-out\nfirst-err\nsecond-out\n"; got != want {
+		t.Fatalf("recovery_context.build_gate_log=%q, want %q", got, want)
+	}
+}
+
+func TestClaimJob_HealAfterSBOMFailure_MissingSBOMLogsFailsClosed(t *testing.T) {
+	t.Parallel()
+
+	sbomJobID := domaintypes.NewJobID()
+	f := newClaimJobFixture(t, claimJobFixtureOptions{
+		jobType:  domaintypes.JobTypeHeal,
+		jobName:  "heal-sbom-1-0",
+		jobImage: "docker.io/acme/heal:latest",
+		specJSON: []byte(`{
+			"steps":[{"image":"docker.io/acme/mig:latest"}],
+			"build_gate":{"heal":{"retries":2,"image":"docker.io/acme/heal:latest"}}
+		}`),
+		jobMeta: []byte(`{"kind":"mig","recovery":{"loop_kind":"healing","error_kind":"code","strategy_id":"code-default"}}`),
+	})
+	f.store.getJobResult = f.store.claimJob.val
+	f.store.listJobsByRunRepoAttempt.val = []store.Job{
+		{
+			ID:      sbomJobID,
+			RunID:   f.runID,
+			RepoID:  f.repoID,
+			Attempt: 1,
+			JobType: domaintypes.JobTypeSBOM,
+			Status:  domaintypes.JobStatusFail,
+			NextID:  &f.jobID,
+		},
+		{
+			ID:      f.jobID,
+			RunID:   f.runID,
+			RepoID:  f.repoID,
+			Attempt: 1,
+			JobType: domaintypes.JobTypeHeal,
+			Status:  domaintypes.JobStatusRunning,
+		},
+	}
+	f.store.listLogsByRunAndJob.val = nil
+
+	handler := claimJobHandler(f.store, bsmock.New(), f.config)
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+f.nodeKey+"/claim", nil)
+	req.SetPathValue("id", f.nodeKey)
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+
+	assertStatus(t, rr, http.StatusNoContent)
+	if !f.store.updateJobCompletion.called {
+		t.Fatal("expected claimed heal-sbom job to be completed as Error")
+	}
+	if got, want := f.store.updateJobCompletion.params.Status, domaintypes.JobStatusError; got != want {
+		t.Fatalf("update status=%s, want %s", got, want)
+	}
+	if f.store.unclaimJob.called {
+		t.Fatal("did not expect unclaim on terminal claim payload failure")
+	}
+}
+
+func gzipRecoveryFrames(t *testing.T, records ...logchunk.Record) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	zw := gzip.NewWriter(&buf)
+	for _, record := range records {
+		if strings.TrimSpace(record.Line) == "" {
+			continue
+		}
+		if err := logchunk.EncodeRecordLine(zw, record.Stream, record.Line); err != nil {
+			t.Fatalf("encode framed line: %v", err)
+		}
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return buf.Bytes()
 }
