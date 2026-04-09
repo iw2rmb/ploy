@@ -33,7 +33,6 @@ const preGateCanonicalSBOMFileName = "sbom.spdx.json"
 const (
 	preGateCycleName         = "pre-gate"
 	postGateCycleName        = "post-gate"
-	sbomJobNameSuffix        = "-sbom"
 	hookJobNameDelimiter     = "-hook-"
 	preGateHookJobNamePrefix = "pre-gate-hook-"
 )
@@ -101,16 +100,19 @@ func gateCycleFinalSnapshotPath(runID types.RunID, cycleName string, hooks []str
 	return gateCycleSBOMOutPath(runID, cycleName)
 }
 
-func gateCycleNameFromSBOMJobName(jobName string) (string, error) {
-	name := strings.TrimSpace(jobName)
-	if !strings.HasSuffix(name, sbomJobNameSuffix) {
-		return "", fmt.Errorf("sbom job_name must end with %q, got %q", sbomJobNameSuffix, name)
+func gateCycleNameFromSBOMContext(sbomCtx *contracts.SBOMJobMetadata) (string, error) {
+	if sbomCtx == nil {
+		return "", fmt.Errorf("sbom context is required")
 	}
-	cycleName := strings.TrimSpace(strings.TrimSuffix(name, sbomJobNameSuffix))
-	if cycleName == "" {
-		return "", fmt.Errorf("sbom cycle name is empty in job_name %q", name)
+	phase := strings.TrimSpace(sbomCtx.Phase)
+	switch phase {
+	case contracts.SBOMPhasePre:
+		return preGateCycleName, nil
+	case contracts.SBOMPhasePost:
+		return postGateCycleName, nil
+	default:
+		return "", fmt.Errorf("sbom context phase invalid: %q", phase)
 	}
-	return cycleName, nil
 }
 
 func gateCycleHookIndexFromJobName(jobName string, hooksLen int) (string, int, error) {
@@ -191,7 +193,7 @@ func preGateHookIndexFromJobName(jobName string, hooksLen int) (int, error) {
 func (r *runController) executeSBOMJob(ctx context.Context, req StartRunRequest) {
 	startTime := time.Now()
 
-	cycleName, err := gateCycleNameFromSBOMJobName(req.JobName)
+	cycleName, err := gateCycleNameFromSBOMContext(req.SBOMContext)
 	if err != nil {
 		slog.Error("failed to derive sbom cycle", "run_id", req.RunID, "job_id", req.JobID, "job_name", req.JobName, "error", err)
 		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
