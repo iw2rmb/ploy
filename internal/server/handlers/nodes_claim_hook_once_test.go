@@ -14,6 +14,7 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
+	"github.com/iw2rmb/ploy/internal/workflow/hook"
 )
 
 func TestResolveHookRuntimeDecision_ReturnsDeterministicHashWithoutLedgerChecks(t *testing.T) {
@@ -461,6 +462,47 @@ func TestResolveHookRuntimeDecision_MissingBundleBlobIsTerminalClaimError(t *tes
 	want := `spec bundle "bundle_missing_blob" blob is missing from object storage`
 	if !strings.Contains(err.Error(), want) {
 		t.Fatalf("expected deterministic missing-blob message %q, got: %v", want, err)
+	}
+}
+
+func TestPopulateHookRuntimeMatchedTransition_OnChange(t *testing.T) {
+	t.Parallel()
+
+	decision := &contracts.HookRuntimeDecision{}
+	spec := hook.Spec{
+		SBOM: hook.SBOMConditions{
+			OnChange: []hook.SBOMChangeCondition{{
+				Name: "org.openapi.generator:org.openapi.generator.gradle.plugin",
+				From: "<5.0.0",
+				To:   ">=5.0.0",
+			}},
+		},
+	}
+	input := hook.MatchInput{
+		Stack: hook.RuntimeStack{Language: "java", Tool: "gradle"},
+		PreviousSBOM: []hook.SBOMPackage{{
+			Name:    "org.openapi.generator:org.openapi.generator.gradle.plugin",
+			Version: "4.3.0",
+		}},
+		CurrentSBOM: []hook.SBOMPackage{{
+			Name:    "org.openapi.generator:org.openapi.generator.gradle.plugin",
+			Version: "6.6.0",
+		}},
+	}
+
+	populateHookRuntimeMatchedTransition(decision, spec, input)
+
+	if got, want := decision.MatchedPredicate, "on_change"; got != want {
+		t.Fatalf("MatchedPredicate=%q want %q", got, want)
+	}
+	if got, want := decision.MatchedPackage, "org.openapi.generator:org.openapi.generator.gradle.plugin"; got != want {
+		t.Fatalf("MatchedPackage=%q want %q", got, want)
+	}
+	if got, want := decision.PreviousVersion, "4.3.0"; got != want {
+		t.Fatalf("PreviousVersion=%q want %q", got, want)
+	}
+	if got, want := decision.CurrentVersion, "6.6.0"; got != want {
+		t.Fatalf("CurrentVersion=%q want %q", got, want)
 	}
 }
 

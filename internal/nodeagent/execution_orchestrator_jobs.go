@@ -308,6 +308,7 @@ func (r *runController) executeHookJob(ctx context.Context, req StartRunRequest)
 	for stepIdx, execStep := range specDoc.Steps {
 		runtimeStep := execStep
 		runtimeStep.CA = mergeUniqueStringEntries(append([]string(nil), execStep.CA...), phaseCA)
+		runtimeStep.Envs = mergeHookRuntimeDecisionEnv(runtimeStep.Envs, req.HookRuntime)
 
 		manifest, manifestErr := buildManifestFromRequest(req, hookStepRunOptions(runtimeStep, req.TypedOptions.BundleMap), 0, contracts.MigStackUnknown)
 		if manifestErr != nil {
@@ -385,6 +386,18 @@ func (r *runController) executeHookJob(ctx context.Context, req StartRunRequest)
 			statsBuilder.MetadataEntry("hook_hash", hash)
 		}
 		statsBuilder.MetadataEntry("hook_should_run", strconv.FormatBool(req.HookRuntime.HookShouldRun))
+		if pkg := strings.TrimSpace(req.HookRuntime.MatchedPackage); pkg != "" {
+			statsBuilder.MetadataEntry("hook_matched_package", pkg)
+		}
+		if prev := strings.TrimSpace(req.HookRuntime.PreviousVersion); prev != "" {
+			statsBuilder.MetadataEntry("hook_previous_version", prev)
+		}
+		if cur := strings.TrimSpace(req.HookRuntime.CurrentVersion); cur != "" {
+			statsBuilder.MetadataEntry("hook_current_version", cur)
+		}
+		if pred := strings.TrimSpace(req.HookRuntime.MatchedPredicate); pred != "" {
+			statsBuilder.MetadataEntry("hook_matched_predicate", pred)
+		}
 	}
 	if resources := runStatsJobResourcesFromStepUsage(finalOutcome.result.ContainerResources); resources != nil {
 		statsBuilder.JobResources(resources)
@@ -411,6 +424,41 @@ func addHookRuntimeMetadata(statsBuilder *types.RunStatsBuilder, decision *contr
 		statsBuilder.MetadataEntry("hook_hash", hash)
 	}
 	statsBuilder.MetadataEntry("hook_should_run", strconv.FormatBool(decision.HookShouldRun))
+	if pkg := strings.TrimSpace(decision.MatchedPackage); pkg != "" {
+		statsBuilder.MetadataEntry("hook_matched_package", pkg)
+	}
+	if prev := strings.TrimSpace(decision.PreviousVersion); prev != "" {
+		statsBuilder.MetadataEntry("hook_previous_version", prev)
+	}
+	if cur := strings.TrimSpace(decision.CurrentVersion); cur != "" {
+		statsBuilder.MetadataEntry("hook_current_version", cur)
+	}
+	if pred := strings.TrimSpace(decision.MatchedPredicate); pred != "" {
+		statsBuilder.MetadataEntry("hook_matched_predicate", pred)
+	}
+}
+
+func mergeHookRuntimeDecisionEnv(base map[string]string, decision *contracts.HookRuntimeDecision) map[string]string {
+	if decision == nil {
+		return copyStringMap(base)
+	}
+	merged := copyStringMap(base)
+	if merged == nil {
+		merged = map[string]string{}
+	}
+	if pred := strings.TrimSpace(decision.MatchedPredicate); pred != "" {
+		merged["PLOY_HOOK_MATCHED_PREDICATE"] = pred
+	}
+	if name := strings.TrimSpace(decision.MatchedPackage); name != "" {
+		merged["PLOY_HOOK_MATCHED_PACKAGE"] = name
+	}
+	if prev := strings.TrimSpace(decision.PreviousVersion); prev != "" {
+		merged["PLOY_HOOK_PREVIOUS_VERSION"] = prev
+	}
+	if cur := strings.TrimSpace(decision.CurrentVersion); cur != "" {
+		merged["PLOY_HOOK_CURRENT_VERSION"] = cur
+	}
+	return merged
 }
 
 func (r *runController) loadHookSpecForExecution(ctx context.Context, req StartRunRequest, source string) (hook.Spec, error) {

@@ -67,10 +67,16 @@ func resolveHookRuntimeDecision(
 		return nil, fmt.Errorf("hook hash is empty for source %q", source)
 	}
 
-	return &contracts.HookRuntimeDecision{
+	runtimeDecision := &contracts.HookRuntimeDecision{
 		HookHash:      hash,
 		HookShouldRun: true,
-	}, nil
+	}
+	matchInput, matchErr := buildHookMatchInput(ctx, st, job)
+	if matchErr != nil {
+		return nil, fmt.Errorf("build hook runtime match input: %w", matchErr)
+	}
+	populateHookRuntimeMatchedTransition(runtimeDecision, hookSpec, matchInput)
+	return runtimeDecision, nil
 }
 
 func buildHookMatchInput(ctx context.Context, st store.Store, job store.Job) (hook.MatchInput, error) {
@@ -184,6 +190,64 @@ func toHookSBOMPackages(rows []store.Sbom) []hook.SBOMPackage {
 		})
 	}
 	return out
+}
+
+func populateHookRuntimeMatchedTransition(
+	decision *contracts.HookRuntimeDecision,
+	spec hook.Spec,
+	input hook.MatchInput,
+) {
+	if decision == nil {
+		return
+	}
+	prevByName := make(map[string][]string)
+	for _, pkg := range input.PreviousSBOM {
+		name := strings.TrimSpace(pkg.Name)
+		if name == "" {
+			continue
+		}
+		prevByName[name] = append(prevByName[name], strings.TrimSpace(pkg.Version))
+	}
+	curByName := make(map[string][]string)
+	for _, pkg := range input.CurrentSBOM {
+		name := strings.TrimSpace(pkg.Name)
+		if name == "" {
+			continue
+		}
+		curByName[name] = append(curByName[name], strings.TrimSpace(pkg.Version))
+	}
+
+	lang := strings.TrimSpace(input.Stack.Language)
+	tool := strings.TrimSpace(input.Stack.Tool)
+	for _, cond := range spec.SBOM.OnChange {
+		name := strings.TrimSpace(cond.Name)
+		if name == "" {
+			continue
+		}
+		prevVersions := prevByName[name]
+		curVersions := curByName[name]
+		if len(prevVersions) == 0 || len(curVersions) == 0 {
+			continue
+		}
+		for _, pv := range prevVersions {
+			if !hook.MatchVersionConstraint(lang, tool, pv, strings.TrimSpace(cond.From)) {
+				continue
+			}
+			for _, cv := range curVersions {
+				if !hook.MatchVersionConstraint(lang, tool, cv, strings.TrimSpace(cond.To)) {
+					continue
+				}
+				if hook.CompareVersions(lang, tool, pv, cv) == 0 {
+					continue
+				}
+				decision.MatchedPredicate = "on_change"
+				decision.MatchedPackage = name
+				decision.PreviousVersion = pv
+				decision.CurrentVersion = cv
+				return
+			}
+		}
+	}
 }
 
 func applyHookOnceLedgerDecision(

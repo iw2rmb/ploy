@@ -339,6 +339,64 @@ func TestAddHookRuntimeMetadata_EmitsHookOnceKeys(t *testing.T) {
 	}
 }
 
+func TestAddHookRuntimeMetadata_EmitsMatchedTransitionKeys(t *testing.T) {
+	builder := types.NewRunStatsBuilder()
+	addHookRuntimeMetadata(builder, &contracts.HookRuntimeDecision{
+		HookHash:         "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+		HookShouldRun:    true,
+		MatchedPredicate: "on_change",
+		MatchedPackage:   "org.openapi.generator:org.openapi.generator.gradle.plugin",
+		PreviousVersion:  "4.3.0",
+		CurrentVersion:   "6.6.0",
+	})
+	stats := builder.MustBuild()
+
+	var decoded map[string]any
+	if err := json.Unmarshal(stats, &decoded); err != nil {
+		t.Fatalf("unmarshal stats: %v", err)
+	}
+	meta, ok := decoded["metadata"].(map[string]any)
+	if !ok {
+		t.Fatalf("metadata missing or wrong type: %T", decoded["metadata"])
+	}
+	if got := meta["hook_matched_predicate"]; got != "on_change" {
+		t.Fatalf("metadata.hook_matched_predicate=%v, want on_change", got)
+	}
+	if got := meta["hook_matched_package"]; got != "org.openapi.generator:org.openapi.generator.gradle.plugin" {
+		t.Fatalf("metadata.hook_matched_package=%v, want package name", got)
+	}
+	if got := meta["hook_previous_version"]; got != "4.3.0" {
+		t.Fatalf("metadata.hook_previous_version=%v, want 4.3.0", got)
+	}
+	if got := meta["hook_current_version"]; got != "6.6.0" {
+		t.Fatalf("metadata.hook_current_version=%v, want 6.6.0", got)
+	}
+}
+
+func TestMergeHookRuntimeDecisionEnv_InjectsRuntimeContext(t *testing.T) {
+	merged := mergeHookRuntimeDecisionEnv(map[string]string{"A": "1"}, &contracts.HookRuntimeDecision{
+		MatchedPredicate: "on_change",
+		MatchedPackage:   "org.openapi.generator:org.openapi.generator.gradle.plugin",
+		PreviousVersion:  "4.3.0",
+		CurrentVersion:   "6.6.0",
+	})
+	if got := merged["A"]; got != "1" {
+		t.Fatalf("merged[A]=%q want 1", got)
+	}
+	if got := merged["PLOY_HOOK_MATCHED_PREDICATE"]; got != "on_change" {
+		t.Fatalf("PLOY_HOOK_MATCHED_PREDICATE=%q want on_change", got)
+	}
+	if got := merged["PLOY_HOOK_MATCHED_PACKAGE"]; got != "org.openapi.generator:org.openapi.generator.gradle.plugin" {
+		t.Fatalf("PLOY_HOOK_MATCHED_PACKAGE=%q want package", got)
+	}
+	if got := merged["PLOY_HOOK_PREVIOUS_VERSION"]; got != "4.3.0" {
+		t.Fatalf("PLOY_HOOK_PREVIOUS_VERSION=%q want 4.3.0", got)
+	}
+	if got := merged["PLOY_HOOK_CURRENT_VERSION"]; got != "6.6.0" {
+		t.Fatalf("PLOY_HOOK_CURRENT_VERSION=%q want 6.6.0", got)
+	}
+}
+
 func TestExecuteHookJob_FailsWhenHookShouldRunFalseReachesExecution(t *testing.T) {
 	cacheHome := t.TempDir()
 	t.Setenv("PLOYD_CACHE_HOME", cacheHome)
