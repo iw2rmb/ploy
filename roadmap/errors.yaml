@@ -1,0 +1,113 @@
+---
+policy: "~/.codex/policies/composing-roadmaps.md"
+schema: "~/.codex/policies/roadmap.schema.json"
+title: "Heal Error Contract: Structured Gate Errors and Automation Routing"
+scope: "Add structured gate error payload propagation and task-oriented healing contract while preserving existing build-gate log flow and keeping heal inputs typed-only (no workspace reattach/copy)."
+documentation:
+  - "design/errors.md"
+  - "docs/build-gate/trimmer.md"
+  - "docs/migs-lifecycle.md"
+  - "docs/envs/README.md"
+  - "/Users/v.v.kovalev/@scale/ploy-lib/research/3CAhnDZNSUr66d5mxmWUiThakpn/thoughts.md"
+  - "/Users/v.v.kovalev/@scale/ploy-lib/research/3CAhnDZNSUr66d5mxmWUiThakpn/3CAhnXvC6L3ewDvUy33qOjRAkrw-build-gate.log"
+  - "/Users/v.v.kovalev/@scale/ploy-lib/research/3CAhnDZNSUr66d5mxmWUiThakpn/3CAiv8IUHXNhmC9ppFsnlFSSbtB-build-gate-swagger-annotations.log"
+  - "/Users/v.v.kovalev/@scale/ploy-lib/research/3CAhnDZNSUr66d5mxmWUiThakpn/3CAk6tP7cnzKd8XlvX9Lwkz8Aq5-build-gate-open-telemetry.log"
+  - "/Users/v.v.kovalev/@scale/ploy-lib/research/3CAhnDZNSUr66d5mxmWUiThakpn/build-gate.log"
+done: false
+reviews: []
+items:
+  - done: false
+    reviews: []
+    label: "1"
+    summary: "Generate structured Gradle gate errors with compileJava, plugin-apply, and raw fallback modes."
+    classification: "determined"
+    components:
+      - "internal/workflow/step/build_gate_log_trimmer.go"
+      - "internal/workflow/step/build_gate_log_trimmer_test.go"
+      - "internal/workflow/step/gate_docker.go"
+    baseline:
+      - "internal/workflow/step/build_gate_log_trimmer.go"
+      - "internal/workflow/step/build_gate_log_trimmer_test.go"
+      - "internal/workflow/step/gate_docker.go"
+    delta:
+      - "[additive] single trimmed log finding text only -> trimmed log finding plus structured error payload for known Gradle failures"
+    implementation:
+      - "Extend Gradle trimming pipeline to emit deterministic structured payload for compileJava compiler diagnostics with grouped entries and file references."
+      - "Add plugin-apply extractor for failures rooted at 'An exception occurred applying plugin request'."
+      - "Add raw fallback mode when specialized extraction does not match, keeping concise normalized content."
+      - "Keep existing trimmed message behavior unchanged for downstream consumers that only read first log finding text."
+    verification:
+      - "Plugin-apply sample 3CAhnXvC6L3ewDvUy33qOjRAkrw-build-gate.log yields mode plugin_apply with plugin id org.springframework.boot, version 3.0.5, and concise failure payload."
+      - "Compile samples 3CAiv8IUHXNhmC9ppFsnlFSSbtB-build-gate-swagger-annotations.log and 3CAk6tP7cnzKd8XlvX9Lwkz8Aq5-build-gate-open-telemetry.log yield mode compile_java and preserve grouped diagnostics for generated and non-generated file paths."
+      - "compileJava samples produce mode compile_java with grouped errors and no compileJava stacktrace in structured payload."
+      - "plugin apply samples produce mode plugin_apply with plugin id or version when present and concise failure block."
+      - "Unknown or unmatched failures produce mode raw with deterministic fallback payload."
+      - "build-gate.log sample verifies compileJava stacktrace starts after compiler diagnostics; structured payload excludes stacktrace while retaining error groups."
+      - "Existing trimmed log finding text path remains stable for parity with current /in/build-gate.log behavior."
+    reasoning: "medium"
+    cfp: 8
+
+  - done: false
+    reviews: []
+    label: "2"
+    summary: "Propagate structured errors through recovery_context and hydrate /in/errors.yaml for heal and re-gate jobs."
+    classification: "determined"
+    components:
+      - "internal/workflow/contracts/build_gate_metadata.go"
+      - "internal/server/handlers/nodes_claim_recovery_context.go"
+      - "internal/server/handlers/server_runs_claim_recovery_test.go"
+      - "internal/nodeagent/execution_orchestrator_healing_runtime.go"
+      - "internal/nodeagent/execution_orchestrator_test.go"
+      - "internal/nodeagent/recovery_io.go"
+    baseline:
+      - "internal/workflow/contracts/build_gate_metadata.go"
+      - "internal/server/handlers/nodes_claim_recovery_context.go"
+      - "internal/nodeagent/execution_orchestrator_healing_runtime.go"
+      - "internal/nodeagent/recovery_io.go"
+    delta:
+      - "[additive] recovery_context carries build_gate_log only -> recovery_context carries build_gate_log and optional structured errors payload"
+    implementation:
+      - "Extend RecoveryClaimContext with optional structured errors field and validation-safe serialization semantics."
+      - "Populate structured errors from gate metadata in claim response builder when available."
+      - "Hydrate /in/errors.yaml for heal and re-gate jobs when structured payload is present."
+      - "Do not copy or reattach gate/sbom workspace content; keep heal inputs typed and claim-driven."
+      - "Preserve /in/build-gate.log as required input and keep existing failure behavior when it is missing."
+    verification:
+      - "Claim responses for heal and re-gate include structured errors when gate metadata provides them."
+      - "Node agent writes /in/errors.yaml and /in/build-gate.log for structured recovery payloads."
+      - "When structured payload is absent, execution remains compatible and still proceeds with /in/build-gate.log only."
+      - "Parity check: no behavior change for non-healing job types and no change to gate failure insertion flow."
+    reasoning: "medium"
+    cfp: 8
+
+  - done: false
+    reviews: []
+    label: "3"
+    summary: "Document task-oriented router contract and automation strategy selection using existing code, deps, infra kinds."
+    classification: "determined"
+    components:
+      - "docs/build-gate/trimmer.md"
+      - "docs/migs-lifecycle.md"
+      - "docs/envs/README.md"
+      - "docs/schemas/mig.example.yaml"
+      - "docs/api/components/schemas/controlplane.yaml"
+    baseline:
+      - "docs/build-gate/trimmer.md"
+      - "docs/migs-lifecycle.md"
+      - "docs/envs/README.md"
+      - "docs/schemas/mig.example.yaml"
+      - "docs/api/components/schemas/controlplane.yaml"
+    delta:
+      - "[replace] implicit healing guidance from trimmed log text only -> explicit task array and automation strategy contract tied to structured errors"
+    implementation:
+      - "Specify /in/errors.yaml input contract and relation to /in/build-gate.log in runtime docs."
+      - "Define router output contract as tasks array with error_kind in code, deps, infra and item indexes into structured errors."
+      - "Define automation choice criteria for manual edits vs bash vs OpenRewrite based on transformation determinism, without project-specific clusters."
+      - "Document that ORW path reuses existing ORW images and runtime contract surfaces."
+    verification:
+      - "Docs consistently describe three structured error modes and optional /in/errors.yaml hydration semantics."
+      - "Docs consistently constrain router kinds to code, deps, infra and avoid project-specific sub-kinds."
+      - "Docs remain aligned with existing API schema semantics and healing metadata fields."
+      - "Parity check: existing /in/build-gate.log-based healing guidance remains valid when structured payload is unavailable."
+    reasoning: "medium"
+    cfp: 4
