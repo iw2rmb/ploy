@@ -79,6 +79,16 @@ func TestJobMeta_Validate(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "valid cache mirror metadata",
+			meta: JobMeta{
+				Kind: JobKindMig,
+				CacheMirror: &CacheMirrorMetadata{
+					SourceJobID: types.JobID("34xaYLp4hQb6V8zHmb8Y7Wm0u8D"),
+				},
+			},
+			wantErr: false,
+		},
+		{
 			name: "valid build job with metadata",
 			meta: JobMeta{
 				Kind: JobKindBuild,
@@ -137,6 +147,14 @@ func TestJobMeta_Validate(t *testing.T) {
 					LoopKind:  "healing",
 					ErrorKind: "invalid",
 				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "invalid cache mirror metadata",
+			meta: JobMeta{
+				Kind:        JobKindMig,
+				CacheMirror: &CacheMirrorMetadata{},
 			},
 			wantErr: true,
 		},

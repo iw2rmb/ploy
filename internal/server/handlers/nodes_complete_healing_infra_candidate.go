@@ -16,6 +16,7 @@ import (
 
 func evaluateAndAttachInfraCandidate(
 	ctx context.Context,
+	st store.Store,
 	bp *blobpersist.Service,
 	runID domaintypes.RunID,
 	failedJob store.Job,
@@ -40,7 +41,7 @@ func evaluateAndAttachInfraCandidate(
 		return
 	}
 
-	raw, err := loadRecoveryArtifact(ctx, bp, runID, prevHeal.ID, path)
+	raw, err := loadRecoveryArtifact(ctx, st, bp, runID, prevHeal.ID, path)
 	if err != nil {
 		switch {
 		case errors.Is(err, blobpersist.ErrRecoveryArtifactNotFound):
@@ -101,6 +102,7 @@ func resolvePreviousHealJob(
 
 func loadRecoveryArtifact(
 	ctx context.Context,
+	st store.Store,
 	bp *blobpersist.Service,
 	runID domaintypes.RunID,
 	healJobID domaintypes.JobID,
@@ -109,5 +111,14 @@ func loadRecoveryArtifact(
 	if bp == nil {
 		return nil, fmt.Errorf("load recovery artifact: blobpersist service is required")
 	}
-	return bp.LoadRecoveryArtifact(ctx, runID, healJobID, artifactPath)
+	sourceID := healJobID
+	if st != nil {
+		sourceJob, err := resolveEffectiveSourceJob(ctx, st, healJobID)
+		if err != nil {
+			return nil, fmt.Errorf("load recovery artifact: resolve effective source: %w", err)
+		}
+		sourceID = sourceJob.ID
+		runID = sourceJob.RunID
+	}
+	return bp.LoadRecoveryArtifact(ctx, runID, sourceID, artifactPath)
 }

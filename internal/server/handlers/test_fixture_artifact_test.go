@@ -20,16 +20,22 @@ type artifactStore struct {
 	listArtifactBundlesByRunAndJob mockResult[[]store.ArtifactBundle]
 
 	// Diff queries
-	listDiffsByRunRepo mockCall[store.ListDiffsByRunRepoParams, []store.Diff]
-	getDiff            mockCall[pgtype.UUID, store.Diff]
+	listDiffsByRunRepo      mockCall[store.ListDiffsByRunRepoParams, []store.Diff]
+	getDiff                 mockCall[pgtype.UUID, store.Diff]
+	getLatestDiffByJob      mockCall[*types.JobID, store.Diff]
+	getLatestDiffByJobByID  map[types.JobID]store.Diff
+	getLatestDiffByJobError error
 
 	// Job lookup (for repo-scoped artifact/diff filtering)
 	getJobCalled bool
 	getJobParams string
 	getJobResult store.Job
+	getJobResults map[types.JobID]store.Job
 	getJobErr    error
 
 	// RunRepo lookup (for repo-scoped queries)
+	getRunRepoCalled         bool
+	getRunRepoParam          store.GetRunRepoParams
 	getRunRepoResult         store.RunRepo
 	getRunRepoErr            error
 	listJobsByRunRepoAttempt mockCall[store.ListJobsByRunRepoAttemptParams, []store.Job]
@@ -63,13 +69,34 @@ func (m *artifactStore) GetDiff(ctx context.Context, id pgtype.UUID) (store.Diff
 	return m.getDiff.record(id)
 }
 
+func (m *artifactStore) GetLatestDiffByJob(ctx context.Context, jobID *types.JobID) (store.Diff, error) {
+	if m.getLatestDiffByJobError != nil {
+		return store.Diff{}, m.getLatestDiffByJobError
+	}
+	if jobID != nil && len(m.getLatestDiffByJobByID) > 0 {
+		if diff, ok := m.getLatestDiffByJobByID[*jobID]; ok {
+			m.getLatestDiffByJob.called = true
+			m.getLatestDiffByJob.params = jobID
+			return diff, nil
+		}
+	}
+	return m.getLatestDiffByJob.record(jobID)
+}
+
 func (m *artifactStore) GetJob(ctx context.Context, id types.JobID) (store.Job, error) {
 	m.getJobCalled = true
 	m.getJobParams = id.String()
+	if len(m.getJobResults) > 0 {
+		if result, ok := m.getJobResults[id]; ok {
+			return result, m.getJobErr
+		}
+	}
 	return m.getJobResult, m.getJobErr
 }
 
 func (m *artifactStore) GetRunRepo(ctx context.Context, arg store.GetRunRepoParams) (store.RunRepo, error) {
+	m.getRunRepoCalled = true
+	m.getRunRepoParam = arg
 	if m.getRunRepoErr != nil {
 		return store.RunRepo{}, m.getRunRepoErr
 	}

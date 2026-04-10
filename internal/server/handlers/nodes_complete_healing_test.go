@@ -690,7 +690,7 @@ func TestLoadRecoveryArtifact_Success(t *testing.T) {
 	}
 
 	bp := blobpersist.New(st, bs)
-	raw, err := loadRecoveryArtifact(context.Background(), bp, runID, jobID, "/out/gate-profile-candidate.json")
+	raw, err := loadRecoveryArtifact(context.Background(), st, bp, runID, jobID, "/out/gate-profile-candidate.json")
 	if err != nil {
 		t.Fatalf("loadRecoveryArtifact error: %v", err)
 	}
@@ -706,7 +706,7 @@ func TestLoadRecoveryArtifact_TypedErrors(t *testing.T) {
 	st := &jobStore{}
 	bp := blobpersist.New(st, bsmock.New())
 
-	_, err := loadRecoveryArtifact(context.Background(), bp, runID, jobID, "/out/gate-profile-candidate.json")
+	_, err := loadRecoveryArtifact(context.Background(), st, bp, runID, jobID, "/out/gate-profile-candidate.json")
 	if !errors.Is(err, blobpersist.ErrRecoveryArtifactNotFound) {
 		t.Fatalf("expected ErrRecoveryArtifactNotFound, got %v", err)
 	}

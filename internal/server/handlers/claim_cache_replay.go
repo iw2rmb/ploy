@@ -2,17 +2,23 @@ package handlers
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/iw2rmb/ploy/internal/blobstore"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/server/blobpersist"
 	"github.com/iw2rmb/ploy/internal/store"
+	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
+
+var cacheReplayDigestHexPattern = regexp.MustCompile(`^[0-9a-f]{64}$`)
 
 type missingCachedReplayArtifactError struct {
 	SourceJobID domaintypes.JobID
@@ -57,14 +63,22 @@ func (s *ClaimService) tryReplayCachedOutcome(
 	ctx context.Context,
 	nodeID domaintypes.NodeID,
 	job store.Job,
-	mergedSpec []byte,
+	payload claimResponsePayload,
 ) (bool, error) {
 	pgStore, ok := s.store.(*store.PgStore)
 	if !ok || pgStore == nil {
 		return false, nil
 	}
 
-	cacheKey, err := computeJobCacheKey(domaintypes.JobType(job.JobType), job.Name, job.JobImage, job.RepoShaIn, mergedSpec)
+	runtimeInputHash, eligible, err := s.resolveRuntimeInputHash(ctx, job, payload)
+	if err != nil {
+		return false, fmt.Errorf("resolve runtime input hash: %w", err)
+	}
+	if !eligible {
+		return false, nil
+	}
+
+	cacheKey, err := computeJobCacheKey(domaintypes.JobType(job.JobType), job.Name, job.JobImage, job.RepoShaIn, runtimeInputHash, payload.Spec)
 	if err != nil {
 		return false, fmt.Errorf("compute cache key: %w", err)
 	}
@@ -97,9 +111,6 @@ func (s *ClaimService) tryReplayCachedOutcome(
 	if err != nil {
 		return false, fmt.Errorf("load source cached job %s: %w", candidate.ID, err)
 	}
-	if err := s.cloneReplayOutputs(ctx, sourceJob, job); err != nil {
-		return false, fmt.Errorf("clone cached outputs from %s: %w", sourceJob.ID, err)
-	}
 
 	replayStatus := domaintypes.JobStatus(candidate.Status)
 	if replayStatus != domaintypes.JobStatusSuccess && replayStatus != domaintypes.JobStatusFail {
@@ -114,9 +125,8 @@ func (s *ClaimService) tryReplayCachedOutcome(
 	}
 
 	stats := JobStatsPayload{}
-	meta := strings.TrimSpace(string(candidate.Meta))
-	if meta != "" && meta != "{}" && meta != "null" {
-		stats.JobMeta = append([]byte(nil), candidate.Meta...)
+	if mirroredMeta, ok := replayMirroredJobMeta(sourceJob.ID, candidate.Meta); ok {
+		stats.JobMeta = mirroredMeta
 	}
 	completeSvc := NewCompleteJobService(s.store, nil, blobpersist.New(s.store, s.blobStore), nil)
 	_, err = completeSvc.Complete(ctx, CompleteJobInput{
@@ -133,68 +143,136 @@ func (s *ClaimService) tryReplayCachedOutcome(
 	return true, nil
 }
 
-func (s *ClaimService) cloneReplayOutputs(ctx context.Context, source, target store.Job) error {
-	if s.blobStore == nil {
-		return nil
-	}
-	bp := blobpersist.New(s.store, s.blobStore)
-	if bp == nil {
-		return nil
-	}
+func (s *ClaimService) resolveRuntimeInputHash(ctx context.Context, job store.Job, payload claimResponsePayload) (string, bool, error) {
+	components := map[string]string{}
+	jobType := domaintypes.JobType(job.JobType)
 
-	if err := bp.CloneLatestDiffByJob(ctx, source.ID.String(), target.RunID.String(), target.ID.String()); err != nil {
-		if errors.Is(err, blobstore.ErrNotFound) {
-			return &missingCachedReplayArtifactError{
-				SourceJobID: source.ID,
-				Err:         err,
-			}
+	switch jobType {
+	case domaintypes.JobTypeHook:
+		if payload.HookRuntime == nil {
+			return "", false, nil
 		}
-		return err
+		_, hash, err := canonicalizeAndHashJSON(payload.HookRuntime)
+		if err != nil {
+			return "", false, fmt.Errorf("hash hook runtime input: %w", err)
+		}
+		components["hook_runtime"] = hash
+	case domaintypes.JobTypeHeal, domaintypes.JobTypeReGate:
+		if payload.RecoveryContext == nil {
+			return "", false, nil
+		}
+		_, hash, err := canonicalizeAndHashJSON(payload.RecoveryContext)
+		if err != nil {
+			return "", false, fmt.Errorf("hash recovery runtime input: %w", err)
+		}
+		components["recovery_context"] = hash
 	}
 
-	targetBundles, err := s.store.ListArtifactBundlesByRunAndJob(ctx, store.ListArtifactBundlesByRunAndJobParams{
-		RunID: target.RunID,
-		JobID: &target.ID,
+	sbomDigest, required, available, err := s.resolveUpstreamSBOMInputHash(ctx, job)
+	if err != nil {
+		return "", false, err
+	}
+	if required && !available {
+		return "", false, nil
+	}
+	if available {
+		components["upstream_sbom_digest"] = sbomDigest
+	}
+
+	if len(components) == 0 {
+		return "", true, nil
+	}
+
+	keys := make([]string, 0, len(components))
+	for k := range components {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	buf := make([]byte, 0, 256)
+	for _, k := range keys {
+		buf = append(buf, k...)
+		buf = append(buf, '=')
+		buf = append(buf, components[k]...)
+		buf = append(buf, '\n')
+	}
+	sum := sha256.Sum256(buf)
+	return hex.EncodeToString(sum[:]), true, nil
+}
+
+func (s *ClaimService) resolveUpstreamSBOMInputHash(ctx context.Context, job store.Job) (string, bool, bool, error) {
+	jobs, err := s.store.ListJobsByRunRepoAttempt(ctx, store.ListJobsByRunRepoAttemptParams{
+		RunID:   job.RunID,
+		RepoID:  job.RepoID,
+		Attempt: job.Attempt,
 	})
 	if err != nil {
-		return fmt.Errorf("list target artifact bundles: %w", err)
-	}
-	if len(targetBundles) > 0 {
-		return nil
+		return "", false, false, fmt.Errorf("list run repo jobs: %w", err)
 	}
 
-	sourceBundles, err := s.store.ListArtifactBundlesByRunAndJob(ctx, store.ListArtifactBundlesByRunAndJobParams{
+	var predecessor *store.Job
+	for idx := range jobs {
+		nextID := jobs[idx].NextID
+		if nextID == nil || *nextID != job.ID {
+			continue
+		}
+		if predecessor != nil {
+			return "", false, false, fmt.Errorf("multiple predecessor jobs reference %s", job.ID)
+		}
+		predecessor = &jobs[idx]
+	}
+	if predecessor == nil {
+		return "", false, false, nil
+	}
+	if domaintypes.JobType(predecessor.JobType) != domaintypes.JobTypeSBOM {
+		return "", false, false, nil
+	}
+	if domaintypes.JobStatus(predecessor.Status) != domaintypes.JobStatusSuccess {
+		return "", false, false, nil
+	}
+
+	source, sourceErr := resolveEffectiveSourceJob(ctx, s.store, predecessor.ID)
+	if sourceErr != nil {
+		// Fail-open: treat unresolved mirrored content as replay ineligible.
+		return "", true, false, nil
+	}
+
+	bundles, err := s.store.ListArtifactBundlesByRunAndJob(ctx, store.ListArtifactBundlesByRunAndJobParams{
 		RunID: source.RunID,
 		JobID: &source.ID,
 	})
 	if err != nil {
-		return fmt.Errorf("list source artifact bundles: %w", err)
+		return "", true, false, fmt.Errorf("list predecessor sbom artifacts: %w", err)
 	}
-	for _, bundle := range sourceBundles {
-		if bundle.ObjectKey == nil || strings.TrimSpace(*bundle.ObjectKey) == "" {
+	for _, bundle := range bundles {
+		if bundle.Name != nil && strings.TrimSpace(*bundle.Name) != "" && strings.TrimSpace(*bundle.Name) != "mig-out" {
 			continue
 		}
-		payload, readErr := blobstore.ReadAll(ctx, s.blobStore, *bundle.ObjectKey)
-		if readErr != nil {
-			if errors.Is(readErr, blobstore.ErrNotFound) {
-				return &missingCachedReplayArtifactError{
-					SourceJobID: source.ID,
-					ObjectKey:   strings.TrimSpace(*bundle.ObjectKey),
-					Err:         readErr,
-				}
-			}
-			return fmt.Errorf("read source artifact blob %s: %w", *bundle.ObjectKey, readErr)
+		digest := ""
+		if bundle.Digest != nil {
+			digest = strings.ToLower(strings.TrimSpace(*bundle.Digest))
 		}
-		_, createErr := bp.CreateArtifactBundle(ctx, store.CreateArtifactBundleParams{
-			RunID:  target.RunID,
-			JobID:  &target.ID,
-			Name:   bundle.Name,
-			Cid:    bundle.Cid,
-			Digest: bundle.Digest,
-		}, payload)
-		if createErr != nil {
-			return fmt.Errorf("clone source artifact %x: %w", bundle.ID.Bytes, createErr)
+		digest = strings.TrimPrefix(digest, "sha256:")
+		if !cacheReplayDigestHexPattern.MatchString(digest) {
+			return "", true, false, nil
 		}
+		return digest, true, true, nil
 	}
-	return nil
+	return "", true, false, nil
+}
+
+func replayMirroredJobMeta(sourceJobID domaintypes.JobID, candidateRaw []byte) ([]byte, bool) {
+	meta, err := contracts.UnmarshalJobMeta(candidateRaw)
+	if err != nil {
+		return nil, false
+	}
+	if meta.CacheMirror != nil {
+		// Disallow mirror->mirror selection.
+		return nil, false
+	}
+	meta.CacheMirror = &contracts.CacheMirrorMetadata{SourceJobID: sourceJobID}
+	out, err := contracts.MarshalJobMeta(meta)
+	if err != nil {
+		return nil, false
+	}
+	return out, true
 }
