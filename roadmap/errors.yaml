@@ -8,11 +8,11 @@ documentation:
   - "docs/build-gate/trimmer.md"
   - "docs/migs-lifecycle.md"
   - "docs/envs/README.md"
-  - "roadmap/thoughts.md"
-  - "roadmap/3CAhnXvC6L3ewDvUy33qOjRAkrw-build-gate.log"
-  - "roadmap/3CAiv8IUHXNhmC9ppFsnlFSSbtB-build-gate-swagger-annotations.log"
-  - "roadmap/3CAk6tP7cnzKd8XlvX9Lwkz8Aq5-build-gate-open-telemetry.log"
-  - "roadmap/build-gate.log"
+  - "/Users/v.v.kovalev/@scale/ploy-lib/research/3CAhnDZNSUr66d5mxmWUiThakpn/thoughts.md"
+  - "/Users/v.v.kovalev/@scale/ploy-lib/research/3CAhnDZNSUr66d5mxmWUiThakpn/3CAhnXvC6L3ewDvUy33qOjRAkrw-build-gate.log"
+  - "/Users/v.v.kovalev/@scale/ploy-lib/research/3CAhnDZNSUr66d5mxmWUiThakpn/3CAiv8IUHXNhmC9ppFsnlFSSbtB-build-gate-swagger-annotations.log"
+  - "/Users/v.v.kovalev/@scale/ploy-lib/research/3CAhnDZNSUr66d5mxmWUiThakpn/3CAk6tP7cnzKd8XlvX9Lwkz8Aq5-build-gate-open-telemetry.log"
+  - "/Users/v.v.kovalev/@scale/ploy-lib/research/3CAhnDZNSUr66d5mxmWUiThakpn/build-gate.log"
 done: false
 reviews: []
 items:
