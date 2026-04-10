@@ -2,10 +2,12 @@ package step
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
+	"gopkg.in/yaml.v3"
 )
 
 func TestDockerGateExecutor_DoesNotRemoveContainerAfterExecution(t *testing.T) {
@@ -97,7 +99,7 @@ func TestDockerGateExecutor_EnvPassthrough(t *testing.T) {
 		Env: map[string]string{
 			"APP_TLS_CERT":  "-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----",
 			"APP_AUTH_JSON": `{"token":"secret"}`,
-			"CUSTOM_VAR":   "custom-value",
+			"CUSTOM_VAR":    "custom-value",
 		},
 	}
 
@@ -178,6 +180,88 @@ func TestDockerGateExecutor_EmptyEnv(t *testing.T) {
 			// For nil/empty input, the container spec env should be nil or empty.
 			if len(rt.captured.Env) != 0 {
 				t.Errorf("expected empty env for %s, got %v", tc.name, rt.captured.Env)
+			}
+		})
+	}
+}
+
+func TestDockerGateExecutor_FailureStructuredEvidence(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name             string
+		workspaceFn      func(t *testing.T) string
+		logs             string
+		wantEvidence     bool
+		wantEvidenceMode string
+	}{
+		{
+			name:        "gradle failure emits structured evidence",
+			workspaceFn: func(t *testing.T) string { return createGradleWorkspace(t, "17") },
+			logs: `
+* What went wrong:
+An exception occurred applying plugin request [id: 'org.springframework.boot', version: '3.0.5']
+> Failed to apply plugin 'org.springframework.boot'.
+BUILD FAILED in 1s
+`,
+			wantEvidence:     true,
+			wantEvidenceMode: "plugin_apply",
+		},
+		{
+			name:        "maven failure has no structured evidence",
+			workspaceFn: func(t *testing.T) string { return createMavenWorkspace(t, "17") },
+			logs: `
+[ERROR] COMPILATION ERROR :
+[ERROR] /workspace/src/main/java/A.java:[1,1] cannot find symbol
+`,
+			wantEvidence: false,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			workspace := tt.workspaceFn(t)
+			rt := &testContainerRuntime{
+				waitFn: func(context.Context, ContainerHandle) (ContainerResult, error) {
+					return ContainerResult{ExitCode: 1}, nil
+				},
+				logsFn: func(context.Context, ContainerHandle) ([]byte, error) {
+					return []byte(tt.logs), nil
+				},
+			}
+			executor := NewDockerGateExecutor(rt)
+			meta, err := executor.Execute(context.Background(), &contracts.StepGateSpec{Enabled: true}, workspace)
+			if err != nil {
+				t.Fatalf("Execute() unexpected error: %v", err)
+			}
+			if meta == nil || len(meta.LogFindings) == 0 {
+				t.Fatalf("expected log findings, got %+v", meta)
+			}
+
+			finding := meta.LogFindings[0]
+			if strings.TrimSpace(finding.Message) == "" {
+				t.Fatal("expected non-empty finding message")
+			}
+
+			if !tt.wantEvidence {
+				if strings.TrimSpace(finding.Evidence) != "" {
+					t.Fatalf("expected empty evidence, got:\n%s", finding.Evidence)
+				}
+				return
+			}
+
+			if strings.TrimSpace(finding.Evidence) == "" {
+				t.Fatal("expected non-empty evidence")
+			}
+			var payload map[string]any
+			if err := yaml.Unmarshal([]byte(finding.Evidence), &payload); err != nil {
+				t.Fatalf("invalid evidence yaml: %v", err)
+			}
+			if mode, _ := payload["mode"].(string); mode != tt.wantEvidenceMode {
+				t.Fatalf("mode=%q, want %q; evidence:\n%s", mode, tt.wantEvidenceMode, finding.Evidence)
 			}
 		})
 	}
