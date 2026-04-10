@@ -11,6 +11,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"github.com/iw2rmb/ploy/internal/workflow/step"
+	"gopkg.in/yaml.v3"
 )
 
 func mustGateProfileSchemaJSON(t *testing.T) string {
@@ -112,6 +113,36 @@ func TestPopulateHealingInDir(t *testing.T) {
 				"gate_profile.schema.json": "auto", // resolved below
 				"build-gate.log":           "claim-log\n",
 			},
+		},
+		{
+			name: "HydratesStructuredErrorsYAML",
+			recovery: &contracts.RecoveryClaimContext{
+				BuildGateLog: "failure\n",
+				Errors:       json.RawMessage(`{"mode":"compile_java","errors":[{"message":"cannot find symbol"}]}`),
+			},
+			wantFiles: map[string]string{"build-gate.log": "failure\n"},
+			customAssert: func(t *testing.T, inDir string) {
+				t.Helper()
+				raw, err := os.ReadFile(filepath.Join(inDir, "errors.yaml"))
+				if err != nil {
+					t.Fatalf("read /in/errors.yaml: %v", err)
+				}
+				var payload map[string]any
+				if err := yaml.Unmarshal(raw, &payload); err != nil {
+					t.Fatalf("decode /in/errors.yaml: %v", err)
+				}
+				if got, want := payload["mode"], "compile_java"; got != want {
+					t.Fatalf("errors.yaml mode=%v, want %q", got, want)
+				}
+			},
+		},
+		{
+			name: "MalformedStructuredErrorsReturnsError",
+			recovery: &contracts.RecoveryClaimContext{
+				BuildGateLog: "failure\n",
+				Errors:       json.RawMessage(`{"mode":`),
+			},
+			wantErr: true,
 		},
 		{
 			name: "DepsCompatHydrationWritesInputs",

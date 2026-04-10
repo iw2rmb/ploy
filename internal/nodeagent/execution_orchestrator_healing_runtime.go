@@ -12,6 +12,7 @@ import (
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
+	"gopkg.in/yaml.v3"
 )
 
 type workspaceChangePolicy string
@@ -85,6 +86,27 @@ func (r *runController) populateHealingInDir(
 		return fmt.Errorf("write /in/build-gate.log: %w", err)
 	}
 	slog.Info("hydrated /in/build-gate.log for healing job", "run_id", runID, "path", destPath)
+	if len(recoveryCtx.Errors) > 0 {
+		var parsed any
+		if err := json.Unmarshal(recoveryCtx.Errors, &parsed); err != nil {
+			return fmt.Errorf("parse recovery_context.errors: %w", err)
+		}
+		switch parsed.(type) {
+		case map[string]any, []any:
+			// allowed
+		default:
+			return fmt.Errorf("parse recovery_context.errors: expected object or array")
+		}
+		errorsYAML, err := yaml.Marshal(parsed)
+		if err != nil {
+			return fmt.Errorf("marshal recovery_context.errors to yaml: %w", err)
+		}
+		inErrorsPath := filepath.Join(inDir, "errors.yaml")
+		if err := os.WriteFile(inErrorsPath, errorsYAML, 0o644); err != nil {
+			return fmt.Errorf("write /in/errors.yaml: %w", err)
+		}
+		slog.Info("hydrated /in/errors.yaml for healing job", "run_id", runID, "path", inErrorsPath)
+	}
 
 	// Hydrate deps healing inputs when recovery context carries deps state.
 	if recoveryCtx != nil {
