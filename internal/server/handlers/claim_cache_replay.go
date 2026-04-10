@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -12,6 +13,45 @@ import (
 	"github.com/iw2rmb/ploy/internal/server/blobpersist"
 	"github.com/iw2rmb/ploy/internal/store"
 )
+
+type missingCachedReplayArtifactError struct {
+	SourceJobID domaintypes.JobID
+	ObjectKey   string
+	Err         error
+}
+
+func (e *missingCachedReplayArtifactError) Error() string {
+	if e == nil {
+		return ""
+	}
+	src := strings.TrimSpace(e.SourceJobID.String())
+	key := strings.TrimSpace(e.ObjectKey)
+	switch {
+	case src == "" && key == "":
+		return fmt.Sprintf("cached replay source blob is missing: %v", e.Err)
+	case key == "":
+		return fmt.Sprintf("cached replay source blob is missing for source job %s: %v", src, e.Err)
+	case src == "":
+		return fmt.Sprintf("cached replay source blob is missing (%s): %v", key, e.Err)
+	default:
+		return fmt.Sprintf("cached replay source blob is missing for source job %s (%s): %v", src, key, e.Err)
+	}
+}
+
+func (e *missingCachedReplayArtifactError) Unwrap() error {
+	if e == nil {
+		return nil
+	}
+	return e.Err
+}
+
+func recoverableCacheReplayMissingArtifact(err error) *missingCachedReplayArtifactError {
+	var target *missingCachedReplayArtifactError
+	if errors.As(err, &target) {
+		return target
+	}
+	return nil
+}
 
 func (s *ClaimService) tryReplayCachedOutcome(
 	ctx context.Context,
@@ -103,6 +143,12 @@ func (s *ClaimService) cloneReplayOutputs(ctx context.Context, source, target st
 	}
 
 	if err := bp.CloneLatestDiffByJob(ctx, source.ID.String(), target.RunID.String(), target.ID.String()); err != nil {
+		if errors.Is(err, blobstore.ErrNotFound) {
+			return &missingCachedReplayArtifactError{
+				SourceJobID: source.ID,
+				Err:         err,
+			}
+		}
 		return err
 	}
 
@@ -130,6 +176,13 @@ func (s *ClaimService) cloneReplayOutputs(ctx context.Context, source, target st
 		}
 		payload, readErr := blobstore.ReadAll(ctx, s.blobStore, *bundle.ObjectKey)
 		if readErr != nil {
+			if errors.Is(readErr, blobstore.ErrNotFound) {
+				return &missingCachedReplayArtifactError{
+					SourceJobID: source.ID,
+					ObjectKey:   strings.TrimSpace(*bundle.ObjectKey),
+					Err:         readErr,
+				}
+			}
 			return fmt.Errorf("read source artifact blob %s: %w", *bundle.ObjectKey, readErr)
 		}
 		_, createErr := bp.CreateArtifactBundle(ctx, store.CreateArtifactBundleParams{
