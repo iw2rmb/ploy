@@ -126,7 +126,7 @@ func RegisterRoutes(s *server.HTTPServer, st store.Store, bs blobstore.Store, bp
 	s.RegisterRouteFunc("POST /v1/nodes/{id}/heartbeat", heartbeatHandler(st), auth.RoleWorker)
 	// NOTE: The ack endpoint (/v1/nodes/{id}/ack) has been removed. Claim is the
 	// canonical endpoint for pulling work from the unified jobs queue.
-	s.RegisterRouteFunc("POST /v1/nodes/{id}/claim", claimJobHandler(st, bs, configHolder, gateProfileResolver), auth.RoleWorker)
+	s.RegisterRouteFunc("POST /v1/nodes/{id}/claim", claimJobHandlerWithEvents(st, bs, eventsService, configHolder, gateProfileResolver), auth.RoleWorker)
 	// NOTE: Node-based completion endpoint (/v1/nodes/{id}/complete) has been removed.
 	// Use the job-level endpoint POST /v1/jobs/{job_id}/complete instead.
 	s.RegisterRouteFunc("POST /v1/nodes/{id}/events", createNodeEventsHandler(st, eventsService), auth.RoleWorker)

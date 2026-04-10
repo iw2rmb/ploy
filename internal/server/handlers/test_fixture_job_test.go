@@ -159,7 +159,7 @@ type jobStore struct {
 	listMigReposByMigResult []store.MigRepo
 
 	// Event
-	createEvent mockResult[store.Event]
+	createEvent mockCall[store.CreateEventParams, store.Event]
 
 	// Ingest (logs)
 	createLog           mockResult[store.Log]
@@ -775,7 +775,7 @@ func (m *jobStore) ListMigReposByMig(ctx context.Context, migID types.MigID) ([]
 // Event methods
 
 func (m *jobStore) CreateEvent(ctx context.Context, params store.CreateEventParams) (store.Event, error) {
-	return m.createEvent.ret()
+	return m.createEvent.record(params)
 }
 
 // Ingest methods

@@ -9,17 +9,22 @@ import (
 
 	"github.com/iw2rmb/ploy/internal/blobstore"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/server"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
 // claimJobHandler allows nodes to claim a queued job for execution.
 // Returns the claimed job with its parent run metadata or 204 No Content if no work is available.
 func claimJobHandler(st store.Store, bs blobstore.Store, configHolder *ConfigHolder, gateProfileResolver ...GateProfileResolver) http.HandlerFunc {
+	return claimJobHandlerWithEvents(st, bs, nil, configHolder, gateProfileResolver...)
+}
+
+func claimJobHandlerWithEvents(st store.Store, bs blobstore.Store, eventsService *server.EventsService, configHolder *ConfigHolder, gateProfileResolver ...GateProfileResolver) http.HandlerFunc {
 	var resolver GateProfileResolver
 	if len(gateProfileResolver) > 0 {
 		resolver = gateProfileResolver[0]
 	}
-	service := NewClaimService(st, bs, configHolder, resolver)
+	service := NewClaimService(st, bs, configHolder, resolver, eventsService)
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		nodeID, err := parseRequiredPathID[domaintypes.NodeID](r, "id")
