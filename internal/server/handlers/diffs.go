@@ -3,18 +3,19 @@ package handlers
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/iw2rmb/ploy/internal/blobstore"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
@@ -90,39 +91,23 @@ func listRunRepoDiffsHandler(st store.Store, bs blobstore.Store) http.HandlerFun
 				}
 				return
 			}
+			diffs, err := listEffectiveRunRepoDiffs(r.Context(), st, runID, repoID)
+			if err != nil {
+				writeHTTPError(w, http.StatusInternalServerError, "failed to list diffs: %v", err)
+				slog.Error("download run repo diff: list diffs failed", "run_id", runID.String(), "repo_id", repoID.String(), "diff_id", diffID.String(), "err", err)
+				return
+			}
 			diffUUID := uuid.MustParse(diffID.String())
-
-			d, err := st.GetDiff(r.Context(), pgtype.UUID{Bytes: diffUUID, Valid: true})
-			if err != nil {
-				if errors.Is(err, pgx.ErrNoRows) {
-					writeHTTPError(w, http.StatusNotFound, "diff not found")
-					return
+			var d store.Diff
+			found := false
+			for _, item := range diffs {
+				if item.Diff.ID.Valid && item.Diff.ID.Bytes == diffUUID {
+					d = item.Diff
+					found = true
+					break
 				}
-				writeHTTPError(w, http.StatusInternalServerError, "failed to get diff: %v", err)
-				slog.Error("download run repo diff: get diff failed", "run_id", runID, "repo_id", repoID, "diff_id", diffID.String(), "err", err)
-				return
 			}
-			// Ensure the diff belongs to this run.
-			if d.RunID != runID {
-				writeHTTPError(w, http.StatusNotFound, "diff not found")
-				return
-			}
-			// Ensure the diff belongs to this repo via job attribution.
-			if d.JobID == nil || d.JobID.IsZero() {
-				writeHTTPError(w, http.StatusNotFound, "diff not found")
-				return
-			}
-			job, err := st.GetJob(r.Context(), *d.JobID)
-			if err != nil {
-				if errors.Is(err, pgx.ErrNoRows) {
-					writeHTTPError(w, http.StatusNotFound, "diff not found")
-					return
-				}
-				writeHTTPError(w, http.StatusInternalServerError, "failed to get diff job: %v", err)
-				slog.Error("download run repo diff: get job failed", "run_id", runID.String(), "repo_id", repoID.String(), "diff_id", diffID.String(), "job_id", d.JobID.String(), "err", err)
-				return
-			}
-			if job.RepoID != repoID {
+			if !found {
 				writeHTTPError(w, http.StatusNotFound, "diff not found")
 				return
 			}
@@ -139,11 +124,7 @@ func listRunRepoDiffsHandler(st store.Store, bs blobstore.Store) http.HandlerFun
 			return
 		}
 
-		// Query diff metadata filtered by repo attribution.
-		diffs, err := st.ListDiffsByRunRepo(r.Context(), store.ListDiffsByRunRepoParams{
-			RunID:  runID,
-			RepoID: repoID,
-		})
+		diffs, err := listEffectiveRunRepoDiffs(r.Context(), st, runID, repoID)
 		if err != nil {
 			writeHTTPError(w, http.StatusInternalServerError, "failed to list diffs: %v", err)
 			slog.Error("list run repo diffs: query failed", "run_id", runID.String(), "repo_id", repoID.String(), "err", err)
@@ -152,18 +133,15 @@ func listRunRepoDiffsHandler(st store.Store, bs blobstore.Store) http.HandlerFun
 
 		// Build response items in the standard list format (diffListResponse).
 		items := make([]diffItem, 0, len(diffs))
-		for _, d := range diffs {
+		for _, row := range diffs {
+			d := row.Diff
 			var summary domaintypes.DiffSummary
 			if len(d.Summary) > 0 {
 				_ = json.Unmarshal(d.Summary, &summary)
 			}
-			var jobID domaintypes.JobID
-			if d.JobID != nil && !d.JobID.IsZero() {
-				jobID = *d.JobID
-			}
 			items = append(items, diffItem{
 				ID:        uuid.UUID(d.ID.Bytes).String(), // diffs.id is still UUID
-				JobID:     jobID,                          // KSUID-backed domain type
+				JobID:     row.DisplayJobID,               // current run/repo job ID
 				CreatedAt: d.CreatedAt.Time,
 				Size:      int(d.PatchSize),
 				Summary:   summary,
@@ -184,10 +162,7 @@ func downloadAccumulatedRunRepoDiff(
 	repoID domaintypes.RepoID,
 	diffID domaintypes.DiffID,
 ) bool {
-	diffs, err := st.ListDiffsByRunRepo(r.Context(), store.ListDiffsByRunRepoParams{
-		RunID:  runID,
-		RepoID: repoID,
-	})
+	diffs, err := listEffectiveRunRepoDiffs(r.Context(), st, runID, repoID)
 	if err != nil {
 		writeHTTPError(w, http.StatusInternalServerError, "failed to list diffs: %v", err)
 		slog.Error("download accumulated run repo diff: list diffs failed", "run_id", runID.String(), "repo_id", repoID.String(), "diff_id", diffID.String(), "err", err)
@@ -197,7 +172,7 @@ func downloadAccumulatedRunRepoDiff(
 	diffUUID := uuid.MustParse(diffID.String())
 	targetIndex := -1
 	for i, item := range diffs {
-		if item.ID.Valid && item.ID.Bytes == diffUUID {
+		if item.Diff.ID.Valid && item.Diff.ID.Bytes == diffUUID {
 			targetIndex = i
 			break
 		}
@@ -208,7 +183,8 @@ func downloadAccumulatedRunRepoDiff(
 	}
 
 	var plain bytes.Buffer
-	for _, item := range diffs[:targetIndex+1] {
+	for _, row := range diffs[:targetIndex+1] {
+		item := row.Diff
 		if item.ObjectKey == nil || strings.TrimSpace(*item.ObjectKey) == "" {
 			writeHTTPError(w, http.StatusNotFound, "diff blob not found")
 			slog.Error("download accumulated run repo diff: missing object key", "run_id", runID.String(), "repo_id", repoID.String(), "diff_id", diffID.String())
@@ -272,4 +248,71 @@ func downloadAccumulatedRunRepoDiff(
 
 	streamBlob(w, bytes.NewReader(gz.Bytes()), int64(gz.Len()), fmt.Sprintf("diff-%s-accumulated.patch.gz", diffUUID.String()), "application/gzip")
 	return true
+}
+
+type runRepoDiffRow struct {
+	Diff         store.Diff
+	DisplayJobID domaintypes.JobID
+}
+
+func listEffectiveRunRepoDiffs(
+	ctx context.Context,
+	st store.Store,
+	runID domaintypes.RunID,
+	repoID domaintypes.RepoID,
+) ([]runRepoDiffRow, error) {
+	rr, err := st.GetRunRepo(ctx, store.GetRunRepoParams{RunID: runID, RepoID: repoID})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return []runRepoDiffRow{}, nil
+		}
+		return nil, err
+	}
+	jobs, err := st.ListJobsByRunRepoAttempt(ctx, store.ListJobsByRunRepoAttemptParams{
+		RunID:   runID,
+		RepoID:  repoID,
+		Attempt: rr.Attempt,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if len(jobs) == 0 {
+		return []runRepoDiffRow{}, nil
+	}
+
+	orderByID := deriveJobOrderByChain(jobs)
+	sort.SliceStable(jobs, func(i, j int) bool {
+		oi := orderByID[jobs[i].ID.String()]
+		oj := orderByID[jobs[j].ID.String()]
+		if oi != oj {
+			return oi < oj
+		}
+		return jobs[i].ID.String() < jobs[j].ID.String()
+	})
+
+	out := make([]runRepoDiffRow, 0, len(jobs))
+	seenDiffIDs := map[string]struct{}{}
+	for _, job := range jobs {
+		sourceID, sourceErr := resolveEffectiveSourceJobID(ctx, st, job.ID)
+		if sourceErr != nil {
+			return nil, sourceErr
+		}
+		diff, getErr := st.GetLatestDiffByJob(ctx, &sourceID)
+		if getErr != nil {
+			if errors.Is(getErr, pgx.ErrNoRows) {
+				continue
+			}
+			return nil, getErr
+		}
+		diffID := uuid.UUID(diff.ID.Bytes).String()
+		if _, exists := seenDiffIDs[diffID]; exists {
+			continue
+		}
+		seenDiffIDs[diffID] = struct{}{}
+		out = append(out, runRepoDiffRow{
+			Diff:         diff,
+			DisplayJobID: job.ID,
+		})
+	}
+	return out, nil
 }

@@ -116,7 +116,7 @@ func maybeRefreshNextReGateRecoveryCandidate(
 	}
 
 	updatedRecovery := lifecycle.CloneRecoveryMetadata(recovery)
-	evaluateAndAttachInfraCandidate(ctx, bp, reGateJob.RunID, reGateJob, jobsByID, detectedExpectation, updatedRecovery)
+	evaluateAndAttachInfraCandidate(ctx, st, bp, reGateJob.RunID, reGateJob, jobsByID, detectedExpectation, updatedRecovery)
 	if meta.RecoveryMetadata != nil {
 		meta.RecoveryMetadata = updatedRecovery
 	}

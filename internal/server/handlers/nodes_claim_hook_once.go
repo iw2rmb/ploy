@@ -142,7 +142,7 @@ func resolveHookSBOMSnapshots(
 		return nil, nil, nil
 	}
 
-	currentRows, err := st.ListSBOMRowsByJob(ctx, latest.ID)
+	currentRows, err := listSBOMRowsByEffectiveJob(ctx, st, *latest)
 	if err != nil {
 		return nil, nil, fmt.Errorf("list current sbom rows for job %s: %w", latest.ID, err)
 	}
@@ -151,7 +151,7 @@ func resolveHookSBOMSnapshots(
 	if previous == nil {
 		return current, nil, nil
 	}
-	previousRows, err := st.ListSBOMRowsByJob(ctx, previous.ID)
+	previousRows, err := listSBOMRowsByEffectiveJob(ctx, st, *previous)
 	if err != nil {
 		return nil, nil, fmt.Errorf("list previous sbom rows for job %s: %w", previous.ID, err)
 	}

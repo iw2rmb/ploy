@@ -54,40 +54,54 @@ func listRunRepoArtifactsHandler(st store.Store) http.HandlerFunc {
 
 		jobOrderByID := deriveJobOrderByChain(jobs)
 
-		// Fetch artifact bundle metadata for this run.
-		bundles, err := st.ListArtifactBundlesByRun(r.Context(), runID)
-		if err != nil {
-			writeHTTPError(w, http.StatusInternalServerError, "failed to list artifacts: %v", err)
-			slog.Error("list run repo artifacts: list bundles failed", "run_id", runID.String(), "repo_id", repoID.String(), "err", err)
-			return
-		}
-
 		type artifactRow struct {
 			summary   artifactSummary
 			order     int
 			createdAt int64
 		}
 
-		artifacts := make([]artifactRow, 0, len(bundles))
-		for _, bundle := range bundles {
-			if bundle.JobID == nil || bundle.JobID.IsZero() {
-				continue
-			}
-			order, ok := jobOrderByID[bundle.JobID.String()]
+		artifacts := make([]artifactRow, 0, len(jobs))
+		seenBundle := map[string]struct{}{}
+		for _, job := range jobs {
+			order, ok := jobOrderByID[job.ID.String()]
 			if !ok {
 				continue
 			}
-
-			createdAt := int64(0)
-			if bundle.CreatedAt.Valid {
-				createdAt = bundle.CreatedAt.Time.UnixNano()
+			bundles, listErr := listArtifactBundlesByEffectiveJob(r.Context(), st, job)
+			if listErr != nil {
+				writeHTTPError(w, http.StatusInternalServerError, "failed to list artifacts: %v", listErr)
+				slog.Error("list run repo artifacts: list bundles failed", "run_id", runID.String(), "repo_id", repoID.String(), "job_id", job.ID.String(), "err", listErr)
+				return
 			}
+			for _, bundle := range bundles {
+				key := bundle.ID.String()
+				if key != "" {
+					if _, exists := seenBundle[key]; exists {
+						continue
+					}
+					seenBundle[key] = struct{}{}
+				}
 
-			artifacts = append(artifacts, artifactRow{
-				summary:   bundleToSummary(bundle),
-				order:     order,
-				createdAt: createdAt,
-			})
+				createdAt := int64(0)
+				if bundle.CreatedAt.Valid {
+					createdAt = bundle.CreatedAt.Time.UnixNano()
+				}
+
+				artifacts = append(artifacts, artifactRow{
+					summary:   bundleToSummary(bundle),
+					order:     order,
+					createdAt: createdAt,
+				})
+			}
+		}
+
+		if len(artifacts) == 0 {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_ = json.NewEncoder(w).Encode(struct {
+				Artifacts []artifactSummary `json:"artifacts"`
+			}{Artifacts: []artifactSummary{}})
+			return
 		}
 
 		sort.SliceStable(artifacts, func(i, j int) bool {
@@ -181,6 +195,5 @@ func deriveJobOrderByChain(jobs []store.Job) map[string]int {
 		orderByID[id] = order
 		order++
 	}
-
 	return orderByID
 }

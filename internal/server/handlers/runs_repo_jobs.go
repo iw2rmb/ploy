@@ -196,10 +196,12 @@ func loadSBOMEvidence(r *http.Request, st store.Store, runID domaintypes.RunID, 
 	var evidence migsapi.RunRepoJobSBOMEvidence
 	hasEvidence := false
 
-	bundles, err := st.ListArtifactBundlesByRunAndJob(r.Context(), store.ListArtifactBundlesByRunAndJobParams{
-		RunID: runID,
-		JobID: &jobID,
-	})
+	job, err := st.GetJob(r.Context(), jobID)
+	if err != nil {
+		slog.Warn("list run repo jobs: load sbom evidence get job failed", "run_id", runID.String(), "job_id", jobID.String(), "err", err)
+		return nil
+	}
+	bundles, err := listArtifactBundlesByEffectiveJob(r.Context(), st, job)
 	if err != nil {
 		slog.Warn("list run repo jobs: load sbom artifact evidence failed", "run_id", runID.String(), "job_id", jobID.String(), "err", err)
 	} else {
@@ -208,7 +210,7 @@ func loadSBOMEvidence(r *http.Request, st store.Store, runID domaintypes.RunID, 
 		hasEvidence = true
 	}
 
-	sbomRows, err := st.ListSBOMRowsByJob(r.Context(), jobID)
+	sbomRows, err := listSBOMRowsByEffectiveJob(r.Context(), st, job)
 	if err != nil {
 		slog.Warn("list run repo jobs: load sbom package-count evidence failed", "run_id", runID.String(), "job_id", jobID.String(), "err", err)
 	} else {

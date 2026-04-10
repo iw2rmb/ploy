@@ -50,25 +50,35 @@ func getJobLogsHandler(st store.Store, bs blobstore.Store, eventsService *server
 			return
 		}
 
+		effectiveJob := job
+		if source, sourceErr := resolveEffectiveSourceJob(r.Context(), st, jobID); sourceErr == nil {
+			effectiveJob.ID = source.ID
+			effectiveJob.RunID = source.RunID
+		} else {
+			slog.Error("get job logs: resolve effective source failed", "job_id", jobID.String(), "err", sourceErr)
+			writeHTTPError(w, http.StatusInternalServerError, "failed to resolve log source")
+			return
+		}
+
 		hub := eventsService.Hub()
-		if err := hub.EnsureJob(jobID); err != nil {
+		if err := hub.EnsureJob(effectiveJob.ID); err != nil {
 			slog.Error("ensure job stream failed", "job_id", jobID.String(), "err", err)
 			writeHTTPError(w, http.StatusBadRequest, "invalid job id")
 			return
 		}
 
-		allowedJobs := map[domaintypes.JobID]struct{}{jobID: {}}
+		allowedJobs := map[domaintypes.JobID]struct{}{effectiveJob.ID: {}}
 		sinceID := parseLastEventID(r.Header.Get("Last-Event-ID"))
 
 		// For fresh connections, backfill historical logs then subscribe to job stream.
 		if sinceID == 0 && bs != nil {
-			if serveJobWithBackfill(w, r, st, bs, hub, job, allowedJobs) {
+			if serveJobWithBackfill(w, r, st, bs, hub, effectiveJob, allowedJobs) {
 				return
 			}
 		}
 
 		// Non-zero sinceID or backfill setup failed: subscribe directly to job stream.
-		if err := logstream.ServeJob(w, r, hub, jobID, sinceID); err != nil {
+		if err := logstream.ServeJob(w, r, hub, effectiveJob.ID, sinceID); err != nil {
 			if !errors.Is(err, context.Canceled) {
 				slog.Error("stream job logs", "job_id", jobID.String(), "err", err)
 			}
@@ -154,4 +164,3 @@ func createJobLogsHandler(st store.Store, bp *blobpersist.Service, eventsService
 		}
 	}
 }
-

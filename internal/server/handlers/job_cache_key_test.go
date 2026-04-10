@@ -43,3 +43,34 @@ func TestResolveHydraForCacheKey_HookUsesCyclePhaseCA(t *testing.T) {
 		})
 	}
 }
+
+func TestComputeJobCacheKey_UpstreamInputHashAffectsKey(t *testing.T) {
+	t.Parallel()
+
+	spec := []byte(`{"steps":[{"image":"ghcr.io/example/mig:1"}]}`)
+	keyA, err := computeJobCacheKey(
+		domaintypes.JobTypeMig,
+		"mig-0",
+		"",
+		"0123456789012345678901234567890123456789",
+		"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		spec,
+	)
+	if err != nil {
+		t.Fatalf("computeJobCacheKey() with hash A error = %v", err)
+	}
+	keyB, err := computeJobCacheKey(
+		domaintypes.JobTypeMig,
+		"mig-0",
+		"",
+		"0123456789012345678901234567890123456789",
+		"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+		spec,
+	)
+	if err != nil {
+		t.Fatalf("computeJobCacheKey() with hash B error = %v", err)
+	}
+	if keyA == keyB {
+		t.Fatal("cache keys are equal for different upstream input hashes")
+	}
+}

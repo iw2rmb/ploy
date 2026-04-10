@@ -23,7 +23,7 @@ const (
 	cacheEmptyLangToolRelease = "||"
 )
 
-func computeJobCacheKey(jobType domaintypes.JobType, jobName, jobImage, repoSHAIn string, mergedSpec []byte) (string, error) {
+func computeJobCacheKey(jobType domaintypes.JobType, jobName, jobImage, repoSHAIn, runtimeInputHash string, mergedSpec []byte) (string, error) {
 	spec, err := contracts.ParseMigSpecJSON(mergedSpec)
 	if err != nil {
 		// Claim-time replay must fail open when spec cannot be parsed.
@@ -67,6 +67,7 @@ func computeJobCacheKey(jobType domaintypes.JobType, jobName, jobImage, repoSHAI
 		strings.TrimSpace(jobType.String()),
 		resolvedImage,
 		normalizeRepoSHA(repoSHAIn),
+		strings.ToLower(strings.TrimSpace(runtimeInputHash)),
 		ltr,
 		strings.Join(envPairs, ";"),
 		strings.Join(inCanonical, ";"),

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	bsmock "github.com/iw2rmb/ploy/internal/blobstore/mock"
@@ -29,14 +30,24 @@ func TestRunRepoDiffs_Download(t *testing.T) {
 	repoIDTyped := domaintypes.RepoID(repoID)
 	objKey := "diffs/run/" + runID.String() + "/diff/" + diffID.String() + ".patch.gz"
 
-	st.getDiff.val = store.Diff{
+	st.getRunRepoResult = store.RunRepo{
+		RunID:   runID,
+		RepoID:  repoIDTyped,
+		Attempt: 1,
+	}
+	st.listJobsByRunRepoAttempt.val = []store.Job{
+		{ID: jobID, RunID: runID, RepoID: repoIDTyped, Attempt: 1},
+	}
+	st.getJobResults = map[domaintypes.JobID]store.Job{
+		jobID: {ID: jobID, RunID: runID, RepoID: repoIDTyped, Attempt: 1},
+	}
+	st.getLatestDiffByJob.val = store.Diff{
 		ID:        pgtype.UUID{Bytes: diffID, Valid: true},
 		RunID:     runID,
 		JobID:     &jobID,
 		PatchSize: int64(len(patch)),
 		ObjectKey: &objKey,
 	}
-	st.getJobResult = store.Job{ID: jobID, RunID: runID, RepoID: repoIDTyped}
 
 	// Create mock blobstore and pre-populate with patch data.
 	bs := bsmock.New()
@@ -54,8 +65,8 @@ func TestRunRepoDiffs_Download(t *testing.T) {
 	if !bytes.Equal(rr.Body.Bytes(), patch) {
 		t.Fatalf("patch len=%d, want %d", rr.Body.Len(), len(patch))
 	}
-	if !st.getDiff.called {
-		t.Fatal("expected GetDiff to be called")
+	if !st.getLatestDiffByJob.called {
+		t.Fatal("expected GetLatestDiffByJob to be called")
 	}
 	if !st.getJobCalled {
 		t.Fatal("expected GetJob to be called")
@@ -66,7 +77,9 @@ func TestRunRepoDiffs_DownloadAccumulated(t *testing.T) {
 	st := &artifactStore{}
 	runID := domaintypes.NewRunID()
 	repoID := "repoAAAA"
-	jobID := domaintypes.NewJobID()
+	repoIDTyped := domaintypes.RepoID(repoID)
+	jobID1 := domaintypes.NewJobID()
+	jobID2 := domaintypes.NewJobID()
 	diffID1 := uuid.New()
 	diffID2 := uuid.New()
 	objKey1 := "diffs/run/" + runID.String() + "/diff/" + diffID1.String() + ".patch.gz"
@@ -74,19 +87,22 @@ func TestRunRepoDiffs_DownloadAccumulated(t *testing.T) {
 	patch1 := "diff --git a/a.txt b/a.txt\n+one\n"
 	patch2 := "diff --git a/b.txt b/b.txt\n+two\n"
 
-	st.listDiffsByRunRepo.val = []store.Diff{
-		{
-			ID:        pgtype.UUID{Bytes: diffID1, Valid: true},
-			RunID:     runID,
-			JobID:     &jobID,
-			ObjectKey: &objKey1,
-		},
-		{
-			ID:        pgtype.UUID{Bytes: diffID2, Valid: true},
-			RunID:     runID,
-			JobID:     &jobID,
-			ObjectKey: &objKey2,
-		},
+	st.getRunRepoResult = store.RunRepo{
+		RunID:   runID,
+		RepoID:  repoIDTyped,
+		Attempt: 1,
+	}
+	st.listJobsByRunRepoAttempt.val = []store.Job{
+		{ID: jobID1, RunID: runID, RepoID: repoIDTyped, Attempt: 1, NextID: &jobID2},
+		{ID: jobID2, RunID: runID, RepoID: repoIDTyped, Attempt: 1},
+	}
+	st.getJobResults = map[domaintypes.JobID]store.Job{
+		jobID1: {ID: jobID1, RunID: runID, RepoID: repoIDTyped, Attempt: 1},
+		jobID2: {ID: jobID2, RunID: runID, RepoID: repoIDTyped, Attempt: 1},
+	}
+	st.getLatestDiffByJobByID = map[domaintypes.JobID]store.Diff{
+		jobID1: {ID: pgtype.UUID{Bytes: diffID1, Valid: true}, RunID: runID, JobID: &jobID1, ObjectKey: &objKey1},
+		jobID2: {ID: pgtype.UUID{Bytes: diffID2, Valid: true}, RunID: runID, JobID: &jobID2, ObjectKey: &objKey2},
 	}
 
 	bs := bsmock.New()
@@ -139,7 +155,7 @@ func TestRunRepoDiffs_ReturnsRepoFilteredItems(t *testing.T) {
 	_ = repoAID   // repo A owns the diff
 
 	// Query for repo B: expect empty list (repo A's diff filtered out)
-	st.listDiffsByRunRepo.val = []store.Diff{} // Empty: repo A's diff excluded
+	st.getRunRepoErr = pgx.ErrNoRows // Equivalent externally: no repo execution rows.
 
 	bs := bsmock.New()
 	rr := httptest.NewRecorder()
@@ -150,15 +166,15 @@ func TestRunRepoDiffs_ReturnsRepoFilteredItems(t *testing.T) {
 
 	assertStatus(t, rr, http.StatusOK)
 
-	// Verify the query was called with correct parameters
-	if !st.listDiffsByRunRepo.called {
-		t.Fatal("expected ListDiffsByRunRepo to be called")
+	// Verify repo scope was queried.
+	if !st.getRunRepoCalled {
+		t.Fatal("expected GetRunRepo to be called")
 	}
-	if st.listDiffsByRunRepo.params.RunID != runID {
-		t.Errorf("run_id=%q, want %q", st.listDiffsByRunRepo.params.RunID, runID)
+	if st.getRunRepoParam.RunID != runID {
+		t.Errorf("run_id=%q, want %q", st.getRunRepoParam.RunID, runID)
 	}
-	if st.listDiffsByRunRepo.params.RepoID != repoBIDTyped {
-		t.Errorf("repo_id=%q, want %q", st.listDiffsByRunRepo.params.RepoID, repoBIDTyped)
+	if st.getRunRepoParam.RepoID != repoBIDTyped {
+		t.Errorf("repo_id=%q, want %q", st.getRunRepoParam.RepoID, repoBIDTyped)
 	}
 
 	var resp diffListResponse
@@ -178,19 +194,33 @@ func TestRunRepoDiffs_ReturnsOwnDiffs(t *testing.T) {
 	st := &artifactStore{}
 	runID := domaintypes.NewRunID()
 	repoID := "repoAAAA" // NanoID-backed
+	repoIDTyped := domaintypes.RepoID(repoID)
 	jobID := domaintypes.NewJobID()
 	diffID := uuid.New()
 	createdAt := time.Date(2025, 1, 15, 12, 0, 0, 0, time.UTC)
 
-	// Store returns the diff that belongs to this repo
-	st.listDiffsByRunRepo.val = []store.Diff{{
+	st.getRunRepoResult = store.RunRepo{
+		RunID:   runID,
+		RepoID:  repoIDTyped,
+		Attempt: 1,
+	}
+	st.listJobsByRunRepoAttempt.val = []store.Job{{
+		ID:      jobID,
+		RunID:   runID,
+		RepoID:  repoIDTyped,
+		Attempt: 1,
+	}}
+	st.getJobResults = map[domaintypes.JobID]store.Job{
+		jobID: {ID: jobID, RunID: runID, RepoID: repoIDTyped, Attempt: 1},
+	}
+	st.getLatestDiffByJob.val = store.Diff{
 		ID:        pgtype.UUID{Bytes: diffID, Valid: true},
 		RunID:     runID,
 		JobID:     &jobID,
 		Summary:   []byte(`{"exit_code":0,"job_type":"mig"}`),
 		CreatedAt: pgtype.Timestamptz{Time: createdAt, Valid: true},
 		PatchSize: 3,
-	}}
+	}
 
 	bs := bsmock.New()
 	rr := httptest.NewRecorder()

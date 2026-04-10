@@ -95,7 +95,7 @@ type jobStore struct {
 	createDiff           mockCall[store.CreateDiffParams, store.Diff]
 	createArtifactBundle mockResult[store.ArtifactBundle]
 
-	listArtifactBundlesByRunAndJob mockResult[[]store.ArtifactBundle]
+	listArtifactBundlesByRunAndJob mockCall[store.ListArtifactBundlesByRunAndJobParams, []store.ArtifactBundle]
 
 	// Run queries (for orchestration)
 	getRun        mockCall[string, store.Run]
@@ -527,7 +527,7 @@ func (m *jobStore) CreateArtifactBundle(ctx context.Context, params store.Create
 }
 
 func (m *jobStore) ListArtifactBundlesByRunAndJob(ctx context.Context, arg store.ListArtifactBundlesByRunAndJobParams) ([]store.ArtifactBundle, error) {
-	return m.listArtifactBundlesByRunAndJob.ret()
+	return m.listArtifactBundlesByRunAndJob.record(arg)
 }
 
 // Run query methods

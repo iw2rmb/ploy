@@ -20,14 +20,12 @@ func TestListRunRepoArtifactsHandler_Success_FiltersAndOrders(t *testing.T) {
 
 	job1 := domaintypes.NewJobID()
 	job2 := domaintypes.NewJobID()
-	otherJob := domaintypes.NewJobID()
 
 	t1 := time.Date(2026, 1, 6, 0, 0, 0, 0, time.UTC)
 	t2 := t1.Add(1 * time.Minute)
 
 	id1 := uuid.MustParse("11111111-1111-1111-1111-111111111111")
 	id2 := uuid.MustParse("22222222-2222-2222-2222-222222222222")
-	idOther := uuid.MustParse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
 
 	name1 := "bundle-1"
 	name2 := "bundle-2"
@@ -35,8 +33,6 @@ func TestListRunRepoArtifactsHandler_Success_FiltersAndOrders(t *testing.T) {
 	cid2 := "bafy-two"
 	digest1 := "sha256:one"
 	digest2 := "sha256:two"
-	digestOther := "sha256:other"
-	cidOther := "bafy-other"
 
 	st := &artifactStore{
 		getRunRepoResult: store.RunRepo{
@@ -50,7 +46,7 @@ func TestListRunRepoArtifactsHandler_Success_FiltersAndOrders(t *testing.T) {
 		{ID: job1, RunID: runID, RepoID: repoID, Attempt: 1, Meta: withNextIDMeta([]byte(`{}`), float64(1000))},
 		{ID: job2, RunID: runID, RepoID: repoID, Attempt: 1, Meta: withNextIDMeta([]byte(`{}`), float64(2000))},
 		}
-	st.listArtifactBundlesByRun.val = []store.ArtifactBundle{
+	st.listArtifactBundlesByRunAndJob.val = []store.ArtifactBundle{
 		{
 			ID:         pgtype.UUID{Bytes: id2, Valid: true},
 			RunID:      runID,
@@ -71,17 +67,7 @@ func TestListRunRepoArtifactsHandler_Success_FiltersAndOrders(t *testing.T) {
 			CreatedAt:  pgtype.Timestamptz{Time: t1, Valid: true},
 			BundleSize: 1,
 		},
-		{
-			ID:         pgtype.UUID{Bytes: idOther, Valid: true},
-			RunID:      runID,
-			JobID:      &otherJob,
-			Name:       nil,
-			Cid:        &cidOther,
-			Digest:     &digestOther,
-			CreatedAt:  pgtype.Timestamptz{Time: t1, Valid: true},
-			BundleSize: 3,
-		},
-		}
+	}
 
 	rr := doRequest(t, listRunRepoArtifactsHandler(st), http.MethodGet,
 		"/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/artifacts", nil,

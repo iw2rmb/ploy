@@ -19,6 +19,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/server/blobpersist"
 	"github.com/iw2rmb/ploy/internal/store"
 	logstream "github.com/iw2rmb/ploy/internal/stream"
+	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
 // --- POST /v1/jobs/{job_id}/logs ---
@@ -287,6 +288,74 @@ func TestGetJobLogsHandler_BackfillExcludesNilJobIDLogs(t *testing.T) {
 	}
 	if strings.Contains(body, "nil-line") {
 		t.Fatal("nil-job-id log must not appear in job-scoped backfill")
+	}
+}
+
+func TestGetJobLogsHandler_BackfillMirroredJobUsesSourceRunLogs(t *testing.T) {
+	t.Parallel()
+
+	mirrorRunID := domaintypes.NewRunID()
+	sourceRunID := domaintypes.NewRunID()
+	repoID := domaintypes.NewRepoID()
+	mirrorJobID := domaintypes.NewJobID()
+	sourceJobID := domaintypes.NewJobID()
+
+	mirrorMeta, err := contracts.MarshalJobMeta(&contracts.JobMeta{
+		Kind: "mig",
+		CacheMirror: &contracts.CacheMirrorMetadata{
+			SourceJobID: sourceJobID,
+		},
+	})
+	if err != nil {
+		t.Fatalf("marshal mirror meta: %v", err)
+	}
+
+	objKey := "logs/source-job.gz"
+	st := &jobStore{}
+	st.getJobResults = map[domaintypes.JobID]store.Job{
+		mirrorJobID: {
+			ID:      mirrorJobID,
+			RunID:   mirrorRunID,
+			RepoID:  repoID,
+			Status:  domaintypes.JobStatusSuccess,
+			JobType: domaintypes.JobTypeMig,
+			Meta:    mirrorMeta,
+		},
+		sourceJobID: {
+			ID:      sourceJobID,
+			RunID:   sourceRunID,
+			RepoID:  repoID,
+			Status:  domaintypes.JobStatusSuccess,
+			JobType: domaintypes.JobTypeMig,
+			Meta:    []byte(`{"kind":"mig"}`),
+		},
+	}
+	st.getRun.val = store.Run{ID: mirrorRunID, Status: domaintypes.RunStatusFinished}
+	st.listLogsByRun.val = []store.Log{
+		{ID: 1, RunID: sourceRunID, JobID: &sourceJobID, ObjectKey: &objKey},
+	}
+
+	bs := bsmock.New()
+	_, _ = bs.Put(context.Background(), objKey, "", gzipLines(t, "source-line"))
+
+	eventsService, err := createTestEventsServiceWithStore(st)
+	if err != nil {
+		t.Fatalf("events service: %v", err)
+	}
+	h := getJobLogsHandler(st, bs, eventsService)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/jobs/"+mirrorJobID.String()+"/logs", nil)
+	req.SetPathValue("job_id", mirrorJobID.String())
+	rr := &flushRecorder{httptest.NewRecorder()}
+
+	h.ServeHTTP(rr, req)
+
+	assertStatus(t, rr.ResponseRecorder, http.StatusOK)
+	if got, want := st.listLogsByRun.params, sourceRunID.String(); got != want {
+		t.Fatalf("listLogsByRun run_id = %s, want %s", got, want)
+	}
+	if !strings.Contains(rr.Body.String(), "source-line") {
+		t.Fatalf("expected source-line in output; body: %s", rr.Body.String())
 	}
 }
 

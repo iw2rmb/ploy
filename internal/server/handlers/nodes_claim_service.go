@@ -29,7 +29,7 @@ type ClaimService struct {
 	configHolder          *ConfigHolder
 	gateResolver          GateProfileResolver
 	eventsService         *server.EventsService
-	replayCachedOutcomeFn func(context.Context, domaintypes.NodeID, store.Job, []byte) (bool, error)
+	replayCachedOutcomeFn func(context.Context, domaintypes.NodeID, store.Job, claimResponsePayload) (bool, error)
 }
 
 func NewClaimService(st store.Store, bs blobstore.Store, configHolder *ConfigHolder, resolver GateProfileResolver, eventsService ...*server.EventsService) *ClaimService {
@@ -237,7 +237,7 @@ func (s *ClaimService) Claim(ctx context.Context, nodeID domaintypes.NodeID) (Cl
 		}
 		return ClaimResult{}, claimInternal("failed to build claim response", err)
 	}
-	replayed, replayErr := s.replayCachedOutcomeFn(ctx, nodeID, job, payload.Spec)
+	replayed, replayErr := s.replayCachedOutcomeFn(ctx, nodeID, job, payload)
 	if replayErr != nil {
 		if missing := recoverableCacheReplayMissingArtifact(replayErr); missing != nil {
 			slog.Warn(

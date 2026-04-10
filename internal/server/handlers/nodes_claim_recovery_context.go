@@ -240,13 +240,18 @@ func sbomLogPayloadFromClaimLogs(
 	runID domaintypes.RunID,
 	jobID domaintypes.JobID,
 ) (string, error) {
+	_ = runID
 	if bs == nil {
 		return "", errors.New("blob store is required")
 	}
 
-	jobIDCopy := jobID
+	effectiveJob, err := resolveEffectiveSourceJob(ctx, st, jobID)
+	if err != nil {
+		return "", fmt.Errorf("resolve effective sbom source: %w", err)
+	}
+	jobIDCopy := effectiveJob.ID
 	logs, err := st.ListLogsByRunAndJob(ctx, store.ListLogsByRunAndJobParams{
-		RunID: runID,
+		RunID: effectiveJob.RunID,
 		JobID: &jobIDCopy,
 	})
 	if err != nil {

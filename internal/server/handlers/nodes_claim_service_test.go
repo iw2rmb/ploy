@@ -299,7 +299,7 @@ func TestClaimService_Claim_CacheReplayMissingBlobFallsBackToLiveExecution(t *te
 	}
 
 	svc := NewClaimService(st, nil, &ConfigHolder{}, nil)
-	svc.replayCachedOutcomeFn = func(context.Context, domaintypes.NodeID, store.Job, []byte) (bool, error) {
+	svc.replayCachedOutcomeFn = func(context.Context, domaintypes.NodeID, store.Job, claimResponsePayload) (bool, error) {
 		return false, fmt.Errorf(
 			"clone cached outputs from %s: %w",
 			sourceJobID,
@@ -378,7 +378,7 @@ func TestClaimService_Claim_CacheReplayHardErrorUnclaimsJob(t *testing.T) {
 	}
 
 	svc := NewClaimService(st, nil, &ConfigHolder{}, nil)
-	svc.replayCachedOutcomeFn = func(context.Context, domaintypes.NodeID, store.Job, []byte) (bool, error) {
+	svc.replayCachedOutcomeFn = func(context.Context, domaintypes.NodeID, store.Job, claimResponsePayload) (bool, error) {
 		return false, errors.New("replay crashed")
 	}
 
