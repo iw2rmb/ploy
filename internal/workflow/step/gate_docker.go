@@ -517,12 +517,16 @@ func buildGateExecutionMetadata(
 		}
 	}
 	if !passed {
-		trimmed := TrimBuildGateLog(tool, string(logs))
+		trimmed, evidence := BuildGateLogFindingContent(tool, string(logs))
 		msg := strings.TrimSpace(trimmed)
 		if msg == "" {
 			msg = fmt.Sprintf("%s build failed (exit %d)", tool, res.ExitCode)
 		}
-		meta.LogFindings = append(meta.LogFindings, contracts.BuildGateLogFinding{Severity: "error", Message: msg})
+		finding := contracts.BuildGateLogFinding{Severity: "error", Message: msg}
+		if strings.TrimSpace(evidence) != "" {
+			finding.Evidence = evidence
+		}
+		meta.LogFindings = append(meta.LogFindings, finding)
 	}
 	attachLogsTextAndDigest(meta, logs)
 	return meta

@@ -3,8 +3,11 @@ package step
 import (
 	"fmt"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
+
+	"gopkg.in/yaml.v3"
 )
 
 var (
@@ -13,21 +16,52 @@ var (
 	gradleScalaIssueStartRe  = regexp.MustCompile(`^\[error\] \/workspace\/.*?\.scala:[0-9]{1,}: .*`)
 	gradleKaptIssueStartRe   = regexp.MustCompile(`^e: \[kapt\] .*`)
 	gradleErrorsCountRe      = regexp.MustCompile(`^([0-9]{1,}) errors$`)
+	gradleJavaErrorLineRe    = regexp.MustCompile(`^(\/workspace\/.*?\.java):([0-9]{1,}): error: (.+)$`)
+	gradlePluginRequestRe    = regexp.MustCompile(`An exception occurred applying plugin request \[id: '([^']+)'(?:, version: '([^']+)')?\]`)
 )
+
+type gradleStructuredPayload struct {
+	Mode          string                  `yaml:"mode"`
+	Task          string                  `yaml:"task,omitempty"`
+	PluginID      string                  `yaml:"plugin_id,omitempty"`
+	PluginVersion string                  `yaml:"plugin_version,omitempty"`
+	Errors        []gradleStructuredError `yaml:"errors"`
+}
+
+type gradleStructuredError struct {
+	Message   string                    `yaml:"message"`
+	Signature string                    `yaml:"signature,omitempty"`
+	Symbol    string                    `yaml:"symbol,omitempty"`
+	Location  string                    `yaml:"location,omitempty"`
+	Files     []gradleStructuredFileRef `yaml:"files,omitempty"`
+}
+
+type gradleStructuredFileRef struct {
+	Path    string `yaml:"path"`
+	Line    int    `yaml:"line,omitempty"`
+	Snippet string `yaml:"snippet,omitempty"`
+}
 
 // TrimBuildGateLog returns a trimmed view of build gate logs for known tools.
 // For Maven and Gradle, it keeps the most relevant failure region (stack trace
 // and summary) and drops earlier noise such as plugin startup banners or task
 // noise. For unknown tools, it returns the original logText unchanged.
 func TrimBuildGateLog(tool, logText string) string {
+	trimmed, _ := BuildGateLogFindingContent(tool, logText)
+	return trimmed
+}
+
+// BuildGateLogFindingContent returns the human-focused trimmed message and an
+// optional structured evidence payload for known build tools.
+func BuildGateLogFindingContent(tool, logText string) (string, string) {
 	tool = strings.ToLower(strings.TrimSpace(tool))
 	switch tool {
 	case "maven":
-		return trimMavenLog(logText)
+		return trimMavenLog(logText), ""
 	case "gradle":
-		return trimGradleLog(logText)
+		return trimGradleLogAndEvidence(logText)
 	default:
-		return logText
+		return logText, ""
 	}
 }
 
@@ -60,9 +94,14 @@ func trimMavenLog(logText string) string {
 }
 
 func trimGradleLog(logText string) string {
+	trimmed, _ := trimGradleLogAndEvidence(logText)
+	return trimmed
+}
+
+func trimGradleLogAndEvidence(logText string) (string, string) {
 	lines := strings.Split(logText, "\n")
 	if len(lines) == 0 {
-		return logText
+		return logText, ""
 	}
 
 	splitAt := -1
@@ -73,7 +112,7 @@ func trimGradleLog(logText string) string {
 		}
 	}
 	if splitAt == -1 {
-		return logText
+		return logText, ""
 	}
 
 	firstPart := lines[:splitAt]
@@ -95,7 +134,239 @@ func trimGradleLog(logText string) string {
 	if strings.HasSuffix(logText, "\n") {
 		result += "\n"
 	}
-	return result
+	return result, renderGradleStructuredEvidence(firstPart, secondPart, result)
+}
+
+func renderGradleStructuredEvidence(firstPart, secondPart []string, trimmed string) string {
+	if payload, ok := buildGradleCompileJavaPayload(firstPart, secondPart); ok {
+		return marshalGradleStructuredPayload(payload)
+	}
+	if payload, ok := buildGradlePluginApplyPayload(secondPart); ok {
+		return marshalGradleStructuredPayload(payload)
+	}
+	raw := strings.TrimSpace(extractGradleWhatWentWrong(secondPart))
+	if raw == "" {
+		raw = normalizeMultilineLimit(trimmed, 20)
+	}
+	if raw == "" {
+		return ""
+	}
+	return marshalGradleStructuredPayload(gradleStructuredPayload{
+		Mode: "raw",
+		Errors: []gradleStructuredError{{
+			Message: raw,
+		}},
+	})
+}
+
+func buildGradleCompileJavaPayload(firstPart, secondPart []string) (gradleStructuredPayload, bool) {
+	if !strings.Contains(strings.Join(secondPart, "\n"), "Execution failed for task ':compileJava'.") {
+		return gradleStructuredPayload{}, false
+	}
+
+	issues := collectGradleCompilerIssues(firstPart)
+	reconcileGradleCompilerIssuesByErrorCount(firstPart, &issues)
+	if len(issues) == 0 {
+		return gradleStructuredPayload{}, false
+	}
+
+	groupBySig := map[string]*gradleStructuredError{}
+	order := make([]string, 0, len(issues))
+	for _, issue := range issues {
+		errEntry, fileRef, ok := parseGradleJavaIssueBlock(issue)
+		if !ok {
+			continue
+		}
+		current, exists := groupBySig[errEntry.Signature]
+		if !exists {
+			entry := errEntry
+			entry.Files = nil
+			groupBySig[errEntry.Signature] = &entry
+			order = append(order, errEntry.Signature)
+			current = &entry
+		}
+		current.Files = append(current.Files, fileRef)
+		groupBySig[errEntry.Signature] = current
+	}
+
+	if len(groupBySig) == 0 {
+		return gradleStructuredPayload{}, false
+	}
+
+	errorsOut := make([]gradleStructuredError, 0, len(order))
+	for _, sig := range order {
+		group := groupBySig[sig]
+		seen := make(map[string]struct{}, len(group.Files))
+		files := make([]gradleStructuredFileRef, 0, len(group.Files))
+		for _, f := range group.Files {
+			key := fmt.Sprintf("%s:%d:%s", f.Path, f.Line, f.Snippet)
+			if _, ok := seen[key]; ok {
+				continue
+			}
+			seen[key] = struct{}{}
+			files = append(files, f)
+		}
+		sort.SliceStable(files, func(i, j int) bool {
+			if files[i].Path == files[j].Path {
+				return files[i].Line < files[j].Line
+			}
+			return files[i].Path < files[j].Path
+		})
+		group.Files = files
+		errorsOut = append(errorsOut, *group)
+	}
+
+	return gradleStructuredPayload{
+		Mode:   "compile_java",
+		Task:   "compileJava",
+		Errors: errorsOut,
+	}, true
+}
+
+func parseGradleJavaIssueBlock(block []string) (gradleStructuredError, gradleStructuredFileRef, bool) {
+	if len(block) == 0 {
+		return gradleStructuredError{}, gradleStructuredFileRef{}, false
+	}
+	m := gradleJavaErrorLineRe.FindStringSubmatch(strings.TrimSpace(block[0]))
+	if len(m) != 4 {
+		return gradleStructuredError{}, gradleStructuredFileRef{}, false
+	}
+	line, err := strconv.Atoi(m[2])
+	if err != nil {
+		return gradleStructuredError{}, gradleStructuredFileRef{}, false
+	}
+
+	message := strings.TrimSpace(m[3])
+	symbol := ""
+	location := ""
+	snippet := ""
+	for _, raw := range block[1:] {
+		lineText := strings.TrimSpace(raw)
+		if lineText == "" || lineText == "^" {
+			continue
+		}
+		switch {
+		case strings.HasPrefix(lineText, "symbol:"):
+			symbol = strings.TrimSpace(strings.TrimPrefix(lineText, "symbol:"))
+		case strings.HasPrefix(lineText, "location:"):
+			location = strings.TrimSpace(strings.TrimPrefix(lineText, "location:"))
+		case snippet == "":
+			snippet = lineText
+		}
+	}
+
+	sigParts := []string{message}
+	if symbol != "" {
+		sigParts = append(sigParts, "symbol="+symbol)
+	}
+	if location != "" {
+		sigParts = append(sigParts, "location="+location)
+	}
+	signature := strings.Join(sigParts, " | ")
+
+	return gradleStructuredError{
+			Message:   message,
+			Signature: signature,
+			Symbol:    symbol,
+			Location:  location,
+		}, gradleStructuredFileRef{
+			Path:    strings.TrimSpace(m[1]),
+			Line:    line,
+			Snippet: snippet,
+		}, true
+}
+
+func buildGradlePluginApplyPayload(secondPart []string) (gradleStructuredPayload, bool) {
+	if len(secondPart) == 0 {
+		return gradleStructuredPayload{}, false
+	}
+	joined := strings.Join(secondPart, "\n")
+	if !strings.Contains(joined, "An exception occurred applying plugin request") {
+		return gradleStructuredPayload{}, false
+	}
+
+	pluginID := ""
+	pluginVersion := ""
+	if match := gradlePluginRequestRe.FindStringSubmatch(joined); len(match) >= 2 {
+		pluginID = strings.TrimSpace(match[1])
+		if len(match) >= 3 {
+			pluginVersion = strings.TrimSpace(match[2])
+		}
+	}
+
+	block := strings.TrimSpace(extractGradleWhatWentWrong(secondPart))
+	if block == "" {
+		block = normalizeMultilineLimit(joined, 20)
+	}
+	if block == "" {
+		return gradleStructuredPayload{}, false
+	}
+
+	return gradleStructuredPayload{
+		Mode:          "plugin_apply",
+		PluginID:      pluginID,
+		PluginVersion: pluginVersion,
+		Errors: []gradleStructuredError{{
+			Message: block,
+		}},
+	}, true
+}
+
+func extractGradleWhatWentWrong(lines []string) string {
+	if len(lines) == 0 {
+		return ""
+	}
+	start := -1
+	for i, line := range lines {
+		if strings.TrimSpace(line) == "* What went wrong:" {
+			start = i + 1
+			break
+		}
+	}
+	if start == -1 || start >= len(lines) {
+		return ""
+	}
+	collected := make([]string, 0, 8)
+	for i := start; i < len(lines); i++ {
+		trimmed := strings.TrimSpace(lines[i])
+		if strings.HasPrefix(trimmed, "* ") || strings.HasPrefix(trimmed, "BUILD FAILED") {
+			break
+		}
+		if trimmed == "" {
+			continue
+		}
+		collected = append(collected, trimmed)
+	}
+	return strings.Join(collected, "\n")
+}
+
+func normalizeMultilineLimit(text string, maxLines int) string {
+	if maxLines <= 0 {
+		return ""
+	}
+	out := make([]string, 0, maxLines)
+	for _, line := range strings.Split(text, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
+		}
+		out = append(out, trimmed)
+		if len(out) == maxLines {
+			break
+		}
+	}
+	return strings.Join(out, "\n")
+}
+
+func marshalGradleStructuredPayload(payload gradleStructuredPayload) string {
+	if len(payload.Errors) == 0 {
+		return ""
+	}
+	data, err := yaml.Marshal(payload)
+	if err != nil {
+		return ""
+	}
+	return string(data)
 }
 
 func collectGradleCompilerIssues(lines []string) [][]string {

@@ -3,6 +3,8 @@ package step
 import (
 	"strings"
 	"testing"
+
+	"gopkg.in/yaml.v3"
 )
 
 func TestTrimBuildGateLog(t *testing.T) {
@@ -211,6 +213,113 @@ BUILD FAILED in 2s
 			}
 			if strings.HasSuffix(tt.logText, "\n") != strings.HasSuffix(trimmed, "\n") {
 				t.Errorf("trailing newline mismatch: input=%t output=%t", strings.HasSuffix(tt.logText, "\n"), strings.HasSuffix(trimmed, "\n"))
+			}
+		})
+	}
+}
+
+func TestBuildGateLogFindingContent(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name              string
+		tool              string
+		logText           string
+		wantMode          string
+		wantEvidenceParts []string
+		wantNoEvidence    bool
+		wantNoStacktrace  bool
+	}{
+		{
+			name: "gradle compile_java evidence with grouped file refs",
+			tool: "gradle",
+			logText: `
+/workspace/src/main/java/a/A.java:10: error: cannot find symbol
+  symbol:   class Missing
+/workspace/src/main/java/b/B.java:20: error: cannot find symbol
+  symbol:   class Missing
+2 errors
+* What went wrong:
+Execution failed for task ':compileJava'.
+> Compilation failed; see the compiler error output for details.
+* Exception is:
+org.gradle.api.tasks.TaskExecutionException: Execution failed for task ':compileJava'.
+  at org.example.Top.a(Top.java:1)
+BUILD FAILED in 5s
+`,
+			wantMode:          "compile_java",
+			wantEvidenceParts: []string{"task: compileJava", "symbol: class Missing", "path: /workspace/src/main/java/a/A.java", "path: /workspace/src/main/java/b/B.java"},
+			wantNoStacktrace:  true,
+		},
+		{
+			name: "gradle plugin_apply evidence includes plugin id and version",
+			tool: "gradle",
+			logText: `
+FAILURE: Build failed with an exception.
+* What went wrong:
+An exception occurred applying plugin request [id: 'org.springframework.boot', version: '3.0.5']
+> Failed to apply plugin 'org.springframework.boot'.
+   > Spring Boot plugin requires Gradle 7.x (7.4 or later).
+* Try:
+> Run with --stacktrace option to get the stack trace.
+BUILD FAILED in 27s
+`,
+			wantMode:          "plugin_apply",
+			wantEvidenceParts: []string{"plugin_id: org.springframework.boot", "plugin_version: 3.0.5", "Failed to apply plugin"},
+		},
+		{
+			name: "gradle raw evidence fallback",
+			tool: "gradle",
+			logText: `
+* What went wrong:
+Execution failed for task ':customTask'.
+> Process 'command 'bash'' finished with non-zero exit value 1
+BUILD FAILED in 1s
+`,
+			wantMode:          "raw",
+			wantEvidenceParts: []string{"customTask", "non-zero exit value 1"},
+		},
+		{
+			name:           "maven has no structured evidence",
+			tool:           "maven",
+			logText:        "[ERROR] COMPILATION ERROR\n",
+			wantNoEvidence: true,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			trimmed, evidence := BuildGateLogFindingContent(tt.tool, tt.logText)
+			if strings.TrimSpace(trimmed) == "" {
+				t.Fatal("expected non-empty trimmed message")
+			}
+			if tt.wantNoEvidence {
+				if strings.TrimSpace(evidence) != "" {
+					t.Fatalf("expected no evidence, got:\n%s", evidence)
+				}
+				return
+			}
+			if strings.TrimSpace(evidence) == "" {
+				t.Fatal("expected evidence payload")
+			}
+
+			var payload map[string]any
+			if err := yaml.Unmarshal([]byte(evidence), &payload); err != nil {
+				t.Fatalf("unmarshal evidence: %v\npayload:\n%s", err, evidence)
+			}
+			if got, _ := payload["mode"].(string); got != tt.wantMode {
+				t.Fatalf("mode=%q, want %q; payload:\n%s", got, tt.wantMode, evidence)
+			}
+			for _, part := range tt.wantEvidenceParts {
+				if !strings.Contains(evidence, part) {
+					t.Errorf("evidence missing %q", part)
+				}
+			}
+			if tt.wantNoStacktrace && strings.Contains(evidence, "TaskExecutionException") {
+				t.Fatalf("evidence should exclude stacktrace, got:\n%s", evidence)
 			}
 		})
 	}

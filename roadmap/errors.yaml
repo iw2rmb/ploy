@@ -83,7 +83,7 @@ items:
   - done: false
     reviews: []
     label: "3"
-    summary: "Document task-oriented router contract and automation strategy selection using existing code, deps, infra kinds."
+    summary: "Document task-oriented router contract and amata-workflow implementation strategy using existing code, deps, infra kinds."
     classification: "determined"
     components:
       - "docs/build-gate/trimmer.md"
@@ -100,10 +100,12 @@ items:
     delta:
       - "[replace] implicit healing guidance from trimmed log text only -> explicit task array and automation strategy contract tied to structured errors"
     implementation:
+      - "Define that 'multitask heal' means updating /Users/v.v.kovalev/@scale/ploy-lib/heal/amata.yaml workflow and does not mean introducing or changing a heal job type."
       - "Specify /in/errors.yaml input contract and relation to /in/build-gate.log in runtime docs."
       - "Define router output contract as tasks array with error_kind in code, deps, infra and item indexes into structured errors."
       - "Define automation choice criteria for manual edits vs bash vs OpenRewrite based on transformation determinism, without project-specific clusters."
-      - "Document that ORW path reuses existing ORW images and runtime contract surfaces."
+      - "Document that ORW path reuses existing ORW images and runtime contract surfaces via updates to /Users/v.v.kovalev/@scale/ploy-lib/heal/amata.yaml workflow."
+      - "Document that invoking bash scripts for healing automation is implemented via updates to /Users/v.v.kovalev/@scale/ploy-lib/heal/amata.yaml workflow."
     verification:
       - "Docs consistently describe three structured error modes and optional /in/errors.yaml hydration semantics."
       - "Docs consistently constrain router kinds to code, deps, infra and avoid project-specific sub-kinds."
