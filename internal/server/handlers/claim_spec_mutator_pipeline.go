@@ -78,10 +78,6 @@ func mutateClaimSpec(input claimSpecMutatorInput) (json.RawMessage, error) {
 			errContext: "merge server bundle map into spec",
 			apply:      applyBundleMapMutator,
 		},
-		{
-			errContext: "merge rerun alter into spec",
-			apply:      applyRerunAlterMutator,
-		},
 	}
 
 	for _, mutator := range pipeline {
