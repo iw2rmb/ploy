@@ -331,20 +331,20 @@ func secondAttemptCase() gateFailureCase {
 	}
 }
 
-func rerunRootSecondAttemptCase() gateFailureCase {
-	rerunRootID := domaintypes.NewJobID()
+func reGateRootSecondAttemptCase() gateFailureCase {
+	reGateRootID := domaintypes.NewJobID()
 	heal1ID := domaintypes.NewJobID()
 	failedReGateID := domaintypes.NewJobID()
 	heal2ID := domaintypes.NewJobID()
 	retrySBOM2ID := domaintypes.NewJobID()
 	reGate2ID := domaintypes.NewJobID()
 	return gateFailureCase{
-		name: "rerun-root re-gate chain continues with second healing attempt",
+		name: "re-gate-root chain continues with second healing attempt",
 		failedJob: store.Job{
 			ID: failedReGateID, JobType: domaintypes.JobTypeReGate, RepoShaIn: testRepoSHAIn,
 		},
 		jobsByID: map[domaintypes.JobID]store.Job{
-			rerunRootID:    {ID: rerunRootID, JobType: domaintypes.JobTypeReGate, NextID: &heal1ID},
+			reGateRootID:   {ID: reGateRootID, JobType: domaintypes.JobTypeReGate, NextID: &heal1ID},
 			heal1ID:        {ID: heal1ID, JobType: domaintypes.JobTypeHeal, NextID: &failedReGateID},
 			failedReGateID: {ID: failedReGateID, JobType: domaintypes.JobTypeReGate},
 		},
@@ -391,7 +391,7 @@ func TestEvaluateGateFailureTransition(t *testing.T) {
 		retriesExhaustedCase(),
 		firstAttemptCase(),
 		secondAttemptCase(),
-		rerunRootSecondAttemptCase(),
+		reGateRootSecondAttemptCase(),
 	}
 
 	for _, tc := range cases {

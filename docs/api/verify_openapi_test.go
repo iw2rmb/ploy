@@ -83,8 +83,6 @@ func TestOpenAPICompleteness(t *testing.T) {
 		{"/v1/jobs/{job_id}/complete", "post"},
 		// Job-level status polling for worker-side cancellation detection
 		{"/v1/jobs/{job_id}/status", "get"},
-		// Job-level rerun endpoint
-		{"/v1/jobs/{job_id}/rerun", "post"},
 		// Job-level runtime image persistence
 		{"/v1/jobs/{job_id}/image", "post"},
 		// Node events
