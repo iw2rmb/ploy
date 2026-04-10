@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"regexp"
 	"sort"
@@ -19,45 +18,6 @@ import (
 )
 
 var cacheReplayDigestHexPattern = regexp.MustCompile(`^[0-9a-f]{64}$`)
-
-type missingCachedReplayArtifactError struct {
-	SourceJobID domaintypes.JobID
-	ObjectKey   string
-	Err         error
-}
-
-func (e *missingCachedReplayArtifactError) Error() string {
-	if e == nil {
-		return ""
-	}
-	src := strings.TrimSpace(e.SourceJobID.String())
-	key := strings.TrimSpace(e.ObjectKey)
-	switch {
-	case src == "" && key == "":
-		return fmt.Sprintf("cached replay source blob is missing: %v", e.Err)
-	case key == "":
-		return fmt.Sprintf("cached replay source blob is missing for source job %s: %v", src, e.Err)
-	case src == "":
-		return fmt.Sprintf("cached replay source blob is missing (%s): %v", key, e.Err)
-	default:
-		return fmt.Sprintf("cached replay source blob is missing for source job %s (%s): %v", src, key, e.Err)
-	}
-}
-
-func (e *missingCachedReplayArtifactError) Unwrap() error {
-	if e == nil {
-		return nil
-	}
-	return e.Err
-}
-
-func recoverableCacheReplayMissingArtifact(err error) *missingCachedReplayArtifactError {
-	var target *missingCachedReplayArtifactError
-	if errors.As(err, &target) {
-		return target
-	}
-	return nil
-}
 
 func (s *ClaimService) tryReplayCachedOutcome(
 	ctx context.Context,

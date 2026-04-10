@@ -124,8 +124,6 @@ type Querier interface {
 	GetArtifactBundle(ctx context.Context, id pgtype.UUID) (ArtifactBundle, error)
 	GetBootstrapToken(ctx context.Context, tokenID string) (GetBootstrapTokenRow, error)
 	GetDefaultGateProfile(ctx context.Context, stackID int64) (GetDefaultGateProfileRow, error)
-	// Returns diff metadata including object_key for object-storage retrieval.
-	GetDiff(ctx context.Context, id pgtype.UUID) (Diff, error)
 	GetEvent(ctx context.Context, id int64) (Event, error)
 	GetExactGateProfile(ctx context.Context, arg GetExactGateProfileParams) (GetExactGateProfileRow, error)
 	// Retrieves a single environment entry by key and target.
@@ -204,10 +202,6 @@ type Querier interface {
 	ListCreatedJobsByRunRepoAttempt(ctx context.Context, arg ListCreatedJobsByRunRepoAttemptParams) ([]Job, error)
 	// Returns diff metadata for a run.
 	ListDiffsByRun(ctx context.Context, runID types.RunID) ([]Diff, error)
-	// Returns diffs for a specific repo execution within a run.
-	// Repo attribution comes from joining diffs.job_id to jobs.repo_id.
-	// This supports the repo-scoped endpoint GET /v1/runs/{run_id}/repos/{repo_id}/diffs.
-	ListDiffsByRunRepo(ctx context.Context, arg ListDiffsByRunRepoParams) ([]Diff, error)
 	// Lists distinct repos for a mig with last known run metadata,
 	// optionally filtered by repo_url substring.
 	ListDistinctRepos(ctx context.Context, filter string) ([]ListDistinctReposRow, error)

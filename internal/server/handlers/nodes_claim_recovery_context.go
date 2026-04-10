@@ -110,7 +110,7 @@ func buildRecoveryClaimContext(
 		}
 	}
 	if strings.TrimSpace(ctxPayload.BuildGateLog) == "" && sbomPredecessor != nil {
-		logPayload, logErr := sbomLogPayloadFromClaimLogs(ctx, st, bs, runID, sbomPredecessor.ID)
+		logPayload, logErr := sbomLogPayloadFromClaimLogs(ctx, st, bs, sbomPredecessor.ID)
 		if logErr != nil {
 			return nil, &ClaimJobTerminalError{
 				Message: fmt.Sprintf("resolve sbom recovery log for predecessor job %s", sbomPredecessor.ID),
@@ -237,10 +237,8 @@ func sbomLogPayloadFromClaimLogs(
 	ctx context.Context,
 	st store.Store,
 	bs blobstore.Store,
-	runID domaintypes.RunID,
 	jobID domaintypes.JobID,
 ) (string, error) {
-	_ = runID
 	if bs == nil {
 		return "", errors.New("blob store is required")
 	}

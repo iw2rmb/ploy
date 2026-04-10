@@ -46,14 +46,6 @@ func resolveEffectiveSourceJob(ctx context.Context, st store.Store, jobID domain
 	return source, nil
 }
 
-func resolveEffectiveSourceJobID(ctx context.Context, st store.Store, jobID domaintypes.JobID) (domaintypes.JobID, error) {
-	job, err := resolveEffectiveSourceJob(ctx, st, jobID)
-	if err != nil {
-		return "", err
-	}
-	return job.ID, nil
-}
-
 func listArtifactBundlesByEffectiveJob(
 	ctx context.Context,
 	st store.Store,
@@ -64,21 +56,6 @@ func listArtifactBundlesByEffectiveJob(
 		return nil, err
 	}
 	return st.ListArtifactBundlesByRunAndJob(ctx, store.ListArtifactBundlesByRunAndJobParams{
-		RunID: source.RunID,
-		JobID: &source.ID,
-	})
-}
-
-func listLogsByEffectiveJob(
-	ctx context.Context,
-	st store.Store,
-	job store.Job,
-) ([]store.Log, error) {
-	source, err := resolveEffectiveSourceJob(ctx, st, job.ID)
-	if err != nil {
-		return nil, err
-	}
-	return st.ListLogsByRunAndJob(ctx, store.ListLogsByRunAndJobParams{
 		RunID: source.RunID,
 		JobID: &source.ID,
 	})
@@ -95,4 +72,3 @@ func listSBOMRowsByEffectiveJob(
 	}
 	return st.ListSBOMRowsByJob(ctx, source.ID)
 }
-

@@ -20,8 +20,6 @@ type artifactStore struct {
 	listArtifactBundlesByRunAndJob mockResult[[]store.ArtifactBundle]
 
 	// Diff queries
-	listDiffsByRunRepo      mockCall[store.ListDiffsByRunRepoParams, []store.Diff]
-	getDiff                 mockCall[pgtype.UUID, store.Diff]
 	getLatestDiffByJob      mockCall[*types.JobID, store.Diff]
 	getLatestDiffByJobByID  map[types.JobID]store.Diff
 	getLatestDiffByJobError error
@@ -59,14 +57,6 @@ func (m *artifactStore) GetArtifactBundle(ctx context.Context, id pgtype.UUID) (
 
 func (m *artifactStore) ListArtifactBundlesByRunAndJob(ctx context.Context, arg store.ListArtifactBundlesByRunAndJobParams) ([]store.ArtifactBundle, error) {
 	return m.listArtifactBundlesByRunAndJob.ret()
-}
-
-func (m *artifactStore) ListDiffsByRunRepo(ctx context.Context, arg store.ListDiffsByRunRepoParams) ([]store.Diff, error) {
-	return m.listDiffsByRunRepo.record(arg)
-}
-
-func (m *artifactStore) GetDiff(ctx context.Context, id pgtype.UUID) (store.Diff, error) {
-	return m.getDiff.record(id)
 }
 
 func (m *artifactStore) GetLatestDiffByJob(ctx context.Context, jobID *types.JobID) (store.Diff, error) {
