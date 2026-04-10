@@ -293,11 +293,11 @@ func listEffectiveRunRepoDiffs(
 	out := make([]runRepoDiffRow, 0, len(jobs))
 	seenDiffIDs := map[string]struct{}{}
 	for _, job := range jobs {
-		sourceID, sourceErr := resolveEffectiveSourceJobID(ctx, st, job.ID)
+		sourceJob, sourceErr := resolveEffectiveSourceJob(ctx, st, job.ID)
 		if sourceErr != nil {
 			return nil, sourceErr
 		}
-		diff, getErr := st.GetLatestDiffByJob(ctx, &sourceID)
+		diff, getErr := st.GetLatestDiffByJob(ctx, &sourceJob.ID)
 		if getErr != nil {
 			if errors.Is(getErr, pgx.ErrNoRows) {
 				continue

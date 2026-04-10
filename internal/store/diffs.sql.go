@@ -66,27 +66,6 @@ func (q *Queries) DeleteDiffsOlderThan(ctx context.Context, createdAt pgtype.Tim
 	return err
 }
 
-const getDiff = `-- name: GetDiff :one
-SELECT id, run_id, job_id, patch_size, object_key, summary, created_at FROM diffs
-WHERE id = $1
-`
-
-// Returns diff metadata including object_key for object-storage retrieval.
-func (q *Queries) GetDiff(ctx context.Context, id pgtype.UUID) (Diff, error) {
-	row := q.db.QueryRow(ctx, getDiff, id)
-	var i Diff
-	err := row.Scan(
-		&i.ID,
-		&i.RunID,
-		&i.JobID,
-		&i.PatchSize,
-		&i.ObjectKey,
-		&i.Summary,
-		&i.CreatedAt,
-	)
-	return i, err
-}
-
 const getLatestDiffByJob = `-- name: GetLatestDiffByJob :one
 SELECT id, run_id, job_id, patch_size, object_key, summary, created_at
 FROM diffs
@@ -127,63 +106,6 @@ ORDER BY created_at ASC, id ASC
 // Returns diff metadata for a run.
 func (q *Queries) ListDiffsByRun(ctx context.Context, runID types.RunID) ([]Diff, error) {
 	rows, err := q.db.Query(ctx, listDiffsByRun, runID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []Diff{}
-	for rows.Next() {
-		var i Diff
-		if err := rows.Scan(
-			&i.ID,
-			&i.RunID,
-			&i.JobID,
-			&i.PatchSize,
-			&i.ObjectKey,
-			&i.Summary,
-			&i.CreatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listDiffsByRunRepo = `-- name: ListDiffsByRunRepo :many
-SELECT
-  d.id,
-  d.run_id,
-  d.job_id,
-  d.patch_size,
-  d.object_key,
-  d.summary,
-  d.created_at
-FROM diffs d
-JOIN jobs j ON j.id = d.job_id
-WHERE d.run_id = $1 AND j.repo_id = $2
-ORDER BY
-  CASE
-    WHEN jsonb_typeof(d.summary->'next_id') = 'number' THEN (d.summary->>'next_id')::DOUBLE PRECISION
-    ELSE 0
-  END ASC,
-  d.created_at ASC,
-  d.id ASC
-`
-
-type ListDiffsByRunRepoParams struct {
-	RunID  types.RunID  `json:"run_id"`
-	RepoID types.RepoID `json:"repo_id"`
-}
-
-// Returns diffs for a specific repo execution within a run.
-// Repo attribution comes from joining diffs.job_id to jobs.repo_id.
-// This supports the repo-scoped endpoint GET /v1/runs/{run_id}/repos/{repo_id}/diffs.
-func (q *Queries) ListDiffsByRunRepo(ctx context.Context, arg ListDiffsByRunRepoParams) ([]Diff, error) {
-	rows, err := q.db.Query(ctx, listDiffsByRunRepo, arg.RunID, arg.RepoID)
 	if err != nil {
 		return nil, err
 	}

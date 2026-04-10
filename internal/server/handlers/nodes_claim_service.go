@@ -2,19 +2,15 @@ package handlers
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
-	"strings"
-	"time"
 
 	"github.com/iw2rmb/ploy/internal/blobstore"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/server"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/workflow/lifecycle"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 // ClaimResult is the domain output from claim orchestration.
@@ -239,27 +235,14 @@ func (s *ClaimService) Claim(ctx context.Context, nodeID domaintypes.NodeID) (Cl
 	}
 	replayed, replayErr := s.replayCachedOutcomeFn(ctx, nodeID, job, payload)
 	if replayErr != nil {
-		if missing := recoverableCacheReplayMissingArtifact(replayErr); missing != nil {
-			slog.Warn(
-				"claim: cached outcome replay skipped due to missing source artifacts; falling back to live execution",
-				"node_id", nodeID,
-				"job_id", job.ID,
-				"run_id", run.ID,
-				"source_job_id", missing.SourceJobID,
-				"object_key", missing.ObjectKey,
-				"err", replayErr,
-			)
-			s.emitCacheReplayFallbackWarning(ctx, run.ID, job.ID, missing)
-		} else {
-			slog.Error("claim: cached outcome replay failed", "node_id", nodeID, "job_id", job.ID, "run_id", run.ID, "err", replayErr)
-			if unclaimErr := s.store.UnclaimJob(ctx, store.UnclaimJobParams{
-				ID:     job.ID,
-				NodeID: nodeID,
-			}); unclaimErr != nil {
-				slog.Error("claim: failed to unclaim job after cached replay error", "job_id", job.ID, "run_id", run.ID, "node_id", nodeID, "err", unclaimErr)
-			}
-			return ClaimResult{}, claimInternal("failed to replay cached outcome", replayErr)
+		slog.Error("claim: cached outcome replay failed", "node_id", nodeID, "job_id", job.ID, "run_id", run.ID, "err", replayErr)
+		if unclaimErr := s.store.UnclaimJob(ctx, store.UnclaimJobParams{
+			ID:     job.ID,
+			NodeID: nodeID,
+		}); unclaimErr != nil {
+			slog.Error("claim: failed to unclaim job after cached replay error", "job_id", job.ID, "run_id", run.ID, "node_id", nodeID, "err", unclaimErr)
 		}
+		return ClaimResult{}, claimInternal("failed to replay cached outcome", replayErr)
 	}
 	if replayed {
 		slog.Info("job completed via cached outcome replay",
@@ -287,57 +270,4 @@ func (s *ClaimService) Claim(ctx context.Context, nodeID domaintypes.NodeID) (Cl
 		"node_id", nodeID,
 	)
 	return ClaimResult{Payload: payload}, nil
-}
-
-func (s *ClaimService) emitCacheReplayFallbackWarning(
-	ctx context.Context,
-	runID domaintypes.RunID,
-	jobID domaintypes.JobID,
-	details *missingCachedReplayArtifactError,
-) {
-	if details == nil {
-		return
-	}
-
-	sourceJobID := strings.TrimSpace(details.SourceJobID.String())
-	objectKey := strings.TrimSpace(details.ObjectKey)
-	parts := []string{
-		"cache replay skipped: source artifacts missing; falling back to live execution",
-	}
-	if sourceJobID != "" {
-		parts = append(parts, "source_job_id="+sourceJobID)
-	}
-	if objectKey != "" {
-		parts = append(parts, "object_key="+objectKey)
-	}
-	msg := strings.Join(parts, " ")
-
-	meta, err := json.Marshal(map[string]any{
-		"component":     "claim_cache_replay",
-		"fallback":      "live_execution",
-		"source_job_id": sourceJobID,
-		"object_key":    objectKey,
-	})
-	if err != nil {
-		meta = []byte(`{}`)
-	}
-
-	params := store.CreateEventParams{
-		RunID:   runID,
-		JobID:   &jobID,
-		Time:    pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
-		Level:   "warn",
-		Message: msg,
-		Meta:    meta,
-	}
-
-	if s.eventsService != nil {
-		if _, eventErr := s.eventsService.CreateAndPublishEvent(ctx, params); eventErr == nil {
-			return
-		}
-	}
-
-	if _, eventErr := s.store.CreateEvent(ctx, params); eventErr != nil {
-		slog.Warn("claim: failed to persist cache replay fallback warning", "run_id", runID, "job_id", jobID, "err", eventErr)
-	}
 }

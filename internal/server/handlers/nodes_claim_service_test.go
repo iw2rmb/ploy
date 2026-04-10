@@ -6,15 +6,12 @@ import (
 	"compress/gzip"
 	"context"
 	"errors"
-	"fmt"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
-	"github.com/iw2rmb/ploy/internal/blobstore"
 	bsmock "github.com/iw2rmb/ploy/internal/blobstore/mock"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
@@ -252,86 +249,6 @@ steps:
 	}
 	if !st.updateRunRepoError.called {
 		t.Fatal("expected UpdateRunRepoError to be called with terminal claim error details")
-	}
-}
-
-func TestClaimService_Claim_CacheReplayMissingBlobFallsBackToLiveExecution(t *testing.T) {
-	t.Parallel()
-
-	nodeID := domaintypes.NodeID(domaintypes.NewNodeKey())
-	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewRepoID()
-	specID := domaintypes.NewSpecID()
-	jobID := domaintypes.NewJobID()
-	sourceJobID := domaintypes.NewJobID()
-	now := time.Now().UTC()
-
-	st := &jobStore{
-		getRunRepoResult: store.RunRepo{
-			RunID:         runID,
-			RepoID:        repoID,
-			RepoBaseRef:   "main",
-			RepoTargetRef: "feature",
-			Status:        domaintypes.RunRepoStatusQueued,
-			Attempt:       1,
-		},
-	}
-	st.getNode.val = store.Node{ID: nodeID}
-	st.getRun.val = store.Run{
-		ID:        runID,
-		SpecID:    specID,
-		Status:    domaintypes.RunStatusStarted,
-		CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
-		StartedAt: pgtype.Timestamptz{Time: now, Valid: true},
-	}
-	st.getSpec.val = store.Spec{ID: specID, Spec: []byte(`{"steps":[{"image":"img"}]}`)}
-	st.claimJob.val = store.Job{
-		ID:          jobID,
-		RunID:       runID,
-		RepoID:      repoID,
-		RepoBaseRef: "main",
-		Attempt:     1,
-		NodeID:      &nodeID,
-		Name:        "mig-0",
-		Status:      domaintypes.JobStatusRunning,
-		JobType:     domaintypes.JobTypeMig,
-		Meta:        []byte(`{}`),
-	}
-
-	svc := NewClaimService(st, nil, &ConfigHolder{}, nil)
-	svc.replayCachedOutcomeFn = func(context.Context, domaintypes.NodeID, store.Job, claimResponsePayload) (bool, error) {
-		return false, fmt.Errorf(
-			"clone cached outputs from %s: %w",
-			sourceJobID,
-			&missingCachedReplayArtifactError{
-				SourceJobID: sourceJobID,
-				ObjectKey:   "artifacts/run/source/bundle/mig-out.tar.gz",
-				Err:         blobstore.ErrNotFound,
-			},
-		)
-	}
-
-	result, err := svc.Claim(context.Background(), nodeID)
-	if err != nil {
-		t.Fatalf("Claim() error = %v", err)
-	}
-	if result.Payload.JobID != jobID {
-		t.Fatalf("payload.job_id = %s, want %s", result.Payload.JobID, jobID)
-	}
-	if !st.updateRunRepoStatus.called {
-		t.Fatal("expected UpdateRunRepoStatus to be called")
-	}
-	if st.unclaimJob.called {
-		t.Fatal("did not expect UnclaimJob for recoverable cached replay miss")
-	}
-	if !st.createEvent.called {
-		t.Fatal("expected warning event to be persisted for cache replay fallback")
-	}
-	if got := strings.ToLower(strings.TrimSpace(st.createEvent.params.Level)); got != "warn" {
-		t.Fatalf("event level = %q, want warn", got)
-	}
-	if got := st.createEvent.params.Message; !strings.Contains(got, "cache replay skipped") {
-		t.Fatalf("event message = %q, expected cache replay skipped marker", got)
 	}
 }
 

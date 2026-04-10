@@ -27,13 +27,6 @@ func TestDiffSelectorBehavior(t *testing.T) {
 			excludedCols:    []string{", patch,", ", patch "},
 			wantOrder:       "ORDER BY created_at ASC, id ASC",
 		},
-		{
-			name:            "ListDiffsByRunRepo",
-			sql:             listDiffsByRunRepo,
-			requiredColumns: []string{"object_key", "patch_size", "summary", "created_at"},
-			excludedCols:    []string{", patch,", ", patch ", "d.patch,", "d.patch "},
-			wantOrder:       "d.created_at ASC, d.id ASC",
-		},
 	}
 
 	for _, tc := range cases {
