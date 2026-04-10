@@ -401,6 +401,111 @@ func TestClaimJob_HealAfterSBOMFailure_MissingSBOMLogsFailsClosed(t *testing.T) 
 	}
 }
 
+func TestClaimJob_HealRecoveryContextIncludesStructuredErrorsFromGateMetadata(t *testing.T) {
+	t.Parallel()
+
+	gateJobID := domaintypes.NewJobID()
+	f := newClaimJobFixture(t, claimJobFixtureOptions{
+		jobType:  domaintypes.JobTypeHeal,
+		jobName:  "heal-1-0",
+		jobImage: "docker.io/acme/heal:latest",
+		specJSON: []byte(`{
+			"steps":[{"image":"docker.io/acme/mig:latest"}],
+			"build_gate":{"heal":{"retries":2,"image":"docker.io/acme/heal:latest"}}
+		}`),
+		jobMeta: []byte(`{"kind":"mig","recovery":{"loop_kind":"healing","error_kind":"code","strategy_id":"code-default"}}`),
+	})
+	f.store.listJobsByRunRepoAttempt.val = []store.Job{
+		{
+			ID:      gateJobID,
+			RunID:   f.runID,
+			RepoID:  f.repoID,
+			Attempt: 1,
+			JobType: domaintypes.JobTypePreGate,
+			NextID:  &f.jobID,
+			Meta:    []byte(`{"kind":"gate","gate":{"log_findings":[{"severity":"error","message":"trimmed failure","evidence":"mode: compile_java\nerrors:\n  - message: cannot find symbol\n"}]}}`),
+		},
+		{
+			ID:      f.jobID,
+			RunID:   f.runID,
+			RepoID:  f.repoID,
+			Attempt: 1,
+			JobType: domaintypes.JobTypeHeal,
+		},
+	}
+
+	rr := f.serve()
+	assertStatus(t, rr, http.StatusOK)
+
+	resp := decodeBody[map[string]any](t, rr)
+	rc, ok := resp["recovery_context"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected recovery_context object, got %T", resp["recovery_context"])
+	}
+	if got, want := rc["build_gate_log"], "trimmed failure\n"; got != want {
+		t.Fatalf("recovery_context.build_gate_log=%q, want %q", got, want)
+	}
+	errorsObj, ok := rc["errors"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected recovery_context.errors object, got %T", rc["errors"])
+	}
+	if got, want := errorsObj["mode"], "compile_java"; got != want {
+		t.Fatalf("recovery_context.errors.mode=%v, want %q", got, want)
+	}
+}
+
+func TestClaimJob_ReGateRecoveryContextIncludesStructuredErrorsFromGateMetadata(t *testing.T) {
+	t.Parallel()
+
+	gateJobID := domaintypes.NewJobID()
+	f := newClaimJobFixture(t, claimJobFixtureOptions{
+		jobType:  domaintypes.JobTypeReGate,
+		jobName:  "re-gate-1",
+		specJSON: []byte(`{"steps":[{"image":"docker.io/acme/mig:latest"}]}`),
+		jobMeta:  []byte(`{"kind":"mig","recovery":{"loop_kind":"healing","error_kind":"code","strategy_id":"code-default"}}`),
+	})
+	f.store.listJobsByRunRepoAttempt.val = []store.Job{
+		{
+			ID:      gateJobID,
+			RunID:   f.runID,
+			RepoID:  f.repoID,
+			Attempt: 1,
+			JobType: domaintypes.JobTypePostGate,
+			NextID:  &f.jobID,
+			Meta:    []byte(`{"kind":"gate","gate":{"log_findings":[{"severity":"error","message":"regate failure","evidence":"mode: plugin_apply\nplugin_id: org.springframework.boot\nerrors:\n  - message: Failed to apply plugin\n"}]}}`),
+		},
+		{
+			ID:      f.jobID,
+			RunID:   f.runID,
+			RepoID:  f.repoID,
+			Attempt: 1,
+			JobType: domaintypes.JobTypeReGate,
+		},
+	}
+
+	rr := f.serve()
+	assertStatus(t, rr, http.StatusOK)
+
+	resp := decodeBody[map[string]any](t, rr)
+	rc, ok := resp["recovery_context"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected recovery_context object, got %T", resp["recovery_context"])
+	}
+	if got, want := rc["build_gate_log"], "regate failure\n"; got != want {
+		t.Fatalf("recovery_context.build_gate_log=%q, want %q", got, want)
+	}
+	errorsObj, ok := rc["errors"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected recovery_context.errors object, got %T", rc["errors"])
+	}
+	if got, want := errorsObj["mode"], "plugin_apply"; got != want {
+		t.Fatalf("recovery_context.errors.mode=%v, want %q", got, want)
+	}
+	if got, want := errorsObj["plugin_id"], "org.springframework.boot"; got != want {
+		t.Fatalf("recovery_context.errors.plugin_id=%v, want %q", got, want)
+	}
+}
+
 func gzipRecoveryFrames(t *testing.T, records ...logchunk.Record) []byte {
 	t.Helper()
 	var buf bytes.Buffer

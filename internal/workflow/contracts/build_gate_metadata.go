@@ -229,6 +229,8 @@ type RecoveryClaimContext struct {
 	DepsCompatEndpoint string `json:"deps_compat_endpoint,omitempty"`
 	// BuildGateLog is the failed gate log snippet intended for /in/build-gate.log.
 	BuildGateLog string `json:"build_gate_log,omitempty"`
+	// Errors carries structured gate errors payload intended for /in/errors.yaml.
+	Errors json.RawMessage `json:"errors,omitempty"`
 	// GateProfile carries failed gate profile JSON for infra healing context.
 	GateProfile json.RawMessage `json:"gate_profile,omitempty"`
 	// GateProfileSchemaJSON carries schema JSON for infra healing context.

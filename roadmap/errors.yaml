@@ -16,7 +16,8 @@ documentation:
 done: false
 reviews: []
 items:
-  - done: false
+  - done: true
+    commit: 46a0830f
     reviews: []
     label: "1"
     summary: "Generate structured Gradle gate errors with compileJava, plugin-apply, and raw fallback modes."
@@ -47,7 +48,7 @@ items:
     reasoning: "medium"
     cfp: 8
 
-  - done: false
+  - done: true
     reviews: []
     label: "2"
     summary: "Propagate structured errors through recovery_context and hydrate /in/errors.yaml for heal and re-gate jobs."

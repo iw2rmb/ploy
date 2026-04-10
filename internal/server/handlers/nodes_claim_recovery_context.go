@@ -14,6 +14,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"github.com/iw2rmb/ploy/internal/workflow/lifecycle"
+	"gopkg.in/yaml.v3"
 )
 
 func buildRecoveryClaimContext(
@@ -106,6 +107,9 @@ func buildRecoveryClaimContext(
 			}
 			if logPayload := gateLogPayloadFromClaimMetadata(gateMeta.GateMetadata); strings.TrimSpace(logPayload) != "" {
 				ctxPayload.BuildGateLog = logPayload
+			}
+			if structured := structuredErrorsFromGateMetadata(gateMeta.GateMetadata); len(structured) > 0 {
+				ctxPayload.Errors = structured
 			}
 		}
 	}
@@ -206,6 +210,33 @@ func gateLogPayloadFromClaimMetadata(gateMetadata *contracts.BuildGateStageMetad
 		logPayload += "\n"
 	}
 	return logPayload
+}
+
+func structuredErrorsFromGateMetadata(gateMetadata *contracts.BuildGateStageMetadata) json.RawMessage {
+	if gateMetadata == nil || len(gateMetadata.LogFindings) == 0 {
+		return nil
+	}
+	for _, finding := range gateMetadata.LogFindings {
+		evidence := strings.TrimSpace(finding.Evidence)
+		if evidence == "" {
+			continue
+		}
+		var parsed any
+		if err := yaml.Unmarshal([]byte(evidence), &parsed); err != nil {
+			continue
+		}
+		switch parsed.(type) {
+		case map[string]any, []any:
+		default:
+			continue
+		}
+		raw, err := json.Marshal(parsed)
+		if err != nil || !json.Valid(raw) {
+			continue
+		}
+		return raw
+	}
+	return nil
 }
 
 func cloneRawJSON(in json.RawMessage) json.RawMessage {

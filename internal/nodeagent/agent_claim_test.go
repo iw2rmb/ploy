@@ -228,6 +228,7 @@ func TestClaimLoop_FieldMapping(t *testing.T) {
 					DetectedStack:        contracts.MigStackJavaMaven,
 					ResolvedHealingImage: "docker.io/acme/heal:latest",
 					BuildGateLog:         "[ERROR] build failed\n",
+					Errors:               json.RawMessage(`{"mode":"raw","errors":[{"message":"x"}]}`),
 				}),
 			},
 			assertions: func(t *testing.T, got StartRunRequest, claim ClaimResponse) {
@@ -255,6 +256,9 @@ func TestClaimLoop_FieldMapping(t *testing.T) {
 				}
 				if got.RecoveryContext.LoopKind != "healing" {
 					t.Errorf("RecoveryContext.LoopKind=%q, want healing", got.RecoveryContext.LoopKind)
+				}
+				if len(got.RecoveryContext.Errors) == 0 {
+					t.Fatalf("RecoveryContext.Errors is empty")
 				}
 			},
 		},
