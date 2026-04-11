@@ -462,6 +462,7 @@ WHERE repo_id = sqlc.arg(repo_id)
   AND cache_key = sqlc.arg(cache_key)
   AND cache_key <> ''
   AND status IN ('Success', 'Fail')
+  AND NOT (meta ? 'cache_mirror')
 ORDER BY finished_at DESC NULLS LAST, id DESC
 LIMIT 1;
 

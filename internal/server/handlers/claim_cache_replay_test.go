@@ -309,3 +309,14 @@ func TestReplayMirroredJobMeta_RejectsMirroredCandidate(t *testing.T) {
 		t.Fatalf("expected mirrored candidate to be rejected, got ok=%v raw=%s", ok, string(raw))
 	}
 }
+
+func TestReplayMirroredJobMeta_RejectsInvalidCandidateMeta(t *testing.T) {
+	t.Parallel()
+
+	sourceJobID := domaintypes.NewJobID()
+	candidateRaw := []byte(`{"kind":"mig"`)
+
+	if raw, ok := replayMirroredJobMeta(sourceJobID, candidateRaw); ok || raw != nil {
+		t.Fatalf("expected invalid candidate meta to be rejected, got ok=%v raw=%s", ok, string(raw))
+	}
+}

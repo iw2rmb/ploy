@@ -172,3 +172,12 @@ func TestEventSelectorBehavior(t *testing.T) {
 		})
 	}
 }
+
+func TestCacheReplaySelectorExcludesMirroredCandidates(t *testing.T) {
+	t.Parallel()
+
+	sqlLower := strings.ToLower(resolveReusableJobByCacheKey)
+	if !strings.Contains(sqlLower, "not (meta ? 'cache_mirror')") {
+		t.Fatalf("ResolveReusableJobByCacheKey must exclude mirrored cache candidates; SQL:\n%s", resolveReusableJobByCacheKey)
+	}
+}

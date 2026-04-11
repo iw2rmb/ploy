@@ -84,10 +84,13 @@ func (s *ClaimService) tryReplayCachedOutcome(
 		return false, nil
 	}
 
-	stats := JobStatsPayload{}
-	if mirroredMeta, ok := replayMirroredJobMeta(sourceJob.ID, candidate.Meta); ok {
-		stats.JobMeta = mirroredMeta
+	mirroredMeta, ok := replayMirroredJobMeta(sourceJob.ID, candidate.Meta)
+	if !ok {
+		// Replay must remain transparent: if mirror metadata cannot be attached,
+		// treat this candidate as ineligible and let regular execution proceed.
+		return false, nil
 	}
+	stats := JobStatsPayload{JobMeta: mirroredMeta}
 	completeSvc := NewCompleteJobService(s.store, nil, blobpersist.New(s.store, s.blobStore), nil)
 	_, err = completeSvc.Complete(ctx, CompleteJobInput{
 		JobID:        job.ID,
