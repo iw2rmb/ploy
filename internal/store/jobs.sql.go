@@ -940,6 +940,39 @@ func (q *Queries) ResolveReusableJobByCacheKey(ctx context.Context, arg ResolveR
 	return i, err
 }
 
+const resolveReusableStepByCacheKey = `-- name: ResolveReusableStepByCacheKey :one
+SELECT
+  id AS ref_job_id,
+  repo_sha_out AS ref_repo_sha_out
+FROM jobs
+WHERE repo_id = $1
+  AND job_type = 'mig'
+  AND status = 'Success'
+  AND cache_key = $2
+  AND cache_key <> ''
+  AND NOT (meta ? 'cache_mirror')
+  AND repo_sha_out ~ '^[0-9a-f]{40}$'
+ORDER BY finished_at DESC NULLS LAST, id DESC
+LIMIT 1
+`
+
+type ResolveReusableStepByCacheKeyParams struct {
+	RepoID   types.RepoID `json:"repo_id"`
+	CacheKey string       `json:"cache_key"`
+}
+
+type ResolveReusableStepByCacheKeyRow struct {
+	RefJobID      types.JobID `json:"ref_job_id"`
+	RefRepoShaOut string      `json:"ref_repo_sha_out"`
+}
+
+func (q *Queries) ResolveReusableStepByCacheKey(ctx context.Context, arg ResolveReusableStepByCacheKeyParams) (ResolveReusableStepByCacheKeyRow, error) {
+	row := q.db.QueryRow(ctx, resolveReusableStepByCacheKey, arg.RepoID, arg.CacheKey)
+	var i ResolveReusableStepByCacheKeyRow
+	err := row.Scan(&i.RefJobID, &i.RefRepoShaOut)
+	return i, err
+}
+
 const scheduleNextJob = `-- name: ScheduleNextJob :one
 WITH next_job AS (
   SELECT j.id

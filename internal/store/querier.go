@@ -158,7 +158,6 @@ type Querier interface {
 	// Returns the most recently created spec bundle for a given cid.
 	// Used for deduplication: callers should check by CID before uploading.
 	GetSpecBundleByCID(ctx context.Context, cid string) (SpecBundle, error)
-	GetStepByJob(ctx context.Context, jobID string) (Step, error)
 	HasHookOnceLedger(ctx context.Context, arg HasHookOnceLedgerParams) (bool, error)
 	// Checks if a mig_repo has any historical executions (run_repos references).
 	// Returns true if the repo cannot be deleted due to history, false otherwise.
@@ -285,7 +284,7 @@ type Querier interface {
 	ResolvePreGateCreationBindingByRepoSHAAndStack(ctx context.Context, arg ResolvePreGateCreationBindingByRepoSHAAndStackParams) (ResolvePreGateCreationBindingByRepoSHAAndStackRow, error)
 	ResolveReusableJobByCacheKey(ctx context.Context, arg ResolveReusableJobByCacheKeyParams) (ResolveReusableJobByCacheKeyRow, error)
 	ResolveReusableSBOMByRepoSHAAndStack(ctx context.Context, arg ResolveReusableSBOMByRepoSHAAndStackParams) (ResolveReusableSBOMByRepoSHAAndStackRow, error)
-	ResolveReusableStepByHash(ctx context.Context, arg ResolveReusableStepByHashParams) (ResolveReusableStepByHashRow, error)
+	ResolveReusableStepByCacheKey(ctx context.Context, arg ResolveReusableStepByCacheKeyParams) (ResolveReusableStepByCacheKeyRow, error)
 	ResolveStackIDByImage(ctx context.Context, image string) (int64, error)
 	ResolveStackIDByRepoSHA(ctx context.Context, arg ResolveStackIDByRepoSHAParams) (int64, error)
 	ResolveStackIDByRequiredStack(ctx context.Context, arg ResolveStackIDByRequiredStackParams) (int64, error)
@@ -359,7 +358,6 @@ type Querier interface {
 	UpsertMigRepo(ctx context.Context, arg UpsertMigRepoParams) (MigRepo, error)
 	UpsertSBOMRow(ctx context.Context, arg UpsertSBOMRowParams) error
 	UpsertSBOMStep(ctx context.Context, arg UpsertSBOMStepParams) error
-	UpsertStep(ctx context.Context, arg UpsertStepParams) error
 }
 
 var _ Querier = (*Queries)(nil)

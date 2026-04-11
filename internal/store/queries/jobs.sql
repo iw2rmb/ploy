@@ -449,6 +449,21 @@ UPDATE jobs
 SET cache_key = $2
 WHERE id = $1;
 
+-- name: ResolveReusableStepByCacheKey :one
+SELECT
+  id AS ref_job_id,
+  repo_sha_out AS ref_repo_sha_out
+FROM jobs
+WHERE repo_id = $1
+  AND job_type = 'mig'
+  AND status = 'Success'
+  AND cache_key = $2
+  AND cache_key <> ''
+  AND NOT (meta ? 'cache_mirror')
+  AND repo_sha_out ~ '^[0-9a-f]{40}$'
+ORDER BY finished_at DESC NULLS LAST, id DESC
+LIMIT 1;
+
 -- name: ResolveReusableJobByCacheKey :one
 SELECT
   id,
