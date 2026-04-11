@@ -92,8 +92,12 @@ type jobStore struct {
 	upsertGateJobProfileLink mockCall[store.UpsertGateJobProfileLinkParams, struct{}]
 
 	// Artifact/Diff (for job completion)
-	createDiff           mockCall[store.CreateDiffParams, store.Diff]
-	createArtifactBundle mockResult[store.ArtifactBundle]
+	createDiff              mockCall[store.CreateDiffParams, store.Diff]
+	deleteDiff              mockCall[pgtype.UUID, struct{}]
+	getLatestDiffByJob      mockCall[*types.JobID, store.Diff]
+	getLatestDiffByJobByID  map[types.JobID]store.Diff
+	getLatestDiffByJobError error
+	createArtifactBundle    mockResult[store.ArtifactBundle]
 
 	listArtifactBundlesByRunAndJob mockCall[store.ListArtifactBundlesByRunAndJobParams, []store.ArtifactBundle]
 
@@ -520,6 +524,25 @@ func (m *jobStore) UpsertGateJobProfileLink(ctx context.Context, arg store.Upser
 
 func (m *jobStore) CreateDiff(ctx context.Context, params store.CreateDiffParams) (store.Diff, error) {
 	return m.createDiff.record(params)
+}
+
+func (m *jobStore) DeleteDiff(ctx context.Context, id pgtype.UUID) error {
+	_, err := m.deleteDiff.record(id)
+	return err
+}
+
+func (m *jobStore) GetLatestDiffByJob(ctx context.Context, jobID *types.JobID) (store.Diff, error) {
+	if m.getLatestDiffByJobError != nil {
+		return store.Diff{}, m.getLatestDiffByJobError
+	}
+	if jobID != nil && len(m.getLatestDiffByJobByID) > 0 {
+		if diff, ok := m.getLatestDiffByJobByID[*jobID]; ok {
+			m.getLatestDiffByJob.called = true
+			m.getLatestDiffByJob.params = jobID
+			return diff, nil
+		}
+	}
+	return m.getLatestDiffByJob.record(jobID)
 }
 
 func (m *jobStore) CreateArtifactBundle(ctx context.Context, params store.CreateArtifactBundleParams) (store.ArtifactBundle, error) {
