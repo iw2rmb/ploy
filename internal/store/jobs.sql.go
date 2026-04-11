@@ -899,6 +899,7 @@ WHERE repo_id = $1
   AND cache_key = $3
   AND cache_key <> ''
   AND status IN ('Success', 'Fail')
+  AND NOT (meta ? 'cache_mirror')
 ORDER BY finished_at DESC NULLS LAST, id DESC
 LIMIT 1
 `
