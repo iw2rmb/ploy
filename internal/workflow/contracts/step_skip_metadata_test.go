@@ -2,8 +2,6 @@ package contracts
 
 import (
 	"testing"
-
-	types "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 func TestMigStepSkipMetadataValidate(t *testing.T) {
@@ -18,24 +16,14 @@ func TestMigStepSkipMetadataValidate(t *testing.T) {
 			name: "valid",
 			meta: &MigStepSkipMetadata{
 				Enabled:       true,
-				RefJobID:      types.JobID("2w6vNfL9qYHhM7xQ8TzP1bK3n4D"),
 				RefRepoSHAOut: "0123456789abcdef0123456789abcdef01234567",
 				Hash:          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 			},
 		},
 		{
-			name: "missing ref job id",
-			meta: &MigStepSkipMetadata{
-				Enabled:       true,
-				RefRepoSHAOut: "0123456789abcdef0123456789abcdef01234567",
-			},
-			wantErr: true,
-		},
-		{
 			name: "invalid repo sha out",
 			meta: &MigStepSkipMetadata{
 				Enabled:       true,
-				RefJobID:      types.JobID("2w6vNfL9qYHhM7xQ8TzP1bK3n4D"),
 				RefRepoSHAOut: "bad-sha",
 			},
 			wantErr: true,
@@ -44,7 +32,6 @@ func TestMigStepSkipMetadataValidate(t *testing.T) {
 			name: "invalid hash",
 			meta: &MigStepSkipMetadata{
 				Enabled:       true,
-				RefJobID:      types.JobID("2w6vNfL9qYHhM7xQ8TzP1bK3n4D"),
 				RefRepoSHAOut: "0123456789abcdef0123456789abcdef01234567",
 				Hash:          "not-a-hash",
 			},
