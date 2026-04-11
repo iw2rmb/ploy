@@ -25,75 +25,44 @@ func resolveAndPersistSBOMStepSkip(
 		return nil, nil
 	}
 
-	spec, err := contracts.ParseMigSpecJSON(mergedSpec)
+	cacheKey, err := computeJobCacheKey(
+		domaintypes.JobTypeSBOM,
+		job.Name,
+		job.JobImage,
+		job.RepoShaIn,
+		"",
+		mergedSpec,
+	)
 	if err != nil {
-		return nil, fmt.Errorf("parse merged spec for sbom cache: %w", err)
+		return nil, fmt.Errorf("compute sbom cache key: %w", err)
 	}
-
-	cycleCtx, ok := sbomCycleContextFromJob(job)
-	if !ok {
+	cacheKey = strings.TrimSpace(cacheKey)
+	if cacheKey == "" {
 		return nil, nil
 	}
-	lang, tool, release := sbomStackTupleFromSpec(spec, cycleCtx.Phase)
-	if lang == "" || tool == "" || release == "" {
-		return nil, nil
-	}
-
-	var refJobID *string
-	var skip *contracts.SBOMStepSkipMetadata
-	repoSHAIn := strings.TrimSpace(job.RepoShaIn)
-	if sha40Pattern.MatchString(repoSHAIn) {
-		row, err := pgStore.ResolveReusableSBOMByRepoSHAAndStack(ctx, store.ResolveReusableSBOMByRepoSHAAndStackParams{
-			RepoID:    job.RepoID,
-			RepoShaIn: repoSHAIn,
-			Lang:      lang,
-			Tool:      tool,
-			Release:   release,
-		})
-		if err == nil {
-			ref := row.RefJobID.String()
-			refJobID = &ref
-			if row.RefArtifactID != "" && strings.TrimSpace(row.RefJobImage) != "" {
-				skip = &contracts.SBOMStepSkipMetadata{
-					Enabled:       true,
-					RefJobID:      row.RefJobID,
-					RefArtifactID: strings.TrimSpace(row.RefArtifactID),
-					RefJobImage:   strings.TrimSpace(row.RefJobImage),
-				}
-			}
-		} else if !isNoRowsError(err) {
-			return nil, fmt.Errorf("resolve reusable sbom: %w", err)
-		}
-	}
-
-	if err := pgStore.UpsertSBOMStep(ctx, store.UpsertSBOMStepParams{
-		JobID:    job.ID.String(),
-		Lang:     lang,
-		Tool:     tool,
-		Release:  release,
-		RefJobID: refJobID,
+	if err := pgStore.UpdateJobCacheKey(ctx, store.UpdateJobCacheKeyParams{
+		ID:       job.ID,
+		CacheKey: cacheKey,
 	}); err != nil {
-		return nil, fmt.Errorf("upsert sbom cache row: %w", err)
+		return nil, fmt.Errorf("persist sbom cache key: %w", err)
+	}
+
+	var skip *contracts.SBOMStepSkipMetadata
+	row, err := pgStore.ResolveReusableSBOMByCacheKey(ctx, store.ResolveReusableSBOMByCacheKeyParams{
+		RepoID:   job.RepoID,
+		CacheKey: cacheKey,
+	})
+	if err == nil {
+		if row.RefArtifactID != "" && strings.TrimSpace(row.RefJobImage) != "" {
+			skip = &contracts.SBOMStepSkipMetadata{
+				Enabled:       true,
+				RefArtifactID: strings.TrimSpace(row.RefArtifactID),
+				RefJobImage:   strings.TrimSpace(row.RefJobImage),
+			}
+		}
+	} else if !isNoRowsError(err) {
+		return nil, fmt.Errorf("resolve reusable sbom: %w", err)
 	}
 
 	return skip, nil
-}
-
-func sbomStackTupleFromSpec(spec *contracts.MigSpec, phase string) (lang, tool, release string) {
-	if spec == nil || spec.BuildGate == nil {
-		return "", "", ""
-	}
-	var cfg *contracts.BuildGatePhaseConfig
-	if strings.TrimSpace(phase) == contracts.SBOMPhasePre {
-		cfg = spec.BuildGate.Pre
-	} else {
-		cfg = spec.BuildGate.Post
-	}
-	if cfg == nil || cfg.Stack == nil || !cfg.Stack.Enabled {
-		return "", "", ""
-	}
-	lang = strings.ToLower(strings.TrimSpace(cfg.Stack.Language))
-	tool = strings.ToLower(strings.TrimSpace(cfg.Stack.Tool))
-	release = strings.TrimSpace(cfg.Stack.Release)
-	return lang, tool, release
 }

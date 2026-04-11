@@ -283,7 +283,7 @@ type Querier interface {
 	ResolvePreGateCreationBindingByRepoSHA(ctx context.Context, arg ResolvePreGateCreationBindingByRepoSHAParams) (ResolvePreGateCreationBindingByRepoSHARow, error)
 	ResolvePreGateCreationBindingByRepoSHAAndStack(ctx context.Context, arg ResolvePreGateCreationBindingByRepoSHAAndStackParams) (ResolvePreGateCreationBindingByRepoSHAAndStackRow, error)
 	ResolveReusableJobByCacheKey(ctx context.Context, arg ResolveReusableJobByCacheKeyParams) (ResolveReusableJobByCacheKeyRow, error)
-	ResolveReusableSBOMByRepoSHAAndStack(ctx context.Context, arg ResolveReusableSBOMByRepoSHAAndStackParams) (ResolveReusableSBOMByRepoSHAAndStackRow, error)
+	ResolveReusableSBOMByCacheKey(ctx context.Context, arg ResolveReusableSBOMByCacheKeyParams) (ResolveReusableSBOMByCacheKeyRow, error)
 	ResolveReusableStepByCacheKey(ctx context.Context, arg ResolveReusableStepByCacheKeyParams) (ResolveReusableStepByCacheKeyRow, error)
 	ResolveStackIDByImage(ctx context.Context, image string) (int64, error)
 	ResolveStackIDByRepoSHA(ctx context.Context, arg ResolveStackIDByRepoSHAParams) (int64, error)
@@ -357,7 +357,6 @@ type Querier interface {
 	// Uniqueness is on (mig_id, repo_id) to prevent duplicate repo membership per mig.
 	UpsertMigRepo(ctx context.Context, arg UpsertMigRepoParams) (MigRepo, error)
 	UpsertSBOMRow(ctx context.Context, arg UpsertSBOMRowParams) error
-	UpsertSBOMStep(ctx context.Context, arg UpsertSBOMStepParams) error
 }
 
 var _ Querier = (*Queries)(nil)

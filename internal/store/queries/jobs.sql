@@ -464,6 +464,31 @@ WHERE repo_id = $1
 ORDER BY finished_at DESC NULLS LAST, id DESC
 LIMIT 1;
 
+-- name: ResolveReusableSBOMByCacheKey :one
+SELECT
+  j.id AS ref_job_id,
+  j.job_image AS ref_job_image,
+  ab.id::text AS ref_artifact_id
+FROM jobs j
+JOIN LATERAL (
+  SELECT a.id
+  FROM artifact_bundles a
+  WHERE a.run_id = j.run_id
+    AND a.job_id = j.id
+    AND (a.name = 'mig-out' OR a.name IS NULL)
+  ORDER BY a.created_at DESC, a.id DESC
+  LIMIT 1
+) ab ON true
+WHERE j.repo_id = $1
+  AND j.job_type = 'sbom'
+  AND j.status = 'Success'
+  AND j.cache_key = $2
+  AND j.cache_key <> ''
+  AND j.job_image <> ''
+  AND NOT (j.meta ? 'cache_mirror')
+ORDER BY j.finished_at DESC NULLS LAST, j.id DESC
+LIMIT 1;
+
 -- name: ResolveReusableJobByCacheKey :one
 SELECT
   id,

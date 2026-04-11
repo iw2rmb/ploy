@@ -193,3 +193,12 @@ func TestStepReuseSelectorExcludesMirroredCandidates(t *testing.T) {
 		t.Fatalf("ResolveReusableStepByCacheKey must exclude mirrored step candidates; SQL:\n%s", resolveReusableStepByCacheKey)
 	}
 }
+
+func TestSBOMReuseSelectorExcludesMirroredCandidates(t *testing.T) {
+	t.Parallel()
+
+	sqlLower := strings.ToLower(resolveReusableSBOMByCacheKey)
+	if !strings.Contains(sqlLower, "not (j.meta ? 'cache_mirror')") {
+		t.Fatalf("ResolveReusableSBOMByCacheKey must exclude mirrored candidates; SQL:\n%s", resolveReusableSBOMByCacheKey)
+	}
+}

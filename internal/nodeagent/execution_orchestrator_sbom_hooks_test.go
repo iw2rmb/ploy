@@ -521,7 +521,6 @@ func TestTryRestoreSBOMFromCache_ImageMismatchSkipsReuse(t *testing.T) {
 		JobID: "job-image-mismatch",
 		SBOMSkip: &contracts.SBOMStepSkipMetadata{
 			Enabled:       true,
-			RefJobID:      "ref-job",
 			RefArtifactID: "123e4567-e89b-12d3-a456-426614174000",
 			RefJobImage:   "ghcr.io/iw2rmb/ploy/sbom-maven:latest",
 		},

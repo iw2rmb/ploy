@@ -670,8 +670,7 @@ func (r *runController) executeMigJob(ctx context.Context, req StartRunRequest) 
 		statsBuilder := types.NewRunStatsBuilder().
 			ExitCode(0).
 			DurationMs(duration.Milliseconds()).
-			MetadataEntry("step_skip", "true").
-			MetadataEntry("step_skip_ref_job_id", req.StepSkip.RefJobID.String())
+			MetadataEntry("step_skip", "true")
 		if strings.TrimSpace(req.StepSkip.Hash) != "" {
 			statsBuilder.MetadataEntry("step_skip_hash", strings.TrimSpace(req.StepSkip.Hash))
 		}
@@ -681,7 +680,7 @@ func (r *runController) executeMigJob(ctx context.Context, req StartRunRequest) 
 		if uploadErr := r.uploadStatus(ctx, req.RunID.String(), types.JobStatusSuccess.String(), &exitCodeZero, stats, req.JobID, strings.TrimSpace(req.StepSkip.RefRepoSHAOut)); uploadErr != nil {
 			slog.Error("failed to upload step-skip success status", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)
 		}
-		slog.Info("mig job skipped via step cache", "run_id", req.RunID, "job_id", req.JobID, "ref_job_id", req.StepSkip.RefJobID, "repo_sha_out", req.StepSkip.RefRepoSHAOut)
+		slog.Info("mig job skipped via step cache", "run_id", req.RunID, "job_id", req.JobID, "repo_sha_out", req.StepSkip.RefRepoSHAOut)
 		return
 	}
 
@@ -1214,8 +1213,7 @@ func (r *runController) runContainerJob(
 				DurationMs(duration.Milliseconds()).
 				MetadataEntry("sbom_skip", "true")
 			if req.SBOMSkip != nil {
-				statsBuilder.MetadataEntry("sbom_skip_ref_job_id", req.SBOMSkip.RefJobID.String()).
-					MetadataEntry("sbom_skip_ref_artifact_id", strings.TrimSpace(req.SBOMSkip.RefArtifactID))
+				statsBuilder.MetadataEntry("sbom_skip_ref_artifact_id", strings.TrimSpace(req.SBOMSkip.RefArtifactID))
 			}
 			stats := statsBuilder.MustBuild()
 			if !cfg.SuppressOutBundle {
@@ -1375,7 +1373,6 @@ func (r *runController) tryRestoreSBOMFromCache(ctx context.Context, req StartRu
 		slog.Warn("sbom cache restore failed; falling back to runtime execution",
 			"run_id", req.RunID,
 			"job_id", req.JobID,
-			"ref_job_id", req.SBOMSkip.RefJobID,
 			"ref_artifact_id", req.SBOMSkip.RefArtifactID,
 			"error", err,
 		)
@@ -1387,7 +1384,6 @@ func (r *runController) tryRestoreSBOMFromCache(ctx context.Context, req StartRu
 		slog.Warn("sbom cache extraction failed; falling back to runtime execution",
 			"run_id", req.RunID,
 			"job_id", req.JobID,
-			"ref_job_id", req.SBOMSkip.RefJobID,
 			"ref_artifact_id", req.SBOMSkip.RefArtifactID,
 			"error", restoreErr,
 		)
@@ -1396,7 +1392,6 @@ func (r *runController) tryRestoreSBOMFromCache(ctx context.Context, req StartRu
 	slog.Info("sbom cache hit restored",
 		"run_id", req.RunID,
 		"job_id", req.JobID,
-		"ref_job_id", req.SBOMSkip.RefJobID,
 		"ref_artifact_id", req.SBOMSkip.RefArtifactID,
 		"image", image,
 		"restored_files", restoredCount,

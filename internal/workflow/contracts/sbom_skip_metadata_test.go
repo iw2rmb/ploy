@@ -3,8 +3,6 @@ package contracts
 import (
 	"strings"
 	"testing"
-
-	types "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 func TestSBOMStepSkipMetadataValidate(t *testing.T) {
@@ -12,7 +10,6 @@ func TestSBOMStepSkipMetadataValidate(t *testing.T) {
 
 	valid := &SBOMStepSkipMetadata{
 		Enabled:       true,
-		RefJobID:      types.JobID("2Y3Y6cnx74Y4LnR2t9L6nWqv0x0"),
 		RefArtifactID: "123e4567-e89b-12d3-a456-426614174000",
 		RefJobImage:   "ghcr.io/iw2rmb/ploy/sbom-maven:latest",
 	}
@@ -29,26 +26,15 @@ func TestSBOMStepSkipMetadataValidate(t *testing.T) {
 			name: "disabled",
 			meta: &SBOMStepSkipMetadata{
 				Enabled:       false,
-				RefJobID:      valid.RefJobID,
 				RefArtifactID: valid.RefArtifactID,
 				RefJobImage:   valid.RefJobImage,
 			},
 			want: "enabled",
 		},
 		{
-			name: "missing ref job id",
-			meta: &SBOMStepSkipMetadata{
-				Enabled:       true,
-				RefArtifactID: valid.RefArtifactID,
-				RefJobImage:   valid.RefJobImage,
-			},
-			want: "ref_job_id",
-		},
-		{
 			name: "bad artifact id",
 			meta: &SBOMStepSkipMetadata{
 				Enabled:       true,
-				RefJobID:      valid.RefJobID,
 				RefArtifactID: "not-uuid",
 				RefJobImage:   valid.RefJobImage,
 			},
@@ -58,7 +44,6 @@ func TestSBOMStepSkipMetadataValidate(t *testing.T) {
 			name: "missing image",
 			meta: &SBOMStepSkipMetadata{
 				Enabled:       true,
-				RefJobID:      valid.RefJobID,
 				RefArtifactID: valid.RefArtifactID,
 			},
 			want: "ref_job_image",
