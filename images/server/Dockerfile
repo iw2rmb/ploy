@@ -15,10 +15,8 @@ RUN set -eux; \
     adduser -D -H -s /sbin/nologin ploy && \
     mkdir -p /etc/ploy /etc/ploy/pki /etc/ploy/gates /etc/ploy/schemas /var/lib/ploy && \
     chown -R ploy:ploy /etc/ploy /var/lib/ploy
-COPY dist/ployd-linux /usr/local/bin/ployd
-RUN chmod +x /usr/local/bin/ployd
-COPY images/server/entrypoint.sh /usr/local/bin/ployd-entrypoint
-RUN chmod +x /usr/local/bin/ployd-entrypoint
+COPY --chmod=755 dist/ployd-linux /usr/local/bin/ployd
+COPY --chmod=755 images/server/entrypoint.sh /usr/local/bin/ployd-entrypoint
 COPY --chown=ploy:ploy gates/ /etc/ploy/gates/
 COPY --chown=ploy:ploy docs/schemas/gate_profile.schema.json /etc/ploy/schemas/gate_profile.schema.json
 USER ploy

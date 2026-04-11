@@ -15,10 +15,8 @@ RUN set -eux; \
     adduser -D -H -s /sbin/nologin ploy && \
     mkdir -p /etc/ploy /etc/ploy/pki /etc/ploy/gates /var/lib/ploy && \
     chown -R ploy:ploy /etc/ploy /var/lib/ploy
-COPY dist/ployd-node-linux /usr/local/bin/ployd-node
-RUN chmod +x /usr/local/bin/ployd-node
-COPY images/node/entrypoint.sh /usr/local/bin/ployd-node-entrypoint
-RUN chmod +x /usr/local/bin/ployd-node-entrypoint
+COPY --chmod=755 dist/ployd-node-linux /usr/local/bin/ployd-node
+COPY --chmod=755 images/node/entrypoint.sh /usr/local/bin/ployd-node-entrypoint
 COPY --chown=ploy:ploy gates/ /etc/ploy/gates/
 USER root
 # Needs access to Docker socket; run as root inside container for docker CLI
