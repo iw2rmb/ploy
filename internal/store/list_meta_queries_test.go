@@ -180,4 +180,7 @@ func TestCacheReplaySelectorExcludesMirroredCandidates(t *testing.T) {
 	if !strings.Contains(sqlLower, "not (meta ? 'cache_mirror')") {
 		t.Fatalf("ResolveReusableJobByCacheKey must exclude mirrored cache candidates; SQL:\n%s", resolveReusableJobByCacheKey)
 	}
+	if !strings.Contains(sqlLower, "status <> 'fail'") || !strings.Contains(sqlLower, "exists") || !strings.Contains(sqlLower, "from logs") {
+		t.Fatalf("ResolveReusableJobByCacheKey must require failed candidates to have log rows; SQL:\n%s", resolveReusableJobByCacheKey)
+	}
 }
