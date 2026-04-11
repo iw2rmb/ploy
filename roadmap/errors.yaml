@@ -49,6 +49,7 @@ items:
     cfp: 8
 
   - done: true
+    commit: 8b3b9f38
     reviews: []
     label: "2"
     summary: "Propagate structured errors through recovery_context and hydrate /in/errors.yaml for heal and re-gate jobs."

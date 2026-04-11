@@ -191,7 +191,8 @@ heal:
         main:
           steps:
             - codex: |
-                Fix the build failure in /in/build-gate.log.
+                Use /in/errors.yaml when present and /in/build-gate.log as fallback.
+                Fix the build failure.
                 Your final message MUST be one line of JSON: {"action_summary":"..."}
     # set:   # optional; passed as ordered --set '<param>=<value>' flags
     #   - param: model
@@ -234,6 +235,27 @@ Healing runtime environment:
 - `PLOY_GATE_PHASE` — phase that failed (`pre_gate|post_gate|re_gate`)
 - `PLOY_LOOP_KIND` — loop context (`healing`)
 
+### Task-oriented healing router contract
+
+Multitask heal is implemented inside the healing Amata workflow (for example
+`@scale/ploy-lib/heal/amata.yaml`). It does not introduce a new job type.
+Control-plane job types remain `heal` and `re_gate`.
+
+Router output contract:
+
+- `tasks`: array of task objects.
+- Task fields:
+  - `error_kind`: one of `code`, `deps`, `infra`.
+  - `bug_summary`: concise single-line description.
+  - `items`: array of indexes into `/in/errors.yaml.errors`.
+
+Rules:
+
+- Healing router kinds are constrained to `code|deps|infra`.
+- No project-specific sub-kinds are part of this contract.
+- Automation choice (`manual` edits vs bash scripts vs OpenRewrite) is selected
+  by lane prompts based on transformation determinism and task shape.
+
 ### Per-iteration artifacts and healing log
 
 During the heal → re-gate loop, the node agent writes per-iteration artifacts
@@ -242,6 +264,7 @@ to `/in` for debugging and cross-iteration context:
 | Artifact | Description |
 |---|---|
 | `/in/build-gate.log` | Latest gate failure log (updated after each re-gate) |
+| `/in/errors.yaml` | Structured gate errors payload when claim-time `recovery_context.errors` is present |
 | `/in/gate_profile.json` | Gate profile used by the failed gate when available |
 | `/in/build-gate-iteration-N.log` | Gate failure log snapshot for iteration N |
 | `/in/healing-iteration-N.log` | Healing agent output log for iteration N |
@@ -250,7 +273,8 @@ to `/in` for debugging and cross-iteration context:
 | `/in/deps-bumps.json` | Prior cumulative dependency bump map for dependency healing |
 
 For `heal`/`re_gate`, claim-time `recovery_context` is the primary source for
-`/in/build-gate.log`, `/in/gate_profile.json`, and `/in/gate_profile.schema.json`.
+`/in/build-gate.log`, optional `/in/errors.yaml`, `/in/gate_profile.json`, and
+`/in/gate_profile.schema.json`.
 Node-local run cache snapshots are fallback-only when claim context fields are absent.
 
 The <code>healing-log.md</code> format:
@@ -506,6 +530,27 @@ The ORW Migs honor an existing `rewrite.yml` in the workspace:
   (or `REWRITE_ACTIVE_RECIPES` if provided).
 - If no `rewrite.yml` exists, ORW Migs fall back to running the class recipe
   directly using `RECIPE_CLASSNAME` and the artifact coordinates.
+
+### Healing: execute OpenRewrite with own recipe
+
+For healing lanes that choose OpenRewrite automation:
+
+1. Write or update `/workspace/rewrite.yml` with the desired custom recipe.
+2. Ensure required recipe envs are set:
+   - `RECIPE_GROUP`
+   - `RECIPE_ARTIFACT`
+   - `RECIPE_VERSION`
+   - `RECIPE_CLASSNAME`
+3. Optionally set `ORW_ACTIVE_RECIPES` when the active recipe should differ
+   from top-level `name` in `rewrite.yml`.
+4. Run the canonical command:
+   - `heal-orw --apply --dir /workspace --out /out/orw-task`
+   (`heal-orw`, `orw-cli`, and `rewrite` are shipped in the `amata` runtime image).
+5. On failure, inspect:
+   - `/out/orw-task/report.json`
+   - `/out/orw-task/transform.log`
+   then fallback to deterministic `bash`/`manual` edits with explicit reason in
+   heal `action_summary`.
 
 When `/out/report.json` contains an ORW failure payload (`success=false`), the
 node agent propagates deterministic failure fields into run stats metadata:
@@ -1266,6 +1311,7 @@ Migs container images are standard OCI images with the following expectations:
   - `/out` — output directory for artifacts and summaries (read-write).
   - `/in` — optional read-only mount for cross-phase inputs such as:
     - initial Build Gate logs (`/in/build-gate.log`),
+    - structured Build Gate errors (`/in/errors.yaml`) when claim context provides `recovery_context.errors`,
     - per-iteration gate logs (`/in/build-gate-iteration-N.log`),
     - per-iteration healing logs (`/in/healing-iteration-N.log`),
     - cumulative healing log (<code>/in/healing-log.md</code>),

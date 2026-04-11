@@ -223,12 +223,25 @@ build_gate:
 #             steps:
 #               - codex: |
 #                   Rules:
-#                   - Use /workspace and /in/build-gate.log to understand the compile error.
+#                   - Use /in/errors.yaml when present; fall back to /in/build-gate.log.
+#                   - Router output may be task-oriented: tasks[] with error_kind in
+#                     code|deps|infra and items[] indexes into errors.yaml entries.
 #                   - Edit files under /workspace as needed to fix the error.
+#                   - Choose automation by determinism:
+#                     manual for localized semantic edits,
+#                     bash for deterministic scripted bulk edits,
+#                     OpenRewrite for deterministic Java AST-safe refactors.
+#                   - OpenRewrite execution contract (custom recipe):
+#                     1) prepare `/workspace/rewrite.yml`
+#                     2) ensure RECIPE_GROUP/RECIPE_ARTIFACT/RECIPE_VERSION/RECIPE_CLASSNAME
+#                     3) optional ORW_ACTIVE_RECIPES override
+#                     4) run `heal-orw --apply --dir /workspace --out /out/orw-task`
+#                     5) on failure inspect `/out/orw-task/report.json` and `transform.log`,
+#                        then fallback to bash/manual with explicit reason.
 #                   - When ready, stop editing and end the session.
 #                   - Your final message MUST be one line of JSON: {"action_summary":"..."}
 #                   Task:
-#                   Fix the compilation error described in /in/build-gate.log.
+#                   Fix the current Build Gate failure.
 #       # set:    # optional; passed as ordered --set '<param>=<value>' flags to amata run
 #       #   - param: model
 #       #     value: gpt-4o
