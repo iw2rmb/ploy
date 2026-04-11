@@ -109,6 +109,7 @@ Role model (bearer token claims):
   worker nodes via a systemd drop-in to make it available cluster-wide.
 - Cross-phase input directory: `/in` is mounted read-only for healing migs (e.g., `codex`).
   - `/in/build-gate.log` — First Build Gate failure log (primarily from claim `recovery_context`; node-local cache fallback)
+  - `/in/errors.yaml` — Structured gate errors payload hydrated from claim `recovery_context.errors` when present (optional)
   - `/in/gate_profile.json` — Gate profile used by the failed gate when available (provided for `infra` healing context)
   - `/in/gate_profile.schema.json` — Gate profile schema for `infra` healing context (`title: Ploy Build Gate Profile`, includes `$comment` guidance for key fields)
   - `/in/amata.yaml` — Amata workflow spec materialized from `amata.spec`
@@ -179,7 +180,8 @@ build_gate:
   - Action fields support include-composition (`retries`, `image`, `command`, `envs`, `ca`, `in`, `out`, `home`, optional `amata`, optional `expectations`)
   - After each healing attempt, the Build Gate is re-run; on pass, the main mig proceeds
   - If healing exhausts retries and gate still fails, run terminates with `reason="build-gate"`
-  - Cross-phase inputs (`/in/build-gate.log`, `/in/gate_profile.json`, `/in/amata.yaml`) are available to healing migs
+  - Cross-phase inputs (`/in/build-gate.log`, optional `/in/errors.yaml`, `/in/gate_profile.json`, `/in/amata.yaml`) are available to healing migs
+  - Task-oriented healing routers may consume `/in/errors.yaml` and emit `tasks[]` with `error_kind` in `code|deps|infra` and `items[]` indexes into `errors` entries
   - For `expectations.artifacts` schema `gate_profile_v1`, healing is expected to write `/out/gate-profile-candidate.json` with explicit `targets.active` (`all_tests|unit|build|unsupported`); candidate promotion to repo `gate_profile` occurs only on successful follow-up `re_gate`
   - Terminal unsupported candidate contract: `targets.active=unsupported`, `targets.build.status=failed`, `targets.build.failure_code=infra_support`
 - Container cleanup model:
@@ -604,6 +606,17 @@ Optional repository and execution controls:
 | `ORW_EXCLUDE_PATHS` | Comma-separated glob patterns excluded from ORW parsing (for example `**/*.proto`) |
 | `ORW_CLI_BIN` | OpenRewrite CLI executable name/path (default: `rewrite`) |
 
+Healing execution (custom recipe via Amata lane):
+
+- Canonical command:
+  - `heal-orw --apply --dir /workspace --out /out/orw-task`
+- `heal-orw` sets `ORW_BUILD_SYSTEM` (`gradle|maven`) using workspace markers
+  and then invokes `orw-cli`.
+- If both `pom.xml` and `build.gradle(.kts)` are present, set
+  `ORW_BUILD_SYSTEM` explicitly before invoking `heal-orw`.
+- Failure artifacts are written to `/out/orw-task/report.json` and
+  `/out/orw-task/transform.log`.
+
 `report.json` contract (`/out/report.json`):
 
 ```json
@@ -634,6 +647,11 @@ Run/API metadata propagation:
 
 **Amata image (`amata`)**: when `amata.spec` is set on a mig step or healing action,
 the container runs `amata run /in/amata.yaml` (with optional `--set` flags).
+
+The `amata` image also ships OpenRewrite healing helpers:
+- `heal-orw` — canonical wrapper that resolves build-system and invokes ORW runtime.
+- `orw-cli` — ORW contract wrapper producing deterministic `/out/report.json`.
+- `rewrite` — bundled OpenRewrite CLI runner executable used by `orw-cli`.
 
 Config files are delivered via Hydra `home` mounts to their
 expected paths under `$HOME`. No env-based materialization is performed:

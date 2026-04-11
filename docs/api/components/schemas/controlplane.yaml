@@ -673,6 +673,14 @@ NodeClaimResponse:
           type: string
         build_gate_log:
           type: string
+        errors:
+          oneOf:
+            - type: object
+            - type: array
+          description: |
+            Optional structured gate errors payload propagated from gate metadata.
+            Present when build-gate `log_findings[0].evidence` is available and
+            valid. Node agents hydrate this payload into `/in/errors.yaml`.
         gate_profile:
           type: object
           additionalProperties: true
@@ -1168,6 +1176,12 @@ RepoJobItem:
       type: string
       nullable: true
       description: One-line build failure description captured from gate metadata (gate jobs only)
+    error_kind:
+      type: string
+      nullable: true
+      description: |
+        Heal result classification persisted by the healing workflow.
+        Values follow recovery kinds (`code|deps|infra|mixed|unknown`) when present.
     lang:
       type: string
       nullable: true

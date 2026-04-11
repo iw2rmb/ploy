@@ -53,24 +53,35 @@ This yields a trimmed view that:
 
 ### Gradle Rules
 
-For Gradle test logs, the trimmer:
+For Gradle logs, the trimmer produces:
+
+- A human-focused trimmed message.
+- Optional structured evidence payload (`log_findings[0].evidence`) that can be
+  forwarded to healing as `/in/errors.yaml`.
+
+Human-focused trimming:
 
 - Splits logs into lines.
-- Anchors on:
-  - `FAILURE: Build failed with an exception.`
-- Preserves a small window of context above the failure header:
-  - Up to 20 lines above the anchor (bounded by the start of the file).
-- Scans forward and stops after the `BUILD FAILED` summary line:
-  - A line starting with `BUILD FAILED in ` or `BUILD FAILED`.
-- Joins the selected region back into a string, preserving a trailing newline
-  when the original log ended with one.
+- Splits around the first `* What went wrong:` block.
+- Preserves compiler diagnostics collected before that block.
+- Removes `* Try:` guidance noise from the failure block.
+- Deduplicates repeated stack frames and compacts repetition markers.
+- Preserves trailing newline parity with input.
 
-This yields a trimmed log that typically includes:
+Structured evidence modes:
 
-- The standard Gradle failure block (`FAILURE: Build failed with an exception.`).
-- The key error description (e.g. `Execution failed for task ':sample:test'.`).
-- A small amount of surrounding context.
-- The `BUILD FAILED` summary but not all preceding task noise.
+- `compile_java`:
+  - Triggered when `* What went wrong:` indicates `Execution failed for task ':compileJava'.`
+  - Groups compiler diagnostics by normalized signature (`message` with optional
+    `symbol` / `location`) and emits grouped `files[]` references.
+  - Excludes Gradle `:compileJava` stacktrace noise from structured payload.
+- `plugin_apply`:
+  - Triggered when failure block contains `An exception occurred applying plugin request ...`.
+  - Extracts `plugin_id` and optional `plugin_version` when present.
+  - Keeps concise plugin failure details in `errors[]`.
+- `raw`:
+  - Fallback for unmatched Gradle failure patterns.
+  - Emits concise normalized `* What went wrong:` content.
 
 ### Unknown Tools
 
@@ -89,9 +100,9 @@ The trimmer is invoked inside the Docker-based gate executor:
 - When the gate command exits with a non-zero status:
   - `Tool` is set to the detected build tool (e.g. `"maven"`, `"gradle"`, `"go"`,
     `"cargo"`, `"pip"`, `"poetry"`).
-  - `TrimBuildGateLog(tool, string(logs))` is called.
-  - The trimmed output (or original logs for unknown tools) is stored in
-    `BuildGateStageMetadata.LogFindings[0].Message`.
+  - `BuildGateLogFindingContent(tool, string(logs))` computes:
+    - trimmed message for `BuildGateStageMetadata.LogFindings[0].Message`
+    - optional structured evidence for `BuildGateStageMetadata.LogFindings[0].Evidence`
 - `BuildGateStageMetadata.LogsText` still carries the full (truncated, ≤10 MiB)
   logs for:
   - Node-side artifact upload (`build-gate.log` bundles).
@@ -109,6 +120,8 @@ available:
 
 - When `BuildGateStageMetadata.LogFindings` contains at least one entry, the
   first finding's `Message` is written to `/in/build-gate.log` for healing migs.
+- When `BuildGateStageMetadata.LogFindings[0].Evidence` is present and valid
+  YAML/JSON, the node writes `/in/errors.yaml` for heal/re-gate jobs.
 - When no trimmed view is available (unknown tool / legacy gate), the agent
   falls back to `BuildGateStageMetadata.LogsText`.
 
@@ -116,6 +129,8 @@ This behavior ensures:
 
 - `codex` and other healing migs see a focused failure slice for known
   tools (Maven/Gradle).
+- Structured Gradle failure context can be consumed deterministically through
+  `/in/errors.yaml` when available.
 - Full logs remain available via artifacts and `LogsText` for manual inspection.
 
 ## Extensibility
