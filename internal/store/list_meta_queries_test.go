@@ -184,3 +184,12 @@ func TestCacheReplaySelectorExcludesMirroredCandidates(t *testing.T) {
 		t.Fatalf("ResolveReusableJobByCacheKey must require failed candidates to have log rows; SQL:\n%s", resolveReusableJobByCacheKey)
 	}
 }
+
+func TestStepReuseSelectorExcludesMirroredCandidates(t *testing.T) {
+	t.Parallel()
+
+	sqlLower := strings.ToLower(resolveReusableStepByCacheKey)
+	if !strings.Contains(sqlLower, "not (meta ? 'cache_mirror')") {
+		t.Fatalf("ResolveReusableStepByCacheKey must exclude mirrored step candidates; SQL:\n%s", resolveReusableStepByCacheKey)
+	}
+}

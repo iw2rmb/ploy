@@ -16,14 +16,6 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
-type migStepOpsPayload struct {
-	Step         contracts.MigStep          `json:"step"`
-	GlobalEnv    map[string]string          `json:"global_env,omitempty"`
-	EffectiveEnv map[string]string          `json:"effective_env,omitempty"`
-	Artifacts    []string                   `json:"artifact_paths,omitempty"`
-	BuildGate    *contracts.BuildGateConfig `json:"build_gate,omitempty"`
-}
-
 func resolveAndPersistMigStepSkip(
 	ctx context.Context,
 	st store.Store,
@@ -50,45 +42,44 @@ func resolveAndPersistMigStepSkip(
 	}
 	stepCfg := spec.Steps[stepIndex]
 
-	effectiveEnv := make(map[string]string, len(spec.Envs)+len(stepCfg.Envs))
-	for k, v := range spec.Envs {
-		effectiveEnv[k] = v
-	}
-	for k, v := range stepCfg.Envs {
-		effectiveEnv[k] = v
-	}
-
-	opsPayload := migStepOpsPayload{
-		Step:         stepCfg,
-		GlobalEnv:    spec.Envs,
-		EffectiveEnv: effectiveEnv,
-		Artifacts:    spec.ArtifactPaths,
-		BuildGate:    spec.BuildGate,
-	}
-
-	opsJSON, hashHex, err := canonicalizeAndHashJSON(opsPayload)
+	cacheKey, err := computeJobCacheKey(
+		domaintypes.JobTypeMig,
+		job.Name,
+		job.JobImage,
+		job.RepoShaIn,
+		"",
+		mergedSpec,
+	)
 	if err != nil {
-		return nil, fmt.Errorf("canonicalize step ops: %w", err)
+		return nil, fmt.Errorf("compute step cache key: %w", err)
+	}
+	cacheKey = strings.TrimSpace(cacheKey)
+	if cacheKey == "" {
+		return nil, nil
+	}
+	if err := pgStore.UpdateJobCacheKey(ctx, store.UpdateJobCacheKeyParams{
+		ID:       job.ID,
+		CacheKey: cacheKey,
+	}); err != nil {
+		return nil, fmt.Errorf("persist step cache key: %w", err)
 	}
 
-	var refJobID *string
 	var skip *contracts.MigStepSkipMetadata
 	repoSHAIn := strings.TrimSpace(job.RepoShaIn)
 	if !stepCfg.Always && sha40Pattern.MatchString(repoSHAIn) {
-		row, err := pgStore.ResolveReusableStepByHash(ctx, store.ResolveReusableStepByHashParams{
-			RepoID:    job.RepoID,
-			RepoShaIn: repoSHAIn,
-			Hash:      hashHex,
+		row, err := pgStore.ResolveReusableStepByCacheKey(ctx, store.ResolveReusableStepByCacheKeyParams{
+			RepoID:   job.RepoID,
+			CacheKey: cacheKey,
 		})
 		if err == nil {
-			ref := row.RefJobID.String()
-			refJobID = &ref
 			if sha40Pattern.MatchString(strings.TrimSpace(row.RefRepoShaOut)) {
+				if err := persistCacheMirrorSourceJob(ctx, pgStore, job.ID, row.RefJobID); err != nil {
+					return nil, fmt.Errorf("persist cache mirror source job: %w", err)
+				}
 				skip = &contracts.MigStepSkipMetadata{
 					Enabled:       true,
-					RefJobID:      row.RefJobID,
 					RefRepoSHAOut: strings.TrimSpace(row.RefRepoShaOut),
-					Hash:          hashHex,
+					Hash:          cacheKey,
 				}
 			}
 		} else if !isNoRowsError(err) {
@@ -96,16 +87,54 @@ func resolveAndPersistMigStepSkip(
 		}
 	}
 
-	if err := pgStore.UpsertStep(ctx, store.UpsertStepParams{
-		JobID:    job.ID.String(),
-		Ops:      opsJSON,
-		Hash:     hashHex,
-		RefJobID: refJobID,
-	}); err != nil {
-		return nil, fmt.Errorf("upsert steps cache row: %w", err)
+	return skip, nil
+}
+
+func persistCacheMirrorSourceJob(
+	ctx context.Context,
+	pgStore *store.PgStore,
+	targetJobID domaintypes.JobID,
+	sourceJobID domaintypes.JobID,
+) error {
+	if pgStore == nil || targetJobID.IsZero() || sourceJobID.IsZero() {
+		return nil
+	}
+	if targetJobID == sourceJobID {
+		return fmt.Errorf("source_job_id must not equal target job id %s", targetJobID)
 	}
 
-	return skip, nil
+	jobRow, err := pgStore.GetJob(ctx, targetJobID)
+	if err != nil {
+		return fmt.Errorf("load target job: %w", err)
+	}
+
+	var meta *contracts.JobMeta
+	if len(jobRow.Meta) == 0 {
+		meta = contracts.NewMigJobMeta()
+	} else {
+		meta, err = contracts.UnmarshalJobMeta(jobRow.Meta)
+		if err != nil {
+			return fmt.Errorf("parse target job meta: %w", err)
+		}
+	}
+
+	if meta.CacheMirror != nil && meta.CacheMirror.SourceJobID == sourceJobID {
+		return nil
+	}
+
+	meta.CacheMirror = &contracts.CacheMirrorMetadata{SourceJobID: sourceJobID}
+	metaBytes, err := contracts.MarshalJobMeta(meta)
+	if err != nil {
+		return fmt.Errorf("marshal target job meta: %w", err)
+	}
+
+	if err := pgStore.UpdateJobMeta(ctx, store.UpdateJobMetaParams{
+		ID:   targetJobID,
+		Meta: metaBytes,
+	}); err != nil {
+		return fmt.Errorf("update target job meta: %w", err)
+	}
+	return nil
 }
 
 func migStepIndexFromJobNameForClaim(jobName string, stepsLen int) (int, error) {
