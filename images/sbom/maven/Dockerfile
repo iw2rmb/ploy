@@ -6,11 +6,12 @@ LABEL org.opencontainers.image.source="https://github.com/iw2rmb/ploy" \
     org.opencontainers.image.licenses="MIT"
 
 RUN mkdir -p /workspace /in /out
-COPY --chmod=755 images/install_ploy_ca_bundle.sh /usr/local/lib/ploy/install_ploy_ca_bundle.sh
 
 WORKDIR /workspace
 ENV WORKSPACE=/workspace \
     INDIR=/in \
     OUTDIR=/out
+
+COPY --chmod=755 images/install_ploy_ca_bundle.sh /usr/local/lib/ploy/install_ploy_ca_bundle.sh
 
 CMD ["bash"]

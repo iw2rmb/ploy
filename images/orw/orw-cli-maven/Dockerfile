@@ -6,18 +6,18 @@ FROM --platform=$BUILDPLATFORM maven:3.9.11-eclipse-temurin-17 AS rewrite-runner
 
 WORKDIR /build
 COPY images/orw/orw-cli-maven/rewrite-runner/pom.xml rewrite-runner/pom.xml
+RUN --mount=type=cache,target=/root/.m2 \
+    bash -euxo pipefail -c 'cd rewrite-runner && mvn -q -DskipTests dependency:go-offline'
 COPY images/orw/shared/orw-cli-runner/src rewrite-runner/src
 RUN --mount=type=cache,target=/root/.m2 \
     bash -euxo pipefail -c 'cd rewrite-runner && mvn -q -DskipTests package'
 
 FROM --platform=$TARGETOS/$TARGETARCH eclipse-temurin:17-jdk
 
-ARG BUILD_TS
 LABEL org.opencontainers.image.source="https://github.com/iw2rmb/ploy" \
     org.opencontainers.image.title="orw-cli-maven" \
     org.opencontainers.image.description="Ploy Migs: standalone OpenRewrite CLI runner (Maven lane)" \
-    org.opencontainers.image.licenses="MIT" \
-    org.opencontainers.image.created="$BUILD_TS"
+    org.opencontainers.image.licenses="MIT"
 
 RUN apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
@@ -36,6 +36,9 @@ RUN printf '%s\n' '#!/usr/bin/env bash' \
 COPY --chmod=755 images/install_ploy_ca_bundle.sh /usr/local/lib/ploy/install_ploy_ca_bundle.sh
 COPY --chmod=755 images/orw/orw-cli-maven/orw-cli.sh /usr/local/bin/orw-cli
 RUN ln -s /usr/local/bin/orw-cli /usr/local/bin/migs-orw-cli
+
+ARG BUILD_TS
+LABEL org.opencontainers.image.created="$BUILD_TS"
 
 ENTRYPOINT ["migs-orw-cli"]
 CMD ["--apply", "--dir", "/workspace", "--out", "/out"]

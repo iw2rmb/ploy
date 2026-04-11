@@ -18,15 +18,11 @@ RUN apk add --no-cache bash git ca-certificates curl jq openjdk17-jre && \
     if command -v update-ca-certificates >/dev/null 2>&1; then \
       update-ca-certificates || true; \
     fi && \
-    npm install -g @openai/codex @charmland/crush @anthropic-ai/claude-code @musistudio/claude-code-router && \
-    npm cache clean --force && \
-    rm -rf /root/.npm /tmp/* && \
+    apk add --no-cache ripgrep fd grep findutils gawk coreutils && \
     mkdir -p /workspace /out /out/codex /etc/ploy/certs && \
     chmod 700 /out/codex && \
     chmod 755 /etc/ploy/certs
 
-RUN apk update
-RUN apk add --no-cache bash ripgrep fd grep findutils gawk coreutils
 SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
 RUN echo 'export PATH="/usr/local/bin:$PATH"' >> /root/.bashrc
 RUN echo 'if [ -f ~/.bashrc ]; then . ~/.bashrc; fi' >> /root/.bash_profile
@@ -38,6 +34,10 @@ ENV PATH="/usr/local/bin:${PATH}" \
     PLOY_API_TOKEN="" \
     PLOY_CLIENT_CERT_PATH="/etc/ploy/certs/client.crt" \
     PLOY_CLIENT_KEY_PATH="/etc/ploy/certs/client.key"
+
+RUN npm install -g @openai/codex @charmland/crush @anthropic-ai/claude-code @musistudio/claude-code-router && \
+    npm cache clean --force && \
+    rm -rf /root/.npm /tmp/*
 
 COPY images/amata/entrypoint.sh /usr/local/bin/ploy/entrypoint.sh
 COPY images/install_ploy_ca_bundle.sh /usr/local/lib/ploy/install_ploy_ca_bundle.sh
