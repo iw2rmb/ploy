@@ -189,11 +189,10 @@ func TestDockerGateExecutor_FailureStructuredEvidence(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name             string
-		workspaceFn      func(t *testing.T) string
-		logs             string
-		wantEvidence     bool
-		wantEvidenceMode string
+		name         string
+		workspaceFn  func(t *testing.T) string
+		logs         string
+		wantEvidence bool
 	}{
 		{
 			name:        "gradle failure emits structured evidence",
@@ -204,8 +203,7 @@ An exception occurred applying plugin request [id: 'org.springframework.boot', v
 > Failed to apply plugin 'org.springframework.boot'.
 BUILD FAILED in 1s
 `,
-			wantEvidence:     true,
-			wantEvidenceMode: "plugin_apply",
+			wantEvidence: true,
 		},
 		{
 			name:        "maven failure has no structured evidence",
@@ -260,8 +258,12 @@ BUILD FAILED in 1s
 			if err := yaml.Unmarshal([]byte(finding.Evidence), &payload); err != nil {
 				t.Fatalf("invalid evidence yaml: %v", err)
 			}
-			if mode, _ := payload["mode"].(string); mode != tt.wantEvidenceMode {
-				t.Fatalf("mode=%q, want %q; evidence:\n%s", mode, tt.wantEvidenceMode, finding.Evidence)
+			if _, hasMode := payload["mode"]; hasMode {
+				t.Fatalf("unexpected mode discriminator in evidence:\n%s", finding.Evidence)
+			}
+			errorsRaw, ok := payload["errors"].([]any)
+			if !ok || len(errorsRaw) == 0 {
+				t.Fatalf("expected non-empty errors array in evidence: %#v", payload["errors"])
 			}
 		})
 	}

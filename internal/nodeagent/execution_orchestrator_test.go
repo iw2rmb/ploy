@@ -129,7 +129,7 @@ func TestPopulateHealingInDir(t *testing.T) {
 			recovery: &contracts.RecoveryClaimContext{
 				BuildGateLog:  "failure\n",
 				DetectedStack: contracts.MigStackJavaGradle,
-				Errors:        json.RawMessage(`{"mode":"compile_java","errors":[{"message":"cannot find symbol"}]}`),
+				Errors:        json.RawMessage(`{"task":"compileJava","errors":[{"message":"cannot find symbol"}]}`),
 			},
 			wantFiles: map[string]string{
 				"build-gate.log":                  "failure\n",
@@ -145,8 +145,11 @@ func TestPopulateHealingInDir(t *testing.T) {
 				if err := yaml.Unmarshal(raw, &payload); err != nil {
 					t.Fatalf("decode /in/errors.yaml: %v", err)
 				}
-				if got, want := payload["mode"], "compile_java"; got != want {
-					t.Fatalf("errors.yaml mode=%v, want %q", got, want)
+				if _, hasMode := payload["mode"]; hasMode {
+					t.Fatalf("errors.yaml unexpectedly contains mode=%v", payload["mode"])
+				}
+				if got, want := payload["task"], "compileJava"; got != want {
+					t.Fatalf("errors.yaml task=%v, want %q", got, want)
 				}
 				if got, want := payload["$schema"], "/in/gradle.java.trimmer.schema.json"; got != want {
 					t.Fatalf("errors.yaml $schema=%v, want %q", got, want)
