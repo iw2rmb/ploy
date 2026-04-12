@@ -2,27 +2,14 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Ploy Gradle Trimmer Evidence",
   "description": "Schema for structured Gradle build-gate trimmer evidence forwarded as /in/errors.yaml.",
-  "$comment": "Gradle compile_java mode uses compact file references: line number is encoded as path suffix ':<line>'.",
+  "$comment": "Gradle compile-java evidence uses compact file references: line number is encoded as path suffix ':<line>'.",
   "type": "object",
-  "required": ["mode", "errors"],
+  "required": ["errors"],
   "additionalProperties": false,
   "properties": {
-    "mode": {
-      "type": "string",
-      "enum": ["compile_java", "plugin_apply", "raw"],
-      "$comment": "Evidence mode produced by trimmer. compile_java carries grouped compiler diagnostics; plugin_apply and raw carry concise failure messages."
-    },
     "task": {
       "type": "string",
-      "$comment": "Gradle task name for compile_java mode."
-    },
-    "plugin_id": {
-      "type": "string",
-      "$comment": "Plugin id extracted from plugin_apply failures when present."
-    },
-    "plugin_version": {
-      "type": "string",
-      "$comment": "Plugin version extracted from plugin_apply failures when present."
+      "$comment": "Gradle task name for compile-java evidence. When present, expected to be compileJava."
     },
     "errors": {
       "type": "array",
@@ -44,6 +31,14 @@
         },
         "symbol": {
           "type": "string"
+        },
+        "plugin": {
+          "type": "string",
+          "$comment": "Plugin id for plugin-apply failures."
+        },
+        "version": {
+          "type": "string",
+          "$comment": "Plugin version for plugin-apply failures when present."
         },
         "location": {
           "type": "string"
@@ -73,7 +68,7 @@
         "path": {
           "type": "string",
           "minLength": 1,
-          "$comment": "File path. For compile_java diagnostics, line is encoded as '<path>:<line>'. Path may be relative when error.base is provided."
+          "$comment": "File path. For compile-java diagnostics, line is encoded as '<path>:<line>'. Path may be relative when error.base is provided."
         },
         "snippet": {
           "type": "string",
@@ -85,16 +80,11 @@
   "allOf": [
     {
       "if": {
-        "properties": {
-          "mode": { "const": "compile_java" }
-        }
+        "required": ["task"],
+        "properties": { "task": { "const": "compileJava" } }
       },
       "then": {
-        "required": ["task"],
         "properties": {
-          "task": {
-            "const": "compileJava"
-          },
           "errors": {
             "items": {
               "required": ["message", "files"]

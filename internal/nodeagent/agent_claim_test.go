@@ -228,7 +228,7 @@ func TestClaimLoop_FieldMapping(t *testing.T) {
 					DetectedStack:        contracts.MigStackJavaMaven,
 					ResolvedHealingImage: "docker.io/acme/heal:latest",
 					BuildGateLog:         "[ERROR] build failed\n",
-					Errors:               json.RawMessage(`{"mode":"raw","errors":[{"message":"x"}]}`),
+					Errors:               json.RawMessage(`{"errors":[{"message":"x"}]}`),
 				}),
 			},
 			assertions: func(t *testing.T, got StartRunRequest, claim ClaimResponse) {

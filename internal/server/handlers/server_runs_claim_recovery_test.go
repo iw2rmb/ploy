@@ -423,7 +423,7 @@ func TestClaimJob_HealRecoveryContextIncludesStructuredErrorsFromGateMetadata(t 
 			Attempt: 1,
 			JobType: domaintypes.JobTypePreGate,
 			NextID:  &f.jobID,
-			Meta:    []byte(`{"kind":"gate","gate":{"log_findings":[{"severity":"error","message":"trimmed failure","evidence":"mode: compile_java\nerrors:\n  - message: cannot find symbol\n"}]}}`),
+			Meta:    []byte(`{"kind":"gate","gate":{"log_findings":[{"severity":"error","message":"trimmed failure","evidence":"task: compileJava\nerrors:\n  - message: cannot find symbol\n"}]}}`),
 		},
 		{
 			ID:      f.jobID,
@@ -449,8 +449,8 @@ func TestClaimJob_HealRecoveryContextIncludesStructuredErrorsFromGateMetadata(t 
 	if !ok {
 		t.Fatalf("expected recovery_context.errors object, got %T", rc["errors"])
 	}
-	if got, want := errorsObj["mode"], "compile_java"; got != want {
-		t.Fatalf("recovery_context.errors.mode=%v, want %q", got, want)
+	if got, want := errorsObj["task"], "compileJava"; got != want {
+		t.Fatalf("recovery_context.errors.task=%v, want %q", got, want)
 	}
 }
 
@@ -472,7 +472,7 @@ func TestClaimJob_ReGateRecoveryContextIncludesStructuredErrorsFromGateMetadata(
 			Attempt: 1,
 			JobType: domaintypes.JobTypePostGate,
 			NextID:  &f.jobID,
-			Meta:    []byte(`{"kind":"gate","gate":{"log_findings":[{"severity":"error","message":"regate failure","evidence":"mode: plugin_apply\nplugin_id: org.springframework.boot\nerrors:\n  - message: Failed to apply plugin\n"}]}}`),
+			Meta:    []byte(`{"kind":"gate","gate":{"log_findings":[{"severity":"error","message":"regate failure","evidence":"errors:\n  - message: Spring Boot plugin requires Gradle 7.x (7.4 or later).\n    plugin: org.springframework.boot\n    version: 3.0.5\n"}]}}`),
 		},
 		{
 			ID:      f.jobID,
@@ -498,11 +498,19 @@ func TestClaimJob_ReGateRecoveryContextIncludesStructuredErrorsFromGateMetadata(
 	if !ok {
 		t.Fatalf("expected recovery_context.errors object, got %T", rc["errors"])
 	}
-	if got, want := errorsObj["mode"], "plugin_apply"; got != want {
-		t.Fatalf("recovery_context.errors.mode=%v, want %q", got, want)
+	if _, hasMode := errorsObj["mode"]; hasMode {
+		t.Fatalf("recovery_context.errors unexpectedly contains mode: %v", errorsObj["mode"])
 	}
-	if got, want := errorsObj["plugin_id"], "org.springframework.boot"; got != want {
-		t.Fatalf("recovery_context.errors.plugin_id=%v, want %q", got, want)
+	errorsArr, ok := errorsObj["errors"].([]any)
+	if !ok || len(errorsArr) == 0 {
+		t.Fatalf("expected recovery_context.errors.errors array, got %T", errorsObj["errors"])
+	}
+	first, ok := errorsArr[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected first errors[] object, got %T", errorsArr[0])
+	}
+	if got, want := first["plugin"], "org.springframework.boot"; got != want {
+		t.Fatalf("recovery_context.errors.errors[0].plugin=%v, want %q", got, want)
 	}
 }
 

@@ -225,7 +225,6 @@ func TestBuildGateLogFindingContent(t *testing.T) {
 		name              string
 		tool              string
 		logText           string
-		wantMode          string
 		wantEvidenceParts []string
 		wantNoEvidence    []string
 		wantNoPayload     bool
@@ -248,7 +247,6 @@ org.gradle.api.tasks.TaskExecutionException: Execution failed for task ':compile
   at org.example.Top.a(Top.java:1)
 BUILD FAILED in 5s
 `,
-			wantMode:          "compile_java",
 			wantEvidenceParts: []string{
 				"task: compileJava",
 				"symbol: class Missing",
@@ -257,7 +255,7 @@ BUILD FAILED in 5s
 				"path: b/B.java:20",
 			},
 			wantNoEvidence:   []string{"line:"},
-			wantNoStacktrace:  true,
+			wantNoStacktrace: true,
 		},
 		{
 			name: "gradle compile_java hoists common snippet and normalizes single-file error",
@@ -273,7 +271,6 @@ Execution failed for task ':compileJava'.
 > Compilation failed; see the compiler error output for details.
 BUILD FAILED in 5s
 `,
-			wantMode: "compile_java",
 			wantEvidenceParts: []string{
 				"base: /workspace/src/main/java/a/",
 				"snippet: return Mono.subscriberContext()",
@@ -294,8 +291,8 @@ An exception occurred applying plugin request [id: 'org.springframework.boot', v
 > Run with --stacktrace option to get the stack trace.
 BUILD FAILED in 27s
 `,
-			wantMode:          "plugin_apply",
-			wantEvidenceParts: []string{"plugin_id: org.springframework.boot", "plugin_version: 3.0.5", "Failed to apply plugin"},
+			wantEvidenceParts: []string{"plugin: org.springframework.boot", "version: 3.0.5", "Spring Boot plugin requires Gradle 7.x"},
+			wantNoEvidence:    []string{"plugin_id:", "plugin_version:", "Failed to apply plugin"},
 		},
 		{
 			name: "gradle raw evidence fallback",
@@ -306,14 +303,13 @@ Execution failed for task ':customTask'.
 > Process 'command 'bash'' finished with non-zero exit value 1
 BUILD FAILED in 1s
 `,
-			wantMode:          "raw",
 			wantEvidenceParts: []string{"customTask", "non-zero exit value 1"},
 		},
 		{
-			name:           "maven has no structured evidence",
-			tool:           "maven",
-			logText:        "[ERROR] COMPILATION ERROR\n",
-			wantNoPayload:  true,
+			name:          "maven has no structured evidence",
+			tool:          "maven",
+			logText:       "[ERROR] COMPILATION ERROR\n",
+			wantNoPayload: true,
 		},
 	}
 
@@ -340,8 +336,8 @@ BUILD FAILED in 1s
 			if err := yaml.Unmarshal([]byte(evidence), &payload); err != nil {
 				t.Fatalf("unmarshal evidence: %v\npayload:\n%s", err, evidence)
 			}
-			if got, _ := payload["mode"].(string); got != tt.wantMode {
-				t.Fatalf("mode=%q, want %q; payload:\n%s", got, tt.wantMode, evidence)
+			if _, hasMode := payload["mode"]; hasMode {
+				t.Fatalf("unexpected mode discriminator in payload:\n%s", evidence)
 			}
 			for _, part := range tt.wantEvidenceParts {
 				if !strings.Contains(evidence, part) {

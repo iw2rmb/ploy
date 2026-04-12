@@ -68,9 +68,9 @@ Human-focused trimming:
 - Deduplicates repeated stack frames and compacts repetition markers.
 - Preserves trailing newline parity with input.
 
-Structured evidence modes:
+Structured evidence variants:
 
-- `compile_java`:
+- compile-java variant:
   - Triggered when `* What went wrong:` indicates `Execution failed for task ':compileJava'.`
   - Groups compiler diagnostics by normalized error identity (`message` with optional
     `symbol` / `location`) and emits grouped `files[]` references.
@@ -79,13 +79,13 @@ Structured evidence modes:
     - when all snippets are identical and non-empty, snippet is hoisted to `errors[].snippet` and removed from each `files[]` item.
     - when all file paths share a common directory prefix, it is hoisted to `errors[].base` and `files[].path` values become relative to that base.
   - Excludes Gradle `:compileJava` stacktrace noise from structured payload.
-- `plugin_apply`:
+- plugin-apply variant:
   - Triggered when failure block contains `An exception occurred applying plugin request ...`.
-  - Extracts `plugin_id` and optional `plugin_version` when present.
-  - Keeps concise plugin failure details in `errors[]`.
-- `raw`:
+  - Emits plugin metadata per error entry as `plugin` and optional `version`.
+  - Stores plugin root-cause text in `errors[].message`.
+- raw variant:
   - Fallback for unmatched Gradle failure patterns.
-  - Emits concise normalized `* What went wrong:` content.
+  - Emits concise normalized `* What went wrong:` content in `errors[].message`.
 
 ### Unknown Tools
 
