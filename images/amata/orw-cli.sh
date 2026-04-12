@@ -28,6 +28,7 @@ Optional env:
   ORW_REPOS                  Comma-separated Maven repo URLs
   ORW_REPO_USERNAME          Repo username (must pair with ORW_REPO_PASSWORD)
   ORW_REPO_PASSWORD          Repo password (must pair with ORW_REPO_USERNAME)
+  ORW_CONFIG_PATH            Optional path to rewrite YAML config (defaults: /out/rewrite.yml)
   ORW_ACTIVE_RECIPES         Comma-separated active recipe overrides
   ORW_FAIL_ON_UNSUPPORTED    true|false (default: true)
   ORW_EXCLUDE_PATHS          Comma-separated glob patterns excluded from parsing (e.g. **/*.proto)
@@ -171,11 +172,25 @@ if ! parse_bool_default_true "${ORW_FAIL_ON_UNSUPPORTED:-}"; then
   fail_on_unsupported=false
 fi
 
-active_recipes="${ORW_ACTIVE_RECIPES:-}"
-if [[ -z "$active_recipes" ]]; then
-  if [[ -f "$workspace/rewrite.yml" ]]; then
-    active_recipes="$(awk '/^name:[[:space:]]*/{print $2; exit}' "$workspace/rewrite.yml" || true)"
+if [[ -n "${ORW_EXCLUDES:-}" || -n "${ORW_INCLUDES:-}" ]]; then
+  echo "[orw-cli] Warning: ORW_EXCLUDES/ORW_INCLUDES are unsupported; use ORW_EXCLUDE_PATHS." | tee -a "$transform_log"
+fi
+export ORW_EXCLUDE_PATHS="${ORW_EXCLUDE_PATHS:-}"
+
+config_path="${ORW_CONFIG_PATH:-}"
+if [[ -z "$config_path" ]]; then
+  if [[ -f "$outdir/rewrite.yml" ]]; then
+    config_path="$outdir/rewrite.yml"
   fi
+fi
+if [[ -n "$config_path" && ! -f "$config_path" ]]; then
+  write_failure_report "input" "" "ORW_CONFIG_PATH does not exist: $config_path"
+  exit 4
+fi
+
+active_recipes="${ORW_ACTIVE_RECIPES:-}"
+if [[ -z "$active_recipes" && -n "$config_path" ]]; then
+  active_recipes="$(awk '/^name:[[:space:]]*/{print $2; exit}' "$config_path" || true)"
 fi
 if [[ -z "$active_recipes" ]]; then
   active_recipes="$classname"
@@ -197,8 +212,8 @@ fi
 
 coords="${group}:${artifact}:${version}"
 args=(--apply --dir "$workspace" --recipe "$active_recipes" --coords "$coords")
-if [[ -f "$workspace/rewrite.yml" ]]; then
-  args+=(--config "$workspace/rewrite.yml")
+if [[ -n "$config_path" ]]; then
+  args+=(--config "$config_path")
 fi
 if [[ -n "${ORW_REPOS:-}" ]]; then
   IFS=',' read -r -a repo_list <<<"${ORW_REPOS}"
