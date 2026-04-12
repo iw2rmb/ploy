@@ -83,6 +83,15 @@ func (s *ClaimService) tryReplayCachedOutcome(
 	if replayStatus == domaintypes.JobStatusSuccess && job.NextID != nil && repoSHAOut == "" {
 		return false, nil
 	}
+	if replayStatus == domaintypes.JobStatusSuccess {
+		ok, diffErr := hasReplayableSourceDiff(ctx, s.store, sourceJob)
+		if diffErr != nil {
+			return false, fmt.Errorf("check replayable source diff for job %s: %w", sourceJob.ID, diffErr)
+		}
+		if !ok {
+			return false, nil
+		}
+	}
 
 	mirroredMeta, ok := replayMirroredJobMeta(sourceJob.ID, candidate.Meta)
 	if !ok {
@@ -238,4 +247,21 @@ func replayMirroredJobMeta(sourceJobID domaintypes.JobID, candidateRaw []byte) (
 		return nil, false
 	}
 	return out, true
+}
+
+func hasReplayableSourceDiff(ctx context.Context, st store.Store, sourceJob store.Job) (bool, error) {
+	if !canChangeWorkspace(domaintypes.JobType(sourceJob.JobType)) {
+		return true, nil
+	}
+	if normalizeRepoSHA(sourceJob.RepoShaOut) == normalizeRepoSHA(sourceJob.RepoShaIn) {
+		return false, nil
+	}
+	sourceJobID := sourceJob.ID
+	if _, err := st.GetLatestDiffByJob(ctx, &sourceJobID); err != nil {
+		if isNoRowsError(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
 }

@@ -100,3 +100,53 @@ func TestMaybeCloneSkippedStepDiffBeforeCompletion_UsesCacheMirrorSourceJob(t *t
 		t.Fatalf("cloned patch mismatch: got %q want %q", string(clonedPatch), string(sourcePatch))
 	}
 }
+
+func TestMaybeCloneSkippedStepDiffBeforeCompletion_ErrorsWhenSourceDiffMissing(t *testing.T) {
+	t.Parallel()
+
+	runID := domaintypes.NewRunID()
+	sourceJobID := domaintypes.NewJobID()
+	targetJobID := domaintypes.NewJobID()
+
+	targetMeta := contracts.NewMigJobMeta()
+	targetMeta.CacheMirror = &contracts.CacheMirrorMetadata{SourceJobID: sourceJobID}
+	targetMetaJSON, err := contracts.MarshalJobMeta(targetMeta)
+	if err != nil {
+		t.Fatalf("marshal target meta: %v", err)
+	}
+	sourceMetaJSON, err := contracts.MarshalJobMeta(contracts.NewMigJobMeta())
+	if err != nil {
+		t.Fatalf("marshal source meta: %v", err)
+	}
+
+	sourceJob := store.Job{
+		ID:         sourceJobID,
+		RunID:      runID,
+		RepoID:     domaintypes.NewRepoID(),
+		JobType:    domaintypes.JobTypeMig,
+		RepoShaIn:  "0123456789abcdef0123456789abcdef01234567",
+		RepoShaOut: "89abcdef0123456789abcdef0123456789abcdef",
+		Meta:       sourceMetaJSON,
+	}
+	targetJob := store.Job{
+		ID:      targetJobID,
+		RunID:   runID,
+		RepoID:  sourceJob.RepoID,
+		JobType: domaintypes.JobTypeMig,
+		Meta:    targetMetaJSON,
+	}
+
+	st := &jobStore{
+		getJobResults: map[domaintypes.JobID]store.Job{
+			sourceJobID: sourceJob,
+			targetJobID: targetJob,
+		},
+	}
+	st.getLatestDiffByJob.err = pgx.ErrNoRows
+	bp := blobpersist.New(st, bsmock.New())
+
+	err = maybeCloneSkippedStepDiffBeforeCompletion(context.Background(), st, bp, targetJob)
+	if err == nil {
+		t.Fatal("expected error when source mirrored job has no diff")
+	}
+}
