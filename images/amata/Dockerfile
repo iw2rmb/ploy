@@ -14,7 +14,7 @@ LABEL org.opencontainers.image.title="ploy-amata" \
     org.opencontainers.image.source="https://github.com/iw2rmb/ploy" \
     org.opencontainers.image.licenses="MIT"
 
-RUN apk add --no-cache bash git ca-certificates curl jq openjdk17-jre && \
+RUN apk add --no-cache bash git ca-certificates curl jq yq openjdk17-jre && \
     if command -v update-ca-certificates >/dev/null 2>&1; then \
       update-ca-certificates || true; \
     fi && \
