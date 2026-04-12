@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	"github.com/iw2rmb/ploy/internal/store"
 	iversion "github.com/iw2rmb/ploy/internal/version"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
@@ -23,7 +22,7 @@ const (
 	cacheEmptyLangToolRelease = "||"
 )
 
-func computeJobCacheKey(jobType domaintypes.JobType, jobName, jobImage, repoSHAIn, runtimeInputHash string, mergedSpec []byte) (string, error) {
+func computeJobCacheKey(jobType domaintypes.JobType, jobMetaRaw []byte, jobImage, repoSHAIn, runtimeInputHash string, mergedSpec []byte) (string, error) {
 	spec, err := contracts.ParseMigSpecJSON(mergedSpec)
 	if err != nil {
 		// Claim-time replay must fail open when spec cannot be parsed.
@@ -32,19 +31,19 @@ func computeJobCacheKey(jobType domaintypes.JobType, jobName, jobImage, repoSHAI
 
 	resolvedImage := strings.TrimSpace(jobImage)
 	if resolvedImage == "" {
-		resolvedImage = resolveJobImageForCacheKey(jobType, jobName, spec)
+		resolvedImage = resolveJobImageForCacheKey(jobType, jobMetaRaw, spec)
 	}
 	if resolvedImage == "" {
 		// No deterministic image means no safe cache key for this claim.
 		return "", nil
 	}
 
-	envPairs, err := resolveEnvPairsForCacheKey(jobType, jobName, spec)
+	envPairs, err := resolveEnvPairsForCacheKey(jobType, jobMetaRaw, spec)
 	if err != nil {
 		return "", err
 	}
 
-	inEntries, homeEntries, caEntries, err := resolveHydraForCacheKey(jobType, jobName, spec)
+	inEntries, homeEntries, caEntries, err := resolveHydraForCacheKey(jobType, jobMetaRaw, spec)
 	if err != nil {
 		return "", err
 	}
@@ -62,7 +61,7 @@ func computeJobCacheKey(jobType domaintypes.JobType, jobName, jobImage, repoSHAI
 		return "", err
 	}
 
-	ltr := resolveLangToolReleaseForCacheKey(jobType, jobName, spec)
+	ltr := resolveLangToolReleaseForCacheKey(jobType, jobMetaRaw, spec)
 	payload := strings.Join([]string{
 		strings.TrimSpace(jobType.String()),
 		resolvedImage,
@@ -78,13 +77,13 @@ func computeJobCacheKey(jobType domaintypes.JobType, jobName, jobImage, repoSHAI
 	return hex.EncodeToString(sum[:]), nil
 }
 
-func resolveJobImageForCacheKey(jobType domaintypes.JobType, jobName string, spec *contracts.MigSpec) string {
+func resolveJobImageForCacheKey(jobType domaintypes.JobType, jobMetaRaw []byte, spec *contracts.MigSpec) string {
 	switch jobType {
 	case domaintypes.JobTypeMig:
 		if spec == nil || len(spec.Steps) == 0 {
 			return ""
 		}
-		idx, err := migStepIndexFromJobNameForClaim(jobName, len(spec.Steps))
+		idx, err := migStepIndexForCacheKey(jobMetaRaw, len(spec.Steps))
 		if err != nil || idx < 0 || idx >= len(spec.Steps) {
 			return ""
 		}
@@ -97,7 +96,7 @@ func resolveJobImageForCacheKey(jobType domaintypes.JobType, jobName string, spe
 	case domaintypes.JobTypePreGate, domaintypes.JobTypePostGate, domaintypes.JobTypeReGate:
 		return cacheDefaultGateImage
 	case domaintypes.JobTypeSBOM:
-		return resolveSBOMImageForCacheKey(jobType, jobName, spec)
+		return resolveSBOMImageForCacheKey(jobType, jobMetaRaw, spec)
 	default:
 		return ""
 	}
@@ -123,8 +122,8 @@ func canonicalJobImageForCacheKey(img contracts.JobImage) string {
 	return strings.Join(parts, "|")
 }
 
-func resolveSBOMImageForCacheKey(jobType domaintypes.JobType, jobName string, spec *contracts.MigSpec) string {
-	phase := phaseConfigForJobCacheKey(jobType, jobName, spec)
+func resolveSBOMImageForCacheKey(jobType domaintypes.JobType, jobMetaRaw []byte, spec *contracts.MigSpec) string {
+	phase := phaseConfigForJobCacheKey(jobType, jobMetaRaw, spec)
 	tool := ""
 	if phase != nil && phase.Stack != nil && phase.Stack.Enabled {
 		tool = strings.ToLower(strings.TrimSpace(phase.Stack.Tool))
@@ -146,7 +145,7 @@ func resolveSBOMImageForCacheKey(jobType domaintypes.JobType, jobName string, sp
 	return registry + "/" + collector + ":" + tag
 }
 
-func resolveEnvPairsForCacheKey(jobType domaintypes.JobType, jobName string, spec *contracts.MigSpec) ([]string, error) {
+func resolveEnvPairsForCacheKey(jobType domaintypes.JobType, jobMetaRaw []byte, spec *contracts.MigSpec) ([]string, error) {
 	env := map[string]string{}
 	if spec != nil {
 		for k, v := range spec.Envs {
@@ -159,7 +158,7 @@ func resolveEnvPairsForCacheKey(jobType domaintypes.JobType, jobName string, spe
 		if spec == nil || len(spec.Steps) == 0 {
 			break
 		}
-		idx, err := migStepIndexFromJobNameForClaim(jobName, len(spec.Steps))
+		idx, err := migStepIndexForCacheKey(jobMetaRaw, len(spec.Steps))
 		if err != nil {
 			return nil, err
 		}
@@ -186,7 +185,7 @@ func resolveEnvPairsForCacheKey(jobType domaintypes.JobType, jobName string, spe
 	return out, nil
 }
 
-func resolveHydraForCacheKey(jobType domaintypes.JobType, jobName string, spec *contracts.MigSpec) (inEntries []string, homeEntries []string, caEntries []string, err error) {
+func resolveHydraForCacheKey(jobType domaintypes.JobType, jobMetaRaw []byte, spec *contracts.MigSpec) (inEntries []string, homeEntries []string, caEntries []string, err error) {
 	if spec == nil {
 		return nil, nil, nil, nil
 	}
@@ -196,7 +195,7 @@ func resolveHydraForCacheKey(jobType domaintypes.JobType, jobName string, spec *
 		if len(spec.Steps) == 0 {
 			return nil, nil, nil, nil
 		}
-		idx, idxErr := migStepIndexFromJobNameForClaim(jobName, len(spec.Steps))
+		idx, idxErr := migStepIndexForCacheKey(jobMetaRaw, len(spec.Steps))
 		if idxErr != nil {
 			return nil, nil, nil, idxErr
 		}
@@ -209,7 +208,7 @@ func resolveHydraForCacheKey(jobType domaintypes.JobType, jobName string, spec *
 		heal := spec.BuildGate.Heal
 		return append([]string(nil), heal.In...), append([]string(nil), heal.Home...), append([]string(nil), heal.CA...), nil
 	case domaintypes.JobTypePreGate, domaintypes.JobTypePostGate, domaintypes.JobTypeReGate, domaintypes.JobTypeSBOM, domaintypes.JobTypeHook:
-		phase := phaseConfigForJobCacheKey(jobType, jobName, spec)
+		phase := phaseConfigForJobCacheKey(jobType, jobMetaRaw, spec)
 		if phase == nil {
 			return nil, nil, nil, nil
 		}
@@ -219,7 +218,7 @@ func resolveHydraForCacheKey(jobType domaintypes.JobType, jobName string, spec *
 	}
 }
 
-func phaseConfigForJobCacheKey(jobType domaintypes.JobType, jobName string, spec *contracts.MigSpec) *contracts.BuildGatePhaseConfig {
+func phaseConfigForJobCacheKey(jobType domaintypes.JobType, jobMetaRaw []byte, spec *contracts.MigSpec) *contracts.BuildGatePhaseConfig {
 	if spec == nil || spec.BuildGate == nil {
 		return nil
 	}
@@ -229,7 +228,7 @@ func phaseConfigForJobCacheKey(jobType domaintypes.JobType, jobName string, spec
 	case domaintypes.JobTypePostGate, domaintypes.JobTypeReGate:
 		return spec.BuildGate.Post
 	case domaintypes.JobTypeSBOM, domaintypes.JobTypeHook:
-		ctx, ok := inferLegacySBOMCycleContext(store.Job{Name: jobName})
+		ctx, ok := sbomCycleContextFromMeta(jobMetaRaw)
 		if ok && ctx.Phase == contracts.SBOMPhasePre {
 			return spec.BuildGate.Pre
 		}
@@ -239,8 +238,8 @@ func phaseConfigForJobCacheKey(jobType domaintypes.JobType, jobName string, spec
 	}
 }
 
-func resolveLangToolReleaseForCacheKey(jobType domaintypes.JobType, jobName string, spec *contracts.MigSpec) string {
-	phase := phaseConfigForJobCacheKey(jobType, jobName, spec)
+func resolveLangToolReleaseForCacheKey(jobType domaintypes.JobType, jobMetaRaw []byte, spec *contracts.MigSpec) string {
+	phase := phaseConfigForJobCacheKey(jobType, jobMetaRaw, spec)
 	if phase == nil || phase.Stack == nil || !phase.Stack.Enabled {
 		return cacheEmptyLangToolRelease
 	}
@@ -248,6 +247,21 @@ func resolveLangToolReleaseForCacheKey(jobType domaintypes.JobType, jobName stri
 	tool := strings.ToLower(strings.TrimSpace(phase.Stack.Tool))
 	release := strings.TrimSpace(phase.Stack.Release)
 	return lang + "|" + tool + "|" + release
+}
+
+func migStepIndexForCacheKey(jobMetaRaw []byte, stepsLen int) (int, error) {
+	if stepsLen <= 1 {
+		return 0, nil
+	}
+	if len(jobMetaRaw) > 0 {
+		if meta, err := contracts.UnmarshalJobMeta(jobMetaRaw); err == nil && meta != nil && meta.MigStepIndex != nil {
+			if *meta.MigStepIndex < 0 || *meta.MigStepIndex >= stepsLen {
+				return 0, fmt.Errorf("mig_step_index out of range: idx=%d steps_len=%d", *meta.MigStepIndex, stepsLen)
+			}
+			return *meta.MigStepIndex, nil
+		}
+	}
+	return 0, fmt.Errorf("mig_step_index metadata is required for multi-step mig cache key (steps_len=%d)", stepsLen)
 }
 
 func canonicalHydraHashDstList(entries []string, home bool) ([]string, error) {

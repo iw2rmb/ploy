@@ -136,11 +136,12 @@ type HooksOnce struct {
 }
 
 type Job struct {
-	ID          types.JobID        `json:"id"`
-	RunID       types.RunID        `json:"run_id"`
-	RepoID      types.RepoID       `json:"repo_id"`
-	RepoBaseRef string             `json:"repo_base_ref"`
-	Attempt     int32              `json:"attempt"`
+	ID          types.JobID  `json:"id"`
+	RunID       types.RunID  `json:"run_id"`
+	RepoID      types.RepoID `json:"repo_id"`
+	RepoBaseRef string       `json:"repo_base_ref"`
+	Attempt     int32        `json:"attempt"`
+	// Deprecated: jobs.name column was removed. Kept only for in-memory compatibility.
 	Name        string             `json:"name"`
 	Status      types.JobStatus    `json:"status"`
 	JobType     types.JobType      `json:"job_type"`

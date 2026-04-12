@@ -5,7 +5,6 @@ SELECT
   repo_id,
   repo_base_ref,
   attempt,
-  name,
   status,
   job_type,
   job_image,
@@ -31,7 +30,6 @@ SELECT
   repo_id,
   repo_base_ref,
   attempt,
-  name,
   status,
   job_type,
   job_image,
@@ -58,7 +56,6 @@ SELECT
   repo_id,
   repo_base_ref,
   attempt,
-  name,
   status,
   job_type,
   job_image,
@@ -86,7 +83,6 @@ INSERT INTO jobs (
   repo_id,
   repo_base_ref,
   attempt,
-  name,
   status,
   job_type,
   job_image,
@@ -95,8 +91,8 @@ INSERT INTO jobs (
   repo_sha_in,
   repo_sha_in8
 ) VALUES (
-  $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
-  CASE WHEN $12::TEXT = '' THEN '' ELSE SUBSTRING($12::TEXT, 1, 8) END
+  $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
+  CASE WHEN $11::TEXT = '' THEN '' ELSE SUBSTRING($11::TEXT, 1, 8) END
 )
 RETURNING
   id,
@@ -104,7 +100,6 @@ RETURNING
   repo_id,
   repo_base_ref,
   attempt,
-  name,
   status,
   job_type,
   job_image,
@@ -239,7 +234,6 @@ SELECT
   repo_id,
   repo_base_ref,
   attempt,
-  name,
   status,
   job_type,
   job_image,
@@ -293,7 +287,6 @@ RETURNING
   jobs.repo_id,
   jobs.repo_base_ref,
   jobs.attempt,
-  jobs.name,
   jobs.status,
   jobs.job_type,
   jobs.job_image,
@@ -337,7 +330,6 @@ RETURNING
   jobs.repo_id,
   jobs.repo_base_ref,
   jobs.attempt,
-  jobs.name,
   jobs.status,
   jobs.job_type,
   jobs.job_image,
@@ -568,7 +560,7 @@ GROUP BY status;
 -- Joins runs and migs to surface mig_name per job for the TUI jobs-list screen.
 SELECT
   jobs.id AS job_id,
-  jobs.name,
+  jobs.job_type::text AS name,
   jobs.job_type,
   jobs.status,
   jobs.duration_ms,

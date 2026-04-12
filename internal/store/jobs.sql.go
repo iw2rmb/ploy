@@ -84,7 +84,7 @@ UPDATE jobs
 SET status = 'Running', node_id = eligible.node_id, started_at = now()
 FROM eligible
 WHERE jobs.id = eligible.id
-RETURNING jobs.id, jobs.run_id, jobs.repo_id, jobs.repo_base_ref, jobs.attempt, jobs.name, jobs.status, jobs.job_type, jobs.job_image, jobs.next_id, jobs.node_id, jobs.exit_code, jobs.started_at, jobs.finished_at, jobs.duration_ms, jobs.repo_sha_in, jobs.repo_sha_out, jobs.repo_sha_in8, jobs.repo_sha_out8, jobs.cache_key, jobs.meta
+RETURNING jobs.id, jobs.run_id, jobs.repo_id, jobs.repo_base_ref, jobs.attempt, jobs.status, jobs.job_type, jobs.job_image, jobs.next_id, jobs.node_id, jobs.exit_code, jobs.started_at, jobs.finished_at, jobs.duration_ms, jobs.repo_sha_in, jobs.repo_sha_out, jobs.repo_sha_in8, jobs.repo_sha_out8, jobs.cache_key, jobs.meta
 `
 
 // Atomically claim the next claimable job for a node (unified queue).
@@ -101,7 +101,6 @@ func (q *Queries) ClaimJob(ctx context.Context, nodeID types.NodeID) (Job, error
 		&i.RepoID,
 		&i.RepoBaseRef,
 		&i.Attempt,
-		&i.Name,
 		&i.Status,
 		&i.JobType,
 		&i.JobImage,
@@ -284,7 +283,6 @@ INSERT INTO jobs (
   repo_id,
   repo_base_ref,
   attempt,
-  name,
   status,
   job_type,
   job_image,
@@ -293,8 +291,8 @@ INSERT INTO jobs (
   repo_sha_in,
   repo_sha_in8
 ) VALUES (
-  $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
-  CASE WHEN $12::TEXT = '' THEN '' ELSE SUBSTRING($12::TEXT, 1, 8) END
+  $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
+  CASE WHEN $11::TEXT = '' THEN '' ELSE SUBSTRING($11::TEXT, 1, 8) END
 )
 RETURNING
   id,
@@ -302,7 +300,6 @@ RETURNING
   repo_id,
   repo_base_ref,
   attempt,
-  name,
   status,
   job_type,
   job_image,
@@ -321,18 +318,19 @@ RETURNING
 `
 
 type CreateJobParams struct {
-	ID          types.JobID     `json:"id"`
-	RunID       types.RunID     `json:"run_id"`
-	RepoID      types.RepoID    `json:"repo_id"`
-	RepoBaseRef string          `json:"repo_base_ref"`
-	Attempt     int32           `json:"attempt"`
-	Name        string          `json:"name"`
-	Status      types.JobStatus `json:"status"`
-	JobType     types.JobType   `json:"job_type"`
-	JobImage    string          `json:"job_image"`
-	NextID      *types.JobID    `json:"next_id"`
-	Meta        []byte          `json:"meta"`
-	RepoShaIn   string          `json:"repo_sha_in"`
+	ID          types.JobID  `json:"id"`
+	RunID       types.RunID  `json:"run_id"`
+	RepoID      types.RepoID `json:"repo_id"`
+	RepoBaseRef string       `json:"repo_base_ref"`
+	Attempt     int32        `json:"attempt"`
+	// Deprecated: jobs.name column was removed. Field ignored by SQL.
+	Name      string          `json:"name"`
+	Status    types.JobStatus `json:"status"`
+	JobType   types.JobType   `json:"job_type"`
+	JobImage  string          `json:"job_image"`
+	NextID    *types.JobID    `json:"next_id"`
+	Meta      []byte          `json:"meta"`
+	RepoShaIn string          `json:"repo_sha_in"`
 }
 
 // Note: `id` is a required TEXT parameter (KSUID-backed); caller generates via types.NewJobID().
@@ -343,7 +341,6 @@ func (q *Queries) CreateJob(ctx context.Context, arg CreateJobParams) (Job, erro
 		arg.RepoID,
 		arg.RepoBaseRef,
 		arg.Attempt,
-		arg.Name,
 		arg.Status,
 		arg.JobType,
 		arg.JobImage,
@@ -358,7 +355,6 @@ func (q *Queries) CreateJob(ctx context.Context, arg CreateJobParams) (Job, erro
 		&i.RepoID,
 		&i.RepoBaseRef,
 		&i.Attempt,
-		&i.Name,
 		&i.Status,
 		&i.JobType,
 		&i.JobImage,
@@ -416,7 +412,6 @@ SELECT
   repo_id,
   repo_base_ref,
   attempt,
-  name,
   status,
   job_type,
   job_image,
@@ -445,7 +440,6 @@ func (q *Queries) GetJob(ctx context.Context, id types.JobID) (Job, error) {
 		&i.RepoID,
 		&i.RepoBaseRef,
 		&i.Attempt,
-		&i.Name,
 		&i.Status,
 		&i.JobType,
 		&i.JobImage,
@@ -472,7 +466,6 @@ SELECT
   repo_id,
   repo_base_ref,
   attempt,
-  name,
   status,
   job_type,
   job_image,
@@ -514,7 +507,6 @@ func (q *Queries) ListCreatedJobsByRunRepoAttempt(ctx context.Context, arg ListC
 			&i.RepoID,
 			&i.RepoBaseRef,
 			&i.Attempt,
-			&i.Name,
 			&i.Status,
 			&i.JobType,
 			&i.JobImage,
@@ -548,7 +540,6 @@ SELECT
   repo_id,
   repo_base_ref,
   attempt,
-  name,
   status,
   job_type,
   job_image,
@@ -584,7 +575,6 @@ func (q *Queries) ListJobsByRun(ctx context.Context, runID types.RunID) ([]Job, 
 			&i.RepoID,
 			&i.RepoBaseRef,
 			&i.Attempt,
-			&i.Name,
 			&i.Status,
 			&i.JobType,
 			&i.JobImage,
@@ -618,7 +608,6 @@ SELECT
   repo_id,
   repo_base_ref,
   attempt,
-  name,
   status,
   job_type,
   job_image,
@@ -660,7 +649,6 @@ func (q *Queries) ListJobsByRunRepoAttempt(ctx context.Context, arg ListJobsByRu
 			&i.RepoID,
 			&i.RepoBaseRef,
 			&i.Attempt,
-			&i.Name,
 			&i.Status,
 			&i.JobType,
 			&i.JobImage,
@@ -690,7 +678,7 @@ func (q *Queries) ListJobsByRunRepoAttempt(ctx context.Context, arg ListJobsByRu
 const listJobsForTUI = `-- name: ListJobsForTUI :many
 SELECT
   jobs.id AS job_id,
-  jobs.name,
+  jobs.job_type::text AS name,
   jobs.job_type,
   jobs.status,
   jobs.duration_ms,
@@ -837,7 +825,6 @@ RETURNING
   jobs.repo_id,
   jobs.repo_base_ref,
   jobs.attempt,
-  jobs.name,
   jobs.status,
   jobs.job_type,
   jobs.job_image,
@@ -866,7 +853,6 @@ func (q *Queries) PromoteJobByIDIfUnblocked(ctx context.Context, id types.JobID)
 		&i.RepoID,
 		&i.RepoBaseRef,
 		&i.Attempt,
-		&i.Name,
 		&i.Status,
 		&i.JobType,
 		&i.JobImage,
@@ -1055,7 +1041,6 @@ RETURNING
   jobs.repo_id,
   jobs.repo_base_ref,
   jobs.attempt,
-  jobs.name,
   jobs.status,
   jobs.job_type,
   jobs.job_image,
@@ -1090,7 +1075,6 @@ func (q *Queries) ScheduleNextJob(ctx context.Context, arg ScheduleNextJobParams
 		&i.RepoID,
 		&i.RepoBaseRef,
 		&i.Attempt,
-		&i.Name,
 		&i.Status,
 		&i.JobType,
 		&i.JobImage,

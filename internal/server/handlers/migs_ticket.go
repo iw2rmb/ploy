@@ -197,7 +197,11 @@ type plannedJob struct {
 	JobImage     string
 	Status       domaintypes.JobStatus
 	StepName     string
+	StepIndex    *int
 	HookSource   string
+	HookIndex    *int
+	HookCycle    string
+	GateCycle    string
 	HookDecision *hookPlanningDecision
 	NextID       *domaintypes.JobID
 	RepoSHAIn    string
@@ -255,17 +259,21 @@ func createJobsFromSpec(
 		jobType      domaintypes.JobType
 		jobImage     string
 		stepName     string
+		stepIndex    *int
 		hookSource   string
+		hookIndex    *int
+		hookCycle    string
+		gateCycle    string
 		hookDecision *hookPlanningDecision
 	}
 	appendGatePreludeDrafts := func(drafts []draft, cycleName string) []draft {
-		drafts = append(drafts, draft{name: cycleName + "-sbom", jobType: domaintypes.JobTypeSBOM})
+		drafts = append(drafts, draft{name: cycleName + "-sbom", jobType: domaintypes.JobTypeSBOM, gateCycle: cycleName})
 		return drafts
 	}
 
 	drafts := make([]draft, 0, len(migsSpec.Steps)+len(resolvedHooks)*2+5)
 	drafts = appendGatePreludeDrafts(drafts, "pre-gate")
-	drafts = append(drafts, draft{name: "pre-gate", jobType: domaintypes.JobTypePreGate})
+	drafts = append(drafts, draft{name: "pre-gate", jobType: domaintypes.JobTypePreGate, gateCycle: "pre-gate"})
 
 	if len(migsSpec.Steps) > 1 {
 		for i, mig := range migsSpec.Steps {
@@ -278,6 +286,10 @@ func createJobsFromSpec(
 				jobType:  domaintypes.JobTypeMig,
 				jobImage: jobImage,
 				stepName: mig.Name,
+				stepIndex: func() *int {
+					v := i
+					return &v
+				}(),
 			})
 		}
 	} else {
@@ -294,10 +306,14 @@ func createJobsFromSpec(
 			jobType:  domaintypes.JobTypeMig,
 			jobImage: migImage,
 			stepName: stepName,
+			stepIndex: func() *int {
+				v := 0
+				return &v
+			}(),
 		})
 	}
 	drafts = appendGatePreludeDrafts(drafts, "post-gate")
-	drafts = append(drafts, draft{name: "post-gate", jobType: domaintypes.JobTypePostGate})
+	drafts = append(drafts, draft{name: "post-gate", jobType: domaintypes.JobTypePostGate, gateCycle: "post-gate"})
 
 	planned := make([]plannedJob, 0, len(drafts))
 	for i, d := range drafts {
@@ -316,7 +332,11 @@ func createJobsFromSpec(
 			JobImage:     jobImage,
 			Status:       status,
 			StepName:     d.stepName,
+			StepIndex:    d.stepIndex,
 			HookSource:   d.hookSource,
+			HookIndex:    d.hookIndex,
+			HookCycle:    d.hookCycle,
+			GateCycle:    d.gateCycle,
 			HookDecision: d.hookDecision,
 		})
 	}
@@ -332,7 +352,7 @@ func createJobsFromSpec(
 	// Insert chain tail-first to satisfy jobs.next_id -> jobs.id FK at insert time.
 	for i := len(planned) - 1; i >= 0; i-- {
 		if err := createPlannedJob(ctx, st, runID, repoID, repoBaseRef, attempt, planned[i]); err != nil {
-			return fmt.Errorf("create job %q: %w", planned[i].Name, err)
+			return fmt.Errorf("create job %q type=%s id=%s: %w", planned[i].Name, planned[i].JobType, planned[i].ID, err)
 		}
 	}
 	if preGateBinding != nil && preGateBinding.ProfileID > 0 {
@@ -451,16 +471,25 @@ func createPlannedJob(ctx context.Context, st store.Store, runID domaintypes.Run
 	} else {
 		meta = contracts.NewMigJobMeta()
 	}
+	meta.MigStepIndex = planned.StepIndex
 	meta.HookSource = strings.TrimSpace(planned.HookSource)
+	meta.HookIndex = planned.HookIndex
+	meta.HookCycleName = strings.TrimSpace(planned.HookCycle)
+	meta.GateCycleName = strings.TrimSpace(planned.GateCycle)
 	if planned.HookDecision != nil {
 		meta.ActionSummary = summarizeHookPlanningDecision(*planned.HookDecision)
 	}
 	if planned.JobType == domaintypes.JobTypeSBOM {
-		ctx, _ := inferLegacySBOMCycleContext(store.Job{
-			ID:   planned.ID,
-			Name: planned.Name,
+		phase := contracts.SBOMPhasePost
+		if strings.TrimSpace(planned.GateCycle) == "pre-gate" {
+			phase = contracts.SBOMPhasePre
+		}
+		meta.SBOM = sbomCycleContextMeta(sbomCycleContext{
+			Phase:     phase,
+			CycleName: strings.TrimSpace(planned.GateCycle),
+			Role:      contracts.SBOMRoleInitial,
+			RootJobID: planned.ID,
 		})
-		meta.SBOM = sbomCycleContextMeta(ctx)
 	}
 	metaBytes, err := contracts.MarshalJobMeta(meta)
 	if err != nil {

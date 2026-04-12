@@ -264,7 +264,6 @@ func (s *ClaimService) Claim(ctx context.Context, nodeID domaintypes.NodeID) (Cl
 
 	slog.Info("job claimed",
 		"job_id", job.ID,
-		"job_name", job.Name,
 		"run_id", run.ID,
 		"next_id", job.NextID,
 		"node_id", nodeID,

@@ -27,7 +27,7 @@ func resolveAndPersistSBOMStepSkip(
 
 	cacheKey, err := computeJobCacheKey(
 		domaintypes.JobTypeSBOM,
-		job.Name,
+		job.Meta,
 		job.JobImage,
 		job.RepoShaIn,
 		"",

@@ -261,14 +261,27 @@ func (r *runController) executeHookJob(ctx context.Context, req StartRunRequest)
 		return
 	}
 
-	cycleName, hookIndex, err := gateCycleHookIndexFromJobName(req.JobName, len(req.TypedOptions.Hooks))
-	if err != nil {
-		slog.Error("failed to derive hook index", "run_id", req.RunID, "job_id", req.JobID, "job_name", req.JobName, "error", err)
-		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
-		return
+	var (
+		cycleName  string
+		hookIndex  int
+		hookSource string
+		err        error
+	)
+	if req.HookContext != nil {
+		req.HookContext.Normalize()
+		cycleName = req.HookContext.CycleName
+		hookIndex = req.HookContext.Index
+		hookSource = req.HookContext.Source
 	}
-
-	hookSource := strings.TrimSpace(req.TypedOptions.Hooks[hookIndex])
+	if cycleName == "" || hookSource == "" || hookIndex < 0 {
+		cycleName, hookIndex, err = gateCycleHookIndexFromJobName(req.JobName, len(req.TypedOptions.Hooks))
+		if err != nil {
+			slog.Error("failed to derive hook index", "run_id", req.RunID, "job_id", req.JobID, "error", err)
+			r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
+			return
+		}
+		hookSource = strings.TrimSpace(req.TypedOptions.Hooks[hookIndex])
+	}
 	if hookSource == "" {
 		err = fmt.Errorf("hook source is empty for index %d", hookIndex)
 		slog.Error("failed to execute hook job", "run_id", req.RunID, "job_id", req.JobID, "hook_index", hookIndex, "error", err)
@@ -693,20 +706,24 @@ func (r *runController) executeMigJob(ctx context.Context, req StartRunRequest) 
 	typedOpts := req.TypedOptions
 	stepIdx := 0
 	if len(typedOpts.Steps) > 0 {
-		idx, err := migStepIndexFromJobName(req.JobName, len(typedOpts.Steps))
-		if err != nil {
-			err = fmt.Errorf("derive mig step index from job_name: %w", err)
-			slog.Error("failed to derive mig step index", "run_id", req.RunID, "job_id", req.JobID, "job_name", req.JobName, "error", err)
+		if req.MigContext != nil {
+			stepIdx = req.MigContext.StepIndex
+		} else {
+			idx, err := migStepIndexFromJobName(req.JobName, len(typedOpts.Steps))
+			if err != nil {
+				err = fmt.Errorf("derive mig step index from job_name: %w", err)
+				slog.Error("failed to derive mig step index", "run_id", req.RunID, "job_id", req.JobID, "error", err)
+				r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
+				return
+			}
+			stepIdx = idx
+		}
+		if stepIdx < 0 || stepIdx >= len(typedOpts.Steps) {
+			err := fmt.Errorf("derived mig step index out of range: derived=%d steps_len=%d", stepIdx, len(typedOpts.Steps))
+			slog.Error("derived mig step index out of range", "run_id", req.RunID, "job_id", req.JobID, "derived_index", stepIdx, "steps_len", len(typedOpts.Steps))
 			r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
 			return
 		}
-		if idx < 0 || idx >= len(typedOpts.Steps) {
-			err := fmt.Errorf("derived mig step index out of range: job_name=%q derived=%d steps_len=%d", req.JobName, idx, len(typedOpts.Steps))
-			slog.Error("derived mig step index out of range", "run_id", req.RunID, "job_id", req.JobID, "job_name", req.JobName, "derived_index", idx, "steps_len", len(typedOpts.Steps))
-			r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
-			return
-		}
-		stepIdx = idx
 	}
 	manifest, err := buildManifestFromRequest(req, typedOpts, stepIdx, stack)
 	if err != nil {

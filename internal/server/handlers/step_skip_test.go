@@ -1,6 +1,10 @@
 package handlers
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/iw2rmb/ploy/internal/workflow/contracts"
+)
 
 func TestCanonicalizeAndHashJSON_Deterministic(t *testing.T) {
 	left := map[string]any{
@@ -29,22 +33,29 @@ func TestCanonicalizeAndHashJSON_Deterministic(t *testing.T) {
 	}
 }
 
-func TestMigStepIndexFromJobNameForClaim(t *testing.T) {
+func TestMigStepIndexForCacheKey(t *testing.T) {
+	metaWithIndex := func(idx int) []byte {
+		meta := contracts.NewMigJobMeta()
+		meta.MigStepIndex = &idx
+		raw, _ := contracts.MarshalJobMeta(meta)
+		return raw
+	}
+
 	tests := []struct {
 		name      string
-		jobName   string
+		meta      []byte
 		stepsLen  int
 		want      int
 		shouldErr bool
 	}{
-		{name: "single step defaults to zero", jobName: "mig-0", stepsLen: 1, want: 0},
-		{name: "multi step parses index", jobName: "mig-2", stepsLen: 3, want: 2},
-		{name: "invalid prefix", jobName: "step-1", stepsLen: 3, shouldErr: true},
-		{name: "out of range", jobName: "mig-3", stepsLen: 3, shouldErr: true},
+		{name: "single step defaults to zero", meta: nil, stepsLen: 1, want: 0},
+		{name: "multi step parses index from meta", meta: metaWithIndex(2), stepsLen: 3, want: 2},
+		{name: "missing meta for multi step", meta: nil, stepsLen: 3, shouldErr: true},
+		{name: "out of range", meta: metaWithIndex(3), stepsLen: 3, shouldErr: true},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			got, err := migStepIndexFromJobNameForClaim(tc.jobName, tc.stepsLen)
+			got, err := migStepIndexForCacheKey(tc.meta, tc.stepsLen)
 			if tc.shouldErr {
 				if err == nil {
 					t.Fatal("expected error, got nil")
@@ -52,7 +63,7 @@ func TestMigStepIndexFromJobNameForClaim(t *testing.T) {
 				return
 			}
 			if err != nil {
-				t.Fatalf("migStepIndexFromJobNameForClaim() error = %v", err)
+				t.Fatalf("migStepIndexForCacheKey() error = %v", err)
 			}
 			if got != tc.want {
 				t.Fatalf("index = %d, want %d", got, tc.want)

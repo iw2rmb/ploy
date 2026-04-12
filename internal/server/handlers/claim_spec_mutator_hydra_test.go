@@ -7,7 +7,37 @@ import (
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
+	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
+
+func testJobMetaForHydraRouting(jobType domaintypes.JobType, jobName string) []byte {
+	meta := contracts.NewMigJobMeta()
+	switch jobType {
+	case domaintypes.JobTypeSBOM:
+		phase := contracts.SBOMPhasePost
+		cycle := "post-gate"
+		if strings.HasPrefix(jobName, "pre-gate") {
+			phase = contracts.SBOMPhasePre
+			cycle = "pre-gate"
+		}
+		meta.SBOM = &contracts.SBOMJobMetadata{
+			Phase:     phase,
+			CycleName: cycle,
+			Role:      contracts.SBOMRoleInitial,
+		}
+	case domaintypes.JobTypeHook:
+		switch {
+		case strings.HasPrefix(jobName, "pre-gate"):
+			meta.HookCycleName = "pre-gate"
+		case strings.HasPrefix(jobName, "post-gate"):
+			meta.HookCycleName = "post-gate"
+		case strings.HasPrefix(jobName, "re-gate"):
+			meta.HookCycleName = "re-gate-1"
+		}
+	}
+	raw, _ := contracts.MarshalJobMeta(meta)
+	return raw
+}
 
 // ---------------------------------------------------------------------------
 // Global env → envs routing (migrated from spec_utils_global_env_test.go)
@@ -856,7 +886,7 @@ func TestApplyHydraOverlay_CanonicalCAInjection(t *testing.T) {
 				},
 			}
 			err := applyHydraOverlayMutator(m, claimSpecMutatorInput{
-				job:     store.Job{Name: tt.jobName, Meta: []byte(`{}`)},
+				job:     store.Job{Meta: testJobMetaForHydraRouting(tt.jobType, tt.jobName)},
 				jobType: tt.jobType,
 				hydraOverlays: map[string]*HydraJobConfig{
 					tt.overlaySection: {CA: []string{tt.wantCA}},
