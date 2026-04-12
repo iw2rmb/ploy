@@ -459,6 +459,12 @@ WHERE repo_id = $1
   AND status = 'Success'
   AND cache_key = $2
   AND cache_key <> ''
+  AND repo_sha_out <> repo_sha_in
+  AND EXISTS (
+    SELECT 1
+    FROM diffs
+    WHERE diffs.job_id = jobs.id
+  )
   AND NOT (meta ? 'cache_mirror')
   AND repo_sha_out ~ '^[0-9a-f]{40}$'
 ORDER BY finished_at DESC NULLS LAST, id DESC

@@ -8,6 +8,7 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
+	"github.com/jackc/pgx/v5"
 )
 
 func TestResolveUpstreamSBOMInputHash_ReturnsDigestHexForSBOMPredecessor(t *testing.T) {
@@ -318,5 +319,110 @@ func TestReplayMirroredJobMeta_RejectsInvalidCandidateMeta(t *testing.T) {
 
 	if raw, ok := replayMirroredJobMeta(sourceJobID, candidateRaw); ok || raw != nil {
 		t.Fatalf("expected invalid candidate meta to be rejected, got ok=%v raw=%s", ok, string(raw))
+	}
+}
+
+func TestHasReplayableSourceDiff(t *testing.T) {
+	t.Parallel()
+
+	baseJobID := domaintypes.NewJobID()
+	baseRunID := domaintypes.NewRunID()
+	baseRepoID := domaintypes.NewRepoID()
+
+	tests := []struct {
+		name    string
+		job     store.Job
+		setup   func(*jobStore)
+		want    bool
+		wantErr bool
+	}{
+		{
+			name: "non-changing job is replayable without diff",
+			job: store.Job{
+				ID:      baseJobID,
+				RunID:   baseRunID,
+				RepoID:  baseRepoID,
+				JobType: domaintypes.JobTypeSBOM,
+			},
+			want: true,
+		},
+		{
+			name: "changing job with unchanged sha is not replayable",
+			job: store.Job{
+				ID:         baseJobID,
+				RunID:      baseRunID,
+				RepoID:     baseRepoID,
+				JobType:    domaintypes.JobTypeMig,
+				RepoShaIn:  "0123456789abcdef0123456789abcdef01234567",
+				RepoShaOut: "0123456789abcdef0123456789abcdef01234567",
+			},
+			want: false,
+		},
+		{
+			name: "changing job with changed sha and diff is replayable",
+			job: store.Job{
+				ID:         baseJobID,
+				RunID:      baseRunID,
+				RepoID:     baseRepoID,
+				JobType:    domaintypes.JobTypeMig,
+				RepoShaIn:  "0123456789abcdef0123456789abcdef01234567",
+				RepoShaOut: "89abcdef0123456789abcdef0123456789abcdef",
+			},
+			setup: func(st *jobStore) {
+				st.getLatestDiffByJob.val = store.Diff{}
+			},
+			want: true,
+		},
+		{
+			name: "changing job with changed sha but missing diff is not replayable",
+			job: store.Job{
+				ID:         baseJobID,
+				RunID:      baseRunID,
+				RepoID:     baseRepoID,
+				JobType:    domaintypes.JobTypeMig,
+				RepoShaIn:  "0123456789abcdef0123456789abcdef01234567",
+				RepoShaOut: "89abcdef0123456789abcdef0123456789abcdef",
+			},
+			setup: func(st *jobStore) {
+				st.getLatestDiffByJob.err = pgx.ErrNoRows
+			},
+			want: false,
+		},
+		{
+			name: "changing job with diff lookup error returns error",
+			job: store.Job{
+				ID:         baseJobID,
+				RunID:      baseRunID,
+				RepoID:     baseRepoID,
+				JobType:    domaintypes.JobTypeMig,
+				RepoShaIn:  "0123456789abcdef0123456789abcdef01234567",
+				RepoShaOut: "89abcdef0123456789abcdef0123456789abcdef",
+			},
+			setup: func(st *jobStore) {
+				st.getLatestDiffByJob.err = context.DeadlineExceeded
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			st := &jobStore{}
+			if tc.setup != nil {
+				tc.setup(st)
+			}
+			got, err := hasReplayableSourceDiff(context.Background(), st, tc.job)
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("hasReplayableSourceDiff() err=%v wantErr=%v", err, tc.wantErr)
+			}
+			if tc.wantErr {
+				return
+			}
+			if got != tc.want {
+				t.Fatalf("hasReplayableSourceDiff()=%v want %v", got, tc.want)
+			}
+		})
 	}
 }

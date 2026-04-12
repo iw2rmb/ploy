@@ -36,6 +36,13 @@ func maybeCloneSkippedStepDiffBeforeCompletion(
 	} else if !isNoRowsError(err) {
 		return fmt.Errorf("check existing target diff: %w", err)
 	}
+	sourceJobID := sourceJob.ID
+	if _, err := st.GetLatestDiffByJob(ctx, &sourceJobID); err != nil {
+		if isNoRowsError(err) {
+			return fmt.Errorf("source mirrored mig job %s has no diff to clone", sourceJob.ID)
+		}
+		return fmt.Errorf("check source diff: %w", err)
+	}
 
 	if err := bp.CloneLatestDiffByJob(ctx, sourceJob.ID.String(), job.RunID.String(), job.ID.String()); err != nil {
 		return err
