@@ -498,11 +498,7 @@ func resolveGateRetrySBOMContext(
 				return current.ID, phase
 			}
 		}
-		phase := defaultPhase
-		if strings.HasPrefix(strings.TrimSpace(current.Name), "pre-gate-") {
-			phase = contracts.SBOMPhasePre
-		}
-		return current.ID, phase
+		return current.ID, defaultPhase
 	}
 
 	return "", defaultPhase

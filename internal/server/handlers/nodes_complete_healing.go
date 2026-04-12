@@ -95,16 +95,17 @@ func maybeCreateHealingJobs(
 			ctx, st, bp, run.ID, failedJob, jobsByID, detectedExpectation, chain.ReGateMeta.RecoveryMetadata)
 	}
 
-	reGateMetaBytes, err := contracts.MarshalJobMeta(chain.ReGateMeta)
-	if err != nil {
-		return fmt.Errorf("marshal re-gate job meta: %w", err)
-	}
 	healMetaBytes, err := contracts.MarshalJobMeta(chain.HealMeta)
 	if err != nil {
 		return fmt.Errorf("marshal heal job meta: %w", err)
 	}
 
 	reGateName := fmt.Sprintf("re-gate-%d", chain.AttemptNumber)
+	chain.ReGateMeta.GateCycleName = reGateName
+	reGateMetaBytes, err := contracts.MarshalJobMeta(chain.ReGateMeta)
+	if err != nil {
+		return fmt.Errorf("marshal re-gate job meta: %w", err)
+	}
 
 	_, err = st.CreateJob(ctx, store.CreateJobParams{
 		ID:          chain.ReGateID,

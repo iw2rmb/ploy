@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
-	"strconv"
 	"strings"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
@@ -36,15 +35,22 @@ func resolveAndPersistMigStepSkip(
 		return nil, fmt.Errorf("parse merged spec for step cache: %w", err)
 	}
 
-	stepIndex, err := migStepIndexFromJobNameForClaim(job.Name, len(spec.Steps))
-	if err != nil {
-		return nil, err
+	stepIndex := 0
+	if len(spec.Steps) > 1 {
+		if len(job.Meta) > 0 {
+			if meta, metaErr := contracts.UnmarshalJobMeta(job.Meta); metaErr == nil && meta != nil && meta.MigStepIndex != nil {
+				stepIndex = *meta.MigStepIndex
+			}
+		}
+		if stepIndex < 0 || stepIndex >= len(spec.Steps) {
+			return nil, fmt.Errorf("mig_step_index is missing or out of range: idx=%d steps_len=%d", stepIndex, len(spec.Steps))
+		}
 	}
 	stepCfg := spec.Steps[stepIndex]
 
 	cacheKey, err := computeJobCacheKey(
 		domaintypes.JobTypeMig,
-		job.Name,
+		job.Meta,
 		job.JobImage,
 		job.RepoShaIn,
 		"",
@@ -135,25 +141,6 @@ func persistCacheMirrorSourceJob(
 		return fmt.Errorf("update target job meta: %w", err)
 	}
 	return nil
-}
-
-func migStepIndexFromJobNameForClaim(jobName string, stepsLen int) (int, error) {
-	name := strings.TrimSpace(jobName)
-	if stepsLen <= 1 {
-		return 0, nil
-	}
-	if !strings.HasPrefix(name, "mig-") {
-		return 0, fmt.Errorf("mig job_name must start with mig- for multi-step runs, got %q", name)
-	}
-	raw := strings.TrimPrefix(name, "mig-")
-	idx, err := strconv.Atoi(raw)
-	if err != nil {
-		return 0, fmt.Errorf("parse mig index from job_name %q: %w", name, err)
-	}
-	if idx < 0 || idx >= stepsLen {
-		return 0, fmt.Errorf("mig index out of range for job_name %q: idx=%d steps_len=%d", name, idx, stepsLen)
-	}
-	return idx, nil
 }
 
 func canonicalizeAndHashJSON(v any) ([]byte, string, error) {

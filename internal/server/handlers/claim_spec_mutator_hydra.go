@@ -101,15 +101,21 @@ func hydraPhaseForAuxBuildGateJob(jobType domaintypes.JobType, job store.Job) st
 			return "post"
 		}
 	}
-	name := strings.TrimSpace(job.Name)
-	switch {
-	case strings.HasPrefix(name, "pre-gate-"):
-		return "pre"
-	case strings.HasPrefix(name, "post-gate-"), strings.HasPrefix(name, "re-gate-"):
-		return "post"
-	default:
-		return ""
+	if jobType == domaintypes.JobTypeHook && len(job.Meta) > 0 {
+		if meta, err := contracts.UnmarshalJobMeta(job.Meta); err == nil && meta != nil {
+			switch strings.TrimSpace(meta.HookCycleName) {
+			case "pre-gate":
+				return "pre"
+			case "post-gate", "re-gate":
+				return "post"
+			default:
+				if strings.HasPrefix(strings.TrimSpace(meta.HookCycleName), "re-gate-") {
+					return "post"
+				}
+			}
+		}
 	}
+	return ""
 }
 
 func applyOverlayToSteps(spec map[string]any, overlay *HydraJobConfig) {

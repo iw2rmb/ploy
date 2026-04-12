@@ -7,6 +7,17 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
+func sbomMetaForPhase(phase, cycle string) []byte {
+	meta := contracts.NewMigJobMeta()
+	meta.SBOM = &contracts.SBOMJobMetadata{
+		Phase:     phase,
+		CycleName: cycle,
+		Role:      contracts.SBOMRoleInitial,
+	}
+	raw, _ := contracts.MarshalJobMeta(meta)
+	return raw
+}
+
 func TestResolveHydraForCacheKey_HookUsesCyclePhaseCA(t *testing.T) {
 	spec := &contracts.MigSpec{
 		BuildGate: &contracts.BuildGateConfig{
@@ -16,20 +27,20 @@ func TestResolveHydraForCacheKey_HookUsesCyclePhaseCA(t *testing.T) {
 	}
 
 	tests := []struct {
-		name    string
-		jobName string
-		wantCA  string
+		name       string
+		jobMetaRaw []byte
+		wantCA     string
 	}{
-		{name: "pre_gate_hook", jobName: "pre-gate-hook-000", wantCA: "1111111"},
-		{name: "post_gate_hook", jobName: "post-gate-hook-000", wantCA: "2222222"},
-		{name: "re_gate_hook", jobName: "re-gate-1-hook-000", wantCA: "2222222"},
+		{name: "pre_gate_hook", jobMetaRaw: sbomMetaForPhase(contracts.SBOMPhasePre, "pre-gate"), wantCA: "1111111"},
+		{name: "post_gate_hook", jobMetaRaw: sbomMetaForPhase(contracts.SBOMPhasePost, "post-gate"), wantCA: "2222222"},
+		{name: "re_gate_hook", jobMetaRaw: sbomMetaForPhase(contracts.SBOMPhasePost, "re-gate-1"), wantCA: "2222222"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			inEntries, homeEntries, caEntries, err := resolveHydraForCacheKey(domaintypes.JobTypeHook, tt.jobName, spec)
+			inEntries, homeEntries, caEntries, err := resolveHydraForCacheKey(domaintypes.JobTypeHook, tt.jobMetaRaw, spec)
 			if err != nil {
-				t.Fatalf("resolveHydraForCacheKey(hook, %q): %v", tt.jobName, err)
+				t.Fatalf("resolveHydraForCacheKey(hook): %v", err)
 			}
 			if len(inEntries) != 0 {
 				t.Fatalf("in entries length = %d, want 0", len(inEntries))
@@ -50,7 +61,7 @@ func TestComputeJobCacheKey_UpstreamInputHashAffectsKey(t *testing.T) {
 	spec := []byte(`{"steps":[{"image":"ghcr.io/example/mig:1"}]}`)
 	keyA, err := computeJobCacheKey(
 		domaintypes.JobTypeMig,
-		"mig-0",
+		[]byte(`{"mig_step_index":0}`),
 		"",
 		"0123456789012345678901234567890123456789",
 		"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -61,7 +72,7 @@ func TestComputeJobCacheKey_UpstreamInputHashAffectsKey(t *testing.T) {
 	}
 	keyB, err := computeJobCacheKey(
 		domaintypes.JobTypeMig,
-		"mig-0",
+		[]byte(`{"mig_step_index":0}`),
 		"",
 		"0123456789012345678901234567890123456789",
 		"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",

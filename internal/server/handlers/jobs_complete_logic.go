@@ -214,11 +214,11 @@ func formatStackGateError(jobType domaintypes.JobType, jobMeta json.RawMessage) 
 
 // formatExit137Error formats a deterministic run_repos.last_error message for
 // jobs that exited with code 137 (typically SIGKILL/OOM kill).
-func formatExit137Error(jobName string, exitCode *int32) *string {
+func formatExit137Error(jobLabel string, exitCode *int32) *string {
 	if exitCode == nil || *exitCode != 137 {
 		return nil
 	}
-	name := strings.TrimSpace(jobName)
+	name := strings.TrimSpace(jobLabel)
 	if name == "" {
 		msg := "job failed with exit code 137 (killed; likely out of memory)"
 		return &msg

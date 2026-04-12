@@ -64,6 +64,9 @@ type ClaimResponse struct {
 	CreatedAt              string                           `json:"created_at"`
 	Spec                   json.RawMessage                  `json:"spec,omitempty"`
 	SBOMContext            *contracts.SBOMJobMetadata       `json:"sbom_context,omitempty"`
+	MigContext             *contracts.MigClaimContext       `json:"mig_context,omitempty"`
+	HookContext            *contracts.HookClaimContext      `json:"hook_context,omitempty"`
+	GateContext            *contracts.GateClaimContext      `json:"gate_context,omitempty"`
 	RecoveryContext        *contracts.RecoveryClaimContext  `json:"recovery_context,omitempty"`
 	GateSkip               *contracts.BuildGateSkipMetadata `json:"gate_skip,omitempty"`
 	StepSkip               *contracts.MigStepSkipMetadata   `json:"step_skip,omitempty"`

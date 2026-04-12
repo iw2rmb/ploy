@@ -16,20 +16,30 @@ type sbomCycleContext struct {
 }
 
 func sbomCycleContextFromJob(job store.Job) (sbomCycleContext, bool) {
-	if len(job.Meta) > 0 {
-		if meta, err := contracts.UnmarshalJobMeta(job.Meta); err == nil && meta.SBOM != nil {
-			ctx := sbomCycleContext{
-				Phase:     strings.TrimSpace(meta.SBOM.Phase),
-				CycleName: strings.TrimSpace(meta.SBOM.CycleName),
-				Role:      strings.TrimSpace(meta.SBOM.Role),
-			}
-			if root := strings.TrimSpace(meta.SBOM.RootJobID); root != "" {
-				ctx.RootJobID = domaintypes.JobID(root)
-			}
-			return normalizeSBOMCycleContext(ctx, job), true
-		}
+	ctx, ok := sbomCycleContextFromMeta(job.Meta)
+	if !ok {
+		return inferLegacySBOMCycleContext(job)
 	}
-	return inferLegacySBOMCycleContext(job)
+	return normalizeSBOMCycleContext(ctx, job), true
+}
+
+func sbomCycleContextFromMeta(metaRaw []byte) (sbomCycleContext, bool) {
+	if len(metaRaw) == 0 {
+		return sbomCycleContext{}, false
+	}
+	meta, err := contracts.UnmarshalJobMeta(metaRaw)
+	if err != nil || meta == nil || meta.SBOM == nil {
+		return sbomCycleContext{}, false
+	}
+	ctx := sbomCycleContext{
+		Phase:     strings.TrimSpace(meta.SBOM.Phase),
+		CycleName: strings.TrimSpace(meta.SBOM.CycleName),
+		Role:      strings.TrimSpace(meta.SBOM.Role),
+	}
+	if root := strings.TrimSpace(meta.SBOM.RootJobID); root != "" {
+		ctx.RootJobID = domaintypes.JobID(root)
+	}
+	return ctx, true
 }
 
 func inferLegacySBOMCycleContext(job store.Job) (sbomCycleContext, bool) {

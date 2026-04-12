@@ -38,7 +38,7 @@ func (s *ClaimService) tryReplayCachedOutcome(
 		return false, nil
 	}
 
-	cacheKey, err := computeJobCacheKey(domaintypes.JobType(job.JobType), job.Name, job.JobImage, job.RepoShaIn, runtimeInputHash, payload.Spec)
+	cacheKey, err := computeJobCacheKey(domaintypes.JobType(job.JobType), job.Meta, job.JobImage, job.RepoShaIn, runtimeInputHash, payload.Spec)
 	if err != nil {
 		return false, fmt.Errorf("compute cache key: %w", err)
 	}

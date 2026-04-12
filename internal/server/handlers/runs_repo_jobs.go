@@ -87,7 +87,7 @@ func listRunRepoJobsHandler(st store.Store) http.HandlerFunc {
 		for _, job := range jobs {
 			jr := migsapi.RunRepoJob{
 				JobID:      job.ID,
-				Name:       job.Name,
+				Name:       string(job.JobType),
 				JobType:    job.JobType,
 				JobImage:   strings.TrimSpace(job.JobImage),
 				RepoShaIn:  job.RepoShaIn,
@@ -100,11 +100,15 @@ func listRunRepoJobsHandler(st store.Store) http.HandlerFunc {
 			}
 
 			jr.HookConditionResult, jr.HookPlanReason = extractRawHookEvidence(job.Meta)
+			var meta *contracts.JobMeta
 
 			// Extract projection fields from structured job metadata.
 			if len(job.Meta) > 0 {
-				meta, err := contracts.UnmarshalJobMeta(job.Meta)
+				meta, err = contracts.UnmarshalJobMeta(job.Meta)
 				if err == nil {
+					if resolvedName := deriveRunRepoJobName(job, meta); resolvedName != "" {
+						jr.Name = resolvedName
+					}
 					if meta.MigStepName != "" {
 						jr.DisplayName = meta.MigStepName
 					}
@@ -162,7 +166,7 @@ func listRunRepoJobsHandler(st store.Store) http.HandlerFunc {
 			}
 
 			if job.JobType == domaintypes.JobTypeHook {
-				if cycleName, ok := cycleNameFromHookJobName(job.Name); ok {
+				if cycleName := hookCycleNameFromMetaOrName(meta, job.Name); cycleName != "" {
 					hookJobsByCycle[cycleName]++
 					if raw := parseSerializedJSON(jr.HookConditionResult); len(raw) > 0 {
 						hookConditionsByCycle[cycleName] = append(hookConditionsByCycle[cycleName], raw)
@@ -374,17 +378,54 @@ func parseSerializedJSON(raw string) json.RawMessage {
 	return json.RawMessage(compact.String())
 }
 
-func cycleNameFromHookJobName(name string) (string, bool) {
-	name = strings.TrimSpace(name)
+func hookCycleNameFromMetaOrName(meta *contracts.JobMeta, fallbackName string) string {
+	if meta != nil && strings.TrimSpace(meta.HookCycleName) != "" {
+		return strings.TrimSpace(meta.HookCycleName)
+	}
+	name := strings.TrimSpace(fallbackName)
 	idx := strings.LastIndex(name, "-hook-")
 	if idx <= 0 {
-		return "", false
+		return ""
 	}
 	cycleName := strings.TrimSpace(name[:idx])
 	if cycleName == "" {
-		return "", false
+		return ""
 	}
-	return cycleName, true
+	return cycleName
+}
+
+func deriveRunRepoJobName(job store.Job, meta *contracts.JobMeta) string {
+	switch domaintypes.JobType(job.JobType) {
+	case domaintypes.JobTypePreGate:
+		return "pre-gate"
+	case domaintypes.JobTypePostGate:
+		return "post-gate"
+	case domaintypes.JobTypeReGate:
+		if meta != nil && strings.TrimSpace(meta.GateCycleName) != "" {
+			return strings.TrimSpace(meta.GateCycleName)
+		}
+		return "re-gate"
+	case domaintypes.JobTypeMig:
+		if meta != nil && meta.MigStepIndex != nil {
+			return fmt.Sprintf("mig-%d", *meta.MigStepIndex)
+		}
+		return "mig"
+	case domaintypes.JobTypeHook:
+		if meta != nil && meta.HookIndex != nil {
+			cycle := strings.TrimSpace(meta.HookCycleName)
+			if cycle == "" {
+				cycle = "hook"
+			}
+			return fmt.Sprintf("%s-hook-%03d", cycle, *meta.HookIndex)
+		}
+		return "hook"
+	case domaintypes.JobTypeSBOM:
+		return "sbom"
+	case domaintypes.JobTypeHeal:
+		return "heal"
+	default:
+		return strings.TrimSpace(job.JobType.String())
+	}
 }
 
 func newRecoveryView(meta *contracts.BuildGateRecoveryMetadata) *migsapi.RunRepoJobRecovery {

@@ -37,19 +37,23 @@ func resolveHookRuntimeDecision(
 		return nil, fmt.Errorf("parse merged spec for hook runtime: %w", err)
 	}
 	source := hookSourceFromJobMeta(job.Meta)
-	hookIndex := -1
 	if source == "" {
-		var err error
-		hookIndex, err = hookIndexFromJobName(job.Name, len(migSpec.Hooks))
+		hookIndex, err := hookIndexFromJobMeta(job.Meta)
 		if err != nil {
 			return nil, err
 		}
+		if hookIndex < 0 {
+			hookIndex, err = hookIndexFromJobName(job.Name, len(migSpec.Hooks))
+			if err != nil {
+				return nil, err
+			}
+		}
+		if hookIndex >= 0 && hookIndex < len(migSpec.Hooks) {
+			source = strings.TrimSpace(migSpec.Hooks[hookIndex])
+		}
 	}
 	if source == "" {
-		source = strings.TrimSpace(migSpec.Hooks[hookIndex])
-	}
-	if source == "" {
-		return nil, fmt.Errorf("hook source is empty for index %d", hookIndex)
+		return nil, fmt.Errorf("hook source is empty")
 	}
 	hookSpec, err := loadRuntimeHookSpec(ctx, st, bs, source, migSpec.BundleMap)
 	if err != nil {
@@ -447,4 +451,18 @@ func hookSourceFromJobMeta(metaRaw []byte) string {
 		return ""
 	}
 	return strings.TrimSpace(meta.HookSource)
+}
+
+func hookIndexFromJobMeta(metaRaw []byte) (int, error) {
+	if len(metaRaw) == 0 {
+		return -1, nil
+	}
+	meta, err := contracts.UnmarshalJobMeta(metaRaw)
+	if err != nil || meta == nil || meta.HookIndex == nil {
+		return -1, nil
+	}
+	if *meta.HookIndex < 0 {
+		return -1, fmt.Errorf("hook_index must be >= 0")
+	}
+	return *meta.HookIndex, nil
 }

@@ -75,6 +75,22 @@ type JobMeta struct {
 	// re-resolve source entries that may expand from directories.
 	HookSource string `json:"hook_source,omitempty"`
 
+	// MigStepIndex stores the concrete mig step index selected for this job.
+	// Populated for mig jobs so execution does not depend on job name parsing.
+	MigStepIndex *int `json:"mig_step_index,omitempty"`
+
+	// HookCycleName stores the concrete gate cycle name used by hook jobs.
+	// Examples: pre-gate, post-gate, re-gate-1.
+	HookCycleName string `json:"hook_cycle_name,omitempty"`
+
+	// HookIndex stores the concrete hook index selected for this job.
+	// Populated for hook jobs so execution does not depend on job name parsing.
+	HookIndex *int `json:"hook_index,omitempty"`
+
+	// GateCycleName stores the concrete gate cycle name used by gate/re-gate jobs.
+	// Examples: pre-gate, post-gate, re-gate-1.
+	GateCycleName string `json:"gate_cycle_name,omitempty"`
+
 	// ActionSummary is a short one-line description of what the healing mig did,
 	// produced by the healing container. Only allowed for mig jobs (kind="mig").
 	// Max 200 chars, no newlines.
@@ -198,6 +214,44 @@ func (m JobMeta) Validate() error {
 	}
 	if m.HookSource != "" && m.Kind != JobKindMig {
 		return fmt.Errorf("hook_source present but kind is %q (only allowed for %q)", m.Kind, JobKindMig)
+	}
+	if m.MigStepIndex != nil {
+		if m.Kind != JobKindMig {
+			return fmt.Errorf("mig_step_index present but kind is %q (only allowed for %q)", m.Kind, JobKindMig)
+		}
+		if *m.MigStepIndex < 0 {
+			return fmt.Errorf("mig_step_index: must be >= 0")
+		}
+	}
+	if m.HookCycleName != "" {
+		if m.Kind != JobKindMig {
+			return fmt.Errorf("hook_cycle_name present but kind is %q (only allowed for %q)", m.Kind, JobKindMig)
+		}
+		if strings.ContainsAny(m.HookCycleName, "\n\r\t") {
+			return fmt.Errorf("hook_cycle_name: must not contain control whitespace")
+		}
+		if strings.TrimSpace(m.HookCycleName) != m.HookCycleName {
+			return fmt.Errorf("hook_cycle_name: must not have leading or trailing whitespace")
+		}
+	}
+	if m.HookIndex != nil {
+		if m.Kind != JobKindMig {
+			return fmt.Errorf("hook_index present but kind is %q (only allowed for %q)", m.Kind, JobKindMig)
+		}
+		if *m.HookIndex < 0 {
+			return fmt.Errorf("hook_index: must be >= 0")
+		}
+	}
+	if m.GateCycleName != "" {
+		if m.Kind != JobKindMig && m.Kind != JobKindGate {
+			return fmt.Errorf("gate_cycle_name present but kind is %q (only allowed for %q or %q)", m.Kind, JobKindMig, JobKindGate)
+		}
+		if strings.ContainsAny(m.GateCycleName, "\n\r\t") {
+			return fmt.Errorf("gate_cycle_name: must not contain control whitespace")
+		}
+		if strings.TrimSpace(m.GateCycleName) != m.GateCycleName {
+			return fmt.Errorf("gate_cycle_name: must not have leading or trailing whitespace")
+		}
 	}
 	if m.SBOM != nil {
 		if m.Kind != JobKindMig {

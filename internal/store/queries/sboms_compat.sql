@@ -5,7 +5,7 @@ WITH latest_successful_sbom_jobs AS (
     j.run_id,
     j.repo_id,
     j.attempt,
-    j.name,
+    COALESCE(j.meta #>> '{sbom,cycle_name}', '') AS cycle_name,
     ROW_NUMBER() OVER (
       PARTITION BY j.run_id, j.repo_id, j.attempt
       ORDER BY COALESCE(j.finished_at, j.started_at, j.created_at) DESC, j.id DESC
@@ -31,7 +31,7 @@ sbom_rows_with_stack AS (
   JOIN jobs gj ON gj.run_id = j.run_id
     AND gj.repo_id = j.repo_id
     AND gj.attempt = j.attempt
-    AND gj.name = regexp_replace(j.name, '-sbom$', '')
+    AND COALESCE(gj.meta->>'gate_cycle_name', '') = j.cycle_name
     AND gj.job_type IN ('pre_gate', 'post_gate', 're_gate')
   JOIN gates g ON g.job_id = gj.id
   JOIN gate_profiles gp ON gp.id = g.profile_id
@@ -54,7 +54,7 @@ WITH latest_successful_sbom_jobs AS (
     j.run_id,
     j.repo_id,
     j.attempt,
-    j.name,
+    COALESCE(j.meta #>> '{sbom,cycle_name}', '') AS cycle_name,
     ROW_NUMBER() OVER (
       PARTITION BY j.run_id, j.repo_id, j.attempt
       ORDER BY COALESCE(j.finished_at, j.started_at, j.created_at) DESC, j.id DESC
@@ -76,7 +76,7 @@ sbom_rows_with_stack AS (
   JOIN jobs gj ON gj.run_id = j.run_id
     AND gj.repo_id = j.repo_id
     AND gj.attempt = j.attempt
-    AND gj.name = regexp_replace(j.name, '-sbom$', '')
+    AND COALESCE(gj.meta->>'gate_cycle_name', '') = j.cycle_name
     AND gj.job_type IN ('pre_gate', 'post_gate', 're_gate')
   JOIN gates g ON g.job_id = gj.id
   JOIN gate_profiles gp ON gp.id = g.profile_id

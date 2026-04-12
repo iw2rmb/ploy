@@ -115,6 +115,11 @@ func (s *CompleteJobService) planAndInsertCycleHookJobs(ctx context.Context, sta
 		}
 		hookMeta := contracts.NewMigJobMeta()
 		hookMeta.HookSource = plans[i].source
+		hookMeta.HookCycleName = cycleName
+		hookMeta.HookIndex = func() *int {
+			v := plans[i].sourceIndex
+			return &v
+		}()
 		hookMeta.ActionSummary = summarizeHookPlanningDecision(plans[i].decision)
 		hookMetaBytes, hookMetaErr := contracts.MarshalJobMeta(hookMeta)
 		if hookMetaErr != nil {

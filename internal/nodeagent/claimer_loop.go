@@ -191,7 +191,7 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 		return true, nil
 	}
 
-	slog.Info("claimed job", "run_id", claim.RunID, "job_id", claim.JobID, "job_name", claim.JobName, "repo_url", claim.RepoURL)
+	slog.Info("claimed job", "run_id", claim.RunID, "job_id", claim.JobID, "repo_url", claim.RepoURL)
 
 	// Map claim response to StartRunRequest.
 	// Parse spec into typed RunOptions and environment variables.
@@ -206,7 +206,7 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 			err,
 			map[string]any{
 				"component": "claim_loop",
-				"job_name":  claim.JobName,
+				"job_type":  claim.JobType,
 			},
 		)
 		return true, fmt.Errorf("parse spec: %w", err)
@@ -221,7 +221,7 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 			err,
 			map[string]any{
 				"component": "claim_loop",
-				"job_name":  claim.JobName,
+				"job_type":  claim.JobType,
 			},
 		)
 		return true, fmt.Errorf("validate stack gate chaining: %w", err)
@@ -242,6 +242,9 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 		NextID:                 claim.NextID,
 		JobName:                claim.JobName, // Job name for branch identification
 		SBOMContext:            claim.SBOMContext,
+		MigContext:             claim.MigContext,
+		HookContext:            claim.HookContext,
+		GateContext:            claim.GateContext,
 		RecoveryContext:        claim.RecoveryContext,
 		GateSkip:               claim.GateSkip,
 		StepSkip:               claim.StepSkip,
@@ -262,7 +265,7 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 			err,
 			map[string]any{
 				"component": "claim_loop",
-				"job_name":  claim.JobName,
+				"job_type":  claim.JobType,
 			},
 		)
 		return true, fmt.Errorf("start run: %w", err)

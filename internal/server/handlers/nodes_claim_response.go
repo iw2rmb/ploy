@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/blobstore"
@@ -39,6 +40,9 @@ type claimResponsePayload struct {
 	CreatedAt              string                           `json:"created_at"`
 	Spec                   json.RawMessage                  `json:"spec,omitempty"`
 	SBOMContext            *contracts.SBOMJobMetadata       `json:"sbom_context,omitempty"`
+	MigContext             *contracts.MigClaimContext       `json:"mig_context,omitempty"`
+	HookContext            *contracts.HookClaimContext      `json:"hook_context,omitempty"`
+	GateContext            *contracts.GateClaimContext      `json:"gate_context,omitempty"`
 	RecoveryContext        *contracts.RecoveryClaimContext  `json:"recovery_context,omitempty"`
 	GateSkip               *contracts.BuildGateSkipMetadata `json:"gate_skip,omitempty"`
 	StepSkip               *contracts.MigStepSkipMetadata   `json:"step_skip,omitempty"`
@@ -125,6 +129,33 @@ func buildClaimResponsePayload(
 		}
 	}
 	var sbomContext *contracts.SBOMJobMetadata
+	var migContext *contracts.MigClaimContext
+	var hookContext *contracts.HookClaimContext
+	var gateContext *contracts.GateClaimContext
+
+	if len(job.Meta) > 0 {
+		if jobMeta, metaErr := contracts.UnmarshalJobMeta(job.Meta); metaErr == nil && jobMeta != nil {
+			if jobType == domaintypes.JobTypeMig && jobMeta.MigStepIndex != nil {
+				migContext = &contracts.MigClaimContext{StepIndex: *jobMeta.MigStepIndex}
+			}
+			if jobType == domaintypes.JobTypeHook {
+				if jobMeta.HookIndex != nil {
+					hookContext = &contracts.HookClaimContext{
+						CycleName: jobMeta.HookCycleName,
+						Source:    jobMeta.HookSource,
+						Index:     *jobMeta.HookIndex,
+					}
+					hookContext.Normalize()
+				}
+			}
+			if jobType == domaintypes.JobTypePreGate || jobType == domaintypes.JobTypePostGate || jobType == domaintypes.JobTypeReGate {
+				if strings.TrimSpace(jobMeta.GateCycleName) != "" {
+					gateContext = &contracts.GateClaimContext{CycleName: strings.TrimSpace(jobMeta.GateCycleName)}
+				}
+			}
+		}
+	}
+
 	if jobType == domaintypes.JobTypeSBOM {
 		jobMeta, metaErr := contracts.UnmarshalJobMeta(job.Meta)
 		if metaErr != nil {
@@ -159,7 +190,7 @@ func buildClaimResponsePayload(
 		RepoID:                 job.RepoID,
 		Attempt:                job.Attempt,
 		JobID:                  job.ID,
-		JobName:                job.Name,
+		JobName:                strings.TrimSpace(job.Name),
 		JobType:                jobType,
 		ActionID:               nil,
 		ActionType:             "",
@@ -176,6 +207,9 @@ func buildClaimResponsePayload(
 		CreatedAt:              run.CreatedAt.Time.Format(time.RFC3339),
 		Spec:                   mergedSpec,
 		SBOMContext:            sbomContext,
+		MigContext:             migContext,
+		HookContext:            hookContext,
+		GateContext:            gateContext,
 		RecoveryContext:        recoveryCtx,
 		GateSkip:               gateSkip,
 		StepSkip:               stepSkip,
@@ -215,6 +249,9 @@ func buildActionClaimResponsePayload(
 		CreatedAt:              run.CreatedAt.Time.Format(time.RFC3339),
 		Spec:                   spec,
 		SBOMContext:            nil,
+		MigContext:             nil,
+		HookContext:            nil,
+		GateContext:            nil,
 		RecoveryContext:        nil,
 		GateSkip:               nil,
 		StepSkip:               nil,

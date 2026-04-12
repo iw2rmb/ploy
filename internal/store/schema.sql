@@ -268,7 +268,6 @@ CREATE TABLE IF NOT EXISTS jobs (
   repo_id         TEXT NOT NULL REFERENCES repos(id) ON DELETE RESTRICT,  -- FK to repos.id for repo attribution.
   repo_base_ref   TEXT NOT NULL,  -- Copied from run_repos.repo_base_ref at job creation time.
   attempt         INTEGER NOT NULL,  -- Copied from run_repos.attempt at job creation time.
-  name            TEXT NOT NULL,
   status          job_status NOT NULL DEFAULT 'Created',  -- v1: 'Created' or 'Queued' (first job per repo attempt).
   job_type        job_type NOT NULL,
   job_image       TEXT NOT NULL DEFAULT '',
@@ -283,8 +282,7 @@ CREATE TABLE IF NOT EXISTS jobs (
   repo_sha_in8    TEXT NOT NULL DEFAULT '',   -- Short form of repo_sha_in.
   repo_sha_out8   TEXT NOT NULL DEFAULT '',   -- Short form of repo_sha_out.
   cache_key       TEXT NOT NULL DEFAULT '',   -- SHA-256 cache identity key for claim-time replay.
-  meta            JSONB NOT NULL DEFAULT '{}'::jsonb,  -- Structured metadata; see JobMeta type docs above.
-  UNIQUE (run_id, repo_id, attempt, name)  -- unique job name per repo attempt.
+  meta            JSONB NOT NULL DEFAULT '{}'::jsonb  -- Structured metadata; see JobMeta type docs above.
 );
 CREATE INDEX IF NOT EXISTS jobs_run_idx ON jobs(run_id);
 -- 'Queued' is the claimable job status (jobs transition Created → Queued when ready to claim).

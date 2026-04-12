@@ -51,9 +51,15 @@ type StartRunRequest struct {
 	JobType   types.JobType   `json:"job_type,omitempty"`  // Job type: pre_gate, mig, post_gate, heal, re_gate
 	JobImage  string          `json:"job_image,omitempty"` // Container image for this job (for heal job dispatch)
 	NextID    *types.JobID    `json:"next_id,omitempty"`   // Linked successor in run chain
-	JobName   string          `json:"job_name,omitempty"`  // Job name for branch identification (e.g., "heal-branch-a-1-0")
+	JobName   string          `json:"job_name,omitempty"`  // Deprecated: kept for wire compatibility during context rollout.
 	// SBOMContext carries explicit sbom cycle metadata from jobs.meta.sbom.
 	SBOMContext *contracts.SBOMJobMetadata `json:"sbom_context,omitempty"`
+	// MigContext carries concrete mig step routing.
+	MigContext *contracts.MigClaimContext `json:"mig_context,omitempty"`
+	// HookContext carries concrete hook cycle/source/index routing.
+	HookContext *contracts.HookClaimContext `json:"hook_context,omitempty"`
+	// GateContext carries concrete gate cycle routing.
+	GateContext *contracts.GateClaimContext `json:"gate_context,omitempty"`
 	// RecoveryContext carries server-resolved recovery inputs for heal/re-gate jobs.
 	RecoveryContext *contracts.RecoveryClaimContext `json:"recovery_context,omitempty"`
 	// GateSkip carries optional skip metadata for gate jobs.

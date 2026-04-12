@@ -26,7 +26,7 @@ func (s *CompleteJobService) onFail(ctx context.Context, state *completeJobState
 	}
 
 	if state.input.Status == domaintypes.JobStatusFail {
-		if errMsg := formatExit137Error(state.job.Name, state.input.ExitCode); errMsg != nil {
+		if errMsg := formatExit137Error(string(state.job.JobType), state.input.ExitCode); errMsg != nil {
 			if updateErr := s.store.UpdateRunRepoError(ctx, store.UpdateRunRepoErrorParams{
 				RunID:     state.job.RunID,
 				RepoID:    state.job.RepoID,
