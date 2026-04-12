@@ -72,8 +72,12 @@ Structured evidence modes:
 
 - `compile_java`:
   - Triggered when `* What went wrong:` indicates `Execution failed for task ':compileJava'.`
-  - Groups compiler diagnostics by normalized signature (`message` with optional
+  - Groups compiler diagnostics by normalized error identity (`message` with optional
     `symbol` / `location`) and emits grouped `files[]` references.
+  - File reference format is compact:
+    - line number is encoded in `files[].path` as `path:line` (for example `a/A.java:10`).
+    - when all snippets are identical and non-empty, snippet is hoisted to `errors[].snippet` and removed from each `files[]` item.
+    - when all file paths share a common directory prefix, it is hoisted to `errors[].base` and `files[].path` values become relative to that base.
   - Excludes Gradle `:compileJava` stacktrace noise from structured payload.
 - `plugin_apply`:
   - Triggered when failure block contains `An exception occurred applying plugin request ...`.
@@ -132,6 +136,10 @@ This behavior ensures:
 - Structured Gradle failure context can be consumed deterministically through
   `/in/errors.yaml` when available.
 - Full logs remain available via artifacts and `LogsText` for manual inspection.
+
+Structured Gradle payload shape is documented in:
+
+- `docs/schemas/gradle.java.trimmer.schema.json`
 
 ## Extensibility
 

@@ -30,15 +30,15 @@ type gradleStructuredPayload struct {
 
 type gradleStructuredError struct {
 	Message   string                    `yaml:"message"`
-	Signature string                    `yaml:"signature,omitempty"`
 	Symbol    string                    `yaml:"symbol,omitempty"`
 	Location  string                    `yaml:"location,omitempty"`
+	Base      string                    `yaml:"base,omitempty"`
+	Snippet   string                    `yaml:"snippet,omitempty"`
 	Files     []gradleStructuredFileRef `yaml:"files,omitempty"`
 }
 
 type gradleStructuredFileRef struct {
 	Path    string `yaml:"path"`
-	Line    int    `yaml:"line,omitempty"`
 	Snippet string `yaml:"snippet,omitempty"`
 }
 
@@ -173,20 +173,20 @@ func buildGradleCompileJavaPayload(firstPart, secondPart []string) (gradleStruct
 	groupBySig := map[string]*gradleStructuredError{}
 	order := make([]string, 0, len(issues))
 	for _, issue := range issues {
-		errEntry, fileRef, ok := parseGradleJavaIssueBlock(issue)
+		sigKey, errEntry, fileRef, ok := parseGradleJavaIssueBlock(issue)
 		if !ok {
 			continue
 		}
-		current, exists := groupBySig[errEntry.Signature]
+		current, exists := groupBySig[sigKey]
 		if !exists {
 			entry := errEntry
 			entry.Files = nil
-			groupBySig[errEntry.Signature] = &entry
-			order = append(order, errEntry.Signature)
+			groupBySig[sigKey] = &entry
+			order = append(order, sigKey)
 			current = &entry
 		}
 		current.Files = append(current.Files, fileRef)
-		groupBySig[errEntry.Signature] = current
+		groupBySig[sigKey] = current
 	}
 
 	if len(groupBySig) == 0 {
@@ -199,7 +199,7 @@ func buildGradleCompileJavaPayload(firstPart, secondPart []string) (gradleStruct
 		seen := make(map[string]struct{}, len(group.Files))
 		files := make([]gradleStructuredFileRef, 0, len(group.Files))
 		for _, f := range group.Files {
-			key := fmt.Sprintf("%s:%d:%s", f.Path, f.Line, f.Snippet)
+			key := fmt.Sprintf("%s:%s", f.Path, f.Snippet)
 			if _, ok := seen[key]; ok {
 				continue
 			}
@@ -207,12 +207,10 @@ func buildGradleCompileJavaPayload(firstPart, secondPart []string) (gradleStruct
 			files = append(files, f)
 		}
 		sort.SliceStable(files, func(i, j int) bool {
-			if files[i].Path == files[j].Path {
-				return files[i].Line < files[j].Line
-			}
 			return files[i].Path < files[j].Path
 		})
 		group.Files = files
+		normalizeGradleFileRefs(group)
 		errorsOut = append(errorsOut, *group)
 	}
 
@@ -223,19 +221,14 @@ func buildGradleCompileJavaPayload(firstPart, secondPart []string) (gradleStruct
 	}, true
 }
 
-func parseGradleJavaIssueBlock(block []string) (gradleStructuredError, gradleStructuredFileRef, bool) {
+func parseGradleJavaIssueBlock(block []string) (string, gradleStructuredError, gradleStructuredFileRef, bool) {
 	if len(block) == 0 {
-		return gradleStructuredError{}, gradleStructuredFileRef{}, false
+		return "", gradleStructuredError{}, gradleStructuredFileRef{}, false
 	}
 	m := gradleJavaErrorLineRe.FindStringSubmatch(strings.TrimSpace(block[0]))
 	if len(m) != 4 {
-		return gradleStructuredError{}, gradleStructuredFileRef{}, false
+		return "", gradleStructuredError{}, gradleStructuredFileRef{}, false
 	}
-	line, err := strconv.Atoi(m[2])
-	if err != nil {
-		return gradleStructuredError{}, gradleStructuredFileRef{}, false
-	}
-
 	message := strings.TrimSpace(m[3])
 	symbol := ""
 	location := ""
@@ -262,18 +255,119 @@ func parseGradleJavaIssueBlock(block []string) (gradleStructuredError, gradleStr
 	if location != "" {
 		sigParts = append(sigParts, "location="+location)
 	}
-	signature := strings.Join(sigParts, " | ")
+	sigKey := strings.Join(sigParts, " | ")
 
-	return gradleStructuredError{
+	pathWithLine := strings.TrimSpace(m[1]) + ":" + strings.TrimSpace(m[2])
+	return sigKey, gradleStructuredError{
 			Message:   message,
-			Signature: signature,
 			Symbol:    symbol,
 			Location:  location,
 		}, gradleStructuredFileRef{
-			Path:    strings.TrimSpace(m[1]),
-			Line:    line,
+			Path:    pathWithLine,
 			Snippet: snippet,
 		}, true
+}
+
+func normalizeGradleFileRefs(entry *gradleStructuredError) {
+	if entry == nil || len(entry.Files) == 0 {
+		return
+	}
+	if snippet, ok := commonSnippet(entry.Files); ok {
+		entry.Snippet = snippet
+		for i := range entry.Files {
+			entry.Files[i].Snippet = ""
+		}
+	}
+	if base, ok := commonBasePath(entry.Files); ok {
+		entry.Base = base
+		for i := range entry.Files {
+			filePath, line, hasLine := splitPathAndLine(entry.Files[i].Path)
+			trimmed := strings.TrimPrefix(filePath, base)
+			if trimmed == "" || trimmed == filePath {
+				continue
+			}
+			if hasLine {
+				entry.Files[i].Path = trimmed + ":" + strconv.Itoa(line)
+				continue
+			}
+			entry.Files[i].Path = trimmed
+		}
+	}
+}
+
+func commonSnippet(files []gradleStructuredFileRef) (string, bool) {
+	if len(files) == 0 {
+		return "", false
+	}
+	candidate := files[0].Snippet
+	if strings.TrimSpace(candidate) == "" {
+		return "", false
+	}
+	for i := 1; i < len(files); i++ {
+		if files[i].Snippet != candidate {
+			return "", false
+		}
+	}
+	return candidate, true
+}
+
+func commonBasePath(files []gradleStructuredFileRef) (string, bool) {
+	if len(files) == 0 {
+		return "", false
+	}
+	dir := ""
+	for i := range files {
+		filePath, _, _ := splitPathAndLine(files[i].Path)
+		slash := strings.LastIndex(filePath, "/")
+		if slash <= 0 {
+			return "", false
+		}
+		currentDir := filePath[:slash+1]
+		if i == 0 {
+			dir = currentDir
+			continue
+		}
+		dir = sharedPrefix(dir, currentDir)
+		if dir == "" {
+			return "", false
+		}
+	}
+	lastSlash := strings.LastIndex(dir, "/")
+	if lastSlash < 0 {
+		return "", false
+	}
+	base := dir[:lastSlash+1]
+	if base == "" {
+		return "", false
+	}
+	return base, true
+}
+
+func splitPathAndLine(pathWithOptionalLine string) (string, int, bool) {
+	idx := strings.LastIndex(pathWithOptionalLine, ":")
+	if idx <= 0 || idx >= len(pathWithOptionalLine)-1 {
+		return pathWithOptionalLine, 0, false
+	}
+	line, err := strconv.Atoi(pathWithOptionalLine[idx+1:])
+	if err != nil {
+		return pathWithOptionalLine, 0, false
+	}
+	return pathWithOptionalLine[:idx], line, true
+}
+
+func sharedPrefix(a, b string) string {
+	if a == "" || b == "" {
+		return ""
+	}
+	limit := len(a)
+	if len(b) < limit {
+		limit = len(b)
+	}
+	i := 0
+	for i < limit && a[i] == b[i] {
+		i++
+	}
+	return a[:i]
 }
 
 func buildGradlePluginApplyPayload(secondPart []string) (gradleStructuredPayload, bool) {

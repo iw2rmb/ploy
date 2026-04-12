@@ -3,6 +3,7 @@ package nodeagent
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -10,8 +11,10 @@ import (
 	"strings"
 	"time"
 
+	ploydnodeassets "github.com/iw2rmb/ploy/cmd/assets/ployd-node"
 	types "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
+	"github.com/iw2rmb/ploy/internal/workflow/lifecycle"
 	"gopkg.in/yaml.v3"
 )
 
@@ -97,6 +100,18 @@ func (r *runController) populateHealingInDir(
 		default:
 			return fmt.Errorf("parse recovery_context.errors: expected object or array")
 		}
+		if schemaPath, schemaRaw, ok, err := resolveTrimmerSchemaForRecovery(recoveryCtx); err != nil {
+			return fmt.Errorf("resolve trimmer schema: %w", err)
+		} else if ok {
+			if parsedObj, isObj := parsed.(map[string]any); isObj {
+				parsedObj["$schema"] = schemaPath
+			}
+			inTrimmerSchemaPath := filepath.Join(inDir, strings.TrimPrefix(schemaPath, "/in/"))
+			if err := os.WriteFile(inTrimmerSchemaPath, schemaRaw, 0o644); err != nil {
+				return fmt.Errorf("write %s: %w", schemaPath, err)
+			}
+			slog.Info("hydrated trimmer schema for healing job", "run_id", runID, "path", schemaPath)
+		}
 		errorsYAML, err := yaml.Marshal(parsed)
 		if err != nil {
 			return fmt.Errorf("marshal recovery_context.errors to yaml: %w", err)
@@ -175,4 +190,28 @@ func (r *runController) populateHealingInDir(
 	slog.Info("hydrated /in/gate_profile.json for healing job", "run_id", runID, "path", inProfilePath)
 
 	return nil
+}
+
+func resolveTrimmerSchemaForRecovery(recoveryCtx *contracts.RecoveryClaimContext) (string, []byte, bool, error) {
+	if recoveryCtx == nil {
+		return "", nil, false, nil
+	}
+	spec := lifecycle.StackExpectationFromMigStack(recoveryCtx.DetectedStack)
+	if spec == nil {
+		return "", nil, false, nil
+	}
+	tool := strings.ToLower(strings.TrimSpace(spec.Tool))
+	language := strings.ToLower(strings.TrimSpace(spec.Language))
+	if tool == "" || language == "" {
+		return "", nil, false, nil
+	}
+	name := tool + "." + language + ".trimmer.schema.json"
+	schemaRaw, err := ploydnodeassets.ReadTrimmerSchema(name)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return "", nil, false, nil
+		}
+		return "", nil, false, err
+	}
+	return "/in/" + name, schemaRaw, true, nil
 }

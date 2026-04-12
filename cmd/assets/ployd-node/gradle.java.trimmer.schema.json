@@ -1,0 +1,107 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Ploy Gradle Trimmer Evidence",
+  "description": "Schema for structured Gradle build-gate trimmer evidence forwarded as /in/errors.yaml.",
+  "$comment": "Gradle compile_java mode uses compact file references: line number is encoded as path suffix ':<line>'.",
+  "type": "object",
+  "required": ["mode", "errors"],
+  "additionalProperties": false,
+  "properties": {
+    "mode": {
+      "type": "string",
+      "enum": ["compile_java", "plugin_apply", "raw"],
+      "$comment": "Evidence mode produced by trimmer. compile_java carries grouped compiler diagnostics; plugin_apply and raw carry concise failure messages."
+    },
+    "task": {
+      "type": "string",
+      "$comment": "Gradle task name for compile_java mode."
+    },
+    "plugin_id": {
+      "type": "string",
+      "$comment": "Plugin id extracted from plugin_apply failures when present."
+    },
+    "plugin_version": {
+      "type": "string",
+      "$comment": "Plugin version extracted from plugin_apply failures when present."
+    },
+    "errors": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/definitions/error"
+      }
+    }
+  },
+  "definitions": {
+    "error": {
+      "type": "object",
+      "required": ["message"],
+      "additionalProperties": false,
+      "properties": {
+        "message": {
+          "type": "string",
+          "minLength": 1
+        },
+        "symbol": {
+          "type": "string"
+        },
+        "location": {
+          "type": "string"
+        },
+        "base": {
+          "type": "string",
+          "$comment": "Common base directory for all files in this error. When present, files[].path is relative to this base.",
+          "pattern": "/$"
+        },
+        "snippet": {
+          "type": "string",
+          "$comment": "Common snippet hoisted from files[].snippet when all file snippets in this error are identical and non-empty."
+        },
+        "files": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/file"
+          }
+        }
+      }
+    },
+    "file": {
+      "type": "object",
+      "required": ["path"],
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "$comment": "File path. For compile_java diagnostics, line is encoded as '<path>:<line>'. Path may be relative when error.base is provided."
+        },
+        "snippet": {
+          "type": "string",
+          "$comment": "Per-file snippet when snippets are not hoisted to error.snippet."
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "mode": { "const": "compile_java" }
+        }
+      },
+      "then": {
+        "required": ["task"],
+        "properties": {
+          "task": {
+            "const": "compileJava"
+          },
+          "errors": {
+            "items": {
+              "required": ["message", "files"]
+            }
+          }
+        }
+      }
+    }
+  ]
+}

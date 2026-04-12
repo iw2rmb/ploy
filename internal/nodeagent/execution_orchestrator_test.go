@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	ploydnodeassets "github.com/iw2rmb/ploy/cmd/assets/ployd-node"
 	"github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"github.com/iw2rmb/ploy/internal/workflow/step"
@@ -19,6 +20,15 @@ func mustGateProfileSchemaJSON(t *testing.T) string {
 	raw, err := contracts.ReadGateProfileSchemaJSON()
 	if err != nil {
 		t.Fatalf("ReadGateProfileSchemaJSON: %v", err)
+	}
+	return string(raw)
+}
+
+func mustTrimmerSchemaJSON(t *testing.T, name string) string {
+	t.Helper()
+	raw, err := ploydnodeassets.ReadTrimmerSchema(name)
+	if err != nil {
+		t.Fatalf("ReadTrimmerSchema(%q): %v", name, err)
 	}
 	return string(raw)
 }
@@ -117,10 +127,14 @@ func TestPopulateHealingInDir(t *testing.T) {
 		{
 			name: "HydratesStructuredErrorsYAML",
 			recovery: &contracts.RecoveryClaimContext{
-				BuildGateLog: "failure\n",
-				Errors:       json.RawMessage(`{"mode":"compile_java","errors":[{"message":"cannot find symbol"}]}`),
+				BuildGateLog:  "failure\n",
+				DetectedStack: contracts.MigStackJavaGradle,
+				Errors:        json.RawMessage(`{"mode":"compile_java","errors":[{"message":"cannot find symbol"}]}`),
 			},
-			wantFiles: map[string]string{"build-gate.log": "failure\n"},
+			wantFiles: map[string]string{
+				"build-gate.log":                  "failure\n",
+				"gradle.java.trimmer.schema.json": "auto_trimmer",
+			},
 			customAssert: func(t *testing.T, inDir string) {
 				t.Helper()
 				raw, err := os.ReadFile(filepath.Join(inDir, "errors.yaml"))
@@ -133,6 +147,38 @@ func TestPopulateHealingInDir(t *testing.T) {
 				}
 				if got, want := payload["mode"], "compile_java"; got != want {
 					t.Fatalf("errors.yaml mode=%v, want %q", got, want)
+				}
+				if got, want := payload["$schema"], "/in/gradle.java.trimmer.schema.json"; got != want {
+					t.Fatalf("errors.yaml $schema=%v, want %q", got, want)
+				}
+			},
+		},
+		{
+			name: "HydratesStructuredErrorsYAMLArrayWithoutSchemaInjection",
+			recovery: &contracts.RecoveryClaimContext{
+				BuildGateLog:  "failure\n",
+				DetectedStack: contracts.MigStackJavaGradle,
+				Errors:        json.RawMessage(`[{"message":"cannot find symbol"}]`),
+			},
+			wantFiles: map[string]string{
+				"build-gate.log":                  "failure\n",
+				"gradle.java.trimmer.schema.json": "auto_trimmer",
+			},
+			customAssert: func(t *testing.T, inDir string) {
+				t.Helper()
+				raw, err := os.ReadFile(filepath.Join(inDir, "errors.yaml"))
+				if err != nil {
+					t.Fatalf("read /in/errors.yaml: %v", err)
+				}
+				var payload []map[string]any
+				if err := yaml.Unmarshal(raw, &payload); err != nil {
+					t.Fatalf("decode /in/errors.yaml array: %v", err)
+				}
+				if len(payload) != 1 {
+					t.Fatalf("errors.yaml len=%d, want 1", len(payload))
+				}
+				if _, has := payload[0]["$schema"]; has {
+					t.Fatalf("errors.yaml array item unexpectedly contains $schema")
 				}
 			},
 		},
@@ -208,6 +254,8 @@ func TestPopulateHealingInDir(t *testing.T) {
 			for k, v := range tc.wantFiles {
 				if v == "auto" {
 					resolvedWantFiles[k] = mustGateProfileSchemaJSON(t)
+				} else if v == "auto_trimmer" {
+					resolvedWantFiles[k] = mustTrimmerSchemaJSON(t, k)
 				} else {
 					resolvedWantFiles[k] = v
 				}
