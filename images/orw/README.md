@@ -49,6 +49,7 @@ Optional:
 
 - `ORW_REPOS` (comma-separated repo URLs)
 - `ORW_REPO_USERNAME` + `ORW_REPO_PASSWORD` (must be paired)
+- `ORW_CONFIG_PATH` (optional explicit rewrite YAML path)
 - `ORW_ACTIVE_RECIPES` (comma-separated override list)
 - `ORW_FAIL_ON_UNSUPPORTED` (default `true`)
 - `ORW_EXCLUDE_PATHS` (comma-separated globs)
@@ -64,10 +65,13 @@ Optional:
 
 ## `rewrite.yml` Behavior
 
-When a `rewrite.yml` exists in workspace:
+When a `rewrite.yml` config is available:
 
-- `rewrite.configLocation` points to `rewrite.yml`
-- Active recipes are derived from the file (docs also mention `REWRITE_ACTIVE_RECIPES` override for this path)
+- Config resolution order is:
+  1) `ORW_CONFIG_PATH`
+  2) `/out/rewrite.yml`
+- Active recipes default to top-level `name:` in `rewrite.yml` (override with `ORW_ACTIVE_RECIPES` when needed)
+- `RECIPE_CLASSNAME` is still required by the ORW runtime contract
 
 If no `rewrite.yml` exists, ORW falls back to class-based recipe execution using the recipe coordinates and `RECIPE_CLASSNAME`.
 

@@ -493,8 +493,8 @@ migs:
       RUN_SCRIPT: ./generate-rewrite.sh
 ```
 
-`./generate-rewrite.sh` runs inside `/workspace` and writes a complete
-`rewrite.yml` to the repo root, for example:
+`./generate-rewrite.sh` runs inside the mig container and writes a complete
+`rewrite.yml` to `/out/rewrite.yml`, for example:
 
 ```yaml
 type: specs.openrewrite.org/v1beta/recipe
@@ -523,11 +523,15 @@ migs:
       RECIPE_CLASSNAME: org.openrewrite.java.migrate.UpgradeToJava17
 ```
 
-The ORW Migs honor an existing `rewrite.yml` in the workspace:
+The ORW Migs honor an existing `rewrite.yml` config:
 
-- `rewrite.configLocation` points to `rewrite.yml`.
+- `rewrite.configLocation` is resolved in this order:
+  1) `ORW_CONFIG_PATH`
+  2) `/out/rewrite.yml`
 - `rewrite.activeRecipes` defaults to the top-level `name:` in `rewrite.yml`
-  (or `REWRITE_ACTIVE_RECIPES` if provided).
+  (or `ORW_ACTIVE_RECIPES` if provided).
+- `RECIPE_CLASSNAME` remains required by ORW runtime contract even when
+  `rewrite.yml` is present.
 - If no `rewrite.yml` exists, ORW Migs fall back to running the class recipe
   directly using `RECIPE_CLASSNAME` and the artifact coordinates.
 
@@ -535,7 +539,7 @@ The ORW Migs honor an existing `rewrite.yml` in the workspace:
 
 For healing lanes that choose OpenRewrite automation:
 
-1. Write or update `/workspace/rewrite.yml` with the desired custom recipe.
+1. Write or update `/out/rewrite.yml` with the desired custom recipe.
 2. Ensure required recipe envs are set:
    - `RECIPE_GROUP`
    - `RECIPE_ARTIFACT`

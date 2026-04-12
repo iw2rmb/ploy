@@ -601,6 +601,7 @@ Optional repository and execution controls:
 | `ORW_REPOS` | Comma-separated Maven repository URLs |
 | `ORW_REPO_USERNAME` | Repository username (must be paired with `ORW_REPO_PASSWORD`) |
 | `ORW_REPO_PASSWORD` | Repository password (must be paired with `ORW_REPO_USERNAME`) |
+| `ORW_CONFIG_PATH` | Optional path to rewrite YAML config; when unset ORW uses `/out/rewrite.yml` |
 | `ORW_ACTIVE_RECIPES` | Comma-separated override list of active recipes |
 | `ORW_FAIL_ON_UNSUPPORTED` | Boolean flag, default `true` |
 | `ORW_EXCLUDE_PATHS` | Comma-separated glob patterns excluded from ORW parsing (for example `**/*.proto`) |
@@ -610,10 +611,16 @@ Healing execution (custom recipe via Amata lane):
 
 - Canonical command:
   - `heal-orw --apply --dir /workspace --out /out/orw-task`
+- `rewrite.yml` support:
+  - Config resolution order is: `ORW_CONFIG_PATH` -> `/out/rewrite.yml`.
+  - When a config file is found, ORW activates top-level `name:` by default.
+  - Use `ORW_ACTIVE_RECIPES` to override active recipe names.
+  - `RECIPE_CLASSNAME` remains required by runtime contract.
 - `heal-orw` sets `ORW_BUILD_SYSTEM` (`gradle|maven`) using workspace markers
   and then invokes `orw-cli`.
 - If both `pom.xml` and `build.gradle(.kts)` are present, set
   `ORW_BUILD_SYSTEM` explicitly before invoking `heal-orw`.
+- If `ORW_EXCLUDE_PATHS` is unset/empty, no exclude globs are applied.
 - Failure artifacts are written to `/out/orw-task/report.json` and
   `/out/orw-task/transform.log`.
 

@@ -126,6 +126,208 @@ exit 67
 	}
 }
 
+func TestOrwCLI_PrefersOutRewriteConfigAndActivatesYamlName(t *testing.T) {
+	t.Parallel()
+
+	workspace := t.TempDir()
+	outdir := t.TempDir()
+	binDir := t.TempDir()
+
+	rewriteYAML := "type: specs.openrewrite.org/v1beta/recipe\nname: PloyApplyYaml\nrecipeList: []\n"
+	if err := os.WriteFile(filepath.Join(outdir, "rewrite.yml"), []byte(rewriteYAML), 0o644); err != nil {
+		t.Fatalf("write out rewrite.yml: %v", err)
+	}
+
+	rewritePath := filepath.Join(binDir, "rewrite")
+	rewriteScript := `#!/usr/bin/env bash
+set -euo pipefail
+config=""
+recipe=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --config) config="${2:-}"; shift 2 ;;
+    --recipe) recipe="${2:-}"; shift 2 ;;
+    *) shift ;;
+  esac
+done
+echo "[rewrite-stub] config=$config"
+echo "[rewrite-stub] recipe=$recipe"
+if [[ "$config" != "${OUT_EXPECTED_CONFIG:-}" ]]; then
+  echo "[rewrite-stub] unexpected config path" >&2
+  exit 51
+fi
+if [[ "$recipe" != "PloyApplyYaml" ]]; then
+  echo "[rewrite-stub] unexpected recipe name" >&2
+  exit 52
+fi
+`
+	if err := os.WriteFile(rewritePath, []byte(rewriteScript), 0o755); err != nil {
+		t.Fatalf("write rewrite stub: %v", err)
+	}
+
+	migScript := resolveORWCLIScript(t)
+	cmd := exec.Command("bash", migScript, "--apply", "--dir", workspace, "--out", outdir)
+	cmd.Env = append(os.Environ(),
+		"RECIPE_GROUP=org.openrewrite.recipe",
+		"RECIPE_ARTIFACT=rewrite-migrate-java",
+		"RECIPE_VERSION=3.20.0",
+		"RECIPE_CLASSNAME=org.openrewrite.java.migrate.UpgradeToJava17",
+		"OUT_EXPECTED_CONFIG="+filepath.Join(outdir, "rewrite.yml"),
+		"PATH="+binDir+string(os.PathListSeparator)+os.Getenv("PATH"),
+	)
+
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("orw-cli failed: %v\nstdout/stderr:\n%s", err, string(out))
+	}
+
+	logBytes, err := os.ReadFile(filepath.Join(outdir, contracts.ORWCLITransformLogName))
+	if err != nil {
+		t.Fatalf("read transform.log: %v", err)
+	}
+	logText := string(logBytes)
+	if !strings.Contains(logText, "[rewrite-stub] config="+filepath.Join(outdir, "rewrite.yml")) {
+		t.Fatalf("transform.log missing /out rewrite.yml usage:\n%s", logText)
+	}
+	if !strings.Contains(logText, "[rewrite-stub] recipe=PloyApplyYaml") {
+		t.Fatalf("transform.log missing recipe name from /out rewrite.yml:\n%s", logText)
+	}
+}
+
+func TestOrwCLI_DoesNotAutoUseWorkspaceRewriteConfig(t *testing.T) {
+	t.Parallel()
+
+	workspace := t.TempDir()
+	outdir := t.TempDir()
+	binDir := t.TempDir()
+
+	rewriteYAML := "type: specs.openrewrite.org/v1beta/recipe\nname: WorkspaceRecipe\nrecipeList: []\n"
+	if err := os.WriteFile(filepath.Join(workspace, "rewrite.yml"), []byte(rewriteYAML), 0o644); err != nil {
+		t.Fatalf("write workspace rewrite.yml: %v", err)
+	}
+
+	rewritePath := filepath.Join(binDir, "rewrite")
+	rewriteScript := `#!/usr/bin/env bash
+set -euo pipefail
+config=""
+recipe=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --config) config="${2:-}"; shift 2 ;;
+    --recipe) recipe="${2:-}"; shift 2 ;;
+    *) shift ;;
+  esac
+done
+echo "[rewrite-stub] config=$config"
+echo "[rewrite-stub] recipe=$recipe"
+if [[ -n "$config" ]]; then
+  echo "[rewrite-stub] unexpected config path" >&2
+  exit 53
+fi
+if [[ "$recipe" != "org.openrewrite.java.migrate.UpgradeToJava17" ]]; then
+  echo "[rewrite-stub] unexpected recipe name" >&2
+  exit 54
+fi
+`
+	if err := os.WriteFile(rewritePath, []byte(rewriteScript), 0o755); err != nil {
+		t.Fatalf("write rewrite stub: %v", err)
+	}
+
+	migScript := resolveORWCLIScript(t)
+	cmd := exec.Command("bash", migScript, "--apply", "--dir", workspace, "--out", outdir)
+	cmd.Env = append(os.Environ(),
+		"RECIPE_GROUP=org.openrewrite.recipe",
+		"RECIPE_ARTIFACT=rewrite-migrate-java",
+		"RECIPE_VERSION=3.20.0",
+		"RECIPE_CLASSNAME=org.openrewrite.java.migrate.UpgradeToJava17",
+		"PATH="+binDir+string(os.PathListSeparator)+os.Getenv("PATH"),
+	)
+
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("orw-cli failed: %v\nstdout/stderr:\n%s", err, string(out))
+	}
+
+	logBytes, err := os.ReadFile(filepath.Join(outdir, contracts.ORWCLITransformLogName))
+	if err != nil {
+		t.Fatalf("read transform.log: %v", err)
+	}
+	logText := string(logBytes)
+	if !strings.Contains(logText, "[rewrite-stub] config=") {
+		t.Fatalf("transform.log missing config marker:\n%s", logText)
+	}
+	if strings.Contains(logText, "[rewrite-stub] config="+filepath.Join(workspace, "rewrite.yml")) {
+		t.Fatalf("transform.log unexpectedly used workspace rewrite.yml:\n%s", logText)
+	}
+	if !strings.Contains(logText, "[rewrite-stub] recipe=org.openrewrite.java.migrate.UpgradeToJava17") {
+		t.Fatalf("transform.log missing class recipe fallback:\n%s", logText)
+	}
+}
+
+func TestOrwCLI_WarnsOnLegacyExcludeAliasesAndExportsCanonicalExcludeEnv(t *testing.T) {
+	t.Parallel()
+
+	workspace := t.TempDir()
+	outdir := t.TempDir()
+	binDir := t.TempDir()
+
+	rewritePath := filepath.Join(binDir, "rewrite")
+	rewriteScript := `#!/usr/bin/env bash
+set -euo pipefail
+if [[ "${ORW_EXCLUDE_PATHS+x}" == "x" ]]; then
+  echo "[rewrite-stub] ORW_EXCLUDE_PATHS_SET"
+else
+  echo "[rewrite-stub] ORW_EXCLUDE_PATHS_UNSET"
+fi
+echo "[rewrite-stub] ORW_EXCLUDES=${ORW_EXCLUDES:-}"
+echo "[rewrite-stub] ORW_INCLUDES=${ORW_INCLUDES:-}"
+`
+	if err := os.WriteFile(rewritePath, []byte(rewriteScript), 0o755); err != nil {
+		t.Fatalf("write rewrite stub: %v", err)
+	}
+
+	migScript := resolveORWCLIScript(t)
+	cmd := exec.Command("bash", migScript, "--apply", "--dir", workspace, "--out", outdir)
+	cmd.Env = append(os.Environ(),
+		"RECIPE_GROUP=org.openrewrite.recipe",
+		"RECIPE_ARTIFACT=rewrite-migrate-java",
+		"RECIPE_VERSION=3.20.0",
+		"RECIPE_CLASSNAME=org.openrewrite.java.migrate.UpgradeToJava17",
+		"ORW_EXCLUDES=**/*.proto",
+		"ORW_INCLUDES=src/main/java/**",
+		"PATH="+binDir+string(os.PathListSeparator)+os.Getenv("PATH"),
+	)
+
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("orw-cli failed: %v\nstdout/stderr:\n%s", err, string(out))
+	}
+
+	logBytes, err := os.ReadFile(filepath.Join(outdir, contracts.ORWCLITransformLogName))
+	if err != nil {
+		t.Fatalf("read transform.log: %v", err)
+	}
+	logText := string(logBytes)
+	if !strings.Contains(logText, "Warning: ORW_EXCLUDES/ORW_INCLUDES are unsupported; use ORW_EXCLUDE_PATHS.") {
+		t.Fatalf("transform.log missing legacy-alias warning:\n%s", logText)
+	}
+	if !strings.Contains(logText, "[rewrite-stub] ORW_EXCLUDE_PATHS_SET") {
+		t.Fatalf("transform.log missing canonical ORW_EXCLUDE_PATHS marker:\n%s", logText)
+	}
+
+	reportBytes, err := os.ReadFile(filepath.Join(outdir, contracts.ORWCLIReportFileName))
+	if err != nil {
+		t.Fatalf("read report.json: %v", err)
+	}
+	report, err := contracts.ParseORWCLIReport(reportBytes)
+	if err != nil {
+		t.Fatalf("parse report.json: %v\nreport=%s", err, string(reportBytes))
+	}
+	if !report.Success {
+		t.Fatalf("report.success=false, expected true: %s", string(reportBytes))
+	}
+}
+
 func TestOrwCLI_UnsupportedTypeAttributionWritesDeterministicReport(t *testing.T) {
 	t.Parallel()
 

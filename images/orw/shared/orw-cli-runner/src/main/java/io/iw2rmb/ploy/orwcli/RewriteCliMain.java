@@ -659,6 +659,9 @@ public final class RewriteCliMain {
         }
 
         private static List<String> splitCsv(String raw) {
+            if (raw == null) {
+                return Collections.emptyList();
+            }
             return Arrays.stream(raw.split(","))
                 .map(String::trim)
                 .filter(s -> !s.isEmpty())
