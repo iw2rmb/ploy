@@ -227,7 +227,8 @@ func TestBuildGateLogFindingContent(t *testing.T) {
 		logText           string
 		wantMode          string
 		wantEvidenceParts []string
-		wantNoEvidence    bool
+		wantNoEvidence    []string
+		wantNoPayload     bool
 		wantNoStacktrace  bool
 	}{
 		{
@@ -248,8 +249,37 @@ org.gradle.api.tasks.TaskExecutionException: Execution failed for task ':compile
 BUILD FAILED in 5s
 `,
 			wantMode:          "compile_java",
-			wantEvidenceParts: []string{"task: compileJava", "symbol: class Missing", "path: /workspace/src/main/java/a/A.java", "path: /workspace/src/main/java/b/B.java"},
+			wantEvidenceParts: []string{
+				"task: compileJava",
+				"symbol: class Missing",
+				"base: /workspace/src/main/java/",
+				"path: a/A.java:10",
+				"path: b/B.java:20",
+			},
+			wantNoEvidence:   []string{"line:"},
 			wantNoStacktrace:  true,
+		},
+		{
+			name: "gradle compile_java hoists common snippet and normalizes single-file error",
+			tool: "gradle",
+			logText: `
+/workspace/src/main/java/a/A.java:10: error: cannot find symbol
+  return Mono.subscriberContext()
+         ^
+  symbol:   method subscriberContext()
+1 errors
+* What went wrong:
+Execution failed for task ':compileJava'.
+> Compilation failed; see the compiler error output for details.
+BUILD FAILED in 5s
+`,
+			wantMode: "compile_java",
+			wantEvidenceParts: []string{
+				"base: /workspace/src/main/java/a/",
+				"snippet: return Mono.subscriberContext()",
+				"path: A.java:10",
+			},
+			wantNoEvidence: []string{"line:", "files:\n      - path: A.java:10\n        snippet:"},
 		},
 		{
 			name: "gradle plugin_apply evidence includes plugin id and version",
@@ -283,7 +313,7 @@ BUILD FAILED in 1s
 			name:           "maven has no structured evidence",
 			tool:           "maven",
 			logText:        "[ERROR] COMPILATION ERROR\n",
-			wantNoEvidence: true,
+			wantNoPayload:  true,
 		},
 	}
 
@@ -296,7 +326,7 @@ BUILD FAILED in 1s
 			if strings.TrimSpace(trimmed) == "" {
 				t.Fatal("expected non-empty trimmed message")
 			}
-			if tt.wantNoEvidence {
+			if tt.wantNoPayload {
 				if strings.TrimSpace(evidence) != "" {
 					t.Fatalf("expected no evidence, got:\n%s", evidence)
 				}
@@ -316,6 +346,11 @@ BUILD FAILED in 1s
 			for _, part := range tt.wantEvidenceParts {
 				if !strings.Contains(evidence, part) {
 					t.Errorf("evidence missing %q", part)
+				}
+			}
+			for _, part := range tt.wantNoEvidence {
+				if strings.Contains(evidence, part) {
+					t.Errorf("evidence should not contain %q", part)
 				}
 			}
 			if tt.wantNoStacktrace && strings.Contains(evidence, "TaskExecutionException") {
