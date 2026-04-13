@@ -455,12 +455,16 @@ WHERE repo_id = sqlc.arg(repo_id)
   AND cache_key <> ''
   AND status IN ('Success', 'Fail')
   AND (
-    status <> 'Fail'
-    OR EXISTS (
-      SELECT 1
-      FROM logs
-      WHERE logs.run_id = jobs.run_id
-        AND logs.job_id = jobs.id
+    status = 'Success'
+    OR (
+      status = 'Fail'
+      AND exit_code = 1
+      AND EXISTS (
+        SELECT 1
+        FROM logs
+        WHERE logs.run_id = jobs.run_id
+          AND logs.job_id = jobs.id
+      )
     )
   )
   AND NOT (meta ? 'cache_mirror')

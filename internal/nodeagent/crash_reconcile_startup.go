@@ -7,6 +7,7 @@ import (
 	"log/slog"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/workflow/lifecycle"
 )
 
 func (c *ClaimManager) runStartupReconcile(ctx context.Context) error {
@@ -81,10 +82,7 @@ func (c *ClaimManager) reconcileRecoveredTerminalContainer(ctx context.Context, 
 	}
 
 	exitCode := int32(terminal.ExitCode)
-	status := types.JobStatusFail
-	if exitCode == 0 {
-		status = types.JobStatusSuccess
-	}
+	status := lifecycle.JobStatusFromExitCode(int(exitCode))
 
 	durationMs := int64(0)
 	if !terminal.StartedAt.IsZero() && !terminal.FinishedAt.IsZero() && terminal.FinishedAt.After(terminal.StartedAt) {

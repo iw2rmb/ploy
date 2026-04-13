@@ -389,6 +389,217 @@ func TestCrashReconcile_RecoveredRunningMonitor_UploadsLogsAndTerminalStatus(t *
 	}
 }
 
+func TestCrashReconcile_RecoveredRunningMonitor_ExitCodeAboveOneReportsError(t *testing.T) {
+	t.Parallel()
+
+	s := workflowkit.NewRunOrchestrationScenario()
+	containerID := "ctr-running-exit-two"
+	completeCh := make(chan struct {
+		Status   string `json:"status"`
+		ExitCode int32  `json:"exit_code"`
+	}, 1)
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/v1/nodes/"+testNodeID+"/logs":
+			w.WriteHeader(http.StatusCreated)
+		case r.URL.Path == "/v1/jobs/"+s.JobID.String()+"/complete":
+			var completePayload struct {
+				Status   string `json:"status"`
+				ExitCode int32  `json:"exit_code"`
+			}
+			_ = json.NewDecoder(r.Body).Decode(&completePayload)
+			select {
+			case completeCh <- completePayload:
+			default:
+			}
+			w.WriteHeader(http.StatusOK)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer ts.Close()
+
+	fakeDocker := &fakeDockerClient{
+		waitByID: map[string]containertypes.WaitResponse{
+			containerID: {StatusCode: 2},
+		},
+		inspectByID: map[string]client.ContainerInspectResult{
+			containerID: {
+				Container: containertypes.InspectResponse{
+					State: &containertypes.State{
+						ExitCode:   2,
+						Status:     containertypes.ContainerState("exited"),
+						StartedAt:  "2026-02-26T15:00:00Z",
+						FinishedAt: "2026-02-26T15:00:02Z",
+					},
+				},
+			},
+		},
+		logsByID: map[string][]byte{
+			containerID: multiplexedDockerLogs("stderr line\n", stdcopy.Stderr),
+		},
+	}
+
+	controller := &mockRunController{}
+	claimer := setupClaimer(t, newAgentConfig(ts.URL), controller)
+	claimer.startupReconciler = &startupCrashReconciler{docker: fakeDocker}
+
+	claimer.startRecoveredRunningMonitors(context.Background(), []recoveredRunningContainer{
+		{ContainerID: containerID, RunID: s.RunID, JobID: s.JobID},
+	})
+
+	timeout := time.After(2 * time.Second)
+	for {
+		select {
+		case completePayload := <-completeCh:
+			if completePayload.Status != types.JobStatusError.String() {
+				t.Fatalf("status = %q, want %q", completePayload.Status, types.JobStatusError.String())
+			}
+			if completePayload.ExitCode != 2 {
+				t.Fatalf("exit_code = %d, want 2", completePayload.ExitCode)
+			}
+			return
+		case <-timeout:
+			t.Fatal("timeout waiting for recovered running completion")
+		default:
+			time.Sleep(10 * time.Millisecond)
+		}
+	}
+}
+
+func TestCrashReconcile_RecoveredRunningMonitor_WaitErrorReportsError(t *testing.T) {
+	t.Parallel()
+
+	s := workflowkit.NewRunOrchestrationScenario()
+	containerID := "ctr-running-wait-error"
+	completeCh := make(chan struct {
+		Status   string `json:"status"`
+		ExitCode int32  `json:"exit_code"`
+	}, 1)
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/v1/jobs/"+s.JobID.String()+"/complete":
+			var completePayload struct {
+				Status   string `json:"status"`
+				ExitCode int32  `json:"exit_code"`
+			}
+			_ = json.NewDecoder(r.Body).Decode(&completePayload)
+			select {
+			case completeCh <- completePayload:
+			default:
+			}
+			w.WriteHeader(http.StatusOK)
+		case r.URL.Path == "/v1/nodes/"+testNodeID+"/logs":
+			w.WriteHeader(http.StatusCreated)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer ts.Close()
+
+	fakeDocker := &fakeDockerClient{
+		waitErrByID: map[string]error{
+			containerID: errors.New("wait failed"),
+		},
+	}
+
+	controller := &mockRunController{}
+	claimer := setupClaimer(t, newAgentConfig(ts.URL), controller)
+	claimer.startupReconciler = &startupCrashReconciler{docker: fakeDocker}
+
+	claimer.startRecoveredRunningMonitors(context.Background(), []recoveredRunningContainer{
+		{ContainerID: containerID, RunID: s.RunID, JobID: s.JobID},
+	})
+
+	timeout := time.After(2 * time.Second)
+	for {
+		select {
+		case completePayload := <-completeCh:
+			if completePayload.Status != types.JobStatusError.String() {
+				t.Fatalf("status = %q, want %q", completePayload.Status, types.JobStatusError.String())
+			}
+			if completePayload.ExitCode != -1 {
+				t.Fatalf("exit_code = %d, want -1", completePayload.ExitCode)
+			}
+			return
+		case <-timeout:
+			t.Fatal("timeout waiting for recovered wait-error completion")
+		default:
+			time.Sleep(10 * time.Millisecond)
+		}
+	}
+}
+
+func TestCrashReconcile_RecoveredTerminalContainer_ExitCodeAboveOneReportsError(t *testing.T) {
+	t.Parallel()
+
+	s := workflowkit.NewRunOrchestrationScenario()
+	containerID := "ctr-terminal-exit-two"
+	completeCh := make(chan struct {
+		Status   string `json:"status"`
+		ExitCode int32  `json:"exit_code"`
+	}, 1)
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/v1/jobs/"+s.JobID.String()+"/complete":
+			var completePayload struct {
+				Status   string `json:"status"`
+				ExitCode int32  `json:"exit_code"`
+			}
+			_ = json.NewDecoder(r.Body).Decode(&completePayload)
+			select {
+			case completeCh <- completePayload:
+			default:
+			}
+			w.WriteHeader(http.StatusOK)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer ts.Close()
+
+	fakeDocker := &fakeDockerClient{
+		waitByID: map[string]containertypes.WaitResponse{
+			containerID: {StatusCode: 2},
+		},
+		inspectByID: map[string]client.ContainerInspectResult{
+			containerID: {
+				Container: containertypes.InspectResponse{
+					State: &containertypes.State{
+						ExitCode:   2,
+						Status:     containertypes.ContainerState("exited"),
+						StartedAt:  "2026-02-26T15:00:00Z",
+						FinishedAt: "2026-02-26T15:00:02Z",
+					},
+				},
+			},
+		},
+	}
+
+	controller := &mockRunController{}
+	claimer := setupClaimer(t, newAgentConfig(ts.URL), controller)
+	claimer.startupReconciler = &startupCrashReconciler{docker: fakeDocker}
+
+	claimer.reconcileRecoveredTerminalContainers(context.Background(), []recoveredTerminalContainer{
+		{ContainerID: containerID, RunID: s.RunID, JobID: s.JobID},
+	})
+
+	select {
+	case completePayload := <-completeCh:
+		if completePayload.Status != types.JobStatusError.String() {
+			t.Fatalf("status = %q, want %q", completePayload.Status, types.JobStatusError.String())
+		}
+		if completePayload.ExitCode != 2 {
+			t.Fatalf("exit_code = %d, want 2", completePayload.ExitCode)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for recovered terminal completion")
+	}
+}
+
 func TestCrashReconcile_RecoveredRunningMonitor_CompletionConflictIsNonFatal(t *testing.T) {
 	t.Parallel()
 

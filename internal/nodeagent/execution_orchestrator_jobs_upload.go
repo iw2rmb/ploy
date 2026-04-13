@@ -136,7 +136,7 @@ func (r *runController) uploadStatus(ctx context.Context, runID, status string, 
 }
 
 // reportTerminalStatus uploads the final job status based on execution outcome.
-// Handles three cases: runtime error, nonzero exit code, and success.
+// Handles runtime errors and maps process exit code to terminal status.
 func (r *runController) reportTerminalStatus(
 	ctx context.Context,
 	req StartRunRequest,
@@ -159,10 +159,7 @@ func (r *runController) reportTerminalStatus(
 			"component": "run_controller", "status": status.String(), "duration_ms": duration.Milliseconds(),
 		})
 	} else {
-		status = types.JobStatusSuccess
-		if result.ExitCode != 0 {
-			status = types.JobStatusFail
-		}
+		status = lifecycle.JobStatusFromExitCode(result.ExitCode)
 		ec := int32(result.ExitCode)
 		exitCode = &ec
 	}

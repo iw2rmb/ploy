@@ -57,6 +57,31 @@ func TestEvaluateClaimDecision(t *testing.T) {
 	}
 }
 
+func TestJobStatusFromExitCode(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name     string
+		exitCode int
+		want     domaintypes.JobStatus
+	}{
+		{name: "zero is success", exitCode: 0, want: domaintypes.JobStatusSuccess},
+		{name: "one is fail", exitCode: 1, want: domaintypes.JobStatusFail},
+		{name: "above one is error", exitCode: 2, want: domaintypes.JobStatusError},
+		{name: "negative synthetic code is error", exitCode: -1, want: domaintypes.JobStatusError},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got := lifecycle.JobStatusFromExitCode(tc.exitCode)
+			if got != tc.want {
+				t.Fatalf("JobStatusFromExitCode(%d) = %q, want %q", tc.exitCode, got, tc.want)
+			}
+		})
+	}
+}
+
 // ========== EvaluateCompletionDecision ==========
 
 func TestEvaluateCompletionDecision(t *testing.T) {

@@ -417,9 +417,14 @@ func TestRunController_reportTerminalStatus(t *testing.T) {
 			wantStatus: types.JobStatusError.String(),
 		},
 		{
-			name:       "nonzero exit code reports fail",
+			name:       "exit code one reports fail",
 			exitCode:   1,
 			wantStatus: types.JobStatusFail.String(),
+		},
+		{
+			name:       "exit code above one reports error",
+			exitCode:   2,
+			wantStatus: types.JobStatusError.String(),
 		},
 		{
 			name:       "zero exit code reports success",

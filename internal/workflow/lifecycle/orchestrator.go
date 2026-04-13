@@ -26,6 +26,18 @@ func JobStatusFromRunError(err error) domaintypes.JobStatus {
 	return domaintypes.JobStatusError
 }
 
+// JobStatusFromExitCode maps a completed process exit code to terminal status.
+// 0 => Success, 1 => Fail, any other value => Error.
+func JobStatusFromExitCode(exitCode int) domaintypes.JobStatus {
+	if exitCode == 0 {
+		return domaintypes.JobStatusSuccess
+	}
+	if exitCode == 1 {
+		return domaintypes.JobStatusFail
+	}
+	return domaintypes.JobStatusError
+}
+
 var sha40Pattern = regexp.MustCompile(`^[0-9a-f]{40}$`)
 
 // ========== Claim Decision ==========
