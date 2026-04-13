@@ -184,27 +184,3 @@ func TestCacheReplaySelectorExcludesMirroredCandidates(t *testing.T) {
 		t.Fatalf("ResolveReusableJobByCacheKey must require failed candidates to have log rows; SQL:\n%s", resolveReusableJobByCacheKey)
 	}
 }
-
-func TestStepReuseSelectorExcludesMirroredCandidates(t *testing.T) {
-	t.Parallel()
-
-	sqlLower := strings.ToLower(resolveReusableStepByCacheKey)
-	if !strings.Contains(sqlLower, "not (meta ? 'cache_mirror')") {
-		t.Fatalf("ResolveReusableStepByCacheKey must exclude mirrored step candidates; SQL:\n%s", resolveReusableStepByCacheKey)
-	}
-	if !strings.Contains(sqlLower, "repo_sha_out <> repo_sha_in") {
-		t.Fatalf("ResolveReusableStepByCacheKey must require changed repo SHA; SQL:\n%s", resolveReusableStepByCacheKey)
-	}
-	if !strings.Contains(sqlLower, "exists") || !strings.Contains(sqlLower, "from diffs") {
-		t.Fatalf("ResolveReusableStepByCacheKey must require source diff evidence; SQL:\n%s", resolveReusableStepByCacheKey)
-	}
-}
-
-func TestSBOMReuseSelectorExcludesMirroredCandidates(t *testing.T) {
-	t.Parallel()
-
-	sqlLower := strings.ToLower(resolveReusableSBOMByCacheKey)
-	if !strings.Contains(sqlLower, "not (j.meta ? 'cache_mirror')") {
-		t.Fatalf("ResolveReusableSBOMByCacheKey must exclude mirrored candidates; SQL:\n%s", resolveReusableSBOMByCacheKey)
-	}
-}

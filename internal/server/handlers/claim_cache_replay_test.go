@@ -463,3 +463,78 @@ func TestHasReplayableSourceDiff(t *testing.T) {
 		})
 	}
 }
+
+func TestCopySBOMRowsFromSourceToTarget_ReplacesTargetRows(t *testing.T) {
+	t.Parallel()
+
+	sourceJobID := domaintypes.NewJobID()
+	targetJobID := domaintypes.NewJobID()
+	repoID := domaintypes.NewRepoID()
+
+	st := &jobStore{
+		listSBOMRowsByJobByID: map[domaintypes.JobID][]store.Sbom{
+			targetJobID: {
+				{JobID: targetJobID, RepoID: repoID, Lib: "old-lib", Ver: "0.1.0"},
+			},
+			sourceJobID: {
+				{JobID: sourceJobID, RepoID: repoID, Lib: "a-lib", Ver: "1.0.0"},
+				{JobID: sourceJobID, RepoID: repoID, Lib: "b-lib", Ver: "2.0.0"},
+			},
+		},
+	}
+
+	snapshot, err := copySBOMRowsFromSourceToTarget(context.Background(), st,
+		store.Job{ID: sourceJobID, RepoID: repoID},
+		store.Job{ID: targetJobID, RepoID: repoID},
+	)
+	if err != nil {
+		t.Fatalf("copySBOMRowsFromSourceToTarget() error = %v", err)
+	}
+	if len(snapshot) != 1 || snapshot[0].Lib != "old-lib" {
+		t.Fatalf("snapshot = %#v, want original target rows", snapshot)
+	}
+	if !st.deleteSBOMRowsByJob.called || len(st.deleteSBOMRowsByJob.calls) != 1 || st.deleteSBOMRowsByJob.calls[0] != targetJobID {
+		t.Fatalf("DeleteSBOMRowsByJob calls = %#v, want [%s]", st.deleteSBOMRowsByJob.calls, targetJobID)
+	}
+	if got := len(st.upsertSBOMRow.calls); got != 2 {
+		t.Fatalf("UpsertSBOMRow call count = %d, want 2", got)
+	}
+	for _, call := range st.upsertSBOMRow.calls {
+		if call.JobID != targetJobID {
+			t.Fatalf("upsert job_id = %s, want %s", call.JobID, targetJobID)
+		}
+		if call.RepoID != repoID {
+			t.Fatalf("upsert repo_id = %s, want %s", call.RepoID, repoID)
+		}
+	}
+}
+
+func TestRestoreSBOMRowsForTarget_ReplacesWithSnapshot(t *testing.T) {
+	t.Parallel()
+
+	targetJobID := domaintypes.NewJobID()
+	repoID := domaintypes.NewRepoID()
+	rows := []store.Sbom{
+		{JobID: targetJobID, RepoID: repoID, Lib: "x-lib", Ver: "1.2.3"},
+		{JobID: targetJobID, RepoID: repoID, Lib: "y-lib", Ver: "4.5.6"},
+	}
+	st := &jobStore{}
+
+	if err := restoreSBOMRowsForTarget(context.Background(), st, targetJobID, rows); err != nil {
+		t.Fatalf("restoreSBOMRowsForTarget() error = %v", err)
+	}
+	if !st.deleteSBOMRowsByJob.called || len(st.deleteSBOMRowsByJob.calls) != 1 || st.deleteSBOMRowsByJob.calls[0] != targetJobID {
+		t.Fatalf("DeleteSBOMRowsByJob calls = %#v, want [%s]", st.deleteSBOMRowsByJob.calls, targetJobID)
+	}
+	if got := len(st.upsertSBOMRow.calls); got != len(rows) {
+		t.Fatalf("UpsertSBOMRow call count = %d, want %d", got, len(rows))
+	}
+	for i, call := range st.upsertSBOMRow.calls {
+		if call.JobID != targetJobID {
+			t.Fatalf("upsert[%d] job_id = %s, want %s", i, call.JobID, targetJobID)
+		}
+		if call.RepoID != rows[i].RepoID || call.Lib != rows[i].Lib || call.Ver != rows[i].Ver {
+			t.Fatalf("upsert[%d] = %#v, want repo/lib/ver from %#v", i, call, rows[i])
+		}
+	}
+}
