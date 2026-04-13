@@ -467,7 +467,7 @@ func TestHookRuntimeStepCA_MergesCyclePhaseCA(t *testing.T) {
 				phaseCA = append(phaseCA, phase.CA...)
 			}
 
-			stepSpec := hook.Step{CA: []string{"step-ca"}}
+			stepSpec := hook.Step{Image: contracts.JobImage{Universal: "hook:latest"}, CA: []string{"step-ca"}}
 			runtimeStep := stepSpec
 			runtimeStep.CA = mergeUniqueStringEntries(append([]string(nil), stepSpec.CA...), phaseCA)
 

@@ -300,7 +300,7 @@ func (r *runController) executeHookJob(ctx context.Context, req StartRunRequest)
 		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
 		return
 	}
-	commandIdentityJSON := encodeHookCommandIdentityList(hookSource, specDoc.Steps)
+	commandIdentityJSON := encodeHookCommandIdentityList(hookSource, specDoc.Steps, stack)
 	phaseConfig := sbomPhaseConfigForCycle(cycleName, req.TypedOptions)
 	phaseCA := []string(nil)
 	if phaseConfig != nil {
@@ -627,7 +627,7 @@ func encodeHookConditionResult(decision *contracts.HookRuntimeDecision) string {
 	return string(raw)
 }
 
-func encodeHookCommandIdentityList(source string, steps []hook.Step) string {
+func encodeHookCommandIdentityList(source string, steps []hook.Step, stack contracts.MigStack) string {
 	type identityStep struct {
 		Name    string   `json:"name,omitempty"`
 		Image   string   `json:"image"`
@@ -635,9 +635,13 @@ func encodeHookCommandIdentityList(source string, steps []hook.Step) string {
 	}
 	stepList := make([]identityStep, 0, len(steps))
 	for _, stepSpec := range steps {
+		image, err := stepSpec.Image.ResolveImage(stack)
+		if err != nil {
+			image = stepSpec.Image.String()
+		}
 		stepList = append(stepList, identityStep{
 			Name:    strings.TrimSpace(stepSpec.Name),
-			Image:   strings.TrimSpace(stepSpec.Image),
+			Image:   strings.TrimSpace(image),
 			Command: append([]string(nil), stepSpec.Command...),
 		})
 	}

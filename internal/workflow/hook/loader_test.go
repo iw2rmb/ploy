@@ -97,7 +97,7 @@ steps:
 	if first[1].ID != "remote-hook" {
 		t.Fatalf("first[1].ID = %q, want %q", first[1].ID, "remote-hook")
 	}
-	if len(first[0].Steps) != 1 || first[0].Steps[0].Image != "ghcr.io/iw2rmb/hook/openapi-generator-inline:latest" {
+	if len(first[0].Steps) != 1 || first[0].Steps[0].Image.Universal != "ghcr.io/iw2rmb/hook/openapi-generator-inline:latest" {
 		t.Fatalf("local hook steps not preserved: %+v", first[0].Steps)
 	}
 	if len(first[0].Steps[0].In) != 1 || first[0].Steps[0].In[0] != "abcdef0:/in/amata.yaml" {

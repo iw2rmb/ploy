@@ -3,6 +3,8 @@ package contracts
 import (
 	"strings"
 	"testing"
+
+	"gopkg.in/yaml.v3"
 )
 
 // TestJobImage_ResolveImage_Universal verifies that universal (string) images
@@ -293,6 +295,48 @@ func TestParseJobImage_Map(t *testing.T) {
 			t.Errorf("expected empty ByStack, got %v", got.ByStack)
 		}
 	})
+}
+
+func TestJobImage_UnmarshalYAML_String(t *testing.T) {
+	t.Parallel()
+
+	var got struct {
+		Image JobImage `yaml:"image"`
+	}
+	if err := yaml.Unmarshal([]byte("image: ghcr.io/iw2rmb/ploy/mig:latest\n"), &got); err != nil {
+		t.Fatalf("yaml unmarshal: %v", err)
+	}
+	if got.Image.Universal != "ghcr.io/iw2rmb/ploy/mig:latest" {
+		t.Fatalf("image.universal=%q, want universal image", got.Image.Universal)
+	}
+	if len(got.Image.ByStack) != 0 {
+		t.Fatalf("image.by_stack=%v, want empty", got.Image.ByStack)
+	}
+}
+
+func TestJobImage_UnmarshalYAML_Map(t *testing.T) {
+	t.Parallel()
+
+	var got struct {
+		Image JobImage `yaml:"image"`
+	}
+	doc := `
+image:
+  default: ghcr.io/iw2rmb/ploy/mig:default
+  java-gradle: ghcr.io/iw2rmb/ploy/mig:gradle
+`
+	if err := yaml.Unmarshal([]byte(doc), &got); err != nil {
+		t.Fatalf("yaml unmarshal: %v", err)
+	}
+	if got.Image.Universal != "" {
+		t.Fatalf("image.universal=%q, want empty", got.Image.Universal)
+	}
+	if got.Image.ByStack[MigStackDefault] != "ghcr.io/iw2rmb/ploy/mig:default" {
+		t.Fatalf("default image=%q, want default image", got.Image.ByStack[MigStackDefault])
+	}
+	if got.Image.ByStack[MigStackJavaGradle] != "ghcr.io/iw2rmb/ploy/mig:gradle" {
+		t.Fatalf("java-gradle image=%q, want gradle image", got.Image.ByStack[MigStackJavaGradle])
+	}
 }
 
 // TestParseJobImage_Nil verifies that nil input returns empty JobImage.

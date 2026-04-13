@@ -33,6 +33,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+
+	"gopkg.in/yaml.v3"
 )
 
 // MigStack represents a detected build stack for image resolution.
@@ -220,6 +222,8 @@ func (m JobImage) MarshalJSON() ([]byte, error) {
 // Accepts both string and map forms from JSON.
 func (m *JobImage) UnmarshalJSON(data []byte) error {
 	if string(data) == "null" {
+		m.Universal = ""
+		m.ByStack = nil
 		return nil
 	}
 
@@ -227,12 +231,14 @@ func (m *JobImage) UnmarshalJSON(data []byte) error {
 	var s string
 	if err := json.Unmarshal(data, &s); err == nil {
 		m.Universal = strings.TrimSpace(s)
+		m.ByStack = nil
 		return nil
 	}
 
 	// Try map (stack-specific form).
 	var raw map[string]string
 	if err := json.Unmarshal(data, &raw); err == nil {
+		m.Universal = ""
 		m.ByStack = make(map[MigStack]string, len(raw))
 		for k, v := range raw {
 			m.ByStack[MigStack(strings.TrimSpace(k))] = strings.TrimSpace(v)
@@ -241,6 +247,58 @@ func (m *JobImage) UnmarshalJSON(data []byte) error {
 	}
 
 	return fmt.Errorf("image: expected string or map, got %s", string(data))
+}
+
+// MarshalYAML implements yaml.Marshaler for JobImage.
+// Serializes as a string when Universal is set, or as a map when ByStack is set.
+func (m JobImage) MarshalYAML() (any, error) {
+	if m.Universal != "" {
+		return m.Universal, nil
+	}
+	if len(m.ByStack) > 0 {
+		result := make(map[string]string, len(m.ByStack))
+		for k, v := range m.ByStack {
+			result[string(k)] = v
+		}
+		return result, nil
+	}
+	return nil, nil
+}
+
+// UnmarshalYAML implements yaml.Unmarshaler for JobImage.
+// Accepts both string and map forms from YAML.
+func (m *JobImage) UnmarshalYAML(value *yaml.Node) error {
+	if value == nil || value.Kind == 0 || value.Tag == "!!null" {
+		m.Universal = ""
+		m.ByStack = nil
+		return nil
+	}
+
+	switch value.Kind {
+	case yaml.ScalarNode:
+		var s string
+		if err := value.Decode(&s); err != nil {
+			return fmt.Errorf("image: expected string or map, got %s", value.Tag)
+		}
+		m.Universal = strings.TrimSpace(s)
+		m.ByStack = nil
+		return nil
+
+	case yaml.MappingNode:
+		var raw map[string]string
+		if err := value.Decode(&raw); err != nil {
+			return fmt.Errorf("image: expected string map, got %s", value.Tag)
+		}
+		m.Universal = ""
+		m.ByStack = make(map[MigStack]string, len(raw))
+		for k, v := range raw {
+			m.ByStack[MigStack(strings.TrimSpace(k))] = strings.TrimSpace(v)
+		}
+		return nil
+
+	default:
+		return fmt.Errorf("image: expected string or map, got %s", value.Tag)
+	}
 }
 
 // ToolToMigStack converts a Build Gate tool name to a MigStack constant.
