@@ -606,7 +606,7 @@ Optional repository and execution controls:
 | Variable | Description |
 |----------|-------------|
 | `ORW_REPOS` | Comma-separated Maven repository URLs |
-| `RECIPE_VERSION` | Optional recipe artifact version (defaults to `8.74.3`) |
+| `RECIPE_VERSION` | Optional recipe artifact version (when unset, ORW resolves the latest available version from configured repositories) |
 | `ORW_REPO_USERNAME` | Repository username (must be paired with `ORW_REPO_PASSWORD`) |
 | `ORW_REPO_PASSWORD` | Repository password (must be paired with `ORW_REPO_USERNAME`) |
 | `ORW_CONFIG_PATH` | Optional path to rewrite YAML config; when unset ORW uses `/out/rewrite.yml` |

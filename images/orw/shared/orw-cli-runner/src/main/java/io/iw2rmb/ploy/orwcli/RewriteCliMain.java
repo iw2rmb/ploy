@@ -4,9 +4,7 @@ import org.eclipse.aether.DefaultRepositorySystemSession;
 import org.eclipse.aether.RepositorySystem;
 import org.eclipse.aether.artifact.DefaultArtifact;
 import org.eclipse.aether.collection.CollectRequest;
-import org.eclipse.aether.collection.DependencyCollectionException;
 import org.eclipse.aether.graph.Dependency;
-import org.eclipse.aether.graph.DependencyNode;
 import org.eclipse.aether.repository.LocalRepository;
 import org.eclipse.aether.repository.RemoteRepository;
 import org.eclipse.aether.resolution.ArtifactResult;
@@ -42,7 +40,6 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.URL;
 import java.net.URLClassLoader;
-import java.nio.charset.StandardCharsets;
 import java.security.CodeSource;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
@@ -61,8 +58,6 @@ import java.util.Objects;
 import java.util.Properties;
 import java.util.Set;
 import java.util.stream.Collectors;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 public final class RewriteCliMain {
     private static final String DEFAULT_REPO = "https://repo1.maven.org/maven2/";
@@ -72,13 +67,6 @@ public final class RewriteCliMain {
     private static final String EXCLUDE_PATHS_ENV = "ORW_EXCLUDE_PATHS";
     private static final String GRADLE_PARSER_CLASS = "org.openrewrite.gradle.GradleParser";
     private static final String MAVEN_PARSER_CLASS = "org.openrewrite.maven.MavenParser";
-    private static final Pattern REWRITE_CORE_JAR_PATTERN = Pattern.compile("^rewrite-core-(.+)\\.jar$");
-    private static final Pattern VERSION_MAJOR_MINOR_PATTERN = Pattern.compile("^(\\d+)\\.(\\d+)(?:\\..*)?$");
-    private static final String REWRITE_GROUP_ID = "org.openrewrite";
-    private static final String REWRITE_CORE_ARTIFACT_ID = "rewrite-core";
-    private static final String RUNNER_POM_XML_RESOURCE = "META-INF/maven/io.iw2rmb.ploy/orw-cli-runner/pom.xml";
-    private static final Pattern RUNNER_REWRITE_VERSION_PATTERN =
-        Pattern.compile("<rewrite\\.version>\\s*([^<\\s]+)\\s*</rewrite\\.version>", Pattern.CASE_INSENSITIVE);
 
     private RewriteCliMain() {
     }
@@ -112,17 +100,9 @@ public final class RewriteCliMain {
     private static void runBootstrap(CliOptions opts, String[] rawArgs) throws Exception {
         RepositoryContext repositoryContext = newRepositoryContext(opts.repos, opts.repoUsername, opts.repoPassword);
         RecipeCoordinate requestedCoordinate = RecipeCoordinate.parse(opts.coords);
-        String runnerVersion = detectRunnerRewriteCoreVersion();
-        RecipeCoordinate effectiveCoordinate = resolveRecipeCoordinate(repositoryContext, requestedCoordinate, runnerVersion);
+        RecipeCoordinate effectiveCoordinate = resolveRecipeCoordinate(repositoryContext, requestedCoordinate);
 
         Resolution resolution = resolveRecipeArtifacts(repositoryContext, effectiveCoordinate.asCoords());
-        ensureRewriteCoreCompatibility(
-            repositoryContext,
-            requestedCoordinate,
-            effectiveCoordinate,
-            runnerVersion,
-            resolution.classpathJars
-        );
 
         URL[] isolatedClasspath = buildIsolatedClasspath(resolution.classpathJars);
         String[] normalizedArgs = withResolvedCoords(rawArgs, effectiveCoordinate.asCoords());
@@ -161,137 +141,16 @@ public final class RewriteCliMain {
 
     private static URL[] buildIsolatedClasspath(List<Path> resolvedJars) throws IOException {
         LinkedHashSet<URL> urls = new LinkedHashSet<>();
+        for (Path jar : resolvedJars) {
+            urls.add(jar.toUri().toURL());
+        }
         CodeSource source = RewriteCliMain.class.getProtectionDomain().getCodeSource();
         if (source == null || source.getLocation() == null) {
             throw new IllegalStateException("Unable to determine runner code source location");
         }
-        // Runner jar must be first to prevent resolved recipe dependencies from overriding runner APIs.
+        // Keep the runner JAR last so resolved recipe dependencies determine the effective OpenRewrite runtime.
         urls.add(source.getLocation());
-        for (Path jar : resolvedJars) {
-            urls.add(jar.toUri().toURL());
-        }
         return urls.toArray(new URL[0]);
-    }
-
-    private static void ensureRewriteCoreCompatibility(
-        RepositoryContext repositoryContext,
-        RecipeCoordinate requestedCoordinate,
-        RecipeCoordinate effectiveCoordinate,
-        String runnerVersion,
-        List<Path> classpathJars
-    ) {
-        String resolvedVersion = detectResolvedRewriteCoreVersion(classpathJars);
-        if (resolvedVersion == null) {
-            return;
-        }
-        if (isMajorMinorCompatible(runnerVersion, resolvedVersion)) {
-            return;
-        }
-        List<String> compatibleVersions = findCompatibleRecipeVersions(
-            repositoryContext,
-            effectiveCoordinate.withoutVersion(),
-            runnerVersion,
-            3
-        );
-        String recommendation = compatibleVersions.isEmpty()
-            ? "No compatible " + effectiveCoordinate.groupId + ":" + effectiveCoordinate.artifactId
-                + " versions were found in configured repositories."
-            : "Compatible versions for runner rewrite-core " + runnerVersion + ": "
-                + String.join(", ", compatibleVersions) + ".";
-        String explicitHint = requestedCoordinate.version == null
-            ? " Auto-resolution could not produce a compatible classpath."
-            : " Explicit RECIPE_VERSION was retained.";
-        throw new InputException(
-            "Incompatible OpenRewrite runtime: runner rewrite-core " + runnerVersion
-                + " is incompatible with resolved rewrite-core " + resolvedVersion
-                + " for " + effectiveCoordinate.asCoords()
-                + ". " + recommendation + explicitHint
-        );
-    }
-
-    private static String detectRunnerRewriteCoreVersion() {
-        String fromRunnerPom = readRunnerRewriteVersionFromPom(RewriteCliMain.class.getClassLoader());
-        if (fromRunnerPom != null) {
-            return fromRunnerPom;
-        }
-        String fromProps = readRewriteCoreVersionFromPomProperties(RewriteCliMain.class.getClassLoader());
-        if (fromProps != null) {
-            return fromProps;
-        }
-        throw new IllegalStateException(
-            "Runner rewrite-core version metadata is unavailable. "
-                + "Expected " + RUNNER_POM_XML_RESOURCE
-                + " (rewrite.version) or META-INF/maven/org.openrewrite/rewrite-core/pom.properties in runner JAR."
-        );
-    }
-
-    private static String readRunnerRewriteVersionFromPom(ClassLoader classLoader) {
-        try (InputStream in = classLoader.getResourceAsStream(RUNNER_POM_XML_RESOURCE)) {
-            if (in == null) {
-                return null;
-            }
-            String xml = new String(in.readAllBytes(), StandardCharsets.UTF_8);
-            Matcher matcher = RUNNER_REWRITE_VERSION_PATTERN.matcher(xml);
-            if (!matcher.find()) {
-                return null;
-            }
-            String version = matcher.group(1);
-            if (version == null || version.isBlank()) {
-                return null;
-            }
-            return version.trim();
-        } catch (IOException e) {
-            return null;
-        }
-    }
-
-    private static String readRewriteCoreVersionFromPomProperties(ClassLoader classLoader) {
-        String resource = "META-INF/maven/org.openrewrite/rewrite-core/pom.properties";
-        try (InputStream in = classLoader.getResourceAsStream(resource)) {
-            if (in == null) {
-                return null;
-            }
-            Properties properties = new Properties();
-            properties.load(in);
-            String version = properties.getProperty("version");
-            if (version == null || version.isBlank()) {
-                return null;
-            }
-            return version.trim();
-        } catch (IOException e) {
-            return null;
-        }
-    }
-
-    private static String detectResolvedRewriteCoreVersion(List<Path> classpathJars) {
-        for (Path jar : classpathJars) {
-            String fileName = jar.getFileName() == null ? "" : jar.getFileName().toString();
-            Matcher matcher = REWRITE_CORE_JAR_PATTERN.matcher(fileName);
-            if (matcher.matches()) {
-                return matcher.group(1);
-            }
-        }
-        return null;
-    }
-
-    private static boolean isMajorMinorCompatible(String runnerVersion, String resolvedVersion) {
-        String runnerMajorMinor = majorMinor(runnerVersion);
-        String resolvedMajorMinor = majorMinor(resolvedVersion);
-        if (runnerMajorMinor == null || resolvedMajorMinor == null) {
-            return Objects.equals(runnerVersion, resolvedVersion);
-        }
-        return runnerMajorMinor.equals(resolvedMajorMinor);
-    }
-
-    private static String majorMinor(String version) {
-        if (version == null) {
-            return null;
-        }
-        Matcher matcher = VERSION_MAJOR_MINOR_PATTERN.matcher(version.trim());
-        if (!matcher.matches()) {
-            return null;
-        }
-        return matcher.group(1) + "." + matcher.group(2);
     }
 
     private static void run(CliOptions opts) throws Exception {
@@ -565,78 +424,30 @@ public final class RewriteCliMain {
 
     private static RecipeCoordinate resolveRecipeCoordinate(
         RepositoryContext repositoryContext,
-        RecipeCoordinate requestedCoordinate,
-        String runnerVersion
+        RecipeCoordinate requestedCoordinate
     ) {
         if (requestedCoordinate.version != null) {
             return requestedCoordinate;
         }
-        String resolvedVersion = resolveLatestCompatibleRecipeVersion(repositoryContext, requestedCoordinate, runnerVersion);
+        String resolvedVersion = resolveLatestRecipeVersion(repositoryContext, requestedCoordinate);
         return requestedCoordinate.withVersion(resolvedVersion);
     }
 
-    private static String resolveLatestCompatibleRecipeVersion(
-        RepositoryContext repositoryContext,
-        RecipeCoordinate recipeCoordinate,
-        String runnerVersion
-    ) {
+    private static String resolveLatestRecipeVersion(RepositoryContext repositoryContext, RecipeCoordinate recipeCoordinate) {
         List<String> versions = listAvailableRecipeVersions(repositoryContext, recipeCoordinate);
         if (versions.isEmpty()) {
             throw new InputException("No versions found for " + recipeCoordinate.groupId + ":" + recipeCoordinate.artifactId);
         }
-
-        List<String> scannedCandidates = new ArrayList<>();
         for (int i = versions.size() - 1; i >= 0; i--) {
-            String candidateVersion = versions.get(i);
-            RecipeCoordinate candidateCoordinate = recipeCoordinate.withVersion(candidateVersion);
-            String resolvedRewriteCoreVersion = resolveRecipeRewriteCoreVersion(repositoryContext, candidateCoordinate);
-            if (scannedCandidates.size() < 5) {
-                scannedCandidates.add(candidateVersion + " (rewrite-core " + safeVersionLabel(resolvedRewriteCoreVersion) + ")");
-            }
-            if (resolvedRewriteCoreVersion != null && isMajorMinorCompatible(runnerVersion, resolvedRewriteCoreVersion)) {
-                return candidateVersion;
+            String candidate = versions.get(i);
+            if (candidate != null && !candidate.isBlank()) {
+                return candidate;
             }
         }
-
-        throw new InputException(
-            "No compatible version found for " + recipeCoordinate.groupId + ":" + recipeCoordinate.artifactId
-                + " with runner rewrite-core " + runnerVersion
-                + ". Latest scanned candidates: " + String.join(", ", scannedCandidates)
-        );
+        throw new InputException("No valid versions found for " + recipeCoordinate.groupId + ":" + recipeCoordinate.artifactId);
     }
 
-    private static List<String> findCompatibleRecipeVersions(
-        RepositoryContext repositoryContext,
-        RecipeCoordinate recipeCoordinate,
-        String runnerVersion,
-        int limit
-    ) {
-        if (limit <= 0) {
-            return Collections.emptyList();
-        }
-        List<String> versions = listAvailableRecipeVersions(repositoryContext, recipeCoordinate);
-        if (versions.isEmpty()) {
-            return Collections.emptyList();
-        }
-
-        List<String> compatible = new ArrayList<>();
-        for (int i = versions.size() - 1; i >= 0 && compatible.size() < limit; i--) {
-            String candidateVersion = versions.get(i);
-            String resolvedRewriteCoreVersion = resolveRecipeRewriteCoreVersion(
-                repositoryContext,
-                recipeCoordinate.withVersion(candidateVersion)
-            );
-            if (resolvedRewriteCoreVersion != null && isMajorMinorCompatible(runnerVersion, resolvedRewriteCoreVersion)) {
-                compatible.add(candidateVersion);
-            }
-        }
-        return compatible;
-    }
-
-    private static List<String> listAvailableRecipeVersions(
-        RepositoryContext repositoryContext,
-        RecipeCoordinate recipeCoordinate
-    ) {
+    private static List<String> listAvailableRecipeVersions(RepositoryContext repositoryContext, RecipeCoordinate recipeCoordinate) {
         VersionRangeRequest rangeRequest = new VersionRangeRequest();
         rangeRequest.setArtifact(new DefaultArtifact(
             recipeCoordinate.groupId,
@@ -659,48 +470,6 @@ public final class RewriteCliMain {
                     + ": " + safeMessage(e)
             );
         }
-    }
-
-    private static String resolveRecipeRewriteCoreVersion(
-        RepositoryContext repositoryContext,
-        RecipeCoordinate recipeCoordinate
-    ) {
-        CollectRequest collectRequest = new CollectRequest();
-        collectRequest.setRoot(new Dependency(new DefaultArtifact(recipeCoordinate.asCoords()), JavaScopes.RUNTIME));
-        for (RemoteRepository remoteRepository : repositoryContext.remoteRepositories) {
-            collectRequest.addRepository(remoteRepository);
-        }
-
-        try {
-            DependencyNode root = repositoryContext.repoSystem.collectDependencies(repositoryContext.session, collectRequest).getRoot();
-            return findDependencyVersion(root, REWRITE_GROUP_ID, REWRITE_CORE_ARTIFACT_ID);
-        } catch (DependencyCollectionException e) {
-            return null;
-        }
-    }
-
-    private static String findDependencyVersion(DependencyNode node, String groupId, String artifactId) {
-        if (node == null) {
-            return null;
-        }
-        Dependency dependency = node.getDependency();
-        if (dependency != null && dependency.getArtifact() != null) {
-            org.eclipse.aether.artifact.Artifact artifact = dependency.getArtifact();
-            if (groupId.equals(artifact.getGroupId()) && artifactId.equals(artifact.getArtifactId())) {
-                return artifact.getVersion();
-            }
-        }
-        for (DependencyNode child : node.getChildren()) {
-            String found = findDependencyVersion(child, groupId, artifactId);
-            if (found != null) {
-                return found;
-            }
-        }
-        return null;
-    }
-
-    private static String safeVersionLabel(String version) {
-        return version == null || version.isBlank() ? "unknown" : version;
     }
 
     private static ClassLoader buildRecipeClassLoader(List<Path> jars) throws IOException {
