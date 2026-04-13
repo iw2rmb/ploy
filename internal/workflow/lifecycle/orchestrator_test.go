@@ -82,6 +82,34 @@ func TestJobStatusFromExitCode(t *testing.T) {
 	}
 }
 
+func TestJobStatusFromExitCodeForJobType(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name     string
+		jobType  domaintypes.JobType
+		exitCode int
+		want     domaintypes.JobStatus
+	}{
+		{name: "hook non-zero is error", jobType: domaintypes.JobTypeHook, exitCode: 1, want: domaintypes.JobStatusError},
+		{name: "heal non-zero is error", jobType: domaintypes.JobTypeHeal, exitCode: 1, want: domaintypes.JobStatusError},
+		{name: "hook zero is success", jobType: domaintypes.JobTypeHook, exitCode: 0, want: domaintypes.JobStatusSuccess},
+		{name: "heal zero is success", jobType: domaintypes.JobTypeHeal, exitCode: 0, want: domaintypes.JobStatusSuccess},
+		{name: "mig exit one remains fail", jobType: domaintypes.JobTypeMig, exitCode: 1, want: domaintypes.JobStatusFail},
+		{name: "mig exit above one remains error", jobType: domaintypes.JobTypeMig, exitCode: 2, want: domaintypes.JobStatusError},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got := lifecycle.JobStatusFromExitCodeForJobType(tc.jobType, tc.exitCode)
+			if got != tc.want {
+				t.Fatalf("JobStatusFromExitCodeForJobType(%q, %d) = %q, want %q", tc.jobType, tc.exitCode, got, tc.want)
+			}
+		})
+	}
+}
+
 // ========== EvaluateCompletionDecision ==========
 
 func TestEvaluateCompletionDecision(t *testing.T) {

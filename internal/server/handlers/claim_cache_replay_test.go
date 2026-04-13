@@ -367,23 +367,26 @@ func TestIsReplayStatusEligible(t *testing.T) {
 
 	cases := []struct {
 		name     string
+		jobType  domaintypes.JobType
 		status   domaintypes.JobStatus
 		exitCode *int32
 		want     bool
 	}{
-		{name: "success always eligible", status: domaintypes.JobStatusSuccess, want: true},
-		{name: "fail with exit one eligible", status: domaintypes.JobStatusFail, exitCode: &one, want: true},
-		{name: "fail with exit above one ineligible", status: domaintypes.JobStatusFail, exitCode: &two, want: false},
-		{name: "fail with missing exit ineligible", status: domaintypes.JobStatusFail, exitCode: nil, want: false},
-		{name: "error ineligible", status: domaintypes.JobStatusError, exitCode: &one, want: false},
+		{name: "success always eligible", jobType: domaintypes.JobTypeMig, status: domaintypes.JobStatusSuccess, want: true},
+		{name: "fail with exit one eligible for mig", jobType: domaintypes.JobTypeMig, status: domaintypes.JobStatusFail, exitCode: &one, want: true},
+		{name: "fail with exit one ineligible for hook", jobType: domaintypes.JobTypeHook, status: domaintypes.JobStatusFail, exitCode: &one, want: false},
+		{name: "fail with exit one ineligible for heal", jobType: domaintypes.JobTypeHeal, status: domaintypes.JobStatusFail, exitCode: &one, want: false},
+		{name: "fail with exit above one ineligible", jobType: domaintypes.JobTypeMig, status: domaintypes.JobStatusFail, exitCode: &two, want: false},
+		{name: "fail with missing exit ineligible", jobType: domaintypes.JobTypeMig, status: domaintypes.JobStatusFail, exitCode: nil, want: false},
+		{name: "error ineligible", jobType: domaintypes.JobTypeMig, status: domaintypes.JobStatusError, exitCode: &one, want: false},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			got := isReplayStatusEligible(tc.status, tc.exitCode)
+			got := isReplayStatusEligible(tc.jobType, tc.status, tc.exitCode)
 			if got != tc.want {
-				t.Fatalf("isReplayStatusEligible(%q, %v) = %v, want %v", tc.status, tc.exitCode, got, tc.want)
+				t.Fatalf("isReplayStatusEligible(%q, %q, %v) = %v, want %v", tc.jobType, tc.status, tc.exitCode, got, tc.want)
 			}
 		})
 	}

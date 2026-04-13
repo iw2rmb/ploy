@@ -403,6 +403,7 @@ func TestRunController_reportTerminalStatus(t *testing.T) {
 	tests := []struct {
 		name       string
 		runErr     error
+		jobType    types.JobType
 		exitCode   int
 		wantStatus string
 	}{
@@ -418,16 +419,31 @@ func TestRunController_reportTerminalStatus(t *testing.T) {
 		},
 		{
 			name:       "exit code one reports fail",
+			jobType:    types.JobTypeMig,
 			exitCode:   1,
 			wantStatus: types.JobStatusFail.String(),
 		},
 		{
+			name:       "hook exit code one reports error",
+			jobType:    types.JobTypeHook,
+			exitCode:   1,
+			wantStatus: types.JobStatusError.String(),
+		},
+		{
+			name:       "heal exit code one reports error",
+			jobType:    types.JobTypeHeal,
+			exitCode:   1,
+			wantStatus: types.JobStatusError.String(),
+		},
+		{
 			name:       "exit code above one reports error",
+			jobType:    types.JobTypeMig,
 			exitCode:   2,
 			wantStatus: types.JobStatusError.String(),
 		},
 		{
 			name:       "zero exit code reports success",
+			jobType:    types.JobTypeMig,
 			exitCode:   0,
 			wantStatus: types.JobStatusSuccess.String(),
 		},
@@ -442,7 +458,7 @@ func TestRunController_reportTerminalStatus(t *testing.T) {
 
 			stats := types.NewRunStatsBuilder().ExitCode(tt.exitCode).MustBuild()
 			result := step.Result{ExitCode: tt.exitCode}
-			req := StartRunRequest{RunID: "test-run", JobID: "test-job"}
+			req := StartRunRequest{RunID: "test-run", JobID: "test-job", JobType: tt.jobType}
 
 			controller.reportTerminalStatus(
 				context.Background(), req, tt.runErr, result,
