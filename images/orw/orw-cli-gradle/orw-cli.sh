@@ -19,9 +19,8 @@ usage() {
 orw-cli --apply --dir <workspace> --out <outdir>
 
 Required env:
-  RECIPE_GROUP
-  RECIPE_ARTIFACT
-  RECIPE_CLASSNAME
+  - Class-only mode (no rewrite config): RECIPE_GROUP, RECIPE_ARTIFACT, RECIPE_CLASSNAME
+  - YAML mode (/out/rewrite.yml or ORW_CONFIG_PATH): recipe coords default automatically
 
 Optional env:
   RECIPE_VERSION              Recipe artifact version (default: ORW_DEFAULT_RECIPE_VERSION or 8.74.3)
@@ -149,11 +148,6 @@ artifact="${RECIPE_ARTIFACT:-}"
 version="${RECIPE_VERSION:-${ORW_DEFAULT_RECIPE_VERSION:-8.74.3}}"
 classname="${RECIPE_CLASSNAME:-}"
 
-if [[ -z "$group" || -z "$artifact" || -z "$classname" ]]; then
-  write_failure_report "input" "" "RECIPE_GROUP/RECIPE_ARTIFACT/RECIPE_CLASSNAME are required"
-  exit 4
-fi
-
 repo_username="${ORW_REPO_USERNAME:-}"
 repo_password="${ORW_REPO_PASSWORD:-}"
 if [[ -n "$repo_username" && -z "$repo_password" ]] || [[ -z "$repo_username" && -n "$repo_password" ]]; then
@@ -188,6 +182,28 @@ if [[ -z "$config_path" ]]; then
 fi
 if [[ -n "$config_path" && ! -f "$config_path" ]]; then
   write_failure_report "input" "" "ORW_CONFIG_PATH does not exist: $config_path"
+  exit 4
+fi
+
+# YAML mode defaults: avoid per-run boilerplate for generated rewrite.yml recipes.
+used_yaml_defaults=false
+if [[ -n "$config_path" ]]; then
+  if [[ -z "$group" ]]; then
+    group="org.openrewrite"
+    used_yaml_defaults=true
+  fi
+  if [[ -z "$artifact" ]]; then
+    artifact="rewrite-java"
+    used_yaml_defaults=true
+  fi
+  if [[ -z "$classname" ]]; then
+    classname="org.openrewrite.java.ChangeMethodName"
+    used_yaml_defaults=true
+  fi
+fi
+
+if [[ -z "$group" || -z "$artifact" || -z "$classname" ]]; then
+  write_failure_report "input" "" "RECIPE_GROUP/RECIPE_ARTIFACT/RECIPE_CLASSNAME are required (unless YAML mode with /out/rewrite.yml defaults)"
   exit 4
 fi
 
@@ -234,6 +250,9 @@ fi
 echo "[orw-cli] Running OpenRewrite CLI" | tee -a "$transform_log"
 echo "[orw-cli] Coords: $coords" | tee -a "$transform_log"
 echo "[orw-cli] Active recipes: $active_recipes" | tee -a "$transform_log"
+if [[ "$used_yaml_defaults" == "true" ]]; then
+  echo "[orw-cli] Applied YAML-mode default recipe coordinates/classname" | tee -a "$transform_log"
+fi
 if [[ -z "${RECIPE_VERSION:-}" ]]; then
   echo "[orw-cli] RECIPE_VERSION is unset; defaulting to $version" | tee -a "$transform_log"
 fi

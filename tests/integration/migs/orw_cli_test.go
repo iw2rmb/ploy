@@ -266,6 +266,102 @@ fi
 	}
 }
 
+func TestOrwCLI_UsesYamlDefaultsWhenRecipeEnvMissing(t *testing.T) {
+	t.Parallel()
+
+	workspace := t.TempDir()
+	outdir := t.TempDir()
+	binDir := t.TempDir()
+
+	rewriteYAML := "type: specs.openrewrite.org/v1beta/recipe\nname: PloyApplyYaml\nrecipeList: []\n"
+	if err := os.WriteFile(filepath.Join(outdir, "rewrite.yml"), []byte(rewriteYAML), 0o644); err != nil {
+		t.Fatalf("write out rewrite.yml: %v", err)
+	}
+
+	rewritePath := filepath.Join(binDir, "rewrite")
+	rewriteScript := `#!/usr/bin/env bash
+set -euo pipefail
+config=""
+recipe=""
+coords=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --config) config="${2:-}"; shift 2 ;;
+    --recipe) recipe="${2:-}"; shift 2 ;;
+    --coords) coords="${2:-}"; shift 2 ;;
+    *) shift ;;
+  esac
+done
+echo "[rewrite-stub] config=$config"
+echo "[rewrite-stub] recipe=$recipe"
+echo "[rewrite-stub] coords=$coords"
+`
+	if err := os.WriteFile(rewritePath, []byte(rewriteScript), 0o755); err != nil {
+		t.Fatalf("write rewrite stub: %v", err)
+	}
+
+	migScript := resolveORWCLIScript(t)
+	cmd := exec.Command("bash", migScript, "--apply", "--dir", workspace, "--out", outdir)
+	cmd.Env = append(os.Environ(),
+		"PATH="+binDir+string(os.PathListSeparator)+os.Getenv("PATH"),
+	)
+
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("orw-cli failed: %v\nstdout/stderr:\n%s", err, string(out))
+	}
+
+	logBytes, err := os.ReadFile(filepath.Join(outdir, contracts.ORWCLITransformLogName))
+	if err != nil {
+		t.Fatalf("read transform.log: %v", err)
+	}
+	logText := string(logBytes)
+	if !strings.Contains(logText, "[rewrite-stub] config="+filepath.Join(outdir, "rewrite.yml")) {
+		t.Fatalf("transform.log missing /out rewrite.yml usage:\n%s", logText)
+	}
+	if !strings.Contains(logText, "[rewrite-stub] recipe=PloyApplyYaml") {
+		t.Fatalf("transform.log missing recipe name from /out rewrite.yml:\n%s", logText)
+	}
+	if !strings.Contains(logText, "[rewrite-stub] coords=org.openrewrite:rewrite-java:8.74.3") {
+		t.Fatalf("transform.log missing YAML-mode default coords:\n%s", logText)
+	}
+	if !strings.Contains(logText, "Applied YAML-mode default recipe coordinates/classname") {
+		t.Fatalf("transform.log missing YAML-mode defaults marker:\n%s", logText)
+	}
+}
+
+func TestOrwCLI_RejectsMissingRecipeEnvWithoutYamlConfig(t *testing.T) {
+	t.Parallel()
+
+	workspace := t.TempDir()
+	outdir := t.TempDir()
+	migScript := resolveORWCLIScript(t)
+	cmd := exec.Command("bash", migScript, "--apply", "--dir", workspace, "--out", outdir)
+
+	err := cmd.Run()
+	if err == nil {
+		t.Fatal("expected orw-cli to fail when recipe env is missing outside YAML mode")
+	}
+
+	reportBytes, readErr := os.ReadFile(filepath.Join(outdir, contracts.ORWCLIReportFileName))
+	if readErr != nil {
+		t.Fatalf("read report.json: %v", readErr)
+	}
+	report, parseErr := contracts.ParseORWCLIReport(reportBytes)
+	if parseErr != nil {
+		t.Fatalf("parse report.json: %v\nreport=%s", parseErr, string(reportBytes))
+	}
+	if report.Success {
+		t.Fatalf("report.success=true, expected false: %s", string(reportBytes))
+	}
+	if report.ErrorKind != contracts.ORWCLIErrorKindInput {
+		t.Fatalf("error_kind=%q, want %q", report.ErrorKind, contracts.ORWCLIErrorKindInput)
+	}
+	if !strings.Contains(report.Message, "RECIPE_GROUP/RECIPE_ARTIFACT/RECIPE_CLASSNAME are required") {
+		t.Fatalf("unexpected report message: %q", report.Message)
+	}
+}
+
 func TestOrwCLI_WarnsOnLegacyExcludeAliasesAndExportsCanonicalExcludeEnv(t *testing.T) {
 	t.Parallel()
 
