@@ -25,7 +25,6 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /workspace
-ENV ORW_BUILD_SYSTEM=gradle
 
 COPY --from=rewrite-runner-build /build/rewrite-runner/target/orw-cli-runner.jar /opt/orw-cli-runner/orw-cli-runner.jar
 RUN printf '%s\n' '#!/usr/bin/env bash' \

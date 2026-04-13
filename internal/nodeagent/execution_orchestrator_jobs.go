@@ -213,7 +213,11 @@ func (r *runController) executeSBOMJob(ctx context.Context, req StartRunRequest)
 		return
 	}
 
-	initialStack := resolveSBOMStackForCycle(cycleName, r.loadPersistedStack(req.RunID), req.TypedOptions)
+	initialStack := resolveSBOMStackForCycle(
+		cycleName,
+		resolveManifestStack(req, r.loadPersistedStack(req.RunID)),
+		req.TypedOptions,
+	)
 	manifest, err := buildSBOMManifest(req, cycleName, initialStack)
 	if err != nil {
 		slog.Error("failed to build sbom manifest", "run_id", req.RunID, "job_id", req.JobID, "cycle_name", cycleName, "error", err)
@@ -292,6 +296,7 @@ func (r *runController) executeHookJob(ctx context.Context, req StartRunRequest)
 	inputSnapshotPath := gateCycleHookInputSnapshotPath(req.RunID, cycleName, hookIndex)
 	outPath := gateCycleHookOutPath(req.RunID, cycleName, hookIndex)
 	conditionJSON := encodeHookConditionResult(req.HookRuntime)
+	stack := resolveManifestStack(req, r.loadPersistedStack(req.RunID))
 
 	if req.HookRuntime != nil && !req.HookRuntime.HookShouldRun {
 		err = fmt.Errorf("hook[%d] runtime decision rejected execution: HookShouldRun=false (cycle=%s source=%q)", hookIndex, cycleName, hookSource)
@@ -323,7 +328,7 @@ func (r *runController) executeHookJob(ctx context.Context, req StartRunRequest)
 		runtimeStep.CA = mergeUniqueStringEntries(append([]string(nil), execStep.CA...), phaseCA)
 		runtimeStep.Envs = mergeHookRuntimeDecisionEnv(runtimeStep.Envs, req.HookRuntime)
 
-		manifest, manifestErr := buildManifestFromRequest(req, hookStepRunOptions(runtimeStep, req.TypedOptions.BundleMap), 0, contracts.MigStackUnknown)
+		manifest, manifestErr := buildManifestFromRequest(req, hookStepRunOptions(runtimeStep, req.TypedOptions.BundleMap), 0, stack)
 		if manifestErr != nil {
 			err = fmt.Errorf("hook[%d] step[%d] build runtime manifest: %w", hookIndex, stepIdx, manifestErr)
 			slog.Error("failed to execute hook job", "run_id", req.RunID, "job_id", req.JobID, "hook_index", hookIndex, "step_idx", stepIdx, "error", err)
@@ -700,7 +705,7 @@ func (r *runController) executeMigJob(ctx context.Context, req StartRunRequest) 
 	// Load the persisted stack from the pre-gate phase for stack-aware image
 	// selection. If no stack was persisted (e.g., gate skipped), defaults to
 	// MigStackUnknown which falls back to "default" in stack maps.
-	stack := r.loadPersistedStack(req.RunID)
+	stack := resolveManifestStack(req, r.loadPersistedStack(req.RunID))
 
 	// Build manifest with stack-aware image resolution using typed options.
 	typedOpts := req.TypedOptions
@@ -767,8 +772,8 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 	// Load the persisted stack from the pre-gate phase for stack-aware image
 	// selection. If no stack was persisted (e.g., gate skipped), defaults to
 	// MigStackUnknown which falls back to "default" in stack maps.
-	stack := r.loadPersistedStack(req.RunID)
-	if req.RecoveryContext != nil && req.RecoveryContext.DetectedStack != "" {
+	stack := resolveManifestStack(req, r.loadPersistedStack(req.RunID))
+	if stack == contracts.MigStackUnknown && req.RecoveryContext != nil && req.RecoveryContext.DetectedStack != "" {
 		stack = req.RecoveryContext.DetectedStack
 	}
 

@@ -188,6 +188,43 @@ func TestResolveRuntimeInputHash_HookRuntimeAffectsHash(t *testing.T) {
 	}
 }
 
+func TestResolveRuntimeInputHash_DetectedStackAffectsHash(t *testing.T) {
+	t.Parallel()
+
+	runID := domaintypes.NewRunID()
+	repoID := domaintypes.NewRepoID()
+	jobID := domaintypes.NewJobID()
+	st := &jobStore{}
+	st.listJobsByRunRepoAttempt.val = []store.Job{{
+		ID:      jobID,
+		RunID:   runID,
+		RepoID:  repoID,
+		Attempt: 1,
+		JobType: domaintypes.JobTypeMig,
+	}}
+
+	svc := NewClaimService(st, nil, &ConfigHolder{}, nil)
+	job := store.Job{ID: jobID, RunID: runID, RepoID: repoID, Attempt: 1, JobType: domaintypes.JobTypeMig}
+	hashA, okA, err := svc.resolveRuntimeInputHash(context.Background(), job, claimResponsePayload{
+		DetectedStack: &contracts.StackExpectation{Language: "java", Tool: "maven", Release: "17"},
+	})
+	if err != nil {
+		t.Fatalf("resolveRuntimeInputHash(A) error = %v", err)
+	}
+	hashB, okB, err := svc.resolveRuntimeInputHash(context.Background(), job, claimResponsePayload{
+		DetectedStack: &contracts.StackExpectation{Language: "java", Tool: "gradle", Release: "17"},
+	})
+	if err != nil {
+		t.Fatalf("resolveRuntimeInputHash(B) error = %v", err)
+	}
+	if !okA || !okB {
+		t.Fatalf("expected eligible hashes, got okA=%v okB=%v", okA, okB)
+	}
+	if hashA == hashB {
+		t.Fatal("runtime input hash must differ for different detected stacks")
+	}
+}
+
 func TestResolveUpstreamSBOMInputHash_UsesEffectiveSourceForMirroredPredecessor(t *testing.T) {
 	t.Parallel()
 

@@ -62,8 +62,7 @@ public final class RewriteCliMain {
     private static final String DEFAULT_REWRITE_VERSION = "8.74.3";
     private static final String BUILD_SYSTEM_GRADLE = "gradle";
     private static final String BUILD_SYSTEM_MAVEN = "maven";
-    private static final String BUILD_SYSTEM_PROP = "orw.build.system";
-    private static final String BUILD_SYSTEM_ENV = "ORW_BUILD_SYSTEM";
+    private static final String STACK_TOOL_ENV = "PLOY_STACK_TOOL";
     private static final String EXCLUDE_PATHS_ENV = "ORW_EXCLUDE_PATHS";
     private static final String GRADLE_PARSER_CLASS = "org.openrewrite.gradle.GradleParser";
     private static final String MAVEN_PARSER_CLASS = "org.openrewrite.maven.MavenParser";
@@ -350,13 +349,9 @@ public final class RewriteCliMain {
         if (requestedBuildSystem != null && !requestedBuildSystem.isBlank()) {
             return normalizeBuildSystem(requestedBuildSystem, "--build-system");
         }
-        String fromProp = System.getProperty(BUILD_SYSTEM_PROP);
-        if (fromProp != null && !fromProp.isBlank()) {
-            return normalizeBuildSystem(fromProp, "-D" + BUILD_SYSTEM_PROP);
-        }
-        String fromEnv = System.getenv(BUILD_SYSTEM_ENV);
+        String fromEnv = System.getenv(STACK_TOOL_ENV);
         if (fromEnv != null && !fromEnv.isBlank()) {
-            return normalizeBuildSystem(fromEnv, BUILD_SYSTEM_ENV);
+            return normalizeBuildSystem(fromEnv, STACK_TOOL_ENV);
         }
 
         boolean hasGradleParser = classAvailable(GRADLE_PARSER_CLASS);
@@ -370,7 +365,7 @@ public final class RewriteCliMain {
         }
         if (hasGradleParser) {
             throw new InputException(
-                "Both Gradle and Maven parsers are available; set --build-system gradle|maven"
+                "Both Gradle and Maven parsers are available; set --build-system gradle|maven or PLOY_STACK_TOOL"
             );
         }
         throw new InputException(

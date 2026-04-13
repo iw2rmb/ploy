@@ -99,41 +99,22 @@ func buildHookMatchInput(ctx context.Context, st store.Store, job store.Job) (ho
 	}
 
 	return hook.MatchInput{
-		Stack:        resolveHookRuntimeStack(jobs),
+		Stack:        resolveHookRuntimeStack(job.ID, jobs),
 		CurrentSBOM:  current,
 		PreviousSBOM: previous,
 	}, nil
 }
 
-func resolveHookRuntimeStack(jobs []store.Job) hook.RuntimeStack {
-	var (
-		selected store.Job
-		found    bool
-		stack    hook.RuntimeStack
-	)
-	for _, candidate := range jobs {
-		if !isGateJobTypeForClaim(domaintypes.JobType(candidate.JobType)) || candidate.Status != domaintypes.JobStatusSuccess || len(candidate.Meta) == 0 {
-			continue
-		}
-		meta, err := contracts.UnmarshalJobMeta(candidate.Meta)
-		if err != nil || meta.GateMetadata == nil {
-			continue
-		}
-		exp := meta.GateMetadata.DetectedStackExpectation()
-		if exp == nil {
-			continue
-		}
-		if !found || sbomJobIsMoreRecent(candidate, selected) {
-			selected = candidate
-			stack = hook.RuntimeStack{
-				Language: strings.TrimSpace(exp.Language),
-				Tool:     strings.TrimSpace(exp.Tool),
-				Release:  strings.TrimSpace(exp.Release),
-			}
-			found = true
-		}
+func resolveHookRuntimeStack(currentJobID domaintypes.JobID, jobs []store.Job) hook.RuntimeStack {
+	exp := resolveDetectedStackExpectationFromJobs(currentJobID, jobs)
+	if exp == nil {
+		return hook.RuntimeStack{}
 	}
-	return stack
+	return hook.RuntimeStack{
+		Language: strings.TrimSpace(exp.Language),
+		Tool:     strings.TrimSpace(exp.Tool),
+		Release:  strings.TrimSpace(exp.Release),
+	}
 }
 
 func resolveHookSBOMSnapshots(

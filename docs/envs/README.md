@@ -625,10 +625,13 @@ Healing execution (custom recipe via Amata lane):
   - Use `ORW_ACTIVE_RECIPES` to override active recipe names.
   - In YAML mode, runtime fills recipe coordinates with defaults when missing.
   - For custom recipe artifacts, set `RECIPE_GROUP`/`RECIPE_ARTIFACT`/`RECIPE_CLASSNAME` explicitly.
-- `heal-orw` sets `ORW_BUILD_SYSTEM` (`gradle|maven`) using workspace markers
-  and then invokes `orw-cli`.
-- If both `pom.xml` and `build.gradle(.kts)` are present, set
-  `ORW_BUILD_SYSTEM` explicitly before invoking `heal-orw`.
+- `heal-orw` requires canonical stack tuple env:
+  - `PLOY_STACK_LANGUAGE`
+  - `PLOY_STACK_TOOL`
+  - `PLOY_STACK_RELEASE`
+- `heal-orw` supports only `java+maven` and `java+gradle` tuples.
+- On missing or unsupported stack tuple, `heal-orw` writes deterministic
+  failure metadata to `/out/orw-task/report.json`.
 - If `ORW_EXCLUDE_PATHS` is unset/empty, no exclude globs are applied.
 - Failure artifacts are written to `/out/orw-task/report.json` and
   `/out/orw-task/transform.log`.

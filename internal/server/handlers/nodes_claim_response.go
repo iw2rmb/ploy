@@ -43,6 +43,7 @@ type claimResponsePayload struct {
 	MigContext             *contracts.MigClaimContext       `json:"mig_context,omitempty"`
 	HookContext            *contracts.HookClaimContext      `json:"hook_context,omitempty"`
 	GateContext            *contracts.GateClaimContext      `json:"gate_context,omitempty"`
+	DetectedStack          *contracts.StackExpectation      `json:"detected_stack,omitempty"`
 	RecoveryContext        *contracts.RecoveryClaimContext  `json:"recovery_context,omitempty"`
 	GateSkip               *contracts.BuildGateSkipMetadata `json:"gate_skip,omitempty"`
 	StepSkip               *contracts.MigStepSkipMetadata   `json:"step_skip,omitempty"`
@@ -178,6 +179,10 @@ func buildClaimResponsePayload(
 	if err != nil {
 		return claimResponsePayload{}, fmt.Errorf("build recovery context: %w", err)
 	}
+	detectedStack, err := resolveClaimDetectedStack(ctx, st, job)
+	if err != nil {
+		return claimResponsePayload{}, fmt.Errorf("resolve detected stack for claim: %w", err)
+	}
 	hookRuntime, err := resolveHookRuntimeDecision(ctx, st, bs, job, mergedSpec, jobType)
 	if err != nil {
 		return claimResponsePayload{}, fmt.Errorf("resolve hook runtime decision: %w", err)
@@ -210,6 +215,7 @@ func buildClaimResponsePayload(
 		MigContext:             migContext,
 		HookContext:            hookContext,
 		GateContext:            gateContext,
+		DetectedStack:          detectedStack,
 		RecoveryContext:        recoveryCtx,
 		GateSkip:               gateSkip,
 		StepSkip:               stepSkip,
@@ -252,6 +258,7 @@ func buildActionClaimResponsePayload(
 		MigContext:             nil,
 		HookContext:            nil,
 		GateContext:            nil,
+		DetectedStack:          nil,
 		RecoveryContext:        nil,
 		GateSkip:               nil,
 		StepSkip:               nil,

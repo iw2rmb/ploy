@@ -245,6 +245,7 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 		MigContext:             claim.MigContext,
 		HookContext:            claim.HookContext,
 		GateContext:            claim.GateContext,
+		DetectedStack:          claim.DetectedStack,
 		RecoveryContext:        claim.RecoveryContext,
 		GateSkip:               claim.GateSkip,
 		StepSkip:               claim.StepSkip,

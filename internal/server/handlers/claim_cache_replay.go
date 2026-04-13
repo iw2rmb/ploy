@@ -119,6 +119,14 @@ func (s *ClaimService) resolveRuntimeInputHash(ctx context.Context, job store.Jo
 	components := map[string]string{}
 	jobType := domaintypes.JobType(job.JobType)
 
+	if payload.DetectedStack != nil {
+		_, hash, err := canonicalizeAndHashJSON(payload.DetectedStack)
+		if err != nil {
+			return "", false, fmt.Errorf("hash detected stack input: %w", err)
+		}
+		components["detected_stack"] = hash
+	}
+
 	switch jobType {
 	case domaintypes.JobTypeHook:
 		if payload.HookRuntime == nil {

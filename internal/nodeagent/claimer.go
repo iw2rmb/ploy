@@ -67,6 +67,7 @@ type ClaimResponse struct {
 	MigContext             *contracts.MigClaimContext       `json:"mig_context,omitempty"`
 	HookContext            *contracts.HookClaimContext      `json:"hook_context,omitempty"`
 	GateContext            *contracts.GateClaimContext      `json:"gate_context,omitempty"`
+	DetectedStack          *contracts.StackExpectation      `json:"detected_stack,omitempty"`
 	RecoveryContext        *contracts.RecoveryClaimContext  `json:"recovery_context,omitempty"`
 	GateSkip               *contracts.BuildGateSkipMetadata `json:"gate_skip,omitempty"`
 	StepSkip               *contracts.MigStepSkipMetadata   `json:"step_skip,omitempty"`
