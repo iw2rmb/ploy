@@ -20,7 +20,7 @@ orw-cli --apply --dir <workspace> --out <outdir>
 
 Required env:
   - Class-only mode (no rewrite config): RECIPE_GROUP, RECIPE_ARTIFACT, RECIPE_CLASSNAME
-  - YAML mode (/out/rewrite.yml or ORW_CONFIG_PATH): recipe coords default automatically
+  - YAML mode (/out/rewrite.yml, /in/rewrite.yml, or ORW_CONFIG_PATH): recipe coords default automatically
 
 Optional env:
   RECIPE_VERSION              Recipe artifact version (default: ORW_DEFAULT_RECIPE_VERSION or 8.74.3)
@@ -28,7 +28,7 @@ Optional env:
   ORW_REPOS                  Comma-separated Maven repo URLs
   ORW_REPO_USERNAME          Repo username (must pair with ORW_REPO_PASSWORD)
   ORW_REPO_PASSWORD          Repo password (must pair with ORW_REPO_USERNAME)
-  ORW_CONFIG_PATH            Optional path to rewrite YAML config (defaults: /out/rewrite.yml)
+  ORW_CONFIG_PATH            Optional path to rewrite YAML config (defaults: /out/rewrite.yml, then /in/rewrite.yml)
   ORW_ACTIVE_RECIPES         Comma-separated active recipe overrides
   ORW_FAIL_ON_UNSUPPORTED    true|false (default: true)
   ORW_EXCLUDE_PATHS          Comma-separated glob patterns excluded from parsing (e.g. **/*.proto)
@@ -178,6 +178,8 @@ if [[ -z "$config_path" ]]; then
     config_path="$outdir/rewrite.yml"
   elif [[ -f "/out/rewrite.yml" ]]; then
     config_path="/out/rewrite.yml"
+  elif [[ -f "/in/rewrite.yml" ]]; then
+    config_path="/in/rewrite.yml"
   fi
 fi
 if [[ -n "$config_path" && ! -f "$config_path" ]]; then
@@ -203,7 +205,7 @@ if [[ -n "$config_path" ]]; then
 fi
 
 if [[ -z "$group" || -z "$artifact" || -z "$classname" ]]; then
-  write_failure_report "input" "" "RECIPE_GROUP/RECIPE_ARTIFACT/RECIPE_CLASSNAME are required (unless YAML mode with /out/rewrite.yml defaults)"
+  write_failure_report "input" "" "RECIPE_GROUP/RECIPE_ARTIFACT/RECIPE_CLASSNAME are required (unless YAML mode with /out/rewrite.yml or /in/rewrite.yml defaults)"
   exit 4
 fi
 
