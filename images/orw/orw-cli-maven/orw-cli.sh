@@ -182,6 +182,8 @@ config_path="${ORW_CONFIG_PATH:-}"
 if [[ -z "$config_path" ]]; then
   if [[ -f "$outdir/rewrite.yml" ]]; then
     config_path="$outdir/rewrite.yml"
+  elif [[ -f "/out/rewrite.yml" ]]; then
+    config_path="/out/rewrite.yml"
   fi
 fi
 if [[ -n "$config_path" && ! -f "$config_path" ]]; then
