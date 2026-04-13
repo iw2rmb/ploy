@@ -19,6 +19,11 @@ import (
 
 var cacheReplayDigestHexPattern = regexp.MustCompile(`^[0-9a-f]{64}$`)
 
+type upstreamSBOMBundle struct {
+	Digest     string
+	ArtifactID string
+}
+
 func (s *ClaimService) tryReplayCachedOutcome(
 	ctx context.Context,
 	nodeID domaintypes.NodeID,
@@ -214,13 +219,28 @@ func (s *ClaimService) resolveRuntimeInputHash(ctx context.Context, job store.Jo
 }
 
 func (s *ClaimService) resolveUpstreamSBOMInputHash(ctx context.Context, job store.Job) (string, bool, bool, error) {
-	jobs, err := s.store.ListJobsByRunRepoAttempt(ctx, store.ListJobsByRunRepoAttemptParams{
+	bundle, required, available, err := resolveUpstreamSBOMBundleForJob(ctx, s.store, job)
+	if err != nil {
+		return "", false, false, err
+	}
+	if !available {
+		return "", required, false, nil
+	}
+	return bundle.Digest, required, true, nil
+}
+
+func resolveUpstreamSBOMBundleForJob(
+	ctx context.Context,
+	st store.Store,
+	job store.Job,
+) (upstreamSBOMBundle, bool, bool, error) {
+	jobs, err := st.ListJobsByRunRepoAttempt(ctx, store.ListJobsByRunRepoAttemptParams{
 		RunID:   job.RunID,
 		RepoID:  job.RepoID,
 		Attempt: job.Attempt,
 	})
 	if err != nil {
-		return "", false, false, fmt.Errorf("list run repo jobs: %w", err)
+		return upstreamSBOMBundle{}, false, false, fmt.Errorf("list run repo jobs: %w", err)
 	}
 
 	var predecessor *store.Job
@@ -230,48 +250,52 @@ func (s *ClaimService) resolveUpstreamSBOMInputHash(ctx context.Context, job sto
 			continue
 		}
 		if predecessor != nil {
-			return "", false, false, fmt.Errorf("multiple predecessor jobs reference %s", job.ID)
+			return upstreamSBOMBundle{}, false, false, fmt.Errorf("multiple predecessor jobs reference %s", job.ID)
 		}
 		predecessor = &jobs[idx]
 	}
 	if predecessor == nil {
-		return "", false, false, nil
+		return upstreamSBOMBundle{}, false, false, nil
 	}
 	if domaintypes.JobType(predecessor.JobType) != domaintypes.JobTypeSBOM {
-		return "", false, false, nil
+		return upstreamSBOMBundle{}, false, false, nil
 	}
 	if domaintypes.JobStatus(predecessor.Status) != domaintypes.JobStatusSuccess {
-		return "", false, false, nil
+		return upstreamSBOMBundle{}, false, false, nil
 	}
 
-	source, sourceErr := resolveEffectiveSourceJob(ctx, s.store, predecessor.ID)
+	source, sourceErr := resolveEffectiveSourceJob(ctx, st, predecessor.ID)
 	if sourceErr != nil {
 		// Fail-open: treat unresolved mirrored content as replay ineligible.
-		return "", true, false, nil
+		return upstreamSBOMBundle{}, true, false, nil
 	}
 
-	bundles, err := s.store.ListArtifactBundlesByRunAndJob(ctx, store.ListArtifactBundlesByRunAndJobParams{
+	bundles, err := st.ListArtifactBundlesByRunAndJob(ctx, store.ListArtifactBundlesByRunAndJobParams{
 		RunID: source.RunID,
 		JobID: &source.ID,
 	})
 	if err != nil {
-		return "", true, false, fmt.Errorf("list predecessor sbom artifacts: %w", err)
+		return upstreamSBOMBundle{}, true, false, fmt.Errorf("list predecessor sbom artifacts: %w", err)
 	}
 	for _, bundle := range bundles {
 		if bundle.Name != nil && strings.TrimSpace(*bundle.Name) != "" && strings.TrimSpace(*bundle.Name) != "mig-out" {
 			continue
 		}
+		artifactID := strings.TrimSpace(bundleToSummary(bundle).ID)
 		digest := ""
 		if bundle.Digest != nil {
 			digest = strings.ToLower(strings.TrimSpace(*bundle.Digest))
 		}
 		digest = strings.TrimPrefix(digest, "sha256:")
 		if !cacheReplayDigestHexPattern.MatchString(digest) {
-			return "", true, false, nil
+			return upstreamSBOMBundle{}, true, false, nil
 		}
-		return digest, true, true, nil
+		return upstreamSBOMBundle{
+			Digest:     digest,
+			ArtifactID: artifactID,
+		}, true, true, nil
 	}
-	return "", true, false, nil
+	return upstreamSBOMBundle{}, true, false, nil
 }
 
 func replayMirroredJobMeta(sourceJobID domaintypes.JobID, candidateRaw []byte) ([]byte, bool) {
