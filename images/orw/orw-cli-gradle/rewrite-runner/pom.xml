@@ -9,6 +9,7 @@
   <properties>
     <maven.compiler.release>17</maven.compiler.release>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <project.build.outputTimestamp>2024-01-01T00:00:00Z</project.build.outputTimestamp>
     <rewrite.version>8.74.3</rewrite.version>
     <rewrite.polyglot.version>2.9.6</rewrite.polyglot.version>
     <maven.resolver.version>1.9.22</maven.resolver.version>
