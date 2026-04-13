@@ -526,6 +526,10 @@ func withClaimHookRuntime(decision *contracts.HookRuntimeDecision) claimOption {
 	return func(c *ClaimResponse) { c.HookRuntime = decision }
 }
 
+func withClaimDetectedStack(exp *contracts.StackExpectation) claimOption {
+	return func(c *ClaimResponse) { c.DetectedStack = exp }
+}
+
 // newClaimResponse returns a ClaimResponse with generated IDs and sensible defaults.
 func newClaimResponse(opts ...claimOption) ClaimResponse {
 	now := time.Now().UTC().Format(time.RFC3339)

@@ -9,13 +9,18 @@ usage() {
   cat <<'USAGE'
 heal-orw --apply --dir <workspace> --out <outdir>
 
-Wraps `orw-cli` and sets ORW_BUILD_SYSTEM deterministically.
+Wraps `orw-cli` and enforces canonical stack tuple env inputs.
 
-Detection order:
-1) ORW_BUILD_SYSTEM env when already set (`gradle|maven`)
-2) workspace markers (`build.gradle(.kts)` or `pom.xml`)
+Required stack env:
+  - PLOY_STACK_LANGUAGE
+  - PLOY_STACK_TOOL
+  - PLOY_STACK_RELEASE
 
-On ambiguous or missing detection, writes /out/report.json and exits non-zero.
+Supported build tools:
+  - maven
+  - gradle
+
+On invalid or missing stack tuple, writes /out/report.json and exits non-zero.
 USAGE
 }
 
@@ -51,48 +56,22 @@ normalize_build_system() {
   esac
 }
 
-build_system_from_stack() {
-  case "${PLOY_DETECTED_STACK:-}" in
-    java-gradle) echo "gradle" ;;
-    java-maven) echo "maven" ;;
-    *) echo "" ;;
-  esac
-}
-
 detect_build_system() {
-  local from_env from_stack has_gradle has_maven
-  from_env="$(normalize_build_system "${ORW_BUILD_SYSTEM:-}")"
-  if [[ -n "$from_env" ]]; then
-    echo "$from_env"
-    return 0
-  fi
-  from_stack="$(build_system_from_stack)"
+  local language tool release normalized_tool normalized_language
+  language="$(echo "${PLOY_STACK_LANGUAGE:-}" | tr '[:upper:]' '[:lower:]' | xargs)"
+  tool="$(echo "${PLOY_STACK_TOOL:-}" | tr '[:upper:]' '[:lower:]' | xargs)"
+  release="$(echo "${PLOY_STACK_RELEASE:-}" | xargs)"
+  normalized_tool="$(normalize_build_system "$tool")"
+  normalized_language="$language"
 
-  has_gradle=0
-  has_maven=0
-  [[ -f "$workspace/build.gradle" || -f "$workspace/build.gradle.kts" ]] && has_gradle=1
-  [[ -f "$workspace/pom.xml" ]] && has_maven=1
-
-  if [[ $has_gradle -eq 1 && $has_maven -eq 1 ]]; then
-    if [[ -n "$from_stack" ]]; then
-      echo "$from_stack"
-      return 0
-    fi
+  if [[ -z "$normalized_language" || -z "$normalized_tool" || -z "$release" ]]; then
     return 1
   fi
-  if [[ $has_gradle -eq 1 ]]; then
-    echo "gradle"
-    return 0
+  if [[ "$normalized_language" != "java" ]]; then
+    return 2
   fi
-  if [[ $has_maven -eq 1 ]]; then
-    echo "maven"
-    return 0
-  fi
-  if [[ -n "$from_stack" ]]; then
-    echo "$from_stack"
-    return 0
-  fi
-  return 2
+  echo "$normalized_tool"
+  return 0
 }
 
 while [[ $# -gt 0 ]]; do
@@ -140,14 +119,13 @@ if build_system="$(detect_build_system)"; then
 else
   case $? in
     1)
-      write_failure_report "input" "" "ambiguous build system (both pom.xml and build.gradle); set ORW_BUILD_SYSTEM explicitly"
+      write_failure_report "input" "" "missing canonical stack tuple env (require PLOY_STACK_LANGUAGE, PLOY_STACK_TOOL, PLOY_STACK_RELEASE)"
       ;;
     *)
-      write_failure_report "input" "" "unable to detect build system (no pom.xml/build.gradle and no stack hint)"
+      write_failure_report "input" "" "unsupported stack tuple for OpenRewrite (require java+maven or java+gradle)"
       ;;
   esac
   exit 4
 fi
 
-export ORW_BUILD_SYSTEM="$build_system"
 exec orw-cli "${args[@]}"

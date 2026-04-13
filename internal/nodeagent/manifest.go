@@ -83,6 +83,7 @@ func buildSBOMManifest(req StartRunRequest, cycleName string, persistedStack con
 		env[k] = v
 	}
 	injectRepoMetadataEnv(env, req)
+	injectStackTupleEnv(env, stackExpectationForRequest(req, stack))
 	env["PLOY_SBOM_CYCLE"] = strings.TrimSpace(cycleName)
 	env["PLOY_SBOM_STACK"] = string(stack)
 	env["PLOY_SBOM_DEPENDENCY_OUTPUT"] = "/out/" + sbomDependencyOutputFileName
@@ -314,6 +315,8 @@ func buildManifestFromRequest(req StartRunRequest, typedOpts RunOptions, stepInd
 		}
 	}
 
+	injectStackTupleEnv(env, stackExpectationForRequest(req, stack))
+
 	// Inject placeholder command only for default ubuntu image.
 	if len(command) == 0 && image == defaultImage {
 		command = []string{"/bin/sh", "-c", "echo 'Build gate placeholder'"}
@@ -458,6 +461,7 @@ func buildHealingManifest(req StartRunRequest, mig MigContainerSpec, index int, 
 		env[k] = v
 	}
 	injectRepoMetadataEnv(env, req)
+	injectStackTupleEnv(env, stackExpectationForRequest(req, stack))
 
 	if codexSession != "" && isAmataHealingImage(image) {
 		env["CODEX_RESUME"] = "1"

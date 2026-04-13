@@ -490,3 +490,37 @@ func TestGlobalEnvPropagation_NoFiltering(t *testing.T) {
 		t.Errorf("manifest.Envs has %d keys, want %d", len(manifest.Envs), len(expectedKeys))
 	}
 }
+
+func TestGlobalEnvPropagation_DetectedStackTupleInjected(t *testing.T) {
+	t.Parallel()
+
+	req := StartRunRequest{
+		RunID:   types.RunID("run-stack-env-test"),
+		JobID:   types.JobID("job-stack-env-test"),
+		RepoURL: types.RepoURL("https://gitlab.com/test/repo.git"),
+		DetectedStack: &contracts.StackExpectation{
+			Language: "java",
+			Tool:     "gradle",
+			Release:  "17",
+		},
+		TypedOptions: RunOptions{
+			Execution: MigContainerSpec{
+				Image: contracts.JobImage{Universal: "docker.io/test/mig:latest"},
+			},
+		},
+	}
+
+	manifest, err := buildManifestFromRequest(req, req.TypedOptions, 0, contracts.MigStackUnknown)
+	if err != nil {
+		t.Fatalf("buildManifestFromRequest() error: %v", err)
+	}
+	if got := manifest.Envs[contracts.PLOYStackLanguageEnv]; got != "java" {
+		t.Fatalf("manifest.Envs[%s]=%q, want java", contracts.PLOYStackLanguageEnv, got)
+	}
+	if got := manifest.Envs[contracts.PLOYStackToolEnv]; got != "gradle" {
+		t.Fatalf("manifest.Envs[%s]=%q, want gradle", contracts.PLOYStackToolEnv, got)
+	}
+	if got := manifest.Envs[contracts.PLOYStackReleaseEnv]; got != "17" {
+		t.Fatalf("manifest.Envs[%s]=%q, want 17", contracts.PLOYStackReleaseEnv, got)
+	}
+}

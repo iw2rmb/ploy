@@ -33,17 +33,17 @@ func (r *runController) executeMRCreateAction(ctx context.Context, req StartActi
 	startTime := time.Now()
 
 	jobReq := StartRunRequest{
-		RunID:       req.RunID,
-		JobID:       req.ActionID,
-		RepoID:      req.RepoID,
-		RepoURL:     req.RepoURL,
-		BaseRef:     req.BaseRef,
-		TargetRef:   req.TargetRef,
+		RunID:        req.RunID,
+		JobID:        req.ActionID,
+		RepoID:       req.RepoID,
+		RepoURL:      req.RepoURL,
+		BaseRef:      req.BaseRef,
+		TargetRef:    req.TargetRef,
 		TypedOptions: req.TypedOptions,
-		Env:         req.Env,
+		Env:          req.Env,
 	}
 
-	manifest, err := buildManifestFromRequest(jobReq, req.TypedOptions, 0, contracts.MigStackUnknown)
+	manifest, err := buildManifestFromRequest(jobReq, req.TypedOptions, 0, resolveManifestStack(jobReq, contracts.MigStackUnknown))
 	if err != nil {
 		stats := types.NewRunStatsBuilder().DurationMs(time.Since(startTime).Milliseconds()).Error(err.Error()).MustBuild()
 		_ = r.statusUploader.UploadActionStatus(ctx, req.ActionID, types.JobStatusError.String(), stats)

@@ -273,6 +273,28 @@ func TestClaimLoop_FieldMapping(t *testing.T) {
 			},
 		},
 		{
+			name: "detected stack propagation",
+			claimOpts: []claimOption{
+				withClaimDetectedStack(&contracts.StackExpectation{
+					Language: "java",
+					Tool:     "maven",
+					Release:  "17",
+				}),
+			},
+			assertions: func(t *testing.T, got StartRunRequest, claim ClaimResponse) {
+				t.Helper()
+				if got.DetectedStack == nil {
+					t.Fatal("DetectedStack=nil, want non-nil")
+				}
+				if claim.DetectedStack == nil {
+					t.Fatal("claim DetectedStack=nil, want non-nil")
+				}
+				if *got.DetectedStack != *claim.DetectedStack {
+					t.Fatalf("DetectedStack mismatch: got %+v want %+v", *got.DetectedStack, *claim.DetectedStack)
+				}
+			},
+		},
+		{
 			name: "hook runtime decision propagation",
 			claimOpts: []claimOption{
 				withClaimJobName("pre-gate-hook-000"),
