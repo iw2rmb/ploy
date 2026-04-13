@@ -33,6 +33,7 @@ func TestResolveReusableJobByCacheKey_FailedCandidateRequiresLogs(t *testing.T) 
 
 	cacheKey := "cache-key-" + types.NewJobID().String()
 	failExitCode := int32(1)
+	errorLikeExitCode := int32(2)
 
 	jobWithLogs, err := db.CreateJob(ctx, CreateJobParams{
 		ID:          types.NewJobID(),
@@ -60,12 +61,46 @@ func TestResolveReusableJobByCacheKey_FailedCandidateRequiresLogs(t *testing.T) 
 		t.Fatalf("UpdateJobCompletion(candidate-with-logs) failed: %v", err)
 	}
 	if _, err := db.CreateLog(ctx, CreateLogParams{
-		RunID:   fixture.Run.ID,
-		JobID:   &jobWithLogs.ID,
-		ChunkNo: 1,
+		RunID:    fixture.Run.ID,
+		JobID:    &jobWithLogs.ID,
+		ChunkNo:  1,
 		DataSize: 1,
 	}); err != nil {
 		t.Fatalf("CreateLog(candidate-with-logs) failed: %v", err)
+	}
+
+	jobWithLogsExitTwo, err := db.CreateJob(ctx, CreateJobParams{
+		ID:          types.NewJobID(),
+		RunID:       fixture.Run.ID,
+		RepoID:      fixture.MigRepo.RepoID,
+		RepoBaseRef: fixture.MigRepo.BaseRef,
+		Attempt:     fixture.RunRepo.Attempt,
+		Name:        "candidate-with-logs-exit-two",
+		Status:      types.JobStatusCreated,
+		JobType:     types.JobTypeMig,
+		JobImage:    "alpine:3.20",
+		Meta:        []byte(`{"kind":"mig"}`),
+	})
+	if err != nil {
+		t.Fatalf("CreateJob(candidate-with-logs-exit-two) failed: %v", err)
+	}
+	if err := db.UpdateJobCacheKey(ctx, UpdateJobCacheKeyParams{ID: jobWithLogsExitTwo.ID, CacheKey: cacheKey}); err != nil {
+		t.Fatalf("UpdateJobCacheKey(candidate-with-logs-exit-two) failed: %v", err)
+	}
+	if err := db.UpdateJobCompletion(ctx, UpdateJobCompletionParams{
+		ID:       jobWithLogsExitTwo.ID,
+		Status:   types.JobStatusFail,
+		ExitCode: &errorLikeExitCode,
+	}); err != nil {
+		t.Fatalf("UpdateJobCompletion(candidate-with-logs-exit-two) failed: %v", err)
+	}
+	if _, err := db.CreateLog(ctx, CreateLogParams{
+		RunID:    fixture.Run.ID,
+		JobID:    &jobWithLogsExitTwo.ID,
+		ChunkNo:  2,
+		DataSize: 1,
+	}); err != nil {
+		t.Fatalf("CreateLog(candidate-with-logs-exit-two) failed: %v", err)
 	}
 
 	jobWithoutLogs, err := db.CreateJob(ctx, CreateJobParams{

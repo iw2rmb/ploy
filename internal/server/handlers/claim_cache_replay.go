@@ -73,7 +73,7 @@ func (s *ClaimService) tryReplayCachedOutcome(
 	}
 
 	replayStatus := domaintypes.JobStatus(candidate.Status)
-	if replayStatus != domaintypes.JobStatusSuccess && replayStatus != domaintypes.JobStatusFail {
+	if !isReplayStatusEligible(replayStatus, candidate.ExitCode) {
 		return false, nil
 	}
 	repoSHAOut := strings.TrimSpace(candidate.RepoShaOut)
@@ -134,6 +134,16 @@ func (s *ClaimService) tryReplayCachedOutcome(
 		return false, fmt.Errorf("replay completion for cached hit source=%s target=%s: %w", sourceJob.ID, job.ID, err)
 	}
 	return true, nil
+}
+
+func isReplayStatusEligible(status domaintypes.JobStatus, exitCode *int32) bool {
+	if status == domaintypes.JobStatusSuccess {
+		return true
+	}
+	if status != domaintypes.JobStatusFail {
+		return false
+	}
+	return exitCode != nil && *exitCode == 1
 }
 
 func (s *ClaimService) resolveRuntimeInputHash(ctx context.Context, job store.Job, payload claimResponsePayload) (string, bool, error) {
