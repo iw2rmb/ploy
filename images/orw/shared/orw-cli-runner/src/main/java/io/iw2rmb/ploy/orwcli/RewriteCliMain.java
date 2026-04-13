@@ -54,9 +54,12 @@ import java.util.Objects;
 import java.util.Properties;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public final class RewriteCliMain {
     private static final String DEFAULT_REPO = "https://repo1.maven.org/maven2/";
+    private static final String DEFAULT_REWRITE_VERSION = "8.74.3";
     private static final String BUILD_SYSTEM_GRADLE = "gradle";
     private static final String BUILD_SYSTEM_MAVEN = "maven";
     private static final String BUILD_SYSTEM_PROP = "orw.build.system";
@@ -64,6 +67,8 @@ public final class RewriteCliMain {
     private static final String EXCLUDE_PATHS_ENV = "ORW_EXCLUDE_PATHS";
     private static final String GRADLE_PARSER_CLASS = "org.openrewrite.gradle.GradleParser";
     private static final String MAVEN_PARSER_CLASS = "org.openrewrite.maven.MavenParser";
+    private static final Pattern REWRITE_CORE_JAR_PATTERN = Pattern.compile("^rewrite-core-(.+)\\.jar$");
+    private static final Pattern VERSION_MAJOR_MINOR_PATTERN = Pattern.compile("^(\\d+)\\.(\\d+)(?:\\..*)?$");
 
     private RewriteCliMain() {
     }
@@ -96,6 +101,7 @@ public final class RewriteCliMain {
 
     private static void runBootstrap(CliOptions opts, String[] rawArgs) throws Exception {
         Resolution resolution = resolveRecipeArtifacts(opts.coords, opts.repos, opts.repoUsername, opts.repoPassword);
+        ensureRewriteCoreCompatibility(opts.coords, resolution.classpathJars);
         URL[] isolatedClasspath = buildIsolatedClasspath(resolution.classpathJars);
         try (IsolatedRewriteClassLoader isolated = new IsolatedRewriteClassLoader(
             isolatedClasspath,
@@ -118,15 +124,94 @@ public final class RewriteCliMain {
 
     private static URL[] buildIsolatedClasspath(List<Path> resolvedJars) throws IOException {
         LinkedHashSet<URL> urls = new LinkedHashSet<>();
-        for (Path jar : resolvedJars) {
-            urls.add(jar.toUri().toURL());
-        }
         CodeSource source = RewriteCliMain.class.getProtectionDomain().getCodeSource();
         if (source == null || source.getLocation() == null) {
             throw new IllegalStateException("Unable to determine runner code source location");
         }
+        // Runner jar must be first to prevent resolved recipe dependencies from overriding runner APIs.
         urls.add(source.getLocation());
+        for (Path jar : resolvedJars) {
+            urls.add(jar.toUri().toURL());
+        }
         return urls.toArray(new URL[0]);
+    }
+
+    private static void ensureRewriteCoreCompatibility(String coords, List<Path> classpathJars) {
+        String runnerVersion = detectRunnerRewriteCoreVersion();
+        String resolvedVersion = detectResolvedRewriteCoreVersion(classpathJars);
+        if (resolvedVersion == null) {
+            return;
+        }
+        if (isMajorMinorCompatible(runnerVersion, resolvedVersion)) {
+            return;
+        }
+        throw new InputException(
+            "Incompatible OpenRewrite runtime: runner rewrite-core " + runnerVersion
+                + " is incompatible with resolved rewrite-core " + resolvedVersion
+                + " for " + coords
+                + ". Align RECIPE_VERSION with runner rewrite-core " + runnerVersion + "."
+        );
+    }
+
+    private static String detectRunnerRewriteCoreVersion() {
+        String fromProps = readRewriteCoreVersionFromPomProperties(RewriteCliMain.class.getClassLoader());
+        if (fromProps != null) {
+            return fromProps;
+        }
+        Package pkg = Environment.class.getPackage();
+        if (pkg != null && pkg.getImplementationVersion() != null && !pkg.getImplementationVersion().isBlank()) {
+            return pkg.getImplementationVersion().trim();
+        }
+        return DEFAULT_REWRITE_VERSION;
+    }
+
+    private static String readRewriteCoreVersionFromPomProperties(ClassLoader classLoader) {
+        String resource = "META-INF/maven/org.openrewrite/rewrite-core/pom.properties";
+        try (InputStream in = classLoader.getResourceAsStream(resource)) {
+            if (in == null) {
+                return null;
+            }
+            Properties properties = new Properties();
+            properties.load(in);
+            String version = properties.getProperty("version");
+            if (version == null || version.isBlank()) {
+                return null;
+            }
+            return version.trim();
+        } catch (IOException e) {
+            return null;
+        }
+    }
+
+    private static String detectResolvedRewriteCoreVersion(List<Path> classpathJars) {
+        for (Path jar : classpathJars) {
+            String fileName = jar.getFileName() == null ? "" : jar.getFileName().toString();
+            Matcher matcher = REWRITE_CORE_JAR_PATTERN.matcher(fileName);
+            if (matcher.matches()) {
+                return matcher.group(1);
+            }
+        }
+        return null;
+    }
+
+    private static boolean isMajorMinorCompatible(String runnerVersion, String resolvedVersion) {
+        String runnerMajorMinor = majorMinor(runnerVersion);
+        String resolvedMajorMinor = majorMinor(resolvedVersion);
+        if (runnerMajorMinor == null || resolvedMajorMinor == null) {
+            return Objects.equals(runnerVersion, resolvedVersion);
+        }
+        return runnerMajorMinor.equals(resolvedMajorMinor);
+    }
+
+    private static String majorMinor(String version) {
+        if (version == null) {
+            return null;
+        }
+        Matcher matcher = VERSION_MAJOR_MINOR_PATTERN.matcher(version.trim());
+        if (!matcher.matches()) {
+            return null;
+        }
+        return matcher.group(1) + "." + matcher.group(2);
     }
 
     private static void run(CliOptions opts) throws Exception {

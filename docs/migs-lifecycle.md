@@ -543,8 +543,8 @@ For healing lanes that choose OpenRewrite automation:
 2. Ensure required recipe envs are set:
    - `RECIPE_GROUP`
    - `RECIPE_ARTIFACT`
-   - `RECIPE_VERSION`
    - `RECIPE_CLASSNAME`
+   - `RECIPE_VERSION` (optional; defaults to image-compatible version)
 3. Optionally set `ORW_ACTIVE_RECIPES` when the active recipe should differ
    from top-level `name` in `rewrite.yml`.
 4. Run the canonical command:

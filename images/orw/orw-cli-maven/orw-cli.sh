@@ -21,10 +21,11 @@ orw-cli --apply --dir <workspace> --out <outdir>
 Required env:
   RECIPE_GROUP
   RECIPE_ARTIFACT
-  RECIPE_VERSION
   RECIPE_CLASSNAME
 
 Optional env:
+  RECIPE_VERSION              Recipe artifact version (default: ORW_DEFAULT_RECIPE_VERSION or 8.74.3)
+  ORW_DEFAULT_RECIPE_VERSION  Default version when RECIPE_VERSION is unset (default: 8.74.3)
   ORW_REPOS                  Comma-separated Maven repo URLs
   ORW_REPO_USERNAME          Repo username (must pair with ORW_REPO_PASSWORD)
   ORW_REPO_PASSWORD          Repo password (must pair with ORW_REPO_USERNAME)
@@ -145,11 +146,11 @@ fi
 
 group="${RECIPE_GROUP:-}"
 artifact="${RECIPE_ARTIFACT:-}"
-version="${RECIPE_VERSION:-}"
+version="${RECIPE_VERSION:-${ORW_DEFAULT_RECIPE_VERSION:-8.74.3}}"
 classname="${RECIPE_CLASSNAME:-}"
 
-if [[ -z "$group" || -z "$artifact" || -z "$version" || -z "$classname" ]]; then
-  write_failure_report "input" "" "RECIPE_GROUP/RECIPE_ARTIFACT/RECIPE_VERSION/RECIPE_CLASSNAME are required"
+if [[ -z "$group" || -z "$artifact" || -z "$classname" ]]; then
+  write_failure_report "input" "" "RECIPE_GROUP/RECIPE_ARTIFACT/RECIPE_CLASSNAME are required"
   exit 4
 fi
 
@@ -231,6 +232,9 @@ fi
 echo "[orw-cli] Running OpenRewrite CLI" | tee -a "$transform_log"
 echo "[orw-cli] Coords: $coords" | tee -a "$transform_log"
 echo "[orw-cli] Active recipes: $active_recipes" | tee -a "$transform_log"
+if [[ -z "${RECIPE_VERSION:-}" ]]; then
+  echo "[orw-cli] RECIPE_VERSION is unset; defaulting to $version" | tee -a "$transform_log"
+fi
 
 status=0
 "$cli_bin" "${args[@]}" 2>&1 | tee -a "$transform_log" || status=$?
