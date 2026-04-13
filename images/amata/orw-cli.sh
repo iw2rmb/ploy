@@ -23,8 +23,7 @@ Required env:
   - YAML mode (/out/rewrite.yml, /in/rewrite.yml, or ORW_CONFIG_PATH): recipe coords default automatically
 
 Optional env:
-  RECIPE_VERSION              Recipe artifact version (default: ORW_DEFAULT_RECIPE_VERSION or 8.74.3)
-  ORW_DEFAULT_RECIPE_VERSION  Default version when RECIPE_VERSION is unset (default: 8.74.3)
+  RECIPE_VERSION              Optional recipe artifact version (auto-resolved when unset)
   ORW_REPOS                  Comma-separated Maven repo URLs
   ORW_REPO_USERNAME          Repo username (must pair with ORW_REPO_PASSWORD)
   ORW_REPO_PASSWORD          Repo password (must pair with ORW_REPO_USERNAME)
@@ -145,7 +144,7 @@ fi
 
 group="${RECIPE_GROUP:-}"
 artifact="${RECIPE_ARTIFACT:-}"
-version="${RECIPE_VERSION:-${ORW_DEFAULT_RECIPE_VERSION:-8.74.3}}"
+version="${RECIPE_VERSION:-}"
 classname="${RECIPE_CLASSNAME:-}"
 
 repo_username="${ORW_REPO_USERNAME:-}"
@@ -231,7 +230,11 @@ if ! command -v "$cli_bin" >/dev/null 2>&1; then
   exit 127
 fi
 
-coords="${group}:${artifact}:${version}"
+if [[ -n "$version" ]]; then
+  coords="${group}:${artifact}:${version}"
+else
+  coords="${group}:${artifact}"
+fi
 args=(--apply --dir "$workspace" --recipe "$active_recipes" --coords "$coords")
 if [[ -n "$config_path" ]]; then
   args+=(--config "$config_path")
@@ -256,7 +259,7 @@ if [[ "$used_yaml_defaults" == "true" ]]; then
   echo "[orw-cli] Applied YAML-mode default recipe coordinates/classname" | tee -a "$transform_log"
 fi
 if [[ -z "${RECIPE_VERSION:-}" ]]; then
-  echo "[orw-cli] RECIPE_VERSION is unset; defaulting to $version" | tee -a "$transform_log"
+  echo "[orw-cli] RECIPE_VERSION is unset; resolving latest compatible version from repositories" | tee -a "$transform_log"
 fi
 
 status=0
