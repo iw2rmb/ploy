@@ -41,7 +41,7 @@ Build Gate detects stack once (for example `java-maven` or `java-gradle`) and th
 Required:
 
 - Class-only/custom mode: `RECIPE_GROUP`, `RECIPE_ARTIFACT`, `RECIPE_CLASSNAME`
-- `RECIPE_VERSION` (optional; defaults to `8.74.3`)
+- `RECIPE_VERSION` (optional; when unset ORW auto-resolves the latest compatible version from configured repositories)
 
 Optional:
 
@@ -58,7 +58,8 @@ Optional:
 - Both ORW images use the Hydra `ca` materialization contract to receive CA certificates.
 - Both ship bundled `rewrite` at `/usr/local/bin/rewrite` backed by an embedded standalone runner JAR.
 - `ORW_CLI_BIN` defaults to the bundled binary and is intended to be overridden only for controlled debugging.
-- Recipes are resolved dynamically from `RECIPE_GROUP/RECIPE_ARTIFACT` and optional `RECIPE_VERSION`; per-recipe image rebuild is not required.
+- Recipes are resolved dynamically from `RECIPE_GROUP/RECIPE_ARTIFACT`; if `RECIPE_VERSION` is provided, ORW uses it as-is and fails fast on runtime incompatibility.
+- If `RECIPE_VERSION` is omitted, ORW resolves the latest recipe version compatible with bundled runner `rewrite-core` major.minor.
 - ORW images execute OpenRewrite in isolated runtime containers instead of invoking Maven/Gradle project tasks directly.
 
 ## `rewrite.yml` Behavior
