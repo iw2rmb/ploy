@@ -52,19 +52,19 @@ type SBOMChangeCondition struct {
 
 // Step defines one hook runtime step.
 type Step struct {
-	Name    string            `json:"name,omitempty" yaml:"name,omitempty"`
-	Image   string            `json:"image" yaml:"image"`
-	Command []string          `json:"command,omitempty" yaml:"command,omitempty"`
-	Envs    map[string]string `json:"envs,omitempty" yaml:"envs,omitempty"`
-	CA      []string          `json:"ca,omitempty" yaml:"ca,omitempty"`
-	In      []string          `json:"in,omitempty" yaml:"in,omitempty"`
-	Out     []string          `json:"out,omitempty" yaml:"out,omitempty"`
-	Home    []string          `json:"home,omitempty" yaml:"home,omitempty"`
+	Name    string             `json:"name,omitempty" yaml:"name,omitempty"`
+	Image   contracts.JobImage `json:"image" yaml:"image"`
+	Command []string           `json:"command,omitempty" yaml:"command,omitempty"`
+	Envs    map[string]string  `json:"envs,omitempty" yaml:"envs,omitempty"`
+	CA      []string           `json:"ca,omitempty" yaml:"ca,omitempty"`
+	In      []string           `json:"in,omitempty" yaml:"in,omitempty"`
+	Out     []string           `json:"out,omitempty" yaml:"out,omitempty"`
+	Home    []string           `json:"home,omitempty" yaml:"home,omitempty"`
 }
 
 // ToJobImage converts the hook step image to the shared runtime image contract.
 func (s Step) ToJobImage() contracts.JobImage {
-	return contracts.JobImage{Universal: strings.TrimSpace(s.Image)}
+	return s.Image
 }
 
 // ToCommandSpec converts the hook step command to the shared runtime command contract.
@@ -114,7 +114,7 @@ func (s Spec) Validate() error {
 		return fmt.Errorf("steps: required")
 	}
 	for i, step := range s.Steps {
-		if step.Image == "" {
+		if step.Image.IsEmpty() {
 			return fmt.Errorf("steps[%d].image: required", i)
 		}
 		for j, arg := range step.Command {
@@ -181,7 +181,7 @@ func normalizeSpec(spec *Spec) {
 
 	for i := range spec.Steps {
 		spec.Steps[i].Name = strings.TrimSpace(spec.Steps[i].Name)
-		spec.Steps[i].Image = strings.TrimSpace(spec.Steps[i].Image)
+		spec.Steps[i].Image = normalizeJobImage(spec.Steps[i].Image)
 		for j := range spec.Steps[i].Command {
 			spec.Steps[i].Command[j] = strings.TrimSpace(spec.Steps[i].Command[j])
 		}
@@ -228,4 +228,18 @@ func normalizeTrimmedStrings(values []string) []string {
 		out = append(out, strings.TrimSpace(value))
 	}
 	return out
+}
+
+func normalizeJobImage(image contracts.JobImage) contracts.JobImage {
+	image.Universal = strings.TrimSpace(image.Universal)
+	if len(image.ByStack) == 0 {
+		return image
+	}
+	normalized := make(map[contracts.MigStack]string, len(image.ByStack))
+	for stack, value := range image.ByStack {
+		key := contracts.MigStack(strings.TrimSpace(string(stack)))
+		normalized[key] = strings.TrimSpace(value)
+	}
+	image.ByStack = normalized
+	return image
 }

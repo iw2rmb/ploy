@@ -1,13 +1,17 @@
 package hook
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/iw2rmb/ploy/internal/workflow/contracts"
+)
 
 func TestMatch_StackFilterSemantics(t *testing.T) {
 	t.Parallel()
 
 	base := Spec{
 		ID:    "stack-filter",
-		Steps: []Step{{Image: "ghcr.io/example/hook:1"}},
+		Steps: []Step{{Image: contracts.JobImage{Universal: "ghcr.io/example/hook:1"}}},
 	}
 
 	tests := []struct {
@@ -97,7 +101,7 @@ func TestMatch_SBOMPredicates_AllTransitionTypes(t *testing.T) {
 				To:   ">=2.0.0",
 			}},
 		},
-		Steps: []Step{{Image: "ghcr.io/example/hook:1"}},
+		Steps: []Step{{Image: contracts.JobImage{Universal: "ghcr.io/example/hook:1"}}},
 	}
 
 	current := []SBOMPackage{
@@ -152,7 +156,7 @@ func TestMatch_OnChangeUsesNormalizedVersionComparison(t *testing.T) {
 				To:   ">=1.0.0",
 			}},
 		},
-		Steps: []Step{{Image: "ghcr.io/example/hook:1"}},
+		Steps: []Step{{Image: contracts.JobImage{Universal: "ghcr.io/example/hook:1"}}},
 	}
 
 	got, err := Match(spec, MatchInput{
@@ -191,7 +195,7 @@ func TestMatch_OnChange_GradlePluginCoordinateTransition(t *testing.T) {
 				To:   ">=5.0.0",
 			}},
 		},
-		Steps: []Step{{Image: "ghcr.io/example/hook:1"}},
+		Steps: []Step{{Image: contracts.JobImage{Universal: "ghcr.io/example/hook:1"}}},
 	}
 
 	got, err := Match(spec, MatchInput{
@@ -236,7 +240,7 @@ func TestMatch_DeterministicHashAndOnceEligibility(t *testing.T) {
 		},
 		Steps: []Step{{
 			Name:    " scan ",
-			Image:   " ghcr.io/example/hook:1 ",
+			Image:   contracts.JobImage{Universal: " ghcr.io/example/hook:1 "},
 			Command: []string{" run ", " --flag "},
 			Envs: map[string]string{
 				" B ": "2",

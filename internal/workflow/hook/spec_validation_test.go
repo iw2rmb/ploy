@@ -30,6 +30,16 @@ steps:
 `,
 		},
 		{
+			name: "accepts stack-specific image map",
+			doc: `
+id: stack-image
+steps:
+  - image:
+      default: ghcr.io/example/hook-default:latest
+      java-gradle: ghcr.io/example/hook-gradle:latest
+`,
+		},
+		{
 			name: "rejects authoring in entry",
 			doc: `
 id: invalid-in

@@ -488,9 +488,9 @@ func TestEncodeHookCommandIdentity_EmitsStructuredJSON(t *testing.T) {
 
 	raw := encodeHookCommandIdentityList("aa11bb22", []hook.Step{{
 		Name:    "security-scan",
-		Image:   "hook:latest",
+		Image:   contracts.JobImage{Universal: "hook:latest"},
 		Command: []string{"scan", "--sbom", "/in/sbom.spdx.json", "--out", "/out/sbom.spdx.json"},
-	}})
+	}}, contracts.MigStackJavaGradle)
 
 	var decoded struct {
 		Source string `json:"source"`
@@ -517,5 +517,35 @@ func TestEncodeHookCommandIdentity_EmitsStructuredJSON(t *testing.T) {
 	}
 	if len(decoded.Steps[0].Command) != 5 {
 		t.Fatalf("steps[0].command len=%d, want 5", len(decoded.Steps[0].Command))
+	}
+}
+
+func TestEncodeHookCommandIdentity_ResolvesStackSpecificImage(t *testing.T) {
+	t.Parallel()
+
+	raw := encodeHookCommandIdentityList("aa11bb22", []hook.Step{{
+		Name: "security-scan",
+		Image: contracts.JobImage{
+			ByStack: map[contracts.MigStack]string{
+				contracts.MigStackDefault:    "hook:default",
+				contracts.MigStackJavaGradle: "hook:gradle",
+			},
+		},
+		Command: []string{"scan"},
+	}}, contracts.MigStackJavaGradle)
+
+	var decoded struct {
+		Steps []struct {
+			Image string `json:"image"`
+		} `json:"steps"`
+	}
+	if err := json.Unmarshal([]byte(raw), &decoded); err != nil {
+		t.Fatalf("unmarshal command identity: %v", err)
+	}
+	if len(decoded.Steps) != 1 {
+		t.Fatalf("steps len=%d, want 1", len(decoded.Steps))
+	}
+	if decoded.Steps[0].Image != "hook:gradle" {
+		t.Fatalf("steps[0].image=%q, want hook:gradle", decoded.Steps[0].Image)
 	}
 }
