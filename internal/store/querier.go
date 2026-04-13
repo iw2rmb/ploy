@@ -283,8 +283,6 @@ type Querier interface {
 	ResolvePreGateCreationBindingByRepoSHA(ctx context.Context, arg ResolvePreGateCreationBindingByRepoSHAParams) (ResolvePreGateCreationBindingByRepoSHARow, error)
 	ResolvePreGateCreationBindingByRepoSHAAndStack(ctx context.Context, arg ResolvePreGateCreationBindingByRepoSHAAndStackParams) (ResolvePreGateCreationBindingByRepoSHAAndStackRow, error)
 	ResolveReusableJobByCacheKey(ctx context.Context, arg ResolveReusableJobByCacheKeyParams) (ResolveReusableJobByCacheKeyRow, error)
-	ResolveReusableSBOMByCacheKey(ctx context.Context, arg ResolveReusableSBOMByCacheKeyParams) (ResolveReusableSBOMByCacheKeyRow, error)
-	ResolveReusableStepByCacheKey(ctx context.Context, arg ResolveReusableStepByCacheKeyParams) (ResolveReusableStepByCacheKeyRow, error)
 	ResolveStackIDByImage(ctx context.Context, image string) (int64, error)
 	ResolveStackIDByRepoSHA(ctx context.Context, arg ResolveStackIDByRepoSHAParams) (int64, error)
 	ResolveStackIDByRequiredStack(ctx context.Context, arg ResolveStackIDByRequiredStackParams) (int64, error)

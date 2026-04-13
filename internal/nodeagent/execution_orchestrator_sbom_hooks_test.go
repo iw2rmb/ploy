@@ -511,27 +511,3 @@ func TestRestoreSBOMOutFilesFromBundle_RestoresSBOMOutputsOnly(t *testing.T) {
 		t.Fatalf("expected non-sbom output not to be restored, err=%v", err)
 	}
 }
-
-func TestTryRestoreSBOMFromCache_ImageMismatchSkipsReuse(t *testing.T) {
-	t.Parallel()
-
-	rc := &runController{}
-	req := StartRunRequest{
-		RunID: "run-image-mismatch",
-		JobID: "job-image-mismatch",
-		SBOMSkip: &contracts.SBOMStepSkipMetadata{
-			Enabled:       true,
-			RefArtifactID: "123e4567-e89b-12d3-a456-426614174000",
-			RefJobImage:   "ghcr.io/iw2rmb/ploy/sbom-maven:latest",
-		},
-	}
-	manifest := contracts.StepManifest{Image: "ghcr.io/iw2rmb/ploy/sbom-gradle:latest"}
-
-	skipped, err := rc.tryRestoreSBOMFromCache(context.Background(), req, manifest, t.TempDir())
-	if err != nil {
-		t.Fatalf("tryRestoreSBOMFromCache() error = %v", err)
-	}
-	if skipped {
-		t.Fatal("expected no cache reuse when image differs")
-	}
-}

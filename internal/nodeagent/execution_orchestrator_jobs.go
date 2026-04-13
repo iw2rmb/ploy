@@ -197,15 +197,6 @@ func preGateHookIndexFromJobName(jobName string, hooksLen int) (int, error) {
 func (r *runController) executeSBOMJob(ctx context.Context, req StartRunRequest) {
 	startTime := time.Now()
 
-	if req.SBOMSkip != nil {
-		if err := req.SBOMSkip.Validate(); err != nil {
-			err = fmt.Errorf("invalid sbom_skip metadata: %w", err)
-			slog.Error("failed to apply sbom skip", "run_id", req.RunID, "job_id", req.JobID, "error", err)
-			r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
-			return
-		}
-	}
-
 	cycleName, err := gateCycleNameFromSBOMContext(req.SBOMContext)
 	if err != nil {
 		slog.Error("failed to derive sbom cycle", "run_id", req.RunID, "job_id", req.JobID, "job_name", req.JobName, "error", err)
@@ -244,9 +235,6 @@ func (r *runController) executeSBOMJob(ctx context.Context, req StartRunRequest)
 		},
 		ValidateOutputs: func(outDir, _ string) error {
 			return materializeValidatedSBOMOutput(outDir, sbomSnapshotPath)
-		},
-		TrySkip: func(ctx context.Context, manifest contracts.StepManifest, _, outDir string) (bool, error) {
-			return r.tryRestoreSBOMFromCache(ctx, req, manifest, outDir)
 		},
 		WorkspacePolicy: workspaceChangePolicyIgnore,
 		StartTime:       startTime,
@@ -675,32 +663,6 @@ func encodeHookCommandIdentityList(source string, steps []hook.Step) string {
 // use stack-specific images (e.g., java-maven, java-gradle) when configured.
 func (r *runController) executeMigJob(ctx context.Context, req StartRunRequest) {
 	startTime := time.Now()
-
-	if req.StepSkip != nil {
-		if err := req.StepSkip.Validate(); err != nil {
-			err = fmt.Errorf("invalid step_skip metadata: %w", err)
-			slog.Error("failed to apply step skip", "run_id", req.RunID, "job_id", req.JobID, "error", err)
-			r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
-			return
-		}
-
-		duration := time.Since(startTime)
-		statsBuilder := types.NewRunStatsBuilder().
-			ExitCode(0).
-			DurationMs(duration.Milliseconds()).
-			MetadataEntry("step_skip", "true")
-		if strings.TrimSpace(req.StepSkip.Hash) != "" {
-			statsBuilder.MetadataEntry("step_skip_hash", strings.TrimSpace(req.StepSkip.Hash))
-		}
-		stats := statsBuilder.MustBuild()
-
-		var exitCodeZero int32 = 0
-		if uploadErr := r.uploadStatus(ctx, req.RunID.String(), types.JobStatusSuccess.String(), &exitCodeZero, stats, req.JobID, strings.TrimSpace(req.StepSkip.RefRepoSHAOut)); uploadErr != nil {
-			slog.Error("failed to upload step-skip success status", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)
-		}
-		slog.Info("mig job skipped via step cache", "run_id", req.RunID, "job_id", req.JobID, "repo_sha_out", req.StepSkip.RefRepoSHAOut)
-		return
-	}
 
 	// Load the persisted stack from the pre-gate phase for stack-aware image
 	// selection. If no stack was persisted (e.g., gate skipped), defaults to
@@ -1232,11 +1194,7 @@ func (r *runController) runContainerJob(
 			repoSHAOut := r.computeRepoSHAOut(ctx, req, workspace, "")
 			statsBuilder := types.NewRunStatsBuilder().
 				ExitCode(0).
-				DurationMs(duration.Milliseconds()).
-				MetadataEntry("sbom_skip", "true")
-			if req.SBOMSkip != nil {
-				statsBuilder.MetadataEntry("sbom_skip_ref_artifact_id", strings.TrimSpace(req.SBOMSkip.RefArtifactID))
-			}
+				DurationMs(duration.Milliseconds())
 			stats := statsBuilder.MustBuild()
 			if !cfg.SuppressOutBundle {
 				if err := r.uploadOutDirBundle(ctx, req.RunID, req.JobID, outDir, "mig-out"); err != nil {
@@ -1374,51 +1332,6 @@ func (r *runController) runContainerJob(
 		r.reportTerminalStatus(ctx, req, runErr, result, stats, repoSHAOut, duration)
 	}
 	return outcome, nil
-}
-
-func (r *runController) tryRestoreSBOMFromCache(ctx context.Context, req StartRunRequest, manifest contracts.StepManifest, outDir string) (bool, error) {
-	if req.SBOMSkip == nil {
-		return false, nil
-	}
-	refImage := strings.TrimSpace(req.SBOMSkip.RefJobImage)
-	image := strings.TrimSpace(manifest.Image)
-	if refImage == "" || image == "" || refImage != image {
-		return false, nil
-	}
-	if r.artifactUploader == nil {
-		slog.Warn("sbom cache hit ignored: artifact uploader is unavailable", "run_id", req.RunID, "job_id", req.JobID)
-		return false, nil
-	}
-
-	bundle, err := r.artifactUploader.DownloadArtifactBundle(ctx, req.SBOMSkip.RefArtifactID)
-	if err != nil {
-		slog.Warn("sbom cache restore failed; falling back to runtime execution",
-			"run_id", req.RunID,
-			"job_id", req.JobID,
-			"ref_artifact_id", req.SBOMSkip.RefArtifactID,
-			"error", err,
-		)
-		return false, nil
-	}
-
-	restoredCount, restoreErr := restoreSBOMOutFilesFromBundle(bundle, outDir)
-	if restoreErr != nil {
-		slog.Warn("sbom cache extraction failed; falling back to runtime execution",
-			"run_id", req.RunID,
-			"job_id", req.JobID,
-			"ref_artifact_id", req.SBOMSkip.RefArtifactID,
-			"error", restoreErr,
-		)
-		return false, nil
-	}
-	slog.Info("sbom cache hit restored",
-		"run_id", req.RunID,
-		"job_id", req.JobID,
-		"ref_artifact_id", req.SBOMSkip.RefArtifactID,
-		"image", image,
-		"restored_files", restoredCount,
-	)
-	return true, nil
 }
 
 func restoreSBOMOutFilesFromBundle(bundle []byte, outDir string) (int, error) {

@@ -66,10 +66,6 @@ type StartRunRequest struct {
 	RecoveryContext *contracts.RecoveryClaimContext `json:"recovery_context,omitempty"`
 	// GateSkip carries optional skip metadata for gate jobs.
 	GateSkip *contracts.BuildGateSkipMetadata `json:"gate_skip,omitempty"`
-	// StepSkip carries optional cache-hit skip metadata for mig jobs.
-	StepSkip *contracts.MigStepSkipMetadata `json:"step_skip,omitempty"`
-	// SBOMSkip carries optional cache-hit skip metadata for sbom jobs.
-	SBOMSkip *contracts.SBOMStepSkipMetadata `json:"sbom_skip,omitempty"`
 	// HookRuntime carries optional hook once-by-hash runtime decision from claim.
 	HookRuntime *contracts.HookRuntimeDecision `json:"hook_runtime,omitempty"`
 	// TypedOptions contains strongly-typed run configuration. This is the canonical

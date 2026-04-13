@@ -93,10 +93,26 @@ func (s *ClaimService) tryReplayCachedOutcome(
 		}
 	}
 
+	var sbomTargetSnapshot []store.Sbom
+	sbomRowsCopied := false
+	if replayStatus == domaintypes.JobStatusSuccess && domaintypes.JobType(job.JobType) == domaintypes.JobTypeSBOM {
+		snapshot, copyErr := copySBOMRowsFromSourceToTarget(ctx, s.store, sourceJob, job)
+		if copyErr != nil {
+			return false, fmt.Errorf("copy mirrored sbom rows source=%s target=%s: %w", sourceJob.ID, job.ID, copyErr)
+		}
+		sbomTargetSnapshot = snapshot
+		sbomRowsCopied = true
+	}
+
 	mirroredMeta, ok := replayMirroredJobMeta(sourceJob.ID, candidate.Meta)
 	if !ok {
 		// Replay must remain transparent: if mirror metadata cannot be attached,
 		// treat this candidate as ineligible and let regular execution proceed.
+		if sbomRowsCopied {
+			if restoreErr := restoreSBOMRowsForTarget(ctx, s.store, job.ID, sbomTargetSnapshot); restoreErr != nil {
+				return false, fmt.Errorf("rollback copied sbom rows after metadata rejection for target=%s: %w", job.ID, restoreErr)
+			}
+		}
 		return false, nil
 	}
 	stats := JobStatsPayload{JobMeta: mirroredMeta}
@@ -110,6 +126,11 @@ func (s *ClaimService) tryReplayCachedOutcome(
 		RepoSHAOut:   repoSHAOut,
 	})
 	if err != nil {
+		if sbomRowsCopied {
+			if restoreErr := restoreSBOMRowsForTarget(ctx, s.store, job.ID, sbomTargetSnapshot); restoreErr != nil {
+				return false, fmt.Errorf("replay completion for cached hit source=%s target=%s failed: %w (rollback sbom rows failed: %v)", sourceJob.ID, job.ID, err, restoreErr)
+			}
+		}
 		return false, fmt.Errorf("replay completion for cached hit source=%s target=%s: %w", sourceJob.ID, job.ID, err)
 	}
 	return true, nil
@@ -272,4 +293,56 @@ func hasReplayableSourceDiff(ctx context.Context, st store.Store, sourceJob stor
 		return false, err
 	}
 	return true, nil
+}
+
+func copySBOMRowsFromSourceToTarget(
+	ctx context.Context,
+	st store.Store,
+	sourceJob store.Job,
+	targetJob store.Job,
+) ([]store.Sbom, error) {
+	existingTargetRows, err := st.ListSBOMRowsByJob(ctx, targetJob.ID)
+	if err != nil {
+		return nil, fmt.Errorf("list target sbom rows: %w", err)
+	}
+	sourceRows, err := st.ListSBOMRowsByJob(ctx, sourceJob.ID)
+	if err != nil {
+		return nil, fmt.Errorf("list source sbom rows: %w", err)
+	}
+	if err := st.DeleteSBOMRowsByJob(ctx, targetJob.ID); err != nil {
+		return nil, fmt.Errorf("delete target sbom rows: %w", err)
+	}
+	for _, row := range sourceRows {
+		if err := st.UpsertSBOMRow(ctx, store.UpsertSBOMRowParams{
+			JobID:  targetJob.ID,
+			RepoID: targetJob.RepoID,
+			Lib:    row.Lib,
+			Ver:    row.Ver,
+		}); err != nil {
+			return nil, fmt.Errorf("insert mirrored sbom row %q@%q: %w", row.Lib, row.Ver, err)
+		}
+	}
+	return existingTargetRows, nil
+}
+
+func restoreSBOMRowsForTarget(
+	ctx context.Context,
+	st store.Store,
+	targetJobID domaintypes.JobID,
+	rows []store.Sbom,
+) error {
+	if err := st.DeleteSBOMRowsByJob(ctx, targetJobID); err != nil {
+		return fmt.Errorf("delete target sbom rows before restore: %w", err)
+	}
+	for _, row := range rows {
+		if err := st.UpsertSBOMRow(ctx, store.UpsertSBOMRowParams{
+			JobID:  targetJobID,
+			RepoID: row.RepoID,
+			Lib:    row.Lib,
+			Ver:    row.Ver,
+		}); err != nil {
+			return fmt.Errorf("restore sbom row %q@%q: %w", row.Lib, row.Ver, err)
+		}
+	}
+	return nil
 }
