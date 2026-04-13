@@ -233,11 +233,13 @@ build_gate:
 #                     OpenRewrite for deterministic Java AST-safe refactors.
 #                   - OpenRewrite execution contract (custom recipe):
 #                     1) prepare `/out/rewrite.yml` (or set `ORW_CONFIG_PATH`)
-#                     2) ensure RECIPE_GROUP/RECIPE_ARTIFACT/RECIPE_CLASSNAME
-#                        (RECIPE_VERSION is optional; defaults to image-compatible version)
-#                     3) optional ORW_ACTIVE_RECIPES override
-#                     4) run `heal-orw --apply --dir /workspace --out /out/orw-task`
-#                     5) on failure inspect `/out/orw-task/report.json` and `transform.log`,
+#                     2) use `heal-orw` as the execution entrypoint
+#                        (runtime applies default recipe coordinates for YAML mode)
+#                     3) set RECIPE_GROUP/RECIPE_ARTIFACT/RECIPE_CLASSNAME
+#                        only for custom recipe artifacts
+#                     4) optional ORW_ACTIVE_RECIPES override
+#                     5) run `heal-orw --apply --dir /workspace --out /out/orw-task`
+#                     6) on failure inspect `/out/orw-task/report.json` and `transform.log`,
 #                        then fallback to bash/manual with explicit reason.
 #                   - When ready, stop editing and end the session.
 #                   - Your final message MUST be one line of JSON: {"action_summary":"..."}

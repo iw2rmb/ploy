@@ -530,8 +530,11 @@ The ORW Migs honor an existing `rewrite.yml` config:
   2) `/out/rewrite.yml`
 - `rewrite.activeRecipes` defaults to the top-level `name:` in `rewrite.yml`
   (or `ORW_ACTIVE_RECIPES` if provided).
-- `RECIPE_CLASSNAME` remains required by ORW runtime contract even when
-  `rewrite.yml` is present.
+- In YAML mode (`rewrite.yml` present), missing recipe coordinates are
+  filled by runtime defaults:
+  - `RECIPE_GROUP=org.openrewrite`
+  - `RECIPE_ARTIFACT=rewrite-java`
+  - `RECIPE_CLASSNAME=org.openrewrite.java.ChangeMethodName`
 - If no `rewrite.yml` exists, ORW Migs fall back to running the class recipe
   directly using `RECIPE_CLASSNAME` and the artifact coordinates.
 
@@ -540,16 +543,15 @@ The ORW Migs honor an existing `rewrite.yml` config:
 For healing lanes that choose OpenRewrite automation:
 
 1. Write or update `/out/rewrite.yml` with the desired custom recipe.
-2. Ensure required recipe envs are set:
-   - `RECIPE_GROUP`
-   - `RECIPE_ARTIFACT`
-   - `RECIPE_CLASSNAME`
-   - `RECIPE_VERSION` (optional; defaults to image-compatible version)
+2. Use `heal-orw` as the only ORW execution entrypoint in healing lanes:
+   - `heal-orw` applies YAML-mode defaults for recipe coordinates when unset.
+   - Set `RECIPE_GROUP`/`RECIPE_ARTIFACT`/`RECIPE_CLASSNAME` only for custom recipe artifacts.
+   - `RECIPE_VERSION` is optional (defaults to image-compatible version).
 3. Optionally set `ORW_ACTIVE_RECIPES` when the active recipe should differ
    from top-level `name` in `rewrite.yml`.
 4. Run the canonical command:
    - `heal-orw --apply --dir /workspace --out /out/orw-task`
-   (`heal-orw`, `orw-cli`, and `rewrite` are shipped in the `amata` runtime image).
+   (`heal-orw` is the public ORW command in the `amata` runtime image).
 5. On failure, inspect:
    - `/out/orw-task/report.json`
    - `/out/orw-task/transform.log`

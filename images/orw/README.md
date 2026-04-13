@@ -40,9 +40,7 @@ Build Gate detects stack once (for example `java-maven` or `java-gradle`) and th
 
 Required:
 
-- `RECIPE_GROUP`
-- `RECIPE_ARTIFACT`
-- `RECIPE_CLASSNAME`
+- Class-only/custom mode: `RECIPE_GROUP`, `RECIPE_ARTIFACT`, `RECIPE_CLASSNAME`
 - `RECIPE_VERSION` (optional; defaults to `8.74.3`)
 
 Optional:
@@ -71,7 +69,10 @@ When a `rewrite.yml` config is available:
   1) `ORW_CONFIG_PATH`
   2) `/out/rewrite.yml`
 - Active recipes default to top-level `name:` in `rewrite.yml` (override with `ORW_ACTIVE_RECIPES` when needed)
-- `RECIPE_CLASSNAME` is still required by the ORW runtime contract
+- Missing recipe coordinates are filled by runtime defaults:
+  - `RECIPE_GROUP=org.openrewrite`
+  - `RECIPE_ARTIFACT=rewrite-java`
+  - `RECIPE_CLASSNAME=org.openrewrite.java.ChangeMethodName`
 
 If no `rewrite.yml` exists, ORW falls back to class-based recipe execution using the recipe coordinates and `RECIPE_CLASSNAME`.
 

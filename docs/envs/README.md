@@ -585,13 +585,21 @@ The `show` and `unset` commands use **`--from`** to specify the target:
 
 The shared ORW runtime contract is consumed by runtime and node parsing code to keep ORW behavior deterministic.
 
-Required recipe coordinates:
+Recipe coordinates are required for class-only/custom recipe-artifact mode:
 
 | Variable | Description |
 |----------|-------------|
 | `RECIPE_GROUP` | Recipe artifact group ID |
 | `RECIPE_ARTIFACT` | Recipe artifact ID |
 | `RECIPE_CLASSNAME` | Fully qualified recipe class name |
+
+YAML mode defaults (`/out/rewrite.yml` present):
+
+| Variable | Default |
+|----------|---------|
+| `RECIPE_GROUP` | `org.openrewrite` |
+| `RECIPE_ARTIFACT` | `rewrite-java` |
+| `RECIPE_CLASSNAME` | `org.openrewrite.java.ChangeMethodName` |
 
 Optional repository and execution controls:
 
@@ -615,7 +623,8 @@ Healing execution (custom recipe via Amata lane):
   - Config resolution order is: `ORW_CONFIG_PATH` -> `/out/rewrite.yml`.
   - When a config file is found, ORW activates top-level `name:` by default.
   - Use `ORW_ACTIVE_RECIPES` to override active recipe names.
-  - `RECIPE_CLASSNAME` remains required by runtime contract.
+  - In YAML mode, runtime fills recipe coordinates with defaults when missing.
+  - For custom recipe artifacts, set `RECIPE_GROUP`/`RECIPE_ARTIFACT`/`RECIPE_CLASSNAME` explicitly.
 - `heal-orw` sets `ORW_BUILD_SYSTEM` (`gradle|maven`) using workspace markers
   and then invokes `orw-cli`.
 - If both `pom.xml` and `build.gradle(.kts)` are present, set
