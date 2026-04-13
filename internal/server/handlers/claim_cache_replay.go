@@ -73,7 +73,7 @@ func (s *ClaimService) tryReplayCachedOutcome(
 	}
 
 	replayStatus := domaintypes.JobStatus(candidate.Status)
-	if !isReplayStatusEligible(replayStatus, candidate.ExitCode) {
+	if !isReplayStatusEligible(domaintypes.JobType(job.JobType), replayStatus, candidate.ExitCode) {
 		return false, nil
 	}
 	repoSHAOut := strings.TrimSpace(candidate.RepoShaOut)
@@ -136,11 +136,14 @@ func (s *ClaimService) tryReplayCachedOutcome(
 	return true, nil
 }
 
-func isReplayStatusEligible(status domaintypes.JobStatus, exitCode *int32) bool {
+func isReplayStatusEligible(jobType domaintypes.JobType, status domaintypes.JobStatus, exitCode *int32) bool {
 	if status == domaintypes.JobStatusSuccess {
 		return true
 	}
 	if status != domaintypes.JobStatusFail {
+		return false
+	}
+	if jobType == domaintypes.JobTypeHook || jobType == domaintypes.JobTypeHeal {
 		return false
 	}
 	return exitCode != nil && *exitCode == 1

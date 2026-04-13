@@ -38,6 +38,21 @@ func JobStatusFromExitCode(exitCode int) domaintypes.JobStatus {
 	return domaintypes.JobStatusError
 }
 
+// JobStatusFromExitCodeForJobType maps process exit codes to terminal status with
+// job-type-specific overrides.
+//
+// Hook and Heal jobs treat any non-zero exit as Error because these failures are
+// node/runtime orchestration failures and must not be replayed from Fail cache.
+func JobStatusFromExitCodeForJobType(jobType domaintypes.JobType, exitCode int) domaintypes.JobStatus {
+	if exitCode == 0 {
+		return domaintypes.JobStatusSuccess
+	}
+	if jobType == domaintypes.JobTypeHook || jobType == domaintypes.JobTypeHeal {
+		return domaintypes.JobStatusError
+	}
+	return JobStatusFromExitCode(exitCode)
+}
+
 var sha40Pattern = regexp.MustCompile(`^[0-9a-f]{40}$`)
 
 // ========== Claim Decision ==========
