@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/google/uuid"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 func TestResolveUpstreamSBOMInputHash_ReturnsDigestHexForSBOMPredecessor(t *testing.T) {
@@ -60,6 +62,65 @@ func TestResolveUpstreamSBOMInputHash_ReturnsDigestHexForSBOMPredecessor(t *test
 	want := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 	if hash != want {
 		t.Fatalf("hash = %q, want %q", hash, want)
+	}
+}
+
+func TestResolveUpstreamSBOMBundleForJob_ReturnsDigestAndArtifactID(t *testing.T) {
+	t.Parallel()
+
+	runID := domaintypes.NewRunID()
+	repoID := domaintypes.NewRepoID()
+	currentID := domaintypes.NewJobID()
+	predecessorID := domaintypes.NewJobID()
+	artifactID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	digest := "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+	name := "mig-out"
+
+	st := &jobStore{}
+	st.listJobsByRunRepoAttempt.val = []store.Job{
+		{
+			ID:      predecessorID,
+			RunID:   runID,
+			RepoID:  repoID,
+			Attempt: 1,
+			NextID:  &currentID,
+			JobType: domaintypes.JobTypeSBOM,
+			Status:  domaintypes.JobStatusSuccess,
+		},
+		{
+			ID:      currentID,
+			RunID:   runID,
+			RepoID:  repoID,
+			Attempt: 1,
+			JobType: domaintypes.JobTypeHook,
+		},
+	}
+	st.listArtifactBundlesByRunAndJob.val = []store.ArtifactBundle{
+		{
+			ID:     pgtype.UUID{Bytes: artifactID, Valid: true},
+			Name:   &name,
+			Digest: &digest,
+		},
+	}
+
+	resolved, required, available, err := resolveUpstreamSBOMBundleForJob(context.Background(), st, store.Job{
+		ID:      currentID,
+		RunID:   runID,
+		RepoID:  repoID,
+		Attempt: 1,
+	})
+	if err != nil {
+		t.Fatalf("resolveUpstreamSBOMBundleForJob() error = %v", err)
+	}
+	if !required || !available {
+		t.Fatalf("required=%v available=%v, want true/true", required, available)
+	}
+	wantDigest := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+	if resolved.Digest != wantDigest {
+		t.Fatalf("digest = %q, want %q", resolved.Digest, wantDigest)
+	}
+	if resolved.ArtifactID != artifactID.String() {
+		t.Fatalf("artifact id = %q, want %q", resolved.ArtifactID, artifactID.String())
 	}
 }
 

@@ -8,6 +8,8 @@ import (
 	"encoding/json"
 	"errors"
 	"io/fs"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -509,5 +511,72 @@ func TestRestoreSBOMOutFilesFromBundle_RestoresSBOMOutputsOnly(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(outDir, "other.txt")); !os.IsNotExist(err) {
 		t.Fatalf("expected non-sbom output not to be restored, err=%v", err)
+	}
+}
+
+func TestEnsureHookSBOMInputSnapshot_RestoresMissingCycleSnapshotFromArtifact(t *testing.T) {
+	t.Parallel()
+
+	artifactID := "11111111-1111-1111-1111-111111111111"
+	bundle := mustTarGzEntries(t, map[string][]byte{
+		"out/sbom.spdx.json":        []byte(`{"spdxVersion":"SPDX-2.3","packages":[]}`),
+		"out/sbom.dependencies.txt": []byte("org.example:lib:1.0.0"),
+	})
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/artifacts/"+artifactID {
+			http.NotFound(w, r)
+			return
+		}
+		if got := r.URL.Query().Get("download"); got != "true" {
+			t.Fatalf("download query = %q, want true", got)
+		}
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(bundle)
+	}))
+	defer server.Close()
+
+	cfg := newAgentConfig(server.URL)
+	rc := newTestController(t, cfg)
+	runID := types.NewRunID()
+	t.Cleanup(func() { _ = os.RemoveAll(runCacheDir(runID)) })
+
+	inputPath := gateCycleSBOMOutPath(runID, postGateCycleName)
+	req := StartRunRequest{
+		RunID: runID,
+		JobID: types.NewJobID(),
+		HookContext: &contracts.HookClaimContext{
+			CycleName:              postGateCycleName,
+			Source:                 "https://hooks.example/hook.yaml",
+			Index:                  0,
+			UpstreamSBOMArtifactID: artifactID,
+		},
+	}
+	if err := rc.ensureHookSBOMInputSnapshot(context.Background(), req, postGateCycleName, inputPath); err != nil {
+		t.Fatalf("ensureHookSBOMInputSnapshot() error = %v", err)
+	}
+	if _, err := os.Stat(inputPath); err != nil {
+		t.Fatalf("expected restored cycle sbom snapshot at %q: %v", inputPath, err)
+	}
+}
+
+func TestEnsureHookSBOMInputSnapshot_MissingArtifactIDReturnsError(t *testing.T) {
+	t.Parallel()
+
+	runID := types.NewRunID()
+	t.Cleanup(func() { _ = os.RemoveAll(runCacheDir(runID)) })
+	rc := &runController{}
+	inputPath := gateCycleSBOMOutPath(runID, postGateCycleName)
+	req := StartRunRequest{
+		RunID:       runID,
+		JobID:       types.NewJobID(),
+		HookContext: &contracts.HookClaimContext{CycleName: postGateCycleName, Index: 0},
+	}
+	err := rc.ensureHookSBOMInputSnapshot(context.Background(), req, postGateCycleName, inputPath)
+	if err == nil {
+		t.Fatal("ensureHookSBOMInputSnapshot() error = nil, want non-nil")
+	}
+	if !strings.Contains(err.Error(), "upstream sbom artifact id is empty") {
+		t.Fatalf("error = %v, want upstream artifact id message", err)
 	}
 }

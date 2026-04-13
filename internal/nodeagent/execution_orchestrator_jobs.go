@@ -285,6 +285,12 @@ func (r *runController) executeHookJob(ctx context.Context, req StartRunRequest)
 	outPath := gateCycleHookOutPath(req.RunID, cycleName, hookIndex)
 	conditionJSON := encodeHookConditionResult(req.HookRuntime)
 	stack := resolveManifestStack(req, r.loadPersistedStack(req.RunID))
+	if restoreErr := r.ensureHookSBOMInputSnapshot(ctx, req, cycleName, inputSnapshotPath); restoreErr != nil {
+		err = fmt.Errorf("hook[%d] prepare sbom input snapshot: %w", hookIndex, restoreErr)
+		slog.Error("failed to execute hook job", "run_id", req.RunID, "job_id", req.JobID, "hook_index", hookIndex, "error", err)
+		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
+		return
+	}
 
 	if req.HookRuntime != nil && !req.HookRuntime.HookShouldRun {
 		err = fmt.Errorf("hook[%d] runtime decision rejected execution: HookShouldRun=false (cycle=%s source=%q)", hookIndex, cycleName, hookSource)
@@ -1390,6 +1396,54 @@ func restoreSBOMOutFilesFromBundle(bundle []byte, outDir string) (int, error) {
 		return restored, fmt.Errorf("validate restored canonical sbom output: %w", err)
 	}
 	return restored, nil
+}
+
+func (r *runController) ensureHookSBOMInputSnapshot(ctx context.Context, req StartRunRequest, cycleName, inputSnapshotPath string) error {
+	if strings.TrimSpace(inputSnapshotPath) == "" {
+		return fmt.Errorf("hook input snapshot path is empty")
+	}
+	if _, err := os.Stat(inputSnapshotPath); err == nil {
+		return nil
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("stat hook input snapshot: %w", err)
+	}
+
+	// Only restore from upstream artifacts when the hook expects the cycle SBOM snapshot.
+	expectedSBOMInput := gateCycleSBOMOutPath(req.RunID, cycleName)
+	if filepath.Clean(inputSnapshotPath) != filepath.Clean(expectedSBOMInput) {
+		return fmt.Errorf("hook input snapshot missing: %s", inputSnapshotPath)
+	}
+
+	artifactID := ""
+	if req.HookContext != nil {
+		artifactID = strings.TrimSpace(req.HookContext.UpstreamSBOMArtifactID)
+	}
+	if artifactID == "" {
+		return fmt.Errorf("hook input snapshot missing at %s and upstream sbom artifact id is empty", inputSnapshotPath)
+	}
+	if r.artifactUploader == nil {
+		return fmt.Errorf("artifact uploader is required to restore upstream sbom snapshot")
+	}
+
+	bundle, err := r.artifactUploader.DownloadArtifactBundle(ctx, artifactID)
+	if err != nil {
+		return fmt.Errorf("download upstream sbom artifact %q: %w", artifactID, err)
+	}
+	restored, err := restoreSBOMOutFilesFromBundle(bundle, filepath.Dir(inputSnapshotPath))
+	if err != nil {
+		return fmt.Errorf("restore sbom outputs from artifact %q: %w", artifactID, err)
+	}
+	if _, err := os.Stat(inputSnapshotPath); err != nil {
+		return fmt.Errorf("verify restored hook input snapshot %q: %w", inputSnapshotPath, err)
+	}
+	slog.Info("restored hook sbom input snapshot from artifact",
+		"run_id", req.RunID,
+		"job_id", req.JobID,
+		"cycle_name", cycleName,
+		"artifact_id", artifactID,
+		"restored_files", restored,
+	)
+	return nil
 }
 
 func normalizeBundlePath(name string) string {

@@ -9,9 +9,10 @@ type MigClaimContext struct {
 
 // HookClaimContext carries concrete hook execution routing.
 type HookClaimContext struct {
-	CycleName string `json:"cycle_name"`
-	Source    string `json:"source"`
-	Index     int    `json:"index"`
+	CycleName              string `json:"cycle_name"`
+	Source                 string `json:"source"`
+	Index                  int    `json:"index"`
+	UpstreamSBOMArtifactID string `json:"upstream_sbom_artifact_id,omitempty"`
 }
 
 // GateClaimContext carries concrete gate execution routing.
@@ -25,6 +26,7 @@ func (c *HookClaimContext) Normalize() {
 	}
 	c.CycleName = strings.TrimSpace(c.CycleName)
 	c.Source = strings.TrimSpace(c.Source)
+	c.UpstreamSBOMArtifactID = strings.TrimSpace(c.UpstreamSBOMArtifactID)
 }
 
 func (c *GateClaimContext) Normalize() {

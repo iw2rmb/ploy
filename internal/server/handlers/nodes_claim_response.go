@@ -171,6 +171,15 @@ func buildClaimResponsePayload(
 	if err != nil {
 		return claimResponsePayload{}, fmt.Errorf("resolve hook runtime decision: %w", err)
 	}
+	if jobType == domaintypes.JobTypeHook && hookContext != nil {
+		upstreamSBOM, _, available, upstreamErr := resolveUpstreamSBOMBundleForJob(ctx, st, job)
+		if upstreamErr != nil {
+			return claimResponsePayload{}, fmt.Errorf("resolve hook upstream sbom bundle: %w", upstreamErr)
+		}
+		if available {
+			hookContext.UpstreamSBOMArtifactID = strings.TrimSpace(upstreamSBOM.ArtifactID)
+		}
+	}
 
 	return claimResponsePayload{
 		WorkType:               "job",
