@@ -80,7 +80,6 @@ exit 67
 	cmd.Env = append(os.Environ(),
 		"RECIPE_GROUP=org.openrewrite.recipe",
 		"RECIPE_ARTIFACT=rewrite-migrate-java",
-		"RECIPE_VERSION=3.20.0",
 		"RECIPE_CLASSNAME=org.openrewrite.java.migrate.UpgradeToJava17",
 		"PATH="+binDir+string(os.PathListSeparator)+os.Getenv("PATH"),
 	)
@@ -108,6 +107,9 @@ exit 67
 	}
 	if strings.Contains(logText, "[mvn-stub] should not run") || strings.Contains(logText, "[gradle-stub] should not run") {
 		t.Fatalf("transform.log shows build-tool invocation:\n%s", logText)
+	}
+	if !strings.Contains(logText, "[orw-cli] Coords: org.openrewrite.recipe:rewrite-migrate-java:8.74.3") {
+		t.Fatalf("transform.log missing default recipe version coords:\n%s", logText)
 	}
 	if strings.Contains(logText, "rewriteRun") || strings.Contains(logText, "rewrite-maven-plugin:run") {
 		t.Fatalf("transform.log shows plugin-coupled execution path:\n%s", logText)

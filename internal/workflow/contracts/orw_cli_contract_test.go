@@ -87,6 +87,24 @@ func TestParseORWCLIInputFromEnv(t *testing.T) {
 		}
 	})
 
+	t.Run("defaults recipe version when unset", func(t *testing.T) {
+		t.Parallel()
+
+		env := map[string]string{
+			ORWRecipeGroupEnv:     validRecipe[ORWRecipeGroupEnv],
+			ORWRecipeArtifactEnv:  validRecipe[ORWRecipeArtifactEnv],
+			ORWRecipeClassnameEnv: validRecipe[ORWRecipeClassnameEnv],
+		}
+
+		got, err := ParseORWCLIInputFromEnv(env)
+		if err != nil {
+			t.Fatalf("ParseORWCLIInputFromEnv returned error: %v", err)
+		}
+		if got.Recipe.Version != ORWDefaultRecipeVersion {
+			t.Fatalf("Recipe.Version = %q, want %q", got.Recipe.Version, ORWDefaultRecipeVersion)
+		}
+	})
+
 	t.Run("rejects invalid fail on unsupported value", func(t *testing.T) {
 		t.Parallel()
 

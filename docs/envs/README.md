@@ -591,7 +591,6 @@ Required recipe coordinates:
 |----------|-------------|
 | `RECIPE_GROUP` | Recipe artifact group ID |
 | `RECIPE_ARTIFACT` | Recipe artifact ID |
-| `RECIPE_VERSION` | Recipe artifact version |
 | `RECIPE_CLASSNAME` | Fully qualified recipe class name |
 
 Optional repository and execution controls:
@@ -599,6 +598,7 @@ Optional repository and execution controls:
 | Variable | Description |
 |----------|-------------|
 | `ORW_REPOS` | Comma-separated Maven repository URLs |
+| `RECIPE_VERSION` | Optional recipe artifact version (defaults to `8.74.3`) |
 | `ORW_REPO_USERNAME` | Repository username (must be paired with `ORW_REPO_PASSWORD`) |
 | `ORW_REPO_PASSWORD` | Repository password (must be paired with `ORW_REPO_USERNAME`) |
 | `ORW_CONFIG_PATH` | Optional path to rewrite YAML config; when unset ORW uses `/out/rewrite.yml` |
@@ -708,7 +708,7 @@ staying isolated from Maven/Gradle project task execution.
 Both images ship a bundled `rewrite` executable (`/usr/local/bin/rewrite`) backed
 by an embedded standalone runner JAR. `ORW_CLI_BIN` defaults to this bundled
 binary and should only be overridden for controlled debugging. Recipes are
-resolved dynamically from `RECIPE_GROUP/RECIPE_ARTIFACT/RECIPE_VERSION`; no
+resolved dynamically from `RECIPE_GROUP/RECIPE_ARTIFACT` and optional `RECIPE_VERSION`; no
 per-recipe image rebuild is required.
 
 ORW jobs also support node-local persistent runtime dependency cache under

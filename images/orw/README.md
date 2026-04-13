@@ -42,8 +42,8 @@ Required:
 
 - `RECIPE_GROUP`
 - `RECIPE_ARTIFACT`
-- `RECIPE_VERSION`
 - `RECIPE_CLASSNAME`
+- `RECIPE_VERSION` (optional; defaults to `8.74.3`)
 
 Optional:
 
@@ -60,7 +60,7 @@ Optional:
 - Both ORW images use the Hydra `ca` materialization contract to receive CA certificates.
 - Both ship bundled `rewrite` at `/usr/local/bin/rewrite` backed by an embedded standalone runner JAR.
 - `ORW_CLI_BIN` defaults to the bundled binary and is intended to be overridden only for controlled debugging.
-- Recipes are resolved dynamically from `RECIPE_GROUP/RECIPE_ARTIFACT/RECIPE_VERSION`; per-recipe image rebuild is not required.
+- Recipes are resolved dynamically from `RECIPE_GROUP/RECIPE_ARTIFACT` and optional `RECIPE_VERSION`; per-recipe image rebuild is not required.
 - ORW images execute OpenRewrite in isolated runtime containers instead of invoking Maven/Gradle project tasks directly.
 
 ## `rewrite.yml` Behavior

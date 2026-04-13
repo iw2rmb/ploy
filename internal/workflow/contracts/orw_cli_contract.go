@@ -10,10 +10,11 @@ import (
 )
 
 const (
-	ORWRecipeGroupEnv     = "RECIPE_GROUP"
-	ORWRecipeArtifactEnv  = "RECIPE_ARTIFACT"
-	ORWRecipeVersionEnv   = "RECIPE_VERSION"
-	ORWRecipeClassnameEnv = "RECIPE_CLASSNAME"
+	ORWRecipeGroupEnv       = "RECIPE_GROUP"
+	ORWRecipeArtifactEnv    = "RECIPE_ARTIFACT"
+	ORWRecipeVersionEnv     = "RECIPE_VERSION"
+	ORWRecipeClassnameEnv   = "RECIPE_CLASSNAME"
+	ORWDefaultRecipeVersion = "8.74.3"
 
 	ORWReposEnv             = "ORW_REPOS"
 	ORWRepoUsernameEnv      = "ORW_REPO_USERNAME"
@@ -75,9 +76,6 @@ func (c ORWCLIRecipeCoordinates) Validate() error {
 	if strings.TrimSpace(c.Artifact) == "" {
 		return fmt.Errorf("%s is required", ORWRecipeArtifactEnv)
 	}
-	if strings.TrimSpace(c.Version) == "" {
-		return fmt.Errorf("%s is required", ORWRecipeVersionEnv)
-	}
 	if strings.TrimSpace(c.Classname) == "" {
 		return fmt.Errorf("%s is required", ORWRecipeClassnameEnv)
 	}
@@ -115,6 +113,9 @@ func ParseORWCLIInputFromEnv(env map[string]string) (ORWCLIInput, error) {
 		},
 		RepoUsername: lookup(ORWRepoUsernameEnv),
 		RepoPassword: lookup(ORWRepoPasswordEnv),
+	}
+	if in.Recipe.Version == "" {
+		in.Recipe.Version = ORWDefaultRecipeVersion
 	}
 
 	if err := in.Recipe.Validate(); err != nil {
