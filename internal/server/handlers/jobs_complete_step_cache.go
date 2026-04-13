@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/server/blobpersist"
@@ -18,7 +19,8 @@ func maybeCloneSkippedStepDiffBeforeCompletion(
 	if bp == nil {
 		return nil
 	}
-	if domaintypes.JobType(job.JobType) != domaintypes.JobTypeMig {
+	jobType := domaintypes.JobType(job.JobType)
+	if !canChangeWorkspace(jobType) {
 		return nil
 	}
 
@@ -39,7 +41,7 @@ func maybeCloneSkippedStepDiffBeforeCompletion(
 	sourceJobID := sourceJob.ID
 	if _, err := st.GetLatestDiffByJob(ctx, &sourceJobID); err != nil {
 		if isNoRowsError(err) {
-			return fmt.Errorf("source mirrored mig job %s has no diff to clone", sourceJob.ID)
+			return fmt.Errorf("source mirrored %s job %s has no diff to clone", strings.TrimSpace(string(sourceJob.JobType)), sourceJob.ID)
 		}
 		return fmt.Errorf("check source diff: %w", err)
 	}

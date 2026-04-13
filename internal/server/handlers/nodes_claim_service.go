@@ -233,6 +233,16 @@ func (s *ClaimService) Claim(ctx context.Context, nodeID domaintypes.NodeID) (Cl
 		}
 		return ClaimResult{}, claimInternal("failed to build claim response", err)
 	}
+	if claimDecision.AdvanceRunRepoToRunning {
+		if err := s.store.UpdateRunRepoStatus(ctx, store.UpdateRunRepoStatusParams{
+			RunID:  job.RunID,
+			RepoID: job.RepoID,
+			Status: domaintypes.RunRepoStatusRunning,
+		}); err != nil {
+			slog.Error("claim: failed to transition run repo to Running", "node_id", nodeID, "job_id", job.ID, "run_id", job.RunID, "repo_id", job.RepoID, "err", err)
+		}
+	}
+
 	replayed, replayErr := s.replayCachedOutcomeFn(ctx, nodeID, job, payload)
 	if replayErr != nil {
 		slog.Error("claim: cached outcome replay failed", "node_id", nodeID, "job_id", job.ID, "run_id", run.ID, "err", replayErr)
@@ -241,6 +251,21 @@ func (s *ClaimService) Claim(ctx context.Context, nodeID domaintypes.NodeID) (Cl
 			NodeID: nodeID,
 		}); unclaimErr != nil {
 			slog.Error("claim: failed to unclaim job after cached replay error", "job_id", job.ID, "run_id", run.ID, "node_id", nodeID, "err", unclaimErr)
+		}
+		if claimDecision.AdvanceRunRepoToRunning {
+			if rollbackErr := s.store.UpdateRunRepoStatus(ctx, store.UpdateRunRepoStatusParams{
+				RunID:  job.RunID,
+				RepoID: job.RepoID,
+				Status: domaintypes.RunRepoStatusQueued,
+			}); rollbackErr != nil {
+				slog.Error("claim: failed to roll back run repo to Queued after cached replay error",
+					"node_id", nodeID,
+					"job_id", job.ID,
+					"run_id", job.RunID,
+					"repo_id", job.RepoID,
+					"err", rollbackErr,
+				)
+			}
 		}
 		return ClaimResult{}, claimInternal("failed to replay cached outcome", replayErr)
 	}
@@ -252,16 +277,6 @@ func (s *ClaimService) Claim(ctx context.Context, nodeID domaintypes.NodeID) (Cl
 		)
 		return ClaimResult{}, &ClaimNoWork{}
 	}
-	if claimDecision.AdvanceRunRepoToRunning {
-		if err := s.store.UpdateRunRepoStatus(ctx, store.UpdateRunRepoStatusParams{
-			RunID:  job.RunID,
-			RepoID: job.RepoID,
-			Status: domaintypes.RunRepoStatusRunning,
-		}); err != nil {
-			slog.Error("claim: failed to transition run repo to Running", "node_id", nodeID, "job_id", job.ID, "run_id", job.RunID, "repo_id", job.RepoID, "err", err)
-		}
-	}
-
 	slog.Info("job claimed",
 		"job_id", job.ID,
 		"run_id", run.ID,
