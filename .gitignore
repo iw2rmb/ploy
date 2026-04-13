@@ -74,3 +74,5 @@ images/amata/amata
 
 .crush
 .refresh.sh
+
+images/orw/orw-cli-gradle/rewrite-runner/target
