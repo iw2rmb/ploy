@@ -108,8 +108,8 @@ exit 67
 	if strings.Contains(logText, "[mvn-stub] should not run") || strings.Contains(logText, "[gradle-stub] should not run") {
 		t.Fatalf("transform.log shows build-tool invocation:\n%s", logText)
 	}
-	if !strings.Contains(logText, "[orw-cli] Coords: org.openrewrite.recipe:rewrite-migrate-java:8.74.3") {
-		t.Fatalf("transform.log missing default recipe version coords:\n%s", logText)
+	if !strings.Contains(logText, "[orw-cli] Coords: org.openrewrite.recipe:rewrite-migrate-java") {
+		t.Fatalf("transform.log missing recipe coords:\n%s", logText)
 	}
 	if strings.Contains(logText, "rewriteRun") || strings.Contains(logText, "rewrite-maven-plugin:run") {
 		t.Fatalf("transform.log shows plugin-coupled execution path:\n%s", logText)
@@ -322,7 +322,7 @@ echo "[rewrite-stub] coords=$coords"
 	if !strings.Contains(logText, "[rewrite-stub] recipe=PloyApplyYaml") {
 		t.Fatalf("transform.log missing recipe name from /out rewrite.yml:\n%s", logText)
 	}
-	if !strings.Contains(logText, "[rewrite-stub] coords=org.openrewrite:rewrite-java:8.74.3") {
+	if !strings.Contains(logText, "[rewrite-stub] coords=org.openrewrite:rewrite-java") {
 		t.Fatalf("transform.log missing YAML-mode default coords:\n%s", logText)
 	}
 	if !strings.Contains(logText, "Applied YAML-mode default recipe coordinates/classname") {

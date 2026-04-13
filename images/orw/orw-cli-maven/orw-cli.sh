@@ -257,7 +257,7 @@ if [[ "$used_yaml_defaults" == "true" ]]; then
   echo "[orw-cli] Applied YAML-mode default recipe coordinates/classname" | tee -a "$transform_log"
 fi
 if [[ -z "${RECIPE_VERSION:-}" ]]; then
-  echo "[orw-cli] RECIPE_VERSION is unset; resolving latest compatible version from repositories" | tee -a "$transform_log"
+  echo "[orw-cli] RECIPE_VERSION is unset; resolving latest available version from repositories" | tee -a "$transform_log"
 fi
 
 status=0

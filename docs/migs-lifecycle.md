@@ -546,7 +546,7 @@ For healing lanes that choose OpenRewrite automation:
 2. Use `heal-orw` as the only ORW execution entrypoint in healing lanes:
    - `heal-orw` applies YAML-mode defaults for recipe coordinates when unset.
    - Set `RECIPE_GROUP`/`RECIPE_ARTIFACT`/`RECIPE_CLASSNAME` only for custom recipe artifacts.
-   - `RECIPE_VERSION` is optional (defaults to image-compatible version).
+   - `RECIPE_VERSION` is optional (when unset, ORW resolves the latest available version from configured repositories).
 3. Optionally set `ORW_ACTIVE_RECIPES` when the active recipe should differ
    from top-level `name` in `rewrite.yml`.
 4. Run the canonical command:
