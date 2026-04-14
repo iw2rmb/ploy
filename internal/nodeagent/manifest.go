@@ -15,6 +15,7 @@ import (
 
 const (
 	sbomDependencyOutputFileName = "sbom.dependencies.txt"
+	sbomJavaClasspathFileName    = "java.classpath"
 	sbomImageRegistryEnvKey      = "PLOY_CONTAINER_REGISTRY"
 	sbomImageRegistryDefault     = "ghcr.io/iw2rmb/ploy"
 )
@@ -211,20 +212,64 @@ func sbomRuntimeImageTag(runtimeVersion string) string {
 
 func sbomCommandForStack(stack contracts.MigStack) contracts.CommandSpec {
 	rawOutputPath := "/out/" + sbomDependencyOutputFileName
+	classpathOutputPath := "/out/" + sbomJavaClasspathFileName
 	switch normalizeSBOMStack(stack) {
 	case contracts.MigStackJavaGradle:
 		return contracts.CommandSpec{
-			Shell: "set -eu; if [ -x /workspace/gradlew ]; then gradle_cmd=\"/workspace/gradlew\"; else gradle_cmd=\"gradle\"; fi; \"$gradle_cmd\" -q -p /workspace dependencies > " + rawOutputPath + "; if ! \"$gradle_cmd\" -q -p /workspace buildEnvironment >> " + rawOutputPath + " 2>/dev/null; then printf \"\\n# ploy: buildEnvironment unavailable\\n\" >> " + rawOutputPath + "; fi",
+			Shell: "set -eu; if [ -x /workspace/gradlew ]; then gradle_cmd=\"/workspace/gradlew\"; else gradle_cmd=\"gradle\"; fi; " +
+				sbomGradleCollectScript(`"$gradle_cmd"`, rawOutputPath, classpathOutputPath),
 		}
 	case contracts.MigStackJavaMaven:
 		return contracts.CommandSpec{
-			Shell: "set -eu; if [ ! -f /workspace/pom.xml ]; then echo \"missing /workspace/pom.xml\" >&2; exit 1; fi; mvn -B -q -f /workspace/pom.xml -DoutputFile=" + rawOutputPath + " dependency:list",
+			Shell: "set -eu; if [ ! -f /workspace/pom.xml ]; then echo \"missing /workspace/pom.xml\" >&2; exit 1; fi; " +
+				sbomMavenCollectScript(rawOutputPath, classpathOutputPath),
 		}
 	default:
 		return contracts.CommandSpec{
-			Shell: "set -eu; if [ -f /workspace/pom.xml ]; then mvn -B -q -f /workspace/pom.xml -DoutputFile=" + rawOutputPath + " dependency:list; exit 0; fi; if [ -x /workspace/gradlew ]; then gradle_cmd=\"/workspace/gradlew\"; \"$gradle_cmd\" -q -p /workspace dependencies > " + rawOutputPath + "; if ! \"$gradle_cmd\" -q -p /workspace buildEnvironment >> " + rawOutputPath + " 2>/dev/null; then printf \"\\n# ploy: buildEnvironment unavailable\\n\" >> " + rawOutputPath + "; fi; exit 0; fi; if [ -f /workspace/build.gradle ] || [ -f /workspace/build.gradle.kts ] || [ -f /workspace/settings.gradle ] || [ -f /workspace/settings.gradle.kts ]; then if command -v gradle >/dev/null 2>&1; then gradle -q -p /workspace dependencies > " + rawOutputPath + "; if ! gradle -q -p /workspace buildEnvironment >> " + rawOutputPath + " 2>/dev/null; then printf \"\\n# ploy: buildEnvironment unavailable\\n\" >> " + rawOutputPath + "; fi; exit 0; fi; echo \"gradle build detected but no gradle wrapper and no gradle binary available\" >&2; exit 1; fi; echo \"unable to resolve sbom collector: expected pom.xml or gradle markers\" >&2; exit 1",
+			Shell: "set -eu; if [ -f /workspace/pom.xml ]; then " +
+				sbomMavenCollectScript(rawOutputPath, classpathOutputPath) +
+				"; exit 0; fi; if [ -x /workspace/gradlew ]; then gradle_cmd=\"/workspace/gradlew\"; " +
+				sbomGradleCollectScript(`"$gradle_cmd"`, rawOutputPath, classpathOutputPath) +
+				"; exit 0; fi; if [ -f /workspace/build.gradle ] || [ -f /workspace/build.gradle.kts ] || [ -f /workspace/settings.gradle ] || [ -f /workspace/settings.gradle.kts ]; then if command -v gradle >/dev/null 2>&1; then " +
+				sbomGradleCollectScript("gradle", rawOutputPath, classpathOutputPath) +
+				"; exit 0; fi; echo \"gradle build detected but no gradle wrapper and no gradle binary available\" >&2; exit 1; fi; echo \"unable to resolve sbom collector: expected pom.xml or gradle markers\" >&2; exit 1",
 		}
 	}
+}
+
+func sbomMavenCollectScript(rawOutputPath, classpathOutputPath string) string {
+	return fmt.Sprintf(`mvn -B -q -f /workspace/pom.xml -DoutputFile=%s dependency:list; cp_compile="$(mktemp)"; cp_runtime="$(mktemp)"; mvn -B -q -f /workspace/pom.xml -Dmdep.outputFile="$cp_compile" -DincludeScope=compile dependency:build-classpath; mvn -B -q -f /workspace/pom.xml -Dmdep.outputFile="$cp_runtime" -DincludeScope=runtime dependency:build-classpath; cat "$cp_compile" "$cp_runtime" | tr ':' '\n' | awk 'NF > 0 && !seen[$0]++ { print $0 }' > %s; rm -f "$cp_compile" "$cp_runtime"`, rawOutputPath, classpathOutputPath)
+}
+
+func sbomGradleCollectScript(gradleCommand, rawOutputPath, classpathOutputPath string) string {
+	return fmt.Sprintf(`%[1]s -q -p /workspace dependencies > %[2]s; if ! %[1]s -q -p /workspace buildEnvironment >> %[2]s 2>/dev/null; then printf "\n# ploy: buildEnvironment unavailable\n" >> %[2]s; fi; classpath_init="$(mktemp)"; cat > "$classpath_init" <<'PLOY_EOF'
+gradle.projectsEvaluated {
+  def root = gradle.rootProject
+  if (root.tasks.findByName('ployWriteJavaClasspath') != null) {
+    return
+  }
+  root.tasks.register('ployWriteJavaClasspath') {
+    doLast {
+      def output = new File('%[3]s')
+      output.parentFile.mkdirs()
+      def entries = new LinkedHashSet<String>()
+      root.allprojects.each { project ->
+        ['compileClasspath', 'runtimeClasspath'].each { cfgName ->
+          def cfg = project.configurations.findByName(cfgName)
+          if (cfg != null && cfg.canBeResolved) {
+            cfg.resolve().each { file -> entries.add(file.absolutePath) }
+          }
+        }
+      }
+      output.text = entries.join(System.lineSeparator())
+      if (!entries.isEmpty()) {
+        output.append(System.lineSeparator())
+      }
+    }
+  }
+}
+PLOY_EOF
+%[1]s -q -p /workspace -I "$classpath_init" ployWriteJavaClasspath; rm -f "$classpath_init"`, gradleCommand, rawOutputPath, classpathOutputPath)
 }
 
 func resolveSBOMRuntimeStack(stack contracts.MigStack) contracts.MigStack {

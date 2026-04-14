@@ -879,6 +879,10 @@ func materializeValidatedSBOMOutput(outDir string, snapshotPath string) error {
 	if err != nil {
 		return fmt.Errorf("read /out/%s: %w", sbomDependencyOutputFileName, err)
 	}
+	classpathPath := filepath.Join(outDir, sbomJavaClasspathFileName)
+	if err := validateJavaClasspathPath(classpathPath); err != nil {
+		return fmt.Errorf("validate /out/%s: %w", sbomJavaClasspathFileName, err)
+	}
 
 	canonicalRaw, err := canonicalSBOMFromDependencyOutput(raw)
 	if err != nil {
@@ -900,6 +904,13 @@ func materializeValidatedSBOMOutput(outDir string, snapshotPath string) error {
 	}
 	if err := validateCanonicalSBOMPath(snapshotPath); err != nil {
 		return fmt.Errorf("validate staged cycle sbom snapshot: %w", err)
+	}
+	classpathSnapshotPath := filepath.Join(filepath.Dir(snapshotPath), sbomJavaClasspathFileName)
+	if err := copyFileBytes(classpathPath, classpathSnapshotPath); err != nil {
+		return fmt.Errorf("stage cycle java classpath snapshot: %w", err)
+	}
+	if err := validateJavaClasspathPath(classpathSnapshotPath); err != nil {
+		return fmt.Errorf("validate staged cycle java classpath snapshot: %w", err)
 	}
 	return nil
 }
@@ -1023,6 +1034,23 @@ func validateCanonicalSBOMPath(path string) error {
 		return err
 	}
 	return validateCanonicalSBOMDocument(raw)
+}
+
+func validateJavaClasspathPath(path string) error {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	for idx, line := range strings.Split(strings.ReplaceAll(string(raw), "\r\n", "\n"), "\n") {
+		entry := strings.TrimSpace(line)
+		if entry == "" {
+			continue
+		}
+		if !filepath.IsAbs(entry) {
+			return fmt.Errorf("line %d must be absolute path: %q", idx+1, entry)
+		}
+	}
+	return nil
 }
 
 func validateCanonicalSBOMDocument(raw []byte) error {
@@ -1370,7 +1398,7 @@ func restoreSBOMOutFilesFromBundle(bundle []byte, outDir string) (int, error) {
 		}
 
 		entry := normalizeBundlePath(header.Name)
-		if entry == "" || !strings.HasPrefix(entry, "out/sbom.") {
+		if entry == "" || !(strings.HasPrefix(entry, "out/sbom.") || entry == "out/"+sbomJavaClasspathFileName) {
 			continue
 		}
 		relative := strings.TrimPrefix(entry, "out/")
@@ -1394,6 +1422,10 @@ func restoreSBOMOutFilesFromBundle(bundle []byte, outDir string) (int, error) {
 	canonicalPath := filepath.Join(outDir, preGateCanonicalSBOMFileName)
 	if err := validateCanonicalSBOMPath(canonicalPath); err != nil {
 		return restored, fmt.Errorf("validate restored canonical sbom output: %w", err)
+	}
+	classpathPath := filepath.Join(outDir, sbomJavaClasspathFileName)
+	if err := validateJavaClasspathPath(classpathPath); err != nil {
+		return restored, fmt.Errorf("validate restored java classpath output: %w", err)
 	}
 	return restored, nil
 }

@@ -56,8 +56,9 @@ Gate validation is orchestrated by the node agent as part of the Migs run lifecy
    phases (`sbom`, `hook`, `pre-gate`, `post-gate`, `re-gate`) plus `mig` and
    optional healing phases.
 2. Node agent claims the next queued job via `/v1/nodes/{id}/claim`.
-3. For `sbom` jobs, the node writes canonical `/out/sbom.spdx.json` and persists it
-   as the cycle snapshot.
+3. For `sbom` jobs, the node writes canonical `/out/sbom.spdx.json` and
+   `/out/java.classpath` (newline-delimited absolute classpath entries) and
+   persists them as cycle snapshots.
 4. For `hook` jobs, the node stages `/in/sbom.spdx.json` for matcher/runtime context,
    executes hook code changes in `/workspace`, and carries forward the input SBOM
    snapshot for that hook index (hook containers do not produce SBOM output).

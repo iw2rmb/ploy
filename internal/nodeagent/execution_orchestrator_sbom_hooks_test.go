@@ -80,6 +80,8 @@ func writeCanonicalSBOMFixture(t *testing.T, path string, name string) []byte {
 func TestMaterializeValidatedSBOMOutput_WritesCanonicalDocument(t *testing.T) {
 	outDir := t.TempDir()
 	snapshotPath := filepath.Join(t.TempDir(), "gate-cycle", "sbom", "out", preGateCanonicalSBOMFileName)
+	classpathOutPath := filepath.Join(outDir, sbomJavaClasspathFileName)
+	classpathSnapshotPath := filepath.Join(filepath.Dir(snapshotPath), sbomJavaClasspathFileName)
 
 	rawDeps := strings.Join([]string{
 		"[INFO]    com.fasterxml.jackson.core:jackson-databind:jar:2.17.2:compile",
@@ -89,6 +91,10 @@ func TestMaterializeValidatedSBOMOutput_WritesCanonicalDocument(t *testing.T) {
 	}, "\n")
 	if err := os.WriteFile(filepath.Join(outDir, sbomDependencyOutputFileName), []byte(rawDeps), 0o644); err != nil {
 		t.Fatalf("write raw dependency output: %v", err)
+	}
+	rawClasspath := []byte("/home/gradle/.gradle/caches/modules-2/files-2.1/a/b/c/a.jar\n/home/gradle/.gradle/caches/modules-2/files-2.1/x/y/z/b.jar\n")
+	if err := os.WriteFile(classpathOutPath, rawClasspath, 0o644); err != nil {
+		t.Fatalf("write java classpath output: %v", err)
 	}
 
 	if err := materializeValidatedSBOMOutput(outDir, snapshotPath); err != nil {
@@ -140,6 +146,13 @@ func TestMaterializeValidatedSBOMOutput_WritesCanonicalDocument(t *testing.T) {
 	if string(stagedRaw) != string(canonicalRaw) {
 		t.Fatalf("staged snapshot mismatch with canonical output")
 	}
+	stagedClasspathRaw, err := os.ReadFile(classpathSnapshotPath)
+	if err != nil {
+		t.Fatalf("read staged java classpath snapshot: %v", err)
+	}
+	if string(stagedClasspathRaw) != string(rawClasspath) {
+		t.Fatalf("staged java classpath mismatch with output")
+	}
 }
 
 func TestMaterializeValidatedSBOMOutput_ErrorsWhenDependencyOutputMissing(t *testing.T) {
@@ -155,6 +168,26 @@ func TestMaterializeValidatedSBOMOutput_ErrorsWhenDependencyOutputMissing(t *tes
 	}
 	if !strings.Contains(err.Error(), sbomDependencyOutputFileName) {
 		t.Fatalf("error = %q, want mention of %s", err, sbomDependencyOutputFileName)
+	}
+}
+
+func TestMaterializeValidatedSBOMOutput_ErrorsWhenJavaClasspathMissing(t *testing.T) {
+	outDir := t.TempDir()
+	snapshotPath := filepath.Join(t.TempDir(), "gate-cycle", "sbom", "out", preGateCanonicalSBOMFileName)
+	rawDeps := "[INFO]    com.fasterxml.jackson.core:jackson-databind:jar:2.17.2:compile\n"
+	if err := os.WriteFile(filepath.Join(outDir, sbomDependencyOutputFileName), []byte(rawDeps), 0o644); err != nil {
+		t.Fatalf("write raw dependency output: %v", err)
+	}
+
+	err := materializeValidatedSBOMOutput(outDir, snapshotPath)
+	if err == nil {
+		t.Fatal("expected error for missing java classpath output")
+	}
+	if !errors.Is(err, fs.ErrNotExist) {
+		t.Fatalf("expected not-exist error, got %v", err)
+	}
+	if !strings.Contains(err.Error(), sbomJavaClasspathFileName) {
+		t.Fatalf("error = %q, want mention of %s", err, sbomJavaClasspathFileName)
 	}
 }
 
@@ -493,6 +526,7 @@ func TestRestoreSBOMOutFilesFromBundle_RestoresSBOMOutputsOnly(t *testing.T) {
 	bundle := mustTarGzEntries(t, map[string][]byte{
 		"out/sbom.spdx.json":        validCanonical,
 		"out/sbom.dependencies.txt": []byte("org.example:lib:1.0.0"),
+		"out/java.classpath":        []byte("/root/.m2/repository/org/example/lib/1.0.0/lib-1.0.0.jar\n"),
 		"out/other.txt":             []byte("ignore"),
 	})
 
@@ -500,8 +534,8 @@ func TestRestoreSBOMOutFilesFromBundle_RestoresSBOMOutputsOnly(t *testing.T) {
 	if err != nil {
 		t.Fatalf("restoreSBOMOutFilesFromBundle() error = %v", err)
 	}
-	if count != 2 {
-		t.Fatalf("restored count = %d, want 2", count)
+	if count != 3 {
+		t.Fatalf("restored count = %d, want 3", count)
 	}
 	if _, err := os.Stat(filepath.Join(outDir, "sbom.spdx.json")); err != nil {
 		t.Fatalf("expected canonical sbom to be restored: %v", err)
@@ -509,8 +543,29 @@ func TestRestoreSBOMOutFilesFromBundle_RestoresSBOMOutputsOnly(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(outDir, "sbom.dependencies.txt")); err != nil {
 		t.Fatalf("expected dependency output to be restored: %v", err)
 	}
+	if _, err := os.Stat(filepath.Join(outDir, sbomJavaClasspathFileName)); err != nil {
+		t.Fatalf("expected java classpath output to be restored: %v", err)
+	}
 	if _, err := os.Stat(filepath.Join(outDir, "other.txt")); !os.IsNotExist(err) {
 		t.Fatalf("expected non-sbom output not to be restored, err=%v", err)
+	}
+}
+
+func TestRestoreSBOMOutFilesFromBundle_ErrorsWhenJavaClasspathMissing(t *testing.T) {
+	t.Parallel()
+
+	outDir := t.TempDir()
+	bundle := mustTarGzEntries(t, map[string][]byte{
+		"out/sbom.spdx.json":        []byte(`{"spdxVersion":"SPDX-2.3","packages":[]}`),
+		"out/sbom.dependencies.txt": []byte("org.example:lib:1.0.0"),
+	})
+
+	_, err := restoreSBOMOutFilesFromBundle(bundle, outDir)
+	if err == nil {
+		t.Fatal("restoreSBOMOutFilesFromBundle() error = nil, want non-nil")
+	}
+	if !strings.Contains(err.Error(), sbomJavaClasspathFileName) {
+		t.Fatalf("error = %v, want mention of %s", err, sbomJavaClasspathFileName)
 	}
 }
 
@@ -521,6 +576,7 @@ func TestEnsureHookSBOMInputSnapshot_RestoresMissingCycleSnapshotFromArtifact(t 
 	bundle := mustTarGzEntries(t, map[string][]byte{
 		"out/sbom.spdx.json":        []byte(`{"spdxVersion":"SPDX-2.3","packages":[]}`),
 		"out/sbom.dependencies.txt": []byte("org.example:lib:1.0.0"),
+		"out/java.classpath":        []byte("/home/gradle/.gradle/caches/modules-2/files-2.1/a/b/c/a.jar\n"),
 	})
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -557,6 +613,9 @@ func TestEnsureHookSBOMInputSnapshot_RestoresMissingCycleSnapshotFromArtifact(t 
 	}
 	if _, err := os.Stat(inputPath); err != nil {
 		t.Fatalf("expected restored cycle sbom snapshot at %q: %v", inputPath, err)
+	}
+	if _, err := os.Stat(filepath.Join(filepath.Dir(inputPath), sbomJavaClasspathFileName)); err != nil {
+		t.Fatalf("expected restored cycle java classpath snapshot: %v", err)
 	}
 }
 
