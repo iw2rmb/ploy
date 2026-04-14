@@ -90,6 +90,66 @@ func TestResolveJavaClasspathClaimContext(t *testing.T) {
 			},
 		},
 		{
+			name: "heal job after sbom predecessor does not request java classpath",
+			job: func() store.Job {
+				runID := domaintypes.NewRunID()
+				repoID := domaintypes.NewRepoID()
+				jobID := domaintypes.NewJobID()
+				return store.Job{
+					ID:      jobID,
+					RunID:   runID,
+					RepoID:  repoID,
+					Attempt: 1,
+					JobType: domaintypes.JobTypeHeal,
+				}
+			}(),
+			setup: func(t *testing.T, st *jobStore, job store.Job) {
+				t.Helper()
+				sbomSuccessID := domaintypes.NewJobID()
+				migID := domaintypes.NewJobID()
+				sbomFailID := domaintypes.NewJobID()
+				st.listJobsByRunRepoAttempt.val = []store.Job{
+					{
+						ID:      sbomSuccessID,
+						RunID:   job.RunID,
+						RepoID:  job.RepoID,
+						Attempt: job.Attempt,
+						NextID:  &migID,
+						JobType: domaintypes.JobTypeSBOM,
+						Status:  domaintypes.JobStatusSuccess,
+					},
+					{
+						ID:      migID,
+						RunID:   job.RunID,
+						RepoID:  job.RepoID,
+						Attempt: job.Attempt,
+						NextID:  &sbomFailID,
+						JobType: domaintypes.JobTypeMig,
+						Status:  domaintypes.JobStatusSuccess,
+					},
+					{
+						ID:      sbomFailID,
+						RunID:   job.RunID,
+						RepoID:  job.RepoID,
+						Attempt: job.Attempt,
+						NextID:  &job.ID,
+						JobType: domaintypes.JobTypeSBOM,
+						Status:  domaintypes.JobStatusFail,
+					},
+					job,
+				}
+			},
+			assertion: func(t *testing.T, got *contracts.JavaClasspathClaimContext, st *jobStore) {
+				t.Helper()
+				if got != nil {
+					t.Fatalf("context=%+v, want nil", *got)
+				}
+				if st.listArtifactBundlesByRunAndJob.called {
+					t.Fatal("ListArtifactBundlesByRunAndJob called, want not called for heal after sbom predecessor")
+				}
+			},
+		},
+		{
 			name: "non-sbom job with sbom ancestor receives source artifact context",
 			job: func() store.Job {
 				runID := domaintypes.NewRunID()

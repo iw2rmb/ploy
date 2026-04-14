@@ -22,7 +22,7 @@ func runJavaClasspathPath(runID types.RunID) string {
 }
 
 func requiresJavaClasspath(req StartRunRequest) bool {
-	if req.JobType == types.JobTypeSBOM || req.JavaClasspathContext == nil {
+	if req.JobType == types.JobTypeSBOM || req.JobType == types.JobTypeHeal || req.JavaClasspathContext == nil {
 		return false
 	}
 	return req.JavaClasspathContext.Required

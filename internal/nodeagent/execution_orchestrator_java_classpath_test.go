@@ -90,7 +90,7 @@ func TestMaterializeJavaClasspathInDir_RestoresFromArtifactWhenRunCacheMissing(t
 	}
 }
 
-func TestCaptureJavaClasspathAfterStandardJob_PersistsForHookMigHeal(t *testing.T) {
+func TestCaptureJavaClasspathAfterStandardJob_PersistsForHookAndMig(t *testing.T) {
 	t.Setenv("PLOYD_CACHE_HOME", t.TempDir())
 
 	testCases := []struct {
@@ -99,7 +99,6 @@ func TestCaptureJavaClasspathAfterStandardJob_PersistsForHookMigHeal(t *testing.
 	}{
 		{name: "hook", jobType: types.JobTypeHook},
 		{name: "mig", jobType: types.JobTypeMig},
-		{name: "heal", jobType: types.JobTypeHeal},
 	}
 
 	for _, tc := range testCases {
@@ -135,6 +134,29 @@ func TestCaptureJavaClasspathAfterStandardJob_PersistsForHookMigHeal(t *testing.
 				t.Fatalf("expected /out java classpath at %q: %v", outPath, err)
 			}
 		})
+	}
+}
+
+func TestMaterializeJavaClasspathInDir_HealDoesNotRequireClasspath(t *testing.T) {
+	t.Setenv("PLOYD_CACHE_HOME", t.TempDir())
+
+	rc := &runController{}
+	req := StartRunRequest{
+		RunID:   types.NewRunID(),
+		JobID:   types.NewJobID(),
+		JobType: types.JobTypeHeal,
+		JavaClasspathContext: &contracts.JavaClasspathClaimContext{
+			Required: true,
+		},
+	}
+
+	inDir := t.TempDir()
+	if err := rc.materializeJavaClasspathInDir(context.Background(), req, inDir); err != nil {
+		t.Fatalf("materializeJavaClasspathInDir() error = %v", err)
+	}
+
+	if _, err := os.Stat(filepath.Join(inDir, sbomJavaClasspathFileName)); !os.IsNotExist(err) {
+		t.Fatalf("expected heal to skip /in java classpath materialization, stat err = %v", err)
 	}
 }
 

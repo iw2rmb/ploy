@@ -41,6 +41,9 @@ func resolveJavaClasspathClaimContext(
 	if !ok {
 		return nil, nil
 	}
+	if jobType == domaintypes.JobTypeHeal && domaintypes.JobType(predecessor.JobType) == domaintypes.JobTypeSBOM {
+		return nil, nil
+	}
 	if !hasSuccessfulSBOMAncestor(predecessorByID, jobsByID, predecessor.ID) {
 		return nil, nil
 	}
