@@ -51,7 +51,6 @@ services:
       - DOCKER_AUTH_CONFIG=${DOCKER_AUTH_CONFIG:-}
       - PLOYD_CACHE_HOME=/private/tmp
       - PLOY_BUILDGATE_CACHE_ROOT=/private/tmp/ploy/gates
-      - PLOY_ORW_CACHE_ROOT=/private/tmp/ploy/orw
       - TMPDIR=/private/tmp
     volumes:
       - ./node/ployd-node.yaml:/etc/ploy/ployd-node.yaml:ro

@@ -2,7 +2,6 @@ package step
 
 import (
 	"path/filepath"
-	"strings"
 	"testing"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
@@ -11,7 +10,7 @@ import (
 
 func TestBuildContainerSpec_MountsORWCacheForStandaloneImages(t *testing.T) {
 	cacheRoot := t.TempDir()
-	t.Setenv(orwCacheRootEnv, cacheRoot)
+	t.Setenv(buildGateCacheRootEnv, cacheRoot)
 
 	tests := []struct {
 		name  string
@@ -41,20 +40,21 @@ func TestBuildContainerSpec_MountsORWCacheForStandaloneImages(t *testing.T) {
 			}
 
 			var found bool
+			wantSource := filepath.Join(cacheRoot, "java", "maven", orwCacheRelease)
 			for _, mount := range spec.Mounts {
-				if mount.Target != orwMavenUserHomeDir {
+				if mount.Target != BuildGateMavenUserHomeDir {
 					continue
 				}
 				found = true
-				if !strings.HasPrefix(mount.Source, filepath.Clean(cacheRoot)+string(filepath.Separator)) {
-					t.Fatalf("orw cache mount source=%q, want under %q", mount.Source, cacheRoot)
+				if mount.Source != wantSource {
+					t.Fatalf("orw cache mount source=%q, want %q", mount.Source, wantSource)
 				}
 				if mount.ReadOnly {
 					t.Fatalf("orw cache mount must be writable: %+v", mount)
 				}
 			}
 			if !found {
-				t.Fatalf("expected ORW cache mount to %q in %+v", orwMavenUserHomeDir, spec.Mounts)
+				t.Fatalf("expected ORW cache mount to %q in %+v", BuildGateMavenUserHomeDir, spec.Mounts)
 			}
 		})
 	}
@@ -62,7 +62,7 @@ func TestBuildContainerSpec_MountsORWCacheForStandaloneImages(t *testing.T) {
 
 func TestBuildContainerSpec_DoesNotMountORWCacheForNonORWImage(t *testing.T) {
 	cacheRoot := t.TempDir()
-	t.Setenv(orwCacheRootEnv, cacheRoot)
+	t.Setenv(buildGateCacheRootEnv, cacheRoot)
 
 	manifest := contracts.StepManifest{
 		ID:    types.StepID("step-non-orw-cache"),
@@ -82,7 +82,7 @@ func TestBuildContainerSpec_DoesNotMountORWCacheForNonORWImage(t *testing.T) {
 	}
 
 	for _, mount := range spec.Mounts {
-		if mount.Target == orwMavenUserHomeDir {
+		if mount.Target == BuildGateMavenUserHomeDir {
 			t.Fatalf("unexpected ORW cache mount for non-ORW image: %+v", mount)
 		}
 	}
