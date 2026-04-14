@@ -75,6 +75,9 @@ func TestApplySBOMRuntimeForStack_ConfiguresManifest(t *testing.T) {
 		wantRuntimeStack   contracts.MigStack
 		wantCommandSnippet string
 		wantExtraSnippet   string
+		wantPrepSnippet    string
+		wantPrepMarker     string
+		wantWorkspaceMark  bool
 		wantClassesPrep    bool
 	}{
 		{
@@ -83,6 +86,9 @@ func TestApplySBOMRuntimeForStack_ConfiguresManifest(t *testing.T) {
 			wantImage:          "ghcr.io/acme/sbom-maven:" + tag,
 			wantRuntimeStack:   contracts.MigStackJavaMaven,
 			wantCommandSnippet: "mvn -B -q -f /workspace/pom.xml",
+			wantPrepSnippet:    "-DskipTests compile",
+			wantPrepMarker:     "compile preparation unavailable",
+			wantWorkspaceMark:  true,
 		},
 		{
 			name:               "gradle",
@@ -91,6 +97,9 @@ func TestApplySBOMRuntimeForStack_ConfiguresManifest(t *testing.T) {
 			wantRuntimeStack:   contracts.MigStackJavaGradle,
 			wantCommandSnippet: "-q -p /workspace dependencies",
 			wantExtraSnippet:   "buildEnvironment",
+			wantPrepSnippet:    "-q -p /workspace classes",
+			wantPrepMarker:     "classes preparation unavailable",
+			wantWorkspaceMark:  true,
 			wantClassesPrep:    true,
 		},
 		{
@@ -100,6 +109,9 @@ func TestApplySBOMRuntimeForStack_ConfiguresManifest(t *testing.T) {
 			wantRuntimeStack:   contracts.MigStackJavaMaven,
 			wantCommandSnippet: "unable to resolve sbom collector",
 			wantExtraSnippet:   "buildEnvironment",
+			wantPrepSnippet:    "-q -p /workspace classes",
+			wantPrepMarker:     "classes preparation unavailable",
+			wantWorkspaceMark:  true,
 			wantClassesPrep:    true,
 		},
 	}
@@ -130,11 +142,14 @@ func TestApplySBOMRuntimeForStack_ConfiguresManifest(t *testing.T) {
 			if tc.stack != contracts.MigStackJavaMaven && !strings.Contains(shell, "ployWriteJavaClasspath") {
 				t.Fatalf("shell command missing ployWriteJavaClasspath task invocation: %q", shell)
 			}
-			if tc.stack != contracts.MigStackJavaMaven && !strings.Contains(shell, "workspace classpath entries unavailable") {
-				t.Fatalf("shell command missing workspace classpath fallback marker: %q", shell)
+			if tc.wantPrepSnippet != "" && !strings.Contains(shell, tc.wantPrepSnippet) {
+				t.Fatalf("shell command missing preparation snippet %q: %q", tc.wantPrepSnippet, shell)
 			}
-			if tc.stack != contracts.MigStackJavaMaven && !strings.Contains(shell, "classes preparation unavailable") {
-				t.Fatalf("shell command missing classes preparation marker: %q", shell)
+			if tc.wantPrepMarker != "" && !strings.Contains(shell, tc.wantPrepMarker) {
+				t.Fatalf("shell command missing preparation marker %q: %q", tc.wantPrepMarker, shell)
+			}
+			if tc.wantWorkspaceMark && !strings.Contains(shell, "workspace classpath entries unavailable") {
+				t.Fatalf("shell command missing workspace classpath fallback marker: %q", shell)
 			}
 			if tc.stack != contracts.MigStackJavaMaven &&
 				(!strings.Contains(shell, "classpath_init") || !strings.Contains(shell, `-I "$classpath_init"`)) {
