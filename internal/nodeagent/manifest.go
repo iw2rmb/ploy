@@ -10,6 +10,7 @@ import (
 	types "github.com/iw2rmb/ploy/internal/domain/types"
 	iversion "github.com/iw2rmb/ploy/internal/version"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
+	"github.com/iw2rmb/ploy/internal/workflow/lifecycle"
 	"github.com/iw2rmb/ploy/internal/workflow/stackdetect"
 )
 
@@ -183,6 +184,7 @@ func applySBOMRuntimeForStack(manifest *contracts.StepManifest, stack contracts.
 	if manifest.Envs == nil {
 		manifest.Envs = map[string]string{}
 	}
+	injectStackTupleEnv(manifest.Envs, lifecycle.StackExpectationFromMigStack(runtimeStack))
 	manifest.Envs["PLOY_SBOM_STACK"] = string(runtimeStack)
 	return nil
 }
@@ -238,7 +240,7 @@ func sbomCommandForStack(stack contracts.MigStack) contracts.CommandSpec {
 }
 
 func sbomMavenCollectScript(rawOutputPath, classpathOutputPath string) string {
-	return fmt.Sprintf(`mvn -B -q -f /workspace/pom.xml -DoutputFile=%s dependency:list; if ! mvn -B -q -f /workspace/pom.xml -DskipTests compile >/dev/null 2>&1; then printf "\n# ploy: compile preparation unavailable\n" >> %s; fi; cp_compile="$(mktemp)"; cp_runtime="$(mktemp)"; workspace_cp="$(mktemp)"; mvn -B -q -f /workspace/pom.xml -Dmdep.outputFile="$cp_compile" -DincludeScope=compile dependency:build-classpath; mvn -B -q -f /workspace/pom.xml -Dmdep.outputFile="$cp_runtime" -DincludeScope=runtime dependency:build-classpath; find /workspace -type d \( -path '*/target/classes' -o -path '*/target/resources' \) | awk 'NF > 0' | sort -u > "$workspace_cp"; cat "$cp_compile" "$cp_runtime" "$workspace_cp" | tr ':' '\n' | awk 'NF > 0 && !seen[$0]++ { print $0 }' > %s; if ! awk 'NF > 0 && index($0, "/workspace/") == 1 { found = 1; exit } END { exit(found ? 0 : 1) }' %s; then printf "\n# ploy: workspace classpath entries unavailable\n" >> %s; fi; rm -f "$cp_compile" "$cp_runtime" "$workspace_cp"`, rawOutputPath, rawOutputPath, classpathOutputPath, classpathOutputPath, rawOutputPath)
+	return fmt.Sprintf(`mvn -B -q -f /workspace/pom.xml -DoutputFile=%s dependency:list; if ! mvn -B -q -f /workspace/pom.xml -DskipTests compile >/dev/null 2>&1; then printf "\n# ploy: compile preparation unavailable\n" >> %s; fi; cp_compile="$(mktemp)"; cp_runtime="$(mktemp)"; workspace_cp="$(mktemp)"; mvn -B -q -f /workspace/pom.xml -Dmdep.outputFile="$cp_compile" -DincludeScope=compile dependency:build-classpath; mvn -B -q -f /workspace/pom.xml -Dmdep.outputFile="$cp_runtime" -DincludeScope=runtime dependency:build-classpath; find /workspace -type d \( -path '*/target/classes' -o -path '*/target/resources' \) | awk 'NF > 0' | sort -u > "$workspace_cp"; cat "$cp_compile" "$cp_runtime" "$workspace_cp" | tr ':' '\n' | awk 'NF > 0 && !seen[$0]++ { print $0 }' > %s; if ! awk 'NF > 0 && index($0, "/workspace/") == 1 { found = 1; exit } END { exit(found ? 0 : 1) }' %s; then printf "\n# ploy: workspace classpath entries unavailable\n" >> %s; if [ -s "$workspace_cp" ]; then echo "sbom classpath invariant violated: workspace outputs exist but are missing from java.classpath" >&2; exit 1; fi; fi; rm -f "$cp_compile" "$cp_runtime" "$workspace_cp"`, rawOutputPath, rawOutputPath, classpathOutputPath, classpathOutputPath, rawOutputPath)
 }
 
 func sbomGradleCollectScript(gradleCommand, rawOutputPath, classpathOutputPath string) string {
@@ -296,6 +298,10 @@ if find /workspace -type d \( -path '*/build/classes/java/main' -o -path '*/buil
 fi
 if ! awk 'NF > 0 && index($0, "/workspace/") == 1 { found = 1; exit } END { exit(found ? 0 : 1) }' %[3]s; then
   printf "\n# ploy: workspace classpath entries unavailable\n" >> %[2]s
+  if [ -s "$workspace_cp" ]; then
+    echo "sbom classpath invariant violated: workspace outputs exist but are missing from java.classpath" >&2
+    exit 1
+  fi
 fi
 rm -f "$classpath_init" "$workspace_cp"`, gradleCommand, rawOutputPath, classpathOutputPath)
 }
