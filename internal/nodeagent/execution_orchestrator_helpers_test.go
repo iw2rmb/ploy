@@ -1,6 +1,7 @@
 package nodeagent
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -203,5 +204,34 @@ func TestTempResource_Cleanup(t *testing.T) {
 			tr := tt.setup(t)
 			tt.check(t, tr)
 		})
+	}
+}
+
+func TestRehydrateWorkspaceWithCleanup_StickyWorkspaceIsNotRemoved(t *testing.T) {
+	cacheHome := t.TempDir()
+	t.Setenv("PLOYD_CACHE_HOME", cacheHome)
+
+	req := StartRunRequest{
+		RunID:  types.RunID("run_sticky_cleanup"),
+		RepoID: types.MigRepoID("repo_sticky_cleanup"),
+		JobID:  types.JobID("job_sticky_cleanup"),
+	}
+	workspace := runRepoWorkspaceDir(req.RunID, req.RepoID)
+	if err := os.MkdirAll(filepath.Join(workspace, ".git"), 0o755); err != nil {
+		t.Fatalf("mkdir sticky .git dir: %v", err)
+	}
+
+	rc := &runController{cfg: Config{}}
+	result, err := rc.rehydrateWorkspaceWithCleanup(context.Background(), req, contracts.StepManifest{})
+	if err != nil {
+		t.Fatalf("rehydrateWorkspaceWithCleanup() error = %v", err)
+	}
+	if result.path != workspace {
+		t.Fatalf("rehydrateWorkspaceWithCleanup() path = %q, want %q", result.path, workspace)
+	}
+
+	result.cleanup()
+	if _, err := os.Stat(workspace); err != nil {
+		t.Fatalf("sticky workspace should not be removed by cleanup, stat err = %v", err)
 	}
 }

@@ -3,8 +3,11 @@ package nodeagent
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/iw2rmb/ploy/internal/domain/types"
 	containertypes "github.com/moby/moby/api/types/container"
@@ -13,11 +16,13 @@ import (
 )
 
 type fakeFreeBytes struct {
-	values []int64
-	errAt  int
-	err    error
-	calls  int
-	paths  []string
+	values       []int64
+	valuesByPath map[string][]int64
+	errAt        int
+	err          error
+	calls        int
+	paths        []string
+	callsByPath  map[string]int
 }
 
 func (f *fakeFreeBytes) read(path string) (int64, error) {
@@ -25,6 +30,20 @@ func (f *fakeFreeBytes) read(path string) (int64, error) {
 	f.paths = append(f.paths, path)
 	if f.errAt > 0 && f.calls == f.errAt {
 		return 0, f.err
+	}
+	if f.callsByPath == nil {
+		f.callsByPath = map[string]int{}
+	}
+	if seq, ok := f.valuesByPath[path]; ok {
+		if len(seq) == 0 {
+			return 0, nil
+		}
+		idx := f.callsByPath[path]
+		f.callsByPath[path] = idx + 1
+		if idx >= len(seq) {
+			idx = len(seq) - 1
+		}
+		return seq[idx], nil
 	}
 	if len(f.values) == 0 {
 		return 0, nil
@@ -39,12 +58,18 @@ func (f *fakeFreeBytes) read(path string) (int64, error) {
 func TestDockerPreClaimCleanup_EnoughCapacitySkipsCleanup(t *testing.T) {
 	t.Parallel()
 
+	workspaceRoot := t.TempDir()
 	fakeDocker := &fakeDockerClient{
 		infoResult: client.SystemInfoResult{Info: system.Info{DockerRootDir: "/var/lib/docker"}},
 	}
-	fb := &fakeFreeBytes{values: []int64{minDockerFreeBytes + 1}}
+	fb := &fakeFreeBytes{
+		valuesByPath: map[string][]int64{
+			"/var/lib/docker": {minDockerFreeBytes + 1},
+			workspaceRoot:     {minDockerFreeBytes + 1},
+		},
+	}
 
-	cleanup := &dockerPreClaimCleanup{docker: fakeDocker, freeBytes: fb.read}
+	cleanup := &dockerPreClaimCleanup{docker: fakeDocker, freeBytes: fb.read, workspaceRoot: workspaceRoot}
 
 	ok, err := cleanup.EnsureCapacity(context.Background())
 	if err != nil {
@@ -65,6 +90,7 @@ func TestDockerPreClaimCleanup_FiltersAndRemovesFIFO(t *testing.T) {
 	t.Parallel()
 
 	low := minDockerFreeBytes - 1
+	workspaceRoot := t.TempDir()
 	fakeDocker := &fakeDockerClient{
 		infoResult: client.SystemInfoResult{Info: system.Info{DockerRootDir: "/var/lib/docker"}},
 		listResult: client.ContainerListResult{Items: []containertypes.Summary{
@@ -75,9 +101,14 @@ func TestDockerPreClaimCleanup_FiltersAndRemovesFIFO(t *testing.T) {
 			{ID: "a10", Created: 10, State: containertypes.ContainerState("dead"), Labels: map[string]string{types.LabelJobID: "job-1"}},
 		}},
 	}
-	fb := &fakeFreeBytes{values: []int64{low, low, low, minDockerFreeBytes + 1}}
+	fb := &fakeFreeBytes{
+		valuesByPath: map[string][]int64{
+			"/var/lib/docker": {low, low, low, minDockerFreeBytes + 1},
+			workspaceRoot:     {minDockerFreeBytes + 1, minDockerFreeBytes + 1, minDockerFreeBytes + 1, minDockerFreeBytes + 1},
+		},
+	}
 
-	cleanup := &dockerPreClaimCleanup{docker: fakeDocker, freeBytes: fb.read}
+	cleanup := &dockerPreClaimCleanup{docker: fakeDocker, freeBytes: fb.read, workspaceRoot: workspaceRoot}
 
 	ok, err := cleanup.EnsureCapacity(context.Background())
 	if err != nil {
@@ -92,10 +123,20 @@ func TestDockerPreClaimCleanup_FiltersAndRemovesFIFO(t *testing.T) {
 	if got, want := fakeDocker.removedIDs, []string{"a10", "b10", "c20"}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("removed order = %v, want %v", got, want)
 	}
+	if len(fb.paths) == 0 {
+		t.Fatal("expected free-bytes probes, got none")
+	}
+	var seenDocker, seenWorkspace bool
 	for _, path := range fb.paths {
-		if path != "/var/lib/docker" {
-			t.Fatalf("free bytes path = %q, want /var/lib/docker", path)
+		if path == "/var/lib/docker" {
+			seenDocker = true
 		}
+		if path == workspaceRoot {
+			seenWorkspace = true
+		}
+	}
+	if !seenDocker || !seenWorkspace {
+		t.Fatalf("free bytes paths must include docker and workspace roots, got %v", fb.paths)
 	}
 }
 
@@ -103,6 +144,7 @@ func TestDockerPreClaimCleanup_ExhaustedContainersReturnsFalse(t *testing.T) {
 	t.Parallel()
 
 	low := minDockerFreeBytes - 1
+	workspaceRoot := t.TempDir()
 	fakeDocker := &fakeDockerClient{
 		infoResult: client.SystemInfoResult{Info: system.Info{DockerRootDir: "/var/lib/docker"}},
 		listResult: client.ContainerListResult{Items: []containertypes.Summary{
@@ -110,9 +152,14 @@ func TestDockerPreClaimCleanup_ExhaustedContainersReturnsFalse(t *testing.T) {
 			{ID: "old-2", Created: 2, State: containertypes.ContainerState("dead"), Labels: map[string]string{types.LabelJobID: "job-2"}},
 		}},
 	}
-	fb := &fakeFreeBytes{values: []int64{low, low, low}}
+	fb := &fakeFreeBytes{
+		valuesByPath: map[string][]int64{
+			"/var/lib/docker": {low, low, low},
+			workspaceRoot:     {minDockerFreeBytes + 1, minDockerFreeBytes + 1, minDockerFreeBytes + 1},
+		},
+	}
 
-	cleanup := &dockerPreClaimCleanup{docker: fakeDocker, freeBytes: fb.read}
+	cleanup := &dockerPreClaimCleanup{docker: fakeDocker, freeBytes: fb.read, workspaceRoot: workspaceRoot}
 
 	ok, err := cleanup.EnsureCapacity(context.Background())
 	if err != nil {
@@ -134,6 +181,7 @@ func TestDockerPreClaimCleanup_InfoError(t *testing.T) {
 		freeBytes: func(string) (int64, error) {
 			return minDockerFreeBytes, nil
 		},
+		workspaceRoot: t.TempDir(),
 	}
 
 	ok, err := cleanup.EnsureCapacity(context.Background())
@@ -153,6 +201,7 @@ func TestDockerPreClaimCleanup_EmptyDockerRootDir(t *testing.T) {
 		freeBytes: func(string) (int64, error) {
 			return minDockerFreeBytes, nil
 		},
+		workspaceRoot: t.TempDir(),
 	}
 
 	ok, err := cleanup.EnsureCapacity(context.Background())
@@ -172,6 +221,7 @@ func TestDockerPreClaimCleanup_FreeBytesError(t *testing.T) {
 		freeBytes: func(string) (int64, error) {
 			return 0, errors.New("statfs failed")
 		},
+		workspaceRoot: t.TempDir(),
 	}
 
 	ok, err := cleanup.EnsureCapacity(context.Background())
@@ -187,6 +237,7 @@ func TestDockerPreClaimCleanup_RemoveError(t *testing.T) {
 	t.Parallel()
 
 	low := minDockerFreeBytes - 1
+	workspaceRoot := t.TempDir()
 	fakeDocker := &fakeDockerClient{
 		infoResult: client.SystemInfoResult{Info: system.Info{DockerRootDir: "/var/lib/docker"}},
 		listResult: client.ContainerListResult{Items: []containertypes.Summary{{
@@ -197,9 +248,14 @@ func TestDockerPreClaimCleanup_RemoveError(t *testing.T) {
 		}}},
 		removeErrByID: map[string]error{"old-1": errors.New("remove failed")},
 	}
-	fb := &fakeFreeBytes{values: []int64{low}}
+	fb := &fakeFreeBytes{
+		valuesByPath: map[string][]int64{
+			"/var/lib/docker": {low},
+			workspaceRoot:     {minDockerFreeBytes + 1},
+		},
+	}
 
-	cleanup := &dockerPreClaimCleanup{docker: fakeDocker, freeBytes: fb.read}
+	cleanup := &dockerPreClaimCleanup{docker: fakeDocker, freeBytes: fb.read, workspaceRoot: workspaceRoot}
 
 	ok, err := cleanup.EnsureCapacity(context.Background())
 	if err == nil {
@@ -210,5 +266,55 @@ func TestDockerPreClaimCleanup_RemoveError(t *testing.T) {
 	}
 	if got, want := fakeDocker.removedIDs, []string{"old-1"}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("removed containers = %v, want %v", got, want)
+	}
+}
+
+func TestDockerPreClaimCleanup_EvictsOldestStickyWorkspaceFirst(t *testing.T) {
+	t.Parallel()
+
+	workspaceRoot := t.TempDir()
+	oldest := filepath.Join(workspaceRoot, "run-old", "repos", "repo-a", "workspace")
+	newer := filepath.Join(workspaceRoot, "run-new", "repos", "repo-b", "workspace")
+	if err := os.MkdirAll(oldest, 0o755); err != nil {
+		t.Fatalf("mkdir oldest workspace: %v", err)
+	}
+	if err := os.MkdirAll(newer, 0o755); err != nil {
+		t.Fatalf("mkdir newer workspace: %v", err)
+	}
+	oldTime := time.Now().Add(-2 * time.Hour)
+	newTime := time.Now().Add(-1 * time.Hour)
+	if err := os.Chtimes(oldest, oldTime, oldTime); err != nil {
+		t.Fatalf("chtimes oldest: %v", err)
+	}
+	if err := os.Chtimes(newer, newTime, newTime); err != nil {
+		t.Fatalf("chtimes newer: %v", err)
+	}
+
+	fakeDocker := &fakeDockerClient{
+		infoResult: client.SystemInfoResult{Info: system.Info{DockerRootDir: "/var/lib/docker"}},
+	}
+	fb := &fakeFreeBytes{
+		valuesByPath: map[string][]int64{
+			"/var/lib/docker": {minDockerFreeBytes + 1, minDockerFreeBytes + 1},
+			workspaceRoot:     {minDockerFreeBytes - 1, minDockerFreeBytes + 1},
+		},
+	}
+	cleanup := &dockerPreClaimCleanup{docker: fakeDocker, freeBytes: fb.read, workspaceRoot: workspaceRoot}
+
+	ok, err := cleanup.EnsureCapacity(context.Background())
+	if err != nil {
+		t.Fatalf("EnsureCapacity() error = %v", err)
+	}
+	if !ok {
+		t.Fatal("EnsureCapacity() ok = false, want true")
+	}
+	if _, err := os.Stat(oldest); !os.IsNotExist(err) {
+		t.Fatalf("oldest workspace should be evicted, stat err=%v", err)
+	}
+	if _, err := os.Stat(newer); err != nil {
+		t.Fatalf("newer workspace should remain, stat err=%v", err)
+	}
+	if fakeDocker.listCalls != 0 {
+		t.Fatalf("ContainerList calls = %d, want 0", fakeDocker.listCalls)
 	}
 }

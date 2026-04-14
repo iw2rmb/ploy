@@ -6,9 +6,12 @@ import (
 	"fmt"
 	"log/slog"
 	"math"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/iw2rmb/ploy/internal/domain/types"
 	containertypes "github.com/moby/moby/api/types/container"
@@ -29,8 +32,9 @@ type claimCleanupDockerClient interface {
 type freeBytesFunc func(path string) (int64, error)
 
 type dockerPreClaimCleanup struct {
-	docker    claimCleanupDockerClient
-	freeBytes freeBytesFunc
+	docker        claimCleanupDockerClient
+	freeBytes     freeBytesFunc
+	workspaceRoot string
 }
 
 func newDockerPreClaimCleanup() (preClaimCleanupFunc, error) {
@@ -39,8 +43,9 @@ func newDockerPreClaimCleanup() (preClaimCleanupFunc, error) {
 		return nil, fmt.Errorf("create docker client: %w", err)
 	}
 	cleanup := &dockerPreClaimCleanup{
-		docker:    dockerClient,
-		freeBytes: dockerRootFreeBytes,
+		docker:        dockerClient,
+		freeBytes:     dockerRootFreeBytes,
+		workspaceRoot: runCacheRootDir(),
 	}
 	return cleanup.EnsureCapacity, nil
 }
@@ -48,6 +53,13 @@ func newDockerPreClaimCleanup() (preClaimCleanupFunc, error) {
 func (c *dockerPreClaimCleanup) EnsureCapacity(ctx context.Context) (bool, error) {
 	if c == nil || c.docker == nil || c.freeBytes == nil {
 		return false, errors.New("pre-claim cleanup not configured")
+	}
+	workspaceRoot := strings.TrimSpace(c.workspaceRoot)
+	if workspaceRoot == "" {
+		workspaceRoot = runCacheRootDir()
+	}
+	if err := os.MkdirAll(workspaceRoot, 0o755); err != nil {
+		return false, fmt.Errorf("ensure workspace root %q: %w", workspaceRoot, err)
 	}
 
 	info, err := c.docker.Info(ctx, client.InfoOptions{})
@@ -59,19 +71,63 @@ func (c *dockerPreClaimCleanup) EnsureCapacity(ctx context.Context) (bool, error
 		return false, errors.New("docker info: empty docker root dir")
 	}
 
-	free, err := c.freeBytes(dockerRoot)
+	capacity, err := c.readCapacity(dockerRoot, workspaceRoot)
 	if err != nil {
-		return false, fmt.Errorf("free bytes for docker root %q: %w", dockerRoot, err)
+		return false, err
 	}
-	if free >= minDockerFreeBytes {
+	if capacity.enough() {
 		return true, nil
 	}
 	slog.Warn(
-		"pre-claim disk guard detected low docker-root capacity",
+		"pre-claim disk guard detected low capacity",
 		"docker_root", dockerRoot,
-		"free_bytes", free,
+		"workspace_root", workspaceRoot,
+		"docker_free_bytes", capacity.dockerFreeBytes,
+		"workspace_free_bytes", capacity.workspaceFreeBytes,
 		"threshold_bytes", minDockerFreeBytes,
 	)
+
+	stickyWorkspaces, err := listStickyWorkspaces(workspaceRoot)
+	if err != nil {
+		return false, fmt.Errorf("list sticky workspaces: %w", err)
+	}
+	removedWorkspaces := 0
+	for _, ws := range stickyWorkspaces {
+		if capacity.enough() {
+			return true, nil
+		}
+		capacityBefore := capacity
+		if err := os.RemoveAll(ws.path); err != nil {
+			return false, fmt.Errorf("remove sticky workspace %q: %w", ws.path, err)
+		}
+		removedWorkspaces++
+		capacity, err = c.readCapacity(dockerRoot, workspaceRoot)
+		if err != nil {
+			return false, err
+		}
+		slog.Info(
+			"pre-claim disk cleanup removed sticky workspace",
+			"workspace_path", ws.path,
+			"workspace_mod_time", ws.modTime,
+			"docker_free_bytes_before", capacityBefore.dockerFreeBytes,
+			"docker_free_bytes_after", capacity.dockerFreeBytes,
+			"workspace_free_bytes_before", capacityBefore.workspaceFreeBytes,
+			"workspace_free_bytes_after", capacity.workspaceFreeBytes,
+			"threshold_bytes", minDockerFreeBytes,
+		)
+	}
+	if capacity.enough() {
+		slog.Info(
+			"pre-claim disk cleanup restored capacity via workspace eviction",
+			"docker_root", dockerRoot,
+			"workspace_root", workspaceRoot,
+			"docker_free_bytes", capacity.dockerFreeBytes,
+			"workspace_free_bytes", capacity.workspaceFreeBytes,
+			"threshold_bytes", minDockerFreeBytes,
+			"removed_workspaces", removedWorkspaces,
+		)
+		return true, nil
+	}
 
 	listed, err := c.docker.ContainerList(ctx, client.ContainerListOptions{All: true})
 	if err != nil {
@@ -81,49 +137,119 @@ func (c *dockerPreClaimCleanup) EnsureCapacity(ctx context.Context) (bool, error
 	removed := 0
 
 	for _, summary := range eligible {
-		if free >= minDockerFreeBytes {
+		if capacity.enough() {
 			return true, nil
 		}
-		freeBefore := free
+		capacityBefore := capacity
 		if _, err := c.docker.ContainerRemove(ctx, summary.ID, client.ContainerRemoveOptions{Force: true}); err != nil {
 			return false, fmt.Errorf("remove container %s: %w", summary.ID, err)
 		}
 		removed++
 
-		free, err = c.freeBytes(dockerRoot)
+		capacity, err = c.readCapacity(dockerRoot, workspaceRoot)
 		if err != nil {
-			return false, fmt.Errorf("free bytes for docker root %q after removing %s: %w", dockerRoot, summary.ID, err)
+			return false, err
 		}
 		slog.Info(
 			"pre-claim disk cleanup removed container",
 			"docker_root", dockerRoot,
 			"container_id", summary.ID,
 			"created", summary.Created,
-			"free_bytes_before", freeBefore,
-			"free_bytes_after", free,
+			"docker_free_bytes_before", capacityBefore.dockerFreeBytes,
+			"docker_free_bytes_after", capacity.dockerFreeBytes,
+			"workspace_free_bytes_before", capacityBefore.workspaceFreeBytes,
+			"workspace_free_bytes_after", capacity.workspaceFreeBytes,
 			"threshold_bytes", minDockerFreeBytes,
 		)
 	}
 
-	if free >= minDockerFreeBytes {
+	if capacity.enough() {
 		slog.Info(
 			"pre-claim disk cleanup restored capacity",
 			"docker_root", dockerRoot,
-			"free_bytes", free,
+			"workspace_root", workspaceRoot,
+			"docker_free_bytes", capacity.dockerFreeBytes,
+			"workspace_free_bytes", capacity.workspaceFreeBytes,
 			"threshold_bytes", minDockerFreeBytes,
 			"removed_containers", removed,
+			"removed_workspaces", removedWorkspaces,
 		)
 		return true, nil
 	}
 	slog.Warn(
-		"pre-claim disk cleanup exhausted eligible containers",
+		"pre-claim disk cleanup exhausted eligible resources",
 		"docker_root", dockerRoot,
-		"free_bytes", free,
+		"workspace_root", workspaceRoot,
+		"docker_free_bytes", capacity.dockerFreeBytes,
+		"workspace_free_bytes", capacity.workspaceFreeBytes,
 		"threshold_bytes", minDockerFreeBytes,
 		"removed_containers", removed,
+		"removed_workspaces", removedWorkspaces,
+		"eligible_workspaces", len(stickyWorkspaces),
 		"eligible_containers", len(eligible),
 	)
 	return false, nil
+}
+
+type diskCapacity struct {
+	dockerFreeBytes    int64
+	workspaceFreeBytes int64
+}
+
+func (d diskCapacity) enough() bool {
+	return d.dockerFreeBytes >= minDockerFreeBytes && d.workspaceFreeBytes >= minDockerFreeBytes
+}
+
+func (c *dockerPreClaimCleanup) readCapacity(dockerRoot, workspaceRoot string) (diskCapacity, error) {
+	dockerFree, err := c.freeBytes(dockerRoot)
+	if err != nil {
+		return diskCapacity{}, fmt.Errorf("free bytes for docker root %q: %w", dockerRoot, err)
+	}
+	workspaceFree, err := c.freeBytes(workspaceRoot)
+	if err != nil {
+		return diskCapacity{}, fmt.Errorf("free bytes for workspace root %q: %w", workspaceRoot, err)
+	}
+	return diskCapacity{
+		dockerFreeBytes:    dockerFree,
+		workspaceFreeBytes: workspaceFree,
+	}, nil
+}
+
+type stickyWorkspaceCandidate struct {
+	path    string
+	modTime time.Time
+}
+
+func listStickyWorkspaces(workspaceRoot string) ([]stickyWorkspaceCandidate, error) {
+	pattern := filepath.Join(workspaceRoot, "*", "repos", "*", "workspace")
+	paths, err := filepath.Glob(pattern)
+	if err != nil {
+		return nil, fmt.Errorf("glob %q: %w", pattern, err)
+	}
+	candidates := make([]stickyWorkspaceCandidate, 0, len(paths))
+	for _, p := range paths {
+		info, err := os.Stat(p)
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return nil, fmt.Errorf("stat sticky workspace %q: %w", p, err)
+		}
+		if !info.IsDir() {
+			continue
+		}
+		candidates = append(candidates, stickyWorkspaceCandidate{
+			path:    p,
+			modTime: info.ModTime().UTC(),
+		})
+	}
+	sort.SliceStable(candidates, func(i, j int) bool {
+		if candidates[i].modTime.Equal(candidates[j].modTime) {
+			return candidates[i].path < candidates[j].path
+		}
+		return candidates[i].modTime.Before(candidates[j].modTime)
+	})
+	return candidates, nil
 }
 
 func eligibleCleanupContainers(containers []containertypes.Summary) []containertypes.Summary {
