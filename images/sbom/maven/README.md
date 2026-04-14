@@ -25,3 +25,6 @@ mvn -B -q -f /workspace/pom.xml org.cyclonedx:cyclonedx-maven-plugin:2.9.1:makeA
 
 Notes
 - The image includes `/usr/local/lib/ploy/install_ploy_ca_bundle.sh` for runtime CA import from Hydra mounts when required.
+- SBOM Java classpath collection is provided by bundled scripts:
+  - `/usr/local/lib/ploy/sbom/collect-java-classpath-maven.sh`
+  - `/usr/local/lib/ploy/sbom/collect-java-classpath-gradle.sh` (used for Gradle-wrapper fallback in unknown-stack path)

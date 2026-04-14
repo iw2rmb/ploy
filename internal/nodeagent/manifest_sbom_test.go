@@ -69,50 +69,46 @@ func TestApplySBOMRuntimeForStack_ConfiguresManifest(t *testing.T) {
 	tag := sbomRuntimeImageTag(iversion.Version)
 
 	tests := []struct {
-		name               string
-		stack              contracts.MigStack
-		wantImage          string
-		wantRuntimeStack   contracts.MigStack
-		wantCommandSnippet string
-		wantExtraSnippet   string
-		wantPrepSnippet    string
-		wantPrepMarker     string
-		wantWorkspaceMark  bool
-		wantClassesPrep    bool
+		name              string
+		stack             contracts.MigStack
+		wantImage         string
+		wantRuntimeStack  contracts.MigStack
+		wantShellSnippets []string
 	}{
 		{
-			name:               "maven",
-			stack:              contracts.MigStackJavaMaven,
-			wantImage:          "ghcr.io/acme/sbom-maven:" + tag,
-			wantRuntimeStack:   contracts.MigStackJavaMaven,
-			wantCommandSnippet: "mvn -B -q -f /workspace/pom.xml",
-			wantPrepSnippet:    "-DskipTests compile",
-			wantPrepMarker:     "compile preparation unavailable",
-			wantWorkspaceMark:  true,
+			name:             "maven",
+			stack:            contracts.MigStackJavaMaven,
+			wantImage:        "ghcr.io/acme/sbom-maven:" + tag,
+			wantRuntimeStack: contracts.MigStackJavaMaven,
+			wantShellSnippets: []string{
+				"missing /workspace/pom.xml",
+				sbomMavenCollectorScript,
+			},
 		},
 		{
-			name:               "gradle",
-			stack:              contracts.MigStackJavaGradle,
-			wantImage:          "ghcr.io/acme/sbom-gradle:" + tag,
-			wantRuntimeStack:   contracts.MigStackJavaGradle,
-			wantCommandSnippet: "-q -p /workspace dependencies",
-			wantExtraSnippet:   "buildEnvironment",
-			wantPrepSnippet:    "-q -p /workspace classes",
-			wantPrepMarker:     "classes preparation unavailable",
-			wantWorkspaceMark:  true,
-			wantClassesPrep:    true,
+			name:             "gradle",
+			stack:            contracts.MigStackJavaGradle,
+			wantImage:        "ghcr.io/acme/sbom-gradle:" + tag,
+			wantRuntimeStack: contracts.MigStackJavaGradle,
+			wantShellSnippets: []string{
+				`PLOY_SBOM_GRADLE_CMD="/workspace/gradlew"`,
+				`PLOY_SBOM_GRADLE_CMD="gradle"`,
+				sbomGradleCollectorScript,
+			},
 		},
 		{
-			name:               "unknown fallback collector path",
-			stack:              contracts.MigStackUnknown,
-			wantImage:          "ghcr.io/acme/sbom-maven:" + tag,
-			wantRuntimeStack:   contracts.MigStackJavaMaven,
-			wantCommandSnippet: "unable to resolve sbom collector",
-			wantExtraSnippet:   "buildEnvironment",
-			wantPrepSnippet:    "-q -p /workspace classes",
-			wantPrepMarker:     "classes preparation unavailable",
-			wantWorkspaceMark:  true,
-			wantClassesPrep:    true,
+			name:             "unknown fallback collector path",
+			stack:            contracts.MigStackUnknown,
+			wantImage:        "ghcr.io/acme/sbom-maven:" + tag,
+			wantRuntimeStack: contracts.MigStackJavaMaven,
+			wantShellSnippets: []string{
+				sbomMavenCollectorScript,
+				sbomGradleCollectorScript,
+				`PLOY_SBOM_GRADLE_CMD="/workspace/gradlew"`,
+				`PLOY_SBOM_GRADLE_CMD="gradle"`,
+				"gradle build detected but no gradle wrapper and no gradle binary available",
+				"unable to resolve sbom collector",
+			},
 		},
 	}
 
@@ -146,52 +142,25 @@ func TestApplySBOMRuntimeForStack_ConfiguresManifest(t *testing.T) {
 				t.Fatalf("manifest.Command=%v, want shell command", manifest.Command)
 			}
 			shell := manifest.Command[len(manifest.Command)-1]
-			if !strings.Contains(shell, tc.wantCommandSnippet) {
-				t.Fatalf("shell command missing %q: %q", tc.wantCommandSnippet, shell)
-			}
-			if tc.wantExtraSnippet != "" && !strings.Contains(shell, tc.wantExtraSnippet) {
-				t.Fatalf("shell command missing %q: %q", tc.wantExtraSnippet, shell)
-			}
-			if tc.stack != contracts.MigStackJavaMaven && !strings.Contains(shell, "ployWriteJavaClasspath") {
-				t.Fatalf("shell command missing ployWriteJavaClasspath task invocation: %q", shell)
-			}
-			if tc.wantPrepSnippet != "" && !strings.Contains(shell, tc.wantPrepSnippet) {
-				t.Fatalf("shell command missing preparation snippet %q: %q", tc.wantPrepSnippet, shell)
-			}
-			if tc.wantPrepMarker != "" && !strings.Contains(shell, tc.wantPrepMarker) {
-				t.Fatalf("shell command missing preparation marker %q: %q", tc.wantPrepMarker, shell)
-			}
-			if tc.wantWorkspaceMark && !strings.Contains(shell, "workspace classpath entries unavailable") {
-				t.Fatalf("shell command missing workspace classpath fallback marker: %q", shell)
-			}
-			if tc.wantWorkspaceMark && !strings.Contains(shell, "sbom classpath invariant violated") {
-				t.Fatalf("shell command missing workspace classpath invariant failure guard: %q", shell)
-			}
-			if tc.stack != contracts.MigStackJavaMaven &&
-				(!strings.Contains(shell, "classpath_init") || !strings.Contains(shell, `-I "$classpath_init"`)) {
-				t.Fatalf("shell command missing inline init-script injection for deterministic classpath task setup: %q", shell)
-			}
-			if tc.wantClassesPrep {
-				if !strings.Contains(shell, "find /workspace -type d") ||
-					!strings.Contains(shell, "build/classes/java/main") ||
-					!strings.Contains(shell, "build/resources/main") {
-					t.Fatalf("shell command missing workspace classpath filesystem fallback: %q", shell)
+			for _, wantSnippet := range tc.wantShellSnippets {
+				if !strings.Contains(shell, wantSnippet) {
+					t.Fatalf("shell command missing %q: %q", wantSnippet, shell)
 				}
-				if strings.Contains(shell, "ployGenerateDeclaredSources") {
-					t.Fatalf("shell command must not use generator detection task in sbom gradle flow: %q", shell)
-				}
-				if !strings.Contains(shell, "-q -p /workspace classes") {
-					t.Fatalf("shell command missing lifecycle classes preparation: %q", shell)
-				}
-				if !strings.Contains(shell, "mainSourceSet.output.classesDirs") {
-					t.Fatalf("shell command missing sourceSets.main classes output wiring in java classpath task: %q", shell)
-				}
-				if !strings.Contains(shell, "mainSourceSet.output.resourcesDir") {
-					t.Fatalf("shell command missing sourceSets.main resources output wiring in java classpath task: %q", shell)
-				}
+			}
+			if strings.Contains(shell, "classpath_init") {
+				t.Fatalf("shell command must not use inline init script after extraction: %q", shell)
+			}
+			if strings.Contains(shell, "ployWriteJavaClasspath") {
+				t.Fatalf("shell command must delegate classpath task wiring to script files: %q", shell)
 			}
 			if tc.stack == contracts.MigStackUnknown && strings.Contains(shell, ": > /out/"+sbomDependencyOutputFileName) {
 				t.Fatalf("unknown stack command uses placeholder output write: %q", shell)
+			}
+			if got := manifest.Envs["PLOY_SBOM_DEPENDENCY_OUTPUT"]; got != "/out/"+sbomDependencyOutputFileName {
+				t.Fatalf("manifest.Envs[PLOY_SBOM_DEPENDENCY_OUTPUT]=%q, want %q", got, "/out/"+sbomDependencyOutputFileName)
+			}
+			if got := manifest.Envs["PLOY_SBOM_JAVA_CLASSPATH_OUTPUT"]; got != "/out/"+sbomJavaClasspathFileName {
+				t.Fatalf("manifest.Envs[PLOY_SBOM_JAVA_CLASSPATH_OUTPUT]=%q, want %q", got, "/out/"+sbomJavaClasspathFileName)
 			}
 		})
 	}

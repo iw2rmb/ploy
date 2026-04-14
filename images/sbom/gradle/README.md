@@ -26,3 +26,6 @@ gradle -q -p /workspace cyclonedxBom
 
 Notes
 - The image includes `/usr/local/lib/ploy/install_ploy_ca_bundle.sh` for runtime CA import from Hydra mounts when required.
+- SBOM Java classpath collection is provided by bundled scripts:
+  - `/usr/local/lib/ploy/sbom/collect-java-classpath-gradle.sh`
+  - `/usr/local/lib/ploy/sbom/gradle-write-java-classpath.init.gradle`
