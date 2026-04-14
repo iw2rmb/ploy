@@ -708,10 +708,18 @@ and, when not writable, the node falls back to `${TMPDIR:-/tmp}/ploy/gates`.
   the active cache directory (`<language>/<tool>/<release>`) from oldest to newest
   until free space reaches `2 GiB` or the directory is exhausted.
 
-**SBOM Gradle image (`sbom-gradle`)**: Uses the same Gradle init script and
-centralized cache-root policy as Gradle gate jobs. Runtime mounts
-`$PLOY_BUILDGATE_CACHE_ROOT/java/gradle/17` to `/home/gradle/.gradle` (with the
-same fallback root and prune policy when `PLOY_BUILDGATE_CACHE_ROOT` is unset).
+**Java non-gate jobs (`sbom`, `hook`, `mig`, `heal`)**: Use the same centralized
+cache-root policy as Build Gate when stack tuple env is set to Java:
+- `PLOY_STACK_LANGUAGE=java`
+- `PLOY_STACK_TOOL=gradle|maven`
+- `PLOY_STACK_RELEASE=<release>`
+
+Runtime mounts:
+- Gradle tuple -> `$PLOY_BUILDGATE_CACHE_ROOT/java/gradle/<release>` to `/home/gradle/.gradle`
+- Maven tuple -> `$PLOY_BUILDGATE_CACHE_ROOT/java/maven/<release>` to `/root/.m2`
+
+When `PLOY_STACK_RELEASE` is empty, runtime uses `unknown-release` as the lane key.
+Image-name marker fallback is not used.
 
 **ORW images (`orw-cli-maven`, `orw-cli-gradle`)**: Same Hydra `ca` materialization behavior as
 build-gate, ensuring OpenRewrite can fetch dependencies from internal artifact repositories while
@@ -723,10 +731,9 @@ binary and should only be overridden for controlled debugging. Recipes are
 resolved dynamically from `RECIPE_GROUP/RECIPE_ARTIFACT` and optional `RECIPE_VERSION`; no
 per-recipe image rebuild is required.
 
-ORW jobs also support node-local persistent runtime dependency cache under
-`$PLOY_BUILDGATE_CACHE_ROOT/java/maven/17`, mounted into the container at `/root/.m2`.
-ORW uses the same cache-root defaults/fallbacks and oldest-first free-space
-prune policy as build-gate/SBOM cache mounts.
+ORW jobs use the same stack-env-driven Java cache mounting behavior as other
+non-gate jobs, with the same cache-root defaults/fallbacks and oldest-first
+free-space prune policy as Build Gate.
 
 ### Security Considerations
 

@@ -90,19 +90,11 @@ func buildContainerSpec(runID types.RunID, jobID types.JobID, manifest contracts
 	if strings.TrimSpace(inDir) != "" {
 		mounts = append(mounts, ContainerMount{Source: inDir, Target: "/in", ReadOnly: false})
 	}
-	// ORW images may resolve recipe artifacts at runtime through Maven Resolver.
-	// Mount a persistent host cache to /root/.m2 when an ORW image is detected.
-	orwCacheMounts, err := buildORWToolCacheMounts(manifest.Image)
+	javaCacheMounts, err := buildJavaToolCacheMountsFromStackEnv(manifest.Envs)
 	if err != nil {
-		return ContainerSpec{}, fmt.Errorf("prepare orw tool cache mounts: %w", err)
+		return ContainerSpec{}, fmt.Errorf("prepare java tool cache mounts: %w", err)
 	}
-	mounts = appendMountsIfTargetMissing(mounts, orwCacheMounts)
-	// SBOM Gradle image reuses the centralized gate cache root for /home/gradle/.gradle.
-	sbomCacheMounts, err := buildSBOMToolCacheMounts(manifest.Image)
-	if err != nil {
-		return ContainerSpec{}, fmt.Errorf("prepare sbom tool cache mounts: %w", err)
-	}
-	mounts = appendMountsIfTargetMissing(mounts, sbomCacheMounts)
+	mounts = appendMountsIfTargetMissing(mounts, javaCacheMounts)
 
 	// Mount Hydra materialized resources from the staging directory.
 	// Each entry references a shortHash; staged content lives at stagingDir/<shortHash>.
