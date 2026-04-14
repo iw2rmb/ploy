@@ -234,7 +234,14 @@ func (r *runController) executeSBOMJob(ctx context.Context, req StartRunRequest)
 			return applySBOMRuntimeForStack(m, stackForManifest)
 		},
 		ValidateOutputs: func(outDir, _ string) error {
-			return materializeValidatedSBOMOutput(outDir, sbomSnapshotPath)
+			if err := materializeValidatedSBOMOutput(outDir, sbomSnapshotPath); err != nil {
+				return err
+			}
+			classpathPath := filepath.Join(outDir, sbomJavaClasspathFileName)
+			if err := persistRunJavaClasspath(req.RunID, classpathPath); err != nil {
+				return fmt.Errorf("persist run java classpath from sbom output: %w", err)
+			}
+			return nil
 		},
 		WorkspacePolicy: workspaceChangePolicyIgnore,
 		StartTime:       startTime,
@@ -340,6 +347,9 @@ func (r *runController) executeHookJob(ctx context.Context, req StartRunRequest)
 			OutDirPattern: "ploy-hook-out-*",
 			InDirPattern:  "ploy-hook-in-*",
 			PopulateInDir: func(inDir string) error {
+				if err := r.materializeJavaClasspathInDir(ctx, req, inDir); err != nil {
+					return err
+				}
 				inPath := filepath.Join(inDir, preGateCanonicalSBOMFileName)
 				if err := copyFileBytes(stepInputPath, inPath); err != nil {
 					return fmt.Errorf("stage /in/%s: %w", preGateCanonicalSBOMFileName, err)
@@ -718,9 +728,13 @@ func (r *runController) executeMigJob(ctx context.Context, req StartRunRequest) 
 	)
 
 	cfg := standardJobConfig{
-		Manifest:                  manifest,
-		DiffType:                  types.DiffJobTypeMig,
-		OutDirPattern:             "ploy-mig-out-*",
+		Manifest:      manifest,
+		DiffType:      types.DiffJobTypeMig,
+		OutDirPattern: "ploy-mig-out-*",
+		InDirPattern:  "ploy-mig-in-*",
+		PopulateInDir: func(inDir string) error {
+			return r.materializeJavaClasspathInDir(ctx, req, inDir)
+		},
 		WorkspacePolicy:           workspaceChangePolicyIgnore,
 		UploadConfiguredArtifacts: true,
 		UploadDiff: func(ctx context.Context, runID types.RunID, jobID types.JobID, jobName string, diffGen step.DiffGenerator, baseDir, workspace string, result step.Result) {
@@ -787,6 +801,9 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 		OutDirPattern: "ploy-heal-out-*",
 		InDirPattern:  "ploy-heal-in-*",
 		PopulateInDir: func(inDir string) error {
+			if err := r.materializeJavaClasspathInDir(ctx, req, inDir); err != nil {
+				return err
+			}
 			return r.populateHealingInDir(req.RunID, inDir, req.RecoveryContext, schemaJSON)
 		},
 		PrepareManifest: func(m *contracts.StepManifest, ws string) error {
@@ -1224,6 +1241,11 @@ func (r *runController) runContainerJob(
 		}
 		if skipped {
 			duration := time.Since(startTime)
+			if runErr == nil {
+				if captureErr := r.captureJavaClasspathAfterStandardJob(req, inDir, outDir); captureErr != nil {
+					runErr = fmt.Errorf("capture java classpath outputs: %w", captureErr)
+				}
+			}
 			if runErr == nil && cfg.ValidateOutputs != nil {
 				if validateErr := cfg.ValidateOutputs(outDir, workspace); validateErr != nil {
 					runErr = fmt.Errorf("validate job outputs: %w", validateErr)
@@ -1287,6 +1309,11 @@ func (r *runController) runContainerJob(
 	if runErr == nil && result.ExitCode == 0 && cfg.ValidateOutputs != nil {
 		if validateErr := cfg.ValidateOutputs(outDir, workspace); validateErr != nil {
 			runErr = fmt.Errorf("validate job outputs: %w", validateErr)
+		}
+	}
+	if runErr == nil && result.ExitCode == 0 {
+		if captureErr := r.captureJavaClasspathAfterStandardJob(req, inDir, outDir); captureErr != nil {
+			runErr = fmt.Errorf("capture java classpath outputs: %w", captureErr)
 		}
 	}
 	duration = time.Since(startTime)

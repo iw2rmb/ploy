@@ -90,6 +90,11 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 			slog.Warn("failed to remove workspace", "path", workspace, "error", err)
 		}
 	}()
+	if err := r.prepareGateJavaClasspathInput(ctx, req, workspace); err != nil {
+		slog.Error("failed to prepare gate java classpath input", "run_id", req.RunID, "job_id", req.JobID, "error", err)
+		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
+		return
+	}
 
 	// Run the build gate.
 	ctx = withGateExecutionLabels(ctx, req)
@@ -145,6 +150,11 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 		r.persistFirstGateFailureLog(req.RunID, gateResult)
 	}
 	r.persistGateProfileSnapshot(req.RunID, req.JobType, manifest.Gate, gateResult)
+	if err := r.captureJavaClasspathAfterGateJob(req, workspace); err != nil {
+		slog.Error("failed to capture gate java classpath output", "run_id", req.RunID, "job_id", req.JobID, "error", err)
+		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
+		return
+	}
 
 	if err := r.uploadOutDirBundle(ctx, req.RunID, req.JobID, filepath.Join(workspace, step.BuildGateWorkspaceOutDir), "build-gate-out"); err != nil {
 		slog.Warn("failed to upload gate /out bundle", "run_id", req.RunID, "job_id", req.JobID, "error", err)
