@@ -1,0 +1,47 @@
+gradle.projectsEvaluated {
+  def root = gradle.rootProject
+  if (root.tasks.findByName('ployWriteJavaClasspath') != null) {
+    return
+  }
+
+  root.tasks.register('ployWriteJavaClasspath') {
+    doLast {
+      def outputPath = System.getenv('PLOY_SBOM_JAVA_CLASSPATH_OUTPUT')
+      if (outputPath == null || outputPath.trim().isEmpty()) {
+        outputPath = '/out/java.classpath'
+      }
+      def output = new File(outputPath)
+      output.parentFile.mkdirs()
+
+      def entries = new LinkedHashSet<String>()
+      root.allprojects.each { project ->
+        def sourceSets = project.extensions.findByName('sourceSets')
+        if (sourceSets != null) {
+          def mainSourceSet = sourceSets.findByName('main')
+          if (mainSourceSet != null) {
+            mainSourceSet.output.classesDirs.files.each { classesDir ->
+              if (classesDir != null && classesDir.exists()) {
+                entries.add(classesDir.absolutePath)
+              }
+            }
+            def resourcesDir = mainSourceSet.output.resourcesDir
+            if (resourcesDir != null && resourcesDir.exists()) {
+              entries.add(resourcesDir.absolutePath)
+            }
+          }
+        }
+        ['compileClasspath', 'runtimeClasspath'].each { cfgName ->
+          def cfg = project.configurations.findByName(cfgName)
+          if (cfg != null && cfg.canBeResolved) {
+            cfg.resolve().each { file -> entries.add(file.absolutePath) }
+          }
+        }
+      }
+
+      output.text = entries.join(System.lineSeparator())
+      if (!entries.isEmpty()) {
+        output.append(System.lineSeparator())
+      }
+    }
+  }
+}
