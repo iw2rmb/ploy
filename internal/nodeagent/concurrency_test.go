@@ -16,11 +16,7 @@ func TestConcurrency_LimitsJobExecution(t *testing.T) {
 	const concurrency = 2
 	const totalJobs = 5
 
-	cfg := Config{
-		ServerURL:   "http://localhost:8080",
-		NodeID:      types.NodeID(testNodeID),
-		Concurrency: concurrency,
-	}
+	cfg := newAgentConfig("http://localhost:8080", withConcurrency(concurrency))
 
 	// Create controller with configured concurrency and typed JobID keys.
 	rc := &runController{
@@ -130,11 +126,7 @@ func TestConcurrency_LimitsJobExecution(t *testing.T) {
 func TestConcurrency_DefaultsToOne(t *testing.T) {
 	t.Parallel()
 
-	cfg := Config{
-		ServerURL:   "http://localhost:8080",
-		NodeID:      types.NodeID(testNodeID),
-		Concurrency: 0, // Not set - should default to 1.
-	}
+	cfg := newAgentConfig("http://localhost:8080", withConcurrency(0)) // Not set - should default to 1.
 
 	rc := &runController{
 		cfg:  cfg,
@@ -218,11 +210,7 @@ func TestConcurrency_DefaultsToOne(t *testing.T) {
 func TestConcurrency_ContextCancellation(t *testing.T) {
 	t.Parallel()
 
-	cfg := Config{
-		ServerURL:   "http://localhost:8080",
-		NodeID:      types.NodeID(testNodeID),
-		Concurrency: 1, // Only 1 slot available.
-	}
+	cfg := newAgentConfig("http://localhost:8080", withConcurrency(1)) // Only 1 slot available.
 
 	rc := &runController{
 		cfg:  cfg,
@@ -267,11 +255,7 @@ func TestConcurrency_ContextCancellation(t *testing.T) {
 func TestConcurrency_SlotReleasedOnJobCompletion(t *testing.T) {
 	t.Parallel()
 
-	cfg := Config{
-		ServerURL:   "http://localhost:8080",
-		NodeID:      types.NodeID(testNodeID),
-		Concurrency: 1,
-	}
+	cfg := newAgentConfig("http://localhost:8080", withConcurrency(1))
 
 	rc := &runController{
 		cfg:  cfg,

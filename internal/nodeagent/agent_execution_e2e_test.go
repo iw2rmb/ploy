@@ -75,17 +75,9 @@ func TestEndToEndFlow(t *testing.T) {
 		defer mockServer.Close()
 
 		// Create a minimal config pointing to the mock server.
-		cfg := Config{
-			NodeID:    testNodeID,
-			ServerURL: mockServer.URL,
-			HTTP: HTTPConfig{
-				Listen: ":0", // Random port.
-			},
-			Heartbeat: HeartbeatConfig{
-				Interval: 1 * time.Second,
-				Timeout:  500 * time.Millisecond,
-			},
-		}
+		cfg := newAgentConfig(mockServer.URL,
+			withHeartbeatInterval(1*time.Second),
+			withHeartbeatTimeout(500*time.Millisecond))
 
 		// Create the run controller with typed JobID keys.
 		rc := newTestController(t, cfg)

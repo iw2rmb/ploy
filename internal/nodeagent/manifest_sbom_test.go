@@ -140,72 +140,84 @@ func TestApplySBOMRuntimeForStack_ConfiguresManifest(t *testing.T) {
 func TestDetectSBOMStackFromWorkspace(t *testing.T) {
 	t.Parallel()
 
-	workspace := t.TempDir()
-	if _, err := detectSBOMStackFromWorkspace(workspace); err == nil {
-		t.Fatal("empty workspace: expected detection error, got nil")
+	tests := []struct {
+		name        string
+		layout      map[string]string // relative path -> content; empty map = empty dir
+		wantStack   contracts.MigStack
+		wantErr     bool
+		wantAmbig   bool
+	}{
+		{
+			name:    "empty workspace",
+			layout:  map[string]string{},
+			wantErr: true,
+		},
+		{
+			name:      "maven pom",
+			layout:    map[string]string{"pom.xml": "<project/>"},
+			wantStack: contracts.MigStackJavaMaven,
+		},
+		{
+			name:      "gradle kts",
+			layout:    map[string]string{"build.gradle.kts": "plugins {}"},
+			wantStack: contracts.MigStackJavaGradle,
+		},
+		{
+			name: "ambiguous pom + gradle",
+			layout: map[string]string{
+				"pom.xml":      "<project/>",
+				"build.gradle": "plugins {}",
+			},
+			wantErr:   true,
+			wantAmbig: true,
+		},
+		{
+			name:    "settings.gradle.kts only",
+			layout:  map[string]string{"settings.gradle.kts": `rootProject.name = "x"`},
+			wantErr: true,
+		},
+		{
+			name:    "gradlew only",
+			layout:  map[string]string{"gradlew": "#!/bin/sh"},
+			wantErr: true,
+		},
 	}
 
-	mavenWorkspace := filepath.Join(workspace, "maven")
-	if err := os.MkdirAll(mavenWorkspace, 0o755); err != nil {
-		t.Fatalf("mkdir maven workspace: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(mavenWorkspace, "pom.xml"), []byte("<project/>"), 0o644); err != nil {
-		t.Fatalf("write pom.xml: %v", err)
-	}
-	if got, err := detectSBOMStackFromWorkspace(mavenWorkspace); err != nil || got != contracts.MigStackJavaMaven {
-		t.Fatalf("maven workspace detection=%q err=%v, want %q", got, err, contracts.MigStackJavaMaven)
-	}
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			dir := t.TempDir()
+			for name, content := range tc.layout {
+				p := filepath.Join(dir, name)
+				if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+					t.Fatalf("mkdir: %v", err)
+				}
+				if err := os.WriteFile(p, []byte(content), 0o644); err != nil {
+					t.Fatalf("write %s: %v", name, err)
+				}
+			}
 
-	gradleWorkspace := filepath.Join(workspace, "gradle")
-	if err := os.MkdirAll(gradleWorkspace, 0o755); err != nil {
-		t.Fatalf("mkdir gradle workspace: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(gradleWorkspace, "build.gradle.kts"), []byte("plugins {}"), 0o644); err != nil {
-		t.Fatalf("write build.gradle.kts: %v", err)
-	}
-	if got, err := detectSBOMStackFromWorkspace(gradleWorkspace); err != nil || got != contracts.MigStackJavaGradle {
-		t.Fatalf("gradle workspace detection=%q err=%v, want %q", got, err, contracts.MigStackJavaGradle)
-	}
-
-	ambiguousWorkspace := filepath.Join(workspace, "ambiguous")
-	if err := os.MkdirAll(ambiguousWorkspace, 0o755); err != nil {
-		t.Fatalf("mkdir ambiguous workspace: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(ambiguousWorkspace, "pom.xml"), []byte("<project/>"), 0o644); err != nil {
-		t.Fatalf("write ambiguous pom.xml: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(ambiguousWorkspace, "build.gradle"), []byte("plugins {}"), 0o644); err != nil {
-		t.Fatalf("write ambiguous build.gradle: %v", err)
-	}
-	if _, err := detectSBOMStackFromWorkspace(ambiguousWorkspace); err == nil {
-		t.Fatal("ambiguous workspace: expected detection error, got nil")
-	} else {
-		var detErr *stackdetect.DetectionError
-		if !errors.As(err, &detErr) || !detErr.IsAmbiguous() {
-			t.Fatalf("ambiguous workspace: expected DetectionError ambiguous, got %v", err)
-		}
-	}
-
-	settingsOnlyWorkspace := filepath.Join(workspace, "settings-only")
-	if err := os.MkdirAll(settingsOnlyWorkspace, 0o755); err != nil {
-		t.Fatalf("mkdir settings-only workspace: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(settingsOnlyWorkspace, "settings.gradle.kts"), []byte("rootProject.name = \"x\""), 0o644); err != nil {
-		t.Fatalf("write settings.gradle.kts: %v", err)
-	}
-	if _, err := detectSBOMStackFromWorkspace(settingsOnlyWorkspace); err == nil {
-		t.Fatal("settings-only workspace: expected detection error, got nil")
-	}
-
-	gradlewOnlyWorkspace := filepath.Join(workspace, "gradlew-only")
-	if err := os.MkdirAll(gradlewOnlyWorkspace, 0o755); err != nil {
-		t.Fatalf("mkdir gradlew-only workspace: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(gradlewOnlyWorkspace, "gradlew"), []byte("#!/bin/sh"), 0o755); err != nil {
-		t.Fatalf("write gradlew: %v", err)
-	}
-	if _, err := detectSBOMStackFromWorkspace(gradlewOnlyWorkspace); err == nil {
-		t.Fatal("gradlew-only workspace: expected detection error, got nil")
+			got, err := detectSBOMStackFromWorkspace(dir)
+			if tc.wantErr {
+				if err == nil {
+					t.Fatalf("expected error, got stack=%q", got)
+				}
+				if tc.wantAmbig {
+					var detErr *stackdetect.DetectionError
+					if !errors.As(err, &detErr) || !detErr.IsAmbiguous() {
+						t.Fatalf("expected ambiguous DetectionError, got %v", err)
+					}
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got != tc.wantStack {
+				t.Errorf("stack = %q, want %q", got, tc.wantStack)
+			}
+		})
 	}
 }
 

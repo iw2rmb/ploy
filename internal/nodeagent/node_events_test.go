@@ -31,13 +31,7 @@ func TestNodeEventUploader_UploadRunEvent_RequestShape(t *testing.T) {
 	}))
 	defer server.Close()
 
-	cfg := Config{
-		ServerURL: server.URL,
-		NodeID:    testNodeID,
-		HTTP: HTTPConfig{
-			TLS: TLSConfig{Enabled: false},
-		},
-	}
+	cfg := newAgentConfig(server.URL)
 
 	uploader, err := newBaseUploader(cfg)
 	if err != nil {
@@ -135,13 +129,7 @@ func TestClaimManager_ClaimAndExecute_EmitsRunEventWhenStartRunFails(t *testing.
 	}))
 	defer server.Close()
 
-	cfg := Config{
-		ServerURL: server.URL,
-		NodeID:    testNodeID,
-		HTTP: HTTPConfig{
-			TLS: TLSConfig{Enabled: false},
-		},
-	}
+	cfg := newAgentConfig(server.URL)
 	controller := &mockRunController{startErr: errors.New("boom")}
 	claimer, err := NewClaimManager(cfg, controller)
 	if err != nil {

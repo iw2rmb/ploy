@@ -21,18 +21,7 @@ func TestSendHeartbeatRespectsTimeout(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	cfg := Config{
-		NodeID:    testNodeID,
-		ServerURL: srv.URL,
-		HTTP: HTTPConfig{
-			TLS: TLSConfig{
-				Enabled: false,
-			},
-		},
-		Heartbeat: HeartbeatConfig{
-			Timeout: 10 * time.Millisecond,
-		},
-	}
+	cfg := newAgentConfig(srv.URL, withHeartbeatTimeout(10*time.Millisecond))
 
 	mgr, err := NewHeartbeatManager(cfg)
 	if err != nil {
@@ -127,18 +116,7 @@ func TestBackoffOn5xxErrors(t *testing.T) {
 			}))
 			defer srv.Close()
 
-			cfg := Config{
-				NodeID:    testNodeID,
-				ServerURL: srv.URL,
-				HTTP: HTTPConfig{
-					TLS: TLSConfig{
-						Enabled: false,
-					},
-				},
-				Heartbeat: HeartbeatConfig{
-					Timeout: 10 * time.Second,
-				},
-			}
+			cfg := newAgentConfig(srv.URL, withHeartbeatTimeout(10*time.Second))
 
 			mgr, err := NewHeartbeatManager(cfg)
 			if err != nil {
@@ -193,18 +171,7 @@ func TestServerErrorType(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	cfg := Config{
-		NodeID:    testNodeID,
-		ServerURL: srv.URL,
-		HTTP: HTTPConfig{
-			TLS: TLSConfig{
-				Enabled: false,
-			},
-		},
-		Heartbeat: HeartbeatConfig{
-			Timeout: 10 * time.Second,
-		},
-	}
+	cfg := newAgentConfig(srv.URL, withHeartbeatTimeout(10*time.Second))
 
 	mgr, err := NewHeartbeatManager(cfg)
 	if err != nil {
@@ -230,9 +197,7 @@ func TestServerErrorType(t *testing.T) {
 
 // TestBackoffDoesNotApplyToNon5xxErrors verifies backoff only applies to 5xx server errors.
 func TestBackoffDoesNotApplyToNon5xxErrors(t *testing.T) {
-	cfg := Config{
-		NodeID: testNodeID,
-	}
+	cfg := newAgentConfig("")
 	mgr, err := NewHeartbeatManager(cfg)
 	if err != nil {
 		t.Fatalf("NewHeartbeatManager error: %v", err)
@@ -285,19 +250,9 @@ func TestHeartbeatStart_BackoffOverridesInterval(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	cfg := Config{
-		NodeID:    testNodeID,
-		ServerURL: srv.URL,
-		HTTP: HTTPConfig{
-			TLS: TLSConfig{
-				Enabled: false,
-			},
-		},
-		Heartbeat: HeartbeatConfig{
-			Interval: 2 * time.Second,
-			Timeout:  5 * time.Second,
-		},
-	}
+	cfg := newAgentConfig(srv.URL,
+		withHeartbeatInterval(2*time.Second),
+		withHeartbeatTimeout(5*time.Second))
 
 	mgr, err := NewHeartbeatManager(cfg)
 	if err != nil {

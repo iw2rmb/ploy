@@ -12,44 +12,6 @@ func testJobImage(image string) contracts.JobImage {
 	return contracts.JobImage{Universal: image}
 }
 
-// assertCommandEqual compares two command slices element-by-element with clear diagnostics.
-func assertCommandEqual(t *testing.T, got, want []string) {
-	t.Helper()
-	if len(got) != len(want) {
-		t.Fatalf("Command len: got %d, want %d: %v", len(got), len(want), got)
-	}
-	for i, v := range want {
-		if got[i] != v {
-			t.Errorf("Command[%d]: got %q, want %q", i, got[i], v)
-		}
-	}
-}
-
-// assertEnvContains verifies that every key in want is present with the correct value.
-func assertEnvContains(t *testing.T, env, want map[string]string) {
-	t.Helper()
-	for key, wantVal := range want {
-		gotVal, ok := env[key]
-		if !ok {
-			t.Errorf("env missing key %q", key)
-			continue
-		}
-		if gotVal != wantVal {
-			t.Errorf("env[%q] = %q, want %q", key, gotVal, wantVal)
-		}
-	}
-}
-
-// assertEnvAbsent verifies that none of the given keys are present.
-func assertEnvAbsent(t *testing.T, env map[string]string, keys []string) {
-	t.Helper()
-	for _, key := range keys {
-		if val, ok := env[key]; ok {
-			t.Errorf("env[%q] = %q, want key absent", key, val)
-		}
-	}
-}
-
 // TestBuildHealingManifest_RepoMetadataInjection verifies that repo metadata
 // env vars (PLOY_REPO_URL, PLOY_BASE_REF, PLOY_TARGET_REF, PLOY_COMMIT_SHA)
 // are injected into healing manifests from the StartRunRequest.
@@ -61,7 +23,7 @@ func TestBuildHealingManifest_RepoMetadataInjection(t *testing.T) {
 		req       StartRunRequest
 		mig       MigContainerSpec
 		wantEnv   map[string]string
-		wantAbsnt []string // keys that should NOT be present
+		wantAbsnt map[string]string // keys that should NOT be present
 	}{
 		{
 			name: "all repo metadata present",
@@ -93,7 +55,7 @@ func TestBuildHealingManifest_RepoMetadataInjection(t *testing.T) {
 				"PLOY_REPO_URL": "https://gitlab.com/test/repo.git",
 				"PLOY_BASE_REF": "develop",
 			},
-			wantAbsnt: []string{"PLOY_TARGET_REF", "PLOY_COMMIT_SHA"},
+			wantAbsnt: map[string]string{"PLOY_TARGET_REF": "", "PLOY_COMMIT_SHA": ""},
 		},
 		{
 			name: "empty strings are not injected",
@@ -108,7 +70,7 @@ func TestBuildHealingManifest_RepoMetadataInjection(t *testing.T) {
 			wantEnv: map[string]string{
 				"PLOY_REPO_URL": "https://gitlab.com/test/repo.git",
 			},
-			wantAbsnt: []string{"PLOY_BASE_REF", "PLOY_TARGET_REF", "PLOY_COMMIT_SHA"},
+			wantAbsnt: map[string]string{"PLOY_BASE_REF": "", "PLOY_TARGET_REF": "", "PLOY_COMMIT_SHA": ""},
 		},
 		{
 			name: "mig env is preserved alongside repo metadata",
@@ -184,8 +146,7 @@ func TestBuildHealingManifest_RepoMetadataInjection(t *testing.T) {
 				t.Fatalf("buildHealingManifest() error = %v", err)
 			}
 
-			assertEnvContains(t, manifest.Envs, tc.wantEnv)
-			assertEnvAbsent(t, manifest.Envs, tc.wantAbsnt)
+			assertEnv(t, manifest.Envs, tc.wantEnv, tc.wantAbsnt)
 		})
 	}
 }
@@ -399,7 +360,7 @@ func TestBuildHealingManifest_AmataResumeInjection(t *testing.T) {
 				}
 			}
 
-			assertEnvContains(t, manifest.Envs, tc.wantEnv)
+			assertEnv(t, manifest.Envs, tc.wantEnv, nil)
 		})
 	}
 }

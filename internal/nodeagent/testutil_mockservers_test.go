@@ -198,6 +198,25 @@ func newDiffUploadServer(t *testing.T, runID, jobID string, opts ...diffServerOp
 	return ts, calls
 }
 
+// newSequenceServer returns an httptest.Server that replies with the next
+// code from `codes` on each request; once the sequence is exhausted it
+// replies with 500. The returned *int is incremented on every request, so
+// tests can assert attempt counts.
+func newSequenceServer(t *testing.T, codes []int) (*httptest.Server, *int) {
+	t.Helper()
+	var attempts int
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		if attempts < len(codes) {
+			w.WriteHeader(codes[attempts])
+		} else {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+		attempts++
+	}))
+	t.Cleanup(ts.Close)
+	return ts, &attempts
+}
+
 // newUncalledServer returns a test server that fails the test if any request
 // is received. Useful for verifying that client-side validation prevents
 // network calls (e.g., size cap checks).

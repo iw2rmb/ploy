@@ -35,15 +35,7 @@ func TestJobImageNameSaver_SaveJobImageName_RequestShape(t *testing.T) {
 	}))
 	defer server.Close()
 
-	cfg := Config{
-		ServerURL: server.URL,
-		NodeID:    testNodeID,
-		HTTP: HTTPConfig{
-			TLS: TLSConfig{Enabled: false},
-		},
-	}
-
-	saver, err := newBaseUploader(cfg)
+	saver, err := newBaseUploader(newAgentConfig(server.URL))
 	if err != nil {
 		t.Fatalf("newBaseUploader() error = %v", err)
 	}
@@ -81,15 +73,7 @@ func TestJobImageNameSaver_SaveJobImageName_RetryOn5xx(t *testing.T) {
 	}))
 	defer server.Close()
 
-	cfg := Config{
-		ServerURL: server.URL,
-		NodeID:    testNodeID,
-		HTTP: HTTPConfig{
-			TLS: TLSConfig{Enabled: false},
-		},
-	}
-
-	saver, err := newBaseUploader(cfg)
+	saver, err := newBaseUploader(newAgentConfig(server.URL))
 	if err != nil {
 		t.Fatalf("newBaseUploader() error = %v", err)
 	}
