@@ -253,6 +253,19 @@ gradle.projectsEvaluated {
   }
   if (root.tasks.findByName('ployGenerateDeclaredSources') == null) {
     def generationTaskPaths = new LinkedHashSet<String>()
+    def collectBuildDependencyPaths = { candidate ->
+      if (candidate == null) {
+        return
+      }
+      try {
+        candidate.buildDependencies.getDependencies(null).each { depTask ->
+          if (depTask != null) {
+            generationTaskPaths.add(depTask.path)
+          }
+        }
+      } catch (Exception ignored) {
+      }
+    }
     root.allprojects.each { project ->
       def sourceSets = project.extensions.findByName('sourceSets')
       if (sourceSets == null) {
@@ -262,7 +275,11 @@ gradle.projectsEvaluated {
       if (mainSourceSet == null) {
         return
       }
+      collectBuildDependencyPaths(mainSourceSet.allSource)
+      collectBuildDependencyPaths(mainSourceSet.java)
+      collectBuildDependencyPaths(mainSourceSet.resources)
       def buildDirPath = normalizePath(project.layout.buildDirectory.get().asFile)
+      def generatedRootPath = normalizePath(new File(project.layout.buildDirectory.get().asFile, "generated"))
       def generatedSourceDirs = new LinkedHashSet<String>()
       mainSourceSet.allSource.srcDirs.each { srcDir ->
         if (srcDir == null) {
@@ -284,7 +301,10 @@ gradle.projectsEvaluated {
           }
           def outputPath = normalizePath(outputFile)
           generatedSourceDirs.each { generatedDir ->
-            if (isEqualOrChild(generatedDir, outputPath) || isEqualOrChild(outputPath, generatedDir)) {
+            if (
+              isEqualOrChild(outputPath, generatedDir) ||
+              (isEqualOrChild(generatedDir, outputPath) && isEqualOrChild(outputPath, generatedRootPath))
+            ) {
               producesGeneratedSources = true
             }
           }
@@ -308,6 +328,21 @@ gradle.projectsEvaluated {
         output.parentFile.mkdirs()
         def entries = new LinkedHashSet<String>()
         root.allprojects.each { project ->
+          def sourceSets = project.extensions.findByName('sourceSets')
+          if (sourceSets != null) {
+            def mainSourceSet = sourceSets.findByName('main')
+            if (mainSourceSet != null) {
+              mainSourceSet.output.classesDirs.files.each { classesDir ->
+                if (classesDir != null) {
+                  entries.add(classesDir.absolutePath)
+                }
+              }
+              def resourcesDir = mainSourceSet.output.resourcesDir
+              if (resourcesDir != null) {
+                entries.add(resourcesDir.absolutePath)
+              }
+            }
+          }
           ['compileClasspath', 'runtimeClasspath'].each { cfgName ->
             def cfg = project.configurations.findByName(cfgName)
             if (cfg != null && cfg.canBeResolved) {

@@ -141,6 +141,18 @@ func TestApplySBOMRuntimeForStack_ConfiguresManifest(t *testing.T) {
 				if !strings.Contains(shell, "declared source generation unavailable") {
 					t.Fatalf("shell command missing deterministic source generation status output: %q", shell)
 				}
+				if !strings.Contains(shell, "mainSourceSet.output.classesDirs") {
+					t.Fatalf("shell command missing sourceSets.main classes output wiring in java classpath task: %q", shell)
+				}
+				if !strings.Contains(shell, "mainSourceSet.output.resourcesDir") {
+					t.Fatalf("shell command missing sourceSets.main resources output wiring in java classpath task: %q", shell)
+				}
+				if !strings.Contains(shell, "collectBuildDependencyPaths(mainSourceSet.allSource)") {
+					t.Fatalf("shell command missing sourceSets build dependency collection for generation task detection: %q", shell)
+				}
+				if !strings.Contains(shell, "generatedRootPath") {
+					t.Fatalf("shell command missing generated root path guard for source generation task detection: %q", shell)
+				}
 			}
 			if tc.stack == contracts.MigStackUnknown && strings.Contains(shell, ": > /out/"+sbomDependencyOutputFileName) {
 				t.Fatalf("unknown stack command uses placeholder output write: %q", shell)
@@ -153,11 +165,11 @@ func TestDetectSBOMStackFromWorkspace(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name        string
-		layout      map[string]string // relative path -> content; empty map = empty dir
-		wantStack   contracts.MigStack
-		wantErr     bool
-		wantAmbig   bool
+		name      string
+		layout    map[string]string // relative path -> content; empty map = empty dir
+		wantStack contracts.MigStack
+		wantErr   bool
+		wantAmbig bool
 	}{
 		{
 			name:    "empty workspace",
