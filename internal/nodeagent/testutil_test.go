@@ -331,6 +331,27 @@ func assertUpload(t *testing.T, calls *[]artifactUploadCall, wantUpload bool, wa
 	}
 }
 
+// assertEnv verifies that env contains every key in contains (with matching
+// value) and is missing every key in absent. Either set may be nil.
+func assertEnv(t *testing.T, env map[string]string, contains, absent map[string]string) {
+	t.Helper()
+	for k, want := range contains {
+		got, ok := env[k]
+		if !ok {
+			t.Errorf("env missing key %q", k)
+			continue
+		}
+		if got != want {
+			t.Errorf("env[%q] = %q, want %q", k, got, want)
+		}
+	}
+	for k := range absent {
+		if v, ok := env[k]; ok {
+			t.Errorf("env[%q] = %q, want key absent", k, v)
+		}
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Config builders
 // ---------------------------------------------------------------------------

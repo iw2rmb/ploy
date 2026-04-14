@@ -300,16 +300,7 @@ func TestBootstrapTLS_CAFileErrors(t *testing.T) {
 				}
 			}
 
-			cfg := Config{
-				ServerURL: "https://127.0.0.1:9999",
-				NodeID:    testNodeID,
-				HTTP: HTTPConfig{
-					TLS: TLSConfig{
-						Enabled:         true,
-						BootstrapCAPath: caPath,
-					},
-				},
-			}
+			cfg := newAgentConfig("https://127.0.0.1:9999", withBootstrapCA(caPath))
 
 			agent := &Agent{cfg: cfg}
 			_, _, err := agent.requestCertificate(context.Background(), "test-token", []byte("csr-data"))

@@ -25,7 +25,7 @@ func TestDiffFetcher_ListRunRepoDiffs(t *testing.T) {
 	}))
 	defer server.Close()
 
-	fetcher, err := NewDiffFetcher(Config{ServerURL: server.URL, NodeID: "aB3xY9"})
+	fetcher, err := NewDiffFetcher(newAgentConfig(server.URL))
 	if err != nil {
 		t.Fatalf("NewDiffFetcher: %v", err)
 	}
@@ -53,7 +53,7 @@ func TestDiffFetcher_FetchRunRepoDiffPatch(t *testing.T) {
 	}))
 	defer server.Close()
 
-	fetcher, err := NewDiffFetcher(Config{ServerURL: server.URL, NodeID: "aB3xY9"})
+	fetcher, err := NewDiffFetcher(newAgentConfig(server.URL))
 	if err != nil {
 		t.Fatalf("NewDiffFetcher: %v", err)
 	}
@@ -102,7 +102,7 @@ func TestDiffFetcher_FetchDiffsForJobRepo_FilterAndOrder(t *testing.T) {
 	}))
 	defer server.Close()
 
-	fetcher, err := NewDiffFetcher(Config{ServerURL: server.URL, NodeID: "aB3xY9"})
+	fetcher, err := NewDiffFetcher(newAgentConfig(server.URL))
 	if err != nil {
 		t.Fatalf("NewDiffFetcher: %v", err)
 	}

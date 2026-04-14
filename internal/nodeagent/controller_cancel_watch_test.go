@@ -32,7 +32,7 @@ func TestRunController_watchRemoteCancellation_CancelsContext(t *testing.T) {
 
 	rc := &runController{
 		statusUploader: &baseUploader{
-			cfg:    Config{ServerURL: server.URL, NodeID: testNodeID},
+			cfg:    newAgentConfig(server.URL),
 			client: server.Client(),
 		},
 	}

@@ -27,7 +27,7 @@ func TestBaseUploader_GetJobStatus(t *testing.T) {
 	defer server.Close()
 
 	uploader := &baseUploader{
-		cfg:    Config{ServerURL: server.URL, NodeID: testNodeID},
+		cfg:    newAgentConfig(server.URL),
 		client: server.Client(),
 	}
 
@@ -50,7 +50,7 @@ func TestBaseUploader_GetJobStatus_NonOK(t *testing.T) {
 	defer server.Close()
 
 	uploader := &baseUploader{
-		cfg:    Config{ServerURL: server.URL, NodeID: testNodeID},
+		cfg:    newAgentConfig(server.URL),
 		client: server.Client(),
 	}
 

@@ -129,19 +129,9 @@ func TestSendHeartbeatSuccess(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	cfg := Config{
-		NodeID:    testNodeID,
-		ServerURL: srv.URL,
-		HTTP: HTTPConfig{
-			TLS: TLSConfig{
-				Enabled: false,
-			},
-		},
-		Heartbeat: HeartbeatConfig{
-			Interval: 30 * time.Second,
-			Timeout:  10 * time.Second,
-		},
-	}
+	cfg := newAgentConfig(srv.URL,
+		withHeartbeatInterval(30*time.Second),
+		withHeartbeatTimeout(10*time.Second))
 
 	mgr, err := NewHeartbeatManager(cfg)
 	if err != nil {
@@ -203,18 +193,7 @@ func TestSendHeartbeatHandlesServerError(t *testing.T) {
 			}))
 			defer srv.Close()
 
-			cfg := Config{
-				NodeID:    testNodeID,
-				ServerURL: srv.URL,
-				HTTP: HTTPConfig{
-					TLS: TLSConfig{
-						Enabled: false,
-					},
-				},
-				Heartbeat: HeartbeatConfig{
-					Timeout: 10 * time.Second,
-				},
-			}
+			cfg := newAgentConfig(srv.URL, withHeartbeatTimeout(10*time.Second))
 
 			mgr, err := NewHeartbeatManager(cfg)
 			if err != nil {
@@ -305,19 +284,9 @@ func TestNewHeartbeatManagerParsesNetIgnoreEnv(t *testing.T) {
 				}
 			})
 
-			cfg := Config{
-				NodeID:    testNodeID,
-				ServerURL: "http://localhost:8080",
-				HTTP: HTTPConfig{
-					TLS: TLSConfig{
-						Enabled: false,
-					},
-				},
-				Heartbeat: HeartbeatConfig{
-					Interval: 30 * time.Second,
-					Timeout:  10 * time.Second,
-				},
-			}
+			cfg := newAgentConfig("http://localhost:8080",
+				withHeartbeatInterval(30*time.Second),
+				withHeartbeatTimeout(10*time.Second))
 
 			mgr, err := NewHeartbeatManager(cfg)
 			if err != nil {

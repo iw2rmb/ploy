@@ -10,10 +10,7 @@ import (
 func TestNilLogHook(t *testing.T) {
 	t.Parallel()
 
-	cfg := Config{
-		ServerURL: "http://localhost:8443",
-		NodeID:    "aB3xY9",
-	}
+	cfg := newAgentConfig("http://localhost:8443")
 
 	ls, err := NewLogStreamer(cfg, types.NewRunID(), types.JobID(""), nil)
 	if err != nil {
@@ -53,10 +50,7 @@ func TestLogStreamer_WithCustomHook(t *testing.T) {
 		return result, nil
 	})
 
-	cfg := Config{
-		ServerURL: "http://localhost:8443",
-		NodeID:    "aB3xY9",
-	}
+	cfg := newAgentConfig("http://localhost:8443")
 
 	ls, err := NewLogStreamer(cfg, types.NewRunID(), types.JobID(""), nil)
 	if err != nil {
@@ -84,10 +78,7 @@ func TestLogStreamer_HookError(t *testing.T) {
 		return nil, errors.New("hook processing failed")
 	})
 
-	cfg := Config{
-		ServerURL: "http://localhost:8443",
-		NodeID:    "aB3xY9",
-	}
+	cfg := newAgentConfig("http://localhost:8443")
 
 	ls, err := NewLogStreamer(cfg, types.NewRunID(), types.JobID(""), nil)
 	if err != nil {
@@ -115,10 +106,7 @@ func TestLogStreamer_HookReturnsNil(t *testing.T) {
 		return nil, nil
 	})
 
-	cfg := Config{
-		ServerURL: "http://localhost:8443",
-		NodeID:    "aB3xY9",
-	}
+	cfg := newAgentConfig("http://localhost:8443")
 
 	ls, err := NewLogStreamer(cfg, types.NewRunID(), types.JobID(""), nil)
 	if err != nil {
@@ -140,10 +128,7 @@ func TestLogStreamer_HookReturnsNil(t *testing.T) {
 func TestLogStreamer_SetHook(t *testing.T) {
 	t.Parallel()
 
-	cfg := Config{
-		ServerURL: "http://localhost:8443",
-		NodeID:    "aB3xY9",
-	}
+	cfg := newAgentConfig("http://localhost:8443")
 
 	ls, err := NewLogStreamer(cfg, types.NewRunID(), types.JobID(""), nil)
 	if err != nil {
@@ -185,10 +170,7 @@ func BenchmarkLogHook(b *testing.B) {
 
 // BenchmarkLogStreamer_WithNilHook measures write performance with nil (no-op) hook.
 func BenchmarkLogStreamer_WithNilHook(b *testing.B) {
-	cfg := Config{
-		ServerURL: "http://localhost:8443",
-		NodeID:    "aB3xY9",
-	}
+	cfg := newAgentConfig("http://localhost:8443")
 
 	ls, err := NewLogStreamer(cfg, types.NewRunID(), types.JobID(""), nil)
 	if err != nil {

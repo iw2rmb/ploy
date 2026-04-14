@@ -353,11 +353,7 @@ func TestClaimLoop_FieldMapping(t *testing.T) {
 			ts := newSingleClaimServer(t, nodeIDStr, claim)
 
 			mock := &mockRunController{}
-			cfg := Config{
-				ServerURL: ts.URL,
-				NodeID:    types.NodeID(nodeIDStr),
-				HTTP:      HTTPConfig{TLS: TLSConfig{Enabled: false}},
-			}
+			cfg := newAgentConfig(ts.URL)
 			claimer := setupClaimer(t, cfg, mock)
 
 			ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)

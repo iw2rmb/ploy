@@ -47,10 +47,7 @@ func TestLogStreamer_Write(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			cfg := Config{
-				NodeID:    "aB3xY9",
-				ServerURL: "http://localhost:8443",
-			}
+			cfg := newAgentConfig("http://localhost:8443")
 			runID := types.NewRunID()
 			jobID := types.NewJobID()
 			ls, err := NewLogStreamer(cfg, runID, jobID, nil)
@@ -77,10 +74,7 @@ func TestLogStreamer_Write(t *testing.T) {
 func TestLogStreamer_SizeCap(t *testing.T) {
 	t.Parallel()
 
-	cfg := Config{
-		NodeID:    "aB3xY9",
-		ServerURL: "http://localhost:8443",
-	}
+	cfg := newAgentConfig("http://localhost:8443")
 	runID := types.NewRunID()
 	ls, err := NewLogStreamer(cfg, runID, types.JobID(""), nil)
 	if err != nil {
@@ -147,10 +141,7 @@ func TestLogStreamer_Compression(t *testing.T) {
 func TestLogStreamer_Close(t *testing.T) {
 	t.Parallel()
 
-	cfg := Config{
-		NodeID:    "aB3xY9",
-		ServerURL: "http://localhost:8443",
-	}
+	cfg := newAgentConfig("http://localhost:8443")
 	runID := types.NewRunID()
 	ls, err := NewLogStreamer(cfg, runID, types.JobID(""), nil)
 	if err != nil {
@@ -181,10 +172,7 @@ func TestLogStreamer_Close(t *testing.T) {
 func TestLogStreamer_FlushInterval(t *testing.T) {
 	t.Parallel()
 
-	cfg := Config{
-		NodeID:    "aB3xY9",
-		ServerURL: "http://localhost:8443",
-	}
+	cfg := newAgentConfig("http://localhost:8443")
 	runID := types.NewRunID()
 	ls, err := NewLogStreamer(cfg, runID, types.JobID(""), nil)
 	if err != nil {
@@ -218,10 +206,7 @@ func TestLogStreamer_FlushInterval(t *testing.T) {
 func TestLogStreamer_ChunkNumbering(t *testing.T) {
 	t.Parallel()
 
-	cfg := Config{
-		NodeID:    "aB3xY9",
-		ServerURL: "http://localhost:8443",
-	}
+	cfg := newAgentConfig("http://localhost:8443")
 	runID := types.NewRunID()
 	ls, err := NewLogStreamer(cfg, runID, types.JobID(""), nil)
 	if err != nil {
@@ -337,10 +322,7 @@ func TestLogStreamer_JobIDInPayload(t *testing.T) {
 			defer server.Close()
 
 			// Create log streamer pointing to mock server.
-			cfg := Config{
-				NodeID:    "aB3xY9",
-				ServerURL: server.URL,
-			}
+			cfg := newAgentConfig(server.URL)
 			ls, err := NewLogStreamer(cfg, runID, tt.jobID, nil)
 			if err != nil {
 				t.Fatalf("NewLogStreamer() failed: %v", err)
@@ -427,10 +409,7 @@ func TestLogStreamer_PreservesStdoutAndStderrFrames(t *testing.T) {
 	}))
 	defer server.Close()
 
-	ls, err := NewLogStreamer(Config{
-		NodeID:    "aB3xY9",
-		ServerURL: server.URL,
-	}, types.NewRunID(), types.NewJobID(), nil)
+	ls, err := NewLogStreamer(newAgentConfig(server.URL), types.NewRunID(), types.NewJobID(), nil)
 	if err != nil {
 		t.Fatalf("NewLogStreamer() failed: %v", err)
 	}
