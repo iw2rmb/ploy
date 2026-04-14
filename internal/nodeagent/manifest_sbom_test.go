@@ -124,6 +124,9 @@ func TestApplySBOMRuntimeForStack_ConfiguresManifest(t *testing.T) {
 			if tc.wantExtraSnippet != "" && !strings.Contains(shell, tc.wantExtraSnippet) {
 				t.Fatalf("shell command missing %q: %q", tc.wantExtraSnippet, shell)
 			}
+			if !strings.Contains(shell, "/out/"+sbomJavaClasspathFileName) {
+				t.Fatalf("shell command missing classpath output path %q: %q", "/out/"+sbomJavaClasspathFileName, shell)
+			}
 			if tc.stack == contracts.MigStackUnknown && strings.Contains(shell, ": > /out/"+sbomDependencyOutputFileName) {
 				t.Fatalf("unknown stack command uses placeholder output write: %q", shell)
 			}
