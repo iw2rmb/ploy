@@ -127,8 +127,9 @@ func TestApplySBOMRuntimeForStack_ConfiguresManifest(t *testing.T) {
 			if tc.stack != contracts.MigStackJavaMaven && !strings.Contains(shell, "ployWriteJavaClasspath") {
 				t.Fatalf("shell command missing ployWriteJavaClasspath task invocation: %q", shell)
 			}
-			if strings.Contains(shell, "classpath_init") || strings.Contains(shell, ` -I "`) {
-				t.Fatalf("shell command unexpectedly contains inline init-script injection: %q", shell)
+			if tc.stack != contracts.MigStackJavaMaven &&
+				(!strings.Contains(shell, "classpath_init") || !strings.Contains(shell, `-I "$classpath_init"`)) {
+				t.Fatalf("shell command missing inline init-script injection for deterministic classpath task setup: %q", shell)
 			}
 			if tc.stack == contracts.MigStackUnknown && strings.Contains(shell, ": > /out/"+sbomDependencyOutputFileName) {
 				t.Fatalf("unknown stack command uses placeholder output write: %q", shell)
