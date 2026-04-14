@@ -14,6 +14,36 @@ settingsEvaluated { settings ->
   }
 }
 
+// Provide a stable task used by SBOM Gradle jobs to materialize java classpath
+// entries into /out without modifying repository files.
+allprojects { p ->
+  if (p != p.rootProject) {
+    return
+  }
+  if (p.tasks.findByName("ployWriteJavaClasspath") != null) {
+    return
+  }
+  p.tasks.create("ployWriteJavaClasspath") {
+    doLast {
+      def output = new File("/out/java.classpath")
+      output.parentFile.mkdirs()
+      def entries = new LinkedHashSet<String>()
+      p.rootProject.allprojects.each { project ->
+        ["compileClasspath", "runtimeClasspath"].each { cfgName ->
+          def cfg = project.configurations.findByName(cfgName)
+          if (cfg != null && cfg.canBeResolved) {
+            cfg.resolve().each { file -> entries.add(file.absolutePath) }
+          }
+        }
+      }
+      output.text = entries.join(System.lineSeparator())
+      if (!entries.isEmpty()) {
+        output.append(System.lineSeparator())
+      }
+    }
+  }
+}
+
 // Emit a stable marker when tasks are loaded from the build cache.
 // This is used by E2E tests to verify that the remote build cache node is actually used.
 def _ployCacheURL = System.getenv("PLOY_GRADLE_BUILD_CACHE_URL")
