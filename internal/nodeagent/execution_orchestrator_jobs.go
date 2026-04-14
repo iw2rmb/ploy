@@ -1588,7 +1588,8 @@ func snapshotWorkspaceForNoIndexDiff(runID types.RunID, jobID types.JobID, diffT
 	}
 }
 
-// rehydrateWorkspaceWithCleanup wraps rehydrateWorkspaceForStep with automatic cleanup.
+// rehydrateWorkspaceWithCleanup wraps rehydrateWorkspaceForStep and returns a no-op
+// cleanup for sticky run/repo workspaces.
 func (r *runController) rehydrateWorkspaceWithCleanup(
 	ctx context.Context,
 	req StartRunRequest,
@@ -1600,12 +1601,8 @@ func (r *runController) rehydrateWorkspaceWithCleanup(
 	}
 
 	return tempResource{
-		path: workspace,
-		cleanup: func() {
-			if err := os.RemoveAll(workspace); err != nil {
-				slog.Warn("failed to remove workspace", "path", workspace, "error", err)
-			}
-		},
+		path:    workspace,
+		cleanup: func() {},
 	}, nil
 }
 

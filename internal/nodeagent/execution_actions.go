@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"os"
 	"time"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
@@ -56,11 +55,6 @@ func (r *runController) executeMRCreateAction(ctx context.Context, req StartActi
 		_ = r.statusUploader.UploadActionStatus(ctx, req.ActionID, lifecycle.JobStatusFromRunError(err).String(), stats)
 		return
 	}
-	defer func() {
-		if rmErr := os.RemoveAll(workspace); rmErr != nil {
-			slog.Warn("failed to remove action workspace", "path", workspace, "err", rmErr)
-		}
-	}()
 
 	mrURL, mrErr := r.createMR(ctx, jobReq, manifest, workspace)
 	builder := types.NewRunStatsBuilder().DurationMs(time.Since(startTime).Milliseconds())

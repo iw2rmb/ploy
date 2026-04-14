@@ -13,14 +13,16 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
-// rehydrateWorkspaceForStep creates a fresh workspace for the given step by rehydrating
-// from the base clone and applying ordered diffs from prior steps.
+// rehydrateWorkspaceForStep returns a sticky per-(run,repo) workspace for the
+// given step. If the sticky workspace already exists and has a valid git dir,
+// it is reused as-is; otherwise the workspace is rebuilt from base clone and
+// ordered prior diffs.
 //
 // For step 0: Creates base clone (or reuses cached base if available).
 // For step k>0: Copies base clone + applies diffs from steps 0 through k-1.
 //
-// This function implements the core rehydration strategy that enables multi-node execution:
-// each step can run on any node by reconstructing workspace state from base + diff chain.
+// This function keeps a single mutable workspace per run/repo chain on a node
+// while preserving deterministic rebuild when workspace is missing/corrupt.
 //
 // Parameters:
 //   - ctx: Context for cancellation and deadlines.
@@ -39,6 +41,22 @@ func (r *runController) rehydrateWorkspaceForStep(
 	repoID := req.RepoID
 	if repoID.IsZero() {
 		return "", fmt.Errorf("rehydrate workspace: repo_id is required for repo-scoped diffs listing")
+	}
+	workspacePath := runRepoWorkspaceDir(req.RunID, repoID)
+	if hasGitDir(workspacePath) {
+		slog.Info("reusing sticky workspace", "run_id", runID, "job_id", req.JobID, "workspace", workspacePath)
+		return workspacePath, nil
+	}
+	if _, err := os.Stat(workspacePath); err == nil {
+		slog.Warn("sticky workspace is invalid; rebuilding", "run_id", runID, "job_id", req.JobID, "workspace", workspacePath)
+		if rmErr := os.RemoveAll(workspacePath); rmErr != nil {
+			return "", fmt.Errorf("remove invalid workspace: %w", rmErr)
+		}
+	} else if !os.IsNotExist(err) {
+		return "", fmt.Errorf("inspect sticky workspace: %w", err)
+	}
+	if err := os.MkdirAll(filepath.Dir(workspacePath), 0o755); err != nil {
+		return "", fmt.Errorf("create sticky workspace parent dir: %w", err)
 	}
 
 	// Step 1: Ensure base clone exists (create on first use, reuse on subsequent calls).
@@ -98,12 +116,9 @@ func (r *runController) rehydrateWorkspaceForStep(
 	slog.Info("base clone created", "run_id", runID, "path", baseClone)
 
 	// Step 2: Rehydrate workspace from base clone + ordered diffs.
+	// The reconstructed workspace is persisted under run+repo cache path.
 	// C2: For ALL steps (including step 0), fetch diffs and apply them.
 	// This ensures step 0 runs on the healed baseline if pre-mig healing occurred.
-	workspacePath, err := createWorkspaceDir()
-	if err != nil {
-		return "", fmt.Errorf("create workspace dir: %w", err)
-	}
 
 	slog.Info("rehydrating workspace from base + diffs", "run_id", runID, "job_id", req.JobID)
 
@@ -127,6 +142,9 @@ func (r *runController) rehydrateWorkspaceForStep(
 	slog.Info("fetched diffs for rehydration", "run_id", runID, "job_id", req.JobID, "diff_count", len(gzippedDiffs))
 
 	// Rehydrate workspace from base + diffs using the helper from execution.go.
+	if err := os.RemoveAll(workspacePath); err != nil && !os.IsNotExist(err) {
+		return "", fmt.Errorf("remove stale sticky workspace before rehydration: %w", err)
+	}
 	if err := RehydrateWorkspaceFromBaseAndDiffs(ctx, baseClone, workspacePath, gzippedDiffs); err != nil {
 		if removeErr := os.RemoveAll(workspacePath); removeErr != nil {
 			slog.Warn("failed to clean up workspace after error", "path", workspacePath, "error", removeErr)
@@ -151,4 +169,13 @@ func (r *runController) rehydrateWorkspaceForStep(
 	}
 
 	return workspacePath, nil
+}
+
+func runRepoWorkspaceDir(runID types.RunID, repoID types.MigRepoID) string {
+	return filepath.Join(runCacheDir(runID), "repos", repoID.String(), "workspace")
+}
+
+func hasGitDir(path string) bool {
+	info, err := os.Stat(filepath.Join(path, ".git"))
+	return err == nil && info.IsDir()
 }

@@ -85,11 +85,6 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
 		return
 	}
-	defer func() {
-		if err := os.RemoveAll(workspace); err != nil {
-			slog.Warn("failed to remove workspace", "path", workspace, "error", err)
-		}
-	}()
 	if err := r.prepareGateJavaClasspathInput(ctx, req, workspace); err != nil {
 		slog.Error("failed to prepare gate java classpath input", "run_id", req.RunID, "job_id", req.JobID, "error", err)
 		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
@@ -285,12 +280,17 @@ func gateResultPassed(gateResult *contracts.BuildGateStageMetadata) bool {
 }
 
 // runCacheDir returns the per-run cache directory under PLOYD_CACHE_HOME (or os.TempDir).
-func runCacheDir(runID types.RunID) string {
+func runCacheRootDir() string {
 	baseRoot := os.Getenv("PLOYD_CACHE_HOME")
 	if baseRoot == "" {
 		baseRoot = os.TempDir()
 	}
-	return filepath.Join(baseRoot, "ploy", "run", runID.String())
+	return filepath.Join(baseRoot, "ploy", "run")
+}
+
+// runCacheDir returns the per-run cache directory under PLOYD_CACHE_HOME (or os.TempDir).
+func runCacheDir(runID types.RunID) string {
+	return filepath.Join(runCacheRootDir(), runID.String())
 }
 
 // persistOnce writes data to dir/filename idempotently: if the file already

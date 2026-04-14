@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/url"
-	"os"
 	"strings"
 	"time"
 
@@ -196,11 +195,6 @@ func (r *runController) executeMRJob(ctx context.Context, req StartRunRequest) {
 		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
 		return
 	}
-	defer func() {
-		if err := os.RemoveAll(workspace); err != nil {
-			slog.Warn("failed to remove workspace", "path", workspace, "error", err)
-		}
-	}()
 
 	slog.Info("starting MR job execution", "run_id", req.RunID, "job_id", req.JobID, "next_id", req.NextID)
 

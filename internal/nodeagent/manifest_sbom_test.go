@@ -75,6 +75,7 @@ func TestApplySBOMRuntimeForStack_ConfiguresManifest(t *testing.T) {
 		wantRuntimeStack   contracts.MigStack
 		wantCommandSnippet string
 		wantExtraSnippet   string
+		wantGenerateTask   bool
 	}{
 		{
 			name:               "maven",
@@ -90,6 +91,7 @@ func TestApplySBOMRuntimeForStack_ConfiguresManifest(t *testing.T) {
 			wantRuntimeStack:   contracts.MigStackJavaGradle,
 			wantCommandSnippet: "-q -p /workspace dependencies",
 			wantExtraSnippet:   "buildEnvironment",
+			wantGenerateTask:   true,
 		},
 		{
 			name:               "unknown fallback collector path",
@@ -98,6 +100,7 @@ func TestApplySBOMRuntimeForStack_ConfiguresManifest(t *testing.T) {
 			wantRuntimeStack:   contracts.MigStackJavaMaven,
 			wantCommandSnippet: "unable to resolve sbom collector",
 			wantExtraSnippet:   "buildEnvironment",
+			wantGenerateTask:   true,
 		},
 	}
 
@@ -130,6 +133,14 @@ func TestApplySBOMRuntimeForStack_ConfiguresManifest(t *testing.T) {
 			if tc.stack != contracts.MigStackJavaMaven &&
 				(!strings.Contains(shell, "classpath_init") || !strings.Contains(shell, `-I "$classpath_init"`)) {
 				t.Fatalf("shell command missing inline init-script injection for deterministic classpath task setup: %q", shell)
+			}
+			if tc.wantGenerateTask {
+				if !strings.Contains(shell, "ployGenerateDeclaredSources") {
+					t.Fatalf("shell command missing deterministic source generation task setup: %q", shell)
+				}
+				if !strings.Contains(shell, "declared source generation unavailable") {
+					t.Fatalf("shell command missing deterministic source generation status output: %q", shell)
+				}
 			}
 			if tc.stack == contracts.MigStackUnknown && strings.Contains(shell, ": > /out/"+sbomDependencyOutputFileName) {
 				t.Fatalf("unknown stack command uses placeholder output write: %q", shell)
