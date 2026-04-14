@@ -15,6 +15,12 @@ Use this flow for any "why did run/job fail?" request.
 - Local DB first: `psql -d ploy` (or `postgres -d ploy` alias if present).
 - If API auth needed, use `~/.config/ploy/default` (may be symlink) for server URL/token.
 
+## 2.1) Direct DB fast path for simple status questions
+- If question is a single factual check (for example: "was this job cached?"), answer from DB first, before collecting full runtime evidence.
+- For cache checks, query `ploy.jobs` for `id`, `cache_key`, `duration_ms`, and `meta->'cache_mirror'`.
+- Treat non-null `meta.cache_mirror.source_job_id` as cached/mirrored from that source job.
+- Only continue to logs/artifacts/container inspection when DB result is missing, ambiguous, or conflicts with observed behavior.
+
 ## 3) Minimum required evidence
 - `ploy run status <run-id> --json`
 - `ploy job log --format raw <job-id>`
