@@ -235,7 +235,8 @@ if [[ -n "$version" ]]; then
 else
   coords="${group}:${artifact}"
 fi
-args=(--apply --dir "$workspace" --recipe "$active_recipes" --coords "$coords")
+classpath_file="/in/java.classpath"
+args=(--apply --dir "$workspace" --recipe "$active_recipes" --coords "$coords" --classpath-file "$classpath_file")
 if [[ -n "$config_path" ]]; then
   args+=(--config "$config_path")
 fi
@@ -255,6 +256,7 @@ fi
 echo "[orw-cli] Running OpenRewrite CLI" | tee -a "$transform_log"
 echo "[orw-cli] Coords: $coords" | tee -a "$transform_log"
 echo "[orw-cli] Active recipes: $active_recipes" | tee -a "$transform_log"
+echo "[orw-cli] Java classpath file: $classpath_file" | tee -a "$transform_log"
 if [[ "$used_yaml_defaults" == "true" ]]; then
   echo "[orw-cli] Applied YAML-mode default recipe coordinates/classname" | tee -a "$transform_log"
 fi

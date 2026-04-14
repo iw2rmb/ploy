@@ -42,13 +42,20 @@ func TestOrwCLI_AppliesWithStandaloneCLIAndNoBuildToolInvocation(t *testing.T) {
 	rewriteScript := `#!/usr/bin/env bash
 set -euo pipefail
 workspace=""
+classpath_file=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --dir) workspace="${2:-}"; shift 2 ;;
+    --classpath-file) classpath_file="${2:-}"; shift 2 ;;
     *) shift ;;
   esac
 done
 echo "[rewrite-stub] apply invoked"
+echo "[rewrite-stub] classpath=$classpath_file"
+if [[ "$classpath_file" != "/in/java.classpath" ]]; then
+  echo "[rewrite-stub] unexpected classpath file" >&2
+  exit 68
+fi
 if [[ -n "$workspace" ]]; then
   printf '// rewritten by rewrite-stub\n' >> "$workspace/App.java"
 fi
@@ -104,6 +111,9 @@ exit 67
 	logText := string(logBytes)
 	if !strings.Contains(logText, "[rewrite-stub] apply invoked") {
 		t.Fatalf("transform.log missing rewrite invocation marker:\n%s", logText)
+	}
+	if !strings.Contains(logText, "[rewrite-stub] classpath=/in/java.classpath") {
+		t.Fatalf("transform.log missing required classpath-file argument:\n%s", logText)
 	}
 	if strings.Contains(logText, "[mvn-stub] should not run") || strings.Contains(logText, "[gradle-stub] should not run") {
 		t.Fatalf("transform.log shows build-tool invocation:\n%s", logText)
