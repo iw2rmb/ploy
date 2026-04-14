@@ -60,6 +60,9 @@ type StartRunRequest struct {
 	HookContext *contracts.HookClaimContext `json:"hook_context,omitempty"`
 	// GateContext carries concrete gate cycle routing.
 	GateContext *contracts.GateClaimContext `json:"gate_context,omitempty"`
+	// JavaClasspathContext carries claim-time java classpath materialization metadata
+	// for non-SBOM jobs.
+	JavaClasspathContext *contracts.JavaClasspathClaimContext `json:"java_classpath_context,omitempty"`
 	// DetectedStack carries the canonical gate-detected stack tuple for this job.
 	DetectedStack *contracts.StackExpectation `json:"detected_stack,omitempty"`
 	// RecoveryContext carries server-resolved recovery inputs for heal/re-gate jobs.

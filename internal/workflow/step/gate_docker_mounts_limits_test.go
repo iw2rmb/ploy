@@ -108,6 +108,37 @@ func TestDockerGateExecutor_MountsOutDir(t *testing.T) {
 	}
 }
 
+func TestDockerGateExecutor_MountsInDirWhenPresent(t *testing.T) {
+	t.Parallel()
+
+	executor, rt, workspace := newDockerGateTestHarness(t)
+	spec := &contracts.StepGateSpec{Enabled: true}
+
+	inDir := filepath.Join(workspace, BuildGateWorkspaceInDir)
+	if err := os.MkdirAll(inDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll(%q): %v", inDir, err)
+	}
+
+	_, err := executor.Execute(context.Background(), spec, workspace)
+	if err != nil {
+		t.Fatalf("Execute() unexpected error: %v", err)
+	}
+	if !rt.createCalled {
+		t.Fatal("expected Create to be called")
+	}
+
+	found := false
+	for _, mount := range rt.captured.Mounts {
+		if mount.Source == inDir && mount.Target == BuildGateContainerInDir && !mount.ReadOnly {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected /in mount %q -> %q in mounts=%+v", inDir, BuildGateContainerInDir, rt.captured.Mounts)
+	}
+}
+
 func TestDockerGateExecutor_MountsGradleNativeCacheDir(t *testing.T) {
 	t.Parallel()
 

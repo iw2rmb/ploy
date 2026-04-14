@@ -317,6 +317,31 @@ func TestClaimLoop_FieldMapping(t *testing.T) {
 				}
 			},
 		},
+		{
+			name: "java classpath context propagation",
+			claimOpts: []claimOption{
+				func(c *ClaimResponse) {
+					c.JavaClasspathContext = &contracts.JavaClasspathClaimContext{
+						Required:         true,
+						SourceArtifactID: "33333333-3333-3333-3333-333333333333",
+						SourceJobID:      types.NewJobID(),
+						SourceJobType:    types.JobTypePreGate,
+					}
+				},
+			},
+			assertions: func(t *testing.T, got StartRunRequest, claim ClaimResponse) {
+				t.Helper()
+				if got.JavaClasspathContext == nil {
+					t.Fatal("JavaClasspathContext=nil, want non-nil")
+				}
+				if claim.JavaClasspathContext == nil {
+					t.Fatal("claim JavaClasspathContext=nil, want non-nil")
+				}
+				if *got.JavaClasspathContext != *claim.JavaClasspathContext {
+					t.Fatalf("JavaClasspathContext mismatch: got %+v want %+v", *got.JavaClasspathContext, *claim.JavaClasspathContext)
+				}
+			},
+		},
 	}
 
 	for _, tt := range tests {

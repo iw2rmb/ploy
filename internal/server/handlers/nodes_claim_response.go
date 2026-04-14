@@ -17,36 +17,37 @@ import (
 )
 
 type claimResponsePayload struct {
-	WorkType               string                           `json:"work_type"`
-	RunID                  domaintypes.RunID                `json:"id"`
-	Name                   *string                          `json:"name,omitempty"`
-	RepoID                 domaintypes.RepoID               `json:"repo_id"`
-	Attempt                int32                            `json:"attempt"`
-	JobID                  domaintypes.JobID                `json:"job_id"`
-	JobName                string                           `json:"job_name"`
-	JobType                domaintypes.JobType              `json:"job_type"`
-	ActionID               *domaintypes.JobID               `json:"action_id,omitempty"`
-	ActionType             string                           `json:"action_type,omitempty"`
-	JobImage               string                           `json:"job_image"`
-	NextID                 *domaintypes.JobID               `json:"next_id"`
-	RepoURL                string                           `json:"repo_url"`
-	RepoGateProfileMissing bool                             `json:"repo_gate_profile_missing"`
-	Status                 domaintypes.RunStatus            `json:"status"`
-	NodeID                 domaintypes.NodeID               `json:"node_id"`
-	BaseRef                string                           `json:"base_ref"`
-	TargetRef              string                           `json:"target_ref"`
-	RepoSHAIn              string                           `json:"repo_sha_in,omitempty"`
-	StartedAt              string                           `json:"started_at"`
-	CreatedAt              string                           `json:"created_at"`
-	Spec                   json.RawMessage                  `json:"spec,omitempty"`
-	SBOMContext            *contracts.SBOMJobMetadata       `json:"sbom_context,omitempty"`
-	MigContext             *contracts.MigClaimContext       `json:"mig_context,omitempty"`
-	HookContext            *contracts.HookClaimContext      `json:"hook_context,omitempty"`
-	GateContext            *contracts.GateClaimContext      `json:"gate_context,omitempty"`
-	DetectedStack          *contracts.StackExpectation      `json:"detected_stack,omitempty"`
-	RecoveryContext        *contracts.RecoveryClaimContext  `json:"recovery_context,omitempty"`
-	GateSkip               *contracts.BuildGateSkipMetadata `json:"gate_skip,omitempty"`
-	HookRuntime            *contracts.HookRuntimeDecision   `json:"hook_runtime,omitempty"`
+	WorkType               string                               `json:"work_type"`
+	RunID                  domaintypes.RunID                    `json:"id"`
+	Name                   *string                              `json:"name,omitempty"`
+	RepoID                 domaintypes.RepoID                   `json:"repo_id"`
+	Attempt                int32                                `json:"attempt"`
+	JobID                  domaintypes.JobID                    `json:"job_id"`
+	JobName                string                               `json:"job_name"`
+	JobType                domaintypes.JobType                  `json:"job_type"`
+	ActionID               *domaintypes.JobID                   `json:"action_id,omitempty"`
+	ActionType             string                               `json:"action_type,omitempty"`
+	JobImage               string                               `json:"job_image"`
+	NextID                 *domaintypes.JobID                   `json:"next_id"`
+	RepoURL                string                               `json:"repo_url"`
+	RepoGateProfileMissing bool                                 `json:"repo_gate_profile_missing"`
+	Status                 domaintypes.RunStatus                `json:"status"`
+	NodeID                 domaintypes.NodeID                   `json:"node_id"`
+	BaseRef                string                               `json:"base_ref"`
+	TargetRef              string                               `json:"target_ref"`
+	RepoSHAIn              string                               `json:"repo_sha_in,omitempty"`
+	StartedAt              string                               `json:"started_at"`
+	CreatedAt              string                               `json:"created_at"`
+	Spec                   json.RawMessage                      `json:"spec,omitempty"`
+	SBOMContext            *contracts.SBOMJobMetadata           `json:"sbom_context,omitempty"`
+	MigContext             *contracts.MigClaimContext           `json:"mig_context,omitempty"`
+	HookContext            *contracts.HookClaimContext          `json:"hook_context,omitempty"`
+	GateContext            *contracts.GateClaimContext          `json:"gate_context,omitempty"`
+	JavaClasspathContext   *contracts.JavaClasspathClaimContext `json:"java_classpath_context,omitempty"`
+	DetectedStack          *contracts.StackExpectation          `json:"detected_stack,omitempty"`
+	RecoveryContext        *contracts.RecoveryClaimContext      `json:"recovery_context,omitempty"`
+	GateSkip               *contracts.BuildGateSkipMetadata     `json:"gate_skip,omitempty"`
+	HookRuntime            *contracts.HookRuntimeDecision       `json:"hook_runtime,omitempty"`
 }
 
 func buildClaimResponsePayload(
@@ -171,6 +172,10 @@ func buildClaimResponsePayload(
 	if err != nil {
 		return claimResponsePayload{}, fmt.Errorf("resolve hook runtime decision: %w", err)
 	}
+	javaClasspathContext, err := resolveJavaClasspathClaimContext(ctx, st, job)
+	if err != nil {
+		return claimResponsePayload{}, fmt.Errorf("resolve java classpath context: %w", err)
+	}
 	if jobType == domaintypes.JobTypeHook && hookContext != nil {
 		upstreamSBOM, _, available, upstreamErr := resolveUpstreamSBOMBundleForJob(ctx, st, job)
 		if upstreamErr != nil {
@@ -208,6 +213,7 @@ func buildClaimResponsePayload(
 		MigContext:             migContext,
 		HookContext:            hookContext,
 		GateContext:            gateContext,
+		JavaClasspathContext:   javaClasspathContext,
 		DetectedStack:          detectedStack,
 		RecoveryContext:        recoveryCtx,
 		GateSkip:               gateSkip,
@@ -249,6 +255,7 @@ func buildActionClaimResponsePayload(
 		MigContext:             nil,
 		HookContext:            nil,
 		GateContext:            nil,
+		JavaClasspathContext:   nil,
 		DetectedStack:          nil,
 		RecoveryContext:        nil,
 		GateSkip:               nil,

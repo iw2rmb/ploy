@@ -63,6 +63,12 @@ const (
 	// BuildGateWorkspaceOutDir is a workspace-local host directory mounted
 	// into gate containers as /out for deterministic artifact collection.
 	BuildGateWorkspaceOutDir = ".ploy-gate-out"
+	// BuildGateWorkspaceInDir is an optional workspace-local host directory
+	// mounted into gate containers as /in for cross-step runtime inputs.
+	BuildGateWorkspaceInDir = ".ploy-gate-in"
+	// BuildGateContainerInDir is the writable input mount path inside gate
+	// containers used by orchestrator-provided runtime inputs.
+	BuildGateContainerInDir = "/in"
 	// BuildGateContainerOutDir is the writable output mount path inside gate
 	// containers used by runtime-generated artifacts (for example Gradle reports).
 	BuildGateContainerOutDir = "/out"
@@ -209,6 +215,15 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 	mounts := []ContainerMount{
 		{Source: workspace, Target: "/workspace", ReadOnly: false},
 		{Source: gateOutDir, Target: BuildGateContainerOutDir, ReadOnly: false},
+	}
+	gateInDir := filepath.Join(workspace, BuildGateWorkspaceInDir)
+	if info, statErr := os.Stat(gateInDir); statErr == nil {
+		if !info.IsDir() {
+			return nil, fmt.Errorf("build gate in path is not a directory: %s", gateInDir)
+		}
+		mounts = append(mounts, ContainerMount{Source: gateInDir, Target: BuildGateContainerInDir, ReadOnly: false})
+	} else if !errors.Is(statErr, os.ErrNotExist) {
+		return nil, fmt.Errorf("stat build gate in dir: %w", statErr)
 	}
 	toolCacheMounts, err := buildGateToolCacheMounts(plan.language, plan.tool, plan.release)
 	if err != nil {
