@@ -43,6 +43,7 @@ import java.net.URLClassLoader;
 import java.security.CodeSource;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.PathMatcher;
 import java.nio.file.Paths;
@@ -168,7 +169,16 @@ public final class RewriteCliMain {
             throw new RuntimeException(t);
         });
 
-        List<SourceFile> sourceFiles = parseWorkspace(workspace, ctx, opts.buildSystem, opts.excludePathMatchers);
+        List<Path> javaClasspath = loadJavaClasspath(opts.classpathFile);
+        System.out.println("[rewrite] Java classpath entries: " + javaClasspath.size());
+
+        List<SourceFile> sourceFiles = parseWorkspace(
+            workspace,
+            ctx,
+            opts.buildSystem,
+            javaClasspath,
+            opts.excludePathMatchers
+        );
         InMemoryLargeSourceSet before = new InMemoryLargeSourceSet(sourceFiles, recipeClassLoader);
 
         RecipeRun run = recipe.run(before, ctx);
@@ -209,11 +219,12 @@ public final class RewriteCliMain {
         Path workspace,
         ExecutionContext ctx,
         String requestedBuildSystem,
+        List<Path> javaClasspath,
         List<PathMatcher> excludePathMatchers
     ) {
         List<Parser> parsers = new ArrayList<>();
         parsers.add(newBuildSystemParser(requestedBuildSystem));
-        parsers.add(JavaParser.fromJavaVersion().logCompilationWarningsAndErrors(true).build());
+        parsers.add(JavaParser.fromJavaVersion().classpath(javaClasspath).logCompilationWarningsAndErrors(true).build());
         parsers.addAll(OmniParser.defaultResourceParsers());
 
         OmniParser parser = OmniParser.builder(parsers).build();
@@ -223,6 +234,50 @@ public final class RewriteCliMain {
             System.out.println("[rewrite] Excluded paths: " + (accepted.size() - filtered.size()));
         }
         return parser.parse(filtered, workspace, ctx).collect(Collectors.toList());
+    }
+
+    private static List<Path> loadJavaClasspath(Path classpathFile) {
+        Path normalized = classpathFile.toAbsolutePath().normalize();
+        if (!Files.isRegularFile(normalized)) {
+            throw new InputException("--classpath-file does not exist: " + normalized);
+        }
+
+        List<String> rawEntries;
+        try {
+            rawEntries = Files.readAllLines(normalized);
+        } catch (IOException e) {
+            throw new InputException("failed to read --classpath-file " + normalized + ": " + safeMessage(e));
+        }
+
+        List<Path> classpathEntries = new ArrayList<>();
+        for (int i = 0; i < rawEntries.size(); i++) {
+            String raw = rawEntries.get(i);
+            String entry = raw == null ? "" : raw.trim();
+            if (entry.isEmpty()) {
+                continue;
+            }
+
+            Path parsed;
+            try {
+                parsed = Paths.get(entry);
+            } catch (InvalidPathException e) {
+                throw new InputException("--classpath-file line " + (i + 1) + " has invalid path: " + entry);
+            }
+            if (!parsed.isAbsolute()) {
+                throw new InputException("--classpath-file line " + (i + 1) + " must be absolute path: " + entry);
+            }
+
+            Path classpathPath = parsed.toAbsolutePath().normalize();
+            if (!Files.exists(classpathPath)) {
+                throw new InputException("--classpath-file line " + (i + 1) + " does not exist: " + classpathPath);
+            }
+            classpathEntries.add(classpathPath);
+        }
+
+        if (classpathEntries.isEmpty()) {
+            throw new InputException("--classpath-file has no usable entries: " + normalized);
+        }
+        return Collections.unmodifiableList(classpathEntries);
     }
 
     private static List<Path> filterAcceptedPaths(Path workspace, List<Path> accepted, List<PathMatcher> excludePathMatchers) {
@@ -697,6 +752,7 @@ public final class RewriteCliMain {
         private final String repoUsername;
         private final String repoPassword;
         private final String buildSystem;
+        private final Path classpathFile;
         private final List<PathMatcher> excludePathMatchers;
 
         private CliOptions(
@@ -708,6 +764,7 @@ public final class RewriteCliMain {
             String repoUsername,
             String repoPassword,
             String buildSystem,
+            Path classpathFile,
             List<PathMatcher> excludePathMatchers
         ) {
             this.dir = dir;
@@ -718,6 +775,7 @@ public final class RewriteCliMain {
             this.repoUsername = repoUsername;
             this.repoPassword = repoPassword;
             this.buildSystem = buildSystem;
+            this.classpathFile = classpathFile;
             this.excludePathMatchers = excludePathMatchers;
         }
 
@@ -730,6 +788,7 @@ public final class RewriteCliMain {
             String repoUsername = null;
             String repoPassword = null;
             String buildSystem = null;
+            Path classpathFile = null;
             List<PathMatcher> excludePathMatchers = Collections.emptyList();
             boolean apply = false;
 
@@ -763,6 +822,9 @@ public final class RewriteCliMain {
                     case "--build-system":
                         buildSystem = requireValue(args, ++i, "--build-system");
                         break;
+                    case "--classpath-file":
+                        classpathFile = Paths.get(requireValue(args, ++i, "--classpath-file"));
+                        break;
                     default:
                         throw new InputException("unknown arg: " + arg);
                 }
@@ -780,6 +842,9 @@ public final class RewriteCliMain {
             if (recipes.isEmpty()) {
                 throw new InputException("--recipe is required");
             }
+            if (classpathFile == null) {
+                throw new InputException("--classpath-file is required");
+            }
             if ((repoUsername == null) != (repoPassword == null)) {
                 throw new InputException("--repo-username and --repo-password must be provided together");
             }
@@ -794,6 +859,7 @@ public final class RewriteCliMain {
                 repoUsername,
                 repoPassword,
                 buildSystem,
+                classpathFile,
                 excludePathMatchers
             );
         }

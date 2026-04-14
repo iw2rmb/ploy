@@ -615,10 +615,19 @@ Optional repository and execution controls:
 | `ORW_EXCLUDE_PATHS` | Comma-separated glob patterns excluded from ORW parsing (for example `**/*.proto`) |
 | `ORW_CLI_BIN` | OpenRewrite CLI executable name/path (default: `rewrite`) |
 
+Required typed file input:
+
+| Path | Description |
+|------|-------------|
+| `/in/java.classpath` | Newline-delimited absolute classpath entries produced by SBOM/build-gate and mounted into ORW jobs. |
+
 Healing execution (custom recipe via Amata lane):
 
 - Canonical command:
   - `heal-orw --apply --dir /workspace --out /out/orw-task`
+- ORW wrapper behavior:
+  - `orw-cli` always passes `--classpath-file /in/java.classpath` to the OpenRewrite runner.
+  - Missing/invalid `/in/java.classpath` is treated as deterministic `input` failure.
 - `rewrite.yml` support:
   - Config resolution order is: `ORW_CONFIG_PATH` -> `/out/rewrite.yml`.
   - When a config file is found, ORW activates top-level `name:` by default.
