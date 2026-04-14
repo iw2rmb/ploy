@@ -156,6 +156,11 @@ func TestApplySBOMRuntimeForStack_ConfiguresManifest(t *testing.T) {
 				t.Fatalf("shell command missing inline init-script injection for deterministic classpath task setup: %q", shell)
 			}
 			if tc.wantClassesPrep {
+				if !strings.Contains(shell, "find /workspace -type d") ||
+					!strings.Contains(shell, "build/classes/java/main") ||
+					!strings.Contains(shell, "build/resources/main") {
+					t.Fatalf("shell command missing workspace classpath filesystem fallback: %q", shell)
+				}
 				if strings.Contains(shell, "ployGenerateDeclaredSources") {
 					t.Fatalf("shell command must not use generator detection task in sbom gradle flow: %q", shell)
 				}

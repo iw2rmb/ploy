@@ -285,10 +285,19 @@ gradle.projectsEvaluated {
 PLOY_EOF
 if ! %[1]s -q -p /workspace classes >/dev/null 2>&1; then printf "\n# ploy: classes preparation unavailable\n" >> %[2]s; fi
 %[1]s -q -p /workspace -I "$classpath_init" ployWriteJavaClasspath
+workspace_cp="$(mktemp)"
+if find /workspace -type d \( -path '*/build/classes/java/main' -o -path '*/build/classes/kotlin/main' -o -path '*/build/classes/groovy/main' -o -path '*/build/resources/main' \) | awk 'NF > 0' | sort -u > "$workspace_cp"; then
+  if [ -s "$workspace_cp" ]; then
+    merged_cp="$(mktemp)"
+    cat %[3]s "$workspace_cp" | awk 'NF > 0 && !seen[$0]++ { print $0 }' > "$merged_cp"
+    mv "$merged_cp" %[3]s
+    printf "\n" >> %[3]s
+  fi
+fi
 if ! awk 'NF > 0 && index($0, "/workspace/") == 1 { found = 1; exit } END { exit(found ? 0 : 1) }' %[3]s; then
   printf "\n# ploy: workspace classpath entries unavailable\n" >> %[2]s
 fi
-rm -f "$classpath_init"`, gradleCommand, rawOutputPath, classpathOutputPath)
+rm -f "$classpath_init" "$workspace_cp"`, gradleCommand, rawOutputPath, classpathOutputPath)
 }
 
 func resolveSBOMRuntimeStack(stack contracts.MigStack) contracts.MigStack {
