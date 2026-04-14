@@ -245,84 +245,8 @@ func sbomGradleCollectScript(gradleCommand, rawOutputPath, classpathOutputPath s
 	return fmt.Sprintf(`%[1]s -q -p /workspace dependencies > %[2]s; if ! %[1]s -q -p /workspace buildEnvironment >> %[2]s 2>/dev/null; then printf "\n# ploy: buildEnvironment unavailable\n" >> %[2]s; fi; classpath_init="$(mktemp)"; cat > "$classpath_init" <<'PLOY_EOF'
 gradle.projectsEvaluated {
   def root = gradle.rootProject
-  def normalizePath = { File file ->
-    file.toPath().toAbsolutePath().normalize().toString()
-  }
-  def isEqualOrChild = { String childPath, String parentPath ->
-    childPath == parentPath || childPath.startsWith(parentPath + File.separator)
-  }
-  if (root.tasks.findByName('ployGenerateDeclaredSources') == null) {
-    def generationTaskPaths = new LinkedHashSet<String>()
-    def collectBuildDependencyPaths = { candidate ->
-      if (candidate == null) {
-        return
-      }
-      try {
-        candidate.buildDependencies.getDependencies(null).each { depTask ->
-          if (depTask != null) {
-            generationTaskPaths.add(depTask.path)
-          }
-        }
-      } catch (Exception ignored) {
-      }
-    }
-    root.allprojects.each { project ->
-      def sourceSets = project.extensions.findByName('sourceSets')
-      if (sourceSets == null) {
-        return
-      }
-      def mainSourceSet = sourceSets.findByName('main')
-      if (mainSourceSet == null) {
-        return
-      }
-      collectBuildDependencyPaths(mainSourceSet.allSource)
-      collectBuildDependencyPaths(mainSourceSet.java)
-      collectBuildDependencyPaths(mainSourceSet.resources)
-      def buildDirPath = normalizePath(project.layout.buildDirectory.get().asFile)
-      def generatedRootPath = normalizePath(new File(project.layout.buildDirectory.get().asFile, "generated"))
-      def generatedSourceDirs = new LinkedHashSet<String>()
-      mainSourceSet.allSource.srcDirs.each { srcDir ->
-        if (srcDir == null) {
-          return
-        }
-        def srcDirPath = normalizePath(srcDir)
-        if (isEqualOrChild(srcDirPath, buildDirPath)) {
-          generatedSourceDirs.add(srcDirPath)
-        }
-      }
-      if (generatedSourceDirs.isEmpty()) {
-        return
-      }
-      project.tasks.each { task ->
-        def producesGeneratedSources = false
-        task.outputs.files.files.each { outputFile ->
-          if (outputFile == null) {
-            return
-          }
-          def outputPath = normalizePath(outputFile)
-          generatedSourceDirs.each { generatedDir ->
-            if (
-              isEqualOrChild(outputPath, generatedDir) ||
-              (isEqualOrChild(generatedDir, outputPath) && isEqualOrChild(outputPath, generatedRootPath))
-            ) {
-              producesGeneratedSources = true
-            }
-          }
-        }
-        if (producesGeneratedSources) {
-          generationTaskPaths.add(task.path)
-        }
-      }
-    }
-    root.tasks.register('ployGenerateDeclaredSources') {
-      if (!generationTaskPaths.isEmpty()) {
-        dependsOn(generationTaskPaths as List)
-      }
-    }
-  }
   if (root.tasks.findByName('ployWriteJavaClasspath') == null) {
     root.tasks.register('ployWriteJavaClasspath') {
-      dependsOn('ployGenerateDeclaredSources')
       doLast {
         def output = new File('%[3]s')
         output.parentFile.mkdirs()
@@ -333,12 +257,12 @@ gradle.projectsEvaluated {
             def mainSourceSet = sourceSets.findByName('main')
             if (mainSourceSet != null) {
               mainSourceSet.output.classesDirs.files.each { classesDir ->
-                if (classesDir != null) {
+                if (classesDir != null && classesDir.exists()) {
                   entries.add(classesDir.absolutePath)
                 }
               }
               def resourcesDir = mainSourceSet.output.resourcesDir
-              if (resourcesDir != null) {
+              if (resourcesDir != null && resourcesDir.exists()) {
                 entries.add(resourcesDir.absolutePath)
               }
             }
@@ -359,8 +283,12 @@ gradle.projectsEvaluated {
   }
 }
 PLOY_EOF
-if ! %[1]s -q -p /workspace -I "$classpath_init" ployGenerateDeclaredSources >/dev/null 2>&1; then printf "\n# ploy: declared source generation unavailable\n" >> %[2]s; fi
-%[1]s -q -p /workspace -I "$classpath_init" ployWriteJavaClasspath; rm -f "$classpath_init"`, gradleCommand, rawOutputPath, classpathOutputPath)
+if ! %[1]s -q -p /workspace classes >/dev/null 2>&1; then printf "\n# ploy: classes preparation unavailable\n" >> %[2]s; fi
+%[1]s -q -p /workspace -I "$classpath_init" ployWriteJavaClasspath
+if ! awk 'NF > 0 && index($0, "/workspace/") == 1 { found = 1; exit } END { exit(found ? 0 : 1) }' %[3]s; then
+  printf "\n# ploy: workspace classpath entries unavailable\n" >> %[2]s
+fi
+rm -f "$classpath_init"`, gradleCommand, rawOutputPath, classpathOutputPath)
 }
 
 func resolveSBOMRuntimeStack(stack contracts.MigStack) contracts.MigStack {

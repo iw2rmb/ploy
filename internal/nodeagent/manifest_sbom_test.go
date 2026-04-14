@@ -75,7 +75,7 @@ func TestApplySBOMRuntimeForStack_ConfiguresManifest(t *testing.T) {
 		wantRuntimeStack   contracts.MigStack
 		wantCommandSnippet string
 		wantExtraSnippet   string
-		wantGenerateTask   bool
+		wantClassesPrep    bool
 	}{
 		{
 			name:               "maven",
@@ -91,7 +91,7 @@ func TestApplySBOMRuntimeForStack_ConfiguresManifest(t *testing.T) {
 			wantRuntimeStack:   contracts.MigStackJavaGradle,
 			wantCommandSnippet: "-q -p /workspace dependencies",
 			wantExtraSnippet:   "buildEnvironment",
-			wantGenerateTask:   true,
+			wantClassesPrep:    true,
 		},
 		{
 			name:               "unknown fallback collector path",
@@ -100,7 +100,7 @@ func TestApplySBOMRuntimeForStack_ConfiguresManifest(t *testing.T) {
 			wantRuntimeStack:   contracts.MigStackJavaMaven,
 			wantCommandSnippet: "unable to resolve sbom collector",
 			wantExtraSnippet:   "buildEnvironment",
-			wantGenerateTask:   true,
+			wantClassesPrep:    true,
 		},
 	}
 
@@ -130,28 +130,28 @@ func TestApplySBOMRuntimeForStack_ConfiguresManifest(t *testing.T) {
 			if tc.stack != contracts.MigStackJavaMaven && !strings.Contains(shell, "ployWriteJavaClasspath") {
 				t.Fatalf("shell command missing ployWriteJavaClasspath task invocation: %q", shell)
 			}
+			if tc.stack != contracts.MigStackJavaMaven && !strings.Contains(shell, "workspace classpath entries unavailable") {
+				t.Fatalf("shell command missing workspace classpath fallback marker: %q", shell)
+			}
+			if tc.stack != contracts.MigStackJavaMaven && !strings.Contains(shell, "classes preparation unavailable") {
+				t.Fatalf("shell command missing classes preparation marker: %q", shell)
+			}
 			if tc.stack != contracts.MigStackJavaMaven &&
 				(!strings.Contains(shell, "classpath_init") || !strings.Contains(shell, `-I "$classpath_init"`)) {
 				t.Fatalf("shell command missing inline init-script injection for deterministic classpath task setup: %q", shell)
 			}
-			if tc.wantGenerateTask {
-				if !strings.Contains(shell, "ployGenerateDeclaredSources") {
-					t.Fatalf("shell command missing deterministic source generation task setup: %q", shell)
+			if tc.wantClassesPrep {
+				if strings.Contains(shell, "ployGenerateDeclaredSources") {
+					t.Fatalf("shell command must not use generator detection task in sbom gradle flow: %q", shell)
 				}
-				if !strings.Contains(shell, "declared source generation unavailable") {
-					t.Fatalf("shell command missing deterministic source generation status output: %q", shell)
+				if !strings.Contains(shell, "-q -p /workspace classes") {
+					t.Fatalf("shell command missing lifecycle classes preparation: %q", shell)
 				}
 				if !strings.Contains(shell, "mainSourceSet.output.classesDirs") {
 					t.Fatalf("shell command missing sourceSets.main classes output wiring in java classpath task: %q", shell)
 				}
 				if !strings.Contains(shell, "mainSourceSet.output.resourcesDir") {
 					t.Fatalf("shell command missing sourceSets.main resources output wiring in java classpath task: %q", shell)
-				}
-				if !strings.Contains(shell, "collectBuildDependencyPaths(mainSourceSet.allSource)") {
-					t.Fatalf("shell command missing sourceSets build dependency collection for generation task detection: %q", shell)
-				}
-				if !strings.Contains(shell, "generatedRootPath") {
-					t.Fatalf("shell command missing generated root path guard for source generation task detection: %q", shell)
 				}
 			}
 			if tc.stack == contracts.MigStackUnknown && strings.Contains(shell, ": > /out/"+sbomDependencyOutputFileName) {
