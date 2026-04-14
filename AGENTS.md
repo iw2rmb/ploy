@@ -21,6 +21,14 @@ Use this flow for any "why did run/job fail?" request.
 - `docker logs <job-container-id>` where label `com.ploy.job_id=<job-id>`
 - `docker inspect <job-container-id>` state + mounts
 
+## 3.1) Fast route by exit code (first triage branch)
+- If `exit_code = -1`: treat as ploy/orchestrator-internal failure first.
+  - Prioritize `ploy-node-1` logs for that `job_id` immediately.
+  - Typical scope: pre-container/setup/population failures (for example input/materialization issues).
+- If `job_type = heal` and `exit_code = 1`: treat as job payload/tooling failure first.
+  - Prioritize runtime artifacts from `*_mig-out.bin`, especially `out/amata/runs/**` (`events.ndjson`, `snapshot.json`, provider outputs when present).
+  - Only pivot to ploy internals after runtime evidence is insufficient/inconsistent.
+
 ## 4) Artifact retrieval path (no re-discovery)
 - Always fetch artifacts with:
   - `ploy mig fetch --run <run-id> --artifact-dir <dir>`
@@ -46,3 +54,6 @@ Use this flow for any "why did run/job fail?" request.
   - immediate failure cause (this job)
   - underlying product/build failure (if different)
 - State explicitly what is proven vs unavailable.
+
+## 8) Maintenance note
+- Keep this runbook's investigation routes current as failure patterns evolve (especially exit-code routing and local temp-preservation paths).
