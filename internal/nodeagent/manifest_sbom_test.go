@@ -129,6 +129,19 @@ func TestApplySBOMRuntimeForStack_ConfiguresManifest(t *testing.T) {
 			if got := manifest.Envs["PLOY_SBOM_STACK"]; got != string(tc.wantRuntimeStack) {
 				t.Fatalf("manifest.Envs[PLOY_SBOM_STACK]=%q, want %q", got, tc.wantRuntimeStack)
 			}
+			if got := manifest.Envs[contracts.PLOYStackLanguageEnv]; got != "java" {
+				t.Fatalf("manifest.Envs[%s]=%q, want java", contracts.PLOYStackLanguageEnv, got)
+			}
+			wantTool := ""
+			switch tc.wantRuntimeStack {
+			case contracts.MigStackJavaGradle:
+				wantTool = "gradle"
+			default:
+				wantTool = "maven"
+			}
+			if got := manifest.Envs[contracts.PLOYStackToolEnv]; got != wantTool {
+				t.Fatalf("manifest.Envs[%s]=%q, want %q", contracts.PLOYStackToolEnv, got, wantTool)
+			}
 			if len(manifest.Command) < 3 {
 				t.Fatalf("manifest.Command=%v, want shell command", manifest.Command)
 			}
@@ -150,6 +163,9 @@ func TestApplySBOMRuntimeForStack_ConfiguresManifest(t *testing.T) {
 			}
 			if tc.wantWorkspaceMark && !strings.Contains(shell, "workspace classpath entries unavailable") {
 				t.Fatalf("shell command missing workspace classpath fallback marker: %q", shell)
+			}
+			if tc.wantWorkspaceMark && !strings.Contains(shell, "sbom classpath invariant violated") {
+				t.Fatalf("shell command missing workspace classpath invariant failure guard: %q", shell)
 			}
 			if tc.stack != contracts.MigStackJavaMaven &&
 				(!strings.Contains(shell, "classpath_init") || !strings.Contains(shell, `-I "$classpath_init"`)) {
