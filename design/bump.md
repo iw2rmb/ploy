@@ -1,164 +1,123 @@
-# Goal-Bounded Dependency Bump Controller
+# Goal-Bounded Bump and Re-Gate Recovery
 
 ## Summary
-Define a deterministic algorithm for mass dependency bumps where the full impacted library set is unknown upfront.  
-The controller is goal-bounded (example: Spring Boot `2.7 -> 3.0`) and expands changes only from observed compile/runtime evidence.
+Define a deterministic dependency bump algorithm for migration runs where impacted libraries are unknown upfront.
+
+The model is:
+- no runtime hooks,
+- no SBOM before gates,
+- healing only from `post_gate`/`re_gate`,
+- bump cycles executed inside `mig` and `heal` jobs.
 
 ## Scope
 In scope:
-- Objective-driven dependency bump loop for Java stacks.
-- Bridge-version handling for API migrations requiring typed OpenRewrite.
-- Integration with existing `sbom -> hook -> gate -> heal -> re_gate` flow.
-- Deterministic stop conditions and reporting.
+- Ploy orchestration changes for migration bump cycles.
+- `mig` and `heal` objective execution model.
+- Re-gate-driven validation loop and artifact contract.
 
 Out of scope:
-- New orchestration model or job types.
-- Unbounded autonomous “fix anything” editing.
-- Backward compatibility with legacy contracts.
+- Amata executor internals (see `~/@iw2rmb/amata/design/short-pooling-download.md`).
+- Concrete ploy-lib prompts/scripts (see `~/@scale/ploy-lib/design/re_gate.md`).
 
 ## Why This Is Needed
-- Mass migrations have unknown transitive impact; static dependency allowlists are insufficient.
-- Typed OpenRewrite requires resolvable symbols; direct jumps to versions that removed old APIs can block recipe matching.
-- Current system already has SBOM snapshots, hook matching on version changes, ORW runtime contracts, and healing loops. We need one algorithm that composes these parts deterministically.
+Mass migrations cannot rely on fixed dependency allowlists. Bump actions must expand from observed build failures while preserving deterministic stop rules.
 
 ## Goals
-- Keep dependency expansion objective-bounded.
-- Prefer minimal, monotonic version movement.
-- Use bridge versions when API rename/removal requires `A` and `B` overlap.
-- Keep retries bounded and auditable.
+- Bound all bump edits to migration objective and observed evidence.
+- Keep recovery points at every successful gate.
+- Support typed OpenRewrite where signatures must be migrated through bridge versions.
 
 ## Non-goals
-- Perfect automatic remediation for all builds.
-- Per-project custom logic hardcoded in control-plane.
-- Introducing legacy-shape validation guards.
+- Restoring legacy hook runtime behavior.
+- Introducing separate top-level bump job types.
 
 ## Current Baseline (Observed)
-- Unified job pipeline executes gate-adjacent phases in deterministic order (`sbom`, optional `hook`, then gate): `/Users/v.v.kovalev/@iw2rmb/ploy/docs/build-gate/README.md`.
-- Hook specs support SBOM predicates including `on_change {name, from, to}`: `/Users/v.v.kovalev/@iw2rmb/ploy/internal/workflow/hook/spec.go`.
-- Hook matcher already compares versions and detects transitions: `/Users/v.v.kovalev/@iw2rmb/ploy/internal/workflow/hook/matcher.go`.
-- Claim-time runtime hook decision exposes matched package and prev/current versions: `/Users/v.v.kovalev/@iw2rmb/ploy/internal/workflow/contracts/hook_runtime.go`.
-- Runtime hook chain insertion after `sbom` exists and is deterministic: `/Users/v.v.kovalev/@iw2rmb/ploy/internal/server/handlers/jobs_complete_service_runtime_hooks.go`.
-- SBOM compatibility endpoint exists (`/v1/sboms/compat`) and returns minimal compatible versions from observed evidence: `/Users/v.v.kovalev/@iw2rmb/ploy/internal/server/handlers/sboms_compat.go`.
-- ORW runtime contract exists, including unsupported reason `type-attribution-unavailable`: `/Users/v.v.kovalev/@iw2rmb/ploy/internal/workflow/contracts/orw_cli_contract.go`.
+- Initial chain currently inserts SBOM before pre/post gates: `internal/server/handlers/migs_ticket.go`.
+- Runtime hook chain is currently inserted after SBOM success: `internal/server/handlers/jobs_complete_service_runtime_hooks.go`.
+- Heal is currently considered for any failed gate (`pre|post|re`): `internal/workflow/lifecycle/orchestrator.go`.
+- Heal insertion currently rewires `failed_gate -> heal -> retry_sbom -> re_gate`: `internal/server/handlers/nodes_complete_healing.go`.
 
 ## Target Contract or Target Architecture
-### 1. Inputs
-- `objective_id` is the migration identity (`mig` name/id).
-- `root_bumps[]` (initial explicit bumps, may be small).
-- `budget`:
-  - max iterations,
-  - max files changed,
-  - max dependency edits per iteration.
+### Objective model
+- `objective_id` is migration identity (`mig` name).
+- Execution lanes inside the same objective:
+  - `mig` lane (planned migration actions),
+  - `heal` lane (child cycles created at runtime).
 
-### 1.1 Execution Placement
-- Bump cycles execute inside the existing run execution as child chains of `mig` and `heal`.
-- No standalone top-level bump phase is introduced.
-- Child-chain progression remains `next_id`-driven and reuses current job lifecycle semantics.
+### Job flow
+Per repo run flow:
+1. `pre_gate` (must pass; no heal on failure).
+2. `mig` (ORW recipe + LLM migration steps).
+3. `post_gate`.
+4. On `post_gate` failure: start `heal -> re_gate` loop.
+5. Repeat `heal -> re_gate` until success or retries exhausted.
+6. Persist final SBOM at end of successful flow.
 
-### 2. Deterministic Bump Loop (Core Algorithm)
-1. Apply `root_bumps[]`.
-2. Run compile gate.
-3. If success: stop.
-4. Classify failures:
-   - `deps/api-mismatch` (missing symbols/imports/signatures),
-   - `infra`,
-   - `non-actionable`.
-5. For `deps/api-mismatch`, derive candidate dependencies from evidence:
-   - current SBOM snapshot,
-   - error signatures,
-   - `/v1/sboms/compat` floors for target stack.
-6. For each candidate dependency, choose action:
-   - direct bump, or
-   - bridge flow when API migration needs overlap (`A` and `B` both resolvable).
-7. Bridge flow:
-   1. bump to overlap version,
-   2. run pinned ORW recipe,
-   3. bump to target version.
-8. Re-run compile gate.
-9. Repeat from step 3 until success or budget exhausted.
+### Healing trigger rules
+- Only `post_gate` and `re_gate` failure can trigger heal.
+- `pre_gate` failure is terminal for repo attempt.
 
-### 3. Expansion Rules
-- Expansion is allowed only when tied to current failure evidence.
-- New dependency edits must be monotonic toward objective target.
-- No unrelated dependency drift.
+### Dependency bump loop inside heal/mig
+1. Apply candidate bump edit(s).
+2. Call build (`re_gate`) and capture output.
+3. If success, keep bump and continue objective flow.
+4. If failure:
+   - classify (`deps`, `code`, `infra`),
+   - for `deps` choose downgrade/bridge/additional package only from current evidence,
+   - for signature drift use bridge path:
+     1. lower to overlap/deprecated version,
+     2. run ORW migration,
+     3. bump to target.
+5. Repeat until success or budget exhausted.
 
-### 4. Stop Rules
-- Stop on:
-  - success,
-  - exhausted budget,
-  - failure class outside `deps/api-mismatch`.
-- Emit terminal report with:
-  - proven cause,
-  - attempted dependency transitions,
-  - bridge+ORW operations,
-  - unresolved blockers.
+### Re-gate artifacts
+- Internal build calls in same workspace produce numbered artifacts in `/out`, e.g.:
+  - `re_build-gate-1.log`
+  - `re_build-errors-1.yaml`
+  - `re_build-gate-2.log`
+- Heal reads these local artifacts directly (no mandatory download for this flow).
 
 ## Implementation Notes
-- Implement controller in migration/hook runtime (no new control-plane job types).
-- Treat the active `mig` as the objective authority; do not add a separate objective registry.
-- Use existing hook lifecycle:
-  - `sbom` snapshot as dependency evidence,
-  - runtime hook decisions for package transition context,
-  - gate/heal/re-gate loop for validation.
-- Add an objective manifest in migration repository (not control-plane) containing:
-  - target stack baseline,
-  - known bridge mappings (`dep`, `from range`, `bridge`, `target`, `orw recipe`),
-  - per-objective budgets.
-- Keep ORW use strict:
-  - run only with pinned recipes and explicit dependency target,
-  - if ORW reports `type-attribution-unavailable`, require bridge step or fail fast.
+- Remove hook planning/insertion from migration lifecycle paths.
+- Remove SBOM-prelude jobs from pre/post gate chain; keep final SBOM persistence only.
+- Change completion routing so only `post_gate`/`re_gate` fail can evaluate healing insertion.
+- Update healing insertion to drop retry-SBOM dependency in the loop.
+- Keep classpath contract for typed ORW by sourcing from latest successful gate artifact (SBOM fallback allowed only when present).
+- Keep compatibility with future generic amata polling/download contract in `~/@iw2rmb/amata/design/short-pooling-download.md`.
 
 ## Milestones
-### Milestone 1: Objective Contract
-Scope:
-- Define `objective_id`, budgets, and report schema.
-Expected Results:
-- One deterministic controller config per migration objective.
-Testable outcome:
-- Contract validation tests pass.
+1. Lifecycle simplification.
+- Scope: remove hook and pre/post SBOM-prelude flow wiring.
+- Testable outcome: planned chains contain `pre_gate -> mig -> post_gate` base.
 
-### Milestone 2: Evidence-Driven Expansion
-Scope:
-- Candidate selection from compile errors + SBOM + `/v1/sboms/compat`.
-Expected Results:
-- Additional dependency edits are only evidence-linked.
-Testable outcome:
-- Integration tests show no unrelated dependency edits.
+2. Healing trigger narrowing.
+- Scope: heal only from failed `post_gate`/`re_gate`.
+- Testable outcome: failed `pre_gate` cancels repo flow without heal.
 
-### Milestone 3: Bridge + ORW Execution
-Scope:
-- Bridge detection and three-step bridge flow.
-Expected Results:
-- API rename/removal migrations succeed when overlap exists.
-Testable outcome:
-- Failing fixture reproduces success only with bridge+ORW path.
+3. Re-gate loop and artifact contract.
+- Scope: numbered re-build artifacts, retry logic.
+- Testable outcome: heal loop consumes `/out/re_build-*` deterministically.
 
-### Milestone 4: Bounded Retry + Reporting
-Scope:
-- Stop rules and terminal report.
-Expected Results:
-- Predictable termination and actionable diagnostics.
-Testable outcome:
-- Exhaustion scenarios produce deterministic failure reports.
+4. Typed ORW continuity.
+- Scope: classpath for `mig`/`heal` from successful gate lineage.
+- Testable outcome: ORW-based heal works without SBOM-prelude jobs.
 
 ## Acceptance Criteria
-- Controller never performs unbounded edit loops.
-- Every non-root dependency change is traceable to observed failure evidence.
-- Bridge+ORW flow is used when overlap is required and defined.
-- Final output always includes a machine-readable attempt report.
-- Existing job orchestration (`sbom`, `hook`, gate, heal, `re_gate`) remains unchanged.
+- No runtime hooks are scheduled/executed in migration flow.
+- Base chain runs without SBOM-prelude jobs.
+- Only `post_gate`/`re_gate` failures can create heal children.
+- Final successful flows persist final SBOM.
+- Bump attempts are bounded and auditable from artifacts + metadata.
 
 ## Risks
-- Error-to-dependency attribution can be noisy for highly coupled projects.
-- Missing bridge mappings can still block typed ORW migrations.
-- SBOM compatibility evidence may be sparse for uncommon stacks/libs.
-- Objective budget may be too strict or too loose for specific repositories.
+- Removing SBOM-prelude weakens early dependency visibility unless gate artifacts are complete.
+- ORW typed attribution may fail when classpath capture from gate is incomplete.
+- First rollout may surface hidden dependencies formerly handled by hooks.
 
 ## References
-- `/Users/v.v.kovalev/@iw2rmb/ploy/docs/build-gate/README.md`
-- `/Users/v.v.kovalev/@iw2rmb/ploy/internal/workflow/hook/spec.go`
-- `/Users/v.v.kovalev/@iw2rmb/ploy/internal/workflow/hook/matcher.go`
-- `/Users/v.v.kovalev/@iw2rmb/ploy/internal/workflow/contracts/hook_runtime.go`
-- `/Users/v.v.kovalev/@iw2rmb/ploy/internal/server/handlers/jobs_complete_service_runtime_hooks.go`
-- `/Users/v.v.kovalev/@iw2rmb/ploy/internal/server/handlers/sboms_compat.go`
-- `/Users/v.v.kovalev/@iw2rmb/ploy/internal/workflow/contracts/orw_cli_contract.go`
+- `internal/server/handlers/migs_ticket.go`
+- `internal/server/handlers/jobs_complete_service_runtime_hooks.go`
+- `internal/workflow/lifecycle/orchestrator.go`
+- `internal/server/handlers/nodes_complete_healing.go`
+- `~/@iw2rmb/amata/design/short-pooling-download.md`
+- `~/@scale/ploy-lib/design/re_gate.md`
