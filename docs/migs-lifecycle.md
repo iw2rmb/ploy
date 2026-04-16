@@ -583,6 +583,7 @@ transaction.
 | Type        | Description                                  | Example        |
 |-------------|----------------------------------------------|----------------|
 | `pre_gate`  | Pre-mig Build Gate validation                | `pre-gate`     |
+| `sbom`      | SBOM stage (`pre-gate`/`post-gate` cycle)   | `pre-gate-sbom`|
 | `mig`       | Migification container execution             | `mig-0`        |
 | `post_gate` | Post-mig Build Gate validation               | `post-gate`    |
 | `heal`      | Healing job after gate failure               | `heal-0`       |
@@ -590,41 +591,41 @@ transaction.
 
 ### Simple run graph
 
-A successful single-step run creates a linear three-node chain:
+A successful single-step run creates a linear five-node chain:
 
 ```
-┌───────────┐       ┌───────────┐       ┌───────────┐
-│ pre-gate  │──────▶│   mig-0   │──────▶│ post-gate │
-└───────────┘       └───────────┘       └───────────┘
+┌───────────┐    ┌────────────────┐    ┌───────────┐    ┌───────────┐    ┌─────────────────┐
+│ pre-gate  │───▶│ pre-gate-sbom  │───▶│   mig-0   │───▶│ post-gate │───▶│ post-gate-sbom  │
+└───────────┘    └────────────────┘    └───────────┘    └───────────┘    └─────────────────┘
 ```
 
 ### Healing run graph
 
-When a gate fails with healing configured, heal, retry-sbom, and re-gate jobs are inserted
+When a gate fails with healing configured, heal and re-gate jobs are inserted
 by rewiring `next_id` links:
 
 ```
-┌───────────┐     ┌───────────┐     ┌───────────┐     ┌───────────┐     ┌───────────┐     ┌───────────┐
-│ pre-gate  │────▶│  heal-0   │────▶│ sbom-rtry │────▶│  re-gate  │────▶│   mig-0   │────▶│ post-gate │
-│  FAILED   │     │           │     │           │     │  PASSED   │     │           │     │           │
-└───────────┘     └───────────┘     └───────────┘     └───────────┘     └───────────┘     └───────────┘
+┌───────────┐     ┌───────────┐     ┌───────────┐     ┌────────────────┐     ┌───────────┐     ┌───────────┐     ┌─────────────────┐
+│ pre-gate  │────▶│  heal-0   │────▶│  re-gate  │────▶│ pre-gate-sbom  │────▶│   mig-0   │────▶│ post-gate │────▶│ post-gate-sbom  │
+│  FAILED   │     │           │     │  PASSED   │     │                │     │           │     │           │     │                 │
+└───────────┘     └───────────┘     └───────────┘     └────────────────┘     └───────────┘     └───────────┘     └─────────────────┘
 ```
 
 Rewire example:
 - Before failure handling: `failed.next_id = old_next`
-- After insertion: `failed.next_id = heal.id`, `heal.next_id = retry_sbom.id`, `retry_sbom.next_id = re_gate.id`, `re_gate.next_id = old_next`
+- After insertion: `failed.next_id = heal.id`, `heal.next_id = re_gate.id`, `re_gate.next_id = old_next`
 - Healing SHA seeding: inserted `heal` jobs inherit `repo_sha_in` from the
   failed gate job.
 - If failed gate `repo_sha_in` is missing/invalid, remaining linked jobs are
   cancelled instead of inserting heal/re-gate jobs.
-- Persistence order is tail-first (`re-gate` row first, then retry sbom, then `heal`, then failed-job rewire)
+- Persistence order is tail-first (`re-gate` row first, then `heal`, then failed-job rewire)
   so each non-null `next_id` always points to an already existing row under the
   `jobs.next_id -> jobs.id` foreign key.
 - For recovery with expected artifact `schema=gate_profile_v1`, healing insertion
   validates candidate bytes from the previous heal artifact
   (`/out/gate-profile-candidate.json`) and records candidate schema/path/validation
   status in `re_gate` recovery metadata.
-- On `heal` success, before promoting the linked retry SBOM/re-gate segment, the server refreshes
+- On `heal` success, before promoting the linked re-gate segment, the server refreshes
   the downstream `re_gate` recovery candidate metadata from the just-finished heal artifact.
 - Candidate outcomes are strict and non-blocking:
   - missing artifact -> `candidate_validation_status=missing`
@@ -1077,7 +1078,7 @@ value is a `StageStatus` object describing that job's execution state.
 	    - `job_image` — container image name for this job (persisted by the node for mig/heal/gate jobs).
 		    - `meta` — JSONB with structured job metadata (optional; see runtime implementation).
   - Dynamic insertion rewires explicit successor links:
-    - Initial chain: `pre-gate -> mig-0 -> post-gate`.
+    - Initial chain: `pre-gate -> pre-gate-sbom -> mig-0 -> post-gate -> post-gate-sbom`.
     - Healing insertion updates `failed.next_id` to `heal`, then links healing tail to the former successor.
 
 	- **Server-driven scheduling**
@@ -1088,7 +1089,7 @@ value is a `StageStatus` object describing that job's execution state.
 		    are ready.
 		  - When a job completes successfully, the server promotes that job's
 		    `next_id` successor from `Created` to `Queued` (when present).
-		  - This model enforces sequential execution: `pre-gate` → `mig-0` → `post-gate`.
+		  - This model enforces sequential execution: `pre-gate` → `pre-gate-sbom` → `mig-0` → `post-gate` → `post-gate-sbom`.
 		  - Healing jobs follow the same pattern: heal jobs are created with status
 		    `Queued` to be claimed immediately after insertion.
 
@@ -1278,11 +1279,11 @@ For a spec with multiple `steps[]` entries:
 2. `POST /v1/runs`:
    - Creates `runs` + `run_repos` rows.
 3. Scheduler and nodeagents:
-   - Scheduler/start path creates jobs for pre-gate, each mig, and post-gates as a linked chain.
+   - Scheduler/start path creates jobs for pre-gate, pre-gate-sbom, each mig, post-gate, and post-gate-sbom as a linked chain.
    - Job creation persists chain rows tail-to-head so each non-null `next_id` already exists when inserted (`jobs.next_id -> jobs.id` FK).
    - Chain head seeding: `pre-gate` is created with
      `repo_sha_in = run_repos.repo_sha0`.
-   - Each job row includes `job_type` (pre_gate, mig, post_gate, heal, re_gate)
+   - Each job row includes `job_type` (pre_gate, sbom, mig, post_gate, heal, re_gate)
      and `job_image` (saved by the executing node before the container starts).
    - ClaimJob returns queued jobs from the unified queue, and the server promotes
      the claimed job's `next_id` successor only after prior jobs succeed.
