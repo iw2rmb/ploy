@@ -266,14 +266,10 @@ func createJobsFromSpec(
 		gateCycle    string
 		hookDecision *hookPlanningDecision
 	}
-	appendGatePreludeDrafts := func(drafts []draft, cycleName string) []draft {
-		drafts = append(drafts, draft{name: cycleName + "-sbom", jobType: domaintypes.JobTypeSBOM, gateCycle: cycleName})
-		return drafts
-	}
 
 	drafts := make([]draft, 0, len(migsSpec.Steps)+len(resolvedHooks)*2+5)
-	drafts = appendGatePreludeDrafts(drafts, "pre-gate")
 	drafts = append(drafts, draft{name: "pre-gate", jobType: domaintypes.JobTypePreGate, gateCycle: "pre-gate"})
+	drafts = append(drafts, draft{name: "pre-gate-sbom", jobType: domaintypes.JobTypeSBOM, gateCycle: "pre-gate"})
 
 	if len(migsSpec.Steps) > 1 {
 		for i, mig := range migsSpec.Steps {
@@ -312,8 +308,8 @@ func createJobsFromSpec(
 			}(),
 		})
 	}
-	drafts = appendGatePreludeDrafts(drafts, "post-gate")
 	drafts = append(drafts, draft{name: "post-gate", jobType: domaintypes.JobTypePostGate, gateCycle: "post-gate"})
+	drafts = append(drafts, draft{name: "post-gate-sbom", jobType: domaintypes.JobTypeSBOM, gateCycle: "post-gate"})
 
 	planned := make([]plannedJob, 0, len(drafts))
 	for i, d := range drafts {

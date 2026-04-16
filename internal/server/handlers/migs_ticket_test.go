@@ -88,11 +88,11 @@ func TestCreateJobsFromSpec(t *testing.T) {
 			repoSHA0:    testRepoSHA0,
 			spec:        []byte(`{"steps":[{"image":"mig1:v1"}]}`),
 			expected: []expectedJob{
-				{"pre-gate-sbom", domaintypes.JobTypeSBOM, domaintypes.JobStatusQueued, "", testRepoSHA0},
-				{"pre-gate", domaintypes.JobTypePreGate, domaintypes.JobStatusCreated, "", ""},
+				{"pre-gate", domaintypes.JobTypePreGate, domaintypes.JobStatusQueued, "", testRepoSHA0},
+				{"pre-gate-sbom", domaintypes.JobTypeSBOM, domaintypes.JobStatusCreated, "", ""},
 				{"mig-0", domaintypes.JobTypeMig, domaintypes.JobStatusCreated, "", ""},
-				{"post-gate-sbom", domaintypes.JobTypeSBOM, domaintypes.JobStatusCreated, "", ""},
 				{"post-gate", domaintypes.JobTypePostGate, domaintypes.JobStatusCreated, "", ""},
+				{"post-gate-sbom", domaintypes.JobTypeSBOM, domaintypes.JobStatusCreated, "", ""},
 			},
 		},
 		{
@@ -104,13 +104,13 @@ func TestCreateJobsFromSpec(t *testing.T) {
 			repoSHA0:    testRepoSHA0,
 			spec:        []byte(`{"steps":[{"image":"mig1:v1"},{"image":"mig2:v2"},{"image":"mig3:v3"}]}`),
 			expected: []expectedJob{
-				{"pre-gate-sbom", domaintypes.JobTypeSBOM, domaintypes.JobStatusQueued, "", testRepoSHA0},
-				{"pre-gate", domaintypes.JobTypePreGate, domaintypes.JobStatusCreated, "", ""},
+				{"pre-gate", domaintypes.JobTypePreGate, domaintypes.JobStatusQueued, "", testRepoSHA0},
+				{"pre-gate-sbom", domaintypes.JobTypeSBOM, domaintypes.JobStatusCreated, "", ""},
 				{"mig-0", domaintypes.JobTypeMig, domaintypes.JobStatusCreated, "mig1:v1", ""},
 				{"mig-1", domaintypes.JobTypeMig, domaintypes.JobStatusCreated, "mig2:v2", ""},
 				{"mig-2", domaintypes.JobTypeMig, domaintypes.JobStatusCreated, "mig3:v3", ""},
-				{"post-gate-sbom", domaintypes.JobTypeSBOM, domaintypes.JobStatusCreated, "", ""},
 				{"post-gate", domaintypes.JobTypePostGate, domaintypes.JobStatusCreated, "", ""},
+				{"post-gate-sbom", domaintypes.JobTypeSBOM, domaintypes.JobStatusCreated, "", ""},
 			},
 		},
 		{
@@ -122,11 +122,11 @@ func TestCreateJobsFromSpec(t *testing.T) {
 			repoSHA0:    testRepoSHA0,
 			spec:        []byte(`{"steps":[{"image":"a"}]}`),
 			expected: []expectedJob{
-				{"pre-gate-sbom", domaintypes.JobTypeSBOM, domaintypes.JobStatusQueued, "", testRepoSHA0},
-				{"pre-gate", domaintypes.JobTypePreGate, domaintypes.JobStatusCreated, "", ""},
+				{"pre-gate", domaintypes.JobTypePreGate, domaintypes.JobStatusQueued, "", testRepoSHA0},
+				{"pre-gate-sbom", domaintypes.JobTypeSBOM, domaintypes.JobStatusCreated, "", ""},
 				{"mig-0", domaintypes.JobTypeMig, domaintypes.JobStatusCreated, "", ""},
-				{"post-gate-sbom", domaintypes.JobTypeSBOM, domaintypes.JobStatusCreated, "", ""},
 				{"post-gate", domaintypes.JobTypePostGate, domaintypes.JobStatusCreated, "", ""},
+				{"post-gate-sbom", domaintypes.JobTypeSBOM, domaintypes.JobStatusCreated, "", ""},
 			},
 		},
 		{
@@ -138,11 +138,11 @@ func TestCreateJobsFromSpec(t *testing.T) {
 			repoSHA0:    testRepoSHA0,
 			spec:        []byte(`{"hooks":["` + hookHashA + `","` + hookHashB + `"],"bundle_map":{"` + hookHashA + `":"bundle_hooks","` + hookHashB + `":"bundle_hooks"},"steps":[{"image":"mig1:v1"}]}`),
 			expected: []expectedJob{
-				{"pre-gate-sbom", domaintypes.JobTypeSBOM, domaintypes.JobStatusQueued, "", testRepoSHA0},
-				{"pre-gate", domaintypes.JobTypePreGate, domaintypes.JobStatusCreated, "", ""},
+				{"pre-gate", domaintypes.JobTypePreGate, domaintypes.JobStatusQueued, "", testRepoSHA0},
+				{"pre-gate-sbom", domaintypes.JobTypeSBOM, domaintypes.JobStatusCreated, "", ""},
 				{"mig-0", domaintypes.JobTypeMig, domaintypes.JobStatusCreated, "", ""},
-				{"post-gate-sbom", domaintypes.JobTypeSBOM, domaintypes.JobStatusCreated, "", ""},
 				{"post-gate", domaintypes.JobTypePostGate, domaintypes.JobStatusCreated, "", ""},
+				{"post-gate-sbom", domaintypes.JobTypeSBOM, domaintypes.JobStatusCreated, "", ""},
 			},
 			useHashHook: true,
 		},
@@ -229,12 +229,12 @@ func TestJobQueueingRules_FirstJobQueued(t *testing.T) {
 			}
 
 			byName := createJobsByName(st.createJob.calls)
-			if byName["pre-gate-sbom"].Status != domaintypes.JobStatusQueued {
-				t.Errorf("expected pre-gate-sbom to be Queued, got %s", byName["pre-gate-sbom"].Status)
+			if byName["pre-gate"].Status != domaintypes.JobStatusQueued {
+				t.Errorf("expected pre-gate to be Queued, got %s", byName["pre-gate"].Status)
 			}
 
 			for _, p := range st.createJob.calls {
-				if p.Name != "pre-gate-sbom" && p.Status != domaintypes.JobStatusCreated {
+				if p.Name != "pre-gate" && p.Status != domaintypes.JobStatusCreated {
 					t.Errorf("job %q: expected status Created, got %s", p.Name, p.Status)
 				}
 			}
@@ -259,26 +259,26 @@ func TestCreateJobsFromSpec_ChainIntegrity(t *testing.T) {
 	preGate := byName["pre-gate"]
 	mig0 := byName["mig-0"]
 	mig1 := byName["mig-1"]
-	postGateSBOM := byName["post-gate-sbom"]
 	postGate := byName["post-gate"]
+	postGateSBOM := byName["post-gate-sbom"]
 
-	if preGateSBOM.NextID == nil || *preGateSBOM.NextID != preGate.ID {
-		t.Fatalf("pre-gate-sbom next_id = %v, want %s", preGateSBOM.NextID, preGate.ID)
+	if preGate.NextID == nil || *preGate.NextID != preGateSBOM.ID {
+		t.Fatalf("pre-gate next_id = %v, want %s", preGate.NextID, preGateSBOM.ID)
 	}
-	if preGate.NextID == nil || *preGate.NextID != mig0.ID {
-		t.Fatalf("pre-gate next_id = %v, want %s", preGate.NextID, mig0.ID)
+	if preGateSBOM.NextID == nil || *preGateSBOM.NextID != mig0.ID {
+		t.Fatalf("pre-gate-sbom next_id = %v, want %s", preGateSBOM.NextID, mig0.ID)
 	}
 	if mig0.NextID == nil || *mig0.NextID != mig1.ID {
 		t.Fatalf("mig-0 next_id = %v, want %s", mig0.NextID, mig1.ID)
 	}
-	if mig1.NextID == nil || *mig1.NextID != postGateSBOM.ID {
-		t.Fatalf("mig-1 next_id = %v, want %s", mig1.NextID, postGateSBOM.ID)
+	if mig1.NextID == nil || *mig1.NextID != postGate.ID {
+		t.Fatalf("mig-1 next_id = %v, want %s", mig1.NextID, postGate.ID)
 	}
-	if postGateSBOM.NextID == nil || *postGateSBOM.NextID != postGate.ID {
-		t.Fatalf("post-gate-sbom next_id = %v, want %s", postGateSBOM.NextID, postGate.ID)
+	if postGate.NextID == nil || *postGate.NextID != postGateSBOM.ID {
+		t.Fatalf("post-gate next_id = %v, want %s", postGate.NextID, postGateSBOM.ID)
 	}
-	if postGate.NextID != nil {
-		t.Fatalf("post-gate next_id = %s, want nil", *postGate.NextID)
+	if postGateSBOM.NextID != nil {
+		t.Fatalf("post-gate-sbom next_id = %s, want nil", *postGateSBOM.NextID)
 	}
 
 	// Verify insert order satisfies immediate next_id FK constraint.
@@ -319,20 +319,20 @@ steps:
 	preSBOM := byName["pre-gate-sbom"]
 	preGate := byName["pre-gate"]
 	mig1 := byName["mig-1"]
-	postSBOM := byName["post-gate-sbom"]
 	postGate := byName["post-gate"]
+	postSBOM := byName["post-gate-sbom"]
 
-	if preSBOM.NextID == nil || *preSBOM.NextID != preGate.ID {
-		t.Fatalf("pre-gate-sbom next_id = %v, want %s", preSBOM.NextID, preGate.ID)
+	if preGate.NextID == nil || *preGate.NextID != preSBOM.ID {
+		t.Fatalf("pre-gate next_id = %v, want %s", preGate.NextID, preSBOM.ID)
 	}
-	if mig1.NextID == nil || *mig1.NextID != postSBOM.ID {
-		t.Fatalf("mig-1 next_id = %v, want %s", mig1.NextID, postSBOM.ID)
+	if mig1.NextID == nil || *mig1.NextID != postGate.ID {
+		t.Fatalf("mig-1 next_id = %v, want %s", mig1.NextID, postGate.ID)
 	}
-	if postSBOM.NextID == nil || *postSBOM.NextID != postGate.ID {
-		t.Fatalf("post-gate-sbom next_id = %v, want %s", postSBOM.NextID, postGate.ID)
+	if postGate.NextID == nil || *postGate.NextID != postSBOM.ID {
+		t.Fatalf("post-gate next_id = %v, want %s", postGate.NextID, postSBOM.ID)
 	}
-	if postGate.NextID != nil {
-		t.Fatalf("post-gate next_id = %v, want nil", *postGate.NextID)
+	if postSBOM.NextID != nil {
+		t.Fatalf("post-gate-sbom next_id = %v, want nil", *postSBOM.NextID)
 	}
 }
 
@@ -376,14 +376,14 @@ steps:
 	postSBOM := byName["post-gate-sbom"]
 	postGate := byName["post-gate"]
 
-	if preSBOM.NextID == nil || *preSBOM.NextID != preGate.ID {
-		t.Fatalf("pre-gate-sbom next_id = %v, want %s", preSBOM.NextID, preGate.ID)
+	if preGate.NextID == nil || *preGate.NextID != preSBOM.ID {
+		t.Fatalf("pre-gate next_id = %v, want %s", preGate.NextID, preSBOM.ID)
 	}
-	if mig0.NextID == nil || *mig0.NextID != postSBOM.ID {
-		t.Fatalf("mig-0 next_id = %v, want %s", mig0.NextID, postSBOM.ID)
+	if mig0.NextID == nil || *mig0.NextID != postGate.ID {
+		t.Fatalf("mig-0 next_id = %v, want %s", mig0.NextID, postGate.ID)
 	}
-	if postSBOM.NextID == nil || *postSBOM.NextID != postGate.ID {
-		t.Fatalf("post-gate-sbom next_id = %v, want %s", postSBOM.NextID, postGate.ID)
+	if postGate.NextID == nil || *postGate.NextID != postSBOM.ID {
+		t.Fatalf("post-gate next_id = %v, want %s", postGate.NextID, postSBOM.ID)
 	}
 
 }

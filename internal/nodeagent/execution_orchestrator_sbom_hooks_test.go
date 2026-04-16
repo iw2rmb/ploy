@@ -77,11 +77,10 @@ func writeCanonicalSBOMFixture(t *testing.T, path string, name string) []byte {
 	return raw
 }
 
-func TestMaterializeValidatedSBOMOutput_WritesCanonicalDocument(t *testing.T) {
+func TestMaterializeValidatedSBOMOutput_HooksFlowWritesCanonicalDocument(t *testing.T) {
 	outDir := t.TempDir()
 	snapshotPath := filepath.Join(t.TempDir(), "gate-cycle", "sbom", "out", preGateCanonicalSBOMFileName)
 	classpathOutPath := filepath.Join(outDir, sbomJavaClasspathFileName)
-	classpathSnapshotPath := filepath.Join(filepath.Dir(snapshotPath), sbomJavaClasspathFileName)
 
 	rawDeps := strings.Join([]string{
 		"[INFO]    com.fasterxml.jackson.core:jackson-databind:jar:2.17.2:compile",
@@ -97,7 +96,7 @@ func TestMaterializeValidatedSBOMOutput_WritesCanonicalDocument(t *testing.T) {
 		t.Fatalf("write java classpath output: %v", err)
 	}
 
-	if err := materializeValidatedSBOMOutput(outDir, snapshotPath); err != nil {
+	if err := materializeValidatedSBOMOutput(outDir, snapshotPath, true); err != nil {
 		t.Fatalf("materializeValidatedSBOMOutput: %v", err)
 	}
 
@@ -146,20 +145,13 @@ func TestMaterializeValidatedSBOMOutput_WritesCanonicalDocument(t *testing.T) {
 	if string(stagedRaw) != string(canonicalRaw) {
 		t.Fatalf("staged snapshot mismatch with canonical output")
 	}
-	stagedClasspathRaw, err := os.ReadFile(classpathSnapshotPath)
-	if err != nil {
-		t.Fatalf("read staged java classpath snapshot: %v", err)
-	}
-	if string(stagedClasspathRaw) != string(rawClasspath) {
-		t.Fatalf("staged java classpath mismatch with output")
-	}
 }
 
-func TestMaterializeValidatedSBOMOutput_ErrorsWhenDependencyOutputMissing(t *testing.T) {
+func TestMaterializeValidatedSBOMOutput_HooksFlowErrorsWhenDependencyOutputMissing(t *testing.T) {
 	outDir := t.TempDir()
 	snapshotPath := filepath.Join(t.TempDir(), "gate-cycle", "sbom", "out", preGateCanonicalSBOMFileName)
 
-	err := materializeValidatedSBOMOutput(outDir, snapshotPath)
+	err := materializeValidatedSBOMOutput(outDir, snapshotPath, true)
 	if err == nil {
 		t.Fatal("expected error for missing dependency output")
 	}
@@ -171,7 +163,7 @@ func TestMaterializeValidatedSBOMOutput_ErrorsWhenDependencyOutputMissing(t *tes
 	}
 }
 
-func TestMaterializeValidatedSBOMOutput_ErrorsWhenJavaClasspathMissing(t *testing.T) {
+func TestMaterializeValidatedSBOMOutput_HooksFlowErrorsWhenJavaClasspathMissing(t *testing.T) {
 	outDir := t.TempDir()
 	snapshotPath := filepath.Join(t.TempDir(), "gate-cycle", "sbom", "out", preGateCanonicalSBOMFileName)
 	rawDeps := "[INFO]    com.fasterxml.jackson.core:jackson-databind:jar:2.17.2:compile\n"
@@ -179,7 +171,7 @@ func TestMaterializeValidatedSBOMOutput_ErrorsWhenJavaClasspathMissing(t *testin
 		t.Fatalf("write raw dependency output: %v", err)
 	}
 
-	err := materializeValidatedSBOMOutput(outDir, snapshotPath)
+	err := materializeValidatedSBOMOutput(outDir, snapshotPath, true)
 	if err == nil {
 		t.Fatal("expected error for missing java classpath output")
 	}
@@ -551,7 +543,7 @@ func TestRestoreSBOMOutFilesFromBundle_RestoresSBOMOutputsOnly(t *testing.T) {
 	}
 }
 
-func TestRestoreSBOMOutFilesFromBundle_ErrorsWhenJavaClasspathMissing(t *testing.T) {
+func TestRestoreSBOMOutFilesFromBundle_AllowsMissingJavaClasspath(t *testing.T) {
 	t.Parallel()
 
 	outDir := t.TempDir()
@@ -560,12 +552,15 @@ func TestRestoreSBOMOutFilesFromBundle_ErrorsWhenJavaClasspathMissing(t *testing
 		"out/sbom.dependencies.txt": []byte("org.example:lib:1.0.0"),
 	})
 
-	_, err := restoreSBOMOutFilesFromBundle(bundle, outDir)
-	if err == nil {
-		t.Fatal("restoreSBOMOutFilesFromBundle() error = nil, want non-nil")
+	count, err := restoreSBOMOutFilesFromBundle(bundle, outDir)
+	if err != nil {
+		t.Fatalf("restoreSBOMOutFilesFromBundle() error = %v", err)
 	}
-	if !strings.Contains(err.Error(), sbomJavaClasspathFileName) {
-		t.Fatalf("error = %v, want mention of %s", err, sbomJavaClasspathFileName)
+	if count != 2 {
+		t.Fatalf("restored count = %d, want 2", count)
+	}
+	if _, err := os.Stat(filepath.Join(outDir, sbomJavaClasspathFileName)); !os.IsNotExist(err) {
+		t.Fatalf("expected java classpath output to be absent, err=%v", err)
 	}
 }
 
