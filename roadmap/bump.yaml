@@ -160,3 +160,4 @@ items:
       - "SBOM failure does not create heal or re_gate recovery, and non-SBOM gate and healing ordering keeps current behavior."
     reasoning: "medium"
     cfp: 8
+    commit: 729711c2
