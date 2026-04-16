@@ -1,0 +1,129 @@
+---
+policy: "~/.codex/policies/composing-roadmaps.md"
+schema: "~/.codex/policies/roadmap.schema.json"
+title: "Child Build Polling and Re-Gate Flow Realignment"
+scope: "Implement parent-job child-build API, explicit pre/post/re gate recovery rules, and deterministic SBOM and artifact lineage contracts for migration runs."
+documentation:
+  - "design/bump.md"
+  - "docs/migs-lifecycle.md"
+  - "docs/api/OpenAPI.yaml"
+done: false
+reviews: []
+items:
+  - done: false
+    reviews: []
+    label: "1"
+    summary: "Add worker-facing job-scoped child-build API contract and route wiring for mig and heal callers."
+    classification: "determined"
+    components:
+      - "internal/server/handlers/register.go"
+      - "internal/server/handlers/jobs_build_routes.go"
+      - "internal/server/handlers/jobs_build_routes_test.go"
+      - "docs/api/paths/jobs_parent_job_id_builds.yaml"
+      - "docs/api/paths/jobs_parent_job_id_builds_child_job_id.yaml"
+      - "docs/api/OpenAPI.yaml"
+    baseline:
+      - "internal/server/handlers/register.go"
+      - "docs/api/OpenAPI.yaml"
+    delta:
+      - "[additive] worker API surface without parent-job child-build routes -> worker API surface with POST and GET parent-job child-build routes"
+    implementation:
+      - "Register POST /v1/jobs/{parent_job_id}/builds and GET /v1/jobs/{parent_job_id}/builds/{child_job_id} on worker-auth path."
+      - "Define request and response schemas with build_kind and reason input and child_job_id, status_url, status output."
+      - "Keep node identity out of endpoint shape and route resolution."
+      - "Do not accept parent_job_type in request payload; derive parent type from parent_job_id on server side."
+    verification:
+      - "OpenAPI advertises both endpoints with request and response schema examples matching design contract."
+      - "Route coverage tests prove both endpoints are reachable under worker auth and reject malformed path values."
+      - "Existing non-child job worker routes keep current path and response behavior."
+    reasoning: "medium"
+    cfp: 8
+
+  - done: false
+    reviews: []
+    label: "2"
+    summary: "Implement child re_gate job creation and status projection with strict parent ownership and linkage checks."
+    classification: "determined"
+    components:
+      - "internal/server/handlers/jobs_build_service.go"
+      - "internal/server/handlers/jobs_build_service_test.go"
+      - "internal/server/handlers/jobs_build_status_projection.go"
+      - "internal/server/handlers/jobs_build_status_projection_test.go"
+      - "internal/server/handlers/jobs_build_auth.go"
+    baseline:
+      - "internal/server/handlers/jobs_status.go"
+      - "internal/domain/types/statuses.go"
+    delta:
+      - "[additive] child re_gate jobs only from server-planned transitions -> child re_gate jobs creatable by running mig or heal parent with explicit parent linkage and pollable status"
+    implementation:
+      - "Validate parent_job_id exists, is Running, belongs to caller worker identity, and is mig or heal job type."
+      - "Create child jobs as regular jobs rows with job_type re_gate and trigger.parent_job_id plus trigger.kind metadata."
+      - "Project canonical status with terminal and success booleans for polling.short done_when and success_when usage."
+      - "Validate parent-child linkage during status reads so unrelated child ids are rejected."
+    verification:
+      - "Create endpoint rejects non-running parent, non-mig or non-heal parent, and cross-owner parent access."
+      - "Status endpoint returns terminal true only for Success, Fail, Error, Cancelled and success true only for Success."
+      - "Existing job status projection for non-child status endpoints stays unchanged."
+    reasoning: "medium"
+    cfp: 8
+
+  - done: false
+    reviews: []
+    label: "3"
+    summary: "Narrow healing triggers to post_gate and re_gate and remove hook and retry-sbom branches from migration recovery chain."
+    classification: "determined"
+    components:
+      - "internal/workflow/lifecycle/orchestrator.go"
+      - "internal/server/handlers/jobs_complete_service_runtime_hooks.go"
+      - "internal/server/handlers/nodes_complete_healing.go"
+      - "internal/server/handlers/nodes_complete_healing_test.go"
+    baseline:
+      - "internal/workflow/lifecycle/orchestrator.go"
+      - "internal/server/handlers/jobs_complete_service_runtime_hooks.go"
+      - "internal/server/handlers/nodes_complete_healing.go"
+    delta:
+      - "[replace] migration failure routing that evaluates heal across gate failures and side branches -> migration failure routing where only failed post_gate or re_gate can spawn heal then re_gate"
+    implementation:
+      - "Update lifecycle completion routing so failed pre_gate is terminal for repo attempt and cannot enqueue heal."
+      - "Remove migration hook scheduling path from completion handling for this flow."
+      - "Reshape healing insertion chain to direct heal then re_gate sequencing without retry-sbom branch."
+      - "Keep job status transitions and repo terminal handling deterministic for exhausted retry budget."
+    verification:
+      - "Failed pre_gate produces terminal repo attempt result with no heal child jobs."
+      - "Failed post_gate and failed re_gate produce heal then re_gate children in deterministic order."
+      - "Non-migration completion handling keeps current behavior for unrelated job families."
+    reasoning: "high"
+    cfp: 9
+
+  - done: false
+    reviews: []
+    label: "4"
+    summary: "Realign SBOM timing, single classpath contract, and parent /out re_build and errors artifact materialization after each child gate."
+    classification: "determined"
+    components:
+      - "internal/server/handlers/migs_ticket.go"
+      - "internal/nodeagent/execution_orchestrator_gate.go"
+      - "internal/nodeagent/execution_orchestrator_jobs.go"
+      - "internal/nodeagent/execution_orchestrator_test.go"
+      - "internal/nodeagent/recovery_runtime.go"
+      - "internal/nodeagent/recovery_io.go"
+    baseline:
+      - "internal/server/handlers/migs_ticket.go"
+      - "internal/nodeagent/execution_orchestrator_gate.go"
+      - "internal/nodeagent/execution_orchestrator_jobs.go"
+      - "internal/nodeagent/recovery_runtime.go"
+    delta:
+      - "[replace] gate lifecycle with earlier sbom prelude assumptions and partial lineage materialization -> gate lifecycle with sbom after pre_gate for classpath source, final sbom preservation step, and contiguous parent out lineage artifacts"
+    implementation:
+      - "Schedule SBOM immediately after successful pre_gate and generate the run single .classpath from that SBOM output."
+      - "Schedule final SBOM as the last successful repo step for preserved final snapshot output only."
+      - "Treat SBOM failures as terminal without heal or re_gate insertion."
+      - "After every child build completion, materialize /out/re_build-gate-{n}.log and /out/errors-{n}.yaml in the parent job with contiguous index sequence."
+      - "Inject PLOY_JOB_ID and required server auth context for both mig and heal runtime lanes so polling.short can call child-build endpoints."
+    verification:
+      - "For k executed child gates, parent out contains exactly k plus 1 paired files for re_build-gate and errors indexes with no gaps."
+      - "Successful pre_gate produces SBOM and exactly one .classpath contract source for the run."
+      - "Successful post_gate path preserves final SBOM snapshot as last stage output without second classpath contract."
+      - "Existing gate command execution semantics remain unchanged apart from inserted SBOM and artifact materialization behavior."
+    reasoning: "high"
+    cfp: 12
