@@ -187,7 +187,7 @@ func TestCompleteJob_Exit137SetsLastError(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name    string
+		name      string
 		storeOpts []func(*jobStore)
 	}{
 		{name: "normal"},

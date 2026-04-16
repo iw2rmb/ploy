@@ -147,15 +147,14 @@ func TestCrossPathParity_GateJobStatusToChainAction(t *testing.T) {
 			jobType: domaintypes.JobTypePostGate, status: domaintypes.JobStatusError, hasNext: true,
 			wantCancelSuccessor: true,
 		},
-		// Gate test failures produce Fail → EvaluateGateFailure → healing path entered (GetRun called).
-		// Completion no longer short-circuits on terminal/unknown classification and instead evaluates
-		// heal/re-gate insertion from spec retry policy, so CancelRemainder is not expected here.
+		// pre-gate failures are terminal for this repo attempt and do not trigger healing.
 		{
 			name:    "pre_gate/test_fail/has-next",
 			jobType: domaintypes.JobTypePreGate, status: domaintypes.JobStatusFail, hasNext: true,
-			wantGetRunCalled:    true,
-			wantCancelSuccessor: false,
+			wantGetRunCalled:    false,
+			wantCancelSuccessor: true,
 		},
+		// post/re-gate test failures produce Fail → EvaluateGateFailure → healing path entered (GetRun called).
 		{
 			name:    "re_gate/test_fail/has-next",
 			jobType: domaintypes.JobTypeReGate, status: domaintypes.JobStatusFail, hasNext: true,

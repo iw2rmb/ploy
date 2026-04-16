@@ -24,7 +24,14 @@ func (s *CompleteJobService) planAndInsertCycleHookJobs(ctx context.Context, sta
 	if !ok {
 		return nil, nil
 	}
+	jobName := strings.TrimSpace(state.job.Name)
+	if strings.HasPrefix(jobName, "re-gate-") {
+		return nil, nil
+	}
 	cycleName := sbomCycleNameFromContext(sbomCtx)
+	if strings.HasPrefix(cycleName, "re-gate") {
+		return nil, nil
+	}
 
 	run, runOK := s.loadRunForPostCompletion(ctx, state, "runtime hook planning")
 	if !runOK {
