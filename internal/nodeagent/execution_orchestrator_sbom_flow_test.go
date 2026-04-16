@@ -88,7 +88,7 @@ func TestMaterializeValidatedSBOMOutput_ClasspathValidationDependsOnFlow(t *test
 	}
 }
 
-func TestFinalizeSBOMFlowOutputs_PersistsRunClasspathOnlyForPreGate(t *testing.T) {
+func TestFinalizeSBOMFlowOutputs_PersistsRunClasspathFromSinglePreGateSource(t *testing.T) {
 	cacheHome := t.TempDir()
 	t.Setenv("PLOYD_CACHE_HOME", cacheHome)
 	runID := types.NewRunID()
@@ -113,6 +113,26 @@ func TestFinalizeSBOMFlowOutputs_PersistsRunClasspathOnlyForPreGate(t *testing.T
 	}
 	if string(persistedPreClasspath) != string(preClasspath) {
 		t.Fatalf("persisted pre-gate classpath mismatch")
+	}
+
+	retryOutDir := t.TempDir()
+	retrySnapshotPath := filepath.Join(t.TempDir(), "pre-retry-cycle", preGateCanonicalSBOMFileName)
+	if err := os.WriteFile(filepath.Join(retryOutDir, sbomDependencyOutputFileName), []byte("retry:a:1.0.0\n"), 0o644); err != nil {
+		t.Fatalf("write retry dependency output: %v", err)
+	}
+	retryClasspath := []byte("/repo/.m2/retry.jar\n")
+	if err := os.WriteFile(filepath.Join(retryOutDir, sbomJavaClasspathFileName), retryClasspath, 0o644); err != nil {
+		t.Fatalf("write retry java classpath output: %v", err)
+	}
+	if err := rc.finalizeSBOMFlowOutputs(runID, preGateCycleName, retryOutDir, retrySnapshotPath); err != nil {
+		t.Fatalf("finalizeSBOMFlowOutputs pre-gate retry: %v", err)
+	}
+	persistedAfterRetryClasspath, err := os.ReadFile(classpathPath)
+	if err != nil {
+		t.Fatalf("read persisted classpath after pre-gate retry flow: %v", err)
+	}
+	if string(persistedAfterRetryClasspath) != string(preClasspath) {
+		t.Fatalf("pre-gate retry flow overwrote persisted classpath")
 	}
 
 	postOutDir := t.TempDir()
