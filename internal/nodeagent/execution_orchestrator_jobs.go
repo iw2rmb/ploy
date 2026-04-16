@@ -234,14 +234,7 @@ func (r *runController) executeSBOMJob(ctx context.Context, req StartRunRequest)
 			return applySBOMRuntimeForStack(m, stackForManifest)
 		},
 		ValidateOutputs: func(outDir, _ string) error {
-			if err := materializeValidatedSBOMOutput(outDir, sbomSnapshotPath); err != nil {
-				return err
-			}
-			classpathPath := filepath.Join(outDir, sbomJavaClasspathFileName)
-			if err := persistRunJavaClasspath(req.RunID, classpathPath); err != nil {
-				return fmt.Errorf("persist run java classpath from sbom output: %w", err)
-			}
-			return nil
+			return r.finalizeSBOMFlowOutputs(req.RunID, cycleName, outDir, sbomSnapshotPath)
 		},
 		WorkspacePolicy: workspaceChangePolicyIgnore,
 		StartTime:       startTime,
@@ -901,48 +894,6 @@ var (
 	sbomVersionTokenPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9+_.-]*$`)
 )
 
-func materializeValidatedSBOMOutput(outDir string, snapshotPath string) error {
-	rawOutputPath := filepath.Join(outDir, sbomDependencyOutputFileName)
-	raw, err := os.ReadFile(rawOutputPath)
-	if err != nil {
-		return fmt.Errorf("read /out/%s: %w", sbomDependencyOutputFileName, err)
-	}
-	classpathPath := filepath.Join(outDir, sbomJavaClasspathFileName)
-	if err := validateJavaClasspathPath(classpathPath); err != nil {
-		return fmt.Errorf("validate /out/%s: %w", sbomJavaClasspathFileName, err)
-	}
-
-	canonicalRaw, err := canonicalSBOMFromDependencyOutput(raw)
-	if err != nil {
-		return fmt.Errorf("build canonical sbom from /out/%s: %w", sbomDependencyOutputFileName, err)
-	}
-	if err := validateCanonicalSBOMDocument(canonicalRaw); err != nil {
-		return fmt.Errorf("validate canonical sbom payload: %w", err)
-	}
-
-	canonicalPath := filepath.Join(outDir, preGateCanonicalSBOMFileName)
-	if err := os.WriteFile(canonicalPath, canonicalRaw, 0o644); err != nil {
-		return fmt.Errorf("write /out/%s: %w", preGateCanonicalSBOMFileName, err)
-	}
-	if err := validateCanonicalSBOMPath(canonicalPath); err != nil {
-		return fmt.Errorf("validate /out/%s: %w", preGateCanonicalSBOMFileName, err)
-	}
-	if err := copyFileBytes(canonicalPath, snapshotPath); err != nil {
-		return fmt.Errorf("stage cycle sbom snapshot: %w", err)
-	}
-	if err := validateCanonicalSBOMPath(snapshotPath); err != nil {
-		return fmt.Errorf("validate staged cycle sbom snapshot: %w", err)
-	}
-	classpathSnapshotPath := filepath.Join(filepath.Dir(snapshotPath), sbomJavaClasspathFileName)
-	if err := copyFileBytes(classpathPath, classpathSnapshotPath); err != nil {
-		return fmt.Errorf("stage cycle java classpath snapshot: %w", err)
-	}
-	if err := validateJavaClasspathPath(classpathSnapshotPath); err != nil {
-		return fmt.Errorf("validate staged cycle java classpath snapshot: %w", err)
-	}
-	return nil
-}
-
 func canonicalSBOMFromDependencyOutput(raw []byte) ([]byte, error) {
 	packages := collectSBOMPackages(raw)
 	doc := canonicalSBOMDocument{
@@ -1490,7 +1441,7 @@ func restoreSBOMOutFilesFromBundle(bundle []byte, outDir string) (int, error) {
 		return restored, fmt.Errorf("validate restored canonical sbom output: %w", err)
 	}
 	classpathPath := filepath.Join(outDir, sbomJavaClasspathFileName)
-	if err := validateJavaClasspathPath(classpathPath); err != nil {
+	if err := validateJavaClasspathPath(classpathPath); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return restored, fmt.Errorf("validate restored java classpath output: %w", err)
 	}
 	return restored, nil
