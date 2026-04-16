@@ -12,7 +12,7 @@ reviews:
   - gaps: ["\"After every child build completion, materialize /out/re_build-gate-{n}.log and /out/errors-{n}.yaml in the parent job workspace with contiguous indexes that include the baseline gate as 1.\" is not fully met: lineage materialization is invoked only via parent-job finalization (`internal/nodeagent/execution_orchestrator_jobs.go`: `FinalizeOutputs` wiring at lines 736-738, 815-817 and execution at 1367-1389), so it does not run at each child-build completion event during runtime; current helper path (`internal/nodeagent/execution_orchestrator_child_build_runtime.go`, `internal/nodeagent/recovery_io.go`) performs reindexing only at finalize time."]
     commit: 696ed4ec
   - gaps: ["\"Remove migration hook scheduling path from completion handling for this flow.\" is not met: SBOM success still routes through hook planning in `internal/server/handlers/jobs_complete_service_post_actions.go:151`, and `internal/server/handlers/jobs_complete_service_runtime_hooks.go:19`-`172` still inserts hook jobs plus a retry SBOM (`Role: SBOMRoleRetry`); this behavior is explicitly asserted in `internal/server/handlers/jobs_complete_orchestration_test.go:260`-`337`, so hook/retry-SBOM branch leftovers remain."]
-    commit: null
+    commit: c3d91ae6
 items:
   - done: true
     reviews:
