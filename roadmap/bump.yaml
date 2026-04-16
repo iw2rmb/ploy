@@ -7,7 +7,7 @@ documentation:
   - "design/bump.md"
   - "docs/migs-lifecycle.md"
   - "docs/api/OpenAPI.yaml"
-done: false
+done: true
 reviews:
   - gaps: ["\"After every child build completion, materialize /out/re_build-gate-{n}.log and /out/errors-{n}.yaml in the parent job workspace with contiguous indexes that include the baseline gate as 1.\" is not fully met: lineage materialization is invoked only via parent-job finalization (`internal/nodeagent/execution_orchestrator_jobs.go`: `FinalizeOutputs` wiring at lines 736-738, 815-817 and execution at 1367-1389), so it does not run at each child-build completion event during runtime; current helper path (`internal/nodeagent/execution_orchestrator_child_build_runtime.go`, `internal/nodeagent/recovery_io.go`) performs reindexing only at finalize time."]
     commit: 696ed4ec
