@@ -1,11 +1,10 @@
 package handlers
 
 import (
-	"errors"
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
-
-	"github.com/jackc/pgx/v5"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
@@ -25,8 +24,10 @@ type createJobBuildResponse struct {
 }
 
 type getJobBuildResponse struct {
-	ChildJobID domaintypes.JobID `json:"child_job_id"`
-	Status     string            `json:"status"`
+	JobID    domaintypes.JobID `json:"job_id"`
+	Status   string            `json:"status"`
+	Terminal bool              `json:"terminal"`
+	Success  bool              `json:"success"`
 }
 
 // createJobBuildHandler is a worker-facing contract endpoint for creating child
@@ -54,13 +55,24 @@ func createJobBuildHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		if _, ok := authorizeParentBuildJob(w, r, st, parentJobID); !ok {
+		parentJob, ok := authorizeParentBuildJob(w, r, st, parentJobID)
+		if !ok {
+			return
+		}
+		childJob, err := createJobBuildReGateChild(r.Context(), st, parentJob, req.BuildKind)
+		if err != nil {
+			writeHTTPError(w, http.StatusInternalServerError, "failed to create child build job: %v", err)
 			return
 		}
 
-		// The route contract is now worker-visible; persistence and status
-		// projection are implemented in the follow-up step.
-		writeHTTPError(w, http.StatusNotImplemented, "child-build creation is not implemented yet")
+		status := projectJobBuildStatus(childJob.Status)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		_ = json.NewEncoder(w).Encode(createJobBuildResponse{
+			ChildJobID: childJob.ID,
+			StatusURL:  childBuildStatusURL(r, parentJobID, childJob.ID),
+			Status:     status.Status,
+		})
 	}
 }
 
@@ -75,51 +87,39 @@ func getJobBuildStatusHandler(st store.Store) http.HandlerFunc {
 			writeHTTPError(w, http.StatusBadRequest, "%s", err)
 			return
 		}
-		if _, err := parseRequiredPathID[domaintypes.JobID](r, "child_job_id"); err != nil {
+		childJobID, err := parseRequiredPathID[domaintypes.JobID](r, "child_job_id")
+		if err != nil {
 			writeHTTPError(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
-		if _, ok := authorizeParentBuildJob(w, r, st, parentJobID); !ok {
+		parentJob, ok := authorizeParentBuildJob(w, r, st, parentJobID)
+		if !ok {
 			return
 		}
 
-		writeHTTPError(w, http.StatusNotImplemented, "child-build status polling is not implemented yet")
+		childJob, err := getLinkedJobBuildChild(r.Context(), st, parentJob, childJobID)
+		if err != nil {
+			writeJobBuildStatusLookupError(w, err)
+			return
+		}
+
+		status := projectJobBuildStatus(childJob.Status)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(getJobBuildResponse{
+			JobID:    childJob.ID,
+			Status:   status.Status,
+			Terminal: status.Terminal,
+			Success:  status.Success,
+		})
 	}
 }
 
-func authorizeParentBuildJob(w http.ResponseWriter, r *http.Request, st store.Store, parentJobID domaintypes.JobID) (store.Job, bool) {
-	nodeIDHeaderStr := strings.TrimSpace(r.Header.Get(nodeUUIDHeader))
-	if nodeIDHeaderStr == "" {
-		writeHTTPError(w, http.StatusBadRequest, "PLOY_NODE_UUID header is required")
-		return store.Job{}, false
+func childBuildStatusURL(r *http.Request, parentJobID, childJobID domaintypes.JobID) string {
+	scheme := "http"
+	if r.TLS != nil {
+		scheme = "https"
 	}
-	var nodeIDHeader domaintypes.NodeID
-	if err := nodeIDHeader.UnmarshalText([]byte(nodeIDHeaderStr)); err != nil {
-		writeHTTPError(w, http.StatusBadRequest, "invalid PLOY_NODE_UUID header")
-		return store.Job{}, false
-	}
-
-	parentJob, err := st.GetJob(r.Context(), parentJobID)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			writeHTTPError(w, http.StatusNotFound, "parent job not found")
-			return store.Job{}, false
-		}
-		writeHTTPError(w, http.StatusInternalServerError, "failed to get parent job: %v", err)
-		return store.Job{}, false
-	}
-	if parentJob.NodeID == nil || *parentJob.NodeID != nodeIDHeader {
-		writeHTTPError(w, http.StatusForbidden, "parent job not assigned to this node")
-		return store.Job{}, false
-	}
-
-	parentJobType := domaintypes.JobType(parentJob.JobType)
-	switch parentJobType {
-	case domaintypes.JobTypeMig, domaintypes.JobTypeHeal:
-		return parentJob, true
-	default:
-		writeHTTPError(w, http.StatusConflict, "parent job type is %s, expected mig/heal", parentJob.JobType)
-		return store.Job{}, false
-	}
+	return fmt.Sprintf("%s://%s/v1/jobs/%s/builds/%s", scheme, r.Host, parentJobID, childJobID)
 }
