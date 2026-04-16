@@ -102,32 +102,58 @@ items:
   - done: false
     reviews: []
     label: "4"
-    summary: "Realign SBOM timing, single classpath contract, and parent /out re_build and errors artifact materialization after each child gate."
+    summary: "Extract child-build runtime wiring so mig and heal can poll child builds and parent /out lineage artifacts stay contiguous after each child gate."
+    classification: "determined"
+    components:
+      - "internal/nodeagent/execution_orchestrator_jobs.go"
+      - "internal/nodeagent/execution_orchestrator_child_build_runtime.go"
+      - "internal/nodeagent/execution_orchestrator_child_build_runtime_test.go"
+      - "internal/nodeagent/recovery_runtime.go"
+      - "internal/nodeagent/recovery_runtime_test.go"
+      - "internal/nodeagent/recovery_io.go"
+      - "internal/nodeagent/recovery_io_test.go"
+    baseline:
+      - "internal/nodeagent/execution_orchestrator_jobs.go"
+      - "internal/nodeagent/recovery_runtime.go"
+      - "internal/nodeagent/recovery_io.go"
+    delta:
+      - "[replace] lane-specific child-build polling env wiring and scattered parent artifact updates -> shared child-build runtime helpers with mig and heal polling context plus contiguous parent gate lineage artifacts"
+    implementation:
+      - "Extract child-build runtime env injection and parent lineage artifact materialization from shared job orchestration into dedicated nodeagent helpers owned by this item."
+      - "Inject PLOY_JOB_ID together with existing server URL, bearer token, and TLS paths into both mig and heal manifests so polling.short can call child-build endpoints."
+      - "After every child build completion, materialize /out/re_build-gate-{n}.log and /out/errors-{n}.yaml in the parent job workspace with contiguous indexes that include the baseline gate as 1."
+      - "Keep SBOM phase selection and classpath contract behavior unchanged behind the new helper boundary in this step."
+    verification:
+      - "Mig and heal manifests both expose PLOY_JOB_ID, PLOY_SERVER_URL, and auth or TLS inputs required for child-build polling."
+      - "For k executed child gates, parent out contains exactly k plus 1 paired files for re_build-gate and errors indexes with no gaps or duplicates."
+      - "Existing gate command execution and child-build status polling semantics stay unchanged apart from added runtime context and artifact materialization."
+    reasoning: "medium"
+    cfp: 8
+  - done: false
+    reviews: []
+    label: "5"
+    summary: "Realign SBOM scheduling so successful pre_gate produces the run single classpath contract and successful post_gate preserves the final snapshot only."
     classification: "determined"
     components:
       - "internal/server/handlers/migs_ticket.go"
-      - "internal/nodeagent/execution_orchestrator_gate.go"
-      - "internal/nodeagent/execution_orchestrator_jobs.go"
-      - "internal/nodeagent/execution_orchestrator_test.go"
-      - "internal/nodeagent/recovery_runtime.go"
-      - "internal/nodeagent/recovery_io.go"
+      - "internal/server/handlers/migs_ticket_test.go"
+      - "internal/nodeagent/execution_orchestrator_sbom_flow.go"
+      - "internal/nodeagent/execution_orchestrator_sbom_flow_test.go"
+      - "internal/nodeagent/execution_orchestrator_sbom_hooks_test.go"
     baseline:
       - "internal/server/handlers/migs_ticket.go"
-      - "internal/nodeagent/execution_orchestrator_gate.go"
       - "internal/nodeagent/execution_orchestrator_jobs.go"
-      - "internal/nodeagent/recovery_runtime.go"
+      - "internal/nodeagent/execution_orchestrator_sbom_hooks_test.go"
     delta:
-      - "[replace] gate lifecycle with earlier sbom prelude assumptions and partial lineage materialization -> gate lifecycle with sbom after pre_gate for classpath source, final sbom preservation step, and contiguous parent out lineage artifacts"
+      - "[replace] gate-cycle planning with prelude sbom assumptions and repeated classpath staging -> repo flow with post-pre_gate sbom capture, final snapshot-only preservation, terminal sbom failures, and a single run classpath contract"
     implementation:
-      - "Schedule SBOM immediately after successful pre_gate and generate the run single .classpath from that SBOM output."
-      - "Schedule final SBOM as the last successful repo step for preserved final snapshot output only."
-      - "Treat SBOM failures as terminal without heal or re_gate insertion."
-      - "After every child build completion, materialize /out/re_build-gate-{n}.log and /out/errors-{n}.yaml in the parent job with contiguous index sequence."
-      - "Inject PLOY_JOB_ID and required server auth context for both mig and heal runtime lanes so polling.short can call child-build endpoints."
+      - "Move SBOM planning so successful pre_gate schedules the classpath-producing SBOM next, while successful post_gate schedules the last-step preservation SBOM only after the repo flow succeeds."
+      - "Implement the dedicated SBOM flow helper to persist the run single .classpath from pre_gate SBOM and keep final SBOM output snapshot-only."
+      - "Treat SBOM failures in this flow as terminal for the repo attempt and do not draft heal or re_gate recovery from SBOM outcomes."
+      - "Reuse the child-build runtime and lineage helpers from the previous item without changing parent /out index semantics."
     verification:
-      - "For k executed child gates, parent out contains exactly k plus 1 paired files for re_build-gate and errors indexes with no gaps."
-      - "Successful pre_gate produces SBOM and exactly one .classpath contract source for the run."
-      - "Successful post_gate path preserves final SBOM snapshot as last stage output without second classpath contract."
-      - "Existing gate command execution semantics remain unchanged apart from inserted SBOM and artifact materialization behavior."
-    reasoning: "high"
-    cfp: 12
+      - "Successful pre_gate produces a persisted SBOM snapshot and exactly one .classpath contract source for the run."
+      - "Successful post_gate path preserves final SBOM snapshot as the last stage output without writing a second classpath contract."
+      - "SBOM failure does not create heal or re_gate recovery, and non-SBOM gate and healing ordering keeps current behavior."
+    reasoning: "medium"
+    cfp: 8
