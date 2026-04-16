@@ -70,7 +70,9 @@ items:
     cfp: 8
     commit: e0833cfd
   - done: false
-    reviews: []
+    reviews:
+      - gaps: ["Step `Narrow healing triggers to post_gate and re_gate and remove hook and retry-sbom branches from migration recovery chain.` is not completed in full: `CompletionChainEvaluateSBOMFailure` and SBOM-healing retry flow leftovers are still present in `internal/workflow/lifecycle/orchestrator.go`, `internal/server/handlers/jobs_complete_service_post_actions.go`, and `internal/server/handlers/nodes_complete_healing.go` (`maybeCreateSBOMHealingJobs`), so hook/retry-sbom recovery branch removal is incomplete."]
+        commit: null
     label: "3"
     summary: "Narrow healing triggers to post_gate and re_gate and remove hook and retry-sbom branches from migration recovery chain."
     classification: "determined"
