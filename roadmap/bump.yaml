@@ -38,7 +38,7 @@ items:
       - "Existing non-child job worker routes keep current path and response behavior."
     reasoning: "medium"
     cfp: 8
-
+    commit: 977e4417
   - done: false
     reviews: []
     label: "2"
@@ -66,7 +66,6 @@ items:
       - "Existing job status projection for non-child status endpoints stays unchanged."
     reasoning: "medium"
     cfp: 8
-
   - done: false
     reviews: []
     label: "3"
@@ -94,7 +93,6 @@ items:
       - "Non-migration completion handling keeps current behavior for unrelated job families."
     reasoning: "high"
     cfp: 9
-
   - done: false
     reviews: []
     label: "4"
