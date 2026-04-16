@@ -122,7 +122,6 @@ func (s *CompleteJobService) onSuccess(ctx context.Context, state *completeJobSt
 	if state.input.Status != domaintypes.JobStatusSuccess {
 		return
 	}
-	nextIDToPromote := state.job.NextID
 	if state.serviceType == completeJobServiceTypeSBOM {
 		sbomRowsPersisted, sbomErr := maybePersistSBOMRowsForJob(
 			ctx,
@@ -147,20 +146,6 @@ func (s *CompleteJobService) onSuccess(ctx context.Context, state *completeJobSt
 				"attempt", state.job.Attempt,
 				"row_count", sbomRowsPersisted,
 			)
-		}
-		hookNextID, hookPlanErr := s.planAndInsertCycleHookJobs(ctx, state)
-		if hookPlanErr != nil {
-			slog.Error("complete job: runtime hook planning for completed sbom job failed",
-				"job_id", state.job.ID,
-				"repo_id", state.job.RepoID,
-				"attempt", state.job.Attempt,
-				"err", hookPlanErr,
-			)
-			// Fail closed: do not advance to the original successor when hook planning
-			// encountered an error, otherwise runnable hooks can be skipped.
-			nextIDToPromote = nil
-		} else if hookNextID != nil {
-			nextIDToPromote = hookNextID
 		}
 	}
 
@@ -212,13 +197,13 @@ func (s *CompleteJobService) onSuccess(ctx context.Context, state *completeJobSt
 
 	decision := lifecycle.EvaluateCompletionDecision(jobType, state.input.Status, state.job.NextID != nil)
 	if decision.ChainAction == lifecycle.CompletionChainAdvanceNext {
-		if nextIDToPromote == nil {
+		if state.job.NextID == nil {
 			return
 		}
-		if _, err := s.store.PromoteJobByIDIfUnblocked(ctx, *nextIDToPromote); err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		if _, err := s.store.PromoteJobByIDIfUnblocked(ctx, *state.job.NextID); err != nil && !errors.Is(err, pgx.ErrNoRows) {
 			slog.Error("complete job: failed to promote next linked job",
 				"job_id", state.job.ID,
-				"next_id", nextIDToPromote,
+				"next_id", state.job.NextID,
 				"err", err,
 			)
 		}

@@ -44,11 +44,11 @@ func TestOnSuccess_SBOMPersistenceFailureStopsChainAdvancement(t *testing.T) {
 		t.Fatal("did not expect PromoteJobByIDIfUnblocked when sbom persistence fails")
 	}
 	if st.createJob.called {
-		t.Fatal("did not expect runtime hook job creation when sbom persistence fails")
+		t.Fatal("did not expect job creation during sbom completion")
 	}
 }
 
-func TestOnSuccess_RuntimeHookPlanningFailureStopsChainAdvancement(t *testing.T) {
+func TestOnSuccess_SBOMSuccessPromotesLinkedNext(t *testing.T) {
 	t.Parallel()
 
 	nextID := domaintypes.NewJobID()
@@ -56,67 +56,6 @@ func TestOnSuccess_RuntimeHookPlanningFailureStopsChainAdvancement(t *testing.T)
 		ID:     domaintypes.NewJobID(),
 		RunID:  domaintypes.NewRunID(),
 		RepoID: domaintypes.NewRepoID(),
-		Name:   "pre-gate-sbom",
-		NextID: &nextID,
-	}
-
-	st := &jobStore{}
-	st.createJob.err = errors.New("create hook job failed")
-	specID := domaintypes.NewSpecID()
-	st.getRun.val = store.Run{
-		ID:     job.RunID,
-		SpecID: specID,
-	}
-	st.getSpec.val = store.Spec{
-		ID: specID,
-		Spec: []byte(`{
-			"hooks": ["aa11bb22"],
-			"bundle_map": {"aa11bb22": "bundle_runtime_hook"},
-			"steps": [{"image": "mig:latest"}]
-		}`),
-	}
-
-	bs := bsmock.New()
-	seedPlanningHookBundle(t, st, bs, "bundle_runtime_hook", `
-id: runtime-hook
-steps:
-  - image: hook:latest
-`)
-
-	svc := &CompleteJobService{
-		store:       st,
-		blobpersist: blobpersist.New(st, bs),
-	}
-	state := &completeJobState{
-		input: CompleteJobInput{
-			Status:     domaintypes.JobStatusSuccess,
-			RepoSHAOut: "0123456789abcdef0123456789abcdef01234567",
-		},
-		job:           job,
-		jobType:       domaintypes.JobTypeSBOM,
-		serviceType:   completeJobServiceTypeSBOM,
-		serviceTypeOK: true,
-	}
-
-	svc.onSuccess(context.Background(), state)
-
-	if !st.createJob.called {
-		t.Fatal("expected runtime hook planning to attempt hook job creation")
-	}
-	if st.promoteJobByIDIfUnblocked.called {
-		t.Fatal("did not expect PromoteJobByIDIfUnblocked when runtime hook planning fails")
-	}
-}
-
-func TestOnSuccess_ReGateSBOMSkipsRuntimeHookPlanning(t *testing.T) {
-	t.Parallel()
-
-	nextID := domaintypes.NewJobID()
-	job := store.Job{
-		ID:     domaintypes.NewJobID(),
-		RunID:  domaintypes.NewRunID(),
-		RepoID: domaintypes.NewRepoID(),
-		Name:   "re-gate-1-sbom",
 		NextID: &nextID,
 	}
 	next := store.Job{
@@ -146,12 +85,9 @@ func TestOnSuccess_ReGateSBOMSkipsRuntimeHookPlanning(t *testing.T) {
 	svc.onSuccess(context.Background(), state)
 
 	if st.createJob.called {
-		t.Fatal("did not expect runtime hook jobs for re-gate sbom cycle")
-	}
-	if st.getRun.called {
-		t.Fatal("did not expect run/spec load for re-gate sbom runtime hooks")
+		t.Fatal("did not expect sbom completion to create additional jobs")
 	}
 	if !st.promoteJobByIDIfUnblocked.called {
-		t.Fatal("expected successor promotion for re-gate sbom success")
+		t.Fatal("expected successor promotion for sbom success")
 	}
 }
