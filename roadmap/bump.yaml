@@ -100,7 +100,9 @@ items:
     cfp: 9
     commit: 4e7c19dd
   - done: false
-    reviews: []
+    reviews:
+      - gaps: ["\"After every child build completion, materialize /out/re_build-gate-{n}.log and /out/errors-{n}.yaml in the parent job workspace with contiguous indexes that include the baseline gate as 1.\" is not fully met: lineage materialization is only invoked via `ValidateOutputs` in `internal/nodeagent/execution_orchestrator_jobs.go` (mig/heal config at lines ~743 and ~823) and executed in `runContainerJob` only on successful/skip terminal path (`internal/nodeagent/execution_orchestrator_jobs.go` lines ~1260 and ~1320), so it does not run after each child completion during job runtime and is skipped on non-zero parent exits."]
+        commit: null
     label: "4"
     summary: "Extract child-build runtime wiring so mig and heal can poll child builds and parent /out lineage artifacts stay contiguous after each child gate."
     classification: "determined"
