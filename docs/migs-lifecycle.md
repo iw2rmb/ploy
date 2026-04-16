@@ -601,15 +601,17 @@ A successful single-step run creates a linear five-node chain:
 
 ### Healing run graph
 
-When a gate fails with healing configured, heal and re-gate jobs are inserted
+When an eligible gate fails with healing configured, heal and re-gate jobs are inserted
 by rewiring `next_id` links:
 
 ```
-┌───────────┐     ┌───────────┐     ┌───────────┐     ┌────────────────┐     ┌───────────┐     ┌───────────┐     ┌─────────────────┐
-│ pre-gate  │────▶│  heal-0   │────▶│  re-gate  │────▶│ pre-gate-sbom  │────▶│   mig-0   │────▶│ post-gate │────▶│ post-gate-sbom  │
-│  FAILED   │     │           │     │  PASSED   │     │                │     │           │     │           │     │                 │
-└───────────┘     └───────────┘     └───────────┘     └────────────────┘     └───────────┘     └───────────┘     └─────────────────┘
+┌───────────┐     ┌───────────┐     ┌───────────┐     ┌────────────────┐
+│ post-gate │────▶│  heal-0   │────▶│  re-gate  │────▶│ post-gate-sbom │
+│  FAILED   │     │           │     │  PASSED   │     │                │
+└───────────┘     └───────────┘     └───────────┘     └────────────────┘
 ```
+
+`pre-gate` failures are terminal for the repo attempt and do not enqueue healing.
 
 Rewire example:
 - Before failure handling: `failed.next_id = old_next`

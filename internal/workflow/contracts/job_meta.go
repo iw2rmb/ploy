@@ -139,8 +139,6 @@ const (
 const (
 	// SBOMRoleInitial is the initial sbom before pre/post gate.
 	SBOMRoleInitial = "initial"
-	// SBOMRoleRetry is a retry sbom after sbom-heal recovery.
-	SBOMRoleRetry = "retry"
 	// SBOMRoleFinal is the final sbom placed after recovered gate flow.
 	SBOMRoleFinal = "final"
 )
@@ -153,7 +151,7 @@ type SBOMJobMetadata struct {
 	// CycleName is the concrete gate cycle identifier used for sbom staging.
 	// Examples: pre-gate, post-gate, re-gate-1.
 	CycleName string `json:"cycle_name,omitempty"`
-	// Role is one of: initial, retry, final.
+	// Role is one of: initial, final.
 	Role string `json:"role,omitempty"`
 	// RootJobID is the stable sbom chain root used for retry accounting.
 	RootJobID string `json:"root_job_id,omitempty"`
@@ -296,7 +294,7 @@ func (m SBOMJobMetadata) Validate() error {
 	if strings.TrimSpace(m.CycleName) != m.CycleName {
 		return fmt.Errorf("cycle_name: must not have leading or trailing whitespace")
 	}
-	if m.Role != "" && m.Role != SBOMRoleInitial && m.Role != SBOMRoleRetry && m.Role != SBOMRoleFinal {
+	if m.Role != "" && m.Role != SBOMRoleInitial && m.Role != SBOMRoleFinal {
 		return fmt.Errorf("role invalid: %q", m.Role)
 	}
 	if strings.ContainsAny(m.RootJobID, "\n\r\t ") {
