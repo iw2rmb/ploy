@@ -96,9 +96,3 @@ post:
         application/json:
           schema:
             $ref: '../components/schemas/common.yaml#/Error'
-    '501':
-      description: Contract endpoint is wired but child-build creation is not implemented yet
-      content:
-        application/json:
-          schema:
-            $ref: '../components/schemas/common.yaml#/Error'
