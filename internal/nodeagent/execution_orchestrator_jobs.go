@@ -733,6 +733,9 @@ func (r *runController) executeMigJob(ctx context.Context, req StartRunRequest) 
 			r.mountChildBuildTLSCerts(m)
 			return nil
 		},
+		RuntimeSync: func(outDir, _ string) error {
+			return r.materializeParentChildBuildLineage(outDir, req.RecoveryContext)
+		},
 		FinalizeOutputs: func(outDir, _ string) error {
 			return r.materializeParentChildBuildLineage(outDir, req.RecoveryContext)
 		},
@@ -811,6 +814,9 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 			r.injectHealingEnvVars(m, ws, req.JobID)
 			r.mountHealingTLSCerts(m)
 			return nil
+		},
+		RuntimeSync: func(outDir, _ string) error {
+			return r.materializeParentChildBuildLineage(outDir, req.RecoveryContext)
 		},
 		FinalizeOutputs: func(outDir, _ string) error {
 			return r.materializeParentChildBuildLineage(outDir, req.RecoveryContext)
@@ -1067,6 +1073,7 @@ type standardJobConfig struct {
 
 	PopulateInDir   func(inDir string) error
 	PrepareManifest func(manifest *contracts.StepManifest, workspace string) error
+	RuntimeSync     func(outDir, workspace string) error
 	ValidateOutputs func(outDir, workspace string) error
 	FinalizeOutputs func(outDir, workspace string) error
 	TrySkip         func(ctx context.Context, manifest contracts.StepManifest, workspace, outDir string) (bool, error)
@@ -1254,6 +1261,7 @@ func (r *runController) runContainerJob(
 	}
 
 	// Materialize Hydra resources into a staging directory for mount planning.
+	stopRuntimeSync := r.startRuntimeOutputSyncLoop(ctx, req, cfg, outDir, workspace)
 	if bundleErr := r.withMaterializedResources(ctx, manifest, req.TypedOptions.BundleMap, "ploy-staging-*", func(stagingDir string) error {
 		result, runErr = execCtx.runner.Run(ctx, step.Request{
 			RunID:      req.RunID,
@@ -1267,8 +1275,10 @@ func (r *runController) runContainerJob(
 		duration = time.Since(startTime)
 		return nil
 	}); bundleErr != nil {
+		stopRuntimeSync()
 		return outcome, bundleErr
 	}
+	stopRuntimeSync()
 
 	if runErr == nil && result.ExitCode == 0 && cfg.ValidateOutputs != nil {
 		if validateErr := cfg.ValidateOutputs(outDir, workspace); validateErr != nil {
@@ -1387,6 +1397,51 @@ func (r *runController) finalizeStandardJobOutputs(
 		return fmt.Errorf("finalize job outputs: %w", finalizeErr)
 	}
 	return runErr
+}
+
+func (r *runController) startRuntimeOutputSyncLoop(
+	ctx context.Context,
+	req StartRunRequest,
+	cfg standardJobConfig,
+	outDir, workspace string,
+) func() {
+	if cfg.RuntimeSync == nil {
+		return func() {}
+	}
+
+	done := make(chan struct{})
+	stop := make(chan struct{})
+	go func() {
+		defer close(done)
+		ticker := time.NewTicker(500 * time.Millisecond)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-stop:
+				return
+			case <-ticker.C:
+				if err := cfg.RuntimeSync(outDir, workspace); err != nil {
+					slog.Warn("runtime output sync failed",
+						"run_id", req.RunID,
+						"job_id", req.JobID,
+						"error", err)
+				}
+			}
+		}
+	}()
+
+	return func() {
+		close(stop)
+		<-done
+		if err := cfg.RuntimeSync(outDir, workspace); err != nil {
+			slog.Warn("runtime output sync final pass failed",
+				"run_id", req.RunID,
+				"job_id", req.JobID,
+				"error", err)
+		}
+	}
 }
 
 func restoreSBOMOutFilesFromBundle(bundle []byte, outDir string) (int, error) {

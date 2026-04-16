@@ -1,9 +1,12 @@
 package nodeagent
 
 import (
+	"context"
 	"errors"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/iw2rmb/ploy/internal/workflow/step"
 )
@@ -107,4 +110,42 @@ func TestFinalizeStandardJobOutputs(t *testing.T) {
 			t.Fatal("invalid test case")
 		})
 	}
+}
+
+func TestStartRuntimeOutputSyncLoop(t *testing.T) {
+	t.Parallel()
+
+	t.Run("no runtime sync returns no-op stopper", func(t *testing.T) {
+		t.Parallel()
+
+		rc := &runController{}
+		stop := rc.startRuntimeOutputSyncLoop(context.Background(), StartRunRequest{}, standardJobConfig{}, t.TempDir(), t.TempDir())
+		stop()
+	})
+
+	t.Run("runtime sync ticks and performs final pass", func(t *testing.T) {
+		t.Parallel()
+
+		rc := &runController{}
+		var calls atomic.Int32
+		stop := rc.startRuntimeOutputSyncLoop(
+			context.Background(),
+			StartRunRequest{},
+			standardJobConfig{
+				RuntimeSync: func(_, _ string) error {
+					calls.Add(1)
+					return nil
+				},
+			},
+			t.TempDir(),
+			t.TempDir(),
+		)
+
+		time.Sleep(620 * time.Millisecond)
+		stop()
+
+		if got := calls.Load(); got < 2 {
+			t.Fatalf("runtime sync call count = %d, want at least 2", got)
+		}
+	})
 }
