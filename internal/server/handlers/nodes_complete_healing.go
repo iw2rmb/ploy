@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"strings"
 
 	"github.com/iw2rmb/ploy/internal/blobstore"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
@@ -167,127 +166,6 @@ func maybeCreateHealingJobs(
 		"error_kind", recoveryMeta.ErrorKind,
 		"strategy_id", recoveryMeta.StrategyID,
 	)
-	return nil
-}
-
-func maybeCreateSBOMHealingJobs(
-	ctx context.Context,
-	st store.Store,
-	run store.Run,
-	failedJob store.Job,
-) error {
-	jobs, err := st.ListJobsByRunRepoAttempt(ctx, store.ListJobsByRunRepoAttemptParams{
-		RunID:   failedJob.RunID,
-		RepoID:  failedJob.RepoID,
-		Attempt: failedJob.Attempt,
-	})
-	if err != nil {
-		return fmt.Errorf("list jobs for repo attempt: %w", err)
-	}
-	jobsByID := make(map[domaintypes.JobID]store.Job, len(jobs))
-	for _, job := range jobs {
-		jobsByID[job.ID] = job
-	}
-	if refreshed, ok := jobsByID[failedJob.ID]; ok {
-		failedJob = refreshed
-	}
-
-	specRow, err := st.GetSpec(ctx, run.SpecID)
-	if err != nil {
-		return fmt.Errorf("get spec: %w", err)
-	}
-	spec, err := contracts.ParseMigSpecJSON(specRow.Spec)
-	if err != nil {
-		return fmt.Errorf("parse run spec: %w", err)
-	}
-
-	var heal *contracts.HealSpec
-	if spec.BuildGate != nil {
-		heal = spec.BuildGate.Heal
-	}
-	decision, decisionErr := lifecycle.EvaluateSBOMFailureTransition(
-		failedJob,
-		jobsByID,
-		heal,
-		contracts.MigStackUnknown,
-		domaintypes.NewJobID,
-	)
-	if decisionErr != nil {
-		return fmt.Errorf("evaluate sbom failure transition: %w", decisionErr)
-	}
-	if decision.Outcome == lifecycle.SBOMFailureOutcomeCancel {
-		slog.Info("maybeCreateSBOMHealingJobs: canceling remaining linked jobs",
-			"run_id", failedJob.RunID,
-			"job_id", failedJob.ID,
-			"reason", decision.CancelReason,
-		)
-		return cancelRemainingJobsAfterFailure(ctx, st, failedJob)
-	}
-	chain := decision.Chain
-	healMeta := contracts.NewMigJobMeta()
-	healMetaBytes, err := contracts.MarshalJobMeta(healMeta)
-	if err != nil {
-		return fmt.Errorf("marshal heal job meta: %w", err)
-	}
-	failedCtx, _ := sbomCycleContextFromJob(failedJob)
-	retrySBOMMeta := contracts.NewMigJobMeta()
-	retrySBOMMeta.SBOM = sbomCycleContextMeta(sbomCycleContext{
-		Phase:     failedCtx.Phase,
-		CycleName: sbomCycleNameFromContext(failedCtx),
-		Role:      contracts.SBOMRoleRetry,
-		RootJobID: chain.RootSBOMID,
-	})
-	retrySBOMMetaBytes, err := contracts.MarshalJobMeta(retrySBOMMeta)
-	if err != nil {
-		return fmt.Errorf("marshal retry sbom job meta: %w", err)
-	}
-
-	_, err = st.CreateJob(ctx, store.CreateJobParams{
-		ID:          chain.RetrySBOMID,
-		RunID:       failedJob.RunID,
-		RepoID:      failedJob.RepoID,
-		RepoBaseRef: failedJob.RepoBaseRef,
-		Attempt:     failedJob.Attempt,
-		Name:        fmt.Sprintf("sbom-retry-%d-%s", chain.AttemptNumber, chain.RetrySBOMID),
-		JobType:     domaintypes.JobTypeSBOM,
-		Status:      domaintypes.JobStatusCreated,
-		NextID:      chain.OldSuccessorID,
-		Meta:        retrySBOMMetaBytes,
-	})
-	if err != nil {
-		return fmt.Errorf("create retry sbom job: %w", err)
-	}
-	_, err = st.CreateJob(ctx, store.CreateJobParams{
-		ID:          chain.HealID,
-		RunID:       failedJob.RunID,
-		RepoID:      failedJob.RepoID,
-		RepoBaseRef: failedJob.RepoBaseRef,
-		Attempt:     failedJob.Attempt,
-		Name:        fmt.Sprintf("heal-sbom-%d-0", chain.AttemptNumber),
-		JobType:     domaintypes.JobTypeHeal,
-		JobImage:    chain.HealImage,
-		Status:      domaintypes.JobStatusQueued,
-		NextID:      &chain.RetrySBOMID,
-		Meta:        healMetaBytes,
-		RepoShaIn:   strings.TrimSpace(chain.HealRepoSHAIn),
-	})
-	if err != nil {
-		return fmt.Errorf("create heal job: %w", err)
-	}
-	if err := st.UpdateJobNextID(ctx, store.UpdateJobNextIDParams{ID: failedJob.ID, NextID: &chain.HealID}); err != nil {
-		return fmt.Errorf("rewire failed sbom next_id: %w", err)
-	}
-	healHead := store.Job{
-		ID:      chain.HealID,
-		RunID:   failedJob.RunID,
-		RepoID:  failedJob.RepoID,
-		Attempt: failedJob.Attempt,
-		JobType: domaintypes.JobTypeHeal,
-		NextID:  &chain.RetrySBOMID,
-	}
-	if err := applyInsertedHeadRepoSHA(ctx, st, healHead, effectiveCompletedRepoSHAOut(failedJob, "")); err != nil {
-		return fmt.Errorf("seed/clear repo sha for inserted sbom-healing chain: %w", err)
-	}
 	return nil
 }
 
