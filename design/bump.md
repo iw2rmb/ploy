@@ -1,123 +1,230 @@
-# Goal-Bounded Bump and Re-Gate Recovery
+# Child Build Short Polling for `mig`/`heal`
 
 ## Summary
-Define a deterministic dependency bump algorithm for migration runs where impacted libraries are unknown upfront.
+Define a deterministic contract for starting a child build-gate job from within `mig` or `heal` execution and waiting for completion using amata `polling.short`.
 
-The model is:
-- no runtime hooks,
-- no SBOM before gates,
-- healing only from `post_gate`/`re_gate`,
-- bump cycles executed inside `mig` and `heal` jobs.
+The contract must produce a real control-plane child job record (auditable in `jobs`), with deterministic status polling semantics and explicit auth boundaries.
 
 ## Scope
 In scope:
-- Ploy orchestration changes for migration bump cycles.
-- `mig` and `heal` objective execution model.
-- Re-gate-driven validation loop and artifact contract.
+- Ploy API and runtime contract for child build creation from running `mig`/`heal` jobs.
+- Job-scoped create/status endpoints consumed by amata `polling.short`.
+- Runtime env/input wiring required so `mig` and `heal` can call the endpoints.
+- Status mapping and terminal/success rules used by `done_when`/`success_when`.
+- Removal of `hook` job type scheduling/execution from this migration child-build flow.
+- SBOM lifecycle invariants for this flow: non-healable SBOM, post-`pre_gate` SBOM+classpath capture, and post-`post_gate` final SBOM preservation.
 
 Out of scope:
-- Amata executor internals (see `~/@iw2rmb/amata/design/short-pooling-download.md`).
-- Concrete ploy-lib prompts/scripts (see `~/@scale/ploy-lib/design/re_gate.md`).
+- Changes to amata `polling.short` implementation itself (already implemented in `/Users/vk/@iw2rmb/amata`).
+- Amata workflow migration/spec edits (tracked in an external DD outside this repository).
+- Replacing existing planned `pre_gate`/`post_gate`/`re_gate` lifecycle.
+- Legacy hook/runtime-hook behavior restoration.
 
 ## Why This Is Needed
-Mass migrations cannot rely on fixed dependency allowlists. Bump actions must expand from observed build failures while preserving deterministic stop rules.
+`mig`/`heal` lanes currently cannot request an on-demand child build and synchronously wait for its result through a typed, resumable polling contract. Existing gate transitions are server-planned or inserted by failure handlers, not requested from inside a running step.
+
+Without a dedicated request+poll contract, workflows must shell out with ad hoc HTTP logic, losing deterministic timeout/resume and schema validation guarantees already available in amata `polling.short`.
 
 ## Goals
-- Bound all bump edits to migration objective and observed evidence.
-- Keep recovery points at every successful gate.
-- Support typed OpenRewrite where signatures must be migrated through bridge versions.
+- Allow `mig` and `heal` to request child build jobs through a stable API contract.
+- Keep child builds visible as first-class control-plane jobs with canonical statuses.
+- Define a single `polling.short` pattern for request + status polling.
+- Keep terminal/success semantics deterministic and auditable.
+- Remove hook-job insertion from this flow so child build validation is hook-free.
+- Make SBOM behavior deterministic: never healed, captured after successful `pre_gate`, and preserved after successful `post_gate`.
 
 ## Non-goals
-- Restoring legacy hook runtime behavior.
-- Introducing separate top-level bump job types.
+- Introducing a new top-level orchestration lane outside existing job model.
+- Making `polling.short` ploy-specific.
+- Backward compatibility for prior ad hoc scripts.
 
 ## Current Baseline (Observed)
-- Initial chain currently inserts SBOM before pre/post gates: `internal/server/handlers/migs_ticket.go`.
-- Runtime hook chain is currently inserted after SBOM success: `internal/server/handlers/jobs_complete_service_runtime_hooks.go`.
-- Heal is currently considered for any failed gate (`pre|post|re`): `internal/workflow/lifecycle/orchestrator.go`.
-- Heal insertion currently rewires `failed_gate -> heal -> retry_sbom -> re_gate`: `internal/server/handlers/nodes_complete_healing.go`.
+- Amata already implements `polling.short` schema + runtime + checkpoint resume (`/Users/vk/@iw2rmb/amata/internal/executor/pollingshort/*`, `/Users/vk/@iw2rmb/amata/internal/runtime/builtins.go`, `/Users/vk/@iw2rmb/amata/schemas/polling.short.amata.schema.json`).
+- Ploy has no parent-job-scoped endpoint for a running `mig`/`heal` container to create a child build job (`internal/server/handlers/register.go`).
+- Worker status endpoint exists, but is ownership-guarded and not exposed as a child-build contract (`internal/server/handlers/jobs_status.go`, `docs/api/paths/jobs_job_id_status.yaml`).
+- Runtime hook chain insertion exists in lifecycle completion paths (`internal/server/handlers/jobs_complete_service_runtime_hooks.go`).
+- Healing insertion currently includes retry-SBOM in the chain (`failed_gate -> heal -> retry_sbom -> re_gate`) (`internal/server/handlers/nodes_complete_healing.go`).
+- Base planning currently drafts SBOM jobs in gate-cycle prelude (`internal/server/handlers/migs_ticket.go`).
+- Healing jobs currently receive recovery HTTP/TLS env (`PLOY_SERVER_URL`, cert paths, optional `PLOY_API_TOKEN`), but this wiring is not generalized to `mig` jobs (`internal/nodeagent/recovery_runtime.go`, `internal/nodeagent/execution_orchestrator_jobs.go`).
+- SBOM execution currently materializes persisted `sbom.spdx.json` and Java classpath outputs (`internal/nodeagent/execution_orchestrator_jobs.go`).
+- Canonical job statuses are fixed to `Created|Queued|Running|Success|Fail|Error|Cancelled` (`internal/domain/types/statuses.go`).
 
 ## Target Contract or Target Architecture
-### Objective model
-- `objective_id` is migration identity (`mig` name).
-- Execution lanes inside the same objective:
-  - `mig` lane (planned migration actions),
-  - `heal` lane (child cycles created at runtime).
+### End-to-end repo flow
+Per repo run:
 
-### Job flow
-Per repo run flow:
-1. `pre_gate` (must pass; no heal on failure).
-2. `mig` (ORW recipe + LLM migration steps).
-3. `post_gate`.
-4. On `post_gate` failure: start `heal -> re_gate` loop.
-5. Repeat `heal -> re_gate` until success or retries exhausted.
-6. Persist final SBOM at end of successful flow.
+1. `pre_gate` runs first.
+2. On successful `pre_gate`, run SBOM and generate the only `.classpath` for the run.
+3. Execute `mig`.
+4. Execute `post_gate`.
+5. On `post_gate` failure, start `heal -> re_gate` loop.
+6. Repeat `heal -> re_gate` until success or retry budget exhaustion.
+7. On successful flow completion, run final SBOM as the last step and preserve resulting SBOM snapshot (no new `.classpath` contract at this step).
 
 ### Healing trigger rules
-- Only `post_gate` and `re_gate` failure can trigger heal.
-- `pre_gate` failure is terminal for repo attempt.
+- Only `post_gate` and `re_gate` failure can trigger `heal`.
+- `pre_gate` failure is terminal for the repo attempt and must not create `heal` children.
 
-### Dependency bump loop inside heal/mig
-1. Apply candidate bump edit(s).
-2. Call build (`re_gate`) and capture output.
-3. If success, keep bump and continue objective flow.
-4. If failure:
-   - classify (`deps`, `code`, `infra`),
-   - for `deps` choose downgrade/bridge/additional package only from current evidence,
-   - for signature drift use bridge path:
-     1. lower to overlap/deprecated version,
-     2. run ORW migration,
-     3. bump to target.
-5. Repeat until success or budget exhausted.
+### Job-scoped child build API
+Add job-scoped endpoints on the control plane (worker auth scope):
 
-### Re-gate artifacts
-- Internal build calls in same workspace produce numbered artifacts in `/out`, e.g.:
-  - `re_build-gate-1.log`
-  - `re_build-errors-1.yaml`
-  - `re_build-gate-2.log`
-- Heal reads these local artifacts directly (no mandatory download for this flow).
+1. `POST /v1/jobs/{parent_job_id}/build`
+- Purpose: create a child build job requested by currently running `mig`/`heal` job.
+- Required request fields:
+  - `build_kind` (fixed to `re_gate` in v1)
+  - `reason` (short machine-readable reason)
+- Response:
+  - `child_job_id`
+  - `status_url` (absolute URL for polling)
+  - `status` (initial canonical status)
+
+2. `GET /v1/jobs/{parent_job_id}/build/{child_job_id}`
+- Purpose: return canonical child job status for polling.
+- Response:
+  - `job_id`
+  - `status` (`Created|Queued|Running|Success|Fail|Error|Cancelled`)
+  - `terminal` (`true` for `Success|Fail|Error|Cancelled`)
+  - `success` (`true` only for `Success`)
+
+### Auth and ownership
+- Calls are authorized as worker-scoped job calls.
+- Create endpoint must verify:
+  - `parent_job_id` exists and is `Running`.
+  - `parent_job_id` belongs to the calling worker identity.
+  - parent job type resolved from `parent_job_id` is `mig` or `heal` only.
+- Status endpoint must verify parent-child linkage and caller ownership for the parent job.
+
+### Child job persistence and execution contract
+- Child build is persisted as a normal control-plane `jobs` row with `job_type=re_gate`.
+- Child job metadata must include parent linkage:
+  - `trigger.parent_job_id`
+  - `trigger.kind=child_gate_request`
+- Child job must remain visible in existing run/repo job listings and logs.
+- This child-build flow must not schedule or execute `hook` jobs.
+
+### Child-gate artifact contract
+- Gate/build lineage artifacts are materialized in the parent job `/out` after each child build completion.
+- Paired artifact names:
+  - `/out/re_build-gate-{n}.log`
+  - `/out/errors-{n}.yaml`
+- Artifact index `{n}` is monotonic per run/repo lineage and starts from the first gate baseline as `1`.
+- Every child gate increments `{n}` by exactly `1`, so total paired artifact count equals `child_gates_executed + 1`.
+- Materialization happens after every child build, preserving deterministic order for later `heal`/analysis steps.
+
+### SBOM lifecycle invariants
+- SBOM jobs in this flow are never healable. On SBOM failure, fail the repo attempt (or cancel remainder by existing terminal policy); do not insert `heal`/`re_gate` for SBOM failure.
+- Execute SBOM after successful `pre_gate` and persist resulting SBOM snapshot plus generated `.classpath` artifact (single classpath source for the run).
+- Execute SBOM after successful `post_gate` as the last stage for final-state preservation; requirement is persisted resulting SBOM snapshot only.
+- Do not insert retry-SBOM between `heal` and `re_gate`.
+
+### `polling.short` usage contract for workflow integration
+Use a single typed pattern:
+
+```yaml
+- type: polling.short
+  request:
+    method: POST
+    url: "{{ env.PLOY_SERVER_URL }}/v1/jobs/{{ env.PLOY_JOB_ID }}/build"
+    headers:
+      Authorization: "Bearer {{ env.PLOY_API_TOKEN }}"
+      Content-Type: "application/json"
+    body:
+      build_kind: "re_gate"
+      reason: "child_build_validation"
+  confirm:
+    method: GET
+    url: "{{ ctx.value.request.response.value.status_url }}"
+    headers:
+      Authorization: "Bearer {{ env.PLOY_API_TOKEN }}"
+  done_when: "ctx.value.confirm.response.value.terminal == true"
+  success_when: "ctx.value.confirm.response.value.success == true"
+```
+
+Rules:
+- `done_when` and `success_when` must resolve to booleans.
+- Terminal status is exactly `Success|Fail|Error|Cancelled`.
+- Success is exactly `status == Success`.
+- Timeouts/checkpoint resume semantics are inherited from implemented amata `polling.short` contract.
 
 ## Implementation Notes
-- Remove hook planning/insertion from migration lifecycle paths.
-- Remove SBOM-prelude jobs from pre/post gate chain; keep final SBOM persistence only.
-- Change completion routing so only `post_gate`/`re_gate` fail can evaluate healing insertion.
-- Update healing insertion to drop retry-SBOM dependency in the loop.
-- Keep classpath contract for typed ORW by sourcing from latest successful gate artifact (SBOM fallback allowed only when present).
-- Keep compatibility with future generic amata polling/download contract in `~/@iw2rmb/amata/design/short-pooling-download.md`.
+- Control-plane API:
+  - register new job-scoped child-build routes in `internal/server/handlers/register.go` and OpenAPI docs under `docs/api/paths`.
+  - add child-build create/status handlers in `internal/server/handlers` with ownership checks aligned to existing worker job status rules.
+- Persistence/orchestration:
+  - create child `re_gate` jobs with parent linkage in `jobs.meta`.
+  - keep status transitions in canonical job lifecycle; no custom status enum.
+- Lifecycle cleanup:
+  - remove hook planning/insertion from this migration child-build path (`jobs_complete_service_runtime_hooks.go` integration point).
+  - update completion routing so only failed `post_gate`/`re_gate` can evaluate healing insertion (`internal/workflow/lifecycle/orchestrator.go` integration point).
+- SBOM lifecycle:
+  - route SBOM failures to terminal repo failure policy without healing insertion.
+  - schedule SBOM immediately after successful `pre_gate` and persist SBOM + the run's only `.classpath`.
+  - schedule final SBOM after successful `post_gate` for resulting-state SBOM preservation only.
+  - remove retry-SBOM insertion from healing chain in this flow (`nodes_complete_healing.go` integration point).
+- Artifact materialization:
+  - after every child build completion, materialize `/out/re_build-gate-{n}.log` and `/out/errors-{n}.yaml` into the parent job workspace with contiguous indexing.
+- Node/runtime wiring:
+  - inject `PLOY_JOB_ID` into both `mig` and `heal` manifests.
+  - keep `PLOY_SERVER_URL` and auth token/cert wiring available for both lanes so `polling.short` requests are possible.
 
 ## Milestones
-1. Lifecycle simplification.
-- Scope: remove hook and pre/post SBOM-prelude flow wiring.
-- Testable outcome: planned chains contain `pre_gate -> mig -> post_gate` base.
+1. Child-build API contract.
+- Scope: add create/status endpoint specs + handler scaffolding + request/response schema tests.
+- Expected result: worker can create and read child-build status via typed endpoints.
+- Testable outcome: endpoint tests cover ownership, invalid parent state, and status projection.
 
-2. Healing trigger narrowing.
-- Scope: heal only from failed `post_gate`/`re_gate`.
-- Testable outcome: failed `pre_gate` cancels repo flow without heal.
+2. Child job persistence and lifecycle.
+- Scope: create persisted child `re_gate` rows with parent linkage, canonical status transitions, and no hook-job insertion in this flow.
+- Expected result: child job appears in repo/run job listings, moves through normal lifecycle, and remains hook-free.
+- Testable outcome: integration tests show child job row creation, terminal completion, metadata linkage, and zero hook jobs created.
 
-3. Re-gate loop and artifact contract.
-- Scope: numbered re-build artifacts, retry logic.
-- Testable outcome: heal loop consumes `/out/re_build-*` deterministically.
+3. Runtime env wiring for `mig`/`heal`.
+- Scope: inject required env vars for endpoint invocation in both lanes.
+- Expected result: `polling.short` step has all identifiers and auth material at runtime.
+- Testable outcome: manifest/unit tests validate env presence for both job types.
 
-4. Typed ORW continuity.
-- Scope: classpath for `mig`/`heal` from successful gate lineage.
-- Testable outcome: ORW-based heal works without SBOM-prelude jobs.
+4. Child-gate artifact lineage.
+- Scope: materialize deterministic `/out/re_build-gate-{n}.log` and `/out/errors-{n}.yaml` pairs in parent job for baseline + each child gate.
+- Expected result: artifact numbering is contiguous and auditable per run/repo.
+- Testable outcome: for `k` child gates, artifacts include exactly `k+1` paired indices with no gaps/duplicates.
+
+5. SBOM lifecycle realignment.
+- Scope: enforce non-healable SBOM policy, move/confirm SBOM execution after `pre_gate` and after `post_gate`, and remove retry-SBOM from healing chain.
+- Expected result: deterministic SBOM preservation without SBOM healing loops.
+- Testable outcome: integration tests show (a) SBOM failure does not create heal/re_gate, (b) successful `pre_gate` produces persisted SBOM + the run's only `.classpath`, (c) successful `post_gate` yields final persisted SBOM snapshot without a second classpath contract.
 
 ## Acceptance Criteria
-- No runtime hooks are scheduled/executed in migration flow.
-- Base chain runs without SBOM-prelude jobs.
-- Only `post_gate`/`re_gate` failures can create heal children.
-- Final successful flows persist final SBOM.
-- Bump attempts are bounded and auditable from artifacts + metadata.
+- `mig` and `heal` can trigger a child build through a typed POST contract.
+- Child build is persisted as a normal job and visible in existing status/log surfaces.
+- Polling endpoint returns canonical status plus explicit `terminal` and `success` booleans.
+- Workflow `done_when`/`success_when` mapping is deterministic and matches canonical status rules.
+- This flow schedules and executes zero `hook` jobs.
+- Repo flow is explicit: `pre_gate -> sbom(pre_gate) -> mig -> post_gate -> (heal -> re_gate)* -> sbom(final)`.
+- Only failed `post_gate`/`re_gate` can create heal children; failed `pre_gate` is terminal.
+- Gate artifact lineage materializes deterministic parent `/out/re_build-gate-{n}.log` and `/out/errors-{n}.yaml` pairs with total count `child_gates_executed + 1`.
+- SBOM failures in this flow never trigger healing.
+- Successful `pre_gate` is followed by persisted SBOM and the run's only generated `.classpath`.
+- Successful `post_gate` is followed by final persisted SBOM snapshot only.
+- No custom/legacy status shape is introduced.
 
 ## Risks
-- Removing SBOM-prelude weakens early dependency visibility unless gate artifacts are complete.
-- ORW typed attribution may fail when classpath capture from gate is incomplete.
-- First rollout may surface hidden dependencies formerly handled by hooks.
+- Incorrect ownership checks could allow cross-job status access.
+- Missing runtime env wiring in one lane (`mig` or `heal`) will break workflow portability.
+- Child-job fan-out may increase node load if rate limiting is not enforced.
+- Workflow authors may encode weak `done_when`/`success_when` expressions despite typed contract.
 
 ## References
-- `internal/server/handlers/migs_ticket.go`
+- `design/bump.md` (this document)
+- `internal/server/handlers/register.go`
+- `internal/server/handlers/jobs_status.go`
 - `internal/server/handlers/jobs_complete_service_runtime_hooks.go`
-- `internal/workflow/lifecycle/orchestrator.go`
+- `internal/server/handlers/migs_ticket.go`
 - `internal/server/handlers/nodes_complete_healing.go`
-- `~/@iw2rmb/amata/design/short-pooling-download.md`
-- `~/@scale/ploy-lib/design/re_gate.md`
+- `internal/workflow/lifecycle/orchestrator.go`
+- `internal/nodeagent/execution_orchestrator_jobs.go`
+- `internal/nodeagent/recovery_runtime.go`
+- `internal/domain/types/statuses.go`
+- `docs/api/paths/jobs_job_id_status.yaml`
+- `/Users/vk/@iw2rmb/amata/docs/engine/index.md`
+- `/Users/vk/@iw2rmb/amata/internal/executor/pollingshort/pollingshort.go`
+- `/Users/vk/@iw2rmb/amata/schemas/polling.short.amata.schema.json`
