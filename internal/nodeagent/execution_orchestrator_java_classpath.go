@@ -21,6 +21,10 @@ func runJavaClasspathPath(runID types.RunID) string {
 	return filepath.Join(runCacheDir(runID), sbomJavaClasspathFileName)
 }
 
+func runJavaClasspathSourcePath(runID types.RunID) string {
+	return filepath.Join(runCacheDir(runID), sbomJavaClasspathFileName+".source_artifact_id")
+}
+
 func requiresJavaClasspath(req StartRunRequest) bool {
 	if req.JobType == types.JobTypeSBOM || req.JobType == types.JobTypeHeal || req.JavaClasspathContext == nil {
 		return false
@@ -63,18 +67,19 @@ func (r *runController) ensureRunJavaClasspathSource(
 	req StartRunRequest,
 	sourcePath string,
 ) error {
-	if err := validateJavaClasspathPath(sourcePath); err == nil {
-		return nil
-	} else if !errors.Is(err, os.ErrNotExist) {
-		return fmt.Errorf("validate cached java classpath: %w", err)
-	}
-
 	artifactID := ""
 	if req.JavaClasspathContext != nil {
 		artifactID = strings.TrimSpace(req.JavaClasspathContext.SourceArtifactID)
 	}
 	if artifactID == "" {
 		return fmt.Errorf("java classpath source artifact id is empty")
+	}
+	useCached, err := hasMatchingRunJavaClasspathSource(req.RunID, sourcePath, artifactID)
+	if err != nil {
+		return err
+	}
+	if useCached {
+		return nil
 	}
 	if r.artifactUploader == nil {
 		return fmt.Errorf("artifact uploader is required to restore java classpath")
@@ -89,6 +94,9 @@ func (r *runController) ensureRunJavaClasspathSource(
 	}
 	if err := validateJavaClasspathPath(sourcePath); err != nil {
 		return fmt.Errorf("validate restored java classpath: %w", err)
+	}
+	if err := writeRunJavaClasspathSourceArtifact(req.RunID, artifactID); err != nil {
+		return fmt.Errorf("persist java classpath source artifact id: %w", err)
 	}
 	slog.Info("restored java classpath from artifact",
 		"run_id", req.RunID,
@@ -150,7 +158,10 @@ func persistRunJavaClasspath(runID types.RunID, srcPath string) error {
 	if err := copyFileBytes(srcPath, destPath); err != nil {
 		return err
 	}
-	return validateJavaClasspathPath(destPath)
+	if err := validateJavaClasspathPath(destPath); err != nil {
+		return err
+	}
+	return clearRunJavaClasspathSourceArtifact(runID)
 }
 
 func captureJavaClasspathForOutBundle(inDir, outDir string) error {
@@ -176,6 +187,9 @@ func (r *runController) captureJavaClasspathAfterStandardJob(req StartRunRequest
 	if err := persistRunJavaClasspath(req.RunID, inClasspathPath); err != nil {
 		return fmt.Errorf("persist run java classpath: %w", err)
 	}
+	if err := writeRunJavaClasspathSourceFromRequest(req); err != nil {
+		return err
+	}
 	if err := captureJavaClasspathForOutBundle(inDir, outDir); err != nil {
 		return fmt.Errorf("seed /out/%s from /in: %w", sbomJavaClasspathFileName, err)
 	}
@@ -199,9 +213,67 @@ func (r *runController) captureJavaClasspathAfterGateJob(req StartRunRequest, wo
 	if err := persistRunJavaClasspath(req.RunID, inClasspathPath); err != nil {
 		return fmt.Errorf("persist run java classpath from gate /in: %w", err)
 	}
+	if err := writeRunJavaClasspathSourceFromRequest(req); err != nil {
+		return err
+	}
 	gateOutDir := filepath.Join(workspace, step.BuildGateWorkspaceOutDir)
 	if err := captureJavaClasspathForOutBundle(inDir, gateOutDir); err != nil {
 		return fmt.Errorf("seed gate /out/%s from /in: %w", sbomJavaClasspathFileName, err)
+	}
+	return nil
+}
+
+func hasMatchingRunJavaClasspathSource(runID types.RunID, classpathPath, artifactID string) (bool, error) {
+	if err := validateJavaClasspathPath(classpathPath); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return false, nil
+		}
+		return false, fmt.Errorf("validate cached java classpath: %w", err)
+	}
+	cachedArtifactID, err := readRunJavaClasspathSourceArtifact(runID)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return false, nil
+		}
+		return false, fmt.Errorf("read cached java classpath source artifact id: %w", err)
+	}
+	return cachedArtifactID == artifactID, nil
+}
+
+func readRunJavaClasspathSourceArtifact(runID types.RunID) (string, error) {
+	raw, err := os.ReadFile(runJavaClasspathSourcePath(runID))
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(raw)), nil
+}
+
+func writeRunJavaClasspathSourceArtifact(runID types.RunID, artifactID string) error {
+	artifactID = strings.TrimSpace(artifactID)
+	if artifactID == "" {
+		return clearRunJavaClasspathSourceArtifact(runID)
+	}
+	if err := os.MkdirAll(runCacheDir(runID), 0o755); err != nil {
+		return fmt.Errorf("mkdir java classpath cache dir: %w", err)
+	}
+	return os.WriteFile(runJavaClasspathSourcePath(runID), []byte(artifactID+"\n"), 0o644)
+}
+
+func clearRunJavaClasspathSourceArtifact(runID types.RunID) error {
+	err := os.Remove(runJavaClasspathSourcePath(runID))
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	return err
+}
+
+func writeRunJavaClasspathSourceFromRequest(req StartRunRequest) error {
+	artifactID := ""
+	if req.JavaClasspathContext != nil {
+		artifactID = req.JavaClasspathContext.SourceArtifactID
+	}
+	if err := writeRunJavaClasspathSourceArtifact(req.RunID, artifactID); err != nil {
+		return fmt.Errorf("persist run java classpath source artifact id: %w", err)
 	}
 	return nil
 }
