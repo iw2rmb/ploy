@@ -68,7 +68,7 @@ Per repo run:
 ### Job-scoped child build API
 Add job-scoped endpoints on the control plane (worker auth scope):
 
-1. `POST /v1/jobs/{parent_job_id}/build`
+1. `POST /v1/jobs/{parent_job_id}/builds`
 - Purpose: create a child build job requested by currently running `mig`/`heal` job.
 - Required request fields:
   - `build_kind` (fixed to `re_gate` in v1)
@@ -78,7 +78,7 @@ Add job-scoped endpoints on the control plane (worker auth scope):
   - `status_url` (absolute URL for polling)
   - `status` (initial canonical status)
 
-2. `GET /v1/jobs/{parent_job_id}/build/{child_job_id}`
+2. `GET /v1/jobs/{parent_job_id}/builds/{child_job_id}`
 - Purpose: return canonical child job status for polling.
 - Response:
   - `job_id`
@@ -124,7 +124,7 @@ Use a single typed pattern:
 - type: polling.short
   request:
     method: POST
-    url: "{{ env.PLOY_SERVER_URL }}/v1/jobs/{{ env.PLOY_JOB_ID }}/build"
+    url: "{{ env.PLOY_SERVER_URL }}/v1/jobs/{{ env.PLOY_JOB_ID }}/builds"
     headers:
       Authorization: "Bearer {{ env.PLOY_API_TOKEN }}"
       Content-Type: "application/json"
