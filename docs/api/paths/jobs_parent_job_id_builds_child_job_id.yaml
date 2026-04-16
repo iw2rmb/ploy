@@ -33,18 +33,26 @@ get:
         application/json:
           schema:
             type: object
-            required: [ child_job_id, status ]
+            required: [ job_id, status, terminal, success ]
             properties:
-              child_job_id:
+              job_id:
                 type: string
               status:
                 type: string
                 enum: [ Created, Queued, Running, Success, Fail, Error, Cancelled ]
+              terminal:
+                type: boolean
+                description: True when status is one of Success, Fail, Error, or Cancelled.
+              success:
+                type: boolean
+                description: True only when status is Success.
           examples:
             status:
               value:
-                child_job_id: 35YfU3rq9CHMiiQ9g4qUg01fR6v
+                job_id: 35YfU3rq9CHMiiQ9g4qUg01fR6v
                 status: Running
+                terminal: false
+                success: false
     '400':
       description: Bad request (invalid path IDs or node header)
       content:
