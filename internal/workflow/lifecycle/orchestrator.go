@@ -110,11 +110,8 @@ func EvaluateCompletionDecision(
 		}
 		return CompletionDecision{ChainAction: CompletionChainNoAction}
 	case domaintypes.JobStatusFail, domaintypes.JobStatusError, domaintypes.JobStatusCancelled:
-		if jobStatus == domaintypes.JobStatusFail && IsGateJobType(jobType) {
+		if jobStatus == domaintypes.JobStatusFail && IsHealingGateJobType(jobType) {
 			return CompletionDecision{ChainAction: CompletionChainEvaluateGateFailure}
-		}
-		if jobStatus == domaintypes.JobStatusFail && jobType == domaintypes.JobTypeSBOM {
-			return CompletionDecision{ChainAction: CompletionChainEvaluateSBOMFailure}
 		}
 		return CompletionDecision{ChainAction: CompletionChainCancelRemainder}
 	default:
@@ -127,6 +124,11 @@ func EvaluateCompletionDecision(
 // IsGateJobType reports whether jobType is a gate variant (pre, post, or re-gate).
 func IsGateJobType(jobType domaintypes.JobType) bool {
 	return jobType == domaintypes.JobTypePreGate || jobType == domaintypes.JobTypePostGate || jobType == domaintypes.JobTypeReGate
+}
+
+// IsHealingGateJobType reports whether failed gate type can start healing.
+func IsHealingGateJobType(jobType domaintypes.JobType) bool {
+	return jobType == domaintypes.JobTypePostGate || jobType == domaintypes.JobTypeReGate
 }
 
 // GateFailureOutcome is the kind of action required after a gate job fails.
@@ -144,9 +146,6 @@ const (
 // enrichment on ReGateMeta.Recovery before marshaling ReGateMeta.
 type HealChainSpec struct {
 	HealID         domaintypes.JobID
-	RetrySBOMID    domaintypes.JobID
-	RetrySBOMRoot  domaintypes.JobID
-	RetrySBOMPhase string
 	ReGateID       domaintypes.JobID
 	AttemptNumber  int
 	HealImage      string
@@ -218,6 +217,11 @@ func EvaluateGateFailureTransition(
 	heal *contracts.HealSpec,
 	newJobID func() domaintypes.JobID,
 ) (GateFailureDecision, error) {
+	failedType := domaintypes.JobType(failedJob.JobType)
+	if !IsHealingGateJobType(failedType) {
+		return cancelDecision("healing only allowed for post_gate and re_gate")
+	}
+
 	if heal == nil {
 		return cancelDecision("no healing config")
 	}
@@ -264,20 +268,12 @@ func EvaluateGateFailureTransition(
 	}
 
 	healID := newJobID()
-	retrySBOMID := newJobID()
 	reGateID := newJobID()
-	retrySBOMRoot, retrySBOMPhase := resolveGateRetrySBOMContext(baseGateID, failedJob, jobsByID)
-	if retrySBOMRoot.IsZero() {
-		retrySBOMRoot = retrySBOMID
-	}
 
 	return GateFailureDecision{
 		Outcome: GateFailureOutcomeHealChain,
 		Chain: &HealChainSpec{
 			HealID:         healID,
-			RetrySBOMID:    retrySBOMID,
-			RetrySBOMRoot:  retrySBOMRoot,
-			RetrySBOMPhase: retrySBOMPhase,
 			ReGateID:       reGateID,
 			AttemptNumber:  attemptNumber,
 			HealImage:      healImage,
@@ -476,59 +472,12 @@ func countExistingHealingAttempts(baseGateID domaintypes.JobID, jobsByID map[dom
 		if jobType == domaintypes.JobTypeHeal {
 			attempts++
 		}
-		if jobType != domaintypes.JobTypeHeal &&
-			jobType != domaintypes.JobTypeSBOM &&
-			jobType != domaintypes.JobTypeHook &&
-			jobType != domaintypes.JobTypeReGate {
+		if jobType != domaintypes.JobTypeHeal && jobType != domaintypes.JobTypeReGate {
 			break
 		}
 		nextID = job.NextID
 	}
 	return attempts
-}
-
-func resolveGateRetrySBOMContext(
-	baseGateID domaintypes.JobID,
-	failedJob store.Job,
-	jobsByID map[domaintypes.JobID]store.Job,
-) (domaintypes.JobID, string) {
-	defaultPhase := contracts.SBOMPhasePost
-	if domaintypes.JobType(failedJob.JobType) == domaintypes.JobTypePreGate {
-		defaultPhase = contracts.SBOMPhasePre
-	}
-
-	base, ok := jobsByID[baseGateID]
-	if !ok {
-		return "", defaultPhase
-	}
-
-	current := RecoveryChainPredecessor(base.ID, jobsByID)
-	for current != nil {
-		jobType := domaintypes.JobType(current.JobType)
-		if jobType == domaintypes.JobTypeHook {
-			current = RecoveryChainPredecessor(current.ID, jobsByID)
-			continue
-		}
-		if jobType != domaintypes.JobTypeSBOM {
-			break
-		}
-		if len(current.Meta) > 0 {
-			if meta, err := contracts.UnmarshalJobMeta(current.Meta); err == nil && meta.SBOM != nil {
-				phase := strings.TrimSpace(meta.SBOM.Phase)
-				if phase != contracts.SBOMPhasePre && phase != contracts.SBOMPhasePost {
-					phase = defaultPhase
-				}
-				root := strings.TrimSpace(meta.SBOM.RootJobID)
-				if root != "" {
-					return domaintypes.JobID(root), phase
-				}
-				return current.ID, phase
-			}
-		}
-		return current.ID, defaultPhase
-	}
-
-	return "", defaultPhase
 }
 
 func countExistingSBOMHealingAttempts(rootSBOMID domaintypes.JobID, jobsByID map[domaintypes.JobID]store.Job) int {

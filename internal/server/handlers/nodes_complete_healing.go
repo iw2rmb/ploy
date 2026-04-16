@@ -14,7 +14,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/lifecycle"
 )
 
-// maybeCreateHealingJobs inserts a heal -> retry-sbom -> re-gate chain after a failed gate job by rewiring next_id links.
+// maybeCreateHealingJobs inserts a heal -> re-gate chain after a failed post/re gate job by rewiring next_id links.
 func maybeCreateHealingJobs(
 	ctx context.Context,
 	st store.Store,
@@ -45,8 +45,8 @@ func maybeCreateHealingJobs(
 	if err := jobType.Validate(); err != nil {
 		return fmt.Errorf("invalid job_type %q for failed job_id=%s: %w", failedJob.JobType, failedJob.ID, err)
 	}
-	if !lifecycle.IsGateJobType(jobType) {
-		slog.Debug("maybeCreateHealingJobs: not a gate job, skipping healing",
+	if !lifecycle.IsHealingGateJobType(jobType) {
+		slog.Debug("maybeCreateHealingJobs: gate type not eligible for healing",
 			"run_id", failedJob.RunID,
 			"job_id", failedJob.ID,
 			"job_type", jobType.String(),
@@ -124,33 +124,6 @@ func maybeCreateHealingJobs(
 		return fmt.Errorf("create re-gate job: %w", err)
 	}
 
-	retrySBOMMeta := contracts.NewMigJobMeta()
-	retrySBOMMeta.SBOM = sbomCycleContextMeta(sbomCycleContext{
-		Phase:     chain.RetrySBOMPhase,
-		CycleName: reGateName,
-		Role:      contracts.SBOMRoleRetry,
-		RootJobID: chain.RetrySBOMRoot,
-	})
-	retrySBOMMetaBytes, err := contracts.MarshalJobMeta(retrySBOMMeta)
-	if err != nil {
-		return fmt.Errorf("marshal retry sbom job meta: %w", err)
-	}
-	_, err = st.CreateJob(ctx, store.CreateJobParams{
-		ID:          chain.RetrySBOMID,
-		RunID:       failedJob.RunID,
-		RepoID:      failedJob.RepoID,
-		RepoBaseRef: failedJob.RepoBaseRef,
-		Attempt:     failedJob.Attempt,
-		Name:        fmt.Sprintf("sbom-retry-%d-%s", chain.AttemptNumber, chain.RetrySBOMID),
-		JobType:     domaintypes.JobTypeSBOM,
-		Status:      domaintypes.JobStatusCreated,
-		NextID:      &chain.ReGateID,
-		Meta:        retrySBOMMetaBytes,
-	})
-	if err != nil {
-		return fmt.Errorf("create retry sbom job: %w", err)
-	}
-
 	_, err = st.CreateJob(ctx, store.CreateJobParams{
 		ID:          chain.HealID,
 		RunID:       failedJob.RunID,
@@ -161,7 +134,7 @@ func maybeCreateHealingJobs(
 		JobType:     domaintypes.JobTypeHeal,
 		JobImage:    chain.HealImage,
 		Status:      domaintypes.JobStatusQueued,
-		NextID:      &chain.RetrySBOMID,
+		NextID:      &chain.ReGateID,
 		Meta:        healMetaBytes,
 		RepoShaIn:   chain.HealRepoSHAIn,
 	})
@@ -178,7 +151,7 @@ func maybeCreateHealingJobs(
 		RepoID:  failedJob.RepoID,
 		Attempt: failedJob.Attempt,
 		JobType: domaintypes.JobTypeHeal,
-		NextID:  &chain.RetrySBOMID,
+		NextID:  &chain.ReGateID,
 	}
 	if err := applyInsertedHeadRepoSHA(ctx, st, healHead, effectiveCompletedRepoSHAOut(failedJob, "")); err != nil {
 		return fmt.Errorf("seed/clear repo sha for inserted healing chain: %w", err)

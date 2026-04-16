@@ -139,11 +139,11 @@ func TestEvaluateCompletionDecision(t *testing.T) {
 		},
 		// Fail paths
 		{
-			name:       "failed pre-gate triggers gate failure evaluation",
+			name:       "failed pre-gate cancels chain",
 			jobType:    domaintypes.JobTypePreGate,
 			jobStatus:  domaintypes.JobStatusFail,
 			hasNext:    true,
-			wantAction: lifecycle.CompletionChainEvaluateGateFailure,
+			wantAction: lifecycle.CompletionChainCancelRemainder,
 		},
 		{
 			name:       "failed post-gate triggers gate failure evaluation",
@@ -169,6 +169,13 @@ func TestEvaluateCompletionDecision(t *testing.T) {
 		{
 			name:       "failed heal job cancels chain",
 			jobType:    domaintypes.JobTypeHeal,
+			jobStatus:  domaintypes.JobStatusFail,
+			hasNext:    true,
+			wantAction: lifecycle.CompletionChainCancelRemainder,
+		},
+		{
+			name:       "failed sbom job cancels chain",
+			jobType:    domaintypes.JobTypeSBOM,
 			jobStatus:  domaintypes.JobStatusFail,
 			hasNext:    true,
 			wantAction: lifecycle.CompletionChainCancelRemainder,
@@ -241,6 +248,29 @@ func TestIsGateJobType(t *testing.T) {
 	}
 }
 
+func TestIsHealingGateJobType(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		jobType domaintypes.JobType
+		want    bool
+	}{
+		{domaintypes.JobTypePreGate, false},
+		{domaintypes.JobTypePostGate, true},
+		{domaintypes.JobTypeReGate, true},
+		{domaintypes.JobTypeMig, false},
+	}
+
+	for _, tc := range cases {
+		t.Run(string(tc.jobType), func(t *testing.T) {
+			t.Parallel()
+			if got := lifecycle.IsHealingGateJobType(tc.jobType); got != tc.want {
+				t.Fatalf("IsHealingGateJobType(%q) = %v, want %v", tc.jobType, got, tc.want)
+			}
+		})
+	}
+}
+
 // ========== EvaluateGateFailureTransition ==========
 
 const testRepoSHAIn = "0123456789abcdef0123456789abcdef01234567"
@@ -301,10 +331,9 @@ func firstAttemptCase() gateFailureCase {
 	baseGateID := domaintypes.NewJobID()
 	successorID := domaintypes.NewJobID()
 	healID := domaintypes.NewJobID()
-	retrySBOMID := domaintypes.NewJobID()
 	reGateID := domaintypes.NewJobID()
 	failedJob := store.Job{
-		ID: baseGateID, JobType: domaintypes.JobTypePreGate,
+		ID: baseGateID, JobType: domaintypes.JobTypePostGate,
 		RepoShaIn: testRepoSHAIn, NextID: &successorID,
 	}
 	return gateFailureCase{
@@ -313,7 +342,7 @@ func firstAttemptCase() gateFailureCase {
 		jobsByID:     map[domaintypes.JobID]store.Job{baseGateID: failedJob},
 		recoveryMeta: &contracts.BuildGateRecoveryMetadata{ErrorKind: "infra", StrategyID: "infra-default"},
 		heal:         basicHealSpec(2),
-		newJobID:     newFixedIDSequence(healID, retrySBOMID, reGateID),
+		newJobID:     newFixedIDSequence(healID, reGateID),
 		wantOutcome:  lifecycle.GateFailureOutcomeHealChain,
 		assertChain: func(t *testing.T, chain *lifecycle.HealChainSpec) {
 			t.Helper()
@@ -322,9 +351,6 @@ func firstAttemptCase() gateFailureCase {
 			}
 			if chain.ReGateID != reGateID {
 				t.Fatalf("ReGateID = %s, want %s", chain.ReGateID, reGateID)
-			}
-			if chain.RetrySBOMID != retrySBOMID {
-				t.Fatalf("RetrySBOMID = %s, want %s", chain.RetrySBOMID, retrySBOMID)
 			}
 			if chain.AttemptNumber != 1 {
 				t.Fatalf("AttemptNumber = %d, want 1", chain.AttemptNumber)
@@ -357,7 +383,6 @@ func secondAttemptCase() gateFailureCase {
 	reGate1ID := domaintypes.NewJobID()
 	successorID := domaintypes.NewJobID()
 	heal2ID := domaintypes.NewJobID()
-	retrySBOM2ID := domaintypes.NewJobID()
 	reGate2ID := domaintypes.NewJobID()
 	return gateFailureCase{
 		name: "second attempt increases number",
@@ -373,7 +398,7 @@ func secondAttemptCase() gateFailureCase {
 		},
 		recoveryMeta: &contracts.BuildGateRecoveryMetadata{ErrorKind: "infra"},
 		heal:         basicHealSpec(3),
-		newJobID:     newFixedIDSequence(heal2ID, retrySBOM2ID, reGate2ID),
+		newJobID:     newFixedIDSequence(heal2ID, reGate2ID),
 		wantOutcome:  lifecycle.GateFailureOutcomeHealChain,
 		assertChain: func(t *testing.T, chain *lifecycle.HealChainSpec) {
 			t.Helper()
@@ -389,7 +414,6 @@ func reGateRootSecondAttemptCase() gateFailureCase {
 	heal1ID := domaintypes.NewJobID()
 	failedReGateID := domaintypes.NewJobID()
 	heal2ID := domaintypes.NewJobID()
-	retrySBOM2ID := domaintypes.NewJobID()
 	reGate2ID := domaintypes.NewJobID()
 	return gateFailureCase{
 		name: "re-gate-root chain continues with second healing attempt",
@@ -403,7 +427,7 @@ func reGateRootSecondAttemptCase() gateFailureCase {
 		},
 		recoveryMeta: &contracts.BuildGateRecoveryMetadata{ErrorKind: "code", StrategyID: "code-default"},
 		heal:         basicHealSpec(3),
-		newJobID:     newFixedIDSequence(heal2ID, retrySBOM2ID, reGate2ID),
+		newJobID:     newFixedIDSequence(heal2ID, reGate2ID),
 		wantOutcome:  lifecycle.GateFailureOutcomeHealChain,
 		assertChain: func(t *testing.T, chain *lifecycle.HealChainSpec) {
 			t.Helper()
@@ -420,22 +444,30 @@ func TestEvaluateGateFailureTransition(t *testing.T) {
 	cases := []gateFailureCase{
 		{
 			name:         "mixed recovery kind still attempts healing",
-			failedJob:    store.Job{ID: domaintypes.NewJobID(), RepoShaIn: testRepoSHAIn},
+			failedJob:    store.Job{ID: domaintypes.NewJobID(), JobType: domaintypes.JobTypePostGate, RepoShaIn: testRepoSHAIn},
 			recoveryMeta: &contracts.BuildGateRecoveryMetadata{ErrorKind: "mixed"},
 			heal:         basicHealSpec(1),
 			newJobID:     domaintypes.NewJobID,
 			wantOutcome:  lifecycle.GateFailureOutcomeHealChain,
 		},
 		{
+			name:         "pre-gate failure is not eligible for healing",
+			failedJob:    store.Job{ID: domaintypes.NewJobID(), JobType: domaintypes.JobTypePreGate, RepoShaIn: testRepoSHAIn},
+			recoveryMeta: &contracts.BuildGateRecoveryMetadata{ErrorKind: "infra"},
+			heal:         basicHealSpec(2),
+			newJobID:     domaintypes.NewJobID,
+			wantOutcome:  lifecycle.GateFailureOutcomeCancel,
+		},
+		{
 			name:         "no healing config cancels",
-			failedJob:    store.Job{ID: domaintypes.NewJobID(), RepoShaIn: testRepoSHAIn},
+			failedJob:    store.Job{ID: domaintypes.NewJobID(), JobType: domaintypes.JobTypePostGate, RepoShaIn: testRepoSHAIn},
 			recoveryMeta: &contracts.BuildGateRecoveryMetadata{ErrorKind: "infra"},
 			newJobID:     domaintypes.NewJobID,
 			wantOutcome:  lifecycle.GateFailureOutcomeCancel,
 		},
 		{
 			name:         "invalid SHA cancels",
-			failedJob:    store.Job{ID: domaintypes.NewJobID(), JobType: domaintypes.JobTypePreGate, RepoShaIn: "not-a-valid-sha"},
+			failedJob:    store.Job{ID: domaintypes.NewJobID(), JobType: domaintypes.JobTypePostGate, RepoShaIn: "not-a-valid-sha"},
 			recoveryMeta: &contracts.BuildGateRecoveryMetadata{ErrorKind: "infra"},
 			heal:         basicHealSpec(1),
 			newJobID:     domaintypes.NewJobID,

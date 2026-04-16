@@ -21,12 +21,12 @@ type gateFailureFixture struct {
 	Store     *jobStore
 }
 
-// newGateFailureFixture creates a pre-gate job fixture with recovery metadata,
+// newGateFailureFixture creates a post-gate job fixture with recovery metadata,
 // a successor mig job, healing spec, and a fully wired mock store.
 // recoveryMeta is the raw job meta JSON for the failed gate.
 func newGateFailureFixture(t *testing.T, recoveryMeta []byte) gateFailureFixture {
 	t.Helper()
-	f := newRepoScopedFixture(domaintypes.JobTypePreGate)
+	f := newRepoScopedFixture(domaintypes.JobTypePostGate)
 	specID := domaintypes.NewSpecID()
 	f.Job.Meta = recoveryMeta
 	specBytes := buildHealingSpec(t, 1) // uses build_gate.heal
@@ -208,7 +208,7 @@ type healingChainFixture struct {
 	Store       *jobStore
 }
 
-// priorHealJob describes an intermediate job to insert between pre-gate and mig-0.
+// priorHealJob describes an intermediate job to insert between post-gate and mig-0.
 type priorHealJob struct {
 	Name    string
 	JobType domaintypes.JobType
@@ -218,15 +218,15 @@ type priorHealJob struct {
 }
 
 type healingChainConfig struct {
-	preGateMeta []byte
-	specFn      func(*testing.T) []byte
-	repoShaIn   string
-	priorHeals  []priorHealJob
-	storeOpts   []func(*jobStore)
+	postGateMeta []byte
+	specFn       func(*testing.T) []byte
+	repoShaIn    string
+	priorHeals   []priorHealJob
+	storeOpts    []func(*jobStore)
 }
 
 func withHealingMeta(meta []byte) func(*healingChainConfig) {
-	return func(c *healingChainConfig) { c.preGateMeta = meta }
+	return func(c *healingChainConfig) { c.postGateMeta = meta }
 }
 
 func withHealingSpec(fn func(*testing.T) []byte) func(*healingChainConfig) {
@@ -245,18 +245,18 @@ func withHealingStoreOpts(opts ...func(*jobStore)) func(*healingChainConfig) {
 	return func(c *healingChainConfig) { c.storeOpts = opts }
 }
 
-// newHealingChain builds a chain of jobs: pre-gate → [prior heals] → mig-0,
+// newHealingChain builds a chain of jobs: post-gate → [prior heals] → mig-0,
 // wires NextID pointers, and configures a jobStore with the chain and spec.
 //
-// The "failed" job is the last gate/re-gate type in the chain (pre-gate when
+// The "failed" job is the last gate/re-gate type in the chain (post-gate when
 // there are no prior heals, or the last re-gate when there are).
 func newHealingChain(t *testing.T, opts ...func(*healingChainConfig)) healingChainFixture {
 	t.Helper()
 
 	cfg := healingChainConfig{
-		preGateMeta: []byte(`{"kind":"gate","gate":{"recovery":{"loop_kind":"healing","error_kind":"infra","strategy_id":"infra-default"}}}`),
-		specFn:      func(t *testing.T) []byte { return buildHealingSpec(t, 2) },
-		repoShaIn:   healingTestRepoSHAIn,
+		postGateMeta: []byte(`{"kind":"gate","gate":{"recovery":{"loop_kind":"healing","error_kind":"infra","strategy_id":"infra-default"}}}`),
+		specFn:       func(t *testing.T) []byte { return buildHealingSpec(t, 2) },
+		repoShaIn:    healingTestRepoSHAIn,
 	}
 	for _, o := range opts {
 		o(&cfg)
@@ -276,10 +276,10 @@ func newHealingChain(t *testing.T, opts ...func(*healingChainConfig)) healingCha
 
 	var jobs []store.Job
 
-	preGate := baseJob("pre-gate", domaintypes.JobTypePreGate, domaintypes.JobStatusFail)
-	preGate.RepoShaIn = cfg.repoShaIn
-	preGate.Meta = cfg.preGateMeta
-	jobs = append(jobs, preGate)
+	postGate := baseJob("post-gate", domaintypes.JobTypePostGate, domaintypes.JobStatusFail)
+	postGate.RepoShaIn = cfg.repoShaIn
+	postGate.Meta = cfg.postGateMeta
+	jobs = append(jobs, postGate)
 
 	for _, ph := range cfg.priorHeals {
 		j := baseJob(ph.Name, ph.JobType, ph.Status)
@@ -303,7 +303,7 @@ func newHealingChain(t *testing.T, opts ...func(*healingChainConfig)) healingCha
 	// Failed job = last gate/re-gate in the chain.
 	failedIdx := 0
 	for i := len(jobs) - 1; i >= 0; i-- {
-		if jobs[i].JobType == domaintypes.JobTypePreGate || jobs[i].JobType == domaintypes.JobTypeReGate {
+		if jobs[i].JobType == domaintypes.JobTypePostGate || jobs[i].JobType == domaintypes.JobTypeReGate {
 			failedIdx = i
 			break
 		}

@@ -614,30 +614,17 @@ func TestCompleteJob_GateFailure_HealingInsertionRewiresNextChain(t *testing.T) 
 	if len(st.createJob.calls) == 0 {
 		t.Fatal("expected healing insertion to create follow-up jobs")
 	}
-	if len(st.createJob.calls) != 3 {
-		t.Fatalf("expected 3 healing jobs, got %d", len(st.createJob.calls))
+	if len(st.createJob.calls) != 2 {
+		t.Fatalf("expected 2 healing jobs, got %d", len(st.createJob.calls))
 	}
 	byName := createJobsByName(st.createJob.calls)
 	reGate := byName["re-gate-1"]
 	heal := byName["heal-1-0"]
-	var retrySBOM *store.CreateJobParams
-	for i := range st.createJob.calls {
-		if st.createJob.calls[i].JobType == domaintypes.JobTypeSBOM {
-			retrySBOM = &st.createJob.calls[i]
-			break
-		}
-	}
 	if reGate.Name != "re-gate-1" || heal.Name != "heal-1-0" {
 		t.Fatalf("expected re-gate-1 and heal-1-0 jobs, got %+v", st.createJob.calls)
 	}
-	if retrySBOM == nil {
-		t.Fatal("expected retry sbom job")
-	}
-	if heal.NextID == nil || *heal.NextID != retrySBOM.ID {
-		t.Fatalf("expected heal.NextID to point to retry sbom job")
-	}
-	if retrySBOM.NextID == nil || *retrySBOM.NextID != reGate.ID {
-		t.Fatalf("expected retry sbom.NextID to point to re-gate")
+	if heal.NextID == nil || *heal.NextID != reGate.ID {
+		t.Fatalf("expected heal.NextID to point to re-gate")
 	}
 	if reGate.NextID == nil || *reGate.NextID != gf.Successor.ID {
 		t.Fatalf("expected re-gate.NextID to preserve old successor %s", gf.Successor.ID)
@@ -671,8 +658,8 @@ func TestCompleteJob_GateFailure_HealingInsertionRetriesRunLookup(t *testing.T) 
 	if st.calls < 2 {
 		t.Fatalf("expected run lookup retry after transient failure, calls=%d", st.calls)
 	}
-	if len(gf.Store.createJob.calls) != 3 {
-		t.Fatalf("expected healing insertion to create 3 jobs after run lookup retry, got %d", len(gf.Store.createJob.calls))
+	if len(gf.Store.createJob.calls) != 2 {
+		t.Fatalf("expected healing insertion to create 2 jobs after run lookup retry, got %d", len(gf.Store.createJob.calls))
 	}
 }
 
@@ -693,8 +680,8 @@ func TestCompleteJob_GateFailure_MixedClassificationInsertsHealing(t *testing.T)
 	}))
 
 	assertStatus(t, rr, http.StatusNoContent)
-	if len(st.createJob.calls) != 3 {
-		t.Fatalf("expected healing insertion to create 3 jobs, got %d", len(st.createJob.calls))
+	if len(st.createJob.calls) != 2 {
+		t.Fatalf("expected healing insertion to create 2 jobs, got %d", len(st.createJob.calls))
 	}
 	if len(st.updateJobStatus.calls) != 0 {
 		t.Fatalf("expected no cancellation calls, got %d", len(st.updateJobStatus.calls))

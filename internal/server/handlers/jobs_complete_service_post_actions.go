@@ -58,12 +58,7 @@ func (s *CompleteJobService) onFail(ctx context.Context, state *completeJobState
 	}
 
 	jobType := state.routedJobType()
-
-	decision := lifecycle.EvaluateCompletionDecision(jobType, state.input.Status, state.job.NextID != nil)
-	switch decision.ChainAction {
-	case lifecycle.CompletionChainNoAction:
-		return
-	case lifecycle.CompletionChainEvaluateGateFailure:
+	if state.input.Status == domaintypes.JobStatusFail && lifecycle.IsGateJobType(jobType) {
 		if errMsg := formatStackGateError(jobType, state.persistedMeta); errMsg != nil {
 			if updateErr := s.store.UpdateRunRepoError(ctx, store.UpdateRunRepoErrorParams{
 				RunID:     state.job.RunID,
@@ -77,6 +72,13 @@ func (s *CompleteJobService) onFail(ctx context.Context, state *completeJobState
 				)
 			}
 		}
+	}
+
+	decision := lifecycle.EvaluateCompletionDecision(jobType, state.input.Status, state.job.NextID != nil)
+	switch decision.ChainAction {
+	case lifecycle.CompletionChainNoAction:
+		return
+	case lifecycle.CompletionChainEvaluateGateFailure:
 		run, ok := s.loadRunForPostCompletion(ctx, state, "healing insertion")
 		if ok {
 			if healErr := maybeCreateHealingJobs(ctx, s.store, s.blobpersist, run, state.job); healErr != nil {

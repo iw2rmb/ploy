@@ -107,3 +107,51 @@ steps:
 		t.Fatal("did not expect PromoteJobByIDIfUnblocked when runtime hook planning fails")
 	}
 }
+
+func TestOnSuccess_ReGateSBOMSkipsRuntimeHookPlanning(t *testing.T) {
+	t.Parallel()
+
+	nextID := domaintypes.NewJobID()
+	job := store.Job{
+		ID:     domaintypes.NewJobID(),
+		RunID:  domaintypes.NewRunID(),
+		RepoID: domaintypes.NewRepoID(),
+		Name:   "re-gate-1-sbom",
+		NextID: &nextID,
+	}
+	next := store.Job{
+		ID:     nextID,
+		RunID:  job.RunID,
+		RepoID: job.RepoID,
+		Status: domaintypes.JobStatusCreated,
+	}
+
+	st := &jobStore{}
+	st.promoteJobByIDIfUnblocked.val = next
+	svc := &CompleteJobService{
+		store:       st,
+		blobpersist: blobpersist.New(st, bsmock.New()),
+	}
+	state := &completeJobState{
+		input: CompleteJobInput{
+			Status:     domaintypes.JobStatusSuccess,
+			RepoSHAOut: "0123456789abcdef0123456789abcdef01234567",
+		},
+		job:           job,
+		jobType:       domaintypes.JobTypeSBOM,
+		serviceType:   completeJobServiceTypeSBOM,
+		serviceTypeOK: true,
+	}
+
+	svc.onSuccess(context.Background(), state)
+
+	if st.createJob.called {
+		t.Fatal("did not expect runtime hook jobs for re-gate sbom cycle")
+	}
+	if st.getRun.called {
+		t.Fatal("did not expect run/spec load for re-gate sbom runtime hooks")
+	}
+	if !st.promoteJobByIDIfUnblocked.called {
+		t.Fatal("expected successor promotion for re-gate sbom success")
+	}
+}
