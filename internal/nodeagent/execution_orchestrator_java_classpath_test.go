@@ -88,6 +88,77 @@ func TestMaterializeJavaClasspathInDir_RestoresFromArtifactWhenRunCacheMissing(t
 	if string(gotRunCache) != string(classpathBytes) {
 		t.Fatalf("run cache java classpath mismatch: got %q want %q", gotRunCache, classpathBytes)
 	}
+	sourceArtifactRaw, err := os.ReadFile(runJavaClasspathSourcePath(runID))
+	if err != nil {
+		t.Fatalf("read run cache java classpath source artifact id: %v", err)
+	}
+	if strings.TrimSpace(string(sourceArtifactRaw)) != artifactID {
+		t.Fatalf("run cache source artifact mismatch: got %q want %q", sourceArtifactRaw, artifactID)
+	}
+}
+
+func TestMaterializeJavaClasspathInDir_RestoresFromArtifactWhenRunCacheSourceMismatchesClaim(t *testing.T) {
+	t.Setenv("PLOYD_CACHE_HOME", t.TempDir())
+
+	artifactID := "11111111-1111-1111-1111-111111111111"
+	classpathBytes := []byte("/root/.m2/repository/org/example/lib/1.0.0/lib-1.0.0.jar\n")
+	bundle := mustTarGzEntries(t, map[string][]byte{
+		"out/java.classpath": classpathBytes,
+	})
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/artifacts/"+artifactID {
+			http.NotFound(w, r)
+			return
+		}
+		if got := r.URL.Query().Get("download"); got != "true" {
+			t.Fatalf("download query = %q, want true", got)
+		}
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(bundle)
+	}))
+	defer server.Close()
+
+	rc := newTestController(t, newAgentConfig(server.URL))
+	runID := types.NewRunID()
+	sourcePath := runJavaClasspathPath(runID)
+	if err := os.MkdirAll(filepath.Dir(sourcePath), 0o755); err != nil {
+		t.Fatalf("MkdirAll(%q): %v", filepath.Dir(sourcePath), err)
+	}
+	if err := os.WriteFile(sourcePath, []byte("/stale/classpath.jar\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(%q): %v", sourcePath, err)
+	}
+	if err := os.WriteFile(runJavaClasspathSourcePath(runID), []byte("22222222-2222-2222-2222-222222222222\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(%q): %v", runJavaClasspathSourcePath(runID), err)
+	}
+	req := StartRunRequest{
+		RunID:   runID,
+		JobID:   types.NewJobID(),
+		JobType: types.JobTypeMig,
+		JavaClasspathContext: &contracts.JavaClasspathClaimContext{
+			Required:         true,
+			SourceArtifactID: artifactID,
+		},
+	}
+
+	inDir := t.TempDir()
+	if err := rc.materializeJavaClasspathInDir(context.Background(), req, inDir); err != nil {
+		t.Fatalf("materializeJavaClasspathInDir() error = %v", err)
+	}
+	gotRunCache, err := os.ReadFile(sourcePath)
+	if err != nil {
+		t.Fatalf("read run cache java classpath: %v", err)
+	}
+	if string(gotRunCache) != string(classpathBytes) {
+		t.Fatalf("run cache java classpath mismatch: got %q want %q", gotRunCache, classpathBytes)
+	}
+	sourceArtifactRaw, err := os.ReadFile(runJavaClasspathSourcePath(runID))
+	if err != nil {
+		t.Fatalf("read run cache java classpath source artifact id: %v", err)
+	}
+	if strings.TrimSpace(string(sourceArtifactRaw)) != artifactID {
+		t.Fatalf("run cache source artifact mismatch: got %q want %q", sourceArtifactRaw, artifactID)
+	}
 }
 
 func TestCaptureJavaClasspathAfterStandardJob_PersistsForHookAndMig(t *testing.T) {
@@ -133,6 +204,9 @@ func TestCaptureJavaClasspathAfterStandardJob_PersistsForHookAndMig(t *testing.T
 			if _, err := os.Stat(outPath); err != nil {
 				t.Fatalf("expected /out java classpath at %q: %v", outPath, err)
 			}
+			if _, err := os.Stat(runJavaClasspathSourcePath(runID)); !os.IsNotExist(err) {
+				t.Fatalf("expected classpath source marker to be absent when source artifact is unset, stat err = %v", err)
+			}
 		})
 	}
 }
@@ -170,7 +244,8 @@ func TestPrepareAndCaptureGateJavaClasspathInput(t *testing.T) {
 		JobID:   types.NewJobID(),
 		JobType: types.JobTypePreGate,
 		JavaClasspathContext: &contracts.JavaClasspathClaimContext{
-			Required: true,
+			Required:         true,
+			SourceArtifactID: "11111111-1111-1111-1111-111111111111",
 		},
 	}
 	classpathBytes := []byte("/cache/gradle/lib.jar\n")
@@ -180,6 +255,9 @@ func TestPrepareAndCaptureGateJavaClasspathInput(t *testing.T) {
 	}
 	if err := os.WriteFile(sourcePath, classpathBytes, 0o644); err != nil {
 		t.Fatalf("WriteFile(%q): %v", sourcePath, err)
+	}
+	if err := os.WriteFile(runJavaClasspathSourcePath(runID), []byte(req.JavaClasspathContext.SourceArtifactID+"\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(%q): %v", runJavaClasspathSourcePath(runID), err)
 	}
 
 	workspace := t.TempDir()
@@ -197,5 +275,12 @@ func TestPrepareAndCaptureGateJavaClasspathInput(t *testing.T) {
 	outPath := filepath.Join(workspace, step.BuildGateWorkspaceOutDir, sbomJavaClasspathFileName)
 	if _, err := os.Stat(outPath); err != nil {
 		t.Fatalf("expected gate /out java classpath at %q: %v", outPath, err)
+	}
+	sourceArtifactRaw, err := os.ReadFile(runJavaClasspathSourcePath(runID))
+	if err != nil {
+		t.Fatalf("read gate classpath source artifact marker: %v", err)
+	}
+	if strings.TrimSpace(string(sourceArtifactRaw)) != req.JavaClasspathContext.SourceArtifactID {
+		t.Fatalf("gate source marker mismatch: got %q want %q", sourceArtifactRaw, req.JavaClasspathContext.SourceArtifactID)
 	}
 }
