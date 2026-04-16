@@ -28,6 +28,20 @@ func TestResolveJavaClasspathClaimContext(t *testing.T) {
 		}
 		return meta
 	}
+	preGateSBOMMeta := func() []byte {
+		meta, err := contracts.MarshalJobMeta(&contracts.JobMeta{
+			Kind: contracts.JobKindMig,
+			SBOM: &contracts.SBOMJobMetadata{
+				Phase:     contracts.SBOMPhasePre,
+				CycleName: "pre-gate",
+				Role:      contracts.SBOMRoleInitial,
+			},
+		})
+		if err != nil {
+			panic(err)
+		}
+		return meta
+	}
 
 	tests := []struct {
 		name      string
@@ -115,8 +129,10 @@ func TestResolveJavaClasspathClaimContext(t *testing.T) {
 						RepoID:  job.RepoID,
 						Attempt: job.Attempt,
 						NextID:  &migID,
+						Name:    "pre-gate-sbom-000",
 						JobType: domaintypes.JobTypeSBOM,
 						Status:  domaintypes.JobStatusSuccess,
+						Meta:    preGateSBOMMeta(),
 					},
 					{
 						ID:      migID,
@@ -175,8 +191,10 @@ func TestResolveJavaClasspathClaimContext(t *testing.T) {
 						RepoID:  job.RepoID,
 						Attempt: job.Attempt,
 						NextID:  &preGateID,
+						Name:    "pre-gate-sbom-000",
 						JobType: domaintypes.JobTypeSBOM,
 						Status:  domaintypes.JobStatusSuccess,
+						Meta:    preGateSBOMMeta(),
 					},
 					{
 						ID:      preGateID,
@@ -199,12 +217,15 @@ func TestResolveJavaClasspathClaimContext(t *testing.T) {
 					job,
 				}
 				st.getJobResults = map[domaintypes.JobID]store.Job{
-					migID: {
-						ID:      migID,
+					sbomID: {
+						ID:      sbomID,
 						RunID:   job.RunID,
 						RepoID:  job.RepoID,
 						Attempt: job.Attempt,
-						JobType: domaintypes.JobTypeMig,
+						Name:    "pre-gate-sbom-000",
+						JobType: domaintypes.JobTypeSBOM,
+						Status:  domaintypes.JobStatusSuccess,
+						Meta:    preGateSBOMMeta(),
 					},
 				}
 				name := "mig-out"
@@ -229,10 +250,98 @@ func TestResolveJavaClasspathClaimContext(t *testing.T) {
 				if st.listArtifactBundlesByRunAndJob.params.JobID == nil {
 					t.Fatal("ListArtifactBundlesByRunAndJob JobID=nil, want non-nil")
 				}
+				if got.SourceJobType != domaintypes.JobTypeSBOM {
+					t.Fatalf("context.SourceJobType=%q, want %q", got.SourceJobType, domaintypes.JobTypeSBOM)
+				}
 			},
 		},
 		{
-			name: "mirrored predecessor resolves source artifact from effective source job",
+			name: "post-gate predecessor does not override pre-gate classpath source",
+			job: func() store.Job {
+				runID := domaintypes.NewRunID()
+				repoID := domaintypes.NewRepoID()
+				jobID := domaintypes.NewJobID()
+				return store.Job{
+					ID:      jobID,
+					RunID:   runID,
+					RepoID:  repoID,
+					Attempt: 1,
+					JobType: domaintypes.JobTypeHook,
+				}
+			}(),
+			setup: func(t *testing.T, st *jobStore, job store.Job) {
+				t.Helper()
+				preSBOMID := domaintypes.NewJobID()
+				preGateID := domaintypes.NewJobID()
+				postSBOMID := domaintypes.NewJobID()
+				st.listJobsByRunRepoAttempt.val = []store.Job{
+					{
+						ID:      preSBOMID,
+						RunID:   job.RunID,
+						RepoID:  job.RepoID,
+						Attempt: job.Attempt,
+						NextID:  &preGateID,
+						Name:    "pre-gate-sbom-000",
+						JobType: domaintypes.JobTypeSBOM,
+						Status:  domaintypes.JobStatusSuccess,
+						Meta:    preGateSBOMMeta(),
+					},
+					{
+						ID:      preGateID,
+						RunID:   job.RunID,
+						RepoID:  job.RepoID,
+						Attempt: job.Attempt,
+						NextID:  &postSBOMID,
+						JobType: domaintypes.JobTypePreGate,
+						Status:  domaintypes.JobStatusSuccess,
+					},
+					{
+						ID:      postSBOMID,
+						RunID:   job.RunID,
+						RepoID:  job.RepoID,
+						Attempt: job.Attempt,
+						NextID:  &job.ID,
+						Name:    "post-gate-sbom-000",
+						JobType: domaintypes.JobTypeSBOM,
+						Status:  domaintypes.JobStatusSuccess,
+					},
+					job,
+				}
+				st.getJobResults = map[domaintypes.JobID]store.Job{
+					preSBOMID: {
+						ID:      preSBOMID,
+						RunID:   job.RunID,
+						RepoID:  job.RepoID,
+						Attempt: job.Attempt,
+						Name:    "pre-gate-sbom-000",
+						JobType: domaintypes.JobTypeSBOM,
+						Status:  domaintypes.JobStatusSuccess,
+						Meta:    preGateSBOMMeta(),
+					},
+				}
+				name := "mig-out"
+				st.listArtifactBundlesByRunAndJob.val = []store.ArtifactBundle{
+					{
+						ID:   pgtype.UUID{Bytes: testBundleIDA, Valid: true},
+						Name: &name,
+					},
+				}
+			},
+			assertion: func(t *testing.T, got *contracts.JavaClasspathClaimContext, st *jobStore) {
+				t.Helper()
+				if got == nil {
+					t.Fatal("context=nil, want non-nil")
+				}
+				if got.SourceArtifactID != testBundleIDA.String() {
+					t.Fatalf("context.SourceArtifactID=%q, want %q", got.SourceArtifactID, testBundleIDA.String())
+				}
+				if got.SourceJobType != domaintypes.JobTypeSBOM {
+					t.Fatalf("context.SourceJobType=%q, want %q", got.SourceJobType, domaintypes.JobTypeSBOM)
+				}
+			},
+		},
+		{
+			name: "java classpath source stays on pre-gate sbom when predecessor is mirrored gate",
 			job: func() store.Job {
 				runID := domaintypes.NewRunID()
 				repoID := domaintypes.NewRepoID()
@@ -257,8 +366,10 @@ func TestResolveJavaClasspathClaimContext(t *testing.T) {
 						RepoID:  job.RepoID,
 						Attempt: job.Attempt,
 						NextID:  &mirroredPreGateID,
+						Name:    "pre-gate-sbom-000",
 						JobType: domaintypes.JobTypeSBOM,
 						Status:  domaintypes.JobStatusSuccess,
+						Meta:    preGateSBOMMeta(),
 					},
 					{
 						ID:      mirroredPreGateID,
@@ -273,25 +384,18 @@ func TestResolveJavaClasspathClaimContext(t *testing.T) {
 					job,
 				}
 				st.getJobResults = map[domaintypes.JobID]store.Job{
-					mirroredPreGateID: {
-						ID:      mirroredPreGateID,
+					sbomID: {
+						ID:      sbomID,
 						RunID:   job.RunID,
 						RepoID:  job.RepoID,
 						Attempt: job.Attempt,
-						JobType: domaintypes.JobTypePreGate,
+						Name:    "pre-gate-sbom-000",
+						JobType: domaintypes.JobTypeSBOM,
 						Status:  domaintypes.JobStatusSuccess,
-						Meta:    buildMetaWithMirror(sourcePreGateID),
-					},
-					sourcePreGateID: {
-						ID:      sourcePreGateID,
-						RunID:   job.RunID,
-						RepoID:  job.RepoID,
-						Attempt: job.Attempt,
-						JobType: domaintypes.JobTypePreGate,
-						Status:  domaintypes.JobStatusSuccess,
+						Meta:    preGateSBOMMeta(),
 					},
 				}
-				name := "build-gate-out"
+				name := "mig-out"
 				st.listArtifactBundlesByRunAndJob.val = []store.ArtifactBundle{
 					{
 						ID:   pgtype.UUID{Bytes: testBundleIDB, Valid: true},
@@ -314,8 +418,8 @@ func TestResolveJavaClasspathClaimContext(t *testing.T) {
 				if got.SourceJobID.IsZero() {
 					t.Fatal("context.SourceJobID is zero, want source job id")
 				}
-				if got.SourceJobType != domaintypes.JobTypePreGate {
-					t.Fatalf("context.SourceJobType=%q, want %q", got.SourceJobType, domaintypes.JobTypePreGate)
+				if got.SourceJobType != domaintypes.JobTypeSBOM {
+					t.Fatalf("context.SourceJobType=%q, want %q", got.SourceJobType, domaintypes.JobTypeSBOM)
 				}
 				if *params.JobID != got.SourceJobID {
 					t.Fatalf("artifact lookup job_id=%s, want context source job id=%s", *params.JobID, got.SourceJobID)

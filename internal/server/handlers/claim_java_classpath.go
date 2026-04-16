@@ -44,11 +44,12 @@ func resolveJavaClasspathClaimContext(
 	if jobType == domaintypes.JobTypeHeal && domaintypes.JobType(predecessor.JobType) == domaintypes.JobTypeSBOM {
 		return nil, nil
 	}
-	if !hasSuccessfulSBOMAncestor(predecessorByID, jobsByID, predecessor.ID) {
+	sourceSBOM, ok := resolveRunClasspathSourceSBOM(predecessorByID, jobsByID, predecessor.ID)
+	if !ok {
 		return nil, nil
 	}
 
-	source, err := resolveEffectiveSourceJob(ctx, st, predecessor.ID)
+	source, err := resolveEffectiveSourceJob(ctx, st, sourceSBOM.ID)
 	if err != nil {
 		return nil, fmt.Errorf("resolve java classpath source job: %w", err)
 	}
@@ -80,40 +81,52 @@ func buildJobPredecessorIndex(jobs []store.Job) (map[domaintypes.JobID]store.Job
 	return predecessorByID, nil
 }
 
-func hasSuccessfulSBOMAncestor(
+func resolveRunClasspathSourceSBOM(
 	predecessorByID map[domaintypes.JobID]store.Job,
 	jobsByID map[domaintypes.JobID]store.Job,
 	start domaintypes.JobID,
-) bool {
+) (store.Job, bool) {
 	if start.IsZero() {
-		return false
+		return store.Job{}, false
 	}
 	visited := make(map[domaintypes.JobID]struct{}, len(jobsByID))
 	current := start
+	var selected store.Job
 	for {
 		if _, seen := visited[current]; seen {
-			return false
+			return store.Job{}, false
 		}
 		visited[current] = struct{}{}
 
 		job, ok := jobsByID[current]
 		if !ok {
-			return false
+			return store.Job{}, false
 		}
-		if isSuccessfulSBOMJob(job) {
-			return true
+		if isSuccessfulPreGateSBOMJob(job) {
+			// Preserve the earliest successful pre-gate source in chain traversal.
+			selected = job
 		}
 		next, ok := predecessorByID[current]
 		if !ok {
-			return false
+			if selected.ID.IsZero() {
+				return store.Job{}, false
+			}
+			return selected, true
 		}
 		current = next.ID
 	}
 }
 
-func isSuccessfulSBOMJob(job store.Job) bool {
-	return domaintypes.JobType(job.JobType) == domaintypes.JobTypeSBOM &&
-		domaintypes.JobStatus(job.Status) == domaintypes.JobStatusSuccess
+func isSuccessfulPreGateSBOMJob(job store.Job) bool {
+	if domaintypes.JobType(job.JobType) != domaintypes.JobTypeSBOM ||
+		domaintypes.JobStatus(job.Status) != domaintypes.JobStatusSuccess {
+		return false
+	}
+	ctx, ok := sbomCycleContextFromJob(job)
+	if !ok {
+		return false
+	}
+	return strings.TrimSpace(ctx.Phase) == contracts.SBOMPhasePre
 }
 
 func resolveJavaClasspathSourceArtifactID(
