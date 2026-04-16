@@ -96,6 +96,7 @@ items:
       - "Non-migration completion handling keeps current behavior for unrelated job families."
     reasoning: "high"
     cfp: 9
+    commit: 4e7c19dd
   - done: false
     reviews: []
     label: "4"
