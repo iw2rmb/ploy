@@ -68,6 +68,7 @@ items:
       - "Existing job status projection for non-child status endpoints stays unchanged."
     reasoning: "medium"
     cfp: 8
+    commit: e0833cfd
   - done: false
     reviews: []
     label: "3"
