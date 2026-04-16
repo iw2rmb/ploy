@@ -129,6 +129,7 @@ items:
       - "Existing gate command execution and child-build status polling semantics stay unchanged apart from added runtime context and artifact materialization."
     reasoning: "medium"
     cfp: 8
+    commit: 1fe10d80
   - done: false
     reviews: []
     label: "5"
