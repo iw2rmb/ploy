@@ -1,6 +1,7 @@
 package nodeagent
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -31,6 +32,13 @@ func (r *runController) finalizeSBOMFlowOutputs(runID types.RunID, cycleName, ou
 	}
 	if !contract.persistClasspath {
 		return nil
+	}
+	// The run-level java.classpath contract has a single source per run.
+	// Keep the first valid pre-gate source and avoid overwriting it on retry sbom jobs.
+	if err := validateJavaClasspathPath(runJavaClasspathPath(runID)); err == nil {
+		return nil
+	} else if !errors.Is(err, os.ErrNotExist) {
+		// Invalid cached classpath is treated as unset and repaired from current output.
 	}
 	classpathPath := filepath.Join(outDir, sbomJavaClasspathFileName)
 	if err := persistRunJavaClasspath(runID, classpathPath); err != nil {
