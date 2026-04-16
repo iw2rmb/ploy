@@ -90,15 +90,9 @@ func (r *runController) populateHealingInDir(
 	}
 	slog.Info("hydrated /in/build-gate.log for healing job", "run_id", runID, "path", destPath)
 	if len(recoveryCtx.Errors) > 0 {
-		var parsed any
-		if err := json.Unmarshal(recoveryCtx.Errors, &parsed); err != nil {
+		parsed, err := parseStructuredErrorsPayload(recoveryCtx.Errors)
+		if err != nil {
 			return fmt.Errorf("parse recovery_context.errors: %w", err)
-		}
-		switch parsed.(type) {
-		case map[string]any, []any:
-			// allowed
-		default:
-			return fmt.Errorf("parse recovery_context.errors: expected object or array")
 		}
 		if schemaPath, schemaRaw, ok, err := resolveTrimmerSchemaForRecovery(recoveryCtx); err != nil {
 			return fmt.Errorf("resolve trimmer schema: %w", err)

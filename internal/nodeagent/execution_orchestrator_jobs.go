@@ -735,6 +735,14 @@ func (r *runController) executeMigJob(ctx context.Context, req StartRunRequest) 
 		PopulateInDir: func(inDir string) error {
 			return r.materializeJavaClasspathInDir(ctx, req, inDir)
 		},
+		PrepareManifest: func(m *contracts.StepManifest, ws string) error {
+			r.injectChildBuildRuntimeEnvVars(m, ws, req.JobID)
+			r.mountChildBuildTLSCerts(m)
+			return nil
+		},
+		ValidateOutputs: func(outDir, _ string) error {
+			return r.materializeParentChildBuildLineage(outDir, req.RecoveryContext)
+		},
 		WorkspacePolicy:           workspaceChangePolicyIgnore,
 		UploadConfiguredArtifacts: true,
 		UploadDiff: func(ctx context.Context, runID types.RunID, jobID types.JobID, jobName string, diffGen step.DiffGenerator, baseDir, workspace string, result step.Result) {
@@ -807,9 +815,12 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 			return r.populateHealingInDir(req.RunID, inDir, req.RecoveryContext, schemaJSON)
 		},
 		PrepareManifest: func(m *contracts.StepManifest, ws string) error {
-			r.injectHealingEnvVars(m, ws)
+			r.injectHealingEnvVars(m, ws, req.JobID)
 			r.mountHealingTLSCerts(m)
 			return nil
+		},
+		ValidateOutputs: func(outDir, _ string) error {
+			return r.materializeParentChildBuildLineage(outDir, req.RecoveryContext)
 		},
 		WorkspacePolicy: workspacePolicy,
 		UploadDiff: func(ctx context.Context, runID types.RunID, jobID types.JobID, jobName string, diffGen step.DiffGenerator, baseDir, workspace string, result step.Result) {
