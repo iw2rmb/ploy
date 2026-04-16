@@ -740,7 +740,7 @@ func (r *runController) executeMigJob(ctx context.Context, req StartRunRequest) 
 			r.mountChildBuildTLSCerts(m)
 			return nil
 		},
-		ValidateOutputs: func(outDir, _ string) error {
+		FinalizeOutputs: func(outDir, _ string) error {
 			return r.materializeParentChildBuildLineage(outDir, req.RecoveryContext)
 		},
 		WorkspacePolicy:           workspaceChangePolicyIgnore,
@@ -819,7 +819,7 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 			r.mountHealingTLSCerts(m)
 			return nil
 		},
-		ValidateOutputs: func(outDir, _ string) error {
+		FinalizeOutputs: func(outDir, _ string) error {
 			return r.materializeParentChildBuildLineage(outDir, req.RecoveryContext)
 		},
 		WorkspacePolicy: workspacePolicy,
@@ -1117,6 +1117,7 @@ type standardJobConfig struct {
 	PopulateInDir   func(inDir string) error
 	PrepareManifest func(manifest *contracts.StepManifest, workspace string) error
 	ValidateOutputs func(outDir, workspace string) error
+	FinalizeOutputs func(outDir, workspace string) error
 	TrySkip         func(ctx context.Context, manifest contracts.StepManifest, workspace, outDir string) (bool, error)
 
 	WorkspacePolicy           workspaceChangePolicy
@@ -1262,6 +1263,7 @@ func (r *runController) runContainerJob(
 					runErr = fmt.Errorf("validate job outputs: %w", validateErr)
 				}
 			}
+			runErr = r.finalizeStandardJobOutputs(req, cfg, outDir, workspace, runErr, step.Result{})
 			repoSHAOut := r.computeRepoSHAOut(ctx, req, workspace, "")
 			statsBuilder := types.NewRunStatsBuilder().
 				ExitCode(0).
@@ -1327,6 +1329,7 @@ func (r *runController) runContainerJob(
 			runErr = fmt.Errorf("capture java classpath outputs: %w", captureErr)
 		}
 	}
+	runErr = r.finalizeStandardJobOutputs(req, cfg, outDir, workspace, runErr, result)
 	duration = time.Since(startTime)
 
 	if runErr != nil || result.ExitCode != 0 {
@@ -1408,6 +1411,31 @@ func (r *runController) runContainerJob(
 		r.reportTerminalStatus(ctx, req, runErr, result, stats, repoSHAOut, duration)
 	}
 	return outcome, nil
+}
+
+func (r *runController) finalizeStandardJobOutputs(
+	req StartRunRequest,
+	cfg standardJobConfig,
+	outDir, workspace string,
+	runErr error,
+	result step.Result,
+) error {
+	if cfg.FinalizeOutputs == nil {
+		return runErr
+	}
+	if finalizeErr := cfg.FinalizeOutputs(outDir, workspace); finalizeErr != nil {
+		// Keep non-zero container exits mapped to their original fail/error
+		// semantics while still attempting lineage finalization.
+		if runErr != nil || result.ExitCode != 0 {
+			slog.Warn("failed to finalize job outputs after non-zero execution",
+				"run_id", req.RunID,
+				"job_id", req.JobID,
+				"error", finalizeErr)
+			return runErr
+		}
+		return fmt.Errorf("finalize job outputs: %w", finalizeErr)
+	}
+	return runErr
 }
 
 func restoreSBOMOutFilesFromBundle(bundle []byte, outDir string) (int, error) {
