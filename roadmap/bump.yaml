@@ -10,7 +10,7 @@ documentation:
 done: false
 reviews: []
 items:
-  - done: false
+  - done: true
     reviews:
       - gaps: ["\"OpenAPI advertises both endpoints with request and response schema examples matching design contract.\" is not fully met: `docs/api/paths/jobs_parent_job_id_builds_child_job_id.yaml:35` defines GET 200 with only `child_job_id` and `status`, while `design/bump.md:83` requires `job_id`, `status`, `terminal`, and `success` in the polling response contract.", "\"Route coverage tests prove both endpoints are reachable under worker auth and reject malformed path values.\" is not fully proven by current tests: `internal/server/handlers/jobs_build_routes_test.go:146` calls handlers directly (bypasses route registration/auth middleware), so it does not validate worker-auth route wiring end-to-end; it also only checks empty path values, not malformed ID formats at routed endpoint level."]
         commit: c013bf9e
