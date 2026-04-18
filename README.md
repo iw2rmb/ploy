@@ -52,5 +52,6 @@ ploy mig run \
 - Environment variables: `docs/envs/README.md`
 - Migs lifecycle: `docs/migs-lifecycle.md`
 - TUI usage: `docs/how-to/tui-navigation.md`
+- Java dependency usage extractor: `docs/how-to/java-dependency-usage-extractor.md`
 
 License: see `LICENSE` when present.
