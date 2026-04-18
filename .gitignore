@@ -35,6 +35,7 @@ __pycache__/
 java/target
 java/*-work
 java/*.json
+!java/report.schema.json
 java/*.classpath
 java/*.txt
 java/*.log
