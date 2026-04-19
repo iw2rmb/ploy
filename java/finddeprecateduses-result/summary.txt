@@ -1,0 +1,10 @@
+recipe=org.openrewrite.java.search.FindDeprecatedUses
+image=ghcr.io/iw2rmb/ploy/orw-cli-gradle:v0.1.7
+stage_dir=/Users/v.v.kovalev/@iw2rmb/ploy/tmp/capital-funds-api-synth-20260417-193636
+classpath_file=/Users/v.v.kovalev/@iw2rmb/ploy/tmp/capital-funds-api-synth-20260417-193636/.ploy-sbom-out/java.classpath
+ploy_stack_tool=gradle
+orw_repos=file:///root/.m2/repository
+orw_exclude_paths=src/test/**,**/src/test/**,**/*.proto
+exit_code=0
+marker_count=63
+timestamp_utc=2026-04-19T18:28:55Z

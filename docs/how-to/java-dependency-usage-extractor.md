@@ -61,10 +61,7 @@ Without `--output`, JSON is printed to stdout.
 {
   "usages": [
     {
-      "package": "org.springframework",
-      "groupId": "org.springframework",
-      "artifactId": "spring-context",
-      "version": "6.1.9",
+      "ga": "org.springframework:spring-context@6.1.9",
       "symbols": [
         "org.springframework.context.ApplicationContext#getBean(java.lang.String)",
         "org.springframework.web.client.RestTemplate#exchange(org.springframework.http.HttpEntity,java.lang.Class)"
@@ -76,8 +73,5 @@ Without `--output`, JSON is printed to stdout.
 
 Notes:
 
-- `package` is:
-  - the matched target prefix (longest-prefix match) when `--target-package` is used
-  - the resolved symbol package when `--no-target-filter` is used
-- `groupId`/`artifactId`/`version` are inferred from classpath JAR paths (Maven/Gradle cache layouts), otherwise `"unknown"`.
+- `ga` is `groupId:artifactId@version` inferred from classpath JAR paths (Maven/Gradle cache layouts), otherwise `"unknown:unknown@unknown"`.
 - `symbols` are deduplicated and sorted.

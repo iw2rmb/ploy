@@ -15,20 +15,8 @@ public final class DependencyUsageJsonWriter {
                 DependencyUsageExtractor.UsageGroup usage = usages.get(i);
                 out.append("    {\n");
                 out
-                    .append("      \"package\": \"")
-                    .append(escape(usage.getDependencyPackage()))
-                    .append("\",\n");
-                out
-                    .append("      \"groupId\": \"")
-                    .append(escape(usage.getGroupId()))
-                    .append("\",\n");
-                out
-                    .append("      \"artifactId\": \"")
-                    .append(escape(usage.getArtifactId()))
-                    .append("\",\n");
-                out
-                    .append("      \"version\": \"")
-                    .append(escape(usage.getVersion()))
+                    .append("      \"ga\": \"")
+                    .append(escape(usage.getGa()))
                     .append("\",\n");
                 out.append("      \"symbols\": [");
 

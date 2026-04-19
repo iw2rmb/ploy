@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ploy.local/java/deprecated-usage-report.schema.json",
+  "title": "Java Deprecated Usage Report",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["ga", "symbols"],
+    "properties": {
+      "ga": {
+        "type": "string",
+        "pattern": "^[^:@]+:[^:@]+@.+$",
+        "$comment": "Dependency coordinate in group:artifact@version form."
+      },
+      "symbols": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["symbol", "deprecation_note"],
+          "properties": {
+            "symbol": {
+              "type": "string",
+              "$comment": "Fully-qualified symbol from dependency usage report that is deprecated in project-used dependency version."
+            },
+            "deprecation_note": {
+              "type": ["string", "null"],
+              "$comment": "Deprecation note from project-used dependency version."
+            }
+          }
+        }
+      }
+    }
+  }
+}
