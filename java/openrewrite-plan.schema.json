@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ploy.local/java/openrewrite-plan.schema.json",
+  "title": "OpenRewrite Report-Driven Plan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["generatedAt", "inputReport", "catalog", "ranker", "target", "changes", "selected"],
+  "properties": {
+    "generatedAt": { "type": "string", "format": "date-time" },
+    "inputReport": { "type": "string" },
+    "catalog": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dir", "scope", "recipeCount", "refreshed"],
+      "properties": {
+        "dir": { "type": "string" },
+        "scope": { "type": "string", "enum": ["official-oss"] },
+        "recipeCount": { "type": "integer", "minimum": 0 },
+        "refreshed": { "type": "boolean" }
+      }
+    },
+    "ranker": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "fallback", "fallbackReason"],
+      "properties": {
+        "mode": { "type": "string", "enum": ["deterministic", "hybrid"] },
+        "fallback": { "type": "boolean" },
+        "fallbackReason": { "type": ["string", "null"] }
+      }
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "changes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "changeId",
+          "updateGA",
+          "kind",
+          "class",
+          "member",
+          "type",
+          "javadocNote",
+          "topCandidates",
+          "bestScore",
+          "coverage",
+          "selectedRecipe"
+        ],
+        "properties": {
+          "changeId": { "type": "string" },
+          "updateGA": { "type": "string" },
+          "kind": { "type": "string" },
+          "class": { "type": "string" },
+          "member": { "type": ["string", "null"] },
+          "type": { "type": "string" },
+          "javadocNote": { "type": "string" },
+          "bestScore": { "type": "number" },
+          "coverage": { "type": "string", "enum": ["covered_fully", "covered_partially", "uncovered"] },
+          "selectedRecipe": { "type": ["string", "null"] },
+          "topCandidates": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["name", "score", "composite", "displayName", "artifact"],
+              "properties": {
+                "name": { "type": "string" },
+                "score": { "type": "number" },
+                "composite": { "type": "boolean" },
+                "displayName": { "type": ["string", "null"] },
+                "artifact": {
+                  "type": ["object", "null"],
+                  "additionalProperties": false,
+                  "required": ["group", "artifact", "version"],
+                  "properties": {
+                    "group": { "type": "string" },
+                    "artifact": { "type": "string" },
+                    "version": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "selected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["composite_order", "atomic_order", "rewrite_recipe_list"],
+      "properties": {
+        "composite_order": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "atomic_order": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "rewrite_recipe_list": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    }
+  }
+}

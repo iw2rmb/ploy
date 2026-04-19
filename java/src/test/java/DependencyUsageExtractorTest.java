@@ -172,10 +172,7 @@ class DependencyUsageExtractorTest {
 
         assertEquals(1, result.getUsages().size());
         DependencyUsageExtractor.UsageGroup usage = result.getUsages().get(0);
-        assertEquals("org.example", usage.getDependencyPackage());
-        assertEquals("org.example", usage.getGroupId());
-        assertEquals("lib", usage.getArtifactId());
-        assertEquals("1.2.3", usage.getVersion());
+        assertEquals("org.example:lib@1.2.3", usage.getGa());
 
         Set<String> symbols = new HashSet<String>(usage.getSymbols());
         assertTrue(symbols.contains("org.example.lib.Api"));
@@ -194,16 +191,7 @@ class DependencyUsageExtractorTest {
         assertTrue(!unfiltered.getUsages().isEmpty());
         boolean foundUnfilteredSymbol = false;
         for (DependencyUsageExtractor.UsageGroup usageGroup : unfiltered.getUsages()) {
-            if (!"org.example.lib".equals(usageGroup.getDependencyPackage())) {
-                continue;
-            }
-            if (!"org.example".equals(usageGroup.getGroupId())) {
-                continue;
-            }
-            if (!"lib".equals(usageGroup.getArtifactId())) {
-                continue;
-            }
-            if (!"1.2.3".equals(usageGroup.getVersion())) {
+            if (!"org.example:lib@1.2.3".equals(usageGroup.getGa())) {
                 continue;
             }
             if (
@@ -218,11 +206,99 @@ class DependencyUsageExtractorTest {
         assertTrue(foundUnfilteredSymbol);
     }
 
+    @Test
+    void analyzeResolvesDependencyMethodsUsingClasspathDirectoryTypes()
+        throws Exception {
+        JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
+        Assumptions.assumeTrue(compiler != null, "JDK compiler is required");
+
+        Path tempDir = Files.createTempDirectory("dep-usage-extractor-dircp-test");
+        Path repoRoot = tempDir.resolve("repo");
+        Path mainSourceDir = repoRoot.resolve("src/main/java/com/acme");
+        Path generatedSourceDir = repoRoot.resolve(
+            "build/generated/sources/proto/main/java/com/acme/gen"
+        );
+        Path generatedClassesDir = repoRoot.resolve("build/classes/java/main");
+        Files.createDirectories(mainSourceDir);
+        Files.createDirectories(generatedSourceDir);
+        Files.createDirectories(generatedClassesDir);
+
+        String generatedTypeSource =
+            "package com.acme.gen;\n" +
+            "public class GenStub {\n" +
+            "  public static GenStub create() { return new GenStub(); }\n" +
+            "}\n";
+        Path generatedTypeFile = generatedSourceDir.resolve("GenStub.java");
+        Files.write(
+            generatedTypeFile,
+            generatedTypeSource.getBytes(StandardCharsets.UTF_8)
+        );
+        compileJavaSources(
+            Collections.singletonList(generatedTypeFile),
+            generatedClassesDir,
+            Collections.emptyList(),
+            compiler
+        );
+
+        String mainSource =
+            "package com.acme;\n" +
+            "import com.acme.gen.GenStub;\n" +
+            "import org.example.lib.Api;\n" +
+            "public class App {\n" +
+            "  public void run() {\n" +
+            "    Api.call(GenStub.create());\n" +
+            "  }\n" +
+            "}\n";
+        Files.write(
+            mainSourceDir.resolve("App.java"),
+            mainSource.getBytes(StandardCharsets.UTF_8)
+        );
+
+        String dependencySource =
+            "package org.example.lib;\n" +
+            "import com.acme.gen.GenStub;\n" +
+            "public class Api {\n" +
+            "  public static void call(GenStub stub) {}\n" +
+            "}\n";
+        Path dependencyJar = createDependencyJar(
+            tempDir.resolve("m2/repository/org/example/lib/1.2.3/lib-1.2.3.jar"),
+            dependencySource,
+            Collections.singletonList(generatedClassesDir),
+            compiler
+        );
+
+        Path classpathFile = tempDir.resolve("java.classpath");
+        Files.write(
+            classpathFile,
+            (
+                generatedClassesDir.toAbsolutePath().toString() +
+                "\n" +
+                dependencyJar.toAbsolutePath().toString() +
+                "\n"
+            ).getBytes(StandardCharsets.UTF_8)
+        );
+
+        DependencyUsageExtractor extractor = new DependencyUsageExtractor();
+        DependencyUsageExtractor.Result result = extractor.analyze(
+            new DependencyUsageExtractor.Config(
+                repoRoot,
+                classpathFile,
+                Collections.singletonList("org.example")
+            )
+        );
+
+        assertEquals(1, result.getUsages().size());
+        DependencyUsageExtractor.UsageGroup usage = result.getUsages().get(0);
+        assertEquals("org.example:lib@1.2.3", usage.getGa());
+        assertTrue(
+            usage.getSymbols().contains(
+                    "org.example.lib.Api#call(com.acme.gen.GenStub)"
+                )
+        );
+    }
+
     private static Path createDependencyJar(Path jarPath, JavaCompiler compiler)
         throws IOException {
-        Path sourceRoot = jarPath.getParent().resolve("src");
-        Path sourceFile = sourceRoot.resolve("org/example/lib/Api.java");
-        Files.createDirectories(sourceFile.getParent());
         String source =
             "package org.example.lib;\n" +
             "public class Api {\n" +
@@ -231,28 +307,34 @@ class DependencyUsageExtractorTest {
             "  public String call(int value) { return String.valueOf(value); }\n" +
             "  public void testOnly() {}\n" +
             "}\n";
+        return createDependencyJar(
+            jarPath,
+            source,
+            Collections.emptyList(),
+            compiler
+        );
+    }
+
+    private static Path createDependencyJar(
+        Path jarPath,
+        String source,
+        List<Path> classpathEntries,
+        JavaCompiler compiler
+    ) throws IOException {
+        Path sourceRoot = jarPath.getParent().resolve("src");
+        Path sourceFile = sourceRoot.resolve("org/example/lib/Api.java");
+        Files.createDirectories(sourceFile.getParent());
         Files.write(sourceFile, source.getBytes(StandardCharsets.UTF_8));
 
         Path classesDir = jarPath.getParent().resolve("classes");
         Files.createDirectories(classesDir);
 
-        try (
-            StandardJavaFileManager fileManager = compiler.getStandardFileManager(
-                null,
-                null,
-                StandardCharsets.UTF_8
-            )
-        ) {
-            Iterable<? extends JavaFileObject> compilationUnits =
-                fileManager.getJavaFileObjects(
-                sourceFile.toFile()
-            );
-            List<String> options = Arrays.asList("-d", classesDir.toString());
-            Boolean ok = compiler
-                .getTask(null, fileManager, null, options, null, compilationUnits)
-                .call();
-            assertTrue(Boolean.TRUE.equals(ok), "dependency compilation failed");
-        }
+        compileJavaSources(
+            Collections.singletonList(sourceFile),
+            classesDir,
+            classpathEntries,
+            compiler
+        );
 
         List<Path> classFiles = collectClassFiles(classesDir);
         Files.createDirectories(jarPath.getParent());
@@ -269,6 +351,50 @@ class DependencyUsageExtractorTest {
         }
 
         return jarPath;
+    }
+
+    private static void compileJavaSources(
+        List<Path> sourceFiles,
+        Path classesDir,
+        List<Path> classpathEntries,
+        JavaCompiler compiler
+    ) throws IOException {
+        try (
+            StandardJavaFileManager fileManager = compiler.getStandardFileManager(
+                null,
+                null,
+                StandardCharsets.UTF_8
+            )
+        ) {
+            List<java.io.File> sourceFilesAsFiles = new ArrayList<java.io.File>();
+            for (Path sourceFile : sourceFiles) {
+                sourceFilesAsFiles.add(sourceFile.toFile());
+            }
+            Iterable<? extends JavaFileObject> compilationUnits =
+                fileManager.getJavaFileObjectsFromFiles(
+                sourceFilesAsFiles
+            );
+            List<String> options = new ArrayList<String>();
+            options.add("-d");
+            options.add(classesDir.toString());
+            if (!classpathEntries.isEmpty()) {
+                options.add("-classpath");
+                options.add(
+                    String.join(
+                        System.getProperty("path.separator"),
+                        classpathEntries
+                            .stream()
+                            .map(path -> path.toAbsolutePath().toString())
+                            .toArray(String[]::new)
+                    )
+                );
+            }
+
+            Boolean ok = compiler
+                .getTask(null, fileManager, null, options, null, compilationUnits)
+                .call();
+            assertTrue(Boolean.TRUE.equals(ok), "dependency compilation failed");
+        }
     }
 
     private static List<Path> collectClassFiles(Path classesDir) throws IOException {

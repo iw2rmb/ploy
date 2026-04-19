@@ -1,0 +1,7 @@
+{
+  "recipe": "org.openrewrite.java.search.FindDeprecatedUses",
+  "stage_dir": "/Users/v.v.kovalev/@iw2rmb/ploy/tmp/capital-funds-api-synth-20260417-193636",
+  "markers_file": "/Users/v.v.kovalev/@iw2rmb/ploy/java/finddeprecateduses-result/deprecated-use-markers.txt",
+  "marker_count": 63,
+  "exit_code": 0
+}

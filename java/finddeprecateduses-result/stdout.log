@@ -1,0 +1,8 @@
+[orw-cli] Running OpenRewrite CLI
+[orw-cli] Coords: org.openrewrite:rewrite-java:8.74.3
+[orw-cli] Active recipes: org.openrewrite.java.search.FindDeprecatedUses
+[orw-cli] Java classpath file: /in/java.classpath
+[rewrite] Java classpath entries: 226
+[rewrite] Excluded paths: 85
+[rewrite] Parsed files: 396
+[rewrite] Applied results: 27

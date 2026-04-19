@@ -16,11 +16,14 @@ import com.github.javaparser.resolution.types.ResolvedArrayType;
 import com.github.javaparser.resolution.types.ResolvedReferenceType;
 import com.github.javaparser.resolution.types.ResolvedType;
 import com.github.javaparser.symbolsolver.JavaSymbolSolver;
+import com.github.javaparser.symbolsolver.resolution.typesolvers.ClassLoaderTypeSolver;
 import com.github.javaparser.symbolsolver.resolution.typesolvers.CombinedTypeSolver;
 import com.github.javaparser.symbolsolver.resolution.typesolvers.JarTypeSolver;
 import com.github.javaparser.symbolsolver.resolution.typesolvers.JavaParserTypeSolver;
 import com.github.javaparser.symbolsolver.resolution.typesolvers.ReflectionTypeSolver;
 import java.io.IOException;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileVisitResult;
 import java.nio.file.FileVisitor;
@@ -78,7 +81,11 @@ public class DependencyUsageExtractor {
             normalized.getTargetPackages()
         );
 
-        CombinedTypeSolver typeSolver = buildTypeSolver(sourceRoots, jarEntries);
+        CombinedTypeSolver typeSolver = buildTypeSolver(
+            sourceRoots,
+            classpathEntries,
+            jarEntries
+        );
         JavaParser parser = newParser(typeSolver);
         UsageCollector collector = new UsageCollector(
             normalized.getTargetPackages(),
@@ -189,6 +196,7 @@ public class DependencyUsageExtractor {
 
     private static CombinedTypeSolver buildTypeSolver(
         List<Path> sourceRoots,
+        List<Path> classpathEntries,
         List<Path> jarEntries
     ) {
         CombinedTypeSolver solver = new CombinedTypeSolver();
@@ -206,7 +214,35 @@ public class DependencyUsageExtractor {
             }
         }
 
+        ClassLoaderTypeSolver classpathSolver = classpathTypeSolver(classpathEntries);
+        if (classpathSolver != null) {
+            solver.add(classpathSolver);
+        }
+
         return solver;
+    }
+
+    private static ClassLoaderTypeSolver classpathTypeSolver(
+        List<Path> classpathEntries
+    ) {
+        LinkedHashSet<URL> urls = new LinkedHashSet<URL>();
+        for (Path entry : classpathEntries) {
+            if (!Files.exists(entry)) {
+                continue;
+            }
+            try {
+                urls.add(entry.toUri().toURL());
+            } catch (Exception ignored) {}
+        }
+        if (urls.isEmpty()) {
+            return null;
+        }
+
+        URLClassLoader classLoader = new URLClassLoader(
+            urls.toArray(new URL[0]),
+            DependencyUsageExtractor.class.getClassLoader()
+        );
+        return new ClassLoaderTypeSolver(classLoader);
     }
 
     private static JavaParser newParser(CombinedTypeSolver typeSolver) {
@@ -451,40 +487,16 @@ public class DependencyUsageExtractor {
     }
 
     public static final class UsageGroup {
-        private final String dependencyPackage;
-        private final String groupId;
-        private final String artifactId;
-        private final String version;
+        private final String ga;
         private final List<String> symbols;
 
-        UsageGroup(
-            String dependencyPackage,
-            String groupId,
-            String artifactId,
-            String version,
-            List<String> symbols
-        ) {
-            this.dependencyPackage = dependencyPackage;
-            this.groupId = groupId;
-            this.artifactId = artifactId;
-            this.version = version;
+        UsageGroup(String ga, List<String> symbols) {
+            this.ga = ga;
             this.symbols = symbols;
         }
 
-        public String getDependencyPackage() {
-            return dependencyPackage;
-        }
-
-        public String getGroupId() {
-            return groupId;
-        }
-
-        public String getArtifactId() {
-            return artifactId;
-        }
-
-        public String getVersion() {
-            return version;
+        public String getGa() {
+            return ga;
         }
 
         public List<String> getSymbols() {
@@ -567,10 +579,7 @@ public class DependencyUsageExtractor {
             for (Map.Entry<UsageKey, TreeSet<String>> entry : usageByKey.entrySet()) {
                 usages.add(
                     new UsageGroup(
-                        entry.getKey().dependencyPackage,
-                        entry.getKey().groupId,
-                        entry.getKey().artifactId,
-                        entry.getKey().version,
+                        entry.getKey().ga,
                         Collections.unmodifiableList(
                             new ArrayList<String>(entry.getValue())
                         )
@@ -608,12 +617,7 @@ public class DependencyUsageExtractor {
             DependencyCoordinates dependency = dependencyIndex.dependencyForType(
                 ownerType
             );
-            UsageKey key = new UsageKey(
-                matchedTarget,
-                dependency.getGroupId(),
-                dependency.getArtifactId(),
-                dependency.getVersion()
-            );
+            UsageKey key = new UsageKey(dependency.getGa());
             TreeSet<String> symbols = usageByKey.get(key);
             if (symbols == null) {
                 symbols = new TreeSet<String>();
@@ -704,38 +708,15 @@ public class DependencyUsageExtractor {
     }
 
     private static final class UsageKey implements Comparable<UsageKey> {
-        private final String dependencyPackage;
-        private final String groupId;
-        private final String artifactId;
-        private final String version;
+        private final String ga;
 
-        UsageKey(
-            String dependencyPackage,
-            String groupId,
-            String artifactId,
-            String version
-        ) {
-            this.dependencyPackage = dependencyPackage;
-            this.groupId = groupId;
-            this.artifactId = artifactId;
-            this.version = version;
+        UsageKey(String ga) {
+            this.ga = ga;
         }
 
         @Override
         public int compareTo(UsageKey other) {
-            int byPackage = dependencyPackage.compareTo(other.dependencyPackage);
-            if (byPackage != 0) {
-                return byPackage;
-            }
-            int byGroup = groupId.compareTo(other.groupId);
-            if (byGroup != 0) {
-                return byGroup;
-            }
-            int byArtifact = artifactId.compareTo(other.artifactId);
-            if (byArtifact != 0) {
-                return byArtifact;
-            }
-            return version.compareTo(other.version);
+            return ga.compareTo(other.ga);
         }
 
         @Override
@@ -747,17 +728,12 @@ public class DependencyUsageExtractor {
                 return false;
             }
             UsageKey other = (UsageKey) obj;
-            return (
-                dependencyPackage.equals(other.dependencyPackage) &&
-                groupId.equals(other.groupId) &&
-                artifactId.equals(other.artifactId) &&
-                version.equals(other.version)
-            );
+            return ga.equals(other.ga);
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(dependencyPackage, groupId, artifactId, version);
+            return Objects.hash(ga);
         }
     }
 
@@ -790,6 +766,10 @@ public class DependencyUsageExtractor {
 
         String getVersion() {
             return version;
+        }
+
+        String getGa() {
+            return groupId + ":" + artifactId + "@" + version;
         }
 
         private static String safe(String value, String fallback) {

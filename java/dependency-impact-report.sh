@@ -292,13 +292,16 @@ du_json="$WORK_DIR/dependency-usage.nofilter.json"
 
 du_by_ga_json="$WORK_DIR/dependency-usage.by-ga.json"
 jq '
+  def ga_no_version($ga):
+    (($ga // "") | split("@")[0]);
+
   reduce (.usages // [])[] as $u (
     {};
-    if (($u.groupId // "unknown") == "unknown" or ($u.artifactId // "unknown") == "unknown") then
+    (ga_no_version($u.ga)) as $ga
+    | if ($ga == "" or $ga == "unknown:unknown") then
       .
     else
-      .[$u.groupId + ":" + $u.artifactId] =
-        ((.[$u.groupId + ":" + $u.artifactId] // []) + ($u.symbols // []))
+      .[$ga] = ((.[$ga] // []) + ($u.symbols // []))
     end
   )
   | with_entries(.value |= (unique | sort))
