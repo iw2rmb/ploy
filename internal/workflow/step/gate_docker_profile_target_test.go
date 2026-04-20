@@ -74,36 +74,6 @@ func TestDockerGateExecutor_PrepOverrideEnvPrecedence(t *testing.T) {
 	}
 }
 
-func TestDockerGateExecutor_SkipShortCircuitsExecution(t *testing.T) {
-	t.Parallel()
-
-	executor, rt, _ := newDockerGateTestHarness(t)
-	gs := workflowkit.NewGateProfileScenario()
-
-	meta, err := executor.Execute(context.Background(), gs.SkipSpec, "")
-	if err != nil {
-		t.Fatalf("Execute() unexpected error: %v", err)
-	}
-	if rt.createCalled || rt.startCalled || rt.waitCalled {
-		t.Fatalf("expected no container execution for skip, got runtime=%+v", rt)
-	}
-	if meta == nil || meta.Skip == nil {
-		t.Fatal("expected skip metadata in gate result")
-	}
-	if got, want := meta.Skip.SourceProfileID, int64(55); got != want {
-		t.Fatalf("skip.source_profile_id=%d, want %d", got, want)
-	}
-	if got, want := meta.Skip.MatchedTarget, contracts.GateProfileTargetBuild; got != want {
-		t.Fatalf("skip.matched_target=%q, want %q", got, want)
-	}
-	if meta.Detected == nil || meta.Detected.Tool != "maven" {
-		t.Fatalf("expected detected stack from gate profile stack, got %+v", meta.Detected)
-	}
-	if len(meta.StaticChecks) == 0 || !meta.StaticChecks[0].Passed {
-		t.Fatalf("expected passing static check metadata, got %+v", meta.StaticChecks)
-	}
-}
-
 func TestDockerGateExecutor_TargetLockUnsupportedCancels(t *testing.T) {
 	t.Parallel()
 

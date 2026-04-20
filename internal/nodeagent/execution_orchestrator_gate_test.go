@@ -22,65 +22,48 @@ func TestApplyGatePhaseOverrides(t *testing.T) {
 	cases := []struct {
 		name                  string
 		jobType               types.JobType
-		gateSkip              *contracts.BuildGateSkipMetadata
 		recoveryCtx           *contracts.RecoveryClaimContext
-		buildPreConfig        *contracts.BuildGatePhaseConfig  // nil for case 4
+		buildPreConfig        *contracts.BuildGatePhaseConfig // nil for case 4
 		buildPostConfig       *contracts.BuildGatePhaseConfig
-		wantStackDetect       *contracts.BuildGateStackConfig  // nil for re_gate
+		wantStackDetect       *contracts.BuildGateStackConfig // nil for re_gate
 		wantGateProfile       *contracts.BuildGateProfileOverride
 		wantTarget            string
-		wantAlways            bool
 		wantEnforceTargetLock bool
-		wantSkip              *contracts.BuildGateSkipMetadata
 		wantCA                []string
 	}{
 		{
 			name:    "pre_gate uses pre stack",
 			jobType: types.JobTypePreGate,
-			gateSkip: &contracts.BuildGateSkipMetadata{
-				Enabled: true, SourceProfileID: 11, MatchedTarget: contracts.GateProfileTargetUnit,
-			},
 			buildPreConfig: &contracts.BuildGatePhaseConfig{
 				Stack: pre, GateProfile: preGateProfile,
-				CA: []string{"aaaaaaa11111", "bbbbbbb22222"},
-				Target: contracts.GateProfileTargetUnit, Always: true,
+				CA:     []string{"aaaaaaa11111", "bbbbbbb22222"},
+				Target: contracts.GateProfileTargetUnit,
 			},
 			buildPostConfig: &contracts.BuildGatePhaseConfig{
 				Stack: post, GateProfile: postGateProfile,
-				Target: contracts.GateProfileTargetAllTests, Always: false,
+				Target: contracts.GateProfileTargetAllTests,
 			},
 			wantStackDetect: pre,
 			wantGateProfile: preGateProfile,
 			wantTarget:      contracts.GateProfileTargetUnit,
-			wantAlways:      true,
-			wantSkip: &contracts.BuildGateSkipMetadata{
-				Enabled: true, SourceProfileID: 11, MatchedTarget: contracts.GateProfileTargetUnit,
-			},
-			wantCA: []string{"aaaaaaa11111", "bbbbbbb22222"},
+			wantCA:          []string{"aaaaaaa11111", "bbbbbbb22222"},
 		},
 		{
 			name:    "post_gate uses post stack",
 			jobType: types.JobTypePostGate,
-			gateSkip: &contracts.BuildGateSkipMetadata{
-				Enabled: true, SourceProfileID: 22, MatchedTarget: contracts.GateProfileTargetAllTests,
-			},
 			buildPreConfig: &contracts.BuildGatePhaseConfig{
 				Stack: pre, GateProfile: preGateProfile,
-				Target: contracts.GateProfileTargetUnit, Always: true,
+				Target: contracts.GateProfileTargetUnit,
 			},
 			buildPostConfig: &contracts.BuildGatePhaseConfig{
 				Stack: post, GateProfile: postGateProfile,
-				CA: []string{"ccccccc33333"},
-				Target: contracts.GateProfileTargetAllTests, Always: false,
+				CA:     []string{"ccccccc33333"},
+				Target: contracts.GateProfileTargetAllTests,
 			},
 			wantStackDetect: post,
 			wantGateProfile: postGateProfile,
 			wantTarget:      contracts.GateProfileTargetAllTests,
-			wantAlways:      false,
-			wantSkip: &contracts.BuildGateSkipMetadata{
-				Enabled: true, SourceProfileID: 22, MatchedTarget: contracts.GateProfileTargetAllTests,
-			},
-			wantCA: []string{"ccccccc33333"},
+			wantCA:          []string{"ccccccc33333"},
 		},
 		{
 			name:    "re_gate uses stack detection output and post gate_profile override",
@@ -90,17 +73,16 @@ func TestApplyGatePhaseOverrides(t *testing.T) {
 			},
 			buildPreConfig: &contracts.BuildGatePhaseConfig{
 				Stack: pre, GateProfile: preGateProfile,
-				Target: contracts.GateProfileTargetUnit, Always: true,
+				Target: contracts.GateProfileTargetUnit,
 			},
 			buildPostConfig: &contracts.BuildGatePhaseConfig{
 				Stack: post, GateProfile: postGateProfile,
-				CA: []string{"ddddddd44444"},
-				Target: contracts.GateProfileTargetAllTests, Always: false,
+				CA:     []string{"ddddddd44444"},
+				Target: contracts.GateProfileTargetAllTests,
 			},
 			wantStackDetect:       nil,
 			wantGateProfile:       postGateProfile,
 			wantTarget:            contracts.GateProfileTargetAllTests,
-			wantAlways:            false,
 			wantEnforceTargetLock: true,
 			wantCA:                []string{"ddddddd44444"},
 		},
@@ -128,7 +110,6 @@ func TestApplyGatePhaseOverrides(t *testing.T) {
 
 			req := StartRunRequest{
 				JobType:         tc.jobType,
-				GateSkip:        tc.gateSkip,
 				RecoveryContext: tc.recoveryCtx,
 			}
 
@@ -145,14 +126,8 @@ func TestApplyGatePhaseOverrides(t *testing.T) {
 					t.Fatalf("Gate.Target=%q; want %q", got, want)
 				}
 			}
-			if got, want := manifest.Gate.Always, tc.wantAlways; got != want {
-				t.Fatalf("Gate.Always=%v; want %v", got, want)
-			}
 			if got, want := manifest.Gate.EnforceTargetLock, tc.wantEnforceTargetLock; got != want {
 				t.Fatalf("Gate.EnforceTargetLock=%v; want %v", got, want)
-			}
-			if tc.wantSkip != nil && manifest.Gate.Skip != tc.gateSkip {
-				t.Fatalf("Gate.Skip=%v; want skip payload", manifest.Gate.Skip)
 			}
 			if len(tc.wantCA) > 0 {
 				if got, want := len(manifest.CA), len(tc.wantCA); got != want {

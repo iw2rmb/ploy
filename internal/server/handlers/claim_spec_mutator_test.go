@@ -31,8 +31,6 @@ func TestMutateClaimSpec_GateProfileResolution(t *testing.T) {
 
 	repoProfile := []byte(`{"schema_version":1,"repo_id":"repo_1","runner_mode":"simple","stack":{"language":"go","tool":"go"},"targets":{"active":"build","build":{"status":"passed","command":"echo repo","env":{}},"unit":{"status":"passed","command":"echo repo unit","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[],"post":[]}}`)
 
-	boolPtr := func(b bool) *bool { return &b }
-
 	tests := []struct {
 		name            string
 		spec            []byte
@@ -46,7 +44,6 @@ func TestMutateClaimSpec_GateProfileResolution(t *testing.T) {
 		wantGateCmd string
 		wantGateEnv map[string]string
 		wantTarget  string
-		wantAlways  *bool
 		// assertions on top-level fields
 		wantEnvs map[string]string
 		checkPAT bool
@@ -78,15 +75,14 @@ func TestMutateClaimSpec_GateProfileResolution(t *testing.T) {
 			wantGateCmd:     "echo explicit",
 		},
 		{
-			name:            "preserves phase target and always, fills gate_profile from repo",
-			spec:            []byte(`{"build_gate":{"pre":{"target":"unit","always":true}}}`),
+			name:            "preserves phase target, fills gate_profile from repo",
+			spec:            []byte(`{"build_gate":{"pre":{"target":"unit"}}}`),
 			jobType:         domaintypes.JobTypePreGate,
 			recoveryMeta:    "{}",
 			repoGateProfile: repoProfile,
 			phase:           "pre",
 			wantGateCmd:     "echo repo",
 			wantTarget:      contracts.GateProfileTargetUnit,
-			wantAlways:      boolPtr(true),
 		},
 	}
 
@@ -128,11 +124,6 @@ func TestMutateClaimSpec_GateProfileResolution(t *testing.T) {
 			if tt.wantTarget != "" {
 				if got := phase["target"]; got != tt.wantTarget {
 					t.Fatalf("build_gate.%s.target=%v, want %q", tt.phase, got, tt.wantTarget)
-				}
-			}
-			if tt.wantAlways != nil {
-				if got := phase["always"]; got != *tt.wantAlways {
-					t.Fatalf("build_gate.%s.always=%v, want %v", tt.phase, got, *tt.wantAlways)
 				}
 			}
 

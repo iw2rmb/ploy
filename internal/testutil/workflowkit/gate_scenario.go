@@ -8,8 +8,6 @@ import "github.com/iw2rmb/ploy/internal/workflow/contracts"
 type GateProfileScenario struct {
 	// PrepCommandSpec is a gate spec with a profile override prep command.
 	PrepCommandSpec *contracts.StepGateSpec
-	// SkipSpec is a gate spec configured for skip short-circuit with stack metadata.
-	SkipSpec *contracts.StepGateSpec
 }
 
 // NewGateProfileScenario returns canonical gate specs for gate-profile override
@@ -21,21 +19,6 @@ func NewGateProfileScenario() GateProfileScenario {
 			Enabled: true,
 			GateProfile: &contracts.BuildGateProfileOverride{
 				Command: contracts.CommandSpec{Shell: "echo prep-gate"},
-			},
-		},
-		SkipSpec: &contracts.StepGateSpec{
-			Enabled: true,
-			Skip: &contracts.BuildGateSkipMetadata{
-				Enabled:         true,
-				SourceProfileID: 55,
-				MatchedTarget:   contracts.GateProfileTargetBuild,
-			},
-			GateProfile: &contracts.BuildGateProfileOverride{
-				Stack: &contracts.GateProfileStack{
-					Language: "java",
-					Tool:     "maven",
-					Release:  "17",
-				},
 			},
 		},
 	}

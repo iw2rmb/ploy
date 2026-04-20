@@ -9,6 +9,7 @@ SELECT
   job_type,
   job_image,
   next_id,
+  name,
   node_id,
   exit_code,
   started_at,
@@ -18,7 +19,6 @@ SELECT
   repo_sha_out,
   repo_sha_in8,
   repo_sha_out8,
-  cache_key,
   meta
 FROM jobs
 WHERE id = $1;
@@ -34,6 +34,7 @@ SELECT
   job_type,
   job_image,
   next_id,
+  name,
   node_id,
   exit_code,
   started_at,
@@ -43,7 +44,6 @@ SELECT
   repo_sha_out,
   repo_sha_in8,
   repo_sha_out8,
-  cache_key,
   meta
 FROM jobs
 WHERE run_id = $1
@@ -60,6 +60,7 @@ SELECT
   job_type,
   job_image,
   next_id,
+  name,
   node_id,
   exit_code,
   started_at,
@@ -69,7 +70,6 @@ SELECT
   repo_sha_out,
   repo_sha_in8,
   repo_sha_out8,
-  cache_key,
   meta
 FROM jobs
 WHERE run_id = $1 AND repo_id = $2 AND attempt = $3
@@ -87,12 +87,13 @@ INSERT INTO jobs (
   job_type,
   job_image,
   next_id,
+  name,
   meta,
   repo_sha_in,
   repo_sha_in8
 ) VALUES (
-  $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
-  CASE WHEN $11::TEXT = '' THEN '' ELSE SUBSTRING($11::TEXT, 1, 8) END
+  $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
+  CASE WHEN $12::TEXT = '' THEN '' ELSE SUBSTRING($12::TEXT, 1, 8) END
 )
 RETURNING
   id,
@@ -104,6 +105,7 @@ RETURNING
   job_type,
   job_image,
   next_id,
+  name,
   node_id,
   exit_code,
   started_at,
@@ -113,7 +115,6 @@ RETURNING
   repo_sha_out,
   repo_sha_in8,
   repo_sha_out8,
-  cache_key,
   meta;
 
 -- name: UpdateJobStatus :exec
@@ -238,6 +239,7 @@ SELECT
   job_type,
   job_image,
   next_id,
+  name,
   node_id,
   exit_code,
   started_at,
@@ -247,7 +249,6 @@ SELECT
   repo_sha_out,
   repo_sha_in8,
   repo_sha_out8,
-  cache_key,
   meta
 FROM jobs
 WHERE run_id = $1 AND repo_id = $2 AND attempt = $3 AND status = 'Created'
@@ -291,6 +292,7 @@ RETURNING
   jobs.job_type,
   jobs.job_image,
   jobs.next_id,
+  jobs.name,
   jobs.node_id,
   jobs.exit_code,
   jobs.started_at,
@@ -300,7 +302,6 @@ RETURNING
   jobs.repo_sha_out,
   jobs.repo_sha_in8,
   jobs.repo_sha_out8,
-  jobs.cache_key,
   jobs.meta;
 
 -- name: PromoteJobByIDIfUnblocked :one
@@ -334,6 +335,7 @@ RETURNING
   jobs.job_type,
   jobs.job_image,
   jobs.next_id,
+  jobs.name,
   jobs.node_id,
   jobs.exit_code,
   jobs.started_at,
@@ -343,7 +345,6 @@ RETURNING
   jobs.repo_sha_out,
   jobs.repo_sha_in8,
   jobs.repo_sha_out8,
-  jobs.cache_key,
   jobs.meta;
 
 -- name: UpdateJobNextID :exec
@@ -435,41 +436,6 @@ WHERE id = $1;
 UPDATE jobs
 SET job_image = $2
 WHERE id = $1;
-
--- name: UpdateJobCacheKey :exec
-UPDATE jobs
-SET cache_key = $2
-WHERE id = $1;
-
--- name: ResolveReusableJobByCacheKey :one
-SELECT
-  id,
-  status,
-  exit_code,
-  repo_sha_out,
-  meta
-FROM jobs
-WHERE repo_id = sqlc.arg(repo_id)
-  AND job_type = sqlc.arg(job_type)
-  AND cache_key = sqlc.arg(cache_key)
-  AND cache_key <> ''
-  AND status IN ('Success', 'Fail')
-  AND (
-    status = 'Success'
-    OR (
-      status = 'Fail'
-      AND exit_code = 1
-      AND EXISTS (
-        SELECT 1
-        FROM logs
-        WHERE logs.run_id = jobs.run_id
-          AND logs.job_id = jobs.id
-      )
-    )
-  )
-  AND NOT (meta ? 'cache_mirror')
-ORDER BY finished_at DESC NULLS LAST, id DESC
-LIMIT 1;
 
 -- name: UpdateJobCompletionWithMeta :exec
 WITH completed AS (

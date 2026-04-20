@@ -9,8 +9,6 @@ import (
 	"fmt"
 	"strings"
 	"unicode/utf8"
-
-	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // JobKind identifies the execution type for a job in the unified queue.
@@ -107,16 +105,6 @@ type JobMeta struct {
 	// SBOM stores cycle context for sbom jobs and related runtime planning.
 	// Allowed for mig jobs (sbom/hook job types are mig-kind metadata).
 	SBOM *SBOMJobMetadata `json:"sbom,omitempty"`
-
-	// CacheMirror links a replayed target job to its source job.
-	// When present, consumers must read content (logs/artifacts/diffs/SBOM rows)
-	// through source_job_id so replayed jobs are transparent to orchestration.
-	CacheMirror *CacheMirrorMetadata `json:"cache_mirror,omitempty"`
-}
-
-// CacheMirrorMetadata captures replay-source linkage for transparent reads.
-type CacheMirrorMetadata struct {
-	SourceJobID domaintypes.JobID `json:"source_job_id,omitempty"`
 }
 
 // RecoveryJobMetadata captures loop context persisted at job level.
@@ -266,19 +254,6 @@ func (m JobMeta) Validate() error {
 		if err := m.Heal.Validate(); err != nil {
 			return fmt.Errorf("heal metadata invalid: %w", err)
 		}
-	}
-	if m.CacheMirror != nil {
-		if err := m.CacheMirror.Validate(); err != nil {
-			return fmt.Errorf("cache_mirror invalid: %w", err)
-		}
-	}
-	return nil
-}
-
-// Validate ensures CacheMirrorMetadata is well-formed.
-func (m CacheMirrorMetadata) Validate() error {
-	if m.SourceJobID.IsZero() {
-		return fmt.Errorf("source_job_id: required")
 	}
 	return nil
 }

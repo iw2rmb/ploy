@@ -282,7 +282,6 @@ type Querier interface {
 	ResolveAnyStackID(ctx context.Context) (int64, error)
 	ResolvePreGateCreationBindingByRepoSHA(ctx context.Context, arg ResolvePreGateCreationBindingByRepoSHAParams) (ResolvePreGateCreationBindingByRepoSHARow, error)
 	ResolvePreGateCreationBindingByRepoSHAAndStack(ctx context.Context, arg ResolvePreGateCreationBindingByRepoSHAAndStackParams) (ResolvePreGateCreationBindingByRepoSHAAndStackRow, error)
-	ResolveReusableJobByCacheKey(ctx context.Context, arg ResolveReusableJobByCacheKeyParams) (ResolveReusableJobByCacheKeyRow, error)
 	ResolveStackIDByImage(ctx context.Context, image string) (int64, error)
 	ResolveStackIDByRepoSHA(ctx context.Context, arg ResolveStackIDByRepoSHAParams) (int64, error)
 	ResolveStackIDByRequiredStack(ctx context.Context, arg ResolveStackIDByRequiredStackParams) (int64, error)
@@ -297,7 +296,6 @@ type Querier interface {
 	UnarchiveMig(ctx context.Context, id types.MigID) error
 	UpdateAPITokenLastUsed(ctx context.Context, tokenID string) error
 	UpdateBootstrapTokenLastUsed(ctx context.Context, tokenID string) error
-	UpdateJobCacheKey(ctx context.Context, arg UpdateJobCacheKeyParams) error
 	UpdateJobCompletion(ctx context.Context, arg UpdateJobCompletionParams) error
 	UpdateJobCompletionWithMeta(ctx context.Context, arg UpdateJobCompletionWithMetaParams) error
 	// Persist the container image name used to execute a job.

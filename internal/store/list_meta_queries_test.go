@@ -172,18 +172,3 @@ func TestEventSelectorBehavior(t *testing.T) {
 		})
 	}
 }
-
-func TestCacheReplaySelectorExcludesMirroredCandidates(t *testing.T) {
-	t.Parallel()
-
-	sqlLower := strings.ToLower(resolveReusableJobByCacheKey)
-	if !strings.Contains(sqlLower, "not (meta ? 'cache_mirror')") {
-		t.Fatalf("ResolveReusableJobByCacheKey must exclude mirrored cache candidates; SQL:\n%s", resolveReusableJobByCacheKey)
-	}
-	if !strings.Contains(sqlLower, "status = 'fail'") ||
-		!strings.Contains(sqlLower, "exit_code = 1") ||
-		!strings.Contains(sqlLower, "exists") ||
-		!strings.Contains(sqlLower, "from logs") {
-		t.Fatalf("ResolveReusableJobByCacheKey must allow replaying failed candidates only for exit_code=1 with log rows; SQL:\n%s", resolveReusableJobByCacheKey)
-	}
-}

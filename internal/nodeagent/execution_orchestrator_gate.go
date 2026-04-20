@@ -191,17 +191,15 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 //   - post_gate may use build_gate.post.gate_profile command/env override.
 //   - re_gate reuses build_gate.post.gate_profile command/env override.
 //
-// Target/always semantics:
-//   - pre_gate uses build_gate.pre.target and build_gate.pre.always.
-//   - post_gate uses build_gate.post.target and build_gate.post.always.
-//   - re_gate reuses build_gate.post.target and build_gate.post.always.
+// Target semantics:
+//   - pre_gate uses build_gate.pre.target.
+//   - post_gate uses build_gate.post.target.
+//   - re_gate reuses build_gate.post.target.
 func applyGatePhaseOverrides(manifest *contracts.StepManifest, req StartRunRequest, typedOpts RunOptions) {
 	if manifest == nil || manifest.Gate == nil {
 		return
 	}
 	manifest.Gate.Target = ""
-	manifest.Gate.Always = false
-	manifest.Gate.Skip = nil
 	manifest.Gate.EnforceTargetLock = false
 
 	switch req.JobType {
@@ -210,20 +208,17 @@ func applyGatePhaseOverrides(manifest *contracts.StepManifest, req StartRunReque
 		if typedOpts.BuildGate.Pre != nil {
 			manifest.CA = mergeUniqueStringEntries(manifest.CA, typedOpts.BuildGate.Pre.CA)
 		}
-		manifest.Gate.Skip = req.GateSkip
 	case types.JobTypePostGate:
 		contracts.ApplyBuildGatePhaseToGateSpec(manifest.Gate, typedOpts.BuildGate.Post)
 		if typedOpts.BuildGate.Post != nil {
 			manifest.CA = mergeUniqueStringEntries(manifest.CA, typedOpts.BuildGate.Post.CA)
 		}
-		manifest.Gate.Skip = req.GateSkip
 	case types.JobTypeReGate:
 		contracts.ApplyBuildGatePhaseToGateSpec(manifest.Gate, typedOpts.BuildGate.Post)
 		if typedOpts.BuildGate.Post != nil {
 			manifest.CA = mergeUniqueStringEntries(manifest.CA, typedOpts.BuildGate.Post.CA)
 		}
 		manifest.Gate.StackDetect = nil // re-gate uses persisted stack from original gate run
-		manifest.Gate.Skip = req.GateSkip
 		if req.RecoveryContext != nil {
 			if strings.TrimSpace(req.RecoveryContext.GateProfileSchemaJSON) != "" &&
 				strings.TrimSpace(manifest.Gate.Target) != "" {

@@ -67,17 +67,6 @@ func (s *CompleteJobService) Complete(ctx context.Context, input CompleteJobInpu
 		}
 	}
 
-	if input.Status == domaintypes.JobStatusSuccess {
-		if err := maybeCloneSkippedStepDiffBeforeCompletion(ctx, s.store, s.blobpersist, job); err != nil {
-			slog.Error("complete job: clone skipped step diff failed",
-				"job_id", input.JobID,
-				"repo_id", job.RepoID,
-				"err", err,
-			)
-			return CompleteJobResult{}, completeInternal("failed to clone skipped step diff", err)
-		}
-	}
-
 	if input.StatsPayload.HasJobResources() {
 		res := input.StatsPayload.JobResources
 		if err := s.store.UpsertJobMetric(ctx, store.UpsertJobMetricParams{

@@ -136,17 +136,16 @@ type HooksOnce struct {
 }
 
 type Job struct {
-	ID          types.JobID  `json:"id"`
-	RunID       types.RunID  `json:"run_id"`
-	RepoID      types.RepoID `json:"repo_id"`
-	RepoBaseRef string       `json:"repo_base_ref"`
-	Attempt     int32        `json:"attempt"`
-	// Deprecated: jobs.name column was removed. Kept only for in-memory compatibility.
-	Name        string             `json:"name"`
+	ID          types.JobID        `json:"id"`
+	RunID       types.RunID        `json:"run_id"`
+	RepoID      types.RepoID       `json:"repo_id"`
+	RepoBaseRef string             `json:"repo_base_ref"`
+	Attempt     int32              `json:"attempt"`
 	Status      types.JobStatus    `json:"status"`
 	JobType     types.JobType      `json:"job_type"`
 	JobImage    string             `json:"job_image"`
 	NextID      *types.JobID       `json:"next_id"`
+	Name        string             `json:"name"`
 	NodeID      *types.NodeID      `json:"node_id"`
 	ExitCode    *int32             `json:"exit_code"`
 	StartedAt   pgtype.Timestamptz `json:"started_at"`
@@ -156,7 +155,6 @@ type Job struct {
 	RepoShaOut  string             `json:"repo_sha_out"`
 	RepoShaIn8  string             `json:"repo_sha_in8"`
 	RepoShaOut8 string             `json:"repo_sha_out8"`
-	CacheKey    string             `json:"cache_key"`
 	Meta        []byte             `json:"meta"`
 }
 

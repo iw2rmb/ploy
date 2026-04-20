@@ -18,15 +18,8 @@ Job Types:
         Must receive /in/java.classpath for java maven/gradle
         May produce diff in /workspace
         
-Cache:
-    Only jobs with Success and Fail statuses can be used as cache
-    .cache_key + job_type must match
-    All Must/May of that job_type files must be materialized (copied) from cache job (e.g. if it's heal, then diff, log, java.classpath must be materialized)
-    For `heal` and `hook` with non-zero exit code, status is always `Error` and leads to run error for that repo
-    
 Job can receive required files ("Must/May receive") only from:
-    1. cache;
-    2. previous job.
+    1. previous job.
     
 DAG:
     `sbom` {-> `heal` -> `sbom` -> `heal` -> ...} {-> `hook` -> `hook` -> ...} -> {pre|re|post}_gate {-> `heal` -> `sbom` -> `heal` -> ... }

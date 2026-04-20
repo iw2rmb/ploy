@@ -84,7 +84,7 @@ UPDATE jobs
 SET status = 'Running', node_id = eligible.node_id, started_at = now()
 FROM eligible
 WHERE jobs.id = eligible.id
-RETURNING jobs.id, jobs.run_id, jobs.repo_id, jobs.repo_base_ref, jobs.attempt, jobs.status, jobs.job_type, jobs.job_image, jobs.next_id, jobs.node_id, jobs.exit_code, jobs.started_at, jobs.finished_at, jobs.duration_ms, jobs.repo_sha_in, jobs.repo_sha_out, jobs.repo_sha_in8, jobs.repo_sha_out8, jobs.cache_key, jobs.meta
+RETURNING jobs.id, jobs.run_id, jobs.repo_id, jobs.repo_base_ref, jobs.attempt, jobs.status, jobs.job_type, jobs.job_image, jobs.next_id, jobs.name, jobs.node_id, jobs.exit_code, jobs.started_at, jobs.finished_at, jobs.duration_ms, jobs.repo_sha_in, jobs.repo_sha_out, jobs.repo_sha_in8, jobs.repo_sha_out8, jobs.meta
 `
 
 // Atomically claim the next claimable job for a node (unified queue).
@@ -105,6 +105,7 @@ func (q *Queries) ClaimJob(ctx context.Context, nodeID types.NodeID) (Job, error
 		&i.JobType,
 		&i.JobImage,
 		&i.NextID,
+		&i.Name,
 		&i.NodeID,
 		&i.ExitCode,
 		&i.StartedAt,
@@ -114,7 +115,6 @@ func (q *Queries) ClaimJob(ctx context.Context, nodeID types.NodeID) (Job, error
 		&i.RepoShaOut,
 		&i.RepoShaIn8,
 		&i.RepoShaOut8,
-		&i.CacheKey,
 		&i.Meta,
 	)
 	return i, err
@@ -287,12 +287,13 @@ INSERT INTO jobs (
   job_type,
   job_image,
   next_id,
+  name,
   meta,
   repo_sha_in,
   repo_sha_in8
 ) VALUES (
-  $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
-  CASE WHEN $11::TEXT = '' THEN '' ELSE SUBSTRING($11::TEXT, 1, 8) END
+  $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
+  CASE WHEN $12::TEXT = '' THEN '' ELSE SUBSTRING($12::TEXT, 1, 8) END
 )
 RETURNING
   id,
@@ -304,6 +305,7 @@ RETURNING
   job_type,
   job_image,
   next_id,
+  name,
   node_id,
   exit_code,
   started_at,
@@ -313,24 +315,22 @@ RETURNING
   repo_sha_out,
   repo_sha_in8,
   repo_sha_out8,
-  cache_key,
   meta
 `
 
 type CreateJobParams struct {
-	ID          types.JobID  `json:"id"`
-	RunID       types.RunID  `json:"run_id"`
-	RepoID      types.RepoID `json:"repo_id"`
-	RepoBaseRef string       `json:"repo_base_ref"`
-	Attempt     int32        `json:"attempt"`
-	// Deprecated: jobs.name column was removed. Field ignored by SQL.
-	Name      string          `json:"name"`
-	Status    types.JobStatus `json:"status"`
-	JobType   types.JobType   `json:"job_type"`
-	JobImage  string          `json:"job_image"`
-	NextID    *types.JobID    `json:"next_id"`
-	Meta      []byte          `json:"meta"`
-	RepoShaIn string          `json:"repo_sha_in"`
+	ID          types.JobID     `json:"id"`
+	RunID       types.RunID     `json:"run_id"`
+	RepoID      types.RepoID    `json:"repo_id"`
+	RepoBaseRef string          `json:"repo_base_ref"`
+	Attempt     int32           `json:"attempt"`
+	Status      types.JobStatus `json:"status"`
+	JobType     types.JobType   `json:"job_type"`
+	JobImage    string          `json:"job_image"`
+	NextID      *types.JobID    `json:"next_id"`
+	Name        string          `json:"name"`
+	Meta        []byte          `json:"meta"`
+	RepoShaIn   string          `json:"repo_sha_in"`
 }
 
 // Note: `id` is a required TEXT parameter (KSUID-backed); caller generates via types.NewJobID().
@@ -345,6 +345,7 @@ func (q *Queries) CreateJob(ctx context.Context, arg CreateJobParams) (Job, erro
 		arg.JobType,
 		arg.JobImage,
 		arg.NextID,
+		arg.Name,
 		arg.Meta,
 		arg.RepoShaIn,
 	)
@@ -359,6 +360,7 @@ func (q *Queries) CreateJob(ctx context.Context, arg CreateJobParams) (Job, erro
 		&i.JobType,
 		&i.JobImage,
 		&i.NextID,
+		&i.Name,
 		&i.NodeID,
 		&i.ExitCode,
 		&i.StartedAt,
@@ -368,7 +370,6 @@ func (q *Queries) CreateJob(ctx context.Context, arg CreateJobParams) (Job, erro
 		&i.RepoShaOut,
 		&i.RepoShaIn8,
 		&i.RepoShaOut8,
-		&i.CacheKey,
 		&i.Meta,
 	)
 	return i, err
@@ -416,6 +417,7 @@ SELECT
   job_type,
   job_image,
   next_id,
+  name,
   node_id,
   exit_code,
   started_at,
@@ -425,7 +427,6 @@ SELECT
   repo_sha_out,
   repo_sha_in8,
   repo_sha_out8,
-  cache_key,
   meta
 FROM jobs
 WHERE id = $1
@@ -444,6 +445,7 @@ func (q *Queries) GetJob(ctx context.Context, id types.JobID) (Job, error) {
 		&i.JobType,
 		&i.JobImage,
 		&i.NextID,
+		&i.Name,
 		&i.NodeID,
 		&i.ExitCode,
 		&i.StartedAt,
@@ -453,7 +455,6 @@ func (q *Queries) GetJob(ctx context.Context, id types.JobID) (Job, error) {
 		&i.RepoShaOut,
 		&i.RepoShaIn8,
 		&i.RepoShaOut8,
-		&i.CacheKey,
 		&i.Meta,
 	)
 	return i, err
@@ -470,6 +471,7 @@ SELECT
   job_type,
   job_image,
   next_id,
+  name,
   node_id,
   exit_code,
   started_at,
@@ -479,7 +481,6 @@ SELECT
   repo_sha_out,
   repo_sha_in8,
   repo_sha_out8,
-  cache_key,
   meta
 FROM jobs
 WHERE run_id = $1 AND repo_id = $2 AND attempt = $3 AND status = 'Created'
@@ -511,6 +512,7 @@ func (q *Queries) ListCreatedJobsByRunRepoAttempt(ctx context.Context, arg ListC
 			&i.JobType,
 			&i.JobImage,
 			&i.NextID,
+			&i.Name,
 			&i.NodeID,
 			&i.ExitCode,
 			&i.StartedAt,
@@ -520,7 +522,6 @@ func (q *Queries) ListCreatedJobsByRunRepoAttempt(ctx context.Context, arg ListC
 			&i.RepoShaOut,
 			&i.RepoShaIn8,
 			&i.RepoShaOut8,
-			&i.CacheKey,
 			&i.Meta,
 		); err != nil {
 			return nil, err
@@ -544,6 +545,7 @@ SELECT
   job_type,
   job_image,
   next_id,
+  name,
   node_id,
   exit_code,
   started_at,
@@ -553,7 +555,6 @@ SELECT
   repo_sha_out,
   repo_sha_in8,
   repo_sha_out8,
-  cache_key,
   meta
 FROM jobs
 WHERE run_id = $1
@@ -579,6 +580,7 @@ func (q *Queries) ListJobsByRun(ctx context.Context, runID types.RunID) ([]Job, 
 			&i.JobType,
 			&i.JobImage,
 			&i.NextID,
+			&i.Name,
 			&i.NodeID,
 			&i.ExitCode,
 			&i.StartedAt,
@@ -588,7 +590,6 @@ func (q *Queries) ListJobsByRun(ctx context.Context, runID types.RunID) ([]Job, 
 			&i.RepoShaOut,
 			&i.RepoShaIn8,
 			&i.RepoShaOut8,
-			&i.CacheKey,
 			&i.Meta,
 		); err != nil {
 			return nil, err
@@ -612,6 +613,7 @@ SELECT
   job_type,
   job_image,
   next_id,
+  name,
   node_id,
   exit_code,
   started_at,
@@ -621,7 +623,6 @@ SELECT
   repo_sha_out,
   repo_sha_in8,
   repo_sha_out8,
-  cache_key,
   meta
 FROM jobs
 WHERE run_id = $1 AND repo_id = $2 AND attempt = $3
@@ -653,6 +654,7 @@ func (q *Queries) ListJobsByRunRepoAttempt(ctx context.Context, arg ListJobsByRu
 			&i.JobType,
 			&i.JobImage,
 			&i.NextID,
+			&i.Name,
 			&i.NodeID,
 			&i.ExitCode,
 			&i.StartedAt,
@@ -662,7 +664,6 @@ func (q *Queries) ListJobsByRunRepoAttempt(ctx context.Context, arg ListJobsByRu
 			&i.RepoShaOut,
 			&i.RepoShaIn8,
 			&i.RepoShaOut8,
-			&i.CacheKey,
 			&i.Meta,
 		); err != nil {
 			return nil, err
@@ -829,6 +830,7 @@ RETURNING
   jobs.job_type,
   jobs.job_image,
   jobs.next_id,
+  jobs.name,
   jobs.node_id,
   jobs.exit_code,
   jobs.started_at,
@@ -838,7 +840,6 @@ RETURNING
   jobs.repo_sha_out,
   jobs.repo_sha_in8,
   jobs.repo_sha_out8,
-  jobs.cache_key,
   jobs.meta
 `
 
@@ -857,6 +858,7 @@ func (q *Queries) PromoteJobByIDIfUnblocked(ctx context.Context, id types.JobID)
 		&i.JobType,
 		&i.JobImage,
 		&i.NextID,
+		&i.Name,
 		&i.NodeID,
 		&i.ExitCode,
 		&i.StartedAt,
@@ -866,65 +868,6 @@ func (q *Queries) PromoteJobByIDIfUnblocked(ctx context.Context, id types.JobID)
 		&i.RepoShaOut,
 		&i.RepoShaIn8,
 		&i.RepoShaOut8,
-		&i.CacheKey,
-		&i.Meta,
-	)
-	return i, err
-}
-
-const resolveReusableJobByCacheKey = `-- name: ResolveReusableJobByCacheKey :one
-SELECT
-  id,
-  status,
-  exit_code,
-  repo_sha_out,
-  meta
-FROM jobs
-WHERE repo_id = $1
-  AND job_type = $2
-  AND cache_key = $3
-  AND cache_key <> ''
-  AND status IN ('Success', 'Fail')
-  AND (
-    status = 'Success'
-    OR (
-      status = 'Fail'
-      AND exit_code = 1
-      AND EXISTS (
-        SELECT 1
-        FROM logs
-        WHERE logs.run_id = jobs.run_id
-          AND logs.job_id = jobs.id
-      )
-    )
-  )
-  AND NOT (meta ? 'cache_mirror')
-ORDER BY finished_at DESC NULLS LAST, id DESC
-LIMIT 1
-`
-
-type ResolveReusableJobByCacheKeyParams struct {
-	RepoID   types.RepoID  `json:"repo_id"`
-	JobType  types.JobType `json:"job_type"`
-	CacheKey string        `json:"cache_key"`
-}
-
-type ResolveReusableJobByCacheKeyRow struct {
-	ID         types.JobID     `json:"id"`
-	Status     types.JobStatus `json:"status"`
-	ExitCode   *int32          `json:"exit_code"`
-	RepoShaOut string          `json:"repo_sha_out"`
-	Meta       []byte          `json:"meta"`
-}
-
-func (q *Queries) ResolveReusableJobByCacheKey(ctx context.Context, arg ResolveReusableJobByCacheKeyParams) (ResolveReusableJobByCacheKeyRow, error) {
-	row := q.db.QueryRow(ctx, resolveReusableJobByCacheKey, arg.RepoID, arg.JobType, arg.CacheKey)
-	var i ResolveReusableJobByCacheKeyRow
-	err := row.Scan(
-		&i.ID,
-		&i.Status,
-		&i.ExitCode,
-		&i.RepoShaOut,
 		&i.Meta,
 	)
 	return i, err
@@ -966,6 +909,7 @@ RETURNING
   jobs.job_type,
   jobs.job_image,
   jobs.next_id,
+  jobs.name,
   jobs.node_id,
   jobs.exit_code,
   jobs.started_at,
@@ -975,7 +919,6 @@ RETURNING
   jobs.repo_sha_out,
   jobs.repo_sha_in8,
   jobs.repo_sha_out8,
-  jobs.cache_key,
   jobs.meta
 `
 
@@ -1000,6 +943,7 @@ func (q *Queries) ScheduleNextJob(ctx context.Context, arg ScheduleNextJobParams
 		&i.JobType,
 		&i.JobImage,
 		&i.NextID,
+		&i.Name,
 		&i.NodeID,
 		&i.ExitCode,
 		&i.StartedAt,
@@ -1009,26 +953,9 @@ func (q *Queries) ScheduleNextJob(ctx context.Context, arg ScheduleNextJobParams
 		&i.RepoShaOut,
 		&i.RepoShaIn8,
 		&i.RepoShaOut8,
-		&i.CacheKey,
 		&i.Meta,
 	)
 	return i, err
-}
-
-const updateJobCacheKey = `-- name: UpdateJobCacheKey :exec
-UPDATE jobs
-SET cache_key = $2
-WHERE id = $1
-`
-
-type UpdateJobCacheKeyParams struct {
-	ID       types.JobID `json:"id"`
-	CacheKey string      `json:"cache_key"`
-}
-
-func (q *Queries) UpdateJobCacheKey(ctx context.Context, arg UpdateJobCacheKeyParams) error {
-	_, err := q.db.Exec(ctx, updateJobCacheKey, arg.ID, arg.CacheKey)
-	return err
 }
 
 const updateJobCompletion = `-- name: UpdateJobCompletion :exec
