@@ -13,11 +13,16 @@ func buildJavaToolCacheMountsFromStackEnv(env map[string]string) ([]ContainerMou
 	if !strings.EqualFold(strings.TrimSpace(env[contracts.PLOYStackLanguageEnv]), "java") {
 		return nil, nil
 	}
-	tool := strings.ToLower(strings.TrimSpace(env[contracts.PLOYStackToolEnv]))
-	switch tool {
-	case "gradle", "maven":
-		return buildGateToolCacheMounts("java", tool, strings.TrimSpace(env[contracts.PLOYStackReleaseEnv]))
-	default:
-		return nil, nil
+
+	release := strings.TrimSpace(env[contracts.PLOYStackReleaseEnv])
+	tools := []string{"maven", "gradle"}
+	mounts := make([]ContainerMount, 0, len(tools))
+	for _, tool := range tools {
+		toolMounts, err := buildGateToolCacheMounts("java", tool, release)
+		if err != nil {
+			return nil, err
+		}
+		mounts = append(mounts, toolMounts...)
 	}
+	return mounts, nil
 }
