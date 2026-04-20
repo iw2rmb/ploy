@@ -14,90 +14,29 @@ func TestBuildContainerSpec_JavaToolCacheMountsFromStackEnv(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		image      string
 		env        map[string]string
-		wantTarget string
-		wantSource string
+		wantMounts map[string]string
 	}{
 		{
-			name:  "sbom stack gradle mounts gradle lane",
-			image: "ghcr.io/iw2rmb/ploy/sbom-gradle:latest",
+			name: "java stack mounts both caches",
 			env: map[string]string{
 				contracts.PLOYStackLanguageEnv: "java",
-				contracts.PLOYStackToolEnv:     "gradle",
 				contracts.PLOYStackReleaseEnv:  "17",
 			},
-			wantTarget: BuildGateGradleUserHomeDir,
-			wantSource: filepath.Join(cacheRoot, "java", "gradle", "17"),
-		},
-		{
-			name:  "hook stack maven mounts maven lane",
-			image: "ghcr.io/example/hook:latest",
-			env: map[string]string{
-				contracts.PLOYStackLanguageEnv: "java",
-				contracts.PLOYStackToolEnv:     "maven",
-				contracts.PLOYStackReleaseEnv:  "21",
+			wantMounts: map[string]string{
+				BuildGateGradleUserHomeDir: filepath.Join(cacheRoot, "java", "gradle", "17"),
+				BuildGateMavenUserHomeDir:  filepath.Join(cacheRoot, "java", "maven", "17"),
 			},
-			wantTarget: BuildGateMavenUserHomeDir,
-			wantSource: filepath.Join(cacheRoot, "java", "maven", "21"),
 		},
 		{
-			name:  "mig stack gradle mounts gradle lane",
-			image: "ghcr.io/example/mig:latest",
-			env: map[string]string{
-				contracts.PLOYStackLanguageEnv: "java",
-				contracts.PLOYStackToolEnv:     "gradle",
-				contracts.PLOYStackReleaseEnv:  "11",
-			},
-			wantTarget: BuildGateGradleUserHomeDir,
-			wantSource: filepath.Join(cacheRoot, "java", "gradle", "11"),
-		},
-		{
-			name:  "heal stack maven mounts maven lane",
-			image: "ghcr.io/iw2rmb/ploy/orw-cli-gradle:latest",
-			env: map[string]string{
-				contracts.PLOYStackLanguageEnv: "java",
-				contracts.PLOYStackToolEnv:     "maven",
-				contracts.PLOYStackReleaseEnv:  "17",
-			},
-			wantTarget: BuildGateMavenUserHomeDir,
-			wantSource: filepath.Join(cacheRoot, "java", "maven", "17"),
-		},
-		{
-			name:  "missing release uses unknown-release lane",
-			image: "ghcr.io/example/mig:latest",
-			env: map[string]string{
-				contracts.PLOYStackLanguageEnv: "java",
-				contracts.PLOYStackToolEnv:     "maven",
-			},
-			wantTarget: BuildGateMavenUserHomeDir,
-			wantSource: filepath.Join(cacheRoot, "java", "maven", "unknown-release"),
-		},
-		{
-			name:  "sbom image without stack env does not mount",
-			image: "ghcr.io/iw2rmb/ploy/sbom-gradle:latest",
-		},
-		{
-			name:  "orw image without stack env does not mount",
-			image: "ghcr.io/iw2rmb/ploy/orw-cli-maven:latest",
-		},
-		{
-			name:  "non-java stack does not mount",
-			image: "ghcr.io/example/mig:latest",
+			name: "non-java stack mounts no java caches",
 			env: map[string]string{
 				contracts.PLOYStackLanguageEnv: "go",
-				contracts.PLOYStackToolEnv:     "go",
 				contracts.PLOYStackReleaseEnv:  "1.25",
 			},
 		},
 		{
-			name:  "unsupported java tool does not mount",
-			image: "ghcr.io/example/mig:latest",
-			env: map[string]string{
-				contracts.PLOYStackLanguageEnv: "java",
-				contracts.PLOYStackToolEnv:     "ant",
-				contracts.PLOYStackReleaseEnv:  "17",
-			},
+			name: "missing stack env mounts no java caches",
 		},
 	}
 
@@ -106,7 +45,7 @@ func TestBuildContainerSpec_JavaToolCacheMountsFromStackEnv(t *testing.T) {
 			manifest := contracts.StepManifest{
 				ID:    types.StepID("step-java-cache"),
 				Name:  "Java cache mount",
-				Image: tt.image,
+				Image: "ghcr.io/example/mig:latest",
 				Envs:  tt.env,
 				Inputs: []contracts.StepInput{{
 					Name:        "src",
@@ -121,30 +60,35 @@ func TestBuildContainerSpec_JavaToolCacheMountsFromStackEnv(t *testing.T) {
 				t.Fatalf("buildContainerSpec error: %v", err)
 			}
 
-			if tt.wantTarget == "" {
-				for _, mount := range spec.Mounts {
-					if mount.Target == BuildGateGradleUserHomeDir || mount.Target == BuildGateMavenUserHomeDir {
-						t.Fatalf("unexpected java cache mount for case %q: %+v", tt.name, mount)
-					}
+			gotMounts := map[string]ContainerMount{}
+			for _, mount := range spec.Mounts {
+				if mount.Target != BuildGateGradleUserHomeDir && mount.Target != BuildGateMavenUserHomeDir {
+					continue
+				}
+				gotMounts[mount.Target] = mount
+			}
+
+			if len(tt.wantMounts) == 0 {
+				if len(gotMounts) != 0 {
+					t.Fatalf("unexpected java cache mounts: %+v", gotMounts)
 				}
 				return
 			}
 
-			var found bool
-			for _, mount := range spec.Mounts {
-				if mount.Target != tt.wantTarget {
-					continue
-				}
-				found = true
-				if mount.Source != tt.wantSource {
-					t.Fatalf("cache mount source=%q, want %q", mount.Source, tt.wantSource)
-				}
-				if mount.ReadOnly {
-					t.Fatalf("cache mount must be writable: %+v", mount)
-				}
+			if len(gotMounts) != len(tt.wantMounts) {
+				t.Fatalf("java cache mount count=%d, want %d (%+v)", len(gotMounts), len(tt.wantMounts), gotMounts)
 			}
-			if !found {
-				t.Fatalf("expected cache mount %q -> %q in %+v", tt.wantSource, tt.wantTarget, spec.Mounts)
+			for target, wantSource := range tt.wantMounts {
+				gotMount, ok := gotMounts[target]
+				if !ok {
+					t.Fatalf("missing java cache mount target %q", target)
+				}
+				if gotMount.Source != wantSource {
+					t.Fatalf("cache mount source=%q, want %q", gotMount.Source, wantSource)
+				}
+				if gotMount.ReadOnly {
+					t.Fatalf("cache mount must be writable: %+v", gotMount)
+				}
 			}
 		})
 	}
