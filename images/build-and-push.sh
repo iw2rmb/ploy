@@ -22,7 +22,7 @@ set -Eeuo pipefail
 #   images/build-and-push.sh
 #   VERSION=v0.1.0 PLATFORM=linux/amd64 images/build-and-push.sh
 
-PLATFORM=${PLATFORM:-linux/amd64}
+PLATFORM=${PLATFORM:-linux/amd64,linux/arm64}
 IMAGE_PREFIX="${IMAGE_PREFIX:-ghcr.io/iw2rmb/ploy}"
 PUSH_LATEST="${PUSH_LATEST:-1}"
 

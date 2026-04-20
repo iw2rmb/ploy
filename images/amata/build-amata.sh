@@ -15,7 +15,7 @@ REPO_ROOT=$HOME/@iw2rmb/amata
 
 # Derive GOOS/GOARCH from PLATFORM env var (e.g. linux/amd64, linux/arm64).
 # Caller scripts expose PLATFORM; default to linux/amd64.
-_PLATFORM="${PLATFORM:-linux/amd64}"
+_PLATFORM="${PLATFORM:-linux/amd64,linux/arm64}"
 _GOOS="${_PLATFORM%%/*}"
 _GOARCH="${_PLATFORM##*/}"
 # Validate: only linux targets make sense for a container image.

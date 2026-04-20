@@ -3,7 +3,7 @@ set -euo pipefail
 
 cd $HOME/@iw2rmb/ploy
 
-PLATFORM="${PLATFORM:-linux/amd64}"
+PLATFORM="${PLATFORM:-linux/amd64,linux/arm64}"
 IMAGE_PREFIX="${PLOY_CONTAINER_REGISTRY:-ghcr.io/iw2rmb/ploy}"
 
 PLATFORM="$PLATFORM" images/amata/build-amata.sh
