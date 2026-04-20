@@ -284,6 +284,12 @@ CREATE TABLE IF NOT EXISTS jobs (
   repo_sha_out8   TEXT NOT NULL DEFAULT '',   -- Short form of repo_sha_out.
   meta            JSONB NOT NULL DEFAULT '{}'::jsonb  -- Structured metadata; see JobMeta type docs above.
 );
+-- Backfill compatibility for pre-versioned clusters:
+-- some existing DBs have jobs without name/cache_key columns.
+ALTER TABLE IF EXISTS jobs
+  ADD COLUMN IF NOT EXISTS name TEXT NOT NULL DEFAULT '';
+ALTER TABLE IF EXISTS jobs
+  DROP COLUMN IF EXISTS cache_key;
 CREATE INDEX IF NOT EXISTS jobs_run_idx ON jobs(run_id);
 -- 'Queued' is the claimable job status (jobs transition Created → Queued when ready to claim).
 CREATE INDEX IF NOT EXISTS jobs_pending_idx ON jobs(run_id, repo_id, attempt, id) WHERE status = 'Queued';
@@ -293,6 +299,7 @@ CREATE INDEX IF NOT EXISTS jobs_next_id_idx ON jobs(next_id) WHERE next_id IS NO
 CREATE INDEX IF NOT EXISTS jobs_predecessor_lookup_idx ON jobs(run_id, repo_id, attempt, next_id);
 -- Index for repo attribution queries (logs/diffs/events join via job_id → jobs.repo_id).
 CREATE INDEX IF NOT EXISTS jobs_repo_idx ON jobs(repo_id);
+DROP INDEX IF EXISTS jobs_cache_lookup_idx;
 
 -- Repo-scoped action queue for terminal follow-up work (e.g., MR creation).
 CREATE TABLE IF NOT EXISTS run_repo_actions (
