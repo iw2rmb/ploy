@@ -800,8 +800,9 @@ Successful gate profile persistence:
 - After successful `pre_gate`, `post_gate`, or `re_gate`, the server persists
   an exact profile keyed by `(repo_id, repo_sha_out, stack_id)` (with
   `repo_sha_in` fallback when `repo_sha_out` is unavailable).
-- The persisted profile marks the selected gate target as `passed` and refreshes
-  the `gates(job_id, profile_id)` link.
+- The persisted profile reuses the exact `executed_command` captured by gate
+  runtime metadata for the selected target (it does not regenerate a default
+  command), then refreshes the `gates(job_id, profile_id)` link.
 
 Gate profile to Build Gate mapping:
 - Gate phase chooses destination override slot (`build_gate.pre.gate_profile` for

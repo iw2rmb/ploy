@@ -216,7 +216,7 @@ func buildSuccessfulGateProfilePayload(
 		return nil, fmt.Errorf("detected stack must include language and tool")
 	}
 
-	command, err := defaultGateTargetCommand(tool, target)
+	command, err := executedGateTargetCommand(gateMeta)
 	if err != nil {
 		return nil, err
 	}
@@ -274,32 +274,15 @@ func buildSuccessfulGateProfilePayload(
 	return raw, nil
 }
 
-func defaultGateTargetCommand(tool, target string) (string, error) {
-	tool = strings.ToLower(strings.TrimSpace(tool))
-	target = strings.TrimSpace(target)
-
-	switch tool {
-	case "maven":
-		switch target {
-		case contracts.GateProfileTargetBuild:
-			return "mvn --ff -B -q -e -DskipTests=true -Dstyle.color=never -f /workspace/pom.xml clean install", nil
-		case contracts.GateProfileTargetUnit, contracts.GateProfileTargetAllTests:
-			return "mvn --ff -B -q -e -DskipTests=false -Dstyle.color=never -f /workspace/pom.xml clean install", nil
-		}
-	case "gradle":
-		switch target {
-		case contracts.GateProfileTargetBuild:
-			return "gradle -q --stacktrace --build-cache build -x test -p /workspace", nil
-		case contracts.GateProfileTargetUnit, contracts.GateProfileTargetAllTests:
-			return "gradle -q --stacktrace --build-cache test -p /workspace", nil
-		}
-	case "go":
-		return "go test ./...", nil
-	case "cargo", "rust":
-		return "cargo test", nil
+func executedGateTargetCommand(gateMeta *contracts.BuildGateStageMetadata) (string, error) {
+	if gateMeta == nil {
+		return "", fmt.Errorf("gate metadata is required")
 	}
-
-	return "", fmt.Errorf("unsupported tool/target for successful gate profile payload: %s/%s", tool, target)
+	command := strings.TrimSpace(gateMeta.ExecutedCommand)
+	if command == "" {
+		return "", fmt.Errorf("gate metadata executed_command is required for successful gate profile persistence")
+	}
+	return command, nil
 }
 
 func upsertSuccessfulGateProfileRow(
