@@ -141,6 +141,15 @@ type MigStep struct {
 	// In lists canonical read-only input entries ("shortHash:/in/dst").
 	In []string `json:"in,omitempty" yaml:"in,omitempty"`
 
+	// InFrom lists cross-step /out → /in references in canonical form.
+	// Source selector forms:
+	//   <type>://out/<path>
+	//   <name>@<type>://out/<path>
+	// Legacy compatibility alias:
+	//   <step-name>://out/<path> (equivalent to <step-name>@mig://...)
+	// and targets a destination under /in.
+	InFrom []InFromRef `json:"in_from,omitempty" yaml:"in_from,omitempty"`
+
 	// Out lists canonical read-write output entries ("shortHash:/out/dst").
 	Out []string `json:"out,omitempty" yaml:"out,omitempty"`
 
@@ -154,7 +163,6 @@ type MigStep struct {
 	// Always forces this step to run even when a cache hit exists for the same
 	// repo_sha_in and canonicalized step operations hash.
 	Always bool `json:"always,omitempty" yaml:"always,omitempty"`
-
 }
 
 // Validate checks that the spec is structurally valid.
@@ -194,6 +202,9 @@ func (s MigSpec) Validate() error {
 		if err := validateHydraFields(mig.CA, mig.In, mig.Out, mig.Home, fmt.Sprintf("steps[%d]", i)); err != nil {
 			return err
 		}
+	}
+	if err := validateInFromReferences(s.Steps); err != nil {
+		return err
 	}
 
 	// Validate heal spec.
@@ -259,7 +270,6 @@ func (s MigSpec) Validate() error {
 
 	return nil
 }
-
 
 func validateBuildGateStackConfig(stack *BuildGateStackConfig, prefix string) error {
 	if stack == nil {

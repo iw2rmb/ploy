@@ -726,7 +726,10 @@ func (r *runController) executeMigJob(ctx context.Context, req StartRunRequest) 
 		OutDirPattern: "ploy-mig-out-*",
 		InDirPattern:  "ploy-mig-in-*",
 		PopulateInDir: func(inDir string) error {
-			return r.materializeJavaClasspathInDir(ctx, req, inDir)
+			if err := r.materializeJavaClasspathInDir(ctx, req, inDir); err != nil {
+				return err
+			}
+			return r.materializeMigInFromInputs(ctx, req, inDir)
 		},
 		PrepareManifest: func(m *contracts.StepManifest, ws string) error {
 			r.injectChildBuildRuntimeEnvVars(m, ws, req.JobID)
