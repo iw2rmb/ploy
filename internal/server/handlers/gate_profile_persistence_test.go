@@ -86,6 +86,7 @@ func TestBuildSuccessfulGateProfilePayload(t *testing.T) {
 			Tool:     "gradle",
 			Passed:   true,
 		}},
+		ExecutedCommand: "./gradlew -q --stacktrace --build-cache build -x test -p /workspace",
 		Detected: &contracts.StackExpectation{
 			Language: "java",
 			Tool:     "gradle",
@@ -111,24 +112,40 @@ func TestBuildSuccessfulGateProfilePayload(t *testing.T) {
 	if profile.Targets.Build == nil || profile.Targets.Build.Status != contracts.PrepTargetStatusPassed {
 		t.Fatalf("targets.build = %#v, want passed target", profile.Targets.Build)
 	}
-	if profile.Targets.Build.Command == "" {
-		t.Fatal("targets.build.command is empty")
+	if got, want := profile.Targets.Build.Command, "./gradlew -q --stacktrace --build-cache build -x test -p /workspace"; got != want {
+		t.Fatalf("targets.build.command = %q, want %q", got, want)
 	}
 	if got, want := profile.Stack.Tool, "gradle"; got != want {
 		t.Fatalf("stack.tool = %q, want %q", got, want)
 	}
 }
 
-func TestDefaultGateTargetCommand(t *testing.T) {
-	got, err := defaultGateTargetCommand("maven", contracts.GateProfileTargetBuild)
-	if err != nil {
-		t.Fatalf("defaultGateTargetCommand() error = %v", err)
+func TestBuildSuccessfulGateProfilePayload_RequiresExecutedCommand(t *testing.T) {
+	repoID := domaintypes.RepoID("repo1234")
+	stack := gateProfileStackRow{
+		ID:      3,
+		Lang:    "java",
+		Tool:    "gradle",
+		Release: "11",
 	}
-	if got == "" {
-		t.Fatal("defaultGateTargetCommand() returned empty command")
+	meta := &contracts.BuildGateStageMetadata{
+		StaticChecks: []contracts.BuildGateStaticCheckReport{{
+			Language: "java",
+			Tool:     "gradle",
+			Passed:   true,
+		}},
+		Detected: &contracts.StackExpectation{
+			Language: "java",
+			Tool:     "gradle",
+			Release:  "11",
+		},
 	}
 
-	if _, err := defaultGateTargetCommand("unknown", contracts.GateProfileTargetBuild); err == nil {
-		t.Fatal("defaultGateTargetCommand() expected error for unknown tool")
+	_, err := buildSuccessfulGateProfilePayload(repoID, contracts.GateProfileTargetBuild, stack, meta)
+	if err == nil {
+		t.Fatal("expected error when executed command is missing")
+	}
+	if got, want := err.Error(), "gate metadata executed_command is required for successful gate profile persistence"; got != want {
+		t.Fatalf("error = %q, want %q", got, want)
 	}
 }

@@ -284,7 +284,8 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 		}
 	}
 
-	meta := buildGateExecutionMetadata(workspace, plan.language, plan.tool, plan.release, plan.image, res, logs)
+	executedCommand := gateProfileCommandFromContainerCommand(plan.cmd)
+	meta := buildGateExecutionMetadata(workspace, plan.language, plan.tool, plan.release, plan.image, executedCommand, res, logs)
 	meta.Resources = collectDockerResourceUsage(ctx, e.rt, h, specC)
 
 	if plan.stackGate != nil {
@@ -478,6 +479,7 @@ func buildGateExecutionMetadata(
 	tool string,
 	release string,
 	image string,
+	executedCommand string,
 	res ContainerResult,
 	logs []byte,
 ) *contracts.BuildGateStageMetadata {
@@ -493,7 +495,8 @@ func buildGateExecutionMetadata(
 			Tool:     strings.TrimSpace(tool),
 			Release:  strings.TrimSpace(release),
 		},
-		RuntimeImage: image,
+		RuntimeImage:    image,
+		ExecutedCommand: strings.TrimSpace(executedCommand),
 	}
 	if passed && strings.EqualFold(tool, "gradle") {
 		if hits := readGradleBuildCacheHits(workspace); len(hits) > 0 {
@@ -518,6 +521,26 @@ func buildGateExecutionMetadata(
 	}
 	attachLogsTextAndDigest(meta, logs)
 	return meta
+}
+
+func gateProfileCommandFromContainerCommand(cmd []string) string {
+	if len(cmd) == 0 {
+		return ""
+	}
+	if len(cmd) >= 3 && cmd[0] == "/bin/sh" && (cmd[1] == "-c" || cmd[1] == "-lc") {
+		shell := strings.TrimSpace(cmd[2])
+		if shell == "" {
+			return ""
+		}
+		// Drop internal CA preamble from fallback-generated commands so the
+		// persisted gate profile stores the runnable tool command itself.
+		prefix := gateCAPreamble + "; "
+		if strings.HasPrefix(shell, prefix) {
+			shell = strings.TrimSpace(strings.TrimPrefix(shell, prefix))
+		}
+		return shell
+	}
+	return strings.TrimSpace(strings.Join(cmd, " "))
 }
 
 func attachLogsTextAndDigest(meta *contracts.BuildGateStageMetadata, logs []byte) {

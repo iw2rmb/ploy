@@ -14,6 +14,10 @@ import (
 type BuildGateStageMetadata struct {
 	LogDigest    types.Sha256Digest           `json:"log_digest,omitempty"`
 	StaticChecks []BuildGateStaticCheckReport `json:"static_checks,omitempty"`
+	// ExecutedCommand is the exact gate command shell payload executed by the
+	// gate container. This is persisted so successful gate profiles can reuse
+	// the command that actually ran (for example ./gradlew vs gradle).
+	ExecutedCommand string `json:"executed_command,omitempty"`
 	// Detected captures the resolved gate stack identity used for this
 	// gate execution. It is the canonical source for stack-aware recovery
 	// validation, including optional release matching.

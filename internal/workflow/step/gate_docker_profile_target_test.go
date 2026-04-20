@@ -16,9 +16,12 @@ func TestDockerGateExecutor_PrepOverrideCommandPrecedence(t *testing.T) {
 	executor, rt, workspace := newDockerGateTestHarness(t)
 	gs := workflowkit.NewGateProfileScenario()
 
-	_, err := executor.Execute(context.Background(), gs.PrepCommandSpec, workspace)
+	meta, err := executor.Execute(context.Background(), gs.PrepCommandSpec, workspace)
 	if err != nil {
 		t.Fatalf("Execute() unexpected error: %v", err)
+	}
+	if meta == nil {
+		t.Fatal("expected gate metadata, got nil")
 	}
 	if !rt.createCalled {
 		t.Fatal("expected Create to be called")
@@ -34,6 +37,9 @@ func TestDockerGateExecutor_PrepOverrideCommandPrecedence(t *testing.T) {
 	// CA delivery is now via Hydra CA mounts; no env preamble should be injected.
 	if strings.Contains(got[2], "PLOY_CA_CERTS") {
 		t.Fatalf("unexpected PLOY_CA_CERTS preamble in prep override command: %q", got[2])
+	}
+	if got, want := meta.ExecutedCommand, "echo prep-gate"; got != want {
+		t.Fatalf("executed_command = %q, want %q", got, want)
 	}
 }
 
@@ -139,6 +145,17 @@ func TestDockerGateExecutor_TargetPinIgnoresPrepOverrideFromAnotherTarget(t *tes
 	cmd := rt.captured.Command[2]
 	if !strings.Contains(cmd, "build -x test -p /workspace") {
 		t.Fatalf("expected pinned build target command, got %q", cmd)
+	}
+	if strings.Contains(meta.ExecutedCommand, gateCAPreamble) {
+		t.Fatalf("executed_command should not include CA preamble, got %q", meta.ExecutedCommand)
+	}
+	expectedExecuted := strings.TrimSpace(cmd)
+	prefix := gateCAPreamble + "; "
+	if strings.HasPrefix(expectedExecuted, prefix) {
+		expectedExecuted = strings.TrimSpace(strings.TrimPrefix(expectedExecuted, prefix))
+	}
+	if got := meta.ExecutedCommand; got != expectedExecuted {
+		t.Fatalf("executed_command = %q, want %q", got, expectedExecuted)
 	}
 }
 
