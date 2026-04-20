@@ -16,18 +16,6 @@ func TestResolveJavaClasspathClaimContext(t *testing.T) {
 
 	testBundleIDA := uuid.MustParse("11111111-1111-1111-1111-111111111111")
 	testBundleIDB := uuid.MustParse("22222222-2222-2222-2222-222222222222")
-	buildMetaWithMirror := func(sourceJobID domaintypes.JobID) []byte {
-		meta, err := contracts.MarshalJobMeta(&contracts.JobMeta{
-			Kind: contracts.JobKindMig,
-			CacheMirror: &contracts.CacheMirrorMetadata{
-				SourceJobID: sourceJobID,
-			},
-		})
-		if err != nil {
-			panic(err)
-		}
-		return meta
-	}
 	preGateSBOMMeta := func() []byte {
 		meta, err := contracts.MarshalJobMeta(&contracts.JobMeta{
 			Kind: contracts.JobKindMig,
@@ -341,7 +329,7 @@ func TestResolveJavaClasspathClaimContext(t *testing.T) {
 			},
 		},
 		{
-			name: "java classpath source stays on pre-gate sbom when predecessor is mirrored gate",
+			name: "java classpath source stays on pre-gate sbom when predecessor is gate",
 			job: func() store.Job {
 				runID := domaintypes.NewRunID()
 				repoID := domaintypes.NewRepoID()
@@ -357,29 +345,28 @@ func TestResolveJavaClasspathClaimContext(t *testing.T) {
 			setup: func(t *testing.T, st *jobStore, job store.Job) {
 				t.Helper()
 				sbomID := domaintypes.NewJobID()
-				mirroredPreGateID := domaintypes.NewJobID()
-				sourcePreGateID := domaintypes.NewJobID()
+				preGateID := domaintypes.NewJobID()
 				st.listJobsByRunRepoAttempt.val = []store.Job{
 					{
 						ID:      sbomID,
 						RunID:   job.RunID,
 						RepoID:  job.RepoID,
 						Attempt: job.Attempt,
-						NextID:  &mirroredPreGateID,
+						NextID:  &preGateID,
 						Name:    "pre-gate-sbom-000",
 						JobType: domaintypes.JobTypeSBOM,
 						Status:  domaintypes.JobStatusSuccess,
 						Meta:    preGateSBOMMeta(),
 					},
 					{
-						ID:      mirroredPreGateID,
+						ID:      preGateID,
 						RunID:   job.RunID,
 						RepoID:  job.RepoID,
 						Attempt: job.Attempt,
 						NextID:  &job.ID,
 						JobType: domaintypes.JobTypePreGate,
 						Status:  domaintypes.JobStatusSuccess,
-						Meta:    buildMetaWithMirror(sourcePreGateID),
+						Meta:    []byte(`{"kind":"mig"}`),
 					},
 					job,
 				}

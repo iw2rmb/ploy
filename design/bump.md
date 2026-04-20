@@ -225,6 +225,6 @@ Rules:
 - `internal/nodeagent/recovery_runtime.go`
 - `internal/domain/types/statuses.go`
 - `docs/api/paths/jobs_job_id_status.yaml`
-- `/Users/vk/@iw2rmb/amata/docs/engine/index.md`
-- `/Users/vk/@iw2rmb/amata/internal/executor/pollingshort/pollingshort.go`
-- `/Users/vk/@iw2rmb/amata/schemas/polling.short.amata.schema.json`
+- Amata engine documentation (external repository).
+- Amata polling-short executor implementation (external repository).
+- Amata polling-short schema contract (external repository).

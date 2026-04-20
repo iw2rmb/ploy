@@ -14,7 +14,6 @@ func TestParseMigSpecJSON_BuildGateStackConfig(t *testing.T) {
 			"enabled": true,
 			"pre": {
 				"target": "unit",
-				"always": true,
 				"stack": {
 					"enabled": true,
 					"language": "java",
@@ -24,7 +23,6 @@ func TestParseMigSpecJSON_BuildGateStackConfig(t *testing.T) {
 			},
 			"post": {
 				"target": "all_tests",
-				"always": false,
 				"stack": {
 					"enabled": true,
 					"language": "java",
@@ -62,9 +60,6 @@ func TestParseMigSpecJSON_BuildGateStackConfig(t *testing.T) {
 	if spec.BuildGate.Pre.Target != GateProfileTargetUnit {
 		t.Errorf("build_gate.pre.target = %q, want %q", spec.BuildGate.Pre.Target, GateProfileTargetUnit)
 	}
-	if !spec.BuildGate.Pre.Always {
-		t.Errorf("build_gate.pre.always = false, want true")
-	}
 
 	if spec.BuildGate.Post == nil || spec.BuildGate.Post.Stack == nil {
 		t.Fatal("build_gate.post.stack is nil")
@@ -80,9 +75,6 @@ func TestParseMigSpecJSON_BuildGateStackConfig(t *testing.T) {
 	}
 	if spec.BuildGate.Post.Target != GateProfileTargetAllTests {
 		t.Errorf("build_gate.post.target = %q, want %q", spec.BuildGate.Post.Target, GateProfileTargetAllTests)
-	}
-	if spec.BuildGate.Post.Always {
-		t.Errorf("build_gate.post.always = true, want false")
 	}
 }
 

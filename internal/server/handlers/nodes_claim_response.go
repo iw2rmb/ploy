@@ -46,7 +46,6 @@ type claimResponsePayload struct {
 	JavaClasspathContext   *contracts.JavaClasspathClaimContext `json:"java_classpath_context,omitempty"`
 	DetectedStack          *contracts.StackExpectation          `json:"detected_stack,omitempty"`
 	RecoveryContext        *contracts.RecoveryClaimContext      `json:"recovery_context,omitempty"`
-	GateSkip               *contracts.BuildGateSkipMetadata     `json:"gate_skip,omitempty"`
 	HookRuntime            *contracts.HookRuntimeDecision       `json:"hook_runtime,omitempty"`
 }
 
@@ -79,7 +78,6 @@ func buildClaimResponsePayload(
 	}
 
 	var repoGateProfile []byte
-	var gateSkip *contracts.BuildGateSkipMetadata
 	if gateProfileResolver != nil && shouldResolveGateProfile(jobType) {
 		phasePolicy, policyErr := gatePhasePolicyForJobSpec(spec, jobType)
 		if policyErr != nil {
@@ -91,12 +89,6 @@ func buildClaimResponsePayload(
 		}
 		if resolution != nil {
 			repoGateProfile = resolution.Payload
-			if resolution.ExactHit && !phasePolicy.Always {
-				gateSkip, err = resolveGateSkipMetadata(resolution.Payload, phasePolicy.Target, resolution.ProfileID)
-				if err != nil {
-					return claimResponsePayload{}, fmt.Errorf("resolve gate skip metadata: %w", err)
-				}
-			}
 		}
 	}
 
@@ -233,7 +225,6 @@ func buildClaimResponsePayload(
 		JavaClasspathContext:   javaClasspathContext,
 		DetectedStack:          detectedStack,
 		RecoveryContext:        recoveryCtx,
-		GateSkip:               gateSkip,
 		HookRuntime:            hookRuntime,
 	}, nil
 }
@@ -275,7 +266,6 @@ func buildActionClaimResponsePayload(
 		JavaClasspathContext:   nil,
 		DetectedStack:          nil,
 		RecoveryContext:        nil,
-		GateSkip:               nil,
 		HookRuntime:            nil,
 	}
 }

@@ -20,12 +20,11 @@ type ClaimResult struct {
 
 // ClaimService orchestrates the claim pipeline.
 type ClaimService struct {
-	store                 store.Store
-	blobStore             blobstore.Store
-	configHolder          *ConfigHolder
-	gateResolver          GateProfileResolver
-	eventsService         *server.EventsService
-	replayCachedOutcomeFn func(context.Context, domaintypes.NodeID, store.Job, claimResponsePayload) (bool, error)
+	store         store.Store
+	blobStore     blobstore.Store
+	configHolder  *ConfigHolder
+	gateResolver  GateProfileResolver
+	eventsService *server.EventsService
 }
 
 func NewClaimService(st store.Store, bs blobstore.Store, configHolder *ConfigHolder, resolver GateProfileResolver, eventsService ...*server.EventsService) *ClaimService {
@@ -40,7 +39,6 @@ func NewClaimService(st store.Store, bs blobstore.Store, configHolder *ConfigHol
 		gateResolver:  resolver,
 		eventsService: evtSvc,
 	}
-	svc.replayCachedOutcomeFn = svc.tryReplayCachedOutcome
 	return svc
 }
 
@@ -241,41 +239,6 @@ func (s *ClaimService) Claim(ctx context.Context, nodeID domaintypes.NodeID) (Cl
 		}); err != nil {
 			slog.Error("claim: failed to transition run repo to Running", "node_id", nodeID, "job_id", job.ID, "run_id", job.RunID, "repo_id", job.RepoID, "err", err)
 		}
-	}
-
-	replayed, replayErr := s.replayCachedOutcomeFn(ctx, nodeID, job, payload)
-	if replayErr != nil {
-		slog.Error("claim: cached outcome replay failed", "node_id", nodeID, "job_id", job.ID, "run_id", run.ID, "err", replayErr)
-		if unclaimErr := s.store.UnclaimJob(ctx, store.UnclaimJobParams{
-			ID:     job.ID,
-			NodeID: nodeID,
-		}); unclaimErr != nil {
-			slog.Error("claim: failed to unclaim job after cached replay error", "job_id", job.ID, "run_id", run.ID, "node_id", nodeID, "err", unclaimErr)
-		}
-		if claimDecision.AdvanceRunRepoToRunning {
-			if rollbackErr := s.store.UpdateRunRepoStatus(ctx, store.UpdateRunRepoStatusParams{
-				RunID:  job.RunID,
-				RepoID: job.RepoID,
-				Status: domaintypes.RunRepoStatusQueued,
-			}); rollbackErr != nil {
-				slog.Error("claim: failed to roll back run repo to Queued after cached replay error",
-					"node_id", nodeID,
-					"job_id", job.ID,
-					"run_id", job.RunID,
-					"repo_id", job.RepoID,
-					"err", rollbackErr,
-				)
-			}
-		}
-		return ClaimResult{}, claimInternal("failed to replay cached outcome", replayErr)
-	}
-	if replayed {
-		slog.Info("job completed via cached outcome replay",
-			"job_id", job.ID,
-			"run_id", run.ID,
-			"node_id", nodeID,
-		)
-		return ClaimResult{}, &ClaimNoWork{}
 	}
 	slog.Info("job claimed",
 		"job_id", job.ID,

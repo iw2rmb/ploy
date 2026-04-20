@@ -79,8 +79,8 @@ func TestParseMigSpecJSON_SingleStep(t *testing.T) {
 func TestParseMigSpecJSON_MultiStep(t *testing.T) {
 	input := `{
 		"steps": [
-			{"name": "step-1", "image": "ghcr.io/iw2rmb/ploy/mig1:latest", "command": ["echo", "step1"], "envs": {"STEP": "1"}, "always": true},
-			{"name": "step-2", "image": "ghcr.io/iw2rmb/ploy/mig2:latest", "envs": {"STEP": "2"}, "always": false}
+			{"name": "step-1", "image": "ghcr.io/iw2rmb/ploy/mig1:latest", "command": ["echo", "step1"], "envs": {"STEP": "1"}},
+			{"name": "step-2", "image": "ghcr.io/iw2rmb/ploy/mig2:latest", "envs": {"STEP": "2"}}
 		],
 		"build_gate": {
 			"enabled": true,
@@ -118,17 +118,11 @@ func TestParseMigSpecJSON_MultiStep(t *testing.T) {
 	if mig1.Envs["STEP"] != "1" {
 		t.Errorf("steps[0].envs[STEP] = %q, want %q", mig1.Envs["STEP"], "1")
 	}
-	if !mig1.Always {
-		t.Errorf("steps[0].always = false, want true")
-	}
 
 	// Verify second step.
 	mig2 := spec.Steps[1]
 	if mig2.Name != "step-2" {
 		t.Errorf("steps[1].name = %q, want %q", mig2.Name, "step-2")
-	}
-	if mig2.Always {
-		t.Errorf("steps[1].always = true, want false")
 	}
 
 	// Verify heal.

@@ -135,7 +135,6 @@ steps:
 # - All steps share the same repository, base_ref, target_ref, and global gate policy.
 # - Each step produces a diff artifact before the next step starts.
 # - If any step fails its gate check, the global healing policy applies.
-# - Optional `always: true` on a step disables step-cache reuse for that step.
 #
 # Each entry in steps[] supports the same `image` field as the single-step spec:
 # - String form: `image: ghcr.io/iw2rmb/ploy/mig:latest` (universal, any stack)
@@ -161,7 +160,6 @@ steps:
 #     envs:
 #       MIGRATION_TARGET: java17
 #       RECIPE_VERSION: "3.20.0"
-#     always: true
 #
 # Example with stack-specific images (for dedicated Maven/Gradle containers):
 # steps:

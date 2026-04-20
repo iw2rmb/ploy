@@ -28,7 +28,7 @@ The rollout shipped contract and scheduling surface changes without end-to-end r
 - This is a real storage/consistency failure, not a matcher/schema failure.
 
 5. Roadmap state signaling drift exists.
-- `roadmap/sbom-hooks/index.md` has all phases unchecked.
+- `roadmap/bump.yaml` is the active roadmap artifact for this scope.
 - `roadmap/sbom-hooks/phase-*.yaml` are marked `done: true` while containing `reviews.gaps` entries documenting unmet behavior.
 - Delivery status was therefore not trustworthy as a readiness signal.
 

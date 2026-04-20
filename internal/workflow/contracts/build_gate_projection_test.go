@@ -77,24 +77,24 @@ func TestApplyBuildGatePhaseToGateSpec(t *testing.T) {
 
 	t.Run("nil inputs are no-op", func(t *testing.T) {
 		t.Parallel()
-		spec := &StepGateSpec{Target: "build", Always: true}
+		spec := &StepGateSpec{Target: "build"}
 		ApplyBuildGatePhaseToGateSpec(spec, nil)
-		if spec.Target != "build" || !spec.Always {
+		if spec.Target != "build" {
 			t.Fatalf("spec changed: %+v", spec)
 		}
 		ApplyBuildGatePhaseToGateSpec(nil, &BuildGatePhaseConfig{Target: GateProfileTargetUnit})
 	})
 
-	t.Run("target always gate profile and enabled stack", func(t *testing.T) {
+	t.Run("target gate profile and enabled stack", func(t *testing.T) {
 		t.Parallel()
 		gp := &BuildGateProfileOverride{Command: CommandSpec{Shell: "go test ./..."}}
 		stack := &BuildGateStackConfig{Enabled: true, Language: "java", Tool: "maven"}
 		spec := &StepGateSpec{}
-		phase := &BuildGatePhaseConfig{Target: GateProfileTargetUnit, Always: true, GateProfile: gp, Stack: stack}
+		phase := &BuildGatePhaseConfig{Target: GateProfileTargetUnit, GateProfile: gp, Stack: stack}
 		ApplyBuildGatePhaseToGateSpec(spec, phase)
 
-		if spec.Target != GateProfileTargetUnit || !spec.Always {
-			t.Fatalf("target/always mismatch: %+v", spec)
+		if spec.Target != GateProfileTargetUnit {
+			t.Fatalf("target mismatch: %+v", spec)
 		}
 		if spec.GateProfile != gp {
 			t.Fatalf("gate profile not propagated")

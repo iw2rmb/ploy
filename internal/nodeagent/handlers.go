@@ -67,8 +67,6 @@ type StartRunRequest struct {
 	DetectedStack *contracts.StackExpectation `json:"detected_stack,omitempty"`
 	// RecoveryContext carries server-resolved recovery inputs for heal/re-gate jobs.
 	RecoveryContext *contracts.RecoveryClaimContext `json:"recovery_context,omitempty"`
-	// GateSkip carries optional skip metadata for gate jobs.
-	GateSkip *contracts.BuildGateSkipMetadata `json:"gate_skip,omitempty"`
 	// HookRuntime carries optional hook once-by-hash runtime decision from claim.
 	HookRuntime *contracts.HookRuntimeDecision `json:"hook_runtime,omitempty"`
 	// TypedOptions contains strongly-typed run configuration. This is the canonical

@@ -88,8 +88,7 @@ type ServerMetadataOptions struct {
 // Each step has its own container spec and optional Stack Gate validation.
 type StepMig struct {
 	MigContainerSpec
-	Stack  *contracts.StackGateSpec
-	Always bool
+	Stack *contracts.StackGateSpec
 }
 
 // migsSpecToRunOptions converts contracts.MigSpec directly to RunOptions.
@@ -161,8 +160,7 @@ func migsSpecToRunOptions(spec *contracts.MigSpec) RunOptions {
 					Out:     step.Out,
 					Home:    step.Home,
 				},
-				Stack:  step.Stack,
-				Always: step.Always,
+				Stack: step.Stack,
 			})
 		}
 	}

@@ -143,13 +143,6 @@ type StepGateSpec struct {
 	// Target pins build gate execution to a concrete target (build|unit|all_tests).
 	Target string
 
-	// Always forces gate execution even when skip heuristics could apply.
-	Always bool
-
-	// Skip instructs gate runtime to short-circuit execution using persisted
-	// profile success metadata.
-	Skip *BuildGateSkipMetadata
-
 	// EnforceTargetLock applies strict target lock behavior for infra re-gates.
 	EnforceTargetLock bool
 }

@@ -43,9 +43,6 @@ type BuildGatePhaseConfig struct {
 
 	// Target pins the gate target for this phase (build|unit|all_tests).
 	Target string `json:"target,omitempty" yaml:"target,omitempty"`
-
-	// Always forces this phase to run even when an exact prior profile could skip it.
-	Always bool `json:"always,omitempty" yaml:"always,omitempty"`
 }
 
 // BuildGateProfileOverride configures a gate_profile-derived command/env override.
@@ -187,7 +184,6 @@ func ApplyBuildGatePhaseToGateSpec(spec *StepGateSpec, phase *BuildGatePhaseConf
 	}
 	spec.GateProfile = phase.GateProfile
 	spec.Target = phase.Target
-	spec.Always = phase.Always
 	if phase.Stack != nil && phase.Stack.Enabled {
 		spec.StackDetect = phase.Stack
 	}

@@ -177,7 +177,6 @@ build_gate:
 - `build_gate.pre.gate_profile` applies to the `pre_gate` command/env override.
 - `build_gate.post.gate_profile` applies to `post_gate` and `re_gate` command/env overrides.
 - `build_gate.pre.target` / `build_gate.post.target` pin gate execution target (`build|unit|all_tests`).
-- `build_gate.pre.always` / `build_gate.post.always` force gate execution even when a prior exact profile would allow skip.
 - When `stack.enabled: true`, Build Gate rejects a detected stack mismatch (e.g. configured `release: "11"` but detected `"17"`).
 - When `default: true`, if stack detection cannot determine tool or release, Build Gate falls back to the configured stack. If `tool` is omitted, a detected tool is used when available.
 - When `default: false`, stack detection failures cancel execution for the repo (job status `Cancelled`), and remaining jobs are cancelled.

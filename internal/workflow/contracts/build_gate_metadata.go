@@ -36,18 +36,9 @@ type BuildGateStageMetadata struct {
 	BugSummary string `json:"bug_summary,omitempty"`
 	// Recovery carries loop context for the universal recovery loop contract.
 	Recovery *BuildGateRecoveryMetadata `json:"recovery,omitempty"`
-	// Skip captures claim-time gate skip decision details.
-	Skip *BuildGateSkipMetadata `json:"skip,omitempty"`
 	// ReportLinks captures uploaded gate report artifact references, including
 	// per-report artifact links that can be surfaced by API clients.
 	ReportLinks []BuildGateReportLink `json:"report_links,omitempty"`
-}
-
-// BuildGateSkipMetadata records why a gate execution was skipped.
-type BuildGateSkipMetadata struct {
-	Enabled         bool   `json:"enabled"`
-	SourceProfileID int64  `json:"source_profile_id,omitempty"`
-	MatchedTarget   string `json:"matched_target,omitempty"`
 }
 
 const (
@@ -160,19 +151,6 @@ func (m BuildGateStageMetadata) Validate() error {
 	if m.Recovery != nil {
 		if err := m.Recovery.Validate(); err != nil {
 			return fmt.Errorf("recovery invalid: %w", err)
-		}
-	}
-	if m.Skip != nil {
-		if !m.Skip.Enabled {
-			return fmt.Errorf("skip.enabled: must be true when skip metadata is present")
-		}
-		if m.Skip.SourceProfileID <= 0 {
-			return fmt.Errorf("skip.source_profile_id: must be > 0")
-		}
-		switch strings.TrimSpace(m.Skip.MatchedTarget) {
-		case GateProfileTargetBuild, GateProfileTargetUnit, GateProfileTargetAllTests:
-		default:
-			return fmt.Errorf("skip.matched_target: invalid value %q", m.Skip.MatchedTarget)
 		}
 	}
 	for i, link := range m.ReportLinks {

@@ -71,6 +71,22 @@ Full reset with DB recreation:
 ploy cluster deploy --drop-db --cluster local
 ```
 
+## Existing DB Cleanup (No Recreate)
+
+For existing databases, you can remove obsolete replay/mirroring data without
+dropping the database:
+
+```sql
+DROP INDEX IF EXISTS jobs_cache_lookup_idx;
+ALTER TABLE jobs DROP COLUMN IF EXISTS cache_key;
+UPDATE jobs
+SET meta = meta - 'cache_mirror'
+WHERE meta ? 'cache_mirror';
+```
+
+This cleanup is optional for rows that never used replay metadata, but safe to
+run repeatedly.
+
 ## Troubleshooting
 
 - `PLOY_DB_DSN` missing/unreachable:

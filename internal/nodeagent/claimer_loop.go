@@ -248,7 +248,6 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 		JavaClasspathContext:   claim.JavaClasspathContext,
 		DetectedStack:          claim.DetectedStack,
 		RecoveryContext:        claim.RecoveryContext,
-		GateSkip:               claim.GateSkip,
 		HookRuntime:            claim.HookRuntime,
 		TypedOptions:           typedOpts, // Strongly-typed run options (canonical source of truth)
 		Env:                    envFromSpec,

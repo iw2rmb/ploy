@@ -163,7 +163,6 @@ func TestMigsSpecToRunOptions_DirectConversion(t *testing.T) {
 				Enabled: true,
 				Pre: &contracts.BuildGatePhaseConfig{
 					Target: contracts.GateProfileTargetUnit,
-					Always: true,
 					GateProfile: &contracts.BuildGateProfileOverride{
 						Command: contracts.CommandSpec{Shell: "go test ./..."},
 						Env:     map[string]string{"GOFLAGS": "-mod=readonly"},
@@ -171,7 +170,6 @@ func TestMigsSpecToRunOptions_DirectConversion(t *testing.T) {
 				},
 				Post: &contracts.BuildGatePhaseConfig{
 					Target: contracts.GateProfileTargetAllTests,
-					Always: false,
 					GateProfile: &contracts.BuildGateProfileOverride{
 						Command: contracts.CommandSpec{Exec: []string{"go", "test", "./...", "-run", "TestUnit"}},
 						Env:     map[string]string{"CGO_ENABLED": "0"},

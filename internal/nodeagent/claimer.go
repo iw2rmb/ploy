@@ -70,7 +70,6 @@ type ClaimResponse struct {
 	JavaClasspathContext   *contracts.JavaClasspathClaimContext `json:"java_classpath_context,omitempty"`
 	DetectedStack          *contracts.StackExpectation          `json:"detected_stack,omitempty"`
 	RecoveryContext        *contracts.RecoveryClaimContext      `json:"recovery_context,omitempty"`
-	GateSkip               *contracts.BuildGateSkipMetadata     `json:"gate_skip,omitempty"`
 	HookRuntime            *contracts.HookRuntimeDecision       `json:"hook_runtime,omitempty"`
 }
 
