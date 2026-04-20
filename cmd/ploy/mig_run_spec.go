@@ -44,6 +44,9 @@ func normalizeMigsSpecToJSON(ctx context.Context, base *url.URL, client *http.Cl
 	if err := applyConfigOverlayInPlace(raw); err != nil {
 		return nil, err
 	}
+	if err := normalizeStepInEntriesInPlace(raw); err != nil {
+		return nil, err
+	}
 
 	if err := compileHookSourcesInPlace(ctx, base, client, raw, specBaseDir); err != nil {
 		return nil, err
@@ -91,6 +94,89 @@ func preprocessMigsSpecInPlace(spec map[string]any, specBaseDir string) error {
 				}
 			}
 		}
+	}
+
+	return nil
+}
+
+// normalizeStepInEntriesInPlace rewrites mixed steps[].in authoring entries:
+// - string entries remain in steps[].in (Hydra authoring/canonical forms)
+// - object entries {from,to} move to steps[].in_from with canonical /in target
+func normalizeStepInEntriesInPlace(spec map[string]any) error {
+	steps, ok := spec["steps"].([]any)
+	if !ok || len(steps) == 0 {
+		return nil
+	}
+
+	for i := range steps {
+		step, ok := steps[i].(map[string]any)
+		if !ok {
+			continue
+		}
+		inRaw, exists := step["in"]
+		if !exists {
+			continue
+		}
+		inEntries, ok := inRaw.([]any)
+		if !ok {
+			return fmt.Errorf("steps[%d].in: expected array, got %T", i, inRaw)
+		}
+
+		inStrings := make([]any, 0, len(inEntries))
+		inFromObjects := make([]any, 0, len(inEntries))
+
+		for j := range inEntries {
+			switch v := inEntries[j].(type) {
+			case string:
+				inStrings = append(inStrings, v)
+			case map[string]any:
+				from, ok := v["from"].(string)
+				if !ok || strings.TrimSpace(from) == "" {
+					return fmt.Errorf("steps[%d].in[%d].from: required string", i, j)
+				}
+				parsed, err := contracts.ParseInFromURI(from)
+				if err != nil {
+					return fmt.Errorf("steps[%d].in[%d].from: %w", i, j, err)
+				}
+				to := ""
+				if rawTo, hasTo := v["to"]; hasTo {
+					s, ok := rawTo.(string)
+					if !ok {
+						return fmt.Errorf("steps[%d].in[%d].to: expected string, got %T", i, j, rawTo)
+					}
+					to = s
+				}
+				target, err := contracts.NormalizeInFromTarget(to, parsed.OutPath)
+				if err != nil {
+					return fmt.Errorf("steps[%d].in[%d].to: %w", i, j, err)
+				}
+				inFromObjects = append(inFromObjects, map[string]any{
+					"from": strings.TrimSpace(from),
+					"to":   target,
+				})
+			default:
+				return fmt.Errorf("steps[%d].in[%d]: expected string or object, got %T", i, j, inEntries[j])
+			}
+		}
+
+		step["in"] = inStrings
+		if len(inFromObjects) == 0 {
+			continue
+		}
+
+		existingRaw, hasExisting := step["in_from"]
+		if !hasExisting {
+			step["in_from"] = inFromObjects
+			continue
+		}
+		existingEntries, ok := existingRaw.([]any)
+		if !ok {
+			return fmt.Errorf("steps[%d].in_from: expected array, got %T", i, existingRaw)
+		}
+		combined := make([]any, 0, len(existingEntries)+len(inFromObjects))
+		combined = append(combined, existingEntries...)
+		combined = append(combined, inFromObjects...)
+		step["in_from"] = combined
 	}
 
 	return nil

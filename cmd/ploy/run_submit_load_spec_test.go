@@ -177,6 +177,65 @@ steps:
 	}
 }
 
+func TestLoadSpec_NormalizesStepInObjectEntriesToInFrom(t *testing.T) {
+	tmpDir := t.TempDir()
+	specPath := filepath.Join(tmpDir, "spec.yaml")
+	spec := []byte(`
+steps:
+  - name: extract-usage
+    image: docker.io/test/extract:latest
+  - name: compose-deprecations
+    image: docker.io/test/compose:latest
+    in:
+      - from: extract-usage://out/dependency-usage.nofilter.json
+`)
+	if err := os.WriteFile(specPath, spec, 0o644); err != nil {
+		t.Fatalf("write spec file: %v", err)
+	}
+
+	payload, err := loadSpec(context.Background(), nil, nil, specPath)
+	if err != nil {
+		t.Fatalf("loadSpec() unexpected error: %v", err)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(payload, &result); err != nil {
+		t.Fatalf("unmarshal payload: %v", err)
+	}
+	steps, ok := result["steps"].([]any)
+	if !ok || len(steps) != 2 {
+		t.Fatalf("steps=%v, want 2 entries", result["steps"])
+	}
+
+	second, ok := steps[1].(map[string]any)
+	if !ok {
+		t.Fatalf("steps[1] type=%T, want map[string]any", steps[1])
+	}
+
+	inVals, ok := second["in"].([]any)
+	if !ok {
+		t.Fatalf("steps[1].in type=%T, want []any", second["in"])
+	}
+	if len(inVals) != 0 {
+		t.Fatalf("steps[1].in len=%d, want 0", len(inVals))
+	}
+
+	inFromVals, ok := second["in_from"].([]any)
+	if !ok || len(inFromVals) != 1 {
+		t.Fatalf("steps[1].in_from=%v, want 1 entry", second["in_from"])
+	}
+	ref, ok := inFromVals[0].(map[string]any)
+	if !ok {
+		t.Fatalf("steps[1].in_from[0] type=%T, want map[string]any", inFromVals[0])
+	}
+	if got, want := ref["from"], "extract-usage://out/dependency-usage.nofilter.json"; got != want {
+		t.Fatalf("steps[1].in_from[0].from=%v, want %q", got, want)
+	}
+	if got, want := ref["to"], "/in/dependency-usage.nofilter.json"; got != want {
+		t.Fatalf("steps[1].in_from[0].to=%v, want %q", got, want)
+	}
+}
+
 func TestLoadSpec_ResolvesHealHydraRecords(t *testing.T) {
 	_, base, client := newMockBundleSrvForLoadSpec(t)
 

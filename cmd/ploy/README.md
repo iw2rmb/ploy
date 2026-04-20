@@ -410,6 +410,9 @@ ploy completion <shell> --help
   override corresponding spec values when both are present. Specs use canonical `steps[]`
   shape for both single-step and multi-step runs. Each step supports
   `image`/`command`/`envs` plus Hydra file-record fields (`ca`, `in`, `out`, `home`)
+  and cross-step input references (`in_from`)
+  using selectors like `sbom://out/java.classpath` or
+  `extract-usage@mig://out/dependency-usage.nofilter.json`
   for deterministic file injection via content-addressed bundles.
   Hydra records are also supported in Build Gate healing action blocks
   (`build_gate.heal`). The spec also supports

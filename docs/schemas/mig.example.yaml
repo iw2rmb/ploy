@@ -99,6 +99,12 @@ steps:
 #          Mounted at /out/<name>; uploaded after step completion.
 #   home — Home-relative files: "src:dst{:ro}" → "shortHash:dst{:ro}".
 #          Mounted relative to $HOME inside the container.
+#   in_from — Cross-step artifact input references. Each entry points to a
+#          source job selector and maps one /out file to /in:
+#          from: <type>://out/<path>
+#          from: <name>@<type>://out/<path>
+#          legacy alias: <step-name>://out/<path> (same as <step-name>@mig://...)
+#          to: /in/<path> (optional; defaults to /in/<basename>)
 #
 # Canonical stored-entry format after CLI compile:
 #   in:   ["shortHash:/in/config.json"]
@@ -137,15 +143,21 @@ steps:
 #
 # Example (disabled by default; remove comments to activate):
 # steps:
-#   - image: docker.io/your-dh-user/migs-migrate-java8:latest
+#   - name: extract-usage
+#     image: docker.io/your-dh-user/migs-migrate-java8:latest
 #     envs:
 #       MIGRATION_TARGET: java8
 #     in:
 #       - ./settings.xml:/in/settings.xml
-#   - image: docker.io/your-dh-user/migs-migrate-java11:latest
+#   - name: compose-deprecations
+#     image: docker.io/your-dh-user/migs-migrate-java11:latest
 #     envs:
 #       MIGRATION_TARGET: java11
-#   - image: docker.io/your-dh-user/migs-migrate-java17:latest
+#     in:
+#       - from: extract-usage@mig://out/dependency-usage.nofilter.json
+#       - from: sbom://out/java.classpath
+#   - name: apply-fixes
+#     image: docker.io/your-dh-user/migs-migrate-java17:latest
 #     envs:
 #       MIGRATION_TARGET: java17
 #       RECIPE_VERSION: "3.20.0"

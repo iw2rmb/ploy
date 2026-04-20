@@ -141,6 +141,23 @@ func buildClaimResponsePayload(
 			}
 		}
 	}
+	if jobType == domaintypes.JobTypeMig && migContext != nil {
+		migSpec, parseErr := contracts.ParseMigSpecJSON(mergedSpec)
+		if parseErr != nil {
+			return claimResponsePayload{}, &ClaimJobTerminalError{
+				Message: fmt.Sprintf("parse mig spec for in_from resolution (job %s)", job.ID),
+				Err:     parseErr,
+			}
+		}
+		resolvedInFrom, resolveErr := resolveMigInFromClaimEntries(ctx, st, job, migSpec, migContext.StepIndex)
+		if resolveErr != nil {
+			return claimResponsePayload{}, &ClaimJobTerminalError{
+				Message: fmt.Sprintf("resolve in_from claim context for job %s", job.ID),
+				Err:     resolveErr,
+			}
+		}
+		migContext.InFrom = resolvedInFrom
+	}
 
 	if jobType == domaintypes.JobTypeSBOM {
 		jobMeta, metaErr := contracts.UnmarshalJobMeta(job.Meta)
