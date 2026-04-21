@@ -1,10 +1,11 @@
 Publish Migs Images to a Local Registry
 
 Overview
-- Migs images live under `images/orw/`, `images/amata/`, and `images/sbom/`:
+- Migs images live under `images/orw/`, `images/amata/`, `images/java-17-orw-codex-amata/`, and `images/sbom/`:
   - `orw-cli-maven` (`images/orw/orw-cli-maven`) -> `orw-cli-maven`
   - `orw-cli-gradle` (`images/orw/orw-cli-gradle`) -> `orw-cli-gradle`
   - `amata` (`images/amata`) -> `amata`
+  - `java-17-orw-codex-amata` (`images/java-17-orw-codex-amata`) -> `java-17-orw-codex-amata`
   - `sbom-maven` (`images/sbom/maven`) -> `ploy/sbom-maven`
   - `sbom-gradle` (`images/sbom/gradle`) -> `ploy/sbom-gradle`
 - The runner resolves images as `$PLOY_CONTAINER_REGISTRY/<name>:latest`.
@@ -17,8 +18,11 @@ Local Registry Prerequisites
 
 Publish all Migs images
 ```bash
+# Optional: custom PEM bundle (path or inline PEM content) for build-time TLS interception environments
+# export PLOY_CA_CERTS=/path/to/ca-bundle.pem
+
 images/build-and-push.sh
-# Builds and pushes: amata, orw-cli-maven, orw-cli-gradle,
+# Builds and pushes: amata, java-17-orw-codex-amata, orw-cli-maven, orw-cli-gradle,
 # sbom-maven, sbom-gradle,
 # gate-gradle:jdk11, gate-gradle:jdk17.
 # Also mirrors Maven gate bases into your registry namespace:
@@ -29,6 +33,13 @@ images/build-and-push.sh
 There is no separate registry sync helper script. Publish explicitly via `build-and-push.sh`
 or targeted `docker buildx build ... --push` commands.
 
+Build-time custom CA bundle (`PLOY_CA_CERTS`):
+- Accepts either:
+  - filesystem path to PEM bundle, or
+  - inline PEM content in the env variable itself.
+- Build scripts forward it as BuildKit secret `ploy_ca_certs`.
+- Dockerfiles mount that secret and place it at `/etc/ploy/certs/ca.crt` before network steps.
+
 Build Gate image mapping source of truth:
 - `gates/stacks.yaml`
 - Java defaults expect:
@@ -37,8 +48,8 @@ Build Gate image mapping source of truth:
   - `$PLOY_CONTAINER_REGISTRY/maven:3-eclipse-temurin-11`
   - `$PLOY_CONTAINER_REGISTRY/maven:3-eclipse-temurin-17`
 
-Custom CA support is runtime-only. Do not inject corporate certs during image build.
-Register CA bundles via `ploy config ca set --file /path/to/ca-bundle.pem` so the
+Runtime CA support is separate from build-time CA injection.
+Register runtime CA bundles via `ploy config ca set --file /path/to/ca-bundle.pem` so the
 cluster can mount them into runtime containers via Hydra `ca` records (mounted
 read-only under `/etc/ploy/ca/`).
 
@@ -76,6 +87,7 @@ image:
 
 Notes
 - Directory mapping:
+  - `java-17-orw-codex-amata` -> `java-17-orw-codex-amata`
   - `orw-cli-maven` -> `orw-cli-maven`
   - `orw-cli-gradle` -> `orw-cli-gradle`
   - `sbom-maven` -> `ploy/sbom-maven`
@@ -93,6 +105,7 @@ Verification
 docker buildx imagetools inspect "$PLOY_CONTAINER_REGISTRY/orw-cli-maven:latest"
 docker buildx imagetools inspect "$PLOY_CONTAINER_REGISTRY/orw-cli-gradle:latest"
 docker buildx imagetools inspect "$PLOY_CONTAINER_REGISTRY/amata:latest"
+docker buildx imagetools inspect "$PLOY_CONTAINER_REGISTRY/java-17-orw-codex-amata:latest"
 docker buildx imagetools inspect "$PLOY_CONTAINER_REGISTRY/sbom-maven:latest"
 docker buildx imagetools inspect "$PLOY_CONTAINER_REGISTRY/sbom-gradle:latest"
 ```
