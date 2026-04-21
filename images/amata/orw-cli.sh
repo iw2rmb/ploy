@@ -166,9 +166,6 @@ if ! parse_bool_default_true "${ORW_FAIL_ON_UNSUPPORTED:-}"; then
   fail_on_unsupported=false
 fi
 
-if [[ -n "${ORW_EXCLUDES:-}" || -n "${ORW_INCLUDES:-}" ]]; then
-  echo "[orw-cli] Warning: ORW_EXCLUDES/ORW_INCLUDES are unsupported; use ORW_EXCLUDE_PATHS." | tee -a "$transform_log"
-fi
 export ORW_EXCLUDE_PATHS="${ORW_EXCLUDE_PATHS:-}"
 
 config_path="${ORW_CONFIG_PATH:-}"
