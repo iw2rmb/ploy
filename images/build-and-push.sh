@@ -7,6 +7,7 @@ set -Eeuo pipefail
 # - server  -> server
 # - node    -> node
 # - amata   -> amata
+# - java-17-orw-codex-amata -> java-17-orw-codex-amata
 # - sbom runners -> sbom-gradle, sbom-maven
 # - gate-gradle -> gate-gradle:jdk11, gate-gradle:jdk17
 # - maven mirrors -> maven:3-eclipse-temurin-11, maven:3-eclipse-temurin-17
@@ -17,6 +18,7 @@ set -Eeuo pipefail
 #   VERSION - Optional semver tag (default from ./VERSION file, format vX.Y.Z)
 #   IMAGE_PREFIX - Optional image prefix (default ghcr.io/iw2rmb/ploy)
 #   PUSH_LATEST - Optional alias toggle for :latest (default 1 for stable releases)
+#   PLOY_CA_CERTS - Optional PEM bundle (path or inline content), passed as BuildKit secret id=ploy_ca_certs
 #
 # Examples:
 #   images/build-and-push.sh
@@ -25,6 +27,8 @@ set -Eeuo pipefail
 PLATFORM=${PLATFORM:-linux/amd64,linux/arm64}
 IMAGE_PREFIX="${IMAGE_PREFIX:-ghcr.io/iw2rmb/ploy}"
 PUSH_LATEST="${PUSH_LATEST:-1}"
+declare -a BUILD_SECRET_ARGS=()
+PLOY_CA_CERTS_TMP=""
 
 if ! command -v docker >/dev/null 2>&1; then
   echo "error: docker CLI not found" >&2
@@ -34,6 +38,13 @@ if ! docker buildx version >/dev/null 2>&1; then
   echo "error: docker buildx not available (install docker buildx plugin)" >&2
   exit 2
 fi
+
+cleanup() {
+  if [[ -n "${PLOY_CA_CERTS_TMP}" && -f "${PLOY_CA_CERTS_TMP}" ]]; then
+    rm -f "${PLOY_CA_CERTS_TMP}"
+  fi
+}
+trap cleanup EXIT
 
 ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
 cd "$ROOT"
@@ -54,6 +65,18 @@ if [[ ! "$VERSION" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)(-[0-9A-Za-z][0-9A-Za-z.-]*)
 fi
 SEMVER_MAJOR="${BASH_REMATCH[1]}"
 SEMVER_MINOR="${BASH_REMATCH[2]}"
+
+if [[ -n "${PLOY_CA_CERTS:-}" ]]; then
+  if [[ -f "${PLOY_CA_CERTS}" ]]; then
+    BUILD_SECRET_ARGS+=(--secret "id=ploy_ca_certs,src=${PLOY_CA_CERTS}")
+    echo "==> Using build CA bundle from file path in PLOY_CA_CERTS"
+  else
+    PLOY_CA_CERTS_TMP="$(mktemp)"
+    printf '%s' "${PLOY_CA_CERTS}" >"${PLOY_CA_CERTS_TMP}"
+    BUILD_SECRET_ARGS+=(--secret "id=ploy_ca_certs,src=${PLOY_CA_CERTS_TMP}")
+    echo "==> Using build CA bundle from inline PEM content in PLOY_CA_CERTS"
+  fi
+fi
 
 build_push() {
   local name="$1"
@@ -82,6 +105,7 @@ build_push() {
     --provenance=false --sbom=false --pull \
     --label "org.opencontainers.image.version=${VERSION}" \
     --label "org.opencontainers.image.revision=${GIT_COMMIT}" \
+    "${BUILD_SECRET_ARGS[@]}" \
     -f "${dockerfile}" \
     "${tag_args[@]}" \
     --push "${context}" --progress=plain
@@ -110,6 +134,7 @@ build_push_fixed_tag() {
     --provenance=false --sbom=false --pull \
     --label "org.opencontainers.image.version=${VERSION}" \
     --label "org.opencontainers.image.revision=${GIT_COMMIT}" \
+    "${BUILD_SECRET_ARGS[@]}" \
     -f "${dockerfile}" \
     -t "${ref}" \
     --push "${context}" --progress=plain
@@ -133,6 +158,7 @@ build_push node images/node/Dockerfile .
 # amata
 bash images/amata/build-amata.sh
 build_push amata images/amata/Dockerfile .
+build_push java-17-orw-codex-amata images/java-17-orw-codex-amata/Dockerfile .
 
 # sbom runners
 build_push sbom-gradle images/sbom/gradle/Dockerfile .

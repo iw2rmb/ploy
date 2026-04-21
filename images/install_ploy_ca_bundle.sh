@@ -99,6 +99,8 @@ install_ploy_ca_bundle() {
     export CURL_CA_BUNDLE="$fallback_bundle"
     export GIT_SSL_CAINFO="$fallback_bundle"
     export CODEX_CA_CERTIFICATE="$fallback_bundle"
+    export NODE_EXTRA_CA_CERTS="$fallback_bundle"
+    export NPM_CONFIG_CAFILE="$fallback_bundle"
   fi
 
   rm -rf "$tmp_dir"
