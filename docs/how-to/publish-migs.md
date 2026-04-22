@@ -25,7 +25,7 @@ images/build-and-push.sh
 # Builds and pushes: amata, java-17-orw-codex-amata, orw-cli-maven, orw-cli-gradle,
 # sbom-maven, sbom-gradle,
 # gate-gradle:jdk11, gate-gradle:jdk17.
-# Also mirrors Maven gate bases into your registry namespace:
+# Also builds/pushes Maven gate wrappers into your registry namespace:
 # maven:3-eclipse-temurin-11, maven:3-eclipse-temurin-17.
 # Also builds/pushes runtime images: server and node.
 ```

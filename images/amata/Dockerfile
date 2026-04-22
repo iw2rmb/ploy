@@ -17,20 +17,25 @@ LABEL org.opencontainers.image.title="ploy-amata" \
     org.opencontainers.image.licenses="MIT"
 
 COPY images/install_ploy_ca_bundle.sh /usr/local/lib/ploy/install_ploy_ca_bundle.sh
-RUN --mount=type=secret,id=ploy_ca_certs,required=false \
-    if [[ -s /run/secrets/ploy_ca_certs ]]; then \
-      mkdir -p /etc/ploy/certs; \
+RUN --mount=type=secret,id=ploy_ca_certs,required=false set -eux; \
+    if [ -s /run/secrets/ploy_ca_certs ]; then \
+      mkdir -p /etc/ploy/certs /tmp/ploy-extra-ca; \
       cp /run/secrets/ploy_ca_certs /etc/ploy/certs/ca.crt; \
-      source /usr/local/lib/ploy/install_ploy_ca_bundle.sh; \
-      install_ploy_ca_bundle; \
-    fi && \
-    apk add --no-cache bash git ca-certificates curl jq yq openjdk17-jre && \
+      cat /etc/ssl/certs/ca-certificates.crt /run/secrets/ploy_ca_certs > /tmp/ploy-extra-ca/ca-bundle.pem; \
+      export SSL_CERT_FILE=/tmp/ploy-extra-ca/ca-bundle.pem; \
+      export CURL_CA_BUNDLE=/tmp/ploy-extra-ca/ca-bundle.pem; \
+      export GIT_SSL_CAINFO=/tmp/ploy-extra-ca/ca-bundle.pem; \
+    fi; \
+    apk add --no-cache bash git ca-certificates curl jq yq openjdk17-jre; \
     if command -v update-ca-certificates >/dev/null 2>&1; then \
       update-ca-certificates || true; \
-    fi && \
-    apk add --no-cache ripgrep fd grep findutils gawk coreutils && \
-    mkdir -p /workspace /out /out/codex /etc/ploy/certs && \
-    chmod 700 /out/codex && \
+    fi; \
+    if [ -s /run/secrets/ploy_ca_certs ]; then \
+      /bin/bash -c 'source /usr/local/lib/ploy/install_ploy_ca_bundle.sh; install_ploy_ca_bundle'; \
+    fi; \
+    apk add --no-cache ripgrep fd grep findutils gawk coreutils; \
+    mkdir -p /workspace /out /out/codex /etc/ploy/certs; \
+    chmod 700 /out/codex; \
     chmod 755 /etc/ploy/certs
 
 SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
