@@ -1,4 +1,4 @@
-FROM maven:3-eclipse-temurin-11
+FROM maven:3.9.11-eclipse-temurin-11
 LABEL org.opencontainers.image.title="ploy-gate-maven-jdk11" \
     org.opencontainers.image.description="Ploy Maven gate runner image with Maven 3 and Eclipse Temurin JDK 11" \
     org.opencontainers.image.source="https://github.com/iw2rmb/ploy" \

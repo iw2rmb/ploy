@@ -1,4 +1,4 @@
-ARG NODE_IMAGE=node:22-bookworm
+ARG NODE_IMAGE=node:22-bookworm-slim
 
 FROM --platform=$BUILDPLATFORM maven:3.9.11-eclipse-temurin-17 AS rewrite-runner-build
 

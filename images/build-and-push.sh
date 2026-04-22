@@ -14,7 +14,7 @@ set -Eeuo pipefail
 # - orw/*   -> <dir name> (for example: orw-cli-maven, orw-cli-gradle)
 #
 # Inputs (env):
-#   PLATFORM - Optional: comma list of platforms (default linux/amd64)
+#   PLATFORM - Optional: comma list of platforms (default linux/amd64,linux/arm64)
 #   VERSION - Optional semver tag (default from ./VERSION file, format vX.Y.Z)
 #   IMAGE_PREFIX - Optional image prefix (default ghcr.io/iw2rmb/ploy)
 #   OUTPUT_MODE - Optional: push|load (default push)
@@ -23,7 +23,7 @@ set -Eeuo pipefail
 #
 # Examples:
 #   images/build-and-push.sh
-#   VERSION=v0.1.0 PLATFORM=linux/amd64 images/build-and-push.sh
+#   VERSION=v0.1.0 PLATFORM=linux/amd64,linux/arm64 images/build-and-push.sh
 #   OUTPUT_MODE=load IMAGE_PREFIX=ploy VERSION=v0.1.0 images/build-and-push.sh
 
 PLATFORM=${PLATFORM:-linux/amd64,linux/arm64}

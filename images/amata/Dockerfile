@@ -1,4 +1,4 @@
-ARG NODE_IMAGE=node:22-alpine
+ARG NODE_IMAGE=node:22-bookworm-slim
 FROM --platform=$BUILDPLATFORM maven:3.9.11-eclipse-temurin-17 AS rewrite-runner-build
 
 WORKDIR /build
@@ -17,28 +17,29 @@ LABEL org.opencontainers.image.title="ploy-amata" \
     org.opencontainers.image.licenses="MIT"
 
 COPY images/install_ploy_ca_bundle.sh /usr/local/lib/ploy/install_ploy_ca_bundle.sh
-RUN --mount=type=secret,id=ploy_ca_certs,required=false set -eux; \
-    if [ -s /run/secrets/ploy_ca_certs ]; then \
-      mkdir -p /etc/ploy/certs /tmp/ploy-extra-ca; \
+RUN --mount=type=secret,id=ploy_ca_certs,required=false \
+    bash -euxo pipefail -c 'if [[ -s /run/secrets/ploy_ca_certs ]]; then \
+      mkdir -p /etc/ploy/certs; \
       cp /run/secrets/ploy_ca_certs /etc/ploy/certs/ca.crt; \
-      cat /etc/ssl/certs/ca-certificates.crt /run/secrets/ploy_ca_certs > /tmp/ploy-extra-ca/ca-bundle.pem; \
-      export SSL_CERT_FILE=/tmp/ploy-extra-ca/ca-bundle.pem; \
-      export CURL_CA_BUNDLE=/tmp/ploy-extra-ca/ca-bundle.pem; \
-      export GIT_SSL_CAINFO=/tmp/ploy-extra-ca/ca-bundle.pem; \
-    fi; \
-    apk add --no-cache bash git ca-certificates curl jq yq openjdk17-jre; \
-    if command -v update-ca-certificates >/dev/null 2>&1; then \
-      update-ca-certificates || true; \
-    fi; \
-    if [ -s /run/secrets/ploy_ca_certs ]; then \
-      /bin/bash -c 'source /usr/local/lib/ploy/install_ploy_ca_bundle.sh; install_ploy_ca_bundle'; \
-    fi; \
-    apk add --no-cache ripgrep fd grep findutils gawk coreutils; \
-    mkdir -p /workspace /out /out/codex /etc/ploy/certs; \
-    chmod 700 /out/codex; \
-    chmod 755 /etc/ploy/certs
+    fi \
+    && if [[ -s /run/secrets/ploy_ca_certs ]] && [[ -f /etc/apt/sources.list.d/debian.sources ]]; then \
+      sed -i "s|http://deb.debian.org|https://deb.debian.org|g" /etc/apt/sources.list.d/debian.sources; \
+    fi \
+    && apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+    bash ca-certificates coreutils curl fd-find findutils gawk git grep jq openjdk-17-jre-headless ripgrep unzip yq \
+    && rm -rf /var/lib/apt/lists/* \
+    && if [[ -s /run/secrets/ploy_ca_certs ]]; then \
+      source /usr/local/lib/ploy/install_ploy_ca_bundle.sh; \
+      install_ploy_ca_bundle; \
+    fi \
+    && mkdir -p /workspace /out /out/codex /etc/ploy/certs \
+    && chmod 700 /out/codex \
+    && chmod 755 /etc/ploy/certs'
 
 SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
+RUN ln -sf /usr/bin/fdfind /usr/local/bin/fd \
+    && if command -v update-ca-certificates >/dev/null 2>&1; then update-ca-certificates || true; fi
 RUN echo 'export PATH="/usr/local/bin:$PATH"' >> /root/.bashrc
 RUN echo 'if [ -f ~/.bashrc ]; then . ~/.bashrc; fi' >> /root/.bash_profile
 
