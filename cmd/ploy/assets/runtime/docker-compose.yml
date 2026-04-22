@@ -3,7 +3,6 @@ services:
     image: ${PLOY_RUNTIME_SERVER_IMAGE:?set PLOY_RUNTIME_SERVER_IMAGE or run ploy cluster deploy}
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    platform: linux/amd64
     restart: unless-stopped
     environment:
       - PLOY_DB_DSN=${PLOY_DB_DSN:?set PLOY_DB_DSN to a container-reachable postgres DSN}
@@ -36,7 +35,6 @@ services:
 
   node:
     image: ${PLOY_RUNTIME_NODE_IMAGE:?set PLOY_RUNTIME_NODE_IMAGE or run ploy cluster deploy}
-    platform: linux/amd64
     user: "0:0"
     security_opt:
       - label=disable
@@ -63,7 +61,6 @@ services:
 
   gradle-build-cache:
     image: gradle/build-cache-node:21.2
-    platform: linux/amd64
     volumes:
       - gradle-build-cache-data:/data
       - ./gradle-build-cache/config.yaml:/seed/config.yaml:ro

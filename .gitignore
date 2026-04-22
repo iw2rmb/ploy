@@ -81,7 +81,7 @@ tests/e2e/deploy/e2e-logs/
 
 # amata
 .amata
-images/amata/amata
+images/amata/amata*
 
 .crush
 .refresh.sh
