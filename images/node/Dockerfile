@@ -5,6 +5,7 @@ LABEL org.opencontainers.image.title="ploy-node" \
     org.opencontainers.image.description="Ploy node runtime image for executing jobs and gates" \
     org.opencontainers.image.source="https://github.com/iw2rmb/ploy" \
     org.opencontainers.image.licenses="MIT"
+ARG TARGETARCH
 
 COPY --chmod=755 images/install_ploy_ca_bundle.sh /usr/local/lib/ploy/install_ploy_ca_bundle.sh
 
@@ -25,7 +26,7 @@ RUN --mount=type=secret,id=ploy_ca_certs,required=false \
     && mkdir -p /etc/ploy /etc/ploy/pki /etc/ploy/gates /var/lib/ploy \
     && chown -R ploy:ploy /etc/ploy /var/lib/ploy'
 COPY --from=docker-cli /usr/local/bin/docker /usr/local/bin/docker
-COPY --chmod=755 dist/ployd-node-linux /usr/local/bin/ployd-node
+COPY --chmod=755 dist/ployd-node-linux-${TARGETARCH} /usr/local/bin/ployd-node
 COPY --chmod=755 images/node/entrypoint.sh /usr/local/bin/ployd-node-entrypoint
 COPY --chown=ploy:ploy gates/ /etc/ploy/gates/
 USER root

@@ -97,7 +97,7 @@ Notes
 
 Multi-arch push
 ```bash
-PLATFORM=linux/amd64 images/build-and-push.sh
+PLATFORM=linux/amd64,linux/arm64 images/build-and-push.sh
 ```
 
 Verification

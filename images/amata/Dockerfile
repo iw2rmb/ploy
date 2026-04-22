@@ -10,6 +10,7 @@ RUN --mount=type=cache,target=/root/.m2 \
     bash -euxo pipefail -c 'if [[ -s /run/secrets/ploy_ca_certs ]]; then mkdir -p /etc/ploy/certs; cp /run/secrets/ploy_ca_certs /etc/ploy/certs/ca.crt; source /usr/local/lib/ploy/install_ploy_ca_bundle.sh; PLOY_CA_IMPORT_JAVA=1 install_ploy_ca_bundle; fi; cd rewrite-runner && mvn -q -DskipTests package'
 
 FROM ${NODE_IMAGE}
+ARG TARGETARCH
 
 LABEL org.opencontainers.image.title="ploy-amata" \
     org.opencontainers.image.description="Ploy Migs runner image with Codex, Crush, Claude Code, and Claude Code Router installed" \
@@ -60,7 +61,7 @@ RUN --mount=type=secret,id=ploy_ca_certs,required=false \
     rm -rf /root/.npm /tmp/*
 
 COPY images/amata/entrypoint.sh /usr/local/bin/ploy/entrypoint.sh
-COPY images/amata/amata /usr/local/bin/amata
+COPY images/amata/amata-linux-${TARGETARCH} /usr/local/bin/amata
 COPY images/amata/orw-cli.sh /usr/local/bin/orw-cli
 COPY images/amata/heal-orw.sh /usr/local/bin/heal-orw
 COPY --from=rewrite-runner-build /build/rewrite-runner/target/orw-cli-runner.jar /opt/orw-cli-runner/orw-cli-runner.jar

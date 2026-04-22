@@ -3,6 +3,7 @@ LABEL org.opencontainers.image.title="ploy-server" \
     org.opencontainers.image.description="Ploy control-plane server runtime image" \
     org.opencontainers.image.source="https://github.com/iw2rmb/ploy" \
     org.opencontainers.image.licenses="MIT"
+ARG TARGETARCH
 
 COPY --chmod=755 images/install_ploy_ca_bundle.sh /usr/local/lib/ploy/install_ploy_ca_bundle.sh
 
@@ -22,7 +23,7 @@ RUN --mount=type=secret,id=ploy_ca_certs,required=false \
     && useradd --system --create-home --home-dir /var/lib/ploy --shell /usr/sbin/nologin ploy \
     && mkdir -p /etc/ploy /etc/ploy/pki /etc/ploy/gates /etc/ploy/schemas /var/lib/ploy \
     && chown -R ploy:ploy /etc/ploy /var/lib/ploy'
-COPY --chmod=755 dist/ployd-linux /usr/local/bin/ployd
+COPY --chmod=755 dist/ployd-linux-${TARGETARCH} /usr/local/bin/ployd
 COPY --chmod=755 images/server/entrypoint.sh /usr/local/bin/ployd-entrypoint
 COPY --chown=ploy:ploy gates/ /etc/ploy/gates/
 COPY --chown=ploy:ploy docs/schemas/gate_profile.schema.json /etc/ploy/schemas/gate_profile.schema.json
