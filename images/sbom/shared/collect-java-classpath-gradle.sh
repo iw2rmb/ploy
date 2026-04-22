@@ -47,7 +47,11 @@ find "$workspace" -type d \
   \( -path '*/build/classes/java/main' \
   -o -path '*/build/classes/kotlin/main' \
   -o -path '*/build/classes/groovy/main' \
-  -o -path '*/build/resources/main' \) \
+  -o -path '*/build/resources/main' \
+  -o -path '*/build/classes/java/test' \
+  -o -path '*/build/classes/kotlin/test' \
+  -o -path '*/build/classes/groovy/test' \
+  -o -path '*/build/resources/test' \) \
   | awk 'NF > 0' | sort -u > "$workspace_cp"
 
 if [[ -s "$workspace_cp" ]]; then

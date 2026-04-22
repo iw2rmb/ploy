@@ -46,12 +46,16 @@ COPY --from=gradle-tools /usr/bin/gradle /usr/bin/gradle
 SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
 
 RUN ln -sf /usr/bin/fdfind /usr/local/bin/fd \
+    && ln -sf /opt/java/openjdk/bin/java /usr/bin/java \
+    && ln -sf /opt/java/openjdk/bin/keytool /usr/bin/keytool \
     && if command -v update-ca-certificates >/dev/null 2>&1; then update-ca-certificates || true; fi
 
 RUN echo 'export PATH="/usr/local/bin:$PATH"' >> /root/.bashrc
 RUN echo 'if [ -f ~/.bashrc ]; then . ~/.bashrc; fi' >> /root/.bash_profile
 
 ENV JAVA_HOME=/opt/java/openjdk \
+    LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8 \
     MAVEN_HOME=/usr/share/maven \
     MAVEN_CONFIG=/root/.m2 \
     GRADLE_HOME=/opt/gradle \
