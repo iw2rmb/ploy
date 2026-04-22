@@ -17,7 +17,7 @@ func TestJobTypeValidate(t *testing.T) {
 		{name: "re_gate", jobType: JobTypeReGate},
 		{name: "sbom", jobType: JobTypeSBOM},
 		{name: "hook", jobType: JobTypeHook},
-		{name: "invalid", jobType: JobType("legacy_gate"), wantErr: true},
+		{name: "invalid", jobType: JobType("not_a_job_type"), wantErr: true},
 		{name: "empty", jobType: JobType(""), wantErr: true},
 	}
 

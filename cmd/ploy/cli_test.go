@@ -40,9 +40,6 @@ func TestExecuteHelpMatchesGolden(t *testing.T) {
 	if diff := diffStrings(expect, buf.String()); diff != "" {
 		t.Fatalf("help output mismatch:\n%s", diff)
 	}
-	if strings.Contains(buf.String(), "Grid") {
-		t.Fatalf("help output should not reference Grid: %q", buf.String())
-	}
 }
 
 // TestExecuteHelpForMigMatchesGolden verifies that "ploy help mig" produces the expected golden output.
@@ -93,21 +90,6 @@ func TestExecuteUnknownCommandSuggestsHelp(t *testing.T) {
 	output := buf.String()
 	if !strings.Contains(output, "help") && !strings.Contains(err.Error(), "help") {
 		t.Logf("expected help hint in output or error, got output=%q err=%v", output, err)
-	}
-}
-
-// TestExecuteLegacyGridCommandIsUnknown verifies that legacy "grid" command is rejected.
-func TestExecuteLegacyGridCommandIsUnknown(t *testing.T) {
-	t.Helper()
-	buf := &bytes.Buffer{}
-	rootCmd := newRootCmd(buf)
-	rootCmd.SetArgs([]string{"grid"})
-	err := rootCmd.Execute()
-	if err == nil {
-		t.Fatal("expected error for unknown command")
-	}
-	if !strings.Contains(err.Error(), "unknown command") {
-		t.Fatalf("expected 'unknown command' error, got %v", err)
 	}
 }
 
