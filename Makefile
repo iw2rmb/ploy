@@ -6,6 +6,7 @@ REQUIRED_GO_TOOLCHAIN := go1.25.9
 VERSION_FILE := VERSION
 VERSION ?= $(shell tr -d '[:space:]' < $(VERSION_FILE) 2>/dev/null || echo "")
 PLOY_SIGN_BINARIES ?= 0
+PLOY_BUILD_PLATFORMS ?= linux/amd64
 ROADMAP_VERIFY_PHASES ?=
 
 # Version stamping
@@ -44,11 +45,45 @@ build: verify-go-toolchain verify-version ## Build the CLI/server/node binaries
 	GOFLAGS= go build -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/$(BINARY) ./cmd/ploy
 	@if [ -d ./cmd/ployd ]; then \
 		go build -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/ployd ./cmd/ployd; \
-		GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/ployd-linux ./cmd/ployd; \
+		first_arch=""; \
+		for platform in $$(printf '%s' "$(PLOY_BUILD_PLATFORMS)" | tr ',' ' '); do \
+			goos="$${platform%%/*}"; \
+			goarch="$${platform##*/}"; \
+			if [ "$$goos" != "linux" ]; then \
+				echo "error: unsupported GOOS '$$goos' in PLOY_BUILD_PLATFORMS='$(PLOY_BUILD_PLATFORMS)'; only linux is supported"; \
+				exit 1; \
+			fi; \
+			case "$$goarch" in \
+				amd64|arm64|arm) ;; \
+				*) echo "error: unsupported GOARCH '$$goarch' in PLOY_BUILD_PLATFORMS='$(PLOY_BUILD_PLATFORMS)'"; exit 1 ;; \
+			esac; \
+			if [ -z "$$first_arch" ]; then first_arch="$$goarch"; fi; \
+			CGO_ENABLED=0 GOOS="$$goos" GOARCH="$$goarch" go build -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/ployd-linux-$$goarch ./cmd/ployd; \
+		done; \
+		if [ -n "$$first_arch" ] && [ -f "$(BUILD_DIR)/ployd-linux-$$first_arch" ]; then \
+			cp "$(BUILD_DIR)/ployd-linux-$$first_arch" "$(BUILD_DIR)/ployd-linux"; \
+		fi; \
 	fi
 	@if [ -d ./cmd/ployd-node ]; then \
 		go build -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/ployd-node ./cmd/ployd-node; \
-		GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/ployd-node-linux ./cmd/ployd-node; \
+		first_arch=""; \
+		for platform in $$(printf '%s' "$(PLOY_BUILD_PLATFORMS)" | tr ',' ' '); do \
+			goos="$${platform%%/*}"; \
+			goarch="$${platform##*/}"; \
+			if [ "$$goos" != "linux" ]; then \
+				echo "error: unsupported GOOS '$$goos' in PLOY_BUILD_PLATFORMS='$(PLOY_BUILD_PLATFORMS)'; only linux is supported"; \
+				exit 1; \
+			fi; \
+			case "$$goarch" in \
+				amd64|arm64|arm) ;; \
+				*) echo "error: unsupported GOARCH '$$goarch' in PLOY_BUILD_PLATFORMS='$(PLOY_BUILD_PLATFORMS)'"; exit 1 ;; \
+			esac; \
+			if [ -z "$$first_arch" ]; then first_arch="$$goarch"; fi; \
+			CGO_ENABLED=0 GOOS="$$goos" GOARCH="$$goarch" go build -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/ployd-node-linux-$$goarch ./cmd/ployd-node; \
+		done; \
+		if [ -n "$$first_arch" ] && [ -f "$(BUILD_DIR)/ployd-node-linux-$$first_arch" ]; then \
+			cp "$(BUILD_DIR)/ployd-node-linux-$$first_arch" "$(BUILD_DIR)/ployd-node-linux"; \
+		fi; \
 	fi
 	@case "$(PLOY_SIGN_BINARIES)" in \
 		1|true|TRUE|yes|YES|on|ON) $(MAKE) sign-binaries VERSION="$(VERSION)" ;; \
@@ -62,7 +97,7 @@ sign-binaries: verify-version ## Sign dist binaries with cosign (keyless or key-
 		exit 1; \
 	fi
 	@mkdir -p $(BUILD_DIR)/signatures
-	@for bin in "$(BUILD_DIR)/ploy" "$(BUILD_DIR)/ployd" "$(BUILD_DIR)/ployd-linux" "$(BUILD_DIR)/ployd-node" "$(BUILD_DIR)/ployd-node-linux"; do \
+	@for bin in "$(BUILD_DIR)/ploy" "$(BUILD_DIR)/ployd" "$(BUILD_DIR)/ployd-linux" "$(BUILD_DIR)/ployd-node" "$(BUILD_DIR)/ployd-node-linux" $(BUILD_DIR)/ployd-linux-* $(BUILD_DIR)/ployd-node-linux-*; do \
 		if [ ! -f "$$bin" ]; then \
 			continue; \
 		fi; \

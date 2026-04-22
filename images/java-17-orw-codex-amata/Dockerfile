@@ -14,6 +14,7 @@ FROM --platform=$TARGETOS/$TARGETARCH maven:3.9.11-eclipse-temurin-17 AS maven-t
 FROM --platform=$TARGETOS/$TARGETARCH gradle:8.8-jdk17 AS gradle-tools
 
 FROM ${NODE_IMAGE}
+ARG TARGETARCH
 
 LABEL org.opencontainers.image.title="java-17-orw-codex-amata" \
     org.opencontainers.image.description="Java 17 image with Maven, Gradle, OpenRewrite, Codex CLI, and Amata" \
@@ -82,7 +83,7 @@ RUN --mount=type=secret,id=ploy_ca_certs,required=false \
 COPY images/amata/entrypoint.sh /usr/local/bin/ploy/entrypoint.sh
 COPY images/gates/gradle/gradle.properties /root/.gradle/gradle.properties
 COPY images/gates/gradle/cache.init.gradle /root/.gradle/init.d/cache.init.gradle
-COPY images/amata/amata /usr/local/bin/amata
+COPY images/amata/amata-linux-${TARGETARCH} /usr/local/bin/amata
 COPY images/amata/orw-cli.sh /usr/local/bin/orw-cli
 COPY images/amata/heal-orw.sh /usr/local/bin/heal-orw
 COPY --from=rewrite-runner-build /build/rewrite-runner/target/orw-cli-runner.jar /opt/orw-cli-runner/orw-cli-runner.jar

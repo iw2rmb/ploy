@@ -153,7 +153,7 @@ build_push_fixed_tag() {
     "${BUILD_OUTPUT_ARGS[@]}" "${context}" --progress=plain
 }
 
-make build
+make build PLOY_BUILD_PLATFORMS="${PLATFORM}"
 
 # server
 build_push server images/server/Dockerfile .
@@ -162,7 +162,7 @@ build_push server images/server/Dockerfile .
 build_push node images/node/Dockerfile .
 
 # amata
-bash images/amata/build-amata.sh
+PLATFORM="${PLATFORM}" bash images/amata/build-amata.sh
 build_push amata images/amata/Dockerfile .
 build_push java-17-orw-codex-amata images/java-17-orw-codex-amata/Dockerfile .
 
