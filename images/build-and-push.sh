@@ -17,18 +17,22 @@ set -Eeuo pipefail
 #   PLATFORM - Optional: comma list of platforms (default linux/amd64)
 #   VERSION - Optional semver tag (default from ./VERSION file, format vX.Y.Z)
 #   IMAGE_PREFIX - Optional image prefix (default ghcr.io/iw2rmb/ploy)
+#   OUTPUT_MODE - Optional: push|load (default push)
 #   PUSH_LATEST - Optional alias toggle for :latest (default 1 for stable releases)
 #   PLOY_CA_CERTS - Optional PEM bundle (path or inline content), passed as BuildKit secret id=ploy_ca_certs
 #
 # Examples:
 #   images/build-and-push.sh
 #   VERSION=v0.1.0 PLATFORM=linux/amd64 images/build-and-push.sh
+#   OUTPUT_MODE=load IMAGE_PREFIX=ploy VERSION=v0.1.0 images/build-and-push.sh
 
 PLATFORM=${PLATFORM:-linux/amd64,linux/arm64}
 IMAGE_PREFIX="${IMAGE_PREFIX:-ghcr.io/iw2rmb/ploy}"
+OUTPUT_MODE="${OUTPUT_MODE:-push}"
 PUSH_LATEST="${PUSH_LATEST:-1}"
 declare -a BUILD_SECRET_ARGS=()
 PLOY_CA_CERTS_TMP=""
+declare -a BUILD_OUTPUT_ARGS=(--push)
 
 if ! command -v docker >/dev/null 2>&1; then
   echo "error: docker CLI not found" >&2
@@ -38,6 +42,15 @@ if ! docker buildx version >/dev/null 2>&1; then
   echo "error: docker buildx not available (install docker buildx plugin)" >&2
   exit 2
 fi
+
+case "$OUTPUT_MODE" in
+  push) BUILD_OUTPUT_ARGS=(--push) ;;
+  load) BUILD_OUTPUT_ARGS=(--load) ;;
+  *)
+    echo "error: OUTPUT_MODE '$OUTPUT_MODE' must be one of: push, load" >&2
+    exit 2
+    ;;
+esac
 
 cleanup() {
   if [[ -n "${PLOY_CA_CERTS_TMP}" && -f "${PLOY_CA_CERTS_TMP}" ]]; then
@@ -108,7 +121,7 @@ build_push() {
     "${BUILD_SECRET_ARGS[@]}" \
     -f "${dockerfile}" \
     "${tag_args[@]}" \
-    --push "${context}" --progress=plain
+    "${BUILD_OUTPUT_ARGS[@]}" "${context}" --progress=plain
 }
 
 build_push_orw() {
@@ -137,7 +150,7 @@ build_push_fixed_tag() {
     "${BUILD_SECRET_ARGS[@]}" \
     -f "${dockerfile}" \
     -t "${ref}" \
-    --push "${context}" --progress=plain
+    "${BUILD_OUTPUT_ARGS[@]}" "${context}" --progress=plain
 }
 
 make build
@@ -181,4 +194,8 @@ for d in "${orw_dirs[@]}"; do
   build_push_orw "$d"
 done
 
-echo "All images pushed under ${IMAGE_PREFIX} for ${VERSION}"
+if [[ "$OUTPUT_MODE" == "push" ]]; then
+  echo "All images pushed under ${IMAGE_PREFIX} for ${VERSION}"
+else
+  echo "All images loaded into local Docker image store under ${IMAGE_PREFIX} for ${VERSION}"
+fi
