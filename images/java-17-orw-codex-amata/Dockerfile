@@ -59,6 +59,7 @@ ENV JAVA_HOME=/opt/java/openjdk \
     MAVEN_HOME=/usr/share/maven \
     MAVEN_CONFIG=/root/.m2 \
     GRADLE_HOME=/opt/gradle \
+    GRADLE_USER_HOME=/root/.gradle \
     PATH="/opt/java/openjdk/bin:/usr/share/maven/bin:/opt/gradle/bin:/usr/local/bin:${PATH}" \
     WORKSPACE=/workspace \
     OUTDIR=/out \

@@ -91,7 +91,7 @@ func TestMaterializeValidatedSBOMOutput_HooksFlowWritesCanonicalDocument(t *test
 	if err := os.WriteFile(filepath.Join(outDir, sbomDependencyOutputFileName), []byte(rawDeps), 0o644); err != nil {
 		t.Fatalf("write raw dependency output: %v", err)
 	}
-	rawClasspath := []byte("/home/gradle/.gradle/caches/modules-2/files-2.1/a/b/c/a.jar\n/home/gradle/.gradle/caches/modules-2/files-2.1/x/y/z/b.jar\n")
+	rawClasspath := []byte("/root/.gradle/caches/modules-2/files-2.1/a/b/c/a.jar\n/root/.gradle/caches/modules-2/files-2.1/x/y/z/b.jar\n")
 	if err := os.WriteFile(classpathOutPath, rawClasspath, 0o644); err != nil {
 		t.Fatalf("write java classpath output: %v", err)
 	}
@@ -571,7 +571,7 @@ func TestEnsureHookSBOMInputSnapshot_RestoresMissingCycleSnapshotFromArtifact(t 
 	bundle := mustTarGzEntries(t, map[string][]byte{
 		"out/sbom.spdx.json":        []byte(`{"spdxVersion":"SPDX-2.3","packages":[]}`),
 		"out/sbom.dependencies.txt": []byte("org.example:lib:1.0.0"),
-		"out/java.classpath":        []byte("/home/gradle/.gradle/caches/modules-2/files-2.1/a/b/c/a.jar\n"),
+		"out/java.classpath":        []byte("/root/.gradle/caches/modules-2/files-2.1/a/b/c/a.jar\n"),
 	})
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

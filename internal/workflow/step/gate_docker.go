@@ -73,7 +73,7 @@ const (
 	// containers used by runtime-generated artifacts (for example Gradle reports).
 	BuildGateContainerOutDir = "/out"
 	// BuildGateGradleUserHomeDir is the native Gradle home path in gate-gradle images.
-	BuildGateGradleUserHomeDir = "/home/gradle/.gradle"
+	BuildGateGradleUserHomeDir = "/root/.gradle"
 	// BuildGateMavenUserHomeDir is the native Maven repository path in Maven gate images.
 	BuildGateMavenUserHomeDir = "/root/.m2"
 )

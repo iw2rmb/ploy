@@ -35,6 +35,9 @@ RUN --mount=type=secret,id=ploy_ca_certs,required=false \
     bash ca-certificates git jq \
     && rm -rf /var/lib/apt/lists/*'
 
+ENV LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8
+
 WORKDIR /workspace
 
 COPY --from=rewrite-runner-build /build/rewrite-runner/target/orw-cli-runner.jar /opt/orw-cli-runner/orw-cli-runner.jar

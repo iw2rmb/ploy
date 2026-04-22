@@ -10,7 +10,10 @@ RUN mkdir -p /workspace /in /out
 WORKDIR /workspace
 ENV WORKSPACE=/workspace \
     INDIR=/in \
-    OUTDIR=/out
+    OUTDIR=/out \
+    LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8 \
+    MAVEN_CONFIG=/root/.m2
 
 COPY --chmod=755 images/install_ploy_ca_bundle.sh /usr/local/lib/ploy/install_ploy_ca_bundle.sh
 RUN --mount=type=secret,id=ploy_ca_certs,required=false \

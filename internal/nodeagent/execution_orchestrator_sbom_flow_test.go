@@ -26,7 +26,7 @@ func TestMaterializeValidatedSBOMOutput_WritesCanonicalSnapshot(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(outDir, sbomDependencyOutputFileName), []byte(rawDeps), 0o644); err != nil {
 		t.Fatalf("write raw dependency output: %v", err)
 	}
-	rawClasspath := []byte("/home/gradle/.gradle/caches/modules-2/files-2.1/a/b/c/a.jar\n")
+	rawClasspath := []byte("/root/.gradle/caches/modules-2/files-2.1/a/b/c/a.jar\n")
 	if err := os.WriteFile(filepath.Join(outDir, sbomJavaClasspathFileName), rawClasspath, 0o644); err != nil {
 		t.Fatalf("write java classpath output: %v", err)
 	}

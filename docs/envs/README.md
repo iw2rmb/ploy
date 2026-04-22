@@ -710,7 +710,7 @@ Build Gate jobs also use node-local persistent tool caches under
 `$PLOY_BUILDGATE_CACHE_ROOT/<language>/<tool>/<release>`.
 When `PLOY_BUILDGATE_CACHE_ROOT` is unset, default root is `/var/cache/ploy/gates`
 and, when not writable, the node falls back to `${TMPDIR:-/tmp}/ploy/gates`.
-- Gradle gates mount that path to `/home/gradle/.gradle`.
+- Gradle gates mount that path to `/root/.gradle`.
 - Maven gates mount that path to `/root/.m2`.
 - On every gate execution, before mounting the cache path, the node checks free
   space on that filesystem. If free space is below `2 GiB`, it prunes entries in
@@ -724,7 +724,7 @@ cache-root policy as Build Gate when stack tuple env is set to Java:
 - `PLOY_STACK_RELEASE=<release>`
 
 Runtime mounts:
-- Gradle tuple -> `$PLOY_BUILDGATE_CACHE_ROOT/java/gradle/<release>` to `/home/gradle/.gradle`
+- Gradle tuple -> `$PLOY_BUILDGATE_CACHE_ROOT/java/gradle/<release>` to `/root/.gradle`
 - Maven tuple -> `$PLOY_BUILDGATE_CACHE_ROOT/java/maven/<release>` to `/root/.m2`
 
 When `PLOY_STACK_RELEASE` is empty, runtime uses `unknown-release` as the lane key.
