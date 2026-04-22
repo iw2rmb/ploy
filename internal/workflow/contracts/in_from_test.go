@@ -12,13 +12,6 @@ func TestParseInFromURI(t *testing.T) {
 		wantErr        bool
 	}{
 		{
-			name:           "legacy step alias maps to mig",
-			raw:            "extract-usage://out/dependency-usage.nofilter.json",
-			wantSourceName: "extract-usage",
-			wantSourceType: "mig",
-			wantOutPath:    "/out/dependency-usage.nofilter.json",
-		},
-		{
 			name:           "type selector",
 			raw:            "sbom://out/java.classpath",
 			wantSourceName: "",
@@ -90,24 +83,6 @@ func TestNormalizeInFromTarget_ExplicitInPath(t *testing.T) {
 }
 
 func TestParseMigSpecJSON_InFromValidation(t *testing.T) {
-	t.Run("valid legacy mig step alias", func(t *testing.T) {
-		input := `{
-			"steps": [
-				{"name": "extract-usage", "image": "img1"},
-				{"name": "compose-deprecations", "image": "img2", "in_from": [
-					{"from": "extract-usage://out/dependency-usage.nofilter.json"}
-				]}
-			]
-		}`
-		spec, err := ParseMigSpecJSON([]byte(input))
-		if err != nil {
-			t.Fatalf("ParseMigSpecJSON() error = %v", err)
-		}
-		if got := spec.Steps[1].InFrom[0].To; got != "/in/dependency-usage.nofilter.json" {
-			t.Fatalf("steps[1].in_from[0].to = %q, want %q", got, "/in/dependency-usage.nofilter.json")
-		}
-	})
-
 	t.Run("valid type selector without step name", func(t *testing.T) {
 		input := `{
 			"steps": [

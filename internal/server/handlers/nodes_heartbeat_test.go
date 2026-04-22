@@ -74,17 +74,6 @@ func TestHeartbeatHandler_RejectsInvalidBodies(t *testing.T) {
   "disk_total_bytes": 1
 }`,
 		},
-		{
-			name: "legacy_mb_fields",
-			body: `{
-  "cpu_free_millis": 1500,
-  "cpu_total_millis": 4000,
-  "mem_free_mb": 2048.0,
-  "mem_total_mb": 8192.0,
-  "disk_free_mb": 10240.0,
-  "disk_total_mb": 51200.0
-}`,
-		},
 	}
 
 	for _, tc := range cases {

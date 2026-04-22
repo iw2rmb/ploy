@@ -324,11 +324,6 @@ func TestHydraScenarioOfflineValidation(t *testing.T) {
 					t.Errorf("%s/run.sh: missing expected Hydra mount path %q", sc.dir, p)
 				}
 			}
-
-			// Verify no legacy prompt-file references.
-			if strings.Contains(content, "/in/prompt.txt") {
-				t.Errorf("%s/run.sh: contains legacy /in/prompt.txt; prompts must come from /in/amata.yaml", sc.dir)
-			}
 		})
 	}
 }

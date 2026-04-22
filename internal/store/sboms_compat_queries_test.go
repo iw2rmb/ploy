@@ -15,8 +15,6 @@ func TestHasSBOMEvidenceForStack_UsesLatestSuccessfulSBOMFromSuccessfulRuns(t *t
 
 	mavenStackID := upsertStackForSBOMCompatTest(t, ctx, db, "java", "17", "maven", "example.com/java:17-maven")
 	mavenProfileID := upsertGateProfileForSBOMCompatTest(t, ctx, db, fx.RunRepo.RepoID, mavenStackID, "1111111111111111111111111111111111111111")
-	// Legacy gate rows must not count anymore.
-	createGateJobAndSBOMRowForSBOMCompatTest(t, ctx, db, fx, mavenProfileID, types.JobTypePreGate, types.JobStatusSuccess, "legacy", "9.9.9")
 	// Latest successful sbom snapshot in the successful run carries evidence.
 	createSBOMJobAndSBOMRowForSBOMCompatTest(t, ctx, db, fx, mavenProfileID, "pre-gate", types.JobTypePreGate, types.JobStatusSuccess, types.JobStatusSuccess, "alpha", "1.0.0")
 	createSBOMJobAndSBOMRowForSBOMCompatTest(t, ctx, db, fx, mavenProfileID, "post-gate", types.JobTypePostGate, types.JobStatusSuccess, types.JobStatusSuccess, "alpha", "1.1.0")
@@ -61,8 +59,6 @@ func TestListSBOMCompatRows_UsesLatestSuccessfulSBOMFromSuccessfulRuns(t *testin
 	mavenStackID := upsertStackForSBOMCompatTest(t, ctx, db, "java", "17", "maven", "example.com/java:17-maven")
 
 	mavenProfileID := upsertGateProfileForSBOMCompatTest(t, ctx, db, fx.RunRepo.RepoID, mavenStackID, "3333333333333333333333333333333333333333")
-	// Legacy gate rows must not count.
-	createGateJobAndSBOMRowForSBOMCompatTest(t, ctx, db, fx, mavenProfileID, types.JobTypePreGate, types.JobStatusSuccess, "legacy", "9.9.9")
 	// Earlier sbom snapshot in the same successful run.
 	createSBOMJobAndSBOMRowForSBOMCompatTest(t, ctx, db, fx, mavenProfileID, "pre-gate", types.JobTypePreGate, types.JobStatusSuccess, types.JobStatusSuccess, "alpha", "1.0.0")
 	// Latest sbom snapshot in the same successful run (must win).
@@ -168,51 +164,6 @@ func upsertGateProfileForSBOMCompatTest(t *testing.T, ctx context.Context, db St
 		t.Fatalf("UpsertExactGateProfile(%s): %v", repoSHA, err)
 	}
 	return row.ID
-}
-
-func createGateJobAndSBOMRowForSBOMCompatTest(
-	t *testing.T,
-	ctx context.Context,
-	db Store,
-	fx v1Fixture,
-	profileID int64,
-	jobType types.JobType,
-	status types.JobStatus,
-	lib, ver string,
-) {
-	t.Helper()
-
-	job, err := db.CreateJob(ctx, CreateJobParams{
-		ID:          types.NewJobID(),
-		RunID:       fx.Run.ID,
-		RepoID:      fx.RunRepo.RepoID,
-		RepoBaseRef: fx.RunRepo.RepoBaseRef,
-		Attempt:     1,
-		Name:        "sbom-" + lib + "-" + ver + "-" + string(jobType) + "-" + string(status),
-		Status:      status,
-		JobType:     jobType,
-		JobImage:    "example.com/gate:latest",
-		Meta:        []byte(`{}`),
-	})
-	if err != nil {
-		t.Fatalf("CreateJob(%s %s %s): %v", lib, ver, jobType, err)
-	}
-
-	if err := db.UpsertGateJobProfileLink(ctx, UpsertGateJobProfileLinkParams{
-		JobID:     job.ID.String(),
-		ProfileID: profileID,
-	}); err != nil {
-		t.Fatalf("UpsertGateJobProfileLink(job=%s): %v", job.ID, err)
-	}
-
-	if err := db.UpsertSBOMRow(ctx, UpsertSBOMRowParams{
-		JobID:  job.ID,
-		RepoID: fx.RunRepo.RepoID,
-		Lib:    lib,
-		Ver:    ver,
-	}); err != nil {
-		t.Fatalf("UpsertSBOMRow(job=%s, lib=%s, ver=%s): %v", job.ID, lib, ver, err)
-	}
 }
 
 func createSBOMJobAndSBOMRowForSBOMCompatTest(

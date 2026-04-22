@@ -154,7 +154,7 @@ func TestRunsCreateSingleRepo_ValidationErrors(t *testing.T) {
 		},
 		{
 			name:       "InvalidSpec",
-			body:       validRunRequestBodyWith(map[string]any{"spec": map[string]any{"mig": map[string]any{"command": "echo hello"}}}),
+			body:       validRunRequestBodyWith(map[string]any{"spec": map[string]any{"steps": "not-array"}}),
 			wantStatus: http.StatusBadRequest,
 		},
 		{

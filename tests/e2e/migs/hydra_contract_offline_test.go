@@ -135,46 +135,4 @@ func TestHydraContractOffline(t *testing.T) {
 		}
 	})
 
-	// Cross-check: scenario scripts must reference Hydra mount paths, not legacy env keys.
-	t.Run("scenarios_use_hydra_not_legacy_env", func(t *testing.T) {
-		root := repoRoot(t)
-		scenarioDir := filepath.Join(root, "tests", "e2e", "migs")
-		entries, err := os.ReadDir(scenarioDir)
-		if err != nil {
-			t.Fatalf("read scenario dir: %v", err)
-		}
-
-		scenarioCount := 0
-		for _, e := range entries {
-			if !e.IsDir() || !strings.HasPrefix(e.Name(), "scenario-hydra-") {
-				continue
-			}
-			scenarioCount++
-			scriptPath := filepath.Join(scenarioDir, e.Name(), "run.sh")
-			data, err := os.ReadFile(scriptPath)
-			if err != nil {
-				t.Fatalf("%s/run.sh missing: %v", e.Name(), err)
-			}
-			content := string(data)
-
-			// Must reference at least one Hydra mount path.
-			hasHydraPath := strings.Contains(content, "/in/") || strings.Contains(content, "/out/")
-			if !hasHydraPath {
-				t.Errorf("%s/run.sh: no Hydra mount paths (/in/ or /out/) found", e.Name())
-			}
-
-			// Must not inject legacy special env keys as env vars.
-			for _, m := range table {
-				// Skip checking for keys that appear in comments or assertions.
-				// Only flag direct env injection patterns.
-				if strings.Contains(content, m.EnvKey+"=") {
-					t.Errorf("%s/run.sh: contains legacy env injection %s=; use Hydra mount", e.Name(), m.EnvKey)
-				}
-			}
-		}
-
-		if scenarioCount == 0 {
-			t.Fatal("no scenario-hydra-* directories found; expected at least 2")
-		}
-	})
 }

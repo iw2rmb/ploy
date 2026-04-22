@@ -77,9 +77,9 @@ func TestMigs_Create(t *testing.T) {
 		{name: "empty name", store: &migStore{}, body: map[string]any{"name": ""}, wantStatus: http.StatusBadRequest, wantNoCalls: true},
 		{name: "invalid name (spaces)", store: &migStore{}, body: map[string]any{"name": "my mig"}, wantStatus: http.StatusBadRequest, wantNoCalls: true},
 		{name: "invalid JSON", store: &migStore{}, body: "not json", wantStatus: http.StatusBadRequest},
-		{name: "invalid spec (legacy)", store: &migStore{}, body: map[string]any{
+		{name: "invalid spec", store: &migStore{}, body: map[string]any{
 			"name": "mig-invalid-spec",
-			"spec": map[string]any{"mig": map[string]any{"command": "echo hello"}},
+			"spec": map[string]any{"steps": "not-array"},
 		}, wantStatus: http.StatusBadRequest, wantNoCalls: true},
 		{name: "duplicate name", store: &migStore{createMigErr: &pgconn.PgError{Code: "23505"}}, body: map[string]any{"name": "existing-mig"}, wantStatus: http.StatusConflict},
 		{name: "store error", store: &migStore{createMigErr: errors.New("database connection failed")}, body: map[string]any{"name": "test-mig"}, wantStatus: http.StatusInternalServerError},

@@ -143,7 +143,7 @@ func TestMigs_SetSpec(t *testing.T) {
 		},
 		// Error paths
 		{name: "missing spec", store: &migStore{}, body: map[string]any{"name": "no-spec"}, wantStatus: http.StatusBadRequest},
-		{name: "invalid spec", store: &migStore{}, body: map[string]any{"spec": map[string]any{"mig": map[string]any{"command": "echo hello"}}}, wantStatus: http.StatusBadRequest},
+		{name: "invalid spec", store: &migStore{}, body: map[string]any{"spec": map[string]any{"steps": "not-array"}}, wantStatus: http.StatusBadRequest},
 		{name: "invalid JSON", store: &migStore{}, body: "not json", wantStatus: http.StatusBadRequest},
 		{name: "mig not found", store: &migStore{getMigErr: pgx.ErrNoRows}, body: map[string]any{"spec": validSpecBody()}, wantStatus: http.StatusNotFound},
 		{
