@@ -22,9 +22,6 @@ RUN --mount=type=secret,id=ploy_ca_certs,required=false \
       mkdir -p /etc/ploy/certs; \
       cp /run/secrets/ploy_ca_certs /etc/ploy/certs/ca.crt; \
     fi \
-    && if [[ -s /run/secrets/ploy_ca_certs ]] && [[ -f /etc/apt/sources.list.d/debian.sources ]]; then \
-      sed -i "s|http://deb.debian.org|https://deb.debian.org|g" /etc/apt/sources.list.d/debian.sources; \
-    fi \
     && apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     bash ca-certificates coreutils curl fd-find findutils gawk git grep jq openjdk-17-jre-headless ripgrep unzip yq \
