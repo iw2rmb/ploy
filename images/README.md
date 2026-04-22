@@ -25,6 +25,13 @@ OCI Labeling Policy
 - Do not duplicate OCI label keys in a Dockerfile; normalize to one final value per key.
 - Verify policy compliance with: `go test ./tests/guards -run TestDockerfilesOCIRequiredLabels`.
 
+Base Image Policy
+
+- Runtime stages are Debian-focused and must not use Alpine.
+- Use `-slim` bases when upstream provides them (for example `debian:bookworm-slim`, `node:22-bookworm-slim`).
+- Keep explicit runtime exceptions only when no upstream slim tag exists for the required toolchain image family (current exceptions: `gradle:8.8-jdk*`, `maven:3.9.11-eclipse-temurin-*`, `eclipse-temurin:17-jdk`).
+- Verify policy compliance with: `go test ./tests/guards -run TestDockerfilesRuntimeBasePolicy`.
+
 Contract
 
 - Repo workspace
