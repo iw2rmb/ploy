@@ -29,8 +29,20 @@ gradle.projectsEvaluated {
               entries.add(resourcesDir.absolutePath)
             }
           }
+          def testSourceSet = sourceSets.findByName('test')
+          if (testSourceSet != null) {
+            testSourceSet.output.classesDirs.files.each { classesDir ->
+              if (classesDir != null && classesDir.exists()) {
+                entries.add(classesDir.absolutePath)
+              }
+            }
+            def resourcesDir = testSourceSet.output.resourcesDir
+            if (resourcesDir != null && resourcesDir.exists()) {
+              entries.add(resourcesDir.absolutePath)
+            }
+          }
         }
-        ['compileClasspath', 'runtimeClasspath'].each { cfgName ->
+        ['compileClasspath', 'runtimeClasspath', 'testCompileClasspath', 'testRuntimeClasspath'].each { cfgName ->
           def cfg = project.configurations.findByName(cfgName)
           if (cfg != null && cfg.canBeResolved) {
             cfg.resolve().each { file -> entries.add(file.absolutePath) }

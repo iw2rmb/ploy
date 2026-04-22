@@ -29,7 +29,34 @@ allprojects { p ->
       output.parentFile.mkdirs()
       def entries = new LinkedHashSet<String>()
       p.rootProject.allprojects.each { project ->
-        ["compileClasspath", "runtimeClasspath"].each { cfgName ->
+        def sourceSets = project.extensions.findByName("sourceSets")
+        if (sourceSets != null) {
+          def mainSourceSet = sourceSets.findByName("main")
+          if (mainSourceSet != null) {
+            mainSourceSet.output.classesDirs.files.each { classesDir ->
+              if (classesDir != null && classesDir.exists()) {
+                entries.add(classesDir.absolutePath)
+              }
+            }
+            def resourcesDir = mainSourceSet.output.resourcesDir
+            if (resourcesDir != null && resourcesDir.exists()) {
+              entries.add(resourcesDir.absolutePath)
+            }
+          }
+          def testSourceSet = sourceSets.findByName("test")
+          if (testSourceSet != null) {
+            testSourceSet.output.classesDirs.files.each { classesDir ->
+              if (classesDir != null && classesDir.exists()) {
+                entries.add(classesDir.absolutePath)
+              }
+            }
+            def resourcesDir = testSourceSet.output.resourcesDir
+            if (resourcesDir != null && resourcesDir.exists()) {
+              entries.add(resourcesDir.absolutePath)
+            }
+          }
+        }
+        ["compileClasspath", "runtimeClasspath", "testCompileClasspath", "testRuntimeClasspath"].each { cfgName ->
           def cfg = project.configurations.findByName(cfgName)
           if (cfg != null && cfg.canBeResolved) {
             cfg.resolve().each { file -> entries.add(file.absolutePath) }
