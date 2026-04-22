@@ -24,16 +24,19 @@ LABEL org.opencontainers.image.source="https://github.com/iw2rmb/ploy" \
 
 COPY --chmod=755 images/install_ploy_ca_bundle.sh /usr/local/lib/ploy/install_ploy_ca_bundle.sh
 RUN --mount=type=secret,id=ploy_ca_certs,required=false \
-    if [[ -s /run/secrets/ploy_ca_certs ]]; then \
+    bash -euxo pipefail -c 'if [[ -s /run/secrets/ploy_ca_certs ]]; then \
       mkdir -p /etc/ploy/certs; \
       cp /run/secrets/ploy_ca_certs /etc/ploy/certs/ca.crt; \
       source /usr/local/lib/ploy/install_ploy_ca_bundle.sh; \
       PLOY_CA_IMPORT_JAVA=1 install_ploy_ca_bundle; \
     fi \
+    && if [[ -s /run/secrets/ploy_ca_certs ]] && [[ -f /etc/apt/sources.list.d/debian.sources ]]; then \
+      sed -i "s|http://deb.debian.org|https://deb.debian.org|g" /etc/apt/sources.list.d/debian.sources; \
+    fi \
     && apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     bash ca-certificates git jq \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/*'
 
 WORKDIR /workspace
 
