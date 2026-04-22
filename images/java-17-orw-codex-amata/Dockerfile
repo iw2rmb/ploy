@@ -76,7 +76,7 @@ RUN --mount=type=secret,id=ploy_ca_certs,required=false \
       source /usr/local/lib/ploy/install_ploy_ca_bundle.sh; \
       PLOY_CA_IMPORT_JAVA=1 install_ploy_ca_bundle; \
     fi \
-    && npm install -g @openai/codex @charmland/crush @anthropic-ai/claude-code @musistudio/claude-code-router \
+    && npm install -g @openai/codex \
     && npm cache clean --force \
     && rm -rf /root/.npm /tmp/*
 
