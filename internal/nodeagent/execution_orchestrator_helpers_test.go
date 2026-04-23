@@ -46,69 +46,6 @@ func TestWithTempDir(t *testing.T) {
 	}
 }
 
-func TestSnapshotWorkspaceForNoIndexDiff(t *testing.T) {
-	runID := types.RunID("test-run")
-	jobID := types.JobID("test-job")
-
-	tests := []struct {
-		name      string
-		setupGit  bool
-		addFile   bool
-		wantEmpty bool
-	}{
-		{name: "creates_snapshot", setupGit: true, addFile: true},
-		{name: "cleanup_works", setupGit: true},
-		{name: "no_git_repo_returns_empty", wantEmpty: true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			workspace := t.TempDir()
-			if tt.setupGit {
-				if err := os.MkdirAll(filepath.Join(workspace, ".git"), 0o755); err != nil {
-					t.Fatalf("create .git: %v", err)
-				}
-			}
-			if tt.addFile {
-				if err := os.WriteFile(filepath.Join(workspace, "test.txt"), []byte("content"), 0o644); err != nil {
-					t.Fatalf("create test file: %v", err)
-				}
-			}
-
-			result := snapshotWorkspaceForNoIndexDiff(runID, jobID, types.DiffJobTypeMig, workspace)
-			defer result.cleanup()
-
-			if tt.wantEmpty {
-				if result.path != "" {
-					t.Fatalf("expected empty dir for non-git workspace, got: %s", result.path)
-				}
-				return
-			}
-
-			if result.path == "" {
-				t.Fatal("snapshot directory is empty")
-			}
-
-			if tt.addFile {
-				data, err := os.ReadFile(filepath.Join(result.path, "test.txt"))
-				if err != nil {
-					t.Fatalf("read copied file: %v", err)
-				}
-				if string(data) != "content" {
-					t.Fatalf("copied file content = %q, want %q", data, "content")
-				}
-			}
-
-			// Verify cleanup removes the directory.
-			snapshotDir := result.path
-			result.cleanup()
-			if _, err := os.Stat(snapshotDir); !os.IsNotExist(err) {
-				t.Fatalf("snapshot directory was not cleaned up: %s", snapshotDir)
-			}
-		})
-	}
-}
-
 func TestClearManifestHydration(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -190,7 +127,7 @@ func TestTempResource_Cleanup(t *testing.T) {
 		{
 			name: "noop cleanup is safe",
 			setup: func(t *testing.T) tempResource {
-				return noopTempResource
+				return tempResource{path: "", cleanup: func() {}}
 			},
 			check: func(t *testing.T, tr tempResource) {
 				tr.cleanup() // must not panic

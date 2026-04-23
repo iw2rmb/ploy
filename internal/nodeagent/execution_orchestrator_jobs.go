@@ -353,8 +353,8 @@ func (r *runController) executeHookJob(ctx context.Context, req StartRunRequest)
 				return materializeHookSnapshot(stepInputPath, stepOutPath)
 			},
 			WorkspacePolicy: workspaceChangePolicyIgnore,
-			UploadDiff: func(ctx context.Context, runID types.RunID, jobID types.JobID, jobName string, diffGen step.DiffGenerator, baseDir, workspace string, result step.Result) {
-				r.uploadDiffWithBaseline(ctx, runID, jobID, jobName, diffGen, baseDir, workspace, result, types.DiffJobTypeMig, false)
+			UploadDiff: func(ctx context.Context, runID types.RunID, jobID types.JobID, jobName string, diffGen step.DiffGenerator, workspace string, result step.Result) {
+				r.uploadJobDiff(ctx, runID, jobID, diffGen, workspace, result, types.DiffJobTypeMig)
 			},
 			SuppressTerminalStatus: true,
 			SuppressOutBundle:      stepIdx+1 < len(specDoc.Steps),
@@ -744,8 +744,8 @@ func (r *runController) executeMigJob(ctx context.Context, req StartRunRequest) 
 		},
 		WorkspacePolicy:           workspaceChangePolicyIgnore,
 		UploadConfiguredArtifacts: true,
-		UploadDiff: func(ctx context.Context, runID types.RunID, jobID types.JobID, jobName string, diffGen step.DiffGenerator, baseDir, workspace string, result step.Result) {
-			r.uploadDiffWithBaseline(ctx, runID, jobID, jobName, diffGen, baseDir, workspace, result, types.DiffJobTypeMig, true)
+		UploadDiff: func(ctx context.Context, runID types.RunID, jobID types.JobID, jobName string, diffGen step.DiffGenerator, workspace string, result step.Result) {
+			r.uploadJobDiff(ctx, runID, jobID, diffGen, workspace, result, types.DiffJobTypeMig)
 		},
 		StartTime: startTime,
 	}
@@ -825,8 +825,8 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 			return r.materializeParentChildBuildLineage(outDir, req.RecoveryContext)
 		},
 		WorkspacePolicy: workspacePolicy,
-		UploadDiff: func(ctx context.Context, runID types.RunID, jobID types.JobID, jobName string, diffGen step.DiffGenerator, baseDir, workspace string, result step.Result) {
-			r.uploadDiffWithBaseline(ctx, runID, jobID, jobName, diffGen, baseDir, workspace, result, types.DiffJobTypeHealing, false)
+		UploadDiff: func(ctx context.Context, runID types.RunID, jobID types.JobID, jobName string, diffGen step.DiffGenerator, workspace string, result step.Result) {
+			r.uploadJobDiff(ctx, runID, jobID, diffGen, workspace, result, types.DiffJobTypeHealing)
 		},
 		BuildJobMeta: func(outDir string) json.RawMessage {
 			bugSummary := parseBugSummary(outDir)
@@ -1087,7 +1087,7 @@ type standardJobConfig struct {
 	WorkspacePolicy           workspaceChangePolicy
 	UploadConfiguredArtifacts bool
 
-	UploadDiff    func(ctx context.Context, runID types.RunID, jobID types.JobID, jobName string, diffGen step.DiffGenerator, baselineDir, workspace string, result step.Result)
+	UploadDiff    func(ctx context.Context, runID types.RunID, jobID types.JobID, jobName string, diffGen step.DiffGenerator, workspace string, result step.Result)
 	BuildJobMeta  func(outDir string) json.RawMessage
 	BuildMetadata func(outDir string) map[string]string
 
@@ -1106,7 +1106,7 @@ type standardJobOutcome struct {
 
 // executeStandardJob orchestrates the common lifecycle of a container job
 // (mig/heal/sbom):
-// runtime init, rehydration, snapshots, directory prep, execution, and uploading.
+// runtime init, rehydration, directory prep, execution, and uploading.
 func (r *runController) executeStandardJob(ctx context.Context, req StartRunRequest, cfg standardJobConfig) {
 	_, execErr := r.executeStandardJobWithOutcome(ctx, req, cfg)
 	if execErr == nil {
@@ -1140,13 +1140,6 @@ func (r *runController) executeStandardJobWithOutcome(ctx context.Context, req S
 	defer wsResult.cleanup()
 	workspace := wsResult.path
 
-	var baselineDir string
-	if execCtx.diffGenerator != nil {
-		snapshot := snapshotWorkspaceForNoIndexDiff(req.RunID, req.JobID, cfg.DiffType, workspace)
-		defer snapshot.cleanup()
-		baselineDir = snapshot.path
-	}
-
 	outDirErr := withTempDir(cfg.OutDirPattern, func(outDir string) error {
 		if cfg.InDirPattern != "" {
 			return withTempDir(cfg.InDirPattern, func(inDir string) error {
@@ -1155,7 +1148,7 @@ func (r *runController) executeStandardJobWithOutcome(ctx context.Context, req S
 						return fmt.Errorf("populate in dir: %w", err)
 					}
 				}
-				stepOutcome, err := r.runContainerJob(ctx, req, cfg, execCtx, baselineDir, workspace, startTime, outDir, inDir)
+				stepOutcome, err := r.runContainerJob(ctx, req, cfg, execCtx, workspace, startTime, outDir, inDir)
 				if err != nil {
 					return err
 				}
@@ -1163,7 +1156,7 @@ func (r *runController) executeStandardJobWithOutcome(ctx context.Context, req S
 				return nil
 			})
 		}
-		stepOutcome, err := r.runContainerJob(ctx, req, cfg, execCtx, baselineDir, workspace, startTime, outDir, "")
+		stepOutcome, err := r.runContainerJob(ctx, req, cfg, execCtx, workspace, startTime, outDir, "")
 		if err != nil {
 			return err
 		}
@@ -1184,7 +1177,7 @@ func (r *runController) runContainerJob(
 	req StartRunRequest,
 	cfg standardJobConfig,
 	execCtx jobExecutionContext,
-	baselineDir, workspace string,
+	workspace string,
 	startTime time.Time,
 	outDir, inDir string,
 ) (standardJobOutcome, error) {
@@ -1308,7 +1301,7 @@ func (r *runController) runContainerJob(
 	}
 
 	if cfg.UploadDiff != nil {
-		cfg.UploadDiff(ctx, req.RunID, req.JobID, req.JobName, execCtx.diffGenerator, baselineDir, workspace, result)
+		cfg.UploadDiff(ctx, req.RunID, req.JobID, req.JobName, execCtx.diffGenerator, workspace, result)
 	}
 
 	if !cfg.SuppressOutBundle {
@@ -1604,39 +1597,6 @@ func (r *runController) withMaterializedResources(ctx context.Context, manifest 
 type tempResource struct {
 	path    string
 	cleanup func()
-}
-
-// noopTempResource is a zero-value tempResource with a no-op cleanup.
-var noopTempResource = tempResource{path: "", cleanup: func() {}}
-
-// snapshotWorkspaceForNoIndexDiff creates a snapshot of the workspace for baseline comparison.
-func snapshotWorkspaceForNoIndexDiff(runID types.RunID, jobID types.JobID, diffType types.DiffJobType, workspace string) tempResource {
-	jobTypeStr := diffType.String()
-	prefix := fmt.Sprintf("ploy-%s-base-*", jobTypeStr)
-	snapshotDir, err := os.MkdirTemp("", prefix)
-	if err != nil {
-		slog.Warn(fmt.Sprintf("%s: failed to create baseline snapshot directory", jobTypeStr),
-			"run_id", runID, "job_id", jobID, "error", err)
-		return noopTempResource
-	}
-
-	if err := copyGitClone(workspace, snapshotDir); err != nil {
-		slog.Warn(fmt.Sprintf("%s: failed to snapshot baseline workspace", jobTypeStr),
-			"run_id", runID, "job_id", jobID, "error", err)
-		if rmErr := os.RemoveAll(snapshotDir); rmErr != nil {
-			slog.Warn("failed to remove snapshot dir after copy failure", "path", snapshotDir, "error", rmErr)
-		}
-		return noopTempResource
-	}
-
-	return tempResource{
-		path: snapshotDir,
-		cleanup: func() {
-			if err := os.RemoveAll(snapshotDir); err != nil {
-				slog.Warn("failed to remove snapshot dir", "path", snapshotDir, "error", err)
-			}
-		},
-	}
 }
 
 // rehydrateWorkspaceWithCleanup wraps rehydrateWorkspaceForStep and returns a no-op
