@@ -8,9 +8,7 @@ import (
 	"strings"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
-	iversion "github.com/iw2rmb/ploy/internal/version"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
-	"github.com/iw2rmb/ploy/internal/workflow/lifecycle"
 	"github.com/iw2rmb/ploy/internal/workflow/stackdetect"
 )
 
@@ -22,6 +20,8 @@ const (
 	sbomScriptDir                = "/usr/local/lib/ploy/sbom"
 	sbomGradleCollectorScript    = sbomScriptDir + "/collect-java-classpath-gradle.sh"
 	sbomMavenCollectorScript     = sbomScriptDir + "/collect-java-classpath-maven.sh"
+	sbomReleaseJDK11             = "11"
+	sbomReleaseJDK17             = "17"
 )
 
 // --- Shared manifest helpers ---
@@ -112,7 +112,8 @@ func buildSBOMManifest(req StartRunRequest, cycleName string, persistedStack con
 	if phase := sbomPhaseConfigForCycle(cycleName, req.TypedOptions); phase != nil {
 		manifest.CA = append(manifest.CA, phase.CA...)
 	}
-	if err := applySBOMRuntimeForStack(&manifest, stack); err != nil {
+	runtimeRelease := sbomRuntimeReleaseForRequest(req, stack)
+	if err := applySBOMRuntimeForStack(&manifest, stack, runtimeRelease); err != nil {
 		return contracts.StepManifest{}, err
 	}
 	return manifest, nil
@@ -171,12 +172,13 @@ func detectSBOMStackFromWorkspace(workspace string) (contracts.MigStack, error) 
 	return normalizeSBOMStack(stack), nil
 }
 
-func applySBOMRuntimeForStack(manifest *contracts.StepManifest, stack contracts.MigStack) error {
+func applySBOMRuntimeForStack(manifest *contracts.StepManifest, stack contracts.MigStack, release string) error {
 	if manifest == nil {
 		return errors.New("sbom manifest required")
 	}
 	runtimeStack := resolveSBOMRuntimeStack(stack)
-	image, err := resolveImage(sbomJobImageSpec(), runtimeStack, "sbom")
+	runtimeRelease := normalizeSBOMRuntimeRelease(release)
+	image, err := resolveImage(sbomJobImageSpec(runtimeRelease), runtimeStack, "sbom")
 	if err != nil {
 		return err
 	}
@@ -194,17 +196,17 @@ func applySBOMRuntimeForStack(manifest *contracts.StepManifest, stack contracts.
 	if strings.TrimSpace(manifest.Envs["PLOY_SBOM_JAVA_CLASSPATH_OUTPUT"]) == "" {
 		manifest.Envs["PLOY_SBOM_JAVA_CLASSPATH_OUTPUT"] = "/out/" + sbomJavaClasspathFileName
 	}
-	injectStackTupleEnv(manifest.Envs, lifecycle.StackExpectationFromMigStack(runtimeStack))
+	injectStackTupleEnv(manifest.Envs, sbomRuntimeStackExpectation(runtimeStack, runtimeRelease))
 	manifest.Envs["PLOY_SBOM_STACK"] = string(runtimeStack)
 	return nil
 }
 
-func sbomJobImageSpec() contracts.JobImage {
+func sbomJobImageSpec(release string) contracts.JobImage {
 	prefix := strings.TrimRight(strings.TrimSpace(os.Getenv(sbomImageRegistryEnvKey)), "/")
 	if prefix == "" {
 		prefix = sbomImageRegistryDefault
 	}
-	tag := sbomRuntimeImageTag(iversion.Version)
+	tag := sbomRuntimeTagForRelease(release)
 	return contracts.JobImage{
 		ByStack: map[contracts.MigStack]string{
 			contracts.MigStackJavaMaven:  prefix + "/sbom-maven:" + tag,
@@ -214,12 +216,44 @@ func sbomJobImageSpec() contracts.JobImage {
 	}
 }
 
-func sbomRuntimeImageTag(runtimeVersion string) string {
-	tag := strings.TrimSpace(runtimeVersion)
-	if tag == "" || strings.EqualFold(tag, "dev") {
-		return "latest"
+func sbomRuntimeReleaseForRequest(req StartRunRequest, fallback contracts.MigStack) string {
+	exp := stackExpectationForRequest(req, fallback)
+	if exp == nil {
+		return sbomReleaseJDK17
 	}
-	return tag
+	return normalizeSBOMRuntimeRelease(exp.Release)
+}
+
+func normalizeSBOMRuntimeRelease(release string) string {
+	switch strings.TrimSpace(release) {
+	case sbomReleaseJDK11:
+		return sbomReleaseJDK11
+	case sbomReleaseJDK17:
+		return sbomReleaseJDK17
+	default:
+		return sbomReleaseJDK17
+	}
+}
+
+func sbomRuntimeTagForRelease(release string) string {
+	switch normalizeSBOMRuntimeRelease(release) {
+	case sbomReleaseJDK11:
+		return "jdk11"
+	default:
+		return "jdk17"
+	}
+}
+
+func sbomRuntimeStackExpectation(stack contracts.MigStack, release string) *contracts.StackExpectation {
+	tool := "maven"
+	if stack == contracts.MigStackJavaGradle {
+		tool = "gradle"
+	}
+	return &contracts.StackExpectation{
+		Language: "java",
+		Tool:     tool,
+		Release:  normalizeSBOMRuntimeRelease(release),
+	}
 }
 
 func sbomCommandForStack(stack contracts.MigStack) contracts.CommandSpec {

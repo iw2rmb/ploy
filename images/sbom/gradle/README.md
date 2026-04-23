@@ -1,13 +1,13 @@
-# SBOM Gradle Image (`sbom-gradle`)
+# SBOM Gradle Image (`sbom-gradle:jdk11|jdk17`)
 
 Purpose
 - Dedicated Java/Gradle runtime for SBOM collection jobs.
 - Canonical image name: `ploy/sbom-gradle`.
-- Published as `ghcr.io/iw2rmb/ploy/sbom-gradle:<tag>`.
+- Published as `ghcr.io/iw2rmb/ploy/sbom-gradle:jdk11` and `ghcr.io/iw2rmb/ploy/sbom-gradle:jdk17`.
 
 Deterministic Tooling
-- Gradle `8.8` via `gradle:8.8-jdk17`.
-- JDK `17` from the base image.
+- Gradle `8.8` via shared lane base `java-base-gradle:jdk11|jdk17`.
+- JDK `11` or `17` from the selected SBOM tag.
 - Reuses the shared Gradle cache init/config from `images/gates/gradle/`.
 
 Runtime Contract
@@ -25,7 +25,7 @@ gradle -q -p /workspace cyclonedxBom
 ```
 
 Notes
-- The image includes `/usr/local/lib/ploy/install_ploy_ca_bundle.sh` for runtime CA import from Hydra mounts when required.
+- CA bootstrap is inherited from shared Java base lanes.
 - SBOM Java classpath collection is provided by bundled scripts:
   - `/usr/local/lib/ploy/sbom/collect-java-classpath-gradle.sh`
   - `/usr/local/lib/ploy/sbom/gradle-write-java-classpath.init.gradle`

@@ -11,7 +11,7 @@ func TestSBOMStepSkipMetadataValidate(t *testing.T) {
 	valid := &SBOMStepSkipMetadata{
 		Enabled:       true,
 		RefArtifactID: "123e4567-e89b-12d3-a456-426614174000",
-		RefJobImage:   "ghcr.io/iw2rmb/ploy/sbom-maven:latest",
+		RefJobImage:   "ghcr.io/iw2rmb/ploy/sbom-maven:jdk17",
 	}
 	if err := valid.Validate(); err != nil {
 		t.Fatalf("Validate(valid) error = %v", err)

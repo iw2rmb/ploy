@@ -7,35 +7,47 @@ import (
 	"strings"
 	"testing"
 
-	iversion "github.com/iw2rmb/ploy/internal/version"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"github.com/iw2rmb/ploy/internal/workflow/stackdetect"
 )
 
-func TestSBOMRuntimeImageTag(t *testing.T) {
+func TestNormalizeSBOMRuntimeRelease(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name    string
-		version string
+		release string
 		want    string
 	}{
-		{name: "empty falls back to latest", version: "", want: "latest"},
-		{name: "whitespace falls back to latest", version: "   ", want: "latest"},
-		{name: "dev falls back to latest", version: "dev", want: "latest"},
-		{name: "uppercase dev falls back to latest", version: "DEV", want: "latest"},
-		{name: "semver uses runtime version", version: "v0.1.7", want: "v0.1.7"},
-		{name: "prerelease uses runtime version", version: "v1.2.3-rc.1", want: "v1.2.3-rc.1"},
+		{name: "empty falls back to jdk17", release: "", want: sbomReleaseJDK17},
+		{name: "whitespace falls back to jdk17", release: "   ", want: sbomReleaseJDK17},
+		{name: "unsupported falls back to jdk17", release: "21", want: sbomReleaseJDK17},
+		{name: "jdk11 accepted", release: sbomReleaseJDK11, want: sbomReleaseJDK11},
+		{name: "jdk17 accepted", release: sbomReleaseJDK17, want: sbomReleaseJDK17},
 	}
 
 	for _, tc := range tests {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			if got := sbomRuntimeImageTag(tc.version); got != tc.want {
-				t.Fatalf("sbomRuntimeImageTag(%q)=%q, want %q", tc.version, got, tc.want)
+			if got := normalizeSBOMRuntimeRelease(tc.release); got != tc.want {
+				t.Fatalf("normalizeSBOMRuntimeRelease(%q)=%q, want %q", tc.release, got, tc.want)
 			}
 		})
+	}
+}
+
+func TestSBOMRuntimeTagForRelease(t *testing.T) {
+	t.Parallel()
+
+	if got := sbomRuntimeTagForRelease(sbomReleaseJDK11); got != "jdk11" {
+		t.Fatalf("sbomRuntimeTagForRelease(jdk11)=%q, want jdk11", got)
+	}
+	if got := sbomRuntimeTagForRelease(sbomReleaseJDK17); got != "jdk17" {
+		t.Fatalf("sbomRuntimeTagForRelease(jdk17)=%q, want jdk17", got)
+	}
+	if got := sbomRuntimeTagForRelease("unknown"); got != "jdk17" {
+		t.Fatalf("sbomRuntimeTagForRelease(unknown)=%q, want jdk17", got)
 	}
 }
 
@@ -66,11 +78,11 @@ func TestResolveSBOMRuntimeStack(t *testing.T) {
 
 func TestApplySBOMRuntimeForStack_ConfiguresManifest(t *testing.T) {
 	t.Setenv(sbomImageRegistryEnvKey, "ghcr.io/acme")
-	tag := sbomRuntimeImageTag(iversion.Version)
 
 	tests := []struct {
 		name              string
 		stack             contracts.MigStack
+		release           string
 		wantImage         string
 		wantRuntimeStack  contracts.MigStack
 		wantShellSnippets []string
@@ -78,7 +90,8 @@ func TestApplySBOMRuntimeForStack_ConfiguresManifest(t *testing.T) {
 		{
 			name:             "maven",
 			stack:            contracts.MigStackJavaMaven,
-			wantImage:        "ghcr.io/acme/sbom-maven:" + tag,
+			release:          sbomReleaseJDK17,
+			wantImage:        "ghcr.io/acme/sbom-maven:jdk17",
 			wantRuntimeStack: contracts.MigStackJavaMaven,
 			wantShellSnippets: []string{
 				"missing /workspace/pom.xml",
@@ -88,7 +101,8 @@ func TestApplySBOMRuntimeForStack_ConfiguresManifest(t *testing.T) {
 		{
 			name:             "gradle",
 			stack:            contracts.MigStackJavaGradle,
-			wantImage:        "ghcr.io/acme/sbom-gradle:" + tag,
+			release:          sbomReleaseJDK11,
+			wantImage:        "ghcr.io/acme/sbom-gradle:jdk11",
 			wantRuntimeStack: contracts.MigStackJavaGradle,
 			wantShellSnippets: []string{
 				`PLOY_SBOM_GRADLE_CMD="/workspace/gradlew"`,
@@ -99,7 +113,8 @@ func TestApplySBOMRuntimeForStack_ConfiguresManifest(t *testing.T) {
 		{
 			name:             "unknown fallback collector path",
 			stack:            contracts.MigStackUnknown,
-			wantImage:        "ghcr.io/acme/sbom-maven:" + tag,
+			release:          "unknown",
+			wantImage:        "ghcr.io/acme/sbom-maven:jdk17",
 			wantRuntimeStack: contracts.MigStackJavaMaven,
 			wantShellSnippets: []string{
 				sbomMavenCollectorScript,
@@ -116,7 +131,7 @@ func TestApplySBOMRuntimeForStack_ConfiguresManifest(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			manifest := &contracts.StepManifest{}
-			if err := applySBOMRuntimeForStack(manifest, tc.stack); err != nil {
+			if err := applySBOMRuntimeForStack(manifest, tc.stack, tc.release); err != nil {
 				t.Fatalf("applySBOMRuntimeForStack: %v", err)
 			}
 			if got := manifest.Image; got != tc.wantImage {
@@ -137,6 +152,10 @@ func TestApplySBOMRuntimeForStack_ConfiguresManifest(t *testing.T) {
 			}
 			if got := manifest.Envs[contracts.PLOYStackToolEnv]; got != wantTool {
 				t.Fatalf("manifest.Envs[%s]=%q, want %q", contracts.PLOYStackToolEnv, got, wantTool)
+			}
+			wantRelease := normalizeSBOMRuntimeRelease(tc.release)
+			if got := manifest.Envs[contracts.PLOYStackReleaseEnv]; got != wantRelease {
+				t.Fatalf("manifest.Envs[%s]=%q, want %q", contracts.PLOYStackReleaseEnv, got, wantRelease)
 			}
 			if len(manifest.Command) < 3 {
 				t.Fatalf("manifest.Command=%v, want shell command", manifest.Command)

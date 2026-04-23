@@ -1,14 +1,16 @@
 Publish Migs Images to a Local Registry
 
 Overview
-- Migs images live under `images/orw/`, `images/amata/`, `images/java-17-codex-amata/`, and `images/sbom/`:
+- Migs images live under `images/orw/`, `images/amata/`, `images/java-17-codex-amata-maven/`, `images/java-17-codex-amata-gradle/`, and `images/sbom/`:
   - `orw-cli-maven` (`images/orw/orw-cli-maven`) -> `orw-cli-maven`
   - `orw-cli-gradle` (`images/orw/orw-cli-gradle`) -> `orw-cli-gradle`
   - `amata` (`images/amata`) -> `amata`
-  - `java-17-codex-amata` (`images/java-17-codex-amata`) -> `java-17-codex-amata`
-  - `sbom-maven` (`images/sbom/maven`) -> `ploy/sbom-maven`
-  - `sbom-gradle` (`images/sbom/gradle`) -> `ploy/sbom-gradle`
-- The runner resolves images as `$PLOY_CONTAINER_REGISTRY/<name>:latest`.
+  - `java-17-codex-amata-maven` (`images/java-17-codex-amata-maven`) -> `java-17-codex-amata-maven`
+  - `java-17-codex-amata-gradle` (`images/java-17-codex-amata-gradle`) -> `java-17-codex-amata-gradle`
+  - `sbom-maven` (`images/sbom/maven`) -> `ploy/sbom-maven:jdk11|jdk17`
+  - `sbom-gradle` (`images/sbom/gradle`) -> `ploy/sbom-gradle:jdk11|jdk17`
+- The runner resolves most mig images as `$PLOY_CONTAINER_REGISTRY/<name>:latest`.
+- SBOM runtime lanes are resolved as fixed tags: `sbom-maven:jdk11|jdk17` and `sbom-gradle:jdk11|jdk17`.
 
 Local Registry Prerequisites
 - Deploy the local stack:
@@ -22,11 +24,14 @@ Publish all Migs images
 # export PLOY_CA_CERTS=/path/to/ca-bundle.pem
 
 images/build-and-push.sh
-# Builds and pushes: amata, java-17-codex-amata, orw-cli-maven, orw-cli-gradle,
-# sbom-maven, sbom-gradle,
+# Builds and pushes: amata, java-17-codex-amata-maven, java-17-codex-amata-gradle,
+# orw-cli-maven, orw-cli-gradle,
+# sbom-maven:jdk11,jdk17 and sbom-gradle:jdk11,jdk17,
 # gate-gradle:jdk11, gate-gradle:jdk17.
 # Also builds/pushes Maven gate wrappers into your registry namespace:
 # maven:3-eclipse-temurin-11, maven:3-eclipse-temurin-17.
+# Also builds/pushes shared Java base lanes:
+# java-base-maven:jdk11,jdk17, java-base-gradle:jdk11,jdk17, java-base-temurin:jdk17.
 # Also builds/pushes runtime images: server and node.
 ```
 
@@ -87,11 +92,12 @@ image:
 
 Notes
 - Directory mapping:
-  - `java-17-codex-amata` -> `java-17-codex-amata`
+  - `java-17-codex-amata-maven` -> `java-17-codex-amata-maven`
+  - `java-17-codex-amata-gradle` -> `java-17-codex-amata-gradle`
   - `orw-cli-maven` -> `orw-cli-maven`
   - `orw-cli-gradle` -> `orw-cli-gradle`
-  - `sbom-maven` -> `ploy/sbom-maven`
-  - `sbom-gradle` -> `ploy/sbom-gradle`
+  - `sbom-maven` -> `ploy/sbom-maven:jdk11|jdk17`
+  - `sbom-gradle` -> `ploy/sbom-gradle:jdk11|jdk17`
 - To use a different registry/namespace, override:
   - `IMAGE_PREFIX=... images/build-and-push.sh`
 
@@ -105,7 +111,10 @@ Verification
 docker buildx imagetools inspect "$PLOY_CONTAINER_REGISTRY/orw-cli-maven:latest"
 docker buildx imagetools inspect "$PLOY_CONTAINER_REGISTRY/orw-cli-gradle:latest"
 docker buildx imagetools inspect "$PLOY_CONTAINER_REGISTRY/amata:latest"
-docker buildx imagetools inspect "$PLOY_CONTAINER_REGISTRY/java-17-codex-amata:latest"
-docker buildx imagetools inspect "$PLOY_CONTAINER_REGISTRY/sbom-maven:latest"
-docker buildx imagetools inspect "$PLOY_CONTAINER_REGISTRY/sbom-gradle:latest"
+docker buildx imagetools inspect "$PLOY_CONTAINER_REGISTRY/java-17-codex-amata-maven:latest"
+docker buildx imagetools inspect "$PLOY_CONTAINER_REGISTRY/java-17-codex-amata-gradle:latest"
+docker buildx imagetools inspect "$PLOY_CONTAINER_REGISTRY/sbom-maven:jdk11"
+docker buildx imagetools inspect "$PLOY_CONTAINER_REGISTRY/sbom-maven:jdk17"
+docker buildx imagetools inspect "$PLOY_CONTAINER_REGISTRY/sbom-gradle:jdk11"
+docker buildx imagetools inspect "$PLOY_CONTAINER_REGISTRY/sbom-gradle:jdk17"
 ```

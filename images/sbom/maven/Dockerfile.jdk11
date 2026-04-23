@@ -1,0 +1,21 @@
+ARG JAVA_BASE_MAVEN_11_IMAGE=ghcr.io/iw2rmb/ploy/java-base-maven:jdk11
+FROM ${JAVA_BASE_MAVEN_11_IMAGE}
+
+LABEL org.opencontainers.image.source="https://github.com/iw2rmb/ploy" \
+    org.opencontainers.image.title="sbom-maven-jdk11" \
+    org.opencontainers.image.description="Ploy SBOM runner: Maven lane with JDK 11" \
+    org.opencontainers.image.licenses="MIT"
+
+RUN mkdir -p /workspace /in /out
+
+WORKDIR /workspace
+ENV WORKSPACE=/workspace \
+    INDIR=/in \
+    OUTDIR=/out \
+    MAVEN_CONFIG=/root/.m2
+
+COPY --chmod=755 images/sbom/shared/collect-java-classpath-gradle.sh /usr/local/lib/ploy/sbom/collect-java-classpath-gradle.sh
+COPY --chmod=755 images/sbom/shared/collect-java-classpath-maven.sh /usr/local/lib/ploy/sbom/collect-java-classpath-maven.sh
+COPY images/sbom/shared/gradle-write-java-classpath.init.gradle /usr/local/lib/ploy/sbom/gradle-write-java-classpath.init.gradle
+
+CMD ["bash"]

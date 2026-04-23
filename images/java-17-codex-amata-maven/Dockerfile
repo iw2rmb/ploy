@@ -1,13 +1,13 @@
 ARG NODE_IMAGE=node:22-bookworm-slim
+ARG JAVA_BASE_MAVEN_17_IMAGE=ghcr.io/iw2rmb/ploy/java-base-maven:jdk17
 
-FROM --platform=$TARGETOS/$TARGETARCH maven:3.9.11-eclipse-temurin-17 AS maven-tools
-FROM --platform=$TARGETOS/$TARGETARCH gradle:8.8-jdk17 AS gradle-tools
+FROM --platform=$TARGETOS/$TARGETARCH ${JAVA_BASE_MAVEN_17_IMAGE} AS maven-tools
 
 FROM ${NODE_IMAGE}
 ARG TARGETARCH
 
-LABEL org.opencontainers.image.title="java-17-codex-amata" \
-    org.opencontainers.image.description="Java 17 image with Maven, Gradle, Codex CLI, and Amata" \
+LABEL org.opencontainers.image.title="java-17-codex-amata-maven" \
+    org.opencontainers.image.description="Java 17 image with Maven, Codex CLI, and Amata" \
     org.opencontainers.image.source="https://github.com/iw2rmb/ploy" \
     org.opencontainers.image.licenses="MIT"
 
@@ -23,7 +23,7 @@ RUN --mount=type=secret,id=ploy_ca_certs,required=false \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     bash ca-certificates coreutils curl fd-find findutils gawk git jq ripgrep unzip \
     && rm -rf /var/lib/apt/lists/* \
-    && mkdir -p /workspace /in /out /out/codex /etc/ploy/certs /root/.gradle/init.d \
+    && mkdir -p /workspace /in /out /out/codex /etc/ploy/certs \
     && chmod 700 /out/codex \
     && chmod 755 /etc/ploy/certs'
 
@@ -31,8 +31,6 @@ COPY --from=maven-tools /opt/java/openjdk /opt/java/openjdk
 COPY --from=maven-tools /usr/share/maven /usr/share/maven
 COPY --from=maven-tools /usr/share/maven/ref /usr/share/maven/ref
 COPY --from=maven-tools /usr/bin/mvn /usr/bin/mvn
-COPY --from=gradle-tools /opt/gradle /opt/gradle
-COPY --from=gradle-tools /usr/bin/gradle /usr/bin/gradle
 
 SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
 
@@ -49,9 +47,7 @@ ENV JAVA_HOME=/opt/java/openjdk \
     LC_ALL=C.UTF-8 \
     MAVEN_HOME=/usr/share/maven \
     MAVEN_CONFIG=/root/.m2 \
-    GRADLE_HOME=/opt/gradle \
-    GRADLE_USER_HOME=/root/.gradle \
-    PATH="/opt/java/openjdk/bin:/usr/share/maven/bin:/opt/gradle/bin:/usr/local/bin:${PATH}" \
+    PATH="/opt/java/openjdk/bin:/usr/share/maven/bin:/usr/local/bin:${PATH}" \
     WORKSPACE=/workspace \
     OUTDIR=/out \
     PLOY_SERVER_URL="" \
@@ -71,8 +67,6 @@ RUN --mount=type=secret,id=ploy_ca_certs,required=false \
     && rm -rf /root/.npm /tmp/*
 
 COPY images/amata/entrypoint.sh /usr/local/bin/ploy/entrypoint.sh
-COPY images/gates/gradle/gradle.properties /root/.gradle/gradle.properties
-COPY images/gates/gradle/cache.init.gradle /root/.gradle/init.d/cache.init.gradle
 COPY images/amata/amata-linux-${TARGETARCH} /usr/local/bin/amata
 
 RUN chmod +x \

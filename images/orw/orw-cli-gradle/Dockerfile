@@ -15,28 +15,13 @@ RUN --mount=type=cache,target=/root/.m2 \
     --mount=type=secret,id=ploy_ca_certs,required=false \
     bash -euxo pipefail -c 'if [[ -s /run/secrets/ploy_ca_certs ]]; then mkdir -p /etc/ploy/certs; cp /run/secrets/ploy_ca_certs /etc/ploy/certs/ca.crt; source /usr/local/lib/ploy/install_ploy_ca_bundle.sh; PLOY_CA_IMPORT_JAVA=1 install_ploy_ca_bundle; fi; cd rewrite-runner && mvn -q -DskipTests package'
 
-FROM --platform=$TARGETOS/$TARGETARCH eclipse-temurin:17-jdk
+ARG JAVA_BASE_TEMURIN_17_IMAGE=ghcr.io/iw2rmb/ploy/java-base-temurin:jdk17
+FROM --platform=$TARGETOS/$TARGETARCH ${JAVA_BASE_TEMURIN_17_IMAGE}
 
 LABEL org.opencontainers.image.source="https://github.com/iw2rmb/ploy" \
     org.opencontainers.image.title="orw-cli-gradle" \
     org.opencontainers.image.description="Ploy Migs: standalone OpenRewrite CLI runner (Gradle lane)" \
     org.opencontainers.image.licenses="MIT"
-
-COPY --chmod=755 images/install_ploy_ca_bundle.sh /usr/local/lib/ploy/install_ploy_ca_bundle.sh
-RUN --mount=type=secret,id=ploy_ca_certs,required=false \
-    bash -euxo pipefail -c 'if [[ -s /run/secrets/ploy_ca_certs ]]; then \
-      mkdir -p /etc/ploy/certs; \
-      cp /run/secrets/ploy_ca_certs /etc/ploy/certs/ca.crt; \
-      source /usr/local/lib/ploy/install_ploy_ca_bundle.sh; \
-      PLOY_CA_IMPORT_JAVA=1 install_ploy_ca_bundle; \
-    fi \
-    && apt-get update \
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-    bash ca-certificates git jq \
-    && rm -rf /var/lib/apt/lists/*'
-
-ENV LANG=C.UTF-8 \
-    LC_ALL=C.UTF-8
 
 WORKDIR /workspace
 
