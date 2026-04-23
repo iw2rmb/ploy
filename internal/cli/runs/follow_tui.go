@@ -126,7 +126,7 @@ func (m followModel) View() tea.View {
 	opts.JobIOPreviews = m.jobIOPreviews
 	opts.ExpandStdout = m.expandStdout
 	opts.ExpandStderr = m.expandStderr
-	opts.FilterRunningRepos = true
+	opts.FilterRunningRepos = len(m.report.Repos) > 1
 	opts.EmptyReposLine = "No repos with in-progress jobs."
 	layout, err := RenderRunReportTextLayout(*m.report, opts)
 	if err != nil {

@@ -199,6 +199,14 @@ func TestFollowModelViewShowsNoRunningReposMessage(t *testing.T) {
 					{JobID: domaintypes.NewJobID(), JobType: "mig", Status: domaintypes.JobStatusFail},
 				},
 			},
+			{
+				RepoID:  domaintypes.NewMigRepoID(),
+				RepoURL: "https://github.com/acme/success.git",
+				Status:  domaintypes.RunRepoStatusSuccess,
+				Jobs: []RunJobEntry{
+					{JobID: domaintypes.NewJobID(), JobType: "mig", Status: domaintypes.JobStatusSuccess},
+				},
+			},
 		},
 	}
 	model := newFollowModel(TextRenderOptions{}, true)
@@ -207,6 +215,37 @@ func TestFollowModelViewShowsNoRunningReposMessage(t *testing.T) {
 	view := strings.TrimSpace(model.View().Content)
 	if !strings.Contains(view, "No repos with in-progress jobs.") {
 		t.Fatalf("expected empty-running message in view, got %q", view)
+	}
+}
+
+func TestFollowModelViewSingleRepoKeepsRepoVisibleWithoutRunningJobs(t *testing.T) {
+	t.Parallel()
+
+	report := RunReport{
+		RunID:   domaintypes.NewRunID(),
+		MigID:   domaintypes.NewMigID(),
+		MigName: "follow-single-repo",
+		SpecID:  domaintypes.NewSpecID(),
+		Repos: []RunEntry{
+			{
+				RepoID:  domaintypes.NewMigRepoID(),
+				RepoURL: "https://github.com/acme/done.git",
+				Status:  domaintypes.RunRepoStatusSuccess,
+				Jobs: []RunJobEntry{
+					{JobID: domaintypes.NewJobID(), JobType: "mig", Status: domaintypes.JobStatusSuccess},
+				},
+			},
+		},
+	}
+	model := newFollowModel(TextRenderOptions{}, true)
+	model.report = &report
+
+	view := strings.TrimSpace(model.View().Content)
+	if !strings.Contains(view, "github.com/acme/done") {
+		t.Fatalf("expected single repo to stay visible in view, got %q", view)
+	}
+	if strings.Contains(view, "No repos with in-progress jobs.") {
+		t.Fatalf("expected single repo to render instead of empty-running message, got %q", view)
 	}
 }
 
