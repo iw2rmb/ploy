@@ -38,6 +38,18 @@ install_ploy_ca_bundle() {
     fi
   }
 
+  _ploy_ca_sha256_from_cert_file() {
+    local cert_file="$1"
+    keytool -printcert -file "$cert_file" 2>/dev/null \
+      | awk -F': ' '/^[[:space:]]*SHA256:/{gsub(":", "", $2); print tolower($2); exit}'
+  }
+
+  _ploy_ca_sha256_from_alias() {
+    local alias_name="$1"
+    keytool -list -v -cacerts -storepass changeit -alias "$alias_name" 2>/dev/null \
+      | awk -F': ' '/^[[:space:]]*SHA256:/{gsub(":", "", $2); print tolower($2); exit}'
+  }
+
   if [[ -r "$ca_path" ]] && [[ -s "$ca_path" ]]; then
     awk '/-----BEGIN CERTIFICATE-----/{n++} {print > (d"/cert" n ".crt")}' d="$tmp_dir" "$ca_path"
   fi
@@ -66,11 +78,37 @@ install_ploy_ca_bundle() {
   local cert_path
   for cert_path in "${certs[@]}"; do
     if [[ "$import_java" == "1" ]] && command -v keytool >/dev/null 2>&1; then
-      local alias_name
-      alias_name="ploy_ca_$(basename "$cert_path" .crt)"
-      keytool -importcert -noprompt -trustcacerts -cacerts -storepass changeit -alias "$alias_name" -file "$cert_path" >/dev/null 2>&1 || {
-        _ploy_ca_log "warning: keytool import failed for ${cert_path}"
-      }
+      local alias_name cert_sha existing_sha should_import
+      cert_sha="$(_ploy_ca_sha256_from_cert_file "$cert_path")"
+      if [[ -n "$cert_sha" ]]; then
+        alias_name="ploy_ca_sha256_${cert_sha}"
+      else
+        alias_name="ploy_ca_$(basename "$cert_path" .crt)"
+      fi
+
+      should_import=1
+      if keytool -list -cacerts -storepass changeit -alias "$alias_name" >/dev/null 2>&1; then
+        if [[ -n "$cert_sha" ]]; then
+          existing_sha="$(_ploy_ca_sha256_from_alias "$alias_name")"
+          if [[ -n "$existing_sha" && "$existing_sha" != "$cert_sha" ]]; then
+            if ! keytool -delete -cacerts -storepass changeit -alias "$alias_name" >/dev/null 2>&1; then
+              _ploy_ca_log "warning: keytool delete failed for alias ${alias_name}"
+              should_import=0
+            fi
+          else
+            should_import=0
+          fi
+        else
+          # Fall back to positional alias semantics when fingerprinting is unavailable.
+          should_import=0
+        fi
+      fi
+
+      if [[ "$should_import" -eq 1 ]]; then
+        keytool -importcert -noprompt -trustcacerts -cacerts -storepass changeit -alias "$alias_name" -file "$cert_path" >/dev/null 2>&1 || {
+          _ploy_ca_log "warning: keytool import failed for ${cert_path}"
+        }
+      fi
     fi
     if [[ -n "$sys_ca_dir" ]]; then
       cp "$cert_path" "$sys_ca_dir/" || true
