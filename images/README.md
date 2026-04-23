@@ -5,7 +5,7 @@ This directory contains example Migs images (container build contexts). Ploy doe
 Image Catalog (selected)
 
 - `amata` (`images/amata`) - Amata-based migration runner image.
-- `java-17-orw-codex-amata` (`images/java-17-orw-codex-amata`) - Java 17 image with Maven, Gradle, OpenRewrite, Codex CLI, and Amata.
+- `java-17-codex-amata` (`images/java-17-codex-amata`) - Java 17 image with Maven, Gradle, Codex CLI, and Amata.
 - `orw-cli-maven` (`images/orw/orw-cli-maven`) - OpenRewrite Maven lane runtime.
 - `orw-cli-gradle` (`images/orw/orw-cli-gradle`) - OpenRewrite Gradle lane runtime.
 - `ploy/sbom-maven` (`images/sbom/maven`) - Maven SBOM collection runtime.

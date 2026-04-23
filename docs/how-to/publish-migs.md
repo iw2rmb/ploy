@@ -1,11 +1,11 @@
 Publish Migs Images to a Local Registry
 
 Overview
-- Migs images live under `images/orw/`, `images/amata/`, `images/java-17-orw-codex-amata/`, and `images/sbom/`:
+- Migs images live under `images/orw/`, `images/amata/`, `images/java-17-codex-amata/`, and `images/sbom/`:
   - `orw-cli-maven` (`images/orw/orw-cli-maven`) -> `orw-cli-maven`
   - `orw-cli-gradle` (`images/orw/orw-cli-gradle`) -> `orw-cli-gradle`
   - `amata` (`images/amata`) -> `amata`
-  - `java-17-orw-codex-amata` (`images/java-17-orw-codex-amata`) -> `java-17-orw-codex-amata`
+  - `java-17-codex-amata` (`images/java-17-codex-amata`) -> `java-17-codex-amata`
   - `sbom-maven` (`images/sbom/maven`) -> `ploy/sbom-maven`
   - `sbom-gradle` (`images/sbom/gradle`) -> `ploy/sbom-gradle`
 - The runner resolves images as `$PLOY_CONTAINER_REGISTRY/<name>:latest`.
@@ -22,7 +22,7 @@ Publish all Migs images
 # export PLOY_CA_CERTS=/path/to/ca-bundle.pem
 
 images/build-and-push.sh
-# Builds and pushes: amata, java-17-orw-codex-amata, orw-cli-maven, orw-cli-gradle,
+# Builds and pushes: amata, java-17-codex-amata, orw-cli-maven, orw-cli-gradle,
 # sbom-maven, sbom-gradle,
 # gate-gradle:jdk11, gate-gradle:jdk17.
 # Also builds/pushes Maven gate wrappers into your registry namespace:
@@ -87,7 +87,7 @@ image:
 
 Notes
 - Directory mapping:
-  - `java-17-orw-codex-amata` -> `java-17-orw-codex-amata`
+  - `java-17-codex-amata` -> `java-17-codex-amata`
   - `orw-cli-maven` -> `orw-cli-maven`
   - `orw-cli-gradle` -> `orw-cli-gradle`
   - `sbom-maven` -> `ploy/sbom-maven`
@@ -105,7 +105,7 @@ Verification
 docker buildx imagetools inspect "$PLOY_CONTAINER_REGISTRY/orw-cli-maven:latest"
 docker buildx imagetools inspect "$PLOY_CONTAINER_REGISTRY/orw-cli-gradle:latest"
 docker buildx imagetools inspect "$PLOY_CONTAINER_REGISTRY/amata:latest"
-docker buildx imagetools inspect "$PLOY_CONTAINER_REGISTRY/java-17-orw-codex-amata:latest"
+docker buildx imagetools inspect "$PLOY_CONTAINER_REGISTRY/java-17-codex-amata:latest"
 docker buildx imagetools inspect "$PLOY_CONTAINER_REGISTRY/sbom-maven:latest"
 docker buildx imagetools inspect "$PLOY_CONTAINER_REGISTRY/sbom-gradle:latest"
 ```

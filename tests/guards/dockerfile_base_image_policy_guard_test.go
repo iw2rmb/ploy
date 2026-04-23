@@ -24,18 +24,18 @@ func TestDockerfilesRuntimeBasePolicy(t *testing.T) {
 	// Debian-focused policy with slim where possible. Non-slim runtime bases are
 	// explicitly allowlisted when upstream toolchain images do not provide slim.
 	policy := map[string]runtimeBasePolicy{
-		"images/server/Dockerfile":                  {Expected: "debian:bookworm-slim", Reason: "core runtime must be Debian slim"},
-		"images/node/Dockerfile":                    {Expected: "debian:bookworm-slim", Reason: "core runtime must be Debian slim"},
-		"images/amata/Dockerfile":                   {Expected: "node:22-bookworm-slim", Reason: "Node runtime provides official Debian slim tag"},
-		"images/java-17-orw-codex-amata/Dockerfile": {Expected: "node:22-bookworm-slim", Reason: "Node runtime provides official Debian slim tag"},
-		"images/sbom/gradle/Dockerfile":             {Expected: "gradle:8.8-jdk17", Reason: "exception: no official gradle:8.8-jdk17-slim tag"},
-		"images/sbom/maven/Dockerfile":              {Expected: "maven:3.9.11-eclipse-temurin-17", Reason: "exception: no official Maven Eclipse Temurin slim tag"},
-		"images/gates/gradle/Dockerfile.jdk11":      {Expected: "gradle:8.8-jdk11", Reason: "exception: no official gradle:8.8-jdk11-slim tag"},
-		"images/gates/gradle/Dockerfile.jdk17":      {Expected: "gradle:8.8-jdk17", Reason: "exception: no official gradle:8.8-jdk17-slim tag"},
-		"images/gates/maven/Dockerfile.jdk11":       {Expected: "maven:3.9.11-eclipse-temurin-11", Reason: "exception: no official Maven Eclipse Temurin slim tag"},
-		"images/gates/maven/Dockerfile.jdk17":       {Expected: "maven:3.9.11-eclipse-temurin-17", Reason: "exception: no official Maven Eclipse Temurin slim tag"},
-		"images/orw/orw-cli-gradle/Dockerfile":      {Expected: "eclipse-temurin:17-jdk", Reason: "exception: no official eclipse-temurin:17-jdk-slim tag"},
-		"images/orw/orw-cli-maven/Dockerfile":       {Expected: "eclipse-temurin:17-jdk", Reason: "exception: no official eclipse-temurin:17-jdk-slim tag"},
+		"images/server/Dockerfile":              {Expected: "debian:bookworm-slim", Reason: "core runtime must be Debian slim"},
+		"images/node/Dockerfile":                {Expected: "debian:bookworm-slim", Reason: "core runtime must be Debian slim"},
+		"images/amata/Dockerfile":               {Expected: "node:22-bookworm-slim", Reason: "Node runtime provides official Debian slim tag"},
+		"images/java-17-codex-amata/Dockerfile": {Expected: "node:22-bookworm-slim", Reason: "Node runtime provides official Debian slim tag"},
+		"images/sbom/gradle/Dockerfile":         {Expected: "gradle:8.8-jdk17", Reason: "exception: no official gradle:8.8-jdk17-slim tag"},
+		"images/sbom/maven/Dockerfile":          {Expected: "maven:3.9.11-eclipse-temurin-17", Reason: "exception: no official Maven Eclipse Temurin slim tag"},
+		"images/gates/gradle/Dockerfile.jdk11":  {Expected: "gradle:8.8-jdk11", Reason: "exception: no official gradle:8.8-jdk11-slim tag"},
+		"images/gates/gradle/Dockerfile.jdk17":  {Expected: "gradle:8.8-jdk17", Reason: "exception: no official gradle:8.8-jdk17-slim tag"},
+		"images/gates/maven/Dockerfile.jdk11":   {Expected: "maven:3.9.11-eclipse-temurin-11", Reason: "exception: no official Maven Eclipse Temurin slim tag"},
+		"images/gates/maven/Dockerfile.jdk17":   {Expected: "maven:3.9.11-eclipse-temurin-17", Reason: "exception: no official Maven Eclipse Temurin slim tag"},
+		"images/orw/orw-cli-gradle/Dockerfile":  {Expected: "eclipse-temurin:17-jdk", Reason: "exception: no official eclipse-temurin:17-jdk-slim tag"},
+		"images/orw/orw-cli-maven/Dockerfile":   {Expected: "eclipse-temurin:17-jdk", Reason: "exception: no official eclipse-temurin:17-jdk-slim tag"},
 	}
 
 	found := make([]string, 0, len(dockerfiles))

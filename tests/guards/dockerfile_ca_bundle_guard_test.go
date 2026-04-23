@@ -13,7 +13,7 @@ func TestPublishedImageDockerfilesUseBuildCABundleInstaller(t *testing.T) {
 		"images/server/Dockerfile",
 		"images/node/Dockerfile",
 		"images/amata/Dockerfile",
-		"images/java-17-orw-codex-amata/Dockerfile",
+		"images/java-17-codex-amata/Dockerfile",
 		"images/sbom/gradle/Dockerfile",
 		"images/sbom/maven/Dockerfile",
 		"images/gates/gradle/Dockerfile.jdk11",
