@@ -19,6 +19,8 @@ set -Eeuo pipefail
 #   IMAGE_PREFIX - Optional image prefix (highest precedence)
 #   PLOY_CONTAINER_REGISTRY - Optional fallback image prefix when IMAGE_PREFIX is unset
 #   (default fallback: ghcr.io/iw2rmb/ploy)
+#   PLOY_BUILD_PULL - Optional: 1|0 to force/disable --pull
+#                     (default: 1 for OUTPUT_MODE=push, 0 for OUTPUT_MODE=load)
 #   OUTPUT_MODE - Optional: push|load (default push)
 #   PUSH_LATEST - Optional alias toggle for :latest (default 1 for stable releases)
 #   PLOY_CA_CERTS - Optional PEM bundle (path or inline content), passed as BuildKit secret id=ploy_ca_certs
@@ -46,6 +48,7 @@ PUSH_LATEST="${PUSH_LATEST:-1}"
 declare -a BUILD_SECRET_ARGS=()
 PLOY_CA_CERTS_TMP=""
 declare -a BUILD_OUTPUT_ARGS=(--push)
+declare -a BUILD_PULL_ARGS=()
 declare -a JAVA_BASE_BUILD_ARGS=()
 declare -a GROUP_ORDER=("ploy" "java-bases" "amata" "sbom" "gates" "orw")
 BUILD_GROUPS_RAW=""
@@ -167,6 +170,29 @@ case "$OUTPUT_MODE" in
     ;;
 esac
 
+resolve_pull_args() {
+  local mode="${PLOY_BUILD_PULL:-}"
+  if [[ -z "$mode" ]]; then
+    if [[ "$OUTPUT_MODE" == "load" ]]; then
+      BUILD_PULL_ARGS=()
+    else
+      BUILD_PULL_ARGS=(--pull)
+    fi
+    return
+  fi
+
+  case "$mode" in
+    1|true|TRUE|yes|YES|on|ON) BUILD_PULL_ARGS=(--pull) ;;
+    0|false|FALSE|no|NO|off|OFF) BUILD_PULL_ARGS=() ;;
+    *)
+      echo "error: PLOY_BUILD_PULL '$mode' must be 1|0|true|false|yes|no|on|off" >&2
+      exit 2
+      ;;
+  esac
+}
+
+resolve_pull_args
+
 cleanup() {
   if [[ -n "${PLOY_CA_CERTS_TMP}" && -f "${PLOY_CA_CERTS_TMP}" ]]; then
     rm -f "${PLOY_CA_CERTS_TMP}"
@@ -238,7 +264,8 @@ build_push() {
   echo "    Tags: ${refs[*]}"
   docker buildx build \
     --platform "${PLATFORM}" \
-    --provenance=false --sbom=false --pull \
+    --provenance=false --sbom=false \
+    "${BUILD_PULL_ARGS[@]}" \
     --label "org.opencontainers.image.version=${VERSION}" \
     --label "org.opencontainers.image.revision=${GIT_COMMIT}" \
     "${BUILD_SECRET_ARGS[@]}" \
@@ -268,7 +295,8 @@ build_push_fixed_tag() {
   echo "==> Building ${ref} (df=${dockerfile}, ctx=${context}, platform=${PLATFORM})"
   docker buildx build \
     --platform "${PLATFORM}" \
-    --provenance=false --sbom=false --pull \
+    --provenance=false --sbom=false \
+    "${BUILD_PULL_ARGS[@]}" \
     --label "org.opencontainers.image.version=${VERSION}" \
     --label "org.opencontainers.image.revision=${GIT_COMMIT}" \
     "${BUILD_SECRET_ARGS[@]}" \
