@@ -87,3 +87,5 @@ images/amata/amata*
 .refresh.sh
 
 images/orw/orw-cli-gradle/rewrite-runner/target
+
+AGENTS.md
