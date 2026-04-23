@@ -88,6 +88,29 @@ func TestMaterializeValidatedSBOMOutput_ClasspathValidationDependsOnFlow(t *test
 	}
 }
 
+func TestMaterializeValidatedSBOMOutput_RejectsNonPortableGradleClasspath(t *testing.T) {
+	t.Parallel()
+
+	outDir := t.TempDir()
+	snapshotPath := filepath.Join(t.TempDir(), "gate-cycle", "sbom", "out", preGateCanonicalSBOMFileName)
+	rawDeps := "[INFO]    com.fasterxml.jackson.core:jackson-databind:jar:2.17.2:compile\n"
+	if err := os.WriteFile(filepath.Join(outDir, sbomDependencyOutputFileName), []byte(rawDeps), 0o644); err != nil {
+		t.Fatalf("write raw dependency output: %v", err)
+	}
+	rawClasspath := []byte("/home/gradle/.gradle/caches/modules-2/files-2.1/a/b/c/a.jar\n")
+	if err := os.WriteFile(filepath.Join(outDir, sbomJavaClasspathFileName), rawClasspath, 0o644); err != nil {
+		t.Fatalf("write java classpath output: %v", err)
+	}
+
+	err := materializeValidatedSBOMOutput(outDir, snapshotPath, true)
+	if err == nil {
+		t.Fatal("expected error for non-portable gradle classpath")
+	}
+	if !strings.Contains(err.Error(), "non-portable gradle cache path") {
+		t.Fatalf("error = %q, want mention of non-portable gradle cache path", err)
+	}
+}
+
 func TestFinalizeSBOMFlowOutputs_PersistsRunClasspathFromSinglePreGateSource(t *testing.T) {
 	cacheHome := t.TempDir()
 	t.Setenv("PLOYD_CACHE_HOME", cacheHome)

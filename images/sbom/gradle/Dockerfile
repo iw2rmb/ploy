@@ -6,7 +6,8 @@ LABEL org.opencontainers.image.source="https://github.com/iw2rmb/ploy" \
     org.opencontainers.image.licenses="MIT"
 
 USER root
-RUN mkdir -p /workspace /in /out
+RUN rm -rf /root/.gradle \
+    && mkdir -p /root/.gradle /workspace /in /out
 
 WORKDIR /workspace
 ENV WORKSPACE=/workspace \

@@ -1037,6 +1037,9 @@ func validateJavaClasspathPath(path string) error {
 		if !filepath.IsAbs(entry) {
 			return fmt.Errorf("line %d must be absolute path: %q", idx+1, entry)
 		}
+		if entry == "/home/gradle/.gradle" || strings.HasPrefix(entry, "/home/gradle/.gradle/") {
+			return fmt.Errorf("line %d uses non-portable gradle cache path: %q (expected /root/.gradle/...)", idx+1, entry)
+		}
 	}
 	return nil
 }
