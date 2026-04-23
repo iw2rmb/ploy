@@ -423,6 +423,250 @@ exit 17
 	}
 }
 
+func TestOrwCLI_AutoExcludeGroovyParseFailures_RetriesOnceAndSucceeds(t *testing.T) {
+	t.Parallel()
+
+	workspace := t.TempDir()
+	outdir := t.TempDir()
+	binDir := t.TempDir()
+	callsFile := filepath.Join(t.TempDir(), "calls.txt")
+
+	rewritePath := filepath.Join(binDir, "rewrite")
+	rewriteScript := `#!/usr/bin/env bash
+set -euo pipefail
+calls_file="${REWRITE_CALLS_FILE:-}"
+count=0
+if [[ -n "$calls_file" && -f "$calls_file" ]]; then
+  count="$(cat "$calls_file")"
+fi
+count=$((count + 1))
+if [[ -n "$calls_file" ]]; then
+  printf '%s' "$count" > "$calls_file"
+fi
+echo "[rewrite-stub] call=$count"
+if [[ "$count" -eq 1 ]]; then
+  echo "org.openrewrite.groovy.GroovyParsingException: Failed to parse build-client-swagger.gradle, cursor position likely inaccurate." >&2
+  exit 1
+fi
+if [[ "${ORW_EXCLUDE_PATHS:-}" != *"**/*.proto"* ]]; then
+  echo "[rewrite-stub] missing inherited exclude" >&2
+  exit 61
+fi
+if [[ "${ORW_EXCLUDE_PATHS:-}" != *"**/build-client-swagger.gradle"* ]]; then
+  echo "[rewrite-stub] missing auto exclude" >&2
+  exit 62
+fi
+echo "[rewrite-stub] retry ok excludes=${ORW_EXCLUDE_PATHS:-}"
+`
+	if err := os.WriteFile(rewritePath, []byte(rewriteScript), 0o755); err != nil {
+		t.Fatalf("write rewrite stub: %v", err)
+	}
+
+	migScript := resolveORWCLIScript(t)
+	cmd := exec.Command("bash", migScript, "--apply", "--dir", workspace, "--out", outdir)
+	cmd.Env = append(os.Environ(),
+		"RECIPE_GROUP=org.openrewrite.recipe",
+		"RECIPE_ARTIFACT=rewrite-migrate-java",
+		"RECIPE_VERSION=3.20.0",
+		"RECIPE_CLASSNAME=org.openrewrite.java.migrate.UpgradeToJava17",
+		"ORW_EXCLUDE_PATHS=**/*.proto",
+		"ORW_AUTO_EXCLUDE_GROOVY_PARSE_FAILURES=true",
+		"REWRITE_CALLS_FILE="+callsFile,
+		"PATH="+binDir+string(os.PathListSeparator)+os.Getenv("PATH"),
+	)
+
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("orw-cli failed: %v\nstdout/stderr:\n%s", err, string(out))
+	}
+
+	logBytes, err := os.ReadFile(filepath.Join(outdir, contracts.ORWCLITransformLogName))
+	if err != nil {
+		t.Fatalf("read transform.log: %v", err)
+	}
+	logText := string(logBytes)
+	if !strings.Contains(logText, "Auto-exclude applied paths: **/build-client-swagger.gradle") {
+		t.Fatalf("transform.log missing auto-exclude marker:\n%s", logText)
+	}
+	if !strings.Contains(logText, "[rewrite-stub] retry ok excludes=") {
+		t.Fatalf("transform.log missing retry success marker:\n%s", logText)
+	}
+
+	callsRaw, err := os.ReadFile(callsFile)
+	if err != nil {
+		t.Fatalf("read calls file: %v", err)
+	}
+	if strings.TrimSpace(string(callsRaw)) != "2" {
+		t.Fatalf("expected two rewrite invocations, got %q", strings.TrimSpace(string(callsRaw)))
+	}
+
+	reportBytes, err := os.ReadFile(filepath.Join(outdir, contracts.ORWCLIReportFileName))
+	if err != nil {
+		t.Fatalf("read report.json: %v", err)
+	}
+	report, err := contracts.ParseORWCLIReport(reportBytes)
+	if err != nil {
+		t.Fatalf("parse report.json: %v\nreport=%s", err, string(reportBytes))
+	}
+	if !report.Success {
+		t.Fatalf("report.success=false, expected true: %s", string(reportBytes))
+	}
+}
+
+func TestOrwCLI_AutoExcludeGroovyParseFailures_DisabledDoesNotRetry(t *testing.T) {
+	t.Parallel()
+
+	workspace := t.TempDir()
+	outdir := t.TempDir()
+	binDir := t.TempDir()
+	callsFile := filepath.Join(t.TempDir(), "calls.txt")
+
+	rewritePath := filepath.Join(binDir, "rewrite")
+	rewriteScript := `#!/usr/bin/env bash
+set -euo pipefail
+calls_file="${REWRITE_CALLS_FILE:-}"
+count=0
+if [[ -n "$calls_file" && -f "$calls_file" ]]; then
+  count="$(cat "$calls_file")"
+fi
+count=$((count + 1))
+if [[ -n "$calls_file" ]]; then
+  printf '%s' "$count" > "$calls_file"
+fi
+echo "[rewrite-stub] call=$count"
+echo "org.openrewrite.groovy.GroovyParsingException: Failed to parse build-client-swagger.gradle, cursor position likely inaccurate." >&2
+exit 1
+`
+	if err := os.WriteFile(rewritePath, []byte(rewriteScript), 0o755); err != nil {
+		t.Fatalf("write rewrite stub: %v", err)
+	}
+
+	migScript := resolveORWCLIScript(t)
+	cmd := exec.Command("bash", migScript, "--apply", "--dir", workspace, "--out", outdir)
+	cmd.Env = append(os.Environ(),
+		"RECIPE_GROUP=org.openrewrite.recipe",
+		"RECIPE_ARTIFACT=rewrite-migrate-java",
+		"RECIPE_VERSION=3.20.0",
+		"RECIPE_CLASSNAME=org.openrewrite.java.migrate.UpgradeToJava17",
+		"REWRITE_CALLS_FILE="+callsFile,
+		"PATH="+binDir+string(os.PathListSeparator)+os.Getenv("PATH"),
+	)
+
+	if err := cmd.Run(); err == nil {
+		t.Fatal("expected orw-cli to fail when auto-exclude is disabled")
+	}
+
+	callsRaw, err := os.ReadFile(callsFile)
+	if err != nil {
+		t.Fatalf("read calls file: %v", err)
+	}
+	if strings.TrimSpace(string(callsRaw)) != "1" {
+		t.Fatalf("expected one rewrite invocation, got %q", strings.TrimSpace(string(callsRaw)))
+	}
+
+	logBytes, err := os.ReadFile(filepath.Join(outdir, contracts.ORWCLITransformLogName))
+	if err != nil {
+		t.Fatalf("read transform.log: %v", err)
+	}
+	logText := string(logBytes)
+	if strings.Contains(logText, "Auto-exclude applied paths:") {
+		t.Fatalf("auto-exclude should not run when disabled:\n%s", logText)
+	}
+
+	reportBytes, err := os.ReadFile(filepath.Join(outdir, contracts.ORWCLIReportFileName))
+	if err != nil {
+		t.Fatalf("read report.json: %v", err)
+	}
+	report, err := contracts.ParseORWCLIReport(reportBytes)
+	if err != nil {
+		t.Fatalf("parse report.json: %v\nreport=%s", err, string(reportBytes))
+	}
+	if report.Success {
+		t.Fatalf("report.success=true, expected false: %s", string(reportBytes))
+	}
+	if report.ErrorKind != contracts.ORWCLIErrorKindExecution {
+		t.Fatalf("error_kind=%q, want %q", report.ErrorKind, contracts.ORWCLIErrorKindExecution)
+	}
+}
+
+func TestOrwCLI_AutoExcludeGroovyParseFailures_MergesAndDedupesPaths(t *testing.T) {
+	t.Parallel()
+
+	workspace := t.TempDir()
+	outdir := t.TempDir()
+	binDir := t.TempDir()
+	callsFile := filepath.Join(t.TempDir(), "calls.txt")
+
+	rewritePath := filepath.Join(binDir, "rewrite")
+	rewriteScript := `#!/usr/bin/env bash
+set -euo pipefail
+calls_file="${REWRITE_CALLS_FILE:-}"
+count=0
+if [[ -n "$calls_file" && -f "$calls_file" ]]; then
+  count="$(cat "$calls_file")"
+fi
+count=$((count + 1))
+if [[ -n "$calls_file" ]]; then
+  printf '%s' "$count" > "$calls_file"
+fi
+echo "[rewrite-stub] call=$count"
+if [[ "$count" -eq 1 ]]; then
+  echo "org.openrewrite.groovy.GroovyParsingException: Failed to parse build-client-swagger.gradle, cursor position likely inaccurate." >&2
+  echo "org.openrewrite.groovy.GroovyParsingException: Failed to parse src/main/groovy/generated-client.gradle, cursor position likely inaccurate." >&2
+  exit 1
+fi
+echo "[rewrite-stub] excludes=${ORW_EXCLUDE_PATHS:-}"
+if [[ "${ORW_EXCLUDE_PATHS:-}" != *"**/*.proto"* ]]; then
+  echo "[rewrite-stub] missing proto exclude" >&2
+  exit 71
+fi
+if [[ "${ORW_EXCLUDE_PATHS:-}" != *"**/build-client-swagger.gradle"* ]]; then
+  echo "[rewrite-stub] missing existing swagger exclude" >&2
+  exit 72
+fi
+if [[ "${ORW_EXCLUDE_PATHS:-}" != *"src/main/groovy/generated-client.gradle"* ]]; then
+  echo "[rewrite-stub] missing relative path exclude" >&2
+  exit 73
+fi
+`
+	if err := os.WriteFile(rewritePath, []byte(rewriteScript), 0o755); err != nil {
+		t.Fatalf("write rewrite stub: %v", err)
+	}
+
+	migScript := resolveORWCLIScript(t)
+	cmd := exec.Command("bash", migScript, "--apply", "--dir", workspace, "--out", outdir)
+	cmd.Env = append(os.Environ(),
+		"RECIPE_GROUP=org.openrewrite.recipe",
+		"RECIPE_ARTIFACT=rewrite-migrate-java",
+		"RECIPE_VERSION=3.20.0",
+		"RECIPE_CLASSNAME=org.openrewrite.java.migrate.UpgradeToJava17",
+		"ORW_EXCLUDE_PATHS=**/*.proto,**/build-client-swagger.gradle",
+		"ORW_AUTO_EXCLUDE_GROOVY_PARSE_FAILURES=true",
+		"REWRITE_CALLS_FILE="+callsFile,
+		"PATH="+binDir+string(os.PathListSeparator)+os.Getenv("PATH"),
+	)
+
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("orw-cli failed: %v\nstdout/stderr:\n%s", err, string(out))
+	}
+
+	logBytes, err := os.ReadFile(filepath.Join(outdir, contracts.ORWCLITransformLogName))
+	if err != nil {
+		t.Fatalf("read transform.log: %v", err)
+	}
+	logText := string(logBytes)
+	if strings.Contains(logText, "Auto-exclude applied paths: **/build-client-swagger.gradle") {
+		t.Fatalf("existing path must not be reported as newly added:\n%s", logText)
+	}
+	if !strings.Contains(logText, "Auto-exclude applied paths: src/main/groovy/generated-client.gradle") {
+		t.Fatalf("expected new relative path to be reported:\n%s", logText)
+	}
+	if strings.Count(logText, "src/main/groovy/generated-client.gradle") < 2 {
+		t.Fatalf("expected relative exclude in both reporting and retry invocation:\n%s", logText)
+	}
+}
+
 func TestOrwCLI_SelfTestWritesSuccessReport(t *testing.T) {
 	t.Parallel()
 

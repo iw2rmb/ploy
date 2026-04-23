@@ -51,6 +51,7 @@ Optional:
 - `ORW_ACTIVE_RECIPES` (comma-separated override list)
 - `ORW_FAIL_ON_UNSUPPORTED` (default `true`)
 - `ORW_EXCLUDE_PATHS` (comma-separated globs)
+- `ORW_AUTO_EXCLUDE_GROOVY_PARSE_FAILURES` (default `false`; on Groovy parse failures auto-derives failed file paths into excludes and retries once)
 - `ORW_CLI_BIN` (defaults to `rewrite`)
 
 Required typed file input:
@@ -67,6 +68,11 @@ Required typed file input:
 - Recipes are resolved dynamically from `RECIPE_GROUP/RECIPE_ARTIFACT`; if `RECIPE_VERSION` is provided, ORW uses it as-is.
 - If `RECIPE_VERSION` is omitted, ORW resolves the latest available recipe version from configured repositories.
 - ORW images execute OpenRewrite in isolated runtime containers instead of invoking Maven/Gradle project tasks directly.
+- When `ORW_AUTO_EXCLUDE_GROOVY_PARSE_FAILURES=true`:
+  - failed run with `GroovyParsingException: Failed to parse ...` derives exclusion patterns from failed file paths,
+  - appends new paths to `ORW_EXCLUDE_PATHS`,
+  - retries OpenRewrite once,
+  - logs applied paths to stdout/`transform.log`.
 
 ## `rewrite.yml` Behavior
 
