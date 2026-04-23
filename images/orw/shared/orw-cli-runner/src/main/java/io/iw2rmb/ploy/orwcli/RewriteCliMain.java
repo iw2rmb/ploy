@@ -293,7 +293,7 @@ public final class RewriteCliMain {
             .collect(Collectors.toList());
     }
 
-    private static boolean matchesAnyExclude(Path workspace, Path path, List<PathMatcher> excludePathMatchers) {
+    static boolean matchesAnyExclude(Path workspace, Path path, List<PathMatcher> excludePathMatchers) {
         Path relative = toWorkspaceRelativePath(workspace, path);
         Path fileName = relative.getFileName();
         String portable = relative.toString().replace('\\', '/');
@@ -321,13 +321,23 @@ public final class RewriteCliMain {
         return path.normalize();
     }
 
-    private static List<PathMatcher> compileExcludePathMatchers(String rawPatterns) {
+    static List<PathMatcher> compileExcludePathMatchers(String rawPatterns) {
         List<String> raw = CliOptions.splitCsv(rawPatterns);
         if (raw.isEmpty()) {
             return Collections.emptyList();
         }
-        List<PathMatcher> matchers = new ArrayList<>(raw.size());
+        LinkedHashSet<String> effectivePatterns = new LinkedHashSet<>();
         for (String pattern : raw) {
+            effectivePatterns.add(pattern);
+            if (pattern.startsWith("**/") && pattern.length() > 3) {
+                // Java glob matcher does not treat "**/" as zero directories.
+                // Add a root-equivalent pattern so "**/foo" also matches "foo".
+                effectivePatterns.add(pattern.substring(3));
+            }
+        }
+
+        List<PathMatcher> matchers = new ArrayList<>(effectivePatterns.size());
+        for (String pattern : effectivePatterns) {
             try {
                 matchers.add(FileSystems.getDefault().getPathMatcher("glob:" + pattern));
             } catch (IllegalArgumentException e) {
