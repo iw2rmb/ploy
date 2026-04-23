@@ -252,7 +252,7 @@ build_push() {
     refs+=("${RESOLVED_IMAGE_PREFIX}/${name}:v${SEMVER_MAJOR}")
     refs+=("${RESOLVED_IMAGE_PREFIX}/${name}:v${SEMVER_MAJOR}.${SEMVER_MINOR}")
     case "$PUSH_LATEST" in
-      1|true|TRUE|yes|YES|on|ON) refs+=("${IMAGE_PREFIX}/${name}:latest") ;;
+      1|true|TRUE|yes|YES|on|ON) refs+=("${RESOLVED_IMAGE_PREFIX}/${name}:latest") ;;
     esac
   fi
 
@@ -262,17 +262,26 @@ build_push() {
 
   echo "==> Building ${refs[0]} (df=${dockerfile}, ctx=${context}, platform=${PLATFORM})"
   echo "    Tags: ${refs[*]}"
-  docker buildx build \
-    --platform "${PLATFORM}" \
-    --provenance=false --sbom=false \
-    "${BUILD_PULL_ARGS[@]}" \
-    --label "org.opencontainers.image.version=${VERSION}" \
-    --label "org.opencontainers.image.revision=${GIT_COMMIT}" \
-    "${BUILD_SECRET_ARGS[@]}" \
-    "${JAVA_BASE_BUILD_ARGS[@]}" \
-    -f "${dockerfile}" \
-    "${tag_args[@]}" \
-    "${BUILD_OUTPUT_ARGS[@]}" "${context}" --progress=plain
+  local -a docker_args=(
+    buildx build
+    --platform "${PLATFORM}"
+    --provenance=false --sbom=false
+    --label "org.opencontainers.image.version=${VERSION}"
+    --label "org.opencontainers.image.revision=${GIT_COMMIT}"
+    -f "${dockerfile}"
+  )
+  if [[ ${#BUILD_PULL_ARGS[@]} -gt 0 ]]; then
+    docker_args+=("${BUILD_PULL_ARGS[@]}")
+  fi
+  if [[ ${#BUILD_SECRET_ARGS[@]} -gt 0 ]]; then
+    docker_args+=("${BUILD_SECRET_ARGS[@]}")
+  fi
+  docker_args+=("${JAVA_BASE_BUILD_ARGS[@]}")
+  docker_args+=("${tag_args[@]}")
+  docker_args+=("${BUILD_OUTPUT_ARGS[@]}")
+  docker_args+=("${context}" --progress=plain)
+
+  docker "${docker_args[@]}"
 }
 
 build_push_orw() {
@@ -293,17 +302,26 @@ build_push_fixed_tag() {
   local ref="${RESOLVED_IMAGE_PREFIX}/${image_name}:${tag}"
 
   echo "==> Building ${ref} (df=${dockerfile}, ctx=${context}, platform=${PLATFORM})"
-  docker buildx build \
-    --platform "${PLATFORM}" \
-    --provenance=false --sbom=false \
-    "${BUILD_PULL_ARGS[@]}" \
-    --label "org.opencontainers.image.version=${VERSION}" \
-    --label "org.opencontainers.image.revision=${GIT_COMMIT}" \
-    "${BUILD_SECRET_ARGS[@]}" \
-    "${JAVA_BASE_BUILD_ARGS[@]}" \
-    -f "${dockerfile}" \
-    -t "${ref}" \
-    "${BUILD_OUTPUT_ARGS[@]}" "${context}" --progress=plain
+  local -a docker_args=(
+    buildx build
+    --platform "${PLATFORM}"
+    --provenance=false --sbom=false
+    --label "org.opencontainers.image.version=${VERSION}"
+    --label "org.opencontainers.image.revision=${GIT_COMMIT}"
+    -f "${dockerfile}"
+    -t "${ref}"
+  )
+  if [[ ${#BUILD_PULL_ARGS[@]} -gt 0 ]]; then
+    docker_args+=("${BUILD_PULL_ARGS[@]}")
+  fi
+  if [[ ${#BUILD_SECRET_ARGS[@]} -gt 0 ]]; then
+    docker_args+=("${BUILD_SECRET_ARGS[@]}")
+  fi
+  docker_args+=("${JAVA_BASE_BUILD_ARGS[@]}")
+  docker_args+=("${BUILD_OUTPUT_ARGS[@]}")
+  docker_args+=("${context}" --progress=plain)
+
+  docker "${docker_args[@]}"
 }
 
 echo "==> Selected build groups: ${SELECTED_GROUPS[*]}"
