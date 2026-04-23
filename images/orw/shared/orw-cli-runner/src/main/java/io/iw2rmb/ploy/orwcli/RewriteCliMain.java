@@ -40,7 +40,10 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.nio.charset.StandardCharsets;
 import java.security.CodeSource;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
@@ -62,6 +65,7 @@ import java.util.stream.Collectors;
 
 public final class RewriteCliMain {
     private static final String DEFAULT_REPO = "https://repo1.maven.org/maven2/";
+    private static final int REPO_ID_HASH_HEX_LEN = 16;
     private static final String BUILD_SYSTEM_GRADLE = "gradle";
     private static final String BUILD_SYSTEM_MAVEN = "maven";
     private static final String STACK_TOOL_ENV = "PLOY_STACK_TOOL";
@@ -462,10 +466,10 @@ public final class RewriteCliMain {
         String repoPassword
     ) {
         List<RemoteRepository> remoteRepositories = new ArrayList<>();
-        int i = 0;
         for (String repo : repos) {
             String normalized = repo.endsWith("/") ? repo : repo + "/";
-            RemoteRepository.Builder builder = new RemoteRepository.Builder("repo-" + (++i), "default", normalized);
+            String repositoryId = repositoryIdForUrl(normalized);
+            RemoteRepository.Builder builder = new RemoteRepository.Builder(repositoryId, "default", normalized);
             if (repoUsername != null && repoPassword != null) {
                 builder.setAuthentication(new AuthenticationBuilder().addUsername(repoUsername).addPassword(repoPassword).build());
             }
@@ -475,6 +479,26 @@ public final class RewriteCliMain {
             remoteRepositories.add(new RemoteRepository.Builder("central", "default", DEFAULT_REPO).build());
         }
         return Collections.unmodifiableList(remoteRepositories);
+    }
+
+    private static String repositoryIdForUrl(String normalizedUrl) {
+        byte[] digest;
+        try {
+            digest = MessageDigest.getInstance("SHA-256").digest(normalizedUrl.getBytes(StandardCharsets.UTF_8));
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 is unavailable", e);
+        }
+        String hex = toHex(digest);
+        return "repo-" + hex.substring(0, REPO_ID_HASH_HEX_LEN);
+    }
+
+    private static String toHex(byte[] bytes) {
+        StringBuilder sb = new StringBuilder(bytes.length * 2);
+        for (byte b : bytes) {
+            sb.append(Character.forDigit((b >>> 4) & 0xF, 16));
+            sb.append(Character.forDigit(b & 0xF, 16));
+        }
+        return sb.toString();
     }
 
     private static RecipeCoordinate resolveRecipeCoordinate(
