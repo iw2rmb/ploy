@@ -15,6 +15,7 @@ install_ploy_ca_bundle() {
   local ca_dir="/etc/ploy/ca"
   local import_java="${PLOY_CA_IMPORT_JAVA:-0}"
   local log_file="${PLOY_CA_LOG_FILE:-}"
+  local java_marker_file="/etc/ploy/certs/.java_cacerts_marker"
 
   local has_input=0
   if [[ -r "$ca_path" ]] && [[ -s "$ca_path" ]]; then
@@ -38,16 +39,36 @@ install_ploy_ca_bundle() {
     fi
   }
 
-  _ploy_ca_sha256_from_cert_file() {
-    local cert_file="$1"
-    keytool -printcert -file "$cert_file" 2>/dev/null \
-      | awk -F': ' '/^[[:space:]]*SHA256:/{gsub(":", "", $2); print tolower($2); exit}'
+  _ploy_ca_hash_stdin() {
+    if command -v sha256sum >/dev/null 2>&1; then
+      sha256sum | awk '{print tolower($1)}'
+      return
+    fi
+    if command -v shasum >/dev/null 2>&1; then
+      shasum -a 256 | awk '{print tolower($1)}'
+      return
+    fi
+    cksum | awk '{print tolower($1) "-" tolower($2)}'
   }
 
-  _ploy_ca_sha256_from_alias() {
-    local alias_name="$1"
-    keytool -list -v -cacerts -storepass changeit -alias "$alias_name" 2>/dev/null \
-      | awk -F': ' '/^[[:space:]]*SHA256:/{gsub(":", "", $2); print tolower($2); exit}'
+  _ploy_ca_hash_file() {
+    local file_path="$1"
+    if command -v sha256sum >/dev/null 2>&1; then
+      sha256sum "$file_path" | awk '{print tolower($1)}'
+      return
+    fi
+    if command -v shasum >/dev/null 2>&1; then
+      shasum -a 256 "$file_path" | awk '{print tolower($1)}'
+      return
+    fi
+    cksum "$file_path" | awk '{print tolower($1) "-" tolower($2)}'
+  }
+
+  _ploy_ca_cert_fingerprint() {
+    local cert_file="$1"
+    local cert_sha
+    cert_sha="$(_ploy_ca_hash_file "$cert_file" 2>/dev/null || true)"
+    printf '%s' "$cert_sha"
   }
 
   if [[ -r "$ca_path" ]] && [[ -s "$ca_path" ]]; then
@@ -69,51 +90,75 @@ install_ploy_ca_bundle() {
     return 0
   fi
 
+  local -a unique_certs=()
+  local -a unique_cert_fps=()
+  local -A seen_cert_fps=()
+  local cert_path cert_sha
+  for cert_path in "${certs[@]}"; do
+    cert_sha="$(_ploy_ca_cert_fingerprint "$cert_path")"
+    if [[ -z "$cert_sha" ]]; then
+      _ploy_ca_log "warning: unable to fingerprint certificate ${cert_path}; skipping"
+      continue
+    fi
+    if [[ -n "${seen_cert_fps[$cert_sha]:-}" ]]; then
+      continue
+    fi
+    seen_cert_fps["$cert_sha"]=1
+    unique_certs+=("$cert_path")
+    unique_cert_fps+=("$cert_sha")
+  done
+  if [[ ${#unique_certs[@]} -eq 0 ]]; then
+    rm -rf "$tmp_dir"
+    return 0
+  fi
+
+  if [[ "$import_java" == "1" ]] && command -v keytool >/dev/null 2>&1; then
+    local java_marker_hash java_marker_current cert_fp alias_name import_failed i
+    java_marker_hash="$(printf '%s\n' "${unique_cert_fps[@]}" | sort | _ploy_ca_hash_stdin 2>/dev/null || true)"
+    java_marker_current=""
+    if [[ -r "$java_marker_file" ]]; then
+      java_marker_current="$(tr -d '[:space:]' < "$java_marker_file")"
+    fi
+
+    if [[ -n "$java_marker_hash" && "$java_marker_current" != "$java_marker_hash" ]]; then
+      import_failed=0
+      for i in "${!unique_certs[@]}"; do
+        cert_path="${unique_certs[$i]}"
+        cert_fp="${unique_cert_fps[$i]}"
+        alias_name="ploy_ca_sha256_${cert_fp}"
+        if ! keytool -importcert -noprompt -trustcacerts -cacerts -storepass changeit -alias "$alias_name" -file "$cert_path" >/dev/null 2>&1; then
+          if ! keytool -list -cacerts -storepass changeit -alias "$alias_name" >/dev/null 2>&1; then
+            _ploy_ca_log "warning: keytool import failed for ${cert_path}"
+            import_failed=1
+          fi
+        fi
+      done
+
+      if [[ "$import_failed" -eq 0 ]]; then
+        mkdir -p "$(dirname "$java_marker_file")"
+        printf '%s\n' "$java_marker_hash" >"$java_marker_file" 2>/dev/null || true
+      fi
+    fi
+  fi
+
   local sys_ca_dir=""
   if command -v update-ca-certificates >/dev/null 2>&1; then
     sys_ca_dir="/usr/local/share/ca-certificates/ploy"
     mkdir -p "$sys_ca_dir"
   fi
 
-  local cert_path
-  for cert_path in "${certs[@]}"; do
-    if [[ "$import_java" == "1" ]] && command -v keytool >/dev/null 2>&1; then
-      local alias_name cert_sha existing_sha should_import
-      cert_sha="$(_ploy_ca_sha256_from_cert_file "$cert_path")"
-      if [[ -n "$cert_sha" ]]; then
-        alias_name="ploy_ca_sha256_${cert_sha}"
-      else
-        alias_name="ploy_ca_$(basename "$cert_path" .crt)"
-      fi
-
-      should_import=1
-      if keytool -list -cacerts -storepass changeit -alias "$alias_name" >/dev/null 2>&1; then
-        if [[ -n "$cert_sha" ]]; then
-          existing_sha="$(_ploy_ca_sha256_from_alias "$alias_name")"
-          if [[ -n "$existing_sha" && "$existing_sha" != "$cert_sha" ]]; then
-            if ! keytool -delete -cacerts -storepass changeit -alias "$alias_name" >/dev/null 2>&1; then
-              _ploy_ca_log "warning: keytool delete failed for alias ${alias_name}"
-              should_import=0
-            fi
-          else
-            should_import=0
-          fi
-        else
-          # Fall back to positional alias semantics when fingerprinting is unavailable.
-          should_import=0
-        fi
-      fi
-
-      if [[ "$should_import" -eq 1 ]]; then
-        keytool -importcert -noprompt -trustcacerts -cacerts -storepass changeit -alias "$alias_name" -file "$cert_path" >/dev/null 2>&1 || {
-          _ploy_ca_log "warning: keytool import failed for ${cert_path}"
-        }
-      fi
+  if [[ -n "$sys_ca_dir" ]]; then
+    shopt -s nullglob
+    local existing_sys_certs=("$sys_ca_dir"/*.crt)
+    shopt -u nullglob
+    if [[ ${#existing_sys_certs[@]} -gt 0 ]]; then
+      rm -f "${existing_sys_certs[@]}" || true
     fi
-    if [[ -n "$sys_ca_dir" ]]; then
-      cp "$cert_path" "$sys_ca_dir/" || true
-    fi
-  done
+  fi
+
+  if [[ -n "$sys_ca_dir" ]]; then
+    cp -- "${unique_certs[@]}" "$sys_ca_dir/" || true
+  fi
 
   if [[ -n "$sys_ca_dir" ]]; then
     update-ca-certificates >/dev/null 2>&1 || true
@@ -128,7 +173,7 @@ install_ploy_ca_bundle() {
     cat /etc/ssl/certs/ca-certificates.crt >>"$fallback_bundle"
     printf '\n' >>"$fallback_bundle"
   fi
-  for cert_path in "${certs[@]}"; do
+  for cert_path in "${unique_certs[@]}"; do
     cat "$cert_path" >>"$fallback_bundle"
     printf '\n' >>"$fallback_bundle"
   done

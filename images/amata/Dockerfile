@@ -54,7 +54,7 @@ RUN --mount=type=secret,id=ploy_ca_certs,required=false \
       mkdir -p /etc/ploy/certs; \
       cp /run/secrets/ploy_ca_certs /etc/ploy/certs/ca.crt; \
       source /usr/local/lib/ploy/install_ploy_ca_bundle.sh; \
-      PLOY_CA_IMPORT_JAVA=1 install_ploy_ca_bundle; \
+      install_ploy_ca_bundle; \
     fi && \
     npm install -g @openai/codex @charmland/crush @anthropic-ai/claude-code @musistudio/claude-code-router && \
     npm cache clean --force && \
