@@ -1,5 +1,5 @@
 ARG NODE_IMAGE=node:22-bookworm-slim
-ARG JAVA_BASE_MAVEN_17_IMAGE=ghcr.io/iw2rmb/ploy/java-base-maven:jdk17
+ARG JAVA_BASE_MAVEN_17_IMAGE=java-base-maven:jdk17
 
 FROM --platform=$TARGETOS/$TARGETARCH ${JAVA_BASE_MAVEN_17_IMAGE} AS maven-tools
 

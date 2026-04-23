@@ -1,4 +1,4 @@
-ARG JAVA_BASE_GRADLE_11_IMAGE=ghcr.io/iw2rmb/ploy/java-base-gradle:jdk11
+ARG JAVA_BASE_GRADLE_11_IMAGE=java-base-gradle:jdk11
 FROM ${JAVA_BASE_GRADLE_11_IMAGE}
 
 LABEL org.opencontainers.image.title="ploy-gate-gradle-jdk11" \
