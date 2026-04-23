@@ -119,14 +119,14 @@ normalize_selected_groups() {
       echo "error: unknown build group '$normalized' (allowed: orw,ploy,amata,sbom,gates)" >&2
       exit 2
     fi
-    if ! contains_value "$normalized" "${uniq_requested[@]}"; then
+    if ! contains_value "$normalized" "${uniq_requested[@]-}"; then
       uniq_requested+=("$normalized")
     fi
   done
 
   SELECTED_GROUPS=()
   for token in "${GROUP_ORDER[@]}"; do
-    if contains_value "$token" "${uniq_requested[@]}"; then
+    if contains_value "$token" "${uniq_requested[@]-}"; then
       SELECTED_GROUPS+=("$token")
     fi
   done
@@ -134,7 +134,7 @@ normalize_selected_groups() {
 
 group_selected() {
   local group="$1"
-  contains_value "$group" "${SELECTED_GROUPS[@]}"
+  contains_value "$group" "${SELECTED_GROUPS[@]-}"
 }
 
 parse_args "$@"
