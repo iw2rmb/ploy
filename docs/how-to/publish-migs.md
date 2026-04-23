@@ -1,12 +1,11 @@
 Publish Migs Images to a Local Registry
 
 Overview
-- Migs images live under `images/orw/`, `images/amata/`, `images/java-17-codex-amata-maven/`, `images/java-17-codex-amata-gradle/`, and `images/sbom/`:
+- Migs images live under `images/orw/`, `images/amata/`, and `images/sbom/`:
   - `orw-cli-maven` (`images/orw/orw-cli-maven`) -> `orw-cli-maven`
   - `orw-cli-gradle` (`images/orw/orw-cli-gradle`) -> `orw-cli-gradle`
-  - `amata` (`images/amata`) -> `amata`
-  - `java-17-codex-amata-maven` (`images/java-17-codex-amata-maven`) -> `java-17-codex-amata-maven`
-  - `java-17-codex-amata-gradle` (`images/java-17-codex-amata-gradle`) -> `java-17-codex-amata-gradle`
+  - `java-17-codex-amata-maven` (`images/amata/java-17-codex-amata-maven`) -> `java-17-codex-amata-maven`
+  - `java-17-codex-amata-gradle` (`images/amata/java-17-codex-amata-gradle`) -> `java-17-codex-amata-gradle`
   - `sbom-maven` (`images/sbom/maven`) -> `ploy/sbom-maven:jdk11|jdk17`
   - `sbom-gradle` (`images/sbom/gradle`) -> `ploy/sbom-gradle:jdk11|jdk17`
 - The runner resolves most mig images as `$PLOY_CONTAINER_REGISTRY/<name>:latest`.
@@ -24,7 +23,7 @@ Publish all Migs images
 # export PLOY_CA_CERTS=/path/to/ca-bundle.pem
 
 images/build-and-push.sh
-# Builds and pushes: amata, java-17-codex-amata-maven, java-17-codex-amata-gradle,
+# Builds and pushes: java-17-codex-amata-maven, java-17-codex-amata-gradle,
 # orw-cli-maven, orw-cli-gradle,
 # sbom-maven:jdk11,jdk17 and sbom-gradle:jdk11,jdk17,
 # gate-gradle:jdk11, gate-gradle:jdk17.
@@ -67,18 +66,18 @@ IMAGE_PREFIX="${PLOY_CONTAINER_REGISTRY:-ghcr.io/iw2rmb/ploy}" \
   --push .
 ```
 
-Publish `amata` (manual one-off)
+Publish a Codex+Amata lane manually (example: Maven lane)
 
 ```bash
 # Step 1: build and stage the amata binary (requires ../amata source sibling repo)
 PLATFORM=linux/amd64 images/amata/build-amata.sh
 
-# Step 2: build and push the amata image
+# Step 2: build and push java-17-codex-amata-maven
 IMAGE_PREFIX="${PLOY_CONTAINER_REGISTRY:-ghcr.io/iw2rmb/ploy}"
 docker buildx build \
   --platform linux/amd64 \
-  -f images/amata/Dockerfile \
-  -t "${IMAGE_PREFIX}/amata:latest" \
+  -f images/amata/java-17-codex-amata-maven/Dockerfile \
+  -t "${IMAGE_PREFIX}/java-17-codex-amata-maven:latest" \
   --push .
 ```
 
@@ -110,7 +109,6 @@ Verification
 ```bash
 docker buildx imagetools inspect "$PLOY_CONTAINER_REGISTRY/orw-cli-maven:latest"
 docker buildx imagetools inspect "$PLOY_CONTAINER_REGISTRY/orw-cli-gradle:latest"
-docker buildx imagetools inspect "$PLOY_CONTAINER_REGISTRY/amata:latest"
 docker buildx imagetools inspect "$PLOY_CONTAINER_REGISTRY/java-17-codex-amata-maven:latest"
 docker buildx imagetools inspect "$PLOY_CONTAINER_REGISTRY/java-17-codex-amata-gradle:latest"
 docker buildx imagetools inspect "$PLOY_CONTAINER_REGISTRY/sbom-maven:jdk11"

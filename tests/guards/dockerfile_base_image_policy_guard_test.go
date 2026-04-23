@@ -26,9 +26,8 @@ func TestDockerfilesRuntimeBasePolicy(t *testing.T) {
 	policy := map[string]runtimeBasePolicy{
 		"images/server/Dockerfile":                     {Expected: "debian:bookworm-slim", Reason: "core runtime must be Debian slim"},
 		"images/node/Dockerfile":                       {Expected: "debian:bookworm-slim", Reason: "core runtime must be Debian slim"},
-		"images/amata/Dockerfile":                      {Expected: "node:22-bookworm-slim", Reason: "Node runtime provides official Debian slim tag"},
-		"images/java-17-codex-amata-maven/Dockerfile":  {Expected: "node:22-bookworm-slim", Reason: "Node runtime provides official Debian slim tag"},
-		"images/java-17-codex-amata-gradle/Dockerfile": {Expected: "node:22-bookworm-slim", Reason: "Node runtime provides official Debian slim tag"},
+		"images/amata/java-17-codex-amata-maven/Dockerfile":  {Expected: "node:22-bookworm-slim", Reason: "Node runtime provides official Debian slim tag"},
+		"images/amata/java-17-codex-amata-gradle/Dockerfile": {Expected: "node:22-bookworm-slim", Reason: "Node runtime provides official Debian slim tag"},
 		"images/java-bases/maven/Dockerfile.jdk11":     {Expected: "maven:3.9.11-eclipse-temurin-11", Reason: "exception: no official Maven Eclipse Temurin slim tag"},
 		"images/java-bases/maven/Dockerfile.jdk17":     {Expected: "maven:3.9.11-eclipse-temurin-17", Reason: "exception: no official Maven Eclipse Temurin slim tag"},
 		"images/java-bases/gradle/Dockerfile.jdk11":    {Expected: "gradle:8.8-jdk11", Reason: "exception: no official gradle:8.8-jdk11-slim tag"},

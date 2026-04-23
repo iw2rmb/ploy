@@ -148,7 +148,7 @@ steps:
 
 build_gate:
   heal:
-    image: docker.io/your-dh-user/amata:latest
+    image: docker.io/your-dh-user/java-17-codex-amata-maven:latest
     in:
       - ./prompt-extra.txt:/in/prompt-extra.txt
 ```
@@ -164,7 +164,7 @@ steps:
 
 build_gate:
   heal:
-    image: docker.io/your-dh-user/amata:latest
+    image: docker.io/your-dh-user/java-17-codex-amata-maven:latest
     in:
       - "g7h8i9j0k1l2:/in/prompt-extra.txt"
 ```

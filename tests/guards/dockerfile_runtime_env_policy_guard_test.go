@@ -32,8 +32,8 @@ func TestDockerfilesRuntimeEnvPolicy(t *testing.T) {
 		"images/sbom/maven/Dockerfile.jdk17":           {RequireMavenConfig: true},
 		"images/orw/orw-cli-gradle/Dockerfile":         {},
 		"images/orw/orw-cli-maven/Dockerfile":          {},
-		"images/java-17-codex-amata-maven/Dockerfile":  {RequireLocale: true, RequireMavenConfig: true},
-		"images/java-17-codex-amata-gradle/Dockerfile": {RequireLocale: true, RequireGradleHome: true},
+		"images/amata/java-17-codex-amata-maven/Dockerfile":  {RequireLocale: true, RequireMavenConfig: true},
+		"images/amata/java-17-codex-amata-gradle/Dockerfile": {RequireLocale: true, RequireGradleHome: true},
 	}
 
 	for rel, spec := range policy {

@@ -600,7 +600,7 @@ build_gate:
   heal:
     <<: !include ./healing/spec.yaml
     retries: 1
-    image: ghcr.io/iw2rmb/ploy/amata:latest
+    image: ghcr.io/iw2rmb/ploy/java-17-codex-amata-maven:latest
     amata:
       spec: |
         version: amata/v1

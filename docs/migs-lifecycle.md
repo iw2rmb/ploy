@@ -156,7 +156,7 @@ build_gate:
   heal:
     <<: !include ./healing/spec.yaml
     retries: 2
-    image: ghcr.io/iw2rmb/ploy/amata:latest
+    image: ghcr.io/iw2rmb/ploy/java-17-codex-amata-maven:latest
     in:
       - ./healing/amata.yaml:amata.yaml
     home:
@@ -179,7 +179,7 @@ from `amata.set`. No prompt file is required in this mode.
 
 ```yaml
 heal:
-  image: ghcr.io/iw2rmb/ploy/amata:latest
+  image: ghcr.io/iw2rmb/ploy/java-17-codex-amata-maven:latest
   amata:
     spec: |
       version: amata/v1

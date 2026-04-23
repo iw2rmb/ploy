@@ -88,7 +88,7 @@ build_gate:
   heal:
     retries: 1
     # Amata healing container using the workspace diff handshake.
-    image: localhost:5000/ploy/amata:latest
+    image: localhost:5000/ploy/java-17-codex-amata-maven:latest
     envs:
       E2E_STEP_NAME: "healing-codex"
     amata:

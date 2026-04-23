@@ -7,8 +7,7 @@ set -Eeuo pipefail
 # - server  -> server
 # - node    -> node
 # - java-bases -> java-base-maven:jdk11,jdk17; java-base-gradle:jdk11,jdk17; java-base-temurin:jdk17
-# - amata   -> amata
-# - codex+amata lanes -> java-17-codex-amata-maven, java-17-codex-amata-gradle
+# - amata group -> java-17-codex-amata-maven, java-17-codex-amata-gradle
 # - sbom runners -> sbom-gradle:jdk11,jdk17 and sbom-maven:jdk11,jdk17
 # - gate-gradle -> gate-gradle:jdk11, gate-gradle:jdk17
 # - gate-maven  -> maven:3-eclipse-temurin-11, maven:3-eclipse-temurin-17
@@ -288,9 +287,8 @@ fi
 
 if group_selected "amata"; then
   PLATFORM="${PLATFORM}" bash images/amata/build-amata.sh
-  build_push amata images/amata/Dockerfile .
-  build_push java-17-codex-amata-maven images/java-17-codex-amata-maven/Dockerfile .
-  build_push java-17-codex-amata-gradle images/java-17-codex-amata-gradle/Dockerfile .
+  build_push java-17-codex-amata-maven images/amata/java-17-codex-amata-maven/Dockerfile .
+  build_push java-17-codex-amata-gradle images/amata/java-17-codex-amata-gradle/Dockerfile .
 fi
 
 if group_selected "sbom"; then
