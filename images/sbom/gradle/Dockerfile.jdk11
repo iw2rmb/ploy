@@ -1,0 +1,24 @@
+ARG JAVA_BASE_GRADLE_11_IMAGE=ghcr.io/iw2rmb/ploy/java-base-gradle:jdk11
+FROM ${JAVA_BASE_GRADLE_11_IMAGE}
+
+LABEL org.opencontainers.image.source="https://github.com/iw2rmb/ploy" \
+    org.opencontainers.image.title="sbom-gradle-jdk11" \
+    org.opencontainers.image.description="Ploy SBOM runner: Gradle lane with JDK 11" \
+    org.opencontainers.image.licenses="MIT"
+
+RUN rm -rf /root/.gradle \
+    && mkdir -p /root/.gradle /workspace /in /out
+
+WORKDIR /workspace
+ENV WORKSPACE=/workspace \
+    INDIR=/in \
+    OUTDIR=/out \
+    GRADLE_USER_HOME=/root/.gradle
+
+COPY --chmod=755 images/sbom/shared/collect-java-classpath-gradle.sh /usr/local/lib/ploy/sbom/collect-java-classpath-gradle.sh
+COPY --chmod=755 images/sbom/shared/collect-java-classpath-maven.sh /usr/local/lib/ploy/sbom/collect-java-classpath-maven.sh
+COPY images/sbom/shared/gradle-write-java-classpath.init.gradle /usr/local/lib/ploy/sbom/gradle-write-java-classpath.init.gradle
+COPY images/gates/gradle/gradle.properties /root/.gradle/gradle.properties
+COPY images/gates/gradle/cache.init.gradle /root/.gradle/init.d/cache.init.gradle
+
+CMD ["bash"]

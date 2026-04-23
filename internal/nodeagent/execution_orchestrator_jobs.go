@@ -231,7 +231,7 @@ func (r *runController) executeSBOMJob(ctx context.Context, req StartRunRequest)
 				return nil
 			}
 			stackForManifest = detectedStack
-			return applySBOMRuntimeForStack(m, stackForManifest)
+			return applySBOMRuntimeForStack(m, stackForManifest, sbomRuntimeReleaseForRequest(req, stackForManifest))
 		},
 		ValidateOutputs: func(outDir, _ string) error {
 			return r.finalizeSBOMFlowOutputs(req.RunID, cycleName, outDir, sbomSnapshotPath)

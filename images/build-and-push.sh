@@ -6,9 +6,10 @@ set -Eeuo pipefail
 # Builds and pushes:
 # - server  -> server
 # - node    -> node
+# - java-bases -> java-base-maven:jdk11,jdk17; java-base-gradle:jdk11,jdk17; java-base-temurin:jdk17
 # - amata   -> amata
-# - java-17-codex-amata -> java-17-codex-amata
-# - sbom runners -> sbom-gradle, sbom-maven
+# - codex+amata lanes -> java-17-codex-amata-maven, java-17-codex-amata-gradle
+# - sbom runners -> sbom-gradle:jdk11,jdk17 and sbom-maven:jdk11,jdk17
 # - gate-gradle -> gate-gradle:jdk11, gate-gradle:jdk17
 # - gate-maven  -> maven:3-eclipse-temurin-11, maven:3-eclipse-temurin-17
 # - orw/*   -> <dir name> (for example: orw-cli-maven, orw-cli-gradle)
@@ -22,14 +23,14 @@ set -Eeuo pipefail
 #   PLOY_CA_CERTS - Optional PEM bundle (path or inline content), passed as BuildKit secret id=ploy_ca_certs
 #
 # CLI options:
-#   --build <groups> - Optional comma list from: orw,ploy,amata,sbom,gates (default: all)
+#   --build <groups> - Optional comma list from: orw,ploy,java-bases,amata,sbom,gates (default: all)
 #   --help           - Show usage
 #
 # Examples:
 #   images/build-and-push.sh
 #   VERSION=v0.1.0 PLATFORM=linux/amd64 images/build-and-push.sh
 #   OUTPUT_MODE=load IMAGE_PREFIX=ploy VERSION=v0.1.0 images/build-and-push.sh
-#   images/build-and-push.sh --build ploy,orw
+#   images/build-and-push.sh --build ploy,java-bases,orw
 
 PLATFORM=${PLATFORM:-linux/amd64}
 IMAGE_PREFIX="${IMAGE_PREFIX:-ghcr.io/iw2rmb/ploy}"
@@ -38,7 +39,7 @@ PUSH_LATEST="${PUSH_LATEST:-1}"
 declare -a BUILD_SECRET_ARGS=()
 PLOY_CA_CERTS_TMP=""
 declare -a BUILD_OUTPUT_ARGS=(--push)
-declare -a GROUP_ORDER=("ploy" "amata" "sbom" "gates" "orw")
+declare -a GROUP_ORDER=("ploy" "java-bases" "amata" "sbom" "gates" "orw")
 BUILD_GROUPS_RAW=""
 declare -a SELECTED_GROUPS=()
 
@@ -47,7 +48,7 @@ usage() {
 Usage: images/build-and-push.sh [--build <groups>]
 
 Options:
-  --build <groups>  Comma-separated groups from: orw,ploy,amata,sbom,gates
+  --build <groups>  Comma-separated groups from: orw,ploy,java-bases,amata,sbom,gates
                     Default: all groups
   -h, --help        Show this help
 USAGE
@@ -116,7 +117,7 @@ normalize_selected_groups() {
       exit 2
     fi
     if ! contains_value "$normalized" "${GROUP_ORDER[@]}"; then
-      echo "error: unknown build group '$normalized' (allowed: orw,ploy,amata,sbom,gates)" >&2
+      echo "error: unknown build group '$normalized' (allowed: orw,ploy,java-bases,amata,sbom,gates)" >&2
       exit 2
     fi
     if ! contains_value "$normalized" "${uniq_requested[@]-}"; then
@@ -271,16 +272,33 @@ if group_selected "ploy"; then
   build_push node images/node/Dockerfile .
 fi
 
+need_java_bases=0
+if group_selected "java-bases" || group_selected "amata" || group_selected "sbom" || group_selected "gates" || group_selected "orw"; then
+  need_java_bases=1
+fi
+
+if [[ "$need_java_bases" == "1" ]]; then
+  # shared Java toolchain lanes
+  build_push_fixed_tag java-base-maven images/java-bases/maven/Dockerfile.jdk11 . jdk11
+  build_push_fixed_tag java-base-maven images/java-bases/maven/Dockerfile.jdk17 . jdk17
+  build_push_fixed_tag java-base-gradle images/java-bases/gradle/Dockerfile.jdk11 . jdk11
+  build_push_fixed_tag java-base-gradle images/java-bases/gradle/Dockerfile.jdk17 . jdk17
+  build_push_fixed_tag java-base-temurin images/java-bases/temurin/Dockerfile.jdk17 . jdk17
+fi
+
 if group_selected "amata"; then
   PLATFORM="${PLATFORM}" bash images/amata/build-amata.sh
   build_push amata images/amata/Dockerfile .
-  build_push java-17-codex-amata images/java-17-codex-amata/Dockerfile .
+  build_push java-17-codex-amata-maven images/java-17-codex-amata-maven/Dockerfile .
+  build_push java-17-codex-amata-gradle images/java-17-codex-amata-gradle/Dockerfile .
 fi
 
 if group_selected "sbom"; then
   # sbom runners
-  build_push sbom-gradle images/sbom/gradle/Dockerfile .
-  build_push sbom-maven images/sbom/maven/Dockerfile .
+  build_push_fixed_tag sbom-gradle images/sbom/gradle/Dockerfile.jdk11 . jdk11
+  build_push_fixed_tag sbom-gradle images/sbom/gradle/Dockerfile.jdk17 . jdk17
+  build_push_fixed_tag sbom-maven images/sbom/maven/Dockerfile.jdk11 . jdk11
+  build_push_fixed_tag sbom-maven images/sbom/maven/Dockerfile.jdk17 . jdk17
 fi
 
 if group_selected "gates"; then
