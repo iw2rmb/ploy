@@ -16,15 +16,15 @@ type runtimeEnvPolicy struct {
 func TestDockerfilesRuntimeEnvPolicy(t *testing.T) {
 	repoRoot := mustFindRepoRoot(t)
 	policy := map[string]runtimeEnvPolicy{
-		"images/gates/gradle/Dockerfile.jdk11":      {RequireGradleHome: true},
-		"images/gates/gradle/Dockerfile.jdk17":      {RequireGradleHome: true},
-		"images/gates/maven/Dockerfile.jdk11":       {RequireMavenConfig: true},
-		"images/gates/maven/Dockerfile.jdk17":       {RequireMavenConfig: true},
-		"images/sbom/gradle/Dockerfile":             {RequireGradleHome: true},
-		"images/sbom/maven/Dockerfile":              {RequireMavenConfig: true},
-		"images/orw/orw-cli-gradle/Dockerfile":      {},
-		"images/orw/orw-cli-maven/Dockerfile":       {},
-		"images/java-17-orw-codex-amata/Dockerfile": {RequireMavenConfig: true, RequireGradleHome: true},
+		"images/gates/gradle/Dockerfile.jdk11":  {RequireGradleHome: true},
+		"images/gates/gradle/Dockerfile.jdk17":  {RequireGradleHome: true},
+		"images/gates/maven/Dockerfile.jdk11":   {RequireMavenConfig: true},
+		"images/gates/maven/Dockerfile.jdk17":   {RequireMavenConfig: true},
+		"images/sbom/gradle/Dockerfile":         {RequireGradleHome: true},
+		"images/sbom/maven/Dockerfile":          {RequireMavenConfig: true},
+		"images/orw/orw-cli-gradle/Dockerfile":  {},
+		"images/orw/orw-cli-maven/Dockerfile":   {},
+		"images/java-17-codex-amata/Dockerfile": {RequireMavenConfig: true, RequireGradleHome: true},
 	}
 
 	for rel, spec := range policy {

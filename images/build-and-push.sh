@@ -7,7 +7,7 @@ set -Eeuo pipefail
 # - server  -> server
 # - node    -> node
 # - amata   -> amata
-# - java-17-orw-codex-amata -> java-17-orw-codex-amata
+# - java-17-codex-amata -> java-17-codex-amata
 # - sbom runners -> sbom-gradle, sbom-maven
 # - gate-gradle -> gate-gradle:jdk11, gate-gradle:jdk17
 # - gate-maven  -> maven:3-eclipse-temurin-11, maven:3-eclipse-temurin-17
@@ -274,7 +274,7 @@ fi
 if group_selected "amata"; then
   PLATFORM="${PLATFORM}" bash images/amata/build-amata.sh
   build_push amata images/amata/Dockerfile .
-  build_push java-17-orw-codex-amata images/java-17-orw-codex-amata/Dockerfile .
+  build_push java-17-codex-amata images/java-17-codex-amata/Dockerfile .
 fi
 
 if group_selected "sbom"; then

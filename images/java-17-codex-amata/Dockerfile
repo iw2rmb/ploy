@@ -1,23 +1,13 @@
 ARG NODE_IMAGE=node:22-bookworm-slim
 
-FROM --platform=$BUILDPLATFORM maven:3.9.11-eclipse-temurin-17 AS rewrite-runner-build
-
-WORKDIR /build
-COPY images/install_ploy_ca_bundle.sh /usr/local/lib/ploy/install_ploy_ca_bundle.sh
-COPY images/amata/rewrite-runner/pom.xml rewrite-runner/pom.xml
-COPY images/orw/shared/orw-cli-runner/src rewrite-runner/src
-RUN --mount=type=cache,target=/root/.m2 \
-    --mount=type=secret,id=ploy_ca_certs,required=false \
-    bash -euxo pipefail -c 'if [[ -s /run/secrets/ploy_ca_certs ]]; then mkdir -p /etc/ploy/certs; cp /run/secrets/ploy_ca_certs /etc/ploy/certs/ca.crt; source /usr/local/lib/ploy/install_ploy_ca_bundle.sh; PLOY_CA_IMPORT_JAVA=1 install_ploy_ca_bundle; fi; cd rewrite-runner && mvn -q -DskipTests package'
-
 FROM --platform=$TARGETOS/$TARGETARCH maven:3.9.11-eclipse-temurin-17 AS maven-tools
 FROM --platform=$TARGETOS/$TARGETARCH gradle:8.8-jdk17 AS gradle-tools
 
 FROM ${NODE_IMAGE}
 ARG TARGETARCH
 
-LABEL org.opencontainers.image.title="java-17-orw-codex-amata" \
-    org.opencontainers.image.description="Java 17 image with Maven, Gradle, OpenRewrite, Codex CLI, and Amata" \
+LABEL org.opencontainers.image.title="java-17-codex-amata" \
+    org.opencontainers.image.description="Java 17 image with Maven, Gradle, Codex CLI, and Amata" \
     org.opencontainers.image.source="https://github.com/iw2rmb/ploy" \
     org.opencontainers.image.licenses="MIT"
 
@@ -84,22 +74,11 @@ COPY images/amata/entrypoint.sh /usr/local/bin/ploy/entrypoint.sh
 COPY images/gates/gradle/gradle.properties /root/.gradle/gradle.properties
 COPY images/gates/gradle/cache.init.gradle /root/.gradle/init.d/cache.init.gradle
 COPY images/amata/amata-linux-${TARGETARCH} /usr/local/bin/amata
-COPY images/amata/orw-cli.sh /usr/local/bin/orw-cli
-COPY images/amata/heal-orw.sh /usr/local/bin/heal-orw
-COPY --from=rewrite-runner-build /build/rewrite-runner/target/orw-cli-runner.jar /opt/orw-cli-runner/orw-cli-runner.jar
-
-RUN printf '%s\n' '#!/usr/bin/env bash' \
-    'set -euo pipefail' \
-    'exec java -jar /opt/orw-cli-runner/orw-cli-runner.jar "$@"' \
-    > /usr/local/bin/rewrite \
-    && chmod +x /usr/local/bin/rewrite
 
 RUN chmod +x \
     /usr/local/bin/ploy/entrypoint.sh \
     /usr/local/lib/ploy/install_ploy_ca_bundle.sh \
-    /usr/local/bin/amata \
-    /usr/local/bin/orw-cli \
-    /usr/local/bin/heal-orw
+    /usr/local/bin/amata
 
 WORKDIR /workspace
 ENTRYPOINT ["/usr/local/bin/ploy/entrypoint.sh"]
