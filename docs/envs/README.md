@@ -619,7 +619,7 @@ Required typed file input:
 
 | Path | Description |
 |------|-------------|
-| `/in/java.classpath` | Newline-delimited absolute classpath entries produced by SBOM/build-gate and mounted into ORW jobs. |
+| `/in/java.classpath` | Newline-delimited absolute classpath entries produced by SBOM/build-gate and mounted into ORW jobs. Gradle cache entries must use `/root/.gradle/...` (not `/home/gradle/.gradle/...`). |
 
 Healing execution (custom recipe via Amata lane):
 
@@ -726,6 +726,7 @@ cache-root policy as Build Gate when stack tuple env is set to Java:
 Runtime mounts:
 - Gradle tuple -> `$PLOY_BUILDGATE_CACHE_ROOT/java/gradle/<release>` to `/root/.gradle`
 - Maven tuple -> `$PLOY_BUILDGATE_CACHE_ROOT/java/maven/<release>` to `/root/.m2`
+- `java.classpath` portability requirement for Gradle entries: `/root/.gradle/...` only.
 
 When `PLOY_STACK_RELEASE` is empty, runtime uses `unknown-release` as the lane key.
 Image-name marker fallback is not used.

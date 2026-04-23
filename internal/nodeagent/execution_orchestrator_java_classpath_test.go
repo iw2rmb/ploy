@@ -161,6 +161,42 @@ func TestMaterializeJavaClasspathInDir_RestoresFromArtifactWhenRunCacheSourceMis
 	}
 }
 
+func TestMaterializeJavaClasspathInDir_RejectsNonPortableGradleClasspathInRunCache(t *testing.T) {
+	t.Setenv("PLOYD_CACHE_HOME", t.TempDir())
+
+	runID := types.NewRunID()
+	artifactID := "11111111-1111-1111-1111-111111111111"
+	sourcePath := runJavaClasspathPath(runID)
+	if err := os.MkdirAll(filepath.Dir(sourcePath), 0o755); err != nil {
+		t.Fatalf("MkdirAll(%q): %v", filepath.Dir(sourcePath), err)
+	}
+	if err := os.WriteFile(sourcePath, []byte("/home/gradle/.gradle/caches/modules-2/files-2.1/a/b/c/lib.jar\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(%q): %v", sourcePath, err)
+	}
+	if err := os.WriteFile(runJavaClasspathSourcePath(runID), []byte(artifactID+"\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(%q): %v", runJavaClasspathSourcePath(runID), err)
+	}
+
+	rc := &runController{}
+	req := StartRunRequest{
+		RunID:   runID,
+		JobID:   types.NewJobID(),
+		JobType: types.JobTypeMig,
+		JavaClasspathContext: &contracts.JavaClasspathClaimContext{
+			Required:         true,
+			SourceArtifactID: artifactID,
+		},
+	}
+
+	err := rc.materializeJavaClasspathInDir(context.Background(), req, t.TempDir())
+	if err == nil {
+		t.Fatal("materializeJavaClasspathInDir() error = nil, want non-nil")
+	}
+	if !strings.Contains(err.Error(), "non-portable gradle cache path") {
+		t.Fatalf("error = %q, want mention of non-portable gradle cache path", err)
+	}
+}
+
 func TestCaptureJavaClasspathAfterStandardJob_PersistsForHookAndMig(t *testing.T) {
 	t.Setenv("PLOYD_CACHE_HOME", t.TempDir())
 

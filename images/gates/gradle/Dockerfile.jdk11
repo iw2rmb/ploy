@@ -12,5 +12,8 @@ ENV LANG=C.UTF-8 \
     LC_ALL=C.UTF-8 \
     GRADLE_USER_HOME=/root/.gradle
 
+RUN rm -rf /root/.gradle \
+    && mkdir -p /root/.gradle
+
 COPY images/gates/gradle/gradle.properties /root/.gradle/gradle.properties
 COPY images/gates/gradle/cache.init.gradle /root/.gradle/init.d/cache.init.gradle
