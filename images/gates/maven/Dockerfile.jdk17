@@ -1,4 +1,4 @@
-ARG JAVA_BASE_MAVEN_17_IMAGE=ghcr.io/iw2rmb/ploy/java-base-maven:jdk17
+ARG JAVA_BASE_MAVEN_17_IMAGE=java-base-maven:jdk17
 FROM ${JAVA_BASE_MAVEN_17_IMAGE}
 
 LABEL org.opencontainers.image.title="ploy-gate-maven-jdk17" \

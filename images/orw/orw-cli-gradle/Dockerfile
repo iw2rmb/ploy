@@ -15,7 +15,7 @@ RUN --mount=type=cache,target=/root/.m2 \
     --mount=type=secret,id=ploy_ca_certs,required=false \
     bash -euxo pipefail -c 'if [[ -s /run/secrets/ploy_ca_certs ]]; then mkdir -p /etc/ploy/certs; cp /run/secrets/ploy_ca_certs /etc/ploy/certs/ca.crt; source /usr/local/lib/ploy/install_ploy_ca_bundle.sh; PLOY_CA_IMPORT_JAVA=1 install_ploy_ca_bundle; fi; cd rewrite-runner && mvn -q -DskipTests package'
 
-ARG JAVA_BASE_TEMURIN_17_IMAGE=ghcr.io/iw2rmb/ploy/java-base-temurin:jdk17
+ARG JAVA_BASE_TEMURIN_17_IMAGE=java-base-temurin:jdk17
 FROM --platform=$TARGETOS/$TARGETARCH ${JAVA_BASE_TEMURIN_17_IMAGE}
 
 LABEL org.opencontainers.image.source="https://github.com/iw2rmb/ploy" \

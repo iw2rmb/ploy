@@ -16,7 +16,9 @@ set -Eeuo pipefail
 # Inputs (env):
 #   PLATFORM - Optional: comma list of platforms (default linux/amd64)
 #   VERSION - Optional semver tag (default from ./VERSION file, format vX.Y.Z)
-#   IMAGE_PREFIX - Optional image prefix (default ghcr.io/iw2rmb/ploy)
+#   IMAGE_PREFIX - Optional image prefix (highest precedence)
+#   PLOY_CONTAINER_REGISTRY - Optional fallback image prefix when IMAGE_PREFIX is unset
+#   (default fallback: ghcr.io/iw2rmb/ploy)
 #   OUTPUT_MODE - Optional: push|load (default push)
 #   PUSH_LATEST - Optional alias toggle for :latest (default 1 for stable releases)
 #   PLOY_CA_CERTS - Optional PEM bundle (path or inline content), passed as BuildKit secret id=ploy_ca_certs
@@ -28,16 +30,23 @@ set -Eeuo pipefail
 # Examples:
 #   images/build-and-push.sh
 #   VERSION=v0.1.0 PLATFORM=linux/amd64 images/build-and-push.sh
-#   OUTPUT_MODE=load IMAGE_PREFIX=ploy VERSION=v0.1.0 images/build-and-push.sh
+#   OUTPUT_MODE=load PLOY_CONTAINER_REGISTRY=ploy VERSION=v0.1.0 images/build-and-push.sh
 #   images/build-and-push.sh --build ploy,java-bases,orw
 
 PLATFORM=${PLATFORM:-linux/amd64}
-IMAGE_PREFIX="${IMAGE_PREFIX:-ghcr.io/iw2rmb/ploy}"
+if [[ -n "${IMAGE_PREFIX:-}" ]]; then
+  RESOLVED_IMAGE_PREFIX="${IMAGE_PREFIX}"
+elif [[ -n "${PLOY_CONTAINER_REGISTRY:-}" ]]; then
+  RESOLVED_IMAGE_PREFIX="${PLOY_CONTAINER_REGISTRY}"
+else
+  RESOLVED_IMAGE_PREFIX="ghcr.io/iw2rmb/ploy"
+fi
 OUTPUT_MODE="${OUTPUT_MODE:-push}"
 PUSH_LATEST="${PUSH_LATEST:-1}"
 declare -a BUILD_SECRET_ARGS=()
 PLOY_CA_CERTS_TMP=""
 declare -a BUILD_OUTPUT_ARGS=(--push)
+declare -a JAVA_BASE_BUILD_ARGS=()
 declare -a GROUP_ORDER=("ploy" "java-bases" "amata" "sbom" "gates" "orw")
 BUILD_GROUPS_RAW=""
 declare -a SELECTED_GROUPS=()
@@ -197,17 +206,25 @@ if [[ -n "${PLOY_CA_CERTS:-}" ]]; then
   fi
 fi
 
+JAVA_BASE_BUILD_ARGS=(
+  --build-arg "JAVA_BASE_MAVEN_11_IMAGE=${RESOLVED_IMAGE_PREFIX}/java-base-maven:jdk11"
+  --build-arg "JAVA_BASE_MAVEN_17_IMAGE=${RESOLVED_IMAGE_PREFIX}/java-base-maven:jdk17"
+  --build-arg "JAVA_BASE_GRADLE_11_IMAGE=${RESOLVED_IMAGE_PREFIX}/java-base-gradle:jdk11"
+  --build-arg "JAVA_BASE_GRADLE_17_IMAGE=${RESOLVED_IMAGE_PREFIX}/java-base-gradle:jdk17"
+  --build-arg "JAVA_BASE_TEMURIN_17_IMAGE=${RESOLVED_IMAGE_PREFIX}/java-base-temurin:jdk17"
+)
+
 build_push() {
   local name="$1"
   local dockerfile="$2"
   local context="$3"
-  local -a refs=("${IMAGE_PREFIX}/${name}:${VERSION}")
+  local -a refs=("${RESOLVED_IMAGE_PREFIX}/${name}:${VERSION}")
   local -a tag_args=()
   local ref
 
   if [[ "$VERSION" != *-* ]]; then
-    refs+=("${IMAGE_PREFIX}/${name}:v${SEMVER_MAJOR}")
-    refs+=("${IMAGE_PREFIX}/${name}:v${SEMVER_MAJOR}.${SEMVER_MINOR}")
+    refs+=("${RESOLVED_IMAGE_PREFIX}/${name}:v${SEMVER_MAJOR}")
+    refs+=("${RESOLVED_IMAGE_PREFIX}/${name}:v${SEMVER_MAJOR}.${SEMVER_MINOR}")
     case "$PUSH_LATEST" in
       1|true|TRUE|yes|YES|on|ON) refs+=("${IMAGE_PREFIX}/${name}:latest") ;;
     esac
@@ -225,6 +242,7 @@ build_push() {
     --label "org.opencontainers.image.version=${VERSION}" \
     --label "org.opencontainers.image.revision=${GIT_COMMIT}" \
     "${BUILD_SECRET_ARGS[@]}" \
+    "${JAVA_BASE_BUILD_ARGS[@]}" \
     -f "${dockerfile}" \
     "${tag_args[@]}" \
     "${BUILD_OUTPUT_ARGS[@]}" "${context}" --progress=plain
@@ -245,7 +263,7 @@ build_push_fixed_tag() {
   local dockerfile="$2"
   local context="$3"
   local tag="$4"
-  local ref="${IMAGE_PREFIX}/${image_name}:${tag}"
+  local ref="${RESOLVED_IMAGE_PREFIX}/${image_name}:${tag}"
 
   echo "==> Building ${ref} (df=${dockerfile}, ctx=${context}, platform=${PLATFORM})"
   docker buildx build \
@@ -254,6 +272,7 @@ build_push_fixed_tag() {
     --label "org.opencontainers.image.version=${VERSION}" \
     --label "org.opencontainers.image.revision=${GIT_COMMIT}" \
     "${BUILD_SECRET_ARGS[@]}" \
+    "${JAVA_BASE_BUILD_ARGS[@]}" \
     -f "${dockerfile}" \
     -t "${ref}" \
     "${BUILD_OUTPUT_ARGS[@]}" "${context}" --progress=plain
@@ -328,7 +347,7 @@ if group_selected "orw"; then
 fi
 
 if [[ "$OUTPUT_MODE" == "push" ]]; then
-  echo "All images pushed under ${IMAGE_PREFIX} for ${VERSION}"
+  echo "All images pushed under ${RESOLVED_IMAGE_PREFIX} for ${VERSION}"
 else
-  echo "All images loaded into local Docker image store under ${IMAGE_PREFIX} for ${VERSION}"
+  echo "All images loaded into local Docker image store under ${RESOLVED_IMAGE_PREFIX} for ${VERSION}"
 fi

@@ -1,5 +1,5 @@
 ARG NODE_IMAGE=node:22-bookworm-slim
-ARG JAVA_BASE_GRADLE_17_IMAGE=ghcr.io/iw2rmb/ploy/java-base-gradle:jdk17
+ARG JAVA_BASE_GRADLE_17_IMAGE=java-base-gradle:jdk17
 
 FROM --platform=$TARGETOS/$TARGETARCH ${JAVA_BASE_GRADLE_17_IMAGE} AS gradle-tools
 

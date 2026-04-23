@@ -1,4 +1,4 @@
-ARG JAVA_BASE_GRADLE_17_IMAGE=ghcr.io/iw2rmb/ploy/java-base-gradle:jdk17
+ARG JAVA_BASE_GRADLE_17_IMAGE=java-base-gradle:jdk17
 FROM ${JAVA_BASE_GRADLE_17_IMAGE}
 
 LABEL org.opencontainers.image.title="ploy-gate-gradle-jdk17" \

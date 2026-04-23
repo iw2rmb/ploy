@@ -1,4 +1,4 @@
-ARG JAVA_BASE_MAVEN_11_IMAGE=ghcr.io/iw2rmb/ploy/java-base-maven:jdk11
+ARG JAVA_BASE_MAVEN_11_IMAGE=java-base-maven:jdk11
 FROM ${JAVA_BASE_MAVEN_11_IMAGE}
 
 LABEL org.opencontainers.image.title="ploy-gate-maven-jdk11" \
