@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 )
@@ -18,8 +19,8 @@ type PatchStats struct {
 
 // CountPatchStats parses a unified diff and returns file and line delta counts.
 // It counts `+` lines (excluding `+++ ` file headers) as additions and `-` lines
-// (excluding `--- ` file headers) as removals. Each `diff --git` or `diff --no-index`
-// header marks one changed file.
+// (excluding `--- ` file headers) as removals. Each `diff --*` header marks one
+// changed file.
 func CountPatchStats(patchBytes []byte) PatchStats {
 	if len(patchBytes) == 0 {
 		return PatchStats{}
@@ -50,103 +51,83 @@ func (d *filesystemDiffGenerator) Generate(ctx context.Context, workspace string
 	return generateGitDiff(ctx, workspace)
 }
 
-func (d *filesystemDiffGenerator) GenerateBetween(ctx context.Context, baseDir, modifiedDir string) ([]byte, error) {
-	return generateGitDiffBetween(ctx, baseDir, modifiedDir)
-}
-
-// NewFilesystemDiffGenerator creates a DiffGenerator backed by git diff.
+// NewFilesystemDiffGenerator creates a DiffGenerator backed by a temporary git
+// index snapshot.
 func NewFilesystemDiffGenerator() DiffGenerator {
 	return &filesystemDiffGenerator{}
 }
 
-// generateGitDiff runs git diff to capture all changes in the workspace.
+// generateGitDiff captures workspace changes using a temporary git index:
+// `git add -A -- .` then `git diff --cached HEAD`.
+// This respects `.gitignore`, includes non-ignored new files, and does not
+// mutate the repository's real index.
 func generateGitDiff(ctx context.Context, workspace string) ([]byte, error) {
-	cmd := exec.CommandContext(ctx, "git", "diff", "HEAD")
+	indexFile, err := os.CreateTemp("", "ploy-diff-index-*")
+	if err != nil {
+		return nil, fmt.Errorf("create temp index: %w", err)
+	}
+	indexPath := indexFile.Name()
+	if closeErr := indexFile.Close(); closeErr != nil {
+		_ = os.Remove(indexPath)
+		return nil, fmt.Errorf("close temp index: %w", closeErr)
+	}
+	if err := os.Remove(indexPath); err != nil {
+		return nil, fmt.Errorf("remove temp index placeholder: %w", err)
+	}
+	defer func() {
+		_ = os.Remove(indexPath)
+	}()
+
+	env := []string{"GIT_INDEX_FILE=" + indexPath}
+	if err := runGitCommandWithEnv(ctx, workspace, env, "read-tree", "HEAD"); err != nil {
+		return nil, fmt.Errorf("git read-tree failed: %w", err)
+	}
+	if err := runGitCommandWithEnv(ctx, workspace, env, "add", "-A", "--", "."); err != nil {
+		return nil, fmt.Errorf("git add failed: %w", err)
+	}
+
+	diff, err := runGitOutputWithEnv(ctx, workspace, env, "diff", "--cached", "HEAD")
+	if err != nil {
+		return nil, fmt.Errorf("git diff --cached failed: %w", err)
+	}
+	return diff, nil
+}
+
+func runGitCommandWithEnv(ctx context.Context, workspace string, env []string, args ...string) error {
+	cmd := exec.CommandContext(ctx, "git", args...)
 	cmd.Dir = workspace
+	cmd.Env = append(os.Environ(), env...)
 
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
+	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
-
 	if err := cmd.Run(); err != nil {
 		if ctx.Err() != nil {
-			return nil, fmt.Errorf("git diff cancelled: %w", ctx.Err())
+			return fmt.Errorf("cancelled: %w", ctx.Err())
 		}
 		if stderr.Len() > 0 {
-			return nil, fmt.Errorf("git diff failed: %s", strings.TrimSpace(stderr.String()))
+			return fmt.Errorf("%s", strings.TrimSpace(stderr.String()))
 		}
-		return nil, fmt.Errorf("git diff failed: %w", err)
+		return err
 	}
-
-	return stdout.Bytes(), nil
+	return nil
 }
 
-// generateGitDiffBetween computes a unified diff between two directories using git diff --no-index.
-// This works even when neither directory is a git repository.
-func generateGitDiffBetween(ctx context.Context, baseDir, modifiedDir string) ([]byte, error) {
-	cmd := exec.CommandContext(ctx, "git", "diff", "--no-index", "--no-prefix", baseDir, modifiedDir)
+func runGitOutputWithEnv(ctx context.Context, workspace string, env []string, args ...string) ([]byte, error) {
+	cmd := exec.CommandContext(ctx, "git", args...)
+	cmd.Dir = workspace
+	cmd.Env = append(os.Environ(), env...)
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
-
-	err := cmd.Run()
-
-	if ctx.Err() != nil {
-		return nil, fmt.Errorf("git diff --no-index cancelled: %w", ctx.Err())
-	}
-
-	if err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			if exitErr.ExitCode() == 1 {
-				return normalizeDiffPaths(stdout.Bytes(), baseDir, modifiedDir), nil
-			}
+	if err := cmd.Run(); err != nil {
+		if ctx.Err() != nil {
+			return nil, fmt.Errorf("cancelled: %w", ctx.Err())
 		}
 		if stderr.Len() > 0 {
-			return nil, fmt.Errorf("git diff --no-index failed: %s", strings.TrimSpace(stderr.String()))
+			return nil, fmt.Errorf("%s", strings.TrimSpace(stderr.String()))
 		}
-		return nil, fmt.Errorf("git diff --no-index failed: %w", err)
+		return nil, err
 	}
-
 	return stdout.Bytes(), nil
-}
-
-// normalizeDiffPaths rewrites git diff output to use standard a/ and b/ prefixes
-// with relative paths.
-func normalizeDiffPaths(diff []byte, baseDir, modifiedDir string) []byte {
-	baseDir = strings.TrimPrefix(baseDir, "/")
-	modifiedDir = strings.TrimPrefix(modifiedDir, "/")
-
-	if !strings.HasSuffix(baseDir, "/") {
-		baseDir += "/"
-	}
-	if !strings.HasSuffix(modifiedDir, "/") {
-		modifiedDir += "/"
-	}
-
-	result := string(diff)
-	result = strings.ReplaceAll(result, baseDir, "a/")
-	result = strings.ReplaceAll(result, modifiedDir, "b/")
-
-	return filterGitDir([]byte(result))
-}
-
-// filterGitDir removes diff hunks that modify .git/ directory contents.
-func filterGitDir(diff []byte) []byte {
-	lines := strings.Split(string(diff), "\n")
-	var filtered []string
-	skip := false
-
-	for _, line := range lines {
-		if strings.HasPrefix(line, "diff --git") {
-			skip = strings.Contains(line, "/.git/") ||
-				strings.Contains(line, "a/.git/") ||
-				strings.Contains(line, "b/.git/")
-		}
-		if !skip {
-			filtered = append(filtered, line)
-		}
-	}
-
-	return []byte(strings.Join(filtered, "\n"))
 }

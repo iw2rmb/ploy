@@ -215,39 +215,14 @@ func (r *runController) computeRepoSHAOut(ctx context.Context, req StartRunReque
 	return repoSHAOut
 }
 
-// uploadDiffWithBaseline generates and uploads a diff between a baseline snapshot
-// and the post-execution workspace. Silent no-op when baseDir is empty.
-// When warnOnMissing is true, logs a warning for the missing baseline.
-func (r *runController) uploadDiffWithBaseline(
-	ctx context.Context,
-	runID types.RunID,
-	jobID types.JobID,
-	jobName string,
-	diffGenerator step.DiffGenerator,
-	baseDir string,
-	workspace string,
-	result step.Result,
-	diffType types.DiffJobType,
-	warnOnMissing bool,
-) {
-	if strings.TrimSpace(baseDir) == "" {
-		if warnOnMissing {
-			slog.Warn(diffType.String()+" diff skipped: baseline snapshot missing",
-				"run_id", runID, "job_id", jobID, "job_name", jobName)
-		}
-		return
-	}
-	r.uploadJobDiff(ctx, runID, jobID, diffGenerator, baseDir, workspace, result, diffType)
-}
-
 // uploadJobDiff is the shared implementation for generating, summarizing, and uploading
-// a diff between a baseline snapshot and the post-execution workspace.
+// a diff for the current workspace state.
 func (r *runController) uploadJobDiff(
 	ctx context.Context,
 	runID types.RunID,
 	jobID types.JobID,
 	diffGenerator step.DiffGenerator,
-	baseDir, workspace string,
+	workspace string,
 	result step.Result,
 	diffType types.DiffJobType,
 ) {
@@ -257,13 +232,13 @@ func (r *runController) uploadJobDiff(
 
 	label := diffType.String()
 
-	diffBytes, err := diffGenerator.GenerateBetween(ctx, baseDir, workspace)
+	diffBytes, err := diffGenerator.Generate(ctx, workspace)
 	if err != nil {
 		slog.Error("failed to generate "+label+" diff", "run_id", runID, "job_id", jobID, "error", err)
 		return
 	}
 	if len(diffBytes) == 0 {
-		slog.Info("no diff to upload (no changes between baseline and workspace)", "run_id", runID, "job_id", jobID, "diff_type", label)
+		slog.Info("no diff to upload (no workspace changes)", "run_id", runID, "job_id", jobID, "diff_type", label)
 		return
 	}
 

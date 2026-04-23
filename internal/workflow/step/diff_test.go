@@ -188,3 +188,103 @@ func TestFilesystemDiffGenerator(t *testing.T) {
 		})
 	}
 }
+
+func TestFilesystemDiffGeneratorGenerateRespectsGitIgnore(t *testing.T) {
+	t.Parallel()
+
+	repoDir := createGenerateDiffTestRepo(t)
+	if err := os.WriteFile(filepath.Join(repoDir, "build.gradle.kts"), []byte("plugins {\n    kotlin(\"jvm\")\n}\n"), 0644); err != nil {
+		t.Fatalf("write tracked file: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(repoDir, "build", "tracked.txt"), []byte("tracked-updated\n"), 0644); err != nil {
+		t.Fatalf("write tracked ignored file: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(repoDir, "build", "wsdl2java"), 0755); err != nil {
+		t.Fatalf("mkdir generated dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(repoDir, "build", "wsdl2java", "Generated.java"), []byte("class Generated {}\n"), 0644); err != nil {
+		t.Fatalf("write generated file: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(repoDir, "new-file.txt"), []byte("new\n"), 0644); err != nil {
+		t.Fatalf("write new file: %v", err)
+	}
+
+	beforeCached := mustGitOutput(t, repoDir, "diff", "--cached", "--name-only", "HEAD")
+
+	generator := NewFilesystemDiffGenerator()
+	diffBytes, err := generator.Generate(context.Background(), repoDir)
+	if err != nil {
+		t.Fatalf("Generate() error = %v", err)
+	}
+
+	diffText := string(diffBytes)
+	for _, want := range []string{
+		"+++ b/build.gradle.kts",
+		"+++ b/build/tracked.txt",
+		"+++ b/new-file.txt",
+	} {
+		if !strings.Contains(diffText, want) {
+			t.Fatalf("diff missing %q\nfull diff:\n%s", want, diffText)
+		}
+	}
+	for _, absent := range []string{
+		"+++ b/build/wsdl2java/Generated.java",
+	} {
+		if strings.Contains(diffText, absent) {
+			t.Fatalf("diff unexpectedly contains %q\nfull diff:\n%s", absent, diffText)
+		}
+	}
+
+	afterCached := mustGitOutput(t, repoDir, "diff", "--cached", "--name-only", "HEAD")
+	if beforeCached != afterCached {
+		t.Fatalf("real index changed by Generate(): before=%q after=%q", beforeCached, afterCached)
+	}
+}
+
+func createGenerateDiffTestRepo(t *testing.T) string {
+	t.Helper()
+
+	repoDir := t.TempDir()
+	mustRunGit(t, repoDir, "init")
+	mustRunGit(t, repoDir, "config", "user.email", "test@example.com")
+	mustRunGit(t, repoDir, "config", "user.name", "Test User")
+
+	if err := os.WriteFile(filepath.Join(repoDir, ".gitignore"), []byte("/build\n"), 0644); err != nil {
+		t.Fatalf("write .gitignore: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(repoDir, "build.gradle.kts"), []byte("plugins {\n}\n"), 0644); err != nil {
+		t.Fatalf("write tracked file: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(repoDir, "build"), 0755); err != nil {
+		t.Fatalf("mkdir build: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(repoDir, "build", "tracked.txt"), []byte("tracked\n"), 0644); err != nil {
+		t.Fatalf("write tracked ignored file: %v", err)
+	}
+
+	mustRunGit(t, repoDir, "add", ".gitignore", "build.gradle.kts")
+	mustRunGit(t, repoDir, "add", "-f", "build/tracked.txt")
+	mustRunGit(t, repoDir, "commit", "-m", "init")
+
+	return repoDir
+}
+
+func mustGitOutput(t *testing.T, dir string, args ...string) string {
+	t.Helper()
+	cmdArgs := append([]string{"-C", dir}, args...)
+	cmd := exec.Command("git", cmdArgs...)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git %v failed: %v (output: %s)", args, err, string(output))
+	}
+	return strings.TrimSpace(string(output))
+}
+
+func mustRunGit(t *testing.T, dir string, args ...string) {
+	t.Helper()
+	cmdArgs := append([]string{"-C", dir}, args...)
+	cmd := exec.Command("git", cmdArgs...)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git %v failed: %v (output: %s)", args, err, string(output))
+	}
+}

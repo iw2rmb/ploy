@@ -349,9 +349,9 @@ func TestRunController_uploadGateReportArtifacts(t *testing.T) {
 	}
 }
 
-// Note: uploadDiff and associated mig diff metadata tests were removed along
-// with legacy HEAD-based diff generation. Migs now use baseline-aware
-// GenerateBetween semantics via dedicated helpers.
+// Note: uploadDiff and associated mig diff metadata tests were removed during
+// previous refactors; current mig/heal diff generation uses Git-native workspace
+// snapshot semantics via step.DiffGenerator.Generate.
 
 // TestIsValidArtifactPath verifies path traversal prevention for artifact paths.
 // This is a security test ensuring malicious paths like "../../etc/passwd" are rejected.
