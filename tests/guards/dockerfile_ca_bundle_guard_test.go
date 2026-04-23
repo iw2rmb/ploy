@@ -12,14 +12,13 @@ func TestPublishedImageDockerfilesUseBuildCABundleInstaller(t *testing.T) {
 	dockerfiles := []string{
 		"images/server/Dockerfile",
 		"images/node/Dockerfile",
-		"images/amata/Dockerfile",
 		"images/java-bases/gradle/Dockerfile.jdk11",
 		"images/java-bases/gradle/Dockerfile.jdk17",
 		"images/java-bases/maven/Dockerfile.jdk11",
 		"images/java-bases/maven/Dockerfile.jdk17",
 		"images/java-bases/temurin/Dockerfile.jdk17",
-		"images/java-17-codex-amata-maven/Dockerfile",
-		"images/java-17-codex-amata-gradle/Dockerfile",
+		"images/amata/java-17-codex-amata-maven/Dockerfile",
+		"images/amata/java-17-codex-amata-gradle/Dockerfile",
 		"images/orw/orw-cli-maven/Dockerfile",
 		"images/orw/orw-cli-gradle/Dockerfile",
 	}

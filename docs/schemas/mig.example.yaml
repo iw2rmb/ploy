@@ -220,7 +220,7 @@ build_gate:
 #   heal:
 #     <<: !include ./healing/spec.yaml
 #     retries: 2
-#     image: docker.io/your-dh-user/amata:latest
+#     image: docker.io/your-dh-user/java-17-codex-amata-maven:latest
 #     amata:
 #       spec: |
 #         version: amata/v1

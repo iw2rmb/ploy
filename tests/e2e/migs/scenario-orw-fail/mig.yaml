@@ -24,7 +24,7 @@ build_gate:
   heal:
     retries: 1
     # Healing: amata mode.
-    image: localhost:5000/ploy/amata:latest
+    image: localhost:5000/ploy/java-17-codex-amata-maven:latest
     amata:
       spec: |
         version: amata/v1

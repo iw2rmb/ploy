@@ -20,11 +20,11 @@
 - Build Migs images (requires Docker):
   - OpenRewrite CLI (Maven): `docker buildx build --platform linux/amd64 -f images/orw/orw-cli-maven/Dockerfile -t orw-cli-maven:e2e .`
   - OpenRewrite CLI (Gradle): `docker buildx build --platform linux/amd64 -f images/orw/orw-cli-gradle/Dockerfile -t orw-cli-gradle:e2e .`
-  - Amata runner: from repo root run `bash images/amata/build-amata.sh`, then `docker buildx build --platform linux/amd64 -f images/amata/Dockerfile -t amata:e2e .`
+  - Codex+Amata Maven lane: from repo root run `bash images/amata/build-amata.sh`, then `docker buildx build --platform linux/amd64 -f images/amata/java-17-codex-amata-maven/Dockerfile -t java-17-codex-amata-maven:e2e .`
   - Optional: `migs-llm`, `migs-plan` as needed.
 - Push to local registry using the helper script:
   - `IMAGE_PREFIX=localhost:5000/ploy VERSION=v0.1.0 images/build-and-push.sh`
-  - The script pushes `amata`, `orw-cli-maven`, `orw-cli-gradle`, plus `server` and `node`.
+  - The script pushes `java-17-codex-amata-maven`, `java-17-codex-amata-gradle`, `orw-cli-maven`, `orw-cli-gradle`, plus `server` and `node`.
   - Images publish as `$IMAGE_PREFIX/<name>:<tag>`.
 
 Notes:
@@ -155,7 +155,7 @@ build_gate:
   enabled: true
   heal:
     retries: 1
-    image: ghcr.io/iw2rmb/ploy/amata:latest
+    image: ghcr.io/iw2rmb/ploy/java-17-codex-amata-maven:latest
     amata:
       spec: |
         version: amata/v1
