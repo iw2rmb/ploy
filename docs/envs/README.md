@@ -612,7 +612,7 @@ Optional repository and execution controls:
 | `ORW_CONFIG_PATH` | Optional path to rewrite YAML config; when unset ORW uses `/out/rewrite.yml` |
 | `ORW_ACTIVE_RECIPES` | Comma-separated override list of active recipes |
 | `ORW_FAIL_ON_UNSUPPORTED` | Boolean flag, default `true` |
-| `ORW_EXCLUDE_PATHS` | Comma-separated glob patterns excluded from ORW parsing (for example `**/*.proto`) |
+| `ORW_EXCLUDE_PATHS` | Comma-separated glob patterns excluded from ORW parsing (for example `**/*.proto`); `orw-cli` may append proto3/edition `.proto` paths during preflight |
 | `ORW_CLI_BIN` | OpenRewrite CLI executable name/path (default: `rewrite`) |
 
 Required typed file input:
@@ -641,7 +641,7 @@ Healing execution (custom recipe via Amata lane):
 - `heal-orw` supports only `java+maven` and `java+gradle` tuples.
 - On missing or unsupported stack tuple, `heal-orw` writes deterministic
   failure metadata to `/out/orw-task/report.json`.
-- If `ORW_EXCLUDE_PATHS` is unset/empty, no exclude globs are applied.
+- Before the first ORW run, `orw-cli` pre-scans workspace `.proto` files and appends proto3/edition paths to `ORW_EXCLUDE_PATHS`.
 - Failure artifacts are written to `/out/orw-task/report.json` and
   `/out/orw-task/transform.log`.
 
