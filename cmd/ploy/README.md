@@ -411,7 +411,7 @@ ploy completion <shell> --help
   shape for both single-step and multi-step runs. Each step supports
   `image`/`command`/`envs` plus Hydra file-record fields (`ca`, `in`, `out`, `home`)
   and cross-step input references (`in_from`)
-  using selectors like `sbom://out/java.classpath` or
+  using selectors like `sbom://out/sbom.dependencies.txt` or
   `extract-usage@mig://out/dependency-usage.nofilter.json`
   for deterministic file injection via content-addressed bundles.
   Hydra records are also supported in Build Gate healing action blocks

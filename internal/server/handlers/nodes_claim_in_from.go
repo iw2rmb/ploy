@@ -10,6 +10,8 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
+const javaClasspathFileName = "java.classpath"
+
 func resolveMigInFromClaimEntries(
 	ctx context.Context,
 	st store.Store,
@@ -45,6 +47,9 @@ func resolveMigInFromClaimEntries(
 		parsed, err := contracts.ParseInFromURI(ref.From)
 		if err != nil {
 			return nil, fmt.Errorf("steps[%d].in_from[%d].from: %w", stepIndex, i, err)
+		}
+		if parsed.SourceType == domaintypes.JobTypeSBOM && parsed.OutPath == "/out/"+javaClasspathFileName {
+			return nil, fmt.Errorf("steps[%d].in_from[%d].from: sbom://out/%s is unsupported; java classpath is available at /share/%s", stepIndex, i, javaClasspathFileName, javaClasspathFileName)
 		}
 		target, err := contracts.NormalizeInFromTarget(ref.To, parsed.OutPath)
 		if err != nil {

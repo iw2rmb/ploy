@@ -71,6 +71,9 @@ type Request struct {
 	OutDir    string
 	// InDir is an optional directory mounted at /in for cross-phase inputs.
 	InDir string
+	// ShareDir is an optional directory mounted at /share for run/repo-scoped
+	// shared inputs/outputs across job stages.
+	ShareDir string
 	// StagingDir is an optional path to a directory containing pre-materialized
 	// Hydra resources. Each CA/In/Out/Home entry is mounted from StagingDir/<shortHash>.
 	StagingDir string
@@ -149,7 +152,7 @@ func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 		result.ExitCode = 0
 		result.Timings.ExecutionDuration = types.Duration(time.Since(executionStart))
 	} else {
-		spec, err := buildContainerSpec(req.RunID, req.JobID, req.Manifest, req.Workspace, req.OutDir, req.InDir, req.StagingDir)
+		spec, err := buildContainerSpec(req.RunID, req.JobID, req.Manifest, req.Workspace, req.OutDir, req.InDir, req.ShareDir, req.StagingDir)
 		if err != nil {
 			return Result{}, fmt.Errorf("build container spec: %w", err)
 		}

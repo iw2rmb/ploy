@@ -126,7 +126,7 @@ steps:
 #       MIGRATION_TARGET: java11
 #     in:
 #       - from: extract-usage@mig://out/dependency-usage.nofilter.json
-#       - from: sbom://out/java.classpath
+#       - from: sbom://out/sbom.dependencies.txt
 #   - name: apply-fixes
 #     image: docker.io/your-dh-user/migs-migrate-java17:latest
 #     envs:

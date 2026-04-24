@@ -52,7 +52,7 @@ while [[ $# -gt 0 ]]; do
 done
 echo "[rewrite-stub] apply invoked"
 echo "[rewrite-stub] classpath=$classpath_file"
-if [[ "$classpath_file" != "/in/java.classpath" ]]; then
+if [[ "$classpath_file" != "/share/java.classpath" ]]; then
   echo "[rewrite-stub] unexpected classpath file" >&2
   exit 68
 fi
@@ -112,7 +112,7 @@ exit 67
 	if !strings.Contains(logText, "[rewrite-stub] apply invoked") {
 		t.Fatalf("transform.log missing rewrite invocation marker:\n%s", logText)
 	}
-	if !strings.Contains(logText, "[rewrite-stub] classpath=/in/java.classpath") {
+	if !strings.Contains(logText, "[rewrite-stub] classpath=/share/java.classpath") {
 		t.Fatalf("transform.log missing required classpath-file argument:\n%s", logText)
 	}
 	if strings.Contains(logText, "[mvn-stub] should not run") || strings.Contains(logText, "[gradle-stub] should not run") {

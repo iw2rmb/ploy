@@ -55,7 +55,7 @@ func TestBuildContainerSpec_JavaToolCacheMountsFromStackEnv(t *testing.T) {
 				}},
 			}
 
-			spec, err := buildContainerSpec(types.RunID("run-java-cache"), types.JobID("job-java-cache"), manifest, "/tmp/ws", "", "", "")
+			spec, err := buildContainerSpec(types.RunID("run-java-cache"), types.JobID("job-java-cache"), manifest, "/tmp/ws", "", "", "", "")
 			if err != nil {
 				t.Fatalf("buildContainerSpec error: %v", err)
 			}

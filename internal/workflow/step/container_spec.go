@@ -50,6 +50,8 @@ type ContainerMount struct {
 	ReadOnly bool
 }
 
+const containerShareDir = "/share"
+
 // ContainerHandle identifies a prepared container by its ID.
 type ContainerHandle string
 
@@ -65,7 +67,7 @@ type ContainerResult struct {
 // for correlation with telemetry and log aggregation systems.
 // stagingDir is an optional path to a staging directory for materialized Hydra
 // resources; each In/Out/Home/CA entry is mounted from stagingDir/<shortHash>.
-func buildContainerSpec(runID types.RunID, jobID types.JobID, manifest contracts.StepManifest, workspace string, outDir string, inDir string, stagingDir string) (ContainerSpec, error) {
+func buildContainerSpec(runID types.RunID, jobID types.JobID, manifest contracts.StepManifest, workspace string, outDir string, inDir string, shareDir string, stagingDir string) (ContainerSpec, error) {
 	// Mount the first input at its mount path; fallback to working dir.
 	mounts := make([]ContainerMount, 0, len(manifest.Inputs))
 	// Always mount the hydrated workspace to the declared mount (first input), respecting mode.
@@ -89,6 +91,10 @@ func buildContainerSpec(runID types.RunID, jobID types.JobID, manifest contracts
 	// read-only mounts.
 	if strings.TrimSpace(inDir) != "" {
 		mounts = append(mounts, ContainerMount{Source: inDir, Target: "/in", ReadOnly: false})
+	}
+	// Optional /share mount for run/repo-scoped shared files.
+	if strings.TrimSpace(shareDir) != "" {
+		mounts = append(mounts, ContainerMount{Source: shareDir, Target: containerShareDir, ReadOnly: false})
 	}
 	javaCacheMounts, err := buildJavaToolCacheMountsFromStackEnv(manifest.Envs)
 	if err != nil {

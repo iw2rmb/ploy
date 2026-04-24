@@ -13,10 +13,10 @@ func TestParseInFromURI(t *testing.T) {
 	}{
 		{
 			name:           "type selector",
-			raw:            "sbom://out/java.classpath",
+			raw:            "sbom://out/sbom.dependencies.txt",
 			wantSourceName: "",
 			wantSourceType: "sbom",
-			wantOutPath:    "/out/java.classpath",
+			wantOutPath:    "/out/sbom.dependencies.txt",
 		},
 		{
 			name:           "named type selector",
@@ -88,7 +88,7 @@ func TestParseMigSpecJSON_InFromValidation(t *testing.T) {
 			"steps": [
 				{"name": "extract-usage", "image": "img1"},
 				{"image": "img2", "in_from": [
-					{"from": "sbom://out/java.classpath"}
+					{"from": "sbom://out/sbom.dependencies.txt"}
 				]}
 			]
 		}`
@@ -96,8 +96,8 @@ func TestParseMigSpecJSON_InFromValidation(t *testing.T) {
 		if err != nil {
 			t.Fatalf("ParseMigSpecJSON() error = %v", err)
 		}
-		if got := spec.Steps[1].InFrom[0].To; got != "/in/java.classpath" {
-			t.Fatalf("steps[1].in_from[0].to = %q, want %q", got, "/in/java.classpath")
+		if got := spec.Steps[1].InFrom[0].To; got != "/in/sbom.dependencies.txt" {
+			t.Fatalf("steps[1].in_from[0].to = %q, want %q", got, "/in/sbom.dependencies.txt")
 		}
 	})
 
@@ -121,7 +121,7 @@ func TestParseMigSpecJSON_InFromValidation(t *testing.T) {
 			"steps": [
 				{"name": "extract-usage", "image": "img1"},
 				{"image": "img2", "in_from": [
-					{"from": "pre@sbom://out/java.classpath"}
+					{"from": "pre@sbom://out/sbom.dependencies.txt"}
 				]}
 			]
 		}`
@@ -151,7 +151,7 @@ func TestParseMigSpecJSON_InFromValidation(t *testing.T) {
 			"steps": [
 				{"name": "dup", "image": "img1"},
 				{"name": "dup", "image": "img2", "in_from": [
-					{"from": "sbom://out/java.classpath"}
+					{"from": "sbom://out/sbom.dependencies.txt"}
 				]}
 			]
 		}`

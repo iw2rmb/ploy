@@ -2,8 +2,8 @@
 set -euo pipefail
 
 workspace="${PLOY_SBOM_WORKSPACE:-/workspace}"
-raw_output="${PLOY_SBOM_DEPENDENCY_OUTPUT:-/out/sbom.dependencies.txt}"
-classpath_output="${PLOY_SBOM_JAVA_CLASSPATH_OUTPUT:-/out/java.classpath}"
+raw_output="${PLOY_SBOM_DEPENDENCY_OUTPUT:-/share/sbom.dependencies.txt}"
+classpath_output="${PLOY_SBOM_JAVA_CLASSPATH_OUTPUT:-/share/java.classpath}"
 init_script="${PLOY_SBOM_GRADLE_INIT_SCRIPT:-/usr/local/lib/ploy/sbom/gradle-write-java-classpath.init.gradle}"
 gradle_cmd="${PLOY_SBOM_GRADLE_CMD:-}"
 

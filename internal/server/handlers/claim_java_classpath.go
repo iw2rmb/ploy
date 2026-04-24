@@ -44,25 +44,13 @@ func resolveJavaClasspathClaimContext(
 	if jobType == domaintypes.JobTypeHeal && domaintypes.JobType(predecessor.JobType) == domaintypes.JobTypeSBOM {
 		return nil, nil
 	}
-	sourceSBOM, ok := resolveRunClasspathSourceSBOM(predecessorByID, jobsByID, predecessor.ID)
+	_, ok = resolveRunClasspathSourceSBOM(predecessorByID, jobsByID, predecessor.ID)
 	if !ok {
 		return nil, nil
 	}
 
-	source, err := resolveEffectiveSourceJob(ctx, st, sourceSBOM.ID)
-	if err != nil {
-		return nil, fmt.Errorf("resolve java classpath source job: %w", err)
-	}
-	artifactID, err := resolveJavaClasspathSourceArtifactID(ctx, st, source)
-	if err != nil {
-		return nil, err
-	}
-
 	return &contracts.JavaClasspathClaimContext{
-		Required:         true,
-		SourceArtifactID: artifactID,
-		SourceJobID:      source.ID,
-		SourceJobType:    domaintypes.JobType(source.JobType),
+		Required: true,
 	}, nil
 }
 
@@ -127,33 +115,6 @@ func isSuccessfulPreGateSBOMJob(job store.Job) bool {
 		return false
 	}
 	return strings.TrimSpace(ctx.Phase) == contracts.SBOMPhasePre
-}
-
-func resolveJavaClasspathSourceArtifactID(
-	ctx context.Context,
-	st store.Store,
-	sourceJob store.Job,
-) (string, error) {
-	bundles, err := st.ListArtifactBundlesByRunAndJob(ctx, store.ListArtifactBundlesByRunAndJobParams{
-		RunID: sourceJob.RunID,
-		JobID: &sourceJob.ID,
-	})
-	if err != nil {
-		return "", fmt.Errorf("list java classpath source artifacts: %w", err)
-	}
-	preferredNames := preferredClasspathBundleNames(domaintypes.JobType(sourceJob.JobType))
-	for _, preferredName := range preferredNames {
-		for i := range bundles {
-			if !classpathBundleNameMatches(bundles[i].Name, preferredName) {
-				continue
-			}
-			artifactID := strings.TrimSpace(bundleToSummary(bundles[i]).ID)
-			if artifactID != "" {
-				return artifactID, nil
-			}
-		}
-	}
-	return "", nil
 }
 
 func preferredClasspathBundleNames(jobType domaintypes.JobType) []string {

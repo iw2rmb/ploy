@@ -56,15 +56,15 @@ Optional:
 
 Required typed file input:
 
-- `/in/java.classpath` (newline-delimited absolute classpath entries)
+- `/share/java.classpath` (newline-delimited absolute classpath entries)
 
 ## How ORW Images Behave
 
 - Both ORW images use the Hydra `ca` materialization contract to receive CA certificates.
 - Both ship bundled `rewrite` at `/usr/local/bin/rewrite` backed by an embedded standalone runner JAR.
 - `ORW_CLI_BIN` defaults to the bundled binary and is intended to be overridden only for controlled debugging.
-- `orw-cli` always passes `--classpath-file /in/java.classpath` to `rewrite` to enable typed Java rewrites.
-- Missing/invalid `/in/java.classpath` is treated as deterministic input failure by the bundled runner.
+- `orw-cli` always passes `--classpath-file /share/java.classpath` to `rewrite` to enable typed Java rewrites.
+- Missing/invalid `/share/java.classpath` is treated as deterministic input failure by the bundled runner.
 - Recipes are resolved dynamically from `RECIPE_GROUP/RECIPE_ARTIFACT`; if `RECIPE_VERSION` is provided, ORW uses it as-is.
 - If `RECIPE_VERSION` is omitted, ORW resolves the latest available recipe version from configured repositories.
 - ORW images execute OpenRewrite in isolated runtime containers instead of invoking Maven/Gradle project tasks directly.

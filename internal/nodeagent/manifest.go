@@ -15,6 +15,7 @@ import (
 const (
 	sbomDependencyOutputFileName = "sbom.dependencies.txt"
 	sbomJavaClasspathFileName    = "java.classpath"
+	sbomShareMountPath           = "/share"
 	sbomImageRegistryEnvKey      = "PLOY_CONTAINER_REGISTRY"
 	sbomImageRegistryDefault     = "ghcr.io/iw2rmb/ploy"
 	sbomScriptDir                = "/usr/local/lib/ploy/sbom"
@@ -91,8 +92,8 @@ func buildSBOMManifest(req StartRunRequest, cycleName string, persistedStack con
 	injectStackTupleEnv(env, stackExpectationForRequest(req, stack))
 	env["PLOY_SBOM_CYCLE"] = strings.TrimSpace(cycleName)
 	env["PLOY_SBOM_STACK"] = string(stack)
-	env["PLOY_SBOM_DEPENDENCY_OUTPUT"] = "/out/" + sbomDependencyOutputFileName
-	env["PLOY_SBOM_JAVA_CLASSPATH_OUTPUT"] = "/out/" + sbomJavaClasspathFileName
+	env["PLOY_SBOM_DEPENDENCY_OUTPUT"] = sbomShareMountPath + "/" + sbomDependencyOutputFileName
+	env["PLOY_SBOM_JAVA_CLASSPATH_OUTPUT"] = sbomShareMountPath + "/" + sbomJavaClasspathFileName
 
 	manifest := contracts.StepManifest{
 		ID:         types.StepID(req.JobID),
@@ -191,10 +192,10 @@ func applySBOMRuntimeForStack(manifest *contracts.StepManifest, stack contracts.
 		manifest.Envs = map[string]string{}
 	}
 	if strings.TrimSpace(manifest.Envs["PLOY_SBOM_DEPENDENCY_OUTPUT"]) == "" {
-		manifest.Envs["PLOY_SBOM_DEPENDENCY_OUTPUT"] = "/out/" + sbomDependencyOutputFileName
+		manifest.Envs["PLOY_SBOM_DEPENDENCY_OUTPUT"] = sbomShareMountPath + "/" + sbomDependencyOutputFileName
 	}
 	if strings.TrimSpace(manifest.Envs["PLOY_SBOM_JAVA_CLASSPATH_OUTPUT"]) == "" {
-		manifest.Envs["PLOY_SBOM_JAVA_CLASSPATH_OUTPUT"] = "/out/" + sbomJavaClasspathFileName
+		manifest.Envs["PLOY_SBOM_JAVA_CLASSPATH_OUTPUT"] = sbomShareMountPath + "/" + sbomJavaClasspathFileName
 	}
 	injectStackTupleEnv(manifest.Envs, sbomRuntimeStackExpectation(runtimeStack, runtimeRelease))
 	manifest.Envs["PLOY_SBOM_STACK"] = string(runtimeStack)
