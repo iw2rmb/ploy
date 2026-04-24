@@ -16,6 +16,7 @@ func TestSBOMClasspathCollectors_IncludeTestDependenciesAndOutputs(t *testing.T)
 	type setupResult struct {
 		extraEnv []string
 		want     []string
+		wantNot  []string
 	}
 	tests := []struct {
 		name      string
@@ -63,7 +64,7 @@ done
 if [[ "$*" == *"dependency:build-classpath"* ]]; then
   case "$scope" in
     compile) printf '/deps/compile.jar\n' > "$output" ;;
-    runtime) printf '/deps/runtime.jar\n' > "$output" ;;
+    runtime) printf '/deps/runtime.jar' > "$output" ;;
     test) printf '/deps/test.jar\n' > "$output" ;;
     *) : > "$output" ;;
   esac
@@ -80,7 +81,10 @@ exit 0
 				if err := writeExecutableScript(mvnPath, mvnStub); err != nil {
 					t.Fatalf("write mvn stub: %v", err)
 				}
-				return setupResult{want: want}
+				return setupResult{
+					want:    want,
+					wantNot: []string{"/deps/runtime.jar/deps/test.jar"},
+				}
 			},
 		},
 		{
@@ -185,6 +189,11 @@ exit 0
 					t.Fatalf("classpath output missing %q:\n%s", want, string(gotClasspath))
 				}
 			}
+			for _, wantNot := range setup.wantNot {
+				if strings.Contains(string(gotClasspath), wantNot) {
+					t.Fatalf("classpath output unexpectedly contains %q:\n%s", wantNot, string(gotClasspath))
+				}
+			}
 		})
 	}
 }
@@ -194,9 +203,9 @@ func TestGradleClasspathInitScripts_IncludeTestConfigurations(t *testing.T) {
 
 	repoRoot := repoRootForNodeagentTests(t)
 	tests := []struct {
-		name      string
-		fileRel   string
-		snippets  []string
+		name     string
+		fileRel  string
+		snippets []string
 	}{
 		{
 			name:    "shared sbom init script includes test configs and test source set",
