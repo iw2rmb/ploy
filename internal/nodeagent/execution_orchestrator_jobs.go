@@ -645,9 +645,6 @@ func (r *runController) runContainerJob(
 	if err != nil {
 		return outcome, err
 	}
-	if err := r.ensureRequiredJavaClasspathShare(req); err != nil {
-		return outcome, err
-	}
 	manifest := cfg.Manifest
 	disableManifestGate(&manifest)
 	clearManifestHydration(&manifest)

@@ -244,7 +244,6 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 		SBOMContext:            claim.SBOMContext,
 		MigContext:             claim.MigContext,
 		GateContext:            claim.GateContext,
-		JavaClasspathContext:   claim.JavaClasspathContext,
 		DetectedStack:          claim.DetectedStack,
 		RecoveryContext:        claim.RecoveryContext,
 		TypedOptions:           typedOpts, // Strongly-typed run options (canonical source of truth)
