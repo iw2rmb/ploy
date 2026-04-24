@@ -187,13 +187,6 @@ func (s *CompleteJobService) onSuccess(ctx context.Context, state *completeJobSt
 			"err", refreshErr,
 		)
 	}
-	if hookOnceErr := s.recordHookOnceLedger(ctx, state); hookOnceErr != nil {
-		slog.Error("complete job: failed to record hook once state",
-			"job_id", state.job.ID,
-			"repo_id", state.job.RepoID,
-			"err", hookOnceErr,
-		)
-	}
 
 	decision := lifecycle.EvaluateCompletionDecision(jobType, state.input.Status, state.job.NextID != nil)
 	if decision.ChainAction == lifecycle.CompletionChainAdvanceNext {

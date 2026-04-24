@@ -27,7 +27,7 @@ var ValidHydraSections = map[string]bool{
 }
 
 // ValidCAConfigSections lists the known section names for config ca entries.
-// This includes Hydra job sections plus sbom/hook auxiliary build-gate jobs.
+// This includes Hydra job sections plus sbom auxiliary build-gate jobs.
 var ValidCAConfigSections = map[string]bool{
 	"pre_gate":  true,
 	"re_gate":   true,
@@ -35,7 +35,6 @@ var ValidCAConfigSections = map[string]bool{
 	"mig":       true,
 	"heal":      true,
 	"sbom":      true,
-	"hook":      true,
 }
 
 // ValidateHydraSection returns an error if section is not a known Hydra section.
@@ -49,7 +48,7 @@ func ValidateHydraSection(section string) error {
 // ValidateCAConfigSection returns an error if section is not valid for config ca.
 func ValidateCAConfigSection(section string) error {
 	if !ValidCAConfigSections[section] {
-		return fmt.Errorf("invalid config ca section %q (must be one of: heal, hook, mig, post_gate, pre_gate, re_gate, sbom)", section)
+		return fmt.Errorf("invalid config ca section %q (must be one of: heal, mig, post_gate, pre_gate, re_gate, sbom)", section)
 	}
 	return nil
 }

@@ -543,10 +543,6 @@ func withClaimJobName(name string) claimOption {
 	return func(c *ClaimResponse) { c.JobName = name }
 }
 
-func withClaimHookRuntime(decision *contracts.HookRuntimeDecision) claimOption {
-	return func(c *ClaimResponse) { c.HookRuntime = decision }
-}
-
 func withClaimDetectedStack(exp *contracts.StackExpectation) claimOption {
 	return func(c *ClaimResponse) { c.DetectedStack = exp }
 }

@@ -74,7 +74,6 @@ func TestConfigCAPutUpsertsEntry(t *testing.T) {
 	}{
 		{name: "mig section", section: "mig"},
 		{name: "sbom section", section: "sbom"},
-		{name: "hook section", section: "hook"},
 	}
 	for _, tt := range tests {
 		tt := tt

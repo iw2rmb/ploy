@@ -20,7 +20,6 @@ type RunOptions struct {
 	ServerMetadata ServerMetadataOptions
 	Steps          []StepMig
 	StackGate      *contracts.StepGateStackSpec
-	Hooks          []string
 
 	// BundleMap maps content hashes to spec bundle download identifiers.
 	// Populated from MigSpec.BundleMap during spec-to-run-options conversion.
@@ -123,8 +122,6 @@ func migsSpecToRunOptions(spec *contracts.MigSpec) RunOptions {
 			runOpts.Healing = healing
 		}
 	}
-	runOpts.Hooks = append([]string(nil), spec.Hooks...)
-
 	runOpts.MRWiring.GitLabPAT = spec.GitLabPAT
 	runOpts.MRWiring.GitLabDomain = spec.GitLabDomain
 	if spec.MROnSuccess != nil {

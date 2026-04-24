@@ -156,16 +156,6 @@ func TestCreateJobsFromSpec(t *testing.T) {
 			spec:        []byte(`{"steps":[{"image":"a"}]}`),
 			wantErr:     "repo_sha0 must match",
 		},
-		{
-			name:        "RejectsRawLocalHookSources",
-			runID:       domaintypes.RunID("run_raw_hook_reject_123456"),
-			repoID:      domaintypes.RepoID("repo_raw_hook"),
-			repoBaseRef: "main",
-			attempt:     1,
-			repoSHA0:    testRepoSHA0,
-			spec:        []byte(`{"hooks":["../../hooks"],"steps":[{"image":"a"}]}`),
-			wantErr:     "local hook sources must be precompiled by CLI into hash entries",
-		},
 	}
 
 	for _, tt := range tests {
@@ -454,7 +444,7 @@ steps:
 	}
 }
 
-func TestCreateJobsFromSpec_MissingBundleBlobFailsBeforeQueueingJobs(t *testing.T) {
+func TestCreateJobsFromSpec_IgnoresMissingHookBundleBlob(t *testing.T) {
 	t.Parallel()
 
 	const (
@@ -482,15 +472,16 @@ func TestCreateJobsFromSpec_MissingBundleBlobFailsBeforeQueueingJobs(t *testing.
 		spec,
 		bs,
 	)
-	if err == nil {
-		t.Fatal("expected createJobsFromSpec to fail when hook bundle blob is missing")
+	if err != nil {
+		t.Fatalf("createJobsFromSpec failed: %v", err)
 	}
-	want := `spec bundle "bundle_missing_blob" blob is missing from object storage`
-	if !strings.Contains(err.Error(), want) {
-		t.Fatalf("expected error to contain %q, got %v", want, err)
+	if len(st.createJob.calls) != 5 {
+		t.Fatalf("expected canonical 5-job chain, got %d", len(st.createJob.calls))
 	}
-	if len(st.createJob.calls) != 0 {
-		t.Fatalf("expected no jobs queued when hook bundle preflight fails, got %d", len(st.createJob.calls))
+	for _, created := range st.createJob.calls {
+		if strings.Contains(created.Name, "-hook-") {
+			t.Fatalf("did not expect hook job %q", created.Name)
+		}
 	}
 }
 

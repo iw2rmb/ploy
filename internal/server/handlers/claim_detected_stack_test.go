@@ -34,7 +34,7 @@ func TestResolveDetectedStackExpectationFromJobs_UsesNearestUpstreamGate(t *test
 		},
 		{
 			ID:      hook1ID,
-			JobType: domaintypes.JobTypeHook,
+			JobType: domaintypes.JobTypeSBOM,
 			Status:  domaintypes.JobStatusSuccess,
 			NextID:  &reGateID,
 		},
@@ -53,7 +53,7 @@ func TestResolveDetectedStackExpectationFromJobs_UsesNearestUpstreamGate(t *test
 		},
 		{
 			ID:      hook2ID,
-			JobType: domaintypes.JobTypeHook,
+			JobType: domaintypes.JobTypeSBOM,
 			Status:  domaintypes.JobStatusCreated,
 		},
 	}
@@ -81,7 +81,7 @@ func TestResolveDetectedStackExpectationFromJobs_NoGateInChain(t *testing.T) {
 		},
 		{
 			ID:      hookID,
-			JobType: domaintypes.JobTypeHook,
+			JobType: domaintypes.JobTypeSBOM,
 			Status:  domaintypes.JobStatusCreated,
 		},
 	}

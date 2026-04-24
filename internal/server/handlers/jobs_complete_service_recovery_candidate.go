@@ -157,7 +157,7 @@ func findNextReGateAfterJob(start store.Job, jobsByID map[domaintypes.JobID]stor
 		if jobType == domaintypes.JobTypeReGate {
 			return job.ID, true
 		}
-		if jobType != domaintypes.JobTypeSBOM && jobType != domaintypes.JobTypeHook {
+		if jobType != domaintypes.JobTypeSBOM {
 			return "", false
 		}
 		if job.NextID == nil {
@@ -172,13 +172,13 @@ func findFailedGateForReGate(reGateID domaintypes.JobID, jobsByID map[domaintype
 	for prev != nil {
 		jobType := domaintypes.JobType(prev.JobType)
 		switch jobType {
-		case domaintypes.JobTypeHook, domaintypes.JobTypeSBOM:
+		case domaintypes.JobTypeSBOM:
 			prev = lifecycle.RecoveryChainPredecessor(prev.ID, jobsByID)
 		case domaintypes.JobTypeHeal:
 			prev = lifecycle.RecoveryChainPredecessor(prev.ID, jobsByID)
 			for prev != nil {
 				switch domaintypes.JobType(prev.JobType) {
-				case domaintypes.JobTypeHook, domaintypes.JobTypeSBOM:
+				case domaintypes.JobTypeSBOM:
 					prev = lifecycle.RecoveryChainPredecessor(prev.ID, jobsByID)
 				case domaintypes.JobTypePreGate, domaintypes.JobTypePostGate, domaintypes.JobTypeReGate:
 					return prev

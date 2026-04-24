@@ -148,7 +148,7 @@ func TestCompleteJob_PromotesLinkedNextJob(t *testing.T) {
 	}
 }
 
-func TestCompleteJob_SBOMAndHookSuccessPromoteLinkedNextJob(t *testing.T) {
+func TestCompleteJob_SBOMSuccessPromoteLinkedNextJob(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -156,7 +156,6 @@ func TestCompleteJob_SBOMAndHookSuccessPromoteLinkedNextJob(t *testing.T) {
 		jobType domaintypes.JobType
 	}{
 		{name: "sbom", jobType: domaintypes.JobTypeSBOM},
-		{name: "hook", jobType: domaintypes.JobTypeHook},
 	}
 
 	for _, tc := range tests {
@@ -212,7 +211,7 @@ func TestCompleteJob_PostAndReGatePreludeSuccessPromoteLinkedNextJob(t *testing.
 			jobName: "post-gate-sbom",
 			spec:    []byte(`{"steps":[{"image":"mig:latest"}]}`),
 		},
-		{name: "regate_hook", jobType: domaintypes.JobTypeHook, jobName: "re-gate-1-hook-000"},
+		{name: "regate_sbom", jobType: domaintypes.JobTypeSBOM, jobName: "re-gate-1-sbom"},
 	}
 
 	for _, tc := range tests {
@@ -290,7 +289,6 @@ func TestCompleteJob_NonGateFailureCancelsRemainingJobs(t *testing.T) {
 	}{
 		{name: "mig", jobType: domaintypes.JobTypeMig},
 		{name: "sbom", jobType: domaintypes.JobTypeSBOM},
-		{name: "hook", jobType: domaintypes.JobTypeHook},
 	}
 
 	for _, tc := range tests {
@@ -392,7 +390,7 @@ func TestCompleteJob_PostAndReGatePreludeFailureCancelsRemainingJobs(t *testing.
 		},
 		{
 			name:          "regate_hook_failure",
-			jobType:       domaintypes.JobTypeHook,
+			jobType:       domaintypes.JobTypeSBOM,
 			jobName:       "re-gate-1-hook-000",
 			successorName: "re-gate-1",
 			successorType: domaintypes.JobTypeReGate,

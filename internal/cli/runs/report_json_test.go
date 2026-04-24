@@ -40,8 +40,6 @@ func TestRenderRunReportJSON(t *testing.T) {
 						Status:              "Running",
 						DurationMs:          1234,
 						DisplayName:         "step-1",
-						HookPlanReason:      "hook planned",
-						HookConditionResult: "{\"evaluated\":true}",
 						SBOMEvidence: &RunJobSBOMEvidence{
 							ArtifactPresent:     boolPtr(true),
 							ParsedPackageCount: intPtr(42),
@@ -96,12 +94,6 @@ func TestRenderRunReportJSON(t *testing.T) {
 	if !ok || len(artifacts) != 1 {
 		t.Fatalf("expected one artifact in payload: %v", job0["artifacts"])
 	}
-	if got := job0["hook_plan_reason"]; got != "hook planned" {
-		t.Fatalf("unexpected hook_plan_reason: %#v", got)
-	}
-	if got := job0["hook_condition_result"]; got != "{\"evaluated\":true}" {
-		t.Fatalf("unexpected hook_condition_result: %#v", got)
-	}
 	sbomEvidence, ok := job0["sbom_evidence"].(map[string]any)
 	if !ok {
 		t.Fatalf("expected sbom_evidence object in payload: %#v", job0["sbom_evidence"])
@@ -145,8 +137,6 @@ func TestRenderRunReportJSONOmitsEmptyOptionalFields(t *testing.T) {
 		"patch_url",
 		"last_error",
 		"artifacts",
-		"hook_plan_reason",
-		"hook_condition_result",
 		"sbom_evidence",
 	} {
 		if strings.Contains(out, "\""+field+"\"") {

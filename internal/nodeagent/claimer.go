@@ -65,12 +65,10 @@ type ClaimResponse struct {
 	Spec                   json.RawMessage                      `json:"spec,omitempty"`
 	SBOMContext            *contracts.SBOMJobMetadata           `json:"sbom_context,omitempty"`
 	MigContext             *contracts.MigClaimContext           `json:"mig_context,omitempty"`
-	HookContext            *contracts.HookClaimContext          `json:"hook_context,omitempty"`
 	GateContext            *contracts.GateClaimContext          `json:"gate_context,omitempty"`
 	JavaClasspathContext   *contracts.JavaClasspathClaimContext `json:"java_classpath_context,omitempty"`
 	DetectedStack          *contracts.StackExpectation          `json:"detected_stack,omitempty"`
 	RecoveryContext        *contracts.RecoveryClaimContext      `json:"recovery_context,omitempty"`
-	HookRuntime            *contracts.HookRuntimeDecision       `json:"hook_runtime,omitempty"`
 }
 
 // NewClaimManager constructs a claim manager for the unified jobs queue.

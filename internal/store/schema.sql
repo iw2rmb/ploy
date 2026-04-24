@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS ploy.schema_version (
 -- - run_status: Started | Cancelled | Finished
 -- - run_repo_status: Queued | Running | Cancelled | Fail | Success
 -- - job_status: Created | Queued | Running | Success | Fail | Error | Cancelled
--- - job_type: pre_gate | mig | post_gate | heal | re_gate | sbom | hook
+-- - job_type: pre_gate | mig | post_gate | heal | re_gate | sbom
 --
 -- Capitalized values are canonical; no aliases.
 DO $$
@@ -57,7 +57,7 @@ BEGIN
     JOIN pg_namespace n ON n.oid = t.typnamespace
     WHERE t.typname = 'job_type' AND n.nspname = 'ploy'
   ) THEN
-    CREATE TYPE job_type AS ENUM ('pre_gate', 'mig', 'post_gate', 'heal', 're_gate', 'sbom', 'hook');
+    CREATE TYPE job_type AS ENUM ('pre_gate', 'mig', 'post_gate', 'heal', 're_gate', 'sbom');
   END IF;
 END $$;
 
@@ -343,23 +343,6 @@ CREATE TABLE IF NOT EXISTS sboms (
 CREATE INDEX IF NOT EXISTS sboms_repo_lib_ver_idx ON sboms(repo_id, lib, ver);
 CREATE INDEX IF NOT EXISTS sboms_job_idx ON sboms(job_id);
 
--- Hook once-by-hash ledger keyed by run/repo and hook hash.
--- Records successful hook execution and whether a once-skip marker was observed.
-CREATE TABLE IF NOT EXISTS hooks_once (
-  run_id               TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
-  repo_id              TEXT NOT NULL REFERENCES repos(id) ON DELETE CASCADE,
-  hook_hash            TEXT NOT NULL CHECK (hook_hash ~ '^[0-9a-f]{64}$'),
-  first_success_job_id TEXT REFERENCES jobs(id) ON DELETE SET NULL,
-  last_success_job_id  TEXT REFERENCES jobs(id) ON DELETE SET NULL,
-  last_skip_job_id     TEXT REFERENCES jobs(id) ON DELETE SET NULL,
-  once_skip_marked     BOOLEAN NOT NULL DEFAULT false,
-  created_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
-  PRIMARY KEY (run_id, repo_id, hook_hash)
-);
-CREATE INDEX IF NOT EXISTS hooks_once_repo_idx ON hooks_once(repo_id);
-CREATE INDEX IF NOT EXISTS hooks_once_hash_idx ON hooks_once(hook_hash);
-
 -- Events (append-only)
 -- Note: run_id and job_id are TEXT (KSUID-backed) to match runs.id and jobs.id.
 -- events.id is BIGSERIAL for monotonic cursor semantics (since-id pagination).
@@ -524,13 +507,13 @@ CREATE INDEX IF NOT EXISTS config_env_target_idx ON config_env(target);
 -- Global CA Entries (config_ca)
 -- Stores canonical CA certificate hash entries for injection into jobs.
 -- Each entry is a shortHash (7-64 hex chars) referencing a content-addressed bundle.
--- section controls which job phase receives the CA entry (pre_gate, re_gate, post_gate, mig, heal, sbom, hook).
+-- section controls which job phase receives the CA entry (pre_gate, re_gate, post_gate, mig, heal, sbom).
 -- Composite primary key on (hash, section) allows one hash to target multiple sections.
 -- Ordering within a section is deterministic by hash ASC.
 DROP TABLE IF EXISTS config_ca;
 CREATE TABLE IF NOT EXISTS config_ca (
   hash        TEXT NOT NULL CHECK (hash ~ '^[0-9a-f]{7,64}$'),  -- Canonical shortHash
-  section     TEXT NOT NULL CHECK (section IN ('pre_gate', 're_gate', 'post_gate', 'mig', 'heal', 'sbom', 'hook')),
+  section     TEXT NOT NULL CHECK (section IN ('pre_gate', 're_gate', 'post_gate', 'mig', 'heal', 'sbom')),
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (hash, section)
 );

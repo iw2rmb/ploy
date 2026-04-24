@@ -21,7 +21,6 @@ func TestRouteCompleteJobServiceType(t *testing.T) {
 		{name: "mig", jobType: domaintypes.JobTypeMig, want: completeJobServiceTypeStep, wantOK: true},
 		{name: "heal", jobType: domaintypes.JobTypeHeal, want: completeJobServiceTypeStep, wantOK: true},
 		{name: "sbom", jobType: domaintypes.JobTypeSBOM, want: completeJobServiceTypeSBOM, wantOK: true},
-		{name: "hook", jobType: domaintypes.JobTypeHook, want: completeJobServiceTypeHook, wantOK: true},
 		{name: "unknown", jobType: domaintypes.JobType("unknown"), want: "", wantOK: false},
 	}
 

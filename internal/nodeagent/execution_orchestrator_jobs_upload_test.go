@@ -2,7 +2,6 @@ package nodeagent
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"net/http"
 	"path/filepath"
@@ -10,7 +9,6 @@ import (
 
 	"github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
-	"github.com/iw2rmb/ploy/internal/workflow/hook"
 	"github.com/iw2rmb/ploy/internal/workflow/step"
 )
 
@@ -424,10 +422,10 @@ func TestRunController_reportTerminalStatus(t *testing.T) {
 			wantStatus: types.JobStatusFail.String(),
 		},
 		{
-			name:       "hook exit code one reports error",
-			jobType:    types.JobTypeHook,
+			name:       "sbom exit code one reports fail",
+			jobType:    types.JobTypeSBOM,
 			exitCode:   1,
-			wantStatus: types.JobStatusError.String(),
+			wantStatus: types.JobStatusFail.String(),
 		},
 		{
 			name:       "heal exit code one reports error",
@@ -469,99 +467,5 @@ func TestRunController_reportTerminalStatus(t *testing.T) {
 				t.Errorf("status = %q, want %q", cap.Status, tt.wantStatus)
 			}
 		})
-	}
-}
-
-func TestEncodeHookConditionResult_EmitsStructuredJSON(t *testing.T) {
-	t.Parallel()
-
-	raw := encodeHookConditionResult(&contracts.HookRuntimeDecision{
-		HookHash:      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-		HookShouldRun: true,
-	})
-
-	var decoded struct {
-		Evaluated bool   `json:"evaluated"`
-		ShouldRun bool   `json:"should_run"`
-		Hash      string `json:"hash"`
-	}
-	if err := json.Unmarshal([]byte(raw), &decoded); err != nil {
-		t.Fatalf("unmarshal condition result: %v", err)
-	}
-	if !decoded.Evaluated {
-		t.Fatalf("evaluated=%v, want true", decoded.Evaluated)
-	}
-	if !decoded.ShouldRun {
-		t.Fatalf("should_run=%v, want true", decoded.ShouldRun)
-	}
-	if decoded.Hash != "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" {
-		t.Fatalf("hash=%q, want hook hash", decoded.Hash)
-	}
-}
-
-func TestEncodeHookCommandIdentity_EmitsStructuredJSON(t *testing.T) {
-	t.Parallel()
-
-	raw := encodeHookCommandIdentityList("aa11bb22", []hook.Step{{
-		Name:    "security-scan",
-		Image:   contracts.JobImage{Universal: "hook:latest"},
-		Command: []string{"scan", "--sbom", "/in/sbom.spdx.json", "--out", "/out/sbom.spdx.json"},
-	}}, contracts.MigStackJavaGradle)
-
-	var decoded struct {
-		Source string `json:"source"`
-		Steps  []struct {
-			Name    string   `json:"name"`
-			Image   string   `json:"image"`
-			Command []string `json:"command"`
-		} `json:"steps"`
-	}
-	if err := json.Unmarshal([]byte(raw), &decoded); err != nil {
-		t.Fatalf("unmarshal command identity: %v", err)
-	}
-	if decoded.Source != "aa11bb22" {
-		t.Fatalf("source=%q, want aa11bb22", decoded.Source)
-	}
-	if len(decoded.Steps) != 1 {
-		t.Fatalf("steps len=%d, want 1", len(decoded.Steps))
-	}
-	if decoded.Steps[0].Name != "security-scan" {
-		t.Fatalf("steps[0].name=%q, want security-scan", decoded.Steps[0].Name)
-	}
-	if decoded.Steps[0].Image != "hook:latest" {
-		t.Fatalf("steps[0].image=%q, want hook:latest", decoded.Steps[0].Image)
-	}
-	if len(decoded.Steps[0].Command) != 5 {
-		t.Fatalf("steps[0].command len=%d, want 5", len(decoded.Steps[0].Command))
-	}
-}
-
-func TestEncodeHookCommandIdentity_ResolvesStackSpecificImage(t *testing.T) {
-	t.Parallel()
-
-	raw := encodeHookCommandIdentityList("aa11bb22", []hook.Step{{
-		Name: "security-scan",
-		Image: contracts.JobImage{
-			ByStack: map[contracts.MigStack]string{
-				contracts.MigStackDefault:    "hook:default",
-				contracts.MigStackJavaGradle: "hook:gradle",
-			},
-		},
-		Command: []string{"scan"},
-	}}, contracts.MigStackJavaGradle)
-
-	var decoded struct {
-		Steps []struct {
-			Image string `json:"image"`
-		} `json:"steps"`
-	}
-	if err := json.Unmarshal([]byte(raw), &decoded); err != nil {
-		t.Fatalf("unmarshal command identity: %v", err)
-	}
-	if len(decoded.Steps) != 1 {
-		t.Fatalf("steps len=%d, want 1", len(decoded.Steps))
-	}
-	if decoded.Steps[0].Image != "hook:gradle" {
-		t.Fatalf("steps[0].image=%q, want hook:gradle", decoded.Steps[0].Image)
 	}
 }

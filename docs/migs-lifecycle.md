@@ -1415,8 +1415,7 @@ The CLI entry points for Migs are implemented in CLI implementation:
   - Healing rows keep `Exit <code>: <one-liner>` without an error-kind prefix.
   - `--json` output passes through full repo-job `recovery` payload from
     `GET /v1/runs/{run_id}/repos/{repo_id}/jobs` (including `loop_kind`,
-    classifier fields, and candidate audit fields), hook planning evidence
-    (`hook_condition_result`, `hook_plan_reason`), and sbom evidence metadata
+    classifier fields, and candidate audit fields), and sbom evidence metadata
     (`sbom_evidence.artifact_present`, `sbom_evidence.parsed_package_count`).
   - Artifact links are rendered as OSC8 hyperlinks in terminal mode and include
     `auth_token` query parameters for browser/OSC8 flows.

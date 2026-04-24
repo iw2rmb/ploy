@@ -206,7 +206,7 @@ func TestClaimService_Claim_TerminalPayloadErrorCompletesClaimedJob(t *testing.T
 		NodeID:      &nodeID,
 		Name:        "pre-gate-hook-000",
 		Status:      domaintypes.JobStatusRunning,
-		JobType:     domaintypes.JobTypeHook,
+		JobType:     domaintypes.JobTypeSBOM,
 	}
 	st.claimJob.val = claimed
 	st.getJobResult = claimed

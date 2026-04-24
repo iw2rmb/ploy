@@ -223,7 +223,7 @@ func TestSaveJobImageName_SuccessSBOMJob(t *testing.T) {
 	}
 }
 
-func TestSaveJobImageName_SuccessHookJob(t *testing.T) {
+func TestSaveJobImageName_SuccessHealJob(t *testing.T) {
 	t.Parallel()
 
 	nodeIDStr := domaintypes.NewNodeKey()
@@ -236,13 +236,13 @@ func TestSaveJobImageName_SuccessHookJob(t *testing.T) {
 		RunID:   runID,
 		NodeID:  &nodeID,
 		Status:  domaintypes.JobStatusRunning,
-		JobType: "hook",
+		JobType: "heal",
 	}
 
 	st := &jobStore{getJobResult: job}
 	handler := saveJobImageNameHandler(st)
 
-	body, _ := json.Marshal(map[string]any{"image": "docker.io/example/hook:latest"})
+	body, _ := json.Marshal(map[string]any{"image": "docker.io/example/heal:latest"})
 	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/image", bytes.NewReader(body))
 	req.SetPathValue("job_id", jobID.String())
 	req.Header.Set(nodeUUIDHeader, nodeIDStr)

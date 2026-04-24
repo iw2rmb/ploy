@@ -68,22 +68,9 @@ type JobMeta struct {
 	// Only populated for mig jobs (kind="mig") when a step name is provided.
 	MigStepName string `json:"mig_step_name,omitempty"`
 
-	// HookSource stores the fully resolved hook manifest source for hook jobs.
-	// Populated for hook jobs (kind="mig") so claim-time runtime does not need to
-	// re-resolve source entries that may expand from directories.
-	HookSource string `json:"hook_source,omitempty"`
-
 	// MigStepIndex stores the concrete mig step index selected for this job.
 	// Populated for mig jobs so execution does not depend on job name parsing.
 	MigStepIndex *int `json:"mig_step_index,omitempty"`
-
-	// HookCycleName stores the concrete gate cycle name used by hook jobs.
-	// Examples: pre-gate, post-gate, re-gate-1.
-	HookCycleName string `json:"hook_cycle_name,omitempty"`
-
-	// HookIndex stores the concrete hook index selected for this job.
-	// Populated for hook jobs so execution does not depend on job name parsing.
-	HookIndex *int `json:"hook_index,omitempty"`
 
 	// GateCycleName stores the concrete gate cycle name used by gate/re-gate jobs.
 	// Examples: pre-gate, post-gate, re-gate-1.
@@ -103,7 +90,7 @@ type JobMeta struct {
 	RecoveryMetadata *RecoveryJobMetadata `json:"recovery,omitempty"`
 
 	// SBOM stores cycle context for sbom jobs and related runtime planning.
-	// Allowed for mig jobs (sbom/hook job types are mig-kind metadata).
+	// Allowed for mig jobs.
 	SBOM *SBOMJobMetadata `json:"sbom,omitempty"`
 }
 
@@ -198,34 +185,12 @@ func (m JobMeta) Validate() error {
 			return fmt.Errorf("action_summary: must be at most 200 characters, got %d", utf8.RuneCountInString(m.ActionSummary))
 		}
 	}
-	if m.HookSource != "" && m.Kind != JobKindMig {
-		return fmt.Errorf("hook_source present but kind is %q (only allowed for %q)", m.Kind, JobKindMig)
-	}
 	if m.MigStepIndex != nil {
 		if m.Kind != JobKindMig {
 			return fmt.Errorf("mig_step_index present but kind is %q (only allowed for %q)", m.Kind, JobKindMig)
 		}
 		if *m.MigStepIndex < 0 {
 			return fmt.Errorf("mig_step_index: must be >= 0")
-		}
-	}
-	if m.HookCycleName != "" {
-		if m.Kind != JobKindMig {
-			return fmt.Errorf("hook_cycle_name present but kind is %q (only allowed for %q)", m.Kind, JobKindMig)
-		}
-		if strings.ContainsAny(m.HookCycleName, "\n\r\t") {
-			return fmt.Errorf("hook_cycle_name: must not contain control whitespace")
-		}
-		if strings.TrimSpace(m.HookCycleName) != m.HookCycleName {
-			return fmt.Errorf("hook_cycle_name: must not have leading or trailing whitespace")
-		}
-	}
-	if m.HookIndex != nil {
-		if m.Kind != JobKindMig {
-			return fmt.Errorf("hook_index present but kind is %q (only allowed for %q)", m.Kind, JobKindMig)
-		}
-		if *m.HookIndex < 0 {
-			return fmt.Errorf("hook_index: must be >= 0")
 		}
 	}
 	if m.GateCycleName != "" {

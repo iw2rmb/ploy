@@ -243,12 +243,10 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 		JobName:                claim.JobName, // Job name for branch identification
 		SBOMContext:            claim.SBOMContext,
 		MigContext:             claim.MigContext,
-		HookContext:            claim.HookContext,
 		GateContext:            claim.GateContext,
 		JavaClasspathContext:   claim.JavaClasspathContext,
 		DetectedStack:          claim.DetectedStack,
 		RecoveryContext:        claim.RecoveryContext,
-		HookRuntime:            claim.HookRuntime,
 		TypedOptions:           typedOpts, // Strongly-typed run options (canonical source of truth)
 		Env:                    envFromSpec,
 	}

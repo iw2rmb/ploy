@@ -102,7 +102,7 @@ func TestResolveInFromSourceJob(t *testing.T) {
 		{
 			name: "missing source by type",
 			selector: contracts.InFromURI{
-				SourceType: domaintypes.JobTypeHook,
+				SourceType: domaintypes.JobTypePreGate,
 			},
 			wantErr: true,
 		},
