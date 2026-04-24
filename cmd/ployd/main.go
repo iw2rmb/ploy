@@ -121,6 +121,17 @@ func runMain() int {
 		slog.Error("seed gate catalog defaults", "err", err, "catalog", catalogPath)
 		return 1
 	}
+	mavenReconcileStats, err := reconcileMavenGateProfiles(ctx, newSQLMavenGateProfileReconcileStore(st.Pool()), bs)
+	if err != nil {
+		slog.Error("reconcile maven gate profiles", "err", err)
+		return 1
+	}
+	slog.Info(
+		"reconciled maven gate profiles",
+		"scanned", mavenReconcileStats.Scanned,
+		"rewritten", mavenReconcileStats.Rewritten,
+		"unchanged", mavenReconcileStats.Unchanged,
+	)
 
 	// Initialize blobpersist service for coordinated DB + object store writes.
 	bp := blobpersist.New(st, bs)
