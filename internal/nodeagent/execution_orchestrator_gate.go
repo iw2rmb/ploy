@@ -106,7 +106,6 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 	if gateErr != nil || gateResult == nil {
 		duration := time.Since(startTime)
 		r.cleanupGateOutDir(workspace)
-		repoSHAOut := r.computeRepoSHAOut(ctx, req, workspace, "")
 		errMsg := gateErr
 		if errMsg == nil {
 			errMsg = errors.New("gate returned nil result with nil error")
@@ -117,7 +116,7 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 			Error(fmt.Sprintf("gate execution failed: %s", errMsg.Error())).
 			MustBuild()
 
-		if uploadErr := r.uploadStatus(ctx, req.RunID.String(), types.JobStatusError.String(), nil, stats, req.JobID, repoSHAOut); uploadErr != nil {
+		if uploadErr := r.uploadStatus(ctx, req.RunID.String(), types.JobStatusError.String(), nil, stats, req.JobID); uploadErr != nil {
 			slog.Error("failed to upload gate error status after gate execution error",
 				"run_id", req.RunID,
 				"job_id", req.JobID,
@@ -158,10 +157,6 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 	r.cleanupGateOutDir(workspace)
 
 	duration := time.Since(startTime)
-	repoSHAOut := r.computeRepoSHAOut(ctx, req, workspace, "")
-
-	// Build stats with gate metadata.
-	stats := r.buildGateJobStats(gateResult, duration)
 
 	// Determine status and exit code based on gate outcome.
 	status := types.JobStatusSuccess
@@ -172,6 +167,32 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 		exitCode = 1
 		logVerb = "failed"
 	}
+	repoSHAOut := ""
+	if status == types.JobStatusSuccess {
+		var repoSHAErr error
+		repoSHAOut, repoSHAErr = r.computeRepoSHAOut(ctx, req, workspace, "")
+		if repoSHAErr != nil {
+			stats := r.buildGateJobStats(gateResult, duration)
+			var errorExitCode int32 = -1
+			if uploadErr := r.uploadStatus(ctx, req.RunID.String(), types.JobStatusError.String(), &errorExitCode, stats, req.JobID); uploadErr != nil {
+				slog.Error("failed to upload gate error status after repo_sha_out failure",
+					"run_id", req.RunID,
+					"job_id", req.JobID,
+					"error", uploadErr,
+				)
+			}
+			slog.Error("gate job errored due to repo_sha_out failure",
+				"run_id", req.RunID,
+				"job_id", req.JobID,
+				"duration", duration,
+				"error", repoSHAErr,
+			)
+			return
+		}
+	}
+
+	// Build stats with gate metadata.
+	stats := r.buildGateJobStats(gateResult, duration)
 	if uploadErr := r.uploadStatus(ctx, req.RunID.String(), status.String(), &exitCode, stats, req.JobID, repoSHAOut); uploadErr != nil {
 		slog.Error("failed to upload gate status", "run_id", req.RunID, "job_id", req.JobID, "status", status, "error", uploadErr)
 	}
