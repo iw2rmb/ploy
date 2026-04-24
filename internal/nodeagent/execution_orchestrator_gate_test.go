@@ -22,10 +22,9 @@ func TestApplyGatePhaseOverrides(t *testing.T) {
 	cases := []struct {
 		name                  string
 		jobType               types.JobType
-		recoveryCtx           *contracts.RecoveryClaimContext
 		buildPreConfig        *contracts.BuildGatePhaseConfig // nil for case 4
 		buildPostConfig       *contracts.BuildGatePhaseConfig
-		wantStackDetect       *contracts.BuildGateStackConfig // nil for re_gate
+		wantStackDetect       *contracts.BuildGateStackConfig
 		wantGateProfile       *contracts.BuildGateProfileOverride
 		wantTarget            string
 		wantEnforceTargetLock bool
@@ -65,40 +64,6 @@ func TestApplyGatePhaseOverrides(t *testing.T) {
 			wantTarget:      contracts.GateProfileTargetAllTests,
 			wantCA:          []string{"ccccccc33333"},
 		},
-		{
-			name:    "re_gate uses stack detection output and post gate_profile override",
-			jobType: types.JobTypeReGate,
-			recoveryCtx: &contracts.RecoveryClaimContext{
-				GateProfileSchemaJSON: `{"type":"object"}`,
-			},
-			buildPreConfig: &contracts.BuildGatePhaseConfig{
-				Stack: pre, GateProfile: preGateProfile,
-				Target: contracts.GateProfileTargetUnit,
-			},
-			buildPostConfig: &contracts.BuildGatePhaseConfig{
-				Stack: post, GateProfile: postGateProfile,
-				CA:     []string{"ddddddd44444"},
-				Target: contracts.GateProfileTargetAllTests,
-			},
-			wantStackDetect:       nil,
-			wantGateProfile:       postGateProfile,
-			wantTarget:            contracts.GateProfileTargetAllTests,
-			wantEnforceTargetLock: true,
-			wantCA:                []string{"ddddddd44444"},
-		},
-		{
-			name:    "re_gate does not enforce target lock for non-infra recovery",
-			jobType: types.JobTypeReGate,
-			recoveryCtx: &contracts.RecoveryClaimContext{
-				LoopKind: "healing",
-			},
-			buildPostConfig: &contracts.BuildGatePhaseConfig{
-				CA:     []string{"eeeeeee55555"},
-				Target: contracts.GateProfileTargetAllTests,
-			},
-			wantEnforceTargetLock: false,
-			wantCA:                []string{"eeeeeee55555"},
-		},
 	}
 
 	for _, tc := range cases {
@@ -109,8 +74,7 @@ func TestApplyGatePhaseOverrides(t *testing.T) {
 			typedOpts.BuildGate.Post = tc.buildPostConfig
 
 			req := StartRunRequest{
-				JobType:         tc.jobType,
-				RecoveryContext: tc.recoveryCtx,
+				JobType: tc.jobType,
 			}
 
 			applyGatePhaseOverrides(&manifest, req, typedOpts)

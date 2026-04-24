@@ -2,10 +2,8 @@ package handlers
 
 import (
 	"bytes"
-	"fmt"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"github.com/iw2rmb/ploy/internal/workflow/gateprofile"
 )
@@ -29,36 +27,8 @@ func applyRepoGateProfileMutator(m map[string]any, gateProfile []byte, jobType d
 	return applyGatePrepOverrideMutator(m, phase, override)
 }
 
-func applyRecoveryCandidatePrepMutator(m map[string]any, job store.Job, jobType domaintypes.JobType) error {
-	if jobType != domaintypes.JobTypeReGate {
-		return nil
-	}
-	if len(job.Meta) == 0 {
-		return nil
-	}
-	jobMeta, err := contracts.UnmarshalJobMeta(job.Meta)
-	if err != nil || jobMeta.RecoveryMetadata == nil {
-		return nil
-	}
-	recovery := jobMeta.RecoveryMetadata
-	if recovery.CandidateValidationStatus != contracts.RecoveryCandidateStatusValid {
-		return nil
-	}
-	if len(bytes.TrimSpace(recovery.CandidateGateProfile)) == 0 {
-		return nil
-	}
-	profile, err := contracts.ParseGateProfileJSON(recovery.CandidateGateProfile)
-	if err != nil {
-		return fmt.Errorf("parse recovery candidate gate_profile: %w", err)
-	}
-	phase, override, err := gateprofile.GateOverrideForJobType(profile, jobType)
-	if err != nil {
-		return err
-	}
-	if override == nil {
-		return nil
-	}
-	return applyGatePrepOverrideMutator(m, phase, override)
+func applyRecoveryCandidatePrepMutator(_ map[string]any, _ domaintypes.JobType) error {
+	return nil
 }
 
 func applyGatePrepOverrideMutator(

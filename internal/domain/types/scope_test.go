@@ -110,26 +110,20 @@ func TestGlobalEnvTarget_MatchesJobType(t *testing.T) {
 	}{
 		// "gates" target matches gate-related jobs.
 		{name: "gates matches pre_gate", target: GlobalEnvTargetGates, jobType: JobTypePreGate, want: true},
-		{name: "gates matches re_gate", target: GlobalEnvTargetGates, jobType: JobTypeReGate, want: true},
 		{name: "gates matches post_gate", target: GlobalEnvTargetGates, jobType: JobTypePostGate, want: true},
 		{name: "gates does not match mig", target: GlobalEnvTargetGates, jobType: JobTypeMig, want: false},
-		{name: "gates does not match heal", target: GlobalEnvTargetGates, jobType: JobTypeHeal, want: false},
 
 		// "steps" target matches step jobs.
 		{name: "steps matches mig", target: GlobalEnvTargetSteps, jobType: JobTypeMig, want: true},
-		{name: "steps matches heal", target: GlobalEnvTargetSteps, jobType: JobTypeHeal, want: true},
 		{name: "steps does not match pre_gate", target: GlobalEnvTargetSteps, jobType: JobTypePreGate, want: false},
-		{name: "steps does not match re_gate", target: GlobalEnvTargetSteps, jobType: JobTypeReGate, want: false},
 		{name: "steps does not match post_gate", target: GlobalEnvTargetSteps, jobType: JobTypePostGate, want: false},
 
 		// "server" target does not match any job type (not job-routed).
 		{name: "server does not match mig", target: GlobalEnvTargetServer, jobType: JobTypeMig, want: false},
-		{name: "server does not match heal", target: GlobalEnvTargetServer, jobType: JobTypeHeal, want: false},
 		{name: "server does not match pre_gate", target: GlobalEnvTargetServer, jobType: JobTypePreGate, want: false},
 
 		// "nodes" target does not match any job type (not job-routed).
 		{name: "nodes does not match mig", target: GlobalEnvTargetNodes, jobType: JobTypeMig, want: false},
-		{name: "nodes does not match heal", target: GlobalEnvTargetNodes, jobType: JobTypeHeal, want: false},
 		{name: "nodes does not match pre_gate", target: GlobalEnvTargetNodes, jobType: JobTypePreGate, want: false},
 
 		// Unknown/empty targets should not match.

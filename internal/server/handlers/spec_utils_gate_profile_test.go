@@ -58,7 +58,7 @@ func TestApplyRepoGateProfileMutator(t *testing.T) {
 		wantErr   string
 	}{
 		{
-			name:      "injects pre_gate from active target",
+			name:      "injects ppost_gate from active target",
 			jobType:   domaintypes.JobTypePreGate,
 			spec:      []byte(`{"steps":[{"image":"docker.io/acme/mig:latest"}]}`),
 			profile:   profile,
@@ -78,8 +78,8 @@ func TestApplyRepoGateProfileMutator(t *testing.T) {
 			wantEnvV:  "0",
 		},
 		{
-			name:      "injects re_gate from active target",
-			jobType:   domaintypes.JobTypeReGate,
+			name:      "injects post_gate from active target",
+			jobType:   domaintypes.JobTypePostGate,
 			spec:      []byte(`{"steps":[{"image":"docker.io/acme/mig:latest"}]}`),
 			profile:   profile,
 			wantPhase: "post",

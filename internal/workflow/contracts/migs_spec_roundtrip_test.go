@@ -53,12 +53,7 @@ func TestMigSpec_RoundTrip_MultiStep(t *testing.T) {
 				MigStackJavaGradle: "mig2:gradle",
 			}}},
 		},
-		BuildGate: &BuildGateConfig{
-			Heal: &HealSpec{
-				Retries: 2,
-				Image:   JobImage{Universal: "amata:latest"},
-			},
-		},
+		BuildGate: &BuildGateConfig{Enabled: true},
 	}
 
 	data, err := json.Marshal(original)
@@ -80,8 +75,8 @@ func TestMigSpec_RoundTrip_MultiStep(t *testing.T) {
 	if !parsed.Steps[1].Image.IsStackSpecific() {
 		t.Errorf("steps[1].image should be stack-specific")
 	}
-	if parsed.BuildGate == nil || parsed.BuildGate.Heal == nil || parsed.BuildGate.Heal.Retries != 2 {
-		t.Errorf("build_gate.heal.retries should be 2")
+	if parsed.BuildGate == nil || !parsed.BuildGate.Enabled {
+		t.Errorf("build_gate.enabled should be true")
 	}
 }
 

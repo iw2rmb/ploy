@@ -92,7 +92,7 @@ func nodeIDPtrOrZero(id *domaintypes.NodeID) domaintypes.NodeID {
 
 func shouldResolveGateProfile(jobType domaintypes.JobType) bool {
 	switch jobType {
-	case domaintypes.JobTypePreGate, domaintypes.JobTypePostGate, domaintypes.JobTypeReGate:
+	case domaintypes.JobTypePreGate, domaintypes.JobTypePostGate:
 		return true
 	default:
 		return false

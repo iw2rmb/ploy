@@ -31,7 +31,7 @@ func TestSmokeWorkflow_HealingDiffs(t *testing.T) {
 	runRepo := fixture.RunRepo
 	t.Logf("✓ Created run: id=%v", run.ID)
 
-	// Create jobs for step 0 and step 1 so ListDiffsByRunRepo can filter by jobs.next_id.
+	// Create jobs for step 0 and step 1 so diffs can be associated with each step job.
 	jobStep0, err := db.CreateJob(ctx, store.CreateJobParams{
 		ID:          domaintypes.NewJobID(),
 		RunID:       run.ID,
@@ -141,18 +141,15 @@ func TestSmokeWorkflow_HealingDiffs(t *testing.T) {
 	}
 	t.Logf("✓ Created step 1 healing diff 2: id=%v", step1Heal2Diff.ID)
 
-	// Verify ListDiffsByRunRepo returns all 5 diffs.
-	allDiffs, err := db.ListDiffsByRunRepo(ctx, store.ListDiffsByRunRepoParams{
-		RunID:  run.ID,
-		RepoID: jobStep0.RepoID,
-	})
+	// Verify ListDiffsByRun returns all 5 diffs for the run.
+	allDiffs, err := db.ListDiffsByRun(ctx, run.ID)
 	if err != nil {
-		t.Fatalf("ListDiffsByRunRepo() failed: %v", err)
+		t.Fatalf("ListDiffsByRun() failed: %v", err)
 	}
 	if len(allDiffs) != 5 {
 		t.Errorf("Expected 5 diffs (2 for step 0 + 3 for step 1), got %d", len(allDiffs))
 	}
-	t.Logf("✓ ListDiffsByRunRepo returned %d diffs", len(allDiffs))
+	t.Logf("✓ ListDiffsByRun returned %d diffs", len(allDiffs))
 
 	// Verify ordering: diffs are ordered by created_at ASC.
 	t.Logf("✓ Verified diff ordering (by created_at)")

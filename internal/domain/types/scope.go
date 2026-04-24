@@ -11,8 +11,8 @@ import (
 // Known persisted values:
 //   - GlobalEnvTargetServer: Inject into the server process
 //   - GlobalEnvTargetNodes: Inject into node agent processes
-//   - GlobalEnvTargetGates: Inject into gate jobs (pre_gate, re_gate, post_gate)
-//   - GlobalEnvTargetSteps: Inject into step jobs (mig, heal)
+//   - GlobalEnvTargetGates: Inject into gate jobs (pre_gate, post_gate)
+//   - GlobalEnvTargetSteps: Inject into step jobs (mig)
 //
 // Unknown values should be rejected at API boundaries using Validate() or ParseGlobalEnvTarget().
 // Empty values are rejected (no default target).
@@ -23,9 +23,9 @@ const (
 	GlobalEnvTargetServer GlobalEnvTarget = "server"
 	// GlobalEnvTargetNodes injects into node agent processes.
 	GlobalEnvTargetNodes GlobalEnvTarget = "nodes"
-	// GlobalEnvTargetGates injects into gate jobs (pre_gate, re_gate, post_gate).
+	// GlobalEnvTargetGates injects into gate jobs (pre_gate, post_gate).
 	GlobalEnvTargetGates GlobalEnvTarget = "gates"
-	// GlobalEnvTargetSteps injects into step jobs (mig, heal).
+	// GlobalEnvTargetSteps injects into step jobs (mig).
 	GlobalEnvTargetSteps GlobalEnvTarget = "steps"
 )
 
@@ -68,15 +68,15 @@ func ParseGlobalEnvTarget(s string) (GlobalEnvTarget, error) {
 // This is the core target-matching logic for global env var injection.
 //
 // Target semantics:
-//   - "gates" → inject into pre_gate, re_gate, and post_gate jobs
-//   - "steps" → inject into mig and heal jobs
+//   - "gates" → inject into pre_gate and post_gate jobs
+//   - "steps" → inject into mig jobs
 //   - "server" / "nodes" → not job-routed (returns false)
 func (t GlobalEnvTarget) MatchesJobType(jobType JobType) bool {
 	switch t {
 	case GlobalEnvTargetGates:
-		return jobType == JobTypePreGate || jobType == JobTypeReGate || jobType == JobTypePostGate
+		return jobType == JobTypePreGate || jobType == JobTypePostGate
 	case GlobalEnvTargetSteps:
-		return jobType == JobTypeMig || jobType == JobTypeHeal
+		return jobType == JobTypeMig
 	default:
 		return false
 	}

@@ -191,12 +191,9 @@ index 1234567..abcdefg 100644
 	t.Logf("✓ Verified %d log chunks stored correctly", len(logs))
 
 	// Step 8: Assert diffs are stored - Verify diffs can be listed by run.
-	diffs, err := db.ListDiffsByRunRepo(ctx, store.ListDiffsByRunRepoParams{
-		RunID:  run.ID,
-		RepoID: job.RepoID,
-	})
+	diffs, err := db.ListDiffsByRun(ctx, run.ID)
 	if err != nil {
-		t.Fatalf("ListDiffsByRunRepo() failed: %v", err)
+		t.Fatalf("ListDiffsByRun() failed: %v", err)
 	}
 	if len(diffs) != 1 {
 		t.Errorf("Expected 1 diff, got %d", len(diffs))
@@ -220,10 +217,16 @@ index 1234567..abcdefg 100644
 	}
 	t.Logf("✓ Verified %d diff row(s) stored correctly", len(diffs))
 
-	// Step 9: Verify the diff can be retrieved individually.
-	fetchedDiff, err := db.GetDiff(ctx, diff.ID)
-	if err != nil {
-		t.Fatalf("GetDiff() failed: %v", err)
+	// Step 9: Verify the created diff can be resolved by ID from run diffs.
+	var fetchedDiff *store.Diff
+	for i := range diffs {
+		if diffs[i].ID.Bytes == diff.ID.Bytes {
+			fetchedDiff = &diffs[i]
+			break
+		}
+	}
+	if fetchedDiff == nil {
+		t.Fatalf("Diff %v not found in ListDiffsByRun() result", diff.ID)
 	}
 	if fetchedDiff.ID.Bytes != diff.ID.Bytes {
 		t.Errorf("Fetched diff ID mismatch: expected %v, got %v", diff.ID, fetchedDiff.ID)

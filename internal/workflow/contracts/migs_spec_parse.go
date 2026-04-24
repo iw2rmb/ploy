@@ -39,7 +39,6 @@ func ParseMigSpecJSON(data []byte) (*MigSpec, error) {
 	if strings.TrimSpace(spec.GitLabPAT) != "" && strings.TrimSpace(spec.GitLabDomain) == "" {
 		spec.GitLabDomain = "gitlab.com"
 	}
-	normalizeHealingDefaults(&spec)
 
 	if err := spec.Validate(); err != nil {
 		return nil, err
@@ -47,17 +46,6 @@ func ParseMigSpecJSON(data []byte) (*MigSpec, error) {
 	normalizeInFromTargets(&spec)
 
 	return &spec, nil
-}
-
-// normalizeHealingDefaults sets default values for the heal spec
-// that cannot be expressed via JSON struct tags (e.g., Retries defaults to 1).
-func normalizeHealingDefaults(spec *MigSpec) {
-	if spec.BuildGate == nil || spec.BuildGate.Heal == nil {
-		return
-	}
-	if spec.BuildGate.Heal.Retries == 0 {
-		spec.BuildGate.Heal.Retries = 1
-	}
 }
 
 func normalizeInFromTargets(spec *MigSpec) {

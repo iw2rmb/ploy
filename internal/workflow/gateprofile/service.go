@@ -91,7 +91,7 @@ func GateOverrideForJobType(
 	switch jobType {
 	case types.JobTypePreGate:
 		phase = contracts.BuildGateProfilePhasePre
-	case types.JobTypePostGate, types.JobTypeReGate:
+	case types.JobTypePostGate:
 		phase = contracts.BuildGateProfilePhasePost
 	default:
 		return "", nil, nil
@@ -223,7 +223,7 @@ func DeriveProfileSnapshotFromOverride(
 		},
 	}
 	switch jobType {
-	case types.JobTypePreGate, types.JobTypePostGate, types.JobTypeReGate:
+	case types.JobTypePreGate, types.JobTypePostGate:
 		switch profile.Targets.Active {
 		case contracts.GateProfileTargetBuild:
 			profile.Targets.Build = targetPassed

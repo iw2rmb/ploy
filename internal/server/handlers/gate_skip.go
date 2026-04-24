@@ -29,7 +29,7 @@ func gatePhasePolicyForJobSpec(rawSpec []byte, jobType domaintypes.JobType) (gat
 	switch jobType {
 	case domaintypes.JobTypePreGate:
 		phase = spec.BuildGate.Pre
-	case domaintypes.JobTypePostGate, domaintypes.JobTypeReGate:
+	case domaintypes.JobTypePostGate:
 		phase = spec.BuildGate.Post
 	default:
 		return gatePhasePolicy{}, nil

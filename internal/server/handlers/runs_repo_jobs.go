@@ -204,11 +204,6 @@ func deriveRunRepoJobName(job store.Job, meta *contracts.JobMeta) string {
 		return "pre-gate"
 	case domaintypes.JobTypePostGate:
 		return "post-gate"
-	case domaintypes.JobTypeReGate:
-		if meta != nil && strings.TrimSpace(meta.GateCycleName) != "" {
-			return strings.TrimSpace(meta.GateCycleName)
-		}
-		return "re-gate"
 	case domaintypes.JobTypeMig:
 		if meta != nil && meta.MigStepIndex != nil {
 			return fmt.Sprintf("mig-%d", *meta.MigStepIndex)
@@ -216,8 +211,6 @@ func deriveRunRepoJobName(job store.Job, meta *contracts.JobMeta) string {
 		return "mig"
 	case domaintypes.JobTypeSBOM:
 		return "sbom"
-	case domaintypes.JobTypeHeal:
-		return "heal"
 	default:
 		return strings.TrimSpace(job.JobType.String())
 	}

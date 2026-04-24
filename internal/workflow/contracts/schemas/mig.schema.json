@@ -23,9 +23,6 @@
     "buildGateObject": {
       "type": "object",
       "properties": {
-        "heal": {
-          "$ref": "#/definitions/healObject"
-        },
         "pre": {
           "$ref": "#/definitions/preObject"
         },
@@ -33,10 +30,6 @@
           "$ref": "#/definitions/postObject"
         }
       },
-      "additionalProperties": true
-    },
-    "healObject": {
-      "type": "object",
       "additionalProperties": true
     },
     "preObject": {

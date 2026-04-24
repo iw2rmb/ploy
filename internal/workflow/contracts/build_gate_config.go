@@ -1,7 +1,6 @@
-// build_gate_config.go defines Build Gate validation and healing configuration types.
+// build_gate_config.go defines Build Gate validation configuration types.
 //
-// These types configure how Build Gate validation runs before/after mig execution
-// and how healing operates when the gate fails.
+// These types configure how Build Gate validation runs before/after mig execution.
 package contracts
 
 import (
@@ -19,10 +18,6 @@ type BuildGateConfig struct {
 
 	// Post configures stack detection policy for the post-gate (and re-gate) phase.
 	Post *BuildGatePhaseConfig `json:"post,omitempty" yaml:"post,omitempty"`
-
-	// Heal configures the single healing action for the heal -> re_gate loop.
-	// When non-nil, gate failures trigger direct heal -> re_gate retries.
-	Heal *HealSpec `json:"heal,omitempty" yaml:"heal,omitempty"`
 
 	// Images provides mig-level image mapping overrides for Build Gate image resolution.
 	// These rules override the default mapping file.
@@ -89,50 +84,6 @@ func (s *BuildGateStackConfig) UnmarshalJSON(data []byte) error {
 		s.Release = r
 	}
 	return nil
-}
-
-// HealSpec describes the single healing action for gate failure recovery.
-// Gate failures trigger direct heal -> re_gate retries bounded by Retries.
-type HealSpec struct {
-	// Retries is the maximum number of healing attempts (default: 1).
-	// Each retry executes the healing action, then re-runs the gate.
-	Retries int `json:"retries,omitempty" yaml:"retries,omitempty"`
-
-	// Image is the container image for the healing action (required).
-	Image JobImage `json:"image,omitempty" yaml:"image,omitempty"`
-
-	// Command is the container command override (optional).
-	Command CommandSpec `json:"command,omitempty" yaml:"command,omitempty"`
-
-	// Envs holds environment variables to inject into the healing container.
-	Envs map[string]string `json:"envs,omitempty" yaml:"envs,omitempty"`
-
-	// CA lists canonical CA certificate entries for the healing container.
-	CA []string `json:"ca,omitempty" yaml:"ca,omitempty"`
-
-	// In lists canonical read-only input entries for the healing container.
-	In []string `json:"in,omitempty" yaml:"in,omitempty"`
-
-	// Out lists canonical read-write output entries for the healing container.
-	Out []string `json:"out,omitempty" yaml:"out,omitempty"`
-
-	// Home lists canonical home-relative entries for the healing container.
-	Home []string `json:"home,omitempty" yaml:"home,omitempty"`
-
-	// Expectations defines typed strategy output contracts for downstream
-	// validation/promotion boundaries.
-	Expectations *RecoveryExpectationsSpec `json:"expectations,omitempty" yaml:"expectations,omitempty"`
-}
-
-// RecoveryExpectationsSpec defines structured expectations for recovery output.
-type RecoveryExpectationsSpec struct {
-	Artifacts []RecoveryExpectedArtifact `json:"artifacts,omitempty" yaml:"artifacts,omitempty"`
-}
-
-// RecoveryExpectedArtifact defines one expected artifact path/schema pair.
-type RecoveryExpectedArtifact struct {
-	Path   string `json:"path,omitempty" yaml:"path,omitempty"`
-	Schema string `json:"schema,omitempty" yaml:"schema,omitempty"`
 }
 
 // BuildGateProfileOverrideToSpecMap converts a BuildGateProfileOverride to the

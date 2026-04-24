@@ -441,67 +441,6 @@ func TestRenderRunReportTextExitOneLinerVariants(t *testing.T) {
 	}
 }
 
-func TestRenderRunReportText_RepoLastErrorIsAttachedToFinalFailedStep(t *testing.T) {
-	t.Parallel()
-
-	sbomFailCode := int32(1)
-	reGateErrCode := int32(-1)
-	lastErr := "materialize re-gate-1 sbom for gate /out: open /tmp/run/gate-cycles/re-gate-1/sbom/out/sbom.spdx.json: no such file or directory"
-
-	report := RunReport{
-		RunID:   domaintypes.NewRunID(),
-		MigID:   domaintypes.NewMigID(),
-		MigName: "regate-last-error",
-		SpecID:  domaintypes.NewSpecID(),
-		Repos: []RunEntry{
-			{
-				RepoID:    domaintypes.NewMigRepoID(),
-				RepoURL:   "https://github.com/acme/re-gate.git",
-				BaseRef:   "main",
-				TargetRef: "ploy/re-gate",
-				Status:    "Fail",
-				Attempt:   1,
-				LastError: &lastErr,
-				Jobs: []RunJobEntry{
-					{
-						JobID:      domaintypes.NewJobID(),
-						JobType:    domaintypes.JobTypeSBOM,
-						Status:     domaintypes.JobStatusFail,
-						ExitCode:   &sbomFailCode,
-						DurationMs: 32000,
-					},
-					{
-						JobID:      domaintypes.NewJobID(),
-						JobType:    domaintypes.JobTypeReGate,
-						Status:     domaintypes.JobStatusError,
-						ExitCode:   &reGateErrCode,
-						DurationMs: 700,
-					},
-				},
-			},
-		},
-	}
-
-	out := renderText(t, report, TextRenderOptions{EnableOSC8: false})
-	if got := strings.Count(out, "materialize re-gate-1 sbom for gate /out"); got != 1 {
-		t.Fatalf("expected exactly one rendered last_error, got %d\noutput:\n%s", got, out)
-	}
-
-	sbomRowIdx := strings.Index(out, "sbom")
-	sbomMsgIdx := strings.Index(out, "Exit 1: "+colorizeErrorText("materialize re-gate-1 sbom for gate /out"))
-	reGateRowIdx := strings.Index(out, "re_gate")
-	reGateErrIdx := strings.Index(out, "Exit -1:")
-	if sbomRowIdx == -1 || reGateRowIdx == -1 || reGateErrIdx == -1 {
-		t.Fatalf("expected sbom/re_gate rows and re_gate exit line, output:\n%s", out)
-	}
-	if sbomMsgIdx != -1 && sbomMsgIdx < reGateRowIdx {
-		t.Fatalf("expected no sbom-attached repo last_error, output:\n%s", out)
-	}
-	if reGateErrIdx < reGateRowIdx {
-		t.Fatalf("expected re_gate exit line after re_gate row, output:\n%s", out)
-	}
-}
-
 func TestRenderRunReportText_HealSummaryWrapsAtEighty(t *testing.T) {
 	t.Parallel()
 

@@ -22,7 +22,7 @@ import (
 // Security/validation:
 // - Requires PLOY_NODE_UUID header and enforces that the job is assigned to that node.
 // - Only allowed while the job is in Running status.
-// - Only allowed for containerized runtime jobs (mig/heal/gate/sbom).
+// - Only allowed for containerized runtime jobs (mig/gate/sbom).
 func saveJobImageNameHandler(st store.Store) http.HandlerFunc {
 	type request struct {
 		Image string `json:"image"`
@@ -84,12 +84,12 @@ func saveJobImageNameHandler(st store.Store) http.HandlerFunc {
 
 		jobType := domaintypes.JobType(job.JobType)
 		switch jobType {
-		case domaintypes.JobTypeMig, domaintypes.JobTypeHeal,
-			domaintypes.JobTypePreGate, domaintypes.JobTypePostGate, domaintypes.JobTypeReGate,
+		case domaintypes.JobTypeMig,
+			domaintypes.JobTypePreGate, domaintypes.JobTypePostGate,
 			domaintypes.JobTypeSBOM:
 			// allowed
 		default:
-			writeHTTPError(w, http.StatusConflict, "job type is %s, expected mig/heal/gate/sbom", job.JobType)
+			writeHTTPError(w, http.StatusConflict, "job type is %s, expected mig/gate/sbom", job.JobType)
 			return
 		}
 

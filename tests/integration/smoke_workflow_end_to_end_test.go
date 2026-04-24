@@ -302,12 +302,9 @@ index abc1234..def5678 100644
 	t.Logf("✓ Verified %d log chunks in correct order", len(logs))
 
 	// Verify diffs are retrievable
-	diffs, err := db.ListDiffsByRunRepo(ctx, store.ListDiffsByRunRepoParams{
-		RunID:  run.ID,
-		RepoID: jobMain.RepoID,
-	})
+	diffs, err := db.ListDiffsByRun(ctx, run.ID)
 	if err != nil {
-		t.Fatalf("ListDiffsByRunRepo() failed: %v", err)
+		t.Fatalf("ListDiffsByRun() failed: %v", err)
 	}
 	if len(diffs) != 1 {
 		t.Errorf("Expected 1 diff, got %d", len(diffs))

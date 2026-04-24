@@ -23,8 +23,7 @@ const (
 )
 
 // executeGateJob runs a build gate validation job.
-// Reports pass/fail status to server. On failure with reason="build-gate",
-// the server will create healing jobs if configured.
+// Reports pass/fail status to server.
 func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest) {
 	startTime := time.Now()
 
@@ -48,7 +47,7 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 		switch req.JobType {
 		case types.JobTypePreGate:
 			stepIdx = 0
-		case types.JobTypePostGate, types.JobTypeReGate:
+		case types.JobTypePostGate:
 			stepIdx = len(typedOpts.Steps) - 1
 		}
 		step := typedOpts.Steps[stepIdx]
@@ -61,7 +60,7 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 				if step.Stack.Inbound != nil && step.Stack.Inbound.Enabled {
 					typedOpts.StackGate = stackGatePhaseSpecToStepGate(step.Stack.Inbound, migImages)
 				}
-			case types.JobTypePostGate, types.JobTypeReGate:
+			case types.JobTypePostGate:
 				if step.Stack.Outbound != nil && step.Stack.Outbound.Enabled {
 					typedOpts.StackGate = stackGatePhaseSpecToStepGate(step.Stack.Outbound, migImages)
 				}
@@ -103,8 +102,8 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 	gateResult, gateErr := r.runGate(ctx, runner, manifest, workspace)
 
 	// Gate execution errors (e.g., Docker pull/create/start failures) are NOT build failures
-	// and must not trigger healing. Treat them as terminal runtime errors for this repo
-	// attempt so the control plane cancels remaining jobs without scheduling heal/re-gate.
+	// and are treated as terminal runtime errors for this repo attempt so the
+	// control plane cancels remaining jobs.
 	if gateErr != nil || gateResult == nil {
 		duration := time.Since(startTime)
 		r.cleanupGateOutDir(workspace)
@@ -125,7 +124,7 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 				"error", uploadErr,
 			)
 		}
-		slog.Error("gate execution failed; marking repo attempt as error (no healing)",
+		slog.Error("gate execution failed; marking repo attempt as error",
 			"run_id", req.RunID,
 			"job_id", req.JobID,
 			"job_type", req.JobType,
@@ -135,13 +134,12 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 		return
 	}
 
-	// Persist the detected stack for this run so mig and healing jobs can
+	// Persist the detected stack for this run so mig jobs can
 	// resolve stack-specific images consistently. This is done for all gate
 	// results (pass or fail) to ensure deterministic image selection.
 	r.persistGateStack(req.RunID, gateResult)
 
-	// Persist the first failing gate log for this run so discrete healing jobs
-	// can hydrate /in/build-gate.log with a trimmed failure view.
+	// Persist the first failing gate log for this run.
 	if !gateResultPassed(gateResult) {
 		r.persistFirstGateFailureLog(req.RunID, gateResult)
 	}
@@ -200,20 +198,8 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 // applyGatePhaseOverrides wires optional per-phase overrides into the gate manifest.
 //
 // Semantics:
-//   - pre_gate may use build_gate.pre.stack as a fallback/override.
-//   - post_gate may use build_gate.post.stack as a fallback/override.
-//   - re_gate must *not* use build_gate.post.stack; it re-runs the gate using the
-//     stackdetect output to select the runtime image/tool.
-//
-// Prep override semantics:
-//   - pre_gate may use build_gate.pre.gate_profile command/env override.
-//   - post_gate may use build_gate.post.gate_profile command/env override.
-//   - re_gate reuses build_gate.post.gate_profile command/env override.
-//
-// Target semantics:
-//   - pre_gate uses build_gate.pre.target.
-//   - post_gate uses build_gate.post.target.
-//   - re_gate reuses build_gate.post.target.
+//   - pre_gate may use build_gate.pre stack/target/gate_profile override.
+//   - post_gate may use build_gate.post stack/target/gate_profile override.
 func applyGatePhaseOverrides(manifest *contracts.StepManifest, req StartRunRequest, typedOpts RunOptions) {
 	if manifest == nil || manifest.Gate == nil {
 		return
@@ -231,18 +217,6 @@ func applyGatePhaseOverrides(manifest *contracts.StepManifest, req StartRunReque
 		contracts.ApplyBuildGatePhaseToGateSpec(manifest.Gate, typedOpts.BuildGate.Post)
 		if typedOpts.BuildGate.Post != nil {
 			manifest.CA = mergeUniqueStringEntries(manifest.CA, typedOpts.BuildGate.Post.CA)
-		}
-	case types.JobTypeReGate:
-		contracts.ApplyBuildGatePhaseToGateSpec(manifest.Gate, typedOpts.BuildGate.Post)
-		if typedOpts.BuildGate.Post != nil {
-			manifest.CA = mergeUniqueStringEntries(manifest.CA, typedOpts.BuildGate.Post.CA)
-		}
-		manifest.Gate.StackDetect = nil // re-gate uses persisted stack from original gate run
-		if req.RecoveryContext != nil {
-			if strings.TrimSpace(req.RecoveryContext.GateProfileSchemaJSON) != "" &&
-				strings.TrimSpace(manifest.Gate.Target) != "" {
-				manifest.Gate.EnforceTargetLock = true
-			}
 		}
 	}
 }

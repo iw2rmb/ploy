@@ -134,11 +134,6 @@ paths:
   # Job-level status polling endpoint — workers use this to detect remote cancellation.
   /v1/jobs/{job_id}/status:
     $ref: "./paths/jobs_job_id_status.yaml"
-  # Job-scoped child-build endpoints for worker polling.short request/confirm flows.
-  /v1/jobs/{parent_job_id}/builds:
-    $ref: "./paths/jobs_parent_job_id_builds.yaml"
-  /v1/jobs/{parent_job_id}/builds/{child_job_id}:
-    $ref: "./paths/jobs_parent_job_id_builds_child_job_id.yaml"
   # Job-level runtime image persistence — nodes persist the resolved container image name (jobs.job_image)
   /v1/jobs/{job_id}/image:
     $ref: "./paths/jobs_job_id_image.yaml"

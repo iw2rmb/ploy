@@ -51,7 +51,7 @@ func TestMutateClaimSpec_GateProfileResolution(t *testing.T) {
 		{
 			name:    "candidate profile wins over repo profile for re_gate",
 			spec:    []byte(`{"envs":{"EXISTING":"1"}}`),
-			jobType: domaintypes.JobTypeReGate,
+			jobType: domaintypes.JobTypePostGate,
 			recoveryMeta: fmt.Sprintf(
 				`{"kind":"gate","recovery":{"loop_kind":"healing","error_kind":"infra","candidate_validation_status":"%s","candidate_gate_profile":{"schema_version":1,"repo_id":"repo_1","runner_mode":"simple","stack":{"language":"go","tool":"go"},"targets":{"active":"unit","unit":{"status":"passed","command":"echo candidate","env":{"SRC":"candidate"}},"build":{"status":"passed","command":"echo candidate build","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[],"post":[]}}}}`,
 				contracts.RecoveryCandidateStatusValid,
@@ -140,41 +140,6 @@ func TestMutateClaimSpec_GateProfileResolution(t *testing.T) {
 				}
 			}
 		})
-	}
-}
-
-func TestMutateClaimSpec_HealInfraAddsSchemaAndArtifacts(t *testing.T) {
-	t.Parallel()
-
-	jobID := domaintypes.NewJobID()
-	out := mustMutateAndUnmarshal(t, claimSpecMutatorInput{
-		spec:    []byte(`{"artifact_paths":["/out/existing.json","/out/a.json"]}`),
-		job:     store.Job{ID: jobID, Meta: []byte(`{"kind":"mig","recovery":{"loop_kind":"healing","error_kind":"infra","strategy_id":"infra-default","expectations":{"artifacts":[{"path":"/out/a.json"},{"path":"/out/a.json"},{"path":"/out/b.json"}]}}}`)},
-		jobType: domaintypes.JobTypeHeal,
-	})
-
-	env := out["env"].(map[string]any)
-	schemaRaw, ok := env[contracts.GateProfileSchemaJSONEnv].(string)
-	if !ok || schemaRaw == "" {
-		t.Fatalf("expected %s in env", contracts.GateProfileSchemaJSONEnv)
-	}
-	if !json.Valid([]byte(schemaRaw)) {
-		t.Fatalf("expected %s to contain valid json", contracts.GateProfileSchemaJSONEnv)
-	}
-
-	paths, ok := out["artifact_paths"].([]any)
-	if !ok {
-		t.Fatalf("artifact_paths=%T, want []any", out["artifact_paths"])
-	}
-	got := map[string]struct{}{}
-	for _, v := range paths {
-		s, _ := v.(string)
-		got[s] = struct{}{}
-	}
-	for _, want := range []string{"/out/existing.json", "/out/a.json", "/out/b.json"} {
-		if _, ok := got[want]; !ok {
-			t.Fatalf("artifact_paths missing %s: %#v", want, paths)
-		}
 	}
 }
 

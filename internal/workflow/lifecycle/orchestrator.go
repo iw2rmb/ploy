@@ -2,11 +2,8 @@ package lifecycle
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"regexp"
-	"strings"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
@@ -40,20 +37,10 @@ func JobStatusFromExitCode(exitCode int) domaintypes.JobStatus {
 
 // JobStatusFromExitCodeForJobType maps process exit codes to terminal status with
 // job-type-specific overrides.
-//
-// Heal jobs treat any non-zero exit as Error because these failures are
-// node/runtime orchestration failures and must not be replayed from Fail cache.
 func JobStatusFromExitCodeForJobType(jobType domaintypes.JobType, exitCode int) domaintypes.JobStatus {
-	if exitCode == 0 {
-		return domaintypes.JobStatusSuccess
-	}
-	if jobType == domaintypes.JobTypeHeal {
-		return domaintypes.JobStatusError
-	}
+	_ = jobType
 	return JobStatusFromExitCode(exitCode)
 }
-
-var sha40Pattern = regexp.MustCompile(`^[0-9a-f]{40}$`)
 
 // ========== Claim Decision ==========
 
@@ -84,8 +71,6 @@ const (
 	CompletionChainCancelRemainder
 	// CompletionChainAdvanceNext promotes the next linked job for execution.
 	CompletionChainAdvanceNext
-	// CompletionChainEvaluateGateFailure requires full gate failure evaluation (cancel or insert heal chain).
-	CompletionChainEvaluateGateFailure
 )
 
 // CompletionDecision is the pure output of completion transition evaluation.
@@ -101,6 +86,7 @@ func EvaluateCompletionDecision(
 	jobStatus domaintypes.JobStatus,
 	hasNext bool,
 ) CompletionDecision {
+	_ = jobType
 	switch jobStatus {
 	case domaintypes.JobStatusSuccess:
 		if hasNext {
@@ -108,154 +94,15 @@ func EvaluateCompletionDecision(
 		}
 		return CompletionDecision{ChainAction: CompletionChainNoAction}
 	case domaintypes.JobStatusFail, domaintypes.JobStatusError, domaintypes.JobStatusCancelled:
-		if jobStatus == domaintypes.JobStatusFail && IsHealingGateJobType(jobType) {
-			return CompletionDecision{ChainAction: CompletionChainEvaluateGateFailure}
-		}
 		return CompletionDecision{ChainAction: CompletionChainCancelRemainder}
 	default:
 		return CompletionDecision{ChainAction: CompletionChainNoAction}
 	}
 }
 
-// ========== Gate Failure Transition ==========
-
-// IsGateJobType reports whether jobType is a gate variant (pre, post, or re-gate).
+// IsGateJobType reports whether jobType is a gate variant (pre or post).
 func IsGateJobType(jobType domaintypes.JobType) bool {
-	return jobType == domaintypes.JobTypePreGate || jobType == domaintypes.JobTypePostGate || jobType == domaintypes.JobTypeReGate
-}
-
-// IsHealingGateJobType reports whether failed gate type can start healing.
-func IsHealingGateJobType(jobType domaintypes.JobType) bool {
-	return jobType == domaintypes.JobTypePostGate || jobType == domaintypes.JobTypeReGate
-}
-
-// GateFailureOutcome is the kind of action required after a gate job fails.
-type GateFailureOutcome int
-
-const (
-	// GateFailureOutcomeCancel cancels remaining jobs in the successor chain.
-	GateFailureOutcomeCancel GateFailureOutcome = iota
-	// GateFailureOutcomeHealChain inserts a heal + re-gate job chain.
-	GateFailureOutcomeHealChain
-)
-
-// HealChainSpec contains the parameters for creating a heal + re-gate job pair.
-// When ShouldAttachCandidate is true, the caller must invoke the infra-candidate
-// enrichment on ReGateMeta.Recovery before marshaling ReGateMeta.
-type HealChainSpec struct {
-	HealID         domaintypes.JobID
-	ReGateID       domaintypes.JobID
-	AttemptNumber  int
-	HealImage      string
-	HealRepoSHAIn  string
-	OldSuccessorID *domaintypes.JobID
-	// HealMeta is the unmaterialized job meta for the heal job.
-	HealMeta *contracts.JobMeta
-	// ReGateMeta is the unmaterialized job meta for the re-gate job.
-	// If ShouldAttachCandidate is true, the caller must enrich
-	// ReGateMeta.Recovery with the infra candidate artifact before marshaling.
-	ReGateMeta *contracts.JobMeta
-	// ShouldAttachCandidate indicates the caller must evaluate and attach the
-	// infra candidate artifact to ReGateMeta.Recovery before marshaling.
-	ShouldAttachCandidate bool
-}
-
-// GateFailureDecision is the pure result of gate failure transition evaluation.
-type GateFailureDecision struct {
-	Outcome      GateFailureOutcome
-	CancelReason string         // non-empty when Outcome == GateFailureOutcomeCancel
-	Chain        *HealChainSpec // non-nil when Outcome == GateFailureOutcomeHealChain
-}
-
-func cancelDecision(reason string) (GateFailureDecision, error) {
-	return GateFailureDecision{Outcome: GateFailureOutcomeCancel, CancelReason: reason}, nil
-}
-
-// EvaluateGateFailureTransition computes what to do after a gate job fails.
-// It is pure: all inputs are pre-loaded and no I/O is performed.
-// newJobID is called to generate IDs for heal and re-gate jobs; pass
-// domaintypes.NewJobID in production and a deterministic stub in tests.
-func EvaluateGateFailureTransition(
-	failedJob store.Job,
-	jobsByID map[domaintypes.JobID]store.Job,
-	recoveryMeta *contracts.BuildGateRecoveryMetadata,
-	detectedStack contracts.MigStack,
-	heal *contracts.HealSpec,
-	newJobID func() domaintypes.JobID,
-) (GateFailureDecision, error) {
-	failedType := domaintypes.JobType(failedJob.JobType)
-	if !IsHealingGateJobType(failedType) {
-		return cancelDecision("healing only allowed for post_gate and re_gate")
-	}
-
-	if heal == nil {
-		return cancelDecision("no healing config")
-	}
-
-	retries := heal.Retries
-	if retries <= 0 {
-		retries = 1
-	}
-
-	baseGateID := resolveBaseGateID(failedJob, jobsByID)
-	healingAttempts := countExistingHealingAttempts(baseGateID, jobsByID)
-	attemptNumber := healingAttempts + 1
-	if attemptNumber > retries {
-		return cancelDecision("healing retries exhausted")
-	}
-
-	healImage, err := heal.Image.ResolveImage(detectedStack)
-	if err != nil {
-		return GateFailureDecision{}, fmt.Errorf("resolve healing image for stack %q: %w", detectedStack, err)
-	}
-
-	healRepoSHAIn := strings.TrimSpace(strings.ToLower(failedJob.RepoShaIn))
-	if !sha40Pattern.MatchString(healRepoSHAIn) {
-		return cancelDecision("invalid failed job repo_sha_in")
-	}
-
-	// Enrich recovery meta expectations from heal spec if not already set.
-	enrichedMeta := CloneRecoveryMetadata(recoveryMeta)
-	if len(enrichedMeta.Expectations) == 0 && heal.Expectations != nil {
-		if b, marshalErr := json.Marshal(heal.Expectations); marshalErr == nil {
-			enrichedMeta.Expectations = b
-		}
-	}
-
-	reGateRecoveryMeta := CloneRecoveryMetadata(enrichedMeta)
-	shouldAttachCandidate := shouldEvaluateInfraCandidate(enrichedMeta, heal)
-	if shouldAttachCandidate {
-		artifactPath := contracts.GateProfileCandidateArtifactPath
-		if p, resolved := resolveRecoveryCandidateArtifactPath(enrichedMeta.Expectations); resolved {
-			artifactPath = p
-		}
-		reGateRecoveryMeta.CandidateSchemaID = contracts.GateProfileCandidateSchemaID
-		reGateRecoveryMeta.CandidateArtifactPath = artifactPath
-	}
-
-	healID := newJobID()
-	reGateID := newJobID()
-
-	return GateFailureDecision{
-		Outcome: GateFailureOutcomeHealChain,
-		Chain: &HealChainSpec{
-			HealID:         healID,
-			ReGateID:       reGateID,
-			AttemptNumber:  attemptNumber,
-			HealImage:      healImage,
-			HealRepoSHAIn:  healRepoSHAIn,
-			OldSuccessorID: failedJob.NextID,
-			HealMeta: &contracts.JobMeta{
-				Kind:             contracts.JobKindMig,
-				RecoveryMetadata: CloneRecoveryMetadata(enrichedMeta),
-			},
-			ReGateMeta: &contracts.JobMeta{
-				Kind:             contracts.JobKindGate,
-				RecoveryMetadata: reGateRecoveryMeta,
-			},
-			ShouldAttachCandidate: shouldAttachCandidate,
-		},
-	}, nil
+	return jobType == domaintypes.JobTypePreGate || jobType == domaintypes.JobTypePostGate
 }
 
 // ========== Recovery Context Resolution ==========
@@ -331,61 +178,6 @@ func clonePtr[T any](p *T) *T {
 	return &v
 }
 
-func resolveBaseGateID(failedJob store.Job, jobsByID map[domaintypes.JobID]store.Job) domaintypes.JobID {
-	failedType := domaintypes.JobType(failedJob.JobType)
-	if failedType != domaintypes.JobTypeReGate {
-		return failedJob.ID
-	}
-
-	currentID := failedJob.ID
-	for range len(jobsByID) {
-		prev := RecoveryChainPredecessor(currentID, jobsByID)
-		if prev == nil {
-			break
-		}
-		prevType := domaintypes.JobType(prev.JobType)
-		if prevType == domaintypes.JobTypePreGate || prevType == domaintypes.JobTypePostGate {
-			return prev.ID
-		}
-		currentID = prev.ID
-	}
-	// For re_gate-root chains (re_gate -> heal -> re_gate -> ...), there is no
-	// pre/post gate predecessor. In that case, currentID points to the earliest
-	// reachable re_gate root and must be used as the base for retry counting.
-	return currentID
-}
-
-func countExistingHealingAttempts(baseGateID domaintypes.JobID, jobsByID map[domaintypes.JobID]store.Job) int {
-	base, ok := jobsByID[baseGateID]
-	if !ok {
-		return 0
-	}
-
-	attempts := 0
-	seen := map[domaintypes.JobID]struct{}{}
-	nextID := base.NextID
-	for nextID != nil {
-		if _, dup := seen[*nextID]; dup {
-			break
-		}
-		seen[*nextID] = struct{}{}
-
-		job, ok := jobsByID[*nextID]
-		if !ok {
-			break
-		}
-		jobType := domaintypes.JobType(job.JobType)
-		if jobType == domaintypes.JobTypeHeal {
-			attempts++
-		}
-		if jobType != domaintypes.JobTypeHeal && jobType != domaintypes.JobTypeReGate {
-			break
-		}
-		nextID = job.NextID
-	}
-	return attempts
-}
-
 // CloneRecoveryMetadata returns a deep copy of src, or nil if src is nil.
 func CloneRecoveryMetadata(src *contracts.BuildGateRecoveryMetadata) *contracts.BuildGateRecoveryMetadata {
 	if src == nil {
@@ -421,54 +213,6 @@ func CloneDepsBumpsMap(src map[string]*string) map[string]*string {
 		out[k] = &ver
 	}
 	return out
-}
-
-func shouldEvaluateInfraCandidate(
-	recoveryMeta *contracts.BuildGateRecoveryMetadata,
-	heal *contracts.HealSpec,
-) bool {
-	if recoveryMeta == nil {
-		return false
-	}
-	kind, ok := contracts.ParseRecoveryErrorKind(recoveryMeta.ErrorKind)
-	if !ok || !contracts.IsInfraRecoveryErrorKind(kind) {
-		return false
-	}
-	if heal == nil || heal.Expectations == nil {
-		return false
-	}
-	for _, artifact := range heal.Expectations.Artifacts {
-		if strings.TrimSpace(artifact.Schema) == contracts.GateProfileCandidateSchemaID {
-			return true
-		}
-	}
-	return false
-}
-
-func resolveRecoveryCandidateArtifactPath(expectations json.RawMessage) (string, bool) {
-	if len(expectations) == 0 {
-		return "", false
-	}
-	var ex struct {
-		Artifacts []struct {
-			Path   string `json:"path"`
-			Schema string `json:"schema"`
-		} `json:"artifacts"`
-	}
-	if err := json.Unmarshal(expectations, &ex); err != nil {
-		return "", false
-	}
-	for _, artifact := range ex.Artifacts {
-		if strings.TrimSpace(artifact.Schema) != contracts.GateProfileCandidateSchemaID {
-			continue
-		}
-		path := strings.TrimSpace(artifact.Path)
-		if path == "" {
-			continue
-		}
-		return path, true
-	}
-	return "", false
 }
 
 // StackExpectationFromMigStack converts a detected MigStack to a StackExpectation,

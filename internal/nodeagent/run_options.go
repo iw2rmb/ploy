@@ -12,7 +12,6 @@ import (
 // RunOptions holds all typed configuration options for a run execution.
 type RunOptions struct {
 	BuildGate      BuildGateOptions
-	Healing        *HealingConfig
 	MRWiring       MRWiringOptions
 	MRFlagsPresent MRFlagsPresence
 	Execution      MigContainerSpec
@@ -32,16 +31,6 @@ type BuildGateOptions struct {
 	Images  []contracts.BuildGateImageRule
 	Pre     *contracts.BuildGatePhaseConfig
 	Post    *contracts.BuildGatePhaseConfig
-}
-
-// HealingConfig describes the heal → re-gate loop configuration.
-type HealingConfig struct {
-	Retries int
-	Mig     MigContainerSpec
-}
-
-func (o RunOptions) HasHealing() bool {
-	return o.Healing != nil && !o.Healing.Mig.Image.IsEmpty()
 }
 
 // MigContainerSpec describes a container's image, command, and env.
@@ -103,24 +92,6 @@ func migsSpecToRunOptions(spec *contracts.MigSpec) RunOptions {
 		runOpts.BuildGate.Images = spec.BuildGate.Images
 		runOpts.BuildGate.Pre = spec.BuildGate.Pre
 		runOpts.BuildGate.Post = spec.BuildGate.Post
-
-		if spec.BuildGate.Heal != nil {
-			heal := spec.BuildGate.Heal
-			healing := &HealingConfig{Retries: heal.Retries}
-			if healing.Retries <= 0 {
-				healing.Retries = 1
-			}
-			healing.Mig = MigContainerSpec{
-				Image:   heal.Image,
-				Command: heal.Command,
-				Env:     copyStringMap(heal.Envs),
-				CA:      heal.CA,
-				In:      heal.In,
-				Out:     heal.Out,
-				Home:    heal.Home,
-			}
-			runOpts.Healing = healing
-		}
 	}
 	runOpts.MRWiring.GitLabPAT = spec.GitLabPAT
 	runOpts.MRWiring.GitLabDomain = spec.GitLabDomain

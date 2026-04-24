@@ -74,9 +74,9 @@ func TestApplyHydraOverlay_GlobalEnvRouting(t *testing.T) {
 		rejectKeys []string
 	}{
 		{domaintypes.JobTypeMig, []string{"STEPS_KEY"}, []string{"GATES_KEY"}},
-		{domaintypes.JobTypeHeal, []string{"STEPS_KEY"}, []string{"GATES_KEY"}},
+		{domaintypes.JobTypeMig, []string{"STEPS_KEY"}, []string{"GATES_KEY"}},
 		{domaintypes.JobTypePreGate, []string{"GATES_KEY"}, []string{"STEPS_KEY"}},
-		{domaintypes.JobTypeReGate, []string{"GATES_KEY"}, []string{"STEPS_KEY"}},
+		{domaintypes.JobTypePostGate, []string{"GATES_KEY"}, []string{"STEPS_KEY"}},
 		{domaintypes.JobTypePostGate, []string{"GATES_KEY"}, []string{"STEPS_KEY"}},
 	} {
 		tests = append(tests, struct {
@@ -314,10 +314,10 @@ func TestApplyHydraOverlay_SectionRouting(t *testing.T) {
 		wantSection string
 	}{
 		{domaintypes.JobTypePreGate, "pre_gate"},
-		{domaintypes.JobTypeReGate, "re_gate"},
+		{domaintypes.JobTypePostGate, "re_gate"},
 		{domaintypes.JobTypePostGate, "post_gate"},
 		{domaintypes.JobTypeMig, "mig"},
-		{domaintypes.JobTypeHeal, "heal"},
+		{domaintypes.JobTypeMig, "heal"},
 	}
 
 	for _, tt := range tests {
@@ -361,7 +361,7 @@ func TestApplyHydraOverlay_HealBlockOverlay(t *testing.T) {
 	}
 	err := applyHydraOverlayMutator(m, claimSpecMutatorInput{
 		job:     store.Job{Meta: []byte(`{}`)},
-		jobType: domaintypes.JobTypeHeal,
+		jobType: domaintypes.JobTypeMig,
 		hydraOverlays: map[string]*HydraJobConfig{
 			"heal": {
 				Envs: map[string]string{"EXISTING": "overlay_val", "HEAL_KEY": "heal_val"},
@@ -820,7 +820,7 @@ func TestApplyHydraOverlay_CanonicalCAInjection(t *testing.T) {
 		},
 		{
 			name:           "re_gate_section_applies_to_build_gate_post",
-			jobType:        domaintypes.JobTypeReGate,
+			jobType:        domaintypes.JobTypePostGate,
 			overlaySection: "re_gate",
 			wantPhase:      "post",
 			wantCA:         "regate1234567ab",

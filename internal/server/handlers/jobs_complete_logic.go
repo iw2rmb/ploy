@@ -164,7 +164,7 @@ func formatStackGateError(jobType domaintypes.JobType, jobMeta json.RawMessage) 
 	switch jobType {
 	case domaintypes.JobTypePreGate:
 		phase = "inbound"
-	case domaintypes.JobTypePostGate, domaintypes.JobTypeReGate:
+	case domaintypes.JobTypePostGate:
 		phase = "outbound"
 	}
 

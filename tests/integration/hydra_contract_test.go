@@ -100,35 +100,6 @@ func TestHydraContract_PrecedenceAndEdgeCases(t *testing.T) {
 		}
 	})
 
-	t.Run("heal_with_hydra_fields_accepted", func(t *testing.T) {
-		t.Parallel()
-		spec := `{
-			"steps": [{"image": "alpine:3.20"}],
-			"build_gate": {
-				"heal": {
-					"retries": 1,
-					"image": "amata:latest",
-					"in": ["eeeeeee:/in/auth.json"],
-					"ca": ["bbbbbbb0123456"]
-				}
-			},
-			"bundle_map": {"bbbbbbb0123456": "bun-2", "eeeeeee": "bun-3"}
-		}`
-		parsed, err := contracts.ParseMigSpecJSON([]byte(spec))
-		if err != nil {
-			t.Fatalf("expected valid spec, got error: %v", err)
-		}
-		if parsed.BuildGate == nil || parsed.BuildGate.Heal == nil {
-			t.Fatal("expected heal to be parsed")
-		}
-		if len(parsed.BuildGate.Heal.In) != 1 {
-			t.Errorf("expected 1 in entry (auth), got %d", len(parsed.BuildGate.Heal.In))
-		}
-		if len(parsed.BuildGate.Heal.CA) != 1 {
-			t.Errorf("expected 1 ca entry, got %d", len(parsed.BuildGate.Heal.CA))
-		}
-	})
-
 	t.Run("envs_key_precedence_spec_wins_over_empty", func(t *testing.T) {
 		t.Parallel()
 		spec := `{
