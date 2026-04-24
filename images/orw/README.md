@@ -68,6 +68,7 @@ Required typed file input:
 - Recipes are resolved dynamically from `RECIPE_GROUP/RECIPE_ARTIFACT`; if `RECIPE_VERSION` is provided, ORW uses it as-is.
 - If `RECIPE_VERSION` is omitted, ORW resolves the latest available recipe version from configured repositories.
 - ORW images execute OpenRewrite in isolated runtime containers instead of invoking Maven/Gradle project tasks directly.
+- Before the first OpenRewrite invocation, `orw-cli` scans workspace `.proto` files and auto-appends proto3/edition files to `ORW_EXCLUDE_PATHS`.
 - When `ORW_AUTO_EXCLUDE_GROOVY_PARSE_FAILURES=true`:
   - failed run with `GroovyParsingException: Failed to parse ...` derives exclusion patterns from failed file paths,
   - appends new paths to `ORW_EXCLUDE_PATHS`,

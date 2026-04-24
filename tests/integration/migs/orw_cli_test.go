@@ -667,6 +667,126 @@ fi
 	}
 }
 
+func TestOrwCLI_PreflightAutoExcludesProto3AndEdition(t *testing.T) {
+	t.Parallel()
+
+	workspace := t.TempDir()
+	outdir := t.TempDir()
+	binDir := t.TempDir()
+	callsFile := filepath.Join(t.TempDir(), "calls.txt")
+
+	proto3Path := filepath.Join(workspace, "src", "main", "resources", "google.type", "date.proto")
+	editionPath := filepath.Join(workspace, "proto", "edition", "features.proto")
+	proto2Path := filepath.Join(workspace, "proto", "legacy.proto")
+	for _, path := range []string{proto3Path, editionPath, proto2Path} {
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatalf("mkdir %s: %v", filepath.Dir(path), err)
+		}
+	}
+
+	if err := os.WriteFile(proto3Path, []byte(`syntax = "proto3";
+message Date { int32 year = 1; }
+`), 0o644); err != nil {
+		t.Fatalf("write proto3 file: %v", err)
+	}
+	if err := os.WriteFile(editionPath, []byte(`/* syntax = "proto2"; */
+edition = "2023";
+message Feature { string name = 1; }
+`), 0o644); err != nil {
+		t.Fatalf("write edition file: %v", err)
+	}
+	if err := os.WriteFile(proto2Path, []byte(`syntax = "proto2";
+message Legacy { optional string name = 1; }
+`), 0o644); err != nil {
+		t.Fatalf("write proto2 file: %v", err)
+	}
+
+	rewritePath := filepath.Join(binDir, "rewrite")
+	rewriteScript := `#!/usr/bin/env bash
+set -euo pipefail
+calls_file="${REWRITE_CALLS_FILE:-}"
+count=0
+if [[ -n "$calls_file" && -f "$calls_file" ]]; then
+  count="$(cat "$calls_file")"
+fi
+count=$((count + 1))
+if [[ -n "$calls_file" ]]; then
+  printf '%s' "$count" > "$calls_file"
+fi
+echo "[rewrite-stub] call=$count"
+echo "[rewrite-stub] excludes=${ORW_EXCLUDE_PATHS:-}"
+if [[ "${ORW_EXCLUDE_PATHS:-}" != *"src/main/resources/google.type/date.proto"* ]]; then
+  echo "[rewrite-stub] missing proto3 preflight exclude" >&2
+  exit 81
+fi
+if [[ "${ORW_EXCLUDE_PATHS:-}" != *"proto/edition/features.proto"* ]]; then
+  echo "[rewrite-stub] missing edition preflight exclude" >&2
+  exit 82
+fi
+if [[ "${ORW_EXCLUDE_PATHS:-}" == *"proto/legacy.proto"* ]]; then
+  echo "[rewrite-stub] proto2 file must not be auto-excluded" >&2
+  exit 83
+fi
+`
+	if err := os.WriteFile(rewritePath, []byte(rewriteScript), 0o755); err != nil {
+		t.Fatalf("write rewrite stub: %v", err)
+	}
+
+	migScript := resolveORWCLIScript(t)
+	cmd := exec.Command("bash", migScript, "--apply", "--dir", workspace, "--out", outdir)
+	cmd.Env = append(os.Environ(),
+		"RECIPE_GROUP=org.openrewrite.recipe",
+		"RECIPE_ARTIFACT=rewrite-migrate-java",
+		"RECIPE_VERSION=3.20.0",
+		"RECIPE_CLASSNAME=org.openrewrite.java.migrate.UpgradeToJava17",
+		"REWRITE_CALLS_FILE="+callsFile,
+		"PATH="+binDir+string(os.PathListSeparator)+os.Getenv("PATH"),
+	)
+
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("orw-cli failed: %v\nstdout/stderr:\n%s", err, string(out))
+	}
+
+	callsRaw, err := os.ReadFile(callsFile)
+	if err != nil {
+		t.Fatalf("read calls file: %v", err)
+	}
+	if strings.TrimSpace(string(callsRaw)) != "1" {
+		t.Fatalf("expected one rewrite invocation, got %q", strings.TrimSpace(string(callsRaw)))
+	}
+
+	logBytes, err := os.ReadFile(filepath.Join(outdir, contracts.ORWCLITransformLogName))
+	if err != nil {
+		t.Fatalf("read transform.log: %v", err)
+	}
+	logText := string(logBytes)
+	if !strings.Contains(logText, "Proto pre-scan auto-exclude candidates:") {
+		t.Fatalf("transform.log missing proto pre-scan marker:\n%s", logText)
+	}
+	if !strings.Contains(logText, "src/main/resources/google.type/date.proto") {
+		t.Fatalf("transform.log missing proto3 path:\n%s", logText)
+	}
+	if !strings.Contains(logText, "proto/edition/features.proto") {
+		t.Fatalf("transform.log missing edition path:\n%s", logText)
+	}
+	if strings.Contains(logText, "proto/legacy.proto") {
+		t.Fatalf("transform.log should not include proto2 path:\n%s", logText)
+	}
+
+	reportBytes, err := os.ReadFile(filepath.Join(outdir, contracts.ORWCLIReportFileName))
+	if err != nil {
+		t.Fatalf("read report.json: %v", err)
+	}
+	report, err := contracts.ParseORWCLIReport(reportBytes)
+	if err != nil {
+		t.Fatalf("parse report.json: %v\nreport=%s", err, string(reportBytes))
+	}
+	if !report.Success {
+		t.Fatalf("report.success=false, expected true: %s", string(reportBytes))
+	}
+}
+
 func TestOrwCLI_SelfTestWritesSuccessReport(t *testing.T) {
 	t.Parallel()
 
