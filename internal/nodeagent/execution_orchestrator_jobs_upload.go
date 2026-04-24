@@ -200,19 +200,17 @@ func (r *runController) uploadGateLogsArtifact(runID types.RunID, jobID types.Jo
 	}
 }
 
-func (r *runController) computeRepoSHAOut(ctx context.Context, req StartRunRequest, workspace string, inputTree string) string {
+func (r *runController) computeRepoSHAOut(ctx context.Context, req StartRunRequest, workspace string, inputTree string) (string, error) {
 	repoSHAIn := strings.TrimSpace(req.RepoSHAIn.String())
 	if repoSHAIn == "" {
-		slog.Warn("repo_sha_in missing on claimed job; skipping repo_sha_out calculation", "run_id", req.RunID, "job_id", req.JobID)
-		return ""
+		return "", fmt.Errorf("repo_sha_in missing on claimed job")
 	}
 	preTree := strings.TrimSpace(inputTree)
 	repoSHAOut, err := gitpkg.ComputeRepoSHAV1(ctx, workspace, repoSHAIn, preTree)
 	if err != nil {
-		slog.Warn("failed to compute repo_sha_out", "run_id", req.RunID, "job_id", req.JobID, "repo_sha_in", repoSHAIn, "error", err)
-		return ""
+		return "", fmt.Errorf("compute repo_sha_out: %w", err)
 	}
-	return repoSHAOut
+	return repoSHAOut, nil
 }
 
 // uploadJobDiff is the shared implementation for generating, summarizing, and uploading

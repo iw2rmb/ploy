@@ -18,14 +18,7 @@ const (
 	repoSHAV1CommitTitle = "ploy repo_sha_v1"
 )
 
-var excludedBuildPathspecs = []string{
-	":(exclude)**/target",
-}
-
-var workspaceTreeAddArgs = append(
-	[]string{"add", "-A", "--", "."},
-	excludedBuildPathspecs...,
-)
+var workspaceTreeAddArgs = []string{"add", "-A", "--", "."}
 
 // ComputeRepoSHAV1 calculates deterministic repo_sha_out for a workspace.
 //
@@ -43,12 +36,11 @@ func ComputeRepoSHAV1(ctx context.Context, repoDir, repoSHAIn string, inputTree 
 		return "", fmt.Errorf("repo_sha_in must match ^[0-9a-f]{40}$")
 	}
 
-	snapshotTree, err := ComputeWorkspaceTreeSHA(ctx, repoDir)
+	inTree, err := resolveInputTree(ctx, repoDir, repoSHAIn, inputTree...)
 	if err != nil {
 		return "", err
 	}
-
-	inTree, err := resolveInputTree(ctx, repoDir, repoSHAIn, inputTree...)
+	snapshotTree, err := computeWorkspaceTreeSHAWithBaseTree(ctx, repoDir, inTree)
 	if err != nil {
 		return "", err
 	}
@@ -75,8 +67,12 @@ func ComputeRepoSHAV1(ctx context.Context, repoDir, repoSHAIn string, inputTree 
 }
 
 // ComputeWorkspaceTreeSHA computes a stable tree hash for the current workspace
-// using a temporary index and excluding build output folders.
+// using a temporary index with pure Git staging semantics.
 func ComputeWorkspaceTreeSHA(ctx context.Context, repoDir string) (string, error) {
+	return computeWorkspaceTreeSHAWithBaseTree(ctx, repoDir, "")
+}
+
+func computeWorkspaceTreeSHAWithBaseTree(ctx context.Context, repoDir, baseTree string) (string, error) {
 	indexFile, err := os.CreateTemp("", "ploy-repo-sha-index-*")
 	if err != nil {
 		return "", fmt.Errorf("create temp index: %w", err)
@@ -94,6 +90,11 @@ func ComputeWorkspaceTreeSHA(ctx context.Context, repoDir string) (string, error
 	}()
 
 	env := []string{"GIT_INDEX_FILE=" + indexPath}
+	if strings.TrimSpace(baseTree) != "" {
+		if _, err := runGitOutput(ctx, repoDir, env, nil, "read-tree", strings.TrimSpace(baseTree)); err != nil {
+			return "", fmt.Errorf("seed workspace snapshot: %w", err)
+		}
+	}
 	if _, err := runGitOutput(ctx, repoDir, env, nil, workspaceTreeAddArgs...); err != nil {
 		return "", fmt.Errorf("stage workspace snapshot: %w", err)
 	}

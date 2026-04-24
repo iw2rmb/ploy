@@ -5,9 +5,11 @@ import (
 	"errors"
 	"net/http"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/testutil/gitrepo"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"github.com/iw2rmb/ploy/internal/workflow/step"
 )
@@ -203,6 +205,64 @@ func TestRunController_uploadStatus(t *testing.T) {
 			checkErr(t, tt.wantErr, err)
 		})
 	}
+}
+
+func TestRunController_computeRepoSHAOut(t *testing.T) {
+	t.Parallel()
+
+	controller := &runController{}
+	ctx := context.Background()
+
+	t.Run("missing repo_sha_in returns error", func(t *testing.T) {
+		t.Parallel()
+
+		repoDir := t.TempDir()
+		initRepoWithFile(t, repoDir, "main.txt", "base\n")
+
+		_, err := controller.computeRepoSHAOut(ctx, StartRunRequest{
+			RunID: "run-1",
+			JobID: "job-1",
+		}, repoDir, "")
+		if err == nil {
+			t.Fatal("computeRepoSHAOut() error = nil, want non-nil")
+		}
+	})
+
+	t.Run("invalid repo_sha_in returns error", func(t *testing.T) {
+		t.Parallel()
+
+		repoDir := t.TempDir()
+		initRepoWithFile(t, repoDir, "main.txt", "base\n")
+
+		_, err := controller.computeRepoSHAOut(ctx, StartRunRequest{
+			RunID:     "run-2",
+			JobID:     "job-2",
+			RepoSHAIn: types.CommitSHA("not-a-sha"),
+		}, repoDir, "")
+		if err == nil {
+			t.Fatal("computeRepoSHAOut() error = nil, want non-nil")
+		}
+	})
+
+	t.Run("valid repo_sha_in returns hash", func(t *testing.T) {
+		t.Parallel()
+
+		repoDir := t.TempDir()
+		initRepoWithFile(t, repoDir, "main.txt", "base\n")
+		headSHA := gitrepo.RevParse(t, repoDir, "HEAD")
+
+		repoSHAOut, err := controller.computeRepoSHAOut(ctx, StartRunRequest{
+			RunID:     "run-3",
+			JobID:     "job-3",
+			RepoSHAIn: types.CommitSHA(headSHA),
+		}, repoDir, "")
+		if err != nil {
+			t.Fatalf("computeRepoSHAOut() error = %v", err)
+		}
+		if !strings.EqualFold(repoSHAOut, headSHA) {
+			t.Fatalf("repo_sha_out = %q, want %q", repoSHAOut, headSHA)
+		}
+	})
 }
 
 func TestRunController_uploadGateLogsArtifact(t *testing.T) {

@@ -686,10 +686,21 @@ func (r *runController) runContainerJob(
 				}
 			}
 			runErr = r.finalizeStandardJobOutputs(req, cfg, outDir, workspace, runErr, step.Result{})
-			repoSHAOut := r.computeRepoSHAOut(ctx, req, workspace, "")
+			repoSHAOut := ""
+			if runErr == nil {
+				var repoSHAErr error
+				repoSHAOut, repoSHAErr = r.computeRepoSHAOut(ctx, req, workspace, "")
+				if repoSHAErr != nil {
+					runErr = repoSHAErr
+					slog.Error("failed to compute repo_sha_out", "run_id", req.RunID, "job_id", req.JobID, "error", repoSHAErr)
+				}
+			}
 			statsBuilder := types.NewRunStatsBuilder().
 				ExitCode(0).
 				DurationMs(duration.Milliseconds())
+			if runErr != nil {
+				statsBuilder.Error(runErr.Error())
+			}
 			stats := statsBuilder.MustBuild()
 			if !cfg.SuppressOutBundle {
 				if err := r.uploadOutDirBundle(ctx, req.RunID, req.JobID, outDir, "mig-out"); err != nil {
@@ -719,7 +730,7 @@ func (r *runController) runContainerJob(
 	}
 	preWorkspaceTree := ""
 	if tree, treeErr := gitpkg.ComputeWorkspaceTreeSHA(ctx, workspace); treeErr != nil {
-		slog.Warn("failed to compute pre-execution workspace tree", "run_id", req.RunID, "job_id", req.JobID, "error", treeErr)
+		return outcome, fmt.Errorf("compute pre-execution workspace tree: %w", treeErr)
 	} else {
 		preWorkspaceTree = tree
 	}
@@ -789,7 +800,15 @@ func (r *runController) runContainerJob(
 		}
 	}
 
-	repoSHAOut := r.computeRepoSHAOut(ctx, req, workspace, preWorkspaceTree)
+	repoSHAOut := ""
+	if runErr == nil && result.ExitCode == 0 {
+		var repoSHAErr error
+		repoSHAOut, repoSHAErr = r.computeRepoSHAOut(ctx, req, workspace, preWorkspaceTree)
+		if repoSHAErr != nil {
+			runErr = repoSHAErr
+			slog.Error("failed to compute repo_sha_out", "run_id", req.RunID, "job_id", req.JobID, "error", repoSHAErr)
+		}
+	}
 
 	statsBuilder := types.NewRunStatsBuilder().
 		ExitCode(result.ExitCode).
@@ -823,6 +842,9 @@ func (r *runController) runContainerJob(
 		for k, v := range orwMeta {
 			statsBuilder.MetadataEntry(k, v)
 		}
+	}
+	if runErr != nil {
+		statsBuilder.Error(runErr.Error())
 	}
 
 	stats := statsBuilder.MustBuild()
