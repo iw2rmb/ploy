@@ -90,20 +90,6 @@ func TestDeriveProfileSnapshotFromOverride(t *testing.T) {
 			},
 		},
 		{
-			name: "regate is accepted",
-			override: &contracts.BuildGateProfileOverride{
-				Command: contracts.CommandSpec{Shell: "./gradlew test"},
-				Stack:   &contracts.GateProfileStack{Language: "java", Tool: "gradle"},
-			},
-			jobType: types.JobTypeReGate,
-			assert: func(t *testing.T, p *contracts.GateProfile) {
-				t.Helper()
-				if p.Targets.Active != contracts.GateProfileTargetAllTests {
-					t.Fatalf("active=%q", p.Targets.Active)
-				}
-			},
-		},
-		{
 			name:    "nil override fails",
 			jobType: types.JobTypePreGate,
 			wantErr: true,
@@ -288,7 +274,6 @@ func TestGateOverrideForJobType(t *testing.T) {
 				}
 			}},
 		{name: "post maps to post", profile: base, jobType: types.JobTypePostGate, wantPhase: contracts.BuildGateProfilePhasePost},
-		{name: "regate maps to post", profile: base, jobType: types.JobTypeReGate, wantPhase: contracts.BuildGateProfilePhasePost},
 		{name: "non gate job returns nil", profile: base, jobType: types.JobTypeMig, wantNil: true},
 		{name: "nil profile returns nil", profile: nil, jobType: types.JobTypePreGate, wantNil: true},
 		{name: "unsupported active target returns nil override", profile: unsupported, jobType: types.JobTypePreGate, wantPhase: contracts.BuildGateProfilePhasePre, wantNil: true},

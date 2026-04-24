@@ -81,15 +81,7 @@ func TestParseMigSpecJSON_MultiStep(t *testing.T) {
 			{"name": "step-1", "image": "ghcr.io/iw2rmb/ploy/mig1:latest", "command": ["echo", "step1"], "envs": {"STEP": "1"}},
 			{"name": "step-2", "image": "ghcr.io/iw2rmb/ploy/mig2:latest", "envs": {"STEP": "2"}}
 		],
-		"build_gate": {
-			"enabled": true,
-			"heal": {
-				"retries": 3,
-				"image": "ghcr.io/iw2rmb/ploy/java-17-codex-amata-maven:latest",
-				"command": "fix-it",
-				"envs": {"PROMPT": "fix the build"}
-			}
-		}
+		"build_gate": {"enabled": true}
 	}`
 
 	spec, err := ParseMigSpecJSON([]byte(input))
@@ -122,22 +114,6 @@ func TestParseMigSpecJSON_MultiStep(t *testing.T) {
 	mig2 := spec.Steps[1]
 	if mig2.Name != "step-2" {
 		t.Errorf("steps[1].name = %q, want %q", mig2.Name, "step-2")
-	}
-
-	// Verify heal.
-	if spec.BuildGate == nil || spec.BuildGate.Heal == nil {
-		t.Fatal("build_gate.heal is nil")
-	}
-	if spec.BuildGate.Heal.Retries != 3 {
-		t.Errorf("build_gate.heal.retries = %d, want 3", spec.BuildGate.Heal.Retries)
-	}
-	if spec.BuildGate.Heal.Image.Universal != "ghcr.io/iw2rmb/ploy/java-17-codex-amata-maven:latest" {
-		t.Errorf("build_gate.heal.image = %q, want %q",
-			spec.BuildGate.Heal.Image.Universal, "ghcr.io/iw2rmb/ploy/java-17-codex-amata-maven:latest")
-	}
-	if spec.BuildGate.Heal.Command.Shell != "fix-it" {
-		t.Errorf("build_gate.heal.command = %q, want %q",
-			spec.BuildGate.Heal.Command.Shell, "fix-it")
 	}
 }
 

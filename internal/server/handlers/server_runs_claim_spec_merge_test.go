@@ -96,7 +96,7 @@ func TestClaimJob_DoesNotMergeRepoGateProfileIntoGateSpec(t *testing.T) {
 		wantEnvV  string
 	}{
 		{
-			name:      "pre_gate keeps spec unchanged without explicit gate_profile",
+			name:      "ppost_gate keeps spec unchanged without explicit gate_profile",
 			jobType:   domaintypes.JobTypePreGate,
 			spec:      []byte(`{"steps":[{"image":"docker.io/acme/mig:latest"}]}`),
 			wantPhase: "pre",
@@ -108,8 +108,8 @@ func TestClaimJob_DoesNotMergeRepoGateProfileIntoGateSpec(t *testing.T) {
 			wantPhase: "post",
 		},
 		{
-			name:      "re_gate keeps spec unchanged without explicit gate_profile",
-			jobType:   domaintypes.JobTypeReGate,
+			name:      "post_gate keeps spec unchanged without explicit gate_profile",
+			jobType:   domaintypes.JobTypePostGate,
 			spec:      []byte(`{"steps":[{"image":"docker.io/acme/mig:latest"}]}`),
 			wantPhase: "post",
 		},

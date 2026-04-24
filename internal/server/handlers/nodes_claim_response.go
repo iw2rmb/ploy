@@ -112,7 +112,7 @@ func buildClaimResponsePayload(
 			if jobType == domaintypes.JobTypeMig && jobMeta.MigStepIndex != nil {
 				migContext = &contracts.MigClaimContext{StepIndex: *jobMeta.MigStepIndex}
 			}
-			if jobType == domaintypes.JobTypePreGate || jobType == domaintypes.JobTypePostGate || jobType == domaintypes.JobTypeReGate {
+			if jobType == domaintypes.JobTypePreGate || jobType == domaintypes.JobTypePostGate {
 				if strings.TrimSpace(jobMeta.GateCycleName) != "" {
 					gateContext = &contracts.GateClaimContext{CycleName: strings.TrimSpace(jobMeta.GateCycleName)}
 				}

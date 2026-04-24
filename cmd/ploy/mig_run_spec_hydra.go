@@ -160,14 +160,6 @@ func compileHydraRecordsInPlace(ctx context.Context, base *url.URL, client *http
 		}
 	}
 
-	if bg, ok := spec["build_gate"].(map[string]any); ok {
-		if heal, ok := bg["heal"].(map[string]any); ok {
-			if hasAuthoringEntries(heal) {
-				blocks = append(blocks, blockRef{heal, "build_gate.heal"})
-			}
-		}
-	}
-
 	if len(blocks) == 0 {
 		return nil
 	}

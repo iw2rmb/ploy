@@ -45,9 +45,6 @@ func ValidateHydraSection(section string) error {
 // map. Global env vars are folded into the overlay's envs field using
 // target-aware precedence (nodes < job-target < per-run spec).
 //
-// For specs with a heal configuration, the heal section overlay is applied
-// to build_gate.heal.
-//
 // Merge precedence: per-run spec values always win over overlay values.
 func applyHydraOverlayMutator(m map[string]any, in claimSpecMutatorInput) error {
 	section := string(in.jobType)
@@ -63,10 +60,6 @@ func applyHydraOverlayMutator(m map[string]any, in claimSpecMutatorInput) error 
 	// by node parsing for each job phase.
 	applyCanonicalHydraOverlay(m, in.jobType, in.job, overlay)
 
-	if err := applyHealOverlay(m, in); err != nil {
-		return err
-	}
-
 	return nil
 }
 
@@ -79,7 +72,7 @@ func applyCanonicalHydraOverlay(spec map[string]any, jobType domaintypes.JobType
 		applyOverlayToSteps(spec, overlay)
 	case domaintypes.JobTypePreGate:
 		mergeCABlock(ensureBuildGatePhase(spec, "pre"), overlay.CA)
-	case domaintypes.JobTypePostGate, domaintypes.JobTypeReGate:
+	case domaintypes.JobTypePostGate:
 		mergeCABlock(ensureBuildGatePhase(spec, "post"), overlay.CA)
 	case domaintypes.JobTypeSBOM:
 		switch hydraPhaseForAuxBuildGateJob(jobType, job) {
@@ -198,32 +191,6 @@ func assembleHydraOverlay(
 	}
 
 	return base
-}
-
-// applyHealOverlay applies the heal section overlay to build_gate.heal when
-// it exists. Returns a collision error when the heal overlay contains
-// duplicate destinations.
-func applyHealOverlay(m map[string]any, in claimSpecMutatorInput) error {
-	bg, ok := m["build_gate"].(map[string]any)
-	if !ok {
-		return nil
-	}
-	healBlock, ok := bg["heal"].(map[string]any)
-	if !ok {
-		return nil
-	}
-
-	overlay := assembleHydraOverlay(in.hydraOverlays, "heal", nil, domaintypes.JobTypeHeal)
-	if overlay.IsEmpty() {
-		return nil
-	}
-
-	if err := validateOverlayCollisions(overlay, "build_gate.heal"); err != nil {
-		return err
-	}
-
-	mergeHydraIntoBlock(healBlock, overlay)
-	return nil
 }
 
 // mergeHydraIntoBlock applies all overlay fields into a spec block using

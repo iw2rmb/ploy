@@ -35,10 +35,10 @@ func TestCrossPathParity_StandardJobErrorToChainAction(t *testing.T) {
 	}{
 		// context.Canceled: non-gate jobs → Cancelled → onCancelled → CancelRemainder.
 		{name: "ctx_canceled/mig/has-next", err: context.Canceled, jobType: domaintypes.JobTypeMig, hasNext: true, wantCancelSuccessor: true},
-		{name: "ctx_deadline/heal/has-next", err: context.DeadlineExceeded, jobType: domaintypes.JobTypeHeal, hasNext: true, wantCancelSuccessor: true},
+		{name: "ctx_deadline/heal/has-next", err: context.DeadlineExceeded, jobType: domaintypes.JobTypeMig, hasNext: true, wantCancelSuccessor: true},
 		// Runtime errors: non-gate jobs → Error → CancelRemainder.
 		{name: "runtime_error/mig/has-next", err: errors.New("container exited unexpectedly"), jobType: domaintypes.JobTypeMig, hasNext: true, wantCancelSuccessor: true},
-		{name: "runtime_error/heal/has-next", err: errors.New("image pull failed"), jobType: domaintypes.JobTypeHeal, hasNext: true, wantCancelSuccessor: true},
+		{name: "runtime_error/heal/has-next", err: errors.New("image pull failed"), jobType: domaintypes.JobTypeMig, hasNext: true, wantCancelSuccessor: true},
 	}
 
 	for _, tc := range cases {
@@ -157,7 +157,7 @@ func TestCrossPathParity_GateJobStatusToChainAction(t *testing.T) {
 		// post/re-gate test failures produce Fail → EvaluateGateFailure → healing path entered (GetRun called).
 		{
 			name:    "re_gate/test_fail/has-next",
-			jobType: domaintypes.JobTypeReGate, status: domaintypes.JobStatusFail, hasNext: true,
+			jobType: domaintypes.JobTypePostGate, status: domaintypes.JobStatusFail, hasNext: true,
 			wantGetRunCalled:    true,
 			wantCancelSuccessor: false,
 		},

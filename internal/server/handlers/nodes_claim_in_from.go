@@ -150,7 +150,7 @@ func resolveSourceArtifactID(ctx context.Context, st store.Store, sourceJob stor
 }
 
 func preferredClasspathBundleNames(jobType domaintypes.JobType) []string {
-	if jobType == domaintypes.JobTypePreGate || jobType == domaintypes.JobTypePostGate || jobType == domaintypes.JobTypeReGate {
+	if jobType == domaintypes.JobTypePreGate || jobType == domaintypes.JobTypePostGate {
 		return []string{"build-gate-out", "mig-out", ""}
 	}
 	return []string{"mig-out", "build-gate-out", ""}

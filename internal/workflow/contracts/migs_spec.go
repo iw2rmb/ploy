@@ -8,14 +8,14 @@
 //
 // The MigSpec type supports a single canonical shape:
 //   - All runs use steps[] (even single-step runs).
-//   - Global build gate policy lives under build_gate (including healing).
+//   - Global build gate policy lives under build_gate.
 //
 // ## Related Files
 //
 // The Mig spec implementation is split across several files:
 //   - migs_spec.go: Core types (MigSpec, MigStep) and validation
 //   - command_spec.go: Polymorphic command handling (CommandSpec)
-//   - build_gate_config.go: Build gate and healing configuration types
+//   - build_gate_config.go: Build gate configuration types
 //   - migs_spec_parse.go: JSON parsing functions
 //
 // ## Usage
@@ -74,7 +74,7 @@ type MigSpec struct {
 
 	// --- Shared configuration (applies to both single-step and multi-step) ---
 
-	// BuildGate configures Build Gate validation and healing policy.
+	// BuildGate configures Build Gate validation policy.
 	// Applies globally to all steps.
 	BuildGate *BuildGateConfig `json:"build_gate,omitempty" yaml:"build_gate,omitempty"`
 
@@ -160,7 +160,6 @@ type MigStep struct {
 //
 // Validation rules:
 //   - steps must be non-empty and each step must have a non-empty image.
-//   - build_gate.heal requires a non-empty image and non-negative retries.
 //   - Stack Gate phases must not be disabled with expectations set.
 func (s MigSpec) Validate() error {
 	// Validate steps.
@@ -183,32 +182,6 @@ func (s MigSpec) Validate() error {
 	}
 	if err := validateInFromReferences(s.Steps); err != nil {
 		return err
-	}
-
-	// Validate heal spec.
-	if s.BuildGate != nil && s.BuildGate.Heal != nil {
-		heal := s.BuildGate.Heal
-		prefix := "build_gate.heal"
-		if heal.Retries < 0 {
-			return fmt.Errorf("%s.retries: must be non-negative, got %d", prefix, heal.Retries)
-		}
-		if heal.Image.IsEmpty() {
-			return fmt.Errorf("%s.image: required", prefix)
-		}
-		if heal.Expectations != nil {
-			for i, artifact := range heal.Expectations.Artifacts {
-				if err := ValidateGateProfileArtifactContract(
-					artifact.Path,
-					artifact.Schema,
-					fmt.Sprintf("%s.expectations.artifacts[%d]", prefix, i),
-				); err != nil {
-					return err
-				}
-			}
-		}
-		if err := validateHydraFields(heal.CA, heal.In, heal.Out, heal.Home, prefix); err != nil {
-			return err
-		}
 	}
 
 	// Validate build gate images.

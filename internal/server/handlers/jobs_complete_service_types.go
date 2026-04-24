@@ -42,9 +42,9 @@ const (
 
 func routeCompleteJobServiceType(jobType domaintypes.JobType) (completeJobServiceType, bool) {
 	switch jobType {
-	case domaintypes.JobTypePreGate, domaintypes.JobTypePostGate, domaintypes.JobTypeReGate:
+	case domaintypes.JobTypePreGate, domaintypes.JobTypePostGate:
 		return completeJobServiceTypeGate, true
-	case domaintypes.JobTypeMig, domaintypes.JobTypeHeal:
+	case domaintypes.JobTypeMig:
 		return completeJobServiceTypeStep, true
 	case domaintypes.JobTypeSBOM:
 		return completeJobServiceTypeSBOM, true

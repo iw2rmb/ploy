@@ -53,25 +53,13 @@ func mutateClaimSpec(input claimSpecMutatorInput) (json.RawMessage, error) {
 		{
 			errContext: "merge recovery candidate prep into spec",
 			apply: func(m map[string]any, in claimSpecMutatorInput) error {
-				return applyRecoveryCandidatePrepMutator(m, in.job, in.jobType)
+				return applyRecoveryCandidatePrepMutator(m, in.jobType)
 			},
 		},
 		{
 			errContext: "merge repo gate_profile into spec",
 			apply: func(m map[string]any, in claimSpecMutatorInput) error {
 				return applyRepoGateProfileMutator(m, in.repoGateProfile, in.jobType)
-			},
-		},
-		{
-			errContext: "merge healing metadata into spec",
-			apply: func(m map[string]any, in claimSpecMutatorInput) error {
-				return applyHealingMutator(m, in.job, in.jobType)
-			},
-		},
-		{
-			errContext: "merge healing schema into spec",
-			apply: func(m map[string]any, in claimSpecMutatorInput) error {
-				return applyHealingSchemaMutator(m, in.job, in.jobType)
 			},
 		},
 		{

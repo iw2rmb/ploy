@@ -489,10 +489,10 @@ func TestRunController_reportTerminalStatus(t *testing.T) {
 			wantStatus: types.JobStatusFail.String(),
 		},
 		{
-			name:       "heal exit code one reports error",
-			jobType:    types.JobTypeHeal,
+			name:       "mig exit code one reports fail",
+			jobType:    types.JobTypeMig,
 			exitCode:   1,
-			wantStatus: types.JobStatusError.String(),
+			wantStatus: types.JobStatusFail.String(),
 		},
 		{
 			name:       "exit code above one reports error",

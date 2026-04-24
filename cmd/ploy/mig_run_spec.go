@@ -4,7 +4,7 @@
 // and compiles Hydra file-record entries (ca/in/out/home) into canonical
 // shortHash:dst form. Specs use a single canonical shape:
 //   - steps[] array with one entry per step (even single-step runs)
-//   - global build gate policy under build_gate (including build_gate.heal)
+//   - global build gate policy under build_gate
 //
 // Spec parsing includes validation and error handling for missing files.
 // Isolating spec handling from execution flow enables focused testing
@@ -76,14 +76,6 @@ func preprocessMigsSpecInPlace(spec map[string]any, specBaseDir string) error {
 	// Expand $VAR/${VAR} placeholders in envs values at all levels.
 	if err := resolveEnvsInPlace(spec); err != nil {
 		return fmt.Errorf("resolve envs (top-level): %w", err)
-	}
-
-	if bg, ok := spec["build_gate"].(map[string]any); ok {
-		if heal, ok := bg["heal"].(map[string]any); ok {
-			if err := resolveEnvsInPlace(heal); err != nil {
-				return fmt.Errorf("resolve envs (build_gate.heal): %w", err)
-			}
-		}
 	}
 
 	if steps, ok := spec["steps"].([]any); ok {
@@ -225,17 +217,6 @@ func resolveImageEnvInPlace(spec map[string]any) error {
 			if err := resolveImageInSection(step, fmt.Sprintf("steps[%d]", i)); err != nil {
 				return err
 			}
-		}
-	}
-
-	bg, ok := spec["build_gate"].(map[string]any)
-	if !ok {
-		return nil
-	}
-
-	if heal, ok := bg["heal"].(map[string]any); ok {
-		if err := resolveImageInSection(heal, "build_gate.heal"); err != nil {
-			return err
 		}
 	}
 
@@ -384,7 +365,6 @@ func expandSpecEnvValue(raw string) (string, error) {
 //
 // Routing:
 //   - steps[] entries receive the "mig" job section overlay
-//   - build_gate.heal receives the "heal" section overlay
 //   - top-level envs receive the "mig" section envs (primary job type)
 func applyConfigOverlayInPlace(spec map[string]any) error {
 	ov, err := cliconfig.LoadOverlay()
@@ -396,8 +376,6 @@ func applyConfigOverlayInPlace(spec map[string]any) error {
 	}
 
 	migCfg := ov.JobSection("mig")
-	healCfg := ov.JobSection("heal")
-
 	// Apply mig overlay to top-level envs.
 	if migCfg != nil && len(migCfg.Envs) > 0 {
 		cliconfig.MergeJobConfigIntoSpec(spec, &cliconfig.JobConfig{Envs: migCfg.Envs})
@@ -411,13 +389,6 @@ func applyConfigOverlayInPlace(spec map[string]any) error {
 				continue
 			}
 			cliconfig.MergeJobConfigIntoSpec(step, migCfg)
-		}
-	}
-
-	// Apply heal overlay to build_gate.heal.
-	if bg, ok := spec["build_gate"].(map[string]any); ok {
-		if heal, ok := bg["heal"].(map[string]any); ok {
-			cliconfig.MergeJobConfigIntoSpec(heal, healCfg)
 		}
 	}
 
@@ -438,7 +409,7 @@ func applyConfigOverlayInPlace(spec map[string]any) error {
 //
 // Multi-step semantics (steps[] array):
 //   - Each entry in steps[] represents a sequential transformation step.
-//   - All steps share the same repository and global build_gate policy (including healing).
+//   - All steps share the same repository and global build_gate policy.
 //   - The CLI preserves steps[] without modification; image/command overrides do not apply when len(steps) > 1.
 //   - The server copies steps[] indexes into jobs.next_id and diffs.next_id.
 func buildSpecPayload(

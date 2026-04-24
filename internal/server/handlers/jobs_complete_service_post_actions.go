@@ -78,17 +78,6 @@ func (s *CompleteJobService) onFail(ctx context.Context, state *completeJobState
 	switch decision.ChainAction {
 	case lifecycle.CompletionChainNoAction:
 		return
-	case lifecycle.CompletionChainEvaluateGateFailure:
-		run, ok := s.loadRunForPostCompletion(ctx, state, "healing insertion")
-		if ok {
-			if healErr := maybeCreateHealingJobs(ctx, s.store, s.blobpersist, run, state.job); healErr != nil {
-				slog.Error("complete job: failed to create healing jobs",
-					"job_id", state.job.ID,
-					"next_id", state.job.NextID,
-					"err", healErr,
-				)
-			}
-		}
 	case lifecycle.CompletionChainCancelRemainder:
 		if err := cancelRemainingJobsAfterFailure(ctx, s.store, state.job); err != nil {
 			slog.Error("complete job: failed to cancel remaining jobs after non-gate failure",
@@ -171,21 +160,6 @@ func (s *CompleteJobService) onSuccess(ctx context.Context, state *completeJobSt
 				}
 			}
 		}
-	}
-
-	if promoteErr := maybePromoteReGateRecoveryCandidate(ctx, s.store, s.gateProfilesBS, state.job, state.persistedMeta); promoteErr != nil {
-		slog.Error("complete job: failed to promote validated re-gate candidate",
-			"job_id", state.job.ID,
-			"repo_id", state.job.RepoID,
-			"err", promoteErr,
-		)
-	}
-	if refreshErr := maybeRefreshNextReGateRecoveryCandidate(ctx, s.store, s.blobpersist, state.job); refreshErr != nil {
-		slog.Error("complete job: failed to refresh next re-gate recovery candidate",
-			"job_id", state.job.ID,
-			"repo_id", state.job.RepoID,
-			"err", refreshErr,
-		)
 	}
 
 	decision := lifecycle.EvaluateCompletionDecision(jobType, state.input.Status, state.job.NextID != nil)

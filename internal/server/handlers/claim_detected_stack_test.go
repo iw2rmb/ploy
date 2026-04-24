@@ -40,7 +40,7 @@ func TestResolveDetectedStackExpectationFromJobs_UsesNearestUpstreamGate(t *test
 		},
 		{
 			ID:      reGateID,
-			JobType: domaintypes.JobTypeReGate,
+			JobType: domaintypes.JobTypePostGate,
 			Status:  domaintypes.JobStatusFail,
 			NextID:  &sbom2ID,
 			Meta:    mustMarshalGateMeta(t, "java", "gradle", "21"),

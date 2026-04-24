@@ -1,4 +1,4 @@
-// execution_orchestrator_jobs.go contains mig and healing job implementations,
+// execution_orchestrator_jobs.go contains mig and sbom job implementations,
 // the shared standard job executor, and workspace lifecycle helpers.
 package nodeagent
 
@@ -69,12 +69,6 @@ func gateCycleNameFromGateJob(jobType types.JobType, jobName string) (string, er
 		return preGateCycleName, nil
 	case types.JobTypePostGate:
 		return postGateCycleName, nil
-	case types.JobTypeReGate:
-		name := strings.TrimSpace(jobName)
-		if name == "" {
-			return "", fmt.Errorf("re-gate job_name is empty")
-		}
-		return name, nil
 	default:
 		return "", fmt.Errorf("unsupported gate job_type %q", jobType)
 	}
@@ -194,122 +188,10 @@ func (r *runController) executeMigJob(ctx context.Context, req StartRunRequest) 
 		PopulateInDir: func(inDir string) error {
 			return r.materializeMigInFromInputs(ctx, req, inDir)
 		},
-		PrepareManifest: func(m *contracts.StepManifest, ws string) error {
-			r.injectChildBuildRuntimeEnvVars(m, ws, req.JobID)
-			r.mountChildBuildTLSCerts(m)
-			return nil
-		},
-		RuntimeSync: func(outDir, _ string) error {
-			return r.materializeParentChildBuildLineage(outDir, req.RecoveryContext)
-		},
-		FinalizeOutputs: func(outDir, _ string) error {
-			return r.materializeParentChildBuildLineage(outDir, req.RecoveryContext)
-		},
 		WorkspacePolicy:           workspaceChangePolicyIgnore,
 		UploadConfiguredArtifacts: true,
 		UploadDiff: func(ctx context.Context, runID types.RunID, jobID types.JobID, jobName string, diffGen step.DiffGenerator, workspace string, result step.Result) {
 			r.uploadJobDiff(ctx, runID, jobID, diffGen, workspace, result, types.DiffJobTypeMig)
-		},
-		StartTime: startTime,
-	}
-
-	r.executeStandardJob(ctx, req, cfg)
-}
-
-// executeHealingJob runs a healing container job.
-// Fetches gate logs from parent job, runs healing container, uploads diff.
-//
-// Stack-aware image selection: The job loads the persisted stack from the
-// pre-gate phase and uses it for manifest building. This ensures healing
-// migs use stack-specific images (e.g., java-maven, java-gradle) when configured.
-func (r *runController) executeHealingJob(ctx context.Context, req StartRunRequest) {
-	startTime := time.Now()
-
-	// Load the persisted stack from the pre-gate phase for stack-aware image
-	// selection. If no stack was persisted (e.g., gate skipped), defaults to
-	// MigStackUnknown which falls back to "default" in stack maps.
-	stack := resolveManifestStack(req, r.loadPersistedStack(req.RunID))
-	if stack == contracts.MigStackUnknown && req.RecoveryContext != nil && req.RecoveryContext.DetectedStack != "" {
-		stack = req.RecoveryContext.DetectedStack
-	}
-
-	// Build manifest with stack-aware image resolution using typed options.
-	// stepIndex=0 is used for manifest building; job configuration comes from req.TypedOptions.
-	typedOpts := req.TypedOptions
-
-	var manifest contracts.StepManifest
-	var err error
-
-	if typedOpts.Healing == nil || typedOpts.Healing.Mig.Image.IsEmpty() {
-		err = fmt.Errorf("healing job missing heal container image")
-	} else {
-		healMig := typedOpts.Healing.Mig
-		manifest, err = buildHealingManifest(req, healMig, 0, "", stack)
-	}
-	if err != nil {
-		slog.Error("failed to build manifest", "run_id", req.RunID, "error", err)
-		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
-		return
-	}
-
-	// Log the stack-aware image selection for observability.
-	slog.Info("healing job using stack-aware image",
-		"run_id", req.RunID,
-		"job_id", req.JobID,
-		"detected_stack", stack,
-		"resolved_image", manifest.Image,
-	)
-	workspacePolicy := resolveHealingWorkspacePolicy(req.RecoveryContext)
-	schemaJSON := ""
-	if req.Env != nil {
-		schemaJSON = strings.TrimSpace(req.Env[contracts.GateProfileSchemaJSONEnv])
-	}
-
-	cfg := standardJobConfig{
-		Manifest:      manifest,
-		DiffType:      types.DiffJobTypeHealing,
-		OutDirPattern: "ploy-heal-out-*",
-		InDirPattern:  "ploy-heal-in-*",
-		PopulateInDir: func(inDir string) error {
-			return r.populateHealingInDir(req.RunID, inDir, req.RecoveryContext, schemaJSON)
-		},
-		PrepareManifest: func(m *contracts.StepManifest, ws string) error {
-			r.injectHealingEnvVars(m, ws, req.JobID)
-			r.mountHealingTLSCerts(m)
-			return nil
-		},
-		RuntimeSync: func(outDir, _ string) error {
-			return r.materializeParentChildBuildLineage(outDir, req.RecoveryContext)
-		},
-		FinalizeOutputs: func(outDir, _ string) error {
-			return r.materializeParentChildBuildLineage(outDir, req.RecoveryContext)
-		},
-		WorkspacePolicy: workspacePolicy,
-		UploadDiff: func(ctx context.Context, runID types.RunID, jobID types.JobID, jobName string, diffGen step.DiffGenerator, workspace string, result step.Result) {
-			r.uploadJobDiff(ctx, runID, jobID, diffGen, workspace, result, types.DiffJobTypeHealing)
-		},
-		BuildJobMeta: func(outDir string) json.RawMessage {
-			bugSummary := parseBugSummary(outDir)
-			actionSummary := parseActionSummary(outDir)
-			errorKind := parseErrorKind(outDir)
-			if bugSummary == "" && actionSummary == "" && errorKind == "" {
-				return nil
-			}
-			heal := &contracts.HealJobMetadata{
-				BugSummary:    bugSummary,
-				ActionSummary: actionSummary,
-				ErrorKind:     errorKind,
-			}
-			meta := &contracts.JobMeta{
-				Kind: contracts.JobKindMig,
-				Heal: heal,
-			}
-			data, err := contracts.MarshalJobMeta(meta)
-			if err != nil {
-				slog.Warn("failed to marshal healing job meta", "run_id", req.RunID, "job_id", req.JobID, "error", err)
-				return nil
-			}
-			return data
 		},
 		StartTime: startTime,
 	}

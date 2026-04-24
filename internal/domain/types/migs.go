@@ -11,8 +11,6 @@ import (
 //   - JobTypePreGate: pre-mig Build Gate
 //   - JobTypeMig: main mig execution
 //   - JobTypePostGate: post-mig Build Gate
-//   - JobTypeHeal: healing after gate failure
-//   - JobTypeReGate: re-run Build Gate after healing
 //   - JobTypeSBOM: SBOM generation job
 //
 // Unknown or empty values should be treated carefully at boundaries; use
@@ -23,8 +21,6 @@ const (
 	JobTypePreGate  JobType = "pre_gate"
 	JobTypeMig      JobType = "mig"
 	JobTypePostGate JobType = "post_gate"
-	JobTypeHeal     JobType = "heal"
-	JobTypeReGate   JobType = "re_gate"
 	JobTypeSBOM     JobType = "sbom"
 )
 
@@ -38,7 +34,7 @@ func (v JobType) IsZero() bool { return IsEmpty(string(v)) }
 func (v JobType) Validate() error {
 	s := strings.TrimSpace(string(v))
 	switch JobType(s) {
-	case JobTypePreGate, JobTypeMig, JobTypePostGate, JobTypeHeal, JobTypeReGate, JobTypeSBOM:
+	case JobTypePreGate, JobTypeMig, JobTypePostGate, JobTypeSBOM:
 		return nil
 	default:
 		return fmt.Errorf("invalid job_type %q", s)

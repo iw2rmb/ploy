@@ -3,7 +3,7 @@
 // This file owns executeRun, the main entry point for executing a single run.
 // It coordinates runtime initialization and dispatches to specialized job
 // handlers based on job type. Job implementations live in:
-//   - execution_orchestrator_jobs.go — mig and healing jobs + standard executor
+//   - execution_orchestrator_jobs.go — mig/sbom jobs + standard executor
 //   - execution_orchestrator_gate.go — gate validation jobs
 package nodeagent
 
@@ -24,17 +24,15 @@ import (
 )
 
 // executeRun orchestrates job execution based on job type.
-// Dispatches to specialized handlers: gate jobs, mig jobs, or healing jobs.
+// Dispatches to specialized handlers: gate jobs, sbom jobs, and mig jobs.
 //
 // Job types:
-//   - pre_gate, post_gate, re_gate: Run build gate validation
+//   - pre_gate, post_gate: Run build gate validation
 //   - mig: Run container with mig execution
-//   - heal: Run healing container after gate failure
 //
 // Each job is atomic - there's no multi-step loop. The server creates
 // individual jobs (pre-gate, mig-0, ..., post-gate) and nodes execute
-// them independently. Healing jobs are created by the server when
-// gates fail, not run inline by the node.
+// them independently.
 func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 	defer func() {
 		// Recover from panics to prevent job leaks and slot exhaustion.
@@ -81,7 +79,7 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 
 	// Dispatch based on job type from claim payload.
 	switch jobType {
-	case types.JobTypePreGate, types.JobTypePostGate, types.JobTypeReGate:
+	case types.JobTypePreGate, types.JobTypePostGate:
 		req.JobType = jobType
 		r.executeGateJob(ctx, req)
 	case types.JobTypeSBOM:
@@ -90,9 +88,6 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 	case types.JobTypeMig:
 		req.JobType = jobType
 		r.executeMigJob(ctx, req)
-	case types.JobTypeHeal:
-		req.JobType = jobType
-		r.executeHealingJob(ctx, req)
 	default:
 		err := fmt.Errorf("invalid job_type %q", jobType)
 		slog.Error("cannot execute job with invalid type", "run_id", req.RunID, "job_id", req.JobID, "job_type", jobType, "error", err)

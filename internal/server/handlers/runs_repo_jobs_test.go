@@ -82,7 +82,7 @@ func TestListRunRepoJobsHandler_ExposesSBOMAndHealJobTypes(t *testing.T) {
 	runID := domaintypes.NewRunID()
 	repoID := domaintypes.NewRepoID()
 	sbomID := domaintypes.NewJobID()
-	healID := domaintypes.NewJobID()
+	migID := domaintypes.NewJobID()
 
 	st := &runStore{
 		getRunRepoResult: store.RunRepo{
@@ -103,12 +103,12 @@ func TestListRunRepoJobsHandler_ExposesSBOMAndHealJobTypes(t *testing.T) {
 			Meta:    []byte(`{"kind":"mig"}`),
 		},
 		{
-			ID:      healID,
+			ID:      migID,
 			RunID:   runID,
 			RepoID:  repoID,
 			Attempt: 1,
-			Name:    "heal",
-			JobType: domaintypes.JobTypeHeal,
+			Name:    "mig-0",
+			JobType: domaintypes.JobTypeMig,
 			Status:  domaintypes.JobStatusSuccess,
 			Meta:    []byte(`{"kind":"mig"}`),
 		},
@@ -136,8 +136,8 @@ func TestListRunRepoJobsHandler_ExposesSBOMAndHealJobTypes(t *testing.T) {
 	if !seen["sbom"] {
 		t.Fatalf("expected job_type %q in response, got %+v", "sbom", seen)
 	}
-	if !seen["heal"] {
-		t.Fatalf("expected job_type %q in response, got %+v", "heal", seen)
+	if !seen["mig"] {
+		t.Fatalf("expected job_type %q in response, got %+v", "mig", seen)
 	}
 }
 

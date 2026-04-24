@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -35,8 +34,7 @@ func persistSuccessfulGateProfile(
 	}
 	jobType := domaintypes.JobType(job.JobType)
 	if jobType != domaintypes.JobTypePreGate &&
-		jobType != domaintypes.JobTypePostGate &&
-		jobType != domaintypes.JobTypeReGate {
+		jobType != domaintypes.JobTypePostGate {
 		return nil
 	}
 
@@ -314,69 +312,6 @@ func upsertSuccessfulGateJobProfileLink(ctx context.Context, st store.Store, job
 		return fmt.Errorf("upsert gate job profile link: %w", err)
 	}
 	return nil
-}
-
-func persistReGateRecoveryCandidateProfile(
-	ctx context.Context,
-	st store.Store,
-	bs blobstore.Store,
-	job store.Job,
-	recovery *contracts.BuildGateRecoveryMetadata,
-) error {
-	if bs == nil || recovery == nil {
-		return nil
-	}
-	if domaintypes.JobType(job.JobType) != domaintypes.JobTypeReGate {
-		return nil
-	}
-
-	candidateRaw := append([]byte(nil), recovery.CandidateGateProfile...)
-	profile, err := contracts.ParseGateProfileJSON(candidateRaw)
-	if err != nil {
-		return fmt.Errorf("parse candidate gate profile: %w", err)
-	}
-
-	repoSHA, err := resolveGateProfileRepoSHA(job)
-	if err != nil {
-		return err
-	}
-
-	stackRow, err := resolveStackRowForProfile(ctx, st, profile)
-	if err != nil {
-		return err
-	}
-	return persistGateProfilePayload(ctx, st, bs, job, repoSHA, stackRow.ID, candidateRaw)
-}
-
-func resolveStackRowForProfile(ctx context.Context, st store.Store, profile *contracts.GateProfile) (gateProfileStackRow, error) {
-	if profile == nil {
-		return gateProfileStackRow{}, fmt.Errorf("candidate gate profile is required")
-	}
-	lang := strings.TrimSpace(profile.Stack.Language)
-	tool := strings.TrimSpace(profile.Stack.Tool)
-	release := strings.TrimSpace(profile.Stack.Release)
-	if lang == "" || tool == "" {
-		return gateProfileStackRow{}, fmt.Errorf("candidate gate profile stack requires language and tool")
-	}
-
-	if release != "" {
-		row, err := queryStackRowByExpectation(ctx, st, lang, tool, release)
-		if err == nil {
-			return row, nil
-		}
-		if !errors.Is(err, pgx.ErrNoRows) {
-			return gateProfileStackRow{}, err
-		}
-	}
-
-	row, err := queryStackRowByLangTool(ctx, st, lang, tool)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return gateProfileStackRow{}, fmt.Errorf("resolve stack for candidate gate profile: %w", err)
-		}
-		return gateProfileStackRow{}, err
-	}
-	return row, nil
 }
 
 func persistGateProfilePayload(

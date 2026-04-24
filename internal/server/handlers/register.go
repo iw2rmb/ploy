@@ -156,12 +156,8 @@ func RegisterRoutes(s *server.HTTPServer, st store.Store, bs blobstore.Store, bp
 	// Job-level status polling endpoint — allows workers to stop local execution
 	// when control plane transitions a running job to Cancelled.
 	s.RegisterRouteFunc("GET /v1/jobs/{job_id}/status", getJobStatusHandler(st), auth.RoleWorker)
-	// Job-scoped child-build endpoints — workers create and poll child builds under
-	// a parent mig/heal job without including node identity in path shape.
-	s.RegisterRouteFunc("POST /v1/jobs/{parent_job_id}/builds", createJobBuildHandler(st), auth.RoleWorker)
-	s.RegisterRouteFunc("GET /v1/jobs/{parent_job_id}/builds/{child_job_id}", getJobBuildStatusHandler(st), auth.RoleWorker)
 	// Job-level runtime image persistence — nodes persist the resolved container image name
-	// that will be used to execute a mig/heal job (stack-aware resolution).
+	// that will be used to execute a mig/gate/sbom job (stack-aware resolution).
 	s.RegisterRouteFunc("POST /v1/jobs/{job_id}/image", saveJobImageNameHandler(st), auth.RoleWorker)
 
 	// NOTE: HTTP Build Gate endpoints (POST /v1/buildgate/validate, GET /v1/buildgate/jobs/{id},

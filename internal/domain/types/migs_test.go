@@ -13,8 +13,6 @@ func TestJobTypeValidate(t *testing.T) {
 		{name: "pre_gate", jobType: JobTypePreGate},
 		{name: "mig", jobType: JobTypeMig},
 		{name: "post_gate", jobType: JobTypePostGate},
-		{name: "heal", jobType: JobTypeHeal},
-		{name: "re_gate", jobType: JobTypeReGate},
 		{name: "sbom", jobType: JobTypeSBOM},
 		{name: "invalid", jobType: JobType("not_a_job_type"), wantErr: true},
 		{name: "empty", jobType: JobType(""), wantErr: true},
