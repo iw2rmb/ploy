@@ -51,9 +51,7 @@ ENV JAVA_HOME=/opt/java/openjdk \
     WORKSPACE=/workspace \
     OUTDIR=/out \
     PLOY_SERVER_URL="" \
-    PLOY_API_TOKEN="" \
-    PLOY_CLIENT_CERT_PATH="/etc/ploy/certs/client.crt" \
-    PLOY_CLIENT_KEY_PATH="/etc/ploy/certs/client.key"
+    PLOY_CLIENT_CERT_PATH="/etc/ploy/certs/client.crt"
 
 RUN --mount=type=secret,id=ploy_ca_certs,required=false \
     if [[ -s /run/secrets/ploy_ca_certs ]]; then \
