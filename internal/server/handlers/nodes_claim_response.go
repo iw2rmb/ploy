@@ -41,12 +41,10 @@ type claimResponsePayload struct {
 	Spec                   json.RawMessage                      `json:"spec,omitempty"`
 	SBOMContext            *contracts.SBOMJobMetadata           `json:"sbom_context,omitempty"`
 	MigContext             *contracts.MigClaimContext           `json:"mig_context,omitempty"`
-	HookContext            *contracts.HookClaimContext          `json:"hook_context,omitempty"`
 	GateContext            *contracts.GateClaimContext          `json:"gate_context,omitempty"`
 	JavaClasspathContext   *contracts.JavaClasspathClaimContext `json:"java_classpath_context,omitempty"`
 	DetectedStack          *contracts.StackExpectation          `json:"detected_stack,omitempty"`
 	RecoveryContext        *contracts.RecoveryClaimContext      `json:"recovery_context,omitempty"`
-	HookRuntime            *contracts.HookRuntimeDecision       `json:"hook_runtime,omitempty"`
 }
 
 func buildClaimResponsePayload(
@@ -108,23 +106,12 @@ func buildClaimResponsePayload(
 
 	var sbomContext *contracts.SBOMJobMetadata
 	var migContext *contracts.MigClaimContext
-	var hookContext *contracts.HookClaimContext
 	var gateContext *contracts.GateClaimContext
 
 	if len(job.Meta) > 0 {
 		if jobMeta, metaErr := contracts.UnmarshalJobMeta(job.Meta); metaErr == nil && jobMeta != nil {
 			if jobType == domaintypes.JobTypeMig && jobMeta.MigStepIndex != nil {
 				migContext = &contracts.MigClaimContext{StepIndex: *jobMeta.MigStepIndex}
-			}
-			if jobType == domaintypes.JobTypeHook {
-				if jobMeta.HookIndex != nil {
-					hookContext = &contracts.HookClaimContext{
-						CycleName: jobMeta.HookCycleName,
-						Source:    jobMeta.HookSource,
-						Index:     *jobMeta.HookIndex,
-					}
-					hookContext.Normalize()
-				}
 			}
 			if jobType == domaintypes.JobTypePreGate || jobType == domaintypes.JobTypePostGate || jobType == domaintypes.JobTypeReGate {
 				if strings.TrimSpace(jobMeta.GateCycleName) != "" {
@@ -177,22 +164,9 @@ func buildClaimResponsePayload(
 	if err != nil {
 		return claimResponsePayload{}, fmt.Errorf("resolve detected stack for claim: %w", err)
 	}
-	hookRuntime, err := resolveHookRuntimeDecision(ctx, st, bs, job, mergedSpec, jobType)
-	if err != nil {
-		return claimResponsePayload{}, fmt.Errorf("resolve hook runtime decision: %w", err)
-	}
 	javaClasspathContext, err := resolveJavaClasspathClaimContext(ctx, st, job)
 	if err != nil {
 		return claimResponsePayload{}, fmt.Errorf("resolve java classpath context: %w", err)
-	}
-	if jobType == domaintypes.JobTypeHook && hookContext != nil {
-		upstreamSBOM, _, available, upstreamErr := resolveUpstreamSBOMBundleForJob(ctx, st, job)
-		if upstreamErr != nil {
-			return claimResponsePayload{}, fmt.Errorf("resolve hook upstream sbom bundle: %w", upstreamErr)
-		}
-		if available {
-			hookContext.UpstreamSBOMArtifactID = strings.TrimSpace(upstreamSBOM.ArtifactID)
-		}
 	}
 
 	return claimResponsePayload{
@@ -220,12 +194,10 @@ func buildClaimResponsePayload(
 		Spec:                   mergedSpec,
 		SBOMContext:            sbomContext,
 		MigContext:             migContext,
-		HookContext:            hookContext,
 		GateContext:            gateContext,
 		JavaClasspathContext:   javaClasspathContext,
 		DetectedStack:          detectedStack,
 		RecoveryContext:        recoveryCtx,
-		HookRuntime:            hookRuntime,
 	}, nil
 }
 
@@ -261,12 +233,10 @@ func buildActionClaimResponsePayload(
 		Spec:                   spec,
 		SBOMContext:            nil,
 		MigContext:             nil,
-		HookContext:            nil,
 		GateContext:            nil,
 		JavaClasspathContext:   nil,
 		DetectedStack:          nil,
 		RecoveryContext:        nil,
-		HookRuntime:            nil,
 	}
 }
 

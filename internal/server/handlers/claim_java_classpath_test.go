@@ -244,7 +244,7 @@ func TestResolveJavaClasspathClaimContext(t *testing.T) {
 			},
 		},
 		{
-			name: "post-gate predecessor does not override pre-gate classpath source",
+			name: "sbom job does not request java classpath context",
 			job: func() store.Job {
 				runID := domaintypes.NewRunID()
 				repoID := domaintypes.NewRepoID()
@@ -254,7 +254,7 @@ func TestResolveJavaClasspathClaimContext(t *testing.T) {
 					RunID:   runID,
 					RepoID:  repoID,
 					Attempt: 1,
-					JobType: domaintypes.JobTypeHook,
+					JobType: domaintypes.JobTypeSBOM,
 				}
 			}(),
 			setup: func(t *testing.T, st *jobStore, job store.Job) {
@@ -317,14 +317,8 @@ func TestResolveJavaClasspathClaimContext(t *testing.T) {
 			},
 			assertion: func(t *testing.T, got *contracts.JavaClasspathClaimContext, st *jobStore) {
 				t.Helper()
-				if got == nil {
-					t.Fatal("context=nil, want non-nil")
-				}
-				if got.SourceArtifactID != testBundleIDA.String() {
-					t.Fatalf("context.SourceArtifactID=%q, want %q", got.SourceArtifactID, testBundleIDA.String())
-				}
-				if got.SourceJobType != domaintypes.JobTypeSBOM {
-					t.Fatalf("context.SourceJobType=%q, want %q", got.SourceJobType, domaintypes.JobTypeSBOM)
+				if got != nil {
+					t.Fatalf("context=%+v, want nil", *got)
 				}
 			},
 		},

@@ -12,13 +12,12 @@ from a single queue with chain progression driven by `next_id`. There is no dedi
 queue or separate worker mode—all nodes pull from the same jobs queue.
 
 **Key characteristics:**
-- **Single queue:** Gate-adjacent jobs (`sbom`, `hook`, `pre-gate`, `post-gate`,
+- **Single queue:** Gate-adjacent jobs (`sbom`, `pre-gate`, `post-gate`,
   `re-gate`) are stored in the `jobs` table with the same schema as mig jobs.
 - **Docker-based execution:** Gates execute locally on the claiming node via Docker
   containers. There is no remote HTTP Build Gate mode.
 - **Chain progression:** Jobs advance through `next_id` successor links. For every
-  gate cycle, scheduling is deterministic: `sbom` runs first, optional `hook`
-  jobs run next, and the gate job runs last for that cycle.
+  gate cycle, scheduling is deterministic: `sbom` runs first, then the gate job.
 - **Workspace semantics:** Gate validation runs against the local workspace on the
   node. For re-gates after healing, the workspace already contains accumulated changes.
 
@@ -53,65 +52,35 @@ Gate validation is orchestrated by the node agent as part of the Migs run lifecy
 
 **Flow:**
 1. Control plane creates a unified job chain in `jobs` that includes gate-adjacent
-   phases (`sbom`, `hook`, `pre-gate`, `post-gate`, `re-gate`) plus `mig` and
+   phases (`sbom`, `pre-gate`, `post-gate`, `re-gate`) plus `mig` and
    optional healing phases.
 2. Node agent claims the next queued job via `/v1/nodes/{id}/claim`.
 3. For `sbom` jobs, the node writes canonical `/out/sbom.spdx.json` and
    `/out/java.classpath` (newline-delimited absolute classpath entries) and
    persists them as cycle snapshots.
-4. For `hook` jobs, the node stages `/in/sbom.spdx.json` for matcher/runtime context,
-   executes hook code changes in `/workspace`, and carries forward the input SBOM
-   snapshot for that hook index (hook containers do not produce SBOM output).
-5. For gate jobs (`pre-gate`, `post-gate`, `re-gate`), the node executes validation
+4. For gate jobs (`pre-gate`, `post-gate`, `re-gate`), the node executes validation
    using the Docker gate executor against the cycle snapshot.
-6. Gate results are captured as `BuildGateStageMetadata` (passed/failed, duration, logs).
-7. Node reports completion via `/v1/jobs/{job_id}/complete`.
+5. Gate results are captured as `BuildGateStageMetadata` (passed/failed, duration, logs).
+6. Node reports completion via `/v1/jobs/{job_id}/complete`.
 
-## Hook/SBOM Evidence in Run Job Status
+## SBOM Evidence in Run Job Status
 
 Repo-scoped job status (`GET /v1/runs/{run_id}/repos/{repo_id}/jobs`) now includes
-optional evidence fields that make sbom/hook planning decisions explicit:
+optional evidence fields for sbom jobs:
 
-- `hook_plan_reason` — planner summary for why a hook was or was not planned.
-- `hook_condition_result` — serialized JSON condition payload.
 - `sbom_evidence` — sbom execution evidence:
   - `artifact_present` (bool): whether sbom artifact bundles exist for the sbom job.
   - `parsed_package_count` (int): number of normalized sbom package rows persisted.
 
-Examples:
-
-1. **True-match (hook planned and executed):**
-```json
-{
-  "name": "pre-gate-hook-000",
-  "job_type": "hook",
-  "hook_plan_reason": "hook_match eval=planned should_run=true stack=true sbom=true on_match=true on_add=false on_remove=false on_change=false",
-  "hook_condition_result": "{\"evaluated\":true,\"should_run\":true,\"stack_matched\":true,\"sbom_matched\":true,\"predicates\":{\"on_match\":true,\"on_add\":false,\"on_remove\":false,\"on_change\":false}}"
-}
-```
-
-2. **False-match (no hook jobs planned after sbom):**
+Example:
 ```json
 {
   "name": "pre-gate-sbom",
   "job_type": "sbom",
-  "hook_plan_reason": "no hook jobs planned for cycle \"pre-gate\"",
-  "hook_condition_result": "{\"evaluated\":true,\"planned_jobs\":0}",
   "sbom_evidence": {
     "artifact_present": true,
     "parsed_package_count": 184
   }
-}
-```
-
-3. **Terminal preflight failure (hook claim/runtime rejects execution):**
-```json
-{
-  "name": "post-gate-hook-001",
-  "job_type": "hook",
-  "status": "Error",
-  "hook_plan_reason": "hook preflight rejected by runtime decision",
-  "hook_condition_result": "{\"evaluated\":true,\"should_run\":false,\"hash\":\"4f8d...\"}"
 }
 ```
 

@@ -19,7 +19,7 @@ info:
       - `/diffs` — list diffs for a repo execution.
       - `/logs` — SSE stream of logs/events for a repo execution.
       - `/artifacts` — list artifact bundles for a repo execution.
-      - `/jobs` — list jobs for a repo execution (for --follow job graph), including optional hook decision and sbom evidence fields (`hook_condition_result`, `hook_plan_reason`, `sbom_evidence`).
+      - `/jobs` — list jobs for a repo execution (for --follow job graph), including optional sbom evidence fields (`sbom_evidence`).
       - `/cancel` — cancel a repo execution within a run.
       - `/restart` — restart a repo execution within a run.
     - `/v1/runs/{run_id}/pull` — resolve repo execution for `ploy run pull`.

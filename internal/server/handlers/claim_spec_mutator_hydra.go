@@ -81,7 +81,7 @@ func applyCanonicalHydraOverlay(spec map[string]any, jobType domaintypes.JobType
 		mergeCABlock(ensureBuildGatePhase(spec, "pre"), overlay.CA)
 	case domaintypes.JobTypePostGate, domaintypes.JobTypeReGate:
 		mergeCABlock(ensureBuildGatePhase(spec, "post"), overlay.CA)
-	case domaintypes.JobTypeSBOM, domaintypes.JobTypeHook:
+	case domaintypes.JobTypeSBOM:
 		switch hydraPhaseForAuxBuildGateJob(jobType, job) {
 		case "pre":
 			mergeCABlock(ensureBuildGatePhase(spec, "pre"), overlay.CA)
@@ -99,20 +99,6 @@ func hydraPhaseForAuxBuildGateJob(jobType domaintypes.JobType, job store.Job) st
 		}
 		if sbomCtx.Phase == contracts.SBOMPhasePost {
 			return "post"
-		}
-	}
-	if jobType == domaintypes.JobTypeHook && len(job.Meta) > 0 {
-		if meta, err := contracts.UnmarshalJobMeta(job.Meta); err == nil && meta != nil {
-			switch strings.TrimSpace(meta.HookCycleName) {
-			case "pre-gate":
-				return "pre"
-			case "post-gate", "re-gate":
-				return "post"
-			default:
-				if strings.HasPrefix(strings.TrimSpace(meta.HookCycleName), "re-gate-") {
-					return "post"
-				}
-			}
 		}
 	}
 	return ""

@@ -56,8 +56,6 @@ type StartRunRequest struct {
 	SBOMContext *contracts.SBOMJobMetadata `json:"sbom_context,omitempty"`
 	// MigContext carries concrete mig step routing.
 	MigContext *contracts.MigClaimContext `json:"mig_context,omitempty"`
-	// HookContext carries concrete hook cycle/source/index routing.
-	HookContext *contracts.HookClaimContext `json:"hook_context,omitempty"`
 	// GateContext carries concrete gate cycle routing.
 	GateContext *contracts.GateClaimContext `json:"gate_context,omitempty"`
 	// JavaClasspathContext carries claim-time java classpath materialization metadata
@@ -67,8 +65,6 @@ type StartRunRequest struct {
 	DetectedStack *contracts.StackExpectation `json:"detected_stack,omitempty"`
 	// RecoveryContext carries server-resolved recovery inputs for heal/re-gate jobs.
 	RecoveryContext *contracts.RecoveryClaimContext `json:"recovery_context,omitempty"`
-	// HookRuntime carries optional hook once-by-hash runtime decision from claim.
-	HookRuntime *contracts.HookRuntimeDecision `json:"hook_runtime,omitempty"`
 	// TypedOptions contains strongly-typed run configuration. This is the canonical
 	// source of truth for all option keys understood by the nodeagent. Execution,
 	// healing, manifest building, and artifact upload paths all consume TypedOptions

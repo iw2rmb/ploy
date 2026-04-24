@@ -161,7 +161,7 @@ func resolveRecoverySourceJobs(
 		for prev != nil {
 			prevType := domaintypes.JobType(prev.JobType)
 			switch {
-			case prevType == domaintypes.JobTypeSBOM || prevType == domaintypes.JobTypeHook:
+			case prevType == domaintypes.JobTypeSBOM:
 				prev = lifecycle.RecoveryChainPredecessor(prev.ID, jobsByID)
 				continue
 			case prevType == domaintypes.JobTypeHeal:
@@ -169,7 +169,7 @@ func resolveRecoverySourceJobs(
 				prevGate := lifecycle.RecoveryChainPredecessor(prev.ID, jobsByID)
 				for prevGate != nil {
 					prevGateType := domaintypes.JobType(prevGate.JobType)
-					if prevGateType == domaintypes.JobTypeSBOM || prevGateType == domaintypes.JobTypeHook {
+					if prevGateType == domaintypes.JobTypeSBOM {
 						prevGate = lifecycle.RecoveryChainPredecessor(prevGate.ID, jobsByID)
 						continue
 					}

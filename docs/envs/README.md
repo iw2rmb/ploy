@@ -505,7 +505,7 @@ Use the `ploy config env` subcommands to manage global environment variables:
 
 ```bash
 # Set CA certificates via typed config
-# Sections: pre_gate, re_gate, post_gate, mig, heal, sbom, hook
+# Sections: pre_gate, re_gate, post_gate, mig, heal, sbom
 ploy config ca set --file ca-bundle.pem --section pre_gate --section re_gate
 
 # Set OpenAI API key (injected into gate and step jobs — default --on jobs)
@@ -523,7 +523,7 @@ ploy config env unset --key OLD_VAR
 
 **Typed config fields** manage structured data that was previously carried as raw env keys.
 Use the dedicated typed config commands:
-- `ploy config ca set/unset/ls` — CA certificates (sections: pre_gate, re_gate, post_gate, mig, heal, sbom, hook)
+- `ploy config ca set/unset/ls` — CA certificates (sections: pre_gate, re_gate, post_gate, mig, heal, sbom)
 - `ploy config home set/unset/ls` — Home-relative file mounts
 
 ### Target Semantics
@@ -717,7 +717,7 @@ and, when not writable, the node falls back to `${TMPDIR:-/tmp}/ploy/gates`.
   the active cache directory (`<language>/<tool>/<release>`) from oldest to newest
   until free space reaches `2 GiB` or the directory is exhausted.
 
-**Java non-gate jobs (`sbom`, `hook`, `mig`, `heal`)**: Use the same centralized
+**Java non-gate jobs (`sbom`, `mig`, `heal`)**: Use the same centralized
 cache-root policy as Build Gate when stack tuple env is set to Java:
 - `PLOY_STACK_LANGUAGE=java`
 - `PLOY_STACK_TOOL=gradle|maven`

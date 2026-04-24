@@ -1,11 +1,16 @@
 package nodeagent
 
 import (
+	"archive/tar"
+	"bytes"
+	"compress/gzip"
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 
@@ -197,15 +202,15 @@ func TestMaterializeJavaClasspathInDir_RejectsNonPortableGradleClasspathInRunCac
 	}
 }
 
-func TestCaptureJavaClasspathAfterStandardJob_PersistsForHookAndMig(t *testing.T) {
+func TestCaptureJavaClasspathAfterStandardJob_PersistsForMigAndPreGate(t *testing.T) {
 	t.Setenv("PLOYD_CACHE_HOME", t.TempDir())
 
 	testCases := []struct {
 		name    string
 		jobType types.JobType
 	}{
-		{name: "hook", jobType: types.JobTypeHook},
 		{name: "mig", jobType: types.JobTypeMig},
+		{name: "pre_gate", jobType: types.JobTypePreGate},
 	}
 
 	for _, tc := range testCases {
@@ -319,4 +324,41 @@ func TestPrepareAndCaptureGateJavaClasspathInput(t *testing.T) {
 	if strings.TrimSpace(string(sourceArtifactRaw)) != req.JavaClasspathContext.SourceArtifactID {
 		t.Fatalf("gate source marker mismatch: got %q want %q", sourceArtifactRaw, req.JavaClasspathContext.SourceArtifactID)
 	}
+}
+
+func mustTarGzEntries(t *testing.T, entries map[string][]byte) []byte {
+	t.Helper()
+
+	var buf bytes.Buffer
+	gzw := gzip.NewWriter(&buf)
+	tw := tar.NewWriter(gzw)
+
+	paths := make([]string, 0, len(entries))
+	for path := range entries {
+		paths = append(paths, path)
+	}
+	sort.Strings(paths)
+
+	for _, path := range paths {
+		content := entries[path]
+		hdr := &tar.Header{
+			Name: path,
+			Mode: 0o644,
+			Size: int64(len(content)),
+		}
+		if err := tw.WriteHeader(hdr); err != nil {
+			t.Fatalf("tar write header %q: %v", path, err)
+		}
+		if _, err := io.Copy(tw, bytes.NewReader(content)); err != nil {
+			t.Fatalf("tar write body %q: %v", path, err)
+		}
+	}
+
+	if err := tw.Close(); err != nil {
+		t.Fatalf("tar close: %v", err)
+	}
+	if err := gzw.Close(); err != nil {
+		t.Fatalf("gzip close: %v", err)
+	}
+	return buf.Bytes()
 }

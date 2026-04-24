@@ -72,12 +72,6 @@ type MigSpec struct {
 	// Envs holds environment variables applied to every step (step envs overrides on conflicts).
 	Envs map[string]string `json:"envs,omitempty" yaml:"envs,omitempty"`
 
-	// --- Hook sources (root-level) ---
-
-	// Hooks lists root-level hook sources (file paths or URLs).
-	// Each entry is evaluated before gate stages to inject custom validation.
-	Hooks []string `json:"hooks,omitempty" yaml:"hooks,omitempty"`
-
 	// --- Shared configuration (applies to both single-step and multi-step) ---
 
 	// BuildGate configures Build Gate validation and healing policy.
@@ -169,18 +163,6 @@ type MigStep struct {
 //   - build_gate.heal requires a non-empty image and non-negative retries.
 //   - Stack Gate phases must not be disabled with expectations set.
 func (s MigSpec) Validate() error {
-	// Validate hooks.
-	seen := make(map[string]struct{}, len(s.Hooks))
-	for i, h := range s.Hooks {
-		if strings.TrimSpace(h) == "" {
-			return fmt.Errorf("hooks[%d]: empty hook source", i)
-		}
-		if _, dup := seen[h]; dup {
-			return fmt.Errorf("hooks[%d]: duplicate hook source %q", i, h)
-		}
-		seen[h] = struct{}{}
-	}
-
 	// Validate steps.
 	if len(s.Steps) == 0 {
 		return fmt.Errorf("steps: required")

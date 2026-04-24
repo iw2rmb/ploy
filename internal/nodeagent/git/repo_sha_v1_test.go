@@ -64,6 +64,29 @@ func TestComputeRepoSHAV1_DeterministicForSameWorkspace(t *testing.T) {
 	}
 }
 
+func TestComputeRepoSHAV1_IgnoresRootTargetDirectory(t *testing.T) {
+	t.Parallel()
+
+	repoDir := initTestRepoWithSingleCommit(t)
+	ctx := context.Background()
+	repoSHAIn := prepareRepoWithTargetIgnore(t, ctx, repoDir)
+
+	if err := os.MkdirAll(filepath.Join(repoDir, "target"), 0o755); err != nil {
+		t.Fatalf("mkdir target: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(repoDir, "target", "generated.txt"), []byte("generated\n"), 0o644); err != nil {
+		t.Fatalf("write target/generated.txt: %v", err)
+	}
+
+	repoSHAOut, err := ComputeRepoSHAV1(ctx, repoDir, repoSHAIn)
+	if err != nil {
+		t.Fatalf("ComputeRepoSHAV1() error = %v", err)
+	}
+	if repoSHAOut != repoSHAIn {
+		t.Fatalf("repo_sha_out = %q, want %q", repoSHAOut, repoSHAIn)
+	}
+}
+
 func TestComputeRepoSHAV1_SyntheticParentWithoutObject_UnchangedWorkspace(t *testing.T) {
 	t.Parallel()
 
@@ -175,4 +198,21 @@ func syntheticCommitHashOnly(t *testing.T, repoDir, parentSHA, treeSHA string) s
 	}
 
 	return syntheticSHA
+}
+
+func prepareRepoWithTargetIgnore(t *testing.T, ctx context.Context, repoDir string) string {
+	t.Helper()
+
+	ignorePath := filepath.Join(repoDir, ".gitignore")
+	if err := os.WriteFile(ignorePath, []byte("**/target\n"), 0o644); err != nil {
+		t.Fatalf("write .gitignore: %v", err)
+	}
+	if err := runGitCommand(ctx, repoDir, nil, "add", "-A"); err != nil {
+		t.Fatalf("git add .gitignore: %v", err)
+	}
+	if err := runGitCommand(ctx, repoDir, nil, "commit", "-m", "add target ignore"); err != nil {
+		t.Fatalf("git commit .gitignore: %v", err)
+	}
+
+	return gitStdout(t, repoDir, "rev-parse", "HEAD")
 }

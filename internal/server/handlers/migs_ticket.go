@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"net/url"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -16,12 +14,10 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
-	"github.com/iw2rmb/ploy/internal/blobstore"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	migsapi "github.com/iw2rmb/ploy/internal/migs/api"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
-	"github.com/iw2rmb/ploy/internal/workflow/hook"
 )
 
 // NOTE: This file uses KSUID-backed string IDs for runs and jobs.
@@ -191,29 +187,16 @@ func getRunStatusHandler(st store.Store) http.HandlerFunc {
 }
 
 type plannedJob struct {
-	ID           domaintypes.JobID
-	Name         string
-	JobType      domaintypes.JobType
-	JobImage     string
-	Status       domaintypes.JobStatus
-	StepName     string
-	StepIndex    *int
-	HookSource   string
-	HookIndex    *int
-	HookCycle    string
-	GateCycle    string
-	HookDecision *hookPlanningDecision
-	NextID       *domaintypes.JobID
-	RepoSHAIn    string
-}
-
-type hookPlanningDecision struct {
-	Evaluated bool
-	Match     hook.MatchDecision
-}
-
-func (d hookPlanningDecision) ShouldRun() bool {
-	return d.Match.ShouldRun
+	ID        domaintypes.JobID
+	Name      string
+	JobType   domaintypes.JobType
+	JobImage  string
+	Status    domaintypes.JobStatus
+	StepName  string
+	StepIndex *int
+	GateCycle string
+	NextID    *domaintypes.JobID
+	RepoSHAIn string
 }
 
 type preGateCreationBinding struct {
@@ -232,7 +215,7 @@ func createJobsFromSpec(
 	attempt int32,
 	repoSHA0 string,
 	spec []byte,
-	hookBlobstores ...blobstore.Store,
+	_ ...any,
 ) error {
 	migsSpec, err := contracts.ParseMigSpecJSON(spec)
 	if err != nil {
@@ -246,28 +229,17 @@ func createJobsFromSpec(
 	if err != nil {
 		return fmt.Errorf("resolve pre-gate binding: %w", err)
 	}
-	resolvedHooks, err := resolveHookManifestSources(*migsSpec)
-	if err != nil {
-		return fmt.Errorf("resolve hook sources: %w", err)
-	}
-	if err := validateResolvedHookSources(ctx, st, migsSpec, resolvedHooks, hookBlobstores...); err != nil {
-		return err
-	}
 
 	type draft struct {
-		name         string
-		jobType      domaintypes.JobType
-		jobImage     string
-		stepName     string
-		stepIndex    *int
-		hookSource   string
-		hookIndex    *int
-		hookCycle    string
-		gateCycle    string
-		hookDecision *hookPlanningDecision
+		name      string
+		jobType   domaintypes.JobType
+		jobImage  string
+		stepName  string
+		stepIndex *int
+		gateCycle string
 	}
 
-	drafts := make([]draft, 0, len(migsSpec.Steps)+len(resolvedHooks)*2+5)
+	drafts := make([]draft, 0, len(migsSpec.Steps)+5)
 	drafts = append(drafts, draft{name: "pre-gate", jobType: domaintypes.JobTypePreGate, gateCycle: "pre-gate"})
 	drafts = append(drafts, draft{name: "pre-gate-sbom", jobType: domaintypes.JobTypeSBOM, gateCycle: "pre-gate"})
 
@@ -322,18 +294,14 @@ func createJobsFromSpec(
 			jobImage = strings.TrimSpace(preGateBinding.JobImage)
 		}
 		planned = append(planned, plannedJob{
-			ID:           domaintypes.NewJobID(),
-			Name:         d.name,
-			JobType:      d.jobType,
-			JobImage:     jobImage,
-			Status:       status,
-			StepName:     d.stepName,
-			StepIndex:    d.stepIndex,
-			HookSource:   d.hookSource,
-			HookIndex:    d.hookIndex,
-			HookCycle:    d.hookCycle,
-			GateCycle:    d.gateCycle,
-			HookDecision: d.hookDecision,
+			ID:        domaintypes.NewJobID(),
+			Name:      d.name,
+			JobType:   d.jobType,
+			JobImage:  jobImage,
+			Status:    status,
+			StepName:  d.stepName,
+			StepIndex: d.stepIndex,
+			GateCycle: d.gateCycle,
 		})
 	}
 	// Seed deterministic SHA chain from run_repos.repo_sha0 at chain head.
@@ -358,21 +326,6 @@ func createJobsFromSpec(
 		}
 		if err := upsertPreGateCreationProfileLink(ctx, st, preGateJobID, preGateBinding.ProfileID); err != nil {
 			return fmt.Errorf("link pre-gate profile: %w", err)
-		}
-	}
-	return nil
-}
-
-func validateResolvedHookSources(
-	ctx context.Context,
-	st store.Store,
-	spec *contracts.MigSpec,
-	resolvedHooks []string,
-	hookBlobstores ...blobstore.Store,
-) error {
-	for i, source := range resolvedHooks {
-		if _, err := loadHookSpecForPlanning(ctx, st, spec, source, hookBlobstores...); err != nil {
-			return fmt.Errorf("validate hook source[%d] %q: %w", i, source, err)
 		}
 	}
 	return nil
@@ -468,13 +421,7 @@ func createPlannedJob(ctx context.Context, st store.Store, runID domaintypes.Run
 		meta = contracts.NewMigJobMeta()
 	}
 	meta.MigStepIndex = planned.StepIndex
-	meta.HookSource = strings.TrimSpace(planned.HookSource)
-	meta.HookIndex = planned.HookIndex
-	meta.HookCycleName = strings.TrimSpace(planned.HookCycle)
 	meta.GateCycleName = strings.TrimSpace(planned.GateCycle)
-	if planned.HookDecision != nil {
-		meta.ActionSummary = summarizeHookPlanningDecision(*planned.HookDecision)
-	}
 	if planned.JobType == domaintypes.JobTypeSBOM {
 		phase := contracts.SBOMPhasePost
 		if strings.TrimSpace(planned.GateCycle) == "pre-gate" {
@@ -507,142 +454,6 @@ func createPlannedJob(ctx context.Context, st store.Store, runID domaintypes.Run
 		RepoShaIn:   planned.RepoSHAIn,
 	})
 	return err
-}
-
-func hookRuntimeFallbackStack(spec *contracts.MigSpec, cycleName string) hook.RuntimeStack {
-	if spec == nil || spec.BuildGate == nil {
-		return hook.RuntimeStack{}
-	}
-	var phase *contracts.BuildGatePhaseConfig
-	switch cycleName {
-	case "pre-gate":
-		phase = spec.BuildGate.Pre
-	case "post-gate", "re-gate":
-		phase = spec.BuildGate.Post
-	}
-	if phase == nil || phase.Stack == nil || !phase.Stack.Enabled {
-		return hook.RuntimeStack{}
-	}
-	return hook.RuntimeStack{
-		Language: strings.TrimSpace(phase.Stack.Language),
-		Tool:     strings.TrimSpace(phase.Stack.Tool),
-		Release:  strings.TrimSpace(phase.Stack.Release),
-	}
-}
-
-func mergeHookRuntimeStackWithFallback(current hook.RuntimeStack, fallback hook.RuntimeStack) hook.RuntimeStack {
-	if strings.TrimSpace(current.Language) == "" {
-		current.Language = fallback.Language
-	}
-	if strings.TrimSpace(current.Tool) == "" {
-		current.Tool = fallback.Tool
-	}
-	if strings.TrimSpace(current.Release) == "" {
-		current.Release = fallback.Release
-	}
-	return current
-}
-
-func resolvePlannableHookDecision(
-	ctx context.Context,
-	st store.Store,
-	spec *contracts.MigSpec,
-	source string,
-	matchInput hook.MatchInput,
-	hookBlobstores ...blobstore.Store,
-) (hookPlanningDecision, error) {
-	specDoc, err := loadHookSpecForPlanning(ctx, st, spec, source, hookBlobstores...)
-	if err != nil {
-		return hookPlanningDecision{}, err
-	}
-	match, err := hook.Match(specDoc, matchInput)
-	if err != nil {
-		return hookPlanningDecision{}, fmt.Errorf("evaluate hook matcher: %w", err)
-	}
-	return hookPlanningDecision{
-		Evaluated: true,
-		Match:     match,
-	}, nil
-}
-
-func loadHookSpecForPlanning(
-	ctx context.Context,
-	st store.Store,
-	spec *contracts.MigSpec,
-	source string,
-	hookBlobstores ...blobstore.Store,
-) (hook.Spec, error) {
-	trimmed := strings.TrimSpace(source)
-	if isHTTPSHookSource(trimmed) {
-		specDoc, err := loadRuntimeHookSpecFromLoader(trimmed, ".")
-		if err != nil {
-			return hook.Spec{}, fmt.Errorf("load hook spec: %w", err)
-		}
-		return specDoc, nil
-	}
-	if canonicalHookSourcePattern.MatchString(trimmed) {
-		specDoc, err := loadHookSpecFromBundleHash(ctx, st, firstHookBlobStore(hookBlobstores...), trimmed, planningBundleMap(spec))
-		if err != nil {
-			return hook.Spec{}, fmt.Errorf("load hook spec from hash: %w", err)
-		}
-		return specDoc, nil
-	}
-	return hook.Spec{}, fmt.Errorf("unsupported hook source %q: local hook sources must be precompiled by CLI into hash entries", source)
-}
-
-func firstHookBlobStore(hookBlobstores ...blobstore.Store) blobstore.Store {
-	if len(hookBlobstores) == 0 {
-		return nil
-	}
-	return hookBlobstores[0]
-}
-
-func planningBundleMap(spec *contracts.MigSpec) map[string]string {
-	if spec == nil {
-		return nil
-	}
-	return spec.BundleMap
-}
-
-func summarizeHookPlanningDecision(decision hookPlanningDecision) string {
-	return fmt.Sprintf(
-		"hook_match eval=planned should_run=%t stack=%t sbom=%t on_match=%t on_add=%t on_remove=%t on_change=%t",
-		decision.Match.ShouldRun,
-		decision.Match.StackMatched,
-		decision.Match.SBOMMatched,
-		decision.Match.Predicates.OnMatch,
-		decision.Match.Predicates.OnAdd,
-		decision.Match.Predicates.OnRemove,
-		decision.Match.Predicates.OnChange,
-	)
-}
-
-func resolveHookManifestSources(spec contracts.MigSpec) ([]string, error) {
-	if len(spec.Hooks) == 0 {
-		return nil, nil
-	}
-	out := make([]string, 0, len(spec.Hooks))
-	for i, raw := range spec.Hooks {
-		source := strings.TrimSpace(raw)
-		if source == "" {
-			return nil, fmt.Errorf("hooks[%d]: empty hook source", i)
-		}
-		if !canonicalHookSourcePattern.MatchString(source) && !isHTTPSHookSource(source) {
-			return nil, fmt.Errorf("hooks[%d] %q: local hook sources must be precompiled by CLI into hash entries", i, raw)
-		}
-		out = append(out, source)
-	}
-	return out, nil
-}
-
-var canonicalHookSourcePattern = regexp.MustCompile(`^[0-9a-f]{7,64}$`)
-
-func isHTTPSHookSource(source string) bool {
-	u, err := url.Parse(source)
-	if err != nil || u == nil {
-		return false
-	}
-	return (u.Scheme == "http" || u.Scheme == "https") && u.Host != ""
 }
 
 // helpers

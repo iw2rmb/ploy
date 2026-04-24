@@ -92,7 +92,7 @@ func resolvePreviousHealJob(
 		if jobType == domaintypes.JobTypeHeal {
 			return prev
 		}
-		if jobType != domaintypes.JobTypeSBOM && jobType != domaintypes.JobTypeHook {
+		if jobType != domaintypes.JobTypeSBOM {
 			return nil
 		}
 		prev = lifecycle.RecoveryChainPredecessor(prev.ID, jobsByID)

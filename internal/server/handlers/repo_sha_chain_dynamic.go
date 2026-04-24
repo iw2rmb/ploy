@@ -14,7 +14,7 @@ func normalizeRepoSHA(sha string) string {
 
 func canChangeWorkspace(jobType domaintypes.JobType) bool {
 	switch jobType {
-	case domaintypes.JobTypeMig, domaintypes.JobTypeHeal, domaintypes.JobTypeHook:
+	case domaintypes.JobTypeMig, domaintypes.JobTypeHeal:
 		return true
 	default:
 		return false

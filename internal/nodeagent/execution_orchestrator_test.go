@@ -391,60 +391,22 @@ func TestGateCycleNameFromSBOMContext(t *testing.T) {
 	}
 }
 
-func TestGateCycleHookIndexFromJobName(t *testing.T) {
-	t.Parallel()
-
-	cases := []struct {
-		name    string
-		jobName string
-		hooks   int
-		wantID  string
-		wantIdx int
-		wantErr bool
-	}{
-		{name: "pre", jobName: "pre-gate-hook-001", hooks: 2, wantID: "pre-gate", wantIdx: 1},
-		{name: "post", jobName: "post-gate-hook-000", hooks: 1, wantID: "post-gate", wantIdx: 0},
-		{name: "regate", jobName: "re-gate-3-hook-002", hooks: 3, wantID: "re-gate-3", wantIdx: 2},
-		{name: "invalid", jobName: "hook-1", hooks: 2, wantErr: true},
-	}
-
-	for _, tc := range cases {
-		tc := tc
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-			gotID, gotIdx, err := gateCycleHookIndexFromJobName(tc.jobName, tc.hooks)
-			if tc.wantErr {
-				if err == nil {
-					t.Fatalf("expected error for job_name=%q", tc.jobName)
-				}
-				return
-			}
-			if err != nil {
-				t.Fatalf("gateCycleHookIndexFromJobName(%q,%d): %v", tc.jobName, tc.hooks, err)
-			}
-			if gotID != tc.wantID || gotIdx != tc.wantIdx {
-				t.Fatalf("gateCycleHookIndexFromJobName(%q,%d)=(%q,%d) want (%q,%d)", tc.jobName, tc.hooks, gotID, gotIdx, tc.wantID, tc.wantIdx)
-			}
-		})
-	}
-}
-
 func TestMaterializeGateSBOMForGate_UsesPostAndReGateCycleSnapshots(t *testing.T) {
 	cacheHome := t.TempDir()
 	t.Setenv("PLOYD_CACHE_HOME", cacheHome)
 
 	runID := types.RunID("run-cycle-materialize")
 	postSnapshot := []byte(`{"spdxVersion":"SPDX-2.3","name":"post-gate-cycle"}`)
-	postLastHookOut := gateCycleHookOutPath(runID, postGateCycleName, 1)
-	if err := os.MkdirAll(filepath.Dir(postLastHookOut), 0o755); err != nil {
-		t.Fatalf("mkdir post hook out: %v", err)
+	postSBOMOut := gateCycleSBOMOutPath(runID, postGateCycleName)
+	if err := os.MkdirAll(filepath.Dir(postSBOMOut), 0o755); err != nil {
+		t.Fatalf("mkdir post sbom out: %v", err)
 	}
-	if err := os.WriteFile(postLastHookOut, postSnapshot, 0o644); err != nil {
-		t.Fatalf("write post hook snapshot: %v", err)
+	if err := os.WriteFile(postSBOMOut, postSnapshot, 0o644); err != nil {
+		t.Fatalf("write post sbom snapshot: %v", err)
 	}
 
 	postWorkspace := t.TempDir()
-	if err := materializeGateSBOMForGate(runID, postGateCycleName, []string{"./hooks/a.yaml", "./hooks/b.yaml"}, postWorkspace); err != nil {
+	if err := materializeGateSBOMForGate(runID, postGateCycleName, postWorkspace); err != nil {
 		t.Fatalf("materialize post-gate sbom: %v", err)
 	}
 	postOutPath := filepath.Join(postWorkspace, step.BuildGateWorkspaceOutDir, preGateCanonicalSBOMFileName)
@@ -467,7 +429,7 @@ func TestMaterializeGateSBOMForGate_UsesPostAndReGateCycleSnapshots(t *testing.T
 	}
 
 	reGateWorkspace := t.TempDir()
-	if err := materializeGateSBOMForGate(runID, reGateCycle, nil, reGateWorkspace); err != nil {
+	if err := materializeGateSBOMForGate(runID, reGateCycle, reGateWorkspace); err != nil {
 		t.Fatalf("materialize re-gate sbom: %v", err)
 	}
 	reGateOutPath := filepath.Join(reGateWorkspace, step.BuildGateWorkspaceOutDir, preGateCanonicalSBOMFileName)
@@ -495,7 +457,7 @@ func TestMaterializeGateSBOMForGate_RequiresCycleSnapshot(t *testing.T) {
 	}
 
 	postWorkspace := t.TempDir()
-	err := materializeGateSBOMForGate(runID, postGateCycleName, nil, postWorkspace)
+	err := materializeGateSBOMForGate(runID, postGateCycleName, postWorkspace)
 	if err == nil {
 		t.Fatalf("expected error when post-gate snapshot is missing")
 	}
@@ -504,7 +466,7 @@ func TestMaterializeGateSBOMForGate_RequiresCycleSnapshot(t *testing.T) {
 	}
 
 	reGateWorkspace := t.TempDir()
-	err = materializeGateSBOMForGate(runID, "re-gate-1", nil, reGateWorkspace)
+	err = materializeGateSBOMForGate(runID, "re-gate-1", reGateWorkspace)
 	if err == nil {
 		t.Fatalf("expected error when re-gate snapshot is missing")
 	}

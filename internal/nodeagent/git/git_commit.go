@@ -35,8 +35,8 @@ func EnsureCommit(ctx context.Context, repoDir, userName, userEmail, message str
 	_ = runGitCommand(ctx, repoDir, nil, "config", "user.name", userName)
 	_ = runGitCommand(ctx, repoDir, nil, "config", "user.email", userEmail)
 
-	if err := runGitCommand(ctx, repoDir, nil, "add", "-A", "--", ".",
-		":(exclude)**/target/**", ":(exclude)target/"); err != nil {
+	addArgs := append([]string{"add", "-A", "--", "."}, excludedBuildPathspecs...)
+	if err := runGitCommand(ctx, repoDir, nil, addArgs...); err != nil {
 		return false, fmt.Errorf("git add: %w", err)
 	}
 	if err := runGitCommand(ctx, repoDir, nil, "commit", "-m", message); err != nil {

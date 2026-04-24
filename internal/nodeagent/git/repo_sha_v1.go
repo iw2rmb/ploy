@@ -18,10 +18,14 @@ const (
 	repoSHAV1CommitTitle = "ploy repo_sha_v1"
 )
 
-var workspaceTreeAddArgs = []string{
-	"add", "-A", "--", ".",
-	":(exclude)**/target/**", ":(exclude)target/",
+var excludedBuildPathspecs = []string{
+	":(exclude)**/target",
 }
+
+var workspaceTreeAddArgs = append(
+	[]string{"add", "-A", "--", "."},
+	excludedBuildPathspecs...,
+)
 
 // ComputeRepoSHAV1 calculates deterministic repo_sha_out for a workspace.
 //

@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -80,9 +79,6 @@ func listRunRepoJobsHandler(st store.Store) http.HandlerFunc {
 			Attempt: attempt,
 			Jobs:    make([]migsapi.RunRepoJob, 0, len(jobs)),
 		}
-		hookJobsByCycle := make(map[string]int)
-		hookConditionsByCycle := make(map[string][]json.RawMessage)
-		sbomCycleByJobID := make(map[domaintypes.JobID]string)
 
 		for _, job := range jobs {
 			jr := migsapi.RunRepoJob{
@@ -99,7 +95,6 @@ func listRunRepoJobsHandler(st store.Store) http.HandlerFunc {
 				DurationMs: job.DurationMs,
 			}
 
-			jr.HookConditionResult, jr.HookPlanReason = extractRawHookEvidence(job.Meta)
 			var meta *contracts.JobMeta
 
 			// Extract projection fields from structured job metadata.
@@ -141,37 +136,12 @@ func listRunRepoJobsHandler(st store.Store) http.HandlerFunc {
 							jr.Version = exp.Release
 						}
 					}
-					if job.JobType == domaintypes.JobTypeHook {
-						actionSummary := strings.TrimSpace(meta.ActionSummary)
-						if actionSummary != "" {
-							if jr.HookPlanReason == "" {
-								jr.HookPlanReason = actionSummary
-							}
-							if jr.HookConditionResult == "" {
-								if conditionJSON, ok := parseHookConditionResultFromSummary(actionSummary); ok {
-									jr.HookConditionResult = conditionJSON
-								}
-							}
-						}
-					}
 				}
 			}
 
 			if job.JobType == domaintypes.JobTypeSBOM {
 				jr.Name = "sbom"
-				if sbomCtx, ok := sbomCycleContextFromJob(job); ok {
-					sbomCycleByJobID[job.ID] = sbomCycleNameFromContext(sbomCtx)
-				}
 				jr.SBOMEvidence = loadSBOMEvidence(r, st, runID, job.ID)
-			}
-
-			if job.JobType == domaintypes.JobTypeHook {
-				if cycleName := hookCycleNameFromMetaOrName(meta, job.Name); cycleName != "" {
-					hookJobsByCycle[cycleName]++
-					if raw := parseSerializedJSON(jr.HookConditionResult); len(raw) > 0 {
-						hookConditionsByCycle[cycleName] = append(hookConditionsByCycle[cycleName], raw)
-					}
-				}
 			}
 
 			// Set timestamps.
@@ -186,7 +156,6 @@ func listRunRepoJobsHandler(st store.Store) http.HandlerFunc {
 
 			resp.Jobs = append(resp.Jobs, jr)
 		}
-		attachSBOMHookPlanningEvidence(resp.Jobs, hookJobsByCycle, hookConditionsByCycle, sbomCycleByJobID)
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
@@ -229,171 +198,6 @@ func loadSBOMEvidence(r *http.Request, st store.Store, runID domaintypes.RunID, 
 	return &evidence
 }
 
-func attachSBOMHookPlanningEvidence(
-	jobs []migsapi.RunRepoJob,
-	hookJobsByCycle map[string]int,
-	hookConditionsByCycle map[string][]json.RawMessage,
-	sbomCycleByJobID map[domaintypes.JobID]string,
-) {
-	for i := range jobs {
-		job := &jobs[i]
-		if job.JobType != domaintypes.JobTypeSBOM || job.Status != domaintypes.JobStatusSuccess {
-			continue
-		}
-		cycleName := strings.TrimSpace(sbomCycleByJobID[job.JobID])
-		if cycleName == "" {
-			continue
-		}
-		plannedHookJobs := hookJobsByCycle[cycleName]
-		if job.HookPlanReason == "" {
-			if plannedHookJobs == 0 {
-				job.HookPlanReason = fmt.Sprintf("no hook jobs planned for cycle %q", cycleName)
-			} else {
-				job.HookPlanReason = fmt.Sprintf("planned %d hook job(s) for cycle %q", plannedHookJobs, cycleName)
-			}
-		}
-		if job.HookConditionResult != "" {
-			continue
-		}
-		payload := struct {
-			Evaluated   bool              `json:"evaluated"`
-			PlannedJobs int               `json:"planned_jobs"`
-			Hooks       []json.RawMessage `json:"hooks,omitempty"`
-		}{
-			Evaluated:   true,
-			PlannedJobs: plannedHookJobs,
-			Hooks:       hookConditionsByCycle[cycleName],
-		}
-		if raw, err := json.Marshal(payload); err == nil {
-			job.HookConditionResult = string(raw)
-		}
-	}
-}
-
-func extractRawHookEvidence(metaRaw []byte) (hookConditionResult string, hookPlanReason string) {
-	var raw map[string]json.RawMessage
-	if len(metaRaw) == 0 || json.Unmarshal(metaRaw, &raw) != nil {
-		return "", ""
-	}
-	return decodeSerializedField(raw["hook_condition_result"]), decodeSerializedField(raw["hook_plan_reason"])
-}
-
-func decodeSerializedField(raw json.RawMessage) string {
-	if len(raw) == 0 {
-		return ""
-	}
-	var plain string
-	if err := json.Unmarshal(raw, &plain); err == nil {
-		return strings.TrimSpace(plain)
-	}
-	s := strings.TrimSpace(string(raw))
-	if s == "" || s == "null" {
-		return ""
-	}
-	if raw := parseSerializedJSON(s); len(raw) > 0 {
-		return string(raw)
-	}
-	return s
-}
-
-func parseHookConditionResultFromSummary(summary string) (string, bool) {
-	summary = strings.TrimSpace(summary)
-	if !strings.HasPrefix(summary, "hook_match ") {
-		return "", false
-	}
-	fields := strings.Fields(summary)
-	kv := make(map[string]string, len(fields))
-	for _, f := range fields[1:] {
-		key, value, ok := strings.Cut(f, "=")
-		if !ok {
-			continue
-		}
-		kv[key] = value
-	}
-	shouldRun, err := strconv.ParseBool(kv["should_run"])
-	if err != nil {
-		return "", false
-	}
-	stackMatched, err := strconv.ParseBool(kv["stack"])
-	if err != nil {
-		return "", false
-	}
-	sbomMatched, err := strconv.ParseBool(kv["sbom"])
-	if err != nil {
-		return "", false
-	}
-	onMatch, err := strconv.ParseBool(kv["on_match"])
-	if err != nil {
-		return "", false
-	}
-	onAdd, err := strconv.ParseBool(kv["on_add"])
-	if err != nil {
-		return "", false
-	}
-	onRemove, err := strconv.ParseBool(kv["on_remove"])
-	if err != nil {
-		return "", false
-	}
-	onChange, err := strconv.ParseBool(kv["on_change"])
-	if err != nil {
-		return "", false
-	}
-	payload := struct {
-		Evaluated    bool `json:"evaluated"`
-		ShouldRun    bool `json:"should_run"`
-		StackMatched bool `json:"stack_matched"`
-		SBOMMatched  bool `json:"sbom_matched"`
-		Predicates   struct {
-			OnMatch  bool `json:"on_match"`
-			OnAdd    bool `json:"on_add"`
-			OnRemove bool `json:"on_remove"`
-			OnChange bool `json:"on_change"`
-		} `json:"predicates"`
-	}{
-		Evaluated:    kv["eval"] == "planned",
-		ShouldRun:    shouldRun,
-		StackMatched: stackMatched,
-		SBOMMatched:  sbomMatched,
-	}
-	payload.Predicates.OnMatch = onMatch
-	payload.Predicates.OnAdd = onAdd
-	payload.Predicates.OnRemove = onRemove
-	payload.Predicates.OnChange = onChange
-	raw, err := json.Marshal(payload)
-	if err != nil {
-		return "", false
-	}
-	return string(raw), true
-}
-
-func parseSerializedJSON(raw string) json.RawMessage {
-	trimmed := strings.TrimSpace(raw)
-	if trimmed == "" {
-		return nil
-	}
-	var compact bytes.Buffer
-	if err := json.Compact(&compact, []byte(trimmed)); err != nil {
-		return nil
-	}
-	return json.RawMessage(compact.String())
-}
-
-func hookCycleNameFromMetaOrName(meta *contracts.JobMeta, fallbackName string) string {
-	if meta != nil && strings.TrimSpace(meta.HookCycleName) != "" {
-		return strings.TrimSpace(meta.HookCycleName)
-	}
-	name := strings.TrimSpace(fallbackName)
-	idx := strings.LastIndex(name, "-hook-")
-	if idx <= 0 {
-		return ""
-	}
-	cycleName := strings.TrimSpace(name[:idx])
-	if cycleName == "" {
-		return ""
-	}
-	return cycleName
-}
-
 func deriveRunRepoJobName(job store.Job, meta *contracts.JobMeta) string {
 	switch domaintypes.JobType(job.JobType) {
 	case domaintypes.JobTypePreGate:
@@ -410,15 +214,6 @@ func deriveRunRepoJobName(job store.Job, meta *contracts.JobMeta) string {
 			return fmt.Sprintf("mig-%d", *meta.MigStepIndex)
 		}
 		return "mig"
-	case domaintypes.JobTypeHook:
-		if meta != nil && meta.HookIndex != nil {
-			cycle := strings.TrimSpace(meta.HookCycleName)
-			if cycle == "" {
-				cycle = "hook"
-			}
-			return fmt.Sprintf("%s-hook-%03d", cycle, *meta.HookIndex)
-		}
-		return "hook"
 	case domaintypes.JobTypeSBOM:
 		return "sbom"
 	case domaintypes.JobTypeHeal:

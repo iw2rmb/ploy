@@ -25,15 +25,6 @@ func testJobMetaForHydraRouting(jobType domaintypes.JobType, jobName string) []b
 			CycleName: cycle,
 			Role:      contracts.SBOMRoleInitial,
 		}
-	case domaintypes.JobTypeHook:
-		switch {
-		case strings.HasPrefix(jobName, "pre-gate"):
-			meta.HookCycleName = "pre-gate"
-		case strings.HasPrefix(jobName, "post-gate"):
-			meta.HookCycleName = "post-gate"
-		case strings.HasPrefix(jobName, "re-gate"):
-			meta.HookCycleName = "re-gate-1"
-		}
 	}
 	raw, _ := contracts.MarshalJobMeta(meta)
 	return raw
@@ -849,30 +840,6 @@ func TestApplyHydraOverlay_CanonicalCAInjection(t *testing.T) {
 			overlaySection: "sbom",
 			wantPhase:      "post",
 			wantCA:         "sbompost123456",
-		},
-		{
-			name:           "hook_section_applies_to_pre_gate_cycle",
-			jobType:        domaintypes.JobTypeHook,
-			jobName:        "pre-gate-hook-000",
-			overlaySection: "hook",
-			wantPhase:      "pre",
-			wantCA:         "hookpre1234567",
-		},
-		{
-			name:           "hook_section_applies_to_post_gate_cycle",
-			jobType:        domaintypes.JobTypeHook,
-			jobName:        "post-gate-hook-000",
-			overlaySection: "hook",
-			wantPhase:      "post",
-			wantCA:         "hookpost123456",
-		},
-		{
-			name:           "hook_section_applies_to_re_gate_cycle",
-			jobType:        domaintypes.JobTypeHook,
-			jobName:        "re-gate-1-hook-000",
-			overlaySection: "hook",
-			wantPhase:      "post",
-			wantCA:         "hookre1234567a",
 		},
 	}
 
