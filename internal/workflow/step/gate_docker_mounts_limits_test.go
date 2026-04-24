@@ -139,6 +139,33 @@ func TestDockerGateExecutor_MountsInDirWhenPresent(t *testing.T) {
 	}
 }
 
+func TestDockerGateExecutor_MountsShareDirWhenProvided(t *testing.T) {
+	t.Parallel()
+
+	executor, rt, workspace := newDockerGateTestHarness(t)
+	spec := &contracts.StepGateSpec{Enabled: true}
+	shareDir := t.TempDir()
+
+	_, err := executor.Execute(WithGateShareDir(context.Background(), shareDir), spec, workspace)
+	if err != nil {
+		t.Fatalf("Execute() unexpected error: %v", err)
+	}
+	if !rt.createCalled {
+		t.Fatal("expected Create to be called")
+	}
+
+	found := false
+	for _, mount := range rt.captured.Mounts {
+		if mount.Source == shareDir && mount.Target == containerShareDir && !mount.ReadOnly {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected /share mount %q -> %q in mounts=%+v", shareDir, containerShareDir, rt.captured.Mounts)
+	}
+}
+
 func TestDockerGateExecutor_MountsGradleNativeCacheDir(t *testing.T) {
 	t.Parallel()
 

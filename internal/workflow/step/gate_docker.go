@@ -198,6 +198,17 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 	} else if !errors.Is(statErr, os.ErrNotExist) {
 		return nil, fmt.Errorf("stat build gate in dir: %w", statErr)
 	}
+	gateShareDir := gateShareDirFromContext(ctx)
+	if gateShareDir != "" {
+		info, statErr := os.Stat(gateShareDir)
+		if statErr != nil {
+			return nil, fmt.Errorf("stat build gate share dir: %w", statErr)
+		}
+		if !info.IsDir() {
+			return nil, fmt.Errorf("build gate share path is not a directory: %s", gateShareDir)
+		}
+		mounts = append(mounts, ContainerMount{Source: gateShareDir, Target: containerShareDir, ReadOnly: false})
+	}
 	toolCacheMounts, err := buildGateToolCacheMounts(plan.language, plan.tool, plan.release)
 	if err != nil {
 		return nil, fmt.Errorf("prepare build gate tool cache mounts: %w", err)

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -527,5 +528,45 @@ func TestRunController_reportTerminalStatus(t *testing.T) {
 				t.Errorf("status = %q, want %q", cap.Status, tt.wantStatus)
 			}
 		})
+	}
+}
+
+func TestRunController_reportTerminalStatus_RemovesShareVolumeOnTerminalSuccess(t *testing.T) {
+	cacheHome := t.TempDir()
+	t.Setenv("PLOYD_CACHE_HOME", cacheHome)
+
+	runID := types.NewRunID()
+	repoID := types.NewMigRepoID()
+	shareDir := runRepoShareDir(runID, repoID)
+	if err := os.MkdirAll(shareDir, 0o755); err != nil {
+		t.Fatalf("mkdir share dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(shareDir, sbomJavaClasspathFileName), []byte("/repo/.m2/a.jar\n"), 0o644); err != nil {
+		t.Fatalf("write share classpath: %v", err)
+	}
+
+	server, _ := newStatusCaptureServer(t, "test-job")
+	controller := newTestController(t, newAgentConfig(server.URL))
+	req := StartRunRequest{
+		RunID:   runID,
+		RepoID:  repoID,
+		JobID:   "test-job",
+		JobType: types.JobTypeMig,
+		NextID:  nil,
+	}
+	stats := types.NewRunStatsBuilder().ExitCode(0).MustBuild()
+
+	controller.reportTerminalStatus(
+		context.Background(),
+		req,
+		nil,
+		step.Result{ExitCode: 0},
+		stats,
+		"",
+		100*1e6,
+	)
+
+	if _, err := os.Stat(shareDir); !os.IsNotExist(err) {
+		t.Fatalf("share volume should be removed on terminal success, stat err=%v", err)
 	}
 }

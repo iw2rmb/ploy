@@ -15,6 +15,7 @@ func TestMaterializeValidatedSBOMOutput_WritesCanonicalSnapshot(t *testing.T) {
 	t.Parallel()
 
 	outDir := t.TempDir()
+	shareDir := t.TempDir()
 	snapshotPath := filepath.Join(t.TempDir(), "gate-cycle", "sbom", "out", preGateCanonicalSBOMFileName)
 
 	rawDeps := strings.Join([]string{
@@ -23,15 +24,15 @@ func TestMaterializeValidatedSBOMOutput_WritesCanonicalSnapshot(t *testing.T) {
 		"+--- org.openapi.generator:org.openapi.generator.gradle.plugin:6.6.0",
 		"noise line that should be ignored",
 	}, "\n")
-	if err := os.WriteFile(filepath.Join(outDir, sbomDependencyOutputFileName), []byte(rawDeps), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(shareDir, sbomDependencyOutputFileName), []byte(rawDeps), 0o644); err != nil {
 		t.Fatalf("write raw dependency output: %v", err)
 	}
 	rawClasspath := []byte("/root/.gradle/caches/modules-2/files-2.1/a/b/c/a.jar\n")
-	if err := os.WriteFile(filepath.Join(outDir, sbomJavaClasspathFileName), rawClasspath, 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(shareDir, sbomJavaClasspathFileName), rawClasspath, 0o644); err != nil {
 		t.Fatalf("write java classpath output: %v", err)
 	}
 
-	if err := materializeValidatedSBOMOutput(outDir, snapshotPath, true); err != nil {
+	if err := materializeValidatedSBOMOutput(outDir, shareDir, snapshotPath, true); err != nil {
 		t.Fatalf("materializeValidatedSBOMOutput: %v", err)
 	}
 
@@ -56,9 +57,10 @@ func TestMaterializeValidatedSBOMOutput_ErrorsWhenDependencyOutputMissing(t *tes
 	t.Parallel()
 
 	outDir := t.TempDir()
+	shareDir := t.TempDir()
 	snapshotPath := filepath.Join(t.TempDir(), "gate-cycle", "sbom", "out", preGateCanonicalSBOMFileName)
 
-	err := materializeValidatedSBOMOutput(outDir, snapshotPath, true)
+	err := materializeValidatedSBOMOutput(outDir, shareDir, snapshotPath, true)
 	if err == nil {
 		t.Fatal("expected error for missing dependency output")
 	}
@@ -74,16 +76,17 @@ func TestMaterializeValidatedSBOMOutput_ClasspathValidationDependsOnFlow(t *test
 	t.Parallel()
 
 	outDir := t.TempDir()
+	shareDir := t.TempDir()
 	snapshotPath := filepath.Join(t.TempDir(), "gate-cycle", "sbom", "out", preGateCanonicalSBOMFileName)
 	rawDeps := "[INFO]    com.fasterxml.jackson.core:jackson-databind:jar:2.17.2:compile\n"
-	if err := os.WriteFile(filepath.Join(outDir, sbomDependencyOutputFileName), []byte(rawDeps), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(shareDir, sbomDependencyOutputFileName), []byte(rawDeps), 0o644); err != nil {
 		t.Fatalf("write raw dependency output: %v", err)
 	}
 
-	if err := materializeValidatedSBOMOutput(outDir, snapshotPath, true); err == nil {
+	if err := materializeValidatedSBOMOutput(outDir, shareDir, snapshotPath, true); err == nil {
 		t.Fatal("expected error for missing java classpath when classpath is required")
 	}
-	if err := materializeValidatedSBOMOutput(outDir, snapshotPath, false); err != nil {
+	if err := materializeValidatedSBOMOutput(outDir, shareDir, snapshotPath, false); err != nil {
 		t.Fatalf("expected snapshot-only flow to pass without java classpath: %v", err)
 	}
 }
@@ -92,17 +95,18 @@ func TestMaterializeValidatedSBOMOutput_RejectsNonPortableGradleClasspath(t *tes
 	t.Parallel()
 
 	outDir := t.TempDir()
+	shareDir := t.TempDir()
 	snapshotPath := filepath.Join(t.TempDir(), "gate-cycle", "sbom", "out", preGateCanonicalSBOMFileName)
 	rawDeps := "[INFO]    com.fasterxml.jackson.core:jackson-databind:jar:2.17.2:compile\n"
-	if err := os.WriteFile(filepath.Join(outDir, sbomDependencyOutputFileName), []byte(rawDeps), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(shareDir, sbomDependencyOutputFileName), []byte(rawDeps), 0o644); err != nil {
 		t.Fatalf("write raw dependency output: %v", err)
 	}
 	rawClasspath := []byte("/home/gradle/.gradle/caches/modules-2/files-2.1/a/b/c/a.jar\n")
-	if err := os.WriteFile(filepath.Join(outDir, sbomJavaClasspathFileName), rawClasspath, 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(shareDir, sbomJavaClasspathFileName), rawClasspath, 0o644); err != nil {
 		t.Fatalf("write java classpath output: %v", err)
 	}
 
-	err := materializeValidatedSBOMOutput(outDir, snapshotPath, true)
+	err := materializeValidatedSBOMOutput(outDir, shareDir, snapshotPath, true)
 	if err == nil {
 		t.Fatal("expected error for non-portable gradle classpath")
 	}
@@ -111,66 +115,47 @@ func TestMaterializeValidatedSBOMOutput_RejectsNonPortableGradleClasspath(t *tes
 	}
 }
 
-func TestFinalizeSBOMFlowOutputs_PersistsRunClasspathFromSinglePreGateSource(t *testing.T) {
+func TestFinalizeSBOMFlowOutputs_UsesShareOutputs(t *testing.T) {
 	cacheHome := t.TempDir()
 	t.Setenv("PLOYD_CACHE_HOME", cacheHome)
 	runID := types.NewRunID()
-	classpathPath := runJavaClasspathPath(runID)
+	repoID := types.NewMigRepoID()
+	shareDir := runRepoShareDir(runID, repoID)
+	if err := os.MkdirAll(shareDir, 0o755); err != nil {
+		t.Fatalf("mkdir share dir: %v", err)
+	}
 
 	preOutDir := t.TempDir()
 	preSnapshotPath := filepath.Join(t.TempDir(), "pre-cycle", preGateCanonicalSBOMFileName)
-	if err := os.WriteFile(filepath.Join(preOutDir, sbomDependencyOutputFileName), []byte("a:b:1.0.0\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(shareDir, sbomDependencyOutputFileName), []byte("a:b:1.0.0\n"), 0o644); err != nil {
 		t.Fatalf("write pre dependency output: %v", err)
 	}
 	preClasspath := []byte("/repo/.m2/a.jar\n")
-	if err := os.WriteFile(filepath.Join(preOutDir, sbomJavaClasspathFileName), preClasspath, 0o644); err != nil {
+	classpathPath := filepath.Join(shareDir, sbomJavaClasspathFileName)
+	if err := os.WriteFile(classpathPath, preClasspath, 0o644); err != nil {
 		t.Fatalf("write pre java classpath output: %v", err)
 	}
 	rc := &runController{}
-	if err := rc.finalizeSBOMFlowOutputs(runID, preGateCycleName, preOutDir, preSnapshotPath); err != nil {
+	if err := rc.finalizeSBOMFlowOutputs(runID, repoID, preGateCycleName, preOutDir, preSnapshotPath); err != nil {
 		t.Fatalf("finalizeSBOMFlowOutputs pre-gate: %v", err)
 	}
-	persistedPreClasspath, err := os.ReadFile(classpathPath)
-	if err != nil {
-		t.Fatalf("read persisted pre-gate classpath: %v", err)
-	}
-	if string(persistedPreClasspath) != string(preClasspath) {
-		t.Fatalf("persisted pre-gate classpath mismatch")
+	if _, err := os.Stat(filepath.Join(preOutDir, preGateCanonicalSBOMFileName)); err != nil {
+		t.Fatalf("expected canonical sbom in /out after pre flow: %v", err)
 	}
 
-	retryOutDir := t.TempDir()
-	retrySnapshotPath := filepath.Join(t.TempDir(), "pre-retry-cycle", preGateCanonicalSBOMFileName)
-	if err := os.WriteFile(filepath.Join(retryOutDir, sbomDependencyOutputFileName), []byte("retry:a:1.0.0\n"), 0o644); err != nil {
-		t.Fatalf("write retry dependency output: %v", err)
-	}
-	retryClasspath := []byte("/repo/.m2/retry.jar\n")
-	if err := os.WriteFile(filepath.Join(retryOutDir, sbomJavaClasspathFileName), retryClasspath, 0o644); err != nil {
-		t.Fatalf("write retry java classpath output: %v", err)
-	}
-	if err := rc.finalizeSBOMFlowOutputs(runID, preGateCycleName, retryOutDir, retrySnapshotPath); err != nil {
-		t.Fatalf("finalizeSBOMFlowOutputs pre-gate retry: %v", err)
-	}
-	persistedAfterRetryClasspath, err := os.ReadFile(classpathPath)
-	if err != nil {
-		t.Fatalf("read persisted classpath after pre-gate retry flow: %v", err)
-	}
-	if string(persistedAfterRetryClasspath) != string(preClasspath) {
-		t.Fatalf("pre-gate retry flow overwrote persisted classpath")
+	if err := os.Remove(classpathPath); err != nil {
+		t.Fatalf("remove share classpath before post flow: %v", err)
 	}
 
 	postOutDir := t.TempDir()
 	postSnapshotPath := filepath.Join(t.TempDir(), "post-cycle", preGateCanonicalSBOMFileName)
-	if err := os.WriteFile(filepath.Join(postOutDir, sbomDependencyOutputFileName), []byte("x:y:2.0.0\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(shareDir, sbomDependencyOutputFileName), []byte("x:y:2.0.0\n"), 0o644); err != nil {
 		t.Fatalf("write post dependency output: %v", err)
 	}
-	if err := rc.finalizeSBOMFlowOutputs(runID, postGateCycleName, postOutDir, postSnapshotPath); err != nil {
+	if err := rc.finalizeSBOMFlowOutputs(runID, repoID, postGateCycleName, postOutDir, postSnapshotPath); err != nil {
 		t.Fatalf("finalizeSBOMFlowOutputs post-gate: %v", err)
 	}
-	persistedPostClasspath, err := os.ReadFile(classpathPath)
-	if err != nil {
-		t.Fatalf("read persisted classpath after post-gate flow: %v", err)
-	}
-	if string(persistedPostClasspath) != string(preClasspath) {
-		t.Fatalf("post-gate flow overwrote persisted classpath")
+	if _, err := os.Stat(filepath.Join(postOutDir, preGateCanonicalSBOMFileName)); err != nil {
+		t.Fatalf("expected canonical sbom in /out after post flow: %v", err)
 	}
 }

@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"context"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -146,5 +148,48 @@ func TestSelectPreferredArtifactID(t *testing.T) {
 	got := selectPreferredArtifactID(bundles, []string{"mig-out", ""})
 	if got != id2.String() {
 		t.Fatalf("artifact id=%q, want %q", got, id2.String())
+	}
+}
+
+func TestResolveMigInFromClaimEntries_RejectsSBOMJavaClasspathInFrom(t *testing.T) {
+	t.Parallel()
+
+	spec, err := contracts.ParseMigSpecJSON([]byte(`{
+		"steps": [
+			{
+				"image": "ghcr.io/example/mig:latest",
+				"in_from": [{"from":"sbom://out/java.classpath"}]
+			}
+		]
+	}`))
+	if err != nil {
+		t.Fatalf("ParseMigSpecJSON() error = %v", err)
+	}
+
+	st := &jobStore{}
+	st.listJobsByRunRepoAttempt.val = []store.Job{
+		{
+			ID:      domaintypes.NewJobID(),
+			RunID:   domaintypes.NewRunID(),
+			RepoID:  domaintypes.NewRepoID(),
+			Attempt: 1,
+			JobType: domaintypes.JobTypeSBOM,
+			Status:  domaintypes.JobStatusSuccess,
+		},
+	}
+	job := store.Job{
+		ID:      domaintypes.NewJobID(),
+		RunID:   st.listJobsByRunRepoAttempt.val[0].RunID,
+		RepoID:  st.listJobsByRunRepoAttempt.val[0].RepoID,
+		Attempt: 1,
+		JobType: domaintypes.JobTypeMig,
+	}
+
+	_, err = resolveMigInFromClaimEntries(context.Background(), st, job, spec, 0)
+	if err == nil {
+		t.Fatal("resolveMigInFromClaimEntries() error = nil, want non-nil")
+	}
+	if got := err.Error(); !strings.Contains(got, "sbom://out/java.classpath is unsupported") {
+		t.Fatalf("error = %q, want sbom java.classpath rejection", got)
 	}
 }

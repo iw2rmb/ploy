@@ -126,7 +126,7 @@ func (r *runController) executeSBOMJob(ctx context.Context, req StartRunRequest)
 			return applySBOMRuntimeForStack(m, stackForManifest, sbomRuntimeReleaseForRequest(req, stackForManifest))
 		},
 		ValidateOutputs: func(outDir, _ string) error {
-			return r.finalizeSBOMFlowOutputs(req.RunID, cycleName, outDir, sbomSnapshotPath)
+			return r.finalizeSBOMFlowOutputs(req.RunID, req.RepoID, cycleName, outDir, sbomSnapshotPath)
 		},
 		WorkspacePolicy: workspaceChangePolicyIgnore,
 		StartTime:       startTime,
@@ -192,9 +192,6 @@ func (r *runController) executeMigJob(ctx context.Context, req StartRunRequest) 
 		OutDirPattern: "ploy-mig-out-*",
 		InDirPattern:  "ploy-mig-in-*",
 		PopulateInDir: func(inDir string) error {
-			if err := r.materializeJavaClasspathInDir(ctx, req, inDir); err != nil {
-				return err
-			}
 			return r.materializeMigInFromInputs(ctx, req, inDir)
 		},
 		PrepareManifest: func(m *contracts.StepManifest, ws string) error {
@@ -274,9 +271,6 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 		OutDirPattern: "ploy-heal-out-*",
 		InDirPattern:  "ploy-heal-in-*",
 		PopulateInDir: func(inDir string) error {
-			if err := r.materializeJavaClasspathInDir(ctx, req, inDir); err != nil {
-				return err
-			}
 			return r.populateHealingInDir(req.RunID, inDir, req.RecoveryContext, schemaJSON)
 		},
 		PrepareManifest: func(m *contracts.StepManifest, ws string) error {
@@ -647,6 +641,13 @@ func (r *runController) runContainerJob(
 	outDir, inDir string,
 ) (standardJobOutcome, error) {
 	outcome := standardJobOutcome{}
+	shareDir, err := ensureRunRepoShareDir(req.RunID, req.RepoID)
+	if err != nil {
+		return outcome, err
+	}
+	if err := r.ensureRequiredJavaClasspathShare(req); err != nil {
+		return outcome, err
+	}
 	manifest := cfg.Manifest
 	disableManifestGate(&manifest)
 	clearManifestHydration(&manifest)
@@ -675,11 +676,6 @@ func (r *runController) runContainerJob(
 		}
 		if skipped {
 			duration := time.Since(startTime)
-			if runErr == nil {
-				if captureErr := r.captureJavaClasspathAfterStandardJob(req, inDir, outDir); captureErr != nil {
-					runErr = fmt.Errorf("capture java classpath outputs: %w", captureErr)
-				}
-			}
 			if runErr == nil && cfg.ValidateOutputs != nil {
 				if validateErr := cfg.ValidateOutputs(outDir, workspace); validateErr != nil {
 					runErr = fmt.Errorf("validate job outputs: %w", validateErr)
@@ -745,6 +741,7 @@ func (r *runController) runContainerJob(
 			Workspace:  workspace,
 			OutDir:     outDir,
 			InDir:      inDir,
+			ShareDir:   shareDir,
 			StagingDir: stagingDir,
 		})
 		duration = time.Since(startTime)
@@ -758,11 +755,6 @@ func (r *runController) runContainerJob(
 	if runErr == nil && result.ExitCode == 0 && cfg.ValidateOutputs != nil {
 		if validateErr := cfg.ValidateOutputs(outDir, workspace); validateErr != nil {
 			runErr = fmt.Errorf("validate job outputs: %w", validateErr)
-		}
-	}
-	if runErr == nil && result.ExitCode == 0 {
-		if captureErr := r.captureJavaClasspathAfterStandardJob(req, inDir, outDir); captureErr != nil {
-			runErr = fmt.Errorf("capture java classpath outputs: %w", captureErr)
 		}
 	}
 	runErr = r.finalizeStandardJobOutputs(req, cfg, outDir, workspace, runErr, result)

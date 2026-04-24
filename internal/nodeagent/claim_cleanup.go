@@ -20,7 +20,8 @@ import (
 
 // minDockerFreeBytes is the minimum free disk space (1 GiB) required in the
 // Docker root directory before claiming new work. Below this threshold the
-// pre-claim cleanup removes stopped Ploy containers to reclaim space.
+// pre-claim cleanup removes sticky /share volumes, sticky workspaces, then
+// stopped Ploy containers to reclaim space.
 const minDockerFreeBytes int64 = 1 << 30
 
 type claimCleanupDockerClient interface {
@@ -87,6 +88,48 @@ func (c *dockerPreClaimCleanup) EnsureCapacity(ctx context.Context) (bool, error
 		"threshold_bytes", minDockerFreeBytes,
 	)
 
+	stickyShares, err := listStickyShareVolumes(workspaceRoot)
+	if err != nil {
+		return false, fmt.Errorf("list sticky share volumes: %w", err)
+	}
+	removedShares := 0
+	for _, share := range stickyShares {
+		if capacity.enough() {
+			return true, nil
+		}
+		capacityBefore := capacity
+		if err := os.RemoveAll(share.path); err != nil {
+			return false, fmt.Errorf("remove sticky share volume %q: %w", share.path, err)
+		}
+		removedShares++
+		capacity, err = c.readCapacity(dockerRoot, workspaceRoot)
+		if err != nil {
+			return false, err
+		}
+		slog.Info(
+			"pre-claim disk cleanup removed sticky share volume",
+			"share_path", share.path,
+			"share_mod_time", share.modTime,
+			"docker_free_bytes_before", capacityBefore.dockerFreeBytes,
+			"docker_free_bytes_after", capacity.dockerFreeBytes,
+			"workspace_free_bytes_before", capacityBefore.workspaceFreeBytes,
+			"workspace_free_bytes_after", capacity.workspaceFreeBytes,
+			"threshold_bytes", minDockerFreeBytes,
+		)
+	}
+	if capacity.enough() {
+		slog.Info(
+			"pre-claim disk cleanup restored capacity via share-volume eviction",
+			"docker_root", dockerRoot,
+			"workspace_root", workspaceRoot,
+			"docker_free_bytes", capacity.dockerFreeBytes,
+			"workspace_free_bytes", capacity.workspaceFreeBytes,
+			"threshold_bytes", minDockerFreeBytes,
+			"removed_share_volumes", removedShares,
+		)
+		return true, nil
+	}
+
 	stickyWorkspaces, err := listStickyWorkspaces(workspaceRoot)
 	if err != nil {
 		return false, fmt.Errorf("list sticky workspaces: %w", err)
@@ -125,6 +168,7 @@ func (c *dockerPreClaimCleanup) EnsureCapacity(ctx context.Context) (bool, error
 			"workspace_free_bytes", capacity.workspaceFreeBytes,
 			"threshold_bytes", minDockerFreeBytes,
 			"removed_workspaces", removedWorkspaces,
+			"removed_share_volumes", removedShares,
 		)
 		return true, nil
 	}
@@ -173,6 +217,7 @@ func (c *dockerPreClaimCleanup) EnsureCapacity(ctx context.Context) (bool, error
 			"threshold_bytes", minDockerFreeBytes,
 			"removed_containers", removed,
 			"removed_workspaces", removedWorkspaces,
+			"removed_share_volumes", removedShares,
 		)
 		return true, nil
 	}
@@ -185,6 +230,8 @@ func (c *dockerPreClaimCleanup) EnsureCapacity(ctx context.Context) (bool, error
 		"threshold_bytes", minDockerFreeBytes,
 		"removed_containers", removed,
 		"removed_workspaces", removedWorkspaces,
+		"removed_share_volumes", removedShares,
+		"eligible_share_volumes", len(stickyShares),
 		"eligible_workspaces", len(stickyWorkspaces),
 		"eligible_containers", len(eligible),
 	)
@@ -221,7 +268,15 @@ type stickyWorkspaceCandidate struct {
 }
 
 func listStickyWorkspaces(workspaceRoot string) ([]stickyWorkspaceCandidate, error) {
-	pattern := filepath.Join(workspaceRoot, "*", "repos", "*", "workspace")
+	return listStickyRunRepoDirs(workspaceRoot, "workspace")
+}
+
+func listStickyShareVolumes(workspaceRoot string) ([]stickyWorkspaceCandidate, error) {
+	return listStickyRunRepoDirs(workspaceRoot, "share")
+}
+
+func listStickyRunRepoDirs(workspaceRoot, leaf string) ([]stickyWorkspaceCandidate, error) {
+	pattern := filepath.Join(workspaceRoot, "*", "repos", "*", leaf)
 	paths, err := filepath.Glob(pattern)
 	if err != nil {
 		return nil, fmt.Errorf("glob %q: %w", pattern, err)
@@ -233,7 +288,7 @@ func listStickyWorkspaces(workspaceRoot string) ([]stickyWorkspaceCandidate, err
 			if os.IsNotExist(err) {
 				continue
 			}
-			return nil, fmt.Errorf("stat sticky workspace %q: %w", p, err)
+			return nil, fmt.Errorf("stat sticky dir %q: %w", p, err)
 		}
 		if !info.IsDir() {
 			continue

@@ -25,7 +25,7 @@ func TestBuildContainerSpec_ResourceLimitsApplied(t *testing.T) {
 		},
 	}
 
-	spec, err := buildContainerSpec(types.RunID("run-limits-1"), types.JobID("job-limits-1"), manifest, "/tmp/ws", "", "", "")
+	spec, err := buildContainerSpec(types.RunID("run-limits-1"), types.JobID("job-limits-1"), manifest, "/tmp/ws", "", "", "", "")
 	if err != nil {
 		t.Fatalf("buildContainerSpec error: %v", err)
 	}
@@ -63,7 +63,7 @@ func TestBuildContainerSpec_ResourceLimitsZeroUnlimited(t *testing.T) {
 		Resources: contracts.StepResourceSpec{},
 	}
 
-	spec, err := buildContainerSpec(types.RunID("run-limits-2"), types.JobID("job-limits-2"), manifest, "/tmp/ws", "", "", "")
+	spec, err := buildContainerSpec(types.RunID("run-limits-2"), types.JobID("job-limits-2"), manifest, "/tmp/ws", "", "", "", "")
 	if err != nil {
 		t.Fatalf("buildContainerSpec error: %v", err)
 	}

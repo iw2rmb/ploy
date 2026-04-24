@@ -175,11 +175,11 @@ func TestApplySBOMRuntimeForStack_ConfiguresManifest(t *testing.T) {
 			if tc.stack == contracts.MigStackUnknown && strings.Contains(shell, ": > /out/"+sbomDependencyOutputFileName) {
 				t.Fatalf("unknown stack command uses placeholder output write: %q", shell)
 			}
-			if got := manifest.Envs["PLOY_SBOM_DEPENDENCY_OUTPUT"]; got != "/out/"+sbomDependencyOutputFileName {
-				t.Fatalf("manifest.Envs[PLOY_SBOM_DEPENDENCY_OUTPUT]=%q, want %q", got, "/out/"+sbomDependencyOutputFileName)
+			if got := manifest.Envs["PLOY_SBOM_DEPENDENCY_OUTPUT"]; got != sbomShareMountPath+"/"+sbomDependencyOutputFileName {
+				t.Fatalf("manifest.Envs[PLOY_SBOM_DEPENDENCY_OUTPUT]=%q, want %q", got, sbomShareMountPath+"/"+sbomDependencyOutputFileName)
 			}
-			if got := manifest.Envs["PLOY_SBOM_JAVA_CLASSPATH_OUTPUT"]; got != "/out/"+sbomJavaClasspathFileName {
-				t.Fatalf("manifest.Envs[PLOY_SBOM_JAVA_CLASSPATH_OUTPUT]=%q, want %q", got, "/out/"+sbomJavaClasspathFileName)
+			if got := manifest.Envs["PLOY_SBOM_JAVA_CLASSPATH_OUTPUT"]; got != sbomShareMountPath+"/"+sbomJavaClasspathFileName {
+				t.Fatalf("manifest.Envs[PLOY_SBOM_JAVA_CLASSPATH_OUTPUT]=%q, want %q", got, sbomShareMountPath+"/"+sbomJavaClasspathFileName)
 			}
 		})
 	}

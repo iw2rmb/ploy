@@ -2,8 +2,8 @@
 set -euo pipefail
 
 workspace="${PLOY_SBOM_WORKSPACE:-/workspace}"
-raw_output="${PLOY_SBOM_DEPENDENCY_OUTPUT:-/out/sbom.dependencies.txt}"
-classpath_output="${PLOY_SBOM_JAVA_CLASSPATH_OUTPUT:-/out/java.classpath}"
+raw_output="${PLOY_SBOM_DEPENDENCY_OUTPUT:-/share/sbom.dependencies.txt}"
+classpath_output="${PLOY_SBOM_JAVA_CLASSPATH_OUTPUT:-/share/java.classpath}"
 pom_path="${PLOY_SBOM_MAVEN_POM_PATH:-$workspace/pom.xml}"
 workspace_prefix="${workspace%/}/"
 

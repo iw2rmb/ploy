@@ -8,7 +8,7 @@ gradle.projectsEvaluated {
     doLast {
       def outputPath = System.getenv('PLOY_SBOM_JAVA_CLASSPATH_OUTPUT')
       if (outputPath == null || outputPath.trim().isEmpty()) {
-        outputPath = '/out/java.classpath'
+        outputPath = '/share/java.classpath'
       }
       def output = new File(outputPath)
       output.parentFile.mkdirs()

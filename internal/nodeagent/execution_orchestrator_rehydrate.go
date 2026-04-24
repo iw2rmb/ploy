@@ -175,6 +175,24 @@ func runRepoWorkspaceDir(runID types.RunID, repoID types.MigRepoID) string {
 	return filepath.Join(runCacheDir(runID), "repos", repoID.String(), "workspace")
 }
 
+func runRepoShareDir(runID types.RunID, repoID types.MigRepoID) string {
+	if repoID.IsZero() {
+		return ""
+	}
+	return filepath.Join(runCacheDir(runID), "repos", repoID.String(), "share")
+}
+
+func ensureRunRepoShareDir(runID types.RunID, repoID types.MigRepoID) (string, error) {
+	shareDir := runRepoShareDir(runID, repoID)
+	if strings.TrimSpace(shareDir) == "" {
+		return "", nil
+	}
+	if err := os.MkdirAll(shareDir, 0o755); err != nil {
+		return "", fmt.Errorf("create run/repo share dir: %w", err)
+	}
+	return shareDir, nil
+}
+
 func hasGitDir(path string) bool {
 	info, err := os.Stat(filepath.Join(path, ".git"))
 	return err == nil && info.IsDir()

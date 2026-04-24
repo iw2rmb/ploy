@@ -22,7 +22,7 @@ func TestBuildContainerSpec_InMountPresent(t *testing.T) {
 		}},
 	}
 
-	spec, err := buildContainerSpec(types.RunID("run-in"), types.JobID("job-in"), manifest, "/tmp/ws", "", "/tmp/in", "")
+	spec, err := buildContainerSpec(types.RunID("run-in"), types.JobID("job-in"), manifest, "/tmp/ws", "", "/tmp/in", "", "")
 	if err != nil {
 		t.Fatalf("buildContainerSpec error: %v", err)
 	}
@@ -60,7 +60,7 @@ func TestBuildContainerSpec_InMountSkipsNestedHydraInMounts(t *testing.T) {
 		In: []string{"abcdef0:/in/amata.yaml"},
 	}
 
-	spec, err := buildContainerSpec(types.RunID("run-in"), types.JobID("job-in"), manifest, "/tmp/ws", "", "/tmp/in", "/tmp/staging")
+	spec, err := buildContainerSpec(types.RunID("run-in"), types.JobID("job-in"), manifest, "/tmp/ws", "", "/tmp/in", "", "/tmp/staging")
 	if err != nil {
 		t.Fatalf("buildContainerSpec error: %v", err)
 	}
@@ -76,5 +76,40 @@ func TestBuildContainerSpec_InMountSkipsNestedHydraInMounts(t *testing.T) {
 	}
 	if !foundIn {
 		t.Fatalf("/in mount not present: %+v", spec.Mounts)
+	}
+}
+
+func TestBuildContainerSpec_ShareMountPresent(t *testing.T) {
+	manifest := contracts.StepManifest{
+		ID:    types.StepID("step-share-mount"),
+		Name:  "With /share",
+		Image: "alpine:3",
+		Inputs: []contracts.StepInput{{
+			Name:        "src",
+			MountPath:   "/workspace",
+			Mode:        contracts.StepInputModeReadWrite,
+			SnapshotCID: types.CID("bafy123"),
+		}},
+	}
+
+	spec, err := buildContainerSpec(types.RunID("run-share"), types.JobID("job-share"), manifest, "/tmp/ws", "", "", "/tmp/share", "")
+	if err != nil {
+		t.Fatalf("buildContainerSpec error: %v", err)
+	}
+
+	var found bool
+	for _, m := range spec.Mounts {
+		if m.Target == "/share" {
+			found = true
+			if m.ReadOnly {
+				t.Fatalf("/share mount should be writable: %+v", m)
+			}
+			if m.Source != "/tmp/share" {
+				t.Fatalf("/share source=%q, want %q", m.Source, "/tmp/share")
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("/share mount not present: %+v", spec.Mounts)
 	}
 }

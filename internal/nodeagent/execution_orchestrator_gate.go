@@ -85,14 +85,21 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
 		return
 	}
-	if err := r.prepareGateJavaClasspathInput(ctx, req, workspace); err != nil {
-		slog.Error("failed to prepare gate java classpath input", "run_id", req.RunID, "job_id", req.JobID, "error", err)
+	shareDir, err := ensureRunRepoShareDir(req.RunID, req.RepoID)
+	if err != nil {
+		slog.Error("failed to ensure run/repo share dir", "run_id", req.RunID, "job_id", req.JobID, "error", err)
+		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
+		return
+	}
+	if err := r.ensureRequiredJavaClasspathShare(req); err != nil {
+		slog.Error("required java classpath in /share is unavailable", "run_id", req.RunID, "job_id", req.JobID, "error", err)
 		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
 		return
 	}
 
 	// Run the build gate.
 	ctx = withGateExecutionLabels(ctx, req)
+	ctx = step.WithGateShareDir(ctx, shareDir)
 	ctx = step.WithGateRuntimeImageObserver(ctx, func(obsCtx context.Context, image string) {
 		if err := r.SaveJobImageName(obsCtx, req.JobID, image); err != nil {
 			slog.Warn("failed to save gate job image name", "run_id", req.RunID, "job_id", req.JobID, "error", err)
@@ -144,12 +151,6 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 		r.persistFirstGateFailureLog(req.RunID, gateResult)
 	}
 	r.persistGateProfileSnapshot(req.RunID, req.JobType, manifest.Gate, gateResult)
-	if err := r.captureJavaClasspathAfterGateJob(req, workspace); err != nil {
-		slog.Error("failed to capture gate java classpath output", "run_id", req.RunID, "job_id", req.JobID, "error", err)
-		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
-		return
-	}
-
 	if err := r.uploadOutDirBundle(ctx, req.RunID, req.JobID, filepath.Join(workspace, step.BuildGateWorkspaceOutDir), "build-gate-out"); err != nil {
 		slog.Warn("failed to upload gate /out bundle", "run_id", req.RunID, "job_id", req.JobID, "error", err)
 	}
@@ -195,6 +196,8 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 	stats := r.buildGateJobStats(gateResult, duration)
 	if uploadErr := r.uploadStatus(ctx, req.RunID.String(), status.String(), &exitCode, stats, req.JobID, repoSHAOut); uploadErr != nil {
 		slog.Error("failed to upload gate status", "run_id", req.RunID, "job_id", req.JobID, "status", status, "error", uploadErr)
+	} else {
+		r.cleanupRunRepoShareOnTerminalSuccess(req, status)
 	}
 	slog.Info("gate job "+logVerb, "run_id", req.RunID, "job_id", req.JobID, "job_type", req.JobType, "duration", duration)
 }

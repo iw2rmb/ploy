@@ -108,7 +108,7 @@ func TestBuildContainerSpec_HydraSingleMount(t *testing.T) {
 
 			spec, err := buildContainerSpec(
 				types.RunID("run-"+tt.name), types.JobID("job-"+tt.name),
-				manifest, "/ws", outDir, "", stagingDir,
+				manifest, "/ws", outDir, "", "", stagingDir,
 			)
 			if err != nil {
 				t.Fatalf("buildContainerSpec error: %v", err)
@@ -193,7 +193,7 @@ func TestBuildContainerSpec_HydraEdgeCases(t *testing.T) {
 
 			spec, err := buildContainerSpec(
 				types.RunID("run-edge"), types.JobID("job-edge"),
-				manifest, "/ws", outDir, "", stagingDir,
+				manifest, "/ws", outDir, "", "", stagingDir,
 			)
 
 			if tt.wantErr != "" {
@@ -237,7 +237,7 @@ func TestBuildContainerSpec_HydraMixedMountPlan(t *testing.T) {
 
 	spec, err := buildContainerSpec(
 		types.RunID("run-mixed"), types.JobID("job-mixed"),
-		manifest, "/ws", outDir, "", stagingDir,
+		manifest, "/ws", outDir, "", "", stagingDir,
 	)
 	if err != nil {
 		t.Fatalf("buildContainerSpec error: %v", err)

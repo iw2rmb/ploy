@@ -437,7 +437,7 @@ if [[ -n "$version" ]]; then
 else
   coords="${group}:${artifact}"
 fi
-classpath_file="/in/java.classpath"
+classpath_file="/share/java.classpath"
 args=(--apply --dir "$workspace" --recipe "$active_recipes" --coords "$coords" --classpath-file "$classpath_file")
 if [[ -n "$config_path" ]]; then
   args+=(--config "$config_path")

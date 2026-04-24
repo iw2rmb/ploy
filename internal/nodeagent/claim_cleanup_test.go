@@ -318,3 +318,53 @@ func TestDockerPreClaimCleanup_EvictsOldestStickyWorkspaceFirst(t *testing.T) {
 		t.Fatalf("ContainerList calls = %d, want 0", fakeDocker.listCalls)
 	}
 }
+
+func TestDockerPreClaimCleanup_EvictsOldestStickyShareVolumeFirst(t *testing.T) {
+	t.Parallel()
+
+	workspaceRoot := t.TempDir()
+	oldest := filepath.Join(workspaceRoot, "run-old", "repos", "repo-a", "share")
+	newer := filepath.Join(workspaceRoot, "run-new", "repos", "repo-b", "share")
+	if err := os.MkdirAll(oldest, 0o755); err != nil {
+		t.Fatalf("mkdir oldest share: %v", err)
+	}
+	if err := os.MkdirAll(newer, 0o755); err != nil {
+		t.Fatalf("mkdir newer share: %v", err)
+	}
+	oldTime := time.Now().Add(-2 * time.Hour)
+	newTime := time.Now().Add(-1 * time.Hour)
+	if err := os.Chtimes(oldest, oldTime, oldTime); err != nil {
+		t.Fatalf("chtimes oldest: %v", err)
+	}
+	if err := os.Chtimes(newer, newTime, newTime); err != nil {
+		t.Fatalf("chtimes newer: %v", err)
+	}
+
+	fakeDocker := &fakeDockerClient{
+		infoResult: client.SystemInfoResult{Info: system.Info{DockerRootDir: "/var/lib/docker"}},
+	}
+	fb := &fakeFreeBytes{
+		valuesByPath: map[string][]int64{
+			"/var/lib/docker": {minDockerFreeBytes + 1, minDockerFreeBytes + 1},
+			workspaceRoot:     {minDockerFreeBytes - 1, minDockerFreeBytes + 1},
+		},
+	}
+	cleanup := &dockerPreClaimCleanup{docker: fakeDocker, freeBytes: fb.read, workspaceRoot: workspaceRoot}
+
+	ok, err := cleanup.EnsureCapacity(context.Background())
+	if err != nil {
+		t.Fatalf("EnsureCapacity() error = %v", err)
+	}
+	if !ok {
+		t.Fatal("EnsureCapacity() ok = false, want true")
+	}
+	if _, err := os.Stat(oldest); !os.IsNotExist(err) {
+		t.Fatalf("oldest share should be evicted, stat err=%v", err)
+	}
+	if _, err := os.Stat(newer); err != nil {
+		t.Fatalf("newer share should remain, stat err=%v", err)
+	}
+	if fakeDocker.listCalls != 0 {
+		t.Fatalf("ContainerList calls = %d, want 0", fakeDocker.listCalls)
+	}
+}

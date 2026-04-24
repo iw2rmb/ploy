@@ -166,9 +166,38 @@ func (r *runController) reportTerminalStatus(
 
 	if uploadErr := r.uploadStatus(ctx, req.RunID.String(), status.String(), exitCode, stats, req.JobID, repoSHAOut); uploadErr != nil {
 		slog.Error("failed to upload terminal status", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)
+	} else {
+		r.cleanupRunRepoShareOnTerminalSuccess(req, status)
 	}
 	slog.Info("job terminated", "run_id", req.RunID, "job_id", req.JobID, "status", status,
 		"exit_code", result.ExitCode, "duration", duration)
+}
+
+func (r *runController) cleanupRunRepoShareOnTerminalSuccess(req StartRunRequest, status types.JobStatus) {
+	if status != types.JobStatusSuccess {
+		return
+	}
+	if req.NextID != nil && !req.NextID.IsZero() {
+		return
+	}
+	shareDir := runRepoShareDir(req.RunID, req.RepoID)
+	if strings.TrimSpace(shareDir) == "" {
+		return
+	}
+	if err := os.RemoveAll(shareDir); err != nil && !os.IsNotExist(err) {
+		slog.Warn("failed to remove run/repo share volume",
+			"run_id", req.RunID,
+			"repo_id", req.RepoID,
+			"share_dir", shareDir,
+			"error", err,
+		)
+		return
+	}
+	slog.Info("removed run/repo share volume after terminal success",
+		"run_id", req.RunID,
+		"repo_id", req.RepoID,
+		"share_dir", shareDir,
+	)
 }
 
 // uploadGateLogsArtifact uploads build gate logs as an artifact bundle and attaches

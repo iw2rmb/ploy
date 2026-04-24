@@ -118,7 +118,7 @@ exit 0
 set -euo pipefail
 
 if [[ "$*" == *"ployWriteJavaClasspath"* ]]; then
-  output="${PLOY_SBOM_JAVA_CLASSPATH_OUTPUT:-/out/java.classpath}"
+  output="${PLOY_SBOM_JAVA_CLASSPATH_OUTPUT:-/share/java.classpath}"
   cat > "$output" <<'EOF'
 %sEOF
   exit 0

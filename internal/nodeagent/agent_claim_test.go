@@ -299,10 +299,7 @@ func TestClaimLoop_FieldMapping(t *testing.T) {
 			claimOpts: []claimOption{
 				func(c *ClaimResponse) {
 					c.JavaClasspathContext = &contracts.JavaClasspathClaimContext{
-						Required:         true,
-						SourceArtifactID: "33333333-3333-3333-3333-333333333333",
-						SourceJobID:      types.NewJobID(),
-						SourceJobType:    types.JobTypePreGate,
+						Required: true,
 					}
 				},
 			},
