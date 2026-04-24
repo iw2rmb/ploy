@@ -149,6 +149,21 @@ func resolveSourceArtifactID(ctx context.Context, st store.Store, sourceJob stor
 	return selectPreferredArtifactID(bundles, preferredClasspathBundleNames(domaintypes.JobType(sourceJob.JobType))), nil
 }
 
+func preferredClasspathBundleNames(jobType domaintypes.JobType) []string {
+	if jobType == domaintypes.JobTypePreGate || jobType == domaintypes.JobTypePostGate || jobType == domaintypes.JobTypeReGate {
+		return []string{"build-gate-out", "mig-out", ""}
+	}
+	return []string{"mig-out", "build-gate-out", ""}
+}
+
+func classpathBundleNameMatches(name *string, expected string) bool {
+	actual := ""
+	if name != nil {
+		actual = strings.TrimSpace(*name)
+	}
+	return actual == expected
+}
+
 func selectPreferredArtifactID(bundles []store.ArtifactBundle, preferredNames []string) string {
 	for _, preferredName := range preferredNames {
 		for i := range bundles {

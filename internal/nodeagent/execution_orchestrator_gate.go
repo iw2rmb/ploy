@@ -91,11 +91,6 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
 		return
 	}
-	if err := r.ensureRequiredJavaClasspathShare(req); err != nil {
-		slog.Error("required java classpath in /share is unavailable", "run_id", req.RunID, "job_id", req.JobID, "error", err)
-		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
-		return
-	}
 
 	// Run the build gate.
 	ctx = withGateExecutionLabels(ctx, req)

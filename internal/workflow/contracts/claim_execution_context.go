@@ -15,13 +15,6 @@ type GateClaimContext struct {
 	CycleName string `json:"cycle_name"`
 }
 
-// JavaClasspathClaimContext carries java classpath availability metadata for
-// non-SBOM jobs. When Required is true, the node must provide
-// /share/java.classpath before execution.
-type JavaClasspathClaimContext struct {
-	Required bool `json:"required"`
-}
-
 func (c *GateClaimContext) Normalize() {
 	if c == nil {
 		return
