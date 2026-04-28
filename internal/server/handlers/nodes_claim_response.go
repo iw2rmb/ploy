@@ -35,6 +35,7 @@ type claimResponsePayload struct {
 	NodeID                 domaintypes.NodeID              `json:"node_id"`
 	BaseRef                string                          `json:"base_ref"`
 	TargetRef              string                          `json:"target_ref"`
+	CommitSHA              string                          `json:"commit_sha,omitempty"`
 	RepoSHAIn              string                          `json:"repo_sha_in,omitempty"`
 	StartedAt              string                          `json:"started_at"`
 	CreatedAt              string                          `json:"created_at"`
@@ -143,6 +144,10 @@ func buildClaimResponsePayload(
 	if err != nil {
 		return claimResponsePayload{}, fmt.Errorf("resolve detected stack for claim: %w", err)
 	}
+	commitSHA := strings.TrimSpace(runRepo.SourceCommitSha)
+	if commitSHA == "" {
+		commitSHA = strings.TrimSpace(job.RepoShaIn)
+	}
 
 	return claimResponsePayload{
 		WorkType:               "job",
@@ -163,6 +168,7 @@ func buildClaimResponsePayload(
 		NodeID:                 nodeIDPtrOrZero(job.NodeID),
 		BaseRef:                job.RepoBaseRef,
 		TargetRef:              runRepo.RepoTargetRef,
+		CommitSHA:              commitSHA,
 		RepoSHAIn:              job.RepoShaIn,
 		StartedAt:              run.StartedAt.Time.Format(time.RFC3339),
 		CreatedAt:              run.CreatedAt.Time.Format(time.RFC3339),

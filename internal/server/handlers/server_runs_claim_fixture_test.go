@@ -24,12 +24,13 @@ type claimJobFixtureOptions struct {
 }
 
 type claimJobFixture struct {
-	nodeKey string
-	nodeID  domaintypes.NodeID
-	runID   domaintypes.RunID
-	repoID  domaintypes.RepoID
-	specID  domaintypes.SpecID
-	jobID   domaintypes.JobID
+	nodeKey         string
+	nodeID          domaintypes.NodeID
+	runID           domaintypes.RunID
+	repoID          domaintypes.RepoID
+	specID          domaintypes.SpecID
+	jobID           domaintypes.JobID
+	sourceCommitSHA string
 
 	store  *jobStore
 	config *ConfigHolder
@@ -44,6 +45,7 @@ func newClaimJobFixture(t testing.TB, opts claimJobFixtureOptions) *claimJobFixt
 	repoID := domaintypes.NewRepoID()
 	specID := domaintypes.NewSpecID()
 	jobID := domaintypes.NewJobID()
+	sourceCommitSHA := "0123456789abcdef0123456789abcdef01234567"
 	now := time.Now().UTC()
 
 	if opts.jobType == "" {
@@ -67,12 +69,14 @@ func newClaimJobFixture(t testing.TB, opts claimJobFixtureOptions) *claimJobFixt
 
 	st := &jobStore{
 		getRunRepoResult: store.RunRepo{
-			RunID:         runID,
-			RepoID:        repoID,
-			RepoBaseRef:   "main",
-			RepoTargetRef: "feature-branch",
-			Status:        opts.runRepoStatus,
-			Attempt:       1,
+			RunID:           runID,
+			RepoID:          repoID,
+			RepoBaseRef:     "main",
+			RepoTargetRef:   "feature-branch",
+			SourceCommitSha: sourceCommitSHA,
+			RepoSha0:        sourceCommitSHA,
+			Status:          opts.runRepoStatus,
+			Attempt:         1,
 		},
 	}
 	st.getNode.val = store.Node{ID: nodeID}
@@ -100,14 +104,15 @@ func newClaimJobFixture(t testing.TB, opts claimJobFixtureOptions) *claimJobFixt
 	st.getSpec.val = store.Spec{ID: specID, Spec: opts.specJSON}
 
 	return &claimJobFixture{
-		nodeKey: nodeKey,
-		nodeID:  nodeID,
-		runID:   runID,
-		repoID:  repoID,
-		specID:  specID,
-		jobID:   jobID,
-		store:   st,
-		config:  &ConfigHolder{},
+		nodeKey:         nodeKey,
+		nodeID:          nodeID,
+		runID:           runID,
+		repoID:          repoID,
+		specID:          specID,
+		jobID:           jobID,
+		sourceCommitSHA: sourceCommitSHA,
+		store:           st,
+		config:          &ConfigHolder{},
 	}
 }
 
