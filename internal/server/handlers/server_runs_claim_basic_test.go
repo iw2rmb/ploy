@@ -50,6 +50,9 @@ func TestClaimJob_HappyPath(t *testing.T) {
 				if resp["target_ref"] != "feature-branch" {
 					t.Fatalf("expected target_ref feature-branch, got %v", resp["target_ref"])
 				}
+				if resp["commit_sha"] != f.sourceCommitSHA {
+					t.Fatalf("expected commit_sha %s, got %v", f.sourceCommitSHA, resp["commit_sha"])
+				}
 				if got, ok := resp["repo_gate_profile_missing"].(bool); !ok || !got {
 					t.Fatalf("expected repo_gate_profile_missing=true, got %v", resp["repo_gate_profile_missing"])
 				}

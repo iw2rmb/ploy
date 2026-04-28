@@ -37,16 +37,19 @@ func TestClaimService_Claim_SuccessBuildsPayloadAndTransitionsRepo(t *testing.T)
 	repoID := domaintypes.NewRepoID()
 	specID := domaintypes.NewSpecID()
 	jobID := domaintypes.NewJobID()
+	sourceCommitSHA := "0123456789abcdef0123456789abcdef01234567"
 	now := time.Now().UTC()
 
 	st := &jobStore{
 		getRunRepoResult: store.RunRepo{
-			RunID:         runID,
-			RepoID:        repoID,
-			RepoBaseRef:   "main",
-			RepoTargetRef: "feature",
-			Status:        domaintypes.RunRepoStatusQueued,
-			Attempt:       1,
+			RunID:           runID,
+			RepoID:          repoID,
+			RepoBaseRef:     "main",
+			RepoTargetRef:   "feature",
+			SourceCommitSha: sourceCommitSHA,
+			RepoSha0:        sourceCommitSHA,
+			Status:          domaintypes.RunRepoStatusQueued,
+			Attempt:         1,
 		},
 	}
 	st.getNode.val = store.Node{ID: nodeID}
@@ -90,6 +93,9 @@ func TestClaimService_Claim_SuccessBuildsPayloadAndTransitionsRepo(t *testing.T)
 	}
 	if result.Payload.RepoURL == "" {
 		t.Fatal("expected payload.repo_url to be populated")
+	}
+	if result.Payload.CommitSHA != sourceCommitSHA {
+		t.Fatalf("payload.commit_sha = %s, want %s", result.Payload.CommitSHA, sourceCommitSHA)
 	}
 }
 
