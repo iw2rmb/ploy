@@ -239,9 +239,8 @@ func createJobsFromSpec(
 		gateCycle string
 	}
 
-	drafts := make([]draft, 0, len(migsSpec.Steps)+5)
+	drafts := make([]draft, 0, len(migsSpec.Steps)+2)
 	drafts = append(drafts, draft{name: "pre-gate", jobType: domaintypes.JobTypePreGate, gateCycle: "pre-gate"})
-	drafts = append(drafts, draft{name: "pre-gate-sbom", jobType: domaintypes.JobTypeSBOM, gateCycle: "pre-gate"})
 
 	if len(migsSpec.Steps) > 1 {
 		for i, mig := range migsSpec.Steps {
@@ -281,7 +280,6 @@ func createJobsFromSpec(
 		})
 	}
 	drafts = append(drafts, draft{name: "post-gate", jobType: domaintypes.JobTypePostGate, gateCycle: "post-gate"})
-	drafts = append(drafts, draft{name: "post-gate-sbom", jobType: domaintypes.JobTypeSBOM, gateCycle: "post-gate"})
 
 	planned := make([]plannedJob, 0, len(drafts))
 	for i, d := range drafts {
@@ -422,18 +420,6 @@ func createPlannedJob(ctx context.Context, st store.Store, runID domaintypes.Run
 	}
 	meta.MigStepIndex = planned.StepIndex
 	meta.GateCycleName = strings.TrimSpace(planned.GateCycle)
-	if planned.JobType == domaintypes.JobTypeSBOM {
-		phase := contracts.SBOMPhasePost
-		if strings.TrimSpace(planned.GateCycle) == "pre-gate" {
-			phase = contracts.SBOMPhasePre
-		}
-		meta.SBOM = sbomCycleContextMeta(sbomCycleContext{
-			Phase:     phase,
-			CycleName: strings.TrimSpace(planned.GateCycle),
-			Role:      contracts.SBOMRoleInitial,
-			RootJobID: planned.ID,
-		})
-	}
 	metaBytes, err := contracts.MarshalJobMeta(meta)
 	if err != nil {
 		return fmt.Errorf("marshal job meta: %w", err)

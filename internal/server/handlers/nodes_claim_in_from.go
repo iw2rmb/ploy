@@ -48,9 +48,6 @@ func resolveMigInFromClaimEntries(
 		if err != nil {
 			return nil, fmt.Errorf("steps[%d].in_from[%d].from: %w", stepIndex, i, err)
 		}
-		if parsed.SourceType == domaintypes.JobTypeSBOM && parsed.OutPath == "/out/"+javaClasspathFileName {
-			return nil, fmt.Errorf("steps[%d].in_from[%d].from: sbom://out/%s is unsupported; java classpath is available at /share/%s", stepIndex, i, javaClasspathFileName, javaClasspathFileName)
-		}
 		target, err := contracts.NormalizeInFromTarget(ref.To, parsed.OutPath)
 		if err != nil {
 			return nil, fmt.Errorf("steps[%d].in_from[%d].to: %w", stepIndex, i, err)

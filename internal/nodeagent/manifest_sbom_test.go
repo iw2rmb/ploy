@@ -91,7 +91,7 @@ func TestApplySBOMRuntimeForStack_ConfiguresManifest(t *testing.T) {
 			name:             "maven",
 			stack:            contracts.MigStackJavaMaven,
 			release:          sbomReleaseJDK17,
-			wantImage:        "ghcr.io/acme/sbom-maven:jdk17",
+			wantImage:        "ghcr.io/acme/maven:3-eclipse-temurin-17",
 			wantRuntimeStack: contracts.MigStackJavaMaven,
 			wantShellSnippets: []string{
 				"missing /workspace/pom.xml",
@@ -102,7 +102,7 @@ func TestApplySBOMRuntimeForStack_ConfiguresManifest(t *testing.T) {
 			name:             "gradle",
 			stack:            contracts.MigStackJavaGradle,
 			release:          sbomReleaseJDK11,
-			wantImage:        "ghcr.io/acme/sbom-gradle:jdk11",
+			wantImage:        "ghcr.io/acme/gate-gradle:jdk11",
 			wantRuntimeStack: contracts.MigStackJavaGradle,
 			wantShellSnippets: []string{
 				`PLOY_SBOM_GRADLE_CMD="/workspace/gradlew"`,
@@ -114,7 +114,7 @@ func TestApplySBOMRuntimeForStack_ConfiguresManifest(t *testing.T) {
 			name:             "unknown fallback collector path",
 			stack:            contracts.MigStackUnknown,
 			release:          "unknown",
-			wantImage:        "ghcr.io/acme/sbom-maven:jdk17",
+			wantImage:        "ghcr.io/acme/maven:3-eclipse-temurin-17",
 			wantRuntimeStack: contracts.MigStackJavaMaven,
 			wantShellSnippets: []string{
 				sbomMavenCollectorScript,

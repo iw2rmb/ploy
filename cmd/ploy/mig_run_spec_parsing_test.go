@@ -324,8 +324,7 @@ steps:
 envs:
   KEY1: value1
   KEY2: value2
-build_gate:
-  heal:
+healing:
     retries: 1
     image: docker.io/test/healer:latest
 gitlab_domain: gitlab.example.com
@@ -342,8 +341,7 @@ mr_on_success: true
 			spec: `{
   "steps": [{"image": "docker.io/test/mig:latest"}],
   "envs": {"KEY1": "value1"},
-  "build_gate": {
-    "heal": {
+  "healing": {
       "retries": 2,
       "image": "docker.io/test/healer:latest"
     }
@@ -358,8 +356,7 @@ mr_on_success: true
 			spec: `
 steps:
   - image: docker.io/test/mig:latest
-build_gate:
-  heal:
+healing:
     retries: 2
     image: docker.io/test/healer:latest
     command: "heal.sh"
@@ -369,12 +366,12 @@ build_gate:
 			wantStepImage: "docker.io/test/mig:latest",
 			digChecks: []digCheck{
 				{
-					digPath:    []string{"build_gate", "heal"},
+					digPath:    []string{"healing"},
 					wantFields: map[string]any{"retries": 2.0, "image": "docker.io/test/healer:latest", "command": "heal.sh"},
 					wantAbsent: []string{"retain_container"},
 				},
 				{
-					digPath:    []string{"build_gate", "heal", "envs"},
+					digPath:    []string{"healing", "envs"},
 					wantFields: map[string]any{"HEALING_MODE": "auto"},
 				},
 			},
@@ -429,7 +426,7 @@ build_gate:
 				}
 			}
 			if tt.wantRetries != 0 {
-				heal := mustDig(t, result, "build_gate", "heal")
+				heal := mustDig(t, result, "healing")
 				assertField(t, heal, "retries", tt.wantRetries)
 			}
 			if tt.wantDomain != "" {
@@ -480,15 +477,14 @@ expectations:
 			spec: `
 steps:
   - image: docker.io/test/mig:latest
-build_gate:
-  heal:
+healing:
     <<: !include %s
     retries: 1
     envs:
       B: inline-override
       C: inline-only
 `,
-			digPath:          []string{"build_gate", "heal"},
+			digPath:          []string{"healing"},
 			wantFields:       map[string]any{"retries": 1.0, "image": "docker.io/test/healer:latest"},
 			wantEnv:          map[string]any{"A": "from-fragment", "B": "inline-override", "C": "inline-only"},
 			wantArtifactsLen: 1,
@@ -504,13 +500,12 @@ envs:
 			spec: `
 steps:
   - image: docker.io/test/mig:latest
-build_gate:
-  heal:
+healing:
     <<: !include %s
     envs:
       INLINE_ONLY: "true"
 `,
-			digPath:      []string{"build_gate", "heal"},
+			digPath:      []string{"healing"},
 			useNormalize: true,
 			wantEnv:      map[string]any{"FRAGMENT_ONLY": nil, "INLINE_ONLY": nil},
 		},
@@ -579,12 +574,11 @@ func TestBuildSpecPayload_IncludePointerSelection(t *testing.T) {
 			spec: `
 steps:
   - image: docker.io/test/mig:latest
-build_gate:
-  heal:
+healing:
     <<: !include ./heal-fragment.yaml#/fragments/heal
     retries: 1
 `,
-			digPath:    []string{"build_gate", "heal"},
+			digPath:    []string{"healing"},
 			wantFields: map[string]any{"image": "docker.io/test/healer:latest", "retries": 1.0},
 		},
 	}
@@ -632,7 +626,7 @@ steps:
       TARGET: java17
 build_gate:
   enabled: true
-  heal:
+healing:
     retries: 1
     image: docker.io/test/healer:latest
 `, ".yaml", specPayloadOpts{})
@@ -644,7 +638,7 @@ build_gate:
 
 	assertField(t, steps[1], "image", "docker.io/test/mig-step2:latest")
 	assertField(t, steps[2], "image", "docker.io/test/mig-step3:latest")
-	mustDig(t, result, "build_gate", "heal")
+	mustDig(t, result, "healing")
 }
 
 func TestBuildSpecPayload_RelativePathsResolveFromSpecDir(t *testing.T) {
@@ -658,15 +652,14 @@ envs:
   TOKEN: spec-dir-token
 steps:
   - image: docker.io/test/mig:latest
-build_gate:
-  heal:
+healing:
     <<: !include heal-fragment.yaml
 `, ".yaml", specPayloadOpts{})
 
 	envs := mustDig(t, result, "envs")
 	assertField(t, envs, "TOKEN", "spec-dir-token")
 
-	heal := mustDig(t, result, "build_gate", "heal")
+	heal := mustDig(t, result, "healing")
 	assertField(t, heal, "image", "docker.io/test/healer-fragment:latest")
 }
 
@@ -679,8 +672,7 @@ func TestBuildSpecPayload_IncludeCycleDetected(t *testing.T) {
 	writeFile(t, specPath, `
 steps:
   - image: docker.io/test/mig:latest
-build_gate:
-  heal: !include ./a.yaml#/heal
+healing: !include ./a.yaml#/heal
 `)
 
 	_, err := callBuildSpecPayload(t, specPath, specPayloadOpts{})
@@ -836,7 +828,6 @@ steps:
 }
 
 func TestBuildSpecPayload_ImageInterpolationAcrossSections(t *testing.T) {
-	t.Setenv("PLOY_TEST_IMG", "docker.io/test/amata:latest")
 	t.Setenv("PLOY_TEST_STEP_DEFAULT", "docker.io/test/default-step:latest")
 	t.Setenv("PLOY_TEST_STEP_MAVEN", "docker.io/test/maven-step:latest")
 
@@ -845,17 +836,10 @@ steps:
   - image:
       default: $PLOY_TEST_STEP_DEFAULT
       java-maven: ${PLOY_TEST_STEP_MAVEN}
-build_gate:
-  heal:
-    retries: 1
-    image: ${PLOY_TEST_IMG}
 `, ".yaml", specPayloadOpts{})
 
 	steps := mustSteps(t, result, 1)
 	stepImage := mustDig(t, steps[0], "image")
 	assertField(t, stepImage, "default", "docker.io/test/default-step:latest")
 	assertField(t, stepImage, "java-maven", "docker.io/test/maven-step:latest")
-
-	heal := mustDig(t, result, "build_gate", "heal")
-	assertField(t, heal, "image", "docker.io/test/amata:latest")
 }

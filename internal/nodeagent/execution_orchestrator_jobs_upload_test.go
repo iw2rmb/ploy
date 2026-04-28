@@ -483,8 +483,8 @@ func TestRunController_reportTerminalStatus(t *testing.T) {
 			wantStatus: types.JobStatusFail.String(),
 		},
 		{
-			name:       "sbom exit code one reports fail",
-			jobType:    types.JobTypeSBOM,
+			name:       "pre_gate exit code one reports fail",
+			jobType:    types.JobTypePreGate,
 			exitCode:   1,
 			wantStatus: types.JobStatusFail.String(),
 		},

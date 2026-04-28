@@ -18,7 +18,6 @@ func TestRouteCompleteJobServiceType(t *testing.T) {
 		{name: "pre_gate", jobType: domaintypes.JobTypePreGate, want: completeJobServiceTypeGate, wantOK: true},
 		{name: "post_gate", jobType: domaintypes.JobTypePostGate, want: completeJobServiceTypeGate, wantOK: true},
 		{name: "mig", jobType: domaintypes.JobTypeMig, want: completeJobServiceTypeStep, wantOK: true},
-		{name: "sbom", jobType: domaintypes.JobTypeSBOM, want: completeJobServiceTypeSBOM, wantOK: true},
 		{name: "unknown", jobType: domaintypes.JobType("unknown"), want: "", wantOK: false},
 	}
 

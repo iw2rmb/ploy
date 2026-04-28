@@ -157,7 +157,7 @@ func RegisterRoutes(s *server.HTTPServer, st store.Store, bs blobstore.Store, bp
 	// when control plane transitions a running job to Cancelled.
 	s.RegisterRouteFunc("GET /v1/jobs/{job_id}/status", getJobStatusHandler(st), auth.RoleWorker)
 	// Job-level runtime image persistence — nodes persist the resolved container image name
-	// that will be used to execute a mig/gate/sbom job (stack-aware resolution).
+	// that will be used to execute a mig/gate job (stack-aware resolution).
 	s.RegisterRouteFunc("POST /v1/jobs/{job_id}/image", saveJobImageNameHandler(st), auth.RoleWorker)
 
 	// NOTE: HTTP Build Gate endpoints (POST /v1/buildgate/validate, GET /v1/buildgate/jobs/{id},

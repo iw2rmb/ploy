@@ -60,7 +60,3 @@ func sbomJobIsMoreRecent(candidate, current store.Job) bool {
 	// Deterministic tie-break when timestamps are equal.
 	return candidate.ID.String() > current.ID.String()
 }
-
-func isSBOMJobType(jobType domaintypes.JobType) bool {
-	return jobType == domaintypes.JobTypeSBOM
-}

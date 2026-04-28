@@ -75,10 +75,10 @@ type StageStatus struct {
 // jobs and related artifacts rather than being tied to a specific storage
 // layout for jobs.meta JSONB.
 //
-// Each execution unit (pre_gate, mig, post_gate, sbom) has a jobs row
+// Each execution unit (pre_gate, mig, post_gate) has a jobs row
 // with job_type identifying the phase type.
 type StageMetadata struct {
-	// JobType identifies the job phase: "pre_gate", "mig", "post_gate", or "sbom".
+	// JobType identifies the job phase: "pre_gate", "mig", or "post_gate".
 	JobType domaintypes.JobType `json:"job_type,omitempty"`
 	// JobImage is the container image for this job (optional, for diagnostics).
 	JobImage string `json:"job_image,omitempty"`

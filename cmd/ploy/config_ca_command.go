@@ -57,6 +57,15 @@ type configCAItem struct {
 	Section string `json:"section"`
 }
 
+func validateConfigCASection(section string) error {
+	switch section {
+	case "pre_gate", "post_gate", "mig":
+		return nil
+	default:
+		return fmt.Errorf("invalid config ca section %q (must be one of: mig, post_gate, pre_gate)", section)
+	}
+}
+
 // handleConfigCAList retrieves and displays all CA entries.
 func handleConfigCAList(args []string, stderr io.Writer) error {
 	if wantsHelp(args) {
@@ -70,7 +79,7 @@ func handleConfigCAList(args []string, stderr io.Writer) error {
 	fs := flag.NewFlagSet("config ca list", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	var section stringValue
-	fs.Var(&section, "section", "Filter by section: pre_gate, re_gate, post_gate, mig, heal, sbom, hook")
+	fs.Var(&section, "section", "Filter by section: pre_gate, post_gate, mig")
 
 	if err := parseFlagSet(fs, args, func() { printConfigCAListUsage(stderr) }); err != nil {
 		return err
@@ -88,7 +97,7 @@ func handleConfigCAList(args []string, stderr io.Writer) error {
 
 	endpoint := strings.TrimSuffix(baseURL.String(), "/") + "/v1/config/ca"
 	if section.set {
-		if err := contracts.ValidateCAConfigSection(section.value); err != nil {
+		if err := validateConfigCASection(section.value); err != nil {
 			return err
 		}
 		endpoint += "/" + section.value
@@ -131,7 +140,7 @@ func printConfigCAListUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "Usage: ploy config ca list [--section <SECTION>]")
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Options:")
-	_, _ = fmt.Fprintln(w, "  --section  Filter by section: pre_gate, re_gate, post_gate, mig, heal, sbom, hook")
+	_, _ = fmt.Fprintln(w, "  --section  Filter by section: pre_gate, post_gate, mig")
 }
 
 // handleConfigCASet adds a CA entry.
@@ -178,7 +187,7 @@ func handleConfigCASet(args []string, stderr io.Writer) error {
 		return errors.New("--section is required")
 	}
 	for _, s := range sections.values {
-		if err := contracts.ValidateCAConfigSection(s); err != nil {
+		if err := validateConfigCASection(s); err != nil {
 			return err
 		}
 	}
@@ -263,7 +272,7 @@ func printConfigCASetUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "Options:")
 	_, _ = fmt.Fprintln(w, "  --hash     CA content hash (7-64 hex chars; mutually exclusive with --file)")
 	_, _ = fmt.Fprintln(w, "  --file     Path to CA bundle file (uploads content, derives hash; mutually exclusive with --hash)")
-	_, _ = fmt.Fprintln(w, "  --section  Target section: pre_gate, re_gate, post_gate, mig, heal, sbom, hook (repeatable, required)")
+	_, _ = fmt.Fprintln(w, "  --section  Target section: pre_gate, post_gate, mig (repeatable, required)")
 }
 
 // handleConfigCAUnset removes a CA entry.
@@ -300,7 +309,7 @@ func handleConfigCAUnset(args []string, stderr io.Writer) error {
 		printConfigCAUnsetUsage(stderr)
 		return errors.New("--section is required")
 	}
-	if err := contracts.ValidateCAConfigSection(section.value); err != nil {
+	if err := validateConfigCASection(section.value); err != nil {
 		return err
 	}
 
@@ -343,5 +352,5 @@ func printConfigCAUnsetUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Options:")
 	_, _ = fmt.Fprintln(w, "  --hash     CA content hash (required)")
-	_, _ = fmt.Fprintln(w, "  --section  Target section: pre_gate, re_gate, post_gate, mig, heal, sbom, hook (required)")
+	_, _ = fmt.Fprintln(w, "  --section  Target section: pre_gate, post_gate, mig (required)")
 }

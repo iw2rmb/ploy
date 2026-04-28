@@ -12,20 +12,8 @@ import (
 
 func testJobMetaForHydraRouting(jobType domaintypes.JobType, jobName string) []byte {
 	meta := contracts.NewMigJobMeta()
-	switch jobType {
-	case domaintypes.JobTypeSBOM:
-		phase := contracts.SBOMPhasePost
-		cycle := "post-gate"
-		if strings.HasPrefix(jobName, "pre-gate") {
-			phase = contracts.SBOMPhasePre
-			cycle = "pre-gate"
-		}
-		meta.SBOM = &contracts.SBOMJobMetadata{
-			Phase:     phase,
-			CycleName: cycle,
-			Role:      contracts.SBOMRoleInitial,
-		}
-	}
+	_ = jobType
+	_ = jobName
 	raw, _ := contracts.MarshalJobMeta(meta)
 	return raw
 }
@@ -306,7 +294,6 @@ func TestApplyHydraOverlay_SectionRouting(t *testing.T) {
 		"re_gate":   {Envs: map[string]string{"SECTION": "re_gate"}},
 		"post_gate": {Envs: map[string]string{"SECTION": "post_gate"}},
 		"mig":       {Envs: map[string]string{"SECTION": "mig"}},
-		"heal":      {Envs: map[string]string{"SECTION": "heal"}},
 	}
 
 	tests := []struct {
@@ -314,10 +301,8 @@ func TestApplyHydraOverlay_SectionRouting(t *testing.T) {
 		wantSection string
 	}{
 		{domaintypes.JobTypePreGate, "pre_gate"},
-		{domaintypes.JobTypePostGate, "re_gate"},
 		{domaintypes.JobTypePostGate, "post_gate"},
 		{domaintypes.JobTypeMig, "mig"},
-		{domaintypes.JobTypeMig, "heal"},
 	}
 
 	for _, tt := range tests {
@@ -343,40 +328,6 @@ func TestApplyHydraOverlay_SectionRouting(t *testing.T) {
 // ---------------------------------------------------------------------------
 // Router phase inheritance
 // ---------------------------------------------------------------------------
-
-// ---------------------------------------------------------------------------
-// Heal block overlay
-// ---------------------------------------------------------------------------
-
-func TestApplyHydraOverlay_HealBlockOverlay(t *testing.T) {
-	t.Parallel()
-
-	m := map[string]any{
-		"build_gate": map[string]any{
-			"heal": map[string]any{
-				"image": "heal:latest",
-				"envs":  map[string]any{"EXISTING": "spec_val"},
-			},
-		},
-	}
-	err := applyHydraOverlayMutator(m, claimSpecMutatorInput{
-		job:     store.Job{Meta: []byte(`{}`)},
-		jobType: domaintypes.JobTypeMig,
-		hydraOverlays: map[string]*HydraJobConfig{
-			"heal": {
-				Envs: map[string]string{"EXISTING": "overlay_val", "HEAL_KEY": "heal_val"},
-				CA:   []string{"heal1234567ab"},
-			},
-		},
-	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	healBlock := m["build_gate"].(map[string]any)["heal"].(map[string]any)
-	assertEnvs(t, healBlock, map[string]string{"EXISTING": "spec_val", "HEAL_KEY": "heal_val"}, nil, nil)
-	assertSlice(t, healBlock, "ca", 1, "heal1234567ab")
-}
 
 // ---------------------------------------------------------------------------
 // Destination collision detection
@@ -423,21 +374,6 @@ func TestApplyHydraOverlay_DestinationCollision(t *testing.T) {
 			},
 			wantErr:   true,
 			errSubstr: ".config/app.toml",
-		},
-		{
-			name: "heal overlay collision detected via non-heal job",
-			spec: map[string]any{
-				"build_gate": map[string]any{
-					"heal": map[string]any{"image": "heal:latest"},
-				},
-			},
-			jobType: domaintypes.JobTypeMig,
-			overlays: map[string]*HydraJobConfig{
-				"mig":  {},
-				"heal": {In: []string{"/a:/in/data.json", "/b:/in/data.json"}},
-			},
-			wantErr:   true,
-			errSubstr: "build_gate.heal",
 		},
 		{
 			name: "spec and overlay share in dst replaces with spec entry",
@@ -817,29 +753,6 @@ func TestApplyHydraOverlay_CanonicalCAInjection(t *testing.T) {
 			overlaySection: "post_gate",
 			wantPhase:      "post",
 			wantCA:         "postgate1234567",
-		},
-		{
-			name:           "re_gate_section_applies_to_build_gate_post",
-			jobType:        domaintypes.JobTypePostGate,
-			overlaySection: "re_gate",
-			wantPhase:      "post",
-			wantCA:         "regate1234567ab",
-		},
-		{
-			name:           "sbom_section_applies_to_pre_gate_cycle",
-			jobType:        domaintypes.JobTypeSBOM,
-			jobName:        "pre-gate-sbom",
-			overlaySection: "sbom",
-			wantPhase:      "pre",
-			wantCA:         "sbompre1234567",
-		},
-		{
-			name:           "sbom_section_applies_to_post_gate_cycle",
-			jobType:        domaintypes.JobTypeSBOM,
-			jobName:        "post-gate-sbom",
-			overlaySection: "sbom",
-			wantPhase:      "post",
-			wantCA:         "sbompost123456",
 		},
 	}
 

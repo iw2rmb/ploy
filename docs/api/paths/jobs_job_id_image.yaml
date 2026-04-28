@@ -29,7 +29,7 @@ post:
 
     Ownership is enforced: only the node that claimed the job may update the image, and
     only while the job is in `Running` status. Only `mig`, `heal`, and gate jobs
-    (`pre_gate`, `post_gate`, `re_gate`) are accepted.
+    (`pre_gate`, `post_gate`) are accepted.
   requestBody:
     required: true
     content:

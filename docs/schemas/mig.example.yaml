@@ -126,7 +126,7 @@ steps:
 #       MIGRATION_TARGET: java11
 #     in:
 #       - from: extract-usage@mig://out/dependency-usage.nofilter.json
-#       - from: sbom://out/sbom.dependencies.txt
+#       - /share/sbom.dependencies.txt:/in/sbom.dependencies.txt
 #   - name: apply-fixes
 #     image: docker.io/your-dh-user/migs-migrate-java17:latest
 #     envs:
@@ -174,15 +174,15 @@ build_gate:
 # - PLOY_SERVER_URL: ploy server URL for Build Gate HTTP API
 
 ################################################################################
-# HEALING CONFIGURATION (build_gate.heal)
+# HEALING CONFIGURATION (build_gate.post)
 ################################################################################
-# Healing runs directly when the Build Gate fails. A single `build_gate.heal`
+# Healing runs directly when the Build Gate fails. A single `build_gate.post`
 # entry defines the healing action, retries, and mig-like execution settings.
 # The system enters a direct
-# heal → re-gate loop until the gate passes or retries are exhausted.
+# heal → post-gate loop until the gate passes or retries are exhausted.
 #
 # Mig-like fields (image, command, envs, in, out, home, ca) are specified
-# directly under `build_gate.heal` (no nested `mig` key).
+# directly under `build_gate.post` (no nested `mig` key).
 #
 # Two execution modes:
 #
@@ -242,7 +242,7 @@ build_gate:
 #   source side of `in`/`out`/`home`) resolve from that included file directory
 # For expectations with `schema: gate_profile_v1`, the healing job should
 # write `/out/gate-profile-candidate.json`. Promotion to repo `gate_profile` occurs
-# only when the immediate follow-up `re_gate` succeeds.
+# only when the immediate follow-up `post_gate` succeeds.
 
 # Optional GitLab integration (control plane/node redact PAT in logs).
 gitlab_domain: gitlab.com # optional; defaults to gitlab.com when gitlab_pat is provided
@@ -267,7 +267,7 @@ mr_on_fail: true
 #   * Both formats share the same global build_gate policy.
 #
 # - Stack-aware image selection:
-#   * The `image` field (in steps[] and in build_gate.heal)
+#   * The `image` field (in steps[] and in build_gate.post)
 #     accepts either a string (universal image) or a map (stack-specific images).
 #   * When using the map form, the Build Gate detects the workspace stack
 #     (java-maven, java-gradle, etc.) and resolves the image accordingly.
@@ -281,7 +281,7 @@ mr_on_fail: true
 #   * Diffs enable rehydration: any step can be re-executed on any node by
 #     applying the ordered chain of diffs from prior steps onto the base snapshot.
 #
-# - The node agent consumes build_gate.heal to run the heal → re-gate loop
+# - The node agent consumes build_gate.post to run the heal → post-gate loop
 #   after the first gate fail (applies to both single-step and multi-step runs).
 # - Healing execution:
 #   * When `amata` block is present (amata.spec non-empty): container runs

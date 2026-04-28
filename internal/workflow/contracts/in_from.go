@@ -12,7 +12,7 @@ import (
 // Example:
 //
 //	from: extract-usage@mig://out/dependency-usage.nofilter.json
-//	from: sbom://out/sbom.dependencies.txt
+//	from: pre_gate://out/sbom.dependencies.txt
 //	to:   /in/dependency-usage.nofilter.json
 type InFromRef struct {
 	From string `json:"from,omitempty" yaml:"from,omitempty"`

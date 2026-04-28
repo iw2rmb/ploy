@@ -154,12 +154,12 @@ func TestCrossPathParity_GateJobStatusToChainAction(t *testing.T) {
 			wantGetRunCalled:    false,
 			wantCancelSuccessor: true,
 		},
-		// post/re-gate test failures produce Fail → EvaluateGateFailure → healing path entered (GetRun called).
+		// post/re-gate test failures are terminal and cancel queued successors.
 		{
 			name:    "re_gate/test_fail/has-next",
 			jobType: domaintypes.JobTypePostGate, status: domaintypes.JobStatusFail, hasNext: true,
-			wantGetRunCalled:    true,
-			wantCancelSuccessor: false,
+			wantGetRunCalled:    false,
+			wantCancelSuccessor: true,
 		},
 		// Gate successes → AdvanceNext when a successor exists.
 		{

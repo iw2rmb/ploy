@@ -9,12 +9,6 @@ Image Catalog (selected)
 - `java-base-*` (`images/java-bases/*`) - Shared Java toolchain lanes with unified CA bootstrap (`maven`, `gradle`, `temurin`).
 - `orw-cli-maven` (`images/orw/orw-cli-maven`) - OpenRewrite Maven lane runtime.
 - `orw-cli-gradle` (`images/orw/orw-cli-gradle`) - OpenRewrite Gradle lane runtime.
-- `ploy/sbom-maven:jdk11|jdk17` (`images/sbom/maven`) - Maven SBOM collection runtime lanes.
-- `ploy/sbom-gradle:jdk11|jdk17` (`images/sbom/gradle`) - Gradle SBOM collection runtime lanes.
-
-SBOM runner image details:
-- [`images/sbom/maven/README.md`](sbom/maven/README.md)
-- [`images/sbom/gradle/README.md`](sbom/gradle/README.md)
 
 OCI Labeling Policy
 

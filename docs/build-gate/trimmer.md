@@ -125,7 +125,7 @@ available:
 - When `BuildGateStageMetadata.LogFindings` contains at least one entry, the
   first finding's `Message` is written to `/in/build-gate.log` for healing migs.
 - When `BuildGateStageMetadata.LogFindings[0].Evidence` is present and valid
-  YAML/JSON, the node writes `/in/errors.yaml` for heal/re-gate jobs.
+  YAML/JSON, the node writes `/in/errors.yaml` for heal/post-gate jobs.
 - When no trimmed view is available (unknown tool / legacy gate), the agent
   falls back to `BuildGateStageMetadata.LogsText`.
 

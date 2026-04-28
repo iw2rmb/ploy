@@ -37,7 +37,6 @@ type completeJobServiceType string
 const (
 	completeJobServiceTypeGate completeJobServiceType = "gate"
 	completeJobServiceTypeStep completeJobServiceType = "step"
-	completeJobServiceTypeSBOM completeJobServiceType = "sbom"
 )
 
 func routeCompleteJobServiceType(jobType domaintypes.JobType) (completeJobServiceType, bool) {
@@ -46,8 +45,6 @@ func routeCompleteJobServiceType(jobType domaintypes.JobType) (completeJobServic
 		return completeJobServiceTypeGate, true
 	case domaintypes.JobTypeMig:
 		return completeJobServiceTypeStep, true
-	case domaintypes.JobTypeSBOM:
-		return completeJobServiceTypeSBOM, true
 	default:
 		return "", false
 	}

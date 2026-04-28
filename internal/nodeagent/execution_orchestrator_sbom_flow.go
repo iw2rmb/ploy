@@ -62,11 +62,13 @@ func materializeValidatedSBOMOutput(outDir, shareDir string, snapshotPath string
 	if err := validateCanonicalSBOMPath(canonicalPath); err != nil {
 		return fmt.Errorf("validate /out/%s: %w", preGateCanonicalSBOMFileName, err)
 	}
-	if err := copyFileBytes(canonicalPath, snapshotPath); err != nil {
-		return fmt.Errorf("stage cycle sbom snapshot: %w", err)
-	}
-	if err := validateCanonicalSBOMPath(snapshotPath); err != nil {
-		return fmt.Errorf("validate staged cycle sbom snapshot: %w", err)
+	if strings.TrimSpace(snapshotPath) != "" {
+		if err := copyFileBytes(canonicalPath, snapshotPath); err != nil {
+			return fmt.Errorf("stage cycle sbom snapshot: %w", err)
+		}
+		if err := validateCanonicalSBOMPath(snapshotPath); err != nil {
+			return fmt.Errorf("validate staged cycle sbom snapshot: %w", err)
+		}
 	}
 	return nil
 }

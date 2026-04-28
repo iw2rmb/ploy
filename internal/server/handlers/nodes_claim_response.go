@@ -39,7 +39,6 @@ type claimResponsePayload struct {
 	StartedAt              string                          `json:"started_at"`
 	CreatedAt              string                          `json:"created_at"`
 	Spec                   json.RawMessage                 `json:"spec,omitempty"`
-	SBOMContext            *contracts.SBOMJobMetadata      `json:"sbom_context,omitempty"`
 	MigContext             *contracts.MigClaimContext      `json:"mig_context,omitempty"`
 	GateContext            *contracts.GateClaimContext     `json:"gate_context,omitempty"`
 	DetectedStack          *contracts.StackExpectation     `json:"detected_stack,omitempty"`
@@ -103,7 +102,6 @@ func buildClaimResponsePayload(
 		return claimResponsePayload{}, err
 	}
 
-	var sbomContext *contracts.SBOMJobMetadata
 	var migContext *contracts.MigClaimContext
 	var gateContext *contracts.GateClaimContext
 
@@ -135,24 +133,6 @@ func buildClaimResponsePayload(
 			}
 		}
 		migContext.InFrom = resolvedInFrom
-	}
-
-	if jobType == domaintypes.JobTypeSBOM {
-		jobMeta, metaErr := contracts.UnmarshalJobMeta(job.Meta)
-		if metaErr != nil {
-			return claimResponsePayload{}, &ClaimJobTerminalError{
-				Message: fmt.Sprintf("parse sbom job meta for job %s", job.ID),
-				Err:     metaErr,
-			}
-		}
-		if jobMeta.SBOM == nil {
-			return claimResponsePayload{}, &ClaimJobTerminalError{
-				Message: fmt.Sprintf("sbom job %s missing sbom meta context", job.ID),
-				Err:     fmt.Errorf("meta.sbom is required"),
-			}
-		}
-		ctx := *jobMeta.SBOM
-		sbomContext = &ctx
 	}
 
 	recoveryCtx, err := buildRecoveryClaimContext(ctx, st, bs, run.ID, job, jobType)
@@ -187,7 +167,6 @@ func buildClaimResponsePayload(
 		StartedAt:              run.StartedAt.Time.Format(time.RFC3339),
 		CreatedAt:              run.CreatedAt.Time.Format(time.RFC3339),
 		Spec:                   mergedSpec,
-		SBOMContext:            sbomContext,
 		MigContext:             migContext,
 		GateContext:            gateContext,
 		DetectedStack:          detectedStack,
@@ -225,7 +204,6 @@ func buildActionClaimResponsePayload(
 		StartedAt:              run.StartedAt.Time.Format(time.RFC3339),
 		CreatedAt:              run.CreatedAt.Time.Format(time.RFC3339),
 		Spec:                   spec,
-		SBOMContext:            nil,
 		MigContext:             nil,
 		GateContext:            nil,
 		DetectedStack:          nil,

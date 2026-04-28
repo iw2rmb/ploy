@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"context"
 	"strings"
 	"testing"
 
@@ -26,12 +25,12 @@ func TestBuildInFromSourceJobIndex_PrefersLatestSuccessfulByTypeAndMigName(t *te
 		{
 			ID:      domaintypes.NewJobID(),
 			Status:  domaintypes.JobStatusError,
-			JobType: domaintypes.JobTypeSBOM,
+			JobType: domaintypes.JobTypePreGate,
 		},
 		{
 			ID:      domaintypes.NewJobID(),
 			Status:  domaintypes.JobStatusSuccess,
-			JobType: domaintypes.JobTypeSBOM,
+			JobType: domaintypes.JobTypePreGate,
 		},
 		{
 			ID:      domaintypes.NewJobID(),
@@ -51,8 +50,8 @@ func TestBuildInFromSourceJobIndex_PrefersLatestSuccessfulByTypeAndMigName(t *te
 	if len(got.latestSuccessByType) != 2 {
 		t.Fatalf("len(latestSuccessByType)=%d, want 2", len(got.latestSuccessByType))
 	}
-	if got.latestSuccessByType[domaintypes.JobTypeSBOM].ID != jobs[1].ID {
-		t.Fatalf("latestSuccessByType[sbom]=%s, want %s", got.latestSuccessByType[domaintypes.JobTypeSBOM].ID, jobs[1].ID)
+	if got.latestSuccessByType[domaintypes.JobTypePreGate].ID != jobs[1].ID {
+		t.Fatalf("latestSuccessByType[pre_gate]=%s, want %s", got.latestSuccessByType[domaintypes.JobTypePreGate].ID, jobs[1].ID)
 	}
 	if got.latestSuccessMigByName["extract-usage"].ID != jobs[3].ID {
 		t.Fatalf("latestSuccessMigByName[extract-usage]=%s, want %s", got.latestSuccessMigByName["extract-usage"].ID, jobs[3].ID)
@@ -60,12 +59,12 @@ func TestBuildInFromSourceJobIndex_PrefersLatestSuccessfulByTypeAndMigName(t *te
 }
 
 func TestResolveInFromSourceJob(t *testing.T) {
-	sourceSBOM := store.Job{ID: domaintypes.NewJobID(), Status: domaintypes.JobStatusSuccess, JobType: domaintypes.JobTypeSBOM}
+	sourcePreGate := store.Job{ID: domaintypes.NewJobID(), Status: domaintypes.JobStatusSuccess, JobType: domaintypes.JobTypePreGate}
 	sourceMig := store.Job{ID: domaintypes.NewJobID(), Status: domaintypes.JobStatusSuccess, JobType: domaintypes.JobTypeMig}
 	idx := inFromSourceJobIndex{
 		latestSuccessByType: map[domaintypes.JobType]store.Job{
-			domaintypes.JobTypeSBOM: sourceSBOM,
-			domaintypes.JobTypeMig:  sourceMig,
+			domaintypes.JobTypePreGate: sourcePreGate,
+			domaintypes.JobTypeMig:     sourceMig,
 		},
 		latestSuccessMigByName: map[string]store.Job{
 			"extract-usage": sourceMig,
@@ -81,9 +80,9 @@ func TestResolveInFromSourceJob(t *testing.T) {
 		{
 			name: "type selector",
 			selector: contracts.InFromURI{
-				SourceType: domaintypes.JobTypeSBOM,
+				SourceType: domaintypes.JobTypePreGate,
 			},
-			wantJobID: sourceSBOM.ID,
+			wantJobID: sourcePreGate.ID,
 		},
 		{
 			name: "named mig selector",
@@ -97,14 +96,14 @@ func TestResolveInFromSourceJob(t *testing.T) {
 			name: "named non-mig selector rejected",
 			selector: contracts.InFromURI{
 				SourceName: "pre",
-				SourceType: domaintypes.JobTypeSBOM,
+				SourceType: domaintypes.JobTypePreGate,
 			},
 			wantErr: true,
 		},
 		{
 			name: "missing source by type",
 			selector: contracts.InFromURI{
-				SourceType: domaintypes.JobTypePreGate,
+				SourceType: domaintypes.JobTypePostGate,
 			},
 			wantErr: true,
 		},
@@ -151,10 +150,10 @@ func TestSelectPreferredArtifactID(t *testing.T) {
 	}
 }
 
-func TestResolveMigInFromClaimEntries_RejectsSBOMJavaClasspathInFrom(t *testing.T) {
+func TestParseMigSpecJSON_RejectsLegacySBOMInFromSelector(t *testing.T) {
 	t.Parallel()
 
-	spec, err := contracts.ParseMigSpecJSON([]byte(`{
+	_, err := contracts.ParseMigSpecJSON([]byte(`{
 		"steps": [
 			{
 				"image": "ghcr.io/example/mig:latest",
@@ -162,34 +161,10 @@ func TestResolveMigInFromClaimEntries_RejectsSBOMJavaClasspathInFrom(t *testing.
 			}
 		]
 	}`))
-	if err != nil {
-		t.Fatalf("ParseMigSpecJSON() error = %v", err)
-	}
-
-	st := &jobStore{}
-	st.listJobsByRunRepoAttempt.val = []store.Job{
-		{
-			ID:      domaintypes.NewJobID(),
-			RunID:   domaintypes.NewRunID(),
-			RepoID:  domaintypes.NewRepoID(),
-			Attempt: 1,
-			JobType: domaintypes.JobTypeSBOM,
-			Status:  domaintypes.JobStatusSuccess,
-		},
-	}
-	job := store.Job{
-		ID:      domaintypes.NewJobID(),
-		RunID:   st.listJobsByRunRepoAttempt.val[0].RunID,
-		RepoID:  st.listJobsByRunRepoAttempt.val[0].RepoID,
-		Attempt: 1,
-		JobType: domaintypes.JobTypeMig,
-	}
-
-	_, err = resolveMigInFromClaimEntries(context.Background(), st, job, spec, 0)
 	if err == nil {
-		t.Fatal("resolveMigInFromClaimEntries() error = nil, want non-nil")
+		t.Fatal("ParseMigSpecJSON() error = nil, want non-nil")
 	}
-	if got := err.Error(); !strings.Contains(got, "sbom://out/java.classpath is unsupported") {
-		t.Fatalf("error = %q, want sbom java.classpath rejection", got)
+	if got := err.Error(); !strings.Contains(got, `unknown step name "sbom"`) {
+		t.Fatalf("error = %q, want unknown step name rejection", got)
 	}
 }

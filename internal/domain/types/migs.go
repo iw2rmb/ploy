@@ -11,7 +11,6 @@ import (
 //   - JobTypePreGate: pre-mig Build Gate
 //   - JobTypeMig: main mig execution
 //   - JobTypePostGate: post-mig Build Gate
-//   - JobTypeSBOM: SBOM generation job
 //
 // Unknown or empty values should be treated carefully at boundaries; use
 // JobType.IsZero/Validate to enforce invariants when appropriate.
@@ -21,7 +20,6 @@ const (
 	JobTypePreGate  JobType = "pre_gate"
 	JobTypeMig      JobType = "mig"
 	JobTypePostGate JobType = "post_gate"
-	JobTypeSBOM     JobType = "sbom"
 )
 
 // String returns the underlying string value.
@@ -34,7 +32,7 @@ func (v JobType) IsZero() bool { return IsEmpty(string(v)) }
 func (v JobType) Validate() error {
 	s := strings.TrimSpace(string(v))
 	switch JobType(s) {
-	case JobTypePreGate, JobTypeMig, JobTypePostGate, JobTypeSBOM:
+	case JobTypePreGate, JobTypeMig, JobTypePostGate:
 		return nil
 	default:
 		return fmt.Errorf("invalid job_type %q", s)

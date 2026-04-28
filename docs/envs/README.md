@@ -121,7 +121,7 @@ Role model (bearer token claims):
   - `out` — Read-write output files (`src:/out/dst`; CLI compiles local paths to `shortHash:/out/dst`)
   - `home` — Home-relative files (`src:dst{:ro}`; CLI compiles to `shortHash:dst{:ro}`)
   - `steps[]` — Multi-step spec steps (each with its own `image`/`command`/`envs`/`ca`/`in`/`out`/`home`)
-  - `build_gate.heal` — Automated healing action for Build Gate failures (`retries`, `image`, `command`, `envs`, `ca`, `in`, `out`, `home`, optional `amata`, optional `expectations`)
+  - `build_gate.post` — Automated healing action for Build Gate failures (`retries`, `image`, `command`, `envs`, `ca`, `in`, `out`, `home`, optional `amata`, optional `expectations`)
   - GitLab MR settings (`mr_on_success`, `mr_on_fail`, `gitlab_domain`, `gitlab_pat`)
   - See [mig.example.yaml](../schemas/mig.example.yaml) for the full schema.
 
@@ -176,13 +176,13 @@ build_gate:
   `ploy mig run repo add --repo-url https://... --base-ref main --target-ref feature my-batch`.
   See [Migs lifecycle](../migs-lifecycle.md) § "1.4 Batched Migs Runs (`runs` + `run_repos`)"
   for full usage.
-  - `build_gate.heal` — Spec block defining the single healing action:
+  - `build_gate.post` — Spec block defining the single healing action:
   - Action fields support include-composition (`retries`, `image`, `command`, `envs`, `ca`, `in`, `out`, `home`, optional `amata`, optional `expectations`)
   - After each healing attempt, the Build Gate is re-run; on pass, the main mig proceeds
   - If healing exhausts retries and gate still fails, run terminates with `reason="build-gate"`
   - Cross-phase inputs (`/in/build-gate.log`, optional `/in/errors.yaml`, `/in/gate_profile.json`, `/in/amata.yaml`) are available to healing migs
   - Task-oriented healing routers may consume `/in/errors.yaml` and emit `tasks[]` with `error_kind` in `code|deps|infra` and `items[]` indexes into `errors` entries
-  - For `expectations.artifacts` schema `gate_profile_v1`, healing is expected to write `/out/gate-profile-candidate.json` with explicit `targets.active` (`all_tests|unit|build|unsupported`); candidate promotion to repo `gate_profile` occurs only on successful follow-up `re_gate`
+  - For `expectations.artifacts` schema `gate_profile_v1`, healing is expected to write `/out/gate-profile-candidate.json` with explicit `targets.active` (`all_tests|unit|build|unsupported`); candidate promotion to repo `gate_profile` occurs only on successful follow-up `post_gate`
   - Terminal unsupported candidate contract: `targets.active=unsupported`, `targets.build.status=failed`, `targets.build.failure_code=infra_support`
 - Container cleanup model:
   - Containers are retained after step/gate completion.
@@ -215,7 +215,7 @@ Server connection details:
 - `PLOY_API_TOKEN` — Bearer token for API authentication (when configured on node).
 
 Healing runtime context:
-- `PLOY_GATE_PHASE` — phase that failed (`pre_gate|post_gate|re_gate`)
+- `PLOY_GATE_PHASE` — phase that failed (`pre_gate|post_gate`)
 - `PLOY_LOOP_KIND` — loop context (`healing`)
 
 See [Build Gate docs](../build-gate/README.md) for Build Gate configuration and execution details.
@@ -505,8 +505,8 @@ Use the `ploy config env` subcommands to manage global environment variables:
 
 ```bash
 # Set CA certificates via typed config
-# Sections: pre_gate, re_gate, post_gate, mig, heal, sbom
-ploy config ca set --file ca-bundle.pem --section pre_gate --section re_gate
+# Sections: pre_gate, post_gate, mig, heal
+ploy config ca set --file ca-bundle.pem --section pre_gate --section post_gate
 
 # Set OpenAI API key (injected into gate and step jobs — default --on jobs)
 ploy config env set --key OPENAI_API_KEY --value sk-...
@@ -523,7 +523,7 @@ ploy config env unset --key OLD_VAR
 
 **Typed config fields** manage structured data that was previously carried as raw env keys.
 Use the dedicated typed config commands:
-- `ploy config ca set/unset/ls` — CA certificates (sections: pre_gate, re_gate, post_gate, mig, heal, sbom)
+- `ploy config ca set/unset/ls` — CA certificates (sections: pre_gate, post_gate, mig, heal)
 - `ploy config home set/unset/ls` — Home-relative file mounts
 
 ### Target Semantics
@@ -534,7 +534,7 @@ Use the dedicated typed config commands:
 |--------|------------|----------|
 | `server` | Server process | Server-side credentials and configuration |
 | `nodes` | Node agent processes | Node-level configuration |
-| `gates` | Gate jobs (`pre_gate`, `re_gate`, `post_gate`) | Build gate credentials |
+| `gates` | Gate jobs (`pre_gate`, `post_gate`) | Build gate credentials |
 | `steps` | Step jobs (`mig`, `heal`) | Mig execution credentials |
 
 The `set` command uses **`--on` selectors** for convenience:
@@ -559,7 +559,7 @@ The `show` and `unset` commands use **`--from`** to specify the target:
    pair and cached in the control-plane's `ConfigHolder` at startup.
 2. **Claim-time merge**: When a node claims a job via `/v1/nodes/{id}/claim`, the server
    merges matching global env vars into the job's spec based on target-to-job-type mapping
-   (gates → pre_gate/re_gate/post_gate; steps → mig/heal).
+   (gates → pre_gate/post_gate; steps → mig/heal).
    The job spec must be a JSON object; invalid/non-object specs are rejected at submission
    time (400). If a persisted spec in the DB is invalid or non-object, claim fails with a 500.
 3. **Precedence**: Per-run env vars (in spec or CLI flags) take precedence—existing keys
@@ -717,7 +717,7 @@ and, when not writable, the node falls back to `${TMPDIR:-/tmp}/ploy/gates`.
   the active cache directory (`<language>/<tool>/<release>`) from oldest to newest
   until free space reaches `2 GiB` or the directory is exhausted.
 
-**Java non-gate jobs (`sbom`, `mig`, `heal`)**: Use the same centralized
+**Java non-gate jobs (`mig`, `heal`)**: Use the same centralized
 cache-root policy as Build Gate when stack tuple env is set to Java:
 - `PLOY_STACK_LANGUAGE=java`
 - `PLOY_STACK_TOOL=gradle|maven`

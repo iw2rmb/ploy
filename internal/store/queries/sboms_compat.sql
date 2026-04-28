@@ -1,11 +1,10 @@
 -- name: ListSBOMCompatRows :many
-WITH latest_successful_sbom_jobs AS (
+WITH latest_successful_gate_jobs AS (
   SELECT
     j.id,
     j.run_id,
     j.repo_id,
     j.attempt,
-    COALESCE(j.meta #>> '{sbom,cycle_name}', '') AS cycle_name,
     ROW_NUMBER() OVER (
       PARTITION BY j.run_id, j.repo_id, j.attempt
       ORDER BY COALESCE(j.finished_at, j.started_at, j.created_at) DESC, j.id DESC
@@ -15,7 +14,7 @@ WITH latest_successful_sbom_jobs AS (
     AND rr.repo_id = j.repo_id
     AND rr.attempt = j.attempt
   WHERE j.status = 'Success'
-    AND j.job_type = 'sbom'
+    AND j.job_type IN ('pre_gate', 'post_gate', 're_gate')
     AND rr.status = 'Success'
 ),
 sbom_rows_with_stack AS (
@@ -25,15 +24,10 @@ sbom_rows_with_stack AS (
     st.lang,
     st.release,
     COALESCE(st.tool, '') AS tool
-  FROM latest_successful_sbom_jobs j
+  FROM latest_successful_gate_jobs j
   JOIN sboms s ON s.job_id = j.id
     AND s.repo_id = j.repo_id
-  JOIN jobs gj ON gj.run_id = j.run_id
-    AND gj.repo_id = j.repo_id
-    AND gj.attempt = j.attempt
-    AND COALESCE(gj.meta->>'gate_cycle_name', '') = j.cycle_name
-    AND gj.job_type IN ('pre_gate', 'post_gate', 're_gate')
-  JOIN gates g ON g.job_id = gj.id
+  JOIN gates g ON g.job_id = j.id
   JOIN gate_profiles gp ON gp.id = g.profile_id
   JOIN stacks st ON st.id = gp.stack_id
   WHERE j.rn = 1
@@ -48,13 +42,12 @@ GROUP BY s.lib, s.ver
 ORDER BY s.lib ASC, s.ver ASC;
 
 -- name: HasSBOMEvidenceForStack :one
-WITH latest_successful_sbom_jobs AS (
+WITH latest_successful_gate_jobs AS (
   SELECT
     j.id,
     j.run_id,
     j.repo_id,
     j.attempt,
-    COALESCE(j.meta #>> '{sbom,cycle_name}', '') AS cycle_name,
     ROW_NUMBER() OVER (
       PARTITION BY j.run_id, j.repo_id, j.attempt
       ORDER BY COALESCE(j.finished_at, j.started_at, j.created_at) DESC, j.id DESC
@@ -64,7 +57,7 @@ WITH latest_successful_sbom_jobs AS (
     AND rr.repo_id = j.repo_id
     AND rr.attempt = j.attempt
   WHERE j.status = 'Success'
-    AND j.job_type = 'sbom'
+    AND j.job_type IN ('pre_gate', 'post_gate', 're_gate')
     AND rr.status = 'Success'
 ),
 sbom_rows_with_stack AS (
@@ -72,13 +65,8 @@ sbom_rows_with_stack AS (
     st.lang,
     st.release,
     COALESCE(st.tool, '') AS tool
-  FROM latest_successful_sbom_jobs j
-  JOIN jobs gj ON gj.run_id = j.run_id
-    AND gj.repo_id = j.repo_id
-    AND gj.attempt = j.attempt
-    AND COALESCE(gj.meta->>'gate_cycle_name', '') = j.cycle_name
-    AND gj.job_type IN ('pre_gate', 'post_gate', 're_gate')
-  JOIN gates g ON g.job_id = gj.id
+  FROM latest_successful_gate_jobs j
+  JOIN gates g ON g.job_id = j.id
   JOIN gate_profiles gp ON gp.id = g.profile_id
   JOIN stacks st ON st.id = gp.stack_id
   WHERE j.rn = 1

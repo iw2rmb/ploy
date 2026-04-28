@@ -16,7 +16,7 @@ func TestJobStatusFromExitCodeForJobType(t *testing.T) {
 		exitCode int
 		want     domaintypes.JobStatus
 	}{
-		{name: "sbom non-zero is fail", jobType: domaintypes.JobTypeSBOM, exitCode: 1, want: domaintypes.JobStatusFail},
+		{name: "pre_gate non-zero is fail", jobType: domaintypes.JobTypePreGate, exitCode: 1, want: domaintypes.JobStatusFail},
 		{name: "mig non-zero is fail", jobType: domaintypes.JobTypeMig, exitCode: 1, want: domaintypes.JobStatusFail},
 		{name: "gate non-zero is fail", jobType: domaintypes.JobTypePostGate, exitCode: 1, want: domaintypes.JobStatusFail},
 		{name: "exit above one is error", jobType: domaintypes.JobTypeMig, exitCode: 2, want: domaintypes.JobStatusError},

@@ -17,7 +17,7 @@ get:
     **Target semantics:**
     - `server` — Inject into the server process
     - `nodes` — Inject into node agent processes
-    - `gates` — Inject into gate jobs (pre_gate, re_gate, post_gate)
+    - `gates` — Inject into gate jobs (pre_gate, post_gate)
     - `steps` — Inject into step jobs (mig, heal)
 
     **Precedence:** Per-run env vars (in spec or CLI flags) take precedence over

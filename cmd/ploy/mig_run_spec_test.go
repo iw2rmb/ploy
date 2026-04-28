@@ -241,61 +241,6 @@ envs:
 }
 
 // ---------------------------------------------------------------------------
-// applyConfigOverlayInPlace: heal overlay routing
-// ---------------------------------------------------------------------------
-
-func TestApplyConfigOverlayInPlace_HealOverlay(t *testing.T) {
-	tests := []struct {
-		name    string
-		config  string
-		spec    map[string]any
-		digPath []string
-		wantEnv map[string]any
-	}{
-		{
-			name: "heal gets heal overlay",
-			config: `
-defaults:
-  job:
-    heal:
-      envs:
-        HEAL_KEY: heal_val
-`,
-			spec: map[string]any{
-				"steps": []any{
-					map[string]any{"image": "docker.io/test/mig:latest"},
-				},
-				"build_gate": map[string]any{
-					"heal": map[string]any{
-						"image": "docker.io/test/healer:latest",
-					},
-				},
-			},
-			digPath: []string{"build_gate", "heal"},
-			wantEnv: map[string]any{"HEAL_KEY": "heal_val"},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			configHome := t.TempDir()
-			t.Setenv("PLOY_CONFIG_HOME", configHome)
-			writeFile(t, filepath.Join(configHome, "config.yaml"), tt.config)
-
-			if err := applyConfigOverlayInPlace(tt.spec); err != nil {
-				t.Fatalf("applyConfigOverlayInPlace: %v", err)
-			}
-
-			target := mustDig(t, tt.spec, tt.digPath...)
-			envs := mustDig(t, target, "envs")
-			for k, v := range tt.wantEnv {
-				assertField(t, envs, k, v)
-			}
-		})
-	}
-}
-
-// ---------------------------------------------------------------------------
 // buildSpecPayload: deterministic canonical output
 // ---------------------------------------------------------------------------
 
@@ -367,9 +312,6 @@ defaults:
       envs:
         LOCAL_KEY: local_val
         SHARED: from_local
-    heal:
-      envs:
-        HEAL_LOCAL: heal_local_val
 `)
 
 	result := runBuildSpecPayload(t, `
@@ -383,8 +325,6 @@ envs:
 build_gate:
   pre:
     target: build
-  heal:
-    image: docker.io/test/healer:latest
 `, ".yaml", specPayloadOpts{})
 
 	// Top-level envs: spec wins for SHARED, local key preserved.
@@ -398,7 +338,4 @@ build_gate:
 	stepEnvs := mustDig(t, steps[0], "envs")
 	assertField(t, stepEnvs, "STEP_SHARED", "from_spec")
 
-	// Heal: heal overlay applied.
-	healEnvs := mustDig(t, result, "build_gate", "heal", "envs")
-	assertField(t, healEnvs, "HEAL_LOCAL", "heal_local_val")
 }

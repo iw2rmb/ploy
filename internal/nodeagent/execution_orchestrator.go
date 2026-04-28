@@ -3,7 +3,7 @@
 // This file owns executeRun, the main entry point for executing a single run.
 // It coordinates runtime initialization and dispatches to specialized job
 // handlers based on job type. Job implementations live in:
-//   - execution_orchestrator_jobs.go — mig/sbom jobs + standard executor
+//   - execution_orchestrator_jobs.go — mig jobs + standard executor
 //   - execution_orchestrator_gate.go — gate validation jobs
 package nodeagent
 
@@ -24,7 +24,7 @@ import (
 )
 
 // executeRun orchestrates job execution based on job type.
-// Dispatches to specialized handlers: gate jobs, sbom jobs, and mig jobs.
+// Dispatches to specialized handlers: gate jobs and mig jobs.
 //
 // Job types:
 //   - pre_gate, post_gate: Run build gate validation
@@ -82,9 +82,6 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 	case types.JobTypePreGate, types.JobTypePostGate:
 		req.JobType = jobType
 		r.executeGateJob(ctx, req)
-	case types.JobTypeSBOM:
-		req.JobType = jobType
-		r.executeSBOMJob(ctx, req)
 	case types.JobTypeMig:
 		req.JobType = jobType
 		r.executeMigJob(ctx, req)

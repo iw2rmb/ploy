@@ -40,8 +40,8 @@ func TestBatchRepoStarter_StartPendingRepos_CreatesJobsWhenNone(t *testing.T) {
 	if got.Started != 1 {
 		t.Fatalf("expected started=1, got %d", got.Started)
 	}
-	if st.createJobCallCount != 5 {
-		t.Fatalf("expected 5 jobs to be created, got %d", st.createJobCallCount)
+	if st.createJobCallCount != 3 {
+		t.Fatalf("expected 3 jobs to be created, got %d", st.createJobCallCount)
 	}
 	if st.createRunCalled {
 		t.Fatalf("expected CreateRun not to be called (no child runs per repo)")

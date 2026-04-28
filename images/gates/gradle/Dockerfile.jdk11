@@ -13,3 +13,5 @@ RUN rm -rf /root/.gradle \
 
 COPY images/gates/gradle/gradle.properties /root/.gradle/gradle.properties
 COPY images/gates/gradle/cache.init.gradle /root/.gradle/init.d/cache.init.gradle
+COPY --chmod=755 images/gates/shared/collect-java-classpath-gradle.sh /usr/local/lib/ploy/sbom/collect-java-classpath-gradle.sh
+COPY images/gates/shared/gradle-write-java-classpath.init.gradle /usr/local/lib/ploy/sbom/gradle-write-java-classpath.init.gradle

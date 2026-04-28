@@ -11,7 +11,7 @@ GlobalEnvTarget:
     Target that controls which components or job types receive this variable.
     - `server` — Inject into the server process
     - `nodes` — Inject into node agent processes
-    - `gates` — Inject into gate jobs (pre_gate, re_gate, post_gate)
+    - `gates` — Inject into gate jobs (pre_gate, post_gate)
     - `steps` — Inject into step jobs (mig, heal)
   enum: [server, nodes, gates, steps]
   example: "gates"

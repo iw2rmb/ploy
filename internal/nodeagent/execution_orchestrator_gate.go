@@ -139,6 +139,31 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 	// results (pass or fail) to ensure deterministic image selection.
 	r.persistGateStack(req.RunID, gateResult)
 
+	// Java gates materialize canonical SBOM outputs directly into /out and /share.
+	// This replaces the removed standalone sbom phase.
+	if gateResultPassed(gateResult) && shouldMaterializeGateSBOM(gateResult) {
+		gateOutDir := filepath.Join(workspace, step.BuildGateWorkspaceOutDir)
+		if err := materializeValidatedSBOMOutput(gateOutDir, shareDir, "", true); err != nil {
+			duration := time.Since(startTime)
+			stats := r.buildGateJobStats(gateResult, duration)
+			var errorExitCode int32 = -1
+			if uploadErr := r.uploadStatus(ctx, req.RunID.String(), types.JobStatusError.String(), &errorExitCode, stats, req.JobID); uploadErr != nil {
+				slog.Error("failed to upload gate error status after sbom materialization failure",
+					"run_id", req.RunID,
+					"job_id", req.JobID,
+					"error", uploadErr,
+				)
+			}
+			slog.Error("gate job errored due to sbom materialization failure",
+				"run_id", req.RunID,
+				"job_id", req.JobID,
+				"duration", duration,
+				"error", err,
+			)
+			return
+		}
+	}
+
 	// Persist the first failing gate log for this run.
 	if !gateResultPassed(gateResult) {
 		r.persistFirstGateFailureLog(req.RunID, gateResult)
@@ -494,6 +519,27 @@ func isGradleGateResult(meta *contracts.BuildGateStageMetadata) bool {
 		return false
 	}
 	return strings.EqualFold(strings.TrimSpace(meta.StaticChecks[0].Tool), "gradle")
+}
+
+func shouldMaterializeGateSBOM(meta *contracts.BuildGateStageMetadata) bool {
+	if meta == nil {
+		return false
+	}
+	if meta.Detected != nil {
+		lang := strings.TrimSpace(strings.ToLower(meta.Detected.Language))
+		tool := strings.TrimSpace(strings.ToLower(meta.Detected.Tool))
+		if lang == "java" && (tool == "maven" || tool == "gradle") {
+			return true
+		}
+	}
+	for _, s := range meta.StaticChecks {
+		lang := strings.TrimSpace(strings.ToLower(s.Language))
+		tool := strings.TrimSpace(strings.ToLower(s.Tool))
+		if lang == "java" && (tool == "maven" || tool == "gradle") {
+			return true
+		}
+	}
+	return false
 }
 
 func gateArtifactURL(serverURL, artifactID string, download bool) string {

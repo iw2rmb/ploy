@@ -3,7 +3,7 @@ get:
   description: |
     Returns minimum successful versions observed in persisted SBOM rows for the
     requested stack (`lang`, `release`, `tool`).
-    Evidence is taken from the latest successful `sbom` snapshot of each
+    Evidence is taken from the latest successful gate SBOM snapshot of each
     successful repo run attempt.
 
     Query semantics:

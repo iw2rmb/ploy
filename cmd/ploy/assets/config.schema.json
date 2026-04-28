@@ -45,16 +45,10 @@
         "pre_gate": {
           "$ref": "#/definitions/jobConfig"
         },
-        "re_gate": {
-          "$ref": "#/definitions/jobConfig"
-        },
         "post_gate": {
           "$ref": "#/definitions/jobConfig"
         },
         "mig": {
-          "$ref": "#/definitions/jobConfig"
-        },
-        "heal": {
           "$ref": "#/definitions/jobConfig"
         }
       }

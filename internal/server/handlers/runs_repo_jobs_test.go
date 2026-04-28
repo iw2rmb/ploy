@@ -76,12 +76,12 @@ func TestListRunRepoJobsHandler_NextIDContract(t *testing.T) {
 	}
 }
 
-func TestListRunRepoJobsHandler_ExposesSBOMAndHealJobTypes(t *testing.T) {
+func TestListRunRepoJobsHandler_ExposesGateAndMigJobTypes(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
 	repoID := domaintypes.NewRepoID()
-	sbomID := domaintypes.NewJobID()
+	preGateID := domaintypes.NewJobID()
 	migID := domaintypes.NewJobID()
 
 	st := &runStore{
@@ -93,14 +93,14 @@ func TestListRunRepoJobsHandler_ExposesSBOMAndHealJobTypes(t *testing.T) {
 	}
 	st.listJobsByRunRepoAttempt.val = []store.Job{
 		{
-			ID:      sbomID,
+			ID:      preGateID,
 			RunID:   runID,
 			RepoID:  repoID,
 			Attempt: 1,
-			Name:    "pre-gate-sbom",
-			JobType: domaintypes.JobTypeSBOM,
+			Name:    "pre-gate",
+			JobType: domaintypes.JobTypePreGate,
 			Status:  domaintypes.JobStatusSuccess,
-			Meta:    []byte(`{"kind":"mig"}`),
+			Meta:    []byte(`{"kind":"gate"}`),
 		},
 		{
 			ID:      migID,
@@ -133,8 +133,8 @@ func TestListRunRepoJobsHandler_ExposesSBOMAndHealJobTypes(t *testing.T) {
 			seen[jt] = true
 		}
 	}
-	if !seen["sbom"] {
-		t.Fatalf("expected job_type %q in response, got %+v", "sbom", seen)
+	if !seen["pre_gate"] {
+		t.Fatalf("expected job_type %q in response, got %+v", "pre_gate", seen)
 	}
 	if !seen["mig"] {
 		t.Fatalf("expected job_type %q in response, got %+v", "mig", seen)
@@ -146,7 +146,7 @@ func TestListRunRepoJobsHandler_ExposesSBOMEvidence(t *testing.T) {
 
 	runID := domaintypes.NewRunID()
 	repoID := domaintypes.NewRepoID()
-	sbomID := domaintypes.NewJobID()
+	preGateID := domaintypes.NewJobID()
 
 	st := &runStore{
 		getRunRepoResult: store.RunRepo{
@@ -157,20 +157,20 @@ func TestListRunRepoJobsHandler_ExposesSBOMEvidence(t *testing.T) {
 	}
 	st.listJobsByRunRepoAttempt.val = []store.Job{
 		{
-			ID:      sbomID,
+			ID:      preGateID,
 			RunID:   runID,
 			RepoID:  repoID,
 			Attempt: 1,
-			Name:    "pre-gate-sbom",
-			JobType: domaintypes.JobTypeSBOM,
+			Name:    "pre-gate",
+			JobType: domaintypes.JobTypePreGate,
 			Status:  domaintypes.JobStatusSuccess,
-			Meta:    []byte(`{"kind":"mig"}`),
+			Meta:    []byte(`{"kind":"gate"}`),
 		},
 	}
 	st.listArtifactBundlesByRunAndJob.val = []store.ArtifactBundle{{}}
 	st.listSBOMRowsByJob.val = []store.Sbom{
-		{JobID: sbomID, RepoID: repoID, Lib: "org.slf4j:slf4j-api", Ver: "1.7.36"},
-		{JobID: sbomID, RepoID: repoID, Lib: "junit:junit", Ver: "4.13.2"},
+		{JobID: preGateID, RepoID: repoID, Lib: "org.slf4j:slf4j-api", Ver: "1.7.36"},
+		{JobID: preGateID, RepoID: repoID, Lib: "junit:junit", Ver: "4.13.2"},
 	}
 
 	handler := listRunRepoJobsHandler(st)
@@ -193,18 +193,18 @@ func TestListRunRepoJobsHandler_ExposesSBOMEvidence(t *testing.T) {
 	if len(resp.Jobs) != 1 {
 		t.Fatalf("expected 1 job, got %d", len(resp.Jobs))
 	}
-	sbomJob := resp.Jobs[0]
-	if got, want := sbomJob.JobType, "sbom"; got != want {
+	gateJob := resp.Jobs[0]
+	if got, want := gateJob.JobType, "pre_gate"; got != want {
 		t.Fatalf("job_type = %q, want %q", got, want)
 	}
-	if sbomJob.SBOMEvidence == nil {
-		t.Fatal("expected sbom_evidence for sbom job")
+	if gateJob.SBOMEvidence == nil {
+		t.Fatal("expected sbom_evidence for gate job")
 	}
-	if sbomJob.SBOMEvidence.ArtifactPresent == nil || !*sbomJob.SBOMEvidence.ArtifactPresent {
-		t.Fatalf("sbom_evidence.artifact_present = %#v, want true", sbomJob.SBOMEvidence.ArtifactPresent)
+	if gateJob.SBOMEvidence.ArtifactPresent == nil || !*gateJob.SBOMEvidence.ArtifactPresent {
+		t.Fatalf("sbom_evidence.artifact_present = %#v, want true", gateJob.SBOMEvidence.ArtifactPresent)
 	}
-	if sbomJob.SBOMEvidence.ParsedPackageCount == nil || *sbomJob.SBOMEvidence.ParsedPackageCount != 2 {
-		t.Fatalf("sbom_evidence.parsed_package_count = %#v, want 2", sbomJob.SBOMEvidence.ParsedPackageCount)
+	if gateJob.SBOMEvidence.ParsedPackageCount == nil || *gateJob.SBOMEvidence.ParsedPackageCount != 2 {
+		t.Fatalf("sbom_evidence.parsed_package_count = %#v, want 2", gateJob.SBOMEvidence.ParsedPackageCount)
 	}
 }
 
@@ -213,7 +213,7 @@ func TestListRunRepoJobsHandler_ExposesSBOMEvidenceWithNoArtifacts(t *testing.T)
 
 	runID := domaintypes.NewRunID()
 	repoID := domaintypes.NewRepoID()
-	sbomID := domaintypes.NewJobID()
+	preGateID := domaintypes.NewJobID()
 
 	st := &runStore{
 		getRunRepoResult: store.RunRepo{
@@ -224,14 +224,14 @@ func TestListRunRepoJobsHandler_ExposesSBOMEvidenceWithNoArtifacts(t *testing.T)
 	}
 	st.listJobsByRunRepoAttempt.val = []store.Job{
 		{
-			ID:      sbomID,
+			ID:      preGateID,
 			RunID:   runID,
 			RepoID:  repoID,
 			Attempt: 1,
-			Name:    "pre-gate-sbom",
-			JobType: domaintypes.JobTypeSBOM,
+			Name:    "pre-gate",
+			JobType: domaintypes.JobTypePreGate,
 			Status:  domaintypes.JobStatusSuccess,
-			Meta:    []byte(`{"kind":"mig"}`),
+			Meta:    []byte(`{"kind":"gate"}`),
 		},
 	}
 	st.listArtifactBundlesByRunAndJob.val = []store.ArtifactBundle{}
