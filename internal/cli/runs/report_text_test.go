@@ -610,7 +610,14 @@ func TestRenderRunReportTextIOPreviewModes(t *testing.T) {
 				ExpandStdout: false,
 				ExpandStderr: false,
 			},
-			notContain: []string{"STD[O]UT", "STD[E]RR", "s1", "s2", "s3", "e1"},
+				notContain: []string{
+					"STD[O]UT",
+					"STD[E]RR",
+					"__preview_stdout_line_1__",
+					"__preview_stdout_line_2__",
+					"__preview_stdout_line_3__",
+					"__preview_stderr_line_1__",
+				},
 		},
 		{
 			name: "success hides preview even when expand flags are set",
@@ -682,12 +689,16 @@ func TestRenderRunReportTextIOPreviewModes(t *testing.T) {
 					},
 				}
 			case "failed hides preview":
-				opts.JobIOPreviews = map[domaintypes.JobID]RunJobIOPreview{
-					jobID: {
-						Stdout: []string{"s1", "s2", "s3"},
-						Stderr: []string{"e1"},
-					},
-				}
+					opts.JobIOPreviews = map[domaintypes.JobID]RunJobIOPreview{
+						jobID: {
+							Stdout: []string{
+								"__preview_stdout_line_1__",
+								"__preview_stdout_line_2__",
+								"__preview_stdout_line_3__",
+							},
+							Stderr: []string{"__preview_stderr_line_1__"},
+						},
+					}
 			case "success hides preview even when expand flags are set":
 				opts.JobIOPreviews = map[domaintypes.JobID]RunJobIOPreview{
 					jobID: {
