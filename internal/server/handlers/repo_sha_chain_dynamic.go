@@ -23,7 +23,7 @@ func canChangeWorkspace(jobType domaintypes.JobType) bool {
 
 func isNonChangingJob(jobType domaintypes.JobType) bool {
 	switch jobType {
-	case domaintypes.JobTypeSBOM, domaintypes.JobTypePreGate, domaintypes.JobTypePostGate:
+	case domaintypes.JobTypePreGate, domaintypes.JobTypePostGate:
 		return true
 	default:
 		return false

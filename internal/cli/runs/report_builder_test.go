@@ -88,7 +88,7 @@ func TestGetRunReportCommandAssemblesCanonicalReport(t *testing.T) {
 					{
 						"job_id":       jobID1.String(),
 						"name":         "step-1",
-						"job_type":     "sbom",
+						"job_type":     "pre_gate",
 						"job_image":    "ghcr.io/acme/runner:1",
 						"next_id":      jobID2.String(),
 						"node_id":      nil,
@@ -99,7 +99,7 @@ func TestGetRunReportCommandAssemblesCanonicalReport(t *testing.T) {
 					{
 						"job_id":       jobID2.String(),
 						"name":         "step-2",
-						"job_type":     "sbom",
+						"job_type":     "post_gate",
 						"job_image":    "ghcr.io/acme/runner:1",
 						"next_id":      nil,
 						"node_id":      nil,
@@ -204,7 +204,7 @@ func TestGetRunReportCommandAssemblesCanonicalReport(t *testing.T) {
 		t.Fatalf("expected recovery.loop_kind to propagate, got %#v", job1.Recovery)
 	}
 	if job1.SBOMEvidence == nil {
-		t.Fatal("expected sbom evidence for sbom job")
+		t.Fatal("expected sbom evidence for gate job")
 	}
 	if job1.SBOMEvidence.ArtifactPresent == nil || !*job1.SBOMEvidence.ArtifactPresent {
 		t.Fatalf("expected sbom artifact_present=true, got %#v", job1.SBOMEvidence.ArtifactPresent)

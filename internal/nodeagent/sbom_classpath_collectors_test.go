@@ -25,7 +25,7 @@ func TestSBOMClasspathCollectors_IncludeTestDependenciesAndOutputs(t *testing.T)
 	}{
 		{
 			name:      "maven collector includes test scope and test outputs",
-			scriptRel: "images/sbom/shared/collect-java-classpath-maven.sh",
+			scriptRel: "images/gates/shared/collect-java-classpath-maven.sh",
 			setup: func(t *testing.T, workspace, binDir string) setupResult {
 				t.Helper()
 
@@ -89,7 +89,7 @@ exit 0
 		},
 		{
 			name:      "gradle collector includes test classpaths and test outputs",
-			scriptRel: "images/sbom/shared/collect-java-classpath-gradle.sh",
+			scriptRel: "images/gates/shared/collect-java-classpath-gradle.sh",
 			setup: func(t *testing.T, workspace, binDir string) setupResult {
 				t.Helper()
 
@@ -209,7 +209,7 @@ func TestGradleClasspathInitScripts_IncludeTestConfigurations(t *testing.T) {
 	}{
 		{
 			name:    "shared sbom init script includes test configs and test source set",
-			fileRel: "images/sbom/shared/gradle-write-java-classpath.init.gradle",
+			fileRel: "images/gates/shared/gradle-write-java-classpath.init.gradle",
 			snippets: []string{
 				"testCompileClasspath",
 				"testRuntimeClasspath",

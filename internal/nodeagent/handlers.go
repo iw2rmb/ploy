@@ -31,7 +31,7 @@ const maxRequestBodySize = 10 << 20 // 10 MiB
 //   - Steps: multi-step migs array for sequential execution.
 //
 // JobType field:
-//   - Identifies the job type: "pre_gate", "mig", "post_gate", "heal", "re_gate".
+//   - Identifies the job type: "pre_gate", "mig", "post_gate".
 //   - Used by orchestrator to dispatch to appropriate execution handler.
 type StartRunRequest struct {
 	RunID   types.RunID     `json:"run_id,omitempty"`
@@ -48,19 +48,17 @@ type StartRunRequest struct {
 	TargetRef types.GitRef    `json:"target_ref,omitempty"`
 	CommitSHA types.CommitSHA `json:"commit_sha,omitempty"`
 	RepoSHAIn types.CommitSHA `json:"repo_sha_in,omitempty"`
-	JobType   types.JobType   `json:"job_type,omitempty"`  // Job type: pre_gate, mig, post_gate, heal, re_gate
-	JobImage  string          `json:"job_image,omitempty"` // Container image for this job (for heal job dispatch)
+	JobType   types.JobType   `json:"job_type,omitempty"`  // Job type: pre_gate, mig, post_gate
+	JobImage  string          `json:"job_image,omitempty"` // Container image for this job
 	NextID    *types.JobID    `json:"next_id,omitempty"`   // Linked successor in run chain
 	JobName   string          `json:"job_name,omitempty"`  // Deprecated: kept for wire compatibility during context rollout.
-	// SBOMContext carries explicit sbom cycle metadata from jobs.meta.sbom.
-	SBOMContext *contracts.SBOMJobMetadata `json:"sbom_context,omitempty"`
 	// MigContext carries concrete mig step routing.
 	MigContext *contracts.MigClaimContext `json:"mig_context,omitempty"`
 	// GateContext carries concrete gate cycle routing.
 	GateContext *contracts.GateClaimContext `json:"gate_context,omitempty"`
 	// DetectedStack carries the canonical gate-detected stack tuple for this job.
 	DetectedStack *contracts.StackExpectation `json:"detected_stack,omitempty"`
-	// RecoveryContext carries server-resolved recovery inputs for heal/re-gate jobs.
+	// RecoveryContext carries server-resolved recovery inputs.
 	RecoveryContext *contracts.RecoveryClaimContext `json:"recovery_context,omitempty"`
 	// TypedOptions contains strongly-typed run configuration. This is the canonical
 	// source of truth for all option keys understood by the nodeagent. Execution,

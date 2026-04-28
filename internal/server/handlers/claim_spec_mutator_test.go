@@ -49,7 +49,7 @@ func TestMutateClaimSpec_GateProfileResolution(t *testing.T) {
 		checkPAT bool
 	}{
 		{
-			name:    "candidate profile wins over repo profile for re_gate",
+			name:    "post_gate uses repo profile over recovery candidate",
 			spec:    []byte(`{"envs":{"EXISTING":"1"}}`),
 			jobType: domaintypes.JobTypePostGate,
 			recoveryMeta: fmt.Sprintf(
@@ -60,8 +60,8 @@ func TestMutateClaimSpec_GateProfileResolution(t *testing.T) {
 			gitLab:          config.GitLabConfig{Token: "server-token", Domain: "https://gitlab.example.com"},
 			globalEnv:       map[string][]GlobalEnvVar{"GLOBAL": {{Value: "g", Target: domaintypes.GlobalEnvTargetGates}}},
 			phase:           "post",
-			wantGateCmd:     "echo candidate",
-			wantGateEnv:     map[string]string{"SRC": "candidate"},
+			wantGateCmd:     "echo repo",
+			wantGateEnv:     map[string]string{"SRC": "repo"},
 			wantEnvs:        map[string]string{"EXISTING": "1", "GLOBAL": "g"},
 			checkPAT:        true,
 		},

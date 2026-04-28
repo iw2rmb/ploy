@@ -16,6 +16,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"github.com/iw2rmb/ploy/internal/workflow/jobchain"
+	"github.com/iw2rmb/ploy/internal/workflow/lifecycle"
 )
 
 // listRunRepoJobsHandler returns jobs for a specific repo execution within a run.
@@ -139,8 +140,7 @@ func listRunRepoJobsHandler(st store.Store) http.HandlerFunc {
 				}
 			}
 
-			if job.JobType == domaintypes.JobTypeSBOM {
-				jr.Name = "sbom"
+			if lifecycle.IsGateJobType(domaintypes.JobType(job.JobType)) {
 				jr.SBOMEvidence = loadSBOMEvidence(r, st, runID, job.ID)
 			}
 
@@ -209,8 +209,6 @@ func deriveRunRepoJobName(job store.Job, meta *contracts.JobMeta) string {
 			return fmt.Sprintf("mig-%d", *meta.MigStepIndex)
 		}
 		return "mig"
-	case domaintypes.JobTypeSBOM:
-		return "sbom"
 	default:
 		return strings.TrimSpace(job.JobType.String())
 	}

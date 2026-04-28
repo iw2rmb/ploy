@@ -12,14 +12,13 @@ from a single queue with chain progression driven by `next_id`. There is no dedi
 queue or separate worker mode—all nodes pull from the same jobs queue.
 
 **Key characteristics:**
-- **Single queue:** Gate-adjacent jobs (`sbom`, `pre-gate`, `post-gate`,
-  `re-gate`) are stored in the `jobs` table with the same schema as mig jobs.
+- **Single queue:** Gate-adjacent jobs (`pre-gate`, `post-gate`, `post-gate`) are
+  stored in the `jobs` table with the same schema as mig jobs.
 - **Docker-based execution:** Gates execute locally on the claiming node via Docker
   containers. There is no remote HTTP Build Gate mode.
-- **Chain progression:** Jobs advance through `next_id` successor links. For every
-  gate cycle, scheduling is deterministic: `sbom` runs first, then the gate job.
+- **Chain progression:** Jobs advance through `next_id` successor links.
 - **Workspace semantics:** Gate validation runs against the local workspace on the
-  node. For re-gates after healing, the workspace already contains accumulated changes.
+  node. For post-gates after healing, the workspace already contains accumulated changes.
 
 **Removed components (historical):**
 - HTTP Build Gate API (`POST /v1/buildgate/validate`, `/v1/buildgate/jobs/{id}`)
@@ -52,31 +51,29 @@ Gate validation is orchestrated by the node agent as part of the Migs run lifecy
 
 **Flow:**
 1. Control plane creates a unified job chain in `jobs` that includes gate-adjacent
-   phases (`sbom`, `pre-gate`, `post-gate`, `re-gate`) plus `mig` and
+   phases (`pre-gate`, `post-gate`, `post-gate`) plus `mig` and
    optional healing phases.
 2. Node agent claims the next queued job via `/v1/nodes/{id}/claim`.
-3. For `sbom` jobs, the node writes canonical `/out/sbom.spdx.json`,
-   writes `/share/java.classpath` (newline-delimited absolute classpath entries),
-   and persists cycle snapshots.
-4. For gate jobs (`pre-gate`, `post-gate`, `re-gate`), the node executes validation
-   using the Docker gate executor against the cycle snapshot.
-5. Gate results are captured as `BuildGateStageMetadata` (passed/failed, duration, logs).
-6. Node reports completion via `/v1/jobs/{job_id}/complete`.
+3. For Java Maven/Gradle gate jobs, the gate command collects
+   `/share/sbom.dependencies.txt` and `/share/java.classpath`, and the node
+   materializes canonical `/out/sbom.spdx.json`.
+4. Gate results are captured as `BuildGateStageMetadata` (passed/failed, duration, logs).
+5. Node reports completion via `/v1/jobs/{job_id}/complete`.
 
 ## SBOM Evidence in Run Job Status
 
-Repo-scoped job status (`GET /v1/runs/{run_id}/repos/{repo_id}/jobs`) now includes
-optional evidence fields for sbom jobs:
+Repo-scoped job status (`GET /v1/runs/{run_id}/repos/{repo_id}/jobs`) includes
+optional evidence fields for gate jobs:
 
-- `sbom_evidence` — sbom execution evidence:
-  - `artifact_present` (bool): whether sbom artifact bundles exist for the sbom job.
-  - `parsed_package_count` (int): number of normalized sbom package rows persisted.
+- `sbom_evidence` — SBOM execution evidence:
+  - `artifact_present` (bool): whether SBOM artifact bundles exist for the gate job.
+  - `parsed_package_count` (int): number of normalized SBOM package rows persisted.
 
 Example:
 ```json
 {
-  "name": "pre-gate-sbom",
-  "job_type": "sbom",
+  "name": "pre-gate",
+  "job_type": "pre_gate",
   "sbom_evidence": {
     "artifact_present": true,
     "parsed_package_count": 184
@@ -144,20 +141,20 @@ build_gate:
 - `build_gate.pre.stack` applies to the `pre_gate` job.
 - `build_gate.post.stack` applies to the `post_gate` job.
 - `build_gate.pre.gate_profile` applies to the `pre_gate` command/env override.
-- `build_gate.post.gate_profile` applies to `post_gate` and `re_gate` command/env overrides.
+- `build_gate.post.gate_profile` applies to `post_gate` and `post_gate` command/env overrides.
 - `build_gate.pre.target` / `build_gate.post.target` pin gate execution target (`build|unit|all_tests`).
 - When `stack.enabled: true`, Build Gate rejects a detected stack mismatch (e.g. configured `release: "11"` but detected `"17"`).
 - When `default: true`, if stack detection cannot determine tool or release, Build Gate falls back to the configured stack. If `tool` is omitted, a detected tool is used when available.
 - When `default: false`, stack detection failures cancel execution for the repo (job status `Cancelled`), and remaining jobs are cancelled.
 - For Gradle, Java `release` detection reads `sourceCompatibility` / `targetCompatibility` (and falls back to Kotlin `kotlinOptions.jvmTarget`); unrelated build logic (tasks, repositories, `ext[...]`, etc.) does not block detection.
 
-`re_gate` always re-runs Build Gate using the stack detected from the workspace (via `stackdetect`) to select the gate runtime image/tool.
+`post_gate` always re-runs Build Gate using the stack detected from the workspace (via `stackdetect`) to select the gate runtime image/tool.
 
 ### Prep Override Precedence
 
 Gate command resolution uses the following precedence (highest wins):
 1. Explicit run spec override: `build_gate.<phase>.gate_profile`
-2. For `re_gate`: validated infra recovery candidate override
+2. For `post_gate`: validated infra recovery candidate override
 3. Claim-time resolved gate profile from `gate_profiles` (exact `(repo_id, repo_sha_in, stack_id)` row)
 4. Detected-tool fallback command (`buildCommandForTool`)
 
@@ -168,7 +165,7 @@ Claim-time gate profile lookup honors strict phase stack requirements:
 - If no stack row matches those required parameters, no gate profile is resolved for that gate claim.
 
 Successful gate profile persistence:
-- On successful `pre_gate`, `post_gate`, or `re_gate`, the server persists an exact
+- On successful `pre_gate`, `post_gate`, or `post_gate`, the server persists an exact
   profile row keyed by `(repo_id, repo_sha_out, stack_id)` (falling back to
   `repo_sha_in` when `repo_sha_out` is unavailable).
 - The persisted payload marks the active gate target as `passed` and updates
@@ -179,13 +176,13 @@ Target pin behavior:
 - Prep stack validation (`prep stack mismatch`) is evaluated only when the prep override is actually selected for execution.
 
 Default gate profiles are seeded from `gates/stacks.yaml` + `gates/profiles/*.yaml`
-at server startup. Pre-gate runtime auto-bootstrap is removed.
+at server startup. Ppost-gate runtime auto-bootstrap is removed.
 Seeded Gradle profiles are wrapper-aware for runnable targets (`build`, `unit`,
 `all_tests`): they use `./gradlew` when `/workspace/gradlew` is executable and
 `/workspace/gradle/wrapper/gradle-wrapper.properties` exists; otherwise they use `gradle`.
 
 Gate profile mapping for simple mode:
-- Gate phase still selects destination override slot (`build_gate.pre.gate_profile` for `pre_gate`; `build_gate.post.gate_profile` for `post_gate` and `re_gate`).
+- Gate phase still selects destination override slot (`build_gate.pre.gate_profile` for `pre_gate`; `build_gate.post.gate_profile` for `post_gate`).
 - Runtime command/env source is always `gate_profile.targets.<targets.active>`.
 - Runtime mapping is status-agnostic: `status`/`failure_code` do not control command/env selection.
 - Runtime does not auto-fallback across targets; only `targets.active` decides command/env source.
@@ -266,7 +263,7 @@ The gate does not modify the repository; it validates the current working tree.
 - **Summary:** Pass/fail flag, duration, optional resource usage.
 - **Detected stack identity:** `BuildGateStageMetadata.detected_stack` captures
   normalized detected stack (`language`, `tool`, optional `release`) for gate and
-  healing/re-gate stack-aware decisions.
+  healing/post-gate stack-aware decisions.
 - **Gradle test reports:** Gate Gradle images force test reports into `/out/gradle-test-results` (JUnit XML)
   and `/out/gradle-test-report` (HTML) via image init script. Node uploads these bundles to object storage
   and records artifact links in `BuildGateStageMetadata.report_links`.
@@ -278,10 +275,10 @@ The gate does not modify the repository; it validates the current working tree.
 
 - Gate-generated files must be written under `/out/*` (no repository writes required for artifacts).
 - Node artifact upload treats gate `/out/*` as first-class output and preserves deterministic `out/` archive-relative paths.
-- SBOM rows are persisted from successful `sbom` jobs for successful repo attempts.
+- SBOM rows are persisted from successful gate jobs for successful repo attempts.
 - Compatibility lookup contract for `deps` healing:
   - `GET /v1/sboms/compat?lang=<lang>&release=<release>&tool=<tool>&libs=<name>:<ver>,<name>`
-  - Returns per-lib minimum successful version evidence from the latest successful sbom snapshot of each successful repo run.
+  - Returns per-lib minimum successful version evidence from the latest successful gate SBOM snapshot of each successful repo run.
   - Returns `null` when no successful SBOM evidence exists for the requested stack.
 
 ## Notes
@@ -314,12 +311,12 @@ provide repository metadata for healing migs that need Git baseline information.
 - `/in/deps-bumps.json` — Prior cumulative dependency bump state (provided for `deps` healing).
 
 Primary source for these inputs is the typed `recovery_context` returned by
-`POST /v1/nodes/{id}/claim` for `heal`/`re_gate` jobs. Node-local run cache files
+`POST /v1/nodes/{id}/claim` for `heal`/`post_gate` jobs. Node-local run cache files
 remain an optional fallback optimization when claim context fields are absent.
 - For deps-oriented healing runs, claim `recovery_context` may carry:
   - `deps_compat_endpoint`
   - `deps_bumps`
-- `/in/amata.yaml` — Workflow spec materialized from `build_gate.heal.amata.spec`.
+- `/in/amata.yaml` — Workflow spec materialized from `build_gate.post.amata.spec`.
 
 **Healing workspace policy:**
 - Infra-style healing: output-only and must not modify `/workspace`; any workspace diff fails the heal job with `healing_warning=unexpected_workspace_changes`.

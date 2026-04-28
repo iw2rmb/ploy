@@ -11,7 +11,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-func TestOnSuccess_SBOMPersistenceFailureStopsChainAdvancement(t *testing.T) {
+func TestOnSuccess_GateSBOMPersistenceFailureStopsChainAdvancement(t *testing.T) {
 	t.Parallel()
 
 	nextID := domaintypes.NewJobID()
@@ -33,22 +33,22 @@ func TestOnSuccess_SBOMPersistenceFailureStopsChainAdvancement(t *testing.T) {
 			RepoSHAOut: "0123456789abcdef0123456789abcdef01234567",
 		},
 		job:           job,
-		jobType:       domaintypes.JobTypeSBOM,
-		serviceType:   completeJobServiceTypeSBOM,
+		jobType:       domaintypes.JobTypePreGate,
+		serviceType:   completeJobServiceTypeGate,
 		serviceTypeOK: true,
 	}
 
 	svc.onSuccess(context.Background(), state)
 
 	if st.promoteJobByIDIfUnblocked.called {
-		t.Fatal("did not expect PromoteJobByIDIfUnblocked when sbom persistence fails")
+		t.Fatal("did not expect PromoteJobByIDIfUnblocked when gate sbom persistence fails")
 	}
 	if st.createJob.called {
-		t.Fatal("did not expect job creation during sbom completion")
+		t.Fatal("did not expect job creation during gate completion")
 	}
 }
 
-func TestOnSuccess_SBOMSuccessPromotesLinkedNext(t *testing.T) {
+func TestOnSuccess_GateSuccessPromotesLinkedNext(t *testing.T) {
 	t.Parallel()
 
 	nextID := domaintypes.NewJobID()
@@ -77,17 +77,17 @@ func TestOnSuccess_SBOMSuccessPromotesLinkedNext(t *testing.T) {
 			RepoSHAOut: "0123456789abcdef0123456789abcdef01234567",
 		},
 		job:           job,
-		jobType:       domaintypes.JobTypeSBOM,
-		serviceType:   completeJobServiceTypeSBOM,
+		jobType:       domaintypes.JobTypePostGate,
+		serviceType:   completeJobServiceTypeGate,
 		serviceTypeOK: true,
 	}
 
 	svc.onSuccess(context.Background(), state)
 
 	if st.createJob.called {
-		t.Fatal("did not expect sbom completion to create additional jobs")
+		t.Fatal("did not expect gate completion to create additional jobs")
 	}
 	if !st.promoteJobByIDIfUnblocked.called {
-		t.Fatal("expected successor promotion for sbom success")
+		t.Fatal("expected successor promotion for gate success")
 	}
 }

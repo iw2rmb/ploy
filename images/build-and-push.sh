@@ -8,7 +8,6 @@ set -Eeuo pipefail
 # - node    -> node
 # - java-bases -> java-base-maven:jdk11,jdk17; java-base-gradle:jdk11,jdk17; java-base-temurin:jdk17
 # - amata group -> java-17-codex-amata-maven, java-17-codex-amata-gradle
-# - sbom runners -> sbom-gradle:jdk11,jdk17 and sbom-maven:jdk11,jdk17
 # - gate-gradle -> gate-gradle:jdk11, gate-gradle:jdk17
 # - gate-maven  -> maven:3-eclipse-temurin-11, maven:3-eclipse-temurin-17
 # - orw/*   -> <dir name> (for example: orw-cli-maven, orw-cli-gradle)
@@ -26,7 +25,7 @@ set -Eeuo pipefail
 #   PLOY_CA_CERTS - Optional PEM bundle (path or inline content), passed as BuildKit secret id=ploy_ca_certs
 #
 # CLI options:
-#   --build <groups> - Optional comma list from: orw,ploy,java-bases,amata,sbom,gates (default: all)
+#   --build <groups> - Optional comma list from: orw,ploy,java-bases,amata,gates (default: all)
 #   --help           - Show usage
 #
 # Examples:
@@ -50,7 +49,7 @@ PLOY_CA_CERTS_TMP=""
 declare -a BUILD_OUTPUT_ARGS=(--push)
 declare -a BUILD_PULL_ARGS=()
 declare -a JAVA_BASE_BUILD_ARGS=()
-declare -a GROUP_ORDER=("ploy" "java-bases" "amata" "sbom" "gates" "orw")
+declare -a GROUP_ORDER=("ploy" "java-bases" "amata" "gates" "orw")
 BUILD_GROUPS_RAW=""
 declare -a SELECTED_GROUPS=()
 
@@ -59,7 +58,7 @@ usage() {
 Usage: images/build-and-push.sh [--build <groups>]
 
 Options:
-  --build <groups>  Comma-separated groups from: orw,ploy,java-bases,amata,sbom,gates
+  --build <groups>  Comma-separated groups from: orw,ploy,java-bases,amata,gates
                     Default: all groups
   -h, --help        Show this help
 USAGE
@@ -128,7 +127,7 @@ normalize_selected_groups() {
       exit 2
     fi
     if ! contains_value "$normalized" "${GROUP_ORDER[@]}"; then
-      echo "error: unknown build group '$normalized' (allowed: orw,ploy,java-bases,amata,sbom,gates)" >&2
+      echo "error: unknown build group '$normalized' (allowed: orw,ploy,java-bases,amata,gates)" >&2
       exit 2
     fi
     if ! contains_value "$normalized" "${uniq_requested[@]-}"; then
@@ -337,7 +336,7 @@ if group_selected "ploy"; then
 fi
 
 need_java_bases=0
-if group_selected "java-bases" || group_selected "amata" || group_selected "sbom" || group_selected "gates" || group_selected "orw"; then
+if group_selected "java-bases" || group_selected "amata" || group_selected "gates" || group_selected "orw"; then
   need_java_bases=1
 fi
 
@@ -354,14 +353,6 @@ if group_selected "amata"; then
   PLATFORM="${PLATFORM}" bash images/amata/build-amata.sh
   build_push java-17-codex-amata-maven images/amata/java-17-codex-amata-maven/Dockerfile .
   build_push java-17-codex-amata-gradle images/amata/java-17-codex-amata-gradle/Dockerfile .
-fi
-
-if group_selected "sbom"; then
-  # sbom runners
-  build_push_fixed_tag sbom-gradle images/sbom/gradle/Dockerfile.jdk11 . jdk11
-  build_push_fixed_tag sbom-gradle images/sbom/gradle/Dockerfile.jdk17 . jdk17
-  build_push_fixed_tag sbom-maven images/sbom/maven/Dockerfile.jdk11 . jdk11
-  build_push_fixed_tag sbom-maven images/sbom/maven/Dockerfile.jdk17 . jdk17
 fi
 
 if group_selected "gates"; then

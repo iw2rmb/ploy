@@ -241,7 +241,6 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 		JobImage:               claim.JobImage,
 		NextID:                 claim.NextID,
 		JobName:                claim.JobName, // Job name for branch identification
-		SBOMContext:            claim.SBOMContext,
 		MigContext:             claim.MigContext,
 		GateContext:            claim.GateContext,
 		DetectedStack:          claim.DetectedStack,

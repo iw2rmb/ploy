@@ -13,9 +13,9 @@ func TestParseInFromURI(t *testing.T) {
 	}{
 		{
 			name:           "type selector",
-			raw:            "sbom://out/sbom.dependencies.txt",
+			raw:            "pre_gate://out/sbom.dependencies.txt",
 			wantSourceName: "",
-			wantSourceType: "sbom",
+			wantSourceType: "pre_gate",
 			wantOutPath:    "/out/sbom.dependencies.txt",
 		},
 		{
@@ -88,7 +88,7 @@ func TestParseMigSpecJSON_InFromValidation(t *testing.T) {
 			"steps": [
 				{"name": "extract-usage", "image": "img1"},
 				{"image": "img2", "in_from": [
-					{"from": "sbom://out/sbom.dependencies.txt"}
+					{"from": "pre_gate://out/sbom.dependencies.txt"}
 				]}
 			]
 		}`
@@ -121,7 +121,7 @@ func TestParseMigSpecJSON_InFromValidation(t *testing.T) {
 			"steps": [
 				{"name": "extract-usage", "image": "img1"},
 				{"image": "img2", "in_from": [
-					{"from": "pre@sbom://out/sbom.dependencies.txt"}
+					{"from": "pre@pre_gate://out/sbom.dependencies.txt"}
 				]}
 			]
 		}`
@@ -151,7 +151,7 @@ func TestParseMigSpecJSON_InFromValidation(t *testing.T) {
 			"steps": [
 				{"name": "dup", "image": "img1"},
 				{"name": "dup", "image": "img2", "in_from": [
-					{"from": "sbom://out/sbom.dependencies.txt"}
+					{"from": "pre_gate://out/sbom.dependencies.txt"}
 				]}
 			]
 		}`

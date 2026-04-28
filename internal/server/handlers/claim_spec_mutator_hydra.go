@@ -67,6 +67,7 @@ func applyCanonicalHydraOverlay(spec map[string]any, jobType domaintypes.JobType
 	if spec == nil || overlay == nil {
 		return
 	}
+	_ = job
 	switch jobType {
 	case domaintypes.JobTypeMig:
 		applyOverlayToSteps(spec, overlay)
@@ -74,27 +75,7 @@ func applyCanonicalHydraOverlay(spec map[string]any, jobType domaintypes.JobType
 		mergeCABlock(ensureBuildGatePhase(spec, "pre"), overlay.CA)
 	case domaintypes.JobTypePostGate:
 		mergeCABlock(ensureBuildGatePhase(spec, "post"), overlay.CA)
-	case domaintypes.JobTypeSBOM:
-		switch hydraPhaseForAuxBuildGateJob(jobType, job) {
-		case "pre":
-			mergeCABlock(ensureBuildGatePhase(spec, "pre"), overlay.CA)
-		case "post":
-			mergeCABlock(ensureBuildGatePhase(spec, "post"), overlay.CA)
-		}
 	}
-}
-
-func hydraPhaseForAuxBuildGateJob(jobType domaintypes.JobType, job store.Job) string {
-	if jobType == domaintypes.JobTypeSBOM {
-		sbomCtx, _ := sbomCycleContextFromJob(job)
-		if sbomCtx.Phase == contracts.SBOMPhasePre {
-			return "pre"
-		}
-		if sbomCtx.Phase == contracts.SBOMPhasePost {
-			return "post"
-		}
-	}
-	return ""
 }
 
 func applyOverlayToSteps(spec map[string]any, overlay *HydraJobConfig) {

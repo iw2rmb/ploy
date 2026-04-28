@@ -75,12 +75,12 @@ func TestListJobsForTUI(t *testing.T) {
 	})
 
 	jobA1 := createJob(fxA, "job-a1", idA1, types.JobTypeMig)
-	jobA2 := createJob(fxA, "job-a2", idA2, types.JobTypeSBOM)
-	jobB1 := createJob(fxB, "job-b1", idB1, types.JobTypeSBOM)
+	jobA2 := createJob(fxA, "job-a2", idA2, types.JobTypePreGate)
+	jobB1 := createJob(fxB, "job-b1", idB1, types.JobTypePostGate)
 	expectedTypeByJobID := map[types.JobID]types.JobType{
 		jobA1: types.JobTypeMig,
-		jobA2: types.JobTypeSBOM,
-		jobB1: types.JobTypeSBOM,
+		jobA2: types.JobTypePreGate,
+		jobB1: types.JobTypePostGate,
 	}
 
 	t.Run("NewestToOldestOrdering", func(t *testing.T) {

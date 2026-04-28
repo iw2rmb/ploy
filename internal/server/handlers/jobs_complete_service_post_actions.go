@@ -111,7 +111,7 @@ func (s *CompleteJobService) onSuccess(ctx context.Context, state *completeJobSt
 	if state.input.Status != domaintypes.JobStatusSuccess {
 		return
 	}
-	if state.serviceType == completeJobServiceTypeSBOM {
+	if lifecycle.IsGateJobType(state.jobType) {
 		sbomRowsPersisted, sbomErr := maybePersistSBOMRowsForJob(
 			ctx,
 			s.store,
@@ -121,7 +121,7 @@ func (s *CompleteJobService) onSuccess(ctx context.Context, state *completeJobSt
 			state.job.ID,
 		)
 		if sbomErr != nil {
-			slog.Error("complete job: persist sbom rows for completed sbom job failed",
+			slog.Error("complete job: persist sbom rows for completed gate job failed",
 				"job_id", state.job.ID,
 				"repo_id", state.job.RepoID,
 				"attempt", state.job.Attempt,
@@ -129,7 +129,7 @@ func (s *CompleteJobService) onSuccess(ctx context.Context, state *completeJobSt
 			)
 			return
 		} else if sbomRowsPersisted > 0 {
-			slog.Info("complete job: persisted sbom rows for completed sbom job",
+			slog.Info("complete job: persisted sbom rows for completed gate job",
 				"job_id", state.job.ID,
 				"repo_id", state.job.RepoID,
 				"attempt", state.job.Attempt,

@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -159,7 +160,7 @@ func TestHandleConfigCAUnset_Validation(t *testing.T) {
 	}
 }
 
-func TestConfigCAUsage_ListsAuxSections(t *testing.T) {
+func TestConfigCAUsage_ListsCurrentSectionsOnly(t *testing.T) {
 	t.Parallel()
 
 	buf := &bytes.Buffer{}
@@ -167,9 +168,19 @@ func TestConfigCAUsage_ListsAuxSections(t *testing.T) {
 	printConfigCASetUsage(buf)
 	printConfigCAUnsetUsage(buf)
 	out := buf.String()
-	for _, token := range []string{"sbom", "hook"} {
+	for _, token := range []string{"pre_gate", "post_gate", "mig"} {
 		if !strings.Contains(out, token) {
 			t.Fatalf("usage output missing %q: %s", token, out)
+		}
+	}
+	for _, token := range []string{`\\bre_gate\\b`, `\\bheal\\b`} {
+		if regexp.MustCompile(token).FindStringIndex(out) != nil {
+			t.Fatalf("usage output unexpectedly contains %q: %s", token, out)
+		}
+	}
+	for _, token := range []string{"sbom", "hook"} {
+		if strings.Contains(out, token) {
+			t.Fatalf("usage output unexpectedly contains %q: %s", token, out)
 		}
 	}
 }

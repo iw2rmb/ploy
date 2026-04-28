@@ -67,7 +67,7 @@ get:
     |--------------|--------|------------------------------------------------------------------|
     | `node_id`    | string | Node ID (NanoID 6-character string) that produced this log line  |
     | `job_id`     | string | Job ID (KSUID string) that produced this log line                |
-    | `job_type`   | string | Job phase: `pre_gate`, `sbom`, `mig`, `post_gate`, `heal`, `re_gate`, `mr` |
+    | `job_type`   | string | Job phase: `pre_gate`, `mig`, `post_gate`, `heal`, `mr` |
     | `next_id`    | number | Optional step metadata used for log enrichment                   |
 
     **Example:**

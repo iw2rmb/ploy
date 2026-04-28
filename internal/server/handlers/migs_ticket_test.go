@@ -89,10 +89,8 @@ func TestCreateJobsFromSpec(t *testing.T) {
 			spec:        []byte(`{"steps":[{"image":"mig1:v1"}]}`),
 			expected: []expectedJob{
 				{"pre-gate", domaintypes.JobTypePreGate, domaintypes.JobStatusQueued, "", testRepoSHA0},
-				{"pre-gate-sbom", domaintypes.JobTypeSBOM, domaintypes.JobStatusCreated, "", ""},
-				{"mig-0", domaintypes.JobTypeMig, domaintypes.JobStatusCreated, "", ""},
+				{"mig-0", domaintypes.JobTypeMig, domaintypes.JobStatusCreated, "mig1:v1", ""},
 				{"post-gate", domaintypes.JobTypePostGate, domaintypes.JobStatusCreated, "", ""},
-				{"post-gate-sbom", domaintypes.JobTypeSBOM, domaintypes.JobStatusCreated, "", ""},
 			},
 		},
 		{
@@ -105,12 +103,10 @@ func TestCreateJobsFromSpec(t *testing.T) {
 			spec:        []byte(`{"steps":[{"image":"mig1:v1"},{"image":"mig2:v2"},{"image":"mig3:v3"}]}`),
 			expected: []expectedJob{
 				{"pre-gate", domaintypes.JobTypePreGate, domaintypes.JobStatusQueued, "", testRepoSHA0},
-				{"pre-gate-sbom", domaintypes.JobTypeSBOM, domaintypes.JobStatusCreated, "", ""},
 				{"mig-0", domaintypes.JobTypeMig, domaintypes.JobStatusCreated, "mig1:v1", ""},
 				{"mig-1", domaintypes.JobTypeMig, domaintypes.JobStatusCreated, "mig2:v2", ""},
 				{"mig-2", domaintypes.JobTypeMig, domaintypes.JobStatusCreated, "mig3:v3", ""},
 				{"post-gate", domaintypes.JobTypePostGate, domaintypes.JobStatusCreated, "", ""},
-				{"post-gate-sbom", domaintypes.JobTypeSBOM, domaintypes.JobStatusCreated, "", ""},
 			},
 		},
 		{
@@ -123,10 +119,8 @@ func TestCreateJobsFromSpec(t *testing.T) {
 			spec:        []byte(`{"steps":[{"image":"a"}]}`),
 			expected: []expectedJob{
 				{"pre-gate", domaintypes.JobTypePreGate, domaintypes.JobStatusQueued, "", testRepoSHA0},
-				{"pre-gate-sbom", domaintypes.JobTypeSBOM, domaintypes.JobStatusCreated, "", ""},
-				{"mig-0", domaintypes.JobTypeMig, domaintypes.JobStatusCreated, "", ""},
+				{"mig-0", domaintypes.JobTypeMig, domaintypes.JobStatusCreated, "a", ""},
 				{"post-gate", domaintypes.JobTypePostGate, domaintypes.JobStatusCreated, "", ""},
-				{"post-gate-sbom", domaintypes.JobTypeSBOM, domaintypes.JobStatusCreated, "", ""},
 			},
 		},
 		{
@@ -139,10 +133,8 @@ func TestCreateJobsFromSpec(t *testing.T) {
 			spec:        []byte(`{"hooks":["` + hookHashA + `","` + hookHashB + `"],"bundle_map":{"` + hookHashA + `":"bundle_hooks","` + hookHashB + `":"bundle_hooks"},"steps":[{"image":"mig1:v1"}]}`),
 			expected: []expectedJob{
 				{"pre-gate", domaintypes.JobTypePreGate, domaintypes.JobStatusQueued, "", testRepoSHA0},
-				{"pre-gate-sbom", domaintypes.JobTypeSBOM, domaintypes.JobStatusCreated, "", ""},
-				{"mig-0", domaintypes.JobTypeMig, domaintypes.JobStatusCreated, "", ""},
+				{"mig-0", domaintypes.JobTypeMig, domaintypes.JobStatusCreated, "mig1:v1", ""},
 				{"post-gate", domaintypes.JobTypePostGate, domaintypes.JobStatusCreated, "", ""},
-				{"post-gate-sbom", domaintypes.JobTypeSBOM, domaintypes.JobStatusCreated, "", ""},
 			},
 			useHashHook: true,
 		},
@@ -200,9 +192,9 @@ func TestJobQueueingRules_FirstJobQueued(t *testing.T) {
 		spec         []byte
 		expectedJobs int
 	}{
-		{"single_mod", []byte(`{"steps":[{"image":"a"}]}`), 5},
-		{"two_migs", []byte(`{"steps":[{"image":"a"},{"image":"b"}]}`), 6},
-		{"five_migs", []byte(`{"steps":[{"image":"a"},{"image":"b"},{"image":"c"},{"image":"d"},{"image":"e"}]}`), 9},
+		{"single_mod", []byte(`{"steps":[{"image":"a"}]}`), 3},
+		{"two_migs", []byte(`{"steps":[{"image":"a"},{"image":"b"}]}`), 4},
+		{"five_migs", []byte(`{"steps":[{"image":"a"},{"image":"b"},{"image":"c"},{"image":"d"},{"image":"e"}]}`), 7},
 	}
 
 	for _, tc := range testCases {
@@ -245,18 +237,13 @@ func TestCreateJobsFromSpec_ChainIntegrity(t *testing.T) {
 
 	// Verify next_id chain ordering.
 	byName := createJobsByName(st.createJob.calls)
-	preGateSBOM := byName["pre-gate-sbom"]
 	preGate := byName["pre-gate"]
 	mig0 := byName["mig-0"]
 	mig1 := byName["mig-1"]
 	postGate := byName["post-gate"]
-	postGateSBOM := byName["post-gate-sbom"]
 
-	if preGate.NextID == nil || *preGate.NextID != preGateSBOM.ID {
-		t.Fatalf("pre-gate next_id = %v, want %s", preGate.NextID, preGateSBOM.ID)
-	}
-	if preGateSBOM.NextID == nil || *preGateSBOM.NextID != mig0.ID {
-		t.Fatalf("pre-gate-sbom next_id = %v, want %s", preGateSBOM.NextID, mig0.ID)
+	if preGate.NextID == nil || *preGate.NextID != mig0.ID {
+		t.Fatalf("pre-gate next_id = %v, want %s", preGate.NextID, mig0.ID)
 	}
 	if mig0.NextID == nil || *mig0.NextID != mig1.ID {
 		t.Fatalf("mig-0 next_id = %v, want %s", mig0.NextID, mig1.ID)
@@ -264,11 +251,8 @@ func TestCreateJobsFromSpec_ChainIntegrity(t *testing.T) {
 	if mig1.NextID == nil || *mig1.NextID != postGate.ID {
 		t.Fatalf("mig-1 next_id = %v, want %s", mig1.NextID, postGate.ID)
 	}
-	if postGate.NextID == nil || *postGate.NextID != postGateSBOM.ID {
-		t.Fatalf("post-gate next_id = %v, want %s", postGate.NextID, postGateSBOM.ID)
-	}
-	if postGateSBOM.NextID != nil {
-		t.Fatalf("post-gate-sbom next_id = %s, want nil", *postGateSBOM.NextID)
+	if postGate.NextID != nil {
+		t.Fatalf("post-gate next_id = %s, want nil", *postGate.NextID)
 	}
 
 	// Verify insert order satisfies immediate next_id FK constraint.
@@ -306,23 +290,18 @@ steps:
 	}
 
 	byName := createJobsByName(st.createJob.calls)
-	preSBOM := byName["pre-gate-sbom"]
 	preGate := byName["pre-gate"]
 	mig1 := byName["mig-1"]
 	postGate := byName["post-gate"]
-	postSBOM := byName["post-gate-sbom"]
 
-	if preGate.NextID == nil || *preGate.NextID != preSBOM.ID {
-		t.Fatalf("pre-gate next_id = %v, want %s", preGate.NextID, preSBOM.ID)
+	if preGate.NextID == nil || *preGate.NextID != byName["mig-0"].ID {
+		t.Fatalf("pre-gate next_id = %v, want %s", preGate.NextID, byName["mig-0"].ID)
 	}
 	if mig1.NextID == nil || *mig1.NextID != postGate.ID {
 		t.Fatalf("mig-1 next_id = %v, want %s", mig1.NextID, postGate.ID)
 	}
-	if postGate.NextID == nil || *postGate.NextID != postSBOM.ID {
-		t.Fatalf("post-gate next_id = %v, want %s", postGate.NextID, postSBOM.ID)
-	}
-	if postSBOM.NextID != nil {
-		t.Fatalf("post-gate-sbom next_id = %v, want nil", *postSBOM.NextID)
+	if postGate.NextID != nil {
+		t.Fatalf("post-gate next_id = %v, want nil", *postGate.NextID)
 	}
 }
 
@@ -354,26 +333,24 @@ steps:
 
 	byName := createJobsByName(st.createJob.calls)
 	if _, exists := byName["pre-gate-hook-000"]; exists {
-		t.Fatal("did not expect pre-gate hooks to be planned before pre-gate sbom completion")
+		t.Fatal("did not expect pre-gate hooks to be planned")
 	}
 	if _, exists := byName["post-gate-hook-000"]; exists {
-		t.Fatal("did not expect post-gate hooks to be planned before post-gate sbom completion")
+		t.Fatal("did not expect post-gate hooks to be planned")
 	}
 
-	preSBOM := byName["pre-gate-sbom"]
 	preGate := byName["pre-gate"]
 	mig0 := byName["mig-0"]
-	postSBOM := byName["post-gate-sbom"]
 	postGate := byName["post-gate"]
 
-	if preGate.NextID == nil || *preGate.NextID != preSBOM.ID {
-		t.Fatalf("pre-gate next_id = %v, want %s", preGate.NextID, preSBOM.ID)
+	if preGate.NextID == nil || *preGate.NextID != mig0.ID {
+		t.Fatalf("pre-gate next_id = %v, want %s", preGate.NextID, mig0.ID)
 	}
 	if mig0.NextID == nil || *mig0.NextID != postGate.ID {
 		t.Fatalf("mig-0 next_id = %v, want %s", mig0.NextID, postGate.ID)
 	}
-	if postGate.NextID == nil || *postGate.NextID != postSBOM.ID {
-		t.Fatalf("post-gate next_id = %v, want %s", postGate.NextID, postSBOM.ID)
+	if postGate.NextID != nil {
+		t.Fatalf("post-gate next_id = %v, want nil", *postGate.NextID)
 	}
 
 }
@@ -404,8 +381,8 @@ steps:
 		t.Fatalf("createJobsFromSpec failed: %v", err)
 	}
 
-	if len(st.createJob.calls) != 5 {
-		t.Fatalf("expected 5 jobs (no hooks), got %d", len(st.createJob.calls))
+	if len(st.createJob.calls) != 3 {
+		t.Fatalf("expected 3 jobs (no hooks), got %d", len(st.createJob.calls))
 	}
 	for _, created := range st.createJob.calls {
 		if strings.Contains(created.Name, "-hook-") {
@@ -434,8 +411,8 @@ steps:
 		t.Fatalf("createJobsFromSpec failed: %v", err)
 	}
 
-	if len(st.createJob.calls) != 5 {
-		t.Fatalf("expected 5 jobs (no hooks), got %d", len(st.createJob.calls))
+	if len(st.createJob.calls) != 3 {
+		t.Fatalf("expected 3 jobs (no hooks), got %d", len(st.createJob.calls))
 	}
 	for _, created := range st.createJob.calls {
 		if strings.Contains(created.Name, "-hook-") {
@@ -475,8 +452,8 @@ func TestCreateJobsFromSpec_IgnoresMissingHookBundleBlob(t *testing.T) {
 	if err != nil {
 		t.Fatalf("createJobsFromSpec failed: %v", err)
 	}
-	if len(st.createJob.calls) != 5 {
-		t.Fatalf("expected canonical 5-job chain, got %d", len(st.createJob.calls))
+	if len(st.createJob.calls) != 3 {
+		t.Fatalf("expected canonical 3-job chain, got %d", len(st.createJob.calls))
 	}
 	for _, created := range st.createJob.calls {
 		if strings.Contains(created.Name, "-hook-") {

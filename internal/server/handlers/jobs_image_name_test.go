@@ -189,7 +189,7 @@ func TestSaveJobImageName_SuccessGateJob(t *testing.T) {
 	}
 }
 
-func TestSaveJobImageName_SuccessSBOMJob(t *testing.T) {
+func TestSaveJobImageName_ConflictSBOMJob(t *testing.T) {
 	t.Parallel()
 
 	nodeIDStr := domaintypes.NewNodeKey()
@@ -217,13 +217,13 @@ func TestSaveJobImageName_SuccessSBOMJob(t *testing.T) {
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
 
-	assertStatus(t, rr, http.StatusNoContent)
-	if !st.updateJobImageName.called {
-		t.Fatalf("expected UpdateJobImageName to be called")
+	assertStatus(t, rr, http.StatusConflict)
+	if st.updateJobImageName.called {
+		t.Fatalf("did not expect UpdateJobImageName to be called")
 	}
 }
 
-func TestSaveJobImageName_SuccessHealJob(t *testing.T) {
+func TestSaveJobImageName_SuccessPostGateJob(t *testing.T) {
 	t.Parallel()
 
 	nodeIDStr := domaintypes.NewNodeKey()
@@ -236,13 +236,13 @@ func TestSaveJobImageName_SuccessHealJob(t *testing.T) {
 		RunID:   runID,
 		NodeID:  &nodeID,
 		Status:  domaintypes.JobStatusRunning,
-		JobType: "heal",
+		JobType: domaintypes.JobTypePostGate,
 	}
 
 	st := &jobStore{getJobResult: job}
 	handler := saveJobImageNameHandler(st)
 
-	body, _ := json.Marshal(map[string]any{"image": "docker.io/example/heal:latest"})
+	body, _ := json.Marshal(map[string]any{"image": "docker.io/example/gate:latest"})
 	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/image", bytes.NewReader(body))
 	req.SetPathValue("job_id", jobID.String())
 	req.Header.Set(nodeUUIDHeader, nodeIDStr)

@@ -78,56 +78,6 @@ func preGateSBOMOutPath(runID types.RunID) string {
 	return gateCycleSBOMOutPath(runID, preGateCycleName)
 }
 
-// executeSBOMJob runs SBOM collection in a container and materializes a
-// validated canonical SPDX snapshot for the current gate cycle.
-func (r *runController) executeSBOMJob(ctx context.Context, req StartRunRequest) {
-	startTime := time.Now()
-
-	cycleName, err := gateCycleNameFromSBOMContext(req.SBOMContext)
-	if err != nil {
-		slog.Error("failed to derive sbom cycle", "run_id", req.RunID, "job_id", req.JobID, "job_name", req.JobName, "error", err)
-		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
-		return
-	}
-
-	initialStack := resolveSBOMStackForCycle(
-		cycleName,
-		resolveManifestStack(req, r.loadPersistedStack(req.RunID)),
-		req.TypedOptions,
-	)
-	manifest, err := buildSBOMManifest(req, cycleName, initialStack)
-	if err != nil {
-		slog.Error("failed to build sbom manifest", "run_id", req.RunID, "job_id", req.JobID, "cycle_name", cycleName, "error", err)
-		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
-		return
-	}
-
-	stackForManifest := initialStack
-	sbomSnapshotPath := gateCycleSBOMOutPath(req.RunID, cycleName)
-	cfg := standardJobConfig{
-		Manifest:      manifest,
-		DiffType:      types.DiffJobTypeMig,
-		OutDirPattern: "ploy-sbom-out-*",
-		PrepareManifest: func(m *contracts.StepManifest, workspace string) error {
-			detectedStack, detectErr := detectSBOMStackFromWorkspace(workspace)
-			if detectErr != nil {
-				return fmt.Errorf("resolve sbom stack from workspace: %w", detectErr)
-			}
-			if detectedStack == stackForManifest {
-				return nil
-			}
-			stackForManifest = detectedStack
-			return applySBOMRuntimeForStack(m, stackForManifest, sbomRuntimeReleaseForRequest(req, stackForManifest))
-		},
-		ValidateOutputs: func(outDir, _ string) error {
-			return r.finalizeSBOMFlowOutputs(req.RunID, req.RepoID, cycleName, outDir, sbomSnapshotPath)
-		},
-		WorkspacePolicy: workspaceChangePolicyIgnore,
-		StartTime:       startTime,
-	}
-	r.executeStandardJob(ctx, req, cfg)
-}
-
 // executeMigJob runs a mig container job.
 // Executes the container, uploads diff, and reports status.
 //

@@ -21,11 +21,11 @@ type RunRepoJobRecovery struct {
 	CandidatePromoted         *bool           `json:"candidate_promoted,omitempty"`
 }
 
-// RunRepoJobSBOMEvidence summarizes persisted SBOM outputs for an sbom job.
+// RunRepoJobSBOMEvidence summarizes persisted SBOM outputs for a gate job.
 type RunRepoJobSBOMEvidence struct {
-	// ArtifactPresent reports whether at least one artifact bundle exists for this sbom job.
+	// ArtifactPresent reports whether at least one artifact bundle exists for this gate job.
 	ArtifactPresent *bool `json:"artifact_present,omitempty"`
-	// ParsedPackageCount reports the number of normalized package rows persisted for this sbom job.
+	// ParsedPackageCount reports the number of normalized package rows persisted for this gate job.
 	ParsedPackageCount *int `json:"parsed_package_count,omitempty"`
 }
 
@@ -49,7 +49,7 @@ type RunRepoJob struct {
 	BugSummary    string                `json:"bug_summary,omitempty"`
 	ErrorKind     string                `json:"error_kind,omitempty"`
 	Recovery      *RunRepoJobRecovery   `json:"recovery,omitempty"`
-	// sbom_evidence exposes artifact + parsed-row evidence for sbom jobs.
+	// sbom_evidence exposes artifact + parsed-row evidence for gate jobs.
 	SBOMEvidence *RunRepoJobSBOMEvidence `json:"sbom_evidence,omitempty"`
 	// Build-gate stack detection fields (gate jobs only).
 	// Populated from gate metadata's detected_stack when present.

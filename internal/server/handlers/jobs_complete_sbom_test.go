@@ -64,7 +64,7 @@ func TestSBOMJobIsMoreRecent_PrefersMostRecentFinishedAtOverLexicographicID(t *t
 
 	candidate := store.Job{
 		ID:      newerLexicographicallySmallerID,
-		JobType: domaintypes.JobTypeSBOM,
+		JobType: domaintypes.JobTypePreGate,
 		Status:  domaintypes.JobStatusSuccess,
 		FinishedAt: pgtype.Timestamptz{
 			Time:  now,
@@ -73,7 +73,7 @@ func TestSBOMJobIsMoreRecent_PrefersMostRecentFinishedAtOverLexicographicID(t *t
 	}
 	current := store.Job{
 		ID:      olderLexicographicallyGreaterID,
-		JobType: domaintypes.JobTypeSBOM,
+		JobType: domaintypes.JobTypePostGate,
 		Status:  domaintypes.JobStatusSuccess,
 		FinishedAt: pgtype.Timestamptz{
 			Time:  now.Add(-1 * time.Minute),
@@ -91,7 +91,7 @@ func TestSBOMJobIsMoreRecent_UsesIDAsDeterministicTieBreak(t *testing.T) {
 	finishedAt := time.Now().UTC()
 	candidate := store.Job{
 		ID:      domaintypes.JobID("job-z"),
-		JobType: domaintypes.JobTypeSBOM,
+		JobType: domaintypes.JobTypePreGate,
 		Status:  domaintypes.JobStatusSuccess,
 		FinishedAt: pgtype.Timestamptz{
 			Time:  finishedAt,
@@ -100,7 +100,7 @@ func TestSBOMJobIsMoreRecent_UsesIDAsDeterministicTieBreak(t *testing.T) {
 	}
 	current := store.Job{
 		ID:      domaintypes.JobID("job-a"),
-		JobType: domaintypes.JobTypeSBOM,
+		JobType: domaintypes.JobTypePostGate,
 		Status:  domaintypes.JobStatusSuccess,
 		FinishedAt: pgtype.Timestamptz{
 			Time:  finishedAt,

@@ -22,14 +22,14 @@ checkpoint notes in the repository.
   - **Pre-mig gate** — runs once on the initial workspace before any steps execute.
   - **Post-mig gate** — runs after each step in `steps[]` that exits with code 0.
 - **Healing** — Optional corrective steps run when any Build Gate (pre or post)
-  fails. The system enters a fail → heal migs → re-gate loop; if the gate still
+  fails. The system enters a fail → heal migs → post-gate loop; if the gate still
   fails after retries, the run terminates.
 
 ## 1.1 Build Gate Sequence
 
 This section makes the pre-/post-gate execution order explicit for both
 single-step and multi-step runs. All gate failures follow the same healing
-protocol: fail → heal migs → re-gate; if healing is exhausted, the run fails
+protocol: fail → heal migs → post-gate; if healing is exhausted, the run fails
 and no further steps execute.
 
 ### Single-step runs (`steps[]` with one entry)
@@ -47,7 +47,7 @@ pre-gate(+healing) → mig → post-gate(+healing)
 1. **Pre-mig Build Gate** — Runs once on the initial hydrated workspace (step 0)
    before the mig container starts. Validates that the baseline code compiles
    and tests pass.
-   - On failure with healing migs configured: enter fail → heal → re-gate loop.
+   - On failure with healing migs configured: enter fail → heal → post-gate loop.
    - If healing is exhausted: run exits without executing the mig.
 
 2. **Mig execution** — The mig container runs against the validated workspace.
@@ -56,7 +56,7 @@ pre-gate(+healing) → mig → post-gate(+healing)
 
 3. **Post-mig Build Gate** — Runs on the same workspace after the mig exits
    with code 0. Validates that the mig's changes do not break the build.
-   - On failure with healing migs configured: enter fail → heal → re-gate loop.
+   - On failure with healing migs configured: enter fail → heal → post-gate loop.
    - If healing is exhausted: run fails.
 
 ### Multi-step runs (`steps[]`)
@@ -70,20 +70,20 @@ pre-gate(+healing) → mig[0] → post-gate[0](+healing) → mig[1] → post-gat
 
 1. **Pre-mig Build Gate** — Runs once on the initial hydrated workspace before
    any migs execute.
-   - On failure with healing: enter fail → heal → re-gate loop.
+   - On failure with healing: enter fail → heal → post-gate loop.
    - If healing exhausted: run exits without executing any migs.
 
 2. **For each step[k] in `steps[]` (k = 0, 1, ..., N-1)**:
    - **Mig[k] execution** — Runs against the workspace with changes from all
      prior steps applied.
    - **Post-mig gate[k]** — Runs after step[k] exits with code 0.
-     - On failure with healing: enter fail → heal → re-gate loop.
+     - On failure with healing: enter fail → heal → post-gate loop.
      - If healing exhausted: run fails and no further steps execute.
    - If step[k] exits non-zero: run fails; no post-gate and no further steps.
 
 ### Gate execution via unified jobs queue
 
-Pre-gate and re-gate validation runs through the `GateExecutor` adapter as part of
+Ppost-gate and post-gate validation runs through the `GateExecutor` adapter as part of
 the unified jobs pipeline. Gate jobs are stored in the `jobs` table alongside mig
 jobs and claimed by nodes using queue eligibility + `next_id` successor links:
 
@@ -106,7 +106,7 @@ jobs and claimed by nodes using queue eligibility + `next_id` successor links:
 2. Node agent claims the next queued job via `/v1/nodes/{id}/claim`.
 3. For gate jobs, the Docker gate executor runs validation in a local container.
 4. Gate results are captured as `BuildGateStageMetadata` and returned to the orchestrator.
-5. For healing flows: re-gate runs against the workspace with accumulated changes.
+5. For healing flows: post-gate runs against the workspace with accumulated changes.
 
 **Key characteristics:**
 - Single unified queue: gate, mig, and healing jobs all use the same `jobs` table.
@@ -114,7 +114,7 @@ jobs and claimed by nodes using queue eligibility + `next_id` successor links:
 - Chain progression via `next_id`: ensures sequential pre-gate → mig → post-gate flow.
 - Gate stage parity: `Runner.Run` and `RunGateOnly` use shared `runHydrationStage`
   and `runGateStage` helpers, so hydration and gate pass/fail semantics are identical
-  across pre-mig and post/re-gate paths.
+  across pre-mig and post/post-gate paths.
 
 See [Build Gate docs](./build-gate/README.md) for gate configuration and execution details.
 
@@ -123,7 +123,7 @@ See [Build Gate docs](./build-gate/README.md) for gate configuration and executi
 All Build Gate failures (pre or post) follow identical handling:
 
 - **Without healing migs**: The run fails immediately with `reason="build-gate"`.
-- **With healing migs**: The system enters the fail → heal → re-gate loop:
+- **With healing migs**: The system enters the fail → heal → post-gate loop:
   1. Gate fails: capture build output to `/in/build-gate.log`.
   2. Execute healing migs (e.g., Codex) to fix the issue.
   3. Re-run the gate on the healed workspace.
@@ -146,7 +146,7 @@ Stack Gate enforces stack expectations at gate boundaries. When failures occur:
 ### Healing configuration
 
 When the Build Gate fails and healing is configured, the node agent enters a
-direct **heal → re-gate** loop using the single `build_gate.heal` entry:
+direct **heal → post-gate** loop using the single `build_gate.post` entry:
 
 ```yaml
 build_gate:
@@ -168,7 +168,7 @@ build_gate:
 ```
 
 Healing action fields (image, command, env, home) are specified directly under
-`build_gate.heal` — there is no nested `mig` key.
+`build_gate.post` — there is no nested `mig` key.
 
 #### Amata execution mode
 
@@ -201,7 +201,7 @@ heal:
     - ~/.codex/auth.json:.codex/auth.json:ro
 ```
 
-The same amata rules apply to `steps[]` and `build_gate.heal` entries.
+The same amata rules apply to `steps[]` and `build_gate.post` entries.
 Use YAML `!include` for spec composition: full replacement
 (`heal: !include ./healing/spec.yaml#/heal`) or deep merge
 (`heal: {<<: !include ./healing/spec.yaml#/heal, ...inline-overrides}`).
@@ -212,7 +212,7 @@ the source side of `in`/`out`/`home`) are resolved from that included file
 directory.
 For recovery with `schema=gate_profile_v1`, healing is expected to emit
 `/out/gate-profile-candidate.json`. Promotion to repo `gate_profile` happens only
-when the immediate follow-up `re_gate` succeeds.
+when the immediate follow-up `post_gate` succeeds.
 Candidate stack validation uses failed-gate `BuildGateStageMetadata.detected_stack`
 as canonical expectation (`language`, `tool`, optional `release`):
 - language/tool must match exactly
@@ -232,14 +232,14 @@ as canonical expectation (`language`, `tool`, optional `release`):
   `jobs.meta.action_summary` for heal jobs.
 
 Healing runtime environment:
-- `PLOY_GATE_PHASE` — phase that failed (`pre_gate|post_gate|re_gate`)
+- `PLOY_GATE_PHASE` — phase that failed (`pre_gate|post_gate`)
 - `PLOY_LOOP_KIND` — loop context (`healing`)
 
 ### Task-oriented healing router contract
 
 Multitask heal is implemented inside the healing Amata workflow (for example
 `@scale/ploy-lib/heal/amata.yaml`). It does not introduce a new job type.
-Control-plane job types remain `heal` and `re_gate`.
+Control-plane job types remain `heal` and `post_gate`.
 
 Router output contract:
 
@@ -258,12 +258,12 @@ Rules:
 
 ### Per-iteration artifacts and healing log
 
-During the heal → re-gate loop, the node agent writes per-iteration artifacts
+During the heal → post-gate loop, the node agent writes per-iteration artifacts
 to `/in` for debugging and cross-iteration context:
 
 | Artifact | Description |
 |---|---|
-| `/in/build-gate.log` | Latest gate failure log (updated after each re-gate) |
+| `/in/build-gate.log` | Latest gate failure log (updated after each post-gate) |
 | `/in/errors.yaml` | Structured gate errors payload when claim-time `recovery_context.errors` is present |
 | `/in/gate_profile.json` | Gate profile used by the failed gate when available |
 | `/in/build-gate-iteration-N.log` | Gate failure log snapshot for iteration N |
@@ -272,7 +272,7 @@ to `/in` for debugging and cross-iteration context:
 | `/in/deps-compat-url.txt` | Prefilled SBOM compatibility endpoint for dependency healing |
 | `/in/deps-bumps.json` | Prior cumulative dependency bump map for dependency healing |
 
-For `heal`/`re_gate`, claim-time `recovery_context` is the primary source for
+For `heal`/`post_gate`, claim-time `recovery_context` is the primary source for
 `/in/build-gate.log`, optional `/in/errors.yaml`, `/in/gate_profile.json`, and
 `/in/gate_profile.schema.json`.
 Node-local run cache snapshots are fallback-only when claim context fields are absent.
@@ -369,7 +369,7 @@ for optimized per-build-tool containers (e.g., dedicated Maven or Gradle images)
 
 ### Image specification forms
 
-The `image` field (in `steps[]` and in `build_gate.heal`) accepts two forms:
+The `image` field (in `steps[]` and in `build_gate.post`) accepts two forms:
 
 **Universal image (string)** — A single image used regardless of stack:
 ```yaml
@@ -446,7 +446,7 @@ is then used consistently for all subsequent Migs steps within the same run:
 1. **Pre-mig gate**: Build Gate detects workspace stack (e.g., `java-maven`).
 2. **Stack propagation**: The stack is stored in run context/metadata.
 3. **Image resolution**: Each mig step resolves its image using the same stack.
-4. **Healing steps**: Stack remains consistent across heal → re-gate cycles.
+4. **Healing steps**: Stack remains consistent across heal → post-gate cycles.
 
 This ensures deterministic image selection: a Maven workspace always uses the
 Maven-specific image throughout the entire run, including healing retries.
@@ -578,11 +578,10 @@ transaction.
 | Type        | Description                                  | Example        |
 |-------------|----------------------------------------------|----------------|
 | `pre_gate`  | Pre-mig Build Gate validation                | `pre-gate`     |
-| `sbom`      | SBOM stage (`pre-gate`/`post-gate` cycle)   | `pre-gate-sbom`|
 | `mig`       | Migification container execution             | `mig-0`        |
 | `post_gate` | Post-mig Build Gate validation               | `post-gate`    |
 | `heal`      | Healing job after gate failure               | `heal-0`       |
-| `re_gate`   | Re-validation after healing                  | `re-gate`      |
+| `post_gate`   | Re-validation after healing                  | `post-gate`      |
 
 ### Simple run graph
 
@@ -590,18 +589,18 @@ A successful single-step run creates a linear five-node chain:
 
 ```
 ┌───────────┐    ┌────────────────┐    ┌───────────┐    ┌───────────┐    ┌─────────────────┐
-│ pre-gate  │───▶│ pre-gate-sbom  │───▶│   mig-0   │───▶│ post-gate │───▶│ post-gate-sbom  │
+│ pre-gate  │───▶│   │───▶│   mig-0   │───▶│ post-gate │───▶│   │
 └───────────┘    └────────────────┘    └───────────┘    └───────────┘    └─────────────────┘
 ```
 
 ### Healing run graph
 
-When an eligible gate fails with healing configured, heal and re-gate jobs are inserted
+When an eligible gate fails with healing configured, heal and post-gate jobs are inserted
 by rewiring `next_id` links:
 
 ```
 ┌───────────┐     ┌───────────┐     ┌───────────┐     ┌────────────────┐
-│ post-gate │────▶│  heal-0   │────▶│  re-gate  │────▶│ post-gate-sbom │
+│ post-gate │────▶│  heal-0   │────▶│  post-gate  │────▶│  │
 │  FAILED   │     │           │     │  PASSED   │     │                │
 └───────────┘     └───────────┘     └───────────┘     └────────────────┘
 ```
@@ -610,36 +609,36 @@ by rewiring `next_id` links:
 
 Rewire example:
 - Before failure handling: `failed.next_id = old_next`
-- After insertion: `failed.next_id = heal.id`, `heal.next_id = re_gate.id`, `re_gate.next_id = old_next`
+- After insertion: `failed.next_id = heal.id`, `heal.next_id = post_gate.id`, `post_gate.next_id = old_next`
 - Healing SHA seeding: inserted `heal` jobs inherit `repo_sha_in` from the
   failed gate job.
 - If failed gate `repo_sha_in` is missing/invalid, remaining linked jobs are
-  cancelled instead of inserting heal/re-gate jobs.
-- Persistence order is tail-first (`re-gate` row first, then `heal`, then failed-job rewire)
+  cancelled instead of inserting heal/post-gate jobs.
+- Persistence order is tail-first (`post-gate` row first, then `heal`, then failed-job rewire)
   so each non-null `next_id` always points to an already existing row under the
   `jobs.next_id -> jobs.id` foreign key.
 - For recovery with expected artifact `schema=gate_profile_v1`, healing insertion
   validates candidate bytes from the previous heal artifact
   (`/out/gate-profile-candidate.json`) and records candidate schema/path/validation
-  status in `re_gate` recovery metadata.
-- On `heal` success, before promoting the linked re-gate segment, the server refreshes
-  the downstream `re_gate` recovery candidate metadata from the just-finished heal artifact.
+  status in `post_gate` recovery metadata.
+- On `heal` success, before promoting the linked post-gate segment, the server refreshes
+  the downstream `post_gate` recovery candidate metadata from the just-finished heal artifact.
 - Candidate outcomes are strict and non-blocking:
   - missing artifact -> `candidate_validation_status=missing`
   - unreadable artifact bundle -> `candidate_validation_status=unavailable`
   - schema/JSON validation failure -> `candidate_validation_status=invalid`
   - valid candidate -> `candidate_validation_status=valid` with embedded candidate payload
-- On successful `re_gate`, a validated candidate is marked with
-  `candidate_promoted=true` in `re_gate` recovery metadata for audit/idempotency.
+- On successful `post_gate`, a validated candidate is marked with
+  `candidate_promoted=true` in `post_gate` recovery metadata for audit/idempotency.
 - Candidate promotion is strict:
-  - never runs on failed `re_gate`
+  - never runs on failed `post_gate`
   - idempotent across retries/replays (already-promoted candidates are skipped)
   - does not write to `mig_repos`; canonical gate profile state is stored in `gate_profiles`
 
 ### Parallel healing branches (Phase E)
 
 Multi-strategy healing creates concurrent branches with independent chain segments.
-The first branch whose re-gate passes wins; losing branches are cancelled:
+The first branch whose post-gate passes wins; losing branches are cancelled:
 
 ```
                            ┌─────────────────────────────────────┐
@@ -648,9 +647,9 @@ The first branch whose re-gate passes wins; losing branches are cancelled:
                      │ Branch A  │                         │ Branch B  │
                      └─────┬─────┘                         └─────┬─────┘
                            │                                     │
-post-gate  ───────────────▶├─▶ heal-a → re-gate-a ───────────────┤
+post-gate  ───────────────▶├─▶ heal-a → post-gate-a ───────────────┤
  FAILED                    │                                     │
-                           └─▶ heal-b → re-gate-b ───────────────┘
+                           └─▶ heal-b → post-gate-b ───────────────┘
                                                                  │
                                               (first pass wins) ─┘
 ```
@@ -773,7 +772,7 @@ Each `run_repos` row tracks execution for a single repository within a run:
 
 Jobs are stored directly in `jobs` and scoped to `(run_id, repo_id, attempt)`.
 The first job for a repo attempt is `Queued`, and later jobs are `Created`. Healing may
-insert `heal-*` + `re-gate-*` jobs by rewiring `next_id` links.
+insert `heal-*` + `post-gate-*` jobs by rewiring `next_id` links.
 
 ### Batch scheduler (v1)
 
@@ -797,7 +796,7 @@ Claim-time profile resolution:
 4. Fallback hits are copied to a new exact row before execution
 
 Successful gate profile persistence:
-- After successful `pre_gate`, `post_gate`, or `re_gate`, the server persists
+- After successful `pre_gate`, `post_gate`, or `post_gate`, the server persists
   an exact profile keyed by `(repo_id, repo_sha_out, stack_id)` (with
   `repo_sha_in` fallback when `repo_sha_out` is unavailable).
 - The persisted profile reuses the exact `executed_command` captured by gate
@@ -806,7 +805,7 @@ Successful gate profile persistence:
 
 Gate profile to Build Gate mapping:
 - Gate phase chooses destination override slot (`build_gate.pre.gate_profile` for
-  `pre_gate`; `build_gate.post.gate_profile` for `post_gate` and `re_gate`).
+  `pre_gate`; `build_gate.post.gate_profile` for `post_gate`).
 - Command/env source is always `gate_profile.targets.<targets.active>`.
 - Mapping is status-agnostic at runtime (`status`/`failure_code` do not alter
   command/env selection).
@@ -824,7 +823,7 @@ Gate profile to Build Gate mapping:
 
 Resolution precedence:
 1. Explicit `build_gate.<phase>.gate_profile` in submitted run spec
-2. For `re_gate` only: validated recovery candidate prep override
+2. For `post_gate` only: validated recovery candidate prep override
 3. Resolved gate profile payload from `gate_profiles`
 4. Default detected-tool command fallback
 
@@ -1016,7 +1015,7 @@ value is a `StageStatus` object describing that job's execution state.
 - Keys are job IDs (KSUID strings), **not** job names or step indices.
 - Use `next_id` within each `StageStatus` to follow successor links.
 - Typical entries: `pre-gate`, `mig-0`, `post-gate` jobs, plus dynamically inserted
-  `heal-*` and `re-gate` jobs for healing flows.
+  `heal-*` and `post-gate` jobs for healing flows.
 
 #### StageStatus fields
 
@@ -1072,11 +1071,11 @@ value is a `StageStatus` object describing that job's execution state.
 		  - `status` — job status in the database (`Created`, `Queued`, `Running`, `Success`, `Fail`, `Cancelled`).
 		    - `RunSummary.stages[*].state` is the external API representation (`pending`, `running`, `succeeded`, `failed`, `cancelled`).
 		    - `node_id` — which node claimed this job.
-	    - `job_type` — job phase (`pre_gate`, `mig`, `post_gate`, `heal`, `re_gate`, `mr`).
+	    - `job_type` — job phase (`pre_gate`, `mig`, `post_gate`, `heal`, `mr`).
 	    - `job_image` — container image name for this job (persisted by the node for mig/heal/gate jobs).
 		    - `meta` — JSONB with structured job metadata (optional; see runtime implementation).
   - Dynamic insertion rewires explicit successor links:
-    - Initial chain: `pre-gate -> pre-gate-sbom -> mig-0 -> post-gate -> post-gate-sbom`.
+    - Initial chain: `pre-gate -> mig-0 -> post-gate`.
     - Healing insertion updates `failed.next_id` to `heal`, then links healing tail to the former successor.
 
 	- **Server-driven scheduling**
@@ -1087,7 +1086,7 @@ value is a `StageStatus` object describing that job's execution state.
 		    are ready.
 		  - When a job completes successfully, the server promotes that job's
 		    `next_id` successor from `Created` to `Queued` (when present).
-		  - This model enforces sequential execution: `pre-gate` → `pre-gate-sbom` → `mig-0` → `post-gate` → `post-gate-sbom`.
+		  - This model enforces sequential execution: `pre-gate` → `mig-0` → `post-gate`.
 		  - Healing jobs follow the same pattern: heal jobs are created with status
 		    `Queued` to be claimed immediately after insertion.
 
@@ -1210,12 +1209,12 @@ Gate profile behavior:
 - Canonical gate profile storage is `gate_profiles` (+ `gates` linkage), not `mig_repos`.
 - During claim, the resolver targets exact identity `(repo_id, repo_sha_in, stack_id)`;
   fallback profiles are copied into a new exact row before execution.
-- Successful gate jobs (`pre_gate|post_gate|re_gate`) persist refreshed exact
+- Successful gate jobs (`pre_gate|post_gate`) persist refreshed exact
   profiles keyed by `(repo_id, repo_sha, stack_id)`.
 - Healing candidate validation uses `docs/schemas/gate_profile.schema.json`
   (`title: Ploy Build Gate Profile`, `$comment` guidance included) plus contract parsing.
-- A validated candidate is tracked in `re_gate` recovery metadata and marked
-  `candidate_promoted=true` after successful `re_gate` for idempotent audit.
+- A validated candidate is tracked in `post_gate` recovery metadata and marked
+  `candidate_promoted=true` after successful `post_gate` for idempotent audit.
 
 Node startup crash reconciliation behavior:
 - On node process startup, the node agent runs one startup reconciliation pass
@@ -1277,11 +1276,11 @@ For a spec with multiple `steps[]` entries:
 2. `POST /v1/runs`:
    - Creates `runs` + `run_repos` rows.
 3. Scheduler and nodeagents:
-   - Scheduler/start path creates jobs for pre-gate, pre-gate-sbom, each mig, post-gate, and post-gate-sbom as a linked chain.
+   - Scheduler/start path creates jobs for pre-gate, , each mig, post-gate, and  as a linked chain.
    - Job creation persists chain rows tail-to-head so each non-null `next_id` already exists when inserted (`jobs.next_id -> jobs.id` FK).
    - Chain head seeding: `pre-gate` is created with
      `repo_sha_in = run_repos.repo_sha0`.
-   - Each job row includes `job_type` (pre_gate, sbom, mig, post_gate, heal, re_gate)
+   - Each job row includes `job_type` (pre_gate, mig, post_gate, heal)
      and `job_image` (saved by the executing node before the container starts).
    - ClaimJob returns queued jobs from the unified queue, and the server promotes
      the claimed job's `next_id` successor only after prior jobs succeed.
@@ -1326,7 +1325,7 @@ Migs container images are standard OCI images with the following expectations:
   - Spec `env` maps are resolved and merged by `buildSpecPayload`.
     - Supported on:
       - each `steps[]` entry (single-step and multi-step runs),
-      - `build_gate.heal`.
+      - `build_gate.post`.
   - **Typed file delivery (Hydra)**: Config files, CA bundles, and inputs are
     delivered via typed mount records (`ca`, `in`, `out`, `home`) instead of env
     vars. See [Environment Variables](./envs/README.md) § "Common Variables
@@ -1334,7 +1333,7 @@ Migs container images are standard OCI images with the following expectations:
   - **Global env injection**: The control plane injects server-configured global
     environment variables at job claim time based on target-to-job-type mapping. Global
     env vars use targets that map to job types:
-    - `gates` → `pre_gate`, `re_gate`, `post_gate` jobs
+    - `gates` → `pre_gate`, `post_gate` jobs
     - `steps` → `mig`, `heal` jobs
     - `nodes` → node agent processes (merged into manifest env)
     - `server` → server process (consumed on set/startup)
@@ -1469,7 +1468,7 @@ correlate log lines with specific nodes, jobs, and pipeline stages.
 |--------------|--------|------------------------------------------------------------------------|
 | `node_id`    | string | Node ID (NanoID 6-character string) that produced this log line        |
 | `job_id`     | string | Job ID (KSUID string) that produced this log line                      |
-| `job_type`   | string | Migs step type: `pre_gate`, `mig`, `post_gate`, `heal`, `re_gate`      |
+| `job_type`   | string | Migs step type: `pre_gate`, `mig`, `post_gate`, `heal`      |
 | `next_id` | number | Optional step metadata used for log enrichment                          |
 
 **Example SSE frame:**

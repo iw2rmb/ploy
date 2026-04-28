@@ -9,8 +9,27 @@ import (
 )
 
 func TestRoadmapVerifySkipsTargetedPhaseWhenNotDone(t *testing.T) {
+	tmp := t.TempDir()
+	phasePath := filepath.Join(tmp, "phase-3-delivery-gates-and-observability.yaml")
+	indexPath := filepath.Join(tmp, "index.md")
+	phase := strings.TrimSpace(`
+title: "Phase 3"
+done: false
+reviews: []
+items:
+  - done: false
+    label: "1"
+    summary: "item"
+`) + "\n"
+	index := "- [ ] `phase-3-delivery-gates-and-observability.yaml` <!-- evidence:phase-3-delivery-gates-and-observability -->\n"
+	if err := os.WriteFile(phasePath, []byte(phase), 0o644); err != nil {
+		t.Fatalf("write phase: %v", err)
+	}
+	if err := os.WriteFile(indexPath, []byte(index), 0o644); err != nil {
+		t.Fatalf("write index: %v", err)
+	}
+
 	repoRoot := mustFindRepoRoot(t)
-	phasePath := filepath.Join("roadmap", "sbom-hooks-remediation", "phase-3-delivery-gates-and-observability.yaml")
 	cmd := exec.Command("bash", "tools/roadmap/verify_done.sh", phasePath)
 	cmd.Dir = repoRoot
 
@@ -65,11 +84,59 @@ items:
 }
 
 func TestRoadmapVerifyPassesForSbomRemediationPhasesWhenDoneAndEvidenceConsistent(t *testing.T) {
+	tmp := t.TempDir()
+	phase1 := filepath.Join(tmp, "phase-1-conditional-planning-and-preflight.yaml")
+	phase2 := filepath.Join(tmp, "phase-2-runtime-execution-and-ingestion.yaml")
+	phase3 := filepath.Join(tmp, "phase-3-delivery-gates-and-observability.yaml")
+	indexPath := filepath.Join(tmp, "index.md")
+
+	donePhase := strings.TrimSpace(`
+title: "Done"
+done: true
+reviews: []
+items:
+  - done: true
+    label: "1"
+    summary: "item"
+    verification:
+      - "assert"
+    reviews:
+      - commit: abcdef12
+        gaps: []
+`) + "\n"
+	notDonePhase := strings.TrimSpace(`
+title: "Not Done"
+done: false
+reviews: []
+items:
+  - done: false
+    label: "1"
+    summary: "item"
+`) + "\n"
+	index := strings.Join([]string{
+		"- [x] `phase-1-conditional-planning-and-preflight.yaml` <!-- evidence:phase-1-conditional-planning-and-preflight -->",
+		"- [x] `phase-2-runtime-execution-and-ingestion.yaml` <!-- evidence:phase-2-runtime-execution-and-ingestion -->",
+		"- [ ] `phase-3-delivery-gates-and-observability.yaml` <!-- evidence:phase-3-delivery-gates-and-observability -->",
+		"",
+	}, "\n")
+	if err := os.WriteFile(phase1, []byte(donePhase), 0o644); err != nil {
+		t.Fatalf("write phase1: %v", err)
+	}
+	if err := os.WriteFile(phase2, []byte(donePhase), 0o644); err != nil {
+		t.Fatalf("write phase2: %v", err)
+	}
+	if err := os.WriteFile(phase3, []byte(notDonePhase), 0o644); err != nil {
+		t.Fatalf("write phase3: %v", err)
+	}
+	if err := os.WriteFile(indexPath, []byte(index), 0o644); err != nil {
+		t.Fatalf("write index: %v", err)
+	}
+
 	repoRoot := mustFindRepoRoot(t)
 	phases := []string{
-		filepath.Join("roadmap", "sbom-hooks-remediation", "phase-1-conditional-planning-and-preflight.yaml"),
-		filepath.Join("roadmap", "sbom-hooks-remediation", "phase-2-runtime-execution-and-ingestion.yaml"),
-		filepath.Join("roadmap", "sbom-hooks-remediation", "phase-3-delivery-gates-and-observability.yaml"),
+		phase1,
+		phase2,
+		phase3,
 	}
 
 	args := append([]string{"tools/roadmap/verify_done.sh"}, phases...)

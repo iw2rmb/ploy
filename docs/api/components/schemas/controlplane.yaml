@@ -533,7 +533,7 @@ MigsRunSummary:
         Use `next_id` within each StageStatus to follow successor links.
 
         **Typical entries**: `pre-gate`, `mig-0`, `post-gate` jobs, plus any
-        dynamically inserted `heal-*` and `re-gate` jobs for healing flows.
+        dynamically inserted `heal-*` and `post-gate` jobs for healing flows.
       type: object
       additionalProperties:
         $ref: "#/StageStatus"
@@ -592,7 +592,7 @@ StageStatus:
 # Nodes claim gate work via the unified /v1/nodes/{id}/claim endpoint.
 # The buildgate_jobs table and related HTTP endpoints have been removed;
 # all gate execution now uses the jobs table with job_type
-# in 'sbom'|'pre_gate'|'re_gate'|'post_gate'.
+# in 'pre_gate'|'post_gate'.
 
 # Response returned by POST /v1/nodes/{id}/claim
 # Schema aligned with claimJobHandler response — exposes job-centric fields.
@@ -618,7 +618,7 @@ NodeClaimResponse:
       description: Logical job name (e.g., "pre-gate", "mig-0", "post-gate")
     job_type:
       type: string
-      description: Job phase (`pre_gate`, `sbom`, `mig`, `post_gate`, `heal`, `re_gate`, `mr`)
+      description: Job phase (`pre_gate`, `mig`, `post_gate`, `heal`, `mr`)
     job_image:
       type: string
       description: Container image for this job (may be empty for non-container jobs)
@@ -650,8 +650,8 @@ NodeClaimResponse:
       type: object
       nullable: true
       description: |
-        Typed recovery context for `heal` and `re_gate` claims.
-        Carries server-resolved healing inputs so heal/re-gate execution does not
+        Typed recovery context for `heal` and `post_gate` claims.
+        Carries server-resolved healing inputs so heal/post-gate execution does not
         depend on node-local run cache files.
       properties:
         loop_kind:
@@ -952,7 +952,7 @@ WorkflowGraphNode:
     type:
       type: string
       description: Job phase type derived from jobs.job_type
-      enum: [pre_gate, sbom, mig, heal, re_gate, post_gate, mr]
+      enum: [pre_gate, mig, heal, post_gate, mr]
     next_id:
       type: string
       nullable: true
@@ -1124,7 +1124,7 @@ RepoJobItem:
       description: Job name (e.g., "mig-0", "pre-gate", "heal")
     job_type:
       type: string
-      description: Job phase type (pre_gate, sbom, mig, post_gate, heal, re_gate, mr)
+      description: Job phase type (pre_gate, mig, post_gate, heal, mr)
     job_image:
       type: string
       description: Container image used for this job (may be empty)
@@ -1235,17 +1235,17 @@ RepoJobItem:
     sbom_evidence:
       type: object
       nullable: true
-      description: Evidence metadata for sbom jobs.
+      description: Evidence metadata for gate jobs.
       properties:
         artifact_present:
           type: boolean
           nullable: true
-          description: True when at least one artifact bundle exists for this sbom job.
+          description: True when at least one artifact bundle exists for this gate job.
         parsed_package_count:
           type: integer
           format: int32
           nullable: true
-          description: Number of parsed package rows persisted for this sbom job.
+          description: Number of parsed package rows persisted for this gate job.
   required:
     - job_id
     - name

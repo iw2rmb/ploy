@@ -12,29 +12,21 @@ func TestResolveDetectedStackExpectationFromJobs_UsesNearestUpstreamGate(t *test
 	t.Parallel()
 
 	preGateID := domaintypes.NewJobID()
-	sbom1ID := domaintypes.NewJobID()
-	hook1ID := domaintypes.NewJobID()
+	mig1ID := domaintypes.NewJobID()
 	reGateID := domaintypes.NewJobID()
-	sbom2ID := domaintypes.NewJobID()
-	hook2ID := domaintypes.NewJobID()
+	mig2ID := domaintypes.NewJobID()
 
 	jobs := []store.Job{
 		{
 			ID:      preGateID,
 			JobType: domaintypes.JobTypePreGate,
 			Status:  domaintypes.JobStatusSuccess,
-			NextID:  &sbom1ID,
+			NextID:  &mig1ID,
 			Meta:    mustMarshalGateMeta(t, "java", "maven", "17"),
 		},
 		{
-			ID:      sbom1ID,
-			JobType: domaintypes.JobTypeSBOM,
-			Status:  domaintypes.JobStatusSuccess,
-			NextID:  &hook1ID,
-		},
-		{
-			ID:      hook1ID,
-			JobType: domaintypes.JobTypeSBOM,
+			ID:      mig1ID,
+			JobType: domaintypes.JobTypeMig,
 			Status:  domaintypes.JobStatusSuccess,
 			NextID:  &reGateID,
 		},
@@ -42,23 +34,17 @@ func TestResolveDetectedStackExpectationFromJobs_UsesNearestUpstreamGate(t *test
 			ID:      reGateID,
 			JobType: domaintypes.JobTypePostGate,
 			Status:  domaintypes.JobStatusFail,
-			NextID:  &sbom2ID,
+			NextID:  &mig2ID,
 			Meta:    mustMarshalGateMeta(t, "java", "gradle", "21"),
 		},
 		{
-			ID:      sbom2ID,
-			JobType: domaintypes.JobTypeSBOM,
+			ID:      mig2ID,
+			JobType: domaintypes.JobTypeMig,
 			Status:  domaintypes.JobStatusSuccess,
-			NextID:  &hook2ID,
-		},
-		{
-			ID:      hook2ID,
-			JobType: domaintypes.JobTypeSBOM,
-			Status:  domaintypes.JobStatusCreated,
 		},
 	}
 
-	got := resolveDetectedStackExpectationFromJobs(hook2ID, jobs)
+	got := resolveDetectedStackExpectationFromJobs(mig2ID, jobs)
 	if got == nil {
 		t.Fatal("resolveDetectedStackExpectationFromJobs() = nil, want non-nil")
 	}
@@ -70,23 +56,23 @@ func TestResolveDetectedStackExpectationFromJobs_UsesNearestUpstreamGate(t *test
 func TestResolveDetectedStackExpectationFromJobs_NoGateInChain(t *testing.T) {
 	t.Parallel()
 
-	sbomID := domaintypes.NewJobID()
-	hookID := domaintypes.NewJobID()
+	mig1ID := domaintypes.NewJobID()
+	mig2ID := domaintypes.NewJobID()
 	jobs := []store.Job{
 		{
-			ID:      sbomID,
-			JobType: domaintypes.JobTypeSBOM,
+			ID:      mig1ID,
+			JobType: domaintypes.JobTypeMig,
 			Status:  domaintypes.JobStatusSuccess,
-			NextID:  &hookID,
+			NextID:  &mig2ID,
 		},
 		{
-			ID:      hookID,
-			JobType: domaintypes.JobTypeSBOM,
+			ID:      mig2ID,
+			JobType: domaintypes.JobTypeMig,
 			Status:  domaintypes.JobStatusCreated,
 		},
 	}
 
-	got := resolveDetectedStackExpectationFromJobs(hookID, jobs)
+	got := resolveDetectedStackExpectationFromJobs(mig2ID, jobs)
 	if got != nil {
 		t.Fatalf("resolveDetectedStackExpectationFromJobs() = %+v, want nil", *got)
 	}

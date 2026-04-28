@@ -7,3 +7,5 @@ LABEL org.opencontainers.image.title="ploy-gate-maven-jdk17" \
     org.opencontainers.image.licenses="MIT"
 
 ENV MAVEN_CONFIG=/root/.m2
+
+COPY --chmod=755 images/gates/shared/collect-java-classpath-maven.sh /usr/local/lib/ploy/sbom/collect-java-classpath-maven.sh

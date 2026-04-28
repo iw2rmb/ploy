@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS ploy.schema_version (
 -- - run_status: Started | Cancelled | Finished
 -- - run_repo_status: Queued | Running | Cancelled | Fail | Success
 -- - job_status: Created | Queued | Running | Success | Fail | Error | Cancelled
--- - job_type: pre_gate | mig | post_gate | heal | re_gate | sbom
+-- - job_type: pre_gate | mig | post_gate | heal | re_gate
 --
 -- Capitalized values are canonical; no aliases.
 DO $$
@@ -57,7 +57,7 @@ BEGIN
     JOIN pg_namespace n ON n.oid = t.typnamespace
     WHERE t.typname = 'job_type' AND n.nspname = 'ploy'
   ) THEN
-    CREATE TYPE job_type AS ENUM ('pre_gate', 'mig', 'post_gate', 'heal', 're_gate', 'sbom');
+    CREATE TYPE job_type AS ENUM ('pre_gate', 'mig', 'post_gate', 'heal', 're_gate');
   END IF;
 END $$;
 
@@ -329,7 +329,7 @@ CREATE TABLE IF NOT EXISTS gates (
 );
 CREATE INDEX IF NOT EXISTS gates_profile_idx ON gates(profile_id);
 
--- SBOM package rows extracted from successful sbom job artifact bundles.
+-- SBOM package rows extracted from successful gate job artifact bundles.
 -- Stack/time attribution is resolved via joins:
 --   sboms.job_id -> jobs -> (created_at)
 --   sboms.job_id -> gates -> gate_profiles -> stacks
@@ -507,13 +507,13 @@ CREATE INDEX IF NOT EXISTS config_env_target_idx ON config_env(target);
 -- Global CA Entries (config_ca)
 -- Stores canonical CA certificate hash entries for injection into jobs.
 -- Each entry is a shortHash (7-64 hex chars) referencing a content-addressed bundle.
--- section controls which job phase receives the CA entry (pre_gate, re_gate, post_gate, mig, heal, sbom).
+-- section controls which job phase receives the CA entry (pre_gate, re_gate, post_gate, mig, heal).
 -- Composite primary key on (hash, section) allows one hash to target multiple sections.
 -- Ordering within a section is deterministic by hash ASC.
 DROP TABLE IF EXISTS config_ca;
 CREATE TABLE IF NOT EXISTS config_ca (
   hash        TEXT NOT NULL CHECK (hash ~ '^[0-9a-f]{7,64}$'),  -- Canonical shortHash
-  section     TEXT NOT NULL CHECK (section IN ('pre_gate', 're_gate', 'post_gate', 'mig', 'heal', 'sbom')),
+  section     TEXT NOT NULL CHECK (section IN ('pre_gate', 're_gate', 'post_gate', 'mig', 'heal')),
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (hash, section)
 );
