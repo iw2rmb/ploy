@@ -39,13 +39,7 @@ func computeArtifactCIDAndDigest(bundle []byte) (cid, digest string) {
 // Run and job IDs are KSUID-backed strings; no UUID parsing is performed.
 // Note: build_id removed as part of builds table removal; artifacts now use job-level grouping only.
 func createJobArtifactHandler(st store.Store, bp *blobpersist.Service) http.HandlerFunc {
-	if bp == nil {
-		panic("createJobArtifactHandler: blobpersist is required")
-	}
-	// Accept up to 16 MiB for the JSON body to accommodate base64 overhead
-	// while still enforcing a strict 10 MiB cap on the decoded bundle bytes.
-	const maxBodySize = 16 << 20   // 16 MiB
-	const maxBundleSize = 10 << 20 // 10 MiB
+	requireBlobPersist("createJobArtifactHandler", bp)
 	return func(w http.ResponseWriter, r *http.Request) {
 		runID, err := parseRequiredPathID[domaintypes.RunID](r, "run_id")
 		if err != nil {
@@ -60,8 +54,7 @@ func createJobArtifactHandler(st store.Store, bp *blobpersist.Service) http.Hand
 		}
 
 		// Check payload size before reading body.
-		if r.ContentLength > maxBodySize {
-			writeHTTPError(w, http.StatusRequestEntityTooLarge, "payload exceeds body size cap")
+		if rejectOversizedContentLength(w, r, ingestMaxBodySize) {
 			return
 		}
 
@@ -72,7 +65,7 @@ func createJobArtifactHandler(st store.Store, bp *blobpersist.Service) http.Hand
 			Bundle []byte  `json:"bundle"` // gzipped tar (raw bytes)
 		}
 
-		if err := decodeRequestJSON(w, r, &req, maxBodySize); err != nil {
+		if err := decodeRequestJSON(w, r, &req, ingestMaxBodySize); err != nil {
 			return
 		}
 
@@ -83,7 +76,7 @@ func createJobArtifactHandler(st store.Store, bp *blobpersist.Service) http.Hand
 		}
 
 		// Enforce decoded bundle size cap (≤ 10 MiB gzipped, base64-decoded here).
-		if len(req.Bundle) > maxBundleSize {
+		if len(req.Bundle) > ingestMaxDataSize {
 			writeHTTPError(w, http.StatusRequestEntityTooLarge, "artifact bundle size exceeds 10 MiB cap")
 			return
 		}

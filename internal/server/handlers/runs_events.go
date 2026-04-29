@@ -21,17 +21,8 @@ import (
 // The blobpersist service handles database metadata and object storage writes.
 // The events service handles SSE fanout.
 func createRunLogHandler(st store.Store, bp *blobpersist.Service, eventsService *server.EventsService) http.HandlerFunc {
-	// Validate dependencies are provided.
-	if bp == nil {
-		panic("createRunLogHandler: blobpersist is required")
-	}
-	if eventsService == nil {
-		panic("createRunLogHandler: eventsService is required")
-	}
-	// Accept up to 16 MiB for the JSON body to accommodate base64 overhead
-	// while still enforcing a strict 10 MiB cap on the decoded gzipped bytes.
-	const maxBodySize = 16 << 20  // 16 MiB
-	const maxChunkSize = 10 << 20 // 10 MiB
+	requireBlobPersist("createRunLogHandler", bp)
+	requireEventsService("createRunLogHandler", eventsService)
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Extract run id from path parameter using domain type helper.
 		runID, err := parseRequiredPathID[domaintypes.RunID](r, "id")
@@ -41,8 +32,7 @@ func createRunLogHandler(st store.Store, bp *blobpersist.Service, eventsService 
 		}
 
 		// Check payload size before reading body.
-		if r.ContentLength > maxBodySize {
-			writeHTTPError(w, http.StatusRequestEntityTooLarge, "payload exceeds body size cap")
+		if rejectOversizedContentLength(w, r, ingestMaxBodySize) {
 			return
 		}
 
@@ -54,7 +44,7 @@ func createRunLogHandler(st store.Store, bp *blobpersist.Service, eventsService 
 			Data    []byte             `json:"data"`
 		}
 
-		if err := decodeRequestJSON(w, r, &req, maxBodySize); err != nil {
+		if err := decodeRequestJSON(w, r, &req, ingestMaxBodySize); err != nil {
 			return
 		}
 
@@ -62,7 +52,7 @@ func createRunLogHandler(st store.Store, bp *blobpersist.Service, eventsService 
 			writeHTTPError(w, http.StatusBadRequest, "data is required and must not be empty")
 			return
 		}
-		if len(req.Data) > maxChunkSize {
+		if len(req.Data) > ingestMaxDataSize {
 			writeHTTPError(w, http.StatusRequestEntityTooLarge, "data exceeds 10 MiB: %d bytes", len(req.Data))
 			return
 		}
