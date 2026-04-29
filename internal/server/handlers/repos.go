@@ -1,8 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"time"
@@ -11,21 +9,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-// Repo-centric API handlers provide endpoints for listing repositories and viewing
-// runs for a given repository. These complement the run-centric batch endpoints
-// by offering an alternative navigation model: start from a repository URL, then
-// drill down to see its run history.
-//
-// Endpoints:
-//   - GET /v1/repos — list distinct repositories with optional ?contains= filter
-//   - GET /v1/repos/{repo_id}/runs — list runs for a specific repository
-
-// -------------------------------------------------------------------------
-// Response types for repo-centric endpoints
-// -------------------------------------------------------------------------
-
-// RepoSummary represents a repository with its last run metadata.
-// Used in the GET /v1/repos response to show known repositories.
+// RepoSummary is returned by GET /v1/repos.
 type RepoSummary struct {
 	RepoID     domaintypes.RepoID `json:"repo_id"`
 	RepoURL    string             `json:"repo_url"`
@@ -33,8 +17,7 @@ type RepoSummary struct {
 	LastStatus *string            `json:"last_status,omitempty"`
 }
 
-// RepoRunSummary represents a run for a specific repository.
-// Used in the GET /v1/repos/{repo_id}/runs response.
+// RepoRunSummary is returned by GET /v1/repos/{repo_id}/runs.
 type RepoRunSummary struct {
 	RunID      domaintypes.RunID         `json:"run_id"`
 	MigID      domaintypes.MigID         `json:"mig_id"`
@@ -47,21 +30,11 @@ type RepoRunSummary struct {
 	FinishedAt *time.Time                `json:"finished_at,omitempty"`
 }
 
-// -------------------------------------------------------------------------
-// Handler implementations
-// -------------------------------------------------------------------------
-
-// listReposHandler returns an HTTP handler that lists distinct repositories.
-// GET /v1/repos — Returns a list of repo summaries with optional filtering.
-// Query parameters:
-//   - contains: substring filter for repo_url (e.g., ?contains=org/project)
+// listReposHandler handles GET /v1/repos.
 func listReposHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Parse optional filter parameter for substring matching.
 		filter := r.URL.Query().Get("contains")
 
-		// Fetch distinct repos from the store.
-		// The store query handles NULL/empty filter internally to return all repos.
 		repos, err := st.ListDistinctRepos(r.Context(), filter)
 		if err != nil {
 			writeHTTPError(w, http.StatusInternalServerError, "failed to list repos: %v", err)
@@ -76,12 +49,10 @@ func listReposHandler(st store.Store) http.HandlerFunc {
 				RepoID:  repo.RepoID,
 				RepoURL: repo.RepoUrl,
 			}
-			// Include last run timing if available.
 			if repo.LastRunAt.Valid {
 				t := repo.LastRunAt.Time
 				summary.LastRunAt = &t
 			}
-			// Include last status if the row has a valid status.
 			if repo.LastStatus != nil {
 				switch v := repo.LastStatus.(type) {
 				case string:
@@ -97,7 +68,6 @@ func listReposHandler(st store.Store) http.HandlerFunc {
 			summaries = append(summaries, summary)
 		}
 
-		// Build and return response.
 		resp := struct {
 			Repos []RepoSummary `json:"repos"`
 		}{
@@ -108,14 +78,7 @@ func listReposHandler(st store.Store) http.HandlerFunc {
 	}
 }
 
-// listRunsForRepoHandler returns an HTTP handler that lists runs for a given repository.
-// GET /v1/repos/{repo_id}/runs — Returns runs associated with the repository ID.
-// Path parameters:
-//   - repo_id: repository identifier (mig_repos.id, NanoID string)
-//
-// Query parameters:
-//   - limit: max number of runs to return (default 50, max 100)
-//   - offset: number of runs to skip (default 0)
+// listRunsForRepoHandler handles GET /v1/repos/{repo_id}/runs.
 func listRunsForRepoHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		repoID, err := parseRequiredPathID[domaintypes.RepoID](r, "repo_id")
@@ -130,7 +93,6 @@ func listRunsForRepoHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Fetch runs for this repository from the store.
 		runs, err := st.ListRunsForRepo(r.Context(), store.ListRunsForRepoParams{
 			RepoID: repoID,
 			Limit:  limit,
@@ -142,7 +104,6 @@ func listRunsForRepoHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Convert store rows to API response format.
 		summaries := make([]RepoRunSummary, 0, len(runs))
 		for _, run := range runs {
 			summary := RepoRunSummary{
@@ -165,7 +126,6 @@ func listRunsForRepoHandler(st store.Store) http.HandlerFunc {
 			summaries = append(summaries, summary)
 		}
 
-		// Build and return response.
 		resp := struct {
 			Runs []RepoRunSummary `json:"runs"`
 		}{
@@ -174,15 +134,4 @@ func listRunsForRepoHandler(st store.Store) http.HandlerFunc {
 
 		writeJSON(w, http.StatusOK, resp)
 	}
-}
-
-func asNullableJSON(raw []byte) (json.RawMessage, error) {
-	if len(raw) == 0 {
-		return nil, nil
-	}
-	if !json.Valid(raw) {
-		return nil, fmt.Errorf("invalid json payload")
-	}
-	cloned := append([]byte(nil), raw...)
-	return json.RawMessage(cloned), nil
 }
