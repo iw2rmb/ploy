@@ -2,9 +2,7 @@ ARG JAVA_BASE_GRADLE_25_IMAGE=java-base-gradle:jdk25
 FROM ${JAVA_BASE_GRADLE_25_IMAGE}
 
 LABEL org.opencontainers.image.title="ploy-gate-gradle-jdk25" \
-    org.opencontainers.image.description="Ploy Gradle gate runner image with Gradle and JDK 25" \
-    org.opencontainers.image.source="https://github.com/iw2rmb/ploy" \
-    org.opencontainers.image.licenses="MIT"
+    org.opencontainers.image.description="Ploy Gradle gate runner image with Gradle and JDK 25"
 
 ENV GRADLE_USER_HOME=/root/.gradle
 

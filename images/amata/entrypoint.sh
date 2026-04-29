@@ -37,7 +37,10 @@ activate_ccr_if_configured() {
     eval "$(ccr activate)"
   fi
 }
-source /usr/local/lib/ploy/install_ploy_ca_bundle.sh
+if [[ -f /usr/local/lib/ploy/install_ploy_ca_bundle.sh ]]; then
+  # CA bootstrap is optional for some image variants.
+  source /usr/local/lib/ploy/install_ploy_ca_bundle.sh
+fi
 
 case "${1:-}" in
   -h|--help)
@@ -53,7 +56,9 @@ fi
 out_dir="${OUTDIR:-/out}"
 mkdir -p "$out_dir" "$codex_config_dir"
 check_hydra_configs
-install_ploy_ca_bundle
+if declare -f install_ploy_ca_bundle >/dev/null 2>&1; then
+  install_ploy_ca_bundle
+fi
 activate_ccr_if_configured
 
 echo "[amata] starting amata run" >&2

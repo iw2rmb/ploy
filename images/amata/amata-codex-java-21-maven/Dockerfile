@@ -7,25 +7,14 @@ FROM ${NODE_IMAGE}
 ARG TARGETARCH
 
 LABEL org.opencontainers.image.title="amata-codex-java-21-maven" \
-    org.opencontainers.image.description="Java 21 image with Maven, Codex CLI, and Amata" \
-    org.opencontainers.image.source="https://github.com/iw2rmb/ploy" \
-    org.opencontainers.image.licenses="MIT"
+    org.opencontainers.image.description="Java 21 image with Maven, Codex CLI, and Amata"
 
-COPY images/install_ploy_ca_bundle.sh /usr/local/lib/ploy/install_ploy_ca_bundle.sh
-RUN --mount=type=secret,id=ploy_ca_certs,required=false \
-    bash -euxo pipefail -c 'if [[ -s /run/secrets/ploy_ca_certs ]]; then \
-      mkdir -p /etc/ploy/certs; \
-      cp /run/secrets/ploy_ca_certs /etc/ploy/certs/ca.crt; \
-      source /usr/local/lib/ploy/install_ploy_ca_bundle.sh; \
-      PLOY_CA_IMPORT_JAVA=1 install_ploy_ca_bundle; \
-    fi \
-    && apt-get update \
+RUN apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     bash ca-certificates coreutils curl fd-find findutils gawk git jq ripgrep unzip \
     && rm -rf /var/lib/apt/lists/* \
-    && mkdir -p /workspace /in /out /out/codex /etc/ploy/certs \
-    && chmod 700 /out/codex \
-    && chmod 755 /etc/ploy/certs'
+    && mkdir -p /workspace /in /out /out/codex \
+    && chmod 700 /out/codex
 
 COPY --from=maven-tools /opt/java/openjdk /opt/java/openjdk
 COPY --from=maven-tools /usr/share/maven /usr/share/maven
@@ -53,14 +42,7 @@ ENV JAVA_HOME=/opt/java/openjdk \
     PLOY_SERVER_URL="" \
     PLOY_CLIENT_CERT_PATH="/etc/ploy/certs/client.crt"
 
-RUN --mount=type=secret,id=ploy_ca_certs,required=false \
-    if [[ -s /run/secrets/ploy_ca_certs ]]; then \
-      mkdir -p /etc/ploy/certs; \
-      cp /run/secrets/ploy_ca_certs /etc/ploy/certs/ca.crt; \
-      source /usr/local/lib/ploy/install_ploy_ca_bundle.sh; \
-      install_ploy_ca_bundle; \
-    fi \
-    && npm install -g @openai/codex \
+RUN npm install -g @openai/codex \
     && npm cache clean --force \
     && rm -rf /root/.npm /tmp/*
 
@@ -69,7 +51,6 @@ COPY images/amata/amata-linux-${TARGETARCH} /usr/local/bin/amata
 
 RUN chmod +x \
     /usr/local/bin/ploy/entrypoint.sh \
-    /usr/local/lib/ploy/install_ploy_ca_bundle.sh \
     /usr/local/bin/amata
 
 WORKDIR /workspace
