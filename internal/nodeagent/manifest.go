@@ -23,6 +23,8 @@ const (
 	sbomMavenCollectorScript     = sbomScriptDir + "/collect-java-classpath-maven.sh"
 	sbomReleaseJDK11             = "11"
 	sbomReleaseJDK17             = "17"
+	sbomReleaseJDK21             = "21"
+	sbomReleaseJDK25             = "25"
 )
 
 // --- Shared manifest helpers ---
@@ -209,8 +211,13 @@ func sbomJobImageSpec(release string) contracts.JobImage {
 	}
 	gateGradleTag := sbomRuntimeTagForRelease(release)
 	mavenTag := "3-eclipse-temurin-17"
-	if normalizeSBOMRuntimeRelease(release) == sbomReleaseJDK11 {
+	switch normalizeSBOMRuntimeRelease(release) {
+	case sbomReleaseJDK11:
 		mavenTag = "3-eclipse-temurin-11"
+	case sbomReleaseJDK21:
+		mavenTag = "3-eclipse-temurin-21"
+	case sbomReleaseJDK25:
+		mavenTag = "3-eclipse-temurin-25"
 	}
 	return contracts.JobImage{
 		ByStack: map[contracts.MigStack]string{
@@ -235,6 +242,10 @@ func normalizeSBOMRuntimeRelease(release string) string {
 		return sbomReleaseJDK11
 	case sbomReleaseJDK17:
 		return sbomReleaseJDK17
+	case sbomReleaseJDK21:
+		return sbomReleaseJDK21
+	case sbomReleaseJDK25:
+		return sbomReleaseJDK25
 	default:
 		return sbomReleaseJDK17
 	}
@@ -244,6 +255,10 @@ func sbomRuntimeTagForRelease(release string) string {
 	switch normalizeSBOMRuntimeRelease(release) {
 	case sbomReleaseJDK11:
 		return "jdk11"
+	case sbomReleaseJDK21:
+		return "jdk21"
+	case sbomReleaseJDK25:
+		return "jdk25"
 	default:
 		return "jdk17"
 	}

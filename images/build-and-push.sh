@@ -6,10 +6,10 @@ set -Eeuo pipefail
 # Builds and pushes:
 # - server  -> server
 # - node    -> node
-# - java-bases -> java-base-maven:jdk11,jdk17; java-base-gradle:jdk11,jdk17; java-base-temurin:jdk17
-# - amata group -> java-17-codex-amata-maven, java-17-codex-amata-gradle
-# - gate-gradle -> gate-gradle:jdk11, gate-gradle:jdk17
-# - gate-maven  -> maven:3-eclipse-temurin-11, maven:3-eclipse-temurin-17
+# - java-bases -> java-base-maven:jdk11,jdk17,jdk21,jdk25; java-base-gradle:jdk11,jdk17,jdk21,jdk25; java-base-temurin:jdk17,jdk21,jdk25
+# - amata group -> java-17-codex-amata-maven, java-17-codex-amata-gradle, java-21-codex-amata-maven, java-21-codex-amata-gradle, java-25-codex-amata-maven, java-25-codex-amata-gradle
+# - gate-gradle -> gate-gradle:jdk11, gate-gradle:jdk17, gate-gradle:jdk21, gate-gradle:jdk25
+# - gate-maven  -> maven:3-eclipse-temurin-11, maven:3-eclipse-temurin-17, maven:3-eclipse-temurin-21, maven:3-eclipse-temurin-25
 # - orw/*   -> <dir name> (for example: orw-cli-maven, orw-cli-gradle)
 #
 # Inputs (env):
@@ -234,9 +234,15 @@ fi
 JAVA_BASE_BUILD_ARGS=(
   --build-arg "JAVA_BASE_MAVEN_11_IMAGE=${RESOLVED_IMAGE_PREFIX}/java-base-maven:jdk11"
   --build-arg "JAVA_BASE_MAVEN_17_IMAGE=${RESOLVED_IMAGE_PREFIX}/java-base-maven:jdk17"
+  --build-arg "JAVA_BASE_MAVEN_21_IMAGE=${RESOLVED_IMAGE_PREFIX}/java-base-maven:jdk21"
+  --build-arg "JAVA_BASE_MAVEN_25_IMAGE=${RESOLVED_IMAGE_PREFIX}/java-base-maven:jdk25"
   --build-arg "JAVA_BASE_GRADLE_11_IMAGE=${RESOLVED_IMAGE_PREFIX}/java-base-gradle:jdk11"
   --build-arg "JAVA_BASE_GRADLE_17_IMAGE=${RESOLVED_IMAGE_PREFIX}/java-base-gradle:jdk17"
+  --build-arg "JAVA_BASE_GRADLE_21_IMAGE=${RESOLVED_IMAGE_PREFIX}/java-base-gradle:jdk21"
+  --build-arg "JAVA_BASE_GRADLE_25_IMAGE=${RESOLVED_IMAGE_PREFIX}/java-base-gradle:jdk25"
   --build-arg "JAVA_BASE_TEMURIN_17_IMAGE=${RESOLVED_IMAGE_PREFIX}/java-base-temurin:jdk17"
+  --build-arg "JAVA_BASE_TEMURIN_21_IMAGE=${RESOLVED_IMAGE_PREFIX}/java-base-temurin:jdk21"
+  --build-arg "JAVA_BASE_TEMURIN_25_IMAGE=${RESOLVED_IMAGE_PREFIX}/java-base-temurin:jdk25"
 )
 
 build_push() {
@@ -344,25 +350,39 @@ if [[ "$need_java_bases" == "1" ]]; then
   # shared Java toolchain lanes
   build_push_fixed_tag java-base-maven images/java-bases/maven/Dockerfile.jdk11 . jdk11
   build_push_fixed_tag java-base-maven images/java-bases/maven/Dockerfile.jdk17 . jdk17
+  build_push_fixed_tag java-base-maven images/java-bases/maven/Dockerfile.jdk21 . jdk21
+  build_push_fixed_tag java-base-maven images/java-bases/maven/Dockerfile.jdk25 . jdk25
   build_push_fixed_tag java-base-gradle images/java-bases/gradle/Dockerfile.jdk11 . jdk11
   build_push_fixed_tag java-base-gradle images/java-bases/gradle/Dockerfile.jdk17 . jdk17
+  build_push_fixed_tag java-base-gradle images/java-bases/gradle/Dockerfile.jdk21 . jdk21
+  build_push_fixed_tag java-base-gradle images/java-bases/gradle/Dockerfile.jdk25 . jdk25
   build_push_fixed_tag java-base-temurin images/java-bases/temurin/Dockerfile.jdk17 . jdk17
+  build_push_fixed_tag java-base-temurin images/java-bases/temurin/Dockerfile.jdk21 . jdk21
+  build_push_fixed_tag java-base-temurin images/java-bases/temurin/Dockerfile.jdk25 . jdk25
 fi
 
 if group_selected "amata"; then
   PLATFORM="${PLATFORM}" bash images/amata/build-amata.sh
   build_push java-17-codex-amata-maven images/amata/java-17-codex-amata-maven/Dockerfile .
   build_push java-17-codex-amata-gradle images/amata/java-17-codex-amata-gradle/Dockerfile .
+  build_push java-21-codex-amata-maven images/amata/java-21-codex-amata-maven/Dockerfile .
+  build_push java-21-codex-amata-gradle images/amata/java-21-codex-amata-gradle/Dockerfile .
+  build_push java-25-codex-amata-maven images/amata/java-25-codex-amata-maven/Dockerfile .
+  build_push java-25-codex-amata-gradle images/amata/java-25-codex-amata-gradle/Dockerfile .
 fi
 
 if group_selected "gates"; then
   # build gate (gradle)
   build_push_fixed_tag gate-gradle images/gates/gradle/Dockerfile.jdk11 . jdk11
   build_push_fixed_tag gate-gradle images/gates/gradle/Dockerfile.jdk17 . jdk17
+  build_push_fixed_tag gate-gradle images/gates/gradle/Dockerfile.jdk21 . jdk21
+  build_push_fixed_tag gate-gradle images/gates/gradle/Dockerfile.jdk25 . jdk25
 
   # build gate (maven)
   build_push_fixed_tag maven images/gates/maven/Dockerfile.jdk11 . 3-eclipse-temurin-11
   build_push_fixed_tag maven images/gates/maven/Dockerfile.jdk17 . 3-eclipse-temurin-17
+  build_push_fixed_tag maven images/gates/maven/Dockerfile.jdk21 . 3-eclipse-temurin-21
+  build_push_fixed_tag maven images/gates/maven/Dockerfile.jdk25 . 3-eclipse-temurin-25
 fi
 
 if group_selected "orw"; then

@@ -1,0 +1,24 @@
+schema_version: 1
+repo_id: default
+runner_mode: simple
+stack:
+  language: java
+  tool: maven
+  release: "25"
+targets:
+  active: all_tests
+  build:
+    status: not_attempted
+    command: if [ -f /workspace/mvnw ]; then ./mvnw -B -e clean compile; else mvn --ff -B -q -e -DskipTests=true -Dstyle.color=never -f /workspace/pom.xml clean install; fi
+    env: {}
+  unit:
+    status: not_attempted
+    command: if [ -f /workspace/mvnw ]; then ./mvnw -B -e clean compile; else mvn --ff -B -q -e -DskipTests=false -Dstyle.color=never -f /workspace/pom.xml test; fi
+    env: {}
+  all_tests:
+    status: not_attempted
+    command: if [ -f /workspace/mvnw ]; then ./mvnw -B -e clean compile; else mvn --ff -B -q -e -DskipTests=false -Dstyle.color=never -f /workspace/pom.xml clean install; fi
+    env: {}
+orchestration:
+  pre: []
+  post: []

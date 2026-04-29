@@ -21,9 +21,11 @@ func TestNormalizeSBOMRuntimeRelease(t *testing.T) {
 	}{
 		{name: "empty falls back to jdk17", release: "", want: sbomReleaseJDK17},
 		{name: "whitespace falls back to jdk17", release: "   ", want: sbomReleaseJDK17},
-		{name: "unsupported falls back to jdk17", release: "21", want: sbomReleaseJDK17},
+		{name: "unsupported falls back to jdk17", release: "19", want: sbomReleaseJDK17},
 		{name: "jdk11 accepted", release: sbomReleaseJDK11, want: sbomReleaseJDK11},
 		{name: "jdk17 accepted", release: sbomReleaseJDK17, want: sbomReleaseJDK17},
+		{name: "jdk21 accepted", release: sbomReleaseJDK21, want: sbomReleaseJDK21},
+		{name: "jdk25 accepted", release: sbomReleaseJDK25, want: sbomReleaseJDK25},
 	}
 
 	for _, tc := range tests {
@@ -45,6 +47,12 @@ func TestSBOMRuntimeTagForRelease(t *testing.T) {
 	}
 	if got := sbomRuntimeTagForRelease(sbomReleaseJDK17); got != "jdk17" {
 		t.Fatalf("sbomRuntimeTagForRelease(jdk17)=%q, want jdk17", got)
+	}
+	if got := sbomRuntimeTagForRelease(sbomReleaseJDK21); got != "jdk21" {
+		t.Fatalf("sbomRuntimeTagForRelease(jdk21)=%q, want jdk21", got)
+	}
+	if got := sbomRuntimeTagForRelease(sbomReleaseJDK25); got != "jdk25" {
+		t.Fatalf("sbomRuntimeTagForRelease(jdk25)=%q, want jdk25", got)
 	}
 	if got := sbomRuntimeTagForRelease("unknown"); got != "jdk17" {
 		t.Fatalf("sbomRuntimeTagForRelease(unknown)=%q, want jdk17", got)
@@ -103,6 +111,29 @@ func TestApplySBOMRuntimeForStack_ConfiguresManifest(t *testing.T) {
 			stack:            contracts.MigStackJavaGradle,
 			release:          sbomReleaseJDK11,
 			wantImage:        "ghcr.io/acme/gate-gradle:jdk11",
+			wantRuntimeStack: contracts.MigStackJavaGradle,
+			wantShellSnippets: []string{
+				`PLOY_SBOM_GRADLE_CMD="/workspace/gradlew"`,
+				`PLOY_SBOM_GRADLE_CMD="gradle"`,
+				sbomGradleCollectorScript,
+			},
+		},
+		{
+			name:             "maven jdk25",
+			stack:            contracts.MigStackJavaMaven,
+			release:          sbomReleaseJDK25,
+			wantImage:        "ghcr.io/acme/maven:3-eclipse-temurin-25",
+			wantRuntimeStack: contracts.MigStackJavaMaven,
+			wantShellSnippets: []string{
+				"missing /workspace/pom.xml",
+				sbomMavenCollectorScript,
+			},
+		},
+		{
+			name:             "gradle jdk21",
+			stack:            contracts.MigStackJavaGradle,
+			release:          sbomReleaseJDK21,
+			wantImage:        "ghcr.io/acme/gate-gradle:jdk21",
 			wantRuntimeStack: contracts.MigStackJavaGradle,
 			wantShellSnippets: []string{
 				`PLOY_SBOM_GRADLE_CMD="/workspace/gradlew"`,

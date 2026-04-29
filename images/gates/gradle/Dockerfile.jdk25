@@ -1,0 +1,17 @@
+ARG JAVA_BASE_GRADLE_25_IMAGE=java-base-gradle:jdk25
+FROM ${JAVA_BASE_GRADLE_25_IMAGE}
+
+LABEL org.opencontainers.image.title="ploy-gate-gradle-jdk25" \
+    org.opencontainers.image.description="Ploy Gradle gate runner image with Gradle and JDK 25" \
+    org.opencontainers.image.source="https://github.com/iw2rmb/ploy" \
+    org.opencontainers.image.licenses="MIT"
+
+ENV GRADLE_USER_HOME=/root/.gradle
+
+RUN rm -rf /root/.gradle \
+    && mkdir -p /root/.gradle
+
+COPY images/gates/gradle/gradle.properties /root/.gradle/gradle.properties
+COPY images/gates/gradle/cache.init.gradle /root/.gradle/init.d/cache.init.gradle
+COPY --chmod=755 images/gates/shared/collect-java-classpath-gradle.sh /usr/local/lib/ploy/sbom/collect-java-classpath-gradle.sh
+COPY images/gates/shared/gradle-write-java-classpath.init.gradle /usr/local/lib/ploy/sbom/gradle-write-java-classpath.init.gradle
