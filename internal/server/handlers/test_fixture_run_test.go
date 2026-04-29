@@ -314,21 +314,7 @@ func (m *runStore) CreateJob(ctx context.Context, params store.CreateJobParams) 
 	m.createJobCalled = true
 	m.createJobCallCount++
 	m.createJobParams = append(m.createJobParams, params)
-	result := m.createJobResult
-	if result.ID.IsZero() {
-		result.ID = types.NewJobID()
-	}
-	result.RunID = params.RunID
-	result.RepoID = params.RepoID
-	result.RepoBaseRef = params.RepoBaseRef
-	result.Attempt = params.Attempt
-	result.Name = params.Name
-	result.Status = params.Status
-	result.JobType = params.JobType
-	result.JobImage = params.JobImage
-	result.NextID = params.NextID
-	result.RepoShaIn = params.RepoShaIn
-	result.Meta = params.Meta
+	result := buildCreateJobResult(m.createJobResult, params)
 	return result, m.createJobErr
 }
 

@@ -117,7 +117,7 @@ func newClaimJobFixture(t testing.TB, opts claimJobFixtureOptions) *claimJobFixt
 }
 
 func (f *claimJobFixture) serve() *httptest.ResponseRecorder {
-	handler := claimJobHandler(f.store, nil, f.config)
+	handler := claimJobHandlerWithEvents(f.store, nil, nil, f.config)
 	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+f.nodeKey+"/claim", nil)
 	req.SetPathValue("id", f.nodeKey)
 	rr := httptest.NewRecorder()

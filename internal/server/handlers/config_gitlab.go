@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"log/slog"
 	"net/http"
 	"sort"
@@ -52,9 +51,9 @@ type ConfigHolder struct {
 	globalEnv  map[string][]GlobalEnvVar
 	hydra      map[string]*HydraJobConfig
 	configCA   map[string][]string          // section → []hash
-	configHome map[string][]ConfigHomeEntry  // section → []entry
-	configIn   map[string][]ConfigInEntry    // section → []entry
-	bundleMap  map[string]string             // shortHash → bundleID (content-addressed, global)
+	configHome map[string][]ConfigHomeEntry // section → []entry
+	configIn   map[string][]ConfigInEntry   // section → []entry
+	bundleMap  map[string]string            // shortHash → bundleID (content-addressed, global)
 }
 
 // NewConfigHolder creates a new config holder with initial GitLab config and
@@ -86,6 +85,92 @@ func (h *ConfigHolder) SetGitLab(cfg config.GitLabConfig) {
 	h.gitlab = cfg
 }
 
+func copySectionSlice[T any](m map[string][]T, section string) []T {
+	entries := m[section]
+	if len(entries) == 0 {
+		return nil
+	}
+	cp := make([]T, len(entries))
+	copy(cp, entries)
+	return cp
+}
+
+func copySectionMap[T any](m map[string][]T) map[string][]T {
+	if len(m) == 0 {
+		return nil
+	}
+	cp := make(map[string][]T, len(m))
+	for k, v := range m {
+		s := make([]T, len(v))
+		copy(s, v)
+		cp[k] = s
+	}
+	return cp
+}
+
+func setSectionSlice[T any](m map[string][]T, section string, entries []T) map[string][]T {
+	if m == nil {
+		m = make(map[string][]T)
+	}
+	if len(entries) == 0 {
+		delete(m, section)
+		return m
+	}
+	cp := make([]T, len(entries))
+	copy(cp, entries)
+	m[section] = cp
+	return m
+}
+
+func upsertSectionBy[T any](m map[string][]T, section string, entry T, match func(a, b T) bool, less func(a, b T) bool) map[string][]T {
+	if m == nil {
+		m = make(map[string][]T)
+	}
+	entries := m[section]
+	for i := range entries {
+		if match(entries[i], entry) {
+			entries[i] = entry
+			m[section] = entries
+			return m
+		}
+	}
+	entries = append(entries, entry)
+	if less != nil {
+		sort.Slice(entries, func(i, j int) bool { return less(entries[i], entries[j]) })
+	}
+	m[section] = entries
+	return m
+}
+
+func deleteSectionBy[T any](m map[string][]T, section string, match func(T) bool) map[string][]T {
+	entries := m[section]
+	for i := range entries {
+		if !match(entries[i]) {
+			continue
+		}
+		entries = append(entries[:i], entries[i+1:]...)
+		if len(entries) == 0 {
+			delete(m, section)
+		} else {
+			m[section] = entries
+		}
+		return m
+	}
+	return m
+}
+
+func (h *ConfigHolder) ensureHydraSectionLocked(section string) *HydraJobConfig {
+	if h.hydra == nil {
+		h.hydra = make(map[string]*HydraJobConfig)
+	}
+	cfg := h.hydra[section]
+	if cfg == nil {
+		cfg = &HydraJobConfig{}
+		h.hydra[section] = cfg
+	}
+	return cfg
+}
+
 // GetGlobalEnvEntries retrieves all entries for a key (one per target).
 // Returns nil if the key does not exist.
 func (h *ConfigHolder) GetGlobalEnvEntries(key string) []GlobalEnvVar {
@@ -98,18 +183,6 @@ func (h *ConfigHolder) GetGlobalEnvEntries(key string) []GlobalEnvVar {
 	cp := make([]GlobalEnvVar, len(entries))
 	copy(cp, entries)
 	return cp
-}
-
-// GetGlobalEnvVar retrieves a single global env var by key.
-// Returns the first entry and true if found, or a zero value and false if not.
-func (h *ConfigHolder) GetGlobalEnvVar(key string) (GlobalEnvVar, bool) {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
-	entries := h.globalEnv[key]
-	if len(entries) == 0 {
-		return GlobalEnvVar{}, false
-	}
-	return entries[0], true
 }
 
 // SetGlobalEnvVar sets or updates a global environment variable by key+target.
@@ -169,31 +242,6 @@ func (h *ConfigHolder) GetHydraOverlays() map[string]*HydraJobConfig {
 	return cp
 }
 
-// SetHydraJobConfig sets the Hydra overlay for a named section.
-// Section must be one of: pre_gate, post_gate, mig.
-func (h *ConfigHolder) SetHydraJobConfig(section string, cfg *HydraJobConfig) error {
-	if err := ValidateHydraSection(section); err != nil {
-		return err
-	}
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	if h.hydra == nil {
-		h.hydra = make(map[string]*HydraJobConfig)
-	}
-	if cfg == nil {
-		delete(h.hydra, section)
-	} else {
-		h.hydra[section] = &HydraJobConfig{
-			Envs: copyStringMap(cfg.Envs),
-			CA:   copyStringSlice(cfg.CA),
-			In:   copyStringSlice(cfg.In),
-			Out:  copyStringSlice(cfg.Out),
-			Home: copyStringSlice(cfg.Home),
-		}
-	}
-	return nil
-}
-
 // gitLabConfigResponse is the wire format for GET/PUT /v1/config/gitlab.
 type gitLabConfigResponse struct {
 	Domain string `json:"domain"`
@@ -212,11 +260,7 @@ func getGitLabConfigHandler(holder *ConfigHolder) http.HandlerFunc {
 			Token:  cfg.Token,
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			slog.Error("config gitlab get: encode response failed", "err", err)
-		}
+		writeJSON(w, http.StatusOK, resp)
 
 		slog.Info("config gitlab get: returned configuration",
 			"domain", cfg.Domain,
@@ -251,11 +295,7 @@ func putGitLabConfigHandler(holder *ConfigHolder) http.HandlerFunc {
 			Token:  req.Token,
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			slog.Error("config gitlab put: encode response failed", "err", err)
-		}
+		writeJSON(w, http.StatusOK, resp)
 
 		slog.Info("config gitlab put: configuration updated",
 			"domain", req.Domain,
@@ -268,45 +308,21 @@ func putGitLabConfigHandler(holder *ConfigHolder) http.HandlerFunc {
 func (h *ConfigHolder) GetConfigCA(section string) []string {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
-	entries := h.configCA[section]
-	if len(entries) == 0 {
-		return nil
-	}
-	cp := make([]string, len(entries))
-	copy(cp, entries)
-	return cp
+	return copySectionSlice(h.configCA, section)
 }
 
 // GetConfigCAAll returns a copy of all CA entries keyed by section.
 func (h *ConfigHolder) GetConfigCAAll() map[string][]string {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
-	if len(h.configCA) == 0 {
-		return nil
-	}
-	cp := make(map[string][]string, len(h.configCA))
-	for k, v := range h.configCA {
-		s := make([]string, len(v))
-		copy(s, v)
-		cp[k] = s
-	}
-	return cp
+	return copySectionMap(h.configCA)
 }
 
 // SetConfigCA replaces the CA hash set for a section and syncs into hydra overlays.
 func (h *ConfigHolder) SetConfigCA(section string, hashes []string) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	if h.configCA == nil {
-		h.configCA = make(map[string][]string)
-	}
-	if len(hashes) == 0 {
-		delete(h.configCA, section)
-	} else {
-		cp := make([]string, len(hashes))
-		copy(cp, hashes)
-		h.configCA[section] = cp
-	}
+	h.configCA = setSectionSlice(h.configCA, section, hashes)
 	h.syncHydraCALocked(section)
 }
 
@@ -347,14 +363,7 @@ func (h *ConfigHolder) DeleteConfigCA(section, hash string) {
 // syncHydraCALocked updates the hydra overlay CA field for a section.
 // Must be called with h.mu held.
 func (h *ConfigHolder) syncHydraCALocked(section string) {
-	if h.hydra == nil {
-		h.hydra = make(map[string]*HydraJobConfig)
-	}
-	cfg := h.hydra[section]
-	if cfg == nil {
-		cfg = &HydraJobConfig{}
-		h.hydra[section] = cfg
-	}
+	cfg := h.ensureHydraSectionLocked(section)
 	cfg.CA = copyStringSlice(h.configCA[section])
 }
 
@@ -362,45 +371,21 @@ func (h *ConfigHolder) syncHydraCALocked(section string) {
 func (h *ConfigHolder) GetConfigHome(section string) []ConfigHomeEntry {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
-	entries := h.configHome[section]
-	if len(entries) == 0 {
-		return nil
-	}
-	cp := make([]ConfigHomeEntry, len(entries))
-	copy(cp, entries)
-	return cp
+	return copySectionSlice(h.configHome, section)
 }
 
 // GetConfigHomeAll returns a copy of all home entries keyed by section.
 func (h *ConfigHolder) GetConfigHomeAll() map[string][]ConfigHomeEntry {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
-	if len(h.configHome) == 0 {
-		return nil
-	}
-	cp := make(map[string][]ConfigHomeEntry, len(h.configHome))
-	for k, v := range h.configHome {
-		s := make([]ConfigHomeEntry, len(v))
-		copy(s, v)
-		cp[k] = s
-	}
-	return cp
+	return copySectionMap(h.configHome)
 }
 
 // SetConfigHome replaces the home entry set for a section and syncs into hydra overlays.
 func (h *ConfigHolder) SetConfigHome(section string, entries []ConfigHomeEntry) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	if h.configHome == nil {
-		h.configHome = make(map[string][]ConfigHomeEntry)
-	}
-	if len(entries) == 0 {
-		delete(h.configHome, section)
-	} else {
-		cp := make([]ConfigHomeEntry, len(entries))
-		copy(cp, entries)
-		h.configHome[section] = cp
-	}
+	h.configHome = setSectionSlice(h.configHome, section, entries)
 	h.syncHydraHomeLocked(section)
 }
 
@@ -408,22 +393,13 @@ func (h *ConfigHolder) SetConfigHome(section string, entries []ConfigHomeEntry) 
 func (h *ConfigHolder) AddConfigHome(section string, entry ConfigHomeEntry) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	if h.configHome == nil {
-		h.configHome = make(map[string][]ConfigHomeEntry)
-	}
-	entries := h.configHome[section]
-	for i, e := range entries {
-		if e.Dst == entry.Dst {
-			entries[i] = entry
-			h.configHome[section] = entries
-			h.syncHydraHomeLocked(section)
-			return
-		}
-	}
-	h.configHome[section] = append(entries, entry)
-	sort.Slice(h.configHome[section], func(i, j int) bool {
-		return h.configHome[section][i].Dst < h.configHome[section][j].Dst
-	})
+	h.configHome = upsertSectionBy(
+		h.configHome,
+		section,
+		entry,
+		func(a, b ConfigHomeEntry) bool { return a.Dst == b.Dst },
+		func(a, b ConfigHomeEntry) bool { return a.Dst < b.Dst },
+	)
 	h.syncHydraHomeLocked(section)
 }
 
@@ -431,30 +407,14 @@ func (h *ConfigHolder) AddConfigHome(section string, entry ConfigHomeEntry) {
 func (h *ConfigHolder) DeleteConfigHome(section, dst string) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	entries := h.configHome[section]
-	for i, e := range entries {
-		if e.Dst == dst {
-			h.configHome[section] = append(entries[:i], entries[i+1:]...)
-			if len(h.configHome[section]) == 0 {
-				delete(h.configHome, section)
-			}
-			break
-		}
-	}
+	h.configHome = deleteSectionBy(h.configHome, section, func(e ConfigHomeEntry) bool { return e.Dst == dst })
 	h.syncHydraHomeLocked(section)
 }
 
 // syncHydraHomeLocked updates the hydra overlay Home field for a section.
 // Must be called with h.mu held.
 func (h *ConfigHolder) syncHydraHomeLocked(section string) {
-	if h.hydra == nil {
-		h.hydra = make(map[string]*HydraJobConfig)
-	}
-	cfg := h.hydra[section]
-	if cfg == nil {
-		cfg = &HydraJobConfig{}
-		h.hydra[section] = cfg
-	}
+	cfg := h.ensureHydraSectionLocked(section)
 	entries := h.configHome[section]
 	home := make([]string, len(entries))
 	for i, e := range entries {
@@ -463,49 +423,11 @@ func (h *ConfigHolder) syncHydraHomeLocked(section string) {
 	cfg.Home = home
 }
 
-// GetConfigIn returns all in entries for a section (sorted by dst).
-func (h *ConfigHolder) GetConfigIn(section string) []ConfigInEntry {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
-	entries := h.configIn[section]
-	if len(entries) == 0 {
-		return nil
-	}
-	cp := make([]ConfigInEntry, len(entries))
-	copy(cp, entries)
-	return cp
-}
-
-// GetConfigInAll returns a copy of all in entries keyed by section.
-func (h *ConfigHolder) GetConfigInAll() map[string][]ConfigInEntry {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
-	if len(h.configIn) == 0 {
-		return nil
-	}
-	cp := make(map[string][]ConfigInEntry, len(h.configIn))
-	for k, v := range h.configIn {
-		s := make([]ConfigInEntry, len(v))
-		copy(s, v)
-		cp[k] = s
-	}
-	return cp
-}
-
 // SetConfigIn replaces the in entry set for a section and syncs into hydra overlays.
 func (h *ConfigHolder) SetConfigIn(section string, entries []ConfigInEntry) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	if h.configIn == nil {
-		h.configIn = make(map[string][]ConfigInEntry)
-	}
-	if len(entries) == 0 {
-		delete(h.configIn, section)
-	} else {
-		cp := make([]ConfigInEntry, len(entries))
-		copy(cp, entries)
-		h.configIn[section] = cp
-	}
+	h.configIn = setSectionSlice(h.configIn, section, entries)
 	h.syncHydraInLocked(section)
 }
 
@@ -513,22 +435,13 @@ func (h *ConfigHolder) SetConfigIn(section string, entries []ConfigInEntry) {
 func (h *ConfigHolder) AddConfigIn(section string, entry ConfigInEntry) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	if h.configIn == nil {
-		h.configIn = make(map[string][]ConfigInEntry)
-	}
-	entries := h.configIn[section]
-	for i, e := range entries {
-		if e.Dst == entry.Dst {
-			entries[i] = entry
-			h.configIn[section] = entries
-			h.syncHydraInLocked(section)
-			return
-		}
-	}
-	h.configIn[section] = append(entries, entry)
-	sort.Slice(h.configIn[section], func(i, j int) bool {
-		return h.configIn[section][i].Dst < h.configIn[section][j].Dst
-	})
+	h.configIn = upsertSectionBy(
+		h.configIn,
+		section,
+		entry,
+		func(a, b ConfigInEntry) bool { return a.Dst == b.Dst },
+		func(a, b ConfigInEntry) bool { return a.Dst < b.Dst },
+	)
 	h.syncHydraInLocked(section)
 }
 
@@ -536,30 +449,14 @@ func (h *ConfigHolder) AddConfigIn(section string, entry ConfigInEntry) {
 func (h *ConfigHolder) DeleteConfigIn(section, dst string) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	entries := h.configIn[section]
-	for i, e := range entries {
-		if e.Dst == dst {
-			h.configIn[section] = append(entries[:i], entries[i+1:]...)
-			if len(h.configIn[section]) == 0 {
-				delete(h.configIn, section)
-			}
-			break
-		}
-	}
+	h.configIn = deleteSectionBy(h.configIn, section, func(e ConfigInEntry) bool { return e.Dst == dst })
 	h.syncHydraInLocked(section)
 }
 
 // syncHydraInLocked updates the hydra overlay In field for a section.
 // Must be called with h.mu held.
 func (h *ConfigHolder) syncHydraInLocked(section string) {
-	if h.hydra == nil {
-		h.hydra = make(map[string]*HydraJobConfig)
-	}
-	cfg := h.hydra[section]
-	if cfg == nil {
-		cfg = &HydraJobConfig{}
-		h.hydra[section] = cfg
-	}
+	cfg := h.ensureHydraSectionLocked(section)
 	entries := h.configIn[section]
 	in := make([]string, len(entries))
 	for i, e := range entries {

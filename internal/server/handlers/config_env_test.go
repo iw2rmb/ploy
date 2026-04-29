@@ -13,7 +13,7 @@ import (
 func TestConfigEnvListReturnsAllEntries(t *testing.T) {
 	holder := NewConfigHolder(config.GitLabConfig{}, map[string][]GlobalEnvVar{
 		"PLOY_CA_CERTS": {{Value: "-----BEGIN CERTIFICATE-----\n...", Target: domaintypes.GlobalEnvTargetGates, Secret: true}},
-		"API_KEY":             {{Value: "sk-abc123", Target: domaintypes.GlobalEnvTargetSteps, Secret: false}},
+		"API_KEY":       {{Value: "sk-abc123", Target: domaintypes.GlobalEnvTargetSteps, Secret: false}},
 	})
 
 	handler := listGlobalEnvHandler(holder)
@@ -221,10 +221,11 @@ func TestConfigEnvPutUpsertsEntry(t *testing.T) {
 	}
 
 	// Verify holder was updated.
-	v, ok := holder.GetGlobalEnvVar("OPENAI_API_KEY")
-	if !ok {
+	entries := holder.GetGlobalEnvEntries("OPENAI_API_KEY")
+	if len(entries) != 1 {
 		t.Fatal("holder does not contain OPENAI_API_KEY")
 	}
+	v := entries[0]
 	if v.Value != "sk-abc123" {
 		t.Errorf("holder Value = %q", v.Value)
 	}
@@ -259,7 +260,7 @@ func TestConfigEnvPutDefaultsSecretToTrue(t *testing.T) {
 		t.Error("store Secret = false, want true (default)")
 	}
 
-	v, _ := holder.GetGlobalEnvVar("TEST_KEY")
+	v := holder.GetGlobalEnvEntries("TEST_KEY")[0]
 	if !v.Secret {
 		t.Error("holder Secret = false, want true")
 	}
@@ -349,7 +350,7 @@ func TestConfigEnvDeleteRemovesEntry(t *testing.T) {
 	}
 
 	// Verify holder was updated.
-	if _, ok := holder.GetGlobalEnvVar("OLD_KEY"); ok {
+	if len(holder.GetGlobalEnvEntries("OLD_KEY")) > 0 {
 		t.Error("holder still contains OLD_KEY after delete")
 	}
 }
@@ -521,7 +522,7 @@ func TestConfigEnvPutStoreError(t *testing.T) {
 	assertStatus(t, rr, http.StatusInternalServerError)
 
 	// Holder should not be updated on store failure.
-	if _, ok := holder.GetGlobalEnvVar("TEST"); ok {
+	if len(holder.GetGlobalEnvEntries("TEST")) > 0 {
 		t.Error("holder should not contain TEST after store failure")
 	}
 }
@@ -541,7 +542,7 @@ func TestConfigEnvDeleteStoreError(t *testing.T) {
 	assertStatus(t, rr, http.StatusInternalServerError)
 
 	// Holder should not be updated on store failure.
-	if _, ok := holder.GetGlobalEnvVar("OLD_KEY"); !ok {
+	if len(holder.GetGlobalEnvEntries("OLD_KEY")) == 0 {
 		t.Error("holder should still contain OLD_KEY after store failure")
 	}
 }
@@ -578,7 +579,7 @@ func TestConfigEnvPut_SpecialKeyBlocked(t *testing.T) {
 			if st.upsertGlobalEnv.called {
 				t.Error("store.UpsertGlobalEnv should not be called for migrated special key")
 			}
-			if _, ok := holder.GetGlobalEnvVar(tt.key); ok {
+			if len(holder.GetGlobalEnvEntries(tt.key)) > 0 {
 				t.Error("holder should not contain the rejected key")
 			}
 		})

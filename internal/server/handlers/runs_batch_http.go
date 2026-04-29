@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -26,9 +25,8 @@ import (
 // - Cancels waiting/running jobs (Created/Queued/Running → Cancelled)
 func cancelRunHandlerV1(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		runID, err := parseRequiredPathID[domaintypes.RunID](r, "id")
-		if err != nil {
-			writeHTTPError(w, http.StatusBadRequest, "%s", err)
+		runID, ok := parseRequiredPathIDOrWriteError[domaintypes.RunID](w, r, "id")
+		if !ok {
 			return
 		}
 
@@ -43,9 +41,7 @@ func cancelRunHandlerV1(st store.Store) http.HandlerFunc {
 			if counts, _ := getRunRepoCounts(r.Context(), st, run.ID); counts != nil && counts.Total > 0 {
 				summary.Counts = counts
 			}
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
-			_ = json.NewEncoder(w).Encode(summary)
+			writeJSON(w, http.StatusOK, summary)
 			return
 		}
 
@@ -61,9 +57,7 @@ func cancelRunHandlerV1(st store.Store) http.HandlerFunc {
 		if counts, _ := getRunRepoCounts(r.Context(), st, run.ID); counts != nil && counts.Total > 0 {
 			summary.Counts = counts
 		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode(summary)
+		writeJSON(w, http.StatusOK, summary)
 	}
 }
 
@@ -71,9 +65,8 @@ func cancelRunHandlerV1(st store.Store) http.HandlerFunc {
 // POST /v1/runs/{id}/repos — Body {repo_url, base_ref, target_ref}.
 func addRunRepoHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		runID, err := parseRequiredPathID[domaintypes.RunID](r, "id")
-		if err != nil {
-			writeHTTPError(w, http.StatusBadRequest, "%s", err)
+		runID, ok := parseRequiredPathIDOrWriteError[domaintypes.RunID](w, r, "id")
+		if !ok {
 			return
 		}
 
@@ -155,9 +148,7 @@ func addRunRepoHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
-		_ = json.NewEncoder(w).Encode(runRepoToResponse(runRepo, repoURL, false, false))
+		writeJSON(w, http.StatusCreated, runRepoToResponse(runRepo, repoURL, false, false))
 	}
 }
 
@@ -165,9 +156,8 @@ func addRunRepoHandler(st store.Store) http.HandlerFunc {
 // GET /v1/runs/{id}/repos
 func listRunReposHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		runID, err := parseRequiredPathID[domaintypes.RunID](r, "id")
-		if err != nil {
-			writeHTTPError(w, http.StatusBadRequest, "%s", err)
+		runID, ok := parseRequiredPathIDOrWriteError[domaintypes.RunID](w, r, "id")
+		if !ok {
 			return
 		}
 
@@ -207,9 +197,7 @@ func listRunReposHandler(st store.Store) http.HandlerFunc {
 			Repos []RunRepoResponse `json:"repos"`
 		}{Repos: reposResp}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode(resp)
+		writeJSON(w, http.StatusOK, resp)
 	}
 }
 
@@ -217,14 +205,12 @@ func listRunReposHandler(st store.Store) http.HandlerFunc {
 // POST /v1/runs/{run_id}/repos/{repo_id}/cancel
 func cancelRunRepoHandlerV1(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		runID, err := parseRequiredPathID[domaintypes.RunID](r, "run_id")
-		if err != nil {
-			writeHTTPError(w, http.StatusBadRequest, "%s", err)
+		runID, ok := parseRequiredPathIDOrWriteError[domaintypes.RunID](w, r, "run_id")
+		if !ok {
 			return
 		}
-		repoID, err := parseRequiredPathID[domaintypes.RepoID](r, "repo_id")
-		if err != nil {
-			writeHTTPError(w, http.StatusBadRequest, "%s", err)
+		repoID, ok := parseRequiredPathIDOrWriteError[domaintypes.RepoID](w, r, "repo_id")
+		if !ok {
 			return
 		}
 
@@ -244,9 +230,7 @@ func cancelRunRepoHandlerV1(st store.Store) http.HandlerFunc {
 			if resolvedURL, err := repoURLForID(r.Context(), st, rr.RepoID); err == nil {
 				repoURL = resolvedURL
 			}
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
-			_ = json.NewEncoder(w).Encode(runRepoToResponse(rr, repoURL, false, false))
+			writeJSON(w, http.StatusOK, runRepoToResponse(rr, repoURL, false, false))
 			return
 		}
 
@@ -282,9 +266,7 @@ func cancelRunRepoHandlerV1(st store.Store) http.HandlerFunc {
 		if resolvedURL, err := repoURLForID(r.Context(), st, rr.RepoID); err == nil {
 			repoURL = resolvedURL
 		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode(runRepoToResponse(rr, repoURL, false, false))
+		writeJSON(w, http.StatusOK, runRepoToResponse(rr, repoURL, false, false))
 	}
 }
 
@@ -296,14 +278,12 @@ func restartRunRepoHandler(st store.Store, hookBlobstores ...blobstore.Store) ht
 		bs = hookBlobstores[0]
 	}
 	return func(w http.ResponseWriter, r *http.Request) {
-		runID, err := parseRequiredPathID[domaintypes.RunID](r, "id")
-		if err != nil {
-			writeHTTPError(w, http.StatusBadRequest, "%s", err)
+		runID, ok := parseRequiredPathIDOrWriteError[domaintypes.RunID](w, r, "id")
+		if !ok {
 			return
 		}
-		repoID, err := parseRequiredPathID[domaintypes.RepoID](r, "repo_id")
-		if err != nil {
-			writeHTTPError(w, http.StatusBadRequest, "%s", err)
+		repoID, ok := parseRequiredPathIDOrWriteError[domaintypes.RepoID](w, r, "repo_id")
+		if !ok {
 			return
 		}
 
@@ -400,9 +380,7 @@ func restartRunRepoHandler(st store.Store, hookBlobstores ...blobstore.Store) ht
 			repoURL = resolvedURL
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode(runRepoToResponse(runRepo, repoURL, false, false))
+		writeJSON(w, http.StatusOK, runRepoToResponse(runRepo, repoURL, false, false))
 	}
 }
 
@@ -439,9 +417,8 @@ func startRunHandler(st store.Store, hookBlobstores ...blobstore.Store) http.Han
 	starter := NewBatchRepoStarter(st, hookBlobstores...)
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		runID, err := parseRequiredPathID[domaintypes.RunID](r, "id")
-		if err != nil {
-			writeHTTPError(w, http.StatusBadRequest, "%s", err)
+		runID, ok := parseRequiredPathIDOrWriteError[domaintypes.RunID](w, r, "id")
+		if !ok {
 			return
 		}
 
@@ -463,8 +440,6 @@ func startRunHandler(st store.Store, hookBlobstores ...blobstore.Store) http.Han
 			Pending:     result.Pending,
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode(resp)
+		writeJSON(w, http.StatusOK, resp)
 	}
 }

@@ -50,7 +50,6 @@ type jobStore struct {
 	scheduleNextJob           mockCall[store.ScheduleNextJobParams, store.Job]
 	promoteJobByIDIfUnblocked mockCall[types.JobID, store.Job]
 
-
 	// Job counts
 	countJobsByRunResult                   int64
 	countJobsByRunErr                      error
@@ -75,7 +74,7 @@ type jobStore struct {
 	hasSBOMEvidenceForStack mockResult[bool]
 	deleteSBOMRowsByJob     mockCallSlice[types.JobID, struct{}]
 
-	upsertSBOMRow         mockCallSlice[store.UpsertSBOMRowParams, struct{}]
+	upsertSBOMRow mockCallSlice[store.UpsertSBOMRowParams, struct{}]
 
 	// Stack/Gate profile resolution
 	resolveStackRowByImage           mockResult[store.ResolveStackRowByImageRow]
@@ -199,21 +198,7 @@ func (m *jobStore) GetJob(ctx context.Context, id types.JobID) (store.Job, error
 func (m *jobStore) CreateJob(ctx context.Context, params store.CreateJobParams) (store.Job, error) {
 	m.createJob.called = true
 	m.createJob.calls = append(m.createJob.calls, params)
-	result := m.createJob.val
-	if result.ID.IsZero() {
-		result.ID = types.NewJobID()
-	}
-	result.RunID = params.RunID
-	result.RepoID = params.RepoID
-	result.RepoBaseRef = params.RepoBaseRef
-	result.Attempt = params.Attempt
-	result.Name = params.Name
-	result.Status = params.Status
-	result.JobType = params.JobType
-	result.JobImage = params.JobImage
-	result.NextID = params.NextID
-	result.RepoShaIn = params.RepoShaIn
-	result.Meta = params.Meta
+	result := buildCreateJobResult(m.createJob.val, params)
 	return result, m.createJob.err
 }
 
