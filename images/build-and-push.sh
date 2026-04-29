@@ -7,10 +7,10 @@ set -Eeuo pipefail
 # - server  -> server
 # - node    -> node
 # - java-bases -> java-base-maven:jdk11,jdk17,jdk21,jdk25; java-base-gradle:jdk11,jdk17,jdk21,jdk25; java-base-temurin:jdk17,jdk21,jdk25
-# - amata group -> java-17-codex-amata-maven, java-17-codex-amata-gradle, java-21-codex-amata-maven, java-21-codex-amata-gradle, java-25-codex-amata-maven, java-25-codex-amata-gradle
+# - amata group -> amata-codex-java-17-maven, amata-codex-java-17-gradle, amata-codex-java-21-maven, amata-codex-java-21-gradle, amata-codex-java-25-maven, amata-codex-java-25-gradle
 # - gate-gradle -> gate-gradle:jdk11, gate-gradle:jdk17, gate-gradle:jdk21, gate-gradle:jdk25
 # - gate-maven  -> maven:3-eclipse-temurin-11, maven:3-eclipse-temurin-17, maven:3-eclipse-temurin-21, maven:3-eclipse-temurin-25
-# - orw/*   -> <dir name> (for example: orw-cli-maven, orw-cli-gradle)
+# - orw/*   -> <dir name> (for example: orw-cli-java-17-maven, orw-cli-java-17-gradle)
 #
 # Inputs (env):
 #   PLATFORM - Optional: comma list of platforms (default linux/amd64)
@@ -363,12 +363,12 @@ fi
 
 if group_selected "amata"; then
   PLATFORM="${PLATFORM}" bash images/amata/build-amata.sh
-  build_push java-17-codex-amata-maven images/amata/java-17-codex-amata-maven/Dockerfile .
-  build_push java-17-codex-amata-gradle images/amata/java-17-codex-amata-gradle/Dockerfile .
-  build_push java-21-codex-amata-maven images/amata/java-21-codex-amata-maven/Dockerfile .
-  build_push java-21-codex-amata-gradle images/amata/java-21-codex-amata-gradle/Dockerfile .
-  build_push java-25-codex-amata-maven images/amata/java-25-codex-amata-maven/Dockerfile .
-  build_push java-25-codex-amata-gradle images/amata/java-25-codex-amata-gradle/Dockerfile .
+  build_push amata-codex-java-17-maven images/amata/amata-codex-java-17-maven/Dockerfile .
+  build_push amata-codex-java-17-gradle images/amata/amata-codex-java-17-gradle/Dockerfile .
+  build_push amata-codex-java-21-maven images/amata/amata-codex-java-21-maven/Dockerfile .
+  build_push amata-codex-java-21-gradle images/amata/amata-codex-java-21-gradle/Dockerfile .
+  build_push amata-codex-java-25-maven images/amata/amata-codex-java-25-maven/Dockerfile .
+  build_push amata-codex-java-25-gradle images/amata/amata-codex-java-25-gradle/Dockerfile .
 fi
 
 if group_selected "gates"; then

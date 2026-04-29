@@ -44,9 +44,7 @@ type RunJobEntry struct {
 	FinishedAt          *time.Time            `json:"finished_at,omitempty"`
 	DurationMs          int64                 `json:"duration_ms"`
 	DisplayName         string                `json:"display_name,omitempty"`
-	ActionSummary       string                `json:"action_summary,omitempty"`
 	BugSummary          string                `json:"bug_summary,omitempty"`
-	ErrorKind           string                `json:"error_kind,omitempty"`
 	Recovery            *RunJobRecovery       `json:"recovery,omitempty"`
 	SBOMEvidence        *RunJobSBOMEvidence   `json:"sbom_evidence,omitempty"`
 	Artifacts           []RunJobArtifact      `json:"artifacts,omitempty"`

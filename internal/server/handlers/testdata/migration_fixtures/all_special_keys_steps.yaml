@@ -29,22 +29,22 @@ expect:
       action: rewrite
       target_field: home
       destination: ".claude-code/config.json"
-      sections: [heal, mig]
+      sections: [mig]
     - env_key: CODEX_AUTH_JSON
       target: steps
       action: rewrite
       target_field: home
       destination: ".codex/auth.json"
-      sections: [heal, mig]
+      sections: [mig]
     - env_key: CODEX_CONFIG_TOML
       target: steps
       action: rewrite
       target_field: home
       destination: ".codex/config.toml"
-      sections: [heal, mig]
+      sections: [mig]
     - env_key: CRUSH_JSON
       target: steps
       action: rewrite
       target_field: home
       destination: ".config/crush/crush.json"
-      sections: [heal, mig]
+      sections: [mig]

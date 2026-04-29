@@ -18,17 +18,17 @@
 **Build + Publish Migs Images (Local Registry)**
 
 - Build Migs images (requires Docker):
-  - OpenRewrite CLI (Maven): `docker buildx build --platform linux/amd64 -f images/orw/orw-cli-maven/Dockerfile -t orw-cli-maven:e2e .`
-  - OpenRewrite CLI (Gradle): `docker buildx build --platform linux/amd64 -f images/orw/orw-cli-gradle/Dockerfile -t orw-cli-gradle:e2e .`
-  - Codex+Amata Maven lane: from repo root run `bash images/amata/build-amata.sh`, then `docker buildx build --platform linux/amd64 -f images/amata/java-17-codex-amata-maven/Dockerfile -t java-17-codex-amata-maven:e2e .`
+  - OpenRewrite CLI (Maven): `docker buildx build --platform linux/amd64 -f images/orw/orw-cli-java-17-maven/Dockerfile -t orw-cli-java-17-maven:e2e .`
+  - OpenRewrite CLI (Gradle): `docker buildx build --platform linux/amd64 -f images/orw/orw-cli-java-17-gradle/Dockerfile -t orw-cli-java-17-gradle:e2e .`
+  - Codex+Amata Maven lane: from repo root run `bash images/amata/build-amata.sh`, then `docker buildx build --platform linux/amd64 -f images/amata/amata-codex-java-17-maven/Dockerfile -t amata-codex-java-17-maven:e2e .`
   - Optional: `migs-llm`, `migs-plan` as needed.
 - Push to local registry using the helper script:
   - `IMAGE_PREFIX=localhost:5000/ploy VERSION=v0.1.0 images/build-and-push.sh`
-  - The script pushes `java-17-codex-amata-maven`, `java-17-codex-amata-gradle`, `orw-cli-maven`, `orw-cli-gradle`, plus `server` and `node`.
+  - The script pushes `amata-codex-java-17-maven`, `amata-codex-java-17-gradle`, `orw-cli-java-17-maven`, `orw-cli-java-17-gradle`, plus `server` and `node`.
   - Images publish as `$IMAGE_PREFIX/<name>:<tag>`.
 
 Notes:
-- Directory→repo mapping: `mig-foo` (folder) corresponds to registry repo `ploy/migs-foo`; `orw-cli-maven`/`orw-cli-gradle` keep their directory names.
+- Directory→repo mapping: `mig-foo` (folder) corresponds to registry repo `ploy/migs-foo`; `orw-cli-java-17-maven`/`orw-cli-java-17-gradle` keep their directory names.
 - The LLM image is a safe E2E stub: when it sees the sample’s failing branch, it creates `src/main/java/e2e/UnknownClass.java` to fix the compile.
 - The Codex healer now uses a **workspace diff handshake**: Codex edits the workspace and exits when done. The node agent then inspects the workspace via `git status --porcelain` and only re-runs the Build Gate externally when changes are present. Codex no longer invokes Build Gate tooling directly from inside the container.
 - ORW runtime isolation contract: OpenRewrite runs through `orw-cli` only; `transform.log` must not contain `rewriteRun` or `rewrite-maven-plugin:run`.
@@ -111,7 +111,7 @@ Healing verification uses the same repo+diff semantics as the unified jobs-based
 
 **Codex Healing Handshake (workspace diff):**
 
-The recommended approach for Codex-based healing is the workspace diff handshake. Codex edits the workspace and, when ready for validation, simply exits. The node agent re-runs the Build Gate externally after healing completes only when workspace diffs exist; a clean workspace (no diff) means no re-gate and the run remains failed.
+The recommended approach for Codex-based healing is the workspace diff handshake. Codex edits the workspace and, when ready for validation, simply exits. The node agent re-runs the Build Gate externally after healing completes only when workspace diffs exist; a clean workspace (no diff) means no gate retry and the run remains failed.
 
 **Codex Healing Handshake Checklist (Validation):**
 
@@ -119,17 +119,17 @@ Validate the following artifact after Codex-based healing runs:
 
 | Artifact | Location | Description | Required |
 |----------|----------|-------------|----------|
-| Healing summary | `heal.json` | Last assistant message summary | Required |
+| Healing summary | `codex-last.txt` | Last assistant message summary | Required |
 
 **Validation steps:**
 
-1. **Workspace diff driven re-gate**: After each healing attempt, verify that:
+1. **Workspace diff driven gate retry**: After each healing attempt, verify that:
    - Healing migs edit files under `/workspace` as needed to fix the failure.
    - The node agent re-runs the Build Gate only when workspace diffs are present (`git status --porcelain` non-empty).
    - When healing performs no net changes (clean `git status`), the gate is not re-run and the run terminates as failed.
 
 2. **Healing summary artifact**:
-   - `heal.json` is written to `/out`
+   - `codex-last.txt` is written to `/out`
    - File may be empty when the healing tool does not emit a final summary payload
 
 Cross-reference: `AGENTS.md` and `docs/testing-workflow.md`.
@@ -155,7 +155,7 @@ build_gate:
   enabled: true
   heal:
     retries: 1
-    image: ghcr.io/iw2rmb/ploy/java-17-codex-amata-maven:latest
+    image: ghcr.io/iw2rmb/ploy/amata-codex-java-17-maven:latest
     amata:
       spec: |
         version: amata/v1
@@ -311,8 +311,8 @@ Example stack-aware spec:
 ```yaml
 mig:
   image:
-    java-maven: ghcr.io/iw2rmb/ploy/orw-cli-maven:latest
-    java-gradle: ghcr.io/iw2rmb/ploy/orw-cli-gradle:latest
+    java-maven: ghcr.io/iw2rmb/ploy/orw-cli-java-17-maven:latest
+    java-gradle: ghcr.io/iw2rmb/ploy/orw-cli-java-17-gradle:latest
   env:
     RECIPE_CLASSNAME: org.openrewrite.java.migrate.UpgradeToJava17
 ```

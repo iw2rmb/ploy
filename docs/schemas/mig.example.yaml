@@ -22,8 +22,8 @@ kind: MigRunSpec
 # 2. **Stack-specific images (map)** — Different images per Build Gate stack:
 #    image:
 #      default: docker.io/your-dh-user/migs-openrewrite:latest
-#      java-maven: docker.io/your-dh-user/orw-cli-maven:latest
-#      java-gradle: docker.io/your-dh-user/orw-cli-gradle:latest
+#      java-maven: docker.io/your-dh-user/orw-cli-java-17-maven:latest
+#      java-gradle: docker.io/your-dh-user/orw-cli-java-17-gradle:latest
 #
 # Stack Resolution Rules (for map form):
 #   1. Exact match: If the detected stack matches a key (e.g., "java-maven"),
@@ -141,8 +141,8 @@ steps:
 # steps:
 #   - image:
 #       default: docker.io/your-dh-user/migs-openrewrite:latest
-#       java-maven: docker.io/your-dh-user/orw-cli-maven:latest
-#       java-gradle: docker.io/your-dh-user/orw-cli-gradle:latest
+#       java-maven: docker.io/your-dh-user/orw-cli-java-17-maven:latest
+#       java-gradle: docker.io/your-dh-user/orw-cli-java-17-gradle:latest
 #     envs:
 #       RECIPE_CLASSNAME: org.openrewrite.java.migrate.UpgradeToJava17
 
@@ -196,7 +196,7 @@ build_gate:
 #   heal:
 #     <<: !include ./healing/spec.yaml
 #     retries: 2
-#     image: docker.io/your-dh-user/java-17-codex-amata-maven:latest
+#     image: docker.io/your-dh-user/amata-codex-java-17-maven:latest
 #     amata:
 #       spec: |
 #         version: amata/v1

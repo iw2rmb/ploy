@@ -16,7 +16,7 @@ type BuildGateConfig struct {
 	// Pre configures stack detection policy for the pre-gate phase.
 	Pre *BuildGatePhaseConfig `json:"pre,omitempty" yaml:"pre,omitempty"`
 
-	// Post configures stack detection policy for the post-gate (and re-gate) phase.
+	// Post configures stack detection policy for the post-gate phase.
 	Post *BuildGatePhaseConfig `json:"post,omitempty" yaml:"post,omitempty"`
 
 	// Images provides mig-level image mapping overrides for Build Gate image resolution.

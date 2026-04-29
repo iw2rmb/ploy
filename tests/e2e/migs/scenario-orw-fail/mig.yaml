@@ -1,4 +1,4 @@
-# Minimal spec for the failing Build Gate → amata heal → re-gate → ORW apply scenario.
+# Minimal spec for the failing Build Gate → amata heal → gate retry → ORW apply scenario.
 # Submit with:
 #   dist/ploy mig run \
 #     --repo-url https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git \
@@ -11,7 +11,7 @@ apiVersion: ploy.mig/v1alpha1
 kind: MigRunSpec
 
 steps:
-  - image: localhost:5000/ploy/orw-cli-maven:latest
+  - image: localhost:5000/ploy/orw-cli-java-17-maven:latest
     env:
       RECIPE_GROUP: org.openrewrite.recipe
       RECIPE_ARTIFACT: rewrite-migrate-java
@@ -24,7 +24,7 @@ build_gate:
   heal:
     retries: 1
     # Healing: amata mode.
-    image: localhost:5000/ploy/java-17-codex-amata-maven:latest
+    image: localhost:5000/ploy/amata-codex-java-17-maven:latest
     amata:
       spec: |
         version: amata/v1

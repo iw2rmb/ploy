@@ -144,7 +144,7 @@ func TestParseMigSpecJSON_StackGate(t *testing.T) {
 	input := `{
 		"steps": [{
 			"name": "java11-to-17",
-			"image": "ghcr.io/iw2rmb/ploy/orw-cli-maven:latest",
+			"image": "ghcr.io/iw2rmb/ploy/orw-cli-java-17-maven:latest",
 			"stack": {
 				"inbound":  {"enabled": true, "expect": {"language": "java", "tool": "maven", "release": "11"}},
 				"outbound": {"enabled": true, "expect": {"language": "java", "tool": "maven", "release": "17"}}

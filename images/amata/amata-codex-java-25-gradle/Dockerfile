@@ -1,13 +1,13 @@
 ARG NODE_IMAGE=node:22-bookworm-slim
-ARG JAVA_BASE_GRADLE_17_IMAGE=java-base-gradle:jdk17
+ARG JAVA_BASE_GRADLE_25_IMAGE=java-base-gradle:jdk25
 
-FROM --platform=$TARGETOS/$TARGETARCH ${JAVA_BASE_GRADLE_17_IMAGE} AS gradle-tools
+FROM --platform=$TARGETOS/$TARGETARCH ${JAVA_BASE_GRADLE_25_IMAGE} AS gradle-tools
 
 FROM ${NODE_IMAGE}
 ARG TARGETARCH
 
-LABEL org.opencontainers.image.title="java-17-codex-amata-gradle" \
-    org.opencontainers.image.description="Java 17 image with Gradle, Codex CLI, and Amata" \
+LABEL org.opencontainers.image.title="amata-codex-java-25-gradle" \
+    org.opencontainers.image.description="Java 25 image with Gradle, Codex CLI, and Amata" \
     org.opencontainers.image.source="https://github.com/iw2rmb/ploy" \
     org.opencontainers.image.licenses="MIT"
 

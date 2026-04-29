@@ -1,4 +1,4 @@
-# Gates target maps to pre_gate, re_gate, post_gate sections.
+# Gates target maps to pre_gate and post_gate sections.
 description: gates target section mapping
 env:
   CRUSH_JSON:
@@ -17,4 +17,4 @@ expect:
       action: rewrite
       target_field: home
       destination: ".config/crush/crush.json"
-      sections: [pre_gate, re_gate, post_gate]
+      sections: [pre_gate, post_gate]

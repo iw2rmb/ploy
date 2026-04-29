@@ -320,7 +320,7 @@ func TestValidateHydraHomeEntries_DuplicateEquivalentPath(t *testing.T) {
 func TestValidateHydraSection(t *testing.T) {
 	t.Parallel()
 
-	for _, s := range []string{"pre_gate", "re_gate", "post_gate", "mig", "heal"} {
+	for _, s := range []string{"pre_gate", "post_gate", "mig"} {
 		if err := ValidateHydraSection(s); err != nil {
 			t.Errorf("ValidateHydraSection(%q) = %v, want nil", s, err)
 		}
@@ -335,7 +335,7 @@ func TestValidateHydraSection(t *testing.T) {
 func TestValidateCAConfigSection(t *testing.T) {
 	t.Parallel()
 
-	for _, s := range []string{"pre_gate", "re_gate", "post_gate", "mig", "heal"} {
+	for _, s := range []string{"pre_gate", "post_gate", "mig"} {
 		if err := ValidateCAConfigSection(s); err != nil {
 			t.Errorf("ValidateCAConfigSection(%q) = %v, want nil", s, err)
 		}

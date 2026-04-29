@@ -115,7 +115,7 @@ type MigrationReport struct {
 }
 
 // allJobSections is the full set of Hydra sections across gates and steps.
-var allJobSections = []string{"heal", "mig", "post_gate", "pre_gate", "re_gate"}
+var allJobSections = []string{"mig", "post_gate", "pre_gate"}
 
 // sectionsForTarget returns the Hydra job sections that a GlobalEnvTarget
 // maps to. Server and nodes targets map to all job sections because special
@@ -124,9 +124,9 @@ var allJobSections = []string{"heal", "mig", "post_gate", "pre_gate", "re_gate"}
 func sectionsForTarget(target domaintypes.GlobalEnvTarget) []string {
 	switch target {
 	case domaintypes.GlobalEnvTargetGates:
-		return []string{"pre_gate", "re_gate", "post_gate"}
+		return []string{"pre_gate", "post_gate"}
 	case domaintypes.GlobalEnvTargetSteps:
-		return []string{"heal", "mig"}
+		return []string{"mig"}
 	case domaintypes.GlobalEnvTargetServer, domaintypes.GlobalEnvTargetNodes:
 		return allJobSections
 	default:

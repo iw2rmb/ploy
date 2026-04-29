@@ -4,17 +4,17 @@ This directory contains example Migs images (container build contexts). Ploy doe
 
 Image Catalog (selected)
 
-- `java-17-codex-amata-maven` (`images/amata/java-17-codex-amata-maven`) - Java 17 image with Maven, Codex CLI, and Amata.
-- `java-17-codex-amata-gradle` (`images/amata/java-17-codex-amata-gradle`) - Java 17 image with Gradle, Codex CLI, and Amata.
-- `java-21-codex-amata-maven` (`images/amata/java-21-codex-amata-maven`) - Java 21 image with Maven, Codex CLI, and Amata.
-- `java-21-codex-amata-gradle` (`images/amata/java-21-codex-amata-gradle`) - Java 21 image with Gradle, Codex CLI, and Amata.
-- `java-25-codex-amata-maven` (`images/amata/java-25-codex-amata-maven`) - Java 25 image with Maven, Codex CLI, and Amata.
-- `java-25-codex-amata-gradle` (`images/amata/java-25-codex-amata-gradle`) - Java 25 image with Gradle, Codex CLI, and Amata.
+- `amata-codex-java-17-maven` (`images/amata/amata-codex-java-17-maven`) - Java 17 image with Maven, Codex CLI, and Amata.
+- `amata-codex-java-17-gradle` (`images/amata/amata-codex-java-17-gradle`) - Java 17 image with Gradle, Codex CLI, and Amata.
+- `amata-codex-java-21-maven` (`images/amata/amata-codex-java-21-maven`) - Java 21 image with Maven, Codex CLI, and Amata.
+- `amata-codex-java-21-gradle` (`images/amata/amata-codex-java-21-gradle`) - Java 21 image with Gradle, Codex CLI, and Amata.
+- `amata-codex-java-25-maven` (`images/amata/amata-codex-java-25-maven`) - Java 25 image with Maven, Codex CLI, and Amata.
+- `amata-codex-java-25-gradle` (`images/amata/amata-codex-java-25-gradle`) - Java 25 image with Gradle, Codex CLI, and Amata.
 - `java-base-*` (`images/java-bases/*`) - Shared Java toolchain lanes with unified CA bootstrap (`maven`, `gradle`, `temurin`).
-- `orw-cli-maven` (`images/orw/orw-cli-maven`) - OpenRewrite Maven lane runtime.
-- `orw-cli-gradle` (`images/orw/orw-cli-gradle`) - OpenRewrite Gradle lane runtime.
-- `orw-cli-maven-jdk21` / `orw-cli-maven-jdk25` - OpenRewrite Maven lane runtime variants for JDK 21/25.
-- `orw-cli-gradle-jdk21` / `orw-cli-gradle-jdk25` - OpenRewrite Gradle lane runtime variants for JDK 21/25.
+- `orw-cli-java-17-maven` (`images/orw/orw-cli-java-17-maven`) - OpenRewrite Maven lane runtime.
+- `orw-cli-java-17-gradle` (`images/orw/orw-cli-java-17-gradle`) - OpenRewrite Gradle lane runtime.
+- `orw-cli-java-21-maven` / `orw-cli-java-25-maven` - OpenRewrite Maven lane runtime variants for JDK 21/25.
+- `orw-cli-java-21-gradle` / `orw-cli-java-25-gradle` - OpenRewrite Gradle lane runtime variants for JDK 21/25.
 
 OCI Labeling Policy
 

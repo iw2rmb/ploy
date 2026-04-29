@@ -11,68 +11,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func TestParseActionSummary(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name    string
-		payload string
-		check   func(t *testing.T, got string)
-	}{
-		{
-			name:    "valid",
-			payload: `{"action_summary":"Applied retry-safe Gradle wrapper fix"}` + "\n",
-			check: func(t *testing.T, got string) {
-				t.Helper()
-				if want := "Applied retry-safe Gradle wrapper fix"; got != want {
-					t.Fatalf("parseActionSummary() = %q, want %q", got, want)
-				}
-			},
-		},
-		{
-			name: "truncates_to_one_line",
-			payload: func() string {
-				long := strings.Repeat("a", 220) + "\nwith newline"
-				body, _ := json.Marshal(map[string]string{"action_summary": long})
-				return string(body) + "\n"
-			}(),
-			check: func(t *testing.T, got string) {
-				t.Helper()
-				if strings.Contains(got, "\n") {
-					t.Fatalf("parseActionSummary() contains newline: %q", got)
-				}
-				if len([]rune(got)) != 200 {
-					t.Fatalf("parseActionSummary() rune length = %d, want 200", len([]rune(got)))
-				}
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			outDir := t.TempDir()
-			if err := os.WriteFile(filepath.Join(outDir, "heal.json"), []byte(tt.payload), 0o644); err != nil {
-				t.Fatalf("write codex-last: %v", err)
-			}
-			tt.check(t, parseActionSummary(outDir))
-		})
-	}
-}
-
-func TestParseErrorKind(t *testing.T) {
-	t.Parallel()
-
-	outDir := t.TempDir()
-	payload := `{"error_kind":"infra"}` + "\n"
-	if err := os.WriteFile(filepath.Join(outDir, "heal.json"), []byte(payload), 0o644); err != nil {
-		t.Fatalf("write heal.json: %v", err)
-	}
-	if got, want := parseErrorKind(outDir), "infra"; got != want {
-		t.Fatalf("parseErrorKind() = %q, want %q", got, want)
-	}
-}
-
 func TestParseORWFailureMetadata(t *testing.T) {
 	t.Parallel()
 

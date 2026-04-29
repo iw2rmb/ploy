@@ -186,46 +186,24 @@ func TestCompleteJob_RepoStatusUsesLastJobStatus(t *testing.T) {
 	f := newRepoScopedFixture("post_gate")
 	f.Job.Name = "post-gate"
 
-	// Complete the last job (post-gate) successfully. Earlier gate failure exists.
-	st := newJobStoreForFixture(f,
-		withRepoAttemptJobs([]store.Job{
-			// Earlier pre-gate failure (healed later).
-			{
-				ID:          domaintypes.NewJobID(),
-				RunID:       f.RunID,
-				RepoID:      f.Job.RepoID,
+		// Complete the last job (post-gate) successfully. Earlier failure exists.
+		st := newJobStoreForFixture(f,
+			withRepoAttemptJobs([]store.Job{
+				// Earlier pre-gate failure.
+				{
+					ID:          domaintypes.NewJobID(),
+					RunID:       f.RunID,
+					RepoID:      f.Job.RepoID,
 				RepoBaseRef: "main",
 				Attempt:     1,
 				Name:        "pre-gate",
 				Status:      domaintypes.JobStatusFail,
-				JobType:     "pre_gate",
-				Meta:        withNextIDMeta([]byte(`{}`), 1000),
-			},
-			{
-				ID:          domaintypes.NewJobID(),
-				RunID:       f.RunID,
-				RepoID:      f.Job.RepoID,
-				RepoBaseRef: "main",
-				Attempt:     1,
-				Name:        "heal-1-0",
-				Status:      domaintypes.JobStatusSuccess,
-				JobType:     "heal",
-				Meta:        withNextIDMeta([]byte(`{}`), 1500),
-			},
-			{
-				ID:          domaintypes.NewJobID(),
-				RunID:       f.RunID,
-				RepoID:      f.Job.RepoID,
-				RepoBaseRef: "main",
-				Attempt:     1,
-				Name:        "re-gate-1",
-				Status:      domaintypes.JobStatusSuccess,
-				JobType:     "re_gate",
-				Meta:        withNextIDMeta([]byte(`{}`), 1750),
-			},
-			{
-				ID:          domaintypes.NewJobID(),
-				RunID:       f.RunID,
+					JobType:     "pre_gate",
+					Meta:        withNextIDMeta([]byte(`{}`), 1000),
+				},
+				{
+					ID:          domaintypes.NewJobID(),
+					RunID:       f.RunID,
 				RepoID:      f.Job.RepoID,
 				RepoBaseRef: "main",
 				Attempt:     1,

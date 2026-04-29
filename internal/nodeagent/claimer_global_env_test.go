@@ -200,7 +200,7 @@ func TestGlobalEnvPropagation_SpecToManifest(t *testing.T) {
 // TestGlobalEnvPropagation_GateManifest verifies that global env vars are
 // preserved in gate manifests built via buildGateManifestFromRequest.
 //
-// Gate jobs (pre_gate, post_gate, re_gate) use a separate manifest builder
+// Gate jobs (pre_gate, post_gate) use a separate manifest builder
 // that sanitizes stack-aware image configuration but should preserve env vars.
 func TestGlobalEnvPropagation_GateManifest(t *testing.T) {
 	t.Parallel()

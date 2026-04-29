@@ -11,11 +11,11 @@ done: true
 reviews:
   - gaps: ["\"After every child build completion, materialize /out/re_build-gate-{n}.log and /out/errors-{n}.yaml in the parent job workspace with contiguous indexes that include the baseline gate as 1.\" is not fully met: lineage materialization is invoked only via parent-job finalization (`internal/nodeagent/execution_orchestrator_jobs.go`: `FinalizeOutputs` wiring at lines 736-738, 815-817 and execution at 1367-1389), so it does not run at each child-build completion event during runtime; current helper path (`internal/nodeagent/execution_orchestrator_child_build_runtime.go`, `internal/nodeagent/recovery_io.go`) performs reindexing only at finalize time."]
     commit: 696ed4ec
-  - gaps: ["\"Remove migration hook scheduling path from completion handling for this flow.\" is not met: SBOM success still routes through hook planning in `internal/server/handlers/jobs_complete_service_post_actions.go:151`, and `internal/server/handlers/jobs_complete_service_runtime_hooks.go:19`-`172` still inserts hook jobs plus a retry SBOM (`Role: SBOMRoleRetry`); this behavior is explicitly asserted in `internal/server/handlers/jobs_complete_orchestration_test.go:260`-`337`, so hook/retry-SBOM branch leftovers remain."]
+  - gaps: ["\"Remove migration hook scheduling path from completion handling for this flow.\" is not met: SBOM success still routes through hook planning in `internal/server/handlers/jobs_complete_service_post_actions.go:151`, and `internal/server/handlers/jobs_complete_service_runtime_hooks.go:19`-`172` still inserts hook jobs plus a retry SBOM (`Role: SBOMStageRoleRetry`); this behavior is explicitly asserted in `internal/server/handlers/jobs_complete_orchestration_test.go:260`-`337`, so hook/retry-SBOM branch leftovers remain."]
     commit: c3d91ae6
-  - gaps: ["\"Reshape healing insertion chain to direct heal then re_gate sequencing without retry-sbom branch.\" is not fully met in documented behavior: `docs/migs-lifecycle.md:603-628` and `docs/api/paths/jobs_job_id_complete.yaml:28` still describe `heal -> retry sbom -> re-gate`, while implementation inserts only `heal -> re_gate` (`internal/server/handlers/nodes_complete_healing.go:109-139`).", "\"Move SBOM planning so successful pre_gate schedules the classpath-producing SBOM next, while successful post_gate schedules the last-step preservation SBOM only after the repo flow succeeds.\" is not fully met in lifecycle documentation: `docs/migs-lifecycle.md:593-599` still documents a three-node `pre-gate -> mig -> post-gate` graph and omits the required pre/post SBOM stages that are implemented in planning (`internal/server/handlers/migs_ticket.go:271-313`).", "\"OpenAPI advertises both endpoints with request and response schema examples matching design contract.\" is not fully met: child-build endpoint docs still include `501 not implemented yet` responses (`docs/api/paths/jobs_parent_job_id_builds.yaml:99-104`, `docs/api/paths/jobs_parent_job_id_builds_child_job_id.yaml:86-91`) although handlers are implemented and do not expose a 501 path (`internal/server/handlers/jobs_build_routes.go:36-109`)."]
+  - gaps: ["\"Reshape healing insertion chain to direct heal then gate_retry sequencing without retry-sbom branch.\" is not fully met in documented behavior: `docs/migs-lifecycle.md:603-628` and `docs/api/paths/jobs_job_id_complete.yaml:28` still describe `heal -> retry sbom -> gate retry`, while implementation inserts only `heal -> gate_retry` (`internal/server/handlers/nodes_complete_healing.go:109-139`).", "\"Move SBOM planning so successful pre_gate schedules the classpath-producing SBOM next, while successful post_gate schedules the last-step preservation SBOM only after the repo flow succeeds.\" is not fully met in lifecycle documentation: `docs/migs-lifecycle.md:593-599` still documents a three-node `pre-gate -> mig -> post-gate` graph and omits the required pre/post SBOM stages that are implemented in planning (`internal/server/handlers/migs_ticket.go:271-313`).", "\"OpenAPI advertises both endpoints with request and response schema examples matching design contract.\" is not fully met: child-build endpoint docs still include `501 not implemented yet` responses (`docs/api/paths/jobs_parent_job_id_builds.yaml:99-104`, `docs/api/paths/jobs_parent_job_id_builds_child_job_id.yaml:86-91`) although handlers are implemented and do not expose a 501 path (`internal/server/handlers/jobs_build_routes.go:36-109`)."]
     commit: 7688d2cd
-  - gaps: ["\"Update lifecycle completion routing so failed pre_gate is terminal for repo attempt and cannot enqueue heal.\" is not fully met in documentation: [docs/migs-lifecycle.md](docs/migs-lifecycle.md) still shows failed `pre-gate` flowing into `heal -> re-gate` (`:609-611`), which contradicts the implemented routing (`internal/workflow/lifecycle/orchestrator.go:127-130`, `internal/server/handlers/nodes_complete_healing.go:47-54`).", "\"Reshape healing insertion chain to direct heal then re_gate sequencing without retry-sbom branch.\" is not fully met due leftover retry-SBOM contract surface: [internal/workflow/contracts/job_meta.go](internal/workflow/contracts/job_meta.go#L142) still defines `SBOMRoleRetry` and still accepts it in validation (`:299`), and retry-role handling is still asserted in [internal/nodeagent/execution_orchestrator_test.go](internal/nodeagent/execution_orchestrator_test.go#L366)."]
+  - gaps: ["\"Update lifecycle completion routing so failed pre_gate is terminal for repo attempt and cannot enqueue heal.\" is not fully met in documentation: [docs/migs-lifecycle.md](docs/migs-lifecycle.md) still shows failed `pre-gate` flowing into `heal -> gate retry` (`:609-611`), which contradicts the implemented routing (`internal/workflow/lifecycle/orchestrator.go:127-130`, `internal/server/handlers/nodes_complete_healing.go:47-54`).", "\"Reshape healing insertion chain to direct heal then gate_retry sequencing without retry-sbom branch.\" is not fully met due leftover retry-SBOM contract surface: [internal/workflow/contracts/job_meta.go](internal/workflow/contracts/job_meta.go#L142) still defines `SBOMStageRoleRetry` and still accepts it in validation (`:299`), and retry-role handling is still asserted in [internal/nodeagent/execution_orchestrator_test.go](internal/nodeagent/execution_orchestrator_test.go#L366)."]
     commit: b0a82885
 items:
   - done: true
@@ -52,7 +52,7 @@ items:
   - done: true
     reviews: []
     label: "2"
-    summary: "Implement child re_gate job creation and status projection with strict parent ownership and linkage checks."
+    summary: "Implement child gate_retry job creation and status projection with strict parent ownership and linkage checks."
     classification: "determined"
     components:
       - "internal/server/handlers/jobs_build_service.go"
@@ -64,10 +64,10 @@ items:
       - "internal/server/handlers/jobs_status.go"
       - "internal/domain/types/statuses.go"
     delta:
-      - "[additive] child re_gate jobs only from server-planned transitions -> child re_gate jobs creatable by running mig or heal parent with explicit parent linkage and pollable status"
+      - "[additive] child gate_retry jobs only from server-planned transitions -> child gate_retry jobs creatable by running mig or heal parent with explicit parent linkage and pollable status"
     implementation:
       - "Validate parent_job_id exists, is Running, belongs to caller worker identity, and is mig or heal job type."
-      - "Create child jobs as regular jobs rows with job_type re_gate and trigger.parent_job_id plus trigger.kind metadata."
+      - "Create child jobs as regular jobs rows with job_type gate_retry and trigger.parent_job_id plus trigger.kind metadata."
       - "Project canonical status with terminal and success booleans for polling.short done_when and success_when usage."
       - "Validate parent-child linkage during status reads so unrelated child ids are rejected."
     verification:
@@ -79,10 +79,10 @@ items:
     commit: e0833cfd
   - done: true
     reviews:
-      - gaps: ["Step `Narrow healing triggers to post_gate and re_gate and remove hook and retry-sbom branches from migration recovery chain.` is not completed in full: `CompletionChainEvaluateSBOMFailure` and SBOM-healing retry flow leftovers are still present in `internal/workflow/lifecycle/orchestrator.go`, `internal/server/handlers/jobs_complete_service_post_actions.go`, and `internal/server/handlers/nodes_complete_healing.go` (`maybeCreateSBOMHealingJobs`), so hook/retry-sbom recovery branch removal is incomplete."]
+      - gaps: ["Step `Narrow healing triggers to post_gate and gate_retry and remove hook and retry-sbom branches from migration recovery chain.` is not completed in full: `CompletionChainEvaluateSBOMFailure` and SBOM-healing retry flow leftovers are still present in `internal/workflow/lifecycle/orchestrator.go`, `internal/server/handlers/jobs_complete_service_post_actions.go`, and `internal/server/handlers/nodes_complete_healing.go` (`maybeCreateSBOMHealingJobs`), so hook/retry-sbom recovery branch removal is incomplete."]
         commit: ea77c545
     label: "3"
-    summary: "Narrow healing triggers to post_gate and re_gate and remove hook and retry-sbom branches from migration recovery chain."
+    summary: "Narrow healing triggers to post_gate and gate_retry and remove hook and retry-sbom branches from migration recovery chain."
     classification: "determined"
     components:
       - "internal/workflow/lifecycle/orchestrator.go"
@@ -94,15 +94,15 @@ items:
       - "internal/server/handlers/jobs_complete_service_runtime_hooks.go"
       - "internal/server/handlers/nodes_complete_healing.go"
     delta:
-      - "[replace] migration failure routing that evaluates heal across gate failures and side branches -> migration failure routing where only failed post_gate or re_gate can spawn heal then re_gate"
+      - "[replace] migration failure routing that evaluates heal across gate failures and side branches -> migration failure routing where only failed post_gate or gate_retry can spawn heal then gate_retry"
     implementation:
       - "Update lifecycle completion routing so failed pre_gate is terminal for repo attempt and cannot enqueue heal."
       - "Remove migration hook scheduling path from completion handling for this flow."
-      - "Reshape healing insertion chain to direct heal then re_gate sequencing without retry-sbom branch."
+      - "Reshape healing insertion chain to direct heal then gate_retry sequencing without retry-sbom branch."
       - "Keep job status transitions and repo terminal handling deterministic for exhausted retry budget."
     verification:
       - "Failed pre_gate produces terminal repo attempt result with no heal child jobs."
-      - "Failed post_gate and failed re_gate produce heal then re_gate children in deterministic order."
+      - "Failed post_gate and failed gate_retry produce heal then gate_retry children in deterministic order."
       - "Non-migration completion handling keeps current behavior for unrelated job families."
     reasoning: "high"
     cfp: 9
@@ -166,12 +166,12 @@ items:
     implementation:
       - "Move SBOM planning so successful pre_gate schedules the classpath-producing SBOM next, while successful post_gate schedules the last-step preservation SBOM only after the repo flow succeeds."
       - "Implement the dedicated SBOM flow helper to persist the run single .classpath from pre_gate SBOM and keep final SBOM output snapshot-only."
-      - "Treat SBOM failures in this flow as terminal for the repo attempt and do not draft heal or re_gate recovery from SBOM outcomes."
+      - "Treat SBOM failures in this flow as terminal for the repo attempt and do not draft heal or gate_retry recovery from SBOM outcomes."
       - "Reuse the child-build runtime and lineage helpers from the previous item without changing parent /out index semantics."
     verification:
       - "Successful pre_gate produces a persisted SBOM snapshot and exactly one .classpath contract source for the run."
       - "Successful post_gate path preserves final SBOM snapshot as the last stage output without writing a second classpath contract."
-      - "SBOM failure does not create heal or re_gate recovery, and non-SBOM gate and healing ordering keeps current behavior."
+      - "SBOM failure does not create heal or gate_retry recovery, and non-SBOM gate and healing ordering keeps current behavior."
     reasoning: "medium"
     cfp: 8
     commit: 729711c2

@@ -72,7 +72,7 @@ func handleConfigHomeList(args []string, stderr io.Writer) error {
 	fs := flag.NewFlagSet("config home list", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	var section stringValue
-	fs.Var(&section, "section", "Filter by section: pre_gate, re_gate, post_gate, mig, heal")
+	fs.Var(&section, "section", "Filter by section: pre_gate, post_gate, mig")
 
 	if err := parseFlagSet(fs, args, func() { printConfigHomeListUsage(stderr) }); err != nil {
 		return err
@@ -137,7 +137,7 @@ func printConfigHomeListUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "Usage: ploy config home list [--section <SECTION>]")
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Options:")
-	_, _ = fmt.Fprintln(w, "  --section  Filter by section: pre_gate, re_gate, post_gate, mig, heal")
+	_, _ = fmt.Fprintln(w, "  --section  Filter by section: pre_gate, post_gate, mig")
 }
 
 // handleConfigHomeSet adds a home mount entry.
@@ -227,7 +227,7 @@ func printConfigHomeSetUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Options:")
 	_, _ = fmt.Fprintln(w, "  --entry    Canonical home entry: shortHash:dst or shortHash:dst:ro (required)")
-	_, _ = fmt.Fprintln(w, "  --section  Target section: pre_gate, re_gate, post_gate, mig, heal (required)")
+	_, _ = fmt.Fprintln(w, "  --section  Target section: pre_gate, post_gate, mig (required)")
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Examples:")
 	_, _ = fmt.Fprintln(w, "  ploy config home set --entry 'abcdef1:.config/app' --section mig")
@@ -310,5 +310,5 @@ func printConfigHomeUnsetUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Options:")
 	_, _ = fmt.Fprintln(w, "  --dst      Home destination path (required)")
-	_, _ = fmt.Fprintln(w, "  --section  Target section: pre_gate, re_gate, post_gate, mig, heal (required)")
+	_, _ = fmt.Fprintln(w, "  --section  Target section: pre_gate, post_gate, mig (required)")
 }

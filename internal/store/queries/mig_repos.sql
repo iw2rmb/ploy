@@ -96,29 +96,6 @@ DO UPDATE SET
   target_ref = EXCLUDED.target_ref
 RETURNING id, mig_id, repo_id, base_ref, target_ref, created_at;
 
--- name: PromoteReGateRecoveryCandidateGateProfile :one
--- Legacy compatibility shim: gate profile persistence on mig_repos is removed.
--- Returns target repo_id for callers that still rely on this method's result.
-WITH compat_args AS (
-  SELECT
-    @job_meta::jsonb AS job_meta,
-    @gate_profile::jsonb AS gate_profile,
-    @gate_profile_artifacts::jsonb AS gate_profile_artifacts
-)
-SELECT j.repo_id
-FROM jobs j, compat_args
-WHERE j.id = @id
-  AND j.job_type = 're_gate'
-  AND j.status = 'Success'
-  AND (
-    CASE
-      WHEN jsonb_typeof(j.meta->'recovery'->'candidate_promoted') = 'boolean'
-      THEN (j.meta->'recovery'->>'candidate_promoted')::boolean
-      ELSE false
-    END
-  ) = false
-LIMIT 1;
-
 -- name: HasMigRepoHistory :one
 -- Checks if a mig_repo has any historical executions (run_repos references).
 -- Returns true if the repo cannot be deleted due to history, false otherwise.

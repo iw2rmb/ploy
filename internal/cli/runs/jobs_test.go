@@ -59,10 +59,10 @@ func TestListRepoJobsCommand_DecodeRecoveryContract(t *testing.T) {
 			"repo_id":"` + repoID.String() + `",
 			"attempt":1,
 			"jobs":[
-				{
-					"job_id":"` + jobID.String() + `",
-					"name":"re-gate-1",
-					"job_type":"re_gate",
+					{
+						"job_id":"` + jobID.String() + `",
+						"name":"post-gate",
+						"job_type":"post_gate",
 					"job_image":"image:tag",
 					"next_id":null,
 					"node_id":null,

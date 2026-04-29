@@ -126,10 +126,10 @@ type StepGateSpec struct {
 	Ref types.GitRef
 
 	// DiffPatch is an optional gzipped unified diff (base64-encoded) to apply
-	// on top of the cloned repo_url+ref baseline. Used by healing re-gates to
-	// verify accumulated workspace changes without shipping full archives.
+	// on top of the cloned repo_url+ref baseline for gate validation retries,
+	// avoiding full archive uploads.
 	//
-	// Set by runGateWithHealing when executing re-gates after healing migs.
+	// Set by gate retry execution after healing migs.
 	// The diff captures all changes relative to the initial repo_url+ref clone.
 	DiffPatch []byte
 
@@ -143,7 +143,7 @@ type StepGateSpec struct {
 	// Target pins build gate execution to a concrete target (build|unit|all_tests).
 	Target string
 
-	// EnforceTargetLock applies strict target lock behavior for infra re-gates.
+	// EnforceTargetLock applies strict target lock behavior for infra gate retries.
 	EnforceTargetLock bool
 }
 

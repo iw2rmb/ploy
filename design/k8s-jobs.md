@@ -1,7 +1,7 @@
 # Kubernetes Jobs Runtime For Claimed Jobs
 
 ## Summary
-Introduce a Kubernetes Job execution backend for nodeagent so claimed Ploy jobs (`pre_gate`, `mig`, `heal`, `re_gate`, `post_gate`, `mr`) can run as Kubernetes Jobs instead of local Docker containers, while keeping Ploy control-plane orchestration (`jobs` table, `next_id`, claim/complete APIs) unchanged.
+Introduce a Kubernetes Job execution backend for nodeagent so claimed Ploy jobs (`pre_gate`, `mig`, `heal`, `gate_retry`, `post_gate`, `mr`) can run as Kubernetes Jobs instead of local Docker containers, while keeping Ploy control-plane orchestration (`jobs` table, `next_id`, claim/complete APIs) unchanged.
 
 ## Scope
 In scope:
@@ -108,7 +108,7 @@ Concrete pressure points:
 - Claim flow unchanged.
 - Before execution:
   - prepare workspace on PVC (rehydration/diff application as today).
-  - materialize `/in` recovery inputs as today for heal/re_gate.
+  - materialize `/in` recovery inputs as today for heal/gate_retry.
 - Execution:
   - create or reattach deterministic Kubernetes `Job`.
   - stream logs from Pod(s).
@@ -151,7 +151,7 @@ Testable outcome:
 Scope:
 - Implement gate execution through K8s backend preserving gate metadata/report paths.
 Expected Results:
-- `pre_gate/post_gate/re_gate` behavior parity with Docker mode (pass/fail/cancel paths).
+- `pre_gate/post_gate/gate_retry` behavior parity with Docker mode (pass/fail/cancel paths).
 Testable outcome:
 - Existing gate orchestration tests adapted to run against backend abstraction.
 
@@ -169,7 +169,7 @@ Testable outcome:
   - `mig`
   - `heal`
   - `pre_gate`
-  - `re_gate`
+  - `gate_retry`
   - `post_gate`
 - No server/store schema or claim/complete API changes are required.
 - Duplicate Kubernetes Job creation for same `job_id` does not occur under restart/reconcile scenarios.

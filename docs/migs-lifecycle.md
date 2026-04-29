@@ -156,7 +156,7 @@ build_gate:
   heal:
     <<: !include ./healing/spec.yaml
     retries: 2
-    image: ghcr.io/iw2rmb/ploy/java-17-codex-amata-maven:latest
+    image: ghcr.io/iw2rmb/ploy/amata-codex-java-17-maven:latest
     in:
       - ./healing/amata.yaml:amata.yaml
     home:
@@ -179,7 +179,7 @@ from `amata.set`. No prompt file is required in this mode.
 
 ```yaml
 heal:
-  image: ghcr.io/iw2rmb/ploy/java-17-codex-amata-maven:latest
+  image: ghcr.io/iw2rmb/ploy/amata-codex-java-17-maven:latest
   amata:
     spec: |
       version: amata/v1
@@ -227,7 +227,7 @@ as canonical expectation (`language`, `tool`, optional `release`):
 - **Exhaustion handling**: If all retries are exhausted and the gate still fails, the run fails.
 - **Workspace policy**: Healing must change `/workspace`; if no files are changed,
   the heal job fails with `healing_warning=no_workspace_changes`.
-- **action_summary**: After each healing iteration, the agent reads `/out/heal.json`
+- **action_summary**: After each healing iteration, the agent reads `/out/codex-last.txt`
   for `{"action_summary":"..."}` (max 200 chars, single-line). This is persisted in
   `jobs.meta.action_summary` for heal jobs.
 
@@ -379,8 +379,8 @@ image: ghcr.io/iw2rmb/ploy/migs-openrewrite:latest
 **Stack-specific images (map)** — Different images per detected stack:
 ```yaml
 image:
-  java-maven: ghcr.io/iw2rmb/ploy/orw-cli-maven:latest
-  java-gradle: ghcr.io/iw2rmb/ploy/orw-cli-gradle:latest
+  java-maven: ghcr.io/iw2rmb/ploy/orw-cli-java-17-maven:latest
+  java-gradle: ghcr.io/iw2rmb/ploy/orw-cli-java-17-gradle:latest
 ```
 
 ### Image templates
@@ -476,21 +476,21 @@ A common use case is dedicated OpenRewrite images for Maven and Gradle:
 
 ```yaml
 image:
-  java-maven: ghcr.io/iw2rmb/ploy/orw-cli-maven:latest
-  java-gradle: ghcr.io/iw2rmb/ploy/orw-cli-gradle:latest
+  java-maven: ghcr.io/iw2rmb/ploy/orw-cli-java-17-maven:latest
+  java-gradle: ghcr.io/iw2rmb/ploy/orw-cli-java-17-gradle:latest
 envs:
   RECIPE_CLASSNAME: org.openrewrite.java.migrate.UpgradeToJava17
 ```
 
 When this spec runs against a Maven project (`pom.xml` present):
 - Build Gate detects `java-maven` stack.
-- Image resolves to `orw-cli-maven:latest`.
-- The `orw-cli-maven` runtime executes OpenRewrite without invoking Maven tasks.
+- Image resolves to `orw-cli-java-17-maven:latest`.
+- The `orw-cli-java-17-maven` runtime executes OpenRewrite without invoking Maven tasks.
 
 When the same spec runs against a Gradle project (`build.gradle` present):
 - Build Gate detects `java-gradle` stack.
-- Image resolves to `orw-cli-gradle:latest`.
-- The `orw-cli-gradle` runtime executes OpenRewrite without invoking Gradle tasks.
+- Image resolves to `orw-cli-java-17-gradle:latest`.
+- The `orw-cli-java-17-gradle` runtime executes OpenRewrite without invoking Gradle tasks.
 
 ### Example: Parameterized OpenRewrite via rewrite.yml
 
@@ -528,8 +528,8 @@ migs:
       RUN_SCRIPT: ./generate-rewrite.sh
   - name: apply-openrewrite
     image:
-      java-maven: ghcr.io/iw2rmb/ploy/orw-cli-maven:latest
-      java-gradle: ghcr.io/iw2rmb/ploy/orw-cli-gradle:latest
+      java-maven: ghcr.io/iw2rmb/ploy/orw-cli-java-17-maven:latest
+      java-gradle: ghcr.io/iw2rmb/ploy/orw-cli-java-17-gradle:latest
     envs:
       RECIPE_GROUP: org.openrewrite.recipe
       RECIPE_ARTIFACT: rewrite-migrate-java

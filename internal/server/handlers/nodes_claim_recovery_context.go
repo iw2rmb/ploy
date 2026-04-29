@@ -17,7 +17,7 @@ func buildRecoveryClaimContext(
 	_ store.Job,
 	_ domaintypes.JobType,
 ) (*contracts.RecoveryClaimContext, error) {
-	// build_gate.heal and re_gate job machinery are removed.
+	// build_gate.heal and rebuild-gate job machinery are removed.
 	return nil, nil
 }
 

@@ -8,10 +8,8 @@
 //	  node:     {envs, ca, home}
 //	  job:
 //	    pre_gate:  {envs, ca, in, out, home}
-//	    re_gate:   {envs, ca, in, out, home}
 //	    post_gate: {envs, ca, in, out, home}
 //	    mig:       {envs, ca, in, out, home}
-//	    heal:      {envs, ca, in, out, home}
 //
 // Merge precedence (lowest → highest): server defaults < local config.yaml < spec.
 // Per-field merge rules:
@@ -51,10 +49,8 @@ type JobConfig struct {
 // JobTargets groups the per-phase job config sections.
 type JobTargets struct {
 	PreGate  *JobConfig `yaml:"pre_gate,omitempty" json:"pre_gate,omitempty"`
-	ReGate   *JobConfig `yaml:"re_gate,omitempty" json:"re_gate,omitempty"`
 	PostGate *JobConfig `yaml:"post_gate,omitempty" json:"post_gate,omitempty"`
 	Mig      *JobConfig `yaml:"mig,omitempty" json:"mig,omitempty"`
-	Heal     *JobConfig `yaml:"heal,omitempty" json:"heal,omitempty"`
 }
 
 // Defaults is the top-level defaults section of config.yaml.
@@ -97,7 +93,7 @@ func LoadOverlayFrom(path string) (Overlay, error) {
 }
 
 // JobSection returns the JobConfig for the given job type string.
-// Known types: "pre_gate", "re_gate", "post_gate", "mig", "heal".
+// Known types: "pre_gate", "post_gate", "mig".
 // Returns nil when the overlay has no config for the given type.
 func (o *Overlay) JobSection(jobType string) *JobConfig {
 	if o.Defaults == nil || o.Defaults.Job == nil {
@@ -106,14 +102,10 @@ func (o *Overlay) JobSection(jobType string) *JobConfig {
 	switch jobType {
 	case "pre_gate":
 		return o.Defaults.Job.PreGate
-	case "re_gate":
-		return o.Defaults.Job.ReGate
 	case "post_gate":
 		return o.Defaults.Job.PostGate
 	case "mig":
 		return o.Defaults.Job.Mig
-	case "heal":
-		return o.Defaults.Job.Heal
 	default:
 		return nil
 	}

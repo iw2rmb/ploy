@@ -3,13 +3,13 @@
 # This spec validates gate-heal-regate behavior for post-mig gate failures:
 # 1. Each migs[] entry is followed by a post-gate check
 # 2. At least one step triggers post-gate failure requiring healing
-# 3. Healing runs and fixes the error; re-gate passes
+# 3. Healing runs and fixes the error; gate retry passes
 # 4. SSE events and final artifacts show gate and healing events for each step
 #
 # Scenario flow:
 #   Step 0: Java8 migration (should pass post-gate)
 #   Step 1: Java11 migration using fail-missing-symbol branch (may fail post-gate,
-#           requiring healing to create missing class before re-gate passes)
+#           requiring healing to create missing class before gate retry passes)
 #   Step 2: Java17 migration (should pass post-gate after step 1 healing)
 #
 # This tests the gate-heal-regate regression guard by exercising:
@@ -44,7 +44,7 @@ kind: MigRunSpec
 steps:
   # Step 0: Apply code formatting as warmup (should pass)
   # This step uses a lightweight recipe that formats code without introducing errors.
-  - image: localhost:5000/ploy/orw-cli-maven:latest
+  - image: localhost:5000/ploy/orw-cli-java-17-maven:latest
     env:
       RECIPE_GROUP: org.openrewrite.recipe
       RECIPE_ARTIFACT: rewrite-java
@@ -54,7 +54,7 @@ steps:
   # Step 1: Migrate to Java 17 (may trigger post-gate failure on fail-missing-symbol branch)
   # This transformation may expose or interact with the UndefinedClass reference.
   # If post-gate fails, healing will create the missing UndefinedMigSymbol class.
-  - image: localhost:5000/ploy/orw-cli-maven:latest
+  - image: localhost:5000/ploy/orw-cli-java-17-maven:latest
     env:
       RECIPE_GROUP: org.openrewrite.recipe
       RECIPE_ARTIFACT: rewrite-migrate-java
@@ -63,7 +63,7 @@ steps:
 
   # Step 2: Apply cleanup recipe (should pass after step 1 healing)
   # This step runs after healing has fixed any post-gate failures from step 1.
-  - image: localhost:5000/ploy/orw-cli-maven:latest
+  - image: localhost:5000/ploy/orw-cli-java-17-maven:latest
     env:
       RECIPE_GROUP: org.openrewrite.recipe
       RECIPE_ARTIFACT: rewrite-java
@@ -85,14 +85,14 @@ build_gate:
   # sequence runs to fix the error. The healing mig:
   # 1. Reads /in/build-gate.log to understand the failure
   # 2. Edits the workspace to fix the issue
-  # 3. Edits the workspace and exits; node agent re-gates only when workspace
+  # 3. Edits the workspace and exits; node agent gate retries only when workspace
   #    diffs are present. This tests the critical gate-heal-regate flow for
   #    post-mig failures using the workspace diff handshake.
   heal:
     retries: 2 # Allow multiple healing attempts for complex errors
     # Healing: amata mode — no prompt file required; amata spec drives the workflow.
     # Exercises the amata execution path for healing.
-    image: localhost:5000/ploy/java-17-codex-amata-maven:latest
+    image: localhost:5000/ploy/amata-codex-java-17-maven:latest
     amata:
       spec: |
         version: amata/v1
@@ -158,7 +158,7 @@ mr_on_success: true
 #    - Run should complete with status=success
 #
 # 5. Artifact validation:
-#    - heal.json should be present
+#    - codex-last.txt should be present
 #    - Final workspace should include healing fix
 #
 # Success criteria:

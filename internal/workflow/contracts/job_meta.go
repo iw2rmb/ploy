@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-	"unicode/utf8"
 )
 
 // JobKind identifies the execution type for a job in the unified queue.
@@ -17,7 +16,7 @@ import (
 type JobKind string
 
 const (
-	// JobKindMig indicates a mig execution job (pre_gate, mig, post_gate, heal, re_gate).
+	// JobKindMig indicates a mig execution job (pre_gate, mig, post_gate).
 	JobKindMig JobKind = "mig"
 	// JobKindGate indicates a build gate validation job.
 	JobKindGate JobKind = "gate"
@@ -72,65 +71,17 @@ type JobMeta struct {
 	// Populated for mig jobs so execution does not depend on job name parsing.
 	MigStepIndex *int `json:"mig_step_index,omitempty"`
 
-	// GateCycleName stores the concrete gate cycle name used by gate/re-gate jobs.
-	// Examples: pre-gate, post-gate, re-gate-1.
+	// GateCycleName stores the concrete gate cycle name used by gate jobs.
+	// Examples: pre-gate, post-gate.
 	GateCycleName string `json:"gate_cycle_name,omitempty"`
-
-	// ActionSummary is a short one-line description of what the healing mig did,
-	// produced by the healing container. Only allowed for mig jobs (kind="mig").
-	// Max 200 chars, no newlines.
-	ActionSummary string `json:"action_summary,omitempty"`
-
-	// Heal contains structured healing output extracted from /out/heal.json.
-	// Only allowed for mig jobs (kind="mig").
-	Heal *HealJobMetadata `json:"heal,omitempty"`
 
 	// RecoveryMetadata stores universal recovery loop metadata.
 	// Allowed for gate and mig jobs; rejected for build jobs.
 	RecoveryMetadata *RecoveryJobMetadata `json:"recovery,omitempty"`
-
-	// SBOM stores cycle context for sbom jobs and related runtime planning.
-	// Allowed for mig jobs.
-	SBOM *SBOMJobMetadata `json:"sbom,omitempty"`
 }
 
 // RecoveryJobMetadata captures loop context persisted at job level.
 type RecoveryJobMetadata = BuildGateRecoveryMetadata
-
-// HealJobMetadata captures structured healing details emitted by the healer.
-type HealJobMetadata struct {
-	BugSummary    string `json:"bug_summary,omitempty"`
-	ActionSummary string `json:"action_summary,omitempty"`
-	ErrorKind     string `json:"error_kind,omitempty"`
-}
-
-const (
-	// SBOMPhasePre identifies pre-gate sbom cycle context.
-	SBOMPhasePre = "pre"
-	// SBOMPhasePost identifies post/re-gate sbom cycle context.
-	SBOMPhasePost = "post"
-)
-
-const (
-	// SBOMRoleInitial is the initial sbom before pre/post gate.
-	SBOMRoleInitial = "initial"
-	// SBOMRoleFinal is the final sbom placed after recovered gate flow.
-	SBOMRoleFinal = "final"
-)
-
-// SBOMJobMetadata captures sbom cycle context so runtime logic does not depend
-// on job naming patterns.
-type SBOMJobMetadata struct {
-	// Phase is one of: pre, post.
-	Phase string `json:"phase,omitempty"`
-	// CycleName is the concrete gate cycle identifier used for sbom staging.
-	// Examples: pre-gate, post-gate, re-gate-1.
-	CycleName string `json:"cycle_name,omitempty"`
-	// Role is one of: initial, final.
-	Role string `json:"role,omitempty"`
-	// RootJobID is the stable sbom chain root used for retry accounting.
-	RootJobID string `json:"root_job_id,omitempty"`
-}
 
 // BuildMeta captures metadata for build tool invocations stored in jobs.meta.
 // This consolidates fields previously tracked in the separate builds table.
@@ -173,18 +124,6 @@ func (m JobMeta) Validate() error {
 			return fmt.Errorf("recovery metadata invalid: %w", err)
 		}
 	}
-	// ActionSummary is only valid for mig jobs.
-	if m.ActionSummary != "" {
-		if m.Kind != JobKindMig {
-			return fmt.Errorf("action_summary present but kind is %q (only allowed for %q)", m.Kind, JobKindMig)
-		}
-		if strings.ContainsAny(m.ActionSummary, "\n\r") {
-			return fmt.Errorf("action_summary: must be single-line")
-		}
-		if utf8.RuneCountInString(m.ActionSummary) > 200 {
-			return fmt.Errorf("action_summary: must be at most 200 characters, got %d", utf8.RuneCountInString(m.ActionSummary))
-		}
-	}
 	if m.MigStepIndex != nil {
 		if m.Kind != JobKindMig {
 			return fmt.Errorf("mig_step_index present but kind is %q (only allowed for %q)", m.Kind, JobKindMig)
@@ -202,74 +141,6 @@ func (m JobMeta) Validate() error {
 		}
 		if strings.TrimSpace(m.GateCycleName) != m.GateCycleName {
 			return fmt.Errorf("gate_cycle_name: must not have leading or trailing whitespace")
-		}
-	}
-	if m.SBOM != nil {
-		if m.Kind != JobKindMig {
-			return fmt.Errorf("sbom metadata present but kind is %q (only allowed for %q)", m.Kind, JobKindMig)
-		}
-		if err := m.SBOM.Validate(); err != nil {
-			return fmt.Errorf("sbom metadata invalid: %w", err)
-		}
-	}
-	if m.Heal != nil {
-		if m.Kind != JobKindMig {
-			return fmt.Errorf("heal metadata present but kind is %q (only allowed for %q)", m.Kind, JobKindMig)
-		}
-		if err := m.Heal.Validate(); err != nil {
-			return fmt.Errorf("heal metadata invalid: %w", err)
-		}
-	}
-	return nil
-}
-
-// Validate ensures SBOMJobMetadata is well-formed.
-func (m SBOMJobMetadata) Validate() error {
-	if m.Phase != "" && m.Phase != SBOMPhasePre && m.Phase != SBOMPhasePost {
-		return fmt.Errorf("phase invalid: %q", m.Phase)
-	}
-	if strings.ContainsAny(m.CycleName, "\n\r\t") {
-		return fmt.Errorf("cycle_name: must not contain control whitespace")
-	}
-	if strings.TrimSpace(m.CycleName) != m.CycleName {
-		return fmt.Errorf("cycle_name: must not have leading or trailing whitespace")
-	}
-	if m.Role != "" && m.Role != SBOMRoleInitial && m.Role != SBOMRoleFinal {
-		return fmt.Errorf("role invalid: %q", m.Role)
-	}
-	if strings.ContainsAny(m.RootJobID, "\n\r\t ") {
-		return fmt.Errorf("root_job_id: must not contain whitespace")
-	}
-	return nil
-}
-
-// Validate ensures HealJobMetadata is well-formed.
-func (m HealJobMetadata) Validate() error {
-	validateLine := func(name, value string) error {
-		if value == "" {
-			return nil
-		}
-		if strings.ContainsAny(value, "\n\r") {
-			return fmt.Errorf("%s: must be single-line", name)
-		}
-		if utf8.RuneCountInString(value) > 200 {
-			return fmt.Errorf("%s: must be at most 200 characters, got %d", name, utf8.RuneCountInString(value))
-		}
-		return nil
-	}
-
-	if err := validateLine("bug_summary", m.BugSummary); err != nil {
-		return err
-	}
-	if err := validateLine("action_summary", m.ActionSummary); err != nil {
-		return err
-	}
-	if err := validateLine("error_kind", m.ErrorKind); err != nil {
-		return err
-	}
-	if m.ErrorKind != "" {
-		if _, ok := ParseRecoveryErrorKind(m.ErrorKind); !ok {
-			return fmt.Errorf("error_kind invalid: %q", m.ErrorKind)
 		}
 	}
 	return nil

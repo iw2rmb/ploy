@@ -1,5 +1,5 @@
 recipe=org.openrewrite.java.search.FindDeprecatedUses
-image=ghcr.io/iw2rmb/ploy/orw-cli-gradle:v0.1.7
+image=ghcr.io/iw2rmb/ploy/orw-cli-java-17-gradle:v0.1.7
 stage_dir=/Users/v.v.kovalev/@iw2rmb/ploy/tmp/capital-funds-api-synth-20260417-193636
 classpath_file=/Users/v.v.kovalev/@iw2rmb/ploy/tmp/capital-funds-api-synth-20260417-193636/.ploy-sbom-out/java.classpath
 ploy_stack_tool=gradle

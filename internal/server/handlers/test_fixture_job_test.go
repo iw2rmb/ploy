@@ -50,8 +50,6 @@ type jobStore struct {
 	scheduleNextJob           mockCall[store.ScheduleNextJobParams, store.Job]
 	promoteJobByIDIfUnblocked mockCall[types.JobID, store.Job]
 
-	promoteReGateRecoveryCandidateGateProfileResult types.RepoID
-	promoteReGateRecoveryCandidateGateProfileErr    error
 
 	// Job counts
 	countJobsByRunResult                   int64
@@ -339,19 +337,6 @@ func (m *jobStore) PromoteJobByIDIfUnblocked(ctx context.Context, id types.JobID
 		return m.listJobsByRunResult[i], nil
 	}
 	return store.Job{}, pgx.ErrNoRows
-}
-
-func (m *jobStore) PromoteReGateRecoveryCandidateGateProfile(ctx context.Context, arg store.PromoteReGateRecoveryCandidateGateProfileParams) (types.RepoID, error) {
-	if m.promoteReGateRecoveryCandidateGateProfileErr != nil {
-		return "", m.promoteReGateRecoveryCandidateGateProfileErr
-	}
-	if !m.promoteReGateRecoveryCandidateGateProfileResult.IsZero() {
-		return m.promoteReGateRecoveryCandidateGateProfileResult, nil
-	}
-	if !m.getJobResult.RepoID.IsZero() {
-		return m.getJobResult.RepoID, nil
-	}
-	return "", pgx.ErrNoRows
 }
 
 // Job count methods

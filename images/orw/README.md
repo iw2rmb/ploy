@@ -1,16 +1,16 @@
-# ORW Images (`orw-cli-maven`, `orw-cli-gradle`)
+# ORW Images (`orw-cli-java-17-maven`, `orw-cli-java-17-gradle`)
 
 Consolidated reference for ORW-related behavior documented under `docs/`.
 
 ## What Lives Here
 
-- `orw-cli-maven` (`images/orw/orw-cli-maven`) -> image name `orw-cli-maven`
-- `orw-cli-gradle` (`images/orw/orw-cli-gradle`) -> image name `orw-cli-gradle`
+- `orw-cli-java-17-maven` (`images/orw/orw-cli-java-17-maven`) -> image name `orw-cli-java-17-maven`
+- `orw-cli-java-17-gradle` (`images/orw/orw-cli-java-17-gradle`) -> image name `orw-cli-java-17-gradle`
 
 Runners resolve as:
 
-- `$PLOY_CONTAINER_REGISTRY/orw-cli-maven:latest`
-- `$PLOY_CONTAINER_REGISTRY/orw-cli-gradle:latest`
+- `$PLOY_CONTAINER_REGISTRY/orw-cli-java-17-maven:latest`
+- `$PLOY_CONTAINER_REGISTRY/orw-cli-java-17-gradle:latest`
 
 ## How ORW Images Are Selected
 
@@ -29,9 +29,9 @@ Typical ORW mapping:
 
 ```yaml
 image:
-  default: $PLOY_CONTAINER_REGISTRY/orw-cli-maven:latest
-  java-maven: $PLOY_CONTAINER_REGISTRY/orw-cli-maven:latest
-  java-gradle: $PLOY_CONTAINER_REGISTRY/orw-cli-gradle:latest
+  default: $PLOY_CONTAINER_REGISTRY/orw-cli-java-17-maven:latest
+  java-maven: $PLOY_CONTAINER_REGISTRY/orw-cli-java-17-maven:latest
+  java-gradle: $PLOY_CONTAINER_REGISTRY/orw-cli-java-17-gradle:latest
 ```
 
 Build Gate detects stack once (for example `java-maven` or `java-gradle`) and that stack is reused across subsequent mig/heal steps in the run.
@@ -136,16 +136,16 @@ Publish a single ORW image:
 ```bash
 IMAGE_PREFIX="${PLOY_CONTAINER_REGISTRY:-ghcr.io/iw2rmb/ploy}" \
   docker buildx build --platform linux/amd64 \
-  -f images/orw/orw-cli-maven/Dockerfile \
-  -t "${IMAGE_PREFIX}/orw-cli-maven:latest" \
+  -f images/orw/orw-cli-java-17-maven/Dockerfile \
+  -t "${IMAGE_PREFIX}/orw-cli-java-17-maven:latest" \
   --push .
 ```
 
 Verify published tags:
 
 ```bash
-docker buildx imagetools inspect "$PLOY_CONTAINER_REGISTRY/orw-cli-maven:latest"
-docker buildx imagetools inspect "$PLOY_CONTAINER_REGISTRY/orw-cli-gradle:latest"
+docker buildx imagetools inspect "$PLOY_CONTAINER_REGISTRY/orw-cli-java-17-maven:latest"
+docker buildx imagetools inspect "$PLOY_CONTAINER_REGISTRY/orw-cli-java-17-gradle:latest"
 ```
 
 ## Sources Consolidated

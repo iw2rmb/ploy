@@ -21,10 +21,10 @@ expect:
       action: rewrite
       target_field: home
       destination: ".codex/auth.json"
-      sections: [heal, mig, post_gate, pre_gate, re_gate]
+      sections: [mig, post_gate, pre_gate]
     - env_key: CRUSH_JSON
       target: server
       action: rewrite
       target_field: home
       destination: ".config/crush/crush.json"
-      sections: [heal, mig, post_gate, pre_gate, re_gate]
+      sections: [mig, post_gate, pre_gate]

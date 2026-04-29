@@ -81,11 +81,12 @@ tests/e2e/deploy/e2e-logs/
 
 # amata
 .amata
-images/amata/amata*
+images/amata/amata
+images/amata/amata-linux-*
 
 .crush
 .refresh.sh
 
-images/orw/orw-cli-gradle/rewrite-runner/target
+images/orw/orw-cli-java-17-gradle/rewrite-runner/target
 
 AGENTS.md

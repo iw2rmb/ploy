@@ -295,22 +295,13 @@ func boldBranchName(name string) string {
 }
 
 func renderExitOneLiner(job RunJobEntry, repoLastError *string, useRepoLastError bool) string {
-	isHeal := normalizeStatus(job.JobType.String()) == "heal"
-	if isHeal {
-		exit := renderExitCode(job.ExitCode)
-		if exit != "0" && isFailedOrCrashedStatus(job.Status.String()) {
-			return renderWrappedExitOneLiner(exit, "Error", true)
-		}
-		return renderHealSummaryBlock(job)
-	}
-
 	if !isFailedOrCrashedStatus(job.Status.String()) {
 		return ""
 	}
 
 	msg := strings.Join(strings.Fields(strings.TrimSpace(job.BugSummary)), " ")
 	if isGateJobType(job.JobType.String()) {
-		if !useRepoLastError || normalizeStatus(job.JobType.String()) != "re_gate" {
+		if !useRepoLastError {
 			return ""
 		}
 		msg = FormatErrorOneLiner(repoLastError)
@@ -535,44 +526,6 @@ func renderWrappedExitOneLiner(exitCode, content string, colorizeContent bool) s
 	return strings.Join(lines, "\n")
 }
 
-func renderHealSummaryBlock(job RunJobEntry) string {
-	actionSummary := strings.TrimSpace(job.ActionSummary)
-	if actionSummary == "" {
-		return ""
-	}
-
-	prefix := "             └ "
-	errorKind := strings.TrimSpace(job.ErrorKind)
-	if errorKind != "" {
-		prefix += "[" + errorKind + "] "
-	}
-	return renderWrappedPrefixedLine(prefix, "               ", actionSummary)
-}
-
-func renderWrappedPrefixedLine(firstPrefix, continuationPrefix, content string) string {
-	const wrapWidth = 80
-
-	content = strings.Join(strings.Fields(strings.TrimSpace(content)), " ")
-	if content == "" {
-		return ""
-	}
-	wrapped := lipgloss.Wrap(content, wrapWidth, " ")
-	rows := strings.Split(wrapped, "\n")
-	if len(rows) == 0 {
-		return ""
-	}
-
-	lines := make([]string, 0, len(rows))
-	for i, row := range rows {
-		if i == 0 {
-			lines = append(lines, firstPrefix+row)
-			continue
-		}
-		lines = append(lines, continuationPrefix+row)
-	}
-	return strings.Join(lines, "\n")
-}
-
 func wrapFixedWidth(content string, width int) []string {
 	if width <= 0 {
 		return []string{content}
@@ -595,7 +548,7 @@ func wrapFixedWidth(content string, width int) []string {
 
 func isGateJobType(jobType string) bool {
 	switch normalizeStatus(jobType) {
-	case "pre_gate", "post_gate", "re_gate":
+	case "pre_gate", "post_gate":
 		return true
 	default:
 		return false
