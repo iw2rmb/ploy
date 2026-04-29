@@ -3,7 +3,6 @@ package handlers
 import (
 	"log/slog"
 	"net/http"
-	"sort"
 	"strings"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
@@ -28,14 +27,8 @@ func listConfigCAHandler(holder *ConfigHolder) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		all := holder.GetConfigCAAll()
 
-		sections := make([]string, 0, len(all))
-		for s := range all {
-			sections = append(sections, s)
-		}
-		sort.Strings(sections)
-
 		var items []configCAListItem
-		for _, s := range sections {
+		for _, s := range sortedSectionNames(all) {
 			hashes := all[s]
 			for _, h := range hashes {
 				items = append(items, configCAListItem{Hash: h, Section: s})
@@ -158,9 +151,9 @@ func deleteConfigCAHandler(holder *ConfigHolder, st store.Store) http.HandlerFun
 		}
 		hash = normalized
 
-		section := r.URL.Query().Get("section")
-		if section == "" {
-			writeHTTPError(w, http.StatusBadRequest, "section query parameter is required")
+		section, err := requiredQueryParam(r, "section")
+		if err != nil {
+			writeHTTPError(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 		if err := contracts.ValidateCAConfigSection(section); err != nil {

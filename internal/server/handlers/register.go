@@ -20,13 +20,14 @@ type routeDeps struct {
 
 // RegisterRoutes mounts all HTTP endpoints on the given server.
 func RegisterRoutes(s *server.HTTPServer, st store.Store, bs blobstore.Store, bp *blobpersist.Service, eventsService *server.EventsService, configHolder *ConfigHolder, tokenSecret string) {
-	var deps routeDeps
-	deps.st = st
-	deps.bs = bs
-	deps.bp = bp
-	deps.eventsService = eventsService
-	deps.configHolder = configHolder
-	deps.tokenSecret = tokenSecret
+	deps := routeDeps{
+		st:            st,
+		bs:            bs,
+		bp:            bp,
+		eventsService: eventsService,
+		configHolder:  configHolder,
+		tokenSecret:   tokenSecret,
+	}
 	if _, ok := st.(*store.PgStore); ok && bs != nil {
 		deps.gateProfileResolver = NewDBGateProfileResolver(st, bs)
 	}
@@ -105,15 +106,15 @@ func registerArtifactReadRoutes(s *server.HTTPServer, deps routeDeps) {
 
 func registerRunRoutes(s *server.HTTPServer, deps routeDeps) {
 	s.RegisterRouteFunc("GET /v1/runs", listRunsHandler(deps.st), auth.RoleControlPlane)
-	s.RegisterRouteFunc("GET /v1/runs/{id}", getRunHandler(deps.st), auth.RoleControlPlane)
-	s.RegisterRouteFunc("GET /v1/runs/{id}/status", getRunStatusHandler(deps.st), auth.RoleControlPlane)
-	s.RegisterRouteFuncAllowQueryToken("GET /v1/runs/{id}/logs", getRunLogsHandler(deps.st, deps.bs, deps.eventsService), auth.RoleControlPlane)
-	s.RegisterRouteFunc("POST /v1/runs/{id}/cancel", cancelRunHandlerV1(deps.st), auth.RoleControlPlane)
-	s.RegisterRouteFunc("POST /v1/runs/{id}/start", startRunHandler(deps.st, deps.bs), auth.RoleControlPlane)
+	s.RegisterRouteFunc("GET /v1/runs/{run_id}", getRunHandler(deps.st), auth.RoleControlPlane)
+	s.RegisterRouteFunc("GET /v1/runs/{run_id}/status", getRunStatusHandler(deps.st), auth.RoleControlPlane)
+	s.RegisterRouteFuncAllowQueryToken("GET /v1/runs/{run_id}/logs", getRunLogsHandler(deps.st, deps.bs, deps.eventsService), auth.RoleControlPlane)
+	s.RegisterRouteFunc("POST /v1/runs/{run_id}/cancel", cancelRunHandlerV1(deps.st), auth.RoleControlPlane)
+	s.RegisterRouteFunc("POST /v1/runs/{run_id}/start", startRunHandler(deps.st, deps.bs), auth.RoleControlPlane)
 
-	s.RegisterRouteFunc("POST /v1/runs/{id}/repos", addRunRepoHandler(deps.st), auth.RoleControlPlane)
-	s.RegisterRouteFunc("GET /v1/runs/{id}/repos", listRunReposHandler(deps.st), auth.RoleControlPlane)
-	s.RegisterRouteFunc("POST /v1/runs/{id}/repos/{repo_id}/restart", restartRunRepoHandler(deps.st, deps.bs), auth.RoleControlPlane)
+	s.RegisterRouteFunc("POST /v1/runs/{run_id}/repos", addRunRepoHandler(deps.st), auth.RoleControlPlane)
+	s.RegisterRouteFunc("GET /v1/runs/{run_id}/repos", listRunReposHandler(deps.st), auth.RoleControlPlane)
+	s.RegisterRouteFunc("POST /v1/runs/{run_id}/repos/{repo_id}/restart", restartRunRepoHandler(deps.st, deps.bs), auth.RoleControlPlane)
 	s.RegisterRouteFuncAllowQueryToken("GET /v1/runs/{run_id}/repos/{repo_id}/diffs", listRunRepoDiffsHandler(deps.st, deps.bs), auth.RoleControlPlane, auth.RoleWorker)
 	s.RegisterRouteFuncAllowQueryToken("GET /v1/runs/{run_id}/repos/{repo_id}/logs", getRunRepoLogsHandler(deps.st, deps.bs, deps.eventsService), auth.RoleControlPlane)
 	s.RegisterRouteFunc("GET /v1/runs/{run_id}/repos/{repo_id}/artifacts", listRunRepoArtifactsHandler(deps.st), auth.RoleControlPlane)

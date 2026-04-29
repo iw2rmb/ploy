@@ -32,7 +32,7 @@ func TestCancelRunHandlerV1_CancelsRunAndWork(t *testing.T) {
 	}
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/runs/"+runID.String()+"/cancel", nil)
-	req.SetPathValue("id", runID.String())
+	req.SetPathValue("run_id", runID.String())
 	rr := httptest.NewRecorder()
 
 	cancelRunHandlerV1(st).ServeHTTP(rr, req)
@@ -61,7 +61,7 @@ func TestCancelRunHandlerV1_CancelRunV1Error(t *testing.T) {
 	st.cancelRunV1.err = errors.New("db exploded")
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/runs/"+runID.String()+"/cancel", nil)
-	req.SetPathValue("id", runID.String())
+	req.SetPathValue("run_id", runID.String())
 	rr := httptest.NewRecorder()
 
 	cancelRunHandlerV1(st).ServeHTTP(rr, req)
@@ -86,7 +86,7 @@ func TestCancelRunHandlerV1_TerminalRunIsIdempotent(t *testing.T) {
 	}
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/runs/"+runID.String()+"/cancel", nil)
-	req.SetPathValue("id", runID.String())
+	req.SetPathValue("run_id", runID.String())
 	rr := httptest.NewRecorder()
 
 	cancelRunHandlerV1(st).ServeHTTP(rr, req)
@@ -132,7 +132,7 @@ func TestAddRunRepoHandler_CreatesRepoWithoutImmediateJobs(t *testing.T) {
 	}
 	body, _ := json.Marshal(reqBody)
 	req := httptest.NewRequest(http.MethodPost, "/v1/runs/"+runID.String()+"/repos", bytes.NewReader(body))
-	req.SetPathValue("id", runID.String())
+	req.SetPathValue("run_id", runID.String())
 	rr := httptest.NewRecorder()
 
 	addRunRepoHandler(st).ServeHTTP(rr, req)
@@ -180,7 +180,7 @@ func TestListRunReposHandler_Success(t *testing.T) {
 	}
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID.String()+"/repos", nil)
-	req.SetPathValue("id", runID.String())
+	req.SetPathValue("run_id", runID.String())
 	rr := httptest.NewRecorder()
 
 	listRunReposHandler(st).ServeHTTP(rr, req)
@@ -230,7 +230,7 @@ func TestListRunReposHandler_ListError(t *testing.T) {
 	st.listRunReposWithURLByRun.err = errors.New("db exploded")
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID.String()+"/repos", nil)
-	req.SetPathValue("id", runID.String())
+	req.SetPathValue("run_id", runID.String())
 	rr := httptest.NewRecorder()
 
 	listRunReposHandler(st).ServeHTTP(rr, req)
@@ -314,7 +314,7 @@ func TestRestartRunRepoHandler_ReopensTerminalRunAndCreatesJobs(t *testing.T) {
 	}
 	body, _ := json.Marshal(reqBody)
 	req := httptest.NewRequest(http.MethodPost, "/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/restart", bytes.NewReader(body))
-	req.SetPathValue("id", runID.String())
+	req.SetPathValue("run_id", runID.String())
 	req.SetPathValue("repo_id", repoID.String())
 	rr := httptest.NewRecorder()
 
@@ -366,7 +366,7 @@ func TestStartRunHandler_StartsQueuedRepos(t *testing.T) {
 	st.listQueuedRunReposByRun.val = []store.RunRepo{queuedRepo}
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/runs/"+runID.String()+"/start", nil)
-	req.SetPathValue("id", runID.String())
+	req.SetPathValue("run_id", runID.String())
 	rr := httptest.NewRecorder()
 
 	startRunHandler(st, nil).ServeHTTP(rr, req)
@@ -399,7 +399,7 @@ func TestStartRunHandler_TerminalRunConflict(t *testing.T) {
 	}
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/runs/"+runID.String()+"/start", nil)
-	req.SetPathValue("id", runID.String())
+	req.SetPathValue("run_id", runID.String())
 	rr := httptest.NewRecorder()
 
 	startRunHandler(st, nil).ServeHTTP(rr, req)

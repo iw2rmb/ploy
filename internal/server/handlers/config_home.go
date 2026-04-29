@@ -4,7 +4,6 @@ import (
 	"log/slog"
 	"net/http"
 	"path"
-	"sort"
 
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
@@ -28,14 +27,8 @@ func listConfigHomeHandler(holder *ConfigHolder) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		all := holder.GetConfigHomeAll()
 
-		sections := make([]string, 0, len(all))
-		for s := range all {
-			sections = append(sections, s)
-		}
-		sort.Strings(sections)
-
 		var items []configHomeListItem
-		for _, s := range sections {
+		for _, s := range sortedSectionNames(all) {
 			entries := all[s]
 			for _, e := range entries {
 				items = append(items, configHomeListItem{Entry: e.Entry, Dst: e.Dst, Section: s})
@@ -119,9 +112,9 @@ func putConfigHomeHandler(holder *ConfigHolder, st store.Store) http.HandlerFunc
 // deleteConfigHomeHandler removes a home entry by destination and section.
 func deleteConfigHomeHandler(holder *ConfigHolder, st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		dst := r.URL.Query().Get("dst")
-		if dst == "" {
-			writeHTTPError(w, http.StatusBadRequest, "dst query parameter is required")
+		dst, err := requiredQueryParam(r, "dst")
+		if err != nil {
+			writeHTTPError(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
@@ -133,9 +126,9 @@ func deleteConfigHomeHandler(holder *ConfigHolder, st store.Store) http.HandlerF
 		}
 		dst = path.Clean(dst)
 
-		section := r.URL.Query().Get("section")
-		if section == "" {
-			writeHTTPError(w, http.StatusBadRequest, "section query parameter is required")
+		section, err := requiredQueryParam(r, "section")
+		if err != nil {
+			writeHTTPError(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 		if err := contracts.ValidateHydraSection(section); err != nil {

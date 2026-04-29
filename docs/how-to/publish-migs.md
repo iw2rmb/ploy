@@ -58,8 +58,8 @@ Build Gate image mapping source of truth:
   - `$PLOY_CONTAINER_REGISTRY/gate-gradle:jdk25`
   - `$PLOY_CONTAINER_REGISTRY/maven:3-eclipse-temurin-11`
   - `$PLOY_CONTAINER_REGISTRY/maven:3-eclipse-temurin-17`
-  - `$PLOY_CONTAINER_REGISTRY/maven:3-eclipse-temurin-21`
-  - `$PLOY_CONTAINER_REGISTRY/maven:3-eclipse-temurin-25`
+  - `$PLOY_CONTAINER_REGISTRY/java-base-maven:jdk21`
+  - `$PLOY_CONTAINER_REGISTRY/java-base-maven:jdk25`
 
 Runtime CA support is separate from build-time CA injection.
 Register runtime CA bundles via `ploy config ca set --file /path/to/ca-bundle.pem` so the

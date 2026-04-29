@@ -464,8 +464,8 @@ MigArchiveResponse:
 # MigsRunSummary — Canonical Migs run status schema
 #
 # This is the single authoritative response type for:
-# - GET /v1/runs/{id}/status (status) → 200 response body
-# - SSE `event: run` payloads on /v1/runs/{id}/logs
+# - GET /v1/runs/{run_id}/status (status) → 200 response body
+# - SSE `event: run` payloads on /v1/runs/{run_id}/logs
 #
 # Wire contract guarantees:
 # - No wrapper types — RunSummary is returned directly as the JSON root.
@@ -477,7 +477,7 @@ MigsRunSummary:
   type: object
   description: |
     Canonical Migs run status schema. This is the single response type for run
-    status queries (GET /v1/runs/{id}/status) and SSE `event: run` payloads. No
+    status queries (GET /v1/runs/{run_id}/status) and SSE `event: run` payloads. No
     wrapper types are used — the JSON shape is RunSummary directly.
   properties:
     run_id:

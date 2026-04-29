@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	"github.com/iw2rmb/ploy/internal/store"
 )
 
 // HydraJobConfig holds the typed Hydra overlay fields for a single job section.
@@ -47,20 +46,20 @@ func applyHydraOverlayMutator(m map[string]any, in claimSpecMutatorInput) error 
 		return err
 	}
 
-	// Keep legacy top-level merge for compatibility with existing consumers/tests.
-	mergeHydraIntoBlock(m, overlay)
+	// MigSpec uses top-level envs as shared env applied to all steps.
+	mergeEnvsBlock(m, overlay.Envs)
+
 	// Ensure typed fields are injected into canonical schema locations consumed
 	// by node parsing for each job phase.
-	applyCanonicalHydraOverlay(m, in.jobType, in.job, overlay)
+	applyCanonicalHydraOverlay(m, in.jobType, overlay)
 
 	return nil
 }
 
-func applyCanonicalHydraOverlay(spec map[string]any, jobType domaintypes.JobType, job store.Job, overlay *HydraJobConfig) {
+func applyCanonicalHydraOverlay(spec map[string]any, jobType domaintypes.JobType, overlay *HydraJobConfig) {
 	if spec == nil || overlay == nil {
 		return
 	}
-	_ = job
 	switch jobType {
 	case domaintypes.JobTypeMig:
 		applyOverlayToSteps(spec, overlay)
@@ -165,19 +164,6 @@ func assembleHydraOverlay(
 	}
 
 	return base
-}
-
-// mergeHydraIntoBlock applies all overlay fields into a spec block using
-// per-field merge rules. Existing block values take precedence.
-func mergeHydraIntoBlock(block map[string]any, cfg *HydraJobConfig) {
-	if cfg == nil {
-		return
-	}
-	mergeEnvsBlock(block, cfg.Envs)
-	mergeCABlock(block, cfg.CA)
-	mergeRecordsByDstBlock(block, "in", cfg.In)
-	mergeRecordsByDstBlock(block, "out", cfg.Out)
-	mergeRecordsByDstBlock(block, "home", cfg.Home)
 }
 
 // mergeEnvsBlock merges overlay envs into block["envs"]. Existing block keys

@@ -18,14 +18,14 @@ import (
 )
 
 // cancelRunHandlerV1 returns an HTTP handler that cancels a v1 run.
-// POST /v1/runs/{id}/cancel (v1 API) — Performs transactional cancellation of a run.
+// POST /v1/runs/{run_id}/cancel (v1 API) — Performs transactional cancellation of a run.
 // This handler delegates cancellation to store.CancelRunV1, which atomically:
 // - Sets runs.status=Cancelled (for non-terminal runs)
 // - Cancels all repos with status Queued or Running → Cancelled
 // - Cancels waiting/running jobs (Created/Queued/Running → Cancelled)
 func cancelRunHandlerV1(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		runID, ok := parseRequiredPathIDOrWriteError[domaintypes.RunID](w, r, "id")
+		runID, ok := parseRequiredPathIDOrWriteError[domaintypes.RunID](w, r, "run_id")
 		if !ok {
 			return
 		}
@@ -67,10 +67,10 @@ func cancelRunHandlerV1(st store.Store) http.HandlerFunc {
 }
 
 // addRunRepoHandler adds a repo to an existing run (and to the mig repo set).
-// POST /v1/runs/{id}/repos — Body {repo_url, base_ref, target_ref}.
+// POST /v1/runs/{run_id}/repos — Body {repo_url, base_ref, target_ref}.
 func addRunRepoHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		runID, ok := parseRequiredPathIDOrWriteError[domaintypes.RunID](w, r, "id")
+		runID, ok := parseRequiredPathIDOrWriteError[domaintypes.RunID](w, r, "run_id")
 		if !ok {
 			return
 		}
@@ -158,10 +158,10 @@ func addRunRepoHandler(st store.Store) http.HandlerFunc {
 }
 
 // listRunReposHandler lists repos for a run.
-// GET /v1/runs/{id}/repos
+// GET /v1/runs/{run_id}/repos
 func listRunReposHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		runID, ok := parseRequiredPathIDOrWriteError[domaintypes.RunID](w, r, "id")
+		runID, ok := parseRequiredPathIDOrWriteError[domaintypes.RunID](w, r, "run_id")
 		if !ok {
 			return
 		}
@@ -285,10 +285,10 @@ func cancelRunRepoHandlerV1(st store.Store) http.HandlerFunc {
 }
 
 // restartRunRepoHandler restarts a repo execution by incrementing attempt and creating new repo-scoped jobs.
-// POST /v1/runs/{id}/repos/{repo_id}/restart
+// POST /v1/runs/{run_id}/repos/{repo_id}/restart
 func restartRunRepoHandler(st store.Store, bs blobstore.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		runID, ok := parseRequiredPathIDOrWriteError[domaintypes.RunID](w, r, "id")
+		runID, ok := parseRequiredPathIDOrWriteError[domaintypes.RunID](w, r, "run_id")
 		if !ok {
 			return
 		}
@@ -434,12 +434,12 @@ type StartRunResponse struct {
 }
 
 // startRunHandler delegates to BatchRepoStarter.StartPendingRepos (shared with the background scheduler).
-// POST /v1/runs/{id}/start
+// POST /v1/runs/{run_id}/start
 func startRunHandler(st store.Store, bs blobstore.Store) http.HandlerFunc {
 	starter := NewBatchRepoStarter(st, bs)
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		runID, ok := parseRequiredPathIDOrWriteError[domaintypes.RunID](w, r, "id")
+		runID, ok := parseRequiredPathIDOrWriteError[domaintypes.RunID](w, r, "run_id")
 		if !ok {
 			return
 		}

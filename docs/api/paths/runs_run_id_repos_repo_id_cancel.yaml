@@ -1,7 +1,7 @@
 # Repo-scoped cancel for a repo execution within a run.
 #
 # This POST endpoint cancels a single repo execution within a batch run.
-# It is the v1 replacement for the HEAD DELETE /v1/runs/{id}/repos/{repo_id}
+# It is the v1 replacement for the HEAD DELETE /v1/runs/{run_id}/repos/{repo_id}
 # endpoint, using POST semantics consistent with other v1 cancellation endpoints.
 post:
   tags: [Control]
@@ -11,7 +11,7 @@ post:
     the repo status to `Cancelled` if it is not already in a terminal state
     (`Success`, `Fail`, `Cancelled`).
 
-    This is the v1 replacement for HEAD `DELETE /v1/runs/{id}/repos/{repo_id}`.
+    This is the v1 replacement for HEAD `DELETE /v1/runs/{run_id}/repos/{repo_id}`.
     The operation is idempotent: if the repo is already terminal, the handler
     returns the current repo state with `200 OK`.
 
