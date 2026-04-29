@@ -90,14 +90,8 @@ func getJobLogsHandler(st store.Store, bs blobstore.Store, eventsService *server
 // log chunks scoped to a specific job. Resolves run context from the job row and
 // reuses the same chunk validation and persistence semantics as other log endpoints.
 func createJobLogsHandler(st store.Store, bp *blobpersist.Service, eventsService *server.EventsService) http.HandlerFunc {
-	if bp == nil {
-		panic("createJobLogsHandler: blobpersist is required")
-	}
-	if eventsService == nil {
-		panic("createJobLogsHandler: eventsService is required")
-	}
-	const maxBodySize = 16 << 20  // 16 MiB
-	const maxChunkSize = 10 << 20 // 10 MiB
+	requireBlobPersist("createJobLogsHandler", bp)
+	requireEventsService("createJobLogsHandler", eventsService)
 	return func(w http.ResponseWriter, r *http.Request) {
 		jobID, err := parseRequiredPathID[domaintypes.JobID](r, "job_id")
 		if err != nil {
@@ -117,8 +111,7 @@ func createJobLogsHandler(st store.Store, bp *blobpersist.Service, eventsService
 			return
 		}
 
-		if r.ContentLength > maxBodySize {
-			writeHTTPError(w, http.StatusRequestEntityTooLarge, "payload exceeds body size cap")
+		if rejectOversizedContentLength(w, r, ingestMaxBodySize) {
 			return
 		}
 
@@ -127,7 +120,7 @@ func createJobLogsHandler(st store.Store, bp *blobpersist.Service, eventsService
 			Data    []byte `json:"data"`
 		}
 
-		if err := decodeRequestJSON(w, r, &req, maxBodySize); err != nil {
+		if err := decodeRequestJSON(w, r, &req, ingestMaxBodySize); err != nil {
 			return
 		}
 
@@ -135,7 +128,7 @@ func createJobLogsHandler(st store.Store, bp *blobpersist.Service, eventsService
 			writeHTTPError(w, http.StatusBadRequest, "data is required and must not be empty")
 			return
 		}
-		if len(req.Data) > maxChunkSize {
+		if len(req.Data) > ingestMaxDataSize {
 			writeHTTPError(w, http.StatusRequestEntityTooLarge, "data exceeds 10 MiB: %d bytes", len(req.Data))
 			return
 		}

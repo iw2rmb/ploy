@@ -18,13 +18,7 @@ import (
 // createJobDiffHandler stores gzipped diff in object storage and metadata in diffs table (≤10 MiB), rejects oversize.
 // Route: POST /v1/runs/{run_id}/jobs/{job_id}/diff
 func createJobDiffHandler(st store.Store, bp *blobpersist.Service) http.HandlerFunc {
-	if bp == nil {
-		panic("createJobDiffHandler: blobpersist is required")
-	}
-	// Accept up to 16 MiB for the JSON body to accommodate base64 overhead
-	// while still enforcing a strict 10 MiB cap on the decoded patch bytes.
-	const maxBodySize = 16 << 20  // 16 MiB
-	const maxPatchSize = 10 << 20 // 10 MiB
+	requireBlobPersist("createJobDiffHandler", bp)
 	return func(w http.ResponseWriter, r *http.Request) {
 		runID, err := parseRequiredPathID[domaintypes.RunID](r, "run_id")
 		if err != nil {
@@ -39,8 +33,7 @@ func createJobDiffHandler(st store.Store, bp *blobpersist.Service) http.HandlerF
 		}
 
 		// Check payload size before reading body.
-		if r.ContentLength > maxBodySize {
-			writeHTTPError(w, http.StatusRequestEntityTooLarge, "payload exceeds body size cap")
+		if rejectOversizedContentLength(w, r, ingestMaxBodySize) {
 			return
 		}
 
@@ -50,7 +43,7 @@ func createJobDiffHandler(st store.Store, bp *blobpersist.Service) http.HandlerF
 			Summary domaintypes.DiffSummary `json:"summary"` // optional summary metadata
 		}
 
-		if err := decodeRequestJSON(w, r, &req, maxBodySize); err != nil {
+		if err := decodeRequestJSON(w, r, &req, ingestMaxBodySize); err != nil {
 			return
 		}
 
@@ -61,7 +54,7 @@ func createJobDiffHandler(st store.Store, bp *blobpersist.Service) http.HandlerF
 		}
 
 		// Enforce decoded patch size cap (≤ 10 MiB gzipped, base64-decoded here).
-		if len(req.Patch) > maxPatchSize {
+		if len(req.Patch) > ingestMaxDataSize {
 			writeHTTPError(w, http.StatusRequestEntityTooLarge, "diff size exceeds 10 MiB cap")
 			return
 		}

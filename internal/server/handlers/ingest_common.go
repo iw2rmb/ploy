@@ -15,6 +15,8 @@ import (
 
 	"github.com/iw2rmb/ploy/internal/blobstore"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/server"
+	"github.com/iw2rmb/ploy/internal/server/blobpersist"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/workflow/lifecycle"
 )
@@ -48,17 +50,35 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	}
 }
 
-// writeJSONStatus writes a JSON response body of the form {"status": "<msg>"}
-// with the given HTTP status code. Use this for responses that carry no
-// structured payload beyond a short human-readable status string.
-func writeJSONStatus(w http.ResponseWriter, status int, msg string) {
-	writeJSON(w, status, struct {
-		Status string `json:"status"`
-	}{Status: msg})
-}
-
 // DefaultMaxBodySize is the default request body size limit (1 MiB).
 const DefaultMaxBodySize = 1 << 20
+
+const (
+	// ingestMaxBodySize allows for base64 overhead in JSON payloads.
+	ingestMaxBodySize int64 = 16 << 20 // 16 MiB
+	// ingestMaxDataSize is the decoded size cap for bundles/diffs/log chunks.
+	ingestMaxDataSize = 10 << 20 // 10 MiB
+)
+
+func requireBlobPersist(caller string, bp *blobpersist.Service) {
+	if bp == nil {
+		panic(caller + ": blobpersist is required")
+	}
+}
+
+func requireEventsService(caller string, eventsService *server.EventsService) {
+	if eventsService == nil {
+		panic(caller + ": eventsService is required")
+	}
+}
+
+func rejectOversizedContentLength(w http.ResponseWriter, r *http.Request, maxBytes int64) bool {
+	if r.ContentLength > maxBytes {
+		writeHTTPError(w, http.StatusRequestEntityTooLarge, "payload exceeds body size cap")
+		return true
+	}
+	return false
+}
 
 // decodeRequestJSON decodes a JSON request body with strict validation:
 //   - Caps request body at maxBytes using http.MaxBytesReader

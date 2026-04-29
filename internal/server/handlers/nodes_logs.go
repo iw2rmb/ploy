@@ -26,17 +26,8 @@ type nodeLogCreateResponse struct {
 // The blobpersist service handles database metadata and object storage writes.
 // The events service handles SSE fanout.
 func createNodeLogsHandler(st store.Store, bp *blobpersist.Service, eventsService *server.EventsService) http.HandlerFunc {
-	// Validate dependencies are provided.
-	if bp == nil {
-		panic("createNodeLogsHandler: blobpersist is required")
-	}
-	if eventsService == nil {
-		panic("createNodeLogsHandler: eventsService is required")
-	}
-	// Accept up to 16 MiB for the JSON body to accommodate base64 overhead
-	// while still enforcing a strict 10 MiB cap on the decoded gzipped bytes.
-	const maxBodySize = 16 << 20  // 16 MiB
-	const maxChunkSize = 10 << 20 // 10 MiB
+	requireBlobPersist("createNodeLogsHandler", bp)
+	requireEventsService("createNodeLogsHandler", eventsService)
 	return func(w http.ResponseWriter, r *http.Request) {
 		nodeID, err := parseRequiredPathID[domaintypes.NodeID](r, "id")
 		if err != nil {
@@ -45,8 +36,7 @@ func createNodeLogsHandler(st store.Store, bp *blobpersist.Service, eventsServic
 		}
 
 		// Check payload size before reading body.
-		if r.ContentLength > maxBodySize {
-			writeHTTPError(w, http.StatusRequestEntityTooLarge, "payload exceeds body size cap")
+		if rejectOversizedContentLength(w, r, ingestMaxBodySize) {
 			return
 		}
 
@@ -60,7 +50,7 @@ func createNodeLogsHandler(st store.Store, bp *blobpersist.Service, eventsServic
 			Data    []byte             `json:"data"`
 		}
 
-		if err := decodeRequestJSON(w, r, &req, maxBodySize); err != nil {
+		if err := decodeRequestJSON(w, r, &req, ingestMaxBodySize); err != nil {
 			return
 		}
 
@@ -77,7 +67,7 @@ func createNodeLogsHandler(st store.Store, bp *blobpersist.Service, eventsServic
 		}
 
 		// Enforce 10 MiB cap on decoded gzipped data bytes.
-		if len(req.Data) > maxChunkSize {
+		if len(req.Data) > ingestMaxDataSize {
 			writeHTTPError(w, http.StatusRequestEntityTooLarge, "data exceeds 10 MiB: %d bytes", len(req.Data))
 			return
 		}
