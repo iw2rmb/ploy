@@ -3,7 +3,6 @@ package lifecycle
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
@@ -105,60 +104,9 @@ func IsGateJobType(jobType domaintypes.JobType) bool {
 	return jobType == domaintypes.JobTypePreGate || jobType == domaintypes.JobTypePostGate
 }
 
-// ========== Recovery Context Resolution ==========
-
-// ResolveGateRecoveryContext extracts recovery classification and stack detection
-// from the failed gate job's metadata. Returns safe defaults when metadata is
-// absent or unparseable.
-func ResolveGateRecoveryContext(failedJob store.Job) (*contracts.BuildGateRecoveryMetadata, contracts.MigStack, *contracts.StackExpectation) {
-	meta := &contracts.BuildGateRecoveryMetadata{
-		LoopKind:  contracts.DefaultRecoveryLoopKind().String(),
-		ErrorKind: contracts.DefaultRecoveryErrorKind().String(),
-	}
-	detectedStack := contracts.MigStackUnknown
-	var detectedExpectation *contracts.StackExpectation
-
-	if len(failedJob.Meta) == 0 {
-		return meta, detectedStack, detectedExpectation
-	}
-
-	jobMeta, err := contracts.UnmarshalJobMeta(failedJob.Meta)
-	if err != nil {
-		return meta, detectedStack, detectedExpectation
-	}
-
-	if jobMeta.GateMetadata != nil {
-		detectedStack = jobMeta.GateMetadata.DetectedStack()
-		detectedExpectation = jobMeta.GateMetadata.DetectedStackExpectation()
-		if jobMeta.GateMetadata.Recovery != nil {
-			meta = CloneRecoveryMetadata(jobMeta.GateMetadata.Recovery)
-		}
-	}
-	if detectedExpectation == nil {
-		detectedExpectation = StackExpectationFromMigStack(detectedStack)
-	}
-	if kind, ok := contracts.ParseRecoveryErrorKind(meta.ErrorKind); (!ok || kind == contracts.RecoveryErrorKindUnknown) && jobMeta.RecoveryMetadata != nil {
-		meta = CloneRecoveryMetadata(jobMeta.RecoveryMetadata)
-	}
-	if loopKind, ok := contracts.ParseRecoveryLoopKind(meta.LoopKind); ok {
-		meta.LoopKind = loopKind.String()
-	} else {
-		meta.LoopKind = contracts.DefaultRecoveryLoopKind().String()
-	}
-	if kind, ok := contracts.ParseRecoveryErrorKind(meta.ErrorKind); ok {
-		meta.ErrorKind = kind.String()
-	} else {
-		meta.ErrorKind = contracts.DefaultRecoveryErrorKind().String()
-	}
-	if meta.StrategyID == "" {
-		meta.StrategyID = fmt.Sprintf("%s-default", meta.ErrorKind)
-	}
-	return meta, detectedStack, detectedExpectation
-}
-
-// RecoveryChainPredecessor returns the job in jobsByID whose NextID points to jobID,
+// ChainPredecessor returns the job in jobsByID whose NextID points to jobID,
 // or nil if no such job exists.
-func RecoveryChainPredecessor(jobID domaintypes.JobID, jobsByID map[domaintypes.JobID]store.Job) *store.Job {
+func ChainPredecessor(jobID domaintypes.JobID, jobsByID map[domaintypes.JobID]store.Job) *store.Job {
 	for _, candidate := range jobsByID {
 		if candidate.NextID != nil && *candidate.NextID == jobID {
 			c := candidate

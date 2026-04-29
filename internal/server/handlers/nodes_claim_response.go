@@ -43,13 +43,12 @@ type claimResponsePayload struct {
 	MigContext             *contracts.MigClaimContext      `json:"mig_context,omitempty"`
 	GateContext            *contracts.GateClaimContext     `json:"gate_context,omitempty"`
 	DetectedStack          *contracts.StackExpectation     `json:"detected_stack,omitempty"`
-	RecoveryContext        *contracts.RecoveryClaimContext `json:"recovery_context,omitempty"`
 }
 
 func buildClaimResponsePayload(
 	ctx context.Context,
 	st store.Store,
-	bs blobstore.Store,
+	_ blobstore.Store,
 	configHolder *ConfigHolder,
 	run store.Run,
 	spec []byte,
@@ -136,10 +135,6 @@ func buildClaimResponsePayload(
 		migContext.InFrom = resolvedInFrom
 	}
 
-	recoveryCtx, err := buildRecoveryClaimContext(ctx, st, bs, run.ID, job, jobType)
-	if err != nil {
-		return claimResponsePayload{}, fmt.Errorf("build recovery context: %w", err)
-	}
 	detectedStack, err := resolveClaimDetectedStack(ctx, st, job)
 	if err != nil {
 		return claimResponsePayload{}, fmt.Errorf("resolve detected stack for claim: %w", err)
@@ -176,7 +171,6 @@ func buildClaimResponsePayload(
 		MigContext:             migContext,
 		GateContext:            gateContext,
 		DetectedStack:          detectedStack,
-		RecoveryContext:        recoveryCtx,
 	}, nil
 }
 
@@ -213,7 +207,6 @@ func buildActionClaimResponsePayload(
 		MigContext:             nil,
 		GateContext:            nil,
 		DetectedStack:          nil,
-		RecoveryContext:        nil,
 	}
 }
 

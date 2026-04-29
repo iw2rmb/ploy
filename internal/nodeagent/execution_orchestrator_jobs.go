@@ -16,7 +16,6 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
-	"sort"
 	"strings"
 	"time"
 
@@ -120,7 +119,6 @@ func (r *runController) executeMigJob(ctx context.Context, req StartRunRequest) 
 		PopulateInDir: func(inDir string) error {
 			return r.materializeMigInFromInputs(ctx, req, inDir)
 		},
-		WorkspacePolicy:           workspaceChangePolicyIgnore,
 		UploadConfiguredArtifacts: true,
 		UploadDiff: func(ctx context.Context, runID types.RunID, jobID types.JobID, jobName string, diffGen step.DiffGenerator, workspace string, result step.Result) {
 			r.uploadJobDiff(ctx, runID, jobID, diffGen, workspace, result, types.DiffJobTypeMig)
@@ -170,124 +168,9 @@ type canonicalSBOMPackage struct {
 }
 
 var (
-	gradleDependencyPattern = regexp.MustCompile(`([A-Za-z0-9_.-]+:[A-Za-z0-9_.-]+):([A-Za-z0-9][A-Za-z0-9+_.-]*)`)
-	gradleOverridePattern   = regexp.MustCompile(`->\s*([A-Za-z0-9][A-Za-z0-9+_.-]*)`)
 	sbomNameTokenPattern    = regexp.MustCompile(`^[A-Za-z0-9_.-]+$`)
 	sbomVersionTokenPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9+_.-]*$`)
 )
-
-func canonicalSBOMFromDependencyOutput(raw []byte) ([]byte, error) {
-	packages := collectSBOMPackages(raw)
-	doc := canonicalSBOMDocument{
-		SPDXVersion:       "SPDX-2.3",
-		DataLicense:       "CC0-1.0",
-		SPDXID:            "SPDXRef-DOCUMENT",
-		Name:              "ploy-generated-sbom",
-		DocumentNamespace: "https://ploy.dev/sbom/generated",
-		CreationInfo: canonicalCreationInfo{
-			Created:  "1970-01-01T00:00:00Z",
-			Creators: []string{"Tool: ploy-nodeagent"},
-		},
-		Packages: make([]canonicalSBOMPackage, len(packages)),
-	}
-	copy(doc.Packages, packages)
-	for i := range doc.Packages {
-		doc.Packages[i].SPDXID = fmt.Sprintf("SPDXRef-Package-%06d", i+1)
-	}
-	return json.MarshalIndent(doc, "", "  ")
-}
-
-func collectSBOMPackages(raw []byte) []canonicalSBOMPackage {
-	lines := strings.Split(string(raw), "\n")
-	packages := make([]canonicalSBOMPackage, 0)
-	seen := make(map[string]struct{})
-	for _, line := range lines {
-		if name, version, ok := parseMavenDependencyLine(line); ok {
-			packages = appendUniqueSBOMPackage(packages, seen, name, version)
-			continue
-		}
-		if name, version, ok := parseGradleDependencyLine(line); ok {
-			packages = appendUniqueSBOMPackage(packages, seen, name, version)
-		}
-	}
-	sort.Slice(packages, func(i, j int) bool {
-		if packages[i].Name == packages[j].Name {
-			return packages[i].VersionInfo < packages[j].VersionInfo
-		}
-		return packages[i].Name < packages[j].Name
-	})
-	return packages
-}
-
-func appendUniqueSBOMPackage(
-	packages []canonicalSBOMPackage,
-	seen map[string]struct{},
-	name string,
-	version string,
-) []canonicalSBOMPackage {
-	key := name + "\x00" + version
-	if _, exists := seen[key]; exists {
-		return packages
-	}
-	seen[key] = struct{}{}
-	return append(packages, canonicalSBOMPackage{
-		Name:        name,
-		VersionInfo: version,
-	})
-}
-
-func parseMavenDependencyLine(line string) (string, string, bool) {
-	fields := strings.Fields(line)
-	for _, field := range fields {
-		token := strings.Trim(strings.TrimSpace(field), ",;")
-		if strings.Count(token, ":") < 4 {
-			continue
-		}
-		parts := strings.Split(token, ":")
-		if len(parts) < 5 {
-			continue
-		}
-		nameGroup := strings.TrimSpace(parts[0])
-		nameArtifact := strings.TrimSpace(parts[1])
-		version := strings.TrimSpace(parts[len(parts)-2])
-		scope := strings.TrimSpace(parts[len(parts)-1])
-		if !sbomNameTokenPattern.MatchString(nameGroup) || !sbomNameTokenPattern.MatchString(nameArtifact) {
-			continue
-		}
-		if !sbomVersionTokenPattern.MatchString(version) || scope == "" {
-			continue
-		}
-		return nameGroup + ":" + nameArtifact, version, true
-	}
-	return "", "", false
-}
-
-func parseGradleDependencyLine(line string) (string, string, bool) {
-	if !strings.Contains(line, "---") {
-		return "", "", false
-	}
-	matches := gradleDependencyPattern.FindStringSubmatch(line)
-	if len(matches) != 3 {
-		return "", "", false
-	}
-
-	name := strings.TrimSpace(matches[1])
-	version := strings.TrimSpace(matches[2])
-	if override := gradleOverridePattern.FindStringSubmatch(line); len(override) == 2 {
-		version = strings.TrimSpace(override[1])
-	}
-	parts := strings.Split(name, ":")
-	if len(parts) != 2 {
-		return "", "", false
-	}
-	if !sbomNameTokenPattern.MatchString(parts[0]) || !sbomNameTokenPattern.MatchString(parts[1]) {
-		return "", "", false
-	}
-	if !sbomVersionTokenPattern.MatchString(version) {
-		return "", "", false
-	}
-	return name, version, true
-}
 
 func validateCanonicalSBOMPath(path string) error {
 	raw, err := os.ReadFile(path)
@@ -357,7 +240,6 @@ type standardJobConfig struct {
 	FinalizeOutputs func(outDir, workspace string) error
 	TrySkip         func(ctx context.Context, manifest contracts.StepManifest, workspace, outDir string) (bool, error)
 
-	WorkspacePolicy           workspaceChangePolicy
 	UploadConfiguredArtifacts bool
 
 	UploadDiff    func(ctx context.Context, runID types.RunID, jobID types.JobID, jobName string, diffGen step.DiffGenerator, workspace string, result step.Result)
@@ -527,14 +409,6 @@ func (r *runController) runContainerJob(
 		}
 	}
 
-	var preStatus string
-	var preStatusErr error
-	if cfg.WorkspacePolicy != workspaceChangePolicyIgnore {
-		preStatus, preStatusErr = gitpkg.WorkspaceStatus(ctx, workspace)
-		if preStatusErr != nil {
-			slog.Warn("failed to compute workspace status before execution", "run_id", req.RunID, "error", preStatusErr)
-		}
-	}
 	preWorkspaceTree := ""
 	if tree, treeErr := gitpkg.ComputeWorkspaceTreeSHA(ctx, workspace); treeErr != nil {
 		return outcome, fmt.Errorf("compute pre-execution workspace tree: %w", treeErr)
@@ -593,16 +467,6 @@ func (r *runController) runContainerJob(
 		r.uploadConfiguredArtifacts(ctx, req, req.TypedOptions, manifest, workspace, outDir)
 	}
 
-	if cfg.WorkspacePolicy != workspaceChangePolicyIgnore && runErr == nil && result.ExitCode == 0 && preStatusErr == nil {
-		postStatus, postErr := gitpkg.WorkspaceStatus(ctx, workspace)
-		if postErr == nil {
-			if warning, violated := validateWorkspacePolicy(cfg.WorkspacePolicy, preStatus, postStatus); violated {
-				r.uploadHealingWorkspacePolicyFailure(ctx, req, warning, duration)
-				return outcome, nil
-			}
-		}
-	}
-
 	repoSHAOut := ""
 	if runErr == nil && result.ExitCode == 0 {
 		var repoSHAErr error
@@ -636,13 +500,6 @@ func (r *runController) runContainerJob(
 			if strings.TrimSpace(k) == "" || strings.TrimSpace(v) == "" {
 				continue
 			}
-			statsBuilder.MetadataEntry(k, v)
-		}
-	}
-	if orwMeta, orwErr := parseORWFailureMetadata(outDir); orwErr != nil {
-		slog.Warn("failed to parse ORW report metadata", "run_id", req.RunID, "job_id", req.JobID, "error", orwErr)
-	} else {
-		for k, v := range orwMeta {
 			statsBuilder.MetadataEntry(k, v)
 		}
 	}

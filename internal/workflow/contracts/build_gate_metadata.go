@@ -226,18 +226,27 @@ const (
 	RecoveryCandidateStatusValid       = "valid"
 )
 
+const (
+	recoveryLoopKindHealing = "healing"
+	recoveryErrorKindInfra  = "infra"
+	recoveryErrorKindCode   = "code"
+	recoveryErrorKindDeps   = "deps"
+	recoveryErrorKindMixed  = "mixed"
+	recoveryErrorKindUnk    = "unknown"
+)
+
 // Validate ensures recovery metadata entries are well formed.
 func (m BuildGateRecoveryMetadata) Validate() error {
 	if strings.TrimSpace(m.LoopKind) == "" {
 		return fmt.Errorf("loop_kind is required")
 	}
-	if _, ok := ParseRecoveryLoopKind(m.LoopKind); !ok {
+	if _, ok := normalizeRecoveryLoopKind(m.LoopKind); !ok {
 		return fmt.Errorf("loop_kind invalid: %q", m.LoopKind)
 	}
 	if strings.TrimSpace(m.ErrorKind) == "" {
 		return fmt.Errorf("error_kind is required")
 	}
-	if _, ok := ParseRecoveryErrorKind(m.ErrorKind); !ok {
+	if _, ok := normalizeRecoveryErrorKind(m.ErrorKind); !ok {
 		return fmt.Errorf("error_kind invalid: %q", m.ErrorKind)
 	}
 	if m.StrategyID != "" {
@@ -327,6 +336,32 @@ func (m BuildGateRecoveryMetadata) Validate() error {
 		}
 	}
 	return nil
+}
+
+func normalizeRecoveryLoopKind(raw string) (string, bool) {
+	switch strings.TrimSpace(raw) {
+	case recoveryLoopKindHealing:
+		return recoveryLoopKindHealing, true
+	default:
+		return "", false
+	}
+}
+
+func normalizeRecoveryErrorKind(raw string) (string, bool) {
+	switch strings.TrimSpace(raw) {
+	case recoveryErrorKindInfra:
+		return recoveryErrorKindInfra, true
+	case recoveryErrorKindCode:
+		return recoveryErrorKindCode, true
+	case recoveryErrorKindDeps:
+		return recoveryErrorKindDeps, true
+	case recoveryErrorKindMixed:
+		return recoveryErrorKindMixed, true
+	case recoveryErrorKindUnk:
+		return recoveryErrorKindUnk, true
+	default:
+		return "", false
+	}
 }
 
 // BuildGateResourceUsage captures container limits and observed usage metrics

@@ -244,7 +244,6 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 		MigContext:             claim.MigContext,
 		GateContext:            claim.GateContext,
 		DetectedStack:          claim.DetectedStack,
-		RecoveryContext:        claim.RecoveryContext,
 		TypedOptions:           typedOpts, // Strongly-typed run options (canonical source of truth)
 		Env:                    envFromSpec,
 	}

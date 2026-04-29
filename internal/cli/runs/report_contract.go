@@ -45,15 +45,11 @@ type RunJobEntry struct {
 	DurationMs          int64                 `json:"duration_ms"`
 	DisplayName         string                `json:"display_name,omitempty"`
 	BugSummary          string                `json:"bug_summary,omitempty"`
-	Recovery            *RunJobRecovery       `json:"recovery,omitempty"`
 	SBOMEvidence        *RunJobSBOMEvidence   `json:"sbom_evidence,omitempty"`
 	Artifacts           []RunJobArtifact      `json:"artifacts,omitempty"`
 	JobLogURL           string                `json:"job_log_url,omitempty"`
 	PatchURL            string                `json:"patch_url,omitempty"`
 }
-
-// RunJobRecovery projects recovery classifier fields surfaced by repo job APIs.
-type RunJobRecovery = migsapi.RunRepoJobRecovery
 
 // RunJobSBOMEvidence projects sbom artifact/parse evidence surfaced by repo job APIs.
 type RunJobSBOMEvidence = migsapi.RunRepoJobSBOMEvidence

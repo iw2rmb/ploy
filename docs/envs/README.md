@@ -108,8 +108,8 @@ Role model (bearer token claims):
   plane, the runner injects it into the `migs-llm` container as `OPENAI_API_KEY`. You can also set it on
   worker nodes via a systemd drop-in to make it available cluster-wide.
 - Cross-phase input directory: `/in` is mounted read-only for healing migs (e.g., `codex`).
-  - `/in/build-gate.log` — First Build Gate failure log (primarily from claim `recovery_context`; node-local cache fallback)
-  - `/in/errors.yaml` — Structured gate errors payload hydrated from claim `recovery_context.errors` when present (optional)
+  - `/in/build-gate.log` — First Build Gate failure log
+  - `/in/errors.yaml` — Structured gate errors payload when available
   - `/in/gate_profile.json` — Gate profile used by the failed gate when available (provided for `infra` healing context)
   - `/in/gate_profile.schema.json` — Gate profile schema for `infra` healing context (`title: Ploy Build Gate Profile`, includes `$comment` guidance for key fields)
   - `/in/amata.yaml` — Amata workflow spec materialized from `amata.spec`

@@ -322,12 +322,7 @@ provide repository metadata for healing migs that need Git baseline information.
 - `/in/deps-compat-url.txt` — Stack-prefilled SBOM compatibility endpoint (provided for `deps` healing).
 - `/in/deps-bumps.json` — Prior cumulative dependency bump state (provided for `deps` healing).
 
-Primary source for these inputs is the typed `recovery_context` returned by
-`POST /v1/nodes/{id}/claim` for `heal`/`post_gate` jobs. Node-local run cache files
-remain an optional fallback optimization when claim context fields are absent.
-- For deps-oriented healing runs, claim `recovery_context` may carry:
-  - `deps_compat_endpoint`
-  - `deps_bumps`
+These inputs are produced from available run/job artifacts and local workspace state.
 - `/in/amata.yaml` — Workflow spec materialized from `build_gate.post.amata.spec`.
 
 **Healing workspace policy:**

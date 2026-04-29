@@ -130,7 +130,6 @@ func (c GetRunReportCommand) buildRepoEntry(
 			DurationMs:          job.DurationMs,
 			DisplayName:         job.DisplayName,
 			BugSummary:          job.BugSummary,
-			Recovery:            job.Recovery,
 			SBOMEvidence:        job.SBOMEvidence,
 			Artifacts:           buildJobArtifacts(c.BaseURL, stageArtifacts[job.JobID]),
 			JobLogURL:           buildJobLogURL(c.BaseURL, job.JobID),
