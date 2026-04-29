@@ -200,6 +200,21 @@ steps:
 `,
 			wantErr: "resolve image env placeholders: steps[0].image: unresolved environment variables: PLOY_TEST_MISSING_IMAGE",
 		},
+		{
+			name: "unresolved build gate image env placeholder",
+			spec: `
+steps:
+  - image: docker.io/test/mig:latest
+build_gate:
+  images:
+    - stack:
+        language: java
+        release: "17"
+        tool: maven
+      image: $PLOY_TEST_MISSING_GATE_IMAGE
+`,
+			wantErr: "resolve image env placeholders: build_gate.images[0].image: unresolved environment variables: PLOY_TEST_MISSING_GATE_IMAGE",
+		},
 	}
 
 	for _, tt := range tests {
@@ -555,6 +570,34 @@ healing:
 			}
 		})
 	}
+}
+
+func TestBuildSpecPayload_BuildGateImageTemplateExpansion(t *testing.T) {
+	t.Parallel()
+
+	spec := `
+steps:
+  - image: docker.io/test/mig:latest
+build_gate:
+  images:
+    - stack:
+        language: java
+        release: "17"
+        tool: maven
+      image: docker.io/test/mig-${stack.language}-${stack.release}-${stack.tool}:latest
+`
+
+	result := runBuildSpecPayload(t, spec, ".yaml", specPayloadOpts{})
+	buildGate := mustDig(t, result, "build_gate")
+	rawImages, ok := buildGate["images"].([]any)
+	if !ok || len(rawImages) != 1 {
+		t.Fatalf("build_gate.images = %T (%v), want len=1 array", buildGate["images"], buildGate["images"])
+	}
+	rule, ok := rawImages[0].(map[string]any)
+	if !ok {
+		t.Fatalf("build_gate.images[0] = %T, want object", rawImages[0])
+	}
+	assertField(t, rule, "image", "docker.io/test/mig-java-17-maven:latest")
 }
 
 func TestBuildSpecPayload_IncludePointerSelection(t *testing.T) {

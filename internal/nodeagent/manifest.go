@@ -31,7 +31,12 @@ const (
 
 // resolveImage validates and resolves a JobImage to a concrete image string using the
 // given stack. Returns an error if the image is empty after resolution.
-func resolveImage(img contracts.JobImage, stack contracts.MigStack, label string) (string, error) {
+func resolveImage(
+	img contracts.JobImage,
+	stack contracts.MigStack,
+	stackExp *contracts.StackExpectation,
+	label string,
+) (string, error) {
 	if img.IsEmpty() {
 		return "", fmt.Errorf("%s: image required", label)
 	}
@@ -39,7 +44,11 @@ func resolveImage(img contracts.JobImage, stack contracts.MigStack, label string
 	if err != nil {
 		return "", fmt.Errorf("%s image resolution: %w", label, err)
 	}
-	resolved = strings.TrimSpace(resolved)
+	expanded, err := contracts.ExpandImageTemplate(resolved, stackExp)
+	if err != nil {
+		return "", fmt.Errorf("%s image template expansion: %w", label, err)
+	}
+	resolved = strings.TrimSpace(expanded)
 	if resolved == "" {
 		return "", fmt.Errorf("%s: image required", label)
 	}
@@ -181,7 +190,12 @@ func applySBOMRuntimeForStack(manifest *contracts.StepManifest, stack contracts.
 	}
 	runtimeStack := resolveSBOMRuntimeStack(stack)
 	runtimeRelease := normalizeSBOMRuntimeRelease(release)
-	image, err := resolveImage(sbomJobImageSpec(runtimeRelease), runtimeStack, "sbom")
+	image, err := resolveImage(
+		sbomJobImageSpec(runtimeRelease),
+		runtimeStack,
+		sbomRuntimeStackExpectation(runtimeStack, runtimeRelease),
+		"sbom",
+	)
 	if err != nil {
 		return err
 	}
@@ -341,6 +355,7 @@ func buildManifestFromRequest(req StartRunRequest, typedOpts RunOptions, stepInd
 	image := defaultImage
 	command := []string(nil)
 	env := make(map[string]string, len(req.Env))
+	stackExp := stackExpectationForRequest(req, stack)
 
 	var hydraCA, hydraIn, hydraOut, hydraHome []string
 	if len(typedOpts.Steps) > 0 {
@@ -351,11 +366,11 @@ func buildManifestFromRequest(req StartRunRequest, typedOpts RunOptions, stepInd
 		stepMig := typedOpts.Steps[stepIndex]
 
 		if !stepMig.Image.IsEmpty() {
-			resolved, err := stepMig.Image.ResolveImage(stack)
+			resolved, err := resolveImage(stepMig.Image, stack, stackExp, fmt.Sprintf("step[%d]", stepIndex))
 			if err != nil {
-				return contracts.StepManifest{}, fmt.Errorf("step[%d] image resolution: %w", stepIndex, err)
+				return contracts.StepManifest{}, err
 			}
-			image = strings.TrimSpace(resolved)
+			image = resolved
 		}
 		command = stepMig.Command.ToSlice()
 		hydraCA = stepMig.CA
@@ -372,11 +387,11 @@ func buildManifestFromRequest(req StartRunRequest, typedOpts RunOptions, stepInd
 	} else {
 		// Single-step run.
 		if !typedOpts.Execution.Image.IsEmpty() {
-			resolved, err := typedOpts.Execution.Image.ResolveImage(stack)
+			resolved, err := resolveImage(typedOpts.Execution.Image, stack, stackExp, "execution")
 			if err != nil {
-				return contracts.StepManifest{}, fmt.Errorf("image resolution: %w", err)
+				return contracts.StepManifest{}, err
 			}
-			image = strings.TrimSpace(resolved)
+			image = resolved
 		}
 		command = typedOpts.Execution.Command.ToSlice()
 		hydraCA = typedOpts.Execution.CA
@@ -389,7 +404,7 @@ func buildManifestFromRequest(req StartRunRequest, typedOpts RunOptions, stepInd
 		}
 	}
 
-	injectStackTupleEnv(env, stackExpectationForRequest(req, stack))
+	injectStackTupleEnv(env, stackExp)
 
 	// Inject placeholder command only for default ubuntu image.
 	if len(command) == 0 && image == defaultImage {
@@ -520,7 +535,8 @@ func buildHealingManifest(req StartRunRequest, mig MigContainerSpec, index int, 
 		return contracts.StepManifest{}, errors.New("job_id required")
 	}
 
-	image, err := resolveImage(mig.Image, stack, fmt.Sprintf("healing mig[%d]", index))
+	stackExp := stackExpectationForRequest(req, stack)
+	image, err := resolveImage(mig.Image, stack, stackExp, fmt.Sprintf("healing mig[%d]", index))
 	if err != nil {
 		return contracts.StepManifest{}, err
 	}

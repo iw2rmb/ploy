@@ -19,10 +19,8 @@ import (
 )
 
 const (
-	installedStacksCatalogPath  = "/etc/ploy/gates/stacks.yaml"
-	contentTypeJSON             = "application/json"
-	defaultRegistryImagePrefix  = "ghcr.io/iw2rmb/ploy"
-	containerRegistryEnvVarName = "PLOY_CONTAINER_REGISTRY"
+	installedStacksCatalogPath = "/etc/ploy/gates/stacks.yaml"
+	contentTypeJSON            = "application/json"
 )
 
 type gateCatalogStack struct {
@@ -248,11 +246,21 @@ func parseGateCatalogStack(catalogPath string, item map[string]any, prefix strin
 		tool = strings.TrimSpace(tv)
 	}
 
+	stackExp := &contracts.StackExpectation{
+		Language: lang,
+		Tool:     tool,
+		Release:  strings.TrimSpace(release),
+	}
+	expandedImage, err := contracts.ExpandImageTemplate(strings.TrimSpace(imageRaw), stackExp)
+	if err != nil {
+		return gateCatalogStack{}, fmt.Errorf("%s.image: %w", prefix, err)
+	}
+
 	return gateCatalogStack{
 		Language:    lang,
-		Release:     strings.TrimSpace(release),
+		Release:     stackExp.Release,
 		Tool:        tool,
-		Image:       expandContainerRegistryPrefix(strings.TrimSpace(imageRaw)),
+		Image:       strings.TrimSpace(expandedImage),
 		ProfileRef:  profileRef,
 		ProfilePath: profilePath,
 	}, nil
@@ -363,19 +371,4 @@ func sanitizeObjectKeyPart(value string) string {
 		return "unknown"
 	}
 	return out
-}
-
-func expandContainerRegistryPrefix(image string) string {
-	image = strings.TrimSpace(image)
-	if image == "" {
-		return image
-	}
-	prefix := strings.TrimSpace(os.Getenv(containerRegistryEnvVarName))
-	if prefix == "" {
-		prefix = defaultRegistryImagePrefix
-	}
-	prefix = strings.TrimRight(prefix, "/")
-	expanded := strings.ReplaceAll(image, "${"+containerRegistryEnvVarName+"}", prefix)
-	expanded = strings.ReplaceAll(expanded, "$"+containerRegistryEnvVarName, prefix)
-	return strings.TrimSpace(expanded)
 }

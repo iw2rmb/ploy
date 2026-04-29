@@ -188,7 +188,7 @@ func TestBuildGateImageResolver_MissingFile(t *testing.T) {
 }
 
 func TestBuildGateImageResolver_ExpandsRegistryPrefixFromEnv(t *testing.T) {
-	t.Setenv(containerRegistryEnvKey, "192.0.2.25:5001/ploy")
+	t.Setenv("PLOY_CONTAINER_REGISTRY", "192.0.2.25:5001/ploy")
 
 	resolver, err := NewBuildGateImageResolver("", []contracts.BuildGateImageRule{
 		{
@@ -210,13 +210,11 @@ func TestBuildGateImageResolver_ExpandsRegistryPrefixFromEnv(t *testing.T) {
 	}
 }
 
-func TestBuildGateImageResolver_UsesDefaultPrefixWhenEnvUnset(t *testing.T) {
-	t.Setenv(containerRegistryEnvKey, "")
-
+func TestBuildGateImageResolver_ExpandsStackPlaceholders(t *testing.T) {
 	resolver, err := NewBuildGateImageResolver("", []contracts.BuildGateImageRule{
 		{
 			Stack: contracts.StackExpectation{Language: "java", Release: "17", Tool: "maven"},
-			Image: "$PLOY_CONTAINER_REGISTRY/maven:3-eclipse-temurin-17",
+			Image: "ghcr.io/acme/mig-${stack.language}-${stack.release}-${stack.tool}:latest",
 		},
 	}, false)
 	if err != nil {
@@ -227,9 +225,24 @@ func TestBuildGateImageResolver_UsesDefaultPrefixWhenEnvUnset(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Resolve() error: %v", err)
 	}
-	want := defaultRegistryImagePrefix + "/maven:3-eclipse-temurin-17"
+	want := "ghcr.io/acme/mig-java-17-maven:latest"
 	if got != want {
 		t.Fatalf("Resolve() = %q, want %q", got, want)
+	}
+}
+
+func TestBuildGateImageResolver_UnresolvedEnvFailsWhenUnset(t *testing.T) {
+	_, err := NewBuildGateImageResolver("", []contracts.BuildGateImageRule{
+		{
+			Stack: contracts.StackExpectation{Language: "java", Release: "17", Tool: "maven"},
+			Image: "$PLOY_TEST_UNSET_GATE_REGISTRY/maven:3-eclipse-temurin-17",
+		},
+	}, false)
+	if err == nil {
+		t.Fatal("expected unresolved env error when registry env is unset")
+	}
+	if !strings.Contains(err.Error(), "unresolved environment variables: PLOY_TEST_UNSET_GATE_REGISTRY") {
+		t.Fatalf("error = %q, want unresolved registry env error", err.Error())
 	}
 }
 

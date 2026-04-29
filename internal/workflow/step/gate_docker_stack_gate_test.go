@@ -64,8 +64,8 @@ func TestGateDocker_StackGate_PreCheckPass(t *testing.T) {
 
 // TestGateDocker_StackGate_PreCheckFailure consolidates mismatch, ambiguous, and unknown scenarios.
 func TestGateDocker_StackGate_PreCheckFailure(t *testing.T) {
-	t.Parallel()
-	expectedRuntimeImage := resolveContainerRegistryPrefix() + "/maven:3-eclipse-temurin-17"
+	t.Setenv("PLOY_CONTAINER_REGISTRY", "ghcr.io/iw2rmb/ploy")
+	expectedRuntimeImage := "ghcr.io/iw2rmb/ploy/maven:3-eclipse-temurin-17"
 
 	tests := []struct {
 		name            string
@@ -199,7 +199,7 @@ java { toolchain { languageVersion = JavaLanguageVersion.of(17) } }`
 
 // TestGateDocker_StackGate_ImageResolution consolidates image resolution scenarios.
 func TestGateDocker_StackGate_ImageResolution(t *testing.T) {
-	t.Parallel()
+	t.Setenv("PLOY_CONTAINER_REGISTRY", "ghcr.io/iw2rmb/ploy")
 
 	tests := []struct {
 		name           string
@@ -216,7 +216,7 @@ func TestGateDocker_StackGate_ImageResolution(t *testing.T) {
 		},
 		{
 			name:      "default mapping file",
-			wantImage: resolveContainerRegistryPrefix() + "/maven:3-eclipse-temurin-17",
+			wantImage: "ghcr.io/iw2rmb/ploy/maven:3-eclipse-temurin-17",
 		},
 		{
 			name: "stack-mapped image",

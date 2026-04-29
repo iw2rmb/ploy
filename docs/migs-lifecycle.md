@@ -383,6 +383,25 @@ image:
   java-gradle: ghcr.io/iw2rmb/ploy/orw-cli-gradle:latest
 ```
 
+### Image templates
+
+Image strings can use placeholders:
+
+- Stack placeholders: `${stack.language}`, `${stack.release}`, `${stack.tool}`
+- Env placeholders: `$VAR`, `${VAR}`
+
+Example:
+
+```yaml
+image: "${PLOY_CONTAINER_REGISTRY}/my-image-${stack.language}-${stack.release}-${stack.tool}:${MIG_TAG}"
+```
+
+Template expansion is strict:
+
+- Unknown stack placeholder keys fail (for example `${stack.foo}`)
+- Missing stack values fail when referenced
+- Unresolved env variables fail
+
 ### Stack detection via Build Gate
 
 The Build Gate detects the workspace stack during validation based on file markers:

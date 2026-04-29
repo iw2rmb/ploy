@@ -29,11 +29,6 @@ import (
 // The ploy Docker images install this file at /etc/ploy/gates/stacks.yaml.
 const DefaultStacksCatalogPath = "gates/stacks.yaml"
 
-const (
-	containerRegistryEnvKey    = "PLOY_CONTAINER_REGISTRY"
-	defaultRegistryImagePrefix = "ghcr.io/iw2rmb/ploy"
-)
-
 var (
 	errBuildGateImageMapping   = errors.New("build gate image mapping")
 	errBuildGateImageRuleMatch = errors.New("build gate image rule match")
@@ -107,7 +102,10 @@ func NewBuildGateImageResolver(
 			return nil, err
 		}
 		if len(fileRules) > 0 {
-			fileRules = normalizeBuildGateImageRules(fileRules)
+			fileRules, err = normalizeBuildGateImageRules(fileRules, "default_catalog")
+			if err != nil {
+				return nil, fmt.Errorf("default stacks catalog: %w", err)
+			}
 			// Validate default catalog rules.
 			mapping := contracts.BuildGateImageMapping{Images: fileRules}
 			if err := mapping.Validate("default_catalog"); err != nil {
@@ -119,7 +117,10 @@ func NewBuildGateImageResolver(
 
 	// Add mig override rules (highest precedence).
 	if len(migOverride) > 0 {
-		normalizedOverrides := normalizeBuildGateImageRules(migOverride)
+		normalizedOverrides, err := normalizeBuildGateImageRules(migOverride, "mig_override")
+		if err != nil {
+			return nil, fmt.Errorf("mig override: %w", err)
+		}
 		mapping := contracts.BuildGateImageMapping{Images: normalizedOverrides}
 		if err := mapping.Validate("mig_override"); err != nil {
 			return nil, fmt.Errorf("mig override: %w", err)
@@ -130,32 +131,20 @@ func NewBuildGateImageResolver(
 	return &BuildGateImageResolver{rules: allRules}, nil
 }
 
-func normalizeBuildGateImageRules(rules []contracts.BuildGateImageRule) []contracts.BuildGateImageRule {
+func normalizeBuildGateImageRules(
+	rules []contracts.BuildGateImageRule,
+	prefix string,
+) ([]contracts.BuildGateImageRule, error) {
 	normalized := make([]contracts.BuildGateImageRule, len(rules))
 	copy(normalized, rules)
 	for i := range normalized {
-		normalized[i].Image = expandContainerRegistryPrefix(normalized[i].Image)
+		expanded, err := contracts.ExpandImageTemplate(normalized[i].Image, &normalized[i].Stack)
+		if err != nil {
+			return nil, fmt.Errorf("%s[%d].image: %w", prefix, i, err)
+		}
+		normalized[i].Image = strings.TrimSpace(expanded)
 	}
-	return normalized
-}
-
-func expandContainerRegistryPrefix(image string) string {
-	image = strings.TrimSpace(image)
-	if image == "" {
-		return image
-	}
-	prefix := resolveContainerRegistryPrefix()
-	expanded := strings.ReplaceAll(image, "${"+containerRegistryEnvKey+"}", prefix)
-	expanded = strings.ReplaceAll(expanded, "$"+containerRegistryEnvKey, prefix)
-	return strings.TrimSpace(expanded)
-}
-
-func resolveContainerRegistryPrefix() string {
-	prefix := strings.TrimSpace(os.Getenv(containerRegistryEnvKey))
-	if prefix == "" {
-		return defaultRegistryImagePrefix
-	}
-	return strings.TrimRight(prefix, "/")
+	return normalized, nil
 }
 
 // Resolve finds the best matching image for the given stack expectation.

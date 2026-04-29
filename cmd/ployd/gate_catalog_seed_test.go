@@ -93,11 +93,11 @@ func TestSeedGateCatalogDefaults_IdempotentReseed(t *testing.T) {
   - lang: java
     release: "17"
     tool: maven
-    image: $PLOY_CONTAINER_REGISTRY/maven:3-eclipse-temurin-17
+    image: $PLOY_CONTAINER_REGISTRY/mig-${stack.language}-${stack.release}-${stack.tool}:latest
     profile: gates/profiles/java-17-maven.yaml
   - lang: go
     release: "1.25.8"
-    image: $PLOY_CONTAINER_REGISTRY/golang:1.25.8
+    image: $PLOY_CONTAINER_REGISTRY/${stack.language}:${stack.release}
     profile: profiles/go-1.25.8.yaml
 `
 	if err := os.MkdirAll(filepath.Dir(catalogPath), 0o755); err != nil {
@@ -152,15 +152,43 @@ func TestSeedGateCatalogDefaults_IdempotentReseed(t *testing.T) {
 	if !ok {
 		t.Fatal("java stack row missing")
 	}
-	if got, want := javaRow.Image, "registry.test.local/ploy/maven:3-eclipse-temurin-17"; got != want {
+	if got, want := javaRow.Image, "registry.test.local/ploy/mig-java-17-maven:latest"; got != want {
 		t.Fatalf("java image=%q, want %q", got, want)
 	}
 	goRow, ok := fakeStore.stacks["go|1.25.8|"]
 	if !ok {
 		t.Fatal("go stack row missing")
 	}
-	if got, want := goRow.Image, "registry.test.local/ploy/golang:1.25.8"; got != want {
+	if got, want := goRow.Image, "registry.test.local/ploy/go:1.25.8"; got != want {
 		t.Fatalf("go image=%q, want %q", got, want)
+	}
+}
+
+func TestSeedGateCatalogDefaults_UnresolvedEnvInImageFails(t *testing.T) {
+	root := t.TempDir()
+	catalogPath := filepath.Join(root, "gates", "stacks.yaml")
+	profileJava := filepath.Join(root, "gates", "profiles", "java-17-maven.yaml")
+	writeGateProfileYAML(t, profileJava, "default", "java", "maven", "17", "mvn -q test")
+	catalog := `stacks:
+  - lang: java
+    release: "17"
+    tool: maven
+    image: $PLOY_TEST_UNSET_REGISTRY/mig:${stack.release}
+    profile: gates/profiles/java-17-maven.yaml
+`
+	if err := os.MkdirAll(filepath.Dir(catalogPath), 0o755); err != nil {
+		t.Fatalf("mkdir catalog dir: %v", err)
+	}
+	if err := os.WriteFile(catalogPath, []byte(catalog), 0o644); err != nil {
+		t.Fatalf("write catalog: %v", err)
+	}
+
+	err := seedGateCatalogDefaults(context.Background(), newFakeGateCatalogSeedStore(), bsmock.New(), catalogPath)
+	if err == nil {
+		t.Fatal("expected unresolved env error")
+	}
+	if !strings.Contains(err.Error(), "unresolved environment variables: PLOY_TEST_UNSET_REGISTRY") {
+		t.Fatalf("error=%q, want unresolved env message", err.Error())
 	}
 }
 
