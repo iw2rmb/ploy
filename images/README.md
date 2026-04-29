@@ -6,9 +6,15 @@ Image Catalog (selected)
 
 - `java-17-codex-amata-maven` (`images/amata/java-17-codex-amata-maven`) - Java 17 image with Maven, Codex CLI, and Amata.
 - `java-17-codex-amata-gradle` (`images/amata/java-17-codex-amata-gradle`) - Java 17 image with Gradle, Codex CLI, and Amata.
+- `java-21-codex-amata-maven` (`images/amata/java-21-codex-amata-maven`) - Java 21 image with Maven, Codex CLI, and Amata.
+- `java-21-codex-amata-gradle` (`images/amata/java-21-codex-amata-gradle`) - Java 21 image with Gradle, Codex CLI, and Amata.
+- `java-25-codex-amata-maven` (`images/amata/java-25-codex-amata-maven`) - Java 25 image with Maven, Codex CLI, and Amata.
+- `java-25-codex-amata-gradle` (`images/amata/java-25-codex-amata-gradle`) - Java 25 image with Gradle, Codex CLI, and Amata.
 - `java-base-*` (`images/java-bases/*`) - Shared Java toolchain lanes with unified CA bootstrap (`maven`, `gradle`, `temurin`).
 - `orw-cli-maven` (`images/orw/orw-cli-maven`) - OpenRewrite Maven lane runtime.
 - `orw-cli-gradle` (`images/orw/orw-cli-gradle`) - OpenRewrite Gradle lane runtime.
+- `orw-cli-maven-jdk21` / `orw-cli-maven-jdk25` - OpenRewrite Maven lane runtime variants for JDK 21/25.
+- `orw-cli-gradle-jdk21` / `orw-cli-gradle-jdk25` - OpenRewrite Gradle lane runtime variants for JDK 21/25.
 
 OCI Labeling Policy
 
@@ -24,7 +30,7 @@ Base Image Policy
 
 - Runtime stages are Debian-focused and must not use Alpine.
 - Use `-slim` bases when upstream provides them (for example `debian:bookworm-slim`, `node:22-bookworm-slim`).
-- Keep explicit runtime exceptions only when no upstream slim tag exists for the required toolchain image family (current exceptions: `gradle:8.8-jdk*`, `maven:3.9.11-eclipse-temurin-*`, `eclipse-temurin:17-jdk`).
+- Keep explicit runtime exceptions only when no upstream slim tag exists for the required toolchain image family (current exceptions: `gradle:8.8-jdk*`, `gradle:jdk25`, `maven:3.9.11-eclipse-temurin-*`, `eclipse-temurin:*-jdk`).
 - Verify policy compliance with: `go test ./tests/guards -run TestDockerfilesRuntimeBasePolicy`.
 
 Contract

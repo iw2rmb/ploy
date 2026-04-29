@@ -4,8 +4,16 @@ Overview
 - Migs images live under `images/orw/` and `images/amata/`:
   - `orw-cli-maven` (`images/orw/orw-cli-maven`) -> `orw-cli-maven`
   - `orw-cli-gradle` (`images/orw/orw-cli-gradle`) -> `orw-cli-gradle`
+  - `orw-cli-maven-jdk21` (`images/orw/orw-cli-maven-jdk21`) -> `orw-cli-maven-jdk21`
+  - `orw-cli-maven-jdk25` (`images/orw/orw-cli-maven-jdk25`) -> `orw-cli-maven-jdk25`
+  - `orw-cli-gradle-jdk21` (`images/orw/orw-cli-gradle-jdk21`) -> `orw-cli-gradle-jdk21`
+  - `orw-cli-gradle-jdk25` (`images/orw/orw-cli-gradle-jdk25`) -> `orw-cli-gradle-jdk25`
   - `java-17-codex-amata-maven` (`images/amata/java-17-codex-amata-maven`) -> `java-17-codex-amata-maven`
   - `java-17-codex-amata-gradle` (`images/amata/java-17-codex-amata-gradle`) -> `java-17-codex-amata-gradle`
+  - `java-21-codex-amata-maven` (`images/amata/java-21-codex-amata-maven`) -> `java-21-codex-amata-maven`
+  - `java-21-codex-amata-gradle` (`images/amata/java-21-codex-amata-gradle`) -> `java-21-codex-amata-gradle`
+  - `java-25-codex-amata-maven` (`images/amata/java-25-codex-amata-maven`) -> `java-25-codex-amata-maven`
+  - `java-25-codex-amata-gradle` (`images/amata/java-25-codex-amata-gradle`) -> `java-25-codex-amata-gradle`
 - The runner resolves most mig images as `$PLOY_CONTAINER_REGISTRY/<name>:latest`.
 
 Local Registry Prerequisites
@@ -20,14 +28,15 @@ Publish all Migs images
 # export PLOY_CA_CERTS=/path/to/ca-bundle.pem
 
 images/build-and-push.sh
-# Builds and pushes: java-17-codex-amata-maven, java-17-codex-amata-gradle,
-# orw-cli-maven, orw-cli-gradle,
-# gate-gradle:jdk11, gate-gradle:jdk17.
-# Also builds/pushes Maven gate wrappers into your registry namespace:
-# maven:3-eclipse-temurin-11, maven:3-eclipse-temurin-17.
-# Also builds/pushes shared Java base lanes:
-# java-base-maven:jdk11,jdk17, java-base-gradle:jdk11,jdk17, java-base-temurin:jdk17.
-# Also builds/pushes runtime images: server and node.
+# Builds and pushes:
+# - Amata lanes: java-17/21/25-codex-amata-{maven,gradle}
+# - ORW lanes: orw-cli-{maven,gradle} and orw-cli-{maven,gradle}-jdk{21,25}
+# - Gate Gradle: gate-gradle:jdk11,jdk17,jdk21,jdk25
+# - Gate Maven: maven:3-eclipse-temurin-11,17,21,25
+# - Java bases: java-base-maven:jdk11,jdk17,jdk21,jdk25
+#               java-base-gradle:jdk11,jdk17,jdk21,jdk25
+#               java-base-temurin:jdk17,jdk21,jdk25
+# - Runtime images: server and node
 ```
 
 There is no separate registry sync helper script. Publish explicitly via `build-and-push.sh`
@@ -45,8 +54,12 @@ Build Gate image mapping source of truth:
 - Java defaults expect:
   - `$PLOY_CONTAINER_REGISTRY/gate-gradle:jdk11`
   - `$PLOY_CONTAINER_REGISTRY/gate-gradle:jdk17`
+  - `$PLOY_CONTAINER_REGISTRY/gate-gradle:jdk21`
+  - `$PLOY_CONTAINER_REGISTRY/gate-gradle:jdk25`
   - `$PLOY_CONTAINER_REGISTRY/maven:3-eclipse-temurin-11`
   - `$PLOY_CONTAINER_REGISTRY/maven:3-eclipse-temurin-17`
+  - `$PLOY_CONTAINER_REGISTRY/maven:3-eclipse-temurin-21`
+  - `$PLOY_CONTAINER_REGISTRY/maven:3-eclipse-temurin-25`
 
 Runtime CA support is separate from build-time CA injection.
 Register runtime CA bundles via `ploy config ca set --file /path/to/ca-bundle.pem` so the
@@ -89,8 +102,16 @@ Notes
 - Directory mapping:
   - `java-17-codex-amata-maven` -> `java-17-codex-amata-maven`
   - `java-17-codex-amata-gradle` -> `java-17-codex-amata-gradle`
+  - `java-21-codex-amata-maven` -> `java-21-codex-amata-maven`
+  - `java-21-codex-amata-gradle` -> `java-21-codex-amata-gradle`
+  - `java-25-codex-amata-maven` -> `java-25-codex-amata-maven`
+  - `java-25-codex-amata-gradle` -> `java-25-codex-amata-gradle`
   - `orw-cli-maven` -> `orw-cli-maven`
   - `orw-cli-gradle` -> `orw-cli-gradle`
+  - `orw-cli-maven-jdk21` -> `orw-cli-maven-jdk21`
+  - `orw-cli-maven-jdk25` -> `orw-cli-maven-jdk25`
+  - `orw-cli-gradle-jdk21` -> `orw-cli-gradle-jdk21`
+  - `orw-cli-gradle-jdk25` -> `orw-cli-gradle-jdk25`
 - To use a different registry/namespace, override:
   - `IMAGE_PREFIX=... images/build-and-push.sh`
 
@@ -103,6 +124,14 @@ Verification
 ```bash
 docker buildx imagetools inspect "$PLOY_CONTAINER_REGISTRY/orw-cli-maven:latest"
 docker buildx imagetools inspect "$PLOY_CONTAINER_REGISTRY/orw-cli-gradle:latest"
+docker buildx imagetools inspect "$PLOY_CONTAINER_REGISTRY/orw-cli-maven-jdk21:latest"
+docker buildx imagetools inspect "$PLOY_CONTAINER_REGISTRY/orw-cli-maven-jdk25:latest"
+docker buildx imagetools inspect "$PLOY_CONTAINER_REGISTRY/orw-cli-gradle-jdk21:latest"
+docker buildx imagetools inspect "$PLOY_CONTAINER_REGISTRY/orw-cli-gradle-jdk25:latest"
 docker buildx imagetools inspect "$PLOY_CONTAINER_REGISTRY/java-17-codex-amata-maven:latest"
 docker buildx imagetools inspect "$PLOY_CONTAINER_REGISTRY/java-17-codex-amata-gradle:latest"
+docker buildx imagetools inspect "$PLOY_CONTAINER_REGISTRY/java-21-codex-amata-maven:latest"
+docker buildx imagetools inspect "$PLOY_CONTAINER_REGISTRY/java-21-codex-amata-gradle:latest"
+docker buildx imagetools inspect "$PLOY_CONTAINER_REGISTRY/java-25-codex-amata-maven:latest"
+docker buildx imagetools inspect "$PLOY_CONTAINER_REGISTRY/java-25-codex-amata-gradle:latest"
 ```

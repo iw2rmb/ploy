@@ -10,6 +10,16 @@ stacks:
     image: $PLOY_CONTAINER_REGISTRY/maven:3-eclipse-temurin-17
     profile: gates/profiles/java-17-maven.yaml
   - lang: java
+    release: "21"
+    tool: maven
+    image: $PLOY_CONTAINER_REGISTRY/maven:3-eclipse-temurin-21
+    profile: gates/profiles/java-21-maven.yaml
+  - lang: java
+    release: "25"
+    tool: maven
+    image: $PLOY_CONTAINER_REGISTRY/maven:3-eclipse-temurin-25
+    profile: gates/profiles/java-25-maven.yaml
+  - lang: java
     release: "11"
     tool: gradle
     image: $PLOY_CONTAINER_REGISTRY/gate-gradle:jdk11
@@ -19,3 +29,13 @@ stacks:
     tool: gradle
     image: $PLOY_CONTAINER_REGISTRY/gate-gradle:jdk17
     profile: gates/profiles/java-17-gradle.yaml
+  - lang: java
+    release: "21"
+    tool: gradle
+    image: $PLOY_CONTAINER_REGISTRY/gate-gradle:jdk21
+    profile: gates/profiles/java-21-gradle.yaml
+  - lang: java
+    release: "25"
+    tool: gradle
+    image: $PLOY_CONTAINER_REGISTRY/gate-gradle:jdk25
+    profile: gates/profiles/java-25-gradle.yaml

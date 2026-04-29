@@ -212,6 +212,7 @@ Build Gate resolves its runtime image from an explicit stack→image mapping.
 **Default catalog shipping:**
 - The repository default lives at `gates/stacks.yaml`.
 - The `node` and `server` Docker images include it at `/etc/ploy/gates/stacks.yaml` by default.
+- Java defaults in the catalog include `maven` and `gradle` entries for releases `11`, `17`, `21`, and `25`.
 
 **Rule format:**
 ```yaml
