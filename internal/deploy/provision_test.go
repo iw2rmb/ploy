@@ -27,17 +27,13 @@ func TestRenderBootstrapScript_InjectsServerEnv(t *testing.T) {
 
 	// Verify functional body fragments exist
 	assertContains("mkdir -p /etc/ploy/pki")
-	assertContains("cat > /etc/ploy/ployd.yaml")
+	assertContains("cat > /etc/ploy/cluster.env")
 	assertContains("systemctl daemon-reload")
 
-	// Assert server config file fragments exist
-	assertContains("cat > /etc/ploy/ployd.yaml <<EOF")
-	assertContains("http:")
-	assertContains("listen: :8080")
-	assertContains("metrics:")
-	assertContains("listen: :9100")
-	assertContains("postgres:")
-	assertContains("dsn: ${PLOY_DB_DSN:-}")
+	// Assert server environment file fragments exist
+	assertContains("PLOY_DB_DSN=${PLOY_DB_DSN}")
+	assertContains("PLOYD_HTTP_LISTEN=${PLOYD_HTTP_LISTEN:-:8080}")
+	assertContains("PLOYD_METRICS_LISTEN=${PLOYD_METRICS_LISTEN:-:9100}")
 
 	// Assert server systemd unit fragments exist
 	assertContains("cat > /etc/systemd/system/ployd.service <<EOF")
@@ -50,7 +46,6 @@ func TestRenderBootstrapScript_InjectsServerEnv(t *testing.T) {
 	assertContains("Restart=always")
 	assertContains("RestartSec=5")
 	assertContains("User=root")
-	assertContains("Environment=PLOYD_CONFIG_PATH=/etc/ploy/ployd.yaml")
 	assertContains("[Install]")
 	assertContains("WantedBy=multi-user.target")
 	assertContains("systemctl enable --now ployd.service")

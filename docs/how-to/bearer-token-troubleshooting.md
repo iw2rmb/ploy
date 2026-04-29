@@ -196,15 +196,13 @@ docker compose -f cmd/ploy/assets/runtime/docker-compose.yml logs -f server
 Check the server's authentication configuration:
 
 ```bash
-cat cmd/ploy/assets/runtime/server/ployd.yaml | rg -n "auth|bearer" || true
+docker compose -f cmd/ploy/assets/runtime/docker-compose.yml exec -T server env | rg -n "PLOY_AUTH_SECRET|PLOYD_AUTH_BEARER_TOKENS_ENABLED" || true
 ```
 
 Expected output:
-```yaml
-auth:
-  bearer_tokens:
-    enabled: true
-    # secret loaded from PLOY_AUTH_SECRET environment variable
+```text
+PLOY_AUTH_SECRET=...
+PLOYD_AUTH_BEARER_TOKENS_ENABLED=true
 ```
 
 Verify the environment variable is set:
@@ -283,10 +281,9 @@ docker compose -f cmd/ploy/assets/runtime/docker-compose.yml exec -T server env 
    SELECT count(*) FROM pg_stat_activity WHERE datname = 'ploy';
    ```
 
-3. Increase the connection pool size in `ployd.yaml`:
-   ```yaml
-   postgres:
-     dsn: "postgres://ploy:password@localhost:5432/ploy?pool_max_conns=50"
+3. Increase the connection pool size by setting `PLOY_DB_DSN` with pool parameters:
+   ```bash
+   export PLOY_DB_DSN='postgres://ploy:password@localhost:5432/ploy?sslmode=disable&pool_max_conns=50'
    ```
 
 ## Security Concerns

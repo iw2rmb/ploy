@@ -23,7 +23,7 @@ queue or separate worker mode—all nodes pull from the same jobs queue.
 **Removed components (historical):**
 - HTTP Build Gate API (`POST /v1/buildgate/validate`, `/v1/buildgate/jobs/{id}`)
 - Dedicated `buildgate_jobs` table
-- `PLOY_BUILDGATE_MODE` and `PLOY_BUILDGATE_WORKER_ENABLED` environment variables
+- `PLOY_BUILDGATE_MODE` environment variable
 - Remote HTTP gate executor and Build Gate worker node designation
 
 ## Execution Flow
@@ -339,7 +339,7 @@ See `docs/envs/README.md` for the complete environment variable reference.
 
 Prior to the unified jobs pipeline, Build Gate supported an HTTP remote execution
 mode with dedicated `buildgate_jobs` table and worker designation via
-`PLOY_BUILDGATE_WORKER_ENABLED`. This mode has been removed. All gate execution
+legacy worker selection knobs. This mode has been removed. All gate execution
 now runs locally on the node claiming the gate job from the unified queue.
 
 See git history for the migration rationale for collapsing gate execution into the jobs pipeline.
