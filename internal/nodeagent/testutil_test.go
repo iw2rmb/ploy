@@ -535,10 +535,6 @@ func withCommitSHA(sha types.CommitSHA) claimOption {
 	return func(c *ClaimResponse) { c.CommitSha = &sha }
 }
 
-func withRecoveryContext(rc *contracts.RecoveryClaimContext) claimOption {
-	return func(c *ClaimResponse) { c.RecoveryContext = rc }
-}
-
 func withClaimJobName(name string) claimOption {
 	return func(c *ClaimResponse) { c.JobName = name }
 }

@@ -58,8 +58,6 @@ type StartRunRequest struct {
 	GateContext *contracts.GateClaimContext `json:"gate_context,omitempty"`
 	// DetectedStack carries the canonical gate-detected stack tuple for this job.
 	DetectedStack *contracts.StackExpectation `json:"detected_stack,omitempty"`
-	// RecoveryContext carries server-resolved recovery inputs.
-	RecoveryContext *contracts.RecoveryClaimContext `json:"recovery_context,omitempty"`
 	// TypedOptions contains strongly-typed run configuration. This is the canonical
 	// source of truth for all option keys understood by the nodeagent. Execution,
 	// healing, manifest building, and artifact upload paths all consume TypedOptions

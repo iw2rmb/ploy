@@ -220,16 +220,9 @@ func TestClaimLoop_FieldMapping(t *testing.T) {
 		assertions func(t *testing.T, got StartRunRequest, claim ClaimResponse)
 	}{
 		{
-			name: "core fields including CommitSHA and RecoveryContext",
+			name: "core fields including CommitSHA",
 			claimOpts: []claimOption{
 				withCommitSHA("deadbeef"),
-				withRecoveryContext(&contracts.RecoveryClaimContext{
-					LoopKind:             "healing",
-					DetectedStack:        contracts.MigStackJavaMaven,
-					ResolvedHealingImage: "docker.io/acme/heal:latest",
-					BuildGateLog:         "[ERROR] build failed\n",
-					Errors:               json.RawMessage(`{"errors":[{"message":"x"}]}`),
-				}),
 			},
 			assertions: func(t *testing.T, got StartRunRequest, claim ClaimResponse) {
 				t.Helper()
@@ -250,15 +243,6 @@ func TestClaimLoop_FieldMapping(t *testing.T) {
 				}
 				if got.CommitSHA != *claim.CommitSha {
 					t.Errorf("CommitSHA=%q want %q", got.CommitSHA, *claim.CommitSha)
-				}
-				if got.RecoveryContext == nil {
-					t.Fatalf("RecoveryContext=nil, want non-nil")
-				}
-				if got.RecoveryContext.LoopKind != "healing" {
-					t.Errorf("RecoveryContext.LoopKind=%q, want healing", got.RecoveryContext.LoopKind)
-				}
-				if len(got.RecoveryContext.Errors) == 0 {
-					t.Fatalf("RecoveryContext.Errors is empty")
 				}
 			},
 		},

@@ -13,18 +13,18 @@ import (
 )
 
 const (
-	sbomDependencyOutputFileName = "sbom.dependencies.txt"
-	sbomJavaClasspathFileName    = "java.classpath"
-	sbomShareMountPath           = "/share"
-	sbomImageRegistryEnvKey      = "PLOY_CONTAINER_REGISTRY"
-	sbomImageRegistryDefault     = "ghcr.io/iw2rmb/ploy"
-	sbomScriptDir                = "/usr/local/lib/ploy/sbom"
-	sbomGradleCollectorScript    = sbomScriptDir + "/collect-java-classpath-gradle.sh"
-	sbomMavenCollectorScript     = sbomScriptDir + "/collect-java-classpath-maven.sh"
-	sbomReleaseJDK11             = "11"
-	sbomReleaseJDK17             = "17"
-	sbomReleaseJDK21             = "21"
-	sbomReleaseJDK25             = "25"
+	sbomCanonicalOutputFileName = "sbom.spdx.json"
+	sbomJavaClasspathFileName   = "java.classpath"
+	sbomShareMountPath          = "/share"
+	sbomImageRegistryEnvKey     = "PLOY_CONTAINER_REGISTRY"
+	sbomImageRegistryDefault    = "ghcr.io/iw2rmb/ploy"
+	sbomScriptDir               = "/usr/local/lib/ploy/sbom"
+	sbomGradleCollectorScript   = sbomScriptDir + "/collect-java-classpath-gradle.sh"
+	sbomMavenCollectorScript    = sbomScriptDir + "/collect-java-classpath-maven.sh"
+	sbomReleaseJDK11            = "11"
+	sbomReleaseJDK17            = "17"
+	sbomReleaseJDK21            = "21"
+	sbomReleaseJDK25            = "25"
 )
 
 // --- Shared manifest helpers ---
@@ -103,8 +103,6 @@ func buildSBOMManifest(req StartRunRequest, cycleName string, persistedStack con
 	injectStackTupleEnv(env, stackExpectationForRequest(req, stack))
 	env["PLOY_SBOM_CYCLE"] = strings.TrimSpace(cycleName)
 	env["PLOY_SBOM_STACK"] = string(stack)
-	env["PLOY_SBOM_DEPENDENCY_OUTPUT"] = sbomShareMountPath + "/" + sbomDependencyOutputFileName
-	env["PLOY_SBOM_JAVA_CLASSPATH_OUTPUT"] = sbomShareMountPath + "/" + sbomJavaClasspathFileName
 
 	manifest := contracts.StepManifest{
 		ID:         types.StepID(req.JobID),
@@ -203,12 +201,6 @@ func applySBOMRuntimeForStack(manifest *contracts.StepManifest, stack contracts.
 	}
 	if manifest.Envs == nil {
 		manifest.Envs = map[string]string{}
-	}
-	if strings.TrimSpace(manifest.Envs["PLOY_SBOM_DEPENDENCY_OUTPUT"]) == "" {
-		manifest.Envs["PLOY_SBOM_DEPENDENCY_OUTPUT"] = sbomShareMountPath + "/" + sbomDependencyOutputFileName
-	}
-	if strings.TrimSpace(manifest.Envs["PLOY_SBOM_JAVA_CLASSPATH_OUTPUT"]) == "" {
-		manifest.Envs["PLOY_SBOM_JAVA_CLASSPATH_OUTPUT"] = sbomShareMountPath + "/" + sbomJavaClasspathFileName
 	}
 	injectStackTupleEnv(manifest.Envs, sbomRuntimeStackExpectation(runtimeStack, runtimeRelease))
 	manifest.Envs["PLOY_SBOM_STACK"] = string(runtimeStack)

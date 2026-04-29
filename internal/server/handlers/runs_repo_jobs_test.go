@@ -350,7 +350,7 @@ func TestListRunRepoJobsHandler_OrdersJobsByChain(t *testing.T) {
 func TestListRunRepoJobsHandler_ExposesGateBugSummary(t *testing.T) {
 	t.Parallel()
 
-	metaJSON := `{"kind":"gate","gate":{"bug_summary":"missing ; in Foo.java","recovery":{"loop_kind":"healing","error_kind":"infra","strategy_id":"infra-default","confidence":0.8,"reason":"docker socket missing","expectations":{"artifacts":[{"path":"/out/gate-profile-candidate.json","schema":"gate_profile_v1"}]}}}}`
+	metaJSON := `{"kind":"gate","gate":{"bug_summary":"missing ; in Foo.java"}}`
 	_, handler, runID, repoID := newRunRepoJobsFixture(t, metaJSON)
 	rr := doRequest(t, handler, http.MethodGet, "/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/jobs", nil, "run_id", runID.String(), "repo_id", repoID.String())
 
@@ -359,18 +359,6 @@ func TestListRunRepoJobsHandler_ExposesGateBugSummary(t *testing.T) {
 	var resp struct {
 		Jobs []struct {
 			BugSummary string `json:"bug_summary"`
-			Recovery   *struct {
-				LoopKind     string   `json:"loop_kind"`
-				StrategyID   string   `json:"strategy_id"`
-				Confidence   *float64 `json:"confidence"`
-				Reason       string   `json:"reason"`
-				Expectations struct {
-					Artifacts []struct {
-						Path   string `json:"path"`
-						Schema string `json:"schema"`
-					} `json:"artifacts"`
-				} `json:"expectations"`
-			} `json:"recovery"`
 		} `json:"jobs"`
 	}
 	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
@@ -381,110 +369,6 @@ func TestListRunRepoJobsHandler_ExposesGateBugSummary(t *testing.T) {
 	}
 	if got, want := resp.Jobs[0].BugSummary, "missing ; in Foo.java"; got != want {
 		t.Fatalf("bug_summary = %q, want %q", got, want)
-	}
-	if resp.Jobs[0].Recovery == nil {
-		t.Fatal("expected recovery field to be projected")
-	}
-	if got, want := resp.Jobs[0].Recovery.LoopKind, "healing"; got != want {
-		t.Fatalf("recovery.loop_kind = %q, want %q", got, want)
-	}
-	if got, want := resp.Jobs[0].Recovery.StrategyID, "infra-default"; got != want {
-		t.Fatalf("recovery.strategy_id = %q, want %q", got, want)
-	}
-	if resp.Jobs[0].Recovery.Confidence == nil || *resp.Jobs[0].Recovery.Confidence != 0.8 {
-		t.Fatalf("recovery.confidence = %#v, want %v", resp.Jobs[0].Recovery.Confidence, 0.8)
-	}
-	if got, want := resp.Jobs[0].Recovery.Reason, "docker socket missing"; got != want {
-		t.Fatalf("recovery.reason = %q, want %q", got, want)
-	}
-	if len(resp.Jobs[0].Recovery.Expectations.Artifacts) != 1 {
-		t.Fatalf("recovery.expectations.artifacts len = %d, want 1", len(resp.Jobs[0].Recovery.Expectations.Artifacts))
-	}
-	if got, want := resp.Jobs[0].Recovery.Expectations.Artifacts[0].Path, "/out/gate-profile-candidate.json"; got != want {
-		t.Fatalf("recovery.expectations.artifacts[0].path = %q, want %q", got, want)
-	}
-}
-
-func TestListRunRepoJobsHandler_ExposesJobLevelRecovery(t *testing.T) {
-	t.Parallel()
-
-	metaJSON := `{"kind":"mig","action_summary":"updated deps","recovery":{"loop_kind":"healing","error_kind":"code","strategy_id":"code-default","reason":"compile failure"}}`
-	st, handler, runID, repoID := newRunRepoJobsFixture(t, metaJSON)
-	// Override job type/status for heal job.
-	st.listJobsByRunRepoAttempt.val[0].Name = "heal"
-	st.listJobsByRunRepoAttempt.val[0].JobType = "heal"
-	st.listJobsByRunRepoAttempt.val[0].Status = domaintypes.JobStatusSuccess
-
-	rr := doRequest(t, handler, http.MethodGet, "/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/jobs", nil, "run_id", runID.String(), "repo_id", repoID.String())
-
-	assertStatus(t, rr, http.StatusOK)
-
-	var resp struct {
-		Jobs []struct {
-			Recovery *struct {
-				LoopKind string `json:"loop_kind"`
-			} `json:"recovery"`
-		} `json:"jobs"`
-	}
-	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
-	if len(resp.Jobs) != 1 {
-		t.Fatalf("expected 1 job entry, got %d", len(resp.Jobs))
-	}
-	if resp.Jobs[0].Recovery == nil {
-		t.Fatal("expected recovery field")
-	}
-	if got, want := resp.Jobs[0].Recovery.LoopKind, "healing"; got != want {
-		t.Fatalf("recovery.loop_kind = %q, want %q", got, want)
-	}
-}
-
-func TestListRunRepoJobsHandler_ExposesRecoveryCandidateAuditFields(t *testing.T) {
-	t.Parallel()
-
-	metaJSON := `{"kind":"gate","recovery":{"loop_kind":"healing","error_kind":"infra","candidate_schema_id":"gate_profile_v1","candidate_artifact_path":"/out/gate-profile-candidate.json","candidate_validation_status":"invalid","candidate_validation_error":"schema mismatch","candidate_promoted":false}}`
-	st, handler, runID, repoID := newRunRepoJobsFixture(t, metaJSON)
-	// Override job type/status for gate job.
-	st.listJobsByRunRepoAttempt.val[0].Name = "post-gate"
-	st.listJobsByRunRepoAttempt.val[0].JobType = "post_gate"
-	st.listJobsByRunRepoAttempt.val[0].Status = domaintypes.JobStatusSuccess
-
-	rr := doRequest(t, handler, http.MethodGet, "/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/jobs", nil, "run_id", runID.String(), "repo_id", repoID.String())
-
-	assertStatus(t, rr, http.StatusOK)
-
-	var resp struct {
-		Jobs []struct {
-			Recovery *struct {
-				CandidateSchemaID         string `json:"candidate_schema_id"`
-				CandidateArtifactPath     string `json:"candidate_artifact_path"`
-				CandidateValidationStatus string `json:"candidate_validation_status"`
-				CandidateValidationError  string `json:"candidate_validation_error"`
-				CandidatePromoted         *bool  `json:"candidate_promoted"`
-			} `json:"recovery"`
-		} `json:"jobs"`
-	}
-	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
-	if len(resp.Jobs) != 1 {
-		t.Fatalf("expected 1 job entry, got %d", len(resp.Jobs))
-	}
-	if resp.Jobs[0].Recovery == nil {
-		t.Fatal("expected recovery field")
-	}
-	if got, want := resp.Jobs[0].Recovery.CandidateSchemaID, "gate_profile_v1"; got != want {
-		t.Fatalf("candidate_schema_id = %q, want %q", got, want)
-	}
-	if got, want := resp.Jobs[0].Recovery.CandidateArtifactPath, "/out/gate-profile-candidate.json"; got != want {
-		t.Fatalf("candidate_artifact_path = %q, want %q", got, want)
-	}
-	if got, want := resp.Jobs[0].Recovery.CandidateValidationStatus, "invalid"; got != want {
-		t.Fatalf("candidate_validation_status = %q, want %q", got, want)
-	}
-	if got := resp.Jobs[0].Recovery.CandidatePromoted; got == nil || *got {
-		t.Fatalf("candidate_promoted = %#v, want false", got)
 	}
 }
 

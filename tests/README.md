@@ -21,10 +21,7 @@ tests/
 │       ├── scenario-selftest.sh
 │       ├── scenario-prep-ready.sh
 │       ├── scenario-prep-fail.sh
-│       ├── scenario-orw-pass.sh
-│       └── scenario-orw-fail/
-│           ├── run.sh
-│           └── mig.yaml
+│       └── scenario-orw-pass.sh
 └── guards/                  # Build-time guards (lints, docs)
     ├── docs_guard_test.go
     └── lints_guard_test.go
@@ -117,9 +114,6 @@ bash tests/e2e/migs/scenario-prep-fail.sh
 
 # OpenRewrite Java 11→17 (passing branch)
 bash tests/e2e/migs/scenario-orw-pass.sh
-
-# OpenRewrite Java 11→17 with healing (failing branch)
-bash tests/e2e/migs/scenario-orw-fail/run.sh
 ```
 
 See `tests/e2e/migs/README.md` for detailed e2e documentation.
@@ -150,7 +144,6 @@ See `tests/e2e/migs/README.md` for detailed e2e documentation.
   - `scenario-prep-ready.sh`: Prep success lifecycle + run gating
   - `scenario-prep-fail.sh`: Prep failure lifecycle + evidence + run gating
   - `scenario-orw-pass.sh`: OpenRewrite mig on passing branch
-  - `scenario-orw-fail/run.sh`: OpenRewrite mig with Build Gate healing
 
 ### Guards
 - **Location:** `tests/guards/`
@@ -203,7 +196,6 @@ The smoke test suite validates these critical paths:
    - Log streaming from container
    - Artifact collection
    - Build Gate validation via HTTP API (repo+diff model)
-   - Healing workflow (Build Gate failure → healing migs → gate retry via remote workers)
    - Decoupled execution: Migs and Build Gate can run on different nodes
 
 ## Writing New Tests

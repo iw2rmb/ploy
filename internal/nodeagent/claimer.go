@@ -66,7 +66,6 @@ type ClaimResponse struct {
 	MigContext             *contracts.MigClaimContext      `json:"mig_context,omitempty"`
 	GateContext            *contracts.GateClaimContext     `json:"gate_context,omitempty"`
 	DetectedStack          *contracts.StackExpectation     `json:"detected_stack,omitempty"`
-	RecoveryContext        *contracts.RecoveryClaimContext `json:"recovery_context,omitempty"`
 }
 
 // NewClaimManager constructs a claim manager for the unified jobs queue.

@@ -2,12 +2,12 @@
 set -euo pipefail
 
 workspace="${PLOY_SBOM_WORKSPACE:-/workspace}"
-raw_output="${PLOY_SBOM_DEPENDENCY_OUTPUT:-/share/sbom.dependencies.txt}"
-classpath_output="${PLOY_SBOM_JAVA_CLASSPATH_OUTPUT:-/share/java.classpath}"
+sbom_output="/share/sbom.spdx.json"
+classpath_output="/share/java.classpath"
 init_script="${PLOY_SBOM_GRADLE_INIT_SCRIPT:-/usr/local/lib/ploy/sbom/gradle-write-java-classpath.init.gradle}"
 gradle_cmd="${PLOY_SBOM_GRADLE_CMD:-}"
 
-mkdir -p "$(dirname "$raw_output")" "$(dirname "$classpath_output")"
+mkdir -p "$(dirname "$sbom_output")" "$(dirname "$classpath_output")"
 
 if [[ -z "$gradle_cmd" ]]; then
   if [[ -x "$workspace/gradlew" ]]; then
@@ -25,16 +25,60 @@ if [[ ! -f "$init_script" ]]; then
   exit 1
 fi
 
-"$gradle_cmd" -q -p "$workspace" dependencies > "$raw_output"
-if ! "$gradle_cmd" -q -p "$workspace" buildEnvironment >> "$raw_output" 2>/dev/null; then
-  printf "\n# ploy: buildEnvironment unavailable\n" >> "$raw_output"
+deps_raw="$(mktemp)"
+deps_pairs="$(mktemp)"
+"$gradle_cmd" -q -p "$workspace" dependencies > "$deps_raw"
+if ! "$gradle_cmd" -q -p "$workspace" buildEnvironment >> "$deps_raw" 2>/dev/null; then
+  :
 fi
 if ! "$gradle_cmd" -q -p "$workspace" classes >/dev/null 2>&1; then
-  printf "\n# ploy: classes preparation unavailable\n" >> "$raw_output"
+  :
 fi
 
-PLOY_SBOM_JAVA_CLASSPATH_OUTPUT="$classpath_output" \
-  "$gradle_cmd" -q -p "$workspace" -I "$init_script" ployWriteJavaClasspath
+awk '
+{
+  if (match($0, /([A-Za-z0-9_.-]+:[A-Za-z0-9_.-]+):([A-Za-z0-9][A-Za-z0-9+_.-]*)/, m)) {
+    name = m[1]
+    version = m[2]
+    if (match($0, /->[[:space:]]*([A-Za-z0-9][A-Za-z0-9+_.-]*)/, o)) {
+      version = o[1]
+    }
+    print name "\t" version
+  }
+}
+' "$deps_raw" | sort -u > "$deps_pairs"
+
+awk -F '\t' '
+BEGIN {
+  print "{"
+  print "  \"spdxVersion\": \"SPDX-2.3\","
+  print "  \"dataLicense\": \"CC0-1.0\","
+  print "  \"SPDXID\": \"SPDXRef-DOCUMENT\","
+  print "  \"name\": \"ploy-generated-sbom\","
+  print "  \"documentNamespace\": \"https://ploy.dev/sbom/generated\","
+  print "  \"creationInfo\": {\"created\":\"1970-01-01T00:00:00Z\",\"creators\":[\"Tool: ploy-nodeagent\"]},"
+  print "  \"packages\": ["
+  n = 0
+}
+NF == 2 {
+  n++
+  if (n > 1) {
+    printf(",\n")
+  }
+  printf("    {\"SPDXID\":\"SPDXRef-Package-%06d\",\"name\":\"%s\",\"versionInfo\":\"%s\"}", n, $1, $2)
+}
+END {
+  if (n > 0) {
+    printf("\n")
+  }
+  print "  ]"
+  print "}"
+}
+' "$deps_pairs" > "$sbom_output"
+
+rm -f "$deps_raw" "$deps_pairs"
+
+"$gradle_cmd" -q -p "$workspace" -I "$init_script" ployWriteJavaClasspath
 
 if [[ ! -s "$classpath_output" ]]; then
   echo "sbom classpath invariant violated: java.classpath is empty or missing" >&2
@@ -58,7 +102,6 @@ if [[ -s "$workspace_cp" ]]; then
   awk 'NR == FNR { seen[$0] = 1; next } NF > 0 && !seen[$0] { print $0 }' \
     "$classpath_output" "$workspace_cp" > "$missing_workspace"
   if [[ -s "$missing_workspace" ]]; then
-    printf "\n# ploy: workspace classpath entries unavailable\n" >> "$raw_output"
     echo "sbom classpath invariant violated: workspace outputs exist but are missing from java.classpath" >&2
     cat "$missing_workspace" >&2
     exit 1

@@ -18,14 +18,9 @@ func TestMaterializeValidatedSBOMOutput_WritesCanonicalSnapshot(t *testing.T) {
 	shareDir := t.TempDir()
 	snapshotPath := filepath.Join(t.TempDir(), "gate-cycle", "sbom", "out", preGateCanonicalSBOMFileName)
 
-	rawDeps := strings.Join([]string{
-		"[INFO]    com.fasterxml.jackson.core:jackson-databind:jar:2.17.2:compile",
-		"\\--- org.apache.commons:commons-lang3:3.17.0",
-		"+--- org.openapi.generator:org.openapi.generator.gradle.plugin:6.6.0",
-		"noise line that should be ignored",
-	}, "\n")
-	if err := os.WriteFile(filepath.Join(shareDir, sbomDependencyOutputFileName), []byte(rawDeps), 0o644); err != nil {
-		t.Fatalf("write raw dependency output: %v", err)
+	rawSBOM := []byte(`{"spdxVersion":"SPDX-2.3","dataLicense":"CC0-1.0","SPDXID":"SPDXRef-DOCUMENT","name":"ploy-generated-sbom","documentNamespace":"https://ploy.dev/sbom/generated","creationInfo":{"created":"1970-01-01T00:00:00Z","creators":["Tool: ploy-nodeagent"]},"packages":[{"SPDXID":"SPDXRef-Package-000001","name":"org.apache.commons:commons-lang3","versionInfo":"3.17.0"}]}`)
+	if err := os.WriteFile(filepath.Join(shareDir, sbomCanonicalOutputFileName), rawSBOM, 0o644); err != nil {
+		t.Fatalf("write canonical sbom output: %v", err)
 	}
 	rawClasspath := []byte("/root/.gradle/caches/modules-2/files-2.1/a/b/c/a.jar\n")
 	if err := os.WriteFile(filepath.Join(shareDir, sbomJavaClasspathFileName), rawClasspath, 0o644); err != nil {
@@ -53,7 +48,7 @@ func TestMaterializeValidatedSBOMOutput_WritesCanonicalSnapshot(t *testing.T) {
 	}
 }
 
-func TestMaterializeValidatedSBOMOutput_ErrorsWhenDependencyOutputMissing(t *testing.T) {
+func TestMaterializeValidatedSBOMOutput_ErrorsWhenSBOMOutputMissing(t *testing.T) {
 	t.Parallel()
 
 	outDir := t.TempDir()
@@ -62,13 +57,13 @@ func TestMaterializeValidatedSBOMOutput_ErrorsWhenDependencyOutputMissing(t *tes
 
 	err := materializeValidatedSBOMOutput(outDir, shareDir, snapshotPath, true)
 	if err == nil {
-		t.Fatal("expected error for missing dependency output")
+		t.Fatal("expected error for missing sbom output")
 	}
 	if !errors.Is(err, fs.ErrNotExist) {
 		t.Fatalf("expected not-exist error, got %v", err)
 	}
-	if !strings.Contains(err.Error(), sbomDependencyOutputFileName) {
-		t.Fatalf("error = %q, want mention of %s", err, sbomDependencyOutputFileName)
+	if !strings.Contains(err.Error(), sbomCanonicalOutputFileName) {
+		t.Fatalf("error = %q, want mention of %s", err, sbomCanonicalOutputFileName)
 	}
 }
 
@@ -78,9 +73,9 @@ func TestMaterializeValidatedSBOMOutput_ClasspathValidationDependsOnFlow(t *test
 	outDir := t.TempDir()
 	shareDir := t.TempDir()
 	snapshotPath := filepath.Join(t.TempDir(), "gate-cycle", "sbom", "out", preGateCanonicalSBOMFileName)
-	rawDeps := "[INFO]    com.fasterxml.jackson.core:jackson-databind:jar:2.17.2:compile\n"
-	if err := os.WriteFile(filepath.Join(shareDir, sbomDependencyOutputFileName), []byte(rawDeps), 0o644); err != nil {
-		t.Fatalf("write raw dependency output: %v", err)
+	rawSBOM := []byte(`{"spdxVersion":"SPDX-2.3","dataLicense":"CC0-1.0","SPDXID":"SPDXRef-DOCUMENT","name":"ploy-generated-sbom","documentNamespace":"https://ploy.dev/sbom/generated","creationInfo":{"created":"1970-01-01T00:00:00Z","creators":["Tool: ploy-nodeagent"]},"packages":[{"SPDXID":"SPDXRef-Package-000001","name":"org.apache.commons:commons-lang3","versionInfo":"3.17.0"}]}`)
+	if err := os.WriteFile(filepath.Join(shareDir, sbomCanonicalOutputFileName), rawSBOM, 0o644); err != nil {
+		t.Fatalf("write canonical sbom output: %v", err)
 	}
 
 	if err := materializeValidatedSBOMOutput(outDir, shareDir, snapshotPath, true); err == nil {
@@ -97,9 +92,9 @@ func TestMaterializeValidatedSBOMOutput_RejectsNonPortableGradleClasspath(t *tes
 	outDir := t.TempDir()
 	shareDir := t.TempDir()
 	snapshotPath := filepath.Join(t.TempDir(), "gate-cycle", "sbom", "out", preGateCanonicalSBOMFileName)
-	rawDeps := "[INFO]    com.fasterxml.jackson.core:jackson-databind:jar:2.17.2:compile\n"
-	if err := os.WriteFile(filepath.Join(shareDir, sbomDependencyOutputFileName), []byte(rawDeps), 0o644); err != nil {
-		t.Fatalf("write raw dependency output: %v", err)
+	rawSBOM := []byte(`{"spdxVersion":"SPDX-2.3","dataLicense":"CC0-1.0","SPDXID":"SPDXRef-DOCUMENT","name":"ploy-generated-sbom","documentNamespace":"https://ploy.dev/sbom/generated","creationInfo":{"created":"1970-01-01T00:00:00Z","creators":["Tool: ploy-nodeagent"]},"packages":[{"SPDXID":"SPDXRef-Package-000001","name":"org.apache.commons:commons-lang3","versionInfo":"3.17.0"}]}`)
+	if err := os.WriteFile(filepath.Join(shareDir, sbomCanonicalOutputFileName), rawSBOM, 0o644); err != nil {
+		t.Fatalf("write canonical sbom output: %v", err)
 	}
 	rawClasspath := []byte("/home/gradle/.gradle/caches/modules-2/files-2.1/a/b/c/a.jar\n")
 	if err := os.WriteFile(filepath.Join(shareDir, sbomJavaClasspathFileName), rawClasspath, 0o644); err != nil {
@@ -127,8 +122,8 @@ func TestFinalizeSBOMFlowOutputs_UsesShareOutputs(t *testing.T) {
 
 	preOutDir := t.TempDir()
 	preSnapshotPath := filepath.Join(t.TempDir(), "pre-cycle", preGateCanonicalSBOMFileName)
-	if err := os.WriteFile(filepath.Join(shareDir, sbomDependencyOutputFileName), []byte("a:b:1.0.0\n"), 0o644); err != nil {
-		t.Fatalf("write pre dependency output: %v", err)
+	if err := os.WriteFile(filepath.Join(shareDir, sbomCanonicalOutputFileName), []byte(`{"spdxVersion":"SPDX-2.3","dataLicense":"CC0-1.0","SPDXID":"SPDXRef-DOCUMENT","name":"ploy-generated-sbom","documentNamespace":"https://ploy.dev/sbom/generated","creationInfo":{"created":"1970-01-01T00:00:00Z","creators":["Tool: ploy-nodeagent"]},"packages":[{"SPDXID":"SPDXRef-Package-000001","name":"a:b","versionInfo":"1.0.0"}]}`), 0o644); err != nil {
+		t.Fatalf("write pre sbom output: %v", err)
 	}
 	preClasspath := []byte("/repo/.m2/a.jar\n")
 	classpathPath := filepath.Join(shareDir, sbomJavaClasspathFileName)
@@ -149,8 +144,8 @@ func TestFinalizeSBOMFlowOutputs_UsesShareOutputs(t *testing.T) {
 
 	postOutDir := t.TempDir()
 	postSnapshotPath := filepath.Join(t.TempDir(), "post-cycle", preGateCanonicalSBOMFileName)
-	if err := os.WriteFile(filepath.Join(shareDir, sbomDependencyOutputFileName), []byte("x:y:2.0.0\n"), 0o644); err != nil {
-		t.Fatalf("write post dependency output: %v", err)
+	if err := os.WriteFile(filepath.Join(shareDir, sbomCanonicalOutputFileName), []byte(`{"spdxVersion":"SPDX-2.3","dataLicense":"CC0-1.0","SPDXID":"SPDXRef-DOCUMENT","name":"ploy-generated-sbom","documentNamespace":"https://ploy.dev/sbom/generated","creationInfo":{"created":"1970-01-01T00:00:00Z","creators":["Tool: ploy-nodeagent"]},"packages":[{"SPDXID":"SPDXRef-Package-000001","name":"x:y","versionInfo":"2.0.0"}]}`), 0o644); err != nil {
+		t.Fatalf("write post sbom output: %v", err)
 	}
 	if err := rc.finalizeSBOMFlowOutputs(runID, repoID, postGateCycleName, postOutDir, postSnapshotPath); err != nil {
 		t.Fatalf("finalizeSBOMFlowOutputs post-gate: %v", err)

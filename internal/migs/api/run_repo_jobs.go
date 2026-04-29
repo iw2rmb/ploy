@@ -1,25 +1,10 @@
 package api
 
 import (
-	"encoding/json"
 	"time"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
-
-// RunRepoJobRecovery projects universal recovery metadata from job payloads.
-type RunRepoJobRecovery struct {
-	LoopKind                  string          `json:"loop_kind"`
-	StrategyID                string          `json:"strategy_id,omitempty"`
-	Confidence                *float64        `json:"confidence,omitempty"`
-	Reason                    string          `json:"reason,omitempty"`
-	Expectations              json.RawMessage `json:"expectations,omitempty"`
-	CandidateSchemaID         string          `json:"candidate_schema_id,omitempty"`
-	CandidateArtifactPath     string          `json:"candidate_artifact_path,omitempty"`
-	CandidateValidationStatus string          `json:"candidate_validation_status,omitempty"`
-	CandidateValidationError  string          `json:"candidate_validation_error,omitempty"`
-	CandidatePromoted         *bool           `json:"candidate_promoted,omitempty"`
-}
 
 // RunRepoJobSBOMEvidence summarizes persisted SBOM outputs for a gate job.
 type RunRepoJobSBOMEvidence struct {
@@ -46,7 +31,6 @@ type RunRepoJob struct {
 	DurationMs    int64                 `json:"duration_ms"`
 	DisplayName   string                `json:"display_name,omitempty"`
 	BugSummary    string                `json:"bug_summary,omitempty"`
-	Recovery      *RunRepoJobRecovery   `json:"recovery,omitempty"`
 	// sbom_evidence exposes artifact + parsed-row evidence for gate jobs.
 	SBOMEvidence *RunRepoJobSBOMEvidence `json:"sbom_evidence,omitempty"`
 	// Build-gate stack detection fields (gate jobs only).

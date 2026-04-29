@@ -117,11 +117,6 @@ func listRunRepoJobsHandler(st store.Store) http.HandlerFunc {
 							jr.JobImage = runtimeImage
 						}
 					}
-					if meta.RecoveryMetadata != nil {
-						jr.Recovery = newRecoveryView(meta.RecoveryMetadata)
-					} else if meta.GateMetadata != nil && meta.GateMetadata.Recovery != nil {
-						jr.Recovery = newRecoveryView(meta.GateMetadata.Recovery)
-					}
 					if meta.GateMetadata != nil {
 						if exp := meta.GateMetadata.DetectedStackExpectation(); exp != nil {
 							jr.Lang = exp.Language
@@ -203,23 +198,5 @@ func deriveRunRepoJobName(job store.Job, meta *contracts.JobMeta) string {
 		return "mig"
 	default:
 		return strings.TrimSpace(job.JobType.String())
-	}
-}
-
-func newRecoveryView(meta *contracts.BuildGateRecoveryMetadata) *migsapi.RunRepoJobRecovery {
-	if meta == nil {
-		return nil
-	}
-	return &migsapi.RunRepoJobRecovery{
-		LoopKind:                  meta.LoopKind,
-		StrategyID:                meta.StrategyID,
-		Confidence:                meta.Confidence,
-		Reason:                    meta.Reason,
-		Expectations:              meta.Expectations,
-		CandidateSchemaID:         meta.CandidateSchemaID,
-		CandidateArtifactPath:     meta.CandidateArtifactPath,
-		CandidateValidationStatus: meta.CandidateValidationStatus,
-		CandidateValidationError:  meta.CandidateValidationError,
-		CandidatePromoted:         meta.CandidatePromoted,
 	}
 }

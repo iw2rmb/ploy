@@ -141,9 +141,6 @@ func newRunStatusReportServer(t *testing.T, runID domaintypes.RunID, migID domai
 						"status":      "Failed",
 						"exit_code":   137,
 						"duration_ms": 1500,
-						"recovery": map[string]any{
-							"loop_kind": "healing",
-						},
 					},
 					{
 						"job_id":         healID.String(),

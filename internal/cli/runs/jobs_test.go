@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"strings"
 	"testing"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
@@ -37,7 +36,7 @@ func TestOrderRepoJobsByChain_ReconstructsLinkedOrder(t *testing.T) {
 	}
 }
 
-func TestListRepoJobsCommand_DecodeRecoveryContract(t *testing.T) {
+func TestListRepoJobsCommand_DecodeJobContract(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
@@ -61,25 +60,13 @@ func TestListRepoJobsCommand_DecodeRecoveryContract(t *testing.T) {
 			"jobs":[
 					{
 						"job_id":"` + jobID.String() + `",
-						"name":"post-gate",
-						"job_type":"post_gate",
+					"name":"post-gate",
+					"job_type":"post_gate",
 					"job_image":"image:tag",
 					"next_id":null,
 					"node_id":null,
 					"status":"Success",
-					"duration_ms":123,
-					"recovery":{
-						"loop_kind":"healing",
-						"strategy_id":"infra-default",
-						"confidence":0.8,
-						"reason":"docker socket missing",
-						"expectations":{"artifacts":[{"path":"/out/gate-profile-candidate.json","schema":"gate_profile_v1"}]},
-						"candidate_schema_id":"gate_profile_v1",
-						"candidate_artifact_path":"/out/gate-profile-candidate.json",
-						"candidate_validation_status":"valid",
-						"candidate_validation_error":"",
-						"candidate_promoted":false
-					}
+					"duration_ms":123
 				}
 			]
 		}`))
@@ -103,22 +90,10 @@ func TestListRepoJobsCommand_DecodeRecoveryContract(t *testing.T) {
 	if len(result.Jobs) != 1 {
 		t.Fatalf("jobs len=%d, want 1", len(result.Jobs))
 	}
-	if result.Jobs[0].Recovery == nil {
-		t.Fatal("expected recovery payload")
+	if got, want := result.Jobs[0].JobType, domaintypes.JobTypePostGate; got != want {
+		t.Fatalf("job_type=%q, want %q", got, want)
 	}
-	if got, want := result.Jobs[0].Recovery.LoopKind, "healing"; got != want {
-		t.Fatalf("loop_kind=%q, want %q", got, want)
-	}
-	if got, want := result.Jobs[0].Recovery.StrategyID, "infra-default"; got != want {
-		t.Fatalf("strategy_id=%q, want %q", got, want)
-	}
-	if got := result.Jobs[0].Recovery.Confidence; got == nil || *got != 0.8 {
-		t.Fatalf("confidence=%v, want 0.8", got)
-	}
-	if got, want := strings.TrimSpace(string(result.Jobs[0].Recovery.Expectations)), `{"artifacts":[{"path":"/out/gate-profile-candidate.json","schema":"gate_profile_v1"}]}`; got != want {
-		t.Fatalf("expectations=%q, want %q", got, want)
-	}
-	if got := result.Jobs[0].Recovery.CandidatePromoted; got == nil || *got {
-		t.Fatalf("candidate_promoted=%v, want false", got)
+	if got, want := result.Jobs[0].JobImage, "image:tag"; got != want {
+		t.Fatalf("job_image=%q, want %q", got, want)
 	}
 }

@@ -646,46 +646,6 @@ NodeClaimResponse:
         If the persisted spec in the DB is invalid or non-object, the server returns 500.
       type: object
       additionalProperties: true
-    recovery_context:
-      type: object
-      nullable: true
-      description: |
-        Typed recovery context for `heal` and `post_gate` claims.
-        Carries server-resolved healing inputs so heal/post-gate execution does not
-        depend on node-local run cache files.
-      properties:
-        loop_kind:
-          type: string
-        detected_stack:
-          type: string
-        resolved_healing_image:
-          type: string
-        expectations:
-          oneOf:
-            - type: object
-            - type: array
-        deps_bumps:
-          type: object
-          additionalProperties:
-            type: string
-            nullable: true
-        deps_compat_endpoint:
-          type: string
-        build_gate_log:
-          type: string
-        errors:
-          oneOf:
-            - type: object
-            - type: array
-          description: |
-            Optional structured gate errors payload propagated from gate metadata.
-            Present when build-gate `log_findings[0].evidence` is available and
-            valid. Node agents hydrate this payload into `/in/errors.yaml`.
-        gate_profile:
-          type: object
-          additionalProperties: true
-        gate_profile_schema_json:
-          type: string
   required:
     - id
     - repo_id
@@ -1194,44 +1154,6 @@ RepoJobItem:
       type: string
       nullable: true
       description: Detected build tool from gate stack detection (gate jobs only)
-    recovery:
-      type: object
-      nullable: true
-      description: Universal recovery loop metadata when present in job metadata
-      properties:
-        loop_kind:
-          type: string
-          description: Loop kind (currently `healing`)
-        strategy_id:
-          type: string
-          description: Selected strategy identifier when available
-        confidence:
-          type: number
-          format: double
-          description: Optional recovery confidence score in range [0,1]
-        reason:
-          type: string
-          description: Short recovery rationale
-        expectations:
-          oneOf:
-            - type: object
-            - type: array
-          description: Strategy-specific structured expectations from recovery metadata
-        candidate_schema_id:
-          type: string
-          description: Candidate prep schema id when infra recovery expects gate_profile artifact
-        candidate_artifact_path:
-          type: string
-          description: Candidate artifact path declared by recovery expectations
-        candidate_validation_status:
-          type: string
-          description: Candidate validation status (`missing|unavailable|invalid|valid`)
-        candidate_validation_error:
-          type: string
-          description: Candidate validation/load error details when status is non-valid
-        candidate_promoted:
-          type: boolean
-          description: True when validated candidate has been marked as promoted in recovery metadata
     sbom_evidence:
       type: object
       nullable: true

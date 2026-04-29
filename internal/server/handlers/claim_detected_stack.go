@@ -39,12 +39,12 @@ func resolveDetectedStackExpectationFromJobs(
 
 	currentID := currentJobID
 	for range len(jobsByID) {
-		prev := lifecycle.RecoveryChainPredecessor(currentID, jobsByID)
+		prev := lifecycle.ChainPredecessor(currentID, jobsByID)
 		if prev == nil {
 			return nil
 		}
 		currentID = prev.ID
-		if !isGateJobTypeForClaim(domaintypes.JobType(prev.JobType)) || len(prev.Meta) == 0 {
+		if !lifecycle.IsGateJobType(domaintypes.JobType(prev.JobType)) || len(prev.Meta) == 0 {
 			continue
 		}
 		meta, err := contracts.UnmarshalJobMeta(prev.Meta)

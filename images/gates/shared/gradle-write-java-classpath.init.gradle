@@ -6,10 +6,7 @@ gradle.projectsEvaluated {
 
   root.tasks.register('ployWriteJavaClasspath') {
     doLast {
-      def outputPath = System.getenv('PLOY_SBOM_JAVA_CLASSPATH_OUTPUT')
-      if (outputPath == null || outputPath.trim().isEmpty()) {
-        outputPath = '/share/java.classpath'
-      }
+      def outputPath = '/share/java.classpath'
       def output = new File(outputPath)
       output.parentFile.mkdirs()
 

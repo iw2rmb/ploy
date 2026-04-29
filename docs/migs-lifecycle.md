@@ -264,7 +264,7 @@ to `/in` for debugging and cross-iteration context:
 | Artifact | Description |
 |---|---|
 | `/in/build-gate.log` | Latest gate failure log (updated after each post-gate) |
-| `/in/errors.yaml` | Structured gate errors payload when claim-time `recovery_context.errors` is present |
+| `/in/errors.yaml` | Structured gate errors payload when available |
 | `/in/gate_profile.json` | Gate profile used by the failed gate when available |
 | `/in/build-gate-iteration-N.log` | Gate failure log snapshot for iteration N |
 | `/in/healing-iteration-N.log` | Healing agent output log for iteration N |
@@ -272,10 +272,9 @@ to `/in` for debugging and cross-iteration context:
 | `/in/deps-compat-url.txt` | Prefilled SBOM compatibility endpoint for dependency healing |
 | `/in/deps-bumps.json` | Prior cumulative dependency bump map for dependency healing |
 
-For `heal`/`post_gate`, claim-time `recovery_context` is the primary source for
-`/in/build-gate.log`, optional `/in/errors.yaml`, `/in/gate_profile.json`, and
-`/in/gate_profile.schema.json`.
-Node-local run cache snapshots are fallback-only when claim context fields are absent.
+For `heal`/`post_gate`, `/in/build-gate.log`, optional `/in/errors.yaml`,
+`/in/gate_profile.json`, and `/in/gate_profile.schema.json` are materialized
+from available run/job artifacts and workspace state.
 
 The <code>healing-log.md</code> format:
 
@@ -1431,9 +1430,7 @@ The CLI entry points for Migs are implemented in CLI implementation:
   - Exit continuation content is soft-wrapped to max 100 symbols per line; wrapped
     lines align under the content start after `Exit <code>: `.
   - Healing rows keep `Exit <code>: <one-liner>` without an error-kind prefix.
-  - `--json` output passes through full repo-job `recovery` payload from
-    `GET /v1/runs/{run_id}/repos/{repo_id}/jobs` (including `loop_kind`,
-    classifier fields, and candidate audit fields), and sbom evidence metadata
+  - `--json` output includes repo-job sbom evidence metadata
     (`sbom_evidence.artifact_present`, `sbom_evidence.parsed_package_count`).
   - Artifact links are rendered as OSC8 hyperlinks in terminal mode and include
     `auth_token` query parameters for browser/OSC8 flows.

@@ -391,7 +391,7 @@ func TestGlobalEnvPropagation_HealingManifest(t *testing.T) {
 
 	// Healing mig with its own env that overrides req.Env on collision.
 	healingMig := MigContainerSpec{
-		Image: testJobImage("amata:latest"),
+		Image: contracts.JobImage{Universal: "docker.io/amata:latest"},
 		Env: map[string]string{
 			"APP_TLS_CERT":     "healing-cert-bundle",
 			"APP_AUTH_JSON":    `{"healing":"auth"}`,
