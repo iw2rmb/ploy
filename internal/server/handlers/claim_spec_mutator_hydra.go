@@ -10,7 +10,6 @@ import (
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
-	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
 // HydraJobConfig holds the typed Hydra overlay fields for a single job section.
@@ -30,12 +29,6 @@ func (c *HydraJobConfig) IsEmpty() bool {
 		return true
 	}
 	return len(c.Envs) == 0 && len(c.CA) == 0 && len(c.In) == 0 && len(c.Out) == 0 && len(c.Home) == 0
-}
-
-// ValidateHydraSection delegates to contracts.ValidateHydraSection for
-// backward compatibility within the handlers package.
-func ValidateHydraSection(section string) error {
-	return contracts.ValidateHydraSection(section)
 }
 
 // applyHydraOverlayMutator replaces the legacy env-only merge with a typed merge

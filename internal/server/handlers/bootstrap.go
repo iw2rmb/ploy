@@ -21,6 +21,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/pki"
 	"github.com/iw2rmb/ploy/internal/server/auth"
 	"github.com/iw2rmb/ploy/internal/store"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -250,7 +251,11 @@ func validateBootstrapToken(r *http.Request, st store.Store, tokenSecret string)
 	}
 
 	revoked, err := st.CheckBootstrapTokenRevoked(r.Context(), claims.ID)
-	if err == nil && revoked.Valid {
+	if err != nil {
+		slog.Error("bootstrap certificate: token revocation check failed", "token_id", claims.ID, "err", err)
+		return nil, fmt.Errorf("failed to verify token revocation")
+	}
+	if revoked.Valid {
 		return nil, fmt.Errorf("token revoked")
 	}
 
@@ -308,6 +313,9 @@ func registerNodeIfNew(ctx context.Context, st store.Store, nodeID domaintypes.N
 
 	if _, err := st.GetNode(ctx, nodeID); err == nil {
 		return nil // already exists
+	} else if !errors.Is(err, pgx.ErrNoRows) {
+		slog.Error("bootstrap certificate: failed to check node before register", "node_id", nodeID.String(), "err", err)
+		return err
 	}
 
 	ipAddr, _ := netip.ParseAddr("0.0.0.0")

@@ -115,7 +115,7 @@ func TestCompleteJob_RequestRejection(t *testing.T) {
 
 			f := newJobFixture("mig")
 			st := newJobStoreForFixture(f)
-			handler := completeJobHandler(st, nil, nil)
+			handler := completeJobHandler(st, nil, nil, nil)
 
 			rr := httptest.NewRecorder()
 			handler.ServeHTTP(rr, tt.buildReq(f))
@@ -132,10 +132,10 @@ func TestCompleteJob_PayloadRejection(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name      string
-		tweakJob  func(*store.Job)
-		storeOpts []func(*jobStore)
-		body      map[string]any
+		name       string
+		tweakJob   func(*store.Job)
+		storeOpts  []func(*jobStore)
+		body       map[string]any
 		wantStatus int
 	}{
 		{name: "missing_status", body: map[string]any{}, wantStatus: http.StatusBadRequest},
@@ -193,7 +193,7 @@ func TestCompleteJob_PayloadRejection(t *testing.T) {
 				tt.tweakJob(&f.Job)
 			}
 			st := newJobStoreForFixture(f, tt.storeOpts...)
-			handler := completeJobHandler(st, nil, nil)
+			handler := completeJobHandler(st, nil, nil, nil)
 
 			rr := httptest.NewRecorder()
 			handler.ServeHTTP(rr, f.completeJobReq(tt.body))
@@ -233,7 +233,7 @@ func TestCompleteJob_InvalidJobMeta(t *testing.T) {
 
 			f := newJobFixture("")
 			st := newJobStoreForFixture(f)
-			handler := completeJobHandler(st, nil, nil)
+			handler := completeJobHandler(st, nil, nil, nil)
 
 			rr := httptest.NewRecorder()
 			handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
@@ -338,7 +338,7 @@ func TestCompleteJob_ValidCompletion(t *testing.T) {
 
 			f := newJobFixture("")
 			st := newJobStoreForFixture(f)
-			handler := completeJobHandler(st, nil, nil)
+			handler := completeJobHandler(st, nil, nil, nil)
 
 			rr := httptest.NewRecorder()
 			handler.ServeHTTP(rr, f.completeJobReq(tt.body))

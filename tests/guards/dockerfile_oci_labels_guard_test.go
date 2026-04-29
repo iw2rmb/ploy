@@ -23,12 +23,37 @@ func TestDockerfilesOCIRequiredLabels(t *testing.T) {
 	}
 
 	requiredKeys := []string{
-		"org.opencontainers.image.source",
 		"org.opencontainers.image.description",
-		"org.opencontainers.image.licenses",
+	}
+
+	noSourceLicense := map[string]struct{}{
+		"images/java-bases/maven/Dockerfile.jdk21":         {},
+		"images/java-bases/maven/Dockerfile.jdk25":         {},
+		"images/java-bases/gradle/Dockerfile.jdk21":        {},
+		"images/java-bases/gradle/Dockerfile.jdk25":        {},
+		"images/java-bases/temurin/Dockerfile.jdk21":       {},
+		"images/java-bases/temurin/Dockerfile.jdk25":       {},
+		"images/gates/maven/Dockerfile.jdk21":              {},
+		"images/gates/maven/Dockerfile.jdk25":              {},
+		"images/gates/gradle/Dockerfile.jdk21":             {},
+		"images/gates/gradle/Dockerfile.jdk25":             {},
+		"images/orw/orw-cli-java-21-maven/Dockerfile":      {},
+		"images/orw/orw-cli-java-25-maven/Dockerfile":      {},
+		"images/orw/orw-cli-java-21-gradle/Dockerfile":     {},
+		"images/orw/orw-cli-java-25-gradle/Dockerfile":     {},
+		"images/amata/amata-codex-java-21-maven/Dockerfile":  {},
+		"images/amata/amata-codex-java-25-maven/Dockerfile":  {},
+		"images/amata/amata-codex-java-21-gradle/Dockerfile": {},
+		"images/amata/amata-codex-java-25-gradle/Dockerfile": {},
 	}
 
 	for _, dockerfile := range dockerfiles {
+		rel, err := filepath.Rel(repoRoot, dockerfile)
+		if err != nil {
+			t.Fatalf("rel path %s: %v", dockerfile, err)
+		}
+		rel = filepath.ToSlash(rel)
+
 		labels := parseDockerfileLabels(t, dockerfile)
 		keyCounts := make(map[string]int, len(labels))
 		for _, label := range labels {
@@ -44,26 +69,45 @@ func TestDockerfilesOCIRequiredLabels(t *testing.T) {
 		}
 		for _, key := range requiredKeys {
 			if keyCounts[key] != 1 {
-				t.Fatalf("%s: required OCI label %q count=%d, want 1", dockerfile, key, keyCounts[key])
+				t.Fatalf("%s: required OCI label %q count=%d, want 1", rel, key, keyCounts[key])
 			}
 		}
 
-		source := labelValue(labels, "org.opencontainers.image.source")
-		if source != requiredOCISourceValue {
-			t.Fatalf("%s: org.opencontainers.image.source=%q, want %q", dockerfile, source, requiredOCISourceValue)
-		}
+		_, allowMissingSourceLicense := noSourceLicense[rel]
+		sourceCount := keyCounts["org.opencontainers.image.source"]
+		licensesCount := keyCounts["org.opencontainers.image.licenses"]
+		if allowMissingSourceLicense {
+			if sourceCount > 0 {
+				t.Fatalf("%s: org.opencontainers.image.source must be absent", rel)
+			}
+			if licensesCount > 0 {
+				t.Fatalf("%s: org.opencontainers.image.licenses must be absent", rel)
+			}
+		} else {
+			if sourceCount != 1 {
+				t.Fatalf("%s: required OCI label %q count=%d, want 1", rel, "org.opencontainers.image.source", sourceCount)
+			}
+			if licensesCount != 1 {
+				t.Fatalf("%s: required OCI label %q count=%d, want 1", rel, "org.opencontainers.image.licenses", licensesCount)
+			}
 
-		licenses := labelValue(labels, "org.opencontainers.image.licenses")
-		if licenses != requiredOCILicensesValue {
-			t.Fatalf("%s: org.opencontainers.image.licenses=%q, want %q", dockerfile, licenses, requiredOCILicensesValue)
+			source := labelValue(labels, "org.opencontainers.image.source")
+			if source != requiredOCISourceValue {
+				t.Fatalf("%s: org.opencontainers.image.source=%q, want %q", rel, source, requiredOCISourceValue)
+			}
+
+			licenses := labelValue(labels, "org.opencontainers.image.licenses")
+			if licenses != requiredOCILicensesValue {
+				t.Fatalf("%s: org.opencontainers.image.licenses=%q, want %q", rel, licenses, requiredOCILicensesValue)
+			}
 		}
 
 		description := strings.TrimSpace(labelValue(labels, "org.opencontainers.image.description"))
 		if description == "" {
-			t.Fatalf("%s: org.opencontainers.image.description must be non-empty", dockerfile)
+			t.Fatalf("%s: org.opencontainers.image.description must be non-empty", rel)
 		}
 		if strings.Contains(description, "\n") || strings.Contains(description, "\r") {
-			t.Fatalf("%s: org.opencontainers.image.description must be single-line", dockerfile)
+			t.Fatalf("%s: org.opencontainers.image.description must be single-line", rel)
 		}
 	}
 }

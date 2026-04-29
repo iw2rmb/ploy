@@ -54,7 +54,7 @@ get:
     - `event: run` payloads carry RunSummary with stages filtered to repo jobs
     - `event: stage` payloads carry stage progress messages
 
-    See `docs/api/paths/runs_id_logs.yaml` for the canonical SSE contract.
+    See `docs/migs-lifecycle.md` for the canonical SSE contract.
   responses:
     '200':
       description: OK — SSE stream established.

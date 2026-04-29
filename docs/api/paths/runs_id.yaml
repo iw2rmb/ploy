@@ -38,37 +38,3 @@ get:
         application/json:
           schema:
             $ref: "../components/schemas/common.yaml#/Error"
-
-delete:
-  tags: [Control]
-  summary: Delete a run
-  description: |
-    Deletes a run by ID.
-  parameters:
-    - in: path
-      name: id
-      required: true
-      schema:
-        type: string
-      description: Run ID (KSUID string)
-  responses:
-    "204":
-      description: No Content
-    "400":
-      description: Bad request (missing or empty run id)
-      content:
-        application/json:
-          schema:
-            $ref: "../components/schemas/common.yaml#/Error"
-    "404":
-      description: Run not found
-      content:
-        application/json:
-          schema:
-            $ref: "../components/schemas/common.yaml#/Error"
-    "500":
-      description: Internal server error
-      content:
-        application/json:
-          schema:
-            $ref: "../components/schemas/common.yaml#/Error"

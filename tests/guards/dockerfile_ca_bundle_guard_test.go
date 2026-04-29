@@ -21,16 +21,10 @@ func TestPublishedImageDockerfilesUseBuildCABundleInstaller(t *testing.T) {
 		"images/java-bases/temurin/Dockerfile.jdk17",
 		"images/amata/amata-codex-java-17-maven/Dockerfile",
 		"images/amata/amata-codex-java-17-gradle/Dockerfile",
-		"images/amata/amata-codex-java-21-maven/Dockerfile",
-		"images/amata/amata-codex-java-21-gradle/Dockerfile",
-		"images/amata/amata-codex-java-25-maven/Dockerfile",
-		"images/amata/amata-codex-java-25-gradle/Dockerfile",
+		// jdk21/jdk25 Amata images do not use build-time CA bootstrap.
 		"images/orw/orw-cli-java-17-maven/Dockerfile",
 		"images/orw/orw-cli-java-17-gradle/Dockerfile",
-		"images/orw/orw-cli-java-21-maven/Dockerfile",
-		"images/orw/orw-cli-java-25-maven/Dockerfile",
-		"images/orw/orw-cli-java-21-gradle/Dockerfile",
-		"images/orw/orw-cli-java-25-gradle/Dockerfile",
+		// jdk21/jdk25 ORW images do not use build-time CA bootstrap.
 	}
 
 	for _, rel := range dockerfiles {

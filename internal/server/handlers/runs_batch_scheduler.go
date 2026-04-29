@@ -23,11 +23,7 @@ type BatchRepoStarter struct {
 }
 
 // NewBatchRepoStarter creates a new BatchRepoStarter with the given store.
-func NewBatchRepoStarter(st store.Store, hookBlobstores ...blobstore.Store) *BatchRepoStarter {
-	var bs blobstore.Store
-	if len(hookBlobstores) > 0 {
-		bs = hookBlobstores[0]
-	}
+func NewBatchRepoStarter(st store.Store, bs blobstore.Store) *BatchRepoStarter {
 	return &BatchRepoStarter{store: st, bs: bs}
 }
 

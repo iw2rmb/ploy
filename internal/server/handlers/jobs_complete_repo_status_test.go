@@ -72,7 +72,7 @@ func TestCompleteJob_RepoTerminalStatus(t *testing.T) {
 				}),
 			)
 
-			handler := completeJobHandler(st, nil, nil)
+			handler := completeJobHandler(st, nil, nil, nil)
 			rr := httptest.NewRecorder()
 			handler.ServeHTTP(rr, f.completeJobReq(tt.reqBody))
 
@@ -150,7 +150,7 @@ func TestCompleteJob_RepoNotTerminalWhileJobsInProgress(t *testing.T) {
 		}),
 	)
 
-	handler := completeJobHandler(st, nil, nil)
+	handler := completeJobHandler(st, nil, nil, nil)
 
 	req := f.completeJobReq(map[string]any{
 		"status":       "Success",
@@ -186,24 +186,24 @@ func TestCompleteJob_RepoStatusUsesLastJobStatus(t *testing.T) {
 	f := newRepoScopedFixture("post_gate")
 	f.Job.Name = "post-gate"
 
-		// Complete the last job (post-gate) successfully. Earlier failure exists.
-		st := newJobStoreForFixture(f,
-			withRepoAttemptJobs([]store.Job{
-				// Earlier pre-gate failure.
-				{
-					ID:          domaintypes.NewJobID(),
-					RunID:       f.RunID,
-					RepoID:      f.Job.RepoID,
+	// Complete the last job (post-gate) successfully. Earlier failure exists.
+	st := newJobStoreForFixture(f,
+		withRepoAttemptJobs([]store.Job{
+			// Earlier pre-gate failure.
+			{
+				ID:          domaintypes.NewJobID(),
+				RunID:       f.RunID,
+				RepoID:      f.Job.RepoID,
 				RepoBaseRef: "main",
 				Attempt:     1,
 				Name:        "pre-gate",
 				Status:      domaintypes.JobStatusFail,
-					JobType:     "pre_gate",
-					Meta:        withNextIDMeta([]byte(`{}`), 1000),
-				},
-				{
-					ID:          domaintypes.NewJobID(),
-					RunID:       f.RunID,
+				JobType:     "pre_gate",
+				Meta:        withNextIDMeta([]byte(`{}`), 1000),
+			},
+			{
+				ID:          domaintypes.NewJobID(),
+				RunID:       f.RunID,
 				RepoID:      f.Job.RepoID,
 				RepoBaseRef: "main",
 				Attempt:     1,
@@ -230,7 +230,7 @@ func TestCompleteJob_RepoStatusUsesLastJobStatus(t *testing.T) {
 		}),
 	)
 
-	handler := completeJobHandler(st, nil, nil)
+	handler := completeJobHandler(st, nil, nil, nil)
 
 	req := f.completeJobReq(map[string]any{
 		"status":    "Success",
@@ -281,7 +281,7 @@ func TestCompleteJob_MultiRepoRunFinishesWhenAllReposTerminal(t *testing.T) {
 		}),
 	)
 
-	handler := completeJobHandler(st, nil, nil)
+	handler := completeJobHandler(st, nil, nil, nil)
 
 	req := f.completeJobReq(map[string]any{
 		"status":    "Success",
@@ -314,7 +314,7 @@ func TestCompleteJob_RejectsV0Status(t *testing.T) {
 			t.Parallel()
 			f := newJobFixture("mig")
 			st := &jobStore{}
-			handler := completeJobHandler(st, nil, nil)
+			handler := completeJobHandler(st, nil, nil, nil)
 
 			req := f.completeJobReq(map[string]any{"status": v0status})
 			rr := httptest.NewRecorder()
