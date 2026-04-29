@@ -23,7 +23,7 @@ kind: MigRunSpec
 # next step begins.
 steps:
   # Step 1: Migrate to Java 8
-  - image: localhost:5000/ploy/orw-cli-maven:latest
+  - image: localhost:5000/ploy/orw-cli-java-17-maven:latest
     env:
       RECIPE_GROUP: org.openrewrite.recipe
       RECIPE_ARTIFACT: rewrite-migrate-java
@@ -32,7 +32,7 @@ steps:
       MIGRATION_STEP: "1"
 
   # Step 2: Migrate to Java 11
-  - image: localhost:5000/ploy/orw-cli-maven:latest
+  - image: localhost:5000/ploy/orw-cli-java-17-maven:latest
     env:
       RECIPE_GROUP: org.openrewrite.recipe
       RECIPE_ARTIFACT: rewrite-migrate-java
@@ -41,7 +41,7 @@ steps:
       MIGRATION_STEP: "2"
 
   # Step 3: Migrate to Java 17
-  - image: localhost:5000/ploy/orw-cli-maven:latest
+  - image: localhost:5000/ploy/orw-cli-java-17-maven:latest
     env:
       RECIPE_GROUP: org.openrewrite.recipe
       RECIPE_ARTIFACT: rewrite-migrate-java
@@ -63,7 +63,7 @@ build_gate:
   heal:
     retries: 1
     # Amata healing container using the workspace diff handshake.
-    image: localhost:5000/ploy/java-17-codex-amata-maven:latest
+    image: localhost:5000/ploy/amata-codex-java-17-maven:latest
     amata:
       spec: |
         version: amata/v1

@@ -291,7 +291,6 @@ func TestApplyHydraOverlay_SectionRouting(t *testing.T) {
 
 	overlays := map[string]*HydraJobConfig{
 		"pre_gate":  {Envs: map[string]string{"SECTION": "pre_gate"}},
-		"re_gate":   {Envs: map[string]string{"SECTION": "re_gate"}},
 		"post_gate": {Envs: map[string]string{"SECTION": "post_gate"}},
 		"mig":       {Envs: map[string]string{"SECTION": "mig"}},
 	}

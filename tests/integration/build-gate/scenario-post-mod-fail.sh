@@ -153,7 +153,7 @@ echo "[scenario] Healing completed (UndefinedMigSymbol.java created)"
 # ─────────────────────────────────────────────────────────────────────────────
 # Step 6: Re-gate after healing should PASS.
 # ─────────────────────────────────────────────────────────────────────────────
-echo "[scenario] Running re-gate after healing (should pass)..."
+echo "[scenario] Running gate retry after healing (should pass)..."
 
 set +e
 REGATE_LOGS=$(docker run --rm -v "$WORKDIR":/workspace -w /workspace \
@@ -163,7 +163,7 @@ REGATE_STATUS=$?
 set -e
 
 if [[ $REGATE_STATUS -ne 0 ]]; then
-  echo "FAIL: re-gate after healing should pass, but failed"
+  echo "FAIL: gate retry after healing should pass, but failed"
   echo "$REGATE_LOGS"
   exit 1
 fi
@@ -199,7 +199,7 @@ FAIL_REGATE_STATUS=$?
 set -e
 
 if [[ $FAIL_REGATE_STATUS -eq 0 ]]; then
-  echo "FAIL: re-gate with incomplete healing should fail, but passed"
+  echo "FAIL: gate retry with incomplete healing should fail, but passed"
   exit 1
 fi
 

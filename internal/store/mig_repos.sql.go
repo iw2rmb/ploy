@@ -236,49 +236,6 @@ func (q *Queries) ListMigReposByMig(ctx context.Context, migID types.MigID) ([]M
 	return items, nil
 }
 
-const promoteReGateRecoveryCandidateGateProfile = `-- name: PromoteReGateRecoveryCandidateGateProfile :one
-WITH compat_args AS (
-  SELECT
-    $2::jsonb AS job_meta,
-    $3::jsonb AS gate_profile,
-    $4::jsonb AS gate_profile_artifacts
-)
-SELECT j.repo_id
-FROM jobs j, compat_args
-WHERE j.id = $1
-  AND j.job_type = 're_gate'
-  AND j.status = 'Success'
-  AND (
-    CASE
-      WHEN jsonb_typeof(j.meta->'recovery'->'candidate_promoted') = 'boolean'
-      THEN (j.meta->'recovery'->>'candidate_promoted')::boolean
-      ELSE false
-    END
-  ) = false
-LIMIT 1
-`
-
-type PromoteReGateRecoveryCandidateGateProfileParams struct {
-	ID                   types.JobID `json:"id"`
-	JobMeta              []byte      `json:"job_meta"`
-	GateProfile          []byte      `json:"gate_profile"`
-	GateProfileArtifacts []byte      `json:"gate_profile_artifacts"`
-}
-
-// Legacy compatibility shim: gate profile persistence on mig_repos is removed.
-// Returns target repo_id for callers that still rely on this method's result.
-func (q *Queries) PromoteReGateRecoveryCandidateGateProfile(ctx context.Context, arg PromoteReGateRecoveryCandidateGateProfileParams) (types.RepoID, error) {
-	row := q.db.QueryRow(ctx, promoteReGateRecoveryCandidateGateProfile,
-		arg.ID,
-		arg.JobMeta,
-		arg.GateProfile,
-		arg.GateProfileArtifacts,
-	)
-	var repo_id types.RepoID
-	err := row.Scan(&repo_id)
-	return repo_id, err
-}
-
 const updateMigRepoRefs = `-- name: UpdateMigRepoRefs :exec
 UPDATE mig_repos
 SET base_ref = $2,

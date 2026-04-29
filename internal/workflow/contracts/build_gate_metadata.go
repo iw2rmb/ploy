@@ -77,7 +77,7 @@ type BuildGateReportLink struct {
 //   - unknown/empty → MigStackUnknown
 //
 // This method ensures the same stack value is visible to both mig and healing
-// executions, enabling consistent image resolution across re-gates.
+// executions, enabling consistent image resolution across gate retries.
 func (m BuildGateStageMetadata) DetectedStack() MigStack {
 	if m.Detected != nil && strings.TrimSpace(m.Detected.Tool) != "" {
 		return ToolToMigStack(m.Detected.Tool)
@@ -187,15 +187,15 @@ type BuildGateRecoveryMetadata struct {
 	CandidateValidationStatus string `json:"candidate_validation_status,omitempty"`
 	// CandidateValidationError captures the validation/load error when status is not valid.
 	CandidateValidationError string `json:"candidate_validation_error,omitempty"`
-	// CandidateGateProfile stores validated candidate payload used for re-gate override.
+	// CandidateGateProfile stores validated candidate payload used for gate override.
 	CandidateGateProfile json.RawMessage `json:"candidate_gate_profile,omitempty"`
 	// CandidatePromoted reports whether a validated candidate has been promoted
-	// into repo gate_profile after successful re-gate completion.
+	// into repo gate_profile after successful gate completion.
 	CandidatePromoted *bool `json:"candidate_promoted,omitempty"`
 }
 
 // RecoveryClaimContext carries typed recovery inputs in node claim responses
-// for healing/re-gate jobs. This payload makes recovery execution independent
+// for healing jobs. This payload makes recovery execution independent
 // from node-local run cache files.
 type RecoveryClaimContext struct {
 	LoopKind string `json:"loop_kind,omitempty"`

@@ -25,7 +25,7 @@ WITH latest_successful_gate_jobs AS (
     AND rr.repo_id = j.repo_id
     AND rr.attempt = j.attempt
   WHERE j.status = 'Success'
-    AND j.job_type IN ('pre_gate', 'post_gate', 're_gate')
+    AND j.job_type IN ('pre_gate', 'post_gate')
     AND rr.status = 'Success'
 ),
 sbom_rows_with_stack AS (
@@ -77,7 +77,7 @@ WITH latest_successful_gate_jobs AS (
     AND rr.repo_id = j.repo_id
     AND rr.attempt = j.attempt
   WHERE j.status = 'Success'
-    AND j.job_type IN ('pre_gate', 'post_gate', 're_gate')
+    AND j.job_type IN ('pre_gate', 'post_gate')
     AND rr.status = 'Success'
 ),
 sbom_rows_with_stack AS (

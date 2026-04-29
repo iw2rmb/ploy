@@ -148,7 +148,7 @@ steps:
 
 build_gate:
   heal:
-    image: docker.io/your-dh-user/java-17-codex-amata-maven:latest
+    image: docker.io/your-dh-user/amata-codex-java-17-maven:latest
     in:
       - ./prompt-extra.txt:/in/prompt-extra.txt
 ```
@@ -164,7 +164,7 @@ steps:
 
 build_gate:
   heal:
-    image: docker.io/your-dh-user/java-17-codex-amata-maven:latest
+    image: docker.io/your-dh-user/amata-codex-java-17-maven:latest
     in:
       - "g7h8i9j0k1l2:/in/prompt-extra.txt"
 ```
@@ -707,7 +707,7 @@ Runtime mounts:
 When `PLOY_STACK_RELEASE` is empty, runtime uses `unknown-release` as the lane key.
 Image-name marker fallback is not used.
 
-**ORW images (`orw-cli-maven`, `orw-cli-gradle`)**: Same Hydra `ca` materialization behavior as
+**ORW images (`orw-cli-java-17-maven`, `orw-cli-java-17-gradle`)**: Same Hydra `ca` materialization behavior as
 build-gate, ensuring OpenRewrite can fetch dependencies from internal artifact repositories while
 staying isolated from Maven/Gradle project task execution.
 

@@ -45,9 +45,7 @@ type RunRepoJob struct {
 	FinishedAt    *time.Time            `json:"finished_at,omitempty"`
 	DurationMs    int64                 `json:"duration_ms"`
 	DisplayName   string                `json:"display_name,omitempty"`
-	ActionSummary string                `json:"action_summary,omitempty"`
 	BugSummary    string                `json:"bug_summary,omitempty"`
-	ErrorKind     string                `json:"error_kind,omitempty"`
 	Recovery      *RunRepoJobRecovery   `json:"recovery,omitempty"`
 	// sbom_evidence exposes artifact + parsed-row evidence for gate jobs.
 	SBOMEvidence *RunRepoJobSBOMEvidence `json:"sbom_evidence,omitempty"`

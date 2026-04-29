@@ -45,9 +45,6 @@ defaults:
         MIG_KEY: mig_val
       home:
         - /src/auth.json:.codex/auth.json:ro
-    heal:
-      envs:
-        HEAL_KEY: heal_val
 `
 	if err := os.WriteFile(cfgPath, []byte(content), 0o644); err != nil {
 		t.Fatal(err)
@@ -111,7 +108,6 @@ func TestOverlay_JobSection(t *testing.T) {
 	ov := Overlay{Defaults: &Defaults{Job: &JobTargets{
 		PreGate: &JobConfig{Envs: map[string]string{"A": "1"}},
 		Mig:     &JobConfig{Envs: map[string]string{"B": "2"}},
-		Heal:    &JobConfig{Envs: map[string]string{"C": "3"}},
 	}}}
 
 	tests := []struct {
@@ -120,8 +116,6 @@ func TestOverlay_JobSection(t *testing.T) {
 	}{
 		{"pre_gate", "A"},
 		{"mig", "B"},
-		{"heal", "C"},
-		{"re_gate", ""},
 		{"unknown", ""},
 	}
 	for _, tt := range tests {

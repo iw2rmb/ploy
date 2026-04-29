@@ -44,7 +44,7 @@ type ConfigInEntry struct {
 // ConfigHolder provides thread-safe access to runtime configuration, including
 // GitLab settings, global environment variables, and typed Hydra overlays.
 // Global env is stored as key → []GlobalEnvVar to support multiple targets per key.
-// Hydra overlays are stored per section (pre_gate, re_gate, post_gate, mig, heal).
+// Hydra overlays are stored per section (pre_gate, post_gate, mig).
 // Config CA, Home, and In entries are section-keyed and synced into hydra overlays.
 type ConfigHolder struct {
 	mu         sync.RWMutex
@@ -170,7 +170,7 @@ func (h *ConfigHolder) GetHydraOverlays() map[string]*HydraJobConfig {
 }
 
 // SetHydraJobConfig sets the Hydra overlay for a named section.
-// Section must be one of: pre_gate, re_gate, post_gate, mig, heal.
+// Section must be one of: pre_gate, post_gate, mig.
 func (h *ConfigHolder) SetHydraJobConfig(section string, cfg *HydraJobConfig) error {
 	if err := ValidateHydraSection(section); err != nil {
 		return err

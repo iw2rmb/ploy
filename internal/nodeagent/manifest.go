@@ -146,9 +146,6 @@ func sbomPhaseConfigForCycle(cycleName string, typedOpts RunOptions) *contracts.
 	case postGateCycleName:
 		return typedOpts.BuildGate.Post
 	}
-	if strings.HasPrefix(strings.TrimSpace(cycleName), "re-gate") {
-		return typedOpts.BuildGate.Post
-	}
 	return nil
 }
 
@@ -502,7 +499,7 @@ func buildManifestFromRequest(req StartRunRequest, typedOpts RunOptions, stepInd
 }
 
 // buildGateManifestFromRequest builds a StepManifest for gate jobs (pre_gate,
-// post_gate, re_gate). Gate jobs use the default image since stack detection
+// post_gate). Gate jobs use the default image since stack detection
 // happens inside the Build Gate itself.
 func buildGateManifestFromRequest(req StartRunRequest, typedOpts RunOptions) (contracts.StepManifest, error) {
 	sanitized := typedOpts

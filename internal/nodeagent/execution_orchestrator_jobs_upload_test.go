@@ -293,9 +293,9 @@ func TestRunController_uploadGateLogsArtifact(t *testing.T) {
 			serverStatus:     http.StatusCreated,
 			wantArtifactID:   true,
 		},
-		{
-			name:             "re-gate logs",
-			logsText:         "re-gate logs content",
+			{
+				name:             "retry gate logs",
+				logsText:         "retry gate logs content",
 			artifactSuffix:   "re1",
 			wantArtifactName: "build-gate-re1.log",
 			serverStatus:     http.StatusCreated,

@@ -16,7 +16,6 @@ Behavior:
   - Always executes the amata binary.
   - If invoked without args and /in/amata.yaml exists, runs: amata run /in/amata.yaml
   - Imports extra CA certs from /etc/ploy/ca when present.
-  - Writes artifacts to /out: heal.json.
 USAGE
 }
 
@@ -62,9 +61,5 @@ set +e
 amata --out jsonl "$@"
 status=$?
 set -e
-
-if [[ ! -s "$out_dir/heal.json" ]]; then
-  touch "$out_dir/heal.json"
-fi
 
 exit "${status:-0}"

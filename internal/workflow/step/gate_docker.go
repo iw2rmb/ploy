@@ -11,8 +11,8 @@
 //     directory directly, which is semantically equivalent to the HTTP Build Gate
 //     API with a diff_patch containing all workspace modifications.
 //
-//   - Full gate history: The node agent captures every gate execution (pre-gate
-//     and all re-gates after healing) in BuildGateStageMetadata, enabling
+//   - Full gate history: The node agent captures every gate execution in
+//     BuildGateStageMetadata, enabling
 //     complete telemetry and audit trails.
 //
 //   - Authoritative results: In-container HTTP Build Gate API calls are advisory
@@ -84,8 +84,8 @@ var errBuildGateRuntimeUnavailable = errors.New("build gate runtime unavailable"
 // same container runtime as step execution, mounting the workspace at /workspace.
 //
 // This executor is the CANONICAL source of gate validation results for the node
-// agent. The node agent always uses this executor for both pre-gate (initial
-// validation) and re-gate (post-healing validation) phases, ensuring consistent
+// agent. The node agent always uses this executor for gate validation phases,
+// ensuring consistent
 // behavior and complete history capture.
 type dockerGateExecutor struct {
 	rt ContainerRuntime
@@ -155,8 +155,8 @@ func NewDockerGateExecutor(rt ContainerRuntime) GateExecutor {
 //   - LogDigest: SHA-256 hash of logs for deduplication and verification
 //   - Resources: Container resource usage metrics (CPU, memory, disk I/O)
 //
-// This metadata is captured by the node agent in both pre-gate (initial validation)
-// and re-gate (post-healing validation) phases, ensuring complete gate history.
+// This metadata is captured by the node agent for gate validation phases,
+// ensuring complete gate history.
 func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGateSpec, workspace string) (*contracts.BuildGateStageMetadata, error) {
 	if ctx != nil && ctx.Err() != nil {
 		return nil, ctx.Err()

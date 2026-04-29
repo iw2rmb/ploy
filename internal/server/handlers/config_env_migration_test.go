@@ -133,10 +133,10 @@ func TestScanSpecialEnvKeys_TargetMapping(t *testing.T) {
 		target       domaintypes.GlobalEnvTarget
 		wantSections []string
 	}{
-		{"gates", "CRUSH_JSON", domaintypes.GlobalEnvTargetGates, []string{"pre_gate", "re_gate", "post_gate"}},
-		{"steps", "CODEX_CONFIG_TOML", domaintypes.GlobalEnvTargetSteps, []string{"heal", "mig"}},
-		{"server expands to all", "CRUSH_JSON", domaintypes.GlobalEnvTargetServer, nil},  // 5 sections
-		{"nodes expands to all", "CRUSH_JSON", domaintypes.GlobalEnvTargetNodes, nil},    // 5 sections
+		{"gates", "CRUSH_JSON", domaintypes.GlobalEnvTargetGates, []string{"pre_gate", "post_gate"}},
+		{"steps", "CODEX_CONFIG_TOML", domaintypes.GlobalEnvTargetSteps, []string{"mig"}},
+		{"server expands to all", "CRUSH_JSON", domaintypes.GlobalEnvTargetServer, nil}, // 3 sections
+		{"nodes expands to all", "CRUSH_JSON", domaintypes.GlobalEnvTargetNodes, nil},   // 3 sections
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -163,9 +163,9 @@ func TestScanSpecialEnvKeys_TargetMapping(t *testing.T) {
 					}
 				}
 			} else {
-				// Server/nodes target maps to all 5 job sections.
-				if len(report.Entries[0].Sections) != 5 {
-					t.Errorf("Sections = %v, want 5 sections (all)", report.Entries[0].Sections)
+				// Server/nodes target maps to all job sections.
+				if len(report.Entries[0].Sections) != 3 {
+					t.Errorf("Sections = %v, want 3 sections (all)", report.Entries[0].Sections)
 				}
 			}
 		})

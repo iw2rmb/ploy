@@ -45,24 +45,6 @@ func gateCycleFinalSnapshotPath(runID types.RunID, cycleName string) string {
 	return gateCycleSBOMOutPath(runID, cycleName)
 }
 
-func gateCycleNameFromSBOMContext(sbomCtx *contracts.SBOMJobMetadata) (string, error) {
-	if sbomCtx == nil {
-		return "", fmt.Errorf("sbom context is required")
-	}
-	if cycleName := strings.TrimSpace(sbomCtx.CycleName); cycleName != "" {
-		return cycleName, nil
-	}
-	phase := strings.TrimSpace(sbomCtx.Phase)
-	switch phase {
-	case contracts.SBOMPhasePre:
-		return preGateCycleName, nil
-	case contracts.SBOMPhasePost:
-		return postGateCycleName, nil
-	default:
-		return "", fmt.Errorf("sbom context phase invalid: %q", phase)
-	}
-}
-
 func gateCycleNameFromGateJob(jobType types.JobType, jobName string) (string, error) {
 	switch jobType {
 	case types.JobTypePreGate:

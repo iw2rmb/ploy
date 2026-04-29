@@ -25,7 +25,7 @@ post:
     2. Transitions the job to terminal status with `finished_at`, `duration_ms`, `exit_code`,
        and optional `repo_sha_out`.
     3. If the job succeeded, schedules the next job in the run (server-driven scheduling).
-    4. If a gate job failed, may create healing jobs and a re-gate job.
+    4. If a gate job failed, may create healing jobs and a gate retry job.
     5. Checks if all jobs are terminal and, if so, derives run status gate-aware.
 
     This endpoint simplifies the node → server contract by addressing jobs directly

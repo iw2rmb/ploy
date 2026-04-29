@@ -41,7 +41,6 @@ type RunStatsGate struct {
 	DurationMs *int64              `json:"duration_ms,omitempty"`
 	PreGate    *RunStatsGatePhase  `json:"pre_gate,omitempty"`
 	FinalGate  *RunStatsGatePhase  `json:"final_gate,omitempty"`
-	ReGates    []RunStatsGatePhase `json:"re_gates,omitempty"`
 }
 
 // RunStatsGatePhase represents a single gate execution phase.
@@ -193,8 +192,7 @@ func (s RunStats) LastResumedAt() string {
 // Priority order:
 //  1. final_gate — The latest post-mig gate result. For runs with no migs executed,
 //     final_gate is populated from the pre-mig gate to ensure consistent summary output.
-//  2. last re-gate — The most recent healing re-gate attempt (from either pre- or post-mig phases).
-//  3. pre_gate — The initial pre-mig gate before any mig execution (fallback when no final_gate).
+//  2. pre_gate — The initial pre-mig gate before any mig execution (fallback when no final_gate).
 //
 // This priority ensures CLI and API consumers always get the most definitive gate result:
 // final_gate represents the authoritative build validation status at run completion.
@@ -207,15 +205,6 @@ func (s RunStats) GateSummary() string {
 	// Check final_gate first (post-mig gate or pre-mig gate fallback for runs with no migs).
 	if acc.Gate.FinalGate != nil {
 		return formatGatePhaseTyped(acc.Gate.FinalGate, "final-gate")
-	}
-
-	// Check re_gates array (healing attempts from both pre- and post-mig phases).
-	if len(acc.Gate.ReGates) > 0 {
-		// Take the last re-gate run as the most recent healing result.
-		lastReGate := &acc.Gate.ReGates[len(acc.Gate.ReGates)-1]
-		if summary := formatGatePhaseTyped(lastReGate, "re-gate"); summary != "" {
-			return summary
-		}
 	}
 
 	// Fall back to pre_gate (pre-mig gate) — only reached if no final_gate was populated.
@@ -350,7 +339,7 @@ func (b *RunStatsBuilder) Gate(passed bool, durationMs int64) *RunStatsBuilder {
 	return b
 }
 
-// GateDetails sets the full gate object (pre-gate, re-gates, final gate, resources, etc.).
+// GateDetails sets the full gate object (pre-gate, final gate, resources, etc.).
 func (b *RunStatsBuilder) GateDetails(gate *RunStatsGate) *RunStatsBuilder {
 	b.acc.Gate = gate
 	return b

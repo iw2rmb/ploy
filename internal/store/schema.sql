@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS ploy.schema_version (
 -- - run_status: Started | Cancelled | Finished
 -- - run_repo_status: Queued | Running | Cancelled | Fail | Success
 -- - job_status: Created | Queued | Running | Success | Fail | Error | Cancelled
--- - job_type: pre_gate | mig | post_gate | heal | re_gate
+-- - job_type: pre_gate | mig | post_gate
 --
 -- Capitalized values are canonical; no aliases.
 DO $$
@@ -57,7 +57,7 @@ BEGIN
     JOIN pg_namespace n ON n.oid = t.typnamespace
     WHERE t.typname = 'job_type' AND n.nspname = 'ploy'
   ) THEN
-    CREATE TYPE job_type AS ENUM ('pre_gate', 'mig', 'post_gate', 'heal', 're_gate');
+    CREATE TYPE job_type AS ENUM ('pre_gate', 'mig', 'post_gate');
   END IF;
 END $$;
 
@@ -507,13 +507,13 @@ CREATE INDEX IF NOT EXISTS config_env_target_idx ON config_env(target);
 -- Global CA Entries (config_ca)
 -- Stores canonical CA certificate hash entries for injection into jobs.
 -- Each entry is a shortHash (7-64 hex chars) referencing a content-addressed bundle.
--- section controls which job phase receives the CA entry (pre_gate, re_gate, post_gate, mig, heal).
+-- section controls which job phase receives the CA entry (pre_gate, post_gate, mig).
 -- Composite primary key on (hash, section) allows one hash to target multiple sections.
 -- Ordering within a section is deterministic by hash ASC.
 DROP TABLE IF EXISTS config_ca;
 CREATE TABLE IF NOT EXISTS config_ca (
   hash        TEXT NOT NULL CHECK (hash ~ '^[0-9a-f]{7,64}$'),  -- Canonical shortHash
-  section     TEXT NOT NULL CHECK (section IN ('pre_gate', 're_gate', 'post_gate', 'mig', 'heal')),
+  section     TEXT NOT NULL CHECK (section IN ('pre_gate', 'post_gate', 'mig')),
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (hash, section)
 );
@@ -522,14 +522,14 @@ CREATE INDEX IF NOT EXISTS config_ca_section_idx ON config_ca(section);
 -- Global Home Entries (config_home)
 -- Stores canonical home mount entries for injection into jobs.
 -- Each entry is "shortHash:dst{:ro}" where dst is $HOME-relative.
--- section controls which job phase receives the entry (pre_gate, re_gate, post_gate, mig, heal).
+-- section controls which job phase receives the entry (pre_gate, post_gate, mig).
 -- Composite primary key on (dst, section) enforces one entry per destination per section
 -- (deterministic dedup by destination).
 DROP TABLE IF EXISTS config_home;
 CREATE TABLE IF NOT EXISTS config_home (
   entry       TEXT NOT NULL,        -- Full canonical entry: "shortHash:dst" or "shortHash:dst:ro"
   dst         TEXT NOT NULL,        -- Extracted normalized destination for dedup
-  section     TEXT NOT NULL CHECK (section IN ('pre_gate', 're_gate', 'post_gate', 'mig', 'heal')),
+  section     TEXT NOT NULL CHECK (section IN ('pre_gate', 'post_gate', 'mig')),
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (dst, section)
 );
@@ -538,14 +538,14 @@ CREATE INDEX IF NOT EXISTS config_home_section_idx ON config_home(section);
 -- Global In Entries (config_in)
 -- Stores canonical in mount entries for injection into jobs.
 -- Each entry is "shortHash:dst" where dst starts with /in/.
--- section controls which job phase receives the entry (pre_gate, re_gate, post_gate, mig, heal).
+-- section controls which job phase receives the entry (pre_gate, post_gate, mig).
 -- Composite primary key on (dst, section) enforces one entry per destination per section
 -- (deterministic dedup by destination).
 DROP TABLE IF EXISTS config_in;
 CREATE TABLE IF NOT EXISTS config_in (
   entry       TEXT NOT NULL,        -- Full canonical entry: "shortHash:dst"
   dst         TEXT NOT NULL,        -- Extracted normalized destination for dedup
-  section     TEXT NOT NULL CHECK (section IN ('pre_gate', 're_gate', 'post_gate', 'mig', 'heal')),
+  section     TEXT NOT NULL CHECK (section IN ('pre_gate', 'post_gate', 'mig')),
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (dst, section)
 );

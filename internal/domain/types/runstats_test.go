@@ -237,21 +237,11 @@ func TestRunStats_GateSummary(t *testing.T) {
 			json: `{"gate": {"pre_gate": {"passed": true, "duration_ms": 890}}}`,
 			want: "passed pre-gate duration=890ms",
 		},
-		{
-			name: "pre gate failed",
-			json: `{"gate": {"pre_gate": {"passed": false, "duration_ms": 456}}}`,
-			want: "failed pre-gate duration=456ms",
-		},
-		{
-			name: "re-gate last run passed",
-			json: `{"gate": {"re_gates": [{"passed": false, "duration_ms": 100}, {"passed": true, "duration_ms": 200}]}}`,
-			want: "passed re-gate duration=200ms",
-		},
-		{
-			name: "final gate takes precedence over re-gates",
-			json: `{"gate": {"re_gates": [{"passed": true, "duration_ms": 100}], "final_gate": {"passed": true, "duration_ms": 300}}}`,
-			want: "passed duration=300ms",
-		},
+			{
+				name: "pre gate failed",
+				json: `{"gate": {"pre_gate": {"passed": false, "duration_ms": 456}}}`,
+				want: "failed pre-gate duration=456ms",
+			},
 		{
 			name: "float64 duration from JSON",
 			json: `{"gate": {"final_gate": {"passed": true, "duration_ms": 1500}}}`,

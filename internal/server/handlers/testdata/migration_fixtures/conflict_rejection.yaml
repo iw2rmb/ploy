@@ -20,4 +20,4 @@ expect:
       action: reject
       target_field: home
       destination: ".codex/auth.json"
-      sections: [heal, mig]
+      sections: [mig]

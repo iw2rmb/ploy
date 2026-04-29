@@ -1,13 +1,13 @@
 ARG NODE_IMAGE=node:22-bookworm-slim
-ARG JAVA_BASE_MAVEN_21_IMAGE=java-base-maven:jdk21
+ARG JAVA_BASE_MAVEN_17_IMAGE=java-base-maven:jdk17
 
-FROM --platform=$TARGETOS/$TARGETARCH ${JAVA_BASE_MAVEN_21_IMAGE} AS maven-tools
+FROM --platform=$TARGETOS/$TARGETARCH ${JAVA_BASE_MAVEN_17_IMAGE} AS maven-tools
 
 FROM ${NODE_IMAGE}
 ARG TARGETARCH
 
-LABEL org.opencontainers.image.title="java-21-codex-amata-maven" \
-    org.opencontainers.image.description="Java 21 image with Maven, Codex CLI, and Amata" \
+LABEL org.opencontainers.image.title="amata-codex-java-17-maven" \
+    org.opencontainers.image.description="Java 17 image with Maven, Codex CLI, and Amata" \
     org.opencontainers.image.source="https://github.com/iw2rmb/ploy" \
     org.opencontainers.image.licenses="MIT"
 

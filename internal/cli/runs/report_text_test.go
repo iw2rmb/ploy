@@ -304,10 +304,10 @@ func TestRenderRunReportTextExitOneLiners(t *testing.T) {
 	specID := domaintypes.NewSpecID()
 	repoID := domaintypes.NewMigRepoID()
 	preGateID := domaintypes.NewJobID()
-	healID := domaintypes.NewJobID()
+	migJobID := domaintypes.NewJobID()
 	errText := "compile\nfailed at step 2"
 	failCode := int32(137)
-	healCode := int32(0)
+	migCode := int32(0)
 
 	report := RunReport{
 		RunID:   runID,
@@ -317,9 +317,9 @@ func TestRenderRunReportTextExitOneLiners(t *testing.T) {
 		Repos: []RunEntry{
 			{
 				RepoID:    repoID,
-				RepoURL:   "https://github.com/acme/heal.git",
+				RepoURL:   "https://github.com/acme/mig.git",
 				BaseRef:   "main",
-				TargetRef: "ploy/heal",
+				TargetRef: "ploy/mig",
 				Attempt:   1,
 				Status:    "Fail",
 				LastError: &errText,
@@ -334,15 +334,13 @@ func TestRenderRunReportTextExitOneLiners(t *testing.T) {
 						Recovery:   &RunJobRecovery{LoopKind: "healing"},
 					},
 					{
-						JobID:         healID,
-						JobType:       "heal",
-						JobImage:      "ghcr.io/acme/heal:1",
+						JobID:         migJobID,
+						JobType:       "mig",
+						JobImage:      "ghcr.io/acme/mig:1",
 						Status:        "Success",
-						ExitCode:      &healCode,
+						ExitCode:      &migCode,
 						DurationMs:    1200,
-						ActionSummary: "Applied import fix and retried build",
 						BugSummary:    "Missing dependency lockfile",
-						ErrorKind:     "deps",
 					},
 				},
 			},
@@ -352,15 +350,11 @@ func TestRenderRunReportTextExitOneLiners(t *testing.T) {
 	out := renderText(t, report, TextRenderOptions{EnableOSC8: false})
 	assertx.Contains(t, out, ColoredStatusGlyph("failed", 0))
 	assertx.Contains(t, out, "pre_gate")
-	assertx.NotContains(t, out, "└  Exit 137: ")
-	assertx.NotContains(t, out, "infra compile failed at step 2")
-	assertx.NotContains(t, out, "<infra>")
+	assertx.Contains(t, out, "└  Exit 137: ")
+	assertx.Contains(t, out, "compile failed at step 2")
 	assertx.Contains(t, out, "✓")
-	assertx.Contains(t, out, "heal")
+	assertx.Contains(t, out, "mig")
 	assertx.NotContains(t, out, "Exit 0")
-	assertx.NotContains(t, out, "Issue [deps]: Missing dependency lockfile")
-	assertx.NotContains(t, out, "Action:")
-	assertx.Contains(t, out, "             └ [deps] Applied import fix and retried build")
 }
 
 func TestRenderRunReportTextExitOneLinerVariants(t *testing.T) {
@@ -398,18 +392,18 @@ func TestRenderRunReportTextExitOneLinerVariants(t *testing.T) {
 			notContain: []string{"<code>"},
 		},
 		{
-			name: "omits unknown prefix when recovery kind is absent",
+			name: "gate without repo error emits nothing",
 			job: RunJobEntry{
 				JobID:      domaintypes.NewJobID(),
-				JobType:    "re_gate",
-				JobImage:   "ghcr.io/acme/re-gate:1",
+				JobType:    "post_gate",
+				JobImage:   "ghcr.io/acme/post-gate:1",
 				Status:     "Failed",
 				ExitCode:   &failCode,
 				DurationMs: 1000,
-				BugSummary: "re-gate failed",
+				BugSummary: "post-gate failed",
 			},
 			contains:   []string{},
-			notContain: []string{"└  Exit 1: " + colorizeErrorText("Error"), "<unknown>", "unknown re-gate failed", "re-gate failed"},
+			notContain: []string{"└  Exit 1: " + colorizeErrorText("Error"), "post-gate failed"},
 		},
 		{
 			name: "wraps at 100 symbols",
@@ -439,29 +433,6 @@ func TestRenderRunReportTextExitOneLinerVariants(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestRenderRunReportText_HealSummaryWrapsAtEighty(t *testing.T) {
-	t.Parallel()
-
-	longBug := strings.Repeat("dependency resolution failed due to missing lockfile entry ", 3)
-	longAction := strings.Repeat("updated lockfile and normalized dependency versions ", 3)
-	job := RunJobEntry{
-		JobID:         domaintypes.NewJobID(),
-		JobType:       "heal",
-		JobImage:      "ghcr.io/acme/heal:1",
-		Status:        "Success",
-		DurationMs:    900,
-		BugSummary:    longBug,
-		ActionSummary: longAction,
-		ErrorKind:     "infra",
-	}
-
-	out := renderText(t, singleJobReport("heal-wrap", "Success", job), TextRenderOptions{EnableOSC8: false})
-	assertx.Contains(t, out, "             └ [infra] ")
-	assertx.Contains(t, out, "\n               ")
-	assertx.NotContains(t, out, "Issue [infra]:")
-	assertx.NotContains(t, out, "Action:")
 }
 
 func TestRenderRunReportTextOSC8OnAndOff(t *testing.T) {

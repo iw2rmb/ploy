@@ -58,13 +58,9 @@ func TestRunStatusReportTextContract(t *testing.T) {
 	assertx.Contains(t, out, "/v1/jobs/"+healID.String()+"/logs")
 	assertx.Contains(t, out, "⣾")
 	assertx.Contains(t, out, "✗")
-	assertx.NotContains(t, out, "└  Exit 137: ")
-	assertx.NotContains(t, out, "infra compile failed at step 2")
-	assertx.NotContains(t, out, "<infra>")
+	assertx.Contains(t, out, "└  Exit 137: ")
+	assertx.Contains(t, out, "compile failed at step 2")
 	assertx.NotContains(t, out, "Exit 0")
-	assertx.NotContains(t, out, "Issue [deps]: Missing dependency lockfile")
-	assertx.NotContains(t, out, "Action:")
-	assertx.Contains(t, out, "└ [deps] Applied import fix and retried build")
 }
 
 func newRunStatusReportServer(t *testing.T, runID domaintypes.RunID, migID domaintypes.MigID, specID domaintypes.SpecID, repoID domaintypes.MigRepoID, preGateID domaintypes.JobID, healID domaintypes.JobID, postGateID domaintypes.JobID) *httptest.Server {
@@ -151,17 +147,15 @@ func newRunStatusReportServer(t *testing.T, runID domaintypes.RunID, migID domai
 					},
 					{
 						"job_id":         healID.String(),
-						"name":           "heal-1-0",
-						"job_type":       "heal",
-						"job_image":      "ghcr.io/acme/heal:1",
+						"name":           "mig-0",
+						"job_type":       "mig",
+						"job_image":      "ghcr.io/acme/mig:1",
 						"next_id":        postGateID.String(),
 						"node_id":        nil,
 						"status":         "Success",
 						"exit_code":      0,
 						"duration_ms":    1200,
 						"bug_summary":    "Missing dependency lockfile",
-						"action_summary": "Applied import fix and retried build",
-						"error_kind":     "deps",
 					},
 					{
 						"job_id":      postGateID.String(),

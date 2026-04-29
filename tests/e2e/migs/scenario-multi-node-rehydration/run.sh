@@ -201,16 +201,16 @@ if [[ $EXIT_CODE -eq 0 ]]; then
     echo ""
 
     echo "6. Codex healing handshake (if healing was triggered):"
-    echo "   - Codex completion: Codex exits after editing; node agent re-gates when workspace diffs exist"
-    echo "   - Healing artifact: Check for heal.json in exported artifacts"
+    echo "   - Codex completion: Codex exits after editing; node agent gate retries when workspace diffs exist"
+    echo "   - Healing artifact: Check for codex-last.txt in exported artifacts"
     echo ""
 
     # Automated validation of Codex artifacts (if present).
-    HEAL_JSON="${ARTIFACT_DIR}/heal.json"
+    HEAL_JSON="${ARTIFACT_DIR}/codex-last.txt"
 
     echo "   Automated artifact checks:"
     if [[ -f "$HEAL_JSON" ]]; then
-      echo "   ✓ heal.json present"
+      echo "   ✓ codex-last.txt present"
     fi
     echo ""
   fi

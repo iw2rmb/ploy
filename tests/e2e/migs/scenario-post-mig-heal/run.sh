@@ -197,26 +197,26 @@ if [[ "$SKIP_ARTIFACTS" == "0" ]]; then
   # 1. Verify healing summary artifact is present. Codex now signals completion by exiting;
   #    the node agent decides whether to re-run the gate based on workspace diffs.
   # ─────────────────────────────────────────────────────────────────────────────
-  CODEX_LAST="${ARTIFACT_DIR}/heal.json"
+  CODEX_LAST="${ARTIFACT_DIR}/codex-last.txt"
 
   echo "  1. Healing artifacts:"
   if [[ -f "$CODEX_LAST" ]]; then
-    echo "     ✓ heal.json present (last assistant message captured)"
+    echo "     ✓ codex-last.txt present (last assistant message captured)"
   else
-    echo "     - heal.json not found (healing may not have run)"
+    echo "     - codex-last.txt not found (healing may not have run)"
   fi
   echo ""
 
   # ─────────────────────────────────────────────────────────────────────────────
-  # 2. Verify heal.json artifact.
+  # 2. Verify codex-last.txt artifact.
   # ─────────────────────────────────────────────────────────────────────────────
-  CODEX_LAST="${ARTIFACT_DIR}/heal.json"
+  CODEX_LAST="${ARTIFACT_DIR}/codex-last.txt"
 
   echo "  2. Healing summary artifact:"
   if [[ -f "$CODEX_LAST" ]]; then
-    echo "     ✓ heal.json present"
+    echo "     ✓ codex-last.txt present"
   else
-    echo "     - heal.json not found"
+    echo "     - codex-last.txt not found"
     echo "       This is expected if healing did not run."
   fi
   echo ""

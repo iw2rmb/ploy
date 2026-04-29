@@ -317,16 +317,15 @@ func TestDetectSBOMStackFromWorkspace_UnsupportedTool(t *testing.T) {
 func TestBuildSBOMManifest_IncludesPhaseCA(t *testing.T) {
 	t.Parallel()
 
-	tests := []struct {
-		name      string
-		cycleName string
-		wantCA    []string
-	}{
-		{name: "pre gate cycle uses pre phase CA", cycleName: preGateCycleName, wantCA: []string{"ca-pre"}},
-		{name: "post gate cycle uses post phase CA", cycleName: postGateCycleName, wantCA: []string{"ca-post"}},
-		{name: "re gate cycle uses post phase CA", cycleName: "re-gate-1", wantCA: []string{"ca-post"}},
-		{name: "unknown cycle has no phase CA", cycleName: "other-cycle", wantCA: nil},
-	}
+		tests := []struct {
+			name      string
+			cycleName string
+			wantCA    []string
+		}{
+			{name: "pre gate cycle uses pre phase CA", cycleName: preGateCycleName, wantCA: []string{"ca-pre"}},
+			{name: "post gate cycle uses post phase CA", cycleName: postGateCycleName, wantCA: []string{"ca-post"}},
+			{name: "unknown cycle has no phase CA", cycleName: "other-cycle", wantCA: nil},
+		}
 
 	for _, tc := range tests {
 		tc := tc

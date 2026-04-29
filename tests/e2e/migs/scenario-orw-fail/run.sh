@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# E2E: ORW apply on failing branch -> Build Gate fails -> healing -> re-gate.
+# E2E: ORW apply on failing branch -> Build Gate fails -> healing -> gate retry.
 #
 # Validates (strict):
 #   1. Final repo status is "Success".
 #   2. Heal produced a non-empty bug_summary.
 #   3. A heal job is present (healing attempt).
-#   4. A re_gate job is present (re-gate status sequence).
+#   4. A gate_retry job is present (gate retry status sequence).
 #   5. Codex handshake artifacts satisfy the metadata contract (strict mode).
-#   6. heal.json satisfies the JSON schema contract: valid JSON, .error_kind == "code",
+#   6. codex-last.txt satisfies the JSON schema contract: valid JSON, .error_kind == "code",
 #      .bug_summary present and non-empty, no unresolved template tokens.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -72,12 +72,12 @@ else
   FAILED=1
 fi
 
-# 4. A re_gate job must be present (re-gate after healing).
-REGATE_JOB="$(printf '%s' "$RUN_JSON" | jq -r '[.repos[0].jobs[] | select(.job_type == "re_gate")] | first | .job_type // empty')"
-if [[ "$REGATE_JOB" == "re_gate" ]]; then
-  echo "  + re_gate job: present"
+# 4. A gate_retry job must be present (gate retry after healing).
+REGATE_JOB="$(printf '%s' "$RUN_JSON" | jq -r '[.repos[0].jobs[] | select(.job_type == "gate_retry")] | first | .job_type // empty')"
+if [[ "$REGATE_JOB" == "gate_retry" ]]; then
+  echo "  + gate_retry job: present"
 else
-  echo "  ! re_gate job: missing — re-gate did not run after healing" >&2
+  echo "  ! gate_retry job: missing — gate retry did not run after healing" >&2
   FAILED=1
 fi
 
@@ -92,40 +92,40 @@ if ! e2e_validate_codex_handshake "$E2E_ARTIFACT_DIR" strict; then
   FAILED=1
 fi
 
-# 6. heal.json must satisfy the JSON schema contract.
-CODEX_LAST="${E2E_ARTIFACT_DIR}/heal.json"
+# 6. codex-last.txt must satisfy the JSON schema contract.
+CODEX_LAST="${E2E_ARTIFACT_DIR}/codex-last.txt"
 if [[ -f "$CODEX_LAST" ]]; then
   if ! jq -e . "$CODEX_LAST" > /dev/null 2>&1; then
-    echo "  ! heal.json: not valid JSON — heal summary contract violated" >&2
+    echo "  ! codex-last.txt: not valid JSON — heal summary contract violated" >&2
     FAILED=1
   else
-    echo "  + heal.json: valid JSON"
+    echo "  + codex-last.txt: valid JSON"
 
     ERROR_KIND="$(jq -r '.error_kind // empty' "$CODEX_LAST")"
     if [[ "$ERROR_KIND" == "code" ]]; then
-      echo "  + heal.json .error_kind: \"code\""
+      echo "  + codex-last.txt .error_kind: \"code\""
     else
-      echo "  ! heal.json .error_kind: expected \"code\", got \"${ERROR_KIND}\"" >&2
+      echo "  ! codex-last.txt .error_kind: expected \"code\", got \"${ERROR_KIND}\"" >&2
       FAILED=1
     fi
 
     CODEX_BUG_SUMMARY="$(jq -r '.bug_summary // empty' "$CODEX_LAST")"
     if [[ -n "$CODEX_BUG_SUMMARY" ]]; then
-      echo "  + heal.json .bug_summary: present"
+      echo "  + codex-last.txt .bug_summary: present"
     else
-      echo "  ! heal.json .bug_summary: missing or empty" >&2
+      echo "  ! codex-last.txt .bug_summary: missing or empty" >&2
       FAILED=1
     fi
 
     if grep -qF '{{' "$CODEX_LAST"; then
-      echo "  ! heal.json: contains unresolved template tokens ({{)" >&2
+      echo "  ! codex-last.txt: contains unresolved template tokens ({{)" >&2
       FAILED=1
     else
-      echo "  + heal.json: no unresolved template tokens"
+      echo "  + codex-last.txt: no unresolved template tokens"
     fi
   fi
 else
-  echo "  ! heal.json: missing" >&2
+  echo "  ! codex-last.txt: missing" >&2
   FAILED=1
 fi
 

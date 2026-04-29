@@ -20,25 +20,21 @@ import (
 // ValidHydraSections lists the known section names for typed Hydra overlays.
 var ValidHydraSections = map[string]bool{
 	"pre_gate":  true,
-	"re_gate":   true,
 	"post_gate": true,
 	"mig":       true,
-	"heal":      true,
 }
 
 // ValidCAConfigSections lists the known section names for config ca entries.
 var ValidCAConfigSections = map[string]bool{
 	"pre_gate":  true,
-	"re_gate":   true,
 	"post_gate": true,
 	"mig":       true,
-	"heal":      true,
 }
 
 // ValidateHydraSection returns an error if section is not a known Hydra section.
 func ValidateHydraSection(section string) error {
 	if !ValidHydraSections[section] {
-		return fmt.Errorf("invalid hydra section %q (must be one of: heal, mig, post_gate, pre_gate, re_gate)", section)
+		return fmt.Errorf("invalid hydra section %q (must be one of: mig, post_gate, pre_gate)", section)
 	}
 	return nil
 }
@@ -46,7 +42,7 @@ func ValidateHydraSection(section string) error {
 // ValidateCAConfigSection returns an error if section is not valid for config ca.
 func ValidateCAConfigSection(section string) error {
 	if !ValidCAConfigSections[section] {
-		return fmt.Errorf("invalid config ca section %q (must be one of: heal, mig, post_gate, pre_gate, re_gate)", section)
+		return fmt.Errorf("invalid config ca section %q (must be one of: mig, post_gate, pre_gate)", section)
 	}
 	return nil
 }

@@ -33,7 +33,7 @@ kind: MigRunSpec
 steps:
   # Step 0: Migrate to Java 8
   # This step establishes the base transformation. Any node can claim this step.
-  - image: localhost:5000/ploy/orw-cli-maven:latest
+  - image: localhost:5000/ploy/orw-cli-java-17-maven:latest
     env:
       RECIPE_GROUP: org.openrewrite.recipe
       RECIPE_ARTIFACT: rewrite-migrate-java
@@ -48,7 +48,7 @@ steps:
   # 1. Copy base clone
   # 2. Fetch and apply diff from step 0
   # 3. Run this transformation on the rehydrated workspace
-  - image: localhost:5000/ploy/orw-cli-maven:latest
+  - image: localhost:5000/ploy/orw-cli-java-17-maven:latest
     env:
       RECIPE_GROUP: org.openrewrite.recipe
       RECIPE_ARTIFACT: rewrite-migrate-java
@@ -62,7 +62,7 @@ steps:
   # 1. Copy base clone
   # 2. Fetch and apply diffs from steps 0 and 1 in order
   # 3. Run this transformation on the rehydrated workspace
-  - image: localhost:5000/ploy/orw-cli-maven:latest
+  - image: localhost:5000/ploy/orw-cli-java-17-maven:latest
     env:
       RECIPE_GROUP: org.openrewrite.recipe
       RECIPE_ARTIFACT: rewrite-migrate-java
@@ -88,7 +88,7 @@ build_gate:
   heal:
     retries: 1
     # Amata healing container using the workspace diff handshake.
-    image: localhost:5000/ploy/java-17-codex-amata-maven:latest
+    image: localhost:5000/ploy/amata-codex-java-17-maven:latest
     envs:
       E2E_STEP_NAME: "healing-codex"
     amata:

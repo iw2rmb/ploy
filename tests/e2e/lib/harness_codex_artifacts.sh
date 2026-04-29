@@ -34,10 +34,10 @@ e2e_validate_codex_handshake() {
   local mode="${2:-advisory}"
   local failed=0
 
-  if [[ -f "${artifact_dir}/heal.json" ]]; then
-    echo "  + heal.json present"
+  if [[ -f "${artifact_dir}/codex-last.txt" ]]; then
+    echo "  + codex-last.txt present"
   else
-    echo "  - heal.json missing"
+    echo "  - codex-last.txt missing"
     [[ "$mode" == "strict" ]] && failed=1
   fi
 
