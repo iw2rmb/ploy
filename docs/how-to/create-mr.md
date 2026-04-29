@@ -128,7 +128,7 @@ Repo URL schemes
 - The CLI redacts tokens in all output
 - Tokens are transmitted securely via mTLS from control plane to nodes
 - Store your `gitlab-config.json` file securely with `chmod 600`
-- Consider using `gitlab.token_file` in the control plane config for additional security (see docs/envs/README.md)
+- Set `PLOY_GITLAB_TOKEN` in the server environment from your secret store (see docs/envs/README.md)
 
 ## Validate Configuration Without Saving
 

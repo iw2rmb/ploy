@@ -219,12 +219,11 @@ Healing runtime context:
 - `PLOY_LOOP_KIND` — loop context (`healing`)
 
 See [Build Gate docs](../build-gate/README.md) for Build Gate configuration and execution details.
-- `PLOYD_CONFIG_PATH` — When set, provides the default ployd configuration file
-  location (default `/etc/ploy/ployd.yaml`). The ployd flag `--config` overrides this
-  environment variable when explicitly provided.
-  Relevant `ployd.yaml` scheduler keys for stale-job recovery:
-  - `scheduler.stale_job_recovery_interval` (default `30s`; set `0` to disable recovery)
-  - `scheduler.node_stale_after` (default `1m`; stale cutoff for node heartbeats)
+- `PLOYD_HTTP_LISTEN` — Server HTTP listen address (default `:8080`).
+- `PLOYD_METRICS_LISTEN` — Server metrics listen address (default `:9100`).
+- `PLOYD_SCHEDULER_STALE_JOB_RECOVERY_INTERVAL` — Stale-job recovery interval
+  (default `30s`; set `0` to disable recovery).
+- `PLOYD_SCHEDULER_NODE_STALE_AFTER` — Node heartbeat stale cutoff (default `1m`).
   Recovery observability and troubleshooting:
   - Recovery emits structured logs (`stale-job-recovery: cycle completed`) with
     `stale_nodes`, `stale_attempts`, `repos_updated`, `jobs_cancelled`, and
@@ -251,8 +250,8 @@ See [Build Gate docs](../build-gate/README.md) for Build Gate configuration and 
   the normalized repo URL, base_ref, and commit_sha. Subsequent hydrations for the same run or
   different runs with identical repo parameters reuse the cached clone, significantly reducing
   clone time and network bandwidth usage.
-- `PLOYD_METRICS_LISTEN` — Exported by bootstrap as `127.0.0.1:9101` for early scripts; not
-  read by `ployd` at runtime. Use the YAML key `metrics.listen` (default `:9100`).
+- `PLOYD_METRICS_LISTEN` — Read by `ployd` at runtime as the metrics listen address
+  (default `:9100`).
 
 
 ## Worker Nodes
@@ -306,7 +305,7 @@ Runtime behavior: the node's Docker client is created from standard Docker env v
   node YAML under `concurrency`; defaults to `1` if not set.
 - `PLOY_LIFECYCLE_NET_IGNORE` — Optional comma-separated list of network interface patterns (supports `*` globs) that the node lifecycle collector skips when computing throughput metrics. Example: `lo,cni*,docker*`.
   The nodeagent heartbeat manager reads this environment variable at startup and passes the parsed patterns to the lifecycle collector via `lifecycle.Options.IgnoreInterfaces`.
-  - Pin via systemd drop-in or in `ployd.yaml` under `environment:` e.g.:
+  - Pin via systemd drop-in `environment:` e.g.:
 
     environment:
       PLOY_LIFECYCLE_NET_IGNORE: "docker*,veth*,br-*"
@@ -314,12 +313,7 @@ Runtime behavior: the node's Docker client is created from standard Docker env v
 - ployd-node config path — The node agent reads its YAML config from
   `/etc/ploy/ployd-node.yaml` by default and accepts an override via the
   CLI flag `--config`. There is currently no environment variable override
-  for this path. TODO: consider introducing `PLOYD_NODE_CONFIG_PATH` for
-  parity with the server's `PLOYD_CONFIG_PATH`.
-- (removed) `PLOY_BUILDGATE_WORKER_ENABLED` — Previously enabled Build Gate worker mode
-  via the HTTP Build Gate API. Removed in favor of the unified jobs pipeline. All nodes
-  now claim work (including gate jobs) from the same `jobs` queue. This variable is no
-  longer consumed by the codebase.
+  for this path.
 - (removed) `PLOY_BUILDGATE_MODE` — Previously controlled gate execution mode (`remote-http`
   vs local Docker). Removed in favor of local Docker-only execution. Gate jobs run as
   part of the unified jobs pipeline on the claiming node. This variable is no longer
@@ -344,11 +338,9 @@ Ploy can automatically create GitLab merge requests when Migs runs complete.
 **Recommended approach:** Use `ploy config gitlab set` to store credentials on the control plane
 (see [docs/how-to/create-mr.md](../how-to/create-mr.md) for usage examples).
 
-Control plane configuration (set via CLI or YAML):
-- `gitlab.domain` (config YAML) — GitLab base URL or host (e.g., `https://gitlab.com` or `gitlab.com`). Optional; Ploy normalizes either form.
-- `gitlab.token` (config YAML) — Inline GitLab Personal Access Token. Optional; stored only in
-  memory at runtime, not persisted back to disk.
-- `gitlab.token_file` (config YAML) — Path to a file containing the PAT. Optional. See details below.
+Control plane configuration:
+- `PLOY_GITLAB_DOMAIN` — GitLab base URL or host (e.g., `https://gitlab.com` or `gitlab.com`). Optional; Ploy normalizes either form.
+- `PLOY_GITLAB_TOKEN` — GitLab Personal Access Token. Optional; stored only in memory at runtime, not persisted back to disk.
 
 Per-run overrides (CLI flags on `ploy run`):
 - `--gitlab-pat` — Override the control plane PAT for this run only
@@ -362,14 +354,8 @@ Branch naming semantics:
 
 Quick test (PAT via config or flags):
 For local testing or CI environments, set the PAT via control plane config or per‑run flags.
-The recommended production approach is to use the control plane config with `gitlab.token_file`.
-
-Example control plane config snippet (`/etc/ploy/ployd.yaml`):
-```yaml
-gitlab:
-  domain: https://gitlab.com
-  token_file: /etc/ploy/secrets/gitlab-pat.txt
-```
+The recommended production approach is to set `PLOY_GITLAB_DOMAIN` and `PLOY_GITLAB_TOKEN`
+in the server environment.
 
 Example usage:
 ```bash
@@ -404,10 +390,8 @@ ploy run --mr-success \
 
 ### Server (Control Plane)
 
-- `http.listen` (config YAML) — Address the server listens on for HTTPS API/SSE. Default `:8443`.
-  There is no environment variable; set this in `ployd.yaml` under `http.listen`.
-- `metrics.listen` (config YAML) — Address for Prometheus metrics endpoint. Default `:9100`.
-  There is no environment variable; set this in `ployd.yaml` under `metrics.listen`.
+- `PLOYD_HTTP_LISTEN` — Address the server listens on for API/SSE. Default `:8080`.
+- `PLOYD_METRICS_LISTEN` — Address for Prometheus metrics endpoint. Default `:9100`.
 - `PLOY_SERVER_CERT_PEM` / `PLOY_SERVER_KEY_PEM` — PEM-encoded server TLS certificate and key
   used by the bootstrap script to write files at `/etc/ploy/pki/server.crt` and
   `/etc/ploy/pki/server.key` for the HTTPS API. At runtime the server reads file paths from
@@ -421,17 +405,9 @@ TLS/mTLS (config YAML):
 - Schema change (Nov 2025): `http.tls.require_client_cert` was removed. mTLS is always required when `http.tls.enabled` is true; there is no opt-out flag.
 
 GitLab integration for automatic MR creation:
-- `gitlab.domain` (config YAML) — GitLab base URL or host (e.g., `https://gitlab.com` or `gitlab.com`). Optional; Ploy normalizes either form.
-- `gitlab.token` (config YAML) — Inline GitLab Personal Access Token. Optional; stored only in
+- `PLOY_GITLAB_DOMAIN` — GitLab base URL or host (e.g., `https://gitlab.com` or `gitlab.com`). Optional; Ploy normalizes either form.
+- `PLOY_GITLAB_TOKEN` — Inline GitLab Personal Access Token. Optional; stored only in
   memory at runtime, not persisted back to disk.
-- `gitlab.token_file` (config YAML) — Path to a file containing the PAT. Optional. When set and
-  `gitlab.token` is not provided, the server reads the token from this file at startup.
-  Requirements:
-  - File permissions must not grant group/other access (≤ `0600`).
-  - Empty/whitespace-only files are rejected.
-  - Relative paths resolve relative to the config file location (e.g., `/etc/ploy/ployd.yaml`).
-  - Absolute paths are accepted as-is. Symlink handling is platform-default (`os.Stat`).
-  Precedence: `gitlab.token` (inline) wins over `gitlab.token_file` when both are set.
 See the **GitLab Merge Request Integration** section above for usage examples and recommended configuration approach.
 
 ### Authentication

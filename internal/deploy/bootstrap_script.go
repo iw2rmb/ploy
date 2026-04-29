@@ -100,7 +100,18 @@ func PrefixedScript(env map[string]string) string {
 	// Use unquoted heredoc to allow variable expansion
 	b.WriteString("  cat > /etc/ploy/cluster.env <<ENVFILE\n")
 	b.WriteString("PLOY_CLUSTER_ID=${CLUSTER_ID}\n")
+	b.WriteString("PLOY_DB_DSN=${PLOY_DB_DSN}\n")
 	b.WriteString("PLOY_AUTH_SECRET=${PLOY_AUTH_SECRET}\n")
+	b.WriteString("PLOY_OBJECTSTORE_ENDPOINT=${PLOY_OBJECTSTORE_ENDPOINT}\n")
+	b.WriteString("PLOY_OBJECTSTORE_BUCKET=${PLOY_OBJECTSTORE_BUCKET}\n")
+	b.WriteString("PLOY_OBJECTSTORE_ACCESS_KEY=${PLOY_OBJECTSTORE_ACCESS_KEY}\n")
+	b.WriteString("PLOY_OBJECTSTORE_SECRET_KEY=${PLOY_OBJECTSTORE_SECRET_KEY}\n")
+	b.WriteString("PLOY_OBJECTSTORE_SECURE=${PLOY_OBJECTSTORE_SECURE}\n")
+	b.WriteString("PLOY_OBJECTSTORE_REGION=${PLOY_OBJECTSTORE_REGION}\n")
+	b.WriteString("PLOY_GITLAB_DOMAIN=${PLOY_GITLAB_DOMAIN}\n")
+	b.WriteString("PLOY_GITLAB_TOKEN=${PLOY_GITLAB_TOKEN}\n")
+	b.WriteString("PLOYD_HTTP_LISTEN=${PLOYD_HTTP_LISTEN:-:8080}\n")
+	b.WriteString("PLOYD_METRICS_LISTEN=${PLOYD_METRICS_LISTEN:-:9100}\n")
 	b.WriteString("PLOY_SERVER_CA_CERT=${PLOY_SERVER_CA_CERT}\n")
 	b.WriteString("PLOY_SERVER_CA_KEY=${PLOY_SERVER_CA_KEY}\n")
 	b.WriteString("ENVFILE\n")
@@ -132,18 +143,6 @@ func PrefixedScript(env map[string]string) string {
 	b.WriteString("      chmod 600 /etc/ploy/pki/server.key\n")
 	b.WriteString("    fi\n")
 	b.WriteString("  fi\n")
-	b.WriteString("  cat > /etc/ploy/ployd.yaml <<EOF\n")
-	b.WriteString("http:\n")
-	b.WriteString("  listen: :8080\n")
-	b.WriteString("metrics:\n")
-	b.WriteString("  listen: :9100\n")
-	b.WriteString("auth:\n")
-	b.WriteString("  bearer_tokens:\n")
-	b.WriteString("    enabled: true\n")
-	b.WriteString("postgres:\n")
-	b.WriteString("  dsn: ${PLOY_DB_DSN:-}\n")
-	b.WriteString("EOF\n\n")
-
 	// Install systemd unit for server
 	b.WriteString("  echo 'Installing ployd systemd unit...'\n")
 	b.WriteString("  cat > /etc/systemd/system/ployd.service <<EOF\n")
@@ -156,7 +155,6 @@ func PrefixedScript(env map[string]string) string {
 	b.WriteString("Restart=always\n")
 	b.WriteString("RestartSec=5\n")
 	b.WriteString("User=root\n")
-	b.WriteString("Environment=PLOYD_CONFIG_PATH=/etc/ploy/ployd.yaml\n")
 	b.WriteString("EnvironmentFile=/etc/ploy/cluster.env\n\n")
 	b.WriteString("[Install]\n")
 	b.WriteString("WantedBy=multi-user.target\n")
@@ -192,7 +190,7 @@ func PrefixedScript(env map[string]string) string {
 	b.WriteString("    echo 'Warning: Initial token data not provided; you will need to create a token manually'\n")
 	b.WriteString("  fi\n")
 
-	b.WriteString("  PLOY_CONFIG_PATH='/etc/ploy/ployd.yaml'\n")
+	b.WriteString("  PLOY_CONFIG_PATH='(env-only)'\n")
 	b.WriteString("  PLOY_SERVICE_NAME='ployd.service'\n")
 
 	// Write node config if this is NOT a primary bootstrap
@@ -259,7 +257,6 @@ func PrefixedScript(env map[string]string) string {
 	// No environment override for node config path; see docs/envs/README.md.
 	// The node reads config path from the --config flag (default /etc/ploy/ployd-node.yaml).
 	// Avoid setting a non-existent env knob to keep parity with docs.
-	// (Server uses PLOYD_CONFIG_PATH; node does not have an equivalent yet.)
 	b.WriteString("[Install]\n")
 	b.WriteString("WantedBy=multi-user.target\n")
 	b.WriteString("EOF\n\n")

@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 
 	bss3 "github.com/iw2rmb/ploy/internal/blobstore/s3"
@@ -23,15 +22,7 @@ func main() {
 }
 
 func runMain() int {
-	// Allow env to supply the default config path; CLI flag still has highest precedence.
-	defaultConfigPath := strings.TrimSpace(os.Getenv("PLOYD_CONFIG_PATH"))
-	if defaultConfigPath == "" {
-		defaultConfigPath = "/etc/ploy/ployd.yaml"
-	}
-
-	var configPath string
 	var showVersion bool
-	flag.StringVar(&configPath, "config", defaultConfigPath, "Path to ployd configuration (flag overrides $PLOYD_CONFIG_PATH)")
 	flag.BoolVar(&showVersion, "version", false, "Print version and exit")
 	flag.Parse()
 
@@ -44,10 +35,10 @@ func runMain() int {
 	// Configure structured logger early (will be reconfigured after loading config).
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{})))
 
-	// Load configuration from file.
-	cfg, err := config.Load(configPath)
+	// Build configuration from environment.
+	cfg, err := config.LoadFromEnv()
 	if err != nil {
-		slog.Error("load config", "err", err, "path", configPath)
+		slog.Error("load config", "err", err)
 		return 1
 	}
 
@@ -60,7 +51,7 @@ func runMain() int {
 	// Resolve PostgreSQL DSN from environment or config.
 	dsn := resolvePgDSN(cfg)
 	if dsn == "" {
-		slog.Error("postgresql dsn not configured", "hint", "set PLOY_DB_DSN or configure postgres.dsn in config file")
+		slog.Error("postgresql dsn not configured", "hint", "set PLOY_DB_DSN")
 		return 1
 	}
 
@@ -87,7 +78,7 @@ func runMain() int {
 		authSecret = cfg.Auth.BearerTokens.Secret
 	}
 	if authSecret == "" {
-		slog.Error("PLOY_AUTH_SECRET environment variable or auth.bearer_tokens.secret config required")
+		slog.Error("PLOY_AUTH_SECRET environment variable is required")
 		return 1
 	}
 
@@ -103,11 +94,11 @@ func runMain() int {
 	// Initialize object store (S3-compatible) from config or environment.
 	objStoreCfg := resolveObjectStoreConfig(cfg)
 	if objStoreCfg.Endpoint == "" {
-		slog.Error("object store endpoint not configured", "hint", "set PLOY_OBJECTSTORE_ENDPOINT or configure object_store.endpoint in config file")
+		slog.Error("object store endpoint not configured", "hint", "set PLOY_OBJECTSTORE_ENDPOINT")
 		return 1
 	}
 	if objStoreCfg.Bucket == "" {
-		slog.Error("object store bucket not configured", "hint", "set PLOY_OBJECTSTORE_BUCKET or configure object_store.bucket in config file")
+		slog.Error("object store bucket not configured", "hint", "set PLOY_OBJECTSTORE_BUCKET")
 		return 1
 	}
 
@@ -138,7 +129,6 @@ func runMain() int {
 
 	// Reflect configured transport settings in startup logs (before listeners come up).
 	slog.Info("ployd server starting",
-		"config", configPath,
 		"bearer_tokens", cfg.Auth.BearerTokens.Enabled,
 		"object_store", objStoreCfg.Endpoint,
 	)

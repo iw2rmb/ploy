@@ -65,8 +65,8 @@ http:
 			}
 			// For the defaults case, verify values.
 			if tt.name == "defaults preserved" {
-				if cfg.HTTP.Listen != ":8443" {
-					t.Fatalf("HTTP.Listen = %q, want :8443", cfg.HTTP.Listen)
+				if cfg.HTTP.Listen != ":8080" {
+					t.Fatalf("HTTP.Listen = %q, want :8080", cfg.HTTP.Listen)
 				}
 				if cfg.Metrics.Listen != ":9100" {
 					t.Fatalf("Metrics.Listen = %q, want :9100", cfg.Metrics.Listen)

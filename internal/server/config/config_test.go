@@ -30,8 +30,8 @@ func TestLoadConfigDefaultsAndCustomizations(t *testing.T) {
 			name: "defaults",
 			yaml: "\npki:\n  bundle_dir: /etc/ploy/pki\n",
 			checks: func(t *testing.T, cfg config.Config) {
-				if cfg.HTTP.Listen != ":8443" {
-					t.Fatalf("HTTP.Listen = %q, want :8443", cfg.HTTP.Listen)
+				if cfg.HTTP.Listen != ":8080" {
+					t.Fatalf("HTTP.Listen = %q, want :8080", cfg.HTTP.Listen)
 				}
 				if cfg.Metrics.Listen != ":9100" {
 					t.Fatalf("Metrics.Listen = %q, want :9100", cfg.Metrics.Listen)

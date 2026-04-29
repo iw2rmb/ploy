@@ -129,14 +129,17 @@ func TestPrefixedScript_ServerConfig(t *testing.T) {
 	if !strings.Contains(script, "if [ \"${BOOTSTRAP_PRIMARY:-false}\" = \"true\" ]; then") {
 		t.Fatalf("script should check BOOTSTRAP_PRIMARY flag")
 	}
-	if !strings.Contains(script, "cat > /etc/ploy/ployd.yaml") {
-		t.Fatalf("script should write server config")
+	if strings.Contains(script, "cat > /etc/ploy/ployd.yaml") {
+		t.Fatalf("script should not write server config file")
 	}
-	if !strings.Contains(script, "postgres:") {
-		t.Fatalf("server config should include postgres section")
+	if !strings.Contains(script, "cat > /etc/ploy/cluster.env <<ENVFILE") {
+		t.Fatalf("script should write server environment file")
 	}
-	if !strings.Contains(script, "http:") {
-		t.Fatalf("server config should include http section")
+	if !strings.Contains(script, "PLOYD_HTTP_LISTEN=${PLOYD_HTTP_LISTEN:-:8080}") {
+		t.Fatalf("cluster.env should include defaulted PLOYD_HTTP_LISTEN")
+	}
+	if !strings.Contains(script, "PLOYD_METRICS_LISTEN=${PLOYD_METRICS_LISTEN:-:9100}") {
+		t.Fatalf("cluster.env should include defaulted PLOYD_METRICS_LISTEN")
 	}
 	if !strings.Contains(script, "cat > /etc/systemd/system/ployd.service") {
 		t.Fatalf("script should install ployd.service systemd unit")
@@ -294,8 +297,8 @@ func TestPrefixedScript_SetsPLOY_CONFIG_PATH_ForServer(t *testing.T) {
 	script := PrefixedScript(map[string]string{
 		"BOOTSTRAP_PRIMARY": "true",
 	})
-	if !strings.Contains(script, "PLOY_CONFIG_PATH='/etc/ploy/ployd.yaml'") {
-		t.Fatalf("server branch should set PLOY_CONFIG_PATH to server config")
+	if !strings.Contains(script, "PLOY_CONFIG_PATH='(env-only)'") {
+		t.Fatalf("server branch should set PLOY_CONFIG_PATH to env-only marker")
 	}
 	if !strings.Contains(script, "PLOY_SERVICE_NAME='ployd.service'") {
 		t.Fatalf("server branch should set PLOY_SERVICE_NAME to ployd.service")
@@ -408,11 +411,11 @@ func TestPrefixedScript_ReuseBranchStructure(t *testing.T) {
 		t.Fatalf("PKI reuse check must be inside BOOTSTRAP_PRIMARY block")
 	}
 
-	// Verify closing fi for the PKI check before the config write
-	configWriteIdx := strings.Index(script, "cat > /etc/ploy/ployd.yaml")
+	// Verify closing fi for the PKI check before the systemd unit write.
+	configWriteIdx := strings.Index(script, "cat > /etc/systemd/system/ployd.service")
 	fiForPKICheck := strings.Index(script[pkiCheckIdx:configWriteIdx], "  fi\n")
 	if fiForPKICheck == -1 {
-		t.Fatalf("PKI reuse check must be closed with fi before config write")
+		t.Fatalf("PKI reuse check must be closed with fi before service setup")
 	}
 }
 

@@ -6,7 +6,7 @@ import (
 )
 
 const (
-	defaultHTTPListen             = ":8443"
+	defaultHTTPListen             = ":8080"
 	defaultMetricsListen          = ":9100"
 	defaultAdminSocket            = "/run/ployd.sock"
 	defaultPKIRenewBefore         = time.Hour
@@ -25,6 +25,11 @@ func defaultConfig() Config {
 		},
 		Metrics: MetricsConfig{
 			Listen: defaultMetricsListen,
+		},
+		Auth: AuthConfig{
+			BearerTokens: BearerTokenConfig{
+				Enabled: true,
+			},
 		},
 		Admin: AdminConfig{
 			Socket: defaultAdminSocket,

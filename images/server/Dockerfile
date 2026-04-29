@@ -28,6 +28,5 @@ COPY --chmod=755 images/server/entrypoint.sh /usr/local/bin/ployd-entrypoint
 COPY --chown=ploy:ploy gates/ /etc/ploy/gates/
 COPY --chown=ploy:ploy docs/schemas/gate_profile.schema.json /etc/ploy/schemas/gate_profile.schema.json
 USER ploy
-EXPOSE 8443 9100
+EXPOSE 8080 9100
 ENTRYPOINT ["/usr/local/bin/ployd-entrypoint"]
-CMD ["--config","/etc/ploy/ployd.yaml"]
