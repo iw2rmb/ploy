@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -79,11 +78,7 @@ func listGlobalEnvHandler(holder *ConfigHolder) http.HandlerFunc {
 			}
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(w).Encode(items); err != nil {
-			slog.Error("config env list: encode response failed", "err", err)
-		}
+		writeJSON(w, http.StatusOK, items)
 
 		slog.Info("config env list: returned entries", "count", len(items))
 	}
@@ -129,11 +124,7 @@ func getGlobalEnvHandler(holder *ConfigHolder) http.HandlerFunc {
 			Secret: v.Secret,
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			slog.Error("config env get: encode response failed", "err", err, "key", key)
-		}
+		writeJSON(w, http.StatusOK, resp)
 
 		slog.Info("config env get: returned entry",
 			"key", key,
@@ -217,11 +208,7 @@ func putGlobalEnvHandler(holder *ConfigHolder, st store.Store) http.HandlerFunc 
 			Secret: secret,
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			slog.Error("config env put: encode response failed", "err", err, "key", key)
-		}
+		writeJSON(w, http.StatusOK, resp)
 
 		slog.Info("config env put: upserted entry",
 			"key", key,

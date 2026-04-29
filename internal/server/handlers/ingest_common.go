@@ -110,6 +110,21 @@ func parseRequiredPathID[T any, PT interface {
 	return id, nil
 }
 
+// parseRequiredPathIDOrWriteError extracts and validates a typed path ID.
+// On validation failure, it writes a 400 response and returns ok=false.
+func parseRequiredPathIDOrWriteError[T any, PT interface {
+	*T
+	encoding.TextUnmarshaler
+}](w http.ResponseWriter, r *http.Request, key string) (T, bool) {
+	id, err := parseRequiredPathID[T, PT](r, key)
+	if err != nil {
+		var zero T
+		writeHTTPError(w, http.StatusBadRequest, "%s", err)
+		return zero, false
+	}
+	return id, true
+}
+
 // optionalParam extracts an optional typed ID from a path parameter.
 // Returns nil if the parameter is missing or empty.
 func optionalParam[T any, PT interface {

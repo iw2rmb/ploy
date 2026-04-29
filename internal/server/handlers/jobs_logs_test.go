@@ -23,118 +23,83 @@ import (
 
 // --- POST /v1/jobs/{job_id}/logs ---
 
-func TestCreateJobLogsHandler_Success(t *testing.T) {
+func TestCreateJobLogsHandler(t *testing.T) {
 	t.Parallel()
 
-	runID := domaintypes.NewRunID()
-	jobID := domaintypes.NewJobID()
-	objKey := "logs/job/" + jobID.String() + "/log/1.gz"
-
-	st := &jobStore{
-		getJobResult: store.Job{ID: jobID, RunID: runID},
-	}
-	st.createLog.val = store.Log{ID: 1, RunID: runID, JobID: &jobID, ChunkNo: 2, DataSize: 5, ObjectKey: &objKey}
-
-	eventsService, err := createTestEventsServiceWithStore(st)
-	if err != nil {
-		t.Fatalf("events service: %v", err)
-	}
-	bp := blobpersist.New(st, bsmock.New())
-	h := createJobLogsHandler(st, bp, eventsService)
-
-	payload := map[string]any{"chunk_no": 2, "data": []byte("hello")}
-	b, _ := json.Marshal(payload)
-	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/logs", bytes.NewReader(b))
-	req.SetPathValue("job_id", jobID.String())
-	req.Header.Set("Content-Type", "application/json")
-	rr := httptest.NewRecorder()
-
-	h.ServeHTTP(rr, req)
-
-	assertStatus(t, rr, http.StatusCreated)
-	assertCalled(t, "GetJob", st.getJobCalled)
-}
-
-func TestCreateJobLogsHandler_JobNotFound(t *testing.T) {
-	t.Parallel()
-
-	jobID := domaintypes.NewJobID()
-	st := &jobStore{getJobErr: pgx.ErrNoRows}
-
-	eventsService, err := createTestEventsServiceWithStore(st)
-	if err != nil {
-		t.Fatalf("events service: %v", err)
-	}
-	bp := blobpersist.New(st, bsmock.New())
-	h := createJobLogsHandler(st, bp, eventsService)
-
-	payload := map[string]any{"chunk_no": 0, "data": []byte("x")}
-	b, _ := json.Marshal(payload)
-	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/logs", bytes.NewReader(b))
-	req.SetPathValue("job_id", jobID.String())
-	req.Header.Set("Content-Type", "application/json")
-	rr := httptest.NewRecorder()
-
-	h.ServeHTTP(rr, req)
-
-	assertStatus(t, rr, http.StatusNotFound)
-}
-
-func TestCreateJobLogsHandler_EmptyData(t *testing.T) {
-	t.Parallel()
-
-	runID := domaintypes.NewRunID()
-	jobID := domaintypes.NewJobID()
-	st := &jobStore{
-		getJobResult: store.Job{ID: jobID, RunID: runID},
+	tests := []struct {
+		name           string
+		setupStore     func(jobID domaintypes.JobID, runID domaintypes.RunID) *jobStore
+		payload        map[string]any
+		wantStatus     int
+		wantGetJobCall bool
+	}{
+		{
+			name: "success",
+			setupStore: func(jobID domaintypes.JobID, runID domaintypes.RunID) *jobStore {
+				objKey := "logs/job/" + jobID.String() + "/log/1.gz"
+				st := &jobStore{getJobResult: store.Job{ID: jobID, RunID: runID}}
+				st.createLog.val = store.Log{ID: 1, RunID: runID, JobID: &jobID, ChunkNo: 2, DataSize: 5, ObjectKey: &objKey}
+				return st
+			},
+			payload:        map[string]any{"chunk_no": 2, "data": []byte("hello")},
+			wantStatus:     http.StatusCreated,
+			wantGetJobCall: true,
+		},
+		{
+			name: "job not found",
+			setupStore: func(jobID domaintypes.JobID, runID domaintypes.RunID) *jobStore {
+				return &jobStore{getJobErr: pgx.ErrNoRows}
+			},
+			payload:        map[string]any{"chunk_no": 0, "data": []byte("x")},
+			wantStatus:     http.StatusNotFound,
+			wantGetJobCall: true,
+		},
+		{
+			name: "empty data",
+			setupStore: func(jobID domaintypes.JobID, runID domaintypes.RunID) *jobStore {
+				return &jobStore{getJobResult: store.Job{ID: jobID, RunID: runID}}
+			},
+			payload:        map[string]any{"chunk_no": 0, "data": []byte{}},
+			wantStatus:     http.StatusBadRequest,
+			wantGetJobCall: true,
+		},
+		{
+			name: "too large",
+			setupStore: func(jobID domaintypes.JobID, runID domaintypes.RunID) *jobStore {
+				return &jobStore{getJobResult: store.Job{ID: jobID, RunID: runID}}
+			},
+			payload:        map[string]any{"chunk_no": 0, "data": make([]byte, 10<<20+1)},
+			wantStatus:     http.StatusRequestEntityTooLarge,
+			wantGetJobCall: true,
+		},
 	}
 
-	eventsService, err := createTestEventsServiceWithStore(st)
-	if err != nil {
-		t.Fatalf("events service: %v", err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			runID := domaintypes.NewRunID()
+			jobID := domaintypes.NewJobID()
+			st := tt.setupStore(jobID, runID)
+
+			eventsService, err := createTestEventsServiceWithStore(st)
+			if err != nil {
+				t.Fatalf("events service: %v", err)
+			}
+			h := createJobLogsHandler(st, blobpersist.New(st, bsmock.New()), eventsService)
+
+			b, _ := json.Marshal(tt.payload)
+			req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/logs", bytes.NewReader(b))
+			req.SetPathValue("job_id", jobID.String())
+			req.Header.Set("Content-Type", "application/json")
+			rr := httptest.NewRecorder()
+
+			h.ServeHTTP(rr, req)
+
+			assertStatus(t, rr, tt.wantStatus)
+			if st.getJobCalled != tt.wantGetJobCall {
+				t.Fatalf("getJobCalled = %v, want %v", st.getJobCalled, tt.wantGetJobCall)
+			}
+		})
 	}
-	bp := blobpersist.New(st, bsmock.New())
-	h := createJobLogsHandler(st, bp, eventsService)
-
-	payload := map[string]any{"chunk_no": 0, "data": []byte{}}
-	b, _ := json.Marshal(payload)
-	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/logs", bytes.NewReader(b))
-	req.SetPathValue("job_id", jobID.String())
-	req.Header.Set("Content-Type", "application/json")
-	rr := httptest.NewRecorder()
-
-	h.ServeHTTP(rr, req)
-
-	assertStatus(t, rr, http.StatusBadRequest)
-}
-
-func TestCreateJobLogsHandler_TooLarge(t *testing.T) {
-	t.Parallel()
-
-	runID := domaintypes.NewRunID()
-	jobID := domaintypes.NewJobID()
-	st := &jobStore{
-		getJobResult: store.Job{ID: jobID, RunID: runID},
-	}
-
-	eventsService, err := createTestEventsServiceWithStore(st)
-	if err != nil {
-		t.Fatalf("events service: %v", err)
-	}
-	bp := blobpersist.New(st, bsmock.New())
-	h := createJobLogsHandler(st, bp, eventsService)
-
-	big := make([]byte, 10<<20+1)
-	payload := map[string]any{"chunk_no": 0, "data": big}
-	b, _ := json.Marshal(payload)
-	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/logs", bytes.NewReader(b))
-	req.SetPathValue("job_id", jobID.String())
-	req.Header.Set("Content-Type", "application/json")
-	rr := httptest.NewRecorder()
-
-	h.ServeHTTP(rr, req)
-
-	assertStatus(t, rr, http.StatusRequestEntityTooLarge)
 }
 
 // --- GET /v1/jobs/{job_id}/logs ---

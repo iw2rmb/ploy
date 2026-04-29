@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"log/slog"
 	"net/http"
 	"path"
@@ -43,11 +42,7 @@ func listConfigHomeHandler(holder *ConfigHolder) http.HandlerFunc {
 			}
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(w).Encode(items); err != nil {
-			slog.Error("config home list: encode response failed", "err", err)
-		}
+		writeJSON(w, http.StatusOK, items)
 	}
 }
 
@@ -70,11 +65,7 @@ func listConfigHomeBySectionHandler(holder *ConfigHolder) http.HandlerFunc {
 			items[i] = configHomeListItem{Entry: e.Entry, Dst: e.Dst, Section: section}
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(w).Encode(items); err != nil {
-			slog.Error("config home list by section: encode response failed", "err", err)
-		}
+		writeJSON(w, http.StatusOK, items)
 	}
 }
 
@@ -119,11 +110,7 @@ func putConfigHomeHandler(holder *ConfigHolder, st store.Store) http.HandlerFunc
 		})
 
 		resp := configHomeListItem{Entry: canonicalEntry, Dst: parsed.Dst, Section: req.Section}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			slog.Error("config home put: encode response failed", "err", err)
-		}
+		writeJSON(w, http.StatusOK, resp)
 
 		slog.Info("config home put: upserted entry", "dst", parsed.Dst, "section", req.Section)
 	}

@@ -655,35 +655,38 @@ func TestConfigHolder_HydraOverlays(t *testing.T) {
 
 	h := &ConfigHolder{}
 
-	// Set a valid section.
-	if err := h.SetHydraJobConfig("mig", &HydraJobConfig{
-		Envs: map[string]string{"K": "V"},
-		CA:   []string{"abc1234567ab"},
-	}); err != nil {
-		t.Fatalf("SetHydraJobConfig: %v", err)
-	}
+	h.SetConfigCA("mig", []string{"abc1234567ab"})
+	h.SetConfigHome("mig", []ConfigHomeEntry{{Entry: "abc1234567ab:.codex/auth.json:ro", Dst: ".codex/auth.json", Section: "mig"}})
+	h.SetConfigIn("mig", []ConfigInEntry{{Entry: "abc1234567ab:/in/code.yaml", Dst: "/in/code.yaml", Section: "mig"}})
 
 	// Get returns a copy.
 	overlays := h.GetHydraOverlays()
 	if overlays == nil || overlays["mig"] == nil {
 		t.Fatal("expected mig overlay")
 	}
-	if overlays["mig"].Envs["K"] != "V" {
-		t.Errorf("mig envs[K] = %v, want V", overlays["mig"].Envs["K"])
+	if got := overlays["mig"].CA; len(got) != 1 || got[0] != "abc1234567ab" {
+		t.Fatalf("mig CA = %v, want [abc1234567ab]", got)
+	}
+	if got := overlays["mig"].Home; len(got) != 1 || got[0] != "abc1234567ab:.codex/auth.json:ro" {
+		t.Fatalf("mig Home = %v, want [abc1234567ab:.codex/auth.json:ro]", got)
+	}
+	if got := overlays["mig"].In; len(got) != 1 || got[0] != "abc1234567ab:/in/code.yaml" {
+		t.Fatalf("mig In = %v, want [abc1234567ab:/in/code.yaml]", got)
 	}
 
-	// Invalid section rejected.
-	if err := h.SetHydraJobConfig("bogus", &HydraJobConfig{}); err == nil {
-		t.Fatal("expected error for invalid section")
+	// Verify returned overlays are defensive copies.
+	overlays["mig"].CA[0] = "mutated"
+	overlays["mig"].Home[0] = "mutated"
+	overlays["mig"].In[0] = "mutated"
+	overlaysAgain := h.GetHydraOverlays()
+	if overlaysAgain["mig"].CA[0] != "abc1234567ab" {
+		t.Fatal("expected CA copy isolation")
 	}
-
-	// Nil deletes the section.
-	if err := h.SetHydraJobConfig("mig", nil); err != nil {
-		t.Fatalf("SetHydraJobConfig(nil): %v", err)
+	if overlaysAgain["mig"].Home[0] != "abc1234567ab:.codex/auth.json:ro" {
+		t.Fatal("expected Home copy isolation")
 	}
-	overlays = h.GetHydraOverlays()
-	if overlays != nil && overlays["mig"] != nil {
-		t.Error("expected mig overlay to be removed")
+	if overlaysAgain["mig"].In[0] != "abc1234567ab:/in/code.yaml" {
+		t.Fatal("expected In copy isolation")
 	}
 }
 

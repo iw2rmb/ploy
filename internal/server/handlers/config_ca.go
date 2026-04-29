@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"log/slog"
 	"net/http"
 	"sort"
@@ -43,11 +42,7 @@ func listConfigCAHandler(holder *ConfigHolder) http.HandlerFunc {
 			}
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(w).Encode(items); err != nil {
-			slog.Error("config ca list: encode response failed", "err", err)
-		}
+		writeJSON(w, http.StatusOK, items)
 	}
 }
 
@@ -70,11 +65,7 @@ func listConfigCABySectionHandler(holder *ConfigHolder) http.HandlerFunc {
 			items[i] = configCAListItem{Hash: h, Section: section}
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(w).Encode(items); err != nil {
-			slog.Error("config ca list by section: encode response failed", "err", err)
-		}
+		writeJSON(w, http.StatusOK, items)
 	}
 }
 
@@ -144,11 +135,7 @@ func putConfigCAHandler(holder *ConfigHolder, st store.Store) http.HandlerFunc {
 		holder.AddConfigCA(req.Section, hash)
 
 		resp := configCAListItem{Hash: hash, Section: req.Section}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			slog.Error("config ca put: encode response failed", "err", err)
-		}
+		writeJSON(w, http.StatusOK, resp)
 
 		slog.Info("config ca put: upserted entry", "hash", hash, "section", req.Section)
 	}
