@@ -645,7 +645,7 @@ func TestGetRunStatusHandler(t *testing.T) {
 			st := tt.setupStore()
 			handler := getRunStatusHandler(st)
 			path := "/v1/runs/" + tt.reqRunID + "/status"
-			rr := doRequest(t, handler, http.MethodGet, path, nil, "id", tt.reqRunID)
+			rr := doRequest(t, handler, http.MethodGet, path, nil, "run_id", tt.reqRunID)
 			assertStatus(t, rr, tt.wantStatus)
 			if tt.verify != nil {
 				tt.verify(t, st, rr)

@@ -14,14 +14,14 @@ import (
 func TestPathParamsUseDomainTypes(t *testing.T) {
 	t.Parallel()
 
-	t.Run("GET /v1/runs/{id} rejects empty id before store calls", func(t *testing.T) {
+	t.Run("GET /v1/runs/{run_id} rejects empty id before store calls", func(t *testing.T) {
 		t.Parallel()
 
 		st := &runStore{}
 		h := getRunHandler(st)
 
 		req := httptest.NewRequest(http.MethodGet, "/v1/runs/", nil)
-		req.SetPathValue("id", "")
+		req.SetPathValue("run_id", "")
 		rr := httptest.NewRecorder()
 
 		h.ServeHTTP(rr, req)
@@ -32,14 +32,14 @@ func TestPathParamsUseDomainTypes(t *testing.T) {
 		}
 	})
 
-	t.Run("GET /v1/runs/{id} rejects whitespace id before store calls", func(t *testing.T) {
+	t.Run("GET /v1/runs/{run_id} rejects whitespace id before store calls", func(t *testing.T) {
 		t.Parallel()
 
 		st := &runStore{}
 		h := getRunHandler(st)
 
 		req := httptest.NewRequest(http.MethodGet, "/v1/runs/", nil)
-		req.SetPathValue("id", "   ")
+		req.SetPathValue("run_id", "   ")
 		rr := httptest.NewRecorder()
 
 		h.ServeHTTP(rr, req)

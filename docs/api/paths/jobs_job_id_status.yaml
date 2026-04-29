@@ -9,7 +9,7 @@ get:
 
     Ownership is enforced: only the worker node currently assigned to the job
     can read the status. Workers use this to stop local execution when the job
-    is cancelled remotely (for example, after `POST /v1/runs/{id}/cancel`).
+    is cancelled remotely (for example, after `POST /v1/runs/{run_id}/cancel`).
   parameters:
     - in: path
       name: job_id

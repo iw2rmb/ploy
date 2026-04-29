@@ -29,7 +29,7 @@ import (
 
 // getRunStatusHandler returns an HTTP handler that fetches run status by ID.
 //
-// Endpoint: GET /v1/runs/{id}/status
+// Endpoint: GET /v1/runs/{run_id}/status
 // Response: 200 OK with RunSummary body (canonical schema, no wrapper types)
 //
 // Canonical contract (see docs/migs-lifecycle.md § 2.1):
@@ -43,7 +43,7 @@ func getRunStatusHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Parse the run ID from the URL path parameter.
 		// Run IDs are KSUID strings; treated as opaque identifiers.
-		runID, err := parseRequiredPathID[domaintypes.RunID](r, "id")
+		runID, err := parseRequiredPathID[domaintypes.RunID](r, "run_id")
 		if err != nil {
 			writeHTTPError(w, http.StatusBadRequest, "%s", err)
 			return

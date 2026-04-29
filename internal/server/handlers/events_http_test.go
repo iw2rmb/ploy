@@ -30,7 +30,7 @@ func TestGetRunLogsHandler_TicketNotFound(t *testing.T) {
 
 	runID := testRunIDKSUID
 	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID+"/logs", nil)
-	req.SetPathValue("id", runID)
+	req.SetPathValue("run_id", runID)
 	rr := httptest.NewRecorder()
 	h.ServeHTTP(rr, req)
 	assertStatus(t, rr, http.StatusNotFound)
@@ -43,7 +43,7 @@ func TestGetRunLogsHandler_InvalidRunID(t *testing.T) {
 	h := getRunLogsHandler(st, nil, eventsService)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/runs/invalid/logs", nil)
-	req.SetPathValue("id", "invalid")
+	req.SetPathValue("run_id", "invalid")
 	rr := httptest.NewRecorder()
 	h.ServeHTTP(rr, req)
 	assertStatus(t, rr, http.StatusBadRequest)
@@ -59,7 +59,7 @@ func TestGetRunLogsHandler_MissingID(t *testing.T) {
 	h := getRunLogsHandler(st, nil, eventsService)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/runs//logs", nil)
-	req.SetPathValue("id", "")
+	req.SetPathValue("run_id", "")
 	rr := httptest.NewRecorder()
 	h.ServeHTTP(rr, req)
 	assertStatus(t, rr, http.StatusBadRequest)
@@ -73,7 +73,7 @@ func TestGetRunLogsHandler_DatabaseError(t *testing.T) {
 
 	runID := testRunIDKSUID
 	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID+"/logs", nil)
-	req.SetPathValue("id", runID)
+	req.SetPathValue("run_id", runID)
 	rr := httptest.NewRecorder()
 	h.ServeHTTP(rr, req)
 	assertStatus(t, rr, http.StatusInternalServerError)
@@ -89,11 +89,15 @@ func TestGetRunLogsHandler_LifecycleOnly(t *testing.T) {
 	eventsService, _ := createTestEventsService()
 	hub := eventsService.Hub()
 	runID := testRunIDKSUID
-	st := func() *runStore { st := &runStore{}; st.getRun.val = store.Run{ID: domaintypes.RunID(runID)}; return st }()
+	st := func() *runStore {
+		st := &runStore{}
+		st.getRun.val = store.Run{ID: domaintypes.RunID(runID)}
+		return st
+	}()
 	h := getRunLogsHandler(st, nil, eventsService)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID+"/logs", nil)
-	req.SetPathValue("id", runID)
+	req.SetPathValue("run_id", runID)
 	rr := &flushRecorder{ResponseRecorder: httptest.NewRecorder()}
 
 	done := make(chan struct{})
@@ -145,11 +149,15 @@ func TestGetRunLogsHandler_RejectsNonLifecycleFrames(t *testing.T) {
 	eventsService, _ := createTestEventsService()
 	hub := eventsService.Hub()
 	runID := testRunIDKSUID
-	st := func() *runStore { st := &runStore{}; st.getRun.val = store.Run{ID: domaintypes.RunID(runID)}; return st }()
+	st := func() *runStore {
+		st := &runStore{}
+		st.getRun.val = store.Run{ID: domaintypes.RunID(runID)}
+		return st
+	}()
 	h := getRunLogsHandler(st, nil, eventsService)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID+"/logs", nil)
-	req.SetPathValue("id", runID)
+	req.SetPathValue("run_id", runID)
 	rr := &flushRecorder{ResponseRecorder: httptest.NewRecorder()}
 
 	done := make(chan struct{})
@@ -204,7 +212,11 @@ func TestGetRunLogsHandler_Resume(t *testing.T) {
 	eventsService, _ := createTestEventsService()
 	hub := eventsService.Hub()
 	runID := testRunIDKSUID
-	st := func() *runStore { st := &runStore{}; st.getRun.val = store.Run{ID: domaintypes.RunID(runID)}; return st }()
+	st := func() *runStore {
+		st := &runStore{}
+		st.getRun.val = store.Run{ID: domaintypes.RunID(runID)}
+		return st
+	}()
 	h := getRunLogsHandler(st, nil, eventsService)
 
 	// Pre-publish a stage event so history contains id=1 before subscriber joins.
@@ -216,7 +228,7 @@ func TestGetRunLogsHandler_Resume(t *testing.T) {
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID+"/logs", nil)
-	req.SetPathValue("id", runID)
+	req.SetPathValue("run_id", runID)
 	req.Header.Set("Last-Event-ID", "1")
 	rr := &flushRecorder{ResponseRecorder: httptest.NewRecorder()}
 
@@ -264,7 +276,7 @@ func TestGetRunLogsHandler_TerminalRunDone(t *testing.T) {
 	h := getRunLogsHandler(st, nil, eventsService)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID+"/logs", nil)
-	req.SetPathValue("id", runID)
+	req.SetPathValue("run_id", runID)
 	rr := &flushRecorder{ResponseRecorder: httptest.NewRecorder()}
 
 	h.ServeHTTP(rr, req)
@@ -299,11 +311,15 @@ func TestGetRunLogsHandler_StageEventPayload(t *testing.T) {
 	hub := eventsService.Hub()
 
 	runID := testRunIDKSUID
-	st := func() *runStore { st := &runStore{}; st.getRun.val = store.Run{ID: domaintypes.RunID(runID)}; return st }()
+	st := func() *runStore {
+		st := &runStore{}
+		st.getRun.val = store.Run{ID: domaintypes.RunID(runID)}
+		return st
+	}()
 	h := getRunLogsHandler(st, nil, eventsService)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID+"/logs", nil)
-	req.SetPathValue("id", runID)
+	req.SetPathValue("run_id", runID)
 	rr := &flushRecorder{ResponseRecorder: httptest.NewRecorder()}
 
 	done := make(chan struct{})

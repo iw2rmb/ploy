@@ -31,6 +31,16 @@ func requiredPathParam(r *http.Request, key string) (string, error) {
 	return val, nil
 }
 
+// requiredQueryParam extracts and validates a required query parameter from the request.
+// Returns the trimmed value or an error if the parameter is missing or empty.
+func requiredQueryParam(r *http.Request, key string) (string, error) {
+	val := strings.TrimSpace(r.URL.Query().Get(key))
+	if val == "" {
+		return "", fmt.Errorf("%s query parameter is required", key)
+	}
+	return val, nil
+}
+
 // writeHTTPError writes a plain-text HTTP error response. It accepts printf-style
 // formatting for the message body.
 func writeHTTPError(w http.ResponseWriter, code int, msg string, args ...any) {

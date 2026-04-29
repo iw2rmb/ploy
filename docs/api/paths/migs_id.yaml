@@ -1,4 +1,4 @@
-# GET /v1/runs/{id}/status — Get Migs run status
+# GET /v1/runs/{run_id}/status — Get Migs run status
 #
 # Canonical response: RunSummary (no wrapper types).
 # See docs/api/components/schemas/controlplane.yaml#/MigsRunSummary for schema.

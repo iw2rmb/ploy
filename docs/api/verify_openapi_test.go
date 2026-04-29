@@ -44,7 +44,7 @@ func TestOpenAPICompleteness(t *testing.T) {
 		{"/v1/pki/sign/client", "post"},
 		// Runs (single-repo submit + batch lifecycle)
 		{"/v1/runs", "post"},
-		{"/v1/runs/{id}/logs", "get"},
+		{"/v1/runs/{run_id}/logs", "get"},
 		// Migs (mig project CRUD)
 		{"/v1/migs", "get"},
 		{"/v1/migs", "post"},
@@ -54,13 +54,13 @@ func TestOpenAPICompleteness(t *testing.T) {
 		{"/v1/migs/{mig_id}/runs", "post"},
 		// Batch runs lifecycle
 		{"/v1/runs", "get"},
-		{"/v1/runs/{id}", "get"},
-		{"/v1/runs/{id}/status", "get"},
-		{"/v1/runs/{id}/cancel", "post"},
+		{"/v1/runs/{run_id}", "get"},
+		{"/v1/runs/{run_id}/status", "get"},
+		{"/v1/runs/{run_id}/cancel", "post"},
 		// RunRepo handlers (repos within a batch)
-		{"/v1/runs/{id}/repos", "get"},
-		{"/v1/runs/{id}/repos", "post"},
-		{"/v1/runs/{id}/repos/{repo_id}/restart", "post"},
+		{"/v1/runs/{run_id}/repos", "get"},
+		{"/v1/runs/{run_id}/repos", "post"},
+		{"/v1/runs/{run_id}/repos/{repo_id}/restart", "post"},
 		// v1 repo-scoped endpoints
 		{"/v1/runs/{run_id}/repos/{repo_id}/diffs", "get"},
 		{"/v1/runs/{run_id}/repos/{repo_id}/logs", "get"},

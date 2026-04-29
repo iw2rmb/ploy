@@ -51,12 +51,6 @@ func mutateClaimSpec(input claimSpecMutatorInput) (json.RawMessage, error) {
 			apply:      applyHydraOverlayMutator,
 		},
 		{
-			errContext: "merge recovery candidate prep into spec",
-			apply: func(m map[string]any, in claimSpecMutatorInput) error {
-				return applyRecoveryCandidatePrepMutator(m, in.jobType)
-			},
-		},
-		{
 			errContext: "merge repo gate_profile into spec",
 			apply: func(m map[string]any, in claimSpecMutatorInput) error {
 				return applyRepoGateProfileMutator(m, in.repoGateProfile, in.jobType)

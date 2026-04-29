@@ -50,7 +50,7 @@ func parseLastEventID(header string) domaintypes.EventID {
 
 // getRunLogsHandler returns an HTTP handler that streams run lifecycle events over SSE.
 // Supports Last-Event-ID header for resuming streams from a specific event.
-// GET /v1/runs/{id}/logs — SSE for run lifecycle (run, stage, done only).
+// GET /v1/runs/{run_id}/logs — SSE for run lifecycle (run, stage, done only).
 //
 // Container log frames are not emitted on this stream; they are served via the
 // job-scoped log endpoint (GET /v1/jobs/{job_id}/logs).
@@ -59,7 +59,7 @@ func parseLastEventID(header string) domaintypes.EventID {
 // For active runs, the handler subscribes to the hub for live lifecycle events.
 func getRunLogsHandler(st store.Store, _ blobstore.Store, eventsService *server.EventsService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		runID, err := parseRequiredPathID[domaintypes.RunID](r, "id")
+		runID, err := parseRequiredPathID[domaintypes.RunID](r, "run_id")
 		if err != nil {
 			writeHTTPError(w, http.StatusBadRequest, "%s", err)
 			return

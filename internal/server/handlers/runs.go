@@ -153,7 +153,7 @@ func listRunsHandler(st store.Store) http.HandlerFunc {
 
 func getRunHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		runID, err := parseRequiredPathID[domaintypes.RunID](r, "id")
+		runID, err := parseRequiredPathID[domaintypes.RunID](r, "run_id")
 		if err != nil {
 			writeHTTPError(w, http.StatusBadRequest, "%s", err)
 			return

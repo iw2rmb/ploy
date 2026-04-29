@@ -1,4 +1,4 @@
-# GET /v1/runs/{id}/logs — SSE stream for run lifecycle events
+# GET /v1/runs/{run_id}/logs — SSE stream for run lifecycle events
 #
 # Event payloads:
 # - `event: run` → RunSummary (canonical schema, no wrapper)

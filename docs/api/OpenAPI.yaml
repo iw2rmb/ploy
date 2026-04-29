@@ -14,7 +14,7 @@ info:
     - `/v1/migs/{mig_id}/runs` — create multi-repo batch runs for a mig.
     - `/v1/migs/{mig_id}/pull` — resolve repo execution for `ploy mig pull`.
     - `/v1/runs` — single-repo run submission and run listing.
-    - `/v1/runs/{id}/*` — run lifecycle (inspect/cancel/start).
+    - `/v1/runs/{run_id}/*` — run lifecycle (inspect/cancel/start).
     - `/v1/runs/{run_id}/repos/{repo_id}/*` — repo-scoped execution surfaces:
       - `/diffs` — list diffs for a repo execution.
       - `/logs` — SSE stream of logs/events for a repo execution.
@@ -98,7 +98,7 @@ paths:
     $ref: "./paths/migs_mig_id_runs.yaml"
   /v1/migs/{mig_id}/pull:
     $ref: "./paths/migs_mig_id_pull.yaml"
-  /v1/runs/{id}/logs:
+  /v1/runs/{run_id}/logs:
     $ref: "./paths/runs_id_logs.yaml"
   /v1/artifacts:
     $ref: "./paths/artifacts.yaml"
@@ -146,17 +146,17 @@ paths:
   # Batch runs endpoints (list/inspect/cancel)
   /v1/runs:
     $ref: "./paths/runs.yaml"
-  /v1/runs/{id}:
+  /v1/runs/{run_id}:
     $ref: "./paths/runs_id.yaml"
-  /v1/runs/{id}/status:
+  /v1/runs/{run_id}/status:
     $ref: "./paths/migs_id.yaml"
-  /v1/runs/{id}/start:
+  /v1/runs/{run_id}/start:
     $ref: "./paths/runs_id_start.yaml"
-  /v1/runs/{id}/cancel:
+  /v1/runs/{run_id}/cancel:
     $ref: "./paths/runs_id_cancel.yaml"
-  /v1/runs/{id}/repos:
+  /v1/runs/{run_id}/repos:
     $ref: "./paths/runs_id_repos.yaml"
-  /v1/runs/{id}/repos/{repo_id}/restart:
+  /v1/runs/{run_id}/repos/{repo_id}/restart:
     $ref: "./paths/runs_id_repos_repo_id_restart.yaml"
   # Repo-scoped diffs listing — see docs/migs-lifecycle.md § "Pulling Diffs Locally"
   /v1/runs/{run_id}/repos/{repo_id}/diffs:

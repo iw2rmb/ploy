@@ -27,10 +27,6 @@ func applyRepoGateProfileMutator(m map[string]any, gateProfile []byte, jobType d
 	return applyGatePrepOverrideMutator(m, phase, override)
 }
 
-func applyRecoveryCandidatePrepMutator(_ map[string]any, _ domaintypes.JobType) error {
-	return nil
-}
-
 func applyGatePrepOverrideMutator(
 	m map[string]any,
 	phase contracts.BuildGateProfilePhase,

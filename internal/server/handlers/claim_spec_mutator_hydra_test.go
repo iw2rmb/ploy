@@ -221,7 +221,12 @@ func TestApplyHydraOverlay_TypedMerge(t *testing.T) {
 		{
 			name: "ca append with dedup",
 			spec: map[string]any{
-				"ca": []any{"abcdef1234ab", "/ca/extra.pem"},
+				"steps": []any{
+					map[string]any{
+						"image": "img:latest",
+						"ca":    []any{"abcdef1234ab", "/ca/extra.pem"},
+					},
+				},
 			},
 			overlays: map[string]*HydraJobConfig{
 				"mig": {CA: []string{"abcdef1234ab", "/ca/new.pem"}},
@@ -231,9 +236,14 @@ func TestApplyHydraOverlay_TypedMerge(t *testing.T) {
 		{
 			name: "in out home merge by destination",
 			spec: map[string]any{
-				"in":   []any{"/a.txt:/in/config.json"},
-				"out":  []any{"/b.txt:/out/result.txt"},
-				"home": []any{"/c.txt:.config/app.toml:ro"},
+				"steps": []any{
+					map[string]any{
+						"image": "img:latest",
+						"in":    []any{"/a.txt:/in/config.json"},
+						"out":   []any{"/b.txt:/out/result.txt"},
+						"home":  []any{"/c.txt:.config/app.toml:ro"},
+					},
+				},
 			},
 			overlays: map[string]*HydraJobConfig{
 				"mig": {
@@ -250,7 +260,11 @@ func TestApplyHydraOverlay_TypedMerge(t *testing.T) {
 		},
 		{
 			name: "empty spec block gets overlay fields",
-			spec: map[string]any{},
+			spec: map[string]any{
+				"steps": []any{
+					map[string]any{"image": "img:latest"},
+				},
+			},
 			overlays: map[string]*HydraJobConfig{
 				"mig": {Envs: map[string]string{"K": "V"}, CA: []string{"abc1234567ab"}, In: []string{"/f:/in/f.txt"}},
 			},
@@ -277,7 +291,9 @@ func TestApplyHydraOverlay_TypedMerge(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			assertEnvs(t, m, tt.checkEnvs, nil, nil)
-			assertSlices(t, m, tt.slices)
+			if len(tt.slices) > 0 {
+				assertSlices(t, firstStepMap(t, m), tt.slices)
+			}
 		})
 	}
 }
@@ -377,7 +393,12 @@ func TestApplyHydraOverlay_DestinationCollision(t *testing.T) {
 		{
 			name: "spec and overlay share in dst replaces with spec entry",
 			spec: map[string]any{
-				"in": []any{"/spec:/in/config.json"},
+				"steps": []any{
+					map[string]any{
+						"image": "img:latest",
+						"in":    []any{"/spec:/in/config.json"},
+					},
+				},
 			},
 			jobType: domaintypes.JobTypeMig,
 			overlays: map[string]*HydraJobConfig{
@@ -388,7 +409,12 @@ func TestApplyHydraOverlay_DestinationCollision(t *testing.T) {
 		{
 			name: "spec and overlay share out dst replaces with spec entry",
 			spec: map[string]any{
-				"out": []any{"/spec:/out/result.txt"},
+				"steps": []any{
+					map[string]any{
+						"image": "img:latest",
+						"out":   []any{"/spec:/out/result.txt"},
+					},
+				},
 			},
 			jobType: domaintypes.JobTypeMig,
 			overlays: map[string]*HydraJobConfig{
@@ -399,7 +425,12 @@ func TestApplyHydraOverlay_DestinationCollision(t *testing.T) {
 		{
 			name: "spec and overlay share home dst replaces with spec entry",
 			spec: map[string]any{
-				"home": []any{"/spec:.config/app.toml:ro"},
+				"steps": []any{
+					map[string]any{
+						"image": "img:latest",
+						"home":  []any{"/spec:.config/app.toml:ro"},
+					},
+				},
 			},
 			jobType: domaintypes.JobTypeMig,
 			overlays: map[string]*HydraJobConfig{
@@ -410,7 +441,12 @@ func TestApplyHydraOverlay_DestinationCollision(t *testing.T) {
 		{
 			name: "overlay appends non-colliding dst to spec",
 			spec: map[string]any{
-				"in": []any{"/spec:/in/a.json"},
+				"steps": []any{
+					map[string]any{
+						"image": "img:latest",
+						"in":    []any{"/spec:/in/a.json"},
+					},
+				},
 			},
 			jobType: domaintypes.JobTypeMig,
 			overlays: map[string]*HydraJobConfig{
@@ -444,7 +480,9 @@ func TestApplyHydraOverlay_DestinationCollision(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			assertSlices(t, m, tt.slices)
+			if len(tt.slices) > 0 {
+				assertSlices(t, firstStepMap(t, m), tt.slices)
+			}
 		})
 	}
 }
@@ -470,9 +508,14 @@ func TestApplyHydraOverlay_ThreeLayerPrecedence(t *testing.T) {
 			name: "spec wins over overlay and global for shared env key",
 			spec: map[string]any{
 				"envs": map[string]any{"SHARED_ALL": "from_spec", "SPEC_ONLY": "spec"},
-				"ca":   []any{"cccccc1234ab"},
-				"in":   []any{"/spec/data:/in/data.json"},
-				"home": []any{"/spec/auth:.auth/config.json:ro"},
+				"steps": []any{
+					map[string]any{
+						"image": "img:latest",
+						"ca":    []any{"cccccc1234ab"},
+						"in":    []any{"/spec/data:/in/data.json"},
+						"home":  []any{"/spec/auth:.auth/config.json:ro"},
+					},
+				},
 			},
 			globalEnv: map[string][]GlobalEnvVar{
 				"GLOBAL_ONLY": {{Value: "global", Target: domaintypes.GlobalEnvTargetSteps}},
@@ -508,7 +551,11 @@ func TestApplyHydraOverlay_ThreeLayerPrecedence(t *testing.T) {
 		},
 		{
 			name: "global fills when overlay has no envs",
-			spec: map[string]any{},
+			spec: map[string]any{
+				"steps": []any{
+					map[string]any{"image": "img:latest"},
+				},
+			},
 			globalEnv: map[string][]GlobalEnvVar{
 				"ONLY_GLOBAL": {{Value: "g", Target: domaintypes.GlobalEnvTargetSteps}},
 			},
@@ -562,7 +609,9 @@ func TestApplyHydraOverlay_ThreeLayerPrecedence(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			assertEnvs(t, m, tt.checkEnvs, nil, nil)
-			assertSlices(t, m, tt.slices)
+			if len(tt.slices) > 0 {
+				assertSlices(t, firstStepMap(t, m), tt.slices)
+			}
 		})
 	}
 }
@@ -699,7 +748,7 @@ func TestMutateClaimSpec_HydraOverlayInPipeline(t *testing.T) {
 
 	jobID := domaintypes.NewJobID()
 	out := mustMutateAndUnmarshal(t, claimSpecMutatorInput{
-		spec:    []byte(`{"envs":{"EXISTING":"1"}}`),
+		spec:    []byte(`{"envs":{"EXISTING":"1"},"steps":[{"image":"img:latest"}]}`),
 		job:     store.Job{ID: jobID, Meta: []byte(`{}`)},
 		jobType: domaintypes.JobTypeMig,
 		globalEnv: map[string][]GlobalEnvVar{
@@ -717,7 +766,7 @@ func TestMutateClaimSpec_HydraOverlayInPipeline(t *testing.T) {
 		t.Errorf("job_id = %v, want %s", got, jobID.String())
 	}
 	assertEnvs(t, out, map[string]string{"EXISTING": "1", "GLOBAL": "g"}, nil, nil)
-	assertSlices(t, out, []sliceCheck{
+	assertSlices(t, firstStepMap(t, out), []sliceCheck{
 		{"ca", 1, "abc1234567ab"},
 		{"in", 1, "/data:/in/data.json"},
 	})
@@ -820,6 +869,19 @@ func assertSlices(t *testing.T, m map[string]any, checks []sliceCheck) {
 	for _, sc := range checks {
 		assertSlice(t, m, sc.field, sc.wantLen, sc.wantFirst)
 	}
+}
+
+func firstStepMap(t *testing.T, spec map[string]any) map[string]any {
+	t.Helper()
+	steps, ok := spec["steps"].([]any)
+	if !ok || len(steps) == 0 {
+		t.Fatalf("expected non-empty steps, got %T", spec["steps"])
+	}
+	step, ok := steps[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected step object, got %T", steps[0])
+	}
+	return step
 }
 
 func assertEnvs(t *testing.T, m map[string]any, checkEnvs map[string]string, expectKeys, rejectKeys []string) {
