@@ -60,10 +60,7 @@ For running jobs, follow mode also shows `STD[O]UT` and `STD[E]RR` preview rows
 currently running jobs, and `e` for stderr previews. Failed jobs are kept expanded.
 Note: `--follow` does not stream container logs. Use `ploy job follow <job-id>` for container log streaming.
 
-`--cap` enforces an overall time limit for `--follow`. If exceeded, the CLI exits the follow; add `--cancel-on-cap` to also cancel the run. When
-build-gate fails with a retryable outcome the runner collects the failure
-metadata, re-plans a healing branch using the Migs planner, and appends `#healN`
-stages before continuing to static checks and tests.
+`--cap` enforces an overall time limit for `--follow`. If exceeded, the CLI exits the follow; add `--cancel-on-cap` to also cancel the run.
 
 When a followed run completes successfully, pass `--artifact-dir <dir>` to
 download referenced artifacts and generate `<dir>/manifest.json`. The manifest
@@ -405,8 +402,7 @@ ploy completion <shell> --help
   required resources (`environment materialize`).
 - `--manifest` — Override manifest name/version in `<name>@<version>` form
   (`environment materialize`).
-- `--spec` — Path to a YAML/JSON spec file defining mig parameters, Build Gate settings,
-  and healing configuration for `mig run`. CLI flags (e.g., `--job-image`, `--gitlab-pat`)
+- `--spec` — Path to a YAML/JSON spec file defining mig parameters and Build Gate settings for `mig run`. CLI flags (e.g., `--job-image`, `--gitlab-pat`)
   override corresponding spec values when both are present. Specs use canonical `steps[]`
   shape for both single-step and multi-step runs. Each step supports
   `image`/`command`/`envs` plus Hydra file-record fields (`ca`, `in`, `out`, `home`)
@@ -414,9 +410,7 @@ ploy completion <shell> --help
   using shared runtime paths like `/share/sbom.dependencies.txt` or
   `extract-usage@mig://out/dependency-usage.nofilter.json`
   for deterministic file injection via content-addressed bundles.
-  Hydra records are also supported in Build Gate healing action blocks
-  (`build_gate.post`). The spec also supports
-  GitLab MR settings. See `docs/schemas/mig.example.yaml` for the full schema and
+  The spec also supports GitLab MR settings. See `docs/schemas/mig.example.yaml` for the full schema and
   `tests/e2e/migs/README.md` for usage examples.
 - `--repo-url` / `--repo-base-ref` / `--repo-target-ref` / `--repo-workspace-hint`
   — Repository materialisation inputs consumed by `mig run`. Allowed `--repo-url` schemes: `https://`, `ssh://`, `file://`. When `--repo-url` is provided, `--repo-base-ref` selects the base branch (commonly `main`). `--repo-target-ref` is optional; when omitted, the node derives a default of `ploy/{run_name|run_id}` (using the run name when set or the run ID, a KSUID string, otherwise) for workspace context and MR source branch. The workspace hint creates an auxiliary directory (e.g. `migs/java`) before Migs stages execute.
@@ -507,7 +501,7 @@ ploy config env set --key CUSTOM_VAR --value myvalue --on gates --secret=false
 ploy config env unset --key OLD_VAR
 
 # CA certificates (typed Hydra field)
-# Sections: pre_gate, post_gate, mig, heal, sbom, hook
+# Sections: pre_gate, post_gate, mig
 ploy config ca set --file ca-bundle.pem --section pre_gate --section post_gate
 ploy config ca ls
 ploy config ca unset --hash <HASH> --section pre_gate
@@ -560,91 +554,17 @@ The node agent uses `internal/nodeagent/gitlab/mr_client.go` with the following 
 
 See `docs/how-to/create-mr.md` for end-to-end usage examples and `internal/nodeagent/gitlab/mr_client.go` for implementation details.
 
-## Build Gate Healing
+## Build Gate
 
-When a Build Gate fails before the main mig runs, the node agent can execute a healing
-sequence configured via `build_gate.post` in the spec. This enables automated
-repair of build failures using tools like Codex or other LLM-based workflows.
-
-**How it works (jobs-based gate model):**
-1. Gate checks run as jobs in the unified `jobs` queue (`pre_gate` and `post_gate` phases)
-   and are claimed by nodes via `/v1/nodes/{id}/claim`.
-2. If the pre-gate job fails and `build_gate.post` is configured, the node executes
-   the healing action under `build_gate.post` against the same workspace
-   and Build Gate logs.
-3. After all healing steps complete, a `post_gate` job runs as another job in the queue. If it
-   passes, the main mig proceeds.
-4. The healing loop retries up to `build_gate.post.retries` (default: 1).
-5. If the gate still fails after exhausting retries, the run terminates with status `failed`
-   and reason `build-gate`. When `mr_on_fail` is enabled, an MR is still created.
-
-**Execution path:**
-Gate and healing steps are executed by the same nodeagent process that runs Migs jobs. Gate
-jobs are regular jobs in the unified queue; there is no separate HTTP Build Gate worker
-mode and no `buildgate_worker_enabled` toggle.
+Build Gate runs as regular jobs in the unified `jobs` queue. Gate jobs are
+claimed and executed by nodes through the same claim loop as other run jobs.
 
 **CLI-visible gate summaries:**
-Gate results are surfaced via `GET /v1/runs/{id}/status` in the same format regardless
-of execution location:
+Gate results are surfaced via `GET /v1/runs/{id}/status`:
 - `Gate: passed duration=1234ms`
 - `Gate: failed pre-gate duration=567ms`
 
-Gate jobs may run on any node that claims them from the unified queue, but the CLI output
-and `Metadata["gate_summary"]` in `GET /v1/runs/{id}/status` responses remain unchanged. The
-gate executor logic abstracts execution location, ensuring consistent gate status
-reporting.
-
-**Spec format (healing under Build Gate):**
-```yaml
-build_gate:
-  heal:
-    <<: !include ./healing/spec.yaml
-    retries: 1
-    image: ghcr.io/iw2rmb/ploy/java-17-codex-amata-maven:latest
-    amata:
-      spec: |
-        version: amata/v1
-        name: gate-healer
-        entry: main
-        workspace:
-          root: /workspace
-        flows:
-          main:
-            steps:
-              - codex: |
-                  Fix the build failure in /in/build-gate.log.
-                  Your final message MUST be one line of JSON: {"action_summary":"..."}
-    home:
-      - ~/.codex/auth.json:.codex/auth.json:ro
-    expectations:
-      artifacts:
-        - path: /out/gate-profile-candidate.json
-          schema: gate_profile_v1
-```
-
-`!include` is a CLI-side YAML composition macro. Use it either as full
-replacement (`heal: !include ./healing/spec.yaml#/heal`) or deep merge
-(`heal: {<<: !include ./healing/spec.yaml#/heal, ...overrides}`).
-Include references support `path[#/pointer]`, recurse through nested includes,
-and fail on include cycles. Relative include paths resolve from the including
-file directory. Relative local-source paths inside included fragments
-(`ca`, and source side of `in`/`out`/`home`) are rebased from
-that included file directory.
-
-For healing with `expectations.artifacts` schema `gate_profile_v1`, the
-healing container is expected to write `/out/gate-profile-candidate.json`. The
-candidate is considered for repo `gate_profile` promotion only after the immediate
-follow-up `post_gate` succeeds. Failed `post_gate` results never promote candidates.
-
-**Cross-phase inputs:**
-- `/in/build-gate.log` — First Build Gate failure log (mounted read-only for healing migs).
-
-**Container cleanup model:**
-- Containers are retained after step/gate completion.
-- Cleanup trigger: before claim; threshold: 1 GiB free on Docker data-root filesystem.
-
-See `docs/schemas/mig.example.yaml` for a complete example and `tests/e2e/migs/README.md`
-for end-to-end healing usage.
+See `docs/build-gate/README.md` for current gate contract and execution details.
 
 ## Job Graph and DAG State
 
@@ -657,20 +577,12 @@ and optional metadata identifying the job phase.
 - `pre_gate` — Build Gate validation before migs run
 - `mig` — Main mig execution (code transformation)
 - `post_gate` — Build Gate validation after migs succeed
-- `heal` — Healing mig execution (when pre/post gate fails)
-- `post_gate` — Build Gate re-validation after healing
 
 **DAG structure:**
 
 ```
 pre-gate → mig-0 → post-gate
-          │
-          └─(fail)→ heal → post-gate → mig-0
 ```
-
-When a gate fails with a retryable outcome, the runner branches into the healing
-flow. The heal job attempts to fix the build issue, then post-gate validates the
-fix. If post-gate passes, the DAG continues to the next mig.
 
 **CLI inspection:**
 
@@ -687,8 +599,7 @@ Jobs:
   [2500] i9j0k1l2: pending
 ```
 
-The `[next_id]` ordering reflects execution sequence. Healing jobs inserted
-dynamically appear with midpoint indices (e.g., 1500 between 1000 and 2000).
+The `[next_id]` ordering reflects execution sequence.
 
 **API response:**
 
