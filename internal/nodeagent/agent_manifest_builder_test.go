@@ -156,6 +156,54 @@ func TestBuildManifestFromRequest(t *testing.T) {
 		}
 	})
 
+	t.Run("single-step image template expands stack and env placeholders", func(t *testing.T) {
+		t.Setenv("PLOY_CONTAINER_REGISTRY", "registry.example/ploy")
+		t.Setenv("MIG_TAG", "v2")
+
+		req := newStartRunRequest(withRunOptions(RunOptions{
+			Execution: MigContainerSpec{
+				Image: contracts.JobImage{
+					Universal: "${PLOY_CONTAINER_REGISTRY}/my-image-${stack.language}-${stack.release}-${stack.tool}:${MIG_TAG}",
+				},
+			},
+		}))
+		req.DetectedStack = &contracts.StackExpectation{
+			Language: "java",
+			Release:  "17",
+			Tool:     "maven",
+		}
+
+		manifest, err := buildManifestFromRequest(req, req.TypedOptions, 0, contracts.MigStackJavaMaven)
+		if err != nil {
+			t.Fatalf("buildManifestFromRequest() error: %v", err)
+		}
+		if got, want := manifest.Image, "registry.example/ploy/my-image-java-17-maven:v2"; got != want {
+			t.Fatalf("image=%q, want %q", got, want)
+		}
+	})
+
+	t.Run("single-step image template fails when stack value is unavailable", func(t *testing.T) {
+		req := newStartRunRequest(withRunOptions(RunOptions{
+			Execution: MigContainerSpec{
+				Image: contracts.JobImage{
+					Universal: "ghcr.io/acme/my-image-${stack.language}-${stack.release}-${stack.tool}:latest",
+				},
+			},
+		}))
+		req.DetectedStack = &contracts.StackExpectation{
+			Language: "java",
+			Tool:     "maven",
+		}
+
+		_, err := buildManifestFromRequest(req, req.TypedOptions, 0, contracts.MigStackJavaMaven)
+		if err == nil {
+			t.Fatal("expected error for missing stack.release placeholder")
+		}
+		if !strings.Contains(err.Error(), "execution image template expansion: unresolved stack placeholders: stack.release") {
+			t.Fatalf("error=%q, want unresolved stack.release", err.Error())
+		}
+	})
+
 	t.Run("placeholder command injected only for default ubuntu image", func(t *testing.T) {
 		req := newStartRunRequest() // empty options -> default image
 		manifest, err := buildManifestDefault(req)

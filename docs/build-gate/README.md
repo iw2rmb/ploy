@@ -220,9 +220,20 @@ stacks:
   - lang: java
     release: "17"
     tool: maven
-    image: $PLOY_CONTAINER_REGISTRY/maven:3-eclipse-temurin-17
+    image: "${PLOY_CONTAINER_REGISTRY}/maven-${stack.language}-${stack.release}-${stack.tool}:${MAVEN_TAG}"
     profile: gates/profiles/java-17-maven.yaml
 ```
+
+Image templates support:
+
+- `${stack.language}`, `${stack.release}`, `${stack.tool}`
+- `$VAR`, `${VAR}` environment placeholders
+
+Template expansion is strict:
+
+- Unknown stack placeholders fail
+- Missing stack values fail when referenced
+- Unresolved env placeholders fail
 
 **Validation:**
 - `lang`, `release`, `image`, and `profile` are required; `tool` is optional.

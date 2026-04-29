@@ -220,7 +220,87 @@ func resolveImageEnvInPlace(spec map[string]any) error {
 		}
 	}
 
+	if buildGateRaw, ok := spec["build_gate"]; ok {
+		buildGate, ok := buildGateRaw.(map[string]any)
+		if !ok {
+			return fmt.Errorf("build_gate: expected object, got %T", buildGateRaw)
+		}
+		if err := resolveBuildGateImageRulesInPlace(buildGate); err != nil {
+			return err
+		}
+	}
+
 	return nil
+}
+
+func resolveBuildGateImageRulesInPlace(buildGate map[string]any) error {
+	rawImages, exists := buildGate["images"]
+	if !exists || rawImages == nil {
+		return nil
+	}
+	images, ok := rawImages.([]any)
+	if !ok {
+		return nil
+	}
+	for i, item := range images {
+		rule, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		rawImage, exists := rule["image"]
+		if !exists {
+			continue
+		}
+		image, ok := rawImage.(string)
+		if !ok {
+			continue
+		}
+		stackExp, err := stackExpectationFromBuildGateRule(rule, i)
+		if err != nil {
+			return err
+		}
+		expanded, err := contracts.ExpandImageTemplate(image, stackExp)
+		if err != nil {
+			return fmt.Errorf("build_gate.images[%d].image: %w", i, err)
+		}
+		rule["image"] = expanded
+	}
+	return nil
+}
+
+func stackExpectationFromBuildGateRule(rule map[string]any, index int) (*contracts.StackExpectation, error) {
+	rawStack, exists := rule["stack"]
+	if !exists || rawStack == nil {
+		return nil, nil
+	}
+	stack, ok := rawStack.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("build_gate.images[%d].stack: expected object, got %T", index, rawStack)
+	}
+
+	exp := &contracts.StackExpectation{}
+	if languageRaw, exists := stack["language"]; exists && languageRaw != nil {
+		language, ok := languageRaw.(string)
+		if !ok {
+			return nil, fmt.Errorf("build_gate.images[%d].stack.language: expected string, got %T", index, languageRaw)
+		}
+		exp.Language = strings.TrimSpace(language)
+	}
+	if toolRaw, exists := stack["tool"]; exists && toolRaw != nil {
+		tool, ok := toolRaw.(string)
+		if !ok {
+			return nil, fmt.Errorf("build_gate.images[%d].stack.tool: expected string, got %T", index, toolRaw)
+		}
+		exp.Tool = strings.TrimSpace(tool)
+	}
+	if releaseRaw, exists := stack["release"]; exists && releaseRaw != nil {
+		release, err := contracts.ParseReleaseValue(releaseRaw, fmt.Sprintf("build_gate.images[%d].stack.release", index))
+		if err != nil {
+			return nil, err
+		}
+		exp.Release = strings.TrimSpace(release)
+	}
+	return exp, nil
 }
 
 func resolveImageInSection(section map[string]any, prefix string) error {
