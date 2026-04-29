@@ -40,7 +40,6 @@ type gateProfileResolverStore interface {
 	ResolveStackIDByRequiredStack(ctx context.Context, language, tool, release string) (int64, error)
 	ResolveStackRowByImage(ctx context.Context, image string) (gateProfileStackRow, error)
 	ResolveStackIDByRepoSHA(ctx context.Context, repoID domaintypes.RepoID, repoSHA string) (int64, error)
-	ResolveAnyStackID(ctx context.Context) (int64, error)
 	GetExactGateProfile(ctx context.Context, repoID domaintypes.RepoID, repoSHA string, stackID int64) (gateProfileRow, error)
 	GetLatestRepoGateProfile(ctx context.Context, repoID domaintypes.RepoID, stackID int64) (gateProfileRow, error)
 	GetDefaultGateProfile(ctx context.Context, stackID int64) (gateProfileRow, error)
@@ -320,10 +319,6 @@ func (s *sqlGateProfileResolverStore) ResolveStackIDByRepoSHA(ctx context.Contex
 		RepoID:  repoID.String(),
 		RepoSha: repoSHA,
 	})
-}
-
-func (s *sqlGateProfileResolverStore) ResolveAnyStackID(ctx context.Context) (int64, error) {
-	return s.st.ResolveAnyStackID(ctx)
 }
 
 func (s *sqlGateProfileResolverStore) GetExactGateProfile(ctx context.Context, repoID domaintypes.RepoID, repoSHA string, stackID int64) (gateProfileRow, error) {

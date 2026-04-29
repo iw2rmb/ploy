@@ -18,8 +18,6 @@ type stubGateProfileResolverStore struct {
 	stackByImage    map[string]int64
 	stackRowByImage map[string]gateProfileStackRow
 	stackByRequired map[string]int64
-	anyStackID      int64
-	anyStackErr     error
 	repoSHAStackID  int64
 	repoSHAErr      error
 
@@ -45,7 +43,6 @@ type stubGateProfileResolverStore struct {
 	linkProfileID    int64
 	resolveImageCall string
 	resolveRepoCall  bool
-	resolveAnyCall   bool
 	resolveExactCall bool
 	resolveRequired  *GateProfileLookupStack
 }
@@ -94,17 +91,6 @@ func (s *stubGateProfileResolverStore) ResolveStackIDByRepoSHA(_ context.Context
 		return s.repoSHAStackID, nil
 	}
 	return 0, pgx.ErrNoRows
-}
-
-func (s *stubGateProfileResolverStore) ResolveAnyStackID(_ context.Context) (int64, error) {
-	s.resolveAnyCall = true
-	if s.anyStackErr != nil {
-		return 0, s.anyStackErr
-	}
-	if s.anyStackID == 0 {
-		return 0, pgx.ErrNoRows
-	}
-	return s.anyStackID, nil
 }
 
 func (s *stubGateProfileResolverStore) GetExactGateProfile(_ context.Context, _ types.RepoID, _ string, _ int64) (gateProfileRow, error) {
@@ -196,7 +182,6 @@ type gateProfileResolverCase struct {
 
 	wantResolveImage    bool
 	wantResolveRepo     bool
-	wantResolveAny      bool
 	wantResolveExact    bool
 	wantResolveRequired bool
 
@@ -243,9 +228,6 @@ func assertGateProfileResolution(t *testing.T, tc gateProfileResolverCase, resol
 	}
 	if tc.st.resolveRepoCall != tc.wantResolveRepo {
 		t.Fatalf("resolveRepoCall = %v, want %v", tc.st.resolveRepoCall, tc.wantResolveRepo)
-	}
-	if tc.st.resolveAnyCall != tc.wantResolveAny {
-		t.Fatalf("resolveAnyCall = %v, want %v", tc.st.resolveAnyCall, tc.wantResolveAny)
 	}
 	if tc.st.resolveExactCall != tc.wantResolveExact {
 		t.Fatalf("resolveExactCall = %v, want %v", tc.st.resolveExactCall, tc.wantResolveExact)
@@ -341,10 +323,10 @@ func TestGateProfileResolver_NormalResolution(t *testing.T) {
 		{
 			name: "fallback_default",
 			st: &stubGateProfileResolverStore{
-				stackByImage: map[string]int64{},
+				stackByImage:   map[string]int64{},
 				repoSHAStackID: 9,
-				exactErr:     pgx.ErrNoRows,
-				latestErr:    pgx.ErrNoRows,
+				exactErr:       pgx.ErrNoRows,
+				latestErr:      pgx.ErrNoRows,
 				defaultRow: gateProfileRow{
 					ID: 31, StackID: 9, ObjectKey: "gate-profiles/default.json",
 				},
@@ -482,7 +464,6 @@ func TestGateProfileResolver_StrictStack(t *testing.T) {
 			name: "no_match_skips_all",
 			st: &stubGateProfileResolverStore{
 				repoSHAStackID: 7,
-				anyStackID:     9,
 			},
 			bs:  &stubBlobStore{},
 			job: store.Job{RepoID: repoB, RepoShaIn: sha2, JobImage: "docker.io/stack:latest"},
@@ -534,7 +515,6 @@ func TestGateProfileResolver_StrictStack(t *testing.T) {
 					},
 				},
 				repoSHAStackID: 7,
-				anyStackID:     9,
 			},
 			bs:  &stubBlobStore{},
 			job: store.Job{RepoID: repoD, RepoShaIn: sha4, JobImage: "ghcr.io/iw2rmb/ploy/gate-gradle:jdk17"},

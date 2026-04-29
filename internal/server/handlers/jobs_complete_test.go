@@ -20,7 +20,7 @@ func TestCompleteJob_Success(t *testing.T) {
 	f := newJobFixture("mig")
 	st := newJobStoreForFixture(f)
 
-	handler := completeJobHandler(st, nil, nil)
+	handler := completeJobHandler(st, nil, nil, nil)
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{"status": "Success"}))
 
@@ -39,7 +39,7 @@ func TestCompleteJob_WithExitCodeAndStats(t *testing.T) {
 	f := newJobFixture("mig")
 	st := newJobStoreForFixture(f)
 
-	handler := completeJobHandler(st, nil, nil)
+	handler := completeJobHandler(st, nil, nil, nil)
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
 		"status":    "Success",
@@ -62,7 +62,7 @@ func TestCompleteJob_WithRepoSHAOut_Persists(t *testing.T) {
 	f := newJobFixture("mig")
 	st := newJobStoreForFixture(f)
 
-	handler := completeJobHandler(st, nil, nil)
+	handler := completeJobHandler(st, nil, nil, nil)
 	rr := httptest.NewRecorder()
 	shaOut := "0123456789abcdef0123456789abcdef01234567"
 	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
@@ -82,7 +82,7 @@ func TestCompleteJob_WithJobResources_PersistsJobMetrics(t *testing.T) {
 	f := newJobFixture("mig")
 	st := newJobStoreForFixture(f)
 
-	handler := completeJobHandler(st, nil, nil)
+	handler := completeJobHandler(st, nil, nil, nil)
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
 		"status":    "Success",
@@ -124,7 +124,7 @@ func TestCompleteJob_WithJobMetaInStats(t *testing.T) {
 	f := newJobFixture("")
 	st := newJobStoreForFixture(f)
 
-	handler := completeJobHandler(st, nil, nil)
+	handler := completeJobHandler(st, nil, nil, nil)
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
 		"status":    "Success",
@@ -157,7 +157,7 @@ func TestCompleteJob_EmptyJobMetaObjectWithWhitespaceIsIgnored(t *testing.T) {
 	f := newJobFixture("")
 	st := newJobStoreForFixture(f)
 
-	handler := completeJobHandler(st, nil, nil)
+	handler := completeJobHandler(st, nil, nil, nil)
 
 	// NOTE: Do not use json.Marshal here; we need whitespace inside job_meta ("{ }").
 	rawBody := `{"status":"Success","exit_code":0,"stats":{"duration_ms":500,"job_meta": { } }}`
@@ -203,7 +203,7 @@ func TestCompleteJob_Exit137SetsLastError(t *testing.T) {
 			f := newRepoScopedFixture("mig")
 			st := newJobStoreForFixture(f, tt.storeOpts...)
 
-			handler := completeJobHandler(st, nil, nil)
+			handler := completeJobHandler(st, nil, nil, nil)
 			rr := httptest.NewRecorder()
 			handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
 				"status":    "Fail",
@@ -225,7 +225,7 @@ func TestCompleteJob_GateFailureSetsLastError(t *testing.T) {
 
 	st := newJobStoreForFixture(f)
 
-	handler := completeJobHandler(st, nil, nil)
+	handler := completeJobHandler(st, nil, nil, nil)
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
 		"status":    "Fail",

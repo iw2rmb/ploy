@@ -29,7 +29,7 @@ func TestBatchRepoStarter_StartPendingRepos_CreatesJobsWhenNone(t *testing.T) {
 	}
 	st.listJobsByRunRepoAttempt.val = []store.Job{}
 
-	starter := NewBatchRepoStarter(st)
+	starter := NewBatchRepoStarter(st, nil)
 	got, err := starter.StartPendingRepos(ctx, runID)
 	if err != nil {
 		t.Fatalf("StartPendingRepos returned error: %v", err)
@@ -73,7 +73,7 @@ func TestBatchRepoStarter_StartPendingRepos_SchedulesNextJobWhenNoActive(t *test
 		{ID: domaintypes.JobID("job_2"), RunID: runID, RepoID: repoID, Attempt: 1, Status: domaintypes.JobStatusCreated},
 	}
 
-	starter := NewBatchRepoStarter(st)
+	starter := NewBatchRepoStarter(st, nil)
 	got, err := starter.StartPendingRepos(ctx, runID)
 	if err != nil {
 		t.Fatalf("StartPendingRepos returned error: %v", err)
@@ -104,7 +104,7 @@ func TestBatchRepoStarter_StartPendingRepos_SkipsTerminalRun(t *testing.T) {
 	st := &runStore{}
 	st.getRun.val = store.Run{ID: runID, SpecID: domaintypes.SpecID("spec_1"), Status: domaintypes.RunStatusFinished}
 
-	starter := NewBatchRepoStarter(st)
+	starter := NewBatchRepoStarter(st, nil)
 	got, err := starter.StartPendingRepos(ctx, runID)
 	if err != nil {
 		t.Fatalf("StartPendingRepos returned error: %v", err)

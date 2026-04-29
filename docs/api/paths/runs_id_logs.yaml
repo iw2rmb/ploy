@@ -42,57 +42,6 @@ get:
 
     Container log frames are **not** emitted on this stream. Use
     `GET /v1/jobs/{job_id}/logs` for job-scoped container logs.
-
-    ## Event Types
-
-    | Event Type   | Payload Schema | Description                                    |
-    |--------------|----------------|------------------------------------------------|
-    | `run`        | `RunSummary`   | Run lifecycle snapshot (state changes)         |
-    | `stage`      | `LogRecord`    | Stage progress message from node               |
-    | `done`       | `Status`       | Terminal sentinel; stream closes after this    |
-
-    ## `event: run` — Run Lifecycle Snapshots
-
-    Each `event: run` frame carries the canonical `RunSummary` schema:
-    - `run_id`: KSUID string (27 characters).
-    - `state`: `pending`, `running`, `succeeded`, `failed`, `cancelling`, `cancelled`.
-    - `repository`: Git repository URL.
-    - `metadata`: Derived context (refs, node_id, gate_summary, reason).
-    - `stages`: Map of job IDs (KSUID) to `StageStatus` objects.
-    - `created_at`, `updated_at`: RFC 3339 timestamps.
-
-    **Example:**
-    ```
-    event: run
-    data: {"run_id":"2NQPoBfVkc8dFmGAQqJnUwMu9jR","state":"running","repository":"https://github.com/org/repo.git","metadata":{"node_id":"aB3xY9"},"created_at":"2025-01-15T10:00:00Z","updated_at":"2025-01-15T10:05:00Z","stages":{"2NQPoBfVkc8dFmGAQqJnUwMu9jS":{"state":"succeeded","next_id":"2NQPoBfVkc8dFmGAQqJnUwMu9jT"}}}
-    ```
-
-    ## `event: stage` — Stage Progress Messages
-
-    Each `event: stage` frame carries a JSON-encoded `LogRecord` with node
-    progress information (e.g. "step started", "gate passed"):
-
-    | Field       | Type   | Description                                       |
-    |-------------|--------|---------------------------------------------------|
-    | `timestamp` | string | RFC 3339 timestamp                                |
-    | `stream`    | string | Log level of the progress message                 |
-    | `line`      | string | Progress message content                          |
-
-    **Example:**
-    ```
-    event: stage
-    data: {"timestamp":"2025-01-15T10:05:00Z","stream":"info","line":"Step 1 started"}
-    ```
-
-    ## `event: done` — Terminal Sentinel
-
-    Signals stream completion. The server closes the connection after this event:
-    ```
-    event: done
-    data: {"status":"done"}
-    ```
-
-    See `docs/migs-lifecycle.md` § 7 for the complete SSE contract specification.
   responses:
     '200':
       description: OK — SSE stream established.
@@ -102,57 +51,10 @@ get:
             type: string
             description: |
               Server-Sent Events stream. Each frame consists of `event:` type and
-              `data:` JSON payload. See description above for payload schemas.
+              `data:` JSON payload.
     '400':
       description: Bad Request — missing or invalid run ID.
     '404':
       description: Not Found — run does not exist.
     '500':
       description: Internal Server Error.
-
-post:
-  tags: [Control]
-  summary: Upload run log chunk
-  description: |
-    Uploads a gzipped log chunk for a run with an optional job association.
-    The gzip payload must contain stream-aware framed lines:
-    JSON per line with `stream` (`stdout|stderr`) and `line`.
-  requestBody:
-    required: true
-    content:
-      application/json:
-        schema:
-          type: object
-          properties:
-            job_id:
-              type: string
-              nullable: true
-              description: Optional job ID (KSUID string).
-            chunk_no:
-              type: integer
-              format: int32
-              description: Monotonic chunk number per (run_id, job_id).
-            data:
-              type: string
-              format: byte
-              description: Base64-encoded gzipped framed log bytes (<= 10 MiB decoded).
-          required: [chunk_no, data]
-  responses:
-    '201':
-      description: Created
-      content:
-        application/json:
-          schema:
-            type: object
-            properties:
-              id: { type: integer, format: int64 }
-              chunk_no: { type: integer, format: int32 }
-            required: [id, chunk_no]
-    '400':
-      description: Bad request
-    '404':
-      description: Run not found
-    '413':
-      description: Payload too large
-    '500':
-      description: Server error

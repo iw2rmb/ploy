@@ -1447,8 +1447,8 @@ The CLI entry points for Migs are implemented in CLI implementation:
 The event hub (runtime implementation) and HTTP wrapper (runtime implementation)
 implement a minimal SSE protocol used by the Migs endpoints.
 
-**OpenAPI reference:** See `docs/api/paths/runs_id_logs.yaml` for the formal
-endpoint specification and event payload schemas.
+**OpenAPI reference:** See `docs/api/paths/runs_run_id_repos_repo_id_logs.yaml`
+for the formal endpoint specification and event payload schemas.
 
 ### 7.1 Event types
 

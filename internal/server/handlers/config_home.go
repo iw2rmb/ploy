@@ -54,7 +54,7 @@ func listConfigHomeBySectionHandler(holder *ConfigHolder) http.HandlerFunc {
 			writeHTTPError(w, http.StatusBadRequest, "%s", err)
 			return
 		}
-		if err := ValidateHydraSection(section); err != nil {
+		if err := contracts.ValidateHydraSection(section); err != nil {
 			writeHTTPError(w, http.StatusBadRequest, "%s", err)
 			return
 		}
@@ -86,7 +86,7 @@ func putConfigHomeHandler(holder *ConfigHolder, st store.Store) http.HandlerFunc
 		}
 		canonicalEntry := parsed.CanonicalHomeEntry()
 
-		if err := ValidateHydraSection(req.Section); err != nil {
+		if err := contracts.ValidateHydraSection(req.Section); err != nil {
 			writeHTTPError(w, http.StatusBadRequest, "%s", err)
 			return
 		}
@@ -138,7 +138,7 @@ func deleteConfigHomeHandler(holder *ConfigHolder, st store.Store) http.HandlerF
 			writeHTTPError(w, http.StatusBadRequest, "section query parameter is required")
 			return
 		}
-		if err := ValidateHydraSection(section); err != nil {
+		if err := contracts.ValidateHydraSection(section); err != nil {
 			writeHTTPError(w, http.StatusBadRequest, "%s", err)
 			return
 		}

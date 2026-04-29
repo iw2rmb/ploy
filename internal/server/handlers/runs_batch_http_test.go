@@ -318,7 +318,7 @@ func TestRestartRunRepoHandler_ReopensTerminalRunAndCreatesJobs(t *testing.T) {
 	req.SetPathValue("repo_id", repoID.String())
 	rr := httptest.NewRecorder()
 
-	restartRunRepoHandler(st).ServeHTTP(rr, req)
+	restartRunRepoHandler(st, nil).ServeHTTP(rr, req)
 
 	assertStatus(t, rr, http.StatusOK)
 	if !st.updateRunStatus.called {
@@ -369,7 +369,7 @@ func TestStartRunHandler_StartsQueuedRepos(t *testing.T) {
 	req.SetPathValue("id", runID.String())
 	rr := httptest.NewRecorder()
 
-	startRunHandler(st).ServeHTTP(rr, req)
+	startRunHandler(st, nil).ServeHTTP(rr, req)
 
 	assertStatus(t, rr, http.StatusOK)
 	if st.createJobCallCount != 3 {
@@ -402,7 +402,7 @@ func TestStartRunHandler_TerminalRunConflict(t *testing.T) {
 	req.SetPathValue("id", runID.String())
 	rr := httptest.NewRecorder()
 
-	startRunHandler(st).ServeHTTP(rr, req)
+	startRunHandler(st, nil).ServeHTTP(rr, req)
 
 	assertStatus(t, rr, http.StatusConflict)
 }

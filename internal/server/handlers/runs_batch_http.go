@@ -52,7 +52,12 @@ func cancelRunHandlerV1(st store.Store) http.HandlerFunc {
 		}
 
 		// Return updated run summary.
-		run, _ = st.GetRun(r.Context(), runID)
+		run, err := st.GetRun(r.Context(), runID)
+		if err != nil {
+			writeHTTPError(w, http.StatusInternalServerError, "failed to load updated run: %v", err)
+			slog.Error("cancel run: reload run failed", "run_id", runID.String(), "err", err)
+			return
+		}
 		summary := runToSummary(run)
 		if counts, _ := getRunRepoCounts(r.Context(), st, run.ID); counts != nil && counts.Total > 0 {
 			summary.Counts = counts
@@ -251,17 +256,26 @@ func cancelRunRepoHandlerV1(st store.Store) http.HandlerFunc {
 						dur = d
 					}
 				}
-				_ = st.UpdateJobStatus(r.Context(), store.UpdateJobStatusParams{
+				if err := st.UpdateJobStatus(r.Context(), store.UpdateJobStatusParams{
 					ID:         job.ID,
 					Status:     domaintypes.JobStatusCancelled,
 					StartedAt:  job.StartedAt,
 					FinishedAt: pgtype.Timestamptz{Time: now, Valid: true},
 					DurationMs: dur,
-				})
+				}); err != nil {
+					writeHTTPError(w, http.StatusInternalServerError, "failed to cancel job %s: %v", job.ID.String(), err)
+					slog.Error("cancel run repo: update job status failed", "run_id", runID.String(), "repo_id", repoID.String(), "job_id", job.ID.String(), "err", err)
+					return
+				}
 			}
 		}
 
-		rr, _ = st.GetRunRepo(r.Context(), store.GetRunRepoParams{RunID: runID, RepoID: repoID})
+		rr, err = st.GetRunRepo(r.Context(), store.GetRunRepoParams{RunID: runID, RepoID: repoID})
+		if err != nil {
+			writeHTTPError(w, http.StatusInternalServerError, "failed to reload repo: %v", err)
+			slog.Error("cancel run repo: reload repo failed", "run_id", runID.String(), "repo_id", repoID.String(), "err", err)
+			return
+		}
 		repoURL := ""
 		if resolvedURL, err := repoURLForID(r.Context(), st, rr.RepoID); err == nil {
 			repoURL = resolvedURL
@@ -272,11 +286,7 @@ func cancelRunRepoHandlerV1(st store.Store) http.HandlerFunc {
 
 // restartRunRepoHandler restarts a repo execution by incrementing attempt and creating new repo-scoped jobs.
 // POST /v1/runs/{id}/repos/{repo_id}/restart
-func restartRunRepoHandler(st store.Store, hookBlobstores ...blobstore.Store) http.HandlerFunc {
-	var bs blobstore.Store
-	if len(hookBlobstores) > 0 {
-		bs = hookBlobstores[0]
-	}
+func restartRunRepoHandler(st store.Store, bs blobstore.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		runID, ok := parseRequiredPathIDOrWriteError[domaintypes.RunID](w, r, "id")
 		if !ok {
@@ -342,13 +352,25 @@ func restartRunRepoHandler(st store.Store, hookBlobstores ...blobstore.Store) ht
 			if req.TargetRef != nil {
 				newTarget = req.TargetRef.String()
 			}
-			_ = st.UpdateRunRepoRefs(r.Context(), store.UpdateRunRepoRefsParams{RunID: runID, RepoID: repoID, RepoBaseRef: newBase, RepoTargetRef: newTarget})
-			if migRepos, listErr := st.ListMigReposByMig(r.Context(), run.MigID); listErr == nil {
-				for _, migRepo := range migRepos {
-					if migRepo.RepoID == repoID {
-						_ = st.UpdateMigRepoRefs(r.Context(), store.UpdateMigRepoRefsParams{ID: migRepo.ID, BaseRef: newBase, TargetRef: newTarget})
-						break
+			if err := st.UpdateRunRepoRefs(r.Context(), store.UpdateRunRepoRefsParams{RunID: runID, RepoID: repoID, RepoBaseRef: newBase, RepoTargetRef: newTarget}); err != nil {
+				writeHTTPError(w, http.StatusInternalServerError, "failed to update run repo refs: %v", err)
+				slog.Error("restart run repo: update run repo refs failed", "run_id", runID.String(), "repo_id", repoID.String(), "err", err)
+				return
+			}
+			migRepos, listErr := st.ListMigReposByMig(r.Context(), run.MigID)
+			if listErr != nil {
+				writeHTTPError(w, http.StatusInternalServerError, "failed to list mig repos: %v", listErr)
+				slog.Error("restart run repo: list mig repos failed", "run_id", runID.String(), "repo_id", repoID.String(), "mig_id", run.MigID.String(), "err", listErr)
+				return
+			}
+			for _, migRepo := range migRepos {
+				if migRepo.RepoID == repoID {
+					if err := st.UpdateMigRepoRefs(r.Context(), store.UpdateMigRepoRefsParams{ID: migRepo.ID, BaseRef: newBase, TargetRef: newTarget}); err != nil {
+						writeHTTPError(w, http.StatusInternalServerError, "failed to update mig repo refs: %v", err)
+						slog.Error("restart run repo: update mig repo refs failed", "run_id", runID.String(), "repo_id", repoID.String(), "mig_repo_id", migRepo.ID.String(), "err", err)
+						return
 					}
+					break
 				}
 			}
 		}
@@ -413,8 +435,8 @@ type StartRunResponse struct {
 
 // startRunHandler delegates to BatchRepoStarter.StartPendingRepos (shared with the background scheduler).
 // POST /v1/runs/{id}/start
-func startRunHandler(st store.Store, hookBlobstores ...blobstore.Store) http.HandlerFunc {
-	starter := NewBatchRepoStarter(st, hookBlobstores...)
+func startRunHandler(st store.Store, bs blobstore.Store) http.HandlerFunc {
+	starter := NewBatchRepoStarter(st, bs)
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		runID, ok := parseRequiredPathIDOrWriteError[domaintypes.RunID](w, r, "id")

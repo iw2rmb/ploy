@@ -25,11 +25,7 @@ type completeJobRequest struct {
 }
 
 // completeJobHandler marks a job as completed with terminal status and stats.
-func completeJobHandler(st store.Store, eventsService *server.EventsService, bp *blobpersist.Service, gateProfileBlobstore ...blobstore.Store) http.HandlerFunc {
-	var gateProfilesBS blobstore.Store
-	if len(gateProfileBlobstore) > 0 {
-		gateProfilesBS = gateProfileBlobstore[0]
-	}
+func completeJobHandler(st store.Store, eventsService *server.EventsService, bp *blobpersist.Service, gateProfilesBS blobstore.Store) http.HandlerFunc {
 	service := NewCompleteJobService(st, eventsService, bp, gateProfilesBS)
 
 	return func(w http.ResponseWriter, r *http.Request) {

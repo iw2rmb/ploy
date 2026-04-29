@@ -39,7 +39,6 @@ func RegisterRoutes(s *server.HTTPServer, st store.Store, bs blobstore.Store, bp
 	registerArtifactReadRoutes(s, deps)
 	registerRunRoutes(s, deps)
 	registerRepoRoutes(s, deps)
-	registerLegacyRunRoutes(s, deps)
 	registerNodeRoutes(s, deps)
 	registerSpecBundleRoutes(s, deps)
 	registerJobArtifactRoutes(s, deps)
@@ -128,13 +127,6 @@ func registerRepoRoutes(s *server.HTTPServer, deps routeDeps) {
 	s.RegisterRouteFunc("GET /v1/repos", listReposHandler(deps.st), auth.RoleControlPlane)
 	s.RegisterRouteFunc("GET /v1/repos/{repo_id}/runs", listRunsForRepoHandler(deps.st), auth.RoleControlPlane)
 	s.RegisterRouteFunc("GET /v1/sboms/compat", sbomCompatHandler(deps.st), auth.RoleControlPlane)
-}
-
-func registerLegacyRunRoutes(s *server.HTTPServer, deps routeDeps) {
-	s.RegisterRouteFunc("GET /v1/runs/{id}/timing", getRunTimingHandler(deps.st), auth.RoleControlPlane)
-	s.RegisterRouteFunc("POST /v1/runs/{id}/logs", createRunLogHandler(deps.st, deps.bp, deps.eventsService), auth.RoleControlPlane)
-	s.RegisterRouteFunc("POST /v1/runs/{id}/diffs", createRunDiffHandler(deps.st, deps.bp), auth.RoleControlPlane)
-	s.RegisterRouteFunc("DELETE /v1/runs/{id}", deleteRunHandler(deps.st), auth.RoleControlPlane)
 }
 
 func registerNodeRoutes(s *server.HTTPServer, deps routeDeps) {

@@ -14,7 +14,7 @@ info:
     - `/v1/migs/{mig_id}/runs` — create multi-repo batch runs for a mig.
     - `/v1/migs/{mig_id}/pull` — resolve repo execution for `ploy mig pull`.
     - `/v1/runs` — single-repo run submission and run listing.
-    - `/v1/runs/{id}/*` — run lifecycle (inspect/cancel/start/timing).
+    - `/v1/runs/{id}/*` — run lifecycle (inspect/cancel/start).
     - `/v1/runs/{run_id}/repos/{repo_id}/*` — repo-scoped execution surfaces:
       - `/diffs` — list diffs for a repo execution.
       - `/logs` — SSE stream of logs/events for a repo execution.
@@ -154,8 +154,6 @@ paths:
     $ref: "./paths/runs_id_start.yaml"
   /v1/runs/{id}/cancel:
     $ref: "./paths/runs_id_cancel.yaml"
-  /v1/runs/{id}/timing:
-    $ref: "./paths/runs_id_timing.yaml"
   /v1/runs/{id}/repos:
     $ref: "./paths/runs_id_repos.yaml"
   /v1/runs/{id}/repos/{repo_id}/restart:
@@ -196,9 +194,6 @@ paths:
   # Job artifact bundle upload endpoint (run-scoped, no node ID)
   /v1/runs/{run_id}/jobs/{job_id}/artifact:
     $ref: "./paths/runs_run_id_jobs_job_id_artifact.yaml"
-  # Control-plane diff ingestion endpoint
-  /v1/runs/{id}/diffs:
-    $ref: "./paths/runs_id_diffs.yaml"
   # Build Gate HTTP service removed: gate runs as jobs in the Migs pipeline.
   # Nodes claim gate work via the unified /v1/nodes/{id}/claim endpoint.
   # Legacy removed:
