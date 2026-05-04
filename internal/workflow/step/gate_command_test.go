@@ -71,3 +71,19 @@ func TestBuildCommandForToolTarget_MavenWrapperPreference(t *testing.T) {
 		})
 	}
 }
+
+func TestBuildCommandForToolTarget_IncludesFailFastShellPrefix(t *testing.T) {
+	t.Parallel()
+
+	workspace := createGradleWorkspace(t, "17")
+	got, err := buildCommandForToolTarget(workspace, "gradle", contracts.GateProfileTargetBuild)
+	if err != nil {
+		t.Fatalf("buildCommandForToolTarget() error: %v", err)
+	}
+	if len(got) != 3 {
+		t.Fatalf("buildCommandForToolTarget() len=%d, want 3", len(got))
+	}
+	if !strings.HasPrefix(got[2], "set -eu; ") {
+		t.Fatalf("command=%q, want fail-fast shell prefix %q", got[2], "set -eu; ")
+	}
+}

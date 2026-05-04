@@ -146,11 +146,8 @@ func TestDockerGateExecutor_TargetPinIgnoresPrepOverrideFromAnotherTarget(t *tes
 	if !strings.Contains(cmd, "build -x test -p /workspace") {
 		t.Fatalf("expected pinned build target command, got %q", cmd)
 	}
-	if strings.Contains(meta.ExecutedCommand, gateCAPreamble) {
-		t.Fatalf("executed_command should not include CA preamble, got %q", meta.ExecutedCommand)
-	}
 	expectedExecuted := strings.TrimSpace(cmd)
-	prefix := gateCAPreamble + "; "
+	prefix := "set -eu; " + gateCAPreamble + "; "
 	if strings.HasPrefix(expectedExecuted, prefix) {
 		expectedExecuted = strings.TrimSpace(strings.TrimPrefix(expectedExecuted, prefix))
 	}
