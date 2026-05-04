@@ -2,22 +2,22 @@ stacks:
   - lang: java
     release: "11"
     tool: maven
-    image: $PLOY_CONTAINER_REGISTRY/maven:3-eclipse-temurin-11
+    image: $PLOY_CONTAINER_REGISTRY/maven:jdk11
     profile: gates/profiles/java-11-maven.yaml
   - lang: java
     release: "17"
     tool: maven
-    image: $PLOY_CONTAINER_REGISTRY/maven:3-eclipse-temurin-17
+    image: $PLOY_CONTAINER_REGISTRY/maven:jdk17
     profile: gates/profiles/java-17-maven.yaml
   - lang: java
     release: "21"
     tool: maven
-    image: $PLOY_CONTAINER_REGISTRY/maven:3-eclipse-temurin-21
+    image: $PLOY_CONTAINER_REGISTRY/maven:jdk21
     profile: gates/profiles/java-21-maven.yaml
   - lang: java
     release: "25"
     tool: maven
-    image: $PLOY_CONTAINER_REGISTRY/maven:3-eclipse-temurin-25
+    image: $PLOY_CONTAINER_REGISTRY/maven:jdk25
     profile: gates/profiles/java-25-maven.yaml
   - lang: java
     release: "11"

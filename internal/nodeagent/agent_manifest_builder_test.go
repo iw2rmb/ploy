@@ -442,7 +442,7 @@ func TestManifestBuildWithGateRepoMeta(t *testing.T) {
 				Enabled: true,
 				Images: []contracts.BuildGateImageRule{{
 					Stack: contracts.StackExpectation{Language: "java", Tool: "maven", Release: "17"},
-					Image: "maven:3-eclipse-temurin-17",
+					Image: "maven:jdk17",
 				}},
 			}}),
 		)
@@ -456,8 +456,8 @@ func TestManifestBuildWithGateRepoMeta(t *testing.T) {
 		if len(manifest.Gate.ImageOverrides) != 1 {
 			t.Fatalf("len(Gate.ImageOverrides)=%d, want 1", len(manifest.Gate.ImageOverrides))
 		}
-		if got := manifest.Gate.ImageOverrides[0].Image; got != "maven:3-eclipse-temurin-17" {
-			t.Errorf("Gate.ImageOverrides[0].Image=%q, want maven:3-eclipse-temurin-17", got)
+		if got := manifest.Gate.ImageOverrides[0].Image; got != "maven:jdk17" {
+			t.Errorf("Gate.ImageOverrides[0].Image=%q, want maven:jdk17", got)
 		}
 		if manifest.Gate.RepoURL.String() != req.RepoURL.String() {
 			t.Errorf("Gate.RepoURL=%q, want %q", manifest.Gate.RepoURL, req.RepoURL.String())

@@ -261,7 +261,7 @@ func TestBuildGateManifestFromRequest_StackGateThreading(t *testing.T) {
 				BuildGate: BuildGateOptions{
 					Enabled: true,
 					Images: []contracts.BuildGateImageRule{
-						{Stack: contracts.StackExpectation{Language: "java", Tool: "maven", Release: "17"}, Image: "maven:3-eclipse-temurin-17"},
+						{Stack: contracts.StackExpectation{Language: "java", Tool: "maven", Release: "17"}, Image: "maven:jdk17"},
 					},
 				},
 			},
@@ -269,8 +269,8 @@ func TestBuildGateManifestFromRequest_StackGateThreading(t *testing.T) {
 				if len(m.Gate.ImageOverrides) != 1 {
 					t.Fatalf("len(Gate.ImageOverrides) = %d, want 1", len(m.Gate.ImageOverrides))
 				}
-				if m.Gate.ImageOverrides[0].Image != "maven:3-eclipse-temurin-17" {
-					t.Errorf("ImageOverrides[0].Image = %q, want %q", m.Gate.ImageOverrides[0].Image, "maven:3-eclipse-temurin-17")
+				if m.Gate.ImageOverrides[0].Image != "maven:jdk17" {
+					t.Errorf("ImageOverrides[0].Image = %q, want %q", m.Gate.ImageOverrides[0].Image, "maven:jdk17")
 				}
 			},
 		},

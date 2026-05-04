@@ -1,19 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ca_installer="/usr/local/lib/ploy/install_ploy_ca_bundle.sh"
-if [[ -f "$ca_installer" ]]; then
-  source "$ca_installer"
-else
-  script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-  local_ca_installer="$(cd "$script_dir/../../.." && pwd)/install_ploy_ca_bundle.sh"
-  if [[ -f "$local_ca_installer" ]]; then
-    source "$local_ca_installer"
-  else
-    install_ploy_ca_bundle() { return 0; }
-  fi
-fi
-
 usage() {
   cat <<'USAGE'
 orw-cli --apply --dir <workspace> --out <outdir>
@@ -34,7 +21,6 @@ Optional env:
   ORW_AUTO_EXCLUDE_GROOVY_PARSE_FAILURES
                              true|false (default: false); retry once after Groovy parse failures by auto-excluding failed files
   ORW_CLI_BIN                Executable name/path for OpenRewrite CLI (default: rewrite)
-  PLOY_CA_CERT_PATH          PEM CA bundle file path imported into trust stores (Hydra mount: /etc/ploy/certs/ca.crt)
 USAGE
 }
 
@@ -120,7 +106,6 @@ if [[ -n "$repo_username" && -z "$repo_password" ]] || [[ -z "$repo_username" &&
   exit 4
 fi
 
-PLOY_CA_IMPORT_JAVA=1 PLOY_CA_LOG_FILE="$transform_log" install_ploy_ca_bundle
 
 fail_on_unsupported=true
 if ! parse_bool_default_true "${ORW_FAIL_ON_UNSUPPORTED:-}"; then

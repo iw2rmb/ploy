@@ -117,7 +117,7 @@ func newGateTestManifest(gateEnabled bool) contracts.StepManifest {
 	return contracts.StepManifest{
 		ID:    types.StepID("test-step"),
 		Name:  "Test Step",
-		Image: "maven:3-eclipse-temurin-17",
+		Image: "maven:jdk17",
 		Inputs: []contracts.StepInput{{
 			Name:        "source",
 			MountPath:   "/workspace",

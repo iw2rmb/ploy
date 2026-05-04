@@ -199,7 +199,7 @@ func TestSeedGateCatalogDefaults_MissingProfileFileFails(t *testing.T) {
   - lang: java
     release: "17"
     tool: maven
-    image: $PLOY_CONTAINER_REGISTRY/maven:3-eclipse-temurin-17
+    image: $PLOY_CONTAINER_REGISTRY/maven:jdk17
     profile: gates/profiles/missing.yaml
 `
 	if err := os.MkdirAll(filepath.Dir(catalogPath), 0o755); err != nil {

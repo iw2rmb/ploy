@@ -408,7 +408,7 @@ func TestListRunRepoJobsHandler_ExposesGateStackDetection(t *testing.T) {
 func TestListRunRepoJobsHandler_PrefersGateRuntimeImageAddress(t *testing.T) {
 	t.Parallel()
 
-	metaJSON := `{"kind":"gate","gate":{"stack_gate":{"enabled":true,"result":"pass","runtime_image":"ghcr.io/iw2rmb/ploy/gates/maven:3-eclipse-temurin-17"}}}`
+	metaJSON := `{"kind":"gate","gate":{"stack_gate":{"enabled":true,"result":"pass","runtime_image":"ghcr.io/iw2rmb/ploy/gates/maven:jdk17"}}}`
 	st, handler, runID, repoID := newRunRepoJobsFixture(t, metaJSON)
 	st.listJobsByRunRepoAttempt.val[0].JobImage = "gate-image-placeholder"
 
@@ -427,7 +427,7 @@ func TestListRunRepoJobsHandler_PrefersGateRuntimeImageAddress(t *testing.T) {
 	if len(resp.Jobs) != 1 {
 		t.Fatalf("expected 1 job entry, got %d", len(resp.Jobs))
 	}
-	if got, want := resp.Jobs[0].JobImage, "ghcr.io/iw2rmb/ploy/gates/maven:3-eclipse-temurin-17"; got != want {
+	if got, want := resp.Jobs[0].JobImage, "ghcr.io/iw2rmb/ploy/gates/maven:jdk17"; got != want {
 		t.Fatalf("job_image = %q, want %q", got, want)
 	}
 }
