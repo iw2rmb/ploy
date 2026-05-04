@@ -39,7 +39,9 @@ awk '
 {
   line = $0
   while (match(line, /[A-Za-z0-9_.-]+:[A-Za-z0-9_.-]+:[A-Za-z0-9][A-Za-z0-9+_.-]*/)) {
-    dep = substr(line, RSTART, RLENGTH)
+    dep_start = RSTART
+    dep_len = RLENGTH
+    dep = substr(line, dep_start, dep_len)
     split(dep, parts, ":")
     name = parts[1] ":" parts[2]
     version = parts[3]
@@ -50,7 +52,12 @@ awk '
       version = ov
     }
     print name "\t" version
-    line = substr(line, RSTART + RLENGTH)
+    next_line = substr(line, dep_start + dep_len)
+    if (next_line == line) {
+      print "sbom parser invariant violated: dependency parser made no progress" > "/dev/stderr"
+      exit 2
+    }
+    line = next_line
   }
 }
 ' "$deps_raw" | sort -u > "$deps_pairs"
