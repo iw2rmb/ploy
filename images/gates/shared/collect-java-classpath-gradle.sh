@@ -37,13 +37,20 @@ fi
 
 awk '
 {
-  if (match($0, /([A-Za-z0-9_.-]+:[A-Za-z0-9_.-]+):([A-Za-z0-9][A-Za-z0-9+_.-]*)/, m)) {
-    name = m[1]
-    version = m[2]
-    if (match($0, /->[[:space:]]*([A-Za-z0-9][A-Za-z0-9+_.-]*)/, o)) {
-      version = o[1]
+  line = $0
+  while (match(line, /[A-Za-z0-9_.-]+:[A-Za-z0-9_.-]+:[A-Za-z0-9][A-Za-z0-9+_.-]*/)) {
+    dep = substr(line, RSTART, RLENGTH)
+    split(dep, parts, ":")
+    name = parts[1] ":" parts[2]
+    version = parts[3]
+    override = line
+    if (match(override, /->[[:space:]]*[A-Za-z0-9][A-Za-z0-9+_.-]*/)) {
+      ov = substr(override, RSTART, RLENGTH)
+      sub(/->[[:space:]]*/, "", ov)
+      version = ov
     }
     print name "\t" version
+    line = substr(line, RSTART + RLENGTH)
   }
 }
 ' "$deps_raw" | sort -u > "$deps_pairs"

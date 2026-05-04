@@ -31,7 +31,7 @@ func buildCommandForTool(workspace string, tool string) ([]string, error) {
 // buildCommandForToolTarget returns a deterministic command for a tool/target pair.
 func buildCommandForToolTarget(workspace string, tool string, target string) ([]string, error) {
 	wrap := func(toolCmd, collectorCmd string) []string {
-		parts := []string{gateCAPreamble}
+		parts := []string{"set -eu", gateCAPreamble}
 		if strings.TrimSpace(collectorCmd) != "" {
 			parts = append(parts, collectorCmd)
 		}

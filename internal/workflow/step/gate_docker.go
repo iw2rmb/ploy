@@ -543,11 +543,17 @@ func gateProfileCommandFromContainerCommand(cmd []string) string {
 		if shell == "" {
 			return ""
 		}
-		// Drop internal CA preamble from fallback-generated commands so the
-		// persisted gate profile stores the runnable tool command itself.
-		prefix := gateCAPreamble + "; "
-		if strings.HasPrefix(shell, prefix) {
-			shell = strings.TrimSpace(strings.TrimPrefix(shell, prefix))
+		// Drop internal wrapper preamble from fallback-generated commands so
+		// the persisted gate profile stores the runnable tool command itself.
+		prefixes := []string{
+			"set -eu; " + gateCAPreamble + "; ",
+			gateCAPreamble + "; ",
+		}
+		for _, prefix := range prefixes {
+			if strings.HasPrefix(shell, prefix) {
+				shell = strings.TrimSpace(strings.TrimPrefix(shell, prefix))
+				break
+			}
 		}
 		return shell
 	}
