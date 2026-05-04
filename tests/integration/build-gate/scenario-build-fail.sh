@@ -4,7 +4,7 @@ set -euo pipefail
 # Integration: Build Gate failure produces an error artifact consumable by LLM mig.
 # Flow:
 #  1) Create a tiny Maven project that fails to compile (missing symbol).
-#  2) Run the Build Gate container (maven:3-eclipse-temurin-17) and capture logs.
+#  2) Run the Build Gate container (maven:jdk17) and capture logs.
 #  3) Save logs to /in/build-gate.log (artifact to pass to LLM; /in is read-only cross-phase input).
 #  4) Run migs/mig-llm stub to heal the missing symbol.
 #  5) Re-run the Build Gate and expect success.
@@ -51,7 +51,7 @@ echo "[scenario] workspace: $WORKDIR"
 # Run Build Gate (Maven test) expecting failure; capture logs
 set +e
 LOGS=$(docker run --rm -v "$WORKDIR":/workspace -w /workspace \
-  maven:3-eclipse-temurin-17 /bin/sh -lc \
+  maven:jdk17 /bin/sh -lc \
   'mvn -B -q -DskipTests=false -Dstyle.color=never -f /workspace/pom.xml test' 2>&1)
 STATUS=$?
 set -e
@@ -85,7 +85,7 @@ echo "[scenario] LLM healing created e2e/UnknownClass.java"
 
 # Re-run Build Gate; expect success
 docker run --rm -v "$WORKDIR":/workspace -w /workspace \
-  maven:3-eclipse-temurin-17 /bin/sh -lc \
+  maven:jdk17 /bin/sh -lc \
   'mvn -B -q -DskipTests=false -Dstyle.color=never -f /workspace/pom.xml test' >/dev/null 2>&1
 
 echo "OK: build-gate failure produces artifact and can be healed by LLM stub"

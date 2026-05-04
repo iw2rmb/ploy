@@ -4,7 +4,7 @@
 # invokes Gradle/Maven project tasks.
 ARG JAVA_BASE_TEMURIN_21_IMAGE=java-base-temurin:jdk21
 ARG JAVA_BASE_MAVEN_21_IMAGE=java-base-maven:jdk21
-FROM --platform=$BUILDPLATFORM ${JAVA_BASE_MAVEN_21_IMAGE} AS rewrite-runner-build
+FROM --platform=linux/amd64 ${JAVA_BASE_MAVEN_21_IMAGE} AS rewrite-runner-build
 
 WORKDIR /build
 COPY images/orw/orw-cli-java-21-gradle/rewrite-runner/pom.xml rewrite-runner/pom.xml

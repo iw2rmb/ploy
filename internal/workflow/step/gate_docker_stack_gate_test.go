@@ -19,7 +19,7 @@ func TestGateDocker_StackGate_PreCheckPass(t *testing.T) {
 		Enabled: true,
 		ImageOverrides: []contracts.BuildGateImageRule{{
 			Stack: contracts.StackExpectation{Language: "java", Tool: "maven", Release: "17"},
-			Image: "maven:3-eclipse-temurin-17",
+			Image: "maven:jdk17",
 		}},
 		StackGate: &contracts.StepGateStackSpec{
 			Enabled: true,
@@ -42,8 +42,8 @@ func TestGateDocker_StackGate_PreCheckPass(t *testing.T) {
 	if !rt.startCalled {
 		t.Error("expected container Start to be called")
 	}
-	if meta.StackGate.RuntimeImage != "maven:3-eclipse-temurin-17" {
-		t.Errorf("RuntimeImage = %q, want %q", meta.StackGate.RuntimeImage, "maven:3-eclipse-temurin-17")
+	if meta.StackGate.RuntimeImage != "maven:jdk17" {
+		t.Errorf("RuntimeImage = %q, want %q", meta.StackGate.RuntimeImage, "maven:jdk17")
 	}
 	if meta.StackGate == nil {
 		t.Fatal("expected StackGate result in metadata")
@@ -65,7 +65,7 @@ func TestGateDocker_StackGate_PreCheckPass(t *testing.T) {
 // TestGateDocker_StackGate_PreCheckFailure consolidates mismatch, ambiguous, and unknown scenarios.
 func TestGateDocker_StackGate_PreCheckFailure(t *testing.T) {
 	t.Setenv("PLOY_CONTAINER_REGISTRY", "ghcr.io/iw2rmb/ploy")
-	expectedRuntimeImage := "ghcr.io/iw2rmb/ploy/maven:3-eclipse-temurin-17"
+	expectedRuntimeImage := "ghcr.io/iw2rmb/ploy/maven:jdk17"
 
 	tests := []struct {
 		name            string
@@ -216,7 +216,7 @@ func TestGateDocker_StackGate_ImageResolution(t *testing.T) {
 		},
 		{
 			name:      "default mapping file",
-			wantImage: "ghcr.io/iw2rmb/ploy/maven:3-eclipse-temurin-17",
+			wantImage: "ghcr.io/iw2rmb/ploy/maven:jdk17",
 		},
 		{
 			name: "stack-mapped image",

@@ -282,7 +282,7 @@ func TestBuildGateStageMetadata_JSONRoundTrip(t *testing.T) {
 					Tool:     "maven",
 					Release:  "17",
 				},
-				RuntimeImage: "maven:3-eclipse-temurin-17",
+				RuntimeImage: "maven:jdk17",
 				Result:       "pass",
 			},
 		}

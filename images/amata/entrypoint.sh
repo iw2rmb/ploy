@@ -15,7 +15,6 @@ File delivery (Hydra):
 Behavior:
   - Always executes the amata binary.
   - If invoked without args and /in/amata.yaml exists, runs: amata run /in/amata.yaml
-  - Imports extra CA certs from /etc/ploy/ca when present.
 USAGE
 }
 
@@ -37,11 +36,6 @@ activate_ccr_if_configured() {
     eval "$(ccr activate)"
   fi
 }
-if [[ -f /usr/local/lib/ploy/install_ploy_ca_bundle.sh ]]; then
-  # CA bootstrap is optional for some image variants.
-  source /usr/local/lib/ploy/install_ploy_ca_bundle.sh
-fi
-
 case "${1:-}" in
   -h|--help)
     usage
@@ -56,9 +50,6 @@ fi
 out_dir="${OUTDIR:-/out}"
 mkdir -p "$out_dir" "$codex_config_dir"
 check_hydra_configs
-if declare -f install_ploy_ca_bundle >/dev/null 2>&1; then
-  install_ploy_ca_bundle
-fi
 activate_ccr_if_configured
 
 echo "[amata] starting amata run" >&2

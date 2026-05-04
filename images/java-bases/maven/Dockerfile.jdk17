@@ -1,13 +1,20 @@
-FROM maven:3.9.11-eclipse-temurin-17
+FROM docker-hosted.artifactory.tcsbank.ru/sec-base-images/ubuntu-noble-java-17-cicd:latest
 
 LABEL org.opencontainers.image.title="java-base-maven-jdk17" \
-    org.opencontainers.image.description="Ploy Java base lane: Maven with JDK 17 and unified CA bootstrap" \
+    org.opencontainers.image.description="Ploy Java base lane: Maven with JDK 17" \
     org.opencontainers.image.source="https://github.com/iw2rmb/ploy" \
     org.opencontainers.image.licenses="MIT"
 
-COPY --chmod=755 images/install_ploy_ca_bundle.sh /usr/local/lib/ploy/install_ploy_ca_bundle.sh
-RUN --mount=type=secret,id=ploy_ca_certs,required=false \
-    bash -euxo pipefail -c 'if [[ -s /run/secrets/ploy_ca_certs ]]; then mkdir -p /etc/ploy/certs; cp /run/secrets/ploy_ca_certs /etc/ploy/certs/ca.crt; source /usr/local/lib/ploy/install_ploy_ca_bundle.sh; PLOY_CA_IMPORT_JAVA=1 install_ploy_ca_bundle; fi'
+RUN bash -euxo pipefail -c 'for i in {1..5}; do \
+      if apt-get -o Acquire::Retries=5 update \
+        && DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=5 install -y --no-install-recommends \
+        maven bash git jq; then \
+        break; \
+      fi; \
+      if [[ "$i" -eq 5 ]]; then exit 1; fi; \
+      sleep $((i*5)); \
+    done' \
+    && rm -rf /var/lib/apt/lists/*
 
 ENV LANG=C.UTF-8 \
     LC_ALL=C.UTF-8 \

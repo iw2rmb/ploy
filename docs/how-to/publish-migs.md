@@ -24,7 +24,8 @@ Local Registry Prerequisites
 
 Publish all Migs images
 ```bash
-# Optional: custom PEM bundle (path or inline PEM content) for build-time TLS interception environments
+# Optional: custom PEM bundle (path or inline PEM content) for build-time TLS interception
+# when building runtime images (`server`, `node`)
 # export PLOY_CA_CERTS=/path/to/ca-bundle.pem
 
 images/build-and-push.sh
@@ -32,7 +33,7 @@ images/build-and-push.sh
 # - Amata lanes: java-17/21/25-codex-amata-{maven,gradle}
 # - ORW lanes: orw-cli-{maven,gradle} and orw-cli-{maven,gradle}-jdk{21,25}
 # - Gate Gradle: gate-gradle:jdk11,jdk17,jdk21,jdk25
-# - Gate Maven: maven:3-eclipse-temurin-11,17,21,25
+# - Gate Maven: maven:jdk11,jdk17,jdk21,jdk25
 # - Java bases: java-base-maven:jdk11,jdk17,jdk21,jdk25
 #               java-base-gradle:jdk11,jdk17,jdk21,jdk25
 #               java-base-temurin:jdk17,jdk21,jdk25
@@ -46,8 +47,7 @@ Build-time custom CA bundle (`PLOY_CA_CERTS`):
 - Accepts either:
   - filesystem path to PEM bundle, or
   - inline PEM content in the env variable itself.
-- Build scripts forward it as BuildKit secret `ploy_ca_certs`.
-- Dockerfiles mount that secret and place it at `/etc/ploy/certs/ca.crt` before network steps.
+- Build scripts forward it as BuildKit secret `ploy_ca_certs` for `server` and `node` builds only.
 
 Build Gate image mapping source of truth:
 - `gates/stacks.yaml`
@@ -56,10 +56,10 @@ Build Gate image mapping source of truth:
   - `$PLOY_CONTAINER_REGISTRY/gate-gradle:jdk17`
   - `$PLOY_CONTAINER_REGISTRY/gate-gradle:jdk21`
   - `$PLOY_CONTAINER_REGISTRY/gate-gradle:jdk25`
-  - `$PLOY_CONTAINER_REGISTRY/maven:3-eclipse-temurin-11`
-  - `$PLOY_CONTAINER_REGISTRY/maven:3-eclipse-temurin-17`
-  - `$PLOY_CONTAINER_REGISTRY/java-base-maven:jdk21`
-  - `$PLOY_CONTAINER_REGISTRY/java-base-maven:jdk25`
+  - `$PLOY_CONTAINER_REGISTRY/maven:jdk11`
+  - `$PLOY_CONTAINER_REGISTRY/maven:jdk17`
+  - `$PLOY_CONTAINER_REGISTRY/maven:jdk21`
+  - `$PLOY_CONTAINER_REGISTRY/maven:jdk25`
 
 Runtime CA support is separate from build-time CA injection.
 Register runtime CA bundles via `ploy config ca set --file /path/to/ca-bundle.pem` so the

@@ -14,7 +14,7 @@ import (
 //
 //	{
 //	  "stack": { "language": "java", "release": "17", "tool": "maven" },
-//	  "image": "maven:3-eclipse-temurin-17"
+//	  "image": "maven:jdk17"
 //	}
 func parseBuildGateImageRule(raw map[string]any, prefix string) (BuildGateImageRule, error) {
 	var rule BuildGateImageRule
@@ -50,7 +50,7 @@ func parseBuildGateImageRule(raw map[string]any, prefix string) (BuildGateImageR
 // Expected format:
 //
 //	[
-//	  { "stack": { "language": "java", "release": "17", "tool": "maven" }, "image": "maven:3-eclipse-temurin-17" },
+//	  { "stack": { "language": "java", "release": "17", "tool": "maven" }, "image": "maven:jdk17" },
 //	  { "stack": { "language": "java", "release": "17" }, "image": "eclipse-temurin:17-jdk" }
 //	]
 func parseBuildGateImageRules(raw []any, prefix string) ([]BuildGateImageRule, error) {

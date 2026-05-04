@@ -1,6 +1,6 @@
 # invalid-missing-language.yaml - Missing required lang field
 stacks:
-  - image: maven:3-eclipse-temurin-17
+  - image: maven:jdk17
     tool: maven
     release: "17"
     profile: profiles/java-17-maven.yaml

@@ -17,7 +17,7 @@ func TestBuildGateImageRule_Specificity(t *testing.T) {
 			name: "tool-specific (language+tool+release)",
 			rule: BuildGateImageRule{
 				Stack: StackExpectation{Language: "java", Tool: "maven", Release: "17"},
-				Image: "maven:3-eclipse-temurin-17",
+				Image: "maven:jdk17",
 			},
 			want: 3,
 		},
@@ -173,7 +173,7 @@ func TestBuildGateImageMapping_Validate(t *testing.T) {
 			name: "valid mapping",
 			mapping: BuildGateImageMapping{
 				Images: []BuildGateImageRule{
-					{Stack: StackExpectation{Language: "java", Release: "17", Tool: "maven"}, Image: "maven:3-eclipse-temurin-17"},
+					{Stack: StackExpectation{Language: "java", Release: "17", Tool: "maven"}, Image: "maven:jdk17"},
 					{Stack: StackExpectation{Language: "java", Release: "17"}, Image: "eclipse-temurin:17-jdk"},
 				},
 			},
@@ -262,7 +262,7 @@ func TestBuildGateImageRule_ParseRoundTrip(t *testing.T) {
 		BuildGate: &BuildGateConfig{
 			Enabled: true,
 			Images: []BuildGateImageRule{
-				{Stack: StackExpectation{Language: "java", Release: "17", Tool: "maven"}, Image: "maven:3-eclipse-temurin-17"},
+				{Stack: StackExpectation{Language: "java", Release: "17", Tool: "maven"}, Image: "maven:jdk17"},
 				{Stack: StackExpectation{Language: "java", Release: "17"}, Image: "eclipse-temurin:17-jdk"},
 				{Stack: StackExpectation{Language: "java", Release: "11", Tool: "gradle"}, Image: "gradle:8.8-jdk11"},
 			},
@@ -317,7 +317,7 @@ func TestParseMigSpecJSON_BuildGateImages(t *testing.T) {
 			"images": [
 				{
 					"stack": {"language": "java", "release": "17", "tool": "maven"},
-					"image": "maven:3-eclipse-temurin-17"
+					"image": "maven:jdk17"
 				},
 				{
 					"stack": {"language": "java", "release": "17"},
@@ -351,8 +351,8 @@ func TestParseMigSpecJSON_BuildGateImages(t *testing.T) {
 	if rule0.Stack.Tool != "maven" {
 		t.Errorf("images[0].stack.tool = %q, want %q", rule0.Stack.Tool, "maven")
 	}
-	if rule0.Image != "maven:3-eclipse-temurin-17" {
-		t.Errorf("images[0].image = %q, want %q", rule0.Image, "maven:3-eclipse-temurin-17")
+	if rule0.Image != "maven:jdk17" {
+		t.Errorf("images[0].image = %q, want %q", rule0.Image, "maven:jdk17")
 	}
 
 	// Verify second rule (tool-agnostic).

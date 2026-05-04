@@ -23,7 +23,7 @@ func writeDummyProfile(t *testing.T, path string) {
 // TestBuildGateImageResolver_Resolve tests resolution logic.
 func TestBuildGateImageResolver_Resolve(t *testing.T) {
 	rules := []contracts.BuildGateImageRule{
-		{Stack: contracts.StackExpectation{Language: "java", Release: "17", Tool: "maven"}, Image: "maven:3-eclipse-temurin-17"},
+		{Stack: contracts.StackExpectation{Language: "java", Release: "17", Tool: "maven"}, Image: "maven:jdk17"},
 		{Stack: contracts.StackExpectation{Language: "java", Release: "17", Tool: "gradle"}, Image: "gradle:8.8-jdk17"},
 		{Stack: contracts.StackExpectation{Language: "java", Release: "17"}, Image: "eclipse-temurin:17-jdk"},
 		{Stack: contracts.StackExpectation{Language: "java", Release: "11"}, Image: "eclipse-temurin:11-jdk"},
@@ -40,7 +40,7 @@ func TestBuildGateImageResolver_Resolve(t *testing.T) {
 		{
 			name: "exact match maven",
 			exp:  contracts.StackExpectation{Language: "java", Release: "17", Tool: "maven"},
-			want: "maven:3-eclipse-temurin-17",
+			want: "maven:jdk17",
 		},
 		{
 			name: "exact match gradle",
@@ -193,7 +193,7 @@ func TestBuildGateImageResolver_ExpandsRegistryPrefixFromEnv(t *testing.T) {
 	resolver, err := NewBuildGateImageResolver("", []contracts.BuildGateImageRule{
 		{
 			Stack: contracts.StackExpectation{Language: "java", Release: "17", Tool: "maven"},
-			Image: "$PLOY_CONTAINER_REGISTRY/maven:3-eclipse-temurin-17",
+			Image: "$PLOY_CONTAINER_REGISTRY/maven:jdk17",
 		},
 	}, false)
 	if err != nil {
@@ -204,7 +204,7 @@ func TestBuildGateImageResolver_ExpandsRegistryPrefixFromEnv(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Resolve() error: %v", err)
 	}
-	want := "192.0.2.25:5001/ploy/maven:3-eclipse-temurin-17"
+	want := "192.0.2.25:5001/ploy/maven:jdk17"
 	if got != want {
 		t.Fatalf("Resolve() = %q, want %q", got, want)
 	}
@@ -235,7 +235,7 @@ func TestBuildGateImageResolver_UnresolvedEnvFailsWhenUnset(t *testing.T) {
 	_, err := NewBuildGateImageResolver("", []contracts.BuildGateImageRule{
 		{
 			Stack: contracts.StackExpectation{Language: "java", Release: "17", Tool: "maven"},
-			Image: "$PLOY_TEST_UNSET_GATE_REGISTRY/maven:3-eclipse-temurin-17",
+			Image: "$PLOY_TEST_UNSET_GATE_REGISTRY/maven:jdk17",
 		},
 	}, false)
 	if err == nil {
@@ -284,7 +284,7 @@ func TestBuildGateImageResolver_LoadValidFile(t *testing.T) {
 		{
 			name: "java 17 maven",
 			exp:  contracts.StackExpectation{Language: "java", Release: "17", Tool: "maven"},
-			want: "maven:3-eclipse-temurin-17",
+			want: "maven:jdk17",
 		},
 		{
 			name: "java 17 gradle",
@@ -299,7 +299,7 @@ func TestBuildGateImageResolver_LoadValidFile(t *testing.T) {
 		{
 			name: "java 11 maven",
 			exp:  contracts.StackExpectation{Language: "java", Release: "11", Tool: "maven"},
-			want: "maven:3-eclipse-temurin-11",
+			want: "maven:jdk11",
 		},
 	}
 
