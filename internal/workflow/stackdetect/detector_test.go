@@ -10,7 +10,7 @@ import (
 
 func TestDetect_Success(t *testing.T) {
 	cases := []struct {
-		name     string
+		name      string
 		workspace string
 		wantLang  string
 		wantTool  string
@@ -72,6 +72,12 @@ func TestDetect_Success(t *testing.T) {
 			workspace: filepath.Join("testdata", "gradle", "precedence-compatibility-over-kotlin-jvmtarget"),
 			wantLang:  "java", wantTool: "gradle", wantRel: "11",
 			evidence: map[string]string{"sourceCompatibility": "11"},
+		},
+		{
+			name:      "gradle/java21-javaversion-extension",
+			workspace: filepath.Join("testdata", "gradle", "java21-javaversion-extension"),
+			wantLang:  "java", wantTool: "gradle", wantRel: "21",
+			evidence: map[string]string{"javaVersion": "21"},
 		},
 		{
 			name:      "go/go125",
