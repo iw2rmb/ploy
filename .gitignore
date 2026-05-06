@@ -32,17 +32,6 @@ __pycache__/
 .gradle/
 .m2/
 
-java/target
-java/*-work
-java/*.json
-!java/report.schema.json
-!java/openrewrite-plan.schema.json
-!java/openrewrite-coverage.schema.json
-!java/deprecated-usage-report.schema.json
-java/*.classpath
-java/*.txt
-java/*.log
-
 # Artifacts
 *.img
 *.qcow2

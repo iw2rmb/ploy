@@ -33,6 +33,10 @@ var (
 	// java { toolchain { languageVersion.set(JavaLanguageVersion.of("17")) } }
 	toolchainLanguageVersionSetRegex = regexp.MustCompile(`(?s)toolchain\s*\{.*?languageVersion\.set\(\s*JavaLanguageVersion\.of\(\s*"?(\d+(?:\.\d+)?)"?\s*\)\s*\)`)
 
+	// dependencyManagerRootExtension { javaVersion = JavaVersion.VERSION_21 }.
+	// Also supports unqualified form: javaVersion = VERSION_21.
+	javaVersionAssignmentRegex = regexp.MustCompile(`\bjavaVersion\s*=\s*(?:"?(\d+(?:\.\d+)?)"?|(?:JavaVersion\.)?VERSION_([0-9_]+))`)
+
 	// Dynamic logic patterns that should trigger "unknown".
 	dynamicPatterns = []*regexp.Regexp{
 		regexp.MustCompile(`findProperty\s*\(`),
@@ -51,6 +55,7 @@ var (
 //  1. sourceCompatibility / targetCompatibility (must match if both present)
 //  2. kotlinOptions.jvmTarget (best-effort; used only if source/target are absent)
 //  3. java.toolchain.languageVersion
+//  4. javaVersion assignment (e.g. dependencyManagerRootExtension.javaVersion)
 func detectGradle(ctx context.Context, workspace, gradlePath string) (*Observation, error) {
 	content, err := os.ReadFile(gradlePath)
 	if err != nil {
@@ -180,6 +185,19 @@ func detectGradle(ctx context.Context, workspace, gradlePath string) (*Observati
 			Tool:     "gradle",
 			Release:  &version,
 			Evidence: evidence,
+		}, nil
+	}
+
+	// 4. Generic javaVersion assignment often used by custom Gradle extensions.
+	javaVersionAssignment := extractCompatibilityVersion(javaVersionAssignmentRegex, text)
+	if javaVersionAssignment != "" {
+		return &Observation{
+			Language: "java",
+			Tool:     "gradle",
+			Release:  &javaVersionAssignment,
+			Evidence: []EvidenceItem{{
+				Path: relativePath, Key: "javaVersion", Value: javaVersionAssignment,
+			}},
 		}, nil
 	}
 

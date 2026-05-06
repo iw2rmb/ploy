@@ -245,6 +245,49 @@ kotlinOptions {
 	}
 }
 
+func TestJavaVersionAssignmentRegex(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "qualified constant",
+			input:    `javaVersion = JavaVersion.VERSION_21`,
+			expected: "21",
+		},
+		{
+			name:     "unqualified constant",
+			input:    `javaVersion = VERSION_17`,
+			expected: "17",
+		},
+		{
+			name:     "legacy constant",
+			input:    `javaVersion = JavaVersion.VERSION_1_8`,
+			expected: "8",
+		},
+		{
+			name:     "numeric assignment",
+			input:    `javaVersion = 11`,
+			expected: "11",
+		},
+		{
+			name:     "no match",
+			input:    `sourceCompatibility = 17`,
+			expected: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := extractCompatibilityVersion(javaVersionAssignmentRegex, tt.input)
+			if result != tt.expected {
+				t.Errorf("expected %q, got %q", tt.expected, result)
+			}
+		})
+	}
+}
+
 func TestDetectGradle(t *testing.T) {
 	t.Parallel()
 
@@ -295,6 +338,26 @@ java {
 }
 `,
 			wantRelease: "21",
+		},
+		{
+			name:     "dependency manager javaVersion assignment qualified",
+			fileName: "build.gradle.kts",
+			content: `
+dependencyManagerRootExtension {
+    javaVersion = JavaVersion.VERSION_21
+}
+`,
+			wantRelease: "21",
+		},
+		{
+			name:     "dependency manager javaVersion assignment unqualified",
+			fileName: "build.gradle.kts",
+			content: `
+dependencyManagerRootExtension {
+    javaVersion = VERSION_17
+}
+`,
+			wantRelease: "17",
 		},
 	}
 
