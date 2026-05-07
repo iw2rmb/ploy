@@ -90,6 +90,7 @@ func toDockerAuthConfig(entry dockerAuthEntry, serverAddress string) (registry.A
 }
 
 func encodeRegistryAuth(cfg registry.AuthConfig) (string, error) {
+	// #nosec G117 -- marshaling runtime-provided Docker auth config; no secrets are hardcoded
 	data, err := json.Marshal(cfg)
 	if err != nil {
 		return "", err
