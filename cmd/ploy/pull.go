@@ -277,7 +277,7 @@ func resolveGitDir(ctx context.Context) (string, error) {
 // Returns the state and true if it exists, or empty state and false if not.
 // Logs a warning if the file exists but contains invalid JSON.
 func loadPullState(path string) (pullState, bool) {
-	data, err := os.ReadFile(path)
+	data, err := readFileRooted(path)
 	if err != nil {
 		return pullState{}, false
 	}

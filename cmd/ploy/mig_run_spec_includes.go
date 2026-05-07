@@ -3,7 +3,6 @@ package main
 import (
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -103,7 +102,7 @@ func loadYAMLFromCache(filePath string, cache map[string]*yaml.Node) (*yaml.Node
 	if root, ok := cache[filePath]; ok {
 		return root, nil
 	}
-	data, err := os.ReadFile(filePath)
+	data, err := readFileRooted(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("read spec %s: %w", filePath, err)
 	}

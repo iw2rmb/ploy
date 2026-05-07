@@ -171,7 +171,7 @@ func compileHookManifestSource(
 	seen map[string]string,
 	bundleMap map[string]string,
 ) (string, error) {
-	data, err := os.ReadFile(manifestPath)
+	data, err := readFileRooted(manifestPath)
 	if err != nil {
 		return "", fmt.Errorf("read hook manifest %q: %w", manifestPath, err)
 	}

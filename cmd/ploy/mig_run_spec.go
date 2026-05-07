@@ -516,14 +516,15 @@ func buildSpecPayload(
 	var specMap map[string]any
 	specBaseDir := ""
 	if specFile != "" {
-		specBaseDir = filepath.Dir(specFile)
-		data, err := os.ReadFile(specFile)
+		cleanSpecPath := filepath.Clean(specFile)
+		specBaseDir = filepath.Dir(cleanSpecPath)
+		data, err := readFileRooted(cleanSpecPath)
 		if err != nil {
-			return nil, fmt.Errorf("read spec file %s: %w", specFile, err)
+			return nil, fmt.Errorf("read spec file %s: %w", cleanSpecPath, err)
 		}
 		specMap, err = parseSpecInputToMap(data, specBaseDir)
 		if err != nil {
-			return nil, fmt.Errorf("parse spec file %s (not valid JSON or YAML): %w", specFile, err)
+			return nil, fmt.Errorf("parse spec file %s (not valid JSON or YAML): %w", cleanSpecPath, err)
 		}
 	} else {
 		specMap = make(map[string]any)

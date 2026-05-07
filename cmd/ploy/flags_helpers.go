@@ -147,7 +147,7 @@ func expandPath(path string) string {
 
 // validateFileReadable checks if a file exists and is readable.
 func validateFileReadable(path string) error {
-	info, err := os.Stat(path)
+	info, err := statFileRooted(path)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return fmt.Errorf("file does not exist: %s", path)
@@ -158,11 +158,12 @@ func validateFileReadable(path string) error {
 		return fmt.Errorf("path is a directory, not a file: %s", path)
 	}
 	// Try to open for reading to verify permissions.
-	f, err := os.Open(path)
+	f, root, err := openFileRooted(path)
 	if err != nil {
 		return fmt.Errorf("cannot read file %s: %w", path, err)
 	}
 	_ = f.Close()
+	_ = root.Close()
 	return nil
 }
 

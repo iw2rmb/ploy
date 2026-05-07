@@ -447,7 +447,7 @@ func loadSpec(ctx context.Context, base *url.URL, client *http.Client, path stri
 		}
 	} else {
 		// Read spec from file.
-		data, err = os.ReadFile(path)
+		data, err = readFileRooted(path)
 		if err != nil {
 			return nil, fmt.Errorf("read file %s: %w", path, err)
 		}
