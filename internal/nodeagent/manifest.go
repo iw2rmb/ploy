@@ -212,21 +212,12 @@ func sbomJobImageSpec(release string) contracts.JobImage {
 	if prefix == "" {
 		prefix = sbomImageRegistryDefault
 	}
-	gateGradleTag := sbomRuntimeTagForRelease(release)
-	mavenTag := "3-eclipse-temurin-17"
-	switch normalizeSBOMRuntimeRelease(release) {
-	case sbomReleaseJDK11:
-		mavenTag = "3-eclipse-temurin-11"
-	case sbomReleaseJDK21:
-		mavenTag = "3-eclipse-temurin-21"
-	case sbomReleaseJDK25:
-		mavenTag = "3-eclipse-temurin-25"
-	}
+	runtimeTag := sbomRuntimeTagForRelease(release)
 	return contracts.JobImage{
 		ByStack: map[contracts.MigStack]string{
-			contracts.MigStackJavaMaven:  prefix + "/maven:" + mavenTag,
-			contracts.MigStackJavaGradle: prefix + "/gate-gradle:" + gateGradleTag,
-			contracts.MigStackDefault:    prefix + "/maven:" + mavenTag,
+			contracts.MigStackJavaMaven:  prefix + "/maven:" + runtimeTag,
+			contracts.MigStackJavaGradle: prefix + "/gate-gradle:" + runtimeTag,
+			contracts.MigStackDefault:    prefix + "/maven:" + runtimeTag,
 		},
 	}
 }
