@@ -54,7 +54,7 @@ func buildSourceArchive(resolvedPath string) ([]byte, error) {
 			return nil, fmt.Errorf("walk dir: %w", err)
 		}
 	} else {
-		data, err := os.ReadFile(resolvedPath)
+		data, err := readFileRooted(resolvedPath)
 		if err != nil {
 			return nil, fmt.Errorf("read file %s: %w", resolvedPath, err)
 		}
@@ -150,7 +150,7 @@ func addDirToTar(tw *tar.Writer, dirPath, namePrefix string) error {
 				return err
 			}
 		} else {
-			data, err := os.ReadFile(childPath)
+			data, err := readFileRooted(childPath)
 			if err != nil {
 				return fmt.Errorf("read file %s: %w", childPath, err)
 			}
