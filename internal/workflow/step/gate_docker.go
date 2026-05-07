@@ -182,7 +182,7 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 
 	// Build container spec with workspace + /out mounts.
 	gateOutDir := filepath.Join(workspace, BuildGateWorkspaceOutDir)
-	if err := os.MkdirAll(gateOutDir, 0o755); err != nil {
+	if err := os.MkdirAll(gateOutDir, 0o750); err != nil {
 		return nil, fmt.Errorf("prepare build gate out dir: %w", err)
 	}
 	mounts := []ContainerMount{
@@ -216,7 +216,7 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 	mounts = append(mounts, toolCacheMounts...)
 	if strings.EqualFold(plan.tool, "gradle") {
 		gradleCacheHitsHostPath := filepath.Join(workspace, BuildGateGradleCacheHitsHostFile)
-		if err := os.WriteFile(gradleCacheHitsHostPath, nil, 0o644); err != nil {
+		if err := os.WriteFile(gradleCacheHitsHostPath, nil, 0o600); err != nil {
 			return nil, fmt.Errorf("prepare gradle cache hits file: %w", err)
 		}
 		mounts = append(mounts, ContainerMount{
@@ -341,7 +341,7 @@ func buildGateToolCacheMounts(language, tool, release string) ([]ContainerMount,
 		sanitizeCachePathPart(tool, "unknown-tool"),
 		sanitizeCachePathPart(release, "unknown-release"),
 	)
-	if err := os.MkdirAll(hostPath, 0o755); err != nil {
+	if err := os.MkdirAll(hostPath, 0o750); err != nil {
 		return nil, err
 	}
 	if err := pruneGateCacheDirOldestFirst(hostPath); err != nil {
@@ -356,18 +356,18 @@ func buildGateToolCacheMounts(language, tool, release string) ([]ContainerMount,
 
 func resolveBuildGateCacheRoot() (string, error) {
 	if override := strings.TrimSpace(os.Getenv(buildGateCacheRootEnv)); override != "" {
-		if err := os.MkdirAll(override, 0o755); err != nil {
+		if err := os.MkdirAll(override, 0o750); err != nil {
 			return "", err
 		}
 		return override, nil
 	}
-	if err := os.MkdirAll(buildGateCacheRootDir, 0o755); err == nil {
+	if err := os.MkdirAll(buildGateCacheRootDir, 0o750); err == nil {
 		return buildGateCacheRootDir, nil
 	} else if !os.IsPermission(err) {
 		return "", err
 	}
 	fallback := filepath.Join(os.TempDir(), buildGateTmpCacheRoot)
-	if err := os.MkdirAll(fallback, 0o755); err != nil {
+	if err := os.MkdirAll(fallback, 0o750); err != nil {
 		return "", err
 	}
 	return fallback, nil

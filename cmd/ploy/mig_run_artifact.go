@@ -28,7 +28,7 @@ import (
 // It streams bytes to disk (no in‑memory buffering), produces deterministic filenames,
 // and writes a manifest.json with stable, sorted entries for reproducible output.
 func downloadRunArtifacts(ctx context.Context, base *url.URL, httpClient *http.Client, runID, dir string, out io.Writer) error {
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return fmt.Errorf("create artifact dir %s: %w", dir, err)
 	}
 	// Fetch run status to retrieve artifact CIDs.
@@ -153,7 +153,7 @@ func downloadRunArtifacts(ctx context.Context, base *url.URL, httpClient *http.C
 			path := filepath.Join(dir, filename)
 
 			// Stream download to disk to avoid buffering large artifacts in memory.
-			f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
+			f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
 			if err != nil {
 				_ = dresp.Body.Close()
 				return fmt.Errorf("open artifact %s: %w", filename, err)
@@ -176,7 +176,7 @@ func downloadRunArtifacts(ctx context.Context, base *url.URL, httpClient *http.C
 	data, _ := json.MarshalIndent(struct {
 		Artifacts []manifestItem `json:"artifacts"`
 	}{Artifacts: items}, "", "  ")
-	if err := os.WriteFile(manifestPath, data, 0o644); err != nil {
+	if err := os.WriteFile(manifestPath, data, 0o600); err != nil {
 		return fmt.Errorf("write manifest: %w", err)
 	}
 	_, _ = fmt.Fprintf(out, "Downloaded %d artifacts to %s\n", downloaded, dir)

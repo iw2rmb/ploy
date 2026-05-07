@@ -177,8 +177,8 @@ func (c RepoDiffsCommand) Run(ctx context.Context) error {
 
 	if strings.TrimSpace(c.SavePath) != "" {
 		// ensure dir exists
-		_ = os.MkdirAll(filepath.Dir(c.SavePath), 0o755)
-		if err := os.WriteFile(c.SavePath, patch, 0o644); err != nil {
+		_ = os.MkdirAll(filepath.Dir(c.SavePath), 0o750)
+		if err := os.WriteFile(c.SavePath, patch, 0o600); err != nil {
 			return fmt.Errorf("write patch: %w", err)
 		}
 		_, _ = fmt.Fprintf(out, "Saved diff to %s (%d bytes)\n", c.SavePath, len(patch))

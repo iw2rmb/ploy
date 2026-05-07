@@ -621,14 +621,14 @@ func restoreSBOMOutFilesFromBundle(bundle []byte, outDir string) (int, error) {
 		}
 		relative := strings.TrimPrefix(entry, "out/")
 		targetPath := filepath.Join(outDir, filepath.FromSlash(relative))
-		if err := os.MkdirAll(filepath.Dir(targetPath), 0o755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(targetPath), 0o750); err != nil {
 			return restored, fmt.Errorf("mkdir sbom output dir: %w", err)
 		}
 		payload, readErr := io.ReadAll(tarReader)
 		if readErr != nil {
 			return restored, fmt.Errorf("read artifact entry %q: %w", entry, readErr)
 		}
-		if writeErr := os.WriteFile(targetPath, payload, 0o644); writeErr != nil {
+		if writeErr := os.WriteFile(targetPath, payload, 0o600); writeErr != nil {
 			return restored, fmt.Errorf("write sbom output %q: %w", targetPath, writeErr)
 		}
 		restored++

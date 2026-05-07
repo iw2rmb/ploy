@@ -55,7 +55,7 @@ func (r *runController) rehydrateWorkspaceForStep(
 	} else if !os.IsNotExist(err) {
 		return "", fmt.Errorf("inspect sticky workspace: %w", err)
 	}
-	if err := os.MkdirAll(filepath.Dir(workspacePath), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(workspacePath), 0o750); err != nil {
 		return "", fmt.Errorf("create sticky workspace parent dir: %w", err)
 	}
 
@@ -66,7 +66,7 @@ func (r *runController) rehydrateWorkspaceForStep(
 		baseRoot = os.TempDir()
 	}
 	baseClone := filepath.Join(baseRoot, "ploy", "run", runID, "base")
-	if err := os.MkdirAll(baseClone, 0o755); err != nil {
+	if err := os.MkdirAll(baseClone, 0o750); err != nil {
 		return "", fmt.Errorf("create base clone dir: %w", err)
 	}
 
@@ -187,7 +187,7 @@ func ensureRunRepoShareDir(runID types.RunID, repoID types.MigRepoID) (string, e
 	if strings.TrimSpace(shareDir) == "" {
 		return "", nil
 	}
-	if err := os.MkdirAll(shareDir, 0o755); err != nil {
+	if err := os.MkdirAll(shareDir, 0o750); err != nil {
 		return "", fmt.Errorf("create run/repo share dir: %w", err)
 	}
 	return shareDir, nil

@@ -176,21 +176,21 @@ func (a *Agent) bootstrap(ctx context.Context) error {
 
 	// Write CA certificate
 	slog.Info("writing certificates to disk")
-	if err := os.MkdirAll("/etc/ploy/pki", 0755); err != nil {
+	if err := os.MkdirAll("/etc/ploy/pki", 0o750); err != nil {
 		return fmt.Errorf("create pki directory: %w", err)
 	}
 
-	if err := os.WriteFile(a.cfg.HTTP.TLS.CAPath, []byte(caCert), 0644); err != nil {
+	if err := os.WriteFile(a.cfg.HTTP.TLS.CAPath, []byte(caCert), 0o600); err != nil {
 		return fmt.Errorf("write CA cert: %w", err)
 	}
 
 	// Write node certificate
-	if err := os.WriteFile(a.cfg.HTTP.TLS.CertPath, []byte(cert), 0644); err != nil {
+	if err := os.WriteFile(a.cfg.HTTP.TLS.CertPath, []byte(cert), 0o600); err != nil {
 		return fmt.Errorf("write node cert: %w", err)
 	}
 
 	// Write node private key (restricted permissions)
-	if err := os.WriteFile(a.cfg.HTTP.TLS.KeyPath, []byte(keyBundle.KeyPEM), 0600); err != nil {
+	if err := os.WriteFile(a.cfg.HTTP.TLS.KeyPath, []byte(keyBundle.KeyPEM), 0o600); err != nil {
 		return fmt.Errorf("write node key: %w", err)
 	}
 

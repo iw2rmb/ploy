@@ -51,7 +51,7 @@ func materializeValidatedSBOMOutput(outDir, shareDir string, snapshotPath string
 	}
 
 	canonicalPath := filepath.Join(outDir, preGateCanonicalSBOMFileName)
-	if err := os.WriteFile(canonicalPath, raw, 0o644); err != nil {
+	if err := os.WriteFile(canonicalPath, raw, 0o600); err != nil {
 		return fmt.Errorf("write /out/%s: %w", preGateCanonicalSBOMFileName, err)
 	}
 	if err := validateCanonicalSBOMPath(canonicalPath); err != nil {

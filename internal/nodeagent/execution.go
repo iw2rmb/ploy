@@ -15,6 +15,8 @@ import (
 	gitpkg "github.com/iw2rmb/ploy/internal/nodeagent/git"
 )
 
+const maxGzippedPatchBytes int64 = 16 << 20
+
 // RehydrateWorkspaceFromBaseAndDiffs copies the base clone and applies ordered per-step diffs
 // to reconstruct workspace state for multi-step runs.
 func RehydrateWorkspaceFromBaseAndDiffs(ctx context.Context, baseClonePath, destWorkspace string, diffs [][]byte) error {
@@ -103,12 +105,16 @@ func decompressPatch(gzippedPatch []byte) ([]byte, error) {
 		_ = reader.Close()
 	}()
 
-	var buf bytes.Buffer
-	if _, err := io.Copy(&buf, reader); err != nil {
+	limited := io.LimitReader(reader, maxGzippedPatchBytes+1)
+	patch, err := io.ReadAll(limited)
+	if err != nil {
 		return nil, fmt.Errorf("gzip decompression failed: %w", err)
 	}
+	if int64(len(patch)) > maxGzippedPatchBytes {
+		return nil, fmt.Errorf("gzip patch exceeds maximum uncompressed size (%d bytes)", maxGzippedPatchBytes)
+	}
 
-	return buf.Bytes(), nil
+	return patch, nil
 }
 
 // ensureBaselineCommitForRehydration creates a git commit after applying prior diffs
@@ -138,7 +144,7 @@ func createWorkspaceDir() (string, error) {
 	if base == "" {
 		base = os.TempDir()
 	}
-	if err := os.MkdirAll(base, 0o755); err != nil {
+	if err := os.MkdirAll(base, 0o750); err != nil {
 		return "", err
 	}
 	absBase, err := filepath.Abs(base)

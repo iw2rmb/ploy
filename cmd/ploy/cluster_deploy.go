@@ -58,7 +58,7 @@ func handleClusterDeploy(args []string, stderr io.Writer) (retErr error) {
 	if err := os.RemoveAll(deployDir); err != nil {
 		return fmt.Errorf("cluster deploy: reset %s: %w", deployDir, err)
 	}
-	if err := os.MkdirAll(deployDir, 0o755); err != nil {
+	if err := os.MkdirAll(deployDir, 0o750); err != nil {
 		return fmt.Errorf("cluster deploy: create %s: %w", deployDir, err)
 	}
 	if err := extractClusterDeployRuntimeAssets(deployDir); err != nil {
@@ -66,9 +66,6 @@ func handleClusterDeploy(args []string, stderr io.Writer) (retErr error) {
 	}
 
 	runScriptPath := filepath.Join(deployDir, "run.sh")
-	if err := os.Chmod(runScriptPath, 0o755); err != nil {
-		return fmt.Errorf("cluster deploy: make runtime script executable: %w", err)
-	}
 
 	env, err := buildClusterDeployEnv(deployDir)
 	if err != nil {
@@ -88,11 +85,11 @@ func ensureClusterDeployConfigSchema(configHome string) error {
 	if len(clusterDeployConfigSchema) == 0 {
 		return errors.New("cluster deploy: embedded config schema is empty")
 	}
-	if err := os.MkdirAll(configHome, 0o755); err != nil {
+	if err := os.MkdirAll(configHome, 0o750); err != nil {
 		return fmt.Errorf("cluster deploy: create config home %s: %w", configHome, err)
 	}
 	target := filepath.Join(configHome, "config.schema.json")
-	if err := os.WriteFile(target, clusterDeployConfigSchema, 0o644); err != nil {
+	if err := os.WriteFile(target, clusterDeployConfigSchema, 0o600); err != nil {
 		return fmt.Errorf("cluster deploy: write config schema %s: %w", target, err)
 	}
 	return nil
@@ -240,7 +237,7 @@ func extractClusterDeployRuntimeAssets(dstDir string) error {
 		}
 
 		if d.IsDir() {
-			if err := os.MkdirAll(targetPath, 0o755); err != nil {
+			if err := os.MkdirAll(targetPath, 0o750); err != nil {
 				return fmt.Errorf("cluster deploy: create dir %s: %w", targetPath, err)
 			}
 			return nil
@@ -263,7 +260,7 @@ func extractClusterDeployRuntimeAssets(dstDir string) error {
 		if err != nil {
 			return fmt.Errorf("cluster deploy: read embedded runtime file %q: %w", path, err)
 		}
-		if err := os.MkdirAll(filepath.Dir(targetPath), 0o755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(targetPath), 0o750); err != nil {
 			return fmt.Errorf("cluster deploy: create parent dir for %s: %w", targetPath, err)
 		}
 		if err := os.WriteFile(targetPath, content, mode); err != nil {

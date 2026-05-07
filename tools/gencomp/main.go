@@ -77,8 +77,8 @@ func main() {
 		}
 
 		// Write the generated completion script to the output file.
-		// Use 0644 permissions (readable by all, writable by owner).
-		if err := os.WriteFile(outFile, output, 0644); err != nil {
+		// Use 0600 permissions (owner read or write only).
+		if err := os.WriteFile(outFile, output, 0o600); err != nil {
 			fmt.Fprintf(os.Stderr, "error writing %s: %v\n", outFile, err)
 			os.Exit(1)
 		}

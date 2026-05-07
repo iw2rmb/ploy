@@ -19,7 +19,7 @@ func initLogging(cfg config.LoggingConfig) error {
 
 	var w io.Writer = os.Stderr
 	if cfg.File != "" {
-		f, err := os.OpenFile(cfg.File, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+		f, err := os.OpenFile(cfg.File, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 		if err != nil {
 			return fmt.Errorf("open log file: %w", err)
 		}

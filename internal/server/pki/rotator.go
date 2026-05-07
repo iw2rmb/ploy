@@ -115,7 +115,7 @@ func (r *DefaultRotator) Renew(ctx context.Context, cfg config.PKIConfig) error 
 		return fmt.Errorf("pki: create certificate: %w", err)
 	}
 	newCertPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})
-	if err := os.WriteFile(cfg.Certificate, newCertPEM, 0o644); err != nil {
+	if err := os.WriteFile(cfg.Certificate, newCertPEM, 0o600); err != nil {
 		return fmt.Errorf("pki: write cert: %w", err)
 	}
 	r.logger.Info("pki certificate renewed",

@@ -43,6 +43,8 @@ type diffListResponse struct {
 	Diffs []diffItem `json:"diffs"`
 }
 
+const maxAccumulatedDiffPlainBytes int64 = 64 << 20
+
 // listRunRepoDiffsHandler returns a JSON list of diffs for a specific repo execution
 // within a run. This is the v1 repo-scoped endpoint replacing the legacy run-scoped
 // diffs listing endpoint.
@@ -211,11 +213,28 @@ func downloadAccumulatedRunRepoDiff(
 			return false
 		}
 
-		if _, copyErr := io.Copy(&plain, zr); copyErr != nil {
+		remaining := maxAccumulatedDiffPlainBytes - int64(plain.Len())
+		if remaining <= 0 {
+			_ = zr.Close()
+			_ = rc.Close()
+			writeHTTPError(w, http.StatusRequestEntityTooLarge, "accumulated diff exceeds size limit")
+			slog.Error("download accumulated run repo diff: uncompressed size limit reached", "run_id", runID.String(), "repo_id", repoID.String(), "diff_id", diffID.String(), "limit_bytes", maxAccumulatedDiffPlainBytes)
+			return false
+		}
+
+		n, copyErr := io.Copy(&plain, io.LimitReader(zr, remaining+1))
+		if copyErr != nil {
 			_ = zr.Close()
 			_ = rc.Close()
 			writeHTTPError(w, http.StatusInternalServerError, "failed to read diff blob")
 			slog.Error("download accumulated run repo diff: gunzip copy failed", "run_id", runID.String(), "repo_id", repoID.String(), "diff_id", diffID.String(), "object_key", *item.ObjectKey, "err", copyErr)
+			return false
+		}
+		if n > remaining {
+			_ = zr.Close()
+			_ = rc.Close()
+			writeHTTPError(w, http.StatusRequestEntityTooLarge, "accumulated diff exceeds size limit")
+			slog.Error("download accumulated run repo diff: uncompressed size exceeded", "run_id", runID.String(), "repo_id", repoID.String(), "diff_id", diffID.String(), "object_key", *item.ObjectKey, "limit_bytes", maxAccumulatedDiffPlainBytes)
 			return false
 		}
 
