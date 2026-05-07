@@ -59,7 +59,7 @@ func (c *dockerPreClaimCleanup) EnsureCapacity(ctx context.Context) (bool, error
 	if workspaceRoot == "" {
 		workspaceRoot = runCacheRootDir()
 	}
-	if err := os.MkdirAll(workspaceRoot, 0o755); err != nil {
+	if err := os.MkdirAll(workspaceRoot, 0o750); err != nil {
 		return false, fmt.Errorf("ensure workspace root %q: %w", workspaceRoot, err)
 	}
 

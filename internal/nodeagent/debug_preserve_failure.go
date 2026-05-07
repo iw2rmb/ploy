@@ -13,7 +13,7 @@ import (
 
 func preserveFailureArtifacts(runID types.RunID, jobID types.JobID, workspace, outDir, inDir string) (string, error) {
 	root := filepath.Join(os.TempDir(), "ploy-preserved", runID.String(), jobID.String(), time.Now().UTC().Format("20060102T150405.000000000Z"))
-	if err := os.MkdirAll(root, 0o755); err != nil {
+	if err := os.MkdirAll(root, 0o750); err != nil {
 		return "", fmt.Errorf("create preserve root: %w", err)
 	}
 
@@ -51,7 +51,7 @@ func copyDirRsync(srcDir, dstDir string) error {
 	if _, err := exec.LookPath("rsync"); err != nil {
 		return fmt.Errorf("rsync unavailable: %w", err)
 	}
-	if err := os.MkdirAll(dstDir, 0o755); err != nil {
+	if err := os.MkdirAll(dstDir, 0o750); err != nil {
 		return fmt.Errorf("create destination: %w", err)
 	}
 	cmd := exec.Command("rsync", "-a", srcDir+"/", dstDir)
@@ -66,8 +66,8 @@ func copyFileBytes(srcFile, dstFile string) error {
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Dir(dstFile), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(dstFile), 0o750); err != nil {
 		return err
 	}
-	return os.WriteFile(dstFile, data, 0o644)
+	return os.WriteFile(dstFile, data, 0o600)
 }

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/lifecycle"
@@ -81,7 +82,10 @@ func (c *ClaimManager) reconcileRecoveredTerminalContainer(ctx context.Context, 
 		return fmt.Errorf("wait recovered terminal container: %w", err)
 	}
 
-	exitCode := int32(terminal.ExitCode)
+	exitCode, err := safeExitCodeInt32(terminal.ExitCode)
+	if err != nil {
+		return fmt.Errorf("normalize recovered terminal exit code: %w", err)
+	}
 	status := lifecycle.JobStatusFromExitCode(int(exitCode))
 
 	durationMs := int64(0)
@@ -99,4 +103,11 @@ func (c *ClaimManager) reconcileRecoveredTerminalContainer(ctx context.Context, 
 		return fmt.Errorf("upload recovered terminal status: %w", err)
 	}
 	return nil
+}
+
+func safeExitCodeInt32(exitCode int) (int32, error) {
+	if exitCode < math.MinInt32 || exitCode > math.MaxInt32 {
+		return 0, fmt.Errorf("exit code %d overflows int32", exitCode)
+	}
+	return int32(exitCode), nil
 }

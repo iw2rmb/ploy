@@ -109,7 +109,9 @@ func (g *gitFetcher) Fetch(ctx context.Context, repo *contracts.RepoMaterializat
 					return nil
 				}
 				// Cache invalid or corrupted; remove and fall through to fresh clone.
-				os.RemoveAll(dest)
+				if removeErr := os.RemoveAll(dest); removeErr != nil {
+					return fmt.Errorf("remove invalid cached clone destination %q: %w", dest, removeErr)
+				}
 			}
 			// Cache copy failed or invalid; fall through to fresh clone.
 		}
@@ -122,7 +124,7 @@ func (g *gitFetcher) Fetch(ctx context.Context, repo *contracts.RepoMaterializat
 		// Populate cache: copy dest to cache directory.
 		// Ignore errors here to avoid failing the overall fetch if cache write fails.
 		// The clone succeeded, so the workspace is valid even if caching fails.
-		if err := os.MkdirAll(filepath.Dir(cachedClonePath), 0o755); err == nil {
+		if err := os.MkdirAll(filepath.Dir(cachedClonePath), 0o750); err == nil {
 			_ = copyGitClone(dest, cachedClonePath)
 		}
 

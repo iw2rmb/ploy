@@ -20,6 +20,8 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
+const maxSpecBundleFileBytes int64 = 32 << 20
+
 // materializeHydraResources collects unique content hashes from the manifest's
 // CA/In/Out/Home entries, downloads each referenced spec bundle by its bundleID
 // (resolved via bundleMap), verifies the SHA-256 digest, and extracts the
@@ -57,7 +59,7 @@ func (r *runController) materializeResource(ctx context.Context, bundleID, hash,
 		return fmt.Errorf("resource %s: %w", hash, err)
 	}
 	dst := filepath.Join(stagingDir, hash)
-	if err := os.MkdirAll(dst, 0o755); err != nil {
+	if err := os.MkdirAll(dst, 0o750); err != nil {
 		return fmt.Errorf("create staging dir for %s: %w", hash, err)
 	}
 	if err := extractBundle(data, dst); err != nil {
@@ -213,7 +215,7 @@ func extractBundle(data []byte, stagingDir string) error {
 
 		switch hdr.Typeflag {
 		case tar.TypeDir:
-			if err := os.MkdirAll(dst, 0o755); err != nil {
+			if err := os.MkdirAll(dst, 0o750); err != nil {
 				return fmt.Errorf("create directory %q: %w", cleaned, err)
 			}
 			perm := hdr.FileInfo().Mode().Perm()
@@ -224,8 +226,14 @@ func extractBundle(data []byte, stagingDir string) error {
 			// child creation when directory mode is restrictive (e.g. no execute bit).
 			finalizeDirs[dst] = dirMeta{perm: perm, modTime: hdr.ModTime}
 		case tar.TypeReg:
-			if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+			if err := os.MkdirAll(filepath.Dir(dst), 0o750); err != nil {
 				return fmt.Errorf("create parent for %q: %w", cleaned, err)
+			}
+			if hdr.Size < 0 {
+				return fmt.Errorf("invalid negative size for %q", cleaned)
+			}
+			if hdr.Size > maxSpecBundleFileBytes {
+				return fmt.Errorf("file %q exceeds maximum size (%d bytes)", cleaned, maxSpecBundleFileBytes)
 			}
 			perm := hdr.FileInfo().Mode().Perm()
 			if perm == 0 {
@@ -235,7 +243,7 @@ func extractBundle(data []byte, stagingDir string) error {
 			if err != nil {
 				return fmt.Errorf("create file %q: %w", cleaned, err)
 			}
-			_, copyErr := io.Copy(f, tr)
+			_, copyErr := io.CopyN(f, tr, hdr.Size)
 			closeErr := f.Close()
 			if copyErr != nil {
 				return fmt.Errorf("write file %q: %w", cleaned, copyErr)

@@ -13,7 +13,7 @@ import (
 func main() {
 	outputs := autocomplete.GenerateAll()
 	base := filepath.Join("cmd", "ploy", "autocomplete")
-	if err := os.MkdirAll(base, 0o755); err != nil {
+	if err := os.MkdirAll(base, 0o750); err != nil {
 		log.Fatalf("create autocomplete directory: %v", err)
 	}
 	for shell, content := range outputs {
@@ -21,7 +21,7 @@ func main() {
 		if len(content) == 0 || content[len(content)-1] != '\n' {
 			content += "\n"
 		}
-		if err := os.WriteFile(filename, []byte(content), 0o644); err != nil {
+		if err := os.WriteFile(filename, []byte(content), 0o600); err != nil {
 			log.Fatalf("write %s: %v", filename, err)
 		}
 	}

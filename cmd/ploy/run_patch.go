@@ -176,10 +176,10 @@ func writeRunPatchOutput(outputPath string, patchGzip []byte) error {
 		return err
 	}
 
-	if err := os.MkdirAll(filepath.Dir(outputPath), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(outputPath), 0o750); err != nil {
 		return err
 	}
-	return os.WriteFile(outputPath, patchGzip, 0o644)
+	return os.WriteFile(outputPath, patchGzip, 0o600)
 }
 
 func printRunPatchUsage(w io.Writer) {

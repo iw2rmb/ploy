@@ -30,7 +30,7 @@ func (r *runController) materializeMigInFromInputs(
 	if r.artifactUploader == nil {
 		return fmt.Errorf("artifact uploader is required for in_from inputs")
 	}
-	if err := os.MkdirAll(inDir, 0o755); err != nil {
+	if err := os.MkdirAll(inDir, 0o750); err != nil {
 		return fmt.Errorf("mkdir /in directory: %w", err)
 	}
 
@@ -74,10 +74,10 @@ func (r *runController) materializeMigInFromInputs(
 		if err != nil {
 			return fmt.Errorf("materialize mig_context.in_from[%d] from %q: %w", i, sourceOutPath, err)
 		}
-		if err := os.MkdirAll(filepath.Dir(destPath), 0o755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(destPath), 0o750); err != nil {
 			return fmt.Errorf("mkdir in_from destination dir: %w", err)
 		}
-		if err := os.WriteFile(destPath, payload, 0o644); err != nil {
+		if err := os.WriteFile(destPath, payload, 0o600); err != nil {
 			return fmt.Errorf("write in_from destination %s: %w", destPath, err)
 		}
 	}

@@ -347,7 +347,7 @@ func copyDir(src, dst string) error {
 }
 
 func copyFile(src, dst string, perm os.FileMode, modTime time.Time) error {
-	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(dst), 0o750); err != nil {
 		return err
 	}
 	sf, err := os.Open(src)
@@ -360,7 +360,9 @@ func copyFile(src, dst string, perm os.FileMode, modTime time.Time) error {
 		return err
 	}
 	if _, err := io.Copy(df, sf); err != nil {
-		df.Close()
+		if closeErr := df.Close(); closeErr != nil {
+			return fmt.Errorf("copy file close error: %w (copy error: %v)", closeErr, err)
+		}
 		return err
 	}
 	if err := df.Close(); err != nil {

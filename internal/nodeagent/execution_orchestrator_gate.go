@@ -309,7 +309,7 @@ func runCacheDir(runID types.RunID) string {
 // persistOnce writes data to dir/filename idempotently: if the file already
 // exists the call is a no-op, preserving the first write.
 func persistOnce(dir, filename string, data []byte, label string, runID types.RunID) {
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o750); err != nil {
 		slog.Warn("failed to create dir for "+label, "run_id", runID, "error", err)
 		return
 	}
@@ -317,7 +317,7 @@ func persistOnce(dir, filename string, data []byte, label string, runID types.Ru
 	if _, err := os.Stat(p); err == nil {
 		return
 	}
-	if err := os.WriteFile(p, data, 0o644); err != nil {
+	if err := os.WriteFile(p, data, 0o600); err != nil {
 		slog.Warn("failed to persist "+label, "run_id", runID, "path", p, "error", err)
 		return
 	}
@@ -376,7 +376,7 @@ func (r *runController) persistGateProfileSnapshot(
 	meta *contracts.BuildGateStageMetadata,
 ) {
 	dir := runCacheDir(runID)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o750); err != nil {
 		slog.Warn("failed to create run dir for gate profile snapshot", "run_id", runID, "error", err)
 		return
 	}
@@ -390,7 +390,7 @@ func (r *runController) persistGateProfileSnapshot(
 		return
 	}
 
-	if err := os.WriteFile(profilePath, raw, 0o644); err != nil {
+	if err := os.WriteFile(profilePath, raw, 0o600); err != nil {
 		slog.Warn("failed to persist gate profile snapshot", "run_id", runID, "path", profilePath, "error", err)
 		return
 	}

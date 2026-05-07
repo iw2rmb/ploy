@@ -96,7 +96,10 @@ func (c *ClaimManager) waitAndUploadRecoveredContainer(ctx context.Context, reco
 		}
 	}
 
-	exitCode := int32(terminal.ExitCode)
+	exitCode, err := safeExitCodeInt32(terminal.ExitCode)
+	if err != nil {
+		return fmt.Errorf("normalize recovered running exit code: %w", err)
+	}
 	status := lifecycle.JobStatusFromExitCode(int(exitCode))
 
 	durationMs := int64(0)

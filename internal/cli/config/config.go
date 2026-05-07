@@ -39,11 +39,11 @@ func SaveDescriptor(desc Descriptor) (Descriptor, error) {
 		return Descriptor{}, errors.New("descriptor: cluster id required")
 	}
 	path := descriptorPath(base, desc.ClusterID)
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
 		return Descriptor{}, fmt.Errorf("descriptor: ensure dir: %w", err)
 	}
 	data, _ := json.MarshalIndent(desc, "", "  ")
-	if err := os.WriteFile(path, data, 0o644); err != nil {
+	if err := os.WriteFile(path, data, 0o600); err != nil {
 		return Descriptor{}, fmt.Errorf("descriptor: write %s: %w", path, err)
 	}
 	return desc, nil
@@ -61,7 +61,7 @@ func SetDefault(clusterID ClusterID) error {
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(base, 0o755); err != nil {
+	if err := os.MkdirAll(base, 0o750); err != nil {
 		return fmt.Errorf("descriptor: ensure dir: %w", err)
 	}
 	marker := filepath.Join(base, "default")
@@ -80,7 +80,7 @@ func SetDefault(clusterID ClusterID) error {
 		}
 		// If symlink creation failed, fall through to legacy marker content.
 	}
-	return os.WriteFile(marker, []byte(strings.TrimSpace(string(clusterID))), 0o644)
+	return os.WriteFile(marker, []byte(strings.TrimSpace(string(clusterID))), 0o600)
 }
 
 // LoadDefault loads the default cluster descriptor.
