@@ -165,6 +165,10 @@ func normalizeStepInEntriesInPlace(spec map[string]any) error {
 		if !ok {
 			return fmt.Errorf("steps[%d].in_from: expected array, got %T", i, existingRaw)
 		}
+		maxInt := int(^uint(0) >> 1)
+		if len(existingEntries) > maxInt-len(inFromObjects) {
+			return fmt.Errorf("steps[%d].in_from: combined length overflow", i)
+		}
 		combined := make([]any, 0, len(existingEntries)+len(inFromObjects))
 		combined = append(combined, existingEntries...)
 		combined = append(combined, inFromObjects...)
