@@ -594,6 +594,14 @@ func restoreSBOMOutFilesFromBundle(bundle []byte, outDir string) (int, error) {
 	if strings.TrimSpace(outDir) == "" {
 		return 0, fmt.Errorf("out dir is required")
 	}
+	if err := os.MkdirAll(outDir, 0o750); err != nil {
+		return 0, fmt.Errorf("create out dir: %w", err)
+	}
+	outRoot, err := os.OpenRoot(outDir)
+	if err != nil {
+		return 0, fmt.Errorf("open out dir root: %w", err)
+	}
+	defer func() { _ = outRoot.Close() }()
 
 	gzReader, err := gzip.NewReader(bytes.NewReader(bundle))
 	if err != nil {
@@ -620,16 +628,23 @@ func restoreSBOMOutFilesFromBundle(bundle []byte, outDir string) (int, error) {
 			continue
 		}
 		relative := strings.TrimPrefix(entry, "out/")
-		targetPath := filepath.Join(outDir, filepath.FromSlash(relative))
-		if err := os.MkdirAll(filepath.Dir(targetPath), 0o750); err != nil {
-			return restored, fmt.Errorf("mkdir sbom output dir: %w", err)
+		if strings.Contains(relative, "/") || strings.Contains(relative, "\\") {
+			return restored, fmt.Errorf("invalid sbom output entry %q", entry)
 		}
 		payload, readErr := io.ReadAll(tarReader)
 		if readErr != nil {
 			return restored, fmt.Errorf("read artifact entry %q: %w", entry, readErr)
 		}
-		if writeErr := os.WriteFile(targetPath, payload, 0o600); writeErr != nil {
-			return restored, fmt.Errorf("write sbom output %q: %w", targetPath, writeErr)
+		outFile, openErr := outRoot.OpenFile(filepath.FromSlash(relative), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
+		if openErr != nil {
+			return restored, fmt.Errorf("open sbom output %q: %w", relative, openErr)
+		}
+		if _, writeErr := outFile.Write(payload); writeErr != nil {
+			_ = outFile.Close()
+			return restored, fmt.Errorf("write sbom output %q: %w", relative, writeErr)
+		}
+		if closeErr := outFile.Close(); closeErr != nil {
+			return restored, fmt.Errorf("close sbom output %q: %w", relative, closeErr)
 		}
 		restored++
 	}
