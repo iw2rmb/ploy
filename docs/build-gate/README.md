@@ -55,8 +55,8 @@ Gate validation is orchestrated by the node agent as part of the Migs run lifecy
    optional healing phases.
 2. Node agent claims the next queued job via `/v1/nodes/{id}/claim`.
 3. For Java Maven/Gradle gate jobs, the gate command collects
-   `/share/sbom.dependencies.txt` and `/share/java.classpath`, and the node
-   materializes canonical `/out/sbom.spdx.json`.
+   `/share/sbom.dependencies.txt` and `/share/java.classpath` inside the gate
+   runtime.
 4. Gate results are captured as `BuildGateStageMetadata` (passed/failed, duration, logs).
 5. Node reports completion via `/v1/jobs/{job_id}/complete`.
 
@@ -67,7 +67,8 @@ optional evidence fields for gate jobs:
 
 - `sbom_evidence` — SBOM execution evidence:
   - `artifact_present` (bool): whether SBOM artifact bundles exist for the gate job.
-  - `parsed_package_count` (int): number of normalized SBOM package rows persisted.
+  - `parsed_package_count` (int): number of normalized SBOM package rows persisted
+    from gate artifacts when present.
 
 Example:
 ```json

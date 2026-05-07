@@ -541,7 +541,7 @@ func TestRunController_reportTerminalStatus_RemovesShareVolumeOnTerminalSuccess(
 	if err := os.MkdirAll(shareDir, 0o755); err != nil {
 		t.Fatalf("mkdir share dir: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(shareDir, sbomJavaClasspathFileName), []byte("/repo/.m2/a.jar\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(shareDir, "java.classpath"), []byte("/repo/.m2/a.jar\n"), 0o644); err != nil {
 		t.Fatalf("write share classpath: %v", err)
 	}
 

@@ -1,21 +1,15 @@
-// execution_orchestrator_jobs.go contains mig and sbom job implementations,
+// execution_orchestrator_jobs.go contains mig job implementations,
 // the shared standard job executor, and workspace lifecycle helpers.
 package nodeagent
 
 import (
-	"archive/tar"
-	"bytes"
-	"compress/gzip"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"os"
 	"path"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"time"
 
@@ -24,40 +18,6 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"github.com/iw2rmb/ploy/internal/workflow/step"
 )
-
-const preGateCanonicalSBOMFileName = "sbom.spdx.json"
-
-const (
-	preGateCycleName  = "pre-gate"
-	postGateCycleName = "post-gate"
-)
-
-func gateCycleRootDir(runID types.RunID, cycleName string) string {
-	return filepath.Join(runCacheDir(runID), "gate-cycles", strings.TrimSpace(cycleName))
-}
-
-func gateCycleSBOMOutPath(runID types.RunID, cycleName string) string {
-	return filepath.Join(gateCycleRootDir(runID, cycleName), "sbom", "out", preGateCanonicalSBOMFileName)
-}
-
-func gateCycleFinalSnapshotPath(runID types.RunID, cycleName string) string {
-	return gateCycleSBOMOutPath(runID, cycleName)
-}
-
-func gateCycleNameFromGateJob(jobType types.JobType, jobName string) (string, error) {
-	switch jobType {
-	case types.JobTypePreGate:
-		return preGateCycleName, nil
-	case types.JobTypePostGate:
-		return postGateCycleName, nil
-	default:
-		return "", fmt.Errorf("unsupported gate job_type %q", jobType)
-	}
-}
-
-func preGateSBOMOutPath(runID types.RunID) string {
-	return gateCycleSBOMOutPath(runID, preGateCycleName)
-}
 
 // executeMigJob runs a mig container job.
 // Executes the container, uploads diff, and reports status.
@@ -127,102 +87,6 @@ func (r *runController) executeMigJob(ctx context.Context, req StartRunRequest) 
 	}
 
 	r.executeStandardJob(ctx, req, cfg)
-}
-
-// materializeGateSBOMForGate copies the final cycle SBOM snapshot to build-gate
-// /out so gate jobs expose a stable output contract.
-func materializeGateSBOMForGate(runID types.RunID, cycleName string, workspace string) error {
-	snapshotPath := gateCycleFinalSnapshotPath(runID, cycleName)
-	gateOutDir := filepath.Join(workspace, step.BuildGateWorkspaceOutDir)
-	sbomOutPath := filepath.Join(gateOutDir, preGateCanonicalSBOMFileName)
-	if err := copyFileBytes(snapshotPath, sbomOutPath); err != nil {
-		return fmt.Errorf("materialize %s sbom for gate /out: %w", cycleName, err)
-	}
-	return nil
-}
-
-// materializePreGateSBOMForGate preserves existing pre-gate helper callers.
-func materializePreGateSBOMForGate(runID types.RunID, workspace string) error {
-	return materializeGateSBOMForGate(runID, preGateCycleName, workspace)
-}
-
-type canonicalSBOMDocument struct {
-	SPDXVersion       string                 `json:"spdxVersion"`
-	DataLicense       string                 `json:"dataLicense"`
-	SPDXID            string                 `json:"SPDXID"`
-	Name              string                 `json:"name"`
-	DocumentNamespace string                 `json:"documentNamespace"`
-	CreationInfo      canonicalCreationInfo  `json:"creationInfo"`
-	Packages          []canonicalSBOMPackage `json:"packages"`
-}
-
-type canonicalCreationInfo struct {
-	Created  string   `json:"created"`
-	Creators []string `json:"creators"`
-}
-
-type canonicalSBOMPackage struct {
-	SPDXID      string `json:"SPDXID,omitempty"`
-	Name        string `json:"name"`
-	VersionInfo string `json:"versionInfo"`
-}
-
-var (
-	sbomNameTokenPattern    = regexp.MustCompile(`^[A-Za-z0-9_.-]+$`)
-	sbomVersionTokenPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9+_.-]*$`)
-)
-
-func validateCanonicalSBOMPath(path string) error {
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		return err
-	}
-	return validateCanonicalSBOMDocument(raw)
-}
-
-func validateJavaClasspathPath(path string) error {
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		return err
-	}
-	for idx, line := range strings.Split(strings.ReplaceAll(string(raw), "\r\n", "\n"), "\n") {
-		entry := strings.TrimSpace(line)
-		if entry == "" {
-			continue
-		}
-		if !filepath.IsAbs(entry) {
-			return fmt.Errorf("line %d must be absolute path: %q", idx+1, entry)
-		}
-		if entry == "/home/gradle/.gradle" || strings.HasPrefix(entry, "/home/gradle/.gradle/") {
-			return fmt.Errorf("line %d uses non-portable gradle cache path: %q (expected /root/.gradle/...)", idx+1, entry)
-		}
-	}
-	return nil
-}
-
-func validateCanonicalSBOMDocument(raw []byte) error {
-	if len(bytes.TrimSpace(raw)) == 0 {
-		return fmt.Errorf("sbom payload is empty")
-	}
-	var doc canonicalSBOMDocument
-	if err := json.Unmarshal(raw, &doc); err != nil {
-		return fmt.Errorf("parse json: %w", err)
-	}
-	if strings.TrimSpace(doc.SPDXVersion) != "SPDX-2.3" {
-		return fmt.Errorf("spdxVersion must be SPDX-2.3")
-	}
-	if doc.Packages == nil {
-		return fmt.Errorf("packages array is required")
-	}
-	for i, pkg := range doc.Packages {
-		if strings.TrimSpace(pkg.Name) == "" {
-			return fmt.Errorf("packages[%d].name is required", i)
-		}
-		if strings.TrimSpace(pkg.VersionInfo) == "" {
-			return fmt.Errorf("packages[%d].versionInfo is required", i)
-		}
-	}
-	return nil
 }
 
 // standardJobConfig configures the execution of a standard container job
@@ -588,79 +452,6 @@ func (r *runController) startRuntimeOutputSyncLoop(
 				"error", err)
 		}
 	}
-}
-
-func restoreSBOMOutFilesFromBundle(bundle []byte, outDir string) (int, error) {
-	if strings.TrimSpace(outDir) == "" {
-		return 0, fmt.Errorf("out dir is required")
-	}
-	if err := os.MkdirAll(outDir, 0o750); err != nil {
-		return 0, fmt.Errorf("create out dir: %w", err)
-	}
-	outRoot, err := os.OpenRoot(outDir)
-	if err != nil {
-		return 0, fmt.Errorf("open out dir root: %w", err)
-	}
-	defer func() { _ = outRoot.Close() }()
-
-	gzReader, err := gzip.NewReader(bytes.NewReader(bundle))
-	if err != nil {
-		return 0, fmt.Errorf("open artifact gzip: %w", err)
-	}
-	defer func() { _ = gzReader.Close() }()
-
-	tarReader := tar.NewReader(gzReader)
-	restored := 0
-	for {
-		header, err := tarReader.Next()
-		if err != nil {
-			if errors.Is(err, io.EOF) {
-				break
-			}
-			return restored, fmt.Errorf("read artifact tar header: %w", err)
-		}
-		if header == nil || header.Typeflag != tar.TypeReg {
-			continue
-		}
-
-		entry := normalizeBundlePath(header.Name)
-		if entry == "" || !(strings.HasPrefix(entry, "out/sbom.") || entry == "out/"+sbomJavaClasspathFileName) {
-			continue
-		}
-		relative := strings.TrimPrefix(entry, "out/")
-		if strings.Contains(relative, "/") || strings.Contains(relative, "\\") {
-			return restored, fmt.Errorf("invalid sbom output entry %q", entry)
-		}
-		payload, readErr := io.ReadAll(tarReader)
-		if readErr != nil {
-			return restored, fmt.Errorf("read artifact entry %q: %w", entry, readErr)
-		}
-		outFile, openErr := outRoot.OpenFile(filepath.FromSlash(relative), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
-		if openErr != nil {
-			return restored, fmt.Errorf("open sbom output %q: %w", relative, openErr)
-		}
-		if _, writeErr := outFile.Write(payload); writeErr != nil {
-			_ = outFile.Close()
-			return restored, fmt.Errorf("write sbom output %q: %w", relative, writeErr)
-		}
-		if closeErr := outFile.Close(); closeErr != nil {
-			return restored, fmt.Errorf("close sbom output %q: %w", relative, closeErr)
-		}
-		restored++
-	}
-
-	if restored == 0 {
-		return 0, fmt.Errorf("artifact bundle has no out/sbom.* entries")
-	}
-	canonicalPath := filepath.Join(outDir, preGateCanonicalSBOMFileName)
-	if err := validateCanonicalSBOMPath(canonicalPath); err != nil {
-		return restored, fmt.Errorf("validate restored canonical sbom output: %w", err)
-	}
-	classpathPath := filepath.Join(outDir, sbomJavaClasspathFileName)
-	if err := validateJavaClasspathPath(classpathPath); err != nil && !errors.Is(err, os.ErrNotExist) {
-		return restored, fmt.Errorf("validate restored java classpath output: %w", err)
-	}
-	return restored, nil
 }
 
 func normalizeBundlePath(name string) string {
