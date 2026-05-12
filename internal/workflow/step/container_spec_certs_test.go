@@ -46,22 +46,9 @@ func TestBuildContainerSpec_CertMountOptions(t *testing.T) {
 		t.Fatalf("got %d mounts, want 4: %+v", len(spec.Mounts), spec.Mounts)
 	}
 
-	expectMount := func(source, target string, readOnly bool) {
-		t.Helper()
-		for _, m := range spec.Mounts {
-			if m.Source == source && m.Target == target {
-				if m.ReadOnly != readOnly {
-					t.Fatalf("mount %s -> %s ReadOnly=%v, want %v", source, target, m.ReadOnly, readOnly)
-				}
-				return
-			}
-		}
-		t.Fatalf("mount %s -> %s not found in %+v", source, target, spec.Mounts)
-	}
-
-	expectMount(caPath, "/etc/ploy/certs/ca.crt", true)
-	expectMount(clientCertPath, "/etc/ploy/certs/client.crt", true)
-	expectMount(clientKeyPath, "/etc/ploy/certs/client.key", true)
+	requireMount(t, spec.Mounts, "/etc/ploy/certs/ca.crt", caPath, true)
+	requireMount(t, spec.Mounts, "/etc/ploy/certs/client.crt", clientCertPath, true)
+	requireMount(t, spec.Mounts, "/etc/ploy/certs/client.key", clientKeyPath, true)
 }
 
 func TestBuildContainerSpec_CertMountOptionsSkipEmptyOrMissing(t *testing.T) {

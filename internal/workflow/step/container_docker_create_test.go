@@ -160,12 +160,7 @@ func TestDockerContainerRuntimeCreate(t *testing.T) {
 			handle, err := rt.Create(context.Background(), tc.spec)
 
 			if tc.wantErr {
-				if err == nil {
-					t.Fatal("expected error, got nil")
-				}
-				if tc.errContains != "" && !strings.Contains(err.Error(), tc.errContains) {
-					t.Errorf("error %q should contain %q", err.Error(), tc.errContains)
-				}
+				requireErrContains(t, err, tc.errContains)
 				return
 			}
 			if err != nil {
@@ -173,6 +168,22 @@ func TestDockerContainerRuntimeCreate(t *testing.T) {
 			}
 			if string(handle) != tc.createRes.ID {
 				t.Errorf("got ID %q, want %q", string(handle), tc.createRes.ID)
+			}
+			// HostConfig.AutoRemove must stay false so logs can be retrieved after exit.
+			if fake.createOpts.HostConfig == nil || fake.createOpts.HostConfig.AutoRemove {
+				t.Error("HostConfig.AutoRemove should be false for log retrieval")
+			}
+			// Every mount we configure should reach moby as a bind mount.
+			if len(tc.spec.Mounts) > 0 {
+				gotMounts := fake.createOpts.HostConfig.Mounts
+				if len(gotMounts) != len(tc.spec.Mounts) {
+					t.Fatalf("mounts: got %d, want %d", len(gotMounts), len(tc.spec.Mounts))
+				}
+				for i, m := range gotMounts {
+					if string(m.Type) != "bind" {
+						t.Errorf("Mount[%d].Type=%q, want %q", i, m.Type, "bind")
+					}
+				}
 			}
 			// Verify image pull was called only when configured and the image is missing.
 			expectPull := tc.pullImage && cerrdefs.IsNotFound(tc.inspectErr)
@@ -246,12 +257,7 @@ func TestDockerContainerRuntimeCreate_InvalidRegistryAuthConfig(t *testing.T) {
 	_, err := rt.Create(context.Background(), ContainerSpec{
 		Image: "ghcr.io/iw2rmb/ploy/amata-codex-java-17-maven:latest",
 	})
-	if err == nil {
-		t.Fatal("expected error for invalid registry auth config")
-	}
-	if !strings.Contains(err.Error(), "parse registry auth config") {
-		t.Fatalf("error = %q, expected parse registry auth config", err.Error())
-	}
+	requireErrContains(t, err, "parse registry auth config")
 	if fake.pullCalled {
 		t.Fatal("did not expect image pull when auth config is invalid")
 	}

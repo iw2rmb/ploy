@@ -46,20 +46,5 @@ func TestDockerGateExecutor_MountsGradleCacheHitsFile(t *testing.T) {
 		t.Fatal("expected Create to be called")
 	}
 
-	wantSource := filepath.Join(workspace, BuildGateGradleCacheHitsHostFile)
-	found := false
-	for _, mount := range rt.captured.Mounts {
-		if mount.Source == wantSource && mount.Target == BuildGateGradleCacheHitsContainerFile && !mount.ReadOnly {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Fatalf(
-			"expected gradle cache hits mount %q -> %q in mounts=%+v",
-			wantSource,
-			BuildGateGradleCacheHitsContainerFile,
-			rt.captured.Mounts,
-		)
-	}
+	requireMount(t, rt.captured.Mounts, BuildGateGradleCacheHitsContainerFile, filepath.Join(workspace, BuildGateGradleCacheHitsHostFile), false)
 }
