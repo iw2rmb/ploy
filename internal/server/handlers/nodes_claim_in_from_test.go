@@ -150,21 +150,21 @@ func TestSelectPreferredArtifactID(t *testing.T) {
 	}
 }
 
-func TestParseMigSpecJSON_RejectsLegacySBOMInFromSelector(t *testing.T) {
+func TestParseMigSpecJSON_RejectsUnknownInFromSelectorType(t *testing.T) {
 	t.Parallel()
 
 	_, err := contracts.ParseMigSpecJSON([]byte(`{
 		"steps": [
 			{
 				"image": "ghcr.io/example/mig:latest",
-				"in_from": [{"from":"sbom://out/java.classpath"}]
+				"in_from": [{"from":"legacy://out/java.classpath"}]
 			}
 		]
 	}`))
 	if err == nil {
 		t.Fatal("ParseMigSpecJSON() error = nil, want non-nil")
 	}
-	if got := err.Error(); !strings.Contains(got, `unknown step name "sbom"`) {
+	if got := err.Error(); !strings.Contains(got, `unknown step name "legacy"`) {
 		t.Fatalf("error = %q, want unknown step name rejection", got)
 	}
 }

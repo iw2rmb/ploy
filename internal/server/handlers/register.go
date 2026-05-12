@@ -127,7 +127,6 @@ func registerRunRoutes(s *server.HTTPServer, deps routeDeps) {
 func registerRepoRoutes(s *server.HTTPServer, deps routeDeps) {
 	s.RegisterRouteFunc("GET /v1/repos", listReposHandler(deps.st), auth.RoleControlPlane)
 	s.RegisterRouteFunc("GET /v1/repos/{repo_id}/runs", listRunsForRepoHandler(deps.st), auth.RoleControlPlane)
-	s.RegisterRouteFunc("GET /v1/sboms/compat", sbomCompatHandler(deps.st), auth.RoleControlPlane)
 }
 
 func registerNodeRoutes(s *server.HTTPServer, deps routeDeps) {

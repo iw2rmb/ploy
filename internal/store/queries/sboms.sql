@@ -6,9 +6,3 @@ ON CONFLICT (job_id, repo_id, lib, ver) DO NOTHING;
 -- name: DeleteSBOMRowsByJob :exec
 DELETE FROM sboms
 WHERE job_id = $1;
-
--- name: ListSBOMRowsByJob :many
-SELECT job_id, repo_id, lib, ver
-FROM sboms
-WHERE job_id = $1
-ORDER BY lib ASC, ver ASC;

@@ -3,13 +3,11 @@ package handlers
 import (
 	"context"
 	"testing"
-	"time"
 
 	bsmock "github.com/iw2rmb/ploy/internal/blobstore/mock"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/server/blobpersist"
 	"github.com/iw2rmb/ploy/internal/store"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 func TestMaybePersistSBOMRowsForJob_PersistsRowsForCompletedSBOMJob(t *testing.T) {
@@ -52,63 +50,5 @@ func TestMaybePersistSBOMRowsForJob_PersistsRowsForCompletedSBOMJob(t *testing.T
 	got := st.upsertSBOMRow.calls[0]
 	if got.JobID != jobID || got.RepoID != repoID || got.Lib != "org.example:lib-a" || got.Ver != "1.0.0" {
 		t.Fatalf("unexpected upsert row: %+v", got)
-	}
-}
-
-func TestSBOMJobIsMoreRecent_PrefersMostRecentFinishedAtOverLexicographicID(t *testing.T) {
-	t.Parallel()
-
-	now := time.Now().UTC()
-	olderLexicographicallyGreaterID := domaintypes.JobID("job-z-older")
-	newerLexicographicallySmallerID := domaintypes.JobID("job-a-newer")
-
-	candidate := store.Job{
-		ID:      newerLexicographicallySmallerID,
-		JobType: domaintypes.JobTypePreGate,
-		Status:  domaintypes.JobStatusSuccess,
-		FinishedAt: pgtype.Timestamptz{
-			Time:  now,
-			Valid: true,
-		},
-	}
-	current := store.Job{
-		ID:      olderLexicographicallyGreaterID,
-		JobType: domaintypes.JobTypePostGate,
-		Status:  domaintypes.JobStatusSuccess,
-		FinishedAt: pgtype.Timestamptz{
-			Time:  now.Add(-1 * time.Minute),
-			Valid: true,
-		},
-	}
-	if !sbomJobIsMoreRecent(candidate, current) {
-		t.Fatalf("expected candidate %s to be more recent than %s", candidate.ID, current.ID)
-	}
-}
-
-func TestSBOMJobIsMoreRecent_UsesIDAsDeterministicTieBreak(t *testing.T) {
-	t.Parallel()
-
-	finishedAt := time.Now().UTC()
-	candidate := store.Job{
-		ID:      domaintypes.JobID("job-z"),
-		JobType: domaintypes.JobTypePreGate,
-		Status:  domaintypes.JobStatusSuccess,
-		FinishedAt: pgtype.Timestamptz{
-			Time:  finishedAt,
-			Valid: true,
-		},
-	}
-	current := store.Job{
-		ID:      domaintypes.JobID("job-a"),
-		JobType: domaintypes.JobTypePostGate,
-		Status:  domaintypes.JobStatusSuccess,
-		FinishedAt: pgtype.Timestamptz{
-			Time:  finishedAt,
-			Valid: true,
-		},
-	}
-
-	if !sbomJobIsMoreRecent(candidate, current) {
-		t.Fatalf("expected candidate %s to win deterministic tie break over %s", candidate.ID, current.ID)
 	}
 }

@@ -95,7 +95,6 @@ type runStore struct {
 
 	listJobsByRunRepoAttempt       mockCall[store.ListJobsByRunRepoAttemptParams, []store.Job]
 	listArtifactBundlesByRunAndJob mockCall[store.ListArtifactBundlesByRunAndJobParams, []store.ArtifactBundle]
-	listSBOMRowsByJob              mockCall[types.JobID, []store.Sbom]
 
 	// Ingest (logs, diffs, artifacts)
 	createLog            mockResult[store.Log]
@@ -336,10 +335,6 @@ func (m *runStore) ListJobsByRunRepoAttempt(ctx context.Context, arg store.ListJ
 
 func (m *runStore) ListArtifactBundlesByRunAndJob(ctx context.Context, arg store.ListArtifactBundlesByRunAndJobParams) ([]store.ArtifactBundle, error) {
 	return m.listArtifactBundlesByRunAndJob.record(arg)
-}
-
-func (m *runStore) ListSBOMRowsByJob(ctx context.Context, jobID types.JobID) ([]store.Sbom, error) {
-	return m.listSBOMRowsByJob.record(jobID)
 }
 
 // Ingest methods

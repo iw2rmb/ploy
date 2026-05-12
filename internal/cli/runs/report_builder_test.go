@@ -96,23 +96,19 @@ func TestGetRunReportCommandAssemblesCanonicalReport(t *testing.T) {
 						"duration_ms":  50,
 						"display_name": "scan",
 					},
-					{
-						"job_id":       jobID2.String(),
-						"name":         "step-2",
-						"job_type":     "post_gate",
-						"job_image":    "ghcr.io/acme/runner:1",
+						{
+							"job_id":       jobID2.String(),
+							"name":         "step-2",
+							"job_type":     "post_gate",
+							"job_image":    "ghcr.io/acme/runner:1",
 						"next_id":      nil,
 						"node_id":      nil,
-						"status":       "Running",
-						"duration_ms":  5,
-						"display_name": "apply",
-						"sbom_evidence": map[string]any{
-							"artifact_present":     true,
-							"parsed_package_count": 184,
+							"status":       "Running",
+							"duration_ms":  5,
+							"display_name": "apply",
 						},
 					},
-				},
-			})
+				})
 		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/diffs":
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"diffs": []map[string]any{
@@ -196,15 +192,6 @@ func TestGetRunReportCommandAssemblesCanonicalReport(t *testing.T) {
 	job1 := entry.Jobs[1]
 	if strings.TrimSpace(job1.PatchURL) != "" {
 		t.Fatalf("expected no patch URL for job without diffs, got %q", job1.PatchURL)
-	}
-	if job1.SBOMEvidence == nil {
-		t.Fatal("expected sbom evidence for gate job")
-	}
-	if job1.SBOMEvidence.ArtifactPresent == nil || !*job1.SBOMEvidence.ArtifactPresent {
-		t.Fatalf("expected sbom artifact_present=true, got %#v", job1.SBOMEvidence.ArtifactPresent)
-	}
-	if job1.SBOMEvidence.ParsedPackageCount == nil || *job1.SBOMEvidence.ParsedPackageCount != 184 {
-		t.Fatalf("expected sbom parsed_package_count=184, got %#v", job1.SBOMEvidence.ParsedPackageCount)
 	}
 	if len(job1.Artifacts) != 1 {
 		t.Fatalf("expected one artifact for job1, got %d", len(job1.Artifacts))

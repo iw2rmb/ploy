@@ -12,12 +12,6 @@ import (
 const gateCAPreamble = `if [ -d /etc/ploy/ca ]; then c=0; tmp="$(mktemp -d)"; for f in /etc/ploy/ca/*; do [ -f "$f" ] || continue; awk '/-----BEGIN CERTIFICATE-----/{n++} {print > (d"/cert" n ".crt")}' d="$tmp" "$f"; c=$((c+1)); done; if [ "$c" -gt 0 ]; then if command -v update-ca-certificates >/dev/null 2>&1; then mkdir -p /usr/local/share/ca-certificates/ploy; for crt in "$tmp"/*.crt; do [ -f "$crt" ] || continue; cp "$crt" /usr/local/share/ca-certificates/ploy/ || true; done; update-ca-certificates >/dev/null 2>&1 || true; fi; if command -v keytool >/dev/null 2>&1; then i=0; for crt in "$tmp"/*.crt; do [ -f "$crt" ] || continue; keytool -importcert -noprompt -trustcacerts -cacerts -storepass changeit -alias "ploy_gate_ca_$i" -file "$crt" >/dev/null 2>&1 || true; i=$((i+1)); done; fi; caf="$(ls "$tmp"/*.crt 2>/dev/null | head -1 || true)"; if [ -n "$caf" ]; then export SSL_CERT_FILE="$caf"; export CURL_CA_BUNDLE="$caf"; export GIT_SSL_CAINFO="$caf"; fi; fi; fi`
 
 const (
-	sbomGateScriptDir             = "/usr/local/lib/ploy/sbom"
-	sbomGradleCollectorScriptPath = sbomGateScriptDir + "/collect-java-classpath-gradle.sh"
-	sbomMavenCollectorScriptPath  = sbomGateScriptDir + "/collect-java-classpath-maven.sh"
-)
-
-const (
 	mavenWrapperCompileCommand = "./mvnw -B -e clean compile"
 	mavenBuildFallbackCommand  = "mvn --ff -B -q -e -DskipTests=true -Dstyle.color=never -f /workspace/pom.xml clean install"
 	mavenAllTestsFallbackCmd   = "mvn --ff -B -q -e -DskipTests=false -Dstyle.color=never -f /workspace/pom.xml clean install"
@@ -30,11 +24,8 @@ func buildCommandForTool(workspace string, tool string) ([]string, error) {
 
 // buildCommandForToolTarget returns a deterministic command for a tool/target pair.
 func buildCommandForToolTarget(workspace string, tool string, target string) ([]string, error) {
-	wrap := func(toolCmd, collectorCmd string) []string {
+	wrap := func(toolCmd string) []string {
 		parts := []string{"set -eu", gateCAPreamble}
-		if strings.TrimSpace(collectorCmd) != "" {
-			parts = append(parts, collectorCmd)
-		}
 		parts = append(parts, toolCmd)
 		return []string{"/bin/sh", "-lc", strings.Join(parts, "; ")}
 	}
@@ -48,9 +39,9 @@ func buildCommandForToolTarget(workspace string, tool string, target string) ([]
 		}
 		switch strings.TrimSpace(target) {
 		case contracts.GateProfileTargetBuild:
-			return wrap(buildCommand, sbomMavenCollectorScriptPath), nil
+			return wrap(buildCommand), nil
 		case contracts.GateProfileTargetAllTests:
-			return wrap(allTestsCommand, sbomMavenCollectorScriptPath), nil
+			return wrap(allTestsCommand), nil
 		default:
 			return nil, fmt.Errorf("unsupported maven target: %q", target)
 		}
@@ -59,22 +50,20 @@ func buildCommandForToolTarget(workspace string, tool string, target string) ([]
 		if hasGradleWrapperSpecified(workspace) {
 			gradleExec = "./gradlew"
 		}
-		collector := "if [ -x /workspace/gradlew ]; then PLOY_SBOM_GRADLE_CMD=\"/workspace/gradlew\" " + sbomGradleCollectorScriptPath +
-			"; else PLOY_SBOM_GRADLE_CMD=\"gradle\" " + sbomGradleCollectorScriptPath + "; fi"
 		switch strings.TrimSpace(target) {
 		case contracts.GateProfileTargetBuild:
-			return wrap(gradleExec+" -q --stacktrace --build-cache build -x test -p /workspace", collector), nil
+			return wrap(gradleExec+" -q --stacktrace --build-cache build -x test -p /workspace"), nil
 		case contracts.GateProfileTargetAllTests:
-			return wrap(gradleExec+" -q --stacktrace --build-cache test -p /workspace", collector), nil
+			return wrap(gradleExec+" -q --stacktrace --build-cache test -p /workspace"), nil
 		default:
 			return nil, fmt.Errorf("unsupported gradle target: %q", target)
 		}
 	case "go":
-		return wrap("go test ./...", ""), nil
+		return wrap("go test ./..."), nil
 	case "cargo":
-		return wrap("cargo test", ""), nil
+		return wrap("cargo test"), nil
 	case "pip", "poetry":
-		return wrap("python -m compileall -q /workspace", ""), nil
+		return wrap("python -m compileall -q /workspace"), nil
 	default:
 		return nil, fmt.Errorf("unsupported build tool: %q", tool)
 	}

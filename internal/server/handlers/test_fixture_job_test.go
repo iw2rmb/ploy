@@ -69,9 +69,6 @@ type jobStore struct {
 	claimRun mockResult[store.Run]
 
 	// SBOM
-	listSBOMRowsByJob       mockResult[[]store.Sbom]
-	listSBOMRowsByJobByID   map[types.JobID][]store.Sbom
-	hasSBOMEvidenceForStack mockResult[bool]
 	deleteSBOMRowsByJob     mockCallSlice[types.JobID, struct{}]
 
 	upsertSBOMRow mockCallSlice[store.UpsertSBOMRowParams, struct{}]
@@ -412,19 +409,6 @@ func (m *jobStore) ClaimRun(ctx context.Context, nodeID *string) (store.Run, err
 }
 
 // SBOM methods
-
-func (m *jobStore) ListSBOMRowsByJob(ctx context.Context, jobID types.JobID) ([]store.Sbom, error) {
-	if len(m.listSBOMRowsByJobByID) > 0 {
-		if rows, ok := m.listSBOMRowsByJobByID[jobID]; ok {
-			return rows, m.listSBOMRowsByJob.err
-		}
-	}
-	return m.listSBOMRowsByJob.ret()
-}
-
-func (m *jobStore) HasSBOMEvidenceForStack(ctx context.Context, arg store.HasSBOMEvidenceForStackParams) (bool, error) {
-	return m.hasSBOMEvidenceForStack.ret()
-}
 
 func (m *jobStore) DeleteSBOMRowsByJob(ctx context.Context, jobID types.JobID) error {
 	_, err := m.deleteSBOMRowsByJob.record(jobID)

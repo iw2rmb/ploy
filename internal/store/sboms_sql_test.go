@@ -14,15 +14,6 @@ func TestSBOMInsertQuery_UsesConflictNoop(t *testing.T) {
 	}
 }
 
-func TestSBOMQuery_OrderDeterministic(t *testing.T) {
-	t.Parallel()
-
-	want := "ORDER BY lib ASC, ver ASC"
-	if !containsOrderBy(listSBOMRowsByJob, want) {
-		t.Fatalf("ListSBOMRowsByJob must have deterministic ordering; want %q in SQL:\n%s", want, listSBOMRowsByJob)
-	}
-}
-
 func TestSBOMConstraint_PrimaryKeyDefinedInSchema(t *testing.T) {
 	t.Parallel()
 

@@ -6,14 +6,6 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-// RunRepoJobSBOMEvidence summarizes persisted SBOM outputs for a gate job.
-type RunRepoJobSBOMEvidence struct {
-	// ArtifactPresent reports whether at least one artifact bundle exists for this gate job.
-	ArtifactPresent *bool `json:"artifact_present,omitempty"`
-	// ParsedPackageCount reports the number of normalized package rows persisted for this gate job.
-	ParsedPackageCount *int `json:"parsed_package_count,omitempty"`
-}
-
 // RunRepoJob represents a job within a repo execution.
 type RunRepoJob struct {
 	JobID         domaintypes.JobID     `json:"job_id"`
@@ -31,8 +23,6 @@ type RunRepoJob struct {
 	DurationMs    int64                 `json:"duration_ms"`
 	DisplayName   string                `json:"display_name,omitempty"`
 	BugSummary    string                `json:"bug_summary,omitempty"`
-	// sbom_evidence exposes artifact + parsed-row evidence for gate jobs.
-	SBOMEvidence *RunRepoJobSBOMEvidence `json:"sbom_evidence,omitempty"`
 	// Build-gate stack detection fields (gate jobs only).
 	// Populated from gate metadata's detected_stack when present.
 	Lang    string `json:"lang,omitempty"`

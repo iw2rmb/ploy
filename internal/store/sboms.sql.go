@@ -21,38 +21,6 @@ func (q *Queries) DeleteSBOMRowsByJob(ctx context.Context, jobID types.JobID) er
 	return err
 }
 
-const listSBOMRowsByJob = `-- name: ListSBOMRowsByJob :many
-SELECT job_id, repo_id, lib, ver
-FROM sboms
-WHERE job_id = $1
-ORDER BY lib ASC, ver ASC
-`
-
-func (q *Queries) ListSBOMRowsByJob(ctx context.Context, jobID types.JobID) ([]Sbom, error) {
-	rows, err := q.db.Query(ctx, listSBOMRowsByJob, jobID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []Sbom{}
-	for rows.Next() {
-		var i Sbom
-		if err := rows.Scan(
-			&i.JobID,
-			&i.RepoID,
-			&i.Lib,
-			&i.Ver,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const upsertSBOMRow = `-- name: UpsertSBOMRow :exec
 INSERT INTO sboms (job_id, repo_id, lib, ver)
 VALUES ($1, $2, $3, $4)

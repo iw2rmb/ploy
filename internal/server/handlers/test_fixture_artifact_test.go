@@ -9,7 +9,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-// artifactStore is a focused mock for artifact download, repo artifacts, diffs, and SBOM compat handler tests.
+// artifactStore is a focused mock for artifact download, repo artifacts, and diffs.
 type artifactStore struct {
 	store.Store
 
@@ -38,9 +38,6 @@ type artifactStore struct {
 	getRunRepoErr            error
 	listJobsByRunRepoAttempt mockCall[store.ListJobsByRunRepoAttemptParams, []store.Job]
 
-	// SBOM compat
-	hasSBOMEvidenceForStack mockResult[bool]
-	listSBOMCompatRows      mockCall[store.ListSBOMCompatRowsParams, []store.ListSBOMCompatRowsRow]
 }
 
 func (m *artifactStore) ListArtifactBundlesByCID(ctx context.Context, cid *string) ([]store.ArtifactBundle, error) {
@@ -95,12 +92,4 @@ func (m *artifactStore) GetRunRepo(ctx context.Context, arg store.GetRunRepoPara
 
 func (m *artifactStore) ListJobsByRunRepoAttempt(ctx context.Context, arg store.ListJobsByRunRepoAttemptParams) ([]store.Job, error) {
 	return m.listJobsByRunRepoAttempt.record(arg)
-}
-
-func (m *artifactStore) HasSBOMEvidenceForStack(ctx context.Context, arg store.HasSBOMEvidenceForStackParams) (bool, error) {
-	return m.hasSBOMEvidenceForStack.ret()
-}
-
-func (m *artifactStore) ListSBOMCompatRows(ctx context.Context, arg store.ListSBOMCompatRowsParams) ([]store.ListSBOMCompatRowsRow, error) {
-	return m.listSBOMCompatRows.record(arg)
 }
