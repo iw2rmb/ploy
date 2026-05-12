@@ -269,7 +269,6 @@ to `/in` for debugging and cross-iteration context:
 | `/in/build-gate-iteration-N.log` | Gate failure log snapshot for iteration N |
 | `/in/healing-iteration-N.log` | Healing agent output log for iteration N |
 | <code>/in/healing-log.md</code> | Cumulative markdown log across all iterations |
-| `/in/deps-compat-url.txt` | Prefilled SBOM compatibility endpoint for dependency healing |
 | `/in/deps-bumps.json` | Prior cumulative dependency bump map for dependency healing |
 
 For `heal`/`post_gate`, `/in/build-gate.log`, optional `/in/errors.yaml`,
@@ -1430,8 +1429,6 @@ The CLI entry points for Migs are implemented in CLI implementation:
   - Exit continuation content is soft-wrapped to max 100 symbols per line; wrapped
     lines align under the content start after `Exit <code>: `.
   - Healing rows keep `Exit <code>: <one-liner>` without an error-kind prefix.
-  - `--json` output includes repo-job sbom evidence metadata
-    (`sbom_evidence.artifact_present`, `sbom_evidence.parsed_package_count`).
   - Artifact links are rendered as OSC8 hyperlinks in terminal mode and include
     `auth_token` query parameters for browser/OSC8 flows.
 

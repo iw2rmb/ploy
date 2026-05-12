@@ -407,7 +407,7 @@ ploy completion <shell> --help
   shape for both single-step and multi-step runs. Each step supports
   `image`/`command`/`envs` plus Hydra file-record fields (`ca`, `in`, `out`, `home`)
   and cross-step input references (`in_from`)
-  using shared runtime paths like `/share/sbom.dependencies.txt` or
+  using shared runtime paths like `/share/java.classpath` or
   `extract-usage@mig://out/dependency-usage.nofilter.json`
   for deterministic file injection via content-addressed bundles.
   The spec also supports GitLab MR settings. See `docs/schemas/mig.example.yaml` for the full schema and

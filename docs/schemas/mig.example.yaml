@@ -130,7 +130,7 @@ steps:
 #       MIGRATION_TARGET: java11
 #     in:
 #       - from: extract-usage@mig://out/dependency-usage.nofilter.json
-#       - /share/sbom.dependencies.txt:/in/sbom.dependencies.txt
+#       - /share/java.classpath:/in/java.classpath
 #   - name: apply-fixes
 #     image: docker.io/your-dh-user/migs-migrate-java17:latest
 #     envs:

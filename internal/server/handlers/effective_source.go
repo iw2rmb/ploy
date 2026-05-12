@@ -27,15 +27,3 @@ func listArtifactBundlesByEffectiveJob(
 		JobID: &source.ID,
 	})
 }
-
-func listSBOMRowsByEffectiveJob(
-	ctx context.Context,
-	st store.Store,
-	job store.Job,
-) ([]store.Sbom, error) {
-	source, err := resolveEffectiveSourceJob(ctx, st, job.ID)
-	if err != nil {
-		return nil, err
-	}
-	return st.ListSBOMRowsByJob(ctx, source.ID)
-}

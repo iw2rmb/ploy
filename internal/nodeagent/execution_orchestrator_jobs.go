@@ -89,8 +89,7 @@ func (r *runController) executeMigJob(ctx context.Context, req StartRunRequest) 
 	r.executeStandardJob(ctx, req, cfg)
 }
 
-// standardJobConfig configures the execution of a standard container job
-// (mig/heal/sbom).
+// standardJobConfig configures the execution of a standard container job.
 type standardJobConfig struct {
 	Manifest      contracts.StepManifest
 	DiffType      types.DiffJobType
@@ -123,8 +122,7 @@ type standardJobOutcome struct {
 	duration   time.Duration
 }
 
-// executeStandardJob orchestrates the common lifecycle of a container job
-// (mig/heal/sbom):
+// executeStandardJob orchestrates the common lifecycle of a container job:
 // runtime init, rehydration, directory prep, execution, and uploading.
 func (r *runController) executeStandardJob(ctx context.Context, req StartRunRequest, cfg standardJobConfig) {
 	_, execErr := r.executeStandardJobWithOutcome(ctx, req, cfg)

@@ -55,32 +55,9 @@ Gate validation is orchestrated by the node agent as part of the Migs run lifecy
    optional healing phases.
 2. Node agent claims the next queued job via `/v1/nodes/{id}/claim`.
 3. For Java Maven/Gradle gate jobs, the gate command collects
-   `/share/sbom.dependencies.txt` and `/share/java.classpath` inside the gate
-   runtime.
+   `/share/java.classpath` inside the gate runtime.
 4. Gate results are captured as `BuildGateStageMetadata` (passed/failed, duration, logs).
 5. Node reports completion via `/v1/jobs/{job_id}/complete`.
-
-## SBOM Evidence in Run Job Status
-
-Repo-scoped job status (`GET /v1/runs/{run_id}/repos/{repo_id}/jobs`) includes
-optional evidence fields for gate jobs:
-
-- `sbom_evidence` — SBOM execution evidence:
-  - `artifact_present` (bool): whether SBOM artifact bundles exist for the gate job.
-  - `parsed_package_count` (int): number of normalized SBOM package rows persisted
-    from gate artifacts when present.
-
-Example:
-```json
-{
-  "name": "pre-gate",
-  "job_type": "pre_gate",
-  "sbom_evidence": {
-    "artifact_present": true,
-    "parsed_package_count": 184
-  }
-}
-```
 
 ## Gate Executor
 
@@ -289,10 +266,6 @@ The gate does not modify the repository; it validates the current working tree.
 - Gate-generated files must be written under `/out/*` (no repository writes required for artifacts).
 - Node artifact upload treats gate `/out/*` as first-class output and preserves deterministic `out/` archive-relative paths.
 - SBOM rows are persisted from successful gate jobs for successful repo attempts.
-- Compatibility lookup contract for `deps` healing:
-  - `GET /v1/sboms/compat?lang=<lang>&release=<release>&tool=<tool>&libs=<name>:<ver>,<name>`
-  - Returns per-lib minimum successful version evidence from the latest successful gate SBOM snapshot of each successful repo run.
-  - Returns `null` when no successful SBOM evidence exists for the requested stack.
 
 ## Notes
 
@@ -320,7 +293,6 @@ provide repository metadata for healing migs that need Git baseline information.
 - `/in/build-gate.log` — First Build Gate failure log (read-only).
 - `/in/gate_profile.json` — Gate profile used by the failed gate when available (provided for `infra` healing).
 - `/in/gate_profile.schema.json` — Gate profile schema contract for infra healing (`title: Ploy Build Gate Profile`, includes `$comment` guidance for agent-facing fields).
-- `/in/deps-compat-url.txt` — Stack-prefilled SBOM compatibility endpoint (provided for `deps` healing).
 - `/in/deps-bumps.json` — Prior cumulative dependency bump state (provided for `deps` healing).
 
 These inputs are produced from available run/job artifacts and local workspace state.

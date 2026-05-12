@@ -1154,20 +1154,6 @@ RepoJobItem:
       type: string
       nullable: true
       description: Detected build tool from gate stack detection (gate jobs only)
-    sbom_evidence:
-      type: object
-      nullable: true
-      description: Evidence metadata for gate jobs.
-      properties:
-        artifact_present:
-          type: boolean
-          nullable: true
-          description: True when at least one artifact bundle exists for this gate job.
-        parsed_package_count:
-          type: integer
-          format: int32
-          nullable: true
-          description: Number of parsed package rows persisted for this gate job.
   required:
     - job_id
     - name

@@ -207,8 +207,6 @@ type RecoveryClaimContext struct {
 	Expectations json.RawMessage `json:"expectations,omitempty"`
 	// DepsBumps carries cumulative dependency bump state for deps healing.
 	DepsBumps map[string]*string `json:"deps_bumps,omitempty"`
-	// DepsCompatEndpoint is a stack-prefilled SBOM compatibility endpoint.
-	DepsCompatEndpoint string `json:"deps_compat_endpoint,omitempty"`
 	// BuildGateLog is the failed gate log snippet intended for /in/build-gate.log.
 	BuildGateLog string `json:"build_gate_log,omitempty"`
 	// Errors carries structured gate errors payload intended for /in/errors.yaml.

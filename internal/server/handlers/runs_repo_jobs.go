@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"fmt"
-	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -12,7 +11,6 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"github.com/iw2rmb/ploy/internal/workflow/jobchain"
-	"github.com/iw2rmb/ploy/internal/workflow/lifecycle"
 )
 
 // listRunRepoJobsHandler returns jobs for a specific repo execution within a run.
@@ -63,7 +61,7 @@ func listRunRepoJobsHandler(st store.Store) http.HandlerFunc {
 		}
 
 		for _, job := range jobs {
-			resp.Jobs = append(resp.Jobs, runRepoJobFromStore(r, st, runID, job))
+			resp.Jobs = append(resp.Jobs, runRepoJobFromStore(job))
 		}
 
 		writeJSON(w, http.StatusOK, resp)
@@ -71,8 +69,8 @@ func listRunRepoJobsHandler(st store.Store) http.HandlerFunc {
 }
 
 // runRepoJobFromStore projects a store.Job into the API shape, applying job
-// metadata, gate SBOM evidence, and timestamp conversions.
-func runRepoJobFromStore(r *http.Request, st store.Store, runID domaintypes.RunID, job store.Job) migsapi.RunRepoJob {
+// metadata and timestamp conversions.
+func runRepoJobFromStore(job store.Job) migsapi.RunRepoJob {
 	jr := migsapi.RunRepoJob{
 		JobID:      job.ID,
 		Name:       string(job.JobType),
@@ -113,10 +111,6 @@ func runRepoJobFromStore(r *http.Request, st store.Store, runID domaintypes.RunI
 		}
 	}
 
-	if lifecycle.IsGateJobType(domaintypes.JobType(job.JobType)) {
-		jr.SBOMEvidence = loadSBOMEvidence(r, st, runID, job.ID)
-	}
-
 	if job.StartedAt.Valid {
 		t := job.StartedAt.Time.UTC()
 		jr.StartedAt = &t
@@ -126,39 +120,6 @@ func runRepoJobFromStore(r *http.Request, st store.Store, runID domaintypes.RunI
 		jr.FinishedAt = &t
 	}
 	return jr
-}
-
-func loadSBOMEvidence(r *http.Request, st store.Store, runID domaintypes.RunID, jobID domaintypes.JobID) *migsapi.RunRepoJobSBOMEvidence {
-	var evidence migsapi.RunRepoJobSBOMEvidence
-	hasEvidence := false
-
-	job, err := st.GetJob(r.Context(), jobID)
-	if err != nil {
-		slog.Warn("list run repo jobs: load sbom evidence get job failed", "run_id", runID.String(), "job_id", jobID.String(), "err", err)
-		return nil
-	}
-	bundles, err := listArtifactBundlesByEffectiveJob(r.Context(), st, job)
-	if err != nil {
-		slog.Warn("list run repo jobs: load sbom artifact evidence failed", "run_id", runID.String(), "job_id", jobID.String(), "err", err)
-	} else {
-		artifactPresent := len(bundles) > 0
-		evidence.ArtifactPresent = &artifactPresent
-		hasEvidence = true
-	}
-
-	sbomRows, err := listSBOMRowsByEffectiveJob(r.Context(), st, job)
-	if err != nil {
-		slog.Warn("list run repo jobs: load sbom package-count evidence failed", "run_id", runID.String(), "job_id", jobID.String(), "err", err)
-	} else {
-		parsedPackageCount := len(sbomRows)
-		evidence.ParsedPackageCount = &parsedPackageCount
-		hasEvidence = true
-	}
-
-	if !hasEvidence {
-		return nil
-	}
-	return &evidence
 }
 
 func deriveRunRepoJobName(job store.Job, meta *contracts.JobMeta) string {

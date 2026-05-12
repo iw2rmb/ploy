@@ -13,10 +13,10 @@ func TestParseInFromURI(t *testing.T) {
 	}{
 		{
 			name:           "type selector",
-			raw:            "pre_gate://out/sbom.dependencies.txt",
+			raw:            "pre_gate://out/pre-gate.log",
 			wantSourceName: "",
 			wantSourceType: "pre_gate",
-			wantOutPath:    "/out/sbom.dependencies.txt",
+			wantOutPath:    "/out/pre-gate.log",
 		},
 		{
 			name:           "named type selector",
@@ -86,20 +86,20 @@ func TestParseMigSpecJSON_InFromValidation(t *testing.T) {
 	t.Run("valid type selector without step name", func(t *testing.T) {
 		input := `{
 			"steps": [
-				{"name": "extract-usage", "image": "img1"},
-				{"image": "img2", "in_from": [
-					{"from": "pre_gate://out/sbom.dependencies.txt"}
-				]}
-			]
-		}`
+					{"name": "extract-usage", "image": "img1"},
+					{"image": "img2", "in_from": [
+						{"from": "pre_gate://out/pre-gate.log"}
+					]}
+				]
+			}`
 		spec, err := ParseMigSpecJSON([]byte(input))
 		if err != nil {
 			t.Fatalf("ParseMigSpecJSON() error = %v", err)
 		}
-		if got := spec.Steps[1].InFrom[0].To; got != "/in/sbom.dependencies.txt" {
-			t.Fatalf("steps[1].in_from[0].to = %q, want %q", got, "/in/sbom.dependencies.txt")
-		}
-	})
+			if got := spec.Steps[1].InFrom[0].To; got != "/in/pre-gate.log" {
+				t.Fatalf("steps[1].in_from[0].to = %q, want %q", got, "/in/pre-gate.log")
+			}
+		})
 
 	t.Run("future named mig selector rejected", func(t *testing.T) {
 		input := `{
@@ -119,12 +119,12 @@ func TestParseMigSpecJSON_InFromValidation(t *testing.T) {
 	t.Run("named non-mig selector rejected", func(t *testing.T) {
 		input := `{
 			"steps": [
-				{"name": "extract-usage", "image": "img1"},
-				{"image": "img2", "in_from": [
-					{"from": "pre@pre_gate://out/sbom.dependencies.txt"}
-				]}
-			]
-		}`
+					{"name": "extract-usage", "image": "img1"},
+					{"image": "img2", "in_from": [
+						{"from": "pre@pre_gate://out/pre-gate.log"}
+					]}
+				]
+			}`
 		_, err := ParseMigSpecJSON([]byte(input))
 		if err == nil {
 			t.Fatal("expected error")
@@ -149,12 +149,12 @@ func TestParseMigSpecJSON_InFromValidation(t *testing.T) {
 	t.Run("duplicate step name allowed when no named mig selector", func(t *testing.T) {
 		input := `{
 			"steps": [
-				{"name": "dup", "image": "img1"},
-				{"name": "dup", "image": "img2", "in_from": [
-					{"from": "pre_gate://out/sbom.dependencies.txt"}
-				]}
-			]
-		}`
+					{"name": "dup", "image": "img1"},
+					{"name": "dup", "image": "img2", "in_from": [
+						{"from": "pre_gate://out/pre-gate.log"}
+					]}
+				]
+			}`
 		if _, err := ParseMigSpecJSON([]byte(input)); err != nil {
 			t.Fatalf("ParseMigSpecJSON() error = %v", err)
 		}

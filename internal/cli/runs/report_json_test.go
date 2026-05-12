@@ -32,21 +32,17 @@ func TestRenderRunReportJSON(t *testing.T) {
 				Attempt:   1,
 				Status:    "Running",
 				PatchURL:  "https://example.test/patch",
-				Jobs: []RunJobEntry{
-					{
-						JobID:               jobID,
-						JobType:             "step",
-						JobImage:            "ghcr.io/acme/runner:1",
-						Status:              "Running",
-						DurationMs:          1234,
-						DisplayName:         "step-1",
-						SBOMEvidence: &RunJobSBOMEvidence{
-							ArtifactPresent:     boolPtr(true),
-							ParsedPackageCount: intPtr(42),
-						},
-						Artifacts: []RunJobArtifact{
-							{
-								Name:      "gate-report",
+					Jobs: []RunJobEntry{
+						{
+							JobID:               jobID,
+							JobType:             "step",
+							JobImage:            "ghcr.io/acme/runner:1",
+							Status:              "Running",
+							DurationMs:          1234,
+							DisplayName:         "step-1",
+							Artifacts: []RunJobArtifact{
+								{
+									Name:      "gate-report",
 								CID:       "bafy-gate-report",
 								LookupURL: "https://example.test/v1/artifacts?cid=bafy-gate-report",
 							},
@@ -94,16 +90,6 @@ func TestRenderRunReportJSON(t *testing.T) {
 	if !ok || len(artifacts) != 1 {
 		t.Fatalf("expected one artifact in payload: %v", job0["artifacts"])
 	}
-	sbomEvidence, ok := job0["sbom_evidence"].(map[string]any)
-	if !ok {
-		t.Fatalf("expected sbom_evidence object in payload: %#v", job0["sbom_evidence"])
-	}
-	if got := sbomEvidence["artifact_present"]; got != true {
-		t.Fatalf("unexpected sbom_evidence.artifact_present: %#v", got)
-	}
-	if got := sbomEvidence["parsed_package_count"]; got != float64(42) {
-		t.Fatalf("unexpected sbom_evidence.parsed_package_count: %#v", got)
-	}
 }
 
 func TestRenderRunReportJSONOmitsEmptyOptionalFields(t *testing.T) {
@@ -137,20 +123,11 @@ func TestRenderRunReportJSONOmitsEmptyOptionalFields(t *testing.T) {
 		"patch_url",
 		"last_error",
 		"artifacts",
-		"sbom_evidence",
 	} {
 		if strings.Contains(out, "\""+field+"\"") {
 			t.Fatalf("expected %q omitted for empty optional fields; got %q", field, out)
 		}
 	}
-}
-
-func boolPtr(v bool) *bool {
-	return &v
-}
-
-func intPtr(v int) *int {
-	return &v
 }
 
 func TestRenderRunReportJSONRequiresWriter(t *testing.T) {
