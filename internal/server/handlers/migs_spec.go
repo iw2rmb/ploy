@@ -69,8 +69,7 @@ func setMigSpecHandler(st store.Store) http.HandlerFunc {
 			CreatedBy: req.CreatedBy,
 		})
 		if err != nil {
-			writeHTTPError(w, http.StatusInternalServerError, "failed to create spec: %v", err)
-			slog.Error("set mig spec: create spec failed", "mig_id", migID, "err", err)
+			serverError(w, "set mig spec", "create spec", err, "mig_id", migID)
 			return
 		}
 
@@ -116,8 +115,7 @@ func getMigLatestSpecHandler(st store.Store) http.HandlerFunc {
 				writeHTTPError(w, http.StatusNotFound, "spec not found")
 				return
 			}
-			writeHTTPError(w, http.StatusInternalServerError, "failed to get spec: %v", err)
-			slog.Error("get mig latest spec: get spec failed", "mig_id", mig.ID, "spec_id", mig.SpecID.String(), "err", err)
+			serverError(w, "get mig latest spec", "get spec", err, "mig_id", mig.ID, "spec_id", mig.SpecID.String())
 			return
 		}
 

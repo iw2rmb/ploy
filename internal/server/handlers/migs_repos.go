@@ -12,7 +12,6 @@ import (
 	"unicode/utf8"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 
 	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
@@ -43,16 +42,9 @@ func addMigRepoHandler(st store.Store) http.HandlerFunc {
 		// Normalize and validate using domain types.
 		normalizedURL := domaintypes.NormalizeRepoURL(string(req.RepoURL))
 		req.RepoURL = domaintypes.RepoURL(normalizedURL)
-		if err := req.RepoURL.Validate(); err != nil {
-			writeHTTPError(w, http.StatusBadRequest, "repo_url: %v", err)
-			return
-		}
-		if err := req.BaseRef.Validate(); err != nil {
-			writeHTTPError(w, http.StatusBadRequest, "base_ref: %v", err)
-			return
-		}
-		if err := req.TargetRef.Validate(); err != nil {
-			writeHTTPError(w, http.StatusBadRequest, "target_ref: %v", err)
+		if !validateField(w, "repo_url", req.RepoURL) ||
+			!validateField(w, "base_ref", req.BaseRef) ||
+			!validateField(w, "target_ref", req.TargetRef) {
 			return
 		}
 
@@ -77,14 +69,11 @@ func addMigRepoHandler(st store.Store) http.HandlerFunc {
 			TargetRef: req.TargetRef.String(),
 		})
 		if err != nil {
-			// Check for unique constraint violation (duplicate repo_url in mig).
-			var pgErr *pgconn.PgError
-			if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			if isUniqueViolation(err) {
 				writeHTTPError(w, http.StatusConflict, "repo already exists in this mig")
 				return
 			}
-			writeHTTPError(w, http.StatusInternalServerError, "failed to create mig repo: %v", err)
-			slog.Error("add mig repo: create failed", "mig_id", migID, "repo_url", normalizedURL, "err", err)
+			serverError(w, "add mig repo", "create mig repo", err, "mig_id", migID, "repo_url", normalizedURL)
 			return
 		}
 
@@ -118,8 +107,7 @@ func listMigReposHandler(st store.Store) http.HandlerFunc {
 		// List repos for this mig.
 		repos, err := st.ListMigReposByMig(r.Context(), migID)
 		if err != nil {
-			writeHTTPError(w, http.StatusInternalServerError, "failed to list mig repos: %v", err)
-			slog.Error("list mig repos: list failed", "mig_id", migID, "err", err)
+			serverError(w, "list mig repos", "list mig repos", err, "mig_id", migID)
 			return
 		}
 
@@ -127,8 +115,7 @@ func listMigReposHandler(st store.Store) http.HandlerFunc {
 		for _, repo := range repos {
 			repoURL, err := repoURLForID(r.Context(), st, repo.RepoID)
 			if err != nil {
-				writeHTTPError(w, http.StatusInternalServerError, "failed to get repo: %v", err)
-				slog.Error("list mig repos: get repo failed", "mig_id", migID, "repo_id", repo.RepoID, "err", err)
+				serverError(w, "list mig repos", "get repo", err, "mig_id", migID, "repo_id", repo.RepoID)
 				return
 			}
 			items = append(items, domainapi.MigRepoSummary{
@@ -172,8 +159,7 @@ func deleteMigRepoHandler(st store.Store) http.HandlerFunc {
 				writeHTTPError(w, http.StatusNotFound, "repo not found")
 				return
 			}
-			writeHTTPError(w, http.StatusInternalServerError, "failed to get repo: %v", err)
-			slog.Error("delete mig repo: get repo failed", "repo_id", repoID, "err", err)
+			serverError(w, "delete mig repo", "get repo", err, "repo_id", repoID)
 			return
 		}
 		if repo.MigID != migID {
@@ -184,8 +170,7 @@ func deleteMigRepoHandler(st store.Store) http.HandlerFunc {
 		// Check if repo has historical executions (run_repos references).
 		hasHistory, err := st.HasMigRepoHistory(r.Context(), repo.RepoID)
 		if err != nil {
-			writeHTTPError(w, http.StatusInternalServerError, "failed to check repo history: %v", err)
-			slog.Error("delete mig repo: check history failed", "repo_id", repoID, "err", err)
+			serverError(w, "delete mig repo", "check repo history", err, "repo_id", repoID)
 			return
 		}
 		if hasHistory {
@@ -195,8 +180,7 @@ func deleteMigRepoHandler(st store.Store) http.HandlerFunc {
 
 		// Delete the repo.
 		if err := st.DeleteMigRepo(r.Context(), repoID); err != nil {
-			writeHTTPError(w, http.StatusInternalServerError, "failed to delete mig repo: %v", err)
-			slog.Error("delete mig repo: delete failed", "repo_id", repoID, "err", err)
+			serverError(w, "delete mig repo", "delete mig repo", err, "repo_id", repoID)
 			return
 		}
 

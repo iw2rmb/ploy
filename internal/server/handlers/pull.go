@@ -95,8 +95,7 @@ func pullRunRepoHandler(st store.Store) http.HandlerFunc {
 		// We need to iterate and compare normalized URLs to find matches.
 		runRepos, err := st.ListRunReposWithURLByRun(r.Context(), runID)
 		if err != nil {
-			writeHTTPError(w, http.StatusInternalServerError, "failed to list run repos: %v", err)
-			slog.Error("pull run repo: list run repos failed", "run_id", runID, "err", err)
+			serverError(w, "pull run repo", "list run repos", err, "run_id", runID)
 			return
 		}
 
@@ -202,15 +201,13 @@ func pullMigRepoHandler(st store.Store) http.HandlerFunc {
 				writeHTTPError(w, http.StatusNotFound, "mig not found")
 				return
 			}
-			writeHTTPError(w, http.StatusInternalServerError, "failed to get mig: %v", err)
-			slog.Error("pull mig repo: get mig failed", "mig_id", migID, "err", err)
+			serverError(w, "pull mig repo", "get mig", err, "mig_id", migID)
 			return
 		}
 
 		migRepos, err := st.ListMigReposByMig(r.Context(), migID)
 		if err != nil {
-			writeHTTPError(w, http.StatusInternalServerError, "failed to list mig repos: %v", err)
-			slog.Error("pull mig repo: list mig repos failed", "mig_id", migID, "err", err)
+			serverError(w, "pull mig repo", "list mig repos", err, "mig_id", migID)
 			return
 		}
 
@@ -219,8 +216,7 @@ func pullMigRepoHandler(st store.Store) http.HandlerFunc {
 		for _, mr := range migRepos {
 			repoURL, err := repoURLForID(r.Context(), st, mr.RepoID)
 			if err != nil {
-				writeHTTPError(w, http.StatusInternalServerError, "failed to get repo: %v", err)
-				slog.Error("pull mig repo: get repo failed", "mig_id", migID, "repo_id", mr.RepoID, "err", err)
+				serverError(w, "pull mig repo", "get repo", err, "mig_id", migID, "repo_id", mr.RepoID)
 				return
 			}
 			if domaintypes.NormalizeRepoURL(repoURL) == normalizedURL {

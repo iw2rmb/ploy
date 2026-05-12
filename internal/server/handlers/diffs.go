@@ -90,8 +90,7 @@ func listRunRepoDiffsHandler(st store.Store, bs blobstore.Store) http.HandlerFun
 			}
 			diffs, err := listEffectiveRunRepoDiffs(r.Context(), st, runID, repoID)
 			if err != nil {
-				writeHTTPError(w, http.StatusInternalServerError, "failed to list diffs: %v", err)
-				slog.Error("download run repo diff: list diffs failed", "run_id", runID.String(), "repo_id", repoID.String(), "diff_id", diffID.String(), "err", err)
+				serverError(w, "download run repo diff", "list diffs", err, "run_id", runID.String(), "repo_id", repoID.String(), "diff_id", diffID.String())
 				return
 			}
 			diffUUID := uuid.MustParse(diffID.String())
@@ -160,8 +159,7 @@ func downloadAccumulatedRunRepoDiff(
 ) bool {
 	diffs, err := listEffectiveRunRepoDiffs(r.Context(), st, runID, repoID)
 	if err != nil {
-		writeHTTPError(w, http.StatusInternalServerError, "failed to list diffs: %v", err)
-		slog.Error("download accumulated run repo diff: list diffs failed", "run_id", runID.String(), "repo_id", repoID.String(), "diff_id", diffID.String(), "err", err)
+		serverError(w, "download accumulated run repo diff", "list diffs", err, "run_id", runID.String(), "repo_id", repoID.String(), "diff_id", diffID.String())
 		return false
 	}
 

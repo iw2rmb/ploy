@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 
 	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
@@ -48,8 +47,7 @@ func createMigHandler(st store.Store) http.HandlerFunc {
 			writeHTTPError(w, http.StatusBadRequest, "name is required")
 			return
 		}
-		if err := domaintypes.MigRef(name).Validate(); err != nil {
-			writeHTTPError(w, http.StatusBadRequest, "name: %v", err)
+		if !validateField(w, "name", domaintypes.MigRef(name)) {
 			return
 		}
 
@@ -71,14 +69,11 @@ func createMigHandler(st store.Store) http.HandlerFunc {
 			CreatedBy: req.CreatedBy,
 		})
 		if err != nil {
-			// Check for unique constraint violation (duplicate name)
-			var pgErr *pgconn.PgError
-			if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			if isUniqueViolation(err) {
 				writeHTTPError(w, http.StatusConflict, "mig with this name already exists")
 				return
 			}
-			writeHTTPError(w, http.StatusInternalServerError, "failed to create mig: %v", err)
-			slog.Error("create mig: create mig failed", "mig_id", migID.String(), "err", err)
+			serverError(w, "create mig", "create mig", err, "mig_id", migID.String())
 			return
 		}
 
@@ -93,13 +88,11 @@ func createMigHandler(st store.Store) http.HandlerFunc {
 				CreatedBy: req.CreatedBy,
 			})
 			if err != nil {
-				writeHTTPError(w, http.StatusInternalServerError, "failed to create spec: %v", err)
-				slog.Error("create mig: create spec failed", "mig_id", migID.String(), "err", err)
+				serverError(w, "create mig", "create spec", err, "mig_id", migID.String())
 				return
 			}
 			if err := st.UpdateMigSpec(r.Context(), store.UpdateMigSpecParams{ID: migID, SpecID: &createdSpec.ID}); err != nil {
-				writeHTTPError(w, http.StatusInternalServerError, "failed to update mig spec: %v", err)
-				slog.Error("create mig: update spec failed", "mig_id", migID.String(), "spec_id", createdSpec.ID.String(), "err", err)
+				serverError(w, "create mig", "update spec", err, "mig_id", migID.String(), "spec_id", createdSpec.ID.String())
 				return
 			}
 			createdID := createdSpec.ID
@@ -167,8 +160,7 @@ func listMigsHandler(st store.Store) http.HandlerFunc {
 		repoURLFilter := strings.TrimSpace(r.URL.Query().Get("repo_url"))
 		if repoURLFilter != "" {
 			repoURLFilter = domaintypes.NormalizeRepoURL(repoURLFilter)
-			if err := domaintypes.RepoURL(repoURLFilter).Validate(); err != nil {
-				writeHTTPError(w, http.StatusBadRequest, "repo_url: %v", err)
+			if !validateField(w, "repo_url", domaintypes.RepoURL(repoURLFilter)) {
 				return
 			}
 		}
@@ -188,8 +180,7 @@ func listMigsHandler(st store.Store) http.HandlerFunc {
 					NameFilter:   nameFilter,
 				})
 				if err != nil {
-					writeHTTPError(w, http.StatusInternalServerError, "failed to list migs: %v", err)
-					slog.Error("list migs: fetch failed", "err", err)
+					serverError(w, "list migs", "list migs", err)
 					return
 				}
 				if len(page) == 0 {
@@ -198,15 +189,13 @@ func listMigsHandler(st store.Store) http.HandlerFunc {
 				for _, mig := range page {
 					repos, err := st.ListMigReposByMig(r.Context(), mig.ID)
 					if err != nil {
-						writeHTTPError(w, http.StatusInternalServerError, "failed to list mig repos: %v", err)
-						slog.Error("list migs: list mig repos failed", "mig_id", mig.ID, "err", err)
+						serverError(w, "list migs", "list mig repos", err, "mig_id", mig.ID)
 						return
 					}
 					for _, mr := range repos {
 						repoURL, err := repoURLForID(r.Context(), st, mr.RepoID)
 						if err != nil {
-							writeHTTPError(w, http.StatusInternalServerError, "failed to get repo: %v", err)
-							slog.Error("list migs: get repo failed", "mig_id", mig.ID, "repo_id", mr.RepoID, "err", err)
+							serverError(w, "list migs", "get repo", err, "mig_id", mig.ID, "repo_id", mr.RepoID)
 							return
 						}
 						if domaintypes.NormalizeRepoURL(repoURL) == repoURLFilter {
@@ -240,8 +229,7 @@ func listMigsHandler(st store.Store) http.HandlerFunc {
 			NameFilter:   nameFilter,
 		})
 		if err != nil {
-			writeHTTPError(w, http.StatusInternalServerError, "failed to list migs: %v", err)
-			slog.Error("list migs: fetch failed", "err", err)
+			serverError(w, "list migs", "list migs", err)
 			return
 		}
 
@@ -286,8 +274,7 @@ func deleteMigHandler(st store.Store) http.HandlerFunc {
 		// Check if any runs exist for this mig
 		hasRuns, err := migHasAnyRuns(r.Context(), st, migID)
 		if err != nil {
-			writeHTTPError(w, http.StatusInternalServerError, "failed to check runs: %v", err)
-			slog.Error("delete mig: check runs failed", "mig_id", migID, "err", err)
+			serverError(w, "delete mig", "check runs", err, "mig_id", migID)
 			return
 		}
 		if hasRuns {

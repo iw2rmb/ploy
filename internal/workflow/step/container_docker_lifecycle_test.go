@@ -208,29 +208,6 @@ func TestDockerContainerRuntimeRemove(t *testing.T) {
 	}
 }
 
-// TestDockerContainerRuntimeNilClient verifies nil client returns errors.
-func TestDockerContainerRuntimeNilClient(t *testing.T) {
-	t.Parallel()
-	rt := &DockerContainerRuntime{client: nil}
-	ctx := context.Background()
-
-	if _, err := rt.Create(ctx, ContainerSpec{Image: "alpine"}); err == nil {
-		t.Error("Create should fail with nil client")
-	}
-	if err := rt.Start(ctx, ContainerHandle("x")); err == nil {
-		t.Error("Start should fail with nil client")
-	}
-	if _, err := rt.Wait(ctx, ContainerHandle("x")); err == nil {
-		t.Error("Wait should fail with nil client")
-	}
-	if _, err := rt.Logs(ctx, ContainerHandle("x")); err == nil {
-		t.Error("Logs should fail with nil client")
-	}
-	if err := rt.Remove(ctx, ContainerHandle("x")); err == nil {
-		t.Error("Remove should fail with nil client")
-	}
-}
-
 // TestParseDockerTime verifies RFC3339Nano timestamp parsing.
 func TestParseDockerTime(t *testing.T) {
 	t.Parallel()

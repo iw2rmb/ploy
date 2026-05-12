@@ -66,8 +66,7 @@ func getRunStatusHandler(st store.Store) http.HandlerFunc {
 		)
 		runRepos, err := st.ListRunReposWithURLByRun(r.Context(), run.ID)
 		if err != nil {
-			writeHTTPError(w, http.StatusInternalServerError, "failed to list run repos: %v", err)
-			slog.Error("get run status: list run repos failed", "run_id", run.ID, "err", err)
+			serverError(w, "get run status", "list run repos", err, "run_id", run.ID)
 			return
 		}
 		if len(runRepos) > 0 {
@@ -127,8 +126,7 @@ func getRunStatusHandler(st store.Store) http.HandlerFunc {
 		// Load jobs and their artifacts using string run ID.
 		jobs, err := st.ListJobsByRun(r.Context(), run.ID)
 		if err != nil {
-			writeHTTPError(w, http.StatusInternalServerError, "failed to list jobs: %v", err)
-			slog.Error("get run status: list jobs failed", "run_id", run.ID, "err", err)
+			serverError(w, "get run status", "list jobs", err, "run_id", run.ID)
 			return
 		}
 		for _, job := range jobs {
@@ -142,8 +140,7 @@ func getRunStatusHandler(st store.Store) http.HandlerFunc {
 			artMap := make(map[string]string)
 			bundles, err := listArtifactBundlesByEffectiveJob(r.Context(), st, job)
 			if err != nil {
-				writeHTTPError(w, http.StatusInternalServerError, "failed to list artifacts: %v", err)
-				slog.Error("get run status: list artifacts failed", "run_id", run.ID, "job_id", jobIDStr, "err", err)
+				serverError(w, "get run status", "list artifacts", err, "run_id", run.ID, "job_id", jobIDStr)
 				return
 			}
 			for _, b := range bundles {
