@@ -1,128 +1,69 @@
 package main
 
 import (
-	"bytes"
 	"strings"
 	"testing"
+
+	"github.com/iw2rmb/ploy/internal/testutil/assertx"
+	"github.com/iw2rmb/ploy/internal/testutil/clienv"
 )
 
 // TestHandleConfigRequiresSubcommand verifies that the config command rejects
 // invocations without a subcommand and displays usage information.
 func TestHandleConfigRequiresSubcommand(t *testing.T) {
-	buf := &bytes.Buffer{}
-	err := handleConfig(nil, buf)
-	if err == nil {
-		t.Fatalf("expected error for missing config subcommand")
-	}
-	out := buf.String()
-	if !strings.Contains(out, "Usage: ploy config") {
-		t.Fatalf("expected config usage output, got: %q", out)
-	}
+	out := clienv.RunExpectError(t, handleConfig, nil, "")
+	assertx.Contains(t, out, "Usage: ploy config")
 }
 
 // TestHandleConfigUnknownSubcommand ensures that unknown config subcommands
 // are rejected with an appropriate error message.
 func TestHandleConfigUnknownSubcommand(t *testing.T) {
-	buf := &bytes.Buffer{}
-	err := handleConfig([]string{"unknown"}, buf)
-	if err == nil {
-		t.Fatalf("expected error for unknown config subcommand")
-	}
-	if !strings.Contains(err.Error(), "unknown config subcommand") {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	clienv.RunExpectError(t, handleConfig, []string{"unknown"}, "unknown config subcommand")
 }
 
 // TestHandleConfigGitLabRequiresSubcommand verifies that the 'config gitlab'
 // command requires a subcommand (show, set, validate) and displays usage.
 func TestHandleConfigGitLabRequiresSubcommand(t *testing.T) {
-	buf := &bytes.Buffer{}
-	err := handleConfigGitLab(nil, buf)
-	if err == nil {
-		t.Fatalf("expected error for missing gitlab subcommand")
-	}
-	out := buf.String()
-	if !strings.Contains(out, "Usage: ploy config gitlab") {
-		t.Fatalf("expected gitlab usage output, got: %q", out)
-	}
+	out := clienv.RunExpectError(t, handleConfigGitLab, nil, "")
+	assertx.Contains(t, out, "Usage: ploy config gitlab")
 }
 
 // TestHandleConfigGitLabUnknownSubcommand ensures that unknown gitlab subcommands
 // are rejected with an appropriate error message.
 func TestHandleConfigGitLabUnknownSubcommand(t *testing.T) {
-	buf := &bytes.Buffer{}
-	err := handleConfigGitLab([]string{"unknown"}, buf)
-	if err == nil {
-		t.Fatalf("expected error for unknown gitlab subcommand")
-	}
-	if !strings.Contains(err.Error(), "unknown gitlab subcommand") {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	clienv.RunExpectError(t, handleConfigGitLab, []string{"unknown"}, "unknown gitlab subcommand")
 }
 
 // TestHandleConfigGitLabShowRejectsExtraArgs ensures that the 'show' subcommand
 // rejects unexpected positional arguments.
 func TestHandleConfigGitLabShowRejectsExtraArgs(t *testing.T) {
-	buf := &bytes.Buffer{}
-	err := handleConfigGitLabShow([]string{"extra"}, buf)
-	if err == nil {
-		t.Fatalf("expected error for unexpected args")
-	}
-	if !strings.Contains(err.Error(), "unexpected arguments:") {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	clienv.RunExpectError(t, handleConfigGitLabShow, []string{"extra"}, "unexpected arguments:")
 }
 
 // TestHandleConfigGitLabSetRequiresFile verifies that the 'set' subcommand
 // requires the --file flag to be specified.
 func TestHandleConfigGitLabSetRequiresFile(t *testing.T) {
-	buf := &bytes.Buffer{}
-	err := handleConfigGitLabSet(nil, buf)
-	if err == nil {
-		t.Fatalf("expected error when --file is missing")
-	}
-	if !strings.Contains(err.Error(), "--file is required") {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	clienv.RunExpectError(t, handleConfigGitLabSet, nil, "--file is required")
 }
 
 // TestHandleConfigGitLabSetRejectsExtraArgs ensures that the 'set' subcommand
 // rejects unexpected positional arguments after flags are parsed.
 func TestHandleConfigGitLabSetRejectsExtraArgs(t *testing.T) {
-	buf := &bytes.Buffer{}
-	err := handleConfigGitLabSet([]string{"--file", "test.json", "extra"}, buf)
-	if err == nil {
-		t.Fatalf("expected error for unexpected args")
-	}
-	if !strings.Contains(err.Error(), "unexpected arguments:") {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	clienv.RunExpectError(t, handleConfigGitLabSet,
+		[]string{"--file", "test.json", "extra"}, "unexpected arguments:")
 }
 
 // TestHandleConfigGitLabValidateRequiresFile verifies that the 'validate' subcommand
 // requires the --file flag to be specified.
 func TestHandleConfigGitLabValidateRequiresFile(t *testing.T) {
-	buf := &bytes.Buffer{}
-	err := handleConfigGitLabValidate(nil, buf)
-	if err == nil {
-		t.Fatalf("expected error when --file is missing")
-	}
-	if !strings.Contains(err.Error(), "--file is required") {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	clienv.RunExpectError(t, handleConfigGitLabValidate, nil, "--file is required")
 }
 
 // TestHandleConfigGitLabValidateRejectsExtraArgs ensures that the 'validate' subcommand
 // rejects unexpected positional arguments after flags are parsed.
 func TestHandleConfigGitLabValidateRejectsExtraArgs(t *testing.T) {
-	buf := &bytes.Buffer{}
-	err := handleConfigGitLabValidate([]string{"--file", "test.json", "extra"}, buf)
-	if err == nil {
-		t.Fatalf("expected error for unexpected args")
-	}
-	if !strings.Contains(err.Error(), "unexpected arguments:") {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	clienv.RunExpectError(t, handleConfigGitLabValidate,
+		[]string{"--file", "test.json", "extra"}, "unexpected arguments:")
 }
 
 // TestValidateGitLabConfigURLRules tests the validation rules for GitLab domain URLs,

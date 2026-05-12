@@ -4,188 +4,36 @@ import (
 	"bytes"
 	"strings"
 	"testing"
+
+	"github.com/iw2rmb/ploy/internal/testutil/assertx"
+	"github.com/iw2rmb/ploy/internal/testutil/clienv"
 )
 
-// TestHelpFlagsAtAllLevels verifies that --help and -h flags work correctly
-// at every command level, printing the correct usage and subcommand lists
-// instead of falling back to Cobra's default or surfacing "unknown subcommand" errors.
+// TestHelpFlagsAtAllLevels verifies that --help and -h flags work at every command level,
+// printing the correct usage and subcommand lists.
+// NOTE: `ploy token` and `ploy server` were removed as top-level commands; token is under
+// `ploy cluster token` and server deployment is under `ploy cluster deploy`.
 func TestHelpFlagsAtAllLevels(t *testing.T) {
 	tests := []struct {
 		name           string
-		args           []string
-		expectContains []string // Strings that must be present in output
-		expectNoError  bool     // Whether the command should succeed (return nil)
+		baseArgs       []string
+		expectContains []string
 	}{
-		// Root level --help
-		// NOTE: `ploy token` has been removed as a top-level command.
-		// Token is now accessible only via `ploy cluster token`.
-		{
-			name:           "ploy --help",
-			args:           []string{"--help"},
-			expectContains: []string{"Ploy CLI v2", "Core Commands:", "mig", "cluster"},
-			expectNoError:  true,
-		},
-		{
-			name:           "ploy -h",
-			args:           []string{"-h"},
-			expectContains: []string{"Ploy CLI v2", "Core Commands:"},
-			expectNoError:  true,
-		},
-
-		// mig command --help
-		{
-			name:           "ploy mig --help",
-			args:           []string{"mig", "--help"},
-			expectContains: []string{"Usage: ploy mig", "run"},
-			expectNoError:  true,
-		},
-		{
-			name:           "ploy mig -h",
-			args:           []string{"mig", "-h"},
-			expectContains: []string{"Usage: ploy mig"},
-			expectNoError:  true,
-		},
-
-		// run command --help
-		{
-			name:           "ploy run --help",
-			args:           []string{"run", "--help"},
-			expectContains: []string{"Usage: ploy run"},
-			expectNoError:  true,
-		},
-		{
-			name:           "ploy run -h",
-			args:           []string{"run", "-h"},
-			expectContains: []string{"Usage: ploy run"},
-			expectNoError:  true,
-		},
-
-		// NOTE: `ploy server` has been removed as a top-level command.
-		// Server deployment is now accessible only via `ploy cluster deploy`.
-		// The server tests have been replaced with cluster deploy tests below.
-
-		// cluster deploy --help (replaces ploy server --help)
-		{
-			name:           "ploy cluster deploy --help",
-			args:           []string{"cluster", "deploy", "--help"},
-			expectContains: []string{"Usage: ploy cluster deploy"},
-			expectNoError:  true,
-		},
-		{
-			name:           "ploy cluster deploy -h",
-			args:           []string{"cluster", "deploy", "-h"},
-			expectContains: []string{"Usage: ploy cluster deploy"},
-			expectNoError:  true,
-		},
-
-		// config command --help
-		{
-			name:           "ploy config --help",
-			args:           []string{"config", "--help"},
-			expectContains: []string{"Usage: ploy config", "gitlab"},
-			expectNoError:  true,
-		},
-		{
-			name:           "ploy config -h",
-			args:           []string{"config", "-h"},
-			expectContains: []string{"Usage: ploy config"},
-			expectNoError:  true,
-		},
-
-		// config gitlab --help (deeper level)
-		{
-			name:           "ploy config gitlab --help",
-			args:           []string{"config", "gitlab", "--help"},
-			expectContains: []string{"Usage: ploy config gitlab", "show", "set", "validate"},
-			expectNoError:  true,
-		},
-		{
-			name:           "ploy config gitlab -h",
-			args:           []string{"config", "gitlab", "-h"},
-			expectContains: []string{"Usage: ploy config gitlab"},
-			expectNoError:  true,
-		},
-
-		// manifest command --help
-		{
-			name:           "ploy manifest --help",
-			args:           []string{"manifest", "--help"},
-			expectContains: []string{"Usage: ploy manifest", "schema", "validate"},
-			expectNoError:  true,
-		},
-		{
-			name:           "ploy manifest -h",
-			args:           []string{"manifest", "-h"},
-			expectContains: []string{"Usage: ploy manifest"},
-			expectNoError:  true,
-		},
-
-		// NOTE: `ploy token` has been removed as a top-level command.
-		// Token operations are now accessible only via `ploy cluster token`.
-		// The ploy token --help tests have been removed from this section.
-		// See cluster token --help tests below.
-
-		// cluster command --help
-		{
-			name:           "ploy cluster --help",
-			args:           []string{"cluster", "--help"},
-			expectContains: []string{"Usage: ploy cluster", "deploy", "node", "token"},
-			expectNoError:  true,
-		},
-		{
-			name:           "ploy cluster -h",
-			args:           []string{"cluster", "-h"},
-			expectContains: []string{"Usage: ploy cluster"},
-			expectNoError:  true,
-		},
-
-		// cluster node --help (deeper level)
-		{
-			name:           "ploy cluster node --help",
-			args:           []string{"cluster", "node", "--help"},
-			expectContains: []string{"Usage: ploy cluster node", "add"},
-			expectNoError:  true,
-		},
-		{
-			name:           "ploy cluster node -h",
-			args:           []string{"cluster", "node", "-h"},
-			expectContains: []string{"Usage: ploy cluster node"},
-			expectNoError:  true,
-		},
-
-		// cluster token --help (deeper level)
-		// NOTE: Token operations are now accessible only via `ploy cluster token`.
-		{
-			name:           "ploy cluster token --help",
-			args:           []string{"cluster", "token", "--help"},
-			expectContains: []string{"Usage: ploy cluster token", "create", "list", "revoke"},
-			expectNoError:  true,
-		},
-		{
-			name:           "ploy cluster token -h",
-			args:           []string{"cluster", "token", "-h"},
-			expectContains: []string{"Usage: ploy cluster token"},
-			expectNoError:  true,
-		},
+		{name: "ploy", baseArgs: nil, expectContains: []string{"Ploy CLI v2", "Core Commands:", "mig", "cluster"}},
+		{name: "ploy mig", baseArgs: []string{"mig"}, expectContains: []string{"Usage: ploy mig", "run"}},
+		{name: "ploy run", baseArgs: []string{"run"}, expectContains: []string{"Usage: ploy run"}},
+		{name: "ploy cluster deploy", baseArgs: []string{"cluster", "deploy"}, expectContains: []string{"Usage: ploy cluster deploy"}},
+		{name: "ploy config", baseArgs: []string{"config"}, expectContains: []string{"Usage: ploy config", "gitlab"}},
+		{name: "ploy config gitlab", baseArgs: []string{"config", "gitlab"}, expectContains: []string{"Usage: ploy config gitlab", "show", "set", "validate"}},
+		{name: "ploy manifest", baseArgs: []string{"manifest"}, expectContains: []string{"Usage: ploy manifest", "schema", "validate"}},
+		{name: "ploy cluster", baseArgs: []string{"cluster"}, expectContains: []string{"Usage: ploy cluster", "deploy", "node", "token"}},
+		{name: "ploy cluster node", baseArgs: []string{"cluster", "node"}, expectContains: []string{"Usage: ploy cluster node", "add"}},
+		{name: "ploy cluster token", baseArgs: []string{"cluster", "token"}, expectContains: []string{"Usage: ploy cluster token", "create", "list", "revoke"}},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			buf := &bytes.Buffer{}
-			err := executeCmd(tt.args, buf)
-
-			// Check error expectation
-			if tt.expectNoError && err != nil {
-				t.Errorf("expected no error, got: %v", err)
-			}
-
-			// Check output contains expected strings
-			output := buf.String()
-			for _, expected := range tt.expectContains {
-				if !strings.Contains(output, expected) {
-					t.Errorf("expected output to contain %q, got:\n%s", expected, output)
-				}
-			}
+			clienv.RunHelp(t, executeCmd, tt.baseArgs, tt.expectContains...)
 		})
 	}
 }
@@ -211,9 +59,8 @@ func TestWantsHelpFunction(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := wantsHelp(tt.args)
-			if result != tt.expected {
-				t.Errorf("wantsHelp(%v) = %v, expected %v", tt.args, result, tt.expected)
+			if got := wantsHelp(tt.args); got != tt.expected {
+				t.Errorf("wantsHelp(%v) = %v, expected %v", tt.args, got, tt.expected)
 			}
 		})
 	}
@@ -221,62 +68,40 @@ func TestWantsHelpFunction(t *testing.T) {
 
 // TestHelpFlagNoUnknownSubcommandError verifies that --help does not trigger
 // "unknown subcommand" errors that would be confusing to users.
-// NOTE: `ploy server` and `ploy token` have been removed as top-level commands.
-// Server deployment is now only accessible via `ploy cluster deploy`.
-// Token operations are now only accessible via `ploy cluster token`.
 func TestHelpFlagNoUnknownSubcommandError(t *testing.T) {
 	commands := [][]string{
 		{"mig", "--help"},
-		// NOTE: {"server", "--help"} removed — server re-rooted under cluster deploy.
-		// NOTE: {"token", "--help"} removed — token re-rooted under cluster token.
 		{"config", "--help"},
 		{"config", "gitlab", "--help"},
 		{"manifest", "--help"},
 		{"cluster", "--help"},
-		{"cluster", "deploy", "--help"}, // Replaces ploy server --help
+		{"cluster", "deploy", "--help"},
 		{"cluster", "node", "--help"},
-		{"cluster", "token", "--help"}, // Replaces ploy token --help
+		{"cluster", "token", "--help"},
 	}
 
 	for _, args := range commands {
 		t.Run(strings.Join(args, " "), func(t *testing.T) {
-			buf := &bytes.Buffer{}
-			err := executeCmd(args, buf)
-
-			// Should not return an error
-			if err != nil {
-				t.Errorf("expected no error for %v, got: %v", args, err)
-			}
-
-			// Output should NOT contain "unknown" or "subcommand" error messages
-			output := buf.String()
-			if strings.Contains(strings.ToLower(output), "unknown") && strings.Contains(strings.ToLower(output), "subcommand") {
-				t.Errorf("output should not contain 'unknown subcommand' for help flag, got:\n%s", output)
+			out := clienv.RunExpectOK(t, executeCmd, args)
+			lower := strings.ToLower(out)
+			if strings.Contains(lower, "unknown") && strings.Contains(lower, "subcommand") {
+				t.Errorf("output should not contain 'unknown subcommand' for help flag, got:\n%s", out)
 			}
 		})
 	}
 }
 
-// TestRootHelpConsistency verifies that ploy --help and ploy help produce
-// identical output, ensuring consistency in the CLI help system.
+// TestRootHelpConsistency verifies that ploy --help and ploy help produce identical output.
 func TestRootHelpConsistency(t *testing.T) {
-	// Get output from ploy --help
 	helpFlagBuf := &bytes.Buffer{}
-	errHelpFlag := executeCmd([]string{"--help"}, helpFlagBuf)
-
-	// Get output from ploy help
+	if err := executeCmd([]string{"--help"}, helpFlagBuf); err != nil {
+		t.Fatalf("ploy --help failed: %v", err)
+	}
 	helpCmdBuf := &bytes.Buffer{}
-	errHelpCmd := executeCmd([]string{"help"}, helpCmdBuf)
-
-	// Both should succeed
-	if errHelpFlag != nil {
-		t.Errorf("ploy --help failed: %v", errHelpFlag)
+	if err := executeCmd([]string{"help"}, helpCmdBuf); err != nil {
+		t.Fatalf("ploy help failed: %v", err)
 	}
-	if errHelpCmd != nil {
-		t.Errorf("ploy help failed: %v", errHelpCmd)
-	}
-
-	// Output should be identical
+	assertx.Contains(t, helpFlagBuf.String(), "Ploy CLI v2")
 	if helpFlagBuf.String() != helpCmdBuf.String() {
 		t.Errorf("ploy --help and ploy help produce different output:\n--help:\n%s\nhelp:\n%s",
 			helpFlagBuf.String(), helpCmdBuf.String())

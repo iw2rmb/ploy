@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -9,11 +8,11 @@ import (
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	migsapi "github.com/iw2rmb/ploy/internal/migs/api"
+	"github.com/iw2rmb/ploy/internal/testutil/assertx"
 	"github.com/iw2rmb/ploy/internal/testutil/clienv"
 )
 
 func TestMigArtifactsListsStageArtifacts(t *testing.T) {
-	t.Helper()
 	runID := domaintypes.NewRunID().String()
 	stageA := domaintypes.NewJobID()
 	stageB := domaintypes.NewJobID()
@@ -35,16 +34,9 @@ func TestMigArtifactsListsStageArtifacts(t *testing.T) {
 	defer server.Close()
 
 	clienv.UseServerDescriptor(t, server.URL)
-	buf := &bytes.Buffer{}
-	err := executeCmd([]string{"mig", "artifacts", runID}, buf)
-	if err != nil {
-		t.Fatalf("mig artifacts error: %v", err)
-	}
-	out := buf.String()
-	if !bytes.Contains([]byte(out), []byte(stageA.String())) || !bytes.Contains([]byte(out), []byte(stageB.String())) {
-		t.Fatalf("expected stage IDs in output; got %q", out)
-	}
-	if !bytes.Contains([]byte(out), []byte("diff: bafy-diff")) || !bytes.Contains([]byte(out), []byte("logs: bafy-logs")) {
-		t.Fatalf("expected artifact entries in output; got %q", out)
-	}
+	out := clienv.RunExpectOK(t, executeCmd, []string{"mig", "artifacts", runID})
+	assertx.Contains(t, out, stageA.String())
+	assertx.Contains(t, out, stageB.String())
+	assertx.Contains(t, out, "diff: bafy-diff")
+	assertx.Contains(t, out, "logs: bafy-logs")
 }

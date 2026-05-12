@@ -5,6 +5,8 @@ import (
 	"io"
 	"strings"
 	"testing"
+
+	"github.com/iw2rmb/ploy/internal/testutil/clienv"
 )
 
 // TestHandleConfigEnv_Routing verifies top-level routing: missing subcommand,
@@ -96,14 +98,7 @@ func TestHandleConfigEnvShow_FlagValidation(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			buf := &bytes.Buffer{}
-			err := handleConfigEnvShow(tt.args, buf)
-			if err == nil {
-				t.Fatal("expected error, got nil")
-			}
-			if !strings.Contains(err.Error(), tt.wantErrContains) {
-				t.Fatalf("expected error containing %q, got: %v", tt.wantErrContains, err)
-			}
+			clienv.RunExpectError(t, handleConfigEnvShow, tt.args, tt.wantErrContains)
 		})
 	}
 }
@@ -125,14 +120,7 @@ func TestHandleConfigEnvSet_FlagValidation(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			buf := &bytes.Buffer{}
-			err := handleConfigEnvSet(tt.args, buf)
-			if err == nil {
-				t.Fatal("expected error, got nil")
-			}
-			if !strings.Contains(err.Error(), tt.wantErrContains) {
-				t.Fatalf("expected error containing %q, got: %v", tt.wantErrContains, err)
-			}
+			clienv.RunExpectError(t, handleConfigEnvSet, tt.args, tt.wantErrContains)
 		})
 	}
 }
@@ -152,14 +140,7 @@ func TestHandleConfigEnvUnset_FlagValidation(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			buf := &bytes.Buffer{}
-			err := handleConfigEnvUnset(tt.args, buf)
-			if err == nil {
-				t.Fatal("expected error, got nil")
-			}
-			if !strings.Contains(err.Error(), tt.wantErrContains) {
-				t.Fatalf("expected error containing %q, got: %v", tt.wantErrContains, err)
-			}
+			clienv.RunExpectError(t, handleConfigEnvUnset, tt.args, tt.wantErrContains)
 		})
 	}
 }
@@ -167,14 +148,7 @@ func TestHandleConfigEnvUnset_FlagValidation(t *testing.T) {
 // TestHandleConfigEnvListRejectsExtraArgs ensures that the 'list' subcommand
 // rejects unexpected positional arguments.
 func TestHandleConfigEnvListRejectsExtraArgs(t *testing.T) {
-	buf := &bytes.Buffer{}
-	err := handleConfigEnvList([]string{"extra"}, buf)
-	if err == nil {
-		t.Fatalf("expected error for unexpected args")
-	}
-	if !strings.Contains(err.Error(), "unexpected arguments:") {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	clienv.RunExpectError(t, handleConfigEnvList, []string{"extra"}, "unexpected arguments:")
 }
 
 // TestHandleConfigEnvSetValidOnSelectors verifies that all valid --on values are accepted.
@@ -208,14 +182,7 @@ func TestHandleConfigEnvSetOnAllExclusive(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			buf := &bytes.Buffer{}
-			err := handleConfigEnvSet(tt.args, buf)
-			if err == nil {
-				t.Fatalf("expected error for --on all combined with other selectors")
-			}
-			if !strings.Contains(err.Error(), "--on all is exclusive") {
-				t.Fatalf("unexpected error: %v", err)
-			}
+			clienv.RunExpectError(t, handleConfigEnvSet, tt.args, "--on all is exclusive")
 		})
 	}
 }

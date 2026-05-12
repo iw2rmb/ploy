@@ -159,14 +159,7 @@ func TestRunSubmitMissingFlags(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			var buf bytes.Buffer
-			err := executeCmd(tc.args, &buf)
-			if err == nil {
-				t.Fatal("expected error for missing flag")
-			}
-			if !strings.Contains(err.Error(), tc.wantErr) {
-				t.Errorf("expected error containing %q, got %q", tc.wantErr, err.Error())
-			}
+			clienv.RunExpectError(t, executeCmd, tc.args, tc.wantErr)
 		})
 	}
 }

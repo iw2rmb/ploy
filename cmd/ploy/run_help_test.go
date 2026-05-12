@@ -1,64 +1,37 @@
 package main
 
 import (
-	"bytes"
-	"strings"
 	"testing"
+
+	"github.com/iw2rmb/ploy/internal/testutil/assertx"
+	"github.com/iw2rmb/ploy/internal/testutil/clienv"
 )
 
-func TestRunStatusHelpUsesStatusUsage(t *testing.T) {
-	t.Helper()
-
+func TestRunSubcommandHelpUsesLeafUsage(t *testing.T) {
 	tests := []struct {
-		name string
-		flag string
+		name      string
+		baseArgs  []string
+		wantUsage string
 	}{
-		{name: "long help flag", flag: "--help"},
-		{name: "short help flag", flag: "-h"},
+		{
+			name:      "run status",
+			baseArgs:  []string{"run", "status"},
+			wantUsage: "Usage: ploy run status [--json] <run-id>",
+		},
+		{
+			name:      "run logs",
+			baseArgs:  []string{"run", "logs"},
+			wantUsage: "Usage: ploy run logs [--max-retries <n>] [--idle-timeout <duration>] [--timeout <duration>] <run-id>",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			buf := &bytes.Buffer{}
-			err := executeCmd([]string{"run", "status", tt.flag}, buf)
-			if err != nil {
-				t.Fatalf("run status %s: %v", tt.flag, err)
-			}
-			out := buf.String()
-			if !strings.Contains(out, "Usage: ploy run status [--json] <run-id>") {
-				t.Fatalf("expected status usage, got: %q", out)
-			}
-			if strings.Contains(out, "Usage: ploy run <command>") {
-				t.Fatalf("expected no top-level run usage, got: %q", out)
-			}
-		})
-	}
-}
-
-func TestRunLogsHelpUsesLogsUsage(t *testing.T) {
-	t.Helper()
-
-	tests := []struct {
-		name string
-		flag string
-	}{
-		{name: "long help flag", flag: "--help"},
-		{name: "short help flag", flag: "-h"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			buf := &bytes.Buffer{}
-			err := executeCmd([]string{"run", "logs", tt.flag}, buf)
-			if err != nil {
-				t.Fatalf("run logs %s: %v", tt.flag, err)
-			}
-			out := buf.String()
-			if !strings.Contains(out, "Usage: ploy run logs [--max-retries <n>] [--idle-timeout <duration>] [--timeout <duration>] <run-id>") {
-				t.Fatalf("expected logs usage, got: %q", out)
-			}
-			if strings.Contains(out, "Usage: ploy run <command>") {
-				t.Fatalf("expected no top-level run usage, got: %q", out)
+			for _, flag := range []string{"--help", "-h"} {
+				args := append(append([]string{}, tt.baseArgs...), flag)
+				out := clienv.RunExpectOK(t, executeCmd, args)
+				assertx.Contains(t, out, tt.wantUsage)
+				assertx.NotContains(t, out, "Usage: ploy run <command>")
 			}
 		})
 	}

@@ -1,14 +1,13 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/testutil/assertx"
 	"github.com/iw2rmb/ploy/internal/testutil/clienv"
 )
 
@@ -44,23 +43,11 @@ func TestRunStartCallsControlPlane(t *testing.T) {
 
 	clienv.UseServerDescriptor(t, server.URL)
 
-	var buf bytes.Buffer
-	err := executeCmd([]string{"run", "start", runID.String()}, &buf)
-	if err != nil {
-		t.Fatalf("run start error: %v", err)
-	}
+	out := clienv.RunExpectOK(t, executeCmd, []string{"run", "start", runID.String()})
 	if !called {
 		t.Fatalf("expected POST /v1/runs/%s/start to be called", runID.String())
 	}
-
-	output := buf.String()
-	if !strings.Contains(output, runID.String()) {
-		t.Errorf("output should contain %s: %s", runID.String(), output)
-	}
-	if !strings.Contains(output, "started 3") {
-		t.Errorf("output should contain started 3: %s", output)
-	}
-	if !strings.Contains(output, "1 already done") {
-		t.Errorf("output should contain 1 already done: %s", output)
-	}
+	assertx.Contains(t, out, runID.String())
+	assertx.Contains(t, out, "started 3")
+	assertx.Contains(t, out, "1 already done")
 }

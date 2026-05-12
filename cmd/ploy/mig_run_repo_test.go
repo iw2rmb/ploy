@@ -77,14 +77,7 @@ func TestMigRunRepoRouting(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			buf := &bytes.Buffer{}
-			err := executeCmd(tc.args, buf)
-			if err == nil {
-				t.Fatalf("expected error, got nil")
-			}
-			if !strings.Contains(err.Error(), tc.wantErr) {
-				t.Errorf("expected error containing %q, got %q", tc.wantErr, err.Error())
-			}
+			clienv.RunExpectError(t, executeCmd, tc.args, tc.wantErr)
 		})
 	}
 }
@@ -284,16 +277,9 @@ func TestMigRunRepoRestartCallsControlPlane(t *testing.T) {
 // repo status must be removed in favor of `ploy run status`.
 func TestMigRunRepoStatusRemoved(t *testing.T) {
 	t.Parallel()
-
-	buf := &bytes.Buffer{}
-	err := executeCmd([]string{"mig", "run", "repo", "status", "2HBZ1MRFOo8uvXVJhVqKlf8W8Ep"}, buf)
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
-	want := "mig run repo status has been removed; use 'ploy run status <run-id>'"
-	if !strings.Contains(err.Error(), want) {
-		t.Fatalf("expected error to contain %q, got %q", want, err.Error())
-	}
+	clienv.RunExpectError(t, executeCmd,
+		[]string{"mig", "run", "repo", "status", "2HBZ1MRFOo8uvXVJhVqKlf8W8Ep"},
+		"mig run repo status has been removed; use 'ploy run status <run-id>'")
 }
 
 // TestMigRunRepoAddServerError verifies error handling when the server returns an error.
