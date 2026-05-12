@@ -136,10 +136,12 @@ func (r *runController) uploadFailureStatus(ctx context.Context, req StartRunReq
 		},
 	)
 
+	errText := normalizedExecutionError(err)
+
 	// Build stats using typed builder to eliminate map[string]any construction.
 	stats := types.NewRunStatsBuilder().
 		DurationMs(duration.Milliseconds()).
-		Error(err.Error()).
+		Error(errText).
 		MustBuild()
 	if uploadErr := r.uploadStatus(ctx, req.RunID.String(), status.String(), exitCode, stats, req.JobID); uploadErr != nil {
 		slog.Error("failed to upload failure status", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)

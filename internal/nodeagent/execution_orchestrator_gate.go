@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -111,10 +110,11 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 		if errMsg == nil {
 			errMsg = errors.New("gate returned nil result with nil error")
 		}
+		errText := normalizedExecutionError(errMsg)
 
 		stats := types.NewRunStatsBuilder().
 			DurationMs(duration.Milliseconds()).
-			Error(fmt.Sprintf("gate execution failed: %s", errMsg.Error())).
+			Error(errText).
 			MustBuild()
 
 		if uploadErr := r.uploadStatus(ctx, req.RunID.String(), types.JobStatusError.String(), nil, stats, req.JobID); uploadErr != nil {

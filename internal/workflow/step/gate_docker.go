@@ -211,6 +211,9 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 	}
 	toolCacheMounts, err := buildGateToolCacheMounts(plan.language, plan.tool, plan.release)
 	if err != nil {
+		if IsNotEnoughSpaceError(err) {
+			return nil, err
+		}
 		return nil, fmt.Errorf("prepare build gate tool cache mounts: %w", err)
 	}
 	mounts = append(mounts, toolCacheMounts...)
@@ -344,7 +347,7 @@ func buildGateToolCacheMounts(language, tool, release string) ([]ContainerMount,
 	if err := os.MkdirAll(hostPath, 0o750); err != nil {
 		return nil, err
 	}
-	if err := pruneGateCacheDirOldestFirst(hostPath); err != nil {
+	if err := ensureGateCacheCapacity(hostPath); err != nil {
 		return nil, err
 	}
 	return []ContainerMount{{
