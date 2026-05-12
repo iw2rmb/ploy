@@ -52,9 +52,9 @@ func buildCommandForToolTarget(workspace string, tool string, target string) ([]
 		}
 		switch strings.TrimSpace(target) {
 		case contracts.GateProfileTargetBuild:
-			return wrap(gradleExec+" -q --stacktrace --build-cache build -x test -p /workspace"), nil
+			return wrap(gradleExec + " -q --stacktrace --build-cache build -x test -p /workspace"), nil
 		case contracts.GateProfileTargetAllTests:
-			return wrap(gradleExec+" -q --stacktrace --build-cache test -p /workspace"), nil
+			return wrap(gradleExec + " -q --stacktrace --build-cache test -p /workspace"), nil
 		default:
 			return nil, fmt.Errorf("unsupported gradle target: %q", target)
 		}

@@ -32,17 +32,14 @@ func RunGateOnly(ctx context.Context, r *Runner, req Request) (Result, error) {
 	var result Result
 
 	// Stage 1: Hydrate workspace (optional).
-	// Prepares the workspace by fetching repository sources if hydrator is configured.
-	hydrationDuration, err := runHydrationStage(ctx, r, req)
+	hydrationDuration, err := r.hydrate(ctx, req)
 	if err != nil {
 		return Result{}, err
 	}
 	result.Timings.HydrationDuration = hydrationDuration
 
-	// Stage 2: Build Gate validation.
-	// Run static validation on the workspace. This is the primary purpose of
-	// RunGateOnly — validate code without running a mig container.
-	gateMetadata, gateDuration, err := runGateStage(ctx, r, req, "gate validation failed")
+	// Stage 2: Build Gate validation — the primary purpose of RunGateOnly.
+	gateMetadata, gateDuration, err := r.runGate(ctx, req, "gate validation failed")
 	result.BuildGate = gateMetadata
 	result.Timings.BuildGateDuration = gateDuration
 	if err != nil {

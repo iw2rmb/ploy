@@ -92,11 +92,6 @@ func trimMavenLog(logText string) string {
 	return result
 }
 
-func trimGradleLog(logText string) string {
-	trimmed, _ := trimGradleLogAndEvidence(logText)
-	return trimmed
-}
-
 func trimGradleLogAndEvidence(logText string) (string, string) {
 	lines := strings.Split(logText, "\n")
 	if len(lines) == 0 {
