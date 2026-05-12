@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"net/http"
 	"os"
 
@@ -20,14 +19,10 @@ func healthHandler(st store.Store) http.HandlerFunc {
 		if err := st.Pool().Ping(r.Context()); err != nil {
 			resp["status"] = "degraded"
 			resp["db"] = "unreachable"
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusServiceUnavailable)
-			_ = json.NewEncoder(w).Encode(resp)
+			writeJSON(w, http.StatusServiceUnavailable, resp)
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode(resp)
+		writeJSON(w, http.StatusOK, resp)
 	}
 }

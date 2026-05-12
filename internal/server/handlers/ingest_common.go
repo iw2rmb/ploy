@@ -155,6 +155,43 @@ func parseRequiredPathIDOrWriteError[T any, PT interface {
 	return id, true
 }
 
+// parseRequiredQueryIDOrWriteError extracts and validates a typed query ID.
+// On validation failure, it writes a 400 response and returns ok=false.
+func parseRequiredQueryIDOrWriteError[T any, PT interface {
+	*T
+	encoding.TextUnmarshaler
+}](w http.ResponseWriter, r *http.Request, key string) (T, bool) {
+	id, err := parseQuery[T, PT](r, key)
+	if err != nil {
+		var zero T
+		writeHTTPError(w, http.StatusBadRequest, "%s", err)
+		return zero, false
+	}
+	return id, true
+}
+
+// requiredPathParamOrWriteError extracts a required string path param.
+// On validation failure, it writes a 400 response and returns ok=false.
+func requiredPathParamOrWriteError(w http.ResponseWriter, r *http.Request, key string) (string, bool) {
+	val, err := requiredPathParam(r, key)
+	if err != nil {
+		writeHTTPError(w, http.StatusBadRequest, "%s", err)
+		return "", false
+	}
+	return val, true
+}
+
+// requiredQueryParamOrWriteError extracts a required string query param.
+// On validation failure, it writes a 400 response and returns ok=false.
+func requiredQueryParamOrWriteError(w http.ResponseWriter, r *http.Request, key string) (string, bool) {
+	val, err := requiredQueryParam(r, key)
+	if err != nil {
+		writeHTTPError(w, http.StatusBadRequest, "%s", err)
+		return "", false
+	}
+	return val, true
+}
+
 // optionalParam extracts an optional typed ID from a path parameter.
 // Returns nil if the parameter is missing or empty.
 func optionalParam[T any, PT interface {
@@ -305,6 +342,55 @@ func getMigByIDOrFail(w http.ResponseWriter, r *http.Request, st store.Store, lo
 		return store.Mig{}, false
 	}
 	return mig, true
+}
+
+// getNodeOrFail fetches a node by ID. On error it writes the HTTP response
+// (404 for not found, 500 for other errors) and returns ok=false.
+func getNodeOrFail(w http.ResponseWriter, r *http.Request, st store.Store, nodeID domaintypes.NodeID, logPrefix string) (store.Node, bool) {
+	node, err := st.GetNode(r.Context(), nodeID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			writeHTTPError(w, http.StatusNotFound, "node not found")
+			return store.Node{}, false
+		}
+		slog.Error(logPrefix+": get node failed", "node_id", nodeID.String(), "err", err)
+		writeHTTPError(w, http.StatusInternalServerError, "failed to get node: %v", err)
+		return store.Node{}, false
+	}
+	return node, true
+}
+
+// getJobOrFail fetches a job by ID. On error it writes the HTTP response
+// (404 for not found, 500 for other errors) and returns ok=false.
+func getJobOrFail(w http.ResponseWriter, r *http.Request, st store.Store, jobID domaintypes.JobID, logPrefix string) (store.Job, bool) {
+	job, err := st.GetJob(r.Context(), jobID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			writeHTTPError(w, http.StatusNotFound, "job not found")
+			return store.Job{}, false
+		}
+		slog.Error(logPrefix+": get job failed", "job_id", jobID.String(), "err", err)
+		writeHTTPError(w, http.StatusInternalServerError, "failed to get job: %v", err)
+		return store.Job{}, false
+	}
+	return job, true
+}
+
+// getJobInRunOrFail fetches the run, fetches the job, and asserts the job
+// belongs to the run. Writes 404/400/500 on failures.
+func getJobInRunOrFail(w http.ResponseWriter, r *http.Request, st store.Store, runID domaintypes.RunID, jobID domaintypes.JobID, logPrefix string) (store.Job, bool) {
+	if _, ok := getRunOrFail(w, r, st, runID, logPrefix); !ok {
+		return store.Job{}, false
+	}
+	job, ok := getJobOrFail(w, r, st, jobID, logPrefix)
+	if !ok {
+		return store.Job{}, false
+	}
+	if job.RunID != runID {
+		writeHTTPError(w, http.StatusBadRequest, "job does not belong to run")
+		return store.Job{}, false
+	}
+	return job, true
 }
 
 // streamBlob writes standard download headers and streams content from r to w.

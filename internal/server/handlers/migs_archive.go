@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"encoding/json"
 	"log/slog"
 	"net/http"
 
@@ -103,9 +102,7 @@ func unarchiveMigHandler(st store.Store) http.HandlerFunc {
 
 // writeMigArchiveResponse writes the standard archive/unarchive JSON response.
 func writeMigArchiveResponse(w http.ResponseWriter, mig store.Mig, archived bool) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(struct {
+	writeJSON(w, http.StatusOK, struct {
 		ID       string `json:"id"`
 		Name     string `json:"name"`
 		Archived bool   `json:"archived"`

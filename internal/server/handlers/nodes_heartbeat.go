@@ -1,14 +1,12 @@
 package handlers
 
 import (
-	"errors"
 	"log/slog"
 	"math"
 	"net/http"
 	"strings"
 	"time"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
@@ -18,14 +16,11 @@ import (
 // heartbeatHandler updates node heartbeat and resource snapshot.
 func heartbeatHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Extract node id from path parameter.
-		nodeID, err := parseRequiredPathID[domaintypes.NodeID](r, "id")
-		if err != nil {
-			writeHTTPError(w, http.StatusBadRequest, "%s", err)
+		nodeID, ok := parseRequiredPathIDOrWriteError[domaintypes.NodeID](w, r, "id")
+		if !ok {
 			return
 		}
 
-		// Decode request body with strict validation.
 		var req struct {
 			CPUFreeMillis  int64  `json:"cpu_free_millis"`
 			CPUTotalMillis int64  `json:"cpu_total_millis"`
@@ -70,20 +65,11 @@ func heartbeatHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Check if the node exists before attempting to update.
-		_, err = st.GetNode(r.Context(), nodeID)
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				writeHTTPError(w, http.StatusNotFound, "node not found")
-				return
-			}
-			writeHTTPError(w, http.StatusInternalServerError, "failed to check node: %v", err)
-			slog.Error("heartbeat: check failed", "node_id", nodeID, "err", err)
+		if _, ok := getNodeOrFail(w, r, st, nodeID, "heartbeat"); !ok {
 			return
 		}
 
-		// Update node heartbeat with resource snapshot.
-		err = st.UpdateNodeHeartbeat(r.Context(), store.UpdateNodeHeartbeatParams{
+		err := st.UpdateNodeHeartbeat(r.Context(), store.UpdateNodeHeartbeatParams{
 			ID: nodeID,
 			LastHeartbeat: pgtype.Timestamptz{
 				Time:  time.Now().UTC(),

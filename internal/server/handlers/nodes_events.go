@@ -2,13 +2,11 @@ package handlers
 
 import (
 	"encoding/json"
-	"errors"
 	"log/slog"
 	"net/http"
 	"strings"
 	"time"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
@@ -20,10 +18,8 @@ import (
 func createNodeEventsHandler(st store.Store, eventsService *server.EventsService) http.HandlerFunc {
 	const maxRequestSize = 1 << 20 // 1 MiB
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Extract node id from path parameter.
-		nodeID, err := parseRequiredPathID[domaintypes.NodeID](r, "id")
-		if err != nil {
-			writeHTTPError(w, http.StatusBadRequest, "%s", err)
+		nodeID, ok := parseRequiredPathIDOrWriteError[domaintypes.NodeID](w, r, "id")
+		if !ok {
 			return
 		}
 
@@ -62,15 +58,7 @@ func createNodeEventsHandler(st store.Store, eventsService *server.EventsService
 			return
 		}
 
-		// Check if the node exists before processing.
-		_, err = st.GetNode(r.Context(), nodeID)
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				writeHTTPError(w, http.StatusNotFound, "node not found")
-				return
-			}
-			writeHTTPError(w, http.StatusInternalServerError, "failed to check node: %v", err)
-			slog.Error("node events: check failed", "node_id", nodeID, "err", err)
+		if _, ok := getNodeOrFail(w, r, st, nodeID, "node events"); !ok {
 			return
 		}
 
@@ -144,12 +132,7 @@ func createNodeEventsHandler(st store.Store, eventsService *server.EventsService
 			count++
 		}
 
-		// Return success response with count.
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
-		if err := json.NewEncoder(w).Encode(map[string]interface{}{"count": count}); err != nil {
-			slog.Error("node events: encode response failed", "err", err)
-		}
+		writeJSON(w, http.StatusCreated, map[string]any{"count": count})
 
 		slog.Debug("node events created",
 			"node_id", nodeID.String(),

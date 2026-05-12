@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -24,14 +23,12 @@ import (
 // Query params: ?attempt=N (optional, defaults to current attempt)
 func listRunRepoJobsHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		runID, err := parseRequiredPathID[domaintypes.RunID](r, "run_id")
-		if err != nil {
-			writeHTTPError(w, http.StatusBadRequest, "%s", err)
+		runID, ok := parseRequiredPathIDOrWriteError[domaintypes.RunID](w, r, "run_id")
+		if !ok {
 			return
 		}
-		repoID, err := parseRequiredPathID[domaintypes.RepoID](r, "repo_id")
-		if err != nil {
-			writeHTTPError(w, http.StatusBadRequest, "%s", err)
+		repoID, ok := parseRequiredPathIDOrWriteError[domaintypes.RepoID](w, r, "repo_id")
+		if !ok {
 			return
 		}
 
@@ -82,74 +79,69 @@ func listRunRepoJobsHandler(st store.Store) http.HandlerFunc {
 		}
 
 		for _, job := range jobs {
-			jr := migsapi.RunRepoJob{
-				JobID:      job.ID,
-				Name:       string(job.JobType),
-				JobType:    job.JobType,
-				JobImage:   strings.TrimSpace(job.JobImage),
-				RepoShaIn:  job.RepoShaIn,
-				RepoShaOut: job.RepoShaOut,
-				NextID:     job.NextID,
-				NodeID:     job.NodeID,
-				Status:     job.Status,
-				ExitCode:   job.ExitCode,
-				DurationMs: job.DurationMs,
+			resp.Jobs = append(resp.Jobs, runRepoJobFromStore(r, st, runID, job))
+		}
+
+		writeJSON(w, http.StatusOK, resp)
+	}
+}
+
+// runRepoJobFromStore projects a store.Job into the API shape, applying job
+// metadata, gate SBOM evidence, and timestamp conversions.
+func runRepoJobFromStore(r *http.Request, st store.Store, runID domaintypes.RunID, job store.Job) migsapi.RunRepoJob {
+	jr := migsapi.RunRepoJob{
+		JobID:      job.ID,
+		Name:       string(job.JobType),
+		JobType:    job.JobType,
+		JobImage:   strings.TrimSpace(job.JobImage),
+		RepoShaIn:  job.RepoShaIn,
+		RepoShaOut: job.RepoShaOut,
+		NextID:     job.NextID,
+		NodeID:     job.NodeID,
+		Status:     job.Status,
+		ExitCode:   job.ExitCode,
+		DurationMs: job.DurationMs,
+	}
+
+	if len(job.Meta) > 0 {
+		if meta, err := contracts.UnmarshalJobMeta(job.Meta); err == nil {
+			if resolvedName := deriveRunRepoJobName(job, meta); resolvedName != "" {
+				jr.Name = resolvedName
 			}
-
-			var meta *contracts.JobMeta
-
-			// Extract projection fields from structured job metadata.
-			if len(job.Meta) > 0 {
-				meta, err = contracts.UnmarshalJobMeta(job.Meta)
-				if err == nil {
-					if resolvedName := deriveRunRepoJobName(job, meta); resolvedName != "" {
-						jr.Name = resolvedName
-					}
-					if meta.MigStepName != "" {
-						jr.DisplayName = meta.MigStepName
-					}
-					if jr.BugSummary == "" && meta.GateMetadata != nil && strings.TrimSpace(meta.GateMetadata.BugSummary) != "" {
-						jr.BugSummary = strings.TrimSpace(meta.GateMetadata.BugSummary)
-					}
-					if meta.GateMetadata != nil && meta.GateMetadata.StackGate != nil {
-						if runtimeImage := strings.TrimSpace(meta.GateMetadata.StackGate.RuntimeImage); runtimeImage != "" {
-							// Prefer the runtime-resolved gate image when available.
-							jr.JobImage = runtimeImage
-						}
-					}
-					if meta.GateMetadata != nil {
-						if exp := meta.GateMetadata.DetectedStackExpectation(); exp != nil {
-							jr.Lang = exp.Language
-							jr.Tooling = exp.Tool
-							jr.Version = exp.Release
-						}
-					}
+			if meta.MigStepName != "" {
+				jr.DisplayName = meta.MigStepName
+			}
+			if jr.BugSummary == "" && meta.GateMetadata != nil && strings.TrimSpace(meta.GateMetadata.BugSummary) != "" {
+				jr.BugSummary = strings.TrimSpace(meta.GateMetadata.BugSummary)
+			}
+			if meta.GateMetadata != nil && meta.GateMetadata.StackGate != nil {
+				if runtimeImage := strings.TrimSpace(meta.GateMetadata.StackGate.RuntimeImage); runtimeImage != "" {
+					jr.JobImage = runtimeImage
 				}
 			}
-
-			if lifecycle.IsGateJobType(domaintypes.JobType(job.JobType)) {
-				jr.SBOMEvidence = loadSBOMEvidence(r, st, runID, job.ID)
+			if meta.GateMetadata != nil {
+				if exp := meta.GateMetadata.DetectedStackExpectation(); exp != nil {
+					jr.Lang = exp.Language
+					jr.Tooling = exp.Tool
+					jr.Version = exp.Release
+				}
 			}
-
-			// Set timestamps.
-			if job.StartedAt.Valid {
-				t := job.StartedAt.Time.UTC()
-				jr.StartedAt = &t
-			}
-			if job.FinishedAt.Valid {
-				t := job.FinishedAt.Time.UTC()
-				jr.FinishedAt = &t
-			}
-
-			resp.Jobs = append(resp.Jobs, jr)
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			slog.Error("list run repo jobs: encode response failed", "err", err)
 		}
 	}
+
+	if lifecycle.IsGateJobType(domaintypes.JobType(job.JobType)) {
+		jr.SBOMEvidence = loadSBOMEvidence(r, st, runID, job.ID)
+	}
+
+	if job.StartedAt.Valid {
+		t := job.StartedAt.Time.UTC()
+		jr.StartedAt = &t
+	}
+	if job.FinishedAt.Valid {
+		t := job.FinishedAt.Time.UTC()
+		jr.FinishedAt = &t
+	}
+	return jr
 }
 
 func loadSBOMEvidence(r *http.Request, st store.Store, runID domaintypes.RunID, jobID domaintypes.JobID) *migsapi.RunRepoJobSBOMEvidence {

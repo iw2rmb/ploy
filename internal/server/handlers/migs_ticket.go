@@ -41,23 +41,13 @@ import (
 // Run and job IDs are KSUID-backed strings; no UUID parsing is performed.
 func getRunStatusHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Parse the run ID from the URL path parameter.
-		// Run IDs are KSUID strings; treated as opaque identifiers.
-		runID, err := parseRequiredPathID[domaintypes.RunID](r, "run_id")
-		if err != nil {
-			writeHTTPError(w, http.StatusBadRequest, "%s", err)
+		runID, ok := parseRequiredPathIDOrWriteError[domaintypes.RunID](w, r, "run_id")
+		if !ok {
 			return
 		}
 
-		// Fetch run.
-		run, err := st.GetRun(r.Context(), runID)
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				writeHTTPError(w, http.StatusNotFound, "run not found")
-				return
-			}
-			writeHTTPError(w, http.StatusInternalServerError, "failed to get run: %v", err)
-			slog.Error("get run status: fetch run failed", "run_id", runID.String(), "err", err)
+		run, ok := getRunOrFail(w, r, st, runID, "get run status")
+		if !ok {
 			return
 		}
 
@@ -177,12 +167,7 @@ func getRunStatusHandler(st store.Store) http.HandlerFunc {
 			}
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		// Encode RunSummary directly — no wrapper type.
-		if err := json.NewEncoder(w).Encode(summary); err != nil {
-			slog.Error("get run status: encode response failed", "err", err)
-		}
+		writeJSON(w, http.StatusOK, summary)
 	}
 }
 

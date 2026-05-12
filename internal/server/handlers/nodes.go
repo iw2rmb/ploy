@@ -1,48 +1,88 @@
 package handlers
 
 import (
-	"encoding/json"
-	"errors"
 	"log/slog"
 	"net/http"
 	"time"
-
-	"github.com/jackc/pgx/v5"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
+// nodeResponse is the JSON shape returned by GET /v1/nodes.
+type nodeResponse struct {
+	ID              string  `json:"id"`
+	Name            string  `json:"name"`
+	IPAddress       string  `json:"ip_address"`
+	Version         *string `json:"version,omitempty"`
+	Concurrency     int32   `json:"concurrency"`
+	CPUTotalMillis  int32   `json:"cpu_total_millis"`
+	CPUFreeMillis   int32   `json:"cpu_free_millis"`
+	MemTotalBytes   int64   `json:"mem_total_bytes"`
+	MemFreeBytes    int64   `json:"mem_free_bytes"`
+	DiskTotalBytes  int64   `json:"disk_total_bytes"`
+	DiskFreeBytes   int64   `json:"disk_free_bytes"`
+	CertSerial      *string `json:"cert_serial,omitempty"`
+	CertFingerprint *string `json:"cert_fingerprint,omitempty"`
+	CertNotBefore   *string `json:"cert_not_before,omitempty"`
+	CertNotAfter    *string `json:"cert_not_after,omitempty"`
+	LastHeartbeat   *string `json:"last_heartbeat,omitempty"`
+	Drained         bool    `json:"drained"`
+	CreatedAt       string  `json:"created_at"`
+}
+
+func nodeToResponse(node store.Node) nodeResponse {
+	nr := nodeResponse{
+		ID:              node.ID.String(),
+		Name:            node.Name,
+		IPAddress:       node.IpAddress.String(),
+		Version:         node.Version,
+		Concurrency:     node.Concurrency,
+		CPUTotalMillis:  node.CpuTotalMillis,
+		CPUFreeMillis:   node.CpuFreeMillis,
+		MemTotalBytes:   node.MemTotalBytes,
+		MemFreeBytes:    node.MemFreeBytes,
+		DiskTotalBytes:  node.DiskTotalBytes,
+		DiskFreeBytes:   node.DiskFreeBytes,
+		CertSerial:      node.CertSerial,
+		CertFingerprint: node.CertFingerprint,
+		Drained:         node.Drained,
+		CreatedAt:       node.CreatedAt.Time.Format(time.RFC3339),
+	}
+	if node.CertNotBefore.Valid {
+		s := node.CertNotBefore.Time.Format(time.RFC3339)
+		nr.CertNotBefore = &s
+	}
+	if node.CertNotAfter.Valid {
+		s := node.CertNotAfter.Time.Format(time.RFC3339)
+		nr.CertNotAfter = &s
+	}
+	if node.LastHeartbeat.Valid {
+		s := node.LastHeartbeat.Time.Format(time.RFC3339)
+		nr.LastHeartbeat = &s
+	}
+	return nr
+}
+
 // drainNodeHandler marks a node as drained.
 func drainNodeHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		nodeID, err := parseRequiredPathID[domaintypes.NodeID](r, "id")
-		if err != nil {
-			writeHTTPError(w, http.StatusBadRequest, "%s", err)
+		nodeID, ok := parseRequiredPathIDOrWriteError[domaintypes.NodeID](w, r, "id")
+		if !ok {
 			return
 		}
 
-		// Verify node exists.
-		node, err := st.GetNode(r.Context(), nodeID)
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				writeHTTPError(w, http.StatusNotFound, "node not found")
-				return
-			}
-			writeHTTPError(w, http.StatusInternalServerError, "failed to get node: %v", err)
-			slog.Error("drain node: lookup failed", "node_id", nodeID, "err", err)
+		node, ok := getNodeOrFail(w, r, st, nodeID, "drain node")
+		if !ok {
 			return
 		}
 
-		// Check if already drained (409 Conflict).
 		if node.Drained {
 			writeHTTPError(w, http.StatusConflict, "node is already drained")
 			return
 		}
 
-		// Update drained flag.
-		err = st.UpdateNodeDrained(r.Context(), store.UpdateNodeDrainedParams{ID: nodeID, Drained: true})
-		if err != nil {
+		if err := st.UpdateNodeDrained(r.Context(), store.UpdateNodeDrainedParams{ID: nodeID, Drained: true}); err != nil {
 			writeHTTPError(w, http.StatusInternalServerError, "failed to drain node: %v", err)
 			slog.Error("drain node: update failed", "node_id", nodeID, "err", err)
 			return
@@ -56,33 +96,22 @@ func drainNodeHandler(st store.Store) http.HandlerFunc {
 // undrainNodeHandler marks a node as undrained (active).
 func undrainNodeHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		nodeID, err := parseRequiredPathID[domaintypes.NodeID](r, "id")
-		if err != nil {
-			writeHTTPError(w, http.StatusBadRequest, "%s", err)
+		nodeID, ok := parseRequiredPathIDOrWriteError[domaintypes.NodeID](w, r, "id")
+		if !ok {
 			return
 		}
 
-		// Verify node exists.
-		node, err := st.GetNode(r.Context(), nodeID)
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				writeHTTPError(w, http.StatusNotFound, "node not found")
-				return
-			}
-			writeHTTPError(w, http.StatusInternalServerError, "failed to get node: %v", err)
-			slog.Error("undrain node: lookup failed", "node_id", nodeID, "err", err)
+		node, ok := getNodeOrFail(w, r, st, nodeID, "undrain node")
+		if !ok {
 			return
 		}
 
-		// Check if already undrained (409 Conflict).
 		if !node.Drained {
 			writeHTTPError(w, http.StatusConflict, "node is not drained")
 			return
 		}
 
-		// Update drained flag.
-		err = st.UpdateNodeDrained(r.Context(), store.UpdateNodeDrainedParams{ID: nodeID, Drained: false})
-		if err != nil {
+		if err := st.UpdateNodeDrained(r.Context(), store.UpdateNodeDrainedParams{ID: nodeID, Drained: false}); err != nil {
 			writeHTTPError(w, http.StatusInternalServerError, "failed to undrain node: %v", err)
 			slog.Error("undrain node: update failed", "node_id", nodeID, "err", err)
 			return
@@ -103,67 +132,11 @@ func listNodesHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Build response slice.
-		type nodeResponse struct {
-			ID              string  `json:"id"`
-			Name            string  `json:"name"`
-			IPAddress       string  `json:"ip_address"`
-			Version         *string `json:"version,omitempty"`
-			Concurrency     int32   `json:"concurrency"`
-			CPUTotalMillis  int32   `json:"cpu_total_millis"`
-			CPUFreeMillis   int32   `json:"cpu_free_millis"`
-			MemTotalBytes   int64   `json:"mem_total_bytes"`
-			MemFreeBytes    int64   `json:"mem_free_bytes"`
-			DiskTotalBytes  int64   `json:"disk_total_bytes"`
-			DiskFreeBytes   int64   `json:"disk_free_bytes"`
-			CertSerial      *string `json:"cert_serial,omitempty"`
-			CertFingerprint *string `json:"cert_fingerprint,omitempty"`
-			CertNotBefore   *string `json:"cert_not_before,omitempty"`
-			CertNotAfter    *string `json:"cert_not_after,omitempty"`
-			LastHeartbeat   *string `json:"last_heartbeat,omitempty"`
-			Drained         bool    `json:"drained"`
-			CreatedAt       string  `json:"created_at"`
-		}
-
 		resp := make([]nodeResponse, 0, len(nodes))
 		for _, node := range nodes {
-			nr := nodeResponse{
-				ID:              node.ID.String(),
-				Name:            node.Name,
-				IPAddress:       node.IpAddress.String(),
-				Version:         node.Version,
-				Concurrency:     node.Concurrency,
-				CPUTotalMillis:  node.CpuTotalMillis,
-				CPUFreeMillis:   node.CpuFreeMillis,
-				MemTotalBytes:   node.MemTotalBytes,
-				MemFreeBytes:    node.MemFreeBytes,
-				DiskTotalBytes:  node.DiskTotalBytes,
-				DiskFreeBytes:   node.DiskFreeBytes,
-				CertSerial:      node.CertSerial,
-				CertFingerprint: node.CertFingerprint,
-				Drained:         node.Drained,
-				CreatedAt:       node.CreatedAt.Time.Format(time.RFC3339),
-			}
-
-			if node.CertNotBefore.Valid {
-				s := node.CertNotBefore.Time.Format(time.RFC3339)
-				nr.CertNotBefore = &s
-			}
-			if node.CertNotAfter.Valid {
-				s := node.CertNotAfter.Time.Format(time.RFC3339)
-				nr.CertNotAfter = &s
-			}
-			if node.LastHeartbeat.Valid {
-				s := node.LastHeartbeat.Time.Format(time.RFC3339)
-				nr.LastHeartbeat = &s
-			}
-
-			resp = append(resp, nr)
+			resp = append(resp, nodeToResponse(node))
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			slog.Error("list nodes: encode response failed", "err", err)
-		}
+		writeJSON(w, http.StatusOK, resp)
 	}
 }

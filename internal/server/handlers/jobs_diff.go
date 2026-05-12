@@ -2,13 +2,10 @@ package handlers
 
 import (
 	"encoding/json"
-	"errors"
 	"log/slog"
 	"net/http"
-	"strings"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/server/blobpersist"
@@ -20,15 +17,13 @@ import (
 func createJobDiffHandler(st store.Store, bp *blobpersist.Service) http.HandlerFunc {
 	requireBlobPersist("createJobDiffHandler", bp)
 	return func(w http.ResponseWriter, r *http.Request) {
-		runID, err := parseRequiredPathID[domaintypes.RunID](r, "run_id")
-		if err != nil {
-			writeHTTPError(w, http.StatusBadRequest, "%s", err)
+		runID, ok := parseRequiredPathIDOrWriteError[domaintypes.RunID](w, r, "run_id")
+		if !ok {
 			return
 		}
 
-		jobID, err := parseRequiredPathID[domaintypes.JobID](r, "job_id")
-		if err != nil {
-			writeHTTPError(w, http.StatusBadRequest, "%s", err)
+		jobID, ok := parseRequiredPathIDOrWriteError[domaintypes.JobID](w, r, "job_id")
+		if !ok {
 			return
 		}
 
@@ -59,50 +54,16 @@ func createJobDiffHandler(st store.Store, bp *blobpersist.Service) http.HandlerF
 			return
 		}
 
-		// Check if the run exists.
-		_, err = st.GetRun(r.Context(), runID)
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				writeHTTPError(w, http.StatusNotFound, "run not found")
-				return
-			}
-			writeHTTPError(w, http.StatusInternalServerError, "failed to check run: %v", err)
-			slog.Error("diff: run check failed", "run_id", runID.String(), "err", err)
+		job, ok := getJobInRunOrFail(w, r, st, runID, jobID, "diff")
+		if !ok {
 			return
 		}
 
-		// Check if the job exists.
-		job, err := st.GetJob(r.Context(), jobID)
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				writeHTTPError(w, http.StatusNotFound, "job not found")
-				return
-			}
-			writeHTTPError(w, http.StatusInternalServerError, "failed to check job: %v", err)
-			slog.Error("diff: job check failed", "job_id", jobID.String(), "err", err)
+		nodeIDHeader, ok := requireNodeUUIDHeader(w, r)
+		if !ok {
 			return
 		}
-
-		// Ensure the job belongs to the provided run.
-		if job.RunID != runID {
-			writeHTTPError(w, http.StatusBadRequest, "job does not belong to run")
-			return
-		}
-
-		// Verify the job is assigned to the calling node using the
-		// PLOY_NODE_UUID header, which is required for worker requests.
-		nodeIDHeaderStr := strings.TrimSpace(r.Header.Get(nodeUUIDHeader))
-		if nodeIDHeaderStr == "" {
-			writeHTTPError(w, http.StatusBadRequest, "PLOY_NODE_UUID header is required")
-			return
-		}
-		var nodeIDHeader domaintypes.NodeID
-		if err := nodeIDHeader.UnmarshalText([]byte(nodeIDHeaderStr)); err != nil {
-			writeHTTPError(w, http.StatusBadRequest, "invalid PLOY_NODE_UUID header")
-			return
-		}
-		if job.NodeID == nil || *job.NodeID != nodeIDHeader {
-			writeHTTPError(w, http.StatusForbidden, "job not assigned to this node")
+		if !assertJobAssignedToNode(w, job, nodeIDHeader) {
 			return
 		}
 
@@ -128,16 +89,11 @@ func createJobDiffHandler(st store.Store, bp *blobpersist.Service) http.HandlerF
 			return
 		}
 
-		// Return success response with diff_id.
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
-		if err := json.NewEncoder(w).Encode(struct {
+		writeJSON(w, http.StatusCreated, struct {
 			DiffID domaintypes.DiffID `json:"diff_id"`
 		}{
 			DiffID: domaintypes.DiffID(uuid.UUID(diff.ID.Bytes).String()),
-		}); err != nil {
-			slog.Error("diff: encode response failed", "err", err)
-		}
+		})
 
 		slog.Debug("diff created",
 			"run_id", runID.String(),

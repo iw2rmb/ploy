@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -150,11 +149,7 @@ func createMigRunHandler(st store.Store) http.HandlerFunc {
 			RunID: run.ID,
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			slog.Error("create mig run: encode response failed", "err", err)
-		}
+		writeJSON(w, http.StatusCreated, resp)
 
 		slog.Info("mig run created",
 			"run_id", run.ID,

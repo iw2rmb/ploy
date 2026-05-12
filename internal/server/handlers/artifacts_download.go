@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 	"strings"
@@ -38,12 +37,7 @@ func listArtifactsByCIDHandler(st store.Store) http.HandlerFunc {
 			artifacts = append(artifacts, bundleToSummary(bundle))
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(w).Encode(map[string]any{"artifacts": artifacts}); err != nil {
-			// Log encoding errors but response is already committed.
-			return
-		}
+		writeJSON(w, http.StatusOK, map[string]any{"artifacts": artifacts})
 	}
 }
 
@@ -52,9 +46,8 @@ func listArtifactsByCIDHandler(st store.Store) http.HandlerFunc {
 // Otherwise, returns artifact metadata in JSON.
 func getArtifactHandler(st store.Store, bs blobstore.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		idStr, err := requiredPathParam(r, "id")
-		if err != nil {
-			writeHTTPError(w, http.StatusBadRequest, "%s", err)
+		idStr, ok := requiredPathParamOrWriteError(w, r, "id")
+		if !ok {
 			return
 		}
 
@@ -127,11 +120,6 @@ func getArtifactHandler(st store.Store, bs blobstore.Store) http.HandlerFunc {
 			detail.CreatedAt = bundle.CreatedAt.Time.Format("2006-01-02T15:04:05Z07:00")
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(w).Encode(detail); err != nil {
-			// Log encoding errors but response is already committed.
-			return
-		}
+		writeJSON(w, http.StatusOK, detail)
 	}
 }

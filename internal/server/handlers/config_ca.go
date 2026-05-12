@@ -42,9 +42,8 @@ func listConfigCAHandler(holder *ConfigHolder) http.HandlerFunc {
 // listConfigCABySectionHandler returns CA entries for a specific section.
 func listConfigCABySectionHandler(holder *ConfigHolder) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		section, err := requiredPathParam(r, "section")
-		if err != nil {
-			writeHTTPError(w, http.StatusBadRequest, "%s", err)
+		section, ok := requiredPathParamOrWriteError(w, r, "section")
+		if !ok {
 			return
 		}
 		if err := contracts.ValidateCAConfigSection(section); err != nil {
@@ -65,9 +64,8 @@ func listConfigCABySectionHandler(holder *ConfigHolder) http.HandlerFunc {
 // putConfigCAHandler upserts a CA entry.
 func putConfigCAHandler(holder *ConfigHolder, st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		hash, err := requiredPathParam(r, "hash")
-		if err != nil {
-			writeHTTPError(w, http.StatusBadRequest, "%s", err)
+		hash, ok := requiredPathParamOrWriteError(w, r, "hash")
+		if !ok {
 			return
 		}
 
@@ -137,9 +135,8 @@ func putConfigCAHandler(holder *ConfigHolder, st store.Store) http.HandlerFunc {
 // deleteConfigCAHandler removes a CA entry.
 func deleteConfigCAHandler(holder *ConfigHolder, st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		hash, err := requiredPathParam(r, "hash")
-		if err != nil {
-			writeHTTPError(w, http.StatusBadRequest, "%s", err)
+		hash, ok := requiredPathParamOrWriteError(w, r, "hash")
+		if !ok {
 			return
 		}
 
@@ -151,9 +148,8 @@ func deleteConfigCAHandler(holder *ConfigHolder, st store.Store) http.HandlerFun
 		}
 		hash = normalized
 
-		section, err := requiredQueryParam(r, "section")
-		if err != nil {
-			writeHTTPError(w, http.StatusBadRequest, "%s", err)
+		section, ok := requiredQueryParamOrWriteError(w, r, "section")
+		if !ok {
 			return
 		}
 		if err := contracts.ValidateCAConfigSection(section); err != nil {

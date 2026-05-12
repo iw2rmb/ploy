@@ -31,9 +31,8 @@ func completeJobHandler(st store.Store, eventsService *server.EventsService, bp 
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
-		jobID, err := parseRequiredPathID[domaintypes.JobID](r, "job_id")
-		if err != nil {
-			writeHTTPError(w, http.StatusBadRequest, "%s", err)
+		jobID, ok := parseRequiredPathIDOrWriteError[domaintypes.JobID](w, r, "job_id")
+		if !ok {
 			return
 		}
 

@@ -81,9 +81,8 @@ func listReposHandler(st store.Store) http.HandlerFunc {
 // listRunsForRepoHandler handles GET /v1/repos/{repo_id}/runs.
 func listRunsForRepoHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		repoID, err := parseRequiredPathID[domaintypes.RepoID](r, "repo_id")
-		if err != nil {
-			writeHTTPError(w, http.StatusBadRequest, "%s", err)
+		repoID, ok := parseRequiredPathIDOrWriteError[domaintypes.RepoID](w, r, "repo_id")
+		if !ok {
 			return
 		}
 
