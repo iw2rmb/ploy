@@ -252,7 +252,7 @@ func (r *runController) runContainerJob(
 				ExitCode(0).
 				DurationMs(duration.Milliseconds())
 			if runErr != nil {
-				statsBuilder.Error(runErr.Error())
+				statsBuilder.Error(normalizedExecutionError(runErr))
 			}
 			stats := statsBuilder.MustBuild()
 			if !cfg.SuppressOutBundle {
@@ -368,7 +368,7 @@ func (r *runController) runContainerJob(
 		}
 	}
 	if runErr != nil {
-		statsBuilder.Error(runErr.Error())
+		statsBuilder.Error(normalizedExecutionError(runErr))
 	}
 
 	stats := statsBuilder.MustBuild()

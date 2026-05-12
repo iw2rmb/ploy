@@ -463,7 +463,6 @@ func setupClaimer(t *testing.T, cfg Config, controller RunController) *ClaimMana
 	if err != nil {
 		t.Fatalf("NewClaimManager: %v", err)
 	}
-	claimer.preClaimCleanup = nil // nil means always proceed
 	installNoopStartupReconciler(claimer)
 	claimer.backoff = backoff.NewStatefulBackoff(backoff.Policy{
 		InitialInterval: types.Duration(10 * time.Millisecond),
