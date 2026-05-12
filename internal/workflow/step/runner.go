@@ -53,11 +53,6 @@ type Runner struct {
 	LogWriter  io.Writer // Optional: streams logs to server as gzipped chunks.
 }
 
-type splitLogWriter interface {
-	StdoutWriter() io.Writer
-	StderrWriter() io.Writer
-}
-
 // Request describes a step execution request.
 type Request struct {
 	// RunID threads the workflow run identifier for correlation/labels.
@@ -115,14 +110,14 @@ func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 	var result Result
 
 	// Stage 1: Hydrate workspace.
-	hydrationDuration, err := runHydrationStage(ctx, r, req)
+	hydrationDuration, err := r.hydrate(ctx, req)
 	if err != nil {
 		return Result{}, err
 	}
 	result.Timings.HydrationDuration = hydrationDuration
 
 	// Stage 2: Pre-mig Build Gate validation.
-	gateMetadata, gateDuration, err := runGateStage(ctx, r, req, "pre-mig validation failed")
+	gateMetadata, gateDuration, err := r.runGate(ctx, req, "pre-mig validation failed")
 	result.BuildGate = gateMetadata
 	result.Timings.BuildGateDuration = gateDuration
 	if err != nil {
@@ -166,19 +161,7 @@ func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 
 		var streamDone <-chan error
 		if r.LogWriter != nil {
-			if streamer, ok := r.Containers.(logStreamingRuntime); ok {
-				stdoutWriter := r.LogWriter
-				stderrWriter := r.LogWriter
-				if split, ok := r.LogWriter.(splitLogWriter); ok {
-					stdoutWriter = split.StdoutWriter()
-					stderrWriter = split.StderrWriter()
-				}
-				done := make(chan error, 1)
-				streamDone = done
-				go func() {
-					done <- streamer.StreamLogs(ctx, handle, stdoutWriter, stderrWriter)
-				}()
-			}
+			streamDone = streamContainerLogs(ctx, r.Containers, handle, nil, r.LogWriter)
 		}
 
 		cRes, err := r.Containers.Wait(ctx, handle)
@@ -189,16 +172,7 @@ func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 			result.ContainerResources = toContainerResourceUsage(usage)
 		}
 		if r.LogWriter != nil {
-			streamOK := false
-			if streamDone != nil {
-				select {
-				case streamErr := <-streamDone:
-					streamOK = streamErr == nil
-				case <-time.After(2 * time.Second):
-					streamOK = false
-				}
-			}
-			if !streamOK {
+			if !awaitStreamWithin(streamDone, 2*time.Second) {
 				if logs, err := r.Containers.Logs(ctx, handle); err == nil && len(logs) > 0 {
 					_, _ = r.LogWriter.Write(logs)
 				}

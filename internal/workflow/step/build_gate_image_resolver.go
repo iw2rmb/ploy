@@ -213,9 +213,8 @@ func loadStacksCatalogFile(path string, required bool) ([]contracts.BuildGateIma
 		return nil, fmt.Errorf("read stacks catalog file: %w", err)
 	}
 
-	// Parse YAML into intermediate structure.
 	var raw struct {
-		Stacks []map[string]any `yaml:"stacks"`
+		Stacks []rawCatalogEntry `yaml:"stacks"`
 	}
 	if err := yaml.Unmarshal(data, &raw); err != nil {
 		return nil, fmt.Errorf("parse stacks catalog file: %w", err)
@@ -225,14 +224,14 @@ func loadStacksCatalogFile(path string, required bool) ([]contracts.BuildGateIma
 		return nil, nil
 	}
 
-	// Convert to typed rules and validate referenced profile files exist.
 	rules := make([]contracts.BuildGateImageRule, 0, len(raw.Stacks))
 	for i, item := range raw.Stacks {
-		rule, profilePath, err := parseStackCatalogEntry(item, fmt.Sprintf("stacks[%d]", i))
+		prefix := fmt.Sprintf("stacks[%d]", i)
+		rule, profilePath, err := item.toRule(prefix)
 		if err != nil {
 			return nil, fmt.Errorf("stacks catalog file %s: %w", path, err)
 		}
-		if err := ensureCatalogProfileExists(path, profilePath, fmt.Sprintf("stacks[%d].profile", i)); err != nil {
+		if err := ensureCatalogProfileExists(path, profilePath, prefix+".profile"); err != nil {
 			return nil, fmt.Errorf("stacks catalog file %s: %w", path, err)
 		}
 		rules = append(rules, rule)
@@ -241,29 +240,29 @@ func loadStacksCatalogFile(path string, required bool) ([]contracts.BuildGateIma
 	return rules, nil
 }
 
-// parseStackCatalogEntry parses a single stack catalog entry from a YAML map.
-func parseStackCatalogEntry(raw map[string]any, prefix string) (contracts.BuildGateImageRule, string, error) {
-	var rule contracts.BuildGateImageRule
-	var profilePath string
+// rawCatalogEntry is the on-disk shape of a stacks.yaml entry. Release accepts
+// strings or numerics; yaml.v3 decodes both into `any`, which ParseReleaseValue
+// coerces into a canonical string.
+type rawCatalogEntry struct {
+	Lang    string `yaml:"lang"`
+	Tool    string `yaml:"tool"`
+	Image   string `yaml:"image"`
+	Profile string `yaml:"profile"`
+	Release any    `yaml:"release"`
+}
 
-	lang, ok := raw["lang"]
-	if !ok || lang == nil {
-		return rule, "", fmt.Errorf("%s.lang: required", prefix)
-	}
-	langStr, ok := lang.(string)
-	if !ok {
-		return rule, "", fmt.Errorf("%s.lang: expected string, got %T", prefix, lang)
-	}
-	rule.Stack.Language = strings.TrimSpace(langStr)
+func (e rawCatalogEntry) toRule(prefix string) (contracts.BuildGateImageRule, string, error) {
+	var rule contracts.BuildGateImageRule
+
+	rule.Stack.Language = strings.TrimSpace(e.Lang)
 	if rule.Stack.Language == "" {
 		return rule, "", fmt.Errorf("%s.lang: required", prefix)
 	}
 
-	release, ok := raw["release"]
-	if !ok || release == nil {
+	if e.Release == nil {
 		return rule, "", fmt.Errorf("%s.release: required", prefix)
 	}
-	releaseStr, err := contracts.ParseReleaseValue(release, prefix+".release")
+	releaseStr, err := contracts.ParseReleaseValue(e.Release, prefix+".release")
 	if err != nil {
 		return rule, "", err
 	}
@@ -272,36 +271,14 @@ func parseStackCatalogEntry(raw map[string]any, prefix string) (contracts.BuildG
 		return rule, "", fmt.Errorf("%s.release: required", prefix)
 	}
 
-	if v, ok := raw["tool"]; ok && v != nil {
-		toolStr, ok := v.(string)
-		if !ok {
-			return rule, "", fmt.Errorf("%s.tool: expected string, got %T", prefix, v)
-		}
-		rule.Stack.Tool = strings.TrimSpace(toolStr)
-	}
+	rule.Stack.Tool = strings.TrimSpace(e.Tool)
 
-	image, ok := raw["image"]
-	if !ok || image == nil {
-		return rule, "", fmt.Errorf("%s.image: required", prefix)
-	}
-	imageStr, ok := image.(string)
-	if !ok {
-		return rule, "", fmt.Errorf("%s.image: expected string, got %T", prefix, image)
-	}
-	rule.Image = strings.TrimSpace(imageStr)
+	rule.Image = strings.TrimSpace(e.Image)
 	if rule.Image == "" {
 		return rule, "", fmt.Errorf("%s.image: required", prefix)
 	}
 
-	profile, ok := raw["profile"]
-	if !ok || profile == nil {
-		return rule, "", fmt.Errorf("%s.profile: required", prefix)
-	}
-	profileStr, ok := profile.(string)
-	if !ok {
-		return rule, "", fmt.Errorf("%s.profile: expected string, got %T", prefix, profile)
-	}
-	profilePath = strings.TrimSpace(profileStr)
+	profilePath := strings.TrimSpace(e.Profile)
 	if profilePath == "" {
 		return rule, "", fmt.Errorf("%s.profile: required", prefix)
 	}

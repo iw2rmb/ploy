@@ -23,17 +23,15 @@ func resolveGateCommand(
 	if prep != nil && !prep.Command.IsEmpty() {
 		prepTarget := strings.TrimSpace(prep.Target)
 		if wantedTarget == "" || prepTarget == wantedTarget {
-			if prep.Stack != nil {
-				if !stackMatchesPrepOverride(prep.Stack, language, tool, release) {
-					return nil, nil, fmt.Errorf("prep stack mismatch: expected %s/%s/%s, got %s/%s/%s",
-						strings.TrimSpace(prep.Stack.Language),
-						strings.TrimSpace(prep.Stack.Tool),
-						strings.TrimSpace(prep.Stack.Release),
-						strings.TrimSpace(language),
-						strings.TrimSpace(tool),
-						strings.TrimSpace(release),
-					)
-				}
+			if prep.Stack != nil && !contracts.StackFieldsMatch(language, tool, release, prep.Stack.Language, prep.Stack.Tool, prep.Stack.Release) {
+				return nil, nil, fmt.Errorf("prep stack mismatch: expected %s/%s/%s, got %s/%s/%s",
+					strings.TrimSpace(prep.Stack.Language),
+					strings.TrimSpace(prep.Stack.Tool),
+					strings.TrimSpace(prep.Stack.Release),
+					strings.TrimSpace(language),
+					strings.TrimSpace(tool),
+					strings.TrimSpace(release),
+				)
 			}
 			return prep.Command.ToSlice(), contracts.CopyEnv(prep.Env), nil
 		}
@@ -52,12 +50,4 @@ func resolveGateCommand(
 		return nil, nil, err
 	}
 	return cmd, nil, nil
-}
-
-
-func stackMatchesPrepOverride(stack *contracts.GateProfileStack, language, tool, release string) bool {
-	if stack == nil {
-		return true
-	}
-	return contracts.StackFieldsMatch(language, tool, release, stack.Language, stack.Tool, stack.Release)
 }

@@ -9,7 +9,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
-func runHydrationStage(ctx context.Context, r *Runner, req Request) (types.Duration, error) {
+func (r *Runner) hydrate(ctx context.Context, req Request) (types.Duration, error) {
 	stageStart := time.Now()
 	if r.Workspace != nil {
 		if err := r.Workspace.Hydrate(ctx, req.Manifest, req.Workspace); err != nil {
@@ -19,7 +19,7 @@ func runHydrationStage(ctx context.Context, r *Runner, req Request) (types.Durat
 	return types.Duration(time.Since(stageStart)), nil
 }
 
-func runGateStage(ctx context.Context, r *Runner, req Request, failMsg string) (*contracts.BuildGateStageMetadata, types.Duration, error) {
+func (r *Runner) runGate(ctx context.Context, req Request, failMsg string) (*contracts.BuildGateStageMetadata, types.Duration, error) {
 	stageStart := time.Now()
 	gateSpec := req.Manifest.Gate
 	if r.Gate == nil || gateSpec == nil || !gateSpec.Enabled {

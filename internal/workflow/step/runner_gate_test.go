@@ -65,10 +65,10 @@ func TestRunner_Run_GateEnabledDisabled(t *testing.T) {
 // executor returning an error, and executor returning metadata with Passed=false.
 func TestRunner_Run_GateFailureScenarios(t *testing.T) {
 	tests := []struct {
-		name          string
-		executeFn     func(ctx context.Context, spec *contracts.StepGateSpec, workspace string) (*contracts.BuildGateStageMetadata, error)
-		wantErrIs     error
-		assertResult  func(t *testing.T, result Result)
+		name         string
+		executeFn    func(ctx context.Context, spec *contracts.StepGateSpec, workspace string) (*contracts.BuildGateStageMetadata, error)
+		wantErrIs    error
+		assertResult func(t *testing.T, result Result)
 	}{
 		{
 			name: "executor error/propagated",
@@ -116,8 +116,8 @@ func TestRunner_Run_GateFailureScenarios(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			runner := Runner{
-				Workspace: &testWorkspaceHydrator{},
-				Gate:      &testGateExecutor{executeFn: tt.executeFn},
+				Workspace:  &testWorkspaceHydrator{},
+				Gate:       &testGateExecutor{executeFn: tt.executeFn},
 				Containers: nil,
 			}
 
@@ -151,7 +151,7 @@ func TestRunGateStage_NilMetadata(t *testing.T) {
 
 	manifest := newGateTestManifest(true)
 	req := newGateTestRequest(manifest)
-	meta, dur, err := runGateStage(context.Background(), &runner, req, "test gate")
+	meta, dur, err := runner.runGate(context.Background(), req, "test gate")
 
 	if meta != nil {
 		t.Errorf("expected nil metadata, got %+v", meta)
