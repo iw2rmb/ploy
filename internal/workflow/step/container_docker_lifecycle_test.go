@@ -1,8 +1,10 @@
 package step
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -203,6 +205,73 @@ func TestDockerContainerRuntimeRemove(t *testing.T) {
 			}
 			if fake.removeID != string(tc.handle) {
 				t.Errorf("removed container %q, want %q", fake.removeID, string(tc.handle))
+			}
+		})
+	}
+}
+
+// TestDockerContainerRuntimeNilClient verifies misconfigured runtime methods
+// fail with a clear error instead of panicking.
+func TestDockerContainerRuntimeNilClient(t *testing.T) {
+	t.Parallel()
+	rt := &DockerContainerRuntime{client: nil}
+	ctx := context.Background()
+
+	testCases := []struct {
+		name string
+		call func() error
+	}{
+		{
+			name: "create",
+			call: func() error {
+				_, err := rt.Create(ctx, ContainerSpec{Image: "alpine"})
+				return err
+			},
+		},
+		{
+			name: "start",
+			call: func() error {
+				return rt.Start(ctx, ContainerHandle("x"))
+			},
+		},
+		{
+			name: "wait",
+			call: func() error {
+				_, err := rt.Wait(ctx, ContainerHandle("x"))
+				return err
+			},
+		},
+		{
+			name: "logs",
+			call: func() error {
+				_, err := rt.Logs(ctx, ContainerHandle("x"))
+				return err
+			},
+		},
+		{
+			name: "stream_logs",
+			call: func() error {
+				return rt.StreamLogs(ctx, ContainerHandle("x"), &bytes.Buffer{}, &bytes.Buffer{})
+			},
+		},
+		{
+			name: "remove",
+			call: func() error {
+				return rt.Remove(ctx, ContainerHandle("x"))
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			err := tc.call()
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if !strings.Contains(err.Error(), "docker runtime not configured") {
+				t.Fatalf("unexpected error: %v", err)
 			}
 		})
 	}
