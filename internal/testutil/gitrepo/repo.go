@@ -111,3 +111,18 @@ func RevParse(t testing.TB, dir, rev string) string {
 	output := Run(t, dir, "rev-parse", rev)
 	return strings.TrimSpace(string(output))
 }
+
+// WithCWD changes the process working directory to dir and registers a cleanup
+// to restore the previous cwd at end of test. The package-level cwd is shared,
+// so callers must not run with t.Parallel().
+func WithCWD(t testing.TB, dir string) {
+	t.Helper()
+	prev, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatalf("chdir %s: %v", dir, err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(prev) })
+}

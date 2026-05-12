@@ -39,14 +39,7 @@ func TestRunPatchRouting(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var buf bytes.Buffer
-			err := executeCmd(tt.args, &buf)
-			if err == nil {
-				t.Fatal("expected error, got nil")
-			}
-			if !strings.Contains(err.Error(), tt.wantErr) {
-				t.Fatalf("error %q should contain %q", err.Error(), tt.wantErr)
-			}
+			clienv.RunExpectError(t, executeCmd, tt.args, tt.wantErr)
 		})
 	}
 }

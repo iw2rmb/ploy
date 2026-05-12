@@ -1,9 +1,11 @@
 package main
 
 import (
-	"bytes"
 	"strings"
 	"testing"
+
+	"github.com/iw2rmb/ploy/internal/testutil/assertx"
+	"github.com/iw2rmb/ploy/internal/testutil/clienv"
 )
 
 func TestHelpRegressionLeafHelpReturnsNoError(t *testing.T) {
@@ -26,15 +28,9 @@ func TestHelpRegressionLeafHelpReturnsNoError(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(strings.Join(tt.args, " "), func(t *testing.T) {
-			buf := &bytes.Buffer{}
-			if err := executeCmd(tt.args, buf); err != nil {
-				t.Fatalf("expected no error, got: %v\noutput:\n%s", err, buf.String())
-			}
-			if !strings.Contains(buf.String(), tt.expectSnippet) {
-				t.Fatalf("expected output to contain %q, got:\n%s", tt.expectSnippet, buf.String())
-			}
+			out := clienv.RunExpectOK(t, executeCmd, tt.args)
+			assertx.Contains(t, out, tt.expectSnippet)
 		})
 	}
 }
@@ -53,15 +49,9 @@ func TestHelpRegressionCommandRoutesDeepPaths(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(strings.Join(tt.args, " "), func(t *testing.T) {
-			buf := &bytes.Buffer{}
-			if err := executeCmd(tt.args, buf); err != nil {
-				t.Fatalf("expected no error, got: %v\noutput:\n%s", err, buf.String())
-			}
-			if !strings.Contains(buf.String(), tt.expectSnippet) {
-				t.Fatalf("expected output to contain %q, got:\n%s", tt.expectSnippet, buf.String())
-			}
+			out := clienv.RunExpectOK(t, executeCmd, tt.args)
+			assertx.Contains(t, out, tt.expectSnippet)
 		})
 	}
 }

@@ -12,8 +12,6 @@ import (
 // This ensures that shell completions remain in sync with the cobra tree.
 // If this test fails, run `make build && go run tools/gencomp/main.go` to regenerate completions.
 func TestAutocompleteArtifactsUpToDate(t *testing.T) {
-	t.Helper()
-
 	// Generate completions directly from the Cobra command tree.
 	// We construct the root command in-process to avoid depending on the binary.
 	var stderr bytes.Buffer

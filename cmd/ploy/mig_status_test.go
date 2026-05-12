@@ -5,16 +5,14 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/testutil/assertx"
 	"github.com/iw2rmb/ploy/internal/testutil/clienv"
 )
 
 func TestMigStatusPrintsMigrationSummary(t *testing.T) {
-	t.Helper()
-
 	migID := domaintypes.MigID("mig001")
 	specID := domaintypes.NewSpecID()
 	repoID1 := domaintypes.NewMigRepoID()
@@ -109,36 +107,19 @@ func TestMigStatusPrintsMigrationSummary(t *testing.T) {
 	}
 
 	out := buf.String()
-	assertContainsMig(t, out, "Mig:   "+migID.String()+"  | java17-upgrade")
-	assertContainsMig(t, out, "Spec:  "+specID.String()+" | Download")
-	assertContainsMig(t, out, "Repos: 2")
-	assertContainsMig(t, out, "Run")
-	assertContainsMig(t, out, "Success")
-	assertContainsMig(t, out, "Fail")
-	assertContainsMig(t, out, "⣽  "+runID1.String())
-	assertContainsMig(t, out, "✓  "+runID2.String())
+	assertx.Contains(t, out, "Mig:   "+migID.String()+"  | java17-upgrade")
+	assertx.Contains(t, out, "Spec:  "+specID.String()+" | Download")
+	assertx.Contains(t, out, "Repos: 2")
+	assertx.Contains(t, out, "Run")
+	assertx.Contains(t, out, "Success")
+	assertx.Contains(t, out, "Fail")
+	assertx.Contains(t, out, "⣽  "+runID1.String())
+	assertx.Contains(t, out, "✓  "+runID2.String())
 }
 
 func TestMigStatusRequiresMigID(t *testing.T) {
-	t.Helper()
 	clienv.UseServerDescriptor(t, "http://example.test")
 
-	var buf bytes.Buffer
-	err := executeCmd([]string{"mig", "status"}, &buf)
-	if err == nil {
-		t.Fatal("expected error when mig id is missing")
-	}
-	if !strings.Contains(err.Error(), "mig id required") {
-		t.Fatalf("expected mig id required error, got %v", err)
-	}
-	if !strings.Contains(buf.String(), "Usage: ploy mig status <mig-id>") {
-		t.Fatalf("expected usage output, got %q", buf.String())
-	}
-}
-
-func assertContainsMig(t *testing.T, output string, want string) {
-	t.Helper()
-	if !strings.Contains(output, want) {
-		t.Fatalf("expected output to contain %q, got %q", want, output)
-	}
+	out := clienv.RunExpectError(t, executeCmd, []string{"mig", "status"}, "mig id required")
+	assertx.Contains(t, out, "Usage: ploy mig status <mig-id>")
 }

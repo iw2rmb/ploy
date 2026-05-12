@@ -20,40 +20,9 @@ import (
 	"testing"
 )
 
-// newMockBundleSrvForLoadSpec creates a mock bundle server for loadSpec tests.
-func newMockBundleSrvForLoadSpec(t *testing.T) (*httptest.Server, *url.URL, *http.Client) {
-	t.Helper()
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/v1/spec-bundles" {
-			if r.Method == http.MethodHead {
-				// All probes miss in loadSpec tests (first-time upload).
-				w.WriteHeader(http.StatusNotFound)
-				return
-			}
-			if r.Method == http.MethodPost {
-				data, _ := io.ReadAll(r.Body)
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(http.StatusCreated)
-				_ = json.NewEncoder(w).Encode(map[string]any{
-					"bundle_id": "test-bundle-id",
-					"cid":       "bafytest",
-					"digest":    "sha256:deadbeef",
-					"size":      len(data),
-				})
-				return
-			}
-		}
-		http.Error(w, "unexpected", http.StatusInternalServerError)
-	}))
-	t.Cleanup(srv.Close)
-	u, err := url.Parse(srv.URL)
-	if err != nil {
-		t.Fatalf("parse server URL: %v", err)
-	}
-	return srv, u, srv.Client()
-}
-
-func newCapturingBundleSrvForLoadSpec(t *testing.T) (*httptest.Server, *url.URL, *http.Client, map[string][]byte) {
+// newBundleSrvForLoadSpec creates a bundle server for loadSpec tests. It always
+// records uploads (keyed by short hash) so any caller can inspect captures.
+func newBundleSrvForLoadSpec(t *testing.T) (*url.URL, *http.Client, map[string][]byte) {
 	t.Helper()
 	uploads := make(map[string][]byte)
 	var mu sync.Mutex
@@ -88,7 +57,7 @@ func newCapturingBundleSrvForLoadSpec(t *testing.T) (*httptest.Server, *url.URL,
 	if err != nil {
 		t.Fatalf("parse server URL: %v", err)
 	}
-	return srv, u, srv.Client(), uploads
+	return u, srv.Client(), uploads
 }
 
 func extractSingleContentFileFromArchive(t *testing.T, archive []byte) []byte {
@@ -125,7 +94,7 @@ func extractSingleContentFileFromArchive(t *testing.T, archive []byte) []byte {
 }
 
 func TestLoadSpec_ResolvesStepHydraRecords(t *testing.T) {
-	_, base, client := newMockBundleSrvForLoadSpec(t)
+	base, client, _ := newBundleSrvForLoadSpec(t)
 
 	tmpDir := t.TempDir()
 	stepInFile := filepath.Join(tmpDir, "step-config.txt")
@@ -309,7 +278,7 @@ steps:
 }
 
 func TestLoadSpec_CompilesLocalHookDirectoryToHashesAndBundleMap(t *testing.T) {
-	_, base, client := newMockBundleSrvForLoadSpec(t)
+	base, client, _ := newBundleSrvForLoadSpec(t)
 
 	tmpDir := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(tmpDir, "hooks", "a"), 0o755); err != nil {
@@ -368,7 +337,7 @@ hooks:
 }
 
 func TestLoadSpec_CompilesLocalHookFileToHash(t *testing.T) {
-	_, base, client := newMockBundleSrvForLoadSpec(t)
+	base, client, _ := newBundleSrvForLoadSpec(t)
 
 	tmpDir := t.TempDir()
 	hookFile := filepath.Join(tmpDir, "hook.yaml")
@@ -431,7 +400,7 @@ hooks:
 }
 
 func TestLoadSpec_LocalHookManifestCompilesHydraAndExpandsPlaceholders(t *testing.T) {
-	_, base, client, uploads := newCapturingBundleSrvForLoadSpec(t)
+	base, client, uploads := newBundleSrvForLoadSpec(t)
 
 	tmpDir := t.TempDir()
 	t.Setenv("PLOY_CONTAINER_REGISTRY", "ghcr.io/example")

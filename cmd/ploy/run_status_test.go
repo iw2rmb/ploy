@@ -14,8 +14,6 @@ import (
 )
 
 func TestRunStatusReportTextContract(t *testing.T) {
-	t.Helper()
-
 	runID := domaintypes.NewRunID()
 	migID := domaintypes.NewMigID()
 	specID := domaintypes.NewSpecID()
@@ -143,16 +141,16 @@ func newRunStatusReportServer(t *testing.T, runID domaintypes.RunID, migID domai
 						"duration_ms": 1500,
 					},
 					{
-						"job_id":         healID.String(),
-						"name":           "mig-0",
-						"job_type":       "mig",
-						"job_image":      "ghcr.io/acme/mig:1",
-						"next_id":        postGateID.String(),
-						"node_id":        nil,
-						"status":         "Success",
-						"exit_code":      0,
-						"duration_ms":    1200,
-						"bug_summary":    "Missing dependency lockfile",
+						"job_id":      healID.String(),
+						"name":        "mig-0",
+						"job_type":    "mig",
+						"job_image":   "ghcr.io/acme/mig:1",
+						"next_id":     postGateID.String(),
+						"node_id":     nil,
+						"status":      "Success",
+						"exit_code":   0,
+						"duration_ms": 1200,
+						"bug_summary": "Missing dependency lockfile",
 					},
 					{
 						"job_id":      postGateID.String(),
@@ -185,8 +183,6 @@ func newRunStatusReportServer(t *testing.T, runID domaintypes.RunID, migID domai
 }
 
 func TestRunStatusJSONGate(t *testing.T) {
-	t.Helper()
-
 	runID := domaintypes.NewRunID()
 	migID := domaintypes.NewMigID()
 	specID := domaintypes.NewSpecID()
@@ -254,8 +250,6 @@ func TestRunStatusJSONGate(t *testing.T) {
 }
 
 func TestRunStatusJSONGate_TrailingJSONFlag(t *testing.T) {
-	t.Helper()
-
 	runID := domaintypes.NewRunID()
 	migID := domaintypes.NewMigID()
 	specID := domaintypes.NewSpecID()

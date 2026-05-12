@@ -28,7 +28,6 @@ func executeCmd(args []string, stderr io.Writer) error {
 // TestExecuteHelpMatchesGolden verifies that "ploy help" produces the expected golden output.
 // Cobra routes "help" through the custom help command we defined in root.go.
 func TestExecuteHelpMatchesGolden(t *testing.T) {
-	t.Helper()
 	buf := &bytes.Buffer{}
 	rootCmd := newRootCmd(buf)
 	rootCmd.SetArgs([]string{"help"})
@@ -44,7 +43,6 @@ func TestExecuteHelpMatchesGolden(t *testing.T) {
 
 // TestExecuteHelpForMigMatchesGolden verifies that "ploy help mig" produces the expected golden output.
 func TestExecuteHelpForMigMatchesGolden(t *testing.T) {
-	t.Helper()
 	buf := &bytes.Buffer{}
 	rootCmd := newRootCmd(buf)
 	rootCmd.SetArgs([]string{"help", "mig"})

@@ -40,56 +40,30 @@ func TestRunListCallsControlPlane(t *testing.T) {
 			}
 
 			now := time.Now()
-			resp := struct {
-				Runs []struct {
-					ID        string    `json:"id"`
-					Status    string    `json:"status"`
-					MigID     string    `json:"mig_id"`
-					SpecID    string    `json:"spec_id"`
-					CreatedAt time.Time `json:"created_at"`
-					Counts    *struct {
-						Total         int32  `json:"total"`
-						Success       int32  `json:"success"`
-						DerivedStatus string `json:"derived_status"`
-					} `json:"repo_counts,omitempty"`
-				} `json:"runs"`
-			}{
-				Runs: []struct {
-					ID        string    `json:"id"`
-					Status    string    `json:"status"`
-					MigID     string    `json:"mig_id"`
-					SpecID    string    `json:"spec_id"`
-					CreatedAt time.Time `json:"created_at"`
-					Counts    *struct {
-						Total         int32  `json:"total"`
-						Success       int32  `json:"success"`
-						DerivedStatus string `json:"derived_status"`
-					} `json:"repo_counts,omitempty"`
-				}{
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"runs": []map[string]any{
 					{
-						ID:        runID1,
-						Status:    "Started",
-						MigID:     migID1,
-						SpecID:    specID1,
-						CreatedAt: now,
-						Counts: &struct {
-							Total         int32  `json:"total"`
-							Success       int32  `json:"success"`
-							DerivedStatus string `json:"derived_status"`
-						}{Total: 5, Success: 2, DerivedStatus: "running"},
+						"id":         runID1,
+						"status":     "Started",
+						"mig_id":     migID1,
+						"spec_id":    specID1,
+						"created_at": now,
+						"repo_counts": map[string]any{
+							"total":          5,
+							"success":        2,
+							"derived_status": "running",
+						},
 					},
 					{
-						ID:        runID2,
-						Status:    "Finished",
-						MigID:     migID2,
-						SpecID:    specID2,
-						CreatedAt: now,
+						"id":         runID2,
+						"status":     "Finished",
+						"mig_id":     migID2,
+						"spec_id":    specID2,
+						"created_at": now,
 					},
 				},
-			}
-
-			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(resp)
+			})
 			return
 		}
 		http.NotFound(w, r)
@@ -128,12 +102,8 @@ func TestMigRunBatchStatusRemoved(t *testing.T) {}
 func TestRunListEmptyResult(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/v1/runs") {
-			resp := struct {
-				Runs []interface{} `json:"runs"`
-			}{Runs: []interface{}{}}
-
 			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(resp)
+			_ = json.NewEncoder(w).Encode(map[string]any{"runs": []any{}})
 			return
 		}
 		http.NotFound(w, r)
@@ -184,15 +154,7 @@ func TestRunListInvalidLimit(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-
-			var buf bytes.Buffer
-			err := executeCmd(tc.args, &buf)
-			if err == nil {
-				t.Fatal("expected error, got nil")
-			}
-			if !strings.Contains(err.Error(), tc.wantErr) {
-				t.Errorf("error %q should contain %q", err.Error(), tc.wantErr)
-			}
+			clienv.RunExpectError(t, executeCmd, tc.args, tc.wantErr)
 		})
 	}
 }

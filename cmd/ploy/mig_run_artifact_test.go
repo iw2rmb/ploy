@@ -43,21 +43,12 @@ func TestDownloadRunArtifactsCreatesManifest(t *testing.T) {
 			})
 		case strings.Contains(r.URL.Path, "/v1/artifacts") && r.URL.Query().Get("cid") != "":
 			// Artifact lookup by CID.
-			listing := struct {
-				Artifacts []struct {
-					ID, CID, Digest, Name string
-					Size                  int64
-				} `json:"artifacts"`
-			}{
-				Artifacts: []struct {
-					ID, CID, Digest, Name string
-					Size                  int64
-				}{
-					{ID: "art-id-1", CID: "cid-abc123", Digest: "sha256:abcdef1234567890", Name: "artifact1", Size: int64(len(artifactContent))},
-				},
-			}
 			w.WriteHeader(http.StatusOK)
-			_ = json.NewEncoder(w).Encode(listing)
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"artifacts": []map[string]any{
+					{"ID": "art-id-1", "CID": "cid-abc123", "Digest": "sha256:abcdef1234567890", "Name": "artifact1", "Size": len(artifactContent)},
+				},
+			})
 		case strings.Contains(r.URL.Path, "/v1/artifacts/art-id-1"):
 			// Artifact download endpoint.
 			w.WriteHeader(http.StatusOK)
@@ -164,39 +155,21 @@ func TestDownloadRunArtifactsMultipleStages(t *testing.T) {
 				},
 			})
 		case strings.Contains(r.URL.Path, "/v1/artifacts") && r.URL.Query().Get("cid") == "cid-plan":
-			listing := struct {
-				Artifacts []struct {
-					ID, CID, Digest, Name string
-					Size                  int64
-				} `json:"artifacts"`
-			}{
-				Artifacts: []struct {
-					ID, CID, Digest, Name string
-					Size                  int64
-				}{
-					{ID: "art-plan", CID: "cid-plan", Digest: "sha256:plan123", Name: "plan.json", Size: 10},
-				},
-			}
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			_ = json.NewEncoder(w).Encode(listing)
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"artifacts": []map[string]any{
+					{"ID": "art-plan", "CID": "cid-plan", "Digest": "sha256:plan123", "Name": "plan.json", "Size": 10},
+				},
+			})
 		case strings.Contains(r.URL.Path, "/v1/artifacts") && r.URL.Query().Get("cid") == "cid-exec":
-			listing := struct {
-				Artifacts []struct {
-					ID, CID, Digest, Name string
-					Size                  int64
-				} `json:"artifacts"`
-			}{
-				Artifacts: []struct {
-					ID, CID, Digest, Name string
-					Size                  int64
-				}{
-					{ID: "art-exec", CID: "cid-exec", Digest: "sha256:exec456", Name: "output.log", Size: 20},
-				},
-			}
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			_ = json.NewEncoder(w).Encode(listing)
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"artifacts": []map[string]any{
+					{"ID": "art-exec", "CID": "cid-exec", "Digest": "sha256:exec456", "Name": "output.log", "Size": 20},
+				},
+			})
 		case strings.Contains(r.URL.Path, "/v1/artifacts/art-plan"):
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte("plan data"))

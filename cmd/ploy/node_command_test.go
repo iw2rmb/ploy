@@ -15,7 +15,32 @@ import (
 	"github.com/iw2rmb/ploy/internal/cli/config"
 	"github.com/iw2rmb/ploy/internal/deploy"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/testutil/assertx"
+	"github.com/iw2rmb/ploy/internal/testutil/clienv"
 )
+
+// newTestNodeAddConfig returns a nodeAddConfig wired up with stub identity and
+// ployd-node binary files under t.TempDir(). Callers set SSHPort/DryRun as needed.
+func newTestNodeAddConfig(t *testing.T) nodeAddConfig {
+	t.Helper()
+	dir := t.TempDir()
+	binPath := filepath.Join(dir, "ployd-node-test")
+	if err := os.WriteFile(binPath, []byte("fake binary"), 0o755); err != nil {
+		t.Fatalf("create test binary: %v", err)
+	}
+	idPath := filepath.Join(dir, "id_test")
+	if err := os.WriteFile(idPath, []byte("fake key"), 0o600); err != nil {
+		t.Fatalf("create test identity: %v", err)
+	}
+	return nodeAddConfig{
+		ClusterID:       "test-cluster",
+		Address:         "10.0.0.10",
+		ServerURL:       "https://10.0.0.5:8443",
+		User:            "testuser",
+		IdentityFile:    idPath,
+		PloydNodeBinary: binPath,
+	}
+}
 
 func TestHandleNodeRequiresSubcommand(t *testing.T) {
 	buf := &bytes.Buffer{}
@@ -64,40 +89,19 @@ func TestHandleNodeAddRejectsExtraArgs(t *testing.T) {
 }
 
 func TestHandleNodeAddRequiresServerURL(t *testing.T) {
-	buf := &bytes.Buffer{}
-	// Provide cluster-id and address but no server-url.
-	// Use explicit identity and binary paths to avoid relying on host defaults.
-	tmpDir := t.TempDir()
-	idPath := filepath.Join(tmpDir, "id_test")
+	idPath := filepath.Join(t.TempDir(), "id_test")
 	if err := os.WriteFile(idPath, []byte("fake key"), 0o600); err != nil {
 		t.Fatalf("create test identity: %v", err)
 	}
-
-	err := handleNodeAdd([]string{
+	clienv.RunExpectError(t, handleNodeAdd, []string{
 		"--cluster-id", "c1",
 		"--address", "10.0.0.5",
 		"--identity", idPath,
 		"--ployd-node-binary", "/dev/null",
-	}, buf)
-	if err == nil {
-		t.Fatalf("expected error when --server-url is missing")
-	}
-	if !strings.Contains(err.Error(), "server-url is required") {
-		t.Fatalf("expected server-url required error, got: %v", err)
-	}
+	}, "server-url is required")
 }
 
 func TestHandleNodeAddValidatesSSHPort(t *testing.T) {
-	tmpDir := t.TempDir()
-	binPath := filepath.Join(tmpDir, "ployd-node-test")
-	if err := os.WriteFile(binPath, []byte("fake binary"), 0755); err != nil {
-		t.Fatalf("create test binary: %v", err)
-	}
-	identityPath := filepath.Join(tmpDir, "id_test")
-	if err := os.WriteFile(identityPath, []byte("fake key"), 0600); err != nil {
-		t.Fatalf("create test identity: %v", err)
-	}
-
 	tests := []struct {
 		name      string
 		sshPort   int
@@ -112,16 +116,9 @@ func TestHandleNodeAddValidatesSSHPort(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := nodeAddConfig{
-				ClusterID:       "test-cluster",
-				Address:         "10.0.0.10",
-				ServerURL:       "https://10.0.0.5:8443",
-				User:            "testuser",
-				IdentityFile:    identityPath,
-				PloydNodeBinary: binPath,
-				SSHPort:         tt.sshPort,
-				DryRun:          true, // Use dry-run to avoid actual provisioning.
-			}
+			cfg := newTestNodeAddConfig(t)
+			cfg.SSHPort = tt.sshPort
+			cfg.DryRun = true
 
 			err := runNodeAdd(cfg, io.Discard)
 			if tt.expectErr {
@@ -132,7 +129,6 @@ func TestHandleNodeAddValidatesSSHPort(t *testing.T) {
 					t.Fatalf("expected SSH port validation error, got: %v", err)
 				}
 			} else if err != nil {
-				// For valid ports in dry-run mode, we expect success.
 				t.Fatalf("unexpected error for valid port %d: %v", tt.sshPort, err)
 			}
 		})
@@ -140,66 +136,24 @@ func TestHandleNodeAddValidatesSSHPort(t *testing.T) {
 }
 
 func TestHandleNodeAddDryRun(t *testing.T) {
-	tmpDir := t.TempDir()
-	binPath := filepath.Join(tmpDir, "ployd-node-test")
-	if err := os.WriteFile(binPath, []byte("fake binary"), 0755); err != nil {
-		t.Fatalf("create test binary: %v", err)
-	}
-	identityPath := filepath.Join(tmpDir, "id_test")
-	if err := os.WriteFile(identityPath, []byte("fake key"), 0600); err != nil {
-		t.Fatalf("create test identity: %v", err)
-	}
-
-	cfg := nodeAddConfig{
-		ClusterID:       "test-cluster",
-		Address:         "10.0.0.10",
-		ServerURL:       "https://10.0.0.5:8443",
-		User:            "testuser",
-		IdentityFile:    identityPath,
-		PloydNodeBinary: binPath,
-		SSHPort:         22,
-		DryRun:          true,
-	}
+	cfg := newTestNodeAddConfig(t)
+	cfg.SSHPort = 22
+	cfg.DryRun = true
 
 	buf := &bytes.Buffer{}
-	err := runNodeAdd(cfg, buf)
-	if err != nil {
+	if err := runNodeAdd(cfg, buf); err != nil {
 		t.Fatalf("dry-run should not error, got: %v", err)
 	}
-
-	output := buf.String()
-	if !strings.Contains(output, "[DRY RUN]") {
-		t.Fatalf("expected dry-run output, got: %q", output)
-	}
-	if !strings.Contains(output, "Validation complete") {
-		t.Fatalf("expected validation complete message, got: %q", output)
-	}
-	if !strings.Contains(output, "No actual provisioning performed") {
-		t.Fatalf("expected no provisioning message, got: %q", output)
-	}
+	out := buf.String()
+	assertx.Contains(t, out, "[DRY RUN]")
+	assertx.Contains(t, out, "Validation complete")
+	assertx.Contains(t, out, "No actual provisioning performed")
 }
 
 func TestRunNodeAddGeneratesNanoIDNodeID(t *testing.T) {
-	tmpDir := t.TempDir()
-	binPath := filepath.Join(tmpDir, "ployd-node-test")
-	if err := os.WriteFile(binPath, []byte("fake binary"), 0o755); err != nil {
-		t.Fatalf("create test binary: %v", err)
-	}
-	identityPath := filepath.Join(tmpDir, "id_test")
-	if err := os.WriteFile(identityPath, []byte("fake key"), 0o600); err != nil {
-		t.Fatalf("create test identity: %v", err)
-	}
-
-	cfg := nodeAddConfig{
-		ClusterID:       "test-cluster",
-		Address:         "10.0.0.10",
-		ServerURL:       "https://10.0.0.5:8443",
-		User:            "testuser",
-		IdentityFile:    identityPath,
-		PloydNodeBinary: binPath,
-		SSHPort:         22,
-		DryRun:          true,
-	}
+	cfg := newTestNodeAddConfig(t)
+	cfg.SSHPort = 22
+	cfg.DryRun = true
 
 	buf := &bytes.Buffer{}
 	if err := runNodeAdd(cfg, buf); err != nil {

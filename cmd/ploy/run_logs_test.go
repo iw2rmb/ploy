@@ -15,7 +15,6 @@ import (
 )
 
 func TestRunLogsLifecycleOutput(t *testing.T) {
-	t.Helper()
 	runID := domaintypes.NewRunID()
 	server := newStreamingServer(t, streamingServerConfig{
 		migRunID: runID,
@@ -45,7 +44,6 @@ func TestRunLogsLifecycleOutput(t *testing.T) {
 }
 
 func TestRunLogsRequiresRunID(t *testing.T) {
-	t.Helper()
 	clienv.UseServerDescriptor(t, "http://example.invalid")
 
 	buf := &bytes.Buffer{}
@@ -59,7 +57,6 @@ func TestRunLogsRequiresRunID(t *testing.T) {
 }
 
 func TestJobLogStructuredOutput(t *testing.T) {
-	t.Helper()
 	jobID := domaintypes.NewJobID()
 	server := newJobStreamingServer(t, jobID, []sseTestEvent{
 		{event: "log", data: `{"timestamp":"2026-03-01T10:00:00Z","stream":"stdout","line":"Step started"}`},
@@ -90,7 +87,6 @@ func TestJobLogStructuredOutput(t *testing.T) {
 }
 
 func TestJobLogRawOutput(t *testing.T) {
-	t.Helper()
 	jobID := domaintypes.NewJobID()
 	server := newJobStreamingServer(t, jobID, []sseTestEvent{
 		{event: "log", data: `{"timestamp":"2026-03-01T10:05:00Z","stream":"stdout","line":"ready"}`},
@@ -121,7 +117,6 @@ func TestJobLogRawOutput(t *testing.T) {
 }
 
 func TestJobLogRequiresJobID(t *testing.T) {
-	t.Helper()
 	clienv.UseServerDescriptor(t, "http://example.invalid")
 
 	buf := &bytes.Buffer{}
@@ -135,7 +130,6 @@ func TestJobLogRequiresJobID(t *testing.T) {
 }
 
 func TestJobLogInvalidFormat(t *testing.T) {
-	t.Helper()
 	clienv.UseServerDescriptor(t, "http://example.invalid")
 
 	buf := &bytes.Buffer{}
@@ -149,7 +143,6 @@ func TestJobLogInvalidFormat(t *testing.T) {
 }
 
 func TestJobLogFollowReconnects(t *testing.T) {
-	t.Helper()
 	jobID := domaintypes.NewJobID()
 	server := newJobStreamingServer(t, jobID, nil)
 	// Override with reconnect plan
@@ -191,7 +184,6 @@ func TestJobLogFollowReconnects(t *testing.T) {
 }
 
 func TestJobFollowSubcommandRemoved(t *testing.T) {
-	t.Helper()
 	clienv.UseServerDescriptor(t, "http://example.invalid")
 
 	buf := &bytes.Buffer{}
