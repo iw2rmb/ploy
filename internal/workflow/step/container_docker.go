@@ -85,6 +85,9 @@ func (r *DockerContainerRuntime) Create(ctx context.Context, spec ContainerSpec)
 		}
 	}()
 
+	if r == nil || r.client == nil {
+		return "", errors.New("step: docker runtime not configured")
+	}
 	if strings.TrimSpace(spec.Image) == "" {
 		return "", errors.New("step: container image required")
 	}
@@ -130,6 +133,9 @@ func (r *DockerContainerRuntime) Create(ctx context.Context, spec ContainerSpec)
 // Start launches the container. ContainerStart is async — the container may still
 // be initializing when Start returns successfully. Use Wait to block until exit.
 func (r *DockerContainerRuntime) Start(ctx context.Context, handle ContainerHandle) error {
+	if r == nil || r.client == nil {
+		return errors.New("step: docker runtime not configured")
+	}
 	_, err := r.client.ContainerStart(ctx, string(handle), client.ContainerStartOptions{})
 	return err
 }
@@ -138,6 +144,9 @@ func (r *DockerContainerRuntime) Start(ctx context.Context, handle ContainerHand
 // then inspects the container to extract start/finish timestamps. On context
 // cancellation the container is force-removed so callers don't leak resources.
 func (r *DockerContainerRuntime) Wait(ctx context.Context, handle ContainerHandle) (ContainerResult, error) {
+	if r == nil || r.client == nil {
+		return ContainerResult{}, errors.New("step: docker runtime not configured")
+	}
 	waitResult := r.client.ContainerWait(ctx, string(handle), client.ContainerWaitOptions{
 		Condition: container.WaitConditionNotRunning,
 	})
@@ -192,6 +201,9 @@ func isContainerNotFound(err error) bool {
 // multiplexed) we fall back to ReadAll on the remaining bytes to avoid total
 // data loss.
 func (r *DockerContainerRuntime) Logs(ctx context.Context, handle ContainerHandle) ([]byte, error) {
+	if r == nil || r.client == nil {
+		return nil, errors.New("step: docker runtime not configured")
+	}
 	reader, err := r.client.ContainerLogs(ctx, string(handle), client.ContainerLogsOptions{
 		ShowStdout: true,
 		ShowStderr: true,
@@ -214,6 +226,9 @@ func (r *DockerContainerRuntime) Logs(ctx context.Context, handle ContainerHandl
 // the provided writers. This is used for live job log uploads while a container
 // is still running.
 func (r *DockerContainerRuntime) StreamLogs(ctx context.Context, handle ContainerHandle, stdout, stderr io.Writer) error {
+	if r == nil || r.client == nil {
+		return errors.New("step: docker runtime not configured")
+	}
 	if stdout == nil {
 		stdout = io.Discard
 	}
@@ -239,6 +254,9 @@ func (r *DockerContainerRuntime) StreamLogs(ctx context.Context, handle Containe
 // Remove deletes the container with Force=true. Removing an already-removed
 // container may return a 404 error; the operation is idempotent in effect.
 func (r *DockerContainerRuntime) Remove(ctx context.Context, handle ContainerHandle) error {
+	if r == nil || r.client == nil {
+		return errors.New("step: docker runtime not configured")
+	}
 	_, err := r.client.ContainerRemove(ctx, string(handle), client.ContainerRemoveOptions{Force: true})
 	return err
 }
