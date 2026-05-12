@@ -1,12 +1,8 @@
 package handlers
 
 import (
-	"encoding/json"
-	"errors"
 	"log/slog"
 	"net/http"
-
-	"github.com/jackc/pgx/v5"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/server"
@@ -29,9 +25,8 @@ func createNodeLogsHandler(st store.Store, bp *blobpersist.Service, eventsServic
 	requireBlobPersist("createNodeLogsHandler", bp)
 	requireEventsService("createNodeLogsHandler", eventsService)
 	return func(w http.ResponseWriter, r *http.Request) {
-		nodeID, err := parseRequiredPathID[domaintypes.NodeID](r, "id")
-		if err != nil {
-			writeHTTPError(w, http.StatusBadRequest, "%s", err)
+		nodeID, ok := parseRequiredPathIDOrWriteError[domaintypes.NodeID](w, r, "id")
+		if !ok {
 			return
 		}
 
@@ -72,15 +67,7 @@ func createNodeLogsHandler(st store.Store, bp *blobpersist.Service, eventsServic
 			return
 		}
 
-		// Check if the node exists before processing.
-		_, err = st.GetNode(r.Context(), nodeID)
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				writeHTTPError(w, http.StatusNotFound, "node not found")
-				return
-			}
-			writeHTTPError(w, http.StatusInternalServerError, "failed to check node: %v", err)
-			slog.Error("node logs: check failed", "node_id", nodeID.String(), "err", err)
+		if _, ok := getNodeOrFail(w, r, st, nodeID, "node logs"); !ok {
 			return
 		}
 
@@ -111,16 +98,10 @@ func createNodeLogsHandler(st store.Store, bp *blobpersist.Service, eventsServic
 			slog.Error("node logs: SSE fanout failed", "log_id", log.ID, "err", err)
 		}
 
-		// Return success response.
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
-		resp := nodeLogCreateResponse{
+		writeJSON(w, http.StatusCreated, nodeLogCreateResponse{
 			ID:      log.ID,
 			ChunkNo: log.ChunkNo,
-		}
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			slog.Error("node logs: encode response failed", "err", err)
-		}
+		})
 
 		slog.Debug("log chunk stored",
 			"node_id", nodeID.String(),

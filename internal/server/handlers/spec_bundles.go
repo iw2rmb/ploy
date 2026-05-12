@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -217,15 +216,11 @@ func writeSpecBundleUploadResponse(w http.ResponseWriter, bundle store.SpecBundl
 		Size:         bundle.Size,
 		Deduplicated: deduplicated,
 	}
-	w.Header().Set("Content-Type", "application/json")
+	status := http.StatusCreated
 	if deduplicated {
-		w.WriteHeader(http.StatusOK)
-	} else {
-		w.WriteHeader(http.StatusCreated)
+		status = http.StatusOK
 	}
-	if err := json.NewEncoder(w).Encode(resp); err != nil {
-		slog.Error("spec bundle upload: encode response failed", "err", err)
-	}
+	writeJSON(w, status, resp)
 }
 
 // probeSpecBundleHandler checks whether a spec bundle with the given CID already exists.
@@ -263,9 +258,8 @@ func probeSpecBundleHandler(st store.Store) http.HandlerFunc {
 // Auth:  RoleWorker, RoleControlPlane
 func downloadSpecBundleHandler(st store.Store, bs blobstore.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		bundleID, err := requiredPathParam(r, "id")
-		if err != nil {
-			writeHTTPError(w, http.StatusBadRequest, "%s", err)
+		bundleID, ok := requiredPathParamOrWriteError(w, r, "id")
+		if !ok {
 			return
 		}
 

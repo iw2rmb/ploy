@@ -42,9 +42,8 @@ func listConfigHomeHandler(holder *ConfigHolder) http.HandlerFunc {
 // listConfigHomeBySectionHandler returns home entries for a specific section.
 func listConfigHomeBySectionHandler(holder *ConfigHolder) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		section, err := requiredPathParam(r, "section")
-		if err != nil {
-			writeHTTPError(w, http.StatusBadRequest, "%s", err)
+		section, ok := requiredPathParamOrWriteError(w, r, "section")
+		if !ok {
 			return
 		}
 		if err := contracts.ValidateHydraSection(section); err != nil {
@@ -112,9 +111,8 @@ func putConfigHomeHandler(holder *ConfigHolder, st store.Store) http.HandlerFunc
 // deleteConfigHomeHandler removes a home entry by destination and section.
 func deleteConfigHomeHandler(holder *ConfigHolder, st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		dst, err := requiredQueryParam(r, "dst")
-		if err != nil {
-			writeHTTPError(w, http.StatusBadRequest, "%s", err)
+		dst, ok := requiredQueryParamOrWriteError(w, r, "dst")
+		if !ok {
 			return
 		}
 
@@ -126,9 +124,8 @@ func deleteConfigHomeHandler(holder *ConfigHolder, st store.Store) http.HandlerF
 		}
 		dst = path.Clean(dst)
 
-		section, err := requiredQueryParam(r, "section")
-		if err != nil {
-			writeHTTPError(w, http.StatusBadRequest, "%s", err)
+		section, ok := requiredQueryParamOrWriteError(w, r, "section")
+		if !ok {
 			return
 		}
 		if err := contracts.ValidateHydraSection(section); err != nil {

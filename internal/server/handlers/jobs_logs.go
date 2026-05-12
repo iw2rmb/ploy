@@ -2,12 +2,9 @@ package handlers
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
-
-	"github.com/jackc/pgx/v5"
 
 	"github.com/iw2rmb/ploy/internal/blobstore"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
@@ -28,25 +25,17 @@ import (
 // For terminal jobs, the handler writes a done sentinel after backfill.
 func getJobLogsHandler(st store.Store, bs blobstore.Store, eventsService *server.EventsService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		jobID, err := parseRequiredPathID[domaintypes.JobID](r, "job_id")
-		if err != nil {
-			writeHTTPError(w, http.StatusBadRequest, "%s", err)
-			return
-		}
-
-		job, err := st.GetJob(r.Context(), jobID)
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				writeHTTPError(w, http.StatusNotFound, "job not found")
-				return
-			}
-			slog.Error("get job logs: database error", "job_id", jobID.String(), "err", err)
-			writeHTTPError(w, http.StatusInternalServerError, "failed to get job")
-			return
-		}
-
-		_, ok := getRunOrFail(w, r, st, job.RunID, "get job logs")
+		jobID, ok := parseRequiredPathIDOrWriteError[domaintypes.JobID](w, r, "job_id")
 		if !ok {
+			return
+		}
+
+		job, ok := getJobOrFail(w, r, st, jobID, "get job logs")
+		if !ok {
+			return
+		}
+
+		if _, ok := getRunOrFail(w, r, st, job.RunID, "get job logs"); !ok {
 			return
 		}
 
@@ -93,21 +82,13 @@ func createJobLogsHandler(st store.Store, bp *blobpersist.Service, eventsService
 	requireBlobPersist("createJobLogsHandler", bp)
 	requireEventsService("createJobLogsHandler", eventsService)
 	return func(w http.ResponseWriter, r *http.Request) {
-		jobID, err := parseRequiredPathID[domaintypes.JobID](r, "job_id")
-		if err != nil {
-			writeHTTPError(w, http.StatusBadRequest, "%s", err)
+		jobID, ok := parseRequiredPathIDOrWriteError[domaintypes.JobID](w, r, "job_id")
+		if !ok {
 			return
 		}
 
-		// Resolve job to get run context.
-		job, err := st.GetJob(r.Context(), jobID)
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				writeHTTPError(w, http.StatusNotFound, "job not found")
-				return
-			}
-			slog.Error("job logs ingest: get job failed", "job_id", jobID.String(), "err", err)
-			writeHTTPError(w, http.StatusInternalServerError, "failed to get job")
+		job, ok := getJobOrFail(w, r, st, jobID, "job logs ingest")
+		if !ok {
 			return
 		}
 
@@ -150,10 +131,6 @@ func createJobLogsHandler(st store.Store, bp *blobpersist.Service, eventsService
 			slog.Error("job logs ingest: SSE fanout failed", "log_id", logRow.ID, "err", err)
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
-		if err := json.NewEncoder(w).Encode(map[string]any{"id": logRow.ID, "chunk_no": logRow.ChunkNo}); err != nil {
-			slog.Error("job logs ingest: encode response failed", "err", err)
-		}
+		writeJSON(w, http.StatusCreated, map[string]any{"id": logRow.ID, "chunk_no": logRow.ChunkNo})
 	}
 }

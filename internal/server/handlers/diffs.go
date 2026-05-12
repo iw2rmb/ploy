@@ -63,17 +63,13 @@ const maxAccumulatedDiffPlainBytes int64 = 64 << 20
 // Run and job IDs are KSUID-backed strings; repo IDs are NanoID-backed strings.
 func listRunRepoDiffsHandler(st store.Store, bs blobstore.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Parse the run ID from the URL path parameter using the shared helper.
-		runID, err := parseRequiredPathID[domaintypes.RunID](r, "run_id")
-		if err != nil {
-			writeHTTPError(w, http.StatusBadRequest, "%s", err)
+		runID, ok := parseRequiredPathIDOrWriteError[domaintypes.RunID](w, r, "run_id")
+		if !ok {
 			return
 		}
 
-		// Parse the repo ID from the URL path parameter using the shared helper.
-		repoID, err := parseRequiredPathID[domaintypes.RepoID](r, "repo_id")
-		if err != nil {
-			writeHTTPError(w, http.StatusBadRequest, "%s", err)
+		repoID, ok := parseRequiredPathIDOrWriteError[domaintypes.RepoID](w, r, "repo_id")
+		if !ok {
 			return
 		}
 
@@ -81,9 +77,8 @@ func listRunRepoDiffsHandler(st store.Store, bs blobstore.Store) http.HandlerFun
 		// When accumulated=true, returns a gzipped patch that contains all diffs
 		// for this repo up to and including diff_id, in list order.
 		if r.URL.Query().Get("download") == "true" {
-			diffID, err := parseQuery[domaintypes.DiffID](r, "diff_id")
-			if err != nil {
-				writeHTTPError(w, http.StatusBadRequest, "%s", err)
+			diffID, ok := parseRequiredQueryIDOrWriteError[domaintypes.DiffID](w, r, "diff_id")
+			if !ok {
 				return
 			}
 			accumulated := strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("accumulated")), "true")
@@ -150,8 +145,7 @@ func listRunRepoDiffsHandler(st store.Store, bs blobstore.Store) http.HandlerFun
 			})
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(diffListResponse{Diffs: items})
+		writeJSON(w, http.StatusOK, diffListResponse{Diffs: items})
 	}
 }
 

@@ -12,7 +12,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -71,37 +70,24 @@ type pullResponse struct {
 //   - If multiple repos match: 409 error (ambiguous).
 func pullRunRepoHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Extract run_id from path.
-		runID, err := parseRequiredPathID[domaintypes.RunID](r, "run_id")
-		if err != nil {
-			writeHTTPError(w, http.StatusBadRequest, "%s", err)
+		runID, ok := parseRequiredPathIDOrWriteError[domaintypes.RunID](w, r, "run_id")
+		if !ok {
 			return
 		}
 
-		// Parse request body with strict validation.
 		var req runPullRequest
 		if err := decodeRequestJSON(w, r, &req, DefaultMaxBodySize); err != nil {
 			return
 		}
 
-		// Validate repo_url is provided.
 		if req.RepoURL == "" {
 			writeHTTPError(w, http.StatusBadRequest, "repo_url is required")
 			return
 		}
 
-		// Normalize the incoming repo_url for comparison.
 		normalizedURL := domaintypes.NormalizeRepoURL(req.RepoURL)
 
-		// Verify the run exists before querying repos.
-		_, err = st.GetRun(r.Context(), runID)
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				writeHTTPError(w, http.StatusNotFound, "run not found")
-				return
-			}
-			writeHTTPError(w, http.StatusInternalServerError, "failed to get run: %v", err)
-			slog.Error("pull run repo: get run failed", "run_id", runID, "err", err)
+		if _, ok := getRunOrFail(w, r, st, runID, "pull run repo"); !ok {
 			return
 		}
 
@@ -146,11 +132,7 @@ func pullRunRepoHandler(st store.Store) http.HandlerFunc {
 			RepoTargetRef: match.RepoTargetRef,
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			slog.Error("pull run repo: encode response failed", "err", err)
-		}
+		writeJSON(w, http.StatusOK, resp)
 
 		slog.Info("pull run repo resolved",
 			"run_id", runID.String(),
@@ -177,10 +159,8 @@ func pullRunRepoHandler(st store.Store) http.HandlerFunc {
 //   - If no run with matching status found: 404 error.
 func pullMigRepoHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Extract mig_id from path.
-		migID, err := parseRequiredPathID[domaintypes.MigID](r, "mig_id")
-		if err != nil {
-			writeHTTPError(w, http.StatusBadRequest, "%s", err)
+		migID, ok := parseRequiredPathIDOrWriteError[domaintypes.MigID](w, r, "mig_id")
+		if !ok {
 			return
 		}
 
@@ -217,9 +197,7 @@ func pullMigRepoHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Verify the mig exists.
-		_, err = st.GetMig(r.Context(), migID)
-		if err != nil {
+		if _, err := st.GetMig(r.Context(), migID); err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				writeHTTPError(w, http.StatusNotFound, "mig not found")
 				return
@@ -229,7 +207,6 @@ func pullMigRepoHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// List all repos for this mig to find matching repo by normalized URL.
 		migRepos, err := st.ListMigReposByMig(r.Context(), migID)
 		if err != nil {
 			writeHTTPError(w, http.StatusInternalServerError, "failed to list mig repos: %v", err)
@@ -286,11 +263,7 @@ func pullMigRepoHandler(st store.Store) http.HandlerFunc {
 			RepoTargetRef: latestRunRepo.RepoTargetRef,
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			slog.Error("pull mig repo: encode response failed", "err", err)
-		}
+		writeJSON(w, http.StatusOK, resp)
 
 		slog.Info("pull mig repo resolved",
 			"mig_id", migID.String(),

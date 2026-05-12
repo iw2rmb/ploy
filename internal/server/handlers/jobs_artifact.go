@@ -3,14 +3,12 @@ package handlers
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/server/blobpersist"
@@ -20,6 +18,42 @@ import (
 // nodeUUIDHeader is the HTTP header key that carries the worker node's ID
 // (NanoID 6-character string) on mutating requests to the control plane.
 const nodeUUIDHeader = "PLOY_NODE_UUID"
+
+// parseNodeUUIDHeader extracts and validates the PLOY_NODE_UUID header value
+// without writing a response. Used by call sites that compose validation in a
+// larger function returning an error.
+func parseNodeUUIDHeader(r *http.Request) (domaintypes.NodeID, error) {
+	headerVal := strings.TrimSpace(r.Header.Get(nodeUUIDHeader))
+	if headerVal == "" {
+		return "", errors.New("PLOY_NODE_UUID header is required")
+	}
+	var nodeID domaintypes.NodeID
+	if err := nodeID.UnmarshalText([]byte(headerVal)); err != nil {
+		return "", errors.New("invalid PLOY_NODE_UUID header")
+	}
+	return nodeID, nil
+}
+
+// requireNodeUUIDHeader validates the PLOY_NODE_UUID header.
+// On failure it writes a 400 response and returns ok=false.
+func requireNodeUUIDHeader(w http.ResponseWriter, r *http.Request) (domaintypes.NodeID, bool) {
+	nodeID, err := parseNodeUUIDHeader(r)
+	if err != nil {
+		writeHTTPError(w, http.StatusBadRequest, "%s", err)
+		return "", false
+	}
+	return nodeID, true
+}
+
+// assertJobAssignedToNode enforces that the job is assigned to the given node.
+// On mismatch it writes a 403 response and returns ok=false.
+func assertJobAssignedToNode(w http.ResponseWriter, job store.Job, nodeID domaintypes.NodeID) bool {
+	if job.NodeID == nil || *job.NodeID != nodeID {
+		writeHTTPError(w, http.StatusForbidden, "job not assigned to this node")
+		return false
+	}
+	return true
+}
 
 // computeArtifactCIDAndDigest computes a content identifier and SHA256 digest for an artifact bundle.
 // CID uses a simple "bafy" prefix with hex-encoded SHA256 for compatibility with existing test fixtures.
@@ -41,15 +75,13 @@ func computeArtifactCIDAndDigest(bundle []byte) (cid, digest string) {
 func createJobArtifactHandler(st store.Store, bp *blobpersist.Service) http.HandlerFunc {
 	requireBlobPersist("createJobArtifactHandler", bp)
 	return func(w http.ResponseWriter, r *http.Request) {
-		runID, err := parseRequiredPathID[domaintypes.RunID](r, "run_id")
-		if err != nil {
-			writeHTTPError(w, http.StatusBadRequest, "%s", err)
+		runID, ok := parseRequiredPathIDOrWriteError[domaintypes.RunID](w, r, "run_id")
+		if !ok {
 			return
 		}
 
-		jobID, err := parseRequiredPathID[domaintypes.JobID](r, "job_id")
-		if err != nil {
-			writeHTTPError(w, http.StatusBadRequest, "%s", err)
+		jobID, ok := parseRequiredPathIDOrWriteError[domaintypes.JobID](w, r, "job_id")
+		if !ok {
 			return
 		}
 
@@ -81,50 +113,16 @@ func createJobArtifactHandler(st store.Store, bp *blobpersist.Service) http.Hand
 			return
 		}
 
-		// Check if the run exists.
-		_, err = st.GetRun(r.Context(), runID)
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				writeHTTPError(w, http.StatusNotFound, "run not found")
-				return
-			}
-			writeHTTPError(w, http.StatusInternalServerError, "failed to check run: %v", err)
-			slog.Error("artifact: run check failed", "run_id", runID.String(), "err", err)
+		job, ok := getJobInRunOrFail(w, r, st, runID, jobID, "artifact")
+		if !ok {
 			return
 		}
 
-		// Check if the job exists.
-		job, err := st.GetJob(r.Context(), jobID)
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				writeHTTPError(w, http.StatusNotFound, "job not found")
-				return
-			}
-			writeHTTPError(w, http.StatusInternalServerError, "failed to check job: %v", err)
-			slog.Error("artifact: job check failed", "job_id", jobID.String(), "err", err)
+		nodeIDHeader, ok := requireNodeUUIDHeader(w, r)
+		if !ok {
 			return
 		}
-
-		// Ensure the job belongs to the provided run.
-		if job.RunID != runID {
-			writeHTTPError(w, http.StatusBadRequest, "job does not belong to run")
-			return
-		}
-
-		// Verify the job is assigned to the calling node using the
-		// PLOY_NODE_UUID header, which is required for worker requests.
-		nodeIDHeaderStr := strings.TrimSpace(r.Header.Get(nodeUUIDHeader))
-		if nodeIDHeaderStr == "" {
-			writeHTTPError(w, http.StatusBadRequest, "PLOY_NODE_UUID header is required")
-			return
-		}
-		var nodeIDHeader domaintypes.NodeID
-		if err := nodeIDHeader.UnmarshalText([]byte(nodeIDHeaderStr)); err != nil {
-			writeHTTPError(w, http.StatusBadRequest, "invalid PLOY_NODE_UUID header")
-			return
-		}
-		if job.NodeID == nil || *job.NodeID != nodeIDHeader {
-			writeHTTPError(w, http.StatusForbidden, "job not assigned to this node")
+		if !assertJobAssignedToNode(w, job, nodeIDHeader) {
 			return
 		}
 
@@ -147,17 +145,11 @@ func createJobArtifactHandler(st store.Store, bp *blobpersist.Service) http.Hand
 			slog.Error("artifact: create failed", "run_id", runID.String(), "job_id", jobID.String(), "err", err)
 			return
 		}
-		// Return success response with artifact_bundle_id.
-		// artifact_bundles.id is still UUID.
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
-		if err := json.NewEncoder(w).Encode(map[string]interface{}{
+		writeJSON(w, http.StatusCreated, map[string]any{
 			"artifact_bundle_id": uuid.UUID(artifact.ID.Bytes).String(),
 			"cid":                strings.TrimSpace(*artifact.Cid),
 			"digest":             strings.TrimSpace(*artifact.Digest),
-		}); err != nil {
-			slog.Error("artifact: encode response failed", "err", err)
-		}
+		})
 
 		slog.Debug("artifact bundle created",
 			"run_id", runID.String(),

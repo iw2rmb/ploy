@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"sort"
+	"strings"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
@@ -91,9 +92,8 @@ func listGlobalEnvHandler(holder *ConfigHolder) http.HandlerFunc {
 // Requires cli-admin role (enforced by middleware).
 func getGlobalEnvHandler(holder *ConfigHolder) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		key, err := requiredPathParam(r, "key")
-		if err != nil {
-			writeHTTPError(w, http.StatusBadRequest, "%s", err)
+		key, ok := requiredPathParamOrWriteError(w, r, "key")
+		if !ok {
 			return
 		}
 
@@ -139,9 +139,8 @@ func getGlobalEnvHandler(holder *ConfigHolder) http.HandlerFunc {
 // Requires cli-admin role (enforced by middleware).
 func putGlobalEnvHandler(holder *ConfigHolder, st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		key, err := requiredPathParam(r, "key")
-		if err != nil {
-			writeHTTPError(w, http.StatusBadRequest, "%s", err)
+		key, ok := requiredPathParamOrWriteError(w, r, "key")
+		if !ok {
 			return
 		}
 
@@ -226,9 +225,8 @@ func putGlobalEnvHandler(holder *ConfigHolder, st store.Store) http.HandlerFunc 
 // Requires cli-admin role (enforced by middleware).
 func deleteGlobalEnvHandler(holder *ConfigHolder, st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		key, err := requiredPathParam(r, "key")
-		if err != nil {
-			writeHTTPError(w, http.StatusBadRequest, "%s", err)
+		key, ok := requiredPathParamOrWriteError(w, r, "key")
+		if !ok {
 			return
 		}
 
@@ -238,11 +236,12 @@ func deleteGlobalEnvHandler(holder *ConfigHolder, st store.Store) http.HandlerFu
 
 		entries := holder.GetGlobalEnvEntries(key)
 		if targetStr != "" {
-			target, err = domaintypes.ParseGlobalEnvTarget(targetStr)
+			parsed, err := domaintypes.ParseGlobalEnvTarget(targetStr)
 			if err != nil {
 				writeHTTPError(w, http.StatusBadRequest, "%s", err)
 				return
 			}
+			target = parsed
 		} else {
 			switch len(entries) {
 			case 0:
@@ -321,14 +320,7 @@ func targetList(entries []GlobalEnvVar) string {
 		targets[i] = e.Target.String()
 	}
 	sort.Strings(targets)
-	result := ""
-	for i, t := range targets {
-		if i > 0 {
-			result += ", "
-		}
-		result += t
-	}
-	return result
+	return strings.Join(targets, ", ")
 }
 
 // GetGlobalEnvAll returns a copy of all global environment entries grouped by key.

@@ -90,11 +90,7 @@ func setMigSpecHandler(st store.Store) http.HandlerFunc {
 			CreatedAt: createdSpec.CreatedAt.Time.Format("2006-01-02T15:04:05Z07:00"),
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			slog.Error("set mig spec: encode response failed", "err", err)
-		}
+		writeJSON(w, http.StatusCreated, resp)
 
 		slog.Info("mig spec set", "mig_id", migID, "spec_id", createdSpec.ID.String())
 	}

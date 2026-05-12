@@ -22,9 +22,8 @@ type completeActionRequest struct {
 
 func completeActionHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		actionID, err := parseRequiredPathID[domaintypes.JobID](r, "action_id")
-		if err != nil {
-			writeHTTPError(w, http.StatusBadRequest, "%s", err)
+		actionID, ok := parseRequiredPathIDOrWriteError[domaintypes.JobID](w, r, "action_id")
+		if !ok {
 			return
 		}
 		nodeID, status, stats, err := validateCompleteActionRequest(r)

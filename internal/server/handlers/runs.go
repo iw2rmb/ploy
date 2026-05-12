@@ -2,12 +2,9 @@ package handlers
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 	"net/http"
 	"time"
-
-	"github.com/jackc/pgx/v5"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
@@ -153,20 +150,13 @@ func listRunsHandler(st store.Store) http.HandlerFunc {
 
 func getRunHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		runID, err := parseRequiredPathID[domaintypes.RunID](r, "run_id")
-		if err != nil {
-			writeHTTPError(w, http.StatusBadRequest, "%s", err)
+		runID, ok := parseRequiredPathIDOrWriteError[domaintypes.RunID](w, r, "run_id")
+		if !ok {
 			return
 		}
 
-		run, err := st.GetRun(r.Context(), runID)
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				writeHTTPError(w, http.StatusNotFound, "run not found")
-				return
-			}
-			writeHTTPError(w, http.StatusInternalServerError, "failed to get run: %v", err)
-			slog.Error("get run: fetch failed", "run_id", runID.String(), "err", err)
+		run, ok := getRunOrFail(w, r, st, runID, "get run")
+		if !ok {
 			return
 		}
 

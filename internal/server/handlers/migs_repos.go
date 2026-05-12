@@ -3,7 +3,6 @@ package handlers
 import (
 	"bufio"
 	"encoding/csv"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -161,9 +160,8 @@ func deleteMigRepoHandler(st store.Store) http.HandlerFunc {
 		}
 		migID := mig.ID
 
-		repoID, err := parseRequiredPathID[domaintypes.MigRepoID](r, "repo_id")
-		if err != nil {
-			writeHTTPError(w, http.StatusBadRequest, "%s", err)
+		repoID, ok := parseRequiredPathIDOrWriteError[domaintypes.MigRepoID](w, r, "repo_id")
+		if !ok {
 			return
 		}
 
@@ -375,11 +373,7 @@ func bulkUpsertMigReposHandler(st store.Store) http.HandlerFunc {
 			Errors:  errs,
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			slog.Error("bulk upsert mig repos: encode response failed", "err", err)
-		}
+		writeJSON(w, http.StatusOK, resp)
 
 		slog.Info("bulk upsert mig repos completed",
 			"mig_id", migID,

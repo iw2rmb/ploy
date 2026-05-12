@@ -3,7 +3,6 @@ package handlers
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"log/slog"
 	"net/http"
 	"os"
@@ -118,11 +117,7 @@ func createAPITokenHandler(st store.Store, tokenSecret string) http.HandlerFunc 
 			Warning:   "Save this token securely. It will not be shown again.",
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			slog.Error("create api token: encode response failed", "err", err)
-		}
+		writeJSON(w, http.StatusOK, resp)
 
 		slog.Info("api token created",
 			"token_id", claims.ID,
@@ -197,11 +192,7 @@ func listAPITokensHandler(st store.Store) http.HandlerFunc {
 			Tokens: responseTokens,
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			slog.Error("list api tokens: encode response failed", "err", err)
-		}
+		writeJSON(w, http.StatusOK, resp)
 
 		slog.Info("api tokens listed", "count", len(tokens))
 	}
@@ -214,15 +205,12 @@ func listAPITokensHandler(st store.Store) http.HandlerFunc {
 // Response: { "message": "Token revoked successfully" }
 func revokeAPITokenHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		tokenID, err := requiredPathParam(r, "id")
-		if err != nil {
-			writeHTTPError(w, http.StatusBadRequest, "%s", err)
+		tokenID, ok := requiredPathParamOrWriteError(w, r, "id")
+		if !ok {
 			return
 		}
 
-		// Revoke the token.
-		err = st.RevokeAPIToken(r.Context(), tokenID)
-		if err != nil {
+		if err := st.RevokeAPIToken(r.Context(), tokenID); err != nil {
 			writeHTTPError(w, http.StatusInternalServerError, "failed to revoke token: %v", err)
 			slog.Error("revoke api token: database update failed", "token_id", tokenID, "err", err)
 			return
@@ -234,11 +222,7 @@ func revokeAPITokenHandler(st store.Store) http.HandlerFunc {
 			Message: "Token revoked successfully",
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			slog.Error("revoke api token: encode response failed", "err", err)
-		}
+		writeJSON(w, http.StatusOK, resp)
 
 		slog.Info("api token revoked", "token_id", tokenID)
 	}

@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -17,32 +16,32 @@ import (
 )
 
 type claimResponsePayload struct {
-	WorkType               string                          `json:"work_type"`
-	RunID                  domaintypes.RunID               `json:"id"`
-	Name                   *string                         `json:"name,omitempty"`
-	RepoID                 domaintypes.RepoID              `json:"repo_id"`
-	Attempt                int32                           `json:"attempt"`
-	JobID                  domaintypes.JobID               `json:"job_id"`
-	JobName                string                          `json:"job_name"`
-	JobType                domaintypes.JobType             `json:"job_type"`
-	ActionID               *domaintypes.JobID              `json:"action_id,omitempty"`
-	ActionType             string                          `json:"action_type,omitempty"`
-	JobImage               string                          `json:"job_image"`
-	NextID                 *domaintypes.JobID              `json:"next_id"`
-	RepoURL                string                          `json:"repo_url"`
-	RepoGateProfileMissing bool                            `json:"repo_gate_profile_missing"`
-	Status                 domaintypes.RunStatus           `json:"status"`
-	NodeID                 domaintypes.NodeID              `json:"node_id"`
-	BaseRef                string                          `json:"base_ref"`
-	TargetRef              string                          `json:"target_ref"`
-	CommitSHA              string                          `json:"commit_sha,omitempty"`
-	RepoSHAIn              string                          `json:"repo_sha_in,omitempty"`
-	StartedAt              string                          `json:"started_at"`
-	CreatedAt              string                          `json:"created_at"`
-	Spec                   json.RawMessage                 `json:"spec,omitempty"`
-	MigContext             *contracts.MigClaimContext      `json:"mig_context,omitempty"`
-	GateContext            *contracts.GateClaimContext     `json:"gate_context,omitempty"`
-	DetectedStack          *contracts.StackExpectation     `json:"detected_stack,omitempty"`
+	WorkType               string                      `json:"work_type"`
+	RunID                  domaintypes.RunID           `json:"id"`
+	Name                   *string                     `json:"name,omitempty"`
+	RepoID                 domaintypes.RepoID          `json:"repo_id"`
+	Attempt                int32                       `json:"attempt"`
+	JobID                  domaintypes.JobID           `json:"job_id"`
+	JobName                string                      `json:"job_name"`
+	JobType                domaintypes.JobType         `json:"job_type"`
+	ActionID               *domaintypes.JobID          `json:"action_id,omitempty"`
+	ActionType             string                      `json:"action_type,omitempty"`
+	JobImage               string                      `json:"job_image"`
+	NextID                 *domaintypes.JobID          `json:"next_id"`
+	RepoURL                string                      `json:"repo_url"`
+	RepoGateProfileMissing bool                        `json:"repo_gate_profile_missing"`
+	Status                 domaintypes.RunStatus       `json:"status"`
+	NodeID                 domaintypes.NodeID          `json:"node_id"`
+	BaseRef                string                      `json:"base_ref"`
+	TargetRef              string                      `json:"target_ref"`
+	CommitSHA              string                      `json:"commit_sha,omitempty"`
+	RepoSHAIn              string                      `json:"repo_sha_in,omitempty"`
+	StartedAt              string                      `json:"started_at"`
+	CreatedAt              string                      `json:"created_at"`
+	Spec                   json.RawMessage             `json:"spec,omitempty"`
+	MigContext             *contracts.MigClaimContext  `json:"mig_context,omitempty"`
+	GateContext            *contracts.GateClaimContext `json:"gate_context,omitempty"`
+	DetectedStack          *contracts.StackExpectation `json:"detected_stack,omitempty"`
 }
 
 func buildClaimResponsePayload(
@@ -211,12 +210,7 @@ func buildActionClaimResponsePayload(
 }
 
 func writeClaimResponse(w http.ResponseWriter, payload claimResponsePayload) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	if err := json.NewEncoder(w).Encode(payload); err != nil {
-		slog.Error("claim: encode response failed", "err", err)
-		return err
-	}
+	writeJSON(w, http.StatusOK, payload)
 	return nil
 }
 

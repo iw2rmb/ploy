@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -18,14 +17,12 @@ import (
 // GET /v1/runs/{run_id}/repos/{repo_id}/artifacts
 func listRunRepoArtifactsHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		runID, err := parseRequiredPathID[domaintypes.RunID](r, "run_id")
-		if err != nil {
-			writeHTTPError(w, http.StatusBadRequest, "%s", err)
+		runID, ok := parseRequiredPathIDOrWriteError[domaintypes.RunID](w, r, "run_id")
+		if !ok {
 			return
 		}
-		repoID, err := parseRequiredPathID[domaintypes.RepoID](r, "repo_id")
-		if err != nil {
-			writeHTTPError(w, http.StatusBadRequest, "%s", err)
+		repoID, ok := parseRequiredPathIDOrWriteError[domaintypes.RepoID](w, r, "repo_id")
+		if !ok {
 			return
 		}
 
@@ -96,9 +93,7 @@ func listRunRepoArtifactsHandler(st store.Store) http.HandlerFunc {
 		}
 
 		if len(artifacts) == 0 {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
-			_ = json.NewEncoder(w).Encode(struct {
+			writeJSON(w, http.StatusOK, struct {
 				Artifacts []artifactSummary `json:"artifacts"`
 			}{Artifacts: []artifactSummary{}})
 			return
@@ -116,13 +111,9 @@ func listRunRepoArtifactsHandler(st store.Store) http.HandlerFunc {
 			out = append(out, row.summary)
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode(struct {
+		writeJSON(w, http.StatusOK, struct {
 			Artifacts []artifactSummary `json:"artifacts"`
-		}{
-			Artifacts: out,
-		})
+		}{Artifacts: out})
 	}
 }
 
