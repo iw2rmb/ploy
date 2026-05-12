@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/iw2rmb/ploy/internal/blobstore"
@@ -88,16 +87,9 @@ func addRunRepoHandler(st store.Store) http.HandlerFunc {
 		if err := decodeRequestJSON(w, r, &req, DefaultMaxBodySize); err != nil {
 			return
 		}
-		if err := req.RepoURL.Validate(); err != nil {
-			writeHTTPError(w, http.StatusBadRequest, "repo_url: %v", err)
-			return
-		}
-		if err := req.BaseRef.Validate(); err != nil {
-			writeHTTPError(w, http.StatusBadRequest, "base_ref: %v", err)
-			return
-		}
-		if err := req.TargetRef.Validate(); err != nil {
-			writeHTTPError(w, http.StatusBadRequest, "target_ref: %v", err)
+		if !validateField(w, "repo_url", req.RepoURL) ||
+			!validateField(w, "base_ref", req.BaseRef) ||
+			!validateField(w, "target_ref", req.TargetRef) {
 			return
 		}
 
@@ -110,13 +102,11 @@ func addRunRepoHandler(st store.Store) http.HandlerFunc {
 			TargetRef: req.TargetRef.String(),
 		})
 		if err != nil {
-			var pgErr *pgconn.PgError
-			if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			if isUniqueViolation(err) {
 				writeHTTPError(w, http.StatusConflict, "repo already exists for mig")
 				return
 			}
-			writeHTTPError(w, http.StatusInternalServerError, "failed to create mig repo: %v", err)
-			slog.Error("add run repo: create mig repo failed", "run_id", runID.String(), "err", err)
+			serverError(w, "add run repo", "create mig repo", err, "run_id", runID.String())
 			return
 		}
 
@@ -148,8 +138,7 @@ func addRunRepoHandler(st store.Store) http.HandlerFunc {
 			RepoSha0:        sourceCommitSHA,
 		})
 		if err != nil {
-			writeHTTPError(w, http.StatusInternalServerError, "failed to create run repo: %v", err)
-			slog.Error("add run repo: create run repo failed", "run_id", runID.String(), "repo_id", migRepo.RepoID, "err", err)
+			serverError(w, "add run repo", "create run repo", err, "run_id", runID.String(), "repo_id", migRepo.RepoID)
 			return
 		}
 
@@ -168,8 +157,7 @@ func listRunReposHandler(st store.Store) http.HandlerFunc {
 
 		mrOnSuccess, mrOnFail, err := resolveRunMRWiring(r, st, runID)
 		if err != nil {
-			writeHTTPError(w, http.StatusInternalServerError, "failed to resolve run spec: %v", err)
-			slog.Error("list run repos: resolve run spec failed", "run_id", runID.String(), "err", err)
+			serverError(w, "list run repos", "resolve run spec", err, "run_id", runID.String())
 			return
 		}
 
@@ -225,8 +213,7 @@ func cancelRunRepoHandlerV1(st store.Store) http.HandlerFunc {
 				writeHTTPError(w, http.StatusNotFound, "repo not found")
 				return
 			}
-			writeHTTPError(w, http.StatusInternalServerError, "failed to get repo: %v", err)
-			slog.Error("cancel run repo: get repo failed", "run_id", runID.String(), "repo_id", repoID.String(), "err", err)
+			serverError(w, "cancel run repo", "get repo", err, "run_id", runID.String(), "repo_id", repoID.String())
 			return
 		}
 
@@ -272,8 +259,7 @@ func cancelRunRepoHandlerV1(st store.Store) http.HandlerFunc {
 
 		rr, err = st.GetRunRepo(r.Context(), store.GetRunRepoParams{RunID: runID, RepoID: repoID})
 		if err != nil {
-			writeHTTPError(w, http.StatusInternalServerError, "failed to reload repo: %v", err)
-			slog.Error("cancel run repo: reload repo failed", "run_id", runID.String(), "repo_id", repoID.String(), "err", err)
+			serverError(w, "cancel run repo", "reload repo", err, "run_id", runID.String(), "repo_id", repoID.String())
 			return
 		}
 		repoURL := ""
@@ -308,8 +294,7 @@ func restartRunRepoHandler(st store.Store, bs blobstore.Store) http.HandlerFunc 
 				writeHTTPError(w, http.StatusNotFound, "repo not found")
 				return
 			}
-			writeHTTPError(w, http.StatusInternalServerError, "failed to get repo: %v", err)
-			slog.Error("restart run repo: get repo failed", "run_id", runID.String(), "repo_id", repoID.String(), "err", err)
+			serverError(w, "restart run repo", "get repo", err, "run_id", runID.String(), "repo_id", repoID.String())
 			return
 		}
 
@@ -321,17 +306,11 @@ func restartRunRepoHandler(st store.Store, bs blobstore.Store) http.HandlerFunc 
 			if err := decodeRequestJSON(w, r, &req, DefaultMaxBodySize); err != nil {
 				return
 			}
-			if req.BaseRef != nil {
-				if err := req.BaseRef.Validate(); err != nil {
-					writeHTTPError(w, http.StatusBadRequest, "base_ref: %v", err)
-					return
-				}
+			if req.BaseRef != nil && !validateField(w, "base_ref", *req.BaseRef) {
+				return
 			}
-			if req.TargetRef != nil {
-				if err := req.TargetRef.Validate(); err != nil {
-					writeHTTPError(w, http.StatusBadRequest, "target_ref: %v", err)
-					return
-				}
+			if req.TargetRef != nil && !validateField(w, "target_ref", *req.TargetRef) {
+				return
 			}
 		}
 
@@ -353,21 +332,18 @@ func restartRunRepoHandler(st store.Store, bs blobstore.Store) http.HandlerFunc 
 				newTarget = req.TargetRef.String()
 			}
 			if err := st.UpdateRunRepoRefs(r.Context(), store.UpdateRunRepoRefsParams{RunID: runID, RepoID: repoID, RepoBaseRef: newBase, RepoTargetRef: newTarget}); err != nil {
-				writeHTTPError(w, http.StatusInternalServerError, "failed to update run repo refs: %v", err)
-				slog.Error("restart run repo: update run repo refs failed", "run_id", runID.String(), "repo_id", repoID.String(), "err", err)
+				serverError(w, "restart run repo", "update run repo refs", err, "run_id", runID.String(), "repo_id", repoID.String())
 				return
 			}
 			migRepos, listErr := st.ListMigReposByMig(r.Context(), run.MigID)
 			if listErr != nil {
-				writeHTTPError(w, http.StatusInternalServerError, "failed to list mig repos: %v", listErr)
-				slog.Error("restart run repo: list mig repos failed", "run_id", runID.String(), "repo_id", repoID.String(), "mig_id", run.MigID.String(), "err", listErr)
+				serverError(w, "restart run repo", "list mig repos", listErr, "run_id", runID.String(), "repo_id", repoID.String(), "mig_id", run.MigID.String())
 				return
 			}
 			for _, migRepo := range migRepos {
 				if migRepo.RepoID == repoID {
 					if err := st.UpdateMigRepoRefs(r.Context(), store.UpdateMigRepoRefsParams{ID: migRepo.ID, BaseRef: newBase, TargetRef: newTarget}); err != nil {
-						writeHTTPError(w, http.StatusInternalServerError, "failed to update mig repo refs: %v", err)
-						slog.Error("restart run repo: update mig repo refs failed", "run_id", runID.String(), "repo_id", repoID.String(), "mig_repo_id", migRepo.ID.String(), "err", err)
+						serverError(w, "restart run repo", "update mig repo refs", err, "run_id", runID.String(), "repo_id", repoID.String(), "mig_repo_id", migRepo.ID.String())
 						return
 					}
 					break
@@ -450,8 +426,7 @@ func startRunHandler(st store.Store, bs blobstore.Store) http.HandlerFunc {
 
 		result, err := starter.StartPendingRepos(r.Context(), runID)
 		if err != nil {
-			writeHTTPError(w, http.StatusInternalServerError, "failed to start queued repos: %v", err)
-			slog.Error("start run: start queued repos failed", "run_id", runID.String(), "err", err)
+			serverError(w, "start run", "start queued repos", err, "run_id", runID.String())
 			return
 		}
 

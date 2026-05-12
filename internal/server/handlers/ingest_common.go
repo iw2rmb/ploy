@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/iw2rmb/ploy/internal/blobstore"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
@@ -71,6 +72,31 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	if err := json.NewEncoder(w).Encode(v); err != nil {
 		slog.Warn("encode json response failed", "err", err)
 	}
+}
+
+// serverError writes a 500 response "failed to <what>: <err>" and logs at error
+// level with key "<logPrefix>: <what> failed". Extra slog attrs are appended
+// before "err".
+func serverError(w http.ResponseWriter, logPrefix, what string, err error, attrs ...any) {
+	writeHTTPError(w, http.StatusInternalServerError, "failed to %s: %v", what, err)
+	slog.Error(logPrefix+": "+what+" failed", append(attrs, "err", err)...)
+}
+
+// validateField runs v.Validate() and on failure writes a 400 "<field>: <err>"
+// then returns false. Caller returns immediately.
+func validateField(w http.ResponseWriter, field string, v interface{ Validate() error }) bool {
+	if err := v.Validate(); err != nil {
+		writeHTTPError(w, http.StatusBadRequest, "%s: %v", field, err)
+		return false
+	}
+	return true
+}
+
+// isUniqueViolation reports whether err is a Postgres unique-constraint
+// violation (SQLSTATE 23505).
+func isUniqueViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23505"
 }
 
 // DefaultMaxBodySize is the default request body size limit (1 MiB).

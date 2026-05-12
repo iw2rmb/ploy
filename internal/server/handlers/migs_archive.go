@@ -32,8 +32,7 @@ func archiveMigHandler(st store.Store) http.HandlerFunc {
 		// Check for running jobs in this mig's runs.
 		hasRunningJobs, err := migHasAnyRunningJobs(r.Context(), st, mig.ID)
 		if err != nil {
-			writeHTTPError(w, http.StatusInternalServerError, "failed to check jobs: %v", err)
-			slog.Error("archive mig: check jobs failed", "mig_id", mig.ID, "err", err)
+			serverError(w, "archive mig", "check jobs", err, "mig_id", mig.ID)
 			return
 		}
 		if hasRunningJobs {

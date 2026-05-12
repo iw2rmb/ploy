@@ -73,8 +73,7 @@ func createMigRunHandler(st store.Store) http.HandlerFunc {
 		// Select repos based on mode.
 		selectedRepos, err := selectReposForRun(r.Context(), st, migID, req.RepoSelector.Mode, req.RepoSelector.Repos)
 		if err != nil {
-			writeHTTPError(w, http.StatusInternalServerError, "failed to select repos: %v", err)
-			slog.Error("create mig run: select repos failed", "mig_id", migID.String(), "mode", req.RepoSelector.Mode, "err", err)
+			serverError(w, "create mig run", "select repos", err, "mig_id", migID.String(), "mode", req.RepoSelector.Mode)
 			return
 		}
 
@@ -93,8 +92,7 @@ func createMigRunHandler(st store.Store) http.HandlerFunc {
 			CreatedBy: req.CreatedBy,
 		})
 		if err != nil {
-			writeHTTPError(w, http.StatusInternalServerError, "failed to create run: %v", err)
-			slog.Error("create mig run: create run failed", "mig_id", migID.String(), "run_id", runID, "err", err)
+			serverError(w, "create mig run", "create run", err, "mig_id", migID.String(), "run_id", runID)
 			return
 		}
 
@@ -103,8 +101,7 @@ func createMigRunHandler(st store.Store) http.HandlerFunc {
 		for _, migRepo := range selectedRepos {
 			repoURL, urlErr := repoURLForID(r.Context(), st, migRepo.RepoID)
 			if urlErr != nil {
-				writeHTTPError(w, http.StatusInternalServerError, "failed to get repo: %v", urlErr)
-				slog.Error("create mig run: get repo failed", "repo_id", migRepo.RepoID, "err", urlErr)
+				serverError(w, "create mig run", "get repo", urlErr, "repo_id", migRepo.RepoID)
 				return
 			}
 			sourceCommitSHA, seedErr := resolveSourceCommitSHAFromContext(r.Context(), repoURL, migRepo.BaseRef)
@@ -130,12 +127,10 @@ func createMigRunHandler(st store.Store) http.HandlerFunc {
 				RepoSha0:        sourceCommitSHA,
 			})
 			if err != nil {
-				writeHTTPError(w, http.StatusInternalServerError, "failed to create run repo: %v", err)
-				slog.Error("create mig run: create run repo failed",
+				serverError(w, "create mig run", "create run repo", err,
 					"run_id", run.ID,
 					"repo_id", migRepo.RepoID,
 					"repo_url", repoURL,
-					"err", err,
 				)
 				return
 			}

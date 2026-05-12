@@ -43,16 +43,9 @@ func createSingleRepoRunHandler(st store.Store, eventsService *server.EventsServ
 		}
 
 		// Validate domain types explicitly to catch missing/zero-value fields.
-		if err := req.RepoURL.Validate(); err != nil {
-			writeHTTPError(w, http.StatusBadRequest, "repo_url: %v", err)
-			return
-		}
-		if err := req.BaseRef.Validate(); err != nil {
-			writeHTTPError(w, http.StatusBadRequest, "base_ref: %v", err)
-			return
-		}
-		if err := req.TargetRef.Validate(); err != nil {
-			writeHTTPError(w, http.StatusBadRequest, "target_ref: %v", err)
+		if !validateField(w, "repo_url", req.RepoURL) ||
+			!validateField(w, "base_ref", req.BaseRef) ||
+			!validateField(w, "target_ref", req.TargetRef) {
 			return
 		}
 
@@ -75,8 +68,7 @@ func createSingleRepoRunHandler(st store.Store, eventsService *server.EventsServ
 			CreatedBy: createdByPtr,
 		})
 		if err != nil {
-			writeHTTPError(w, http.StatusInternalServerError, "failed to create spec: %v", err)
-			slog.Error("create single-repo run: create spec failed", "err", err)
+			serverError(w, "create single-repo run", "create spec", err)
 			return
 		}
 
@@ -88,8 +80,7 @@ func createSingleRepoRunHandler(st store.Store, eventsService *server.EventsServ
 			SpecID:    &createdSpec.ID,
 			CreatedBy: createdByPtr,
 		}); err != nil {
-			writeHTTPError(w, http.StatusInternalServerError, "failed to create mig: %v", err)
-			slog.Error("create single-repo run: create mig failed", "mig_id", migID, "err", err)
+			serverError(w, "create single-repo run", "create mig", err, "mig_id", migID)
 			return
 		}
 
@@ -104,8 +95,7 @@ func createSingleRepoRunHandler(st store.Store, eventsService *server.EventsServ
 			TargetRef: req.TargetRef.String(),
 		})
 		if err != nil {
-			writeHTTPError(w, http.StatusInternalServerError, "failed to create mig repo: %v", err)
-			slog.Error("create single-repo run: create mig repo failed", "mig_id", migID, "repo_url", req.RepoURL, "err", err)
+			serverError(w, "create single-repo run", "create mig repo", err, "mig_id", migID, "repo_url", req.RepoURL)
 			return
 		}
 
@@ -118,8 +108,7 @@ func createSingleRepoRunHandler(st store.Store, eventsService *server.EventsServ
 			CreatedBy: createdByPtr,
 		})
 		if err != nil {
-			writeHTTPError(w, http.StatusInternalServerError, "failed to create run: %v", err)
-			slog.Error("create single-repo run: create run failed", "run_id", runID, "err", err)
+			serverError(w, "create single-repo run", "create run", err, "run_id", runID)
 			return
 		}
 
@@ -146,8 +135,7 @@ func createSingleRepoRunHandler(st store.Store, eventsService *server.EventsServ
 			RepoSha0:        sourceCommitSHA,
 		})
 		if err != nil {
-			writeHTTPError(w, http.StatusInternalServerError, "failed to create run repo: %v", err)
-			slog.Error("create single-repo run: create run_repo failed", "run_id", run.ID, "repo_id", migRepo.RepoID, "err", err)
+			serverError(w, "create single-repo run", "create run repo", err, "run_id", run.ID, "repo_id", migRepo.RepoID)
 			return
 		}
 
