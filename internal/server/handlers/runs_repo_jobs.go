@@ -1,14 +1,11 @@
 package handlers
 
 import (
-	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
-
-	"github.com/jackc/pgx/v5"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	migsapi "github.com/iw2rmb/ploy/internal/migs/api"
@@ -32,15 +29,8 @@ func listRunRepoJobsHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		rr, err := st.GetRunRepo(r.Context(), store.GetRunRepoParams{RunID: runID, RepoID: repoID})
-		if err != nil {
-			switch {
-			case errors.Is(err, pgx.ErrNoRows):
-				writeHTTPError(w, http.StatusNotFound, "repo not found")
-			default:
-				writeHTTPError(w, http.StatusInternalServerError, "failed to get repo: %v", err)
-				slog.Error("list run repo jobs: get repo failed", "run_id", runID.String(), "repo_id", repoID.String(), "err", err)
-			}
+		rr, ok := getRunRepoOrFail(w, r, st, runID, repoID, "list run repo jobs")
+		if !ok {
 			return
 		}
 
@@ -55,14 +45,8 @@ func listRunRepoJobsHandler(st store.Store) http.HandlerFunc {
 			attempt = int32(parsed)
 		}
 
-		jobs, err := st.ListJobsByRunRepoAttempt(r.Context(), store.ListJobsByRunRepoAttemptParams{
-			RunID:   runID,
-			RepoID:  repoID,
-			Attempt: attempt,
-		})
-		if err != nil {
-			writeHTTPError(w, http.StatusInternalServerError, "failed to list jobs: %v", err)
-			slog.Error("list run repo jobs: list jobs failed", "run_id", runID.String(), "repo_id", repoID.String(), "attempt", attempt, "err", err)
+		jobs, ok := listJobsForRunRepoOrFail(w, r, st, runID, repoID, attempt, "list run repo jobs")
+		if !ok {
 			return
 		}
 		jobs = jobchain.Order(

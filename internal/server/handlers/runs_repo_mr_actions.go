@@ -119,13 +119,8 @@ func createRunRepoMRActionHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		runRepo, err := st.GetRunRepo(r.Context(), store.GetRunRepoParams{RunID: runID, RepoID: repoID})
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				writeHTTPError(w, http.StatusNotFound, "run repo not found")
-				return
-			}
-			writeHTTPError(w, http.StatusInternalServerError, "failed to load run repo: %v", err)
+		runRepo, ok := getRunRepoOrFail(w, r, st, runID, repoID, "create run repo mr action")
+		if !ok {
 			return
 		}
 		action, _, mrURL, ensureErr := ensureMRCreateAction(r.Context(), st, runID, runRepo, true)

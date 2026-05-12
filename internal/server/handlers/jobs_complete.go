@@ -146,13 +146,9 @@ func validateCompleteJobRequest(r *http.Request, req completeJobRequest) (
 		repoSHAOut = candidate
 	}
 
-	nodeIDHeaderStr := strings.TrimSpace(r.Header.Get(nodeUUIDHeader))
-	if nodeIDHeaderStr == "" {
-		return "", JobStatsPayload{}, nil, "", "", completeBadRequest("PLOY_NODE_UUID header is required")
-	}
-	var nodeIDHeader domaintypes.NodeID
-	if err := nodeIDHeader.UnmarshalText([]byte(nodeIDHeaderStr)); err != nil {
-		return "", JobStatsPayload{}, nil, "", "", completeBadRequest("invalid PLOY_NODE_UUID header")
+	nodeIDHeader, err := parseNodeUUIDHeader(r)
+	if err != nil {
+		return "", JobStatsPayload{}, nil, "", "", completeBadRequest("%s", err)
 	}
 
 	return normalizedStatus, statsPayload, statsBytes, repoSHAOut, nodeIDHeader, nil

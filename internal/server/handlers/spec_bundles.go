@@ -2,8 +2,6 @@ package handlers
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -109,16 +107,6 @@ func probeSpecBundleIntegrity(ctx context.Context, st store.Store, bs blobstore.
 	return bundle, nil
 }
 
-// computeSpecBundleCIDAndDigest computes a content identifier and SHA256 digest for a spec bundle.
-// Uses the same scheme as artifact bundles for consistency.
-func computeSpecBundleCIDAndDigest(data []byte) (cid, digest string) {
-	hash := sha256.Sum256(data)
-	hexHash := hex.EncodeToString(hash[:])
-	cid = "bafy" + hexHash[:32]
-	digest = "sha256:" + hexHash
-	return cid, digest
-}
-
 // uploadSpecBundleHandler accepts a raw gzip-compressed spec bundle from the CLI,
 // persists metadata to spec_bundles and the blob to object storage, and returns
 // the assigned bundle_id. Deduplication is performed by CID: if a bundle with the
@@ -129,9 +117,7 @@ func computeSpecBundleCIDAndDigest(data []byte) (cid, digest string) {
 // Body:  raw binary (application/octet-stream), ≤ 50 MiB
 // Query: created_by (optional)
 func uploadSpecBundleHandler(st store.Store, bp *blobpersist.Service) http.HandlerFunc {
-	if bp == nil {
-		panic("uploadSpecBundleHandler: blobpersist is required")
-	}
+	requireBlobPersist("uploadSpecBundleHandler", bp)
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Reject oversized requests before reading.
 		if r.ContentLength > maxSpecBundleSize {
@@ -156,7 +142,7 @@ func uploadSpecBundleHandler(st store.Store, bp *blobpersist.Service) http.Handl
 
 		createdBy := strings.TrimSpace(r.URL.Query().Get("created_by"))
 
-		cid, digest := computeSpecBundleCIDAndDigest(data)
+		cid, digest := computeCIDAndDigest(data)
 
 		// Deduplication: if a bundle with this CID already exists, reuse it.
 		existing, err := st.GetSpecBundleByCID(r.Context(), cid)

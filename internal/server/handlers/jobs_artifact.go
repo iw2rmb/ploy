@@ -1,8 +1,6 @@
 package handlers
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -53,18 +51,6 @@ func assertJobAssignedToNode(w http.ResponseWriter, job store.Job, nodeID domain
 		return false
 	}
 	return true
-}
-
-// computeArtifactCIDAndDigest computes a content identifier and SHA256 digest for an artifact bundle.
-// CID uses a simple "bafy" prefix with hex-encoded SHA256 for compatibility with existing test fixtures.
-// Digest is the full SHA256 hex string with "sha256:" prefix.
-func computeArtifactCIDAndDigest(bundle []byte) (cid, digest string) {
-	hash := sha256.Sum256(bundle)
-	hexHash := hex.EncodeToString(hash[:])
-	// Use bafy prefix (like IPFS CIDv1) followed by first 32 chars of hash for readability
-	cid = "bafy" + hexHash[:32]
-	digest = "sha256:" + hexHash
-	return cid, digest
 }
 
 // createJobArtifactHandler stores gzipped artifact bundle in object storage and metadata in artifact_bundles table (≤10 MiB), rejects oversize.
@@ -127,7 +113,7 @@ func createJobArtifactHandler(st store.Store, bp *blobpersist.Service) http.Hand
 		}
 
 		// Compute CID and digest for content-addressable storage.
-		cid, digest := computeArtifactCIDAndDigest(req.Bundle)
+		cid, digest := computeCIDAndDigest(req.Bundle)
 
 		// Create artifact bundle params using domain RunID.
 		params := store.CreateArtifactBundleParams{

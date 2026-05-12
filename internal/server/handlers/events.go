@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/iw2rmb/ploy/internal/blobstore"
@@ -350,15 +349,8 @@ func getRunRepoLogsHandler(st store.Store, _ blobstore.Store, eventsService *ser
 			return
 		}
 
-		rr, err := st.GetRunRepo(r.Context(), store.GetRunRepoParams{RunID: runID, RepoID: repoID})
-		if err != nil {
-			switch {
-			case errors.Is(err, pgx.ErrNoRows):
-				writeHTTPError(w, http.StatusNotFound, "repo not found")
-			default:
-				slog.Error("get run repo logs: get repo failed", "run_id", runID.String(), "repo_id", repoID.String(), "err", err)
-				writeHTTPError(w, http.StatusInternalServerError, "failed to get repo")
-			}
+		rr, ok := getRunRepoOrFail(w, r, st, runID, repoID, "get run repo logs")
+		if !ok {
 			return
 		}
 
@@ -367,14 +359,8 @@ func getRunRepoLogsHandler(st store.Store, _ blobstore.Store, eventsService *ser
 			return
 		}
 
-		jobs, err := st.ListJobsByRunRepoAttempt(r.Context(), store.ListJobsByRunRepoAttemptParams{
-			RunID:   runID,
-			RepoID:  repoID,
-			Attempt: rr.Attempt,
-		})
-		if err != nil {
-			slog.Error("get run repo logs: list jobs failed", "run_id", runID.String(), "repo_id", repoID.String(), "attempt", rr.Attempt, "err", err)
-			writeHTTPError(w, http.StatusInternalServerError, "failed to list jobs")
+		jobs, ok := listJobsForRunRepoOrFail(w, r, st, runID, repoID, rr.Attempt, "get run repo logs")
+		if !ok {
 			return
 		}
 
