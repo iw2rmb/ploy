@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"strings"
 	"testing"
 	"time"
 
@@ -67,15 +66,16 @@ func TestDockerContainerRuntimeStart(t *testing.T) {
 func TestDockerContainerRuntimeWait(t *testing.T) {
 	t.Parallel()
 	testCases := []struct {
-		name       string
-		handle     ContainerHandle
-		statusCode int64
-		waitErr    error
-		startedAt  string
-		finishedAt string
-		inspectErr error
-		wantCode   int
-		wantErr    bool
+		name            string
+		handle          ContainerHandle
+		statusCode      int64
+		waitErr         error
+		startedAt       string
+		finishedAt      string
+		inspectErr      error
+		wantCode        int
+		wantErr         bool
+		wantForceRemove bool
 	}{
 		{
 			name:       "success_exit_0",
@@ -109,10 +109,16 @@ func TestDockerContainerRuntimeWait(t *testing.T) {
 			waitErr: errors.New("container died unexpectedly"),
 			wantErr: true,
 		},
+		{
+			name:            "cancelled_context_force_removes",
+			handle:          ContainerHandle("cancel-test"),
+			waitErr:         context.Canceled,
+			wantErr:         true,
+			wantForceRemove: true,
+		},
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			fake := &fakeDockerClient{
@@ -134,10 +140,22 @@ func TestDockerContainerRuntimeWait(t *testing.T) {
 			rt := newDockerContainerRuntimeWithClient(fake, DockerContainerRuntimeOptions{})
 
 			result, err := rt.Wait(context.Background(), tc.handle)
+			// Wait should always call ContainerWait with NotRunning condition.
+			if fake.waitOptions.Condition != container.WaitConditionNotRunning {
+				t.Errorf("WaitCondition=%q, want %q", fake.waitOptions.Condition, container.WaitConditionNotRunning)
+			}
 
 			if tc.wantErr {
 				if err == nil {
 					t.Fatal("expected error, got nil")
+				}
+				if tc.wantForceRemove {
+					if !fake.removeCalled {
+						t.Fatal("expected Wait() to force-remove container on error")
+					}
+					if fake.removeID != string(tc.handle) {
+						t.Fatalf("removed container %q, want %q", fake.removeID, string(tc.handle))
+					}
 				}
 				return
 			}
@@ -263,16 +281,9 @@ func TestDockerContainerRuntimeNilClient(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			err := tc.call()
-			if err == nil {
-				t.Fatal("expected error, got nil")
-			}
-			if !strings.Contains(err.Error(), "docker runtime not configured") {
-				t.Fatalf("unexpected error: %v", err)
-			}
+			requireErrContains(t, tc.call(), "docker runtime not configured")
 		})
 	}
 }

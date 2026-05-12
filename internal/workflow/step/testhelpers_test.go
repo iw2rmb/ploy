@@ -2,12 +2,59 @@ package step
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
 	workspaceutil "github.com/iw2rmb/ploy/internal/testutil/workspace"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
+
+// findMount returns the first mount whose Target equals target.
+func findMount(mounts []ContainerMount, target string) (ContainerMount, bool) {
+	for _, m := range mounts {
+		if m.Target == target {
+			return m, true
+		}
+	}
+	return ContainerMount{}, false
+}
+
+// requireMount fails the test unless a mount with the given target exists and
+// matches the expected source and readOnly flag.
+func requireMount(t *testing.T, mounts []ContainerMount, target, source string, readOnly bool) {
+	t.Helper()
+	m, ok := findMount(mounts, target)
+	if !ok {
+		t.Fatalf("mount %q not found in %+v", target, mounts)
+	}
+	if m.Source != source {
+		t.Fatalf("mount %q: source=%q, want %q", target, m.Source, source)
+	}
+	if m.ReadOnly != readOnly {
+		t.Fatalf("mount %q: ReadOnly=%v, want %v", target, m.ReadOnly, readOnly)
+	}
+}
+
+// requireNoMount fails the test if any mount has the given target.
+func requireNoMount(t *testing.T, mounts []ContainerMount, target string) {
+	t.Helper()
+	if _, ok := findMount(mounts, target); ok {
+		t.Fatalf("unexpected mount with target %q in %+v", target, mounts)
+	}
+}
+
+// requireErrContains fails the test unless err is non-nil and its message
+// contains the want substring. When want is empty, only non-nil-ness is checked.
+func requireErrContains(t *testing.T, err error, want string) {
+	t.Helper()
+	if err == nil {
+		t.Fatalf("expected error containing %q, got nil", want)
+	}
+	if want != "" && !strings.Contains(err.Error(), want) {
+		t.Fatalf("error %q should contain %q", err.Error(), want)
+	}
+}
 
 // testContainerRuntime is a configurable mock for ContainerRuntime.
 // Fields can be set to customize behavior; nil fields use sensible defaults.

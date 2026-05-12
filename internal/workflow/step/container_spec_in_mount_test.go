@@ -31,19 +31,7 @@ func TestBuildContainerSpec_InMountPresent(t *testing.T) {
 	if len(spec.Mounts) != 2 {
 		t.Fatalf("got %d mounts, want 2: %+v", len(spec.Mounts), spec.Mounts)
 	}
-	// Find /in mount
-	var found bool
-	for _, m := range spec.Mounts {
-		if m.Target == "/in" {
-			found = true
-			if m.ReadOnly {
-				t.Fatalf("/in mount should be writable: %+v", m)
-			}
-		}
-	}
-	if !found {
-		t.Fatalf("/in mount not present: %+v", spec.Mounts)
-	}
+	requireMount(t, spec.Mounts, "/in", "/tmp/in", false)
 }
 
 func TestBuildContainerSpec_InMountSkipsNestedHydraInMounts(t *testing.T) {
@@ -65,18 +53,8 @@ func TestBuildContainerSpec_InMountSkipsNestedHydraInMounts(t *testing.T) {
 		t.Fatalf("buildContainerSpec error: %v", err)
 	}
 
-	var foundIn bool
-	for _, m := range spec.Mounts {
-		if m.Target == "/in" {
-			foundIn = true
-		}
-		if m.Target == "/in/amata.yaml" {
-			t.Fatalf("unexpected nested Hydra in mount: %+v", m)
-		}
-	}
-	if !foundIn {
-		t.Fatalf("/in mount not present: %+v", spec.Mounts)
-	}
+	requireMount(t, spec.Mounts, "/in", "/tmp/in", false)
+	requireNoMount(t, spec.Mounts, "/in/amata.yaml")
 }
 
 func TestBuildContainerSpec_ShareMountPresent(t *testing.T) {
@@ -97,19 +75,5 @@ func TestBuildContainerSpec_ShareMountPresent(t *testing.T) {
 		t.Fatalf("buildContainerSpec error: %v", err)
 	}
 
-	var found bool
-	for _, m := range spec.Mounts {
-		if m.Target == "/share" {
-			found = true
-			if m.ReadOnly {
-				t.Fatalf("/share mount should be writable: %+v", m)
-			}
-			if m.Source != "/tmp/share" {
-				t.Fatalf("/share source=%q, want %q", m.Source, "/tmp/share")
-			}
-		}
-	}
-	if !found {
-		t.Fatalf("/share mount not present: %+v", spec.Mounts)
-	}
+	requireMount(t, spec.Mounts, "/share", "/tmp/share", false)
 }

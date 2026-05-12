@@ -3,7 +3,6 @@ package step
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
@@ -20,311 +19,33 @@ func writeDummyProfile(t *testing.T, path string) {
 	}
 }
 
-// TestBuildGateImageResolver_Resolve tests resolution logic.
+// buildResolverFromRules constructs a resolver directly without validation.
+// Used by table-driven tests where the rule list is the unit under test.
+func buildResolverFromRules(rules ...contracts.BuildGateImageRule) func(*testing.T) (*BuildGateImageResolver, error) {
+	return func(*testing.T) (*BuildGateImageResolver, error) {
+		return &BuildGateImageResolver{rules: rules}, nil
+	}
+}
+
+// TestBuildGateImageResolver_Resolve exercises every positive resolution path:
+// direct rule lists, precedence/specificity ordering, file loading, env/stack
+// placeholder expansion, and release coercion. Each row constructs a resolver
+// and asserts that Resolve(exp) returns wantImage.
 func TestBuildGateImageResolver_Resolve(t *testing.T) {
-	rules := []contracts.BuildGateImageRule{
+	defaultRules := []contracts.BuildGateImageRule{
 		{Stack: contracts.StackExpectation{Language: "java", Release: "17", Tool: "maven"}, Image: "maven:jdk17"},
 		{Stack: contracts.StackExpectation{Language: "java", Release: "17", Tool: "gradle"}, Image: "gradle:8.8-jdk17"},
 		{Stack: contracts.StackExpectation{Language: "java", Release: "17"}, Image: "eclipse-temurin:17-jdk"},
 		{Stack: contracts.StackExpectation{Language: "java", Release: "11"}, Image: "eclipse-temurin:11-jdk"},
 	}
 
-	resolver := &BuildGateImageResolver{rules: rules}
-
-	tests := []struct {
-		name    string
-		exp     contracts.StackExpectation
-		want    string
-		wantErr string
-	}{
-		{
-			name: "exact match maven",
-			exp:  contracts.StackExpectation{Language: "java", Release: "17", Tool: "maven"},
-			want: "maven:jdk17",
-		},
-		{
-			name: "exact match gradle",
-			exp:  contracts.StackExpectation{Language: "java", Release: "17", Tool: "gradle"},
-			want: "gradle:8.8-jdk17",
-		},
-		{
-			name: "tool-agnostic fallback (unknown tool)",
-			exp:  contracts.StackExpectation{Language: "java", Release: "17", Tool: "ant"},
-			want: "eclipse-temurin:17-jdk",
-		},
-		{
-			name: "tool-agnostic fallback (no tool)",
-			exp:  contracts.StackExpectation{Language: "java", Release: "17"},
-			want: "eclipse-temurin:17-jdk",
-		},
-		{
-			name: "different release",
-			exp:  contracts.StackExpectation{Language: "java", Release: "11"},
-			want: "eclipse-temurin:11-jdk",
-		},
-		{
-			name:    "no match - wrong language",
-			exp:     contracts.StackExpectation{Language: "go", Release: "1.21"},
-			wantErr: "no image rule matches stack go:1.21:",
-		},
-		{
-			name:    "no match - wrong release",
-			exp:     contracts.StackExpectation{Language: "java", Release: "21"},
-			wantErr: "no image rule matches stack java:21:",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := resolver.Resolve(tt.exp)
-			if tt.wantErr != "" {
-				if err == nil {
-					t.Fatal("expected error")
-				}
-				if !strings.Contains(err.Error(), tt.wantErr) {
-					t.Errorf("error = %q, want to contain %q", err.Error(), tt.wantErr)
-				}
-				return
-			}
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if got != tt.want {
-				t.Errorf("Resolve() = %q, want %q", got, tt.want)
-			}
-		})
-	}
-}
-
-// TestBuildGateImageResolver_Precedence tests that higher precedence rules win.
-func TestBuildGateImageResolver_Precedence(t *testing.T) {
-	// Default file rules (lowest precedence).
-	defaultRules := []contracts.BuildGateImageRule{
-		{Stack: contracts.StackExpectation{Language: "java", Release: "17"}, Image: "default:17"},
-	}
-
-	// Mig override rules (highest precedence).
-	migRules := []contracts.BuildGateImageRule{
-		{Stack: contracts.StackExpectation{Language: "java", Release: "17"}, Image: "mig:17"},
-	}
-
-	tests := []struct {
-		name         string
-		defaultRules []contracts.BuildGateImageRule
-		migRules     []contracts.BuildGateImageRule
-		wantImage    string
-	}{
-		{
-			name:         "mig overrides all",
-			defaultRules: defaultRules,
-			migRules:     migRules,
-			wantImage:    "mig:17",
-		},
-		{
-			name:         "default when no overrides",
-			defaultRules: defaultRules,
-			migRules:     nil,
-			wantImage:    "default:17",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Build merged rules manually (simulating NewBuildGateImageResolver without file loading).
-			var rules []contracts.BuildGateImageRule
-			rules = append(rules, tt.defaultRules...)
-			rules = append(rules, tt.migRules...)
-
-			resolver := &BuildGateImageResolver{rules: rules}
-			got, err := resolver.Resolve(contracts.StackExpectation{Language: "java", Release: "17"})
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if got != tt.wantImage {
-				t.Errorf("Resolve() = %q, want %q", got, tt.wantImage)
-			}
-		})
-	}
-}
-
-// TestBuildGateImageResolver_PrecedenceLastWins tests that the last rule at same specificity wins.
-func TestBuildGateImageResolver_PrecedenceLastWins(t *testing.T) {
-	// Two rules at same specificity with different images - last one should win.
-	rules := []contracts.BuildGateImageRule{
-		{Stack: contracts.StackExpectation{Language: "java", Release: "17"}, Image: "image1:17"},
-		{Stack: contracts.StackExpectation{Language: "java", Release: "17"}, Image: "image2:17"},
-	}
-
-	resolver := &BuildGateImageResolver{rules: rules}
-	got, err := resolver.Resolve(contracts.StackExpectation{Language: "java", Release: "17"})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	// Last rule wins (higher precedence).
-	if got != "image2:17" {
-		t.Errorf("Resolve() = %q, want %q (last rule should win)", got, "image2:17")
-	}
-}
-
-// TestBuildGateImageResolver_MissingFile tests error handling for missing file.
-func TestBuildGateImageResolver_MissingFile(t *testing.T) {
-	// When requireDefaultFile=true and file is missing, should error.
-	_, err := NewBuildGateImageResolver("/nonexistent/path/stacks.yaml", nil, true)
-	if err == nil {
-		t.Fatal("expected error for missing file when requireDefaultFile=true")
-	}
-	if !strings.Contains(err.Error(), "required but not found") {
-		t.Errorf("error = %q, want to contain 'required but not found'", err.Error())
-	}
-
-	// When requireDefaultFile=false and file is missing, should not error.
-	resolver, err := NewBuildGateImageResolver("/nonexistent/path/stacks.yaml", nil, false)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if resolver == nil {
-		t.Fatal("resolver is nil")
-	}
-}
-
-func TestBuildGateImageResolver_ExpandsRegistryPrefixFromEnv(t *testing.T) {
-	t.Setenv("PLOY_CONTAINER_REGISTRY", "192.0.2.25:5001/ploy")
-
-	resolver, err := NewBuildGateImageResolver("", []contracts.BuildGateImageRule{
-		{
-			Stack: contracts.StackExpectation{Language: "java", Release: "17", Tool: "maven"},
-			Image: "$PLOY_CONTAINER_REGISTRY/maven:jdk17",
-		},
-	}, false)
-	if err != nil {
-		t.Fatalf("NewBuildGateImageResolver() error: %v", err)
-	}
-
-	got, err := resolver.Resolve(contracts.StackExpectation{Language: "java", Release: "17", Tool: "maven"})
-	if err != nil {
-		t.Fatalf("Resolve() error: %v", err)
-	}
-	want := "192.0.2.25:5001/ploy/maven:jdk17"
-	if got != want {
-		t.Fatalf("Resolve() = %q, want %q", got, want)
-	}
-}
-
-func TestBuildGateImageResolver_ExpandsStackPlaceholders(t *testing.T) {
-	resolver, err := NewBuildGateImageResolver("", []contracts.BuildGateImageRule{
-		{
-			Stack: contracts.StackExpectation{Language: "java", Release: "17", Tool: "maven"},
-			Image: "ghcr.io/acme/mig-${stack.language}-${stack.release}-${stack.tool}:latest",
-		},
-	}, false)
-	if err != nil {
-		t.Fatalf("NewBuildGateImageResolver() error: %v", err)
-	}
-
-	got, err := resolver.Resolve(contracts.StackExpectation{Language: "java", Release: "17", Tool: "maven"})
-	if err != nil {
-		t.Fatalf("Resolve() error: %v", err)
-	}
-	want := "ghcr.io/acme/mig-java-17-maven:latest"
-	if got != want {
-		t.Fatalf("Resolve() = %q, want %q", got, want)
-	}
-}
-
-func TestBuildGateImageResolver_UnresolvedEnvFailsWhenUnset(t *testing.T) {
-	_, err := NewBuildGateImageResolver("", []contracts.BuildGateImageRule{
-		{
-			Stack: contracts.StackExpectation{Language: "java", Release: "17", Tool: "maven"},
-			Image: "$PLOY_TEST_UNSET_GATE_REGISTRY/maven:jdk17",
-		},
-	}, false)
-	if err == nil {
-		t.Fatal("expected unresolved env error when registry env is unset")
-	}
-	if !strings.Contains(err.Error(), "unresolved environment variables: PLOY_TEST_UNSET_GATE_REGISTRY") {
-		t.Fatalf("error = %q, want unresolved registry env error", err.Error())
-	}
-}
-
-// TestBuildGateImageResolver_DuplicateInLevel tests duplicate rejection within same source.
-func TestBuildGateImageResolver_DuplicateInLevel(t *testing.T) {
-	// Duplicates within the same level should be rejected during validation.
-	duplicateRules := []contracts.BuildGateImageRule{
-		{Stack: contracts.StackExpectation{Language: "java", Release: "17"}, Image: "image1:17"},
-		{Stack: contracts.StackExpectation{Language: "java", Release: "17"}, Image: "image2:17"},
-	}
-
-	_, err := NewBuildGateImageResolver("", duplicateRules, false)
-	if err == nil {
-		t.Fatal("expected duplicate validation error")
-	}
-	if !strings.Contains(err.Error(), "duplicate selector") {
-		t.Errorf("error = %q, want to contain 'duplicate selector'", err.Error())
-	}
-}
-
-// TestBuildGateImageResolver_LoadValidFile tests loading a valid YAML file.
-func TestBuildGateImageResolver_LoadValidFile(t *testing.T) {
-	testFile := filepath.Join("testdata", "stacks-catalog", "valid.yaml")
-	if _, err := os.Stat(testFile); os.IsNotExist(err) {
-		t.Skip("test data file not found")
-	}
-
-	resolver, err := NewBuildGateImageResolver(testFile, nil, true)
-	if err != nil {
-		t.Fatalf("NewBuildGateImageResolver failed: %v", err)
-	}
-
-	// Test resolution.
-	tests := []struct {
-		name string
-		exp  contracts.StackExpectation
-		want string
-	}{
-		{
-			name: "java 17 maven",
-			exp:  contracts.StackExpectation{Language: "java", Release: "17", Tool: "maven"},
-			want: "maven:jdk17",
-		},
-		{
-			name: "java 17 gradle",
-			exp:  contracts.StackExpectation{Language: "java", Release: "17", Tool: "gradle"},
-			want: "gradle:8.8-jdk17",
-		},
-		{
-			name: "java 17 fallback",
-			exp:  contracts.StackExpectation{Language: "java", Release: "17"},
-			want: "eclipse-temurin:17-jdk",
-		},
-		{
-			name: "java 11 maven",
-			exp:  contracts.StackExpectation{Language: "java", Release: "11", Tool: "maven"},
-			want: "maven:jdk11",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := resolver.Resolve(tt.exp)
-			if err != nil {
-				t.Fatalf("Resolve failed: %v", err)
-			}
-			if got != tt.want {
-				t.Errorf("Resolve() = %q, want %q", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestBuildGateImageResolver_LoadFile_ReleaseCoercion(t *testing.T) {
-	t.Parallel()
-
-	dir := t.TempDir()
-	path := filepath.Join(dir, "stacks.yaml")
-	writeDummyProfile(t, filepath.Join(dir, "profiles", "java-maven.yaml"))
-	writeDummyProfile(t, filepath.Join(dir, "profiles", "java-gradle.yaml"))
-	writeDummyProfile(t, filepath.Join(dir, "profiles", "python.yaml"))
-	const body = `stacks:
+	// Shared file-backed fixtures.
+	releaseCoercionDir := t.TempDir()
+	releaseCoercionPath := filepath.Join(releaseCoercionDir, "stacks.yaml")
+	writeDummyProfile(t, filepath.Join(releaseCoercionDir, "profiles", "java-maven.yaml"))
+	writeDummyProfile(t, filepath.Join(releaseCoercionDir, "profiles", "java-gradle.yaml"))
+	writeDummyProfile(t, filepath.Join(releaseCoercionDir, "profiles", "python.yaml"))
+	if err := os.WriteFile(releaseCoercionPath, []byte(`stacks:
   - lang: java
     tool: maven
     release: 17
@@ -339,139 +60,15 @@ func TestBuildGateImageResolver_LoadFile_ReleaseCoercion(t *testing.T) {
     release: 3.11
     image: python:3.11
     profile: profiles/python.yaml
-`
-	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
-		t.Fatalf("write mapping file: %v", err)
+`), 0o644); err != nil {
+		t.Fatalf("write release-coercion mapping file: %v", err)
 	}
 
-	resolver, err := NewBuildGateImageResolver(path, nil, true)
-	if err != nil {
-		t.Fatalf("NewBuildGateImageResolver() error: %v", err)
-	}
-
-	tests := []struct {
-		name string
-		exp  contracts.StackExpectation
-		want string
-	}{
-		{
-			name: "integer release",
-			exp:  contracts.StackExpectation{Language: "java", Tool: "maven", Release: "17"},
-			want: "maven:17",
-		},
-		{
-			name: "whole float coerces to integer string",
-			exp:  contracts.StackExpectation{Language: "java", Tool: "gradle", Release: "17"},
-			want: "gradle:17",
-		},
-		{
-			name: "decimal float preserved",
-			exp:  contracts.StackExpectation{Language: "python", Release: "3.11"},
-			want: "python:3.11",
-		},
-	}
-	for _, tt := range tests {
-		tt := tt
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			got, err := resolver.Resolve(tt.exp)
-			if err != nil {
-				t.Fatalf("Resolve() error: %v", err)
-			}
-			if got != tt.want {
-				t.Fatalf("Resolve() = %q, want %q", got, tt.want)
-			}
-		})
-	}
-}
-
-// TestBuildGateImageResolver_LoadInvalidFile tests error handling for invalid files.
-func TestBuildGateImageResolver_LoadInvalidFile(t *testing.T) {
-	tests := []struct {
-		name    string
-		file    string
-		wantErr string
-	}{
-		{
-			name:    "missing language",
-			file:    filepath.Join("testdata", "stacks-catalog", "invalid-missing-language.yaml"),
-			wantErr: "stacks[0].lang: required",
-		},
-		{
-			name:    "duplicate selector",
-			file:    filepath.Join("testdata", "stacks-catalog", "invalid-duplicate.yaml"),
-			wantErr: "duplicate selector",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if _, err := os.Stat(tt.file); os.IsNotExist(err) {
-				t.Skip("test data file not found")
-			}
-
-			_, err := NewBuildGateImageResolver(tt.file, nil, true)
-			if err == nil {
-				t.Fatal("expected error")
-			}
-			if !strings.Contains(err.Error(), tt.wantErr) {
-				t.Errorf("error = %q, want to contain %q", err.Error(), tt.wantErr)
-			}
-		})
-	}
-}
-
-// TestBuildGateImageResolver_EmptyRules tests error when no rules available.
-func TestBuildGateImageResolver_EmptyRules(t *testing.T) {
-	resolver := &BuildGateImageResolver{rules: nil}
-	_, err := resolver.Resolve(contracts.StackExpectation{Language: "java", Release: "17"})
-	if err == nil {
-		t.Fatal("expected error for empty rules")
-	}
-	if !strings.Contains(err.Error(), "no image mapping rules available") {
-		t.Errorf("error = %q, want to contain 'no image mapping rules available'", err.Error())
-	}
-}
-
-// TestBuildGateImageResolver_SpecificityWins tests that more specific rules win over less specific.
-func TestBuildGateImageResolver_SpecificityWins(t *testing.T) {
-	rules := []contracts.BuildGateImageRule{
-		// Tool-agnostic (specificity 2).
-		{Stack: contracts.StackExpectation{Language: "java", Release: "17"}, Image: "agnostic:17"},
-		// Tool-specific (specificity 3) - should win.
-		{Stack: contracts.StackExpectation{Language: "java", Release: "17", Tool: "maven"}, Image: "maven:17"},
-	}
-
-	resolver := &BuildGateImageResolver{rules: rules}
-
-	// Request with maven tool should get maven-specific image.
-	got, err := resolver.Resolve(contracts.StackExpectation{Language: "java", Release: "17", Tool: "maven"})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if got != "maven:17" {
-		t.Errorf("Resolve() = %q, want %q (specificity should win)", got, "maven:17")
-	}
-
-	// Request with unknown tool should fall back to agnostic.
-	got, err = resolver.Resolve(contracts.StackExpectation{Language: "java", Release: "17", Tool: "ant"})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if got != "agnostic:17" {
-		t.Errorf("Resolve() = %q, want %q (should fallback to agnostic)", got, "agnostic:17")
-	}
-}
-
-// TestBuildGateImageResolver_FullPrecedenceWithFile tests all three precedence levels
-// with an actual file for the default rules.
-func TestBuildGateImageResolver_FullPrecedenceWithFile(t *testing.T) {
-	// Create temp file for default rules.
-	tmpDir := t.TempDir()
-	defaultFile := filepath.Join(tmpDir, "default.yaml")
-	writeDummyProfile(t, filepath.Join(tmpDir, "profiles", "java17.yaml"))
-	writeDummyProfile(t, filepath.Join(tmpDir, "profiles", "java11.yaml"))
-	if err := os.WriteFile(defaultFile, []byte(`
+	fullPrecedenceDir := t.TempDir()
+	fullPrecedencePath := filepath.Join(fullPrecedenceDir, "default.yaml")
+	writeDummyProfile(t, filepath.Join(fullPrecedenceDir, "profiles", "java17.yaml"))
+	writeDummyProfile(t, filepath.Join(fullPrecedenceDir, "profiles", "java11.yaml"))
+	if err := os.WriteFile(fullPrecedencePath, []byte(`
 stacks:
   - image: default:17
     lang: java
@@ -481,58 +78,225 @@ stacks:
     lang: java
     release: "11"
     profile: profiles/java11.yaml
-`), 0644); err != nil {
-		t.Fatalf("WriteFile failed: %v", err)
+`), 0o644); err != nil {
+		t.Fatalf("write full-precedence mapping file: %v", err)
 	}
-	migRules := []contracts.BuildGateImageRule{
+	migOverride := []contracts.BuildGateImageRule{
 		{Stack: contracts.StackExpectation{Language: "java", Release: "17"}, Image: "mig:17"},
 	}
 
-	t.Run("mig overrides default", func(t *testing.T) {
-		resolver, err := NewBuildGateImageResolver(defaultFile, migRules, true)
-		if err != nil {
-			t.Fatalf("NewBuildGateImageResolver failed: %v", err)
+	validFile := filepath.Join("testdata", "stacks-catalog", "valid.yaml")
+	loadValidFile := func(t *testing.T) (*BuildGateImageResolver, error) {
+		if _, err := os.Stat(validFile); os.IsNotExist(err) {
+			t.Skip("test data file not found")
 		}
+		return NewBuildGateImageResolver(validFile, nil, true)
+	}
 
-		got, err := resolver.Resolve(contracts.StackExpectation{Language: "java", Release: "17"})
-		if err != nil {
-			t.Fatalf("Resolve failed: %v", err)
-		}
-		if got != "mig:17" {
-			t.Errorf("Resolve() = %q, want %q (mig should override default)", got, "mig:17")
-		}
-	})
+	tests := []struct {
+		name      string
+		setup     func(t *testing.T) (*BuildGateImageResolver, error)
+		exp       contracts.StackExpectation
+		wantImage string
+	}{
+		// Direct rules: exact match + tool-agnostic fallbacks.
+		{"exact match maven", buildResolverFromRules(defaultRules...), contracts.StackExpectation{Language: "java", Release: "17", Tool: "maven"}, "maven:jdk17"},
+		{"exact match gradle", buildResolverFromRules(defaultRules...), contracts.StackExpectation{Language: "java", Release: "17", Tool: "gradle"}, "gradle:8.8-jdk17"},
+		{"tool-agnostic fallback unknown tool", buildResolverFromRules(defaultRules...), contracts.StackExpectation{Language: "java", Release: "17", Tool: "ant"}, "eclipse-temurin:17-jdk"},
+		{"tool-agnostic fallback no tool", buildResolverFromRules(defaultRules...), contracts.StackExpectation{Language: "java", Release: "17"}, "eclipse-temurin:17-jdk"},
+		{"different release", buildResolverFromRules(defaultRules...), contracts.StackExpectation{Language: "java", Release: "11"}, "eclipse-temurin:11-jdk"},
 
-	t.Run("default used when no overrides", func(t *testing.T) {
-		resolver, err := NewBuildGateImageResolver(defaultFile, nil, true)
-		if err != nil {
-			t.Fatalf("NewBuildGateImageResolver failed: %v", err)
-		}
+		// Precedence: mig override beats default; default used otherwise; last wins at same specificity.
+		{"mig overrides default", buildResolverFromRules(
+			contracts.BuildGateImageRule{Stack: contracts.StackExpectation{Language: "java", Release: "17"}, Image: "default:17"},
+			contracts.BuildGateImageRule{Stack: contracts.StackExpectation{Language: "java", Release: "17"}, Image: "mig:17"},
+		), contracts.StackExpectation{Language: "java", Release: "17"}, "mig:17"},
+		{"default used when no mig override", buildResolverFromRules(
+			contracts.BuildGateImageRule{Stack: contracts.StackExpectation{Language: "java", Release: "17"}, Image: "default:17"},
+		), contracts.StackExpectation{Language: "java", Release: "17"}, "default:17"},
+		{"last rule wins at same specificity", buildResolverFromRules(
+			contracts.BuildGateImageRule{Stack: contracts.StackExpectation{Language: "java", Release: "17"}, Image: "image1:17"},
+			contracts.BuildGateImageRule{Stack: contracts.StackExpectation{Language: "java", Release: "17"}, Image: "image2:17"},
+		), contracts.StackExpectation{Language: "java", Release: "17"}, "image2:17"},
 
-		got, err := resolver.Resolve(contracts.StackExpectation{Language: "java", Release: "17"})
-		if err != nil {
-			t.Fatalf("Resolve failed: %v", err)
-		}
-		if got != "default:17" {
-			t.Errorf("Resolve() = %q, want %q (should use default)", got, "default:17")
-		}
-	})
+		// Specificity: more-specific rule wins over tool-agnostic.
+		{"specificity wins over agnostic", buildResolverFromRules(
+			contracts.BuildGateImageRule{Stack: contracts.StackExpectation{Language: "java", Release: "17"}, Image: "agnostic:17"},
+			contracts.BuildGateImageRule{Stack: contracts.StackExpectation{Language: "java", Release: "17", Tool: "maven"}, Image: "maven:17"},
+		), contracts.StackExpectation{Language: "java", Release: "17", Tool: "maven"}, "maven:17"},
+		{"unknown tool falls back to agnostic", buildResolverFromRules(
+			contracts.BuildGateImageRule{Stack: contracts.StackExpectation{Language: "java", Release: "17"}, Image: "agnostic:17"},
+			contracts.BuildGateImageRule{Stack: contracts.StackExpectation{Language: "java", Release: "17", Tool: "maven"}, Image: "maven:17"},
+		), contracts.StackExpectation{Language: "java", Release: "17", Tool: "ant"}, "agnostic:17"},
 
-	t.Run("default used for non-overridden stack", func(t *testing.T) {
-		// mig only overrides java:17, not java:11.
-		resolver, err := NewBuildGateImageResolver(defaultFile, migRules, true)
-		if err != nil {
-			t.Fatalf("NewBuildGateImageResolver failed: %v", err)
-		}
+		// Env / placeholder expansion via NewBuildGateImageResolver.
+		{"expands $PLOY_CONTAINER_REGISTRY", func(t *testing.T) (*BuildGateImageResolver, error) {
+			t.Setenv("PLOY_CONTAINER_REGISTRY", "192.0.2.25:5001/ploy")
+			return NewBuildGateImageResolver("", []contracts.BuildGateImageRule{{
+				Stack: contracts.StackExpectation{Language: "java", Release: "17", Tool: "maven"},
+				Image: "$PLOY_CONTAINER_REGISTRY/maven:jdk17",
+			}}, false)
+		}, contracts.StackExpectation{Language: "java", Release: "17", Tool: "maven"}, "192.0.2.25:5001/ploy/maven:jdk17"},
+		{"expands ${stack.*} placeholders", func(*testing.T) (*BuildGateImageResolver, error) {
+			return NewBuildGateImageResolver("", []contracts.BuildGateImageRule{{
+				Stack: contracts.StackExpectation{Language: "java", Release: "17", Tool: "maven"},
+				Image: "ghcr.io/acme/mig-${stack.language}-${stack.release}-${stack.tool}:latest",
+			}}, false)
+		}, contracts.StackExpectation{Language: "java", Release: "17", Tool: "maven"}, "ghcr.io/acme/mig-java-17-maven:latest"},
 
-		got, err := resolver.Resolve(contracts.StackExpectation{Language: "java", Release: "11"})
-		if err != nil {
-			t.Fatalf("Resolve failed: %v", err)
-		}
-		if got != "default:11" {
-			t.Errorf("Resolve() = %q, want %q (should fall back to default for java:11)", got, "default:11")
-		}
-	})
+		// File loading: shipped testdata.
+		{"file java 17 maven", loadValidFile, contracts.StackExpectation{Language: "java", Release: "17", Tool: "maven"}, "maven:jdk17"},
+		{"file java 17 gradle", loadValidFile, contracts.StackExpectation{Language: "java", Release: "17", Tool: "gradle"}, "gradle:8.8-jdk17"},
+		{"file java 17 fallback", loadValidFile, contracts.StackExpectation{Language: "java", Release: "17"}, "eclipse-temurin:17-jdk"},
+		{"file java 11 maven", loadValidFile, contracts.StackExpectation{Language: "java", Release: "11", Tool: "maven"}, "maven:jdk11"},
+
+		// Release coercion (integer / whole-float / decimal-float in YAML).
+		{"file release int coerced", func(*testing.T) (*BuildGateImageResolver, error) {
+			return NewBuildGateImageResolver(releaseCoercionPath, nil, true)
+		}, contracts.StackExpectation{Language: "java", Tool: "maven", Release: "17"}, "maven:17"},
+		{"file release whole-float coerced", func(*testing.T) (*BuildGateImageResolver, error) {
+			return NewBuildGateImageResolver(releaseCoercionPath, nil, true)
+		}, contracts.StackExpectation{Language: "java", Tool: "gradle", Release: "17"}, "gradle:17"},
+		{"file release decimal preserved", func(*testing.T) (*BuildGateImageResolver, error) {
+			return NewBuildGateImageResolver(releaseCoercionPath, nil, true)
+		}, contracts.StackExpectation{Language: "python", Release: "3.11"}, "python:3.11"},
+
+		// Full precedence: file + mig overrides combined.
+		{"file+mig: mig overrides default", func(*testing.T) (*BuildGateImageResolver, error) {
+			return NewBuildGateImageResolver(fullPrecedencePath, migOverride, true)
+		}, contracts.StackExpectation{Language: "java", Release: "17"}, "mig:17"},
+		{"file+mig: default used when not overridden", func(*testing.T) (*BuildGateImageResolver, error) {
+			return NewBuildGateImageResolver(fullPrecedencePath, migOverride, true)
+		}, contracts.StackExpectation{Language: "java", Release: "11"}, "default:11"},
+		{"file: default used when no mig provided", func(*testing.T) (*BuildGateImageResolver, error) {
+			return NewBuildGateImageResolver(fullPrecedencePath, nil, true)
+		}, contracts.StackExpectation{Language: "java", Release: "17"}, "default:17"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resolver, err := tt.setup(t)
+			if err != nil {
+				t.Fatalf("setup error: %v", err)
+			}
+			got, err := resolver.Resolve(tt.exp)
+			if err != nil {
+				t.Fatalf("Resolve() error: %v", err)
+			}
+			if got != tt.wantImage {
+				t.Errorf("Resolve() = %q, want %q", got, tt.wantImage)
+			}
+		})
+	}
+}
+
+// TestBuildGateImageResolver_Errors exercises every error path: empty rules,
+// no-match expectations, missing required file, unresolved env, duplicate
+// selectors, and invalid YAML files. Each row errors either during setup
+// (wantSetupErr non-empty) or during Resolve (wantResolveErr non-empty).
+func TestBuildGateImageResolver_Errors(t *testing.T) {
+	tests := []struct {
+		name           string
+		setup          func(t *testing.T) (*BuildGateImageResolver, error)
+		exp            contracts.StackExpectation
+		wantSetupErr   string
+		wantResolveErr string
+	}{
+		{
+			name:           "no match wrong language",
+			setup:          buildResolverFromRules(contracts.BuildGateImageRule{Stack: contracts.StackExpectation{Language: "java", Release: "17"}, Image: "x:17"}),
+			exp:            contracts.StackExpectation{Language: "go", Release: "1.21"},
+			wantResolveErr: "no image rule matches stack go:1.21:",
+		},
+		{
+			name:           "no match wrong release",
+			setup:          buildResolverFromRules(contracts.BuildGateImageRule{Stack: contracts.StackExpectation{Language: "java", Release: "17"}, Image: "x:17"}),
+			exp:            contracts.StackExpectation{Language: "java", Release: "21"},
+			wantResolveErr: "no image rule matches stack java:21:",
+		},
+		{
+			name:           "empty rules",
+			setup:          buildResolverFromRules(),
+			exp:            contracts.StackExpectation{Language: "java", Release: "17"},
+			wantResolveErr: "no image mapping rules available",
+		},
+		{
+			name: "missing required file",
+			setup: func(*testing.T) (*BuildGateImageResolver, error) {
+				return NewBuildGateImageResolver("/nonexistent/path/stacks.yaml", nil, true)
+			},
+			wantSetupErr: "required but not found",
+		},
+		{
+			name: "duplicate selector within same level",
+			setup: func(*testing.T) (*BuildGateImageResolver, error) {
+				return NewBuildGateImageResolver("", []contracts.BuildGateImageRule{
+					{Stack: contracts.StackExpectation{Language: "java", Release: "17"}, Image: "image1:17"},
+					{Stack: contracts.StackExpectation{Language: "java", Release: "17"}, Image: "image2:17"},
+				}, false)
+			},
+			wantSetupErr: "duplicate selector",
+		},
+		{
+			name: "unresolved env var fails when unset",
+			setup: func(*testing.T) (*BuildGateImageResolver, error) {
+				return NewBuildGateImageResolver("", []contracts.BuildGateImageRule{{
+					Stack: contracts.StackExpectation{Language: "java", Release: "17", Tool: "maven"},
+					Image: "$PLOY_TEST_UNSET_GATE_REGISTRY/maven:jdk17",
+				}}, false)
+			},
+			wantSetupErr: "unresolved environment variables: PLOY_TEST_UNSET_GATE_REGISTRY",
+		},
+		{
+			name: "file missing language",
+			setup: func(t *testing.T) (*BuildGateImageResolver, error) {
+				path := filepath.Join("testdata", "stacks-catalog", "invalid-missing-language.yaml")
+				if _, err := os.Stat(path); os.IsNotExist(err) {
+					t.Skip("test data file not found")
+				}
+				return NewBuildGateImageResolver(path, nil, true)
+			},
+			wantSetupErr: "stacks[0].lang: required",
+		},
+		{
+			name: "file duplicate selector",
+			setup: func(t *testing.T) (*BuildGateImageResolver, error) {
+				path := filepath.Join("testdata", "stacks-catalog", "invalid-duplicate.yaml")
+				if _, err := os.Stat(path); os.IsNotExist(err) {
+					t.Skip("test data file not found")
+				}
+				return NewBuildGateImageResolver(path, nil, true)
+			},
+			wantSetupErr: "duplicate selector",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resolver, err := tt.setup(t)
+			if tt.wantSetupErr != "" {
+				requireErrContains(t, err, tt.wantSetupErr)
+				return
+			}
+			if err != nil {
+				t.Fatalf("setup error: %v", err)
+			}
+			_, err = resolver.Resolve(tt.exp)
+			requireErrContains(t, err, tt.wantResolveErr)
+		})
+	}
+}
+
+// TestBuildGateImageResolver_MissingFileOptional verifies that a missing
+// default-file path is tolerated when requireDefaultFile=false.
+func TestBuildGateImageResolver_MissingFileOptional(t *testing.T) {
+	resolver, err := NewBuildGateImageResolver("/nonexistent/path/stacks.yaml", nil, false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resolver == nil {
+		t.Fatal("resolver is nil")
+	}
 }
 
 func TestBuildGateImageResolver_DefaultCatalogAssetsAreValid(t *testing.T) {

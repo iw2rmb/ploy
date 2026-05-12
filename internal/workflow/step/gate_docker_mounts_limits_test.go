@@ -11,191 +11,140 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
-func TestDockerGateExecutor_MountsDockerSocketForUnixDockerHost(t *testing.T) {
-	t.Parallel()
-
-	executor, rt, _ := newDockerGateTestHarness(t)
-
-	socketDir := t.TempDir()
-	socketPath := filepath.Join(socketDir, "docker.sock")
-	if err := os.WriteFile(socketPath, []byte("mock socket"), 0o600); err != nil {
-		t.Fatalf("write docker socket placeholder: %v", err)
+// TestDockerGateExecutor_Mounts consolidates the mount-shape assertions for the
+// docker gate executor: each row builds a workspace, spec, and context, then
+// expects either a specific mount to be present or a specific target absent.
+func TestDockerGateExecutor_Mounts(t *testing.T) {
+	type expectMount struct {
+		source   string
+		target   string
+		readOnly bool
 	}
-
-	workspace := createMavenWorkspace(t, "17")
-	spec := &contracts.StepGateSpec{
-		Enabled: true,
-		GateProfile: &contracts.BuildGateProfileOverride{
-			Command: contracts.CommandSpec{Shell: "echo prep-gate"},
-			Env: map[string]string{
-				"DOCKER_HOST": "unix://" + socketPath,
+	tests := []struct {
+		name string
+		// build returns the workspace path, spec, ctx, expected mount (may be zero), and an
+		// optional substring whose presence in any mount target should fail the test.
+		build      func(t *testing.T) (workspace string, spec *contracts.StepGateSpec, ctx context.Context, want expectMount, absentTargetSubstr string)
+		expectMount bool
+	}{
+		{
+			name: "unix docker host mounts socket",
+			build: func(t *testing.T) (string, *contracts.StepGateSpec, context.Context, expectMount, string) {
+				socketDir := t.TempDir()
+				socketPath := filepath.Join(socketDir, "docker.sock")
+				if err := os.WriteFile(socketPath, []byte("mock socket"), 0o600); err != nil {
+					t.Fatalf("write docker socket placeholder: %v", err)
+				}
+				spec := &contracts.StepGateSpec{
+					Enabled: true,
+					GateProfile: &contracts.BuildGateProfileOverride{
+						Command: contracts.CommandSpec{Shell: "echo prep-gate"},
+						Env:     map[string]string{"DOCKER_HOST": "unix://" + socketPath},
+					},
+				}
+				return createMavenWorkspace(t, "17"), spec, context.Background(),
+					expectMount{source: socketPath, target: socketPath, readOnly: false}, ""
 			},
+			expectMount: true,
+		},
+		{
+			name: "tcp docker host omits socket",
+			build: func(t *testing.T) (string, *contracts.StepGateSpec, context.Context, expectMount, string) {
+				spec := &contracts.StepGateSpec{
+					Enabled: true,
+					GateProfile: &contracts.BuildGateProfileOverride{
+						Command: contracts.CommandSpec{Shell: "echo prep-gate"},
+						Env:     map[string]string{"DOCKER_HOST": "tcp://prep-dind:2375"},
+					},
+				}
+				return createMavenWorkspace(t, "17"), spec, context.Background(),
+					expectMount{}, "docker.sock"
+			},
+		},
+		{
+			name: "out dir mounted writable",
+			build: func(t *testing.T) (string, *contracts.StepGateSpec, context.Context, expectMount, string) {
+				workspace := createMavenWorkspace(t, "17")
+				return workspace, &contracts.StepGateSpec{Enabled: true}, context.Background(),
+					expectMount{source: filepath.Join(workspace, BuildGateWorkspaceOutDir), target: BuildGateContainerOutDir}, ""
+			},
+			expectMount: true,
+		},
+		{
+			name: "in dir mounted when present",
+			build: func(t *testing.T) (string, *contracts.StepGateSpec, context.Context, expectMount, string) {
+				workspace := createMavenWorkspace(t, "17")
+				inDir := filepath.Join(workspace, BuildGateWorkspaceInDir)
+				if err := os.MkdirAll(inDir, 0o755); err != nil {
+					t.Fatalf("MkdirAll(%q): %v", inDir, err)
+				}
+				return workspace, &contracts.StepGateSpec{Enabled: true}, context.Background(),
+					expectMount{source: inDir, target: BuildGateContainerInDir}, ""
+			},
+			expectMount: true,
+		},
+		{
+			name: "share dir mounted when provided via context",
+			build: func(t *testing.T) (string, *contracts.StepGateSpec, context.Context, expectMount, string) {
+				shareDir := t.TempDir()
+				return createMavenWorkspace(t, "17"), &contracts.StepGateSpec{Enabled: true},
+					WithGateShareDir(context.Background(), shareDir),
+					expectMount{source: shareDir, target: containerShareDir}, ""
+			},
+			expectMount: true,
+		},
+		{
+			name: "gradle workspace mounts native cache",
+			build: func(t *testing.T) (string, *contracts.StepGateSpec, context.Context, expectMount, string) {
+				cacheRoot, err := resolveBuildGateCacheRoot()
+				if err != nil {
+					t.Fatalf("resolveBuildGateCacheRoot() error: %v", err)
+				}
+				return createGradleWorkspace(t, "17"), &contracts.StepGateSpec{Enabled: true}, context.Background(),
+					expectMount{source: filepath.Join(cacheRoot, "java", "gradle", "17"), target: BuildGateGradleUserHomeDir}, ""
+			},
+			expectMount: true,
+		},
+		{
+			name: "maven workspace mounts native cache",
+			build: func(t *testing.T) (string, *contracts.StepGateSpec, context.Context, expectMount, string) {
+				cacheRoot, err := resolveBuildGateCacheRoot()
+				if err != nil {
+					t.Fatalf("resolveBuildGateCacheRoot() error: %v", err)
+				}
+				return createMavenWorkspace(t, "17"), &contracts.StepGateSpec{Enabled: true}, context.Background(),
+					expectMount{source: filepath.Join(cacheRoot, "java", "maven", "17"), target: BuildGateMavenUserHomeDir}, ""
+			},
+			expectMount: true,
 		},
 	}
 
-	_, err := executor.Execute(context.Background(), spec, workspace)
-	if err != nil {
-		t.Fatalf("Execute() unexpected error: %v", err)
-	}
-	if !rt.createCalled {
-		t.Fatal("expected Create to be called")
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	found := false
-	for _, mount := range rt.captured.Mounts {
-		if mount.Source == socketPath && mount.Target == socketPath {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Fatalf("expected docker socket mount for %q, got mounts=%+v", socketPath, rt.captured.Mounts)
-	}
-}
+			rt := &testContainerRuntime{}
+			executor := NewDockerGateExecutor(rt)
+			workspace, spec, ctx, want, absent := tt.build(t)
 
-func TestDockerGateExecutor_DoesNotMountDockerSocketForTCPDockerHost(t *testing.T) {
-	t.Parallel()
+			if _, err := executor.Execute(ctx, spec, workspace); err != nil {
+				t.Fatalf("Execute() unexpected error: %v", err)
+			}
+			if !rt.createCalled {
+				t.Fatal("expected Create to be called")
+			}
 
-	executor, rt, workspace := newDockerGateTestHarness(t)
-	spec := &contracts.StepGateSpec{
-		Enabled: true,
-		GateProfile: &contracts.BuildGateProfileOverride{
-			Command: contracts.CommandSpec{Shell: "echo prep-gate"},
-			Env: map[string]string{
-				"DOCKER_HOST": "tcp://prep-dind:2375",
-			},
-		},
-	}
-
-	_, err := executor.Execute(context.Background(), spec, workspace)
-	if err != nil {
-		t.Fatalf("Execute() unexpected error: %v", err)
-	}
-	if !rt.createCalled {
-		t.Fatal("expected Create to be called")
-	}
-	for _, mount := range rt.captured.Mounts {
-		if strings.Contains(mount.Target, "docker.sock") {
-			t.Fatalf("expected no docker socket mounts for tcp docker host, got mounts=%+v", rt.captured.Mounts)
-		}
-	}
-}
-
-func TestDockerGateExecutor_MountsOutDir(t *testing.T) {
-	t.Parallel()
-
-	executor, rt, workspace := newDockerGateTestHarness(t)
-	spec := &contracts.StepGateSpec{Enabled: true}
-
-	_, err := executor.Execute(context.Background(), spec, workspace)
-	if err != nil {
-		t.Fatalf("Execute() unexpected error: %v", err)
-	}
-	if !rt.createCalled {
-		t.Fatal("expected Create to be called")
-	}
-
-	wantSource := filepath.Join(workspace, BuildGateWorkspaceOutDir)
-	found := false
-	for _, mount := range rt.captured.Mounts {
-		if mount.Source == wantSource && mount.Target == BuildGateContainerOutDir && !mount.ReadOnly {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Fatalf("expected /out mount %q -> %q in mounts=%+v", wantSource, BuildGateContainerOutDir, rt.captured.Mounts)
-	}
-}
-
-func TestDockerGateExecutor_MountsInDirWhenPresent(t *testing.T) {
-	t.Parallel()
-
-	executor, rt, workspace := newDockerGateTestHarness(t)
-	spec := &contracts.StepGateSpec{Enabled: true}
-
-	inDir := filepath.Join(workspace, BuildGateWorkspaceInDir)
-	if err := os.MkdirAll(inDir, 0o755); err != nil {
-		t.Fatalf("MkdirAll(%q): %v", inDir, err)
-	}
-
-	_, err := executor.Execute(context.Background(), spec, workspace)
-	if err != nil {
-		t.Fatalf("Execute() unexpected error: %v", err)
-	}
-	if !rt.createCalled {
-		t.Fatal("expected Create to be called")
-	}
-
-	found := false
-	for _, mount := range rt.captured.Mounts {
-		if mount.Source == inDir && mount.Target == BuildGateContainerInDir && !mount.ReadOnly {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Fatalf("expected /in mount %q -> %q in mounts=%+v", inDir, BuildGateContainerInDir, rt.captured.Mounts)
-	}
-}
-
-func TestDockerGateExecutor_MountsShareDirWhenProvided(t *testing.T) {
-	t.Parallel()
-
-	executor, rt, workspace := newDockerGateTestHarness(t)
-	spec := &contracts.StepGateSpec{Enabled: true}
-	shareDir := t.TempDir()
-
-	_, err := executor.Execute(WithGateShareDir(context.Background(), shareDir), spec, workspace)
-	if err != nil {
-		t.Fatalf("Execute() unexpected error: %v", err)
-	}
-	if !rt.createCalled {
-		t.Fatal("expected Create to be called")
-	}
-
-	found := false
-	for _, mount := range rt.captured.Mounts {
-		if mount.Source == shareDir && mount.Target == containerShareDir && !mount.ReadOnly {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Fatalf("expected /share mount %q -> %q in mounts=%+v", shareDir, containerShareDir, rt.captured.Mounts)
-	}
-}
-
-func TestDockerGateExecutor_MountsGradleNativeCacheDir(t *testing.T) {
-	t.Parallel()
-
-	rt := &testContainerRuntime{}
-	executor := NewDockerGateExecutor(rt)
-	workspace := createGradleWorkspace(t, "17")
-	spec := &contracts.StepGateSpec{Enabled: true}
-
-	_, err := executor.Execute(context.Background(), spec, workspace)
-	if err != nil {
-		t.Fatalf("Execute() unexpected error: %v", err)
-	}
-	if !rt.createCalled {
-		t.Fatal("expected Create to be called")
-	}
-
-	cacheRoot, err := resolveBuildGateCacheRoot()
-	if err != nil {
-		t.Fatalf("resolveBuildGateCacheRoot() error: %v", err)
-	}
-	wantSource := filepath.Join(cacheRoot, "java", "gradle", "17")
-	found := false
-	for _, mount := range rt.captured.Mounts {
-		if mount.Source == wantSource && mount.Target == BuildGateGradleUserHomeDir && !mount.ReadOnly {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Fatalf("expected gradle cache mount %q -> %q in mounts=%+v", wantSource, BuildGateGradleUserHomeDir, rt.captured.Mounts)
+			if tt.expectMount {
+				requireMount(t, rt.captured.Mounts, want.target, want.source, want.readOnly)
+			}
+			if absent != "" {
+				for _, m := range rt.captured.Mounts {
+					if strings.Contains(m.Target, absent) {
+						t.Fatalf("unexpected mount target containing %q: %+v", absent, rt.captured.Mounts)
+					}
+				}
+			}
+		})
 	}
 }
 
@@ -215,39 +164,6 @@ func TestResolveBuildGateCacheRoot_UsesOverrideEnv(t *testing.T) {
 	}
 	if !info.IsDir() {
 		t.Fatalf("expected override path to be a directory: %q", override)
-	}
-}
-
-func TestDockerGateExecutor_MountsMavenNativeCacheDir(t *testing.T) {
-	t.Parallel()
-
-	rt := &testContainerRuntime{}
-	executor := NewDockerGateExecutor(rt)
-	workspace := createMavenWorkspace(t, "17")
-	spec := &contracts.StepGateSpec{Enabled: true}
-
-	_, err := executor.Execute(context.Background(), spec, workspace)
-	if err != nil {
-		t.Fatalf("Execute() unexpected error: %v", err)
-	}
-	if !rt.createCalled {
-		t.Fatal("expected Create to be called")
-	}
-
-	cacheRoot, err := resolveBuildGateCacheRoot()
-	if err != nil {
-		t.Fatalf("resolveBuildGateCacheRoot() error: %v", err)
-	}
-	wantSource := filepath.Join(cacheRoot, "java", "maven", "17")
-	found := false
-	for _, mount := range rt.captured.Mounts {
-		if mount.Source == wantSource && mount.Target == BuildGateMavenUserHomeDir && !mount.ReadOnly {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Fatalf("expected maven cache mount %q -> %q in mounts=%+v", wantSource, BuildGateMavenUserHomeDir, rt.captured.Mounts)
 	}
 }
 
@@ -314,7 +230,6 @@ func TestDockerGateExecutor_LimitEnvParsing(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Setenv(buildGateLimitMemoryEnv, tc.memEnv)
 			t.Setenv(buildGateLimitCPUEnv, tc.cpuEnv)
@@ -348,68 +263,48 @@ func TestDockerGateExecutor_LimitEnvParsing(t *testing.T) {
 	}
 }
 
-func TestDockerGateExecutor_GradleCommandOmitsFailFast(t *testing.T) {
-	rt := &testContainerRuntime{}
-	executor := NewDockerGateExecutor(rt)
-
-	tmpDir := createGradleWorkspace(t, "17")
-
-	spec := &contracts.StepGateSpec{
-		Enabled: true,
+// TestDockerGateExecutor_GradleCommand verifies the gradle command flags emitted
+// for both the fallback (system gradle) and wrapper (./gradlew) workspaces.
+func TestDockerGateExecutor_GradleCommand(t *testing.T) {
+	tests := []struct {
+		name      string
+		workspace func(t *testing.T) string
+		wantBin   string
+	}{
+		{
+			name:      "fallback gradle binary",
+			workspace: func(t *testing.T) string { return createGradleWorkspace(t, "17") },
+			wantBin:   "gradle -q --stacktrace --build-cache",
+		},
+		{
+			name:      "wrapper preferred when present",
+			workspace: func(t *testing.T) string { return createGradleWorkspaceWithWrapper(t, "17") },
+			wantBin:   "./gradlew -q --stacktrace --build-cache",
+		},
 	}
-
-	if _, err := executor.Execute(context.Background(), spec, tmpDir); err != nil {
-		t.Fatalf("Execute() unexpected error: %v", err)
-	}
-
-	if !rt.createCalled {
-		t.Fatal("expected Create to be called")
-	}
-	if len(rt.captured.Command) != 3 {
-		t.Fatalf("expected 3-element command, got %v", rt.captured.Command)
-	}
-
-	cmd := rt.captured.Command[2]
-	if !strings.Contains(cmd, "gradle -q --stacktrace --build-cache") {
-		t.Fatalf("expected gradle command with -q --stacktrace --build-cache, got %q", cmd)
-	}
-	if strings.Contains(cmd, "--fail-fast") {
-		t.Fatalf("expected gradle command not to contain --fail-fast, got %q", cmd)
-	}
-	if !strings.Contains(cmd, "test -p /workspace") {
-		t.Fatalf("expected gradle command to run tests in /workspace, got %q", cmd)
-	}
-}
-
-func TestDockerGateExecutor_GradleCommandUsesWrapperWhenSpecified(t *testing.T) {
-	rt := &testContainerRuntime{}
-	executor := NewDockerGateExecutor(rt)
-
-	tmpDir := createGradleWorkspaceWithWrapper(t, "17")
-
-	spec := &contracts.StepGateSpec{
-		Enabled: true,
-	}
-
-	if _, err := executor.Execute(context.Background(), spec, tmpDir); err != nil {
-		t.Fatalf("Execute() unexpected error: %v", err)
-	}
-
-	if !rt.createCalled {
-		t.Fatal("expected Create to be called")
-	}
-	if len(rt.captured.Command) != 3 {
-		t.Fatalf("expected 3-element command, got %v", rt.captured.Command)
-	}
-
-	cmd := rt.captured.Command[2]
-	if !strings.Contains(cmd, "./gradlew -q --stacktrace --build-cache") {
-		t.Fatalf("expected gradle wrapper command with -q --stacktrace --build-cache, got %q", cmd)
-	}
-	if strings.Contains(cmd, "--fail-fast") {
-		t.Fatalf("expected gradle command not to contain --fail-fast, got %q", cmd)
-	}
-	if !strings.Contains(cmd, "test -p /workspace") {
-		t.Fatalf("expected gradle command to run tests in /workspace, got %q", cmd)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rt := &testContainerRuntime{}
+			executor := NewDockerGateExecutor(rt)
+			if _, err := executor.Execute(context.Background(), &contracts.StepGateSpec{Enabled: true}, tt.workspace(t)); err != nil {
+				t.Fatalf("Execute() unexpected error: %v", err)
+			}
+			if !rt.createCalled {
+				t.Fatal("expected Create to be called")
+			}
+			if len(rt.captured.Command) != 3 {
+				t.Fatalf("expected 3-element command, got %v", rt.captured.Command)
+			}
+			cmd := rt.captured.Command[2]
+			if !strings.Contains(cmd, tt.wantBin) {
+				t.Fatalf("expected gradle command containing %q, got %q", tt.wantBin, cmd)
+			}
+			if strings.Contains(cmd, "--fail-fast") {
+				t.Fatalf("expected gradle command not to contain --fail-fast, got %q", cmd)
+			}
+			if !strings.Contains(cmd, "test -p /workspace") {
+				t.Fatalf("expected gradle command to run tests in /workspace, got %q", cmd)
+			}
+		})
 	}
 }

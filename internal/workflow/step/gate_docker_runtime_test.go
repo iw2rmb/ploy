@@ -112,34 +112,14 @@ func TestDockerGateExecutor_EnvPassthrough(t *testing.T) {
 		t.Fatal("expected Create to be called")
 	}
 
-	// Verify all env vars from spec.Env are passed to the container spec.
-	if rt.captured.Env == nil {
-		t.Fatal("expected ContainerSpec.Env to be set, got nil")
+	// Verify all env vars from spec.Env are passed verbatim to the container spec.
+	if len(rt.captured.Env) != len(spec.Env) {
+		t.Fatalf("env count = %d, want %d: %v", len(rt.captured.Env), len(spec.Env), rt.captured.Env)
 	}
-	if len(rt.captured.Env) != 3 {
-		t.Fatalf("expected 3 env vars, got %d: %v", len(rt.captured.Env), rt.captured.Env)
-	}
-
-	// Check each expected key.
-	expectedKeys := []string{"APP_TLS_CERT", "APP_AUTH_JSON", "CUSTOM_VAR"}
-	for _, key := range expectedKeys {
-		if _, ok := rt.captured.Env[key]; !ok {
-			t.Errorf("expected env var %q to be present, but it's missing", key)
+	for key, want := range spec.Env {
+		if got := rt.captured.Env[key]; got != want {
+			t.Errorf("env[%s] = %q, want %q", key, got, want)
 		}
-	}
-
-	// Verify values are correct.
-	if rt.captured.Env["APP_TLS_CERT"] != spec.Env["APP_TLS_CERT"] {
-		t.Errorf("APP_TLS_CERT mismatch: got %q, want %q",
-			rt.captured.Env["APP_TLS_CERT"], spec.Env["APP_TLS_CERT"])
-	}
-	if rt.captured.Env["APP_AUTH_JSON"] != spec.Env["APP_AUTH_JSON"] {
-		t.Errorf("APP_AUTH_JSON mismatch: got %q, want %q",
-			rt.captured.Env["APP_AUTH_JSON"], spec.Env["APP_AUTH_JSON"])
-	}
-	if rt.captured.Env["CUSTOM_VAR"] != spec.Env["CUSTOM_VAR"] {
-		t.Errorf("CUSTOM_VAR mismatch: got %q, want %q",
-			rt.captured.Env["CUSTOM_VAR"], spec.Env["CUSTOM_VAR"])
 	}
 }
 

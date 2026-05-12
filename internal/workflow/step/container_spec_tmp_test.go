@@ -114,28 +114,21 @@ func TestBuildContainerSpec_HydraSingleMount(t *testing.T) {
 				t.Fatalf("buildContainerSpec error: %v", err)
 			}
 
-			var found bool
-			for _, m := range spec.Mounts {
-				if m.Target == tt.wantTarget {
-					found = true
-					if tt.wantSrcSfx != "" && !strings.HasSuffix(m.Source, tt.wantSrcSfx) {
-						t.Errorf("mount %s: source = %q, want suffix %q", tt.wantTarget, m.Source, tt.wantSrcSfx)
-					}
-					if tt.wantSrcSfx != "" && m.ReadOnly != tt.wantRO {
-						t.Errorf("mount %s: readOnly = %v, want %v", tt.wantTarget, m.ReadOnly, tt.wantRO)
-					}
-				}
-			}
-			if !found {
+			m, ok := findMount(spec.Mounts, tt.wantTarget)
+			if !ok {
 				t.Fatalf("mount %s not found in %+v", tt.wantTarget, spec.Mounts)
+			}
+			if tt.wantSrcSfx != "" {
+				if !strings.HasSuffix(m.Source, tt.wantSrcSfx) {
+					t.Errorf("mount %s: source = %q, want suffix %q", tt.wantTarget, m.Source, tt.wantSrcSfx)
+				}
+				if m.ReadOnly != tt.wantRO {
+					t.Errorf("mount %s: readOnly = %v, want %v", tt.wantTarget, m.ReadOnly, tt.wantRO)
+				}
 			}
 
 			if tt.negTarget != "" {
-				for _, m := range spec.Mounts {
-					if m.Target == tt.negTarget {
-						t.Fatalf("unexpected separate mount for %s", tt.negTarget)
-					}
-				}
+				requireNoMount(t, spec.Mounts, tt.negTarget)
 			}
 		})
 	}
@@ -147,10 +140,11 @@ func TestBuildContainerSpec_HydraSingleMount(t *testing.T) {
 
 func TestBuildContainerSpec_HydraEdgeCases(t *testing.T) {
 	tests := []struct {
-		name       string
-		setup      func(m *contracts.StepManifest) (outDir, stagingDir string)
-		wantErr    string
-		wantMounts int // expected mount count when no error
+		name            string
+		setup           func(m *contracts.StepManifest) (outDir, stagingDir string)
+		wantErr         bool
+		wantErrContains string // substring; empty means "any error" when wantErr is true
+		wantMounts      int    // expected mount count when no error
 	}{
 		{
 			name: "skipped without staging dir",
@@ -174,7 +168,8 @@ func TestBuildContainerSpec_HydraEdgeCases(t *testing.T) {
 				m.Out = []string{"fff0000:/out/results"}
 				return "", t.TempDir()
 			},
-			wantErr: "outDir required",
+			wantErr:         true,
+			wantErrContains: "outDir required",
 		},
 		{
 			name: "out invalid entry rejected",
@@ -182,7 +177,7 @@ func TestBuildContainerSpec_HydraEdgeCases(t *testing.T) {
 				m.Out = []string{"not-a-valid-entry"}
 				return t.TempDir(), t.TempDir()
 			},
-			wantErr: "", // any non-nil error
+			wantErr: true,
 		},
 	}
 
@@ -196,19 +191,8 @@ func TestBuildContainerSpec_HydraEdgeCases(t *testing.T) {
 				manifest, "/ws", outDir, "", "", stagingDir,
 			)
 
-			if tt.wantErr != "" {
-				if err == nil {
-					t.Fatal("expected error, got nil")
-				}
-				if !strings.Contains(err.Error(), tt.wantErr) {
-					t.Errorf("error = %q, want containing %q", err, tt.wantErr)
-				}
-				return
-			}
-			if tt.name == "out invalid entry rejected" {
-				if err == nil {
-					t.Fatal("expected error for invalid out entry, got nil")
-				}
+			if tt.wantErr {
+				requireErrContains(t, err, tt.wantErrContains)
 				return
 			}
 			if err != nil {
@@ -243,42 +227,12 @@ func TestBuildContainerSpec_HydraMixedMountPlan(t *testing.T) {
 		t.Fatalf("buildContainerSpec error: %v", err)
 	}
 
-	type wantMount struct {
-		target   string
-		readOnly bool
-		source   string
-	}
-	wants := []wantMount{
-		{target: "/workspace", readOnly: false, source: "/ws"},
-		{target: "/out", readOnly: false, source: outDir},
-		{target: "/etc/ploy/ca/aaa0000", readOnly: true, source: filepath.Join(stagingDir, "aaa0000", "content")},
-		{target: "/in/data.json", readOnly: true, source: filepath.Join(stagingDir, "bbb1111", "content")},
-		{target: "/root/.config/app.toml", readOnly: true, source: filepath.Join(stagingDir, "ddd3333", "content")},
-	}
-
-	for _, w := range wants {
-		var found bool
-		for _, m := range spec.Mounts {
-			if m.Target == w.target {
-				found = true
-				if m.Source != w.source {
-					t.Errorf("mount %s: source = %q, want %q", w.target, m.Source, w.source)
-				}
-				if m.ReadOnly != w.readOnly {
-					t.Errorf("mount %s: readOnly = %v, want %v", w.target, m.ReadOnly, w.readOnly)
-				}
-			}
-		}
-		if !found {
-			t.Errorf("mount %s not found in spec mounts", w.target)
-		}
-	}
-
-	for _, m := range spec.Mounts {
-		if m.Target == "/out/results" {
-			t.Errorf("unexpected separate mount for /out/results; should be covered by /out")
-		}
-	}
+	requireMount(t, spec.Mounts, "/workspace", "/ws", false)
+	requireMount(t, spec.Mounts, "/out", outDir, false)
+	requireMount(t, spec.Mounts, "/etc/ploy/ca/aaa0000", filepath.Join(stagingDir, "aaa0000", "content"), true)
+	requireMount(t, spec.Mounts, "/in/data.json", filepath.Join(stagingDir, "bbb1111", "content"), true)
+	requireMount(t, spec.Mounts, "/root/.config/app.toml", filepath.Join(stagingDir, "ddd3333", "content"), true)
+	requireNoMount(t, spec.Mounts, "/out/results")
 
 	if len(spec.Mounts) != 5 {
 		t.Errorf("got %d mounts, want 5: %+v", len(spec.Mounts), spec.Mounts)
@@ -289,63 +243,59 @@ func TestBuildContainerSpec_HydraMixedMountPlan(t *testing.T) {
 // SeedOutDirFromStaging
 // ---------------------------------------------------------------------------
 
-func TestSeedOutDirFromStaging_ContainmentCheck(t *testing.T) {
-	stagingDir := t.TempDir()
-	outDir := t.TempDir()
-
-	hash := "abc0000"
-	contentDir := filepath.Join(stagingDir, hash, "content")
-	if err := os.MkdirAll(contentDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(contentDir, "ok.txt"), []byte("data"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	manifest := contracts.StepManifest{
-		Out: []string{hash + ":/out/results"},
-	}
-
-	if err := SeedOutDirFromStaging(manifest, stagingDir, outDir); err != nil {
-		t.Fatalf("SeedOutDirFromStaging error: %v", err)
-	}
-
-	got, err := os.ReadFile(filepath.Join(outDir, "results", "ok.txt"))
-	if err != nil {
-		t.Fatalf("seeded content missing: %v", err)
-	}
-	if string(got) != "data" {
-		t.Errorf("content = %q, want %q", got, "data")
-	}
-}
-
 func TestSeedOutDirFromStaging(t *testing.T) {
-	stagingDir := t.TempDir()
-	outDir := t.TempDir()
+	tests := []struct {
+		name     string
+		hash     string
+		fileName string
+		body     string
+		outEntry string // value placed into manifest.Out (without hash prefix)
+		wantRel  string // path under outDir where content should appear
+	}{
+		{
+			name:     "nested target path",
+			hash:     "abc0000",
+			fileName: "ok.txt",
+			body:     "data",
+			outEntry: "/out/results",
+			wantRel:  filepath.Join("results", "ok.txt"),
+		},
+		{
+			name:     "flat target path",
+			hash:     "abc0000",
+			fileName: "result.txt",
+			body:     "output",
+			outEntry: "/out/data",
+			wantRel:  filepath.Join("data", "result.txt"),
+		},
+	}
 
-	hash := "abc0000"
-	contentDir := filepath.Join(stagingDir, hash, "content")
-	if err := os.MkdirAll(contentDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(contentDir, "result.txt"), []byte("output"), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			stagingDir := t.TempDir()
+			outDir := t.TempDir()
 
-	manifest := contracts.StepManifest{
-		Out: []string{hash + ":/out/data"},
-	}
+			contentDir := filepath.Join(stagingDir, tt.hash, "content")
+			if err := os.MkdirAll(contentDir, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(contentDir, tt.fileName), []byte(tt.body), 0o644); err != nil {
+				t.Fatal(err)
+			}
 
-	if err := SeedOutDirFromStaging(manifest, stagingDir, outDir); err != nil {
-		t.Fatalf("SeedOutDirFromStaging error: %v", err)
-	}
+			manifest := contracts.StepManifest{Out: []string{tt.hash + ":" + tt.outEntry}}
+			if err := SeedOutDirFromStaging(manifest, stagingDir, outDir); err != nil {
+				t.Fatalf("SeedOutDirFromStaging error: %v", err)
+			}
 
-	got, err := os.ReadFile(filepath.Join(outDir, "data", "result.txt"))
-	if err != nil {
-		t.Fatalf("seeded content missing: %v", err)
-	}
-	if string(got) != "output" {
-		t.Errorf("seeded content = %q, want %q", got, "output")
+			got, err := os.ReadFile(filepath.Join(outDir, tt.wantRel))
+			if err != nil {
+				t.Fatalf("seeded content missing: %v", err)
+			}
+			if string(got) != tt.body {
+				t.Errorf("content = %q, want %q", got, tt.body)
+			}
+		})
 	}
 }
 
