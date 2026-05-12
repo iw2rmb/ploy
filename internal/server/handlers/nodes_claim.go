@@ -47,10 +47,7 @@ func claimJobHandlerWithEvents(st store.Store, bs blobstore.Store, eventsService
 			}
 		}
 
-		if err := writeClaimResponse(w, result.Payload); err != nil {
-			writeHTTPError(w, http.StatusInternalServerError, "failed to encode claim response: %v", err)
-			return
-		}
+		writeJSON(w, http.StatusOK, result.Payload)
 	}
 }
 

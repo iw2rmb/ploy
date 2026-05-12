@@ -23,7 +23,7 @@ import (
 // TestUploadSpecBundleHandler covers the POST /v1/spec-bundles endpoint.
 func TestUploadSpecBundleHandler(t *testing.T) {
 	bundleData := []byte("fake gzip bundle content for testing")
-	cid, digest := computeSpecBundleCIDAndDigest(bundleData)
+	cid, digest := computeCIDAndDigest(bundleData)
 
 	t.Run("UploadSuccess", func(t *testing.T) {
 		bundleID := domaintypes.NewSpecBundleID()

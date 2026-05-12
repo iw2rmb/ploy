@@ -452,7 +452,7 @@ func ExecuteMigration(
 
 		hash := archiveShortHash(archiveBytes)
 
-		cid, digest := computeSpecBundleCIDAndDigest(archiveBytes)
+		cid, digest := computeCIDAndDigest(archiveBytes)
 		bundleID := domaintypes.NewSpecBundleID()
 		createdBy := "env-migration"
 		if _, uploadErr := bp.CreateSpecBundle(ctx, store.CreateSpecBundleParams{

@@ -1,9 +1,9 @@
 package handlers
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
 
@@ -121,9 +121,7 @@ func getMigLatestSpecHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", "spec-"+spec.ID.String()+".json"))
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write(spec.Spec)
+		streamBlob(w, bytes.NewReader(spec.Spec), int64(len(spec.Spec)),
+			"spec-"+spec.ID.String()+".json", "application/json")
 	}
 }

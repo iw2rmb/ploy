@@ -12,7 +12,7 @@ func FuzzComputeArtifactCIDAndDigest(f *testing.F) {
 	f.Add([]byte("a"))
 	f.Add([]byte("some test bytes"))
 	f.Fuzz(func(t *testing.T, b []byte) {
-		cid, digest := computeArtifactCIDAndDigest(b)
+		cid, digest := computeCIDAndDigest(b)
 		// digest must match sha256: + 64 hex
 		sum := sha256.Sum256(b)
 		hexSum := hex.EncodeToString(sum[:])

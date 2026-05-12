@@ -209,11 +209,6 @@ func buildActionClaimResponsePayload(
 	}
 }
 
-func writeClaimResponse(w http.ResponseWriter, payload claimResponsePayload) error {
-	writeJSON(w, http.StatusOK, payload)
-	return nil
-}
-
 // buildAndSendJobClaimResponse constructs and sends the claim response for a job.
 // Kept as a test helper wrapper around the response builder.
 func buildAndSendJobClaimResponse(
@@ -233,5 +228,6 @@ func buildAndSendJobClaimResponse(
 	if err != nil {
 		return err
 	}
-	return writeClaimResponse(w, payload)
+	writeJSON(w, http.StatusOK, payload)
+	return nil
 }

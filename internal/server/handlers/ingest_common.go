@@ -1,7 +1,9 @@
 package handlers
 
 import (
+	"crypto/sha256"
 	"encoding"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -20,6 +22,17 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/workflow/lifecycle"
 )
+
+// computeCIDAndDigest computes a content identifier and SHA256 digest for a byte payload.
+// CID uses a "bafy" prefix with the first 32 chars of the hex-encoded SHA256.
+// Digest is the full SHA256 hex string with "sha256:" prefix.
+func computeCIDAndDigest(data []byte) (cid, digest string) {
+	hash := sha256.Sum256(data)
+	hexHash := hex.EncodeToString(hash[:])
+	cid = "bafy" + hexHash[:32]
+	digest = "sha256:" + hexHash
+	return cid, digest
+}
 
 // requiredPathParam extracts and validates a required path parameter from the request.
 // Returns the trimmed value or an error if the parameter is missing or empty.
@@ -391,6 +404,38 @@ func getJobInRunOrFail(w http.ResponseWriter, r *http.Request, st store.Store, r
 		return store.Job{}, false
 	}
 	return job, true
+}
+
+// getRunRepoOrFail fetches a run_repo by (run_id, repo_id). On error it writes the
+// HTTP response (404 for not found, 500 for other errors) and returns ok=false.
+func getRunRepoOrFail(w http.ResponseWriter, r *http.Request, st store.Store, runID domaintypes.RunID, repoID domaintypes.RepoID, logPrefix string) (store.RunRepo, bool) {
+	rr, err := st.GetRunRepo(r.Context(), store.GetRunRepoParams{RunID: runID, RepoID: repoID})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			writeHTTPError(w, http.StatusNotFound, "repo not found")
+			return store.RunRepo{}, false
+		}
+		slog.Error(logPrefix+": get run repo failed", "run_id", runID.String(), "repo_id", repoID.String(), "err", err)
+		writeHTTPError(w, http.StatusInternalServerError, "failed to get repo: %v", err)
+		return store.RunRepo{}, false
+	}
+	return rr, true
+}
+
+// listJobsForRunRepoOrFail lists jobs for a given (run_id, repo_id, attempt). On
+// error it writes a 500 response and returns ok=false.
+func listJobsForRunRepoOrFail(w http.ResponseWriter, r *http.Request, st store.Store, runID domaintypes.RunID, repoID domaintypes.RepoID, attempt int32, logPrefix string) ([]store.Job, bool) {
+	jobs, err := st.ListJobsByRunRepoAttempt(r.Context(), store.ListJobsByRunRepoAttemptParams{
+		RunID:   runID,
+		RepoID:  repoID,
+		Attempt: attempt,
+	})
+	if err != nil {
+		slog.Error(logPrefix+": list jobs failed", "run_id", runID.String(), "repo_id", repoID.String(), "attempt", attempt, "err", err)
+		writeHTTPError(w, http.StatusInternalServerError, "failed to list jobs: %v", err)
+		return nil, false
+	}
+	return jobs, true
 }
 
 // streamBlob writes standard download headers and streams content from r to w.

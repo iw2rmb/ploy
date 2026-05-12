@@ -65,60 +65,46 @@ func nodeToResponse(node store.Node) nodeResponse {
 }
 
 // drainNodeHandler marks a node as drained.
-func drainNodeHandler(st store.Store) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		nodeID, ok := parseRequiredPathIDOrWriteError[domaintypes.NodeID](w, r, "id")
-		if !ok {
-			return
-		}
-
-		node, ok := getNodeOrFail(w, r, st, nodeID, "drain node")
-		if !ok {
-			return
-		}
-
-		if node.Drained {
-			writeHTTPError(w, http.StatusConflict, "node is already drained")
-			return
-		}
-
-		if err := st.UpdateNodeDrained(r.Context(), store.UpdateNodeDrainedParams{ID: nodeID, Drained: true}); err != nil {
-			writeHTTPError(w, http.StatusInternalServerError, "failed to drain node: %v", err)
-			slog.Error("drain node: update failed", "node_id", nodeID, "err", err)
-			return
-		}
-
-		w.WriteHeader(http.StatusNoContent)
-		slog.Info("node drained", "node_id", nodeID, "name", node.Name)
-	}
-}
+func drainNodeHandler(st store.Store) http.HandlerFunc { return setNodeDrainHandler(st, true) }
 
 // undrainNodeHandler marks a node as undrained (active).
-func undrainNodeHandler(st store.Store) http.HandlerFunc {
+func undrainNodeHandler(st store.Store) http.HandlerFunc { return setNodeDrainHandler(st, false) }
+
+// setNodeDrainHandler returns a handler that toggles a node's drained flag.
+// When drain=true it sets drained=true (409 if already drained); when false it clears it.
+func setNodeDrainHandler(st store.Store, drain bool) http.HandlerFunc {
+	action := "drain"
+	conflictMsg := "node is already drained"
+	logDone := "node drained"
+	if !drain {
+		action = "undrain"
+		conflictMsg = "node is not drained"
+		logDone = "node undrained"
+	}
 	return func(w http.ResponseWriter, r *http.Request) {
 		nodeID, ok := parseRequiredPathIDOrWriteError[domaintypes.NodeID](w, r, "id")
 		if !ok {
 			return
 		}
 
-		node, ok := getNodeOrFail(w, r, st, nodeID, "undrain node")
+		node, ok := getNodeOrFail(w, r, st, nodeID, action+" node")
 		if !ok {
 			return
 		}
 
-		if !node.Drained {
-			writeHTTPError(w, http.StatusConflict, "node is not drained")
+		if node.Drained == drain {
+			writeHTTPError(w, http.StatusConflict, "%s", conflictMsg)
 			return
 		}
 
-		if err := st.UpdateNodeDrained(r.Context(), store.UpdateNodeDrainedParams{ID: nodeID, Drained: false}); err != nil {
-			writeHTTPError(w, http.StatusInternalServerError, "failed to undrain node: %v", err)
-			slog.Error("undrain node: update failed", "node_id", nodeID, "err", err)
+		if err := st.UpdateNodeDrained(r.Context(), store.UpdateNodeDrainedParams{ID: nodeID, Drained: drain}); err != nil {
+			writeHTTPError(w, http.StatusInternalServerError, "failed to %s node: %v", action, err)
+			slog.Error(action+" node: update failed", "node_id", nodeID, "err", err)
 			return
 		}
 
 		w.WriteHeader(http.StatusNoContent)
-		slog.Info("node undrained", "node_id", nodeID, "name", node.Name)
+		slog.Info(logDone, "node_id", nodeID, "name", node.Name)
 	}
 }
 
