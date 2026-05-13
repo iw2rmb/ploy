@@ -43,20 +43,22 @@ func resolveSourceCommitSHA(ctx context.Context, repoURL, ref string) (string, e
 		candidates = append(candidates, "refs/heads/"+ref, "refs/tags/"+ref)
 	}
 
+	attemptErrs := make([]string, 0, len(candidates))
 	for _, candidate := range candidates {
 		sha, err := gitLSRemote(ctx, repoURL, candidate)
 		if err == nil {
 			return sha, nil
 		}
+		attemptErrs = append(attemptErrs, fmt.Sprintf("%s: %v", candidate, err))
 	}
-	return "", fmt.Errorf("resolve source commit sha for ref %q", ref)
+	return "", fmt.Errorf("resolve source commit sha for ref %q: %s", ref, strings.Join(attemptErrs, "; "))
 }
 
 func gitLSRemote(ctx context.Context, repoURL, ref string) (string, error) {
 	cmd := exec.CommandContext(ctx, "git", "ls-remote", repoURL, ref)
-	out, err := cmd.Output()
+	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("git ls-remote failed (%s)", classifyGitLSRemoteFailure(out))
 	}
 	lines := bytes.Split(bytes.TrimSpace(out), []byte("\n"))
 	for _, line := range lines {
@@ -74,4 +76,26 @@ func gitLSRemote(ctx context.Context, repoURL, ref string) (string, error) {
 		}
 	}
 	return "", fmt.Errorf("no matching commit sha found")
+}
+
+func classifyGitLSRemoteFailure(out []byte) string {
+	msg := strings.ToLower(strings.TrimSpace(string(out)))
+	switch {
+	case strings.Contains(msg, "authentication failed"),
+		strings.Contains(msg, "http basic: access denied"),
+		strings.Contains(msg, "access denied"),
+		strings.Contains(msg, "invalid username or password"),
+		strings.Contains(msg, "could not read username"),
+		strings.Contains(msg, "unable to update url base from redirection"),
+		strings.Contains(msg, "/users/sign_in"):
+		return "authentication failed or token rejected"
+	case strings.Contains(msg, "couldn't find remote ref"),
+		strings.Contains(msg, "remote ref does not exist"):
+		return "ref not found on remote"
+	case strings.Contains(msg, "repository not found"),
+		strings.Contains(msg, "project not found"):
+		return "repository not found or access denied"
+	default:
+		return "remote query failed"
+	}
 }

@@ -3,6 +3,8 @@ package nodeagent
 import (
 	"errors"
 	"fmt"
+	"net"
+	"net/url"
 	"strings"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
@@ -52,6 +54,60 @@ func injectRepoMetadataEnv(env map[string]string, req StartRunRequest) {
 	if v := strings.TrimSpace(req.CommitSHA.String()); v != "" {
 		env["PLOY_COMMIT_SHA"] = v
 	}
+}
+
+func repoURLForHydration(repoURL types.RepoURL, opts RunOptions) types.RepoURL {
+	raw := strings.TrimSpace(repoURL.String())
+	if raw == "" {
+		return repoURL
+	}
+	pat := strings.TrimSpace(opts.MRWiring.GitLabPAT)
+	if pat == "" {
+		return repoURL
+	}
+
+	parsed, err := url.Parse(raw)
+	if err != nil {
+		return repoURL
+	}
+	if parsed.User != nil {
+		return repoURL
+	}
+	scheme := strings.ToLower(parsed.Scheme)
+	if scheme != "https" && scheme != "http" {
+		return repoURL
+	}
+
+	domainHost := normalizeGitLabDomainHost(opts.MRWiring.GitLabDomain)
+	if domainHost != "" && !strings.EqualFold(parsed.Hostname(), domainHost) {
+		return repoURL
+	}
+
+	parsed.User = url.UserPassword("oauth2", pat)
+	return types.RepoURL(parsed.String())
+}
+
+func normalizeGitLabDomainHost(raw string) string {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return ""
+	}
+	trimmed = strings.TrimSuffix(trimmed, "/")
+
+	if strings.Contains(trimmed, "://") {
+		parsed, err := url.Parse(trimmed)
+		if err == nil {
+			return strings.ToLower(strings.TrimSpace(parsed.Hostname()))
+		}
+	}
+	if slash := strings.IndexByte(trimmed, '/'); slash >= 0 {
+		trimmed = trimmed[:slash]
+	}
+	if host, _, err := net.SplitHostPort(trimmed); err == nil {
+		trimmed = host
+	}
+
+	return strings.ToLower(strings.TrimSpace(trimmed))
 }
 
 // --- Main manifest builders ---
@@ -134,7 +190,7 @@ func buildManifestFromRequest(req StartRunRequest, typedOpts RunOptions, stepInd
 	}
 
 	repo := contracts.RepoMaterialization{
-		URL:       req.RepoURL,
+		URL:       repoURLForHydration(req.RepoURL, typedOpts),
 		BaseRef:   req.BaseRef,
 		TargetRef: types.GitRef(targetRef),
 		Commit:    req.CommitSHA,
