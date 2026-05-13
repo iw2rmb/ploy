@@ -3,6 +3,7 @@ package types
 import (
 	"encoding"
 	"errors"
+	"net/url"
 	"strings"
 )
 
@@ -149,6 +150,13 @@ func (v CommitSHA) Validate() error {
 //   - Removes trailing ".git" suffix
 func NormalizeRepoURL(raw string) string {
 	normalized := strings.TrimSpace(raw)
+	lower := strings.ToLower(normalized)
+	if strings.HasPrefix(lower, "https://") || strings.HasPrefix(lower, "ssh://") || strings.HasPrefix(lower, "file://") {
+		if parsed, err := url.Parse(normalized); err == nil && parsed.User != nil {
+			parsed.User = nil
+			normalized = parsed.String()
+		}
+	}
 	normalized = strings.TrimSuffix(normalized, "/")
 	normalized = strings.TrimSuffix(normalized, ".git")
 	return normalized

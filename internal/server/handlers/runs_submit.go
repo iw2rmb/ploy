@@ -3,6 +3,7 @@ package handlers
 import (
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
@@ -84,8 +85,10 @@ func createSingleRepoRunHandler(st store.Store, eventsService *server.EventsServ
 			return
 		}
 
-		// Create mig repo for the provided repo_url
-		normalizedRepoURL := domaintypes.NormalizeRepoURL(req.RepoURL.String())
+		// Create mig repo for the provided repo_url.
+		// Persist normalized URL without embedded credentials.
+		rawRepoURL := strings.TrimSpace(req.RepoURL.String())
+		normalizedRepoURL := domaintypes.NormalizeRepoURL(rawRepoURL)
 		migRepoID := domaintypes.NewMigRepoID()
 		migRepo, err := st.CreateMigRepo(r.Context(), store.CreateMigRepoParams{
 			ID:        migRepoID,
@@ -95,7 +98,7 @@ func createSingleRepoRunHandler(st store.Store, eventsService *server.EventsServ
 			TargetRef: req.TargetRef.String(),
 		})
 		if err != nil {
-			serverError(w, "create single-repo run", "create mig repo", err, "mig_id", migID, "repo_url", req.RepoURL)
+			serverError(w, "create single-repo run", "create mig repo", err, "mig_id", migID, "repo_url", normalizedRepoURL)
 			return
 		}
 
@@ -112,8 +115,14 @@ func createSingleRepoRunHandler(st store.Store, eventsService *server.EventsServ
 			return
 		}
 
-		// Create run_repo entry
-		sourceCommitSHA, seedErr := resolveSourceCommitSHAFromContext(r.Context(), normalizedRepoURL, migRepo.BaseRef)
+		// Create run_repo entry.
+		// Resolve source commit with explicit URL credentials when provided,
+		// otherwise derive GitLab PAT auth from spec for private repos.
+		repoURLForSeed := rawRepoURL
+		if !repoURLContainsCredentials(rawRepoURL) {
+			repoURLForSeed = repoURLWithGitLabPATFromSpec(normalizedRepoURL, req.Spec)
+		}
+		sourceCommitSHA, seedErr := resolveSourceCommitSHAFromContext(r.Context(), repoURLForSeed, migRepo.BaseRef)
 		if seedErr != nil {
 			writeHTTPError(w, http.StatusBadRequest, "failed to resolve source commit for repo %s ref %s: %v", normalizedRepoURL, migRepo.BaseRef, seedErr)
 			slog.Error("create single-repo run: resolve source commit failed",
@@ -184,7 +193,7 @@ func createSingleRepoRunHandler(st store.Store, eventsService *server.EventsServ
 			"mig_id", migID.String(),
 			"spec_id", createdSpec.ID,
 			"repo_id", runRepo.RepoID,
-			"repo_url", req.RepoURL,
+			"repo_url", normalizedRepoURL,
 			"base_ref", req.BaseRef,
 			"target_ref", req.TargetRef,
 		)

@@ -96,6 +96,12 @@ func createMigRunHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
+		specRow, err := st.GetSpec(r.Context(), *mig.SpecID)
+		if err != nil {
+			serverError(w, "create mig run", "get spec", err, "mig_id", migID.String(), "spec_id", *mig.SpecID)
+			return
+		}
+
 		// Create run_repos entries for each selected repo.
 		// v1: run_repos snapshots refs from mig_repos at run creation time.
 		for _, migRepo := range selectedRepos {
@@ -104,7 +110,8 @@ func createMigRunHandler(st store.Store) http.HandlerFunc {
 				serverError(w, "create mig run", "get repo", urlErr, "repo_id", migRepo.RepoID)
 				return
 			}
-			sourceCommitSHA, seedErr := resolveSourceCommitSHAFromContext(r.Context(), repoURL, migRepo.BaseRef)
+			repoURLForSeed := repoURLWithGitLabPATFromSpec(repoURL, specRow.Spec)
+			sourceCommitSHA, seedErr := resolveSourceCommitSHAFromContext(r.Context(), repoURLForSeed, migRepo.BaseRef)
 			if seedErr != nil {
 				writeHTTPError(w, http.StatusBadRequest, "failed to resolve source commit for repo %s ref %s: %v", repoURL, migRepo.BaseRef, seedErr)
 				slog.Error("create mig run: resolve source commit failed",

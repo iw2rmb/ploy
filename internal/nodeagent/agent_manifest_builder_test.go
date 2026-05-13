@@ -75,6 +75,39 @@ func TestBuildManifestFromRequest(t *testing.T) {
 		}
 	})
 
+	t.Run("hydrates gitlab repo with oauth2 token while keeping gate repo URL clean", func(t *testing.T) {
+		req := newStartRunRequest(
+			withRunRepoURL("https://gitlab.example.com/group/repo.git"),
+			withRunOptions(RunOptions{
+				MRWiring: MRWiringOptions{
+					GitLabPAT:    "glpat-secret",
+					GitLabDomain: "https://gitlab.example.com",
+				},
+			}),
+		)
+
+		manifest, err := buildManifestDefault(req)
+		if err != nil {
+			t.Fatalf("buildManifestDefault() error: %v", err)
+		}
+		if len(manifest.Inputs) != 1 || manifest.Inputs[0].Hydration == nil || manifest.Inputs[0].Hydration.Repo == nil {
+			t.Fatalf("expected hydration repo to be set")
+		}
+
+		gotHydrationURL := manifest.Inputs[0].Hydration.Repo.URL.String()
+		wantHydrationURL := "https://oauth2:glpat-secret@gitlab.example.com/group/repo.git"
+		if gotHydrationURL != wantHydrationURL {
+			t.Fatalf("hydration repo URL=%q, want %q", gotHydrationURL, wantHydrationURL)
+		}
+
+		if manifest.Gate == nil {
+			t.Fatal("expected gate config")
+		}
+		if gotGateURL := manifest.Gate.RepoURL.String(); gotGateURL != "https://gitlab.example.com/group/repo.git" {
+			t.Fatalf("gate repo URL=%q, want clean URL", gotGateURL)
+		}
+	})
+
 	t.Run("validation errors", func(t *testing.T) {
 		tests := []struct {
 			name    string

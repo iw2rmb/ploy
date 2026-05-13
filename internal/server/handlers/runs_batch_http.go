@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -93,11 +94,14 @@ func addRunRepoHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
+		rawRepoURL := strings.TrimSpace(req.RepoURL.String())
+		normalizedRepoURL := domaintypes.NormalizeRepoURL(rawRepoURL)
+
 		migRepoID := domaintypes.NewMigRepoID()
 		migRepo, err := st.CreateMigRepo(r.Context(), store.CreateMigRepoParams{
 			ID:        migRepoID,
 			MigID:     run.MigID,
-			Url:       req.RepoURL.String(),
+			Url:       normalizedRepoURL,
 			BaseRef:   req.BaseRef.String(),
 			TargetRef: req.TargetRef.String(),
 		})
@@ -110,18 +114,23 @@ func addRunRepoHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		repoURL, err := repoURLForID(r.Context(), st, migRepo.RepoID)
+		spec, err := st.GetSpec(r.Context(), run.SpecID)
 		if err != nil {
-			writeHTTPError(w, http.StatusInternalServerError, "failed to get repo url: %v", err)
+			writeHTTPError(w, http.StatusInternalServerError, "failed to get run spec: %v", err)
 			return
 		}
-		sourceCommitSHA, seedErr := resolveSourceCommitSHAFromContext(r.Context(), repoURL, migRepo.BaseRef)
+
+		repoURLForSeed := rawRepoURL
+		if !repoURLContainsCredentials(rawRepoURL) {
+			repoURLForSeed = repoURLWithGitLabPATFromSpec(normalizedRepoURL, spec.Spec)
+		}
+		sourceCommitSHA, seedErr := resolveSourceCommitSHAFromContext(r.Context(), repoURLForSeed, migRepo.BaseRef)
 		if seedErr != nil {
-			writeHTTPError(w, http.StatusBadRequest, "failed to resolve source commit for repo %s ref %s: %v", repoURL, migRepo.BaseRef, seedErr)
+			writeHTTPError(w, http.StatusBadRequest, "failed to resolve source commit for repo %s ref %s: %v", normalizedRepoURL, migRepo.BaseRef, seedErr)
 			slog.Error("add run repo: resolve source commit failed",
 				"run_id", runID.String(),
 				"repo_id", migRepo.RepoID,
-				"repo_url", repoURL,
+				"repo_url", normalizedRepoURL,
 				"base_ref", migRepo.BaseRef,
 				"err", seedErr,
 			)
@@ -142,7 +151,7 @@ func addRunRepoHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		writeJSON(w, http.StatusCreated, runRepoToResponse(runRepo, repoURL, false, false))
+		writeJSON(w, http.StatusCreated, runRepoToResponse(runRepo, normalizedRepoURL, false, false))
 	}
 }
 
