@@ -175,7 +175,7 @@ release:
     name: ploy
   draft: false
   prerelease: auto
-  mode: append
+  mode: replace
   header: |
     ## Ploy {{ .Version }}
 
