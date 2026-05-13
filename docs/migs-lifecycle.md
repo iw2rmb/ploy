@@ -207,7 +207,7 @@ Use YAML `!include` for spec composition: full replacement
 (`heal: {<<: !include ./healing/spec.yaml#/heal, ...inline-overrides}`).
 Include references support `path[#/pointer]`, nested includes, and cycle
 detection. Relative include paths resolve from each including file directory.
-Relative local-source paths inside included fragments (`amata.spec`, `ca`, and
+Relative local-source paths inside included fragments (`amata.spec` and
 the source side of `in`/`out`/`home`) are resolved from that included file
 directory.
 For recovery with `schema=gate_profile_v1`, healing is expected to emit
@@ -1343,8 +1343,8 @@ Migs container images are standard OCI images with the following expectations:
     - Supported on:
       - each `steps[]` entry (single-step and multi-step runs),
       - `build_gate.post`.
-  - **Typed file delivery (Hydra)**: Config files, CA bundles, and inputs are
-    delivered via typed mount records (`ca`, `in`, `out`, `home`) instead of env
+  - **Typed file delivery (Hydra)**: Config files and inputs are
+    delivered via typed mount records (`in`, `out`, `home`) instead of env
     vars. See [Environment Variables](./envs/README.md) § "Common Variables
     Consumed by Official Images" for the mapping.
   - **Global env injection**: The control plane injects server-configured global

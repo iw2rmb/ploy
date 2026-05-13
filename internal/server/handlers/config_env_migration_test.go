@@ -55,7 +55,7 @@ func TestIsSpecialEnvKey(t *testing.T) {
 		}
 	}
 
-	notSpecial := []string{"OPENAI_API_KEY", "PLOY_GRADLE_BUILD_CACHE_URL", "PLOY_CA_CERTS", "PATH", ""}
+	notSpecial := []string{"OPENAI_API_KEY", "PLOY_GRADLE_BUILD_CACHE_URL", "SECRET_BLOB", "PATH", ""}
 	for _, k := range notSpecial {
 		if IsSpecialEnvKey(k) {
 			t.Errorf("IsSpecialEnvKey(%q) = true, want false", k)
@@ -100,7 +100,7 @@ func TestScanSpecialEnvKeys_RewriteCandidates(t *testing.T) {
 		"OPENAI_API_KEY":    {{Value: "sk-xxx", Target: domaintypes.GlobalEnvTargetSteps, Secret: true}},
 	}
 
-	report := ScanSpecialEnvKeys(globalEnv, nil, nil, nil)
+	report := ScanSpecialEnvKeys(globalEnv, nil, nil)
 
 	if report.Rewritten != 2 {
 		t.Errorf("Rewritten = %d, want 2", report.Rewritten)
@@ -144,7 +144,7 @@ func TestScanSpecialEnvKeys_TargetMapping(t *testing.T) {
 				tt.key: {{Value: "data", Target: tt.target, Secret: true}},
 			}
 
-			report := ScanSpecialEnvKeys(globalEnv, nil, nil, nil)
+			report := ScanSpecialEnvKeys(globalEnv, nil, nil)
 
 			if report.Rewritten != 1 {
 				t.Fatalf("Rewritten = %d, want 1", report.Rewritten)
@@ -201,7 +201,7 @@ func TestScanSpecialEnvKeys_ConflictCases(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			report := ScanSpecialEnvKeys(tt.globalEnv, nil, tt.existingHome, nil)
+			report := ScanSpecialEnvKeys(tt.globalEnv, tt.existingHome, nil)
 
 			if report.Rejected != 1 {
 				t.Fatalf("Rejected = %d, want 1", report.Rejected)
@@ -225,7 +225,7 @@ func TestScanSpecialEnvKeys_MultipleTargets(t *testing.T) {
 		},
 	}
 
-	report := ScanSpecialEnvKeys(globalEnv, nil, nil, nil)
+	report := ScanSpecialEnvKeys(globalEnv, nil, nil)
 
 	if report.Rewritten != 3 {
 		t.Errorf("Rewritten = %d, want 3 (gates + steps + server)", report.Rewritten)
@@ -236,7 +236,7 @@ func TestScanSpecialEnvKeys_MultipleTargets(t *testing.T) {
 }
 
 func TestScanSpecialEnvKeys_EmptyInput(t *testing.T) {
-	report := ScanSpecialEnvKeys(nil, nil, nil, nil)
+	report := ScanSpecialEnvKeys(nil, nil, nil)
 	if len(report.Entries) != 0 {
 		t.Errorf("Entries = %d, want 0", len(report.Entries))
 	}
@@ -248,7 +248,7 @@ func TestScanSpecialEnvKeys_NonSpecialKeysIgnored(t *testing.T) {
 		"PLOY_GRADLE_BUILD_CACHE_URL": {{Value: "https://cache.example.com", Target: domaintypes.GlobalEnvTargetGates}},
 	}
 
-	report := ScanSpecialEnvKeys(globalEnv, nil, nil, nil)
+	report := ScanSpecialEnvKeys(globalEnv, nil, nil)
 
 	if len(report.Entries) != 0 {
 		t.Errorf("Entries = %d, want 0 (non-special keys should be ignored)", len(report.Entries))
@@ -265,7 +265,7 @@ func TestMigrationReport_Metrics(t *testing.T) {
 		"mig": {{Entry: "existinghash:.codex/auth.json:ro", Dst: ".codex/auth.json"}},
 	}
 
-	report := ScanSpecialEnvKeys(globalEnv, nil, existingHome, nil)
+	report := ScanSpecialEnvKeys(globalEnv, existingHome, nil)
 
 	// AUTH steps → reject (conflict, hash mismatch),
 	// CONFIG server → rewrite (all sections), CRUSH steps → rewrite

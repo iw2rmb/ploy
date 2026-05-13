@@ -60,15 +60,13 @@ steps:
       # ORW_EXCLUDE_PATHS: "**/*.proto,build/generated/**"
 
 ################################################################################
-# HYDRA FILE RECORDS — ca / in / out / home
+# HYDRA FILE RECORDS — in / out / home
 ################################################################################
-# Hydra provides four typed file-record fields. Each field accepts local
+# Hydra provides three typed file-record fields. Each field accepts local
 # source paths in the spec; the CLI compiles them to canonical
 # shortHash:dst form before submit.
 #
 # Field semantics:
-#   ca   — CA certificate entries (local PEM paths or shortHash values).
-#          Mounted read-only under /etc/ploy/ca/.
 #   in   — Read-only input files: "src:/in/dst" → "shortHash:/in/dst".
 #          Mounted at /in/<name> inside the container.
 #   out  — Read-write output files: "src:/out/dst" → "shortHash:/out/dst".
@@ -86,11 +84,8 @@ steps:
 #   in:   ["shortHash:/in/config.json"]
 #   out:  ["shortHash:/out/result.txt"]
 #   home: ["shortHash:.config/app.toml:ro"]
-#   ca:   ["shortHash"]
 #
 # Example (before CLI compile — local paths):
-#   ca:
-#     - ./ca-bundle.pem
 #   home:
 #     - ./codex-auth.json:.codex/auth.json
 #   out:
@@ -185,7 +180,7 @@ build_gate:
 # The system enters a direct
 # heal → post-gate loop until the gate passes or retries are exhausted.
 #
-# Mig-like fields (image, command, envs, in, out, home, ca) are specified
+# Mig-like fields (image, command, envs, in, out, home) are specified
 # directly under `build_gate.post` (no nested `mig` key).
 #
 # Two execution modes:
@@ -242,7 +237,7 @@ build_gate:
 # - deep merge with overrides: `field: {<<: !include ./file.yaml#/pointer, ...}`
 # - include references support `path[#/pointer]`, nested includes, and cycle detection
 # - relative include paths resolve from each including file directory
-# - relative local-source paths inside included fragments (`amata.spec`, `ca`, and
+# - relative local-source paths inside included fragments (`amata.spec` and
 #   source side of `in`/`out`/`home`) resolve from that included file directory
 # For expectations with `schema: gate_profile_v1`, the healing job should
 # write `/out/gate-profile-candidate.json`. Promotion to repo `gate_profile` occurs
@@ -259,11 +254,11 @@ mr_on_fail: true
 # - This YAML is submitted via: `ploy run --spec mig.yaml` along with
 #   repository flags (e.g., --repo, --base-ref, --target-ref).
 #
-# - The agent honors: image, command, envs, ca, in, out, home,
+# - The agent honors: image, command, envs, in, out, home,
 #   steps[] (for single-step and multi-step runs), gitlab_domain, gitlab_pat, mr_on_success,
 #   mr_on_fail, build_gate.* (enabled, images, heal).
 #
-# - Use envs for environment variables and ca/in/out/home for file injection.
+# - Use envs for environment variables and in/out/home for file injection.
 #
 # - Single-step vs multi-step:
 #   * Single-step: Use `steps[]` with exactly one entry.

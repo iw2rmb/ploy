@@ -7,18 +7,13 @@ import (
 )
 
 // TestConfigCommand_HydraSubcommandRouting verifies that the config command
-// surface routes ca and home typed Hydra subcommands correctly.
+// surface routes typed Hydra subcommands correctly.
 func TestConfigCommand_HydraSubcommandRouting(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    []string
 		wantErr string
 	}{
-		{
-			name:    "ca routes to handleConfigCA",
-			args:    []string{"ca"},
-			wantErr: "ca subcommand required",
-		},
 		{
 			name:    "home routes to handleConfigHome",
 			args:    []string{"home"},
@@ -38,4 +33,3 @@ func TestConfigCommand_HydraSubcommandRouting(t *testing.T) {
 		})
 	}
 }
-

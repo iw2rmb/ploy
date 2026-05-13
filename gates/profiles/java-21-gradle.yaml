@@ -1,0 +1,26 @@
+schema_version: 1
+repo_id: default
+runner_mode: simple
+stack:
+  language: java
+  tool: gradle
+  release: "21"
+targets:
+  active: all_tests
+  build:
+    status: not_attempted
+    command: &gradle_build_cmd >-
+      GRADLE_BIN=gradle; if [ -x /workspace/gradlew ] && [ -f /workspace/gradle/wrapper/gradle-wrapper.properties ]; then GRADLE_BIN=./gradlew; fi; ${GRADLE_BIN} -q --stacktrace --build-cache build -x test -p /workspace
+    env: {}
+  unit:
+    status: not_attempted
+    command: &gradle_test_cmd >-
+      GRADLE_BIN=gradle; if [ -x /workspace/gradlew ] && [ -f /workspace/gradle/wrapper/gradle-wrapper.properties ]; then GRADLE_BIN=./gradlew; fi; ${GRADLE_BIN} -q --stacktrace --build-cache test -p /workspace
+    env: {}
+  all_tests:
+    status: not_attempted
+    command: *gradle_test_cmd
+    env: {}
+orchestration:
+  pre: []
+  post: []

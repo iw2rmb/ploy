@@ -11,10 +11,10 @@ func TestClaimJob_MergesGlobalEnvIntoSpec(t *testing.T) {
 	t.Parallel()
 
 	f := newClaimJobFixture(t, claimJobFixtureOptions{
-		specJSON: []byte(`{"envs":{"PLOY_CA_CERTS":"per-run-cert","PER_RUN_ONLY":"value"}}`),
+		specJSON: []byte(`{"envs":{"SECRET_BLOB":"per-run-secret","PER_RUN_ONLY":"value"}}`),
 	})
 
-	f.config.SetGlobalEnvVar("PLOY_CA_CERTS", GlobalEnvVar{Value: "global-cert", Target: domaintypes.GlobalEnvTargetSteps, Secret: true})
+	f.config.SetGlobalEnvVar("SECRET_BLOB", GlobalEnvVar{Value: "global-secret", Target: domaintypes.GlobalEnvTargetSteps, Secret: true})
 	f.config.SetGlobalEnvVar("STEPS_SECRET", GlobalEnvVar{Value: "steps-secret-val", Target: domaintypes.GlobalEnvTargetSteps, Secret: true})
 	f.config.SetGlobalEnvVar("NODES_FALLBACK", GlobalEnvVar{Value: "nodes-env", Target: domaintypes.GlobalEnvTargetNodes, Secret: false})
 	f.config.SetGlobalEnvVar("SERVER_ONLY", GlobalEnvVar{Value: "server-env", Target: domaintypes.GlobalEnvTargetServer, Secret: false})
@@ -32,11 +32,9 @@ func TestClaimJob_MergesGlobalEnvIntoSpec(t *testing.T) {
 		t.Fatalf("expected spec.envs to be an object, got %T", spec["envs"])
 	}
 
-	// Per-run envs for special key (PLOY_CA_CERTS) preserved in envs
-	// (per-run values always win; the special-key filter only affects
-	// global env overlay, not per-run spec values).
-	if envs["PLOY_CA_CERTS"] != "per-run-cert" {
-		t.Fatalf("expected per-run PLOY_CA_CERTS to win, got %v", envs["PLOY_CA_CERTS"])
+	// Per-run envs preserve precedence over global env values.
+	if envs["SECRET_BLOB"] != "per-run-secret" {
+		t.Fatalf("expected per-run SECRET_BLOB to win, got %v", envs["SECRET_BLOB"])
 	}
 	// Steps-target non-special key injected for mig job.
 	if envs["STEPS_SECRET"] != "steps-secret-val" {

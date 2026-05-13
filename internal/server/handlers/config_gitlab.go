@@ -20,12 +20,6 @@ type GlobalEnvVar struct {
 	Secret bool                        `json:"secret"`
 }
 
-// ConfigCAEntry represents a single global CA hash entry with its section.
-type ConfigCAEntry struct {
-	Hash    string `json:"hash"`
-	Section string `json:"section"`
-}
-
 // ConfigHomeEntry represents a single global home mount entry with its section.
 type ConfigHomeEntry struct {
 	Entry   string `json:"entry"`
@@ -44,13 +38,12 @@ type ConfigInEntry struct {
 // GitLab settings, global environment variables, and typed Hydra overlays.
 // Global env is stored as key → []GlobalEnvVar to support multiple targets per key.
 // Hydra overlays are stored per section (pre_gate, post_gate, mig).
-// Config CA, Home, and In entries are section-keyed and synced into hydra overlays.
+// Config Home and In entries are section-keyed and synced into hydra overlays.
 type ConfigHolder struct {
 	mu         sync.RWMutex
 	gitlab     config.GitLabConfig
 	globalEnv  map[string][]GlobalEnvVar
 	hydra      map[string]*HydraJobConfig
-	configCA   map[string][]string          // section → []hash
 	configHome map[string][]ConfigHomeEntry // section → []entry
 	configIn   map[string][]ConfigInEntry   // section → []entry
 	bundleMap  map[string]string            // shortHash → bundleID (content-addressed, global)
@@ -233,7 +226,6 @@ func (h *ConfigHolder) GetHydraOverlays() map[string]*HydraJobConfig {
 	for k, v := range h.hydra {
 		cp[k] = &HydraJobConfig{
 			Envs: copyStringMap(v.Envs),
-			CA:   copyStringSlice(v.CA),
 			In:   copyStringSlice(v.In),
 			Out:  copyStringSlice(v.Out),
 			Home: copyStringSlice(v.Home),
@@ -302,69 +294,6 @@ func putGitLabConfigHandler(holder *ConfigHolder) http.HandlerFunc {
 			"has_token", req.Token != "",
 		)
 	}
-}
-
-// GetConfigCA returns all CA hashes for a section (sorted).
-func (h *ConfigHolder) GetConfigCA(section string) []string {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
-	return copySectionSlice(h.configCA, section)
-}
-
-// GetConfigCAAll returns a copy of all CA entries keyed by section.
-func (h *ConfigHolder) GetConfigCAAll() map[string][]string {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
-	return copySectionMap(h.configCA)
-}
-
-// SetConfigCA replaces the CA hash set for a section and syncs into hydra overlays.
-func (h *ConfigHolder) SetConfigCA(section string, hashes []string) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	h.configCA = setSectionSlice(h.configCA, section, hashes)
-	h.syncHydraCALocked(section)
-}
-
-// AddConfigCA adds a single CA hash to a section (dedup, sort, then sync).
-func (h *ConfigHolder) AddConfigCA(section, hash string) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	if h.configCA == nil {
-		h.configCA = make(map[string][]string)
-	}
-	for _, existing := range h.configCA[section] {
-		if existing == hash {
-			return // already present
-		}
-	}
-	h.configCA[section] = append(h.configCA[section], hash)
-	sort.Strings(h.configCA[section])
-	h.syncHydraCALocked(section)
-}
-
-// DeleteConfigCA removes a single CA hash from a section.
-func (h *ConfigHolder) DeleteConfigCA(section, hash string) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	entries := h.configCA[section]
-	for i, e := range entries {
-		if e == hash {
-			h.configCA[section] = append(entries[:i], entries[i+1:]...)
-			if len(h.configCA[section]) == 0 {
-				delete(h.configCA, section)
-			}
-			break
-		}
-	}
-	h.syncHydraCALocked(section)
-}
-
-// syncHydraCALocked updates the hydra overlay CA field for a section.
-// Must be called with h.mu held.
-func (h *ConfigHolder) syncHydraCALocked(section string) {
-	cfg := h.ensureHydraSectionLocked(section)
-	cfg.CA = copyStringSlice(h.configCA[section])
 }
 
 // GetConfigHome returns all home entries for a section (sorted by dst).

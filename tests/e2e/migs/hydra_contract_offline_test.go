@@ -44,7 +44,7 @@ func TestHydraContractOffline(t *testing.T) {
 	})
 
 	t.Run("all_fields_valid", func(t *testing.T) {
-		validFields := map[string]bool{"ca": true, "home": true, "in": true}
+		validFields := map[string]bool{"home": true, "in": true}
 		for _, m := range table {
 			if !validFields[m.TargetField] {
 				t.Errorf("key %q has invalid TargetField %q", m.EnvKey, m.TargetField)
@@ -95,7 +95,7 @@ func TestHydraContractOffline(t *testing.T) {
 	})
 
 	// Cross-check: docs inventories must list every special env key or its
-	// typed target field (legacy keys migrated to typed fields like "ca" are
+	// typed target field (legacy keys migrated to typed fields are
 	// documented under the target field name, not the original env key).
 	t.Run("docs_env_readme_lists_all_keys", func(t *testing.T) {
 		root := repoRoot(t)

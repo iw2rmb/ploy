@@ -1,26 +1,23 @@
 // overlay.go implements local config.yaml overlay loading and deterministic
-// merge for the Hydra envs/ca/in/out/home contract.
+// merge for the Hydra envs/in/out/home contract.
 //
 // The config.yaml lives at $PLOY_CONFIG_HOME/config.yaml and supports:
 //
 //	defaults:
-//	  server:   {envs, ca, home}
-//	  node:     {envs, ca, home}
+//	  server:   {envs, home}
+//	  node:     {envs, home}
 //	  job:
-//	    pre_gate:  {envs, ca, in, out, home}
-//	    post_gate: {envs, ca, in, out, home}
-//	    mig:       {envs, ca, in, out, home}
+//	    pre_gate:  {envs, in, out, home}
+//	    post_gate: {envs, in, out, home}
+//	    mig:       {envs, in, out, home}
 //
 // Merge precedence (lowest → highest): server defaults < local config.yaml < spec.
 // Per-field merge rules:
 //   - envs: key-based override by precedence
-//   - ca:   append with dedup by value (digest-like strings)
 //   - in/out/home: merge by destination; higher precedence replaces same destination
 package config
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -30,17 +27,15 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// ComponentConfig holds envs/ca/home for server and node component sections.
+// ComponentConfig holds envs/home for server and node component sections.
 type ComponentConfig struct {
 	Envs map[string]string `yaml:"envs,omitempty" json:"envs,omitempty"`
-	CA   []string          `yaml:"ca,omitempty" json:"ca,omitempty"`
 	Home []string          `yaml:"home,omitempty" json:"home,omitempty"`
 }
 
 // JobConfig holds the full Hydra field set for job container sections.
 type JobConfig struct {
 	Envs map[string]string `yaml:"envs,omitempty" json:"envs,omitempty"`
-	CA   []string          `yaml:"ca,omitempty" json:"ca,omitempty"`
 	In   []string          `yaml:"in,omitempty" json:"in,omitempty"`
 	Out  []string          `yaml:"out,omitempty" json:"out,omitempty"`
 	Home []string          `yaml:"home,omitempty" json:"home,omitempty"`
@@ -114,7 +109,6 @@ func (o *Overlay) JobSection(jobType string) *JobConfig {
 // MergeJobConfigIntoSpec applies a JobConfig overlay onto a spec container block
 // (map[string]any) using deterministic merge rules:
 //   - envs: key-based override (overlay wins for same key, spec wins overall)
-//   - ca: append with dedup by value
 //   - in/out/home: merge by destination; spec entry replaces overlay for same dst
 //
 // This implements the "local config < spec" precedence for a single block.
@@ -123,7 +117,6 @@ func MergeJobConfigIntoSpec(block map[string]any, cfg *JobConfig) {
 		return
 	}
 	mergeEnvsIntoBlock(block, cfg.Envs)
-	mergeCAIntoBlock(block, cfg.CA)
 	mergeRecordsByDst(block, "in", cfg.In)
 	mergeRecordsByDst(block, "out", cfg.Out)
 	mergeRecordsByDst(block, "home", cfg.Home)
@@ -146,74 +139,6 @@ func mergeEnvsIntoBlock(block map[string]any, overlay map[string]string) {
 		}
 	}
 	block["envs"] = existing
-}
-
-// mergeCAIntoBlock appends overlay CA entries, deduplicating by value.
-func mergeCAIntoBlock(block map[string]any, overlay []string) {
-	if len(overlay) == 0 {
-		return
-	}
-	seen := make(map[string]bool)
-	var merged []any
-
-	// Existing spec CA entries first (higher precedence).
-	if raw, ok := block["ca"].([]any); ok {
-		for _, e := range raw {
-			s, ok := e.(string)
-			if !ok {
-				merged = append(merged, e)
-				continue
-			}
-			key := caDedup(s)
-			if !seen[key] {
-				seen[key] = true
-				merged = append(merged, s)
-			}
-		}
-	}
-
-	// Overlay CA entries appended, deduped.
-	for _, s := range overlay {
-		key := caDedup(s)
-		if !seen[key] {
-			seen[key] = true
-			merged = append(merged, s)
-		}
-	}
-
-	if len(merged) > 0 {
-		block["ca"] = merged
-	}
-}
-
-// caDedup returns a dedup key for a CA entry. For hex-hash entries use as-is;
-// for file paths, read the file and compute SHA-256 of the content so that a
-// canonical hash entry and a file-path entry pointing to identical bytes are
-// deduped by content. Falls back to hashing the path string if the file is
-// unreadable.
-func caDedup(s string) string {
-	s = strings.TrimSpace(s)
-	// If it looks like a hex hash (7-64 chars), use it directly.
-	if len(s) >= 7 && len(s) <= 64 && isHex(s) {
-		return s
-	}
-	// File path: read content and hash the bytes.
-	if data, err := os.ReadFile(s); err == nil {
-		h := sha256.Sum256(data)
-		return hex.EncodeToString(h[:])
-	}
-	// Fallback: hash the path string when the file is unreadable.
-	h := sha256.Sum256([]byte(s))
-	return hex.EncodeToString(h[:])
-}
-
-func isHex(s string) bool {
-	for _, c := range s {
-		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
-			return false
-		}
-	}
-	return true
 }
 
 // mergeRecordsByDst merges overlay entries into block[field] by destination.

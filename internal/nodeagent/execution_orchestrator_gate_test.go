@@ -28,14 +28,12 @@ func TestApplyGatePhaseOverrides(t *testing.T) {
 		wantGateProfile       *contracts.BuildGateProfileOverride
 		wantTarget            string
 		wantEnforceTargetLock bool
-		wantCA                []string
 	}{
 		{
 			name:    "pre_gate uses pre stack",
 			jobType: types.JobTypePreGate,
 			buildPreConfig: &contracts.BuildGatePhaseConfig{
 				Stack: pre, GateProfile: preGateProfile,
-				CA:     []string{"aaaaaaa11111", "bbbbbbb22222"},
 				Target: contracts.GateProfileTargetUnit,
 			},
 			buildPostConfig: &contracts.BuildGatePhaseConfig{
@@ -45,7 +43,6 @@ func TestApplyGatePhaseOverrides(t *testing.T) {
 			wantStackDetect: pre,
 			wantGateProfile: preGateProfile,
 			wantTarget:      contracts.GateProfileTargetUnit,
-			wantCA:          []string{"aaaaaaa11111", "bbbbbbb22222"},
 		},
 		{
 			name:    "post_gate uses post stack",
@@ -56,13 +53,11 @@ func TestApplyGatePhaseOverrides(t *testing.T) {
 			},
 			buildPostConfig: &contracts.BuildGatePhaseConfig{
 				Stack: post, GateProfile: postGateProfile,
-				CA:     []string{"ccccccc33333"},
 				Target: contracts.GateProfileTargetAllTests,
 			},
 			wantStackDetect: post,
 			wantGateProfile: postGateProfile,
 			wantTarget:      contracts.GateProfileTargetAllTests,
-			wantCA:          []string{"ccccccc33333"},
 		},
 	}
 
@@ -92,16 +87,6 @@ func TestApplyGatePhaseOverrides(t *testing.T) {
 			}
 			if got, want := manifest.Gate.EnforceTargetLock, tc.wantEnforceTargetLock; got != want {
 				t.Fatalf("Gate.EnforceTargetLock=%v; want %v", got, want)
-			}
-			if len(tc.wantCA) > 0 {
-				if got, want := len(manifest.CA), len(tc.wantCA); got != want {
-					t.Fatalf("manifest.CA length=%d; want %d (%v)", got, want, manifest.CA)
-				}
-				for i, want := range tc.wantCA {
-					if manifest.CA[i] != want {
-						t.Fatalf("manifest.CA[%d]=%q; want %q", i, manifest.CA[i], want)
-					}
-				}
 			}
 		})
 	}

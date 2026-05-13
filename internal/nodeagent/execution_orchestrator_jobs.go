@@ -479,7 +479,7 @@ func withTempDir(prefix string, fn func(path string) error) error {
 	return fn(dir)
 }
 
-// withMaterializedResources materializes Hydra resources (CA/In/Out/Home) from the
+// withMaterializedResources materializes Hydra resources (In/Out/Home) from the
 // manifest into a staging directory and passes the staging path to fn. When the
 // manifest has no Hydra entries, fn receives "".
 func (r *runController) withMaterializedResources(ctx context.Context, manifest contracts.StepManifest, bundleMap map[string]string, prefix string, fn func(stagingDir string) error) error {

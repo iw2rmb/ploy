@@ -88,16 +88,6 @@ func TestBuildContainerSpec_HydraSingleMount(t *testing.T) {
 			wantTarget: "/root/.codex/auth.json",
 			wantSrcSfx: filepath.Join("ccccccc", "content"),
 		},
-		{
-			name: "ca mount read-only",
-			setup: func(m *contracts.StepManifest) string {
-				m.CA = []string{"eeeeeee"}
-				return ""
-			},
-			wantTarget: "/etc/ploy/ca/eeeeeee",
-			wantSrcSfx: filepath.Join("eeeeeee", "content"),
-			wantRO:     true,
-		},
 	}
 
 	for _, tt := range tests {
@@ -150,7 +140,6 @@ func TestBuildContainerSpec_HydraEdgeCases(t *testing.T) {
 			name: "skipped without staging dir",
 			setup: func(m *contracts.StepManifest) (string, string) {
 				m.In = []string{"abcdef0:/in/config.json"}
-				m.CA = []string{"bbbbbbb"}
 				return "", ""
 			},
 			wantMounts: 1,
@@ -206,7 +195,7 @@ func TestBuildContainerSpec_HydraEdgeCases(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Mixed mount plan (all four Hydra entry types together)
+// Mixed mount plan (all three Hydra entry types together)
 // ---------------------------------------------------------------------------
 
 func TestBuildContainerSpec_HydraMixedMountPlan(t *testing.T) {
@@ -214,7 +203,6 @@ func TestBuildContainerSpec_HydraMixedMountPlan(t *testing.T) {
 	outDir := t.TempDir()
 
 	manifest := baseManifestForHydra(t)
-	manifest.CA = []string{"aaa0000"}
 	manifest.In = []string{"bbb1111:/in/data.json"}
 	manifest.Out = []string{"ccc2222:/out/results"}
 	manifest.Home = []string{"ddd3333:.config/app.toml:ro"}
@@ -229,13 +217,12 @@ func TestBuildContainerSpec_HydraMixedMountPlan(t *testing.T) {
 
 	requireMount(t, spec.Mounts, "/workspace", "/ws", false)
 	requireMount(t, spec.Mounts, "/out", outDir, false)
-	requireMount(t, spec.Mounts, "/etc/ploy/ca/aaa0000", filepath.Join(stagingDir, "aaa0000", "content"), true)
 	requireMount(t, spec.Mounts, "/in/data.json", filepath.Join(stagingDir, "bbb1111", "content"), true)
 	requireMount(t, spec.Mounts, "/root/.config/app.toml", filepath.Join(stagingDir, "ddd3333", "content"), true)
 	requireNoMount(t, spec.Mounts, "/out/results")
 
-	if len(spec.Mounts) != 5 {
-		t.Errorf("got %d mounts, want 5: %+v", len(spec.Mounts), spec.Mounts)
+	if len(spec.Mounts) != 4 {
+		t.Errorf("got %d mounts, want 4: %+v", len(spec.Mounts), spec.Mounts)
 	}
 }
 

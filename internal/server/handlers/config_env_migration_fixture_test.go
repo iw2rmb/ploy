@@ -100,7 +100,7 @@ func TestMigrationDryRunFixtures(t *testing.T) {
 			}
 
 			// Run scan.
-			report := ScanSpecialEnvKeys(globalEnv, fix.ExistingCA, existingHome, nil)
+			report := ScanSpecialEnvKeys(globalEnv, existingHome, nil)
 
 			// Assert counts.
 			if report.Rewritten != fix.Expect.Rewritten {

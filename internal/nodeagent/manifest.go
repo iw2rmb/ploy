@@ -76,7 +76,7 @@ func buildManifestFromRequest(req StartRunRequest, typedOpts RunOptions, stepInd
 	env := make(map[string]string, len(req.Env))
 	stackExp := stackExpectationForRequest(req, stack)
 
-	var hydraCA, hydraIn, hydraOut, hydraHome []string
+	var hydraIn, hydraOut, hydraHome []string
 	if len(typedOpts.Steps) > 0 {
 		// Multi-step run.
 		if stepIndex < 0 || stepIndex >= len(typedOpts.Steps) {
@@ -92,7 +92,6 @@ func buildManifestFromRequest(req StartRunRequest, typedOpts RunOptions, stepInd
 			image = resolved
 		}
 		command = stepMig.Command.ToSlice()
-		hydraCA = stepMig.CA
 		hydraIn = stepMig.In
 		hydraOut = stepMig.Out
 		hydraHome = stepMig.Home
@@ -113,7 +112,6 @@ func buildManifestFromRequest(req StartRunRequest, typedOpts RunOptions, stepInd
 			image = resolved
 		}
 		command = typedOpts.Execution.Command.ToSlice()
-		hydraCA = typedOpts.Execution.CA
 		hydraIn = typedOpts.Execution.In
 		hydraOut = typedOpts.Execution.Out
 		hydraHome = typedOpts.Execution.Home
@@ -188,7 +186,6 @@ func buildManifestFromRequest(req StartRunRequest, typedOpts RunOptions, stepInd
 		Command:    command,
 		WorkingDir: "/workspace",
 		Envs:       env,
-		CA:         hydraCA,
 		In:         hydraIn,
 		Out:        hydraOut,
 		Home:       hydraHome,
@@ -285,7 +282,6 @@ func buildHealingManifest(req StartRunRequest, mig MigContainerSpec, index int, 
 		Command:    command,
 		WorkingDir: "/workspace",
 		Envs:       env,
-		CA:         mig.CA,
 		In:         mig.In,
 		Out:        mig.Out,
 		Home:       mig.Home,

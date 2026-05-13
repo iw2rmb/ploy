@@ -41,7 +41,6 @@ type MigContainerSpec struct {
 	Env     map[string]string
 
 	// Hydra resource entries for staged materialization and mount planning.
-	CA   []string // canonical CA cert entries (shortHash)
 	In   []string // canonical read-only input entries (shortHash:/in/dst)
 	Out  []string // canonical read-write output entries (shortHash:/out/dst)
 	Home []string // canonical home-relative entries (shortHash:dst{:ro})
@@ -109,7 +108,6 @@ func migsSpecToRunOptions(spec *contracts.MigSpec) RunOptions {
 		step := spec.Steps[0]
 		runOpts.Execution.Image = step.Image
 		runOpts.Execution.Command = step.Command
-		runOpts.Execution.CA = step.CA
 		runOpts.Execution.In = step.In
 		runOpts.Execution.Out = step.Out
 		runOpts.Execution.Home = step.Home
@@ -123,7 +121,6 @@ func migsSpecToRunOptions(spec *contracts.MigSpec) RunOptions {
 					Image:   step.Image,
 					Command: step.Command,
 					Env:     copyStringMap(step.Envs),
-					CA:      step.CA,
 					In:      step.In,
 					Out:     step.Out,
 					Home:    step.Home,

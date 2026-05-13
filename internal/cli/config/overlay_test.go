@@ -1,8 +1,6 @@
 package config
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -153,51 +151,6 @@ func TestMergeJobConfigIntoSpec_EnvsKeyOverride(t *testing.T) {
 	}
 }
 
-func TestMergeJobConfigIntoSpec_CAAppendDedup(t *testing.T) {
-	block := map[string]any{
-		"ca": []any{"abcdef1234ab", "/ca/extra.pem"},
-	}
-	cfg := &JobConfig{CA: []string{"abcdef1234ab", "/ca/new.pem"}}
-	MergeJobConfigIntoSpec(block, cfg)
-
-	ca := block["ca"].([]any)
-	// abcdef1234ab from spec + /ca/extra.pem from spec + /ca/new.pem from overlay.
-	// The duplicate abcdef1234ab from overlay is deduped.
-	if len(ca) != 3 {
-		t.Fatalf("ca length = %d, want 3: %v", len(ca), ca)
-	}
-}
-
-func TestMergeJobConfigIntoSpec_CADedupByContentDigest(t *testing.T) {
-	// Create a temp CA file with known content.
-	dir := t.TempDir()
-	caFile := filepath.Join(dir, "ca.pem")
-	caContent := []byte("-----BEGIN CERTIFICATE-----\nMIIBxTCCAW...\n-----END CERTIFICATE-----\n")
-	if err := os.WriteFile(caFile, caContent, 0o644); err != nil {
-		t.Fatal(err)
-	}
-	// Compute the content digest (same algorithm as caDedup).
-	h := sha256.Sum256(caContent)
-	contentHash := hex.EncodeToString(h[:])
-
-	// Spec has the canonical hash; overlay has the file path pointing to same bytes.
-	block := map[string]any{
-		"ca": []any{contentHash},
-	}
-	cfg := &JobConfig{CA: []string{caFile}}
-	MergeJobConfigIntoSpec(block, cfg)
-
-	ca := block["ca"].([]any)
-	// The file-path entry should be deduped against the hash entry because
-	// reading the file produces the same SHA-256 digest.
-	if len(ca) != 1 {
-		t.Fatalf("ca length = %d, want 1 (file-path entry should dedup against content hash): %v", len(ca), ca)
-	}
-	if ca[0] != contentHash {
-		t.Errorf("ca[0] = %v, want canonical hash %s", ca[0], contentHash)
-	}
-}
-
 func TestMergeJobConfigIntoSpec_InOutHomeByDst(t *testing.T) {
 	block := map[string]any{
 		"in":   []any{"/a.txt:/in/config.json"},
@@ -248,7 +201,6 @@ func TestMergeJobConfigIntoSpec_EmptyBlock(t *testing.T) {
 	block := map[string]any{}
 	cfg := &JobConfig{
 		Envs: map[string]string{"K": "V"},
-		CA:   []string{"abc1234567ab"},
 		In:   []string{"/f:/in/f.txt"},
 	}
 	MergeJobConfigIntoSpec(block, cfg)
@@ -256,9 +208,9 @@ func TestMergeJobConfigIntoSpec_EmptyBlock(t *testing.T) {
 	if envs["K"] != "V" {
 		t.Fatalf("envs mismatch: %+v", envs)
 	}
-	ca := block["ca"].([]any)
-	if len(ca) != 1 {
-		t.Fatalf("ca length = %d, want 1", len(ca))
+	in := block["in"].([]any)
+	if len(in) != 1 {
+		t.Fatalf("in length = %d, want 1", len(in))
 	}
 }
 
@@ -303,7 +255,6 @@ func TestMergeThreeLayerPrecedence(t *testing.T) {
 			"SHARED_SL":   "from_server",
 			"SHARED_ALL":  "from_server",
 		},
-		CA:   []string{"aaaaaa1234ab"},
 		In:   []string{"/srv/data:/in/data.json"},
 		Home: []string{"/srv/auth:.auth/config.json"},
 	}
@@ -315,7 +266,6 @@ func TestMergeThreeLayerPrecedence(t *testing.T) {
 			"SHARED_SL":  "from_local",
 			"SHARED_ALL": "from_local",
 		},
-		CA:   []string{"bbbbbb1234ab", "aaaaaa1234ab"},
 		In:   []string{"/local/extra:/in/extra.json"},
 		Home: []string{"/local/auth:.auth/config.json"},
 	}
@@ -326,7 +276,6 @@ func TestMergeThreeLayerPrecedence(t *testing.T) {
 			"SPEC_ONLY":  "spec",
 			"SHARED_ALL": "from_spec",
 		},
-		"ca":   []any{"cccccc1234ab"},
 		"in":   []any{"/spec/data:/in/data.json"},
 		"home": []any{"/spec/auth:.auth/config.json:ro"},
 	}
@@ -345,7 +294,6 @@ func TestMergeThreeLayerPrecedence(t *testing.T) {
 	// Step 2: spec block with server+local as overlay → spec wins for shared keys.
 	MergeJobConfigIntoSpec(specBlock, &JobConfig{
 		Envs: toStringMap(localBlock["envs"]),
-		CA:   toStringSlice(localBlock["ca"]),
 		In:   toStringSlice(localBlock["in"]),
 		Home: toStringSlice(localBlock["home"]),
 	})
@@ -368,15 +316,6 @@ func TestMergeThreeLayerPrecedence(t *testing.T) {
 	}
 	if envs["SPEC_ONLY"] != "spec" {
 		t.Errorf("SPEC_ONLY = %v, want spec", envs["SPEC_ONLY"])
-	}
-
-	// CA: spec's cccccc + server's aaaaaa + local's bbbbbb (deduped, append order).
-	ca := toStringSlice(specBlock["ca"])
-	if len(ca) != 3 {
-		t.Fatalf("ca length = %d, want 3: %v", len(ca), ca)
-	}
-	if ca[0] != "cccccc1234ab" {
-		t.Errorf("ca[0] = %v, want cccccc1234ab (from spec)", ca[0])
 	}
 
 	// in: spec's /in/data.json wins over server's same dst; local's /in/extra.json appended.

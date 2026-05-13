@@ -12,13 +12,12 @@ import (
 func TestHydraContract_PrecedenceAndEdgeCases(t *testing.T) {
 	t.Parallel()
 
-	t.Run("spec_with_envs_ca_in_out_home_accepted", func(t *testing.T) {
+	t.Run("spec_with_envs_in_out_home_accepted", func(t *testing.T) {
 		t.Parallel()
 		spec := `{
 			"steps": [{
 				"image": "alpine:3.20",
 				"envs": {"K1": "v1", "K2": "v2"},
-				"ca":   ["abcdef0123456"],
 				"in":   ["abcdef0123456:/in/config.json"],
 				"out":  ["abcdef0123456:/out/result.txt"],
 				"home": ["abcdef0123456:.config/app.toml:ro"]
@@ -31,9 +30,6 @@ func TestHydraContract_PrecedenceAndEdgeCases(t *testing.T) {
 		}
 		if len(parsed.Steps) != 1 {
 			t.Fatalf("expected 1 step, got %d", len(parsed.Steps))
-		}
-		if len(parsed.Steps[0].CA) != 1 {
-			t.Errorf("expected 1 CA entry, got %d", len(parsed.Steps[0].CA))
 		}
 		if len(parsed.Steps[0].In) != 1 {
 			t.Errorf("expected 1 In entry, got %d", len(parsed.Steps[0].In))
@@ -92,14 +88,6 @@ func TestHydraContract_PrecedenceAndEdgeCases(t *testing.T) {
 		}
 	})
 
-	t.Run("duplicate_ca_hashes_rejected", func(t *testing.T) {
-		t.Parallel()
-		err := contracts.ValidateHydraCAEntries([]string{"abcdef0", "abcdef0"}, "test")
-		if err == nil {
-			t.Fatal("expected duplicate hash error")
-		}
-	})
-
 	t.Run("envs_key_precedence_spec_wins_over_empty", func(t *testing.T) {
 		t.Parallel()
 		spec := `{
@@ -114,40 +102,6 @@ func TestHydraContract_PrecedenceAndEdgeCases(t *testing.T) {
 		}
 		if parsed.Steps[0].Envs["K1"] != "from-spec" {
 			t.Errorf("expected K1=from-spec, got %q", parsed.Steps[0].Envs["K1"])
-		}
-	})
-
-	t.Run("hash_boundary_7_chars_valid", func(t *testing.T) {
-		t.Parallel()
-		_, err := contracts.ParseStoredCAEntry("abcdef0")
-		if err != nil {
-			t.Fatalf("7-char hash should be valid: %v", err)
-		}
-	})
-
-	t.Run("hash_boundary_6_chars_invalid", func(t *testing.T) {
-		t.Parallel()
-		_, err := contracts.ParseStoredCAEntry("abcdef")
-		if err == nil {
-			t.Fatal("6-char hash should be invalid")
-		}
-	})
-
-	t.Run("hash_boundary_64_chars_valid", func(t *testing.T) {
-		t.Parallel()
-		hash := strings.Repeat("a", 64)
-		_, err := contracts.ParseStoredCAEntry(hash)
-		if err != nil {
-			t.Fatalf("64-char hash should be valid: %v", err)
-		}
-	})
-
-	t.Run("hash_boundary_65_chars_invalid", func(t *testing.T) {
-		t.Parallel()
-		hash := strings.Repeat("a", 65)
-		_, err := contracts.ParseStoredCAEntry(hash)
-		if err == nil {
-			t.Fatal("65-char hash should be invalid")
 		}
 	})
 

@@ -74,10 +74,7 @@ func gateProfileCommandFromContainerCommand(cmd []string) string {
 		if shell == "" {
 			return ""
 		}
-		prefixes := []string{
-			"set -eu; " + gateCAPreamble + "; ",
-			gateCAPreamble + "; ",
-		}
+		prefixes := []string{"set -eu; "}
 		for _, prefix := range prefixes {
 			if rest, ok := strings.CutPrefix(shell, prefix); ok {
 				shell = strings.TrimSpace(rest)

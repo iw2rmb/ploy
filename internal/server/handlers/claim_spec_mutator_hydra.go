@@ -1,8 +1,6 @@
 package handlers
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"path"
 	"sort"
@@ -16,7 +14,6 @@ import (
 // the claim spec using per-field merge strategies.
 type HydraJobConfig struct {
 	Envs map[string]string
-	CA   []string
 	In   []string
 	Out  []string
 	Home []string
@@ -27,11 +24,11 @@ func (c *HydraJobConfig) IsEmpty() bool {
 	if c == nil {
 		return true
 	}
-	return len(c.Envs) == 0 && len(c.CA) == 0 && len(c.In) == 0 && len(c.Out) == 0 && len(c.Home) == 0
+	return len(c.Envs) == 0 && len(c.In) == 0 && len(c.Out) == 0 && len(c.Home) == 0
 }
 
 // applyHydraOverlayMutator replaces the legacy env-only merge with a typed merge
-// for envs, ca, in, out, and home using deterministic ordering.
+// for envs, in, out, and home using deterministic ordering.
 //
 // Section routing resolves the overlay for the job type from the hydra overlay
 // map. Global env vars are folded into the overlay's envs field using
@@ -64,9 +61,9 @@ func applyCanonicalHydraOverlay(spec map[string]any, jobType domaintypes.JobType
 	case domaintypes.JobTypeMig:
 		applyOverlayToSteps(spec, overlay)
 	case domaintypes.JobTypePreGate:
-		mergeCABlock(ensureBuildGatePhase(spec, "pre"), overlay.CA)
+		return
 	case domaintypes.JobTypePostGate:
-		mergeCABlock(ensureBuildGatePhase(spec, "post"), overlay.CA)
+		return
 	}
 }
 
@@ -80,25 +77,10 @@ func applyOverlayToSteps(spec map[string]any, overlay *HydraJobConfig) {
 		if !ok || step == nil {
 			continue
 		}
-		mergeCABlock(step, overlay.CA)
 		mergeRecordsByDstBlock(step, "in", overlay.In)
 		mergeRecordsByDstBlock(step, "out", overlay.Out)
 		mergeRecordsByDstBlock(step, "home", overlay.Home)
 	}
-}
-
-func ensureBuildGatePhase(spec map[string]any, phase string) map[string]any {
-	bg, ok := spec["build_gate"].(map[string]any)
-	if !ok || bg == nil {
-		bg = make(map[string]any)
-		spec["build_gate"] = bg
-	}
-	block, ok := bg[phase].(map[string]any)
-	if !ok || block == nil {
-		block = make(map[string]any)
-		bg[phase] = block
-	}
-	return block
 }
 
 // assembleHydraOverlay builds the complete HydraJobConfig for a job section by
@@ -114,7 +96,6 @@ func assembleHydraOverlay(
 	if cfg, ok := overlays[section]; ok && cfg != nil {
 		base = &HydraJobConfig{
 			Envs: copyStringMap(cfg.Envs),
-			CA:   copyStringSlice(cfg.CA),
 			In:   copyStringSlice(cfg.In),
 			Out:  copyStringSlice(cfg.Out),
 			Home: copyStringSlice(cfg.Home),
@@ -189,63 +170,6 @@ func mergeEnvsBlock(block map[string]any, overlay map[string]string) {
 		}
 	}
 	block["envs"] = existing
-}
-
-// mergeCABlock appends overlay CA entries, deduplicating by digest value.
-// Block entries appear first (higher precedence).
-func mergeCABlock(block map[string]any, overlay []string) {
-	if len(overlay) == 0 {
-		return
-	}
-	seen := make(map[string]bool)
-	var merged []any
-
-	if raw, ok := block["ca"].([]any); ok {
-		for _, e := range raw {
-			s, ok := e.(string)
-			if !ok {
-				merged = append(merged, e)
-				continue
-			}
-			key := hydraCADedup(s)
-			if !seen[key] {
-				seen[key] = true
-				merged = append(merged, s)
-			}
-		}
-	}
-
-	for _, s := range overlay {
-		key := hydraCADedup(s)
-		if !seen[key] {
-			seen[key] = true
-			merged = append(merged, s)
-		}
-	}
-
-	if len(merged) > 0 {
-		block["ca"] = merged
-	}
-}
-
-// hydraCADedup returns a dedup key for a CA entry. Hex-hash entries (7-64
-// chars) are used as-is; file paths are hashed for comparison.
-func hydraCADedup(s string) string {
-	s = strings.TrimSpace(s)
-	if len(s) >= 7 && len(s) <= 64 && isHexStr(s) {
-		return s
-	}
-	h := sha256.Sum256([]byte(s))
-	return hex.EncodeToString(h[:])
-}
-
-func isHexStr(s string) bool {
-	for _, c := range s {
-		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
-			return false
-		}
-	}
-	return true
 }
 
 // mergeRecordsByDstBlock merges overlay entries into block[field] by

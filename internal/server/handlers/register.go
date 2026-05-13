@@ -59,11 +59,6 @@ func registerConfigRoutes(s *server.HTTPServer, deps routeDeps) {
 	s.RegisterRouteFunc("PUT /v1/config/env/{key}", putGlobalEnvHandler(deps.configHolder, deps.st), auth.RoleCLIAdmin)
 	s.RegisterRouteFunc("DELETE /v1/config/env/{key}", deleteGlobalEnvHandler(deps.configHolder, deps.st), auth.RoleCLIAdmin)
 
-	s.RegisterRouteFunc("GET /v1/config/ca", listConfigCAHandler(deps.configHolder), auth.RoleCLIAdmin)
-	s.RegisterRouteFunc("GET /v1/config/ca/{section}", listConfigCABySectionHandler(deps.configHolder), auth.RoleCLIAdmin)
-	s.RegisterRouteFunc("PUT /v1/config/ca/{hash}", putConfigCAHandler(deps.configHolder, deps.st), auth.RoleCLIAdmin)
-	s.RegisterRouteFunc("DELETE /v1/config/ca/{hash}", deleteConfigCAHandler(deps.configHolder, deps.st), auth.RoleCLIAdmin)
-
 	s.RegisterRouteFunc("GET /v1/config/home", listConfigHomeHandler(deps.configHolder), auth.RoleCLIAdmin)
 	s.RegisterRouteFunc("GET /v1/config/home/{section}", listConfigHomeBySectionHandler(deps.configHolder), auth.RoleCLIAdmin)
 	s.RegisterRouteFunc("PUT /v1/config/home", putConfigHomeHandler(deps.configHolder, deps.st), auth.RoleCLIAdmin)

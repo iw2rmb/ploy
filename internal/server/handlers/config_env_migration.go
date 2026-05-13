@@ -41,9 +41,9 @@ var (
 // migration table).
 type SpecialEnvMapping struct {
 	EnvKey      string // Legacy config_env key name.
-	TargetField string // Hydra field: "ca", "home", or "in".
+	TargetField string // Hydra field: "home" or "in".
 	Destination string // For home: $HOME-relative path; for in: absolute path.
-	Mode        string // For home: "ro" or ""; unused for ca/in.
+	Mode        string // For home: "ro" or ""; unused for in.
 }
 
 // specialEnvMappings is the canonical mapping table. Order is stable and
@@ -138,12 +138,11 @@ func sectionsForTarget(target domaintypes.GlobalEnvTarget) []string {
 // report identifying special keys that should be migrated to typed fields.
 //
 // All targets (including server and nodes) are candidates for migration.
-// When existingHome/In/CA contains records that conflict with the migration
+// When existingHome/In contains records that conflict with the migration
 // target, the entry is rejected — unless the existing record matches what
 // the migration would produce (idempotent retry after partial failure).
 func ScanSpecialEnvKeys(
 	globalEnv map[string][]GlobalEnvVar,
-	existingCA map[string][]string,
 	existingHome map[string][]ConfigHomeEntry,
 	existingIn map[string][]ConfigInEntry,
 ) *MigrationReport {
@@ -201,17 +200,6 @@ func ScanSpecialEnvKeys(
 						}
 					}
 				}
-			case "ca":
-				for _, section := range sections {
-					for _, existing := range existingCA[section] {
-						if existing == expectedHash {
-							// Same hash from a prior migration run — not a conflict.
-							continue
-						}
-						conflicts = append(conflicts, fmt.Sprintf(
-							"section %q already has ca entry with different hash", section))
-					}
-				}
 			}
 
 			if len(conflicts) > 0 {
@@ -246,13 +234,10 @@ func ScanSpecialEnvKeys(
 // RewriteSpecialEnvEntry computes the canonical typed record string for a
 // mapping given an uploaded content hash.
 //
-// For ca: returns ("ca", hash).
 // For home: returns ("home", "hash:dst:ro") or ("home", "hash:dst").
 // For in: returns ("in", "hash:dst").
 func RewriteSpecialEnvEntry(mapping *SpecialEnvMapping, hash string) (field, entry string) {
 	switch mapping.TargetField {
-	case "ca":
-		return "ca", hash
 	case "home":
 		if mapping.Mode == "ro" {
 			return "home", hash + ":" + mapping.Destination + ":ro"
@@ -383,7 +368,7 @@ func migrationExpectedHash(_ *SpecialEnvMapping, value string) string {
 	return archiveShortHash(archiveBytes)
 }
 
-// ExecuteMigration persists rewrite-eligible report entries as typed ca/home/in
+// ExecuteMigration persists rewrite-eligible report entries as typed home/in
 // records and removes the corresponding legacy env records from both the store
 // and the in-memory ConfigHolder.
 //
@@ -521,7 +506,7 @@ func ExecuteMigration(
 	return result, nil
 }
 
-// persistTypedRecord persists a single typed record (ca, home, or in) to the
+// persistTypedRecord persists a single typed record (home or in) to the
 // store and updates the in-memory ConfigHolder.
 func persistTypedRecord(
 	ctx context.Context,
@@ -531,15 +516,6 @@ func persistTypedRecord(
 	mapping *SpecialEnvMapping,
 ) error {
 	switch field {
-	case "ca":
-		if err := st.UpsertConfigCA(ctx, store.UpsertConfigCAParams{
-			Hash:    record,
-			Section: section,
-		}); err != nil {
-			return err
-		}
-		holder.AddConfigCA(section, record)
-
 	case "home":
 		dst := mapping.Destination
 		if err := st.UpsertConfigHome(ctx, store.UpsertConfigHomeParams{

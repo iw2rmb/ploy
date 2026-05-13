@@ -210,38 +210,9 @@ func applyGatePhaseOverrides(manifest *contracts.StepManifest, req StartRunReque
 	switch req.JobType {
 	case types.JobTypePreGate:
 		contracts.ApplyBuildGatePhaseToGateSpec(manifest.Gate, typedOpts.BuildGate.Pre)
-		if typedOpts.BuildGate.Pre != nil {
-			manifest.CA = mergeUniqueStringEntries(manifest.CA, typedOpts.BuildGate.Pre.CA)
-		}
 	case types.JobTypePostGate:
 		contracts.ApplyBuildGatePhaseToGateSpec(manifest.Gate, typedOpts.BuildGate.Post)
-		if typedOpts.BuildGate.Post != nil {
-			manifest.CA = mergeUniqueStringEntries(manifest.CA, typedOpts.BuildGate.Post.CA)
-		}
 	}
-}
-
-func mergeUniqueStringEntries(base, extra []string) []string {
-	if len(extra) == 0 {
-		return base
-	}
-	seen := make(map[string]struct{}, len(base)+len(extra))
-	out := make([]string, 0, len(base)+len(extra))
-	for _, v := range base {
-		if _, ok := seen[v]; ok {
-			continue
-		}
-		seen[v] = struct{}{}
-		out = append(out, v)
-	}
-	for _, v := range extra {
-		if _, ok := seen[v]; ok {
-			continue
-		}
-		seen[v] = struct{}{}
-		out = append(out, v)
-	}
-	return out
 }
 
 // runGate executes the build gate and returns the result.

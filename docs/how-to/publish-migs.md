@@ -24,10 +24,6 @@ Local Registry Prerequisites
 
 Publish all Migs images
 ```bash
-# Optional: custom PEM bundle (path or inline PEM content) for build-time TLS interception
-# when building runtime images (`server`, `node`)
-# export PLOY_CA_CERTS=/path/to/ca-bundle.pem
-
 images/build-and-push.sh
 # Builds and pushes:
 # - Amata lanes: java-17/21/25-codex-amata-{maven,gradle}
@@ -43,12 +39,6 @@ images/build-and-push.sh
 There is no separate registry sync helper script. Publish explicitly via `build-and-push.sh`
 or targeted `docker buildx build ... --push` commands.
 
-Build-time custom CA bundle (`PLOY_CA_CERTS`):
-- Accepts either:
-  - filesystem path to PEM bundle, or
-  - inline PEM content in the env variable itself.
-- Build scripts forward it as BuildKit secret `ploy_ca_certs` for `server` and `node` builds only.
-
 Build Gate image mapping source of truth:
 - `gates/stacks.yaml`
 - Java defaults expect:
@@ -60,11 +50,6 @@ Build Gate image mapping source of truth:
   - `$PLOY_CONTAINER_REGISTRY/maven:jdk17`
   - `$PLOY_CONTAINER_REGISTRY/maven:jdk21`
   - `$PLOY_CONTAINER_REGISTRY/maven:jdk25`
-
-Runtime CA support is separate from build-time CA injection.
-Register runtime CA bundles via `ploy config ca set --file /path/to/ca-bundle.pem` so the
-cluster can mount them into runtime containers via Hydra `ca` records (mounted
-read-only under `/etc/ploy/ca/`).
 
 Publish a single Migs image (example: orw-cli-java-17-maven)
 ```bash

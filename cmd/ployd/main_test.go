@@ -179,10 +179,6 @@ func (s *schedulerProbeStore) ListGlobalEnv(ctx context.Context) ([]store.Config
 	return nil, nil
 }
 
-func (s *schedulerProbeStore) ListConfigCA(ctx context.Context) ([]store.ConfigCa, error) {
-	return nil, nil
-}
-
 func (s *schedulerProbeStore) ListConfigHome(ctx context.Context) ([]store.ConfigHome, error) {
 	return nil, nil
 }

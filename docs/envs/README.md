@@ -31,20 +31,6 @@ defaults change, or components adopt additional configuration.
   Non-loopback hosts must be reachable from inside containers.
   Example:
   `postgres://ploy:ploy@localhost:5432/ploy?sslmode=disable`.
-- `PLOY_DEPLOY_CA_BUNDLE` — Optional path to a PEM CA bundle used by
-  local, runtime-local, and offline-VPS deploy workflows to configure Docker daemon trust for container registries
-  (`docker.io`, `registry-1.docker.io`, `auth.docker.io`, `index.docker.io`, `ghcr.io`).
-  The script also installs the bundle into system CA trust before restarting
-  Docker, so Docker Hub auth/token TLS uses the same root CAs.
-  The same bundle is mounted into runtime containers (`server`/`node`) as a local file
-  and exported through runtime TLS env vars; it is not baked into images.
-  Deploy scripts seed the typed `ca` config field via `ploy config ca set` so
-  mig/build-gate containers receive the same CA bundle at runtime through
-  the Hydra `ca` materialization path (not as a raw env var).
-  Current automation targets:
-  - Docker context `colima` (installs CA inside the Colima VM and restarts Docker)
-  - Linux hosts (installs CA under `/etc/docker/certs.d/...` and restarts Docker)
-  The offline-VPS deploy flow also accepts `PLOY_CA_CERT` as an alias for this value.
 - `PLOY_SERVER_PORT` — Optional host port mapped to the server container's internal
   port `8080` in the local compose stack. Default: `8080`. Both local
   and runtime-local/VPS deploy scripts pass it through to the compose stack. Use this when the
@@ -116,25 +102,24 @@ Role model (bearer token claims):
 - `--spec` — Path to a YAML/JSON spec file for `ploy run` defining mig parameters,
   Build Gate settings, and healing configuration. The spec supports:
   - `envs` — Environment variables (key-value map, merged by key across precedence layers)
-  - `ca` — CA certificate entries (local paths or canonical `shortHash` values)
   - `in` — Read-only input files (`src:/in/dst`; CLI compiles local paths to `shortHash:/in/dst`)
   - `out` — Read-write output files (`src:/out/dst`; CLI compiles local paths to `shortHash:/out/dst`)
   - `home` — Home-relative files (`src:dst{:ro}`; CLI compiles to `shortHash:dst{:ro}`)
-  - `steps[]` — Multi-step spec steps (each with its own `image`/`command`/`envs`/`ca`/`in`/`out`/`home`)
-  - `build_gate.post` — Automated healing action for Build Gate failures (`retries`, `image`, `command`, `envs`, `ca`, `in`, `out`, `home`, optional `amata`, optional `expectations`)
+  - `steps[]` — Multi-step spec steps (each with its own `image`/`command`/`envs`/`in`/`out`/`home`)
+  - `build_gate.post` — Automated healing action for Build Gate failures (`retries`, `image`, `command`, `envs`, `in`, `out`, `home`, optional `amata`, optional `expectations`)
   - GitLab MR settings (`mr_on_success`, `mr_on_fail`, `gitlab_domain`, `gitlab_pat`)
   - See [mig.example.yaml](../schemas/mig.example.yaml) for the full schema.
 
 ### Hydra file-record compilation
 
-The CLI compiles local file paths in `ca`, `in`, `out`, and `home` fields into
+The CLI compiles local file paths in `in`, `out`, and `home` fields into
 canonical `shortHash:dst` records before spec submission:
 
 1. Resolves each source path relative to the spec file directory.
 2. Computes a content hash, uploads the archive when missing, and rewrites
    the entry to `shortHash:dst` form.
 3. The node agent downloads bundles by hash and mounts them at the declared
-   destination (read-only for `ca`/`in`, read-write for `out`, configurable
+   destination (read-only for `in`, read-write for `out`, configurable
    for `home`).
 
 **Example spec fragment (before CLI compile):**
@@ -143,8 +128,6 @@ steps:
   - image: docker.io/your-dh-user/migs-openrewrite:latest
     in:
       - ./recipe.yaml:/in/recipe.yaml
-    ca:
-      - ./ca-bundle.pem
 
 build_gate:
   heal:
@@ -159,8 +142,6 @@ steps:
   - image: docker.io/your-dh-user/migs-openrewrite:latest
     in:
       - "a1b2c3d4e5f6g7:/in/recipe.yaml"
-    ca:
-      - "f8e9d0c1b2a3"
 
 build_gate:
   heal:
@@ -177,7 +158,7 @@ build_gate:
   See [Migs lifecycle](../migs-lifecycle.md) § "1.4 Batched Migs Runs (`runs` + `run_repos`)"
   for full usage.
   - `build_gate.post` — Spec block defining the single healing action:
-  - Action fields support include-composition (`retries`, `image`, `command`, `envs`, `ca`, `in`, `out`, `home`, optional `amata`, optional `expectations`)
+  - Action fields support include-composition (`retries`, `image`, `command`, `envs`, `in`, `out`, `home`, optional `amata`, optional `expectations`)
   - After each healing attempt, the Build Gate is re-run; on pass, the main mig proceeds
   - If healing exhausts retries and gate still fails, run terminates with `reason="build-gate"`
   - Cross-phase inputs (`/in/build-gate.log`, optional `/in/errors.yaml`, `/in/gate_profile.json`, `/in/amata.yaml`) are available to healing migs
@@ -207,7 +188,6 @@ Repo metadata (injected from StartRunRequest):
 Server connection details:
 - `PLOY_SERVER_URL` — Control plane base URL (e.g., `https://<server>:8443`)
 - `PLOY_HOST_WORKSPACE` — Host filesystem path to workspace for in-container tooling
-- CA certificates are delivered via Hydra `ca` mount entries (mounted under `/etc/ploy/ca/`), not as an environment variable.
 - `PLOY_CLIENT_CERT_PATH` — Path to client certificate (`/etc/ploy/certs/client.crt`)
 - `PLOY_CLIENT_KEY_PATH` — Path to client key (`/etc/ploy/certs/client.key`)
 - `PLOY_API_TOKEN` — Bearer token for API authentication (when configured on node).
@@ -471,17 +451,13 @@ are stored in the object store.
 
 The control plane supports centralized global environment variables that are automatically injected
 into cluster components based on target rules. This enables cluster-wide configuration of credentials,
-CA bundles, and API keys without embedding them in every spec file.
+and API keys without embedding them in every spec file.
 
 ### Configuration via CLI
 
 Use the `ploy config env` subcommands to manage global environment variables:
 
 ```bash
-# Set CA certificates via typed config
-# Sections: pre_gate, post_gate, mig, heal
-ploy config ca set --file ca-bundle.pem --section pre_gate --section post_gate
-
 # Set OpenAI API key (injected into gate and step jobs — default --on jobs)
 ploy config env set --key OPENAI_API_KEY --value sk-...
 
@@ -497,7 +473,6 @@ ploy config env unset --key OLD_VAR
 
 **Typed config fields** manage structured data that was previously carried as raw env keys.
 Use the dedicated typed config commands:
-- `ploy config ca set/unset/ls` — CA certificates (sections: pre_gate, post_gate, mig, heal)
 - `ploy config home set/unset/ls` — Home-relative file mounts
 
 ### Target Semantics
@@ -548,7 +523,6 @@ The `show` and `unset` commands use **`--from`** to specify the target:
 
 | Variable | Consumer | Description |
 |----------|----------|-------------|
-| `ca` (typed) | ORW migs, build-gate, custom migs | PEM-encoded CA certificates; mounted via Hydra `ca` materialization at `/etc/ploy/ca/<hash>` |
 | `home` (typed) | `codex` | File mounts relative to $HOME (replaces `CODEX_AUTH_JSON`, `CODEX_CONFIG_TOML`, `CCR_CONFIG_JSON`, `CRUSH_JSON`) |
 | `in` (typed) | `codex`, healing | Read-only input file mounts |
 | `OPENAI_API_KEY` | Future OpenAI-integrated migs | API key for LLM operations |
@@ -669,15 +643,6 @@ If `/root/.claude-code-router/config.json` exists at startup, `amata` runs:
 - `ccr start`
 - `eval "$(ccr activate)"`
 
-**Build Gate images (Maven/Gradle)**: The gate executor uses the Hydra `ca` mount
-entries to install CA certificates into the container trust store:
-1. CA bundles are delivered as files under `/etc/ploy/ca/<hash>`.
-2. The gate preamble splits the PEM bundle into individual `.crt` files.
-3. Copies them to `/usr/local/share/ca-certificates/ploy/`.
-4. Runs `update-ca-certificates` (on Debian/Ubuntu images).
-5. Optionally imports into Java cacerts via `keytool` when available.
-6. Exports `SSL_CERT_FILE`, `CURL_CA_BUNDLE`, and `GIT_SSL_CAINFO` to the resolved path.
-
 **Build Gate Gradle images (`gate-gradle:*`)**: Ship a Gradle init script under `~/.gradle/init.d/` that enables a remote Gradle Build Cache when `PLOY_GRADLE_BUILD_CACHE_URL` is set (push behavior controlled by `PLOY_GRADLE_BUILD_CACHE_PUSH`).
 
 Build Gate jobs also use node-local persistent tool caches under
@@ -705,9 +670,7 @@ Runtime mounts:
 When `PLOY_STACK_RELEASE` is empty, runtime uses `unknown-release` as the lane key.
 Image-name marker fallback is not used.
 
-**ORW images (`orw-cli-java-17-maven`, `orw-cli-java-17-gradle`)**: Same Hydra `ca` materialization behavior as
-build-gate, ensuring OpenRewrite can fetch dependencies from internal artifact repositories while
-staying isolated from Maven/Gradle project task execution.
+**ORW images (`orw-cli-java-17-maven`, `orw-cli-java-17-gradle`)**: Run with the same stack-env-driven cache behavior as other Java lanes while staying isolated from Maven/Gradle project task execution.
 
 Both images ship a bundled `rewrite` executable (`/usr/local/bin/rewrite`) backed
 by an embedded standalone runner JAR. `ORW_CLI_BIN` defaults to this bundled

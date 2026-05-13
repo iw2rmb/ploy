@@ -145,17 +145,6 @@ func run(ctx context.Context, cfg config.Config, st store.Store, authorizer *aut
 	// Server-target consumption: apply server-target entries to process environment on startup.
 	applyServerTargetEnv(globalEnvMap)
 
-	// Load global CA entries from the store for ConfigHolder initialization.
-	var globalCAEntries []store.ConfigCa
-	if st != nil {
-		globalCAEntries, err = st.ListConfigCA(ctx)
-		if err != nil {
-			slog.Warn("failed to load global CA entries from store, continuing with empty set", "err", err)
-			globalCAEntries = nil
-		}
-	}
-	slog.Info("loaded global CA entries from store", "count", len(globalCAEntries))
-
 	// Load global home entries from the store for ConfigHolder initialization.
 	var globalHomeEntries []store.ConfigHome
 	if st != nil {
@@ -193,15 +182,6 @@ func run(ctx context.Context, cfg config.Config, st store.Store, authorizer *aut
 	// Initialize config holder for runtime configuration access.
 	configHolder := handlers.NewConfigHolder(cfg.GitLab, globalEnvMap)
 
-	// Populate ConfigHolder with persisted CA entries keyed by section.
-	caBySection := make(map[string][]string)
-	for _, e := range globalCAEntries {
-		caBySection[e.Section] = append(caBySection[e.Section], e.Hash)
-	}
-	for section, hashes := range caBySection {
-		configHolder.SetConfigCA(section, hashes)
-	}
-
 	// Populate ConfigHolder with persisted home entries keyed by section.
 	homeBySection := make(map[string][]handlers.ConfigHomeEntry)
 	for _, e := range globalHomeEntries {
@@ -234,8 +214,8 @@ func run(ctx context.Context, cfg config.Config, st store.Store, authorizer *aut
 	}
 
 	// Execute hard-cut migration: persist rewrite-eligible legacy special env keys
-	// as typed ca/home/in records and remove the legacy env records.
-	migrationReport := handlers.ScanSpecialEnvKeys(globalEnvMap, caBySection, homeBySection, inBySection)
+	// as typed home/in records and remove the legacy env records.
+	migrationReport := handlers.ScanSpecialEnvKeys(globalEnvMap, homeBySection, inBySection)
 	if st != nil {
 		execResult, execErr := handlers.ExecuteMigration(ctx, migrationReport, st, configHolder, bp)
 		if execErr != nil {
