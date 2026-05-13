@@ -15,7 +15,6 @@ AUTH_JSON_PATH=""
 PLOY_DB_DSN="${PLOY_DB_DSN:-}"
 PLOY_DB_DSN_HOST=""
 PLOY_DB_DSN_CONTAINER=""
-PLOY_DEPLOY_CA_BUNDLE="${PLOY_DEPLOY_CA_BUNDLE:-}"
 PLOY_CONTAINER_SOCKET_PATH="${PLOY_CONTAINER_SOCKET_PATH:-/var/run/docker.sock}"
 PLOY_SERVER_PORT="${PLOY_SERVER_PORT:-8080}"
 PLOY_VERSION="${PLOY_VERSION:-$(ploy --version | head -n 1)}"
@@ -55,7 +54,6 @@ Environment:
   PLOY_OBJECTSTORE_ENDPOINT   S3-compatible endpoint URL used by server object store config
   PLOY_OBJECTSTORE_ACCESS_KEY S3 access key used by server object store config
   PLOY_OBJECTSTORE_SECRET_KEY S3 secret key used by server object store config
-  PLOY_DEPLOY_CA_BUNDLE           Optional path to PEM CA bundle used for docker daemon trust and runtime container trust
   PLOY_VERSION            Runtime version tag (default from `ploy --version`, example v0.1.0)
   PLOY_RUNTIME_SERVER_IMAGE   Runtime server image (default ghcr.io/iw2rmb/ploy/server:${PLOY_VERSION})
   PLOY_RUNTIME_NODE_IMAGE     Runtime node image (default ghcr.io/iw2rmb/ploy/node:${PLOY_VERSION})
@@ -180,144 +178,6 @@ run_as_root() {
     return
   fi
   return 1
-}
-
-wait_for_docker_engine_ready() {
-  for _ in {1..30}; do
-    if docker info >/dev/null 2>&1; then
-      return 0
-    fi
-    sleep 1
-  done
-  echo "error: docker engine did not become ready in time after CA installation" >&2
-  exit 1
-}
-
-install_registry_ca_colima() {
-  local ca_path="$1"
-  local -a registries=(docker.io registry-1.docker.io auth.docker.io index.docker.io ghcr.io)
-
-  if ! command -v colima >/dev/null 2>&1; then
-    echo "error: docker context is colima but colima CLI is not installed" >&2
-    exit 1
-  fi
-
-  log "Installing PLOY_DEPLOY_CA_BUNDLE into colima docker registry trust..."
-  for reg in "${registries[@]}"; do
-    colima ssh -- sudo mkdir -p "/etc/docker/certs.d/${reg}"
-    cat "$ca_path" | colima ssh -- sudo tee "/etc/docker/certs.d/${reg}/ca.crt" >/dev/null
-    colima ssh -- sudo chmod 0644 "/etc/docker/certs.d/${reg}/ca.crt"
-  done
-  colima ssh -- sudo mkdir -p /usr/local/share/ca-certificates/ploy
-  cat "$ca_path" | colima ssh -- sudo tee /usr/local/share/ca-certificates/ploy/ploy-ca.crt >/dev/null
-  colima ssh -- sudo update-ca-certificates >/dev/null
-  colima ssh -- sudo systemctl restart docker
-}
-
-install_registry_ca_linux() {
-  local ca_path="$1"
-  local -a registries=(docker.io registry-1.docker.io auth.docker.io index.docker.io ghcr.io)
-
-  log "Installing PLOY_DEPLOY_CA_BUNDLE into local docker registry trust..."
-  for reg in "${registries[@]}"; do
-    if ! run_as_root mkdir -p "/etc/docker/certs.d/${reg}"; then
-      echo "error: cannot create /etc/docker/certs.d/${reg}" >&2
-      exit 1
-    fi
-    if ! run_as_root install -m 0644 "$ca_path" "/etc/docker/certs.d/${reg}/ca.crt"; then
-      echo "error: cannot install CA bundle to /etc/docker/certs.d/${reg}/ca.crt" >&2
-      exit 1
-    fi
-  done
-
-  if ! run_as_root mkdir -p /usr/local/share/ca-certificates/ploy; then
-    echo "error: cannot create /usr/local/share/ca-certificates/ploy" >&2
-    exit 1
-  fi
-  if ! run_as_root install -m 0644 "$ca_path" /usr/local/share/ca-certificates/ploy/ploy-ca.crt; then
-    echo "error: cannot install CA bundle to /usr/local/share/ca-certificates/ploy/ploy-ca.crt" >&2
-    exit 1
-  fi
-  if command -v update-ca-certificates >/dev/null 2>&1; then
-    run_as_root update-ca-certificates >/dev/null || {
-      echo "error: failed to update system CA trust" >&2
-      exit 1
-    }
-  fi
-
-  if command -v systemctl >/dev/null 2>&1; then
-    run_as_root systemctl restart docker || {
-      echo "error: failed to restart docker via systemctl" >&2
-      exit 1
-    }
-    return
-  fi
-  if command -v service >/dev/null 2>&1; then
-    run_as_root service docker restart || {
-      echo "error: failed to restart docker via service" >&2
-      exit 1
-    }
-    return
-  fi
-
-  echo "error: installed CA bundle but could not restart docker daemon" >&2
-  exit 1
-}
-
-configure_docker_registry_ca_if_needed() {
-  local ca_path context os_name engine_name
-
-  if [[ -z "$PLOY_DEPLOY_CA_BUNDLE" ]]; then
-    return 0
-  fi
-
-  ca_path="$(resolve_ca_bundle_path "$PLOY_DEPLOY_CA_BUNDLE")"
-  PLOY_DEPLOY_CA_BUNDLE="$ca_path"
-  context="$(docker context show 2>/dev/null || true)"
-  os_name="$(uname -s)"
-  engine_name="$(docker info --format '{{.Name}}' 2>/dev/null || true)"
-
-  if [[ "$context" == "colima" || "$engine_name" == "colima" ]]; then
-    install_registry_ca_colima "$PLOY_DEPLOY_CA_BUNDLE"
-    wait_for_docker_engine_ready
-    return
-  fi
-  if [[ "$os_name" == "Linux" ]]; then
-    install_registry_ca_linux "$PLOY_DEPLOY_CA_BUNDLE"
-    wait_for_docker_engine_ready
-    return
-  fi
-
-  echo "error: PLOY_DEPLOY_CA_BUNDLE auto-install is not supported for docker context '${context}' (engine='${engine_name}') on ${os_name}" >&2
-  echo "error: configure docker daemon trust manually, then rerun ploy cluster deploy" >&2
-  exit 1
-}
-
-resolve_runtime_ca_bundle() {
-  if [[ -z "${PLOY_DEPLOY_CA_BUNDLE:-}" ]]; then
-    PLOY_DEPLOY_CA_BUNDLE="/dev/null"
-    return 0
-  fi
-
-  PLOY_DEPLOY_CA_BUNDLE="$(resolve_ca_bundle_path "$PLOY_DEPLOY_CA_BUNDLE")"
-}
-
-resolve_ca_bundle_path() {
-  local ca_path="$1"
-
-  if [[ "$ca_path" != /* ]]; then
-    ca_path="$RUNTIME_DIR/$ca_path"
-  fi
-  if [[ ! -f "$ca_path" ]]; then
-    echo "error: PLOY_DEPLOY_CA_BUNDLE file not found: $ca_path" >&2
-    exit 1
-  fi
-  if [[ ! -s "$ca_path" ]]; then
-    echo "error: PLOY_DEPLOY_CA_BUNDLE file is empty: $ca_path" >&2
-    exit 1
-  fi
-
-  printf '%s\n' "$ca_path"
 }
 
 generate_tokens() {
@@ -536,9 +396,6 @@ main() {
       ;;
   esac
 
-  configure_docker_registry_ca_if_needed
-  resolve_runtime_ca_bundle
-
   if [[ -z "$PLOY_DB_DSN" ]]; then
     echo "error: PLOY_DB_DSN is required (example: postgres://ploy:ploy@localhost:5432/ploy?sslmode=disable)" >&2
     exit 1
@@ -576,7 +433,6 @@ main() {
   export PLOY_DB_DSN
   export PLOY_CONTAINER_SOCKET_PATH
   export PLOY_SERVER_PORT
-  export PLOY_DEPLOY_CA_BUNDLE
   export WORKER_TOKEN_PATH
   export PLOY_CONTAINER_REGISTRY
 

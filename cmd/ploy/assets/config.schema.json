@@ -30,9 +30,6 @@
         "envs": {
           "$ref": "#/definitions/envMap"
         },
-        "ca": {
-          "$ref": "#/definitions/stringArray"
-        },
         "home": {
           "$ref": "#/definitions/stringArray"
         }
@@ -74,9 +71,6 @@
       "properties": {
         "envs": {
           "$ref": "#/definitions/envMap"
-        },
-        "ca": {
-          "$ref": "#/definitions/stringArray"
         },
         "in": {
           "$ref": "#/definitions/stringArray"

@@ -195,7 +195,7 @@ func TestApplyHydraOverlay_GlobalEnvRouting(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Typed Hydra overlay merge (envs, ca, in, out, home)
+// Typed Hydra overlay merge (envs, in, out, home)
 // ---------------------------------------------------------------------------
 
 func TestApplyHydraOverlay_TypedMerge(t *testing.T) {
@@ -217,21 +217,6 @@ func TestApplyHydraOverlay_TypedMerge(t *testing.T) {
 				"mig": {Envs: map[string]string{"OVERLAY_KEY": "overlay_val", "SHARED": "from_overlay"}},
 			},
 			checkEnvs: map[string]string{"SPEC_KEY": "spec_val", "OVERLAY_KEY": "overlay_val", "SHARED": "from_spec"},
-		},
-		{
-			name: "ca append with dedup",
-			spec: map[string]any{
-				"steps": []any{
-					map[string]any{
-						"image": "img:latest",
-						"ca":    []any{"abcdef1234ab", "/ca/extra.pem"},
-					},
-				},
-			},
-			overlays: map[string]*HydraJobConfig{
-				"mig": {CA: []string{"abcdef1234ab", "/ca/new.pem"}},
-			},
-			slices: []sliceCheck{{"ca", 3, ""}},
 		},
 		{
 			name: "in out home merge by destination",
@@ -266,10 +251,10 @@ func TestApplyHydraOverlay_TypedMerge(t *testing.T) {
 				},
 			},
 			overlays: map[string]*HydraJobConfig{
-				"mig": {Envs: map[string]string{"K": "V"}, CA: []string{"abc1234567ab"}, In: []string{"/f:/in/f.txt"}},
+				"mig": {Envs: map[string]string{"K": "V"}, In: []string{"/f:/in/f.txt"}},
 			},
 			checkEnvs: map[string]string{"K": "V"},
-			slices:    []sliceCheck{{"ca", 1, ""}},
+			slices:    []sliceCheck{{"in", 1, "/f:/in/f.txt"}},
 		},
 		{
 			name:      "nil overlay does nothing",
@@ -511,7 +496,6 @@ func TestApplyHydraOverlay_ThreeLayerPrecedence(t *testing.T) {
 				"steps": []any{
 					map[string]any{
 						"image": "img:latest",
-						"ca":    []any{"cccccc1234ab"},
 						"in":    []any{"/spec/data:/in/data.json"},
 						"home":  []any{"/spec/auth:.auth/config.json:ro"},
 					},
@@ -524,7 +508,6 @@ func TestApplyHydraOverlay_ThreeLayerPrecedence(t *testing.T) {
 			overlays: map[string]*HydraJobConfig{
 				"mig": {
 					Envs: map[string]string{"OVERLAY_ONLY": "overlay", "SHARED_ALL": "from_overlay", "GLOBAL_ONLY": "overlay_override"},
-					CA:   []string{"aaaaaa1234ab", "cccccc1234ab"},
 					In:   []string{"/overlay/extra:/in/extra.json", "/overlay/data:/in/data.json"},
 					Home: []string{"/overlay/auth:.auth/config.json"},
 				},
@@ -532,7 +515,6 @@ func TestApplyHydraOverlay_ThreeLayerPrecedence(t *testing.T) {
 			jobType:   domaintypes.JobTypeMig,
 			checkEnvs: map[string]string{"SHARED_ALL": "from_spec", "SPEC_ONLY": "spec", "OVERLAY_ONLY": "overlay", "GLOBAL_ONLY": "overlay_override"},
 			slices: []sliceCheck{
-				{"ca", 2, "cccccc1234ab"},
 				{"in", 2, "/spec/data:/in/data.json"},
 				{"home", 1, "/spec/auth:.auth/config.json:ro"},
 			},
@@ -704,7 +686,6 @@ func TestConfigHolder_HydraOverlays(t *testing.T) {
 
 	h := &ConfigHolder{}
 
-	h.SetConfigCA("mig", []string{"abc1234567ab"})
 	h.SetConfigHome("mig", []ConfigHomeEntry{{Entry: "abc1234567ab:.codex/auth.json:ro", Dst: ".codex/auth.json", Section: "mig"}})
 	h.SetConfigIn("mig", []ConfigInEntry{{Entry: "abc1234567ab:/in/code.yaml", Dst: "/in/code.yaml", Section: "mig"}})
 
@@ -712,9 +693,6 @@ func TestConfigHolder_HydraOverlays(t *testing.T) {
 	overlays := h.GetHydraOverlays()
 	if overlays == nil || overlays["mig"] == nil {
 		t.Fatal("expected mig overlay")
-	}
-	if got := overlays["mig"].CA; len(got) != 1 || got[0] != "abc1234567ab" {
-		t.Fatalf("mig CA = %v, want [abc1234567ab]", got)
 	}
 	if got := overlays["mig"].Home; len(got) != 1 || got[0] != "abc1234567ab:.codex/auth.json:ro" {
 		t.Fatalf("mig Home = %v, want [abc1234567ab:.codex/auth.json:ro]", got)
@@ -724,13 +702,9 @@ func TestConfigHolder_HydraOverlays(t *testing.T) {
 	}
 
 	// Verify returned overlays are defensive copies.
-	overlays["mig"].CA[0] = "mutated"
 	overlays["mig"].Home[0] = "mutated"
 	overlays["mig"].In[0] = "mutated"
 	overlaysAgain := h.GetHydraOverlays()
-	if overlaysAgain["mig"].CA[0] != "abc1234567ab" {
-		t.Fatal("expected CA copy isolation")
-	}
 	if overlaysAgain["mig"].Home[0] != "abc1234567ab:.codex/auth.json:ro" {
 		t.Fatal("expected Home copy isolation")
 	}
@@ -756,7 +730,6 @@ func TestMutateClaimSpec_HydraOverlayInPipeline(t *testing.T) {
 		},
 		hydraOverlays: map[string]*HydraJobConfig{
 			"mig": {
-				CA: []string{"abc1234567ab"},
 				In: []string{"/data:/in/data.json"},
 			},
 		},
@@ -767,80 +740,8 @@ func TestMutateClaimSpec_HydraOverlayInPipeline(t *testing.T) {
 	}
 	assertEnvs(t, out, map[string]string{"EXISTING": "1", "GLOBAL": "g"}, nil, nil)
 	assertSlices(t, firstStepMap(t, out), []sliceCheck{
-		{"ca", 1, "abc1234567ab"},
 		{"in", 1, "/data:/in/data.json"},
 	})
-}
-
-func TestApplyHydraOverlay_CanonicalCAInjection(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name           string
-		jobType        domaintypes.JobType
-		jobName        string
-		overlaySection string
-		wantPhase      string
-		wantCA         string
-		wantOnSteps    bool
-	}{
-		{
-			name:           "mig_section_applies_to_steps",
-			jobType:        domaintypes.JobTypeMig,
-			overlaySection: "mig",
-			wantCA:         "abcdef1234567",
-			wantOnSteps:    true,
-		},
-		{
-			name:           "pre_gate_section_applies_to_build_gate_pre",
-			jobType:        domaintypes.JobTypePreGate,
-			overlaySection: "pre_gate",
-			wantPhase:      "pre",
-			wantCA:         "pregate1234567",
-		},
-		{
-			name:           "post_gate_section_applies_to_build_gate_post",
-			jobType:        domaintypes.JobTypePostGate,
-			overlaySection: "post_gate",
-			wantPhase:      "post",
-			wantCA:         "postgate1234567",
-		},
-	}
-
-	for _, tt := range tests {
-		tt := tt
-		t.Run(tt.name, func(t *testing.T) {
-			m := map[string]any{
-				"steps": []any{
-					map[string]any{"image": "img:latest"},
-					map[string]any{"image": "img2:latest", "ca": []any{"111111111111"}},
-				},
-			}
-			err := applyHydraOverlayMutator(m, claimSpecMutatorInput{
-				job:     store.Job{Meta: testJobMetaForHydraRouting(tt.jobType, tt.jobName)},
-				jobType: tt.jobType,
-				hydraOverlays: map[string]*HydraJobConfig{
-					tt.overlaySection: {CA: []string{tt.wantCA}},
-				},
-			})
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-
-			if tt.wantOnSteps {
-				steps := m["steps"].([]any)
-				step0 := steps[0].(map[string]any)
-				step1 := steps[1].(map[string]any)
-				assertSlice(t, step0, "ca", 1, tt.wantCA)
-				assertSlice(t, step1, "ca", 2, "111111111111")
-				return
-			}
-
-			bg := m["build_gate"].(map[string]any)
-			phase := bg[tt.wantPhase].(map[string]any)
-			assertSlice(t, phase, "ca", 1, tt.wantCA)
-		})
-	}
 }
 
 // ---------------------------------------------------------------------------

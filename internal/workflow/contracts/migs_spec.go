@@ -104,7 +104,7 @@ type MigSpec struct {
 	// ArtifactName is an optional custom name for the uploaded artifact bundle.
 	ArtifactName string `json:"artifact_name,omitempty" yaml:"artifact_name,omitempty"`
 
-	// BundleMap maps content hashes used in CA/In/Out/Home entries to their
+	// BundleMap maps content hashes used in In/Out/Home entries to their
 	// spec bundle download identifiers (bundle IDs). Populated by the CLI
 	// compiler during spec submission. The nodeagent uses this to resolve
 	// shortHash → bundleID for resource download during materialization.
@@ -128,9 +128,6 @@ type MigStep struct {
 
 	// Envs holds environment variables specific to this step.
 	Envs map[string]string `json:"envs,omitempty" yaml:"envs,omitempty"`
-
-	// CA lists canonical CA certificate entries (shortHash values).
-	CA []string `json:"ca,omitempty" yaml:"ca,omitempty"`
 
 	// In lists canonical read-only input entries ("shortHash:/in/dst").
 	In []string `json:"in,omitempty" yaml:"in,omitempty"`
@@ -176,7 +173,7 @@ func (s MigSpec) Validate() error {
 				return err
 			}
 		}
-		if err := validateHydraFields(mig.CA, mig.In, mig.Out, mig.Home, fmt.Sprintf("steps[%d]", i)); err != nil {
+		if err := validateHydraFields(mig.In, mig.Out, mig.Home, fmt.Sprintf("steps[%d]", i)); err != nil {
 			return err
 		}
 	}
@@ -205,9 +202,6 @@ func (s MigSpec) Validate() error {
 				continue
 			}
 			if err := validateBuildGateStackConfig(pair.phase.Stack, pair.prefix+".stack"); err != nil {
-				return err
-			}
-			if err := ValidateHydraCAEntries(pair.phase.CA, pair.prefix+".ca"); err != nil {
 				return err
 			}
 			if err := validateBuildGateProfileOverride(pair.phase.GateProfile, pair.prefix+".gate_profile"); err != nil {

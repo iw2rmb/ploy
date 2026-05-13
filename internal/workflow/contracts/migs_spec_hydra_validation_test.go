@@ -36,12 +36,6 @@ func TestMigSpecValidate_HydraFieldsStep(t *testing.T) {
 			}`,
 		},
 		{
-			name: "valid ca entry",
-			input: `{
-				"steps": [{"image": "img:latest", "ca": ["abcdef0123456"]}]
-			}`,
-		},
-		{
 			name: "in entry wrong domain",
 			input: `{
 				"steps": [{"image": "img:latest", "in": ["abcdef0:/tmp/config.json"]}]
@@ -75,13 +69,6 @@ func TestMigSpecValidate_HydraFieldsStep(t *testing.T) {
 				"steps": [{"image": "img:latest", "in": ["abcdef0:/in/../etc/passwd"]}]
 			}`,
 			wantErr: "steps[0].in[0]",
-		},
-		{
-			name: "ca entry invalid hash",
-			input: `{
-				"steps": [{"image": "img:latest", "ca": ["not-hex!"]}]
-			}`,
-			wantErr: "steps[0].ca[0]",
 		},
 		{
 			name: "duplicate in destinations rejected",

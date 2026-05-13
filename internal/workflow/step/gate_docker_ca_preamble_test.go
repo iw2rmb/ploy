@@ -69,22 +69,16 @@ func TestDockerGateExecutor_NoPreambleInCommand(t *testing.T) {
 
 			cmd := rt.captured.Command[2]
 
-			// CA delivery is now via Hydra CA mounts; no env preamble should
-			// be injected into gate commands.
-			if strings.Contains(cmd, "PLOY_CA_CERTS") {
-				t.Errorf("unexpected PLOY_CA_CERTS preamble in command: %q", cmd)
-			}
-
-			// The build command must still be present.
-			if !strings.Contains(cmd, tc.expectInCmd) {
-				t.Errorf("expected %q in command, got %q", tc.expectInCmd, cmd)
+				// The build command must still be present.
+				if !strings.Contains(cmd, tc.expectInCmd) {
+					t.Errorf("expected %q in command, got %q", tc.expectInCmd, cmd)
 			}
 		})
 	}
 }
 
 // TestDockerGateExecutor_NoPreambleOnPrepOverride verifies that prep override
-// commands contain no env preamble (CA delivery uses Hydra mount entries).
+// commands contain no extra preamble content.
 func TestDockerGateExecutor_NoPreambleOnPrepOverride(t *testing.T) {
 	t.Parallel()
 
@@ -128,12 +122,9 @@ func TestDockerGateExecutor_NoPreambleOnPrepOverride(t *testing.T) {
 
 			cmd := rt.captured.Command[len(rt.captured.Command)-1]
 
-			if strings.Contains(cmd, "PLOY_CA_CERTS") {
-				t.Errorf("unexpected PLOY_CA_CERTS preamble in prep override command: %q", cmd)
-			}
-			if !strings.Contains(cmd, "prep-gate-test") {
-				t.Errorf("expected original command content in prep override command, got %q", cmd)
-			}
+				if !strings.Contains(cmd, "prep-gate-test") {
+					t.Errorf("expected original command content in prep override command, got %q", cmd)
+				}
 		})
 	}
 }

@@ -1,7 +1,7 @@
 // mig_run_spec.go separates spec file handling from mig run execution.
 //
 // This file contains buildSpecPayload which parses YAML/JSON spec files
-// and compiles Hydra file-record entries (ca/in/out/home) into canonical
+// and compiles Hydra file-record entries (in/out/home) into canonical
 // shortHash:dst form. Specs use a single canonical shape:
 //   - steps[] array with one entry per step (even single-step runs)
 //   - global build gate policy under build_gate
@@ -485,7 +485,7 @@ func applyConfigOverlayInPlace(spec map[string]any) error {
 // Processing order:
 //  1. Load spec file (YAML or JSON format) if provided
 //  2. Preprocess: resolve !include composition, image env, envs expansion
-//  3. Compile Hydra records: ca/in/out/home authoring entries → canonical shortHash:dst form
+//  3. Compile Hydra records: in/out/home authoring entries → canonical shortHash:dst form
 //  4. Apply CLI flag overrides (higher precedence than spec file) to top-level fields
 //  5. Apply defaults (e.g., gitlab_domain when gitlab_pat is set)
 //

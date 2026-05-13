@@ -1,0 +1,24 @@
+schema_version: 1
+repo_id: default
+runner_mode: simple
+stack:
+  language: rust
+  tool: cargo
+  release: "1.76"
+targets:
+  active: all_tests
+  build:
+    status: not_attempted
+    command: cargo check
+    env: {}
+  unit:
+    status: not_attempted
+    command: cargo test
+    env: {}
+  all_tests:
+    status: not_attempted
+    command: cargo test
+    env: {}
+orchestration:
+  pre: []
+  post: []

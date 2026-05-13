@@ -22,9 +22,6 @@ export PLOY_OBJECTSTORE_SECRET_KEY='...'
 export PLOY_VERSION='v0.1.0'                    # optional; defaults to CLI version when semver
 
 ploy cluster deploy --cluster local
-
-# If you need custom CA certificates, register them via typed config:
-# ploy config ca set --file /path/to/ca-bundle.pem
 ```
 
 Notes:
@@ -93,8 +90,6 @@ run repeatedly.
   - set DSN and verify PostgreSQL is reachable from containers.
 - Port `8080` conflict:
   - set `PLOY_SERVER_PORT` (for example `18080`).
-- TLS issues pulling images:
-  - register the CA bundle via `ploy config ca set --file /path/to/ca-bundle.pem` and rerun `ploy cluster deploy`.
 - Node cannot run containers:
   - verify `PLOY_CONTAINER_SOCKET_PATH` (default `/var/run/docker.sock`).
 - Logs:

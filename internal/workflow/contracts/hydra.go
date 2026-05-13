@@ -1,12 +1,10 @@
 // hydra.go defines Hydra canonical stored-entry parsers and validators for
-// the envs/ca/in/out/home contract fields.
+// the envs/in/out/home contract fields.
 //
 // Canonical stored-entry formats:
 //   - in:   "shortHash:dst"      where dst starts with /in/
 //   - out:  "shortHash:dst"      where dst starts with /out/
 //   - home: "shortHash:dst{:ro}" where dst is $HOME-relative (no leading /)
-//   - ca:   "shortHash"          plain hex hash
-//
 // shortHash is a hex-only, colon-free prefix of the full content hash.
 package contracts
 
@@ -24,25 +22,10 @@ var ValidHydraSections = map[string]bool{
 	"mig":       true,
 }
 
-// ValidCAConfigSections lists the known section names for config ca entries.
-var ValidCAConfigSections = map[string]bool{
-	"pre_gate":  true,
-	"post_gate": true,
-	"mig":       true,
-}
-
 // ValidateHydraSection returns an error if section is not a known Hydra section.
 func ValidateHydraSection(section string) error {
 	if !ValidHydraSections[section] {
 		return fmt.Errorf("invalid hydra section %q (must be one of: mig, post_gate, pre_gate)", section)
-	}
-	return nil
-}
-
-// ValidateCAConfigSection returns an error if section is not valid for config ca.
-func ValidateCAConfigSection(section string) error {
-	if !ValidCAConfigSections[section] {
-		return fmt.Errorf("invalid config ca section %q (must be one of: mig, post_gate, pre_gate)", section)
 	}
 	return nil
 }
@@ -129,15 +112,6 @@ func (p ParsedStoredEntry) CanonicalHomeEntry() string {
 	return s
 }
 
-// ParseStoredCAEntry validates a canonical `ca` entry: a plain shortHash.
-func ParseStoredCAEntry(s string) (string, error) {
-	trimmed := strings.TrimSpace(s)
-	if !shortHashPattern.MatchString(trimmed) {
-		return "", fmt.Errorf("ca entry %q: must be a valid short hash (7-64 hex chars)", s)
-	}
-	return trimmed, nil
-}
-
 // ValidateHomeDestination validates a home destination path without requiring
 // a full canonical entry. The destination must be relative, non-empty, cleaned,
 // and free of path traversal.
@@ -203,28 +177,9 @@ func ValidateHydraHomeEntries(entries []string, prefix string) error {
 	return nil
 }
 
-// ValidateHydraCAEntries validates a slice of canonical `ca` entries.
-func ValidateHydraCAEntries(entries []string, prefix string) error {
-	seen := make(map[string]struct{}, len(entries))
-	for i, entry := range entries {
-		hash, err := ParseStoredCAEntry(entry)
-		if err != nil {
-			return fmt.Errorf("%s[%d]: %w", prefix, i, err)
-		}
-		if _, dup := seen[hash]; dup {
-			return fmt.Errorf("%s[%d]: duplicate hash %q", prefix, i, hash)
-		}
-		seen[hash] = struct{}{}
-	}
-	return nil
-}
-
-// validateHydraFields validates the Hydra fields (ca, in, out, home) on a
+// validateHydraFields validates the Hydra fields (in, out, home) on a
 // container spec (step or heal action).
-func validateHydraFields(ca, in, out, home []string, prefix string) error {
-	if err := ValidateHydraCAEntries(ca, prefix+".ca"); err != nil {
-		return err
-	}
+func validateHydraFields(in, out, home []string, prefix string) error {
 	if err := ValidateHydraInEntries(in, prefix+".in"); err != nil {
 		return err
 	}

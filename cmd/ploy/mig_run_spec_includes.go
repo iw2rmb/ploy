@@ -356,8 +356,6 @@ func normalizeIncludedLocalPaths(node *yaml.Node, sourcePath string) error {
 		}
 
 		switch key.Value {
-		case "ca":
-			normalizeCAEntries(value, sourcePath)
 		case "in":
 			normalizeMountEntries(value, sourcePath, false)
 		case "out":
@@ -371,23 +369,6 @@ func normalizeIncludedLocalPaths(node *yaml.Node, sourcePath string) error {
 		}
 	}
 	return nil
-}
-
-func normalizeCAEntries(node *yaml.Node, sourcePath string) {
-	if node.Kind != yaml.SequenceNode {
-		return
-	}
-	for _, entry := range node.Content {
-		entry = derefAlias(entry)
-		if entry.Kind != yaml.ScalarNode {
-			continue
-		}
-		s := strings.TrimSpace(entry.Value)
-		if shortHashPattern.MatchString(s) {
-			continue
-		}
-		entry.Value = normalizeLocalSourcePath(sourcePath, s)
-	}
 }
 
 func normalizeMountEntries(node *yaml.Node, sourcePath string, isHome bool) {

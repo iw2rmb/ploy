@@ -70,7 +70,7 @@ type Request struct {
 	// shared inputs/outputs across job stages.
 	ShareDir string
 	// StagingDir is an optional path to a directory containing pre-materialized
-	// Hydra resources. Each CA/In/Out/Home entry is mounted from StagingDir/<shortHash>.
+	// Hydra resources. Each In/Out/Home entry is mounted from StagingDir/<shortHash>.
 	StagingDir string
 }
 

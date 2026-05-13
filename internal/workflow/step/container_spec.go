@@ -105,20 +105,6 @@ func buildContainerSpec(runID types.RunID, jobID types.JobID, manifest contracts
 	// Mount Hydra materialized resources from the staging directory.
 	// Each entry references a shortHash; staged content lives at stagingDir/<shortHash>.
 	if strings.TrimSpace(stagingDir) != "" {
-		// CA entries: mount at deterministic CA cert path (read-only).
-		// Archives are rooted under "content" (see buildSourceArchive), so
-		// the mount source must include the content subdirectory.
-		for _, entry := range manifest.CA {
-			hash, err := contracts.ParseStoredCAEntry(entry)
-			if err != nil {
-				return ContainerSpec{}, fmt.Errorf("ca entry %q: %w", entry, err)
-			}
-			mounts = append(mounts, ContainerMount{
-				Source:   filepath.Join(stagingDir, hash, "content"),
-				Target:   "/etc/ploy/ca/" + hash,
-				ReadOnly: true,
-			})
-		}
 		// In entries:
 		// - when inDir is present, entries are seeded into inDir and exposed via
 		//   the single /in mount (no nested bind mounts under /in/*).

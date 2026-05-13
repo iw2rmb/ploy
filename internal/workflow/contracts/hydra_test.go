@@ -223,61 +223,6 @@ func TestParseStoredHomeEntry(t *testing.T) {
 	}
 }
 
-func TestParseStoredCAEntry(t *testing.T) {
-	tests := []struct {
-		name    string
-		input   string
-		want    string
-		wantErr string
-	}{
-		{
-			name:  "valid hash",
-			input: "abcdef0123456",
-			want:  "abcdef0123456",
-		},
-		{
-			name:  "valid 7-char hash",
-			input: "abcdef0",
-			want:  "abcdef0",
-		},
-		{
-			name:    "invalid chars",
-			input:   "NOT_HEX",
-			wantErr: "must be a valid short hash",
-		},
-		{
-			name:    "too short",
-			input:   "abc",
-			wantErr: "must be a valid short hash",
-		},
-		{
-			name:    "empty",
-			input:   "",
-			wantErr: "must be a valid short hash",
-		},
-	}
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			got, err := ParseStoredCAEntry(tc.input)
-			if tc.wantErr != "" {
-				if err == nil {
-					t.Fatalf("expected error containing %q, got nil", tc.wantErr)
-				}
-				if !strings.Contains(err.Error(), tc.wantErr) {
-					t.Fatalf("error %q does not contain %q", err.Error(), tc.wantErr)
-				}
-				return
-			}
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if got != tc.want {
-				t.Errorf("got %q, want %q", got, tc.want)
-			}
-		})
-	}
-}
-
 func TestValidateHydraInEntries_DuplicateDst(t *testing.T) {
 	err := ValidateHydraInEntries([]string{
 		"abcdef0:/in/a",
@@ -329,30 +274,5 @@ func TestValidateHydraSection(t *testing.T) {
 		if err := ValidateHydraSection(s); err == nil {
 			t.Errorf("ValidateHydraSection(%q) = nil, want error", s)
 		}
-	}
-}
-
-func TestValidateCAConfigSection(t *testing.T) {
-	t.Parallel()
-
-	for _, s := range []string{"pre_gate", "post_gate", "mig"} {
-		if err := ValidateCAConfigSection(s); err != nil {
-			t.Errorf("ValidateCAConfigSection(%q) = %v, want nil", s, err)
-		}
-	}
-	for _, s := range []string{"", "unknown", "mr", "server", "node"} {
-		if err := ValidateCAConfigSection(s); err == nil {
-			t.Errorf("ValidateCAConfigSection(%q) = nil, want error", s)
-		}
-	}
-}
-
-func TestValidateHydraCAEntries_DuplicateHash(t *testing.T) {
-	err := ValidateHydraCAEntries([]string{"abcdef0", "abcdef0"}, "test")
-	if err == nil {
-		t.Fatal("expected duplicate hash error")
-	}
-	if !strings.Contains(err.Error(), "duplicate hash") {
-		t.Fatalf("error %q does not mention duplicate hash", err.Error())
 	}
 }

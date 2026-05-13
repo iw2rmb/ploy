@@ -38,9 +38,6 @@ type StepManifest struct {
 	// logged.
 	Options map[string]any
 
-	// CA lists canonical CA certificate entries (shortHash values).
-	CA []string
-
 	// In lists canonical read-only input entries ("shortHash:/in/dst").
 	In []string
 

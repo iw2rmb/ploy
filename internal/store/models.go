@@ -58,12 +58,6 @@ type ConfigBundleMap struct {
 	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
 }
 
-type ConfigCa struct {
-	Hash      string             `json:"hash"`
-	Section   string             `json:"section"`
-	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
-}
-
 type ConfigEnv struct {
 	Key       string             `json:"key"`
 	Target    string             `json:"target"`

@@ -65,7 +65,15 @@ func TestGateDocker_StackGate_PreCheckPass(t *testing.T) {
 // TestGateDocker_StackGate_PreCheckFailure consolidates mismatch, ambiguous, and unknown scenarios.
 func TestGateDocker_StackGate_PreCheckFailure(t *testing.T) {
 	t.Setenv("PLOY_CONTAINER_REGISTRY", "ghcr.io/iw2rmb/ploy")
-	expectedRuntimeImage := "ghcr.io/iw2rmb/ploy/maven:jdk17"
+	expectedRuntimeImage, err := resolveImageForExpectation(
+		buildGateDefaultStacksCatalogPath(),
+		nil,
+		contracts.StackExpectation{Language: "java", Tool: "maven", Release: "17"},
+		true,
+	)
+	if err != nil {
+		t.Fatalf("resolve expected runtime image: %v", err)
+	}
 
 	tests := []struct {
 		name            string
@@ -200,6 +208,15 @@ java { toolchain { languageVersion = JavaLanguageVersion.of(17) } }`
 // TestGateDocker_StackGate_ImageResolution consolidates image resolution scenarios.
 func TestGateDocker_StackGate_ImageResolution(t *testing.T) {
 	t.Setenv("PLOY_CONTAINER_REGISTRY", "ghcr.io/iw2rmb/ploy")
+	defaultMappingImage, err := resolveImageForExpectation(
+		buildGateDefaultStacksCatalogPath(),
+		nil,
+		contracts.StackExpectation{Language: "java", Tool: "maven", Release: "17"},
+		true,
+	)
+	if err != nil {
+		t.Fatalf("resolve default mapping image: %v", err)
+	}
 
 	tests := []struct {
 		name           string
@@ -216,7 +233,7 @@ func TestGateDocker_StackGate_ImageResolution(t *testing.T) {
 		},
 		{
 			name:      "default mapping file",
-			wantImage: "ghcr.io/iw2rmb/ploy/maven:jdk17",
+			wantImage: defaultMappingImage,
 		},
 		{
 			name: "stack-mapped image",

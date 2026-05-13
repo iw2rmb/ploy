@@ -12,8 +12,8 @@ import (
 // returns all key+target pairs sorted by key then target, with secret values redacted.
 func TestConfigEnvListReturnsAllEntries(t *testing.T) {
 	holder := NewConfigHolder(config.GitLabConfig{}, map[string][]GlobalEnvVar{
-		"PLOY_CA_CERTS": {{Value: "-----BEGIN CERTIFICATE-----\n...", Target: domaintypes.GlobalEnvTargetGates, Secret: true}},
-		"API_KEY":       {{Value: "sk-abc123", Target: domaintypes.GlobalEnvTargetSteps, Secret: false}},
+		"SECRET_BLOB": {{Value: "opaque-secret", Target: domaintypes.GlobalEnvTargetGates, Secret: true}},
+		"API_KEY":     {{Value: "sk-abc123", Target: domaintypes.GlobalEnvTargetSteps, Secret: false}},
 	})
 
 	handler := listGlobalEnvHandler(holder)
@@ -28,7 +28,7 @@ func TestConfigEnvListReturnsAllEntries(t *testing.T) {
 	}
 
 	// Verify sorted order by key.
-	if resp[0].Key != "API_KEY" || resp[1].Key != "PLOY_CA_CERTS" {
+	if resp[0].Key != "API_KEY" || resp[1].Key != "SECRET_BLOB" {
 		t.Errorf("entries not sorted: got %v, %v", resp[0].Key, resp[1].Key)
 	}
 

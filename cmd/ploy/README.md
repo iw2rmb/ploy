@@ -405,7 +405,7 @@ ploy completion <shell> --help
 - `--spec` — Path to a YAML/JSON spec file defining mig parameters and Build Gate settings for `mig run`. CLI flags (e.g., `--job-image`, `--gitlab-pat`)
   override corresponding spec values when both are present. Specs use canonical `steps[]`
   shape for both single-step and multi-step runs. Each step supports
-  `image`/`command`/`envs` plus Hydra file-record fields (`ca`, `in`, `out`, `home`)
+  `image`/`command`/`envs` plus Hydra file-record fields (`in`, `out`, `home`)
   and cross-step input references (`in_from`)
   using shared runtime paths like `/share/java.classpath` or
   `extract-usage@mig://out/dependency-usage.nofilter.json`
@@ -457,7 +457,7 @@ See `docs/migs-lifecycle.md` § 7.2 for the complete SSE payload specification.
 
 The `ploy config env` commands manage global environment variables that are automatically
 injected into cluster components. This provides a centralized way to configure
-credentials, CA bundles, and other shared settings without embedding them in every spec file.
+credentials and other shared settings without embedding them in every spec file.
 
 ### Key Concepts
 
@@ -500,18 +500,12 @@ ploy config env set --key CUSTOM_VAR --value myvalue --on gates --secret=false
 # Delete a variable (use --from when key exists for multiple targets)
 ploy config env unset --key OLD_VAR
 
-# CA certificates (typed Hydra field)
-# Sections: pre_gate, post_gate, mig
-ploy config ca set --file ca-bundle.pem --section pre_gate --section post_gate
-ploy config ca ls
-ploy config ca unset --hash <HASH> --section pre_gate
 ```
 
 ### Common Variables
 
 | Variable / Field | Description | Recommended Target |
 |------------------|-------------|-------------------|
-| `ca` (typed) | PEM-encoded CA certificates for TLS trust | `all` |
 | `OPENAI_API_KEY` | OpenAI API key for LLM-integrated migs | `jobs` |
 
 See `docs/envs/README.md` § "Global Env Configuration" for detailed semantics and

@@ -342,13 +342,13 @@ func TestHydraResources_Materialization(t *testing.T) {
 		assertFn  func(t *testing.T, stagingDir string)
 	}{
 		{
-			name: "download verify extract via CA entry",
+			name: "download verify extract via in entry",
 			handler: func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Content-Type", "application/gzip")
 				w.WriteHeader(http.StatusOK)
 				_, _ = w.Write(validArchive)
 			},
-			manifest:  contracts.StepManifest{CA: []string{validHash}},
+			manifest:  contracts.StepManifest{In: []string{validHash + ":/in/config.json"}},
 			bundleMap: map[string]string{validHash: "bun-test-123"},
 			assertFn: func(t *testing.T, stagingDir string) {
 				t.Helper()
@@ -385,7 +385,7 @@ func TestHydraResources_Materialization(t *testing.T) {
 			handler: func(w http.ResponseWriter, r *http.Request) {
 				t.Fatal("handler should not be called")
 			},
-			manifest:  contracts.StepManifest{CA: []string{"deadbeef1234"}},
+			manifest:  contracts.StepManifest{In: []string{"deadbeef1234:/in/config.json"}},
 			bundleMap: map[string]string{}, // no mapping
 			wantErr:   true,
 		},
@@ -419,7 +419,7 @@ func TestHydraResources_Materialization(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Mixed in/out/home/ca materialization and mount planning integration
+// Mixed in/out/home materialization and mount planning integration
 // ---------------------------------------------------------------------------
 
 func TestHydraResources_MixedMaterializationAndMountPlanning(t *testing.T) {
@@ -427,11 +427,6 @@ func TestHydraResources_MixedMaterializationAndMountPlanning(t *testing.T) {
 
 	// Build distinct archives for each entry type, using the "content" root
 	// that buildSourceArchive produces.
-	caArchive := buildTestTarGz(t, map[string][]byte{
-		"content": []byte("-----BEGIN CERTIFICATE-----\nFAKE\n-----END CERTIFICATE-----"),
-	}, nil)
-	caHash := digestOf(caArchive)[:12]
-
 	inArchive := buildTestTarGz(t, map[string][]byte{
 		"content": []byte(`{"config":"value"}`),
 	}, nil)
@@ -449,14 +444,12 @@ func TestHydraResources_MixedMaterializationAndMountPlanning(t *testing.T) {
 	homeHash := digestOf(homeArchive)[:12]
 
 	archives := map[string][]byte{
-		caHash:   caArchive,
 		inHash:   inArchive,
 		outHash:  outArchive,
 		homeHash: homeArchive,
 	}
 
 	bundleMap := map[string]string{
-		caHash:   "bun-ca",
 		inHash:   "bun-in",
 		outHash:  "bun-out",
 		homeHash: "bun-home",
@@ -478,7 +471,6 @@ func TestHydraResources_MixedMaterializationAndMountPlanning(t *testing.T) {
 	defer srv.Close()
 
 	manifest := contracts.StepManifest{
-		CA:        []string{caHash},
 		In:        []string{inHash + ":/in/config.json"},
 		Out:       []string{outHash + ":/out/results"},
 		Home:      []string{homeHash + ":.auth.json:ro"},
@@ -488,27 +480,19 @@ func TestHydraResources_MixedMaterializationAndMountPlanning(t *testing.T) {
 	rc := newTestController(t, newAgentConfig(srv.URL))
 	stagingDir := t.TempDir()
 
-	// 1. Materialize all 4 entry types in a single call.
+	// 1. Materialize all entry types in a single call.
 	if err := rc.materializeHydraResources(t.Context(), manifest, bundleMap, stagingDir); err != nil {
 		t.Fatalf("materializeHydraResources: %v", err)
 	}
 
 	// 2. Verify all unique hashes were staged.
-	for _, hash := range []string{caHash, inHash, outHash, homeHash} {
+	for _, hash := range []string{inHash, outHash, homeHash} {
 		if _, err := os.Stat(filepath.Join(stagingDir, hash)); err != nil {
 			t.Errorf("staging dir for hash %s missing: %v", hash, err)
 		}
 	}
 
 	// 3. Verify staged content at the content subdirectory level.
-	gotCA, err := os.ReadFile(filepath.Join(stagingDir, caHash, "content"))
-	if err != nil {
-		t.Fatalf("read CA content: %v", err)
-	}
-	if !bytes.Contains(gotCA, []byte("CERTIFICATE")) {
-		t.Errorf("CA content missing CERTIFICATE marker: %q", gotCA)
-	}
-
 	gotIn, err := os.ReadFile(filepath.Join(stagingDir, inHash, "content"))
 	if err != nil {
 		t.Fatalf("read In content: %v", err)
@@ -542,8 +526,8 @@ func TestHydraResources_MixedMaterializationAndMountPlanning(t *testing.T) {
 		}
 		seen[h] = true
 	}
-	if len(hashes) != 4 {
-		t.Errorf("expected 4 unique hashes, got %d: %v", len(hashes), hashes)
+	if len(hashes) != 3 {
+		t.Errorf("expected 3 unique hashes, got %d: %v", len(hashes), hashes)
 	}
 
 	// 5. Execute out mount planning via SeedOutDirFromStaging and verify
@@ -560,7 +544,7 @@ func TestHydraResources_MixedMaterializationAndMountPlanning(t *testing.T) {
 		t.Errorf("seeded out = %q, want %q", seededOut, "seed content")
 	}
 
-	// 6. Assert mount source layout for in/ca/home matches buildContainerSpec
+	// 6. Assert mount source layout for in/home matches buildContainerSpec
 	//    expectations: each mount source is stagingDir/<hash>/content.
 	type wantMount struct {
 		hash     string
@@ -569,7 +553,6 @@ func TestHydraResources_MixedMaterializationAndMountPlanning(t *testing.T) {
 		readOnly bool
 	}
 	wantMounts := []wantMount{
-		{hash: caHash, field: "ca", target: "/etc/ploy/ca/" + caHash, readOnly: true},
 		{hash: inHash, field: "in", target: "/in/config.json", readOnly: true},
 		{hash: homeHash, field: "home", target: "/root/.auth.json", readOnly: true},
 	}
@@ -593,7 +576,6 @@ func TestHydraResources_MixedMaterializationAndMountPlanning(t *testing.T) {
 			Mode:        contracts.StepInputModeReadWrite,
 			SnapshotCID: types.CID("bafy-test"),
 		}},
-		CA:        manifest.CA,
 		In:        manifest.In,
 		Out:       manifest.Out,
 		Home:      manifest.Home,

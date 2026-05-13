@@ -6,7 +6,7 @@ set -euo pipefail
 # Validates that spec bundles containing dangerous entries are rejected by the
 # node agent with deterministic error messages, and runs end with status "Fail"
 # rather than "Success". This tests the Hydra bundle safety layer which guards
-# all content-addressed file materialization (ca, in, out, home).
+# all content-addressed file materialization (in, out, home).
 #
 # Part 1 — traversal:
 #   1. Craft a tar.gz archive containing a traversal entry ("../evil.txt").

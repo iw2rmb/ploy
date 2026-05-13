@@ -1,16 +1,14 @@
 // mig_run_spec_hydra.go implements the Hydra file-record compiler for CLI spec processing.
 //
-// The compiler resolves authoring-form ca/in/out/home entries into canonical
+// The compiler resolves authoring-form in/out/home entries into canonical
 // shortHash:dst form suitable for contract validation and server submission.
 //
 // Authoring input formats:
-//   - ca:   source-path
 //   - in:   src:dst          (right-biased split, dst treated as /in-relative)
 //   - out:  src:dst          (right-biased split, dst treated as /out-relative)
 //   - home: src:dst{:ro}     (right-biased split, dst is $HOME-relative)
 //
 // After compilation, entries are rewritten to:
-//   - ca:   shortHash
 //   - in:   shortHash:/in/dst
 //   - out:  shortHash:/out/dst
 //   - home: shortHash:dst{:ro}
@@ -141,7 +139,7 @@ func guardAuthoringTraversal(p string) error {
 }
 
 // compileHydraRecordsInPlace walks all container blocks in the spec and compiles
-// authoring-form ca/in/out/home entries into canonical shortHash:dst form.
+// authoring-form in/out/home entries into canonical shortHash:dst form.
 // Returns nil immediately when no authoring entries are present.
 func compileHydraRecordsInPlace(ctx context.Context, base *url.URL, client *http.Client, spec map[string]any, specBaseDir string) error {
 	type blockRef struct {
@@ -201,7 +199,7 @@ func compileHydraRecordsInPlace(ctx context.Context, base *url.URL, client *http
 // hasAuthoringEntries checks whether a block contains any non-canonical entries
 // that require compilation.
 func hasAuthoringEntries(block map[string]any) bool {
-	for _, key := range []string{"ca", "in", "out", "home"} {
+	for _, key := range []string{"in", "out", "home"} {
 		entries, ok := block[key].([]any)
 		if !ok {
 			continue
@@ -221,9 +219,6 @@ func hasAuthoringEntries(block map[string]any) bool {
 
 // isAlreadyCanonical checks if an entry is already in canonical stored form.
 func isAlreadyCanonical(field, s string) bool {
-	if field == "ca" {
-		return shortHashPattern.MatchString(strings.TrimSpace(s))
-	}
 	// For in/out/home, check if the first segment before : is a short hash.
 	idx := strings.Index(s, ":")
 	if idx <= 0 {
@@ -234,9 +229,6 @@ func isAlreadyCanonical(field, s string) bool {
 
 // compileHydraBlock compiles authoring entries in a single container block.
 func compileHydraBlock(ctx context.Context, base *url.URL, client *http.Client, block map[string]any, prefix, specBaseDir string, seen map[string]string, bundleMap map[string]string) error {
-	if err := compileCAEntries(ctx, base, client, block, prefix, specBaseDir, seen, bundleMap); err != nil {
-		return err
-	}
 	if err := compileInEntries(ctx, base, client, block, prefix, specBaseDir, seen, bundleMap); err != nil {
 		return err
 	}
@@ -244,38 +236,6 @@ func compileHydraBlock(ctx context.Context, base *url.URL, client *http.Client, 
 		return err
 	}
 	return compileHomeEntries(ctx, base, client, block, prefix, specBaseDir, seen, bundleMap)
-}
-
-func compileCAEntries(ctx context.Context, base *url.URL, client *http.Client, block map[string]any, prefix, specBaseDir string, seen map[string]string, bundleMap map[string]string) error {
-	entries, ok := block["ca"].([]any)
-	if !ok || len(entries) == 0 {
-		return nil
-	}
-	compiled := make([]any, 0, len(entries))
-	dedupSet := make(map[string]bool)
-	for i, e := range entries {
-		s, ok := e.(string)
-		if !ok {
-			return fmt.Errorf("%s.ca[%d]: expected string, got %T", prefix, i, e)
-		}
-		s = strings.TrimSpace(s)
-		var hash string
-		if shortHashPattern.MatchString(s) {
-			hash = s
-		} else {
-			var err error
-			hash, err = compileFileRecord(ctx, base, client, s, specBaseDir, seen, bundleMap)
-			if err != nil {
-				return fmt.Errorf("%s.ca[%d]: %w", prefix, i, err)
-			}
-		}
-		if !dedupSet[hash] {
-			dedupSet[hash] = true
-			compiled = append(compiled, hash)
-		}
-	}
-	block["ca"] = compiled
-	return nil
 }
 
 func compileInEntries(ctx context.Context, base *url.URL, client *http.Client, block map[string]any, prefix, specBaseDir string, seen map[string]string, bundleMap map[string]string) error {

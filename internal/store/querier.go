@@ -78,10 +78,6 @@ type Querier interface {
 	DeleteArtifactBundlesOlderThan(ctx context.Context, createdAt pgtype.Timestamptz) error
 	// Removes a bundle map entry by hash.
 	DeleteConfigBundleMap(ctx context.Context, hash string) error
-	// Removes a CA entry by hash and section.
-	DeleteConfigCA(ctx context.Context, arg DeleteConfigCAParams) error
-	// Removes all CA entries for a section.
-	DeleteConfigCABySection(ctx context.Context, section string) error
 	// Removes a home entry by dst and section.
 	DeleteConfigHome(ctx context.Context, arg DeleteConfigHomeParams) error
 	// Removes all home entries for a section.
@@ -177,12 +173,6 @@ type Querier interface {
 	// Provides ListConfigBundleMap, UpsertConfigBundleMap, DeleteConfigBundleMap.
 	// Returns all bundle map entries ordered by hash for deterministic iteration.
 	ListConfigBundleMap(ctx context.Context) ([]ConfigBundleMap, error)
-	// config_ca.sql — CRUD queries for global CA hash entries (config_ca table).
-	// Provides ListConfigCA, UpsertConfigCA, DeleteConfigCA, DeleteConfigCABySection.
-	// Returns all CA entries ordered by section then hash for deterministic iteration.
-	ListConfigCA(ctx context.Context) ([]ConfigCa, error)
-	// Returns CA entries for a specific section ordered by hash.
-	ListConfigCABySection(ctx context.Context, section string) ([]ConfigCa, error)
 	// config_home.sql — CRUD queries for global home mount entries (config_home table).
 	// Provides ListConfigHome, UpsertConfigHome, DeleteConfigHome, DeleteConfigHomeBySection.
 	// Returns all home entries ordered by section then dst for deterministic iteration.
@@ -322,9 +312,6 @@ type Querier interface {
 	// Inserts or updates a bundle map entry (upsert on primary key hash).
 	// Refreshes bundle_id and updated_at on conflict.
 	UpsertConfigBundleMap(ctx context.Context, arg UpsertConfigBundleMapParams) error
-	// Inserts or updates a CA entry (upsert on composite key (hash, section)).
-	// Refreshes updated_at on conflict.
-	UpsertConfigCA(ctx context.Context, arg UpsertConfigCAParams) error
 	// Inserts or updates a home entry (upsert on composite key (dst, section)).
 	// Refreshes entry and updated_at on conflict (entry may change if hash or ro flag changes).
 	UpsertConfigHome(ctx context.Context, arg UpsertConfigHomeParams) error
