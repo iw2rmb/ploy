@@ -14,15 +14,23 @@ func TestBuildGateImageRule_Specificity(t *testing.T) {
 		want int
 	}{
 		{
-			name: "tool-specific (language+tool+release)",
+			name: "tool-specific with release",
 			rule: BuildGateImageRule{
 				Stack: StackExpectation{Language: "java", Tool: "maven", Release: "17"},
 				Image: "maven:jdk17",
 			},
+			want: 4,
+		},
+		{
+			name: "tool-specific without release",
+			rule: BuildGateImageRule{
+				Stack: StackExpectation{Language: "java", Tool: "maven"},
+				Image: "gate-maven:latest",
+			},
 			want: 3,
 		},
 		{
-			name: "tool-agnostic (language+release)",
+			name: "release-only",
 			rule: BuildGateImageRule{
 				Stack: StackExpectation{Language: "java", Release: "17"},
 				Image: "eclipse-temurin:17-jdk",
@@ -36,6 +44,14 @@ func TestBuildGateImageRule_Specificity(t *testing.T) {
 				Image: "eclipse-temurin:17-jdk",
 			},
 			want: 2,
+		},
+		{
+			name: "language-only fallback",
+			rule: BuildGateImageRule{
+				Stack: StackExpectation{Language: "java"},
+				Image: "gate-generic:java",
+			},
+			want: 1,
 		},
 	}
 
@@ -112,6 +128,22 @@ func TestBuildGateImageRule_Matches(t *testing.T) {
 			exp:  StackExpectation{Language: "java", Tool: "gradle", Release: "17"},
 			want: false,
 		},
+		{
+			name: "language-only matches any release/tool",
+			rule: BuildGateImageRule{
+				Stack: StackExpectation{Language: "java"},
+			},
+			exp:  StackExpectation{Language: "java", Tool: "gradle", Release: "25"},
+			want: true,
+		},
+		{
+			name: "tool-specific rule without release matches any release for that tool",
+			rule: BuildGateImageRule{
+				Stack: StackExpectation{Language: "java", Tool: "maven"},
+			},
+			exp:  StackExpectation{Language: "java", Tool: "maven", Release: "17"},
+			want: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -143,6 +175,13 @@ func TestBuildGateImageRule_SelectorKey(t *testing.T) {
 				Stack: StackExpectation{Language: "java", Release: "17"},
 			},
 			want: "java:17:*",
+		},
+		{
+			name: "language-only uses dual wildcard",
+			rule: BuildGateImageRule{
+				Stack: StackExpectation{Language: "java"},
+			},
+			want: "java:*:*",
 		},
 		{
 			name: "different release",
@@ -194,15 +233,6 @@ func TestBuildGateImageMapping_Validate(t *testing.T) {
 				},
 			},
 			wantErr: "build_gate.images[0].stack.language: required",
-		},
-		{
-			name: "missing release",
-			mapping: BuildGateImageMapping{
-				Images: []BuildGateImageRule{
-					{Stack: StackExpectation{Language: "java"}, Image: "test:latest"},
-				},
-			},
-			wantErr: "build_gate.images[0].stack.release: required",
 		},
 		{
 			name: "missing image",
@@ -435,7 +465,7 @@ func TestMigSpec_Validate_BuildGateImages(t *testing.T) {
 					]
 				}
 			}`,
-			wantErr: "build_gate.images[0].stack.release: required",
+			wantErr: "",
 		},
 		{
 			name: "duplicate selectors",

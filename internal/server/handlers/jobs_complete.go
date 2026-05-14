@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/iw2rmb/ploy/internal/blobstore"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/server"
 	"github.com/iw2rmb/ploy/internal/server/auth"
@@ -25,8 +24,8 @@ type completeJobRequest struct {
 }
 
 // completeJobHandler marks a job as completed with terminal status and stats.
-func completeJobHandler(st store.Store, eventsService *server.EventsService, bp *blobpersist.Service, gateProfilesBS blobstore.Store) http.HandlerFunc {
-	service := NewCompleteJobService(st, eventsService, bp, gateProfilesBS)
+func completeJobHandler(st store.Store, eventsService *server.EventsService, bp *blobpersist.Service) http.HandlerFunc {
+	service := NewCompleteJobService(st, eventsService, bp)
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()

@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -11,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
@@ -181,11 +179,6 @@ type plannedJob struct {
 	RepoSHAIn string
 }
 
-type preGateCreationBinding struct {
-	ProfileID int64
-	JobImage  string
-}
-
 // createJobsFromSpec parses the run spec and creates an explicit next_id-linked job chain.
 // Queue semantics are head-only: the first job is Queued, all successors are Created.
 func createJobsFromSpec(
@@ -207,11 +200,6 @@ func createJobsFromSpec(
 	if !sha40Pattern.MatchString(repoSHA0) {
 		return fmt.Errorf("repo_sha0 must match ^[0-9a-f]{40}$")
 	}
-	preGateBinding, err := resolvePreGateCreationBindingFromStore(ctx, st, repoID, repoSHA0, migsSpec)
-	if err != nil {
-		return fmt.Errorf("resolve pre-gate binding: %w", err)
-	}
-
 	type draft struct {
 		name      string
 		jobType   domaintypes.JobType
@@ -269,15 +257,11 @@ func createJobsFromSpec(
 		if i == 0 {
 			status = domaintypes.JobStatusQueued
 		}
-		jobImage := d.jobImage
-		if d.jobType == domaintypes.JobTypePreGate && preGateBinding != nil && strings.TrimSpace(preGateBinding.JobImage) != "" {
-			jobImage = strings.TrimSpace(preGateBinding.JobImage)
-		}
 		planned = append(planned, plannedJob{
 			ID:        domaintypes.NewJobID(),
 			Name:      d.name,
 			JobType:   d.jobType,
-			JobImage:  jobImage,
+			JobImage:  d.jobImage,
 			Status:    status,
 			StepName:  d.stepName,
 			StepIndex: d.stepIndex,
@@ -299,97 +283,7 @@ func createJobsFromSpec(
 			return fmt.Errorf("create job %q type=%s id=%s: %w", planned[i].Name, planned[i].JobType, planned[i].ID, err)
 		}
 	}
-	if preGateBinding != nil && preGateBinding.ProfileID > 0 {
-		preGateJobID, ok := findPlannedJobIDByType(planned, domaintypes.JobTypePreGate)
-		if !ok {
-			return fmt.Errorf("pre-gate job missing from planned chain")
-		}
-		if err := upsertPreGateCreationProfileLink(ctx, st, preGateJobID, preGateBinding.ProfileID); err != nil {
-			return fmt.Errorf("link pre-gate profile: %w", err)
-		}
-	}
 	return nil
-}
-
-func findPlannedJobIDByType(planned []plannedJob, jobType domaintypes.JobType) (domaintypes.JobID, bool) {
-	for _, p := range planned {
-		if p.JobType == jobType {
-			return p.ID, true
-		}
-	}
-	return "", false
-}
-
-func resolvePreGateCreationBindingFromStore(
-	ctx context.Context,
-	st store.Store,
-	repoID domaintypes.RepoID,
-	repoSHA string,
-	spec *contracts.MigSpec,
-) (*preGateCreationBinding, error) {
-	pgStore, ok := st.(*store.PgStore)
-	if !ok || pgStore == nil {
-		return nil, nil
-	}
-
-	repoIDText := repoID.String()
-	repoSHAText := repoSHA
-	lang, tool, release := preGateStackHintsFromSpec(spec)
-	if lang != "" || tool != "" || release != "" {
-		row, err := pgStore.ResolvePreGateCreationBindingByRepoSHAAndStack(ctx, store.ResolvePreGateCreationBindingByRepoSHAAndStackParams{
-			RepoID:  repoIDText,
-			RepoSha: repoSHAText,
-			Lang:    lang,
-			Tool:    tool,
-			Release: release,
-		})
-		if err == nil {
-			return &preGateCreationBinding{
-				ProfileID: row.ProfileID,
-				JobImage:  row.JobImage,
-			}, nil
-		}
-		if !errors.Is(err, pgx.ErrNoRows) {
-			return nil, err
-		}
-	}
-
-	row, err := pgStore.ResolvePreGateCreationBindingByRepoSHA(ctx, store.ResolvePreGateCreationBindingByRepoSHAParams{
-		RepoID:  repoIDText,
-		RepoSha: repoSHAText,
-	})
-	if err == nil {
-		return &preGateCreationBinding{
-			ProfileID: row.ProfileID,
-			JobImage:  row.JobImage,
-		}, nil
-	}
-	if !errors.Is(err, pgx.ErrNoRows) {
-		return nil, err
-	}
-	return nil, nil
-}
-
-func preGateStackHintsFromSpec(spec *contracts.MigSpec) (lang, tool, release string) {
-	if spec == nil || spec.BuildGate == nil || spec.BuildGate.Pre == nil || spec.BuildGate.Pre.Stack == nil {
-		return "", "", ""
-	}
-	stack := spec.BuildGate.Pre.Stack
-	if !stack.Enabled {
-		return "", "", ""
-	}
-	return strings.TrimSpace(stack.Language), strings.TrimSpace(stack.Tool), strings.TrimSpace(stack.Release)
-}
-
-func upsertPreGateCreationProfileLink(ctx context.Context, st store.Store, jobID domaintypes.JobID, profileID int64) error {
-	pgStore, ok := st.(*store.PgStore)
-	if !ok || pgStore == nil || profileID <= 0 {
-		return nil
-	}
-	return pgStore.UpsertGateJobProfileLink(ctx, store.UpsertGateJobProfileLinkParams{
-		JobID:     jobID.String(),
-		ProfileID: profileID,
-	})
 }
 
 func createPlannedJob(ctx context.Context, st store.Store, runID domaintypes.RunID, repoID domaintypes.RepoID, repoBaseRef string, attempt int32, planned plannedJob) error {

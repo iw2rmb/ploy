@@ -8,17 +8,6 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
-func writeDummyProfile(t *testing.T, path string) {
-	t.Helper()
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		t.Fatalf("mkdir profile dir: %v", err)
-	}
-	const profile = "schema_version: 1\nrepo_id: default\nrunner_mode: simple\nstack:\n  language: java\n  tool: maven\ntargets:\n  active: build\n  build:\n    status: not_attempted\n    command: echo ok\n    env: {}\n  unit:\n    status: not_attempted\n    env: {}\n  all_tests:\n    status: not_attempted\n    env: {}\norchestration:\n  pre: []\n  post: []\n"
-	if err := os.WriteFile(path, []byte(profile), 0o644); err != nil {
-		t.Fatalf("write profile file: %v", err)
-	}
-}
-
 // buildResolverFromRules constructs a resolver directly without validation.
 // Used by table-driven tests where the rule list is the unit under test.
 func buildResolverFromRules(rules ...contracts.BuildGateImageRule) func(*testing.T) (*BuildGateImageResolver, error) {
@@ -41,43 +30,33 @@ func TestBuildGateImageResolver_Resolve(t *testing.T) {
 
 	// Shared file-backed fixtures.
 	releaseCoercionDir := t.TempDir()
-	releaseCoercionPath := filepath.Join(releaseCoercionDir, "stacks.yaml")
-	writeDummyProfile(t, filepath.Join(releaseCoercionDir, "profiles", "java-maven.yaml"))
-	writeDummyProfile(t, filepath.Join(releaseCoercionDir, "profiles", "java-gradle.yaml"))
-	writeDummyProfile(t, filepath.Join(releaseCoercionDir, "profiles", "python.yaml"))
-	if err := os.WriteFile(releaseCoercionPath, []byte(`stacks:
+	releaseCoercionPath := filepath.Join(releaseCoercionDir, "gates.yaml")
+	if err := os.WriteFile(releaseCoercionPath, []byte(`gates:
   - lang: java
     tool: maven
     release: 17
     image: maven:17
-    profile: profiles/java-maven.yaml
   - lang: java
     tool: gradle
     release: 17.0
     image: gradle:17
-    profile: profiles/java-gradle.yaml
   - lang: python
     release: 3.11
     image: python:3.11
-    profile: profiles/python.yaml
 `), 0o644); err != nil {
 		t.Fatalf("write release-coercion mapping file: %v", err)
 	}
 
 	fullPrecedenceDir := t.TempDir()
 	fullPrecedencePath := filepath.Join(fullPrecedenceDir, "default.yaml")
-	writeDummyProfile(t, filepath.Join(fullPrecedenceDir, "profiles", "java17.yaml"))
-	writeDummyProfile(t, filepath.Join(fullPrecedenceDir, "profiles", "java11.yaml"))
 	if err := os.WriteFile(fullPrecedencePath, []byte(`
-stacks:
+gates:
   - image: default:17
     lang: java
     release: "17"
-    profile: profiles/java17.yaml
   - image: default:11
     lang: java
     release: "11"
-    profile: profiles/java11.yaml
 `), 0o644); err != nil {
 		t.Fatalf("write full-precedence mapping file: %v", err)
 	}
@@ -223,7 +202,7 @@ func TestBuildGateImageResolver_Errors(t *testing.T) {
 		{
 			name: "missing required file",
 			setup: func(*testing.T) (*BuildGateImageResolver, error) {
-				return NewBuildGateImageResolver("/nonexistent/path/stacks.yaml", nil, true)
+				return NewBuildGateImageResolver("/nonexistent/path/gates.yaml", nil, true)
 			},
 			wantSetupErr: "required but not found",
 		},
@@ -256,7 +235,7 @@ func TestBuildGateImageResolver_Errors(t *testing.T) {
 				}
 				return NewBuildGateImageResolver(path, nil, true)
 			},
-			wantSetupErr: "stacks[0].lang: required",
+			wantSetupErr: "gates[0].lang: required",
 		},
 		{
 			name: "file duplicate selector",
@@ -290,7 +269,7 @@ func TestBuildGateImageResolver_Errors(t *testing.T) {
 // TestBuildGateImageResolver_MissingFileOptional verifies that a missing
 // default-file path is tolerated when requireDefaultFile=false.
 func TestBuildGateImageResolver_MissingFileOptional(t *testing.T) {
-	resolver, err := NewBuildGateImageResolver("/nonexistent/path/stacks.yaml", nil, false)
+	resolver, err := NewBuildGateImageResolver("/nonexistent/path/gates.yaml", nil, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -300,7 +279,7 @@ func TestBuildGateImageResolver_MissingFileOptional(t *testing.T) {
 }
 
 func TestBuildGateImageResolver_DefaultCatalogAssetsAreValid(t *testing.T) {
-	catalogPath := buildGateDefaultStacksCatalogPath()
+	catalogPath := buildGateDefaultGatesCatalogPath()
 	resolver, err := NewBuildGateImageResolver(catalogPath, nil, true)
 	if err != nil {
 		t.Fatalf("NewBuildGateImageResolver() error: %v", err)
@@ -309,6 +288,6 @@ func TestBuildGateImageResolver_DefaultCatalogAssetsAreValid(t *testing.T) {
 		t.Fatal("resolver is nil")
 	}
 	if len(resolver.rules) == 0 {
-		t.Fatal("resolver has no rules from default stacks catalog")
+		t.Fatal("resolver has no rules from default gates catalog")
 	}
 }

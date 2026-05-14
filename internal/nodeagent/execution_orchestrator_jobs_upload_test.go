@@ -76,10 +76,10 @@ func TestRunController_uploadConfiguredArtifacts(t *testing.T) {
 		},
 		{
 			name:          "resolves /out path deterministically",
-			artifactPaths: []string{"/out/gate-profile-candidate.json"},
+			artifactPaths: []string{"/out/custom-artifact.json"},
 			wantUpload:    true,
-			outDirFiles:   []string{"gate-profile-candidate.json"},
-			wantHeaders:   []string{"out/gate-profile-candidate.json"},
+			outDirFiles:   []string{"custom-artifact.json"},
+			wantHeaders:   []string{"out/custom-artifact.json"},
 		},
 	}
 
@@ -293,9 +293,9 @@ func TestRunController_uploadGateLogsArtifact(t *testing.T) {
 			serverStatus:     http.StatusCreated,
 			wantArtifactID:   true,
 		},
-			{
-				name:             "retry gate logs",
-				logsText:         "retry gate logs content",
+		{
+			name:             "retry gate logs",
+			logsText:         "retry gate logs content",
 			artifactSuffix:   "re1",
 			wantArtifactName: "build-gate-re1.log",
 			serverStatus:     http.StatusCreated,

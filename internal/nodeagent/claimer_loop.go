@@ -209,24 +209,23 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 	}
 
 	startReq := StartRunRequest{
-		RunID:                  claim.RunID, // Already types.RunID from ClaimResponse
-		JobID:                  claim.JobID, // Already types.JobID from ClaimResponse
-		RepoID:                 claim.RepoID,
-		RepoURL:                claim.RepoURL,
-		RepoGateProfileMissing: claim.RepoGateProfileMissing,
-		BaseRef:                claim.BaseRef,
-		TargetRef:              claim.TargetRef,
-		CommitSHA:              derefCommitSHA(claim.CommitSha),
-		RepoSHAIn:              derefCommitSHA(claim.RepoShaIn),
-		JobType:                claim.JobType,
-		JobImage:               claim.JobImage,
-		NextID:                 claim.NextID,
-		JobName:                claim.JobName, // Job name for branch identification
-		MigContext:             claim.MigContext,
-		GateContext:            claim.GateContext,
-		DetectedStack:          claim.DetectedStack,
-		TypedOptions:           typedOpts, // Strongly-typed run options (canonical source of truth)
-		Env:                    envFromSpec,
+		RunID:         claim.RunID, // Already types.RunID from ClaimResponse
+		JobID:         claim.JobID, // Already types.JobID from ClaimResponse
+		RepoID:        claim.RepoID,
+		RepoURL:       claim.RepoURL,
+		BaseRef:       claim.BaseRef,
+		TargetRef:     claim.TargetRef,
+		CommitSHA:     derefCommitSHA(claim.CommitSha),
+		RepoSHAIn:     derefCommitSHA(claim.RepoShaIn),
+		JobType:       claim.JobType,
+		JobImage:      claim.JobImage,
+		NextID:        claim.NextID,
+		JobName:       claim.JobName, // Job name for branch identification
+		MigContext:    claim.MigContext,
+		GateContext:   claim.GateContext,
+		DetectedStack: claim.DetectedStack,
+		TypedOptions:  typedOpts, // Strongly-typed run options (canonical source of truth)
+		Env:           envFromSpec,
 	}
 
 	// Invoke controller.StartRun to execute the claimed job.

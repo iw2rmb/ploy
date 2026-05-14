@@ -1,7 +1,9 @@
 package handlers
 
 import (
+	"encoding/json"
 	"net/http"
+	"reflect"
 	"testing"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
@@ -81,47 +83,37 @@ func TestClaimJob_JobTargetOverridesNodesTarget(t *testing.T) {
 	}
 }
 
-func TestClaimJob_DoesNotMergeRepoGateProfileIntoGateSpec(t *testing.T) {
+func TestClaimJob_ClaimKeepsBuildGateConfigUnchanged(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name      string
-		jobType   domaintypes.JobType
-		spec      []byte
-		wantPhase string
-		wantCmd   string
-		wantEnvK  string
-		wantEnvV  string
+		name    string
+		jobType domaintypes.JobType
+		spec    []byte
 	}{
 		{
-			name:      "ppost_gate keeps spec unchanged without explicit gate_profile",
-			jobType:   domaintypes.JobTypePreGate,
-			spec:      []byte(`{"steps":[{"image":"docker.io/acme/mig:latest"}]}`),
-			wantPhase: "pre",
-		},
-		{
-			name:      "post_gate keeps spec unchanged without explicit gate_profile",
-			jobType:   domaintypes.JobTypePostGate,
-			spec:      []byte(`{"steps":[{"image":"docker.io/acme/mig:latest"}]}`),
-			wantPhase: "post",
-		},
-		{
-			name:      "post_gate keeps spec unchanged without explicit gate_profile",
-			jobType:   domaintypes.JobTypePostGate,
-			spec:      []byte(`{"steps":[{"image":"docker.io/acme/mig:latest"}]}`),
-			wantPhase: "post",
-		},
-		{
-			name:    "explicit spec gate_profile is preserved",
+			name:    "pre_gate preserves build_gate block",
 			jobType: domaintypes.JobTypePreGate,
 			spec: []byte(`{
 				"steps":[{"image":"docker.io/acme/mig:latest"}],
-				"build_gate":{"pre":{"gate_profile":{"command":"echo explicit","env":{"X":"1"}}}}
+				"build_gate":{
+					"enabled": true,
+					"pre":{"stack":{"enabled":true,"language":"java","tool":"maven","release":"17","default":true}},
+					"images":[{"stack":{"language":"java","tool":"maven","release":"17"},"image":"maven:jdk17"}]
+				}
 			}`),
-			wantPhase: "pre",
-			wantCmd:   "echo explicit",
-			wantEnvK:  "X",
-			wantEnvV:  "1",
+		},
+		{
+			name:    "post_gate preserves build_gate block",
+			jobType: domaintypes.JobTypePostGate,
+			spec: []byte(`{
+				"steps":[{"image":"docker.io/acme/mig:latest"}],
+				"build_gate":{
+					"enabled": true,
+					"post":{"stack":{"enabled":true,"language":"java","tool":"gradle","release":"21","default":false}},
+					"images":[{"stack":{"language":"java","tool":"gradle","release":"21"},"image":"gradle:jdk21"}]
+				}
+			}`),
 		},
 	}
 
@@ -138,48 +130,25 @@ func TestClaimJob_DoesNotMergeRepoGateProfileIntoGateSpec(t *testing.T) {
 			assertStatus(t, rr, http.StatusOK)
 
 			resp := decodeBody[map[string]any](t, rr)
-			if got, ok := resp["repo_gate_profile_missing"].(bool); !ok || !got {
-				t.Fatalf("expected repo_gate_profile_missing=true, got %v", resp["repo_gate_profile_missing"])
-			}
 			spec, ok := resp["spec"].(map[string]any)
 			if !ok {
 				t.Fatalf("expected spec object, got %T", resp["spec"])
 			}
-			bg, ok := spec["build_gate"].(map[string]any)
-			if tc.wantCmd == "" {
-				if ok {
-					if phase, phaseOK := bg[tc.wantPhase].(map[string]any); phaseOK {
-						if _, exists := phase["gate_profile"]; exists {
-							t.Fatalf("did not expect build_gate.%s.gate_profile", tc.wantPhase)
-						}
-					}
-				}
-				return
+
+			var src map[string]any
+			if err := json.Unmarshal(tc.spec, &src); err != nil {
+				t.Fatalf("unmarshal source spec: %v", err)
 			}
+			wantBG, ok := src["build_gate"].(map[string]any)
 			if !ok {
-				t.Fatalf("expected build_gate object, got %T", spec["build_gate"])
+				t.Fatalf("source spec missing build_gate object")
 			}
-			phase, ok := bg[tc.wantPhase].(map[string]any)
+			gotBG, ok := spec["build_gate"].(map[string]any)
 			if !ok {
-				t.Fatalf("expected build_gate.%s object, got %T", tc.wantPhase, bg[tc.wantPhase])
+				t.Fatalf("response spec missing build_gate object")
 			}
-			prepRaw, exists := phase["gate_profile"]
-			if !exists {
-				t.Fatalf("expected build_gate.%s.gate_profile", tc.wantPhase)
-			}
-			prep, ok := prepRaw.(map[string]any)
-			if !ok {
-				t.Fatalf("expected build_gate.%s.gate_profile object, got %T", tc.wantPhase, prepRaw)
-			}
-			if got := prep["command"]; got != tc.wantCmd {
-				t.Fatalf("build_gate.%s.gate_profile.command=%v, want %q", tc.wantPhase, got, tc.wantCmd)
-			}
-			env, ok := prep["env"].(map[string]any)
-			if !ok {
-				t.Fatalf("expected build_gate.%s.gate_profile.env object, got %T", tc.wantPhase, prep["env"])
-			}
-			if got := env[tc.wantEnvK]; got != tc.wantEnvV {
-				t.Fatalf("build_gate.%s.gate_profile.env[%s]=%v, want %q", tc.wantPhase, tc.wantEnvK, got, tc.wantEnvV)
+			if !reflect.DeepEqual(gotBG, wantBG) {
+				t.Fatalf("build_gate mutated:\n got=%v\nwant=%v", gotBG, wantBG)
 			}
 		})
 	}

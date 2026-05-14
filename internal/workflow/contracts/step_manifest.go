@@ -115,7 +115,7 @@ type StepGateSpec struct {
 	RepoURL types.RepoURL
 
 	// RepoID is the repo identifier for this execution.
-	// Used by pre-gate auto-bootstrap to build a persisted gate_profile payload.
+	// Used for gate job/runtime correlation.
 	RepoID types.MigRepoID
 
 	// Ref is the Git reference (commit SHA, branch, or tag) for remote gate execution.
@@ -133,15 +133,6 @@ type StepGateSpec struct {
 	// StackGate holds the Stack Gate configuration for this step.
 	// Used for pre/post gate validation of stack expectations.
 	StackGate *StepGateStackSpec
-
-	// GateProfile holds optional gate_profile-derived command/env overrides for this gate phase.
-	GateProfile *BuildGateProfileOverride
-
-	// Target pins build gate execution to a concrete target (build|unit|all_tests).
-	Target string
-
-	// EnforceTargetLock applies strict target lock behavior for infra gate retries.
-	EnforceTargetLock bool
 }
 
 // StepGateStackSpec holds the effective Stack Gate configuration for a gate phase.

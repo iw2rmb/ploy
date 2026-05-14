@@ -53,9 +53,6 @@ func TestClaimJob_HappyPath(t *testing.T) {
 				if resp["commit_sha"] != f.sourceCommitSHA {
 					t.Fatalf("expected commit_sha %s, got %v", f.sourceCommitSHA, resp["commit_sha"])
 				}
-				if got, ok := resp["repo_gate_profile_missing"].(bool); !ok || !got {
-					t.Fatalf("expected repo_gate_profile_missing=true, got %v", resp["repo_gate_profile_missing"])
-				}
 				if resp["status"] != "Started" {
 					t.Fatalf("expected status Started, got %v", resp["status"])
 				}

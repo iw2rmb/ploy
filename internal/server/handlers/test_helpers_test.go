@@ -297,10 +297,6 @@ func withArtifactBundles(bundles []store.ArtifactBundle) func(*jobStore) {
 	return func(st *jobStore) { st.listArtifactBundlesByRunAndJob.val = bundles }
 }
 
-func withResolveStackRow(row store.ResolveStackRowByLangToolRow) func(*jobStore) {
-	return func(st *jobStore) { st.resolveStackRowByLangTool.val = row }
-}
-
 func withGetRunCreatedAt(t time.Time) func(*jobStore) {
 	return func(st *jobStore) {
 		st.getRun.val.CreatedAt = pgtype.Timestamptz{Time: t, Valid: true}

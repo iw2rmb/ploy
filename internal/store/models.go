@@ -100,23 +100,6 @@ type Event struct {
 	Meta    []byte             `json:"meta"`
 }
 
-type Gate struct {
-	JobID     string             `json:"job_id"`
-	ProfileID int64              `json:"profile_id"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
-}
-
-type GateProfile struct {
-	ID        int64              `json:"id"`
-	RepoID    *string            `json:"repo_id"`
-	RepoSha   *string            `json:"repo_sha"`
-	RepoSha8  *string            `json:"repo_sha8"`
-	StackID   int64              `json:"stack_id"`
-	Url       string             `json:"url"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
-}
-
 type Job struct {
 	ID          types.JobID        `json:"id"`
 	RunID       types.RunID        `json:"run_id"`
@@ -296,14 +279,4 @@ type SpecBundle struct {
 	CreatedBy *string            `json:"created_by"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 	LastRefAt pgtype.Timestamptz `json:"last_ref_at"`
-}
-
-type Stack struct {
-	ID        int64              `json:"id"`
-	Lang      string             `json:"lang"`
-	Release   string             `json:"release"`
-	Tool      *string            `json:"tool"`
-	Image     string             `json:"image"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
 }

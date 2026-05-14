@@ -1,6 +1,5 @@
 # invalid-missing-language.yaml - Missing required lang field
-stacks:
+gates:
   - image: maven:jdk17
     tool: maven
     release: "17"
-    profile: profiles/java-17-maven.yaml

@@ -80,7 +80,7 @@ func TestCrossPathParity_StandardJobErrorToChainAction(t *testing.T) {
 			}
 			st.listJobsByRunRepoAttempt.val = []store.Job{job, successor}
 
-			svc := NewCompleteJobService(st, nil, nil, nil)
+			svc := NewCompleteJobService(st, nil, nil)
 
 			// Nodeagent path: map execution error to job status (mirrors runController.uploadFailureStatus).
 			status := lifecycle.JobStatusFromRunError(tc.err)
@@ -214,7 +214,7 @@ func TestCrossPathParity_GateJobStatusToChainAction(t *testing.T) {
 			}
 			st.listJobsByRunRepoAttempt.val = []store.Job{job, successor}
 
-			svc := NewCompleteJobService(st, nil, nil, nil)
+			svc := NewCompleteJobService(st, nil, nil)
 
 			input := CompleteJobInput{
 				JobID:      jobID,

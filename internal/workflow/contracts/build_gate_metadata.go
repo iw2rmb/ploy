@@ -15,8 +15,7 @@ type BuildGateStageMetadata struct {
 	LogDigest    types.Sha256Digest           `json:"log_digest,omitempty"`
 	StaticChecks []BuildGateStaticCheckReport `json:"static_checks,omitempty"`
 	// ExecutedCommand is the exact gate command shell payload executed by the
-	// gate container. This is persisted so successful gate profiles can reuse
-	// the command that actually ran (for example ./gradlew vs gradle).
+	// gate container.
 	ExecutedCommand string `json:"executed_command,omitempty"`
 	// Detected captures the resolved gate stack identity used for this
 	// gate execution. It is the canonical source for stack-aware recovery
@@ -179,19 +178,6 @@ type BuildGateRecoveryMetadata struct {
 	// DepsBumps carries cumulative dependency bump state for deps healing loops.
 	// Values are non-empty versions or nil (meaning dependency disable/remove).
 	DepsBumps map[string]*string `json:"deps_bumps,omitempty"`
-	// CandidateSchemaID is the declared schema id for infra recovery candidate.
-	CandidateSchemaID string `json:"candidate_schema_id,omitempty"`
-	// CandidateArtifactPath is the artifact path declared in expectations.
-	CandidateArtifactPath string `json:"candidate_artifact_path,omitempty"`
-	// CandidateValidationStatus captures whether candidate resolution+validation passed.
-	CandidateValidationStatus string `json:"candidate_validation_status,omitempty"`
-	// CandidateValidationError captures the validation/load error when status is not valid.
-	CandidateValidationError string `json:"candidate_validation_error,omitempty"`
-	// CandidateGateProfile stores validated candidate payload used for gate override.
-	CandidateGateProfile json.RawMessage `json:"candidate_gate_profile,omitempty"`
-	// CandidatePromoted reports whether a validated candidate has been promoted
-	// into repo gate_profile after successful gate completion.
-	CandidatePromoted *bool `json:"candidate_promoted,omitempty"`
 }
 
 // RecoveryClaimContext carries typed recovery inputs in node claim responses
@@ -211,18 +197,7 @@ type RecoveryClaimContext struct {
 	BuildGateLog string `json:"build_gate_log,omitempty"`
 	// Errors carries structured gate errors payload intended for /in/errors.yaml.
 	Errors json.RawMessage `json:"errors,omitempty"`
-	// GateProfile carries failed gate profile JSON for infra healing context.
-	GateProfile json.RawMessage `json:"gate_profile,omitempty"`
-	// GateProfileSchemaJSON carries schema JSON for infra healing context.
-	GateProfileSchemaJSON string `json:"gate_profile_schema_json,omitempty"`
 }
-
-const (
-	RecoveryCandidateStatusMissing     = "missing"
-	RecoveryCandidateStatusUnavailable = "unavailable"
-	RecoveryCandidateStatusInvalid     = "invalid"
-	RecoveryCandidateStatusValid       = "valid"
-)
 
 const (
 	recoveryLoopKindHealing = "healing"
@@ -291,46 +266,6 @@ func (m BuildGateRecoveryMetadata) Validate() error {
 			if ver != nil && strings.TrimSpace(*ver) == "" {
 				return fmt.Errorf("deps_bumps[%q]: version must be non-empty when present", lib)
 			}
-		}
-	}
-	if m.CandidateSchemaID != "" || m.CandidateArtifactPath != "" {
-		if err := ValidateGateProfileArtifactContract(
-			m.CandidateArtifactPath,
-			m.CandidateSchemaID,
-			"candidate",
-		); err != nil {
-			return err
-		}
-	}
-	if m.CandidateValidationStatus != "" {
-		switch m.CandidateValidationStatus {
-		case RecoveryCandidateStatusMissing, RecoveryCandidateStatusUnavailable, RecoveryCandidateStatusInvalid, RecoveryCandidateStatusValid:
-		default:
-			return fmt.Errorf("candidate_validation_status invalid: %q", m.CandidateValidationStatus)
-		}
-	}
-	if len(m.CandidateGateProfile) > 0 {
-		if !json.Valid(m.CandidateGateProfile) {
-			return fmt.Errorf("candidate_gate_profile: invalid JSON")
-		}
-	}
-	if m.CandidateValidationStatus == RecoveryCandidateStatusValid {
-		if len(m.CandidateGateProfile) == 0 {
-			return fmt.Errorf("candidate_gate_profile: required when candidate_validation_status=%q", RecoveryCandidateStatusValid)
-		}
-		if strings.TrimSpace(m.CandidateValidationError) != "" {
-			return fmt.Errorf("candidate_validation_error: must be empty when candidate_validation_status=%q", RecoveryCandidateStatusValid)
-		}
-	}
-	if m.CandidateValidationStatus != RecoveryCandidateStatusValid && len(m.CandidateGateProfile) > 0 {
-		return fmt.Errorf("candidate_gate_profile: forbidden when candidate_validation_status=%q", m.CandidateValidationStatus)
-	}
-	if m.CandidatePromoted != nil && *m.CandidatePromoted {
-		if m.CandidateValidationStatus != RecoveryCandidateStatusValid {
-			return fmt.Errorf("candidate_promoted: true requires candidate_validation_status=%q", RecoveryCandidateStatusValid)
-		}
-		if len(m.CandidateGateProfile) == 0 {
-			return fmt.Errorf("candidate_promoted: true requires candidate_gate_profile")
 		}
 	}
 	return nil

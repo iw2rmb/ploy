@@ -161,10 +161,6 @@ build_gate:
       - ./healing/amata.yaml:amata.yaml
     home:
       - ~/.codex/auth.json:.codex/auth.json:ro
-    expectations:
-      artifacts:
-        - path: /out/gate-profile-candidate.json
-          schema: gate_profile_v1
 ```
 
 Healing action fields (image, command, env, home) are specified directly under
@@ -210,15 +206,6 @@ detection. Relative include paths resolve from each including file directory.
 Relative local-source paths inside included fragments (`amata.spec` and
 the source side of `in`/`out`/`home`) are resolved from that included file
 directory.
-For recovery with `schema=gate_profile_v1`, healing is expected to emit
-`/out/gate-profile-candidate.json`. Promotion to repo `gate_profile` happens only
-when the immediate follow-up `post_gate` succeeds.
-Candidate stack validation uses failed-gate `BuildGateStageMetadata.detected_stack`
-as canonical expectation (`language`, `tool`, optional `release`):
-- language/tool must match exactly
-- when detected `release` is non-empty, release must match exactly
-- when detected `release` is empty, release is treated as wildcard
-
 **Healing** semantics:
 
 - **Single workspace**: Healing runs on the same workspace that the failing gate validated.
@@ -265,15 +252,14 @@ to `/in` for debugging and cross-iteration context:
 |---|---|
 | `/in/build-gate.log` | Latest gate failure log (updated after each post-gate) |
 | `/in/errors.yaml` | Structured gate errors payload when available |
-| `/in/gate_profile.json` | Gate profile used by the failed gate when available |
 | `/in/build-gate-iteration-N.log` | Gate failure log snapshot for iteration N |
 | `/in/healing-iteration-N.log` | Healing agent output log for iteration N |
 | <code>/in/healing-log.md</code> | Cumulative markdown log across all iterations |
 | `/in/deps-bumps.json` | Prior cumulative dependency bump map for dependency healing |
 
 For `heal`/`post_gate`, `/in/build-gate.log`, optional `/in/errors.yaml`,
-`/in/gate_profile.json`, and `/in/gate_profile.schema.json` are materialized
-from available run/job artifacts and workspace state.
+and `/in/amata.yaml` are materialized from available run/job artifacts and
+workspace state.
 
 The <code>healing-log.md</code> format:
 
@@ -634,23 +620,8 @@ Rewire example:
 - Persistence order is tail-first (`post-gate` row first, then `heal`, then failed-job rewire)
   so each non-null `next_id` always points to an already existing row under the
   `jobs.next_id -> jobs.id` foreign key.
-- For recovery with expected artifact `schema=gate_profile_v1`, healing insertion
-  validates candidate bytes from the previous heal artifact
-  (`/out/gate-profile-candidate.json`) and records candidate schema/path/validation
-  status in `post_gate` recovery metadata.
-- On `heal` success, before promoting the linked post-gate segment, the server refreshes
-  the downstream `post_gate` recovery candidate metadata from the just-finished heal artifact.
-- Candidate outcomes are strict and non-blocking:
-  - missing artifact -> `candidate_validation_status=missing`
-  - unreadable artifact bundle -> `candidate_validation_status=unavailable`
-  - schema/JSON validation failure -> `candidate_validation_status=invalid`
-  - valid candidate -> `candidate_validation_status=valid` with embedded candidate payload
-- On successful `post_gate`, a validated candidate is marked with
-  `candidate_promoted=true` in `post_gate` recovery metadata for audit/idempotency.
-- Candidate promotion is strict:
-  - never runs on failed `post_gate`
-  - idempotent across retries/replays (already-promoted candidates are skipped)
-  - does not write to `mig_repos`; canonical gate profile state is stored in `gate_profiles`
+- Recovery artifact handling is generic: expected artifact paths are read from
+  `expectations.artifacts` and consumed by healing logic as-is.
 
 ### Parallel healing branches (Phase E)
 
@@ -796,57 +767,18 @@ insert `heal-*` + `post-gate-*` jobs by rewiring `next_id` links.
 The background scheduler ensures queued repos have jobs and promotes the next job for a
 repo attempt. It does not create per-repo child runs.
 
-### Gate profile usage (current)
+### Build Gate mapping (current)
 
 There is no standalone prep scheduler loop and no `prep_runs` table.
-Gate profiles are resolved at claim-time from canonical storage:
-- `gate_profiles` rows keyed by `(repo_id, repo_sha, stack_id)`
-- `gates(job_id, profile_id)` linkage for auditability
-- default stack profiles seeded from `gates/stacks.yaml` + `gates/profiles/*.yaml`
-- default Gradle profiles are wrapper-aware for runnable targets (`build`, `unit`,
-  `all_tests`): use `./gradlew` when wrapper files are present; otherwise `gradle`
 
-Claim-time profile resolution:
-1. Exact profile lookup by `(repo_id, repo_sha_in, stack_id)`
-2. Fallback to latest repo+stack profile
-3. Fallback to default stack profile (`repo_id IS NULL`, `repo_sha IS NULL`)
-4. Fallback hits are copied to a new exact row before execution
-
-Successful gate profile persistence:
-- After successful `pre_gate`, `post_gate`, or `post_gate`, the server persists
-  an exact profile keyed by `(repo_id, repo_sha_out, stack_id)` (with
-  `repo_sha_in` fallback when `repo_sha_out` is unavailable).
-- The persisted profile reuses the exact `executed_command` captured by gate
-  runtime metadata for the selected target (it does not regenerate a default
-  command), then refreshes the `gates(job_id, profile_id)` link.
-
-Gate profile to Build Gate mapping:
-- Gate phase chooses destination override slot (`build_gate.pre.gate_profile` for
-  `pre_gate`; `build_gate.post.gate_profile` for `post_gate`).
-- Command/env source is always `gate_profile.targets.<targets.active>`.
-- Mapping is status-agnostic at runtime (`status`/`failure_code` do not alter
-  command/env selection).
-- There is no runtime auto-fallback across targets.
-- `targets.active=unsupported` is terminal and injects no runnable override.
-- Terminal unsupported payload contract:
-  - `targets.build.status=failed`
-  - `targets.build.failure_code=infra_support`
-- Runtime hints are mapped:
-  - `runtime.docker.mode=host_socket` -> `DOCKER_HOST=unix:///var/run/docker.sock`
+Current Build Gate mapping:
+- Image is selected from `build_gate.images[]` overrides first, then `gates/gates.yaml`.
+- Gate command is image-owned (container `CMD`/entrypoint); ploy does not inject commands.
+- `build_gate.pre.target` and `build_gate.post.target` are not part of the current contract.
   - `runtime.docker.mode=tcp` -> `DOCKER_HOST=<runtime.docker.host>`
   - `runtime.docker.api_version` -> `DOCKER_API_VERSION=<value>`
 - During gate execution, `DOCKER_HOST=unix://...` triggers auto-mount of that
   socket path into the gate container.
-
-Resolution precedence:
-1. Explicit `build_gate.<phase>.gate_profile` in submitted run spec
-2. For `post_gate` only: validated recovery candidate prep override
-3. Resolved gate profile payload from `gate_profiles`
-4. Default detected-tool command fallback
-
-Gate env precedence:
-1. Base gate env from spec and server env injection
-2. Mapped/explicit prep env override on key conflicts
 
 ### Relationship summary (v1)
 
@@ -858,9 +790,6 @@ Gate env precedence:
 | `mig_repos` | Managed repo membership for a mig          | (`mig_id`, `repo_id`) membership + ref snapshot source |
 | `runs`      | Run record                                 | `runs` → `run_repos` (1:N), `runs` → `jobs` (1:N) |
 | `run_repos` | Per-repo execution state within a run      | `(run_id, repo_id, attempt)` materializes job chains |
-| `stacks`    | Canonical stack/image catalog              | `stacks` → `gate_profiles` (1:N) |
-| `gate_profiles` | Default and exact gate profiles         | keyed by `(repo_id, repo_sha, stack_id)` |
-| `gates`     | Gate job to profile linkage                | `gates.job_id -> jobs.id`, `gates.profile_id -> gate_profiles.id` |
 | `jobs`      | Execution units (pre-gate, mig, heal, etc.)| `jobs` → `diffs`/`logs`/artifacts via `job_id` |
 
 ### Pulling Diffs Locally (`run pull` / `mig pull`)
@@ -1222,17 +1151,6 @@ Current stale-heartbeat recovery behavior:
 - When recovery finalizes a run, the server publishes the same terminal SSE
   sequence as normal completion: a terminal `run` snapshot followed by `done`.
 
-Gate profile behavior:
-- Canonical gate profile storage is `gate_profiles` (+ `gates` linkage), not `mig_repos`.
-- During claim, the resolver targets exact identity `(repo_id, repo_sha_in, stack_id)`;
-  fallback profiles are copied into a new exact row before execution.
-- Successful gate jobs (`pre_gate|post_gate`) persist refreshed exact
-  profiles keyed by `(repo_id, repo_sha, stack_id)`.
-- Healing candidate validation uses `docs/schemas/gate_profile.schema.json`
-  (`title: Ploy Build Gate Profile`, `$comment` guidance included) plus contract parsing.
-- A validated candidate is tracked in `post_gate` recovery metadata and marked
-  `candidate_promoted=true` after successful `post_gate` for idempotent audit.
-
 Node startup crash reconciliation behavior:
 - On node process startup, the node agent runs one startup reconciliation pass
   before the first `/v1/nodes/{id}/claim` poll.
@@ -1365,9 +1283,7 @@ Migs container images are standard OCI images with the following expectations:
   - Entry point should read/modify the repo under `/workspace`.
   - Output artifacts, logs and plans should be written under `/out`.
   - For healing artifact ingestion, `/out` uploads are archived under stable
-    tar paths rooted at `out/` (for example
-    `out/gate-profile-candidate.json`). Recovery candidate lookup uses this
-    path strictly; missing entries are treated as missing candidates (no fallback).
+    tar paths rooted at `out/` and looked up by exact expected artifact path.
   - Exit code `0` signals success. Non-zero exit code is treated as failure and
     surfaces in:
     -  run `state=failed`,

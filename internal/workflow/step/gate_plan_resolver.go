@@ -52,9 +52,9 @@ func resolveGateExecutionPlan(
 		return gateExecutionPlan{}, imageResolutionTerminal(stackCtx, err)
 	}
 
-	cmd, prepEnv, err := resolveGateCommand(workspace, stackCtx.language, stackCtx.tool, stackCtx.release, spec.GateProfile, spec.Target)
+	cmd, prepEnv, err := resolveGateCommand(workspace, stackCtx.language, stackCtx.tool, stackCtx.release)
 	if err != nil {
-		return gateExecutionPlan{}, commandResolutionTerminal(stackCtx, err, spec.EnforceTargetLock, image)
+		return gateExecutionPlan{}, commandResolutionTerminal(stackCtx, err, image)
 	}
 
 	if stackCtx.stackGate != nil {
@@ -94,31 +94,17 @@ func imageResolutionTerminal(stackCtx gateStackContext, err error) *gateExecutio
 func commandResolutionTerminal(
 	stackCtx gateStackContext,
 	err error,
-	enforceTargetLock bool,
 	runtimeImage string,
 ) *gateExecutionTerminal {
-	unknownCode := "BUILD_GATE_UNKNOWN_TOOL"
-	unsupportedCode := "BUILD_GATE_TARGET_UNSUPPORTED"
+	unknownCode := "BUILD_GATE_COMMAND_RESOLUTION_ERROR"
 	if stackCtx.stackGate != nil {
-		unknownCode = "STACK_GATE_UNKNOWN"
-		unsupportedCode = "STACK_GATE_TARGET_UNSUPPORTED"
+		unknownCode = "STACK_GATE_COMMAND_RESOLUTION_ERROR"
 	}
 
-	code, terminalErr := mapGateCommandTerminal(err, unsupportedCode, unknownCode, enforceTargetLock)
 	if stackCtx.stackGate != nil {
-		return stackGateFailureTerminal(stackCtx.stackGate, stackCtx.language, code, err.Error(), "", "unknown", runtimeImage, terminalErr)
+		return stackGateFailureTerminal(stackCtx.stackGate, stackCtx.language, unknownCode, err.Error(), "", "unknown", runtimeImage, nil)
 	}
-	return buildGateFailureTerminal(stackCtx.language, stackCtx.tool, code, err.Error(), "", terminalErr, runtimeImage)
-}
-
-func mapGateCommandTerminal(err error, unsupportedCode string, unknownCode string, enforceTargetLock bool) (string, error) {
-	if !errors.Is(err, errGateTargetUnsupported) {
-		return unknownCode, nil
-	}
-	if enforceTargetLock {
-		return unsupportedCode, fmt.Errorf("%w: %s", ErrRepoCancelled, err.Error())
-	}
-	return unsupportedCode, nil
+	return buildGateFailureTerminal(stackCtx.language, stackCtx.tool, unknownCode, err.Error(), "", nil, runtimeImage)
 }
 
 // buildGateFailureTerminal builds a terminal for non-stack-gate (build-gate) failures.

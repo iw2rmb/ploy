@@ -18,7 +18,6 @@ func buildGateExecutionMetadata(
 	tool string,
 	release string,
 	image string,
-	executedCommand string,
 	res ContainerResult,
 	logs []byte,
 ) *contracts.BuildGateStageMetadata {
@@ -34,8 +33,7 @@ func buildGateExecutionMetadata(
 			Tool:     strings.TrimSpace(tool),
 			Release:  strings.TrimSpace(release),
 		},
-		RuntimeImage:    image,
-		ExecutedCommand: strings.TrimSpace(executedCommand),
+		RuntimeImage: image,
 	}
 	if passed && strings.EqualFold(tool, "gradle") {
 		if hits := readGradleBuildCacheHits(workspace); len(hits) > 0 {
@@ -60,30 +58,6 @@ func buildGateExecutionMetadata(
 	}
 	attachLogsTextAndDigest(meta, logs)
 	return meta
-}
-
-// gateProfileCommandFromContainerCommand returns the user-facing tool command
-// for persistence in the gate profile, stripping our internal /bin/sh -lc and
-// CA preamble wrapper when present.
-func gateProfileCommandFromContainerCommand(cmd []string) string {
-	if len(cmd) == 0 {
-		return ""
-	}
-	if len(cmd) >= 3 && cmd[0] == "/bin/sh" && (cmd[1] == "-c" || cmd[1] == "-lc") {
-		shell := strings.TrimSpace(cmd[2])
-		if shell == "" {
-			return ""
-		}
-		prefixes := []string{"set -eu; "}
-		for _, prefix := range prefixes {
-			if rest, ok := strings.CutPrefix(shell, prefix); ok {
-				shell = strings.TrimSpace(rest)
-				break
-			}
-		}
-		return shell
-	}
-	return strings.TrimSpace(strings.Join(cmd, " "))
 }
 
 func attachLogsTextAndDigest(meta *contracts.BuildGateStageMetadata, logs []byte) {

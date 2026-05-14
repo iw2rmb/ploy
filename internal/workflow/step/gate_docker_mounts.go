@@ -4,8 +4,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-
-	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
 func appendDockerHostSocketMount(mounts []ContainerMount, env map[string]string) []ContainerMount {
@@ -115,7 +113,7 @@ func dockerHostSocketPathFromEnv(env map[string]string) string {
 	if len(env) == 0 {
 		return ""
 	}
-	dockerHost := strings.TrimSpace(env[contracts.GateProfileDockerHostEnv])
+	dockerHost := strings.TrimSpace(env["DOCKER_HOST"])
 	if dockerHost == "" || !strings.HasPrefix(dockerHost, "unix://") {
 		return ""
 	}
