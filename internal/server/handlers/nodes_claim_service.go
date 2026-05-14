@@ -23,11 +23,10 @@ type ClaimService struct {
 	store         store.Store
 	blobStore     blobstore.Store
 	configHolder  *ConfigHolder
-	gateResolver  GateProfileResolver
 	eventsService *server.EventsService
 }
 
-func NewClaimService(st store.Store, bs blobstore.Store, configHolder *ConfigHolder, resolver GateProfileResolver, eventsService ...*server.EventsService) *ClaimService {
+func NewClaimService(st store.Store, bs blobstore.Store, configHolder *ConfigHolder, eventsService ...*server.EventsService) *ClaimService {
 	var evtSvc *server.EventsService
 	if len(eventsService) > 0 {
 		evtSvc = eventsService[0]
@@ -36,7 +35,6 @@ func NewClaimService(st store.Store, bs blobstore.Store, configHolder *ConfigHol
 		store:         st,
 		blobStore:     bs,
 		configHolder:  configHolder,
-		gateResolver:  resolver,
 		eventsService: evtSvc,
 	}
 	return svc
@@ -194,12 +192,12 @@ func (s *ClaimService) Claim(ctx context.Context, nodeID domaintypes.NodeID) (Cl
 		return ClaimResult{}, claimInternal("failed to get spec for claimed job", err)
 	}
 
-	payload, err := buildClaimResponsePayload(ctx, s.store, s.blobStore, s.configHolder, run, spec.Spec, rr, repoURL, job, s.gateResolver)
+	payload, err := buildClaimResponsePayload(ctx, s.store, s.blobStore, s.configHolder, run, spec.Spec, rr, repoURL, job)
 	if err != nil {
 		slog.Error("claim: failed to build response", "job_id", job.ID, "run_id", run.ID, "err", err)
 		var terminalErr *ClaimJobTerminalError
 		if errors.As(err, &terminalErr) {
-			completeSvc := NewCompleteJobService(s.store, nil, nil, nil)
+			completeSvc := NewCompleteJobService(s.store, nil, nil)
 			_, completeErr := completeSvc.Complete(ctx, CompleteJobInput{
 				JobID:        job.ID,
 				NodeID:       nodeID,

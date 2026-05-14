@@ -24,7 +24,7 @@ func TestDockerGateExecutor_Mounts(t *testing.T) {
 		name string
 		// build returns the workspace path, spec, ctx, expected mount (may be zero), and an
 		// optional substring whose presence in any mount target should fail the test.
-		build      func(t *testing.T) (workspace string, spec *contracts.StepGateSpec, ctx context.Context, want expectMount, absentTargetSubstr string)
+		build       func(t *testing.T) (workspace string, spec *contracts.StepGateSpec, ctx context.Context, want expectMount, absentTargetSubstr string)
 		expectMount bool
 	}{
 		{
@@ -37,10 +37,7 @@ func TestDockerGateExecutor_Mounts(t *testing.T) {
 				}
 				spec := &contracts.StepGateSpec{
 					Enabled: true,
-					GateProfile: &contracts.BuildGateProfileOverride{
-						Command: contracts.CommandSpec{Shell: "echo prep-gate"},
-						Env:     map[string]string{"DOCKER_HOST": "unix://" + socketPath},
-					},
+					Env:     map[string]string{"DOCKER_HOST": "unix://" + socketPath},
 				}
 				return createMavenWorkspace(t, "17"), spec, context.Background(),
 					expectMount{source: socketPath, target: socketPath, readOnly: false}, ""
@@ -52,10 +49,7 @@ func TestDockerGateExecutor_Mounts(t *testing.T) {
 			build: func(t *testing.T) (string, *contracts.StepGateSpec, context.Context, expectMount, string) {
 				spec := &contracts.StepGateSpec{
 					Enabled: true,
-					GateProfile: &contracts.BuildGateProfileOverride{
-						Command: contracts.CommandSpec{Shell: "echo prep-gate"},
-						Env:     map[string]string{"DOCKER_HOST": "tcp://prep-dind:2375"},
-					},
+					Env:     map[string]string{"DOCKER_HOST": "tcp://prep-dind:2375"},
 				}
 				return createMavenWorkspace(t, "17"), spec, context.Background(),
 					expectMount{}, "docker.sock"
@@ -258,52 +252,6 @@ func TestDockerGateExecutor_LimitEnvParsing(t *testing.T) {
 			}
 			if rt.captured.StorageSizeOpt != tc.wantDiskOp {
 				t.Fatalf("StorageSizeOpt=%q, want %q", rt.captured.StorageSizeOpt, tc.wantDiskOp)
-			}
-		})
-	}
-}
-
-// TestDockerGateExecutor_GradleCommand verifies the gradle command flags emitted
-// for both the fallback (system gradle) and wrapper (./gradlew) workspaces.
-func TestDockerGateExecutor_GradleCommand(t *testing.T) {
-	tests := []struct {
-		name      string
-		workspace func(t *testing.T) string
-		wantBin   string
-	}{
-		{
-			name:      "fallback gradle binary",
-			workspace: func(t *testing.T) string { return createGradleWorkspace(t, "17") },
-			wantBin:   "gradle -q --stacktrace --build-cache",
-		},
-		{
-			name:      "wrapper preferred when present",
-			workspace: func(t *testing.T) string { return createGradleWorkspaceWithWrapper(t, "17") },
-			wantBin:   "./gradlew -q --stacktrace --build-cache",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			rt := &testContainerRuntime{}
-			executor := NewDockerGateExecutor(rt)
-			if _, err := executor.Execute(context.Background(), &contracts.StepGateSpec{Enabled: true}, tt.workspace(t)); err != nil {
-				t.Fatalf("Execute() unexpected error: %v", err)
-			}
-			if !rt.createCalled {
-				t.Fatal("expected Create to be called")
-			}
-			if len(rt.captured.Command) != 3 {
-				t.Fatalf("expected 3-element command, got %v", rt.captured.Command)
-			}
-			cmd := rt.captured.Command[2]
-			if !strings.Contains(cmd, tt.wantBin) {
-				t.Fatalf("expected gradle command containing %q, got %q", tt.wantBin, cmd)
-			}
-			if strings.Contains(cmd, "--fail-fast") {
-				t.Fatalf("expected gradle command not to contain --fail-fast, got %q", cmd)
-			}
-			if !strings.Contains(cmd, "test -p /workspace") {
-				t.Fatalf("expected gradle command to run tests in /workspace, got %q", cmd)
 			}
 		})
 	}

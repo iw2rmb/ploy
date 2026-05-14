@@ -133,12 +133,8 @@ func CloneRecoveryMetadata(src *contracts.BuildGateRecoveryMetadata) *contracts.
 	}
 	out := *src
 	out.Confidence = clonePtr(src.Confidence)
-	out.CandidatePromoted = clonePtr(src.CandidatePromoted)
 	if len(src.Expectations) > 0 {
 		out.Expectations = append([]byte(nil), src.Expectations...)
-	}
-	if len(src.CandidateGateProfile) > 0 {
-		out.CandidateGateProfile = append([]byte(nil), src.CandidateGateProfile...)
 	}
 	if src.DepsBumps != nil {
 		out.DepsBumps = CloneDepsBumpsMap(src.DepsBumps)

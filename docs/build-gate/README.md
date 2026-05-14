@@ -1,324 +1,47 @@
-# Build Gate Contract
+# Build Gate
 
-Scope
-- Minimal, stable contract to validate a repository after each Migs stage.
-- Works in Migs and standalone CI.
+## Current Contract
 
-## Overview: Unified Jobs Pipeline
+Build Gate is image-driven:
 
-Build Gate validation runs as part of the **unified jobs pipeline**. Gate jobs are
-stored in the `jobs` table alongside mig and healing jobs, and nodes claim work
-from a single queue with chain progression driven by `next_id`. There is no dedicated Build Gate
-queue or separate worker mode—all nodes pull from the same jobs queue.
+- Image is resolved by stack selector from `gates/gates.yaml` (or `build_gate.images` overrides in spec).
+- Command is owned by the gate image (`CMD`/entrypoint inside image).
+- Ploy no longer injects per-phase target/command overrides into Build Gate execution.
+- Gate profiles are not resolved/persisted by the server and are not promoted from successful gates.
 
-**Key characteristics:**
-- **Single queue:** Gate-adjacent jobs (`pre-gate`, `post-gate`, `post-gate`) are
-  stored in the `jobs` table with the same schema as mig jobs.
-- **Docker-based execution:** Gates execute locally on the claiming node via Docker
-  containers. There is no remote HTTP Build Gate mode.
-- **Chain progression:** Jobs advance through `next_id` successor links.
-- **Workspace semantics:** Gate validation runs against the local workspace on the
-  node. For post-gates after healing, the workspace already contains accumulated changes.
+## Catalog Format
 
-**Removed components (historical):**
-- HTTP Build Gate API (`POST /v1/buildgate/validate`, `/v1/buildgate/jobs/{id}`)
-- Dedicated `buildgate_jobs` table
-- `PLOY_BUILDGATE_MODE` environment variable
-- Remote HTTP gate executor and Build Gate worker node designation
+`gates/gates.yaml`:
 
-## Execution Flow
-
-Gate validation is orchestrated by the node agent as part of the Migs run lifecycle:
-
-```
-┌─────────────────────┐     ┌────────────────────┐     ┌───────────────────────┐
-│ Control Plane       │     │ Jobs Queue         │     │ Node Agent            │
-│ (creates jobs)      │────▶│ (jobs table)       │────▶│ (claims & executes)   │
-└─────────────────────┘     └────────────────────┘     └───────────────────────┘
-                                                                │
-                                                                ▼
-                                                       ┌───────────────────────┐
-                                                       │ Docker Gate Executor  │
-                                                       │ (local container)     │
-                                                       └───────────────────────┘
-                                                                │
-                                                                ▼
-                                                       ┌───────────────────────┐
-                                                       │ BuildGateStage        │
-                                                       │ Metadata (pass/fail)  │
-                                                       └───────────────────────┘
-```
-
-**Flow:**
-1. Control plane creates a unified job chain in `jobs` that includes gate-adjacent
-   phases (`pre-gate`, `post-gate`, `post-gate`) plus `mig` and
-   optional healing phases.
-2. Node agent claims the next queued job via `/v1/nodes/{id}/claim`.
-3. For Java Maven/Gradle gate jobs, the gate command collects
-   `/share/java.classpath` inside the gate runtime.
-4. Gate results are captured as `BuildGateStageMetadata` (passed/failed, duration, logs).
-5. Node reports completion via `/v1/jobs/{job_id}/complete`.
-
-## Gate Executor
-
-The `GateExecutor` interface (`internal/workflow/step`) provides a unified
-abstraction for gate validation. The only implementation is the Docker-based executor:
-
-**Code path:** `internal/workflow/step/gate_docker.go`
-
-**Characteristics:**
-- Workspace is local to the node; no network transfer of code.
-- Gate execution runs in a Docker container with the working tree mounted.
-- Build tools have direct access to the workspace.
-- Gate results are captured and returned as `BuildGateStageMetadata`.
-
-### Internal Planning Flow
-
-Gate execution planning inside `internal/workflow/step/gate_docker.go` and
-`internal/workflow/step/gate_docker_stack_gate.go` is intentionally flattened:
-
-1. `stackdetect.Detect` runs once per gate execution.
-2. `resolveGateExecutionPlan` produces either:
-   - an executable plan (`image`, `cmd`, detected language/tool), or
-   - a terminal gate result with prebuilt metadata/error for mismatch/unknown cases.
-3. If a plan is returned, Docker execution runs once and `BuildGateStageMetadata`
-   is built from container result + logs.
-4. Metadata now includes `detected_stack` (`language`, `tool`, optional `release`)
-   as the canonical detected gate identity used by recovery candidate validation.
-
-The stack-gate and detected-stack branches share focused terminal-metadata builders,
-so error codes/messages and `RuntimeImage` reporting stay consistent without duplicating
-gate terminal-state wrappers.
-
-See `docs/migs-lifecycle.md` section 1.1 for gate sequence diagrams and healing
-flow details.
-
-## Gate Configuration
-
-Gates are configured via the mig spec and environment variables on worker nodes.
-
-**Spec configuration:**
 ```yaml
-build_gate:
-  enabled: true
-  images: [] # optional stack→image overrides
-  pre:
-    stack:
-      enabled: true
-      language: java
-      release: "11"
-      default: true
-  post:
-    stack:
-      enabled: true
-      language: java
-      release: "17"
-      default: true
-```
-
-- `build_gate.pre.stack` applies to the `pre_gate` job.
-- `build_gate.post.stack` applies to the `post_gate` job.
-- `build_gate.pre.gate_profile` applies to the `pre_gate` command/env override.
-- `build_gate.post.gate_profile` applies to `post_gate` and `post_gate` command/env overrides.
-- `build_gate.pre.target` / `build_gate.post.target` pin gate execution target (`build|unit|all_tests`).
-- When `stack.enabled: true`, Build Gate rejects a detected stack mismatch (e.g. configured `release: "11"` but detected `"17"`).
-- When `default: true`, if stack detection cannot determine tool or release, Build Gate falls back to the configured stack. If `tool` is omitted, a detected tool is used when available.
-- When `default: false`, stack detection failures cancel execution for the repo (job status `Cancelled`), and remaining jobs are cancelled.
-- For Gradle, Java `release` detection reads `sourceCompatibility` / `targetCompatibility` (and falls back to Kotlin `kotlinOptions.jvmTarget`); unrelated build logic (tasks, repositories, `ext[...]`, etc.) does not block detection.
-
-`post_gate` always re-runs Build Gate using the stack detected from the workspace (via `stackdetect`) to select the gate runtime image/tool.
-
-### Prep Override Precedence
-
-Gate command resolution uses the following precedence (highest wins):
-1. Explicit run spec override: `build_gate.<phase>.gate_profile`
-2. For `post_gate`: validated infra recovery candidate override
-3. Claim-time resolved gate profile from `gate_profiles` (exact `(repo_id, repo_sha_in, stack_id)` row)
-4. Detected-tool fallback command (`buildCommandForTool`)
-
-Claim-time gate profile lookup honors strict phase stack requirements:
-- When `build_gate.<phase>.stack` is strict (`enabled: true` and `default: false`),
-  profile resolution filters by required stack (`language`, `release`, optional `tool`)
-  before image/repo-sha/any-stack fallback paths.
-- If no stack row matches those required parameters, no gate profile is resolved for that gate claim.
-
-Successful gate profile persistence:
-- On successful `pre_gate`, `post_gate`, or `post_gate`, the server persists an exact
-  profile row keyed by `(repo_id, repo_sha_out, stack_id)` (falling back to
-  `repo_sha_in` when `repo_sha_out` is unavailable).
-- The persisted payload marks the active gate target as `passed` and updates
-  `gates(job_id, profile_id)` for auditability.
-
-Target pin behavior:
-- If `build_gate.<phase>.target` is set and differs from a prep override target, Build Gate ignores that prep override and runs the pinned target command.
-- Prep stack validation (`prep stack mismatch`) is evaluated only when the prep override is actually selected for execution.
-
-Default gate profiles are seeded from `gates/stacks.yaml` + `gates/profiles/*.yaml`
-at server startup. Ppost-gate runtime auto-bootstrap is removed.
-Seeded Gradle profiles are wrapper-aware for runnable targets (`build`, `unit`,
-`all_tests`): they use `./gradlew` when `/workspace/gradlew` is executable and
-`/workspace/gradle/wrapper/gradle-wrapper.properties` exists; otherwise they use `gradle`.
-
-Gate profile mapping for simple mode:
-- Gate phase still selects destination override slot (`build_gate.pre.gate_profile` for `pre_gate`; `build_gate.post.gate_profile` for `post_gate`).
-- Runtime command/env source is always `gate_profile.targets.<targets.active>`.
-- Runtime mapping is status-agnostic: `status`/`failure_code` do not control command/env selection.
-- Runtime does not auto-fallback across targets; only `targets.active` decides command/env source.
-- `targets.active=unsupported` is terminal for gate mapping and injects no runnable override.
-- Terminal unsupported contract requires:
-  - `targets.build.status=failed`
-  - `targets.build.failure_code=infra_support`
-- Runtime hint mapping:
-  - `runtime.docker.mode=host_socket` injects `DOCKER_HOST=unix:///var/run/docker.sock`
-  - `runtime.docker.mode=tcp` injects `DOCKER_HOST=<runtime.docker.host>`
-  - `runtime.docker.api_version` injects `DOCKER_API_VERSION=<value>` when set
-  - when `DOCKER_HOST` is `unix://...`, Build Gate mounts that socket path into the gate container automatically.
-
-Environment precedence for gate execution:
-1. Gate env from run/spec (`spec.env` + global env injection)
-2. `build_gate.<phase>.gate_profile.env` (override wins on key conflicts)
-
-### Stack Gate: Build Gate Image Mapping
-
-When Stack Gate is enabled for a gate phase (a gate job carries `gate.stack_gate.expect`),
-Build Gate resolves its runtime image from an explicit stack→image mapping.
-
-**Resolution sources and precedence (highest wins):**
-1. Mig spec: `build_gate.images[]` (per-stack overrides)
-2. Default catalog: `gates/stacks.yaml` (installed at `/etc/ploy/gates/stacks.yaml` in Docker images)
-
-**Default catalog shipping:**
-- The repository default lives at `gates/stacks.yaml`.
-- The `node` and `server` Docker images include it at `/etc/ploy/gates/stacks.yaml` by default.
-- Java defaults in the catalog include `maven` and `gradle` entries for releases `11`, `17`, `21`, and `25`.
-
-**Rule format:**
-```yaml
-stacks:
+gates:
   - lang: java
-    release: "17"
     tool: maven
-    image: "${PLOY_CONTAINER_REGISTRY}/maven-${stack.language}-${stack.release}-${stack.tool}:${MAVEN_TAG}"
-    profile: gates/profiles/java-17-maven.yaml
+    release: "17"
+    image: $PLOY_CONTAINER_REGISTRY/gate-${stack.tool}:jdk${stack.release}
 ```
 
-Image templates support:
+Rules:
 
-- `${stack.language}`, `${stack.release}`, `${stack.tool}`
-- `$VAR`, `${VAR}` environment placeholders
+- `lang` required
+- `release` required (string or number in YAML)
+- `tool` optional
+- `image` required
 
-Template expansion is strict:
+## Resolution Order
 
-- Unknown stack placeholders fail
-- Missing stack values fail when referenced
-- Unresolved env placeholders fail
+1. `build_gate.images[]` from run spec (highest precedence)
+2. `gates/gates.yaml` (default)
 
-**Validation:**
-- `lang`, `release`, `image`, and `profile` are required; `tool` is optional.
-- Duplicate selectors in the catalog are rejected.
-- Referenced profile files must exist.
+Most-specific match wins (language+release+tool beats language+release).
 
-**Environment variables (on worker nodes):**
-- Resource limits: `PLOY_BUILDGATE_LIMIT_MEMORY_BYTES`, `PLOY_BUILDGATE_LIMIT_CPU_MILLIS`,
-  `PLOY_BUILDGATE_LIMIT_DISK_SPACE`.
+## Phase Options
 
-See `docs/envs/README.md` for the complete environment variable reference.
+`build_gate.pre.stack` and `build_gate.post.stack` remain supported for stack-detect policy.
 
-## Inputs
+## Runtime Paths
 
-- **Workspace mount:** `/workspace` (required, read-write). Contains the Git checkout.
-- **Output mount:** `/out` (read-write), backed by a workspace-local host directory for gate artifacts.
-- **Resource limits:** Memory, CPU, and disk limits are optional and configurable via
-  environment variables.
-
-## Behavior
-
-Gate validation behavior depends on the detected tool (from stack detection):
-
-| Tool    | Command                                                                                   |
-|---------|-------------------------------------------------------------------------------------------|
-| `maven` | `./mvnw -B -e clean compile` when `/workspace/mvnw` exists; otherwise `mvn --ff -B -q -e -DskipTests=false -Dstyle.color=never -f /workspace/pom.xml clean install` |
-| `gradle`| `./gradlew -q --stacktrace --build-cache test -p /workspace` when `gradle/wrapper/gradle-wrapper.properties` exists; otherwise `gradle -q --stacktrace --build-cache test -p /workspace` |
-| `go`    | `go test ./...`                                                                           |
-| `cargo` | `cargo test`                                                                              |
-| `pip` / `poetry` | `python -m compileall -q /workspace`                                               |
-
-The gate does not modify the repository; it validates the current working tree.
-
-## Outputs
-
-- **Exit code:** `0` = success; non-zero = failure.
-- **Logs:** Combined stdout/stderr captured and truncated to ≤10 MiB; uploaded as
-  `build-gate.log` artifact.
-- **Summary:** Pass/fail flag, duration, optional resource usage.
-- **Detected stack identity:** `BuildGateStageMetadata.detected_stack` captures
-  normalized detected stack (`language`, `tool`, optional `release`) for gate and
-  healing/post-gate stack-aware decisions.
-- **Gradle test reports:** Gate Gradle images force test reports into `/out/gradle-test-results` (JUnit XML)
-  and `/out/gradle-test-report` (HTML) via image init script. Node uploads these bundles to object storage
-  and records artifact links in `BuildGateStageMetadata.report_links`.
-- **API exposure:** Gate status is surfaced via `GET /v1/runs/{id}/status` and `Metadata["gate_summary"]` on the run.
-  - Format: `Gate: passed duration=1234ms` or `Gate: failed pre-gate duration=567ms`.
-  - Accessible via `Metadata["gate_summary"]` in `GET /v1/runs/{id}/status` responses.
-
-### `/out` Artifact Contract
-
-- Gate-generated files must be written under `/out/*` (no repository writes required for artifacts).
-- Node artifact upload treats gate `/out/*` as first-class output and preserves deterministic `out/` archive-relative paths.
-- SBOM rows are persisted from successful gate jobs for successful repo attempts.
-
-## Notes
-
-- When the container runtime is unavailable, gate execution fails immediately and
-  the run does not proceed to mig execution.
-- Disk limit is driver dependent; if unsupported, container creation may fail early.
-
-## Healing Container Environment
-
-Healing containers receive environment variables from the node agent to support
-Build Gate verification. Since gate execution is local (no HTTP API), these variables
-provide repository metadata for healing migs that need Git baseline information.
-
-**Repo metadata (injected from StartRunRequest):**
-- `PLOY_REPO_URL` — Git repository URL for the Migs run.
-- `PLOY_BASE_REF` — Base Git reference (branch or tag).
-- `PLOY_TARGET_REF` — Target Git reference for the run.
-- `PLOY_COMMIT_SHA` — Pinned commit SHA when available.
-
-**Server connection details:**
-- `PLOY_SERVER_URL` — Control plane base URL.
-- `PLOY_HOST_WORKSPACE` — Host filesystem path to workspace.
-
-**Cross-phase inputs (mounted at `/in`):**
-- `/in/build-gate.log` — First Build Gate failure log (read-only).
-- `/in/gate_profile.json` — Gate profile used by the failed gate when available (provided for `infra` healing).
-- `/in/gate_profile.schema.json` — Gate profile schema contract for infra healing (`title: Ploy Build Gate Profile`, includes `$comment` guidance for agent-facing fields).
-- `/in/deps-bumps.json` — Prior cumulative dependency bump state (provided for `deps` healing).
-
-These inputs are produced from available run/job artifacts and local workspace state.
-- `/in/amata.yaml` — Workflow spec materialized from `build_gate.post.amata.spec`.
-
-**Healing workspace policy:**
-- Infra-style healing: output-only and must not modify `/workspace`; any workspace diff fails the heal job with `healing_warning=unexpected_workspace_changes`.
-- Non-infra healing: must modify `/workspace`; no workspace diff fails the heal job with `healing_warning=no_workspace_changes`.
-
-See `docs/envs/README.md` for the complete environment variable reference.
-
-## Implementation References
-
-- Gate executor: `internal/workflow/step/gate_docker.go`
-- Gate job execution: `internal/nodeagent/execution_orchestrator_gate.go`
-- Healing job execution: `internal/nodeagent/execution_orchestrator_jobs.go`
-- Healing runtime helpers: `internal/nodeagent/execution_orchestrator_healing_runtime.go`
-- Run orchestration: `internal/nodeagent/execution_orchestrator.go`
-- Job claiming: `internal/store/queries/jobs.sql` (`ClaimJob` query)
-- Contracts: `internal/workflow/contracts/build_gate_metadata.go`
-
-## Historical Note
-
-Prior to the unified jobs pipeline, Build Gate supported an HTTP remote execution
-mode with dedicated `buildgate_jobs` table and worker designation via
-legacy worker selection knobs. This mode has been removed. All gate execution
-now runs locally on the node claiming the gate job from the unified queue.
-
-See git history for the migration rationale for collapsing gate execution into the jobs pipeline.
+- Host out dir: `.ploy-gate-out`
+- Container out dir: `/out`
+- Optional host in dir: `.ploy-gate-in`
+- Container in dir: `/in`

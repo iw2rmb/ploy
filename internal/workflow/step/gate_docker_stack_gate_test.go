@@ -66,7 +66,7 @@ func TestGateDocker_StackGate_PreCheckPass(t *testing.T) {
 func TestGateDocker_StackGate_PreCheckFailure(t *testing.T) {
 	t.Setenv("PLOY_CONTAINER_REGISTRY", "ghcr.io/iw2rmb/ploy")
 	expectedRuntimeImage, err := resolveImageForExpectation(
-		buildGateDefaultStacksCatalogPath(),
+		buildGateDefaultGatesCatalogPath(),
 		nil,
 		contracts.StackExpectation{Language: "java", Tool: "maven", Release: "17"},
 		true,
@@ -209,7 +209,7 @@ java { toolchain { languageVersion = JavaLanguageVersion.of(17) } }`
 func TestGateDocker_StackGate_ImageResolution(t *testing.T) {
 	t.Setenv("PLOY_CONTAINER_REGISTRY", "ghcr.io/iw2rmb/ploy")
 	defaultMappingImage, err := resolveImageForExpectation(
-		buildGateDefaultStacksCatalogPath(),
+		buildGateDefaultGatesCatalogPath(),
 		nil,
 		contracts.StackExpectation{Language: "java", Tool: "maven", Release: "17"},
 		true,

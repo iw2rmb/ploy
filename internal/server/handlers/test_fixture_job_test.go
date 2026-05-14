@@ -69,18 +69,9 @@ type jobStore struct {
 	claimRun mockResult[store.Run]
 
 	// SBOM
-	deleteSBOMRowsByJob     mockCallSlice[types.JobID, struct{}]
+	deleteSBOMRowsByJob mockCallSlice[types.JobID, struct{}]
 
 	upsertSBOMRow mockCallSlice[store.UpsertSBOMRowParams, struct{}]
-
-	// Stack/Gate profile resolution
-	resolveStackRowByImage           mockResult[store.ResolveStackRowByImageRow]
-	resolveStackRowByLangTool        mockResult[store.ResolveStackRowByLangToolRow]
-	resolveStackRowByLangToolRelease mockResult[store.ResolveStackRowByLangToolReleaseRow]
-
-	upsertExactGateProfile mockCall[store.UpsertExactGateProfileParams, store.UpsertExactGateProfileRow]
-
-	upsertGateJobProfileLink mockCall[store.UpsertGateJobProfileLinkParams, struct{}]
 
 	// Artifact/Diff (for job completion)
 	createDiff              mockCall[store.CreateDiffParams, store.Diff]
@@ -417,44 +408,6 @@ func (m *jobStore) DeleteSBOMRowsByJob(ctx context.Context, jobID types.JobID) e
 
 func (m *jobStore) UpsertSBOMRow(ctx context.Context, arg store.UpsertSBOMRowParams) error {
 	_, err := m.upsertSBOMRow.record(arg)
-	return err
-}
-
-// Stack/Gate profile methods
-
-func (m *jobStore) ResolveStackRowByImage(ctx context.Context, image string) (store.ResolveStackRowByImageRow, error) {
-	return resolveOrNoRows(&m.resolveStackRowByImage, func(r store.ResolveStackRowByImageRow) int64 { return r.ID })
-}
-
-func (m *jobStore) ResolveStackRowByLangTool(ctx context.Context, arg store.ResolveStackRowByLangToolParams) (store.ResolveStackRowByLangToolRow, error) {
-	return resolveOrNoRows(&m.resolveStackRowByLangTool, func(r store.ResolveStackRowByLangToolRow) int64 { return r.ID })
-}
-
-func (m *jobStore) ResolveStackRowByLangToolRelease(ctx context.Context, arg store.ResolveStackRowByLangToolReleaseParams) (store.ResolveStackRowByLangToolReleaseRow, error) {
-	return resolveOrNoRows(&m.resolveStackRowByLangToolRelease, func(r store.ResolveStackRowByLangToolReleaseRow) int64 { return r.ID })
-}
-
-func (m *jobStore) UpsertExactGateProfile(ctx context.Context, arg store.UpsertExactGateProfileParams) (store.UpsertExactGateProfileRow, error) {
-	m.upsertExactGateProfile.called = true
-	m.upsertExactGateProfile.params = arg
-	if m.upsertExactGateProfile.err != nil {
-		return store.UpsertExactGateProfileRow{}, m.upsertExactGateProfile.err
-	}
-	if m.upsertExactGateProfile.val.ID != 0 {
-		return m.upsertExactGateProfile.val, nil
-	}
-	return store.UpsertExactGateProfileRow{
-		ID:       1,
-		RepoID:   arg.RepoID,
-		RepoSha:  arg.RepoSha,
-		RepoSha8: "",
-		StackID:  arg.StackID,
-		Url:      arg.Url,
-	}, nil
-}
-
-func (m *jobStore) UpsertGateJobProfileLink(ctx context.Context, arg store.UpsertGateJobProfileLinkParams) error {
-	_, err := m.upsertGateJobProfileLink.record(arg)
 	return err
 }
 

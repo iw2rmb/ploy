@@ -486,8 +486,8 @@ envs:
   B: from-fragment
 expectations:
   artifacts:
-    - path: /out/gate-profile-candidate.json
-      schema: gate_profile_v1
+    - path: /out/custom-artifact.json
+      schema: artifact_v1
 `,
 			spec: `
 steps:

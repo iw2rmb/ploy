@@ -1,8 +1,8 @@
-// build_gate_image_resolver.go implements the Build Gate stack catalog resolver.
+// build_gate_image_resolver.go implements the Build Gate image catalog resolver.
 //
 // The resolver selects runtime images for Build Gate containers when Stack Gate
 // is enabled. It loads rules from multiple sources with precedence ordering:
-//  1. Default stacks catalog (gates/stacks.yaml) - lowest precedence
+//  1. Default gates catalog (gates/gates.yaml) - lowest precedence
 //  2. Mig-level image overrides - highest precedence
 //
 // Resolution uses "most specific match wins" semantics:
@@ -14,8 +14,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path"
-	"path/filepath"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -23,11 +21,11 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
-// DefaultStacksCatalogPath is the repository-relative location of the default
-// Build Gate stacks catalog.
+// DefaultGatesCatalogPath is the repository-relative location of the default
+// Build Gate gates catalog.
 //
-// The ploy Docker images install this file at /etc/ploy/gates/stacks.yaml.
-const DefaultStacksCatalogPath = "gates/stacks.yaml"
+// The ploy Docker images install this file at /etc/ploy/gates/gates.yaml.
+const DefaultGatesCatalogPath = "gates/gates.yaml"
 
 var (
 	errBuildGateImageMapping   = errors.New("build gate image mapping")
@@ -76,7 +74,7 @@ type BuildGateImageResolver struct {
 // from multiple sources.
 //
 // Parameters:
-//   - defaultPath: Path to the default stacks catalog (empty to skip file loading)
+//   - defaultPath: Path to the default gates catalog (empty to skip file loading)
 //   - migOverride: Mig-level override rules (may be nil)
 //   - requireDefaultFile: Whether the default catalog file must exist
 //
@@ -97,19 +95,19 @@ func NewBuildGateImageResolver(
 
 	// Load default catalog if path is provided.
 	if defaultPath != "" {
-		fileRules, err := loadStacksCatalogFile(defaultPath, requireDefaultFile)
+		fileRules, err := loadGatesCatalogFile(defaultPath, requireDefaultFile)
 		if err != nil {
 			return nil, err
 		}
 		if len(fileRules) > 0 {
 			fileRules, err = normalizeBuildGateImageRules(fileRules, "default_catalog")
 			if err != nil {
-				return nil, fmt.Errorf("default stacks catalog: %w", err)
+				return nil, fmt.Errorf("default gates catalog: %w", err)
 			}
 			// Validate default catalog rules.
 			mapping := contracts.BuildGateImageMapping{Images: fileRules}
 			if err := mapping.Validate("default_catalog"); err != nil {
-				return nil, fmt.Errorf("default stacks catalog: %w", err)
+				return nil, fmt.Errorf("default gates catalog: %w", err)
 			}
 			allRules = append(allRules, fileRules...)
 		}
@@ -140,6 +138,12 @@ func normalizeBuildGateImageRules(
 	for i := range normalized {
 		expanded, err := contracts.ExpandImageTemplate(normalized[i].Image, &normalized[i].Stack)
 		if err != nil {
+			// Allow short rules (for example language-only selectors) to keep
+			// stack placeholders unresolved until Resolve() provides runtime stack.
+			if strings.Contains(err.Error(), "unresolved stack placeholders:") {
+				normalized[i].Image = strings.TrimSpace(normalized[i].Image)
+				continue
+			}
 			return nil, fmt.Errorf("%s[%d].image: %w", prefix, i, err)
 		}
 		normalized[i].Image = strings.TrimSpace(expanded)
@@ -190,7 +194,11 @@ func (r *BuildGateImageResolver) Resolve(exp contracts.StackExpectation) (string
 	// to find the first (highest precedence) match at max specificity.
 	for i := len(matches) - 1; i >= 0; i-- {
 		if matches[i].Specificity() == maxSpecificity {
-			return matches[i].Image, nil
+			expanded, err := contracts.ExpandImageTemplate(matches[i].Image, &exp)
+			if err != nil {
+				return "", fmt.Errorf("resolve image template: %w", err)
+			}
+			return strings.TrimSpace(expanded), nil
 		}
 	}
 
@@ -198,41 +206,38 @@ func (r *BuildGateImageResolver) Resolve(exp contracts.StackExpectation) (string
 	return "", fmt.Errorf("internal error: no match found at specificity %d", maxSpecificity)
 }
 
-// loadStacksCatalogFile loads image rules from a YAML stacks catalog.
+// loadGatesCatalogFile loads image rules from a YAML gates catalog.
 // If the file doesn't exist and required is true, returns an error.
 // If the file doesn't exist and required is false, returns nil.
-func loadStacksCatalogFile(path string, required bool) ([]contracts.BuildGateImageRule, error) {
+func loadGatesCatalogFile(path string, required bool) ([]contracts.BuildGateImageRule, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
 			if required {
-				return nil, fmt.Errorf("stacks catalog file required but not found: %s", path)
+				return nil, fmt.Errorf("gates catalog file required but not found: %s", path)
 			}
 			return nil, nil
 		}
-		return nil, fmt.Errorf("read stacks catalog file: %w", err)
+		return nil, fmt.Errorf("read gates catalog file: %w", err)
 	}
 
 	var raw struct {
-		Stacks []rawCatalogEntry `yaml:"stacks"`
+		Gates []rawCatalogEntry `yaml:"gates"`
 	}
 	if err := yaml.Unmarshal(data, &raw); err != nil {
-		return nil, fmt.Errorf("parse stacks catalog file: %w", err)
+		return nil, fmt.Errorf("parse gates catalog file: %w", err)
 	}
 
-	if len(raw.Stacks) == 0 {
+	if len(raw.Gates) == 0 {
 		return nil, nil
 	}
 
-	rules := make([]contracts.BuildGateImageRule, 0, len(raw.Stacks))
-	for i, item := range raw.Stacks {
-		prefix := fmt.Sprintf("stacks[%d]", i)
-		rule, profilePath, err := item.toRule(prefix)
+	rules := make([]contracts.BuildGateImageRule, 0, len(raw.Gates))
+	for i, item := range raw.Gates {
+		prefix := fmt.Sprintf("gates[%d]", i)
+		rule, err := item.toRule(prefix)
 		if err != nil {
-			return nil, fmt.Errorf("stacks catalog file %s: %w", path, err)
-		}
-		if err := ensureCatalogProfileExists(path, profilePath, prefix+".profile"); err != nil {
-			return nil, fmt.Errorf("stacks catalog file %s: %w", path, err)
+			return nil, fmt.Errorf("gates catalog file %s: %w", path, err)
 		}
 		rules = append(rules, rule)
 	}
@@ -240,75 +245,38 @@ func loadStacksCatalogFile(path string, required bool) ([]contracts.BuildGateIma
 	return rules, nil
 }
 
-// rawCatalogEntry is the on-disk shape of a stacks.yaml entry. Release accepts
+// rawCatalogEntry is the on-disk shape of a gates.yaml entry. Release accepts
 // strings or numerics; yaml.v3 decodes both into `any`, which ParseReleaseValue
-// coerces into a canonical string.
+// coerces into a canonical string. Release is optional for language-level rules.
 type rawCatalogEntry struct {
 	Lang    string `yaml:"lang"`
 	Tool    string `yaml:"tool"`
 	Image   string `yaml:"image"`
-	Profile string `yaml:"profile"`
 	Release any    `yaml:"release"`
 }
 
-func (e rawCatalogEntry) toRule(prefix string) (contracts.BuildGateImageRule, string, error) {
+func (e rawCatalogEntry) toRule(prefix string) (contracts.BuildGateImageRule, error) {
 	var rule contracts.BuildGateImageRule
 
 	rule.Stack.Language = strings.TrimSpace(e.Lang)
 	if rule.Stack.Language == "" {
-		return rule, "", fmt.Errorf("%s.lang: required", prefix)
+		return rule, fmt.Errorf("%s.lang: required", prefix)
 	}
 
-	if e.Release == nil {
-		return rule, "", fmt.Errorf("%s.release: required", prefix)
-	}
-	releaseStr, err := contracts.ParseReleaseValue(e.Release, prefix+".release")
-	if err != nil {
-		return rule, "", err
-	}
-	rule.Stack.Release = strings.TrimSpace(releaseStr)
-	if rule.Stack.Release == "" {
-		return rule, "", fmt.Errorf("%s.release: required", prefix)
+	if e.Release != nil {
+		releaseStr, err := contracts.ParseReleaseValue(e.Release, prefix+".release")
+		if err != nil {
+			return rule, err
+		}
+		rule.Stack.Release = strings.TrimSpace(releaseStr)
 	}
 
 	rule.Stack.Tool = strings.TrimSpace(e.Tool)
 
 	rule.Image = strings.TrimSpace(e.Image)
 	if rule.Image == "" {
-		return rule, "", fmt.Errorf("%s.image: required", prefix)
+		return rule, fmt.Errorf("%s.image: required", prefix)
 	}
 
-	profilePath := strings.TrimSpace(e.Profile)
-	if profilePath == "" {
-		return rule, "", fmt.Errorf("%s.profile: required", prefix)
-	}
-
-	return rule, profilePath, nil
-}
-
-func ensureCatalogProfileExists(catalogPath, profileRef, field string) error {
-	resolved := resolveCatalogAssetPath(catalogPath, profileRef)
-	info, err := os.Stat(resolved)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return fmt.Errorf("%s: referenced file does not exist %q (resolved to %q)", field, profileRef, resolved)
-		}
-		return fmt.Errorf("%s: stat referenced file %q: %w", field, profileRef, err)
-	}
-	if info.IsDir() {
-		return fmt.Errorf("%s: referenced file is a directory %q (resolved to %q)", field, profileRef, resolved)
-	}
-	return nil
-}
-
-func resolveCatalogAssetPath(catalogPath, assetRef string) string {
-	cleanRef := path.Clean(strings.TrimSpace(assetRef))
-	if filepath.IsAbs(cleanRef) {
-		return cleanRef
-	}
-	catalogDir := filepath.Dir(catalogPath)
-	if strings.HasPrefix(cleanRef, "gates/") {
-		return filepath.Join(filepath.Dir(catalogDir), filepath.FromSlash(cleanRef))
-	}
-	return filepath.Join(catalogDir, filepath.FromSlash(cleanRef))
+	return rule, nil
 }

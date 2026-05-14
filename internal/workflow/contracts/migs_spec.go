@@ -204,12 +204,6 @@ func (s MigSpec) Validate() error {
 			if err := validateBuildGateStackConfig(pair.phase.Stack, pair.prefix+".stack"); err != nil {
 				return err
 			}
-			if err := validateBuildGateProfileOverride(pair.phase.GateProfile, pair.prefix+".gate_profile"); err != nil {
-				return err
-			}
-			if err := validateBuildGatePhaseTarget(pair.phase.Target, pair.prefix+".target"); err != nil {
-				return err
-			}
 		}
 	}
 
@@ -237,36 +231,6 @@ func validateBuildGateStackConfig(stack *BuildGateStackConfig, prefix string) er
 		return fmt.Errorf("%s.release: required", prefix)
 	}
 	return nil
-}
-
-func validateBuildGateProfileOverride(prep *BuildGateProfileOverride, prefix string) error {
-	if prep == nil {
-		return nil
-	}
-	if prep.Command.IsEmpty() {
-		return fmt.Errorf("%s.command: required", prefix)
-	}
-	if err := validateBuildGatePhaseTarget(prep.Target, prefix+".target"); err != nil {
-		return err
-	}
-	if prep.Stack != nil {
-		if strings.TrimSpace(prep.Stack.Language) == "" {
-			return fmt.Errorf("%s.stack.language: required", prefix)
-		}
-		if strings.TrimSpace(prep.Stack.Tool) == "" {
-			return fmt.Errorf("%s.stack.tool: required", prefix)
-		}
-	}
-	return nil
-}
-
-func validateBuildGatePhaseTarget(target string, prefix string) error {
-	switch strings.TrimSpace(target) {
-	case "", GateProfileTargetBuild, GateProfileTargetUnit, GateProfileTargetAllTests:
-		return nil
-	default:
-		return fmt.Errorf("%s: invalid value %q (expected one of: %s|%s|%s)", prefix, target, GateProfileTargetBuild, GateProfileTargetUnit, GateProfileTargetAllTests)
-	}
 }
 
 func validateStackGateSpec(spec *StackGateSpec, prefix string) error {

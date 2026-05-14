@@ -26,7 +26,7 @@ func TestCompleteJobService_Complete_ReturnsConflictForNonRunningJob(t *testing.
 		},
 	}
 
-	svc := NewCompleteJobService(st, nil, nil, nil)
+	svc := NewCompleteJobService(st, nil, nil)
 	_, err := svc.Complete(context.Background(), CompleteJobInput{
 		JobID:      jobID,
 		NodeID:     nodeID,
@@ -63,7 +63,7 @@ func TestCompleteJobService_Complete_SuccessPromotesNextJob(t *testing.T) {
 		},
 	}
 
-	svc := NewCompleteJobService(st, nil, nil, nil)
+	svc := NewCompleteJobService(st, nil, nil)
 	_, err := svc.Complete(context.Background(), CompleteJobInput{
 		JobID:        jobID,
 		NodeID:       nodeID,

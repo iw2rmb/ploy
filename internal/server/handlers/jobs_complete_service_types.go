@@ -3,7 +3,6 @@ package handlers
 import (
 	"fmt"
 
-	"github.com/iw2rmb/ploy/internal/blobstore"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/server"
 	"github.com/iw2rmb/ploy/internal/server/blobpersist"
@@ -26,10 +25,9 @@ type CompleteJobResult struct{}
 
 // CompleteJobService orchestrates job completion workflow.
 type CompleteJobService struct {
-	store          store.Store
-	eventsService  *server.EventsService
-	blobpersist    *blobpersist.Service
-	gateProfilesBS blobstore.Store
+	store         store.Store
+	eventsService *server.EventsService
+	blobpersist   *blobpersist.Service
 }
 
 type completeJobServiceType string
@@ -50,12 +48,11 @@ func routeCompleteJobServiceType(jobType domaintypes.JobType) (completeJobServic
 	}
 }
 
-func NewCompleteJobService(st store.Store, eventsService *server.EventsService, bp *blobpersist.Service, gateProfilesBS blobstore.Store) *CompleteJobService {
+func NewCompleteJobService(st store.Store, eventsService *server.EventsService, bp *blobpersist.Service) *CompleteJobService {
 	return &CompleteJobService{
-		store:          st,
-		eventsService:  eventsService,
-		blobpersist:    bp,
-		gateProfilesBS: gateProfilesBS,
+		store:         st,
+		eventsService: eventsService,
+		blobpersist:   bp,
 	}
 }
 

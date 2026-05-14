@@ -5,106 +5,10 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
-
-func TestGatePlanResolver_CommandTargetUnsupportedPolicy(t *testing.T) {
-	t.Parallel()
-
-	testCases := []struct {
-		name          string
-		stackGate     bool
-		enforceLock   bool
-		wantCode      string
-		wantCancelled bool
-	}{
-		{
-			name:          "detected_stack_no_lock",
-			stackGate:     false,
-			enforceLock:   false,
-			wantCode:      "BUILD_GATE_TARGET_UNSUPPORTED",
-			wantCancelled: false,
-		},
-		{
-			name:          "detected_stack_lock_enabled",
-			stackGate:     false,
-			enforceLock:   true,
-			wantCode:      "BUILD_GATE_TARGET_UNSUPPORTED",
-			wantCancelled: true,
-		},
-		{
-			name:          "stack_gate_no_lock",
-			stackGate:     true,
-			enforceLock:   false,
-			wantCode:      "STACK_GATE_TARGET_UNSUPPORTED",
-			wantCancelled: false,
-		},
-		{
-			name:          "stack_gate_lock_enabled",
-			stackGate:     true,
-			enforceLock:   true,
-			wantCode:      "STACK_GATE_TARGET_UNSUPPORTED",
-			wantCancelled: true,
-		},
-	}
-
-	for _, tc := range testCases {
-		tc := tc
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
-			workspace := createMavenWorkspace(t, "17")
-			spec := &contracts.StepGateSpec{
-				Enabled: true,
-				ImageOverrides: []contracts.BuildGateImageRule{{
-					Stack: contracts.StackExpectation{Language: "java", Tool: "maven", Release: "17"},
-					Image: "planner-test:java17",
-				}},
-				Target:            contracts.GateProfileTargetUnit,
-				EnforceTargetLock: tc.enforceLock,
-				GateProfile: &contracts.BuildGateProfileOverride{
-					Command: contracts.CommandSpec{Shell: "echo candidate"},
-					Target:  contracts.GateProfileTargetAllTests,
-				},
-			}
-			if tc.stackGate {
-				spec.StackGate = &contracts.StepGateStackSpec{
-					Enabled: true,
-					Expect:  &contracts.StackExpectation{Language: "java", Tool: "maven", Release: "17"},
-				}
-			}
-
-			plan, terminal := resolveGateExecutionPlan(context.Background(), workspace, spec, "")
-			if terminal == nil {
-				t.Fatal("expected terminal result")
-			}
-			if plan.image != "" || len(plan.cmd) != 0 {
-				t.Fatalf("expected empty plan on terminal path, got %+v", plan)
-			}
-			if terminal.meta == nil || len(terminal.meta.LogFindings) == 0 {
-				t.Fatalf("expected terminal metadata with log findings, got %+v", terminal.meta)
-			}
-			if got := terminal.meta.LogFindings[0].Code; got != tc.wantCode {
-				t.Fatalf("log code = %q, want %q", got, tc.wantCode)
-			}
-			if got := errors.Is(terminal.err, ErrRepoCancelled); got != tc.wantCancelled {
-				t.Fatalf("cancelled = %v, want %v (err=%v)", got, tc.wantCancelled, terminal.err)
-			}
-			if !terminal.reportRuntimeImage {
-				t.Fatal("expected runtime image reporting on target-unsupported terminal")
-			}
-			if strings.TrimSpace(terminal.runtimeImage) == "" {
-				t.Fatal("expected non-empty terminal runtime image")
-			}
-			if strings.TrimSpace(terminal.meta.RuntimeImage) == "" {
-				t.Fatal("expected metadata RuntimeImage on target-unsupported terminal")
-			}
-		})
-	}
-}
 
 func TestGatePlanResolver_StackDetectDefaultPolicy(t *testing.T) {
 	t.Parallel()

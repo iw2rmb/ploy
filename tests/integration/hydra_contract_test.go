@@ -357,11 +357,11 @@ func TestHydraContract_OutUploadContinuity(t *testing.T) {
 		t.Parallel()
 		spec := `{
 			"steps": [{
-				"image": "alpine:3.20",
-				"out": [
-					"abcdef0123456:/out/gate-profile-candidate.json",
-					"bbbbbbb012345:/out/build.log"
-				]
+					"image": "alpine:3.20",
+					"out": [
+						"abcdef0123456:/out/custom-artifact.json",
+						"bbbbbbb012345:/out/build.log"
+					]
 			}],
 			"bundle_map": {"abcdef0123456": "bun-1", "bbbbbbb012345": "bun-2"}
 		}`

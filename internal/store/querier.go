@@ -119,15 +119,12 @@ type Querier interface {
 	// Returns artifact bundle metadata including object_key for object-storage retrieval.
 	GetArtifactBundle(ctx context.Context, id pgtype.UUID) (ArtifactBundle, error)
 	GetBootstrapToken(ctx context.Context, tokenID string) (GetBootstrapTokenRow, error)
-	GetDefaultGateProfile(ctx context.Context, stackID int64) (GetDefaultGateProfileRow, error)
 	GetEvent(ctx context.Context, id int64) (Event, error)
-	GetExactGateProfile(ctx context.Context, arg GetExactGateProfileParams) (GetExactGateProfileRow, error)
 	// Retrieves a single environment entry by key and target.
 	// Returns pgx.ErrNoRows if the (key, target) pair does not exist.
 	GetGlobalEnv(ctx context.Context, arg GetGlobalEnvParams) (ConfigEnv, error)
 	GetJob(ctx context.Context, id types.JobID) (Job, error)
 	GetLatestDiffByJob(ctx context.Context, jobID *types.JobID) (Diff, error)
-	GetLatestRepoGateProfile(ctx context.Context, arg GetLatestRepoGateProfileParams) (GetLatestRepoGateProfileRow, error)
 	// v1: Gets the newest run_repos row for a specific repo_id in a mig,
 	// filtered by terminal status (Success or Fail).
 	// Used by POST /v1/migs/{mig_id}/pull to select last-succeeded or last-failed.
@@ -259,15 +256,6 @@ type Querier interface {
 	// Atomically promote a specific linked successor job: Created -> Queued.
 	// The candidate is eligible only when every predecessor that points to it is Success.
 	PromoteJobByIDIfUnblocked(ctx context.Context, id types.JobID) (Job, error)
-	ResolveAnyStackID(ctx context.Context) (int64, error)
-	ResolvePreGateCreationBindingByRepoSHA(ctx context.Context, arg ResolvePreGateCreationBindingByRepoSHAParams) (ResolvePreGateCreationBindingByRepoSHARow, error)
-	ResolvePreGateCreationBindingByRepoSHAAndStack(ctx context.Context, arg ResolvePreGateCreationBindingByRepoSHAAndStackParams) (ResolvePreGateCreationBindingByRepoSHAAndStackRow, error)
-	ResolveStackIDByImage(ctx context.Context, image string) (int64, error)
-	ResolveStackIDByRepoSHA(ctx context.Context, arg ResolveStackIDByRepoSHAParams) (int64, error)
-	ResolveStackIDByRequiredStack(ctx context.Context, arg ResolveStackIDByRequiredStackParams) (int64, error)
-	ResolveStackRowByImage(ctx context.Context, image string) (ResolveStackRowByImageRow, error)
-	ResolveStackRowByLangTool(ctx context.Context, arg ResolveStackRowByLangToolParams) (ResolveStackRowByLangToolRow, error)
-	ResolveStackRowByLangToolRelease(ctx context.Context, arg ResolveStackRowByLangToolReleaseParams) (ResolveStackRowByLangToolReleaseRow, error)
 	RevokeAPIToken(ctx context.Context, tokenID string) error
 	// Atomically promote the next unblocked job in a repo attempt: Created -> Queued.
 	// A created job is unblocked when all predecessor jobs that point to it are Success.
@@ -318,8 +306,6 @@ type Querier interface {
 	// Inserts or updates an in entry (upsert on composite key (dst, section)).
 	// Refreshes entry and updated_at on conflict (entry may change if hash changes).
 	UpsertConfigIn(ctx context.Context, arg UpsertConfigInParams) error
-	UpsertExactGateProfile(ctx context.Context, arg UpsertExactGateProfileParams) (UpsertExactGateProfileRow, error)
-	UpsertGateJobProfileLink(ctx context.Context, arg UpsertGateJobProfileLinkParams) error
 	// Inserts or updates an environment entry (upsert on composite key (key, target)).
 	// Updates value, secret, and refreshes updated_at on conflict.
 	// This ensures idempotent set operations from the CLI or API.

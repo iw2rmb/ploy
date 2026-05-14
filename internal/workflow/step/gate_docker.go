@@ -78,7 +78,7 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 		return nil, errBuildGateRuntimeUnavailable
 	}
 
-	catalogPath := buildGateDefaultStacksCatalogPath()
+	catalogPath := buildGateDefaultGatesCatalogPath()
 
 	plan, terminal := resolveGateExecutionPlan(ctx, workspace, spec, catalogPath)
 	if terminal != nil {
@@ -141,8 +141,7 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 		}
 	}
 
-	executedCommand := gateProfileCommandFromContainerCommand(plan.cmd)
-	meta := buildGateExecutionMetadata(workspace, plan.language, plan.tool, plan.release, plan.image, executedCommand, res, logs)
+	meta := buildGateExecutionMetadata(workspace, plan.language, plan.tool, plan.release, plan.image, res, logs)
 	meta.Resources = collectDockerResourceUsage(ctx, e.rt, h, specC)
 
 	if plan.stackGate != nil {
@@ -209,12 +208,12 @@ func assembleGateMounts(ctx context.Context, workspace string, plan gateExecutio
 	return mounts, nil
 }
 
-// buildGateDefaultStacksCatalogPath resolves the active stacks catalog file:
-// the installed copy at /etc/ploy/gates/stacks.yaml when present, otherwise
-// the repo-relative DefaultStacksCatalogPath discovered by walking up to a
+// buildGateDefaultGatesCatalogPath resolves the active gates catalog file:
+// the installed copy at /etc/ploy/gates/gates.yaml when present, otherwise
+// the repo-relative DefaultGatesCatalogPath discovered by walking up to a
 // go.mod ancestor.
-func buildGateDefaultStacksCatalogPath() string {
-	installed := "/etc/ploy/gates/stacks.yaml"
+func buildGateDefaultGatesCatalogPath() string {
+	installed := "/etc/ploy/gates/gates.yaml"
 	if info, err := os.Stat(installed); err == nil && !info.IsDir() {
 		return installed
 	}
@@ -223,7 +222,7 @@ func buildGateDefaultStacksCatalogPath() string {
 		dir := wd
 		for {
 			if info, serr := os.Stat(filepath.Join(dir, "go.mod")); serr == nil && !info.IsDir() {
-				candidate := filepath.Join(dir, DefaultStacksCatalogPath)
+				candidate := filepath.Join(dir, DefaultGatesCatalogPath)
 				if info, serr := os.Stat(candidate); serr == nil && !info.IsDir() {
 					return candidate
 				}
@@ -236,5 +235,5 @@ func buildGateDefaultStacksCatalogPath() string {
 			dir = parent
 		}
 	}
-	return DefaultStacksCatalogPath
+	return DefaultGatesCatalogPath
 }

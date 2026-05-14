@@ -12,7 +12,6 @@ import (
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
-	"github.com/iw2rmb/ploy/internal/workflow/gateprofile"
 	"github.com/iw2rmb/ploy/internal/workflow/step"
 )
 
@@ -143,7 +142,6 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 	if !gateResultPassed(gateResult) {
 		r.persistFirstGateFailureLog(req.RunID, gateResult)
 	}
-	r.persistGateProfileSnapshot(req.RunID, req.JobType, manifest.Gate, gateResult)
 	if err := r.uploadOutDirBundle(ctx, req.RunID, req.JobID, filepath.Join(workspace, step.BuildGateWorkspaceOutDir), "build-gate-out"); err != nil {
 		slog.Warn("failed to upload gate /out bundle", "run_id", req.RunID, "job_id", req.JobID, "error", err)
 	}
@@ -195,17 +193,11 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 	slog.Info("gate job "+logVerb, "run_id", req.RunID, "job_id", req.JobID, "job_type", req.JobType, "duration", duration)
 }
 
-// applyGatePhaseOverrides wires optional per-phase overrides into the gate manifest.
-//
-// Semantics:
-//   - pre_gate may use build_gate.pre stack/target/gate_profile override.
-//   - post_gate may use build_gate.post stack/target/gate_profile override.
+// applyGatePhaseOverrides wires optional per-phase stack policy into the gate manifest.
 func applyGatePhaseOverrides(manifest *contracts.StepManifest, req StartRunRequest, typedOpts RunOptions) {
 	if manifest == nil || manifest.Gate == nil {
 		return
 	}
-	manifest.Gate.Target = ""
-	manifest.Gate.EnforceTargetLock = false
 
 	switch req.JobType {
 	case types.JobTypePreGate:
@@ -313,55 +305,6 @@ func (r *runController) persistFirstGateFailureLog(runID types.RunID, meta *cont
 		return
 	}
 	persistOnce(runCacheDir(runID), "build-gate-first.log", []byte(logPayload), "first build gate failure log", runID)
-}
-
-func (r *runController) persistGateProfileSnapshot(
-	runID types.RunID,
-	jobType types.JobType,
-	gateSpec *contracts.StepGateSpec,
-	meta *contracts.BuildGateStageMetadata,
-) {
-	dir := runCacheDir(runID)
-	if err := os.MkdirAll(dir, 0o750); err != nil {
-		slog.Warn("failed to create run dir for gate profile snapshot", "run_id", runID, "error", err)
-		return
-	}
-	profilePath := filepath.Join(dir, "build-gate-profile.json")
-
-	raw := resolveGateProfileSnapshotRaw(jobType, gateSpec, meta)
-	if len(raw) == 0 {
-		if err := os.Remove(profilePath); err != nil && !os.IsNotExist(err) {
-			slog.Warn("failed to remove stale gate profile snapshot", "run_id", runID, "path", profilePath, "error", err)
-		}
-		return
-	}
-
-	if err := os.WriteFile(profilePath, raw, 0o600); err != nil {
-		slog.Warn("failed to persist gate profile snapshot", "run_id", runID, "path", profilePath, "error", err)
-		return
-	}
-	slog.Info("persisted gate profile snapshot", "run_id", runID, "path", profilePath)
-}
-
-func resolveGateProfileSnapshotRaw(
-	jobType types.JobType,
-	gateSpec *contracts.StepGateSpec,
-	meta *contracts.BuildGateStageMetadata,
-) json.RawMessage {
-	if gateSpec == nil || gateSpec.GateProfile == nil || gateSpec.RepoID.IsZero() {
-		return nil
-	}
-	raw, err := gateprofile.DeriveProfileSnapshotFromOverride(
-		gateSpec.RepoID.String(),
-		gateSpec.GateProfile,
-		strings.TrimSpace(gateSpec.Target),
-		jobType,
-		meta,
-	)
-	if err != nil {
-		return nil
-	}
-	return raw
 }
 
 func (r *runController) cleanupGateOutDir(workspace string) {

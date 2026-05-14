@@ -149,35 +149,6 @@ CREATE TABLE IF NOT EXISTS repos (
 );
 CREATE INDEX IF NOT EXISTS repos_created_idx ON repos(created_at);
 
--- Build stacks catalog (seeded from gates/stacks.yaml).
-CREATE TABLE IF NOT EXISTS stacks (
-  id           BIGSERIAL PRIMARY KEY,
-  lang         TEXT NOT NULL,
-  release      TEXT NOT NULL,
-  tool         TEXT,
-  image        TEXT NOT NULL,
-  created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
-  UNIQUE (lang, release, tool)
-);
-CREATE INDEX IF NOT EXISTS stacks_lang_release_idx ON stacks(lang, release);
-
--- Gate profiles indexed by exact execution identity (repo_id + repo_sha + stack_id).
--- Default profiles use NULL repo_id/repo_sha and are stack-scoped only.
-CREATE TABLE IF NOT EXISTS gate_profiles (
-  id           BIGSERIAL PRIMARY KEY,
-  repo_id      TEXT REFERENCES repos(id) ON DELETE CASCADE,
-  repo_sha     TEXT,
-  repo_sha8    TEXT,
-  stack_id     BIGINT NOT NULL REFERENCES stacks(id) ON DELETE RESTRICT,
-  url          TEXT NOT NULL,
-  created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
-  UNIQUE (repo_id, repo_sha, stack_id)
-);
-CREATE INDEX IF NOT EXISTS gate_profiles_stack_updated_idx ON gate_profiles(stack_id, updated_at DESC, id DESC);
-CREATE INDEX IF NOT EXISTS gate_profiles_repo_stack_updated_idx ON gate_profiles(repo_id, stack_id, updated_at DESC, id DESC);
-
 -- MigRepos (managed repo set for a mig project)
 -- Each row represents a repo participating in a mig, with mutable refs.
 -- Note: id is TEXT (NanoID-backed, 8 chars) for compact, human-friendly repo identifiers.
@@ -320,19 +291,8 @@ CREATE TABLE IF NOT EXISTS run_repo_actions (
 CREATE INDEX IF NOT EXISTS run_repo_actions_pending_idx ON run_repo_actions(run_id, repo_id, attempt, id) WHERE status = 'Queued';
 CREATE INDEX IF NOT EXISTS run_repo_actions_node_idx ON run_repo_actions(node_id) WHERE node_id IS NOT NULL;
 
--- Gate executions mapped to resolved gate profile rows.
--- One gate record per job_id.
-CREATE TABLE IF NOT EXISTS gates (
-  job_id       TEXT PRIMARY KEY REFERENCES jobs(id) ON DELETE CASCADE,
-  profile_id   BIGINT NOT NULL REFERENCES gate_profiles(id) ON DELETE RESTRICT,
-  created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-CREATE INDEX IF NOT EXISTS gates_profile_idx ON gates(profile_id);
-
 -- SBOM package rows extracted from successful gate job artifact bundles.
--- Stack/time attribution is resolved via joins:
---   sboms.job_id -> jobs -> (created_at)
---   sboms.job_id -> gates -> gate_profiles -> stacks
+-- Time attribution is available via sboms.job_id -> jobs.created_at.
 CREATE TABLE IF NOT EXISTS sboms (
   job_id      TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
   repo_id     TEXT NOT NULL REFERENCES repos(id) ON DELETE CASCADE,

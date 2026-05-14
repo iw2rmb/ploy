@@ -40,7 +40,7 @@ There is no separate registry sync helper script. Publish explicitly via `build-
 or targeted `docker buildx build ... --push` commands.
 
 Build Gate image mapping source of truth:
-- `gates/stacks.yaml`
+- `gates/gates.yaml`
 - Java defaults expect:
   - `$PLOY_CONTAINER_REGISTRY/gate-gradle:jdk11`
   - `$PLOY_CONTAINER_REGISTRY/gate-gradle:jdk17`

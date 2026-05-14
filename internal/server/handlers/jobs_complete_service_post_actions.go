@@ -139,28 +139,6 @@ func (s *CompleteJobService) onSuccess(ctx context.Context, state *completeJobSt
 	}
 
 	jobType := state.routedJobType()
-	if s.gateProfilesBS != nil {
-		if state.serviceType == completeJobServiceTypeGate {
-			run, ok := s.loadRunForPostCompletion(ctx, state, "gate profile persistence")
-			if ok {
-				specRow, specErr := s.store.GetSpec(ctx, run.SpecID)
-				if specErr != nil {
-					slog.Error("complete job: failed to load spec for gate profile persistence",
-						"job_id", state.job.ID,
-						"run_id", run.ID,
-						"spec_id", run.SpecID,
-						"err", specErr,
-					)
-				} else if persistErr := persistSuccessfulGateProfile(ctx, s.store, s.gateProfilesBS, state.job, state.persistedMeta, specRow.Spec); persistErr != nil {
-					slog.Error("complete job: failed to persist successful gate profile",
-						"job_id", state.job.ID,
-						"repo_id", state.job.RepoID,
-						"err", persistErr,
-					)
-				}
-			}
-		}
-	}
 
 	decision := lifecycle.EvaluateCompletionDecision(jobType, state.input.Status, state.job.NextID != nil)
 	if decision.ChainAction == lifecycle.CompletionChainAdvanceNext {

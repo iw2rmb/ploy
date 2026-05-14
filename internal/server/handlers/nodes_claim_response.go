@@ -16,32 +16,31 @@ import (
 )
 
 type claimResponsePayload struct {
-	WorkType               string                      `json:"work_type"`
-	RunID                  domaintypes.RunID           `json:"id"`
-	Name                   *string                     `json:"name,omitempty"`
-	RepoID                 domaintypes.RepoID          `json:"repo_id"`
-	Attempt                int32                       `json:"attempt"`
-	JobID                  domaintypes.JobID           `json:"job_id"`
-	JobName                string                      `json:"job_name"`
-	JobType                domaintypes.JobType         `json:"job_type"`
-	ActionID               *domaintypes.JobID          `json:"action_id,omitempty"`
-	ActionType             string                      `json:"action_type,omitempty"`
-	JobImage               string                      `json:"job_image"`
-	NextID                 *domaintypes.JobID          `json:"next_id"`
-	RepoURL                string                      `json:"repo_url"`
-	RepoGateProfileMissing bool                        `json:"repo_gate_profile_missing"`
-	Status                 domaintypes.RunStatus       `json:"status"`
-	NodeID                 domaintypes.NodeID          `json:"node_id"`
-	BaseRef                string                      `json:"base_ref"`
-	TargetRef              string                      `json:"target_ref"`
-	CommitSHA              string                      `json:"commit_sha,omitempty"`
-	RepoSHAIn              string                      `json:"repo_sha_in,omitempty"`
-	StartedAt              string                      `json:"started_at"`
-	CreatedAt              string                      `json:"created_at"`
-	Spec                   json.RawMessage             `json:"spec,omitempty"`
-	MigContext             *contracts.MigClaimContext  `json:"mig_context,omitempty"`
-	GateContext            *contracts.GateClaimContext `json:"gate_context,omitempty"`
-	DetectedStack          *contracts.StackExpectation `json:"detected_stack,omitempty"`
+	WorkType      string                      `json:"work_type"`
+	RunID         domaintypes.RunID           `json:"id"`
+	Name          *string                     `json:"name,omitempty"`
+	RepoID        domaintypes.RepoID          `json:"repo_id"`
+	Attempt       int32                       `json:"attempt"`
+	JobID         domaintypes.JobID           `json:"job_id"`
+	JobName       string                      `json:"job_name"`
+	JobType       domaintypes.JobType         `json:"job_type"`
+	ActionID      *domaintypes.JobID          `json:"action_id,omitempty"`
+	ActionType    string                      `json:"action_type,omitempty"`
+	JobImage      string                      `json:"job_image"`
+	NextID        *domaintypes.JobID          `json:"next_id"`
+	RepoURL       string                      `json:"repo_url"`
+	Status        domaintypes.RunStatus       `json:"status"`
+	NodeID        domaintypes.NodeID          `json:"node_id"`
+	BaseRef       string                      `json:"base_ref"`
+	TargetRef     string                      `json:"target_ref"`
+	CommitSHA     string                      `json:"commit_sha,omitempty"`
+	RepoSHAIn     string                      `json:"repo_sha_in,omitempty"`
+	StartedAt     string                      `json:"started_at"`
+	CreatedAt     string                      `json:"created_at"`
+	Spec          json.RawMessage             `json:"spec,omitempty"`
+	MigContext    *contracts.MigClaimContext  `json:"mig_context,omitempty"`
+	GateContext   *contracts.GateClaimContext `json:"gate_context,omitempty"`
+	DetectedStack *contracts.StackExpectation `json:"detected_stack,omitempty"`
 }
 
 func buildClaimResponsePayload(
@@ -54,7 +53,6 @@ func buildClaimResponsePayload(
 	runRepo store.RunRepo,
 	repoURL string,
 	job store.Job,
-	gateProfileResolver GateProfileResolver,
 ) (claimResponsePayload, error) {
 	jobType := domaintypes.JobType(job.JobType)
 	if err := jobType.Validate(); err != nil {
@@ -72,30 +70,14 @@ func buildClaimResponsePayload(
 		bundleMap = configHolder.GetBundleMap()
 	}
 
-	var repoGateProfile []byte
-	if gateProfileResolver != nil && shouldResolveGateProfile(jobType) {
-		phasePolicy, policyErr := gatePhasePolicyForJobSpec(spec, jobType)
-		if policyErr != nil {
-			return claimResponsePayload{}, policyErr
-		}
-		resolution, err := gateProfileResolver.ResolveGateProfileForJob(ctx, job, phasePolicy.LookupConstraints)
-		if err != nil {
-			return claimResponsePayload{}, fmt.Errorf("resolve gate profile: %w", err)
-		}
-		if resolution != nil {
-			repoGateProfile = resolution.Payload
-		}
-	}
-
 	mergedSpec, err := mutateClaimSpec(claimSpecMutatorInput{
-		spec:            spec,
-		job:             job,
-		jobType:         jobType,
-		gitLab:          gitlabCfg,
-		globalEnv:       globalEnv,
-		repoGateProfile: repoGateProfile,
-		hydraOverlays:   hydraOverlays,
-		bundleMap:       bundleMap,
+		spec:          spec,
+		job:           job,
+		jobType:       jobType,
+		gitLab:        gitlabCfg,
+		globalEnv:     globalEnv,
+		hydraOverlays: hydraOverlays,
+		bundleMap:     bundleMap,
 	})
 	if err != nil {
 		return claimResponsePayload{}, err
@@ -144,32 +126,31 @@ func buildClaimResponsePayload(
 	}
 
 	return claimResponsePayload{
-		WorkType:               "job",
-		RunID:                  run.ID,
-		Name:                   nil,
-		RepoID:                 job.RepoID,
-		Attempt:                job.Attempt,
-		JobID:                  job.ID,
-		JobName:                strings.TrimSpace(job.Name),
-		JobType:                jobType,
-		ActionID:               nil,
-		ActionType:             "",
-		JobImage:               job.JobImage,
-		NextID:                 job.NextID,
-		RepoURL:                repoURL,
-		RepoGateProfileMissing: true,
-		Status:                 run.Status,
-		NodeID:                 nodeIDPtrOrZero(job.NodeID),
-		BaseRef:                job.RepoBaseRef,
-		TargetRef:              runRepo.RepoTargetRef,
-		CommitSHA:              commitSHA,
-		RepoSHAIn:              job.RepoShaIn,
-		StartedAt:              run.StartedAt.Time.Format(time.RFC3339),
-		CreatedAt:              run.CreatedAt.Time.Format(time.RFC3339),
-		Spec:                   mergedSpec,
-		MigContext:             migContext,
-		GateContext:            gateContext,
-		DetectedStack:          detectedStack,
+		WorkType:      "job",
+		RunID:         run.ID,
+		Name:          nil,
+		RepoID:        job.RepoID,
+		Attempt:       job.Attempt,
+		JobID:         job.ID,
+		JobName:       strings.TrimSpace(job.Name),
+		JobType:       jobType,
+		ActionID:      nil,
+		ActionType:    "",
+		JobImage:      job.JobImage,
+		NextID:        job.NextID,
+		RepoURL:       repoURL,
+		Status:        run.Status,
+		NodeID:        nodeIDPtrOrZero(job.NodeID),
+		BaseRef:       job.RepoBaseRef,
+		TargetRef:     runRepo.RepoTargetRef,
+		CommitSHA:     commitSHA,
+		RepoSHAIn:     job.RepoShaIn,
+		StartedAt:     run.StartedAt.Time.Format(time.RFC3339),
+		CreatedAt:     run.CreatedAt.Time.Format(time.RFC3339),
+		Spec:          mergedSpec,
+		MigContext:    migContext,
+		GateContext:   gateContext,
+		DetectedStack: detectedStack,
 	}, nil
 }
 
@@ -181,31 +162,30 @@ func buildActionClaimResponsePayload(
 	action store.RunRepoAction,
 ) claimResponsePayload {
 	return claimResponsePayload{
-		WorkType:               "action",
-		RunID:                  run.ID,
-		Name:                   nil,
-		RepoID:                 action.RepoID,
-		Attempt:                action.Attempt,
-		JobID:                  "",
-		JobName:                "",
-		JobType:                "",
-		ActionID:               &action.ID,
-		ActionType:             action.ActionType,
-		JobImage:               "",
-		NextID:                 nil,
-		RepoURL:                repoURL,
-		RepoGateProfileMissing: false,
-		Status:                 run.Status,
-		NodeID:                 nodeIDPtrOrZero(action.NodeID),
-		BaseRef:                runRepo.RepoBaseRef,
-		TargetRef:              runRepo.RepoTargetRef,
-		RepoSHAIn:              "",
-		StartedAt:              run.StartedAt.Time.Format(time.RFC3339),
-		CreatedAt:              run.CreatedAt.Time.Format(time.RFC3339),
-		Spec:                   spec,
-		MigContext:             nil,
-		GateContext:            nil,
-		DetectedStack:          nil,
+		WorkType:      "action",
+		RunID:         run.ID,
+		Name:          nil,
+		RepoID:        action.RepoID,
+		Attempt:       action.Attempt,
+		JobID:         "",
+		JobName:       "",
+		JobType:       "",
+		ActionID:      &action.ID,
+		ActionType:    action.ActionType,
+		JobImage:      "",
+		NextID:        nil,
+		RepoURL:       repoURL,
+		Status:        run.Status,
+		NodeID:        nodeIDPtrOrZero(action.NodeID),
+		BaseRef:       runRepo.RepoBaseRef,
+		TargetRef:     runRepo.RepoTargetRef,
+		RepoSHAIn:     "",
+		StartedAt:     run.StartedAt.Time.Format(time.RFC3339),
+		CreatedAt:     run.CreatedAt.Time.Format(time.RFC3339),
+		Spec:          spec,
+		MigContext:    nil,
+		GateContext:   nil,
+		DetectedStack: nil,
 	}
 }
 
@@ -222,9 +202,8 @@ func buildAndSendJobClaimResponse(
 	runRepo store.RunRepo,
 	repoURL string,
 	job store.Job,
-	gateProfileResolver GateProfileResolver,
 ) error {
-	payload, err := buildClaimResponsePayload(r.Context(), st, bs, configHolder, run, spec, runRepo, repoURL, job, gateProfileResolver)
+	payload, err := buildClaimResponsePayload(r.Context(), st, bs, configHolder, run, spec, runRepo, repoURL, job)
 	if err != nil {
 		return err
 	}

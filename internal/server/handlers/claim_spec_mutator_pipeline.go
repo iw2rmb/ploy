@@ -10,14 +10,13 @@ import (
 )
 
 type claimSpecMutatorInput struct {
-	spec            json.RawMessage
-	job             store.Job
-	jobType         domaintypes.JobType
-	gitLab          config.GitLabConfig
-	globalEnv       map[string][]GlobalEnvVar
-	repoGateProfile []byte
-	hydraOverlays   map[string]*HydraJobConfig
-	bundleMap       map[string]string // server-side shortHash → bundleID
+	spec          json.RawMessage
+	job           store.Job
+	jobType       domaintypes.JobType
+	gitLab        config.GitLabConfig
+	globalEnv     map[string][]GlobalEnvVar
+	hydraOverlays map[string]*HydraJobConfig
+	bundleMap     map[string]string // server-side shortHash → bundleID
 }
 
 type claimSpecMutator struct {
@@ -49,12 +48,6 @@ func mutateClaimSpec(input claimSpecMutatorInput) (json.RawMessage, error) {
 		{
 			errContext: "merge hydra overlay into spec",
 			apply:      applyHydraOverlayMutator,
-		},
-		{
-			errContext: "merge repo gate_profile into spec",
-			apply: func(m map[string]any, in claimSpecMutatorInput) error {
-				return applyRepoGateProfileMutator(m, in.repoGateProfile, in.jobType)
-			},
 		},
 		{
 			errContext: "merge server bundle map into spec",

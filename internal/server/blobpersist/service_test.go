@@ -21,13 +21,13 @@ import (
 type stubStore struct {
 	store.Store
 
-	createLog                          func(ctx context.Context, arg store.CreateLogParams) (store.Log, error)
-	deleteLog                          func(ctx context.Context, id int64) error
-	createDiff                         func(ctx context.Context, arg store.CreateDiffParams) (store.Diff, error)
-	deleteDiff                         func(ctx context.Context, id pgtype.UUID) error
-	getLatestDiffByJob                 func(ctx context.Context, jobID *types.JobID) (store.Diff, error)
-	createArtifactBundle               func(ctx context.Context, arg store.CreateArtifactBundleParams) (store.ArtifactBundle, error)
-	deleteArtifactBundle               func(ctx context.Context, id pgtype.UUID) error
+	createLog                      func(ctx context.Context, arg store.CreateLogParams) (store.Log, error)
+	deleteLog                      func(ctx context.Context, id int64) error
+	createDiff                     func(ctx context.Context, arg store.CreateDiffParams) (store.Diff, error)
+	deleteDiff                     func(ctx context.Context, id pgtype.UUID) error
+	getLatestDiffByJob             func(ctx context.Context, jobID *types.JobID) (store.Diff, error)
+	createArtifactBundle           func(ctx context.Context, arg store.CreateArtifactBundleParams) (store.ArtifactBundle, error)
+	deleteArtifactBundle           func(ctx context.Context, id pgtype.UUID) error
 	listArtifactBundlesByRunAndJob func(ctx context.Context, arg store.ListArtifactBundlesByRunAndJobParams) ([]store.ArtifactBundle, error)
 }
 
@@ -308,13 +308,13 @@ func TestLoadRecoveryArtifact(t *testing.T) {
 	objectKey := "artifacts/run/" + runID.String() + "/bundle/" + artifactUUID.String() + ".tar.gz"
 
 	successBundle := mustTarGzBundle(t, map[string][]byte{
-		"out/gate-profile-candidate.json": []byte(`{"schema_version":1}`),
+		"out/custom-artifact.json": []byte(`{"schema_version":1}`),
 	})
 	notFoundBundle := mustTarGzBundle(t, map[string][]byte{
 		"out/something-else.json": []byte(`{"ok":true}`),
 	})
 	invalidJSONBundle := mustTarGzBundle(t, map[string][]byte{
-		"out/gate-profile-candidate.json": []byte("not-json"),
+		"out/custom-artifact.json": []byte("not-json"),
 	})
 
 	tests := []struct {
@@ -343,7 +343,7 @@ func TestLoadRecoveryArtifact(t *testing.T) {
 			}
 
 			svc := New(st, bs)
-			got, err := svc.LoadRecoveryArtifact(context.Background(), runID, jobID, "/out/gate-profile-candidate.json")
+			got, err := svc.LoadRecoveryArtifact(context.Background(), runID, jobID, "/out/custom-artifact.json")
 			if tt.wantErr != nil {
 				if !errors.Is(err, tt.wantErr) {
 					t.Fatalf("expected %v, got %v", tt.wantErr, err)

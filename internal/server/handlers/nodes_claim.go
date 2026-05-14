@@ -13,12 +13,8 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-func claimJobHandlerWithEvents(st store.Store, bs blobstore.Store, eventsService *server.EventsService, configHolder *ConfigHolder, gateProfileResolver ...GateProfileResolver) http.HandlerFunc {
-	var resolver GateProfileResolver
-	if len(gateProfileResolver) > 0 {
-		resolver = gateProfileResolver[0]
-	}
-	service := NewClaimService(st, bs, configHolder, resolver, eventsService)
+func claimJobHandlerWithEvents(st store.Store, bs blobstore.Store, eventsService *server.EventsService, configHolder *ConfigHolder) http.HandlerFunc {
+	service := NewClaimService(st, bs, configHolder, eventsService)
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		nodeID, ok := parseRequiredPathIDOrWriteError[domaintypes.NodeID](w, r, "id")
@@ -78,13 +74,4 @@ func nodeIDPtrOrZero(id *domaintypes.NodeID) domaintypes.NodeID {
 		return ""
 	}
 	return *id
-}
-
-func shouldResolveGateProfile(jobType domaintypes.JobType) bool {
-	switch jobType {
-	case domaintypes.JobTypePreGate, domaintypes.JobTypePostGate:
-		return true
-	default:
-		return false
-	}
 }

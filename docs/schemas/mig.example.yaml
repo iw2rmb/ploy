@@ -239,10 +239,6 @@ build_gate:
 # - relative include paths resolve from each including file directory
 # - relative local-source paths inside included fragments (`amata.spec` and
 #   source side of `in`/`out`/`home`) resolve from that included file directory
-# For expectations with `schema: gate_profile_v1`, the healing job should
-# write `/out/gate-profile-candidate.json`. Promotion to repo `gate_profile` occurs
-# only when the immediate follow-up `post_gate` succeeds.
-
 # Optional GitLab integration (control plane/node redact PAT in logs).
 gitlab_domain: gitlab.com # optional; defaults to gitlab.com when gitlab_pat is provided
 # gitlab_pat: "<TOKEN>"           # optional; can be set via ploy config gitlab; avoid committing to VCS

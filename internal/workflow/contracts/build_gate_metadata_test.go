@@ -11,10 +11,6 @@ func confidencePtr(v float64) *float64 {
 	return &v
 }
 
-func boolPtr(v bool) *bool {
-	return &v
-}
-
 // TestBuildGateStageMetadata_DetectedStack verifies that DetectedStack correctly
 // derives the MigStack from the first static check's tool name.
 func TestBuildGateStageMetadata_DetectedStack(t *testing.T) {
@@ -299,7 +295,7 @@ func TestBuildGateStageMetadata_JSONRoundTrip(t *testing.T) {
 				StrategyID:   "infra-default",
 				Confidence:   confidencePtr(0.75),
 				Reason:       "docker daemon unavailable",
-				Expectations: json.RawMessage(`{"artifacts":[{"path":"/out/gate-profile-candidate.json","schema":"gate_profile_v1"}]}`),
+				Expectations: json.RawMessage(`{"artifacts":[{"path":"/out/errors.yaml","schema":"yaml"}]}`),
 			},
 		}
 		requireJSONRoundTrip(t, original)
@@ -360,30 +356,7 @@ func TestBuildGateStageMetadata_Recovery_Validation(t *testing.T) {
 				StrategyID:   "infra-default",
 				Confidence:   confidencePtr(0.8),
 				Reason:       "pre_gate network timeout",
-				Expectations: json.RawMessage(`{"artifacts":[{"path":"/out/gate-profile-candidate.json","schema":"gate_profile_v1"}]}`),
-			},
-		},
-		{
-			name: "valid candidate promoted",
-			recovery: BuildGateRecoveryMetadata{
-				LoopKind:                  "healing",
-				ErrorKind:                 "infra",
-				CandidateSchemaID:         GateProfileCandidateSchemaID,
-				CandidateArtifactPath:     GateProfileCandidateArtifactPath,
-				CandidateValidationStatus: RecoveryCandidateStatusValid,
-				CandidatePromoted:         boolPtr(true),
-				CandidateGateProfile: json.RawMessage(`{
-					"schema_version": 1,
-					"repo_id": "repo_123",
-					"runner_mode": "simple",
-					"targets": {
-						"active": "unit",
-						"build": {"status":"passed","command":"go test ./...","env":{},"failure_code":null},
-						"unit": {"status":"passed","command":"go test ./... -run Unit","env":{},"failure_code":null},
-						"all_tests": {"status":"not_attempted","env":{}}
-					},
-					"orchestration": {"pre": [], "post": []}
-				}`),
+				Expectations: json.RawMessage(`{"artifacts":[{"path":"/out/errors.yaml","schema":"yaml"}]}`),
 			},
 		},
 		// Enum validation.
@@ -439,45 +412,6 @@ func TestBuildGateStageMetadata_Recovery_Validation(t *testing.T) {
 			name:       "invalid expectations type",
 			recovery:   BuildGateRecoveryMetadata{LoopKind: "healing", ErrorKind: "infra", Expectations: json.RawMessage(`"scalar"`)},
 			wantSubstr: "expectations",
-		},
-		// Candidate state machine.
-		{
-			name: "invalid candidate status",
-			recovery: BuildGateRecoveryMetadata{
-				LoopKind:                  "healing",
-				ErrorKind:                 "infra",
-				CandidateValidationStatus: "done",
-			},
-			wantSubstr: "candidate_validation_status invalid",
-		},
-		{
-			name: "valid status missing payload",
-			recovery: BuildGateRecoveryMetadata{
-				LoopKind:                  "healing",
-				ErrorKind:                 "infra",
-				CandidateValidationStatus: RecoveryCandidateStatusValid,
-			},
-			wantSubstr: "candidate_gate_profile: required when",
-		},
-		{
-			name: "non-valid status with payload",
-			recovery: BuildGateRecoveryMetadata{
-				LoopKind:                  "healing",
-				ErrorKind:                 "infra",
-				CandidateValidationStatus: RecoveryCandidateStatusInvalid,
-				CandidateGateProfile:      json.RawMessage(`{"schema_version":1}`),
-			},
-			wantSubstr: "candidate_gate_profile: forbidden when",
-		},
-		{
-			name: "promoted true with non-valid status",
-			recovery: BuildGateRecoveryMetadata{
-				LoopKind:                  "healing",
-				ErrorKind:                 "infra",
-				CandidateValidationStatus: RecoveryCandidateStatusInvalid,
-				CandidatePromoted:         boolPtr(true),
-			},
-			wantSubstr: "candidate_promoted: true requires candidate_validation_status",
 		},
 	}
 

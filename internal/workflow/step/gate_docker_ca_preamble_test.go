@@ -2,32 +2,28 @@ package step
 
 import (
 	"context"
-	"strings"
 	"testing"
 
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
-func TestDockerGateExecutor_NoPreambleInCommand(t *testing.T) {
+func TestDockerGateExecutor_UsesImageOwnedCommand(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
-		name        string
-		workspace   func(t *testing.T) string
-		spec        func() *contracts.StepGateSpec
-		expectInCmd string // substring expected in the shell command
+		name      string
+		workspace func(t *testing.T) string
+		spec      func() *contracts.StepGateSpec
 	}{
 		{
-			name:        "maven",
-			workspace:   func(t *testing.T) string { return createMavenWorkspace(t, "17") },
-			spec:        func() *contracts.StepGateSpec { return &contracts.StepGateSpec{Enabled: true} },
-			expectInCmd: "mvn --ff -B -q -e",
+			name:      "maven",
+			workspace: func(t *testing.T) string { return createMavenWorkspace(t, "17") },
+			spec:      func() *contracts.StepGateSpec { return &contracts.StepGateSpec{Enabled: true} },
 		},
 		{
-			name:        "gradle",
-			workspace:   func(t *testing.T) string { return createGradleWorkspace(t, "17") },
-			spec:        func() *contracts.StepGateSpec { return &contracts.StepGateSpec{Enabled: true} },
-			expectInCmd: "gradle -q --stacktrace",
+			name:      "gradle",
+			workspace: func(t *testing.T) string { return createGradleWorkspace(t, "17") },
+			spec:      func() *contracts.StepGateSpec { return &contracts.StepGateSpec{Enabled: true} },
 		},
 		{
 			name:      "go",
@@ -41,7 +37,6 @@ func TestDockerGateExecutor_NoPreambleInCommand(t *testing.T) {
 					}},
 				}
 			},
-			expectInCmd: "go test ./...",
 		},
 	}
 
@@ -63,68 +58,9 @@ func TestDockerGateExecutor_NoPreambleInCommand(t *testing.T) {
 			if !rt.createCalled {
 				t.Fatal("expected Create to be called")
 			}
-			if len(rt.captured.Command) != 3 {
-				t.Fatalf("expected 3-element command, got %v", rt.captured.Command)
+			if len(rt.captured.Command) != 0 {
+				t.Fatalf("expected no explicit command override, got %v", rt.captured.Command)
 			}
-
-			cmd := rt.captured.Command[2]
-
-				// The build command must still be present.
-				if !strings.Contains(cmd, tc.expectInCmd) {
-					t.Errorf("expected %q in command, got %q", tc.expectInCmd, cmd)
-			}
-		})
-	}
-}
-
-// TestDockerGateExecutor_NoPreambleOnPrepOverride verifies that prep override
-// commands contain no extra preamble content.
-func TestDockerGateExecutor_NoPreambleOnPrepOverride(t *testing.T) {
-	t.Parallel()
-
-	testCases := []struct {
-		name    string
-		command contracts.CommandSpec
-	}{
-		{
-			name:    "shell_form",
-			command: contracts.CommandSpec{Shell: "echo prep-gate-test"},
-		},
-		{
-			name:    "exec_form",
-			command: contracts.CommandSpec{Exec: []string{"/usr/bin/echo", "prep-gate-test"}},
-		},
-	}
-
-	for _, tc := range testCases {
-		tc := tc
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
-			rt := &testContainerRuntime{}
-			executor := NewDockerGateExecutor(rt)
-			workspace := createMavenWorkspace(t, "17")
-
-			spec := &contracts.StepGateSpec{
-				Enabled: true,
-				GateProfile: &contracts.BuildGateProfileOverride{
-					Command: tc.command,
-				},
-			}
-
-			_, err := executor.Execute(context.Background(), spec, workspace)
-			if err != nil {
-				t.Fatalf("Execute() unexpected error: %v", err)
-			}
-			if !rt.createCalled {
-				t.Fatal("expected Create to be called")
-			}
-
-			cmd := rt.captured.Command[len(rt.captured.Command)-1]
-
-				if !strings.Contains(cmd, "prep-gate-test") {
-					t.Errorf("expected original command content in prep override command, got %q", cmd)
-				}
 		})
 	}
 }

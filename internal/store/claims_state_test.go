@@ -40,7 +40,7 @@ func newTestStore(t *testing.T) (context.Context, Store) {
 func cleanTestTables(t *testing.T, ctx context.Context, db Store) {
 	t.Helper()
 	_, err := db.Pool().Exec(ctx,
-		`TRUNCATE jobs, nodes, run_repos, runs, mig_repos, migs, specs, gates, gate_profiles, repos CASCADE`)
+		`TRUNCATE jobs, nodes, run_repos, runs, mig_repos, migs, specs, repos CASCADE`)
 	if err != nil {
 		t.Fatalf("cleanTestTables: %v", err)
 	}
