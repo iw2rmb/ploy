@@ -45,7 +45,7 @@ func printUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "  run              Inspect runs and stream events")
 	_, _ = fmt.Fprintln(w, "  job              Inspect and follow job logs")
 	_, _ = fmt.Fprintln(w, "  pull             Pull Migs diffs for current repo HEAD")
-	_, _ = fmt.Fprintln(w, "  cluster          Manage clusters (deploy, nodes, tokens)")
+	_, _ = fmt.Fprintln(w, "  cluster          Manage clusters (nodes, tokens)")
 	_, _ = fmt.Fprintln(w, "  config           Inspect or update cluster configuration")
 	_, _ = fmt.Fprintln(w, "  manifest         Inspect and validate integration manifests")
 	_, _ = fmt.Fprintln(w, "  tui              Interactive TUI for migrations, runs, and jobs")

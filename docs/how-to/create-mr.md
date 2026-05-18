@@ -8,7 +8,7 @@ Overview
 Prerequisites
 - A GitLab instance (self-hosted or gitlab.com)
 - A Personal Access Token (PAT) with `api` scope
-- A Ploy cluster running (see `ploy cluster deploy`) and accessible via `ploy` CLI (`PLOY_CONFIG_HOME=$HOME/.config/ploy`)
+- A Ploy cluster running (see `docker compose -f /Users/v.v.kovalev/@scale/ploy-lib/images/docker-compose.yml up -d`) and accessible via `ploy` CLI (`PLOY_CONFIG_HOME=$HOME/.config/ploy`)
 
 ## Method 1: Configure Global GitLab Credentials (Recommended)
 

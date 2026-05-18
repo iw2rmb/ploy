@@ -18,13 +18,13 @@ Overview
 
 Local Registry Prerequisites
 - Deploy the local stack:
-  - `ploy cluster deploy`
+  - `docker compose -f /Users/v.v.kovalev/@scale/ploy-lib/images/docker-compose.yml up -d`
 - Export the registry prefix for specs/scripts:
-  - `export PLOY_CONTAINER_REGISTRY=ghcr.io/iw2rmb/ploy`
+  - `export PLOY_CONTAINER_REGISTRY=docker-hosted.artifactory.tcsbank.ru/at-scale/ploy`
 
 Publish all Migs images
 ```bash
-images/build-and-push.sh
+images/build.sh
 # Builds and pushes:
 # - Amata lanes: java-17/21/25-codex-amata-{maven,gradle}
 # - ORW lanes: orw-cli-{maven,gradle} and orw-cli-{maven,gradle}-jdk{21,25}
@@ -36,7 +36,7 @@ images/build-and-push.sh
 # - Runtime images: server and node
 ```
 
-There is no separate registry sync helper script. Publish explicitly via `build-and-push.sh`
+There is no separate registry sync helper script. Publish explicitly via `build.sh`
 or targeted `docker buildx build ... --push` commands.
 
 Build Gate image mapping source of truth:
@@ -53,7 +53,7 @@ Build Gate image mapping source of truth:
 
 Publish a single Migs image (example: orw-cli-java-17-maven)
 ```bash
-IMAGE_PREFIX="${PLOY_CONTAINER_REGISTRY:-ghcr.io/iw2rmb/ploy}" \
+IMAGE_PREFIX="${PLOY_CONTAINER_REGISTRY:-docker-hosted.artifactory.tcsbank.ru/at-scale/ploy}" \
   docker buildx build --platform linux/amd64 \
   -f images/orw/orw-cli-java-17-maven/Dockerfile \
   -t "${IMAGE_PREFIX}/orw-cli-java-17-maven:latest" \
@@ -67,7 +67,7 @@ Publish a Codex+Amata lane manually (example: Maven lane)
 PLATFORM=linux/amd64 images/amata/build-amata.sh
 
 # Step 2: build and push amata-codex-java-17-maven
-IMAGE_PREFIX="${PLOY_CONTAINER_REGISTRY:-ghcr.io/iw2rmb/ploy}"
+IMAGE_PREFIX="${PLOY_CONTAINER_REGISTRY:-docker-hosted.artifactory.tcsbank.ru/at-scale/ploy}"
 docker buildx build \
   --platform linux/amd64 \
   -f images/amata/amata-codex-java-17-maven/Dockerfile \
@@ -98,11 +98,11 @@ Notes
   - `orw-cli-java-21-gradle` -> `orw-cli-java-21-gradle`
   - `orw-cli-java-25-gradle` -> `orw-cli-java-25-gradle`
 - To use a different registry/namespace, override:
-  - `IMAGE_PREFIX=... images/build-and-push.sh`
+  - `IMAGE_PREFIX=... images/build.sh`
 
 Multi-arch push
 ```bash
-PLATFORM=linux/amd64,linux/arm64 images/build-and-push.sh
+PLATFORM=linux/amd64,linux/arm64 images/build.sh
 ```
 
 Verification

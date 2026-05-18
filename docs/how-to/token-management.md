@@ -154,7 +154,8 @@ deploy:
 ## Worker Node Authentication (Local Docker)
 
 In the local Docker cluster, the worker node uses a long-lived bearer token stored at
-`/etc/ploy/bearer-token` in the node container. `ploy cluster deploy` provisions this token.
+`/etc/ploy/bearer-token` in the node container. The compose stack mounts the host
+file selected by `WORKER_TOKEN_PATH`.
 
 ## Token Security
 
@@ -288,6 +289,5 @@ Revoke an API token.
 
 ## Related Documentation
 
-- [Deploy](deploy.md) - Local Docker development setup
 - [Environment Variables](../envs/README.md) - Configuration reference
 - [Troubleshooting Guide](bearer-token-troubleshooting.md) - Common authentication issues

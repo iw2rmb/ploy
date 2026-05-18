@@ -176,15 +176,13 @@ run_cli_tests() {
         5
 
     # Test 4: CLI cluster help (shows usage even with error code; check output exists)
-    # NOTE: `ploy server` has been re-rooted under `ploy cluster deploy`.
-    # We now test the cluster command instead.
     run_test "CLI: cluster help" \
         "dist/ploy cluster --help 2>&1 | grep -q 'Usage: ploy cluster'" \
         5
 
-    # Test 5: CLI cluster deploy help (check deploy usage is cluster-scoped)
-    run_test "CLI: cluster deploy help" \
-        "dist/ploy cluster deploy --help 2>&1 | grep -q 'Usage: ploy cluster deploy'" \
+    # Test 5: CLI cluster token help
+    run_test "CLI: cluster token help" \
+        "dist/ploy cluster token --help 2>&1 | grep -q 'Usage: ploy cluster token'" \
         5
 }
 
