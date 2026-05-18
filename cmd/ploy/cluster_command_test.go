@@ -25,7 +25,7 @@ func TestHandleClusterUnknownSubcommand(t *testing.T) {
 // TestHandleClusterHelp verifies that handleCluster responds to --help and -h flags
 // by printing usage and returning nil (no error).
 func TestHandleClusterHelp(t *testing.T) {
-	clienv.RunHelp(t, handleCluster, nil, "Usage: ploy cluster", "deploy", "node", "token")
+	clienv.RunHelp(t, handleCluster, nil, "Usage: ploy cluster", "node", "token")
 }
 
 // TestHandleClusterDelegatesNodeToHandleNode verifies that "cluster node" routes to handleNode.
@@ -61,10 +61,8 @@ func TestPrintClusterUsage(t *testing.T) {
 	expectedStrings := []string{
 		"Usage: ploy cluster <command>",
 		"Commands:",
-		"deploy",
 		"node",
 		"token",
-		"Deploy runtime stack on the current host",
 		"Manage worker nodes in a cluster",
 		"Manage API tokens bound to a cluster",
 	}
@@ -82,7 +80,7 @@ func TestClusterCommandIntegration(t *testing.T) {
 		args           []string
 		expectContains []string
 	}{
-		{name: "ploy cluster --help", args: []string{"cluster", "--help"}, expectContains: []string{"Usage: ploy cluster", "deploy", "node", "token"}},
+		{name: "ploy cluster --help", args: []string{"cluster", "--help"}, expectContains: []string{"Usage: ploy cluster", "node", "token"}},
 		{name: "ploy cluster -h", args: []string{"cluster", "-h"}, expectContains: []string{"Usage: ploy cluster"}},
 		{name: "ploy help cluster", args: []string{"help", "cluster"}, expectContains: []string{"Usage: ploy cluster"}},
 	}

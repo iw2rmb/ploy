@@ -97,7 +97,3 @@ Run tests with:
 go test -v ./internal/nodeagent/...
 go test -race -cover ./internal/nodeagent/...
 ```
-
-## Next Steps
-
-See `docs/how-to/deploy.md`.

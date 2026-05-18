@@ -31,9 +31,8 @@ export PLOY_DB_DSN='postgres://ploy:ploy@localhost:5432/ploy?sslmode=disable'
 export PLOY_OBJECTSTORE_ENDPOINT='http://localhost:3900'
 export PLOY_OBJECTSTORE_ACCESS_KEY='...'
 export PLOY_OBJECTSTORE_SECRET_KEY='...'
-export PLOY_VERSION='v0.1.0'                  # optional; defaults to ./VERSION
 
-ploy cluster deploy
+docker compose -f /Users/v.v.kovalev/@scale/ploy-lib/images/docker-compose.yml up -d
 ```
 
 Submit and follow a run:
@@ -47,7 +46,6 @@ ploy mig run \
 
 ## Documentation
 
-- Deploy cluster: `docs/how-to/deploy.md`
 - API schema: `docs/api/OpenAPI.yaml`
 - Environment variables: `docs/envs/README.md`
 - Migs lifecycle: `docs/migs-lifecycle.md`

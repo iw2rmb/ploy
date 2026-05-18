@@ -66,13 +66,13 @@ func newRootCmdWithIO(stdout, stderr io.Writer) *cobra.Command {
 	// Each builder function creates a cobra command tree with proper subcommand structure.
 
 	// Migs workflow commands
-	root.AddCommand(newMigCmd(stderr))   // ploy mig (run, fetch, cancel, inspect, artifacts, diffs)
-	root.AddCommand(newRunCmd(stderr))   // ploy run (events, inspect)
-	root.AddCommand(newJobCmd(stderr))   // ploy job (follow job logs)
-	root.AddCommand(newPullCmd(stderr))  // ploy pull (local repo pull workflow)
+	root.AddCommand(newMigCmd(stderr))  // ploy mig (run, fetch, cancel, inspect, artifacts, diffs)
+	root.AddCommand(newRunCmd(stderr))  // ploy run (events, inspect)
+	root.AddCommand(newJobCmd(stderr))  // ploy job (follow job logs)
+	root.AddCommand(newPullCmd(stderr)) // ploy pull (local repo pull workflow)
 
 	// Cluster and configuration commands
-	root.AddCommand(newClusterCmd(stderr))  // ploy cluster (deploy, node, token)
+	root.AddCommand(newClusterCmd(stderr))  // ploy cluster (node, token)
 	root.AddCommand(newConfigCmd(stderr))   // ploy config (gitlab show/set/validate)
 	root.AddCommand(newManifestCmd(stderr)) // ploy manifest (schema, validate)
 
@@ -81,10 +81,9 @@ func newRootCmdWithIO(stdout, stderr io.Writer) *cobra.Command {
 
 	// Server, node, and token management commands
 	// NOTE: `ploy server`, `ploy node`, and `ploy token` have been removed as top-level commands.
-	// Runtime deployment is accessible via `ploy cluster deploy`.
 	// Node operations are now accessible only via `ploy cluster node`.
 	// Token operations are now accessible only via `ploy cluster token`.
-	// This keeps deployment and node-management under `ploy cluster ...` and reduces top-level command surface.
+	// This keeps node-management under `ploy cluster ...` and reduces top-level command surface.
 
 	// Override help function so that `ploy --help` and `ploy -h` print our
 	// custom usage output instead of Cobra's default help format.

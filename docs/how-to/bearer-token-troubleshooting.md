@@ -107,7 +107,7 @@ Check:
 
 2. Check server logs for signature validation errors:
    ```bash
-   docker compose -f cmd/ploy/assets/runtime/docker-compose.yml logs --tail=200 server | rg -i "token|auth|401|403" || true
+   docker compose -f /Users/v.v.kovalev/@scale/ploy-lib/images/docker-compose.yml logs --tail=200 server | rg -i "token|auth|401|403" || true
    ```
 
 3. If the server's `PLOY_AUTH_SECRET` changed, all existing tokens are invalid. Create a new token using the updated secret or contact your cluster admin.
@@ -188,7 +188,7 @@ Check:
 Monitor the server logs for authentication errors:
 
 ```bash
-docker compose -f cmd/ploy/assets/runtime/docker-compose.yml logs -f server
+docker compose -f /Users/v.v.kovalev/@scale/ploy-lib/images/docker-compose.yml logs -f server
 ```
 
 ### Verify Server Configuration
@@ -196,7 +196,7 @@ docker compose -f cmd/ploy/assets/runtime/docker-compose.yml logs -f server
 Check the server's authentication configuration:
 
 ```bash
-docker compose -f cmd/ploy/assets/runtime/docker-compose.yml exec -T server env | rg -n "PLOY_AUTH_SECRET|PLOYD_AUTH_BEARER_TOKENS_ENABLED" || true
+docker compose -f /Users/v.v.kovalev/@scale/ploy-lib/images/docker-compose.yml exec -T server env | rg -n "PLOY_AUTH_SECRET|PLOYD_AUTH_BEARER_TOKENS_ENABLED" || true
 ```
 
 Expected output:
@@ -208,7 +208,7 @@ PLOYD_AUTH_BEARER_TOKENS_ENABLED=true
 Verify the environment variable is set:
 
 ```bash
-docker compose -f cmd/ploy/assets/runtime/docker-compose.yml exec -T server env | rg PLOY_AUTH_SECRET || true
+docker compose -f /Users/v.v.kovalev/@scale/ploy-lib/images/docker-compose.yml exec -T server env | rg PLOY_AUTH_SECRET || true
 ```
 
 ### Check Database State
@@ -235,7 +235,7 @@ Ensure `PLOY_AUTH_SECRET` is consistent:
 
 ```bash
 # Check current secret (be careful not to log this!)
-docker compose -f cmd/ploy/assets/runtime/docker-compose.yml exec -T server env | rg PLOY_AUTH_SECRET || true
+docker compose -f /Users/v.v.kovalev/@scale/ploy-lib/images/docker-compose.yml exec -T server env | rg PLOY_AUTH_SECRET || true
 
 # If the secret changed, all tokens are invalid
 # Generate a new admin token manually via database or API
@@ -273,7 +273,7 @@ docker compose -f cmd/ploy/assets/runtime/docker-compose.yml exec -T server env 
 
 1. The server updates `last_used_at` asynchronously to avoid blocking requests. Verify this is working:
    ```bash
-   docker compose -f cmd/ploy/assets/runtime/docker-compose.yml logs --tail=500 server | rg "last_used_at" || true
+   docker compose -f /Users/v.v.kovalev/@scale/ploy-lib/images/docker-compose.yml logs --tail=500 server | rg "last_used_at" || true
    ```
 
 2. If synchronous updates are blocking, check for database connection pool exhaustion:
@@ -303,7 +303,7 @@ docker compose -f cmd/ploy/assets/runtime/docker-compose.yml exec -T server env 
 
 3. Review server logs for suspicious activity:
    ```bash
-   docker compose -f cmd/ploy/assets/runtime/docker-compose.yml logs --tail=500 server | rg <token-id> || true
+   docker compose -f /Users/v.v.kovalev/@scale/ploy-lib/images/docker-compose.yml logs --tail=500 server | rg <token-id> || true
    ```
 
 4. Create a new token and update all systems using the old token.
@@ -387,11 +387,10 @@ resp, _ := client.Do(req)
 ### Update Node Provisioning
 
 In the local Docker cluster, the node authenticates to the control plane using
-the bearer token at `/etc/ploy/bearer-token`. `ploy cluster deploy` writes
-this file into the node container and restarts it.
+the bearer token at `/etc/ploy/bearer-token`. The compose stack mounts the host
+file selected by `WORKER_TOKEN_PATH`; update that file and restart the node.
 
 ## Related Documentation
 
 - [Token Management Guide](token-management.md) - Creating, listing, and revoking tokens
-- [Deploy](deploy.md) - Local development setup
 - [Environment Variables](../envs/README.md) - Configuration reference

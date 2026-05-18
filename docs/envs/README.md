@@ -21,32 +21,17 @@ defaults change, or components adopt additional configuration.
 - `PLOY_RUNTIME_ADAPTER` — Optional runtime adapter selector. Defaults to
   `local-step`. Other adapters (e.g., `k8s`) can plug in here; the CLI
   fails fast when an unknown adapter name is provided.
-- `PLOY_DB_DSN` — Required by local and offline-VPS deploy workflows.
-  Used both for host-side setup SQL (DB create/drop, token insert, node seed)
-  and injected into the server container as `PLOY_DB_DSN`.
-  Host-side DSN may use `localhost`; local deploy rewrites loopback hosts
-  (`localhost`, `127.0.0.1`, `::1`) to `host.docker.internal` for container use.
-  For VPS deploy, the DSN must already be reachable from both the remote host
-  and the remote `server` container; the offline-VPS deploy flow does not rewrite it.
+- `PLOY_DB_DSN` — Required by the server container.
   Non-loopback hosts must be reachable from inside containers.
   Example:
   `postgres://ploy:ploy@localhost:5432/ploy?sslmode=disable`.
 - `PLOY_SERVER_PORT` — Optional host port mapped to the server container's internal
-  port `8080` in the local compose stack. Default: `8080`. Both local
-  and runtime-local/VPS deploy scripts pass it through to the compose stack. Use this when the
+  port `8080` in the local compose stack. Default: `8080`. Use this when the
   host port `8080` is already occupied (example: `PLOY_SERVER_PORT=18080`).
-- `PLOY_RUNTIME_PULL_IMAGES` — Runtime-local deploy toggle for pull-before-start behavior.
-  Defaults to `1` (enabled). Set `0`/`false` to skip `docker compose pull`.
-- `PLOY_VERSION` — Runtime image semver tag used by `ploy cluster deploy` when explicit image
-  overrides are not set. Defaults to `./VERSION` in the repo root.
-- `PLOY_RUNTIME_SERVER_IMAGE` — Optional runtime-local server image override.
-  Default: `ghcr.io/iw2rmb/ploy/server:${PLOY_VERSION}`.
-- `PLOY_RUNTIME_NODE_IMAGE` — Optional runtime-local node image override.
-  Default: `ghcr.io/iw2rmb/ploy/node:${PLOY_VERSION}`.
-- `WORKER_TOKEN_PATH` — Optional host path used by local deploy scripts to persist the worker bearer
-  token and mounted into the node container at `/etc/ploy/bearer-token`.
-  Default: `<PLOY_CONFIG_HOME>/<cluster>/bearer-token` (for example `~/.config/ploy/local/bearer-token`).
-  If this path is a directory, scripts replace it with a file automatically.
+- `PLOY_IMAGE_TAG` — Runtime compose tag for the `server` and `node` images in
+  the external compose assets under `ploy-lib/images`. Defaults to `latest`.
+- `WORKER_TOKEN_PATH` — Required host path mounted into the node container at
+  `/etc/ploy/bearer-token`.
 - `PLOY_CONTAINER_SOCKET_PATH` — Optional host socket path mounted into the local
   `node` container at `/var/run/docker.sock`.
   Docker script default: `/var/run/docker.sock`.
@@ -73,26 +58,14 @@ Role model (bearer token claims):
 - `USER` — Standard Unix environment variable indicating the current user. The CLI
   reads this to populate the `Submitter` field when creating mig runs via `ploy mig run`.
 - `PLOY_CONTAINER_REGISTRY` — Registry/repository prefix used by runner templates.
-  Images resolve to `$PLOY_CONTAINER_REGISTRY/<name>:latest`. Deploy scripts expect this to be provided.
+  Images resolve to `$PLOY_CONTAINER_REGISTRY/<name>:latest`. Runtime compose
+  assets default to `docker-hosted.artifactory.tcsbank.ru/at-scale/ploy`.
 - `PLOY_OBJECTSTORE_ENDPOINT` — S3-compatible endpoint URL provided by environment.
 - `PLOY_OBJECTSTORE_ACCESS_KEY` — S3 access key ID provided by environment.
 - `PLOY_OBJECTSTORE_SECRET_KEY` — S3 secret access key provided by environment.
 
-- `AUTH_SECRET_PATH` — Optional path to the auth-secret file used by
-  local and offline-VPS deploy workflows for JWT signing secret reuse.
-  Defaults:
-  - local deploy: `auth-secret.txt` under local deploy workspace
-  - VPS deploy: `auth-secret.txt` under offline-VPS deploy workspace
-- `CLUSTER_ID` — Optional cluster ID used by local and offline-VPS deploy workflows
-  when generating bearer tokens. Default: `local`.
-- `NODE_ID` — Optional node ID used by local and offline-VPS deploy workflows
-  when seeding the default worker node row and worker token
-  description. Default: `local1`.
-- `DOCKERHUB_PAT` — Optional Docker Hub Personal Access Token for authenticated pulls when you use Docker Hub
-  as `PLOY_CONTAINER_REGISTRY`.
-- `PLOY_OPENAI_API_KEY` — Optional OpenAI API key propagated to Migs LLM lanes. When set on the control
-  plane, the runner injects it into the `migs-llm` container as `OPENAI_API_KEY`. You can also set it on
-  worker nodes via a systemd drop-in to make it available cluster-wide.
+- `CLUSTER_ID` — Optional cluster ID passed to the server container by the
+  external compose assets. Default: `local`.
 - Cross-phase input directory: `/in` is mounted read-only for healing migs (e.g., `codex`).
   - `/in/build-gate.log` — First Build Gate failure log
   - `/in/errors.yaml` — Structured gate errors payload when available
@@ -701,7 +674,6 @@ See `docs/api/OpenAPI.yaml` paths:
 ## Related Docs
 
 - [Migs lifecycle](../migs-lifecycle.md) — Server/node execution and orchestration flow
-- [Deployment](../how-to/deploy.md) — Local Docker cluster
 
 ## Build Gate Limits
 

@@ -2,8 +2,8 @@
 set -euo pipefail
 
 # ensure_local_descriptor recreates the local default cluster descriptor when it
-# is missing or broken. It uses cmd/ploy/assets/runtime/generated-tokens.env produced by
-# ploy cluster deploy.
+# is missing or broken. If generated-tokens.env is absent or stale, it mints a
+# token through the running local server.
 ensure_local_descriptor() {
   local repo_root="${1:?repo_root is required}"
   local base_dir="${2:?config_home is required}"
@@ -51,7 +51,7 @@ ensure_local_descriptor() {
   fi
 
   echo "error: failed to prepare a valid local descriptor at ${marker}" >&2
-  echo "hint: run 'ploy cluster deploy' to reprovision local cluster credentials" >&2
+  echo "hint: start the local stack with /Users/v.v.kovalev/@scale/ploy-lib/images/docker-compose.yml and retry" >&2
   return 1
 }
 

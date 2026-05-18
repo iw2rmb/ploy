@@ -27,7 +27,7 @@ func TestCommandsWiredIntoRoot(t *testing.T) {
 		"run",      // newRunCmd
 		"job",      // newJobCmd
 		"pull",     // newPullCmd
-		"cluster",  // newClusterCmd (includes token, node, deploy)
+		"cluster",  // newClusterCmd (includes token, node)
 		"config",   // newConfigCmd
 		"manifest", // newManifestCmd
 		"tui",      // newTUICmd

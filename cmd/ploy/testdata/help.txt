@@ -8,7 +8,7 @@ Core Commands:
   run              Inspect runs and stream events
   job              Inspect and follow job logs
   pull             Pull Migs diffs for current repo HEAD
-  cluster          Manage clusters (deploy, nodes, tokens)
+  cluster          Manage clusters (nodes, tokens)
   config           Inspect or update cluster configuration
   manifest         Inspect and validate integration manifests
   tui              Interactive TUI for migrations, runs, and jobs
