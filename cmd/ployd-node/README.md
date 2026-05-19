@@ -87,7 +87,7 @@ ployd-node -config /path/to/config.yaml
 - TLS 1.3 minimum version
 - Mutual TLS (mTLS) required for all endpoints
 - Client certificates verified against cluster CA
-- Structured logging via Go's `log/slog` to stderr
+- Structured daemon logs as newline-delimited JSON on stdout/stderr
 
 ### Testing
 

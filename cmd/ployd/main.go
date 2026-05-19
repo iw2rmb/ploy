@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"flag"
+	"io"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -23,17 +24,25 @@ func main() {
 
 func runMain() int {
 	var showVersion bool
-	flag.BoolVar(&showVersion, "version", false, "Print version and exit")
-	flag.Parse()
+
+	_ = initLogging(config.LoggingConfig{})
+
+	fs := flag.NewFlagSet("ployd", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	fs.BoolVar(&showVersion, "version", false, "Print version and exit")
+	if err := fs.Parse(os.Args[1:]); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			slog.Info("usage", "usage", "Usage: ployd [-version]")
+			return 0
+		}
+		slog.Error("parse flags", "err", err)
+		return 2
+	}
 
 	if showVersion {
-		slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{})))
 		slog.Info("ployd", "version", iversion.Version, "commit", iversion.Commit, "built_at", iversion.BuiltAt)
 		return 0
 	}
-
-	// Configure structured logger early (will be reconfigured after loading config).
-	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{})))
 
 	// Build configuration from environment.
 	cfg, err := config.LoadFromEnv()

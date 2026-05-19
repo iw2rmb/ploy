@@ -4,12 +4,15 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
+	"io"
 	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
 
+	"github.com/iw2rmb/ploy/internal/daemonlog"
 	"github.com/iw2rmb/ploy/internal/nodeagent"
 	iversion "github.com/iw2rmb/ploy/internal/version"
 )
@@ -20,6 +23,8 @@ var (
 	newAgent   = func(cfg nodeagent.Config) (interface{ Run(context.Context) error }, error) {
 		return nodeagent.New(cfg)
 	}
+	stdoutWriter io.Writer = os.Stdout
+	stderrWriter io.Writer = os.Stderr
 )
 
 func main() {
@@ -29,12 +34,21 @@ func main() {
 func run() int {
 	var configPath string
 	var showVersion bool
-	flag.StringVar(&configPath, "config", "/etc/ploy/ployd-node.yaml", "Path to ployd-node configuration")
-	flag.BoolVar(&showVersion, "version", false, "Print version and exit")
-	flag.Parse()
 
-	// Configure structured logger early.
-	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{})))
+	daemonlog.ConfigureDefault(stdoutWriter, stderrWriter, slog.LevelInfo, daemonlog.FromEnv())
+
+	fs := flag.NewFlagSet("ployd-node", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	fs.StringVar(&configPath, "config", "/etc/ploy/ployd-node.yaml", "Path to ployd-node configuration")
+	fs.BoolVar(&showVersion, "version", false, "Print version and exit")
+	if err := fs.Parse(os.Args[1:]); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			slog.Info("usage", "usage", "Usage: ployd-node [-version] [-config <path>]")
+			return 0
+		}
+		slog.Error("parse flags", "err", err)
+		return 2
+	}
 
 	if showVersion {
 		slog.Info("ployd-node", "version", iversion.Version, "commit", iversion.Commit, "built_at", iversion.BuiltAt)

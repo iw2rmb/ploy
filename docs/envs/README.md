@@ -261,6 +261,20 @@ Runtime behavior: the node's Docker client is created from standard Docker env v
   `/etc/ploy/ployd-node.yaml` by default and accepts an override via the
   CLI flag `--config`. There is currently no environment variable override
   for this path.
+- `PLOYD_LOG_LEVEL` — Optional server daemon minimum log level
+  (`debug`, `info`, `warn`, or `error`). Defaults to `info`. Daemon process
+  logs are always newline-delimited JSON on stdout/stderr; this variable only
+  changes filtering.
+- `PLOY_LOG_ENV` — Optional daemon log envelope environment value. Defaults to
+  `prod`.
+- `PLOY_LOG_SYSTEM` — Optional daemon log envelope system value. Defaults to
+  `ploy-server`.
+- `PLOY_LOG_INST` — Optional daemon log envelope instance value. Defaults to
+  `ploy.t-tech.team`.
+- (removed) `PLOYD_LOG_JSON`, `PLOYD_LOG_FILE`, `PLOYD_LOG_STATIC_FIELDS`,
+  `PLOYD_LOG_MAX_SIZE_MB`, `PLOYD_LOG_MAX_BACKUPS`, and
+  `PLOYD_LOG_MAX_AGE_DAYS` — Daemon process logs no longer support alternate
+  formats, file output, or process-local rotation settings.
 - (removed) `PLOY_BUILDGATE_MODE` — Previously controlled gate execution mode (`remote-http`
   vs local Docker). Removed in favor of local Docker-only execution. Gate jobs run as
   part of the unified jobs pipeline on the claiming node. This variable is no longer

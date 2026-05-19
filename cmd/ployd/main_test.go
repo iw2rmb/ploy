@@ -1,13 +1,14 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"flag"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"path/filepath"
-	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -86,26 +87,103 @@ func TestParseLogLevel(t *testing.T) {
 	}
 }
 
-func TestInitLogging_FileWrites(t *testing.T) {
-	dir := t.TempDir()
-	logPath := filepath.Join(dir, "ployd.log")
-
-	cfg := apiconfig.LoggingConfig{File: logPath, JSON: false, Level: "debug"}
+func TestInitLogging_WritesDaemonJSONToStdoutAndStderr(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	withDaemonLogWriters(t, &stdout, &stderr)
 	prev := slog.Default()
 	t.Cleanup(func() { slog.SetDefault(prev) })
 
+	cfg := apiconfig.LoggingConfig{Level: "debug"}
 	if err := initLogging(cfg); err != nil {
 		t.Fatalf("initLogging() error: %v", err)
 	}
 	slog.Info("hello", "k", "v")
+	slog.Error("failed", "err", "boom")
 
-	data, err := os.ReadFile(logPath)
-	if err != nil {
-		t.Fatalf("read log file: %v", err)
+	infoFrame := decodeDaemonLogFrame(t, stdout.String())
+	if infoFrame["level"] != "INFO" || infoFrame["msg"] != "hello" || infoFrame["k"] != "v" {
+		t.Fatalf("stdout frame = %#v", infoFrame)
 	}
-	if len(data) == 0 || !strings.Contains(string(data), "hello") {
-		t.Fatalf("expected log file to contain entry, got: %q", string(data))
+	errorFrame := decodeDaemonLogFrame(t, stderr.String())
+	if errorFrame["level"] != "ERROR" || errorFrame["msg"] != "failed" || errorFrame["err"] != "boom" {
+		t.Fatalf("stderr frame = %#v", errorFrame)
 	}
+}
+
+func TestRunMain_VersionEmitsDaemonJSON(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	withDaemonLogWriters(t, &stdout, &stderr)
+	prev := slog.Default()
+	t.Cleanup(func() { slog.SetDefault(prev) })
+	withFreshMainFlags(t, []string{"-version"}, func() {
+		code := runMain()
+		if code != 0 {
+			t.Fatalf("runMain() exit code = %d, want 0", code)
+		}
+	})
+
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+	frame := decodeDaemonLogFrame(t, stdout.String())
+	if frame["level"] != "INFO" || frame["msg"] != "ployd" {
+		t.Fatalf("version frame = %#v", frame)
+	}
+}
+
+func TestRunMain_InvalidFlagEmitsDaemonJSONError(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	withDaemonLogWriters(t, &stdout, &stderr)
+	prev := slog.Default()
+	t.Cleanup(func() { slog.SetDefault(prev) })
+	withFreshMainFlags(t, []string{"-unknown"}, func() {
+		code := runMain()
+		if code != 2 {
+			t.Fatalf("runMain() exit code = %d, want 2", code)
+		}
+	})
+
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout = %q, want empty", stdout.String())
+	}
+	frame := decodeDaemonLogFrame(t, stderr.String())
+	if frame["level"] != "ERROR" || frame["msg"] != "parse flags" {
+		t.Fatalf("invalid flag frame = %#v", frame)
+	}
+}
+
+func withDaemonLogWriters(t *testing.T, stdout, stderr *bytes.Buffer) {
+	t.Helper()
+	oldStdout := stdoutWriter
+	oldStderr := stderrWriter
+	stdoutWriter = stdout
+	stderrWriter = stderr
+	t.Cleanup(func() {
+		stdoutWriter = oldStdout
+		stderrWriter = oldStderr
+	})
+}
+
+func withFreshMainFlags(t *testing.T, args []string, fn func()) {
+	t.Helper()
+	oldCommandLine := flag.CommandLine
+	oldArgs := os.Args
+	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+	os.Args = append([]string{"ployd"}, args...)
+	t.Cleanup(func() {
+		flag.CommandLine = oldCommandLine
+		os.Args = oldArgs
+	})
+	fn()
+}
+
+func decodeDaemonLogFrame(t *testing.T, line string) map[string]any {
+	t.Helper()
+	var frame map[string]any
+	if err := json.Unmarshal([]byte(line), &frame); err != nil {
+		t.Fatalf("decode daemon log frame %q: %v", line, err)
+	}
+	return frame
 }
 
 func TestRun_Shutdown(t *testing.T) {
