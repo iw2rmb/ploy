@@ -68,13 +68,7 @@ type SchedulerConfig struct {
 
 // LoggingConfig configures logging destinations.
 type LoggingConfig struct {
-	Level        string            `yaml:"level"`
-	File         string            `yaml:"file"`
-	MaxSizeMB    int               `yaml:"max_size_mb"`
-	MaxBackups   int               `yaml:"max_backups"`
-	MaxAgeDays   int               `yaml:"max_age_days"`
-	JSON         bool              `yaml:"json"`
-	StaticFields map[string]string `yaml:"static_fields"`
+	Level string `yaml:"level"`
 }
 
 // PostgresConfig configures PostgreSQL connection.

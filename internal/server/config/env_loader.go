@@ -1,7 +1,6 @@
 package config
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"strconv"
@@ -34,21 +33,10 @@ func LoadFromEnv() (Config, error) {
 	} else if ok {
 		cfg.Auth.BearerTokens.Enabled = enabled
 	}
-	if jsonLogs, ok, err := envBool("PLOYD_LOG_JSON"); err != nil {
-		return Config{}, err
-	} else if ok {
-		cfg.Logging.JSON = jsonLogs
-	}
 	if dropPartitions, ok, err := envBool("PLOYD_SCHEDULER_DROP_PARTITIONS"); err != nil {
 		return Config{}, err
 	} else if ok {
 		cfg.Scheduler.DropPartitions = dropPartitions
-	}
-
-	if staticFields, ok, err := envStringMap("PLOYD_LOG_STATIC_FIELDS"); err != nil {
-		return Config{}, err
-	} else if ok {
-		cfg.Logging.StaticFields = staticFields
 	}
 
 	if err := applyEnvString(&cfg.HTTP.Listen, "PLOYD_HTTP_LISTEN"); err != nil {
@@ -76,9 +64,6 @@ func LoadFromEnv() (Config, error) {
 		return Config{}, err
 	}
 	if err := applyEnvString(&cfg.Logging.Level, "PLOYD_LOG_LEVEL"); err != nil {
-		return Config{}, err
-	}
-	if err := applyEnvString(&cfg.Logging.File, "PLOYD_LOG_FILE"); err != nil {
 		return Config{}, err
 	}
 
@@ -113,16 +98,6 @@ func LoadFromEnv() (Config, error) {
 		return Config{}, err
 	}
 	if err := applyEnvDuration(&cfg.Scheduler.NodeStaleAfter, "PLOYD_SCHEDULER_NODE_STALE_AFTER"); err != nil {
-		return Config{}, err
-	}
-
-	if err := applyEnvInt(&cfg.Logging.MaxSizeMB, "PLOYD_LOG_MAX_SIZE_MB"); err != nil {
-		return Config{}, err
-	}
-	if err := applyEnvInt(&cfg.Logging.MaxBackups, "PLOYD_LOG_MAX_BACKUPS"); err != nil {
-		return Config{}, err
-	}
-	if err := applyEnvInt(&cfg.Logging.MaxAgeDays, "PLOYD_LOG_MAX_AGE_DAYS"); err != nil {
 		return Config{}, err
 	}
 
@@ -165,26 +140,6 @@ func applyEnvDuration(dst *time.Duration, key string) error {
 	return nil
 }
 
-func applyEnvInt(dst *int, key string) error {
-	if dst == nil {
-		return nil
-	}
-	raw, ok := os.LookupEnv(key)
-	if !ok {
-		return nil
-	}
-	v := strings.TrimSpace(raw)
-	if v == "" {
-		return nil
-	}
-	n, err := strconv.Atoi(v)
-	if err != nil {
-		return fmt.Errorf("config: %s: parse int %q: %w", key, v, err)
-	}
-	*dst = n
-	return nil
-}
-
 func envBool(key string) (bool, bool, error) {
 	raw, ok := os.LookupEnv(key)
 	if !ok {
@@ -199,23 +154,4 @@ func envBool(key string) (bool, bool, error) {
 		return false, false, fmt.Errorf("config: %s: parse bool %q: %w", key, v, err)
 	}
 	return b, true, nil
-}
-
-func envStringMap(key string) (map[string]string, bool, error) {
-	raw, ok := os.LookupEnv(key)
-	if !ok {
-		return nil, false, nil
-	}
-	v := strings.TrimSpace(raw)
-	if v == "" {
-		return nil, false, nil
-	}
-	var m map[string]string
-	if err := json.Unmarshal([]byte(v), &m); err != nil {
-		return nil, false, fmt.Errorf("config: %s: parse json object: %w", key, err)
-	}
-	if m == nil {
-		return map[string]string{}, true, nil
-	}
-	return m, true, nil
 }

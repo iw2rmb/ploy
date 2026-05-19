@@ -35,9 +35,7 @@ func TestLoadFromEnv_Overrides(t *testing.T) {
 	t.Setenv("PLOYD_METRICS_LISTEN", "127.0.0.1:19100")
 	t.Setenv("PLOYD_HTTP_READ_TIMEOUT", "21s")
 	t.Setenv("PLOYD_AUTH_BEARER_TOKENS_ENABLED", "false")
-	t.Setenv("PLOYD_LOG_JSON", "true")
-	t.Setenv("PLOYD_LOG_MAX_SIZE_MB", "128")
-	t.Setenv("PLOYD_LOG_STATIC_FIELDS", `{"cluster":"test","role":"server"}`)
+	t.Setenv("PLOYD_LOG_LEVEL", "debug")
 	t.Setenv("PLOYD_SCHEDULER_BATCH_SCHEDULER_INTERVAL", "0s")
 	t.Setenv("PLOYD_SCHEDULER_STALE_JOB_RECOVERY_INTERVAL", "45s")
 	t.Setenv("PLOY_GITLAB_DOMAIN", "https://gitlab.example.com")
@@ -59,14 +57,8 @@ func TestLoadFromEnv_Overrides(t *testing.T) {
 	if cfg.Auth.BearerTokens.Enabled {
 		t.Fatal("Auth.BearerTokens.Enabled = true, want false")
 	}
-	if !cfg.Logging.JSON {
-		t.Fatal("Logging.JSON = false, want true")
-	}
-	if cfg.Logging.MaxSizeMB != 128 {
-		t.Fatalf("Logging.MaxSizeMB = %d, want 128", cfg.Logging.MaxSizeMB)
-	}
-	if cfg.Logging.StaticFields["cluster"] != "test" {
-		t.Fatalf("Logging.StaticFields[cluster] = %q, want test", cfg.Logging.StaticFields["cluster"])
+	if cfg.Logging.Level != "debug" {
+		t.Fatalf("Logging.Level = %q, want debug", cfg.Logging.Level)
 	}
 	if cfg.Scheduler.BatchSchedulerInterval != 0 {
 		t.Fatalf("BatchSchedulerInterval = %v, want 0", cfg.Scheduler.BatchSchedulerInterval)
@@ -89,10 +81,8 @@ func TestLoadFromEnv_ParseErrors(t *testing.T) {
 		value       string
 		errContains string
 	}{
-		{name: "bool", key: "PLOYD_LOG_JSON", value: "nope", errContains: "PLOYD_LOG_JSON"},
-		{name: "int", key: "PLOYD_LOG_MAX_SIZE_MB", value: "x", errContains: "PLOYD_LOG_MAX_SIZE_MB"},
+		{name: "bool", key: "PLOYD_AUTH_BEARER_TOKENS_ENABLED", value: "nope", errContains: "PLOYD_AUTH_BEARER_TOKENS_ENABLED"},
 		{name: "duration", key: "PLOYD_HTTP_READ_TIMEOUT", value: "1lightyear", errContains: "PLOYD_HTTP_READ_TIMEOUT"},
-		{name: "json", key: "PLOYD_LOG_STATIC_FIELDS", value: "{oops}", errContains: "PLOYD_LOG_STATIC_FIELDS"},
 		{name: "listen", key: "PLOYD_HTTP_LISTEN", value: "127.0.0.1", errContains: "http.listen"},
 	}
 
@@ -145,12 +135,6 @@ func clearEnvForLoadFromEnv(t *testing.T) {
 		"PLOYD_SCHEDULER_STALE_JOB_RECOVERY_INTERVAL",
 		"PLOYD_SCHEDULER_NODE_STALE_AFTER",
 		"PLOYD_LOG_LEVEL",
-		"PLOYD_LOG_FILE",
-		"PLOYD_LOG_MAX_SIZE_MB",
-		"PLOYD_LOG_MAX_BACKUPS",
-		"PLOYD_LOG_MAX_AGE_DAYS",
-		"PLOYD_LOG_JSON",
-		"PLOYD_LOG_STATIC_FIELDS",
 		"PLOYD_AUTH_BEARER_TOKENS_ENABLED",
 	}
 	for _, k := range keys {
