@@ -59,3 +59,37 @@ func (c *mockCallSlice[P, R]) last() P {
 	}
 	return c.calls[len(c.calls)-1]
 }
+
+// mockCallSeq returns a different value/error for each successive call,
+// latching on the last entry once exhausted. Mirrors mockCall in API surface
+// (called, params, n) so callers can swap one for the other.
+type mockCallSeq[P, R any] struct {
+	called bool
+	params P
+	vals   []R
+	errs   []error
+	n      int
+}
+
+func (c *mockCallSeq[P, R]) record(p P) (R, error) {
+	c.called = true
+	c.params = p
+	var v R
+	var err error
+	if len(c.vals) > 0 {
+		idx := c.n
+		if idx >= len(c.vals) {
+			idx = len(c.vals) - 1
+		}
+		v = c.vals[idx]
+	}
+	if len(c.errs) > 0 {
+		idx := c.n
+		if idx >= len(c.errs) {
+			idx = len(c.errs) - 1
+		}
+		err = c.errs[idx]
+	}
+	c.n++
+	return v, err
+}

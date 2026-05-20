@@ -121,7 +121,7 @@ func TestUploadSpecBundleHandler(t *testing.T) {
 			Digest:    digest,
 			Size:      int64(len(bundleData)),
 			ObjectKey: &objKey,
-			}
+		}
 		bs := bsmock.New()
 		bp := blobpersist.New(st, bs)
 
@@ -146,7 +146,7 @@ func TestDownloadSpecBundleHandler(t *testing.T) {
 		st.getSpecBundle.val = store.SpecBundle{
 			ID:        string(bundleID),
 			ObjectKey: &objectKey,
-			}
+		}
 		bs := bsmock.New()
 		if _, err := bs.Put(context.Background(), objectKey, "application/gzip", bundleContent); err != nil {
 			t.Fatalf("seed blob store: %v", err)
@@ -193,7 +193,7 @@ func TestDownloadSpecBundleHandler(t *testing.T) {
 		st.getSpecBundle.val = store.SpecBundle{
 			ID:        string(bundleID),
 			ObjectKey: &objectKey,
-			}
+		}
 		bs := bsmock.New() // empty: key not seeded
 
 		w := doRequest(t, http.HandlerFunc(downloadSpecBundleHandler(st, bs)),
@@ -229,7 +229,7 @@ func TestSpecBundleDownloadLastRefInvokedWhenRequestCanceledImmediatelyAfterResp
 	st.getSpecBundle.val = store.SpecBundle{
 		ID:        string(bundleID),
 		ObjectKey: &objectKey,
-		}
+	}
 	bs := bsmock.New()
 	if _, err := bs.Put(context.Background(), objectKey, "application/gzip", bundleContent); err != nil {
 		t.Fatalf("seed blob store: %v", err)

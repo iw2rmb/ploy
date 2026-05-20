@@ -103,13 +103,12 @@ func newRunRepoJobsFixture(t *testing.T, metaJSON string) (*runStore, http.Handl
 	repoID := domaintypes.NewRepoID()
 	jobID := domaintypes.NewJobID()
 
-	st := &runStore{
-		getRunRepoResult: store.RunRepo{
-			RunID:   runID,
-			RepoID:  repoID,
-			Attempt: 1,
-		},
-	}
+	st := &runStore{}
+	st.getRunRepo.vals = []store.RunRepo{{
+		RunID:   runID,
+		RepoID:  repoID,
+		Attempt: 1,
+	}}
 	st.listJobsByRunRepoAttempt.val = []store.Job{
 		{
 			ID:      jobID,
@@ -138,16 +137,15 @@ func allReposSelector() map[string]any {
 // activeMigWithSpec returns a migStore pre-configured with an active (non-archived)
 // mig (ID "mig123"), a spec row, and one MigRepo.
 func activeMigWithSpec(specID domaintypes.SpecID) *migStore {
-	st := &migStore{
-		getMigResult: store.Mig{
-			ID:         "mig123",
-			Name:       "test-mig",
-			SpecID:     &specID,
-			ArchivedAt: pgtype.Timestamptz{Valid: false},
-		},
-		listMigReposByMigResult: []store.MigRepo{
-			{ID: "repo1", MigID: "mig123", RepoID: "repo1", BaseRef: "main", TargetRef: "feature1"},
-		},
+	st := &migStore{}
+	st.getMig.val = store.Mig{
+		ID:         "mig123",
+		Name:       "test-mig",
+		SpecID:     &specID,
+		ArchivedAt: pgtype.Timestamptz{Valid: false},
+	}
+	st.listMigReposByMig.val = []store.MigRepo{
+		{ID: "repo1", MigID: "mig123", RepoID: "repo1", BaseRef: "main", TargetRef: "feature1"},
 	}
 	st.getSpec.val = store.Spec{
 		ID:   specID,
@@ -234,13 +232,12 @@ func (f jobTestFixture) completeJobReq(bodyMap map[string]any) *http.Request {
 }
 
 // newJobStoreForFixture returns a jobStore pre-configured for a standard running job fixture.
-// The store has getRun.val (Started), getJobResult, and listJobsByRunResult set.
+// The store has getRun.val (Started), getJob.val, and listJobsByRun.val set.
 // Pass functional options to override or extend the defaults.
 func newJobStoreForFixture(f jobTestFixture, opts ...func(*jobStore)) *jobStore {
-	st := &jobStore{
-		getJobResult:        f.Job,
-		listJobsByRunResult: []store.Job{f.Job},
-	}
+	st := &jobStore{}
+	st.getJob.val = f.Job
+	st.listJobsByRun.val = []store.Job{f.Job}
 	st.getRun.val = store.Run{ID: f.RunID, Status: domaintypes.RunStatusStarted}
 	for _, o := range opts {
 		o(st)
@@ -268,7 +265,7 @@ func withRunStatus(status domaintypes.RunStatus) func(*jobStore) {
 }
 
 func withJobResults(m map[domaintypes.JobID]store.Job) func(*jobStore) {
-	return func(st *jobStore) { st.getJobResults = m }
+	return func(st *jobStore) { st.getJobByID = m }
 }
 
 func withPromoteResult(job store.Job) func(*jobStore) {
@@ -284,13 +281,13 @@ func withGetRunErr(err error) func(*jobStore) {
 
 func withGetJobErr(err error) func(*jobStore) {
 	return func(st *jobStore) {
-		st.getJobErr = err
-		st.getJobResult = store.Job{}
+		st.getJob.err = err
+		st.getJob.val = store.Job{}
 	}
 }
 
 func withListJobsByRun(jobs []store.Job) func(*jobStore) {
-	return func(st *jobStore) { st.listJobsByRunResult = jobs }
+	return func(st *jobStore) { st.listJobsByRun.val = jobs }
 }
 
 func withArtifactBundles(bundles []store.ArtifactBundle) func(*jobStore) {

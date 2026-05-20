@@ -248,18 +248,18 @@ func TestPullMigRepoHandler_Success_LastSucceeded(t *testing.T) {
 	runID := domaintypes.NewRunID()
 
 	st := &runStore{
-		getMigResult: store.Mig{ID: migID, Name: "test-mig"},
-		listMigReposByMigResult: []store.MigRepo{
-			{
-				ID:        migRepoID,
-				MigID:     migID,
-				RepoID:    repoID,
-				BaseRef:   "main",
-				TargetRef: "feature",
-			},
-		},
 		repoByID: map[domaintypes.RepoID]store.Repo{
 			repoID: {ID: repoID, Url: "https://github.com/org/repo"},
+		},
+	}
+	st.getMig.val = store.Mig{ID: migID, Name: "test-mig"}
+	st.listMigReposByMig.val = []store.MigRepo{
+		{
+			ID:        migRepoID,
+			MigID:     migID,
+			RepoID:    repoID,
+			BaseRef:   "main",
+			TargetRef: "feature",
 		},
 	}
 	st.getLatestRunRepoByMigAndRepoStatus.val = store.GetLatestRunRepoByMigAndRepoStatusRow{
@@ -308,18 +308,18 @@ func TestPullMigRepoHandler_Success_LastFailed(t *testing.T) {
 	runID := domaintypes.NewRunID()
 
 	st := &runStore{
-		getMigResult: store.Mig{ID: migID, Name: "test-mig"},
-		listMigReposByMigResult: []store.MigRepo{
-			{
-				ID:        migRepoID,
-				MigID:     migID,
-				RepoID:    repoID,
-				BaseRef:   "main",
-				TargetRef: "feature",
-			},
-		},
 		repoByID: map[domaintypes.RepoID]store.Repo{
 			repoID: {ID: repoID, Url: "https://github.com/org/repo"},
+		},
+	}
+	st.getMig.val = store.Mig{ID: migID, Name: "test-mig"}
+	st.listMigReposByMig.val = []store.MigRepo{
+		{
+			ID:        migRepoID,
+			MigID:     migID,
+			RepoID:    repoID,
+			BaseRef:   "main",
+			TargetRef: "feature",
 		},
 	}
 	st.getLatestRunRepoByMigAndRepoStatus.val = store.GetLatestRunRepoByMigAndRepoStatusRow{
@@ -358,18 +358,18 @@ func TestPullMigRepoHandler_URLNormalization(t *testing.T) {
 	runID := domaintypes.NewRunID()
 
 	st := &runStore{
-		getMigResult: store.Mig{ID: migID},
-		listMigReposByMigResult: []store.MigRepo{
-			{
-				ID:        migRepoID,
-				MigID:     migID,
-				RepoID:    repoID,
-				BaseRef:   "main",
-				TargetRef: "feature",
-			},
-		},
 		repoByID: map[domaintypes.RepoID]store.Repo{
 			repoID: {ID: repoID, Url: "https://github.com/org/repo.git"},
+		},
+	}
+	st.getMig.val = store.Mig{ID: migID}
+	st.listMigReposByMig.val = []store.MigRepo{
+		{
+			ID:        migRepoID,
+			MigID:     migID,
+			RepoID:    repoID,
+			BaseRef:   "main",
+			TargetRef: "feature",
 		},
 	}
 	st.getLatestRunRepoByMigAndRepoStatus.val = store.GetLatestRunRepoByMigAndRepoStatusRow{
@@ -391,9 +391,8 @@ func TestPullMigRepoHandler_MigNotFound(t *testing.T) {
 
 	migID := domaintypes.NewMigID()
 
-	st := &runStore{
-		getMigErr: pgx.ErrNoRows,
-	}
+	st := &runStore{}
+	st.getMig.err = pgx.ErrNoRows
 	handler := pullMigRepoHandler(st)
 
 	body := `{"repo_url": "https://github.com/org/repo"}`
@@ -410,18 +409,18 @@ func TestPullMigRepoHandler_RepoNotInMig(t *testing.T) {
 	repoID := domaintypes.NewRepoID()
 
 	st := &runStore{
-		getMigResult: store.Mig{ID: migID},
-		listMigReposByMigResult: []store.MigRepo{
-			{
-				ID:        migRepoID,
-				MigID:     migID,
-				RepoID:    repoID,
-				BaseRef:   "main",
-				TargetRef: "feature",
-			},
-		},
 		repoByID: map[domaintypes.RepoID]store.Repo{
 			repoID: {ID: repoID, Url: "https://github.com/org/other-repo"},
+		},
+	}
+	st.getMig.val = store.Mig{ID: migID}
+	st.listMigReposByMig.val = []store.MigRepo{
+		{
+			ID:        migRepoID,
+			MigID:     migID,
+			RepoID:    repoID,
+			BaseRef:   "main",
+			TargetRef: "feature",
 		},
 	}
 	handler := pullMigRepoHandler(st)
@@ -440,18 +439,18 @@ func TestPullMigRepoHandler_NoMatchingRun(t *testing.T) {
 	repoID := domaintypes.NewRepoID()
 
 	st := &runStore{
-		getMigResult: store.Mig{ID: migID},
-		listMigReposByMigResult: []store.MigRepo{
-			{
-				ID:        migRepoID,
-				MigID:     migID,
-				RepoID:    repoID,
-				BaseRef:   "main",
-				TargetRef: "feature",
-			},
-		},
 		repoByID: map[domaintypes.RepoID]store.Repo{
 			repoID: {ID: repoID, Url: "https://github.com/org/repo"},
+		},
+	}
+	st.getMig.val = store.Mig{ID: migID}
+	st.listMigReposByMig.val = []store.MigRepo{
+		{
+			ID:        migRepoID,
+			MigID:     migID,
+			RepoID:    repoID,
+			BaseRef:   "main",
+			TargetRef: "feature",
 		},
 	}
 	st.getLatestRunRepoByMigAndRepoStatus.err = pgx.ErrNoRows
@@ -468,9 +467,8 @@ func TestPullMigRepoHandler_InvalidMode(t *testing.T) {
 
 	migID := domaintypes.NewMigID()
 
-	st := &runStore{
-		getMigResult: store.Mig{ID: migID},
-	}
+	st := &runStore{}
+	st.getMig.val = store.Mig{ID: migID}
 	handler := pullMigRepoHandler(st)
 
 	body := `{"repo_url": "https://github.com/org/repo", "mode": "invalid"}`
@@ -510,10 +508,9 @@ func TestPullMigRepoHandler_StoreError(t *testing.T) {
 
 	migID := domaintypes.NewMigID()
 
-	st := &runStore{
-		getMigResult:         store.Mig{ID: migID},
-		listMigReposByMigErr: errors.New("database error"),
-	}
+	st := &runStore{}
+	st.getMig.val = store.Mig{ID: migID}
+	st.listMigReposByMig.err = errors.New("database error")
 	handler := pullMigRepoHandler(st)
 
 	body := `{"repo_url": "https://github.com/org/repo"}`

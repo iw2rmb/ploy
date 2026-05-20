@@ -106,15 +106,15 @@ func TestAddRunRepoHandler_CreatesRepoWithoutImmediateJobs(t *testing.T) {
 	specID := domaintypes.NewSpecID()
 
 	st := &runStore{
-		createMigRepoResult: store.MigRepo{
-			ID:        migRepoID,
-			RepoID:    repoID,
-			BaseRef:   "main",
-			TargetRef: "feature",
-		},
 		repoByID: map[domaintypes.RepoID]store.Repo{
 			repoID: {ID: repoID, Url: "https://github.com/org/repo.git"},
 		},
+	}
+	st.createMigRepo.val = store.MigRepo{
+		ID:        migRepoID,
+		RepoID:    repoID,
+		BaseRef:   "main",
+		TargetRef: "feature",
 	}
 	st.getRun.val = store.Run{
 		ID:        runID,
@@ -138,11 +138,11 @@ func TestAddRunRepoHandler_CreatesRepoWithoutImmediateJobs(t *testing.T) {
 	addRunRepoHandler(st).ServeHTTP(rr, req)
 
 	assertStatus(t, rr, http.StatusCreated)
-	if !st.createMigRepoCalled || !st.createRunRepoCalled {
+	if !st.createMigRepo.called || !st.createRunRepo.called {
 		t.Fatalf("expected CreateMigRepo and CreateRunRepo to be called")
 	}
-	if st.createJobCallCount != 0 {
-		t.Fatalf("expected no jobs to be created for new repo submission, got %d", st.createJobCallCount)
+	if len(st.createJob.calls) != 0 {
+		t.Fatalf("expected no jobs to be created for new repo submission, got %d", len(st.createJob.calls))
 	}
 }
 
@@ -243,9 +243,8 @@ func TestCancelRunRepoHandlerV1_NotFound(t *testing.T) {
 
 	runID := domaintypes.NewRunID()
 	repoID := domaintypes.NewRepoID()
-	st := &runStore{
-		getRunRepoErr: pgx.ErrNoRows,
-	}
+	st := &runStore{}
+	st.getRunRepo.errs = []error{pgx.ErrNoRows}
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/cancel", nil)
 	req.SetPathValue("run_id", runID.String())
@@ -266,34 +265,34 @@ func TestRestartRunRepoHandler_ReopensTerminalRunAndCreatesJobs(t *testing.T) {
 	specID := domaintypes.NewSpecID()
 
 	st := &runStore{
-		getRunRepoResults: []store.RunRepo{
-			{
-				RunID:         runID,
-				RepoID:        repoID,
-				RepoBaseRef:   "main",
-				RepoTargetRef: "feature",
-				RepoSha0:      testRunRepoSHASeed,
-				Attempt:       1,
-				Status:        domaintypes.RunRepoStatusFail,
-				CreatedAt:     pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
-			},
-			{
-				RunID:         runID,
-				RepoID:        repoID,
-				RepoBaseRef:   "develop",
-				RepoTargetRef: "feature-2",
-				RepoSha0:      testRunRepoSHASeed,
-				Attempt:       2,
-				Status:        domaintypes.RunRepoStatusQueued,
-				CreatedAt:     pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
-			},
-		},
-		listMigReposByMigResult: []store.MigRepo{
-			{ID: migRepoID, RepoID: repoID},
-		},
 		repoByID: map[domaintypes.RepoID]store.Repo{
 			repoID: {ID: repoID, Url: "https://github.com/org/repo.git"},
 		},
+	}
+	st.getRunRepo.vals = []store.RunRepo{
+		{
+			RunID:         runID,
+			RepoID:        repoID,
+			RepoBaseRef:   "main",
+			RepoTargetRef: "feature",
+			RepoSha0:      testRunRepoSHASeed,
+			Attempt:       1,
+			Status:        domaintypes.RunRepoStatusFail,
+			CreatedAt:     pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
+		},
+		{
+			RunID:         runID,
+			RepoID:        repoID,
+			RepoBaseRef:   "develop",
+			RepoTargetRef: "feature-2",
+			RepoSha0:      testRunRepoSHASeed,
+			Attempt:       2,
+			Status:        domaintypes.RunRepoStatusQueued,
+			CreatedAt:     pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
+		},
+	}
+	st.listMigReposByMig.val = []store.MigRepo{
+		{ID: migRepoID, RepoID: repoID},
 	}
 	st.getRun.val = store.Run{
 		ID:        runID,
@@ -330,8 +329,8 @@ func TestRestartRunRepoHandler_ReopensTerminalRunAndCreatesJobs(t *testing.T) {
 	if !st.incrementRunRepoAttempt.called {
 		t.Fatalf("expected IncrementRunRepoAttempt to be called")
 	}
-	if st.createJobCallCount != 3 {
-		t.Fatalf("expected 3 jobs for restarted repo, got %d", st.createJobCallCount)
+	if len(st.createJob.calls) != 3 {
+		t.Fatalf("expected 3 jobs for restarted repo, got %d", len(st.createJob.calls))
 	}
 }
 
@@ -372,8 +371,8 @@ func TestStartRunHandler_StartsQueuedRepos(t *testing.T) {
 	startRunHandler(st, nil).ServeHTTP(rr, req)
 
 	assertStatus(t, rr, http.StatusOK)
-	if st.createJobCallCount != 3 {
-		t.Fatalf("expected starter to create 3 jobs, got %d", st.createJobCallCount)
+	if len(st.createJob.calls) != 3 {
+		t.Fatalf("expected starter to create 3 jobs, got %d", len(st.createJob.calls))
 	}
 
 	resp := decodeBody[StartRunResponse](t, rr)

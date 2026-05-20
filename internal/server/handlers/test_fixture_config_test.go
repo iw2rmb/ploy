@@ -28,8 +28,8 @@ type configStore struct {
 	upsertConfigBundleMap mockCall[store.UpsertConfigBundleMapParams, struct{}]
 
 	// Spec Bundles
-	createSpecBundle mockCall[store.CreateSpecBundleParams, store.SpecBundle]
-	getSpecBundle    mockResult[store.SpecBundle]
+	createSpecBundle   mockCall[store.CreateSpecBundleParams, store.SpecBundle]
+	getSpecBundle      mockResult[store.SpecBundle]
 	getSpecBundleByCID mockResult[store.SpecBundle]
 	deleteSpecBundle   mockResult[struct{}]
 

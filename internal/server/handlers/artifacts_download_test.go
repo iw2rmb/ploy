@@ -37,7 +37,7 @@ func TestListArtifactsByCIDHandler(t *testing.T) {
 				Name:       &testName,
 				BundleSize: testBundleSize,
 			},
-			}
+		}
 
 		rr := doRequest(t, listArtifactsByCIDHandler(st), http.MethodGet, "/v1/artifacts?cid="+testCID, nil)
 		assertStatus(t, rr, http.StatusOK)
@@ -79,15 +79,23 @@ func TestListArtifactsByCIDHandler(t *testing.T) {
 				status: http.StatusBadRequest,
 			},
 			{
-				name:   "DBError",
-				query:  "?cid=bafyerr",
-				st:     func() *artifactStore { st := &artifactStore{}; st.listArtifactBundlesByCID.err = errors.New("boom"); return st }(),
+				name:  "DBError",
+				query: "?cid=bafyerr",
+				st: func() *artifactStore {
+					st := &artifactStore{}
+					st.listArtifactBundlesByCID.err = errors.New("boom")
+					return st
+				}(),
 				status: http.StatusInternalServerError,
 			},
 			{
-				name:   "NoResults",
-				query:  "?cid=bafy-not-found",
-				st:     func() *artifactStore { st := &artifactStore{}; st.listArtifactBundlesByCID.val = []store.ArtifactBundle{}; return st }(),
+				name:  "NoResults",
+				query: "?cid=bafy-not-found",
+				st: func() *artifactStore {
+					st := &artifactStore{}
+					st.listArtifactBundlesByCID.val = []store.ArtifactBundle{}
+					return st
+				}(),
 				status: http.StatusOK,
 			},
 		}
@@ -121,7 +129,7 @@ func TestGetArtifactHandler(t *testing.T) {
 			Digest:     &testDigest,
 			Name:       &testName,
 			BundleSize: testBundleSize,
-			}
+		}
 		bs := bsmock.New()
 		rr := doRequest(t, getArtifactHandler(st, bs), http.MethodGet,
 			"/v1/artifacts/"+artifactID.String(), nil,
@@ -165,7 +173,7 @@ func TestGetArtifactHandler(t *testing.T) {
 			Digest:     &testDigest,
 			BundleSize: int64(len(testBundle)),
 			ObjectKey:  &objKey,
-			}
+		}
 		bs := bsmock.New()
 		_, _ = bs.Put(context.TODO(), objKey, "application/gzip", testBundle)
 
@@ -217,9 +225,13 @@ func TestGetArtifactHandler(t *testing.T) {
 				status: http.StatusNotFound,
 			},
 			{
-				name:   "DBError",
-				id:     artifactID.String(),
-				st:     func() *artifactStore { st := &artifactStore{}; st.getArtifactBundle.err = errors.New("db down"); return st }(),
+				name: "DBError",
+				id:   artifactID.String(),
+				st: func() *artifactStore {
+					st := &artifactStore{}
+					st.getArtifactBundle.err = errors.New("db down")
+					return st
+				}(),
 				status: http.StatusInternalServerError,
 			},
 			{

@@ -67,17 +67,16 @@ func newClaimJobFixture(t testing.TB, opts claimJobFixtureOptions) *claimJobFixt
 		opts.jobMeta = []byte(`{}`)
 	}
 
-	st := &jobStore{
-		getRunRepoResult: store.RunRepo{
-			RunID:           runID,
-			RepoID:          repoID,
-			RepoBaseRef:     "main",
-			RepoTargetRef:   "feature-branch",
-			SourceCommitSha: sourceCommitSHA,
-			RepoSha0:        sourceCommitSHA,
-			Status:          opts.runRepoStatus,
-			Attempt:         1,
-		},
+	st := &jobStore{}
+	st.getRunRepo.val = store.RunRepo{
+		RunID:           runID,
+		RepoID:          repoID,
+		RepoBaseRef:     "main",
+		RepoTargetRef:   "feature-branch",
+		SourceCommitSha: sourceCommitSHA,
+		RepoSha0:        sourceCommitSHA,
+		Status:          opts.runRepoStatus,
+		Attempt:         1,
 	}
 	st.getNode.val = store.Node{ID: nodeID}
 	st.claimJob.val = store.Job{

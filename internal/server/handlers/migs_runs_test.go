@@ -34,7 +34,7 @@ func TestMigRuns_Create(t *testing.T) {
 		{
 			name: "all repos",
 			setupFn: func(st *migStore) {
-				st.listMigReposByMigResult = []store.MigRepo{
+				st.listMigReposByMig.val = []store.MigRepo{
 					{ID: "repo1", MigID: "mig123", RepoID: "repo1", BaseRef: "main", TargetRef: "feature1"},
 					{ID: "repo2", MigID: "mig123", RepoID: "repo2", BaseRef: "main", TargetRef: "feature2"},
 				}
@@ -43,11 +43,11 @@ func TestMigRuns_Create(t *testing.T) {
 			wantStatus: http.StatusCreated,
 			verify: func(t *testing.T, st *migStore, rr *httptest.ResponseRecorder) {
 				t.Helper()
-				assertCalled(t, "GetMig", st.getMigCalled)
-				assertCalled(t, "ListMigReposByMig", st.listMigReposByMigCalled)
-				assertCalled(t, "CreateRun", st.createRunCalled)
-				assertCalled(t, "CreateRunRepo", st.createRunRepoCalled)
-				assertNotCalled(t, "CreateJob", st.createJobCalled)
+				assertCalled(t, "GetMig", st.getMig.called)
+				assertCalled(t, "ListMigReposByMig", st.listMigReposByMig.called)
+				assertCalled(t, "CreateRun", st.createRun.called)
+				assertCalled(t, "CreateRunRepo", st.createRunRepo.called)
+				assertNotCalled(t, "CreateJob", st.createJob.called)
 				resp := decodeBody[struct {
 					RunID string `json:"run_id"`
 				}](t, rr)
@@ -59,7 +59,7 @@ func TestMigRuns_Create(t *testing.T) {
 		{
 			name: "failed repos",
 			setupFn: func(st *migStore) {
-				st.listMigReposByMigResult = []store.MigRepo{
+				st.listMigReposByMig.val = []store.MigRepo{
 					{ID: "repo1", MigID: "mig123", RepoID: "repo1", BaseRef: "main", TargetRef: "feature1"},
 					{ID: "repo2", MigID: "mig123", RepoID: "repo2", BaseRef: "main", TargetRef: "feature2"},
 					{ID: "repo3", MigID: "mig123", RepoID: "repo3", BaseRef: "main", TargetRef: "feature3"},
@@ -74,7 +74,7 @@ func TestMigRuns_Create(t *testing.T) {
 				if st.listFailedRepoIDsByMig.params != "mig123" {
 					t.Errorf("ListFailedRepoIDsByMig param = %q, want %q", st.listFailedRepoIDsByMig.params, "mig123")
 				}
-				assertCalled(t, "CreateRunRepo", st.createRunRepoCalled)
+				assertCalled(t, "CreateRunRepo", st.createRunRepo.called)
 				resp := decodeBody[struct {
 					RunID string `json:"run_id"`
 				}](t, rr)
@@ -86,7 +86,7 @@ func TestMigRuns_Create(t *testing.T) {
 		{
 			name: "explicit repos",
 			setupFn: func(st *migStore) {
-				st.listMigReposByMigResult = []store.MigRepo{
+				st.listMigReposByMig.val = []store.MigRepo{
 					{ID: "repo1", MigID: "mig123", RepoID: "repo1", BaseRef: "main", TargetRef: "feature1"},
 					{ID: "repo2", MigID: "mig123", RepoID: "repo2", BaseRef: "main", TargetRef: "feature2"},
 					{ID: "repo3", MigID: "mig123", RepoID: "repo3", BaseRef: "main", TargetRef: "feature3"},
@@ -109,7 +109,7 @@ func TestMigRuns_Create(t *testing.T) {
 			wantStatus: http.StatusCreated,
 			verify: func(t *testing.T, st *migStore, rr *httptest.ResponseRecorder) {
 				t.Helper()
-				assertCalled(t, "ListMigReposByMig", st.listMigReposByMigCalled)
+				assertCalled(t, "ListMigReposByMig", st.listMigReposByMig.called)
 				resp := decodeBody[struct {
 					RunID string `json:"run_id"`
 				}](t, rr)
@@ -128,8 +128,8 @@ func TestMigRuns_Create(t *testing.T) {
 			wantStatus: http.StatusCreated,
 			verify: func(t *testing.T, st *migStore, _ *httptest.ResponseRecorder) {
 				t.Helper()
-				if st.createRunParams.CreatedBy == nil || *st.createRunParams.CreatedBy != "test-user@example.com" {
-					t.Errorf("created_by not propagated; got %v, want test-user@example.com", st.createRunParams.CreatedBy)
+				if st.createRun.params.CreatedBy == nil || *st.createRun.params.CreatedBy != "test-user@example.com" {
+					t.Errorf("created_by not propagated; got %v, want test-user@example.com", st.createRun.params.CreatedBy)
 				}
 			},
 		},
@@ -137,25 +137,27 @@ func TestMigRuns_Create(t *testing.T) {
 		{name: "InvalidMode", store: &migStore{}, body: map[string]any{"repo_selector": map[string]any{"mode": "invalid"}}, wantStatus: http.StatusBadRequest},
 		{name: "ExplicitEmptyRepos", store: &migStore{}, body: map[string]any{"repo_selector": map[string]any{"mode": "explicit", "repos": []string{}}}, wantStatus: http.StatusBadRequest},
 		{name: "InvalidJSON", store: &migStore{}, body: "not json", wantStatus: http.StatusBadRequest},
-		{name: "MigNotFound", store: &migStore{getMigErr: pgx.ErrNoRows}, body: allReposSelector(), wantStatus: http.StatusNotFound},
+		{name: "MigNotFound", store: func() *migStore { s := &migStore{}; s.getMig.err = pgx.ErrNoRows; return s }(), body: allReposSelector(), wantStatus: http.StatusNotFound},
 		{
 			name: "ArchivedMig",
 			store: func() *migStore {
 				specID := domaintypes.SpecID("spec123")
-				return &migStore{
-					getMigResult: store.Mig{
-						ID: "mig123", Name: "test-mig", SpecID: &specID,
-						ArchivedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
-					},
+				s := &migStore{}
+				s.getMig.val = store.Mig{
+					ID: "mig123", Name: "test-mig", SpecID: &specID,
+					ArchivedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
 				}
+				return s
 			}(),
 			body: allReposSelector(), wantStatus: http.StatusConflict,
 		},
 		{
 			name: "NoSpec",
-			store: &migStore{
-				getMigResult: store.Mig{ID: "mig123", Name: "test-mig", SpecID: nil, ArchivedAt: pgtype.Timestamptz{Valid: false}},
-			},
+			store: func() *migStore {
+				s := &migStore{}
+				s.getMig.val = store.Mig{ID: "mig123", Name: "test-mig", SpecID: nil, ArchivedAt: pgtype.Timestamptz{Valid: false}}
+				return s
+			}(),
 			body: allReposSelector(), wantStatus: http.StatusBadRequest,
 		},
 		{
@@ -169,10 +171,10 @@ func TestMigRuns_Create(t *testing.T) {
 			body: map[string]any{"repo_selector": map[string]any{"mode": "failed"}}, wantStatus: http.StatusBadRequest,
 		},
 		// ── Store errors ─────────────────────────────────────────────────
-		{name: "GetMigError", setupFn: func(st *migStore) { st.getMigErr = errors.New("database connection failed") }, body: allReposSelector(), wantStatus: http.StatusInternalServerError},
-		{name: "ListMigReposError", setupFn: func(st *migStore) { st.listMigReposByMigErr = errors.New("database connection failed") }, body: allReposSelector(), wantStatus: http.StatusInternalServerError},
-		{name: "CreateRunError", setupFn: func(st *migStore) { st.createRunErr = errors.New("database connection failed") }, body: allReposSelector(), wantStatus: http.StatusInternalServerError},
-		{name: "CreateRunRepoError", setupFn: func(st *migStore) { st.createRunRepoErr = errors.New("database connection failed") }, body: allReposSelector(), wantStatus: http.StatusInternalServerError},
+		{name: "GetMigError", setupFn: func(st *migStore) { st.getMig.err = errors.New("database connection failed") }, body: allReposSelector(), wantStatus: http.StatusInternalServerError},
+		{name: "ListMigReposError", setupFn: func(st *migStore) { st.listMigReposByMig.err = errors.New("database connection failed") }, body: allReposSelector(), wantStatus: http.StatusInternalServerError},
+		{name: "CreateRunError", setupFn: func(st *migStore) { st.createRun.errs = []error{errors.New("database connection failed")} }, body: allReposSelector(), wantStatus: http.StatusInternalServerError},
+		{name: "CreateRunRepoError", setupFn: func(st *migStore) { st.createRunRepo.err = errors.New("database connection failed") }, body: allReposSelector(), wantStatus: http.StatusInternalServerError},
 		{name: "ListFailedReposError", setupFn: func(st *migStore) { st.listFailedRepoIDsByMig.err = errors.New("database connection failed") }, body: map[string]any{"repo_selector": map[string]any{"mode": "failed"}}, wantStatus: http.StatusInternalServerError},
 	}
 
@@ -216,5 +218,5 @@ func TestMigRuns_Create_RejectsWhenSourceCommitSeedFails(t *testing.T) {
 	handler.ServeHTTP(rr, req)
 
 	assertStatus(t, rr, http.StatusBadRequest)
-	assertNotCalled(t, "CreateRunRepo", st.createRunRepoCalled)
+	assertNotCalled(t, "CreateRunRepo", st.createRunRepo.called)
 }

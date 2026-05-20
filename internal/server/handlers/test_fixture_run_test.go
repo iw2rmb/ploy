@@ -19,8 +19,7 @@ type runStore struct {
 	getRunTiming mockCall[string, store.RunsTiming]
 
 	listRunsTimings mockResult[[]store.RunsTiming]
-	listRunsResult  []store.Run
-	listRunsErr     error
+	listRuns        mockResult[[]store.Run]
 
 	deleteRun   mockCall[string, struct{}]
 	cancelRunV1 mockCall[string, struct{}]
@@ -36,40 +35,25 @@ type runStore struct {
 
 	listQueuedRunReposByRun mockCall[string, []store.RunRepo]
 
-	getRunRepoCalled  bool
-	getRunRepoParam   store.GetRunRepoParams
-	getRunRepoResult  store.RunRepo
-	getRunRepoResults []store.RunRepo
-	getRunRepoCalls   int
-	getRunRepoErr     error
+	getRunRepo mockCallSeq[store.GetRunRepoParams, store.RunRepo]
 
 	updateRunRepoRefs       mockCall[store.UpdateRunRepoRefsParams, struct{}]
 	updateMigRepoRefs       mockCall[store.UpdateMigRepoRefsParams, struct{}]
 	incrementRunRepoAttempt mockCall[store.IncrementRunRepoAttemptParams, struct{}]
 
-	updateRunRepoStatusCalled bool
-	updateRunRepoStatusParams []store.UpdateRunRepoStatusParams
-	updateRunRepoStatusErr    error
+	updateRunRepoStatus mockCallSlice[store.UpdateRunRepoStatusParams, struct{}]
 
 	// Create run repo (for batch add)
-	createRunRepoCalled bool
-	createRunRepoParams store.CreateRunRepoParams
-	createRunRepoResult store.RunRepo
-	createRunRepoErr    error
+	createRunRepo mockCall[store.CreateRunRepoParams, store.RunRepo]
 
 	// Mig repo (for batch operations and pull)
-	createMigRepoResult store.MigRepo
-	createMigRepoCalled bool
-	createMigRepoParams store.CreateMigRepoParams
-	createMigRepoErr    error
+	createMigRepo mockCall[store.CreateMigRepoParams, store.MigRepo]
 
-	getMigResult store.Mig
-	getMigErr    error
+	getMig mockResult[store.Mig]
 
 	getMigRepo mockResult[store.MigRepo]
 
-	listMigReposByMigResult []store.MigRepo
-	listMigReposByMigErr    error
+	listMigReposByMig mockResult[[]store.MigRepo]
 
 	repoByID map[types.RepoID]store.Repo
 
@@ -77,21 +61,11 @@ type runStore struct {
 	getSpec mockCall[string, store.Spec]
 
 	// Job (for batch, ingest, and run-repo-jobs)
-	getJobCalled bool
-	getJobParams string
-	getJobResult store.Job
-	getJobErr    error
+	getJob mockCall[types.JobID, store.Job]
 
-	createJobCalled    bool
-	createJobCallCount int
-	createJobParams    []store.CreateJobParams
-	createJobResult    store.Job
-	createJobErr       error
+	createJob mockCallSlice[store.CreateJobParams, store.Job]
 
-	scheduleNextJobCalled bool
-	scheduleNextJobParam  store.ScheduleNextJobParams
-	scheduleNextJobResult store.Job
-	scheduleNextJobErr    error
+	scheduleNextJob mockCall[store.ScheduleNextJobParams, store.Job]
 
 	listJobsByRunRepoAttempt       mockCall[store.ListJobsByRunRepoAttemptParams, []store.Job]
 	listArtifactBundlesByRunAndJob mockCall[store.ListArtifactBundlesByRunAndJobParams, []store.ArtifactBundle]
@@ -104,7 +78,9 @@ type runStore struct {
 	// Events
 	createEvent mockResult[store.Event]
 
-	// Run creation (for batch scheduler assertions)
+	// Run creation tripwire (for batch scheduler assertions; runStore has no
+	// CreateRun method, so this flag stays at its zero value — the check exists
+	// only to fail loudly if the code path is ever wired into the mock).
 	createRunCalled bool
 }
 
@@ -123,14 +99,7 @@ func (m *runStore) ListRunsTimings(ctx context.Context, arg store.ListRunsTiming
 }
 
 func (m *runStore) ListRuns(ctx context.Context, params store.ListRunsParams) ([]store.Run, error) {
-	if int(params.Offset) >= len(m.listRunsResult) {
-		return []store.Run{}, m.listRunsErr
-	}
-	end := int(params.Offset) + int(params.Limit)
-	if end > len(m.listRunsResult) {
-		end = len(m.listRunsResult)
-	}
-	return m.listRunsResult[params.Offset:end], m.listRunsErr
+	return listPaged(m.listRuns.val, params.Offset, params.Limit), m.listRuns.err
 }
 
 func (m *runStore) DeleteRun(ctx context.Context, id types.RunID) error {
@@ -171,20 +140,7 @@ func (m *runStore) ListQueuedRunReposByRun(ctx context.Context, runID types.RunI
 }
 
 func (m *runStore) GetRunRepo(ctx context.Context, arg store.GetRunRepoParams) (store.RunRepo, error) {
-	m.getRunRepoCalled = true
-	m.getRunRepoParam = arg
-	if m.getRunRepoErr != nil {
-		return store.RunRepo{}, m.getRunRepoErr
-	}
-	if len(m.getRunRepoResults) > 0 {
-		idx := m.getRunRepoCalls
-		if idx >= len(m.getRunRepoResults) {
-			idx = len(m.getRunRepoResults) - 1
-		}
-		m.getRunRepoCalls++
-		return m.getRunRepoResults[idx], nil
-	}
-	return m.getRunRepoResult, nil
+	return m.getRunRepo.record(arg)
 }
 
 func (m *runStore) UpdateRunRepoRefs(ctx context.Context, params store.UpdateRunRepoRefsParams) error {
@@ -193,37 +149,15 @@ func (m *runStore) UpdateRunRepoRefs(ctx context.Context, params store.UpdateRun
 }
 
 func (m *runStore) UpdateRunRepoStatus(ctx context.Context, params store.UpdateRunRepoStatusParams) error {
-	m.updateRunRepoStatusCalled = true
-	m.updateRunRepoStatusParams = append(m.updateRunRepoStatusParams, params)
-	return m.updateRunRepoStatusErr
+	_, err := m.updateRunRepoStatus.record(params)
+	return err
 }
 
 func (m *runStore) CreateRunRepo(ctx context.Context, params store.CreateRunRepoParams) (store.RunRepo, error) {
-	m.createRunRepoCalled = true
-	m.createRunRepoParams = params
-	result := m.createRunRepoResult
-	if result.MigID.IsZero() {
-		result.MigID = params.MigID
-	}
-	if result.RunID.IsZero() {
-		result.RunID = params.RunID
-	}
-	if result.RepoID.IsZero() {
-		result.RepoID = params.RepoID
-	}
-	if result.RepoBaseRef == "" {
-		result.RepoBaseRef = params.RepoBaseRef
-	}
-	if result.RepoTargetRef == "" {
-		result.RepoTargetRef = params.RepoTargetRef
-	}
-	if result.Status == "" {
-		result.Status = types.RunRepoStatusQueued
-	}
-	if result.Attempt == 0 {
-		result.Attempt = 1
-	}
-	return result, m.createRunRepoErr
+	result := defaultRunRepo(m.createRunRepo.val, params)
+	m.createRunRepo.val = result
+	_, err := m.createRunRepo.record(params)
+	return result, err
 }
 
 func (m *runStore) IncrementRunRepoAttempt(ctx context.Context, arg store.IncrementRunRepoAttemptParams) error {
@@ -234,36 +168,21 @@ func (m *runStore) IncrementRunRepoAttempt(ctx context.Context, arg store.Increm
 // Mig/Repo methods (for batch and pull)
 
 func (m *runStore) CreateMigRepo(ctx context.Context, params store.CreateMigRepoParams) (store.MigRepo, error) {
-	m.createMigRepoCalled = true
-	m.createMigRepoParams = params
-	result := m.createMigRepoResult
-	if result.ID.IsZero() {
-		result.ID = params.ID
-	}
-	if result.MigID.IsZero() {
-		result.MigID = params.MigID
-	}
-	if result.RepoID.IsZero() {
-		result.RepoID = types.NewRepoID()
-	}
-	if result.BaseRef == "" {
-		result.BaseRef = params.BaseRef
-	}
-	if result.TargetRef == "" {
-		result.TargetRef = params.TargetRef
-	}
+	result := defaultMigRepo(m.createMigRepo.val, params.ID, params.MigID, params.BaseRef, params.TargetRef)
 	if m.repoByID == nil {
 		m.repoByID = map[types.RepoID]store.Repo{}
 	}
 	m.repoByID[result.RepoID] = store.Repo{ID: result.RepoID, Url: params.Url}
-	return result, m.createMigRepoErr
+	m.createMigRepo.val = result
+	_, err := m.createMigRepo.record(params)
+	return result, err
 }
 
 func (m *runStore) GetMig(ctx context.Context, id types.MigID) (store.Mig, error) {
-	if m.getMigErr != nil {
-		return store.Mig{}, m.getMigErr
+	if m.getMig.err != nil {
+		return store.Mig{}, m.getMig.err
 	}
-	result := m.getMigResult
+	result := m.getMig.val
 	if result.ID.IsZero() {
 		result.ID = id
 	}
@@ -275,7 +194,7 @@ func (m *runStore) GetMigRepo(ctx context.Context, id types.MigRepoID) (store.Mi
 }
 
 func (m *runStore) ListMigReposByMig(ctx context.Context, migID types.MigID) ([]store.MigRepo, error) {
-	return m.listMigReposByMigResult, m.listMigReposByMigErr
+	return m.listMigReposByMig.ret()
 }
 
 func (m *runStore) UpdateMigRepoRefs(ctx context.Context, params store.UpdateMigRepoRefsParams) error {
@@ -289,10 +208,7 @@ func (m *runStore) GetRepo(ctx context.Context, id types.RepoID) (store.Repo, er
 			return repo, nil
 		}
 	}
-	if !id.IsZero() {
-		return store.Repo{ID: id, Url: "https://github.com/user/repo.git"}, nil
-	}
-	return store.Repo{}, pgx.ErrNoRows
+	return defaultRepo(id)
 }
 
 // Spec methods
@@ -304,29 +220,26 @@ func (m *runStore) GetSpec(ctx context.Context, id types.SpecID) (store.Spec, er
 // Job methods (for batch, ingest)
 
 func (m *runStore) GetJob(ctx context.Context, id types.JobID) (store.Job, error) {
-	m.getJobCalled = true
-	m.getJobParams = id.String()
-	return m.getJobResult, m.getJobErr
+	return m.getJob.record(id)
 }
 
 func (m *runStore) CreateJob(ctx context.Context, params store.CreateJobParams) (store.Job, error) {
-	m.createJobCalled = true
-	m.createJobCallCount++
-	m.createJobParams = append(m.createJobParams, params)
-	result := buildCreateJobResult(m.createJobResult, params)
-	return result, m.createJobErr
+	m.createJob.called = true
+	m.createJob.calls = append(m.createJob.calls, params)
+	result := buildCreateJobResult(m.createJob.val, params)
+	return result, m.createJob.err
 }
 
 func (m *runStore) ScheduleNextJob(ctx context.Context, arg store.ScheduleNextJobParams) (store.Job, error) {
-	m.scheduleNextJobCalled = true
-	m.scheduleNextJobParam = arg
-	if m.scheduleNextJobErr != nil {
-		return store.Job{}, m.scheduleNextJobErr
+	m.scheduleNextJob.called = true
+	m.scheduleNextJob.params = arg
+	if m.scheduleNextJob.err != nil {
+		return store.Job{}, m.scheduleNextJob.err
 	}
-	if m.scheduleNextJobResult.ID.IsZero() {
+	if m.scheduleNextJob.val.ID.IsZero() {
 		return store.Job{}, pgx.ErrNoRows
 	}
-	return m.scheduleNextJobResult, nil
+	return m.scheduleNextJob.val, nil
 }
 
 func (m *runStore) ListJobsByRunRepoAttempt(ctx context.Context, arg store.ListJobsByRunRepoAttemptParams) ([]store.Job, error) {

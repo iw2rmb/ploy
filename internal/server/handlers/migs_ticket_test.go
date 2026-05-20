@@ -24,11 +24,10 @@ func TestCreateSingleRepoRunHandler_SingleRepo(t *testing.T) {
 	t.Parallel()
 
 	now := time.Now().UTC()
-	st := &jobStore{
-		createRunResult: store.Run{
-			Status:    domaintypes.RunStatusStarted,
-			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
-		},
+	st := &jobStore{}
+	st.createRun.val = store.Run{
+		Status:    domaintypes.RunStatusStarted,
+		CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
 	}
 
 	handler := createSingleRepoRunHandler(st, nil)
@@ -52,7 +51,7 @@ func TestCreateSingleRepoRunHandler_SingleRepo(t *testing.T) {
 		t.Fatal("expected spec_id to be set")
 	}
 
-	if !st.createSpecCalled || !st.createMigCalled || !st.createMigRepoCalled || !st.createRunCalled || !st.createRunRepoCalled {
+	if !st.createSpec.called || !st.createMig.called || !st.createMigRepo.called || !st.createRun.called || !st.createRunRepo.called {
 		t.Fatal("expected spec/mig/repo/run creation calls to be made")
 	}
 	if len(st.createJob.calls) != 0 {
@@ -499,11 +498,10 @@ func TestCreateSingleRepoRunHandler_PublishesEvent(t *testing.T) {
 	t.Parallel()
 
 	now := time.Now().UTC()
-	st := &jobStore{
-		createRunResult: store.Run{
-			Status:    domaintypes.RunStatusStarted,
-			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
-		},
+	st := &jobStore{}
+	st.createRun.val = store.Run{
+		Status:    domaintypes.RunStatusStarted,
+		CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
 	}
 
 	eventsService, _ := createTestEventsService()
@@ -557,10 +555,9 @@ func TestGetRunStatusHandler(t *testing.T) {
 		{
 			name: "success",
 			setupStore: func() *jobStore {
-				st := &jobStore{
-					listJobsByRunResult: []store.Job{
-						{ID: jobID, RunID: runID, Status: domaintypes.JobStatusQueued, NextID: &nextJobID, Meta: withNextIDMeta([]byte(`{}`), float64(1000))},
-					},
+				st := &jobStore{}
+				st.listJobsByRun.val = []store.Job{
+					{ID: jobID, RunID: runID, Status: domaintypes.JobStatusQueued, NextID: &nextJobID, Meta: withNextIDMeta([]byte(`{}`), float64(1000))},
 				}
 				st.getRun.val = store.Run{
 					ID:        runID,
@@ -609,7 +606,7 @@ func TestGetRunStatusHandler(t *testing.T) {
 				}
 				assertCalled(t, "GetRun", st.getRun.called)
 				assertCalled(t, "ListRunReposWithURLByRun", st.listRunReposWithURLByRun.called)
-				assertCalled(t, "ListJobsByRun", st.listJobsByRunCalled)
+				assertCalled(t, "ListJobsByRun", st.listJobsByRun.called)
 			},
 		},
 		{

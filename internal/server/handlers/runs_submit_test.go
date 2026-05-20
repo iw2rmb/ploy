@@ -32,33 +32,33 @@ func TestRunsCreateSingleRepo_Success(t *testing.T) {
 	assertStatus(t, rr, http.StatusCreated)
 
 	// Verify store methods were called in order.
-	if !st.createSpecCalled {
+	if !st.createSpec.called {
 		t.Error("store.CreateSpec was not called")
 	}
-	if !st.createMigCalled {
+	if !st.createMig.called {
 		t.Error("store.CreateMig was not called")
 	}
-	if !st.createMigRepoCalled {
+	if !st.createMigRepo.called {
 		t.Error("store.CreateMigRepo was not called")
 	}
-	if !st.createRunCalled {
+	if !st.createRun.called {
 		t.Error("store.CreateRun was not called")
 	}
-	if !st.createRunRepoCalled {
+	if !st.createRunRepo.called {
 		t.Error("store.CreateRunRepo was not called")
 	}
-	if st.createJobCalled {
+	if st.createJob.called {
 		t.Error("store.CreateJob should not be called during submission")
 	}
 
 	// Verify mig name == mig id (v1 contract).
-	if st.createMigParams.Name != st.createMigParams.ID.String() {
+	if st.createMig.params.Name != st.createMig.params.ID.String() {
 		t.Errorf("mig name (%q) != mig id (%q); v1 requires name == id for single-repo runs",
-			st.createMigParams.Name, st.createMigParams.ID.String())
+			st.createMig.params.Name, st.createMig.params.ID.String())
 	}
 
 	// Verify spec_id was linked to mig.
-	if st.createMigParams.SpecID == nil {
+	if st.createMig.params.SpecID == nil {
 		t.Error("mig was not linked to spec (spec_id is nil)")
 	}
 
@@ -91,8 +91,8 @@ func TestRunsCreateSingleRepo_DoesNotCreateJobsImmediately(t *testing.T) {
 	rr := doRequest(t, handler, http.MethodPost, "/v1/runs", validRunRequestBody())
 	assertStatus(t, rr, http.StatusCreated)
 
-	if st.createJobCallCount != 0 {
-		t.Fatalf("expected no jobs to be created during submission, got %d", st.createJobCallCount)
+	if len(st.createJob.calls) != 0 {
+		t.Fatalf("expected no jobs to be created during submission, got %d", len(st.createJob.calls))
 	}
 }
 
@@ -110,13 +110,13 @@ func TestRunsCreateSingleRepo_RepoURLNormalized(t *testing.T) {
 	assertStatus(t, rr, http.StatusCreated)
 
 	// Verify mig_repo was created with normalized URL.
-	if !st.createMigRepoCalled {
+	if !st.createMigRepo.called {
 		t.Fatal("store.CreateMigRepo was not called")
 	}
 	// types.NormalizeRepoURL trims trailing "/" and ".git".
 	expectedURL := "https://github.com/org/repo"
-	if st.createMigRepoParams.Url != expectedURL {
-		t.Errorf("mig_repo URL = %q, want %q (normalized)", st.createMigRepoParams.Url, expectedURL)
+	if st.createMigRepo.params.Url != expectedURL {
+		t.Errorf("mig_repo URL = %q, want %q (normalized)", st.createMigRepo.params.Url, expectedURL)
 	}
 }
 
@@ -186,13 +186,13 @@ func TestRunsCreateSingleRepo_WithCreatedBy(t *testing.T) {
 	assertStatus(t, rr, http.StatusCreated)
 
 	// Verify created_by was propagated to store calls.
-	if st.createSpecParams.CreatedBy == nil || *st.createSpecParams.CreatedBy != "test-user@example.com" {
+	if st.createSpec.params.CreatedBy == nil || *st.createSpec.params.CreatedBy != "test-user@example.com" {
 		t.Error("created_by not propagated to CreateSpec")
 	}
-	if st.createMigParams.CreatedBy == nil || *st.createMigParams.CreatedBy != "test-user@example.com" {
+	if st.createMig.params.CreatedBy == nil || *st.createMig.params.CreatedBy != "test-user@example.com" {
 		t.Error("created_by not propagated to CreateMig")
 	}
-	if st.createRunParams.CreatedBy == nil || *st.createRunParams.CreatedBy != "test-user@example.com" {
+	if st.createRun.params.CreatedBy == nil || *st.createRun.params.CreatedBy != "test-user@example.com" {
 		t.Error("created_by not propagated to CreateRun")
 	}
 }
@@ -217,8 +217,8 @@ func TestRunsCreateSingleRepo_MultiStepSpec(t *testing.T) {
 	}))
 	assertStatus(t, rr, http.StatusCreated)
 
-	if st.createJobCallCount != 0 {
-		t.Errorf("createJobCallCount = %d, want 0", st.createJobCallCount)
+	if len(st.createJob.calls) != 0 {
+		t.Errorf("createJobCallCount = %d, want 0", len(st.createJob.calls))
 	}
 }
 
@@ -234,23 +234,23 @@ func TestRunsCreateSingleRepo_StoreErrors(t *testing.T) {
 	}{
 		{
 			name:    "CreateSpecError",
-			setupFn: func(st *migStore) { st.createSpecErr = errors.New("database connection failed") },
+			setupFn: func(st *migStore) { st.createSpec.err = errors.New("database connection failed") },
 		},
 		{
 			name:    "CreateMigError",
-			setupFn: func(st *migStore) { st.createMigErr = errors.New("database connection failed") },
+			setupFn: func(st *migStore) { st.createMig.err = errors.New("database connection failed") },
 		},
 		{
 			name:    "CreateMigRepoError",
-			setupFn: func(st *migStore) { st.createMigRepoErr = errors.New("database connection failed") },
+			setupFn: func(st *migStore) { st.createMigRepo.err = errors.New("database connection failed") },
 		},
 		{
 			name:    "CreateRunError",
-			setupFn: func(st *migStore) { st.createRunErr = errors.New("database connection failed") },
+			setupFn: func(st *migStore) { st.createRun.errs = []error{errors.New("database connection failed")} },
 		},
 		{
 			name:    "CreateRunRepoError",
-			setupFn: func(st *migStore) { st.createRunRepoErr = errors.New("database connection failed") },
+			setupFn: func(st *migStore) { st.createRunRepo.err = errors.New("database connection failed") },
 		},
 	}
 
@@ -281,7 +281,7 @@ func TestRunsCreateSingleRepo_RejectsWhenSourceCommitSeedFails(t *testing.T) {
 	handler.ServeHTTP(rr, req)
 
 	assertStatus(t, rr, http.StatusBadRequest)
-	if st.createRunRepoCalled {
+	if st.createRunRepo.called {
 		t.Fatal("store.CreateRunRepo should not be called when source commit seed resolution fails")
 	}
 }

@@ -12,20 +12,7 @@ import (
 // Run repo methods
 
 func (m *jobStore) GetRunRepo(ctx context.Context, arg store.GetRunRepoParams) (store.RunRepo, error) {
-	m.getRunRepoCalled = true
-	m.getRunRepoParam = arg
-	if m.getRunRepoErr != nil {
-		return store.RunRepo{}, m.getRunRepoErr
-	}
-	if len(m.getRunRepoResults) > 0 {
-		idx := m.getRunRepoCalls
-		if idx >= len(m.getRunRepoResults) {
-			idx = len(m.getRunRepoResults) - 1
-		}
-		m.getRunRepoCalls++
-		return m.getRunRepoResults[idx], nil
-	}
-	return m.getRunRepoResult, nil
+	return m.getRunRepo.record(arg)
 }
 
 func (m *jobStore) UpdateRunRepoStatus(ctx context.Context, params store.UpdateRunRepoStatusParams) error {
@@ -49,31 +36,10 @@ func (m *jobStore) IncrementRunRepoAttempt(ctx context.Context, arg store.Increm
 }
 
 func (m *jobStore) CreateRunRepo(ctx context.Context, params store.CreateRunRepoParams) (store.RunRepo, error) {
-	m.createRunRepoCalled = true
-	m.createRunRepoParams = params
-	result := m.createRunRepoResult
-	if result.MigID.IsZero() {
-		result.MigID = params.MigID
-	}
-	if result.RunID.IsZero() {
-		result.RunID = params.RunID
-	}
-	if result.RepoID.IsZero() {
-		result.RepoID = params.RepoID
-	}
-	if result.RepoBaseRef == "" {
-		result.RepoBaseRef = params.RepoBaseRef
-	}
-	if result.RepoTargetRef == "" {
-		result.RepoTargetRef = params.RepoTargetRef
-	}
-	if result.Status == "" {
-		result.Status = types.RunRepoStatusQueued
-	}
-	if result.Attempt == 0 {
-		result.Attempt = 1
-	}
-	return result, m.createRunRepoErr
+	result := defaultRunRepo(m.createRunRepo.val, params)
+	m.createRunRepo.val = result
+	_, err := m.createRunRepo.record(params)
+	return result, err
 }
 
 func (m *jobStore) ListRunReposByRun(ctx context.Context, runID types.RunID) ([]store.RunRepo, error) {

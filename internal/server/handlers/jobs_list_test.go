@@ -31,7 +31,7 @@ func TestListJobsHandler_Success(t *testing.T) {
 			RunID:      runID,
 			RepoID:     repoID,
 		},
-		}
+	}
 	st.countJobsForTUI.val = 1
 
 	handler := listJobsHandler(st)
