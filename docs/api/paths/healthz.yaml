@@ -1,0 +1,23 @@
+get:
+  tags: [Control]
+  summary: Liveness probe
+  description: |
+    Reports that the control-plane HTTP process is alive. This endpoint does not
+    check downstream dependencies.
+  security: []
+  responses:
+    '200':
+      description: Process is alive
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [status]
+            additionalProperties: false
+            properties:
+              status:
+                type: string
+                enum: [ok]
+              cluster_id:
+                type: string
+                description: Cluster identifier when PLOY_CLUSTER_ID is set.

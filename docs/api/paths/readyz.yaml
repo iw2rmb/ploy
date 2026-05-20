@@ -1,0 +1,41 @@
+get:
+  tags: [Control]
+  summary: Readiness probe
+  description: |
+    Reports whether the control plane is ready to serve traffic. The readiness
+    check verifies database connectivity.
+  security: []
+  responses:
+    '200':
+      description: Control plane is ready
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [status]
+            additionalProperties: false
+            properties:
+              status:
+                type: string
+                enum: [ok]
+              cluster_id:
+                type: string
+                description: Cluster identifier when PLOY_CLUSTER_ID is set.
+    '503':
+      description: Control plane is not ready
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [status, db]
+            additionalProperties: false
+            properties:
+              status:
+                type: string
+                enum: [degraded]
+              db:
+                type: string
+                enum: [unreachable]
+              cluster_id:
+                type: string
+                description: Cluster identifier when PLOY_CLUSTER_ID is set.
