@@ -35,9 +35,9 @@ func TestMigs_Create(t *testing.T) {
 			wantStatus: http.StatusCreated,
 			verify: func(t *testing.T, st *migStore, rr *httptest.ResponseRecorder) {
 				t.Helper()
-				assertCalled(t, "CreateMig", st.createMigCalled)
-				if st.createMigParams.Name != "my-mig" {
-					t.Errorf("store Name = %q, want %q", st.createMigParams.Name, "my-mig")
+				assertCalled(t, "CreateMig", st.createMig.called)
+				if st.createMig.params.Name != "my-mig" {
+					t.Errorf("store Name = %q, want %q", st.createMig.params.Name, "my-mig")
 				}
 				resp := decodeBody[struct {
 					ID        string  `json:"id"`
@@ -60,8 +60,8 @@ func TestMigs_Create(t *testing.T) {
 			wantStatus: http.StatusCreated,
 			verify: func(t *testing.T, st *migStore, rr *httptest.ResponseRecorder) {
 				t.Helper()
-				assertCalled(t, "CreateMig", st.createMigCalled)
-				assertCalled(t, "CreateSpec", st.createSpecCalled)
+				assertCalled(t, "CreateMig", st.createMig.called)
+				assertCalled(t, "CreateSpec", st.createSpec.called)
 				assertCalled(t, "UpdateMigSpec", st.updateMigSpec.called)
 				resp := decodeBody[struct {
 					ID     string  `json:"id"`
@@ -81,8 +81,12 @@ func TestMigs_Create(t *testing.T) {
 			"name": "mig-invalid-spec",
 			"spec": map[string]any{"steps": "not-array"},
 		}, wantStatus: http.StatusBadRequest, wantNoCalls: true},
-		{name: "duplicate name", store: &migStore{createMigErr: &pgconn.PgError{Code: "23505"}}, body: map[string]any{"name": "existing-mig"}, wantStatus: http.StatusConflict},
-		{name: "store error", store: &migStore{createMigErr: errors.New("database connection failed")}, body: map[string]any{"name": "test-mig"}, wantStatus: http.StatusInternalServerError},
+		{name: "duplicate name", store: func() *migStore { s := &migStore{}; s.createMig.err = &pgconn.PgError{Code: "23505"}; return s }(), body: map[string]any{"name": "existing-mig"}, wantStatus: http.StatusConflict},
+		{name: "store error", store: func() *migStore {
+			s := &migStore{}
+			s.createMig.err = errors.New("database connection failed")
+			return s
+		}(), body: map[string]any{"name": "test-mig"}, wantStatus: http.StatusInternalServerError},
 	}
 
 	for _, tt := range tests {
@@ -91,7 +95,7 @@ func TestMigs_Create(t *testing.T) {
 			rr := doRequest(t, handler, http.MethodPost, "/v1/migs", tt.body)
 			assertStatus(t, rr, tt.wantStatus)
 			if tt.wantNoCalls {
-				assertNotCalled(t, "CreateMig", tt.store.createMigCalled)
+				assertNotCalled(t, "CreateMig", tt.store.createMig.called)
 			}
 			if tt.verify != nil {
 				tt.verify(t, tt.store, rr)
@@ -117,12 +121,14 @@ func TestMigs_List(t *testing.T) {
 	}{
 		{
 			name: "returns migs",
-			store: &migStore{
-				listMigsResult: []store.Mig{
+			store: func() *migStore {
+				st := &migStore{}
+				st.listMigs.val = []store.Mig{
 					{ID: "mig001", Name: "alpha-mig", CreatedAt: pgtype.Timestamptz{Time: now, Valid: true}},
 					{ID: "mig002", Name: "beta-mig", CreatedAt: pgtype.Timestamptz{Time: now.Add(-time.Hour), Valid: true}},
-				},
-			},
+				}
+				return st
+			}(),
 			wantStatus: http.StatusOK,
 			verify: func(t *testing.T, _ *migStore, rr *httptest.ResponseRecorder) {
 				t.Helper()
@@ -147,12 +153,12 @@ func TestMigs_List(t *testing.T) {
 			wantStatus: http.StatusOK,
 			verify: func(t *testing.T, st *migStore, _ *httptest.ResponseRecorder) {
 				t.Helper()
-				assertCalled(t, "ListMigs", st.listMigsCalled)
-				if st.listMigsParams.Limit != 10 {
-					t.Errorf("Limit = %d, want 10", st.listMigsParams.Limit)
+				assertCalled(t, "ListMigs", st.listMigs.called)
+				if st.listMigs.params.Limit != 10 {
+					t.Errorf("Limit = %d, want 10", st.listMigs.params.Limit)
 				}
-				if st.listMigsParams.Offset != 5 {
-					t.Errorf("Offset = %d, want 5", st.listMigsParams.Offset)
+				if st.listMigs.params.Offset != 5 {
+					t.Errorf("Offset = %d, want 5", st.listMigs.params.Offset)
 				}
 			},
 		},
@@ -163,11 +169,11 @@ func TestMigs_List(t *testing.T) {
 			wantStatus: http.StatusOK,
 			verify: func(t *testing.T, st *migStore, _ *httptest.ResponseRecorder) {
 				t.Helper()
-				if st.listMigsParams.NameFilter == nil {
+				if st.listMigs.params.NameFilter == nil {
 					t.Fatal("NameFilter is nil, expected pointer to 'alpha'")
 				}
-				if *st.listMigsParams.NameFilter != "alpha" {
-					t.Errorf("NameFilter = %q, want %q", *st.listMigsParams.NameFilter, "alpha")
+				if *st.listMigs.params.NameFilter != "alpha" {
+					t.Errorf("NameFilter = %q, want %q", *st.listMigs.params.NameFilter, "alpha")
 				}
 			},
 		},
@@ -187,20 +193,23 @@ func TestMigs_List(t *testing.T) {
 		},
 		{
 			name: "repo_url filter normalizes",
-			store: &migStore{
-				listMigsResult: []store.Mig{
+			store: func() *migStore {
+				st := &migStore{
+					listMigReposByMigResults: map[string][]store.MigRepo{
+						"mig001": {{ID: "repo1", MigID: "mig001", RepoID: "repo1"}},
+						"mig002": {{ID: "repo2", MigID: "mig002", RepoID: "repo2"}},
+					},
+					repoByID: map[types.RepoID]store.Repo{
+						"repo1": {ID: "repo1", Url: "https://github.com/org/repo"},
+						"repo2": {ID: "repo2", Url: "https://github.com/org/other"},
+					},
+				}
+				st.listMigs.val = []store.Mig{
 					{ID: "mig001", Name: "alpha", CreatedAt: pgtype.Timestamptz{Time: now, Valid: true}},
 					{ID: "mig002", Name: "beta", CreatedAt: pgtype.Timestamptz{Time: now.Add(-time.Minute), Valid: true}},
-				},
-				listMigReposByMigResults: map[string][]store.MigRepo{
-					"mig001": {{ID: "repo1", MigID: "mig001", RepoID: "repo1"}},
-					"mig002": {{ID: "repo2", MigID: "mig002", RepoID: "repo2"}},
-				},
-				repoByID: map[types.RepoID]store.Repo{
-					"repo1": {ID: "repo1", Url: "https://github.com/org/repo"},
-					"repo2": {ID: "repo2", Url: "https://github.com/org/other"},
-				},
-			},
+				}
+				return st
+			}(),
 			query:      "repo_url=https://github.com/org/repo.git/",
 			wantStatus: http.StatusOK,
 			verify: func(t *testing.T, _ *migStore, rr *httptest.ResponseRecorder) {
@@ -220,23 +229,26 @@ func TestMigs_List(t *testing.T) {
 		},
 		{
 			name: "repo_url filter paginates",
-			store: &migStore{
-				listMigsResult: []store.Mig{
+			store: func() *migStore {
+				st := &migStore{
+					listMigReposByMigResults: map[string][]store.MigRepo{
+						"mig00A": {{ID: "repoA", MigID: "mig00A", RepoID: "repoA"}},
+						"mig00B": {{ID: "repoB", MigID: "mig00B", RepoID: "repoB"}},
+						"mig00C": {{ID: "repoC", MigID: "mig00C", RepoID: "repoC"}},
+					},
+					repoByID: map[types.RepoID]store.Repo{
+						"repoA": {ID: "repoA", Url: "https://github.com/org/repo"},
+						"repoB": {ID: "repoB", Url: "https://github.com/org/repo"},
+						"repoC": {ID: "repoC", Url: "https://github.com/org/repo"},
+					},
+				}
+				st.listMigs.val = []store.Mig{
 					{ID: "mig00A", Name: "a", CreatedAt: pgtype.Timestamptz{Time: now, Valid: true}},
 					{ID: "mig00B", Name: "b", CreatedAt: pgtype.Timestamptz{Time: now.Add(-time.Minute), Valid: true}},
 					{ID: "mig00C", Name: "c", CreatedAt: pgtype.Timestamptz{Time: now.Add(-2 * time.Minute), Valid: true}},
-				},
-				listMigReposByMigResults: map[string][]store.MigRepo{
-					"mig00A": {{ID: "repoA", MigID: "mig00A", RepoID: "repoA"}},
-					"mig00B": {{ID: "repoB", MigID: "mig00B", RepoID: "repoB"}},
-					"mig00C": {{ID: "repoC", MigID: "mig00C", RepoID: "repoC"}},
-				},
-				repoByID: map[types.RepoID]store.Repo{
-					"repoA": {ID: "repoA", Url: "https://github.com/org/repo"},
-					"repoB": {ID: "repoB", Url: "https://github.com/org/repo"},
-					"repoC": {ID: "repoC", Url: "https://github.com/org/repo"},
-				},
-			},
+				}
+				return st
+			}(),
 			query:      "repo_url=https://github.com/org/repo&limit=1&offset=1",
 			wantStatus: http.StatusOK,
 			verify: func(t *testing.T, _ *migStore, rr *httptest.ResponseRecorder) {
@@ -254,8 +266,12 @@ func TestMigs_List(t *testing.T) {
 			},
 		},
 		{
-			name:       "store error",
-			store:      &migStore{listMigsErr: errors.New("database connection failed")},
+			name: "store error",
+			store: func() *migStore {
+				st := &migStore{}
+				st.listMigs.err = errors.New("database connection failed")
+				return st
+			}(),
 			wantStatus: http.StatusInternalServerError,
 		},
 		{
@@ -281,11 +297,11 @@ func TestMigs_List(t *testing.T) {
 			rr := doRequest(t, listMigsHandler(tt.store), http.MethodGet, path, nil)
 			assertStatus(t, rr, tt.wantStatus)
 			if tt.wantArchived != nil {
-				if tt.store.listMigsParams.ArchivedOnly == nil {
+				if tt.store.listMigs.params.ArchivedOnly == nil {
 					t.Fatal("ArchivedOnly is nil")
 				}
-				if *tt.store.listMigsParams.ArchivedOnly != *tt.wantArchived {
-					t.Errorf("ArchivedOnly = %v, want %v", *tt.store.listMigsParams.ArchivedOnly, *tt.wantArchived)
+				if *tt.store.listMigs.params.ArchivedOnly != *tt.wantArchived {
+					t.Errorf("ArchivedOnly = %v, want %v", *tt.store.listMigs.params.ArchivedOnly, *tt.wantArchived)
 				}
 			}
 			if tt.verify != nil {
@@ -309,12 +325,12 @@ func TestMigs_Delete(t *testing.T) {
 	}{
 		{
 			name:       "success",
-			store:      &migStore{listRunsResult: []store.Run{}},
+			store:      &migStore{},
 			migRef:     "mig123",
 			wantStatus: http.StatusNoContent,
 			verify: func(t *testing.T, st *migStore) {
 				t.Helper()
-				assertCalled(t, "GetMig", st.getMigCalled)
+				assertCalled(t, "GetMig", st.getMig.called)
 				assertCalled(t, "DeleteMig", st.deleteMig.called)
 				if st.deleteMig.params != "mig123" {
 					t.Errorf("DeleteMig param = %q, want %q", st.deleteMig.params, "mig123")
@@ -322,8 +338,12 @@ func TestMigs_Delete(t *testing.T) {
 			},
 		},
 		{
-			name:       "not found",
-			store:      &migStore{getMigErr: pgx.ErrNoRows},
+			name: "not found",
+			store: func() *migStore {
+				st := &migStore{}
+				st.getMig.err = pgx.ErrNoRows
+				return st
+			}(),
 			migRef:     "nonexistent",
 			wantStatus: http.StatusNotFound,
 			verify: func(t *testing.T, st *migStore) {
@@ -333,9 +353,11 @@ func TestMigs_Delete(t *testing.T) {
 		},
 		{
 			name: "refuses with runs",
-			store: &migStore{
-				listRunsResult: []store.Run{{ID: "run1", MigID: "mig123"}},
-			},
+			store: func() *migStore {
+				st := &migStore{}
+				st.listRuns.val = []store.Run{{ID: "run1", MigID: "mig123"}}
+				return st
+			}(),
 			migRef:     "mig123",
 			wantStatus: http.StatusConflict,
 			verify: func(t *testing.T, st *migStore) {
@@ -345,16 +367,17 @@ func TestMigs_Delete(t *testing.T) {
 		},
 		{
 			name: "by name",
-			store: &migStore{
-				getMigErr:          pgx.ErrNoRows,
-				getMigByNameResult: store.Mig{ID: "mig123", Name: "my-mig"},
-				listRunsResult:     []store.Run{},
-			},
+			store: func() *migStore {
+				st := &migStore{}
+				st.getMig.err = pgx.ErrNoRows
+				st.getMigByName.val = store.Mig{ID: "mig123", Name: "my-mig"}
+				return st
+			}(),
 			migRef:     "my-mig",
 			wantStatus: http.StatusNoContent,
 			verify: func(t *testing.T, st *migStore) {
 				t.Helper()
-				assertCalled(t, "GetMigByName", st.getMigByNameCalled)
+				assertCalled(t, "GetMigByName", st.getMigByName.called)
 				if st.deleteMig.params != "mig123" {
 					t.Errorf("DeleteMig param = %q, want %q", st.deleteMig.params, "mig123")
 				}
@@ -363,7 +386,7 @@ func TestMigs_Delete(t *testing.T) {
 		{
 			name: "store error",
 			store: func() *migStore {
-				st := &migStore{listRunsResult: []store.Run{}}
+				st := &migStore{}
 				st.deleteMig.err = errors.New("database connection failed")
 				return st
 			}(),

@@ -30,7 +30,7 @@ func TestRunRepoDiffs_Download(t *testing.T) {
 	repoIDTyped := domaintypes.RepoID(repoID)
 	objKey := "diffs/run/" + runID.String() + "/diff/" + diffID.String() + ".patch.gz"
 
-	st.getRunRepoResult = store.RunRepo{
+	st.getRunRepo.val = store.RunRepo{
 		RunID:   runID,
 		RepoID:  repoIDTyped,
 		Attempt: 1,
@@ -38,7 +38,7 @@ func TestRunRepoDiffs_Download(t *testing.T) {
 	st.listJobsByRunRepoAttempt.val = []store.Job{
 		{ID: jobID, RunID: runID, RepoID: repoIDTyped, Attempt: 1},
 	}
-	st.getJobResults = map[domaintypes.JobID]store.Job{
+	st.getJobByID = map[domaintypes.JobID]store.Job{
 		jobID: {ID: jobID, RunID: runID, RepoID: repoIDTyped, Attempt: 1},
 	}
 	st.getLatestDiffByJob.val = store.Diff{
@@ -68,7 +68,7 @@ func TestRunRepoDiffs_Download(t *testing.T) {
 	if !st.getLatestDiffByJob.called {
 		t.Fatal("expected GetLatestDiffByJob to be called")
 	}
-	if !st.getJobCalled {
+	if !st.getJob.called {
 		t.Fatal("expected GetJob to be called")
 	}
 }
@@ -87,7 +87,7 @@ func TestRunRepoDiffs_DownloadAccumulated(t *testing.T) {
 	patch1 := "diff --git a/a.txt b/a.txt\n+one\n"
 	patch2 := "diff --git a/b.txt b/b.txt\n+two\n"
 
-	st.getRunRepoResult = store.RunRepo{
+	st.getRunRepo.val = store.RunRepo{
 		RunID:   runID,
 		RepoID:  repoIDTyped,
 		Attempt: 1,
@@ -96,7 +96,7 @@ func TestRunRepoDiffs_DownloadAccumulated(t *testing.T) {
 		{ID: jobID1, RunID: runID, RepoID: repoIDTyped, Attempt: 1, NextID: &jobID2},
 		{ID: jobID2, RunID: runID, RepoID: repoIDTyped, Attempt: 1},
 	}
-	st.getJobResults = map[domaintypes.JobID]store.Job{
+	st.getJobByID = map[domaintypes.JobID]store.Job{
 		jobID1: {ID: jobID1, RunID: runID, RepoID: repoIDTyped, Attempt: 1},
 		jobID2: {ID: jobID2, RunID: runID, RepoID: repoIDTyped, Attempt: 1},
 	}
@@ -155,7 +155,7 @@ func TestRunRepoDiffs_ReturnsRepoFilteredItems(t *testing.T) {
 	_ = repoAID   // repo A owns the diff
 
 	// Query for repo B: expect empty list (repo A's diff filtered out)
-	st.getRunRepoErr = pgx.ErrNoRows // Equivalent externally: no repo execution rows.
+	st.getRunRepo.err = pgx.ErrNoRows // Equivalent externally: no repo execution rows.
 
 	bs := bsmock.New()
 	rr := httptest.NewRecorder()
@@ -167,14 +167,14 @@ func TestRunRepoDiffs_ReturnsRepoFilteredItems(t *testing.T) {
 	assertStatus(t, rr, http.StatusOK)
 
 	// Verify repo scope was queried.
-	if !st.getRunRepoCalled {
+	if !st.getRunRepo.called {
 		t.Fatal("expected GetRunRepo to be called")
 	}
-	if st.getRunRepoParam.RunID != runID {
-		t.Errorf("run_id=%q, want %q", st.getRunRepoParam.RunID, runID)
+	if st.getRunRepo.params.RunID != runID {
+		t.Errorf("run_id=%q, want %q", st.getRunRepo.params.RunID, runID)
 	}
-	if st.getRunRepoParam.RepoID != repoBIDTyped {
-		t.Errorf("repo_id=%q, want %q", st.getRunRepoParam.RepoID, repoBIDTyped)
+	if st.getRunRepo.params.RepoID != repoBIDTyped {
+		t.Errorf("repo_id=%q, want %q", st.getRunRepo.params.RepoID, repoBIDTyped)
 	}
 
 	var resp diffListResponse
@@ -199,7 +199,7 @@ func TestRunRepoDiffs_ReturnsOwnDiffs(t *testing.T) {
 	diffID := uuid.New()
 	createdAt := time.Date(2025, 1, 15, 12, 0, 0, 0, time.UTC)
 
-	st.getRunRepoResult = store.RunRepo{
+	st.getRunRepo.val = store.RunRepo{
 		RunID:   runID,
 		RepoID:  repoIDTyped,
 		Attempt: 1,
@@ -210,7 +210,7 @@ func TestRunRepoDiffs_ReturnsOwnDiffs(t *testing.T) {
 		RepoID:  repoIDTyped,
 		Attempt: 1,
 	}}
-	st.getJobResults = map[domaintypes.JobID]store.Job{
+	st.getJobByID = map[domaintypes.JobID]store.Job{
 		jobID: {ID: jobID, RunID: runID, RepoID: repoIDTyped, Attempt: 1},
 	}
 	st.getLatestDiffByJob.val = store.Diff{

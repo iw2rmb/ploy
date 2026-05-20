@@ -28,9 +28,8 @@ func TestSaveJobImageName_Success(t *testing.T) {
 		JobType: "mig",
 	}
 
-	st := &jobStore{
-		getJobResult: job,
-	}
+	st := &jobStore{}
+	st.getJob.val = job
 
 	handler := saveJobImageNameHandler(st)
 
@@ -100,9 +99,8 @@ func TestSaveJobImageName_ForbiddenWrongNode(t *testing.T) {
 		JobType: "mig",
 	}
 
-	st := &jobStore{
-		getJobResult: job,
-	}
+	st := &jobStore{}
+	st.getJob.val = job
 	handler := saveJobImageNameHandler(st)
 
 	body, _ := json.Marshal(map[string]any{"image": "docker.io/example/migs:latest"})
@@ -137,7 +135,8 @@ func TestSaveJobImageName_ConflictJobNotRunning(t *testing.T) {
 		JobType: "mig",
 	}
 
-	st := &jobStore{getJobResult: job}
+	st := &jobStore{}
+	st.getJob.val = job
 	handler := saveJobImageNameHandler(st)
 
 	body, _ := json.Marshal(map[string]any{"image": "docker.io/example/migs:latest"})
@@ -171,7 +170,8 @@ func TestSaveJobImageName_SuccessGateJob(t *testing.T) {
 		JobType: "pre_gate",
 	}
 
-	st := &jobStore{getJobResult: job}
+	st := &jobStore{}
+	st.getJob.val = job
 	handler := saveJobImageNameHandler(st)
 
 	body, _ := json.Marshal(map[string]any{"image": "docker.io/example/migs:latest"})
@@ -205,7 +205,8 @@ func TestSaveJobImageName_SuccessPostGateJob(t *testing.T) {
 		JobType: domaintypes.JobTypePostGate,
 	}
 
-	st := &jobStore{getJobResult: job}
+	st := &jobStore{}
+	st.getJob.val = job
 	handler := saveJobImageNameHandler(st)
 
 	body, _ := json.Marshal(map[string]any{"image": "docker.io/example/gate:latest"})
@@ -239,7 +240,8 @@ func TestSaveJobImageName_ConflictWrongJobType(t *testing.T) {
 		JobType: "unknown",
 	}
 
-	st := &jobStore{getJobResult: job}
+	st := &jobStore{}
+	st.getJob.val = job
 	handler := saveJobImageNameHandler(st)
 
 	body, _ := json.Marshal(map[string]any{"image": "docker.io/example/migs:latest"})

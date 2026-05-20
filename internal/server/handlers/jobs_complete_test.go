@@ -28,7 +28,7 @@ func TestCompleteJob_Success(t *testing.T) {
 	if rr.Body.Len() != 0 {
 		t.Fatalf("expected empty 204 response body, got %q", rr.Body.String())
 	}
-	assertCalled(t, "GetJob", st.getJobCalled)
+	assertCalled(t, "GetJob", st.getJob.called)
 	assertCalled(t, "UpdateJobCompletion", st.updateJobCompletion.called)
 }
 

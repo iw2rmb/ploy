@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/iw2rmb/ploy/internal/domain/types"
@@ -64,54 +63,40 @@ func (m *jobStore) ListLogsByRunAndJob(ctx context.Context, arg store.ListLogsBy
 // Spec/Mig/Run creation methods (for migs_ticket flow)
 
 func (m *jobStore) CreateSpec(ctx context.Context, params store.CreateSpecParams) (store.Spec, error) {
-	m.createSpecCalled = true
-	m.createSpecParams = params
 	result := store.Spec{ID: params.ID, Spec: params.Spec, CreatedBy: params.CreatedBy}
-	return result, m.createSpecErr
+	m.createSpec.val = result
+	_, err := m.createSpec.record(params)
+	return result, err
 }
 
 func (m *jobStore) CreateMig(ctx context.Context, params store.CreateMigParams) (store.Mig, error) {
-	m.createMigCalled = true
-	m.createMigParams = params
-	return store.Mig{ID: params.ID, Name: params.Name, SpecID: params.SpecID, CreatedBy: params.CreatedBy}, nil
+	result := store.Mig{ID: params.ID, Name: params.Name, SpecID: params.SpecID, CreatedBy: params.CreatedBy}
+	m.createMig.val = result
+	_, err := m.createMig.record(params)
+	return result, err
 }
 
 func (m *jobStore) CreateMigRepo(ctx context.Context, params store.CreateMigRepoParams) (store.MigRepo, error) {
-	m.createMigRepoCalled = true
-	return store.MigRepo{ID: params.ID, MigID: params.MigID, RepoID: types.NewRepoID(), BaseRef: params.BaseRef, TargetRef: params.TargetRef}, nil
+	result := defaultMigRepo(m.createMigRepo.val, params.ID, params.MigID, params.BaseRef, params.TargetRef)
+	if result.RepoID.IsZero() {
+		result.RepoID = types.NewRepoID()
+	}
+	m.createMigRepo.val = result
+	_, err := m.createMigRepo.record(params)
+	return result, err
 }
 
 func (m *jobStore) GetRepo(ctx context.Context, id types.RepoID) (store.Repo, error) {
-	if !id.IsZero() {
-		return store.Repo{ID: id, Url: "https://github.com/user/repo.git"}, nil
-	}
-	return store.Repo{}, pgx.ErrNoRows
+	return defaultRepo(id)
 }
 
 func (m *jobStore) CreateRun(ctx context.Context, params store.CreateRunParams) (store.Run, error) {
-	m.createRunCalled = true
-	m.createRunParams = params
-	result := m.createRunResult
-	if result.ID.IsZero() {
-		result.ID = params.ID
-	}
-	if result.MigID.IsZero() {
-		result.MigID = params.MigID
-	}
-	if result.SpecID.IsZero() {
-		result.SpecID = params.SpecID
-	}
-	result.CreatedBy = params.CreatedBy
-	return result, nil
+	result := defaultRun(m.createRun.val, params)
+	m.createRun.val = result
+	_, err := m.createRun.record(params)
+	return result, err
 }
 
 func (m *jobStore) ListRuns(ctx context.Context, params store.ListRunsParams) ([]store.Run, error) {
-	if int(params.Offset) >= len(m.listRunsResult) {
-		return []store.Run{}, nil
-	}
-	end := int(params.Offset) + int(params.Limit)
-	if end > len(m.listRunsResult) {
-		end = len(m.listRunsResult)
-	}
-	return m.listRunsResult[params.Offset:end], nil
+	return listPaged(m.listRuns.val, params.Offset, params.Limit), m.listRuns.err
 }

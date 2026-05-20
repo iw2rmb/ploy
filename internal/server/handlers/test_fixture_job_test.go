@@ -22,18 +22,12 @@ type jobStore struct {
 	store.Store
 
 	// Job queries
-	getJobCalled  bool
-	getJobParams  string
-	getJobResult  store.Job
-	getJobResults map[types.JobID]store.Job
-	getJobErr     error
+	getJob     mockCall[types.JobID, store.Job]
+	getJobByID map[types.JobID]store.Job
 
 	createJob mockCallSlice[store.CreateJobParams, store.Job]
 
-	listJobsByRunCalled bool
-	listJobsByRunParam  string
-	listJobsByRunResult []store.Job
-	listJobsByRunErr    error
+	listJobsByRun mockCall[types.RunID, []store.Job]
 
 	listJobsByRunRepoAttempt mockCall[store.ListJobsByRunRepoAttemptParams, []store.Job]
 
@@ -48,18 +42,15 @@ type jobStore struct {
 	updateJobImageName          mockCall[store.UpdateJobImageNameParams, struct{}]
 	upsertJobMetric             mockCall[store.UpsertJobMetricParams, struct{}]
 
-	updateJobNextIDParams []store.UpdateJobNextIDParams
-	updateJobNextIDErr    error
+	updateJobNextID mockCallSlice[store.UpdateJobNextIDParams, struct{}]
 
 	// Job scheduling/promotion
 	scheduleNextJob           mockCall[store.ScheduleNextJobParams, store.Job]
 	promoteJobByIDIfUnblocked mockCall[types.JobID, store.Job]
 
 	// Job counts
-	countJobsByRunResult                   int64
-	countJobsByRunErr                      error
-	countJobsByRunAndStatusResult          int64
-	countJobsByRunAndStatusErr             error
+	countJobsByRun                         mockResult[int64]
+	countJobsByRunAndStatus                mockResult[int64]
 	countJobsByRunRepoAttemptGroupByStatus mockResult[[]store.CountJobsByRunRepoAttemptGroupByStatusRow]
 
 	// Job listing (TUI)
@@ -104,12 +95,7 @@ type jobStore struct {
 	updateRunStatsMRURL mockCall[store.UpdateRunStatsMRURLParams, struct{}]
 
 	// Run repo (for orchestration)
-	getRunRepoCalled  bool
-	getRunRepoParam   store.GetRunRepoParams
-	getRunRepoResult  store.RunRepo
-	getRunRepoResults []store.RunRepo
-	getRunRepoCalls   int
-	getRunRepoErr     error
+	getRunRepo mockCall[store.GetRunRepoParams, store.RunRepo]
 
 	updateRunRepoStatus mockCallSlice[store.UpdateRunRepoStatusParams, struct{}]
 
@@ -117,10 +103,7 @@ type jobStore struct {
 	updateRunRepoRefs       mockCall[store.UpdateRunRepoRefsParams, struct{}]
 	incrementRunRepoAttempt mockCall[store.IncrementRunRepoAttemptParams, struct{}]
 
-	createRunRepoCalled bool
-	createRunRepoParams store.CreateRunRepoParams
-	createRunRepoResult store.RunRepo
-	createRunRepoErr    error
+	createRunRepo mockCall[store.CreateRunRepoParams, store.RunRepo]
 
 	listRunReposByRun        mockCall[string, []store.RunRepo]
 	listQueuedRunReposByRun  mockCall[string, []store.RunRepo]
@@ -158,34 +141,29 @@ type jobStore struct {
 	listLogsByRunAndJob mockCall[store.ListLogsByRunAndJobParams, []store.Log]
 
 	// Spec creation (for migs_ticket flow)
-	createSpecCalled bool
-	createSpecParams store.CreateSpecParams
-	createSpecErr    error
+	createSpec mockCall[store.CreateSpecParams, store.Spec]
 
 	// Mig creation (for migs_ticket flow)
-	createMigCalled     bool
-	createMigParams     store.CreateMigParams
-	createMigRepoCalled bool
+	createMig     mockCall[store.CreateMigParams, store.Mig]
+	createMigRepo mockCall[store.CreateMigRepoParams, store.MigRepo]
 
 	// Run creation (for migs_ticket flow)
-	createRunCalled bool
-	createRunParams store.CreateRunParams
-	createRunResult store.Run
+	createRun mockCall[store.CreateRunParams, store.Run]
 
-	listRunsResult []store.Run
+	listRuns mockResult[[]store.Run]
 }
 
 // Job query methods
 
 func (m *jobStore) GetJob(ctx context.Context, id types.JobID) (store.Job, error) {
-	m.getJobCalled = true
-	m.getJobParams = id.String()
-	if len(m.getJobResults) > 0 {
-		if result, ok := m.getJobResults[id]; ok {
-			return result, m.getJobErr
+	if len(m.getJobByID) > 0 {
+		if result, ok := m.getJobByID[id]; ok {
+			m.getJob.called = true
+			m.getJob.params = id
+			return result, m.getJob.err
 		}
 	}
-	return m.getJobResult, m.getJobErr
+	return m.getJob.record(id)
 }
 
 func (m *jobStore) CreateJob(ctx context.Context, params store.CreateJobParams) (store.Job, error) {
@@ -196,16 +174,16 @@ func (m *jobStore) CreateJob(ctx context.Context, params store.CreateJobParams) 
 }
 
 func (m *jobStore) ListJobsByRun(ctx context.Context, runID types.RunID) ([]store.Job, error) {
-	m.listJobsByRunCalled = true
-	m.listJobsByRunParam = runID.String()
-	result := make([]store.Job, len(m.listJobsByRunResult))
-	for i, j := range m.listJobsByRunResult {
+	m.listJobsByRun.called = true
+	m.listJobsByRun.params = runID
+	result := make([]store.Job, len(m.listJobsByRun.val))
+	for i, j := range m.listJobsByRun.val {
 		result[i] = j
 		if m.updateJobCompletion.called && j.ID == m.updateJobCompletion.params.ID {
 			result[i].Status = m.updateJobCompletion.params.Status
 		}
 	}
-	return result, m.listJobsByRunErr
+	return result, m.listJobsByRun.err
 }
 
 func (m *jobStore) ListJobsByRunRepoAttempt(ctx context.Context, arg store.ListJobsByRunRepoAttemptParams) ([]store.Job, error) {
@@ -254,18 +232,17 @@ func (m *jobStore) UpsertJobMetric(ctx context.Context, params store.UpsertJobMe
 }
 
 func (m *jobStore) UpdateJobNextID(ctx context.Context, params store.UpdateJobNextIDParams) error {
-	m.updateJobNextIDParams = append(m.updateJobNextIDParams, params)
-	if m.updateJobNextIDErr != nil {
-		return m.updateJobNextIDErr
+	if _, err := m.updateJobNextID.record(params); err != nil {
+		return err
 	}
 	for i := range m.listJobsByRunRepoAttempt.val {
 		if m.listJobsByRunRepoAttempt.val[i].ID == params.ID {
 			m.listJobsByRunRepoAttempt.val[i].NextID = params.NextID
 		}
 	}
-	for i := range m.listJobsByRunResult {
-		if m.listJobsByRunResult[i].ID == params.ID {
-			m.listJobsByRunResult[i].NextID = params.NextID
+	for i := range m.listJobsByRun.val {
+		if m.listJobsByRun.val[i].ID == params.ID {
+			m.listJobsByRun.val[i].NextID = params.NextID
 		}
 	}
 	return nil
@@ -304,15 +281,15 @@ func (m *jobStore) PromoteJobByIDIfUnblocked(ctx context.Context, id types.JobID
 		m.listJobsByRunRepoAttempt.val[i].Status = types.JobStatusQueued
 		return m.listJobsByRunRepoAttempt.val[i], nil
 	}
-	for i := range m.listJobsByRunResult {
-		if m.listJobsByRunResult[i].ID != id {
+	for i := range m.listJobsByRun.val {
+		if m.listJobsByRun.val[i].ID != id {
 			continue
 		}
-		if m.listJobsByRunResult[i].Status != types.JobStatusCreated {
+		if m.listJobsByRun.val[i].Status != types.JobStatusCreated {
 			return store.Job{}, pgx.ErrNoRows
 		}
-		m.listJobsByRunResult[i].Status = types.JobStatusQueued
-		return m.listJobsByRunResult[i], nil
+		m.listJobsByRun.val[i].Status = types.JobStatusQueued
+		return m.listJobsByRun.val[i], nil
 	}
 	return store.Job{}, pgx.ErrNoRows
 }
@@ -320,22 +297,22 @@ func (m *jobStore) PromoteJobByIDIfUnblocked(ctx context.Context, id types.JobID
 // Job count methods
 
 func (m *jobStore) CountJobsByRun(ctx context.Context, runID types.RunID) (int64, error) {
-	if m.countJobsByRunErr != nil {
-		return 0, m.countJobsByRunErr
+	if m.countJobsByRun.err != nil {
+		return 0, m.countJobsByRun.err
 	}
-	if m.countJobsByRunResult == 0 && len(m.listJobsByRunResult) > 0 {
-		return int64(len(m.listJobsByRunResult)), nil
+	if m.countJobsByRun.val == 0 && len(m.listJobsByRun.val) > 0 {
+		return int64(len(m.listJobsByRun.val)), nil
 	}
-	return m.countJobsByRunResult, nil
+	return m.countJobsByRun.val, nil
 }
 
 func (m *jobStore) CountJobsByRunAndStatus(ctx context.Context, arg store.CountJobsByRunAndStatusParams) (int64, error) {
-	if m.countJobsByRunAndStatusErr != nil {
-		return 0, m.countJobsByRunAndStatusErr
+	if m.countJobsByRunAndStatus.err != nil {
+		return 0, m.countJobsByRunAndStatus.err
 	}
-	if m.countJobsByRunAndStatusResult == 0 && len(m.listJobsByRunResult) > 0 {
+	if m.countJobsByRunAndStatus.val == 0 && len(m.listJobsByRun.val) > 0 {
 		var count int64
-		for _, j := range m.listJobsByRunResult {
+		for _, j := range m.listJobsByRun.val {
 			effectiveStatus := j.Status
 			if m.updateJobCompletion.called && j.ID == m.updateJobCompletion.params.ID {
 				effectiveStatus = m.updateJobCompletion.params.Status
@@ -346,7 +323,7 @@ func (m *jobStore) CountJobsByRunAndStatus(ctx context.Context, arg store.CountJ
 		}
 		return count, nil
 	}
-	return m.countJobsByRunAndStatusResult, nil
+	return m.countJobsByRunAndStatus.val, nil
 }
 
 func (m *jobStore) CountJobsByRunRepoAttemptGroupByStatus(ctx context.Context, arg store.CountJobsByRunRepoAttemptGroupByStatusParams) ([]store.CountJobsByRunRepoAttemptGroupByStatusRow, error) {

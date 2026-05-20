@@ -65,8 +65,8 @@ func TestPathParamsUseDomainTypes(t *testing.T) {
 		h.ServeHTTP(rr, req)
 
 		assertStatus(t, rr, http.StatusBadRequest)
-		if st.getRun.called || st.getJobCalled || st.createDiff.called {
-			t.Fatalf("expected no store calls, but got GetRun=%v GetJob=%v CreateDiff=%v", st.getRun.called, st.getJobCalled, st.createDiff.called)
+		if st.getRun.called || st.getJob.called || st.createDiff.called {
+			t.Fatalf("expected no store calls, but got GetRun=%v GetJob=%v CreateDiff=%v", st.getRun.called, st.getJob.called, st.createDiff.called)
 		}
 	})
 
@@ -83,8 +83,8 @@ func TestPathParamsUseDomainTypes(t *testing.T) {
 		h.ServeHTTP(rr, req)
 
 		assertStatus(t, rr, http.StatusBadRequest)
-		if st.getMigCalled || st.createRunCalled {
-			t.Fatalf("expected no store calls, but got GetMig=%v CreateRun=%v", st.getMigCalled, st.createRunCalled)
+		if st.getMig.called || st.createRun.called {
+			t.Fatalf("expected no store calls, but got GetMig=%v CreateRun=%v", st.getMig.called, st.createRun.called)
 		}
 	})
 
@@ -123,7 +123,7 @@ func TestPathParamsUseDomainTypes(t *testing.T) {
 		h.ServeHTTP(rr, req)
 
 		assertStatus(t, rr, http.StatusBadRequest)
-		if st.getJobCalled {
+		if st.getJob.called {
 			t.Fatalf("expected no store calls, but GetJob was called")
 		}
 	})
@@ -146,7 +146,7 @@ func TestPathParamsUseDomainTypes(t *testing.T) {
 		h.ServeHTTP(rr, req)
 
 		assertStatus(t, rr, http.StatusBadRequest)
-		if st.getJobCalled {
+		if st.getJob.called {
 			t.Fatalf("expected no store calls, but GetJob was called")
 		}
 	})

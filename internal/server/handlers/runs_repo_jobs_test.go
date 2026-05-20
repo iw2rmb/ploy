@@ -17,13 +17,12 @@ func TestListRunRepoJobsHandler_NextIDContract(t *testing.T) {
 	jobID := domaintypes.NewJobID()
 	nextID := domaintypes.NewJobID()
 
-	st := &runStore{
-		getRunRepoResult: store.RunRepo{
-			RunID:   runID,
-			RepoID:  repoID,
-			Attempt: 1,
-		},
-	}
+	st := &runStore{}
+	st.getRunRepo.vals = []store.RunRepo{{
+		RunID:   runID,
+		RepoID:  repoID,
+		Attempt: 1,
+	}}
 	st.listJobsByRunRepoAttempt.val = []store.Job{
 		{
 			ID:         jobID,
@@ -84,13 +83,12 @@ func TestListRunRepoJobsHandler_ExposesGateAndMigJobTypes(t *testing.T) {
 	preGateID := domaintypes.NewJobID()
 	migID := domaintypes.NewJobID()
 
-	st := &runStore{
-		getRunRepoResult: store.RunRepo{
-			RunID:   runID,
-			RepoID:  repoID,
-			Attempt: 1,
-		},
-	}
+	st := &runStore{}
+	st.getRunRepo.vals = []store.RunRepo{{
+		RunID:   runID,
+		RepoID:  repoID,
+		Attempt: 1,
+	}}
 	st.listJobsByRunRepoAttempt.val = []store.Job{
 		{
 			ID:      preGateID,
@@ -147,13 +145,12 @@ func TestListRunRepoJobsHandler_AttemptQueryOverride(t *testing.T) {
 	runID := domaintypes.NewRunID()
 	repoID := domaintypes.NewRepoID()
 
-	st := &runStore{
-		getRunRepoResult: store.RunRepo{
-			RunID:   runID,
-			RepoID:  repoID,
-			Attempt: 1,
-		},
-	}
+	st := &runStore{}
+	st.getRunRepo.vals = []store.RunRepo{{
+		RunID:   runID,
+		RepoID:  repoID,
+		Attempt: 1,
+	}}
 	st.listJobsByRunRepoAttempt.val = []store.Job{}
 
 	handler := listRunRepoJobsHandler(st)
@@ -175,13 +172,12 @@ func TestListRunRepoJobsHandler_OrdersJobsByChain(t *testing.T) {
 	mig1 := domaintypes.NewJobID()
 	post := domaintypes.NewJobID()
 
-	st := &runStore{
-		getRunRepoResult: store.RunRepo{
-			RunID:   runID,
-			RepoID:  repoID,
-			Attempt: 1,
-		},
-	}
+	st := &runStore{}
+	st.getRunRepo.vals = []store.RunRepo{{
+		RunID:   runID,
+		RepoID:  repoID,
+		Attempt: 1,
+	}}
 	st.listJobsByRunRepoAttempt.val = []store.Job{
 		{ID: post, RunID: runID, RepoID: repoID, Attempt: 1, Name: "post-gate", JobType: "post_gate", Status: domaintypes.JobStatusCreated},
 		{ID: mig1, RunID: runID, RepoID: repoID, Attempt: 1, Name: "mig-1", JobType: "mig", NextID: &post, Status: domaintypes.JobStatusCreated},

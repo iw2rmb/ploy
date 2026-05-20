@@ -14,16 +14,15 @@ func TestCompleteJobService_Complete_ReturnsConflictForNonRunningJob(t *testing.
 
 	nodeID := domaintypes.NodeID(domaintypes.NewNodeKey())
 	jobID := domaintypes.NewJobID()
-	st := &jobStore{
-		getJobResult: store.Job{
-			ID:        jobID,
-			RunID:     domaintypes.NewRunID(),
-			RepoID:    domaintypes.NewRepoID(),
-			NodeID:    &nodeID,
-			Status:    domaintypes.JobStatusQueued,
-			JobType:   domaintypes.JobTypeMig,
-			RepoShaIn: "0123456789abcdef0123456789abcdef01234567",
-		},
+	st := &jobStore{}
+	st.getJob.val = store.Job{
+		ID:        jobID,
+		RunID:     domaintypes.NewRunID(),
+		RepoID:    domaintypes.NewRepoID(),
+		NodeID:    &nodeID,
+		Status:    domaintypes.JobStatusQueued,
+		JobType:   domaintypes.JobTypeMig,
+		RepoShaIn: "0123456789abcdef0123456789abcdef01234567",
 	}
 
 	svc := NewCompleteJobService(st, nil, nil)
@@ -48,19 +47,18 @@ func TestCompleteJobService_Complete_SuccessPromotesNextJob(t *testing.T) {
 	runID := domaintypes.NewRunID()
 	repoID := domaintypes.NewRepoID()
 
-	st := &jobStore{
-		getJobResult: store.Job{
-			ID:          jobID,
-			RunID:       runID,
-			RepoID:      repoID,
-			RepoBaseRef: "main",
-			Attempt:     1,
-			NodeID:      &nodeID,
-			Status:      domaintypes.JobStatusRunning,
-			JobType:     domaintypes.JobTypeMig,
-			RepoShaIn:   "0123456789abcdef0123456789abcdef01234567",
-			NextID:      &nextID,
-		},
+	st := &jobStore{}
+	st.getJob.val = store.Job{
+		ID:          jobID,
+		RunID:       runID,
+		RepoID:      repoID,
+		RepoBaseRef: "main",
+		Attempt:     1,
+		NodeID:      &nodeID,
+		Status:      domaintypes.JobStatusRunning,
+		JobType:     domaintypes.JobTypeMig,
+		RepoShaIn:   "0123456789abcdef0123456789abcdef01234567",
+		NextID:      &nextID,
 	}
 
 	svc := NewCompleteJobService(st, nil, nil)

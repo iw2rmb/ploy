@@ -22,9 +22,8 @@ func TestGetJobLogsHandler_ResumeWithLastEventID(t *testing.T) {
 	runID := domaintypes.NewRunID()
 	jobID := domaintypes.NewJobID()
 
-	st := &jobStore{
-		getJobResult: store.Job{ID: jobID, RunID: runID},
-	}
+	st := &jobStore{}
+	st.getJob.val = store.Job{ID: jobID, RunID: runID}
 	st.getRun.val = store.Run{ID: runID, Status: domaintypes.RunStatusStarted}
 
 	eventsService, err := createTestEventsServiceWithStore(st)
@@ -91,9 +90,8 @@ func TestGetJobLogsHandler_RetentionFrame(t *testing.T) {
 	runID := domaintypes.NewRunID()
 	jobID := domaintypes.NewJobID()
 
-	st := &jobStore{
-		getJobResult: store.Job{ID: jobID, RunID: runID},
-	}
+	st := &jobStore{}
+	st.getJob.val = store.Job{ID: jobID, RunID: runID}
 	st.getRun.val = store.Run{ID: runID, Status: domaintypes.RunStatusStarted}
 
 	eventsService, err := createTestEventsServiceWithStore(st)
@@ -150,9 +148,8 @@ func TestGetJobLogsHandler_BackfillLiveNoDuplicates(t *testing.T) {
 
 	objKey := "logs/job.gz"
 
-	st := &jobStore{
-		getJobResult: store.Job{ID: jobID, RunID: runID, Status: domaintypes.JobStatusRunning},
-	}
+	st := &jobStore{}
+	st.getJob.val = store.Job{ID: jobID, RunID: runID, Status: domaintypes.JobStatusRunning}
 	st.getRun.val = store.Run{ID: runID, Status: domaintypes.RunStatusStarted}
 	st.listLogsByRun.val = []store.Log{
 		{ID: 1, RunID: runID, JobID: &jobID, ObjectKey: &objKey},
@@ -232,9 +229,8 @@ func TestGetJobLogsHandler_GapLogEventsDelivered(t *testing.T) {
 
 	objKey := "logs/gap-job.gz"
 
-	st := &jobStore{
-		getJobResult: store.Job{ID: jobID, RunID: runID, Status: domaintypes.JobStatusRunning},
-	}
+	st := &jobStore{}
+	st.getJob.val = store.Job{ID: jobID, RunID: runID, Status: domaintypes.JobStatusRunning}
 	st.getRun.val = store.Run{ID: runID, Status: domaintypes.RunStatusStarted}
 	st.listLogsByRun.val = []store.Log{
 		{ID: 1, RunID: runID, JobID: &jobID, ObjectKey: &objKey},
@@ -318,9 +314,8 @@ func TestGetJobLogsHandler_OverlapDedupDuringBackfill(t *testing.T) {
 	overlapLine := "overlap-persisted-and-hub"
 	objKey := "logs/overlap-job.gz"
 
-	st := &jobStore{
-		getJobResult: store.Job{ID: jobID, RunID: runID, Status: domaintypes.JobStatusRunning},
-	}
+	st := &jobStore{}
+	st.getJob.val = store.Job{ID: jobID, RunID: runID, Status: domaintypes.JobStatusRunning}
 	st.getRun.val = store.Run{ID: runID, Status: domaintypes.RunStatusStarted}
 	st.listLogsByRun.val = []store.Log{
 		{ID: 1, RunID: runID, JobID: &jobID, ObjectKey: &objKey},
@@ -400,9 +395,8 @@ func TestGetJobLogsHandler_RepeatedLiveLineNotDropped(t *testing.T) {
 	repeatedLine := "repeated-content"
 	objKey := "logs/repeated-job.gz"
 
-	st := &jobStore{
-		getJobResult: store.Job{ID: jobID, RunID: runID, Status: domaintypes.JobStatusRunning},
-	}
+	st := &jobStore{}
+	st.getJob.val = store.Job{ID: jobID, RunID: runID, Status: domaintypes.JobStatusRunning}
 	st.getRun.val = store.Run{ID: runID, Status: domaintypes.RunStatusStarted}
 	st.listLogsByRun.val = []store.Log{
 		{ID: 1, RunID: runID, JobID: &jobID, ObjectKey: &objKey},

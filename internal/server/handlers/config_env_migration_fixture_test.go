@@ -30,10 +30,10 @@ type migrationFixtureHomeEntry struct {
 }
 
 type migrationFixtureExpect struct {
-	Rewritten int                              `yaml:"rewritten"`
-	Rejected  int                              `yaml:"rejected"`
-	Skipped   int                              `yaml:"skipped"`
-	Entries   []migrationFixtureExpectedEntry  `yaml:"entries"`
+	Rewritten int                             `yaml:"rewritten"`
+	Rejected  int                             `yaml:"rejected"`
+	Skipped   int                             `yaml:"skipped"`
+	Entries   []migrationFixtureExpectedEntry `yaml:"entries"`
 }
 
 type migrationFixtureExpectedEntry struct {

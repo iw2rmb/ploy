@@ -28,7 +28,8 @@ func TestCreateJobLogsHandler(t *testing.T) {
 			name: "success",
 			setupStore: func(jobID domaintypes.JobID, runID domaintypes.RunID) *jobStore {
 				objKey := "logs/job/" + jobID.String() + "/log/1.gz"
-				st := &jobStore{getJobResult: store.Job{ID: jobID, RunID: runID}}
+				st := &jobStore{}
+				st.getJob.val = store.Job{ID: jobID, RunID: runID}
 				st.createLog.val = store.Log{ID: 1, RunID: runID, JobID: &jobID, ChunkNo: 2, DataSize: 5, ObjectKey: &objKey}
 				return st
 			},
@@ -39,7 +40,9 @@ func TestCreateJobLogsHandler(t *testing.T) {
 		{
 			name: "job not found",
 			setupStore: func(jobID domaintypes.JobID, runID domaintypes.RunID) *jobStore {
-				return &jobStore{getJobErr: pgx.ErrNoRows}
+				st := &jobStore{}
+				st.getJob.err = pgx.ErrNoRows
+				return st
 			},
 			payload:        map[string]any{"chunk_no": 0, "data": []byte("x")},
 			wantStatus:     http.StatusNotFound,
@@ -48,7 +51,9 @@ func TestCreateJobLogsHandler(t *testing.T) {
 		{
 			name: "empty data",
 			setupStore: func(jobID domaintypes.JobID, runID domaintypes.RunID) *jobStore {
-				return &jobStore{getJobResult: store.Job{ID: jobID, RunID: runID}}
+				st := &jobStore{}
+				st.getJob.val = store.Job{ID: jobID, RunID: runID}
+				return st
 			},
 			payload:        map[string]any{"chunk_no": 0, "data": []byte{}},
 			wantStatus:     http.StatusBadRequest,
@@ -57,7 +62,9 @@ func TestCreateJobLogsHandler(t *testing.T) {
 		{
 			name: "too large",
 			setupStore: func(jobID domaintypes.JobID, runID domaintypes.RunID) *jobStore {
-				return &jobStore{getJobResult: store.Job{ID: jobID, RunID: runID}}
+				st := &jobStore{}
+				st.getJob.val = store.Job{ID: jobID, RunID: runID}
+				return st
 			},
 			payload:        map[string]any{"chunk_no": 0, "data": make([]byte, 10<<20+1)},
 			wantStatus:     http.StatusRequestEntityTooLarge,
@@ -79,8 +86,8 @@ func TestCreateJobLogsHandler(t *testing.T) {
 
 			rr := doRequest(t, h, http.MethodPost, "/v1/jobs/"+jobID.String()+"/logs", tt.payload, "job_id", jobID.String())
 			assertStatus(t, rr, tt.wantStatus)
-			if st.getJobCalled != tt.wantGetJobCall {
-				t.Fatalf("getJobCalled = %v, want %v", st.getJobCalled, tt.wantGetJobCall)
+			if st.getJob.called != tt.wantGetJobCall {
+				t.Fatalf("getJob.called = %v, want %v", st.getJob.called, tt.wantGetJobCall)
 			}
 		})
 	}

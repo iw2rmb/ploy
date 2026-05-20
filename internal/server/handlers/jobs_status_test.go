@@ -52,10 +52,9 @@ func TestGetJobStatusHandler(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			st := &jobStore{
-				getJobResult: f.Job,
-				getJobErr:    tt.storeErr,
-			}
+			st := &jobStore{}
+			st.getJob.val = f.Job
+			st.getJob.err = tt.storeErr
 
 			handler := getJobStatusHandler(st)
 			rr := httptest.NewRecorder()

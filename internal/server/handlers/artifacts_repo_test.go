@@ -34,18 +34,17 @@ func TestListRunRepoArtifactsHandler_Success_FiltersAndOrders(t *testing.T) {
 	digest1 := "sha256:one"
 	digest2 := "sha256:two"
 
-	st := &artifactStore{
-		getRunRepoResult: store.RunRepo{
-			RunID:   runID,
-			RepoID:  repoID,
-			Status:  domaintypes.RunRepoStatusRunning,
-			Attempt: 1,
-		},
+	st := &artifactStore{}
+	st.getRunRepo.val = store.RunRepo{
+		RunID:   runID,
+		RepoID:  repoID,
+		Status:  domaintypes.RunRepoStatusRunning,
+		Attempt: 1,
 	}
 	st.listJobsByRunRepoAttempt.val = []store.Job{
 		{ID: job1, RunID: runID, RepoID: repoID, Attempt: 1, Meta: withNextIDMeta([]byte(`{}`), float64(1000))},
 		{ID: job2, RunID: runID, RepoID: repoID, Attempt: 1, Meta: withNextIDMeta([]byte(`{}`), float64(2000))},
-		}
+	}
 	st.listArtifactBundlesByRunAndJob.val = []store.ArtifactBundle{
 		{
 			ID:         pgtype.UUID{Bytes: id2, Valid: true},

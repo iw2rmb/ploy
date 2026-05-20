@@ -40,17 +40,16 @@ func TestClaimService_Claim_SuccessBuildsPayloadAndTransitionsRepo(t *testing.T)
 	sourceCommitSHA := "0123456789abcdef0123456789abcdef01234567"
 	now := time.Now().UTC()
 
-	st := &jobStore{
-		getRunRepoResult: store.RunRepo{
-			RunID:           runID,
-			RepoID:          repoID,
-			RepoBaseRef:     "main",
-			RepoTargetRef:   "feature",
-			SourceCommitSha: sourceCommitSHA,
-			RepoSha0:        sourceCommitSHA,
-			Status:          domaintypes.RunRepoStatusQueued,
-			Attempt:         1,
-		},
+	st := &jobStore{}
+	st.getRunRepo.val = store.RunRepo{
+		RunID:           runID,
+		RepoID:          repoID,
+		RepoBaseRef:     "main",
+		RepoTargetRef:   "feature",
+		SourceCommitSha: sourceCommitSHA,
+		RepoSha0:        sourceCommitSHA,
+		Status:          domaintypes.RunRepoStatusQueued,
+		Attempt:         1,
 	}
 	st.getNode.val = store.Node{ID: nodeID}
 	st.getRun.val = store.Run{
@@ -109,15 +108,14 @@ func TestClaimService_Claim_RequeuesClaimedJobWhenPayloadBuildFails(t *testing.T
 	jobID := domaintypes.NewJobID()
 	now := time.Now().UTC()
 
-	st := &jobStore{
-		getRunRepoResult: store.RunRepo{
-			RunID:         runID,
-			RepoID:        repoID,
-			RepoBaseRef:   "main",
-			RepoTargetRef: "feature",
-			Status:        domaintypes.RunRepoStatusQueued,
-			Attempt:       1,
-		},
+	st := &jobStore{}
+	st.getRunRepo.val = store.RunRepo{
+		RunID:         runID,
+		RepoID:        repoID,
+		RepoBaseRef:   "main",
+		RepoTargetRef: "feature",
+		Status:        domaintypes.RunRepoStatusQueued,
+		Attempt:       1,
 	}
 	st.getNode.val = store.Node{ID: nodeID}
 	st.getRun.val = store.Run{

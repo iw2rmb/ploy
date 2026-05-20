@@ -38,9 +38,9 @@ func assertAdminOnly(t *testing.T, endpoints []struct {
 	t.Helper()
 
 	roles := []struct {
-		role       auth.Role
-		name       string
-		wantBlock  bool
+		role      auth.Role
+		name      string
+		wantBlock bool
 	}{
 		{auth.RoleControlPlane, "control-plane", true},
 		{auth.RoleWorker, "worker", true},

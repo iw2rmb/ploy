@@ -14,59 +14,35 @@ type migStore struct {
 	store.Store
 
 	// Spec
-	createSpecCalled bool
-	createSpecParams store.CreateSpecParams
-	createSpecResult store.Spec
-	createSpecErr    error
+	createSpec mockCall[store.CreateSpecParams, store.Spec]
 
 	getSpec       mockCall[string, store.Spec]
 	updateMigSpec mockCall[store.UpdateMigSpecParams, struct{}]
 
 	// Mig CRUD
-	createMigCalled bool
-	createMigParams store.CreateMigParams
-	createMigResult store.Mig
-	createMigErr    error
+	createMig mockCall[store.CreateMigParams, store.Mig]
 
-	listMigsCalled bool
-	listMigsParams store.ListMigsParams
-	listMigsResult []store.Mig
-	listMigsErr    error
+	listMigs mockCall[store.ListMigsParams, []store.Mig]
 
-	getMigCalled bool
-	getMigParam  string
-	getMigResult store.Mig
-	getMigErr    error
+	getMig mockCall[types.MigID, store.Mig]
 
-	getMigByNameCalled bool
-	getMigByNameParam  string
-	getMigByNameResult store.Mig
-	getMigByNameErr    error
+	getMigByName mockCall[string, store.Mig]
 
 	deleteMig    mockCall[string, struct{}]
 	archiveMig   mockCall[string, struct{}]
 	unarchiveMig mockCall[string, struct{}]
 
 	// MigRepo
-	createMigRepoCalled bool
-	createMigRepoParams store.CreateMigRepoParams
-	createMigRepoResult store.MigRepo
-	createMigRepoErr    error
+	createMigRepo mockCall[store.CreateMigRepoParams, store.MigRepo]
 
 	getMigRepo mockResult[store.MigRepo]
 
-	listMigReposByMigCalled  bool
-	listMigReposByMigParam   string
-	listMigReposByMigResult  []store.MigRepo
+	listMigReposByMig        mockCall[types.MigID, []store.MigRepo]
 	listMigReposByMigResults map[string][]store.MigRepo
-	listMigReposByMigErr     error
 
 	getMigRepoByURL mockCall[store.GetMigRepoByURLParams, store.MigRepo]
 
-	upsertMigRepoCalled bool
-	upsertMigRepoParams store.UpsertMigRepoParams
-	upsertMigRepoResult store.MigRepo
-	upsertMigRepoErr    error
+	upsertMigRepo mockCall[store.UpsertMigRepoParams, store.MigRepo]
 
 	deleteMigRepo     mockResult[struct{}]
 	hasMigRepoHistory mockResult[bool]
@@ -76,34 +52,19 @@ type migStore struct {
 
 	repoByID map[types.RepoID]store.Repo
 
-	// Run creation (for migs_runs, runs_submit)
-	createRunCalled       bool
-	createRunParams       store.CreateRunParams
-	createRunResult       store.Run
-	createRunErr          error
-	createRunErrs         []error
-	createRunErrCallCount int
-	createRunResults      []store.Run
-	createRunCallCount    int
+	// Run creation (for migs_runs, runs_submit). Sequenced for tests that
+	// observe a different result/err for each CreateRun call.
+	createRun mockCallSeq[store.CreateRunParams, store.Run]
 
-	createRunRepoCalled bool
-	createRunRepoParams store.CreateRunRepoParams
-	createRunRepoResult store.RunRepo
-	createRunRepoErr    error
+	createRunRepo mockCall[store.CreateRunRepoParams, store.RunRepo]
 
 	// Run/Job queries (for archive validation and migs_ticket)
-	getRun              mockCall[string, store.Run]
-	listRunsResult      []store.Run
-	listRunsErr         error
-	listJobsByRunResult []store.Job
-	listJobsByRunCalled bool
+	getRun        mockCall[string, store.Run]
+	listRuns      mockResult[[]store.Run]
+	listJobsByRun mockCall[types.RunID, []store.Job]
 
 	// Job creation (for migs_ticket, runs_submit)
-	createJobCalled    bool
-	createJobCallCount int
-	createJobParams    []store.CreateJobParams
-	createJobResult    store.Job
-	createJobErr       error
+	createJob mockCallSlice[store.CreateJobParams, store.Job]
 
 	// Artifact (for migs_ticket)
 	listArtifactBundlesByRunAndJob mockResult[[]store.ArtifactBundle]
@@ -115,17 +76,10 @@ type migStore struct {
 // Spec methods
 
 func (m *migStore) CreateSpec(ctx context.Context, params store.CreateSpecParams) (store.Spec, error) {
-	m.createSpecCalled = true
-	m.createSpecParams = params
-	result := m.createSpecResult
-	if result.ID.IsZero() {
-		result.ID = params.ID
-	}
-	if result.Spec == nil {
-		result.Spec = params.Spec
-	}
-	result.CreatedBy = params.CreatedBy
-	return result, m.createSpecErr
+	m.createSpec.called = true
+	m.createSpec.params = params
+	result := store.Spec{ID: params.ID, Spec: params.Spec, CreatedBy: params.CreatedBy}
+	return result, m.createSpec.err
 }
 
 func (m *migStore) GetSpec(ctx context.Context, id types.SpecID) (store.Spec, error) {
@@ -140,40 +94,25 @@ func (m *migStore) UpdateMigSpec(ctx context.Context, params store.UpdateMigSpec
 // Mig CRUD methods
 
 func (m *migStore) CreateMig(ctx context.Context, params store.CreateMigParams) (store.Mig, error) {
-	m.createMigCalled = true
-	m.createMigParams = params
-	result := m.createMigResult
-	if result.ID.IsZero() {
-		result.ID = params.ID
-	}
-	if result.Name == "" {
-		result.Name = params.Name
-	}
-	result.SpecID = params.SpecID
-	result.CreatedBy = params.CreatedBy
-	return result, m.createMigErr
+	m.createMig.called = true
+	m.createMig.params = params
+	result := store.Mig{ID: params.ID, Name: params.Name, SpecID: params.SpecID, CreatedBy: params.CreatedBy}
+	return result, m.createMig.err
 }
 
 func (m *migStore) ListMigs(ctx context.Context, params store.ListMigsParams) ([]store.Mig, error) {
-	m.listMigsCalled = true
-	m.listMigsParams = params
-	if int(params.Offset) >= len(m.listMigsResult) {
-		return []store.Mig{}, m.listMigsErr
-	}
-	end := int(params.Offset) + int(params.Limit)
-	if end > len(m.listMigsResult) {
-		end = len(m.listMigsResult)
-	}
-	return m.listMigsResult[params.Offset:end], m.listMigsErr
+	m.listMigs.called = true
+	m.listMigs.params = params
+	return listPaged(m.listMigs.val, params.Offset, params.Limit), m.listMigs.err
 }
 
 func (m *migStore) GetMig(ctx context.Context, id types.MigID) (store.Mig, error) {
-	m.getMigCalled = true
-	m.getMigParam = id.String()
-	if m.getMigErr != nil {
-		return store.Mig{}, m.getMigErr
+	m.getMig.called = true
+	m.getMig.params = id
+	if m.getMig.err != nil {
+		return store.Mig{}, m.getMig.err
 	}
-	result := m.getMigResult
+	result := m.getMig.val
 	if result.ID.IsZero() {
 		result.ID = id
 	}
@@ -184,12 +123,12 @@ func (m *migStore) GetMig(ctx context.Context, id types.MigID) (store.Mig, error
 }
 
 func (m *migStore) GetMigByName(ctx context.Context, name string) (store.Mig, error) {
-	m.getMigByNameCalled = true
-	m.getMigByNameParam = name
-	if m.getMigByNameErr != nil {
-		return store.Mig{}, m.getMigByNameErr
+	m.getMigByName.called = true
+	m.getMigByName.params = name
+	if m.getMigByName.err != nil {
+		return store.Mig{}, m.getMigByName.err
 	}
-	result := m.getMigByNameResult
+	result := m.getMigByName.val
 	if result.ID.IsZero() && result.Name == "" {
 		return store.Mig{}, pgx.ErrNoRows
 	}
@@ -217,29 +156,14 @@ func (m *migStore) UnarchiveMig(ctx context.Context, id types.MigID) error {
 // MigRepo methods
 
 func (m *migStore) CreateMigRepo(ctx context.Context, params store.CreateMigRepoParams) (store.MigRepo, error) {
-	m.createMigRepoCalled = true
-	m.createMigRepoParams = params
-	result := m.createMigRepoResult
-	if result.ID.IsZero() {
-		result.ID = params.ID
-	}
-	if result.MigID.IsZero() {
-		result.MigID = params.MigID
-	}
-	if result.RepoID.IsZero() {
-		result.RepoID = types.NewRepoID()
-	}
-	if result.BaseRef == "" {
-		result.BaseRef = params.BaseRef
-	}
-	if result.TargetRef == "" {
-		result.TargetRef = params.TargetRef
-	}
+	result := defaultMigRepo(m.createMigRepo.val, params.ID, params.MigID, params.BaseRef, params.TargetRef)
 	if m.repoByID == nil {
 		m.repoByID = map[types.RepoID]store.Repo{}
 	}
 	m.repoByID[result.RepoID] = store.Repo{ID: result.RepoID, Url: params.Url}
-	return result, m.createMigRepoErr
+	m.createMigRepo.val = result
+	_, err := m.createMigRepo.record(params)
+	return result, err
 }
 
 func (m *migStore) GetMigRepo(ctx context.Context, id types.MigRepoID) (store.MigRepo, error) {
@@ -247,15 +171,14 @@ func (m *migStore) GetMigRepo(ctx context.Context, id types.MigRepoID) (store.Mi
 }
 
 func (m *migStore) ListMigReposByMig(ctx context.Context, migID types.MigID) ([]store.MigRepo, error) {
-	m.listMigReposByMigCalled = true
-	migIDStr := migID.String()
-	m.listMigReposByMigParam = migIDStr
 	if m.listMigReposByMigResults != nil {
-		if repos, ok := m.listMigReposByMigResults[migIDStr]; ok {
-			return repos, m.listMigReposByMigErr
+		if repos, ok := m.listMigReposByMigResults[migID.String()]; ok {
+			m.listMigReposByMig.called = true
+			m.listMigReposByMig.params = migID
+			return repos, m.listMigReposByMig.err
 		}
 	}
-	return m.listMigReposByMigResult, m.listMigReposByMigErr
+	return m.listMigReposByMig.record(migID)
 }
 
 func (m *migStore) GetMigRepoByURL(ctx context.Context, arg store.GetMigRepoByURLParams) (store.MigRepo, error) {
@@ -263,29 +186,14 @@ func (m *migStore) GetMigRepoByURL(ctx context.Context, arg store.GetMigRepoByUR
 }
 
 func (m *migStore) UpsertMigRepo(ctx context.Context, arg store.UpsertMigRepoParams) (store.MigRepo, error) {
-	m.upsertMigRepoCalled = true
-	m.upsertMigRepoParams = arg
-	result := m.upsertMigRepoResult
-	if result.ID.IsZero() {
-		result.ID = arg.ID
-	}
-	if result.MigID.IsZero() {
-		result.MigID = arg.MigID
-	}
-	if result.RepoID.IsZero() {
-		result.RepoID = types.NewRepoID()
-	}
-	if result.BaseRef == "" {
-		result.BaseRef = arg.BaseRef
-	}
-	if result.TargetRef == "" {
-		result.TargetRef = arg.TargetRef
-	}
+	result := defaultMigRepo(m.upsertMigRepo.val, arg.ID, arg.MigID, arg.BaseRef, arg.TargetRef)
 	if m.repoByID == nil {
 		m.repoByID = map[types.RepoID]store.Repo{}
 	}
 	m.repoByID[result.RepoID] = store.Repo{ID: result.RepoID, Url: arg.Url}
-	return result, m.upsertMigRepoErr
+	m.upsertMigRepo.val = result
+	_, err := m.upsertMigRepo.record(arg)
+	return result, err
 }
 
 func (m *migStore) DeleteMigRepo(ctx context.Context, id types.MigRepoID) error {
@@ -311,76 +219,27 @@ func (m *migStore) GetRepo(ctx context.Context, id types.RepoID) (store.Repo, er
 			return repo, nil
 		}
 	}
-	if !id.IsZero() {
-		return store.Repo{ID: id, Url: "https://github.com/user/repo.git"}, nil
-	}
-	return store.Repo{}, pgx.ErrNoRows
+	return defaultRepo(id)
 }
 
 // Run creation methods
 
 func (m *migStore) CreateRun(ctx context.Context, params store.CreateRunParams) (store.Run, error) {
-	m.createRunCalled = true
-	m.createRunParams = params
-
-	err := m.createRunErr
-	if len(m.createRunErrs) > 0 {
-		idx := m.createRunErrCallCount
-		if idx >= len(m.createRunErrs) {
-			idx = len(m.createRunErrs) - 1
-		}
-		m.createRunErrCallCount++
-		err = m.createRunErrs[idx]
+	if len(m.createRun.vals) > 0 || len(m.createRun.errs) > 0 {
+		return m.createRun.record(params)
 	}
-
-	if len(m.createRunResults) > 0 {
-		idx := m.createRunCallCount
-		if idx >= len(m.createRunResults) {
-			idx = len(m.createRunResults) - 1
-		}
-		m.createRunCallCount++
-		return m.createRunResults[idx], err
-	}
-	result := m.createRunResult
-	if result.ID.IsZero() {
-		result.ID = params.ID
-	}
-	if result.MigID.IsZero() {
-		result.MigID = params.MigID
-	}
-	if result.SpecID.IsZero() {
-		result.SpecID = params.SpecID
-	}
-	result.CreatedBy = params.CreatedBy
-	return result, err
+	// No configured result: synthesize per-call from params.
+	m.createRun.called = true
+	m.createRun.params = params
+	m.createRun.n++
+	return defaultRun(store.Run{}, params), nil
 }
 
 func (m *migStore) CreateRunRepo(ctx context.Context, params store.CreateRunRepoParams) (store.RunRepo, error) {
-	m.createRunRepoCalled = true
-	m.createRunRepoParams = params
-	result := m.createRunRepoResult
-	if result.MigID.IsZero() {
-		result.MigID = params.MigID
-	}
-	if result.RunID.IsZero() {
-		result.RunID = params.RunID
-	}
-	if result.RepoID.IsZero() {
-		result.RepoID = params.RepoID
-	}
-	if result.RepoBaseRef == "" {
-		result.RepoBaseRef = params.RepoBaseRef
-	}
-	if result.RepoTargetRef == "" {
-		result.RepoTargetRef = params.RepoTargetRef
-	}
-	if result.Status == "" {
-		result.Status = types.RunRepoStatusQueued
-	}
-	if result.Attempt == 0 {
-		result.Attempt = 1
-	}
-	return result, m.createRunRepoErr
+	result := defaultRunRepo(m.createRunRepo.val, params)
+	m.createRunRepo.val = result
+	_, err := m.createRunRepo.record(params)
+	return result, err
 }
 
 // Run/Job query methods (for archive validation and migs_ticket)
@@ -390,27 +249,20 @@ func (m *migStore) GetRun(ctx context.Context, id types.RunID) (store.Run, error
 }
 
 func (m *migStore) ListRuns(ctx context.Context, params store.ListRunsParams) ([]store.Run, error) {
-	if int(params.Offset) >= len(m.listRunsResult) {
-		return []store.Run{}, m.listRunsErr
-	}
-	end := int(params.Offset) + int(params.Limit)
-	if end > len(m.listRunsResult) {
-		end = len(m.listRunsResult)
-	}
-	return m.listRunsResult[params.Offset:end], m.listRunsErr
+	return listPaged(m.listRuns.val, params.Offset, params.Limit), m.listRuns.err
 }
 
 func (m *migStore) ListJobsByRun(ctx context.Context, runID types.RunID) ([]store.Job, error) {
-	m.listJobsByRunCalled = true
-	return m.listJobsByRunResult, nil
+	m.listJobsByRun.called = true
+	m.listJobsByRun.params = runID
+	return m.listJobsByRun.val, m.listJobsByRun.err
 }
 
 func (m *migStore) CreateJob(ctx context.Context, params store.CreateJobParams) (store.Job, error) {
-	m.createJobCalled = true
-	m.createJobCallCount++
-	m.createJobParams = append(m.createJobParams, params)
-	result := buildCreateJobResult(m.createJobResult, params)
-	return result, m.createJobErr
+	m.createJob.called = true
+	m.createJob.calls = append(m.createJob.calls, params)
+	result := buildCreateJobResult(m.createJob.val, params)
+	return result, m.createJob.err
 }
 
 func (m *migStore) ListArtifactBundlesByRunAndJob(ctx context.Context, arg store.ListArtifactBundlesByRunAndJobParams) ([]store.ArtifactBundle, error) {
