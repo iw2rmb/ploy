@@ -1,4 +1,4 @@
-package server
+package events
 
 import (
 	"context"
@@ -9,10 +9,10 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// newTestEventsService creates an EventsService with sensible test defaults.
-func newTestEventsService(t *testing.T, store store.Store, opts ...func(*EventsOptions)) *EventsService {
+// newTestService creates a Service with sensible test defaults.
+func newTestService(t *testing.T, store store.Store, opts ...func(*Options)) *Service {
 	t.Helper()
-	o := EventsOptions{
+	o := Options{
 		BufferSize:  4,
 		HistorySize: 8,
 		Store:       store,
@@ -20,9 +20,9 @@ func newTestEventsService(t *testing.T, store store.Store, opts ...func(*EventsO
 	for _, fn := range opts {
 		fn(&o)
 	}
-	svc, err := NewEventsService(o)
+	svc, err := NewService(o)
 	if err != nil {
-		t.Fatalf("NewEventsService() error = %v", err)
+		t.Fatalf("NewService() error = %v", err)
 	}
 	return svc
 }

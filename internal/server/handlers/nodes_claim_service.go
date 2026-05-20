@@ -8,7 +8,7 @@ import (
 
 	"github.com/iw2rmb/ploy/internal/blobstore"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	"github.com/iw2rmb/ploy/internal/server"
+	"github.com/iw2rmb/ploy/internal/server/events"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/workflow/lifecycle"
 )
@@ -23,11 +23,11 @@ type ClaimService struct {
 	store         store.Store
 	blobStore     blobstore.Store
 	configHolder  *ConfigHolder
-	eventsService *server.EventsService
+	eventsService *events.Service
 }
 
-func NewClaimService(st store.Store, bs blobstore.Store, configHolder *ConfigHolder, eventsService ...*server.EventsService) *ClaimService {
-	var evtSvc *server.EventsService
+func NewClaimService(st store.Store, bs blobstore.Store, configHolder *ConfigHolder, eventsService ...*events.Service) *ClaimService {
+	var evtSvc *events.Service
 	if len(eventsService) > 0 {
 		evtSvc = eventsService[0]
 	}

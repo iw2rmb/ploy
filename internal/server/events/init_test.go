@@ -1,4 +1,4 @@
-package server
+package events
 
 // This file contains tests for service initialization and lifecycle.
 
@@ -14,12 +14,12 @@ import (
 func TestStorage_New(t *testing.T) {
 	tests := []struct {
 		name    string
-		opts    EventsOptions
+		opts    Options
 		wantErr bool
 	}{
 		{
 			name: "valid options with defaults",
-			opts: EventsOptions{
+			opts: Options{
 				BufferSize:  0,
 				HistorySize: 0,
 			},
@@ -27,7 +27,7 @@ func TestStorage_New(t *testing.T) {
 		},
 		{
 			name: "valid options with explicit values",
-			opts: EventsOptions{
+			opts: Options{
 				BufferSize:  32,
 				HistorySize: 256,
 			},
@@ -35,7 +35,7 @@ func TestStorage_New(t *testing.T) {
 		},
 		{
 			name: "negative buffer size",
-			opts: EventsOptions{
+			opts: Options{
 				BufferSize:  -1,
 				HistorySize: 256,
 			},
@@ -43,7 +43,7 @@ func TestStorage_New(t *testing.T) {
 		},
 		{
 			name: "negative history size",
-			opts: EventsOptions{
+			opts: Options{
 				BufferSize:  32,
 				HistorySize: -1,
 			},
@@ -51,7 +51,7 @@ func TestStorage_New(t *testing.T) {
 		},
 		{
 			name: "negative job cache size",
-			opts: EventsOptions{
+			opts: Options{
 				BufferSize:   32,
 				HistorySize:  256,
 				JobCacheSize: -1,
@@ -62,7 +62,7 @@ func TestStorage_New(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			svc, err := NewEventsService(tt.opts)
+			svc, err := NewService(tt.opts)
 			if tt.wantErr {
 				if err == nil {
 					t.Fatal("expected error, got nil")
@@ -85,7 +85,7 @@ func TestStorage_New(t *testing.T) {
 // TestStorage_ServiceReadyImmediately verifies the service hub is usable
 // immediately after construction without a lifecycle phase.
 func TestStorage_ServiceReadyImmediately(t *testing.T) {
-	svc := newTestEventsService(t, nil)
+	svc := newTestService(t, nil)
 	if svc.Hub() == nil {
 		t.Fatal("expected hub, got nil")
 	}
@@ -94,16 +94,16 @@ func TestStorage_ServiceReadyImmediately(t *testing.T) {
 // TestStorage_WithoutStore verifies that the service correctly returns
 // errors when attempting to persist events without a configured store.
 func TestStorage_WithoutStore(t *testing.T) {
-	svc := newTestEventsService(t, nil)
+	svc := newTestService(t, nil)
 
 	ctx := context.Background()
 
-	// CreateAndPublishEvent without store — should fail (requires DB persistence).
+	// CreateAndPublishEvent without store should fail (requires DB persistence).
 	if _, err := svc.CreateAndPublishEvent(ctx, store.CreateEventParams{}); err == nil {
 		t.Fatal("expected error when store not configured, got nil")
 	}
 
-	// CreateAndPublishLog without store — should NOT fail (SSE fanout only).
+	// CreateAndPublishLog without store should NOT fail (SSE fanout only).
 	if err := svc.CreateAndPublishLog(ctx, store.Log{}, []byte{}); err != nil {
 		t.Fatalf("expected no error for CreateAndPublishLog (SSE-only), got: %v", err)
 	}

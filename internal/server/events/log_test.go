@@ -1,4 +1,4 @@
-package server
+package events
 
 // This file contains tests for log SSE fanout behavior.
 
@@ -56,7 +56,7 @@ func TestStorage_CreateAndPublishLog(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mock := &mockStore{}
-			svc := newTestEventsService(t, mock)
+			svc := newTestService(t, mock)
 
 			ctx := context.Background()
 			if err := svc.CreateAndPublishLog(ctx, tt.log, tt.data); err != nil {

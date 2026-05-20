@@ -9,11 +9,11 @@ import (
 
 	"github.com/iw2rmb/ploy/internal/blobstore"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	"github.com/iw2rmb/ploy/internal/server"
+	"github.com/iw2rmb/ploy/internal/server/events"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-func claimJobHandlerWithEvents(st store.Store, bs blobstore.Store, eventsService *server.EventsService, configHolder *ConfigHolder) http.HandlerFunc {
+func claimJobHandlerWithEvents(st store.Store, bs blobstore.Store, eventsService *events.Service, configHolder *ConfigHolder) http.HandlerFunc {
 	service := NewClaimService(st, bs, configHolder, eventsService)
 
 	return func(w http.ResponseWriter, r *http.Request) {

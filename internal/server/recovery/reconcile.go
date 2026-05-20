@@ -10,7 +10,7 @@ import (
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	migsapi "github.com/iw2rmb/ploy/internal/migs/api"
-	"github.com/iw2rmb/ploy/internal/server"
+	"github.com/iw2rmb/ploy/internal/server/events"
 	"github.com/iw2rmb/ploy/internal/store"
 	logstream "github.com/iw2rmb/ploy/internal/stream"
 	"github.com/iw2rmb/ploy/internal/workflow/lifecycle"
@@ -61,7 +61,7 @@ func MaybeUpdateRunRepoStatus(
 
 // MaybeCompleteRunIfAllReposTerminal transitions runs.status to Finished only when
 // all run_repos are terminal and publishes run/done SSE events.
-func MaybeCompleteRunIfAllReposTerminal(ctx context.Context, st store.Store, eventsService *server.EventsService, run store.Run) (bool, error) {
+func MaybeCompleteRunIfAllReposTerminal(ctx context.Context, st store.Store, eventsService *events.Service, run store.Run) (bool, error) {
 	runID := run.ID
 	if lifecycle.IsTerminalRunStatus(run.Status) {
 		return false, nil

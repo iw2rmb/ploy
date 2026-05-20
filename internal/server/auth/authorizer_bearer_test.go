@@ -234,9 +234,9 @@ func TestAuthorizerBearerToken_RoleExtraction(t *testing.T) {
 		{RoleControlPlane, []Role{RoleControlPlane}, true},
 		{RoleWorker, []Role{RoleWorker}, true},
 		{RoleCLIAdmin, []Role{RoleCLIAdmin}, true},
-		{RoleCLIAdmin, []Role{RoleControlPlane}, true},  // admin can access control-plane
-		{RoleControlPlane, []Role{RoleWorker}, false},    // control-plane cannot access worker
-		{RoleWorker, []Role{RoleCLIAdmin}, false},        // worker cannot access admin
+		{RoleCLIAdmin, []Role{RoleControlPlane}, true}, // admin can access control-plane
+		{RoleControlPlane, []Role{RoleWorker}, false},  // control-plane cannot access worker
+		{RoleWorker, []Role{RoleCLIAdmin}, false},      // worker cannot access admin
 	}
 
 	for _, tt := range tests {

@@ -9,7 +9,7 @@ import (
 	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	migsapi "github.com/iw2rmb/ploy/internal/migs/api"
-	"github.com/iw2rmb/ploy/internal/server"
+	"github.com/iw2rmb/ploy/internal/server/events"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
@@ -28,7 +28,7 @@ import (
 // - Job materialization is deferred to the batch scheduler/start endpoint and gated on prep readiness.
 //
 // This handler replaces the previous POST /v1/migs endpoint for run submission.
-func createSingleRepoRunHandler(st store.Store, eventsService *server.EventsService) http.HandlerFunc {
+func createSingleRepoRunHandler(st store.Store, eventsService *events.Service) http.HandlerFunc {
 	// Spec can be large (JSON blobs), so we allow up to 4 MiB.
 	const maxBodySize = 4 << 20
 	return func(w http.ResponseWriter, r *http.Request) {

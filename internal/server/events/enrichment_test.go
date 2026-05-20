@@ -1,4 +1,4 @@
-package server
+package events
 
 // This file contains tests for log enrichment with job metadata.
 
@@ -58,7 +58,7 @@ func TestStorage_LogStreamPreservesStderr(t *testing.T) {
 
 	runID := domaintypes.NewRunID()
 	jobID := domaintypes.NewJobID()
-	svc := newTestEventsService(t, &mockStore{})
+	svc := newTestService(t, &mockStore{})
 
 	logRow := store.Log{
 		ID:        1,
@@ -138,7 +138,7 @@ func TestStorage_LogEnrichmentWithJobMetadata(t *testing.T) {
 				},
 			}
 
-			svc := newTestEventsService(t, mock)
+			svc := newTestService(t, mock)
 
 			ctx := context.Background()
 			logRow := store.Log{
@@ -204,7 +204,7 @@ func TestStorage_LogEnrichmentWithoutJobID(t *testing.T) {
 		},
 	}
 
-	svc := newTestEventsService(t, mock)
+	svc := newTestService(t, mock)
 
 	ctx := context.Background()
 	logRow := store.Log{
@@ -247,7 +247,7 @@ func TestStorage_LogEnrichmentJobLookupFailure(t *testing.T) {
 		},
 	}
 
-	svc := newTestEventsService(t, mock)
+	svc := newTestService(t, mock)
 
 	ctx := context.Background()
 	logRow := store.Log{
@@ -307,7 +307,7 @@ func TestStorage_LogEnrichmentJobContextCacheEvictsLRU(t *testing.T) {
 		},
 	}
 
-	svc := newTestEventsService(t, mock, func(o *EventsOptions) {
+	svc := newTestService(t, mock, func(o *Options) {
 		o.JobCacheSize = 2
 	})
 

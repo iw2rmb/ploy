@@ -1,4 +1,4 @@
-package server
+package httpserver
 
 import (
 	"context"
@@ -7,8 +7,6 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
-	"runtime"
-	"runtime/debug"
 	"sync"
 	"time"
 
@@ -17,22 +15,22 @@ import (
 )
 
 const (
-	// httpReadHeaderTimeout caps how long the server waits for request headers
+	// readHeaderTimeout caps how long the server waits for request headers
 	// after accepting a connection. Protects against slowloris-style attacks.
-	httpReadHeaderTimeout = 10 * time.Second
+	readHeaderTimeout = 10 * time.Second
 
-	// httpShutdownTimeout bounds the graceful shutdown drain period.
-	httpShutdownTimeout = 10 * time.Second
+	// shutdownTimeout bounds the graceful shutdown drain period.
+	shutdownTimeout = 10 * time.Second
 )
 
-// HTTPOptions configure the HTTP server.
-type HTTPOptions struct {
+// Options configure the HTTP server.
+type Options struct {
 	Config     config.HTTPConfig
 	Authorizer *auth.Authorizer
 }
 
-// HTTPServer manages the main API HTTP server with bearer token authentication.
-type HTTPServer struct {
+// Server manages the main API HTTP server with bearer token authentication.
+type Server struct {
 	mu         sync.Mutex
 	cfg        config.HTTPConfig
 	authorizer *auth.Authorizer
@@ -42,13 +40,13 @@ type HTTPServer struct {
 	mux        *http.ServeMux
 }
 
-// NewHTTPServer constructs a new HTTP server.
-func NewHTTPServer(opts HTTPOptions) (*HTTPServer, error) {
+// NewServer constructs a new HTTP server.
+func NewServer(opts Options) (*Server, error) {
 	if opts.Authorizer == nil {
 		return nil, errors.New("httpserver: authorizer is required")
 	}
 
-	return &HTTPServer{
+	return &Server{
 		cfg:        opts.Config,
 		authorizer: opts.Authorizer,
 		mux:        http.NewServeMux(),
@@ -56,7 +54,7 @@ func NewHTTPServer(opts HTTPOptions) (*HTTPServer, error) {
 }
 
 // Start begins serving HTTP(S) requests.
-func (s *HTTPServer) Start(ctx context.Context) error {
+func (s *Server) Start(ctx context.Context) error {
 	s.mu.Lock()
 	if s.running {
 		s.mu.Unlock()
@@ -71,7 +69,7 @@ func (s *HTTPServer) Start(ctx context.Context) error {
 
 	srv := &http.Server{
 		Handler:           s.mux,
-		ReadHeaderTimeout: httpReadHeaderTimeout,
+		ReadHeaderTimeout: readHeaderTimeout,
 		ReadTimeout:       s.cfg.ReadTimeout,
 		WriteTimeout:      s.cfg.WriteTimeout,
 		IdleTimeout:       s.cfg.IdleTimeout,
@@ -100,7 +98,7 @@ func (s *HTTPServer) Start(ctx context.Context) error {
 }
 
 // Stop gracefully stops the HTTP server.
-func (s *HTTPServer) Stop(ctx context.Context) error {
+func (s *Server) Stop(ctx context.Context) error {
 	s.mu.Lock()
 	if !s.running {
 		s.mu.Unlock()
@@ -114,7 +112,7 @@ func (s *HTTPServer) Stop(ctx context.Context) error {
 	s.mu.Unlock()
 
 	if srv != nil {
-		shutdownCtx, cancel := context.WithTimeout(ctx, httpShutdownTimeout)
+		shutdownCtx, cancel := context.WithTimeout(ctx, shutdownTimeout)
 		defer cancel()
 		if err := srv.Shutdown(shutdownCtx); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			return fmt.Errorf("httpserver: shutdown: %w", err)
@@ -126,7 +124,7 @@ func (s *HTTPServer) Stop(ctx context.Context) error {
 }
 
 // Addr returns the listener address if the server is running.
-func (s *HTTPServer) Addr() string {
+func (s *Server) Addr() string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.listener != nil {
@@ -138,8 +136,8 @@ func (s *HTTPServer) Addr() string {
 // handle is the internal registration method. It applies panic recovery, auth
 // middleware, and optional pre-auth wrappers in the correct order:
 //
-//	panicRecovery → preAuth wrappers → auth → handler
-func (s *HTTPServer) handle(pattern string, handler http.Handler, roles []auth.Role, preAuth ...func(http.Handler) http.Handler) {
+//	panicRecovery -> preAuth wrappers -> auth -> handler
+func (s *Server) handle(pattern string, handler http.Handler, roles []auth.Role, preAuth ...func(http.Handler) http.Handler) {
 	if len(roles) > 0 {
 		handler = s.authorizer.Middleware(roles...)(handler)
 	}
@@ -152,13 +150,13 @@ func (s *HTTPServer) handle(pattern string, handler http.Handler, roles []auth.R
 
 // RegisterRoute registers a handler for the given pattern with optional middleware.
 // The authorizer middleware will be applied if roles are provided.
-func (s *HTTPServer) RegisterRoute(pattern string, handler http.Handler, roles ...auth.Role) {
+func (s *Server) RegisterRoute(pattern string, handler http.Handler, roles ...auth.Role) {
 	s.handle(pattern, handler, roles)
 }
 
 // RegisterRouteFunc registers a handler function for the given pattern with optional middleware.
 // The authorizer middleware will be applied if roles are provided.
-func (s *HTTPServer) RegisterRouteFunc(pattern string, handlerFunc http.HandlerFunc, roles ...auth.Role) {
+func (s *Server) RegisterRouteFunc(pattern string, handlerFunc http.HandlerFunc, roles ...auth.Role) {
 	s.handle(pattern, handlerFunc, roles)
 }
 
@@ -166,20 +164,20 @@ func (s *HTTPServer) RegisterRouteFunc(pattern string, handlerFunc http.HandlerF
 // query parameters for authentication. This is intended for GET endpoints
 // serving downloadable content (logs, diffs, specs) where browser/OSC8
 // links cannot set Authorization headers.
-func (s *HTTPServer) RegisterRouteFuncAllowQueryToken(pattern string, handlerFunc http.HandlerFunc, roles ...auth.Role) {
+func (s *Server) RegisterRouteFuncAllowQueryToken(pattern string, handlerFunc http.HandlerFunc, roles ...auth.Role) {
 	s.handle(pattern, handlerFunc, roles, auth.WithQueryTokenAllowed)
 }
 
 // Handler returns the underlying HTTP handler (ServeMux) used by the server.
 // This is primarily intended for tests that need to exercise the registered
 // routes without starting a real listener.
-func (s *HTTPServer) Handler() http.Handler {
+func (s *Server) Handler() http.Handler {
 	return s.mux
 }
 
 // listen creates a plain TCP listener.
 // TLS termination is handled by the load balancer.
-func (s *HTTPServer) listen(ctx context.Context) (net.Listener, error) {
+func (s *Server) listen(ctx context.Context) (net.Listener, error) {
 	address := s.cfg.Listen
 	if address == "" {
 		address = ":8080"
@@ -187,38 +185,4 @@ func (s *HTTPServer) listen(ctx context.Context) (net.Listener, error) {
 
 	lc := net.ListenConfig{}
 	return lc.Listen(ctx, "tcp", address)
-}
-
-func withPanicRecovery(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		defer func() {
-			if recovered := recover(); recovered != nil {
-				slog.Error("http handler panic recovered",
-					"method", r.Method,
-					"path", r.URL.Path,
-					"panic_type", fmt.Sprintf("%T", recovered),
-					"panic_message", panicMessageSafe(recovered),
-					"stack", string(debug.Stack()),
-				)
-				http.Error(w, "internal server error", http.StatusInternalServerError)
-			}
-		}()
-
-		next.ServeHTTP(w, r)
-	})
-}
-
-func panicMessageSafe(recovered any) (msg string) {
-	switch v := recovered.(type) {
-	case string:
-		return v
-	case runtime.Error:
-		return "runtime panic"
-	case error:
-		// Avoid calling Error() in panic-recovery logging path; panicking Error()
-		// implementations should be fixed at source.
-		return fmt.Sprintf("%T", v)
-	default:
-		return fmt.Sprintf("%T", recovered)
-	}
 }

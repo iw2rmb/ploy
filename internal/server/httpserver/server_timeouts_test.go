@@ -1,4 +1,4 @@
-package server
+package httpserver
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/server/config"
 )
 
-func TestHTTPServer_Timeouts(t *testing.T) {
+func TestServer_Timeouts(t *testing.T) {
 	tests := []struct {
 		name         string
 		readTimeout  time.Duration
@@ -38,8 +38,8 @@ func TestHTTPServer_Timeouts(t *testing.T) {
 			httpSrv := srv.httpServer
 			srv.mu.Unlock()
 
-			if httpSrv.ReadHeaderTimeout != httpReadHeaderTimeout {
-				t.Errorf("ReadHeaderTimeout = %v, want %v", httpSrv.ReadHeaderTimeout, httpReadHeaderTimeout)
+			if httpSrv.ReadHeaderTimeout != readHeaderTimeout {
+				t.Errorf("ReadHeaderTimeout = %v, want %v", httpSrv.ReadHeaderTimeout, readHeaderTimeout)
 			}
 			if httpSrv.ReadTimeout != tt.readTimeout {
 				t.Errorf("ReadTimeout = %v, want %v", httpSrv.ReadTimeout, tt.readTimeout)

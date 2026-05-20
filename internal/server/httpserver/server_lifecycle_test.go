@@ -1,4 +1,4 @@
-package server
+package httpserver
 
 import (
 	"context"
@@ -8,26 +8,26 @@ import (
 	"time"
 )
 
-func TestNewHTTPServer(t *testing.T) {
+func TestNewServer(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		srv := newTestServer(t)
 		if srv == nil {
-			t.Fatal("NewHTTPServer() returned nil server")
+			t.Fatal("NewServer() returned nil server")
 		}
 	})
 
 	t.Run("error_missing_authorizer", func(t *testing.T) {
-		srv, err := NewHTTPServer(HTTPOptions{})
+		srv, err := NewServer(Options{})
 		if err == nil {
-			t.Fatal("NewHTTPServer() expected error for missing authorizer")
+			t.Fatal("NewServer() expected error for missing authorizer")
 		}
 		if srv != nil {
-			t.Error("NewHTTPServer() should return nil server on error")
+			t.Error("NewServer() should return nil server on error")
 		}
 	})
 }
 
-func TestHTTPServer_StartStop(t *testing.T) {
+func TestServer_StartStop(t *testing.T) {
 	t.Run("plain_http", func(t *testing.T) {
 		srv := newTestServer(t)
 		ctx := context.Background()
@@ -66,7 +66,7 @@ func TestHTTPServer_StartStop(t *testing.T) {
 	})
 }
 
-func TestHTTPServer_GracefulShutdown(t *testing.T) {
+func TestServer_GracefulShutdown(t *testing.T) {
 	srv := newTestServer(t)
 
 	srv.RegisterRouteFunc("/slow", func(w http.ResponseWriter, r *http.Request) {

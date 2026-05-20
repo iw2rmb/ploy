@@ -10,12 +10,12 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	"github.com/iw2rmb/ploy/internal/server"
+	"github.com/iw2rmb/ploy/internal/server/events"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
 // createNodeEventsHandler appends structured events/log frames to DB with SSE fanout.
-func createNodeEventsHandler(st store.Store, eventsService *server.EventsService) http.HandlerFunc {
+func createNodeEventsHandler(st store.Store, eventsService *events.Service) http.HandlerFunc {
 	const maxRequestSize = 1 << 20 // 1 MiB
 	return func(w http.ResponseWriter, r *http.Request) {
 		nodeID, ok := parseRequiredPathIDOrWriteError[domaintypes.NodeID](w, r, "id")
