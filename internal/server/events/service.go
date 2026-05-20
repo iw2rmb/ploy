@@ -1,27 +1,22 @@
-package server
+package events
 
 import (
-	"container/list"
 	"context"
 	"errors"
 	"fmt"
 	"log/slog"
-	"strings"
-	"sync"
-	"time"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/logchunk"
 	migsapi "github.com/iw2rmb/ploy/internal/migs/api"
 	"github.com/iw2rmb/ploy/internal/store"
 	logstream "github.com/iw2rmb/ploy/internal/stream"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const defaultEventsJobCacheSize = 4096
+const defaultJobCacheSize = 4096
 
-// EventsOptions configures the events service.
-type EventsOptions struct {
+// Options configures the events service.
+type Options struct {
 	// BufferSize controls the per-subscriber channel size.
 	BufferSize int
 	// HistorySize bounds the number of events retained for resumption.
@@ -35,83 +30,17 @@ type EventsOptions struct {
 	Store store.Store
 }
 
-// EventsService wraps the logstream hub for server-side event streaming
+// Service wraps the logstream hub for server-side event streaming
 // and coordinates database persistence with SSE fanout.
-type EventsService struct {
+type Service struct {
 	hub      *logstream.Hub
 	store    store.Store
 	logger   *slog.Logger
-	jobCache *eventsJobContextCache
+	jobCache *jobContextCache
 }
 
-type jobContextCacheEntry struct {
-	jobID domaintypes.JobID
-	ctx   eventsJobContext
-}
-
-type eventsJobContextCache struct {
-	mu         sync.Mutex
-	maxEntries int
-	entries    map[domaintypes.JobID]*list.Element
-	lru        *list.List
-}
-
-func newEventsJobContextCache(maxEntries int) *eventsJobContextCache {
-	return &eventsJobContextCache{
-		maxEntries: maxEntries,
-		entries:    make(map[domaintypes.JobID]*list.Element, maxEntries),
-		lru:        list.New(),
-	}
-}
-
-func (c *eventsJobContextCache) Get(jobID domaintypes.JobID) (eventsJobContext, bool) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	elem, ok := c.entries[jobID]
-	if !ok {
-		return eventsJobContext{}, false
-	}
-
-	c.lru.MoveToFront(elem)
-	entry := elem.Value.(jobContextCacheEntry)
-	return entry.ctx, true
-}
-
-func (c *eventsJobContextCache) Set(jobID domaintypes.JobID, ctx eventsJobContext) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	if elem, ok := c.entries[jobID]; ok {
-		elem.Value = jobContextCacheEntry{
-			jobID: jobID,
-			ctx:   ctx,
-		}
-		c.lru.MoveToFront(elem)
-		return
-	}
-
-	elem := c.lru.PushFront(jobContextCacheEntry{
-		jobID: jobID,
-		ctx:   ctx,
-	})
-	c.entries[jobID] = elem
-
-	if c.lru.Len() <= c.maxEntries {
-		return
-	}
-
-	last := c.lru.Back()
-	if last == nil {
-		return
-	}
-	evicted := last.Value.(jobContextCacheEntry)
-	delete(c.entries, evicted.jobID)
-	c.lru.Remove(last)
-}
-
-// NewEventsService constructs a new events service.
-func NewEventsService(opts EventsOptions) (*EventsService, error) {
+// NewService constructs a new events service.
+func NewService(opts Options) (*Service, error) {
 	if opts.BufferSize < 0 {
 		return nil, errors.New("events: buffer size must be non-negative")
 	}
@@ -123,7 +52,7 @@ func NewEventsService(opts EventsOptions) (*EventsService, error) {
 	}
 	jobCacheSize := opts.JobCacheSize
 	if jobCacheSize == 0 {
-		jobCacheSize = defaultEventsJobCacheSize
+		jobCacheSize = defaultJobCacheSize
 	}
 
 	logger := opts.Logger
@@ -136,16 +65,16 @@ func NewEventsService(opts EventsOptions) (*EventsService, error) {
 		HistorySize: opts.HistorySize,
 	})
 
-	return &EventsService{
+	return &Service{
 		hub:      hub,
 		store:    opts.Store,
 		logger:   logger,
-		jobCache: newEventsJobContextCache(jobCacheSize),
+		jobCache: newJobContextCache(jobCacheSize),
 	}, nil
 }
 
 // Hub returns the underlying logstream hub.
-func (s *EventsService) Hub() *logstream.Hub {
+func (s *Service) Hub() *logstream.Hub {
 	return s.hub
 }
 
@@ -155,7 +84,7 @@ func (s *EventsService) Hub() *logstream.Hub {
 // is returned; SSE fanout errors are logged but do not fail the operation.
 //
 // params.RunID is a KSUID-backed RunID; normalized for hub operations.
-func (s *EventsService) CreateAndPublishEvent(ctx context.Context, params store.CreateEventParams) (store.Event, error) {
+func (s *Service) CreateAndPublishEvent(ctx context.Context, params store.CreateEventParams) (store.Event, error) {
 	if s.store == nil {
 		return store.Event{}, errors.New("events: store not configured")
 	}
@@ -192,7 +121,7 @@ func (s *EventsService) CreateAndPublishEvent(ctx context.Context, params store.
 // frames and published to the job stream keyed by JobID.
 //
 // If the log has no JobID, SSE fanout is skipped (job-stream requires a job key).
-func (s *EventsService) CreateAndPublishLog(ctx context.Context, log store.Log, data []byte) error {
+func (s *Service) CreateAndPublishLog(ctx context.Context, log store.Log, data []byte) error {
 	if log.JobID == nil || log.JobID.IsZero() {
 		s.logger.Debug("log has no job_id, skipping job-stream SSE fanout", "log_id", log.ID)
 		return nil
@@ -210,11 +139,11 @@ func (s *EventsService) CreateAndPublishLog(ctx context.Context, log store.Log, 
 // to the SSE hub. The runID (KSUID-backed RunID) is used as the streamID for SSE fanout.
 //
 // The payload is intentionally typed as migsapi.RunSummary to enforce a
-// JSON‑serializable contract at the service boundary and prevent accidental
-// non‑JSON payloads from being published. Callers should also emit a terminal
+// JSON-serializable contract at the service boundary and prevent accidental
+// non-JSON payloads from being published. Callers should also emit a terminal
 // "done" status via Hub().PublishStatus when the run reaches a terminal state
 // so SSE clients can terminate streams cleanly. Returns an error if the fanout fails.
-func (s *EventsService) PublishRun(ctx context.Context, runID domaintypes.RunID, payload migsapi.RunSummary) error {
+func (s *Service) PublishRun(ctx context.Context, runID domaintypes.RunID, payload migsapi.RunSummary) error {
 	if runID.IsZero() {
 		return logstream.ErrInvalidRunID
 	}
@@ -228,7 +157,7 @@ func (s *EventsService) PublishRun(ctx context.Context, runID domaintypes.RunID,
 // publishEventToHub converts a database event to a stage event and publishes it
 // to the run-keyed stream. Stage events carry node progress messages (e.g.
 // "step started", "gate passed") and are distinct from container log frames.
-func (s *EventsService) publishEventToHub(ctx context.Context, runID domaintypes.RunID, event store.Event) error {
+func (s *Service) publishEventToHub(ctx context.Context, runID domaintypes.RunID, event store.Event) error {
 	record := logstream.LogRecord{
 		Timestamp: timestampToString(event.Time),
 		Stream:    event.Level,
@@ -242,7 +171,7 @@ func (s *EventsService) publishEventToHub(ctx context.Context, runID domaintypes
 // them to the job-keyed stream. It enriches each LogRecord with execution
 // context (node_id, job_id, job_type) by looking up the associated job
 // metadata when available.
-func (s *EventsService) publishLogToJobStream(ctx context.Context, jobID domaintypes.JobID, log store.Log, data []byte) error {
+func (s *Service) publishLogToJobStream(ctx context.Context, jobID domaintypes.JobID, log store.Log, data []byte) error {
 	ts := timestampToString(log.CreatedAt)
 
 	// Fetch job metadata to enrich log records with execution context.
@@ -281,7 +210,7 @@ func (s *EventsService) publishLogToJobStream(ctx context.Context, jobID domaint
 // PublishJobRetention emits a retention hint on the job-keyed stream,
 // informing SSE clients about log retention metadata for the job.
 // Returns ErrInvalidJobID if the job ID is blank.
-func (s *EventsService) PublishJobRetention(ctx context.Context, jobID domaintypes.JobID, hint logstream.RetentionHint) error {
+func (s *Service) PublishJobRetention(ctx context.Context, jobID domaintypes.JobID, hint logstream.RetentionHint) error {
 	if jobID.IsZero() {
 		return logstream.ErrInvalidJobID
 	}
@@ -291,105 +220,9 @@ func (s *EventsService) PublishJobRetention(ctx context.Context, jobID domaintyp
 // PublishJobDone emits a terminal done sentinel on the job-keyed stream,
 // signaling to SSE clients that the job has completed and the stream
 // will close. Returns ErrInvalidJobID if the job ID is blank.
-func (s *EventsService) PublishJobDone(ctx context.Context, jobID domaintypes.JobID, status string) error {
+func (s *Service) PublishJobDone(ctx context.Context, jobID domaintypes.JobID, status string) error {
 	if jobID.IsZero() {
 		return logstream.ErrInvalidJobID
 	}
 	return s.hub.PublishJobStatus(ctx, jobID, logstream.Status{Status: status})
-}
-
-// eventsJobContext holds execution context extracted from job metadata.
-// Used to enrich log records with node and mig information.
-// Uses domain types to preserve type safety end-to-end without lossy casts.
-type eventsJobContext struct {
-	NodeID  domaintypes.NodeID
-	JobID   domaintypes.JobID
-	JobType domaintypes.JobType
-}
-
-// loadJobContext fetches job metadata for a given job ID and extracts
-// fields needed to enrich log records. Returns an empty context if the
-// job ID is nil/empty or the lookup fails (logs are still published without
-// enrichment in these cases).
-func (s *EventsService) loadJobContext(ctx context.Context, jobID *domaintypes.JobID) eventsJobContext {
-	// If job ID is nil or empty, return empty context.
-	if jobID == nil || jobID.IsZero() {
-		return eventsJobContext{}
-	}
-
-	// Check cache first to avoid redundant DB lookups during log bursts.
-	if cached, ok := s.jobCache.Get(*jobID); ok {
-		return cached
-	}
-
-	// If store is not configured, return empty context (log-only mode).
-	if s.store == nil {
-		return eventsJobContext{}
-	}
-
-	job, err := s.store.GetJob(ctx, *jobID)
-	if err != nil {
-		// Log lookup failure but don't block log publishing.
-		s.logger.Debug("job lookup failed for log enrichment",
-			"job_id", jobID.String(),
-			"error", err)
-		return eventsJobContext{}
-	}
-
-	// Normalize and validate job metadata before enrichment.
-	//
-	// job.ID/job.NodeID are typed IDs; job.JobType must satisfy JobType.Validate().
-	//
-	// Invalid values are omitted from enrichment to keep the emitted SSE payload
-	// contract strict.
-
-	jid := job.ID
-
-	var nid domaintypes.NodeID
-	if job.NodeID != nil && !job.NodeID.IsZero() {
-		nid = *job.NodeID
-	}
-
-	mt := domaintypes.JobType(domaintypes.Normalize(job.JobType.String()))
-	if !mt.IsZero() {
-		if err := mt.Validate(); err != nil {
-			s.logger.Debug("invalid job_type for log enrichment",
-				"job_id", job.ID.String(),
-				"job_type", job.JobType,
-				"error", err,
-			)
-			mt = ""
-		}
-	}
-
-	jctx := eventsJobContext{
-		NodeID:  nid,
-		JobID:   jid,
-		JobType: mt,
-	}
-	s.jobCache.Set(*jobID, jctx)
-	return jctx
-}
-
-// timestampToString converts a pgtype.Timestamptz to RFC3339 string.
-// Returns empty string if the timestamp is invalid or null.
-func timestampToString(ts pgtype.Timestamptz) string {
-	if !ts.Valid {
-		return ""
-	}
-	return ts.Time.Format(time.RFC3339)
-}
-
-// normalizeEventLevel canonicalizes and validates event level using domain LogLevel.
-// It maps unknown or empty values to "info" to keep storage/SSE streams consistent.
-func normalizeEventLevel(level string) string {
-	s := strings.ToLower(domaintypes.Normalize(level))
-	if domaintypes.IsEmpty(s) {
-		return domaintypes.LogLevelInfo.String()
-	}
-	l := domaintypes.LogLevel(s)
-	if err := l.Validate(); err != nil {
-		return domaintypes.LogLevelInfo.String()
-	}
-	return l.String()
 }

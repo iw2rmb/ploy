@@ -11,7 +11,7 @@ import (
 	"time"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	"github.com/iw2rmb/ploy/internal/server"
+	"github.com/iw2rmb/ploy/internal/server/events"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/testutil/workflowkit/ids"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -323,7 +323,7 @@ func TestStaleJobRecoveryTask_Run_EmitsTerminalSSEOnlyOncePerRun(t *testing.T) {
 		},
 	}
 
-	eventsService, err := server.NewEventsService(server.EventsOptions{
+	eventsService, err := events.NewService(events.Options{
 		BufferSize:  10,
 		HistorySize: 20,
 	})

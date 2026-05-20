@@ -1,4 +1,4 @@
-package server
+package httpserver
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/server/auth"
 )
 
-func TestHTTPServer_RegisterRouteFunc(t *testing.T) {
+func TestServer_RegisterRouteFunc(t *testing.T) {
 	t.Run("without_middleware", func(t *testing.T) {
 		srv := newTestServer(t)
 		srv.RegisterRouteFunc("/test", func(w http.ResponseWriter, r *http.Request) {
@@ -59,7 +59,7 @@ func TestHTTPServer_RegisterRouteFunc(t *testing.T) {
 	})
 }
 
-func TestHTTPServer_RegisterRoute(t *testing.T) {
+func TestServer_RegisterRoute(t *testing.T) {
 	srv := newTestServer(t)
 	srv.RegisterRoute("/test", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -83,7 +83,7 @@ func TestHTTPServer_RegisterRoute(t *testing.T) {
 	}
 }
 
-func TestHTTPServer_RecoversHandlerPanic(t *testing.T) {
+func TestServer_RecoversHandlerPanic(t *testing.T) {
 	srv := newTestServer(t)
 	srv.RegisterRouteFunc("/panic", func(w http.ResponseWriter, r *http.Request) {
 		panic("boom")
@@ -126,7 +126,7 @@ func (panicErr) Error() string {
 	panic("panic while formatting error")
 }
 
-func TestHTTPServer_RecoversPanicWithBrokenError(t *testing.T) {
+func TestServer_RecoversPanicWithBrokenError(t *testing.T) {
 	srv := newTestServer(t)
 	srv.RegisterRouteFunc("/panic-error", func(w http.ResponseWriter, r *http.Request) {
 		panic(panicErr{})

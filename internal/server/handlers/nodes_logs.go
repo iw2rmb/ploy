@@ -5,8 +5,8 @@ import (
 	"net/http"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	"github.com/iw2rmb/ploy/internal/server"
 	"github.com/iw2rmb/ploy/internal/server/blobpersist"
+	"github.com/iw2rmb/ploy/internal/server/events"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -21,7 +21,7 @@ type nodeLogCreateResponse struct {
 //
 // The blobpersist service handles database metadata and object storage writes.
 // The events service handles SSE fanout.
-func createNodeLogsHandler(st store.Store, bp *blobpersist.Service, eventsService *server.EventsService) http.HandlerFunc {
+func createNodeLogsHandler(st store.Store, bp *blobpersist.Service, eventsService *events.Service) http.HandlerFunc {
 	requireBlobPersist("createNodeLogsHandler", bp)
 	requireEventsService("createNodeLogsHandler", eventsService)
 	return func(w http.ResponseWriter, r *http.Request) {

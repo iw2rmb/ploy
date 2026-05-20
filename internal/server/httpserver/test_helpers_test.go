@@ -1,4 +1,4 @@
-package server
+package httpserver
 
 import (
 	"testing"
@@ -7,8 +7,8 @@ import (
 	"github.com/iw2rmb/ploy/internal/server/config"
 )
 
-// newTestServer creates an HTTPServer with insecure auth on an OS-assigned port.
-func newTestServer(t *testing.T, cfg ...config.HTTPConfig) *HTTPServer {
+// newTestServer creates an Server with insecure auth on an OS-assigned port.
+func newTestServer(t *testing.T, cfg ...config.HTTPConfig) *Server {
 	t.Helper()
 	authorizer := auth.NewAuthorizer(auth.Options{
 		AllowInsecure: true,
@@ -20,12 +20,12 @@ func newTestServer(t *testing.T, cfg ...config.HTTPConfig) *HTTPServer {
 	} else {
 		httpCfg = config.HTTPConfig{Listen: "127.0.0.1:0"}
 	}
-	srv, err := NewHTTPServer(HTTPOptions{
+	srv, err := NewServer(Options{
 		Config:     httpCfg,
 		Authorizer: authorizer,
 	})
 	if err != nil {
-		t.Fatalf("NewHTTPServer() error = %v", err)
+		t.Fatalf("NewServer() error = %v", err)
 	}
 	return srv
 }

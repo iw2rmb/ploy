@@ -1,4 +1,4 @@
-package server
+package httpserver
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/server/config"
 )
 
-func TestHTTPServer_Addr(t *testing.T) {
+func TestServer_Addr(t *testing.T) {
 	t.Run("before_start", func(t *testing.T) {
 		srv := newTestServer(t, config.HTTPConfig{Listen: ":8443"})
 		if addr := srv.Addr(); addr != ":8443" {

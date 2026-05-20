@@ -17,10 +17,11 @@ import (
 	"gopkg.in/yaml.v3"
 
 	bsmock "github.com/iw2rmb/ploy/internal/blobstore/mock"
-	"github.com/iw2rmb/ploy/internal/server"
 	"github.com/iw2rmb/ploy/internal/server/auth"
 	"github.com/iw2rmb/ploy/internal/server/blobpersist"
 	"github.com/iw2rmb/ploy/internal/server/config"
+	"github.com/iw2rmb/ploy/internal/server/events"
+	"github.com/iw2rmb/ploy/internal/server/httpserver"
 )
 
 // TestRegisterRoutesMatchesOpenAPI verifies that all endpoints documented in
@@ -46,13 +47,13 @@ func TestRegisterRoutesMatchesOpenAPI(t *testing.T) {
 
 	// Prepare a test server instance with insecure authorizer so requests
 	// do not require mTLS. We'll exercise three roles to cover all routes.
-	newServer := func(defaultRole auth.Role) (*server.HTTPServer, *server.EventsService) {
+	newServer := func(defaultRole auth.Role) (*httpserver.Server, *events.Service) {
 		authz := auth.NewAuthorizer(auth.Options{AllowInsecure: true, DefaultRole: defaultRole})
-		srv, err := server.NewHTTPServer(server.HTTPOptions{Authorizer: authz})
+		srv, err := httpserver.NewServer(httpserver.Options{Authorizer: authz})
 		if err != nil {
 			t.Fatalf("http server: %v", err)
 		}
-		ev, err := server.NewEventsService(server.EventsOptions{})
+		ev, err := events.NewService(events.Options{})
 		if err != nil {
 			t.Fatalf("events: %v", err)
 		}
@@ -70,7 +71,7 @@ func TestRegisterRoutesMatchesOpenAPI(t *testing.T) {
 	srvAdmin, _ := newServer(auth.RoleCLIAdmin)
 
 	// Helper to probe an endpoint against one server.
-	probe := func(srv *server.HTTPServer, method, path string) int {
+	probe := func(srv *httpserver.Server, method, path string) int {
 		// Replace templated vars with sample values.
 		sample := path
 		sample = strings.ReplaceAll(sample, "{id}", uuid.New().String())

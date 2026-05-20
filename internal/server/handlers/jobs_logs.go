@@ -8,8 +8,8 @@ import (
 
 	"github.com/iw2rmb/ploy/internal/blobstore"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	"github.com/iw2rmb/ploy/internal/server"
 	"github.com/iw2rmb/ploy/internal/server/blobpersist"
+	"github.com/iw2rmb/ploy/internal/server/events"
 	"github.com/iw2rmb/ploy/internal/store"
 	logstream "github.com/iw2rmb/ploy/internal/stream"
 )
@@ -23,7 +23,7 @@ import (
 // For fresh connections (sinceID == 0), the handler backfills historical logs
 // from the database and object store, then subscribes to the job stream.
 // For terminal jobs, the handler writes a done sentinel after backfill.
-func getJobLogsHandler(st store.Store, bs blobstore.Store, eventsService *server.EventsService) http.HandlerFunc {
+func getJobLogsHandler(st store.Store, bs blobstore.Store, eventsService *events.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		jobID, ok := parseRequiredPathIDOrWriteError[domaintypes.JobID](w, r, "job_id")
 		if !ok {
@@ -78,7 +78,7 @@ func getJobLogsHandler(st store.Store, bs blobstore.Store, eventsService *server
 // createJobLogsHandler handles POST /v1/jobs/{job_id}/logs for receiving gzipped
 // log chunks scoped to a specific job. Resolves run context from the job row and
 // reuses the same chunk validation and persistence semantics as other log endpoints.
-func createJobLogsHandler(st store.Store, bp *blobpersist.Service, eventsService *server.EventsService) http.HandlerFunc {
+func createJobLogsHandler(st store.Store, bp *blobpersist.Service, eventsService *events.Service) http.HandlerFunc {
 	requireBlobPersist("createJobLogsHandler", bp)
 	requireEventsService("createJobLogsHandler", eventsService)
 	return func(w http.ResponseWriter, r *http.Request) {

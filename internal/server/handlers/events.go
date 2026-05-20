@@ -15,7 +15,7 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/logchunk"
 	"github.com/iw2rmb/ploy/internal/migs/api"
-	"github.com/iw2rmb/ploy/internal/server"
+	"github.com/iw2rmb/ploy/internal/server/events"
 	"github.com/iw2rmb/ploy/internal/store"
 	logstream "github.com/iw2rmb/ploy/internal/stream"
 	"github.com/iw2rmb/ploy/internal/workflow/lifecycle"
@@ -56,7 +56,7 @@ func parseLastEventID(header string) domaintypes.EventID {
 //
 // For terminal runs, the handler writes a "done" sentinel immediately.
 // For active runs, the handler subscribes to the hub for live lifecycle events.
-func getRunLogsHandler(st store.Store, _ blobstore.Store, eventsService *server.EventsService) http.HandlerFunc {
+func getRunLogsHandler(st store.Store, _ blobstore.Store, eventsService *events.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		runID, ok := parseRequiredPathIDOrWriteError[domaintypes.RunID](w, r, "run_id")
 		if !ok {
@@ -338,7 +338,7 @@ func timestampToString(ts pgtype.Timestamptz) string {
 //
 // Container log frames are not emitted on this stream (logs moved to job-scoped
 // streams). Only run, stage, and done events are returned.
-func getRunRepoLogsHandler(st store.Store, _ blobstore.Store, eventsService *server.EventsService) http.HandlerFunc {
+func getRunRepoLogsHandler(st store.Store, _ blobstore.Store, eventsService *events.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		runID, ok := parseRequiredPathIDOrWriteError[domaintypes.RunID](w, r, "run_id")
 		if !ok {

@@ -1,4 +1,4 @@
-package server_test
+package metrics_test
 
 import (
 	"context"
@@ -6,11 +6,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/iw2rmb/ploy/internal/server"
+	"github.com/iw2rmb/ploy/internal/server/metrics"
 )
 
 func TestServerStartStop(t *testing.T) {
-	srv := server.NewMetricsServer("127.0.0.1:0")
+	srv := metrics.NewServer("127.0.0.1:0")
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	if err := srv.Start(ctx); err != nil {
@@ -27,7 +27,7 @@ func TestServerStartStop(t *testing.T) {
 }
 
 func TestServerStopTimeout(t *testing.T) {
-	srv := server.NewMetricsServer("127.0.0.1:0")
+	srv := metrics.NewServer("127.0.0.1:0")
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	if err := srv.Start(ctx); err != nil {

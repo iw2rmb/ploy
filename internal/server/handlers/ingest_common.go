@@ -18,8 +18,8 @@ import (
 
 	"github.com/iw2rmb/ploy/internal/blobstore"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	"github.com/iw2rmb/ploy/internal/server"
 	"github.com/iw2rmb/ploy/internal/server/blobpersist"
+	"github.com/iw2rmb/ploy/internal/server/events"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/workflow/lifecycle"
 )
@@ -115,7 +115,7 @@ func requireBlobPersist(caller string, bp *blobpersist.Service) {
 	}
 }
 
-func requireEventsService(caller string, eventsService *server.EventsService) {
+func requireEventsService(caller string, eventsService *events.Service) {
 	if eventsService == nil {
 		panic(caller + ": eventsService is required")
 	}

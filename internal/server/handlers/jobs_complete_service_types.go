@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	"github.com/iw2rmb/ploy/internal/server"
 	"github.com/iw2rmb/ploy/internal/server/blobpersist"
+	"github.com/iw2rmb/ploy/internal/server/events"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -26,7 +26,7 @@ type CompleteJobResult struct{}
 // CompleteJobService orchestrates job completion workflow.
 type CompleteJobService struct {
 	store         store.Store
-	eventsService *server.EventsService
+	eventsService *events.Service
 	blobpersist   *blobpersist.Service
 }
 
@@ -48,7 +48,7 @@ func routeCompleteJobServiceType(jobType domaintypes.JobType) (completeJobServic
 	}
 }
 
-func NewCompleteJobService(st store.Store, eventsService *server.EventsService, bp *blobpersist.Service) *CompleteJobService {
+func NewCompleteJobService(st store.Store, eventsService *events.Service, bp *blobpersist.Service) *CompleteJobService {
 	return &CompleteJobService{
 		store:         st,
 		eventsService: eventsService,

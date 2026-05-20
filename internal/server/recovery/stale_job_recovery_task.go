@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/iw2rmb/ploy/internal/server"
+	"github.com/iw2rmb/ploy/internal/server/events"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -22,7 +22,7 @@ var ErrNilStore = errors.New("stale-job-recovery: store is required")
 // Options configures stale running-job recovery task behavior.
 type Options struct {
 	Store          store.Store
-	EventsService  *server.EventsService
+	EventsService  *events.Service
 	Interval       time.Duration
 	NodeStaleAfter time.Duration
 	Logger         *slog.Logger
@@ -31,7 +31,7 @@ type Options struct {
 // StaleJobRecoveryTask scans for stale Running jobs and reconciles repo/run state.
 type StaleJobRecoveryTask struct {
 	store          store.Store
-	eventsService  *server.EventsService
+	eventsService  *events.Service
 	interval       time.Duration
 	nodeStaleAfter time.Duration
 	logger         *slog.Logger

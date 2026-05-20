@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/iw2rmb/ploy/internal/server"
 	"github.com/iw2rmb/ploy/internal/server/auth"
 	"github.com/iw2rmb/ploy/internal/server/config"
+	"github.com/iw2rmb/ploy/internal/server/httpserver"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -49,12 +49,12 @@ func TestServerStartStop_InsecureMode(t *testing.T) {
 	httpCfg := config.HTTPConfig{
 		Listen: "127.0.0.1:0", // Use port 0 to let OS assign a free port.
 	}
-	httpSrv, err := server.NewHTTPServer(server.HTTPOptions{
+	httpSrv, err := httpserver.NewServer(httpserver.Options{
 		Config:     httpCfg,
 		Authorizer: authorizer,
 	})
 	if err != nil {
-		t.Fatalf("server.NewHTTPServer() failed: %v", err)
+		t.Fatalf("httpserver.NewServer() failed: %v", err)
 	}
 
 	// Register a simple health handler to verify the server is responding.

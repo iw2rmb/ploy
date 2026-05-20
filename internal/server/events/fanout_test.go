@@ -1,4 +1,4 @@
-package server
+package events
 
 import (
 	"context"
@@ -20,7 +20,7 @@ func TestFanout_LogsGoToJobStreamOnly(t *testing.T) {
 	runID := domaintypes.NewRunID()
 	jobID := domaintypes.NewJobID()
 
-	svc := newTestEventsService(t, &mockStore{})
+	svc := newTestService(t, &mockStore{})
 
 	ctx := context.Background()
 	logRow := store.Log{
@@ -70,7 +70,7 @@ func TestFanout_EventsGoToRunStreamAsStage(t *testing.T) {
 			}, nil
 		},
 	}
-	svc := newTestEventsService(t, mock)
+	svc := newTestService(t, mock)
 
 	ctx := context.Background()
 	_, err := svc.CreateAndPublishEvent(ctx, store.CreateEventParams{
@@ -106,7 +106,7 @@ func TestFanout_NilJobIDSkipsFanout(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
-	svc := newTestEventsService(t, nil)
+	svc := newTestService(t, nil)
 
 	ctx := context.Background()
 	logRow := store.Log{
@@ -132,7 +132,7 @@ func TestFanout_JobDoneSentinelClosesStream(t *testing.T) {
 	t.Parallel()
 
 	jobID := domaintypes.NewJobID()
-	svc := newTestEventsService(t, nil)
+	svc := newTestService(t, nil)
 
 	ctx := context.Background()
 
