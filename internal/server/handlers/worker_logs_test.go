@@ -4,11 +4,8 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
-	"net/http/httptest"
-	"strings"
 	"testing"
 
 	"github.com/jackc/pgx/v5"
@@ -19,136 +16,68 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
+// mustGzip returns the gzip-encoded bytes of data; fails the test on error.
+func mustGzip(t *testing.T, data []byte) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	gz := gzip.NewWriter(&buf)
+	if _, err := gz.Write(data); err != nil {
+		t.Fatalf("gzip write: %v", err)
+	}
+	if err := gz.Close(); err != nil {
+		t.Fatalf("gzip close: %v", err)
+	}
+	return buf.Bytes()
+}
+
+func newNodeLogsHandler(t *testing.T, mockStore *mockStoreForLogs) http.HandlerFunc {
+	t.Helper()
+	eventsService, err := createTestEventsServiceWithStore(mockStore)
+	if err != nil {
+		t.Fatalf("events service: %v", err)
+	}
+	bp := blobpersist.New(mockStore, bsmock.New())
+	return createNodeLogsHandler(mockStore, bp, eventsService)
+}
+
+// TestCreateNodeLogsHandler_Success covers the happy path and asserts that
+// the store recorded the create call.
 func TestCreateNodeLogsHandler_Success(t *testing.T) {
 	t.Parallel()
 
-	// Create mock store.
-	mockStore := &mockStoreForLogs{
-		nodeExists: true,
-	}
+	mockStore := &mockStoreForLogs{nodeExists: true}
+	handler := newNodeLogsHandler(t, mockStore)
 
-	// Create events service with the mock store — required for log ingestion.
-	eventsService, err := createTestEventsServiceWithStore(mockStore)
-	if err != nil {
-		t.Fatalf("failed to create events service: %v", err)
-	}
-
-	bp := blobpersist.New(mockStore, bsmock.New())
-	handler := createNodeLogsHandler(mockStore, bp, eventsService)
-
-	// Prepare gzipped test data.
-	var buf bytes.Buffer
-	gzWriter := gzip.NewWriter(&buf)
-	if _, err = gzWriter.Write([]byte("test log line\n")); err != nil {
-		t.Fatalf("gzip write failed: %v", err)
-	}
-	if err = gzWriter.Close(); err != nil {
-		t.Fatalf("gzip close failed: %v", err)
-	}
-	gzippedData := buf.Bytes()
-
-	// Prepare request payload.
-	runID := domaintypes.NewRunID()
-	jobID := domaintypes.NewJobID()
-	payload := map[string]interface{}{
-		"run_id":   runID.String(),
-		"job_id":   jobID.String(),
-		"chunk_no": 0,
-		"data":     gzippedData,
-	}
-	body, err := json.Marshal(payload)
-	if err != nil {
-		t.Fatalf("marshal payload: %v", err)
-	}
-
-	// Create request.
 	nodeID := domaintypes.NewNodeKey()
-	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/logs", bytes.NewReader(body))
-	req.SetPathValue("id", nodeID)
-	req.Header.Set("Content-Type", "application/json")
-
-	// Create response recorder.
-	w := httptest.NewRecorder()
-
-	// Call handler.
-	handler(w, req)
-
-	// Check response.
-	if w.Code != http.StatusCreated {
-		t.Errorf("status code = %d, want %d; body: %s", w.Code, http.StatusCreated, w.Body.String())
+	payload := map[string]any{
+		"run_id":   domaintypes.NewRunID().String(),
+		"job_id":   domaintypes.NewJobID().String(),
+		"chunk_no": 0,
+		"data":     mustGzip(t, []byte("test log line\n")),
 	}
-
-	// Verify log was created.
-	if !mockStore.logCreated {
-		t.Error("log was not created in store")
-	}
+	rr := doRequest(t, handler, http.MethodPost, "/v1/nodes/"+nodeID+"/logs", payload, "id", nodeID)
+	assertStatus(t, rr, http.StatusCreated)
+	assertCalled(t, "CreateLog", mockStore.logCreated)
 }
 
 // TestCreateNodeLogsHandler_WithJobID verifies that job_id is propagated to the store.
-// Note: build_id removed as part of builds table removal; logs now use job-level grouping only.
 func TestCreateNodeLogsHandler_WithJobID(t *testing.T) {
 	t.Parallel()
 
-	// Create mock store.
-	mockStore := &mockStoreForLogs{
-		nodeExists: true,
-	}
+	mockStore := &mockStoreForLogs{nodeExists: true}
+	handler := newNodeLogsHandler(t, mockStore)
 
-	// Create events service with the mock store — required for log ingestion.
-	eventsService, err := createTestEventsServiceWithStore(mockStore)
-	if err != nil {
-		t.Fatalf("failed to create events service: %v", err)
-	}
-
-	bp := blobpersist.New(mockStore, bsmock.New())
-	handler := createNodeLogsHandler(mockStore, bp, eventsService)
-
-	// Prepare gzipped test data.
-	var buf bytes.Buffer
-	gzWriter := gzip.NewWriter(&buf)
-	if _, err = gzWriter.Write([]byte("hello with job id\n")); err != nil {
-		t.Fatalf("gzip write failed: %v", err)
-	}
-	if err = gzWriter.Close(); err != nil {
-		t.Fatalf("gzip close failed: %v", err)
-	}
-	gzippedData := buf.Bytes()
-
-	// Prepare request payload including job_id.
-	runID := domaintypes.NewRunID()
+	nodeID := domaintypes.NewNodeKey()
 	jobID := domaintypes.NewJobID()
-	payload := map[string]interface{}{
-		"run_id":   runID.String(),
+	payload := map[string]any{
+		"run_id":   domaintypes.NewRunID().String(),
 		"job_id":   jobID.String(),
 		"chunk_no": 1,
-		"data":     gzippedData,
+		"data":     mustGzip(t, []byte("hello with job id\n")),
 	}
-	body, err := json.Marshal(payload)
-	if err != nil {
-		t.Fatalf("marshal payload: %v", err)
-	}
-
-	// Create request.
-	nodeID := domaintypes.NewNodeKey()
-	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/logs", bytes.NewReader(body))
-	req.SetPathValue("id", nodeID)
-	req.Header.Set("Content-Type", "application/json")
-
-	// Create response recorder.
-	w := httptest.NewRecorder()
-
-	// Call handler.
-	handler(w, req)
-
-	// Check response.
-	if w.Code != http.StatusCreated {
-		t.Fatalf("status code = %d, want %d; body: %s", w.Code, http.StatusCreated, w.Body.String())
-	}
-
-	// Verify job_id propagated to store.
-	if !mockStore.logCreated {
-		t.Fatal("log was not created in store")
-	}
+	rr := doRequest(t, handler, http.MethodPost, "/v1/nodes/"+nodeID+"/logs", payload, "id", nodeID)
+	assertStatus(t, rr, http.StatusCreated)
+	assertCalled(t, "CreateLog", mockStore.logCreated)
 	if mockStore.lastCreateLog.JobID == nil {
 		t.Fatal("expected JobID to be set")
 	}
@@ -157,221 +86,89 @@ func TestCreateNodeLogsHandler_WithJobID(t *testing.T) {
 	}
 }
 
-func TestCreateNodeLogsHandler_InvalidNodeID(t *testing.T) {
+// TestCreateNodeLogsHandler_Errors covers the error/validation paths in one table.
+func TestCreateNodeLogsHandler_Errors(t *testing.T) {
 	t.Parallel()
 
-	mockStore := &mockStoreForLogs{}
-	// Create events service with the mock store — required for log ingestion.
-	eventsService, err := createTestEventsServiceWithStore(mockStore)
-	if err != nil {
-		t.Fatalf("failed to create events service: %v", err)
-	}
-	bp := blobpersist.New(mockStore, bsmock.New())
-	handler := createNodeLogsHandler(mockStore, bp, eventsService)
-
-	// Create request with invalid node ID.
-	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/invalid/logs", strings.NewReader("{}"))
-	req.SetPathValue("id", "invalid")
-	req.Header.Set("Content-Type", "application/json")
-
-	w := httptest.NewRecorder()
-	handler(w, req)
-
-	if w.Code != http.StatusBadRequest {
-		t.Errorf("status code = %d, want %d", w.Code, http.StatusBadRequest)
-	}
-}
-
-func TestCreateNodeLogsHandler_PayloadTooLarge(t *testing.T) {
-	t.Parallel()
-
-	mockStore := &mockStoreForLogs{
-		nodeExists: true,
-	}
-	// Create events service with the mock store — required for log ingestion.
-	eventsService, err := createTestEventsServiceWithStore(mockStore)
-	if err != nil {
-		t.Fatalf("failed to create events service: %v", err)
-	}
-	bp := blobpersist.New(mockStore, bsmock.New())
-	handler := createNodeLogsHandler(mockStore, bp, eventsService)
-
-	// Create decoded payload larger than 10 MiB (will trigger 413 after decode).
-	largeData := make([]byte, 10<<20+1)
-	payload := map[string]interface{}{
-		"run_id":   domaintypes.NewRunID().String(),
-		"chunk_no": 0,
-		"data":     largeData,
-	}
-	body, err := json.Marshal(payload)
-	if err != nil {
-		t.Fatalf("marshal payload: %v", err)
-	}
-
-	nodeID := domaintypes.NewNodeKey()
-	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/logs", bytes.NewReader(body))
-	req.SetPathValue("id", nodeID)
-	req.Header.Set("Content-Type", "application/json")
-
-	w := httptest.NewRecorder()
-	handler(w, req)
-
-	if w.Code != http.StatusRequestEntityTooLarge {
-		t.Errorf("status code = %d, want %d", w.Code, http.StatusRequestEntityTooLarge)
-	}
-}
-
-func TestCreateNodeLogsHandler_BodyTooLarge(t *testing.T) {
-	t.Parallel()
-
-	mockStore := &mockStoreForLogs{
-		nodeExists: true,
-	}
-	// Create events service with the mock store — required for log ingestion.
-	eventsService, err := createTestEventsServiceWithStore(mockStore)
-	if err != nil {
-		t.Fatalf("failed to create events service: %v", err)
-	}
-	bp := blobpersist.New(mockStore, bsmock.New())
-	handler := createNodeLogsHandler(mockStore, bp, eventsService)
-
-	// Craft a request whose JSON body exceeds 16 MiB due to base64 overhead.
-	// Any payload large enough to trip the body cap will also exceed the decoded cap,
-	// but MaxBytesReader should fail early before decode.
-	hugeData := make([]byte, 16<<20)
-	payload := map[string]interface{}{
-		"run_id":   domaintypes.NewRunID().String(),
-		"chunk_no": 0,
-		"data":     hugeData,
-	}
-	body, err := json.Marshal(payload)
-	if err != nil {
-		t.Fatalf("marshal payload: %v", err)
+	validRunID := domaintypes.NewRunID().String()
+	tests := []struct {
+		name       string
+		nodeExists bool
+		nodeID     string
+		body       any
+		wantStatus int
+	}{
+		{
+			name:       "invalid_node_id",
+			nodeExists: false,
+			nodeID:     "invalid",
+			body:       "{}",
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "payload_too_large_decoded",
+			nodeExists: true,
+			nodeID:     domaintypes.NewNodeKey(),
+			body: map[string]any{
+				"run_id":   validRunID,
+				"chunk_no": 0,
+				"data":     make([]byte, 10<<20+1),
+			},
+			wantStatus: http.StatusRequestEntityTooLarge,
+		},
+		{
+			name:       "body_too_large",
+			nodeExists: true,
+			nodeID:     domaintypes.NewNodeKey(),
+			body: map[string]any{
+				"run_id":   validRunID,
+				"chunk_no": 0,
+				"data":     make([]byte, 16<<20),
+			},
+			wantStatus: http.StatusRequestEntityTooLarge,
+		},
+		{
+			name:       "missing_run_id",
+			nodeExists: true,
+			nodeID:     domaintypes.NewNodeKey(),
+			body: map[string]any{
+				"chunk_no": 0,
+				"data":     []byte("test"),
+			},
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "empty_data",
+			nodeExists: true,
+			nodeID:     domaintypes.NewNodeKey(),
+			body: map[string]any{
+				"run_id":   validRunID,
+				"chunk_no": 0,
+				"data":     []byte{},
+			},
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "node_not_found",
+			nodeExists: false,
+			nodeID:     domaintypes.NewNodeKey(),
+			body: map[string]any{
+				"run_id":   validRunID,
+				"chunk_no": 0,
+				"data":     []byte("test"),
+			},
+			wantStatus: http.StatusNotFound,
+		},
 	}
 
-	nodeID := domaintypes.NewNodeKey()
-	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/logs", bytes.NewReader(body))
-	req.SetPathValue("id", nodeID)
-	req.Header.Set("Content-Type", "application/json")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockStore := &mockStoreForLogs{nodeExists: tt.nodeExists}
+			handler := newNodeLogsHandler(t, mockStore)
 
-	w := httptest.NewRecorder()
-	handler(w, req)
-
-	if w.Code != http.StatusRequestEntityTooLarge {
-		t.Errorf("status code = %d, want %d", w.Code, http.StatusRequestEntityTooLarge)
-	}
-}
-
-func TestCreateNodeLogsHandler_MissingRunID(t *testing.T) {
-	t.Parallel()
-
-	mockStore := &mockStoreForLogs{
-		nodeExists: true,
-	}
-	// Create events service with the mock store — required for log ingestion.
-	eventsService, err := createTestEventsServiceWithStore(mockStore)
-	if err != nil {
-		t.Fatalf("failed to create events service: %v", err)
-	}
-	bp := blobpersist.New(mockStore, bsmock.New())
-	handler := createNodeLogsHandler(mockStore, bp, eventsService)
-
-	// Create payload without run_id.
-	payload := map[string]interface{}{
-		"chunk_no": 0,
-		"data":     []byte("test"),
-	}
-	body, err := json.Marshal(payload)
-	if err != nil {
-		t.Fatalf("marshal payload: %v", err)
-	}
-
-	nodeID := domaintypes.NewNodeKey()
-	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/logs", bytes.NewReader(body))
-	req.SetPathValue("id", nodeID)
-	req.Header.Set("Content-Type", "application/json")
-
-	w := httptest.NewRecorder()
-	handler(w, req)
-
-	if w.Code != http.StatusBadRequest {
-		t.Errorf("status code = %d, want %d", w.Code, http.StatusBadRequest)
-	}
-}
-
-func TestCreateNodeLogsHandler_EmptyData(t *testing.T) {
-	t.Parallel()
-
-	mockStore := &mockStoreForLogs{
-		nodeExists: true,
-	}
-	// Create events service with the mock store — required for log ingestion.
-	eventsService, err := createTestEventsServiceWithStore(mockStore)
-	if err != nil {
-		t.Fatalf("failed to create events service: %v", err)
-	}
-	bp := blobpersist.New(mockStore, bsmock.New())
-	handler := createNodeLogsHandler(mockStore, bp, eventsService)
-
-	// Create payload with empty data.
-	payload := map[string]interface{}{
-		"run_id":   domaintypes.NewRunID().String(),
-		"chunk_no": 0,
-		"data":     []byte{},
-	}
-	body, err := json.Marshal(payload)
-	if err != nil {
-		t.Fatalf("marshal payload: %v", err)
-	}
-
-	nodeID := domaintypes.NewNodeKey()
-	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/logs", bytes.NewReader(body))
-	req.SetPathValue("id", nodeID)
-	req.Header.Set("Content-Type", "application/json")
-
-	w := httptest.NewRecorder()
-	handler(w, req)
-
-	if w.Code != http.StatusBadRequest {
-		t.Errorf("status code = %d, want %d", w.Code, http.StatusBadRequest)
-	}
-}
-
-func TestCreateNodeLogsHandler_NodeNotFound(t *testing.T) {
-	t.Parallel()
-
-	mockStore := &mockStoreForLogs{
-		nodeExists: false,
-	}
-	// Create events service with the mock store — required for log ingestion.
-	eventsService, err := createTestEventsServiceWithStore(mockStore)
-	if err != nil {
-		t.Fatalf("failed to create events service: %v", err)
-	}
-	bp := blobpersist.New(mockStore, bsmock.New())
-	handler := createNodeLogsHandler(mockStore, bp, eventsService)
-
-	// Create valid payload.
-	payload := map[string]interface{}{
-		"run_id":   domaintypes.NewRunID().String(),
-		"chunk_no": 0,
-		"data":     []byte("test"),
-	}
-	body, err := json.Marshal(payload)
-	if err != nil {
-		t.Fatalf("marshal payload: %v", err)
-	}
-
-	nodeID := domaintypes.NewNodeKey()
-	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/logs", bytes.NewReader(body))
-	req.SetPathValue("id", nodeID)
-	req.Header.Set("Content-Type", "application/json")
-
-	w := httptest.NewRecorder()
-	handler(w, req)
-
-	if w.Code != http.StatusNotFound {
-		t.Errorf("status code = %d, want %d", w.Code, http.StatusNotFound)
+			rr := doRequest(t, handler, http.MethodPost, "/v1/nodes/"+tt.nodeID+"/logs", tt.body, "id", tt.nodeID)
+			assertStatus(t, rr, tt.wantStatus)
+		})
 	}
 }
 
@@ -393,7 +190,6 @@ func (m *mockStoreForLogs) GetNode(ctx context.Context, id domaintypes.NodeID) (
 func (m *mockStoreForLogs) CreateLog(ctx context.Context, arg store.CreateLogParams) (store.Log, error) {
 	m.logCreated = true
 	m.lastCreateLog = arg
-	// Note: build_id removed as part of builds table removal; logs now use job-level grouping only.
 	jobKey := "none"
 	if arg.JobID != nil && !arg.JobID.IsZero() {
 		jobKey = arg.JobID.String()

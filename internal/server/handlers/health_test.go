@@ -1,9 +1,7 @@
 package handlers
 
 import (
-	"encoding/json"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -44,17 +42,10 @@ func TestHealthProbeHandlers(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rr := httptest.NewRecorder()
-			tt.handler.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, tt.path, nil))
+			rr := doRequest(t, tt.handler, http.MethodGet, tt.path, nil)
+			assertStatus(t, rr, tt.wantCode)
 
-			if rr.Code != tt.wantCode {
-				t.Fatalf("status = %d, want %d", rr.Code, tt.wantCode)
-			}
-
-			var body map[string]string
-			if err := json.NewDecoder(rr.Body).Decode(&body); err != nil {
-				t.Fatalf("decode response: %v", err)
-			}
+			body := decodeBody[map[string]string](t, rr)
 			for key, want := range tt.wantFields {
 				if body[key] != want {
 					t.Fatalf("%s = %q, want %q", key, body[key], want)

@@ -3,7 +3,6 @@ package handlers
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -44,15 +43,9 @@ func TestUploadSpecBundleHandler(t *testing.T) {
 		req.Header.Set("Content-Type", "application/octet-stream")
 		w := httptest.NewRecorder()
 		uploadSpecBundleHandler(st, bp)(w, req)
+		assertStatus(t, w, http.StatusCreated)
 
-		if w.Code != http.StatusCreated {
-			t.Fatalf("expected 201, got %d: %s", w.Code, w.Body.String())
-		}
-
-		var resp specBundleUploadResponse
-		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
-			t.Fatalf("decode response: %v", err)
-		}
+		resp := decodeBody[specBundleUploadResponse](t, w)
 		if resp.BundleID != bundleID.String() {
 			t.Errorf("bundle_id: got %q, want %q", resp.BundleID, bundleID.String())
 		}
@@ -80,15 +73,9 @@ func TestUploadSpecBundleHandler(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/v1/spec-bundles", bytes.NewReader(bundleData))
 		w := httptest.NewRecorder()
 		uploadSpecBundleHandler(st, bp)(w, req)
+		assertStatus(t, w, http.StatusOK)
 
-		if w.Code != http.StatusOK {
-			t.Fatalf("expected 200 for deduplicated, got %d: %s", w.Code, w.Body.String())
-		}
-
-		var resp specBundleUploadResponse
-		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
-			t.Fatalf("decode response: %v", err)
-		}
+		resp := decodeBody[specBundleUploadResponse](t, w)
 		if resp.BundleID != existingID.String() {
 			t.Errorf("bundle_id: got %q, want %q", resp.BundleID, existingID.String())
 		}
@@ -108,10 +95,7 @@ func TestUploadSpecBundleHandler(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/v1/spec-bundles", strings.NewReader(""))
 		w := httptest.NewRecorder()
 		uploadSpecBundleHandler(st, bp)(w, req)
-
-		if w.Code != http.StatusBadRequest {
-			t.Errorf("expected 400 for empty body, got %d", w.Code)
-		}
+		assertStatus(t, w, http.StatusBadRequest)
 	})
 
 	t.Run("ExceedsSizeLimit", func(t *testing.T) {
@@ -123,10 +107,7 @@ func TestUploadSpecBundleHandler(t *testing.T) {
 		req.ContentLength = maxSpecBundleSize + 1
 		w := httptest.NewRecorder()
 		uploadSpecBundleHandler(st, bp)(w, req)
-
-		if w.Code != http.StatusRequestEntityTooLarge {
-			t.Errorf("expected 413 for oversized request, got %d", w.Code)
-		}
+		assertStatus(t, w, http.StatusRequestEntityTooLarge)
 	})
 
 	t.Run("CreatedByQueryParam", func(t *testing.T) {
@@ -147,10 +128,7 @@ func TestUploadSpecBundleHandler(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/v1/spec-bundles?created_by=ci-bot", bytes.NewReader(bundleData))
 		w := httptest.NewRecorder()
 		uploadSpecBundleHandler(st, bp)(w, req)
-
-		if w.Code != http.StatusCreated {
-			t.Fatalf("expected 201, got %d: %s", w.Code, w.Body.String())
-		}
+		assertStatus(t, w, http.StatusCreated)
 		if st.createSpecBundle.params.CreatedBy == nil || *st.createSpecBundle.params.CreatedBy != "ci-bot" {
 			t.Errorf("expected created_by=ci-bot, got %v", st.createSpecBundle.params.CreatedBy)
 		}
@@ -174,14 +152,9 @@ func TestDownloadSpecBundleHandler(t *testing.T) {
 			t.Fatalf("seed blob store: %v", err)
 		}
 
-		req := httptest.NewRequest(http.MethodGet, "/v1/spec-bundles/"+bundleID.String(), nil)
-		req.SetPathValue("id", bundleID.String())
-		w := httptest.NewRecorder()
-		downloadSpecBundleHandler(st, bs)(w, req)
-
-		if w.Code != http.StatusOK {
-			t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
-		}
+		w := doRequest(t, http.HandlerFunc(downloadSpecBundleHandler(st, bs)),
+			http.MethodGet, "/v1/spec-bundles/"+bundleID.String(), nil, "id", bundleID.String())
+		assertStatus(t, w, http.StatusOK)
 		if ct := w.Header().Get("Content-Type"); ct != "application/gzip" {
 			t.Errorf("Content-Type: got %q, want application/gzip", ct)
 		}
@@ -199,14 +172,9 @@ func TestDownloadSpecBundleHandler(t *testing.T) {
 		st.getSpecBundle.err = pgx.ErrNoRows
 		bs := bsmock.New()
 
-		req := httptest.NewRequest(http.MethodGet, "/v1/spec-bundles/"+bundleID.String(), nil)
-		req.SetPathValue("id", bundleID.String())
-		w := httptest.NewRecorder()
-		downloadSpecBundleHandler(st, bs)(w, req)
-
-		if w.Code != http.StatusNotFound {
-			t.Errorf("expected 404, got %d", w.Code)
-		}
+		w := doRequest(t, http.HandlerFunc(downloadSpecBundleHandler(st, bs)),
+			http.MethodGet, "/v1/spec-bundles/"+bundleID.String(), nil, "id", bundleID.String())
+		assertStatus(t, w, http.StatusNotFound)
 	})
 
 	t.Run("InvalidID", func(t *testing.T) {
@@ -214,14 +182,9 @@ func TestDownloadSpecBundleHandler(t *testing.T) {
 		st.getSpecBundle.err = pgx.ErrNoRows
 		bs := bsmock.New()
 
-		req := httptest.NewRequest(http.MethodGet, "/v1/spec-bundles/not-valid-id", nil)
-		req.SetPathValue("id", "not-valid-id")
-		w := httptest.NewRecorder()
-		downloadSpecBundleHandler(st, bs)(w, req)
-
-		if w.Code != http.StatusNotFound {
-			t.Errorf("expected 404 for invalid ID, got %d", w.Code)
-		}
+		w := doRequest(t, http.HandlerFunc(downloadSpecBundleHandler(st, bs)),
+			http.MethodGet, "/v1/spec-bundles/not-valid-id", nil, "id", "not-valid-id")
+		assertStatus(t, w, http.StatusNotFound)
 	})
 
 	t.Run("BlobNotFound", func(t *testing.T) {
@@ -233,14 +196,9 @@ func TestDownloadSpecBundleHandler(t *testing.T) {
 			}
 		bs := bsmock.New() // empty: key not seeded
 
-		req := httptest.NewRequest(http.MethodGet, "/v1/spec-bundles/"+bundleID.String(), nil)
-		req.SetPathValue("id", bundleID.String())
-		w := httptest.NewRecorder()
-		downloadSpecBundleHandler(st, bs)(w, req)
-
-		if w.Code != http.StatusNotFound {
-			t.Errorf("expected 404 for missing blob, got %d", w.Code)
-		}
+		w := doRequest(t, http.HandlerFunc(downloadSpecBundleHandler(st, bs)),
+			http.MethodGet, "/v1/spec-bundles/"+bundleID.String(), nil, "id", bundleID.String())
+		assertStatus(t, w, http.StatusNotFound)
 	})
 
 	t.Run("MissingObjectKey", func(t *testing.T) {
@@ -248,17 +206,12 @@ func TestDownloadSpecBundleHandler(t *testing.T) {
 		st.getSpecBundle.val = store.SpecBundle{
 			ID:        string(bundleID),
 			ObjectKey: nil, // no object key
-			}
+		}
 		bs := bsmock.New()
 
-		req := httptest.NewRequest(http.MethodGet, "/v1/spec-bundles/"+bundleID.String(), nil)
-		req.SetPathValue("id", bundleID.String())
-		w := httptest.NewRecorder()
-		downloadSpecBundleHandler(st, bs)(w, req)
-
-		if w.Code != http.StatusNotFound {
-			t.Errorf("expected 404 for missing object key, got %d", w.Code)
-		}
+		w := doRequest(t, http.HandlerFunc(downloadSpecBundleHandler(st, bs)),
+			http.MethodGet, "/v1/spec-bundles/"+bundleID.String(), nil, "id", bundleID.String())
+		assertStatus(t, w, http.StatusNotFound)
 	})
 
 }
@@ -288,9 +241,7 @@ func TestSpecBundleDownloadLastRefInvokedWhenRequestCanceledImmediatelyAfterResp
 	req.SetPathValue("id", bundleID.String())
 	w := httptest.NewRecorder()
 	downloadSpecBundleHandler(st, bs)(w, req)
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
-	}
+	assertStatus(t, w, http.StatusOK)
 
 	// Regression guard: cancel request context immediately after response completion.
 	cancelReq()
