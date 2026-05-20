@@ -42,7 +42,9 @@ func RegisterRoutes(s *server.HTTPServer, st store.Store, bs blobstore.Store, bp
 }
 
 func registerHealthRoutes(s *server.HTTPServer, deps routeDeps) {
-	s.RegisterRouteFunc("/health", healthHandler(deps.st))
+	s.RegisterRouteFunc("/health", readyzHandler(deps.st))
+	s.RegisterRouteFunc("GET /healthz", healthzHandler())
+	s.RegisterRouteFunc("GET /readyz", readyzHandler(deps.st))
 }
 
 func registerConfigRoutes(s *server.HTTPServer, deps routeDeps) {

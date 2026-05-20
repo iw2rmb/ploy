@@ -3,9 +3,10 @@ info:
   title: Ploy Control Plane API
   version: "1.0.0"
   description: |
-    REST surface exposed by the Ploy control-plane `ployd` deployment. All routes
-    require authentication. The server supports both mutual TLS and JWT bearer
-    tokens (`Authorization: Bearer ...`) depending on client and deployment.
+    REST surface exposed by the Ploy control-plane `ployd` deployment. Control
+    routes require authentication, while `/healthz` and `/readyz` are unauthenticated
+    probe endpoints. The server supports both mutual TLS and JWT bearer tokens
+    (`Authorization: Bearer ...`) depending on client and deployment.
 
     v1 API surfaces:
     - `/v1/migs` — mig project CRUD (create/list/delete/archive).
@@ -48,6 +49,10 @@ security:
   - bearerAuth: []
   - mtls: []
 paths:
+  /healthz:
+    $ref: "./paths/healthz.yaml"
+  /readyz:
+    $ref: "./paths/readyz.yaml"
   # Config endpoints
   /v1/config/gitlab:
     $ref: "./paths/config_gitlab.yaml"

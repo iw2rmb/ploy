@@ -33,6 +33,9 @@ func TestOpenAPICompleteness(t *testing.T) {
 		path   string
 		method string
 	}{
+		// Process probes
+		{"/healthz", "get"},
+		{"/readyz", "get"},
 		// Config — Global Env
 		{"/v1/config/env", "get"},
 		{"/v1/config/env/{key}", "get"},
