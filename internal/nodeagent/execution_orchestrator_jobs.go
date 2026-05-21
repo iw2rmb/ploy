@@ -72,16 +72,14 @@ func (r *runController) executeMigJob(ctx context.Context, req StartRunRequest) 
 	)
 
 	cfg := standardJobConfig{
-		Manifest:      manifest,
-		DiffType:      types.DiffJobTypeMig,
-		OutDirPattern: "ploy-mig-out-*",
-		InDirPattern:  "ploy-mig-in-*",
+		Manifest: manifest,
+		DiffType: types.DiffJobTypeMig,
 		PopulateInDir: func(inDir string) error {
 			return r.materializeMigInFromInputs(ctx, req, inDir)
 		},
 		UploadConfiguredArtifacts: true,
-		UploadDiff: func(ctx context.Context, runID types.RunID, jobID types.JobID, jobName string, diffGen step.DiffGenerator, workspace string, result step.Result) (bool, error) {
-			return r.uploadJobDiff(ctx, runID, jobID, diffGen, workspace, result, types.DiffJobTypeMig)
+		UploadDiff: func(ctx context.Context, runID types.RunID, jobID types.JobID, jobName string, diffGen step.DiffGenerator, workspace string, result step.Result, diffPath string) (bool, error) {
+			return r.uploadJobDiff(ctx, runID, jobID, diffGen, workspace, result, types.DiffJobTypeMig, diffPath)
 		},
 		StartTime: startTime,
 	}
@@ -91,10 +89,8 @@ func (r *runController) executeMigJob(ctx context.Context, req StartRunRequest) 
 
 // standardJobConfig configures the execution of a standard container job.
 type standardJobConfig struct {
-	Manifest      contracts.StepManifest
-	DiffType      types.DiffJobType
-	OutDirPattern string
-	InDirPattern  string
+	Manifest contracts.StepManifest
+	DiffType types.DiffJobType
 
 	PopulateInDir   func(inDir string) error
 	PrepareManifest func(manifest *contracts.StepManifest, workspace string) error
@@ -105,7 +101,7 @@ type standardJobConfig struct {
 
 	UploadConfiguredArtifacts bool
 
-	UploadDiff    func(ctx context.Context, runID types.RunID, jobID types.JobID, jobName string, diffGen step.DiffGenerator, workspace string, result step.Result) (bool, error)
+	UploadDiff    func(ctx context.Context, runID types.RunID, jobID types.JobID, jobName string, diffGen step.DiffGenerator, workspace string, result step.Result, diffPath string) (bool, error)
 	BuildJobMeta  func(outDir string) json.RawMessage
 	BuildMetadata func(outDir string) map[string]string
 
@@ -125,8 +121,11 @@ type standardJobOutcome struct {
 // executeStandardJob orchestrates the common lifecycle of a container job:
 // runtime init, sticky workspace preparation, directory prep, execution, and uploading.
 func (r *runController) executeStandardJob(ctx context.Context, req StartRunRequest, cfg standardJobConfig) {
-	_, execErr := r.executeStandardJobWithOutcome(ctx, req, cfg)
+	outcome, execErr := r.executeStandardJobWithOutcome(ctx, req, cfg)
 	if execErr == nil {
+		if outcome.runErr != nil || outcome.result.ExitCode != 0 {
+			r.uploadRepoArtifactsIfPresent(req.RunID, req.RepoID, req.JobID)
+		}
 		return
 	}
 	startTime := cfg.StartTime
@@ -134,6 +133,7 @@ func (r *runController) executeStandardJob(ctx context.Context, req StartRunRequ
 		startTime = time.Now()
 	}
 	slog.Error("standard job execution failed", "run_id", req.RunID, "job_id", req.JobID, "error", execErr)
+	r.uploadRepoArtifactsIfPresent(req.RunID, req.RepoID, req.JobID)
 	r.uploadFailureStatus(ctx, req, execErr, time.Since(startTime))
 }
 
@@ -144,11 +144,26 @@ func (r *runController) executeStandardJobWithOutcome(ctx context.Context, req S
 	}
 	var outcome standardJobOutcome
 
+	artifactPaths := runRepoJobArtifactPaths(req.RunID, req.RepoID, req.JobID)
+	if err := ensureJobArtifactDirs(artifactPaths); err != nil {
+		return outcome, fmt.Errorf("prepare job artifacts: %w", err)
+	}
+
 	execCtx, cleanup, err := r.initJobExecutionContext(ctx, req.RunID, req.JobID)
 	if err != nil {
 		return outcome, fmt.Errorf("initialize runtime: %w", err)
 	}
 	defer cleanup()
+	artifactLogs, err := newArtifactLogWriter(execCtx.logStreamer, artifactPaths)
+	if err != nil {
+		return outcome, fmt.Errorf("prepare job artifact logs: %w", err)
+	}
+	execCtx.runner.LogWriter = artifactLogs
+	defer func() {
+		if err := artifactLogs.Close(); err != nil {
+			slog.Warn("failed to close job artifact logs", "run_id", req.RunID, "job_id", req.JobID, "error", err)
+		}
+	}()
 
 	wsResult, err := r.prepareStickyWorkspaceWithCleanup(ctx, req, cfg.Manifest)
 	if err != nil {
@@ -157,33 +172,16 @@ func (r *runController) executeStandardJobWithOutcome(ctx context.Context, req S
 	defer wsResult.cleanup()
 	workspace := wsResult.path
 
-	outDirErr := withTempDir(cfg.OutDirPattern, func(outDir string) error {
-		if cfg.InDirPattern != "" {
-			return withTempDir(cfg.InDirPattern, func(inDir string) error {
-				if cfg.PopulateInDir != nil {
-					if err := cfg.PopulateInDir(inDir); err != nil {
-						return fmt.Errorf("populate in dir: %w", err)
-					}
-				}
-				stepOutcome, err := r.runContainerJob(ctx, req, cfg, execCtx, workspace, startTime, outDir, inDir)
-				if err != nil {
-					return err
-				}
-				outcome = stepOutcome
-				return nil
-			})
+	if cfg.PopulateInDir != nil {
+		if err := cfg.PopulateInDir(artifactPaths.In); err != nil {
+			return outcome, fmt.Errorf("populate in dir: %w", err)
 		}
-		stepOutcome, err := r.runContainerJob(ctx, req, cfg, execCtx, workspace, startTime, outDir, "")
-		if err != nil {
-			return err
-		}
-		outcome = stepOutcome
-		return nil
-	})
-
-	if outDirErr != nil {
-		return outcome, outDirErr
 	}
+	stepOutcome, err := r.runContainerJob(ctx, req, cfg, execCtx, workspace, startTime, artifactPaths.Out, artifactPaths.In, artifactPaths.Diff)
+	if err != nil {
+		return outcome, err
+	}
+	outcome = stepOutcome
 	return outcome, nil
 }
 
@@ -196,7 +194,7 @@ func (r *runController) runContainerJob(
 	execCtx jobExecutionContext,
 	workspace string,
 	startTime time.Time,
-	outDir, inDir string,
+	outDir, inDir, diffPath string,
 ) (standardJobOutcome, error) {
 	outcome := standardJobOutcome{}
 	shareDir, err := ensureRunRepoShareDir(req.RunID, req.RepoID)
@@ -307,18 +305,10 @@ func (r *runController) runContainerJob(
 	runErr = r.finalizeStandardJobOutputs(req, cfg, outDir, workspace, runErr, result)
 	duration = time.Since(startTime)
 
-	if runErr != nil || result.ExitCode != 0 {
-		if preserveRoot, preserveErr := preserveFailureArtifacts(req.RunID, req.JobID, workspace, outDir, inDir); preserveErr != nil {
-			slog.Warn("failed to preserve failure artifacts", "run_id", req.RunID, "job_id", req.JobID, "error", preserveErr)
-		} else {
-			slog.Info("preserved failure artifacts", "run_id", req.RunID, "job_id", req.JobID, "path", preserveRoot)
-		}
-	}
-
 	diffUploaded := false
 	if cfg.UploadDiff != nil {
 		var diffErr error
-		diffUploaded, diffErr = cfg.UploadDiff(ctx, req.RunID, req.JobID, req.JobName, execCtx.diffGenerator, workspace, result)
+		diffUploaded, diffErr = cfg.UploadDiff(ctx, req.RunID, req.JobID, req.JobName, execCtx.diffGenerator, workspace, result, diffPath)
 		if diffErr != nil && runErr == nil && result.ExitCode == 0 {
 			runErr = fmt.Errorf("upload job diff: %w", diffErr)
 		}

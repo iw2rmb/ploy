@@ -58,20 +58,13 @@ func resolveMigInFromClaimEntries(
 			return nil, fmt.Errorf("steps[%d].in_from[%d].from: %w", stepIndex, i, err)
 		}
 
-		artifactID, err := resolveSourceArtifactID(ctx, st, sourceJob)
-		if err != nil {
-			return nil, fmt.Errorf("steps[%d].in_from[%d].from: resolve source artifact: %w", stepIndex, i, err)
-		}
-		if artifactID == "" {
-			return nil, fmt.Errorf("steps[%d].in_from[%d].from: source %q artifact is missing", stepIndex, i, formatInFromSelector(parsed))
-		}
-
 		resolved = append(resolved, contracts.ResolvedInFromRef{
-			From:             strings.TrimSpace(ref.From),
-			To:               target,
-			SourceStepName:   parsed.SourceName,
-			SourceOutPath:    parsed.OutPath,
-			SourceArtifactID: artifactID,
+			From:           strings.TrimSpace(ref.From),
+			To:             target,
+			SourceStepName: parsed.SourceName,
+			SourceJobID:    sourceJob.ID,
+			SourceJobType:  domaintypes.JobType(sourceJob.JobType),
+			SourceOutPath:  parsed.OutPath,
 		})
 	}
 
@@ -129,49 +122,4 @@ func resolveInFromSourceJob(parsed contracts.InFromURI, idx inFromSourceJobIndex
 		return store.Job{}, fmt.Errorf("source job type %q successful job is not available", parsed.SourceType)
 	}
 	return sourceJob, nil
-}
-
-func formatInFromSelector(parsed contracts.InFromURI) string {
-	if parsed.SourceName == "" {
-		return parsed.SourceType.String()
-	}
-	return fmt.Sprintf("%s@%s", parsed.SourceName, parsed.SourceType)
-}
-
-func resolveSourceArtifactID(ctx context.Context, st store.Store, sourceJob store.Job) (string, error) {
-	bundles, err := listArtifactBundlesByEffectiveJob(ctx, st, sourceJob)
-	if err != nil {
-		return "", fmt.Errorf("list source artifacts: %w", err)
-	}
-	return selectPreferredArtifactID(bundles, preferredClasspathBundleNames(domaintypes.JobType(sourceJob.JobType))), nil
-}
-
-func preferredClasspathBundleNames(jobType domaintypes.JobType) []string {
-	if jobType == domaintypes.JobTypePreGate || jobType == domaintypes.JobTypePostGate {
-		return []string{"build-gate-out", "mig-out", ""}
-	}
-	return []string{"mig-out", "build-gate-out", ""}
-}
-
-func classpathBundleNameMatches(name *string, expected string) bool {
-	actual := ""
-	if name != nil {
-		actual = strings.TrimSpace(*name)
-	}
-	return actual == expected
-}
-
-func selectPreferredArtifactID(bundles []store.ArtifactBundle, preferredNames []string) string {
-	for _, preferredName := range preferredNames {
-		for i := range bundles {
-			if !classpathBundleNameMatches(bundles[i].Name, preferredName) {
-				continue
-			}
-			artifactID := strings.TrimSpace(bundleToSummary(bundles[i]).ID)
-			if artifactID != "" {
-				return artifactID
-			}
-		}
-	}
-	return ""
 }

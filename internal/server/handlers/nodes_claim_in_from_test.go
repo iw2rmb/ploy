@@ -4,9 +4,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
-
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
@@ -125,28 +122,6 @@ func TestResolveInFromSourceJob(t *testing.T) {
 				t.Fatalf("job id = %s, want %s", got.ID, tt.wantJobID)
 			}
 		})
-	}
-}
-
-func TestSelectPreferredArtifactID(t *testing.T) {
-	id1 := uuid.New()
-	id2 := uuid.New()
-	nameOther := "other"
-	nameMigOut := "mig-out"
-	bundles := []store.ArtifactBundle{
-		{
-			ID:   pgtype.UUID{Bytes: id1, Valid: true},
-			Name: &nameOther,
-		},
-		{
-			ID:   pgtype.UUID{Bytes: id2, Valid: true},
-			Name: &nameMigOut,
-		},
-	}
-
-	got := selectPreferredArtifactID(bundles, []string{"mig-out", ""})
-	if got != id2.String() {
-		t.Fatalf("artifact id=%q, want %q", got, id2.String())
 	}
 }
 

@@ -1217,9 +1217,13 @@ For a spec with multiple `steps[]` entries:
 Sticky workspace execution is implemented in runtime implementation:
 
 - `prepareStickyWorkspaceForStep`:
-  - Hydrates the chain head directly into `$PLOYD_CACHE_HOME/ploy/run/{run_id}/repos/{repo_id}/workspace`.
+  - Hydrates the chain head directly into `$PLOYD_CACHE_HOME/runs/{run_id}/repos/{repo_id}/workspace`.
   - Reuses that same workspace for later jobs in the repo chain.
   - Fails later jobs when the sticky workspace is missing.
+- Per-repo job artifacts live under `$PLOYD_CACHE_HOME/runs/{run_id}/repos/{repo_id}/artifacts`.
+  - Each job writes `artifacts/{job_id}/in`, `artifacts/{job_id}/out`, `stdout.log`, `stderr.log`, and `diff.patch`.
+  - `in_from` inputs are local symlinks from a prior job's `out/` file into the current job's `in/`.
+  - The node uploads the whole `artifacts/` tree after job failure/error and after successful `post_gate`.
 
 - `advanceWorkspaceBaseline`:
   - After a successful mig diff upload, creates a local commit that becomes the new `HEAD`.

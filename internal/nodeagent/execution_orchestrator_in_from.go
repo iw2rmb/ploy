@@ -1,14 +1,9 @@
 package nodeagent
 
 import (
-	"archive/tar"
-	"bytes"
-	"compress/gzip"
 	"context"
 	"fmt"
-	"io"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 
@@ -27,15 +22,11 @@ func (r *runController) materializeMigInFromInputs(
 	if strings.TrimSpace(inDir) == "" {
 		return fmt.Errorf("cross-step /in directory is required")
 	}
-	if r.artifactUploader == nil {
-		return fmt.Errorf("artifact uploader is required for in_from inputs")
-	}
 	if err := os.MkdirAll(inDir, 0o750); err != nil {
 		return fmt.Errorf("mkdir /in directory: %w", err)
 	}
 
 	cleanInDir := filepath.Clean(inDir)
-	artifactCache := make(map[string][]byte, len(req.MigContext.InFrom))
 	for i := range req.MigContext.InFrom {
 		ref := req.MigContext.InFrom[i]
 		sourceOutPath := strings.TrimSpace(ref.SourceOutPath)
@@ -56,71 +47,31 @@ func (r *runController) materializeMigInFromInputs(
 			return fmt.Errorf("mig_context.in_from[%d].to: resolved path %s escapes /in", i, destPath)
 		}
 
-		artifactID := strings.TrimSpace(ref.SourceArtifactID)
-		if artifactID == "" {
-			return fmt.Errorf("mig_context.in_from[%d].source_artifact_id: required", i)
+		sourceJobID := ref.SourceJobID
+		if sourceJobID.IsZero() {
+			return fmt.Errorf("mig_context.in_from[%d].source_job_id: required", i)
 		}
-		bundle, ok := artifactCache[artifactID]
-		if !ok {
-			downloaded, err := r.artifactUploader.DownloadArtifactBundle(ctx, artifactID)
-			if err != nil {
-				return fmt.Errorf("download artifact %q for mig_context.in_from[%d]: %w", artifactID, i, err)
-			}
-			bundle = downloaded
-			artifactCache[artifactID] = bundle
-		}
-
-		payload, err := extractRegularFileFromArtifactOutPath(bundle, sourceOutPath)
+		sourcePath, err := runRepoJobOutFile(req.RunID, req.RepoID, sourceJobID, sourceOutPath)
 		if err != nil {
-			return fmt.Errorf("materialize mig_context.in_from[%d] from %q: %w", i, sourceOutPath, err)
+			return fmt.Errorf("mig_context.in_from[%d].source_out_path: %w", i, err)
+		}
+		info, err := os.Stat(sourcePath)
+		if err != nil {
+			return fmt.Errorf("materialize mig_context.in_from[%d] from %q: %w", i, sourcePath, err)
+		}
+		if info.IsDir() {
+			return fmt.Errorf("materialize mig_context.in_from[%d] from %q: source is a directory", i, sourcePath)
 		}
 		if err := os.MkdirAll(filepath.Dir(destPath), 0o750); err != nil {
 			return fmt.Errorf("mkdir in_from destination dir: %w", err)
 		}
-		if err := os.WriteFile(destPath, payload, 0o600); err != nil {
-			return fmt.Errorf("write in_from destination %s: %w", destPath, err)
+		if err := os.Remove(destPath); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("remove existing in_from destination %s: %w", destPath, err)
+		}
+		if err := os.Symlink(sourcePath, destPath); err != nil {
+			return fmt.Errorf("link in_from destination %s: %w", destPath, err)
 		}
 	}
 
 	return nil
-}
-
-func extractRegularFileFromArtifactOutPath(bundle []byte, sourceOutPath string) ([]byte, error) {
-	normalizedOutPath := path.Clean(strings.TrimSpace(sourceOutPath))
-	if !strings.HasPrefix(normalizedOutPath, "/out/") || normalizedOutPath == "/out" {
-		return nil, fmt.Errorf("source path must stay under /out")
-	}
-	targetEntry := strings.TrimPrefix(normalizedOutPath, "/")
-
-	gzReader, err := gzip.NewReader(bytes.NewReader(bundle))
-	if err != nil {
-		return nil, fmt.Errorf("open artifact gzip: %w", err)
-	}
-	defer func() { _ = gzReader.Close() }()
-
-	tarReader := tar.NewReader(gzReader)
-	for {
-		header, err := tarReader.Next()
-		if err != nil {
-			if err == io.EOF {
-				return nil, fmt.Errorf("artifact bundle has no %s entry", targetEntry)
-			}
-			return nil, fmt.Errorf("read artifact tar header: %w", err)
-		}
-		if header == nil {
-			continue
-		}
-		entry := normalizeBundlePath(header.Name)
-		if entry != targetEntry {
-			continue
-		}
-		if header.Typeflag != tar.TypeReg && header.Typeflag != tar.TypeRegA {
-			return nil, fmt.Errorf("artifact entry %s is not a regular file", targetEntry)
-		}
-		payload, readErr := io.ReadAll(tarReader)
-		if readErr != nil {
-			return nil, fmt.Errorf("read artifact entry %s: %w", targetEntry, readErr)
-		}
-		return payload, nil
-	}
 }

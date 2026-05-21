@@ -408,9 +408,86 @@ func TestRunController_uploadGateReportArtifacts(t *testing.T) {
 	}
 }
 
-// Note: uploadDiff and associated mig diff metadata tests were removed during
-// previous refactors; current mig/heal diff generation uses Git-native workspace
-// snapshot semantics via step.DiffGenerator.Generate.
+type staticDiffGenerator struct {
+	diff []byte
+	err  error
+}
+
+func (g staticDiffGenerator) Generate(context.Context, string) ([]byte, error) {
+	return g.diff, g.err
+}
+
+func TestRunController_uploadJobDiffWritesInspectabilityCopy(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		diff       []byte
+		stalePatch bool
+		wantUpload bool
+		wantPatch  string
+	}{
+		{
+			name:       "non-empty diff writes patch and uploads",
+			diff:       []byte("diff --git a/a.txt b/a.txt\n--- a/a.txt\n+++ b/a.txt\n@@ -1 +1 @@\n-old\n+new\n"),
+			wantUpload: true,
+			wantPatch:  "diff --git a/a.txt b/a.txt\n--- a/a.txt\n+++ b/a.txt\n@@ -1 +1 @@\n-old\n+new\n",
+		},
+		{
+			name:       "empty diff removes stale patch and skips upload",
+			stalePatch: true,
+			wantUpload: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			server, calls := newDiffUploadServer(t, "test-run", "test-job")
+			controller := newTestController(t, newAgentConfig(server.URL))
+			patchPath := filepath.Join(t.TempDir(), "diff.patch")
+			if tt.stalePatch {
+				if err := os.WriteFile(patchPath, []byte("stale"), 0o644); err != nil {
+					t.Fatalf("write stale patch: %v", err)
+				}
+			}
+
+			uploaded, err := controller.uploadJobDiff(
+				context.Background(),
+				"test-run",
+				"test-job",
+				staticDiffGenerator{diff: tt.diff},
+				t.TempDir(),
+				step.Result{ExitCode: 0},
+				types.DiffJobTypeMig,
+				patchPath,
+			)
+			if err != nil {
+				t.Fatalf("uploadJobDiff() error = %v", err)
+			}
+			if uploaded != tt.wantUpload {
+				t.Fatalf("uploaded = %v, want %v", uploaded, tt.wantUpload)
+			}
+			if got := len(*calls) > 0; got != tt.wantUpload {
+				t.Fatalf("diff upload occurred = %v, want %v", got, tt.wantUpload)
+			}
+			data, readErr := os.ReadFile(patchPath)
+			if tt.wantPatch == "" {
+				if !os.IsNotExist(readErr) {
+					t.Fatalf("diff.patch should not exist, readErr=%v data=%q", readErr, data)
+				}
+				return
+			}
+			if readErr != nil {
+				t.Fatalf("read diff.patch: %v", readErr)
+			}
+			if string(data) != tt.wantPatch {
+				t.Fatalf("diff.patch = %q, want %q", data, tt.wantPatch)
+			}
+		})
+	}
+}
 
 // TestIsValidArtifactPath verifies path traversal prevention for artifact paths.
 // This is a security test ensuring malicious paths like "../../etc/passwd" are rejected.
@@ -531,13 +608,13 @@ func TestRunController_reportTerminalStatus(t *testing.T) {
 	}
 }
 
-func TestRunController_reportTerminalStatus_RemovesShareVolumeOnTerminalSuccess(t *testing.T) {
+func TestRunController_reportTerminalStatus_PreservesSharedArtifactsOnTerminalSuccess(t *testing.T) {
 	cacheHome := t.TempDir()
 	t.Setenv("PLOYD_CACHE_HOME", cacheHome)
 
 	runID := types.NewRunID()
 	repoID := types.NewMigRepoID()
-	shareDir := runRepoShareDir(runID, repoID)
+	shareDir := runRepoSharedArtifactsDir(runID, repoID)
 	if err := os.MkdirAll(shareDir, 0o755); err != nil {
 		t.Fatalf("mkdir share dir: %v", err)
 	}
@@ -566,7 +643,7 @@ func TestRunController_reportTerminalStatus_RemovesShareVolumeOnTerminalSuccess(
 		100*1e6,
 	)
 
-	if _, err := os.Stat(shareDir); !os.IsNotExist(err) {
-		t.Fatalf("share volume should be removed on terminal success, stat err=%v", err)
+	if _, err := os.Stat(filepath.Join(shareDir, "java.classpath")); err != nil {
+		t.Fatalf("shared artifact should remain on terminal success, stat err=%v", err)
 	}
 }

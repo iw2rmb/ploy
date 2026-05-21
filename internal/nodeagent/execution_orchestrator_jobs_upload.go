@@ -174,30 +174,8 @@ func (r *runController) reportTerminalStatus(
 }
 
 func (r *runController) cleanupRunRepoShareOnTerminalSuccess(req StartRunRequest, status types.JobStatus) {
-	if status != types.JobStatusSuccess {
-		return
-	}
-	if req.NextID != nil && !req.NextID.IsZero() {
-		return
-	}
-	shareDir := runRepoShareDir(req.RunID, req.RepoID)
-	if strings.TrimSpace(shareDir) == "" {
-		return
-	}
-	if err := os.RemoveAll(shareDir); err != nil && !os.IsNotExist(err) {
-		slog.Warn("failed to remove run/repo share volume",
-			"run_id", req.RunID,
-			"repo_id", req.RepoID,
-			"share_dir", shareDir,
-			"error", err,
-		)
-		return
-	}
-	slog.Info("removed run/repo share volume after terminal success",
-		"run_id", req.RunID,
-		"repo_id", req.RepoID,
-		"share_dir", shareDir,
-	)
+	_ = req
+	_ = status
 }
 
 // uploadGateLogsArtifact uploads build gate logs as an artifact bundle and attaches
@@ -252,6 +230,7 @@ func (r *runController) uploadJobDiff(
 	workspace string,
 	result step.Result,
 	diffType types.DiffJobType,
+	diffPath string,
 ) (bool, error) {
 	if diffGenerator == nil {
 		return false, nil
@@ -266,7 +245,17 @@ func (r *runController) uploadJobDiff(
 	}
 	if len(diffBytes) == 0 {
 		slog.Info("no diff to upload (no workspace changes)", "run_id", runID, "job_id", jobID, "diff_type", label)
+		if strings.TrimSpace(diffPath) != "" {
+			if err := os.Remove(diffPath); err != nil && !os.IsNotExist(err) {
+				slog.Warn("failed to remove empty diff artifact", "run_id", runID, "job_id", jobID, "path", diffPath, "error", err)
+			}
+		}
 		return false, nil
+	}
+	if strings.TrimSpace(diffPath) != "" {
+		if err := os.WriteFile(diffPath, diffBytes, 0o600); err != nil {
+			return false, fmt.Errorf("write diff artifact %s: %w", diffPath, err)
+		}
 	}
 
 	patchStats := step.CountPatchStats(diffBytes)

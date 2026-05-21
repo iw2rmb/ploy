@@ -54,16 +54,17 @@ Use this flow for any "why did run/job fail?" request.
 
 ## 5) Important caveat
 - `/out` bundle may not include per-step provider files (`stderr.txt`, `transcript.txt`, `provider-metadata.json`).
-- If missing there and temp mounts are already cleaned, report clearly: exact provider-internal error is unrecoverable post-factum.
+- If missing there and absent from the repo-local artifacts tree, report clearly: exact provider-internal error is unrecoverable post-factum.
 
-## 6) Failure temp preservation (node remote path)
-- On failed jobs, node preserves investigation copies automatically (no env flag):
-  - `/tmp/ploy-preserved/<run-id>/<job-id>/<timestamp>/`
-  - contains `in/`, `out/`, `workspace/` (when available)
+## 6) Repo-local artifacts (node remote path)
+- Jobs write durable repo-local artifacts under:
+  - `$PLOYD_CACHE_HOME/runs/<run-id>/repos/<repo-id>/artifacts`
+  - per-job files live in `<job-id>/{in,out,stdout.log,stderr.log,diff.patch}`
+- The node uploads the full `artifacts/` tree on job failure/error and successful `post_gate`.
 - On remote cluster, inspect via:
-  - `ssh "$PLOY_SSH" "printf '%s\n' \"$VPS_PWD\" | sudo -S find /tmp/ploy-preserved -maxdepth 5 -type d | tail -n 50"`
-- To copy all preserved evidence locally:
-  - `mkdir -p ./tmp && ssh "$PLOY_SSH" "printf '%s\n' \"$VPS_PWD\" | sudo -S tar -C /tmp -czf - ploy-preserved" > ./tmp/ploy-preserved.tgz`
+  - `ssh "$PLOY_SSH" "printf '%s\n' \"$VPS_PWD\" | sudo -S find \"\$PLOYD_CACHE_HOME/runs/<run-id>/repos/<repo-id>/artifacts\" -maxdepth 3 -type f | sort"`
+- To copy all repo artifacts locally:
+  - `mkdir -p ./tmp && ssh "$PLOY_SSH" "printf '%s\n' \"$VPS_PWD\" | sudo -S tar -C \"\$PLOYD_CACHE_HOME/runs/<run-id>/repos/<repo-id>\" -czf - artifacts" > ./tmp/repo-artifacts.tgz`
 
 ## 7) Response contract
 - Separate:
