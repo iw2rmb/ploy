@@ -11,7 +11,7 @@
 //   - execution_orchestrator_gate.go — gate job execution and failure context persistence.
 //   - execution_orchestrator_jobs.go — mig/mr job execution and shared helpers.
 //   - execution_upload.go — centralized diff/status/artifact upload helpers.
-//   - execution.go — runtime factories, rehydration helpers, workspace/file utilities.
+//   - execution.go — runtime factories, sticky workspace helpers, workspace/file utilities.
 //   - manifest.go — request→manifest translation helpers.
 //   - job.go — job status types, image name persistence.
 //   - http.go — base HTTP client, URL builders, compression helpers.

@@ -279,13 +279,14 @@ The <code>healing-log.md</code> format:
 
 For an end-to-end schema example, see [mig.example.yaml](./schemas/mig.example.yaml).
 
-### Workspace and rehydration semantics
+### Workspace semantics
 
 This subsection clarifies which code version each Build Gate sees during execution.
 Understanding workspace state is essential for debugging gate failures and reasoning
 about multi-step runs where diffs accumulate across steps.
 
-Rehydration is performed by the node runtime before each job starts.
+The node runtime keeps one sticky workspace per `(run_id, repo_id)` on the node
+that executes the repo chain.
 
 #### Pre-mig gate workspace
 
@@ -301,45 +302,37 @@ base_ref → fresh clone → pre-mig gate
 
 #### Post-mig gate workspace
 
-Each **post-mig gate** runs on the **rehydrated workspace for that step**. The workspace
-reflects all changes from prior migs (steps 0 through k-1) plus the changes from the
-current mig (step k).
+Each **post-mig gate** runs on the same sticky workspace after the current mig
+step has mutated it. The workspace reflects all changes from prior migs plus
+the changes from the current mig.
 
-Before `mig[k]` executes, `rehydrateWorkspaceForStep` reconstructs the workspace for
-step k from:
-
-1. **Base clone**: A cached copy of the initial repository state (base_ref).
-2. **Ordered diffs**: Diffs from steps 0 through k-1 fetched from the control plane,
-   sorted deterministically by chain position, then `(created_at, id)` in the node agent, and
-   applied in order using `git apply`.
-
-After `mig[k]` completes, its changes are present in the same workspace that the
-post-mig gate validates.
+After each successful mig step, the node advances the local Git baseline so the
+next mig diff is incremental instead of cumulative.
 
 Workspace state for post-mig gate at step k:
 ```
-base_ref → base clone → apply diffs[0..k-1] → mig[k] execution → post-mig gate[k]
+base_ref → sticky workspace → mig[0] → ... → mig[k] execution → post-mig gate[k]
 ```
 
-#### Multi-node execution
+#### Linear repo chain execution
 
-The rehydration strategy enables **multi-node execution**: any node can reconstruct
-the workspace for step k by fetching the base clone and applying the ordered diff chain.
-This decouples step execution from node affinity—step 0 can run on node A, step 1 on
-node B, etc.
+Repo chains are linear and execute against one sticky node-local workspace. The
+runtime does not reconstruct later jobs from stored diffs. If a later job in the
+chain reaches a node without the sticky workspace, execution fails as a node
+runtime error.
 
 Key invariants:
-- Each step uploads its diff (tagged with `job_id` and optional summary metadata) after successful execution.
-- `rehydrateWorkspaceForStep` fetches diffs for steps `0..k-1` before executing step `k`.
-- A baseline commit is created after rehydration (via `ensureBaselineCommitForRehydration`)
-  so that `git diff HEAD` produces only the changes from step k, not cumulative changes.
+- Each mig step uploads its diff, tagged with `job_id` and optional summary metadata.
+- Stored diffs are API/user artifacts, not node runtime input for the next step.
+- Successful mig steps create a local baseline commit so `git diff HEAD`
+  produces only the next step's changes.
 
 #### Summary table
 
 | Gate Phase     | Workspace State                                      | Runtime Behavior                             |
 |----------------|------------------------------------------------------|----------------------------------------------|
-| Pre-mig gate   | Fresh clone of base_ref                              | Rehydrated baseline workspace for step `0`   |
-| Post-mig gate[k] | Base clone + diffs[0..k-1] + mig[k] changes       | Rehydrated workspace for step `k`            |
+| Pre-mig gate   | Fresh clone of base_ref                              | Hydrates the sticky workspace                |
+| Post-mig gate[k] | Sticky workspace after mig[k] changes             | Validates the current sticky workspace       |
 
 - **Build Gate configuration**: See [Build Gate docs](./build-gate/README.md) for gate configuration
   and Docker-based execution details.
@@ -1044,7 +1037,7 @@ value is a `StageStatus` object describing that job's execution state.
 	      — returns a list of diffs with `job_id` and summary metadata, ordered by
 	      producing job chain position, then `created_at` (ascending).
 	    - `GET /v1/runs/{run_id}/repos/{repo_id}/diffs?download=true&diff_id=<uuid>` — returns the gzipped unified diff.
-	  - Diffs are applied in chain order for rehydration.
+	  - Runtime progression uses the sticky workspace; stored diffs are not replayed by nodeagents.
 
 ### 2.3 Artifacts
 
@@ -1178,7 +1171,7 @@ artifacts/diffs to the correct node.
 - `GET /v1/runs/{id}` — inspect a single batch run with aggregated repo counts from `run_repos`.
 - `POST /v1/runs/{id}/cancel` — cancel a batch run by transitioning the run to `Cancelled` and marking `Queued`/`Running` `run_repos` as `Cancelled`, and cancelling/removing waiting jobs from the queue (idempotent for terminal runs). The CLI maps this to `ploy run cancel <run-id>` and returns the canonical `RunSummary` payload.
 
-## 4. Node Execution and Rehydration
+## 4. Node Execution and Sticky Workspaces
 
 ### 4.1 Single-step runs
 
@@ -1202,7 +1195,7 @@ For a spec with exactly one `steps[]` entry:
 5. Control plane updates  run status and emits a final `run` snapshot plus
    a `done` status on the SSE stream.
 
-### 4.2 Multi-step runs (`steps[]`) and rehydration
+### 4.2 Multi-step runs (`steps[]`) and sticky workspaces
 
 For a spec with multiple `steps[]` entries:
 
@@ -1221,25 +1214,23 @@ For a spec with multiple `steps[]` entries:
      the claimed job's `next_id` successor only after prior jobs succeed.
    - Execute each job against a workspace that reflects all prior steps.
 
-Workspace rehydration is implemented in runtime implementation:
+Sticky workspace execution is implemented in runtime implementation:
 
-- `rehydrateWorkspaceForStep`:
-  - Copies the base clone (base_ref).
-  - Applies diffs for prior jobs in order using `git apply`.
-  - Diffs are fetched via `GET /v1/runs/{run_id}/repos/{repo_id}/diffs`, ordered by chain position.
+- `prepareStickyWorkspaceForStep`:
+  - Hydrates the chain head directly into `$PLOYD_CACHE_HOME/ploy/run/{run_id}/repos/{repo_id}/workspace`.
+  - Reuses that same workspace for later jobs in the repo chain.
+  - Fails later jobs when the sticky workspace is missing.
 
-- `ensureBaselineCommitForRehydration`:
-  - After applying prior diffs, creates a local commit that becomes the new
-    `HEAD`.
+- `advanceWorkspaceBaseline`:
+  - After a successful mig diff upload, creates a local commit that becomes the new `HEAD`.
   - Ensures that `git diff HEAD` after the job produces an **incremental**
     patch containing only changes from that job.
   - Control plane stores per-job diffs under the job's `job_id`.
 
 This design guarantees that:
 
-- Any node can reconstruct the identical workspace for a job using base clone +
-  prior diffs.
 - Jobs execute sequentially due to ClaimJob dependency enforcement.
+- Later jobs observe prior changes through the same node-local workspace.
 
 ## 5. Container Contract for Migs Images
 

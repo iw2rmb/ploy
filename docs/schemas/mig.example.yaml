@@ -99,7 +99,7 @@ steps:
 # When you need multiple transformation steps executed sequentially, add
 # multiple entries to steps[]. Each step runs with the same global
 # build gate and healing policy. The diff from each step is captured before the
-# next step begins, enabling per-step rehydration and multi-node execution.
+# next step begins, while the next step continues on the same sticky workspace.
 #
 # Rules:
 # - Migs execute in array order (steps are sequential within one run).
@@ -273,8 +273,8 @@ mr_on_fail: true
 #   * Migs execute in array order (sequential steps within one run).
 #   * All steps share the same repository and global gate/heal policy.
 #   * Each step produces a diff artifact captured before the next step.
-#   * Diffs enable rehydration: any step can be re-executed on any node by
-#     applying the ordered chain of diffs from prior steps onto the base snapshot.
+#   * Runtime progression uses the same node-local sticky workspace; stored diffs
+#     are user/API artifacts, not node runtime input for later steps.
 #
 # - The node agent consumes build_gate.post to run the heal → post-gate loop
 #   after the first gate fail (applies to both single-step and multi-step runs).

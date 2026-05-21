@@ -177,7 +177,7 @@ func buildPushRemoteURL(repoURL, gitlabDomain, projectID string) (string, error)
 }
 
 // executeMRJob runs a post-run MR creation job.
-// It rehydrates the final workspace state and invokes createMR.
+// It uses the final sticky workspace state and invokes createMR.
 func (r *runController) executeMRJob(ctx context.Context, req StartRunRequest) {
 	startTime := time.Now()
 
@@ -189,9 +189,9 @@ func (r *runController) executeMRJob(ctx context.Context, req StartRunRequest) {
 		return
 	}
 
-	workspace, err := r.rehydrateWorkspaceForStep(ctx, req, manifest)
+	workspace, err := r.prepareStickyWorkspaceForStep(ctx, req, manifest)
 	if err != nil {
-		slog.Error("failed to rehydrate workspace for MR job", "run_id", req.RunID, "job_id", req.JobID, "error", err)
+		slog.Error("failed to prepare sticky workspace for MR job", "run_id", req.RunID, "job_id", req.JobID, "error", err)
 		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
 		return
 	}

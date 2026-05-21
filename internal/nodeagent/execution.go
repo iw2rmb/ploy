@@ -1,127 +1,24 @@
 package nodeagent
 
 import (
-	"bytes"
-	"compress/gzip"
 	"context"
 	"fmt"
-	"io"
 	"log/slog"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"strings"
 
+	types "github.com/iw2rmb/ploy/internal/domain/types"
 	gitpkg "github.com/iw2rmb/ploy/internal/nodeagent/git"
 )
 
-const maxGzippedPatchBytes int64 = 16 << 20
-
-// RehydrateWorkspaceFromBaseAndDiffs copies the base clone and applies ordered per-step diffs
-// to reconstruct workspace state for multi-step runs.
-func RehydrateWorkspaceFromBaseAndDiffs(ctx context.Context, baseClonePath, destWorkspace string, diffs [][]byte) error {
-	if strings.TrimSpace(baseClonePath) == "" {
-		return fmt.Errorf("baseClonePath is empty")
+// advanceWorkspaceBaseline commits successful mig changes in the sticky
+// workspace so the next mig diff is incremental against the previous step.
+func advanceWorkspaceBaseline(ctx context.Context, workspace string, runID types.RunID, jobID types.JobID, diffUploaded bool) error {
+	message := fmt.Sprintf("Ploy: apply changes for run %s job %s", runID.String(), jobID.String())
+	committed, err := gitpkg.EnsureCommit(ctx, workspace, "ploy-baseline", "ploy-baseline@ploy.local", message)
+	if err == nil && committed {
+		slog.Info("advanced sticky workspace baseline", "run_id", runID.String(), "job_id", jobID.String(), "diff_uploaded", diffUploaded)
 	}
-	if strings.TrimSpace(destWorkspace) == "" {
-		return fmt.Errorf("destWorkspace is empty")
-	}
-
-	info, err := os.Stat(baseClonePath)
-	if err != nil {
-		return fmt.Errorf("baseClonePath validation failed: %w", err)
-	}
-	if !info.IsDir() {
-		return fmt.Errorf("baseClonePath is not a directory: %s", baseClonePath)
-	}
-
-	if err := copyGitClone(baseClonePath, destWorkspace); err != nil {
-		return fmt.Errorf("failed to copy base clone: %w", err)
-	}
-
-	for i, gzippedPatch := range diffs {
-		if err := applyGzippedPatch(ctx, destWorkspace, gzippedPatch); err != nil {
-			return fmt.Errorf("failed to apply diff at index %d: %w", i, err)
-		}
-	}
-
-	return nil
-}
-
-// copyGitClone creates a copy of a git repository from src to dest using rsync.
-func copyGitClone(src, dest string) error {
-	if _, err := os.Stat(filepath.Join(src, ".git")); err != nil {
-		return fmt.Errorf("source is not a git repository: %w", err)
-	}
-
-	if _, err := exec.LookPath("rsync"); err != nil {
-		return fmt.Errorf("rsync not available for git clone copy: %w", err)
-	}
-
-	cmd := exec.Command("rsync", "-a", src+"/", dest)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("rsync failed: %w (output: %s)", err, string(output))
-	}
-
-	return nil
-}
-
-// applyGzippedPatch decompresses a gzipped patch and applies it via "git apply".
-func applyGzippedPatch(ctx context.Context, workspace string, gzippedPatch []byte) error {
-	patch, err := decompressPatch(gzippedPatch)
-	if err != nil {
-		return fmt.Errorf("failed to decompress patch: %w", err)
-	}
-
-	if len(bytes.TrimSpace(patch)) == 0 {
-		return nil
-	}
-
-	cmd := exec.CommandContext(ctx, "git", "apply")
-	cmd.Dir = workspace
-	cmd.Stdin = bytes.NewReader(patch)
-
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("git apply failed: %w (stderr: %s)", err, stderr.String())
-	}
-
-	return nil
-}
-
-func decompressPatch(gzippedPatch []byte) ([]byte, error) {
-	if len(gzippedPatch) == 0 {
-		return []byte{}, nil
-	}
-
-	reader, err := gzip.NewReader(bytes.NewReader(gzippedPatch))
-	if err != nil {
-		return nil, fmt.Errorf("gzip reader initialization failed: %w", err)
-	}
-	defer func() {
-		_ = reader.Close()
-	}()
-
-	limited := io.LimitReader(reader, maxGzippedPatchBytes+1)
-	patch, err := io.ReadAll(limited)
-	if err != nil {
-		return nil, fmt.Errorf("gzip decompression failed: %w", err)
-	}
-	if int64(len(patch)) > maxGzippedPatchBytes {
-		return nil, fmt.Errorf("gzip patch exceeds maximum uncompressed size (%d bytes)", maxGzippedPatchBytes)
-	}
-
-	return patch, nil
-}
-
-// ensureBaselineCommitForRehydration creates a git commit after applying prior diffs
-// so that the current job only emits its own changes.
-func ensureBaselineCommitForRehydration(ctx context.Context, workspace string) error {
-	message := "Ploy: rehydration baseline"
-	_, err := gitpkg.EnsureCommit(ctx, workspace, "ploy-rehydrate", "ploy-rehydrate@ploy.local", message)
 	return err
 }
 

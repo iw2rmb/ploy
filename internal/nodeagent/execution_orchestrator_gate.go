@@ -75,10 +75,9 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 
 	applyGatePhaseOverrides(&manifest, req, typedOpts)
 
-	// Rehydrate workspace from base + diffs.
-	workspace, err := r.rehydrateWorkspaceForStep(ctx, req, manifest)
+	workspace, err := r.prepareStickyWorkspaceForStep(ctx, req, manifest)
 	if err != nil {
-		slog.Error("failed to rehydrate workspace", "run_id", req.RunID, "error", err)
+		slog.Error("failed to prepare sticky workspace", "run_id", req.RunID, "error", err)
 		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
 		return
 	}

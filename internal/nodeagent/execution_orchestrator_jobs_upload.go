@@ -252,9 +252,9 @@ func (r *runController) uploadJobDiff(
 	workspace string,
 	result step.Result,
 	diffType types.DiffJobType,
-) {
+) (bool, error) {
 	if diffGenerator == nil {
-		return
+		return false, nil
 	}
 
 	label := diffType.String()
@@ -262,11 +262,11 @@ func (r *runController) uploadJobDiff(
 	diffBytes, err := diffGenerator.Generate(ctx, workspace)
 	if err != nil {
 		slog.Error("failed to generate "+label+" diff", "run_id", runID, "job_id", jobID, "error", err)
-		return
+		return false, err
 	}
 	if len(diffBytes) == 0 {
 		slog.Info("no diff to upload (no workspace changes)", "run_id", runID, "job_id", jobID, "diff_type", label)
-		return
+		return false, nil
 	}
 
 	patchStats := step.CountPatchStats(diffBytes)
@@ -286,10 +286,11 @@ func (r *runController) uploadJobDiff(
 
 	if err := r.diffUploader.UploadDiff(ctx, runID, jobID, diffBytes, summary); err != nil {
 		slog.Error("failed to upload "+label+" diff", "run_id", runID, "job_id", jobID, "error", err)
-		return
+		return false, err
 	}
 
 	slog.Info(label+" diff uploaded successfully", "run_id", runID, "job_id", jobID, "size", len(diffBytes))
+	return true, nil
 }
 
 // isValidArtifactPath validates that an artifact path is safe for upload.
