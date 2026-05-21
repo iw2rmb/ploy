@@ -3,34 +3,15 @@ package handlers
 import (
 	"context"
 	"encoding/base64"
-	"os"
-	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 
 	"github.com/iw2rmb/ploy/internal/gitauth"
+	"github.com/iw2rmb/ploy/internal/testutil/fakegit"
 )
 
 func TestGitLSRemoteUsesCleanURLAndAuthEnv(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("shell script fake git is not portable to windows")
-	}
-
-	dir := t.TempDir()
-	binDir := filepath.Join(dir, "bin")
-	if err := os.MkdirAll(binDir, 0o755); err != nil {
-		t.Fatalf("create bin dir: %v", err)
-	}
-	argsPath := filepath.Join(dir, "args.txt")
-	envPath := filepath.Join(dir, "env.txt")
-	script := "#!/bin/sh\nprintf '%s\\n' \"$@\" > \"$CAPTURE_ARGS\"\nenv > \"$CAPTURE_ENV\"\necho '0123456789abcdef0123456789abcdef01234567\trefs/heads/main'\n"
-	if err := os.WriteFile(filepath.Join(binDir, "git"), []byte(script), 0o755); err != nil {
-		t.Fatalf("write fake git: %v", err)
-	}
-	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
-	t.Setenv("CAPTURE_ARGS", argsPath)
-	t.Setenv("CAPTURE_ENV", envPath)
+	capture := fakegit.Install(t, "0123456789abcdef0123456789abcdef01234567\trefs/heads/main")
 
 	sha, err := gitLSRemote(
 		context.Background(),
@@ -45,7 +26,7 @@ func TestGitLSRemoteUsesCleanURLAndAuthEnv(t *testing.T) {
 		t.Fatalf("sha=%q", sha)
 	}
 
-	args := readTestFile(t, argsPath)
+	args := fakegit.Read(t, capture.ArgsPath)
 	if strings.Contains(args, "glpat-secret") {
 		t.Fatalf("git args contain PAT: %q", args)
 	}
@@ -53,7 +34,7 @@ func TestGitLSRemoteUsesCleanURLAndAuthEnv(t *testing.T) {
 		t.Fatalf("git args do not contain clean URL: %q", args)
 	}
 
-	env := readTestFile(t, envPath)
+	env := fakegit.Read(t, capture.EnvPath)
 	if !strings.Contains(env, "GIT_CONFIG_KEY_0=http.https://gitlab.example.com/.extraHeader") {
 		t.Fatalf("git env missing scoped extraHeader key: %q", env)
 	}
@@ -61,13 +42,4 @@ func TestGitLSRemoteUsesCleanURLAndAuthEnv(t *testing.T) {
 	if !strings.Contains(env, wantHeader) {
 		t.Fatalf("git env missing auth header")
 	}
-}
-
-func readTestFile(t *testing.T, path string) string {
-	t.Helper()
-	b, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("read %s: %v", path, err)
-	}
-	return string(b)
 }

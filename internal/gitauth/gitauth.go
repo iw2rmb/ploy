@@ -6,6 +6,8 @@ import (
 	"net"
 	"net/url"
 	"strings"
+
+	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
 // Options configures transient Git HTTP authentication.
@@ -50,12 +52,38 @@ func PrepareURL(rawURL string, opts Options) PreparedURL {
 		return prepared
 	}
 
-	prepared.Env = ExtraHeaderEnv(clean, username, password)
+	prepared.Env = extraHeaderEnv(clean, username, password)
 	return prepared
 }
 
-// ExtraHeaderEnv returns GIT_CONFIG_* entries for a scoped HTTP Basic auth header.
-func ExtraHeaderEnv(repoURL url.URL, username, password string) []string {
+// PrepareBasicURL strips URL credentials and attaches the provided Basic auth pair.
+func PrepareBasicURL(rawURL, username, password string) (PreparedURL, error) {
+	trimmed := strings.TrimSpace(rawURL)
+	parsed, err := url.Parse(trimmed)
+	if err != nil {
+		return PreparedURL{}, fmt.Errorf("parse remote url: %w", err)
+	}
+	clean := *parsed
+	clean.User = nil
+	return PreparedURL{
+		URL: clean.String(),
+		Env: extraHeaderEnv(clean, username, password),
+	}, nil
+}
+
+// OptionsFromManifest extracts Git auth options from manifest options.
+func OptionsFromManifest(manifest contracts.StepManifest) Options {
+	opts := Options{}
+	if pat, ok := manifest.OptionString("gitlab_pat"); ok {
+		opts.GitLabPAT = pat
+	}
+	if domain, ok := manifest.OptionString("gitlab_domain"); ok {
+		opts.GitLabDomain = domain
+	}
+	return opts
+}
+
+func extraHeaderEnv(repoURL url.URL, username, password string) []string {
 	scope := fmt.Sprintf("%s://%s/", strings.ToLower(repoURL.Scheme), repoURL.Host)
 	payload := base64.StdEncoding.EncodeToString([]byte(username + ":" + password))
 	return []string{
@@ -82,15 +110,14 @@ func gitLabCredentials(repoURL url.URL, opts Options) (string, string, bool) {
 	if pat == "" {
 		return "", "", false
 	}
-	domainHost := NormalizeGitLabDomainHost(opts.GitLabDomain)
+	domainHost := normalizeGitLabDomainHost(opts.GitLabDomain)
 	if domainHost != "" && !strings.EqualFold(repoURL.Hostname(), domainHost) {
 		return "", "", false
 	}
 	return "oauth2", pat, true
 }
 
-// NormalizeGitLabDomainHost canonicalizes a GitLab domain option for hostname matching.
-func NormalizeGitLabDomainHost(raw string) string {
+func normalizeGitLabDomainHost(raw string) string {
 	trimmed := strings.TrimSpace(raw)
 	if trimmed == "" {
 		return ""

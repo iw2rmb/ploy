@@ -3,12 +3,12 @@ package git
 import (
 	"context"
 	"encoding/base64"
-	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/iw2rmb/ploy/internal/testutil/fakegit"
 )
 
 func TestPushOptions_Validation(t *testing.T) {
@@ -308,29 +308,12 @@ func TestPush_Integration(t *testing.T) {
 }
 
 func TestPushBranchUsesCleanURLAndAuthEnv(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("shell script fake git is not portable to windows")
-	}
-
-	dir := t.TempDir()
-	binDir := filepath.Join(dir, "bin")
-	if err := os.MkdirAll(binDir, 0o755); err != nil {
-		t.Fatalf("create bin dir: %v", err)
-	}
-	argsPath := filepath.Join(dir, "args.txt")
-	envPath := filepath.Join(dir, "env.txt")
-	script := "#!/bin/sh\nprintf '%s\\n' \"$@\" > \"$CAPTURE_ARGS\"\nenv > \"$CAPTURE_ENV\"\n"
-	if err := os.WriteFile(filepath.Join(binDir, "git"), []byte(script), 0o755); err != nil {
-		t.Fatalf("write fake git: %v", err)
-	}
-	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
-	t.Setenv("CAPTURE_ARGS", argsPath)
-	t.Setenv("CAPTURE_ENV", envPath)
+	capture := fakegit.Install(t, "")
 
 	p := &pusher{}
 	err := p.pushBranch(
 		context.Background(),
-		dir,
+		capture.Dir,
 		"workflow/test",
 		"glpat-secret",
 		"https://oauth2:old-token@gitlab.example.com/group/repo.git",
@@ -339,7 +322,7 @@ func TestPushBranchUsesCleanURLAndAuthEnv(t *testing.T) {
 		t.Fatalf("pushBranch() error: %v", err)
 	}
 
-	args := readTestFile(t, argsPath)
+	args := fakegit.Read(t, capture.ArgsPath)
 	if strings.Contains(args, "glpat-secret") || strings.Contains(args, "old-token") {
 		t.Fatalf("git args contain credentials: %q", args)
 	}
@@ -347,7 +330,7 @@ func TestPushBranchUsesCleanURLAndAuthEnv(t *testing.T) {
 		t.Fatalf("git args do not contain clean URL: %q", args)
 	}
 
-	env := readTestFile(t, envPath)
+	env := fakegit.Read(t, capture.EnvPath)
 	wantHeader := "GIT_CONFIG_VALUE_0=Authorization: Basic " + base64.StdEncoding.EncodeToString([]byte("oauth2:glpat-secret"))
 	if !strings.Contains(env, "GIT_CONFIG_KEY_0=http.https://gitlab.example.com/.extraHeader") {
 		t.Fatalf("git env missing scoped extraHeader key: %q", env)
@@ -404,15 +387,6 @@ func TestRunGitCommand(t *testing.T) {
 			t.Errorf("runGitCommand(status) in directory failed: %v", err)
 		}
 	})
-}
-
-func readTestFile(t *testing.T, path string) string {
-	t.Helper()
-	b, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("read %s: %v", path, err)
-	}
-	return string(b)
 }
 
 func TestNewPusher(t *testing.T) {
