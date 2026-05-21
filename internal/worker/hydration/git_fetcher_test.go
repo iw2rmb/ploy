@@ -114,8 +114,8 @@ func TestGitFetcher_CacheDir(t *testing.T) {
 		dest := t.TempDir()
 		cleanURL := "https://gitlab.example.com/group/repo.git"
 		credentialedURL := "https://oauth2:glpat-secret@gitlab.example.com/group/repo.git"
-		cacheKey := computeCacheKey(cleanURL, "main", "")
-		cachedClone := filepath.Join(cacheDir, "git-clones", cacheKey)
+		commitSHA := gitrepo.RevParse(t, repoDir, "HEAD")
+		cachedClone := mustCacheClonePath(t, cacheDir, cleanURL, commitSHA)
 
 		if err := os.MkdirAll(filepath.Dir(cachedClone), 0o750); err != nil {
 			t.Fatalf("create cache parent: %v", err)
@@ -131,6 +131,7 @@ func TestGitFetcher_CacheDir(t *testing.T) {
 			URL:       types.RepoURL(cleanURL),
 			BaseRef:   types.GitRef("main"),
 			TargetRef: types.GitRef("main"),
+			Commit:    types.CommitSHA(commitSHA),
 		}
 
 		if err := fetcher.Fetch(context.Background(), repo, dest, gitauth.Options{
@@ -159,20 +160,46 @@ func TestGitFetcher_CacheDir(t *testing.T) {
 		}
 
 		ctx := context.Background()
-		if err := fetcher.Fetch(ctx, makeRepo(repo1Dir, "main", "main", ""), dest1, gitauth.Options{}); err != nil {
+		if err := fetcher.Fetch(ctx, makeRepo(repo1Dir, "main", "main", gitrepo.RevParse(t, repo1Dir, "HEAD")), dest1, gitauth.Options{}); err != nil {
 			t.Fatalf("Fetch() repo1 error = %v", err)
 		}
-		if err := fetcher.Fetch(ctx, makeRepo(repo2Dir, "main", "main", ""), dest2, gitauth.Options{}); err != nil {
+		if err := fetcher.Fetch(ctx, makeRepo(repo2Dir, "main", "main", gitrepo.RevParse(t, repo2Dir, "HEAD")), dest2, gitauth.Options{}); err != nil {
 			t.Fatalf("Fetch() repo2 error = %v", err)
 		}
 
 		assertCacheEntryCount(t, cacheDir, 2)
 	})
 
+	t.Run("same repo and commit with different base_ref reuses cache entry", func(t *testing.T) {
+		t.Parallel()
+
+		repoDir := setupRepoWithFeatureBranch(t)
+		commitSHA := gitrepo.RevParse(t, repoDir, "main")
+		cacheDir := t.TempDir()
+		dest1 := t.TempDir()
+		dest2 := t.TempDir()
+
+		fetcher, err := NewGitFetcher(GitFetcherOptions{CacheDir: cacheDir})
+		if err != nil {
+			t.Fatalf("NewGitFetcher() error = %v", err)
+		}
+
+		ctx := context.Background()
+		if err := fetcher.Fetch(ctx, makeRepo(repoDir, "main", "main", commitSHA), dest1, gitauth.Options{}); err != nil {
+			t.Fatalf("Fetch() main error = %v", err)
+		}
+		if err := fetcher.Fetch(ctx, makeRepo(repoDir, "feature", "feature", commitSHA), dest2, gitauth.Options{}); err != nil {
+			t.Fatalf("Fetch() feature error = %v", err)
+		}
+
+		assertCacheEntryCount(t, cacheDir, 1)
+	})
+
 	t.Run("different commit_sha gets separate cache entry", func(t *testing.T) {
 		t.Parallel()
 
 		repoDir := setupRepoWithCommits(t)
+		latestCommitSHA := gitrepo.RevParse(t, repoDir, "HEAD")
 		secondCommitSHA := gitrepo.RevParse(t, repoDir, "HEAD~1")
 		cacheDir := t.TempDir()
 		dest1 := t.TempDir()
@@ -184,7 +211,7 @@ func TestGitFetcher_CacheDir(t *testing.T) {
 		}
 
 		ctx := context.Background()
-		if err := fetcher.Fetch(ctx, makeRepo(repoDir, "main", "main", ""), dest1, gitauth.Options{}); err != nil {
+		if err := fetcher.Fetch(ctx, makeRepo(repoDir, "main", "main", latestCommitSHA), dest1, gitauth.Options{}); err != nil {
 			t.Fatalf("Fetch() latest commit error = %v", err)
 		}
 		if err := fetcher.Fetch(ctx, makeRepo(repoDir, "main", "main", secondCommitSHA), dest2, gitauth.Options{}); err != nil {
@@ -215,101 +242,67 @@ func TestGitFetcher_CacheDir(t *testing.T) {
 	})
 }
 
-func TestComputeCacheKey(t *testing.T) {
+func TestCacheClonePath(t *testing.T) {
+	sha := "0123456789abcdef0123456789abcdef01234567"
 	tests := []struct {
-		name     string
-		url1     string
-		baseRef1 string
-		commit1  string
-		url2     string
-		baseRef2 string
-		commit2  string
-		wantSame bool
+		name    string
+		url     string
+		commit  string
+		want    string
+		wantErr bool
 	}{
 		{
-			name:     "same inputs produce same key",
-			url1:     "https://github.com/example/repo.git",
-			baseRef1: "main",
-			commit1:  "abc123",
-			url2:     "https://github.com/example/repo.git",
-			baseRef2: "main",
-			commit2:  "abc123",
-			wantSame: true,
+			name:   "https nested namespace",
+			url:    "https://github.com/org/team/repo.git",
+			commit: sha,
+			want:   filepath.Join("cache", "git-clones", "github.com", "org", "team", "repo", sha),
 		},
 		{
-			name:     "URL normalization: trailing slash ignored",
-			url1:     "https://github.com/example/repo.git",
-			baseRef1: "main",
-			url2:     "https://github.com/example/repo.git/",
-			baseRef2: "main",
-			wantSame: true,
+			name:   "credentials stripped",
+			url:    "https://oauth2:glpat-secret@gitlab.example.com/group/repo.git/",
+			commit: strings.ToUpper(sha),
+			want:   filepath.Join("cache", "git-clones", "gitlab.example.com", "group", "repo", sha),
 		},
 		{
-			name:     "URL normalization: .git suffix ignored",
-			url1:     "https://github.com/example/repo",
-			baseRef1: "main",
-			url2:     "https://github.com/example/repo.git",
-			baseRef2: "main",
-			wantSame: true,
+			name:   "ssh scheme strips user",
+			url:    "ssh://git@gitlab.example.com/group/repo.git",
+			commit: sha,
+			want:   filepath.Join("cache", "git-clones", "gitlab.example.com", "group", "repo", sha),
 		},
 		{
-			name:     "URL normalization: credentials ignored",
-			url1:     "https://gitlab.example.com/example/repo.git",
-			baseRef1: "main",
-			url2:     "https://oauth2:glpat-secret@gitlab.example.com/example/repo.git",
-			baseRef2: "main",
-			wantSame: true,
+			name:   "file scheme",
+			url:    "file:///tmp/group/repo.git",
+			commit: sha,
+			want:   filepath.Join("cache", "git-clones", "_file", "tmp", "group", "repo", sha),
 		},
 		{
-			name:     "different base_ref produces different key",
-			url1:     "https://github.com/example/repo.git",
-			baseRef1: "main",
-			url2:     "https://github.com/example/repo.git",
-			baseRef2: "develop",
-			wantSame: false,
+			name:    "short commit rejected",
+			url:     "https://github.com/org/repo.git",
+			commit:  "01234567",
+			wantErr: true,
 		},
 		{
-			name:     "different commit_sha produces different key",
-			url1:     "https://github.com/example/repo.git",
-			baseRef1: "main",
-			commit1:  "abc123",
-			url2:     "https://github.com/example/repo.git",
-			baseRef2: "main",
-			commit2:  "def456",
-			wantSame: false,
-		},
-		{
-			name:     "different URL produces different key",
-			url1:     "https://github.com/example/repo1.git",
-			baseRef1: "main",
-			url2:     "https://github.com/example/repo2.git",
-			baseRef2: "main",
-			wantSame: false,
-		},
-		{
-			name:     "empty vs non-empty commit produces different key",
-			url1:     "https://github.com/example/repo.git",
-			baseRef1: "main",
-			url2:     "https://github.com/example/repo.git",
-			baseRef2: "main",
-			commit2:  "abc123",
-			wantSame: false,
+			name:    "path traversal rejected",
+			url:     "https://github.com/org/../repo.git",
+			commit:  sha,
+			wantErr: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			key1 := computeCacheKey(tt.url1, tt.baseRef1, tt.commit1)
-			key2 := computeCacheKey(tt.url2, tt.baseRef2, tt.commit2)
-
-			if tt.wantSame && key1 != key2 {
-				t.Errorf("expected same cache key, got %q and %q", key1, key2)
+			got, err := cacheClonePath("cache", tt.url, tt.commit)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("cacheClonePath() error = nil, want error")
+				}
+				return
 			}
-			if !tt.wantSame && key1 == key2 {
-				t.Errorf("expected different cache keys, both got %q", key1)
+			if err != nil {
+				t.Fatalf("cacheClonePath() error = %v", err)
 			}
-			if len(key1) != 64 {
-				t.Errorf("expected 64-char hex string, got %d chars: %q", len(key1), key1)
+			if got != tt.want {
+				t.Fatalf("cacheClonePath() = %q, want %q", got, tt.want)
 			}
 		})
 	}
@@ -337,6 +330,29 @@ func TestGitFetcher_BaseHydrationStrategy(t *testing.T) {
 		}
 
 		gitrepo.AssertRepo(t, dest)
+	})
+
+	t.Run("existing hydrated destination with wrong commit is rebuilt", func(t *testing.T) {
+		repoDir := setupRepoWithCommits(t)
+		secondCommitSHA := gitrepo.RevParse(t, repoDir, "HEAD~1")
+		parent := t.TempDir()
+		dest := filepath.Join(parent, "clone")
+
+		gitrepo.Run(t, parent, "clone", "file://"+repoDir, "clone")
+
+		fetcher, err := NewGitFetcher(GitFetcherOptions{})
+		if err != nil {
+			t.Fatalf("NewGitFetcher() error = %v", err)
+		}
+
+		if err := fetcher.Fetch(context.Background(), makeRepo(repoDir, "main", "main", secondCommitSHA), dest, gitauth.Options{}); err != nil {
+			t.Fatalf("Fetch() error = %v", err)
+		}
+
+		currentSHA := gitrepo.RevParse(t, dest, "HEAD")
+		if currentSHA != secondCommitSHA {
+			t.Errorf("expected commit %s, got %s", secondCommitSHA, currentSHA)
+		}
 	})
 
 	t.Run("shallow clone creates minimal history", func(t *testing.T) {
@@ -436,13 +452,35 @@ func makeRepo(dir, baseRef, targetRef, commit string) *contracts.RepoMaterializa
 
 func assertCacheEntryCount(t *testing.T, cacheDir string, want int) {
 	t.Helper()
-	entries, err := os.ReadDir(filepath.Join(cacheDir, "git-clones"))
+	got := 0
+	err := filepath.WalkDir(filepath.Join(cacheDir, "git-clones"), func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if !d.IsDir() {
+			return nil
+		}
+		if d.Name() == ".git" {
+			got++
+			return filepath.SkipDir
+		}
+		return nil
+	})
 	if err != nil {
-		t.Fatalf("failed to read cache directory: %v", err)
+		t.Fatalf("failed to walk cache directory: %v", err)
 	}
-	if len(entries) != want {
-		t.Errorf("expected %d cache entries, got %d", want, len(entries))
+	if got != want {
+		t.Errorf("expected %d cache entries, got %d", want, got)
 	}
+}
+
+func mustCacheClonePath(t *testing.T, cacheDir, repoURL, commitSHA string) string {
+	t.Helper()
+	path, err := cacheClonePath(cacheDir, repoURL, commitSHA)
+	if err != nil {
+		t.Fatalf("cacheClonePath() error = %v", err)
+	}
+	return path
 }
 
 func assertRemoteOriginURL(t *testing.T, repoDir, want string) {

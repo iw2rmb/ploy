@@ -193,10 +193,11 @@ See [Build Gate docs](../build-gate/README.md) for Build Gate configuration and 
 - `PLOYD_CACHE_HOME` — Cache directory for working data. Defaults to `/var/cache/ploy` when set
   by bootstrap. Used at runtime by the node agent for ephemeral workspaces and git clone caching.
   When set, the node agent caches base git clones under `$PLOYD_CACHE_HOME/git-clones/` to avoid
-  repeated network fetches for the same repo/ref/commit combination. The cache key is derived from
-  the normalized repo URL, base_ref, and commit_sha. Subsequent hydrations for the same run or
-  different runs with identical repo parameters reuse the cached clone, significantly reducing
-  clone time and network bandwidth usage.
+  repeated network fetches for the same repo snapshot. Cache entries are pure shallow Git clones
+  stored as `git-clones/<domain>/<namespace>/<repo>/<full_commit_sha>/`. The path is derived from
+  the normalized repo URL and resolved full commit SHA; `base_ref` is only used to resolve or fetch
+  the snapshot. Subsequent hydrations for the same repo commit reuse the cached clone, significantly
+  reducing clone time and network bandwidth usage.
 - `PLOYD_METRICS_LISTEN` — Read by `ployd` at runtime as the metrics listen address
   (default `:9100`).
 
