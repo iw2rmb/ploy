@@ -2,9 +2,9 @@ package hydration
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
+	"log/slog"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -19,7 +19,7 @@ import (
 type GitFetcherOptions struct {
 	// CacheDir specifies the base directory for caching git clones.
 	// When set (typically from PLOYD_CACHE_HOME), the fetcher reuses existing clones
-	// for the same repo/ref/commit combination, avoiding repeated full clones.
+	// for the same repo and resolved commit combination, avoiding repeated full clones.
 	// When empty, caching is disabled and each fetch performs a fresh clone.
 	CacheDir string
 }
@@ -61,8 +61,8 @@ func NewGitFetcher(opts GitFetcherOptions) (GitFetcher, error) {
 //  3. Optionally fetches and checks out a specific commit_sha for pinned snapshots.
 //
 // When CacheDir is configured (via PLOYD_CACHE_HOME), the fetcher reuses existing
-// base clones for the same repo/ref/commit combination. The cache key is derived from
-// the normalized repo URL, base_ref, and commit_sha. If a cached clone exists, it is
+// base clones for the same repo and resolved commit combination. The cache path is
+// derived from the normalized repo URL and full commit SHA. If a cached clone exists, it is
 // copied to the destination workspace, avoiding repeated network fetches.
 //
 // The resulting clone serves as the logical "base snapshot" that nodes use
@@ -91,43 +91,59 @@ func (g *gitFetcher) Fetch(ctx context.Context, repo *contracts.RepoMaterializat
 	// path (for example, when a per-step workspace is a copy of an existing base clone).
 	if dest != "" {
 		if info, err := os.Stat(dest); err == nil && info.IsDir() {
-			if validateCloneOrigin(ctx, dest, url) {
+			fullCommitSHA := normalizeFullCommitSHA(commitSHA)
+			if fullCommitSHA != "" && validateCachedClone(ctx, dest, url, fullCommitSHA) {
 				if err := sanitizeCloneOrigin(ctx, dest, url); err != nil {
 					return fmt.Errorf("sanitize hydrated clone origin: %w", err)
 				}
 				return nil
+			}
+			if fullCommitSHA == "" && validateCloneOrigin(ctx, dest, url) {
+				if err := sanitizeCloneOrigin(ctx, dest, url); err != nil {
+					return fmt.Errorf("sanitize hydrated clone origin: %w", err)
+				}
+				return nil
+			}
+			if removeErr := os.RemoveAll(dest); removeErr != nil {
+				return fmt.Errorf("remove stale hydrated clone destination %q: %w", dest, removeErr)
 			}
 		}
 	}
 
 	// Check if caching is enabled and we have a cached clone.
 	if g.opts.CacheDir != "" {
-		cacheKey := computeCacheKey(url, baseRef, commitSHA)
-		cachedClonePath := filepath.Join(g.opts.CacheDir, "git-clones", cacheKey)
+		fullCommitSHA := normalizeFullCommitSHA(commitSHA)
+		if fullCommitSHA != "" {
+			cachedClonePath, err := cacheClonePath(g.opts.CacheDir, url, fullCommitSHA)
+			if err != nil {
+				return fmt.Errorf("build git clone cache path: %w", err)
+			}
 
-		// If cache exists, copy it to dest and validate before using.
-		if _, err := os.Stat(cachedClonePath); err == nil {
-			if validateCloneOrigin(ctx, cachedClonePath, url) {
-				if err := sanitizeCloneOrigin(ctx, cachedClonePath, url); err != nil {
-					if removeErr := os.RemoveAll(cachedClonePath); removeErr != nil {
-						return fmt.Errorf("remove unsanitized cached clone %q: %w", cachedClonePath, removeErr)
+			// If cache exists, copy it to dest and validate before using.
+			if _, err := os.Stat(cachedClonePath); err == nil {
+				if validateCachedClone(ctx, cachedClonePath, url, fullCommitSHA) {
+					if err := sanitizeCloneOrigin(ctx, cachedClonePath, url); err != nil {
+						if removeErr := os.RemoveAll(cachedClonePath); removeErr != nil {
+							return fmt.Errorf("remove unsanitized cached clone %q: %w", cachedClonePath, removeErr)
+						}
 					}
 				}
-			}
-			if err := copyGitClone(cachedClonePath, dest); err == nil {
-				// Validate the cached clone matches expected URL.
-				if validateCloneOrigin(ctx, dest, url) {
-					if err := sanitizeCloneOrigin(ctx, dest, url); err != nil {
-						return fmt.Errorf("sanitize cached clone destination origin: %w", err)
+				if err := copyGitClone(cachedClonePath, dest); err == nil {
+					if validateCachedClone(ctx, dest, url, fullCommitSHA) {
+						if err := sanitizeCloneOrigin(ctx, dest, url); err != nil {
+							return fmt.Errorf("sanitize cached clone destination origin: %w", err)
+						}
+						return nil
 					}
-					return nil
+					if removeErr := os.RemoveAll(dest); removeErr != nil {
+						return fmt.Errorf("remove invalid cached clone destination %q: %w", dest, removeErr)
+					}
 				}
-				// Cache invalid or corrupted; remove and fall through to fresh clone.
-				if removeErr := os.RemoveAll(dest); removeErr != nil {
-					return fmt.Errorf("remove invalid cached clone destination %q: %w", dest, removeErr)
+				// Cache copy failed or invalid; remove stale cache and fall through to fresh clone.
+				if removeErr := os.RemoveAll(cachedClonePath); removeErr != nil {
+					return fmt.Errorf("remove invalid cached clone %q: %w", cachedClonePath, removeErr)
 				}
 			}
-			// Cache copy failed or invalid; fall through to fresh clone.
 		}
 
 		// Cache miss or copy failed: perform fresh clone and populate cache.
@@ -135,11 +151,18 @@ func (g *gitFetcher) Fetch(ctx context.Context, repo *contracts.RepoMaterializat
 			return err
 		}
 
-		// Populate cache: copy dest to cache directory.
-		// Ignore errors here to avoid failing the overall fetch if cache write fails.
-		// The clone succeeded, so the workspace is valid even if caching fails.
-		if err := os.MkdirAll(filepath.Dir(cachedClonePath), 0o750); err == nil {
-			_ = copyGitClone(dest, cachedClonePath)
+		resolvedCommitSHA, err := resolveCloneHEAD(ctx, dest)
+		if err != nil {
+			slog.Warn("failed to resolve hydrated clone head for cache population", "path", dest, "error", err)
+			return nil
+		}
+		cachedClonePath, err := cacheClonePath(g.opts.CacheDir, url, resolvedCommitSHA)
+		if err != nil {
+			slog.Warn("failed to build git clone cache path", "repo_url", url, "commit_sha", resolvedCommitSHA, "error", err)
+			return nil
+		}
+		if err := populateCachedClone(ctx, dest, cachedClonePath, url, resolvedCommitSHA); err != nil {
+			slog.Warn("failed to populate git clone cache", "path", cachedClonePath, "error", err)
 		}
 
 		return nil
@@ -189,20 +212,87 @@ func (g *gitFetcher) cloneAndCheckout(ctx context.Context, rawURL, baseRef, comm
 	return nil
 }
 
-// computeCacheKey generates a stable cache key for a repo/ref/commit combination.
-// The key is a SHA256 hash of the normalized inputs to ensure filesystem-safe,
-// collision-resistant identifiers that remain stable across runs.
-func computeCacheKey(url, baseRef, commitSHA string) string {
-	// Normalize URL: strip trailing slashes and .git suffix for consistent keys.
-	// Uses the shared domaintypes.NormalizeRepoURL helper for canonical URL form.
-	normalized := domaintypes.NormalizeRepoURL(url)
+func cacheClonePath(cacheDir, rawURL, commitSHA string) (string, error) {
+	fullCommitSHA := normalizeFullCommitSHA(commitSHA)
+	if fullCommitSHA == "" {
+		return "", fmt.Errorf("commit sha must be a full 40-character hex sha")
+	}
 
-	// Include base_ref and commit_sha in the key for cache isolation.
-	// Different base_ref or commit_sha values result in different cache entries.
-	keyInput := fmt.Sprintf("%s|%s|%s", normalized, baseRef, commitSHA)
+	components, err := cacheRepoPathComponents(rawURL)
+	if err != nil {
+		return "", err
+	}
+	components = append([]string{cacheDir, "git-clones"}, components...)
+	components = append(components, fullCommitSHA)
+	return filepath.Join(components...), nil
+}
 
-	hash := sha256.Sum256([]byte(keyInput))
-	return hex.EncodeToString(hash[:])
+func cacheRepoPathComponents(rawURL string) ([]string, error) {
+	normalized := domaintypes.NormalizeRepoURL(rawURL)
+	if normalized == "" {
+		return nil, fmt.Errorf("repo url is empty")
+	}
+
+	parsed, err := url.Parse(normalized)
+	if err != nil {
+		return nil, fmt.Errorf("parse repo url: %w", err)
+	}
+
+	scheme := strings.ToLower(parsed.Scheme)
+	var components []string
+	switch scheme {
+	case "https", "http", "ssh":
+		host := strings.ToLower(strings.TrimSpace(parsed.Host))
+		if host == "" {
+			return nil, fmt.Errorf("repo url host is empty")
+		}
+		components = append(components, host)
+		components = append(components, splitRepoPath(parsed.Path)...)
+	case "file":
+		components = append(components, "_file")
+		components = append(components, splitRepoPath(parsed.Path)...)
+	default:
+		return nil, fmt.Errorf("unsupported repo url scheme %q", parsed.Scheme)
+	}
+
+	if len(components) < 2 {
+		return nil, fmt.Errorf("repo url path is empty")
+	}
+	for _, component := range components {
+		if !safeCachePathComponent(component) {
+			return nil, fmt.Errorf("unsafe repo url path component %q", component)
+		}
+	}
+	return components, nil
+}
+
+func splitRepoPath(path string) []string {
+	parts := strings.Split(strings.Trim(path, "/"), "/")
+	components := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			components = append(components, part)
+		}
+	}
+	return components
+}
+
+func safeCachePathComponent(component string) bool {
+	return component != "" && component != "." && component != ".." && !strings.ContainsAny(component, `/\`)
+}
+
+func normalizeFullCommitSHA(commitSHA string) string {
+	commitSHA = strings.ToLower(strings.TrimSpace(commitSHA))
+	if len(commitSHA) != 40 {
+		return ""
+	}
+	for _, r := range commitSHA {
+		if (r < '0' || r > '9') && (r < 'a' || r > 'f') {
+			return ""
+		}
+	}
+	return commitSHA
 }
 
 // validateCloneOrigin checks if dest is a git repository with the expected origin URL.
@@ -222,12 +312,74 @@ func validateCloneOrigin(ctx context.Context, dest, expectedURL string) bool {
 	return domaintypes.NormalizeRepoURL(remoteURL) == domaintypes.NormalizeRepoURL(expectedURL)
 }
 
+func validateCachedClone(ctx context.Context, dest, expectedURL, expectedCommitSHA string) bool {
+	if !validateCloneOrigin(ctx, dest, expectedURL) {
+		return false
+	}
+	head, err := resolveCloneHEAD(ctx, dest)
+	if err != nil {
+		return false
+	}
+	return head == normalizeFullCommitSHA(expectedCommitSHA)
+}
+
+func resolveCloneHEAD(ctx context.Context, dest string) (string, error) {
+	cmd := exec.CommandContext(ctx, "git", "-C", dest, "rev-parse", "HEAD")
+	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GIT_ASKPASS=echo")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("git rev-parse HEAD: %w (output: %s)", err, string(output))
+	}
+	commitSHA := normalizeFullCommitSHA(string(output))
+	if commitSHA == "" {
+		return "", fmt.Errorf("git rev-parse HEAD returned non-full sha %q", strings.TrimSpace(string(output)))
+	}
+	return commitSHA, nil
+}
+
 func sanitizeCloneOrigin(ctx context.Context, dest, expectedURL string) error {
 	prepared := gitauth.PrepareURL(expectedURL, gitauth.Options{})
 	if strings.TrimSpace(prepared.URL) == "" {
 		return nil
 	}
 	return runGitCommand(ctx, dest, nil, "remote", "set-url", "origin", prepared.URL)
+}
+
+func populateCachedClone(ctx context.Context, src, dest, expectedURL, expectedCommitSHA string) error {
+	if _, err := os.Stat(dest); err == nil {
+		if validateCachedClone(ctx, dest, expectedURL, expectedCommitSHA) {
+			return nil
+		}
+		if err := os.RemoveAll(dest); err != nil {
+			return fmt.Errorf("remove invalid cached clone %q: %w", dest, err)
+		}
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("inspect cached clone %q: %w", dest, err)
+	}
+
+	parent := filepath.Dir(dest)
+	if err := os.MkdirAll(parent, 0o750); err != nil {
+		return fmt.Errorf("create cache parent %q: %w", parent, err)
+	}
+	tmp, err := os.MkdirTemp(parent, "."+filepath.Base(dest)+".tmp-*")
+	if err != nil {
+		return fmt.Errorf("create temp cache dir: %w", err)
+	}
+	defer func() { _ = os.RemoveAll(tmp) }()
+
+	if err := copyGitClone(src, tmp); err != nil {
+		return err
+	}
+	if !validateCachedClone(ctx, tmp, expectedURL, expectedCommitSHA) {
+		return fmt.Errorf("copied cache clone failed validation")
+	}
+	if err := os.Rename(tmp, dest); err != nil {
+		if validateCachedClone(ctx, dest, expectedURL, expectedCommitSHA) {
+			return nil
+		}
+		return fmt.Errorf("publish cached clone %q: %w", dest, err)
+	}
+	return nil
 }
 
 // copyGitClone creates a copy of a git repository from src to dest.
