@@ -99,7 +99,7 @@ func (r *runController) prepareStickyWorkspaceForStep(
 	if err := os.RemoveAll(workspacePath); err != nil && !os.IsNotExist(err) {
 		return "", fmt.Errorf("remove stale sticky workspace before hydration: %w", err)
 	}
-	if err := gitFetcher.Fetch(ctx, repo, workspacePath, gitAuthOptionsFromManifestOrRequest(manifest, req.TypedOptions)); err != nil {
+	if err := gitFetcher.Fetch(ctx, repo, workspacePath, gitAuthOptionsForStickyHydration(manifest, req.TypedOptions)); err != nil {
 		if removeErr := os.RemoveAll(workspacePath); removeErr != nil {
 			slog.Warn("failed to clean up workspace after error", "path", workspacePath, "error", removeErr)
 		}
@@ -115,16 +115,13 @@ func hasGitDir(path string) bool {
 	return err == nil && info.IsDir()
 }
 
-func gitAuthOptionsFromManifestOrRequest(manifest contracts.StepManifest, opts RunOptions) gitauth.Options {
+func gitAuthOptionsForStickyHydration(manifest contracts.StepManifest, opts RunOptions) gitauth.Options {
 	auth := gitauth.Options{
 		GitLabPAT:    strings.TrimSpace(opts.MRWiring.GitLabPAT),
 		GitLabDomain: strings.TrimSpace(opts.MRWiring.GitLabDomain),
 	}
-	if pat, ok := manifest.OptionString("gitlab_pat"); ok {
-		auth.GitLabPAT = pat
-	}
-	if domain, ok := manifest.OptionString("gitlab_domain"); ok {
-		auth.GitLabDomain = domain
+	if manifestAuth := gitauth.OptionsFromManifest(manifest); manifestAuth != (gitauth.Options{}) {
+		auth = manifestAuth
 	}
 	return auth
 }

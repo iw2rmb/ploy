@@ -3,7 +3,6 @@ package git
 import (
 	"context"
 	"fmt"
-	"net/url"
 	"os"
 	"os/exec"
 	"strings"
@@ -96,17 +95,15 @@ func (p *pusher) configureGitUser(ctx context.Context, repoDir, userName, userEm
 
 // pushBranch performs the git push operation with auth scoped to this Git process.
 func (p *pusher) pushBranch(ctx context.Context, repoDir, targetRef, pat, remoteURL string) error {
-	u, err := url.Parse(remoteURL)
+	prepared, err := gitauth.PrepareBasicURL(remoteURL, "oauth2", pat)
 	if err != nil {
-		return fmt.Errorf("parse remote url: %w", err)
+		return err
 	}
-	u.User = nil
-	authEnv := gitauth.ExtraHeaderEnv(*u, "oauth2", pat)
 
 	// Push the current HEAD to the remote branch name, creating it if needed.
 	refspec := "HEAD:refs/heads/" + targetRef
-	if err := runGitCommand(ctx, repoDir, authEnv, "push", u.String(), refspec); err != nil {
-		return RedactError(fmt.Errorf("git push %s: %w", u.Host, err), pat)
+	if err := runGitCommand(ctx, repoDir, prepared.Env, "push", prepared.URL, refspec); err != nil {
+		return RedactError(fmt.Errorf("git push: %w", err), pat)
 	}
 	return nil
 }
