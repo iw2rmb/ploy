@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -12,7 +11,6 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
-	bsmock "github.com/iw2rmb/ploy/internal/blobstore/mock"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	migsapi "github.com/iw2rmb/ploy/internal/migs/api"
 	"github.com/iw2rmb/ploy/internal/store"
@@ -61,10 +59,6 @@ func TestCreateSingleRepoRunHandler_SingleRepo(t *testing.T) {
 
 func TestCreateJobsFromSpec(t *testing.T) {
 	t.Parallel()
-	const (
-		hookHashA = "a1b2c3d4e5f6"
-		hookHashB = "b1c2d3e4f5a6"
-	)
 
 	tests := []struct {
 		name        string
@@ -76,7 +70,6 @@ func TestCreateJobsFromSpec(t *testing.T) {
 		spec        []byte
 		expected    []expectedJob
 		wantErr     string
-		useHashHook bool
 	}{
 		{
 			name:        "SingleMig",
@@ -123,21 +116,6 @@ func TestCreateJobsFromSpec(t *testing.T) {
 			},
 		},
 		{
-			name:        "WithHooks",
-			runID:       domaintypes.RunID("run_hooks_123456789012345"),
-			repoID:      domaintypes.RepoID("repo_hooks"),
-			repoBaseRef: "main",
-			attempt:     1,
-			repoSHA0:    testRepoSHA0,
-			spec:        []byte(`{"hooks":["` + hookHashA + `","` + hookHashB + `"],"bundle_map":{"` + hookHashA + `":"bundle_hooks","` + hookHashB + `":"bundle_hooks"},"steps":[{"image":"mig1:v1"}]}`),
-			expected: []expectedJob{
-				{"pre-gate", domaintypes.JobTypePreGate, domaintypes.JobStatusQueued, "", testRepoSHA0},
-				{"mig-0", domaintypes.JobTypeMig, domaintypes.JobStatusCreated, "mig1:v1", ""},
-				{"post-gate", domaintypes.JobTypePostGate, domaintypes.JobStatusCreated, "", ""},
-			},
-			useHashHook: true,
-		},
-		{
 			name:        "InvalidRepoSHA0",
 			runID:       domaintypes.RunID("run_123"),
 			repoID:      domaintypes.RepoID("repo_456"),
@@ -152,21 +130,12 @@ func TestCreateJobsFromSpec(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			st := &jobStore{}
-			var hookBS *bsmock.Store
-			if tt.useHashHook {
-				hookBS = bsmock.New()
-				seedPlanningHookBundle(t, st, hookBS, "bundle_hooks", `
-id: hook-bundle
-steps:
-  - image: hook:latest
-`)
-			}
 			repoSHA0 := tt.repoSHA0
 			if repoSHA0 == "" {
 				repoSHA0 = testRepoSHA0
 			}
 
-			err := createJobsFromSpec(context.Background(), st, tt.runID, tt.repoID, tt.repoBaseRef, tt.attempt, repoSHA0, tt.spec, hookBS)
+			err := createJobsFromSpec(context.Background(), st, tt.runID, tt.repoID, tt.repoBaseRef, tt.attempt, repoSHA0, tt.spec)
 
 			if tt.wantErr != "" {
 				if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
@@ -263,201 +232,6 @@ func TestCreateJobsFromSpec_ChainIntegrity(t *testing.T) {
 			}
 		}
 		inserted[p.ID] = struct{}{}
-	}
-}
-
-func TestCreateJobsFromSpec_PostGatePreludeWithHooks_DeterministicOrder(t *testing.T) {
-	t.Parallel()
-
-	const (
-		hookHashA = "aa11bb22cc33"
-		hookHashB = "dd44ee55ff66"
-	)
-
-	st := &jobStore{}
-	bs := bsmock.New()
-	seedPlanningHookBundle(t, st, bs, "bundle_post_gate", `
-id: hook-bundle
-steps:
-  - image: hook:latest
-`)
-	spec := []byte(`{"hooks":["` + hookHashA + `","` + hookHashB + `"],"bundle_map":{"` + hookHashA + `":"bundle_post_gate","` + hookHashB + `":"bundle_post_gate"},"steps":[{"image":"a"},{"image":"b"}]}`)
-
-	err := createJobsFromSpec(context.Background(), st, domaintypes.RunID("run_123"), domaintypes.RepoID("repo_456"), "main", 1, testRepoSHA0, spec, bs)
-	if err != nil {
-		t.Fatalf("createJobsFromSpec failed: %v", err)
-	}
-
-	byName := createJobsByName(st.createJob.calls)
-	preGate := byName["pre-gate"]
-	mig1 := byName["mig-1"]
-	postGate := byName["post-gate"]
-
-	if preGate.NextID == nil || *preGate.NextID != byName["mig-0"].ID {
-		t.Fatalf("pre-gate next_id = %v, want %s", preGate.NextID, byName["mig-0"].ID)
-	}
-	if mig1.NextID == nil || *mig1.NextID != postGate.ID {
-		t.Fatalf("mig-1 next_id = %v, want %s", mig1.NextID, postGate.ID)
-	}
-	if postGate.NextID != nil {
-		t.Fatalf("post-gate next_id = %v, want nil", *postGate.NextID)
-	}
-}
-
-func TestCreateJobsFromSpec_ConditionalHooks_MixedCycleMatches(t *testing.T) {
-	t.Parallel()
-
-	mux := http.NewServeMux()
-	mux.HandleFunc("/hook-java.yaml", func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte(`
-id: hook-java
-stack:
-  language: java
-steps:
-  - image: hook:latest
-`))
-	})
-	server := httptest.NewServer(mux)
-	t.Cleanup(server.Close)
-
-	st := &jobStore{}
-	spec := []byte(fmt.Sprintf(
-		`{"hooks":["%s/hook-java.yaml"],"steps":[{"image":"a"}],"build_gate":{"pre":{"stack":{"enabled":true,"language":"java","release":"17"}},"post":{"stack":{"enabled":true,"language":"go","release":"1.22"}}}}`,
-		server.URL,
-	))
-	err := createJobsFromSpec(context.Background(), st, domaintypes.RunID("run_conditional_123"), domaintypes.RepoID("repo_conditional"), "main", 1, testRepoSHA0, spec)
-	if err != nil {
-		t.Fatalf("createJobsFromSpec failed: %v", err)
-	}
-
-	byName := createJobsByName(st.createJob.calls)
-	if _, exists := byName["pre-gate-hook-000"]; exists {
-		t.Fatal("did not expect pre-gate hooks to be planned")
-	}
-	if _, exists := byName["post-gate-hook-000"]; exists {
-		t.Fatal("did not expect post-gate hooks to be planned")
-	}
-
-	preGate := byName["pre-gate"]
-	mig0 := byName["mig-0"]
-	postGate := byName["post-gate"]
-
-	if preGate.NextID == nil || *preGate.NextID != mig0.ID {
-		t.Fatalf("pre-gate next_id = %v, want %s", preGate.NextID, mig0.ID)
-	}
-	if mig0.NextID == nil || *mig0.NextID != postGate.ID {
-		t.Fatalf("mig-0 next_id = %v, want %s", mig0.NextID, postGate.ID)
-	}
-	if postGate.NextID != nil {
-		t.Fatalf("post-gate next_id = %v, want nil", *postGate.NextID)
-	}
-
-}
-
-func TestCreateJobsFromSpec_ConditionalHooks_AllFalseCreatesNoHooks(t *testing.T) {
-	t.Parallel()
-
-	mux := http.NewServeMux()
-	mux.HandleFunc("/hook-ruby.yaml", func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte(`
-id: hook-ruby
-stack:
-  language: ruby
-steps:
-  - image: hook:latest
-`))
-	})
-	server := httptest.NewServer(mux)
-	t.Cleanup(server.Close)
-
-	st := &jobStore{}
-	spec := []byte(fmt.Sprintf(
-		`{"hooks":["%s/hook-ruby.yaml"],"steps":[{"image":"a"}],"build_gate":{"pre":{"stack":{"enabled":true,"language":"java","release":"17"}},"post":{"stack":{"enabled":true,"language":"go","release":"1.22"}}}}`,
-		server.URL,
-	))
-	err := createJobsFromSpec(context.Background(), st, domaintypes.RunID("run_conditional_false_123"), domaintypes.RepoID("repo_conditional_false"), "main", 1, testRepoSHA0, spec)
-	if err != nil {
-		t.Fatalf("createJobsFromSpec failed: %v", err)
-	}
-
-	if len(st.createJob.calls) != 3 {
-		t.Fatalf("expected 3 jobs (no hooks), got %d", len(st.createJob.calls))
-	}
-	for _, created := range st.createJob.calls {
-		if strings.Contains(created.Name, "-hook-") {
-			t.Fatalf("did not expect hook job %q when all matcher decisions are false", created.Name)
-		}
-	}
-}
-
-func TestCreateJobsFromSpec_ConditionalHashHooks_AllFalseCreatesNoHooks(t *testing.T) {
-	t.Parallel()
-
-	const hookHash = "aa11bb22cc33"
-	st := &jobStore{}
-	bs := bsmock.New()
-	seedPlanningHookBundle(t, st, bs, "bundle_hash_false", `
-id: hook-ruby
-stack:
-  language: ruby
-steps:
-  - image: hook:latest
-`)
-	spec := []byte(`{"hooks":["` + hookHash + `"],"bundle_map":{"` + hookHash + `":"bundle_hash_false"},"steps":[{"image":"a"}],"build_gate":{"pre":{"stack":{"enabled":true,"language":"java","release":"17"}},"post":{"stack":{"enabled":true,"language":"go","release":"1.22"}}}}`)
-
-	err := createJobsFromSpec(context.Background(), st, domaintypes.RunID("run_conditional_hash_false_123"), domaintypes.RepoID("repo_conditional_hash_false"), "main", 1, testRepoSHA0, spec, bs)
-	if err != nil {
-		t.Fatalf("createJobsFromSpec failed: %v", err)
-	}
-
-	if len(st.createJob.calls) != 3 {
-		t.Fatalf("expected 3 jobs (no hooks), got %d", len(st.createJob.calls))
-	}
-	for _, created := range st.createJob.calls {
-		if strings.Contains(created.Name, "-hook-") {
-			t.Fatalf("did not expect hook job %q when all matcher decisions are false", created.Name)
-		}
-	}
-}
-
-func TestCreateJobsFromSpec_IgnoresMissingHookBundleBlob(t *testing.T) {
-	t.Parallel()
-
-	const (
-		hookHash = "deadc0de1234"
-		bundleID = "bundle_missing_blob"
-	)
-
-	st := &jobStore{}
-	bs := bsmock.New() // intentionally empty; metadata exists but blob is missing
-	objKey := "spec_bundles/" + bundleID + "/bundle.tar.gz"
-	st.getSpecBundle.val = store.SpecBundle{
-		ID:        bundleID,
-		ObjectKey: &objKey,
-	}
-
-	spec := []byte(`{"hooks":["` + hookHash + `"],"bundle_map":{"` + hookHash + `":"` + bundleID + `"},"steps":[{"image":"a"}]}`)
-	err := createJobsFromSpec(
-		context.Background(),
-		st,
-		domaintypes.RunID("run_missing_bundle_blob_123"),
-		domaintypes.RepoID("repo_missing_bundle_blob"),
-		"main",
-		1,
-		testRepoSHA0,
-		spec,
-		bs,
-	)
-	if err != nil {
-		t.Fatalf("createJobsFromSpec failed: %v", err)
-	}
-	if len(st.createJob.calls) != 3 {
-		t.Fatalf("expected canonical 3-job chain, got %d", len(st.createJob.calls))
-	}
-	for _, created := range st.createJob.calls {
-		if strings.Contains(created.Name, "-hook-") {
-			t.Fatalf("did not expect hook job %q", created.Name)
-		}
 	}
 }
 

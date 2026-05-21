@@ -57,36 +57,24 @@ func TestHeartbeatHandler_BytesContract(t *testing.T) {
 	}
 }
 
-func TestHeartbeatHandler_RejectsInvalidBodies(t *testing.T) {
-	cases := []struct {
-		name string
-		body string
-	}{
-		{
-			name: "redundant_identity",
-			body: `{
-  "node_id": "aB3xY9",
+func TestHeartbeatHandler_RejectsUnknownFields(t *testing.T) {
+	st := &nodeStore{}
+	h := heartbeatHandler(st)
+	nodeID := "aB3xY9"
+
+	body := `{
+  "unexpected": "value",
   "cpu_free_millis": 1,
   "cpu_total_millis": 1,
   "mem_free_bytes": 1,
   "mem_total_bytes": 1,
   "disk_free_bytes": 1,
   "disk_total_bytes": 1
-}`,
-		},
-	}
+}`
 
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			st := &nodeStore{}
-			h := heartbeatHandler(st)
-			nodeID := "aB3xY9"
+	rr := doRequest(t, h, http.MethodPost, "/v1/nodes/"+nodeID+"/heartbeat", body, "id", nodeID)
 
-			rr := doRequest(t, h, http.MethodPost, "/v1/nodes/"+nodeID+"/heartbeat", tc.body, "id", nodeID)
-
-			assertStatus(t, rr, http.StatusBadRequest)
-			assertNotCalled(t, "GetNode", st.getNode.called)
-			assertNotCalled(t, "UpdateNodeHeartbeat", st.updateNodeHeartbeat.called)
-		})
-	}
+	assertStatus(t, rr, http.StatusBadRequest)
+	assertNotCalled(t, "GetNode", st.getNode.called)
+	assertNotCalled(t, "UpdateNodeHeartbeat", st.updateNodeHeartbeat.called)
 }
