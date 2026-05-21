@@ -45,9 +45,6 @@ func buildGateToolCacheMounts(language, tool, release string) ([]ContainerMount,
 	if err := os.MkdirAll(hostPath, 0o750); err != nil {
 		return nil, err
 	}
-	if err := ensureGateCacheCapacity(hostPath); err != nil {
-		return nil, err
-	}
 	return []ContainerMount{{
 		Source:   hostPath,
 		Target:   target,
