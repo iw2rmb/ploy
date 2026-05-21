@@ -17,7 +17,7 @@ func TestSBOMInsertQuery_UsesConflictNoop(t *testing.T) {
 func TestSBOMConstraint_PrimaryKeyDefinedInSchema(t *testing.T) {
 	t.Parallel()
 
-	schema := normalizeWhitespace(getSchemaSQL())
+	schema := normalizeWhitespace(schemaSQL)
 	wantTable := normalizeWhitespace("CREATE TABLE IF NOT EXISTS sboms")
 	wantPK := normalizeWhitespace("PRIMARY KEY (job_id, repo_id, lib, ver)")
 	if !strings.Contains(schema, wantTable) {
