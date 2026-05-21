@@ -49,7 +49,7 @@ func (r *runController) executeMRCreateAction(ctx context.Context, req StartActi
 		return
 	}
 
-	workspace, err := r.rehydrateWorkspaceForStep(ctx, jobReq, manifest)
+	workspace, err := r.prepareStickyWorkspaceForStep(ctx, jobReq, manifest)
 	if err != nil {
 		stats := types.NewRunStatsBuilder().DurationMs(time.Since(startTime).Milliseconds()).Error(err.Error()).MustBuild()
 		_ = r.statusUploader.UploadActionStatus(ctx, req.ActionID, lifecycle.JobStatusFromRunError(err).String(), stats)

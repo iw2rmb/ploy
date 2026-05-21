@@ -1,7 +1,7 @@
 # Multi-step mig spec demonstrating sequential transformation steps with
 # global build gate and healing policy. This example shows a three-step Java
 # migration workflow: Java 8 → Java 11 → Java 17, with each step producing
-# a diff that enables per-step rehydration and multi-node execution.
+# a diff artifact while execution continues on the same sticky workspace.
 #
 # Submit with:
 #   dist/ploy mig run \

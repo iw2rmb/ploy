@@ -80,8 +80,8 @@ func (r *runController) executeMigJob(ctx context.Context, req StartRunRequest) 
 			return r.materializeMigInFromInputs(ctx, req, inDir)
 		},
 		UploadConfiguredArtifacts: true,
-		UploadDiff: func(ctx context.Context, runID types.RunID, jobID types.JobID, jobName string, diffGen step.DiffGenerator, workspace string, result step.Result) {
-			r.uploadJobDiff(ctx, runID, jobID, diffGen, workspace, result, types.DiffJobTypeMig)
+		UploadDiff: func(ctx context.Context, runID types.RunID, jobID types.JobID, jobName string, diffGen step.DiffGenerator, workspace string, result step.Result) (bool, error) {
+			return r.uploadJobDiff(ctx, runID, jobID, diffGen, workspace, result, types.DiffJobTypeMig)
 		},
 		StartTime: startTime,
 	}
@@ -105,7 +105,7 @@ type standardJobConfig struct {
 
 	UploadConfiguredArtifacts bool
 
-	UploadDiff    func(ctx context.Context, runID types.RunID, jobID types.JobID, jobName string, diffGen step.DiffGenerator, workspace string, result step.Result)
+	UploadDiff    func(ctx context.Context, runID types.RunID, jobID types.JobID, jobName string, diffGen step.DiffGenerator, workspace string, result step.Result) (bool, error)
 	BuildJobMeta  func(outDir string) json.RawMessage
 	BuildMetadata func(outDir string) map[string]string
 
@@ -123,7 +123,7 @@ type standardJobOutcome struct {
 }
 
 // executeStandardJob orchestrates the common lifecycle of a container job:
-// runtime init, rehydration, directory prep, execution, and uploading.
+// runtime init, sticky workspace preparation, directory prep, execution, and uploading.
 func (r *runController) executeStandardJob(ctx context.Context, req StartRunRequest, cfg standardJobConfig) {
 	_, execErr := r.executeStandardJobWithOutcome(ctx, req, cfg)
 	if execErr == nil {
@@ -150,9 +150,9 @@ func (r *runController) executeStandardJobWithOutcome(ctx context.Context, req S
 	}
 	defer cleanup()
 
-	wsResult, err := r.rehydrateWorkspaceWithCleanup(ctx, req, cfg.Manifest)
+	wsResult, err := r.prepareStickyWorkspaceWithCleanup(ctx, req, cfg.Manifest)
 	if err != nil {
-		return outcome, fmt.Errorf("rehydrate workspace: %w", err)
+		return outcome, fmt.Errorf("prepare sticky workspace: %w", err)
 	}
 	defer wsResult.cleanup()
 	workspace := wsResult.path
@@ -315,8 +315,20 @@ func (r *runController) runContainerJob(
 		}
 	}
 
+	diffUploaded := false
 	if cfg.UploadDiff != nil {
-		cfg.UploadDiff(ctx, req.RunID, req.JobID, req.JobName, execCtx.diffGenerator, workspace, result)
+		var diffErr error
+		diffUploaded, diffErr = cfg.UploadDiff(ctx, req.RunID, req.JobID, req.JobName, execCtx.diffGenerator, workspace, result)
+		if diffErr != nil && runErr == nil && result.ExitCode == 0 {
+			runErr = fmt.Errorf("upload job diff: %w", diffErr)
+		}
+	}
+
+	if runErr == nil && result.ExitCode == 0 && req.JobType == types.JobTypeMig {
+		if err := advanceWorkspaceBaseline(ctx, workspace, req.RunID, req.JobID, diffUploaded); err != nil {
+			runErr = fmt.Errorf("advance workspace baseline: %w", err)
+			slog.Error("failed to advance workspace baseline", "run_id", req.RunID, "job_id", req.JobID, "error", err)
+		}
 	}
 
 	if !cfg.SuppressOutBundle {
@@ -496,20 +508,20 @@ func (r *runController) withMaterializedResources(ctx context.Context, manifest 
 }
 
 // tempResource holds a temporary path and its cleanup function.
-// Used for workspace snapshots, rehydrated workspaces, and similar lifecycle-scoped directories.
+// Used for workspace snapshots, sticky workspaces, and similar lifecycle-scoped directories.
 type tempResource struct {
 	path    string
 	cleanup func()
 }
 
-// rehydrateWorkspaceWithCleanup wraps rehydrateWorkspaceForStep and returns a no-op
+// prepareStickyWorkspaceWithCleanup wraps prepareStickyWorkspaceForStep and returns a no-op
 // cleanup for sticky run/repo workspaces.
-func (r *runController) rehydrateWorkspaceWithCleanup(
+func (r *runController) prepareStickyWorkspaceWithCleanup(
 	ctx context.Context,
 	req StartRunRequest,
 	manifest contracts.StepManifest,
 ) (tempResource, error) {
-	workspace, err := r.rehydrateWorkspaceForStep(ctx, req, manifest)
+	workspace, err := r.prepareStickyWorkspaceForStep(ctx, req, manifest)
 	if err != nil {
 		return tempResource{}, err
 	}

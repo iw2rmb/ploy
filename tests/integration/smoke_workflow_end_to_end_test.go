@@ -364,7 +364,7 @@ index abc1234..def5678 100644
 
 // TestSmokeWorkflow_HealingDiffs validates that healing diffs with job_type and next_id
 // are correctly stored and retrieved alongside mig diffs.
-// C2: This test verifies the unified job+diff model where both mig and healing diffs
-// share the same next_id, enabling rehydration to include all diffs for a step.
+// This test verifies the unified job+diff model where both mig and healing diffs
+// are exposed through the repo-scoped diff listing.
 //
 // Requires: PLOY_TEST_DB_DSN environment variable.

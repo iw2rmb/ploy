@@ -144,7 +144,7 @@ func TestTempResource_Cleanup(t *testing.T) {
 	}
 }
 
-func TestRehydrateWorkspaceWithCleanup_StickyWorkspaceIsNotRemoved(t *testing.T) {
+func TestPrepareStickyWorkspaceWithCleanup_StickyWorkspaceIsNotRemoved(t *testing.T) {
 	cacheHome := t.TempDir()
 	t.Setenv("PLOYD_CACHE_HOME", cacheHome)
 
@@ -159,12 +159,12 @@ func TestRehydrateWorkspaceWithCleanup_StickyWorkspaceIsNotRemoved(t *testing.T)
 	}
 
 	rc := &runController{cfg: Config{}}
-	result, err := rc.rehydrateWorkspaceWithCleanup(context.Background(), req, contracts.StepManifest{})
+	result, err := rc.prepareStickyWorkspaceWithCleanup(context.Background(), req, contracts.StepManifest{})
 	if err != nil {
-		t.Fatalf("rehydrateWorkspaceWithCleanup() error = %v", err)
+		t.Fatalf("prepareStickyWorkspaceWithCleanup() error = %v", err)
 	}
 	if result.path != workspace {
-		t.Fatalf("rehydrateWorkspaceWithCleanup() path = %q, want %q", result.path, workspace)
+		t.Fatalf("prepareStickyWorkspaceWithCleanup() path = %q, want %q", result.path, workspace)
 	}
 
 	result.cleanup()
