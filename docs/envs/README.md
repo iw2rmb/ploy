@@ -635,10 +635,6 @@ When `PLOY_BUILDGATE_CACHE_ROOT` is unset, default root is `/var/cache/ploy/gate
 and, when not writable, the node falls back to `${TMPDIR:-/tmp}/ploy/gates`.
 - Gradle gates mount that path to `/root/.gradle`.
 - Maven gates mount that path to `/root/.m2`.
-- On every gate execution, before mounting the cache path, the node checks free
-  space on that filesystem. If free space is below `2 GiB`, it prunes entries in
-  the active cache directory (`<language>/<tool>/<release>`) from oldest to newest
-  until free space reaches `2 GiB` or the directory is exhausted.
 
 **Java non-gate jobs (`mig`, `heal`)**: Use the same centralized
 cache-root policy as Build Gate when stack tuple env is set to Java:
@@ -663,8 +659,7 @@ resolved dynamically from `RECIPE_GROUP/RECIPE_ARTIFACT` and optional `RECIPE_VE
 per-recipe image rebuild is required.
 
 ORW jobs use the same stack-env-driven Java cache mounting behavior as other
-non-gate jobs, with the same cache-root defaults/fallbacks and oldest-first
-free-space prune policy as Build Gate.
+non-gate jobs, with the same cache-root defaults/fallbacks as Build Gate.
 
 ### Security Considerations
 

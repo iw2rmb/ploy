@@ -186,9 +186,6 @@ func assembleGateMounts(ctx context.Context, workspace string, plan gateExecutio
 
 	toolCacheMounts, err := buildGateToolCacheMounts(plan.language, plan.tool, plan.release)
 	if err != nil {
-		if IsNotEnoughSpaceError(err) {
-			return nil, err
-		}
 		return nil, fmt.Errorf("prepare build gate tool cache mounts: %w", err)
 	}
 	mounts = append(mounts, toolCacheMounts...)
