@@ -958,6 +958,34 @@ func (q *Queries) ScheduleNextJob(ctx context.Context, arg ScheduleNextJobParams
 	return i, err
 }
 
+const unclaimJob = `-- name: UnclaimJob :exec
+UPDATE jobs
+SET status = 'Queued',
+    node_id = NULL,
+    started_at = NULL
+FROM (
+  SELECT nodes.id AS node_id
+  FROM nodes
+  WHERE nodes.id = $2
+    AND $2::TEXT != ''
+) AS claiming_node
+WHERE jobs.id = $1
+  AND jobs.node_id = claiming_node.node_id
+  AND status = 'Running'
+`
+
+type UnclaimJobParams struct {
+	ID     types.JobID  `json:"id"`
+	NodeID types.NodeID `json:"node_id"`
+}
+
+// Revert a claimed Running job back to claimable Queued state.
+// Guarded by both job id and node id so a foreign node cannot steal the slot.
+func (q *Queries) UnclaimJob(ctx context.Context, arg UnclaimJobParams) error {
+	_, err := q.db.Exec(ctx, unclaimJob, arg.ID, arg.NodeID)
+	return err
+}
+
 const updateJobCompletion = `-- name: UpdateJobCompletion :exec
 WITH completed AS (
   UPDATE jobs

@@ -262,6 +262,9 @@ type Querier interface {
 	ScheduleNextJob(ctx context.Context, arg ScheduleNextJobParams) (Job, error)
 	// Unarchives a mig by clearing archived_at.
 	UnarchiveMig(ctx context.Context, id types.MigID) error
+	// Revert a claimed Running job back to claimable Queued state.
+	// Guarded by both job id and node id so a foreign node cannot steal the slot.
+	UnclaimJob(ctx context.Context, arg UnclaimJobParams) error
 	UpdateAPITokenLastUsed(ctx context.Context, tokenID string) error
 	UpdateBootstrapTokenLastUsed(ctx context.Context, tokenID string) error
 	UpdateJobCompletion(ctx context.Context, arg UpdateJobCompletionParams) error

@@ -155,7 +155,7 @@ func TestClaimService_Claim_RequeuesClaimedJobWhenPayloadBuildFails(t *testing.T
 		t.Fatalf("unclaim job id = %s, want %s", got, jobID)
 	}
 	if got := st.unclaimJob.params.NodeID; got != nodeID {
-		t.Fatalf("unclaim node id = %s, want %s", got, nodeID)
+		t.Fatalf("unclaim node id = %v, want %s", got, nodeID)
 	}
 	if st.updateRunRepoStatus.called {
 		t.Fatal("expected UpdateRunRepoStatus to not be called when payload build fails")

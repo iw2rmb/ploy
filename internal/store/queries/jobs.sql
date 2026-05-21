@@ -189,6 +189,23 @@ FROM eligible
 WHERE jobs.id = eligible.id
 RETURNING jobs.*;
 
+-- name: UnclaimJob :exec
+-- Revert a claimed Running job back to claimable Queued state.
+-- Guarded by both job id and node id so a foreign node cannot steal the slot.
+UPDATE jobs
+SET status = 'Queued',
+    node_id = NULL,
+    started_at = NULL
+FROM (
+  SELECT nodes.id AS node_id
+  FROM nodes
+  WHERE nodes.id = @node_id
+    AND @node_id::TEXT != ''
+) AS claiming_node
+WHERE jobs.id = sqlc.arg(id)
+  AND jobs.node_id = claiming_node.node_id
+  AND status = 'Running';
+
 -- name: ListStaleRunningJobs :many
 -- Lists running jobs whose assigned node is stale at the provided cutoff.
 -- Rows are grouped by (run_id, repo_id, attempt) for deterministic recovery processing.
