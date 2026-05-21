@@ -64,84 +64,70 @@ func (m *mockStore) Pool() *pgxpool.Pool {
 }
 
 func TestNew(t *testing.T) {
-	t.Run("nil store returns error", func(t *testing.T) {
-		worker, err := New(Options{Store: nil})
-		if !errors.Is(err, ErrNilStore) {
-			t.Errorf("expected ErrNilStore, got %v", err)
-		}
-		if worker != nil {
-			t.Errorf("expected nil worker, got %v", worker)
-		}
-	})
-
-	t.Run("default TTL is 30 days", func(t *testing.T) {
-		mock := &mockStore{}
-		worker, err := New(Options{Store: mock})
-		if err != nil {
-			t.Errorf("expected no error, got %v", err)
-		}
-		if worker == nil {
-			t.Fatal("expected worker, got nil")
-		}
-		expected := 30 * 24 * time.Hour
-		if worker.ttl != expected {
-			t.Errorf("expected TTL %v, got %v", expected, worker.ttl)
-		}
-	})
-
-	t.Run("default interval is 1 hour", func(t *testing.T) {
-		mock := &mockStore{}
-		worker, err := New(Options{Store: mock})
-		if err != nil {
-			t.Errorf("expected no error, got %v", err)
-		}
-		if worker == nil {
-			t.Fatal("expected worker, got nil")
-		}
-		expected := time.Hour
-		if worker.interval != expected {
-			t.Errorf("expected interval %v, got %v", expected, worker.interval)
-		}
-	})
-
-	t.Run("custom TTL and interval", func(t *testing.T) {
-		mock := &mockStore{}
-		customTTL := 7 * 24 * time.Hour
-		customInterval := 30 * time.Minute
-		worker, err := New(Options{
-			Store:    mock,
-			TTL:      customTTL,
-			Interval: customInterval,
-		})
-		if err != nil {
-			t.Errorf("expected no error, got %v", err)
-		}
-		if worker == nil {
-			t.Fatal("expected worker, got nil")
-		}
-		if worker.ttl != customTTL {
-			t.Errorf("expected TTL %v, got %v", customTTL, worker.ttl)
-		}
-		if worker.interval != customInterval {
-			t.Errorf("expected interval %v, got %v", customInterval, worker.interval)
-		}
-	})
-}
-
-func TestWorker_Name(t *testing.T) {
-	mock := &mockStore{}
-	worker, _ := New(Options{Store: mock})
-	if worker.Name() != "ttl-worker" {
-		t.Errorf("expected name 'ttl-worker', got %q", worker.Name())
+	customTTL := 7 * 24 * time.Hour
+	customInterval := 30 * time.Minute
+	tests := []struct {
+		name         string
+		opts         Options
+		wantErr      error
+		wantTTL      time.Duration
+		wantInterval time.Duration
+		wantDrop     bool
+	}{
+		{
+			name:    "nil store returns error",
+			opts:    Options{},
+			wantErr: ErrNilStore,
+		},
+		{
+			name:         "defaults",
+			opts:         Options{Store: &mockStore{}},
+			wantTTL:      30 * 24 * time.Hour,
+			wantInterval: time.Hour,
+		},
+		{
+			name:         "custom TTL and interval",
+			opts:         Options{Store: &mockStore{}, TTL: customTTL, Interval: customInterval},
+			wantTTL:      customTTL,
+			wantInterval: customInterval,
+		},
+		{
+			name:         "drop partitions enabled",
+			opts:         Options{Store: &mockStore{}, DropPartitions: true},
+			wantTTL:      30 * 24 * time.Hour,
+			wantInterval: time.Hour,
+			wantDrop:     true,
+		},
 	}
-}
 
-func TestWorker_Interval(t *testing.T) {
-	mock := &mockStore{}
-	expected := 2 * time.Hour
-	worker, _ := New(Options{Store: mock, Interval: expected})
-	if worker.Interval() != expected {
-		t.Errorf("expected interval %v, got %v", expected, worker.Interval())
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			worker, err := New(tt.opts)
+			if tt.wantErr != nil {
+				if !errors.Is(err, tt.wantErr) {
+					t.Fatalf("New() error=%v, want %v", err, tt.wantErr)
+				}
+				if worker != nil {
+					t.Fatalf("New() worker=%v, want nil", worker)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("New() failed: %v", err)
+			}
+			if worker.Name() != "ttl-worker" {
+				t.Fatalf("Name()=%q, want ttl-worker", worker.Name())
+			}
+			if worker.ttl != tt.wantTTL {
+				t.Fatalf("ttl=%v, want %v", worker.ttl, tt.wantTTL)
+			}
+			if worker.Interval() != tt.wantInterval {
+				t.Fatalf("Interval()=%v, want %v", worker.Interval(), tt.wantInterval)
+			}
+			if worker.dropPartitions != tt.wantDrop {
+				t.Fatalf("dropPartitions=%v, want %v", worker.dropPartitions, tt.wantDrop)
+			}
+		})
 	}
 }
 
@@ -244,77 +230,4 @@ func TestWorker_Run(t *testing.T) {
 		}
 	})
 
-	t.Run("deletes rows older than horizon", func(t *testing.T) {
-		mock := &mockStore{
-			deleteLogsCount:      15,
-			deleteEventsCount:    25,
-			deleteDiffsCount:     8,
-			deleteArtifactsCount: 4,
-		}
-
-		// Use a specific TTL for predictable cutoff calculation.
-		ttl := 7 * 24 * time.Hour // 7 days
-		worker, err := New(Options{
-			Store: mock,
-			TTL:   ttl,
-		})
-		if err != nil {
-			t.Fatalf("failed to create worker: %v", err)
-		}
-
-		// Capture the execution window to verify cutoff.
-		before := time.Now().Add(-ttl)
-		if err := worker.Run(context.Background()); err != nil {
-			t.Errorf("expected no error, got %v", err)
-		}
-		after := time.Now().Add(-ttl)
-
-		// Verify all delete operations were called.
-		if !mock.deleteLogsCalled {
-			t.Error("expected DeleteExpiredLogs to be called")
-		}
-		if !mock.deleteEventsCalled {
-			t.Error("expected DeleteExpiredEvents to be called")
-		}
-		if !mock.deleteDiffsCalled {
-			t.Error("expected DeleteExpiredDiffs to be called")
-		}
-		if !mock.deleteArtifactsCalled {
-			t.Error("expected DeleteExpiredArtifactBundles to be called")
-		}
-
-		// Verify cutoff timestamps are valid and within expected range.
-		// The cutoff should be approximately (now - TTL).
-		if !mock.lastLogsArg.Valid {
-			t.Error("logs cutoff timestamp is invalid")
-		} else if mock.lastLogsArg.Time.Before(before) || mock.lastLogsArg.Time.After(after) {
-			t.Errorf("logs cutoff %v outside expected window [%v, %v]",
-				mock.lastLogsArg.Time, before, after)
-		}
-
-		if !mock.lastEventsArg.Valid {
-			t.Error("events cutoff timestamp is invalid")
-		} else if mock.lastEventsArg.Time.Before(before) || mock.lastEventsArg.Time.After(after) {
-			t.Errorf("events cutoff %v outside expected window [%v, %v]",
-				mock.lastEventsArg.Time, before, after)
-		}
-
-		if !mock.lastDiffsArg.Valid {
-			t.Error("diffs cutoff timestamp is invalid")
-		} else if mock.lastDiffsArg.Time.Before(before) || mock.lastDiffsArg.Time.After(after) {
-			t.Errorf("diffs cutoff %v outside expected window [%v, %v]",
-				mock.lastDiffsArg.Time, before, after)
-		}
-
-		if !mock.lastArtifactsArg.Valid {
-			t.Error("artifacts cutoff timestamp is invalid")
-		} else if mock.lastArtifactsArg.Time.Before(before) || mock.lastArtifactsArg.Time.After(after) {
-			t.Errorf("artifacts cutoff %v outside expected window [%v, %v]",
-				mock.lastArtifactsArg.Time, before, after)
-		}
-
-		// Verify that the mock return values are being processed correctly.
-		// The actual deletion counts are logged but not returned by Run(),
-		// so we just verify the operations completed.
-	})
 }

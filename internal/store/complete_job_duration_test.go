@@ -1,9 +1,7 @@
 package store
 
 import (
-	"context"
 	"net/netip"
-	"os"
 	"testing"
 
 	"github.com/iw2rmb/ploy/internal/domain/types"
@@ -17,20 +15,8 @@ import (
 // completes it using UpdateJobCompletion and UpdateJobCompletionWithMeta.
 // The duration_ms must always be set to a valid non-negative value (0 when
 // started_at is NULL, actual duration otherwise).
-//
-// Requires PLOY_TEST_DB_DSN to be set with a test database.
 func TestCompleteJobDurationNeverNull(t *testing.T) {
-	dsn := os.Getenv("PLOY_TEST_DB_DSN")
-	if dsn == "" {
-		t.Skip("PLOY_TEST_DB_DSN not set; skipping store integration test")
-	}
-
-	ctx := context.Background()
-	db, err := NewStore(ctx, dsn)
-	if err != nil {
-		t.Fatalf("NewStore() failed: %v", err)
-	}
-	defer db.Close()
+	ctx, db := newTestStore(t)
 
 	// Create v1 fixture (mig, spec, mig_repo, run, run_repo).
 	fixture := newV1Fixture(t, ctx, db,

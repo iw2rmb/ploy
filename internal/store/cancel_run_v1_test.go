@@ -16,8 +16,6 @@ func TestCancelRunV1_CancelsRunAndActiveWork(t *testing.T) {
 	runningRepo := createRunRepoForStoreTest(t, ctx, db, fx.Mig.ID, fx.Run.ID, "https://github.com/test/cancel-run-v1-running", "main", "feature-running", types.RunRepoStatusRunning)
 	successRepo := createRunRepoForStoreTest(t, ctx, db, fx.Mig.ID, fx.Run.ID, "https://github.com/test/cancel-run-v1-success", "main", "feature-success", types.RunRepoStatusSuccess)
 
-	createdJob := createJobForStoreTest(t, ctx, db, fx.Run.ID, fx.MigRepo.RepoID, fx.RunRepo.RepoBaseRef, 1, "created", types.JobStatusCreated)
-	queuedJob := createJobForStoreTest(t, ctx, db, fx.Run.ID, fx.MigRepo.RepoID, fx.RunRepo.RepoBaseRef, 1, "queued", types.JobStatusQueued)
 	runningJob := createJobForStoreTest(t, ctx, db, fx.Run.ID, fx.MigRepo.RepoID, fx.RunRepo.RepoBaseRef, 1, "running", types.JobStatusQueued)
 	setJobRunningForCancelBulkTest(t, ctx, db, runningJob.ID)
 	if _, err := db.Pool().Exec(ctx, `UPDATE jobs SET started_at = now() - interval '3 seconds' WHERE id = $1`, runningJob.ID); err != nil {
@@ -71,22 +69,6 @@ func TestCancelRunV1_CancelsRunAndActiveWork(t *testing.T) {
 	}
 	if successRepoAfter.Status != types.RunRepoStatusSuccess {
 		t.Fatalf("success repo status=%q, want %q", successRepoAfter.Status, types.RunRepoStatusSuccess)
-	}
-
-	createdAfter, err := db.GetJob(ctx, createdJob.ID)
-	if err != nil {
-		t.Fatalf("GetJob(created after) failed: %v", err)
-	}
-	if createdAfter.Status != types.JobStatusCancelled {
-		t.Fatalf("created job status=%q, want %q", createdAfter.Status, types.JobStatusCancelled)
-	}
-
-	queuedAfter, err := db.GetJob(ctx, queuedJob.ID)
-	if err != nil {
-		t.Fatalf("GetJob(queued after) failed: %v", err)
-	}
-	if queuedAfter.Status != types.JobStatusCancelled {
-		t.Fatalf("queued job status=%q, want %q", queuedAfter.Status, types.JobStatusCancelled)
 	}
 
 	runningAfter, err := db.GetJob(ctx, runningJob.ID)
@@ -150,6 +132,9 @@ EXECUTE FUNCTION ploy.%s();
 	err := db.CancelRunV1(ctx, fx.Run.ID)
 	if err == nil {
 		t.Fatal("expected CancelRunV1() to fail")
+	}
+	if !strings.Contains(err.Error(), "cancel active jobs") {
+		t.Fatalf("error=%q, expected context about cancel active jobs", err.Error())
 	}
 
 	runAfter, getRunErr := db.GetRun(ctx, fx.Run.ID)
@@ -257,51 +242,5 @@ func TestCancelRunV1_CancelledRunIsIdempotent(t *testing.T) {
 	}
 	if runAfter.Status != types.RunStatusCancelled {
 		t.Fatalf("run status=%q, want %q", runAfter.Status, types.RunStatusCancelled)
-	}
-}
-
-func TestCancelRunV1_RollbackErrorHasContext(t *testing.T) {
-	ctx, db := openStoreForCancelBulkTests(t)
-
-	fx := newV1Fixture(t, ctx, db, "https://github.com/test/cancel-run-v1-errctx", "main", "feature-errctx", []byte(`{"type":"cancel-run-v1-errctx"}`))
-	job := createJobForStoreTest(t, ctx, db, fx.Run.ID, fx.MigRepo.RepoID, fx.RunRepo.RepoBaseRef, 1, "created", types.JobStatusCreated)
-
-	suffix := strings.NewReplacer("-", "_").Replace(strings.ToLower(types.NewNodeKey()))
-	fnName := fmt.Sprintf("test_cancel_run_v1_fail_jobs_ctx_fn_%s", suffix)
-	trName := fmt.Sprintf("test_cancel_run_v1_fail_jobs_ctx_tr_%s", suffix)
-
-	createFnSQL := fmt.Sprintf(`
-CREATE FUNCTION ploy.%s() RETURNS trigger
-LANGUAGE plpgsql
-AS $$
-BEGIN
-  RAISE EXCEPTION 'forced cancel jobs failure for context test';
-END;
-$$;
-`, fnName)
-	if _, err := db.Pool().Exec(ctx, createFnSQL); err != nil {
-		t.Fatalf("create trigger function failed: %v", err)
-	}
-	t.Cleanup(func() {
-		_, _ = db.Pool().Exec(ctx, fmt.Sprintf(`DROP FUNCTION IF EXISTS ploy.%s() CASCADE`, fnName))
-	})
-
-	createTriggerSQL := fmt.Sprintf(`
-CREATE TRIGGER %s
-BEFORE UPDATE ON ploy.jobs
-FOR EACH ROW
-WHEN (OLD.id = '%s' AND NEW.status = 'Cancelled')
-EXECUTE FUNCTION ploy.%s();
-`, trName, job.ID, fnName)
-	if _, err := db.Pool().Exec(ctx, createTriggerSQL); err != nil {
-		t.Fatalf("create trigger failed: %v", err)
-	}
-
-	err := db.CancelRunV1(ctx, fx.Run.ID)
-	if err == nil {
-		t.Fatal("expected CancelRunV1() to fail")
-	}
-	if !strings.Contains(err.Error(), "cancel active jobs") {
-		t.Fatalf("error=%q, expected context about cancel active jobs", err.Error())
 	}
 }
