@@ -1,44 +1,118 @@
 package nodeagent
 
 import (
-	"bytes"
-	"compress/gzip"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"sync"
 	"testing"
-	"time"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/logchunk"
 )
 
+type capturedLogChunk struct {
+	RunID   types.RunID  `json:"run_id"`
+	JobID   *types.JobID `json:"job_id,omitempty"`
+	ChunkNo int32        `json:"chunk_no"`
+	Data    []byte       `json:"data"`
+}
+
+type capturedLogUpload struct {
+	Payload capturedLogChunk
+	Records []logchunk.Record
+}
+
+func newLogCaptureServer(t *testing.T) (*httptest.Server, func() []capturedLogUpload) {
+	t.Helper()
+
+	var (
+		mu      sync.Mutex
+		uploads []capturedLogUpload
+	)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			t.Errorf("method = %s, want POST", r.Method)
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		if !strings.HasSuffix(r.URL.Path, "/logs") {
+			t.Errorf("path = %s, want suffix /logs", r.URL.Path)
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Errorf("read request body: %v", err)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		var payload capturedLogChunk
+		if err := json.Unmarshal(body, &payload); err != nil {
+			t.Errorf("unmarshal payload: %v", err)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		records, err := logchunk.DecodeGzip(payload.Data)
+		if err != nil {
+			if !strings.Contains(err.Error(), "log chunk contains no decodable records") {
+				t.Errorf("decode framed chunk: %v", err)
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+		}
+
+		mu.Lock()
+		uploads = append(uploads, capturedLogUpload{Payload: payload, Records: records})
+		mu.Unlock()
+		w.WriteHeader(http.StatusCreated)
+	}))
+	t.Cleanup(server.Close)
+
+	snapshot := func() []capturedLogUpload {
+		mu.Lock()
+		defer mu.Unlock()
+		cp := make([]capturedLogUpload, len(uploads))
+		copy(cp, uploads)
+		return cp
+	}
+	return server, snapshot
+}
+
+func flattenLogRecords(uploads []capturedLogUpload) []logchunk.Record {
+	var records []logchunk.Record
+	for _, upload := range uploads {
+		records = append(records, upload.Records...)
+	}
+	return records
+}
+
 func TestLogStreamer_Write(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name     string
-		input    string
-		wantErr  bool
-		validate func(t *testing.T, ls *LogStreamer)
+		name      string
+		input     string
+		wantLines []string
 	}{
 		{
-			name:    "empty write",
-			input:   "",
-			wantErr: false,
+			name:  "empty write",
+			input: "",
 		},
 		{
-			name:    "small write",
-			input:   "test log line\n",
-			wantErr: false,
+			name:      "small write",
+			input:     "test log line\n",
+			wantLines: []string{"test log line"},
 		},
 		{
-			name:    "multiple lines",
-			input:   "line 1\nline 2\nline 3\n",
-			wantErr: false,
+			name:      "multiple lines",
+			input:     "line 1\nline 2\nline 3\n",
+			wantLines: []string{"line 1", "line 2", "line 3"},
 		},
 	}
 
@@ -47,7 +121,8 @@ func TestLogStreamer_Write(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			cfg := newAgentConfig("http://localhost:8443")
+			server, uploads := newLogCaptureServer(t)
+			cfg := newAgentConfig(server.URL)
 			runID := types.NewRunID()
 			jobID := types.NewJobID()
 			ls, err := NewLogStreamer(cfg, runID, jobID, nil)
@@ -57,183 +132,57 @@ func TestLogStreamer_Write(t *testing.T) {
 			defer func() { _ = ls.Close() }()
 
 			n, err := ls.Write([]byte(tt.input))
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Write() error = %v, wantErr %v", err, tt.wantErr)
-				return
+			if err != nil {
+				t.Fatalf("Write() error = %v", err)
 			}
-			if err == nil && n != len(tt.input) {
+			if n != len(tt.input) {
 				t.Errorf("Write() wrote %d bytes, want %d", n, len(tt.input))
 			}
-			if tt.validate != nil {
-				tt.validate(t, ls)
+			if err := ls.Close(); err != nil {
+				t.Fatalf("Close() error = %v", err)
+			}
+
+			records := flattenLogRecords(uploads())
+			if len(records) != len(tt.wantLines) {
+				t.Fatalf("records = %+v, want %d records", records, len(tt.wantLines))
+			}
+			for i, want := range tt.wantLines {
+				if records[i].Stream != logchunk.StreamStdout || records[i].Line != want {
+					t.Fatalf("record[%d] = %+v, want stdout %q", i, records[i], want)
+				}
 			}
 		})
-	}
-}
-
-func TestLogStreamer_SizeCap(t *testing.T) {
-	t.Parallel()
-
-	cfg := newAgentConfig("http://localhost:8443")
-	runID := types.NewRunID()
-	ls, err := NewLogStreamer(cfg, runID, types.JobID(""), nil)
-	if err != nil {
-		t.Fatalf("NewLogStreamer() failed: %v", err)
-	}
-	defer func() { _ = ls.Close() }()
-
-	// Exercise buffering/flush behavior with a moderate amount of log data.
-	// The log chunk cap is enforced on the gzipped bytes (MaxUploadSize).
-	chunk := strings.Repeat("test log line with some content\n", 1024)
-	for i := 0; i < 50; i++ {
-		_, err := ls.Write([]byte(chunk))
-		if err != nil {
-			t.Fatalf("Write() unexpected error: %v", err)
-		}
-	}
-
-	// Verify that chunks were created (implicitly tested by no errors during writes).
-	// The actual size cap enforcement happens during flushLocked.
-}
-
-func TestLogStreamer_Compression(t *testing.T) {
-	t.Parallel()
-
-	// Test that data is actually compressed.
-	var buf bytes.Buffer
-	gzWriter := gzip.NewWriter(&buf)
-
-	input := "test log line\n"
-	for i := 0; i < 100; i++ {
-		_, err := gzWriter.Write([]byte(input))
-		if err != nil {
-			t.Fatalf("gzip write failed: %v", err)
-		}
-	}
-	if err := gzWriter.Close(); err != nil {
-		t.Fatalf("gzip close failed: %v", err)
-	}
-
-	// Verify compressed size is smaller than uncompressed.
-	uncompressed := len(input) * 100
-	compressed := buf.Len()
-	if compressed >= uncompressed {
-		t.Errorf("compression did not reduce size: uncompressed=%d, compressed=%d", uncompressed, compressed)
-	}
-
-	// Verify we can decompress it.
-	gzReader, err := gzip.NewReader(&buf)
-	if err != nil {
-		t.Fatalf("gzip reader failed: %v", err)
-	}
-	defer func() { _ = gzReader.Close() }()
-
-	decompressed, err := io.ReadAll(gzReader)
-	if err != nil {
-		t.Fatalf("gzip read failed: %v", err)
-	}
-
-	if len(decompressed) != uncompressed {
-		t.Errorf("decompressed size mismatch: got %d, want %d", len(decompressed), uncompressed)
 	}
 }
 
 func TestLogStreamer_Close(t *testing.T) {
 	t.Parallel()
 
-	cfg := newAgentConfig("http://localhost:8443")
+	server, uploads := newLogCaptureServer(t)
+	cfg := newAgentConfig(server.URL)
 	runID := types.NewRunID()
 	ls, err := NewLogStreamer(cfg, runID, types.JobID(""), nil)
 	if err != nil {
 		t.Fatalf("NewLogStreamer() failed: %v", err)
 	}
 
-	// Write some data.
-	_, err = ls.Write([]byte("test log\n"))
-	if err != nil {
+	if _, err := ls.Write([]byte("test log without newline")); err != nil {
 		t.Fatalf("Write() failed: %v", err)
 	}
-
-	// Close should flush remaining data.
-	err = ls.Close()
-	if err != nil {
-		// Close may fail if server is not available, which is expected in unit tests.
-		// We just verify Close can be called without panicking.
-		t.Logf("Close() returned error (expected in unit test): %v", err)
+	if err := ls.Close(); err != nil {
+		t.Fatalf("Close() returned error: %v", err)
+	}
+	if err := ls.Close(); err != nil {
+		t.Fatalf("second Close() returned error: %v", err)
 	}
 
-	// Calling Close again should be idempotent.
-	err = ls.Close()
-	if err != nil {
-		t.Logf("Close() second call returned error: %v", err)
+	records := flattenLogRecords(uploads())
+	if len(records) != 1 {
+		t.Fatalf("records = %+v, want one record", records)
 	}
-}
-
-func TestLogStreamer_FlushInterval(t *testing.T) {
-	t.Parallel()
-
-	cfg := newAgentConfig("http://localhost:8443")
-	runID := types.NewRunID()
-	ls, err := NewLogStreamer(cfg, runID, types.JobID(""), nil)
-	if err != nil {
-		t.Fatalf("NewLogStreamer() failed: %v", err)
+	if records[0].Line != "test log without newline" {
+		t.Fatalf("record = %+v, want flushed pending line", records[0])
 	}
-	defer func() { _ = ls.Close() }()
-
-	// Write a small amount of data.
-	_, err = ls.Write([]byte("test log\n"))
-	if err != nil {
-		t.Fatalf("Write() failed: %v", err)
-	}
-
-	// Wait for periodic flush to trigger (flush interval is 2 seconds).
-	time.Sleep(3 * time.Second)
-
-	// Verify the buffer was flushed by checking chunk number incremented.
-	ls.mu.Lock()
-	chunkNo := ls.chunkNo
-	ls.mu.Unlock()
-
-	// After flush, chunk number should be > 0 (unless server is not available).
-	// This test is best-effort since it depends on server availability.
-	if chunkNo > 0 {
-		t.Logf("Periodic flush triggered successfully, chunk_no=%d", chunkNo)
-	} else {
-		t.Logf("Periodic flush may have failed (server not available), chunk_no=%d", chunkNo)
-	}
-}
-
-func TestLogStreamer_ChunkNumbering(t *testing.T) {
-	t.Parallel()
-
-	cfg := newAgentConfig("http://localhost:8443")
-	runID := types.NewRunID()
-	ls, err := NewLogStreamer(cfg, runID, types.JobID(""), nil)
-	if err != nil {
-		t.Fatalf("NewLogStreamer() failed: %v", err)
-	}
-	defer func() { _ = ls.Close() }()
-
-	// Verify initial chunk number is 0.
-	ls.mu.Lock()
-	initialChunkNo := ls.chunkNo
-	ls.mu.Unlock()
-
-	if initialChunkNo != 0 {
-		t.Errorf("initial chunk_no = %d, want 0", initialChunkNo)
-	}
-
-	// Write enough data to trigger a flush.
-	largeData := strings.Repeat("x", maxChunkSize+1)
-	_, _ = ls.Write([]byte(largeData))
-
-	// Chunk number should have incremented after flush attempt.
-	// Note: actual increment depends on whether flush succeeds (server available).
-	ls.mu.Lock()
-	afterChunkNo := ls.chunkNo
-	ls.mu.Unlock()
-
-	t.Logf("chunk_no after large write: %d (flush may have failed if server unavailable)", afterChunkNo)
 }
 
 // TestLogStreamer_JobIDInPayload verifies that the log streamer includes job_id
@@ -243,14 +192,6 @@ func TestLogStreamer_ChunkNumbering(t *testing.T) {
 // per-job log retrieval and enrichment.
 func TestLogStreamer_JobIDInPayload(t *testing.T) {
 	t.Parallel()
-
-	// logChunkPayload mirrors the structure sent by sendChunk.
-	type logChunkPayload struct {
-		RunID   types.RunID  `json:"run_id"`
-		JobID   *types.JobID `json:"job_id,omitempty"`
-		ChunkNo int32        `json:"chunk_no"`
-		Data    []byte       `json:"data"`
-	}
 
 	runID := types.NewRunID()
 	jobID := types.NewJobID()
@@ -280,77 +221,29 @@ func TestLogStreamer_JobIDInPayload(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			// Track received payloads from the mock server.
-			var mu sync.Mutex
-			var receivedPayloads []logChunkPayload
+			server, uploads := newLogCaptureServer(t)
 
-			// Create a mock server that captures log chunk requests.
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				// Verify this is a POST to the logs endpoint.
-				if r.Method != http.MethodPost {
-					t.Errorf("unexpected method: %s", r.Method)
-					http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-					return
-				}
-				if !strings.HasSuffix(r.URL.Path, "/logs") {
-					t.Errorf("unexpected path: %s", r.URL.Path)
-					http.Error(w, "not found", http.StatusNotFound)
-					return
-				}
-
-				// Parse the request body.
-				body, err := io.ReadAll(r.Body)
-				if err != nil {
-					t.Errorf("failed to read request body: %v", err)
-					http.Error(w, "bad request", http.StatusBadRequest)
-					return
-				}
-
-				var payload logChunkPayload
-				if err := json.Unmarshal(body, &payload); err != nil {
-					t.Errorf("failed to unmarshal payload: %v", err)
-					http.Error(w, "bad request", http.StatusBadRequest)
-					return
-				}
-
-				mu.Lock()
-				receivedPayloads = append(receivedPayloads, payload)
-				mu.Unlock()
-
-				w.WriteHeader(http.StatusCreated)
-			}))
-			defer server.Close()
-
-			// Create log streamer pointing to mock server.
 			cfg := newAgentConfig(server.URL)
 			ls, err := NewLogStreamer(cfg, runID, tt.jobID, nil)
 			if err != nil {
 				t.Fatalf("NewLogStreamer() failed: %v", err)
 			}
 
-			// Write some data to the log streamer.
-			_, err = ls.Write([]byte("test log line for job_id verification\n"))
-			if err != nil {
+			if _, err := ls.Write([]byte("test log line for job_id verification\n")); err != nil {
 				t.Fatalf("Write() failed: %v", err)
 			}
-
-			// Close to flush any remaining data.
 			if err := ls.Close(); err != nil {
 				t.Fatalf("Close() failed: %v", err)
 			}
 
-			// Verify we received at least one payload.
-			mu.Lock()
-			defer mu.Unlock()
+			receivedPayloads := uploads()
 			if len(receivedPayloads) == 0 {
 				t.Fatal("expected at least one log chunk payload, got none")
 			}
 
-			// Check the first payload for job_id presence and value.
-			payload := receivedPayloads[0]
+			payload := receivedPayloads[0].Payload
 
 			if tt.wantJobID {
-				// Expect job_id to be present and have the correct value.
 				if payload.JobID == nil {
 					t.Errorf("expected job_id to be present in payload, but it was nil")
 				} else if payload.JobID.String() != tt.wantJobIDV {
@@ -363,7 +256,6 @@ func TestLogStreamer_JobIDInPayload(t *testing.T) {
 				}
 			}
 
-			// Verify run_id is always present.
 			if payload.RunID != runID {
 				t.Errorf("run_id = %q, want %q", payload.RunID.String(), runID.String())
 			}
@@ -374,40 +266,7 @@ func TestLogStreamer_JobIDInPayload(t *testing.T) {
 func TestLogStreamer_PreservesStdoutAndStderrFrames(t *testing.T) {
 	t.Parallel()
 
-	type logChunkPayload struct {
-		Data []byte `json:"data"`
-	}
-
-	var (
-		mu      sync.Mutex
-		records []logchunk.Record
-	)
-
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		body, err := io.ReadAll(r.Body)
-		if err != nil {
-			t.Errorf("read request body: %v", err)
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-		var payload logChunkPayload
-		if err := json.Unmarshal(body, &payload); err != nil {
-			t.Errorf("unmarshal payload: %v", err)
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-		frames, err := logchunk.DecodeGzip(payload.Data)
-		if err != nil {
-			t.Errorf("decode framed chunk: %v", err)
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-		mu.Lock()
-		records = append(records, frames...)
-		mu.Unlock()
-		w.WriteHeader(http.StatusCreated)
-	}))
-	defer server.Close()
+	server, uploads := newLogCaptureServer(t)
 
 	ls, err := NewLogStreamer(newAgentConfig(server.URL), types.NewRunID(), types.NewJobID(), nil)
 	if err != nil {
@@ -424,8 +283,7 @@ func TestLogStreamer_PreservesStdoutAndStderrFrames(t *testing.T) {
 		t.Fatalf("close log streamer: %v", err)
 	}
 
-	mu.Lock()
-	defer mu.Unlock()
+	records := flattenLogRecords(uploads())
 	if len(records) < 2 {
 		t.Fatalf("expected at least 2 framed records, got %d", len(records))
 	}
@@ -434,5 +292,72 @@ func TestLogStreamer_PreservesStdoutAndStderrFrames(t *testing.T) {
 	}
 	if records[1].Stream != logchunk.StreamStderr || records[1].Line != "err-line" {
 		t.Fatalf("second record = %+v, want stderr err-line", records[1])
+	}
+}
+
+func TestLogStreamer_Hook(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		hook LogHook
+		want string
+	}{
+		{
+			name: "nil hook writes original input",
+			want: "hello",
+		},
+		{
+			name: "custom hook transforms input",
+			hook: func(p []byte) ([]byte, error) {
+				return []byte(strings.ToUpper(string(p))), nil
+			},
+			want: "HELLO",
+		},
+		{
+			name: "hook error falls back to original input",
+			hook: func([]byte) ([]byte, error) {
+				return nil, errors.New("hook processing failed")
+			},
+			want: "hello",
+		},
+		{
+			name: "nil hook result falls back to original input",
+			hook: func([]byte) ([]byte, error) {
+				return nil, nil
+			},
+			want: "hello",
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			server, uploads := newLogCaptureServer(t)
+			ls, err := NewLogStreamer(newAgentConfig(server.URL), types.NewRunID(), types.NewJobID(), nil)
+			if err != nil {
+				t.Fatalf("NewLogStreamer() failed: %v", err)
+			}
+			if tt.hook != nil {
+				ls.SetHook(tt.hook)
+			}
+
+			if n, err := ls.Write([]byte("hello\n")); err != nil || n != len("hello\n") {
+				t.Fatalf("Write() = %d, %v; want %d, nil", n, err, len("hello\n"))
+			}
+			if err := ls.Close(); err != nil {
+				t.Fatalf("Close() error = %v", err)
+			}
+
+			records := flattenLogRecords(uploads())
+			if len(records) != 1 {
+				t.Fatalf("records = %+v, want one record", records)
+			}
+			if records[0].Line != tt.want {
+				t.Fatalf("record line = %q, want %q", records[0].Line, tt.want)
+			}
+		})
 	}
 }

@@ -50,15 +50,8 @@ func TestRunRepoArtifactPaths(t *testing.T) {
 	if paths.Stdout != filepath.Join(wantJobRoot, "stdout.log") || paths.Stderr != filepath.Join(wantJobRoot, "stderr.log") || paths.Diff != filepath.Join(wantJobRoot, "diff.patch") {
 		t.Fatalf("job log/diff paths = %+v", paths)
 	}
-}
 
-func TestRunRepoArtifactPaths_ZeroRepoID(t *testing.T) {
-	t.Setenv("PLOYD_CACHE_HOME", t.TempDir())
-
-	runID := types.NewRunID()
-	jobID := types.NewJobID()
-	var repoID types.MigRepoID
-
+	repoID = types.MigRepoID("")
 	if got := runRepoRootDir(runID, repoID); got != "" {
 		t.Fatalf("runRepoRootDir zero repo = %q, want empty", got)
 	}

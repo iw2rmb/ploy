@@ -203,73 +203,66 @@ func TestHandleRunStop(t *testing.T) {
 	}
 }
 
-func TestHandleRunStart_MethodNotAllowed(t *testing.T) {
-	cfg := newAgentConfig("http://127.0.0.1:8080")
-	mock := &mockRunController{}
-	srv := &Server{cfg: cfg, controller: mock}
-
-	req := httptest.NewRequest(http.MethodGet, "/v1/run/start", nil)
-	w := httptest.NewRecorder()
-
-	srv.handleRunStart(w, req)
-
-	if w.Code != http.StatusMethodNotAllowed {
-		t.Fatalf("status = %d, want %d", w.Code, http.StatusMethodNotAllowed)
+func TestHandleRunRequestErrors(t *testing.T) {
+	tests := []struct {
+		name       string
+		method     string
+		path       string
+		body       string
+		handle     func(*Server, http.ResponseWriter, *http.Request)
+		wantStatus int
+	}{
+		{
+			name:       "start method not allowed",
+			method:     http.MethodGet,
+			path:       "/v1/run/start",
+			handle:     (*Server).handleRunStart,
+			wantStatus: http.StatusMethodNotAllowed,
+		},
+		{
+			name:       "stop method not allowed",
+			method:     http.MethodGet,
+			path:       "/v1/run/stop",
+			handle:     (*Server).handleRunStop,
+			wantStatus: http.StatusMethodNotAllowed,
+		},
+		{
+			name:       "start invalid json",
+			method:     http.MethodPost,
+			path:       "/v1/run/start",
+			body:       "not-json",
+			handle:     (*Server).handleRunStart,
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "stop invalid json",
+			method:     http.MethodPost,
+			path:       "/v1/run/stop",
+			body:       "not-json",
+			handle:     (*Server).handleRunStop,
+			wantStatus: http.StatusBadRequest,
+		},
 	}
 
-	if mock.acquireCalls != 0 || mock.releaseCalls != 0 {
-		t.Fatalf("AcquireSlot/ReleaseSlot calls = %d/%d, want 0/0", mock.acquireCalls, mock.releaseCalls)
-	}
-}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := newAgentConfig("http://127.0.0.1:8080")
+			mock := &mockRunController{}
+			srv := &Server{cfg: cfg, controller: mock}
 
-func TestHandleRunStop_MethodNotAllowed(t *testing.T) {
-	cfg := newAgentConfig("http://127.0.0.1:8080")
-	mock := &mockRunController{}
-	srv := &Server{cfg: cfg, controller: mock}
+			req := httptest.NewRequest(tt.method, tt.path, bytes.NewBufferString(tt.body))
+			req.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/run/stop", nil)
-	w := httptest.NewRecorder()
+			tt.handle(srv, w, req)
 
-	srv.handleRunStop(w, req)
-
-	if w.Code != http.StatusMethodNotAllowed {
-		t.Fatalf("status = %d, want %d", w.Code, http.StatusMethodNotAllowed)
-	}
-}
-
-func TestHandleRunStart_InvalidJSON(t *testing.T) {
-	cfg := newAgentConfig("http://127.0.0.1:8080")
-	mock := &mockRunController{}
-	srv := &Server{cfg: cfg, controller: mock}
-
-	req := httptest.NewRequest(http.MethodPost, "/v1/run/start", bytes.NewBufferString("not-json"))
-	req.Header.Set("Content-Type", "application/json")
-	w := httptest.NewRecorder()
-
-	srv.handleRunStart(w, req)
-
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want %d", w.Code, http.StatusBadRequest)
-	}
-
-	if mock.acquireCalls != 0 || mock.releaseCalls != 0 {
-		t.Fatalf("AcquireSlot/ReleaseSlot calls = %d/%d, want 0/0", mock.acquireCalls, mock.releaseCalls)
-	}
-}
-
-func TestHandleRunStop_InvalidJSON(t *testing.T) {
-	cfg := newAgentConfig("http://127.0.0.1:8080")
-	mock := &mockRunController{}
-	srv := &Server{cfg: cfg, controller: mock}
-
-	req := httptest.NewRequest(http.MethodPost, "/v1/run/stop", bytes.NewBufferString("not-json"))
-	req.Header.Set("Content-Type", "application/json")
-	w := httptest.NewRecorder()
-
-	srv.handleRunStop(w, req)
-
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want %d", w.Code, http.StatusBadRequest)
+			if w.Code != tt.wantStatus {
+				t.Fatalf("status = %d, want %d", w.Code, tt.wantStatus)
+			}
+			if mock.acquireCalls != 0 || mock.releaseCalls != 0 {
+				t.Fatalf("AcquireSlot/ReleaseSlot calls = %d/%d, want 0/0", mock.acquireCalls, mock.releaseCalls)
+			}
+		})
 	}
 }
 
