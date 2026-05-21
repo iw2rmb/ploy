@@ -49,7 +49,12 @@ func TestListQueriesDeterministicOrder(t *testing.T) {
 		{"ListRunsForRepo", listRunsForRepo, "ORDER BY rr.created_at DESC, rr.run_id DESC"},
 		{"ListFailedRepoIDsByMig", listFailedRepoIDsByMig, "ORDER BY rr.repo_id, rr.created_at DESC, rr.run_id DESC"},
 
-		// logs.sql ordering is verified in logs_sql_ordering_test.go.
+		// logs.sql - chunk order needs id tie-breaker.
+		{"ListLogsByRun", listLogsByRun, "ORDER BY chunk_no ASC, id ASC"},
+		{"ListLogsByRunSince", listLogsByRunSince, "ORDER BY chunk_no ASC, id ASC"},
+		{"ListLogsByRunAndJob", listLogsByRunAndJob, "ORDER BY chunk_no ASC, id ASC"},
+		{"ListLogsByRunAndJobSince", listLogsByRunAndJobSince, "ORDER BY chunk_no ASC, id ASC"},
+
 		// diffs/artifact_bundles/events ordering is verified in list_meta_queries_test.go.
 	}
 

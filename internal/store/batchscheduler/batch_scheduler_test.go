@@ -65,87 +65,57 @@ func newTestRunID() types.RunID {
 }
 
 func TestNew(t *testing.T) {
-	t.Run("nil store returns error", func(t *testing.T) {
-		sched, err := New(Options{
-			Store:       nil,
-			RepoStarter: newMockRepoStarter(),
-		})
-		if !errors.Is(err, ErrNilStore) {
-			t.Errorf("expected ErrNilStore, got %v", err)
-		}
-		if sched != nil {
-			t.Errorf("expected nil scheduler, got %v", sched)
-		}
-	})
-
-	t.Run("nil repoStarter returns error", func(t *testing.T) {
-		sched, err := New(Options{
-			Store:       &mockStore{},
-			RepoStarter: nil,
-		})
-		if !errors.Is(err, ErrNilRepoStarter) {
-			t.Errorf("expected ErrNilRepoStarter, got %v", err)
-		}
-		if sched != nil {
-			t.Errorf("expected nil scheduler, got %v", sched)
-		}
-	})
-
-	t.Run("default interval is 5 seconds", func(t *testing.T) {
-		sched, err := New(Options{
-			Store:       &mockStore{},
-			RepoStarter: newMockRepoStarter(),
-		})
-		if err != nil {
-			t.Errorf("expected no error, got %v", err)
-		}
-		if sched == nil {
-			t.Fatal("expected scheduler, got nil")
-		}
-		expected := 5 * time.Second
-		if sched.interval != expected {
-			t.Errorf("expected interval %v, got %v", expected, sched.interval)
-		}
-	})
-
-	t.Run("custom interval", func(t *testing.T) {
-		customInterval := 10 * time.Second
-		sched, err := New(Options{
-			Store:       &mockStore{},
-			RepoStarter: newMockRepoStarter(),
-			Interval:    customInterval,
-		})
-		if err != nil {
-			t.Errorf("expected no error, got %v", err)
-		}
-		if sched == nil {
-			t.Fatal("expected scheduler, got nil")
-		}
-		if sched.interval != customInterval {
-			t.Errorf("expected interval %v, got %v", customInterval, sched.interval)
-		}
-	})
-}
-
-func TestScheduler_Name(t *testing.T) {
-	sched, _ := New(Options{
-		Store:       &mockStore{},
-		RepoStarter: newMockRepoStarter(),
-	})
-	if sched.Name() != "batch-scheduler" {
-		t.Errorf("expected name 'batch-scheduler', got %q", sched.Name())
+	customInterval := 10 * time.Second
+	tests := []struct {
+		name         string
+		opts         Options
+		wantErr      error
+		wantInterval time.Duration
+	}{
+		{
+			name:    "nil store returns error",
+			opts:    Options{RepoStarter: newMockRepoStarter()},
+			wantErr: ErrNilStore,
+		},
+		{
+			name:    "nil repoStarter returns error",
+			opts:    Options{Store: &mockStore{}},
+			wantErr: ErrNilRepoStarter,
+		},
+		{
+			name:         "default interval",
+			opts:         Options{Store: &mockStore{}, RepoStarter: newMockRepoStarter()},
+			wantInterval: 5 * time.Second,
+		},
+		{
+			name:         "custom interval",
+			opts:         Options{Store: &mockStore{}, RepoStarter: newMockRepoStarter(), Interval: customInterval},
+			wantInterval: customInterval,
+		},
 	}
-}
 
-func TestScheduler_Interval(t *testing.T) {
-	expected := 15 * time.Second
-	sched, _ := New(Options{
-		Store:       &mockStore{},
-		RepoStarter: newMockRepoStarter(),
-		Interval:    expected,
-	})
-	if sched.Interval() != expected {
-		t.Errorf("expected interval %v, got %v", expected, sched.Interval())
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sched, err := New(tt.opts)
+			if tt.wantErr != nil {
+				if !errors.Is(err, tt.wantErr) {
+					t.Fatalf("New() error=%v, want %v", err, tt.wantErr)
+				}
+				if sched != nil {
+					t.Fatalf("New() scheduler=%v, want nil", sched)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("New() failed: %v", err)
+			}
+			if sched.Name() != "batch-scheduler" {
+				t.Fatalf("Name()=%q, want batch-scheduler", sched.Name())
+			}
+			if sched.Interval() != tt.wantInterval {
+				t.Fatalf("Interval()=%v, want %v", sched.Interval(), tt.wantInterval)
+			}
+		})
 	}
 }
 

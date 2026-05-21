@@ -2,7 +2,6 @@ package store
 
 import (
 	"context"
-	"os"
 	"testing"
 	"time"
 
@@ -300,23 +299,7 @@ func TestCancelBulkQueries_AreScopedToRunID(t *testing.T) {
 
 func openStoreForCancelBulkTests(t *testing.T) (context.Context, Store) {
 	t.Helper()
-
-	dsn := os.Getenv("PLOY_TEST_DB_DSN")
-	if dsn == "" {
-		t.Skip("PLOY_TEST_DB_DSN not set; skipping store integration test")
-	}
-
-	ctx := context.Background()
-	db, err := NewStore(ctx, dsn)
-	if err != nil {
-		t.Fatalf("NewStore() failed: %v", err)
-	}
-	if err := RunMigrations(ctx, db.Pool()); err != nil {
-		t.Fatalf("RunMigrations() failed: %v", err)
-	}
-	t.Cleanup(db.Close)
-	cleanTestTables(t, ctx, db)
-	return ctx, db
+	return newTestStore(t)
 }
 
 func setJobRunningForCancelBulkTest(t *testing.T, ctx context.Context, db Store, jobID types.JobID) {

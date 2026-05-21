@@ -31,6 +31,9 @@ func newTestStore(t *testing.T) (context.Context, Store) {
 		t.Fatalf("NewStore() failed: %v", err)
 	}
 	t.Cleanup(func() { db.Close() })
+	if err := RunMigrations(ctx, db.Pool()); err != nil {
+		t.Fatalf("RunMigrations() failed: %v", err)
+	}
 	cleanTestTables(t, ctx, db)
 	return ctx, db
 }
@@ -40,7 +43,13 @@ func newTestStore(t *testing.T) (context.Context, Store) {
 func cleanTestTables(t *testing.T, ctx context.Context, db Store) {
 	t.Helper()
 	_, err := db.Pool().Exec(ctx,
-		`TRUNCATE jobs, nodes, run_repos, runs, mig_repos, migs, specs, repos CASCADE`)
+		`TRUNCATE
+			jobs, job_metrics, run_repo_actions, sboms, nodes, node_metrics,
+			run_repos, runs, mig_repos, migs, specs, spec_bundles, repos,
+			events, diffs, logs, artifact_bundles,
+			api_tokens, bootstrap_tokens,
+			config_env, config_home, config_in, config_bundle_map
+		CASCADE`)
 	if err != nil {
 		t.Fatalf("cleanTestTables: %v", err)
 	}

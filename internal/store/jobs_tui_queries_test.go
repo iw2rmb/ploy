@@ -1,29 +1,14 @@
 package store
 
 import (
-	"context"
-	"os"
 	"testing"
 
 	"github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/segmentio/ksuid"
 )
 
-// TestListJobsForTUI covers ordering, run_id filtering, and total counting via CountJobsForTUI.
-// Skipped unless PLOY_TEST_DB_DSN is set.
 func TestListJobsForTUI(t *testing.T) {
-	dsn := os.Getenv("PLOY_TEST_DB_DSN")
-	if dsn == "" {
-		t.Skip("PLOY_TEST_DB_DSN not set; skipping store integration test")
-	}
-
-	ctx := context.Background()
-	db, err := NewStore(ctx, dsn)
-	if err != nil {
-		t.Fatalf("NewStore() failed: %v", err)
-	}
-	defer db.Close()
-	cleanTestTables(t, ctx, db)
+	ctx, db := newTestStore(t)
 
 	// Two separate runs so we can test filtered vs unfiltered results.
 	fxA := newV1Fixture(t, ctx, db, "https://github.com/test/tui-a", "main", "feat-a", []byte(`{"type":"test"}`))

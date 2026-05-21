@@ -1,26 +1,14 @@
 package store
 
 import (
-	"context"
 	"fmt"
-	"os"
 	"testing"
 
 	"github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 func TestUpdateJobCompletion_PropagatesRepoSHAOutToNextJob(t *testing.T) {
-	dsn := os.Getenv("PLOY_TEST_DB_DSN")
-	if dsn == "" {
-		t.Skip("PLOY_TEST_DB_DSN not set; skipping store integration test")
-	}
-
-	ctx := context.Background()
-	db, err := NewStore(ctx, dsn)
-	if err != nil {
-		t.Fatalf("NewStore() failed: %v", err)
-	}
-	defer db.Close()
+	ctx, db := newTestStore(t)
 
 	fx := newV1Fixture(t, ctx, db,
 		"https://github.com/iw2rmb/ploy-sha-chain-test.git",
@@ -101,17 +89,7 @@ func TestUpdateJobCompletion_PropagatesRepoSHAOutToNextJob(t *testing.T) {
 }
 
 func TestUpdateJobCompletion_PropagationIsAtomic(t *testing.T) {
-	dsn := os.Getenv("PLOY_TEST_DB_DSN")
-	if dsn == "" {
-		t.Skip("PLOY_TEST_DB_DSN not set; skipping store integration test")
-	}
-
-	ctx := context.Background()
-	db, err := NewStore(ctx, dsn)
-	if err != nil {
-		t.Fatalf("NewStore() failed: %v", err)
-	}
-	defer db.Close()
+	ctx, db := newTestStore(t)
 
 	fx := newV1Fixture(t, ctx, db,
 		"https://github.com/iw2rmb/ploy-sha-chain-atomic.git",

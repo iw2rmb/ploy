@@ -1,8 +1,6 @@
 package store
 
 import (
-	"context"
-	"os"
 	"testing"
 	"time"
 
@@ -10,22 +8,8 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// TestV1SQLCQueries_Migs verifies that the v1 migs queries are wired and match
-// the expected filter semantics.
-//
-// This test is skipped if PLOY_TEST_DB_DSN is not set.
 func TestV1SQLCQueries_Migs(t *testing.T) {
-	dsn := os.Getenv("PLOY_TEST_DB_DSN")
-	if dsn == "" {
-		t.Skip("PLOY_TEST_DB_DSN not set; skipping store integration test")
-	}
-
-	ctx := context.Background()
-	db, err := NewStore(ctx, dsn)
-	if err != nil {
-		t.Fatalf("NewStore() failed: %v", err)
-	}
-	defer db.Close()
+	ctx, db := newTestStore(t)
 
 	createdBy := "test-user"
 
@@ -151,21 +135,8 @@ func TestV1SQLCQueries_Migs(t *testing.T) {
 	}
 }
 
-// TestV1SQLCQueries_MigRepos verifies v1 mig_repos lookup/upsert/delete behavior.
-//
-// This test is skipped if PLOY_TEST_DB_DSN is not set.
 func TestV1SQLCQueries_MigRepos(t *testing.T) {
-	dsn := os.Getenv("PLOY_TEST_DB_DSN")
-	if dsn == "" {
-		t.Skip("PLOY_TEST_DB_DSN not set; skipping store integration test")
-	}
-
-	ctx := context.Background()
-	db, err := NewStore(ctx, dsn)
-	if err != nil {
-		t.Fatalf("NewStore() failed: %v", err)
-	}
-	defer db.Close()
+	ctx, db := newTestStore(t)
 
 	createdBy := "test-user"
 	migID := types.NewMigID()
@@ -250,21 +221,8 @@ func TestV1SQLCQueries_MigRepos(t *testing.T) {
 	}
 }
 
-// TestV1SQLCQueries_Specs verifies ListSpecs ordering by created_at DESC.
-//
-// This test is skipped if PLOY_TEST_DB_DSN is not set.
 func TestV1SQLCQueries_Specs(t *testing.T) {
-	dsn := os.Getenv("PLOY_TEST_DB_DSN")
-	if dsn == "" {
-		t.Skip("PLOY_TEST_DB_DSN not set; skipping store integration test")
-	}
-
-	ctx := context.Background()
-	db, err := NewStore(ctx, dsn)
-	if err != nil {
-		t.Fatalf("NewStore() failed: %v", err)
-	}
-	defer db.Close()
+	ctx, db := newTestStore(t)
 
 	createdBy := "test-user"
 
