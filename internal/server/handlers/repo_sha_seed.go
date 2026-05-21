@@ -4,9 +4,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
 	"regexp"
 	"strings"
+
+	"github.com/iw2rmb/ploy/internal/gitauth"
 )
 
 var sha40Pattern = regexp.MustCompile(`^[0-9a-f]{40}$`)
@@ -15,20 +18,23 @@ type sourceCommitSHAResolverFunc func(context.Context, string, string) (string, 
 
 type sourceCommitSHAResolverContextKey struct{}
 
-var sourceCommitSHAResolver sourceCommitSHAResolverFunc = resolveSourceCommitSHA
+var sourceCommitSHAResolver sourceCommitSHAResolverFunc
 
 func withSourceCommitSHAResolver(ctx context.Context, resolver sourceCommitSHAResolverFunc) context.Context {
 	return context.WithValue(ctx, sourceCommitSHAResolverContextKey{}, resolver)
 }
 
-func resolveSourceCommitSHAFromContext(ctx context.Context, repoURL, ref string) (string, error) {
+func resolveSourceCommitSHAFromContext(ctx context.Context, repoURL, ref string, auth gitauth.Options) (string, error) {
 	if resolver, ok := ctx.Value(sourceCommitSHAResolverContextKey{}).(sourceCommitSHAResolverFunc); ok && resolver != nil {
 		return resolver(ctx, repoURL, ref)
 	}
-	return sourceCommitSHAResolver(ctx, repoURL, ref)
+	if sourceCommitSHAResolver != nil {
+		return sourceCommitSHAResolver(ctx, repoURL, ref)
+	}
+	return resolveSourceCommitSHA(ctx, repoURL, ref, auth)
 }
 
-func resolveSourceCommitSHA(ctx context.Context, repoURL, ref string) (string, error) {
+func resolveSourceCommitSHA(ctx context.Context, repoURL, ref string, auth gitauth.Options) (string, error) {
 	repoURL = strings.TrimSpace(repoURL)
 	ref = strings.TrimSpace(ref)
 	if repoURL == "" {
@@ -45,7 +51,7 @@ func resolveSourceCommitSHA(ctx context.Context, repoURL, ref string) (string, e
 
 	attemptErrs := make([]string, 0, len(candidates))
 	for _, candidate := range candidates {
-		sha, err := gitLSRemote(ctx, repoURL, candidate)
+		sha, err := gitLSRemote(ctx, repoURL, candidate, auth)
 		if err == nil {
 			return sha, nil
 		}
@@ -54,8 +60,11 @@ func resolveSourceCommitSHA(ctx context.Context, repoURL, ref string) (string, e
 	return "", fmt.Errorf("resolve source commit sha for ref %q: %s", ref, strings.Join(attemptErrs, "; "))
 }
 
-func gitLSRemote(ctx context.Context, repoURL, ref string) (string, error) {
-	cmd := exec.CommandContext(ctx, "git", "ls-remote", repoURL, ref)
+func gitLSRemote(ctx context.Context, repoURL, ref string, auth gitauth.Options) (string, error) {
+	prepared := gitauth.PrepareURL(repoURL, auth)
+	cmd := exec.CommandContext(ctx, "git", "ls-remote", prepared.URL, ref)
+	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GIT_ASKPASS=echo")
+	cmd.Env = append(cmd.Env, prepared.Env...)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("git ls-remote failed (%s)", classifyGitLSRemoteFailure(out))

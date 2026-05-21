@@ -75,7 +75,7 @@ func TestBuildManifestFromRequest(t *testing.T) {
 		}
 	})
 
-	t.Run("hydrates gitlab repo with oauth2 token while keeping gate repo URL clean", func(t *testing.T) {
+	t.Run("keeps hydration and gate repo URLs clean while retaining gitlab auth options", func(t *testing.T) {
 		req := newStartRunRequest(
 			withRunRepoURL("https://gitlab.example.com/group/repo.git"),
 			withRunOptions(RunOptions{
@@ -95,9 +95,12 @@ func TestBuildManifestFromRequest(t *testing.T) {
 		}
 
 		gotHydrationURL := manifest.Inputs[0].Hydration.Repo.URL.String()
-		wantHydrationURL := "https://oauth2:glpat-secret@gitlab.example.com/group/repo.git"
+		wantHydrationURL := "https://gitlab.example.com/group/repo.git"
 		if gotHydrationURL != wantHydrationURL {
 			t.Fatalf("hydration repo URL=%q, want %q", gotHydrationURL, wantHydrationURL)
+		}
+		if gotPAT, ok := manifest.Options["gitlab_pat"].(string); !ok || gotPAT != "glpat-secret" {
+			t.Fatalf("manifest gitlab_pat=%v, want glpat-secret", manifest.Options["gitlab_pat"])
 		}
 
 		if manifest.Gate == nil {

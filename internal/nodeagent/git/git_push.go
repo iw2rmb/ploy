@@ -7,6 +7,8 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+
+	"github.com/iw2rmb/ploy/internal/gitauth"
 )
 
 // PushOptions holds configuration for pushing a git branch.
@@ -16,7 +18,7 @@ type PushOptions struct {
 	// TargetRef is the branch name to push (e.g., "workflow/abc/123").
 	TargetRef string
 	// PAT is the Personal Access Token for authentication.
-	// Will be provided via GIT_ASKPASS to avoid embedding in remote URL.
+	// Will be provided via per-process Git config env to avoid embedding in remote URL.
 	PAT string
 	// UserName is the git user.name config value.
 	UserName string
@@ -39,7 +41,7 @@ func NewPusher() Pusher {
 	return &pusher{}
 }
 
-// Push pushes the target branch to origin using PAT authentication via GIT_ASKPASS.
+// Push pushes the target branch to origin using transient PAT authentication.
 // It configures git user.name and user.email, then performs the push operation.
 // The PAT is never persisted to disk or embedded in the remote URL.
 func (p *pusher) Push(ctx context.Context, opts PushOptions) error {
@@ -92,19 +94,18 @@ func (p *pusher) configureGitUser(ctx context.Context, repoDir, userName, userEm
 	return nil
 }
 
-// pushBranch performs the git push operation using the provided askpass script.
+// pushBranch performs the git push operation with auth scoped to this Git process.
 func (p *pusher) pushBranch(ctx context.Context, repoDir, targetRef, pat, remoteURL string) error {
-	// Build a remote URL with embedded token using the oauth2 user (GitLab pattern).
 	u, err := url.Parse(remoteURL)
 	if err != nil {
 		return fmt.Errorf("parse remote url: %w", err)
 	}
-	u.User = url.UserPassword("oauth2", pat)
+	u.User = nil
+	authEnv := gitauth.ExtraHeaderEnv(*u, "oauth2", pat)
 
 	// Push the current HEAD to the remote branch name, creating it if needed.
-	// Equivalent to: git push https://oauth2:<token>@host/path.git HEAD:refs/heads/<targetRef>
 	refspec := "HEAD:refs/heads/" + targetRef
-	if err := runGitCommand(ctx, repoDir, nil, "push", u.String(), refspec); err != nil {
+	if err := runGitCommand(ctx, repoDir, authEnv, "push", u.String(), refspec); err != nil {
 		return RedactError(fmt.Errorf("git push %s: %w", u.Host, err), pat)
 	}
 	return nil
@@ -117,7 +118,8 @@ func runGitCommand(ctx context.Context, dir string, env []string, args ...string
 		cmd.Dir = dir
 	}
 	// Start with base environment and add custom env vars.
-	cmd.Env = append(os.Environ(), env...)
+	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GIT_ASKPASS=echo")
+	cmd.Env = append(cmd.Env, env...)
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {

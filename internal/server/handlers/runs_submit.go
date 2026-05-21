@@ -116,13 +116,7 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service) h
 		}
 
 		// Create run_repo entry.
-		// Resolve source commit with explicit URL credentials when provided,
-		// otherwise derive GitLab PAT auth from spec for private repos.
-		repoURLForSeed := rawRepoURL
-		if !repoURLContainsCredentials(rawRepoURL) {
-			repoURLForSeed = repoURLWithGitLabPATFromSpec(normalizedRepoURL, req.Spec)
-		}
-		sourceCommitSHA, seedErr := resolveSourceCommitSHAFromContext(r.Context(), repoURLForSeed, migRepo.BaseRef)
+		sourceCommitSHA, seedErr := resolveSourceCommitSHAFromContext(r.Context(), rawRepoURL, migRepo.BaseRef, gitAuthOptionsFromSpec(req.Spec))
 		if seedErr != nil {
 			writeHTTPError(w, http.StatusBadRequest, "failed to resolve source commit for repo %s ref %s: %v", normalizedRepoURL, migRepo.BaseRef, seedErr)
 			slog.Error("create single-repo run: resolve source commit failed",

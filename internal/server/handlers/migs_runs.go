@@ -110,8 +110,7 @@ func createMigRunHandler(st store.Store) http.HandlerFunc {
 				serverError(w, "create mig run", "get repo", urlErr, "repo_id", migRepo.RepoID)
 				return
 			}
-			repoURLForSeed := repoURLWithGitLabPATFromSpec(repoURL, specRow.Spec)
-			sourceCommitSHA, seedErr := resolveSourceCommitSHAFromContext(r.Context(), repoURLForSeed, migRepo.BaseRef)
+			sourceCommitSHA, seedErr := resolveSourceCommitSHAFromContext(r.Context(), repoURL, migRepo.BaseRef, gitAuthOptionsFromSpec(specRow.Spec))
 			if seedErr != nil {
 				writeHTTPError(w, http.StatusBadRequest, "failed to resolve source commit for repo %s ref %s: %v", repoURL, migRepo.BaseRef, seedErr)
 				slog.Error("create mig run: resolve source commit failed",

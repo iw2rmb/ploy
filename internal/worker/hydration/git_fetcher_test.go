@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/gitauth"
 	"github.com/iw2rmb/ploy/internal/testutil/gitrepo"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
@@ -80,7 +81,7 @@ func TestGitFetcher_Fetch(t *testing.T) {
 				t.Fatalf("NewGitFetcher() error = %v", err)
 			}
 
-			err = fetcher.Fetch(context.Background(), tt.repo, tt.dest)
+			err = fetcher.Fetch(context.Background(), tt.repo, tt.dest, gitauth.Options{})
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Fetch() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -105,71 +106,42 @@ func TestGitFetcher_CacheDir(t *testing.T) {
 		t.Skip("rsync command not found, skipping cache dir tests")
 	}
 
-	t.Run("cache miss performs fresh clone", func(t *testing.T) {
+	t.Run("cache hit sanitizes credentialed origin urls", func(t *testing.T) {
 		t.Parallel()
 
 		repoDir := gitrepo.SetupBasic(t)
 		cacheDir := t.TempDir()
 		dest := t.TempDir()
+		cleanURL := "https://gitlab.example.com/group/repo.git"
+		credentialedURL := "https://oauth2:glpat-secret@gitlab.example.com/group/repo.git"
+		cacheKey := computeCacheKey(cleanURL, "main", "")
+		cachedClone := filepath.Join(cacheDir, "git-clones", cacheKey)
+
+		if err := os.MkdirAll(filepath.Dir(cachedClone), 0o750); err != nil {
+			t.Fatalf("create cache parent: %v", err)
+		}
+		gitrepo.Run(t, cacheDir, "clone", "file://"+repoDir, cachedClone)
+		gitrepo.Run(t, cachedClone, "remote", "set-url", "origin", credentialedURL)
 
 		fetcher, err := NewGitFetcher(GitFetcherOptions{CacheDir: cacheDir})
 		if err != nil {
 			t.Fatalf("NewGitFetcher() error = %v", err)
 		}
+		repo := &contracts.RepoMaterialization{
+			URL:       types.RepoURL(cleanURL),
+			BaseRef:   types.GitRef("main"),
+			TargetRef: types.GitRef("main"),
+		}
 
-		repo := makeRepo(repoDir, "main", "main", "")
-		if err := fetcher.Fetch(context.Background(), repo, dest); err != nil {
+		if err := fetcher.Fetch(context.Background(), repo, dest, gitauth.Options{
+			GitLabPAT:    "glpat-secret",
+			GitLabDomain: "gitlab.example.com",
+		}); err != nil {
 			t.Fatalf("Fetch() error = %v", err)
 		}
 
-		gitrepo.AssertRepo(t, dest)
-
-		cacheCloneDir := filepath.Join(cacheDir, "git-clones")
-		if _, err := os.Stat(cacheCloneDir); os.IsNotExist(err) {
-			t.Errorf("expected cache directory at %s", cacheCloneDir)
-		}
-	})
-
-	t.Run("cache hit reuses cached clone", func(t *testing.T) {
-		t.Parallel()
-
-		repoDir := gitrepo.SetupBasic(t)
-		cacheDir := t.TempDir()
-		dest1 := t.TempDir()
-		dest2 := t.TempDir()
-
-		fetcher, err := NewGitFetcher(GitFetcherOptions{CacheDir: cacheDir})
-		if err != nil {
-			t.Fatalf("NewGitFetcher() error = %v", err)
-		}
-
-		repo := makeRepo(repoDir, "main", "main", "")
-		ctx := context.Background()
-
-		if err := fetcher.Fetch(ctx, repo, dest1); err != nil {
-			t.Fatalf("Fetch() first call error = %v", err)
-		}
-		if err := fetcher.Fetch(ctx, repo, dest2); err != nil {
-			t.Fatalf("Fetch() second call error = %v", err)
-		}
-
-		for _, dest := range []string{dest1, dest2} {
-			gitrepo.AssertRepo(t, dest)
-		}
-
-		readme1 := filepath.Join(dest1, "README.md")
-		readme2 := filepath.Join(dest2, "README.md")
-		content1, err := os.ReadFile(readme1)
-		if err != nil {
-			t.Fatalf("failed to read README.md from dest1: %v", err)
-		}
-		content2, err := os.ReadFile(readme2)
-		if err != nil {
-			t.Fatalf("failed to read README.md from dest2: %v", err)
-		}
-		if string(content1) != string(content2) {
-			t.Errorf("cached clone content mismatch: %q vs %q", string(content1), string(content2))
-		}
+		assertRemoteOriginURL(t, cachedClone, cleanURL)
+		assertRemoteOriginURL(t, dest, cleanURL)
 	})
 
 	t.Run("different repos get separate cache entries", func(t *testing.T) {
@@ -187,10 +159,10 @@ func TestGitFetcher_CacheDir(t *testing.T) {
 		}
 
 		ctx := context.Background()
-		if err := fetcher.Fetch(ctx, makeRepo(repo1Dir, "main", "main", ""), dest1); err != nil {
+		if err := fetcher.Fetch(ctx, makeRepo(repo1Dir, "main", "main", ""), dest1, gitauth.Options{}); err != nil {
 			t.Fatalf("Fetch() repo1 error = %v", err)
 		}
-		if err := fetcher.Fetch(ctx, makeRepo(repo2Dir, "main", "main", ""), dest2); err != nil {
+		if err := fetcher.Fetch(ctx, makeRepo(repo2Dir, "main", "main", ""), dest2, gitauth.Options{}); err != nil {
 			t.Fatalf("Fetch() repo2 error = %v", err)
 		}
 
@@ -212,10 +184,10 @@ func TestGitFetcher_CacheDir(t *testing.T) {
 		}
 
 		ctx := context.Background()
-		if err := fetcher.Fetch(ctx, makeRepo(repoDir, "main", "main", ""), dest1); err != nil {
+		if err := fetcher.Fetch(ctx, makeRepo(repoDir, "main", "main", ""), dest1, gitauth.Options{}); err != nil {
 			t.Fatalf("Fetch() latest commit error = %v", err)
 		}
-		if err := fetcher.Fetch(ctx, makeRepo(repoDir, "main", "main", secondCommitSHA), dest2); err != nil {
+		if err := fetcher.Fetch(ctx, makeRepo(repoDir, "main", "main", secondCommitSHA), dest2, gitauth.Options{}); err != nil {
 			t.Fatalf("Fetch() specific commit error = %v", err)
 		}
 
@@ -235,7 +207,7 @@ func TestGitFetcher_CacheDir(t *testing.T) {
 			t.Fatalf("NewGitFetcher() error = %v", err)
 		}
 
-		if err := fetcher.Fetch(context.Background(), makeRepo(repoDir, "main", "main", ""), dest); err != nil {
+		if err := fetcher.Fetch(context.Background(), makeRepo(repoDir, "main", "main", ""), dest, gitauth.Options{}); err != nil {
 			t.Fatalf("Fetch() error = %v", err)
 		}
 
@@ -277,6 +249,14 @@ func TestComputeCacheKey(t *testing.T) {
 			url1:     "https://github.com/example/repo",
 			baseRef1: "main",
 			url2:     "https://github.com/example/repo.git",
+			baseRef2: "main",
+			wantSame: true,
+		},
+		{
+			name:     "URL normalization: credentials ignored",
+			url1:     "https://gitlab.example.com/example/repo.git",
+			baseRef1: "main",
+			url2:     "https://oauth2:glpat-secret@gitlab.example.com/example/repo.git",
 			baseRef2: "main",
 			wantSame: true,
 		},
@@ -352,7 +332,7 @@ func TestGitFetcher_BaseHydrationStrategy(t *testing.T) {
 			t.Fatalf("NewGitFetcher() error = %v", err)
 		}
 
-		if err := fetcher.Fetch(context.Background(), makeRepo(repoDir, "main", "main", ""), dest); err != nil {
+		if err := fetcher.Fetch(context.Background(), makeRepo(repoDir, "main", "main", ""), dest, gitauth.Options{}); err != nil {
 			t.Fatalf("Fetch() on already hydrated dest error = %v", err)
 		}
 
@@ -368,7 +348,7 @@ func TestGitFetcher_BaseHydrationStrategy(t *testing.T) {
 			t.Fatalf("NewGitFetcher() error = %v", err)
 		}
 
-		if err := fetcher.Fetch(context.Background(), makeRepo(repoDir, "main", "main", ""), dest); err != nil {
+		if err := fetcher.Fetch(context.Background(), makeRepo(repoDir, "main", "main", ""), dest, gitauth.Options{}); err != nil {
 			t.Fatalf("Fetch() error = %v", err)
 		}
 
@@ -388,7 +368,7 @@ func TestGitFetcher_BaseHydrationStrategy(t *testing.T) {
 			t.Fatalf("NewGitFetcher() error = %v", err)
 		}
 
-		if err := fetcher.Fetch(context.Background(), makeRepo(repoDir, "main", "main", secondCommitSHA), dest); err != nil {
+		if err := fetcher.Fetch(context.Background(), makeRepo(repoDir, "main", "main", secondCommitSHA), dest, gitauth.Options{}); err != nil {
 			t.Fatalf("Fetch() error = %v", err)
 		}
 
@@ -408,7 +388,7 @@ func TestGitFetcher_BaseHydrationStrategy(t *testing.T) {
 			t.Fatalf("NewGitFetcher() error = %v", err)
 		}
 
-		if err := fetcher.Fetch(context.Background(), makeRepo(repoDir, "main", "main", ""), dest); err != nil {
+		if err := fetcher.Fetch(context.Background(), makeRepo(repoDir, "main", "main", ""), dest, gitauth.Options{}); err != nil {
 			t.Fatalf("Fetch() error = %v", err)
 		}
 
@@ -462,5 +442,13 @@ func assertCacheEntryCount(t *testing.T, cacheDir string, want int) {
 	}
 	if len(entries) != want {
 		t.Errorf("expected %d cache entries, got %d", want, len(entries))
+	}
+}
+
+func assertRemoteOriginURL(t *testing.T, repoDir, want string) {
+	t.Helper()
+	got := strings.TrimSpace(string(gitrepo.Run(t, repoDir, "remote", "get-url", "origin")))
+	if got != want {
+		t.Fatalf("origin URL=%q, want %q", got, want)
 	}
 }
