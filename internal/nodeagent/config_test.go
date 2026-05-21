@@ -19,6 +19,7 @@ func TestLoadConfig(t *testing.T) {
 			yaml: `
 server_url: https://server.example.com:8443
 node_id: aB3xY9
+cluster_id: local-runtime
 http:
   listen: ":8444"
   tls:
@@ -32,7 +33,12 @@ http:
 				if cfg.NodeID != "aB3xY9" {
 					t.Errorf("NodeID = %q, want %q", cfg.NodeID, "aB3xY9")
 				}
-				// Listen default comes from config file; no assertion on value.
+				if cfg.ClusterID != "local-runtime" {
+					t.Errorf("ClusterID = %q, want %q", cfg.ClusterID, "local-runtime")
+				}
+				if cfg.HTTP.Listen != ":8444" {
+					t.Errorf("HTTP.Listen = %q, want %q", cfg.HTTP.Listen, ":8444")
+				}
 				if cfg.Concurrency != 1 {
 					t.Errorf("Concurrency = %d, want %d", cfg.Concurrency, 1)
 				}
