@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -25,15 +26,45 @@ const (
 func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest) {
 	startTime := time.Now()
 
+	artifactPaths := runRepoJobArtifactPaths(req.RunID, req.RepoID, req.JobID)
+	uploadRepoArtifactsOnReturn := false
+	closeArtifactLogs := func() {}
+	defer func() {
+		closeArtifactLogs()
+		if uploadRepoArtifactsOnReturn {
+			r.uploadRepoArtifactsIfPresent(req.RunID, req.RepoID, req.JobID)
+		}
+	}()
+	if err := ensureJobArtifactDirs(artifactPaths); err != nil {
+		uploadRepoArtifactsOnReturn = true
+		slog.Error("failed to prepare job artifacts", "run_id", req.RunID, "job_id", req.JobID, "error", err)
+		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
+		return
+	}
+
 	// Initialize runtime components.
 	// Pass jobID to associate log chunks with this specific gate job.
 	runner, _, logStreamer, err := r.initializeRuntime(ctx, req.RunID, req.JobID)
 	if err != nil {
+		uploadRepoArtifactsOnReturn = true
 		slog.Error("failed to initialize runtime", "run_id", req.RunID, "error", err)
 		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
 		return
 	}
 	defer func() { _ = logStreamer.Close() }()
+	artifactLogs, err := newArtifactLogWriter(logStreamer, artifactPaths)
+	if err != nil {
+		uploadRepoArtifactsOnReturn = true
+		slog.Error("failed to prepare job artifact logs", "run_id", req.RunID, "job_id", req.JobID, "error", err)
+		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
+		return
+	}
+	runner.LogWriter = artifactLogs
+	closeArtifactLogs = func() {
+		if err := artifactLogs.Close(); err != nil {
+			slog.Warn("failed to close job artifact logs", "run_id", req.RunID, "job_id", req.JobID, "error", err)
+		}
+	}
 
 	// Build manifest using typed options from request.
 	// stepIndex=0 is used for manifest building; job configuration comes from req.TypedOptions.
@@ -68,6 +99,7 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 
 	manifest, err := buildGateManifestFromRequest(req, typedOpts)
 	if err != nil {
+		uploadRepoArtifactsOnReturn = true
 		slog.Error("failed to build manifest", "run_id", req.RunID, "error", err)
 		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
 		return
@@ -77,12 +109,21 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 
 	workspace, err := r.prepareStickyWorkspaceForStep(ctx, req, manifest)
 	if err != nil {
+		uploadRepoArtifactsOnReturn = true
 		slog.Error("failed to prepare sticky workspace", "run_id", req.RunID, "error", err)
 		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
 		return
 	}
+	if err := exposeGateOutDir(workspace, artifactPaths.Out); err != nil {
+		uploadRepoArtifactsOnReturn = true
+		slog.Error("failed to expose gate out dir", "run_id", req.RunID, "job_id", req.JobID, "error", err)
+		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
+		return
+	}
+	defer cleanupGateOutLink(workspace)
 	shareDir, err := ensureRunRepoShareDir(req.RunID, req.RepoID)
 	if err != nil {
+		uploadRepoArtifactsOnReturn = true
 		slog.Error("failed to ensure run/repo share dir", "run_id", req.RunID, "job_id", req.JobID, "error", err)
 		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
 		return
@@ -103,7 +144,7 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 	// control plane cancels remaining jobs.
 	if gateErr != nil || gateResult == nil {
 		duration := time.Since(startTime)
-		r.cleanupGateOutDir(workspace)
+		uploadRepoArtifactsOnReturn = true
 		errMsg := gateErr
 		if errMsg == nil {
 			errMsg = errors.New("gate returned nil result with nil error")
@@ -145,7 +186,6 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 		slog.Warn("failed to upload gate /out bundle", "run_id", req.RunID, "job_id", req.JobID, "error", err)
 	}
 	r.uploadGateReportArtifacts(ctx, req.RunID, req.JobID, workspace, gateResult)
-	r.cleanupGateOutDir(workspace)
 
 	duration := time.Since(startTime)
 
@@ -157,12 +197,14 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 		status = types.JobStatusFail
 		exitCode = 1
 		logVerb = "failed"
+		uploadRepoArtifactsOnReturn = true
 	}
 	repoSHAOut := ""
 	if status == types.JobStatusSuccess {
 		var repoSHAErr error
 		repoSHAOut, repoSHAErr = r.computeRepoSHAOut(ctx, req, workspace, "")
 		if repoSHAErr != nil {
+			uploadRepoArtifactsOnReturn = true
 			stats := r.buildGateJobStats(gateResult, duration)
 			var errorExitCode int32 = -1
 			if uploadErr := r.uploadStatus(ctx, req.RunID.String(), types.JobStatusError.String(), &errorExitCode, stats, req.JobID); uploadErr != nil {
@@ -180,6 +222,9 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 			)
 			return
 		}
+	}
+	if status == types.JobStatusSuccess && req.JobType == types.JobTypePostGate {
+		uploadRepoArtifactsOnReturn = true
 	}
 
 	// Build stats with gate metadata.
@@ -227,20 +272,6 @@ func gateResultPassed(gateResult *contracts.BuildGateStageMetadata) bool {
 		return false
 	}
 	return gateResult.StaticChecks[0].Passed
-}
-
-// runCacheDir returns the per-run cache directory under PLOYD_CACHE_HOME (or os.TempDir).
-func runCacheRootDir() string {
-	baseRoot := os.Getenv("PLOYD_CACHE_HOME")
-	if baseRoot == "" {
-		baseRoot = os.TempDir()
-	}
-	return filepath.Join(baseRoot, "ploy", "run")
-}
-
-// runCacheDir returns the per-run cache directory under PLOYD_CACHE_HOME (or os.TempDir).
-func runCacheDir(runID types.RunID) string {
-	return filepath.Join(runCacheRootDir(), runID.String())
 }
 
 // persistOnce writes data to dir/filename idempotently: if the file already
@@ -306,10 +337,24 @@ func (r *runController) persistFirstGateFailureLog(runID types.RunID, meta *cont
 	persistOnce(runCacheDir(runID), "build-gate-first.log", []byte(logPayload), "first build gate failure log", runID)
 }
 
-func (r *runController) cleanupGateOutDir(workspace string) {
+func exposeGateOutDir(workspace, outDir string) error {
+	linkPath := filepath.Join(workspace, step.BuildGateWorkspaceOutDir)
+	if err := os.RemoveAll(linkPath); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("remove previous gate out link: %w", err)
+	}
+	if err := os.MkdirAll(outDir, 0o750); err != nil {
+		return fmt.Errorf("create gate out artifacts dir: %w", err)
+	}
+	if err := os.Symlink(outDir, linkPath); err != nil {
+		return fmt.Errorf("create gate out symlink: %w", err)
+	}
+	return nil
+}
+
+func cleanupGateOutLink(workspace string) {
 	outDir := filepath.Join(workspace, step.BuildGateWorkspaceOutDir)
 	if err := os.RemoveAll(outDir); err != nil && !os.IsNotExist(err) {
-		slog.Warn("failed to remove gate out dir", "path", outDir, "error", err)
+		slog.Warn("failed to remove gate out link", "path", outDir, "error", err)
 	}
 }
 

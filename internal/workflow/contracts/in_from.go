@@ -27,13 +27,13 @@ type InFromURI struct {
 }
 
 // ResolvedInFromRef is claim-time resolved input materialization metadata.
-// SourceArtifactID points to the artifact bundle that contains SourceOutPath.
 type ResolvedInFromRef struct {
-	From             string `json:"from,omitempty"`
-	To               string `json:"to,omitempty"`
-	SourceStepName   string `json:"source_step_name,omitempty"`
-	SourceOutPath    string `json:"source_out_path,omitempty"`
-	SourceArtifactID string `json:"source_artifact_id,omitempty"`
+	From           string              `json:"from,omitempty"`
+	To             string              `json:"to,omitempty"`
+	SourceStepName string              `json:"source_step_name,omitempty"`
+	SourceJobID    domaintypes.JobID   `json:"source_job_id,omitempty"`
+	SourceJobType  domaintypes.JobType `json:"source_job_type,omitempty"`
+	SourceOutPath  string              `json:"source_out_path,omitempty"`
 }
 
 // ParseInFromURI parses one of:
