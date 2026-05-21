@@ -37,19 +37,17 @@ type runStatsAccessor struct {
 
 // RunStatsGate represents the gate sub-structure in stats.
 type RunStatsGate struct {
-	Passed     *bool               `json:"passed,omitempty"`
-	DurationMs *int64              `json:"duration_ms,omitempty"`
-	PreGate    *RunStatsGatePhase  `json:"pre_gate,omitempty"`
-	FinalGate  *RunStatsGatePhase  `json:"final_gate,omitempty"`
+	Passed     *bool              `json:"passed,omitempty"`
+	DurationMs *int64             `json:"duration_ms,omitempty"`
+	PreGate    *RunStatsGatePhase `json:"pre_gate,omitempty"`
+	FinalGate  *RunStatsGatePhase `json:"final_gate,omitempty"`
 }
 
 // RunStatsGatePhase represents a single gate execution phase.
 type RunStatsGatePhase struct {
-	Passed         bool                   `json:"passed"`
-	DurationMs     int64                  `json:"duration_ms"`
-	LogsArtifactID string                 `json:"logs_artifact_id,omitempty"`
-	LogsBundleCID  string                 `json:"logs_bundle_cid,omitempty"`
-	Resources      *RunStatsGateResources `json:"resources,omitempty"`
+	Passed     bool                   `json:"passed"`
+	DurationMs int64                  `json:"duration_ms"`
+	Resources  *RunStatsGateResources `json:"resources,omitempty"`
 }
 
 // RunStatsGateResources represents resource usage for a gate phase.

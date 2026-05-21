@@ -77,7 +77,6 @@ func (r *runController) executeMigJob(ctx context.Context, req StartRunRequest) 
 		PopulateInDir: func(inDir string) error {
 			return r.materializeMigInFromInputs(ctx, req, inDir)
 		},
-		UploadConfiguredArtifacts: true,
 		UploadDiff: func(ctx context.Context, runID types.RunID, jobID types.JobID, jobName string, diffGen step.DiffGenerator, workspace string, result step.Result, diffPath string) (bool, error) {
 			return r.uploadJobDiff(ctx, runID, jobID, diffGen, workspace, result, types.DiffJobTypeMig, diffPath)
 		},
@@ -99,14 +98,11 @@ type standardJobConfig struct {
 	FinalizeOutputs func(outDir, workspace string) error
 	TrySkip         func(ctx context.Context, manifest contracts.StepManifest, workspace, outDir string) (bool, error)
 
-	UploadConfiguredArtifacts bool
-
 	UploadDiff    func(ctx context.Context, runID types.RunID, jobID types.JobID, jobName string, diffGen step.DiffGenerator, workspace string, result step.Result, diffPath string) (bool, error)
 	BuildJobMeta  func(outDir string) json.RawMessage
 	BuildMetadata func(outDir string) map[string]string
 
 	SuppressTerminalStatus bool
-	SuppressOutBundle      bool
 
 	StartTime time.Time
 }
@@ -251,11 +247,6 @@ func (r *runController) runContainerJob(
 				statsBuilder.Error(normalizedExecutionError(runErr))
 			}
 			stats := statsBuilder.MustBuild()
-			if !cfg.SuppressOutBundle {
-				if err := r.uploadOutDirBundle(ctx, req.RunID, req.JobID, outDir, "mig-out"); err != nil {
-					slog.Warn("/out artifact upload failed", "run_id", req.RunID, "job_id", req.JobID, "next_id", req.NextID, "error", err)
-				}
-			}
 			outcome = standardJobOutcome{
 				runErr:     runErr,
 				result:     step.Result{},
@@ -319,16 +310,6 @@ func (r *runController) runContainerJob(
 			runErr = fmt.Errorf("advance workspace baseline: %w", err)
 			slog.Error("failed to advance workspace baseline", "run_id", req.RunID, "job_id", req.JobID, "error", err)
 		}
-	}
-
-	if !cfg.SuppressOutBundle {
-		if err := r.uploadOutDirBundle(ctx, req.RunID, req.JobID, outDir, "mig-out"); err != nil {
-			slog.Warn("/out artifact upload failed", "run_id", req.RunID, "job_id", req.JobID, "next_id", req.NextID, "error", err)
-		}
-	}
-
-	if cfg.UploadConfiguredArtifacts {
-		r.uploadConfiguredArtifacts(ctx, req, req.TypedOptions, manifest, workspace, outDir)
 	}
 
 	repoSHAOut := ""

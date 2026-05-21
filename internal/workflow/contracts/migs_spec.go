@@ -96,14 +96,6 @@ type MigSpec struct {
 	// Pointer form preserves presence (absent vs explicitly false).
 	MROnFail *bool `json:"mr_on_fail,omitempty" yaml:"mr_on_fail,omitempty"`
 
-	// --- Artifact configuration ---
-
-	// ArtifactPaths lists workspace-relative paths to upload as artifacts.
-	ArtifactPaths []string `json:"artifact_paths,omitempty" yaml:"artifact_paths,omitempty"`
-
-	// ArtifactName is an optional custom name for the uploaded artifact bundle.
-	ArtifactName string `json:"artifact_name,omitempty" yaml:"artifact_name,omitempty"`
-
 	// BundleMap maps content hashes used in In/Out/Home entries to their
 	// spec bundle download identifiers (bundle IDs). Populated by the CLI
 	// compiler during spec submission. The nodeagent uses this to resolve
