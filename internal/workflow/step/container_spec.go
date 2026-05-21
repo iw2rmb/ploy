@@ -230,8 +230,7 @@ func appendMountsIfTargetMissing(existing []ContainerMount, additional []Contain
 
 // SeedOutDirFromStaging copies materialized Hydra out entry content from the
 // staging directory into outDir so that the single /out mount covers both
-// pre-seeded content and container writes. This ensures uploadOutDirBundle
-// archives all out content including Hydra-originated entries.
+// pre-seeded content and container writes.
 func SeedOutDirFromStaging(manifest contracts.StepManifest, stagingDir, outDir string) error {
 	if stagingDir == "" || outDir == "" {
 		return nil

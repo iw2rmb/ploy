@@ -7,110 +7,14 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
 	gitpkg "github.com/iw2rmb/ploy/internal/nodeagent/git"
-	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"github.com/iw2rmb/ploy/internal/workflow/lifecycle"
 	"github.com/iw2rmb/ploy/internal/workflow/step"
 )
-
-// uploadConfiguredArtifacts uploads artifact bundles specified in the typed RunOptions.
-// Relative paths resolve in workspace; /out/* paths resolve from outDir and keep
-// deterministic archive names under out/.
-func (r *runController) uploadConfiguredArtifacts(ctx context.Context, req StartRunRequest, typedOpts RunOptions, manifest contracts.StepManifest, workspace, outDir string) {
-	if len(typedOpts.Artifacts.Paths) == 0 {
-		return
-	}
-
-	entries := make([]ArtifactBundleEntry, 0, len(typedOpts.Artifacts.Paths))
-	for _, p := range typedOpts.Artifacts.Paths {
-		fullPath, archivePath, ok := resolveConfiguredArtifactPath(p, workspace, outDir)
-		if !ok {
-			slog.Warn("artifact path rejected",
-				"run_id", req.RunID, "job_id", req.JobID, "path", p,
-			)
-			continue
-		}
-
-		if _, err := os.Stat(fullPath); err == nil {
-			entries = append(entries, ArtifactBundleEntry{
-				SourcePath:  fullPath,
-				ArchivePath: archivePath,
-			})
-		} else {
-			slog.Warn("artifact path not found", "run_id", req.RunID, "path", p)
-		}
-	}
-
-	if len(entries) == 0 {
-		return
-	}
-
-	if _, _, err := r.artifactUploader.UploadArtifactEntries(ctx, req.RunID, req.JobID, entries, typedOpts.Artifacts.Name); err != nil {
-		slog.Error("failed to upload artifact bundle", "run_id", req.RunID, "job_id", req.JobID, "error", err)
-	} else {
-		slog.Info("artifact bundle uploaded successfully", "run_id", req.RunID, "job_id", req.JobID, "paths", len(entries))
-	}
-}
-
-func resolveConfiguredArtifactPath(rawPath, workspace, outDir string) (fullPath string, archivePath string, ok bool) {
-	p := strings.TrimSpace(rawPath)
-	if p == "" {
-		return "", "", false
-	}
-
-	if strings.HasPrefix(p, "/out/") {
-		if strings.TrimSpace(outDir) == "" {
-			return "", "", false
-		}
-		rel := strings.TrimPrefix(p, "/out/")
-		cleanRel := filepath.Clean(rel)
-		if cleanRel == "." || strings.HasPrefix(cleanRel, "..") || filepath.IsAbs(cleanRel) {
-			return "", "", false
-		}
-		return filepath.Join(outDir, cleanRel), filepath.ToSlash(filepath.Join("out", cleanRel)), true
-	}
-
-	if !isValidArtifactPath(p, workspace) {
-		return "", "", false
-	}
-
-	return filepath.Clean(filepath.Join(workspace, p)), "", true
-}
-
-// uploadOutDirBundle bundles and uploads the /out directory when it contains files.
-// Archive paths are rooted at out/ to preserve deterministic in-container paths.
-func (r *runController) uploadOutDirBundle(ctx context.Context, runID types.RunID, jobID types.JobID, outDir, artifactName string) error {
-	if r.artifactUploader == nil {
-		return nil
-	}
-	if outDir == "" {
-		return nil
-	}
-
-	hasFiles, _ := listFilesRecursive(outDir)
-	if !hasFiles {
-		return nil
-	}
-	name := strings.TrimSpace(artifactName)
-	if name == "" {
-		name = "mig-out"
-	}
-
-	entries := []ArtifactBundleEntry{{
-		SourcePath:  outDir,
-		ArchivePath: "out",
-	}}
-	if _, _, err := r.artifactUploader.UploadArtifactEntries(ctx, runID, jobID, entries, name); err != nil {
-		return fmt.Errorf("upload /out bundle: %w", err)
-	}
-
-	return nil
-}
 
 // uploadStatus uploads terminal status and execution statistics to the control plane.
 // Uses a detached context to ensure reporting even if the run context is cancelled.
@@ -176,35 +80,6 @@ func (r *runController) reportTerminalStatus(
 func (r *runController) cleanupRunRepoShareOnTerminalSuccess(req StartRunRequest, status types.JobStatus) {
 	_ = req
 	_ = status
-}
-
-// uploadGateLogsArtifact uploads build gate logs as an artifact bundle and attaches
-// artifact IDs to the gate stats payload.
-func (r *runController) uploadGateLogsArtifact(runID types.RunID, jobID types.JobID, logsText, artifactNameSuffix string, phase *types.RunStatsGatePhase) {
-	if phase == nil {
-		return
-	}
-
-	logFile, err := os.CreateTemp("", "ploy-gate-*.log")
-	if err != nil {
-		return
-	}
-	defer func() { _ = os.Remove(logFile.Name()) }()
-
-	_, _ = logFile.WriteString(logsText)
-	_ = logFile.Close()
-
-	artifactName := "build-gate.log"
-	if artifactNameSuffix != "" {
-		artifactName = "build-gate-" + artifactNameSuffix + ".log"
-	}
-
-	if id, cid, uerr := r.artifactUploader.UploadArtifact(context.Background(), runID, jobID, []string{logFile.Name()}, artifactName); uerr == nil {
-		phase.LogsArtifactID = id
-		phase.LogsBundleCID = cid
-	} else {
-		slog.Warn("failed to upload "+artifactName, "run_id", runID, "job_id", jobID, "error", uerr)
-	}
 }
 
 func (r *runController) computeRepoSHAOut(ctx context.Context, req StartRunRequest, workspace string, inputTree string) (string, error) {
@@ -280,27 +155,4 @@ func (r *runController) uploadJobDiff(
 
 	slog.Info(label+" diff uploaded successfully", "run_id", runID, "job_id", jobID, "size", len(diffBytes))
 	return true, nil
-}
-
-// isValidArtifactPath validates that an artifact path is safe for upload.
-// Prevents path traversal by ensuring the path is relative and contained within workspace.
-func isValidArtifactPath(artifactPath string, workspace string) bool {
-	if artifactPath == "" || strings.TrimSpace(artifactPath) == "" {
-		return false
-	}
-	if filepath.IsAbs(artifactPath) {
-		return false
-	}
-
-	fullPath := filepath.Clean(filepath.Join(workspace, artifactPath))
-	rel, err := filepath.Rel(workspace, fullPath)
-	if err != nil {
-		return false
-	}
-
-	if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-		return false
-	}
-
-	return true
 }

@@ -8,11 +8,11 @@ e2e_extract_mig_out_bundles() {
   local -a bundles=()
 
   shopt -s nullglob
-  bundles=("${artifact_dir}"/*_mig-out.bin)
+  bundles=("${artifact_dir}"/*_repo-artifacts.bin)
   shopt -u nullglob
 
   if ((${#bundles[@]} == 0)); then
-    echo "  - no mig-out bundles found in ${artifact_dir}"
+    echo "  - no repo-artifacts bundles found in ${artifact_dir}"
     return 0
   fi
 
@@ -34,7 +34,7 @@ e2e_validate_codex_handshake() {
   local mode="${2:-advisory}"
   local failed=0
 
-  if [[ -f "${artifact_dir}/codex-last.txt" ]]; then
+  if find "${artifact_dir}/artifacts" -path '*/out/codex-last.txt' -type f -print -quit 2>/dev/null | grep -q .; then
     echo "  + codex-last.txt present"
   else
     echo "  - codex-last.txt missing"

@@ -3,8 +3,6 @@
 package nodeagent
 
 import (
-	"strings"
-
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
@@ -15,7 +13,6 @@ type RunOptions struct {
 	MRWiring       MRWiringOptions
 	MRFlagsPresent MRFlagsPresence
 	Execution      MigContainerSpec
-	Artifacts      ArtifactOptions
 	ServerMetadata ServerMetadataOptions
 	Steps          []StepMig
 	StackGate      *contracts.StepGateStackSpec
@@ -52,12 +49,6 @@ type MRWiringOptions struct {
 	GitLabDomain string
 	MROnSuccess  bool
 	MROnFail     bool
-}
-
-// ArtifactOptions configures artifact collection and upload.
-type ArtifactOptions struct {
-	Paths []string
-	Name  string
 }
 
 // MRFlagsPresence tracks whether MR creation flags were explicitly set in the spec.
@@ -127,16 +118,6 @@ func migsSpecToRunOptions(spec *contracts.MigSpec) RunOptions {
 				},
 				Stack: step.Stack,
 			})
-		}
-	}
-
-	runOpts.Artifacts.Name = spec.ArtifactName
-	if len(spec.ArtifactPaths) > 0 {
-		runOpts.Artifacts.Paths = make([]string, 0, len(spec.ArtifactPaths))
-		for _, p := range spec.ArtifactPaths {
-			if trimmed := strings.TrimSpace(p); trimmed != "" {
-				runOpts.Artifacts.Paths = append(runOpts.Artifacts.Paths, p)
-			}
 		}
 	}
 

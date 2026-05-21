@@ -88,15 +88,12 @@ func TestManifestStepID(t *testing.T) {
 	}
 }
 
-// TestBuildManifestFromRequest_PropagatesJobAndArtifactName ensures job_id and
-// artifact_name options are propagated into manifest.Options.
-func TestBuildManifestFromRequest_PropagatesJobAndArtifactName(t *testing.T) {
+func TestBuildManifestFromRequest_PropagatesJobID(t *testing.T) {
 	req := newStartRunRequest(
 		withRunID("run-opts-1"),
 		withJobID("6ba7b810-9dad-11d1-80b4-00c04fd430c8"),
 		withRunOptions(RunOptions{
 			ServerMetadata: ServerMetadataOptions{JobID: types.JobID("6ba7b810-9dad-11d1-80b4-00c04fd430c8")},
-			Artifacts:      ArtifactOptions{Name: "custom-bundle"},
 		}),
 	)
 
@@ -107,8 +104,5 @@ func TestBuildManifestFromRequest_PropagatesJobAndArtifactName(t *testing.T) {
 
 	if jid, ok := m.OptionString("job_id"); !ok || jid == "" {
 		t.Fatalf("manifest.Options missing job_id")
-	}
-	if an, ok := m.OptionString("artifact_name"); !ok || an != "custom-bundle" {
-		t.Fatalf("manifest.Options artifact_name mismatch: got %q", an)
 	}
 }

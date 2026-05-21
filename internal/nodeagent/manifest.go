@@ -213,9 +213,6 @@ func buildManifestFromRequest(req StartRunRequest, typedOpts RunOptions, stepInd
 	if !typedOpts.ServerMetadata.JobID.IsZero() {
 		mergedOpts["job_id"] = typedOpts.ServerMetadata.JobID.String()
 	}
-	if aname := strings.TrimSpace(typedOpts.Artifacts.Name); aname != "" {
-		mergedOpts["artifact_name"] = aname
-	}
 
 	// Derive gate ref: CommitSHA > TargetRef > BaseRef.
 	gateRef := ""

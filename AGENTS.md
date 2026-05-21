@@ -39,16 +39,16 @@ Use this flow for any "why did run/job fail?" request.
   - Prioritize `ploy-node-1` logs for that `job_id` immediately.
   - Typical scope: pre-container/setup/population failures (for example input/materialization issues).
 - If `job_type = heal` and `exit_code = 1`: treat as job payload/tooling failure first.
-  - Prioritize runtime artifacts from `*_mig-out.bin`, especially `out/amata/runs/**` (`events.ndjson`, `snapshot.json`, provider outputs when present).
+  - Prioritize runtime artifacts from `*_repo-artifacts.bin`, especially `artifacts/<job-id>/out/amata/runs/**` (`events.ndjson`, `snapshot.json`, provider outputs when present).
   - Only pivot to ploy internals after runtime evidence is insufficient/inconsistent.
 
 ## 4) Artifact retrieval path (no re-discovery)
 - Always fetch artifacts with:
   - `ploy mig fetch --run <run-id> --artifact-dir <dir>`
-- If needed, unpack `*_mig-out.bin` (`tar -xzf ...`) and inspect:
-  - `out/amata/runs/*/events.ndjson`
-  - `out/amata/runs/*/snapshot.json`
-  - `out/heal.json`
+- If needed, unpack `*_repo-artifacts.bin` (`tar -xzf ...`) and inspect:
+  - `artifacts/<job-id>/out/amata/runs/*/events.ndjson`
+  - `artifacts/<job-id>/out/amata/runs/*/snapshot.json`
+  - `artifacts/<job-id>/out/heal.json`
 - For heal/payload analysis, correlate artifact behavior with MIG sources in:
   - `/Users/v.v.kovalev/@scale/ploy-lib/migs`
 

@@ -218,29 +218,6 @@ func TestParseMigSpecJSON_ValidationError(t *testing.T) {
 
 // TestParseMigSpecJSON_HealingValidation tests healing spec validation.
 
-func TestMigSpec_ArtifactFields(t *testing.T) {
-	input := `{
-		"steps": [{"image": "test:latest"}],
-		"artifact_name": "my-bundle",
-		"artifact_paths": ["output/", "logs/app.log"]
-	}`
-
-	spec, err := ParseMigSpecJSON([]byte(input))
-	if err != nil {
-		t.Fatalf("ParseMigSpecJSON failed: %v", err)
-	}
-
-	if spec.ArtifactName != "my-bundle" {
-		t.Errorf("artifact_name = %q, want %q", spec.ArtifactName, "my-bundle")
-	}
-	if len(spec.ArtifactPaths) != 2 {
-		t.Fatalf("len(artifact_paths) = %d, want 2", len(spec.ArtifactPaths))
-	}
-	if spec.ArtifactPaths[0] != "output/" {
-		t.Errorf("artifact_paths[0] = %q, want %q", spec.ArtifactPaths[0], "output/")
-	}
-}
-
 func TestParseMigSpecJSON_RequiresStepsEvenWithExtraFields(t *testing.T) {
 	input := `{
 		"mig": {
