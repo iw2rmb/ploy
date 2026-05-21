@@ -132,7 +132,7 @@ func TestConfigEnvGetWithTargetSelector(t *testing.T) {
 func TestConfigEnvGet_Errors(t *testing.T) {
 	tests := []struct {
 		name       string
-		setupEnv   map[string][]GlobalEnvVar
+		setup      func(*ConfigHolder)
 		key        string
 		query      string
 		wantStatus int
@@ -144,19 +144,17 @@ func TestConfigEnvGet_Errors(t *testing.T) {
 		},
 		{
 			name: "ambiguity without target selector",
-			setupEnv: map[string][]GlobalEnvVar{
-				"MULTI": {
-					{Value: "a", Target: domaintypes.GlobalEnvTargetGates, Secret: false},
-					{Value: "b", Target: domaintypes.GlobalEnvTargetSteps, Secret: false},
-				},
+			setup: func(h *ConfigHolder) {
+				h.SetGlobalEnvVar("MULTI", GlobalEnvVar{Value: "a", Target: domaintypes.GlobalEnvTargetGates, Secret: false})
+				h.SetGlobalEnvVar("MULTI", GlobalEnvVar{Value: "b", Target: domaintypes.GlobalEnvTargetSteps, Secret: false})
 			},
 			key:        "MULTI",
 			wantStatus: http.StatusConflict,
 		},
 		{
 			name: "invalid target",
-			setupEnv: map[string][]GlobalEnvVar{
-				"MY_KEY": {{Value: "val", Target: domaintypes.GlobalEnvTargetGates, Secret: false}},
+			setup: func(h *ConfigHolder) {
+				h.SetGlobalEnvVar("MY_KEY", GlobalEnvVar{Value: "val", Target: domaintypes.GlobalEnvTargetGates, Secret: false})
 			},
 			key:        "MY_KEY",
 			query:      "?target=bogus",
@@ -164,8 +162,8 @@ func TestConfigEnvGet_Errors(t *testing.T) {
 		},
 		{
 			name: "target not found",
-			setupEnv: map[string][]GlobalEnvVar{
-				"MY_KEY": {{Value: "val", Target: domaintypes.GlobalEnvTargetGates, Secret: false}},
+			setup: func(h *ConfigHolder) {
+				h.SetGlobalEnvVar("MY_KEY", GlobalEnvVar{Value: "val", Target: domaintypes.GlobalEnvTargetGates, Secret: false})
 			},
 			key:        "MY_KEY",
 			query:      "?target=steps",
@@ -174,16 +172,9 @@ func TestConfigEnvGet_Errors(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			holder := NewConfigHolder(config.GitLabConfig{}, tt.setupEnv)
-			if tt.setupEnv == nil {
-				// Ensure non-ambiguous env entries are set via SetGlobalEnvVar if needed.
-			}
-
-			// For the ambiguity test, set up via SetGlobalEnvVar.
-			if tt.name == "ambiguity without target selector" {
-				holder = NewConfigHolder(config.GitLabConfig{}, nil)
-				holder.SetGlobalEnvVar("MULTI", GlobalEnvVar{Value: "a", Target: domaintypes.GlobalEnvTargetGates, Secret: false})
-				holder.SetGlobalEnvVar("MULTI", GlobalEnvVar{Value: "b", Target: domaintypes.GlobalEnvTargetSteps, Secret: false})
+			holder := NewConfigHolder(config.GitLabConfig{}, nil)
+			if tt.setup != nil {
+				tt.setup(holder)
 			}
 
 			handler := getGlobalEnvHandler(holder)
@@ -507,43 +498,66 @@ func TestConfigEnvRoundTrip(t *testing.T) {
 	}
 }
 
-// TestConfigEnvPutStoreError verifies that store errors return 500.
-func TestConfigEnvPutStoreError(t *testing.T) {
-	st := &configStore{}
-	st.upsertGlobalEnv.err = errMockDatabase
-	holder := NewConfigHolder(config.GitLabConfig{}, nil)
-
-	handler := putGlobalEnvHandler(holder, st)
-
-	reqBody := map[string]any{"value": "test", "target": "gates"}
-
-	rr := doRequest(t, handler, http.MethodPut, "/v1/config/env/TEST", reqBody, "key", "TEST")
-
-	assertStatus(t, rr, http.StatusInternalServerError)
-
-	// Holder should not be updated on store failure.
-	if len(holder.GetGlobalEnvEntries("TEST")) > 0 {
-		t.Error("holder should not contain TEST after store failure")
+func TestConfigEnvStoreErrors(t *testing.T) {
+	tests := []struct {
+		name   string
+		method string
+		path   string
+		body   any
+		key    string
+		setup  func(*ConfigHolder, *configStore)
+		assert func(*testing.T, *ConfigHolder)
+	}{
+		{
+			name:   "put",
+			method: http.MethodPut,
+			path:   "/v1/config/env/TEST",
+			body:   map[string]any{"value": "test", "target": "gates"},
+			key:    "TEST",
+			setup: func(_ *ConfigHolder, st *configStore) {
+				st.upsertGlobalEnv.err = errMockDatabase
+			},
+			assert: func(t *testing.T, holder *ConfigHolder) {
+				t.Helper()
+				if len(holder.GetGlobalEnvEntries("TEST")) > 0 {
+					t.Error("holder should not contain TEST after store failure")
+				}
+			},
+		},
+		{
+			name:   "delete",
+			method: http.MethodDelete,
+			path:   "/v1/config/env/OLD_KEY?target=gates",
+			key:    "OLD_KEY",
+			setup: func(holder *ConfigHolder, st *configStore) {
+				st.deleteGlobalEnv.err = errMockDatabase
+				holder.SetGlobalEnvVar("OLD_KEY", GlobalEnvVar{Value: "val", Target: domaintypes.GlobalEnvTargetGates, Secret: false})
+			},
+			assert: func(t *testing.T, holder *ConfigHolder) {
+				t.Helper()
+				if len(holder.GetGlobalEnvEntries("OLD_KEY")) == 0 {
+					t.Error("holder should still contain OLD_KEY after store failure")
+				}
+			},
+		},
 	}
-}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			st := &configStore{}
+			holder := NewConfigHolder(config.GitLabConfig{}, nil)
+			tt.setup(holder, st)
+			var handler http.Handler
+			if tt.method == http.MethodPut {
+				handler = putGlobalEnvHandler(holder, st)
+			} else {
+				handler = deleteGlobalEnvHandler(holder, st)
+			}
 
-// TestConfigEnvDeleteStoreError verifies that store errors return 500.
-func TestConfigEnvDeleteStoreError(t *testing.T) {
-	st := &configStore{}
-	st.deleteGlobalEnv.err = errMockDatabase
-	holder := NewConfigHolder(config.GitLabConfig{}, map[string][]GlobalEnvVar{
-		"OLD_KEY": {{Value: "val", Target: domaintypes.GlobalEnvTargetGates, Secret: false}},
-	})
+			rr := doRequest(t, handler, tt.method, tt.path, tt.body, "key", tt.key)
 
-	handler := deleteGlobalEnvHandler(holder, st)
-
-	rr := doRequest(t, handler, http.MethodDelete, "/v1/config/env/OLD_KEY?target=gates", nil, "key", "OLD_KEY")
-
-	assertStatus(t, rr, http.StatusInternalServerError)
-
-	// Holder should not be updated on store failure.
-	if len(holder.GetGlobalEnvEntries("OLD_KEY")) == 0 {
-		t.Error("holder should still contain OLD_KEY after store failure")
+			assertStatus(t, rr, http.StatusInternalServerError)
+			tt.assert(t, holder)
+		})
 	}
 }
 

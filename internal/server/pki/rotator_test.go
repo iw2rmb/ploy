@@ -10,7 +10,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/server/pki"
 )
 
-func TestDefaultRotatorRenew(t *testing.T) {
+func TestDefaultRotatorRenewSkipsMissingCertificate(t *testing.T) {
 	rotator := pki.NewDefaultRotator(slog.Default())
 	cfg := config.PKIConfig{
 		BundleDir:   "/etc/ploy/pki",
@@ -19,7 +19,6 @@ func TestDefaultRotatorRenew(t *testing.T) {
 		RenewBefore: time.Hour,
 	}
 	ctx := context.Background()
-	// Should not return error (stub implementation).
 	if err := rotator.Renew(ctx, cfg); err != nil {
 		t.Fatalf("Renew() error = %v, want nil", err)
 	}

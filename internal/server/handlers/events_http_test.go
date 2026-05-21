@@ -19,66 +19,55 @@ import (
 // testRunIDKSUID is a synthetic KSUID-like ID (27 characters) used for tests.
 const testRunIDKSUID = "123456789012345678901234567"
 
-func TestGetRunLogsHandler_TicketNotFound(t *testing.T) {
+func TestGetRunLogsHandler_Errors(t *testing.T) {
 	t.Parallel()
-	eventsService, err := createTestEventsService()
-	if err != nil {
-		t.Fatalf("events: %v", err)
+	tests := []struct {
+		name       string
+		runID      string
+		setup      func(*runStore)
+		wantStatus int
+		wantGetRun bool
+	}{
+		{
+			name:  "run not found",
+			runID: testRunIDKSUID,
+			setup: func(st *runStore) {
+				st.getRun.err = pgx.ErrNoRows
+			},
+			wantStatus: http.StatusNotFound,
+			wantGetRun: true,
+		},
+		{name: "invalid run id", runID: "invalid", setup: func(*runStore) {}, wantStatus: http.StatusBadRequest},
+		{name: "missing run id", runID: "", setup: func(*runStore) {}, wantStatus: http.StatusBadRequest},
+		{
+			name:  "database error",
+			runID: testRunIDKSUID,
+			setup: func(st *runStore) {
+				st.getRun.err = pgx.ErrTxClosed
+			},
+			wantStatus: http.StatusInternalServerError,
+			wantGetRun: true,
+		},
 	}
-	st := func() *runStore { st := &runStore{}; st.getRun.err = pgx.ErrNoRows; return st }()
-	h := getRunLogsHandler(st, nil, eventsService)
-
-	runID := testRunIDKSUID
-	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID+"/logs", nil)
-	req.SetPathValue("run_id", runID)
-	rr := httptest.NewRecorder()
-	h.ServeHTTP(rr, req)
-	assertStatus(t, rr, http.StatusNotFound)
-}
-
-func TestGetRunLogsHandler_InvalidRunID(t *testing.T) {
-	t.Parallel()
-	eventsService, _ := createTestEventsService()
-	st := &runStore{}
-	h := getRunLogsHandler(st, nil, eventsService)
-
-	req := httptest.NewRequest(http.MethodGet, "/v1/runs/invalid/logs", nil)
-	req.SetPathValue("run_id", "invalid")
-	rr := httptest.NewRecorder()
-	h.ServeHTTP(rr, req)
-	assertStatus(t, rr, http.StatusBadRequest)
-	if st.getRun.called {
-		t.Fatal("expected GetRun not to be called")
-	}
-}
-
-func TestGetRunLogsHandler_MissingID(t *testing.T) {
-	t.Parallel()
-	eventsService, _ := createTestEventsService()
-	st := &runStore{}
-	h := getRunLogsHandler(st, nil, eventsService)
-
-	req := httptest.NewRequest(http.MethodGet, "/v1/runs//logs", nil)
-	req.SetPathValue("run_id", "")
-	rr := httptest.NewRecorder()
-	h.ServeHTTP(rr, req)
-	assertStatus(t, rr, http.StatusBadRequest)
-}
-
-func TestGetRunLogsHandler_DatabaseError(t *testing.T) {
-	t.Parallel()
-	eventsService, _ := createTestEventsService()
-	st := func() *runStore { st := &runStore{}; st.getRun.err = pgx.ErrTxClosed; return st }()
-	h := getRunLogsHandler(st, nil, eventsService)
-
-	runID := testRunIDKSUID
-	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID+"/logs", nil)
-	req.SetPathValue("run_id", runID)
-	rr := httptest.NewRecorder()
-	h.ServeHTTP(rr, req)
-	assertStatus(t, rr, http.StatusInternalServerError)
-	if !st.getRun.called {
-		t.Fatal("expected GetRun to be called")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			eventsService, err := createTestEventsService()
+			if err != nil {
+				t.Fatalf("events: %v", err)
+			}
+			st := &runStore{}
+			tt.setup(st)
+			h := getRunLogsHandler(st, nil, eventsService)
+			req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+tt.runID+"/logs", nil)
+			req.SetPathValue("run_id", tt.runID)
+			rr := httptest.NewRecorder()
+			h.ServeHTTP(rr, req)
+			assertStatus(t, rr, tt.wantStatus)
+			if st.getRun.called != tt.wantGetRun {
+				t.Fatalf("GetRun called = %v, want %v", st.getRun.called, tt.wantGetRun)
+			}
+		})
 	}
 }
 

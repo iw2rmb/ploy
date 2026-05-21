@@ -12,249 +12,71 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-func TestSaveJobImageName_Success(t *testing.T) {
+func TestSaveJobImageNameHandler(t *testing.T) {
 	t.Parallel()
 
-	nodeIDStr := domaintypes.NewNodeKey()
-	nodeID := domaintypes.NodeID(nodeIDStr)
-	runID := domaintypes.NewRunID()
-	jobID := domaintypes.NewJobID()
-
-	job := store.Job{
-		ID:      jobID,
-		RunID:   runID,
-		NodeID:  &nodeID,
-		Status:  domaintypes.JobStatusRunning,
-		JobType: "mig",
+	type testCase struct {
+		name       string
+		bodyImage  string
+		jobStatus  domaintypes.JobStatus
+		jobType    domaintypes.JobType
+		wrongNode  bool
+		wantStatus int
+		wantUpdate bool
+		wantImage  string
+	}
+	tests := []testCase{
+		{name: "mig job", bodyImage: "docker.io/example/migs:latest", jobStatus: domaintypes.JobStatusRunning, jobType: domaintypes.JobTypeMig, wantStatus: http.StatusNoContent, wantUpdate: true, wantImage: "docker.io/example/migs:latest"},
+		{name: "pre gate job", bodyImage: "docker.io/example/migs:latest", jobStatus: domaintypes.JobStatusRunning, jobType: domaintypes.JobTypePreGate, wantStatus: http.StatusNoContent, wantUpdate: true, wantImage: "docker.io/example/migs:latest"},
+		{name: "post gate job", bodyImage: "docker.io/example/gate:latest", jobStatus: domaintypes.JobStatusRunning, jobType: domaintypes.JobTypePostGate, wantStatus: http.StatusNoContent, wantUpdate: true, wantImage: "docker.io/example/gate:latest"},
+		{name: "empty image", bodyImage: "   ", wantStatus: http.StatusBadRequest},
+		{name: "wrong node", bodyImage: "docker.io/example/migs:latest", jobStatus: domaintypes.JobStatusRunning, jobType: domaintypes.JobTypeMig, wrongNode: true, wantStatus: http.StatusForbidden},
+		{name: "job not running", bodyImage: "docker.io/example/migs:latest", jobStatus: domaintypes.JobStatusQueued, jobType: domaintypes.JobTypeMig, wantStatus: http.StatusConflict},
+		{name: "wrong job type", bodyImage: "docker.io/example/migs:latest", jobStatus: domaintypes.JobStatusRunning, jobType: domaintypes.JobType("unknown"), wantStatus: http.StatusConflict},
 	}
 
-	st := &jobStore{}
-	st.getJob.val = job
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	handler := saveJobImageNameHandler(st)
+			nodeIDStr := domaintypes.NewNodeKey()
+			nodeID := domaintypes.NodeID(nodeIDStr)
+			jobNodeID := nodeID
+			if tt.wrongNode {
+				jobNodeID = domaintypes.NodeID(domaintypes.NewNodeKey())
+			}
+			jobID := domaintypes.NewJobID()
+			st := &jobStore{}
+			st.getJob.val = store.Job{
+				ID:      jobID,
+				RunID:   domaintypes.NewRunID(),
+				NodeID:  &jobNodeID,
+				Status:  tt.jobStatus,
+				JobType: tt.jobType,
+			}
+			handler := saveJobImageNameHandler(st)
+			body, _ := json.Marshal(map[string]any{"image": tt.bodyImage})
+			req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/image", bytes.NewReader(body))
+			req.SetPathValue("job_id", jobID.String())
+			req.Header.Set(nodeUUIDHeader, nodeIDStr)
+			req = req.WithContext(auth.ContextWithIdentity(req.Context(), auth.Identity{Role: auth.RoleWorker, CommonName: nodeIDStr}))
 
-	body, _ := json.Marshal(map[string]any{
-		"image": "docker.io/example/migs:latest",
-	})
-	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/image", bytes.NewReader(body))
-	req.SetPathValue("job_id", jobID.String())
-	req.Header.Set(nodeUUIDHeader, nodeIDStr)
-	req = req.WithContext(auth.ContextWithIdentity(req.Context(), auth.Identity{Role: auth.RoleWorker, CommonName: nodeIDStr}))
+			rr := httptest.NewRecorder()
+			handler.ServeHTTP(rr, req)
 
-	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, req)
-
-	assertStatus(t, rr, http.StatusNoContent)
-	if !st.updateJobImageName.called {
-		t.Fatalf("expected UpdateJobImageName to be called")
-	}
-	if st.updateJobImageName.params.ID != jobID {
-		t.Fatalf("UpdateJobImageName ID = %s, want %s", st.updateJobImageName.params.ID, jobID)
-	}
-	if st.updateJobImageName.params.JobImage != "docker.io/example/migs:latest" {
-		t.Fatalf("UpdateJobImageName JobImage = %q, want %q", st.updateJobImageName.params.JobImage, "docker.io/example/migs:latest")
-	}
-}
-
-func TestSaveJobImageName_EmptyImage(t *testing.T) {
-	t.Parallel()
-
-	nodeIDStr := domaintypes.NewNodeKey()
-	jobID := domaintypes.NewJobID()
-
-	st := &jobStore{}
-	handler := saveJobImageNameHandler(st)
-
-	body, _ := json.Marshal(map[string]any{
-		"image": "   ",
-	})
-	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/image", bytes.NewReader(body))
-	req.SetPathValue("job_id", jobID.String())
-	req.Header.Set(nodeUUIDHeader, nodeIDStr)
-	req = req.WithContext(auth.ContextWithIdentity(req.Context(), auth.Identity{Role: auth.RoleWorker, CommonName: nodeIDStr}))
-
-	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, req)
-
-	assertStatus(t, rr, http.StatusBadRequest)
-	if st.updateJobImageName.called {
-		t.Fatalf("expected UpdateJobImageName NOT to be called")
-	}
-}
-
-func TestSaveJobImageName_ForbiddenWrongNode(t *testing.T) {
-	t.Parallel()
-
-	nodeIDStr := domaintypes.NewNodeKey()
-	nodeID := domaintypes.NodeID(nodeIDStr)
-	otherNode := domaintypes.NodeID(domaintypes.NewNodeKey())
-	runID := domaintypes.NewRunID()
-	jobID := domaintypes.NewJobID()
-
-	job := store.Job{
-		ID:      jobID,
-		RunID:   runID,
-		NodeID:  &otherNode,
-		Status:  domaintypes.JobStatusRunning,
-		JobType: "mig",
-	}
-
-	st := &jobStore{}
-	st.getJob.val = job
-	handler := saveJobImageNameHandler(st)
-
-	body, _ := json.Marshal(map[string]any{"image": "docker.io/example/migs:latest"})
-	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/image", bytes.NewReader(body))
-	req.SetPathValue("job_id", jobID.String())
-	req.Header.Set(nodeUUIDHeader, nodeIDStr)
-	req = req.WithContext(auth.ContextWithIdentity(req.Context(), auth.Identity{Role: auth.RoleWorker, CommonName: nodeIDStr}))
-
-	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, req)
-
-	assertStatus(t, rr, http.StatusForbidden)
-	if st.updateJobImageName.called {
-		t.Fatalf("expected UpdateJobImageName NOT to be called")
-	}
-	_ = nodeID // avoid unused in case of future refactors
-}
-
-func TestSaveJobImageName_ConflictJobNotRunning(t *testing.T) {
-	t.Parallel()
-
-	nodeIDStr := domaintypes.NewNodeKey()
-	nodeID := domaintypes.NodeID(nodeIDStr)
-	runID := domaintypes.NewRunID()
-	jobID := domaintypes.NewJobID()
-
-	job := store.Job{
-		ID:      jobID,
-		RunID:   runID,
-		NodeID:  &nodeID,
-		Status:  domaintypes.JobStatusQueued,
-		JobType: "mig",
-	}
-
-	st := &jobStore{}
-	st.getJob.val = job
-	handler := saveJobImageNameHandler(st)
-
-	body, _ := json.Marshal(map[string]any{"image": "docker.io/example/migs:latest"})
-	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/image", bytes.NewReader(body))
-	req.SetPathValue("job_id", jobID.String())
-	req.Header.Set(nodeUUIDHeader, nodeIDStr)
-	req = req.WithContext(auth.ContextWithIdentity(req.Context(), auth.Identity{Role: auth.RoleWorker, CommonName: nodeIDStr}))
-
-	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, req)
-
-	assertStatus(t, rr, http.StatusConflict)
-	if st.updateJobImageName.called {
-		t.Fatalf("expected UpdateJobImageName NOT to be called")
-	}
-}
-
-func TestSaveJobImageName_SuccessGateJob(t *testing.T) {
-	t.Parallel()
-
-	nodeIDStr := domaintypes.NewNodeKey()
-	nodeID := domaintypes.NodeID(nodeIDStr)
-	runID := domaintypes.NewRunID()
-	jobID := domaintypes.NewJobID()
-
-	job := store.Job{
-		ID:      jobID,
-		RunID:   runID,
-		NodeID:  &nodeID,
-		Status:  domaintypes.JobStatusRunning,
-		JobType: "pre_gate",
-	}
-
-	st := &jobStore{}
-	st.getJob.val = job
-	handler := saveJobImageNameHandler(st)
-
-	body, _ := json.Marshal(map[string]any{"image": "docker.io/example/migs:latest"})
-	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/image", bytes.NewReader(body))
-	req.SetPathValue("job_id", jobID.String())
-	req.Header.Set(nodeUUIDHeader, nodeIDStr)
-	req = req.WithContext(auth.ContextWithIdentity(req.Context(), auth.Identity{Role: auth.RoleWorker, CommonName: nodeIDStr}))
-
-	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, req)
-
-	assertStatus(t, rr, http.StatusNoContent)
-	if !st.updateJobImageName.called {
-		t.Fatalf("expected UpdateJobImageName to be called")
-	}
-}
-
-func TestSaveJobImageName_SuccessPostGateJob(t *testing.T) {
-	t.Parallel()
-
-	nodeIDStr := domaintypes.NewNodeKey()
-	nodeID := domaintypes.NodeID(nodeIDStr)
-	runID := domaintypes.NewRunID()
-	jobID := domaintypes.NewJobID()
-
-	job := store.Job{
-		ID:      jobID,
-		RunID:   runID,
-		NodeID:  &nodeID,
-		Status:  domaintypes.JobStatusRunning,
-		JobType: domaintypes.JobTypePostGate,
-	}
-
-	st := &jobStore{}
-	st.getJob.val = job
-	handler := saveJobImageNameHandler(st)
-
-	body, _ := json.Marshal(map[string]any{"image": "docker.io/example/gate:latest"})
-	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/image", bytes.NewReader(body))
-	req.SetPathValue("job_id", jobID.String())
-	req.Header.Set(nodeUUIDHeader, nodeIDStr)
-	req = req.WithContext(auth.ContextWithIdentity(req.Context(), auth.Identity{Role: auth.RoleWorker, CommonName: nodeIDStr}))
-
-	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, req)
-
-	assertStatus(t, rr, http.StatusNoContent)
-	if !st.updateJobImageName.called {
-		t.Fatalf("expected UpdateJobImageName to be called")
-	}
-}
-
-func TestSaveJobImageName_ConflictWrongJobType(t *testing.T) {
-	t.Parallel()
-
-	nodeIDStr := domaintypes.NewNodeKey()
-	nodeID := domaintypes.NodeID(nodeIDStr)
-	runID := domaintypes.NewRunID()
-	jobID := domaintypes.NewJobID()
-
-	job := store.Job{
-		ID:      jobID,
-		RunID:   runID,
-		NodeID:  &nodeID,
-		Status:  domaintypes.JobStatusRunning,
-		JobType: "unknown",
-	}
-
-	st := &jobStore{}
-	st.getJob.val = job
-	handler := saveJobImageNameHandler(st)
-
-	body, _ := json.Marshal(map[string]any{"image": "docker.io/example/migs:latest"})
-	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/image", bytes.NewReader(body))
-	req.SetPathValue("job_id", jobID.String())
-	req.Header.Set(nodeUUIDHeader, nodeIDStr)
-	req = req.WithContext(auth.ContextWithIdentity(req.Context(), auth.Identity{Role: auth.RoleWorker, CommonName: nodeIDStr}))
-
-	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, req)
-
-	assertStatus(t, rr, http.StatusConflict)
-	if st.updateJobImageName.called {
-		t.Fatalf("expected UpdateJobImageName NOT to be called")
+			assertStatus(t, rr, tt.wantStatus)
+			if st.updateJobImageName.called != tt.wantUpdate {
+				t.Fatalf("UpdateJobImageName called = %v, want %v", st.updateJobImageName.called, tt.wantUpdate)
+			}
+			if !tt.wantUpdate {
+				return
+			}
+			if st.updateJobImageName.params.ID != jobID {
+				t.Fatalf("UpdateJobImageName ID = %s, want %s", st.updateJobImageName.params.ID, jobID)
+			}
+			if st.updateJobImageName.params.JobImage != tt.wantImage {
+				t.Fatalf("UpdateJobImageName JobImage = %q, want %q", st.updateJobImageName.params.JobImage, tt.wantImage)
+			}
+		})
 	}
 }
