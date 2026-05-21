@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/gitauth"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
@@ -40,7 +41,7 @@ type GitFetcherOptions struct {
 // ensuring identical base states across nodes before applying ordered diffs.
 type GitFetcher interface {
 	// Fetch performs shallow clone and checkout of the specified repository.
-	Fetch(ctx context.Context, repo *contracts.RepoMaterialization, dest string) error
+	Fetch(ctx context.Context, repo *contracts.RepoMaterialization, dest string, auth gitauth.Options) error
 }
 
 type gitFetcher struct {
@@ -72,7 +73,7 @@ func NewGitFetcher(opts GitFetcherOptions) (GitFetcher, error) {
 // Note: target_ref is intentionally not checked out during hydration. The workspace
 // remains on base_ref so that subsequent diff application produces the correct
 // final state for each step.
-func (g *gitFetcher) Fetch(ctx context.Context, repo *contracts.RepoMaterialization, dest string) error {
+func (g *gitFetcher) Fetch(ctx context.Context, repo *contracts.RepoMaterialization, dest string, auth gitauth.Options) error {
 	if repo == nil {
 		return fmt.Errorf("repo materialization is required")
 	}
@@ -91,6 +92,9 @@ func (g *gitFetcher) Fetch(ctx context.Context, repo *contracts.RepoMaterializat
 	if dest != "" {
 		if info, err := os.Stat(dest); err == nil && info.IsDir() {
 			if validateCloneOrigin(ctx, dest, url) {
+				if err := sanitizeCloneOrigin(ctx, dest, url); err != nil {
+					return fmt.Errorf("sanitize hydrated clone origin: %w", err)
+				}
 				return nil
 			}
 		}
@@ -103,9 +107,19 @@ func (g *gitFetcher) Fetch(ctx context.Context, repo *contracts.RepoMaterializat
 
 		// If cache exists, copy it to dest and validate before using.
 		if _, err := os.Stat(cachedClonePath); err == nil {
+			if validateCloneOrigin(ctx, cachedClonePath, url) {
+				if err := sanitizeCloneOrigin(ctx, cachedClonePath, url); err != nil {
+					if removeErr := os.RemoveAll(cachedClonePath); removeErr != nil {
+						return fmt.Errorf("remove unsanitized cached clone %q: %w", cachedClonePath, removeErr)
+					}
+				}
+			}
 			if err := copyGitClone(cachedClonePath, dest); err == nil {
 				// Validate the cached clone matches expected URL.
 				if validateCloneOrigin(ctx, dest, url) {
+					if err := sanitizeCloneOrigin(ctx, dest, url); err != nil {
+						return fmt.Errorf("sanitize cached clone destination origin: %w", err)
+					}
 					return nil
 				}
 				// Cache invalid or corrupted; remove and fall through to fresh clone.
@@ -117,7 +131,7 @@ func (g *gitFetcher) Fetch(ctx context.Context, repo *contracts.RepoMaterializat
 		}
 
 		// Cache miss or copy failed: perform fresh clone and populate cache.
-		if err := g.cloneAndCheckout(ctx, url, baseRef, commitSHA, dest); err != nil {
+		if err := g.cloneAndCheckout(ctx, url, baseRef, commitSHA, dest, auth); err != nil {
 			return err
 		}
 
@@ -132,12 +146,14 @@ func (g *gitFetcher) Fetch(ctx context.Context, repo *contracts.RepoMaterializat
 	}
 
 	// No caching: perform a fresh clone.
-	return g.cloneAndCheckout(ctx, url, baseRef, commitSHA, dest)
+	return g.cloneAndCheckout(ctx, url, baseRef, commitSHA, dest, auth)
 }
 
 // cloneAndCheckout performs a shallow clone and optional commit checkout.
 // This is the core git fetch logic extracted for reuse between cached and non-cached flows.
-func (g *gitFetcher) cloneAndCheckout(ctx context.Context, url, baseRef, commitSHA, dest string) error {
+func (g *gitFetcher) cloneAndCheckout(ctx context.Context, rawURL, baseRef, commitSHA, dest string, auth gitauth.Options) error {
+	prepared := gitauth.PrepareURL(rawURL, auth)
+
 	// Step 1: Create base snapshot via shallow clone.
 	// --depth 1: Fetch only the latest commit to minimize transfer size.
 	// --single-branch: Fetch only the specified branch to reduce clone time.
@@ -146,10 +162,13 @@ func (g *gitFetcher) cloneAndCheckout(ctx context.Context, url, baseRef, commitS
 	if baseRef != "" {
 		cloneArgs = append(cloneArgs, "--branch", baseRef, "--single-branch")
 	}
-	cloneArgs = append(cloneArgs, url, dest)
+	cloneArgs = append(cloneArgs, prepared.URL, dest)
 
-	if err := runGitCommand(ctx, "", cloneArgs...); err != nil {
+	if err := runGitCommand(ctx, "", prepared.Env, cloneArgs...); err != nil {
 		return fmt.Errorf("git clone failed: %w", err)
+	}
+	if err := sanitizeCloneOrigin(ctx, dest, rawURL); err != nil {
+		return fmt.Errorf("sanitize cloned origin: %w", err)
 	}
 
 	// Step 2: Pin to specific commit if requested (optional).
@@ -158,11 +177,11 @@ func (g *gitFetcher) cloneAndCheckout(ctx context.Context, url, baseRef, commitS
 	// even if base_ref (e.g., 'main') has moved forward between node executions.
 	if commitSHA != "" {
 		fetchArgs := []string{"fetch", "origin", commitSHA, "--depth", "1"}
-		if err := runGitCommand(ctx, dest, fetchArgs...); err != nil {
+		if err := runGitCommand(ctx, dest, prepared.Env, fetchArgs...); err != nil {
 			return fmt.Errorf("git fetch %s failed: %w", commitSHA, err)
 		}
 		checkoutArgs := []string{"checkout", "FETCH_HEAD"}
-		if err := runGitCommand(ctx, dest, checkoutArgs...); err != nil {
+		if err := runGitCommand(ctx, dest, nil, checkoutArgs...); err != nil {
 			return fmt.Errorf("git checkout %s failed: %w", commitSHA, err)
 		}
 	}
@@ -203,6 +222,14 @@ func validateCloneOrigin(ctx context.Context, dest, expectedURL string) bool {
 	return domaintypes.NormalizeRepoURL(remoteURL) == domaintypes.NormalizeRepoURL(expectedURL)
 }
 
+func sanitizeCloneOrigin(ctx context.Context, dest, expectedURL string) error {
+	prepared := gitauth.PrepareURL(expectedURL, gitauth.Options{})
+	if strings.TrimSpace(prepared.URL) == "" {
+		return nil
+	}
+	return runGitCommand(ctx, dest, nil, "remote", "set-url", "origin", prepared.URL)
+}
+
 // copyGitClone creates a copy of a git repository from src to dest.
 func copyGitClone(src, dest string) error {
 	if _, err := os.Stat(filepath.Join(src, ".git")); err != nil {
@@ -226,13 +253,14 @@ func copyGitClone(src, dest string) error {
 }
 
 // runGitCommand executes a git command in the specified directory.
-func runGitCommand(ctx context.Context, dir string, args ...string) error {
+func runGitCommand(ctx context.Context, dir string, env []string, args ...string) error {
 	cmd := exec.CommandContext(ctx, "git", args...)
 	if dir != "" {
 		cmd.Dir = dir
 	}
 	// Disable any interactive credential prompts to avoid hanging in headless runs.
 	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GIT_ASKPASS=echo")
+	cmd.Env = append(cmd.Env, env...)
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {

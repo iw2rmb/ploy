@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/gitauth"
 	workspaceutil "github.com/iw2rmb/ploy/internal/testutil/workspace"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
@@ -147,12 +148,12 @@ func (m *testWorkspaceHydrator) Hydrate(ctx context.Context, manifest contracts.
 
 // testGitFetcher is a configurable mock for GitFetcher.
 type testGitFetcher struct {
-	fetchFn func(ctx context.Context, repo *contracts.RepoMaterialization, dest string) error
+	fetchFn func(ctx context.Context, repo *contracts.RepoMaterialization, dest string, auth gitauth.Options) error
 }
 
-func (m *testGitFetcher) Fetch(ctx context.Context, repo *contracts.RepoMaterialization, dest string) error {
+func (m *testGitFetcher) Fetch(ctx context.Context, repo *contracts.RepoMaterialization, dest string, auth gitauth.Options) error {
 	if m.fetchFn != nil {
-		return m.fetchFn(ctx, repo, dest)
+		return m.fetchFn(ctx, repo, dest, auth)
 	}
 	return nil
 }

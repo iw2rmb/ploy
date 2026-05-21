@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/gitauth"
 	"github.com/iw2rmb/ploy/internal/worker/hydration"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
@@ -98,7 +99,7 @@ func (r *runController) prepareStickyWorkspaceForStep(
 	if err := os.RemoveAll(workspacePath); err != nil && !os.IsNotExist(err) {
 		return "", fmt.Errorf("remove stale sticky workspace before hydration: %w", err)
 	}
-	if err := gitFetcher.Fetch(ctx, repo, workspacePath); err != nil {
+	if err := gitFetcher.Fetch(ctx, repo, workspacePath, gitAuthOptionsFromManifestOrRequest(manifest, req.TypedOptions)); err != nil {
 		if removeErr := os.RemoveAll(workspacePath); removeErr != nil {
 			slog.Warn("failed to clean up workspace after error", "path", workspacePath, "error", removeErr)
 		}
@@ -112,4 +113,18 @@ func (r *runController) prepareStickyWorkspaceForStep(
 func hasGitDir(path string) bool {
 	info, err := os.Stat(filepath.Join(path, ".git"))
 	return err == nil && info.IsDir()
+}
+
+func gitAuthOptionsFromManifestOrRequest(manifest contracts.StepManifest, opts RunOptions) gitauth.Options {
+	auth := gitauth.Options{
+		GitLabPAT:    strings.TrimSpace(opts.MRWiring.GitLabPAT),
+		GitLabDomain: strings.TrimSpace(opts.MRWiring.GitLabDomain),
+	}
+	if pat, ok := manifest.OptionString("gitlab_pat"); ok {
+		auth.GitLabPAT = pat
+	}
+	if domain, ok := manifest.OptionString("gitlab_domain"); ok {
+		auth.GitLabDomain = domain
+	}
+	return auth
 }

@@ -120,11 +120,7 @@ func addRunRepoHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		repoURLForSeed := rawRepoURL
-		if !repoURLContainsCredentials(rawRepoURL) {
-			repoURLForSeed = repoURLWithGitLabPATFromSpec(normalizedRepoURL, spec.Spec)
-		}
-		sourceCommitSHA, seedErr := resolveSourceCommitSHAFromContext(r.Context(), repoURLForSeed, migRepo.BaseRef)
+		sourceCommitSHA, seedErr := resolveSourceCommitSHAFromContext(r.Context(), rawRepoURL, migRepo.BaseRef, gitAuthOptionsFromSpec(spec.Spec))
 		if seedErr != nil {
 			writeHTTPError(w, http.StatusBadRequest, "failed to resolve source commit for repo %s ref %s: %v", normalizedRepoURL, migRepo.BaseRef, seedErr)
 			slog.Error("add run repo: resolve source commit failed",
