@@ -60,6 +60,21 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service) h
 			return
 		}
 
+		// Resolve the source SHA before creating durable rows. A failed remote
+		// query must reject the submit instead of leaving a run with no repos.
+		rawRepoURL := strings.TrimSpace(req.RepoURL.String())
+		normalizedRepoURL := domaintypes.NormalizeRepoURL(rawRepoURL)
+		sourceCommitSHA, seedErr := resolveSourceCommitSHAFromContext(r.Context(), rawRepoURL, req.BaseRef.String(), gitAuthOptionsFromSpec(req.Spec))
+		if seedErr != nil {
+			writeHTTPError(w, http.StatusBadRequest, "failed to resolve source commit for repo %s ref %s: %v", normalizedRepoURL, req.BaseRef.String(), seedErr)
+			slog.Error("create single-repo run: resolve source commit failed",
+				"repo_url", normalizedRepoURL,
+				"base_ref", req.BaseRef.String(),
+				"err", seedErr,
+			)
+			return
+		}
+
 		// v1 side-effect: Create spec row
 		specID := domaintypes.NewSpecID()
 		createdSpec, err := st.CreateSpec(r.Context(), store.CreateSpecParams{
@@ -87,8 +102,6 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service) h
 
 		// Create mig repo for the provided repo_url.
 		// Persist normalized URL without embedded credentials.
-		rawRepoURL := strings.TrimSpace(req.RepoURL.String())
-		normalizedRepoURL := domaintypes.NormalizeRepoURL(rawRepoURL)
 		migRepoID := domaintypes.NewMigRepoID()
 		migRepo, err := st.CreateMigRepo(r.Context(), store.CreateMigRepoParams{
 			ID:        migRepoID,
@@ -116,18 +129,6 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service) h
 		}
 
 		// Create run_repo entry.
-		sourceCommitSHA, seedErr := resolveSourceCommitSHAFromContext(r.Context(), rawRepoURL, migRepo.BaseRef, gitAuthOptionsFromSpec(req.Spec))
-		if seedErr != nil {
-			writeHTTPError(w, http.StatusBadRequest, "failed to resolve source commit for repo %s ref %s: %v", normalizedRepoURL, migRepo.BaseRef, seedErr)
-			slog.Error("create single-repo run: resolve source commit failed",
-				"run_id", run.ID,
-				"repo_id", migRepo.RepoID,
-				"repo_url", normalizedRepoURL,
-				"base_ref", migRepo.BaseRef,
-				"err", seedErr,
-			)
-			return
-		}
 		runRepo, err := st.CreateRunRepo(r.Context(), store.CreateRunRepoParams{
 			MigID:           migID,
 			RunID:           run.ID,
