@@ -121,6 +121,8 @@ func classifyGitLSRemoteFailure(err error, out []byte) string {
 		strings.Contains(msg, "http basic: access denied"),
 		strings.Contains(msg, "access denied"),
 		strings.Contains(msg, "invalid username or password"),
+		strings.Contains(msg, "the requested url returned error: 401"),
+		strings.Contains(msg, "the requested url returned error: 403"),
 		strings.Contains(msg, "could not read username"),
 		strings.Contains(msg, "unable to update url base from redirection"),
 		strings.Contains(msg, "/users/sign_in"):
@@ -129,8 +131,22 @@ func classifyGitLSRemoteFailure(err error, out []byte) string {
 		strings.Contains(msg, "remote ref does not exist"):
 		return "ref not found on remote"
 	case strings.Contains(msg, "repository not found"),
-		strings.Contains(msg, "project not found"):
+		strings.Contains(msg, "project not found"),
+		strings.Contains(msg, "the requested url returned error: 404"):
 		return "repository not found or access denied"
+	case strings.Contains(msg, "could not resolve host"):
+		return "dns lookup failed"
+	case strings.Contains(msg, "failed to connect"),
+		strings.Contains(msg, "connection timed out"),
+		strings.Contains(msg, "operation timed out"),
+		strings.Contains(msg, "network is unreachable"),
+		strings.Contains(msg, "no route to host"):
+		return "network connection failed"
+	case strings.Contains(msg, "ssl certificate problem"),
+		strings.Contains(msg, "certificate verify failed"),
+		strings.Contains(msg, "tls handshake"),
+		strings.Contains(msg, "gnutls_handshake"):
+		return "tls or certificate validation failed"
 	default:
 		return "remote query failed"
 	}
