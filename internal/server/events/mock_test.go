@@ -67,6 +67,10 @@ func (m *mockStore) CancelRunV1(ctx context.Context, runID domaintypes.RunID) er
 	return nil
 }
 
+func (m *mockStore) CreateRunWithRepos(ctx context.Context, arg store.CreateRunWithReposParams) (store.Run, []store.RunRepo, error) {
+	return store.Run{}, nil, nil
+}
+
 func (m *mockStore) UnclaimJob(ctx context.Context, arg store.UnclaimJobParams) error {
 	return nil
 }

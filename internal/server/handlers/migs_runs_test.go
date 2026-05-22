@@ -35,8 +35,8 @@ func TestMigRuns_Create(t *testing.T) {
 			name: "all repos",
 			setupFn: func(st *migStore) {
 				st.listMigReposByMig.val = []store.MigRepo{
-					{ID: "repo1", MigID: "mig123", RepoID: "repo1", BaseRef: "main", TargetRef: "feature1"},
-					{ID: "repo2", MigID: "mig123", RepoID: "repo2", BaseRef: "main", TargetRef: "feature2"},
+					{ID: "migRepo1", MigID: "mig123", RepoID: "global01", BaseRef: "main", TargetRef: "feature1"},
+					{ID: "migRepo2", MigID: "mig123", RepoID: "global02", BaseRef: "main", TargetRef: "feature2"},
 				}
 			},
 			body:       allReposSelector(),
@@ -48,6 +48,26 @@ func TestMigRuns_Create(t *testing.T) {
 				assertCalled(t, "CreateRun", st.createRun.called)
 				assertCalled(t, "CreateRunRepo", st.createRunRepo.called)
 				assertNotCalled(t, "CreateJob", st.createJob.called)
+				if st.createRun.n != 1 {
+					t.Fatalf("CreateRun calls = %d, want 1", st.createRun.n)
+				}
+				if len(st.createRunRepoParams) != 2 {
+					t.Fatalf("CreateRunRepo calls = %d, want 2", len(st.createRunRepoParams))
+				}
+				if got := st.createRunRepoParams[0].RepoID; got != "global01" {
+					t.Fatalf("first run_repo repo_id = %q, want global01", got)
+				}
+				if got := st.createRunRepoParams[1].RepoID; got != "global02" {
+					t.Fatalf("second run_repo repo_id = %q, want global02", got)
+				}
+				for _, params := range st.createRunRepoParams {
+					if params.RunID != st.createRun.params.ID {
+						t.Fatalf("run_repo run_id = %q, want %q", params.RunID, st.createRun.params.ID)
+					}
+					if params.SourceCommitSha != testSourceCommitSHA || params.RepoSha0 != testSourceCommitSHA {
+						t.Fatalf("run_repo SHA seed mismatch: source=%q sha0=%q", params.SourceCommitSha, params.RepoSha0)
+					}
+				}
 				resp := decodeBody[struct {
 					RunID string `json:"run_id"`
 				}](t, rr)
@@ -218,5 +238,6 @@ func TestMigRuns_Create_RejectsWhenSourceCommitSeedFails(t *testing.T) {
 	handler.ServeHTTP(rr, req)
 
 	assertStatus(t, rr, http.StatusBadRequest)
+	assertNotCalled(t, "CreateRun", st.createRun.called)
 	assertNotCalled(t, "CreateRunRepo", st.createRunRepo.called)
 }

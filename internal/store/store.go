@@ -22,8 +22,15 @@ var ErrInvalidJSON = errors.New("store: invalid JSON for JSONB column")
 type Store interface {
 	Querier
 	CancelRunV1(ctx context.Context, runID types.RunID) error
+	CreateRunWithRepos(ctx context.Context, arg CreateRunWithReposParams) (Run, []RunRepo, error)
 	Close()
 	Pool() *pgxpool.Pool
+}
+
+// CreateRunWithReposParams contains the complete DB materialization for a mig run.
+type CreateRunWithReposParams struct {
+	Run   CreateRunParams
+	Repos []CreateRunRepoParams
 }
 
 // PgStore wraps a pgxpool connection pool and implements Store.
@@ -76,6 +83,48 @@ func (s *PgStore) Close() {
 // such as partition management.
 func (s *PgStore) Pool() *pgxpool.Pool {
 	return s.pool
+}
+
+// CreateRunWithRepos atomically creates a run and its selected run_repos rows.
+func (s *PgStore) CreateRunWithRepos(ctx context.Context, arg CreateRunWithReposParams) (Run, []RunRepo, error) {
+	if len(arg.Repos) == 0 {
+		return Run{}, nil, errors.New("create run with repos: repos required")
+	}
+
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return Run{}, nil, fmt.Errorf("create run with repos: begin tx: %w", err)
+	}
+
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tx.Rollback(ctx)
+		}
+	}()
+
+	qtx := s.Queries.WithTx(tx)
+
+	run, err := qtx.CreateRun(ctx, arg.Run)
+	if err != nil {
+		return Run{}, nil, fmt.Errorf("create run with repos: create run: %w", err)
+	}
+
+	runRepos := make([]RunRepo, 0, len(arg.Repos))
+	for _, repo := range arg.Repos {
+		runRepo, err := qtx.CreateRunRepo(ctx, repo)
+		if err != nil {
+			return Run{}, nil, fmt.Errorf("create run with repos: create run repo %s: %w", repo.RepoID, err)
+		}
+		runRepos = append(runRepos, runRepo)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return Run{}, nil, fmt.Errorf("create run with repos: commit tx: %w", err)
+	}
+
+	committed = true
+	return run, runRepos, nil
 }
 
 // CancelRunV1 atomically cancels a v1 run and all active child work.

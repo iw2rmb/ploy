@@ -56,7 +56,8 @@ type migStore struct {
 	// observe a different result/err for each CreateRun call.
 	createRun mockCallSeq[store.CreateRunParams, store.Run]
 
-	createRunRepo mockCall[store.CreateRunRepoParams, store.RunRepo]
+	createRunRepo       mockCall[store.CreateRunRepoParams, store.RunRepo]
+	createRunRepoParams []store.CreateRunRepoParams
 
 	// Run/Job queries (for archive validation and migs_ticket)
 	getRun        mockCall[string, store.Run]
@@ -237,9 +238,26 @@ func (m *migStore) CreateRun(ctx context.Context, params store.CreateRunParams) 
 
 func (m *migStore) CreateRunRepo(ctx context.Context, params store.CreateRunRepoParams) (store.RunRepo, error) {
 	result := defaultRunRepo(m.createRunRepo.val, params)
-	m.createRunRepo.val = result
+	m.createRunRepoParams = append(m.createRunRepoParams, params)
 	_, err := m.createRunRepo.record(params)
 	return result, err
+}
+
+func (m *migStore) CreateRunWithRepos(ctx context.Context, params store.CreateRunWithReposParams) (store.Run, []store.RunRepo, error) {
+	run, err := m.CreateRun(ctx, params.Run)
+	if err != nil {
+		return store.Run{}, nil, err
+	}
+
+	repos := make([]store.RunRepo, 0, len(params.Repos))
+	for _, repoParams := range params.Repos {
+		repo, err := m.CreateRunRepo(ctx, repoParams)
+		if err != nil {
+			return store.Run{}, nil, err
+		}
+		repos = append(repos, repo)
+	}
+	return run, repos, nil
 }
 
 // Run/Job query methods (for archive validation and migs_ticket)

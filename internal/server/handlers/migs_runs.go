@@ -83,27 +83,14 @@ func createMigRunHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Create run with spec_id copied from migs.spec_id for immutability.
 		runID := domaintypes.NewRunID()
-		run, err := st.CreateRun(r.Context(), store.CreateRunParams{
-			ID:        runID,
-			MigID:     migID,
-			SpecID:    *mig.SpecID,
-			CreatedBy: req.CreatedBy,
-		})
-		if err != nil {
-			serverError(w, "create mig run", "create run", err, "mig_id", migID.String(), "run_id", runID)
-			return
-		}
-
 		specRow, err := st.GetSpec(r.Context(), *mig.SpecID)
 		if err != nil {
 			serverError(w, "create mig run", "get spec", err, "mig_id", migID.String(), "spec_id", *mig.SpecID)
 			return
 		}
 
-		// Create run_repos entries for each selected repo.
-		// v1: run_repos snapshots refs from mig_repos at run creation time.
+		runRepos := make([]store.CreateRunRepoParams, 0, len(selectedRepos))
 		for _, migRepo := range selectedRepos {
 			repoURL, urlErr := repoURLForID(r.Context(), st, migRepo.RepoID)
 			if urlErr != nil {
@@ -114,7 +101,7 @@ func createMigRunHandler(st store.Store) http.HandlerFunc {
 			if seedErr != nil {
 				writeHTTPError(w, http.StatusBadRequest, "failed to resolve source commit for repo %s ref %s: %v", repoURL, migRepo.BaseRef, seedErr)
 				slog.Error("create mig run: resolve source commit failed",
-					"run_id", run.ID,
+					"run_id", runID,
 					"repo_id", migRepo.RepoID,
 					"repo_url", repoURL,
 					"base_ref", migRepo.BaseRef,
@@ -122,25 +109,29 @@ func createMigRunHandler(st store.Store) http.HandlerFunc {
 				)
 				return
 			}
-			// Create run_repo entry snapshotting refs.
-			_, err := st.CreateRunRepo(r.Context(), store.CreateRunRepoParams{
+			runRepos = append(runRepos, store.CreateRunRepoParams{
 				MigID:           migID,
-				RunID:           run.ID,
+				RunID:           runID,
 				RepoID:          migRepo.RepoID,
 				RepoBaseRef:     migRepo.BaseRef,
 				RepoTargetRef:   migRepo.TargetRef,
 				SourceCommitSha: sourceCommitSHA,
 				RepoSha0:        sourceCommitSHA,
 			})
-			if err != nil {
-				serverError(w, "create mig run", "create run repo", err,
-					"run_id", run.ID,
-					"repo_id", migRepo.RepoID,
-					"repo_url", repoURL,
-				)
-				return
-			}
+		}
 
+		run, _, err := st.CreateRunWithRepos(r.Context(), store.CreateRunWithReposParams{
+			Run: store.CreateRunParams{
+				ID:        runID,
+				MigID:     migID,
+				SpecID:    *mig.SpecID,
+				CreatedBy: req.CreatedBy,
+			},
+			Repos: runRepos,
+		})
+		if err != nil {
+			serverError(w, "create mig run", "create run with repos", err, "mig_id", migID.String(), "run_id", runID)
+			return
 		}
 
 		// Build response with run_id.

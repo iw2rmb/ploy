@@ -162,6 +162,134 @@ func TestCreateRun_RoundTrip_V1(t *testing.T) {
 	}
 }
 
+func TestCreateRunWithRepos_CreatesRunAndReposAtomically(t *testing.T) {
+	ctx, db := newTestStore(t)
+
+	createdBy := "test-user"
+	specID := types.NewSpecID()
+	spec, err := db.CreateSpec(ctx, CreateSpecParams{
+		ID:        specID,
+		Name:      "test-spec-" + specID.String(),
+		Spec:      []byte(`{"type":"test"}`),
+		CreatedBy: &createdBy,
+	})
+	if err != nil {
+		t.Fatalf("CreateSpec() failed: %v", err)
+	}
+
+	seedMigID := types.NewMigID()
+	if _, err := db.CreateMig(ctx, CreateMigParams{
+		ID:        seedMigID,
+		Name:      "seed-mig-" + seedMigID.String(),
+		SpecID:    &spec.ID,
+		CreatedBy: &createdBy,
+	}); err != nil {
+		t.Fatalf("CreateMig(seed) failed: %v", err)
+	}
+
+	const repoURL = "https://github.com/org/repo-atomic"
+	if _, err := db.CreateMigRepo(ctx, CreateMigRepoParams{
+		ID:        "global01",
+		MigID:     seedMigID,
+		Url:       repoURL,
+		BaseRef:   "main",
+		TargetRef: "feature",
+	}); err != nil {
+		t.Fatalf("CreateMigRepo(seed) failed: %v", err)
+	}
+
+	migID := types.NewMigID()
+	if _, err := db.CreateMig(ctx, CreateMigParams{
+		ID:        migID,
+		Name:      "atomic-mig-" + migID.String(),
+		SpecID:    &spec.ID,
+		CreatedBy: &createdBy,
+	}); err != nil {
+		t.Fatalf("CreateMig() failed: %v", err)
+	}
+	migRepo, err := db.CreateMigRepo(ctx, CreateMigRepoParams{
+		ID:        "member01",
+		MigID:     migID,
+		Url:       repoURL,
+		BaseRef:   "main",
+		TargetRef: "feature",
+	})
+	if err != nil {
+		t.Fatalf("CreateMigRepo() failed: %v", err)
+	}
+	if migRepo.ID == types.MigRepoID(migRepo.RepoID.String()) {
+		t.Fatalf("test setup requires distinct mig_repo id and repo id, both were %q", migRepo.ID)
+	}
+
+	runID := types.NewRunID()
+	run, repos, err := db.CreateRunWithRepos(ctx, CreateRunWithReposParams{
+		Run: CreateRunParams{
+			ID:        runID,
+			MigID:     migID,
+			SpecID:    spec.ID,
+			CreatedBy: &createdBy,
+		},
+		Repos: []CreateRunRepoParams{{
+			MigID:           migID,
+			RunID:           runID,
+			RepoID:          migRepo.RepoID,
+			RepoBaseRef:     "main",
+			RepoTargetRef:   "feature",
+			SourceCommitSha: "0123456789abcdef0123456789abcdef01234567",
+			RepoSha0:        "0123456789abcdef0123456789abcdef01234567",
+		}},
+	})
+	if err != nil {
+		t.Fatalf("CreateRunWithRepos() failed: %v", err)
+	}
+	if run.ID != runID || len(repos) != 1 || repos[0].RepoID != migRepo.RepoID {
+		t.Fatalf("unexpected CreateRunWithRepos result: run=%+v repos=%+v", run, repos)
+	}
+
+	rollbackRunID := types.NewRunID()
+	_, _, err = db.CreateRunWithRepos(ctx, CreateRunWithReposParams{
+		Run: CreateRunParams{
+			ID:        rollbackRunID,
+			MigID:     migID,
+			SpecID:    spec.ID,
+			CreatedBy: &createdBy,
+		},
+		Repos: []CreateRunRepoParams{
+			{
+				MigID:           migID,
+				RunID:           rollbackRunID,
+				RepoID:          migRepo.RepoID,
+				RepoBaseRef:     "main",
+				RepoTargetRef:   "feature",
+				SourceCommitSha: "0123456789abcdef0123456789abcdef01234567",
+				RepoSha0:        "0123456789abcdef0123456789abcdef01234567",
+			},
+			{
+				MigID:           migID,
+				RunID:           rollbackRunID,
+				RepoID:          "missing1",
+				RepoBaseRef:     "main",
+				RepoTargetRef:   "feature",
+				SourceCommitSha: "0123456789abcdef0123456789abcdef01234567",
+				RepoSha0:        "0123456789abcdef0123456789abcdef01234567",
+			},
+		},
+	})
+	if err == nil {
+		t.Fatal("CreateRunWithRepos() with invalid repo unexpectedly succeeded")
+	}
+	if _, err := db.GetRun(ctx, rollbackRunID); err != pgx.ErrNoRows {
+		t.Fatalf("GetRun(rollback) err = %v, want pgx.ErrNoRows", err)
+	}
+	rolledBackRepos, err := db.ListRunReposByRun(ctx, rollbackRunID)
+	if err != nil {
+		t.Fatalf("ListRunReposByRun(rollback) failed: %v", err)
+	}
+	if len(rolledBackRepos) != 0 {
+		t.Fatalf("rollback run repos = %d, want 0", len(rolledBackRepos))
+	}
+}
+
 func TestRunRepo_CRUDAndStateTransitions_V1(t *testing.T) {
 	ctx, db := newTestStore(t)
 
