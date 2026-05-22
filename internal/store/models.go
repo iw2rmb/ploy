@@ -182,6 +182,30 @@ type Node struct {
 	CreatedAt       pgtype.Timestamptz `json:"created_at"`
 }
 
+type NodeDaemonLog struct {
+	ID        int64              `json:"id"`
+	NodeID    types.NodeID       `json:"node_id"`
+	Component string             `json:"component"`
+	Stream    string             `json:"stream"`
+	Message   string             `json:"message"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
+type NodeDiagnostic struct {
+	NodeID        types.NodeID       `json:"node_id"`
+	Component     string             `json:"component"`
+	Status        string             `json:"status"`
+	LastError     *string            `json:"last_error"`
+	Version       *string            `json:"version"`
+	ImageRef      *string            `json:"image_ref"`
+	LocalImageID  *string            `json:"local_image_id"`
+	RemoteImageID *string            `json:"remote_image_id"`
+	Details       []byte             `json:"details"`
+	LastCheckedAt pgtype.Timestamptz `json:"last_checked_at"`
+	LastSuccessAt pgtype.Timestamptz `json:"last_success_at"`
+	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
+}
+
 type NodeMetric struct {
 	ID             int64              `json:"id"`
 	NodeID         types.NodeID       `json:"node_id"`

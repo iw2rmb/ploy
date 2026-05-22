@@ -1,0 +1,47 @@
+parameters:
+  - in: path
+    name: id
+    required: true
+    schema: { type: string }
+    description: Node ID (NanoID 6-character string)
+get:
+  tags: [Control]
+  summary: List recent node daemon logs
+  parameters:
+    - in: query
+      name: component
+      required: false
+      schema: { type: string, enum: [node, node-updater] }
+    - in: query
+      name: limit
+      required: false
+      schema: { type: integer, minimum: 1, maximum: 1000, default: 200 }
+  responses:
+    '200':
+      description: Recent daemon log lines, newest first
+      content:
+        application/json:
+          schema:
+            type: array
+            items:
+              $ref: '../components/schemas/controlplane.yaml#/NodeDaemonLog'
+    '400': { description: Bad Request }
+    '404': { description: Node not found }
+post:
+  tags: [Control]
+  summary: Append node daemon log lines
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: '../components/schemas/controlplane.yaml#/CreateNodeDaemonLogsRequest'
+  responses:
+    '201':
+      description: Log lines stored
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/controlplane.yaml#/CreateNodeDaemonLogsResponse'
+    '400': { description: Bad Request }
+    '404': { description: Node not found }

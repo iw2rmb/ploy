@@ -1,0 +1,37 @@
+parameters:
+  - in: path
+    name: id
+    required: true
+    schema: { type: string }
+    description: Node ID (NanoID 6-character string)
+get:
+  tags: [Control]
+  summary: List node daemon diagnostics
+  responses:
+    '200':
+      description: Current diagnostics for long-lived node-side components
+      content:
+        application/json:
+          schema:
+            type: array
+            items:
+              $ref: '../components/schemas/controlplane.yaml#/NodeDiagnostic'
+    '404': { description: Node not found }
+post:
+  tags: [Control]
+  summary: Upsert node daemon diagnostics
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: '../components/schemas/controlplane.yaml#/UpsertNodeDiagnosticRequest'
+  responses:
+    '200':
+      description: Diagnostic row stored
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/controlplane.yaml#/NodeDiagnostic'
+    '400': { description: Bad Request }
+    '404': { description: Node not found }

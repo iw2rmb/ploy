@@ -147,6 +147,11 @@ paths:
   # Node logs endpoint (gzipped chunks)
   /v1/nodes/{id}/logs:
     $ref: "./paths/nodes_id_logs.yaml"
+  # Node daemon diagnostics/logs for long-lived node-side components.
+  /v1/nodes/{id}/diagnostics:
+    $ref: "./paths/nodes_id_diagnostics.yaml"
+  /v1/nodes/{id}/daemon-logs:
+    $ref: "./paths/nodes_id_daemon_logs.yaml"
   # Batch runs endpoints (list/inspect/cancel)
   /v1/runs:
     $ref: "./paths/runs.yaml"

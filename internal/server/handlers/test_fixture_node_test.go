@@ -16,6 +16,11 @@ type nodeStore struct {
 	updateNodeHeartbeat mockCall[store.UpdateNodeHeartbeatParams, struct{}]
 	updateCertMetadata  mockResult[struct{}]
 	createLog           mockResult[store.Log]
+	upsertDiagnostic    mockCall[store.UpsertNodeDiagnosticParams, store.NodeDiagnostic]
+	listDiagnostics     mockCall[types.NodeID, []store.NodeDiagnostic]
+	createDaemonLog     mockCallSlice[store.CreateNodeDaemonLogParams, store.NodeDaemonLog]
+	listDaemonLogs      mockCall[store.ListNodeDaemonLogsParams, []store.NodeDaemonLog]
+	trimDaemonLogs      mockCall[store.TrimNodeDaemonLogsParams, struct{}]
 }
 
 func (m *nodeStore) GetNode(ctx context.Context, id types.NodeID) (store.Node, error) {
@@ -43,4 +48,38 @@ func (m *nodeStore) UpdateNodeCertMetadata(ctx context.Context, params store.Upd
 
 func (m *nodeStore) CreateLog(ctx context.Context, params store.CreateLogParams) (store.Log, error) {
 	return m.createLog.ret()
+}
+
+func (m *nodeStore) UpsertNodeDiagnostic(ctx context.Context, params store.UpsertNodeDiagnosticParams) (store.NodeDiagnostic, error) {
+	if m.upsertDiagnostic.val.NodeID.IsZero() {
+		m.upsertDiagnostic.val.NodeID = params.NodeID
+		m.upsertDiagnostic.val.Component = params.Component
+		m.upsertDiagnostic.val.Status = params.Status
+		m.upsertDiagnostic.val.LastError = params.LastError
+		m.upsertDiagnostic.val.Version = params.Version
+		m.upsertDiagnostic.val.ImageRef = params.ImageRef
+		m.upsertDiagnostic.val.LocalImageID = params.LocalImageID
+		m.upsertDiagnostic.val.RemoteImageID = params.RemoteImageID
+		m.upsertDiagnostic.val.Details = params.Details
+		m.upsertDiagnostic.val.LastCheckedAt = params.LastCheckedAt
+		m.upsertDiagnostic.val.LastSuccessAt = params.LastSuccessAt
+	}
+	return m.upsertDiagnostic.record(params)
+}
+
+func (m *nodeStore) ListNodeDiagnostics(ctx context.Context, nodeID types.NodeID) ([]store.NodeDiagnostic, error) {
+	return m.listDiagnostics.record(nodeID)
+}
+
+func (m *nodeStore) CreateNodeDaemonLog(ctx context.Context, params store.CreateNodeDaemonLogParams) (store.NodeDaemonLog, error) {
+	return m.createDaemonLog.record(params)
+}
+
+func (m *nodeStore) ListNodeDaemonLogs(ctx context.Context, params store.ListNodeDaemonLogsParams) ([]store.NodeDaemonLog, error) {
+	return m.listDaemonLogs.record(params)
+}
+
+func (m *nodeStore) TrimNodeDaemonLogs(ctx context.Context, params store.TrimNodeDaemonLogsParams) error {
+	_, err := m.trimDaemonLogs.record(params)
+	return err
 }

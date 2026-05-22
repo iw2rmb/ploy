@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	iversion "github.com/iw2rmb/ploy/internal/version"
 	"github.com/iw2rmb/ploy/internal/worker/lifecycle"
 	"github.com/iw2rmb/ploy/internal/workflow/backoff"
 )
@@ -157,6 +158,7 @@ func (h *HeartbeatManager) sendHeartbeat(ctx context.Context) error {
 		MemTotalBytes:  int64(capacity.MemTotalBytes),
 		DiskFreeBytes:  int64(capacity.DiskFreeBytes),
 		DiskTotalBytes: int64(capacity.DiskTotalBytes),
+		Version:        nodeAgentVersionString(),
 	}
 
 	body, err := json.Marshal(payload)
@@ -193,7 +195,48 @@ func (h *HeartbeatManager) sendHeartbeat(ctx context.Context) error {
 		return err
 	}
 
+	h.uploadSelfDiagnostic(ctx)
 	return nil
+}
+
+func (h *HeartbeatManager) uploadSelfDiagnostic(ctx context.Context) {
+	if h.client == nil {
+		return
+	}
+	diagCtx, cancel := context.WithTimeout(ctx, h.cfg.Heartbeat.Timeout)
+	defer cancel()
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	uploader := &baseUploader{cfg: h.cfg, client: h.client}
+	payload := map[string]any{
+		"version":         nodeAgentVersionString(),
+		"last_checked_at": now,
+		"last_success_at": now,
+		"details": map[string]any{
+			"commit":          iversion.Commit,
+			"built_at":        iversion.BuiltAt,
+			"concurrency":     h.cfg.Concurrency,
+			"cache_root":      os.Getenv("PLOYD_CACHE_HOME"),
+			"docker_root":     os.Getenv("DOCKER_ROOT_DIR"),
+			"tmpdir":          os.Getenv("TMPDIR"),
+			"server_url":      h.cfg.ServerURL,
+			"heartbeat_every": h.cfg.Heartbeat.Interval.String(),
+		},
+	}
+	if err := uploader.UploadNodeDiagnostic(diagCtx, "node", "ok", payload); err != nil {
+		slog.Warn("node diagnostic upload failed", "err", err)
+	}
+}
+
+func nodeAgentVersionString() string {
+	version := strings.TrimSpace(iversion.Version)
+	commit := strings.TrimSpace(iversion.Commit)
+	if commit == "" {
+		return version
+	}
+	if version == "" {
+		return commit
+	}
+	return version + "@" + commit
 }
 
 // serverError wraps a 5xx error for backoff handling.

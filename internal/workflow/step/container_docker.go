@@ -3,6 +3,7 @@ package step
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -159,11 +160,16 @@ func (r *DockerContainerRuntime) Wait(ctx context.Context, handle ContainerHandl
 			return ContainerResult{}, fmt.Errorf("step: wait container: %w", err)
 		}
 	case status := <-waitResult.Result:
-		res := ContainerResult{ExitCode: int(status.StatusCode)}
+		res := ContainerResult{ExitCode: int(status.StatusCode), ContainerID: string(handle)}
 		inspect, err := r.client.ContainerInspect(ctx, string(handle), client.ContainerInspectOptions{})
-		if err == nil && inspect.Container.State != nil {
-			res.StartedAt = parseDockerTime(inspect.Container.State.StartedAt)
-			res.CompletedAt = parseDockerTime(inspect.Container.State.FinishedAt)
+		if err == nil {
+			if data, marshalErr := json.Marshal(inspect.Container); marshalErr == nil {
+				res.InspectJSON = data
+			}
+			if inspect.Container.State != nil {
+				res.StartedAt = parseDockerTime(inspect.Container.State.StartedAt)
+				res.CompletedAt = parseDockerTime(inspect.Container.State.FinishedAt)
+			}
 		}
 		return res, nil
 	}

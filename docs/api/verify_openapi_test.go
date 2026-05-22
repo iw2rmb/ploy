@@ -92,6 +92,11 @@ func TestOpenAPICompleteness(t *testing.T) {
 		{"/v1/nodes/{id}/events", "post"},
 		// Node logs
 		{"/v1/nodes/{id}/logs", "post"},
+		// Node daemon diagnostics/logs
+		{"/v1/nodes/{id}/diagnostics", "get"},
+		{"/v1/nodes/{id}/diagnostics", "post"},
+		{"/v1/nodes/{id}/daemon-logs", "get"},
+		{"/v1/nodes/{id}/daemon-logs", "post"},
 		// Job diff upload (run-scoped, no node ID)
 		{"/v1/runs/{run_id}/jobs/{job_id}/diff", "post"},
 		// Job artifact upload (run-scoped, no node ID)

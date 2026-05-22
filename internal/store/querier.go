@@ -64,6 +64,7 @@ type Querier interface {
 	// Creates a new node with an application-supplied NanoID(6) as the primary key.
 	// The `id` parameter must be generated via types.NewNodeKey() before calling.
 	CreateNode(ctx context.Context, arg CreateNodeParams) (Node, error)
+	CreateNodeDaemonLog(ctx context.Context, arg CreateNodeDaemonLogParams) (NodeDaemonLog, error)
 	// v1: Creates a new run for a mig + spec snapshot. Runs are created in Started state.
 	// Note: `id` is a required TEXT parameter (KSUID-backed); caller generates via types.NewRunID().
 	CreateRun(ctx context.Context, arg CreateRunParams) (Run, error)
@@ -223,6 +224,8 @@ type Querier interface {
 	// archived_only: if true, return only archived migs; if false, return only active migs; if null, return all.
 	// name_filter: if non-empty, filter by name substring (case-insensitive); if null/empty, no name filtering.
 	ListMigs(ctx context.Context, arg ListMigsParams) ([]Mig, error)
+	ListNodeDaemonLogs(ctx context.Context, arg ListNodeDaemonLogsParams) ([]NodeDaemonLog, error)
+	ListNodeDiagnostics(ctx context.Context, nodeID types.NodeID) ([]NodeDiagnostic, error)
 	// ListNodeMetricsPartitions retrieves all partition names for the node_metrics table.
 	ListNodeMetricsPartitions(ctx context.Context) ([]string, error)
 	ListNodes(ctx context.Context) ([]Node, error)
@@ -260,6 +263,7 @@ type Querier interface {
 	// Atomically promote the next unblocked job in a repo attempt: Created -> Queued.
 	// A created job is unblocked when all predecessor jobs that point to it are Success.
 	ScheduleNextJob(ctx context.Context, arg ScheduleNextJobParams) (Job, error)
+	TrimNodeDaemonLogs(ctx context.Context, arg TrimNodeDaemonLogsParams) error
 	// Unarchives a mig by clearing archived_at.
 	UnarchiveMig(ctx context.Context, id types.MigID) error
 	// Revert a claimed Running job back to claimable Queued state.
@@ -317,6 +321,7 @@ type Querier interface {
 	// Bulk upsert a mig_repo by normalized repo_url.
 	// Uniqueness is on (mig_id, repo_id) to prevent duplicate repo membership per mig.
 	UpsertMigRepo(ctx context.Context, arg UpsertMigRepoParams) (MigRepo, error)
+	UpsertNodeDiagnostic(ctx context.Context, arg UpsertNodeDiagnosticParams) (NodeDiagnostic, error)
 	UpsertSBOMRow(ctx context.Context, arg UpsertSBOMRowParams) error
 }
 
