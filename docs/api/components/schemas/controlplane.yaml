@@ -828,6 +828,69 @@ NodeCreateLogRequest:
       contentEncoding: base64
   required: [run_id, chunk_no, data]
 
+NodeDiagnostic:
+  type: object
+  properties:
+    node_id: { type: string }
+    component: { type: string, enum: [node, node-updater] }
+    status: { type: string }
+    last_error: { type: string, nullable: true }
+    version: { type: string, nullable: true }
+    image_ref: { type: string, nullable: true }
+    local_image_id: { type: string, nullable: true }
+    remote_image_id: { type: string, nullable: true }
+    details: { type: object, additionalProperties: true }
+    last_checked_at: { type: string, format: date-time, nullable: true }
+    last_success_at: { type: string, format: date-time, nullable: true }
+    updated_at: { type: string, format: date-time }
+  required: [node_id, component, status, details, updated_at]
+
+UpsertNodeDiagnosticRequest:
+  type: object
+  additionalProperties: false
+  properties:
+    component: { type: string, enum: [node, node-updater] }
+    status: { type: string }
+    last_error: { type: string, nullable: true }
+    version: { type: string, nullable: true }
+    image_ref: { type: string, nullable: true }
+    local_image_id: { type: string, nullable: true }
+    remote_image_id: { type: string, nullable: true }
+    details: { type: object, additionalProperties: true }
+    last_checked_at: { type: string, format: date-time, nullable: true }
+    last_success_at: { type: string, format: date-time, nullable: true }
+  required: [component, status]
+
+NodeDaemonLog:
+  type: object
+  properties:
+    id: { type: integer, format: int64 }
+    node_id: { type: string }
+    component: { type: string, enum: [node, node-updater] }
+    stream: { type: string, enum: [stdout, stderr, system] }
+    message: { type: string }
+    created_at: { type: string, format: date-time }
+  required: [id, node_id, component, stream, message]
+
+CreateNodeDaemonLogsRequest:
+  type: object
+  additionalProperties: false
+  properties:
+    component: { type: string, enum: [node, node-updater] }
+    stream: { type: string, enum: [stdout, stderr, system] }
+    lines:
+      type: array
+      items: { type: string }
+      minItems: 1
+      maxItems: 200
+  required: [component, stream, lines]
+
+CreateNodeDaemonLogsResponse:
+  type: object
+  properties:
+    count: { type: integer }
+  required: [count]
+
 ArtifactBundle:
   type: object
   # Note: artifact_bundles.id is still UUID, but run_id and job_id are KSUID strings.

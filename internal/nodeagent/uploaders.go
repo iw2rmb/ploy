@@ -111,6 +111,45 @@ func (b *baseUploader) SaveJobImageName(ctx context.Context, jobID types.JobID, 
 	)
 }
 
+// UploadNodeDiagnostic stores current daemon state for node-side components.
+func (b *baseUploader) UploadNodeDiagnostic(ctx context.Context, component, status string, payload map[string]any) error {
+	if strings.TrimSpace(component) == "" {
+		return fmt.Errorf("component is required")
+	}
+	if strings.TrimSpace(status) == "" {
+		return fmt.Errorf("status is required")
+	}
+	if payload == nil {
+		payload = map[string]any{}
+	}
+	payload["component"] = strings.TrimSpace(component)
+	payload["status"] = strings.TrimSpace(status)
+	return b.postJSONWithRetry(
+		ctx,
+		fmt.Sprintf("/v1/nodes/%s/diagnostics", b.cfg.NodeID.String()),
+		payload,
+		"upload node diagnostic",
+		postJSONRetryModeDefault,
+	)
+}
+
+// UploadNodeDaemonLogs stores recent daemon log lines outside run/job log streams.
+func (b *baseUploader) UploadNodeDaemonLogs(ctx context.Context, component, stream string, lines []string) error {
+	if len(lines) == 0 {
+		return nil
+	}
+	resp, err := b.postJSON(ctx, fmt.Sprintf("/v1/nodes/%s/daemon-logs", b.cfg.NodeID.String()), map[string]any{
+		"component": strings.TrimSpace(component),
+		"stream":    strings.TrimSpace(stream),
+		"lines":     lines,
+	}, http.StatusCreated, "upload node daemon logs")
+	if err != nil {
+		return err
+	}
+	_ = resp.Body.Close()
+	return nil
+}
+
 // UploadRunEvent posts a single structured event for a run.
 func (b *baseUploader) UploadRunEvent(
 	ctx context.Context,

@@ -6,9 +6,11 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"sync"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/workflow/step"
 )
 
 type artifactLogWriter struct {
@@ -95,5 +97,15 @@ func (r *runController) uploadRepoArtifactsIfPresent(runID types.RunID, repoID t
 	}}
 	if _, _, err := r.artifactUploader.UploadArtifactEntries(context.Background(), runID, jobID, entries, "repo-artifacts"); err != nil {
 		slog.Warn("failed to upload repo artifacts", "run_id", runID, "repo_id", repoID, "job_id", jobID, "error", err)
+	}
+}
+
+func persistContainerInspectArtifact(req StartRunRequest, paths jobArtifactPaths, result step.Result) {
+	if len(result.ContainerInspectJSON) == 0 || paths.Root == "" {
+		return
+	}
+	path := filepath.Join(paths.Root, "container.inspect.json")
+	if err := os.WriteFile(path, result.ContainerInspectJSON, 0o600); err != nil {
+		slog.Warn("failed to write container inspect artifact", "run_id", req.RunID, "job_id", req.JobID, "container_id", result.ContainerID, "error", err)
 	}
 }

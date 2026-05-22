@@ -131,6 +131,10 @@ func registerNodeRoutes(s *httpserver.Server, deps routeDeps) {
 	s.RegisterRouteFunc("POST /v1/nodes/{id}/claim", claimJobHandlerWithEvents(deps.st, deps.bs, deps.eventsService, deps.configHolder), auth.RoleWorker)
 	s.RegisterRouteFunc("POST /v1/nodes/{id}/events", createNodeEventsHandler(deps.st, deps.eventsService), auth.RoleWorker)
 	s.RegisterRouteFunc("POST /v1/nodes/{id}/logs", createNodeLogsHandler(deps.st, deps.bp, deps.eventsService), auth.RoleWorker)
+	s.RegisterRouteFunc("POST /v1/nodes/{id}/diagnostics", upsertNodeDiagnosticHandler(deps.st), auth.RoleWorker, auth.RoleControlPlane)
+	s.RegisterRouteFunc("GET /v1/nodes/{id}/diagnostics", listNodeDiagnosticsHandler(deps.st), auth.RoleControlPlane)
+	s.RegisterRouteFunc("POST /v1/nodes/{id}/daemon-logs", createNodeDaemonLogsHandler(deps.st), auth.RoleWorker, auth.RoleControlPlane)
+	s.RegisterRouteFunc("GET /v1/nodes/{id}/daemon-logs", listNodeDaemonLogsHandler(deps.st), auth.RoleControlPlane)
 }
 
 func registerSpecBundleRoutes(s *httpserver.Server, deps routeDeps) {

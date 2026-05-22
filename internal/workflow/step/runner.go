@@ -77,6 +77,9 @@ type Request struct {
 // Result contains the outcome of a step execution.
 type Result struct {
 	ExitCode int
+	// Docker container identity and inspect output when a container was run.
+	ContainerID          string
+	ContainerInspectJSON []byte
 	// Per-stage timings captured during execution.
 	Timings            StageTiming
 	BuildGate          *contracts.BuildGateStageMetadata
@@ -179,6 +182,8 @@ func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 			}
 		}
 		result.ExitCode = cRes.ExitCode
+		result.ContainerID = cRes.ContainerID
+		result.ContainerInspectJSON = cRes.InspectJSON
 		result.Timings.ExecutionDuration = types.Duration(time.Since(executionStart))
 
 	}

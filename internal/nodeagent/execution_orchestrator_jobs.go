@@ -295,6 +295,9 @@ func (r *runController) runContainerJob(
 	}
 	runErr = r.finalizeStandardJobOutputs(req, cfg, outDir, workspace, runErr, result)
 	duration = time.Since(startTime)
+	if runErr != nil || result.ExitCode != 0 {
+		persistContainerInspectArtifact(req, runRepoJobArtifactPaths(req.RunID, req.RepoID, req.JobID), result)
+	}
 
 	diffUploaded := false
 	if cfg.UploadDiff != nil {

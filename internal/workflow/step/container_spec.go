@@ -60,6 +60,8 @@ type ContainerResult struct {
 	ExitCode    int
 	StartedAt   time.Time
 	CompletedAt time.Time
+	ContainerID string
+	InspectJSON []byte
 }
 
 // buildContainerSpec assembles a ContainerSpec from the manifest and workspace path.

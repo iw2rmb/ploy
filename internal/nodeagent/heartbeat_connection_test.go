@@ -98,20 +98,27 @@ func TestBuildURLRejectsAbsoluteOrAuthorityPath(t *testing.T) {
 func TestSendHeartbeatSuccess(t *testing.T) {
 	var receivedPayload HeartbeatPayload
 	var receivedMap map[string]any
+	heartbeatPath := "/v1/nodes/" + testNodeID + "/heartbeat"
+	diagnosticsPath := "/v1/nodes/" + testNodeID + "/diagnostics"
+	heartbeatRequests := 0
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			t.Errorf("method = %s, want POST", r.Method)
 		}
 
-		expectedPath := "/v1/nodes/" + testNodeID + "/heartbeat"
-		if r.URL.Path != expectedPath {
-			t.Errorf("path = %s, want %s", r.URL.Path, expectedPath)
-		}
-
 		if ct := r.Header.Get("Content-Type"); ct != "application/json" {
 			t.Errorf("content-type = %s, want application/json", ct)
 		}
+
+		if r.URL.Path == diagnosticsPath {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		if r.URL.Path != heartbeatPath {
+			t.Errorf("path = %s, want %s or %s", r.URL.Path, heartbeatPath, diagnosticsPath)
+		}
+		heartbeatRequests++
 
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
@@ -141,6 +148,9 @@ func TestSendHeartbeatSuccess(t *testing.T) {
 	ctx := context.Background()
 	if err := mgr.sendHeartbeat(ctx); err != nil {
 		t.Fatalf("sendHeartbeat error: %v", err)
+	}
+	if heartbeatRequests != 1 {
+		t.Fatalf("heartbeat requests = %d, want 1", heartbeatRequests)
 	}
 
 	if _, ok := receivedMap["node_id"]; ok {

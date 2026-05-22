@@ -233,6 +233,14 @@ func (s *PgStore) CreateDiff(ctx context.Context, arg CreateDiffParams) (Diff, e
 	return s.Queries.CreateDiff(ctx, arg)
 }
 
+// UpsertNodeDiagnostic validates the Details JSONB field and stores daemon state.
+func (s *PgStore) UpsertNodeDiagnostic(ctx context.Context, arg UpsertNodeDiagnosticParams) (NodeDiagnostic, error) {
+	if err := validateJSONB(arg.Details); err != nil {
+		return NodeDiagnostic{}, fmt.Errorf("node_diagnostics.details: %w", err)
+	}
+	return s.Queries.UpsertNodeDiagnostic(ctx, arg)
+}
+
 // UpdateJobMeta validates the Meta JSONB field and updates job metadata.
 func (s *PgStore) UpdateJobMeta(ctx context.Context, arg UpdateJobMetaParams) error {
 	if err := validateJSONB(arg.Meta); err != nil {

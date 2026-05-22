@@ -398,6 +398,36 @@ CREATE TABLE IF NOT EXISTS node_metrics (
 CREATE INDEX IF NOT EXISTS node_metrics_node_time_idx ON node_metrics USING BRIN (created_at);
 CREATE INDEX IF NOT EXISTS node_metrics_node_idx ON node_metrics(node_id);
 
+-- Node daemon diagnostics. These rows are not tied to a run/job: they describe
+-- long-lived node-side components such as ployd-node and node-updater.
+CREATE TABLE IF NOT EXISTS node_diagnostics (
+  node_id          TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
+  component        TEXT NOT NULL CHECK (component IN ('node', 'node-updater')),
+  status           TEXT NOT NULL,
+  last_error       TEXT,
+  version          TEXT,
+  image_ref        TEXT,
+  local_image_id   TEXT,
+  remote_image_id  TEXT,
+  details          JSONB NOT NULL DEFAULT '{}'::jsonb,
+  last_checked_at  TIMESTAMPTZ,
+  last_success_at  TIMESTAMPTZ,
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (node_id, component)
+);
+CREATE INDEX IF NOT EXISTS node_diagnostics_updated_idx ON node_diagnostics(updated_at);
+
+-- Recent daemon log lines for node-side components. Run/job logs stay in logs.
+CREATE TABLE IF NOT EXISTS node_daemon_logs (
+  id          BIGSERIAL PRIMARY KEY,
+  node_id     TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
+  component   TEXT NOT NULL CHECK (component IN ('node', 'node-updater')),
+  stream      TEXT NOT NULL CHECK (stream IN ('stdout', 'stderr', 'system')),
+  message     TEXT NOT NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS node_daemon_logs_node_component_id_idx ON node_daemon_logs(node_id, component, id DESC);
+
 -- Job resource consumption history.
 -- One row per job execution (job_id), populated from node-reported completion stats.
 CREATE TABLE IF NOT EXISTS job_metrics (
