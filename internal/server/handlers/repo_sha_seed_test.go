@@ -41,6 +41,30 @@ func TestClassifyGitLSRemoteFailure(t *testing.T) {
 			want: "repository not found or access denied",
 		},
 		{
+			name: "http 404",
+			err:  errors.New("exit status 128"),
+			out:  "fatal: unable to access 'https://gitlab.example.com/group/repo.git/': The requested URL returned error: 404",
+			want: "repository not found or access denied",
+		},
+		{
+			name: "dns failure",
+			err:  errors.New("exit status 128"),
+			out:  "fatal: unable to access 'https://gitlab.example.com/group/repo.git/': Could not resolve host: gitlab.example.com",
+			want: "dns lookup failed",
+		},
+		{
+			name: "network failure",
+			err:  errors.New("exit status 128"),
+			out:  "fatal: unable to access 'https://gitlab.example.com/group/repo.git/': Failed to connect to gitlab.example.com port 443",
+			want: "network connection failed",
+		},
+		{
+			name: "tls failure",
+			err:  errors.New("exit status 128"),
+			out:  "fatal: unable to access 'https://gitlab.example.com/group/repo.git/': SSL certificate problem: unable to get local issuer certificate",
+			want: "tls or certificate validation failed",
+		},
+		{
 			name: "timeout",
 			err:  context.DeadlineExceeded,
 			want: "timed out",
