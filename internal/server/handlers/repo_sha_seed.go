@@ -3,11 +3,13 @@ package handlers
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/iw2rmb/ploy/internal/gitauth"
 )
@@ -19,19 +21,32 @@ type sourceCommitSHAResolverFunc func(context.Context, string, string) (string, 
 type sourceCommitSHAResolverContextKey struct{}
 
 var sourceCommitSHAResolver sourceCommitSHAResolverFunc
+var sourceCommitResolveTimeout = 20 * time.Second
 
 func withSourceCommitSHAResolver(ctx context.Context, resolver sourceCommitSHAResolverFunc) context.Context {
 	return context.WithValue(ctx, sourceCommitSHAResolverContextKey{}, resolver)
 }
 
 func resolveSourceCommitSHAFromContext(ctx context.Context, repoURL, ref string, auth gitauth.Options) (string, error) {
+	resolveCtx, cancel := withSourceCommitResolveTimeout(ctx)
+	defer cancel()
 	if resolver, ok := ctx.Value(sourceCommitSHAResolverContextKey{}).(sourceCommitSHAResolverFunc); ok && resolver != nil {
-		return resolver(ctx, repoURL, ref)
+		return resolver(resolveCtx, repoURL, ref)
 	}
 	if sourceCommitSHAResolver != nil {
-		return sourceCommitSHAResolver(ctx, repoURL, ref)
+		return sourceCommitSHAResolver(resolveCtx, repoURL, ref)
 	}
-	return resolveSourceCommitSHA(ctx, repoURL, ref, auth)
+	return resolveSourceCommitSHA(resolveCtx, repoURL, ref, auth)
+}
+
+func withSourceCommitResolveTimeout(ctx context.Context) (context.Context, context.CancelFunc) {
+	if sourceCommitResolveTimeout <= 0 {
+		return ctx, func() {}
+	}
+	if deadline, ok := ctx.Deadline(); ok && time.Until(deadline) <= sourceCommitResolveTimeout {
+		return ctx, func() {}
+	}
+	return context.WithTimeout(ctx, sourceCommitResolveTimeout)
 }
 
 func resolveSourceCommitSHA(ctx context.Context, repoURL, ref string, auth gitauth.Options) (string, error) {
@@ -67,7 +82,11 @@ func gitLSRemote(ctx context.Context, repoURL, ref string, auth gitauth.Options)
 	cmd.Env = append(cmd.Env, prepared.Env...)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return "", fmt.Errorf("git ls-remote failed (%s)", classifyGitLSRemoteFailure(out))
+		failureErr := err
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			failureErr = ctxErr
+		}
+		return "", fmt.Errorf("git ls-remote failed (%s)", classifyGitLSRemoteFailure(failureErr, out))
 	}
 	lines := bytes.Split(bytes.TrimSpace(out), []byte("\n"))
 	for _, line := range lines {
@@ -87,7 +106,15 @@ func gitLSRemote(ctx context.Context, repoURL, ref string, auth gitauth.Options)
 	return "", fmt.Errorf("no matching commit sha found")
 }
 
-func classifyGitLSRemoteFailure(out []byte) string {
+func classifyGitLSRemoteFailure(err error, out []byte) string {
+	switch {
+	case errors.Is(err, context.DeadlineExceeded):
+		return "timed out"
+	case errors.Is(err, context.Canceled):
+		return "canceled"
+	case errors.Is(err, exec.ErrNotFound), strings.Contains(err.Error(), "executable file not found"):
+		return "git executable not found in server runtime"
+	}
 	msg := strings.ToLower(strings.TrimSpace(string(out)))
 	switch {
 	case strings.Contains(msg, "authentication failed"),

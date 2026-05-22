@@ -281,6 +281,18 @@ func TestRunsCreateSingleRepo_RejectsWhenSourceCommitSeedFails(t *testing.T) {
 	handler.ServeHTTP(rr, req)
 
 	assertStatus(t, rr, http.StatusBadRequest)
+	if st.createSpec.called {
+		t.Fatal("store.CreateSpec should not be called when source commit seed resolution fails")
+	}
+	if st.createMig.called {
+		t.Fatal("store.CreateMig should not be called when source commit seed resolution fails")
+	}
+	if st.createMigRepo.called {
+		t.Fatal("store.CreateMigRepo should not be called when source commit seed resolution fails")
+	}
+	if st.createRun.called {
+		t.Fatal("store.CreateRun should not be called when source commit seed resolution fails")
+	}
 	if st.createRunRepo.called {
 		t.Fatal("store.CreateRunRepo should not be called when source commit seed resolution fails")
 	}
