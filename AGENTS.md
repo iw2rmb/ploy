@@ -4,40 +4,55 @@ Use this flow for any "why did run/job fail?" request.
 
 ## Exec summary
 - This repository is the orchestrator/control-plane, not the user project that failed to build/test.
-- For job/run failure analysis, default to runtime evidence from the failed run/job first (status, logs, artifacts, preserved temp), then inspect orchestrator code only when evidence points there.
+- For job/run failure analysis, default to runtime evidence from the failed run/job first (status, logs, API-visible artifacts), then inspect orchestrator code only when evidence points there.
 - Do not answer language/build-tool behavior questions from orchestrator internals unless explicitly asked to analyze orchestrator implementation.
-- Active investigation target is remote cluster `round-leaf-6114` on `s_v.v.kovalev@10.120.34.186`.
+- Active investigation target is cluster `round-leaf-6114`.
+- Do not SSH to the node/server host for investigation unless the user explicitly re-enables SSH access for the current task.
 
-## 1) Assume remote cluster first
+## 1) Use control-plane endpoints first
 - Do not start with broad repo searches.
-- Use remote host as first source of truth:
-  - `export PLOY_SSH='s_v.v.kovalev@10.120.34.186'`
-  - `ssh "$PLOY_SSH" 'hostname'`
-- Remote Docker requires sudo; use `VPS_PWD` as sudo password:
-  - `ssh "$PLOY_SSH" "printf '%s\n' \"$VPS_PWD\" | sudo -S docker ps --format '{{.Names}}'"`
-- Expected core containers include `ploy-server-1` and `ploy-node-1`.
+- Use `~/.config/ploy/default` for the `round-leaf-6114` server URL and token.
+- Treat API/CLI output as the source of truth. Do not use remote Docker, remote DB, or node filesystem paths when only designated endpoints are available.
+- Never paste auth tokens into responses or shell output summaries.
 
-## 2) Control-plane access source (in order)
-- Remote DB first: `ssh "$PLOY_SSH" 'psql "$PLOY_DB_DSN"'`.
-- DB is reachable only on the remote host; do not start with local `psql`.
-- If API auth is needed, use `~/.config/ploy/default` (cluster profile for `round-leaf-6114`; may be symlink) for server URL/token.
+## 2) Designated debug endpoints
+- Run status:
+  - `GET /v1/runs/<run-id>/status`
+  - CLI: `ploy run status <run-id> --json`
+- Run lifecycle events:
+  - `GET /v1/runs/<run-id>/logs`
+- Job status:
+  - `GET /v1/jobs/<job-id>/status`
+- Job logs:
+  - `GET /v1/jobs/<job-id>/logs`
+  - CLI: `ploy job log --format raw <job-id>`
+- Repo job list:
+  - `GET /v1/runs/<run-id>/repos/<repo-id>/jobs`
+- Repo artifact list:
+  - `GET /v1/runs/<run-id>/repos/<repo-id>/artifacts`
+- Artifact metadata/download:
+  - `GET /v1/artifacts/<artifact-id>`
+  - `GET /v1/artifacts/<artifact-id>?download=true`
+- Diff list/download:
+  - `GET /v1/runs/<run-id>/repos/<repo-id>/diffs`
+  - `GET /v1/runs/<run-id>/repos/<repo-id>/diffs?download=true&diff_id=<uuid>`
 
 ## 2.1) Direct DB fast path for simple status questions
-- If question is a single factual check (for example: "what is this job status?"), answer from DB first, before collecting full runtime evidence.
-- Only continue to logs/artifacts/container inspection when DB result is missing, ambiguous, or conflicts with observed behavior.
+- If question is a single factual check (for example: "what is this job status?"), answer from `/v1/jobs/<job-id>/status` or `ploy run status <run-id> --json` first, before collecting full runtime evidence.
+- Only continue to logs and artifacts when the API result is missing, ambiguous, or conflicts with observed behavior.
 
 ## 3) Minimum required evidence
 - `ploy run status <run-id> --json`
 - `ploy job log --format raw <job-id>`
-- `ssh "$PLOY_SSH" "printf '%s\n' \"$VPS_PWD\" | sudo -S docker logs <job-container-id>"` where label `com.ploy.job_id=<job-id>`
-- `ssh "$PLOY_SSH" "printf '%s\n' \"$VPS_PWD\" | sudo -S docker inspect <job-container-id>"` (state + mounts)
-- To resolve `<job-container-id>` on remote host:
-  - `ssh "$PLOY_SSH" "printf '%s\n' \"$VPS_PWD\" | sudo -S docker ps -aq --filter label=com.ploy.job_id=<job-id>"`
+- `GET /v1/jobs/<job-id>/status`
+- `GET /v1/runs/<run-id>/repos/<repo-id>/jobs`
+- `GET /v1/runs/<run-id>/repos/<repo-id>/artifacts`
+- Download relevant artifact bundles with `GET /v1/artifacts/<artifact-id>?download=true` when present.
 
 ## 3.1) Fast route by exit code (first triage branch)
 - If `exit_code = -1`: treat as ploy/orchestrator-internal failure first.
-  - Prioritize `ploy-node-1` logs for that `job_id` immediately.
-  - Typical scope: pre-container/setup/population failures (for example input/materialization issues).
+  - Prioritize job status, raw job logs, repo job list, and artifact bundles for that `job_id`.
+  - Typical scope: pre-container/setup/population failures (for example input/materialization issues). If API evidence is insufficient, state the unavailable evidence explicitly.
 - If `job_type = heal` and `exit_code = 1`: treat as job payload/tooling failure first.
   - Prioritize runtime artifacts from `*_repo-artifacts.bin`, especially `artifacts/<job-id>/out/amata/runs/**` (`events.ndjson`, `snapshot.json`, provider outputs when present).
   - Only pivot to ploy internals after runtime evidence is insufficient/inconsistent.
@@ -45,6 +60,9 @@ Use this flow for any "why did run/job fail?" request.
 ## 4) Artifact retrieval path (no re-discovery)
 - Always fetch artifacts with:
   - `ploy mig fetch --run <run-id> --artifact-dir <dir>`
+- If `ploy mig fetch` does not expose the needed bundle, use:
+  - `GET /v1/runs/<run-id>/repos/<repo-id>/artifacts`
+  - `GET /v1/artifacts/<artifact-id>?download=true`
 - If needed, unpack `*_repo-artifacts.bin` (`tar -xzf ...`) and inspect:
   - `artifacts/<job-id>/out/amata/runs/*/events.ndjson`
   - `artifacts/<job-id>/out/amata/runs/*/snapshot.json`
@@ -56,15 +74,13 @@ Use this flow for any "why did run/job fail?" request.
 - `/out` bundle may not include per-step provider files (`stderr.txt`, `transcript.txt`, `provider-metadata.json`).
 - If missing there and absent from the repo-local artifacts tree, report clearly: exact provider-internal error is unrecoverable post-factum.
 
-## 6) Repo-local artifacts (node remote path)
+## 6) Repo-local artifacts
 - Jobs write durable repo-local artifacts under:
   - `$PLOYD_CACHE_HOME/runs/<run-id>/repos/<repo-id>/artifacts`
   - per-job files live in `<job-id>/{in,out,stdout.log,stderr.log,diff.patch}`
 - The node uploads the full `artifacts/` tree on job failure/error and successful `post_gate`.
-- On remote cluster, inspect via:
-  - `ssh "$PLOY_SSH" "printf '%s\n' \"$VPS_PWD\" | sudo -S find \"\$PLOYD_CACHE_HOME/runs/<run-id>/repos/<repo-id>/artifacts\" -maxdepth 3 -type f | sort"`
-- To copy all repo artifacts locally:
-  - `mkdir -p ./tmp && ssh "$PLOY_SSH" "printf '%s\n' \"$VPS_PWD\" | sudo -S tar -C \"\$PLOYD_CACHE_HOME/runs/<run-id>/repos/<repo-id>\" -czf - artifacts" > ./tmp/repo-artifacts.tgz`
+- With no SSH access, inspect only uploaded bundles through `GET /v1/runs/<run-id>/repos/<repo-id>/artifacts` and `GET /v1/artifacts/<artifact-id>?download=true`.
+- If a required file exists only on the node filesystem and was not uploaded, report that limitation explicitly instead of trying remote access.
 
 ## 7) Response contract
 - Separate:
