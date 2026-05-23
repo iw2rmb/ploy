@@ -25,7 +25,7 @@ func TestMaterializeMigInFromInputs(t *testing.T) {
 		wantTargetRel string
 	}{
 		{
-			name: "links source out file into current in dir",
+			name: "copies source out file into current in dir",
 			ref: contracts.ResolvedInFromRef{
 				From:          "extract@mig://out/dependency-usage.json",
 				To:            "/in/dependency-usage.json",
@@ -118,16 +118,22 @@ func TestMaterializeMigInFromInputs(t *testing.T) {
 			}
 
 			target := filepath.Join(inDir, tt.wantTargetRel)
-			linkTarget, err := os.Readlink(target)
+			info, err := os.Lstat(target)
 			if err != nil {
-				t.Fatalf("Readlink(%s) error = %v", target, err)
+				t.Fatalf("Lstat(%s) error = %v", target, err)
 			}
-			wantSource, err := runRepoJobOutFile(runID, repoID, sourceJobID, tt.ref.SourceOutPath)
+			if info.Mode()&os.ModeSymlink != 0 {
+				t.Fatalf("target is symlink, want regular file")
+			}
+			if !info.Mode().IsRegular() {
+				t.Fatalf("target mode = %v, want regular file", info.Mode())
+			}
+			got, err := os.ReadFile(target)
 			if err != nil {
-				t.Fatalf("runRepoJobOutFile() error = %v", err)
+				t.Fatalf("ReadFile(%s) error = %v", target, err)
 			}
-			if linkTarget != wantSource {
-				t.Fatalf("link target = %q, want %q", linkTarget, wantSource)
+			if string(got) != "payload" {
+				t.Fatalf("target content = %q, want payload", string(got))
 			}
 		})
 	}
