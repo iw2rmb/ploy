@@ -178,10 +178,12 @@ func (r *runController) initializeRuntime(ctx context.Context, runID types.RunID
 	if registryAuthConfig == "" {
 		registryAuthConfig = strings.TrimSpace(os.Getenv("DOCKER_AUTH_CONFIG"))
 	}
+	containerRegistry := strings.TrimSpace(os.Getenv("PLOY_CONTAINER_REGISTRY"))
 	containerRuntime, err := step.NewDockerContainerRuntime(step.DockerContainerRuntimeOptions{
-		PullImage:              true,
-		Network:                network,
-		RegistryAuthConfigJSON: registryAuthConfig,
+		PullImage:                 true,
+		Network:                   network,
+		RegistryAuthConfigJSON:    registryAuthConfig,
+		DelegatedAuthPullRegistry: containerRegistry,
 	})
 	if err != nil {
 		slog.Warn("docker unavailable; falling back to stub runtime", "run_id", runID, "error", err)

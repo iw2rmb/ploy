@@ -36,6 +36,13 @@ type dockerImageAPI interface {
 	ImageInspect(ctx context.Context, imageID string, inspectOpts ...client.ImageInspectOption) (client.ImageInspectResult, error)
 }
 
+type dockerDelegatedPullAPI interface {
+	ContainerList(ctx context.Context, options client.ContainerListOptions) (client.ContainerListResult, error)
+	ExecCreate(ctx context.Context, container string, options client.ExecCreateOptions) (client.ExecCreateResult, error)
+	ExecAttach(ctx context.Context, execID string, options client.ExecAttachOptions) (client.ExecAttachResult, error)
+	ExecInspect(ctx context.Context, execID string, options client.ExecInspectOptions) (client.ExecInspectResult, error)
+}
+
 // dockerStatsAPI abstracts container stats retrieval, used by gate resource telemetry.
 type dockerStatsAPI interface {
 	ContainerStats(ctx context.Context, containerID string, options client.ContainerStatsOptions) (client.ContainerStatsResult, error)
@@ -43,10 +50,11 @@ type dockerStatsAPI interface {
 
 // DockerContainerRuntime executes containers using the local Docker daemon.
 type DockerContainerRuntime struct {
-	client dockerClientAPI
-	images dockerImageAPI
-	stats  dockerStatsAPI
-	opts   DockerContainerRuntimeOptions
+	client        dockerClientAPI
+	images        dockerImageAPI
+	delegatedPull dockerDelegatedPullAPI
+	stats         dockerStatsAPI
+	opts          DockerContainerRuntimeOptions
 }
 
 // NewDockerContainerRuntime constructs a Docker-backed container runtime.
@@ -57,7 +65,7 @@ func NewDockerContainerRuntime(opts DockerContainerRuntimeOptions) (ContainerRun
 	if err != nil {
 		return nil, fmt.Errorf("step: configure docker runtime: %w", err)
 	}
-	return &DockerContainerRuntime{client: cli, images: cli, stats: cli, opts: opts}, nil
+	return &DockerContainerRuntime{client: cli, images: cli, delegatedPull: cli, stats: cli, opts: opts}, nil
 }
 
 // newDockerContainerRuntimeWithClient constructs a DockerContainerRuntime with
@@ -66,6 +74,9 @@ func newDockerContainerRuntimeWithClient(cli dockerClientAPI, opts DockerContain
 	rt := &DockerContainerRuntime{client: cli, opts: opts}
 	if img, ok := cli.(dockerImageAPI); ok {
 		rt.images = img
+	}
+	if dp, ok := cli.(dockerDelegatedPullAPI); ok {
+		rt.delegatedPull = dp
 	}
 	if s, ok := cli.(dockerStatsAPI); ok {
 		rt.stats = s
@@ -291,6 +302,12 @@ func (r *DockerContainerRuntime) pullImage(ctx context.Context, imageRef string)
 		RegistryAuth: registryAuth,
 	})
 	if err != nil {
+		if r.shouldDelegateAuthPull(imageRef, err) {
+			if delegatedErr := r.delegateAuthPull(ctx, imageRef, err); delegatedErr != nil {
+				return delegatedErr
+			}
+			return nil
+		}
 		return fmt.Errorf("step: pull image %s: %w", imageRef, err)
 	}
 	defer func() { _ = reader.Close() }()
