@@ -156,18 +156,6 @@ func putGlobalEnvHandler(holder *ConfigHolder, st store.Store) http.HandlerFunc 
 			return
 		}
 
-		// Hard-cut guard: reject special env keys that have been migrated to
-		// typed Hydra fields (home/in). All targets are blocked; job
-		// targets (gates/steps) must use the typed config APIs, and
-		// server/nodes targets are no longer valid for these keys.
-		if IsSpecialEnvKey(key) {
-			m := LookupSpecialEnvMapping(key)
-			writeHTTPError(w, http.StatusBadRequest,
-				"key %q is a migrated special env key; use config %s API instead (destination: %s)",
-				key, m.TargetField, m.Destination)
-			return
-		}
-
 		// Default secret to true if not explicitly set.
 		secret := true
 		if req.Secret != nil {

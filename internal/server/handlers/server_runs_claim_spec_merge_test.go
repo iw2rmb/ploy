@@ -18,6 +18,7 @@ func TestClaimJob_MergesGlobalEnvIntoSpec(t *testing.T) {
 
 	f.config.SetGlobalEnvVar("SECRET_BLOB", GlobalEnvVar{Value: "global-secret", Target: domaintypes.GlobalEnvTargetSteps, Secret: true})
 	f.config.SetGlobalEnvVar("STEPS_SECRET", GlobalEnvVar{Value: "steps-secret-val", Target: domaintypes.GlobalEnvTargetSteps, Secret: true})
+	f.config.SetGlobalEnvVar("CODEX_AUTH_JSON", GlobalEnvVar{Value: `{"token":"secret"}`, Target: domaintypes.GlobalEnvTargetSteps, Secret: true})
 	f.config.SetGlobalEnvVar("NODES_FALLBACK", GlobalEnvVar{Value: "nodes-env", Target: domaintypes.GlobalEnvTargetNodes, Secret: false})
 	f.config.SetGlobalEnvVar("SERVER_ONLY", GlobalEnvVar{Value: "server-env", Target: domaintypes.GlobalEnvTargetServer, Secret: false})
 
@@ -38,14 +39,12 @@ func TestClaimJob_MergesGlobalEnvIntoSpec(t *testing.T) {
 	if envs["SECRET_BLOB"] != "per-run-secret" {
 		t.Fatalf("expected per-run SECRET_BLOB to win, got %v", envs["SECRET_BLOB"])
 	}
-	// Steps-target non-special key injected for mig job.
+	// Steps-target keys are injected for mig jobs.
 	if envs["STEPS_SECRET"] != "steps-secret-val" {
 		t.Fatalf("expected STEPS_SECRET to be injected, got %v", envs["STEPS_SECRET"])
 	}
-	// Special env keys with global env target must NOT be injected as raw envs.
-	// They are file-backed and migrated to typed Hydra fields.
-	if _, ok := envs["CODEX_AUTH_JSON"]; ok {
-		t.Fatalf("expected special key CODEX_AUTH_JSON not to be injected as env var")
+	if envs["CODEX_AUTH_JSON"] != `{"token":"secret"}` {
+		t.Fatalf("expected CODEX_AUTH_JSON to be injected as an ordinary env var, got %v", envs["CODEX_AUTH_JSON"])
 	}
 	// Nodes-target provides fallback for all job types.
 	if envs["NODES_FALLBACK"] != "nodes-env" {

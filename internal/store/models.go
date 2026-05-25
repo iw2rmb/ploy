@@ -66,13 +66,6 @@ type ConfigEnv struct {
 	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
 }
 
-type ConfigHome struct {
-	Entry     string             `json:"entry"`
-	Dst       string             `json:"dst"`
-	Section   string             `json:"section"`
-	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
-}
-
 type ConfigIn struct {
 	Entry     string             `json:"entry"`
 	Dst       string             `json:"dst"`

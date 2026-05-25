@@ -87,16 +87,6 @@ func TestApplyHydraOverlay_DestinationCollision(t *testing.T) {
 			errSubstr: "/out/result.txt",
 		},
 		{
-			name:    "duplicate home destinations in overlay",
-			spec:    map[string]any{},
-			jobType: domaintypes.JobTypeMig,
-			overlays: map[string]*HydraJobConfig{
-				"mig": {Home: []string{"/a:.config/app.toml", "/b:.config/app.toml:ro"}},
-			},
-			wantErr:   true,
-			errSubstr: ".config/app.toml",
-		},
-		{
 			name: "spec and overlay share in dst replaces with spec entry",
 			spec: map[string]any{
 				"steps": []any{
@@ -127,22 +117,6 @@ func TestApplyHydraOverlay_DestinationCollision(t *testing.T) {
 				"mig": {Out: []string{"/overlay:/out/result.txt"}},
 			},
 			slices: []sliceCheck{{"out", 1, "/spec:/out/result.txt"}},
-		},
-		{
-			name: "spec and overlay share home dst replaces with spec entry",
-			spec: map[string]any{
-				"steps": []any{
-					map[string]any{
-						"image": "img:latest",
-						"home":  []any{"/spec:.config/app.toml:ro"},
-					},
-				},
-			},
-			jobType: domaintypes.JobTypeMig,
-			overlays: map[string]*HydraJobConfig{
-				"mig": {Home: []string{"/overlay:.config/app.toml"}},
-			},
-			slices: []sliceCheck{{"home", 1, "/spec:.config/app.toml:ro"}},
 		},
 		{
 			name: "overlay appends non-colliding dst to spec",
@@ -229,7 +203,6 @@ func TestApplyHydraOverlay_ThreeLayerPrecedence(t *testing.T) {
 				"mig": {
 					Envs: map[string]string{"OVERLAY_ONLY": "overlay", "SHARED_ALL": "from_overlay", "GLOBAL_ONLY": "overlay_override"},
 					In:   []string{"/overlay/extra:/in/extra.json", "/overlay/data:/in/data.json"},
-					Home: []string{"/overlay/auth:.auth/config.json"},
 				},
 			},
 			jobType:   domaintypes.JobTypeMig,

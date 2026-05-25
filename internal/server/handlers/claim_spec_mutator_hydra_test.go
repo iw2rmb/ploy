@@ -185,7 +185,7 @@ func TestApplyHydraOverlay_GlobalEnvRouting(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Typed Hydra overlay merge (envs, in, out, home)
+// Typed Hydra overlay merge (envs, in, out)
 // ---------------------------------------------------------------------------
 
 func TestApplyHydraOverlay_TypedMerge(t *testing.T) {
@@ -209,7 +209,7 @@ func TestApplyHydraOverlay_TypedMerge(t *testing.T) {
 			checkEnvs: map[string]string{"SPEC_KEY": "spec_val", "OVERLAY_KEY": "overlay_val", "SHARED": "from_spec"},
 		},
 		{
-			name: "in out home merge by destination",
+			name: "in out merge by destination preserves spec home",
 			spec: map[string]any{
 				"steps": []any{
 					map[string]any{
@@ -222,15 +222,14 @@ func TestApplyHydraOverlay_TypedMerge(t *testing.T) {
 			},
 			overlays: map[string]*HydraJobConfig{
 				"mig": {
-					In:   []string{"/overlay.txt:/in/config.json", "/overlay2.txt:/in/extra.json"},
-					Out:  []string{"/overlay.txt:/out/new.txt"},
-					Home: []string{"/overlay.txt:.config/app.toml", "/overlay.txt:.config/other.toml"},
+					In:  []string{"/overlay.txt:/in/config.json", "/overlay2.txt:/in/extra.json"},
+					Out: []string{"/overlay.txt:/out/new.txt"},
 				},
 			},
 			slices: []sliceCheck{
 				{"in", 2, "/a.txt:/in/config.json"},
 				{"out", 2, ""},
-				{"home", 2, "/c.txt:.config/app.toml:ro"},
+				{"home", 1, "/c.txt:.config/app.toml:ro"},
 			},
 		},
 		{

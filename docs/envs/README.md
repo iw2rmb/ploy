@@ -455,10 +455,6 @@ ploy config env show --key OPENAI_API_KEY --raw
 ploy config env unset --key OLD_VAR
 ```
 
-**Typed config fields** manage structured data that was previously carried as raw env keys.
-Use the dedicated typed config commands:
-- `ploy config home set/unset/ls` — Home-relative file mounts
-
 ### Target Semantics
 
 **Targets** control which components receive each variable:
@@ -507,7 +503,7 @@ The `show` and `unset` commands use **`--from`** to specify the target:
 
 | Variable | Consumer | Description |
 |----------|----------|-------------|
-| `home` (typed) | `codex` | File mounts relative to $HOME (replaces `CODEX_AUTH_JSON`, `CODEX_CONFIG_TOML`, `CCR_CONFIG_JSON`, `CRUSH_JSON`) |
+| `home` (spec field) | `codex` | Per-run file mounts relative to `$HOME` |
 | `in` (typed) | `codex`, healing | Read-only input file mounts |
 | `OPENAI_API_KEY` | Future OpenAI-integrated migs | API key for LLM operations |
 | `PLOY_GRADLE_BUILD_CACHE_URL` | Build Gate (Gradle) | HTTP URL of the remote Gradle Build Cache endpoint (e.g. `http://gradle-build-cache:5071/cache/`). When unset, remote cache is disabled. |
@@ -621,7 +617,7 @@ expected paths under `$HOME`. No env-based materialization is performed:
 - `crush.json` → `$HOME/.config/crush/crush.json` (via `home` mount)
 
 `amata` sets `CODEX_HOME=$HOME/.codex` by default. Configure delivery via
-`ploy config home set` or the spec `home` field.
+the run spec `home` field.
 
 If `/root/.claude-code-router/config.json` exists at startup, `amata` runs:
 - `ccr start`

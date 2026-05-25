@@ -56,11 +56,6 @@ func registerConfigRoutes(s *httpserver.Server, deps routeDeps) {
 	s.RegisterRouteFunc("GET /v1/config/env/{key}", getGlobalEnvHandler(deps.configHolder), auth.RoleCLIAdmin)
 	s.RegisterRouteFunc("PUT /v1/config/env/{key}", putGlobalEnvHandler(deps.configHolder, deps.st), auth.RoleCLIAdmin)
 	s.RegisterRouteFunc("DELETE /v1/config/env/{key}", deleteGlobalEnvHandler(deps.configHolder, deps.st), auth.RoleCLIAdmin)
-
-	s.RegisterRouteFunc("GET /v1/config/home", listConfigHomeHandler(deps.configHolder), auth.RoleCLIAdmin)
-	s.RegisterRouteFunc("GET /v1/config/home/{section}", listConfigHomeBySectionHandler(deps.configHolder), auth.RoleCLIAdmin)
-	s.RegisterRouteFunc("PUT /v1/config/home", putConfigHomeHandler(deps.configHolder, deps.st), auth.RoleCLIAdmin)
-	s.RegisterRouteFunc("DELETE /v1/config/home", deleteConfigHomeHandler(deps.configHolder, deps.st), auth.RoleCLIAdmin)
 }
 
 func registerTokenRoutes(s *httpserver.Server, deps routeDeps) {

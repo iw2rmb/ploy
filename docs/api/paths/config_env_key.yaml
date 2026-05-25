@@ -19,7 +19,7 @@ get:
       required: true
       schema:
         type: string
-      description: Environment variable key (e.g., OPENAI_API_KEY, CUSTOM_VAR). Reserved keys managed by typed config fields (home) are rejected on all targets.
+      description: Environment variable key (e.g., OPENAI_API_KEY, CUSTOM_VAR).
       example: OPENAI_API_KEY
     - in: query
       name: target
@@ -71,10 +71,6 @@ put:
     **Common use cases:**
     - `OPENAI_API_KEY` with target `steps` — API key for LLM-integrated migs.
     - Custom variables for user-defined mig parameters.
-
-    **Reserved keys:** Keys managed by typed config fields (`home`) are
-    rejected by this endpoint on all targets. Use the typed config commands
-    (`ploy config home`) instead.
 
     Requires `cli-admin` role.
   parameters:

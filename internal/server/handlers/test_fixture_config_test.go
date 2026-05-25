@@ -6,7 +6,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-// configStore is a focused mock for global env, config home, and spec bundle handler tests.
+// configStore is a focused mock for global env, config in, and spec bundle handler tests.
 type configStore struct {
 	store.Store
 
@@ -15,10 +15,6 @@ type configStore struct {
 	getGlobalEnv    mockResult[store.ConfigEnv]
 	upsertGlobalEnv mockCall[store.UpsertGlobalEnvParams, struct{}]
 	deleteGlobalEnv mockCall[store.DeleteGlobalEnvParams, struct{}]
-
-	// Config Home
-	upsertConfigHome mockCall[store.UpsertConfigHomeParams, struct{}]
-	deleteConfigHome mockCall[store.DeleteConfigHomeParams, struct{}]
 
 	// Config In
 	upsertConfigIn mockCall[store.UpsertConfigInParams, struct{}]
@@ -59,18 +55,6 @@ func (m *configStore) UpsertGlobalEnv(ctx context.Context, params store.UpsertGl
 
 func (m *configStore) DeleteGlobalEnv(ctx context.Context, arg store.DeleteGlobalEnvParams) error {
 	_, err := m.deleteGlobalEnv.record(arg)
-	return err
-}
-
-// Config Home methods
-
-func (m *configStore) UpsertConfigHome(ctx context.Context, params store.UpsertConfigHomeParams) error {
-	_, err := m.upsertConfigHome.record(params)
-	return err
-}
-
-func (m *configStore) DeleteConfigHome(ctx context.Context, arg store.DeleteConfigHomeParams) error {
-	_, err := m.deleteConfigHome.record(arg)
 	return err
 }
 
