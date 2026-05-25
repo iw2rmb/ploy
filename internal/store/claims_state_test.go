@@ -48,7 +48,7 @@ func cleanTestTables(t *testing.T, ctx context.Context, db Store) {
 			run_repos, runs, mig_repos, migs, specs, spec_bundles, repos,
 			events, diffs, logs, artifact_bundles,
 			api_tokens, bootstrap_tokens,
-			config_env, config_home, config_in, config_bundle_map
+			config_env, config_in, config_bundle_map
 		CASCADE`)
 	if err != nil {
 		t.Fatalf("cleanTestTables: %v", err)

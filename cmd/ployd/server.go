@@ -147,17 +147,6 @@ func run(ctx context.Context, cfg config.Config, st store.Store, authorizer *aut
 	// Server-target consumption: apply server-target entries to process environment on startup.
 	applyServerTargetEnv(globalEnvMap)
 
-	// Load global home entries from the store for ConfigHolder initialization.
-	var globalHomeEntries []store.ConfigHome
-	if st != nil {
-		globalHomeEntries, err = st.ListConfigHome(ctx)
-		if err != nil {
-			slog.Warn("failed to load global home entries from store, continuing with empty set", "err", err)
-			globalHomeEntries = nil
-		}
-	}
-	slog.Info("loaded global home entries from store", "count", len(globalHomeEntries))
-
 	// Load global in entries from the store for ConfigHolder initialization.
 	var globalInEntries []store.ConfigIn
 	if st != nil {
@@ -169,8 +158,8 @@ func run(ctx context.Context, cfg config.Config, st store.Store, authorizer *aut
 	}
 	slog.Info("loaded global in entries from store", "count", len(globalInEntries))
 
-	// Load bundle map entries from the store so that migrated home/in records
-	// can be resolved to spec bundle IDs after a server restart.
+	// Load bundle map entries from the store so that config_in records can be
+	// resolved to spec bundle IDs after a server restart.
 	var bundleMapEntries []store.ConfigBundleMap
 	if st != nil {
 		bundleMapEntries, err = st.ListConfigBundleMap(ctx)
@@ -183,19 +172,6 @@ func run(ctx context.Context, cfg config.Config, st store.Store, authorizer *aut
 
 	// Initialize config holder for runtime configuration access.
 	configHolder := handlers.NewConfigHolder(cfg.GitLab, globalEnvMap)
-
-	// Populate ConfigHolder with persisted home entries keyed by section.
-	homeBySection := make(map[string][]handlers.ConfigHomeEntry)
-	for _, e := range globalHomeEntries {
-		homeBySection[e.Section] = append(homeBySection[e.Section], handlers.ConfigHomeEntry{
-			Entry:   e.Entry,
-			Dst:     e.Dst,
-			Section: e.Section,
-		})
-	}
-	for section, entries := range homeBySection {
-		configHolder.SetConfigHome(section, entries)
-	}
 
 	// Populate ConfigHolder with persisted in entries keyed by section.
 	inBySection := make(map[string][]handlers.ConfigInEntry)
@@ -213,25 +189,6 @@ func run(ctx context.Context, cfg config.Config, st store.Store, authorizer *aut
 	// Populate ConfigHolder with persisted bundle map entries.
 	for _, e := range bundleMapEntries {
 		configHolder.AddBundleMapping(e.Hash, e.BundleID)
-	}
-
-	// Execute hard-cut migration: persist rewrite-eligible legacy special env keys
-	// as typed home/in records and remove the legacy env records.
-	migrationReport := handlers.ScanSpecialEnvKeys(globalEnvMap, homeBySection, inBySection)
-	if st != nil {
-		execResult, execErr := handlers.ExecuteMigration(ctx, migrationReport, st, configHolder, bp)
-		if execErr != nil {
-			return fmt.Errorf("special env migration: execution failed: %w", execErr)
-		}
-		handlers.LogMigrationExecResult(execResult)
-		if len(execResult.Errors) > 0 {
-			return fmt.Errorf("special env migration: %d error(s) during migration — unmigrated special keys would be dropped from env injection", len(execResult.Errors))
-		}
-		if execResult.Rejected > 0 {
-			return fmt.Errorf("special env migration: %d rejected conflict(s) — conflicting legacy env keys cannot be auto-migrated; resolve manually", execResult.Rejected)
-		}
-	} else {
-		handlers.LogMigrationReport(migrationReport)
 	}
 
 	// Register HTTP routes.
@@ -299,11 +256,6 @@ func run(ctx context.Context, cfg config.Config, st store.Store, authorizer *aut
 // Called once at startup to ensure server-target global env is available to the process.
 func applyServerTargetEnv(envMap map[string][]handlers.GlobalEnvVar) {
 	for key, entries := range envMap {
-		// Special env keys are file-backed and migrated to typed Hydra
-		// fields; they must not be injected as raw process env vars.
-		if handlers.IsSpecialEnvKey(key) {
-			continue
-		}
 		for _, e := range entries {
 			if e.Target == domaintypes.GlobalEnvTargetServer {
 				if err := os.Setenv(key, e.Value); err != nil {

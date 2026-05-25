@@ -30,10 +30,10 @@ func TestHandleConfigRouting(t *testing.T) {
 			wantErr: "unknown config subcommand",
 		},
 		{
-			name:    "config routes home",
+			name:    "config rejects removed home subcommand",
 			fn:      Handle,
 			args:    []string{"home"},
-			wantErr: "home subcommand required",
+			wantErr: "unknown config subcommand",
 		},
 		{
 			name:    "config gitlab requires subcommand",

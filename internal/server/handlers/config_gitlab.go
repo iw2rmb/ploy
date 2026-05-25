@@ -20,13 +20,6 @@ type GlobalEnvVar struct {
 	Secret bool                        `json:"secret"`
 }
 
-// ConfigHomeEntry represents a single global home mount entry with its section.
-type ConfigHomeEntry struct {
-	Entry   string `json:"entry"`
-	Dst     string `json:"dst"`
-	Section string `json:"section"`
-}
-
 // ConfigInEntry represents a single global in mount entry with its section.
 type ConfigInEntry struct {
 	Entry   string `json:"entry"`
@@ -38,15 +31,14 @@ type ConfigInEntry struct {
 // GitLab settings, global environment variables, and typed Hydra overlays.
 // Global env is stored as key → []GlobalEnvVar to support multiple targets per key.
 // Hydra overlays are stored per section (pre_gate, post_gate, mig).
-// Config Home and In entries are section-keyed and synced into hydra overlays.
+// Config In entries are section-keyed and synced into hydra overlays.
 type ConfigHolder struct {
-	mu         sync.RWMutex
-	gitlab     config.GitLabConfig
-	globalEnv  map[string][]GlobalEnvVar
-	hydra      map[string]*HydraJobConfig
-	configHome map[string][]ConfigHomeEntry // section → []entry
-	configIn   map[string][]ConfigInEntry   // section → []entry
-	bundleMap  map[string]string            // shortHash → bundleID (content-addressed, global)
+	mu        sync.RWMutex
+	gitlab    config.GitLabConfig
+	globalEnv map[string][]GlobalEnvVar
+	hydra     map[string]*HydraJobConfig
+	configIn  map[string][]ConfigInEntry // section → []entry
+	bundleMap map[string]string          // shortHash → bundleID (content-addressed, global)
 }
 
 // NewConfigHolder creates a new config holder with initial GitLab config and
@@ -85,19 +77,6 @@ func copySectionSlice[T any](m map[string][]T, section string) []T {
 	}
 	cp := make([]T, len(entries))
 	copy(cp, entries)
-	return cp
-}
-
-func copySectionMap[T any](m map[string][]T) map[string][]T {
-	if len(m) == 0 {
-		return nil
-	}
-	cp := make(map[string][]T, len(m))
-	for k, v := range m {
-		s := make([]T, len(v))
-		copy(s, v)
-		cp[k] = s
-	}
 	return cp
 }
 
@@ -228,7 +207,6 @@ func (h *ConfigHolder) GetHydraOverlays() map[string]*HydraJobConfig {
 			Envs: copyStringMap(v.Envs),
 			In:   copyStringSlice(v.In),
 			Out:  copyStringSlice(v.Out),
-			Home: copyStringSlice(v.Home),
 		}
 	}
 	return cp
@@ -294,62 +272,6 @@ func putGitLabConfigHandler(holder *ConfigHolder) http.HandlerFunc {
 			"has_token", req.Token != "",
 		)
 	}
-}
-
-// GetConfigHome returns all home entries for a section (sorted by dst).
-func (h *ConfigHolder) GetConfigHome(section string) []ConfigHomeEntry {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
-	return copySectionSlice(h.configHome, section)
-}
-
-// GetConfigHomeAll returns a copy of all home entries keyed by section.
-func (h *ConfigHolder) GetConfigHomeAll() map[string][]ConfigHomeEntry {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
-	return copySectionMap(h.configHome)
-}
-
-// SetConfigHome replaces the home entry set for a section and syncs into hydra overlays.
-func (h *ConfigHolder) SetConfigHome(section string, entries []ConfigHomeEntry) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	h.configHome = setSectionSlice(h.configHome, section, entries)
-	h.syncHydraHomeLocked(section)
-}
-
-// AddConfigHome adds or replaces a home entry by destination in a section (dedup by dst, sort by dst).
-func (h *ConfigHolder) AddConfigHome(section string, entry ConfigHomeEntry) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	h.configHome = upsertSectionBy(
-		h.configHome,
-		section,
-		entry,
-		func(a, b ConfigHomeEntry) bool { return a.Dst == b.Dst },
-		func(a, b ConfigHomeEntry) bool { return a.Dst < b.Dst },
-	)
-	h.syncHydraHomeLocked(section)
-}
-
-// DeleteConfigHome removes a home entry by destination from a section.
-func (h *ConfigHolder) DeleteConfigHome(section, dst string) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	h.configHome = deleteSectionBy(h.configHome, section, func(e ConfigHomeEntry) bool { return e.Dst == dst })
-	h.syncHydraHomeLocked(section)
-}
-
-// syncHydraHomeLocked updates the hydra overlay Home field for a section.
-// Must be called with h.mu held.
-func (h *ConfigHolder) syncHydraHomeLocked(section string) {
-	cfg := h.ensureHydraSectionLocked(section)
-	entries := h.configHome[section]
-	home := make([]string, len(entries))
-	for i, e := range entries {
-		home[i] = e.Entry
-	}
-	cfg.Home = home
 }
 
 // SetConfigIn replaces the in entry set for a section and syncs into hydra overlays.

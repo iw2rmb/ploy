@@ -494,22 +494,6 @@ CREATE TABLE IF NOT EXISTS config_env (
 -- Index for listing by target (useful for job claim filtering).
 CREATE INDEX IF NOT EXISTS config_env_target_idx ON config_env(target);
 
--- Global Home Entries (config_home)
--- Stores canonical home mount entries for injection into jobs.
--- Each entry is "shortHash:dst{:ro}" where dst is $HOME-relative.
--- section controls which job phase receives the entry (pre_gate, post_gate, mig).
--- Composite primary key on (dst, section) enforces one entry per destination per section
--- (deterministic dedup by destination).
-DROP TABLE IF EXISTS config_home;
-CREATE TABLE IF NOT EXISTS config_home (
-  entry       TEXT NOT NULL,        -- Full canonical entry: "shortHash:dst" or "shortHash:dst:ro"
-  dst         TEXT NOT NULL,        -- Extracted normalized destination for dedup
-  section     TEXT NOT NULL CHECK (section IN ('pre_gate', 'post_gate', 'mig')),
-  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-  PRIMARY KEY (dst, section)
-);
-CREATE INDEX IF NOT EXISTS config_home_section_idx ON config_home(section);
-
 -- Global In Entries (config_in)
 -- Stores canonical in mount entries for injection into jobs.
 -- Each entry is "shortHash:dst" where dst starts with /in/.
@@ -528,7 +512,7 @@ CREATE INDEX IF NOT EXISTS config_in_section_idx ON config_in(section);
 
 -- Global Bundle Map (config_bundle_map)
 -- Stores shortHash → bundleID mappings for content-addressed spec bundles
--- referenced by config_home and config_in entries.
+-- referenced by config_in entries.
 -- Persisted so that after a server restart the claim mutator can resolve
 -- content hashes to spec bundle IDs for node-side materialization.
 DROP TABLE IF EXISTS config_bundle_map;

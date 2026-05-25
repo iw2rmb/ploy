@@ -16,7 +16,6 @@ type HydraJobConfig struct {
 	Envs map[string]string
 	In   []string
 	Out  []string
-	Home []string
 }
 
 // IsEmpty reports whether all fields are empty.
@@ -24,11 +23,11 @@ func (c *HydraJobConfig) IsEmpty() bool {
 	if c == nil {
 		return true
 	}
-	return len(c.Envs) == 0 && len(c.In) == 0 && len(c.Out) == 0 && len(c.Home) == 0
+	return len(c.Envs) == 0 && len(c.In) == 0 && len(c.Out) == 0
 }
 
 // applyHydraOverlayMutator replaces the legacy env-only merge with a typed merge
-// for envs, in, out, and home using deterministic ordering.
+// for envs, in, and out using deterministic ordering.
 //
 // Section routing resolves the overlay for the job type from the hydra overlay
 // map. Global env vars are folded into the overlay's envs field using
@@ -79,7 +78,6 @@ func applyOverlayToSteps(spec map[string]any, overlay *HydraJobConfig) {
 		}
 		mergeRecordsByDstBlock(step, "in", overlay.In)
 		mergeRecordsByDstBlock(step, "out", overlay.Out)
-		mergeRecordsByDstBlock(step, "home", overlay.Home)
 	}
 }
 
@@ -98,20 +96,14 @@ func assembleHydraOverlay(
 			Envs: copyStringMap(cfg.Envs),
 			In:   copyStringSlice(cfg.In),
 			Out:  copyStringSlice(cfg.Out),
-			Home: copyStringSlice(cfg.Home),
 		}
 	}
 
 	// Two-pass global env resolution (same logic as legacy applyGlobalEnvMutator).
-	// Special env keys (file-backed, migrated to typed Hydra fields) are
-	// excluded — they must not be folded as raw env vars into job envs.
 	globalMerged := make(map[string]string)
 
 	// Pass 1: nodes-target (lowest priority among global env).
 	for k, entries := range globalEnv {
-		if IsSpecialEnvKey(k) {
-			continue
-		}
 		for _, v := range entries {
 			if v.Target == domaintypes.GlobalEnvTargetNodes {
 				globalMerged[k] = v.Value
@@ -121,9 +113,6 @@ func assembleHydraOverlay(
 
 	// Pass 2: job-target (gates or steps) overrides nodes-target.
 	for k, entries := range globalEnv {
-		if IsSpecialEnvKey(k) {
-			continue
-		}
 		for _, v := range entries {
 			if v.Target.MatchesJobType(jobType) {
 				globalMerged[k] = v.Value
@@ -232,8 +221,8 @@ func hydraExtractDst(field, entry string) string {
 }
 
 // validateOverlayCollisions checks for duplicate destinations within a single
-// overlay's in, out, and home fields. Returns a deterministic error listing
-// all collisions found.
+// overlay's in and out fields. Returns a deterministic error listing all
+// collisions found.
 func validateOverlayCollisions(cfg *HydraJobConfig, prefix string) error {
 	if cfg == nil {
 		return nil
@@ -245,7 +234,6 @@ func validateOverlayCollisions(cfg *HydraJobConfig, prefix string) error {
 	}{
 		{"in", cfg.In},
 		{"out", cfg.Out},
-		{"home", cfg.Home},
 	} {
 		if dups := findDuplicateDsts(f.name, f.entries); len(dups) > 0 {
 			for _, dst := range dups {
