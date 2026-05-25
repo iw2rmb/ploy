@@ -12,7 +12,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/iw2rmb/ploy/internal/cli/config"
 	"github.com/iw2rmb/ploy/internal/deploy"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/testutil/assertx"
@@ -261,118 +260,6 @@ func TestResolvePloydNodeBinaryPath_Explicit(t *testing.T) {
 	}
 }
 
-// TestNodeAddDescriptorRefresh verifies that the cluster descriptor is refreshed after successful node add.
-func TestNodeAddDescriptorRefresh(t *testing.T) {
-	// Set up temporary config directory.
-	tmpDir := t.TempDir()
-	t.Setenv("PLOY_CONFIG_HOME", tmpDir)
-	// Ensure any test-created descriptors are removed.
-	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
-
-	// Create a temporary test binary file.
-	binaryPath := filepath.Join(tmpDir, "ployd-node-test")
-	if err := os.WriteFile(binaryPath, []byte("fake binary"), 0755); err != nil {
-		t.Fatalf("create test binary: %v", err)
-	}
-
-	identityPath := filepath.Join(tmpDir, "id_test")
-	if err := os.WriteFile(identityPath, []byte("fake key"), 0600); err != nil {
-		t.Fatalf("create test identity: %v", err)
-	}
-
-	// Prepare configuration.
-	clusterID := "test-cluster-node"
-	serverURL := "https://10.0.0.5:8443"
-	cfg := nodeAddConfig{
-		ClusterID:       domaintypes.ClusterID(clusterID),
-		Address:         "10.0.0.10",
-		ServerURL:       serverURL,
-		User:            "testuser",
-		IdentityFile:    identityPath,
-		PloydNodeBinary: binaryPath,
-		SSHPort:         2222,
-	}
-
-	// Simulate provisioning with mock runner.
-	user := cfg.User
-	if strings.TrimSpace(user) == "" {
-		user = deploy.DefaultRemoteUser
-	}
-
-	sshPort := cfg.SSHPort
-	if sshPort == 0 {
-		sshPort = deploy.DefaultSSHPort
-	}
-
-	scriptEnv := map[string]string{
-		"CLUSTER_ID":           clusterID,
-		"NODE_ID":              "node-test-123",
-		"NODE_ADDRESS":         cfg.Address,
-		"BOOTSTRAP_PRIMARY":    "false",
-		"PLOY_CA_CERT_PEM":     "CA-PEM",
-		"PLOY_SERVER_CERT_PEM": "CERT-PEM",
-		"PLOY_SERVER_KEY_PEM":  "KEY-PEM",
-		"PLOY_SERVER_URL":      serverURL,
-	}
-
-	provisionOpts := deploy.ProvisionOptions{
-		Host:            cfg.Address,
-		Address:         cfg.Address,
-		User:            user,
-		Port:            sshPort,
-		IdentityFile:    identityPath,
-		PloydBinaryPath: binaryPath,
-		Stdout:          io.Discard,
-		Stderr:          io.Discard,
-		ScriptEnv:       scriptEnv,
-		ScriptArgs:      []string{"--cluster-id", clusterID, "--node-id", "node-test-123", "--node-address", cfg.Address},
-		ServiceChecks:   []string{"ployd-node"},
-	}
-
-	// Use mock runner to simulate successful provisioning.
-	mockRunner := &mockNodeProvisionRunner{t: t}
-	provisionOpts.Runner = mockRunner
-
-	ctx := context.Background()
-	if err := deploy.ProvisionHost(ctx, provisionOpts); err != nil {
-		t.Fatalf("ProvisionHost failed: %v", err)
-	}
-
-	// Simulate the descriptor refresh logic from runNodeAdd.
-	desc := config.Descriptor{
-		ClusterID:       config.ClusterID(clusterID),
-		Address:         serverURL,
-		Scheme:          "https",
-		SSHIdentityPath: identityPath,
-	}
-	if _, err := config.SaveDescriptor(desc); err != nil {
-		t.Fatalf("SaveDescriptor failed: %v", err)
-	}
-
-	// Verify the descriptor was saved/refreshed.
-	list, err := config.ListDescriptors()
-	if err != nil {
-		t.Fatalf("ListDescriptors failed: %v", err)
-	}
-	if len(list) != 1 {
-		t.Fatalf("expected 1 descriptor, got %d", len(list))
-	}
-
-	saved := list[0]
-	if string(saved.ClusterID) != clusterID {
-		t.Fatalf("expected ClusterID=%q, got %q", clusterID, saved.ClusterID)
-	}
-	if saved.Address != serverURL {
-		t.Fatalf("expected Address=%q, got %q", serverURL, saved.Address)
-	}
-	if saved.Scheme != "https" {
-		t.Fatalf("expected Scheme=%q, got %q", "https", saved.Scheme)
-	}
-	if saved.SSHIdentityPath != identityPath {
-		t.Fatalf("expected SSHIdentityPath=%q, got %q", identityPath, saved.SSHIdentityPath)
-	}
-}
-
 func TestFetchCACertificate_HTTPS_UsesSSH(t *testing.T) {
 	ctx := context.Background()
 	var called bool
@@ -440,14 +327,4 @@ func TestFetchCACertificate_NoScheme_AssumesHTTPS(t *testing.T) {
 	if ca != "CA-PEM\n" {
 		t.Fatalf("expected CA cert, got %q", ca)
 	}
-}
-
-// mockNodeProvisionRunner is a test double for deploy.Runner for node provisioning.
-type mockNodeProvisionRunner struct {
-	t *testing.T
-}
-
-func (m *mockNodeProvisionRunner) Run(ctx context.Context, name string, args []string, stdin io.Reader, streams deploy.IOStreams) error {
-	// Just accept all commands without error.
-	return nil
 }

@@ -40,27 +40,12 @@ func TestMigPullRouting(t *testing.T) {
 func TestMigPullUsageErrors(t *testing.T) {
 	t.Parallel()
 
-	tests := []struct {
-		name      string
-		args      []string
-		wantErr   string
-		wantUsage bool
-	}{
+	runPullUsageErrorCases(t, "Usage: ploy mig pull", []pullUsageErrorCase{
 		{name: "unknown flag", args: []string{"mig", "pull", "--unknown"}, wantErr: "flag provided but not defined", wantUsage: true},
 		{name: "origin flag without value", args: []string{"mig", "pull", "--origin"}, wantErr: "flag needs an argument", wantUsage: true},
 		{name: "extra positional argument", args: []string{"mig", "pull", "my-mig", "extra-arg"}, wantErr: "unexpected argument: extra-arg"},
 		{name: "mutually exclusive flags", args: []string{"mig", "pull", "--last-failed", "--last-succeeded"}, wantErr: "mutually exclusive", wantUsage: true},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-			out := clienv.RunExpectError(t, executeCmd, tc.args, tc.wantErr)
-			if tc.wantUsage {
-				assertx.Contains(t, out, "Usage: ploy mig pull")
-			}
-		})
-	}
+	})
 }
 
 // TestMigPullUsageHelp validates that the usage text contains expected content.

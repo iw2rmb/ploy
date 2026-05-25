@@ -15,6 +15,26 @@ import (
 // Routing and Flag Parsing Tests
 // =============================================================================
 
+type pullUsageErrorCase struct {
+	name      string
+	args      []string
+	wantErr   string
+	wantUsage bool
+}
+
+func runPullUsageErrorCases(t *testing.T, usage string, tests []pullUsageErrorCase) {
+	t.Helper()
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			out := clienv.RunExpectError(t, executeCmd, tc.args, tc.wantErr)
+			if tc.wantUsage {
+				assertx.Contains(t, out, usage)
+			}
+		})
+	}
+}
+
 // TestRunPullRouting validates that `ploy run pull` routes to handleRunPull.
 func TestRunPullRouting(t *testing.T) {
 	requireGit(t)
@@ -39,26 +59,11 @@ func TestRunPullRouting(t *testing.T) {
 func TestRunPullUsageErrors(t *testing.T) {
 	t.Parallel()
 
-	tests := []struct {
-		name      string
-		args      []string
-		wantErr   string
-		wantUsage bool
-	}{
+	runPullUsageErrorCases(t, "Usage: ploy run pull", []pullUsageErrorCase{
 		{name: "unknown flag", args: []string{"run", "pull", "--unknown", "my-run"}, wantErr: "flag provided but not defined", wantUsage: true},
 		{name: "origin flag without value", args: []string{"run", "pull", "--origin"}, wantErr: "flag needs an argument", wantUsage: true},
 		{name: "extra positional argument", args: []string{"run", "pull", "my-run", "extra-arg"}, wantErr: "unexpected argument: extra-arg"},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-			out := clienv.RunExpectError(t, executeCmd, tc.args, tc.wantErr)
-			if tc.wantUsage {
-				assertx.Contains(t, out, "Usage: ploy run pull")
-			}
-		})
-	}
+	})
 }
 
 // TestRunPullUsageHelp validates that the usage text contains expected content.

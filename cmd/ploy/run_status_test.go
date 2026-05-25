@@ -183,102 +183,86 @@ func newRunStatusReportServer(t *testing.T, runID domaintypes.RunID, migID domai
 }
 
 func TestRunStatusJSONGate(t *testing.T) {
-	runID := domaintypes.NewRunID()
-	migID := domaintypes.NewMigID()
-	specID := domaintypes.NewSpecID()
-	repoID := domaintypes.NewMigRepoID()
-	preGateID := domaintypes.NewJobID()
-	healID := domaintypes.NewJobID()
-	postGateID := domaintypes.NewJobID()
-
-	server := newRunStatusReportServer(t, runID, migID, specID, repoID, preGateID, healID, postGateID)
-	defer server.Close()
-
-	clienv.UseServerDescriptor(t, server.URL)
-
-	var buf bytes.Buffer
-	err := executeCmd([]string{"run", "status", "--json", runID.String()}, &buf)
-	if err != nil {
-		t.Fatalf("run status --json error: %v", err)
+	tests := []struct {
+		name string
+		args func(runID string) []string
+	}{
+		{
+			name: "leading json flag",
+			args: func(runID string) []string { return []string{"run", "status", "--json", runID} },
+		},
+		{
+			name: "trailing json flag",
+			args: func(runID string) []string { return []string{"run", "status", runID, "--json"} },
+		},
 	}
 
-	var parsed map[string]any
-	if err := json.Unmarshal(buf.Bytes(), &parsed); err != nil {
-		t.Fatalf("expected valid JSON output, got %q (err=%v)", buf.String(), err)
-	}
-	for _, key := range []string{"mig_id", "mig_name", "repos"} {
-		if _, ok := parsed[key]; !ok {
-			t.Fatalf("expected %s in JSON output, got %v", key, parsed)
-		}
-	}
-	repos, ok := parsed["repos"].([]any)
-	if !ok || len(repos) != 1 {
-		t.Fatalf("expected one repo in JSON output, got %T %#v", parsed["repos"], parsed["repos"])
-	}
-	repo0, ok := repos[0].(map[string]any)
-	if !ok {
-		t.Fatalf("expected repo object, got %T", repos[0])
-	}
-	jobs, ok := repo0["jobs"].([]any)
-	if !ok || len(jobs) != 3 {
-		t.Fatalf("expected three jobs in JSON output, got %T %#v", repo0["jobs"], repo0["jobs"])
-	}
-	job0, ok := jobs[0].(map[string]any)
-	if !ok {
-		t.Fatalf("expected first job object, got %T", jobs[0])
-	}
-	artifacts, ok := job0["artifacts"].([]any)
-	if !ok || len(artifacts) != 1 {
-		t.Fatalf("expected one artifact for first job, got %T %#v", job0["artifacts"], job0["artifacts"])
-	}
-	artifact0, ok := artifacts[0].(map[string]any)
-	if !ok {
-		t.Fatalf("expected artifact object, got %T", artifacts[0])
-	}
-	if got := artifact0["name"]; got != "gate-report" {
-		t.Fatalf("expected artifact name gate-report, got %#v", got)
-	}
-	if got := artifact0["cid"]; got != "bafy-gate-report" {
-		t.Fatalf("expected artifact cid bafy-gate-report, got %#v", got)
-	}
-	if got := artifact0["lookup_url"]; got != server.URL+"/v1/artifacts?cid=bafy-gate-report" {
-		t.Fatalf("unexpected artifact lookup_url: %#v", got)
-	}
-	if strings.Contains(buf.String(), "Mig:") {
-		t.Fatalf("expected JSON output only, got text report marker in %q", buf.String())
-	}
-}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			runID := domaintypes.NewRunID()
+			migID := domaintypes.NewMigID()
+			specID := domaintypes.NewSpecID()
+			repoID := domaintypes.NewMigRepoID()
+			preGateID := domaintypes.NewJobID()
+			healID := domaintypes.NewJobID()
+			postGateID := domaintypes.NewJobID()
 
-func TestRunStatusJSONGate_TrailingJSONFlag(t *testing.T) {
-	runID := domaintypes.NewRunID()
-	migID := domaintypes.NewMigID()
-	specID := domaintypes.NewSpecID()
-	repoID := domaintypes.NewMigRepoID()
-	preGateID := domaintypes.NewJobID()
-	healID := domaintypes.NewJobID()
-	postGateID := domaintypes.NewJobID()
+			server := newRunStatusReportServer(t, runID, migID, specID, repoID, preGateID, healID, postGateID)
+			defer server.Close()
 
-	server := newRunStatusReportServer(t, runID, migID, specID, repoID, preGateID, healID, postGateID)
-	defer server.Close()
+			clienv.UseServerDescriptor(t, server.URL)
 
-	clienv.UseServerDescriptor(t, server.URL)
+			var buf bytes.Buffer
+			err := executeCmd(tt.args(runID.String()), &buf)
+			if err != nil {
+				t.Fatalf("run status --json error: %v", err)
+			}
 
-	var buf bytes.Buffer
-	err := executeCmd([]string{"run", "status", runID.String(), "--json"}, &buf)
-	if err != nil {
-		t.Fatalf("run status <run-id> --json error: %v", err)
-	}
-
-	var parsed map[string]any
-	if err := json.Unmarshal(buf.Bytes(), &parsed); err != nil {
-		t.Fatalf("expected valid JSON output, got %q (err=%v)", buf.String(), err)
-	}
-	for _, key := range []string{"mig_id", "mig_name", "repos"} {
-		if _, ok := parsed[key]; !ok {
-			t.Fatalf("expected %s in JSON output, got %v", key, parsed)
-		}
-	}
-	if strings.Contains(buf.String(), "Mig:") {
-		t.Fatalf("expected JSON output only, got text report marker in %q", buf.String())
+			var parsed map[string]any
+			if err := json.Unmarshal(buf.Bytes(), &parsed); err != nil {
+				t.Fatalf("expected valid JSON output, got %q (err=%v)", buf.String(), err)
+			}
+			for _, key := range []string{"mig_id", "mig_name", "repos"} {
+				if _, ok := parsed[key]; !ok {
+					t.Fatalf("expected %s in JSON output, got %v", key, parsed)
+				}
+			}
+			repos, ok := parsed["repos"].([]any)
+			if !ok || len(repos) != 1 {
+				t.Fatalf("expected one repo in JSON output, got %T %#v", parsed["repos"], parsed["repos"])
+			}
+			repo0, ok := repos[0].(map[string]any)
+			if !ok {
+				t.Fatalf("expected repo object, got %T", repos[0])
+			}
+			jobs, ok := repo0["jobs"].([]any)
+			if !ok || len(jobs) != 3 {
+				t.Fatalf("expected three jobs in JSON output, got %T %#v", repo0["jobs"], repo0["jobs"])
+			}
+			job0, ok := jobs[0].(map[string]any)
+			if !ok {
+				t.Fatalf("expected first job object, got %T", jobs[0])
+			}
+			artifacts, ok := job0["artifacts"].([]any)
+			if !ok || len(artifacts) != 1 {
+				t.Fatalf("expected one artifact for first job, got %T %#v", job0["artifacts"], job0["artifacts"])
+			}
+			artifact0, ok := artifacts[0].(map[string]any)
+			if !ok {
+				t.Fatalf("expected artifact object, got %T", artifacts[0])
+			}
+			if got := artifact0["name"]; got != "gate-report" {
+				t.Fatalf("expected artifact name gate-report, got %#v", got)
+			}
+			if got := artifact0["cid"]; got != "bafy-gate-report" {
+				t.Fatalf("expected artifact cid bafy-gate-report, got %#v", got)
+			}
+			if got := artifact0["lookup_url"]; got != server.URL+"/v1/artifacts?cid=bafy-gate-report" {
+				t.Fatalf("unexpected artifact lookup_url: %#v", got)
+			}
+			if strings.Contains(buf.String(), "Mig:") {
+				t.Fatalf("expected JSON output only, got text report marker in %q", buf.String())
+			}
+		})
 	}
 }
