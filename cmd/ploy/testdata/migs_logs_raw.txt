@@ -1,3 +1,0 @@
-ready
-warn
-Retention: not retained (bundle expires per default policy)

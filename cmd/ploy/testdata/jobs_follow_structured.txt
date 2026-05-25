@@ -1,2 +1,0 @@
-2025-10-22T11:00:00Z stdout first
-2025-10-22T11:00:01Z stdout second
