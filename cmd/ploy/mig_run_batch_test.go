@@ -93,10 +93,6 @@ func TestRunListCallsControlPlane(t *testing.T) {
 	}
 }
 
-// TestMigRunBatchStatusCallsControlPlane validates status command calls the API.
-// Not parallel because useServerDescriptor uses t.Setenv.
-func TestMigRunBatchStatusRemoved(t *testing.T) {}
-
 // TestRunListEmptyResult validates ls command handles empty results.
 // Not parallel because useServerDescriptor uses t.Setenv.
 func TestRunListEmptyResult(t *testing.T) {

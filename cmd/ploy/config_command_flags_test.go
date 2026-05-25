@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"io"
 	"strings"
 	"testing"
 
@@ -8,30 +10,59 @@ import (
 	"github.com/iw2rmb/ploy/internal/testutil/clienv"
 )
 
-// TestHandleConfigRequiresSubcommand verifies that the config command rejects
-// invocations without a subcommand and displays usage information.
-func TestHandleConfigRequiresSubcommand(t *testing.T) {
-	out := clienv.RunExpectError(t, handleConfig, nil, "")
-	assertx.Contains(t, out, "Usage: ploy config")
-}
+func TestHandleConfigRouting(t *testing.T) {
+	tests := []struct {
+		name    string
+		fn      func([]string, io.Writer) error
+		args    []string
+		wantErr string
+		wantOut string
+	}{
+		{
+			name:    "config requires subcommand",
+			fn:      handleConfig,
+			wantOut: "Usage: ploy config",
+		},
+		{
+			name:    "config rejects unknown subcommand",
+			fn:      handleConfig,
+			args:    []string{"unknown"},
+			wantErr: "unknown config subcommand",
+		},
+		{
+			name:    "config routes home",
+			fn:      handleConfig,
+			args:    []string{"home"},
+			wantErr: "home subcommand required",
+		},
+		{
+			name:    "config gitlab requires subcommand",
+			fn:      handleConfigGitLab,
+			wantOut: "Usage: ploy config gitlab",
+		},
+		{
+			name:    "config gitlab rejects unknown subcommand",
+			fn:      handleConfigGitLab,
+			args:    []string{"unknown"},
+			wantErr: "unknown gitlab subcommand",
+		},
+	}
 
-// TestHandleConfigUnknownSubcommand ensures that unknown config subcommands
-// are rejected with an appropriate error message.
-func TestHandleConfigUnknownSubcommand(t *testing.T) {
-	clienv.RunExpectError(t, handleConfig, []string{"unknown"}, "unknown config subcommand")
-}
-
-// TestHandleConfigGitLabRequiresSubcommand verifies that the 'config gitlab'
-// command requires a subcommand (show, set, validate) and displays usage.
-func TestHandleConfigGitLabRequiresSubcommand(t *testing.T) {
-	out := clienv.RunExpectError(t, handleConfigGitLab, nil, "")
-	assertx.Contains(t, out, "Usage: ploy config gitlab")
-}
-
-// TestHandleConfigGitLabUnknownSubcommand ensures that unknown gitlab subcommands
-// are rejected with an appropriate error message.
-func TestHandleConfigGitLabUnknownSubcommand(t *testing.T) {
-	clienv.RunExpectError(t, handleConfigGitLab, []string{"unknown"}, "unknown gitlab subcommand")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			buf := &bytes.Buffer{}
+			err := tt.fn(tt.args, buf)
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if tt.wantErr != "" && !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("expected error containing %q, got: %v", tt.wantErr, err)
+			}
+			if tt.wantOut != "" {
+				assertx.Contains(t, buf.String(), tt.wantOut)
+			}
+		})
+	}
 }
 
 // TestHandleConfigGitLabShowRejectsExtraArgs ensures that the 'show' subcommand
