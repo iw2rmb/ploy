@@ -111,5 +111,48 @@ if [[ ! -r /usr/local/bin/ploy-node-updater ]]; then
   exit 1
 fi
 source /usr/local/bin/ploy-node-updater
-maybe_update_self
-echo "node-updater is already current"`
+if declare -F maybe_update_self >/dev/null; then
+  maybe_update_self
+  echo "node-updater is already current"
+  exit 0
+fi
+
+CONTAINER_REGISTRY="${PLOY_CONTAINER_REGISTRY:-docker-hosted.artifactory.tcsbank.ru/at-scale/ploy}"
+IMAGE_TAG="${PLOY_IMAGE_TAG:-latest}"
+NODE_UPDATER_IMAGE="${PLOY_NODE_UPDATER_IMAGE:-${CONTAINER_REGISTRY}/node-updater:${IMAGE_TAG}}"
+NODE_UPDATER_SERVICE="${PLOY_NODE_UPDATER_SERVICE:-node-updater}"
+
+node_updater_container_image_id() {
+  local container_id
+  container_id="$(compose ps -q "$NODE_UPDATER_SERVICE")"
+  if [[ -z "$container_id" ]]; then
+    return 0
+  fi
+  docker inspect --format '{{.Image}}' "$container_id"
+}
+
+pull_node_updater_image() {
+  if docker pull "$NODE_UPDATER_IMAGE"; then
+    return 0
+  fi
+  echo "docker pull failed for ${NODE_UPDATER_IMAGE}; refreshing registry auth"
+  if declare -F authenticate_registry >/dev/null; then
+    authenticate_registry
+  fi
+  docker pull "$NODE_UPDATER_IMAGE"
+}
+
+current_id="$(node_updater_container_image_id || true)"
+pull_node_updater_image
+latest_id="$(docker image inspect "$NODE_UPDATER_IMAGE" --format '{{.ID}}')"
+if [[ -n "$current_id" && "$current_id" == "$latest_id" ]]; then
+  echo "node-updater is already current"
+  exit 0
+fi
+
+echo "node-updater image changed; recreating compose service ${NODE_UPDATER_SERVICE}"
+(
+  sleep 1
+  compose up -d --no-deps --force-recreate "$NODE_UPDATER_SERVICE"
+) >/tmp/ploy-node-updater-self-update.log 2>&1 &
+echo "node-updater self-update launched"`
