@@ -129,3 +129,12 @@ func (m *jobStore) UpdateRunRepoActionCompletion(ctx context.Context, params sto
 func (m *jobStore) ListRunRepoActionsByRunRepoAttempt(ctx context.Context, arg store.ListRunRepoActionsByRunRepoAttemptParams) ([]store.RunRepoAction, error) {
 	return m.listRunRepoActionsByRunRepoAttempt.record(arg)
 }
+
+func (m *jobStore) GetNodeAction(ctx context.Context, id types.JobID) (store.NodeAction, error) {
+	return m.getNodeAction.record(id)
+}
+
+func (m *jobStore) UpdateNodeActionCompletion(ctx context.Context, params store.UpdateNodeActionCompletionParams) error {
+	_, err := m.updateNodeActionCompletion.record(params)
+	return err
+}

@@ -291,6 +291,24 @@ CREATE TABLE IF NOT EXISTS run_repo_actions (
 CREATE INDEX IF NOT EXISTS run_repo_actions_pending_idx ON run_repo_actions(run_id, repo_id, attempt, id) WHERE status = 'Queued';
 CREATE INDEX IF NOT EXISTS run_repo_actions_node_idx ON run_repo_actions(node_id) WHERE node_id IS NOT NULL;
 
+-- Node-scoped maintenance queue. These actions are hardcoded node operations
+-- such as disk cleanup and node-updater self-update; they are not arbitrary
+-- command execution.
+CREATE TABLE IF NOT EXISTS node_actions (
+  id              TEXT PRIMARY KEY,  -- KSUID-backed string ID; app-generated.
+  node_id         TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
+  action_type     TEXT NOT NULL,
+  status          job_status NOT NULL DEFAULT 'Queued',
+  started_at      TIMESTAMPTZ,
+  finished_at     TIMESTAMPTZ,
+  duration_ms     BIGINT NOT NULL DEFAULT 0 CHECK (duration_ms >= 0),
+  meta            JSONB NOT NULL DEFAULT '{}'::jsonb,
+  result          JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS node_actions_pending_idx ON node_actions(node_id, id) WHERE status = 'Queued';
+CREATE INDEX IF NOT EXISTS node_actions_node_idx ON node_actions(node_id, created_at DESC);
+
 -- SBOM package rows extracted from successful gate job artifact bundles.
 -- Time attribution is available via sboms.job_id -> jobs.created_at.
 CREATE TABLE IF NOT EXISTS sboms (

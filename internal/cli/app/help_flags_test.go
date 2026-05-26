@@ -26,7 +26,7 @@ func TestHelpFlagsAtAllLevels(t *testing.T) {
 		{name: "ploy config", baseArgs: []string{"config"}, expectContains: []string{"Usage: ploy config", "env"}},
 		{name: "ploy manifest", baseArgs: []string{"manifest"}, expectContains: []string{"Usage: ploy manifest", "schema", "validate"}},
 		{name: "ploy cluster", baseArgs: []string{"cluster"}, expectContains: []string{"Usage: ploy cluster", "node", "token"}},
-		{name: "ploy cluster node", baseArgs: []string{"cluster", "node"}, expectContains: []string{"Usage: ploy cluster node", "add"}},
+		{name: "ploy cluster node", baseArgs: []string{"cluster", "node"}, expectContains: []string{"Usage: ploy cluster node", "add", "cleanup", "update-updater", "actions"}},
 		{name: "ploy cluster token", baseArgs: []string{"cluster", "token"}, expectContains: []string{"Usage: ploy cluster token", "create", "list", "revoke"}},
 	}
 

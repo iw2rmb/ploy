@@ -18,3 +18,17 @@ func (v RunRepoActionType) Validate() error {
 	}
 	return nil
 }
+
+const (
+	NodeActionCleanupDisk   = "node.cleanup_disk"
+	NodeActionUpdateUpdater = "node.update_updater"
+)
+
+func IsNodeActionType(actionType string) bool {
+	switch strings.TrimSpace(actionType) {
+	case NodeActionCleanupDisk, NodeActionUpdateUpdater:
+		return true
+	default:
+		return false
+	}
+}

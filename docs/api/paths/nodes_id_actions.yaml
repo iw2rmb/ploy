@@ -1,0 +1,40 @@
+post:
+  tags: [Control]
+  summary: Enqueue node maintenance action
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: '../OpenAPI.yaml#/components/schemas/CreateNodeActionRequest'
+  responses:
+    '201':
+      description: Node action queued
+      content:
+        application/json:
+          schema:
+            $ref: '../OpenAPI.yaml#/components/schemas/NodeAction'
+    '400':
+      description: Invalid or unsupported action type
+    '404':
+      description: Node not found
+get:
+  tags: [Control]
+  summary: List node maintenance actions
+  parameters:
+    - in: query
+      name: limit
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+  responses:
+    '200':
+      description: Recent node actions
+      content:
+        application/json:
+          schema:
+            type: array
+            items:
+              $ref: '../OpenAPI.yaml#/components/schemas/NodeAction'

@@ -59,6 +59,7 @@ type jobStore struct {
 
 	// Claiming
 	claimJob           mockCall[types.NodeID, store.Job]
+	claimNodeAction    mockCall[types.NodeID, store.NodeAction]
 	claimRunRepoAction mockCall[types.NodeID, store.RunRepoAction]
 	unclaimJob         mockCall[store.UnclaimJobParams, struct{}]
 
@@ -118,6 +119,8 @@ type jobStore struct {
 	getRunRepoActionByKey              mockCall[store.GetRunRepoActionByKeyParams, store.RunRepoAction]
 	updateRunRepoActionCompletion      mockCall[store.UpdateRunRepoActionCompletionParams, struct{}]
 	listRunRepoActionsByRunRepoAttempt mockCall[store.ListRunRepoActionsByRunRepoAttemptParams, []store.RunRepoAction]
+	getNodeAction                      mockCall[types.JobID, store.NodeAction]
+	updateNodeActionCompletion         mockCall[store.UpdateNodeActionCompletionParams, struct{}]
 
 	// Stale recovery
 	listStaleRunningJobs           mockCall[pgtype.Timestamptz, []store.ListStaleRunningJobsRow]
@@ -369,6 +372,21 @@ func (m *jobStore) ClaimRunRepoAction(ctx context.Context, nodeID types.NodeID) 
 		return store.RunRepoAction{}, pgx.ErrNoRows
 	}
 	return m.claimRunRepoAction.val, nil
+}
+
+func (m *jobStore) ClaimNodeAction(ctx context.Context, nodeID types.NodeID) (store.NodeAction, error) {
+	m.claimNodeAction.called = true
+	m.claimNodeAction.params = nodeID
+	if nodeID.IsZero() {
+		return store.NodeAction{}, store.ErrEmptyNodeID
+	}
+	if m.claimNodeAction.err != nil {
+		return store.NodeAction{}, m.claimNodeAction.err
+	}
+	if m.claimNodeAction.val.ID.IsZero() {
+		return store.NodeAction{}, pgx.ErrNoRows
+	}
+	return m.claimNodeAction.val, nil
 }
 
 func (m *jobStore) UnclaimJob(ctx context.Context, arg store.UnclaimJobParams) error {

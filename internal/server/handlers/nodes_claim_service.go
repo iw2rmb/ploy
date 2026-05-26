@@ -15,7 +15,8 @@ import (
 
 // ClaimResult is the domain output from claim orchestration.
 type ClaimResult struct {
-	Payload claimResponsePayload
+	Payload  claimResponsePayload
+	Response any
 }
 
 // ClaimService orchestrates the claim pipeline.
@@ -117,6 +118,21 @@ func (s *ClaimService) Claim(ctx context.Context, nodeID domaintypes.NodeID) (Cl
 		}
 		slog.Error("claim: node check failed", "node_id", nodeID, "err_type", fmt.Sprintf("%T", err), "err", safeErrorString(err))
 		return ClaimResult{}, claimInternal("failed to check node", err)
+	}
+
+	nodeAction, nodeActionErr := s.store.ClaimNodeAction(ctx, nodeID)
+	if nodeActionErr == nil {
+		payload := buildNodeActionClaimResponsePayload(nodeAction)
+		slog.Info("node action claimed",
+			"action_id", nodeAction.ID,
+			"action_type", nodeAction.ActionType,
+			"node_id", nodeID,
+		)
+		return ClaimResult{Response: payload}, nil
+	}
+	if !isNoRowsError(nodeActionErr) {
+		slog.Error("claim: database node-action-claim error", "node_id", nodeID, "err_type", fmt.Sprintf("%T", nodeActionErr), "err", safeErrorString(nodeActionErr))
+		return ClaimResult{}, claimInternal("failed to claim node action", nodeActionErr)
 	}
 
 	job, err := s.store.ClaimJob(ctx, nodeID)

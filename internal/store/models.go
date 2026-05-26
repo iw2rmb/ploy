@@ -175,6 +175,19 @@ type Node struct {
 	CreatedAt       pgtype.Timestamptz `json:"created_at"`
 }
 
+type NodeAction struct {
+	ID         types.JobID        `json:"id"`
+	NodeID     types.NodeID       `json:"node_id"`
+	ActionType string             `json:"action_type"`
+	Status     types.JobStatus    `json:"status"`
+	StartedAt  pgtype.Timestamptz `json:"started_at"`
+	FinishedAt pgtype.Timestamptz `json:"finished_at"`
+	DurationMs int64              `json:"duration_ms"`
+	Meta       []byte             `json:"meta"`
+	Result     []byte             `json:"result"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+}
+
 type NodeDaemonLog struct {
 	ID        int64              `json:"id"`
 	NodeID    types.NodeID       `json:"node_id"`

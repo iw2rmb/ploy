@@ -43,6 +43,10 @@ func claimJobHandlerWithEvents(st store.Store, bs blobstore.Store, eventsService
 			}
 		}
 
+		if result.Response != nil {
+			writeJSON(w, http.StatusOK, result.Response)
+			return
+		}
 		writeJSON(w, http.StatusOK, result.Payload)
 	}
 }

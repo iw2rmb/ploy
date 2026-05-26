@@ -21,6 +21,8 @@ type nodeStore struct {
 	createDaemonLog     mockCallSlice[store.CreateNodeDaemonLogParams, store.NodeDaemonLog]
 	listDaemonLogs      mockCall[store.ListNodeDaemonLogsParams, []store.NodeDaemonLog]
 	trimDaemonLogs      mockCall[store.TrimNodeDaemonLogsParams, struct{}]
+	createNodeAction    mockCall[store.CreateNodeActionParams, store.NodeAction]
+	listNodeActions     mockCall[store.ListNodeActionsParams, []store.NodeAction]
 }
 
 func (m *nodeStore) GetNode(ctx context.Context, id types.NodeID) (store.Node, error) {
@@ -82,4 +84,19 @@ func (m *nodeStore) ListNodeDaemonLogs(ctx context.Context, params store.ListNod
 func (m *nodeStore) TrimNodeDaemonLogs(ctx context.Context, params store.TrimNodeDaemonLogsParams) error {
 	_, err := m.trimDaemonLogs.record(params)
 	return err
+}
+
+func (m *nodeStore) CreateNodeAction(ctx context.Context, params store.CreateNodeActionParams) (store.NodeAction, error) {
+	if m.createNodeAction.val.ID.IsZero() {
+		m.createNodeAction.val.ID = params.ID
+		m.createNodeAction.val.NodeID = params.NodeID
+		m.createNodeAction.val.ActionType = params.ActionType
+		m.createNodeAction.val.Status = params.Status
+		m.createNodeAction.val.Meta = params.Meta
+	}
+	return m.createNodeAction.record(params)
+}
+
+func (m *nodeStore) ListNodeActions(ctx context.Context, params store.ListNodeActionsParams) ([]store.NodeAction, error) {
+	return m.listNodeActions.record(params)
 }
