@@ -1287,9 +1287,9 @@ Migs container images are standard OCI images with the following expectations:
 
 - **Container lifecycle**
   - Step and gate containers are retained by default after completion.
-  - Cleanup runs before each claim attempt via the node runtime pre-claim disk guard.
-  - Trigger and threshold: free space below `1 GiB` on the Docker data-root filesystem (`DockerRootDir`).
-  - Cleanup policy: remove only stopped ploy-managed containers in FIFO order (oldest created first) until threshold is restored or candidates are exhausted.
+  - Cleanup runs in the node-updater sidecar on service start and hourly by default.
+  - Node disk telemetry reports the lowest-free configured storage path from `/`,
+    `DOCKER_ROOT_DIR`, `PLOYD_CACHE_HOME`, `PLOY_BUILDGATE_CACHE_ROOT`, and `TMPDIR`.
   - Logs are still streamed through `CreateAndPublishLog` and SSE.
 
 ## 6. CLI Surfaces for Migs
