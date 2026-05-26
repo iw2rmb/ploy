@@ -106,15 +106,10 @@ else
 fi`
 
 const updateUpdaterScript = `set -euo pipefail
-: "${PLOY_COMPOSE_PROJECT_DIR:?set PLOY_COMPOSE_PROJECT_DIR}"
-: "${PLOY_COMPOSE_FILE:?set PLOY_COMPOSE_FILE}"
-log_file="${PLOY_NODE_UPDATER_SELF_UPDATE_LOG:-/tmp/ploy-node-updater-self-update.log}"
-(
-  sleep 1
-  if [[ -n "${PLOY_DP_SERVICE_ACCOUNT_KEY_FILE:-}" && -s "${PLOY_DP_SERVICE_ACCOUNT_KEY_FILE}" ]]; then
-    dp auth service-acc --key-file "$PLOY_DP_SERVICE_ACCOUNT_KEY_FILE" >/dev/null || true
-  fi
-  docker compose --project-directory "$PLOY_COMPOSE_PROJECT_DIR" -f "$PLOY_COMPOSE_FILE" pull node-updater
-  docker compose --project-directory "$PLOY_COMPOSE_PROJECT_DIR" -f "$PLOY_COMPOSE_FILE" up -d --no-deps --force-recreate node-updater
-) >"$log_file" 2>&1 &
-echo "node-updater self-update launched; log=${log_file}"`
+if [[ ! -r /usr/local/bin/ploy-node-updater ]]; then
+  echo "node-updater script not found"
+  exit 1
+fi
+source /usr/local/bin/ploy-node-updater
+maybe_update_self
+echo "node-updater is already current"`

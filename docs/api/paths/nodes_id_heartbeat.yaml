@@ -9,6 +9,9 @@ post:
   summary: Post a node heartbeat (node → server)
   description: |
     Updates the node's last heartbeat timestamp and resource snapshot (CPU, memory, disk).
+    The disk fields report the most constrained configured node storage path
+    among `/`, `DOCKER_ROOT_DIR`, `PLOYD_CACHE_HOME`, `PLOY_BUILDGATE_CACHE_ROOT`,
+    and `TMPDIR`; the full per-path breakdown is published through node diagnostics.
     Node agents call this endpoint periodically to report health and resource availability.
   requestBody:
     required: true
@@ -47,12 +50,12 @@ post:
             disk_free_bytes:
               type: integer
               format: int64
-              description: Free disk space in bytes
+              description: Free bytes on the selected constrained node storage path
               example: 10737418240
             disk_total_bytes:
               type: integer
               format: int64
-              description: Total disk space in bytes
+              description: Total bytes on the selected constrained node storage path
               example: 53687091200
             version:
               type: string

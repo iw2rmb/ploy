@@ -135,7 +135,9 @@ build_gate:
   - Task-oriented healing routers may consume `/in/errors.yaml` and emit `tasks[]` with `error_kind` in `code|deps|infra` and `items[]` indexes into `errors` entries
 - Container cleanup model:
   - Containers are retained after step/gate completion.
-  - Cleanup trigger: before claim; threshold: 1 GiB free on Docker data-root filesystem (`DockerRootDir`).
+  - The node-updater sidecar runs cleanup on start and then hourly by default.
+  - Disk telemetry selects the lowest-free configured storage path from `/`,
+    `DOCKER_ROOT_DIR`, `PLOYD_CACHE_HOME`, `PLOY_BUILDGATE_CACHE_ROOT`, and `TMPDIR`.
 - Gate status visibility: Use `GET /v1/runs/{id}/status` to view gate results (format: `Gate: passed duration=1234ms` or `Gate: failed pre-gate duration=567ms`) via `Metadata["gate_summary"]`.
 - SBOM persistence contract:
   - Successful gate outputs under `/out/*` are the evidence source for SBOM row persistence.

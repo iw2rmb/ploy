@@ -22,7 +22,7 @@ func TestExecuteNodeMaintenanceAction(t *testing.T) {
 		wantErr     bool
 	}{
 		{name: "cleanup disk", actionType: types.NodeActionCleanupDisk, wantCommand: "run_cleanup_cycle"},
-		{name: "update updater", actionType: types.NodeActionUpdateUpdater, wantCommand: "docker compose"},
+		{name: "update updater", actionType: types.NodeActionUpdateUpdater, wantCommand: "maybe_update_self"},
 		{name: "unsupported", actionType: "node.shell", wantErr: true},
 	}
 

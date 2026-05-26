@@ -41,6 +41,20 @@ Use this flow for any "why did run/job fail?" request.
 - If question is a single factual check (for example: "what is this job status?"), answer from `/v1/jobs/<job-id>/status` or `ploy run status <run-id> --json` first, before collecting full runtime evidence.
 - Only continue to logs and artifacts when the API result is missing, ambiguous, or conflicts with observed behavior.
 
+## 2.2) Node maintenance and free-space checks
+- With no SSH access, use node diagnostics and maintenance actions instead of host shell commands.
+- Free-space data is available from:
+  - `GET /v1/nodes` for the selected constrained storage aggregate.
+  - `GET /v1/nodes/<node-id>/diagnostics` for `node.details.storage.paths`, covering `/`, `DOCKER_ROOT_DIR`, `PLOYD_CACHE_HOME`, `PLOY_BUILDGATE_CACHE_ROOT`, and `TMPDIR`.
+- Node maintenance CLI:
+  - `ploy cluster node cleanup <node-id> --wait`
+  - `ploy cluster node update-updater <node-id> --wait`
+  - `ploy cluster node actions <node-id> --limit 20`
+- API equivalents:
+  - `POST /v1/nodes/<node-id>/actions` with `{"action_type":"node.cleanup_disk"}` or `{"action_type":"node.update_updater"}`.
+  - `GET /v1/nodes/<node-id>/actions?limit=N`.
+- The `node-updater` service restores registry auth with mounted `dp.sa.json`, runs cleanup on start and hourly by default, and can recreate itself when its image changes.
+
 ## 3) Minimum required evidence
 - `ploy run status <run-id> --json`
 - `ploy job log --format raw <job-id>`

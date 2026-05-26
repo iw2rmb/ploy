@@ -150,14 +150,16 @@ func (h *HeartbeatManager) sendHeartbeat(ctx context.Context) error {
 	// Use typed NodeCapacity instead of map[string]any casts.
 	// This eliminates unsafe type assertions and provides compile-time safety.
 	capacity := snap.Capacity
+	storage := collectStorageDiagnostics()
+	diskFreeBytes, diskTotalBytes := storage.heartbeatDiskBytes(int64(capacity.DiskFreeBytes), int64(capacity.DiskTotalBytes))
 
 	payload := HeartbeatPayload{
 		CPUFreeMillis:  int32(capacity.CPUFreeMillis),
 		CPUTotalMillis: int32(capacity.CPUTotalMillis),
 		MemFreeBytes:   int64(capacity.MemFreeBytes),
 		MemTotalBytes:  int64(capacity.MemTotalBytes),
-		DiskFreeBytes:  int64(capacity.DiskFreeBytes),
-		DiskTotalBytes: int64(capacity.DiskTotalBytes),
+		DiskFreeBytes:  diskFreeBytes,
+		DiskTotalBytes: diskTotalBytes,
 		Version:        nodeAgentVersionString(),
 	}
 
@@ -195,11 +197,11 @@ func (h *HeartbeatManager) sendHeartbeat(ctx context.Context) error {
 		return err
 	}
 
-	h.uploadSelfDiagnostic(ctx)
+	h.uploadSelfDiagnostic(ctx, storage)
 	return nil
 }
 
-func (h *HeartbeatManager) uploadSelfDiagnostic(ctx context.Context) {
+func (h *HeartbeatManager) uploadSelfDiagnostic(ctx context.Context, storage storageDiagnostics) {
 	if h.client == nil {
 		return
 	}
@@ -220,6 +222,7 @@ func (h *HeartbeatManager) uploadSelfDiagnostic(ctx context.Context) {
 			"tmpdir":          os.Getenv("TMPDIR"),
 			"server_url":      h.cfg.ServerURL,
 			"heartbeat_every": h.cfg.Heartbeat.Interval.String(),
+			"storage":         storage,
 		},
 	}
 	if err := uploader.UploadNodeDiagnostic(diagCtx, "node", "ok", payload); err != nil {
