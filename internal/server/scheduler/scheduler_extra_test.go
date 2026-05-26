@@ -66,29 +66,32 @@ func TestZeroIntervalTaskRunsOnce(t *testing.T) {
 
 // TestStopContextDeadline ensures Stop respects the provided context deadline.
 func TestStopContextDeadline(t *testing.T) {
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	done := make(chan struct{})
 	s := scheduler.New()
 	s.AddTask(&stubTask{
 		name:     "slow",
 		interval: time.Hour,
 		run: func(ctx context.Context) error {
-			select {
-			case <-ctx.Done():
-				return nil
-			case <-time.After(500 * time.Millisecond):
-				return nil
-			}
+			close(entered)
+			<-release
+			close(done)
+			return nil
 		},
 	})
 	ctx, cancel := context.WithCancel(context.Background())
 	if err := s.Start(ctx); err != nil {
 		t.Fatalf("Start() error = %v", err)
 	}
-	time.Sleep(10 * time.Millisecond)
-	stopCtx, stopCancel := context.WithTimeout(context.Background(), 1*time.Nanosecond)
+	<-entered
+	stopCtx, stopCancel := context.WithTimeout(context.Background(), time.Millisecond)
 	defer stopCancel()
 	if err := s.Stop(stopCtx); err == nil {
 		t.Fatal("expected Stop to return context error with deadline")
 	}
+	close(release)
+	<-done
 	cancel()
 	_ = s.Stop(context.Background())
 }
