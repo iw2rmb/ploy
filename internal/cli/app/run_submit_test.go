@@ -383,10 +383,6 @@ envs:
 		"--job-env", "KEY2=extra",
 		"--job-image", "ghcr.io/acme/mig:2",
 		"--job-command", `["echo","from-cli"]`,
-		"--gitlab-pat", "glpat-test123",
-		"--gitlab-domain", "gitlab.example.com",
-		"--mr-success",
-		"--mr-fail",
 	}, &buf)
 	if err != nil {
 		t.Fatalf("run submit error: %v", err)
@@ -418,20 +414,9 @@ envs:
 	if envs["KEY1"] != "from-cli" || envs["KEY2"] != "extra" {
 		t.Fatalf("expected envs overrides, got %v", envs)
 	}
-	if spec["gitlab_pat"] != "glpat-test123" {
-		t.Fatalf("expected gitlab_pat in spec, got %v", spec["gitlab_pat"])
-	}
-	if spec["gitlab_domain"] != "gitlab.example.com" {
-		t.Fatalf("expected gitlab_domain in spec, got %v", spec["gitlab_domain"])
-	}
-	if spec["mr_on_success"] != true || spec["mr_on_fail"] != true {
-		t.Fatalf("expected mr flags in spec, got success=%v fail=%v", spec["mr_on_success"], spec["mr_on_fail"])
-	}
-
-	// Ensure PAT is not echoed back in textual output.
 	out := buf.String()
-	if strings.Contains(out, "glpat-test123") {
-		t.Fatalf("PAT should not appear in output: %s", out)
+	if strings.Contains(out, "ghcr.io/acme/mig:2") {
+		t.Fatalf("spec internals should not appear in output: %s", out)
 	}
 }
 
@@ -509,7 +494,6 @@ func TestRunSubmitFollowUsesRunStatusFormat(t *testing.T) {
 						"base_ref":          "main",
 						"target_ref":        "ploy/java17",
 						"source_commit_sha": "0123456789abcdef0123456789abcdef01234567",
-						"mr_on_success":     true,
 						"status":            repoStatus,
 						"attempt":           1,
 						"created_at":        "2026-02-24T08:01:00Z",
@@ -571,8 +555,11 @@ func TestRunSubmitFollowUsesRunStatusFormat(t *testing.T) {
 	if !strings.Contains(out, "github.com/acme/service (https://github.com/acme/service.git) @ ") {
 		t.Fatalf("expected run status repo header, got: %q", out)
 	}
-	if !strings.Contains(out, "\x1b[1mmain") || !strings.Contains(out, "01234567") || !strings.Contains(out, " -> ") || !strings.Contains(out, "\x1b[1mploy/java17") {
-		t.Fatalf("expected bold branch names and short sha, got: %q", out)
+	if !strings.Contains(out, "\x1b[1mmain") || !strings.Contains(out, "01234567") {
+		t.Fatalf("expected bold base branch and short sha, got: %q", out)
+	}
+	if strings.Contains(out, " -> ") {
+		t.Fatalf("did not expect target branch annotation, got: %q", out)
 	}
 	if strings.Count(out, "   Mig:   "+migID.String()+"   | java17-upgrade") != 1 {
 		t.Fatalf("expected mig header to render once in follow output, got: %q", out)

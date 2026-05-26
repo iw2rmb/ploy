@@ -18,7 +18,7 @@ import (
 //
 //	{
 //	  "job_meta": { "kind": "gate", "gate": { ... } },
-//	  "metadata": { "mr_url": "https://..." },
+//	  "metadata": { "reason": "..." },
 //	  "duration_ms": 1234
 //	}
 //
@@ -31,7 +31,6 @@ type JobStatsPayload struct {
 	JobMeta json.RawMessage `json:"job_meta,omitempty"`
 
 	// Metadata contains optional string key-value pairs for run-level context.
-	// The mr_url key is used by MR jobs to report merge request URLs.
 	Metadata map[string]string `json:"metadata,omitempty"`
 
 	// DurationMs is the job execution duration in milliseconds (informational).
@@ -57,15 +56,6 @@ type JobResourcesPayload struct {
 	CPUConsumedNs     int64 `json:"cpu_consumed_ns,omitempty"`
 	DiskConsumedBytes int64 `json:"disk_consumed_bytes,omitempty"`
 	MemConsumedBytes  int64 `json:"mem_consumed_bytes,omitempty"`
-}
-
-// MRURL returns the merge request URL from metadata, if present.
-// Returns empty string if metadata is nil or mr_url key is absent/empty.
-func (p JobStatsPayload) MRURL() string {
-	if p.Metadata == nil {
-		return ""
-	}
-	return strings.TrimSpace(p.Metadata["mr_url"])
 }
 
 // HasJobMeta returns true if job_meta is present and non-empty.

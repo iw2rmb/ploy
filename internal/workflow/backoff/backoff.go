@@ -87,19 +87,6 @@ func CertificateBootstrapPolicy() Policy {
 	}
 }
 
-// GitLabMRPolicy returns a policy for GitLab merge request API retries.
-// Starts at 1s with 2x multiplier and 4 total attempts (initial + 3 retries).
-// Matches existing GitLab MR retry behavior (1s, 2s, 4s).
-func GitLabMRPolicy() Policy {
-	return Policy{
-		InitialInterval: types.Duration(1 * time.Second),
-		MaxInterval:     types.Duration(4 * time.Second), // 1s * 2^2 = 4s max.
-		Multiplier:      2.0,
-		MaxElapsedTime:  0, // No time limit for GitLab MR retries.
-		MaxAttempts:     4, // Initial attempt + 3 retries.
-	}
-}
-
 // SSEStreamPolicy returns a policy for SSE stream reconnect backoff.
 // Starts at 250ms with 2x multiplier, matching existing SSE default.
 // Uses unlimited retries (-1) unless caller configures MaxRetries.

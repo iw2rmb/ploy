@@ -16,8 +16,6 @@ import (
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/domain/types"
-	"github.com/iw2rmb/ploy/internal/nodeagent/git"
-	"github.com/iw2rmb/ploy/internal/nodeagent/gitlab"
 	"github.com/iw2rmb/ploy/internal/pki"
 	"github.com/iw2rmb/ploy/internal/workflow/backoff"
 )
@@ -50,8 +48,6 @@ func New(cfg Config) (*Agent, error) {
 		jobImageNameSaver: uploader,
 		nodeEventUploader: uploader,
 		httpClient:        uploader.client,
-		newPusher:         git.NewPusher,
-		newMRClient:       func() mrCreator { return gitlab.NewMRClient() },
 	}
 
 	server, err := NewServer(cfg, controller)

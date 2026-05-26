@@ -4,16 +4,12 @@ import (
 	"strings"
 
 	"github.com/iw2rmb/ploy/internal/gitauth"
-	"github.com/iw2rmb/ploy/internal/workflow/contracts"
+	"github.com/iw2rmb/ploy/internal/server/config"
 )
 
-func gitAuthOptionsFromSpec(specJSON []byte) gitauth.Options {
-	spec, err := contracts.ParseMigSpecJSON(specJSON)
-	if err != nil || spec == nil {
-		return gitauth.Options{}
-	}
+func gitAuthOptionsFromConfig(cfg config.GitLabConfig) gitauth.Options {
 	return gitauth.Options{
-		GitLabPAT:    strings.TrimSpace(spec.GitLabPAT),
-		GitLabDomain: strings.TrimSpace(spec.GitLabDomain),
+		GitLabPAT:    strings.TrimSpace(cfg.Token),
+		GitLabDomain: strings.TrimSpace(cfg.Domain),
 	}
 }

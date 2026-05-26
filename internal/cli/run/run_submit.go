@@ -50,12 +50,6 @@ type runSubmitFlags struct {
 	JobImage   *string
 	MigCommand *string
 
-	// GitLab integration
-	GitLabPAT    *string
-	GitLabDomain *string
-	MRSuccess    *bool
-	MRFail       *bool
-
 	// Artifact and output
 	ArtifactDir *string
 	JSONOut     *bool
@@ -87,12 +81,6 @@ func parseRunSubmitFlags(args []string) (*runSubmitFlags, error) {
 	fs.Var(flags.MigEnvs, "job-env", "Job environment KEY=VALUE (repeatable)")
 	flags.JobImage = fs.String("job-image", "", "Container image for the mig step (optional)")
 	flags.MigCommand = fs.String("job-command", "", "Container command override")
-
-	// GitLab integration
-	flags.GitLabPAT = fs.String("gitlab-pat", "", "GitLab Personal Access Token for this run (overrides server default)")
-	flags.GitLabDomain = fs.String("gitlab-domain", "", "GitLab domain for this run (overrides server default)")
-	flags.MRSuccess = fs.Bool("mr-success", false, "Create a merge request on success")
-	flags.MRFail = fs.Bool("mr-fail", false, "Create a merge request on failure")
 
 	// Artifact and output
 	flags.ArtifactDir = fs.String("artifact-dir", "", "directory to download final artifacts into (with manifest.json)")
@@ -260,23 +248,6 @@ func buildRunSubmitSpecPayload(ctx context.Context, base *url.URL, client *http.
 	if flags.MigCommand != nil {
 		migCommand = strings.TrimSpace(*flags.MigCommand)
 	}
-	gitlabPAT := ""
-	if flags.GitLabPAT != nil {
-		gitlabPAT = strings.TrimSpace(*flags.GitLabPAT)
-	}
-	gitlabDomain := ""
-	if flags.GitLabDomain != nil {
-		gitlabDomain = strings.TrimSpace(*flags.GitLabDomain)
-	}
-	mrSuccess := false
-	if flags.MRSuccess != nil {
-		mrSuccess = *flags.MRSuccess
-	}
-	mrFail := false
-	if flags.MRFail != nil {
-		mrFail = *flags.MRFail
-	}
-
 	specPayload, err := specpayload.Build(
 		ctx,
 		base,
@@ -286,10 +257,6 @@ func buildRunSubmitSpecPayload(ctx context.Context, base *url.URL, client *http.
 		migImage,
 		false,
 		migCommand,
-		gitlabPAT,
-		gitlabDomain,
-		mrSuccess,
-		mrFail,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("load spec: %w", err)
@@ -434,16 +401,12 @@ func submitSingleRepoRun(ctx context.Context, base *url.URL, httpClient *http.Cl
 	return created.RunID, created.MigID, nil
 }
 
-func outputRunSubmitJSONSummary(ctx context.Context, base *url.URL, httpClient *http.Client, runID domaintypes.RunID, initialState, finalState string, flags *runSubmitFlags) error {
-	// Optional: probe MR URL from run status metadata.
-	mrURL, _ := FetchMRURL(ctx, base, httpClient, runID.String())
-
+func outputRunSubmitJSONSummary(_ context.Context, _ *url.URL, _ *http.Client, runID domaintypes.RunID, initialState, finalState string, flags *runSubmitFlags) error {
 	type runJSON struct {
 		RunID       domaintypes.RunID `json:"run_id"`
 		Initial     string            `json:"initial_state,omitempty"`
 		Final       string            `json:"final_state,omitempty"`
 		ArtifactDir string            `json:"artifact_dir,omitempty"`
-		MRURL       string            `json:"mr_url,omitempty"`
 	}
 
 	out := runJSON{
@@ -455,10 +418,6 @@ func outputRunSubmitJSONSummary(ctx context.Context, base *url.URL, httpClient *
 	if s := strings.TrimSpace(*flags.ArtifactDir); s != "" {
 		out.ArtifactDir = s
 	}
-	if mrURL != "" {
-		out.MRURL = mrURL
-	}
-
 	b, _ := json.Marshal(out)
 	fmt.Println(string(b))
 	return nil
@@ -487,12 +446,6 @@ func printRunSubmitUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "  --job-env KEY=VALUE  Job environment (repeatable)")
 	_, _ = fmt.Fprintln(w, "  --job-image <image>  Container image for mig step")
 	_, _ = fmt.Fprintln(w, "  --job-command <cmd>  Container command override")
-	_, _ = fmt.Fprintln(w, "")
-	_, _ = fmt.Fprintln(w, "GitLab options:")
-	_, _ = fmt.Fprintln(w, "  --gitlab-pat <token>      GitLab Personal Access Token")
-	_, _ = fmt.Fprintln(w, "  --gitlab-domain <domain>  GitLab domain")
-	_, _ = fmt.Fprintln(w, "  --mr-success              Create merge request on success")
-	_, _ = fmt.Fprintln(w, "  --mr-fail                 Create merge request on failure")
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Artifacts/output:")
 	_, _ = fmt.Fprintln(w, "  --artifact-dir <dir>  Download final artifacts after successful --follow")

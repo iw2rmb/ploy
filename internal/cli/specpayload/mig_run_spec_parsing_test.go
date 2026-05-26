@@ -17,14 +17,10 @@ import (
 // specPayloadOpts holds optional Build parameters.
 // Zero values correspond to the default (nil/empty/false) arguments.
 type specPayloadOpts struct {
-	migEnvs      []string
-	migImage     string
-	retain       bool
-	migCommand   string
-	gitlabPAT    string
-	gitlabDomain string
-	mrSuccess    bool
-	mrFail       bool
+	migEnvs    []string
+	migImage   string
+	retain     bool
+	migCommand string
 }
 
 func writeFile(t *testing.T, path, content string) {
@@ -39,7 +35,6 @@ func callBuildSpecPayload(t *testing.T, specFile string, opts specPayloadOpts) (
 	return Build(
 		context.Background(), nil, nil, specFile,
 		opts.migEnvs, opts.migImage, opts.retain, opts.migCommand,
-		opts.gitlabPAT, opts.gitlabDomain, opts.mrSuccess, opts.mrFail,
 	)
 }
 
@@ -326,8 +321,6 @@ func TestBuildSpecPayload_BasicParsing(t *testing.T) {
 		wantStepImage string
 		wantEnv       map[string]any
 		wantRetries   float64
-		wantDomain    string
-		wantMRSuccess bool
 		digChecks     []digCheck // optional nested field assertions
 	}{
 		{
@@ -342,13 +335,9 @@ envs:
 healing:
     retries: 1
     image: docker.io/test/healer:latest
-gitlab_domain: gitlab.example.com
-mr_on_success: true
 `,
 			wantStepImage: "docker.io/test/mig:latest",
 			wantEnv:       map[string]any{"KEY1": "value1", "KEY2": "value2"},
-			wantDomain:    "gitlab.example.com",
-			wantMRSuccess: true,
 		},
 		{
 			name: "JSON spec",
@@ -443,12 +432,6 @@ build_gate:
 			if tt.wantRetries != 0 {
 				heal := mustDig(t, result, "healing")
 				assertField(t, heal, "retries", tt.wantRetries)
-			}
-			if tt.wantDomain != "" {
-				assertField(t, result, "gitlab_domain", tt.wantDomain)
-			}
-			if tt.wantMRSuccess {
-				assertField(t, result, "mr_on_success", true)
 			}
 			for _, dc := range tt.digChecks {
 				target := mustDig(t, result, dc.digPath...)
@@ -773,28 +756,23 @@ func TestBuildSpecPayload_CLIOverrides(t *testing.T) {
 		wantStepAbsent []string // checked on all steps
 	}{
 		{
-			name: "full CLI overrides on spec with envs and gitlab",
+			name: "full CLI overrides on spec with envs",
 			spec: `
 steps:
   - image: docker.io/test/mig:v1
 envs:
   KEY1: from_spec
   KEY2: value2
-gitlab_domain: gitlab.com
 `,
 			opts: specPayloadOpts{
-				migEnvs:      []string{"KEY1=from_cli", "KEY3=new_value"},
-				migImage:     "docker.io/test/mig:v2",
-				retain:       true,
-				gitlabPAT:    "glpat-test",
-				gitlabDomain: "gitlab.example.com",
-				mrSuccess:    true,
+				migEnvs:  []string{"KEY1=from_cli", "KEY3=new_value"},
+				migImage: "docker.io/test/mig:v2",
+				retain:   true,
 			},
 			wantStepCount:  1,
 			wantStepImages: []string{"docker.io/test/mig:v2"},
 			wantStepAbsent: []string{"retain_container"},
 			wantTopEnv:     map[string]any{"KEY1": "from_cli", "KEY2": "value2", "KEY3": "new_value"},
-			wantTopFields:  map[string]any{"gitlab_domain": "gitlab.example.com", "gitlab_pat": "glpat-test", "mr_on_success": true},
 		},
 		{
 			name: "single-step image and env overrides",

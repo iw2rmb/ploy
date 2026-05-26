@@ -17,7 +17,7 @@ get:
     **Response includes**:
     - `run_id`, `state`: Run identifier and lifecycle state.
     - `repository`: Git repository URL.
-    - `metadata`: Derived context (refs, node_id, gate_summary, reason, mr_url).
+    - `metadata`: Derived context (refs, node_id, gate_summary, reason).
     - `stages`: Map of job IDs to `StageStatus` objects.
     - `created_at`, `updated_at`: Timestamps (RFC 3339).
 

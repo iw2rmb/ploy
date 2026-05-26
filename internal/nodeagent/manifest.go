@@ -142,18 +142,6 @@ func buildManifestFromRequest(req StartRunRequest, typedOpts RunOptions, stepInd
 
 	// Build manifest options from typed accessors.
 	mergedOpts := make(map[string]any)
-	if pat := strings.TrimSpace(typedOpts.MRWiring.GitLabPAT); pat != "" {
-		mergedOpts["gitlab_pat"] = pat
-	}
-	if domain := strings.TrimSpace(typedOpts.MRWiring.GitLabDomain); domain != "" {
-		mergedOpts["gitlab_domain"] = domain
-	}
-	if typedOpts.MRFlagsPresent.MROnSuccessSet {
-		mergedOpts["mr_on_success"] = typedOpts.MRWiring.MROnSuccess
-	}
-	if typedOpts.MRFlagsPresent.MROnFailSet {
-		mergedOpts["mr_on_fail"] = typedOpts.MRWiring.MROnFail
-	}
 	if !typedOpts.ServerMetadata.JobID.IsZero() {
 		mergedOpts["job_id"] = typedOpts.ServerMetadata.JobID.String()
 	}

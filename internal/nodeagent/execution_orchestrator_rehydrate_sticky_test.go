@@ -1,7 +1,12 @@
 package nodeagent
 
 import (
+	"archive/tar"
+	"compress/gzip"
 	"context"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -91,10 +96,11 @@ func TestPrepareStickyWorkspaceForStep_ChainHeadHydratesWorkspaceWithoutRunBase(
 	repoDir := gitrepo.SetupBasic(t)
 
 	req := StartRunRequest{
-		RunID:   types.RunID("run_sticky_hydrate"),
-		RepoID:  types.MigRepoID("repo_sticky_hydrate"),
-		JobID:   types.JobID("job_sticky_hydrate"),
-		JobType: types.JobTypePreGate,
+		RunID:     types.RunID("run_sticky_hydrate"),
+		RepoID:    types.MigRepoID("repo_sticky_hydrate"),
+		JobID:     types.JobID("job_sticky_hydrate"),
+		JobType:   types.JobTypePreGate,
+		CommitSHA: types.CommitSHA(gitrepo.RevParse(t, repoDir, "HEAD")),
 	}
 	manifest := contracts.StepManifest{
 		Inputs: []contracts.StepInput{
@@ -111,7 +117,9 @@ func TestPrepareStickyWorkspaceForStep_ChainHeadHydratesWorkspaceWithoutRunBase(
 		},
 	}
 
-	rc := &runController{cfg: Config{}}
+	srv := snapshotFixtureServer(t, repoDir)
+	defer srv.Close()
+	rc := &runController{cfg: Config{ServerURL: srv.URL, NodeID: types.NodeID("node01")}, httpClient: srv.Client()}
 	workspace, err := rc.prepareStickyWorkspaceForStep(context.Background(), req, manifest)
 	if err != nil {
 		t.Fatalf("prepareStickyWorkspaceForStep() error = %v", err)
@@ -123,4 +131,70 @@ func TestPrepareStickyWorkspaceForStep_ChainHeadHydratesWorkspaceWithoutRunBase(
 	if _, err := os.Stat(filepath.Join(runCacheDir(req.RunID), "base")); !os.IsNotExist(err) {
 		t.Fatalf("run base dir should not be created, stat err = %v", err)
 	}
+}
+
+func snapshotFixtureServer(t *testing.T, repoDir string) *httptest.Server {
+	t.Helper()
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		w.Header().Set("Content-Type", "application/gzip")
+		gz := gzip.NewWriter(w)
+		tw := tar.NewWriter(gz)
+		err := filepath.WalkDir(repoDir, func(path string, d os.DirEntry, walkErr error) error {
+			if walkErr != nil {
+				return walkErr
+			}
+			if path == repoDir {
+				return nil
+			}
+			info, err := d.Info()
+			if err != nil {
+				return err
+			}
+			rel, err := filepath.Rel(repoDir, path)
+			if err != nil {
+				return err
+			}
+			link := ""
+			if info.Mode()&os.ModeSymlink != 0 {
+				link, err = os.Readlink(path)
+				if err != nil {
+					return err
+				}
+			}
+			hdr, err := tar.FileInfoHeader(info, link)
+			if err != nil {
+				return err
+			}
+			hdr.Name = filepath.ToSlash(rel)
+			if err := tw.WriteHeader(hdr); err != nil {
+				return err
+			}
+			if d.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+				return nil
+			}
+			f, err := os.Open(path)
+			if err != nil {
+				return err
+			}
+			_, copyErr := io.Copy(tw, f)
+			closeErr := f.Close()
+			if copyErr != nil {
+				return copyErr
+			}
+			return closeErr
+		})
+		if closeErr := tw.Close(); err == nil {
+			err = closeErr
+		}
+		if closeErr := gz.Close(); err == nil {
+			err = closeErr
+		}
+		if err != nil {
+			t.Errorf("write snapshot fixture: %v", err)
+		}
+	}))
 }

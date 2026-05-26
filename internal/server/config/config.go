@@ -10,7 +10,7 @@ type Config struct {
 	Scheduler   SchedulerConfig   `yaml:"scheduler"`
 	Logging     LoggingConfig     `yaml:"logging"`
 	Postgres    PostgresConfig    `yaml:"postgres"`
-	GitLab      GitLabConfig      `yaml:"gitlab"`
+	GitLab      GitLabConfig      `yaml:"-"`
 	ObjectStore ObjectStoreConfig `yaml:"object_store"`
 	FilePath    string            `yaml:"-"`
 }

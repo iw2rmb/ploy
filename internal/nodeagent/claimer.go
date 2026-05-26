@@ -48,7 +48,7 @@ type ClaimResponse struct {
 	JobName       string                      `json:"job_name"`              // Job name (e.g., "pre-gate", "mig-0")
 	JobType       types.JobType               `json:"job_type"`              // Job phase: pre_gate, mig, post_gate
 	ActionID      *types.JobID                `json:"action_id,omitempty"`   // Claimed action ID
-	ActionType    string                      `json:"action_type,omitempty"` // Action type (e.g. mr_create)
+	ActionType    string                      `json:"action_type,omitempty"` // Action type for generic repo follow-up work
 	JobImage      string                      `json:"job_image"`             // Container image for mig jobs
 	NextID        *types.JobID                `json:"next_id"`
 	RepoURL       types.RepoURL               `json:"repo_url"`

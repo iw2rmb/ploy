@@ -5,13 +5,12 @@ import (
 	"testing"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	"github.com/iw2rmb/ploy/internal/server/config"
 )
 
 // TestConfigEnvListReturnsAllEntries verifies that GET /v1/config/env
 // returns all key+target pairs sorted by key then target, with secret values redacted.
 func TestConfigEnvListReturnsAllEntries(t *testing.T) {
-	holder := NewConfigHolder(config.GitLabConfig{}, map[string][]GlobalEnvVar{
+	holder := NewConfigHolder(map[string][]GlobalEnvVar{
 		"SECRET_BLOB": {{Value: "opaque-secret", Target: domaintypes.GlobalEnvTargetGates, Secret: true}},
 		"API_KEY":     {{Value: "sk-abc123", Target: domaintypes.GlobalEnvTargetSteps, Secret: false}},
 	})
@@ -52,7 +51,7 @@ func TestConfigEnvListReturnsAllEntries(t *testing.T) {
 // TestConfigEnvListMultiTarget verifies that list returns separate entries
 // for the same key with different targets.
 func TestConfigEnvListMultiTarget(t *testing.T) {
-	holder := NewConfigHolder(config.GitLabConfig{}, nil)
+	holder := NewConfigHolder(nil)
 	holder.SetGlobalEnvVar("SHARED_KEY", GlobalEnvVar{Value: "val-gates", Target: domaintypes.GlobalEnvTargetGates, Secret: false})
 	holder.SetGlobalEnvVar("SHARED_KEY", GlobalEnvVar{Value: "val-steps", Target: domaintypes.GlobalEnvTargetSteps, Secret: false})
 
@@ -79,7 +78,7 @@ func TestConfigEnvListMultiTarget(t *testing.T) {
 // TestConfigEnvGetReturnsEntry verifies GET /v1/config/env/{key}
 // returns full value (including for secrets) for admin access.
 func TestConfigEnvGetReturnsEntry(t *testing.T) {
-	holder := NewConfigHolder(config.GitLabConfig{}, map[string][]GlobalEnvVar{
+	holder := NewConfigHolder(map[string][]GlobalEnvVar{
 		"CODEX_AUTH_JSON": {{Value: `{"token":"secret"}`, Target: domaintypes.GlobalEnvTargetSteps, Secret: true}},
 	})
 
@@ -108,7 +107,7 @@ func TestConfigEnvGetReturnsEntry(t *testing.T) {
 // TestConfigEnvGetWithTargetSelector verifies GET /v1/config/env/{key}?target=
 // returns the correct entry when multiple targets exist.
 func TestConfigEnvGetWithTargetSelector(t *testing.T) {
-	holder := NewConfigHolder(config.GitLabConfig{}, nil)
+	holder := NewConfigHolder(nil)
 	holder.SetGlobalEnvVar("MULTI", GlobalEnvVar{Value: "gates-val", Target: domaintypes.GlobalEnvTargetGates, Secret: false})
 	holder.SetGlobalEnvVar("MULTI", GlobalEnvVar{Value: "steps-val", Target: domaintypes.GlobalEnvTargetSteps, Secret: false})
 
@@ -172,7 +171,7 @@ func TestConfigEnvGet_Errors(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			holder := NewConfigHolder(config.GitLabConfig{}, nil)
+			holder := NewConfigHolder(nil)
 			if tt.setup != nil {
 				tt.setup(holder)
 			}
@@ -189,7 +188,7 @@ func TestConfigEnvGet_Errors(t *testing.T) {
 // persists to store and updates the holder.
 func TestConfigEnvPutUpsertsEntry(t *testing.T) {
 	st := &configStore{}
-	holder := NewConfigHolder(config.GitLabConfig{}, nil)
+	holder := NewConfigHolder(nil)
 
 	handler := putGlobalEnvHandler(holder, st)
 
@@ -232,7 +231,7 @@ func TestConfigEnvPutUpsertsEntry(t *testing.T) {
 // when not explicitly set in the request.
 func TestConfigEnvPutDefaultsSecretToTrue(t *testing.T) {
 	st := &configStore{}
-	holder := NewConfigHolder(config.GitLabConfig{}, nil)
+	holder := NewConfigHolder(nil)
 
 	handler := putGlobalEnvHandler(holder, st)
 
@@ -271,7 +270,7 @@ func TestConfigEnvPut_ValidationErrors(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			st := &configStore{}
-			holder := NewConfigHolder(config.GitLabConfig{}, nil)
+			holder := NewConfigHolder(nil)
 
 			handler := putGlobalEnvHandler(holder, st)
 			rr := doRequest(t, handler, http.MethodPut, "/v1/config/env/"+tt.key, tt.body, "key", tt.key)
@@ -288,7 +287,7 @@ func TestConfigEnvPut_ValidationErrors(t *testing.T) {
 // creates separate entries in the holder.
 func TestConfigEnvPutMultiTarget(t *testing.T) {
 	st := &configStore{}
-	holder := NewConfigHolder(config.GitLabConfig{}, nil)
+	holder := NewConfigHolder(nil)
 
 	putHandler := putGlobalEnvHandler(holder, st)
 
@@ -319,7 +318,7 @@ func TestConfigEnvPutMultiTarget(t *testing.T) {
 // removes from store and holder.
 func TestConfigEnvDeleteRemovesEntry(t *testing.T) {
 	st := &configStore{}
-	holder := NewConfigHolder(config.GitLabConfig{}, map[string][]GlobalEnvVar{
+	holder := NewConfigHolder(map[string][]GlobalEnvVar{
 		"OLD_KEY": {{Value: "old-value", Target: domaintypes.GlobalEnvTargetGates, Secret: false}},
 	})
 
@@ -350,7 +349,7 @@ func TestConfigEnvDeleteRemovesEntry(t *testing.T) {
 // ?target= succeeds when only one target exists for the key.
 func TestConfigEnvDeleteInfersTarget(t *testing.T) {
 	st := &configStore{}
-	holder := NewConfigHolder(config.GitLabConfig{}, map[string][]GlobalEnvVar{
+	holder := NewConfigHolder(map[string][]GlobalEnvVar{
 		"SINGLE": {{Value: "val", Target: domaintypes.GlobalEnvTargetNodes, Secret: false}},
 	})
 
@@ -399,7 +398,7 @@ func TestConfigEnvDelete_Errors(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			st := &configStore{}
-			holder := NewConfigHolder(config.GitLabConfig{}, nil)
+			holder := NewConfigHolder(nil)
 			tt.setup(holder)
 
 			handler := deleteGlobalEnvHandler(holder, st)
@@ -416,7 +415,7 @@ func TestConfigEnvDelete_Errors(t *testing.T) {
 // TestConfigEnvDeleteNonexistentKey verifies DELETE for non-existent key returns 204.
 func TestConfigEnvDeleteNonexistentKey(t *testing.T) {
 	st := &configStore{}
-	holder := NewConfigHolder(config.GitLabConfig{}, nil)
+	holder := NewConfigHolder(nil)
 
 	handler := deleteGlobalEnvHandler(holder, st)
 
@@ -466,7 +465,7 @@ func TestConfigEnvRoundTrip(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			st := &configStore{}
-			holder := NewConfigHolder(config.GitLabConfig{}, nil)
+			holder := NewConfigHolder(nil)
 
 			// PUT the entry.
 			putRR := doRequest(t, putGlobalEnvHandler(holder, st), http.MethodPut, "/v1/config/env/"+tt.key, map[string]any{
@@ -544,7 +543,7 @@ func TestConfigEnvStoreErrors(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			st := &configStore{}
-			holder := NewConfigHolder(config.GitLabConfig{}, nil)
+			holder := NewConfigHolder(nil)
 			tt.setup(holder, st)
 			var handler http.Handler
 			if tt.method == http.MethodPut {

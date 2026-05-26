@@ -189,6 +189,72 @@ func (q *Queries) GetRunRepo(ctx context.Context, arg GetRunRepoParams) (RunRepo
 	return i, err
 }
 
+const getRunRepoSnapshotMetadata = `-- name: GetRunRepoSnapshotMetadata :one
+SELECT
+  rr.run_id,
+  rr.repo_id,
+  rr.repo_base_ref,
+  rr.repo_target_ref,
+  rr.source_commit_sha,
+  r.url AS repo_url
+FROM run_repos rr
+JOIN repos r ON r.id = rr.repo_id
+WHERE rr.run_id = $1
+  AND rr.repo_id = $2
+`
+
+type GetRunRepoSnapshotMetadataParams struct {
+	RunID  types.RunID  `json:"run_id"`
+	RepoID types.RepoID `json:"repo_id"`
+}
+
+type GetRunRepoSnapshotMetadataRow struct {
+	RunID           types.RunID  `json:"run_id"`
+	RepoID          types.RepoID `json:"repo_id"`
+	RepoBaseRef     string       `json:"repo_base_ref"`
+	RepoTargetRef   string       `json:"repo_target_ref"`
+	SourceCommitSha string       `json:"source_commit_sha"`
+	RepoUrl         string       `json:"repo_url"`
+}
+
+func (q *Queries) GetRunRepoSnapshotMetadata(ctx context.Context, arg GetRunRepoSnapshotMetadataParams) (GetRunRepoSnapshotMetadataRow, error) {
+	row := q.db.QueryRow(ctx, getRunRepoSnapshotMetadata, arg.RunID, arg.RepoID)
+	var i GetRunRepoSnapshotMetadataRow
+	err := row.Scan(
+		&i.RunID,
+		&i.RepoID,
+		&i.RepoBaseRef,
+		&i.RepoTargetRef,
+		&i.SourceCommitSha,
+		&i.RepoUrl,
+	)
+	return i, err
+}
+
+const hasRunningJobForRunRepoNode = `-- name: HasRunningJobForRunRepoNode :one
+SELECT EXISTS (
+  SELECT 1
+  FROM jobs
+  WHERE run_id = $1
+    AND repo_id = $2
+    AND node_id = $3
+    AND status = 'Running'
+)::boolean
+`
+
+type HasRunningJobForRunRepoNodeParams struct {
+	RunID  types.RunID   `json:"run_id"`
+	RepoID types.RepoID  `json:"repo_id"`
+	NodeID *types.NodeID `json:"node_id"`
+}
+
+func (q *Queries) HasRunningJobForRunRepoNode(ctx context.Context, arg HasRunningJobForRunRepoNodeParams) (bool, error) {
+	row := q.db.QueryRow(ctx, hasRunningJobForRunRepoNode, arg.RunID, arg.RepoID, arg.NodeID)
+	var column_1 bool
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const incrementRunRepoAttempt = `-- name: IncrementRunRepoAttempt :exec
 UPDATE run_repos
 SET attempt = attempt + 1,

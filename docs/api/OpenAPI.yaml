@@ -40,7 +40,7 @@ tags:
   - name: Security
     description: PKI operations (CA info, CSR signing).
   - name: Config
-    description: Configuration management (GitLab, runtime settings).
+    description: Configuration management for runtime settings.
   - name: Control
     description: Core control-plane surfaces (repos, migs run lifecycle, runs).
   - name: Artifacts
@@ -54,8 +54,6 @@ paths:
   /readyz:
     $ref: "./paths/readyz.yaml"
   # Config endpoints
-  /v1/config/gitlab:
-    $ref: "./paths/config_gitlab.yaml"
   /v1/config/env:
     $ref: "./paths/config_env.yaml"
   /v1/config/env/{key}:
@@ -179,6 +177,9 @@ paths:
   # Repo-scoped jobs listing — lists jobs for a repo execution
   /v1/runs/{run_id}/repos/{repo_id}/jobs:
     $ref: "./paths/runs_run_id_repos_repo_id_jobs.yaml"
+  # Worker-only repo snapshot download for server-owned hydration
+  /v1/runs/{run_id}/repos/{repo_id}/snapshot:
+    $ref: "./paths/runs_run_id_repos_repo_id_snapshot.yaml"
   # Repo-scoped cancel — cancels a single repo execution within a run
   /v1/runs/{run_id}/repos/{repo_id}/cancel:
     $ref: "./paths/runs_run_id_repos_repo_id_cancel.yaml"
@@ -229,7 +230,7 @@ components:
       $ref: "./components/schemas/pki.yaml#/PKIAdminSignRequest"
     PKIClientSignRequest:
       $ref: "./components/schemas/pki.yaml#/PKIClientSignRequest"
-    # Config schemas (global env, GitLab settings)
+    # Config schemas (global env settings)
     GlobalEnvTarget:
       $ref: "./components/schemas/config.yaml#/GlobalEnvTarget"
     GlobalEnvListItem:

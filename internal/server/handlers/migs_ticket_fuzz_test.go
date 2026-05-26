@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/iw2rmb/ploy/internal/gitauth"
 )
 
 // FuzzCreateSingleRepoRunHandler ensures the single-repo run submission handler is resilient to
@@ -12,7 +14,7 @@ import (
 // path with a nil-backed mock store; success is not required.
 func FuzzCreateSingleRepoRunHandler(f *testing.F) {
 	st := &jobStore{}
-	h := createSingleRepoRunHandler(st, nil)
+	h := createSingleRepoRunHandler(st, nil, gitauth.Options{})
 
 	// Seed with a few typical cases.
 	seeds := [][]byte{

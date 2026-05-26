@@ -6,8 +6,6 @@ import (
 	"net"
 	"net/url"
 	"strings"
-
-	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
 // Options configures transient Git HTTP authentication.
@@ -69,18 +67,6 @@ func PrepareBasicURL(rawURL, username, password string) (PreparedURL, error) {
 		URL: clean.String(),
 		Env: extraHeaderEnv(clean, username, password),
 	}, nil
-}
-
-// OptionsFromManifest extracts Git auth options from manifest options.
-func OptionsFromManifest(manifest contracts.StepManifest) Options {
-	opts := Options{}
-	if pat, ok := manifest.OptionString("gitlab_pat"); ok {
-		opts.GitLabPAT = pat
-	}
-	if domain, ok := manifest.OptionString("gitlab_domain"); ok {
-		opts.GitLabDomain = domain
-	}
-	return opts
 }
 
 func extraHeaderEnv(repoURL url.URL, username, password string) []string {

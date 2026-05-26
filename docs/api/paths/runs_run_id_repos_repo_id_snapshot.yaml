@@ -1,0 +1,90 @@
+get:
+  tags: [Control]
+  summary: Download repo snapshot for worker hydration
+  description: |
+    Worker-only endpoint that streams the server-owned Git snapshot for a repo
+    execution. The response is a gzip tar archive that includes the working tree
+    and `.git` directory at the source commit recorded on the run repo.
+
+    Authorization is by worker identity only. Callers must send
+    `PLOY_NODE_UUID`; query-token authentication is not accepted for this route.
+    The node must currently own a running job or action for the run repo.
+  parameters:
+    - in: path
+      name: run_id
+      required: true
+      schema:
+        type: string
+      description: Run ID (KSUID string)
+    - in: path
+      name: repo_id
+      required: true
+      schema:
+        type: string
+      description: Repo ID (NanoID 8-character string)
+    - in: header
+      name: PLOY_NODE_UUID
+      required: true
+      schema:
+        type: string
+      description: Node UUID assigned to the worker.
+  responses:
+    '200':
+      description: Snapshot archive
+      headers:
+        X-Ploy-Repo-URL:
+          schema: { type: string }
+          description: Clean repository URL.
+        X-Ploy-Repo-Source-SHA:
+          schema: { type: string }
+          description: Source commit SHA included in the snapshot.
+        X-Ploy-Repo-Ref:
+          schema: { type: string }
+          description: Source ref associated with the run repo.
+      content:
+        application/gzip:
+          schema:
+            type: string
+            format: binary
+    '400':
+      description: Bad request, including missing or invalid node header.
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+    '401':
+      description: Authentication required.
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+    '403':
+      description: Worker does not own a running job or action for this run repo.
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+    '404':
+      description: Run repo not found.
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+    '409':
+      description: Run repo is not snapshot-ready.
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+    '502':
+      description: Snapshot materialization failed.
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+    '504':
+      description: Snapshot materialization timed out.
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'

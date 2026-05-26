@@ -76,11 +76,11 @@ type PostgresConfig struct {
 	DSN string `yaml:"dsn"`
 }
 
-// GitLabConfig configures GitLab integration.
+// GitLabConfig holds env-only GitLab access requisites for server-owned Git
+// operations. It is intentionally not YAML-mapped.
 type GitLabConfig struct {
-	Domain    string `yaml:"domain"`
-	Token     string `yaml:"token"`
-	TokenFile string `yaml:"token_file"`
+	Domain string
+	Token  string
 }
 
 // ObjectStoreConfig configures S3-compatible object storage (e.g., Garage).

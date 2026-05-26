@@ -1,16 +1,19 @@
 package nodeagent
 
 import (
+	"archive/tar"
+	"compress/gzip"
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
+	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
-	"github.com/iw2rmb/ploy/internal/gitauth"
-	"github.com/iw2rmb/ploy/internal/worker/hydration"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
@@ -59,15 +62,6 @@ func (r *runController) prepareStickyWorkspaceForStep(
 		return "", fmt.Errorf("create sticky workspace parent dir: %w", err)
 	}
 
-	// Initialize git fetcher for repository hydration. The fetcher is responsible for
-	// reusing cached clones when PLOYD_CACHE_HOME is configured.
-	gitFetcher, err := hydration.NewGitFetcher(hydration.GitFetcherOptions{
-		CacheDir: os.Getenv("PLOYD_CACHE_HOME"),
-	})
-	if err != nil {
-		return "", fmt.Errorf("create git fetcher: %w", err)
-	}
-
 	// Determine repo materialization:
 	// - Prefer manifest inputs that already carry hydration.Repo (gate/mig jobs).
 	// - Fallback to StartRunRequest repo fields (healing jobs and other callers).
@@ -99,7 +93,7 @@ func (r *runController) prepareStickyWorkspaceForStep(
 	if err := os.RemoveAll(workspacePath); err != nil && !os.IsNotExist(err) {
 		return "", fmt.Errorf("remove stale sticky workspace before hydration: %w", err)
 	}
-	if err := gitFetcher.Fetch(ctx, repo, workspacePath, gitAuthOptionsForStickyHydration(manifest, req.TypedOptions)); err != nil {
+	if err := r.downloadSnapshot(ctx, req, repo, workspacePath); err != nil {
 		if removeErr := os.RemoveAll(workspacePath); removeErr != nil {
 			slog.Warn("failed to clean up workspace after error", "path", workspacePath, "error", removeErr)
 		}
@@ -115,13 +109,132 @@ func hasGitDir(path string) bool {
 	return err == nil && info.IsDir()
 }
 
-func gitAuthOptionsForStickyHydration(manifest contracts.StepManifest, opts RunOptions) gitauth.Options {
-	auth := gitauth.Options{
-		GitLabPAT:    strings.TrimSpace(opts.MRWiring.GitLabPAT),
-		GitLabDomain: strings.TrimSpace(opts.MRWiring.GitLabDomain),
+func (r *runController) downloadSnapshot(ctx context.Context, req StartRunRequest, repo *contracts.RepoMaterialization, workspacePath string) error {
+	if repo == nil {
+		return fmt.Errorf("repo materialization is required")
 	}
-	if manifestAuth := gitauth.OptionsFromManifest(manifest); manifestAuth != (gitauth.Options{}) {
-		auth = manifestAuth
+	if strings.TrimSpace(req.CommitSHA.String()) == "" {
+		return fmt.Errorf("commit_sha is required for snapshot hydration")
 	}
-	return auth
+	if err := os.MkdirAll(workspacePath, 0o750); err != nil {
+		return fmt.Errorf("create workspace: %w", err)
+	}
+
+	apiPath := fmt.Sprintf("/v1/runs/%s/repos/%s/snapshot", req.RunID, req.RepoID)
+	u := MustBuildURL(r.cfg.ServerURL, apiPath)
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+	if err != nil {
+		return fmt.Errorf("create snapshot request: %w", err)
+	}
+	httpReq.Header.Set("PLOY_NODE_UUID", r.cfg.NodeID.String())
+	resp, err := r.httpClient.Do(httpReq)
+	if err != nil {
+		return fmt.Errorf("download snapshot: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		return fmt.Errorf("download snapshot failed: status %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+	}
+	if err := unpackTarGz(resp.Body, workspacePath); err != nil {
+		return fmt.Errorf("unpack snapshot: %w", err)
+	}
+	if err := verifyWorkspaceHEAD(ctx, workspacePath, req.CommitSHA.String()); err != nil {
+		return err
+	}
+	return nil
+}
+
+func unpackTarGz(r io.Reader, dest string) error {
+	gz, err := gzip.NewReader(r)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = gz.Close() }()
+	tr := tar.NewReader(gz)
+	for {
+		hdr, err := tr.Next()
+		if err == io.EOF {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		target, err := safeTarTarget(dest, hdr.Name)
+		if err != nil {
+			return err
+		}
+		switch hdr.Typeflag {
+		case tar.TypeDir:
+			if err := os.MkdirAll(target, os.FileMode(hdr.Mode)&0o777); err != nil {
+				return err
+			}
+		case tar.TypeReg, tar.TypeRegA:
+			if err := os.MkdirAll(filepath.Dir(target), 0o750); err != nil {
+				return err
+			}
+			f, err := os.OpenFile(target, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, os.FileMode(hdr.Mode)&0o777)
+			if err != nil {
+				return err
+			}
+			_, copyErr := io.Copy(f, tr)
+			closeErr := f.Close()
+			if copyErr != nil {
+				return copyErr
+			}
+			if closeErr != nil {
+				return closeErr
+			}
+		case tar.TypeSymlink:
+			if err := os.MkdirAll(filepath.Dir(target), 0o750); err != nil {
+				return err
+			}
+			if err := os.Symlink(hdr.Linkname, target); err != nil {
+				return err
+			}
+		default:
+			return fmt.Errorf("unsupported tar entry %q type %d", hdr.Name, hdr.Typeflag)
+		}
+	}
+}
+
+func safeTarTarget(root, name string) (string, error) {
+	name = strings.TrimSpace(name)
+	if name == "" || filepath.IsAbs(name) {
+		return "", fmt.Errorf("unsafe tar path %q", name)
+	}
+	clean := filepath.Clean(name)
+	if clean == "." || strings.HasPrefix(clean, ".."+string(filepath.Separator)) || clean == ".." {
+		return "", fmt.Errorf("unsafe tar path %q", name)
+	}
+	target := filepath.Join(root, clean)
+	rel, err := filepath.Rel(root, target)
+	if err != nil {
+		return "", err
+	}
+	if rel == "." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || rel == ".." {
+		return "", fmt.Errorf("unsafe tar path %q", name)
+	}
+	return target, nil
+}
+
+func verifyWorkspaceHEAD(ctx context.Context, workspace, want string) error {
+	head, err := resolveGitHEAD(ctx, workspace)
+	if err != nil {
+		return fmt.Errorf("verify hydrated snapshot HEAD: %w", err)
+	}
+	if head != strings.TrimSpace(want) {
+		return fmt.Errorf("hydrated snapshot HEAD mismatch: got %s want %s", head, strings.TrimSpace(want))
+	}
+	return nil
+}
+
+func resolveGitHEAD(ctx context.Context, workspace string) (string, error) {
+	cmd := exec.CommandContext(ctx, "git", "-C", workspace, "rev-parse", "HEAD")
+	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GIT_ASKPASS=echo")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("git rev-parse HEAD: %w (output: %s)", err, string(out))
+	}
+	return strings.TrimSpace(string(out)), nil
 }

@@ -505,7 +505,6 @@ MigsRunSummary:
         failure/cancellation context and diagnostics:
         - `repo_base_ref`: Base Git ref used for this run (e.g., "main").
         - `repo_target_ref`: Target Git ref for the run (e.g., "feature-branch").
-        - `mr_url`: Merge request URL when available (GitLab/GitHub).
         - `gate_summary`: Build Gate health summary from run stats.
         - `orw_error_kind`: ORW runtime failure kind from `/out/report.json` when ORW fails.
         - `orw_reason`: ORW deterministic failure reason (for example `type-attribution-unavailable`).
@@ -641,8 +640,7 @@ NodeClaimResponse:
     spec:
       description: |
         Opaque run specification JSON merged by the server at claim time.
-        Includes `job_id` and any server defaults (e.g., `gitlab_pat`, `gitlab_domain`,
-        `mr_on_success`, `mr_on_fail`).
+        Includes `job_id` and server-owned execution context.
         If the persisted spec in the DB is invalid or non-object, the server returns 500.
       type: object
       additionalProperties: true

@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/gitauth"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -24,7 +25,7 @@ import (
 // - Copies migs.spec_id → runs.spec_id for immutability.
 // - Creates run_repos rows snapshotting refs from mig_repos.
 // - Job materialization is deferred to the batch scheduler/start endpoint and gated on prep readiness.
-func createMigRunHandler(st store.Store) http.HandlerFunc {
+func createMigRunHandler(st store.Store, gitAuth gitauth.Options) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Parse request body with strict validation.
 		var req struct {
@@ -84,12 +85,6 @@ func createMigRunHandler(st store.Store) http.HandlerFunc {
 		}
 
 		runID := domaintypes.NewRunID()
-		specRow, err := st.GetSpec(r.Context(), *mig.SpecID)
-		if err != nil {
-			serverError(w, "create mig run", "get spec", err, "mig_id", migID.String(), "spec_id", *mig.SpecID)
-			return
-		}
-
 		runRepos := make([]store.CreateRunRepoParams, 0, len(selectedRepos))
 		for _, migRepo := range selectedRepos {
 			repoURL, urlErr := repoURLForID(r.Context(), st, migRepo.RepoID)
@@ -97,7 +92,7 @@ func createMigRunHandler(st store.Store) http.HandlerFunc {
 				serverError(w, "create mig run", "get repo", urlErr, "repo_id", migRepo.RepoID)
 				return
 			}
-			sourceCommitSHA, seedErr := resolveSourceCommitSHAFromContext(r.Context(), repoURL, migRepo.BaseRef, gitAuthOptionsFromSpec(specRow.Spec))
+			sourceCommitSHA, seedErr := resolveSourceCommitSHAFromContext(r.Context(), repoURL, migRepo.BaseRef, gitAuth)
 			if seedErr != nil {
 				writeHTTPError(w, http.StatusBadRequest, "failed to resolve source commit for repo %s ref %s: %v", repoURL, migRepo.BaseRef, seedErr)
 				slog.Error("create mig run: resolve source commit failed",

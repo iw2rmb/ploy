@@ -10,7 +10,6 @@ import (
 
 	"github.com/iw2rmb/ploy/internal/blobstore"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	"github.com/iw2rmb/ploy/internal/server/config"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
@@ -59,12 +58,10 @@ func buildClaimResponsePayload(
 		return claimResponsePayload{}, fmt.Errorf("invalid claimed job job_type %q for job_id=%s: %w", job.JobType, job.ID, err)
 	}
 
-	gitlabCfg := config.GitLabConfig{}
 	globalEnv := map[string][]GlobalEnvVar{}
 	var hydraOverlays map[string]*HydraJobConfig
 	var bundleMap map[string]string
 	if configHolder != nil {
-		gitlabCfg = configHolder.GetGitLab()
 		globalEnv = configHolder.GetGlobalEnvAll()
 		hydraOverlays = configHolder.GetHydraOverlays()
 		bundleMap = configHolder.GetBundleMap()
@@ -74,7 +71,6 @@ func buildClaimResponsePayload(
 		spec:          spec,
 		job:           job,
 		jobType:       jobType,
-		gitLab:        gitlabCfg,
 		globalEnv:     globalEnv,
 		hydraOverlays: hydraOverlays,
 		bundleMap:     bundleMap,

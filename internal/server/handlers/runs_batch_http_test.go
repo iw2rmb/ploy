@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/gitauth"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -135,7 +136,7 @@ func TestAddRunRepoHandler_CreatesRepoWithoutImmediateJobs(t *testing.T) {
 	req.SetPathValue("run_id", runID.String())
 	rr := httptest.NewRecorder()
 
-	addRunRepoHandler(st).ServeHTTP(rr, req)
+	addRunRepoHandler(st, gitauth.Options{}).ServeHTTP(rr, req)
 
 	assertStatus(t, rr, http.StatusCreated)
 	if !st.createMigRepo.called || !st.createRunRepo.called {
@@ -163,7 +164,7 @@ func TestListRunReposHandler_Success(t *testing.T) {
 	}
 	st.getSpec.val = store.Spec{
 		ID:   specID,
-		Spec: []byte(`{"steps":[{"image":"a"}],"mr_on_success":true}`),
+		Spec: []byte(`{"steps":[{"image":"a"}]}`),
 	}
 	st.listRunReposWithURLByRun.val = []store.ListRunReposWithURLByRunRow{
 		{
@@ -198,9 +199,6 @@ func TestListRunReposHandler_Success(t *testing.T) {
 	}
 	if got := resp.Repos[0].SourceCommitSHA; got != "0123456789abcdef0123456789abcdef01234567" {
 		t.Fatalf("expected source_commit_sha, got %q", got)
-	}
-	if !resp.Repos[0].MROnSuccess || resp.Repos[0].MROnFail {
-		t.Fatalf("unexpected mr flags: success=%v fail=%v", resp.Repos[0].MROnSuccess, resp.Repos[0].MROnFail)
 	}
 	if !st.listRunReposWithURLByRun.called {
 		t.Fatalf("expected ListRunReposWithURLByRun to be called")

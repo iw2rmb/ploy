@@ -366,26 +366,6 @@ func TestCompleteJob_ValidCompletion(t *testing.T) {
 
 // ===== JobStatsPayload Unit Tests =====
 
-func TestJobStatsPayload_MRURL(t *testing.T) {
-	tests := []struct {
-		name     string
-		payload  JobStatsPayload
-		expected string
-	}{
-		{name: "nil metadata", payload: JobStatsPayload{}, expected: ""},
-		{name: "empty metadata", payload: JobStatsPayload{Metadata: map[string]string{}}, expected: ""},
-		{name: "mr_url present", payload: JobStatsPayload{Metadata: map[string]string{"mr_url": "https://gitlab.com/mr/1"}}, expected: "https://gitlab.com/mr/1"},
-		{name: "mr_url with whitespace", payload: JobStatsPayload{Metadata: map[string]string{"mr_url": "  https://gitlab.com/mr/2  "}}, expected: "https://gitlab.com/mr/2"},
-	}
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			if got := tc.payload.MRURL(); got != tc.expected {
-				t.Errorf("MRURL() = %q, want %q", got, tc.expected)
-			}
-		})
-	}
-}
-
 func TestJobStatsPayload_HasJobMeta(t *testing.T) {
 	tests := []struct {
 		name     string

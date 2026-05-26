@@ -2,7 +2,6 @@ package specpayload
 
 import (
 	"path/filepath"
-	"strings"
 	"testing"
 )
 
@@ -54,124 +53,6 @@ func TestBuildSpecPayload_NoSpecOrEmpty(t *testing.T) {
 				for k, v := range tt.wantEnv {
 					assertField(t, envs, k, v)
 				}
-			}
-		})
-	}
-}
-
-// ---------------------------------------------------------------------------
-// Build: GitLab domain defaulting
-// ---------------------------------------------------------------------------
-
-func TestBuildSpecPayload_GitLabDomainDefaulting(t *testing.T) {
-	tests := []struct {
-		name          string
-		specContent   string
-		gitlabPAT     string
-		gitlabDomain  string
-		mrSuccess     bool
-		mrFail        bool
-		wantDomain    string
-		wantDomainSet bool
-		wantMRFail    bool // extra MR flag assertion
-	}{
-		{
-			name:          "PAT provided, no domain - defaults to gitlab.com",
-			gitlabPAT:     "glpat-test",
-			wantDomain:    "gitlab.com",
-			wantDomainSet: true,
-		},
-		{
-			name:          "PAT and domain both provided - uses CLI domain",
-			gitlabPAT:     "glpat-test",
-			gitlabDomain:  "gitlab.example.com",
-			wantDomain:    "gitlab.example.com",
-			wantDomainSet: true,
-		},
-		{
-			name:          "PAT in CLI, domain in spec - spec preserved",
-			specContent:   "gitlab_domain: gitlab.spec.com\n",
-			gitlabPAT:     "glpat-test",
-			wantDomain:    "gitlab.spec.com",
-			wantDomainSet: true,
-		},
-		{
-			name:          "PAT in CLI, domain in spec - CLI overrides spec",
-			specContent:   "gitlab_domain: gitlab.spec.com\n",
-			gitlabPAT:     "glpat-test",
-			gitlabDomain:  "gitlab.cli.com",
-			wantDomain:    "gitlab.cli.com",
-			wantDomainSet: true,
-		},
-		{
-			name:          "no PAT - domain not set",
-			wantDomainSet: false,
-		},
-		{
-			name:          "PAT in spec - defaults to gitlab.com",
-			specContent:   "gitlab_pat: glpat-from-spec\n",
-			wantDomain:    "gitlab.com",
-			wantDomainSet: true,
-		},
-		{
-			name: "MR flags with PAT and domain defaulting",
-			specContent: `
-steps:
-  - image: docker.io/test/mig:latest
-envs:
-  KEY1: value1
-`,
-			gitlabPAT:     "glpat-test-123",
-			mrFail:        true,
-			wantDomain:    "gitlab.com",
-			wantDomainSet: true,
-			wantMRFail:    true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			var specFile string
-			if tt.specContent != "" {
-				tmpDir := t.TempDir()
-				specFile = filepath.Join(tmpDir, "test.yaml")
-				writeFile(t, specFile, tt.specContent)
-			}
-
-			migImage := ""
-			if tt.gitlabPAT != "" || strings.TrimSpace(tt.specContent) != "" || tt.gitlabDomain != "" {
-				migImage = "docker.io/test/mig:latest"
-			}
-			payload, err := callBuildSpecPayload(t, specFile, specPayloadOpts{
-				migImage:     migImage,
-				gitlabPAT:    tt.gitlabPAT,
-				gitlabDomain: tt.gitlabDomain,
-				mrSuccess:    tt.mrSuccess,
-				mrFail:       tt.mrFail,
-			})
-			if err != nil {
-				t.Fatalf("Build: %v", err)
-			}
-
-			if payload == nil && !tt.wantDomainSet {
-				return
-			}
-
-			result := unmarshalPayload(t, payload)
-
-			if tt.wantDomainSet {
-				assertField(t, result, "gitlab_domain", tt.wantDomain)
-			} else {
-				assertAbsent(t, result, "gitlab_domain")
-			}
-
-			if tt.wantMRFail {
-				assertField(t, result, "mr_on_fail", true)
-				// mr_on_success should be false/absent when not set.
-				if v, ok := result["mr_on_success"].(bool); ok && v {
-					t.Errorf("expected mr_on_success=false or absent, got true")
-				}
-				assertField(t, result, "gitlab_pat", tt.gitlabPAT)
 			}
 		})
 	}

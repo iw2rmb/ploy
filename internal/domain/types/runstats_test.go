@@ -177,45 +177,6 @@ func TestRunStats_ResumeMetadata_FromJSON(t *testing.T) {
 	}
 }
 
-func TestRunStats_MRURL(t *testing.T) {
-	tests := []struct {
-		name string
-		json string
-		want string
-	}{
-		{
-			name: "MR URL present",
-			json: `{"metadata": {"mr_url": "https://gitlab.com/org/repo/-/merge_requests/42"}}`,
-			want: "https://gitlab.com/org/repo/-/merge_requests/42",
-		},
-		{
-			name: "MR URL with whitespace",
-			json: `{"metadata": {"mr_url": "  https://gitlab.com/org/repo/-/merge_requests/99  "}}`,
-			want: "https://gitlab.com/org/repo/-/merge_requests/99",
-		},
-		{
-			name: "no metadata",
-			json: `{}`,
-			want: "",
-		},
-		{
-			name: "metadata missing mr_url",
-			json: `{"metadata": {"other_field": "value"}}`,
-			want: "",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			stats := mustParseRunStats(t, tt.json)
-			got := stats.MRURL()
-			if got != tt.want {
-				t.Errorf("MRURL() = %q, want %q", got, tt.want)
-			}
-		})
-	}
-}
-
 func TestRunStats_GateSummary(t *testing.T) {
 	tests := []struct {
 		name string
@@ -237,11 +198,11 @@ func TestRunStats_GateSummary(t *testing.T) {
 			json: `{"gate": {"pre_gate": {"passed": true, "duration_ms": 890}}}`,
 			want: "passed pre-gate duration=890ms",
 		},
-			{
-				name: "pre gate failed",
-				json: `{"gate": {"pre_gate": {"passed": false, "duration_ms": 456}}}`,
-				want: "failed pre-gate duration=456ms",
-			},
+		{
+			name: "pre gate failed",
+			json: `{"gate": {"pre_gate": {"passed": false, "duration_ms": 456}}}`,
+			want: "failed pre-gate duration=456ms",
+		},
 		{
 			name: "float64 duration from JSON",
 			json: `{"gate": {"final_gate": {"passed": true, "duration_ms": 1500}}}`,
@@ -322,9 +283,6 @@ func TestRunStats_GateSummary_FromJSON(t *testing.T) {
 					"usage": {"cpu_total_ns": 2345678901, "mem_usage_bytes": 23456789}
 				}
 			}
-		},
-		"metadata": {
-			"mr_url": "https://gitlab.com/org/repo/-/merge_requests/1"
 		}
 	}`
 
@@ -338,13 +296,6 @@ func TestRunStats_GateSummary_FromJSON(t *testing.T) {
 	want := "failed final-gate duration=2345ms"
 	if got != want {
 		t.Errorf("GateSummary() = %q, want %q", got, want)
-	}
-
-	// Test MR URL extraction.
-	gotMR := stats.MRURL()
-	wantMR := "https://gitlab.com/org/repo/-/merge_requests/1"
-	if gotMR != wantMR {
-		t.Errorf("MRURL() = %q, want %q", gotMR, wantMR)
 	}
 
 	// Test exit code extraction.
@@ -412,12 +363,12 @@ func TestRunStatsBuilder(t *testing.T) {
 
 	t.Run("with metadata", func(t *testing.T) {
 		stats := NewRunStatsBuilder().
-			MetadataEntry("mr_url", "https://example.com/mr/1").
+			MetadataEntry("reason", "manual").
 			MustBuild()
 
-		mrURL := stats.MRURL()
-		if mrURL != "https://example.com/mr/1" {
-			t.Errorf("MRURL() = %q, want %q", mrURL, "https://example.com/mr/1")
+		got := stats.Metadata()["reason"]
+		if got != "manual" {
+			t.Errorf("Metadata()[reason] = %q, want %q", got, "manual")
 		}
 	})
 

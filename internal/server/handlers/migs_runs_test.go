@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/gitauth"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -207,7 +208,7 @@ func TestMigRuns_Create(t *testing.T) {
 					tt.setupFn(st)
 				}
 			}
-			handler := createMigRunHandler(st)
+			handler := createMigRunHandler(st, gitauth.Options{})
 			rr := doRequest(t, handler, http.MethodPost, "/v1/migs/mig123/runs", tt.body, "mig_id", "mig123")
 			assertStatus(t, rr, tt.wantStatus)
 			if tt.verify != nil {
@@ -223,7 +224,7 @@ func TestMigRuns_Create_RejectsWhenSourceCommitSeedFails(t *testing.T) {
 	st.repoByID = map[domaintypes.RepoID]store.Repo{
 		"repo1": {ID: "repo1", Url: "https://github.com/org/repo1"},
 	}
-	handler := createMigRunHandler(st)
+	handler := createMigRunHandler(st, gitauth.Options{})
 
 	body, _ := json.Marshal(allReposSelector())
 

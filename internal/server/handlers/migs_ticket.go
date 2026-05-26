@@ -85,19 +85,12 @@ func getRunStatusHandler(st store.Store) http.HandlerFunc {
 			Stages:     make(map[domaintypes.JobID]migsapi.StageStatus),
 		}
 
-		// Surface MR URL, gate summary, and resume metadata from runs.stats if present.
-		// Node stores MR URL under stats.metadata.mr_url and gate data under stats.gate.
+		// Surface gate summary and resume metadata from runs.stats if present.
 		// Gate summary exposes gate health without requiring raw artifact inspection.
 		// Resume metadata (resume_count, last_resumed_at) tracks resume history.
 		if len(run.Stats) > 0 && json.Valid(run.Stats) {
 			var stats domaintypes.RunStats
 			if err := json.Unmarshal(run.Stats, &stats); err == nil {
-				if mr := stats.MRURL(); mr != "" {
-					if summary.Metadata == nil {
-						summary.Metadata = map[string]string{}
-					}
-					summary.Metadata["mr_url"] = mr
-				}
 				// Extract gate summary for quick gate health visibility.
 				if gateSummary := stats.GateSummary(); gateSummary != "" {
 					if summary.Metadata == nil {

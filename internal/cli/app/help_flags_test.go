@@ -23,8 +23,7 @@ func TestHelpFlagsAtAllLevels(t *testing.T) {
 		{name: "ploy", baseArgs: nil, expectContains: []string{"Ploy CLI v2", "Core Commands:", "mig", "cluster"}},
 		{name: "ploy mig", baseArgs: []string{"mig"}, expectContains: []string{"Usage: ploy mig", "run"}},
 		{name: "ploy run", baseArgs: []string{"run"}, expectContains: []string{"Usage: ploy run"}},
-		{name: "ploy config", baseArgs: []string{"config"}, expectContains: []string{"Usage: ploy config", "gitlab"}},
-		{name: "ploy config gitlab", baseArgs: []string{"config", "gitlab"}, expectContains: []string{"Usage: ploy config gitlab", "show", "set", "validate"}},
+		{name: "ploy config", baseArgs: []string{"config"}, expectContains: []string{"Usage: ploy config", "env"}},
 		{name: "ploy manifest", baseArgs: []string{"manifest"}, expectContains: []string{"Usage: ploy manifest", "schema", "validate"}},
 		{name: "ploy cluster", baseArgs: []string{"cluster"}, expectContains: []string{"Usage: ploy cluster", "node", "token"}},
 		{name: "ploy cluster node", baseArgs: []string{"cluster", "node"}, expectContains: []string{"Usage: ploy cluster node", "add"}},
@@ -72,7 +71,6 @@ func TestHelpFlagNoUnknownSubcommandError(t *testing.T) {
 	commands := [][]string{
 		{"mig", "--help"},
 		{"config", "--help"},
-		{"config", "gitlab", "--help"},
 		{"manifest", "--help"},
 		{"cluster", "--help"},
 		{"cluster", "node", "--help"},

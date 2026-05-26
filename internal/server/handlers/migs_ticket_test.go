@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/gitauth"
 	migsapi "github.com/iw2rmb/ploy/internal/migs/api"
 	"github.com/iw2rmb/ploy/internal/store"
 )
@@ -28,7 +29,7 @@ func TestCreateSingleRepoRunHandler_SingleRepo(t *testing.T) {
 		CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
 	}
 
-	handler := createSingleRepoRunHandler(st, nil)
+	handler := createSingleRepoRunHandler(st, nil, gitauth.Options{})
 	rr := doRequest(t, handler, http.MethodPost, "/v1/runs", validRunRequestBody())
 
 	assertStatus(t, rr, http.StatusCreated)
@@ -239,7 +240,7 @@ func TestCreateSingleRepoRunHandler_ValidationErrors(t *testing.T) {
 	t.Parallel()
 
 	st := &jobStore{}
-	handler := createSingleRepoRunHandler(st, nil)
+	handler := createSingleRepoRunHandler(st, nil, gitauth.Options{})
 
 	tests := []struct {
 		name       string
@@ -279,7 +280,7 @@ func TestCreateSingleRepoRunHandler_PublishesEvent(t *testing.T) {
 	}
 
 	eventsService, _ := createTestEventsService()
-	handler := createSingleRepoRunHandler(st, eventsService)
+	handler := createSingleRepoRunHandler(st, eventsService, gitauth.Options{})
 
 	rr := doRequest(t, handler, http.MethodPost, "/v1/runs", validRunRequestBody())
 	assertStatus(t, rr, http.StatusCreated)

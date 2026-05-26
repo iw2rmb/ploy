@@ -239,11 +239,6 @@ build_gate:
 # - relative include paths resolve from each including file directory
 # - relative local-source paths inside included fragments (`amata.spec` and
 #   source side of `in`/`out`/`home`) resolve from that included file directory
-# Optional GitLab integration (control plane/node redact PAT in logs).
-gitlab_domain: gitlab.com # optional; defaults to gitlab.com when gitlab_pat is provided
-# gitlab_pat: "<TOKEN>"           # optional; can be set via ploy config gitlab; avoid committing to VCS
-mr_on_success: true
-mr_on_fail: true
 ################################################################################
 # NOTES
 ################################################################################
@@ -251,8 +246,7 @@ mr_on_fail: true
 #   repository flags (e.g., --repo, --base-ref, --target-ref).
 #
 # - The agent honors: image, command, envs, in, out, home,
-#   steps[] (for single-step and multi-step runs), gitlab_domain, gitlab_pat, mr_on_success,
-#   mr_on_fail, build_gate.* (enabled, images, heal).
+#   steps[] (for single-step and multi-step runs), build_gate.* (enabled, images, heal).
 #
 # - Use envs for environment variables and in/out/home for file injection.
 #

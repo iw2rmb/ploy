@@ -24,12 +24,12 @@ func TestPolicies(t *testing.T) {
 		wantMaxAttempts int
 	}{
 		{
-			name:           "rollout",
-			policy:         RolloutPolicy(),
-			wantInitial:    2 * time.Second,
-			wantMax:        30 * time.Second,
-			wantMultiplier: 2.0,
-			wantMaxElapsed: 5 * time.Minute,
+			name:            "rollout",
+			policy:          RolloutPolicy(),
+			wantInitial:     2 * time.Second,
+			wantMax:         30 * time.Second,
+			wantMultiplier:  2.0,
+			wantMaxElapsed:  5 * time.Minute,
 			wantMaxAttempts: 10,
 		},
 		{
@@ -45,14 +45,6 @@ func TestPolicies(t *testing.T) {
 			wantInitial:    250 * time.Millisecond,
 			wantMax:        5 * time.Second,
 			wantMultiplier: 2.0,
-		},
-		{
-			name:            "gitlab MR",
-			policy:          GitLabMRPolicy(),
-			wantInitial:     1 * time.Second,
-			wantMax:         4 * time.Second,
-			wantMultiplier:  2.0,
-			wantMaxAttempts: 4,
 		},
 	}
 
@@ -129,9 +121,9 @@ func TestRunWithBackoff(t *testing.T) {
 		wantCalls func(calls int) bool
 	}{
 		{
-			name:   "immediate success",
-			policy: fastPolicy(3),
-			op:     func(_ *int) error { return nil },
+			name:      "immediate success",
+			policy:    fastPolicy(3),
+			op:        func(_ *int) error { return nil },
 			wantCalls: func(c int) bool { return c == 1 },
 		},
 		{
@@ -146,9 +138,9 @@ func TestRunWithBackoff(t *testing.T) {
 			wantCalls: func(c int) bool { return c == 3 },
 		},
 		{
-			name:   "exhaust attempts",
-			policy: fastPolicy(3),
-			op:     func(_ *int) error { return errors.New("persistent error") },
+			name:      "exhaust attempts",
+			policy:    fastPolicy(3),
+			op:        func(_ *int) error { return errors.New("persistent error") },
 			wantErr:   true,
 			wantCalls: func(c int) bool { return c == 3 },
 		},
@@ -168,10 +160,10 @@ func TestRunWithBackoff(t *testing.T) {
 			wantCalls: func(c int) bool { return c <= 4 },
 		},
 		{
-			name:   "nil logger does not panic",
-			policy: fastPolicy(2),
-			logger: nil,
-			op:     func(_ *int) error { return nil },
+			name:      "nil logger does not panic",
+			policy:    fastPolicy(2),
+			logger:    nil,
+			op:        func(_ *int) error { return nil },
 			wantCalls: func(c int) bool { return c == 1 },
 		},
 		{

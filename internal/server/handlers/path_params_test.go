@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	bsmock "github.com/iw2rmb/ploy/internal/blobstore/mock"
+	"github.com/iw2rmb/ploy/internal/gitauth"
 	"github.com/iw2rmb/ploy/internal/server/blobpersist"
 )
 
@@ -74,7 +75,7 @@ func TestPathParamsUseDomainTypes(t *testing.T) {
 		t.Parallel()
 
 		st := &migStore{}
-		h := createMigRunHandler(st)
+		h := createMigRunHandler(st, gitauth.Options{})
 
 		req := httptest.NewRequest(http.MethodPost, "/v1/migs//runs", nil)
 		req.SetPathValue("mig_id", "")

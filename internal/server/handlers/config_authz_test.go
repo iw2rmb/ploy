@@ -16,8 +16,6 @@ func TestConfigEndpoints_AdminOnly(t *testing.T) {
 		path   string
 		body   string
 	}{
-		{name: "GET /v1/config/gitlab", method: http.MethodGet, path: "/v1/config/gitlab"},
-		{name: "PUT /v1/config/gitlab", method: http.MethodPut, path: "/v1/config/gitlab", body: `{"domain":"https://gitlab.example.com","token":"test-token"}`},
 		{name: "GET /v1/config/env", method: http.MethodGet, path: "/v1/config/env"},
 		{name: "GET /v1/config/env/{key}", method: http.MethodGet, path: "/v1/config/env/TEST_KEY"},
 		{name: "PUT /v1/config/env/{key}", method: http.MethodPut, path: "/v1/config/env/TEST_KEY", body: `{"value":"test","target":"server"}`},

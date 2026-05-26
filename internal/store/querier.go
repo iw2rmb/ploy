@@ -140,6 +140,7 @@ type Querier interface {
 	GetRunRepo(ctx context.Context, arg GetRunRepoParams) (RunRepo, error)
 	GetRunRepoAction(ctx context.Context, id types.JobID) (RunRepoAction, error)
 	GetRunRepoActionByKey(ctx context.Context, arg GetRunRepoActionByKeyParams) (RunRepoAction, error)
+	GetRunRepoSnapshotMetadata(ctx context.Context, arg GetRunRepoSnapshotMetadataParams) (GetRunRepoSnapshotMetadataRow, error)
 	GetRunTiming(ctx context.Context, id types.RunID) (RunsTiming, error)
 	GetSpec(ctx context.Context, id types.SpecID) (Spec, error)
 	// Returns spec bundle metadata including object_key for object-storage retrieval.
@@ -150,6 +151,8 @@ type Querier interface {
 	// Checks if a mig_repo has any historical executions (run_repos references).
 	// Returns true if the repo cannot be deleted due to history, false otherwise.
 	HasMigRepoHistory(ctx context.Context, repoID types.RepoID) (bool, error)
+	HasRunningActionForRunRepoNode(ctx context.Context, arg HasRunningActionForRunRepoNodeParams) (bool, error)
+	HasRunningJobForRunRepoNode(ctx context.Context, arg HasRunningJobForRunRepoNodeParams) (bool, error)
 	// Increments attempt and resets status/timing for a fresh repo execution attempt.
 	IncrementRunRepoAttempt(ctx context.Context, arg IncrementRunRepoAttemptParams) error
 	InsertAPIToken(ctx context.Context, arg InsertAPITokenParams) error
@@ -287,9 +290,6 @@ type Querier interface {
 	// Increments resume_count and updates last_resumed_at timestamp in runs.stats.
 	// Uses JSONB merge (||) to preserve existing stats while adding resume metadata.
 	UpdateRunResume(ctx context.Context, id types.RunID) error
-	// Merge an MR URL into runs.stats.metadata.mr_url without altering other fields.
-	// Preserves existing stats and metadata keys via JSONB merge.
-	UpdateRunStatsMRURL(ctx context.Context, arg UpdateRunStatsMRURLParams) error
 	UpdateRunStatus(ctx context.Context, arg UpdateRunStatusParams) error
 	// Updates last_ref_at to now() for the given spec bundle.
 	// Call this whenever a spec or run references the bundle to keep GC metadata fresh.

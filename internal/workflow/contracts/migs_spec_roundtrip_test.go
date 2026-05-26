@@ -6,16 +6,13 @@ import (
 )
 
 func TestMigSpec_RoundTrip(t *testing.T) {
-	mrOnSuccess := true
 	original := &MigSpec{
 		Steps: []MigStep{{
 			Image:   JobImage{Universal: "ghcr.io/iw2rmb/ploy/mig:latest"},
 			Command: CommandSpec{Shell: "echo hello"},
 			Envs:    map[string]string{"FOO": "bar"},
 		}},
-		BuildGate:   &BuildGateConfig{Enabled: true},
-		GitLabPAT:   "secret",
-		MROnSuccess: &mrOnSuccess,
+		BuildGate: &BuildGateConfig{Enabled: true},
 	}
 
 	data, err := json.Marshal(original)
@@ -36,9 +33,6 @@ func TestMigSpec_RoundTrip(t *testing.T) {
 	}
 	if parsed.BuildGate == nil || !parsed.BuildGate.Enabled {
 		t.Errorf("build_gate.enabled should be true")
-	}
-	if parsed.GitLabPAT != "secret" {
-		t.Errorf("gitlab_pat = %q, want %q", parsed.GitLabPAT, "secret")
 	}
 }
 

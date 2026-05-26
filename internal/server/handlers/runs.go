@@ -82,8 +82,6 @@ type RunRepoResponse struct {
 	BaseRef         string                    `json:"base_ref"`
 	TargetRef       string                    `json:"target_ref"`
 	SourceCommitSHA string                    `json:"source_commit_sha,omitempty"`
-	MROnSuccess     bool                      `json:"mr_on_success,omitempty"`
-	MROnFail        bool                      `json:"mr_on_fail,omitempty"`
 	Status          domaintypes.RunRepoStatus `json:"status"`
 	Attempt         int32                     `json:"attempt"`
 	LastError       *string                   `json:"last_error,omitempty"`
@@ -94,7 +92,7 @@ type RunRepoResponse struct {
 
 // runRepoToResponse converts a store.RunRepo to a RunRepoResponse.
 // Wraps raw store strings in domain types for type-safe API output.
-func runRepoToResponse(rr store.RunRepo, repoURL string, mrOnSuccess, mrOnFail bool) RunRepoResponse {
+func runRepoToResponse(rr store.RunRepo, repoURL string) RunRepoResponse {
 	resp := RunRepoResponse{
 		RunID:           rr.RunID,
 		RepoID:          rr.RepoID,
@@ -102,8 +100,6 @@ func runRepoToResponse(rr store.RunRepo, repoURL string, mrOnSuccess, mrOnFail b
 		BaseRef:         rr.RepoBaseRef,
 		TargetRef:       rr.RepoTargetRef,
 		SourceCommitSHA: rr.SourceCommitSha,
-		MROnSuccess:     mrOnSuccess,
-		MROnFail:        mrOnFail,
 		Status:          rr.Status,
 		Attempt:         rr.Attempt,
 		LastError:       rr.LastError,

@@ -1,13 +1,10 @@
 package handlers
 
 import (
-	"log/slog"
-	"net/http"
 	"sort"
 	"sync"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	"github.com/iw2rmb/ploy/internal/server/config"
 )
 
 // GlobalEnvVar represents a single global environment variable with its metadata.
@@ -28,22 +25,21 @@ type ConfigInEntry struct {
 }
 
 // ConfigHolder provides thread-safe access to runtime configuration, including
-// GitLab settings, global environment variables, and typed Hydra overlays.
+// global environment variables and typed Hydra overlays.
 // Global env is stored as key → []GlobalEnvVar to support multiple targets per key.
 // Hydra overlays are stored per section (pre_gate, post_gate, mig).
 // Config In entries are section-keyed and synced into hydra overlays.
 type ConfigHolder struct {
 	mu        sync.RWMutex
-	gitlab    config.GitLabConfig
 	globalEnv map[string][]GlobalEnvVar
 	hydra     map[string]*HydraJobConfig
 	configIn  map[string][]ConfigInEntry // section → []entry
 	bundleMap map[string]string          // shortHash → bundleID (content-addressed, global)
 }
 
-// NewConfigHolder creates a new config holder with initial GitLab config and
-// an optional multi-target map of global environment variables.
-func NewConfigHolder(gitlab config.GitLabConfig, globalEnv map[string][]GlobalEnvVar) *ConfigHolder {
+// NewConfigHolder creates a new config holder with an optional multi-target map
+// of global environment variables.
+func NewConfigHolder(globalEnv map[string][]GlobalEnvVar) *ConfigHolder {
 	envCopy := make(map[string][]GlobalEnvVar, len(globalEnv))
 	for k, entries := range globalEnv {
 		cp := make([]GlobalEnvVar, len(entries))
@@ -51,23 +47,8 @@ func NewConfigHolder(gitlab config.GitLabConfig, globalEnv map[string][]GlobalEn
 		envCopy[k] = cp
 	}
 	return &ConfigHolder{
-		gitlab:    gitlab,
 		globalEnv: envCopy,
 	}
-}
-
-// GetGitLab returns the current GitLab configuration.
-func (h *ConfigHolder) GetGitLab() config.GitLabConfig {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
-	return h.gitlab
-}
-
-// SetGitLab updates the GitLab configuration.
-func (h *ConfigHolder) SetGitLab(cfg config.GitLabConfig) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	h.gitlab = cfg
 }
 
 func copySectionSlice[T any](m map[string][]T, section string) []T {
@@ -210,68 +191,6 @@ func (h *ConfigHolder) GetHydraOverlays() map[string]*HydraJobConfig {
 		}
 	}
 	return cp
-}
-
-// gitLabConfigResponse is the wire format for GET/PUT /v1/config/gitlab.
-type gitLabConfigResponse struct {
-	Domain string `json:"domain"`
-	Token  string `json:"token"`
-}
-
-// getGitLabConfigHandler returns an HTTP handler that returns the current GitLab config.
-// It requires mTLS admin role authorization (enforced by middleware).
-// The token field is included in the response for admin access.
-func getGitLabConfigHandler(holder *ConfigHolder) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		cfg := holder.GetGitLab()
-
-		resp := gitLabConfigResponse{
-			Domain: cfg.Domain,
-			Token:  cfg.Token,
-		}
-
-		writeJSON(w, http.StatusOK, resp)
-
-		slog.Info("config gitlab get: returned configuration",
-			"domain", cfg.Domain,
-			"has_token", cfg.Token != "",
-		)
-	}
-}
-
-// putGitLabConfigHandler returns an HTTP handler that updates the GitLab config.
-// It requires mTLS admin role authorization (enforced by middleware).
-// The configuration is stored in memory only; persistence is the caller's responsibility.
-func putGitLabConfigHandler(holder *ConfigHolder) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		var req struct {
-			Domain string `json:"domain"`
-			Token  string `json:"token"`
-		}
-
-		if err := decodeRequestJSON(w, r, &req, DefaultMaxBodySize); err != nil {
-			return
-		}
-
-		// Update the in-memory configuration.
-		holder.SetGitLab(config.GitLabConfig{
-			Domain: req.Domain,
-			Token:  req.Token,
-		})
-
-		// Return the updated configuration.
-		resp := gitLabConfigResponse{
-			Domain: req.Domain,
-			Token:  req.Token,
-		}
-
-		writeJSON(w, http.StatusOK, resp)
-
-		slog.Info("config gitlab put: configuration updated",
-			"domain", req.Domain,
-			"has_token", req.Token != "",
-		)
-	}
 }
 
 // SetConfigIn replaces the in entry set for a section and syncs into hydra overlays.
