@@ -489,7 +489,7 @@ func applyConfigOverlayInPlace(spec map[string]any) error {
 //  2. Preprocess: resolve !include composition, image env, envs expansion
 //  3. Compile Hydra records: in/out/home authoring entries → canonical shortHash:dst form
 //  4. Apply CLI flag overrides (higher precedence than spec file) to top-level fields
-//  5. Apply defaults (e.g., gitlab_domain when gitlab_pat is set)
+//  5. Validate the current spec contract
 //
 // Returns nil payload when neither spec file nor CLI overrides are provided.
 //
@@ -507,10 +507,6 @@ func Build(
 	migImage string,
 	retain bool,
 	migCommand string,
-	gitlabPAT string,
-	gitlabDomain string,
-	mrSuccess bool,
-	mrFail bool,
 ) ([]byte, error) {
 	_ = retain
 
@@ -549,8 +545,7 @@ func Build(
 	}
 
 	// Merge CLI flag overrides (CLI flags take precedence)
-	hasOverrides := len(migEnvs) > 0 || migImage != "" || migCommand != "" ||
-		gitlabPAT != "" || gitlabDomain != "" || mrSuccess || mrFail
+	hasOverrides := len(migEnvs) > 0 || migImage != "" || migCommand != ""
 
 	// Only proceed if we have a spec file or CLI overrides
 	if len(specMap) == 0 && !hasOverrides {
@@ -626,28 +621,6 @@ func Build(
 			} else {
 				step0["command"] = migCommand
 			}
-		}
-	}
-
-	// Add GitLab options (never print PAT in logs; node agent will handle redaction)
-	if gitlabPAT != "" {
-		specMap["gitlab_pat"] = gitlabPAT
-	}
-	if gitlabDomain != "" {
-		specMap["gitlab_domain"] = gitlabDomain
-	}
-	if mrSuccess {
-		specMap["mr_on_success"] = true
-	}
-	if mrFail {
-		specMap["mr_on_fail"] = true
-	}
-
-	// Default gitlab_domain to "gitlab.com" when gitlab_pat is provided but gitlab_domain is empty.
-	// This runs after all CLI overrides to check the final state.
-	if _, hasPAT := specMap["gitlab_pat"]; hasPAT {
-		if _, hasDomain := specMap["gitlab_domain"]; !hasDomain {
-			specMap["gitlab_domain"] = "gitlab.com"
 		}
 	}
 

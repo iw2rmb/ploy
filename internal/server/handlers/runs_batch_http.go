@@ -12,8 +12,8 @@ import (
 
 	"github.com/iw2rmb/ploy/internal/blobstore"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/gitauth"
 	"github.com/iw2rmb/ploy/internal/store"
-	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"github.com/iw2rmb/ploy/internal/workflow/lifecycle"
 )
 
@@ -68,7 +68,7 @@ func cancelRunHandlerV1(st store.Store) http.HandlerFunc {
 
 // addRunRepoHandler adds a repo to an existing run (and to the mig repo set).
 // POST /v1/runs/{run_id}/repos — Body {repo_url, base_ref, target_ref}.
-func addRunRepoHandler(st store.Store) http.HandlerFunc {
+func addRunRepoHandler(st store.Store, gitAuth gitauth.Options) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		runID, ok := parseRequiredPathIDOrWriteError[domaintypes.RunID](w, r, "run_id")
 		if !ok {
@@ -114,13 +114,7 @@ func addRunRepoHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		spec, err := st.GetSpec(r.Context(), run.SpecID)
-		if err != nil {
-			writeHTTPError(w, http.StatusInternalServerError, "failed to get run spec: %v", err)
-			return
-		}
-
-		sourceCommitSHA, seedErr := resolveSourceCommitSHAFromContext(r.Context(), rawRepoURL, migRepo.BaseRef, gitAuthOptionsFromSpec(spec.Spec))
+		sourceCommitSHA, seedErr := resolveSourceCommitSHAFromContext(r.Context(), rawRepoURL, migRepo.BaseRef, gitAuth)
 		if seedErr != nil {
 			writeHTTPError(w, http.StatusBadRequest, "failed to resolve source commit for repo %s ref %s: %v", normalizedRepoURL, migRepo.BaseRef, seedErr)
 			slog.Error("add run repo: resolve source commit failed",
@@ -147,7 +141,7 @@ func addRunRepoHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		writeJSON(w, http.StatusCreated, runRepoToResponse(runRepo, normalizedRepoURL, false, false))
+		writeJSON(w, http.StatusCreated, runRepoToResponse(runRepo, normalizedRepoURL))
 	}
 }
 
@@ -157,12 +151,6 @@ func listRunReposHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		runID, ok := parseRequiredPathIDOrWriteError[domaintypes.RunID](w, r, "run_id")
 		if !ok {
-			return
-		}
-
-		mrOnSuccess, mrOnFail, err := resolveRunMRWiring(r, st, runID)
-		if err != nil {
-			serverError(w, "list run repos", "resolve run spec", err, "run_id", runID.String())
 			return
 		}
 
@@ -188,7 +176,7 @@ func listRunReposHandler(st store.Store) http.HandlerFunc {
 				CreatedAt:       rr.CreatedAt,
 				StartedAt:       rr.StartedAt,
 				FinishedAt:      rr.FinishedAt,
-			}, rr.RepoUrl, mrOnSuccess, mrOnFail))
+			}, rr.RepoUrl))
 		}
 
 		resp := struct {
@@ -227,7 +215,7 @@ func cancelRunRepoHandlerV1(st store.Store) http.HandlerFunc {
 			if resolvedURL, err := repoURLForID(r.Context(), st, rr.RepoID); err == nil {
 				repoURL = resolvedURL
 			}
-			writeJSON(w, http.StatusOK, runRepoToResponse(rr, repoURL, false, false))
+			writeJSON(w, http.StatusOK, runRepoToResponse(rr, repoURL))
 			return
 		}
 
@@ -271,7 +259,7 @@ func cancelRunRepoHandlerV1(st store.Store) http.HandlerFunc {
 		if resolvedURL, err := repoURLForID(r.Context(), st, rr.RepoID); err == nil {
 			repoURL = resolvedURL
 		}
-		writeJSON(w, http.StatusOK, runRepoToResponse(rr, repoURL, false, false))
+		writeJSON(w, http.StatusOK, runRepoToResponse(rr, repoURL))
 	}
 }
 
@@ -383,27 +371,8 @@ func restartRunRepoHandler(st store.Store, bs blobstore.Store) http.HandlerFunc 
 			repoURL = resolvedURL
 		}
 
-		writeJSON(w, http.StatusOK, runRepoToResponse(runRepo, repoURL, false, false))
+		writeJSON(w, http.StatusOK, runRepoToResponse(runRepo, repoURL))
 	}
-}
-
-func resolveRunMRWiring(r *http.Request, st store.Store, runID domaintypes.RunID) (bool, bool, error) {
-	run, err := st.GetRun(r.Context(), runID)
-	if err != nil {
-		return false, false, err
-	}
-	spec, err := st.GetSpec(r.Context(), run.SpecID)
-	if err != nil {
-		return false, false, err
-	}
-	parsed, err := contracts.ParseMigSpecJSON(spec.Spec)
-	if err != nil {
-		return false, false, err
-	}
-
-	mrOnSuccess := parsed.MROnSuccess != nil && *parsed.MROnSuccess
-	mrOnFail := parsed.MROnFail != nil && *parsed.MROnFail
-	return mrOnSuccess, mrOnFail, nil
 }
 
 // StartRunResponse contains the result of starting a batch run.

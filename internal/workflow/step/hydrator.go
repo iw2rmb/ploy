@@ -24,11 +24,10 @@ func NewFilesystemWorkspaceHydrator(fetcher hydration.GitFetcher) (WorkspaceHydr
 
 // Hydrate prepares the workspace by fetching repository sources as needed.
 func (h *filesystemWorkspaceHydrator) Hydrate(ctx context.Context, manifest contracts.StepManifest, workspace string) error {
-	auth := gitauth.OptionsFromManifest(manifest)
 	// Process each input that has repository hydration configured.
 	for _, input := range manifest.Inputs {
 		if input.Hydration != nil && input.Hydration.Repo != nil {
-			if err := h.fetcher.Fetch(ctx, input.Hydration.Repo, workspace, auth); err != nil {
+			if err := h.fetcher.Fetch(ctx, input.Hydration.Repo, workspace, gitauth.Options{}); err != nil {
 				return fmt.Errorf("failed to hydrate input %s: %w", input.Name, err)
 			}
 		}

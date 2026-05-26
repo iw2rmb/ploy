@@ -939,7 +939,6 @@ for the formal schema definition.
 
 - `repo_base_ref`, `repo_target_ref`: Git refs used for this run.
 - `node_id`: ID of the node that claimed/executed the run.
-- `mr_url`: Merge request URL when available (GitLab/GitHub).
 - `gate_summary`: Build Gate health summary from run stats.
 - `reason`: Terminal failure/cancellation reason when available.
 - `resume_count`, `last_resumed_at`: Resume history when present.

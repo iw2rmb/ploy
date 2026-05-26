@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"log/slog"
 	"net/http"
 	"strings"
 
@@ -76,9 +75,6 @@ func completeAction(
 	if errText := stats.ErrorMessage(); errText != "" {
 		meta["error"] = errText
 	}
-	if mrURL := stats.MRURL(); mrURL != "" {
-		meta["mr_url"] = mrURL
-	}
 	metaBytes, err := json.Marshal(meta)
 	if err != nil {
 		return err
@@ -89,13 +85,6 @@ func completeAction(
 		Meta:   metaBytes,
 	}); err != nil {
 		return err
-	}
-	if status == domaintypes.JobStatusSuccess {
-		if mrURL := stats.MRURL(); mrURL != "" {
-			if err := st.UpdateRunStatsMRURL(ctx, store.UpdateRunStatsMRURLParams{ID: action.RunID, MrUrl: mrURL}); err != nil {
-				slog.Error("complete action: failed to merge MR URL into run stats", "action_id", actionID, "run_id", action.RunID, "err", err)
-			}
-		}
 	}
 	return nil
 }

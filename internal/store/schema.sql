@@ -278,7 +278,7 @@ CREATE TABLE IF NOT EXISTS run_repo_actions (
   run_id          TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
   repo_id         TEXT NOT NULL REFERENCES repos(id) ON DELETE RESTRICT,
   attempt         INTEGER NOT NULL,
-  action_type     TEXT NOT NULL CHECK (action_type IN ('mr_create')),
+  action_type     TEXT NOT NULL,
   status          job_status NOT NULL DEFAULT 'Queued',
   node_id         TEXT REFERENCES nodes(id) ON DELETE SET NULL,
   started_at      TIMESTAMPTZ,

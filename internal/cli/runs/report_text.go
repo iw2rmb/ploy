@@ -270,12 +270,7 @@ func renderRepoHeaderLine(repo RunEntry, repoLinkLabel string, opts TextRenderOp
 	shaPart := colorizeNeutralText(fmt.Sprintf("(%s)", shortSHA))
 	basePart := fmt.Sprintf("@ %s %s", boldBranchName(baseRef), shaPart)
 
-	header := fmt.Sprintf("   %s %s %s", repoIDCell, repoLabel, basePart)
-	if repo.MROnSuccess || repo.MROnFail {
-		targetRef := valueOrDash(strings.TrimSpace(repo.TargetRef))
-		header += fmt.Sprintf(" -> %s", boldBranchName(targetRef))
-	}
-	return header
+	return fmt.Sprintf("   %s %s %s", repoIDCell, repoLabel, basePart)
 }
 
 func formatShortSHA(raw string) string {

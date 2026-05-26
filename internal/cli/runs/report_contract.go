@@ -22,8 +22,6 @@ type RunEntry struct {
 	BaseRef         string                    `json:"base_ref"`
 	TargetRef       string                    `json:"target_ref"`
 	SourceCommitSHA string                    `json:"source_commit_sha,omitempty"`
-	MROnSuccess     bool                      `json:"mr_on_success,omitempty"`
-	MROnFail        bool                      `json:"mr_on_fail,omitempty"`
 	Attempt         int32                     `json:"attempt"`
 	Status          domaintypes.RunRepoStatus `json:"status"`
 	LastError       *string                   `json:"last_error,omitempty"`
@@ -33,20 +31,20 @@ type RunEntry struct {
 
 // RunJobEntry is one row in the follow-style job graph.
 type RunJobEntry struct {
-	JobID               domaintypes.JobID     `json:"job_id"`
-	JobType             domaintypes.JobType   `json:"job_type"`
-	JobImage            string                `json:"job_image"`
-	NodeID              *domaintypes.NodeID   `json:"node_id,omitempty"`
-	Status              domaintypes.JobStatus `json:"status"`
-	ExitCode            *int32                `json:"exit_code,omitempty"`
-	StartedAt           *time.Time            `json:"started_at,omitempty"`
-	FinishedAt          *time.Time            `json:"finished_at,omitempty"`
-	DurationMs          int64                 `json:"duration_ms"`
-	DisplayName         string                `json:"display_name,omitempty"`
-	BugSummary          string                `json:"bug_summary,omitempty"`
-	Artifacts           []RunJobArtifact      `json:"artifacts,omitempty"`
-	JobLogURL           string                `json:"job_log_url,omitempty"`
-	PatchURL            string                `json:"patch_url,omitempty"`
+	JobID       domaintypes.JobID     `json:"job_id"`
+	JobType     domaintypes.JobType   `json:"job_type"`
+	JobImage    string                `json:"job_image"`
+	NodeID      *domaintypes.NodeID   `json:"node_id,omitempty"`
+	Status      domaintypes.JobStatus `json:"status"`
+	ExitCode    *int32                `json:"exit_code,omitempty"`
+	StartedAt   *time.Time            `json:"started_at,omitempty"`
+	FinishedAt  *time.Time            `json:"finished_at,omitempty"`
+	DurationMs  int64                 `json:"duration_ms"`
+	DisplayName string                `json:"display_name,omitempty"`
+	BugSummary  string                `json:"bug_summary,omitempty"`
+	Artifacts   []RunJobArtifact      `json:"artifacts,omitempty"`
+	JobLogURL   string                `json:"job_log_url,omitempty"`
+	PatchURL    string                `json:"patch_url,omitempty"`
 }
 
 // RunJobArtifact is the per-job artifact view emitted by run status JSON.

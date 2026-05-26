@@ -129,6 +129,29 @@ JOIN repos r ON rr.repo_id = r.id
 WHERE rr.run_id = $1
 ORDER BY rr.created_at ASC, rr.repo_id ASC;
 
+-- name: GetRunRepoSnapshotMetadata :one
+SELECT
+  rr.run_id,
+  rr.repo_id,
+  rr.repo_base_ref,
+  rr.repo_target_ref,
+  rr.source_commit_sha,
+  r.url AS repo_url
+FROM run_repos rr
+JOIN repos r ON r.id = rr.repo_id
+WHERE rr.run_id = $1
+  AND rr.repo_id = $2;
+
+-- name: HasRunningJobForRunRepoNode :one
+SELECT EXISTS (
+  SELECT 1
+  FROM jobs
+  WHERE run_id = $1
+    AND repo_id = $2
+    AND node_id = $3
+    AND status = 'Running'
+)::boolean;
+
 -- name: GetLatestRunRepoByMigAndRepoStatus :one
 -- v1: Gets the newest run_repos row for a specific repo_id in a mig,
 -- filtered by terminal status (Success or Fail).

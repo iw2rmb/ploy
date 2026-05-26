@@ -14,7 +14,6 @@ package contracts
 import (
 	"encoding/json"
 	"fmt"
-	"strings"
 )
 
 // ParseMigSpecJSON parses a mig specification from JSON bytes.
@@ -33,11 +32,6 @@ func ParseMigSpecJSON(data []byte) (*MigSpec, error) {
 	var spec MigSpec
 	if err := json.Unmarshal(data, &spec); err != nil {
 		return nil, fmt.Errorf("parse migs spec json: %w", err)
-	}
-
-	// Normalize defaults.
-	if strings.TrimSpace(spec.GitLabPAT) != "" && strings.TrimSpace(spec.GitLabDomain) == "" {
-		spec.GitLabDomain = "gitlab.com"
 	}
 
 	if err := spec.Validate(); err != nil {

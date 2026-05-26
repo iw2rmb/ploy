@@ -174,6 +174,30 @@ func (q *Queries) GetRunRepoActionByKey(ctx context.Context, arg GetRunRepoActio
 	return i, err
 }
 
+const hasRunningActionForRunRepoNode = `-- name: HasRunningActionForRunRepoNode :one
+SELECT EXISTS (
+  SELECT 1
+  FROM run_repo_actions
+  WHERE run_id = $1
+    AND repo_id = $2
+    AND node_id = $3
+    AND status = 'Running'
+)::boolean
+`
+
+type HasRunningActionForRunRepoNodeParams struct {
+	RunID  types.RunID   `json:"run_id"`
+	RepoID types.RepoID  `json:"repo_id"`
+	NodeID *types.NodeID `json:"node_id"`
+}
+
+func (q *Queries) HasRunningActionForRunRepoNode(ctx context.Context, arg HasRunningActionForRunRepoNodeParams) (bool, error) {
+	row := q.db.QueryRow(ctx, hasRunningActionForRunRepoNode, arg.RunID, arg.RepoID, arg.NodeID)
+	var column_1 bool
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const listRunRepoActionsByRunRepoAttempt = `-- name: ListRunRepoActionsByRunRepoAttempt :many
 SELECT id, run_id, repo_id, attempt, action_type, status, node_id, started_at, finished_at, duration_ms, meta, created_at
 FROM run_repo_actions

@@ -53,7 +53,6 @@ func PrintCommandUsage(w io.Writer, parts ...string) {
 		case "config":
 			_, _ = fmt.Fprintln(w, "")
 			_, _ = fmt.Fprintln(w, "Commands:")
-			_, _ = fmt.Fprintln(w, "  gitlab      Manage GitLab integration credentials")
 			_, _ = fmt.Fprintln(w, "  env         Manage global environment variables")
 		}
 	default:

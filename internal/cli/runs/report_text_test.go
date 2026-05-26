@@ -65,7 +65,6 @@ func TestRenderRunReportTextHeadersAndArtifacts(t *testing.T) {
 				BaseRef:         "main",
 				TargetRef:       "ploy/java17",
 				SourceCommitSHA: "0123456789abcdef0123456789abcdef01234567",
-				MROnSuccess:     true,
 				Attempt:         1,
 				Status:          "Running",
 				Jobs: []RunJobEntry{
@@ -104,7 +103,8 @@ func TestRenderRunReportTextHeadersAndArtifacts(t *testing.T) {
 	assertx.Contains(t, out, "   Spec:  "+specID.String()+" (https://example.test/v1/migs/"+migID.String()+"/specs/latest)")
 	assertx.Contains(t, out, "   Repos: 1")
 	assertx.Contains(t, out, "\n   Repos: 1\n   Run:   "+runID.String()+"\n\n")
-	assertx.Contains(t, out, "   "+colorizeNeutralText("["+repoID.String()+"]")+" github.com/acme/service (https://github.com/acme/service.git) @ "+boldBranchName("main")+" "+colorizeNeutralText("(01234567)")+" -> "+boldBranchName("ploy/java17"))
+	assertx.Contains(t, out, "   "+colorizeNeutralText("["+repoID.String()+"]")+" github.com/acme/service (https://github.com/acme/service.git) @ "+boldBranchName("main")+" "+colorizeNeutralText("(01234567)"))
+	assertx.NotContains(t, out, " -> ")
 	assertx.NotContains(t, out, "Artefacts")
 	assertx.NotContains(t, out, "State")
 	assertx.NotContains(t, out, "Logs (https://example.test/v1/runs/")
@@ -333,13 +333,13 @@ func TestRenderRunReportTextExitOneLiners(t *testing.T) {
 						DurationMs: 1500,
 					},
 					{
-						JobID:         migJobID,
-						JobType:       "mig",
-						JobImage:      "ghcr.io/acme/mig:1",
-						Status:        "Success",
-						ExitCode:      &migCode,
-						DurationMs:    1200,
-						BugSummary:    "Missing dependency lockfile",
+						JobID:      migJobID,
+						JobType:    "mig",
+						JobImage:   "ghcr.io/acme/mig:1",
+						Status:     "Success",
+						ExitCode:   &migCode,
+						DurationMs: 1200,
+						BugSummary: "Missing dependency lockfile",
 					},
 				},
 			},
@@ -579,14 +579,14 @@ func TestRenderRunReportTextIOPreviewModes(t *testing.T) {
 				ExpandStdout: false,
 				ExpandStderr: false,
 			},
-				notContain: []string{
-					"STD[O]UT",
-					"STD[E]RR",
-					"__preview_stdout_line_1__",
-					"__preview_stdout_line_2__",
-					"__preview_stdout_line_3__",
-					"__preview_stderr_line_1__",
-				},
+			notContain: []string{
+				"STD[O]UT",
+				"STD[E]RR",
+				"__preview_stdout_line_1__",
+				"__preview_stdout_line_2__",
+				"__preview_stdout_line_3__",
+				"__preview_stderr_line_1__",
+			},
 		},
 		{
 			name: "success hides preview even when expand flags are set",
@@ -658,16 +658,16 @@ func TestRenderRunReportTextIOPreviewModes(t *testing.T) {
 					},
 				}
 			case "failed hides preview":
-					opts.JobIOPreviews = map[domaintypes.JobID]RunJobIOPreview{
-						jobID: {
-							Stdout: []string{
-								"__preview_stdout_line_1__",
-								"__preview_stdout_line_2__",
-								"__preview_stdout_line_3__",
-							},
-							Stderr: []string{"__preview_stderr_line_1__"},
+				opts.JobIOPreviews = map[domaintypes.JobID]RunJobIOPreview{
+					jobID: {
+						Stdout: []string{
+							"__preview_stdout_line_1__",
+							"__preview_stdout_line_2__",
+							"__preview_stdout_line_3__",
 						},
-					}
+						Stderr: []string{"__preview_stderr_line_1__"},
+					},
+				}
 			case "success hides preview even when expand flags are set":
 				opts.JobIOPreviews = map[domaintypes.JobID]RunJobIOPreview{
 					jobID: {

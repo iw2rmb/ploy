@@ -139,42 +139,6 @@ func TestFilesystemWorkspaceHydrator_Hydrate(t *testing.T) {
 			errSubstr: "failed to hydrate input workspace",
 		},
 		{
-			name: "passes gitlab auth options to repo fetcher",
-			manifest: contracts.StepManifest{
-				Options: map[string]any{
-					"gitlab_pat":    "glpat-secret",
-					"gitlab_domain": "gitlab.example.com",
-				},
-				Inputs: []contracts.StepInput{
-					{
-						Name:      "workspace",
-						MountPath: "/workspace",
-						Mode:      contracts.StepInputModeReadWrite,
-						Hydration: &contracts.StepInputHydration{
-							Repo: &contracts.RepoMaterialization{
-								URL:       "https://gitlab.example.com/example/repo.git",
-								BaseRef:   "main",
-								TargetRef: "main",
-							},
-						},
-					},
-				},
-			},
-			workspace: "/tmp/workspace",
-			fetcher: &testGitFetcher{
-				fetchFn: func(ctx context.Context, repo *contracts.RepoMaterialization, dest string, auth gitauth.Options) error {
-					if auth.GitLabPAT != "glpat-secret" {
-						return errors.New("unexpected gitlab pat")
-					}
-					if auth.GitLabDomain != "gitlab.example.com" {
-						return errors.New("unexpected gitlab domain")
-					}
-					return nil
-				},
-			},
-			wantErr: false,
-		},
-		{
 			name: "multiple inputs with repo hydration",
 			manifest: contracts.StepManifest{
 				Inputs: []contracts.StepInput{

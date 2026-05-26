@@ -44,8 +44,7 @@ func TestRunStatusReportTextContract(t *testing.T) {
 	assertx.Contains(t, out, "github.com/acme/service (https://github.com/acme/service.git) @ ")
 	assertx.Contains(t, out, "\x1b[1mmain")
 	assertx.Contains(t, out, "01234567")
-	assertx.Contains(t, out, " -> ")
-	assertx.Contains(t, out, "\x1b[1mploy/java17")
+	assertx.NotContains(t, out, " -> ")
 	assertx.NotContains(t, out, "Artefacts")
 	assertx.NotContains(t, out, "State")
 	assertx.NotContains(t, out, "Logs (")
@@ -115,7 +114,6 @@ func newRunStatusReportServer(t *testing.T, runID domaintypes.RunID, migID domai
 						"base_ref":          "main",
 						"target_ref":        "ploy/java17",
 						"source_commit_sha": "0123456789abcdef0123456789abcdef01234567",
-						"mr_on_success":     true,
 						"status":            "Running",
 						"attempt":           1,
 						"last_error":        lastErr,

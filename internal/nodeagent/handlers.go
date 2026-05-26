@@ -24,7 +24,6 @@ const maxRequestBodySize = 10 << 20 // 10 MiB
 //
 //   - BuildGate: enabled flag and image overrides for gate validation.
 //   - Healing: retry policy and healing mig spec.
-//   - MRWiring: GitLab PAT, domain, and MR creation triggers (mr_on_success, mr_on_fail).
 //   - Execution: container image, command, and retention settings.
 //   - Artifacts: artifact name and workspace-relative paths to upload.
 //   - ServerMetadata: server-injected job ID for upload correlation.

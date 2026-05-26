@@ -8,6 +8,7 @@ import (
 
 	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/gitauth"
 	migsapi "github.com/iw2rmb/ploy/internal/migs/api"
 	"github.com/iw2rmb/ploy/internal/server/events"
 	"github.com/iw2rmb/ploy/internal/store"
@@ -28,7 +29,7 @@ import (
 // - Job materialization is deferred to the batch scheduler/start endpoint and gated on prep readiness.
 //
 // This handler replaces the previous POST /v1/migs endpoint for run submission.
-func createSingleRepoRunHandler(st store.Store, eventsService *events.Service) http.HandlerFunc {
+func createSingleRepoRunHandler(st store.Store, eventsService *events.Service, gitAuth gitauth.Options) http.HandlerFunc {
 	// Spec can be large (JSON blobs), so we allow up to 4 MiB.
 	const maxBodySize = 4 << 20
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -64,7 +65,7 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service) h
 		// query must reject the submit instead of leaving a run with no repos.
 		rawRepoURL := strings.TrimSpace(req.RepoURL.String())
 		normalizedRepoURL := domaintypes.NormalizeRepoURL(rawRepoURL)
-		sourceCommitSHA, seedErr := resolveSourceCommitSHAFromContext(r.Context(), rawRepoURL, req.BaseRef.String(), gitAuthOptionsFromSpec(req.Spec))
+		sourceCommitSHA, seedErr := resolveSourceCommitSHAFromContext(r.Context(), rawRepoURL, req.BaseRef.String(), gitAuth)
 		if seedErr != nil {
 			writeHTTPError(w, http.StatusBadRequest, "failed to resolve source commit for repo %s ref %s: %v", normalizedRepoURL, req.BaseRef.String(), seedErr)
 			slog.Error("create single-repo run: resolve source commit failed",

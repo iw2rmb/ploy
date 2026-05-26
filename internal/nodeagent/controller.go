@@ -8,7 +8,6 @@ import (
 	"sync"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
-	"github.com/iw2rmb/ploy/internal/nodeagent/git"
 )
 
 const MaxConcurrency = 64
@@ -35,11 +34,6 @@ type runController struct {
 	// httpClient is the shared HTTP client for components created during job execution
 	// (e.g., log streamer). Created once at init to avoid duplicate TLS/token I/O.
 	httpClient *http.Client
-
-	// Factory functions for MR creation dependencies.
-	// Defaults are set in New(); tests can override.
-	newPusher   func() git.Pusher
-	newMRClient func() mrCreator
 }
 
 type jobContext struct {

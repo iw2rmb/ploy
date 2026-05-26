@@ -108,8 +108,6 @@ func (c GetRunReportCommand) buildRepoEntry(
 		BaseRef:         repo.BaseRef,
 		TargetRef:       repo.TargetRef,
 		SourceCommitSHA: repo.SourceCommitSHA,
-		MROnSuccess:     repo.MROnSuccess,
-		MROnFail:        repo.MROnFail,
 		Attempt:         repo.Attempt,
 		Status:          repo.Status,
 		LastError:       repo.LastError,
@@ -119,20 +117,20 @@ func (c GetRunReportCommand) buildRepoEntry(
 
 	for _, job := range jobsResult.Jobs {
 		out.Jobs = append(out.Jobs, RunJobEntry{
-			JobID:               job.JobID,
-			JobType:             job.JobType,
-			JobImage:            job.JobImage,
-			NodeID:              job.NodeID,
-			Status:              job.Status,
-			ExitCode:            job.ExitCode,
-			StartedAt:           job.StartedAt,
-			FinishedAt:          job.FinishedAt,
-				DurationMs:          job.DurationMs,
-				DisplayName:         job.DisplayName,
-				BugSummary:          job.BugSummary,
-				Artifacts:           buildJobArtifacts(c.BaseURL, stageArtifacts[job.JobID]),
-				JobLogURL:           buildJobLogURL(c.BaseURL, job.JobID),
-				PatchURL:            jobPatchByID[job.JobID],
+			JobID:       job.JobID,
+			JobType:     job.JobType,
+			JobImage:    job.JobImage,
+			NodeID:      job.NodeID,
+			Status:      job.Status,
+			ExitCode:    job.ExitCode,
+			StartedAt:   job.StartedAt,
+			FinishedAt:  job.FinishedAt,
+			DurationMs:  job.DurationMs,
+			DisplayName: job.DisplayName,
+			BugSummary:  job.BugSummary,
+			Artifacts:   buildJobArtifacts(c.BaseURL, stageArtifacts[job.JobID]),
+			JobLogURL:   buildJobLogURL(c.BaseURL, job.JobID),
+			PatchURL:    jobPatchByID[job.JobID],
 		})
 	}
 
@@ -146,8 +144,6 @@ type runRepoReportSource struct {
 	BaseRef         string                    `json:"base_ref"`
 	TargetRef       string                    `json:"target_ref"`
 	SourceCommitSHA string                    `json:"source_commit_sha,omitempty"`
-	MROnSuccess     bool                      `json:"mr_on_success,omitempty"`
-	MROnFail        bool                      `json:"mr_on_fail,omitempty"`
 	Status          domaintypes.RunRepoStatus `json:"status"`
 	Attempt         int32                     `json:"attempt"`
 	LastError       *string                   `json:"last_error,omitempty"`

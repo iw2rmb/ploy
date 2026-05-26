@@ -93,8 +93,3 @@ func (m *jobStore) CancelRunV1(ctx context.Context, runID types.RunID) error {
 func (m *jobStore) UpdateRunResume(ctx context.Context, id types.RunID) error {
 	return m.updateRunResume.err
 }
-
-func (m *jobStore) UpdateRunStatsMRURL(ctx context.Context, params store.UpdateRunStatsMRURLParams) error {
-	_, err := m.updateRunStatsMRURL.record(params)
-	return err
-}

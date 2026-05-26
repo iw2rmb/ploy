@@ -4,10 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	"github.com/iw2rmb/ploy/internal/server/config"
 )
 
 func parseSpecObjectStrict(spec json.RawMessage) (map[string]any, error) {
@@ -35,19 +33,6 @@ func marshalSpecObject(m map[string]any) (json.RawMessage, error) {
 
 func applyJobIDMutator(m map[string]any, jobID domaintypes.JobID) error {
 	m["job_id"] = jobID.String()
-	return nil
-}
-
-func applyGitLabConfigMutator(m map[string]any, cfg config.GitLabConfig) error {
-	if strings.TrimSpace(cfg.Token) == "" && strings.TrimSpace(cfg.Domain) == "" {
-		return nil
-	}
-	if _, hasPerRunPAT := m["gitlab_pat"]; !hasPerRunPAT && cfg.Token != "" {
-		m["gitlab_pat"] = cfg.Token
-	}
-	if _, hasPerRunDomain := m["gitlab_domain"]; !hasPerRunDomain && cfg.Domain != "" {
-		m["gitlab_domain"] = cfg.Domain
-	}
 	return nil
 }
 

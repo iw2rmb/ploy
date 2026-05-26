@@ -9,6 +9,7 @@ import (
 
 	"github.com/iw2rmb/ploy/internal/blobstore"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/gitauth"
 	"github.com/iw2rmb/ploy/internal/server/auth"
 	"github.com/iw2rmb/ploy/internal/server/blobpersist"
 	"github.com/iw2rmb/ploy/internal/server/config"
@@ -19,6 +20,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/server/pki"
 	"github.com/iw2rmb/ploy/internal/server/recovery"
 	"github.com/iw2rmb/ploy/internal/server/scheduler"
+	"github.com/iw2rmb/ploy/internal/server/snapshot"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/store/batchscheduler"
 	"github.com/iw2rmb/ploy/internal/store/ttlworker"
@@ -171,7 +173,7 @@ func run(ctx context.Context, cfg config.Config, st store.Store, authorizer *aut
 	slog.Info("loaded bundle map entries from store", "count", len(bundleMapEntries))
 
 	// Initialize config holder for runtime configuration access.
-	configHolder := handlers.NewConfigHolder(cfg.GitLab, globalEnvMap)
+	configHolder := handlers.NewConfigHolder(globalEnvMap)
 
 	// Populate ConfigHolder with persisted in entries keyed by section.
 	inBySection := make(map[string][]handlers.ConfigInEntry)
@@ -191,8 +193,17 @@ func run(ctx context.Context, cfg config.Config, st store.Store, authorizer *aut
 		configHolder.AddBundleMapping(e.Hash, e.BundleID)
 	}
 
+	gitAuth := gitauth.Options{
+		GitLabPAT:    cfg.GitLab.Token,
+		GitLabDomain: cfg.GitLab.Domain,
+	}
+	snapshotService := snapshot.NewService(snapshot.Options{
+		CacheDir: os.Getenv("PLOYD_CACHE_HOME"),
+		Auth:     gitAuth,
+	})
+
 	// Register HTTP routes.
-	handlers.RegisterRoutes(httpSrv, st, bs, bp, eventsService, configHolder, tokenSecret)
+	handlers.RegisterRoutes(httpSrv, st, bs, bp, eventsService, configHolder, tokenSecret, gitAuth, snapshotService)
 
 	// Initialize metrics server.
 	metricsSrv := metrics.NewServer(cfg.Metrics.Listen)

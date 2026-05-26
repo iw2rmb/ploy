@@ -170,29 +170,6 @@ func (s *CompleteJobService) reconcileRepoRun(ctx context.Context, state *comple
 		return
 	}
 
-	runRepo, runRepoErr := s.store.GetRunRepo(ctx, store.GetRunRepoParams{
-		RunID:  state.job.RunID,
-		RepoID: state.job.RepoID,
-	})
-	if runRepoErr != nil {
-		slog.Error("complete job: failed to load run repo after status reconciliation",
-			"job_id", state.job.ID,
-			"repo_id", state.job.RepoID,
-			"attempt", state.job.Attempt,
-			"err", runRepoErr,
-		)
-	} else {
-		if enqueueErr := enqueueAutoMRCreateAction(ctx, s.store, state.job.RunID, runRepo); enqueueErr != nil {
-			slog.Error("complete job: failed to enqueue auto MR action",
-				"job_id", state.job.ID,
-				"run_id", state.job.RunID,
-				"repo_id", state.job.RepoID,
-				"attempt", state.job.Attempt,
-				"err", enqueueErr,
-			)
-		}
-	}
-
 	run, ok := s.loadRunForPostCompletion(ctx, state, "run completion reconciliation")
 	if !ok {
 		return

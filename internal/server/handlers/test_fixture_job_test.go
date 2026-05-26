@@ -92,7 +92,6 @@ type jobStore struct {
 	updateRunStatus     mockCall[store.UpdateRunStatusParams, struct{}]
 	cancelRunV1         mockCall[string, struct{}]
 	updateRunResume     mockResult[struct{}]
-	updateRunStatsMRURL mockCall[store.UpdateRunStatsMRURLParams, struct{}]
 
 	// Run repo (for orchestration)
 	getRunRepo mockCall[store.GetRunRepoParams, store.RunRepo]

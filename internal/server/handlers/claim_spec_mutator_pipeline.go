@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	"github.com/iw2rmb/ploy/internal/server/config"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -13,7 +12,6 @@ type claimSpecMutatorInput struct {
 	spec          json.RawMessage
 	job           store.Job
 	jobType       domaintypes.JobType
-	gitLab        config.GitLabConfig
 	globalEnv     map[string][]GlobalEnvVar
 	hydraOverlays map[string]*HydraJobConfig
 	bundleMap     map[string]string // server-side shortHash → bundleID
@@ -37,12 +35,6 @@ func mutateClaimSpec(input claimSpecMutatorInput) (json.RawMessage, error) {
 			errContext: "merge job_id into spec",
 			apply: func(m map[string]any, in claimSpecMutatorInput) error {
 				return applyJobIDMutator(m, in.job.ID)
-			},
-		},
-		{
-			errContext: "merge gitlab defaults into spec",
-			apply: func(m map[string]any, in claimSpecMutatorInput) error {
-				return applyGitLabConfigMutator(m, in.gitLab)
 			},
 		},
 		{

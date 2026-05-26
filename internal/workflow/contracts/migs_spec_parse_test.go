@@ -11,11 +11,7 @@ func TestParseMigSpecJSON_SingleStep(t *testing.T) {
 			"command": "echo hello",
 			"envs": {"FOO": "bar", "BAZ": "qux"}
 		}],
-		"build_gate": {"enabled": true},
-		"gitlab_pat": "secret",
-		"gitlab_domain": "gitlab.com",
-		"mr_on_success": true,
-		"mr_on_fail": false
+		"build_gate": {"enabled": true}
 	}`
 
 	spec, err := ParseMigSpecJSON([]byte(input))
@@ -59,19 +55,6 @@ func TestParseMigSpecJSON_SingleStep(t *testing.T) {
 		t.Errorf("build_gate.enabled = false, want true")
 	}
 
-	// Verify GitLab integration.
-	if spec.GitLabPAT != "secret" {
-		t.Errorf("gitlab_pat = %q, want %q", spec.GitLabPAT, "secret")
-	}
-	if spec.GitLabDomain != "gitlab.com" {
-		t.Errorf("gitlab_domain = %q, want %q", spec.GitLabDomain, "gitlab.com")
-	}
-	if spec.MROnSuccess == nil || !*spec.MROnSuccess {
-		t.Errorf("mr_on_success = %v, want true", spec.MROnSuccess)
-	}
-	if spec.MROnFail == nil || *spec.MROnFail {
-		t.Errorf("mr_on_fail = %v, want false", spec.MROnFail)
-	}
 }
 
 // TestParseMigSpecJSON_MultiStep tests parsing multi-step spec JSON.

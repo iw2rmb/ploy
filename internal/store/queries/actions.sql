@@ -63,3 +63,12 @@ WHERE run_id = $1
   AND attempt = $3
 ORDER BY id ASC;
 
+-- name: HasRunningActionForRunRepoNode :one
+SELECT EXISTS (
+  SELECT 1
+  FROM run_repo_actions
+  WHERE run_id = $1
+    AND repo_id = $2
+    AND node_id = $3
+    AND status = 'Running'
+)::boolean;

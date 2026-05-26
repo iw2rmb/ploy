@@ -10,8 +10,6 @@ import (
 // RunOptions holds all typed configuration options for a run execution.
 type RunOptions struct {
 	BuildGate      BuildGateOptions
-	MRWiring       MRWiringOptions
-	MRFlagsPresent MRFlagsPresence
 	Execution      MigContainerSpec
 	ServerMetadata ServerMetadataOptions
 	Steps          []StepMig
@@ -43,20 +41,6 @@ type MigContainerSpec struct {
 	Home []string // canonical home-relative entries (shortHash:dst{:ro})
 }
 
-// MRWiringOptions configures GitLab merge request creation for run outcomes.
-type MRWiringOptions struct {
-	GitLabPAT    string
-	GitLabDomain string
-	MROnSuccess  bool
-	MROnFail     bool
-}
-
-// MRFlagsPresence tracks whether MR creation flags were explicitly set in the spec.
-type MRFlagsPresence struct {
-	MROnSuccessSet bool
-	MROnFailSet    bool
-}
-
 // ServerMetadataOptions holds server-injected metadata for uploads and tracking.
 type ServerMetadataOptions struct {
 	JobID domaintypes.JobID
@@ -83,17 +67,6 @@ func migsSpecToRunOptions(spec *contracts.MigSpec) RunOptions {
 		runOpts.BuildGate.Pre = spec.BuildGate.Pre
 		runOpts.BuildGate.Post = spec.BuildGate.Post
 	}
-	runOpts.MRWiring.GitLabPAT = spec.GitLabPAT
-	runOpts.MRWiring.GitLabDomain = spec.GitLabDomain
-	if spec.MROnSuccess != nil {
-		runOpts.MRWiring.MROnSuccess = *spec.MROnSuccess
-		runOpts.MRFlagsPresent.MROnSuccessSet = true
-	}
-	if spec.MROnFail != nil {
-		runOpts.MRWiring.MROnFail = *spec.MROnFail
-		runOpts.MRFlagsPresent.MROnFailSet = true
-	}
-
 	// Single-step: extract from steps[0]. Multi-step: populate Steps[].
 	if len(spec.Steps) == 1 {
 		step := spec.Steps[0]

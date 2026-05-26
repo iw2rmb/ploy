@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/iw2rmb/ploy/internal/gitauth"
 )
 
 // =============================================================================
@@ -25,7 +27,7 @@ import (
 func TestRunsCreateSingleRepo_Success(t *testing.T) {
 	st := &migStore{}
 	eventsService, _ := createTestEventsService()
-	handler := createSingleRepoRunHandler(st, eventsService)
+	handler := createSingleRepoRunHandler(st, eventsService, gitauth.Options{})
 
 	rr := doRequest(t, handler, http.MethodPost, "/v1/runs", validRunRequestBody())
 
@@ -86,7 +88,7 @@ func TestRunsCreateSingleRepo_Success(t *testing.T) {
 func TestRunsCreateSingleRepo_DoesNotCreateJobsImmediately(t *testing.T) {
 	st := &migStore{}
 	eventsService, _ := createTestEventsService()
-	handler := createSingleRepoRunHandler(st, eventsService)
+	handler := createSingleRepoRunHandler(st, eventsService, gitauth.Options{})
 
 	rr := doRequest(t, handler, http.MethodPost, "/v1/runs", validRunRequestBody())
 	assertStatus(t, rr, http.StatusCreated)
@@ -101,7 +103,7 @@ func TestRunsCreateSingleRepo_DoesNotCreateJobsImmediately(t *testing.T) {
 func TestRunsCreateSingleRepo_RepoURLNormalized(t *testing.T) {
 	st := &migStore{}
 	eventsService, _ := createTestEventsService()
-	handler := createSingleRepoRunHandler(st, eventsService)
+	handler := createSingleRepoRunHandler(st, eventsService, gitauth.Options{})
 
 	// URL with trailing slash and .git suffix — should be normalized.
 	rr := doRequest(t, handler, http.MethodPost, "/v1/runs", validRunRequestBodyWith(map[string]any{
@@ -167,7 +169,7 @@ func TestRunsCreateSingleRepo_ValidationErrors(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			st := &migStore{}
-			handler := createSingleRepoRunHandler(st, nil)
+			handler := createSingleRepoRunHandler(st, nil, gitauth.Options{})
 			rr := doRequest(t, handler, http.MethodPost, "/v1/runs", tt.body)
 			assertStatus(t, rr, tt.wantStatus)
 		})
@@ -178,7 +180,7 @@ func TestRunsCreateSingleRepo_ValidationErrors(t *testing.T) {
 func TestRunsCreateSingleRepo_WithCreatedBy(t *testing.T) {
 	st := &migStore{}
 	eventsService, _ := createTestEventsService()
-	handler := createSingleRepoRunHandler(st, eventsService)
+	handler := createSingleRepoRunHandler(st, eventsService, gitauth.Options{})
 
 	rr := doRequest(t, handler, http.MethodPost, "/v1/runs", validRunRequestBodyWith(map[string]any{
 		"created_by": "test-user@example.com",
@@ -201,7 +203,7 @@ func TestRunsCreateSingleRepo_WithCreatedBy(t *testing.T) {
 func TestRunsCreateSingleRepo_MultiStepSpec(t *testing.T) {
 	st := &migStore{}
 	eventsService, _ := createTestEventsService()
-	handler := createSingleRepoRunHandler(st, eventsService)
+	handler := createSingleRepoRunHandler(st, eventsService, gitauth.Options{})
 
 	// Multi-step spec with steps[] array.
 	multiStepSpec := map[string]any{
@@ -258,7 +260,7 @@ func TestRunsCreateSingleRepo_StoreErrors(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			st := &migStore{}
 			tt.setupFn(st)
-			handler := createSingleRepoRunHandler(st, nil)
+			handler := createSingleRepoRunHandler(st, nil, gitauth.Options{})
 			rr := doRequest(t, handler, http.MethodPost, "/v1/runs", validRunRequestBody())
 			assertStatus(t, rr, http.StatusInternalServerError)
 		})
@@ -268,7 +270,7 @@ func TestRunsCreateSingleRepo_StoreErrors(t *testing.T) {
 func TestRunsCreateSingleRepo_RejectsWhenSourceCommitSeedFails(t *testing.T) {
 	st := &migStore{}
 	eventsService, _ := createTestEventsService()
-	handler := createSingleRepoRunHandler(st, eventsService)
+	handler := createSingleRepoRunHandler(st, eventsService, gitauth.Options{})
 
 	body, _ := json.Marshal(validRunRequestBody())
 	req := httptest.NewRequest(http.MethodPost, "/v1/runs", bytes.NewReader(body))

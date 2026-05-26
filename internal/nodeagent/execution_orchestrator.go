@@ -18,10 +18,16 @@ import (
 	"time"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
-	"github.com/iw2rmb/ploy/internal/worker/hydration"
+	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"github.com/iw2rmb/ploy/internal/workflow/lifecycle"
 	"github.com/iw2rmb/ploy/internal/workflow/step"
 )
+
+type noopWorkspaceHydrator struct{}
+
+func (noopWorkspaceHydrator) Hydrate(context.Context, contracts.StepManifest, string) error {
+	return nil
+}
 
 // executeRun orchestrates job execution based on job type.
 // Dispatches to specialized handlers: gate jobs and mig jobs.
@@ -157,20 +163,6 @@ func (r *runController) uploadFailureStatus(ctx context.Context, req StartRunReq
 //   - jobID: job identifier for associating log chunks with specific jobs; pass a zero value
 //     only when job attribution is not available
 func (r *runController) initializeRuntime(ctx context.Context, runID types.RunID, jobID types.JobID) (step.Runner, step.DiffGenerator, *LogStreamer, error) {
-	// Initialize git fetcher without snapshot publishing (node agent operates on ephemeral workspaces).
-	gitFetcher, err := hydration.NewGitFetcher(hydration.GitFetcherOptions{
-		CacheDir: os.Getenv("PLOYD_CACHE_HOME"),
-	})
-	if err != nil {
-		return step.Runner{}, nil, nil, fmt.Errorf("create git fetcher: %w", err)
-	}
-
-	// Initialize workspace hydrator with git fetcher.
-	workspaceHydrator, err := step.NewFilesystemWorkspaceHydrator(gitFetcher)
-	if err != nil {
-		return step.Runner{}, nil, nil, fmt.Errorf("create workspace hydrator: %w", err)
-	}
-
 	// Initialize container runtime with image pull enabled.
 	// Fallback to nil if Docker is unavailable (simulated execution mode).
 	network := os.Getenv("PLOY_DOCKER_NETWORK")
@@ -207,7 +199,7 @@ func (r *runController) initializeRuntime(ctx context.Context, runID types.RunID
 
 	// Assemble the step runner with all components.
 	runner := step.Runner{
-		Workspace:  workspaceHydrator,
+		Workspace:  noopWorkspaceHydrator{},
 		Containers: containerRuntime,
 		Gate:       gateExecutor,
 		LogWriter:  logStreamer,

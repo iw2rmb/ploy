@@ -218,35 +218,3 @@ func buildArtifactFilename(stage, name, cid, digest string) string {
 	}
 	return fmt.Sprintf("%s_%s_%s.bin", cid, stage, name)
 }
-
-// fetchMRURL loads the run status and extracts the MR URL from metadata when present.
-// Returns empty string if the MR URL is not found or an error occurs.
-func FetchMRURL(ctx context.Context, base *url.URL, httpClient *http.Client, runID string) (string, error) {
-	statusURL, err := url.JoinPath(base.String(), "v1", "runs", url.PathEscape(strings.TrimSpace(runID)), "status")
-	if err != nil {
-		return "", err
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, statusURL, nil)
-	if err != nil {
-		return "", err
-	}
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer func() { _ = resp.Body.Close() }()
-	if resp.StatusCode != http.StatusOK {
-		return "", common.ControlPlaneHTTPError(resp)
-	}
-	// Decode RunSummary directly — the server returns the canonical type (no wrapper).
-	var summary migsapi.RunSummary
-	if err := json.NewDecoder(resp.Body).Decode(&summary); err != nil {
-		return "", err
-	}
-	if summary.Metadata != nil {
-		if v, ok := summary.Metadata["mr_url"]; ok && strings.TrimSpace(v) != "" {
-			return strings.TrimSpace(v), nil
-		}
-	}
-	return "", nil
-}

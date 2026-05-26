@@ -32,7 +32,7 @@ Run IDs (`<run-id>`) are KSUID-backed strings.
 Treat them as opaque identifiers when passing them between commands or scripts.
 
 Note on `--json` output:
-- When `--json` is supplied (e.g., `ploy mig run --json`), stdout emits a compact JSON summary (fields include `run_id`, `final_state`, optional `artifact_dir`, `mr_url`).
+- When `--json` is supplied (e.g., `ploy mig run --json`), stdout emits a compact JSON summary (fields include `run_id`, `final_state`, and optional `artifact_dir`).
 - Human‑readable progress continues to print to stderr, so scripts can safely pipe stdout to `jq` without mixing formats.
 
 Quick capture example:
@@ -402,7 +402,7 @@ ploy completion <shell> --help
   required resources (`environment materialize`).
 - `--manifest` — Override manifest name/version in `<name>@<version>` form
   (`environment materialize`).
-- `--spec` — Path to a YAML/JSON spec file defining mig parameters and Build Gate settings for `mig run`. CLI flags (e.g., `--job-image`, `--gitlab-pat`)
+- `--spec` — Path to a YAML/JSON spec file defining mig parameters and Build Gate settings for `mig run`. CLI flags (e.g., `--job-image`)
   override corresponding spec values when both are present. Specs use canonical `steps[]`
   shape for both single-step and multi-step runs. Each step supports
   `image`/`command`/`envs` plus Hydra file-record fields (`in`, `out`, `home`)
@@ -410,10 +410,10 @@ ploy completion <shell> --help
   using shared runtime paths like `/share/java.classpath` or
   `extract-usage@mig://out/dependency-usage.nofilter.json`
   for deterministic file injection via content-addressed bundles.
-  The spec also supports GitLab MR settings. See `docs/schemas/mig.example.yaml` for the full schema and
+  See `docs/schemas/mig.example.yaml` for the full schema and
   `tests/e2e/migs/README.md` for usage examples.
 - `--repo-url` / `--repo-base-ref` / `--repo-target-ref` / `--repo-workspace-hint`
-  — Repository materialisation inputs consumed by `mig run`. Allowed `--repo-url` schemes: `https://`, `ssh://`, `file://`. When `--repo-url` is provided, `--repo-base-ref` selects the base branch (commonly `main`). `--repo-target-ref` is optional; when omitted, the node derives a default of `ploy/{run_name|run_id}` (using the run name when set or the run ID, a KSUID string, otherwise) for workspace context and MR source branch. The workspace hint creates an auxiliary directory (e.g. `migs/java`) before Migs stages execute.
+  — Repository materialisation inputs consumed by `mig run`. Allowed `--repo-url` schemes: `https://`, `ssh://`, `file://`. When `--repo-url` is provided, `--repo-base-ref` selects the base branch (commonly `main`). `--repo-target-ref` is optional; when omitted, the node derives a default of `ploy/{run_name|run_id}` (using the run name when set or the run ID, a KSUID string, otherwise) for workspace context. The workspace hint creates an auxiliary directory (e.g. `migs/java`) before Migs stages execute.
 - `--migs-plan-timeout` — Duration string passed to the Migs planner to timebox
   plan evaluation (`mig run`).
 - `--migs-max-parallel` — Upper bound on concurrent Migs stages emitted by the
@@ -511,43 +511,6 @@ ploy config env unset --key OLD_VAR
 See `docs/envs/README.md` § "Global Env Configuration" for detailed semantics and
 `docs/migs-lifecycle.md` for how these variables flow into job containers.
 
-## GitLab MR Integration
-
-The GitLab merge request client uses `gitlab.com/gitlab-org/api/client-go` for typed API interactions and integrates with the shared backoff policy for resilient operation.
-
-### Retry Behavior
-
-GitLab API calls automatically retry on transient failures using the `internal/workflow/backoff` shared helper:
-- **Retry policy**: `GitLabMRPolicy` provides 4 max attempts (1 initial + 3 retries) with a 1s initial interval, 2x multiplier (1s, 2s, 4s backoff schedule), and 50% jitter for robustness.
-- **Retryable conditions**: Rate limits (HTTP 429), server errors (5xx), and network failures without an HTTP response (e.g., connection refused, DNS failures).
-- **Non-retryable conditions**: Client errors (4xx except 429), context cancellation, and missing response data are treated as permanent failures and do not trigger retries.
-- **Context cancellation**: All retry operations honor `context.Context` cancellation and exit early when the context is done.
-
-### Security & PAT Redaction
-
-Personal Access Tokens (PATs) are automatically redacted from all error messages and logs to prevent credential leakage:
-- The client redacts both literal PATs and URL-encoded variants (query-escaped, path-escaped).
-- PATs are never logged or written to disk on worker nodes.
-- Tokens are transmitted securely via mTLS from the control plane to nodes.
-- All errors flowing out of client-go-backed operations pass through the redaction layer.
-
-### Configuration
-
-GitLab credentials can be configured globally on the control plane or overridden per run via CLI flags:
-- **Global config**: Use `ploy config gitlab set --file <config.json>` to configure domain and PAT once (see `docs/how-to/create-mr.md`).
-- **Per-run override**: Use `--gitlab-domain` and `--gitlab-pat` flags to override for a single run.
-- **Domain normalization**: The client accepts bare hostnames (e.g., `gitlab.com`) or full URLs (e.g., `https://gitlab.com`) and normalizes them for API calls. Localhost and 127.0.0.1 addresses default to HTTP; all other domains default to HTTPS.
-- **Authentication headers**: The client-go wrapper sets both `Authorization: Bearer <token>` and `PRIVATE-TOKEN: <token>` headers for compatibility with different GitLab configurations.
-
-### Implementation Notes
-
-The node agent uses `internal/nodeagent/gitlab/mr_client.go` with the following behavior:
-- **Project ID encoding**: External callers provide URL-encoded project IDs (e.g., `org%2Fproject`), which are decoded before passing to client-go (the library re-encodes internally).
-- **Optional fields**: Description and labels are trimmed and only included when non-empty. Labels are split by commas and passed as a slice to client-go.
-- **Error handling**: All API errors include PAT redaction via `redactError()` to ensure tokens never appear in logs or returned errors.
-
-See `docs/how-to/create-mr.md` for end-to-end usage examples and `internal/nodeagent/gitlab/mr_client.go` for implementation details.
-
 ## Build Gate
 
 Build Gate runs as regular jobs in the unified `jobs` queue. Gate jobs are
@@ -600,7 +563,6 @@ The `[next_id]` ordering reflects execution sequence.
 The `GET /v1/runs/{id}/status` endpoint returns `RunSummary` with:
 - `stages` — Map of job ID (KSUID string) to `StageStatus` (state, next_id, attempts)
 - `metadata["gate_summary"]` — Human-readable gate result
-- `metadata["mr_url"]` — Merge request URL if created
 
 See `internal/migs/api/types.go` for the full schema.
 

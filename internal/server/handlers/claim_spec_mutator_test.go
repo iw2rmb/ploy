@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	"github.com/iw2rmb/ploy/internal/server/config"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -32,18 +31,11 @@ func TestMutateClaimSpec_BaseMutators(t *testing.T) {
 		spec:      []byte(`{"envs":{"EXISTING":"1"}}`),
 		job:       store.Job{ID: jobID},
 		jobType:   domaintypes.JobTypePostGate,
-		gitLab:    config.GitLabConfig{Token: "server-token", Domain: "https://gitlab.example.com"},
 		globalEnv: map[string][]GlobalEnvVar{"GLOBAL": {{Value: "g", Target: domaintypes.GlobalEnvTargetGates}}},
 	})
 
 	if got := out["job_id"]; got != jobID.String() {
 		t.Fatalf("job_id=%v, want %s", got, jobID.String())
-	}
-	if got := out["gitlab_pat"]; got != "server-token" {
-		t.Fatalf("gitlab_pat=%v", got)
-	}
-	if got := out["gitlab_domain"]; got != "https://gitlab.example.com" {
-		t.Fatalf("gitlab_domain=%v", got)
 	}
 	envs := out["envs"].(map[string]any)
 	if got := envs["EXISTING"]; got != "1" {

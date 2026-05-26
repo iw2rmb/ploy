@@ -205,27 +205,6 @@ func (q *Queries) UpdateRunResume(ctx context.Context, id types.RunID) error {
 	return err
 }
 
-const updateRunStatsMRURL = `-- name: UpdateRunStatsMRURL :exec
-	UPDATE runs
-	SET stats = COALESCE(stats, '{}'::jsonb) || jsonb_build_object(
-	    'metadata',
-	    COALESCE(stats->'metadata', '{}'::jsonb) || jsonb_build_object('mr_url', $2)
-	)
-	WHERE id = $1
-`
-
-type UpdateRunStatsMRURLParams struct {
-	ID    types.RunID `json:"id"`
-	MrUrl interface{} `json:"mr_url"`
-}
-
-// Merge an MR URL into runs.stats.metadata.mr_url without altering other fields.
-// Preserves existing stats and metadata keys via JSONB merge.
-func (q *Queries) UpdateRunStatsMRURL(ctx context.Context, arg UpdateRunStatsMRURLParams) error {
-	_, err := q.db.Exec(ctx, updateRunStatsMRURL, arg.ID, arg.MrUrl)
-	return err
-}
-
 const updateRunStatus = `-- name: UpdateRunStatus :exec
 UPDATE runs
 SET status = $2,

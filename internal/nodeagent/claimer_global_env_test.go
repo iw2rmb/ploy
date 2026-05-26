@@ -147,7 +147,6 @@ func TestGlobalEnvPropagation_SpecToManifest(t *testing.T) {
 	specJSON := json.RawMessage(`{
 		"job_id": "` + testKSUID + `",
 		"steps": [{"image": "docker.io/test/mig:latest"}],
-		"gitlab_pat": "glpat-test-token",
 		"envs": {
 			"APP_TLS_CERT": "-----BEGIN CERTIFICATE-----\ntest-cert\n-----END CERTIFICATE-----",
 			"APP_AUTH_JSON": "{\"token\":\"test-codex-token\"}",

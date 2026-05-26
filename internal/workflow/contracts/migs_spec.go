@@ -78,24 +78,6 @@ type MigSpec struct {
 	// Applies globally to all steps.
 	BuildGate *BuildGateConfig `json:"build_gate,omitempty" yaml:"build_gate,omitempty"`
 
-	// --- GitLab MR integration ---
-
-	// GitLabPAT is the Personal Access Token for GitLab API authentication.
-	// This value is never logged and is only passed to the GitLab client.
-	GitLabPAT string `json:"gitlab_pat,omitempty" yaml:"gitlab_pat,omitempty"`
-
-	// GitLabDomain is the GitLab instance domain (e.g., "gitlab.com").
-	// Defaults to "gitlab.com" when GitLabPAT is provided but domain is empty.
-	GitLabDomain string `json:"gitlab_domain,omitempty" yaml:"gitlab_domain,omitempty"`
-
-	// MROnSuccess controls whether to create an MR when the run succeeds.
-	// Pointer form preserves presence (absent vs explicitly false).
-	MROnSuccess *bool `json:"mr_on_success,omitempty" yaml:"mr_on_success,omitempty"`
-
-	// MROnFail controls whether to create an MR when the run fails.
-	// Pointer form preserves presence (absent vs explicitly false).
-	MROnFail *bool `json:"mr_on_fail,omitempty" yaml:"mr_on_fail,omitempty"`
-
 	// BundleMap maps content hashes used in In/Out/Home entries to their
 	// spec bundle download identifiers (bundle IDs). Populated by the CLI
 	// compiler during spec submission. The nodeagent uses this to resolve

@@ -15,7 +15,7 @@ import (
 //   - Enables efficient pass-through when stats are only relayed (no decode/re-encode).
 //   - Maintains wire format compatibility with existing producers and consumers.
 //
-// Typed accessor methods (ExitCode, Metadata, MRURL, etc.) decode only the
+// Typed accessor methods (ExitCode, Metadata, GateSummary, etc.) decode only the
 // specific fields they need, avoiding full deserialization overhead.
 type RunStats json.RawMessage
 
@@ -153,15 +153,6 @@ func (s RunStats) Metadata() map[string]string {
 		}
 	}
 	return out
-}
-
-// MRURL returns the mr_url entry from the metadata map when present.
-func (s RunStats) MRURL() string {
-	meta := s.Metadata()
-	if meta == nil {
-		return ""
-	}
-	return strings.TrimSpace(meta["mr_url"])
 }
 
 // ResumeCount returns the number of times this run has been resumed.

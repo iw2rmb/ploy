@@ -75,15 +75,9 @@ func TestBuildManifestFromRequest(t *testing.T) {
 		}
 	})
 
-	t.Run("keeps hydration and gate repo URLs clean while retaining gitlab auth options", func(t *testing.T) {
+	t.Run("keeps hydration and gate repo URLs clean", func(t *testing.T) {
 		req := newStartRunRequest(
 			withRunRepoURL("https://gitlab.example.com/group/repo.git"),
-			withRunOptions(RunOptions{
-				MRWiring: MRWiringOptions{
-					GitLabPAT:    "glpat-secret",
-					GitLabDomain: "https://gitlab.example.com",
-				},
-			}),
 		)
 
 		manifest, err := buildManifestDefault(req)
@@ -99,10 +93,6 @@ func TestBuildManifestFromRequest(t *testing.T) {
 		if gotHydrationURL != wantHydrationURL {
 			t.Fatalf("hydration repo URL=%q, want %q", gotHydrationURL, wantHydrationURL)
 		}
-		if gotPAT, ok := manifest.Options["gitlab_pat"].(string); !ok || gotPAT != "glpat-secret" {
-			t.Fatalf("manifest gitlab_pat=%v, want glpat-secret", manifest.Options["gitlab_pat"])
-		}
-
 		if manifest.Gate == nil {
 			t.Fatal("expected gate config")
 		}
@@ -248,52 +238,6 @@ func TestBuildManifestFromRequest(t *testing.T) {
 		}
 		if want := []string{"/bin/sh", "-c", "echo 'Build gate placeholder'"}; !slices.Equal(manifest.Command, want) {
 			t.Fatalf("command = %v, want %v", manifest.Command, want)
-		}
-	})
-
-	t.Run("gitlab options are extracted and stored in manifest", func(t *testing.T) {
-		req := newStartRunRequest(withRunOptions(RunOptions{
-			MRWiring: MRWiringOptions{
-				GitLabPAT: "glpat-secret-token", GitLabDomain: "gitlab.example.com",
-				MROnSuccess: true, MROnFail: false,
-			},
-			MRFlagsPresent: MRFlagsPresence{MROnSuccessSet: true, MROnFailSet: true},
-		}))
-		manifest, err := buildManifestDefault(req)
-		if err != nil {
-			t.Fatalf("buildManifestDefault() error: %v", err)
-		}
-		if manifest.Options == nil {
-			t.Fatal("expected Options to be set")
-		}
-		if pat, ok := manifest.Options["gitlab_pat"].(string); !ok || pat != "glpat-secret-token" {
-			t.Errorf("expected gitlab_pat=glpat-secret-token, got %v", manifest.Options["gitlab_pat"])
-		}
-		if domain, ok := manifest.Options["gitlab_domain"].(string); !ok || domain != "gitlab.example.com" {
-			t.Errorf("expected gitlab_domain=gitlab.example.com, got %v", manifest.Options["gitlab_domain"])
-		}
-		if mrSuccess, ok := manifest.Options["mr_on_success"].(bool); !ok || !mrSuccess {
-			t.Errorf("expected mr_on_success=true, got %v", manifest.Options["mr_on_success"])
-		}
-		if mrFail, ok := manifest.Options["mr_on_fail"].(bool); !ok || mrFail {
-			t.Errorf("expected mr_on_fail=false, got %v", manifest.Options["mr_on_fail"])
-		}
-	})
-
-	t.Run("gitlab options are trimmed and only included when non-empty", func(t *testing.T) {
-		req := newStartRunRequest(withRunOptions(RunOptions{
-			MRWiring:       MRWiringOptions{GitLabPAT: "  trimmed-token  ", GitLabDomain: "", MROnSuccess: true},
-			MRFlagsPresent: MRFlagsPresence{MROnSuccessSet: true},
-		}))
-		manifest, err := buildManifestDefault(req)
-		if err != nil {
-			t.Fatalf("buildManifestDefault() error: %v", err)
-		}
-		if pat, ok := manifest.Options["gitlab_pat"].(string); !ok || pat != "trimmed-token" {
-			t.Errorf("expected trimmed gitlab_pat=trimmed-token, got %v", manifest.Options["gitlab_pat"])
-		}
-		if _, ok := manifest.Options["gitlab_domain"]; ok {
-			t.Errorf("expected gitlab_domain to be omitted when empty")
 		}
 	})
 

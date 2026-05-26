@@ -78,7 +78,6 @@ Role model (bearer token claims):
   - `home` — Home-relative files (`src:dst{:ro}`; CLI compiles to `shortHash:dst{:ro}`)
   - `steps[]` — Multi-step spec steps (each with its own `image`/`command`/`envs`/`in`/`out`/`home`)
   - `build_gate.post` — Automated healing action for Build Gate failures (`retries`, `image`, `command`, `envs`, `in`, `out`, `home`, optional `amata`, optional `expectations`)
-  - GitLab MR settings (`mr_on_success`, `mr_on_fail`, `gitlab_domain`, `gitlab_pat`)
   - See [mig.example.yaml](../schemas/mig.example.yaml) for the full schema.
 
 ### Hydra file-record compilation
@@ -288,58 +287,17 @@ Runtime behavior: the node's Docker client is created from standard Docker env v
   (default `e2e`).
 - `PLOY_E2E_REPO_OVERRIDE` — Optional Git repository override used by the Migs
   E2E scenarios in place of the default Java sample repo.
-- `PLOY_E2E_GITLAB_TOKEN` — Optional GitLab PAT so the E2E harness can clean up
-  branches after creating merge requests.
 - `PLOY_E2E_LIVE_SCENARIOS` — Optional comma-separated scenario IDs that the
   live Migs smoke test should execute (defaults to `simple-openrewrite`).
 
-## GitLab Merge Request Integration
+## GitLab Source Hydration
 
-Ploy can automatically create GitLab merge requests when Migs runs complete.
+GitLab credentials are server-owned `ployd` environment only. They are used by
+the control plane to resolve source SHAs and materialize repo snapshots that
+workers download through the snapshot endpoint.
 
-**Recommended approach:** Use `ploy config gitlab set` to store credentials on the control plane
-(see [docs/how-to/create-mr.md](../how-to/create-mr.md) for usage examples).
-
-Control plane configuration:
-- `PLOY_GITLAB_DOMAIN` — GitLab base URL or host (e.g., `https://gitlab.com` or `gitlab.com`). Optional; Ploy normalizes either form.
-- `PLOY_GITLAB_TOKEN` — GitLab Personal Access Token. Optional; stored only in memory at runtime, not persisted back to disk.
-
-Per-run overrides (CLI flags on `ploy run`):
-- `--gitlab-pat` — Override the control plane PAT for this run only
-- `--gitlab-domain` — Override the control plane domain for this run only
-- `--mr-success` — Create an MR when the run succeeds
-- `--mr-fail` — Create an MR when the run fails
-
-Branch naming semantics:
-- The MR source branch is always the effective target ref for the run. When `--target-ref` is provided, that value is used. When it is omitted, the node derives a default of `ploy/{run_name|run_id}` using the run name when set (e.g., batch name) or the run ID (KSUID string) otherwise.
-- The base branch is whatever you pass via `--base-ref` (commonly `main`).
-
-Quick test (PAT via config or flags):
-For local testing or CI environments, set the PAT via control plane config or per‑run flags.
-The recommended production approach is to set `PLOY_GITLAB_DOMAIN` and `PLOY_GITLAB_TOKEN`
-in the server environment.
-
-Example usage:
-```bash
-# Configure once on control plane
-ploy config gitlab set --file gitlab-config.json
-
-# Run with MR on success (server assigns run ID)
-ploy run --mr-success \
-  --repo https://gitlab.com/org/repo.git \
-  --base-ref main \
-  --target-ref workflow/upgrade
-
-# Per-run override
-ploy run --mr-success \
-  --gitlab-pat glpat-xxxxxxxxxxxxxxxxxxxx \
-  --gitlab-domain https://gitlab.example.com \
-  --repo https://gitlab.example.com/org/repo.git \
-  --base-ref main \
-  --target-ref workflow/upgrade
-```
-
-
+- `PLOY_GITLAB_DOMAIN` — GitLab base URL or host (for example `https://gitlab.com` or `gitlab.com`). Optional; when set, token auth is scoped to that host.
+- `PLOY_GITLAB_TOKEN` — GitLab Personal Access Token used by `ployd` for source resolution and snapshot materialization. It is not accepted in specs, CLI flags, or node manifests.
 
 ## gapi
 
@@ -366,11 +324,9 @@ TLS/mTLS (config YAML):
 - TLS version is pinned to 1.3.
 - Schema change (Nov 2025): `http.tls.require_client_cert` was removed. mTLS is always required when `http.tls.enabled` is true; there is no opt-out flag.
 
-GitLab integration for automatic MR creation:
-- `PLOY_GITLAB_DOMAIN` — GitLab base URL or host (e.g., `https://gitlab.com` or `gitlab.com`). Optional; Ploy normalizes either form.
-- `PLOY_GITLAB_TOKEN` — Inline GitLab Personal Access Token. Optional; stored only in
-  memory at runtime, not persisted back to disk.
-See the **GitLab Merge Request Integration** section above for usage examples and recommended configuration approach.
+GitLab source hydration:
+- `PLOY_GITLAB_DOMAIN` — GitLab base URL or host. Optional; when set, token auth is scoped to that host.
+- `PLOY_GITLAB_TOKEN` — GitLab Personal Access Token used by `ployd` for source resolution and snapshot materialization.
 
 ### Authentication
 

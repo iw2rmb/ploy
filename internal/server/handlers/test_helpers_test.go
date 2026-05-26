@@ -19,9 +19,9 @@ import (
 
 	bsmock "github.com/iw2rmb/ploy/internal/blobstore/mock"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/gitauth"
 	"github.com/iw2rmb/ploy/internal/server/auth"
 	"github.com/iw2rmb/ploy/internal/server/blobpersist"
-	"github.com/iw2rmb/ploy/internal/server/config"
 	"github.com/iw2rmb/ploy/internal/server/events"
 	"github.com/iw2rmb/ploy/internal/server/httpserver"
 	"github.com/iw2rmb/ploy/internal/store"
@@ -474,7 +474,7 @@ func newTestServerWithRole(t *testing.T, role auth.Role) *httpserver.Server {
 	st := &jobStore{}
 	bs := bsmock.New()
 	bp := blobpersist.New(st, bs)
-	RegisterRoutes(srv, st, bs, bp, ev, NewConfigHolder(config.GitLabConfig{}, nil), "test-secret")
+	RegisterRoutes(srv, st, bs, bp, ev, NewConfigHolder(nil), "test-secret", gitauth.Options{}, nil)
 	return srv
 }
 
