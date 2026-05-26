@@ -166,16 +166,14 @@ func (r *runController) initializeRuntime(ctx context.Context, runID types.RunID
 	// Initialize container runtime with image pull enabled.
 	// Fallback to nil if Docker is unavailable (simulated execution mode).
 	network := os.Getenv("PLOY_DOCKER_NETWORK")
-	registryAuthConfig := strings.TrimSpace(os.Getenv("PLOY_DOCKER_AUTH_CONFIG"))
-	if registryAuthConfig == "" {
-		registryAuthConfig = strings.TrimSpace(os.Getenv("DOCKER_AUTH_CONFIG"))
+	registryAuthConfig, err := resolveDockerRegistryAuthConfig()
+	if err != nil {
+		return step.Runner{}, nil, nil, err
 	}
-	containerRegistry := strings.TrimSpace(os.Getenv("PLOY_CONTAINER_REGISTRY"))
 	containerRuntime, err := step.NewDockerContainerRuntime(step.DockerContainerRuntimeOptions{
-		PullImage:                 true,
-		Network:                   network,
-		RegistryAuthConfigJSON:    registryAuthConfig,
-		DelegatedAuthPullRegistry: containerRegistry,
+		PullImage:              true,
+		Network:                network,
+		RegistryAuthConfigJSON: registryAuthConfig,
 	})
 	if err != nil {
 		slog.Warn("docker unavailable; falling back to stub runtime", "run_id", runID, "error", err)
@@ -206,6 +204,20 @@ func (r *runController) initializeRuntime(ctx context.Context, runID types.RunID
 	}
 
 	return runner, diffGenerator, logStreamer, nil
+}
+
+func resolveDockerRegistryAuthConfig() (string, error) {
+	if raw := strings.TrimSpace(os.Getenv("PLOY_DOCKER_AUTH_CONFIG")); raw != "" {
+		return raw, nil
+	}
+	if path := strings.TrimSpace(os.Getenv("PLOY_DOCKER_AUTH_CONFIG_FILE")); path != "" {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return "", fmt.Errorf("read PLOY_DOCKER_AUTH_CONFIG_FILE %q: %w", path, err)
+		}
+		return strings.TrimSpace(string(data)), nil
+	}
+	return strings.TrimSpace(os.Getenv("DOCKER_AUTH_CONFIG")), nil
 }
 
 // jobExecutionContext holds runtime components initialized for a mig/heal job.

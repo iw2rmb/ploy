@@ -55,7 +55,7 @@ func TestClaimLoop_OnlyUnifiedEndpoint(t *testing.T) {
 	}
 }
 
-func TestClaimAndExecute_NodeActionPayloadStartsActionWithoutSpec(t *testing.T) {
+func TestClaimAndExecute_ActionPayloadStartsActionWithoutSpec(t *testing.T) {
 	t.Parallel()
 
 	actionID := types.NewJobID()
@@ -65,7 +65,7 @@ func TestClaimAndExecute_NodeActionPayloadStartsActionWithoutSpec(t *testing.T) 
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"work_type":   "action",
 				"action_id":   actionID.String(),
-				"action_type": types.NodeActionCleanupDisk,
+				"action_type": "run_repo.followup",
 				"node_id":     testNodeID,
 			})
 		default:
@@ -86,8 +86,8 @@ func TestClaimAndExecute_NodeActionPayloadStartsActionWithoutSpec(t *testing.T) 
 	if !controller.startActionCalled {
 		t.Fatal("StartAction was not called")
 	}
-	if controller.lastStartAction.ActionID != actionID || controller.lastStartAction.ActionType != types.NodeActionCleanupDisk {
-		t.Fatalf("StartAction request = (%s,%s), want (%s,%s)", controller.lastStartAction.ActionID, controller.lastStartAction.ActionType, actionID, types.NodeActionCleanupDisk)
+	if controller.lastStartAction.ActionID != actionID || controller.lastStartAction.ActionType != "run_repo.followup" {
+		t.Fatalf("StartAction request = (%s,%s), want (%s,%s)", controller.lastStartAction.ActionID, controller.lastStartAction.ActionType, actionID, "run_repo.followup")
 	}
 	if controller.startCalled {
 		t.Fatal("StartRun should not be called for node action payload")

@@ -3,7 +3,6 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
-	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -12,11 +11,6 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
-
-type createNodeActionRequest struct {
-	ActionType string          `json:"action_type"`
-	Meta       json.RawMessage `json:"meta,omitempty"`
-}
 
 type nodeActionResponse struct {
 	ID         string          `json:"id"`
@@ -29,43 +23,6 @@ type nodeActionResponse struct {
 	Meta       json.RawMessage `json:"meta,omitempty"`
 	Result     json.RawMessage `json:"result,omitempty"`
 	CreatedAt  string          `json:"created_at,omitempty"`
-}
-
-func createNodeActionHandler(st store.Store) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		nodeID, ok := parseRequiredPathIDOrWriteError[domaintypes.NodeID](w, r, "id")
-		if !ok {
-			return
-		}
-		if _, ok := getNodeOrFail(w, r, st, nodeID, "create node action"); !ok {
-			return
-		}
-		req, err := decodeCreateNodeActionRequest(r)
-		if err != nil {
-			writeHTTPError(w, http.StatusBadRequest, "%v", err)
-			return
-		}
-		if !domaintypes.IsNodeActionType(req.ActionType) {
-			writeHTTPError(w, http.StatusBadRequest, "unsupported node action_type %q", req.ActionType)
-			return
-		}
-		meta := req.Meta
-		if len(meta) == 0 {
-			meta = []byte(`{}`)
-		}
-		action, err := st.CreateNodeAction(r.Context(), store.CreateNodeActionParams{
-			ID:         domaintypes.NewJobID(),
-			NodeID:     nodeID,
-			ActionType: req.ActionType,
-			Status:     domaintypes.JobStatusQueued,
-			Meta:       meta,
-		})
-		if err != nil {
-			writeHTTPError(w, http.StatusInternalServerError, "failed to create node action: %v", err)
-			return
-		}
-		writeJSON(w, http.StatusCreated, nodeActionToResponse(action))
-	}
 }
 
 func listNodeActionsHandler(st store.Store) http.HandlerFunc {
@@ -90,26 +47,6 @@ func listNodeActionsHandler(st store.Store) http.HandlerFunc {
 		}
 		writeJSON(w, http.StatusOK, resp)
 	}
-}
-
-func decodeCreateNodeActionRequest(r *http.Request) (createNodeActionRequest, error) {
-	dec := json.NewDecoder(r.Body)
-	dec.DisallowUnknownFields()
-	var req createNodeActionRequest
-	if err := dec.Decode(&req); err != nil {
-		return createNodeActionRequest{}, err
-	}
-	if err := dec.Decode(&struct{}{}); err != io.EOF {
-		if err == nil {
-			return createNodeActionRequest{}, errors.New("request body must contain exactly one JSON value")
-		}
-		return createNodeActionRequest{}, err
-	}
-	req.ActionType = strings.TrimSpace(req.ActionType)
-	if req.ActionType == "" {
-		return createNodeActionRequest{}, errors.New("action_type is required")
-	}
-	return req, nil
 }
 
 func parseNodeActionLimit(r *http.Request) (int32, error) {

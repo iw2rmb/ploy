@@ -1287,7 +1287,7 @@ Migs container images are standard OCI images with the following expectations:
 
 - **Container lifecycle**
   - Step and gate containers are retained by default after completion.
-  - Cleanup runs in the node-updater sidecar on service start and hourly by default.
+  - Cleanup runs through host `ploy-node-cleanup` systemd timers.
   - Node disk telemetry reports the lowest-free configured storage path from `/`,
     `DOCKER_ROOT_DIR`, `PLOYD_CACHE_HOME`, `PLOY_BUILDGATE_CACHE_ROOT`, and `TMPDIR`.
   - Logs are still streamed through `CreateAndPublishLog` and SSE.

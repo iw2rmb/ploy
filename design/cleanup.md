@@ -1,40 +1,31 @@
-# Node Cleanup Follow-Up
+# Node Maintenance Simplification
 
 ## Summary
 
-The current maintenance release intentionally keeps two recovery paths active:
-the node-updater performs autonomous cleanup/self-update, and the control plane
-can still enqueue emergency node actions. After the updated node-updater proves
-it can update itself and recover disk pressure, the control-plane emergency path
-should be reduced.
+Node maintenance moves from the `node-updater` sidecar to host `systemd`
+services. The node pulls job images directly using a Docker auth config file,
+and the host owns registry auth refresh, node image updates, and cleanup.
 
 ## Keep
 
-- Hourly node-updater cleanup, including cleanup on service start.
-- Node-updater self-update before node image update.
 - Node storage diagnostics for `/`, `DOCKER_ROOT_DIR`, `PLOYD_CACHE_HOME`,
   `PLOY_BUILDGATE_CACHE_ROOT`, and `TMPDIR`.
-- `GET /v1/nodes/<node-id>/diagnostics` and daemon logs for no-SSH operations.
-- `ploy cluster node actions` while queued maintenance actions still exist.
+- `GET /v1/nodes/<node-id>/diagnostics` for read-only operational state.
+- Historical `GET /v1/nodes/<node-id>/actions` while old action rows may exist.
+- Host cleanup with Docker volume pruning disabled unless explicitly enabled.
 
-## Remove After Success
+## Remove
 
-- Remove `node.update_updater` from the control-plane action queue once every
-  active node reports an updater version with self-update support.
-- Remove most Docker-exec updater control from the node agent. The updater
-  should own updater recreation and regular cleanup itself.
-- Keep `node.cleanup_disk` only as a short-lived emergency action until hourly
-  cleanup has recovered disk on the affected nodes for several cycles.
-- Remove emergency Docker volume pruning from the regular path. It should remain
-  opt-in only, because volumes can be unrelated to Ploy run caches.
+- `node-updater` service, image build, self-update, and diagnostics.
+- Delegated node image pulls through `docker exec` into `node-updater`.
+- Control-plane creation of `node.cleanup_disk` and `node.update_updater`.
+- Node claim priority for node-scoped maintenance actions.
 
 ## Success Criteria
 
-- The affected node reports current `node-updater` diagnostics after a service
-  restart.
-- `details.storage.paths` shows nonzero free space for the Ploy run cache and
-  Build Gate cache mounts.
-- Hourly updater daemon logs show cleanup cycles without manual SSH or Docker
-  commands.
+- `PLOY_DOCKER_AUTH_CONFIG_FILE` exists on the host, is mounted into the node,
+  and direct node pulls work without the updater container.
+- `ploy-node-update.timer` can drain, recreate, and undrain the node.
+- `ploy-node-cleanup.timer` recovers disk without manual Docker commands.
 - New `pre_gate` jobs no longer fail during workspace hydration because of
   `No space left on device`.

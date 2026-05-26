@@ -1,7 +1,8 @@
-# Node Maintenance Actions
+# Node Maintenance
 
-Nodes can run control-plane queued maintenance actions without SSH. The action
-claim path accepts only hardcoded `node.*` action types; it is not a remote shell.
+Worker node maintenance is host-owned. The node container executes jobs and
+reports telemetry; host `systemd` timers refresh registry auth, update the node
+image, and clean local cache state.
 
 ## Storage telemetry
 
@@ -14,32 +15,37 @@ The full breakdown is uploaded as the `node` diagnostic under
 `details.storage`. Each path entry includes the source env, path, free/total/used
 bytes, used percent, inode counters, and any probe error.
 
-## Actions
+## Registry auth
 
-- `node.cleanup_disk` runs inside the `node-updater` container. It waits for
-  active job containers, runs the updater cleanup cycle with an emergency age,
-  prunes Docker containers/images/build cache/volumes, and removes mounted
-  Build Gate cache entries when that cache path is visible in the updater.
-- `node.update_updater` runs inside the current `node-updater` container and
-  delegates to the updater's own self-update function.
+The node pulls job images directly. Auth config precedence is:
 
-The updater also runs a cleanup cycle on start and then every hour by default.
-It restores registry auth with `dp auth service-acc` when the service account
-key is mounted, checks its own image before the node image, and recreates the
-`node-updater` service when a newer updater image is available.
+1. `PLOY_DOCKER_AUTH_CONFIG`
+2. `PLOY_DOCKER_AUTH_CONFIG_FILE`
+3. `DOCKER_AUTH_CONFIG`
 
-## CLI
+`PLOY_DOCKER_AUTH_CONFIG_FILE` must point to a Docker auth config JSON file in
+`DOCKER_AUTH_CONFIG` format. Host maintenance should refresh this file
+atomically and keep it readable by the node container.
+
+## Host services
+
+The deploy service bundle provides:
+
+- `ploy-node-auth-refresh.timer` — refreshes Artifactory Docker auth.
+- `ploy-node-update.timer` — pulls the node image, drains the node, waits for
+  active job containers, recreates the node service, and undrains.
+- `ploy-node-cleanup.timer` — prunes exited containers, unused images, and old
+  Ploy cache directories.
+
+## CLI and API
+
+Node maintenance actions are no longer enqueued through the control plane.
+
+Useful read-only surfaces remain:
 
 ```sh
-ploy cluster node cleanup <node-id> --wait
-ploy cluster node update-updater <node-id> --wait
 ploy cluster node actions <node-id> --limit 20
 ```
 
-The server API is:
-
-- `POST /v1/nodes/{id}/actions` with `{"action_type":"node.cleanup_disk"}` or
-  `{"action_type":"node.update_updater"}`.
-- `GET /v1/nodes/{id}/actions?limit=N` for recent action status and result.
-- `GET /v1/nodes/{id}/diagnostics` for node and node-updater diagnostics,
-  including storage details and updater image check status.
+- `GET /v1/nodes/{id}/actions?limit=N` for historical action status.
+- `GET /v1/nodes/{id}/diagnostics` for node diagnostics and storage details.

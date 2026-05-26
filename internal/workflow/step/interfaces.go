@@ -21,9 +21,6 @@ type DockerContainerRuntimeOptions struct {
 	// RegistryAuthConfigJSON is a Docker auth config JSON payload (DOCKER_AUTH_CONFIG
 	// format). When set, image pulls use matching registry credentials.
 	RegistryAuthConfigJSON string
-	// DelegatedAuthPullRegistry enables the node-only authenticated pull fallback
-	// for images whose registry host matches this value.
-	DelegatedAuthPullRegistry string
 }
 
 // ContainerRuntime executes containers.

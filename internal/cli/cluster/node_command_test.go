@@ -78,13 +78,11 @@ func TestHandleNodeAddRequiresClusterIDAndAddress(t *testing.T) {
 	}
 }
 
-func TestHandleNodeMaintenanceCommandsRequireNodeID(t *testing.T) {
+func TestHandleNodeActionsRequiresNodeID(t *testing.T) {
 	tests := []struct {
 		name string
 		args []string
 	}{
-		{name: "cleanup", args: []string{"cleanup"}},
-		{name: "update updater", args: []string{"update-updater"}},
 		{name: "actions", args: []string{"actions"}},
 	}
 

@@ -830,7 +830,7 @@ NodeDiagnostic:
   type: object
   properties:
     node_id: { type: string }
-    component: { type: string, enum: [node, node-updater] }
+    component: { type: string, enum: [node] }
     status: { type: string }
     last_error: { type: string, nullable: true }
     version: { type: string, nullable: true }
@@ -847,7 +847,7 @@ UpsertNodeDiagnosticRequest:
   type: object
   additionalProperties: false
   properties:
-    component: { type: string, enum: [node, node-updater] }
+    component: { type: string, enum: [node] }
     status: { type: string }
     last_error: { type: string, nullable: true }
     version: { type: string, nullable: true }
@@ -864,7 +864,7 @@ NodeDaemonLog:
   properties:
     id: { type: integer, format: int64 }
     node_id: { type: string }
-    component: { type: string, enum: [node, node-updater] }
+    component: { type: string, enum: [node] }
     stream: { type: string, enum: [stdout, stderr, system] }
     message: { type: string }
     created_at: { type: string, format: date-time }
@@ -874,7 +874,7 @@ CreateNodeDaemonLogsRequest:
   type: object
   additionalProperties: false
   properties:
-    component: { type: string, enum: [node, node-updater] }
+    component: { type: string, enum: [node] }
     stream: { type: string, enum: [stdout, stderr, system] }
     lines:
       type: array
@@ -960,17 +960,6 @@ Node:
     - drained
     - created_at
 
-CreateNodeActionRequest:
-  type: object
-  properties:
-    action_type:
-      type: string
-      enum: [node.cleanup_disk, node.update_updater]
-    meta:
-      type: object
-      additionalProperties: true
-  required: [action_type]
-
 NodeAction:
   type: object
   properties:
@@ -978,7 +967,7 @@ NodeAction:
     node_id: { type: string, description: "Node ID (NanoID 6-character string)" }
     action_type:
       type: string
-      enum: [node.cleanup_disk, node.update_updater]
+      description: Historical node action type.
     status:
       type: string
       enum: [Queued, Running, Success, Fail, Error, Cancelled]

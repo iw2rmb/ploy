@@ -42,18 +42,16 @@ Use this flow for any "why did run/job fail?" request.
 - Only continue to logs and artifacts when the API result is missing, ambiguous, or conflicts with observed behavior.
 
 ## 2.2) Node maintenance and free-space checks
-- With no SSH access, use node diagnostics and maintenance actions instead of host shell commands.
+- With no SSH access, use node diagnostics instead of host shell commands.
 - Free-space data is available from:
   - `GET /v1/nodes` for the selected constrained storage aggregate.
   - `GET /v1/nodes/<node-id>/diagnostics` for `node.details.storage.paths`, covering `/`, `DOCKER_ROOT_DIR`, `PLOYD_CACHE_HOME`, `PLOY_BUILDGATE_CACHE_ROOT`, and `TMPDIR`.
-- Node maintenance CLI:
-  - `ploy cluster node cleanup <node-id> --wait`
-  - `ploy cluster node update-updater <node-id> --wait`
-  - `ploy cluster node actions <node-id> --limit 20`
-- API equivalents:
-  - `POST /v1/nodes/<node-id>/actions` with `{"action_type":"node.cleanup_disk"}` or `{"action_type":"node.update_updater"}`.
-  - `GET /v1/nodes/<node-id>/actions?limit=N`.
-- The `node-updater` service restores registry auth with mounted `dp.sa.json`, runs cleanup on start and hourly by default, and can recreate itself when its image changes.
+- Node maintenance is host-owned by deploy `systemd` timers:
+  - `ploy-node-auth-refresh.timer`
+  - `ploy-node-update.timer`
+  - `ploy-node-cleanup.timer`
+- Historical node action rows remain readable with `GET /v1/nodes/<node-id>/actions?limit=N`.
+- Node image pulls use direct Docker auth from `PLOY_DOCKER_AUTH_CONFIG`, then `PLOY_DOCKER_AUTH_CONFIG_FILE`, then `DOCKER_AUTH_CONFIG`.
 
 ## 3) Minimum required evidence
 - `ploy run status <run-id> --json`

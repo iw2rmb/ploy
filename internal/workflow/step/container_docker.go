@@ -50,11 +50,10 @@ type dockerStatsAPI interface {
 
 // DockerContainerRuntime executes containers using the local Docker daemon.
 type DockerContainerRuntime struct {
-	client        dockerClientAPI
-	images        dockerImageAPI
-	delegatedPull DockerExecAPI
-	stats         dockerStatsAPI
-	opts          DockerContainerRuntimeOptions
+	client dockerClientAPI
+	images dockerImageAPI
+	stats  dockerStatsAPI
+	opts   DockerContainerRuntimeOptions
 }
 
 // NewDockerContainerRuntime constructs a Docker-backed container runtime.
@@ -65,7 +64,7 @@ func NewDockerContainerRuntime(opts DockerContainerRuntimeOptions) (ContainerRun
 	if err != nil {
 		return nil, fmt.Errorf("step: configure docker runtime: %w", err)
 	}
-	return &DockerContainerRuntime{client: cli, images: cli, delegatedPull: cli, stats: cli, opts: opts}, nil
+	return &DockerContainerRuntime{client: cli, images: cli, stats: cli, opts: opts}, nil
 }
 
 // newDockerContainerRuntimeWithClient constructs a DockerContainerRuntime with
@@ -74,9 +73,6 @@ func newDockerContainerRuntimeWithClient(cli dockerClientAPI, opts DockerContain
 	rt := &DockerContainerRuntime{client: cli, opts: opts}
 	if img, ok := cli.(dockerImageAPI); ok {
 		rt.images = img
-	}
-	if dp, ok := cli.(DockerExecAPI); ok {
-		rt.delegatedPull = dp
 	}
 	if s, ok := cli.(dockerStatsAPI); ok {
 		rt.stats = s
@@ -302,12 +298,6 @@ func (r *DockerContainerRuntime) pullImage(ctx context.Context, imageRef string)
 		RegistryAuth: registryAuth,
 	})
 	if err != nil {
-		if r.shouldDelegateAuthPull(imageRef, err) {
-			if delegatedErr := r.delegateAuthPull(ctx, imageRef, err); delegatedErr != nil {
-				return delegatedErr
-			}
-			return nil
-		}
 		return fmt.Errorf("step: pull image %s: %w", imageRef, err)
 	}
 	defer func() { _ = reader.Close() }()

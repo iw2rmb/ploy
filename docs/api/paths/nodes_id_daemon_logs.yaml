@@ -11,7 +11,7 @@ get:
     - in: query
       name: component
       required: false
-      schema: { type: string, enum: [node, node-updater] }
+      schema: { type: string, enum: [node] }
     - in: query
       name: limit
       required: false
