@@ -123,7 +123,6 @@ func registerNodeRoutes(s *httpserver.Server, deps routeDeps) {
 	s.RegisterRouteFunc("GET /v1/nodes", listNodesHandler(deps.st), auth.RoleControlPlane)
 	s.RegisterRouteFunc("POST /v1/nodes/{id}/drain", drainNodeHandler(deps.st), auth.RoleControlPlane)
 	s.RegisterRouteFunc("POST /v1/nodes/{id}/undrain", undrainNodeHandler(deps.st), auth.RoleControlPlane)
-	s.RegisterRouteFunc("POST /v1/nodes/{id}/actions", createNodeActionHandler(deps.st), auth.RoleControlPlane)
 	s.RegisterRouteFunc("GET /v1/nodes/{id}/actions", listNodeActionsHandler(deps.st), auth.RoleControlPlane)
 
 	s.RegisterRouteFunc("POST /v1/nodes/{id}/heartbeat", heartbeatHandler(deps.st), auth.RoleWorker)

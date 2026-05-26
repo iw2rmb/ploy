@@ -135,7 +135,7 @@ build_gate:
   - Task-oriented healing routers may consume `/in/errors.yaml` and emit `tasks[]` with `error_kind` in `code|deps|infra` and `items[]` indexes into `errors` entries
 - Container cleanup model:
   - Containers are retained after step/gate completion.
-  - The node-updater sidecar runs cleanup on start and then hourly by default.
+  - Host `ploy-node-cleanup` systemd timers prune completed containers and cache state.
   - Disk telemetry selects the lowest-free configured storage path from `/`,
     `DOCKER_ROOT_DIR`, `PLOYD_CACHE_HOME`, `PLOY_BUILDGATE_CACHE_ROOT`, and `TMPDIR`.
 - Gate status visibility: Use `GET /v1/runs/{id}/status` to view gate results (format: `Gate: passed duration=1234ms` or `Gate: failed pre-gate duration=567ms`) via `Metadata["gate_summary"]`.
@@ -228,6 +228,14 @@ Runtime behavior: the node's Docker client is created from standard Docker env v
   `{"auths":{"ghcr.io":{"auth":"<base64(username:token)>"}}}`.
 - `PLOY_DOCKER_AUTH_CONFIG` — Optional override for `DOCKER_AUTH_CONFIG`.
   When both are set, `PLOY_DOCKER_AUTH_CONFIG` wins.
+- `PLOY_DOCKER_AUTH_CONFIG_FILE` — Optional path to a Docker auth config JSON
+  file. Used when `PLOY_DOCKER_AUTH_CONFIG` is empty. If set and unreadable,
+  node runtime initialization fails explicitly instead of silently pulling
+  without credentials.
+
+Auth precedence is:
+`PLOY_DOCKER_AUTH_CONFIG`, then `PLOY_DOCKER_AUTH_CONFIG_FILE`, then
+`DOCKER_AUTH_CONFIG`.
 
 **When to set these variables:**
 - **Remote Docker daemon**: Set `DOCKER_HOST=tcp://<host>:2376` and TLS variables when the

@@ -291,9 +291,8 @@ CREATE TABLE IF NOT EXISTS run_repo_actions (
 CREATE INDEX IF NOT EXISTS run_repo_actions_pending_idx ON run_repo_actions(run_id, repo_id, attempt, id) WHERE status = 'Queued';
 CREATE INDEX IF NOT EXISTS run_repo_actions_node_idx ON run_repo_actions(node_id) WHERE node_id IS NOT NULL;
 
--- Node-scoped maintenance queue. These actions are hardcoded node operations
--- such as disk cleanup and node-updater self-update; they are not arbitrary
--- command execution.
+-- Historical node-scoped maintenance queue. Host systemd services now own node
+-- maintenance; existing rows remain readable for old action results.
 CREATE TABLE IF NOT EXISTS node_actions (
   id              TEXT PRIMARY KEY,  -- KSUID-backed string ID; app-generated.
   node_id         TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
@@ -416,11 +415,10 @@ CREATE TABLE IF NOT EXISTS node_metrics (
 CREATE INDEX IF NOT EXISTS node_metrics_node_time_idx ON node_metrics USING BRIN (created_at);
 CREATE INDEX IF NOT EXISTS node_metrics_node_idx ON node_metrics(node_id);
 
--- Node daemon diagnostics. These rows are not tied to a run/job: they describe
--- long-lived node-side components such as ployd-node and node-updater.
+-- Node daemon diagnostics. These rows are not tied to a run/job.
 CREATE TABLE IF NOT EXISTS node_diagnostics (
   node_id          TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
-  component        TEXT NOT NULL CHECK (component IN ('node', 'node-updater')),
+  component        TEXT NOT NULL CHECK (component IN ('node')),
   status           TEXT NOT NULL,
   last_error       TEXT,
   version          TEXT,
@@ -439,7 +437,7 @@ CREATE INDEX IF NOT EXISTS node_diagnostics_updated_idx ON node_diagnostics(upda
 CREATE TABLE IF NOT EXISTS node_daemon_logs (
   id          BIGSERIAL PRIMARY KEY,
   node_id     TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
-  component   TEXT NOT NULL CHECK (component IN ('node', 'node-updater')),
+  component   TEXT NOT NULL CHECK (component IN ('node')),
   stream      TEXT NOT NULL CHECK (stream IN ('stdout', 'stderr', 'system')),
   message     TEXT NOT NULL,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now()

@@ -29,46 +29,6 @@ func TestClaimService_Claim_ReturnsNoWorkWhenQueueEmpty(t *testing.T) {
 	}
 }
 
-func TestClaimService_Claim_NodeActionBeforeRunRepoAction(t *testing.T) {
-	t.Parallel()
-
-	nodeID := domaintypes.NodeID(domaintypes.NewNodeKey())
-	actionID := domaintypes.NewJobID()
-	st := &jobStore{}
-	st.getNode.val = store.Node{ID: nodeID}
-	st.claimJob.val = store.Job{ID: domaintypes.NewJobID()}
-	st.claimNodeAction.val = store.NodeAction{
-		ID:         actionID,
-		NodeID:     nodeID,
-		ActionType: domaintypes.NodeActionCleanupDisk,
-		Status:     domaintypes.JobStatusRunning,
-		StartedAt:  pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
-		CreatedAt:  pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
-	}
-
-	svc := NewClaimService(st, nil, &ConfigHolder{}, nil)
-	result, err := svc.Claim(context.Background(), nodeID)
-	if err != nil {
-		t.Fatalf("Claim() error = %v", err)
-	}
-	if !st.claimNodeAction.called {
-		t.Fatal("expected ClaimNodeAction to be called")
-	}
-	if st.claimJob.called {
-		t.Fatal("expected ClaimJob to not be called when node action is available")
-	}
-	if st.claimRunRepoAction.called {
-		t.Fatal("expected ClaimRunRepoAction to not be called when node action is available")
-	}
-	payload, ok := result.Response.(nodeActionClaimResponsePayload)
-	if !ok {
-		t.Fatalf("response payload type = %T, want nodeActionClaimResponsePayload", result.Response)
-	}
-	if payload.ActionID != actionID || payload.ActionType != domaintypes.NodeActionCleanupDisk {
-		t.Fatalf("node action payload = (%s,%s), want (%s,%s)", payload.ActionID, payload.ActionType, actionID, domaintypes.NodeActionCleanupDisk)
-	}
-}
-
 func TestClaimService_Claim_SuccessBuildsPayloadAndTransitionsRepo(t *testing.T) {
 	t.Parallel()
 

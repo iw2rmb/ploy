@@ -13,7 +13,7 @@ func TestNodeActions_CreateClaimCompleteList(t *testing.T) {
 	action, err := db.CreateNodeAction(ctx, CreateNodeActionParams{
 		ID:         types.NewJobID(),
 		NodeID:     node.ID,
-		ActionType: types.NodeActionCleanupDisk,
+		ActionType: "node.cleanup_disk",
 		Status:     types.JobStatusQueued,
 		Meta:       []byte(`{"reason":"test"}`),
 	})

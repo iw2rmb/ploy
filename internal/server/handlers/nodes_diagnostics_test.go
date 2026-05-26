@@ -26,7 +26,7 @@ func TestNodeDiagnosticsHandlers_CurrentContract(t *testing.T) {
 			run: func(t *testing.T, st *nodeStore) {
 				h := upsertNodeDiagnosticHandler(st)
 				body := `{
-  "component": "node-updater",
+  "component": "node",
   "status": "ok",
   "version": "v1",
   "image_ref": "registry/node:latest",
@@ -42,7 +42,7 @@ func TestNodeDiagnosticsHandlers_CurrentContract(t *testing.T) {
 			verify: func(t *testing.T, st *nodeStore) {
 				assertCalled(t, "UpsertNodeDiagnostic", st.upsertDiagnostic.called)
 				got := st.upsertDiagnostic.params
-				if got.NodeID != nodeID || got.Component != "node-updater" || got.Status != "ok" {
+				if got.NodeID != nodeID || got.Component != "node" || got.Status != "ok" {
 					t.Fatalf("diagnostic key/status = %s/%s/%s", got.NodeID, got.Component, got.Status)
 				}
 				if string(got.Details) != `{"phase":"manifest"}` {
@@ -82,7 +82,7 @@ func TestNodeDiagnosticsHandlers_CurrentContract(t *testing.T) {
 			name: "post daemon logs stores lines and trims",
 			run: func(t *testing.T, st *nodeStore) {
 				h := createNodeDaemonLogsHandler(st)
-				body := `{"component":"node-updater","stream":"stderr","lines":["pull ok","cycle ok"]}`
+				body := `{"component":"node","stream":"stderr","lines":["node ok","heartbeat ok"]}`
 				rr := doRequest(t, h, http.MethodPost, "/v1/nodes/"+nodeID.String()+"/daemon-logs", body, "id", nodeID.String())
 				assertStatus(t, rr, http.StatusCreated)
 			},
@@ -90,7 +90,7 @@ func TestNodeDiagnosticsHandlers_CurrentContract(t *testing.T) {
 				if len(st.createDaemonLog.calls) != 2 {
 					t.Fatalf("CreateNodeDaemonLog calls = %d, want 2", len(st.createDaemonLog.calls))
 				}
-				if st.createDaemonLog.calls[0].Message != "pull ok" || st.createDaemonLog.calls[1].Message != "cycle ok" {
+				if st.createDaemonLog.calls[0].Message != "node ok" || st.createDaemonLog.calls[1].Message != "heartbeat ok" {
 					t.Fatalf("messages = %+v", st.createDaemonLog.calls)
 				}
 				assertCalled(t, "TrimNodeDaemonLogs", st.trimDaemonLogs.called)
@@ -102,18 +102,18 @@ func TestNodeDiagnosticsHandlers_CurrentContract(t *testing.T) {
 				st.listDaemonLogs.val = []store.NodeDaemonLog{{
 					ID:        7,
 					NodeID:    nodeID,
-					Component: "node-updater",
+					Component: "node",
 					Stream:    "stderr",
-					Message:   "unauthorized",
+					Message:   "storage ok",
 					CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
 				}}
 				h := listNodeDaemonLogsHandler(st)
-				rr := doRequest(t, h, http.MethodGet, "/v1/nodes/"+nodeID.String()+"/daemon-logs?component=node-updater&limit=50", "", "id", nodeID.String())
+				rr := doRequest(t, h, http.MethodGet, "/v1/nodes/"+nodeID.String()+"/daemon-logs?component=node&limit=50", "", "id", nodeID.String())
 				assertStatus(t, rr, http.StatusOK)
 			},
 			verify: func(t *testing.T, st *nodeStore) {
 				assertCalled(t, "ListNodeDaemonLogs", st.listDaemonLogs.called)
-				if st.listDaemonLogs.params.Component == nil || *st.listDaemonLogs.params.Component != "node-updater" {
+				if st.listDaemonLogs.params.Component == nil || *st.listDaemonLogs.params.Component != "node" {
 					t.Fatalf("component filter = %+v", st.listDaemonLogs.params.Component)
 				}
 				if st.listDaemonLogs.params.LimitCount != 50 {

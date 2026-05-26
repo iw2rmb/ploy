@@ -4,11 +4,75 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
+
+func TestResolveDockerRegistryAuthConfig(t *testing.T) {
+	authFile := filepath.Join(t.TempDir(), "docker-auth.json")
+	if err := os.WriteFile(authFile, []byte("  {\"auths\":{\"file.example\":{\"auth\":\"file\"}}}\n"), 0o600); err != nil {
+		t.Fatalf("write auth file: %v", err)
+	}
+	missingFile := filepath.Join(t.TempDir(), "missing.json")
+
+	tests := []struct {
+		name       string
+		ployAuth   string
+		filePath   string
+		dockerAuth string
+		want       string
+		wantErr    string
+	}{
+		{
+			name:       "inline_ploy_auth_wins",
+			ployAuth:   `{"auths":{"inline.example":{"auth":"inline"}}}`,
+			filePath:   authFile,
+			dockerAuth: `{"auths":{"docker.example":{"auth":"docker"}}}`,
+			want:       `{"auths":{"inline.example":{"auth":"inline"}}}`,
+		},
+		{
+			name:       "file_used_when_inline_empty",
+			filePath:   authFile,
+			dockerAuth: `{"auths":{"docker.example":{"auth":"docker"}}}`,
+			want:       `{"auths":{"file.example":{"auth":"file"}}}`,
+		},
+		{
+			name:       "docker_auth_fallback",
+			dockerAuth: `{"auths":{"docker.example":{"auth":"docker"}}}`,
+			want:       `{"auths":{"docker.example":{"auth":"docker"}}}`,
+		},
+		{
+			name:     "configured_file_read_error",
+			filePath: missingFile,
+			wantErr:  "read PLOY_DOCKER_AUTH_CONFIG_FILE",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("PLOY_DOCKER_AUTH_CONFIG", tt.ployAuth)
+			t.Setenv("PLOY_DOCKER_AUTH_CONFIG_FILE", tt.filePath)
+			t.Setenv("DOCKER_AUTH_CONFIG", tt.dockerAuth)
+
+			got, err := resolveDockerRegistryAuthConfig()
+			if tt.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+					t.Fatalf("resolveDockerRegistryAuthConfig() error = %v, want contains %q", err, tt.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("resolveDockerRegistryAuthConfig() error = %v", err)
+			}
+			if got != tt.want {
+				t.Fatalf("resolveDockerRegistryAuthConfig() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
 
 func TestWithTempDir(t *testing.T) {
 	tests := []struct {

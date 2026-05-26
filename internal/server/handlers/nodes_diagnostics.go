@@ -23,8 +23,7 @@ const (
 )
 
 var validNodeDaemonComponents = map[string]bool{
-	"node":         true,
-	"node-updater": true,
+	"node": true,
 }
 
 var validNodeDaemonStreams = map[string]bool{
