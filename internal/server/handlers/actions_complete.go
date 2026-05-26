@@ -62,6 +62,9 @@ func completeAction(
 ) error {
 	action, err := st.GetRunRepoAction(ctx, actionID)
 	if err != nil {
+		if isNoRowsError(err) {
+			return completeNodeAction(ctx, st, actionID, nodeID, status, stats)
+		}
 		return err
 	}
 	if action.NodeID == nil || *action.NodeID != nodeID {
@@ -87,6 +90,44 @@ func completeAction(
 		return err
 	}
 	return nil
+}
+
+func completeNodeAction(
+	ctx context.Context,
+	st store.Store,
+	actionID domaintypes.JobID,
+	nodeID domaintypes.NodeID,
+	status domaintypes.JobStatus,
+	stats JobStatsPayload,
+) error {
+	action, err := st.GetNodeAction(ctx, actionID)
+	if err != nil {
+		return err
+	}
+	if action.NodeID != nodeID {
+		return errForbiddenActionOwner
+	}
+	if action.Status != domaintypes.JobStatusRunning {
+		return errActionNotRunning
+	}
+	result := map[string]any{}
+	for key, value := range stats.Metadata {
+		if strings.TrimSpace(key) != "" {
+			result[key] = value
+		}
+	}
+	if errText := stats.ErrorMessage(); errText != "" {
+		result["error"] = errText
+	}
+	resultBytes, err := json.Marshal(result)
+	if err != nil {
+		return err
+	}
+	return st.UpdateNodeActionCompletion(ctx, store.UpdateNodeActionCompletionParams{
+		ID:     actionID,
+		Status: status,
+		Result: resultBytes,
+	})
 }
 
 func validateCompleteActionRequest(r *http.Request) (domaintypes.NodeID, domaintypes.JobStatus, JobStatsPayload, error) {

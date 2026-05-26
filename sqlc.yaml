@@ -158,3 +158,7 @@ sql:
               import: "github.com/iw2rmb/ploy/internal/domain/types"
               type: "NodeID"
               pointer: true
+          - column: "node_actions.id"
+            go_type: "github.com/iw2rmb/ploy/internal/domain/types.JobID"
+          - column: "node_actions.node_id"
+            go_type: "github.com/iw2rmb/ploy/internal/domain/types.NodeID"

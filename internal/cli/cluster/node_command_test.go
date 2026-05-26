@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/iw2rmb/ploy/internal/cli/common"
+	cliconfig "github.com/iw2rmb/ploy/internal/cli/config"
 	"github.com/iw2rmb/ploy/internal/deploy"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/testutil/assertx"
@@ -74,6 +75,30 @@ func TestHandleNodeAddRequiresClusterIDAndAddress(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "address is required") {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestHandleNodeMaintenanceCommandsRequireNodeID(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+	}{
+		{name: "cleanup", args: []string{"cleanup"}},
+		{name: "update updater", args: []string{"update-updater"}},
+		{name: "actions", args: []string{"actions"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			buf := &bytes.Buffer{}
+			err := handleNode(tt.args, buf)
+			if err == nil {
+				t.Fatal("expected missing node-id error")
+			}
+			if !strings.Contains(err.Error(), "node-id is required") {
+				t.Fatalf("error = %v, want node-id is required", err)
+			}
+		})
 	}
 }
 
@@ -187,7 +212,6 @@ func TestRunNodeAddGeneratesNanoIDNodeID(t *testing.T) {
 }
 
 func TestSignNodeCSR_Success(t *testing.T) {
-	t.Parallel()
 	nodeID := domaintypes.NewNodeKey()
 	// Arrange a fake PKI sign endpoint
 	var gotPath, gotContentType string
@@ -209,6 +233,7 @@ func TestSignNodeCSR_Success(t *testing.T) {
 		})
 	}))
 	defer srv.Close()
+	configureDefaultClusterForNodeTest(t, srv.URL)
 
 	// Act
 	cert, ca, err := signNodeCSR(context.Background(), srv.URL, nodeID, []byte("CSR-PEM"))
@@ -232,16 +257,28 @@ func TestSignNodeCSR_Success(t *testing.T) {
 }
 
 func TestSignNodeCSR_Non200(t *testing.T) {
-	t.Parallel()
 	nodeID := domaintypes.NewNodeKey()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad csr", http.StatusBadRequest)
 	}))
 	defer srv.Close()
+	configureDefaultClusterForNodeTest(t, srv.URL)
 
 	_, _, err := signNodeCSR(context.Background(), srv.URL, nodeID, []byte("CSR-PEM"))
 	if err == nil || !strings.Contains(err.Error(), "server returned 400: bad csr") {
 		t.Fatalf("expected status error, got: %v", err)
+	}
+}
+
+func configureDefaultClusterForNodeTest(t *testing.T, serverURL string) {
+	t.Helper()
+	clienv.IsolateConfigHomeAllowDefault(t)
+	clusterID := cliconfig.ClusterID("test")
+	if _, err := cliconfig.SaveDescriptor(cliconfig.Descriptor{ClusterID: clusterID, Address: serverURL}); err != nil {
+		t.Fatalf("SaveDescriptor: %v", err)
+	}
+	if err := cliconfig.SetDefault(clusterID); err != nil {
+		t.Fatalf("SetDefault: %v", err)
 	}
 }
 

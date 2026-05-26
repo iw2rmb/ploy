@@ -89,7 +89,14 @@ func (r *DockerContainerRuntime) delegateAuthPull(ctx context.Context, imageRef 
 }
 
 func (r *DockerContainerRuntime) findNodeUpdaterContainer(ctx context.Context) (string, error) {
-	list, err := r.delegatedPull.ContainerList(ctx, client.ContainerListOptions{
+	return FindNodeUpdaterContainer(ctx, r.delegatedPull)
+}
+
+func FindNodeUpdaterContainer(ctx context.Context, api DockerExecAPI) (string, error) {
+	if api == nil {
+		return "", errors.New("find node-updater container: docker exec api is nil")
+	}
+	list, err := api.ContainerList(ctx, client.ContainerListOptions{
 		Filters: make(client.Filters).Add("label", "com.docker.compose.service=node-updater"),
 	})
 	if err != nil {
@@ -99,7 +106,7 @@ func (r *DockerContainerRuntime) findNodeUpdaterContainer(ctx context.Context) (
 		return id, nil
 	}
 
-	list, err = r.delegatedPull.ContainerList(ctx, client.ContainerListOptions{
+	list, err = api.ContainerList(ctx, client.ContainerListOptions{
 		Filters: make(client.Filters).Add("name", "ploy-node-updater-1"),
 	})
 	if err != nil {
@@ -122,16 +129,24 @@ func firstContainerID(list client.ContainerListResult) string {
 
 func (r *DockerContainerRuntime) execUpdaterDockerPull(ctx context.Context, updaterID, imageRef string) (string, int, error) {
 	const shellScript = `dp auth service-acc --key-file "${PLOY_DP_SERVICE_ACCOUNT_KEY_FILE:-/etc/ploy/dp.sa.json}" >/dev/null && docker pull "$1"`
-	create, err := r.delegatedPull.ExecCreate(ctx, updaterID, client.ExecCreateOptions{
+	return ExecNodeUpdaterBash(ctx, r.delegatedPull, updaterID, shellScript, "ploy-node-auth-pull", imageRef)
+}
+
+func ExecNodeUpdaterBash(ctx context.Context, api DockerExecAPI, updaterID, shellScript, argv0 string, args ...string) (string, int, error) {
+	if api == nil {
+		return "", 0, errors.New("exec updater bash: docker exec api is nil")
+	}
+	cmd := []string{
+		"/usr/bin/bash",
+		"-lc",
+		shellScript,
+		argv0,
+	}
+	cmd = append(cmd, args...)
+	create, err := api.ExecCreate(ctx, updaterID, client.ExecCreateOptions{
 		AttachStdout: true,
 		AttachStderr: true,
-		Cmd: []string{
-			"/usr/bin/bash",
-			"-lc",
-			shellScript,
-			"ploy-node-auth-pull",
-			imageRef,
-		},
+		Cmd:          cmd,
 	})
 	if err != nil {
 		return "", 0, fmt.Errorf("create updater exec: %w", err)
@@ -140,7 +155,7 @@ func (r *DockerContainerRuntime) execUpdaterDockerPull(ctx context.Context, upda
 		return "", 0, errors.New("create updater exec: empty exec id")
 	}
 
-	attached, err := r.delegatedPull.ExecAttach(ctx, create.ID, client.ExecAttachOptions{})
+	attached, err := api.ExecAttach(ctx, create.ID, client.ExecAttachOptions{})
 	if err != nil {
 		return "", 0, fmt.Errorf("attach updater exec: %w", err)
 	}
@@ -158,7 +173,7 @@ func (r *DockerContainerRuntime) execUpdaterDockerPull(ctx context.Context, upda
 	}
 	output := strings.TrimSpace(stdoutBuf.String() + stderrBuf.String())
 
-	inspect, err := r.delegatedPull.ExecInspect(ctx, create.ID, client.ExecInspectOptions{})
+	inspect, err := api.ExecInspect(ctx, create.ID, client.ExecInspectOptions{})
 	if err != nil {
 		return output, 0, fmt.Errorf("inspect updater exec: %w", err)
 	}

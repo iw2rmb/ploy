@@ -36,7 +36,7 @@ type dockerImageAPI interface {
 	ImageInspect(ctx context.Context, imageID string, inspectOpts ...client.ImageInspectOption) (client.ImageInspectResult, error)
 }
 
-type dockerDelegatedPullAPI interface {
+type DockerExecAPI interface {
 	ContainerList(ctx context.Context, options client.ContainerListOptions) (client.ContainerListResult, error)
 	ExecCreate(ctx context.Context, container string, options client.ExecCreateOptions) (client.ExecCreateResult, error)
 	ExecAttach(ctx context.Context, execID string, options client.ExecAttachOptions) (client.ExecAttachResult, error)
@@ -52,7 +52,7 @@ type dockerStatsAPI interface {
 type DockerContainerRuntime struct {
 	client        dockerClientAPI
 	images        dockerImageAPI
-	delegatedPull dockerDelegatedPullAPI
+	delegatedPull DockerExecAPI
 	stats         dockerStatsAPI
 	opts          DockerContainerRuntimeOptions
 }
@@ -75,7 +75,7 @@ func newDockerContainerRuntimeWithClient(cli dockerClientAPI, opts DockerContain
 	if img, ok := cli.(dockerImageAPI); ok {
 		rt.images = img
 	}
-	if dp, ok := cli.(dockerDelegatedPullAPI); ok {
+	if dp, ok := cli.(DockerExecAPI); ok {
 		rt.delegatedPull = dp
 	}
 	if s, ok := cli.(dockerStatsAPI); ok {

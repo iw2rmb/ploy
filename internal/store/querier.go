@@ -33,6 +33,7 @@ type Querier interface {
 	// - jobs are claimable only when runs.status='Started'
 	// - nodeID must be non-empty
 	ClaimJob(ctx context.Context, nodeID types.NodeID) (Job, error)
+	ClaimNodeAction(ctx context.Context, nodeID types.NodeID) (NodeAction, error)
 	ClaimRunRepoAction(ctx context.Context, nodeID types.NodeID) (RunRepoAction, error)
 	ClearRepoSHAChainFromJob(ctx context.Context, arg ClearRepoSHAChainFromJobParams) (int64, error)
 	CountJobsByRun(ctx context.Context, runID types.RunID) (int64, error)
@@ -64,6 +65,7 @@ type Querier interface {
 	// Creates a new node with an application-supplied NanoID(6) as the primary key.
 	// The `id` parameter must be generated via types.NewNodeKey() before calling.
 	CreateNode(ctx context.Context, arg CreateNodeParams) (Node, error)
+	CreateNodeAction(ctx context.Context, arg CreateNodeActionParams) (NodeAction, error)
 	CreateNodeDaemonLog(ctx context.Context, arg CreateNodeDaemonLogParams) (NodeDaemonLog, error)
 	// v1: Creates a new run for a mig + spec snapshot. Runs are created in Started state.
 	// Note: `id` is a required TEXT parameter (KSUID-backed); caller generates via types.NewRunID().
@@ -135,6 +137,7 @@ type Querier interface {
 	// Gets a mig_repo by mig_id and repo_url (for uniqueness constraint enforcement).
 	GetMigRepoByURL(ctx context.Context, arg GetMigRepoByURLParams) (MigRepo, error)
 	GetNode(ctx context.Context, id types.NodeID) (Node, error)
+	GetNodeAction(ctx context.Context, id types.JobID) (NodeAction, error)
 	GetRepo(ctx context.Context, id types.RepoID) (Repo, error)
 	GetRun(ctx context.Context, id types.RunID) (Run, error)
 	GetRunRepo(ctx context.Context, arg GetRunRepoParams) (RunRepo, error)
@@ -217,6 +220,7 @@ type Querier interface {
 	// archived_only: if true, return only archived migs; if false, return only active migs; if null, return all.
 	// name_filter: if non-empty, filter by name substring (case-insensitive); if null/empty, no name filtering.
 	ListMigs(ctx context.Context, arg ListMigsParams) ([]Mig, error)
+	ListNodeActions(ctx context.Context, arg ListNodeActionsParams) ([]NodeAction, error)
 	ListNodeDaemonLogs(ctx context.Context, arg ListNodeDaemonLogsParams) ([]NodeDaemonLog, error)
 	ListNodeDiagnostics(ctx context.Context, nodeID types.NodeID) ([]NodeDiagnostic, error)
 	// ListNodeMetricsPartitions retrieves all partition names for the node_metrics table.
@@ -275,6 +279,7 @@ type Querier interface {
 	UpdateJobStatus(ctx context.Context, arg UpdateJobStatusParams) error
 	UpdateMigRepoRefs(ctx context.Context, arg UpdateMigRepoRefsParams) error
 	UpdateMigSpec(ctx context.Context, arg UpdateMigSpecParams) error
+	UpdateNodeActionCompletion(ctx context.Context, arg UpdateNodeActionCompletionParams) error
 	UpdateNodeCertMetadata(ctx context.Context, arg UpdateNodeCertMetadataParams) error
 	UpdateNodeDrained(ctx context.Context, arg UpdateNodeDrainedParams) error
 	UpdateNodeHeartbeat(ctx context.Context, arg UpdateNodeHeartbeatParams) error

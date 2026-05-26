@@ -55,6 +55,45 @@ func TestClaimLoop_OnlyUnifiedEndpoint(t *testing.T) {
 	}
 }
 
+func TestClaimAndExecute_NodeActionPayloadStartsActionWithoutSpec(t *testing.T) {
+	t.Parallel()
+
+	actionID := types.NewJobID()
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v1/nodes/" + testNodeID + "/claim":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"work_type":   "action",
+				"action_id":   actionID.String(),
+				"action_type": types.NodeActionCleanupDisk,
+				"node_id":     testNodeID,
+			})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer ts.Close()
+
+	controller := &mockRunController{}
+	claimer := setupClaimer(t, newAgentConfig(ts.URL), controller)
+	claimed, err := claimer.claimAndExecute(context.Background())
+	if err != nil {
+		t.Fatalf("claimAndExecute() error = %v", err)
+	}
+	if !claimed {
+		t.Fatal("claimAndExecute() claimed = false, want true")
+	}
+	if !controller.startActionCalled {
+		t.Fatal("StartAction was not called")
+	}
+	if controller.lastStartAction.ActionID != actionID || controller.lastStartAction.ActionType != types.NodeActionCleanupDisk {
+		t.Fatalf("StartAction request = (%s,%s), want (%s,%s)", controller.lastStartAction.ActionID, controller.lastStartAction.ActionType, actionID, types.NodeActionCleanupDisk)
+	}
+	if controller.startCalled {
+		t.Fatal("StartRun should not be called for node action payload")
+	}
+}
+
 func TestClaimLoop_StartupReconcileBeforeClaim_Contract(t *testing.T) {
 	t.Parallel()
 

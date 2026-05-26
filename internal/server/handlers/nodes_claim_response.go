@@ -42,6 +42,15 @@ type claimResponsePayload struct {
 	DetectedStack *contracts.StackExpectation `json:"detected_stack,omitempty"`
 }
 
+type nodeActionClaimResponsePayload struct {
+	WorkType   string             `json:"work_type"`
+	ActionID   domaintypes.JobID  `json:"action_id"`
+	ActionType string             `json:"action_type"`
+	NodeID     domaintypes.NodeID `json:"node_id"`
+	StartedAt  string             `json:"started_at,omitempty"`
+	CreatedAt  string             `json:"created_at"`
+}
+
 func buildClaimResponsePayload(
 	ctx context.Context,
 	st store.Store,
@@ -183,6 +192,22 @@ func buildActionClaimResponsePayload(
 		GateContext:   nil,
 		DetectedStack: nil,
 	}
+}
+
+func buildNodeActionClaimResponsePayload(action store.NodeAction) nodeActionClaimResponsePayload {
+	payload := nodeActionClaimResponsePayload{
+		WorkType:   "action",
+		ActionID:   action.ID,
+		ActionType: action.ActionType,
+		NodeID:     action.NodeID,
+	}
+	if action.StartedAt.Valid {
+		payload.StartedAt = action.StartedAt.Time.Format(time.RFC3339)
+	}
+	if action.CreatedAt.Valid {
+		payload.CreatedAt = action.CreatedAt.Time.Format(time.RFC3339)
+	}
+	return payload
 }
 
 // buildAndSendJobClaimResponse constructs and sends the claim response for a job.

@@ -960,6 +960,40 @@ Node:
     - drained
     - created_at
 
+CreateNodeActionRequest:
+  type: object
+  properties:
+    action_type:
+      type: string
+      enum: [node.cleanup_disk, node.update_updater]
+    meta:
+      type: object
+      additionalProperties: true
+  required: [action_type]
+
+NodeAction:
+  type: object
+  properties:
+    id: { type: string, description: "Action ID (KSUID string)" }
+    node_id: { type: string, description: "Node ID (NanoID 6-character string)" }
+    action_type:
+      type: string
+      enum: [node.cleanup_disk, node.update_updater]
+    status:
+      type: string
+      enum: [Queued, Running, Success, Fail, Error, Cancelled]
+    started_at: { type: string, format: date-time, nullable: true }
+    finished_at: { type: string, format: date-time, nullable: true }
+    duration_ms: { type: integer, format: int64 }
+    meta:
+      type: object
+      additionalProperties: true
+    result:
+      type: object
+      additionalProperties: true
+    created_at: { type: string, format: date-time }
+  required: [id, node_id, action_type, status, duration_ms]
+
 WorkflowGraphNode:
   type: object
   # Note: job IDs (id, parent_ids, child_ids) are now KSUID-backed strings.

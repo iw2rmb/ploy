@@ -7,7 +7,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"github.com/iw2rmb/ploy/internal/cli/common"
 	"io"
 	"net/http"
 	"net/url"
@@ -17,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/iw2rmb/ploy/internal/cli/common"
 	"github.com/iw2rmb/ploy/internal/cli/config"
 	"github.com/iw2rmb/ploy/internal/deploy"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
@@ -36,6 +36,12 @@ func handleNode(args []string, stderr io.Writer) error {
 	switch args[0] {
 	case "add":
 		return handleNodeAdd(args[1:], stderr)
+	case "cleanup":
+		return handleNodeAction(args[1:], stderr, domaintypes.NodeActionCleanupDisk, "cleanup")
+	case "update-updater":
+		return handleNodeAction(args[1:], stderr, domaintypes.NodeActionUpdateUpdater, "update-updater")
+	case "actions":
+		return handleNodeActionsList(args[1:], stderr)
 	default:
 		printNodeUsage(stderr)
 		return fmt.Errorf("unknown node subcommand %q", args[0])
@@ -54,12 +60,208 @@ func printNodeUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Commands:")
 	_, _ = fmt.Fprintln(w, "  add       Add a worker node to the cluster")
+	_, _ = fmt.Fprintln(w, "  cleanup   Enqueue disk cleanup on a worker node")
+	_, _ = fmt.Fprintln(w, "  update-updater")
+	_, _ = fmt.Fprintln(w, "            Enqueue node-updater self-update on a worker node")
+	_, _ = fmt.Fprintln(w, "  actions   List recent worker node maintenance actions")
 }
 
 // printNodeAddUsage prints usage information for the node add command.
 // NOTE: Node add is now accessed via `ploy cluster node add`.
 func printNodeAddUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "Usage: ploy cluster node add --cluster-id <id> --address <ip> --server-url <url>")
+}
+
+func printNodeActionUsage(w io.Writer, command string) {
+	_, _ = fmt.Fprintf(w, "Usage: ploy cluster node %s [--wait] <node-id>\n", command)
+}
+
+func printNodeActionsUsage(w io.Writer) {
+	_, _ = fmt.Fprintln(w, "Usage: ploy cluster node actions [--limit <n>] <node-id>")
+}
+
+type nodeActionAPIResponse struct {
+	ID         string          `json:"id"`
+	NodeID     string          `json:"node_id"`
+	ActionType string          `json:"action_type"`
+	Status     string          `json:"status"`
+	DurationMs int64           `json:"duration_ms"`
+	Result     json.RawMessage `json:"result,omitempty"`
+	CreatedAt  string          `json:"created_at,omitempty"`
+}
+
+func handleNodeAction(args []string, stderr io.Writer, actionType, command string) error {
+	if common.WantsHelp(args) {
+		printNodeActionUsage(stderr, command)
+		return nil
+	}
+	fs := flag.NewFlagSet("node "+command, flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	wait := fs.Bool("wait", false, "Wait for action completion")
+	if err := common.ParseFlagSet(fs, args, func() { printNodeActionUsage(stderr, command) }); err != nil {
+		return err
+	}
+	if fs.NArg() != 1 {
+		printNodeActionUsage(stderr, command)
+		return errors.New("node-id is required")
+	}
+	nodeID, err := parseNodeIDArg(fs.Arg(0))
+	if err != nil {
+		return err
+	}
+	ctx := context.Background()
+	action, err := createNodeAction(ctx, nodeID, actionType)
+	if err != nil {
+		return err
+	}
+	_, _ = fmt.Fprintf(stderr, "Node action queued: %s (%s on %s)\n", action.ID, action.ActionType, action.NodeID)
+	if !*wait {
+		return nil
+	}
+	action, err = waitNodeAction(ctx, nodeID, action.ID)
+	if err != nil {
+		return err
+	}
+	_, _ = fmt.Fprintf(stderr, "Node action finished: %s (%s)\n", action.ID, action.Status)
+	if action.Status != domaintypes.JobStatusSuccess.String() {
+		return fmt.Errorf("node action %s finished with status %s", action.ID, action.Status)
+	}
+	return nil
+}
+
+func handleNodeActionsList(args []string, stderr io.Writer) error {
+	if common.WantsHelp(args) {
+		printNodeActionsUsage(stderr)
+		return nil
+	}
+	fs := flag.NewFlagSet("node actions", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	limit := fs.Int("limit", 20, "Maximum actions to show")
+	if err := common.ParseFlagSet(fs, args, func() { printNodeActionsUsage(stderr) }); err != nil {
+		return err
+	}
+	if fs.NArg() != 1 {
+		printNodeActionsUsage(stderr)
+		return errors.New("node-id is required")
+	}
+	if *limit < 1 || *limit > 100 {
+		return errors.New("limit must be between 1 and 100")
+	}
+	nodeID, err := parseNodeIDArg(fs.Arg(0))
+	if err != nil {
+		return err
+	}
+	actions, err := listNodeActions(context.Background(), nodeID, *limit)
+	if err != nil {
+		return err
+	}
+	for _, action := range actions {
+		_, _ = fmt.Fprintf(stderr, "%s\t%s\t%s\t%dms\n", action.ID, action.ActionType, action.Status, action.DurationMs)
+	}
+	return nil
+}
+
+func parseNodeIDArg(raw string) (domaintypes.NodeID, error) {
+	var nodeID domaintypes.NodeID
+	if err := nodeID.UnmarshalText([]byte(strings.TrimSpace(raw))); err != nil {
+		return "", fmt.Errorf("invalid node-id: %w", err)
+	}
+	return nodeID, nil
+}
+
+func createNodeAction(ctx context.Context, nodeID domaintypes.NodeID, actionType string) (nodeActionAPIResponse, error) {
+	base, httpClient, err := common.ResolveControlPlaneHTTP(ctx)
+	if err != nil {
+		return nodeActionAPIResponse{}, err
+	}
+	endpoint, err := url.JoinPath(base.String(), "v1", "nodes", nodeID.String(), "actions")
+	if err != nil {
+		return nodeActionAPIResponse{}, err
+	}
+	body, err := json.Marshal(map[string]string{"action_type": actionType})
+	if err != nil {
+		return nodeActionAPIResponse{}, err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
+	if err != nil {
+		return nodeActionAPIResponse{}, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return nodeActionAPIResponse{}, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusCreated {
+		return nodeActionAPIResponse{}, common.ControlPlaneHTTPError(resp)
+	}
+	var action nodeActionAPIResponse
+	if err := json.NewDecoder(resp.Body).Decode(&action); err != nil {
+		return nodeActionAPIResponse{}, fmt.Errorf("decode node action response: %w", err)
+	}
+	return action, nil
+}
+
+func listNodeActions(ctx context.Context, nodeID domaintypes.NodeID, limit int) ([]nodeActionAPIResponse, error) {
+	base, httpClient, err := common.ResolveControlPlaneHTTP(ctx)
+	if err != nil {
+		return nil, err
+	}
+	endpoint, err := url.JoinPath(base.String(), "v1", "nodes", nodeID.String(), "actions")
+	if err != nil {
+		return nil, err
+	}
+	u, err := url.Parse(endpoint)
+	if err != nil {
+		return nil, err
+	}
+	q := u.Query()
+	q.Set("limit", fmt.Sprintf("%d", limit))
+	u.RawQuery = q.Encode()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		return nil, common.ControlPlaneHTTPError(resp)
+	}
+	var actions []nodeActionAPIResponse
+	if err := json.NewDecoder(resp.Body).Decode(&actions); err != nil {
+		return nil, fmt.Errorf("decode node actions response: %w", err)
+	}
+	return actions, nil
+}
+
+func waitNodeAction(ctx context.Context, nodeID domaintypes.NodeID, actionID string) (nodeActionAPIResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+	defer cancel()
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+	for {
+		actions, err := listNodeActions(ctx, nodeID, 100)
+		if err != nil {
+			return nodeActionAPIResponse{}, err
+		}
+		for _, action := range actions {
+			if action.ID != actionID {
+				continue
+			}
+			switch action.Status {
+			case domaintypes.JobStatusSuccess.String(), domaintypes.JobStatusFail.String(), domaintypes.JobStatusError.String(), domaintypes.JobStatusCancelled.String():
+				return action, nil
+			}
+		}
+		select {
+		case <-ctx.Done():
+			return nodeActionAPIResponse{}, fmt.Errorf("wait node action %s: %w", actionID, ctx.Err())
+		case <-ticker.C:
+		}
+	}
 }
 
 // handleNodeAdd validates required flags for adding a worker node.

@@ -44,7 +44,7 @@ func cleanTestTables(t *testing.T, ctx context.Context, db Store) {
 	t.Helper()
 	_, err := db.Pool().Exec(ctx,
 		`TRUNCATE
-			jobs, job_metrics, run_repo_actions, sboms, nodes, node_metrics,
+			jobs, job_metrics, run_repo_actions, node_actions, sboms, nodes, node_metrics,
 			run_repos, runs, mig_repos, migs, specs, spec_bundles, repos,
 			events, diffs, logs, artifact_bundles,
 			api_tokens, bootstrap_tokens,
