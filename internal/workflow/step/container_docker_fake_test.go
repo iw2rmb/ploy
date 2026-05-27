@@ -1,7 +1,6 @@
 package step
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"encoding/binary"
@@ -89,28 +88,6 @@ type fakeDockerClient struct {
 	imageInspectCalled bool
 	imageInspectRef    string
 	imageInspectRefs   []string
-
-	// ContainerList behavior (used by delegated pull tests)
-	containerListResults []client.ContainerListResult
-	containerListErrs    []error
-	containerListCalls   []client.ContainerListOptions
-
-	// Exec behavior (used by delegated pull tests)
-	execCreateResult client.ExecCreateResult
-	execCreateErr    error
-	execCreateCalled bool
-	execContainer    string
-	execCreateOpts   client.ExecCreateOptions
-
-	execAttachOutput string
-	execAttachErr    error
-	execAttachCalled bool
-	execAttachID     string
-
-	execInspectResult client.ExecInspectResult
-	execInspectErr    error
-	execInspectCalled bool
-	execInspectID     string
 }
 
 // ContainerCreate simulates container creation.
@@ -208,46 +185,6 @@ func (f *fakeDockerClient) ImageInspect(ctx context.Context, imageID string, ins
 		return client.ImageInspectResult{}, f.imageInspectErrs[idx]
 	}
 	return client.ImageInspectResult{}, f.imageInspectErr
-}
-
-func (f *fakeDockerClient) ContainerList(ctx context.Context, options client.ContainerListOptions) (client.ContainerListResult, error) {
-	f.containerListCalls = append(f.containerListCalls, options)
-	idx := len(f.containerListCalls) - 1
-	if idx < len(f.containerListErrs) && f.containerListErrs[idx] != nil {
-		return client.ContainerListResult{}, f.containerListErrs[idx]
-	}
-	if idx < len(f.containerListResults) {
-		return f.containerListResults[idx], nil
-	}
-	return client.ContainerListResult{}, nil
-}
-
-func (f *fakeDockerClient) ExecCreate(ctx context.Context, containerID string, options client.ExecCreateOptions) (client.ExecCreateResult, error) {
-	f.execCreateCalled = true
-	f.execContainer = containerID
-	f.execCreateOpts = options
-	return f.execCreateResult, f.execCreateErr
-}
-
-func (f *fakeDockerClient) ExecAttach(ctx context.Context, execID string, options client.ExecAttachOptions) (client.ExecAttachResult, error) {
-	f.execAttachCalled = true
-	f.execAttachID = execID
-	if f.execAttachErr != nil {
-		return client.ExecAttachResult{}, f.execAttachErr
-	}
-	var stream bytes.Buffer
-	writeMultiplexedFrame(&stream, stdcopy.Stdout, []byte(f.execAttachOutput))
-	return client.ExecAttachResult{
-		HijackedResponse: client.HijackedResponse{
-			Reader: bufio.NewReader(&stream),
-		},
-	}, nil
-}
-
-func (f *fakeDockerClient) ExecInspect(ctx context.Context, execID string, options client.ExecInspectOptions) (client.ExecInspectResult, error) {
-	f.execInspectCalled = true
-	f.execInspectID = execID
-	return f.execInspectResult, f.execInspectErr
 }
 
 // fakeImagePullResponse implements client.ImagePullResponse for testing.

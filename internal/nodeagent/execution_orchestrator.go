@@ -167,10 +167,9 @@ func (r *runController) initializeRuntime(ctx context.Context, runID types.RunID
 	// Fallback to nil if Docker is unavailable (simulated execution mode).
 	network := os.Getenv("PLOY_DOCKER_NETWORK")
 	containerRuntime, err := step.NewDockerContainerRuntime(step.DockerContainerRuntimeOptions{
-		PullImage:                    true,
-		Network:                      network,
-		RegistryAuthConfigFile:       resolveDockerRegistryAuthConfigFile(),
-		RegistryAuthRefreshContainer: resolveDockerRegistryAuthRefreshContainer(),
+		PullImage:              true,
+		Network:                network,
+		RegistryAuthConfigFile: resolveDockerRegistryAuthConfigFile(),
 	})
 	if err != nil {
 		slog.Warn("docker unavailable; falling back to stub runtime", "run_id", runID, "error", err)
@@ -205,10 +204,6 @@ func (r *runController) initializeRuntime(ctx context.Context, runID types.RunID
 
 func resolveDockerRegistryAuthConfigFile() string {
 	return strings.TrimSpace(os.Getenv("PLOY_DOCKER_AUTH_CONFIG_FILE"))
-}
-
-func resolveDockerRegistryAuthRefreshContainer() string {
-	return strings.TrimSpace(os.Getenv("PLOY_DOCKER_AUTH_REFRESH_CONTAINER"))
 }
 
 // jobExecutionContext holds runtime components initialized for a mig/heal job.

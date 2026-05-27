@@ -25,10 +25,6 @@ type DockerContainerRuntimeOptions struct {
 	// RegistryAuthConfigJSON is a Docker auth config JSON payload (DOCKER_AUTH_CONFIG
 	// format). When set, image pulls use matching registry credentials.
 	RegistryAuthConfigJSON string
-	// RegistryAuthRefreshContainer is an optional helper container name or ID.
-	// On registry unauthorized errors, the runtime executes the fixed auth
-	// refresh helper in this container and retries the pull once.
-	RegistryAuthRefreshContainer string
 }
 
 // ContainerRuntime executes containers.

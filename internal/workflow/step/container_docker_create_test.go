@@ -28,6 +28,7 @@ func TestDockerContainerRuntimeCreate(t *testing.T) {
 		pullImage   bool
 		inspectErr  error
 		pullErr     error
+		wantPulls   int
 		wantErr     bool
 		errContains string
 	}{
@@ -133,6 +134,7 @@ func TestDockerContainerRuntimeCreate(t *testing.T) {
 			pullImage:   true,
 			inspectErr:  cerrdefs.ErrNotFound,
 			pullErr:     errors.New("authentication required"),
+			wantPulls:   1,
 			wantErr:     true,
 			errContains: "pull image",
 		},
@@ -188,6 +190,9 @@ func TestDockerContainerRuntimeCreate(t *testing.T) {
 			}
 			if !expectPull && fake.pullCalled {
 				t.Error("image pull should NOT have been called")
+			}
+			if tc.wantPulls > 0 && fake.pullCalls != tc.wantPulls {
+				t.Fatalf("image pull calls = %d, want %d", fake.pullCalls, tc.wantPulls)
 			}
 		})
 	}
