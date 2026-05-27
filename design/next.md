@@ -4,6 +4,8 @@
 
 - design/gitlab.md
 
+## Run vs Pull
+
 ## Users
 
 1. Rename role `cli-admin` to `admin`

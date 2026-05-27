@@ -7,12 +7,15 @@ Use this flow for any "why did run/job fail?" request.
 - For job/run failure analysis, default to runtime evidence from the failed run/job first (status, logs, API-visible artifacts), then inspect orchestrator code only when evidence points there.
 - Do not answer language/build-tool behavior questions from orchestrator internals unless explicitly asked to analyze orchestrator implementation.
 - Active investigation target is cluster `round-leaf-6114`.
-- Do not SSH to the node/server host for investigation unless the user explicitly re-enables SSH access for the current task.
+- Node SSH is available for investigation:
+  - `tsh ssh v.v.kovalev@ploy-node-1.chi.t-oblako.ru`
+  - Act as root on the node when needed.
 
 ## 1) Use control-plane endpoints first
 - Do not start with broad repo searches.
 - Use `~/.config/ploy/default` for the `round-leaf-6114` server URL and token.
-- Treat API/CLI output as the source of truth. Do not use remote Docker, remote DB, or node filesystem paths when only designated endpoints are available.
+- Treat API/CLI output as the first source of truth.
+- If API-visible logs/artifacts are empty, ambiguous, or insufficient, SSH to the node and inspect runtime evidence directly.
 - Never paste auth tokens into responses or shell output summaries.
 
 ## 2) Designated debug endpoints
@@ -42,7 +45,8 @@ Use this flow for any "why did run/job fail?" request.
 - Only continue to logs and artifacts when the API result is missing, ambiguous, or conflicts with observed behavior.
 
 ## 2.2) Node maintenance and free-space checks
-- With no SSH access, use node diagnostics instead of host shell commands.
+- Prefer direct node inspection over inferred state when SSH is available.
+- If SSH is unavailable, use node diagnostics instead of host shell commands.
 - Free-space data is available from:
   - `GET /v1/nodes` for the selected constrained storage aggregate.
   - `GET /v1/nodes/<node-id>/diagnostics` for `node.details.storage.paths`, covering `/`, `DOCKER_ROOT_DIR`, `PLOYD_CACHE_HOME`, `PLOY_BUILDGATE_CACHE_ROOT`, and `TMPDIR`.
@@ -91,8 +95,8 @@ Use this flow for any "why did run/job fail?" request.
   - `$PLOYD_CACHE_HOME/runs/<run-id>/repos/<repo-id>/artifacts`
   - per-job files live in `<job-id>/{in,out,stdout.log,stderr.log,diff.patch}`
 - The node uploads the full `artifacts/` tree on job failure/error and successful `post_gate`.
-- With no SSH access, inspect only uploaded bundles through `GET /v1/runs/<run-id>/repos/<repo-id>/artifacts` and `GET /v1/artifacts/<artifact-id>?download=true`.
-- If a required file exists only on the node filesystem and was not uploaded, report that limitation explicitly instead of trying remote access.
+- With SSH access, inspect the node-side repo-local artifact tree directly when uploaded bundles are insufficient.
+- If SSH is unavailable and a required file exists only on the node filesystem, report that limitation explicitly.
 
 ## 7) Response contract
 - Separate:
