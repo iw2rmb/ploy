@@ -8,7 +8,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
-func TestGateDocker_StackDetect_DefaultTrue_FallsBackOnMissingVersion(t *testing.T) {
+func TestGateDocker_StackDetect_FallbackUsesConfiguredStackOnMissingVersion(t *testing.T) {
 	t.Parallel()
 
 	workspace := createMavenWorkspaceNoJavaVersion(t)
@@ -23,10 +23,10 @@ func TestGateDocker_StackDetect_DefaultTrue_FallsBackOnMissingVersion(t *testing
 			Image: "custom-maven:java17",
 		}},
 		StackDetect: &contracts.BuildGateStackConfig{
-			Enabled:  true,
+			Mode:     contracts.BuildGateStackModeFallback,
 			Language: "java",
+			Tool:     "maven",
 			Release:  "17",
-			Default:  true,
 		},
 	}
 
@@ -50,7 +50,7 @@ func TestGateDocker_StackDetect_DefaultTrue_FallsBackOnMissingVersion(t *testing
 	}
 }
 
-func TestGateDocker_StackDetect_DefaultFalse_CancelsOnDetectionFailure(t *testing.T) {
+func TestGateDocker_StackDetect_StrictCancelsOnDetectionFailure(t *testing.T) {
 	t.Parallel()
 
 	workspace := createMavenWorkspaceNoJavaVersion(t)
@@ -60,10 +60,10 @@ func TestGateDocker_StackDetect_DefaultFalse_CancelsOnDetectionFailure(t *testin
 	spec := &contracts.StepGateSpec{
 		Enabled: true,
 		StackDetect: &contracts.BuildGateStackConfig{
-			Enabled:  true,
+			Mode:     contracts.BuildGateStackModeStrict,
 			Language: "java",
+			Tool:     "maven",
 			Release:  "17",
-			Default:  false,
 		},
 	}
 

@@ -66,18 +66,15 @@ Role model (bearer token claims):
 
 - `CLUSTER_ID` — Optional cluster ID passed to the server container by the
   external compose assets. Default: `local`.
-- Cross-phase input directory: `/in` is mounted read-only for healing migs (e.g., `codex`).
-  - `/in/build-gate.log` — First Build Gate failure log
-  - `/in/errors.yaml` — Structured gate errors payload when available
-  - `/in/amata.yaml` — Amata workflow spec materialized from `amata.spec`
 - `--spec` — Path to a YAML/JSON spec file for `ploy run` defining mig parameters,
-  Build Gate settings, and healing configuration. The spec supports:
+  Build Gate settings, and file inputs. The spec supports:
   - `envs` — Environment variables (key-value map, merged by key across precedence layers)
   - `in` — Read-only input files (`src:/in/dst`; CLI compiles local paths to `shortHash:/in/dst`)
   - `out` — Read-write output files (`src:/out/dst`; CLI compiles local paths to `shortHash:/out/dst`)
   - `home` — Home-relative files (`src:dst{:ro}`; CLI compiles to `shortHash:dst{:ro}`)
   - `steps[]` — Multi-step spec steps (each with its own `image`/`command`/`envs`/`in`/`out`/`home`)
-  - `build_gate.post` — Automated healing action for Build Gate failures (`retries`, `image`, `command`, `envs`, `in`, `out`, `home`, optional `amata`, optional `expectations`)
+  - `build_gate.pre.stack` / `build_gate.post.stack` — Stack-detection policy for gate phases
+  - `build_gate.images` — Build Gate image overrides selected by stack rules
   - See [mig.example.yaml](../schemas/mig.example.yaml) for the full schema.
 
 ### Hydra file-record compilation
@@ -100,10 +97,12 @@ steps:
       - ./recipe.yaml:/in/recipe.yaml
 
 build_gate:
-  heal:
-    image: docker.io/your-dh-user/amata-codex-java-17-maven:latest
-    in:
-      - ./prompt-extra.txt:/in/prompt-extra.txt
+  post:
+    stack:
+      mode: fallback
+      language: java
+      tool: maven
+      release: "17"
 ```
 
 **After CLI compile (canonical form submitted to server):**
@@ -114,10 +113,12 @@ steps:
       - "a1b2c3d4e5f6g7:/in/recipe.yaml"
 
 build_gate:
-  heal:
-    image: docker.io/your-dh-user/amata-codex-java-17-maven:latest
-    in:
-      - "g7h8i9j0k1l2:/in/prompt-extra.txt"
+  post:
+    stack:
+      mode: fallback
+      language: java
+      tool: maven
+      release: "17"
 ```
 
 - `--name` — Creates a mig project with `ploy mig add --name <name> [--spec <path|->]`.
@@ -127,12 +128,6 @@ build_gate:
   `ploy mig run repo add --repo-url https://... --base-ref main --target-ref feature my-batch`.
   See [Migs lifecycle](../migs-lifecycle.md) § "1.4 Batched Migs Runs (`runs` + `run_repos`)"
   for full usage.
-  - `build_gate.post` — Spec block defining the single healing action:
-  - Action fields support include-composition (`retries`, `image`, `command`, `envs`, `in`, `out`, `home`, optional `amata`, optional `expectations`)
-  - After each healing attempt, the Build Gate is re-run; on pass, the main mig proceeds
-  - If healing exhausts retries and gate still fails, run terminates with `reason="build-gate"`
-  - Cross-phase inputs (`/in/build-gate.log`, optional `/in/errors.yaml`, `/in/amata.yaml`) are available to healing migs
-  - Task-oriented healing routers may consume `/in/errors.yaml` and emit `tasks[]` with `error_kind` in `code|deps|infra` and `items[]` indexes into `errors` entries
 - Container cleanup model:
   - Containers are retained after step/gate completion.
   - Host `ploy-node-cleanup` systemd timers prune completed containers and cache state.
@@ -567,10 +562,7 @@ Run/API metadata propagation:
 
 ### How Official Images Consume These Variables
 
-**Amata image (`amata`)**: when `amata.spec` is set on a mig step or healing action,
-the container runs `amata run /in/amata.yaml` (with optional `--set` flags).
-
-The `amata` image also ships OpenRewrite healing helpers:
+**Amata image (`amata`)** ships OpenRewrite helpers:
 - `heal-orw` — canonical wrapper that resolves build-system and invokes ORW runtime.
 - `orw-cli` — ORW contract wrapper producing deterministic `/out/report.json`.
 - `rewrite` — bundled OpenRewrite CLI runner executable used by `orw-cli`.

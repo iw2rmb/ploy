@@ -50,7 +50,7 @@ func Normalize(ctx context.Context, base *url.URL, client *http.Client, data []b
 		return nil, err
 	}
 
-	if err := compileHookSourcesInPlace(ctx, base, client, raw, specBaseDir); err != nil {
+	if err := validateSpecShape(raw); err != nil {
 		return nil, err
 	}
 
@@ -67,6 +67,41 @@ func Normalize(ctx context.Context, base *url.URL, client *http.Client, data []b
 		return nil, fmt.Errorf("validate spec: %w", err)
 	}
 
+	return jsonBytes, nil
+}
+
+// ValidateLocalFile validates a JSON/YAML spec after local-only normalization.
+func ValidateLocalFile(path string) (json.RawMessage, error) {
+	cleanSpecPath := filepath.Clean(path)
+	data, err := common.ReadFileRooted(cleanSpecPath)
+	if err != nil {
+		return nil, fmt.Errorf("read spec file %s: %w", cleanSpecPath, err)
+	}
+	return ValidateLocal(data, filepath.Dir(cleanSpecPath))
+}
+
+// ValidateLocal validates a JSON/YAML spec without network bundle compilation.
+func ValidateLocal(data []byte, specBaseDir string) (json.RawMessage, error) {
+	raw, err := parseSpecInputToMap(data, specBaseDir)
+	if err != nil {
+		return nil, fmt.Errorf("parse spec (not valid JSON or YAML): %w", err)
+	}
+	if err := preprocessMigsSpecInPlace(raw, specBaseDir); err != nil {
+		return nil, err
+	}
+	if err := applyConfigOverlayInPlace(raw); err != nil {
+		return nil, err
+	}
+	if err := normalizeStepInEntriesInPlace(raw); err != nil {
+		return nil, err
+	}
+	jsonBytes, err := json.Marshal(raw)
+	if err != nil {
+		return nil, fmt.Errorf("marshal spec to JSON: %w", err)
+	}
+	if _, err := contracts.ParseMigSpecJSON(jsonBytes); err != nil {
+		return nil, fmt.Errorf("validate spec: %w", err)
+	}
 	return jsonBytes, nil
 }
 
@@ -536,20 +571,22 @@ func Build(
 		return nil, err
 	}
 
-	if err := compileHookSourcesInPlace(ctx, base, client, specMap, specBaseDir); err != nil {
-		return nil, err
-	}
-
-	if err := compileHydraRecordsInPlace(ctx, base, client, specMap, specBaseDir); err != nil {
-		return nil, err
-	}
-
 	// Merge CLI flag overrides (CLI flags take precedence)
 	hasOverrides := len(migEnvs) > 0 || migImage != "" || migCommand != ""
+
+	if err := normalizeStepInEntriesInPlace(specMap); err != nil {
+		return nil, err
+	}
 
 	// Only proceed if we have a spec file or CLI overrides
 	if len(specMap) == 0 && !hasOverrides {
 		return nil, nil
+	}
+
+	if _, hasSteps := specMap["steps"]; hasSteps || !hasOverrides {
+		if err := validateSpecShape(specMap); err != nil {
+			return nil, err
+		}
 	}
 
 	if len(migEnvs) > 0 {
@@ -628,6 +665,14 @@ func Build(
 		return nil, nil
 	}
 
+	if err := validateSpecShape(specMap); err != nil {
+		return nil, err
+	}
+
+	if err := compileHydraRecordsInPlace(ctx, base, client, specMap, specBaseDir); err != nil {
+		return nil, err
+	}
+
 	// Marshal to JSON for submission
 	jsonBytes, err := json.Marshal(specMap)
 	if err != nil {
@@ -641,6 +686,17 @@ func Build(
 	}
 
 	return jsonBytes, nil
+}
+
+func validateSpecShape(spec map[string]any) error {
+	jsonBytes, err := json.Marshal(spec)
+	if err != nil {
+		return fmt.Errorf("marshal spec for validation: %w", err)
+	}
+	if err := contracts.ValidateMigSpecJSON(jsonBytes); err != nil {
+		return fmt.Errorf("validate spec: %w", err)
+	}
+	return nil
 }
 
 // Load loads a spec from a file path or stdin when path is "-".

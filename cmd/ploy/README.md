@@ -24,8 +24,8 @@ ploy mig run \
   [--repo-url <url> --repo-base-ref <branch> [--repo-target-ref <branch>] \
    --repo-workspace-hint <dir>] \
   [--migs-plan-timeout <duration>] [--migs-max-parallel <n>] [--cap <duration>] [--cancel-on-cap]
-ploy environment materialize <commit-sha> --app <app> \
-  [--dry-run] [--manifest <name@version>]
+ploy spec schema                                                            # print the mig JSON Schema
+ploy spec validate docs/schemas/mig.example.yaml                            # validate a mig spec
 ```
 
 Run IDs (`<run-id>`) are KSUID-backed strings.
@@ -46,7 +46,6 @@ TICKET=$(ploy mig run --json \
 
 `mig run` submits a run to the control plane (server assigns the run id),
 materialises the repository passed via `--repo-*` flags (when provided),
-compiles the referenced integration manifest (when provided),
 publishes checkpoints for every stage transition (including lane cache keys),
 executes migs/build/test against a temporary workspace, and cleans up before
 exit. Migs planner hints (`--migs-plan-timeout`, `--migs-max-parallel`)
@@ -315,11 +314,6 @@ ploy pull --dry-run
 
 ---
 
-`environment materialize` evaluates the integration manifest for a given
-app/commit pair, composes deterministic cache keys for each required lane, and
-hydrates those caches through an in-memory hydrator. Dry-run mode avoids
-hydration and still reports required resources.
-
 `upload` uses the cached bearer-token cluster descriptor to post gzipped bundles to the control‑plane API. The CLI always targets the default descriptor under `PLOY_CONFIG_HOME` (or home default).
 It targets `POST /v1/runs/{id}/artifact_bundles` and enforces the 10 MiB bundle cap locally before sending.
 
@@ -394,14 +388,6 @@ ploy completion <shell> --help
 
 ## Flags
 
-- `--commit` / `--manifest` — Optional cache-key
-  preview inputs consumed by the lane engine.
-- `--app` — Application identifier resolved to an integration manifest (required
-  for `environment materialize`).
-- `--dry-run` — Skip cache hydration while still reporting
-  required resources (`environment materialize`).
-- `--manifest` — Override manifest name/version in `<name>@<version>` form
-  (`environment materialize`).
 - `--spec` — Path to a YAML/JSON spec file defining mig parameters and Build Gate settings for `mig run`. CLI flags (e.g., `--job-image`)
   override corresponding spec values when both are present. Specs use canonical `steps[]`
   shape for both single-step and multi-step runs. Each step supports
@@ -584,7 +570,6 @@ See `internal/migs/api/types.go` for the full schema.
   overall, ≥90% on the runner package).
 - Roadmap slices should extend `internal/workflow/runner` and keep the CLI
   focused on stateless execution against the new control-plane contracts.
-- See `docs/MANIFESTS.md` for schema details and authoring guidance on
-  integration manifests.
+- See `docs/schemas/mig.example.yaml` for the current mig spec shape.
 - Review `docs/DOCS.md` for the documentation matrix and editing conventions
   that keep the CLI guides aligned.

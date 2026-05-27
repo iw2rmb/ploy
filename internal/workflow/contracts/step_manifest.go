@@ -106,8 +106,9 @@ type StepGateSpec struct {
 	ImageOverrides []BuildGateImageRule
 
 	// StackDetect configures stack detection behavior for this gate.
-	// When enabled with default=true, the gate may fall back to the configured
-	// values when stack detection cannot determine tool or release.
+	// mode=forced skips detection and uses the configured stack.
+	// mode=strict requires detection to match the configured stack.
+	// mode=fallback uses detection when complete, otherwise the configured stack.
 	StackDetect *BuildGateStackConfig
 
 	// RepoURL is the Git repository URL for remote gate execution.

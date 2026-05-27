@@ -36,7 +36,26 @@ Most-specific match wins (language+release+tool beats language+release).
 
 ## Phase Options
 
-`build_gate.pre.stack` and `build_gate.post.stack` remain supported for stack-detect policy.
+`build_gate.pre.stack` and `build_gate.post.stack` configure stack-detect policy:
+
+```yaml
+build_gate:
+  pre:
+    stack:
+      mode: strict
+      language: java
+      tool: maven
+      release: "17"
+```
+
+Modes:
+
+- `forced`: skip detection and use the configured stack.
+- `strict`: run detection and fail when it differs from the configured stack.
+- `fallback`: use complete detection, otherwise use the configured stack.
+
+When `mode` is set, `language`, `tool`, and `release` are required. An absent
+or empty `stack` object keeps normal auto-detection.
 
 ## Runtime Paths
 

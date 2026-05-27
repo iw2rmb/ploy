@@ -5,7 +5,7 @@ import (
 
 	"github.com/iw2rmb/ploy/internal/cli/cluster"
 	"github.com/iw2rmb/ploy/internal/cli/configure"
-	"github.com/iw2rmb/ploy/internal/cli/manifest"
+	"github.com/iw2rmb/ploy/internal/cli/spec"
 	"github.com/spf13/cobra"
 )
 
@@ -23,17 +23,17 @@ func newConfigCmd(stderr io.Writer) *cobra.Command {
 	return configCmd
 }
 
-// newManifestCmd creates the cobra command tree for 'ploy manifest' and its subcommands.
-func newManifestCmd(stderr io.Writer) *cobra.Command {
-	manifestCmd := &cobra.Command{
-		Use:                "manifest",
-		Short:              "Inspect and validate integration manifests",
+// newSpecCmd creates the cobra command tree for 'ploy spec' and its subcommands.
+func newSpecCmd(stdout, stderr io.Writer) *cobra.Command {
+	specCmd := &cobra.Command{
+		Use:                "spec",
+		Short:              "Inspect and validate mig specs",
 		DisableFlagParsing: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return manifest.Handle(args, stderr)
+			return spec.Handle(args, stdout, stderr)
 		},
 	}
-	return manifestCmd
+	return specCmd
 }
 
 // newClusterCmd creates the cobra command for 'ploy cluster' and its subcommands.

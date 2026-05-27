@@ -6,67 +6,61 @@ import (
 )
 
 func TestParseMigSpecJSON_BuildGateStackConfig(t *testing.T) {
-	input := `{
-		"steps": [{
-			"image": "ghcr.io/iw2rmb/ploy/mig:latest"
-		}],
-		"build_gate": {
-			"enabled": true,
-			"pre": {
-				"stack": {
+	tests := []struct {
+		name        string
+		mode        BuildGateStackMode
+		releaseJSON string
+		wantRelease string
+	}{
+		{name: "forced", mode: BuildGateStackModeForced, releaseJSON: "11", wantRelease: "11"},
+		{name: "strict", mode: BuildGateStackModeStrict, releaseJSON: `"17"`, wantRelease: "17"},
+		{name: "fallback", mode: BuildGateStackModeFallback, releaseJSON: `"21"`, wantRelease: "21"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			input := `{
+				"steps": [{
+					"image": "ghcr.io/iw2rmb/ploy/mig:latest"
+				}],
+				"build_gate": {
 					"enabled": true,
-					"language": "java",
-					"release": 11,
-					"default": true
+					"pre": {
+						"stack": {
+							"mode": "` + string(tt.mode) + `",
+							"language": "java",
+							"tool": "maven",
+							"release": ` + tt.releaseJSON + `
+						}
+					}
 				}
-			},
-			"post": {
-				"stack": {
-					"enabled": true,
-					"language": "java",
-					"tool": "maven",
-					"release": "17",
-					"default": false
-				}
+			}`
+
+			spec, err := ParseMigSpecJSON([]byte(input))
+			if err != nil {
+				t.Fatalf("ParseMigSpecJSON failed: %v", err)
 			}
-		}
-	}`
 
-	spec, err := ParseMigSpecJSON([]byte(input))
-	if err != nil {
-		t.Fatalf("ParseMigSpecJSON failed: %v", err)
-	}
-
-	if spec.BuildGate == nil {
-		t.Fatal("build_gate is nil")
-	}
-	if spec.BuildGate.Pre == nil || spec.BuildGate.Pre.Stack == nil {
-		t.Fatal("build_gate.pre.stack is nil")
-	}
-	if !spec.BuildGate.Pre.Stack.Enabled {
-		t.Errorf("build_gate.pre.stack.enabled = false, want true")
-	}
-	if spec.BuildGate.Pre.Stack.Language != "java" {
-		t.Errorf("build_gate.pre.stack.language = %q, want %q", spec.BuildGate.Pre.Stack.Language, "java")
-	}
-	if spec.BuildGate.Pre.Stack.Release != "11" {
-		t.Errorf("build_gate.pre.stack.release = %q, want %q", spec.BuildGate.Pre.Stack.Release, "11")
-	}
-	if !spec.BuildGate.Pre.Stack.Default {
-		t.Errorf("build_gate.pre.stack.default = false, want true")
-	}
-
-	if spec.BuildGate.Post == nil || spec.BuildGate.Post.Stack == nil {
-		t.Fatal("build_gate.post.stack is nil")
-	}
-	if spec.BuildGate.Post.Stack.Tool != "maven" {
-		t.Errorf("build_gate.post.stack.tool = %q, want %q", spec.BuildGate.Post.Stack.Tool, "maven")
-	}
-	if spec.BuildGate.Post.Stack.Release != "17" {
-		t.Errorf("build_gate.post.stack.release = %q, want %q", spec.BuildGate.Post.Stack.Release, "17")
-	}
-	if spec.BuildGate.Post.Stack.Default {
-		t.Errorf("build_gate.post.stack.default = true, want false")
+			if spec.BuildGate == nil {
+				t.Fatal("build_gate is nil")
+			}
+			if spec.BuildGate.Pre == nil || spec.BuildGate.Pre.Stack == nil {
+				t.Fatal("build_gate.pre.stack is nil")
+			}
+			stack := spec.BuildGate.Pre.Stack
+			if stack.Mode != tt.mode {
+				t.Errorf("build_gate.pre.stack.mode = %q, want %q", stack.Mode, tt.mode)
+			}
+			if stack.Language != "java" {
+				t.Errorf("build_gate.pre.stack.language = %q, want %q", stack.Language, "java")
+			}
+			if stack.Tool != "maven" {
+				t.Errorf("build_gate.pre.stack.tool = %q, want %q", stack.Tool, "maven")
+			}
+			if stack.Release != tt.wantRelease {
+				t.Errorf("build_gate.pre.stack.release = %q, want %q", stack.Release, tt.wantRelease)
+			}
+		})
 	}
 }
 
@@ -77,28 +71,44 @@ func TestParseMigSpecJSON_BuildGateStackConfig_Invalid(t *testing.T) {
 		wantErr string
 	}{
 		{
-			name: "enabled without language",
+			name: "mode without language",
 			input: `{
 				"steps": [{"image": "ghcr.io/iw2rmb/ploy/mig:latest"}],
-				"build_gate": {"pre": {"stack": {"enabled": true, "release": "11"}}}
+				"build_gate": {"pre": {"stack": {"mode": "strict", "tool": "maven", "release": "11"}}}
 			}`,
-			wantErr: "build_gate.pre.stack.language: required",
+			wantErr: "build_gate.pre.stack",
 		},
 		{
-			name: "enabled without release",
+			name: "mode without tool",
 			input: `{
 				"steps": [{"image": "ghcr.io/iw2rmb/ploy/mig:latest"}],
-				"build_gate": {"post": {"stack": {"enabled": true, "language": "java"}}}
+				"build_gate": {"post": {"stack": {"mode": "strict", "language": "java", "release": "17"}}}
 			}`,
-			wantErr: "build_gate.post.stack.release: required",
+			wantErr: "build_gate.post.stack",
 		},
 		{
-			name: "disabled with fields is ambiguous",
+			name: "mode without release",
 			input: `{
 				"steps": [{"image": "ghcr.io/iw2rmb/ploy/mig:latest"}],
-				"build_gate": {"pre": {"stack": {"enabled": false, "language": "java", "release": "11"}}}
+				"build_gate": {"post": {"stack": {"mode": "strict", "language": "java", "tool": "maven"}}}
 			}`,
-			wantErr: "build_gate.pre.stack: enabled=false with stack fields is ambiguous",
+			wantErr: "build_gate.post.stack",
+		},
+		{
+			name: "stack fields without mode",
+			input: `{
+				"steps": [{"image": "ghcr.io/iw2rmb/ploy/mig:latest"}],
+				"build_gate": {"pre": {"stack": {"language": "java", "tool": "maven", "release": "11"}}}
+			}`,
+			wantErr: "build_gate.pre.stack",
+		},
+		{
+			name: "unknown mode",
+			input: `{
+				"steps": [{"image": "ghcr.io/iw2rmb/ploy/mig:latest"}],
+				"build_gate": {"pre": {"stack": {"mode": "prefer", "language": "java", "tool": "maven", "release": "11"}}}
+			}`,
+			wantErr: "build_gate.pre.stack.mode",
 		},
 	}
 

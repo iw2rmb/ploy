@@ -21,8 +21,8 @@ func TestHelpRegressionLeafHelpReturnsNoError(t *testing.T) {
 		{args: []string{"cluster", "node", "add", "--help"}, expectSnippet: "Usage: ploy cluster node add"},
 		{args: []string{"cluster", "token", "list", "--help"}, expectSnippet: "Usage: ploy cluster token list"},
 		{args: []string{"config", "env", "set", "--help"}, expectSnippet: "Usage: ploy config env set"},
-		{args: []string{"manifest", "schema", "--help"}, expectSnippet: "Usage: ploy manifest schema"},
-		{args: []string{"manifest", "validate", "--help"}, expectSnippet: "Usage: ploy manifest validate"},
+		{args: []string{"spec", "schema", "--help"}, expectSnippet: "Usage: ploy spec schema"},
+		{args: []string{"spec", "validate", "--help"}, expectSnippet: "Usage: ploy spec validate"},
 		{args: []string{"mig", "run", "repo", "--help"}, expectSnippet: "Usage: ploy mig run repo"},
 	}
 
@@ -41,8 +41,8 @@ func TestHelpRegressionCommandRoutesDeepPaths(t *testing.T) {
 		args          []string
 		expectSnippet string
 	}{
-		{args: []string{"help", "manifest"}, expectSnippet: "Usage: ploy manifest <command>"},
-		{args: []string{"help", "manifest", "schema"}, expectSnippet: "Usage: ploy manifest schema"},
+		{args: []string{"help", "spec"}, expectSnippet: "Usage: ploy spec <command>"},
+		{args: []string{"help", "spec", "schema"}, expectSnippet: "Usage: ploy spec schema"},
 		{args: []string{"help", "cluster", "node"}, expectSnippet: "Usage: ploy cluster node <command>"},
 		{args: []string{"help", "run", "status"}, expectSnippet: "Usage: ploy run status [--json] <run-id>"},
 	}

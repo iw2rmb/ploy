@@ -45,6 +45,11 @@ func (c CommandSpec) IsEmpty() bool {
 	return c.Shell == "" && len(c.Exec) == 0
 }
 
+// IsZero lets encoding/json omit empty commands from parent structs.
+func (c CommandSpec) IsZero() bool {
+	return c.IsEmpty()
+}
+
 // ToSlice converts the command to a []string suitable for container execution.
 // Returns nil if the command is empty.
 //

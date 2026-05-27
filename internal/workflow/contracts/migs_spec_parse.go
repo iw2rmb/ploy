@@ -24,7 +24,7 @@ func ParseMigSpecJSON(data []byte) (*MigSpec, error) {
 	}
 
 	// Validate raw contract shape through embedded MIG schema before typed unmarshaling.
-	if err := validateMigSpecSchema(data); err != nil {
+	if err := ValidateMigSpecJSON(data); err != nil {
 		return nil, err
 	}
 

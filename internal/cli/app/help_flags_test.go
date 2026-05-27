@@ -24,7 +24,7 @@ func TestHelpFlagsAtAllLevels(t *testing.T) {
 		{name: "ploy mig", baseArgs: []string{"mig"}, expectContains: []string{"Usage: ploy mig", "run"}},
 		{name: "ploy run", baseArgs: []string{"run"}, expectContains: []string{"Usage: ploy run"}},
 		{name: "ploy config", baseArgs: []string{"config"}, expectContains: []string{"Usage: ploy config", "env"}},
-		{name: "ploy manifest", baseArgs: []string{"manifest"}, expectContains: []string{"Usage: ploy manifest", "schema", "validate"}},
+		{name: "ploy spec", baseArgs: []string{"spec"}, expectContains: []string{"Usage: ploy spec", "schema", "validate"}},
 		{name: "ploy cluster", baseArgs: []string{"cluster"}, expectContains: []string{"Usage: ploy cluster", "node", "token"}},
 		{name: "ploy cluster node", baseArgs: []string{"cluster", "node"}, expectContains: []string{"Usage: ploy cluster node", "add", "actions"}},
 		{name: "ploy cluster token", baseArgs: []string{"cluster", "token"}, expectContains: []string{"Usage: ploy cluster token", "create", "list", "revoke"}},
@@ -71,7 +71,7 @@ func TestHelpFlagNoUnknownSubcommandError(t *testing.T) {
 	commands := [][]string{
 		{"mig", "--help"},
 		{"config", "--help"},
-		{"manifest", "--help"},
+		{"spec", "--help"},
 		{"cluster", "--help"},
 		{"cluster", "node", "--help"},
 		{"cluster", "token", "--help"},

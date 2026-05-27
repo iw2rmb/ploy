@@ -143,69 +143,45 @@ Stack Gate enforces stack expectations at gate boundaries. When failures occur:
 2. Error stored in `run_repos.last_error`, shown in CLI follow output
 3. Includes: phase, expected/detected, evidence (paths/keys only)
 
-### Healing configuration
+### Build Gate stack configuration
 
-When the Build Gate fails and healing is configured, the node agent enters a
-direct **heal → post-gate** loop using the single `build_gate.post` entry:
+Mig specs configure Build Gate phase stack policy under `build_gate.pre.stack`
+and `build_gate.post.stack`. These phase objects only describe stack-detection
+policy; they do not define extra mig/heal actions.
 
 ```yaml
 build_gate:
   enabled: true
-
-  # Single heal entry — runs directly on gate failure.
-  heal:
-    <<: !include ./healing/spec.yaml
-    retries: 2
-    image: ghcr.io/iw2rmb/ploy/amata-codex-java-17-maven:latest
-    in:
-      - ./healing/amata.yaml:amata.yaml
-    home:
-      - ~/.codex/auth.json:.codex/auth.json:ro
+  pre:
+    stack:
+      mode: strict
+      language: java
+      tool: maven
+      release: "11"
+  post:
+    stack:
+      mode: fallback
+      language: java
+      tool: maven
+      release: "17"
 ```
 
-Healing action fields (image, command, env, home) are specified directly under
-`build_gate.post` — there is no nested `mig` key.
+`mode` is one of:
 
-#### Amata execution mode
+- `forced`: skip detection and use `language`/`tool`/`release`.
+- `strict`: run detection and fail when the detected stack differs.
+- `fallback`: use a complete detected stack, or the configured stack when detection fails or is incomplete.
 
-Mig steps and healing containers support amata execution by setting `amata.spec` to a path of an amata workflow YAML file.
-The CLI loads file content into the canonical spec. The node agent materializes it as `/in/amata.yaml` and runs
-`amata run /in/amata.yaml` with optional ordered `--set '<param>=<value>'` flags
-from `amata.set`. No prompt file is required in this mode.
+When `mode` is set, `language`, `tool`, and `release` are required. Leave
+`stack` absent or empty for normal auto-detection.
 
-```yaml
-heal:
-  image: ghcr.io/iw2rmb/ploy/amata-codex-java-17-maven:latest
-  amata:
-    spec: |
-      version: amata/v1
-      name: code-healer
-      entry: main
-      workspace:
-        root: /workspace
-      flows:
-        main:
-          steps:
-            - codex: |
-                Use /in/errors.yaml when present and /in/build-gate.log as fallback.
-                Fix the build failure.
-                Your final message MUST be one line of JSON: {"action_summary":"..."}
-    # set:   # optional; passed as ordered --set '<param>=<value>' flags
-    #   - param: model
-    #     value: gpt-4o
-  home:
-    - ~/.codex/auth.json:.codex/auth.json:ro
-```
-
-The same amata rules apply to `steps[]` and `build_gate.post` entries.
 Use YAML `!include` for spec composition: full replacement
-(`heal: !include ./healing/spec.yaml#/heal`) or deep merge
-(`heal: {<<: !include ./healing/spec.yaml#/heal, ...inline-overrides}`).
+(`steps: !include ./steps.yaml#/steps`) or deep merge
+(`steps: [{<<: !include ./steps.yaml#/steps/0, ...inline-overrides}]`).
 Include references support `path[#/pointer]`, nested includes, and cycle
 detection. Relative include paths resolve from each including file directory.
-Relative local-source paths inside included fragments (`amata.spec` and
-the source side of `in`/`out`/`home`) are resolved from that included file
-directory.
+Relative local-source paths inside included fragments (`in`/`out`/`home`) are
+resolved from that included file directory.
 **Healing** semantics:
 
 - **Single workspace**: Healing runs on the same workspace that the failing gate validated.
@@ -346,7 +322,7 @@ for optimized per-build-tool containers (e.g., dedicated Maven or Gradle images)
 
 ### Image specification forms
 
-The `image` field (in `steps[]` and in `build_gate.post`) accepts two forms:
+The `image` field in `steps[]` accepts two forms:
 
 **Universal image (string)** — A single image used regardless of stack:
 ```yaml
@@ -1245,15 +1221,9 @@ Migs container images are standard OCI images with the following expectations:
     - initial Build Gate logs (`/in/build-gate.log`),
     - structured Build Gate errors (`/in/errors.yaml`) when claim context provides `recovery_context.errors`,
     - per-iteration gate logs (`/in/build-gate-iteration-N.log`),
-    - per-iteration healing logs (`/in/healing-iteration-N.log`),
-    - cumulative healing log (<code>/in/healing-log.md</code>),
-    - amata workflow spec (`/in/amata.yaml`), etc.
-
 - **Environment**
   - Spec `env` maps are resolved and merged by `buildSpecPayload`.
-    - Supported on:
-      - each `steps[]` entry (single-step and multi-step runs),
-      - `build_gate.post`.
+    - Supported at the root `envs` map and on each `steps[]` entry.
   - **Typed file delivery (Hydra)**: Config files and inputs are
     delivered via typed mount records (`in`, `out`, `home`) instead of env
     vars. See [Environment Variables](./envs/README.md) § "Common Variables

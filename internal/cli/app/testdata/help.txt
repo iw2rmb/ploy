@@ -10,7 +10,7 @@ Core Commands:
   pull             Pull Migs diffs for current repo HEAD
   cluster          Manage clusters (nodes, tokens)
   config           Inspect or update cluster configuration
-  manifest         Inspect and validate integration manifests
+  spec             Inspect and validate mig specs
   tui              Interactive TUI for migrations, runs, and jobs
 
 Use 'ploy help <command>' for detailed command help.

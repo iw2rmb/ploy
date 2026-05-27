@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
@@ -48,6 +49,39 @@ func TestBatchRepoStarter_StartPendingRepos_CreatesJobsWhenNone(t *testing.T) {
 	}
 	if st.scheduleNextJob.called {
 		t.Fatalf("expected ScheduleNextJob not to be called when creating jobs")
+	}
+}
+
+func TestBatchRepoStarter_StartPendingRepos_InvalidStoredSpec(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	runID := domaintypes.RunID("run_1")
+	specID := domaintypes.SpecID("spec_1")
+	repoID := domaintypes.RepoID("repo_1")
+
+	st := &runStore{}
+	st.getRun.val = store.Run{ID: runID, SpecID: specID, Status: domaintypes.RunStatusStarted}
+	st.getSpec.val = store.Spec{ID: specID, Spec: []byte(`{"version":"old","steps":[{"image":"a"}]}`)}
+	st.listRunReposByRun.val = []store.RunRepo{
+		{RunID: runID, RepoID: repoID, Status: domaintypes.RunRepoStatusQueued, RepoBaseRef: "main", RepoSha0: testRunRepoSHA0, Attempt: 1},
+	}
+	st.listQueuedRunReposByRun.val = []store.RunRepo{
+		{RunID: runID, RepoID: repoID, Status: domaintypes.RunRepoStatusQueued, RepoBaseRef: "main", RepoSha0: testRunRepoSHA0, Attempt: 1},
+	}
+
+	starter := NewBatchRepoStarter(st, nil)
+	if _, err := starter.StartPendingRepos(ctx, runID); err != nil {
+		t.Fatalf("StartPendingRepos returned error: %v", err)
+	}
+	if !st.updateRunRepoError.called {
+		t.Fatal("expected run repo error to be recorded")
+	}
+	if st.updateRunRepoError.params.LastError == nil || !strings.Contains(*st.updateRunRepoError.params.LastError, "parse migs spec") {
+		t.Fatalf("last_error = %v, want parse migs spec", st.updateRunRepoError.params.LastError)
+	}
+	if len(st.createJob.calls) != 0 {
+		t.Fatalf("expected no jobs to be created, got %d", len(st.createJob.calls))
 	}
 }
 

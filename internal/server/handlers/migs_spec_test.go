@@ -18,7 +18,7 @@ import (
 // =============================================================================
 
 func TestMigs_GetLatestSpec(t *testing.T) {
-	specRow := store.Spec{ID: "spec123", Spec: []byte(`{"version":"0.2.0","steps":[{"image":"alpine"}]}`)}
+	specRow := store.Spec{ID: "spec123", Spec: []byte(`{"steps":[{"image":"alpine"}]}`)}
 	migSpecID := specRow.ID
 
 	tests := []struct {

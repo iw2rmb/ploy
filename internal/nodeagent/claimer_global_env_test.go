@@ -57,31 +57,6 @@ func TestParseSpec_GlobalEnvFromServerClaim(t *testing.T) {
 			},
 		},
 		{
-			// parseSpec only extracts top-level env. Nested/unknown blocks must not
-			// be merged into the container env map.
-			name: "nested_env_not_merged",
-			spec: json.RawMessage(`{
-					"steps": [{"image": "docker.io/test/mig:latest"}],
-					"envs": {
-						"GLOBAL_VAR": "global_value",
-						"SHARED_VAR": "top_level_value"
-					},
-					"ignored": {
-						"image": "test/mig:latest",
-						"env": {
-							"MIG_VAR": "mig_value",
-							"SHARED_VAR": "mig_ignored"
-						}
-					}
-				}`),
-			wantEnv: map[string]string{
-				// Only top-level env is extracted; mig.env is ignored.
-				"GLOBAL_VAR": "global_value",
-				"SHARED_VAR": "top_level_value",
-				// MIG_VAR is NOT present because mig.env is not processed.
-			},
-		},
-		{
 			name: "empty_env_values_preserved",
 			spec: json.RawMessage(`{
 				"steps": [{"image": "docker.io/test/mig:latest"}],
