@@ -1,17 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-e2e_gitlab_flags() {
-  E2E_GITLAB_FLAGS=()
-
-  if [[ -n "${PLOY_GITLAB_PAT:-}" ]]; then
-    E2E_GITLAB_FLAGS+=(--gitlab-pat "${PLOY_GITLAB_PAT}")
-  fi
-  if [[ -n "${PLOY_GITLAB_DOMAIN:-}" ]]; then
-    E2E_GITLAB_FLAGS+=(--gitlab-domain "${PLOY_GITLAB_DOMAIN}")
-  fi
-}
-
 e2e_args_have_flag() {
   local wanted="${1:?wanted flag is required}"
   shift
@@ -29,8 +18,6 @@ e2e_mig_run_json() {
   local -a args=()
   local generated_spec=""
   local has_spec=0
-
-  e2e_gitlab_flags
 
   while [[ ${#raw_args[@]} -gt 0 ]]; do
     case "${raw_args[0]}" in
@@ -84,7 +71,7 @@ e2e_mig_run_json() {
     args+=(--artifact-dir "$E2E_ARTIFACT_DIR")
   fi
 
-  "$PLOY_BIN" run --json "${args[@]}" "${E2E_GITLAB_FLAGS[@]}"
+  "$PLOY_BIN" run --json "${args[@]}"
   local rc=$?
   if [[ -n "$generated_spec" && -f "$generated_spec" ]]; then
     rm -f "$generated_spec"

@@ -38,7 +38,7 @@ type StartRunRequest struct {
 	RepoID  types.MigRepoID `json:"repo_id,omitempty"`  // Repo ID (NanoID) for repo-scoped artifacts (diffs/logs)
 	RepoURL types.RepoURL   `json:"repo_url,omitempty"` // Repository URL for this run
 	// Name is an optional human-friendly run name provided by the control plane.
-	// When set (e.g., for batch runs), it can be used for branch naming in MR flows.
+	// When set (e.g., for batch runs), it can be used for branch naming.
 	Name      string          `json:"name,omitempty"`
 	BaseRef   types.GitRef    `json:"base_ref,omitempty"`
 	TargetRef types.GitRef    `json:"target_ref,omitempty"`

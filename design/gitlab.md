@@ -36,8 +36,7 @@ Out of scope:
 - Short-lived GitLab token minting.
 - Git proxying.
 - Supporting per-run or per-spec GitLab credentials.
-- Backward compatibility for old `gitlab_pat`, `gitlab_domain`,
-  `mr_on_success`, or `mr_on_fail` contracts.
+- Backward compatibility for old GitLab or MR creation contracts.
 
 ## Why This Is Needed
 Current GitLab auth crosses too many boundaries.
@@ -133,8 +132,6 @@ Remove these fields from the active Mig spec contract:
 ```yaml
 gitlab_pat
 gitlab_domain
-mr_on_success
-mr_on_fail
 ```
 
 Schema/contract validation defines accepted current fields. Do not add
@@ -351,8 +348,6 @@ Remove CLI/spec surfaces:
 - `--mr-fail`
 - `gitlab_pat`
 - `gitlab_domain`
-- `mr_on_success`
-- `mr_on_fail`
 
 Any future MR design must be server-owned and must not reintroduce GitLab PATs
 into node claims or node runtime.
@@ -473,7 +468,7 @@ Expected results:
 
 Testable outcome:
 
-- `rg "mr_on_success|mr_on_fail|gitlab_pat|gitlab_domain|mr_create|CreateMR"`
+- `rg "gitlab_pat|gitlab_domain|mr_create|CreateMR"`
   returns no active runtime contract references.
 - API route registration has no `/mr` endpoint.
 

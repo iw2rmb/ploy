@@ -1,5 +1,5 @@
 # Multi-step mig spec demonstrating sequential transformation steps with
-# global build gate and healing policy. This example shows a three-step Java
+# global Build Gate policy. This example shows a three-step Java
 # migration workflow: Java 8 → Java 11 → Java 17, with each step producing
 # a diff artifact while execution continues on the same sticky workspace.
 #
@@ -19,12 +19,12 @@ kind: MigRunSpec
 ################################################################################
 # Sequential transformation steps: Java 8 → Java 11 → Java 17
 # Each mig executes in array order, sharing the same repository and global
-# build gate/healing policy. The diff from each step is captured before the
+# Build Gate policy. The diff from each step is captured before the
 # next step begins.
 steps:
   # Step 1: Migrate to Java 8
   - image: localhost:5000/ploy/orw-cli-java-17-maven:latest
-    env:
+    envs:
       RECIPE_GROUP: org.openrewrite.recipe
       RECIPE_ARTIFACT: rewrite-migrate-java
       RECIPE_VERSION: "3.20.0"
@@ -33,7 +33,7 @@ steps:
 
   # Step 2: Migrate to Java 11
   - image: localhost:5000/ploy/orw-cli-java-17-maven:latest
-    env:
+    envs:
       RECIPE_GROUP: org.openrewrite.recipe
       RECIPE_ARTIFACT: rewrite-migrate-java
       RECIPE_VERSION: "3.20.0"
@@ -42,7 +42,7 @@ steps:
 
   # Step 3: Migrate to Java 17
   - image: localhost:5000/ploy/orw-cli-java-17-maven:latest
-    env:
+    envs:
       RECIPE_GROUP: org.openrewrite.recipe
       RECIPE_ARTIFACT: rewrite-migrate-java
       RECIPE_VERSION: "3.20.0"
@@ -50,42 +50,8 @@ steps:
       MIGRATION_STEP: "3"
 
 ################################################################################
-# GLOBAL BUILD GATE AND HEALING POLICY
+# GLOBAL BUILD GATE POLICY
 ################################################################################
 # Build gate runs after each mig step. For multi-step runs, the gate validates
 # the accumulated changes from all prior steps.
 build_gate: {}
-
-  # Healing policy applies to any step that fails its gate check. The healing
-  # sequence runs once per retry count, then the gate is re-evaluated before
-  # proceeding to the next step.
-  heal:
-    retries: 1
-    # Amata healing container using the workspace diff handshake.
-    image: localhost:5000/ploy/amata-codex-java-17-maven:latest
-    amata:
-      spec: |
-        version: amata/v1
-        name: code-healer
-        entry: main
-        workspace:
-          root: /workspace
-        flows:
-          main:
-            steps:
-              - codex: |
-                  Fix the build failure in /in/build-gate.log.
-                  Edit files under /workspace as needed.
-                  End with one JSON line:
-                  {"action_summary":"<<=200 chars, single line>"}
-    # Uncomment to mount auth via Hydra home:
-    # home:
-    #   - ~/.codex/auth.json:.codex/auth.json
-
-################################################################################
-# GITLAB INTEGRATION (optional)
-################################################################################
-mr_on_fail: false
-mr_on_success: true
-# gitlab_domain: gitlab.com  # optional; defaults to gitlab.com when gitlab_pat is set
-# gitlab_pat: ""  # optional; can be provided via CLI or ploy config gitlab

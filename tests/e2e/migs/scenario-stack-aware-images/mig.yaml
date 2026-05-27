@@ -29,13 +29,10 @@ steps:
       default: localhost:5000/ploy/orw-cli-java-17-maven:latest
       java-maven: localhost:5000/ploy/orw-cli-java-17-maven:latest
       java-gradle: localhost:5000/ploy/orw-cli-java-17-gradle:latest
-    env:
+    envs:
       RECIPE_GROUP: org.openrewrite.recipe
       RECIPE_ARTIFACT: rewrite-migrate-java
       RECIPE_VERSION: "3.20.0"
       RECIPE_CLASSNAME: org.openrewrite.java.migrate.UpgradeToJava17
 
 build_gate: {}
-
-mr_on_fail: false
-mr_on_success: true

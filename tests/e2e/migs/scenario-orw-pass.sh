@@ -29,7 +29,6 @@ RUN_JSON="$(e2e_mig_run_json \
   --job-env RECIPE_ARTIFACT="$RECIPE_ARTIFACT" \
   --job-env RECIPE_VERSION="$RECIPE_VERSION" \
   --job-env RECIPE_CLASSNAME="$RECIPE_CLASSNAME" \
-  --mr-success \
   --follow)"
 RUN_ID="$(e2e_mig_run_id "$RUN_JSON")"
 
