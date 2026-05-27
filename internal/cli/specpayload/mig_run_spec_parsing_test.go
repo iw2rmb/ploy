@@ -350,7 +350,6 @@ envs:
 steps:
   - image: docker.io/test/mig:latest
 build_gate:
-  enabled: true
   pre:
     stack:
       mode: fallback
@@ -498,7 +497,7 @@ steps:
       STEP: "3"
       TARGET: java17
 build_gate:
-  enabled: true
+  disabled: false
 `, ".yaml", specPayloadOpts{})
 
 	steps := mustSteps(t, result, 3)

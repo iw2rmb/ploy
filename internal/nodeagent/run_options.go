@@ -22,10 +22,10 @@ type RunOptions struct {
 
 // BuildGateOptions configures pre-mig build gate validation.
 type BuildGateOptions struct {
-	Enabled bool
-	Images  []contracts.BuildGateImageRule
-	Pre     *contracts.BuildGatePhaseConfig
-	Post    *contracts.BuildGatePhaseConfig
+	Disabled bool
+	Images   []contracts.BuildGateImageRule
+	Pre      *contracts.BuildGatePhaseConfig
+	Post     *contracts.BuildGatePhaseConfig
 }
 
 // MigContainerSpec describes a container's image, command, and env.
@@ -62,7 +62,7 @@ func migsSpecToRunOptions(spec *contracts.MigSpec) RunOptions {
 	runOpts := RunOptions{}
 
 	if spec.BuildGate != nil {
-		runOpts.BuildGate.Enabled = spec.BuildGate.Enabled
+		runOpts.BuildGate.Disabled = spec.BuildGate.Disabled
 		runOpts.BuildGate.Images = spec.BuildGate.Images
 		runOpts.BuildGate.Pre = spec.BuildGate.Pre
 		runOpts.BuildGate.Post = spec.BuildGate.Post

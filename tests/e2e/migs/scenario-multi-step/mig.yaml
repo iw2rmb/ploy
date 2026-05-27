@@ -54,8 +54,7 @@ steps:
 ################################################################################
 # Build gate runs after each mig step. For multi-step runs, the gate validates
 # the accumulated changes from all prior steps.
-build_gate:
-  enabled: true
+build_gate: {}
 
   # Healing policy applies to any step that fails its gate check. The healing
   # sequence runs once per retry count, then the gate is re-evaluated before

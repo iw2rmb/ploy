@@ -47,7 +47,6 @@ steps:
 
 # Build Gate settings apply globally.
 build_gate:
-  enabled: true
   pre:
     stack:
       mode: strict

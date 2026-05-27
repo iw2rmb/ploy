@@ -12,7 +12,7 @@ func TestMigSpec_RoundTrip(t *testing.T) {
 			Command: CommandSpec{Shell: "echo hello"},
 			Envs:    map[string]string{"FOO": "bar"},
 		}},
-		BuildGate: &BuildGateConfig{Enabled: true},
+		BuildGate: &BuildGateConfig{},
 	}
 
 	data, err := json.Marshal(original)
@@ -31,8 +31,8 @@ func TestMigSpec_RoundTrip(t *testing.T) {
 	if parsed.Steps[0].Command.Shell != original.Steps[0].Command.Shell {
 		t.Errorf("command.Shell = %q, want %q", parsed.Steps[0].Command.Shell, original.Steps[0].Command.Shell)
 	}
-	if parsed.BuildGate == nil || !parsed.BuildGate.Enabled {
-		t.Errorf("build_gate.enabled should be true")
+	if parsed.BuildGate == nil || parsed.BuildGate.Disabled {
+		t.Errorf("build_gate.disabled should be false")
 	}
 }
 
@@ -47,7 +47,7 @@ func TestMigSpec_RoundTrip_MultiStep(t *testing.T) {
 				MigStackJavaGradle: "mig2:gradle",
 			}}},
 		},
-		BuildGate: &BuildGateConfig{Enabled: true},
+		BuildGate: &BuildGateConfig{},
 	}
 
 	data, err := json.Marshal(original)
@@ -69,8 +69,8 @@ func TestMigSpec_RoundTrip_MultiStep(t *testing.T) {
 	if !parsed.Steps[1].Image.IsStackSpecific() {
 		t.Errorf("steps[1].image should be stack-specific")
 	}
-	if parsed.BuildGate == nil || !parsed.BuildGate.Enabled {
-		t.Errorf("build_gate.enabled should be true")
+	if parsed.BuildGate == nil || parsed.BuildGate.Disabled {
+		t.Errorf("build_gate.disabled should be false")
 	}
 }
 

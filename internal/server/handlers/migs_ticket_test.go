@@ -117,6 +117,19 @@ func TestCreateJobsFromSpec(t *testing.T) {
 			},
 		},
 		{
+			name:        "BuildGateDisabled",
+			runID:       domaintypes.RunID("run_gate_disabled_123"),
+			repoID:      domaintypes.RepoID("repo_gate_disabled"),
+			repoBaseRef: "main",
+			attempt:     1,
+			repoSHA0:    testRepoSHA0,
+			spec:        []byte(`{"steps":[{"image":"a"},{"image":"b"}],"build_gate":{"disabled":true}}`),
+			expected: []expectedJob{
+				{"mig-0", domaintypes.JobTypeMig, domaintypes.JobStatusQueued, "a", testRepoSHA0},
+				{"mig-1", domaintypes.JobTypeMig, domaintypes.JobStatusCreated, "b", ""},
+			},
+		},
+		{
 			name:        "InvalidRepoSHA0",
 			runID:       domaintypes.RunID("run_123"),
 			repoID:      domaintypes.RepoID("repo_456"),

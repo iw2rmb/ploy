@@ -196,7 +196,7 @@ func buildManifestFromRequest(req StartRunRequest, typedOpts RunOptions, stepInd
 		Options: mergedOpts,
 	}
 
-	manifest.Gate.Enabled = typedOpts.BuildGate.Enabled
+	manifest.Gate.Enabled = !typedOpts.BuildGate.Disabled
 	manifest.Gate.ImageOverrides = typedOpts.BuildGate.Images
 
 	return manifest, nil
