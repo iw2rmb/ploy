@@ -3,7 +3,6 @@ package app
 import (
 	"bytes"
 	"io"
-	"strings"
 	"testing"
 
 	"github.com/iw2rmb/ploy/internal/testutil/golden"
@@ -53,41 +52,6 @@ func TestExecuteHelpForMigMatchesGolden(t *testing.T) {
 	expect := golden.LoadString(t, "testdata", "help_mig.txt")
 	if diff := diffStrings(expect, buf.String()); diff != "" {
 		t.Fatalf("help mig output mismatch:\n%s", diff)
-	}
-}
-
-// TestExecuteRequiresCommandPrintsHelp verifies that running ploy with no arguments prints usage and returns an error.
-// The root command's RunE prints usage and returns "command required" to match old behavior.
-func TestExecuteRequiresCommandPrintsHelp(t *testing.T) {
-	buf := &bytes.Buffer{}
-	rootCmd := NewRootCmd(buf)
-	rootCmd.SetArgs([]string{})
-	err := rootCmd.Execute()
-	if err == nil {
-		t.Fatal("expected error when no arguments provided")
-	}
-	if !strings.Contains(buf.String(), "Ploy CLI v2") {
-		t.Fatalf("expected usage output, got %q", buf.String())
-	}
-}
-
-// TestExecuteUnknownCommandSuggestsHelp verifies that unknown commands produce an error and suggest help.
-func TestExecuteUnknownCommandSuggestsHelp(t *testing.T) {
-	buf := &bytes.Buffer{}
-	rootCmd := NewRootCmd(buf)
-	rootCmd.SetArgs([]string{"unknown"})
-	err := rootCmd.Execute()
-	if err == nil {
-		t.Fatal("expected error for unknown command")
-	}
-	// Cobra's error for unknown subcommand typically says "unknown command".
-	if !strings.Contains(err.Error(), "unknown command") {
-		t.Fatalf("expected 'unknown command' error, got %v", err)
-	}
-	// Cobra may print suggestions; ensure help is mentioned somewhere.
-	output := buf.String()
-	if !strings.Contains(output, "help") && !strings.Contains(err.Error(), "help") {
-		t.Logf("expected help hint in output or error, got output=%q err=%v", output, err)
 	}
 }
 

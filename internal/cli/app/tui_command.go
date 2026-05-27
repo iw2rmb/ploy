@@ -37,6 +37,7 @@ func newTUICmd(stderr io.Writer) *cobra.Command {
 	return &cobra.Command{
 		Use:   "tui",
 		Short: "Interactive TUI for migrations, runs, and jobs",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runTUI(stderr)
 		},

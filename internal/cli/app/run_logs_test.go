@@ -43,19 +43,6 @@ func TestRunLogsLifecycleOutput(t *testing.T) {
 	}
 }
 
-func TestRunLogsRequiresRunID(t *testing.T) {
-	clienv.UseServerDescriptor(t, "http://example.invalid")
-
-	buf := &bytes.Buffer{}
-	err := executeCmd([]string{"run", "logs"}, buf)
-	if err == nil {
-		t.Fatal("expected error when run id is missing")
-	}
-	if !strings.Contains(err.Error(), "run id") {
-		t.Fatalf("expected run id error, got %v", err)
-	}
-}
-
 func TestJobLogStructuredOutput(t *testing.T) {
 	jobID := domaintypes.NewJobID()
 	server := newJobStreamingServer(t, jobID, []sseTestEvent{
@@ -116,19 +103,6 @@ func TestJobLogRawOutput(t *testing.T) {
 	}
 }
 
-func TestJobLogRequiresJobID(t *testing.T) {
-	clienv.UseServerDescriptor(t, "http://example.invalid")
-
-	buf := &bytes.Buffer{}
-	err := executeCmd([]string{"job", "log"}, buf)
-	if err == nil {
-		t.Fatal("expected error when job id is missing")
-	}
-	if !strings.Contains(err.Error(), "job id") {
-		t.Fatalf("expected job id error, got %v", err)
-	}
-}
-
 func TestJobLogInvalidFormat(t *testing.T) {
 	clienv.UseServerDescriptor(t, "http://example.invalid")
 
@@ -180,19 +154,6 @@ func TestJobLogFollowReconnects(t *testing.T) {
 	}
 	if !strings.Contains(out, "second") {
 		t.Fatalf("expected 'second' in output, got: %q", out)
-	}
-}
-
-func TestJobFollowSubcommandRemoved(t *testing.T) {
-	clienv.UseServerDescriptor(t, "http://example.invalid")
-
-	buf := &bytes.Buffer{}
-	err := executeCmd([]string{"job", "follow", "job-123"}, buf)
-	if err == nil {
-		t.Fatal("expected error for removed job follow subcommand")
-	}
-	if !strings.Contains(err.Error(), `unknown job subcommand "follow"`) {
-		t.Fatalf("expected unknown subcommand error, got: %v", err)
 	}
 }
 

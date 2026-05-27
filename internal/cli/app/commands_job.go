@@ -1,7 +1,10 @@
 package app
 
 import (
+	"context"
+	"errors"
 	"io"
+	"time"
 
 	"github.com/iw2rmb/ploy/internal/cli/job"
 	"github.com/spf13/cobra"
@@ -10,12 +13,44 @@ import (
 // newJobCmd creates the cobra command tree for 'ploy job' and its subcommands.
 func newJobCmd(stderr io.Writer) *cobra.Command {
 	jobCmd := &cobra.Command{
-		Use:                "job",
-		Short:              "Inspect and follow job logs",
-		DisableFlagParsing: true,
+		Use:   "job",
+		Short: "Inspect and follow job logs",
+		Args:  cobra.NoArgs,
+		RunE:  func(cmd *cobra.Command, args []string) error { return cmd.Help() },
+	}
+	jobCmd.AddCommand(newJobLogCmd(stderr))
+	return jobCmd
+}
+
+func newJobLogCmd(stderr io.Writer) *cobra.Command {
+	var format string
+	var follow bool
+	var maxRetries int
+	var idleTimeout, timeout time.Duration
+	cmd := &cobra.Command{
+		Use:   "log [--follow|-f] [--format <raw|structured>] <job-id>",
+		Short: "Print job logs",
+		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return job.Handle(args, stderr)
+			err := job.RunLog(context.Background(), job.LogOptions{
+				JobID:       args[0],
+				Format:      format,
+				Follow:      follow,
+				MaxRetries:  maxRetries,
+				IdleTimeout: idleTimeout,
+				Timeout:     timeout,
+				Output:      stderr,
+			})
+			if errors.Is(err, job.ErrInvalidFormat) {
+				_ = cmd.Help()
+			}
+			return err
 		},
 	}
-	return jobCmd
+	cmd.Flags().StringVar(&format, "format", "structured", "Output format (raw|structured)")
+	cmd.Flags().BoolVarP(&follow, "follow", "f", false, "Follow stream after printing available logs")
+	cmd.Flags().IntVar(&maxRetries, "max-retries", 3, "Max reconnect attempts")
+	cmd.Flags().DurationVar(&idleTimeout, "idle-timeout", 45*time.Second, "Cancel if no events arrive")
+	cmd.Flags().DurationVar(&timeout, "timeout", 0, "Overall timeout for the stream")
+	return cmd
 }

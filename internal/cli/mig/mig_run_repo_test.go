@@ -2,8 +2,8 @@ package mig
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -13,79 +13,65 @@ import (
 	"github.com/iw2rmb/ploy/internal/testutil/clienv"
 )
 
-func executeMigCmd(args []string, stderr io.Writer) error {
-	if len(args) > 0 && args[0] == "mig" {
-		args = args[1:]
-	}
-	return Handle(args, stderr)
-}
-
-// TestMigRunRepoRouting verifies that `mig run repo` dispatches to the correct handler.
-// Tests argument parsing without making HTTP calls (no t.Setenv, so t.Parallel is safe).
-func TestMigRunRepoRouting(t *testing.T) {
+func TestMigRunRepoRequiredFlagValidation(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name    string
-		args    []string
+		run     func() error
 		wantErr string
 	}{
 		{
-			name:    "no action shows usage",
-			args:    []string{"mig", "run", "repo"},
-			wantErr: "mig run repo action required",
-		},
-		{
-			name:    "unknown action",
-			args:    []string{"mig", "run", "repo", "unknown"},
-			wantErr: `unknown mig run repo action "unknown"`,
-		},
-		{
 			name:    "add without run-id",
-			args:    []string{"mig", "run", "repo", "add"},
+			run:     func() error { return RunRunRepoAdd(context.Background(), RunRepoAddOptions{}) },
 			wantErr: "run-id required",
 		},
 		{
 			name:    "add without repo-url",
-			args:    []string{"mig", "run", "repo", "add", "batch-123"},
+			run:     func() error { return RunRunRepoAdd(context.Background(), RunRepoAddOptions{RunID: "batch-123"}) },
 			wantErr: "--repo-url required",
 		},
 		{
-			name:    "add without base-ref",
-			args:    []string{"mig", "run", "repo", "add", "--repo-url", "https://github.com/org/repo.git", "batch-123"},
+			name: "add without base-ref",
+			run: func() error {
+				return RunRunRepoAdd(context.Background(), RunRepoAddOptions{RunID: "batch-123", RepoURL: "https://github.com/org/repo.git"})
+			},
 			wantErr: "--base-ref required",
 		},
 		{
 			name:    "remove without run-id",
-			args:    []string{"mig", "run", "repo", "remove"},
+			run:     func() error { return RunRunRepoRemove(context.Background(), "", "", nil) },
 			wantErr: "run-id required",
 		},
 		{
 			name:    "remove without repo-id",
-			args:    []string{"mig", "run", "repo", "remove", "batch-123"},
+			run:     func() error { return RunRunRepoRemove(context.Background(), "batch-123", "", nil) },
 			wantErr: "--repo-id required",
 		},
 		{
 			name:    "restart without run-id",
-			args:    []string{"mig", "run", "repo", "restart"},
+			run:     func() error { return RunRunRepoRestart(context.Background(), RunRepoRestartOptions{}) },
 			wantErr: "run-id required",
 		},
 		{
-			name:    "restart without repo-id",
-			args:    []string{"mig", "run", "repo", "restart", "batch-123"},
+			name: "restart without repo-id",
+			run: func() error {
+				return RunRunRepoRestart(context.Background(), RunRepoRestartOptions{RunID: "batch-123"})
+			},
 			wantErr: "--repo-id required",
-		},
-		{
-			name:    "status without run-id",
-			args:    []string{"mig", "run", "repo", "status"},
-			wantErr: "mig run repo status has been removed; use 'ploy run status <run-id>'",
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			clienv.RunExpectError(t, executeMigCmd, tc.args, tc.wantErr)
+			err := tc.run()
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if !strings.Contains(err.Error(), tc.wantErr) {
+				t.Fatalf("expected error containing %q, got %v", tc.wantErr, err)
+			}
 		})
 	}
 }
@@ -124,14 +110,13 @@ func TestMigRunRepoAddCallsControlPlane(t *testing.T) {
 	clienv.UseServerDescriptor(t, server.URL)
 
 	buf := &bytes.Buffer{}
-	// Note: Flags must come before the positional run-id argument for flag parsing.
-	err := executeMigCmd([]string{
-		"mig", "run", "repo", "add",
-		"--repo-url", "https://github.com/org/repo.git",
-		"--base-ref", "main",
-		"--target-ref", "feature-branch",
-		"2HBZ1MRFOo8uvXVJhVqKlf8W8Ep",
-	}, buf)
+	err := RunRunRepoAdd(context.Background(), RunRepoAddOptions{
+		RunID:     "2HBZ1MRFOo8uvXVJhVqKlf8W8Ep",
+		RepoURL:   "https://github.com/org/repo.git",
+		BaseRef:   "main",
+		TargetRef: "feature-branch",
+		Output:    buf,
+	})
 	if err != nil {
 		t.Fatalf("mig run repo add error: %v", err)
 	}
@@ -163,14 +148,12 @@ func TestMigRunRepoAddRejectsInvalidRepoURLScheme(t *testing.T) {
 
 	clienv.UseServerDescriptor(t, server.URL)
 
-	buf := &bytes.Buffer{}
-	err := executeMigCmd([]string{
-		"mig", "run", "repo", "add",
-		"--repo-url", "http://github.com/org/repo.git",
-		"--base-ref", "main",
-		"--target-ref", "feature-branch",
-		"2HBZ1MRFOo8uvXVJhVqKlf8W8Ep",
-	}, buf)
+	err := RunRunRepoAdd(context.Background(), RunRepoAddOptions{
+		RunID:     "2HBZ1MRFOo8uvXVJhVqKlf8W8Ep",
+		RepoURL:   "http://github.com/org/repo.git",
+		BaseRef:   "main",
+		TargetRef: "feature-branch",
+	})
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -214,12 +197,7 @@ func TestMigRunRepoRemoveCallsControlPlane(t *testing.T) {
 	clienv.UseServerDescriptor(t, server.URL)
 
 	buf := &bytes.Buffer{}
-	// Note: Flags must come before the positional run-id argument for flag parsing.
-	err := executeMigCmd([]string{
-		"mig", "run", "repo", "remove",
-		"--repo-id", "a1b2c3d4",
-		"2HBZ1MRFOo8uvXVJhVqKlf8W8Ep",
-	}, buf)
+	err := RunRunRepoRemove(context.Background(), "2HBZ1MRFOo8uvXVJhVqKlf8W8Ep", "a1b2c3d4", buf)
 	if err != nil {
 		t.Fatalf("mig run repo remove error: %v", err)
 	}
@@ -262,13 +240,12 @@ func TestMigRunRepoRestartCallsControlPlane(t *testing.T) {
 	clienv.UseServerDescriptor(t, server.URL)
 
 	buf := &bytes.Buffer{}
-	// Note: Flags must come before the positional run-id argument for flag parsing.
-	err := executeMigCmd([]string{
-		"mig", "run", "repo", "restart",
-		"--repo-id", "a1b2c3d4",
-		"--target-ref", "feature-branch-v2",
-		"2HBZ1MRFOo8uvXVJhVqKlf8W8Ep",
-	}, buf)
+	err := RunRunRepoRestart(context.Background(), RunRepoRestartOptions{
+		RunID:     "2HBZ1MRFOo8uvXVJhVqKlf8W8Ep",
+		RepoID:    "a1b2c3d4",
+		TargetRef: "feature-branch-v2",
+		Output:    buf,
+	})
 	if err != nil {
 		t.Fatalf("mig run repo restart error: %v", err)
 	}
@@ -279,15 +256,6 @@ func TestMigRunRepoRestartCallsControlPlane(t *testing.T) {
 	if receivedBody["target_ref"] == nil || *receivedBody["target_ref"] != "feature-branch-v2" {
 		t.Errorf("expected target_ref=feature-branch-v2 in request body")
 	}
-}
-
-// RED gate for roadmap/reporting.md Phase 0:
-// repo status must be removed in favor of `ploy run status`.
-func TestMigRunRepoStatusRemoved(t *testing.T) {
-	t.Parallel()
-	clienv.RunExpectError(t, executeMigCmd,
-		[]string{"mig", "run", "repo", "status", "2HBZ1MRFOo8uvXVJhVqKlf8W8Ep"},
-		"mig run repo status has been removed; use 'ploy run status <run-id>'")
 }
 
 // TestMigRunRepoAddServerError verifies error handling when the server returns an error.
@@ -305,14 +273,13 @@ func TestMigRunRepoAddServerError(t *testing.T) {
 	clienv.UseServerDescriptor(t, server.URL)
 
 	buf := &bytes.Buffer{}
-	// Note: Flags must come before the positional run-id argument for flag parsing.
-	err := executeMigCmd([]string{
-		"mig", "run", "repo", "add",
-		"--repo-url", "https://github.com/org/repo.git",
-		"--base-ref", "main",
-		"--target-ref", "feature-branch",
-		"2HBZ1MRFOo8uvXVJhVqKlf8W8Ep",
-	}, buf)
+	err := RunRunRepoAdd(context.Background(), RunRepoAddOptions{
+		RunID:     "2HBZ1MRFOo8uvXVJhVqKlf8W8Ep",
+		RepoURL:   "https://github.com/org/repo.git",
+		BaseRef:   "main",
+		TargetRef: "feature-branch",
+		Output:    buf,
+	})
 	if err == nil {
 		t.Fatal("expected error for 404 response")
 	}
@@ -341,11 +308,7 @@ func TestMigRunRepoRemoveServerError(t *testing.T) {
 	clienv.UseServerDescriptor(t, server.URL)
 
 	buf := &bytes.Buffer{}
-	err := executeMigCmd([]string{
-		"mig", "run", "repo", "remove",
-		"--repo-id", "a1b2c3d4",
-		"2HBZ1MRFOo8uvXVJhVqKlf8W8Ep",
-	}, buf)
+	err := RunRunRepoRemove(context.Background(), "2HBZ1MRFOo8uvXVJhVqKlf8W8Ep", "a1b2c3d4", buf)
 	if err == nil {
 		t.Fatal("expected error for 404 response")
 	}
@@ -370,42 +333,16 @@ func TestMigRunRepoRestartServerError(t *testing.T) {
 	clienv.UseServerDescriptor(t, server.URL)
 
 	buf := &bytes.Buffer{}
-	err := executeMigCmd([]string{
-		"mig", "run", "repo", "restart",
-		"--repo-id", "a1b2c3d4",
-		"2HBZ1MRFOo8uvXVJhVqKlf8W8Ep",
-	}, buf)
+	err := RunRunRepoRestart(context.Background(), RunRepoRestartOptions{
+		RunID:  "2HBZ1MRFOo8uvXVJhVqKlf8W8Ep",
+		RepoID: "a1b2c3d4",
+		Output: buf,
+	})
 	if err == nil {
 		t.Fatal("expected error for 409 response")
 	}
 	if !strings.Contains(err.Error(), "409") && !strings.Contains(err.Error(), "terminal") {
 		t.Errorf("expected error mentioning 409 or terminal, got: %v", err)
-	}
-}
-
-// TestMigRunRepoStatusServerError verifies the removed status command fails immediately.
-// Note: Not parallel because useServerDescriptor uses t.Setenv.
-func TestMigRunRepoStatusServerError(t *testing.T) {
-	var called bool
-
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		called = true
-		http.NotFound(w, r)
-	}))
-	defer server.Close()
-
-	clienv.UseServerDescriptor(t, server.URL)
-
-	buf := &bytes.Buffer{}
-	err := executeMigCmd([]string{"mig", "run", "repo", "status", "unknown-batch"}, buf)
-	if err == nil {
-		t.Fatal("expected removed-command error")
-	}
-	if !strings.Contains(err.Error(), "mig run repo status has been removed; use 'ploy run status <run-id>'") {
-		t.Errorf("expected removed-command error, got: %v", err)
-	}
-	if called {
-		t.Fatal("expected no control plane request for removed status command")
 	}
 }
 
@@ -440,12 +377,12 @@ func TestMigRunRepoRestartWithBaseRef(t *testing.T) {
 	clienv.UseServerDescriptor(t, server.URL)
 
 	buf := &bytes.Buffer{}
-	err := executeMigCmd([]string{
-		"mig", "run", "repo", "restart",
-		"--repo-id", "a1b2c3d4",
-		"--base-ref", "main-v2",
-		"2HBZ1MRFOo8uvXVJhVqKlf8W8Ep",
-	}, buf)
+	err := RunRunRepoRestart(context.Background(), RunRepoRestartOptions{
+		RunID:   "2HBZ1MRFOo8uvXVJhVqKlf8W8Ep",
+		RepoID:  "a1b2c3d4",
+		BaseRef: "main-v2",
+		Output:  buf,
+	})
 	if err != nil {
 		t.Fatalf("mig run repo restart error: %v", err)
 	}
@@ -487,13 +424,13 @@ func TestMigRunRepoRestartWithBothRefs(t *testing.T) {
 	clienv.UseServerDescriptor(t, server.URL)
 
 	buf := &bytes.Buffer{}
-	err := executeMigCmd([]string{
-		"mig", "run", "repo", "restart",
-		"--repo-id", "a1b2c3d4",
-		"--base-ref", "main-v2",
-		"--target-ref", "feature-v2",
-		"2HBZ1MRFOo8uvXVJhVqKlf8W8Ep",
-	}, buf)
+	err := RunRunRepoRestart(context.Background(), RunRepoRestartOptions{
+		RunID:     "2HBZ1MRFOo8uvXVJhVqKlf8W8Ep",
+		RepoID:    "a1b2c3d4",
+		BaseRef:   "main-v2",
+		TargetRef: "feature-v2",
+		Output:    buf,
+	})
 	if err != nil {
 		t.Fatalf("mig run repo restart error: %v", err)
 	}

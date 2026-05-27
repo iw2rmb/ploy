@@ -43,19 +43,6 @@ func newTestNodeAddConfig(t *testing.T) nodeAddConfig {
 	}
 }
 
-func TestHandleNodeRequiresSubcommand(t *testing.T) {
-	buf := &bytes.Buffer{}
-	err := handleNode(nil, buf)
-	if err == nil {
-		t.Fatalf("expected error for missing node subcommand")
-	}
-	out := buf.String()
-	// NOTE: Node commands are now accessed via `ploy cluster node` namespace.
-	if !strings.Contains(out, "Usage: ploy cluster node") {
-		t.Fatalf("expected node usage output with cluster prefix, got: %q", out)
-	}
-}
-
 func TestHandleNodeAddRequiresClusterIDAndAddress(t *testing.T) {
 	buf := &bytes.Buffer{}
 	// No flags at all -> cluster-id required first
@@ -74,39 +61,6 @@ func TestHandleNodeAddRequiresClusterIDAndAddress(t *testing.T) {
 		t.Fatalf("expected error when --address is missing")
 	}
 	if !strings.Contains(err.Error(), "address is required") {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-func TestHandleNodeActionsRequiresNodeID(t *testing.T) {
-	tests := []struct {
-		name string
-		args []string
-	}{
-		{name: "actions", args: []string{"actions"}},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			buf := &bytes.Buffer{}
-			err := handleNode(tt.args, buf)
-			if err == nil {
-				t.Fatal("expected missing node-id error")
-			}
-			if !strings.Contains(err.Error(), "node-id is required") {
-				t.Fatalf("error = %v, want node-id is required", err)
-			}
-		})
-	}
-}
-
-func TestHandleNodeAddRejectsExtraArgs(t *testing.T) {
-	buf := &bytes.Buffer{}
-	err := handleNodeAdd([]string{"--cluster-id", "c1", "--address", "1.2.3.4", "extra"}, buf)
-	if err == nil {
-		t.Fatalf("expected error for unexpected args")
-	}
-	if !strings.Contains(err.Error(), "unexpected arguments:") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }

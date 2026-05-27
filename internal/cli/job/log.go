@@ -1,4 +1,4 @@
-package jobs
+package job
 
 import (
 	"context"
@@ -8,12 +8,65 @@ import (
 	"io"
 	"net/url"
 	"strings"
+	"time"
 
+	"github.com/iw2rmb/ploy/internal/cli/common"
 	"github.com/iw2rmb/ploy/internal/cli/logs"
 	"github.com/iw2rmb/ploy/internal/cli/stream"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	logstream "github.com/iw2rmb/ploy/internal/stream"
 )
+
+type LogOptions struct {
+	JobID       string
+	Format      string
+	Follow      bool
+	MaxRetries  int
+	IdleTimeout time.Duration
+	Timeout     time.Duration
+	Output      io.Writer
+}
+
+func RunLog(ctx context.Context, opts LogOptions) error {
+	jobID := strings.TrimSpace(opts.JobID)
+	if jobID == "" {
+		return errors.New("job id required")
+	}
+	if opts.MaxRetries < -1 {
+		return fmt.Errorf("max retries must be >= -1")
+	}
+
+	effectiveIdle := opts.IdleTimeout
+	effectiveRetries := opts.MaxRetries
+	if !opts.Follow {
+		effectiveIdle = 2 * time.Second
+		effectiveRetries = 0
+	}
+
+	if opts.Timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, opts.Timeout)
+		defer cancel()
+	}
+
+	base, httpClient, err := common.ResolveControlPlaneHTTP(ctx)
+	if err != nil {
+		return err
+	}
+
+	cmd := FollowCommand{
+		JobID:  domaintypes.JobID(jobID),
+		Format: logs.Format(strings.ToLower(strings.TrimSpace(opts.Format))),
+		Output: opts.Output,
+		Client: stream.Client{
+			HTTPClient:  common.CloneForStream(httpClient),
+			MaxRetries:  effectiveRetries,
+			IdleTimeout: effectiveIdle,
+		},
+		BaseURL: base,
+	}
+	return cmd.Run(ctx)
+}
 
 // FollowCommand streams job logs from the job SSE endpoint.
 type FollowCommand struct {

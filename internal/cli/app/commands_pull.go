@@ -2,6 +2,7 @@ package app
 
 import (
 	"io"
+	"time"
 
 	"github.com/iw2rmb/ploy/internal/cli/pull"
 	"github.com/spf13/cobra"
@@ -9,6 +10,10 @@ import (
 
 // newPullCmd creates the cobra command for `ploy pull`.
 func newPullCmd(stderr io.Writer) *cobra.Command {
+	var origin string
+	var newRun, follow, dryRun, cancelOnCap bool
+	var capDuration time.Duration
+	var maxRetries int
 	cmd := &cobra.Command{
 		Use:   "pull",
 		Short: "Pull Migs diffs for current repo HEAD",
@@ -23,14 +28,26 @@ Behavior:
   - If --follow is set: follows run until terminal and then pulls diffs`,
 		SilenceUsage:  true,
 		SilenceErrors: true,
+		Args:          cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Collect all flags and positional args for handlePull.
-			// Since we're using flag.FlagSet internally, pass the original args.
-			return pull.Handle(args, stderr)
+			runArgs := []string{}
+			runArgs = addChangedBool(cmd, runArgs, "new-run", newRun)
+			runArgs = addChangedBool(cmd, runArgs, "follow", follow)
+			runArgs = addChangedString(cmd, runArgs, "origin", origin)
+			runArgs = addChangedBool(cmd, runArgs, "dry-run", dryRun)
+			runArgs = addChangedDuration(cmd, runArgs, "cap", capDuration)
+			runArgs = addChangedBool(cmd, runArgs, "cancel-on-cap", cancelOnCap)
+			runArgs = addChangedInt(cmd, runArgs, "max-retries", maxRetries)
+			return pull.Handle(runArgs, stderr)
 		},
-		// Disable cobra's built-in flag parsing so handlePull can use flag.FlagSet.
-		DisableFlagParsing: true,
 	}
+	cmd.Flags().BoolVar(&newRun, "new-run", false, "Force initiating a new run")
+	cmd.Flags().BoolVar(&follow, "follow", false, "Follow run until completion")
+	cmd.Flags().StringVar(&origin, "origin", "origin", "Git remote to match")
+	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Validate and print actions without mutating")
+	cmd.Flags().DurationVar(&capDuration, "cap", 0, "Optional time cap for --follow")
+	cmd.Flags().BoolVar(&cancelOnCap, "cancel-on-cap", false, "Cancel run if cap exceeded")
+	cmd.Flags().IntVar(&maxRetries, "max-retries", 5, "Max SSE reconnect attempts")
 
 	return cmd
 }
