@@ -290,7 +290,6 @@ func TestBuildGateImageRule_ParseRoundTrip(t *testing.T) {
 			Image: JobImage{Universal: "ghcr.io/iw2rmb/ploy/mig:latest"},
 		}},
 		BuildGate: &BuildGateConfig{
-			Enabled: true,
 			Images: []BuildGateImageRule{
 				{Stack: StackExpectation{Language: "java", Release: "17", Tool: "maven"}, Image: "maven:jdk17"},
 				{Stack: StackExpectation{Language: "java", Release: "17"}, Image: "eclipse-temurin:17-jdk"},
@@ -343,7 +342,6 @@ func TestParseMigSpecJSON_BuildGateImages(t *testing.T) {
 	input := `{
 		"steps": [{"image": "test:latest"}],
 		"build_gate": {
-			"enabled": true,
 			"images": [
 				{
 					"stack": {"language": "java", "release": "17", "tool": "maven"},
@@ -397,7 +395,6 @@ func TestParseMigSpecJSON_BuildGateImages_NumericRelease(t *testing.T) {
 	input := `{
 		"steps": [{"image": "test:latest"}],
 		"build_gate": {
-			"enabled": true,
 			"images": [
 				{
 					"stack": {"language": "java", "release": 17},

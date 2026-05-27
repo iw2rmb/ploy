@@ -5,5 +5,4 @@ steps:
       - -lc
       - echo "noop mig step (gradle build-cache e2e)"
 
-build_gate:
-  enabled: true
+build_gate: {}

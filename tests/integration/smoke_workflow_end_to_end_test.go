@@ -32,9 +32,7 @@ func TestSmokeWorkflow_EndToEnd(t *testing.T) {
 		"type": "smoke-workflow",
 		"image": "docker.io/example/mig-test:latest",
 		"command": ["mig-test", "--input", "/workspace"],
-		"build_gate": {
-			"enabled": true
-		}
+		"build_gate": {}
 	}`)
 	fixture := newV1RunFixture(t, ctx, db, "https://github.com/example/smoke-workflow", "main", "feature/smoke-workflow", migSpec)
 	run := fixture.Run

@@ -151,7 +151,6 @@ policy; they do not define extra mig/heal actions.
 
 ```yaml
 build_gate:
-  enabled: true
   pre:
     stack:
       mode: strict
@@ -174,6 +173,8 @@ build_gate:
 
 When `mode` is set, `language`, `tool`, and `release` are required. Leave
 `stack` absent or empty for normal auto-detection.
+
+Set `build_gate.disabled: true` when no Build Gate jobs should be created.
 
 Use YAML `!include` for spec composition: full replacement
 (`steps: !include ./steps.yaml#/steps`) or deep merge

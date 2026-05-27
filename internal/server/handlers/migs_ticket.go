@@ -202,8 +202,11 @@ func createJobsFromSpec(
 		gateCycle string
 	}
 
+	buildGateDisabled := migsSpec.BuildGate != nil && migsSpec.BuildGate.Disabled
 	drafts := make([]draft, 0, len(migsSpec.Steps)+2)
-	drafts = append(drafts, draft{name: "pre-gate", jobType: domaintypes.JobTypePreGate, gateCycle: "pre-gate"})
+	if !buildGateDisabled {
+		drafts = append(drafts, draft{name: "pre-gate", jobType: domaintypes.JobTypePreGate, gateCycle: "pre-gate"})
+	}
 
 	if len(migsSpec.Steps) > 1 {
 		for i, mig := range migsSpec.Steps {
@@ -242,7 +245,9 @@ func createJobsFromSpec(
 			}(),
 		})
 	}
-	drafts = append(drafts, draft{name: "post-gate", jobType: domaintypes.JobTypePostGate, gateCycle: "post-gate"})
+	if !buildGateDisabled {
+		drafts = append(drafts, draft{name: "post-gate", jobType: domaintypes.JobTypePostGate, gateCycle: "post-gate"})
+	}
 
 	planned := make([]plannedJob, 0, len(drafts))
 	for i, d := range drafts {

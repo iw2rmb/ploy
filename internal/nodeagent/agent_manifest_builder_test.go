@@ -419,7 +419,6 @@ func TestManifestBuildWithGateRepoMeta(t *testing.T) {
 			withRunRepoURL("https://gitlab.com/iw2rmb/ploy-orw.git"),
 			withRunTargetRef("main"),
 			withRunOptions(RunOptions{BuildGate: BuildGateOptions{
-				Enabled: true,
 				Images: []contracts.BuildGateImageRule{{
 					Stack: contracts.StackExpectation{Language: "java", Tool: "maven", Release: "17"},
 					Image: "maven:jdk17",
@@ -449,7 +448,6 @@ func TestBuildGateManifestFromRequest_IgnoresStackAwareJobImages(t *testing.T) {
 	t.Parallel()
 
 	req := newStartRunRequest(withRunOptions(RunOptions{
-		BuildGate: BuildGateOptions{Enabled: true},
 		Steps: []StepMig{{MigContainerSpec: MigContainerSpec{
 			Image: contracts.JobImage{ByStack: map[contracts.MigStack]string{
 				contracts.MigStackJavaMaven:  "docker.io/example/orw-cli:latest",

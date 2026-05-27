@@ -57,6 +57,8 @@ Modes:
 When `mode` is set, `language`, `tool`, and `release` are required. An absent
 or empty `stack` object keeps normal auto-detection.
 
+Set `build_gate.disabled: true` when no Build Gate jobs should be created.
+
 ## Runtime Paths
 
 - Host out dir: `.ploy-gate-out`

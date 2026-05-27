@@ -9,8 +9,8 @@ import (
 
 // BuildGateConfig configures Build Gate validation for a mig run.
 type BuildGateConfig struct {
-	// Enabled controls whether the build gate runs before/after mig execution.
-	Enabled bool `json:"enabled,omitempty" yaml:"enabled,omitempty"`
+	// Disabled skips Build Gate jobs when true.
+	Disabled bool `json:"disabled,omitempty" yaml:"disabled,omitempty"`
 
 	// Pre configures stack detection policy for the pre-gate phase.
 	Pre *BuildGatePhaseConfig `json:"pre,omitempty" yaml:"pre,omitempty"`

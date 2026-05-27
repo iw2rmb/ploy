@@ -190,9 +190,7 @@ func TestGlobalEnvPropagation_GateManifest(t *testing.T) {
 				}
 			}
 		],
-		"build_gate": {
-			"enabled": true
-		},
+		"build_gate": {},
 		"envs": {
 			"APP_TLS_CERT": "gate-test-cert-bundle",
 			"APP_AUTH_JSON": "gate-codex-auth",

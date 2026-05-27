@@ -259,7 +259,6 @@ func TestBuildGateManifestFromRequest_StackGateThreading(t *testing.T) {
 			name: "threads build_gate.images into Gate.ImageOverrides",
 			opts: RunOptions{
 				BuildGate: BuildGateOptions{
-					Enabled: true,
 					Images: []contracts.BuildGateImageRule{
 						{Stack: contracts.StackExpectation{Language: "java", Tool: "maven", Release: "17"}, Image: "maven:jdk17"},
 					},

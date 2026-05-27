@@ -24,7 +24,6 @@ func TestParseMigSpecJSON_BuildGateStackConfig(t *testing.T) {
 					"image": "ghcr.io/iw2rmb/ploy/mig:latest"
 				}],
 				"build_gate": {
-					"enabled": true,
 					"pre": {
 						"stack": {
 							"mode": "` + string(tt.mode) + `",

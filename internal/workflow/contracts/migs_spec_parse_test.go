@@ -12,7 +12,7 @@ func TestParseMigSpecJSON_SingleStep(t *testing.T) {
 			"command": "echo hello",
 			"envs": {"FOO": "bar", "BAZ": "qux"}
 		}],
-		"build_gate": {"enabled": true}
+		"build_gate": {}
 	}`
 
 	spec, err := ParseMigSpecJSON([]byte(input))
@@ -52,8 +52,8 @@ func TestParseMigSpecJSON_SingleStep(t *testing.T) {
 	if spec.BuildGate == nil {
 		t.Fatal("build_gate is nil")
 	}
-	if !spec.BuildGate.Enabled {
-		t.Errorf("build_gate.enabled = false, want true")
+	if spec.BuildGate.Disabled {
+		t.Errorf("build_gate.disabled = true, want false")
 	}
 
 }
@@ -65,7 +65,7 @@ func TestParseMigSpecJSON_MultiStep(t *testing.T) {
 			{"name": "step-1", "image": "ghcr.io/iw2rmb/ploy/mig1:latest", "command": ["echo", "step1"], "envs": {"STEP": "1"}},
 			{"name": "step-2", "image": "ghcr.io/iw2rmb/ploy/mig2:latest", "envs": {"STEP": "2"}}
 		],
-		"build_gate": {"enabled": true}
+		"build_gate": {"disabled": true}
 	}`
 
 	spec, err := ParseMigSpecJSON([]byte(input))
@@ -85,6 +85,9 @@ func TestParseMigSpecJSON_MultiStep(t *testing.T) {
 	}
 	if mig1.Image.Universal != "ghcr.io/iw2rmb/ploy/mig1:latest" {
 		t.Errorf("steps[0].image = %q, want %q", mig1.Image.Universal, "ghcr.io/iw2rmb/ploy/mig1:latest")
+	}
+	if spec.BuildGate == nil || !spec.BuildGate.Disabled {
+		t.Errorf("build_gate.disabled should be true")
 	}
 	// Command is exec array form.
 	if len(mig1.Command.Exec) != 2 || mig1.Command.Exec[0] != "echo" || mig1.Command.Exec[1] != "step1" {
@@ -154,7 +157,7 @@ func TestParseMigSpecJSON_APIVersionAndKind(t *testing.T) {
 			"command": "echo hello",
 			"envs": {"FOO": "bar"}
 		}],
-		"build_gate": {"enabled": true}
+		"build_gate": {}
 	}`
 
 	spec, err := ParseMigSpecJSON([]byte(input))

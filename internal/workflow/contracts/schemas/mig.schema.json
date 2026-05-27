@@ -146,7 +146,7 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "enabled": { "type": "boolean" },
+        "disabled": { "type": "boolean" },
         "pre": { "$ref": "#/definitions/buildGatePhase" },
         "post": { "$ref": "#/definitions/buildGatePhase" },
         "images": {
