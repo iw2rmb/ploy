@@ -6,7 +6,6 @@ Build Gate is image-driven:
 
 - Image is resolved by stack selector from `gates/gates.yaml` (or `build_gate.images` overrides in spec).
 - Command is owned by the gate image (`CMD`/entrypoint inside image).
-- Ploy no longer injects per-phase target/command overrides into Build Gate execution.
 - Gate profiles are not resolved/persisted by the server and are not promoted from successful gates.
 
 ## Catalog Format

@@ -766,8 +766,7 @@ There is no standalone prep scheduler loop and no `prep_runs` table.
 
 Current Build Gate mapping:
 - Image is selected from `build_gate.images[]` overrides first, then `gates/gates.yaml`.
-- Gate command is image-owned (container `CMD`/entrypoint); ploy does not inject commands.
-- `build_gate.pre.target` and `build_gate.post.target` are not part of the current contract.
+- Gate command is image-owned (container `CMD`/entrypoint).
   - `runtime.docker.mode=tcp` -> `DOCKER_HOST=<runtime.docker.host>`
   - `runtime.docker.api_version` -> `DOCKER_API_VERSION=<value>`
 - During gate execution, `DOCKER_HOST=unix://...` triggers auto-mount of that
