@@ -6,102 +6,24 @@ import (
 	"testing"
 )
 
-// TestCommandsWiredIntoRoot verifies that all command builders are properly
-// wired into the root cobra command tree. This test ensures that the refactored
-// command structure (using newMigCmd, newClusterCmd, etc.) properly integrates
-// with the root command.
-func TestCommandsWiredIntoRoot(t *testing.T) {
-	// Create root command with stderr buffer to capture output.
-	stderr := &bytes.Buffer{}
-	rootCmd := NewRootCmd(stderr)
-
-	// Verify that all expected commands are registered as subcommands.
-	// The command names should match the "Use" field from each builder function.
-	// NOTE: "token" has been removed from the top-level commands.
-	// Token operations are now accessible only via `ploy cluster token`.
-	expectedCommands := []string{
-		"version", // Built-in version command
-		"mig",     // newMigCmd
-		"run",     // newRunCmd
-		"job",     // newJobCmd
-		"pull",    // newPullCmd
-		"cluster", // newClusterCmd (includes token, node)
-		"config",  // newConfigCmd
-		"spec",    // newSpecCmd
-		"tui",     // newTUICmd
-	}
-
-	// Get all registered subcommands from the root command.
-	commands := rootCmd.Commands()
-	commandNames := make(map[string]bool)
-	for _, cmd := range commands {
-		commandNames[cmd.Name()] = true
-	}
-
-	// Verify each expected command is registered.
-	for _, expected := range expectedCommands {
-		if !commandNames[expected] {
-			t.Errorf("expected command %q to be registered in root, but it was not found", expected)
-		}
-	}
-
-	// Verify that no unexpected commands are registered (excluding "help" and "completion").
-	// Cobra adds "help" and "completion" automatically in some configurations.
-	for name := range commandNames {
-		found := false
-		for _, expected := range expectedCommands {
-			if name == expected {
-				found = true
-				break
-			}
-		}
-		// Allow "help" and "completion" as they may be added by cobra automatically.
-		if !found && name != "help" && name != "completion" {
-			t.Errorf("unexpected command %q registered in root", name)
-		}
-	}
-}
-
-// TestRootCmdPreservesExistingBehavior verifies that the refactored root command
-// preserves backward-compatible behavior for common use cases.
-func TestRootCmdPreservesExistingBehavior(t *testing.T) {
+func TestRootCmdCobraBehavior(t *testing.T) {
 	t.Run("version flag", func(t *testing.T) {
 		stdout := &bytes.Buffer{}
 		stderr := &bytes.Buffer{}
 		rootCmd := NewRootCmdWithIO(stdout, stderr)
 		rootCmd.SetArgs([]string{"--version"})
 
-		// Execute should handle --version and return the sentinel error.
 		err := rootCmd.Execute()
-		if err == nil || err.Error() != "version displayed" {
-			t.Errorf("expected sentinel error 'version displayed', got: %v", err)
+		if err != nil {
+			t.Errorf("expected nil error for --version, got: %v", err)
 		}
 
-		// Verify version output was written to stdout.
 		output := stdout.String()
 		if !strings.Contains(output, "dev") {
 			t.Errorf("expected version output in stdout, got: %q", output)
 		}
 		if stderr.Len() != 0 {
 			t.Errorf("expected empty stderr for version output, got: %q", stderr.String())
-		}
-	})
-
-	t.Run("no args prints usage", func(t *testing.T) {
-		stderr := &bytes.Buffer{}
-		rootCmd := NewRootCmd(stderr)
-		rootCmd.SetArgs([]string{})
-
-		// Execute with no args should print usage and return "command required" error.
-		err := rootCmd.Execute()
-		if err == nil || !strings.Contains(err.Error(), "command required") {
-			t.Errorf("expected 'command required' error, got: %v", err)
-		}
-
-		// Verify usage output was written to stderr.
-		output := stderr.String()
-		if !strings.Contains(output, "Ploy CLI v2") {
-			t.Errorf("expected usage output in stderr, got: %q", output)
 		}
 	})
 }
@@ -133,6 +55,52 @@ func TestCompletionCommandGeneratesScripts(t *testing.T) {
 			}
 			if got := stdout.String(); !strings.Contains(got, tt.want) {
 				t.Fatalf("completion %s output missing %q:\n%s", tt.shell, tt.want, got)
+			}
+		})
+	}
+}
+
+func TestCobraCommandTreeRouting(t *testing.T) {
+	tests := []struct {
+		name    string
+		args    []string
+		wantOK  bool
+		wantOut string
+		wantErr string
+	}{
+		{name: "root parent help", args: nil, wantOK: true, wantOut: "Available Commands:"},
+		{name: "cluster parent help", args: []string{"cluster"}, wantOK: true, wantOut: "ploy cluster [command]"},
+		{name: "cluster node parent help", args: []string{"cluster", "node"}, wantOK: true, wantOut: "ploy cluster node [command]"},
+		{name: "config env parent help", args: []string{"config", "env"}, wantOK: true, wantOut: "ploy config env [command]"},
+		{name: "mig repo parent help", args: []string{"mig", "repo"}, wantOK: true, wantOut: "ploy mig repo [command]"},
+		{name: "top-level unknown", args: []string{"unknown"}, wantErr: `unknown command "unknown"`},
+		{name: "cluster unknown", args: []string{"cluster", "unknown"}, wantErr: `unknown command "unknown"`},
+		{name: "cluster node unknown", args: []string{"cluster", "node", "unknown"}, wantErr: `unknown command "unknown"`},
+		{name: "job follow unknown", args: []string{"job", "follow"}, wantErr: `unknown command "follow"`},
+		{name: "help run status", args: []string{"help", "run", "status"}, wantOK: true, wantOut: "ploy run status [--json] <run-id> [flags]"},
+		{name: "run status help", args: []string{"run", "status", "--help"}, wantOK: true, wantOut: "ploy run status [--json] <run-id> [flags]"},
+		{name: "run logs help", args: []string{"run", "logs", "--help"}, wantOK: true, wantOut: "ploy run logs <run-id> [flags]"},
+		{name: "token list help", args: []string{"cluster", "token", "list", "--help"}, wantOK: true, wantOut: "ploy cluster token list [flags]"},
+		{name: "spec validate help", args: []string{"spec", "validate", "--help"}, wantOK: true, wantOut: "ploy spec validate <path> [<path>...] [flags]"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			buf := &bytes.Buffer{}
+			err := executeCmd(tt.args, buf)
+			if tt.wantOK && err != nil {
+				t.Fatalf("expected success, got %v", err)
+			}
+			if !tt.wantOK {
+				if err == nil {
+					t.Fatal("expected error, got nil")
+				}
+				if !strings.Contains(err.Error(), tt.wantErr) {
+					t.Fatalf("expected error containing %q, got %v", tt.wantErr, err)
+				}
+			}
+			if tt.wantOut != "" && !strings.Contains(buf.String(), tt.wantOut) {
+				t.Fatalf("expected output containing %q, got %q", tt.wantOut, buf.String())
 			}
 		})
 	}

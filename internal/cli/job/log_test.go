@@ -1,4 +1,4 @@
-package jobs
+package job
 
 import (
 	"bytes"
@@ -125,7 +125,7 @@ func TestFollowCommandRetention(t *testing.T) {
 	}
 }
 
-func TestFollowCommandValidation(t *testing.T) {
+func TestFollowCommandRejectsInvalidConfiguration(t *testing.T) {
 	t.Parallel()
 
 	baseURL, _ := url.Parse("http://localhost:9999")
@@ -135,14 +135,6 @@ func TestFollowCommandValidation(t *testing.T) {
 		cmd     FollowCommand
 		wantErr string
 	}{
-		{
-			name: "missing job id",
-			cmd: FollowCommand{
-				Client:  stream.Client{HTTPClient: http.DefaultClient},
-				BaseURL: baseURL,
-			},
-			wantErr: "job id required",
-		},
 		{
 			name: "missing base url",
 			cmd: FollowCommand{

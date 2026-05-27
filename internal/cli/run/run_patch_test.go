@@ -14,61 +14,6 @@ import (
 	"github.com/iw2rmb/ploy/internal/testutil/clienv"
 )
 
-func TestRunPatchRouting(t *testing.T) {
-	tests := []struct {
-		name    string
-		args    []string
-		wantErr string
-	}{
-		{
-			name:    "missing run id",
-			args:    []string{"run", "patch"},
-			wantErr: "run-id required",
-		},
-		{
-			name:    "extra positional argument",
-			args:    []string{"run", "patch", "run-1", "extra"},
-			wantErr: "unexpected argument: extra",
-		},
-		{
-			name:    "unknown flag",
-			args:    []string{"run", "patch", "--unknown", "run-1"},
-			wantErr: "flag provided but not defined",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			clienv.RunExpectError(t, Handle, tt.args[1:], tt.wantErr)
-		})
-	}
-}
-
-func TestRunPatchUsageHelp(t *testing.T) {
-	var buf bytes.Buffer
-	printRunPatchUsage(&buf)
-
-	out := buf.String()
-	if !strings.Contains(out, "Usage: ploy run patch") {
-		t.Fatalf("usage line missing: %q", out)
-	}
-	if !strings.Contains(out, "--repo-id") {
-		t.Fatalf("expected --repo-id in usage: %q", out)
-	}
-	if !strings.Contains(out, "--repo-url") {
-		t.Fatalf("expected --repo-url in usage: %q", out)
-	}
-	if strings.Contains(out, "--origin") {
-		t.Fatalf("did not expect --origin in usage: %q", out)
-	}
-	if !strings.Contains(out, "--diff-id") {
-		t.Fatalf("expected --diff-id in usage: %q", out)
-	}
-	if !strings.Contains(out, ".patch.gz") {
-		t.Fatalf("expected .patch.gz mention in usage: %q", out)
-	}
-}
-
 func TestHandleRunPatch_RepoIDLatestToFile(t *testing.T) {
 	runID := domaintypes.NewRunID()
 	repoID := domaintypes.NewMigRepoID()

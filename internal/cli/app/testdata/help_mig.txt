@@ -1,44 +1,24 @@
-Usage: ploy mig <command>
+Plan and run Migs workflows
 
-Mig Project Management:
+Usage:
+  ploy mig [flags]
+  ploy mig [command]
+
+Available Commands:
   add         Create a new mig project
-  list        List mig projects
-  remove      Delete a mig project
   archive     Archive a mig project
-  unarchive   Unarchive a mig project
-
-Spec Management:
-  spec set    Set a mig's spec from a file
-
-Repo Set Management:
-  repo add    Add a repo to the mig
-  repo list   List repos in the mig
-  repo remove Remove a repo from the mig
-  repo import Import repos from CSV
-
-Pulling Diffs:
-  pull        Pull diffs into the current git worktree
-  status      Show migration status and per-run summary
-
-Run Execution:
-  run <mig>   Run a mig project (with --repo or --failed for repo selection)
-  run repo    Manage repos within a batch run
-
-Artifacts:
   artifacts   List run artifacts by stage
   fetch       Download run artifacts
+  list        List mig projects
+  pull        Pull diffs into the current git worktree
+  remove      Delete a mig project
+  repo        Manage repos in a mig
+  run         Run a mig project
+  spec        Manage mig specs
+  status      Show migration status and per-run summary
+  unarchive   Unarchive a mig project
 
-Use 'ploy mig <command> --help' for command details.
+Flags:
+  -h, --help   help for mig
 
-Flags for 'ploy mig run <mig>':
-  --repo <url>    Explicit repo URL(s) to run (repeatable)
-  --failed        Run repos with last terminal state Fail
-
-Flags for 'ploy mig pull':
-  --origin <remote>    Git remote to match (default: origin)
-  --dry-run            Validate and print actions without mutating the repo
-  --last-failed        Select the latest failed run (default: last succeeded)
-  --last-succeeded     Select the latest succeeded run (default)
-
-Single-repo runs now live under 'ploy run':
-  ploy run --repo <url> --base-ref <ref> --target-ref <ref> --spec <path|->
+Use "ploy mig [command] --help" for more information about a command.

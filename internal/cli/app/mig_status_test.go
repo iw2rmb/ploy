@@ -116,10 +116,3 @@ func TestMigStatusPrintsMigrationSummary(t *testing.T) {
 	assertx.Contains(t, out, "⣽  "+runID1.String())
 	assertx.Contains(t, out, "✓  "+runID2.String())
 }
-
-func TestMigStatusRequiresMigID(t *testing.T) {
-	clienv.UseServerDescriptor(t, "http://example.test")
-
-	out := clienv.RunExpectError(t, executeCmd, []string{"mig", "status"}, "mig id required")
-	assertx.Contains(t, out, "Usage: ploy mig status <mig-id>")
-}

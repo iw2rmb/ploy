@@ -16,12 +16,12 @@ func TestRunSubcommandHelpUsesLeafUsage(t *testing.T) {
 		{
 			name:      "run status",
 			baseArgs:  []string{"run", "status"},
-			wantUsage: "Usage: ploy run status [--json] <run-id>",
+			wantUsage: "ploy run status [--json] <run-id> [flags]",
 		},
 		{
 			name:      "run logs",
 			baseArgs:  []string{"run", "logs"},
-			wantUsage: "Usage: ploy run logs [--max-retries <n>] [--idle-timeout <duration>] [--timeout <duration>] <run-id>",
+			wantUsage: "ploy run logs <run-id> [flags]",
 		},
 	}
 

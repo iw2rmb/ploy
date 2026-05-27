@@ -17,12 +17,7 @@ func main() {
 	// Cobra's Execute() method processes os.Args[1:] automatically.
 	if err := rootCmd.Execute(); err != nil {
 		// Cobra's SilenceErrors is set, so we control error output here.
-		// Skip reporting if it's the sentinel "version displayed" error.
-		if err.Error() != "version displayed" {
-			_, _ = fmt.Fprintf(os.Stderr, "error: %v\n", err)
-			os.Exit(1)
-		}
-		// For "version displayed", exit cleanly without error message.
-		os.Exit(0)
+		_, _ = fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		os.Exit(1)
 	}
 }

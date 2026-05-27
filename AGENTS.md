@@ -9,7 +9,7 @@ Use this flow for any "why did run/job fail?" request.
 - Active investigation target is cluster `round-leaf-6114`.
 - Node SSH is available for investigation:
   - `tsh ssh v.v.kovalev@ploy-node-1.chi.t-oblako.ru`
-  - Act as root on the node when needed.
+  - Use `sudo` if root privileges are necessary.
 
 ## 1) Use control-plane endpoints first
 - Do not start with broad repo searches.

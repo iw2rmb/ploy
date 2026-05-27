@@ -1,16 +1,24 @@
-Ploy CLI v2
+Ploy CLI v2 — control plane and node management
 
 Usage:
-  ploy <command> [<args>]
+  ploy [flags]
+  ploy [command]
 
-Core Commands:
-  mig              Plan and run Migs workflows
-  run              Inspect runs and stream events
-  job              Inspect and follow job logs
-  pull             Pull Migs diffs for current repo HEAD
-  cluster          Manage clusters (nodes, tokens)
-  config           Inspect or update cluster configuration
-  spec             Inspect and validate mig specs
-  tui              Interactive TUI for migrations, runs, and jobs
+Available Commands:
+  cluster     Manage clusters (nodes, tokens)
+  completion  Generate the autocompletion script for the specified shell
+  config      Inspect or update cluster configuration
+  help        Help about any command
+  job         Inspect and follow job logs
+  mig         Plan and run Migs workflows
+  pull        Pull Migs diffs for current repo HEAD
+  run         Inspect runs and stream events
+  spec        Inspect and validate mig specs
+  tui         Interactive TUI for migrations, runs, and jobs
+  version     Print version information
 
-Use 'ploy help <command>' for detailed command help.
+Flags:
+  -h, --help      help for ploy
+  -v, --version   Print version information
+
+Use "ploy [command] --help" for more information about a command.
