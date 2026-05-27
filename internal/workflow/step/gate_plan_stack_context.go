@@ -24,6 +24,14 @@ func resolveGateStackContext(
 	return resolveDetectedStackContext(ctx, workspace, spec, obs, detectErr)
 }
 
+func useForcedStackDetect(spec *contracts.StepGateSpec) bool {
+	if spec == nil {
+		return false
+	}
+	stackGateMode := spec.StackGate != nil && spec.StackGate.Enabled && spec.StackGate.Expect != nil
+	return !stackGateMode && stackDetectMode(spec.StackDetect) == contracts.BuildGateStackModeForced
+}
+
 func resolveStackGateContext(
 	spec *contracts.StepGateSpec,
 	obs *stackdetect.Observation,
@@ -88,101 +96,34 @@ func resolveStackGateContext(
 }
 
 func resolveDetectedStackContext(
-	ctx context.Context,
-	workspace string,
+	_ context.Context,
+	_ string,
 	spec *contracts.StepGateSpec,
 	obs *stackdetect.Observation,
 	detectErr error,
 ) (gateStackContext, *gateExecutionTerminal) {
+	switch stackDetectMode(spec.StackDetect) {
+	case contracts.BuildGateStackModeForced:
+		return resolveForcedStackDetectContext(spec.StackDetect)
+	case contracts.BuildGateStackModeStrict:
+		return resolveStrictStackDetectContext(spec.StackDetect, obs, detectErr)
+	case contracts.BuildGateStackModeFallback:
+		return resolveFallbackStackDetectContext(spec.StackDetect, obs, detectErr)
+	}
+
 	exp := observationToStackExpectation(obs)
 	expIncomplete := exp == nil || strings.TrimSpace(exp.Language) == "" || strings.TrimSpace(exp.Release) == ""
-	stackDetectCfg := spec.StackDetect
 	language := ""
 	tool := ""
 
-	if stackDetectCfg != nil && stackDetectCfg.Enabled {
-		expectedLanguage := strings.TrimSpace(stackDetectCfg.Language)
-		expectedRelease := strings.TrimSpace(stackDetectCfg.Release)
-		expectedTool := strings.TrimSpace(stackDetectCfg.Tool)
-
-		if detectErr == nil && !expIncomplete && obs != nil {
-			expected := &contracts.StackExpectation{
-				Language: expectedLanguage,
-				Tool:     expectedTool,
-				Release:  expectedRelease,
-			}
-			if matched, reason := matchStackForStackDetectConfig(obs, expected); !matched {
-				return gateStackContext{}, buildGateFailureTerminal(expectedLanguage, "stackdetect",
-					"BUILD_GATE_STACK_MISMATCH", reason, formatEvidenceForLog(obs.Evidence), nil, "")
-			}
-		}
-
-		chosenTool := expectedTool
-		if chosenTool == "" && obs != nil && strings.TrimSpace(obs.Tool) != "" {
-			chosenTool = strings.TrimSpace(obs.Tool)
-		}
-		if chosenTool == "" && (detectErr != nil || expIncomplete) {
-			toolObs, toolErr := stackdetect.DetectTool(ctx, workspace)
-			if toolErr == nil && toolObs != nil {
-				chosenTool = strings.TrimSpace(toolObs.Tool)
-			}
-		}
-		if chosenTool == "" {
-			code := "BUILD_GATE_STACK_DETECT_FAILED"
-			if !stackDetectCfg.Default {
-				msg := "stack detection could not determine build tool"
-				return gateStackContext{}, buildGateFailureTerminal("", "stackdetect",
-					code,
-					msg,
-					"", buildGateInternalError(code, msg), "")
-			}
-			msg := "stack detection fallback is enabled but build tool could not be determined (set build_gate.<phase>.stack.tool or ensure workspace has an unambiguous build file)"
-			return gateStackContext{}, buildGateFailureTerminal("", "stackdetect",
-				code,
-				msg,
-				"", buildGateInternalError(code, msg), "")
-		}
-
-		language = expectedLanguage
-		tool = chosenTool
-		exp = &contracts.StackExpectation{
-			Language: expectedLanguage,
-			Tool:     chosenTool,
-			Release:  expectedRelease,
-		}
-		expIncomplete = strings.TrimSpace(exp.Language) == "" || strings.TrimSpace(exp.Release) == ""
+	if detectErr != nil || expIncomplete {
+		return gateStackContext{}, stackDetectionFailureTerminal(detectErr,
+			"stack detection produced incomplete result; language and release are required")
 	}
 
-	if detectErr != nil || expIncomplete {
-		var detErr *stackdetect.DetectionError
-		msg := "stack detection failed"
-		evidence := ""
-		if detectErr != nil {
-			msg = detectErr.Error()
-			if errors.As(detectErr, &detErr) {
-				msg = detErr.Message
-				evidence = formatEvidenceForLog(detErr.Evidence)
-			}
-		} else {
-			msg = "stack detection produced incomplete result; language and release are required"
-		}
-
-		if stackDetectCfg != nil && stackDetectCfg.Enabled && !stackDetectCfg.Default {
-			code := "BUILD_GATE_STACK_DETECT_FAILED"
-			return gateStackContext{}, buildGateFailureTerminal("", "stackdetect",
-				code, msg, evidence, buildGateInternalError(code, msg), "")
-		}
-
-		if stackDetectCfg == nil || !stackDetectCfg.Enabled {
-			code := "BUILD_GATE_STACK_DETECT_FAILED"
-			return gateStackContext{}, buildGateFailureTerminal("", "stackdetect",
-				code, msg, evidence, buildGateInternalError(code, msg), "")
-		}
-	} else if stackDetectCfg == nil || !stackDetectCfg.Enabled {
-		language = strings.TrimSpace(exp.Language)
-		if obs != nil {
-			tool = strings.TrimSpace(obs.Tool)
-		}
+	language = strings.TrimSpace(exp.Language)
+	if obs != nil {
+		tool = strings.TrimSpace(obs.Tool)
 	}
 
 	if exp == nil {
@@ -208,6 +149,128 @@ func resolveDetectedStackContext(
 		tool:        tool,
 		release:     normalized.Release,
 	}, nil
+}
+
+func resolveForcedStackDetectContext(stackDetectCfg *contracts.BuildGateStackConfig) (gateStackContext, *gateExecutionTerminal) {
+	expected := configuredStackExpectation(stackDetectCfg)
+	if !stackExpectationComplete(expected) {
+		return gateStackContext{}, buildGateStackConfigTerminal()
+	}
+	normalized := normalizeStackExpectation(expected)
+	return gateStackContext{
+		expectation: normalized,
+		language:    normalized.Language,
+		tool:        normalized.Tool,
+		release:     normalized.Release,
+	}, nil
+}
+
+func resolveStrictStackDetectContext(
+	stackDetectCfg *contracts.BuildGateStackConfig,
+	obs *stackdetect.Observation,
+	detectErr error,
+) (gateStackContext, *gateExecutionTerminal) {
+	expected := configuredStackExpectation(stackDetectCfg)
+	if !stackExpectationComplete(expected) {
+		return gateStackContext{}, buildGateStackConfigTerminal()
+	}
+	if detectErr != nil || !observationComplete(obs) {
+		return gateStackContext{}, stackDetectionFailureTerminal(detectErr,
+			"stack detection produced incomplete result; language, tool, and release are required")
+	}
+	if matched, reason := matchStackWithOptions(obs, expected, stackMatchOptions{}); !matched {
+		return gateStackContext{}, buildGateFailureTerminal(expected.Language, "stackdetect",
+			"BUILD_GATE_STACK_MISMATCH", reason, formatEvidenceForLog(obs.Evidence), nil, "")
+	}
+	normalized := normalizeStackExpectation(expected)
+	return gateStackContext{
+		expectation: normalized,
+		language:    normalized.Language,
+		tool:        normalized.Tool,
+		release:     normalized.Release,
+	}, nil
+}
+
+func resolveFallbackStackDetectContext(
+	stackDetectCfg *contracts.BuildGateStackConfig,
+	obs *stackdetect.Observation,
+	detectErr error,
+) (gateStackContext, *gateExecutionTerminal) {
+	expected := configuredStackExpectation(stackDetectCfg)
+	if !stackExpectationComplete(expected) {
+		return gateStackContext{}, buildGateStackConfigTerminal()
+	}
+	if detectErr != nil || !observationComplete(obs) {
+		normalized := normalizeStackExpectation(expected)
+		return gateStackContext{
+			expectation: normalized,
+			language:    normalized.Language,
+			tool:        normalized.Tool,
+			release:     normalized.Release,
+		}, nil
+	}
+	detected := normalizeStackExpectation(observationToStackExpectation(obs))
+	return gateStackContext{
+		expectation: detected,
+		language:    detected.Language,
+		tool:        detected.Tool,
+		release:     detected.Release,
+	}, nil
+}
+
+func stackDetectMode(stackDetectCfg *contracts.BuildGateStackConfig) contracts.BuildGateStackMode {
+	if stackDetectCfg == nil {
+		return ""
+	}
+	return contracts.BuildGateStackMode(strings.TrimSpace(string(stackDetectCfg.Mode)))
+}
+
+func configuredStackExpectation(stackDetectCfg *contracts.BuildGateStackConfig) *contracts.StackExpectation {
+	if stackDetectCfg == nil {
+		return nil
+	}
+	return &contracts.StackExpectation{
+		Language: strings.TrimSpace(stackDetectCfg.Language),
+		Tool:     strings.TrimSpace(stackDetectCfg.Tool),
+		Release:  strings.TrimSpace(stackDetectCfg.Release),
+	}
+}
+
+func observationComplete(obs *stackdetect.Observation) bool {
+	exp := observationToStackExpectation(obs)
+	return stackExpectationComplete(exp)
+}
+
+func stackExpectationComplete(exp *contracts.StackExpectation) bool {
+	return exp != nil &&
+		strings.TrimSpace(exp.Language) != "" &&
+		strings.TrimSpace(exp.Tool) != "" &&
+		strings.TrimSpace(exp.Release) != ""
+}
+
+func stackDetectionFailureTerminal(detectErr error, incompleteMsg string) *gateExecutionTerminal {
+	var detErr *stackdetect.DetectionError
+	msg := "stack detection failed"
+	evidence := ""
+	if detectErr != nil {
+		msg = detectErr.Error()
+		if errors.As(detectErr, &detErr) {
+			msg = detErr.Message
+			evidence = formatEvidenceForLog(detErr.Evidence)
+		}
+	} else {
+		msg = incompleteMsg
+	}
+	code := "BUILD_GATE_STACK_DETECT_FAILED"
+	return buildGateFailureTerminal("", "stackdetect",
+		code, msg, evidence, buildGateInternalError(code, msg), "")
+}
+
+func buildGateStackConfigTerminal() *gateExecutionTerminal {
+	code := "BUILD_GATE_STACK_CONFIG_INVALID"
+	msg := "build gate stack mode requires language, tool, and release"
+	return buildGateFailureTerminal("", "stackdetect",
+		code, msg, "", buildGateInternalError(code, msg), "")
 }
 
 func resolveStackGateRuntimeImageForTerminal(

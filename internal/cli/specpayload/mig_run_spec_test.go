@@ -205,7 +205,11 @@ envs:
   SHARED: from_spec
 build_gate:
   pre:
-    target: build
+    stack:
+      mode: fallback
+      language: java
+      tool: maven
+      release: "17"
 `, ".yaml", specPayloadOpts{})
 
 	// Top-level envs: spec wins for SHARED, local key preserved.

@@ -3,7 +3,6 @@ package specpayload
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -320,7 +319,6 @@ func TestBuildSpecPayload_BasicParsing(t *testing.T) {
 		ext           string
 		wantStepImage string
 		wantEnv       map[string]any
-		wantRetries   float64
 		digChecks     []digCheck // optional nested field assertions
 	}{
 		{
@@ -332,9 +330,6 @@ steps:
 envs:
   KEY1: value1
   KEY2: value2
-healing:
-    retries: 1
-    image: docker.io/test/healer:latest
 `,
 			wantStepImage: "docker.io/test/mig:latest",
 			wantEnv:       map[string]any{"KEY1": "value1", "KEY2": "value2"},
@@ -344,41 +339,9 @@ healing:
 			ext:  ".json",
 			spec: `{
   "steps": [{"image": "docker.io/test/mig:latest"}],
-  "envs": {"KEY1": "value1"},
-  "healing": {
-      "retries": 2,
-      "image": "docker.io/test/healer:latest"
-    }
-  }
+  "envs": {"KEY1": "value1"}
 }`,
 			wantStepImage: "docker.io/test/mig:latest",
-			wantRetries:   2,
-		},
-		{
-			name: "heal fields and envs",
-			ext:  ".yaml",
-			spec: `
-steps:
-  - image: docker.io/test/mig:latest
-healing:
-    retries: 2
-    image: docker.io/test/healer:latest
-    command: "heal.sh"
-    envs:
-      HEALING_MODE: auto
-`,
-			wantStepImage: "docker.io/test/mig:latest",
-			digChecks: []digCheck{
-				{
-					digPath:    []string{"healing"},
-					wantFields: map[string]any{"retries": 2.0, "image": "docker.io/test/healer:latest", "command": "heal.sh"},
-					wantAbsent: []string{"retain_container"},
-				},
-				{
-					digPath:    []string{"healing", "envs"},
-					wantFields: map[string]any{"HEALING_MODE": "auto"},
-				},
-			},
 		},
 		{
 			name: "build_gate stack pre and post",
@@ -390,26 +353,26 @@ build_gate:
   enabled: true
   pre:
     stack:
-      enabled: true
+      mode: fallback
       language: java
+      tool: maven
       release: 11
-      default: true
   post:
     stack:
-      enabled: true
+      mode: strict
       language: java
+      tool: maven
       release: "17"
-      default: true
 `,
 			wantStepImage: "docker.io/test/mig:latest",
 			digChecks: []digCheck{
 				{
 					digPath:    []string{"build_gate", "pre", "stack"},
-					wantFields: map[string]any{"language": "java", "default": true, "release": 11.0},
+					wantFields: map[string]any{"mode": "fallback", "language": "java", "tool": "maven", "release": 11.0},
 				},
 				{
 					digPath:    []string{"build_gate", "post", "stack"},
-					wantFields: map[string]any{"release": "17"},
+					wantFields: map[string]any{"mode": "strict", "release": "17"},
 				},
 			},
 		},
@@ -429,10 +392,6 @@ build_gate:
 					assertField(t, envs, k, v)
 				}
 			}
-			if tt.wantRetries != 0 {
-				heal := mustDig(t, result, "healing")
-				assertField(t, heal, "retries", tt.wantRetries)
-			}
 			for _, dc := range tt.digChecks {
 				target := mustDig(t, result, dc.digPath...)
 				for k, v := range dc.wantFields {
@@ -440,115 +399,6 @@ build_gate:
 				}
 				for _, k := range dc.wantAbsent {
 					assertAbsent(t, target, k)
-				}
-			}
-		})
-	}
-}
-
-func TestBuildSpecPayload_IncludeMerge(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name             string
-		fragment         string
-		spec             string   // %s placeholder for fragment path
-		digPath          []string // path to the merged object in the result
-		useNormalize     bool     // call Normalize instead
-		wantFields       map[string]any
-		wantEnv          map[string]any // nil value → just check key existence
-		wantArtifactsLen int
-	}{
-		{
-			name: "heal include merge with inline overrides",
-			fragment: `
-retries: 2
-image: docker.io/test/healer:latest
-envs:
-  A: from-fragment
-  B: from-fragment
-expectations:
-  artifacts:
-    - path: /out/custom-artifact.json
-      schema: artifact_v1
-`,
-			spec: `
-steps:
-  - image: docker.io/test/mig:latest
-healing:
-    <<: !include %s
-    retries: 1
-    envs:
-      B: inline-override
-      C: inline-only
-`,
-			digPath:          []string{"healing"},
-			wantFields:       map[string]any{"retries": 1.0, "image": "docker.io/test/healer:latest"},
-			wantEnv:          map[string]any{"A": "from-fragment", "B": "inline-override", "C": "inline-only"},
-			wantArtifactsLen: 1,
-		},
-		{
-			name: "Normalize heal include merge",
-			fragment: `
-retries: 2
-image: docker.io/test/healer:latest
-envs:
-  FRAGMENT_ONLY: yes
-`,
-			spec: `
-steps:
-  - image: docker.io/test/mig:latest
-healing:
-    <<: !include %s
-    envs:
-      INLINE_ONLY: "true"
-`,
-			digPath:      []string{"healing"},
-			useNormalize: true,
-			wantEnv:      map[string]any{"FRAGMENT_ONLY": nil, "INLINE_ONLY": nil},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			tmpDir := t.TempDir()
-			fragPath := filepath.Join(tmpDir, "fragment.yaml")
-			writeFile(t, fragPath, tt.fragment)
-			specContent := fmt.Sprintf(tt.spec, fragPath)
-
-			var result map[string]any
-			if tt.useNormalize {
-				normalized, err := Normalize(context.Background(), nil, nil, []byte(specContent), "")
-				if err != nil {
-					t.Fatalf("Normalize: %v", err)
-				}
-				result = unmarshalPayload(t, normalized)
-			} else {
-				result = buildAndParseSpec(t, tmpDir, specContent, ".yaml", specPayloadOpts{})
-			}
-
-			target := mustDig(t, result, tt.digPath...)
-			for key, want := range tt.wantFields {
-				assertField(t, target, key, want)
-			}
-			if tt.wantEnv != nil {
-				envs := mustDig(t, target, "envs")
-				for key, want := range tt.wantEnv {
-					if want == nil {
-						if _, ok := envs[key]; !ok {
-							t.Errorf("expected envs.%s to exist", key)
-						}
-					} else {
-						assertField(t, envs, key, want)
-					}
-				}
-			}
-			if tt.wantArtifactsLen > 0 {
-				expectations := mustDig(t, target, "expectations")
-				artifacts, ok := expectations["artifacts"].([]any)
-				if !ok || len(artifacts) != tt.wantArtifactsLen {
-					t.Fatalf("expected %d artifacts, got %v", tt.wantArtifactsLen, expectations["artifacts"])
 				}
 			}
 		})
@@ -589,23 +439,22 @@ func TestBuildSpecPayload_IncludePointerSelection(t *testing.T) {
 		fragmentFile string
 		fragment     string
 		spec         string
-		digPath      []string
-		wantFields   map[string]any
+		wantImage    string
 		wantEnv      map[string]any
 	}{
 		{
-			name:         "heal pointer include",
-			fragmentFile: "heal-fragment.yaml",
-			fragment:     "fragments:\n  heal:\n    image: docker.io/test/healer:latest\n    retries: 2\n",
+			name:         "step pointer include",
+			fragmentFile: "step-fragment.yaml",
+			fragment:     "fragments:\n  step:\n    image: docker.io/test/from-fragment:latest\n    envs:\n      A: from-fragment\n      B: from-fragment\n",
 			spec: `
 steps:
-  - image: docker.io/test/mig:latest
-healing:
-    <<: !include ./heal-fragment.yaml#/fragments/heal
-    retries: 1
+  - <<: !include ./step-fragment.yaml#/fragments/step
+    envs:
+      B: inline
+      C: inline
 `,
-			digPath:    []string{"healing"},
-			wantFields: map[string]any{"image": "docker.io/test/healer:latest", "retries": 1.0},
+			wantImage: "docker.io/test/from-fragment:latest",
+			wantEnv:   map[string]any{"A": "from-fragment", "B": "inline", "C": "inline"},
 		},
 	}
 
@@ -614,12 +463,10 @@ healing:
 			tmpDir := t.TempDir()
 			writeFile(t, filepath.Join(tmpDir, tt.fragmentFile), tt.fragment)
 			result := buildAndParseSpec(t, tmpDir, tt.spec, ".yaml", specPayloadOpts{})
-			target := mustDig(t, result, tt.digPath...)
-			for key, want := range tt.wantFields {
-				assertField(t, target, key, want)
-			}
+			steps := mustSteps(t, result, 1)
+			assertField(t, steps[0], "image", tt.wantImage)
 			if tt.wantEnv != nil {
-				envs := mustDig(t, target, "envs")
+				envs := mustDig(t, steps[0], "envs")
 				for key, want := range tt.wantEnv {
 					assertField(t, envs, key, want)
 				}
@@ -652,9 +499,6 @@ steps:
       TARGET: java17
 build_gate:
   enabled: true
-healing:
-    retries: 1
-    image: docker.io/test/healer:latest
 `, ".yaml", specPayloadOpts{})
 
 	steps := mustSteps(t, result, 3)
@@ -664,41 +508,36 @@ healing:
 
 	assertField(t, steps[1], "image", "docker.io/test/mig-step2:latest")
 	assertField(t, steps[2], "image", "docker.io/test/mig-step3:latest")
-	mustDig(t, result, "healing")
 }
 
 func TestBuildSpecPayload_RelativePathsResolveFromSpecDir(t *testing.T) {
 	specDir := t.TempDir()
 	t.Chdir(t.TempDir())
 
-	writeFile(t, filepath.Join(specDir, "heal-fragment.yaml"), "image: docker.io/test/healer-fragment:latest\n")
+	writeFile(t, filepath.Join(specDir, "step-fragment.yaml"), "image: docker.io/test/step-fragment:latest\n")
 
 	result := buildAndParseSpec(t, specDir, `
 envs:
   TOKEN: spec-dir-token
 steps:
-  - image: docker.io/test/mig:latest
-healing:
-    <<: !include heal-fragment.yaml
+  - <<: !include step-fragment.yaml
 `, ".yaml", specPayloadOpts{})
 
 	envs := mustDig(t, result, "envs")
 	assertField(t, envs, "TOKEN", "spec-dir-token")
 
-	heal := mustDig(t, result, "healing")
-	assertField(t, heal, "image", "docker.io/test/healer-fragment:latest")
+	steps := mustSteps(t, result, 1)
+	assertField(t, steps[0], "image", "docker.io/test/step-fragment:latest")
 }
 
 func TestBuildSpecPayload_IncludeCycleDetected(t *testing.T) {
 	specDir := t.TempDir()
-	writeFile(t, filepath.Join(specDir, "a.yaml"), "heal: !include ./b.yaml#/heal\n")
-	writeFile(t, filepath.Join(specDir, "b.yaml"), "heal: !include ./a.yaml#/heal\n")
+	writeFile(t, filepath.Join(specDir, "a.yaml"), "steps: !include ./b.yaml#/steps\n")
+	writeFile(t, filepath.Join(specDir, "b.yaml"), "steps: !include ./a.yaml#/steps\n")
 
 	specPath := filepath.Join(specDir, "spec.yaml")
 	writeFile(t, specPath, `
-steps:
-  - image: docker.io/test/mig:latest
-healing: !include ./a.yaml#/heal
+steps: !include ./a.yaml#/steps
 `)
 
 	_, err := callBuildSpecPayload(t, specPath, specPayloadOpts{})

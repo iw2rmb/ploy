@@ -10,34 +10,69 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
-func TestGatePlanResolver_StackDetectDefaultPolicy(t *testing.T) {
+func TestGatePlanResolver_StackDetectModePolicy(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
 		name          string
+		workspace     func(t *testing.T) string
 		stackDetect   *contracts.BuildGateStackConfig
 		wantTerminal  bool
 		wantCode      string
 		wantErrPrefix string
+		wantImage     string
+		wantRelease   string
 	}{
 		{
 			name:          "no_explicit_fallback_returns_internal_error",
+			workspace:     func(t *testing.T) string { return createMavenWorkspaceNoJavaVersion(t) },
 			stackDetect:   nil,
 			wantTerminal:  true,
 			wantCode:      "BUILD_GATE_STACK_DETECT_FAILED",
 			wantErrPrefix: "BUILD_GATE_STACK_DETECT_FAILED:",
 		},
 		{
-			name:          "default_false_returns_internal_error",
-			stackDetect:   &contracts.BuildGateStackConfig{Enabled: true, Language: "java", Release: "17", Default: false},
+			name:        "forced_skips_detection_and_returns_configured_plan",
+			workspace:   func(t *testing.T) string { return filepath.Join(t.TempDir(), "missing-workspace") },
+			stackDetect: &contracts.BuildGateStackConfig{Mode: contracts.BuildGateStackModeForced, Language: "java", Tool: "maven", Release: "17"},
+			wantImage:   "planner-test:java17",
+			wantRelease: "17",
+		},
+		{
+			name:          "strict_returns_internal_error_on_incomplete_detection",
+			workspace:     func(t *testing.T) string { return createMavenWorkspaceNoJavaVersion(t) },
+			stackDetect:   &contracts.BuildGateStackConfig{Mode: contracts.BuildGateStackModeStrict, Language: "java", Tool: "maven", Release: "17"},
 			wantTerminal:  true,
 			wantCode:      "BUILD_GATE_STACK_DETECT_FAILED",
 			wantErrPrefix: "BUILD_GATE_STACK_DETECT_FAILED:",
 		},
 		{
-			name:         "default_true_returns_plan",
-			stackDetect:  &contracts.BuildGateStackConfig{Enabled: true, Language: "java", Release: "17", Default: true},
-			wantTerminal: false,
+			name:         "strict_returns_mismatch_on_different_detected_stack",
+			workspace:    func(t *testing.T) string { return createMavenWorkspace(t, "11") },
+			stackDetect:  &contracts.BuildGateStackConfig{Mode: contracts.BuildGateStackModeStrict, Language: "java", Tool: "maven", Release: "17"},
+			wantTerminal: true,
+			wantCode:     "BUILD_GATE_STACK_MISMATCH",
+		},
+		{
+			name:        "fallback_returns_configured_plan_on_incomplete_detection",
+			workspace:   func(t *testing.T) string { return createMavenWorkspaceNoJavaVersion(t) },
+			stackDetect: &contracts.BuildGateStackConfig{Mode: contracts.BuildGateStackModeFallback, Language: "java", Tool: "maven", Release: "17"},
+			wantImage:   "planner-test:java17",
+			wantRelease: "17",
+		},
+		{
+			name:        "fallback_returns_configured_plan_on_detection_failure",
+			workspace:   func(t *testing.T) string { return filepath.Join(t.TempDir(), "missing-workspace") },
+			stackDetect: &contracts.BuildGateStackConfig{Mode: contracts.BuildGateStackModeFallback, Language: "java", Tool: "maven", Release: "17"},
+			wantImage:   "planner-test:java17",
+			wantRelease: "17",
+		},
+		{
+			name:        "fallback_uses_detected_stack_on_success",
+			workspace:   func(t *testing.T) string { return createMavenWorkspace(t, "11") },
+			stackDetect: &contracts.BuildGateStackConfig{Mode: contracts.BuildGateStackModeFallback, Language: "java", Tool: "maven", Release: "17"},
+			wantImage:   "planner-test:java11",
+			wantRelease: "11",
 		},
 	}
 
@@ -46,17 +81,22 @@ func TestGatePlanResolver_StackDetectDefaultPolicy(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			workspace := createMavenWorkspaceNoJavaVersion(t)
 			spec := &contracts.StepGateSpec{
 				Enabled: true,
-				ImageOverrides: []contracts.BuildGateImageRule{{
-					Stack: contracts.StackExpectation{Language: "java", Tool: "maven", Release: "17"},
-					Image: "planner-test:java17",
-				}},
+				ImageOverrides: []contracts.BuildGateImageRule{
+					{
+						Stack: contracts.StackExpectation{Language: "java", Tool: "maven", Release: "11"},
+						Image: "planner-test:java11",
+					},
+					{
+						Stack: contracts.StackExpectation{Language: "java", Tool: "maven", Release: "17"},
+						Image: "planner-test:java17",
+					},
+				},
 				StackDetect: tc.stackDetect,
 			}
 
-			plan, terminal := resolveGateExecutionPlan(context.Background(), workspace, spec, "")
+			plan, terminal := resolveGateExecutionPlan(context.Background(), tc.workspace(t), spec, "")
 			if tc.wantTerminal {
 				if terminal == nil {
 					t.Fatal("expected terminal result")
@@ -80,7 +120,7 @@ func TestGatePlanResolver_StackDetectDefaultPolicy(t *testing.T) {
 			if terminal != nil {
 				t.Fatalf("expected plan result, got terminal=%+v", terminal)
 			}
-			if got, want := plan.image, "planner-test:java17"; got != want {
+			if got, want := plan.image, tc.wantImage; got != want {
 				t.Fatalf("plan image = %q, want %q", got, want)
 			}
 			if got, want := plan.tool, "maven"; got != want {
@@ -89,7 +129,7 @@ func TestGatePlanResolver_StackDetectDefaultPolicy(t *testing.T) {
 			if got, want := plan.language, "java"; got != want {
 				t.Fatalf("plan language = %q, want %q", got, want)
 			}
-			if got, want := plan.release, "17"; got != want {
+			if got, want := plan.release, tc.wantRelease; got != want {
 				t.Fatalf("plan release = %q, want %q", got, want)
 			}
 		})

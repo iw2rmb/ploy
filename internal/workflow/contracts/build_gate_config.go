@@ -30,17 +30,21 @@ type BuildGatePhaseConfig struct {
 	Stack *BuildGateStackConfig `json:"stack,omitempty" yaml:"stack,omitempty"`
 }
 
+// BuildGateStackMode controls how a phase stack config interacts with detection.
+type BuildGateStackMode string
+
+const (
+	BuildGateStackModeForced   BuildGateStackMode = "forced"
+	BuildGateStackModeStrict   BuildGateStackMode = "strict"
+	BuildGateStackModeFallback BuildGateStackMode = "fallback"
+)
+
 // BuildGateStackConfig configures expected stack information for a gate phase.
-//
-// When Default is true, the gate can fall back to this configuration when stack
-// detection cannot determine tool or version.
-// When Default is false, stack detection failures cancel execution for the repo.
 type BuildGateStackConfig struct {
-	Enabled  bool   `json:"enabled,omitempty" yaml:"enabled,omitempty"`
-	Language string `json:"language,omitempty" yaml:"language,omitempty"`
-	Tool     string `json:"tool,omitempty" yaml:"tool,omitempty"`
-	Release  string `json:"release,omitempty" yaml:"release,omitempty"`
-	Default  bool   `json:"default,omitempty" yaml:"default,omitempty"`
+	Mode     BuildGateStackMode `json:"mode,omitempty" yaml:"mode,omitempty"`
+	Language string             `json:"language,omitempty" yaml:"language,omitempty"`
+	Tool     string             `json:"tool,omitempty" yaml:"tool,omitempty"`
+	Release  string             `json:"release,omitempty" yaml:"release,omitempty"`
 }
 
 // UnmarshalJSON handles numeric release values (e.g., YAML `release: 11` → JSON number).
@@ -65,12 +69,12 @@ func (s *BuildGateStackConfig) UnmarshalJSON(data []byte) error {
 
 // ApplyBuildGatePhaseToGateSpec copies the gate execution fields from a
 // BuildGatePhaseConfig into the corresponding fields of a StepGateSpec.
-// StackDetect is set only when phase.Stack is non-nil and enabled.
+// StackDetect is set only when phase.Stack has a non-empty mode.
 func ApplyBuildGatePhaseToGateSpec(spec *StepGateSpec, phase *BuildGatePhaseConfig) {
 	if spec == nil || phase == nil {
 		return
 	}
-	if phase.Stack != nil && phase.Stack.Enabled {
+	if phase.Stack != nil && phase.Stack.Mode != "" {
 		spec.StackDetect = phase.Stack
 	}
 }

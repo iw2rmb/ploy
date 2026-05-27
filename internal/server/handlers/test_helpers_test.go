@@ -56,9 +56,8 @@ func (f *flushRecorder) Flush() {}
 // validSpecBody returns a canonical spec map for test request bodies.
 func validSpecBody() map[string]any {
 	return map[string]any{
-		"version": "0.2.0",
-		"envs":    map[string]any{},
-		"steps":   []any{map[string]any{"image": "docker.io/test/mig:latest"}},
+		"envs":  map[string]any{},
+		"steps": []any{map[string]any{"image": "docker.io/test/mig:latest"}},
 	}
 }
 

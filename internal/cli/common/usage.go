@@ -45,11 +45,11 @@ func PrintCommandUsage(w io.Writer, parts ...string) {
 			_, _ = fmt.Fprintln(w, "  fetch       Download run artifacts")
 			_, _ = fmt.Fprintln(w, "")
 			_, _ = fmt.Fprintln(w, "Use 'ploy mig <command> --help' for command details.")
-		case "manifest":
+		case "spec":
 			_, _ = fmt.Fprintln(w, "")
 			_, _ = fmt.Fprintln(w, "Commands:")
-			_, _ = fmt.Fprintln(w, "  schema      Print the integration manifest JSON schema")
-			_, _ = fmt.Fprintln(w, "  validate    Validate manifests and optionally rewrite them to v2")
+			_, _ = fmt.Fprintln(w, "  schema      Print the mig JSON schema")
+			_, _ = fmt.Fprintln(w, "  validate    Validate mig specs")
 		case "config":
 			_, _ = fmt.Fprintln(w, "")
 			_, _ = fmt.Fprintln(w, "Commands:")

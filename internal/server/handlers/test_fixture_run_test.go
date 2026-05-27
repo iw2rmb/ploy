@@ -40,6 +40,7 @@ type runStore struct {
 	updateRunRepoRefs       mockCall[store.UpdateRunRepoRefsParams, struct{}]
 	updateMigRepoRefs       mockCall[store.UpdateMigRepoRefsParams, struct{}]
 	incrementRunRepoAttempt mockCall[store.IncrementRunRepoAttemptParams, struct{}]
+	updateRunRepoError      mockCall[store.UpdateRunRepoErrorParams, struct{}]
 
 	updateRunRepoStatus mockCallSlice[store.UpdateRunRepoStatusParams, struct{}]
 
@@ -150,6 +151,11 @@ func (m *runStore) UpdateRunRepoRefs(ctx context.Context, params store.UpdateRun
 
 func (m *runStore) UpdateRunRepoStatus(ctx context.Context, params store.UpdateRunRepoStatusParams) error {
 	_, err := m.updateRunRepoStatus.record(params)
+	return err
+}
+
+func (m *runStore) UpdateRunRepoError(ctx context.Context, params store.UpdateRunRepoErrorParams) error {
+	_, err := m.updateRunRepoError.record(params)
 	return err
 }
 

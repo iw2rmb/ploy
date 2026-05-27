@@ -1,6 +1,7 @@
 package contracts
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -213,9 +214,10 @@ func TestParseMigSpecJSON_RequiresStepsEvenWithExtraFields(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for missing steps")
 	}
-	wantErr := "steps: required"
-	if err.Error() != wantErr {
-		t.Errorf("error = %q, want %q", err.Error(), wantErr)
+	for _, want := range []string{"missing property 'steps'", "additional properties 'mig' not allowed"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error = %q, want to contain %q", err.Error(), want)
+		}
 	}
 }
 

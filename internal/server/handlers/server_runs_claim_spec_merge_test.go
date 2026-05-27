@@ -97,7 +97,7 @@ func TestClaimJob_ClaimKeepsBuildGateConfigUnchanged(t *testing.T) {
 				"steps":[{"image":"docker.io/acme/mig:latest"}],
 				"build_gate":{
 					"enabled": true,
-					"pre":{"stack":{"enabled":true,"language":"java","tool":"maven","release":"17","default":true}},
+					"pre":{"stack":{"mode":"fallback","language":"java","tool":"maven","release":"17"}},
 					"images":[{"stack":{"language":"java","tool":"maven","release":"17"},"image":"maven:jdk17"}]
 				}
 			}`),
@@ -109,7 +109,7 @@ func TestClaimJob_ClaimKeepsBuildGateConfigUnchanged(t *testing.T) {
 				"steps":[{"image":"docker.io/acme/mig:latest"}],
 				"build_gate":{
 					"enabled": true,
-					"post":{"stack":{"enabled":true,"language":"java","tool":"gradle","release":"21","default":false}},
+					"post":{"stack":{"mode":"strict","language":"java","tool":"gradle","release":"21"}},
 					"images":[{"stack":{"language":"java","tool":"gradle","release":"21"},"image":"gradle:jdk21"}]
 				}
 			}`),

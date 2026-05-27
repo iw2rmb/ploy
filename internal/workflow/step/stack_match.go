@@ -38,13 +38,6 @@ func matchStack(obs *stackdetect.Observation, expect *contracts.StackExpectation
 	})
 }
 
-func matchStackForStackDetectConfig(obs *stackdetect.Observation, expect *contracts.StackExpectation) (bool, string) {
-	return matchStackWithOptions(obs, expect, stackMatchOptions{
-		includeEvidence:                 false,
-		requireDetectedToolForToolMatch: true,
-	})
-}
-
 func matchStackWithOptions(obs *stackdetect.Observation, expect *contracts.StackExpectation, opts stackMatchOptions) (bool, string) {
 	if expect == nil {
 		return true, ""

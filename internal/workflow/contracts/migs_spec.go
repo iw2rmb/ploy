@@ -98,7 +98,7 @@ type MigStep struct {
 
 	// Command is the container command override for this step (optional).
 	// Can be a shell string or an exec array.
-	Command CommandSpec `json:"command,omitempty" yaml:"command,omitempty"`
+	Command CommandSpec `json:"command,omitempty,omitzero" yaml:"command,omitempty"`
 
 	// Envs holds environment variables specific to this step.
 	Envs map[string]string `json:"envs,omitempty" yaml:"envs,omitempty"`
@@ -189,17 +189,25 @@ func validateBuildGateStackConfig(stack *BuildGateStackConfig, prefix string) er
 		return nil
 	}
 
-	// Reject enabled:false with any configured fields (ambiguous).
-	if !stack.Enabled {
-		if stack.Language != "" || stack.Tool != "" || stack.Release != "" || stack.Default {
-			return fmt.Errorf("%s: enabled=false with stack fields is ambiguous; remove stack fields or set enabled=true", prefix)
+	mode := BuildGateStackMode(strings.TrimSpace(string(stack.Mode)))
+	if mode == "" {
+		if strings.TrimSpace(stack.Language) != "" || strings.TrimSpace(stack.Tool) != "" || strings.TrimSpace(stack.Release) != "" {
+			return fmt.Errorf("%s.mode: required when language, tool, or release is set", prefix)
 		}
 		return nil
 	}
 
-	// Enabled:true requires at least language and release.
+	switch mode {
+	case BuildGateStackModeForced, BuildGateStackModeStrict, BuildGateStackModeFallback:
+	default:
+		return fmt.Errorf("%s.mode: must be one of forced, strict, fallback", prefix)
+	}
+
 	if strings.TrimSpace(stack.Language) == "" {
 		return fmt.Errorf("%s.language: required", prefix)
+	}
+	if strings.TrimSpace(stack.Tool) == "" {
+		return fmt.Errorf("%s.tool: required", prefix)
 	}
 	if strings.TrimSpace(stack.Release) == "" {
 		return fmt.Errorf("%s.release: required", prefix)

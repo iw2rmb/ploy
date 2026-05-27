@@ -1,283 +1,68 @@
-# apiVersion and kind are informational; the current control plane forwards this
-# spec as an opaque JSON object. Keep keys stable and snake_case to align with
-# existing CLI/agent options.
+# Current mig spec contract. Validate with:
+#   ploy spec validate docs/schemas/mig.example.yaml
 apiVersion: ploy.mig/v1alpha1
 kind: MigRunSpec
 
-################################################################################
-# CANONICAL MODS SHAPE (steps[])
-################################################################################
-# Main container steps run against the hydrated repository at /workspace.
-# Canonical shape is always `steps[]`:
-# - single-step runs: one entry in `steps[]`
-# - multi-step runs: multiple ordered entries in `steps[]`
+# Environment variables applied to every step. Step-level envs override these.
+envs:
+  RECIPE_GROUP: org.openrewrite.recipe
+  RECIPE_ARTIFACT: rewrite-migrate-java
+  RECIPE_VERSION: "3.20.0"
 
-# Required: image that performs the transformation (e.g., OpenRewrite).
-#
-# The `image` field accepts two forms:
-#
-# 1. **Universal image (string)** — A single image used for all stacks:
-#    image: docker.io/your-dh-user/migs-openrewrite:latest
-#
-# 2. **Stack-specific images (map)** — Different images per Build Gate stack:
-#    image:
-#      default: docker.io/your-dh-user/migs-openrewrite:latest
-#      java-maven: docker.io/your-dh-user/orw-cli-java-17-maven:latest
-#      java-gradle: docker.io/your-dh-user/orw-cli-java-17-gradle:latest
-#
-# Stack Resolution Rules (for map form):
-#   1. Exact match: If the detected stack matches a key (e.g., "java-maven"),
-#      that image is selected.
-#   2. Default fallback: If no exact match exists, the "default" key is used.
-#   3. Error: If neither the stack key nor "default" is present, the run fails
-#      with a clear error message.
-#
-# Recognized Stack Names (from Build Gate detection):
-#   - "java-maven"  — Maven-based Java projects (pom.xml detected)
-#   - "java-gradle" — Gradle-based Java projects (build.gradle detected)
-#   - "java"        — Generic Java projects (no build tool detected)
-#   - "unknown"     — No recognized stack markers found
-#   - "default"     — Fallback key for unrecognized stacks
-#
-# The universal string form ignores stack detection and always uses the same image.
-# Image strings also support strict templates:
-#   - stack placeholders: ${stack.language}, ${stack.release}, ${stack.tool}
-#   - env placeholders: $VAR, ${VAR}
-# Missing values fail validation at runtime/spec preprocessing.
+# Required. Each step runs against the hydrated repository at /workspace.
 steps:
-  - image: docker.io/your-dh-user/migs-openrewrite:latest
-    # Optional: override command; when omitted, image CMD/ENTRYPOINT is used
-    # command: ["/bin/sh", "-lc", "orw-cli --apply --dir /workspace --out /out"]
-    # Environment variables passed into the mig container (key-value map).
+  - name: migrate-java
+    image:
+      default: docker.io/your-dh-user/migs-openrewrite:latest
+      java-maven: docker.io/your-dh-user/orw-cli-java-17-maven:latest
+      java-gradle: docker.io/your-dh-user/orw-cli-java-17-gradle:latest
+    command: ["/bin/sh", "-lc", "orw-cli --apply --dir /workspace --out /out"]
     envs:
-      RECIPE_GROUP: org.openrewrite.recipe
-      RECIPE_ARTIFACT: rewrite-migrate-java
-      RECIPE_VERSION: "3.20.0"
       RECIPE_CLASSNAME: org.openrewrite.java.migrate.UpgradeToJava17
-      # Optional ORW runtime controls:
-      # ORW_REPOS: "https://repo1.maven.org/maven2,https://repo.internal/maven"
-      # ORW_FAIL_ON_UNSUPPORTED: "true"
-      # ORW_EXCLUDE_PATHS: "**/*.proto,build/generated/**"
+    in:
+      - 0123456789ab:/in/settings.xml
+    out:
+      - fedcba987654:/out/report.json
+    home:
+      - 111111111111:.config/app.toml:ro
+    stack:
+      inbound:
+        enabled: true
+        expect:
+          language: java
+          tool: maven
+          release: "11"
+      outbound:
+        enabled: true
+        expect:
+          language: java
+          tool: maven
+          release: "17"
 
-################################################################################
-# HYDRA FILE RECORDS — in / out / home
-################################################################################
-# Hydra provides three typed file-record fields. Each field accepts local
-# source paths in the spec; the CLI compiles them to canonical
-# shortHash:dst form before submit.
-#
-# Field semantics:
-#   in   — Read-only input files: "src:/in/dst" → "shortHash:/in/dst".
-#          Mounted at /in/<name> inside the container.
-#   out  — Read-write output files: "src:/out/dst" → "shortHash:/out/dst".
-#          Mounted at /out/<name>; uploaded after step completion.
-#   home — Home-relative files: "src:dst{:ro}" → "shortHash:dst{:ro}".
-#          Mounted relative to $HOME inside the container.
-#   in_from — Cross-step artifact input references. Each entry points to a
-#          source job selector and maps one /out file to /in:
-#          from: <type>://out/<path>
-#          from: <name>@<type>://out/<path>
-#          legacy alias: <step-name>://out/<path> (same as <step-name>@mig://...)
-#          to: /in/<path> (optional; defaults to /in/<basename>)
-#
-# Canonical stored-entry format after CLI compile:
-#   in:   ["shortHash:/in/config.json"]
-#   out:  ["shortHash:/out/result.txt"]
-#   home: ["shortHash:.config/app.toml:ro"]
-#
-# Example (before CLI compile — local paths):
-#   home:
-#     - ./codex-auth.json:.codex/auth.json
-#   out:
-#     - ./seed.txt:/out/seed.txt
-#   home:
-#     - ./app.toml:.config/app.toml:ro
+  - name: summarize
+    image: docker.io/your-dh-user/mig-summary:latest
+    in_from:
+      - from: migrate-java@mig://out/report.json
+        to: /in/report.json
 
-################################################################################
-# MULTI-STEP MODS (optional, for sequential transformations)
-################################################################################
-# When you need multiple transformation steps executed sequentially, add
-# multiple entries to steps[]. Each step runs with the same global
-# build gate and healing policy. The diff from each step is captured before the
-# next step begins, while the next step continues on the same sticky workspace.
-#
-# Rules:
-# - Migs execute in array order (steps are sequential within one run).
-# - All steps share the same repository, base_ref, target_ref, and global gate policy.
-# - Each step produces a diff artifact before the next step starts.
-# - If any step fails its gate check, the global healing policy applies.
-#
-# Each entry in steps[] supports the same `image` field as the single-step spec:
-# - String form: `image: ghcr.io/iw2rmb/ploy/mig:latest` (universal, any stack)
-# - Map form: `image: {default: ..., java-maven: ..., java-gradle: ...}` (stack-aware)
-#
-# Example (disabled by default; remove comments to activate):
-# steps:
-#   - name: extract-usage
-#     image: docker.io/your-dh-user/migs-migrate-java8:latest
-#     envs:
-#       MIGRATION_TARGET: java8
-#     in:
-#       - ./settings.xml:/in/settings.xml
-#   - name: compose-deprecations
-#     image: docker.io/your-dh-user/migs-migrate-java11:latest
-#     envs:
-#       MIGRATION_TARGET: java11
-#     in:
-#       - from: extract-usage@mig://out/dependency-usage.nofilter.json
-#       - /share/java.classpath:/in/java.classpath
-#   - name: apply-fixes
-#     image: docker.io/your-dh-user/migs-migrate-java17:latest
-#     envs:
-#       MIGRATION_TARGET: java17
-#       RECIPE_VERSION: "3.20.0"
-#
-# Example with stack-specific images (for dedicated Maven/Gradle containers):
-# steps:
-#   - image:
-#       default: docker.io/your-dh-user/migs-openrewrite:latest
-#       java-maven: docker.io/your-dh-user/orw-cli-java-17-maven:latest
-#       java-gradle: docker.io/your-dh-user/orw-cli-java-17-gradle:latest
-#     envs:
-#       RECIPE_CLASSNAME: org.openrewrite.java.migrate.UpgradeToJava17
-
-################################################################################
-# GLOBAL BUILD GATE AND HEALING POLICY
-################################################################################
-# Build Gate settings apply to all steps (both single-step and multi-step runs).
-# The node agent reuses the same Java gate for Maven/Gradle (maven: -e; gradle:
-# --stacktrace).
-#
-# Gate execution occurs after each mig transformation. For multi-step runs, the
-# gate validates the accumulated changes from all prior steps.
+# Build Gate settings apply globally.
 build_gate:
   enabled: true
-  images: [] # optional stack→image mapping overrides
-
-# Healing configuration executed when the Build Gate fails (applies globally to
-# all steps). For multi-step runs, the healing policy is shared across all
-# steps. When a step's gate fails, healing runs once per the retry count, then
-# the gate is re-evaluated before proceeding to the next step.
-#
-# Workspace Diff Handshake (recommended for Codex healing):
-# - Codex edits the workspace and exits when done.
-# - The node agent (not Codex) computes `git status --porcelain` on the workspace
-#   and re-runs the Build Gate externally only when changes are present.
-# - This separation keeps Codex focused on code fixes while the control plane
-#   handles validation orchestration and build verification.
-#
-# Environment variables injected by the node agent for healing migs:
-# - PLOY_REPO_URL: Git repository URL (same as the Migs run)
-# - PLOY_BUILDGATE_REF: Git ref for Build Gate baseline (base_ref or commit_sha)
-# - PLOY_HOST_WORKSPACE: Host path to workspace (for direct host verification)
-# - PLOY_SERVER_URL: ploy server URL for Build Gate HTTP API
-
-################################################################################
-# HEALING CONFIGURATION (build_gate.post)
-################################################################################
-# Healing runs directly when the Build Gate fails. A single `build_gate.post`
-# entry defines the healing action, retries, and mig-like execution settings.
-# The system enters a direct
-# heal → post-gate loop until the gate passes or retries are exhausted.
-#
-# Mig-like fields (image, command, envs, in, out, home) are specified
-# directly under `build_gate.post` (no nested `mig` key).
-#
-# Two execution modes:
-#
-# 1. amata mode (recommended): set `amata.spec` — no prompt file required.
-#
-# build_gate:
-#   heal:
-#     <<: !include ./healing/spec.yaml
-#     retries: 2
-#     image: docker.io/your-dh-user/amata-codex-java-17-maven:latest
-#     amata:
-#       spec: |
-#         version: amata/v1
-#         name: code-healer
-#         entry: main
-#         workspace:
-#           root: /workspace
-#         flows:
-#           main:
-#             steps:
-#               - codex: |
-#                   Rules:
-#                   - Use /in/errors.yaml when present; fall back to /in/build-gate.log.
-#                   - Router output may be task-oriented: tasks[] with error_kind in
-#                     code|deps|infra and items[] indexes into errors.yaml entries.
-#                   - Edit files under /workspace as needed to fix the error.
-#                   - Choose automation by determinism:
-#                     manual for localized semantic edits,
-#                     bash for deterministic scripted bulk edits,
-#                     OpenRewrite for deterministic Java AST-safe refactors.
-#                   - OpenRewrite execution contract (custom recipe):
-#                     1) prepare `/out/rewrite.yml` (or set `ORW_CONFIG_PATH`)
-#                     2) use `heal-orw` as the execution entrypoint
-#                        (runtime applies default recipe coordinates for YAML mode)
-#                     3) set RECIPE_GROUP/RECIPE_ARTIFACT/RECIPE_CLASSNAME
-#                        only for custom recipe artifacts
-#                     4) optional ORW_ACTIVE_RECIPES override
-#                     5) run `heal-orw --apply --dir /workspace --out /out/orw-task`
-#                     6) on failure inspect `/out/orw-task/report.json` and `transform.log`,
-#                        then fallback to bash/manual with explicit reason.
-#                   - When ready, stop editing and end the session.
-#                   - Your final message MUST be one line of JSON: {"action_summary":"..."}
-#                   Task:
-#                   Fix the current Build Gate failure.
-#       # set:    # optional; passed as ordered --set '<param>=<value>' flags to amata run
-#       #   - param: model
-#       #     value: gpt-4o
-#     home:
-#       - ~/.codex/auth.json:.codex/auth.json
-#
-# `!include` is optional preprocessing handled by CLI:
-# - scalar replacement: `field: !include ./file.yaml#/pointer`
-# - deep merge with overrides: `field: {<<: !include ./file.yaml#/pointer, ...}`
-# - include references support `path[#/pointer]`, nested includes, and cycle detection
-# - relative include paths resolve from each including file directory
-# - relative local-source paths inside included fragments (`amata.spec` and
-#   source side of `in`/`out`/`home`) resolve from that included file directory
-################################################################################
-# NOTES
-################################################################################
-# - This YAML is submitted via: `ploy run --spec mig.yaml` along with
-#   repository flags (e.g., --repo, --base-ref, --target-ref).
-#
-# - The agent honors: image, command, envs, in, out, home,
-#   steps[] (for single-step and multi-step runs), build_gate.* (enabled, images, heal).
-#
-# - Use envs for environment variables and in/out/home for file injection.
-#
-# - Single-step vs multi-step:
-#   * Single-step: Use `steps[]` with exactly one entry.
-#   * Multi-step: Use `steps[]` with multiple entries for sequential transformations.
-#   * Both formats share the same global build_gate policy.
-#
-# - Stack-aware image selection:
-#   * The `image` field (in steps[] and in build_gate.post)
-#     accepts either a string (universal image) or a map (stack-specific images).
-#   * When using the map form, the Build Gate detects the workspace stack
-#     (java-maven, java-gradle, etc.) and resolves the image accordingly.
-#   * Resolution order: exact stack match → "default" key → error.
-#   * See the CANONICAL MODS SHAPE section above for full image resolution rules.
-#
-# - Multi-step semantics:
-#   * Migs execute in array order (sequential steps within one run).
-#   * All steps share the same repository and global gate/heal policy.
-#   * Each step produces a diff artifact captured before the next step.
-#   * Runtime progression uses the same node-local sticky workspace; stored diffs
-#     are user/API artifacts, not node runtime input for later steps.
-#
-# - The node agent consumes build_gate.post to run the heal → post-gate loop
-#   after the first gate fail (applies to both single-step and multi-step runs).
-# - Healing execution:
-#   * When `amata` block is present (amata.spec non-empty): container runs
-#     `amata run /in/amata.yaml` with optional ordered `--set '<param>=<value>'` flags.
-#   * When `amata` block is absent: container uses its image default command/entrypoint.
-# - Container cleanup model:
-#   * Containers are retained after step/gate completion.
-#   * Cleanup trigger: before claim; threshold: 1 GiB free on Docker data-root filesystem.
-# - Healing produces action_summary, persisted in jobs.meta and written to
-#   /in/healing-log.md per iteration.
+  pre:
+    stack:
+      mode: strict
+      language: java
+      tool: maven
+      release: "11"
+  post:
+    stack:
+      mode: fallback
+      language: java
+      tool: maven
+      release: "17"
+  images:
+    - stack:
+        language: java
+        tool: maven
+        release: "17"
+      image: docker.io/your-dh-user/build-gate-java-17-maven:latest

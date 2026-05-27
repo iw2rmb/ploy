@@ -8,10 +8,10 @@ import (
 	"github.com/iw2rmb/ploy/internal/cli/cluster"
 	"github.com/iw2rmb/ploy/internal/cli/configure"
 	"github.com/iw2rmb/ploy/internal/cli/job"
-	"github.com/iw2rmb/ploy/internal/cli/manifest"
 	"github.com/iw2rmb/ploy/internal/cli/mig"
 	"github.com/iw2rmb/ploy/internal/cli/pull"
 	runcli "github.com/iw2rmb/ploy/internal/cli/run"
+	"github.com/iw2rmb/ploy/internal/cli/spec"
 	"github.com/spf13/cobra"
 
 	iversion "github.com/iw2rmb/ploy/internal/version"
@@ -79,9 +79,9 @@ func NewRootCmdWithIO(stdout, stderr io.Writer) *cobra.Command {
 	root.AddCommand(newPullCmd(stderr)) // ploy pull (local repo pull workflow)
 
 	// Cluster and configuration commands
-	root.AddCommand(newClusterCmd(stderr))  // ploy cluster (node, token)
-	root.AddCommand(newConfigCmd(stderr))   // ploy config (gitlab show/set/validate)
-	root.AddCommand(newManifestCmd(stderr)) // ploy manifest (schema, validate)
+	root.AddCommand(newClusterCmd(stderr)) // ploy cluster (node, token)
+	root.AddCommand(newConfigCmd(stderr))  // ploy config (gitlab show/set/validate)
+	root.AddCommand(newSpecCmd(stdout, stderr))
 
 	// Interactive TUI
 	root.AddCommand(newTUICmd(stderr)) // ploy tui (interactive terminal UI)
@@ -148,7 +148,7 @@ func PrintUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "  pull             Pull Migs diffs for current repo HEAD")
 	_, _ = fmt.Fprintln(w, "  cluster          Manage clusters (nodes, tokens)")
 	_, _ = fmt.Fprintln(w, "  config           Inspect or update cluster configuration")
-	_, _ = fmt.Fprintln(w, "  manifest         Inspect and validate integration manifests")
+	_, _ = fmt.Fprintln(w, "  spec             Inspect and validate mig specs")
 	_, _ = fmt.Fprintln(w, "  tui              Interactive TUI for migrations, runs, and jobs")
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Use 'ploy help <command>' for detailed command help.")
@@ -174,8 +174,8 @@ func printRequestedHelp(w io.Writer, args []string) {
 		_ = cluster.Handle(withHelp, w)
 	case "config":
 		_ = configure.Handle(withHelp, w)
-	case "manifest":
-		_ = manifest.Handle(withHelp, w)
+	case "spec":
+		_ = spec.Handle(withHelp, w, w)
 	case "tui":
 		printTUIUsage(w)
 	case "version":

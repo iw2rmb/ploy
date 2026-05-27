@@ -41,8 +41,14 @@ func resolveGateExecutionPlan(
 	spec *contracts.StepGateSpec,
 	mappingPath string,
 ) (gateExecutionPlan, *gateExecutionTerminal) {
-	obs, detectErr := stackdetect.Detect(ctx, workspace)
-	stackCtx, terminal := resolveGateStackContext(ctx, workspace, spec, obs, detectErr, mappingPath)
+	var stackCtx gateStackContext
+	var terminal *gateExecutionTerminal
+	if useForcedStackDetect(spec) {
+		stackCtx, terminal = resolveForcedStackDetectContext(spec.StackDetect)
+	} else {
+		obs, detectErr := stackdetect.Detect(ctx, workspace)
+		stackCtx, terminal = resolveGateStackContext(ctx, workspace, spec, obs, detectErr, mappingPath)
+	}
 	if terminal != nil {
 		return gateExecutionPlan{}, terminal
 	}

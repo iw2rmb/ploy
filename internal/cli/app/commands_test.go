@@ -20,15 +20,15 @@ func TestCommandsWiredIntoRoot(t *testing.T) {
 	// NOTE: "token" has been removed from the top-level commands.
 	// Token operations are now accessible only via `ploy cluster token`.
 	expectedCommands := []string{
-		"version",  // Built-in version command
-		"mig",      // newMigCmd
-		"run",      // newRunCmd
-		"job",      // newJobCmd
-		"pull",     // newPullCmd
-		"cluster",  // newClusterCmd (includes token, node)
-		"config",   // newConfigCmd
-		"manifest", // newManifestCmd
-		"tui",      // newTUICmd
+		"version", // Built-in version command
+		"mig",     // newMigCmd
+		"run",     // newRunCmd
+		"job",     // newJobCmd
+		"pull",    // newPullCmd
+		"cluster", // newClusterCmd (includes token, node)
+		"config",  // newConfigCmd
+		"spec",    // newSpecCmd
+		"tui",     // newTUICmd
 	}
 
 	// Get all registered subcommands from the root command.
