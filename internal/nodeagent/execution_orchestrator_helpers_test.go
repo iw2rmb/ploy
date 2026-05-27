@@ -27,11 +27,17 @@ func TestResolveDockerRegistryAuthConfig(t *testing.T) {
 		wantErr    string
 	}{
 		{
-			name:       "inline_ploy_auth_wins",
+			name:       "file_used_when_inline_env_present",
 			ployAuth:   `{"auths":{"inline.example":{"auth":"inline"}}}`,
 			filePath:   authFile,
 			dockerAuth: `{"auths":{"docker.example":{"auth":"docker"}}}`,
-			want:       `{"auths":{"inline.example":{"auth":"inline"}}}`,
+			want:       `{"auths":{"file.example":{"auth":"file"}}}`,
+		},
+		{
+			name:       "inline_env_ignored_when_file_empty",
+			ployAuth:   `{"auths":{"inline.example":{"auth":"inline"}}}`,
+			dockerAuth: `{"auths":{"docker.example":{"auth":"docker"}}}`,
+			want:       "",
 		},
 		{
 			name:       "file_used_when_inline_empty",
@@ -40,9 +46,9 @@ func TestResolveDockerRegistryAuthConfig(t *testing.T) {
 			want:       `{"auths":{"file.example":{"auth":"file"}}}`,
 		},
 		{
-			name:       "docker_auth_fallback",
+			name:       "docker_auth_ignored",
 			dockerAuth: `{"auths":{"docker.example":{"auth":"docker"}}}`,
-			want:       `{"auths":{"docker.example":{"auth":"docker"}}}`,
+			want:       "",
 		},
 		{
 			name:     "configured_file_read_error",

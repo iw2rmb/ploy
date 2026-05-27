@@ -17,15 +17,14 @@ bytes, used percent, inode counters, and any probe error.
 
 ## Registry auth
 
-The node pulls job images directly. Auth config precedence is:
-
-1. `PLOY_DOCKER_AUTH_CONFIG`
-2. `PLOY_DOCKER_AUTH_CONFIG_FILE`
-3. `DOCKER_AUTH_CONFIG`
-
-`PLOY_DOCKER_AUTH_CONFIG_FILE` must point to a Docker auth config JSON file in
-`DOCKER_AUTH_CONFIG` format. Host maintenance should refresh this file
+The node pulls job images directly. Private-registry auth is read only from
+`PLOY_DOCKER_AUTH_CONFIG_FILE`, which must point to a Docker auth config JSON
+file in `DOCKER_AUTH_CONFIG` format. Host maintenance should refresh this file
 atomically and keep it readable by the node container.
+
+Do not inject `PLOY_DOCKER_AUTH_CONFIG` or `DOCKER_AUTH_CONFIG` into the node
+container for job image pulls. Inline env values are immutable for the lifetime
+of the container and can outlive refreshed credentials.
 
 ## Host services
 
