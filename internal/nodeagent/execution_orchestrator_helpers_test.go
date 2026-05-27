@@ -18,8 +18,8 @@ func TestResolveDockerRegistryAuthConfigFile(t *testing.T) {
 	}{
 		{
 			name:     "configured_file_used",
-			filePath: "/etc/ploy/docker-auth-config.json",
-			want:     "/etc/ploy/docker-auth-config.json",
+			filePath: "/etc/ploy/docker-auth-config/config.json",
+			want:     "/etc/ploy/docker-auth-config/config.json",
 		},
 		{
 			name: "no_file_configured",
@@ -36,15 +36,6 @@ func TestResolveDockerRegistryAuthConfigFile(t *testing.T) {
 				t.Fatalf("resolveDockerRegistryAuthConfigFile() = %q, want %q", got, tt.want)
 			}
 		})
-	}
-}
-
-func TestResolveDockerRegistryAuthRefreshContainer(t *testing.T) {
-	t.Setenv("PLOY_DOCKER_AUTH_REFRESH_CONTAINER", "ploy-node-auth-helper")
-
-	got := resolveDockerRegistryAuthRefreshContainer()
-	if got != "ploy-node-auth-helper" {
-		t.Fatalf("resolveDockerRegistryAuthRefreshContainer() = %q, want ploy-node-auth-helper", got)
 	}
 }
 

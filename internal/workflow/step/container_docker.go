@@ -36,13 +36,6 @@ type dockerImageAPI interface {
 	ImageInspect(ctx context.Context, imageID string, inspectOpts ...client.ImageInspectOption) (client.ImageInspectResult, error)
 }
 
-type DockerExecAPI interface {
-	ContainerList(ctx context.Context, options client.ContainerListOptions) (client.ContainerListResult, error)
-	ExecCreate(ctx context.Context, container string, options client.ExecCreateOptions) (client.ExecCreateResult, error)
-	ExecAttach(ctx context.Context, execID string, options client.ExecAttachOptions) (client.ExecAttachResult, error)
-	ExecInspect(ctx context.Context, execID string, options client.ExecInspectOptions) (client.ExecInspectResult, error)
-}
-
 // dockerStatsAPI abstracts container stats retrieval, used by gate resource telemetry.
 type dockerStatsAPI interface {
 	ContainerStats(ctx context.Context, containerID string, options client.ContainerStatsOptions) (client.ContainerStatsResult, error)
@@ -52,7 +45,6 @@ type dockerStatsAPI interface {
 type DockerContainerRuntime struct {
 	client dockerClientAPI
 	images dockerImageAPI
-	exec   DockerExecAPI
 	stats  dockerStatsAPI
 	opts   DockerContainerRuntimeOptions
 }
@@ -65,7 +57,7 @@ func NewDockerContainerRuntime(opts DockerContainerRuntimeOptions) (ContainerRun
 	if err != nil {
 		return nil, fmt.Errorf("step: configure docker runtime: %w", err)
 	}
-	return &DockerContainerRuntime{client: cli, images: cli, exec: cli, stats: cli, opts: opts}, nil
+	return &DockerContainerRuntime{client: cli, images: cli, stats: cli, opts: opts}, nil
 }
 
 // newDockerContainerRuntimeWithClient constructs a DockerContainerRuntime with
@@ -74,9 +66,6 @@ func newDockerContainerRuntimeWithClient(cli dockerClientAPI, opts DockerContain
 	rt := &DockerContainerRuntime{client: cli, opts: opts}
 	if img, ok := cli.(dockerImageAPI); ok {
 		rt.images = img
-	}
-	if execAPI, ok := cli.(DockerExecAPI); ok {
-		rt.exec = execAPI
 	}
 	if s, ok := cli.(dockerStatsAPI); ok {
 		rt.stats = s
@@ -285,20 +274,6 @@ func (r *DockerContainerRuntime) ensureImageAvailable(ctx context.Context, image
 }
 
 func (r *DockerContainerRuntime) pullImage(ctx context.Context, imageRef string) error {
-	err := r.pullImageOnce(ctx, imageRef)
-	if err == nil {
-		return nil
-	}
-	if !isRegistryUnauthorized(err) || strings.TrimSpace(r.opts.RegistryAuthRefreshContainer) == "" {
-		return err
-	}
-	if refreshErr := r.refreshRegistryAuthForPull(ctx, imageRef); refreshErr != nil {
-		return fmt.Errorf("%w; auth refresh failed: %v", err, refreshErr)
-	}
-	return r.pullImageOnce(ctx, imageRef)
-}
-
-func (r *DockerContainerRuntime) pullImageOnce(ctx context.Context, imageRef string) error {
 	registryAuth, err := r.registryAuthForImage(imageRef)
 	if err != nil {
 		return fmt.Errorf("step: pull image %s: %w", imageRef, err)
@@ -319,24 +294,6 @@ func (r *DockerContainerRuntime) pullImageOnce(ctx context.Context, imageRef str
 		return fmt.Errorf("step: pull image %s: %w", imageRef, err)
 	}
 	return nil
-}
-
-func isRegistryUnauthorized(err error) bool {
-	if err == nil {
-		return false
-	}
-	msg := strings.ToLower(err.Error())
-	for _, needle := range []string{
-		"unauthorized",
-		"authentication required",
-		"no basic auth credentials",
-		"denied: requested access",
-	} {
-		if strings.Contains(msg, needle) {
-			return true
-		}
-	}
-	return false
 }
 
 // flattenEnv converts a map[string]string environment to []string "K=V" format.
