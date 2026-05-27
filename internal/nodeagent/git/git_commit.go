@@ -38,7 +38,7 @@ func EnsureCommit(ctx context.Context, repoDir, userName, userEmail, message str
 	if err := runGitCommand(ctx, repoDir, nil, "add", "-A", "--", "."); err != nil {
 		return false, fmt.Errorf("git add: %w", err)
 	}
-	if err := runGitCommand(ctx, repoDir, nil, "commit", "-m", message); err != nil {
+	if err := runGitCommand(ctx, repoDir, nil, "-c", "core.hooksPath=/dev/null", "-c", "commit.gpgsign=false", "commit", "-m", message); err != nil {
 		return false, fmt.Errorf("git commit: %w", err)
 	}
 	return true, nil
