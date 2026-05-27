@@ -144,20 +144,7 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 		if errMsg == nil {
 			errMsg = errors.New("gate returned nil result with nil error")
 		}
-		errText := normalizedExecutionError(errMsg)
-
-		stats := types.NewRunStatsBuilder().
-			DurationMs(duration.Milliseconds()).
-			Error(errText).
-			MustBuild()
-
-		if uploadErr := r.uploadStatus(ctx, req.RunID.String(), types.JobStatusError.String(), nil, stats, req.JobID); uploadErr != nil {
-			slog.Error("failed to upload gate error status after gate execution error",
-				"run_id", req.RunID,
-				"job_id", req.JobID,
-				"error", uploadErr,
-			)
-		}
+		r.uploadGateErrorStatus(ctx, req, errMsg, duration)
 		slog.Error("gate execution failed; marking repo attempt as error",
 			"run_id", req.RunID,
 			"job_id", req.JobID,
@@ -226,6 +213,10 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 		r.cleanupRunRepoShareOnTerminalSuccess(req, status)
 	}
 	slog.Info("gate job "+logVerb, "run_id", req.RunID, "job_id", req.JobID, "job_type", req.JobType, "duration", duration)
+}
+
+func (r *runController) uploadGateErrorStatus(ctx context.Context, req StartRunRequest, err error, duration time.Duration) {
+	r.uploadFailureStatus(ctx, req, err, duration)
 }
 
 // applyGatePhaseOverrides wires optional per-phase stack policy into the gate manifest.

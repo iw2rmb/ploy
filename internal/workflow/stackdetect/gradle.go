@@ -7,6 +7,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/pelletier/go-toml/v2"
 )
 
 // Regex patterns for Gradle version detection.
@@ -56,6 +58,7 @@ var (
 //  2. kotlinOptions.jvmTarget (best-effort; used only if source/target are absent)
 //  3. java.toolchain.languageVersion
 //  4. javaVersion assignment (e.g. dependencyManagerRootExtension.javaVersion)
+//  5. gradle/libs.versions.toml [versions].jvmTarget
 func detectGradle(ctx context.Context, workspace, gradlePath string) (*Observation, error) {
 	content, err := os.ReadFile(gradlePath)
 	if err != nil {
@@ -201,6 +204,20 @@ func detectGradle(ctx context.Context, workspace, gradlePath string) (*Observati
 		}, nil
 	}
 
+	// 5. Version catalog JVM target.
+	versionCatalogTarget, versionCatalogEvidence, err := detectGradleVersionCatalogJvmTarget(workspace)
+	if err != nil {
+		return nil, err
+	}
+	if versionCatalogTarget != "" {
+		return &Observation{
+			Language: "java",
+			Tool:     "gradle",
+			Release:  &versionCatalogTarget,
+			Evidence: versionCatalogEvidence,
+		}, nil
+	}
+
 	// No Java version found.
 	for _, pattern := range dynamicPatterns {
 		if pattern.MatchString(text) {
@@ -214,6 +231,47 @@ func detectGradle(ctx context.Context, workspace, gradlePath string) (*Observati
 		Reason:  "unknown",
 		Message: "no supported Java version configuration found in " + filepath.Base(gradlePath),
 	}
+}
+
+type gradleVersionCatalog struct {
+	Versions struct {
+		JVMTarget string `toml:"jvmTarget"`
+	} `toml:"versions"`
+}
+
+func detectGradleVersionCatalogJvmTarget(workspace string) (string, []EvidenceItem, error) {
+	const rel = "gradle/libs.versions.toml"
+	path := filepath.Join(workspace, rel)
+	content, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", nil, nil
+		}
+		return "", nil, &DetectionError{
+			Reason:  "unknown",
+			Message: "failed to read " + rel + ": " + err.Error(),
+		}
+	}
+
+	var catalog gradleVersionCatalog
+	if err := toml.Unmarshal(content, &catalog); err != nil {
+		return "", nil, &DetectionError{
+			Reason:  "unknown",
+			Message: "failed to parse " + rel + ": " + err.Error(),
+		}
+	}
+
+	value := strings.TrimSpace(catalog.Versions.JVMTarget)
+	if value == "" {
+		return "", nil, nil
+	}
+
+	version := normalizeJavaVersion(value)
+	return version, []EvidenceItem{{
+		Path:  rel,
+		Key:   "versions.jvmTarget",
+		Value: version,
+	}}, nil
 }
 
 // extractCompatibilityVersion extracts version from sourceCompatibility or targetCompatibility patterns.

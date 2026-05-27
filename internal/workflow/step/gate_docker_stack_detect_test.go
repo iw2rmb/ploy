@@ -2,7 +2,7 @@ package step
 
 import (
 	"context"
-	"errors"
+	"strings"
 	"testing"
 
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
@@ -71,8 +71,8 @@ func TestGateDocker_StackDetect_DefaultFalse_CancelsOnDetectionFailure(t *testin
 	if err == nil {
 		t.Fatal("expected error")
 	}
-	if !errors.Is(err, ErrRepoCancelled) {
-		t.Fatalf("error = %v, want ErrRepoCancelled", err)
+	if got, wantPrefix := err.Error(), "BUILD_GATE_STACK_DETECT_FAILED:"; !strings.HasPrefix(got, wantPrefix) {
+		t.Fatalf("error = %q, want prefix %q", got, wantPrefix)
 	}
 
 	// Container must NOT be executed.
