@@ -3,92 +3,205 @@ package run
 import (
 	"context"
 	"errors"
-	"flag"
 	"fmt"
 	"io"
 	"strings"
+	"time"
 
 	"github.com/iw2rmb/ploy/internal/cli/common"
 	pullcli "github.com/iw2rmb/ploy/internal/cli/pull"
 	runcmd "github.com/iw2rmb/ploy/internal/cli/runs"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/spf13/cobra"
 )
 
-func Handle(args []string, stderr io.Writer) error {
-	// Handle --help and -h flags to print usage and exit cleanly.
-	if common.WantsHelp(args) {
-		common.PrintRunUsage(stderr)
-		return nil
-	}
-	if len(args) == 0 {
-		common.PrintRunUsage(stderr)
-		return errors.New("run subcommand required")
+// NewCommand constructs the Cobra command tree for `ploy run`.
+func NewCommand() *cobra.Command {
+	submit := SubmitOptions{MaxRetries: 5}
+	cmd := &cobra.Command{
+		Use:   "run",
+		Short: "Inspect runs and stream events",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if !cmd.Flags().Changed("repo") &&
+				!cmd.Flags().Changed("base-ref") &&
+				!cmd.Flags().Changed("target-ref") &&
+				!cmd.Flags().Changed("spec") {
+				return cmd.Help()
+			}
+			submit.Output = cmd.OutOrStdout()
+			submit.FollowOutput = cmd.ErrOrStderr()
+			return RunSubmit(cmd.Context(), submit)
+		},
 	}
 
-	// Check if the first argument is a flag (starts with "-").
-	// When flags are provided directly to `ploy run`, route to run submit.
-	// This implements: ploy run --repo ... --base-ref ... --target-ref ... --spec ...
-	if strings.HasPrefix(args[0], "-") {
-		return handleRunSubmit(args, stderr)
-	}
+	cmd.Flags().StringVar(&submit.RepoURL, "repo", "", "Git repository URL")
+	cmd.Flags().StringVar(&submit.BaseRef, "base-ref", "", "Base Git ref")
+	cmd.Flags().StringVar(&submit.TargetRef, "target-ref", "", "Target Git ref")
+	cmd.Flags().StringVar(&submit.SpecFile, "spec", "", "Path to YAML/JSON spec file")
+	cmd.Flags().BoolVar(&submit.Follow, "follow", false, "Follow run until completion")
+	cmd.Flags().DurationVar(&submit.CapDuration, "cap", 0, "Optional time cap for --follow")
+	cmd.Flags().BoolVar(&submit.CancelOnCap, "cancel-on-cap", false, "Cancel run if cap exceeded")
+	cmd.Flags().IntVar(&submit.MaxRetries, "max-retries", 5, "Max report fetch retries")
+	cmd.Flags().StringArrayVar(&submit.MigEnvs, "job-env", nil, "Job environment KEY=VALUE")
+	cmd.Flags().StringVar(&submit.JobImage, "job-image", "", "Container image for the mig step")
+	cmd.Flags().StringVar(&submit.MigCommand, "job-command", "", "Container command override")
+	cmd.Flags().StringVar(&submit.ArtifactDir, "artifact-dir", "", "Directory to download final artifacts into")
+	cmd.Flags().BoolVar(&submit.JSONOut, "json", false, "Print machine-readable JSON summary")
 
-	switch args[0] {
-	case "ls":
-		return handleRunList(args[1:], stderr)
-	case "cancel":
-		return handleRunCancel(args[1:], stderr)
-	case "start":
-		return handleRunStart(args[1:], stderr)
-	case "status":
-		return handleRunStatus(args[1:], stderr)
-	case "logs":
-		return handleRunLogs(args[1:], stderr)
-	case "diff":
-		return handleRunDiff(args[1:], stderr)
-	case "pull":
-		// Pull command: pulls diffs from a specific run into the current repo.
-		return pullcli.HandleRunPull(args[1:], stderr)
-	case "patch":
-		// Patch command: downloads a diff artifact without applying it.
-		return handleRunPatch(args[1:], stderr)
-	default:
-		common.PrintRunUsage(stderr)
-		return fmt.Errorf("unknown run subcommand %q", args[0])
+	cmd.AddCommand(newListCommand())
+	cmd.AddCommand(newCancelCommand())
+	cmd.AddCommand(newStartCommand())
+	cmd.AddCommand(newStatusCommand())
+	cmd.AddCommand(newLogsCommand())
+	cmd.AddCommand(newPullCommand())
+	cmd.AddCommand(newPatchCommand())
+	return cmd
+}
+
+func newListCommand() *cobra.Command {
+	opts := ListOptions{Limit: 50}
+	cmd := &cobra.Command{
+		Use:   "ls",
+		Short: "List batch runs with pagination",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			opts.Output = cmd.OutOrStdout()
+			return RunList(cmd.Context(), opts)
+		},
+	}
+	cmd.Flags().IntVar(&opts.Limit, "limit", 50, "Max number of runs to return")
+	cmd.Flags().IntVar(&opts.Offset, "offset", 0, "Number of runs to skip")
+	return cmd
+}
+
+func newCancelCommand() *cobra.Command {
+	opts := CancelOptions{}
+	cmd := &cobra.Command{
+		Use:   "cancel [--reason <text>] <run-id>",
+		Short: "Cancel a run via the control plane",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			opts.RunID = args[0]
+			opts.Output = cmd.OutOrStdout()
+			return RunCancel(cmd.Context(), opts)
+		},
+	}
+	cmd.Flags().StringVar(&opts.Reason, "reason", "", "Optional reason for cancellation")
+	return cmd
+}
+
+func newStartCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "start <run-id>",
+		Short: "Start pending repos for a batch run",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return RunStart(cmd.Context(), StartOptions{
+				RunID:  args[0],
+				Output: cmd.OutOrStdout(),
+			})
+		},
 	}
 }
 
-func handleRunStatus(args []string, stderr io.Writer) error {
-	if common.WantsHelp(args) {
-		printRunStatusUsage(stderr)
-		return nil
+func newStatusCommand() *cobra.Command {
+	opts := StatusOptions{}
+	cmd := &cobra.Command{
+		Use:   "status [--json] <run-id>",
+		Short: "Show status for a run",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			opts.RunID = args[0]
+			opts.Output = cmd.OutOrStdout()
+			return RunStatus(cmd.Context(), opts)
+		},
 	}
+	cmd.Flags().BoolVar(&opts.JSONOut, "json", false, "Print machine-readable JSON report")
+	return cmd
+}
 
-	fs := flag.NewFlagSet("run status", flag.ContinueOnError)
-	fs.SetOutput(io.Discard)
-	jsonOut := fs.Bool("json", false, "print machine-readable JSON report with links and per-job artifacts")
-
-	if err := fs.Parse(normalizeRunStatusArgs(args)); err != nil {
-		if errors.Is(err, flag.ErrHelp) {
-			printRunStatusUsage(stderr)
-			return nil
-		}
-		printRunStatusUsage(stderr)
-		return err
+func newLogsCommand() *cobra.Command {
+	opts := LogsOptions{
+		MaxRetries:  3,
+		IdleTimeout: 45 * time.Second,
 	}
+	cmd := &cobra.Command{
+		Use:   "logs <run-id>",
+		Short: "Stream run lifecycle events",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			opts.RunID = args[0]
+			opts.Output = cmd.OutOrStdout()
+			return RunLogs(cmd.Context(), opts)
+		},
+	}
+	cmd.Flags().IntVar(&opts.MaxRetries, "max-retries", 3, "Max reconnect attempts")
+	cmd.Flags().DurationVar(&opts.IdleTimeout, "idle-timeout", 45*time.Second, "Cancel if no events arrive")
+	cmd.Flags().DurationVar(&opts.Timeout, "timeout", 0, "Overall timeout for the stream")
+	return cmd
+}
 
-	rest := fs.Args()
-	if len(rest) == 0 || strings.TrimSpace(rest[0]) == "" {
-		printRunStatusUsage(stderr)
+func newPullCommand() *cobra.Command {
+	var origin string
+	var dryRun bool
+	cmd := &cobra.Command{
+		Use:   "pull [--origin <remote>] [--dry-run] <run-id>",
+		Short: "Pull diffs into the current git worktree",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			runArgs := []string{}
+			if cmd.Flags().Changed("origin") {
+				runArgs = append(runArgs, "--origin", origin)
+			}
+			if cmd.Flags().Changed("dry-run") {
+				runArgs = append(runArgs, fmt.Sprintf("--dry-run=%t", dryRun))
+			}
+			runArgs = append(runArgs, args...)
+			return pullcli.HandleRunPull(runArgs, cmd.ErrOrStderr())
+		},
+	}
+	cmd.Flags().StringVar(&origin, "origin", "origin", "Git remote to match")
+	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Validate and print actions without mutating the repo")
+	return cmd
+}
+
+func newPatchCommand() *cobra.Command {
+	opts := PatchOptions{OutputPath: "-"}
+	cmd := &cobra.Command{
+		Use:   "patch [--repo-id <id> | --repo-url <url>] [--diff-id <uuid>] [--output <path|->] <run-id>",
+		Short: "Download a run patch artifact",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			opts.RunID = args[0]
+			opts.Output = cmd.OutOrStdout()
+			return RunPatch(cmd.Context(), opts)
+		},
+	}
+	cmd.Flags().StringVar(&opts.RepoID, "repo-id", "", "Repo id")
+	cmd.Flags().StringVar(&opts.RepoURL, "repo-url", "", "Repo url")
+	cmd.Flags().StringVar(&opts.DiffID, "diff-id", "", "Specific diff id to download")
+	cmd.Flags().StringVar(&opts.OutputPath, "output", "-", "Output path")
+	return cmd
+}
+
+type StatusOptions struct {
+	RunID   string
+	JSONOut bool
+	Output  io.Writer
+}
+
+func RunStatus(ctx context.Context, opts StatusOptions) error {
+	runID := strings.TrimSpace(opts.RunID)
+	if runID == "" {
 		return errors.New("run id required")
 	}
-	runID := strings.TrimSpace(rest[0])
-
-	ctx := context.Background()
-	base, httpClient, err := common.ResolveControlPlaneHTTP(ctx)
-	if err != nil {
-		return err
+	out := opts.Output
+	if out == nil {
+		out = io.Discard
 	}
-	token, err := common.ResolveControlPlaneToken()
+
+	base, httpClient, err := common.ResolveControlPlaneHTTP(ctx)
 	if err != nil {
 		return err
 	}
@@ -101,50 +214,17 @@ func handleRunStatus(args []string, stderr io.Writer) error {
 		return err
 	}
 
-	if *jsonOut {
-		return runcmd.RenderRunReportJSON(stderr, report)
+	if opts.JSONOut {
+		return runcmd.RenderRunReportJSON(out, report)
 	}
 
-	if err := runcmd.RenderRunStatusSnapshotText(stderr, report, runcmd.TextRenderOptions{
-		EnableOSC8: common.SupportsOSC8(stderr),
-		AuthToken:  token,
-		BaseURL:    base,
-	}); err != nil {
+	token, err := common.ResolveControlPlaneToken()
+	if err != nil {
 		return err
 	}
-
-	return nil
-}
-
-// normalizeRunStatusArgs hoists --json before positionals so both
-// `ploy run status --json <run-id>` and `ploy run status <run-id> --json` work.
-func normalizeRunStatusArgs(args []string) []string {
-	if len(args) == 0 {
-		return nil
-	}
-
-	rest := make([]string, 0, len(args))
-	seenJSON := false
-	for _, arg := range args {
-		if arg == "--json" {
-			seenJSON = true
-			continue
-		}
-		rest = append(rest, arg)
-	}
-	if !seenJSON {
-		return rest
-	}
-
-	normalized := make([]string, 0, len(rest)+1)
-	normalized = append(normalized, "--json")
-	normalized = append(normalized, rest...)
-	return normalized
-}
-
-func printRunStatusUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy run status [--json] <run-id>")
-	_, _ = fmt.Fprintln(w, "")
-	_, _ = fmt.Fprintln(w, "Options:")
-	_, _ = fmt.Fprintln(w, "  --json   Print machine-readable JSON report with links and per-job artifacts")
+	return runcmd.RenderRunStatusSnapshotText(out, report, runcmd.TextRenderOptions{
+		EnableOSC8: common.SupportsOSC8(out),
+		AuthToken:  token,
+		BaseURL:    base,
+	})
 }

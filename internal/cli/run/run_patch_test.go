@@ -2,6 +2,7 @@ package run
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -14,7 +15,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/testutil/clienv"
 )
 
-func TestHandleRunPatch_RepoIDLatestToFile(t *testing.T) {
+func TestRunPatch_RepoIDLatestToFile(t *testing.T) {
 	runID := domaintypes.NewRunID()
 	repoID := domaintypes.NewMigRepoID()
 	diffID1 := domaintypes.DiffID("550e8400-e29b-41d4-a716-4466554400a1")
@@ -63,9 +64,14 @@ func TestHandleRunPatch_RepoIDLatestToFile(t *testing.T) {
 
 	outPath := filepath.Join(t.TempDir(), "patch.patch.gz")
 	var stderr bytes.Buffer
-	err := handleRunPatch([]string{"--repo-id", repoID.String(), "--output", outPath, runID.String()}, &stderr)
+	err := RunPatch(context.Background(), PatchOptions{
+		RunID:      runID.String(),
+		RepoID:     repoID.String(),
+		OutputPath: outPath,
+		Output:     &stderr,
+	})
 	if err != nil {
-		t.Fatalf("handleRunPatch error: %v", err)
+		t.Fatalf("RunPatch error: %v", err)
 	}
 	if !listCalled {
 		t.Fatal("expected list endpoint call")
@@ -83,7 +89,7 @@ func TestHandleRunPatch_RepoIDLatestToFile(t *testing.T) {
 	}
 }
 
-func TestHandleRunPatch_DiffIDNotFound(t *testing.T) {
+func TestRunPatch_DiffIDNotFound(t *testing.T) {
 	runID := domaintypes.NewRunID()
 	repoID := domaintypes.NewMigRepoID()
 	missingDiff := "550e8400-e29b-41d4-a716-4466554400ff"
@@ -113,7 +119,12 @@ func TestHandleRunPatch_DiffIDNotFound(t *testing.T) {
 	clienv.UseServerDescriptor(t, server.URL)
 
 	var stderr bytes.Buffer
-	err := handleRunPatch([]string{"--repo-id", repoID.String(), "--diff-id", missingDiff, runID.String()}, &stderr)
+	err := RunPatch(context.Background(), PatchOptions{
+		RunID:  runID.String(),
+		RepoID: repoID.String(),
+		DiffID: missingDiff,
+		Output: &stderr,
+	})
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -125,7 +136,7 @@ func TestHandleRunPatch_DiffIDNotFound(t *testing.T) {
 	}
 }
 
-func TestHandleRunPatch_ResolveRepoViaRepoURL(t *testing.T) {
+func TestRunPatch_ResolveRepoViaRepoURL(t *testing.T) {
 	runID := domaintypes.NewRunID()
 	repoID := domaintypes.NewMigRepoID()
 	diffID := domaintypes.DiffID("550e8400-e29b-41d4-a716-4466554400bb")
@@ -178,9 +189,14 @@ func TestHandleRunPatch_ResolveRepoViaRepoURL(t *testing.T) {
 
 	outPath := filepath.Join(t.TempDir(), "resolved.patch.gz")
 	var stderr bytes.Buffer
-	err := handleRunPatch([]string{"--repo-url", "https://github.com/example/repo.git", "--output", outPath, runID.String()}, &stderr)
+	err := RunPatch(context.Background(), PatchOptions{
+		RunID:      runID.String(),
+		RepoURL:    "https://github.com/example/repo.git",
+		OutputPath: outPath,
+		Output:     &stderr,
+	})
 	if err != nil {
-		t.Fatalf("handleRunPatch error: %v", err)
+		t.Fatalf("RunPatch error: %v", err)
 	}
 	if !pullCalled {
 		t.Fatal("expected run pull resolution endpoint call")
@@ -193,7 +209,7 @@ func TestHandleRunPatch_ResolveRepoViaRepoURL(t *testing.T) {
 	}
 }
 
-func TestHandleRunPatch_AutoResolveSingleRunRepo(t *testing.T) {
+func TestRunPatch_AutoResolveSingleRunRepo(t *testing.T) {
 	runID := domaintypes.NewRunID()
 	repoID := domaintypes.NewMigRepoID()
 	diffID := domaintypes.DiffID("550e8400-e29b-41d4-a716-4466554400cc")
@@ -262,9 +278,13 @@ func TestHandleRunPatch_AutoResolveSingleRunRepo(t *testing.T) {
 
 	outPath := filepath.Join(t.TempDir(), "single.patch.gz")
 	var stderr bytes.Buffer
-	err := handleRunPatch([]string{"--output", outPath, runID.String()}, &stderr)
+	err := RunPatch(context.Background(), PatchOptions{
+		RunID:      runID.String(),
+		OutputPath: outPath,
+		Output:     &stderr,
+	})
 	if err != nil {
-		t.Fatalf("handleRunPatch error: %v", err)
+		t.Fatalf("RunPatch error: %v", err)
 	}
 	if !listReposCalled {
 		t.Fatal("expected run repos list call")
@@ -280,7 +300,7 @@ func TestHandleRunPatch_AutoResolveSingleRunRepo(t *testing.T) {
 	}
 }
 
-func TestHandleRunPatch_MultiRepoRequiresSelector(t *testing.T) {
+func TestRunPatch_MultiRepoRequiresSelector(t *testing.T) {
 	runID := domaintypes.NewRunID()
 	repoID1 := domaintypes.NewMigRepoID()
 	repoID2 := domaintypes.NewMigRepoID()
@@ -332,7 +352,10 @@ func TestHandleRunPatch_MultiRepoRequiresSelector(t *testing.T) {
 	clienv.UseServerDescriptor(t, server.URL)
 
 	var stderr bytes.Buffer
-	err := handleRunPatch([]string{runID.String()}, &stderr)
+	err := RunPatch(context.Background(), PatchOptions{
+		RunID:  runID.String(),
+		Output: &stderr,
+	})
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -347,7 +370,7 @@ func TestHandleRunPatch_MultiRepoRequiresSelector(t *testing.T) {
 	}
 }
 
-func TestHandleRunPatch_RepoIDAndRepoURLMutuallyExclusive(t *testing.T) {
+func TestRunPatch_RepoIDAndRepoURLMutuallyExclusive(t *testing.T) {
 	runID := domaintypes.NewRunID()
 	repoID := domaintypes.NewMigRepoID()
 
@@ -359,7 +382,12 @@ func TestHandleRunPatch_RepoIDAndRepoURLMutuallyExclusive(t *testing.T) {
 	clienv.UseServerDescriptor(t, server.URL)
 
 	var stderr bytes.Buffer
-	err := handleRunPatch([]string{"--repo-id", repoID.String(), "--repo-url", "https://github.com/example/repo.git", runID.String()}, &stderr)
+	err := RunPatch(context.Background(), PatchOptions{
+		RunID:   runID.String(),
+		RepoID:  repoID.String(),
+		RepoURL: "https://github.com/example/repo.git",
+		Output:  &stderr,
+	})
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}

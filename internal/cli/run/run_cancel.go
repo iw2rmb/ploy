@@ -3,34 +3,30 @@ package run
 import (
 	"context"
 	"errors"
-	"flag"
-	"github.com/iw2rmb/ploy/internal/cli/common"
 	"io"
 	"strings"
 
+	"github.com/iw2rmb/ploy/internal/cli/common"
 	"github.com/iw2rmb/ploy/internal/cli/runs"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-func handleRunCancel(args []string, stderr io.Writer) error {
-	if common.WantsHelp(args) {
-		printRunCancelUsage(stderr)
-		return nil
-	}
+type CancelOptions struct {
+	RunID  string
+	Reason string
+	Output io.Writer
+}
 
-	fs := flag.NewFlagSet("run cancel", flag.ContinueOnError)
-	fs.SetOutput(io.Discard)
-	reason := fs.String("reason", "", "optional reason for cancellation")
-	if err := common.ParseFlagSet(fs, args, func() { printRunCancelUsage(stderr) }); err != nil {
-		return err
-	}
-	rest := fs.Args()
-	if len(rest) == 0 || strings.TrimSpace(rest[0]) == "" {
-		printRunCancelUsage(stderr)
+func RunCancel(ctx context.Context, opts CancelOptions) error {
+	runID := strings.TrimSpace(opts.RunID)
+	if runID == "" {
 		return errors.New("run id required")
 	}
-	runID := strings.TrimSpace(rest[0])
-	ctx := context.Background()
+	out := opts.Output
+	if out == nil {
+		out = io.Discard
+	}
+
 	base, httpClient, err := common.ResolveControlPlaneHTTP(ctx)
 	if err != nil {
 		return err
@@ -39,12 +35,8 @@ func handleRunCancel(args []string, stderr io.Writer) error {
 		BaseURL: base,
 		Client:  httpClient,
 		RunID:   domaintypes.RunID(runID),
-		Reason:  strings.TrimSpace(*reason),
-		Output:  stderr,
+		Reason:  strings.TrimSpace(opts.Reason),
+		Output:  out,
 	}
 	return cmd.Run(ctx)
-}
-
-func printRunCancelUsage(w io.Writer) {
-	_, _ = io.WriteString(w, "Usage: ploy run cancel [--reason <text>] <run-id>\n")
 }

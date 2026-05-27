@@ -3,38 +3,32 @@ package run
 import (
 	"context"
 	"errors"
-	"flag"
 	"fmt"
-	"github.com/iw2rmb/ploy/internal/cli/common"
 	"io"
 	"strings"
 
+	"github.com/iw2rmb/ploy/internal/cli/common"
 	runcmd "github.com/iw2rmb/ploy/internal/cli/runs"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-// handleRunStart implements `ploy run start <run-id>`.
+type StartOptions struct {
+	RunID  string
+	Output io.Writer
+}
+
+// RunStart implements `ploy run start <run-id>`.
 // Starts execution for pending repos in a batch run.
-func handleRunStart(args []string, stderr io.Writer) error {
-	if common.WantsHelp(args) {
-		printRunStartUsage(stderr)
-		return nil
-	}
-
-	fs := flag.NewFlagSet("run start", flag.ContinueOnError)
-	fs.SetOutput(io.Discard)
-	if err := common.ParseFlagSet(fs, args, func() { printRunStartUsage(stderr) }); err != nil {
-		return err
-	}
-
-	rest := fs.Args()
-	if len(rest) == 0 || strings.TrimSpace(rest[0]) == "" {
-		printRunStartUsage(stderr)
+func RunStart(ctx context.Context, opts StartOptions) error {
+	runID := strings.TrimSpace(opts.RunID)
+	if runID == "" {
 		return errors.New("run id required")
 	}
-	runID := strings.TrimSpace(rest[0])
+	out := opts.Output
+	if out == nil {
+		out = io.Discard
+	}
 
-	ctx := context.Background()
 	base, httpClient, err := common.ResolveControlPlaneHTTP(ctx)
 	if err != nil {
 		return err
@@ -51,12 +45,8 @@ func handleRunStart(args []string, stderr io.Writer) error {
 		return err
 	}
 
-	_, _ = fmt.Fprintf(stderr, "Run %s: started %d repo(s), %d already done, %d pending\n",
+	_, _ = fmt.Fprintf(out, "Run %s: started %d repo(s), %d already done, %d pending\n",
 		result.RunID, result.Started, result.AlreadyDone, result.Pending)
 
 	return nil
-}
-
-func printRunStartUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy run start <run-id>")
 }

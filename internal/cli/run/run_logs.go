@@ -4,57 +4,41 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"flag"
 	"fmt"
-	"github.com/iw2rmb/ploy/internal/cli/common"
 	"io"
 	"strings"
 	"time"
 
+	"github.com/iw2rmb/ploy/internal/cli/common"
 	"github.com/iw2rmb/ploy/internal/cli/stream"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	logstream "github.com/iw2rmb/ploy/internal/stream"
 )
 
-func handleRunLogs(args []string, stderr io.Writer) error {
-	if common.WantsHelp(args) {
-		printRunLogsUsage(stderr)
-		return nil
-	}
+type LogsOptions struct {
+	RunID       string
+	MaxRetries  int
+	IdleTimeout time.Duration
+	Timeout     time.Duration
+	Output      io.Writer
+}
 
-	fs := flag.NewFlagSet("run logs", flag.ContinueOnError)
-	fs.SetOutput(io.Discard)
-	maxRetries := fs.Int("max-retries", 3, "max reconnect attempts (-1 for unlimited)")
-	idle := fs.Duration("idle-timeout", 45*time.Second, "cancel if no events arrive within this duration (0=off)")
-	overall := fs.Duration("timeout", 0, "overall timeout for the stream (0=off)")
-	if err := fs.Parse(args); err != nil {
-		if errors.Is(err, flag.ErrHelp) {
-			printRunLogsUsage(stderr)
-			return nil
-		}
-		printRunLogsUsage(stderr)
-		return err
-	}
-
-	runIDArgs := fs.Args()
-	if len(runIDArgs) == 0 {
-		printRunLogsUsage(stderr)
-		return errors.New("run id required")
-	}
-	runID := strings.TrimSpace(runIDArgs[0])
+func RunLogs(ctx context.Context, opts LogsOptions) error {
+	runID := strings.TrimSpace(opts.RunID)
 	if runID == "" {
-		printRunLogsUsage(stderr)
 		return errors.New("run id required")
 	}
-	if *maxRetries < -1 {
-		printRunLogsUsage(stderr)
+	if opts.MaxRetries < -1 {
 		return fmt.Errorf("max retries must be >= -1")
 	}
+	out := opts.Output
+	if out == nil {
+		out = io.Discard
+	}
 
-	ctx := context.Background()
-	if *overall > 0 {
+	if opts.Timeout > 0 {
 		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, *overall)
+		ctx, cancel = context.WithTimeout(ctx, opts.Timeout)
 		defer cancel()
 	}
 	base, httpClient, err := common.ResolveControlPlaneHTTP(ctx)
@@ -66,8 +50,8 @@ func handleRunLogs(args []string, stderr io.Writer) error {
 
 	client := stream.Client{
 		HTTPClient:  common.CloneForStream(httpClient),
-		MaxRetries:  *maxRetries,
-		IdleTimeout: *idle,
+		MaxRetries:  opts.MaxRetries,
+		IdleTimeout: opts.IdleTimeout,
 	}
 
 	handler := func(evt stream.Event) error {
@@ -83,7 +67,7 @@ func handleRunLogs(args []string, stderr io.Writer) error {
 				return fmt.Errorf("run logs: decode run event: %w", err)
 			}
 			ts := time.Now().UTC().Format(time.RFC3339)
-			_, _ = fmt.Fprintf(stderr, "%s [run] state=%s\n", ts, payload.State)
+			_, _ = fmt.Fprintf(out, "%s [run] state=%s\n", ts, payload.State)
 		case "stage":
 			if len(evt.Data) == 0 {
 				return nil
@@ -110,9 +94,9 @@ func handleRunLogs(args []string, stderr io.Writer) error {
 			}
 			line := strings.TrimRight(rec.Line, "\r\n")
 			if ctx.Len() > 0 {
-				_, _ = fmt.Fprintf(stderr, "%s [stage] %s %s\n", ts, ctx.String(), line)
+				_, _ = fmt.Fprintf(out, "%s [stage] %s %s\n", ts, ctx.String(), line)
 			} else {
-				_, _ = fmt.Fprintf(stderr, "%s [stage] %s\n", ts, line)
+				_, _ = fmt.Fprintf(out, "%s [stage] %s\n", ts, line)
 			}
 		case "done", "complete", "completed":
 			return stream.ErrDone
@@ -123,16 +107,4 @@ func handleRunLogs(args []string, stderr io.Writer) error {
 	}
 
 	return client.Stream(ctx, endpoint.String(), handler)
-}
-
-func printRunLogsUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy run logs [--max-retries <n>] [--idle-timeout <duration>] [--timeout <duration>] <run-id>")
-	_, _ = fmt.Fprintln(w, "")
-	_, _ = fmt.Fprintln(w, "Streams run lifecycle events (run state changes and stage transitions).")
-	_, _ = fmt.Fprintln(w, "For container logs, use: ploy job log --follow <job-id>")
-	_, _ = fmt.Fprintln(w, "")
-	_, _ = fmt.Fprintln(w, "Options:")
-	_, _ = fmt.Fprintln(w, "  --max-retries <n>           Max reconnect attempts (-1 for unlimited, default: 3)")
-	_, _ = fmt.Fprintln(w, "  --idle-timeout <duration>   Cancel if no events arrive (0=off, default: 45s)")
-	_, _ = fmt.Fprintln(w, "  --timeout <duration>        Overall stream timeout (0=off)")
 }
