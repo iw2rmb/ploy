@@ -80,7 +80,7 @@ func NewRootCmdWithIO(stdout, stderr io.Writer) *cobra.Command {
 
 	// Cluster and configuration commands
 	root.AddCommand(newClusterCmd(stderr)) // ploy cluster (node, token)
-	root.AddCommand(newConfigCmd(stderr))  // ploy config (gitlab show/set/validate)
+	root.AddCommand(newConfigCmd(stderr))  // ploy config
 	root.AddCommand(newSpecCmd(stdout, stderr))
 
 	// Interactive TUI

@@ -35,12 +35,12 @@ get:
         X-Ploy-Repo-URL:
           schema: { type: string }
           description: Clean repository URL.
-        X-Ploy-Repo-Source-SHA:
+        X-Ploy-Repo-SHA:
           schema: { type: string }
           description: Source commit SHA included in the snapshot.
-        X-Ploy-Repo-Ref:
+        X-Ploy-Repo-Base-Ref:
           schema: { type: string }
-          description: Source ref associated with the run repo.
+          description: Base ref associated with the run repo.
       content:
         application/gzip:
           schema:
