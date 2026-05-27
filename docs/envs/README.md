@@ -216,21 +216,16 @@ setting on typical deployments where Docker runs on the default Unix socket.
 
 Runtime behavior: the node's Docker client is created from standard Docker env vars with API version negotiation enabled.
 
-- `DOCKER_AUTH_CONFIG` — Optional Docker auth config JSON used by node image pulls.
-  When set, the node extracts credentials for the target image registry and passes
-  them to Docker Engine via `ImagePullOptions.RegistryAuth`.
-  Example:
-  `{"auths":{"ghcr.io":{"auth":"<base64(username:token)>"}}}`.
-- `PLOY_DOCKER_AUTH_CONFIG` — Optional override for `DOCKER_AUTH_CONFIG`.
-  When both are set, `PLOY_DOCKER_AUTH_CONFIG` wins.
 - `PLOY_DOCKER_AUTH_CONFIG_FILE` — Optional path to a Docker auth config JSON
-  file. Used when `PLOY_DOCKER_AUTH_CONFIG` is empty. If set and unreadable,
+  file. When set, this file is read for each job runtime initialization so host
+  auth refreshes take effect without recreating the node container. If set and unreadable,
   node runtime initialization fails explicitly instead of silently pulling
   without credentials.
+  Example:
+  `{"auths":{"ghcr.io":{"auth":"<base64(username:token)>"}}}`.
 
-Auth precedence is:
-`PLOY_DOCKER_AUTH_CONFIG`, then `PLOY_DOCKER_AUTH_CONFIG_FILE`, then
-`DOCKER_AUTH_CONFIG`.
+The node does not consume inline registry-auth environment variables for job
+image pulls. Use `PLOY_DOCKER_AUTH_CONFIG_FILE` for private registries.
 
 **When to set these variables:**
 - **Remote Docker daemon**: Set `DOCKER_HOST=tcp://<host>:2376` and TLS variables when the

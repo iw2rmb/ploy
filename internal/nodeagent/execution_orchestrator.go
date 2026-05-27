@@ -207,9 +207,6 @@ func (r *runController) initializeRuntime(ctx context.Context, runID types.RunID
 }
 
 func resolveDockerRegistryAuthConfig() (string, error) {
-	if raw := strings.TrimSpace(os.Getenv("PLOY_DOCKER_AUTH_CONFIG")); raw != "" {
-		return raw, nil
-	}
 	if path := strings.TrimSpace(os.Getenv("PLOY_DOCKER_AUTH_CONFIG_FILE")); path != "" {
 		data, err := os.ReadFile(path)
 		if err != nil {
@@ -217,7 +214,7 @@ func resolveDockerRegistryAuthConfig() (string, error) {
 		}
 		return strings.TrimSpace(string(data)), nil
 	}
-	return strings.TrimSpace(os.Getenv("DOCKER_AUTH_CONFIG")), nil
+	return "", nil
 }
 
 // jobExecutionContext holds runtime components initialized for a mig/heal job.
