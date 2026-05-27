@@ -111,23 +111,19 @@ func TestDockerContainerRuntimeCreate(t *testing.T) {
 			spec: ContainerSpec{
 				Image: "alpine:latest",
 			},
-			createRes: client.ContainerCreateResult{ID: "pulled-container"},
-			pullImage: true,
-			// Simulate a missing image so PullImage triggers a registry pull.
+			createRes:  client.ContainerCreateResult{ID: "pulled-container"},
+			pullImage:  true,
 			inspectErr: cerrdefs.ErrNotFound,
 			wantErr:    false,
 		},
 		{
-			name: "success_skip_pull_when_image_present",
+			name: "success_pull_even_when_image_present",
 			spec: ContainerSpec{
-				Image: "gate-gradle:jdk11",
+				Image: "gate-gradle:latest",
 			},
 			createRes: client.ContainerCreateResult{ID: "local-image-container"},
 			pullImage: true,
-			// Image is present locally, but a registry pull would fail (private/local tag).
-			// Runtime should skip pull when inspect succeeds.
-			pullErr: errors.New("pull access denied"),
-			wantErr: false,
+			wantErr:   false,
 		},
 		{
 			name: "error_image_pull_fails",
@@ -185,8 +181,8 @@ func TestDockerContainerRuntimeCreate(t *testing.T) {
 					}
 				}
 			}
-			// Verify image pull was called only when configured and the image is missing.
-			expectPull := tc.pullImage && cerrdefs.IsNotFound(tc.inspectErr)
+			// Verify image pull was called whenever configured.
+			expectPull := tc.pullImage
 			if expectPull && !fake.pullCalled {
 				t.Error("image pull should have been called")
 			}

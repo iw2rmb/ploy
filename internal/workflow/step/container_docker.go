@@ -30,7 +30,7 @@ type dockerClientAPI interface {
 	ContainerRemove(ctx context.Context, containerID string, options client.ContainerRemoveOptions) (client.ContainerRemoveResult, error)
 }
 
-// dockerImageAPI abstracts image operations (pull & inspect) for conditional image fetching.
+// dockerImageAPI abstracts image operations for Docker image fetching.
 type dockerImageAPI interface {
 	ImagePull(ctx context.Context, refStr string, options client.ImagePullOptions) (client.ImagePullResponse, error)
 	ImageInspect(ctx context.Context, imageID string, inspectOpts ...client.ImageInspectOption) (client.ImageInspectResult, error)
@@ -274,18 +274,10 @@ func (r *DockerContainerRuntime) Remove(ctx context.Context, handle ContainerHan
 	return err
 }
 
-// ensureImageAvailable checks whether the image exists locally and pulls it from
-// a registry only when it is missing. This avoids failing local development
-// runs when tags (e.g. gate-gradle:jdk11) are built locally and not published.
+// ensureImageAvailable refreshes the image before container creation. Job images
+// commonly use mutable tags such as latest, so local presence is not enough.
 func (r *DockerContainerRuntime) ensureImageAvailable(ctx context.Context, imageRef string) error {
-	_, err := r.images.ImageInspect(ctx, imageRef)
-	if err == nil {
-		return nil
-	}
-	if cerrdefs.IsNotFound(err) {
-		return r.pullImage(ctx, imageRef)
-	}
-	return fmt.Errorf("step: inspect image %s: %w", imageRef, err)
+	return r.pullImage(ctx, imageRef)
 }
 
 func (r *DockerContainerRuntime) pullImage(ctx context.Context, imageRef string) error {
