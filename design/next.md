@@ -1,9 +1,5 @@
 # TODO
 
-## GitLab
-
-- design/gitlab.md
-
 ## Run vs Pull
 
 ## Users
