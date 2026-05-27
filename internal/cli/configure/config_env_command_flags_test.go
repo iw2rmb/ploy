@@ -24,7 +24,7 @@ func TestHandleConfigEnvShow_FlagValidation(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			clienv.RunExpectError(t, handleConfigEnvShow, tt.args, tt.wantErrContains)
+			clienv.RunExpectError(t, executeConfigEnvShow, tt.args, tt.wantErrContains)
 		})
 	}
 }
@@ -45,7 +45,7 @@ func TestHandleConfigEnvSet_FlagValidation(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			clienv.RunExpectError(t, handleConfigEnvSet, tt.args, tt.wantErrContains)
+			clienv.RunExpectError(t, executeConfigEnvSet, tt.args, tt.wantErrContains)
 		})
 	}
 }
@@ -64,7 +64,7 @@ func TestHandleConfigEnvUnset_FlagValidation(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			clienv.RunExpectError(t, handleConfigEnvUnset, tt.args, tt.wantErrContains)
+			clienv.RunExpectError(t, executeConfigEnvUnset, tt.args, tt.wantErrContains)
 		})
 	}
 }
@@ -80,7 +80,7 @@ func TestHandleConfigEnvSetValidOnSelectors(t *testing.T) {
 			defer srv.Close()
 			clienv.UseServerDescriptor(t, srv.URL)
 			buf := &bytes.Buffer{}
-			err := handleConfigEnvSet([]string{"--key", "FOO", "--value", "bar", "--on", sel}, buf)
+			err := executeConfigEnvSet([]string{"--key", "FOO", "--value", "bar", "--on", sel}, buf)
 			if err != nil {
 				t.Fatalf("selector %q should be valid, got: %v", sel, err)
 			}
@@ -100,7 +100,7 @@ func TestHandleConfigEnvSetOnAllExclusive(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			clienv.RunExpectError(t, handleConfigEnvSet, tt.args, "--on all is exclusive")
+			clienv.RunExpectError(t, executeConfigEnvSet, tt.args, "--on all is exclusive")
 		})
 	}
 }
@@ -113,7 +113,7 @@ func TestHandleConfigEnvSetMultipleOnSelectors(t *testing.T) {
 	defer srv.Close()
 	clienv.UseServerDescriptor(t, srv.URL)
 	buf := &bytes.Buffer{}
-	err := handleConfigEnvSet([]string{"--key", "FOO", "--value", "bar", "--on", "gates", "--on", "steps"}, buf)
+	err := executeConfigEnvSet([]string{"--key", "FOO", "--value", "bar", "--on", "gates", "--on", "steps"}, buf)
 	if err != nil {
 		t.Fatalf("selectors should be valid, got: %v", err)
 	}

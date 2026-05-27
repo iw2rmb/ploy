@@ -1,35 +1,25 @@
 package configure
 
 import (
-	"errors"
-	"fmt"
-	"github.com/iw2rmb/ploy/internal/cli/common"
 	"io"
+
+	"github.com/spf13/cobra"
 )
 
-// Handle routes config subcommands.
-func Handle(args []string, stderr io.Writer) error {
-	// Handle --help and -h flags to print usage and exit cleanly.
-	if common.WantsHelp(args) {
-		printConfigUsage(stderr)
-		return nil
+// NewCommand constructs the cobra command tree for `ploy config`.
+func NewCommand(stdout, stderr io.Writer) *cobra.Command {
+	configCmd := &cobra.Command{
+		Use:   "config",
+		Short: "Inspect or update cluster configuration",
+		Args:  cobra.NoArgs,
+		RunE:  func(cmd *cobra.Command, args []string) error { return cmd.Help() },
 	}
-	if len(args) == 0 {
-		printConfigUsage(stderr)
-		return errors.New("config subcommand required")
+	if stdout != nil {
+		configCmd.SetOut(stdout)
 	}
-	switch args[0] {
-	case "env":
-		return handleConfigEnv(args[1:], stderr)
-	default:
-		printConfigUsage(stderr)
-		return fmt.Errorf("unknown config subcommand %q", args[0])
+	if stderr != nil {
+		configCmd.SetErr(stderr)
 	}
-}
-
-func printConfigUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy config <command>")
-	_, _ = fmt.Fprintln(w, "")
-	_, _ = fmt.Fprintln(w, "Commands:")
-	_, _ = fmt.Fprintln(w, "  env       Manage global environment variables")
+	configCmd.AddCommand(newEnvCommand())
+	return configCmd
 }

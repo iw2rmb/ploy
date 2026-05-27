@@ -3,6 +3,7 @@ package configure
 import (
 	"bytes"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -12,8 +13,29 @@ import (
 	"testing"
 
 	"github.com/iw2rmb/ploy/internal/testutil/clienv"
-	"github.com/iw2rmb/ploy/internal/testutil/stdcapture"
 )
+
+func executeConfigEnvCommand(args []string, output io.Writer) error {
+	cmd := NewCommand(output, output)
+	cmd.SetArgs(append([]string{"env"}, args...))
+	return cmd.Execute()
+}
+
+func executeConfigEnvList(args []string, output io.Writer) error {
+	return executeConfigEnvCommand(append([]string{"list"}, args...), output)
+}
+
+func executeConfigEnvShow(args []string, output io.Writer) error {
+	return executeConfigEnvCommand(append([]string{"show"}, args...), output)
+}
+
+func executeConfigEnvSet(args []string, output io.Writer) error {
+	return executeConfigEnvCommand(append([]string{"set"}, args...), output)
+}
+
+func executeConfigEnvUnset(args []string, output io.Writer) error {
+	return executeConfigEnvCommand(append([]string{"unset"}, args...), output)
+}
 
 // TestHandleConfigEnvListSuccess verifies that the 'list' subcommand retrieves
 // and displays global env variables from the server using target wire format.
@@ -38,13 +60,11 @@ func TestHandleConfigEnvListSuccess(t *testing.T) {
 	clienv.UseServerDescriptor(t, srv.URL)
 
 	buf := &bytes.Buffer{}
-	var err error
-	output := stdcapture.CaptureStdout(t, func() {
-		err = handleConfigEnvList(nil, buf)
-	})
+	err := executeConfigEnvList(nil, buf)
+	output := buf.String()
 
 	if err != nil {
-		t.Fatalf("handleConfigEnvList error: %v", err)
+		t.Fatalf("executeConfigEnvList error: %v", err)
 	}
 
 	// Verify header uses TARGET column.
@@ -81,13 +101,11 @@ func TestHandleConfigEnvListEmpty(t *testing.T) {
 	clienv.UseServerDescriptor(t, srv.URL)
 
 	buf := &bytes.Buffer{}
-	var err error
-	output := stdcapture.CaptureStdout(t, func() {
-		err = handleConfigEnvList(nil, buf)
-	})
+	err := executeConfigEnvList(nil, buf)
+	output := buf.String()
 
 	if err != nil {
-		t.Fatalf("handleConfigEnvList error: %v", err)
+		t.Fatalf("executeConfigEnvList error: %v", err)
 	}
 
 	if !strings.Contains(output, "No global environment variables configured") {
@@ -118,13 +136,11 @@ func TestHandleConfigEnvShowSuccess(t *testing.T) {
 	clienv.UseServerDescriptor(t, srv.URL)
 
 	buf := &bytes.Buffer{}
-	var err error
-	output := stdcapture.CaptureStdout(t, func() {
-		err = handleConfigEnvShow([]string{"--key", "DEPLOY_TOKEN"}, buf)
-	})
+	err := executeConfigEnvShow([]string{"--key", "DEPLOY_TOKEN"}, buf)
+	output := buf.String()
 
 	if err != nil {
-		t.Fatalf("handleConfigEnvShow error: %v", err)
+		t.Fatalf("executeConfigEnvShow error: %v", err)
 	}
 
 	if !strings.Contains(output, "Key:    DEPLOY_TOKEN") {
@@ -160,13 +176,10 @@ func TestHandleConfigEnvShowWithFrom(t *testing.T) {
 	clienv.UseServerDescriptor(t, srv.URL)
 
 	buf := &bytes.Buffer{}
-	var err error
-	stdcapture.CaptureStdout(t, func() {
-		err = handleConfigEnvShow([]string{"--key", "DEPLOY_TOKEN", "--from", "gates"}, buf)
-	})
+	err := executeConfigEnvShow([]string{"--key", "DEPLOY_TOKEN", "--from", "gates"}, buf)
 
 	if err != nil {
-		t.Fatalf("handleConfigEnvShow error: %v", err)
+		t.Fatalf("executeConfigEnvShow error: %v", err)
 	}
 	if gotQuery != "gates" {
 		t.Fatalf("expected target query param 'gates', got %q", gotQuery)
@@ -215,7 +228,7 @@ func TestHandleConfigEnvShow_ErrorResponses(t *testing.T) {
 			clienv.UseServerDescriptor(t, srv.URL)
 
 			buf := &bytes.Buffer{}
-			err := handleConfigEnvShow(tt.args, buf)
+			err := executeConfigEnvShow(tt.args, buf)
 			if err == nil {
 				t.Fatal("expected error, got nil")
 			}
@@ -245,13 +258,11 @@ func TestHandleConfigEnvShowRaw(t *testing.T) {
 	clienv.UseServerDescriptor(t, srv.URL)
 
 	buf := &bytes.Buffer{}
-	var err error
-	output := stdcapture.CaptureStdout(t, func() {
-		err = handleConfigEnvShow([]string{"--key", "SECRET_KEY", "--raw"}, buf)
-	})
+	err := executeConfigEnvShow([]string{"--key", "SECRET_KEY", "--raw"}, buf)
+	output := buf.String()
 
 	if err != nil {
-		t.Fatalf("handleConfigEnvShow error: %v", err)
+		t.Fatalf("executeConfigEnvShow error: %v", err)
 	}
 
 	// With --raw, the full value should be shown.
@@ -295,13 +306,11 @@ func TestHandleConfigEnvSetSuccessInline(t *testing.T) {
 	clienv.UseServerDescriptor(t, srv.URL)
 
 	buf := &bytes.Buffer{}
-	var err error
-	output := stdcapture.CaptureStdout(t, func() {
-		err = handleConfigEnvSet([]string{"--key", "OPENAI_API_KEY", "--value", "sk-test-12345"}, buf)
-	})
+	err := executeConfigEnvSet([]string{"--key", "OPENAI_API_KEY", "--value", "sk-test-12345"}, buf)
+	output := buf.String()
 
 	if err != nil {
-		t.Fatalf("handleConfigEnvSet error: %v", err)
+		t.Fatalf("executeConfigEnvSet error: %v", err)
 	}
 
 	// Default --on=jobs → gates, steps (2 PUTs).
@@ -357,13 +366,11 @@ func TestHandleConfigEnvSetSingleTarget(t *testing.T) {
 	clienv.UseServerDescriptor(t, srv.URL)
 
 	buf := &bytes.Buffer{}
-	var err error
-	output := stdcapture.CaptureStdout(t, func() {
-		err = handleConfigEnvSet([]string{"--key", "FOO", "--value", "bar", "--on", "gates"}, buf)
-	})
+	err := executeConfigEnvSet([]string{"--key", "FOO", "--value", "bar", "--on", "gates"}, buf)
+	output := buf.String()
 
 	if err != nil {
-		t.Fatalf("handleConfigEnvSet error: %v", err)
+		t.Fatalf("executeConfigEnvSet error: %v", err)
 	}
 	if gotBody["target"] != "gates" {
 		t.Fatalf("expected target 'gates', got: %v", gotBody["target"])
@@ -407,13 +414,10 @@ func TestHandleConfigEnvSetSuccessFromFile(t *testing.T) {
 	clienv.UseServerDescriptor(t, srv.URL)
 
 	buf := &bytes.Buffer{}
-	var err error
-	stdcapture.CaptureStdout(t, func() {
-		err = handleConfigEnvSet([]string{"--key", "MY_CUSTOM_CERT", "--file", filePath, "--on", "all"}, buf)
-	})
+	err := executeConfigEnvSet([]string{"--key", "MY_CUSTOM_CERT", "--file", filePath, "--on", "all"}, buf)
 
 	if err != nil {
-		t.Fatalf("handleConfigEnvSet error: %v", err)
+		t.Fatalf("executeConfigEnvSet error: %v", err)
 	}
 
 	// --on all → 4 PUTs (gates, nodes, server, steps).
@@ -448,18 +452,15 @@ func TestHandleConfigEnvSetSecretFalse(t *testing.T) {
 	clienv.UseServerDescriptor(t, srv.URL)
 
 	buf := &bytes.Buffer{}
-	var err error
-	stdcapture.CaptureStdout(t, func() {
-		err = handleConfigEnvSet([]string{
-			"--key", "DEBUG_MODE",
-			"--value", "true",
-			"--on", "gates",
-			"--secret=false",
-		}, buf)
-	})
+	err := executeConfigEnvSet([]string{
+		"--key", "DEBUG_MODE",
+		"--value", "true",
+		"--on", "gates",
+		"--secret=false",
+	}, buf)
 
 	if err != nil {
-		t.Fatalf("handleConfigEnvSet error: %v", err)
+		t.Fatalf("executeConfigEnvSet error: %v", err)
 	}
 
 	if gotBody["secret"] != false {
@@ -477,7 +478,7 @@ func TestHandleConfigEnvSetServerError(t *testing.T) {
 	clienv.UseServerDescriptor(t, srv.URL)
 
 	buf := &bytes.Buffer{}
-	err := handleConfigEnvSet([]string{"--key", "FOO", "--value", "bar", "--on", "gates"}, buf)
+	err := executeConfigEnvSet([]string{"--key", "FOO", "--value", "bar", "--on", "gates"}, buf)
 	if err == nil {
 		t.Fatalf("expected error from server")
 	}
@@ -500,13 +501,11 @@ func TestHandleConfigEnvUnsetSuccess(t *testing.T) {
 	clienv.UseServerDescriptor(t, srv.URL)
 
 	buf := &bytes.Buffer{}
-	var err error
-	output := stdcapture.CaptureStdout(t, func() {
-		err = handleConfigEnvUnset([]string{"--key", "DEPLOY_TOKEN"}, buf)
-	})
+	err := executeConfigEnvUnset([]string{"--key", "DEPLOY_TOKEN"}, buf)
+	output := buf.String()
 
 	if err != nil {
-		t.Fatalf("handleConfigEnvUnset error: %v", err)
+		t.Fatalf("executeConfigEnvUnset error: %v", err)
 	}
 
 	if gotMethod != "DELETE" {
@@ -534,13 +533,10 @@ func TestHandleConfigEnvUnsetWithFrom(t *testing.T) {
 	clienv.UseServerDescriptor(t, srv.URL)
 
 	buf := &bytes.Buffer{}
-	var err error
-	stdcapture.CaptureStdout(t, func() {
-		err = handleConfigEnvUnset([]string{"--key", "DEPLOY_TOKEN", "--from", "gates"}, buf)
-	})
+	err := executeConfigEnvUnset([]string{"--key", "DEPLOY_TOKEN", "--from", "gates"}, buf)
 
 	if err != nil {
-		t.Fatalf("handleConfigEnvUnset error: %v", err)
+		t.Fatalf("executeConfigEnvUnset error: %v", err)
 	}
 	if gotQuery != "gates" {
 		t.Fatalf("expected target query param 'gates', got %q", gotQuery)
@@ -582,7 +578,7 @@ func TestHandleConfigEnvUnset_ErrorResponses(t *testing.T) {
 			clienv.UseServerDescriptor(t, srv.URL)
 
 			buf := &bytes.Buffer{}
-			err := handleConfigEnvUnset(tt.args, buf)
+			err := executeConfigEnvUnset(tt.args, buf)
 			if err == nil {
 				t.Fatal("expected error, got nil")
 			}
@@ -603,14 +599,12 @@ func TestHandleConfigEnvUnsetNotFound(t *testing.T) {
 	clienv.UseServerDescriptor(t, srv.URL)
 
 	buf := &bytes.Buffer{}
-	var err error
-	output := stdcapture.CaptureStdout(t, func() {
-		err = handleConfigEnvUnset([]string{"--key", "MISSING_KEY"}, buf)
-	})
+	err := executeConfigEnvUnset([]string{"--key", "MISSING_KEY"}, buf)
+	output := buf.String()
 
 	// Should not error; 404 is acceptable for delete (idempotent).
 	if err != nil {
-		t.Fatalf("handleConfigEnvUnset error: %v", err)
+		t.Fatalf("executeConfigEnvUnset error: %v", err)
 	}
 
 	if !strings.Contains(output, "not found") {
@@ -628,7 +622,7 @@ func TestHandleConfigEnvListServerError(t *testing.T) {
 	clienv.UseServerDescriptor(t, srv.URL)
 
 	buf := &bytes.Buffer{}
-	err := handleConfigEnvList(nil, buf)
+	err := executeConfigEnvList(nil, buf)
 	if err == nil {
 		t.Fatalf("expected error from server")
 	}
@@ -653,13 +647,11 @@ func TestHandleConfigEnvShowRedactsShortSecrets(t *testing.T) {
 	clienv.UseServerDescriptor(t, srv.URL)
 
 	buf := &bytes.Buffer{}
-	var err error
-	output := stdcapture.CaptureStdout(t, func() {
-		err = handleConfigEnvShow([]string{"--key", "SHORT"}, buf)
-	})
+	err := executeConfigEnvShow([]string{"--key", "SHORT"}, buf)
+	output := buf.String()
 
 	if err != nil {
-		t.Fatalf("handleConfigEnvShow error: %v", err)
+		t.Fatalf("executeConfigEnvShow error: %v", err)
 	}
 
 	// Short secrets should show *** instead of partial value.

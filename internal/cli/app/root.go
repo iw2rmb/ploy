@@ -49,8 +49,8 @@ func NewRootCmdWithIO(stdout, stderr io.Writer) *cobra.Command {
 	root.AddCommand(newJobCmd(stderr))  // ploy job (follow job logs)
 	root.AddCommand(newPullCmd(stderr)) // ploy pull (local repo pull workflow)
 
-	root.AddCommand(newClusterCmd(stderr)) // ploy cluster (node, token)
-	root.AddCommand(newConfigCmd(stderr))  // ploy config
+	root.AddCommand(newClusterCmd(stderr))        // ploy cluster (node, token)
+	root.AddCommand(newConfigCmd(stdout, stderr)) // ploy config
 	root.AddCommand(newSpecCmd(stdout, stderr))
 
 	root.AddCommand(newTUICmd(stderr)) // ploy tui (interactive terminal UI)
