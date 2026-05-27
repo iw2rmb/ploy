@@ -765,8 +765,7 @@ Current Build Gate mapping:
 
 The `ploy run pull <run-id>` and `ploy mig pull` commands enable developers to reconstruct
 Migs-generated changes in their local git repository. This is useful for reviewing,
-testing, or continuing work on changes produced by a run without relying on MR-based
-workflows.
+testing, or continuing work on changes produced by a run.
 
 **High-level sequence:**
 
@@ -985,7 +984,7 @@ value is a `StageStatus` object describing that job's execution state.
 		  - `status` — job status in the database (`Created`, `Queued`, `Running`, `Success`, `Fail`, `Cancelled`).
 		    - `RunSummary.stages[*].state` is the external API representation (`pending`, `running`, `succeeded`, `failed`, `cancelled`).
 		    - `node_id` — which node claimed this job.
-	    - `job_type` — job phase (`pre_gate`, `mig`, `post_gate`, `heal`, `mr`).
+	    - `job_type` — job phase (`pre_gate`, `mig`, `post_gate`, `heal`).
 	    - `job_image` — container image name for this job (persisted by the node for mig/heal/gate jobs).
 		    - `meta` — JSONB with structured job metadata (optional; see runtime implementation).
   - Dynamic insertion rewires explicit successor links:
@@ -1046,7 +1045,7 @@ value is a `StageStatus` object describing that job's execution state.
     - `runs` row.
     - `jobs` rows (including `meta` JSONB with job metadata).
     - Artifact bundles per job.
-    - Run stats (MR URL, gate summary).
+    - Run stats, including gate summary.
   - Returns `RunSummary` directly (Go type `migsapi.RunSummary`); the canonical JSON shape for run state.
 
 - `GET /v1/runs/{id}/logs` — SSE event stream for run lifecycle events only.
@@ -1316,7 +1315,7 @@ The CLI entry points for Migs are implemented in CLI implementation:
   - Resolves migration metadata (`Mig`, `Spec`, `Repos`) and lists runs for the
     migration with per-run success/fail repo counts.
 
-- Run summaries (gate/MR/job graph) are also exposed via:
+- Run summaries (gate/job graph) are also exposed via:
   - `GET /v1/runs/{id}/status` (HTTP)
 
 ## 7. SSE Contract

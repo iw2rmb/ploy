@@ -200,10 +200,6 @@ run_unit_tests() {
         "go test -v -timeout=30s ./internal/cli/stream/..." \
         30
 
-    # Test GitLab MR client
-    run_test "Unit: GitLab MR client" \
-        "go test -v -timeout=30s ./internal/nodeagent/gitlab/..." \
-        30
 }
 
 # Run e2e selftest scenario (minimal container execution)

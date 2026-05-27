@@ -534,7 +534,6 @@ Use `GET /v1/runs/{id}/status` to view run-level state:
 ```bash
 $ curl -sk "$PLOY_CONTROL_PLANE_URL/v1/runs/migs-abc123/status" | jq .
 Run migs-abc123: running
-MR: https://gitlab.com/org/repo/-/merge_requests/1
 Gate: failed pre-gate duration=567ms
 Jobs:
   [1000] a1b2c3d4: succeeded

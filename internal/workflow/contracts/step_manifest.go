@@ -32,7 +32,7 @@ type StepManifest struct {
 	Artifacts  []StepArtifact
 	Gate       *StepGateSpec
 	Resources  StepResourceSpec
-	// Options holds arbitrary run-specific options (e.g., GitLab PAT, MR flags).
+	// Options holds arbitrary run-specific options.
 	// Read options via OptionString/OptionBool helpers to avoid scattered type
 	// assertions in callers. This field is not validated and values are never
 	// logged.

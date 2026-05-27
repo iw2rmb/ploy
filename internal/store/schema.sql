@@ -272,7 +272,7 @@ CREATE INDEX IF NOT EXISTS jobs_predecessor_lookup_idx ON jobs(run_id, repo_id, 
 CREATE INDEX IF NOT EXISTS jobs_repo_idx ON jobs(repo_id);
 DROP INDEX IF EXISTS jobs_cache_lookup_idx;
 
--- Repo-scoped action queue for terminal follow-up work (e.g., MR creation).
+-- Repo-scoped action queue for terminal follow-up work.
 CREATE TABLE IF NOT EXISTS run_repo_actions (
   id              TEXT PRIMARY KEY,  -- KSUID-backed string ID; app-generated.
   run_id          TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,

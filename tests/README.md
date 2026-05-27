@@ -45,7 +45,6 @@ tests/
 
 3. **For e2e tests, configure a cluster:**
    - Ensure `${PLOY_CONFIG_HOME:-$HOME/.config/ploy}/default` exists with cluster descriptor.
-   - Set `PLOY_GITLAB_PAT` if testing GitLab MR creation.
 
 ### Running Smoke Tests
 
@@ -55,7 +54,7 @@ The `smoke_tests.sh` script orchestrates tests across multiple layers:
 ```bash
 bash tests/smoke_tests.sh --quick
 ```
-- Runs unit tests for critical packages (backoff, SSE, GitLab client)
+- Runs unit tests for critical packages (backoff, SSE)
 - Runs CLI smoke tests (version, help)
 - Runs integration tests if `PLOY_TEST_DB_DSN` is set
 - **Duration:** ~1-2 minutes
@@ -85,8 +84,6 @@ go test -v ./internal/workflow/backoff/...
 # SSE stream client
 go test -v ./internal/cli/stream/...
 
-# GitLab MR client
-go test -v ./internal/nodeagent/gitlab/...
 ```
 
 **Integration tests (require PLOY_TEST_DB_DSN):**
@@ -179,19 +176,13 @@ The smoke test suite validates these critical paths:
    - Policy-based retry strategies (GitLab, heartbeat, claim loop, etc.)
    - Permanent error detection
 
-5. **GitLab MR client:**
-   - MR creation via `gitlab.com/gitlab-org/api/client-go`
-   - Retry on transient failures (429, 5xx)
-   - PAT redaction in error messages
-   - Domain normalization (localhost, 127.0.0.1 → HTTP)
-
-6. **CLI functionality:**
+5. **CLI functionality:**
    - Version and help commands
    - Subcommand help (mig, server, etc.)
    - Flag parsing and validation
    - Run inspection commands: `run status`, `run logs`, `mig run repo status`
 
-7. **Container execution (e2e):**
+6. **Container execution (e2e):**
    - Mig container lifecycle
    - Log streaming from container
    - Artifact collection
@@ -311,4 +302,4 @@ The smoke test suite is designed for CI environments:
 
 ---
 
-**Validation status:** This test suite validates the critical workflows modified during the library reuse roadmap (backoff, SSE, GitLab client, CLI).
+**Validation status:** This test suite validates the critical workflows modified during the library reuse roadmap (backoff, SSE, CLI).

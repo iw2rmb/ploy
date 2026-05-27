@@ -11,7 +11,7 @@ import (
 )
 
 // TestCrossPathParity_StandardJobErrorToChainAction exercises the joint nodeagent→server
-// completion path for standard (mig/heal/MR) job error scenarios through concrete production
+// completion path for standard mig/heal job error scenarios through concrete production
 // code paths.
 //
 // Nodeagent step: lifecycle.JobStatusFromRunError maps execution errors to job statuses.
