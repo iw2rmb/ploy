@@ -93,11 +93,14 @@ func loadMigSpecSchema() error {
 }
 
 func formatMigSchemaError(err *jsonschema.ValidationError) string {
-	units := collectMigSchemaErrorUnits(err.BasicOutput())
+	units := collectLeafMigSchemaErrorUnits(err.DetailedOutput())
+	if len(units) == 0 {
+		units = collectMigSchemaErrorUnits(err.BasicOutput())
+	}
 	if len(units) == 0 {
 		return err.Error()
 	}
-	return strings.Join(units, "; ")
+	return strings.Join(dedupeStrings(units), "; ")
 }
 
 func collectMigSchemaErrorUnits(unit *jsonschema.OutputUnit) []string {
@@ -116,6 +119,44 @@ func collectMigSchemaErrorUnits(unit *jsonschema.OutputUnit) []string {
 	}
 	for i := range unit.Errors {
 		out = append(out, collectMigSchemaErrorUnits(&unit.Errors[i])...)
+	}
+	return out
+}
+
+func collectLeafMigSchemaErrorUnits(unit *jsonschema.OutputUnit) []string {
+	if unit == nil {
+		return nil
+	}
+	var out []string
+	for i := range unit.Errors {
+		out = append(out, collectLeafMigSchemaErrorUnits(&unit.Errors[i])...)
+	}
+	if len(out) > 0 {
+		return out
+	}
+	if unit.Error == nil {
+		return nil
+	}
+	path := migSchemaInstancePath(unit.InstanceLocation)
+	msg := unit.Error.String()
+	if path == "" {
+		return []string{msg}
+	}
+	return []string{path + ": " + msg}
+}
+
+func dedupeStrings(values []string) []string {
+	if len(values) < 2 {
+		return values
+	}
+	seen := make(map[string]struct{}, len(values))
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		out = append(out, value)
 	}
 	return out
 }

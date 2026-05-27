@@ -47,6 +47,11 @@ func TestHandleSpecValidate(t *testing.T) {
 			spec:    "version: old\nsteps:\n  - image: docker.io/test/mig:latest\n",
 			wantErr: "validate spec",
 		},
+		{
+			name:    "unknown nested build gate key",
+			spec:    "steps:\n  - image: docker.io/test/mig:latest\nbuild_gate:\n  enabled: true\n",
+			wantErr: "additional properties 'enabled' not allowed",
+		},
 	}
 
 	for _, tt := range tests {
