@@ -2,9 +2,9 @@ package step
 
 import (
 	"context"
-	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
@@ -15,21 +15,28 @@ func TestGatePlanResolver_StackDetectDefaultPolicy(t *testing.T) {
 
 	testCases := []struct {
 		name          string
-		defaultValue  bool
+		stackDetect   *contracts.BuildGateStackConfig
 		wantTerminal  bool
 		wantCode      string
-		wantCancelled bool
+		wantErrPrefix string
 	}{
 		{
-			name:          "default_false_cancels",
-			defaultValue:  false,
+			name:          "no_explicit_fallback_returns_internal_error",
+			stackDetect:   nil,
 			wantTerminal:  true,
 			wantCode:      "BUILD_GATE_STACK_DETECT_FAILED",
-			wantCancelled: true,
+			wantErrPrefix: "BUILD_GATE_STACK_DETECT_FAILED:",
+		},
+		{
+			name:          "default_false_returns_internal_error",
+			stackDetect:   &contracts.BuildGateStackConfig{Enabled: true, Language: "java", Release: "17", Default: false},
+			wantTerminal:  true,
+			wantCode:      "BUILD_GATE_STACK_DETECT_FAILED",
+			wantErrPrefix: "BUILD_GATE_STACK_DETECT_FAILED:",
 		},
 		{
 			name:         "default_true_returns_plan",
-			defaultValue: true,
+			stackDetect:  &contracts.BuildGateStackConfig{Enabled: true, Language: "java", Release: "17", Default: true},
 			wantTerminal: false,
 		},
 	}
@@ -46,12 +53,7 @@ func TestGatePlanResolver_StackDetectDefaultPolicy(t *testing.T) {
 					Stack: contracts.StackExpectation{Language: "java", Tool: "maven", Release: "17"},
 					Image: "planner-test:java17",
 				}},
-				StackDetect: &contracts.BuildGateStackConfig{
-					Enabled:  true,
-					Language: "java",
-					Release:  "17",
-					Default:  tc.defaultValue,
-				},
+				StackDetect: tc.stackDetect,
 			}
 
 			plan, terminal := resolveGateExecutionPlan(context.Background(), workspace, spec, "")
@@ -62,8 +64,15 @@ func TestGatePlanResolver_StackDetectDefaultPolicy(t *testing.T) {
 				if got := terminal.meta.LogFindings[0].Code; got != tc.wantCode {
 					t.Fatalf("log code = %q, want %q", got, tc.wantCode)
 				}
-				if got := errors.Is(terminal.err, ErrRepoCancelled); got != tc.wantCancelled {
-					t.Fatalf("cancelled = %v, want %v (err=%v)", got, tc.wantCancelled, terminal.err)
+				if tc.wantErrPrefix != "" {
+					if terminal.err == nil {
+						t.Fatal("terminal err = nil, want non-nil")
+					}
+					if got := terminal.err.Error(); !strings.HasPrefix(got, tc.wantErrPrefix) {
+						t.Fatalf("terminal err = %q, want prefix %q", got, tc.wantErrPrefix)
+					}
+				} else if terminal.err != nil {
+					t.Fatalf("terminal err = %v, want nil", terminal.err)
 				}
 				return
 			}

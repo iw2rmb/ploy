@@ -292,10 +292,13 @@ func TestDetectGradle(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name        string
-		fileName    string
-		content     string
-		wantRelease string
+		name            string
+		fileName        string
+		content         string
+		extraFiles      map[string]string
+		wantRelease     string
+		wantEvidenceKey string
+		wantError       bool
 	}{
 		{
 			name:     "ext properties with explicit compatibility",
@@ -359,6 +362,35 @@ dependencyManagerRootExtension {
 `,
 			wantRelease: "17",
 		},
+		{
+			name:     "version catalog jvm target",
+			fileName: "build.gradle",
+			content: `
+plugins { id "java" }
+`,
+			extraFiles: map[string]string{
+				"gradle/libs.versions.toml": `
+[versions]
+jvmTarget = "17"
+`,
+			},
+			wantRelease:     "17",
+			wantEvidenceKey: "versions.jvmTarget",
+		},
+		{
+			name:     "malformed version catalog",
+			fileName: "build.gradle",
+			content: `
+plugins { id "java" }
+`,
+			extraFiles: map[string]string{
+				"gradle/libs.versions.toml": `
+[versions
+jvmTarget = "17"
+`,
+			},
+			wantError: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -369,8 +401,23 @@ dependencyManagerRootExtension {
 			if err := os.WriteFile(gradlePath, []byte(tt.content), 0o600); err != nil {
 				t.Fatalf("write %s: %v", tt.fileName, err)
 			}
+			for rel, content := range tt.extraFiles {
+				path := filepath.Join(workspace, rel)
+				if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+					t.Fatalf("mkdir %s: %v", filepath.Dir(path), err)
+				}
+				if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+					t.Fatalf("write %s: %v", rel, err)
+				}
+			}
 
 			obs, err := detectGradle(context.Background(), workspace, gradlePath)
+			if tt.wantError {
+				if err == nil {
+					t.Fatal("detectGradle error = nil, want non-nil")
+				}
+				return
+			}
 			if err != nil {
 				t.Fatalf("detectGradle error: %v", err)
 			}
@@ -385,6 +432,21 @@ dependencyManagerRootExtension {
 			}
 			if obs.Language != "java" {
 				t.Errorf("language = %q, want %q", obs.Language, "java")
+			}
+			if tt.wantEvidenceKey != "" {
+				if len(obs.Evidence) != 1 {
+					t.Fatalf("evidence len = %d, want 1", len(obs.Evidence))
+				}
+				evidence := obs.Evidence[0]
+				if evidence.Path != "gradle/libs.versions.toml" {
+					t.Errorf("evidence path = %q, want %q", evidence.Path, "gradle/libs.versions.toml")
+				}
+				if evidence.Key != tt.wantEvidenceKey {
+					t.Errorf("evidence key = %q, want %q", evidence.Key, tt.wantEvidenceKey)
+				}
+				if evidence.Value != tt.wantRelease {
+					t.Errorf("evidence value = %q, want %q", evidence.Value, tt.wantRelease)
+				}
 			}
 		})
 	}

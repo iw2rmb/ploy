@@ -88,7 +88,8 @@ func imageResolutionTerminal(stackCtx gateStackContext, err error) *gateExecutio
 	if errors.Is(err, errBuildGateImageRuleMatch) {
 		code = "BUILD_GATE_NO_IMAGE_RULE"
 	}
-	return buildGateFailureTerminal(stackCtx.language, stackCtx.tool, code, err.Error(), "", nil, "")
+	return buildGateFailureTerminal(stackCtx.language, stackCtx.tool, code, err.Error(), "",
+		buildGateInternalError(code, err.Error()), "")
 }
 
 func commandResolutionTerminal(
@@ -104,7 +105,20 @@ func commandResolutionTerminal(
 	if stackCtx.stackGate != nil {
 		return stackGateFailureTerminal(stackCtx.stackGate, stackCtx.language, unknownCode, err.Error(), "", "unknown", runtimeImage, nil)
 	}
-	return buildGateFailureTerminal(stackCtx.language, stackCtx.tool, unknownCode, err.Error(), "", nil, runtimeImage)
+	return buildGateFailureTerminal(stackCtx.language, stackCtx.tool, unknownCode, err.Error(), "",
+		buildGateInternalError(unknownCode, err.Error()), runtimeImage)
+}
+
+func buildGateInternalError(code string, message string) error {
+	code = strings.TrimSpace(code)
+	message = strings.TrimSpace(message)
+	if code == "" {
+		return errors.New(message)
+	}
+	if message == "" {
+		return errors.New(code)
+	}
+	return fmt.Errorf("%s: %s", code, message)
 }
 
 // buildGateFailureTerminal builds a terminal for non-stack-gate (build-gate) failures.

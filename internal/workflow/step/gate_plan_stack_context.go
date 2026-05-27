@@ -128,16 +128,19 @@ func resolveDetectedStackContext(
 			}
 		}
 		if chosenTool == "" {
+			code := "BUILD_GATE_STACK_DETECT_FAILED"
 			if !stackDetectCfg.Default {
+				msg := "stack detection could not determine build tool"
 				return gateStackContext{}, buildGateFailureTerminal("", "stackdetect",
-					"BUILD_GATE_STACK_DETECT_FAILED",
-					"stack detection could not determine build tool",
-					"", ErrRepoCancelled, "")
+					code,
+					msg,
+					"", buildGateInternalError(code, msg), "")
 			}
+			msg := "stack detection fallback is enabled but build tool could not be determined (set build_gate.<phase>.stack.tool or ensure workspace has an unambiguous build file)"
 			return gateStackContext{}, buildGateFailureTerminal("", "stackdetect",
-				"BUILD_GATE_STACK_DETECT_FAILED",
-				"stack detection fallback is enabled but build tool could not be determined (set build_gate.<phase>.stack.tool or ensure workspace has an unambiguous build file)",
-				"", nil, "")
+				code,
+				msg,
+				"", buildGateInternalError(code, msg), "")
 		}
 
 		language = expectedLanguage
@@ -165,13 +168,15 @@ func resolveDetectedStackContext(
 		}
 
 		if stackDetectCfg != nil && stackDetectCfg.Enabled && !stackDetectCfg.Default {
+			code := "BUILD_GATE_STACK_DETECT_FAILED"
 			return gateStackContext{}, buildGateFailureTerminal("", "stackdetect",
-				"BUILD_GATE_STACK_DETECT_FAILED", msg, evidence, ErrRepoCancelled, "")
+				code, msg, evidence, buildGateInternalError(code, msg), "")
 		}
 
 		if stackDetectCfg == nil || !stackDetectCfg.Enabled {
+			code := "BUILD_GATE_STACK_DETECT_FAILED"
 			return gateStackContext{}, buildGateFailureTerminal("", "stackdetect",
-				"BUILD_GATE_STACK_DETECT_FAILED", msg, evidence, nil, "")
+				code, msg, evidence, buildGateInternalError(code, msg), "")
 		}
 	} else if stackDetectCfg == nil || !stackDetectCfg.Enabled {
 		language = strings.TrimSpace(exp.Language)
@@ -181,10 +186,12 @@ func resolveDetectedStackContext(
 	}
 
 	if exp == nil {
+		code := "BUILD_GATE_STACK_DETECT_FAILED"
+		msg := "stack detection produced incomplete result; language and release are required"
 		return gateStackContext{}, buildGateFailureTerminal("", "stackdetect",
-			"BUILD_GATE_STACK_DETECT_FAILED",
-			"stack detection produced incomplete result; language and release are required",
-			"", nil, "")
+			code,
+			msg,
+			"", buildGateInternalError(code, msg), "")
 	}
 
 	normalized := normalizeStackExpectation(exp)
