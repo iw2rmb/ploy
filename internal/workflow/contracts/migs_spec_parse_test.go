@@ -203,24 +203,49 @@ func TestParseMigSpecJSON_ValidationError(t *testing.T) {
 	}
 }
 
-// TestParseMigSpecJSON_HealingValidation tests healing spec validation.
-
-func TestParseMigSpecJSON_RequiresStepsEvenWithExtraFields(t *testing.T) {
-	input := `{
-		"mig": {
-			"image": "ghcr.io/iw2rmb/ploy/mig:latest",
-			"command": "echo hello"
-		}
-	}`
-
-	_, err := ParseMigSpecJSON([]byte(input))
-	if err == nil {
-		t.Fatal("expected error for missing steps")
+func TestParseMigSpecJSON_SchemaValidationErrors(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		wantErr []string
+	}{
+		{
+			name: "missing steps with extra root field",
+			input: `{
+				"mig": {
+					"image": "ghcr.io/iw2rmb/ploy/mig:latest",
+					"command": "echo hello"
+				}
+			}`,
+			wantErr: []string{
+				"missing property 'steps'",
+				"additional properties 'mig' not allowed",
+			},
+		},
+		{
+			name: "unknown nested build gate field",
+			input: `{
+				"steps": [{"image": "ghcr.io/iw2rmb/ploy/mig:latest"}],
+				"build_gate": {"enabled": true}
+			}`,
+			wantErr: []string{
+				"build_gate: additional properties 'enabled' not allowed",
+			},
+		},
 	}
-	for _, want := range []string{"missing property 'steps'", "additional properties 'mig' not allowed"} {
-		if !strings.Contains(err.Error(), want) {
-			t.Errorf("error = %q, want to contain %q", err.Error(), want)
-		}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := ParseMigSpecJSON([]byte(tt.input))
+			if err == nil {
+				t.Fatal("expected schema validation error")
+			}
+			for _, want := range tt.wantErr {
+				if !strings.Contains(err.Error(), want) {
+					t.Errorf("error = %q, want to contain %q", err.Error(), want)
+				}
+			}
+		})
 	}
 }
 
