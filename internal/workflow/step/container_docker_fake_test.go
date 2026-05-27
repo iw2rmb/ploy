@@ -74,10 +74,14 @@ type fakeDockerClient struct {
 	statsErr    error
 
 	// ImagePull behavior
-	pullErr    error
-	pullCalled bool
-	pullRef    string // captured image reference
-	pullOpts   client.ImagePullOptions
+	pullErr        error
+	pullErrs       []error
+	pullCalled     bool
+	pullCalls      int
+	pullRef        string // captured image reference
+	pullRefs       []string
+	pullOpts       client.ImagePullOptions
+	pullOptsByCall []client.ImagePullOptions
 
 	// ImageInspect behavior (used by pull policy tests)
 	imageInspectErr    error
@@ -171,9 +175,20 @@ func (f *fakeDockerClient) ContainerStats(ctx context.Context, containerID strin
 // Returns client.ImagePullResponse (which embeds io.ReadCloser).
 func (f *fakeDockerClient) ImagePull(ctx context.Context, refStr string, options client.ImagePullOptions) (client.ImagePullResponse, error) {
 	f.pullCalled = true
+	f.pullCalls++
 	f.pullRef = refStr
+	f.pullRefs = append(f.pullRefs, refStr)
 	f.pullOpts = options
-	if f.pullErr != nil {
+	f.pullOptsByCall = append(f.pullOptsByCall, options)
+	if len(f.pullErrs) > 0 {
+		idx := f.pullCalls - 1
+		if idx >= len(f.pullErrs) {
+			idx = len(f.pullErrs) - 1
+		}
+		if f.pullErrs[idx] != nil {
+			return nil, f.pullErrs[idx]
+		}
+	} else if f.pullErr != nil {
 		return nil, f.pullErr
 	}
 	// Return a type that satisfies client.ImagePullResponse (io.ReadCloser + extra methods).

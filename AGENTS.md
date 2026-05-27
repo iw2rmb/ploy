@@ -50,12 +50,12 @@ Use this flow for any "why did run/job fail?" request.
 - Free-space data is available from:
   - `GET /v1/nodes` for the selected constrained storage aggregate.
   - `GET /v1/nodes/<node-id>/diagnostics` for `node.details.storage.paths`, covering `/`, `DOCKER_ROOT_DIR`, `PLOYD_CACHE_HOME`, `PLOY_BUILDGATE_CACHE_ROOT`, and `TMPDIR`.
-- Node maintenance is host-owned by deploy `systemd` timers:
-  - `ploy-node-auth-refresh.timer`
-  - `ploy-node-update.timer`
+- Node maintenance is host-owned by deploy `systemd` services:
+  - `ploy-node-auth-refresh.service`
+  - `ploy-node-update.service`
   - `ploy-node-cleanup.timer`
 - Historical node action rows remain readable with `GET /v1/nodes/<node-id>/actions?limit=N`.
-- Node image pulls use direct Docker auth from `PLOY_DOCKER_AUTH_CONFIG`, then `PLOY_DOCKER_AUTH_CONFIG_FILE`, then `DOCKER_AUTH_CONFIG`.
+- Node image pulls read Docker auth only from `PLOY_DOCKER_AUTH_CONFIG_FILE`; on registry unauthorized, `PLOY_DOCKER_AUTH_REFRESH_CONTAINER` can refresh auth once before a single retry.
 
 ## 3) Minimum required evidence
 - `ploy run status <run-id> --json`
