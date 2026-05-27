@@ -5,6 +5,7 @@ import (
 	"io"
 	"strings"
 
+	runcli "github.com/iw2rmb/ploy/internal/cli/run"
 	"github.com/spf13/cobra"
 
 	iversion "github.com/iw2rmb/ploy/internal/version"
@@ -44,10 +45,10 @@ func NewRootCmdWithIO(stdout, stderr io.Writer) *cobra.Command {
 	root.AddCommand(versionCmd)
 	root.Flags().BoolP("version", "v", false, "Print version information")
 
-	root.AddCommand(newMigCmd(stderr))  // ploy mig (run, fetch, cancel, inspect, artifacts, diffs)
-	root.AddCommand(newRunCmd(stderr))  // ploy run (events, inspect)
-	root.AddCommand(newJobCmd(stderr))  // ploy job (follow job logs)
-	root.AddCommand(newPullCmd(stderr)) // ploy pull (local repo pull workflow)
+	root.AddCommand(newMigCmd(stderr))   // ploy mig (run, fetch, cancel, inspect, artifacts, diffs)
+	root.AddCommand(runcli.NewCommand()) // ploy run (events, inspect)
+	root.AddCommand(newJobCmd(stderr))   // ploy job (follow job logs)
+	root.AddCommand(newPullCmd(stderr))  // ploy pull (local repo pull workflow)
 
 	root.AddCommand(newClusterCmd(stderr))        // ploy cluster (node, token)
 	root.AddCommand(newConfigCmd(stdout, stderr)) // ploy config

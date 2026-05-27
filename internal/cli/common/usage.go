@@ -73,31 +73,6 @@ func join(parts []string, sep string) string {
 	return out
 }
 
-// Minimal helpers for run usage output paths.
-// For `ploy run`, print full subcommand list.
-func PrintRunUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy run <command>")
-	_, _ = fmt.Fprintln(w, "       ploy run --repo <url> --base-ref <ref> --target-ref <ref> --spec <path|->")
-	_, _ = fmt.Fprintln(w, "")
-	_, _ = fmt.Fprintln(w, "Commands:")
-	_, _ = fmt.Fprintln(w, "  ls          List batch runs with pagination")
-	_, _ = fmt.Fprintln(w, "  status      Show status for a run (use --json for machine-readable links/artifacts)")
-	_, _ = fmt.Fprintln(w, "  logs        Stream run lifecycle events (SSE)")
-	_, _ = fmt.Fprintln(w, "  cancel      Cancel a run via the control plane")
-	_, _ = fmt.Fprintln(w, "  start       Start pending repos for a batch run")
-	_, _ = fmt.Fprintln(w, "  pull        Pull diffs into the current git worktree")
-	_, _ = fmt.Fprintln(w, "  patch       Download a run patch artifact (.patch.gz) without applying")
-	_, _ = fmt.Fprintln(w, "")
-	_, _ = fmt.Fprintln(w, "Run submission (direct flags without subcommand):")
-	_, _ = fmt.Fprintln(w, "  --repo <url>       Git repository URL (https/ssh/file)")
-	_, _ = fmt.Fprintln(w, "  --base-ref <ref>   Base Git ref (branch or tag)")
-	_, _ = fmt.Fprintln(w, "  --target-ref <ref> Target Git ref (branch)")
-	_, _ = fmt.Fprintln(w, "  --spec <path|->    Path to YAML/JSON spec file (use '-' for stdin)")
-	_, _ = fmt.Fprintln(w, "  --follow           Follow run until completion")
-	_, _ = fmt.Fprintln(w, "  --artifact-dir <dir> Download final artifacts after successful --follow")
-	_, _ = fmt.Fprintln(w, "  --json             Print machine-readable JSON summary")
-}
-
 // wantsHelp checks whether the given argument list represents a help request.
 // It returns true if the sole argument is "--help" or "-h", which is the
 // pattern used by command routers that manually parse arguments

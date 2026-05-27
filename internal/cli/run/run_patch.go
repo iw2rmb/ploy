@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"flag"
 	"fmt"
 	"io"
 	"net/http"
@@ -20,42 +19,33 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-// handleRunPatch implements:
+type PatchOptions struct {
+	RunID      string
+	RepoID     string
+	RepoURL    string
+	DiffID     string
+	OutputPath string
+	Output     io.Writer
+}
+
+// RunPatch implements:
 //
 //	ploy run patch [--repo-id <id> | --repo-url <url>] [--diff-id <uuid>] [--output <path|->] <run-id>
 //
 // It is a read-only command: it downloads the stored patch artifact and does not apply it.
-func handleRunPatch(args []string, stderr io.Writer) error {
-	if common.WantsHelp(args) {
-		printRunPatchUsage(stderr)
-		return nil
-	}
-
-	fs := flag.NewFlagSet("run patch", flag.ContinueOnError)
-	fs.SetOutput(io.Discard)
-
-	repoIDFlag := fs.String("repo-id", "", "repo id")
-	repoURLFlag := fs.String("repo-url", "", "repo url")
-	diffIDFlag := fs.String("diff-id", "", "specific diff id to download (default: latest)")
-	output := fs.String("output", "-", "output path for .patch.gz bytes ('-' for stdout)")
-
-	if err := common.ParseFlagSet(fs, args, func() { printRunPatchUsage(stderr) }); err != nil {
-		return err
-	}
-
-	rest := fs.Args()
-	if len(rest) == 0 || strings.TrimSpace(rest[0]) == "" {
-		printRunPatchUsage(stderr)
+func RunPatch(ctx context.Context, opts PatchOptions) error {
+	runIDValue := strings.TrimSpace(opts.RunID)
+	if runIDValue == "" {
 		return errors.New("run-id required")
 	}
-	if len(rest) > 1 {
-		printRunPatchUsage(stderr)
-		return fmt.Errorf("unexpected argument: %s", rest[1])
+	out := opts.Output
+	if out == nil {
+		out = io.Discard
 	}
 
-	runID := domaintypes.RunID(strings.TrimSpace(rest[0]))
+	runID := domaintypes.RunID(runIDValue)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 
 	base, httpClient, err := common.ResolveControlPlaneHTTP(ctx)
@@ -63,7 +53,7 @@ func handleRunPatch(args []string, stderr io.Writer) error {
 		return fmt.Errorf("run patch: %w", err)
 	}
 
-	repoID, err := resolveRunPatchRepoID(ctx, httpClient, base, runID, strings.TrimSpace(*repoIDFlag), strings.TrimSpace(*repoURLFlag))
+	repoID, err := resolveRunPatchRepoID(ctx, httpClient, base, runID, strings.TrimSpace(opts.RepoID), strings.TrimSpace(opts.RepoURL))
 	if err != nil {
 		return fmt.Errorf("run patch: %w", err)
 	}
@@ -76,7 +66,7 @@ func handleRunPatch(args []string, stderr io.Writer) error {
 		return errors.New("run patch: no diffs available for this repo execution")
 	}
 
-	selectedDiff, err := resolveRunPatchDiffID(diffs, strings.TrimSpace(*diffIDFlag))
+	selectedDiff, err := resolveRunPatchDiffID(diffs, strings.TrimSpace(opts.DiffID))
 	if err != nil {
 		return fmt.Errorf("run patch: %w", err)
 	}
@@ -94,7 +84,7 @@ func handleRunPatch(args []string, stderr io.Writer) error {
 		return fmt.Errorf("run patch: download patch: %w", err)
 	}
 
-	if err := writeRunPatchOutput(strings.TrimSpace(*output), patchGzip); err != nil {
+	if err := writeRunPatchOutput(strings.TrimSpace(opts.OutputPath), patchGzip, out); err != nil {
 		return fmt.Errorf("run patch: write output: %w", err)
 	}
 
@@ -172,9 +162,9 @@ func resolveRunPatchDiffID(diffs []migs.DiffEntry, diffIDFlag string) (domaintyp
 	return "", fmt.Errorf("diff %s not found in run repo diff listing", diffID)
 }
 
-func writeRunPatchOutput(outputPath string, patchGzip []byte) error {
+func writeRunPatchOutput(outputPath string, patchGzip []byte, out io.Writer) error {
 	if outputPath == "" || outputPath == "-" {
-		_, err := os.Stdout.Write(patchGzip)
+		_, err := out.Write(patchGzip)
 		return err
 	}
 
@@ -182,25 +172,6 @@ func writeRunPatchOutput(outputPath string, patchGzip []byte) error {
 		return err
 	}
 	return os.WriteFile(outputPath, patchGzip, 0o600)
-}
-
-func printRunPatchUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy run patch [--repo-id <id> | --repo-url <url>] [--diff-id <uuid>] [--output <path|->] <run-id>")
-	_, _ = fmt.Fprintln(w, "")
-	_, _ = fmt.Fprintln(w, "Downloads a stored patch artifact (.patch.gz) without applying it.")
-	_, _ = fmt.Fprintln(w, "")
-	_, _ = fmt.Fprintln(w, "Flags:")
-	_, _ = fmt.Fprintln(w, "  --repo-id <id>       Repo ID selector")
-	_, _ = fmt.Fprintln(w, "  --repo-url <url>     Repo URL selector")
-	_, _ = fmt.Fprintln(w, "  --diff-id <uuid>     Specific diff ID to download (default: latest)")
-	_, _ = fmt.Fprintln(w, "  --output <path|->    Output path for raw .patch.gz bytes (default: -)")
-	_, _ = fmt.Fprintln(w, "")
-	_, _ = fmt.Fprintln(w, "Notes:")
-	_, _ = fmt.Fprintln(w, "  - If no repo selector is provided and the run has one repo, it is selected automatically.")
-	_, _ = fmt.Fprintln(w, "  - For multi-repo runs, provide --repo-id or --repo-url.")
-	_, _ = fmt.Fprintln(w, "  - This command does not run git prechecks.")
-	_, _ = fmt.Fprintln(w, "  - This command does not create or switch branches.")
-	_, _ = fmt.Fprintln(w, "  - This command does not apply patch content.")
 }
 
 type runPatchRepoEntry struct {

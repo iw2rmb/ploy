@@ -7,7 +7,6 @@ import (
 
 	"github.com/iw2rmb/ploy/internal/cli/mig"
 	"github.com/iw2rmb/ploy/internal/cli/pull"
-	runcli "github.com/iw2rmb/ploy/internal/cli/run"
 	"github.com/spf13/cobra"
 )
 
@@ -46,11 +45,6 @@ func newMigCmd(stderr io.Writer) *cobra.Command {
 	}})
 
 	return migCmd
-}
-
-// newRunCmd creates the cobra command for 'ploy run' (inspect/follow runs).
-func newRunCmd(stderr io.Writer) *cobra.Command {
-	return newRunCommand(stderr)
 }
 
 func newMigAddCmd(stderr io.Writer) *cobra.Command {
@@ -230,148 +224,5 @@ func newMigFetchCmd(stderr io.Writer) *cobra.Command {
 	}}
 	cmd.Flags().StringVar(&runID, "run", "", "Migs run id to fetch artifacts for")
 	cmd.Flags().StringVar(&artifactDir, "artifact-dir", "", "Directory to download artifacts into")
-	return cmd
-}
-
-func newRunCommand(stderr io.Writer) *cobra.Command {
-	var repoURL, baseRef, targetRef, specFile, jobImage, jobCommand, artifactDir string
-	var jobEnv []string
-	var follow, cancelOnCap, jsonOut bool
-	var capDuration time.Duration
-	var maxRetries int
-	runCmd := &cobra.Command{
-		Use:   "run",
-		Short: "Inspect runs and stream events",
-		Args:  cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			if !cmd.Flags().Changed("repo") && !cmd.Flags().Changed("base-ref") && !cmd.Flags().Changed("target-ref") && !cmd.Flags().Changed("spec") {
-				return cmd.Help()
-			}
-			runArgs := []string{}
-			runArgs = addChangedString(cmd, runArgs, "repo", repoURL)
-			runArgs = addChangedString(cmd, runArgs, "base-ref", baseRef)
-			runArgs = addChangedString(cmd, runArgs, "target-ref", targetRef)
-			runArgs = addChangedString(cmd, runArgs, "spec", specFile)
-			runArgs = addChangedBool(cmd, runArgs, "follow", follow)
-			runArgs = addChangedDuration(cmd, runArgs, "cap", capDuration)
-			runArgs = addChangedBool(cmd, runArgs, "cancel-on-cap", cancelOnCap)
-			runArgs = addChangedInt(cmd, runArgs, "max-retries", maxRetries)
-			runArgs = addChangedStringArray(cmd, runArgs, "job-env", jobEnv)
-			runArgs = addChangedString(cmd, runArgs, "job-image", jobImage)
-			runArgs = addChangedString(cmd, runArgs, "job-command", jobCommand)
-			runArgs = addChangedString(cmd, runArgs, "artifact-dir", artifactDir)
-			runArgs = addChangedBool(cmd, runArgs, "json", jsonOut)
-			return runcli.Handle(runArgs, stderr)
-		},
-	}
-	runCmd.Flags().StringVar(&repoURL, "repo", "", "Git repository URL")
-	runCmd.Flags().StringVar(&baseRef, "base-ref", "", "Base Git ref")
-	runCmd.Flags().StringVar(&targetRef, "target-ref", "", "Target Git ref")
-	runCmd.Flags().StringVar(&specFile, "spec", "", "Path to YAML/JSON spec file")
-	runCmd.Flags().BoolVar(&follow, "follow", false, "Follow run until completion")
-	runCmd.Flags().DurationVar(&capDuration, "cap", 0, "Optional time cap for --follow")
-	runCmd.Flags().BoolVar(&cancelOnCap, "cancel-on-cap", false, "Cancel run if cap exceeded")
-	runCmd.Flags().IntVar(&maxRetries, "max-retries", 5, "Max report fetch retries")
-	runCmd.Flags().StringArrayVar(&jobEnv, "job-env", nil, "Job environment KEY=VALUE")
-	runCmd.Flags().StringVar(&jobImage, "job-image", "", "Container image for the mig step")
-	runCmd.Flags().StringVar(&jobCommand, "job-command", "", "Container command override")
-	runCmd.Flags().StringVar(&artifactDir, "artifact-dir", "", "Directory to download final artifacts into")
-	runCmd.Flags().BoolVar(&jsonOut, "json", false, "Print machine-readable JSON summary")
-	runCmd.AddCommand(newRunListCmd(stderr))
-	runCmd.AddCommand(newRunCancelCmd(stderr))
-	runCmd.AddCommand(&cobra.Command{Use: "start <run-id>", Short: "Start pending repos for a batch run", Args: cobra.ExactArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
-		return runcli.Handle(append([]string{"start"}, args...), stderr)
-	}})
-	runCmd.AddCommand(newRunStatusCmd(stderr))
-	runCmd.AddCommand(newRunLogsCmd(stderr))
-	runCmd.AddCommand(newRunPullCmd(stderr))
-	runCmd.AddCommand(newRunPatchCmd(stderr))
-	return runCmd
-}
-
-func newRunListCmd(stderr io.Writer) *cobra.Command {
-	var limit, offset int
-	cmd := &cobra.Command{Use: "ls", Short: "List batch runs with pagination", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, args []string) error {
-		runArgs := []string{"ls"}
-		runArgs = addChangedInt(cmd, runArgs, "limit", limit)
-		runArgs = addChangedInt(cmd, runArgs, "offset", offset)
-		return runcli.Handle(runArgs, stderr)
-	}}
-	cmd.Flags().IntVar(&limit, "limit", 50, "Max number of runs to return")
-	cmd.Flags().IntVar(&offset, "offset", 0, "Number of runs to skip")
-	return cmd
-}
-
-func newRunCancelCmd(stderr io.Writer) *cobra.Command {
-	var reason string
-	cmd := &cobra.Command{Use: "cancel [--reason <text>] <run-id>", Short: "Cancel a run via the control plane", Args: cobra.ExactArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
-		runArgs := []string{"cancel"}
-		runArgs = addChangedString(cmd, runArgs, "reason", reason)
-		runArgs = append(runArgs, args...)
-		return runcli.Handle(runArgs, stderr)
-	}}
-	cmd.Flags().StringVar(&reason, "reason", "", "Optional reason for cancellation")
-	return cmd
-}
-
-func newRunStatusCmd(stderr io.Writer) *cobra.Command {
-	var jsonOut bool
-	cmd := &cobra.Command{Use: "status [--json] <run-id>", Short: "Show status for a run", Args: cobra.ExactArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
-		runArgs := []string{"status"}
-		runArgs = addChangedBool(cmd, runArgs, "json", jsonOut)
-		runArgs = append(runArgs, args...)
-		return runcli.Handle(runArgs, stderr)
-	}}
-	cmd.Flags().BoolVar(&jsonOut, "json", false, "Print machine-readable JSON report")
-	return cmd
-}
-
-func newRunLogsCmd(stderr io.Writer) *cobra.Command {
-	var maxRetries int
-	var idleTimeout, timeout time.Duration
-	cmd := &cobra.Command{Use: "logs <run-id>", Short: "Stream run lifecycle events", Args: cobra.ExactArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
-		runArgs := []string{"logs"}
-		runArgs = addChangedInt(cmd, runArgs, "max-retries", maxRetries)
-		runArgs = addChangedDuration(cmd, runArgs, "idle-timeout", idleTimeout)
-		runArgs = addChangedDuration(cmd, runArgs, "timeout", timeout)
-		runArgs = append(runArgs, args...)
-		return runcli.Handle(runArgs, stderr)
-	}}
-	cmd.Flags().IntVar(&maxRetries, "max-retries", 3, "Max reconnect attempts")
-	cmd.Flags().DurationVar(&idleTimeout, "idle-timeout", 45*time.Second, "Cancel if no events arrive")
-	cmd.Flags().DurationVar(&timeout, "timeout", 0, "Overall timeout for the stream")
-	return cmd
-}
-
-func newRunPullCmd(stderr io.Writer) *cobra.Command {
-	var origin string
-	var dryRun bool
-	cmd := &cobra.Command{Use: "pull [--origin <remote>] [--dry-run] <run-id>", Short: "Pull diffs into the current git worktree", Args: cobra.ExactArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
-		runArgs := []string{"pull"}
-		runArgs = addChangedString(cmd, runArgs, "origin", origin)
-		runArgs = addChangedBool(cmd, runArgs, "dry-run", dryRun)
-		runArgs = append(runArgs, args...)
-		return runcli.Handle(runArgs, stderr)
-	}}
-	cmd.Flags().StringVar(&origin, "origin", "origin", "Git remote to match")
-	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Validate and print actions without mutating the repo")
-	return cmd
-}
-
-func newRunPatchCmd(stderr io.Writer) *cobra.Command {
-	var repoID, repoURL, diffID, output string
-	cmd := &cobra.Command{Use: "patch [--repo-id <id> | --repo-url <url>] [--diff-id <uuid>] [--output <path|->] <run-id>", Short: "Download a run patch artifact", Args: cobra.ExactArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
-		runArgs := []string{"patch"}
-		runArgs = addChangedString(cmd, runArgs, "repo-id", repoID)
-		runArgs = addChangedString(cmd, runArgs, "repo-url", repoURL)
-		runArgs = addChangedString(cmd, runArgs, "diff-id", diffID)
-		runArgs = addChangedString(cmd, runArgs, "output", output)
-		runArgs = append(runArgs, args...)
-		return runcli.Handle(runArgs, stderr)
-	}}
-	cmd.Flags().StringVar(&repoID, "repo-id", "", "Repo id")
-	cmd.Flags().StringVar(&repoURL, "repo-url", "", "Repo url")
-	cmd.Flags().StringVar(&diffID, "diff-id", "", "Specific diff id to download")
-	cmd.Flags().StringVar(&output, "output", "-", "Output path")
 	return cmd
 }
