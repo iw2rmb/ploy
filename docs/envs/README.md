@@ -217,12 +217,16 @@ setting on typical deployments where Docker runs on the default Unix socket.
 Runtime behavior: the node's Docker client is created from standard Docker env vars with API version negotiation enabled.
 
 - `PLOY_DOCKER_AUTH_CONFIG_FILE` — Optional path to a Docker auth config JSON
-  file. When set, this file is read for each job runtime initialization so host
-  auth refreshes take effect without recreating the node container. If set and unreadable,
-  node runtime initialization fails explicitly instead of silently pulling
-  without credentials.
+  file. When set, this file is read for each job image pull so host auth
+  refreshes take effect without recreating the node container. If set and
+  unreadable, image pulls fail explicitly instead of silently pulling without
+  credentials.
   Example:
   `{"auths":{"ghcr.io":{"auth":"<base64(username:token)>"}}}`.
+- `PLOY_DOCKER_AUTH_REFRESH_CONTAINER` — Optional helper container name or ID.
+  When set, registry unauthorized pull errors trigger
+  `/usr/local/lib/ploy/ploy-node-auth-refresh refresh-for-pull <image-ref>` in
+  that container, followed by one pull retry.
 
 The node does not consume inline registry-auth environment variables for job
 image pulls. Use `PLOY_DOCKER_AUTH_CONFIG_FILE` for private registries.

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"os"
 	"strings"
 
 	"github.com/moby/moby/api/types/registry"
@@ -23,7 +24,10 @@ type dockerAuthEntry struct {
 }
 
 func (r *DockerContainerRuntime) registryAuthForImage(imageRef string) (string, error) {
-	raw := strings.TrimSpace(r.opts.RegistryAuthConfigJSON)
+	raw, err := r.registryAuthConfigJSON()
+	if err != nil {
+		return "", err
+	}
 	if raw == "" {
 		return "", nil
 	}
@@ -51,6 +55,17 @@ func (r *DockerContainerRuntime) registryAuthForImage(imageRef string) (string, 
 		return "", fmt.Errorf("encode registry auth: %w", err)
 	}
 	return encoded, nil
+}
+
+func (r *DockerContainerRuntime) registryAuthConfigJSON() (string, error) {
+	if path := strings.TrimSpace(r.opts.RegistryAuthConfigFile); path != "" {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return "", fmt.Errorf("read registry auth config file %q: %w", path, err)
+		}
+		return strings.TrimSpace(string(data)), nil
+	}
+	return strings.TrimSpace(r.opts.RegistryAuthConfigJSON), nil
 }
 
 func toDockerAuthConfig(entry dockerAuthEntry, serverAddress string) (registry.AuthConfig, bool) {

@@ -52,6 +52,7 @@ type dockerStatsAPI interface {
 type DockerContainerRuntime struct {
 	client dockerClientAPI
 	images dockerImageAPI
+	exec   DockerExecAPI
 	stats  dockerStatsAPI
 	opts   DockerContainerRuntimeOptions
 }
@@ -64,7 +65,7 @@ func NewDockerContainerRuntime(opts DockerContainerRuntimeOptions) (ContainerRun
 	if err != nil {
 		return nil, fmt.Errorf("step: configure docker runtime: %w", err)
 	}
-	return &DockerContainerRuntime{client: cli, images: cli, stats: cli, opts: opts}, nil
+	return &DockerContainerRuntime{client: cli, images: cli, exec: cli, stats: cli, opts: opts}, nil
 }
 
 // newDockerContainerRuntimeWithClient constructs a DockerContainerRuntime with
@@ -73,6 +74,9 @@ func newDockerContainerRuntimeWithClient(cli dockerClientAPI, opts DockerContain
 	rt := &DockerContainerRuntime{client: cli, opts: opts}
 	if img, ok := cli.(dockerImageAPI); ok {
 		rt.images = img
+	}
+	if execAPI, ok := cli.(DockerExecAPI); ok {
+		rt.exec = execAPI
 	}
 	if s, ok := cli.(dockerStatsAPI); ok {
 		rt.stats = s
@@ -281,6 +285,20 @@ func (r *DockerContainerRuntime) ensureImageAvailable(ctx context.Context, image
 }
 
 func (r *DockerContainerRuntime) pullImage(ctx context.Context, imageRef string) error {
+	err := r.pullImageOnce(ctx, imageRef)
+	if err == nil {
+		return nil
+	}
+	if !isRegistryUnauthorized(err) || strings.TrimSpace(r.opts.RegistryAuthRefreshContainer) == "" {
+		return err
+	}
+	if refreshErr := r.refreshRegistryAuthForPull(ctx, imageRef); refreshErr != nil {
+		return fmt.Errorf("%w; auth refresh failed: %v", err, refreshErr)
+	}
+	return r.pullImageOnce(ctx, imageRef)
+}
+
+func (r *DockerContainerRuntime) pullImageOnce(ctx context.Context, imageRef string) error {
 	registryAuth, err := r.registryAuthForImage(imageRef)
 	if err != nil {
 		return fmt.Errorf("step: pull image %s: %w", imageRef, err)
@@ -294,8 +312,31 @@ func (r *DockerContainerRuntime) pullImage(ctx context.Context, imageRef string)
 	}
 	defer func() { _ = reader.Close() }()
 	// Drain the response to ensure the pull completes before returning.
-	_, _ = io.Copy(io.Discard, reader)
+	if _, err := io.Copy(io.Discard, reader); err != nil {
+		return fmt.Errorf("step: pull image %s: %w", imageRef, err)
+	}
+	if err := reader.Wait(ctx); err != nil {
+		return fmt.Errorf("step: pull image %s: %w", imageRef, err)
+	}
 	return nil
+}
+
+func isRegistryUnauthorized(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	for _, needle := range []string{
+		"unauthorized",
+		"authentication required",
+		"no basic auth credentials",
+		"denied: requested access",
+	} {
+		if strings.Contains(msg, needle) {
+			return true
+		}
+	}
+	return false
 }
 
 // flattenEnv converts a map[string]string environment to []string "K=V" format.
