@@ -1,28 +1,5 @@
 # TODO
 
-## CLI Run machinery refactor
-
-- update `ploy run ...`
-
-```bash
-ploy run <spec-path> [ <repo-path> = . {--apply} | <namespace/repo{:<sha|branch>}> ] { --pull <artifacts-path> }
-    # run spec for a [ local repo { and apply result } or remote repo ] and put final artifacts
-    # spec is a folder that contains mig.yaml or full path to any yaml-file that is compliant with spec
-    # if no <repo-path> / <namespace/repo> is specified, then ploy looks into CWD
-    # if at CWD is not a git repo -> hard fail; otherwise, convert from HEAD to <sha:namespace/repo>, no diff/staged included
-    # if --apply then apply resulting patch if succeeded
-    # remove other flags and corresponding machinery (--json, --job*, --cap*, --max-retries, --target-ref)
-ploy run ls {[ | <path> | <sha|branch>:namespace/repo ]} {--per-page X} {--page Y} # list last runs { for a specific repo }
-ploy run cancel <run-id>
-ploy run apply <run-id> {<path> = .} # apply patch from run-id to the repo in <path>, defaulting <path> to CWD; replaces `ploy run patch`
-ploy run pull <run-id> {<artifacts-path>} # pull artifacts to a specific path; if not specified - put in OS-generated tmp
-```
-
-- remove `ploy run patch` (replaced with `ploy run apply`);
-- remove previous machinery for `ploy run pull`;
-- remove `ploy run start` entierly;
-- keep `ploy run status`.
-
 ## Specs
 
 - remove `kind` field
