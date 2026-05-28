@@ -20,6 +20,7 @@ The new contract removes submit-time flag composition, removes the old diff-orie
 In scope:
 
 - `internal/cli/run` command tree and handlers.
+- `ploy job log` default-format adjustment.
 - Shared CLI helpers needed to resolve local repo identity, remote repo specs, artifact directories, and patch application.
 - Removal of `GET /v1/runs/{run_id}/logs` and its CLI client path.
 - CLI tests and app-level help/golden outputs for the new `ploy run` surface.
@@ -77,6 +78,7 @@ The target contract makes one path primary: submit a spec against a local or rem
 - `DownloadRunArtifacts` fetches status, resolves artifact CIDs through `GET /v1/artifacts?cid=...`, downloads via `GET /v1/artifacts/{id}?download=true`, and writes `manifest.json` in `internal/cli/run/run_artifact.go:31-196`.
 - Current `ploy run logs` is registered as a subcommand in `internal/cli/run/run_commands.go:124-142` and implemented by `internal/cli/run/run_logs.go`.
 - Current `GET /v1/runs/{run_id}/logs` is registered at `internal/server/handlers/register.go:101` and served by the run lifecycle SSE handler in `internal/server/handlers/events.go`.
+- Current `ploy job log` registers `--format` with default `structured` in `internal/cli/app/commands_job.go`; `internal/cli/job/log.go` also defaults an empty format to structured.
 - Current `ploy run pull` delegates to `internal/cli/pull.HandleRunPull` from `internal/cli/run/run_commands.go:145-166`. That old flow requires a git worktree, requires a clean tree, resolves `origin`, calls `POST /v1/runs/{run_id}/pull`, fetches refs, creates a branch, downloads diffs, and applies them at `internal/cli/pull/run_pull.go:57-219`.
 - Current `ploy run patch` downloads gzip patch bytes without applying them through `RunPatch` in `internal/cli/run/run_patch.go`.
 - Current `ploy run start` calls `runs.StartCommand` and `POST /v1/runs/{id}/start` through `internal/cli/run/run_start.go:20-49`.
@@ -195,6 +197,13 @@ Pagination:
 - `--json` and `--follow` are mutually exclusive.
 - Root submit `--json` is still removed; status JSON is a retained inspection capability.
 
+### `ploy job log`
+
+- Keep `ploy job log [--follow|-f] [--format <raw|structured>] <job-id>`.
+- Change the default format to `raw`.
+- `--format structured` remains available for callers that need timestamp/stream-prefixed records.
+- The command should emit raw log lines when `--format` is omitted.
+
 ## Implementation Notes
 
 ### Command Tree
@@ -214,6 +223,13 @@ Pagination:
 - For `--follow`, render the same live status view as current submit follow mode, but drive it from repeated run report/status fetches instead of `GET /v1/runs/{run_id}/logs`.
 - Refactor any reusable renderer out of `runs.FollowRunCommand` if needed; do not keep the run-log SSE endpoint only for follow rendering.
 - Do not add `--cap`, `--cancel-on-cap`, or `--max-retries` to `run status --follow`; use command-owned defaults.
+
+### Job Log Path
+
+- Change the Cobra flag default in `internal/cli/app/commands_job.go` from `structured` to `raw`.
+- Change `internal/cli/job/log.go` so an empty `LogOptions.Format` defaults to `logs.FormatRaw`.
+- Keep validation restricted to `raw` and `structured`.
+- Update tests that assume the implicit default is structured; keep explicit structured-format coverage.
 
 ### Submit Path
 
@@ -329,6 +345,7 @@ Remove or update tests and docs that assert the old surface:
 - `internal/cli/app/run_logs_test.go`.
 - `internal/cli/app/run_submit_test.go` old flag-shape cases.
 - `internal/cli/app/run_status_test.go` should keep `run status --json` coverage and add `run status --follow` coverage.
+- `internal/cli/job/log_test.go` default-format expectations.
 - Server tests that assert `GET /v1/runs/{run_id}/logs`.
 - `internal/cli/run/run_command_test.go` old help/command inventory expectations.
 - `cmd/ploy/README.md` sections for old `ploy run --repo ...`, `run patch`, old `run pull`, `run start`, `run logs`, root submit `--json`, `--cap`, and `--max-retries`.
@@ -439,6 +456,8 @@ Testable outcome:
 - `ploy run status <run-id>` still renders status.
 - `ploy run status --json <run-id>` still renders JSON status.
 - `ploy run status <run-id> --follow` renders the live run status until the run reaches a terminal state.
+- `ploy job log <job-id>` defaults to raw output.
+- `ploy job log <job-id> --format structured` still renders structured output.
 
 ## Risks
 
