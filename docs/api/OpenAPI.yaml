@@ -16,7 +16,7 @@ info:
     - `/v1/migs/{mig_id}/pull` — resolve repo execution for `ploy mig pull`.
     - `/v1/repos/resolve` — expand `namespace/repo[:ref]` shorthand using server-owned GitLab config.
     - `/v1/runs` — single-repo run submission and run listing.
-    - `/v1/runs/{run_id}/*` — run lifecycle (inspect/cancel/start).
+    - `/v1/runs/{run_id}/*` — run lifecycle (inspect/cancel).
     - `/v1/runs/{run_id}/repos/{repo_id}/*` — repo-scoped execution surfaces:
       - `/diffs` — list diffs for a repo execution.
       - `/logs` — SSE stream of logs/events for a repo execution.
@@ -158,8 +158,6 @@ paths:
     $ref: "./paths/runs_id.yaml"
   /v1/runs/{run_id}/status:
     $ref: "./paths/migs_id.yaml"
-  /v1/runs/{run_id}/start:
-    $ref: "./paths/runs_id_start.yaml"
   /v1/runs/{run_id}/cancel:
     $ref: "./paths/runs_id_cancel.yaml"
   /v1/runs/{run_id}/repos:

@@ -264,3 +264,30 @@ func TestRunStatusJSONGate(t *testing.T) {
 		})
 	}
 }
+
+func TestRunStatusFollowUsesReportPolling(t *testing.T) {
+	runID := domaintypes.NewRunID().String()
+	server := newSuccessfulRunSubmitServer(t, successfulRunSubmitConfig{
+		RunID:   runID,
+		MigID:   domaintypes.NewMigID().String(),
+		SpecID:  domaintypes.NewSpecID().String(),
+		RepoID:  domaintypes.NewMigRepoID().String(),
+		JobID:   domaintypes.NewJobID().String(),
+		RepoURL: "https://gitlab.example.com/acme/service.git",
+		Ref:     "main",
+	})
+	defer server.Close()
+	clienv.UseServerDescriptor(t, server.URL)
+
+	var buf bytes.Buffer
+	if err := executeCmd([]string{"run", "status", "--follow", runID}, &buf); err != nil {
+		t.Fatalf("run status --follow error: %v", err)
+	}
+	out := buf.String()
+	if !strings.Contains(out, "acme/service") {
+		t.Fatalf("expected final status snapshot, got %q", out)
+	}
+	if strings.Contains(out, "/v1/runs/"+runID+"/logs") {
+		t.Fatalf("follow output should not include removed log endpoint: %q", out)
+	}
+}

@@ -99,7 +99,6 @@ func registerRunRoutes(s *httpserver.Server, deps routeDeps) {
 	s.RegisterRouteFunc("GET /v1/runs/{run_id}", getRunHandler(deps.st), auth.RoleControlPlane)
 	s.RegisterRouteFunc("GET /v1/runs/{run_id}/status", getRunStatusHandler(deps.st), auth.RoleControlPlane)
 	s.RegisterRouteFunc("POST /v1/runs/{run_id}/cancel", cancelRunHandlerV1(deps.st), auth.RoleControlPlane)
-	s.RegisterRouteFunc("POST /v1/runs/{run_id}/start", startRunHandler(deps.st, deps.bs), auth.RoleControlPlane)
 
 	s.RegisterRouteFunc("POST /v1/runs/{run_id}/repos", addRunRepoHandler(deps.st, deps.gitAuth), auth.RoleControlPlane)
 	s.RegisterRouteFunc("GET /v1/runs/{run_id}/repos", listRunReposHandler(deps.st), auth.RoleControlPlane)

@@ -120,7 +120,7 @@ func newApplyCommand() *cobra.Command {
 	opts := ApplyOptions{}
 	cmd := &cobra.Command{
 		Use:   "apply <run-id> [path]",
-		Short: "Apply a successful run patch to a local repo",
+		Short: "Apply a successful run result to a local repo",
 		Args:  cobra.RangeArgs(1, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.RunID = args[0]

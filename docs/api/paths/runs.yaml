@@ -2,13 +2,14 @@ post:
   tags: [Control]
   summary: Submit single-repo run
   description: |
-    Submit a single-repo run and start execution immediately.
+    Submit a single-repo run. Repo jobs are materialized by the scheduler after
+    submission, not started directly by this request.
 
     Side-effects:
     - Creates a mig project (mig name == mig id).
     - Creates a spec row and sets migs.spec_id.
     - Creates a mig repo row for the provided repo_url.
-    - Creates a run and run repo row and enqueues jobs.
+    - Creates a run and queued run repo row.
   requestBody:
     required: true
     content:
@@ -17,7 +18,7 @@ post:
           $ref: "../components/schemas/controlplane.yaml#/RunSubmitRequest"
   responses:
     "201":
-      description: Created — run accepted and started.
+      description: Created — run accepted for scheduler materialization.
       content:
         application/json:
           schema:
@@ -60,6 +61,12 @@ get:
         format: int32
         minimum: 0
       description: Number of runs to skip from the start of the result set.
+    - in: query
+      name: repo_url
+      required: false
+      schema:
+        type: string
+      description: Optional repository URL filter. The server normalizes the URL before matching run repos.
   responses:
     "200":
       description: OK

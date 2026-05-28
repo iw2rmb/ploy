@@ -24,7 +24,7 @@ import (
 // - Archived migs cannot be executed.
 // - Copies migs.spec_id → runs.spec_id for immutability.
 // - Creates run_repos rows snapshotting source refs from mig_repos.
-// - Job materialization is deferred to the batch scheduler/start endpoint and gated on prep readiness.
+// - Job materialization is deferred to the batch scheduler and gated on prep readiness.
 func createMigRunHandler(st store.Store, gitAuth gitauth.Options) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Parse request body with strict validation.

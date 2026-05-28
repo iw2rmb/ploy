@@ -97,10 +97,10 @@ func addRunRepoHandler(st store.Store, gitAuth gitauth.Options) http.HandlerFunc
 
 		migRepoID := domaintypes.NewMigRepoID()
 		migRepo, err := st.CreateMigRepo(r.Context(), store.CreateMigRepoParams{
-			ID:        migRepoID,
-			MigID:     run.MigID,
-			Url:       normalizedRepoURL,
-			BaseRef:   req.BaseRef.String(),
+			ID:      migRepoID,
+			MigID:   run.MigID,
+			Url:     normalizedRepoURL,
+			BaseRef: req.BaseRef.String(),
 		})
 		if err != nil {
 			if isUniqueViolation(err) {
@@ -359,45 +359,5 @@ func restartRunRepoHandler(st store.Store, bs blobstore.Store) http.HandlerFunc 
 		}
 
 		writeJSON(w, http.StatusOK, runRepoToResponse(runRepo, repoURL))
-	}
-}
-
-// StartRunResponse contains the result of starting a batch run.
-type StartRunResponse struct {
-	RunID       domaintypes.RunID `json:"run_id"`
-	Started     int               `json:"started"`
-	AlreadyDone int               `json:"already_done"`
-	Pending     int               `json:"pending"`
-}
-
-// startRunHandler delegates to BatchRepoStarter.StartPendingRepos (shared with the background scheduler).
-// POST /v1/runs/{run_id}/start
-func startRunHandler(st store.Store, bs blobstore.Store) http.HandlerFunc {
-	starter := NewBatchRepoStarter(st, bs)
-
-	return func(w http.ResponseWriter, r *http.Request) {
-		runID, ok := parseRequiredPathIDOrWriteError[domaintypes.RunID](w, r, "run_id")
-		if !ok {
-			return
-		}
-
-		if _, ok := getActiveRunOrFail(w, r, st, runID, "start run"); !ok {
-			return
-		}
-
-		result, err := starter.StartPendingRepos(r.Context(), runID)
-		if err != nil {
-			serverError(w, "start run", "start queued repos", err, "run_id", runID.String())
-			return
-		}
-
-		resp := StartRunResponse{
-			RunID:       runID,
-			Started:     result.Started,
-			AlreadyDone: result.AlreadyDone,
-			Pending:     result.Pending,
-		}
-
-		writeJSON(w, http.StatusOK, resp)
 	}
 }
