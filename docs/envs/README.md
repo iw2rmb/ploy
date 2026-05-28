@@ -223,10 +223,13 @@ Runtime behavior: the node's Docker client is created from standard Docker env v
   pulls fail explicitly instead of silently pulling without credentials.
   Example:
   `{"auths":{"ghcr.io":{"auth":"<base64(username:token)>"}}}`.
+- `PLOY_DOCKER_AUTH_REFRESH_SOCKET` — Optional Unix socket used only after
+  Docker returns an auth error for a job image pull. The node asks the host to
+  refresh registry auth, then retries the same pull once. The host owns the DP
+  key and Docker auth file writes.
 
 The node does not consume inline registry-auth environment variables for job
-image pulls, and it does not refresh Docker auth after registry unauthorized
-errors. Use `PLOY_DOCKER_AUTH_CONFIG_FILE` for private registries.
+image pulls. Use `PLOY_DOCKER_AUTH_CONFIG_FILE` for private registries.
 
 **When to set these variables:**
 - **Remote Docker daemon**: Set `DOCKER_HOST=tcp://<host>:2376` and TLS variables when the

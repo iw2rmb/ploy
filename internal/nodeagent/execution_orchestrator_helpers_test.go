@@ -39,6 +39,35 @@ func TestResolveDockerRegistryAuthConfigFile(t *testing.T) {
 	}
 }
 
+func TestResolveDockerRegistryAuthRefreshSocket(t *testing.T) {
+	tests := []struct {
+		name       string
+		socketPath string
+		want       string
+	}{
+		{
+			name:       "configured_socket_used",
+			socketPath: "/run/ploy/node-auth-refresh.sock",
+			want:       "/run/ploy/node-auth-refresh.sock",
+		},
+		{
+			name: "no_socket_configured",
+			want: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("PLOY_DOCKER_AUTH_REFRESH_SOCKET", tt.socketPath)
+
+			got := resolveDockerRegistryAuthRefreshSocket()
+			if got != tt.want {
+				t.Fatalf("resolveDockerRegistryAuthRefreshSocket() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestWithTempDir(t *testing.T) {
 	tests := []struct {
 		name    string
