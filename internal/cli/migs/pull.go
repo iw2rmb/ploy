@@ -30,8 +30,10 @@ import (
 //   - RunID: the run containing the execution
 //   - RepoID: the mig_repos.id for the matched repo
 type PullResolution struct {
-	RunID  domaintypes.RunID     `json:"run_id"`
-	RepoID domaintypes.MigRepoID `json:"repo_id"`
+	RunID           domaintypes.RunID     `json:"run_id"`
+	RepoID          domaintypes.MigRepoID `json:"repo_id"`
+	RepoURL         string                `json:"repo_url,omitempty"`
+	SourceCommitSHA string                `json:"source_commit_sha,omitempty"`
 }
 
 // =============================================================================
@@ -101,6 +103,9 @@ func (c RunPullCommand) Run(ctx context.Context) (*PullResolution, error) {
 	var result PullResolution
 	if err := httpx.DecodeResponseJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
 		return nil, fmt.Errorf("run pull: decode response: %w", err)
+	}
+	if result.RepoID.IsZero() {
+		return nil, fmt.Errorf("run pull: empty repo_id in response")
 	}
 
 	return &result, nil

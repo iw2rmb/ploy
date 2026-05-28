@@ -147,77 +147,6 @@ func TestListBatchesCommand_Run(t *testing.T) {
 	}
 }
 
-// TestStartBatchCommand_Run validates StartBatchCommand responses.
-func TestStartBatchCommand_Run(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name       string
-		batchID    domaintypes.RunID // Updated to domain type
-		serverResp struct {
-			RunID       domaintypes.RunID
-			Started     int
-			AlreadyDone int
-			Pending     int
-		}
-		statusCode  int
-		wantErr     bool
-		wantErrText string
-	}{
-		{
-			name:    "successful start",
-			batchID: domaintypes.RunID("batch-789"), // Convert to domain type
-			serverResp: struct {
-				RunID       domaintypes.RunID
-				Started     int
-				AlreadyDone int
-				Pending     int
-			}{
-				RunID:       domaintypes.RunID("batch-789"), // Convert to domain type
-				Started:     3,
-				AlreadyDone: 1,
-				Pending:     0,
-			},
-			statusCode: http.StatusOK,
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
-			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				// Verify POST method.
-				if r.Method != http.MethodPost {
-					t.Errorf("expected POST, got %s", r.Method)
-				}
-				// Verify path ends with /start.
-				if !strings.HasSuffix(r.URL.Path, "/start") {
-					t.Errorf("expected path to end with /start, got %s", r.URL.Path)
-				}
-
-				if tc.statusCode == http.StatusNotFound {
-					http.Error(w, "run not found", http.StatusNotFound)
-					return
-				}
-
-				w.Header().Set("Content-Type", "application/json")
-				_ = json.NewEncoder(w).Encode(tc.serverResp)
-			}))
-			t.Cleanup(srv.Close)
-
-			baseURL, err := url.Parse(srv.URL)
-			if err != nil {
-				t.Fatalf("parse server URL: %v", err)
-			}
-
-			_ = baseURL
-			_ = tc
-			t.Skip("StartBatchCommand has been replaced by runs.StartCommand")
-		})
-	}
-}
-
 // TestCreateBatchCommand_Run validates CreateBatchCommand responses.
 func TestCreateBatchCommand_Run(t *testing.T) {
 	t.Parallel()
@@ -274,7 +203,7 @@ func TestCreateBatchCommand_Run(t *testing.T) {
 					// Decode and verify request body.
 					var req struct {
 						RepoURL string `json:"repo_url"`
-						BaseRef string `json:"base_ref"`
+						Ref     string `json:"ref"`
 						Spec    any    `json:"spec"`
 					}
 					if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -282,6 +211,9 @@ func TestCreateBatchCommand_Run(t *testing.T) {
 					}
 					if req.RepoURL != tc.repoURL {
 						t.Errorf("request repo_url = %q, want %q", req.RepoURL, tc.repoURL)
+					}
+					if req.Ref != tc.baseRef {
+						t.Errorf("request ref = %q, want %q", req.Ref, tc.baseRef)
 					}
 					if req.Spec == nil {
 						t.Errorf("request spec should be present")

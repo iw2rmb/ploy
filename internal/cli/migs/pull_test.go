@@ -52,8 +52,10 @@ func TestRunPullCommand_Success(t *testing.T) {
 
 		// Return a valid response.
 		resp := PullResolution{
-			RunID:  runID,
-			RepoID: repoID,
+			RunID:           runID,
+			RepoID:          repoID,
+			RepoURL:         "https://github.com/example/repo.git",
+			SourceCommitSHA: "0123456789abcdef0123456789abcdef01234567",
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
@@ -80,6 +82,12 @@ func TestRunPullCommand_Success(t *testing.T) {
 	}
 	if result.RepoID != repoID {
 		t.Errorf("expected RepoID %q, got %q", repoID.String(), result.RepoID.String())
+	}
+	if result.RepoURL != "https://github.com/example/repo.git" {
+		t.Errorf("expected RepoURL to be populated, got %q", result.RepoURL)
+	}
+	if result.SourceCommitSHA != "0123456789abcdef0123456789abcdef01234567" {
+		t.Errorf("expected SourceCommitSHA to be populated, got %q", result.SourceCommitSHA)
 	}
 }
 

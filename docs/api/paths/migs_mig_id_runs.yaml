@@ -3,7 +3,7 @@ post:
   summary: Create mig run (multi-repo)
   description: |
     Create a batch run from the mig's current spec over a selected set of repos
-    and start execution immediately.
+    and queue them for scheduler materialization.
 
     Repo selection modes:
     - all: all repos in the mig repo set

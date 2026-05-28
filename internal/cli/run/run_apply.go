@@ -3,7 +3,6 @@ package run
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -24,13 +23,6 @@ type ApplyOptions struct {
 	RepoPath string
 	Force    bool
 	Output   io.Writer
-}
-
-type resolvedRunRepoForApply struct {
-	RunID           domaintypes.RunID  `json:"run_id"`
-	RepoID          domaintypes.RepoID `json:"repo_id"`
-	RepoURL         string             `json:"repo_url"`
-	SourceCommitSHA string             `json:"source_commit_sha"`
 }
 
 func RunApply(ctx context.Context, opts ApplyOptions) error {
@@ -64,7 +56,12 @@ func runApply(ctx context.Context, opts ApplyOptions, base *url.URL, httpClient 
 		return fmt.Errorf("run apply: %w", err)
 	}
 
-	resolved, err := resolveRunRepoForApply(ctx, httpClient, base, runID, local.RepoURL)
+	resolved, err := migs.RunPullCommand{
+		Client:  httpClient,
+		BaseURL: base,
+		RunID:   runID,
+		RepoURL: local.RepoURL,
+	}.Run(ctx)
 	if err != nil {
 		return fmt.Errorf("run apply: %w", err)
 	}
@@ -76,12 +73,11 @@ func runApply(ctx context.Context, opts ApplyOptions, base *url.URL, httpClient 
 		return fmt.Errorf("run apply: local HEAD %s does not match run source_commit_sha %s; use --force to apply anyway", local.CommitSHA, sourceSHA)
 	}
 
-	repoID := domaintypes.MigRepoID(resolved.RepoID.String())
 	diffs, err := migs.ListRunRepoDiffsCommand{
 		Client:  httpClient,
 		BaseURL: base,
 		RunID:   runID,
-		RepoID:  repoID,
+		RepoID:  resolved.RepoID,
 	}.Run(ctx)
 	if err != nil {
 		return fmt.Errorf("run apply: list diffs: %w", err)
@@ -96,7 +92,7 @@ func runApply(ctx context.Context, opts ApplyOptions, base *url.URL, httpClient 
 		Client:      httpClient,
 		BaseURL:     base,
 		RunID:       runID,
-		RepoID:      repoID,
+		RepoID:      resolved.RepoID,
 		DiffID:      latest.ID,
 		Accumulated: true,
 	}.Run(ctx)
@@ -112,47 +108,6 @@ func runApply(ctx context.Context, opts ApplyOptions, base *url.URL, httpClient 
 	}
 	_, _ = fmt.Fprintf(out, "Applied patch from run %s to %s\n", runID.String(), local.Worktree)
 	return nil
-}
-
-func resolveRunRepoForApply(ctx context.Context, httpClient *http.Client, baseURL *url.URL, runID domaintypes.RunID, repoURL string) (resolvedRunRepoForApply, error) {
-	if baseURL == nil {
-		return resolvedRunRepoForApply{}, errors.New("base url required")
-	}
-	endpoint := baseURL.JoinPath("v1", "runs", runID.String(), "repos", "resolve")
-	payload, err := json.Marshal(struct {
-		RepoURL string `json:"repo_url"`
-	}{RepoURL: repoURL})
-	if err != nil {
-		return resolvedRunRepoForApply{}, fmt.Errorf("resolve repo: marshal request: %w", err)
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), bytes.NewReader(payload))
-	if err != nil {
-		return resolvedRunRepoForApply{}, fmt.Errorf("resolve repo: build request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return resolvedRunRepoForApply{}, fmt.Errorf("resolve repo: http request failed: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		var apiErr struct {
-			Error string `json:"error"`
-		}
-		if err := json.Unmarshal(body, &apiErr); err == nil && strings.TrimSpace(apiErr.Error) != "" {
-			return resolvedRunRepoForApply{}, fmt.Errorf("resolve repo: %s", strings.TrimSpace(apiErr.Error))
-		}
-		return resolvedRunRepoForApply{}, fmt.Errorf("resolve repo: %s", strings.TrimSpace(string(body)))
-	}
-	var result resolvedRunRepoForApply
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return resolvedRunRepoForApply{}, fmt.Errorf("resolve repo: decode response: %w", err)
-	}
-	if result.RepoID.IsZero() {
-		return resolvedRunRepoForApply{}, errors.New("resolve repo: empty repo_id in response")
-	}
-	return result, nil
 }
 
 func ensureNoGitDiff(ctx context.Context, worktree string) error {

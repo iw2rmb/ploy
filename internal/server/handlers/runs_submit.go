@@ -29,7 +29,7 @@ var submitCommitSHARe = regexp.MustCompile(`^[0-9a-f]{40}$`)
 // - Creates an initial spec row and sets migs.spec_id.
 // - Creates a mig repo row for the provided repo_url.
 // - Creates a run and queued run_repo row.
-// - Job materialization is deferred to the batch scheduler/start endpoint and gated on prep readiness.
+// - Job materialization is deferred to the batch scheduler and gated on prep readiness.
 //
 // This handler replaces the previous POST /v1/migs endpoint for run submission.
 func createSingleRepoRunHandler(st store.Store, eventsService *events.Service, gitAuth gitauth.Options) http.HandlerFunc {

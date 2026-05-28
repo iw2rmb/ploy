@@ -248,13 +248,18 @@ RunSubmitRequest:
     repo_url:
       type: string
       description: "Repository URL. Allowed schemes: https://, ssh://, file://."
-    base_ref: { type: string }
+    ref:
+      type: string
+      description: Git ref or commit SHA used as the run source.
+    commit_sha:
+      type: string
+      description: Optional lowercase 40-hex commit SHA. When provided, the server uses it directly as the source commit.
     spec:
       type: object
       additionalProperties: true
       description: Migs spec JSON object (must be a JSON object).
     created_by: { type: string, nullable: true }
-  required: [repo_url, base_ref, spec]
+  required: [repo_url, ref, spec]
 
 CreateSingleRepoRunResponse:
   type: object
