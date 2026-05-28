@@ -10,10 +10,10 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
-// TestClaimJobLocksJobOnly verifies that ClaimJob does not lock rows in `runs`.
-// The ClaimJob query joins `runs` for eligibility checks, but it must lock only
-// the selected `jobs` row via `FOR UPDATE OF j SKIP LOCKED`.
-func TestClaimJobLocksJobOnly(t *testing.T) {
+// TestClaimJobLocksJobAndRunRepoOnly verifies that ClaimJob does not lock rows
+// in `runs`. It locks the selected `jobs` row plus the owning `run_repos` row,
+// so concurrent nodes cannot split one repo attempt across nodes.
+func TestClaimJobLocksJobAndRunRepoOnly(t *testing.T) {
 	dsn := os.Getenv("PLOY_TEST_DB_DSN")
 	if dsn == "" {
 		t.Skip("PLOY_TEST_DB_DSN not set; skipping integration test")
@@ -99,5 +99,14 @@ func TestClaimJobLocksJobOnly(t *testing.T) {
 	}
 	if runID != fx.Run.ID {
 		t.Fatalf("locked run %s, want %s", runID, fx.Run.ID)
+	}
+
+	err = txCheck.QueryRow(ctx, `SELECT run_id FROM run_repos WHERE run_id = $1 AND repo_id = $2 FOR UPDATE NOWAIT`, fx.Run.ID, fx.MigRepo.RepoID).Scan(&runID)
+	if err == nil {
+		t.Fatalf("run_repos row was not locked by ClaimJob; expected repo-attempt lock for node affinity")
+	}
+	var pgErr *pgconn.PgError
+	if !errors.As(err, &pgErr) || pgErr.Code != "55P03" {
+		t.Fatalf("run_repos NOWAIT lock failed with %v, want lock_not_available", err)
 	}
 }

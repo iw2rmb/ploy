@@ -1081,6 +1081,8 @@ Nodeagents use `/v1/nodes/*` to execute work:
 - `POST /v1/nodes/{id}/claim` — claim the next queued job from the unified
   jobs queue (returns the claimed job plus run
   metadata) and marks the repo as `Running` in `run_repos`.
+  Claiming pins a `(run_id, repo_id, attempt)` to the first claiming node; later
+  jobs for the same repo attempt are eligible only for that node.
   (The separate `/v1/nodes/{id}/ack` endpoint has been removed.)
 - `POST /v1/jobs/{job_id}/complete` — report final status and stats for a job
   (canonical endpoint; node-based `/v1/nodes/{id}/complete` has been removed).
@@ -1186,6 +1188,9 @@ For a spec with multiple `steps[]` entries:
      and `job_image` (saved by the executing node before the container starts).
    - ClaimJob returns queued jobs from the unified queue, and the server promotes
      the claimed job's `next_id` successor only after prior jobs succeed.
+   - ClaimJob locks the owning `run_repos` row while selecting a job and rejects
+     jobs whose repo attempt already has a different claimed node, so one
+     `(run_id, repo_id, attempt)` cannot be split across nodes.
    - Execute each job against a workspace that reflects all prior steps.
 
 Sticky workspace execution is implemented in runtime implementation:
@@ -1209,6 +1214,8 @@ This design guarantees that:
 
 - Jobs execute sequentially due to ClaimJob dependency enforcement.
 - Later jobs observe prior changes through the same node-local workspace.
+- A single repo attempt stays on one node; a restarted attempt can be claimed by
+  another node because affinity is scoped to `(run_id, repo_id, attempt)`.
 
 ## 5. Container Contract for Migs Images
 
