@@ -82,8 +82,7 @@ func TestCancelResumeSubmitCommands(t *testing.T) {
 			State:      migsapi.RunStatePending,
 			Repository: "https://example.com/repo.git",
 			Metadata: map[string]string{
-				"repo_base_ref":   "main",
-				"repo_target_ref": "feature",
+				"repo_base_ref": "main",
 			},
 			Stages: make(map[domaintypes.JobID]migsapi.StageStatus),
 		})
@@ -100,10 +99,9 @@ func TestCancelResumeSubmitCommands(t *testing.T) {
 		Client:  srv.Client(),
 		BaseURL: base,
 		Request: domainapi.RunSubmitRequest{
-			RepoURL:   domaintypes.RepoURL("https://example.com/repo.git"),
-			BaseRef:   domaintypes.GitRef("main"),
-			TargetRef: domaintypes.GitRef("feature"),
-			Spec:      []byte("{}"),
+			RepoURL: domaintypes.RepoURL("https://example.com/repo.git"),
+			BaseRef: domaintypes.GitRef("main"),
+			Spec:    []byte("{}"),
 		},
 	}).Run(context.Background())
 	if err != nil || sum.RunID != runID {
@@ -128,9 +126,8 @@ func TestSubmitCommand_InvalidRepoURLScheme(t *testing.T) {
 		Client:  srv.Client(),
 		BaseURL: base,
 		Request: domainapi.RunSubmitRequest{
-			RepoURL:   domaintypes.RepoURL("http://example.com/repo.git"),
-			BaseRef:   domaintypes.GitRef("main"),
-			TargetRef: domaintypes.GitRef("feature"),
+			RepoURL: domaintypes.RepoURL("http://example.com/repo.git"),
+			BaseRef: domaintypes.GitRef("main"),
 		},
 	}).Run(context.Background())
 	if err == nil {
@@ -207,10 +204,9 @@ func TestMigsCommandsErrorPaths(t *testing.T) {
 		Client:  srv.Client(),
 		BaseURL: base,
 		Request: domainapi.RunSubmitRequest{
-			RepoURL:   domaintypes.RepoURL("https://example.com/repo.git"),
-			BaseRef:   domaintypes.GitRef("main"),
-			TargetRef: domaintypes.GitRef("feature"),
-			Spec:      []byte("{}"),
+			RepoURL: domaintypes.RepoURL("https://example.com/repo.git"),
+			BaseRef: domaintypes.GitRef("main"),
+			Spec:    []byte("{}"),
 		},
 	}).Run(context.Background()); err == nil {
 		t.Fatal("expected submit error")

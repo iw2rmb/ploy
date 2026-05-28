@@ -159,7 +159,7 @@ Required invariants:
 
 - Every run has exactly one non-null `wave_id`.
 - Every run has exactly one non-null `repo_id`.
-- Every run has immutable `spec_id`, `repo_base_ref`, `repo_target_ref`,
+- Every run has immutable `spec_id`, `repo_base_ref`, `source_commit_sha`,
   `source_commit_sha`, and `repo_sha0` values.
 - Every run has one current `attempt`.
 - Every wave has one or more runs.
@@ -196,7 +196,7 @@ CREATE TABLE runs (
   spec_id            TEXT NOT NULL REFERENCES specs(id) ON DELETE RESTRICT,
   repo_id            TEXT NOT NULL REFERENCES repos(id) ON DELETE RESTRICT,
   repo_base_ref      TEXT NOT NULL,
-  repo_target_ref    TEXT NOT NULL,
+  source_commit_sha  TEXT NOT NULL,
   source_commit_sha  TEXT NOT NULL DEFAULT '',
   repo_sha0          TEXT NOT NULL DEFAULT '',
   created_by         TEXT,
@@ -265,7 +265,7 @@ Request remains the single-repo submit shape:
 {
   "repo_url": "https://gitlab.example/org/repo.git",
   "base_ref": "master",
-  "target_ref": "migration/branch",
+  "source_commit_sha": "0123456789abcdef0123456789abcdef01234567",
   "spec": {},
   "created_by": "optional"
 }
@@ -366,7 +366,7 @@ POST /v1/runs/{run_id}/repos/{repo_id}/cancel
 Run pull resolution:
 
 - `POST /v1/runs/{run_id}/pull` no longer needs `repo_url` to choose a repo.
-- It returns the run's `repo_id` and `repo_target_ref` for clients that still need
+- It returns the run's `repo_id` for clients that still need
   branch naming metadata.
 - `POST /v1/migs/{mig_id}/pull` selects the latest terminal run for the requested
   repo URL and status mode.

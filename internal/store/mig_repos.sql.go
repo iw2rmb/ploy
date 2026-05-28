@@ -37,19 +37,17 @@ INSERT INTO mig_repos (
   id,
   mig_id,
   repo_id,
-  base_ref,
-  target_ref
+  base_ref
 )
-VALUES ($1, $2, (SELECT id FROM resolved_repo), $4, $5)
-RETURNING id, mig_id, repo_id, base_ref, target_ref, created_at
+VALUES ($1, $2, (SELECT id FROM resolved_repo), $4)
+RETURNING id, mig_id, repo_id, base_ref, created_at
 `
 
 type CreateMigRepoParams struct {
-	ID        types.MigRepoID `json:"id"`
-	MigID     types.MigID     `json:"mig_id"`
-	Url       string          `json:"url"`
-	BaseRef   string          `json:"base_ref"`
-	TargetRef string          `json:"target_ref"`
+	ID      types.MigRepoID `json:"id"`
+	MigID   types.MigID     `json:"mig_id"`
+	Url     string          `json:"url"`
+	BaseRef string          `json:"base_ref"`
 }
 
 func (q *Queries) CreateMigRepo(ctx context.Context, arg CreateMigRepoParams) (MigRepo, error) {
@@ -58,7 +56,6 @@ func (q *Queries) CreateMigRepo(ctx context.Context, arg CreateMigRepoParams) (M
 		arg.MigID,
 		arg.Url,
 		arg.BaseRef,
-		arg.TargetRef,
 	)
 	var i MigRepo
 	err := row.Scan(
@@ -66,7 +63,6 @@ func (q *Queries) CreateMigRepo(ctx context.Context, arg CreateMigRepoParams) (M
 		&i.MigID,
 		&i.RepoID,
 		&i.BaseRef,
-		&i.TargetRef,
 		&i.CreatedAt,
 	)
 	return i, err
@@ -85,7 +81,7 @@ func (q *Queries) DeleteMigRepo(ctx context.Context, id types.MigRepoID) error {
 }
 
 const getMigRepo = `-- name: GetMigRepo :one
-SELECT id, mig_id, repo_id, base_ref, target_ref, created_at
+SELECT id, mig_id, repo_id, base_ref, created_at
 FROM mig_repos
 WHERE id = $1
 `
@@ -98,14 +94,13 @@ func (q *Queries) GetMigRepo(ctx context.Context, id types.MigRepoID) (MigRepo, 
 		&i.MigID,
 		&i.RepoID,
 		&i.BaseRef,
-		&i.TargetRef,
 		&i.CreatedAt,
 	)
 	return i, err
 }
 
 const getMigRepoByURL = `-- name: GetMigRepoByURL :one
-SELECT mr.id, mr.mig_id, mr.repo_id, mr.base_ref, mr.target_ref, mr.created_at
+SELECT mr.id, mr.mig_id, mr.repo_id, mr.base_ref, mr.created_at
 FROM mig_repos mr
 JOIN repos r ON r.id = mr.repo_id
 WHERE mr.mig_id = $1 AND r.url = $2
@@ -125,7 +120,6 @@ func (q *Queries) GetMigRepoByURL(ctx context.Context, arg GetMigRepoByURLParams
 		&i.MigID,
 		&i.RepoID,
 		&i.BaseRef,
-		&i.TargetRef,
 		&i.CreatedAt,
 	)
 	return i, err
@@ -203,7 +197,7 @@ func (q *Queries) ListDistinctRepos(ctx context.Context, filter string) ([]ListD
 }
 
 const listMigReposByMig = `-- name: ListMigReposByMig :many
-SELECT id, mig_id, repo_id, base_ref, target_ref, created_at
+SELECT id, mig_id, repo_id, base_ref, created_at
 FROM mig_repos
 WHERE mig_id = $1
 ORDER BY created_at ASC, id ASC
@@ -223,7 +217,6 @@ func (q *Queries) ListMigReposByMig(ctx context.Context, migID types.MigID) ([]M
 			&i.MigID,
 			&i.RepoID,
 			&i.BaseRef,
-			&i.TargetRef,
 			&i.CreatedAt,
 		); err != nil {
 			return nil, err
@@ -236,21 +229,19 @@ func (q *Queries) ListMigReposByMig(ctx context.Context, migID types.MigID) ([]M
 	return items, nil
 }
 
-const updateMigRepoRefs = `-- name: UpdateMigRepoRefs :exec
+const updateMigRepoBaseRef = `-- name: UpdateMigRepoBaseRef :exec
 UPDATE mig_repos
-SET base_ref = $2,
-    target_ref = $3
+SET base_ref = $2
 WHERE id = $1
 `
 
-type UpdateMigRepoRefsParams struct {
-	ID        types.MigRepoID `json:"id"`
-	BaseRef   string          `json:"base_ref"`
-	TargetRef string          `json:"target_ref"`
+type UpdateMigRepoBaseRefParams struct {
+	ID      types.MigRepoID `json:"id"`
+	BaseRef string          `json:"base_ref"`
 }
 
-func (q *Queries) UpdateMigRepoRefs(ctx context.Context, arg UpdateMigRepoRefsParams) error {
-	_, err := q.db.Exec(ctx, updateMigRepoRefs, arg.ID, arg.BaseRef, arg.TargetRef)
+func (q *Queries) UpdateMigRepoBaseRef(ctx context.Context, arg UpdateMigRepoBaseRefParams) error {
+	_, err := q.db.Exec(ctx, updateMigRepoBaseRef, arg.ID, arg.BaseRef)
 	return err
 }
 
@@ -279,23 +270,20 @@ INSERT INTO mig_repos (
   id,
   mig_id,
   repo_id,
-  base_ref,
-  target_ref
+  base_ref
 )
-VALUES ($1, $2, (SELECT id FROM resolved_repo), $4, $5)
+VALUES ($1, $2, (SELECT id FROM resolved_repo), $4)
 ON CONFLICT (mig_id, repo_id)
 DO UPDATE SET
-  base_ref = EXCLUDED.base_ref,
-  target_ref = EXCLUDED.target_ref
-RETURNING id, mig_id, repo_id, base_ref, target_ref, created_at
+  base_ref = EXCLUDED.base_ref
+RETURNING id, mig_id, repo_id, base_ref, created_at
 `
 
 type UpsertMigRepoParams struct {
-	ID        types.MigRepoID `json:"id"`
-	MigID     types.MigID     `json:"mig_id"`
-	Url       string          `json:"url"`
-	BaseRef   string          `json:"base_ref"`
-	TargetRef string          `json:"target_ref"`
+	ID      types.MigRepoID `json:"id"`
+	MigID   types.MigID     `json:"mig_id"`
+	Url     string          `json:"url"`
+	BaseRef string          `json:"base_ref"`
 }
 
 // Bulk upsert a mig_repo by normalized repo_url.
@@ -306,7 +294,6 @@ func (q *Queries) UpsertMigRepo(ctx context.Context, arg UpsertMigRepoParams) (M
 		arg.MigID,
 		arg.Url,
 		arg.BaseRef,
-		arg.TargetRef,
 	)
 	var i MigRepo
 	err := row.Scan(
@@ -314,7 +301,6 @@ func (q *Queries) UpsertMigRepo(ctx context.Context, arg UpsertMigRepoParams) (M
 		&i.MigID,
 		&i.RepoID,
 		&i.BaseRef,
-		&i.TargetRef,
 		&i.CreatedAt,
 	)
 	return i, err

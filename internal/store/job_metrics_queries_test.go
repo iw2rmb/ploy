@@ -9,7 +9,7 @@ import (
 func TestUpsertJobMetric_InsertsAndUpdatesByJobID(t *testing.T) {
 	ctx, db := openStoreForCancelBulkTests(t)
 
-	fx := newV1Fixture(t, ctx, db, "https://github.com/test/job-metrics", "main", "feature", []byte(`{"type":"job-metrics"}`))
+	fx := newV1Fixture(t, ctx, db, "https://github.com/test/job-metrics", "main", []byte(`{"type":"job-metrics"}`))
 	job := createJobForStoreTest(t, ctx, db, fx.Run.ID, fx.RunRepo.RepoID, fx.RunRepo.RepoBaseRef, 1, "job-metrics", types.JobStatusCreated)
 
 	nodeA := createNodeForStaleRecoveryQueryTest(t, ctx, db)

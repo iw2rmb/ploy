@@ -37,8 +37,8 @@ type runStore struct {
 
 	getRunRepo mockCallSeq[store.GetRunRepoParams, store.RunRepo]
 
-	updateRunRepoRefs       mockCall[store.UpdateRunRepoRefsParams, struct{}]
-	updateMigRepoRefs       mockCall[store.UpdateMigRepoRefsParams, struct{}]
+	updateRunRepoBaseRef    mockCall[store.UpdateRunRepoBaseRefParams, struct{}]
+	updateMigRepoBaseRef    mockCall[store.UpdateMigRepoBaseRefParams, struct{}]
 	incrementRunRepoAttempt mockCall[store.IncrementRunRepoAttemptParams, struct{}]
 	updateRunRepoError      mockCall[store.UpdateRunRepoErrorParams, struct{}]
 
@@ -144,8 +144,8 @@ func (m *runStore) GetRunRepo(ctx context.Context, arg store.GetRunRepoParams) (
 	return m.getRunRepo.record(arg)
 }
 
-func (m *runStore) UpdateRunRepoRefs(ctx context.Context, params store.UpdateRunRepoRefsParams) error {
-	_, err := m.updateRunRepoRefs.record(params)
+func (m *runStore) UpdateRunRepoBaseRef(ctx context.Context, params store.UpdateRunRepoBaseRefParams) error {
+	_, err := m.updateRunRepoBaseRef.record(params)
 	return err
 }
 
@@ -174,7 +174,7 @@ func (m *runStore) IncrementRunRepoAttempt(ctx context.Context, arg store.Increm
 // Mig/Repo methods (for batch and pull)
 
 func (m *runStore) CreateMigRepo(ctx context.Context, params store.CreateMigRepoParams) (store.MigRepo, error) {
-	result := defaultMigRepo(m.createMigRepo.val, params.ID, params.MigID, params.BaseRef, params.TargetRef)
+	result := defaultMigRepo(m.createMigRepo.val, params.ID, params.MigID, params.BaseRef)
 	if m.repoByID == nil {
 		m.repoByID = map[types.RepoID]store.Repo{}
 	}
@@ -203,8 +203,8 @@ func (m *runStore) ListMigReposByMig(ctx context.Context, migID types.MigID) ([]
 	return m.listMigReposByMig.ret()
 }
 
-func (m *runStore) UpdateMigRepoRefs(ctx context.Context, params store.UpdateMigRepoRefsParams) error {
-	_, err := m.updateMigRepoRefs.record(params)
+func (m *runStore) UpdateMigRepoBaseRef(ctx context.Context, params store.UpdateMigRepoBaseRefParams) error {
+	_, err := m.updateMigRepoBaseRef.record(params)
 	return err
 }
 

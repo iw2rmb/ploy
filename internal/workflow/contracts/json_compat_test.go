@@ -26,7 +26,6 @@ func TestJSONCompatibility_WorkflowRun_Golden(t *testing.T) {
 		Repo: RepoMaterialization{
 			URL:           types.RepoURL("https://gitlab.com/iw2rmb/sample.git"),
 			BaseRef:       types.GitRef("main"),
-			TargetRef:     types.GitRef("migs/example-grid"),
 			Commit:        types.CommitSHA("abcdef1234567890"),
 			WorkspaceHint: "ws",
 		},

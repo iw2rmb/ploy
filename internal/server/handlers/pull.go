@@ -46,11 +46,9 @@ type migPullRequest struct {
 // It provides the identifiers needed to fetch diffs:
 //   - run_id: the run containing the execution
 //   - repo_id: the mig_repos.id for the matched repo
-//   - repo_target_ref: the target ref snapshot from run_repos
 type pullResponse struct {
-	RunID         domaintypes.RunID  `json:"run_id"`
-	RepoID        domaintypes.RepoID `json:"repo_id"`
-	RepoTargetRef string             `json:"repo_target_ref"`
+	RunID  domaintypes.RunID  `json:"run_id"`
+	RepoID domaintypes.RepoID `json:"repo_id"`
 }
 
 // -------------------------------------------------------------------------
@@ -60,7 +58,7 @@ type pullResponse struct {
 // pullRunRepoHandler resolves a repo_url to execution identifiers for a specific run.
 // Endpoint: POST /v1/runs/{run_id}/pull
 // Request: {repo_url}
-// Response: 200 OK with {run_id, repo_id, repo_target_ref}
+// Response: 200 OK with {run_id, repo_id}
 //
 // v1 contract:
 //   - Server matches the repo by joining run_repos to mig_repos by repo_id,
@@ -126,9 +124,8 @@ func pullRunRepoHandler(st store.Store) http.HandlerFunc {
 		// Single match found — return the pull response.
 		match := matches[0]
 		resp := pullResponse{
-			RunID:         match.RunID,
-			RepoID:        match.RepoID,
-			RepoTargetRef: match.RepoTargetRef,
+			RunID:  match.RunID,
+			RepoID: match.RepoID,
 		}
 
 		writeJSON(w, http.StatusOK, resp)
@@ -144,7 +141,7 @@ func pullRunRepoHandler(st store.Store) http.HandlerFunc {
 // pullMigRepoHandler resolves a repo_url to execution identifiers for a mig.
 // Endpoint: POST /v1/migs/{mig_id}/pull
 // Request: {repo_url, mode?}
-// Response: 200 OK with {run_id, repo_id, repo_target_ref}
+// Response: 200 OK with {run_id, repo_id}
 //
 // v1 contract:
 //   - Server performs the lookup using mig_id + repo_url → mig_repos.id.
@@ -254,9 +251,8 @@ func pullMigRepoHandler(st store.Store) http.HandlerFunc {
 
 		// Return the pull response.
 		resp := pullResponse{
-			RunID:         latestRunRepo.RunID,
-			RepoID:        latestRunRepo.RepoID,
-			RepoTargetRef: latestRunRepo.RepoTargetRef,
+			RunID:  latestRunRepo.RunID,
+			RepoID: latestRunRepo.RepoID,
 		}
 
 		writeJSON(w, http.StatusOK, resp)

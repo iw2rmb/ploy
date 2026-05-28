@@ -64,13 +64,13 @@ func TestStepManifestValidate(t *testing.T) {
 			},
 			wantErr: "id",
 		},
-			{
-				name: "invalid id characters",
-				mutate: func(m *StepManifest) {
-					m.ID = "migs Apply"
-				},
-				wantErr: "id",
+		{
+			name: "invalid id characters",
+			mutate: func(m *StepManifest) {
+				m.ID = "migs Apply"
 			},
+			wantErr: "id",
+		},
 		{
 			name: "missing image",
 			mutate: func(m *StepManifest) {
@@ -110,8 +110,8 @@ func TestStepManifestValidate(t *testing.T) {
 						{CID: types.CID("bafy-diff-2"), Digest: types.Sha256Digest("sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc")},
 					},
 					Repo: &RepoMaterialization{
-						URL:       types.RepoURL("https://gitlab.example.com/group/project.git"),
-						TargetRef: types.GitRef("refs/heads/main"),
+						URL:     types.RepoURL("https://gitlab.example.com/group/project.git"),
+						BaseRef: types.GitRef("main"),
 					},
 				}
 			},

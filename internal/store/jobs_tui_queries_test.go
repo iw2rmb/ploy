@@ -11,8 +11,8 @@ func TestListJobsForTUI(t *testing.T) {
 	ctx, db := newTestStore(t)
 
 	// Two separate runs so we can test filtered vs unfiltered results.
-	fxA := newV1Fixture(t, ctx, db, "https://github.com/test/tui-a", "main", "feat-a", []byte(`{"type":"test"}`))
-	fxB := newV1Fixture(t, ctx, db, "https://github.com/test/tui-b", "main", "feat-b", []byte(`{"type":"test"}`))
+	fxA := newV1Fixture(t, ctx, db, "https://github.com/test/tui-a", "main", []byte(`{"type":"test"}`))
+	fxB := newV1Fixture(t, ctx, db, "https://github.com/test/tui-b", "main", []byte(`{"type":"test"}`))
 
 	createJob := func(fx v1Fixture, name string, id types.JobID, jobType types.JobType) types.JobID {
 		t.Helper()

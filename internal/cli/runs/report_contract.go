@@ -20,7 +20,6 @@ type RunEntry struct {
 	RepoID          domaintypes.MigRepoID     `json:"repo_id"`
 	RepoURL         string                    `json:"repo_url"`
 	BaseRef         string                    `json:"base_ref"`
-	TargetRef       string                    `json:"target_ref"`
 	SourceCommitSHA string                    `json:"source_commit_sha,omitempty"`
 	Attempt         int32                     `json:"attempt"`
 	Status          domaintypes.RunRepoStatus `json:"status"`

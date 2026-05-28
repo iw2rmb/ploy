@@ -5,7 +5,7 @@ post:
     Bulk upsert repos for a mig project from CSV.
 
     The request body is UTF-8 CSV with a required header row:
-    `repo_url,base_ref,target_ref`.
+    `repo_url,base_ref`.
 
     Continues on per-line errors; may partially apply.
 

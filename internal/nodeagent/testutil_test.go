@@ -553,7 +553,6 @@ func newClaimResponse(opts ...claimOption) ClaimResponse {
 		Status:    "Started",
 		NodeID:    types.NodeID(testNodeID),
 		BaseRef:   types.GitRef("main"),
-		TargetRef: types.GitRef("feature-branch"),
 		StartedAt: now,
 		CreatedAt: now,
 	}
@@ -583,10 +582,6 @@ func withRunRepoURL(u string) startRunOption {
 
 func withRunBaseRef(ref string) startRunOption {
 	return func(r *StartRunRequest) { r.BaseRef = types.GitRef(ref) }
-}
-
-func withRunTargetRef(ref string) startRunOption {
-	return func(r *StartRunRequest) { r.TargetRef = types.GitRef(ref) }
 }
 
 func withRunCommitSHA(sha string) startRunOption {

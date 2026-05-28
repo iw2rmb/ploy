@@ -58,9 +58,8 @@ func getRunStatusHandler(st store.Store) http.HandlerFunc {
 		}
 
 		var (
-			repoURL    string
-			repoBase   string
-			repoTarget string
+			repoURL  string
+			repoBase string
 		)
 		runRepos, err := st.ListRunReposWithURLByRun(r.Context(), run.ID)
 		if err != nil {
@@ -70,7 +69,6 @@ func getRunStatusHandler(st store.Store) http.HandlerFunc {
 		if len(runRepos) > 0 {
 			rr := runRepos[0]
 			repoBase = rr.RepoBaseRef
-			repoTarget = rr.RepoTargetRef
 			repoURL = rr.RepoUrl
 		}
 
@@ -79,7 +77,7 @@ func getRunStatusHandler(st store.Store) http.HandlerFunc {
 			State:      runState,
 			Submitter:  "",
 			Repository: repoURL,
-			Metadata:   map[string]string{"repo_base_ref": repoBase, "repo_target_ref": repoTarget},
+			Metadata:   map[string]string{"repo_base_ref": repoBase},
 			CreatedAt:  timeOrZero(run.CreatedAt),
 			UpdatedAt:  time.Now().UTC(),
 			Stages:     make(map[domaintypes.JobID]migsapi.StageStatus),

@@ -77,7 +77,7 @@ func (m *jobStore) CreateMig(ctx context.Context, params store.CreateMigParams) 
 }
 
 func (m *jobStore) CreateMigRepo(ctx context.Context, params store.CreateMigRepoParams) (store.MigRepo, error) {
-	result := defaultMigRepo(m.createMigRepo.val, params.ID, params.MigID, params.BaseRef, params.TargetRef)
+	result := defaultMigRepo(m.createMigRepo.val, params.ID, params.MigID, params.BaseRef)
 	if result.RepoID.IsZero() {
 		result.RepoID = types.NewRepoID()
 	}

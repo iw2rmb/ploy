@@ -150,11 +150,10 @@ func RunSpecSet(ctx context.Context, migRef, specPath string, output io.Writer) 
 }
 
 type RepoAddOptions struct {
-	MigRef    string
-	RepoURL   string
-	BaseRef   string
-	TargetRef string
-	Output    io.Writer
+	MigRef  string
+	RepoURL string
+	BaseRef string
+	Output  io.Writer
 }
 
 func RunRepoAdd(ctx context.Context, opts RepoAddOptions) error {
@@ -172,7 +171,6 @@ func RunRepoAdd(ctx context.Context, opts RepoAddOptions) error {
 		MigRef:    domaintypes.MigRef(migID),
 		RepoURL:   opts.RepoURL,
 		BaseRef:   opts.BaseRef,
-		TargetRef: opts.TargetRef,
 	}).Run(ctx)
 	if err != nil {
 		return err
@@ -204,13 +202,12 @@ func RunRepoList(ctx context.Context, migRef string, output io.Writer) error {
 	}
 
 	w := tabwriter.NewWriter(output, 0, 0, 2, ' ', 0)
-	_, _ = fmt.Fprintln(w, "ID\tREPO_URL\tBASE_REF\tTARGET_REF\tADDED_AT")
+	_, _ = fmt.Fprintln(w, "ID\tREPO_URL\tBASE_REF\tADDED_AT")
 	for _, repo := range results {
-		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
+		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\n",
 			repo.ID.String(),
 			domaintypes.NormalizeRepoURLSchemless(repo.RepoURL),
 			repo.BaseRef,
-			repo.TargetRef,
 			repo.CreatedAt.Format(time.RFC3339),
 		)
 	}
@@ -376,11 +373,10 @@ func RunStatus(ctx context.Context, migID string, output io.Writer) error {
 }
 
 type RunRepoAddOptions struct {
-	RunID     string
-	RepoURL   string
-	BaseRef   string
-	TargetRef string
-	Output    io.Writer
+	RunID   string
+	RepoURL string
+	BaseRef string
+	Output  io.Writer
 }
 
 func RunRunRepoAdd(ctx context.Context, opts RunRepoAddOptions) error {
@@ -401,22 +397,13 @@ func RunRunRepoAdd(ctx context.Context, opts RunRepoAddOptions) error {
 	if err := domaintypes.GitRef(baseRef).Validate(); err != nil {
 		return fmt.Errorf("--base-ref: %w", err)
 	}
-	targetRef := strings.TrimSpace(opts.TargetRef)
-	if targetRef == "" {
-		return errors.New("--target-ref required")
-	}
-	if err := domaintypes.GitRef(targetRef).Validate(); err != nil {
-		return fmt.Errorf("--target-ref: %w", err)
-	}
-
 	base, httpClient, err := common.ResolveControlPlaneHTTP(ctx)
 	if err != nil {
 		return err
 	}
 	resp, err := doRunRepoAdd(ctx, base, httpClient, strings.TrimSpace(opts.RunID), runRepoAddRequest{
-		RepoURL:   trimmedRepoURL,
-		BaseRef:   baseRef,
-		TargetRef: targetRef,
+		RepoURL: trimmedRepoURL,
+		BaseRef: baseRef,
 	})
 	if err != nil {
 		return err
@@ -445,11 +432,10 @@ func RunRunRepoRemove(ctx context.Context, runID, repoID string, output io.Write
 }
 
 type RunRepoRestartOptions struct {
-	RunID     string
-	RepoID    string
-	BaseRef   string
-	TargetRef string
-	Output    io.Writer
+	RunID   string
+	RepoID  string
+	BaseRef string
+	Output  io.Writer
 }
 
 func RunRunRepoRestart(ctx context.Context, opts RunRepoRestartOptions) error {
@@ -462,9 +448,6 @@ func RunRunRepoRestart(ctx context.Context, opts RunRepoRestartOptions) error {
 	reqBody := runRepoRestartRequest{}
 	if br := strings.TrimSpace(opts.BaseRef); br != "" {
 		reqBody.BaseRef = &br
-	}
-	if tr := strings.TrimSpace(opts.TargetRef); tr != "" {
-		reqBody.TargetRef = &tr
 	}
 
 	base, httpClient, err := common.ResolveControlPlaneHTTP(ctx)
@@ -614,14 +597,12 @@ func migValueOrDash(v string) string {
 
 // runRepoAddRequest is the request body for adding a repo to a batch.
 type runRepoAddRequest struct {
-	RepoURL   string `json:"repo_url"`
-	BaseRef   string `json:"base_ref"`
-	TargetRef string `json:"target_ref"`
+	RepoURL string `json:"repo_url"`
+	BaseRef string `json:"base_ref"`
 }
 
 type runRepoRestartRequest struct {
-	BaseRef   *string `json:"base_ref,omitempty"`
-	TargetRef *string `json:"target_ref,omitempty"`
+	BaseRef *string `json:"base_ref,omitempty"`
 }
 
 type runRepoResponse struct {
@@ -629,7 +610,6 @@ type runRepoResponse struct {
 	RepoID     domaintypes.MigRepoID `json:"repo_id"`
 	RepoURL    string                `json:"repo_url"`
 	BaseRef    string                `json:"base_ref"`
-	TargetRef  string                `json:"target_ref"`
 	Status     string                `json:"status"`
 	Attempt    int32                 `json:"attempt"`
 	LastError  *string               `json:"last_error,omitempty"`

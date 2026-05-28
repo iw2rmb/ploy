@@ -89,9 +89,8 @@ func TestFilesystemWorkspaceHydrator_Hydrate(t *testing.T) {
 						Mode:      contracts.StepInputModeReadWrite,
 						Hydration: &contracts.StepInputHydration{
 							Repo: &contracts.RepoMaterialization{
-								URL:       "https://github.com/example/repo.git",
-								BaseRef:   "main",
-								TargetRef: "main",
+								URL:     "https://github.com/example/repo.git",
+								BaseRef: "main",
 							},
 						},
 					},
@@ -121,9 +120,8 @@ func TestFilesystemWorkspaceHydrator_Hydrate(t *testing.T) {
 						Mode:      contracts.StepInputModeReadWrite,
 						Hydration: &contracts.StepInputHydration{
 							Repo: &contracts.RepoMaterialization{
-								URL:       "https://github.com/example/repo.git",
-								BaseRef:   "main",
-								TargetRef: "main",
+								URL:     "https://github.com/example/repo.git",
+								BaseRef: "main",
 							},
 						},
 					},
@@ -148,9 +146,8 @@ func TestFilesystemWorkspaceHydrator_Hydrate(t *testing.T) {
 						Mode:      contracts.StepInputModeReadWrite,
 						Hydration: &contracts.StepInputHydration{
 							Repo: &contracts.RepoMaterialization{
-								URL:       "https://github.com/example/repo1.git",
-								BaseRef:   "main",
-								TargetRef: "main",
+								URL:     "https://github.com/example/repo1.git",
+								BaseRef: "main",
 							},
 						},
 					},
@@ -166,9 +163,8 @@ func TestFilesystemWorkspaceHydrator_Hydrate(t *testing.T) {
 						Mode:      contracts.StepInputModeReadOnly,
 						Hydration: &contracts.StepInputHydration{
 							Repo: &contracts.RepoMaterialization{
-								URL:       "https://github.com/example/repo2.git",
-								BaseRef:   "main",
-								TargetRef: "develop",
+								URL:     "https://github.com/example/repo2.git",
+								BaseRef: "main",
 							},
 						},
 					},

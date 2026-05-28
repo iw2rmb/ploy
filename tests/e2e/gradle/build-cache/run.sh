@@ -82,11 +82,10 @@ echo "[e2e] Ensuring gate env config for Gradle build cache..."
 "$PLOY_BIN" config env set --key PLOY_GRADLE_BUILD_CACHE_URL --value "http://gradle-build-cache:5071/cache/" --scope gate >/dev/null
 "$PLOY_BIN" config env set --key PLOY_GRADLE_BUILD_CACHE_PUSH --value "true" --scope gate >/dev/null
 
-echo "[e2e] Submitting run (repo=${REPO_URL}, base=${REPO_BASE_REF}, target=${REPO_TARGET_REF})..."
+echo "[e2e] Submitting run (repo=${REPO_URL}, base=${REPO_BASE_REF})..."
 RUN_JSON="$("$PLOY_BIN" mig run --json \
   --repo-url "$REPO_URL" \
   --repo-base-ref "$REPO_BASE_REF" \
-  --repo-target-ref "$REPO_TARGET_REF" \
   --spec "$SPEC_FILE" \
   --follow)"
 

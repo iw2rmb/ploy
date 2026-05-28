@@ -114,9 +114,9 @@ func TestV1Schema_MigReposUniqueness(t *testing.T) {
 	// Insert first mig_repos row.
 	repoID1 := domaintypes.NewMigRepoID()
 	_, err = db.Pool().Exec(ctx, `
-			INSERT INTO mig_repos (id, mig_id, repo_id, base_ref, target_ref, created_at)
-			VALUES ($1, $2, $3, $4, $5, now())
-		`, repoID1.String(), migID.String(), resolvedRepoID1, "main", "feature")
+			INSERT INTO mig_repos (id, mig_id, repo_id, base_ref, created_at)
+			VALUES ($1, $2, $3, $4, now())
+		`, repoID1.String(), migID.String(), resolvedRepoID1, "main")
 	if err != nil {
 		t.Fatalf("first mig_repos insert failed: %v", err)
 	}
@@ -124,9 +124,9 @@ func TestV1Schema_MigReposUniqueness(t *testing.T) {
 	// Attempt to insert second mig_repos row with the same (mig_id, repo_id).
 	repoID2 := domaintypes.NewMigRepoID()
 	_, err = db.Pool().Exec(ctx, `
-			INSERT INTO mig_repos (id, mig_id, repo_id, base_ref, target_ref, created_at)
-			VALUES ($1, $2, $3, $4, $5, now())
-		`, repoID2.String(), migID.String(), resolvedRepoID1, "main", "feature-2")
+			INSERT INTO mig_repos (id, mig_id, repo_id, base_ref, created_at)
+			VALUES ($1, $2, $3, $4, now())
+		`, repoID2.String(), migID.String(), resolvedRepoID1, "main")
 
 	// Verify that the insert was rejected due to unique constraint violation.
 	if err == nil {
@@ -203,9 +203,9 @@ func TestV1Schema_RunReposCompositePK(t *testing.T) {
 
 	// Insert mig_repo.
 	_, err = db.Pool().Exec(ctx, `
-			INSERT INTO mig_repos (id, mig_id, repo_id, base_ref, target_ref, created_at)
-			VALUES ($1, $2, $3, $4, $5, now())
-		`, repoID.String(), migID.String(), resolvedRepoIDPK, "main", "feature")
+			INSERT INTO mig_repos (id, mig_id, repo_id, base_ref, created_at)
+			VALUES ($1, $2, $3, $4, now())
+		`, repoID.String(), migID.String(), resolvedRepoIDPK, "main")
 	if err != nil {
 		t.Fatalf("mig_repos insert failed: %v", err)
 	}
@@ -221,18 +221,18 @@ func TestV1Schema_RunReposCompositePK(t *testing.T) {
 
 	// Insert first run_repos row.
 	_, err = db.Pool().Exec(ctx, `
-			INSERT INTO run_repos (mig_id, run_id, repo_id, repo_base_ref, repo_target_ref, status, created_at)
-			VALUES ($1, $2, $3, $4, $5, $6, now())
-		`, migID.String(), runID.String(), resolvedRepoIDPK, "main", "feature", "Queued")
+			INSERT INTO run_repos (mig_id, run_id, repo_id, repo_base_ref, status, created_at)
+			VALUES ($1, $2, $3, $4, $5, now())
+		`, migID.String(), runID.String(), resolvedRepoIDPK, "main", "Queued")
 	if err != nil {
 		t.Fatalf("first run_repos insert failed: %v", err)
 	}
 
 	// Attempt to insert second run_repos row with the same (run_id, repo_id).
 	_, err = db.Pool().Exec(ctx, `
-			INSERT INTO run_repos (mig_id, run_id, repo_id, repo_base_ref, repo_target_ref, status, created_at)
-			VALUES ($1, $2, $3, $4, $5, $6, now())
-		`, migID.String(), runID.String(), resolvedRepoIDPK, "main", "feature-2", "Queued")
+			INSERT INTO run_repos (mig_id, run_id, repo_id, repo_base_ref, status, created_at)
+			VALUES ($1, $2, $3, $4, $5, now())
+		`, migID.String(), runID.String(), resolvedRepoIDPK, "main", "Queued")
 
 	// Verify that the insert was rejected due to PK violation.
 	if err == nil {
@@ -314,9 +314,9 @@ func TestV1Schema_JobsUniqueness(t *testing.T) {
 
 	// Insert mig_repo.
 	_, err = db.Pool().Exec(ctx, `
-			INSERT INTO mig_repos (id, mig_id, repo_id, base_ref, target_ref, created_at)
-			VALUES ($1, $2, $3, $4, $5, now())
-		`, repoID.String(), migID.String(), resolvedRepoIDJobs, "main", "feature")
+			INSERT INTO mig_repos (id, mig_id, repo_id, base_ref, created_at)
+			VALUES ($1, $2, $3, $4, now())
+		`, repoID.String(), migID.String(), resolvedRepoIDJobs, "main")
 	if err != nil {
 		t.Fatalf("mig_repos insert failed: %v", err)
 	}
@@ -332,9 +332,9 @@ func TestV1Schema_JobsUniqueness(t *testing.T) {
 
 	// Insert run_repos.
 	_, err = db.Pool().Exec(ctx, `
-			INSERT INTO run_repos (mig_id, run_id, repo_id, repo_base_ref, repo_target_ref, status, created_at)
-			VALUES ($1, $2, $3, $4, $5, $6, now())
-		`, migID.String(), runID.String(), resolvedRepoIDJobs, "main", "feature", "Queued")
+			INSERT INTO run_repos (mig_id, run_id, repo_id, repo_base_ref, status, created_at)
+			VALUES ($1, $2, $3, $4, $5, now())
+		`, migID.String(), runID.String(), resolvedRepoIDJobs, "main", "Queued")
 	if err != nil {
 		t.Fatalf("run_repos insert failed: %v", err)
 	}

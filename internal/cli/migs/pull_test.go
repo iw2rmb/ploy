@@ -52,9 +52,8 @@ func TestRunPullCommand_Success(t *testing.T) {
 
 		// Return a valid response.
 		resp := PullResolution{
-			RunID:         runID,
-			RepoID:        repoID,
-			RepoTargetRef: domaintypes.GitRef("migs/" + runID.String() + "/feature"),
+			RunID:  runID,
+			RepoID: repoID,
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
@@ -81,9 +80,6 @@ func TestRunPullCommand_Success(t *testing.T) {
 	}
 	if result.RepoID != repoID {
 		t.Errorf("expected RepoID %q, got %q", repoID.String(), result.RepoID.String())
-	}
-	if result.RepoTargetRef.String() != "migs/"+runID.String()+"/feature" {
-		t.Errorf("expected RepoTargetRef %q, got %q", "migs/"+runID.String()+"/feature", result.RepoTargetRef.String())
 	}
 }
 
@@ -212,9 +208,8 @@ func TestMigPullCommand_Success(t *testing.T) {
 
 		// Return a valid response.
 		resp := PullResolution{
-			RunID:         runID,
-			RepoID:        repoID,
-			RepoTargetRef: domaintypes.GitRef("migs/" + runID.String() + "/feature"),
+			RunID:  runID,
+			RepoID: repoID,
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
@@ -270,9 +265,8 @@ func TestMigPullCommand_WithLastFailed(t *testing.T) {
 
 		// Return a valid response.
 		resp := PullResolution{
-			RunID:         runID,
-			RepoID:        repoID,
-			RepoTargetRef: domaintypes.GitRef("migs/" + runID.String() + "/fix"),
+			RunID:  runID,
+			RepoID: repoID,
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
@@ -324,9 +318,8 @@ func TestMigPullCommand_DefaultMode(t *testing.T) {
 
 		// Return a valid response.
 		resp := PullResolution{
-			RunID:         runID,
-			RepoID:        repoID,
-			RepoTargetRef: domaintypes.GitRef("migs/" + runID.String() + "/feature"),
+			RunID:  runID,
+			RepoID: repoID,
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)

@@ -150,7 +150,6 @@ type MigRepo struct {
 	MigID     types.MigID        `json:"mig_id"`
 	RepoID    types.RepoID       `json:"repo_id"`
 	BaseRef   string             `json:"base_ref"`
-	TargetRef string             `json:"target_ref"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
 
@@ -252,7 +251,6 @@ type RunRepo struct {
 	RunID           types.RunID         `json:"run_id"`
 	RepoID          types.RepoID        `json:"repo_id"`
 	RepoBaseRef     string              `json:"repo_base_ref"`
-	RepoTargetRef   string              `json:"repo_target_ref"`
 	SourceCommitSha string              `json:"source_commit_sha"`
 	RepoSha0        string              `json:"repo_sha0"`
 	Status          types.RunRepoStatus `json:"status"`

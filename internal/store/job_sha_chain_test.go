@@ -13,7 +13,6 @@ func TestUpdateJobCompletion_PropagatesRepoSHAOutToNextJob(t *testing.T) {
 	fx := newV1Fixture(t, ctx, db,
 		"https://github.com/iw2rmb/ploy-sha-chain-test.git",
 		"main",
-		"feature",
 		[]byte(`{"steps":[]}`),
 	)
 
@@ -94,7 +93,6 @@ func TestUpdateJobCompletion_PropagationIsAtomic(t *testing.T) {
 	fx := newV1Fixture(t, ctx, db,
 		"https://github.com/iw2rmb/ploy-sha-chain-atomic.git",
 		"main",
-		"feature",
 		[]byte(`{"steps":[]}`),
 	)
 

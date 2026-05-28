@@ -100,7 +100,7 @@ type jobStore struct {
 	updateRunRepoStatus mockCallSlice[store.UpdateRunRepoStatusParams, struct{}]
 
 	updateRunRepoError      mockCall[store.UpdateRunRepoErrorParams, struct{}]
-	updateRunRepoRefs       mockCall[store.UpdateRunRepoRefsParams, struct{}]
+	updateRunRepoBaseRef    mockCall[store.UpdateRunRepoBaseRefParams, struct{}]
 	incrementRunRepoAttempt mockCall[store.IncrementRunRepoAttemptParams, struct{}]
 
 	createRunRepo mockCall[store.CreateRunRepoParams, store.RunRepo]

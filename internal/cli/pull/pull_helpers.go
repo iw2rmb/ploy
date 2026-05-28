@@ -69,88 +69,33 @@ func resolveGitRemoteURL(ctx context.Context, remoteName string) (string, error)
 	return rawURL, nil
 }
 
-// fetchRef fetches the given ref from the origin remote using a shallow fetch.
-// The fetched commit is available as FETCH_HEAD.
-func fetchRef(ctx context.Context, origin, ref string, stderr io.Writer, dryRun bool) error {
-	_, _ = fmt.Fprintf(stderr, "  fetching %q from %s...\n", ref, origin)
-	if dryRun {
-		return nil
-	}
-
-	cmd := exec.CommandContext(ctx, "git", "fetch", origin, ref, "--depth=1")
-	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GIT_ASKPASS=echo")
-
-	var stderrBuf bytes.Buffer
-	cmd.Stderr = &stderrBuf
-
-	if err := cmd.Run(); err != nil {
-		stderrStr := stderrBuf.String()
-		if strings.Contains(stderrStr, "couldn't find remote ref") ||
-			strings.Contains(stderrStr, "not found") ||
-			strings.Contains(stderrStr, "invalid refspec") {
-			return fmt.Errorf("ref %q not reachable from origin %q", ref, origin)
-		}
-		return fmt.Errorf("git fetch failed: %w (stderr: %s)", err, strings.TrimSpace(stderrStr))
-	}
-
-	return nil
-}
-
-func resolveFetchHeadSHA(ctx context.Context) (string, error) {
-	cmd := exec.CommandContext(ctx, "git", "rev-parse", "FETCH_HEAD")
+func resolveHEADSHA(ctx context.Context) (string, error) {
+	cmd := exec.CommandContext(ctx, "git", "rev-parse", "HEAD")
 	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GIT_ASKPASS=echo")
 
 	out, err := cmd.Output()
 	if err != nil {
-		return "", fmt.Errorf("failed to resolve FETCH_HEAD: %w", err)
+		return "", fmt.Errorf("failed to resolve HEAD: %w", err)
 	}
 	sha := strings.TrimSpace(string(out))
 	if sha == "" {
-		return "", fmt.Errorf("FETCH_HEAD resolved to empty sha")
+		return "", fmt.Errorf("HEAD resolved to empty sha")
 	}
 	return sha, nil
 }
 
-// checkBranchCollision checks if a branch with the given name already exists locally or remotely.
-func checkBranchCollision(ctx context.Context, origin, targetRef string, stderr io.Writer) error {
-	localCmd := exec.CommandContext(ctx, "git", "show-ref", "--verify", "refs/heads/"+targetRef)
-	localCmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GIT_ASKPASS=echo")
-	if err := localCmd.Run(); err == nil {
-		return fmt.Errorf("branch %q already exists locally", targetRef)
+func ensureHEADMatchesSource(ctx context.Context, sourceCommit string) error {
+	sourceCommit = strings.TrimSpace(sourceCommit)
+	if sourceCommit == "" {
+		return fmt.Errorf("source_commit_sha is required")
 	}
-
-	remoteCmd := exec.CommandContext(ctx, "git", "ls-remote", "--heads", origin, targetRef)
-	remoteCmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GIT_ASKPASS=echo")
-	var remoteBuf bytes.Buffer
-	remoteCmd.Stdout = &remoteBuf
-	if err := remoteCmd.Run(); err == nil && strings.TrimSpace(remoteBuf.String()) != "" {
-		return fmt.Errorf("branch %q already exists on remote %q", targetRef, origin)
+	headSHA, err := resolveHEADSHA(ctx)
+	if err != nil {
+		return err
 	}
-
-	return nil
-}
-
-// createAndCheckoutBranch creates a new branch at the given commit and checks it out.
-func createAndCheckoutBranch(ctx context.Context, targetRef, commitSHA string, stderr io.Writer) error {
-	_, _ = fmt.Fprintf(stderr, "  creating branch %q at %s...\n", targetRef, commitSHA)
-
-	branchCmd := exec.CommandContext(ctx, "git", "branch", targetRef, commitSHA)
-	branchCmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GIT_ASKPASS=echo")
-	var branchStderr bytes.Buffer
-	branchCmd.Stderr = &branchStderr
-	if err := branchCmd.Run(); err != nil {
-		return fmt.Errorf("failed to create branch %q: %w (stderr: %s)", targetRef, err, strings.TrimSpace(branchStderr.String()))
+	if !strings.EqualFold(headSHA, sourceCommit) {
+		return fmt.Errorf("local HEAD %s does not match run source_commit_sha %s", headSHA, sourceCommit)
 	}
-
-	checkoutCmd := exec.CommandContext(ctx, "git", "checkout", targetRef)
-	checkoutCmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GIT_ASKPASS=echo")
-	var checkoutStderr bytes.Buffer
-	checkoutCmd.Stderr = &checkoutStderr
-	if err := checkoutCmd.Run(); err != nil {
-		return fmt.Errorf("failed to checkout branch %q: %w (stderr: %s)", targetRef, err, strings.TrimSpace(checkoutStderr.String()))
-	}
-
-	_, _ = fmt.Fprintf(stderr, "  switched to branch %q\n", targetRef)
 	return nil
 }
 

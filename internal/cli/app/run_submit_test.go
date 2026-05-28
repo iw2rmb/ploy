@@ -14,7 +14,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/testutil/clienv"
 )
 
-// TestRunSubmitCallsControlPlane validates `ploy run --repo ... --base-ref ... --target-ref ... --spec ...`
+// TestRunSubmitCallsControlPlane validates `ploy run --repo ... --base-ref ... --spec ...`
 // calls POST /v1/runs and prints run_id and mig_id.
 // Not parallel because useServerDescriptor uses t.Setenv.
 func TestRunSubmitCallsControlPlane(t *testing.T) {
@@ -68,7 +68,6 @@ func TestRunSubmitCallsControlPlane(t *testing.T) {
 		"run",
 		"--repo", "https://github.com/test/repo",
 		"--base-ref", "main",
-		"--target-ref", "feature-branch",
 		"--spec", specPath,
 	}, &buf)
 	if err != nil {
@@ -85,9 +84,6 @@ func TestRunSubmitCallsControlPlane(t *testing.T) {
 	}
 	if capturedRequest["base_ref"] != "main" {
 		t.Errorf("expected base_ref='main', got %v", capturedRequest["base_ref"])
-	}
-	if capturedRequest["target_ref"] != "feature-branch" {
-		t.Errorf("expected target_ref='feature-branch', got %v", capturedRequest["target_ref"])
 	}
 	if capturedRequest["created_by"] != "test-user" {
 		t.Errorf("expected created_by='test-user', got %v", capturedRequest["created_by"])
@@ -137,22 +133,17 @@ func TestRunSubmitMissingFlags(t *testing.T) {
 	}{
 		{
 			name:    "missing repo",
-			args:    []string{"run", "--base-ref", "main", "--target-ref", "feature", "--spec", specPath},
+			args:    []string{"run", "--base-ref", "main", "--spec", specPath},
 			wantErr: "--repo is required",
 		},
 		{
 			name:    "missing base-ref",
-			args:    []string{"run", "--repo", "https://github.com/test/repo", "--target-ref", "feature", "--spec", specPath},
+			args:    []string{"run", "--repo", "https://github.com/test/repo", "--spec", specPath},
 			wantErr: "--base-ref is required",
 		},
 		{
-			name:    "missing target-ref",
-			args:    []string{"run", "--repo", "https://github.com/test/repo", "--base-ref", "main", "--spec", specPath},
-			wantErr: "--target-ref is required",
-		},
-		{
 			name:    "missing spec",
-			args:    []string{"run", "--repo", "https://github.com/test/repo", "--base-ref", "main", "--target-ref", "feature"},
+			args:    []string{"run", "--repo", "https://github.com/test/repo", "--base-ref", "main"},
 			wantErr: "--spec is required",
 		},
 	}
@@ -210,7 +201,6 @@ func TestRunSubmitSpecFromStdin(t *testing.T) {
 		"run",
 		"--repo", "https://github.com/test/repo",
 		"--base-ref", "main",
-		"--target-ref", "feature",
 		"--spec", "-",
 	}, &buf)
 	if err != nil {
@@ -271,7 +261,6 @@ func TestRunSubmitJSONSpec(t *testing.T) {
 		"run",
 		"--repo", "https://github.com/test/repo",
 		"--base-ref", "main",
-		"--target-ref", "feature",
 		"--spec", specPath,
 	}, &buf)
 	if err != nil {
@@ -305,7 +294,6 @@ func TestRunSubmitInvalidSpec(t *testing.T) {
 		"run",
 		"--repo", "https://github.com/test/repo",
 		"--base-ref", "main",
-		"--target-ref", "feature",
 		"--spec", specPath,
 	}, &buf)
 
@@ -324,7 +312,6 @@ func TestRunSubmitNonExistentSpec(t *testing.T) {
 		"run",
 		"--repo", "https://github.com/test/repo",
 		"--base-ref", "main",
-		"--target-ref", "feature",
 		"--spec", "/nonexistent/path/spec.yaml",
 	}, &buf)
 
@@ -377,7 +364,6 @@ envs:
 		"run",
 		"--repo", "https://github.com/acme/service.git",
 		"--base-ref", "main",
-		"--target-ref", "ploy/java17",
 		"--spec", specPath,
 		"--job-env", "KEY1=from-cli",
 		"--job-env", "KEY2=extra",
@@ -492,7 +478,6 @@ func TestRunSubmitFollowUsesRunStatusFormat(t *testing.T) {
 						"repo_id":           repoID.String(),
 						"repo_url":          "https://github.com/acme/service.git",
 						"base_ref":          "main",
-						"target_ref":        "ploy/java17",
 						"source_commit_sha": "0123456789abcdef0123456789abcdef01234567",
 						"status":            repoStatus,
 						"attempt":           1,
@@ -537,7 +522,6 @@ func TestRunSubmitFollowUsesRunStatusFormat(t *testing.T) {
 		"run",
 		"--repo", "https://github.com/acme/service.git",
 		"--base-ref", "main",
-		"--target-ref", "ploy/java17",
 		"--spec", specPath,
 		"--follow",
 	}, &buf)
@@ -559,7 +543,7 @@ func TestRunSubmitFollowUsesRunStatusFormat(t *testing.T) {
 		t.Fatalf("expected compact repo header without domain/url/branch, got: %q", out)
 	}
 	if strings.Contains(out, " -> ") {
-		t.Fatalf("did not expect target branch annotation, got: %q", out)
+		t.Fatalf("did not expect branch transition annotation, got: %q", out)
 	}
 	if strings.Count(out, "   Mig:   "+migID.String()+"   | java17-upgrade") != 1 {
 		t.Fatalf("expected mig header to render once in follow output, got: %q", out)

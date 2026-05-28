@@ -277,7 +277,7 @@ type Querier interface {
 	UpdateJobNextID(ctx context.Context, arg UpdateJobNextIDParams) error
 	UpdateJobRepoSHAIn(ctx context.Context, arg UpdateJobRepoSHAInParams) error
 	UpdateJobStatus(ctx context.Context, arg UpdateJobStatusParams) error
-	UpdateMigRepoRefs(ctx context.Context, arg UpdateMigRepoRefsParams) error
+	UpdateMigRepoBaseRef(ctx context.Context, arg UpdateMigRepoBaseRefParams) error
 	UpdateMigSpec(ctx context.Context, arg UpdateMigSpecParams) error
 	UpdateNodeActionCompletion(ctx context.Context, arg UpdateNodeActionCompletionParams) error
 	UpdateNodeCertMetadata(ctx context.Context, arg UpdateNodeCertMetadataParams) error
@@ -285,9 +285,9 @@ type Querier interface {
 	UpdateNodeHeartbeat(ctx context.Context, arg UpdateNodeHeartbeatParams) error
 	UpdateRunCompletion(ctx context.Context, arg UpdateRunCompletionParams) error
 	UpdateRunRepoActionCompletion(ctx context.Context, arg UpdateRunRepoActionCompletionParams) error
+	// Updates the source ref snapshot for the run repo.
+	UpdateRunRepoBaseRef(ctx context.Context, arg UpdateRunRepoBaseRefParams) error
 	UpdateRunRepoError(ctx context.Context, arg UpdateRunRepoErrorParams) error
-	// Updates snapshot refs for the run repo (used when restarting with new refs).
-	UpdateRunRepoRefs(ctx context.Context, arg UpdateRunRepoRefsParams) error
 	// Updates repo status + timing fields.
 	// started_at: set when transitioning to Running.
 	// finished_at: set when transitioning to a terminal status.

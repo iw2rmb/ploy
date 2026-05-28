@@ -17,9 +17,8 @@
 //  2. Verify working tree is clean
 //  3. Resolve git remote URL for the specified origin
 //  4. Call POST /v1/runs/{run_id}/pull to resolve repo execution identifiers
-//  5. Fetch base_ref from run_repos and perform git fetch
-//  6. Create target branch at the fetched commit
-//  7. Download all diffs and apply via git apply
+//  5. Verify local HEAD matches run_repos.source_commit_sha
+//  6. Download all diffs and apply via git apply
 package pull
 
 import (
@@ -138,11 +137,8 @@ func HandleRunPull(args []string, stderr io.Writer) error {
 
 	_, _ = fmt.Fprintf(stderr, "run pull: resolved run %s\n", runID)
 	_, _ = fmt.Fprintf(stderr, "  repo ID: %s\n", resolution.RepoID.String())
-	_, _ = fmt.Fprintf(stderr, "  target ref: %s\n", resolution.RepoTargetRef.String())
 
-	// Step 5: Fetch repo details to get base_ref.
-	// The pull resolution returns repo_target_ref, but we need base_ref for checkout.
-	// Query the run repos endpoint to get the full repo details.
+	// Step 5: Fetch repo details to validate the local source commit.
 	repoDetails, err := fetchRunRepoDetails(ctx, httpClient, base, domaintypes.RunID(runID), resolution.RepoID)
 	if err != nil {
 		return fmt.Errorf("run pull: fetch repo details: %w", err)
@@ -154,44 +150,26 @@ func HandleRunPull(args []string, stderr io.Writer) error {
 	}
 	_, _ = fmt.Fprintf(stderr, "  base ref: %s\n", baseRef)
 
-	targetRef := strings.TrimSpace(resolution.RepoTargetRef.String())
-	if targetRef == "" {
-		return errors.New("run pull: target_ref is not available for this run")
+	sourceCommit := strings.TrimSpace(repoDetails.SourceCommitSHA)
+	if sourceCommit == "" {
+		return errors.New("run pull: source_commit_sha is not available for this run")
 	}
-
-	// Step 6: Fetch the base ref from the origin remote.
-	// Uses shared helper from pull_helpers.go.
-	if err := fetchRef(ctx, *origin, baseRef, stderr, *dryRun); err != nil {
+	if err := ensureHEADMatchesSource(ctx, sourceCommit); err != nil {
 		return fmt.Errorf("run pull: %w", err)
 	}
+	_, _ = fmt.Fprintf(stderr, "  source commit: %s\n", sourceCommit)
 
-	baseCommit := ""
-	if !*dryRun {
-		commit, err := resolveFetchHeadSHA(ctx)
-		if err != nil {
-			return fmt.Errorf("run pull: %w", err)
-		}
-		baseCommit = commit
-		_, _ = fmt.Fprintf(stderr, "  base commit: %s\n", baseCommit)
-	}
-
-	// Step 7: Check for branch collisions.
-	// Uses shared helper from pull_helpers.go.
-	if err := checkBranchCollision(ctx, *origin, targetRef, stderr); err != nil {
-		return fmt.Errorf("run pull: %w", err)
-	}
-
-	// Step 8: Fetch diffs for this repo execution.
+	// Step 6: Fetch diffs for this repo execution.
 	diffs, err := ListRunRepoDiffs(ctx, httpClient, base, domaintypes.RunID(runID), resolution.RepoID)
 	if err != nil {
 		return fmt.Errorf("run pull: list diffs: %w", err)
 	}
 	_, _ = fmt.Fprintf(stderr, "  diffs to apply: %d\n", len(diffs))
 
-	// Step 9: Handle --dry-run mode.
+	// Step 7: Handle --dry-run mode.
 	if *dryRun {
-		_, _ = fmt.Fprintf(stderr, "\nWould create branch %q at %q (origin %q) and apply %d Migs diff(s)\n",
-			targetRef, baseRef, *origin, len(diffs))
+		_, _ = fmt.Fprintf(stderr, "\nWould apply %d Migs diff(s) to current worktree at %s\n",
+			len(diffs), sourceCommit)
 		for i, diff := range diffs {
 			_, _ = fmt.Fprintf(stderr, "  diff %d: %s (%d bytes gzipped)\n",
 				i+1, diff.ID, diff.Size)
@@ -199,13 +177,7 @@ func HandleRunPull(args []string, stderr io.Writer) error {
 		return nil
 	}
 
-	// Step 10: Create the target branch at the fetched base commit.
-	// Uses shared helper from pull_helpers.go.
-	if err := createAndCheckoutBranch(ctx, targetRef, baseCommit, stderr); err != nil {
-		return fmt.Errorf("run pull: %w", err)
-	}
-
-	// Step 11: Download and apply all diffs.
+	// Step 8: Download and apply all diffs.
 	// Uses shared helper from pull_helpers.go.
 	appliedCount, err := downloadAndApplyDiffs(ctx, domaintypes.RunID(runID), resolution.RepoID, diffs, stderr)
 	if err != nil {
@@ -213,8 +185,8 @@ func HandleRunPull(args []string, stderr io.Writer) error {
 	}
 
 	// Success message.
-	_, _ = fmt.Fprintf(stderr, "\nApplied %d Migs diff(s) from run %s to branch %q (origin %q)\n",
-		appliedCount, runID, targetRef, *origin)
+	_, _ = fmt.Fprintf(stderr, "\nApplied %d Migs diff(s) from run %s to current worktree (origin %q)\n",
+		appliedCount, runID, *origin)
 
 	return nil
 }
@@ -222,10 +194,10 @@ func HandleRunPull(args []string, stderr io.Writer) error {
 // runRepoDetails holds the repo details needed for pull operations.
 // This is a simplified structure containing only the fields we need.
 type runRepoDetails struct {
-	RepoID    domaintypes.MigRepoID `json:"repo_id"`
-	BaseRef   string                `json:"base_ref"`
-	TargetRef string                `json:"target_ref"`
-	Status    string                `json:"status"`
+	RepoID          domaintypes.MigRepoID `json:"repo_id"`
+	BaseRef         string                `json:"base_ref"`
+	SourceCommitSHA string                `json:"source_commit_sha,omitempty"`
+	Status          string                `json:"status"`
 }
 
 // fetchRunRepoDetails fetches the repo details for a run/repo pair.
@@ -275,7 +247,7 @@ func printRunPullUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "Usage: ploy run pull [--origin <remote>] [--dry-run] <run-id>")
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Pulls Migs diffs from a run into the current git repository.")
-	_, _ = fmt.Fprintln(w, "Creates a new branch at the run's base commit and applies stored diffs.")
+	_, _ = fmt.Fprintln(w, "Applies stored diffs to the current worktree when HEAD matches the run source commit.")
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Use this command when you have a specific run ID.")
 	_, _ = fmt.Fprintln(w, "")

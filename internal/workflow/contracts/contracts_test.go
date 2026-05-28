@@ -65,9 +65,8 @@ func TestWorkflowRunValidate(t *testing.T) {
 		RunID:         types.RunID("run-456"),
 		Manifest:      ManifestReference{Name: "smoke", Version: "2025-09-26"},
 		Repo: RepoMaterialization{
-			URL:       types.RepoURL("https://gitlab.com/iw2rmb/sample.git"),
-			BaseRef:   types.GitRef("main"),
-			TargetRef: types.GitRef("migs/example-grid"),
+			URL:     types.RepoURL("https://gitlab.com/iw2rmb/sample.git"),
+			BaseRef: types.GitRef("main"),
 		},
 	}
 	if err := withRepo.Validate(); err != nil {
@@ -77,7 +76,7 @@ func TestWorkflowRunValidate(t *testing.T) {
 	badRepo := valid
 	badRepo.Repo = RepoMaterialization{URL: types.RepoURL("https://example.com/repo.git")}
 	if err := badRepo.Validate(); err == nil {
-		t.Fatal("expected repo validation error when target ref missing")
+		t.Fatal("expected repo validation error when base ref missing")
 	}
 
 	commitOnly := valid
@@ -91,8 +90,7 @@ func TestWorkflowRunValidate(t *testing.T) {
 
 	invalidScheme := valid
 	invalidScheme.Repo = RepoMaterialization{
-		URL:       types.RepoURL("http://example.com/repo.git"),
-		TargetRef: types.GitRef("main"),
+		URL: types.RepoURL("http://example.com/repo.git"),
 	}
 	if err := invalidScheme.Validate(); err == nil {
 		t.Fatal("expected validation error for invalid repo url scheme")

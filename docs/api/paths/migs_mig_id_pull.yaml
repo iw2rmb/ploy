@@ -7,7 +7,7 @@ post:
 
     Behavior:
     - Request provides repo_url and optional mode (last-succeeded default, last-failed).
-    - Response returns run_id, repo_id, and repo_target_ref (from run_repos snapshot).
+    - Response returns run_id and repo_id.
   parameters:
     - in: path
       name: mig_id

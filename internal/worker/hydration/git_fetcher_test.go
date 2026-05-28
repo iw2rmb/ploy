@@ -37,38 +37,35 @@ func TestGitFetcher_Fetch(t *testing.T) {
 		{
 			name: "invalid repo URL",
 			repo: &contracts.RepoMaterialization{
-				URL:       types.RepoURL("invalid-url"),
-				TargetRef: types.GitRef("main"),
+				URL: types.RepoURL("invalid-url"),
 			},
 			dest:      t.TempDir(),
 			wantErr:   true,
 			errSubstr: "invalid repo",
 		},
 		{
-			name: "missing target_ref and commit",
+			name: "missing base_ref and commit",
 			repo: &contracts.RepoMaterialization{
 				URL: types.RepoURL("https://github.com/example/repo.git"),
 			},
 			dest:      t.TempDir(),
 			wantErr:   true,
-			errSubstr: "target_ref or commit is required",
+			errSubstr: "base_ref or commit is required",
 		},
 		{
-			name: "valid repo with different target_ref",
+			name: "valid repo with base_ref",
 			repo: &contracts.RepoMaterialization{
-				URL:       types.RepoURL("file://" + repoWithFeatureBranch),
-				BaseRef:   types.GitRef("main"),
-				TargetRef: types.GitRef("feature"),
+				URL:     types.RepoURL("file://" + repoWithFeatureBranch),
+				BaseRef: types.GitRef("main"),
 			},
 			dest: t.TempDir(),
 		},
 		{
 			name: "valid repo with commit_sha HEAD",
 			repo: &contracts.RepoMaterialization{
-				URL:       types.RepoURL("file://" + gitrepo.SetupBasic(t)),
-				BaseRef:   types.GitRef("main"),
-				TargetRef: types.GitRef("main"),
-				Commit:    types.CommitSHA("HEAD"),
+				URL:     types.RepoURL("file://" + gitrepo.SetupBasic(t)),
+				BaseRef: types.GitRef("main"),
+				Commit:  types.CommitSHA("HEAD"),
 			},
 			dest: t.TempDir(),
 		},
@@ -128,10 +125,9 @@ func TestGitFetcher_CacheDir(t *testing.T) {
 			t.Fatalf("NewGitFetcher() error = %v", err)
 		}
 		repo := &contracts.RepoMaterialization{
-			URL:       types.RepoURL(cleanURL),
-			BaseRef:   types.GitRef("main"),
-			TargetRef: types.GitRef("main"),
-			Commit:    types.CommitSHA(commitSHA),
+			URL:     types.RepoURL(cleanURL),
+			BaseRef: types.GitRef("main"),
+			Commit:  types.CommitSHA(commitSHA),
 		}
 
 		if err := fetcher.Fetch(context.Background(), repo, dest, gitauth.Options{
@@ -160,10 +156,10 @@ func TestGitFetcher_CacheDir(t *testing.T) {
 		}
 
 		ctx := context.Background()
-		if err := fetcher.Fetch(ctx, makeRepo(repo1Dir, "main", "main", gitrepo.RevParse(t, repo1Dir, "HEAD")), dest1, gitauth.Options{}); err != nil {
+		if err := fetcher.Fetch(ctx, makeRepo(repo1Dir, "main", gitrepo.RevParse(t, repo1Dir, "HEAD")), dest1, gitauth.Options{}); err != nil {
 			t.Fatalf("Fetch() repo1 error = %v", err)
 		}
-		if err := fetcher.Fetch(ctx, makeRepo(repo2Dir, "main", "main", gitrepo.RevParse(t, repo2Dir, "HEAD")), dest2, gitauth.Options{}); err != nil {
+		if err := fetcher.Fetch(ctx, makeRepo(repo2Dir, "main", gitrepo.RevParse(t, repo2Dir, "HEAD")), dest2, gitauth.Options{}); err != nil {
 			t.Fatalf("Fetch() repo2 error = %v", err)
 		}
 
@@ -185,10 +181,10 @@ func TestGitFetcher_CacheDir(t *testing.T) {
 		}
 
 		ctx := context.Background()
-		if err := fetcher.Fetch(ctx, makeRepo(repoDir, "main", "main", commitSHA), dest1, gitauth.Options{}); err != nil {
+		if err := fetcher.Fetch(ctx, makeRepo(repoDir, "main", commitSHA), dest1, gitauth.Options{}); err != nil {
 			t.Fatalf("Fetch() main error = %v", err)
 		}
-		if err := fetcher.Fetch(ctx, makeRepo(repoDir, "feature", "feature", commitSHA), dest2, gitauth.Options{}); err != nil {
+		if err := fetcher.Fetch(ctx, makeRepo(repoDir, "feature", commitSHA), dest2, gitauth.Options{}); err != nil {
 			t.Fatalf("Fetch() feature error = %v", err)
 		}
 
@@ -211,10 +207,10 @@ func TestGitFetcher_CacheDir(t *testing.T) {
 		}
 
 		ctx := context.Background()
-		if err := fetcher.Fetch(ctx, makeRepo(repoDir, "main", "main", latestCommitSHA), dest1, gitauth.Options{}); err != nil {
+		if err := fetcher.Fetch(ctx, makeRepo(repoDir, "main", latestCommitSHA), dest1, gitauth.Options{}); err != nil {
 			t.Fatalf("Fetch() latest commit error = %v", err)
 		}
-		if err := fetcher.Fetch(ctx, makeRepo(repoDir, "main", "main", secondCommitSHA), dest2, gitauth.Options{}); err != nil {
+		if err := fetcher.Fetch(ctx, makeRepo(repoDir, "main", secondCommitSHA), dest2, gitauth.Options{}); err != nil {
 			t.Fatalf("Fetch() specific commit error = %v", err)
 		}
 
@@ -234,7 +230,7 @@ func TestGitFetcher_CacheDir(t *testing.T) {
 			t.Fatalf("NewGitFetcher() error = %v", err)
 		}
 
-		if err := fetcher.Fetch(context.Background(), makeRepo(repoDir, "main", "main", ""), dest, gitauth.Options{}); err != nil {
+		if err := fetcher.Fetch(context.Background(), makeRepo(repoDir, "main", ""), dest, gitauth.Options{}); err != nil {
 			t.Fatalf("Fetch() error = %v", err)
 		}
 
@@ -325,7 +321,7 @@ func TestGitFetcher_BaseHydrationStrategy(t *testing.T) {
 			t.Fatalf("NewGitFetcher() error = %v", err)
 		}
 
-		if err := fetcher.Fetch(context.Background(), makeRepo(repoDir, "main", "main", ""), dest, gitauth.Options{}); err != nil {
+		if err := fetcher.Fetch(context.Background(), makeRepo(repoDir, "main", ""), dest, gitauth.Options{}); err != nil {
 			t.Fatalf("Fetch() on already hydrated dest error = %v", err)
 		}
 
@@ -345,7 +341,7 @@ func TestGitFetcher_BaseHydrationStrategy(t *testing.T) {
 			t.Fatalf("NewGitFetcher() error = %v", err)
 		}
 
-		if err := fetcher.Fetch(context.Background(), makeRepo(repoDir, "main", "main", secondCommitSHA), dest, gitauth.Options{}); err != nil {
+		if err := fetcher.Fetch(context.Background(), makeRepo(repoDir, "main", secondCommitSHA), dest, gitauth.Options{}); err != nil {
 			t.Fatalf("Fetch() error = %v", err)
 		}
 
@@ -364,7 +360,7 @@ func TestGitFetcher_BaseHydrationStrategy(t *testing.T) {
 			t.Fatalf("NewGitFetcher() error = %v", err)
 		}
 
-		if err := fetcher.Fetch(context.Background(), makeRepo(repoDir, "main", "main", ""), dest, gitauth.Options{}); err != nil {
+		if err := fetcher.Fetch(context.Background(), makeRepo(repoDir, "main", ""), dest, gitauth.Options{}); err != nil {
 			t.Fatalf("Fetch() error = %v", err)
 		}
 
@@ -384,7 +380,7 @@ func TestGitFetcher_BaseHydrationStrategy(t *testing.T) {
 			t.Fatalf("NewGitFetcher() error = %v", err)
 		}
 
-		if err := fetcher.Fetch(context.Background(), makeRepo(repoDir, "main", "main", secondCommitSHA), dest, gitauth.Options{}); err != nil {
+		if err := fetcher.Fetch(context.Background(), makeRepo(repoDir, "main", secondCommitSHA), dest, gitauth.Options{}); err != nil {
 			t.Fatalf("Fetch() error = %v", err)
 		}
 
@@ -404,7 +400,7 @@ func TestGitFetcher_BaseHydrationStrategy(t *testing.T) {
 			t.Fatalf("NewGitFetcher() error = %v", err)
 		}
 
-		if err := fetcher.Fetch(context.Background(), makeRepo(repoDir, "main", "main", ""), dest, gitauth.Options{}); err != nil {
+		if err := fetcher.Fetch(context.Background(), makeRepo(repoDir, "main", ""), dest, gitauth.Options{}); err != nil {
 			t.Fatalf("Fetch() error = %v", err)
 		}
 
@@ -438,11 +434,10 @@ func setupRepoWithCommits(t *testing.T) string {
 	return repoDir
 }
 
-func makeRepo(dir, baseRef, targetRef, commit string) *contracts.RepoMaterialization {
+func makeRepo(dir, baseRef, commit string) *contracts.RepoMaterialization {
 	r := &contracts.RepoMaterialization{
-		URL:       types.RepoURL("file://" + dir),
-		BaseRef:   types.GitRef(baseRef),
-		TargetRef: types.GitRef(targetRef),
+		URL:     types.RepoURL("file://" + dir),
+		BaseRef: types.GitRef(baseRef),
 	}
 	if commit != "" {
 		r.Commit = types.CommitSHA(commit)

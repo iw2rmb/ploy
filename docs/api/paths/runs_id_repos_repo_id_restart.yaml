@@ -4,9 +4,8 @@ post:
   description: |
     Restart execution for a single repo within a batch run. The handler resets
     the repo's status to `Queued`, increments the attempt counter, and clears
-    timing fields. Optionally, callers may supply new `base_ref` and/or
-    `target_ref` values in the request body to update the tracked refs for the
-    repo before the next attempt.
+    timing fields. Optionally, callers may supply a new `base_ref` in the
+    request body to update the tracked source ref before the next attempt.
   parameters:
     - in: path
       name: id
@@ -32,9 +31,6 @@ post:
             base_ref:
               type: string
               description: Optional new base ref to assign to the repo.
-            target_ref:
-              type: string
-              description: Optional new target ref to assign to the repo.
   responses:
     '200':
       description: OK

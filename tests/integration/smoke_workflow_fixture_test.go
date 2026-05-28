@@ -16,7 +16,7 @@ type v1RunFixture struct {
 	RunRepo store.RunRepo
 }
 
-func newV1RunFixture(t *testing.T, ctx context.Context, db store.Store, repoURL, baseRef, targetRef string, specJSON []byte) v1RunFixture {
+func newV1RunFixture(t *testing.T, ctx context.Context, db store.Store, repoURL, baseRef string, specJSON []byte) v1RunFixture {
 	t.Helper()
 
 	createdBy := "smoke-test"
@@ -45,11 +45,10 @@ func newV1RunFixture(t *testing.T, ctx context.Context, db store.Store, repoURL,
 
 	migRepoID := domaintypes.NewMigRepoID()
 	migRepo, err := db.CreateMigRepo(ctx, store.CreateMigRepoParams{
-		ID:        migRepoID,
-		MigID:     migID,
-		Url:       repoURL,
-		BaseRef:   baseRef,
-		TargetRef: targetRef,
+		ID:      migRepoID,
+		MigID:   migID,
+		Url:     repoURL,
+		BaseRef: baseRef,
 	})
 	if err != nil {
 		t.Fatalf("CreateMigRepo() failed: %v", err)
@@ -67,11 +66,12 @@ func newV1RunFixture(t *testing.T, ctx context.Context, db store.Store, repoURL,
 	}
 
 	runRepo, err := db.CreateRunRepo(ctx, store.CreateRunRepoParams{
-		MigID:         migID,
-		RunID:         run.ID,
-		RepoID:        migRepo.RepoID,
-		RepoBaseRef:   baseRef,
-		RepoTargetRef: targetRef,
+		MigID:           migID,
+		RunID:           run.ID,
+		RepoID:          migRepo.RepoID,
+		RepoBaseRef:     baseRef,
+		SourceCommitSha: "0123456789abcdef0123456789abcdef01234567",
+		RepoSha0:        "0123456789abcdef0123456789abcdef01234567",
 	})
 	if err != nil {
 		t.Fatalf("CreateRunRepo() failed: %v", err)

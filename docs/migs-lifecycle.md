@@ -645,8 +645,8 @@ artifacts) remain job-addressed via `job_id`.
 │   ┌─────▼─────┐            ┌─────▼─────┐             ┌─────▼─────┐          │
 │   │   spec    │            │ repo_url  │             │   jobs    │          │
 │   │   name    │            │ base_ref  │             │  diffs    │          │
-│   │  status   │            │ target_ref│             │   logs    │          │
-│   │           │            │  status   │             │ artifacts │          │
+│   │  status   │            │  status   │             │   logs    │          │
+│   │           │            │  attempt  │             │ artifacts │          │
 │   └───────────┘            │  attempt  │             └───────────┘          │
 │                            └───────────┘                                    │
 │                                                                             │
@@ -661,10 +661,10 @@ artifacts) remain job-addressed via `job_id`.
 
 - **Repo set (`mig_repos` + `repos`)** — Managed repositories for a mig project.
   `repos` stores global repository identity (`repos.id`, canonical URL) and
-  `mig_repos` stores mig membership plus mutable refs (`base_ref`, `target_ref`).
+  `mig_repos` stores mig membership plus the mutable source ref (`base_ref`).
 
 - **Run repos (`run_repos`)** — One row per `(run_id, repo_id)` capturing snapshot
-  refs (`repo_base_ref`, `repo_target_ref`), immutable SHA seed
+  source ref (`repo_base_ref`), immutable SHA seed
   (`source_commit_sha`, `repo_sha0`), per-repo status (`Queued`, `Running`, `Success`,
   `Fail`, `Cancelled`), and retry `attempt`.
 
@@ -674,7 +674,7 @@ artifacts) remain job-addressed via `job_id`.
 
 ### Single-repo vs batch runs
 
-Single-repo submission via `ploy run --repo ... --base-ref ... --target-ref ... --spec ...`
+Single-repo submission via `ploy run --repo ... --base-ref ... --spec ...`
 is
 internally a **degenerate batch** with exactly one `run_repos` entry. The same
 code paths handle both cases:
@@ -780,18 +780,12 @@ testing, or continuing work on changes produced by a run.
 │     └─ (mig pull) Optionally infer mig via GET /v1/migs?repo_url=...         │
 │               then call POST /v1/migs/{mig_id}/pull with repo_url + mode     │
 │                                                                             │
-│  2. Fetch base snapshot                                                      │
+│  2. Validate source commit                                                   │
 │     ├─ Call GET /v1/runs/{run_id}/repos and find repo_id                     │
-│     ├─ Use run_repos.base_ref snapshot                                       │
-│     └─ git fetch <origin> <base_ref> --depth=1                               │
+│     ├─ Read run_repos.source_commit_sha                                      │
+│     └─ Verify local HEAD equals source_commit_sha                            │
 │                                                                             │
-│  3. Create branch                                                            │
-│     ├─ Use repo_target_ref (branch name snapshot)                            │
-│     ├─ Check no local/remote collision for repo_target_ref                   │
-│     ├─ git branch <target_ref> FETCH_HEAD                                    │
-│     └─ git checkout <target_ref>                                             │
-│                                                                             │
-│  4. Apply diffs                                                              │
+│  3. Apply diffs                                                              │
 │     ├─ Call GET /v1/runs/{run_id}/repos/{repo_id}/diffs to list diffs        │
 │     ├─ For each diff (ordered by chain position):                           │
 │     │   ├─ Download via GET /v1/runs/{run_id}/repos/{repo_id}/diffs?download=true&diff_id=<uuid> │
@@ -816,16 +810,16 @@ testing, or continuing work on changes produced by a run.
 | Field                       | Source                          | Purpose                                   |
 |----------------------------|---------------------------------|-------------------------------------------|
 | `repo_id`                  | API / `POST /v1/*/pull`         | Identify the repo within the run          |
-| `repo_target_ref`          | API / `POST /v1/*/pull`         | Target branch name snapshot               |
-| `run_repos.base_ref`       | API / `GET /v1/runs/{run_id}/repos` | Base ref snapshot for branch base     |
+| `source_commit_sha`        | API / `GET /v1/runs/{run_id}/repos` | Local HEAD safety check                |
+| `run_repos.base_ref`       | API / `GET /v1/runs/{run_id}/repos` | Source ref display and diagnostics     |
 | `diffs.summary.next_id` | diffs summary JSON              | Optional legacy step metadata for display |
 | `diffs.id`                 | API / `GET /v1/runs/.../diffs`   | UUID used as `diff_id` for download       |
 
 **API endpoints consumed:**
 
-- `POST /v1/runs/{run_id}/pull` — Resolve `repo_id` + `repo_target_ref` for the current repo within the run.
-- `POST /v1/migs/{mig_id}/pull` — Resolve `run_id` + `repo_id` + `repo_target_ref` for the current repo within the selected run.
-- `GET /v1/runs/{run_id}/repos` — Fetch run repo snapshots (used to read `base_ref`).
+- `POST /v1/runs/{run_id}/pull` — Resolve `repo_id` for the current repo within the run.
+- `POST /v1/migs/{mig_id}/pull` — Resolve `run_id` + `repo_id` for the current repo within the selected run.
+- `GET /v1/runs/{run_id}/repos` — Fetch run repo snapshots (used to read `base_ref` and `source_commit_sha`).
 - `GET /v1/runs/{run_id}/repos/{repo_id}/diffs` — List diffs for the repo execution within a run.
 - `GET /v1/runs/{run_id}/repos/{repo_id}/diffs?download=true&diff_id=<uuid>` — Download gzipped patch content.
 
@@ -912,7 +906,7 @@ for the formal schema definition.
 
 **Metadata keys:**
 
-- `repo_base_ref`, `repo_target_ref`: Git refs used for this run.
+- `repo_base_ref`: Git source ref used for this run.
 - `node_id`: ID of the node that claimed/executed the run.
 - `gate_summary`: Build Gate health summary from run stats.
 - `reason`: Terminal failure/cancellation reason when available.
@@ -951,7 +945,6 @@ value is a `StageStatus` object describing that job's execution state.
   "repository": "https://github.com/org/repo.git",
   "metadata": {
     "repo_base_ref": "main",
-    "repo_target_ref": "feature-branch",
     "node_id": "aB3xY9"
   },
   "created_at": "2025-01-15T10:00:00Z",
@@ -1028,7 +1021,7 @@ value is a `StageStatus` object describing that job's execution state.
 ### 3.1 Migs endpoints (runtime implementation)
 
 - `POST /v1/runs` — submit a single-repo Migs run.
-  - Shape: `{repo_url, base_ref, target_ref, spec, created_by?}`.
+  - Shape: `{repo_url, base_ref, spec, created_by?}`.
   - Handler: `createSingleRepoRunHandler`.
   - Behaviour (single source of truth for Migs execution):
     - Creates a spec (`specs`), a mig project (`migs`), a managed repo membership (`mig_repos`)
@@ -1307,7 +1300,7 @@ The CLI entry points for Migs are implemented in CLI implementation:
   - Renders a one-shot, follow-style snapshot with header lines:
     `Mig`, `Spec`, `Repos`, `Run`, and per-repo blocks.
   - The status glyph column is rendered with an empty header cell (no `State` label).
-  - Repo headers render the repo URL as a hyperlink and show `<base_ref> -> <target_ref>`.
+  - Repo headers render the repo URL as a hyperlink and show `<base_ref>`.
   - `Spec` renders a `Download` hyperlink to `/v1/migs/{mig_ref}/specs/latest`.
   - `Artifacts` are shown only for terminal steps; unfinished steps render `-`.
   - Build gate failures/crashes render the continuation line as

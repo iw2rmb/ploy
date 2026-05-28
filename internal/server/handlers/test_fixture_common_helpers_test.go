@@ -53,9 +53,6 @@ func defaultRunRepo(result store.RunRepo, params store.CreateRunRepoParams) stor
 	if result.RepoBaseRef == "" {
 		result.RepoBaseRef = params.RepoBaseRef
 	}
-	if result.RepoTargetRef == "" {
-		result.RepoTargetRef = params.RepoTargetRef
-	}
 	if result.Status == "" {
 		result.Status = types.RunRepoStatusQueued
 	}
@@ -67,7 +64,7 @@ func defaultRunRepo(result store.RunRepo, params store.CreateRunRepoParams) stor
 
 // defaultMigRepo fills zero-valued result fields from the MigRepo input shape
 // shared by CreateMigRepoParams and UpsertMigRepoParams.
-func defaultMigRepo(result store.MigRepo, id types.MigRepoID, migID types.MigID, baseRef, targetRef string) store.MigRepo {
+func defaultMigRepo(result store.MigRepo, id types.MigRepoID, migID types.MigID, baseRef string) store.MigRepo {
 	if result.ID.IsZero() {
 		result.ID = id
 	}
@@ -79,9 +76,6 @@ func defaultMigRepo(result store.MigRepo, id types.MigRepoID, migID types.MigID,
 	}
 	if result.BaseRef == "" {
 		result.BaseRef = baseRef
-	}
-	if result.TargetRef == "" {
-		result.TargetRef = targetRef
 	}
 	return result
 }

@@ -67,7 +67,7 @@ func cancelRunHandlerV1(st store.Store) http.HandlerFunc {
 }
 
 // addRunRepoHandler adds a repo to an existing run (and to the mig repo set).
-// POST /v1/runs/{run_id}/repos — Body {repo_url, base_ref, target_ref}.
+// POST /v1/runs/{run_id}/repos — Body {repo_url, base_ref}.
 func addRunRepoHandler(st store.Store, gitAuth gitauth.Options) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		runID, ok := parseRequiredPathIDOrWriteError[domaintypes.RunID](w, r, "run_id")
@@ -81,16 +81,14 @@ func addRunRepoHandler(st store.Store, gitAuth gitauth.Options) http.HandlerFunc
 		}
 
 		var req struct {
-			RepoURL   domaintypes.RepoURL `json:"repo_url"`
-			BaseRef   domaintypes.GitRef  `json:"base_ref"`
-			TargetRef domaintypes.GitRef  `json:"target_ref"`
+			RepoURL domaintypes.RepoURL `json:"repo_url"`
+			BaseRef domaintypes.GitRef  `json:"base_ref"`
 		}
 		if err := decodeRequestJSON(w, r, &req, DefaultMaxBodySize); err != nil {
 			return
 		}
 		if !validateField(w, "repo_url", req.RepoURL) ||
-			!validateField(w, "base_ref", req.BaseRef) ||
-			!validateField(w, "target_ref", req.TargetRef) {
+			!validateField(w, "base_ref", req.BaseRef) {
 			return
 		}
 
@@ -103,7 +101,6 @@ func addRunRepoHandler(st store.Store, gitAuth gitauth.Options) http.HandlerFunc
 			MigID:     run.MigID,
 			Url:       normalizedRepoURL,
 			BaseRef:   req.BaseRef.String(),
-			TargetRef: req.TargetRef.String(),
 		})
 		if err != nil {
 			if isUniqueViolation(err) {
@@ -132,7 +129,6 @@ func addRunRepoHandler(st store.Store, gitAuth gitauth.Options) http.HandlerFunc
 			RunID:           runID,
 			RepoID:          migRepo.RepoID,
 			RepoBaseRef:     migRepo.BaseRef,
-			RepoTargetRef:   migRepo.TargetRef,
 			SourceCommitSha: sourceCommitSHA,
 			RepoSha0:        sourceCommitSHA,
 		})
@@ -168,7 +164,6 @@ func listRunReposHandler(st store.Store) http.HandlerFunc {
 				RunID:           rr.RunID,
 				RepoID:          rr.RepoID,
 				RepoBaseRef:     rr.RepoBaseRef,
-				RepoTargetRef:   rr.RepoTargetRef,
 				SourceCommitSha: rr.SourceCommitSha,
 				Status:          rr.Status,
 				Attempt:         rr.Attempt,
@@ -292,17 +287,13 @@ func restartRunRepoHandler(st store.Store, bs blobstore.Store) http.HandlerFunc 
 		}
 
 		var req struct {
-			BaseRef   *domaintypes.GitRef `json:"base_ref,omitempty"`
-			TargetRef *domaintypes.GitRef `json:"target_ref,omitempty"`
+			BaseRef *domaintypes.GitRef `json:"base_ref,omitempty"`
 		}
 		if r.ContentLength > 0 || r.Header.Get("Transfer-Encoding") == "chunked" {
 			if err := decodeRequestJSON(w, r, &req, DefaultMaxBodySize); err != nil {
 				return
 			}
 			if req.BaseRef != nil && !validateField(w, "base_ref", *req.BaseRef) {
-				return
-			}
-			if req.TargetRef != nil && !validateField(w, "target_ref", *req.TargetRef) {
 				return
 			}
 		}
@@ -315,17 +306,13 @@ func restartRunRepoHandler(st store.Store, bs blobstore.Store) http.HandlerFunc 
 			}
 		}
 
-		if req.BaseRef != nil || req.TargetRef != nil {
+		if req.BaseRef != nil {
 			newBase := runRepo.RepoBaseRef
 			if req.BaseRef != nil {
 				newBase = req.BaseRef.String()
 			}
-			newTarget := runRepo.RepoTargetRef
-			if req.TargetRef != nil {
-				newTarget = req.TargetRef.String()
-			}
-			if err := st.UpdateRunRepoRefs(r.Context(), store.UpdateRunRepoRefsParams{RunID: runID, RepoID: repoID, RepoBaseRef: newBase, RepoTargetRef: newTarget}); err != nil {
-				serverError(w, "restart run repo", "update run repo refs", err, "run_id", runID.String(), "repo_id", repoID.String())
+			if err := st.UpdateRunRepoBaseRef(r.Context(), store.UpdateRunRepoBaseRefParams{RunID: runID, RepoID: repoID, RepoBaseRef: newBase}); err != nil {
+				serverError(w, "restart run repo", "update run repo base ref", err, "run_id", runID.String(), "repo_id", repoID.String())
 				return
 			}
 			migRepos, listErr := st.ListMigReposByMig(r.Context(), run.MigID)
@@ -335,8 +322,8 @@ func restartRunRepoHandler(st store.Store, bs blobstore.Store) http.HandlerFunc 
 			}
 			for _, migRepo := range migRepos {
 				if migRepo.RepoID == repoID {
-					if err := st.UpdateMigRepoRefs(r.Context(), store.UpdateMigRepoRefsParams{ID: migRepo.ID, BaseRef: newBase, TargetRef: newTarget}); err != nil {
-						serverError(w, "restart run repo", "update mig repo refs", err, "run_id", runID.String(), "repo_id", repoID.String(), "mig_repo_id", migRepo.ID.String())
+					if err := st.UpdateMigRepoBaseRef(r.Context(), store.UpdateMigRepoBaseRefParams{ID: migRepo.ID, BaseRef: newBase}); err != nil {
+						serverError(w, "restart run repo", "update mig repo base ref", err, "run_id", runID.String(), "repo_id", repoID.String(), "mig_repo_id", migRepo.ID.String())
 						return
 					}
 					break

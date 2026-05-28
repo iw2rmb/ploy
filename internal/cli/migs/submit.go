@@ -41,10 +41,6 @@ func (c SubmitCommand) Run(ctx context.Context) (migsapi.RunSummary, error) {
 	if err := reqBody.BaseRef.Validate(); err != nil {
 		return migsapi.RunSummary{}, fmt.Errorf("migs submit: base_ref: %w", err)
 	}
-	reqBody.TargetRef = domaintypes.GitRef(strings.TrimSpace(reqBody.TargetRef.String()))
-	if err := reqBody.TargetRef.Validate(); err != nil {
-		return migsapi.RunSummary{}, fmt.Errorf("migs submit: target_ref: %w", err)
-	}
 	if len(reqBody.Spec) == 0 {
 		return migsapi.RunSummary{}, fmt.Errorf("migs submit: spec is required")
 	}

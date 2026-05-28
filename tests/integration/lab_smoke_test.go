@@ -63,15 +63,13 @@ func TestLabSmoke(t *testing.T) {
 
 	repoURL := "https://github.com/octocat/Hello-World"
 	baseRef := "main"
-	targetRef := "feature/smoke-test"
 
 	migRepoID := domaintypes.NewMigRepoID()
 	migRepo, err := db.CreateMigRepo(ctx, store.CreateMigRepoParams{
-		ID:        migRepoID,
-		MigID:     migID,
-		Url:       repoURL,
-		BaseRef:   baseRef,
-		TargetRef: targetRef,
+		ID:      migRepoID,
+		MigID:   migID,
+		Url:     repoURL,
+		BaseRef: baseRef,
 	})
 	if err != nil {
 		t.Fatalf("CreateMigRepo() failed: %v", err)
@@ -90,11 +88,12 @@ func TestLabSmoke(t *testing.T) {
 	t.Logf("Created run: id=%v, mig_id=%s, spec_id=%s, status=%s", run.ID, run.MigID, run.SpecID, run.Status)
 
 	runRepo, err := db.CreateRunRepo(ctx, store.CreateRunRepoParams{
-		MigID:         migID,
-		RunID:         run.ID,
-		RepoID:        migRepo.RepoID,
-		RepoBaseRef:   migRepo.BaseRef,
-		RepoTargetRef: migRepo.TargetRef,
+		MigID:           migID,
+		RunID:           run.ID,
+		RepoID:          migRepo.RepoID,
+		RepoBaseRef:     migRepo.BaseRef,
+		SourceCommitSha: "0123456789abcdef0123456789abcdef01234567",
+		RepoSha0:        "0123456789abcdef0123456789abcdef01234567",
 	})
 	if err != nil {
 		t.Fatalf("CreateRunRepo() failed: %v", err)

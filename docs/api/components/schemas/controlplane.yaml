@@ -132,9 +132,6 @@ RunRepo:
     base_ref:
       type: string
       description: Git ref used as the base for comparisons (e.g., main, master).
-    target_ref:
-      type: string
-      description: Git ref representing the target branch for the run.
     status:
       $ref: "#/RunRepoStatus"
       description: Current execution status for this repo.
@@ -169,7 +166,6 @@ RunRepo:
     - repo_id
     - repo_url
     - base_ref
-    - target_ref
     - status
     - attempt
     - created_at
@@ -232,12 +228,11 @@ CreateRunRequest:
       type: string
       description: "Repository URL. Allowed schemes: https://, ssh://, file://."
     base_ref: { type: string }
-    target_ref: { type: string }
     spec:
       type: object
       additionalProperties: true
       description: Migs spec JSON object.
-  required: [repo_url, base_ref, target_ref]
+  required: [repo_url, base_ref]
 
 CreateRunResponse:
   type: object
@@ -254,13 +249,12 @@ RunSubmitRequest:
       type: string
       description: "Repository URL. Allowed schemes: https://, ssh://, file://."
     base_ref: { type: string }
-    target_ref: { type: string }
     spec:
       type: object
       additionalProperties: true
       description: Migs spec JSON object (must be a JSON object).
     created_by: { type: string, nullable: true }
-  required: [repo_url, base_ref, target_ref, spec]
+  required: [repo_url, base_ref, spec]
 
 CreateSingleRepoRunResponse:
   type: object
@@ -318,8 +312,7 @@ AddMigRepoRequest:
       type: string
       description: "Repository URL. Allowed schemes: https://, ssh://, file://."
     base_ref: { type: string }
-    target_ref: { type: string }
-  required: [repo_url, base_ref, target_ref]
+  required: [repo_url, base_ref]
 
 MigRepo:
   type: object
@@ -330,9 +323,8 @@ MigRepo:
       type: string
       description: "Repository URL (normalized for matching)."
     base_ref: { type: string }
-    target_ref: { type: string }
     created_at: { type: string, format: date-time }
-  required: [id, mig_id, repo_url, base_ref, target_ref, created_at]
+  required: [id, mig_id, repo_url, base_ref, created_at]
 
 ListMigReposResponse:
   type: object
@@ -428,10 +420,7 @@ PullResolutionResponse:
     repo_id:
       type: string
       description: Repo ID (NanoID 8-character string)
-    repo_target_ref:
-      type: string
-      description: Target ref snapshot for this repo execution (run_repos.repo_target_ref)
-  required: [run_id, repo_id, repo_target_ref]
+  required: [run_id, repo_id]
 
 MigListItem:
   type: object
@@ -504,7 +493,6 @@ MigsRunSummary:
         Additional run metadata as string key-value pairs. Contains derived
         failure/cancellation context and diagnostics:
         - `repo_base_ref`: Base Git ref used for this run (e.g., "main").
-        - `repo_target_ref`: Target Git ref for the run (e.g., "feature-branch").
         - `gate_summary`: Build Gate health summary from run stats.
         - `orw_error_kind`: ORW runtime failure kind from `/out/report.json` when ORW fails.
         - `orw_reason`: ORW deterministic failure reason (for example `type-attribution-unavailable`).
@@ -630,7 +618,6 @@ NodeClaimResponse:
     node_id:
       { type: string, description: "Node ID (NanoID 6-character string)" }
     base_ref: { type: string }
-    target_ref: { type: string }
     next_id:
       type: string
       nullable: true
@@ -654,7 +641,6 @@ NodeClaimResponse:
     - status
     - node_id
     - base_ref
-    - target_ref
     - next_id
     - started_at
     - created_at
@@ -1124,9 +1110,6 @@ RepoRunSummary:
     base_ref:
       type: string
       description: Git base ref for the run
-    target_ref:
-      type: string
-      description: Git target ref for the run
     attempt:
       type: integer
       format: int32
@@ -1147,7 +1130,6 @@ RepoRunSummary:
     - run_status
     - repo_status
     - base_ref
-    - target_ref
     - attempt
 
 # -------------------------------------------------------------------------

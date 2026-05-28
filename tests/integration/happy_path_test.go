@@ -58,14 +58,12 @@ func TestHappyPath_CreateRepoModRun(t *testing.T) {
 
 	repoURL := "https://github.com/example/happy-path-test"
 	baseRef := "main"
-	targetRef := "feature/happy-path"
 	migRepoID := domaintypes.NewMigRepoID()
 	repo, err := db.CreateMigRepo(ctx, store.CreateMigRepoParams{
-		ID:        migRepoID,
-		MigID:     migID,
-		Url:       repoURL,
-		BaseRef:   baseRef,
-		TargetRef: targetRef,
+		ID:      migRepoID,
+		MigID:   migID,
+		Url:     repoURL,
+		BaseRef: baseRef,
 	})
 	if err != nil {
 		t.Fatalf("CreateMigRepo() failed: %v", err)
@@ -92,9 +90,6 @@ func TestHappyPath_CreateRepoModRun(t *testing.T) {
 	}
 	if repo.BaseRef != baseRef {
 		t.Errorf("Expected base_ref %q, got %q", baseRef, repo.BaseRef)
-	}
-	if repo.TargetRef != targetRef {
-		t.Errorf("Expected target_ref %q, got %q", targetRef, repo.TargetRef)
 	}
 
 	// Step 4: Simulate node appends - Create events.

@@ -479,16 +479,15 @@ func (s *staleTaskStore) ListRunReposWithURLByRun(_ context.Context, runID domai
 				continue
 			}
 			rows = append(rows, store.ListRunReposWithURLByRunRow{
-				RunID:         rr.RunID,
-				RepoID:        rr.RepoID,
-				RepoBaseRef:   rr.RepoBaseRef,
-				RepoTargetRef: rr.RepoTargetRef,
-				Status:        rr.Status,
-				Attempt:       rr.Attempt,
-				CreatedAt:     rr.CreatedAt,
-				StartedAt:     rr.StartedAt,
-				FinishedAt:    rr.FinishedAt,
-				RepoUrl:       "https://github.com/user/repo.git",
+				RunID:       rr.RunID,
+				RepoID:      rr.RepoID,
+				RepoBaseRef: rr.RepoBaseRef,
+				Status:      rr.Status,
+				Attempt:     rr.Attempt,
+				CreatedAt:   rr.CreatedAt,
+				StartedAt:   rr.StartedAt,
+				FinishedAt:  rr.FinishedAt,
+				RepoUrl:     "https://github.com/user/repo.git",
 			})
 		}
 		if len(rows) > 0 {

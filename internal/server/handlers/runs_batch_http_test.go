@@ -112,10 +112,9 @@ func TestAddRunRepoHandler_CreatesRepoWithoutImmediateJobs(t *testing.T) {
 		},
 	}
 	st.createMigRepo.val = store.MigRepo{
-		ID:        migRepoID,
-		RepoID:    repoID,
-		BaseRef:   "main",
-		TargetRef: "feature",
+		ID:      migRepoID,
+		RepoID:  repoID,
+		BaseRef: "main",
 	}
 	st.getRun.val = store.Run{
 		ID:        runID,
@@ -127,9 +126,8 @@ func TestAddRunRepoHandler_CreatesRepoWithoutImmediateJobs(t *testing.T) {
 	st.getSpec.val = store.Spec{ID: specID, Spec: []byte(`{"steps":[{"image":"a"}]}`)}
 
 	reqBody := map[string]any{
-		"repo_url":   "https://github.com/org/repo.git",
-		"base_ref":   "main",
-		"target_ref": "feature",
+		"repo_url": "https://github.com/org/repo.git",
+		"base_ref": "main",
 	}
 	body, _ := json.Marshal(reqBody)
 	req := httptest.NewRequest(http.MethodPost, "/v1/runs/"+runID.String()+"/repos", bytes.NewReader(body))
@@ -171,7 +169,6 @@ func TestListRunReposHandler_Success(t *testing.T) {
 			RunID:           runID,
 			RepoID:          repoID,
 			RepoBaseRef:     "main",
-			RepoTargetRef:   "feature",
 			SourceCommitSha: "0123456789abcdef0123456789abcdef01234567",
 			Status:          domaintypes.RunRepoStatusQueued,
 			Attempt:         1,
@@ -269,24 +266,22 @@ func TestRestartRunRepoHandler_ReopensTerminalRunAndCreatesJobs(t *testing.T) {
 	}
 	st.getRunRepo.vals = []store.RunRepo{
 		{
-			RunID:         runID,
-			RepoID:        repoID,
-			RepoBaseRef:   "main",
-			RepoTargetRef: "feature",
-			RepoSha0:      testRunRepoSHASeed,
-			Attempt:       1,
-			Status:        domaintypes.RunRepoStatusFail,
-			CreatedAt:     pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
+			RunID:       runID,
+			RepoID:      repoID,
+			RepoBaseRef: "main",
+			RepoSha0:    testRunRepoSHASeed,
+			Attempt:     1,
+			Status:      domaintypes.RunRepoStatusFail,
+			CreatedAt:   pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
 		},
 		{
-			RunID:         runID,
-			RepoID:        repoID,
-			RepoBaseRef:   "develop",
-			RepoTargetRef: "feature-2",
-			RepoSha0:      testRunRepoSHASeed,
-			Attempt:       2,
-			Status:        domaintypes.RunRepoStatusQueued,
-			CreatedAt:     pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
+			RunID:       runID,
+			RepoID:      repoID,
+			RepoBaseRef: "develop",
+			RepoSha0:    testRunRepoSHASeed,
+			Attempt:     2,
+			Status:      domaintypes.RunRepoStatusQueued,
+			CreatedAt:   pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
 		},
 	}
 	st.listMigReposByMig.val = []store.MigRepo{
@@ -306,8 +301,7 @@ func TestRestartRunRepoHandler_ReopensTerminalRunAndCreatesJobs(t *testing.T) {
 	}
 
 	reqBody := map[string]any{
-		"base_ref":   "develop",
-		"target_ref": "feature-2",
+		"base_ref": "develop",
 	}
 	body, _ := json.Marshal(reqBody)
 	req := httptest.NewRequest(http.MethodPost, "/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/restart", bytes.NewReader(body))
@@ -321,8 +315,8 @@ func TestRestartRunRepoHandler_ReopensTerminalRunAndCreatesJobs(t *testing.T) {
 	if !st.updateRunStatus.called {
 		t.Fatalf("expected UpdateRunStatus to be called for terminal run")
 	}
-	if !st.updateRunRepoRefs.called || !st.updateMigRepoRefs.called {
-		t.Fatalf("expected refs updates to be called")
+	if !st.updateRunRepoBaseRef.called || !st.updateMigRepoBaseRef.called {
+		t.Fatalf("expected base ref updates to be called")
 	}
 	if !st.incrementRunRepoAttempt.called {
 		t.Fatalf("expected IncrementRunRepoAttempt to be called")
@@ -340,14 +334,13 @@ func TestStartRunHandler_StartsQueuedRepos(t *testing.T) {
 	specID := domaintypes.NewSpecID()
 
 	queuedRepo := store.RunRepo{
-		RunID:         runID,
-		RepoID:        repoID,
-		RepoBaseRef:   "main",
-		RepoTargetRef: "feature",
-		RepoSha0:      testRunRepoSHASeed,
-		Attempt:       1,
-		Status:        domaintypes.RunRepoStatusQueued,
-		CreatedAt:     pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
+		RunID:       runID,
+		RepoID:      repoID,
+		RepoBaseRef: "main",
+		RepoSha0:    testRunRepoSHASeed,
+		Attempt:     1,
+		Status:      domaintypes.RunRepoStatusQueued,
+		CreatedAt:   pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
 	}
 
 	st := &runStore{}

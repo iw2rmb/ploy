@@ -45,7 +45,6 @@ func TestClaimService_Claim_SuccessBuildsPayloadAndTransitionsRepo(t *testing.T)
 		RunID:           runID,
 		RepoID:          repoID,
 		RepoBaseRef:     "main",
-		RepoTargetRef:   "feature",
 		SourceCommitSha: sourceCommitSHA,
 		RepoSha0:        sourceCommitSHA,
 		Status:          domaintypes.RunRepoStatusQueued,
@@ -110,12 +109,11 @@ func TestClaimService_Claim_RequeuesClaimedJobWhenPayloadBuildFails(t *testing.T
 
 	st := &jobStore{}
 	st.getRunRepo.val = store.RunRepo{
-		RunID:         runID,
-		RepoID:        repoID,
-		RepoBaseRef:   "main",
-		RepoTargetRef: "feature",
-		Status:        domaintypes.RunRepoStatusQueued,
-		Attempt:       1,
+		RunID:       runID,
+		RepoID:      repoID,
+		RepoBaseRef: "main",
+		Status:      domaintypes.RunRepoStatusQueued,
+		Attempt:     1,
 	}
 	st.getNode.val = store.Node{ID: nodeID}
 	st.getRun.val = store.Run{

@@ -139,7 +139,6 @@ func TestGlobalEnvPropagation_SpecToManifest(t *testing.T) {
 		JobID:        types.JobID(testKSUID),
 		RepoURL:      types.RepoURL("https://gitlab.com/test/repo.git"),
 		BaseRef:      types.GitRef("main"),
-		TargetRef:    types.GitRef("feature/global-env"),
 		TypedOptions: typedOpts,
 		Env:          env, // Global env vars flow here.
 	}
@@ -349,11 +348,10 @@ func TestGlobalEnvPropagation_HealingManifest(t *testing.T) {
 	t.Parallel()
 
 	req := StartRunRequest{
-		RunID:     types.RunID("run-healing-env-test"),
-		JobID:     types.JobID("job-healing-env-test"),
-		RepoURL:   types.RepoURL("https://gitlab.com/test/repo.git"),
-		BaseRef:   types.GitRef("main"),
-		TargetRef: types.GitRef("feature/healing"),
+		RunID:   types.RunID("run-healing-env-test"),
+		JobID:   types.JobID("job-healing-env-test"),
+		RepoURL: types.RepoURL("https://gitlab.com/test/repo.git"),
+		BaseRef: types.GitRef("main"),
 		Env: map[string]string{
 			"GLOBAL_VAR":   "global_value",
 			"APP_TLS_CERT": "global-cert-bundle",
@@ -386,7 +384,6 @@ func TestGlobalEnvPropagation_HealingManifest(t *testing.T) {
 		"SHARED_VAR":       "from_req",            // from req.Env (no mig override)
 		"PLOY_REPO_URL":    "https://gitlab.com/test/repo.git",
 		"PLOY_BASE_REF":    "main",
-		"PLOY_TARGET_REF":  "feature/healing",
 	}
 
 	for key, wantVal := range expectedEnv {

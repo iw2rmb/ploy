@@ -189,11 +189,10 @@ func TestCreateRunWithRepos_CreatesRunAndReposAtomically(t *testing.T) {
 
 	const repoURL = "https://github.com/org/repo-atomic"
 	if _, err := db.CreateMigRepo(ctx, CreateMigRepoParams{
-		ID:        "global01",
-		MigID:     seedMigID,
-		Url:       repoURL,
-		BaseRef:   "main",
-		TargetRef: "feature",
+		ID:      "global01",
+		MigID:   seedMigID,
+		Url:     repoURL,
+		BaseRef: "main",
 	}); err != nil {
 		t.Fatalf("CreateMigRepo(seed) failed: %v", err)
 	}
@@ -208,11 +207,10 @@ func TestCreateRunWithRepos_CreatesRunAndReposAtomically(t *testing.T) {
 		t.Fatalf("CreateMig() failed: %v", err)
 	}
 	migRepo, err := db.CreateMigRepo(ctx, CreateMigRepoParams{
-		ID:        "member01",
-		MigID:     migID,
-		Url:       repoURL,
-		BaseRef:   "main",
-		TargetRef: "feature",
+		ID:      "member01",
+		MigID:   migID,
+		Url:     repoURL,
+		BaseRef: "main",
 	})
 	if err != nil {
 		t.Fatalf("CreateMigRepo() failed: %v", err)
@@ -234,7 +232,6 @@ func TestCreateRunWithRepos_CreatesRunAndReposAtomically(t *testing.T) {
 			RunID:           runID,
 			RepoID:          migRepo.RepoID,
 			RepoBaseRef:     "main",
-			RepoTargetRef:   "feature",
 			SourceCommitSha: "0123456789abcdef0123456789abcdef01234567",
 			RepoSha0:        "0123456789abcdef0123456789abcdef01234567",
 		}},
@@ -260,7 +257,6 @@ func TestCreateRunWithRepos_CreatesRunAndReposAtomically(t *testing.T) {
 				RunID:           rollbackRunID,
 				RepoID:          migRepo.RepoID,
 				RepoBaseRef:     "main",
-				RepoTargetRef:   "feature",
 				SourceCommitSha: "0123456789abcdef0123456789abcdef01234567",
 				RepoSha0:        "0123456789abcdef0123456789abcdef01234567",
 			},
@@ -269,7 +265,6 @@ func TestCreateRunWithRepos_CreatesRunAndReposAtomically(t *testing.T) {
 				RunID:           rollbackRunID,
 				RepoID:          "missing1",
 				RepoBaseRef:     "main",
-				RepoTargetRef:   "feature",
 				SourceCommitSha: "0123456789abcdef0123456789abcdef01234567",
 				RepoSha0:        "0123456789abcdef0123456789abcdef01234567",
 			},
@@ -293,7 +288,7 @@ func TestCreateRunWithRepos_CreatesRunAndReposAtomically(t *testing.T) {
 func TestRunRepo_CRUDAndStateTransitions_V1(t *testing.T) {
 	ctx, db := newTestStore(t)
 
-	fx := newV1Fixture(t, ctx, db, "https://github.com/org/repo-a", "main", "feature/a", []byte(`{"type":"batch"}`))
+	fx := newV1Fixture(t, ctx, db, "https://github.com/org/repo-a", "main", []byte(`{"type":"batch"}`))
 
 	if fx.RunRepo.Status != types.RunRepoStatusQueued {
 		t.Fatalf("CreateRunRepo() status=%q, want %q", fx.RunRepo.Status, types.RunRepoStatusQueued)
@@ -305,11 +300,10 @@ func TestRunRepo_CRUDAndStateTransitions_V1(t *testing.T) {
 	// Add a second repo for the mig and run.
 	migRepo2ID := types.NewMigRepoID()
 	migRepo2, err := db.CreateMigRepo(ctx, CreateMigRepoParams{
-		ID:        migRepo2ID,
-		MigID:     fx.Mig.ID,
-		Url:       "https://github.com/org/repo-b",
-		BaseRef:   "main",
-		TargetRef: "feature/b",
+		ID:      migRepo2ID,
+		MigID:   fx.Mig.ID,
+		Url:     "https://github.com/org/repo-b",
+		BaseRef: "main",
 	})
 	if err != nil {
 		t.Fatalf("CreateMigRepo() for repo-b failed: %v", err)
@@ -319,7 +313,6 @@ func TestRunRepo_CRUDAndStateTransitions_V1(t *testing.T) {
 		RunID:           fx.Run.ID,
 		RepoID:          migRepo2.RepoID,
 		RepoBaseRef:     "main",
-		RepoTargetRef:   "feature/b",
 		SourceCommitSha: "0123456789abcdef0123456789abcdef01234567",
 		RepoSha0:        "0123456789abcdef0123456789abcdef01234567",
 	})
@@ -413,15 +406,14 @@ func TestRunRepo_CRUDAndStateTransitions_V1(t *testing.T) {
 func TestListRunReposWithURLByRun_ReturnsRepoURLAndOrdering_V1(t *testing.T) {
 	ctx, db := newTestStore(t)
 
-	fx := newV1Fixture(t, ctx, db, "https://github.com/org/repo-a", "main", "feature/a", []byte(`{"type":"batch"}`))
+	fx := newV1Fixture(t, ctx, db, "https://github.com/org/repo-a", "main", []byte(`{"type":"batch"}`))
 
 	migRepo2ID := types.NewMigRepoID()
 	migRepo2, err := db.CreateMigRepo(ctx, CreateMigRepoParams{
-		ID:        migRepo2ID,
-		MigID:     fx.Mig.ID,
-		Url:       "https://github.com/org/repo-b",
-		BaseRef:   "main",
-		TargetRef: "feature/b",
+		ID:      migRepo2ID,
+		MigID:   fx.Mig.ID,
+		Url:     "https://github.com/org/repo-b",
+		BaseRef: "main",
 	})
 	if err != nil {
 		t.Fatalf("CreateMigRepo() for repo-b failed: %v", err)
@@ -432,7 +424,6 @@ func TestListRunReposWithURLByRun_ReturnsRepoURLAndOrdering_V1(t *testing.T) {
 		RunID:           fx.Run.ID,
 		RepoID:          migRepo2.RepoID,
 		RepoBaseRef:     migRepo2.BaseRef,
-		RepoTargetRef:   migRepo2.TargetRef,
 		SourceCommitSha: "0123456789abcdef0123456789abcdef01234567",
 		RepoSha0:        "0123456789abcdef0123456789abcdef01234567",
 	})

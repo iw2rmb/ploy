@@ -29,11 +29,9 @@ import (
 // It provides the identifiers needed to fetch diffs:
 //   - RunID: the run containing the execution
 //   - RepoID: the mig_repos.id for the matched repo
-//   - RepoTargetRef: the target ref snapshot from run_repos
 type PullResolution struct {
-	RunID         domaintypes.RunID     `json:"run_id"`
-	RepoID        domaintypes.MigRepoID `json:"repo_id"`
-	RepoTargetRef domaintypes.GitRef    `json:"repo_target_ref"`
+	RunID  domaintypes.RunID     `json:"run_id"`
+	RepoID domaintypes.MigRepoID `json:"repo_id"`
 }
 
 // =============================================================================
@@ -54,7 +52,7 @@ type RunPullCommand struct {
 }
 
 // Run executes POST /v1/runs/{run_id}/pull with the provided repo_url.
-// Returns the PullResolution containing run_id, repo_id, and repo_target_ref.
+// Returns the PullResolution containing run_id and repo_id.
 func (c RunPullCommand) Run(ctx context.Context) (*PullResolution, error) {
 	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
 		return nil, fmt.Errorf("run pull: %w", err)
@@ -142,7 +140,7 @@ type MigPullCommand struct {
 }
 
 // Run executes POST /v1/migs/{mig_id}/pull with the provided repo_url and mode.
-// Returns the PullResolution containing run_id, repo_id, and repo_target_ref.
+// Returns the PullResolution containing run_id and repo_id.
 func (c MigPullCommand) Run(ctx context.Context) (*PullResolution, error) {
 	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
 		return nil, fmt.Errorf("mig pull: %w", err)

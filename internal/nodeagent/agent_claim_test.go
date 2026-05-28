@@ -158,9 +158,6 @@ func TestClaimLoop_FieldMapping(t *testing.T) {
 				if got.BaseRef != claim.BaseRef {
 					t.Errorf("BaseRef=%q want %q", got.BaseRef, claim.BaseRef)
 				}
-				if got.TargetRef != claim.TargetRef {
-					t.Errorf("TargetRef=%q want %q", got.TargetRef, claim.TargetRef)
-				}
 				if got.CommitSHA != *claim.CommitSha {
 					t.Errorf("CommitSHA=%q want %q", got.CommitSHA, *claim.CommitSha)
 				}

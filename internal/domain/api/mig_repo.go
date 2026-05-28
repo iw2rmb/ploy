@@ -17,7 +17,6 @@ type MigRepoSummary struct {
 	MigID     domaintypes.MigID     `json:"mig_id"`
 	RepoURL   string                `json:"repo_url"`
 	BaseRef   string                `json:"base_ref"`
-	TargetRef string                `json:"target_ref"`
 	CreatedAt time.Time             `json:"created_at"`
 }
 

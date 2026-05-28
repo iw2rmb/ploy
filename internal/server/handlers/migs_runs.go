@@ -23,7 +23,7 @@ import (
 // - Must use migs.spec_id; if NULL, return error.
 // - Archived migs cannot be executed.
 // - Copies migs.spec_id → runs.spec_id for immutability.
-// - Creates run_repos rows snapshotting refs from mig_repos.
+// - Creates run_repos rows snapshotting source refs from mig_repos.
 // - Job materialization is deferred to the batch scheduler/start endpoint and gated on prep readiness.
 func createMigRunHandler(st store.Store, gitAuth gitauth.Options) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -109,7 +109,6 @@ func createMigRunHandler(st store.Store, gitAuth gitauth.Options) http.HandlerFu
 				RunID:           runID,
 				RepoID:          migRepo.RepoID,
 				RepoBaseRef:     migRepo.BaseRef,
-				RepoTargetRef:   migRepo.TargetRef,
 				SourceCommitSha: sourceCommitSHA,
 				RepoSha0:        sourceCommitSHA,
 			})

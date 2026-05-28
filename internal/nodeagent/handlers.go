@@ -41,7 +41,6 @@ type StartRunRequest struct {
 	// When set (e.g., for batch runs), it can be used for branch naming.
 	Name      string          `json:"name,omitempty"`
 	BaseRef   types.GitRef    `json:"base_ref,omitempty"`
-	TargetRef types.GitRef    `json:"target_ref,omitempty"`
 	CommitSHA types.CommitSHA `json:"commit_sha,omitempty"`
 	RepoSHAIn types.CommitSHA `json:"repo_sha_in,omitempty"`
 	JobType   types.JobType   `json:"job_type,omitempty"`  // Job type: pre_gate, mig, post_gate
@@ -71,7 +70,6 @@ type StartActionRequest struct {
 	RepoID       types.MigRepoID   `json:"repo_id,omitempty"`
 	RepoURL      types.RepoURL     `json:"repo_url,omitempty"`
 	BaseRef      types.GitRef      `json:"base_ref,omitempty"`
-	TargetRef    types.GitRef      `json:"target_ref,omitempty"`
 	TypedOptions RunOptions        `json:"-"`
 	Env          map[string]string `json:"env"`
 }

@@ -73,10 +73,7 @@ post:
             base_ref:
               type: string
               description: Git ref used as the base for comparisons (e.g., main).
-            target_ref:
-              type: string
-              description: Git ref representing the target branch for the run.
-          required: [repo_url, base_ref, target_ref]
+          required: [repo_url, base_ref]
   responses:
     '201':
       description: Created

@@ -142,15 +142,14 @@ func TestListRunsForRepoHandler_Success(t *testing.T) {
 	st := &repoListStore{}
 	st.listRunsForRepo.val = []store.ListRunsForRepoRow{
 		{
-			RunID:         runID,
-			MigID:         migID,
-			RunStatus:     domaintypes.RunStatusFinished,
-			RepoStatus:    domaintypes.RunRepoStatusSuccess,
-			RepoBaseRef:   "main",
-			RepoTargetRef: "feature-branch",
-			Attempt:       1,
-			StartedAt:     pgtype.Timestamptz{Time: now, Valid: true},
-			FinishedAt:    pgtype.Timestamptz{Time: now.Add(time.Minute), Valid: true},
+			RunID:       runID,
+			MigID:       migID,
+			RunStatus:   domaintypes.RunStatusFinished,
+			RepoStatus:  domaintypes.RunRepoStatusSuccess,
+			RepoBaseRef: "main",
+			Attempt:     1,
+			StartedAt:   pgtype.Timestamptz{Time: now, Valid: true},
+			FinishedAt:  pgtype.Timestamptz{Time: now.Add(time.Minute), Valid: true},
 		},
 	}
 	handler := listRunsForRepoHandler(st)
@@ -185,9 +184,6 @@ func TestListRunsForRepoHandler_Success(t *testing.T) {
 	}
 	if run.BaseRef != "main" {
 		t.Fatalf("unexpected base_ref: %s", run.BaseRef)
-	}
-	if run.TargetRef != "feature-branch" {
-		t.Fatalf("unexpected target_ref: %s", run.TargetRef)
 	}
 	if run.Attempt != 1 {
 		t.Fatalf("unexpected attempt: %d", run.Attempt)

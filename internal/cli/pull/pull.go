@@ -392,9 +392,8 @@ func executePullDiffs(ctx context.Context, httpClient *http.Client, baseURL *url
 	}
 
 	_, _ = fmt.Fprintf(stderr, "  repo ID: %s\n", resolution.RepoID.String())
-	_, _ = fmt.Fprintf(stderr, "  target ref: %s\n", resolution.RepoTargetRef.String())
 
-	// Fetch repo details to get base_ref.
+	// Fetch repo details to validate the local source commit.
 	repoDetails, err := fetchRunRepoDetails(ctx, httpClient, baseURL, runID, resolution.RepoID)
 	if err != nil {
 		return fmt.Errorf("pull: fetch repo details: %w", err)
@@ -406,30 +405,14 @@ func executePullDiffs(ctx context.Context, httpClient *http.Client, baseURL *url
 	}
 	_, _ = fmt.Fprintf(stderr, "  base ref: %s\n", baseRef)
 
-	targetRef := strings.TrimSpace(resolution.RepoTargetRef.String())
-	if targetRef == "" {
-		return errors.New("pull: target_ref is not available for this run")
+	sourceCommit := strings.TrimSpace(repoDetails.SourceCommitSHA)
+	if sourceCommit == "" {
+		return errors.New("pull: source_commit_sha is not available for this run")
 	}
-
-	// Fetch the base ref from the origin remote.
-	if err := fetchRef(ctx, origin, baseRef, stderr, dryRun); err != nil {
+	if err := ensureHEADMatchesSource(ctx, sourceCommit); err != nil {
 		return fmt.Errorf("pull: %w", err)
 	}
-
-	baseCommit := ""
-	if !dryRun {
-		commit, err := resolveFetchHeadSHA(ctx)
-		if err != nil {
-			return fmt.Errorf("pull: %w", err)
-		}
-		baseCommit = commit
-		_, _ = fmt.Fprintf(stderr, "  base commit: %s\n", baseCommit)
-	}
-
-	// Check for branch collisions.
-	if err := checkBranchCollision(ctx, origin, targetRef, stderr); err != nil {
-		return fmt.Errorf("pull: %w", err)
-	}
+	_, _ = fmt.Fprintf(stderr, "  source commit: %s\n", sourceCommit)
 
 	// Fetch diffs for this repo execution.
 	diffs, err := ListRunRepoDiffs(ctx, httpClient, baseURL, runID, resolution.RepoID)
@@ -440,18 +423,13 @@ func executePullDiffs(ctx context.Context, httpClient *http.Client, baseURL *url
 
 	// Handle --dry-run mode.
 	if dryRun {
-		_, _ = fmt.Fprintf(stderr, "\nWould create branch %q at %q (origin %q) and apply %d Migs diff(s)\n",
-			targetRef, baseRef, origin, len(diffs))
+		_, _ = fmt.Fprintf(stderr, "\nWould apply %d Migs diff(s) to current worktree at %s\n",
+			len(diffs), sourceCommit)
 		for i, diff := range diffs {
 			_, _ = fmt.Fprintf(stderr, "  diff %d: %s (%d bytes gzipped)\n",
 				i+1, diff.ID, diff.Size)
 		}
 		return nil
-	}
-
-	// Create the target branch at the fetched base commit.
-	if err := createAndCheckoutBranch(ctx, targetRef, baseCommit, stderr); err != nil {
-		return fmt.Errorf("pull: %w", err)
 	}
 
 	// Download and apply all diffs.
@@ -461,8 +439,8 @@ func executePullDiffs(ctx context.Context, httpClient *http.Client, baseURL *url
 	}
 
 	// Success message.
-	_, _ = fmt.Fprintf(stderr, "\nApplied %d Migs diff(s) from run %s to branch %q (origin %q)\n",
-		appliedCount, runID, targetRef, origin)
+	_, _ = fmt.Fprintf(stderr, "\nApplied %d Migs diff(s) from run %s to current worktree (origin %q)\n",
+		appliedCount, runID, origin)
 
 	return nil
 }

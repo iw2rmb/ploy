@@ -31,7 +31,6 @@ echo ""
 RUN_JSON="$(e2e_mig_run_json \
   --repo-url "$REPO" \
   --repo-base-ref "$BASE_REF" \
-  --repo-target-ref "$TARGET_REF" \
   --spec "$SPEC" \
   --follow)"
 RUN_ID="$(e2e_mig_run_id "$RUN_JSON")"

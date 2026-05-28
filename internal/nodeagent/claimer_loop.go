@@ -161,7 +161,6 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 			RepoID:       claim.RepoID,
 			RepoURL:      claim.RepoURL,
 			BaseRef:      claim.BaseRef,
-			TargetRef:    claim.TargetRef,
 			TypedOptions: typedOpts,
 			Env:          envFromSpec,
 		}
@@ -214,7 +213,6 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 		RepoID:        claim.RepoID,
 		RepoURL:       claim.RepoURL,
 		BaseRef:       claim.BaseRef,
-		TargetRef:     claim.TargetRef,
 		CommitSHA:     derefCommitSHA(claim.CommitSha),
 		RepoSHAIn:     derefCommitSHA(claim.RepoShaIn),
 		JobType:       claim.JobType,

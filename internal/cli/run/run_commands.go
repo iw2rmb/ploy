@@ -25,7 +25,6 @@ func NewCommand() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if !cmd.Flags().Changed("repo") &&
 				!cmd.Flags().Changed("base-ref") &&
-				!cmd.Flags().Changed("target-ref") &&
 				!cmd.Flags().Changed("spec") {
 				return cmd.Help()
 			}
@@ -37,7 +36,6 @@ func NewCommand() *cobra.Command {
 
 	cmd.Flags().StringVar(&submit.RepoURL, "repo", "", "Git repository URL")
 	cmd.Flags().StringVar(&submit.BaseRef, "base-ref", "", "Base Git ref")
-	cmd.Flags().StringVar(&submit.TargetRef, "target-ref", "", "Target Git ref")
 	cmd.Flags().StringVar(&submit.SpecFile, "spec", "", "Path to YAML/JSON spec file")
 	cmd.Flags().BoolVar(&submit.Follow, "follow", false, "Follow run until completion")
 	cmd.Flags().DurationVar(&submit.CapDuration, "cap", 0, "Optional time cap for --follow")

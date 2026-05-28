@@ -18,9 +18,9 @@ func FuzzCreateSingleRepoRunHandler(f *testing.F) {
 
 	// Seed with a few typical cases.
 	seeds := [][]byte{
-		[]byte(`{"repo_url":"https://example.com/repo.git","base_ref":"main","target_ref":"feature","spec":{}}`),
-		[]byte(`{"repo_url":"","base_ref":"","target_ref":""}`),
-		[]byte(`{"repo_url":" https://x ","base_ref":" m ","target_ref":" t ","spec":{}}`),
+		[]byte(`{"repo_url":"https://example.com/repo.git","base_ref":"main","spec":{}}`),
+		[]byte(`{"repo_url":"","base_ref":""}`),
+		[]byte(`{"repo_url":" https://x ","base_ref":" m ","spec":{}}`),
 		[]byte(`{invalid`),
 	}
 	for _, s := range seeds {
