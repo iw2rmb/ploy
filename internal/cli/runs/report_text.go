@@ -116,15 +116,8 @@ func RenderRunReportTextLayout(report RunReport, opts TextRenderOptions) (RunRep
 	}
 
 	for _, repo := range repos {
-		repoLinkLabel := strings.TrimSpace(repo.RepoURL)
-		if repoLinkLabel != "" {
-			repoLinkLabel = domaintypes.NormalizeRepoURLSchemless(repoLinkLabel)
-		} else {
-			repoLinkLabel = repo.RepoID.String()
-		}
-
 		repoFrame := FollowRepoFrame{
-			HeaderLine: renderRepoHeaderLine(repo, repoLinkLabel, opts),
+			HeaderLine: renderRepoHeaderLine(repo, opts),
 		}
 
 		if len(repo.Jobs) == 0 {
@@ -151,20 +144,15 @@ func RenderRunReportTextLayout(report RunReport, opts TextRenderOptions) (RunRep
 				duration = FormatDurationCompact(job.DurationMs)
 			}
 			durationCell := fmt.Sprintf("%8s", duration)
-			nodeIDCell := FormatNodeID(job.NodeID)
-			if nodeIDCell != "-" {
-				nodeIDCell = colorizeNeutralText(nodeIDCell)
-			}
 
 			repoFrame.Rows = append(repoFrame.Rows, FollowStepRow{
 				Cells: []string{
 					state,
 					durationCell,
 					step,
+					renderArtifactsForStatus(job.Status.String(), patchURL, opts),
 					jobIDCell,
 					valueOrDash(strings.TrimSpace(job.JobImage)),
-					renderArtifactsForStatus(job.Status.String(), patchURL, opts),
-					nodeIDCell,
 				},
 				ExitOneLiner: renderExitOneLiner(job, repo.LastError, jobIdx == repoErrorOwnerIdx),
 				DetailLines:  renderJobIOPreviewLines(job, opts),
@@ -219,6 +207,13 @@ func renderOptionalLink(label, rawURL string, enableOSC8 bool, authToken string)
 	return renderLink(label, rawURL, enableOSC8, authToken)
 }
 
+func renderOptionalOSC8Link(label, rawURL string, enableOSC8 bool) string {
+	if strings.TrimSpace(rawURL) == "" || !enableOSC8 {
+		return label
+	}
+	return renderLink(label, rawURL, true, "")
+}
+
 func renderArtifacts(patchURL string, opts TextRenderOptions) string {
 	patchURL = strings.TrimSpace(patchURL)
 	if patchURL == "" {
@@ -261,16 +256,37 @@ func renderStepName(jobType string) string {
 	return lipgloss.NewStyle().Bold(true).Render(step)
 }
 
-func renderRepoHeaderLine(repo RunEntry, repoLinkLabel string, opts TextRenderOptions) string {
-	repoIDCell := valueOrDash(repo.RepoID.String())
-	repoIDCell = colorizeNeutralText("[" + repoIDCell + "]")
-	repoLabel := renderOptionalLink(repoLinkLabel, repo.RepoURL, opts.EnableOSC8, "")
-	baseRef := valueOrDash(strings.TrimSpace(repo.BaseRef))
+func renderRepoHeaderLine(repo RunEntry, opts TextRenderOptions) string {
+	repoLabel := renderOptionalOSC8Link(renderRepoPathLabel(repo), repo.RepoURL, opts.EnableOSC8)
 	shortSHA := formatShortSHA(strings.TrimSpace(repo.SourceCommitSHA))
-	shaPart := colorizeNeutralText(fmt.Sprintf("(%s)", shortSHA))
-	basePart := fmt.Sprintf("@ %s %s", boldBranchName(baseRef), shaPart)
+	nodeID := colorizeNeutralText(repoNodeID(repo))
 
-	return fmt.Sprintf("   %s %s %s", repoIDCell, repoLabel, basePart)
+	return fmt.Sprintf("   %s:%s @ %s", repoLabel, colorizeNeutralText(shortSHA), nodeID)
+}
+
+func renderRepoPathLabel(repo RunEntry) string {
+	label := strings.TrimSpace(repo.RepoURL)
+	if label != "" {
+		label = domaintypes.NormalizeRepoURLSchemless(label)
+		label = strings.TrimSuffix(label, ".git")
+		if slash := strings.Index(label, "/"); slash >= 0 && slash+1 < len(label) {
+			label = label[slash+1:]
+		}
+	}
+	if label == "" {
+		label = repo.RepoID.String()
+	}
+	return valueOrDash(label)
+}
+
+func repoNodeID(repo RunEntry) string {
+	for _, job := range repo.Jobs {
+		nodeID := FormatNodeID(job.NodeID)
+		if nodeID != "-" {
+			return nodeID
+		}
+	}
+	return "-"
 }
 
 func formatShortSHA(raw string) string {
@@ -283,10 +299,6 @@ func formatShortSHA(raw string) string {
 		}
 	}
 	return raw[:8]
-}
-
-func boldBranchName(name string) string {
-	return lipgloss.NewStyle().Bold(true).Render(name)
 }
 
 func renderExitOneLiner(job RunJobEntry, repoLastError *string, useRepoLastError bool) string {

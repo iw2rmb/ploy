@@ -43,6 +43,83 @@ func renderText(t *testing.T, report RunReport, opts TextRenderOptions) string {
 	return buf.String()
 }
 
+func TestRenderRepoPathLabel(t *testing.T) {
+	t.Parallel()
+
+	repoID := domaintypes.NewMigRepoID()
+	tests := []struct {
+		name string
+		repo RunEntry
+		want string
+	}{
+		{
+			name: "https repo",
+			repo: RunEntry{RepoID: repoID, RepoURL: "https://github.com/acme/service.git"},
+			want: "acme/service",
+		},
+		{
+			name: "nested namespace",
+			repo: RunEntry{RepoID: repoID, RepoURL: "ssh://git@gitlab.example.test/platform/team/service.git"},
+			want: "platform/team/service",
+		},
+		{
+			name: "scp style",
+			repo: RunEntry{RepoID: repoID, RepoURL: "git@gitlab.example.test:platform/team/service.git"},
+			want: "platform/team/service",
+		},
+		{
+			name: "missing url",
+			repo: RunEntry{RepoID: repoID},
+			want: repoID.String(),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if got := renderRepoPathLabel(tc.repo); got != tc.want {
+				t.Fatalf("renderRepoPathLabel()=%q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestRepoNodeID(t *testing.T) {
+	t.Parallel()
+
+	nodeID := domaintypes.NodeID(domaintypes.NewNodeKey())
+	var zero domaintypes.NodeID
+	tests := []struct {
+		name string
+		repo RunEntry
+		want string
+	}{
+		{
+			name: "first nonzero job node",
+			repo: RunEntry{Jobs: []RunJobEntry{
+				{NodeID: nil},
+				{NodeID: &zero},
+				{NodeID: &nodeID},
+			}},
+			want: nodeID.String(),
+		},
+		{
+			name: "none",
+			repo: RunEntry{Jobs: []RunJobEntry{{NodeID: nil}, {NodeID: &zero}}},
+			want: "-",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if got := repoNodeID(tc.repo); got != tc.want {
+				t.Fatalf("repoNodeID()=%q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestRenderRunReportTextHeadersAndArtifacts(t *testing.T) {
 	t.Parallel()
 
@@ -52,6 +129,7 @@ func TestRenderRunReportTextHeadersAndArtifacts(t *testing.T) {
 	repoID := domaintypes.NewMigRepoID()
 	preGateID := domaintypes.NewJobID()
 	migJobID := domaintypes.NewJobID()
+	nodeID := domaintypes.NodeID(domaintypes.NewNodeKey())
 
 	report := RunReport{
 		RunID:   runID,
@@ -72,6 +150,7 @@ func TestRenderRunReportTextHeadersAndArtifacts(t *testing.T) {
 						JobID:      preGateID,
 						JobType:    "pre_gate",
 						JobImage:   "ghcr.io/acme/pre-gate:1",
+						NodeID:     &nodeID,
 						Status:     "Running",
 						DurationMs: 2450,
 						JobLogURL:  "https://example.test/v1/jobs/" + preGateID.String() + "/logs",
@@ -103,7 +182,10 @@ func TestRenderRunReportTextHeadersAndArtifacts(t *testing.T) {
 	assertx.Contains(t, out, "   Spec:  "+specID.String()+" (https://example.test/v1/migs/"+migID.String()+"/specs/latest)")
 	assertx.Contains(t, out, "   Repos: 1")
 	assertx.Contains(t, out, "\n   Repos: 1\n   Run:   "+runID.String()+"\n\n")
-	assertx.Contains(t, out, "   "+colorizeNeutralText("["+repoID.String()+"]")+" github.com/acme/service (https://github.com/acme/service.git) @ "+boldBranchName("main")+" "+colorizeNeutralText("(01234567)"))
+	assertx.Contains(t, out, "   acme/service:"+colorizeNeutralText("01234567")+" @ "+colorizeNeutralText(nodeID.String()))
+	assertx.NotContains(t, out, "["+repoID.String()+"]")
+	assertx.NotContains(t, out, "github.com/acme/service")
+	assertx.NotContains(t, out, "https://github.com/acme/service.git")
 	assertx.NotContains(t, out, " -> ")
 	assertx.NotContains(t, out, "Artefacts")
 	assertx.NotContains(t, out, "State")
@@ -116,6 +198,10 @@ func TestRenderRunReportTextHeadersAndArtifacts(t *testing.T) {
 	assertx.Contains(t, out, "⣾")
 	plain := stripCSI(out)
 	assertx.Contains(t, plain, "    2.5s  pre_gate")
+	assertx.Contains(t, plain, "mig       Patch (https://example.test/v1/runs/")
+	if strings.Count(plain, nodeID.String()) != 1 {
+		t.Fatalf("expected node id only in repo header, got %q", plain)
+	}
 }
 
 func TestRenderRunReportTextVisibilityRules(t *testing.T) {
@@ -150,9 +236,9 @@ func TestRenderRunReportTextVisibilityRules(t *testing.T) {
 				}
 			}(),
 			contains: []string{
-				"github.com/acme/no-mr (https://github.com/acme/no-mr.git) @ " + boldBranchName("main") + " " + colorizeNeutralText("(fedcba98)"),
+				"acme/no-mr:" + colorizeNeutralText("fedcba98") + " @ " + colorizeNeutralText("-"),
 			},
-			notContain: []string{"feature/no-mr", " -> "},
+			notContain: []string{"github.com/acme/no-mr", "https://github.com/acme/no-mr.git", "feature/no-mr", " -> "},
 		},
 		{
 			name: "hides patch artifacts for cancelled jobs",
@@ -254,8 +340,8 @@ func TestRenderRunReportTextLayout_FilterRunningRepos(t *testing.T) {
 		t.Fatalf("RenderRunReportTextLayout error: %v", err)
 	}
 	assertx.Contains(t, layout.Text, "   Repos: 1")
-	assertx.Contains(t, layout.Text, "github.com/acme/running")
-	assertx.NotContains(t, layout.Text, "github.com/acme/done")
+	assertx.Contains(t, layout.Text, "acme/running")
+	assertx.NotContains(t, layout.Text, "acme/done")
 }
 
 func TestRenderRunReportTextLayout_FilterRunningReposEmptyMessage(t *testing.T) {
@@ -293,7 +379,7 @@ func TestRenderRunReportTextLayout_FilterRunningReposEmptyMessage(t *testing.T) 
 	}
 	assertx.Contains(t, layout.Text, "No repos with in-progress jobs.")
 	assertx.Contains(t, layout.Text, "   Repos: 0")
-	assertx.NotContains(t, layout.Text, "github.com/acme/done")
+	assertx.NotContains(t, layout.Text, "acme/done")
 }
 
 func TestRenderRunReportTextExitOneLiners(t *testing.T) {
@@ -480,7 +566,9 @@ func TestRenderRunReportTextOSC8OnAndOff(t *testing.T) {
 	assertx.NotContains(t, plainOut, "Logs (")
 	assertx.Contains(t, plainOut, colorizeNeutralText(jobID.String())+" ("+jobLogURL+"?auth_token=test-token)")
 	assertx.Contains(t, plainOut, report.SpecID.String()+" (https://example.test/v1/migs/"+migID.String()+"/specs/latest?auth_token=test-token)")
-	assertx.Contains(t, plainOut, "github.com/acme/links (https://github.com/acme/links.git)")
+	assertx.Contains(t, plainOut, "acme/links:")
+	assertx.NotContains(t, plainOut, "github.com/acme/links")
+	assertx.NotContains(t, plainOut, "https://github.com/acme/links.git")
 	assertx.NotContains(t, plainOut, "https://github.com/acme/links.git?auth_token=")
 	assertx.Contains(t, plainOut, "Patch (https://example.test/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/diffs?")
 	assertx.Contains(t, plainOut, "auth_token=test-token")
@@ -493,7 +581,7 @@ func TestRenderRunReportTextOSC8OnAndOff(t *testing.T) {
 	linkedOut := renderText(t, report, TextRenderOptions{EnableOSC8: true, AuthToken: "test-token", BaseURL: baseURL})
 	assertx.Contains(t, linkedOut, "\x1b]8;;"+jobLogURL+"?auth_token=test-token\x1b\\"+colorizeNeutralText(jobID.String())+"\x1b]8;;\x1b\\")
 	assertx.Contains(t, linkedOut, "\x1b]8;;https://example.test/v1/migs/"+migID.String()+"/specs/latest?auth_token=test-token")
-	assertx.Contains(t, linkedOut, "\x1b]8;;https://github.com/acme/links.git\x1b\\github.com/acme/links\x1b]8;;\x1b\\")
+	assertx.Contains(t, linkedOut, "\x1b]8;;https://github.com/acme/links.git\x1b\\acme/links\x1b]8;;\x1b\\")
 	assertx.NotContains(t, linkedOut, "github.com/acme/links.git?auth_token=")
 	assertx.Contains(t, linkedOut, "\x1b]8;;https://example.test/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/diffs?")
 	assertx.Contains(t, linkedOut, "auth_token=test-token")
@@ -854,8 +942,8 @@ func TestRenderRunStatusSnapshotText_NormalizesFollowOnlyOptions(t *testing.T) {
 
 	rendered := out.String()
 	assertx.Contains(t, rendered, "   Repos: 2")
-	assertx.Contains(t, rendered, "github.com/acme/running")
-	assertx.Contains(t, rendered, "github.com/acme/done")
+	assertx.Contains(t, rendered, "acme/running")
+	assertx.Contains(t, rendered, "acme/done")
 	assertx.NotContains(t, rendered, "No repos with in-progress jobs.")
 	assertx.NotContains(t, rendered, "preview")
 }
