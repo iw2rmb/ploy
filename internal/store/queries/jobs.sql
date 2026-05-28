@@ -173,14 +173,26 @@ WITH eligible AS (
   SELECT j.id, n.id AS node_id
   FROM nodes n
   JOIN jobs j ON TRUE
+  JOIN run_repos rr ON rr.run_id = j.run_id
+    AND rr.repo_id = j.repo_id
+    AND rr.attempt = j.attempt
   JOIN runs r ON j.run_id = r.id
   WHERE n.id = @node_id
     AND @node_id::TEXT != ''
     AND j.status = 'Queued'
     AND j.node_id IS NULL
     AND r.status = 'Started'
+    AND NOT EXISTS (
+      SELECT 1
+      FROM jobs owner
+      WHERE owner.run_id = j.run_id
+        AND owner.repo_id = j.repo_id
+        AND owner.attempt = j.attempt
+        AND owner.node_id IS NOT NULL
+        AND owner.node_id != n.id
+    )
   ORDER BY j.run_id ASC, j.repo_id ASC, j.attempt ASC, j.id ASC
-  FOR UPDATE OF j SKIP LOCKED
+  FOR UPDATE OF rr, j SKIP LOCKED
   LIMIT 1
 )
 UPDATE jobs

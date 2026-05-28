@@ -150,8 +150,9 @@ func TestClaimJob_Basic(t *testing.T) {
 	}
 }
 
-// TestClaimJob_AllJobsClaimedOnce verifies that N queued jobs are each claimed
-// exactly once, regardless of whether one or many nodes do the claiming.
+// TestClaimJob_AllJobsClaimedOnce verifies that N independent queued jobs are
+// each claimed exactly once, regardless of whether one or many nodes do the
+// claiming.
 func TestClaimJob_AllJobsClaimedOnce(t *testing.T) {
 	ctx, db := newTestStore(t)
 
@@ -166,10 +167,10 @@ func TestClaimJob_AllJobsClaimedOnce(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cleanTestTables(t, ctx, db)
-			fx := newV1Fixture(t, ctx, db, "https://github.com/test/"+tt.name, "main", "feature", []byte(`{}`))
 
 			wanted := make(map[types.JobID]bool, tt.numJobs)
 			for i := 0; i < tt.numJobs; i++ {
+				fx := newV1Fixture(t, ctx, db, "https://github.com/test/"+tt.name+"/"+strconv.Itoa(i), "main", "feature", []byte(`{}`))
 				j := createTestJob(t, ctx, db, fx, "job-"+strconv.Itoa(i))
 				wanted[j.ID] = true
 			}
@@ -200,14 +201,62 @@ func TestClaimJob_AllJobsClaimedOnce(t *testing.T) {
 	}
 }
 
+func TestClaimJob_PinsRunRepoAttemptToFirstClaimingNode(t *testing.T) {
+	ctx, db := newTestStore(t)
+	fx := newV1Fixture(t, ctx, db, "https://github.com/test/node-affinity", "main", "feature", []byte(`{}`))
+
+	first := createTestJob(t, ctx, db, fx, "first")
+	second := createTestJob(t, ctx, db, fx, "second")
+	nodeA := createTestNode(t, ctx, db)
+	nodeB := createTestNode(t, ctx, db)
+
+	claimedFirst, err := db.ClaimJob(ctx, nodeA.ID)
+	if err != nil {
+		t.Fatalf("ClaimJob(nodeA first) failed: %v", err)
+	}
+	wantSameAttempt := map[types.JobID]bool{first.ID: true, second.ID: true}
+	if !wantSameAttempt[claimedFirst.ID] {
+		t.Fatalf("ClaimJob(nodeA first) = %s, want one of %s/%s", claimedFirst.ID, first.ID, second.ID)
+	}
+
+	if claimedByForeignNode, err := db.ClaimJob(ctx, nodeB.ID); err == nil {
+		t.Fatalf("ClaimJob(nodeB) = %s, want no eligible job for node-affined repo attempt", claimedByForeignNode.ID)
+	}
+
+	claimedSecond, err := db.ClaimJob(ctx, nodeA.ID)
+	if err != nil {
+		t.Fatalf("ClaimJob(nodeA second) failed: %v", err)
+	}
+	if !wantSameAttempt[claimedSecond.ID] || claimedSecond.ID == claimedFirst.ID {
+		t.Fatalf("ClaimJob(nodeA second) = %s, want remaining same-attempt job", claimedSecond.ID)
+	}
+
+	if err := db.IncrementRunRepoAttempt(ctx, IncrementRunRepoAttemptParams{
+		RunID:  fx.Run.ID,
+		RepoID: fx.MigRepo.RepoID,
+	}); err != nil {
+		t.Fatalf("IncrementRunRepoAttempt() failed: %v", err)
+	}
+	fx.RunRepo.Attempt++
+	nextAttemptJob := createTestJob(t, ctx, db, fx, "next-attempt")
+
+	claimedNextAttempt, err := db.ClaimJob(ctx, nodeB.ID)
+	if err != nil {
+		t.Fatalf("ClaimJob(nodeB next attempt) failed: %v", err)
+	}
+	if claimedNextAttempt.ID != nextAttemptJob.ID {
+		t.Fatalf("ClaimJob(nodeB next attempt) = %s, want %s", claimedNextAttempt.ID, nextAttemptJob.ID)
+	}
+}
+
 // TestClaimJob_SkipLocked verifies that FOR UPDATE SKIP LOCKED prevents
 // concurrent nodes from claiming the same job.
 func TestClaimJob_SkipLocked(t *testing.T) {
 	ctx, db := newTestStore(t)
-	fx := newV1Fixture(t, ctx, db, "https://github.com/test/skip-locked", "main", "concurrent", []byte(`{}`))
 
 	const n = 10
 	for i := 0; i < n; i++ {
+		fx := newV1Fixture(t, ctx, db, "https://github.com/test/skip-locked/"+strconv.Itoa(i), "main", "concurrent", []byte(`{}`))
 		createTestJob(t, ctx, db, fx, "job-"+strconv.Itoa(i))
 	}
 
