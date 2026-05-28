@@ -64,7 +64,7 @@ get:
             type: string
             description: |
               Server-Sent Events stream. Each frame consists of `event:` type and
-              `data:` JSON payload. See the run logs endpoint contract for payload schemas.
+              `data:` JSON payload for repo-scoped lifecycle frames.
     '400':
       description: Bad Request — missing or invalid run_id or repo_id.
       content:

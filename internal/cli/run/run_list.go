@@ -20,9 +20,10 @@ import (
 )
 
 type ListOptions struct {
-	Limit  int
-	Offset int
-	Output io.Writer
+	Limit        int
+	Offset       int
+	RepoSelector string
+	Output       io.Writer
 }
 
 // RunList implements `ploy run ls [--limit N] [--offset N]`.
@@ -44,6 +45,14 @@ func RunList(ctx context.Context, opts ListOptions) error {
 	if err != nil {
 		return err
 	}
+	repoURL := ""
+	if opts.RepoSelector != "" {
+		repo, err := resolveRunRepo(ctx, base, httpClient, opts.RepoSelector)
+		if err != nil {
+			return err
+		}
+		repoURL = repo.RepoURL
+	}
 
 	// Execute the list command using the batch client.
 	cmd := migs.ListBatchesCommand{
@@ -51,6 +60,7 @@ func RunList(ctx context.Context, opts ListOptions) error {
 		BaseURL: base,
 		Limit:   int32(opts.Limit),
 		Offset:  int32(opts.Offset),
+		RepoURL: repoURL,
 	}
 
 	batches, err := cmd.Run(ctx)

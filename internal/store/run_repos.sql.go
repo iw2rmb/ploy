@@ -415,7 +415,7 @@ type ListRunReposWithURLByRunRow struct {
 // Lists all run_repos for a run with their repo_url (from repos).
 // Used by:
 // - GET  /v1/runs/{id}/repos (full repo response without N+1 lookups)
-// - POST /v1/runs/{run_id}/pull (repo resolution by normalized URL)
+// - POST /v1/runs/{run_id}/repos/resolve (repo resolution by normalized URL)
 func (q *Queries) ListRunReposWithURLByRun(ctx context.Context, runID types.RunID) ([]ListRunReposWithURLByRunRow, error) {
 	rows, err := q.db.Query(ctx, listRunReposWithURLByRun, runID)
 	if err != nil {

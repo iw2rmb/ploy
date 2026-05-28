@@ -98,12 +98,12 @@ func registerRunRoutes(s *httpserver.Server, deps routeDeps) {
 	s.RegisterRouteFunc("GET /v1/runs", listRunsHandler(deps.st), auth.RoleControlPlane)
 	s.RegisterRouteFunc("GET /v1/runs/{run_id}", getRunHandler(deps.st), auth.RoleControlPlane)
 	s.RegisterRouteFunc("GET /v1/runs/{run_id}/status", getRunStatusHandler(deps.st), auth.RoleControlPlane)
-	s.RegisterRouteFuncAllowQueryToken("GET /v1/runs/{run_id}/logs", getRunLogsHandler(deps.st, deps.bs, deps.eventsService), auth.RoleControlPlane)
 	s.RegisterRouteFunc("POST /v1/runs/{run_id}/cancel", cancelRunHandlerV1(deps.st), auth.RoleControlPlane)
 	s.RegisterRouteFunc("POST /v1/runs/{run_id}/start", startRunHandler(deps.st, deps.bs), auth.RoleControlPlane)
 
 	s.RegisterRouteFunc("POST /v1/runs/{run_id}/repos", addRunRepoHandler(deps.st, deps.gitAuth), auth.RoleControlPlane)
 	s.RegisterRouteFunc("GET /v1/runs/{run_id}/repos", listRunReposHandler(deps.st), auth.RoleControlPlane)
+	s.RegisterRouteFunc("POST /v1/runs/{run_id}/repos/resolve", resolveRunRepoHandler(deps.st), auth.RoleControlPlane)
 	s.RegisterRouteFunc("GET /v1/runs/{run_id}/repos/{repo_id}/snapshot", getRunRepoSnapshotHandler(deps.st, deps.snapshots), auth.RoleWorker)
 	s.RegisterRouteFunc("POST /v1/runs/{run_id}/repos/{repo_id}/restart", restartRunRepoHandler(deps.st, deps.bs), auth.RoleControlPlane)
 	s.RegisterRouteFuncAllowQueryToken("GET /v1/runs/{run_id}/repos/{repo_id}/diffs", listRunRepoDiffsHandler(deps.st, deps.bs), auth.RoleControlPlane, auth.RoleWorker)
@@ -111,10 +111,10 @@ func registerRunRoutes(s *httpserver.Server, deps routeDeps) {
 	s.RegisterRouteFunc("GET /v1/runs/{run_id}/repos/{repo_id}/artifacts", listRunRepoArtifactsHandler(deps.st), auth.RoleControlPlane)
 	s.RegisterRouteFunc("GET /v1/runs/{run_id}/repos/{repo_id}/jobs", listRunRepoJobsHandler(deps.st), auth.RoleControlPlane)
 	s.RegisterRouteFunc("POST /v1/runs/{run_id}/repos/{repo_id}/cancel", cancelRunRepoHandlerV1(deps.st), auth.RoleControlPlane)
-	s.RegisterRouteFunc("POST /v1/runs/{run_id}/pull", pullRunRepoHandler(deps.st), auth.RoleControlPlane)
 }
 
 func registerRepoRoutes(s *httpserver.Server, deps routeDeps) {
+	s.RegisterRouteFunc("POST /v1/repos/resolve", resolveRepoSelectorHandler(deps.gitAuth), auth.RoleControlPlane)
 	s.RegisterRouteFunc("GET /v1/repos", listReposHandler(deps.st), auth.RoleControlPlane)
 	s.RegisterRouteFunc("GET /v1/repos/{repo_id}/runs", listRunsForRepoHandler(deps.st), auth.RoleControlPlane)
 }

@@ -338,7 +338,7 @@ func TestAuthorizerBearerToken_InsecureModeWithToken(t *testing.T) {
 
 func TestAuthorizerQueryToken(t *testing.T) {
 	token := mustGenerateAPIToken(t, string(RoleControlPlane), time.Now().Add(24*time.Hour))
-	path := "/v1/runs/run-123/logs?auth_token=" + token
+	path := "/v1/runs/run-123/repos/repo-123/logs?auth_token=" + token
 
 	tests := []struct {
 		name             string

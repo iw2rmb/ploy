@@ -77,9 +77,8 @@ func TestCobraCommandTreeRouting(t *testing.T) {
 		{name: "cluster unknown", args: []string{"cluster", "unknown"}, wantErr: `unknown command "unknown"`},
 		{name: "cluster node unknown", args: []string{"cluster", "node", "unknown"}, wantErr: `unknown command "unknown"`},
 		{name: "job follow unknown", args: []string{"job", "follow"}, wantErr: `unknown command "follow"`},
-		{name: "help run status", args: []string{"help", "run", "status"}, wantOK: true, wantOut: "ploy run status [--json] <run-id> [flags]"},
-		{name: "run status help", args: []string{"run", "status", "--help"}, wantOK: true, wantOut: "ploy run status [--json] <run-id> [flags]"},
-		{name: "run logs help", args: []string{"run", "logs", "--help"}, wantOK: true, wantOut: "ploy run logs <run-id> [flags]"},
+		{name: "help run status", args: []string{"help", "run", "status"}, wantOK: true, wantOut: "ploy run status <run-id> [flags]"},
+		{name: "run status help", args: []string{"run", "status", "--help"}, wantOK: true, wantOut: "ploy run status <run-id> [flags]"},
 		{name: "token list help", args: []string{"cluster", "token", "list", "--help"}, wantOK: true, wantOut: "ploy cluster token list [flags]"},
 		{name: "spec validate help", args: []string{"spec", "validate", "--help"}, wantOK: true, wantOut: "ploy spec validate <path> [<path>...] [flags]"},
 	}

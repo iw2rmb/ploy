@@ -65,7 +65,7 @@ func validSpecBody() map[string]any {
 func validRunRequestBody() map[string]any {
 	return map[string]any{
 		"repo_url": "https://github.com/org/repo",
-		"base_ref": "main",
+		"ref":      "main",
 		"spec":     validSpecBody(),
 	}
 }

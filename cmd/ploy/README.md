@@ -18,7 +18,7 @@ ploy help <command>            # Alternative help syntax
 Common command patterns:
 
 ```bash
-ploy run --repo <url> --base-ref <ref> --spec <path|->                     # submit a single-repo run
+ploy run <spec-path> [<repo-path>|<namespace/repo[:ref]>] [--apply] [--pull[=path]] # submit a single-repo run
 ploy mig run <mig-id|name> [--repo <url> ...] [--failed]                   # execute a mig project over its repo set
 ploy mig run \
   [--repo-url <url> --repo-base-ref <branch> --repo-workspace-hint <dir>] \
@@ -55,11 +55,11 @@ job type, job ID, display name, status glyph, duration, and status for each job.
 For running jobs, follow mode also shows `STD[O]UT` and `STD[E]RR` preview rows
 (collapsed by default). Press `o` to expand/collapse stdout previews for all
 currently running jobs, and `e` for stderr previews. Failed jobs are kept expanded.
-Note: `--follow` does not stream container logs. Use `ploy job follow <job-id>` for container log streaming.
+Note: `--follow` does not stream container logs. Use `ploy job log --follow <job-id>` for container log streaming.
 
 `--cap` enforces an overall time limit for `--follow`. If exceeded, the CLI exits the follow; add `--cancel-on-cap` to also cancel the run.
 
-When a followed run completes successfully, pass `--artifact-dir <dir>` to
+When a `ploy run` submission completes successfully, pass `--pull[=<dir>]` to
 download referenced artifacts and generate `<dir>/manifest.json`. The manifest
 lists artifacts with `stage`, `name`, `cid`, `digest`, `size` (bytes written),
 and the local `path`. Filenames are sanitized and deterministic; when a content
@@ -134,8 +134,8 @@ ploy mig run repo add \
   --base-ref main \
   my-batch
 
-# Step 3: Optionally stream logs for the entire batch.
-ploy run logs my-batch
+# Step 3: Optionally follow status for the entire batch.
+ploy run status my-batch --follow
 ```
 
 Each attached repository creates a `run_repo` entry, and jobs execute per-repo
@@ -177,25 +177,25 @@ ploy mig run repo remove \
 | `mig run repo add`       | Attach a repository to an existing batch      |
 | `mig run repo remove`    | Detach a repository from a batch              |
 | `mig run repo restart`   | Re-queue a repo job with optional new base ref |
-| `run pull <run-id>`      | Pull diffs for the current repo from a run    |
-| `run patch <run-id>`     | Download a stored `.patch.gz` artifact only   |
+| `run apply <run-id>`     | Apply diffs for the current repo from a run   |
+| `run pull <run-id>`      | Download final artifacts for a run            |
 | `mig pull [<mig>]`       | Pull diffs for the current repo from a mig    |
-| `run logs <batch>`       | Stream logs/events for all repos in a batch   |
+| `run status --follow`    | Follow run status until terminal              |
 
 See `docs/migs-lifecycle.md` for the relationship between runs, `run_repos`, and jobs.
 
 ### Pull Migs Changes Locally
 
-After a run completes, you can pull the Migs-generated changes into your local
-repository using either `ploy run pull <run-id>` (run-based) or `ploy mig pull` (mig-based).
+After a run completes, you can apply the Migs-generated changes into your local
+repository using either `ploy run apply <run-id>` (run-based) or `ploy mig pull` (mig-based).
 These commands apply stored diffs from the control plane to the current worktree.
 
 ```bash
 # From a repo that participated in a Migs run:
 cd service-a
 
-# Run-based pull (you know the run_id):
-ploy run pull <run-id>
+# Run-based apply (you know the run_id):
+ploy run apply <run-id>
 
 # Mig-based pull (default: last succeeded):
 ploy mig pull <mig-id|name>
@@ -204,40 +204,26 @@ ploy mig pull <mig-id|name>
 **How it works:**
 1. Derives the current repo identity from the git remote (default: `origin`).
 2. Verifies the working tree is clean (no uncommitted changes).
-3. Resolves `(run_id, repo_id)` via `POST /v1/runs/{run_id}/pull` (or `POST /v1/migs/{mig_id}/pull` for mig-based pull).
+3. Resolves `(run_id, repo_id)` via `POST /v1/runs/{run_id}/repos/resolve` (or `POST /v1/migs/{mig_id}/pull` for mig-based pull).
 4. Fetches repo details and verifies local `HEAD` matches the run's `source_commit_sha`.
 5. Downloads and applies all stored Migs diffs via `git apply`.
 
 **Arguments:**
-- `<run-id>` — Run ID (KSUID string), for `ploy run pull`.
+- `<run-id>` — Run ID (KSUID string), for `ploy run apply`.
 - `[<mig-id|name>]` — Mig ID or name (optional), for `ploy mig pull`.
 
 **Flags:**
-- `--origin <remote>` — Git remote to match (default: `origin`). Use this when your
-  repository has multiple remotes.
-- `--dry-run` — Validate and print planned actions without applying
-  patches. Useful for previewing what changes would be pulled.
+- `--force` — For `ploy run apply`, allow local `HEAD` to differ from the run source SHA.
+  This never bypasses dirty worktree checks.
 
 **Examples:**
 
 ```bash
-# Pull changes from a run ID.
-ploy run pull <run-id>
+# Apply changes from a run ID.
+ploy run apply <run-id>
 
-# Download the latest stored patch artifact only (no apply).
-ploy run patch <run-id> --output latest.patch.gz
-
-# Download a specific diff patch artifact.
-ploy run patch <run-id> --repo-id <repo-id> --diff-id <diff-id> --output step1.patch.gz
-
-# Select repo by URL for multi-repo runs.
-ploy run patch <run-id> --repo-url https://github.com/org/repo-a.git --output repo-a.patch.gz
-
-# Preview what would be pulled without making changes.
-ploy run pull --dry-run <run-id>
-
-# Pull from a run using a specific remote.
-ploy run pull --origin upstream <run-id>
+# Download final run artifacts.
+ploy run pull <run-id> [artifacts-path]
 
 # Pull changes from the latest successful run for a mig.
 ploy mig pull <mig-id|name>
@@ -278,7 +264,7 @@ ploy pull --dry-run
 4. If state exists and SHA matches: reuses the saved run ID.
 5. If SHA mismatch: requires `--new-run` to initiate a fresh run.
 6. With `--follow`: displays a job graph until run completes.
-7. On success: pulls diffs using the same logic as `ploy run pull`.
+7. On success: pulls diffs using the same repo-resolution and diff-application path as `ploy mig pull`.
 
 **Flags:**
 - `--new-run` — Force initiating a new run, overwriting any saved pull state.
@@ -400,37 +386,7 @@ ploy completion <shell> --help
 - `--artifact-dir` — Download final artifacts to the given directory after a
   successful run (`mig run --follow`). A `manifest.json` file is created with
   artifact metadata.
-- Streaming guards (long-lived SSE):
-  - `run logs` uses resilient SSE streams backed by `github.com/tmaxmax/go-sse` and a shared exponential backoff policy.
-  - `--idle-timeout <duration>` (default `45s`): Cancels the stream when no events arrive within the specified duration. Set to `0` to disable idle timeout.
-  - `--timeout <duration>` (default `0`, unlimited): Caps the overall stream time. When exceeded, the CLI exits the stream.
-  - `--max-retries <int>` (default `3` for `run logs`): Maximum number of reconnect attempts. Set to `-1` for unlimited retries.
-  - Reconnection semantics: On connection errors or mid-stream failures, the client automatically reconnects with exponential backoff (250ms initial interval, 2x multiplier with jitter, capped at 30s). Backoff resets after successfully receiving events. Last-Event-ID is preserved across reconnects to resume from the last processed event.
-  - Server `retry` hints are not supported: The library-backed SSE client does not consume server-sent `retry` fields. Reconnect delays are driven entirely by the shared backoff policy.
 - `--cap` — Overall time limit for `--follow`. When the duration elapses, the CLI stops following; use `--cancel-on-cap` to cancel the run too (e.g., `--cap 5m --cancel-on-cap`).
-
-## Run Logs (Lifecycle Stream)
-
-The `ploy run logs` command streams lifecycle events from the run SSE endpoint
-(`GET /v1/runs/{id}/logs`). It emits only `run`, `stage`, and `done` frames —
-container log frames (`event: log`, `event: retention`) are not present on the
-run stream.
-
-For container log streaming, use `ploy job follow <job-id>`, which connects to
-the job-scoped SSE endpoint (`GET /v1/jobs/{job_id}/logs`) and receives `log`,
-`retention`, and `done` frames.
-
-### Example usage
-
-```bash
-# Stream run lifecycle events
-ploy run logs <run-id>
-
-# Stream container logs for a specific job
-ploy job follow <job-id>
-```
-
-See `docs/migs-lifecycle.md` § 7.2 for the complete SSE payload specification.
 
 ## Global Environment Configuration
 

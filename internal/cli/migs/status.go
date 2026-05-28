@@ -1,6 +1,6 @@
 // status.go provides CLI client implementations for fetching diffs and patches.
 //
-// This file implements helpers used by `ploy run pull` and `ploy mig pull`:
+// This file implements helpers used by `ploy run apply` and `ploy mig pull`:
 //   - ListRunRepoDiffsCommand: Fetches repo-scoped diffs via GET /v1/runs/{run_id}/repos/{repo_id}/diffs (v1).
 //   - DownloadDiffCommand: Downloads a single diff via GET /v1/runs/{run_id}/repos/{repo_id}/diffs?download=true&diff_id=<uuid>.
 //   - DownloadDiffGzipCommand: Downloads raw gzip bytes for a single diff from the same endpoint.

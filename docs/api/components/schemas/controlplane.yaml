@@ -454,7 +454,7 @@ MigArchiveResponse:
 #
 # This is the single authoritative response type for:
 # - GET /v1/runs/{run_id}/status (status) → 200 response body
-# - SSE `event: run` payloads on /v1/runs/{run_id}/logs
+# - server-side run lifecycle events published internally
 #
 # Wire contract guarantees:
 # - No wrapper types — RunSummary is returned directly as the JSON root.

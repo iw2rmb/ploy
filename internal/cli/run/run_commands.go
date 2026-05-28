@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/cli/common"
-	pullcli "github.com/iw2rmb/ploy/internal/cli/pull"
 	runcmd "github.com/iw2rmb/ploy/internal/cli/runs"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/spf13/cobra"
@@ -19,51 +18,45 @@ import (
 func NewCommand() *cobra.Command {
 	submit := SubmitOptions{MaxRetries: 5}
 	cmd := &cobra.Command{
-		Use:   "run",
-		Short: "Inspect runs and stream events",
-		Args:  cobra.NoArgs,
+		Use:   "run <spec-path> [<repo-path>|<namespace/repo[:ref]>]",
+		Short: "Submit and inspect runs",
+		Args:  cobra.RangeArgs(1, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if !cmd.Flags().Changed("repo") &&
-				!cmd.Flags().Changed("base-ref") &&
-				!cmd.Flags().Changed("spec") {
-				return cmd.Help()
+			submit.SpecPath = args[0]
+			if len(args) > 1 {
+				submit.RepoSelector = args[1]
 			}
+			submit.PullArtifacts = cmd.Flags().Changed("pull")
 			submit.Output = cmd.OutOrStdout()
 			submit.FollowOutput = cmd.ErrOrStderr()
 			return RunSubmit(cmd.Context(), submit)
 		},
 	}
 
-	cmd.Flags().StringVar(&submit.RepoURL, "repo", "", "Git repository URL")
-	cmd.Flags().StringVar(&submit.BaseRef, "base-ref", "", "Base Git ref")
-	cmd.Flags().StringVar(&submit.SpecFile, "spec", "", "Path to YAML/JSON spec file")
-	cmd.Flags().BoolVar(&submit.Follow, "follow", false, "Follow run until completion")
-	cmd.Flags().DurationVar(&submit.CapDuration, "cap", 0, "Optional time cap for --follow")
-	cmd.Flags().BoolVar(&submit.CancelOnCap, "cancel-on-cap", false, "Cancel run if cap exceeded")
-	cmd.Flags().IntVar(&submit.MaxRetries, "max-retries", 5, "Max report fetch retries")
-	cmd.Flags().StringArrayVar(&submit.MigEnvs, "job-env", nil, "Job environment KEY=VALUE")
-	cmd.Flags().StringVar(&submit.JobImage, "job-image", "", "Container image for the mig step")
-	cmd.Flags().StringVar(&submit.MigCommand, "job-command", "", "Container command override")
-	cmd.Flags().StringVar(&submit.ArtifactDir, "artifact-dir", "", "Directory to download final artifacts into")
-	cmd.Flags().BoolVar(&submit.JSONOut, "json", false, "Print machine-readable JSON summary")
+	cmd.Flags().BoolVar(&submit.Apply, "apply", false, "Apply the resulting patch to a local repo after success")
+	cmd.Flags().StringVar(&submit.PullPath, "pull", "", "Download final artifacts after success; optional path")
+	if flag := cmd.Flags().Lookup("pull"); flag != nil {
+		flag.NoOptDefVal = osTempArtifactDirSentinel
+	}
 
 	cmd.AddCommand(newListCommand())
 	cmd.AddCommand(newCancelCommand())
-	cmd.AddCommand(newStartCommand())
 	cmd.AddCommand(newStatusCommand())
-	cmd.AddCommand(newLogsCommand())
 	cmd.AddCommand(newPullCommand())
-	cmd.AddCommand(newPatchCommand())
+	cmd.AddCommand(newApplyCommand())
 	return cmd
 }
 
 func newListCommand() *cobra.Command {
 	opts := ListOptions{Limit: 50}
 	cmd := &cobra.Command{
-		Use:   "ls",
+		Use:   "ls [<path>|<namespace/repo[:ref]>]",
 		Short: "List batch runs with pagination",
-		Args:  cobra.NoArgs,
+		Args:  cobra.RangeArgs(0, 1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) > 0 {
+				opts.RepoSelector = args[0]
+			}
 			opts.Output = cmd.OutOrStdout()
 			return RunList(cmd.Context(), opts)
 		},
@@ -76,7 +69,7 @@ func newListCommand() *cobra.Command {
 func newCancelCommand() *cobra.Command {
 	opts := CancelOptions{}
 	cmd := &cobra.Command{
-		Use:   "cancel [--reason <text>] <run-id>",
+		Use:   "cancel <run-id>",
 		Short: "Cancel a run via the control plane",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -85,28 +78,13 @@ func newCancelCommand() *cobra.Command {
 			return RunCancel(cmd.Context(), opts)
 		},
 	}
-	cmd.Flags().StringVar(&opts.Reason, "reason", "", "Optional reason for cancellation")
 	return cmd
-}
-
-func newStartCommand() *cobra.Command {
-	return &cobra.Command{
-		Use:   "start <run-id>",
-		Short: "Start pending repos for a batch run",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return RunStart(cmd.Context(), StartOptions{
-				RunID:  args[0],
-				Output: cmd.OutOrStdout(),
-			})
-		},
-	}
 }
 
 func newStatusCommand() *cobra.Command {
 	opts := StatusOptions{}
 	cmd := &cobra.Command{
-		Use:   "status [--json] <run-id>",
+		Use:   "status <run-id>",
 		Short: "Show status for a run",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -116,76 +94,51 @@ func newStatusCommand() *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVar(&opts.JSONOut, "json", false, "Print machine-readable JSON report")
-	return cmd
-}
-
-func newLogsCommand() *cobra.Command {
-	opts := LogsOptions{
-		MaxRetries:  3,
-		IdleTimeout: 45 * time.Second,
-	}
-	cmd := &cobra.Command{
-		Use:   "logs <run-id>",
-		Short: "Stream run lifecycle events",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			opts.RunID = args[0]
-			opts.Output = cmd.OutOrStdout()
-			return RunLogs(cmd.Context(), opts)
-		},
-	}
-	cmd.Flags().IntVar(&opts.MaxRetries, "max-retries", 3, "Max reconnect attempts")
-	cmd.Flags().DurationVar(&opts.IdleTimeout, "idle-timeout", 45*time.Second, "Cancel if no events arrive")
-	cmd.Flags().DurationVar(&opts.Timeout, "timeout", 0, "Overall timeout for the stream")
+	cmd.Flags().BoolVar(&opts.Follow, "follow", false, "Follow run status until completion")
 	return cmd
 }
 
 func newPullCommand() *cobra.Command {
-	var origin string
-	var dryRun bool
+	opts := ArtifactPullOptions{}
 	cmd := &cobra.Command{
-		Use:   "pull [--origin <remote>] [--dry-run] <run-id>",
-		Short: "Pull diffs into the current git worktree",
-		Args:  cobra.ExactArgs(1),
+		Use:   "pull <run-id> [artifacts-path]",
+		Short: "Download final run artifacts",
+		Args:  cobra.RangeArgs(1, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			runArgs := []string{}
-			if cmd.Flags().Changed("origin") {
-				runArgs = append(runArgs, "--origin", origin)
+			opts.RunID = args[0]
+			if len(args) > 1 {
+				opts.ArtifactsPath = args[1]
 			}
-			if cmd.Flags().Changed("dry-run") {
-				runArgs = append(runArgs, fmt.Sprintf("--dry-run=%t", dryRun))
-			}
-			runArgs = append(runArgs, args...)
-			return pullcli.HandleRunPull(runArgs, cmd.ErrOrStderr())
+			opts.Output = cmd.OutOrStdout()
+			return RunArtifactPull(cmd.Context(), opts)
 		},
 	}
-	cmd.Flags().StringVar(&origin, "origin", "origin", "Git remote to match")
-	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Validate and print actions without mutating the repo")
 	return cmd
 }
 
-func newPatchCommand() *cobra.Command {
-	opts := PatchOptions{OutputPath: "-"}
+func newApplyCommand() *cobra.Command {
+	opts := ApplyOptions{}
 	cmd := &cobra.Command{
-		Use:   "patch [--repo-id <id> | --repo-url <url>] [--diff-id <uuid>] [--output <path|->] <run-id>",
-		Short: "Download a run patch artifact",
-		Args:  cobra.ExactArgs(1),
+		Use:   "apply <run-id> [path]",
+		Short: "Apply a successful run patch to a local repo",
+		Args:  cobra.RangeArgs(1, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.RunID = args[0]
+			if len(args) > 1 {
+				opts.RepoPath = args[1]
+			}
 			opts.Output = cmd.OutOrStdout()
-			return RunPatch(cmd.Context(), opts)
+			return RunApply(cmd.Context(), opts)
 		},
 	}
-	cmd.Flags().StringVar(&opts.RepoID, "repo-id", "", "Repo id")
-	cmd.Flags().StringVar(&opts.RepoURL, "repo-url", "", "Repo url")
-	cmd.Flags().StringVar(&opts.DiffID, "diff-id", "", "Specific diff id to download")
-	cmd.Flags().StringVar(&opts.OutputPath, "output", "-", "Output path")
+	cmd.Flags().BoolVar(&opts.Force, "force", false, "Apply even if local HEAD differs from the run source SHA")
 	return cmd
 }
 
 type StatusOptions struct {
 	RunID   string
 	JSONOut bool
+	Follow  bool
 	Output  io.Writer
 }
 
@@ -193,6 +146,9 @@ func RunStatus(ctx context.Context, opts StatusOptions) error {
 	runID := strings.TrimSpace(opts.RunID)
 	if runID == "" {
 		return errors.New("run id required")
+	}
+	if opts.JSONOut && opts.Follow {
+		return errors.New("--json and --follow are mutually exclusive")
 	}
 	out := opts.Output
 	if out == nil {
@@ -219,6 +175,16 @@ func RunStatus(ctx context.Context, opts StatusOptions) error {
 	token, err := common.ResolveControlPlaneToken()
 	if err != nil {
 		return err
+	}
+	if opts.Follow {
+		final, err := followRunReports(ctx, base, httpClient, domaintypes.RunID(runID), out, 5, time.Second)
+		if err != nil {
+			return err
+		}
+		if final != "" && final != "succeeded" {
+			return fmt.Errorf("run ended in %s", strings.ToLower(string(final)))
+		}
+		return nil
 	}
 	return runcmd.RenderRunStatusSnapshotText(out, report, runcmd.TextRenderOptions{
 		EnableOSC8: common.SupportsOSC8(out),

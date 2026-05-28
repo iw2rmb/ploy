@@ -14,35 +14,6 @@ import (
 	"github.com/iw2rmb/ploy/internal/testutil/clienv"
 )
 
-func TestRunLogsLifecycleOutput(t *testing.T) {
-	runID := domaintypes.NewRunID()
-	server := newStreamingServer(t, streamingServerConfig{
-		migRunID: runID,
-		logEvents: []sseTestEvent{
-			{event: "run", data: `{"state":"running"}`},
-			{event: "stage", data: `{"timestamp":"2026-03-01T10:00:00Z","stream":"info","line":"step started"}`},
-			{event: "done", data: `{"status":"completed"}`},
-		},
-	})
-	defer server.Close()
-
-	clienv.UseServerDescriptor(t, server.URL)
-
-	buf := &bytes.Buffer{}
-	err := executeCmd([]string{"run", "logs", runID.String()}, buf)
-	if err != nil {
-		t.Fatalf("run logs: %v", err)
-	}
-
-	out := buf.String()
-	if !strings.Contains(out, "[run] state=running") {
-		t.Fatalf("expected run lifecycle event, got: %q", out)
-	}
-	if !strings.Contains(out, "[stage]") || !strings.Contains(out, "step started") {
-		t.Fatalf("expected stage lifecycle event, got: %q", out)
-	}
-}
-
 func TestJobLogStructuredOutput(t *testing.T) {
 	jobID := domaintypes.NewJobID()
 	server := newJobStreamingServer(t, jobID, []sseTestEvent{
@@ -86,7 +57,7 @@ func TestJobLogRawOutput(t *testing.T) {
 	clienv.UseServerDescriptor(t, server.URL)
 
 	buf := &bytes.Buffer{}
-	err := executeCmd([]string{"job", "log", "--format", "raw", jobID.String()}, buf)
+	err := executeCmd([]string{"job", "log", jobID.String()}, buf)
 	if err != nil {
 		t.Fatalf("job log raw: %v", err)
 	}
@@ -158,7 +129,6 @@ func TestJobLogFollowReconnects(t *testing.T) {
 }
 
 type streamingServerConfig struct {
-	migRunID   domaintypes.RunID
 	jobID      string
 	logEvents  []sseTestEvent
 	reconnects []streamReconnectPlan
@@ -181,11 +151,8 @@ func newStreamingServer(t *testing.T, cfg streamingServerConfig) *httptest.Serve
 		connectionN int
 	)
 	streamPath := ""
-	if !cfg.migRunID.IsZero() {
-		streamPath = fmt.Sprintf("/v1/runs/%s/logs", cfg.migRunID.String())
-	}
 	if cfg.jobID != "" {
-		streamPath = fmt.Sprintf("/v1/jobs/%s/logs", cfg.jobID)
+		streamPath = "/v1/jobs/" + cfg.jobID + "/logs"
 	}
 
 	handler := func(w http.ResponseWriter, r *http.Request) {

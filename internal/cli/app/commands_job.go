@@ -47,7 +47,7 @@ func newJobLogCmd(stderr io.Writer) *cobra.Command {
 			return err
 		},
 	}
-	cmd.Flags().StringVar(&format, "format", "structured", "Output format (raw|structured)")
+	cmd.Flags().StringVar(&format, "format", "raw", "Output format (raw|structured)")
 	cmd.Flags().BoolVarP(&follow, "follow", "f", false, "Follow stream after printing available logs")
 	cmd.Flags().IntVar(&maxRetries, "max-retries", 3, "Max reconnect attempts")
 	cmd.Flags().DurationVar(&idleTimeout, "idle-timeout", 45*time.Second, "Cancel if no events arrive")

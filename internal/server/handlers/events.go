@@ -47,53 +47,6 @@ func parseLastEventID(header string) domaintypes.EventID {
 	return eid
 }
 
-// getRunLogsHandler returns an HTTP handler that streams run lifecycle events over SSE.
-// Supports Last-Event-ID header for resuming streams from a specific event.
-// GET /v1/runs/{run_id}/logs — SSE for run lifecycle (run, stage, done only).
-//
-// Container log frames are not emitted on this stream; they are served via the
-// job-scoped log endpoint (GET /v1/jobs/{job_id}/logs).
-//
-// For terminal runs, the handler writes a "done" sentinel immediately.
-// For active runs, the handler subscribes to the hub for live lifecycle events.
-func getRunLogsHandler(st store.Store, _ blobstore.Store, eventsService *events.Service) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		runID, ok := parseRequiredPathIDOrWriteError[domaintypes.RunID](w, r, "run_id")
-		if !ok {
-			return
-		}
-
-		run, ok := getRunOrFail(w, r, st, runID, "get run logs")
-		if !ok {
-			return
-		}
-
-		sinceID := parseLastEventID(r.Header.Get("Last-Event-ID"))
-		hub := eventsService.Hub()
-
-		if err := hub.Ensure(runID); err != nil {
-			slog.Error("ensure stream failed", "run_id", runID.String(), "err", err)
-			writeHTTPError(w, http.StatusBadRequest, "invalid run id")
-			return
-		}
-
-		// For fresh connections to terminal runs, write done immediately.
-		if sinceID == 0 && lifecycle.IsTerminalRunStatus(run.Status) {
-			if serveRunTerminalDone(w, run) {
-				return
-			}
-		}
-
-		// Subscribe to hub for live lifecycle events (run, stage, done).
-		// Reject log/retention frames that may exist in run stream history.
-		if err := logstream.ServeFiltered(w, r, hub, runID, sinceID, buildRunLifecycleFilter()); err != nil {
-			if !errors.Is(err, context.Canceled) {
-				slog.Error("stream run logs", "run_id", runID.String(), "err", err)
-			}
-		}
-	}
-}
-
 // serveRunTerminalDone writes SSE headers and a done sentinel for terminal runs.
 // Returns true if the response was fully handled.
 func serveRunTerminalDone(w http.ResponseWriter, run store.Run) bool {
@@ -391,19 +344,6 @@ func getRunRepoLogsHandler(st store.Store, _ blobstore.Store, eventsService *eve
 			if !errors.Is(err, context.Canceled) {
 				slog.Error("stream run repo logs", "run_id", runID.String(), "repo_id", repoID.String(), "err", err)
 			}
-		}
-	}
-}
-
-// buildRunLifecycleFilter returns a filter that passes only run lifecycle events
-// (run, stage, done) and rejects log and retention frames.
-func buildRunLifecycleFilter() func(logstream.Event) (logstream.Event, bool) {
-	return func(evt logstream.Event) (logstream.Event, bool) {
-		switch evt.Type {
-		case domaintypes.SSEEventRun, domaintypes.SSEEventStage, domaintypes.SSEEventDone:
-			return evt, true
-		default:
-			return evt, false
 		}
 	}
 }

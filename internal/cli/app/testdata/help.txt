@@ -12,7 +12,7 @@ Available Commands:
   job         Inspect and follow job logs
   mig         Plan and run Migs workflows
   pull        Pull Migs diffs for current repo HEAD
-  run         Inspect runs and stream events
+  run         Submit and inspect runs
   spec        Inspect and validate mig specs
   tui         Interactive TUI for migrations, runs, and jobs
   version     Print version information

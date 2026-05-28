@@ -30,7 +30,7 @@ func TestRunPullCommand_Success(t *testing.T) {
 		if r.Method != http.MethodPost {
 			t.Errorf("expected POST method, got %s", r.Method)
 		}
-		if !strings.HasPrefix(r.URL.Path, basePathPrefix+"/v1/runs/") || !strings.HasSuffix(r.URL.Path, "/pull") {
+		if !strings.HasPrefix(r.URL.Path, basePathPrefix+"/v1/runs/") || !strings.HasSuffix(r.URL.Path, "/repos/resolve") {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
 

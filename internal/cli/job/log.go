@@ -81,7 +81,7 @@ type FollowCommand struct {
 func (c FollowCommand) Run(ctx context.Context) error {
 	format := c.Format
 	if format == "" {
-		format = logs.FormatStructured
+		format = logs.FormatRaw
 	}
 	if format != logs.FormatStructured && format != logs.FormatRaw {
 		return ErrInvalidFormat

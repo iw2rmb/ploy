@@ -674,9 +674,8 @@ artifacts) remain job-addressed via `job_id`.
 
 ### Single-repo vs batch runs
 
-Single-repo submission via `ploy run --repo ... --base-ref ... --spec ...`
-is
-internally a **degenerate batch** with exactly one `run_repos` entry. The same
+Single-repo submission via `ploy run <spec-path> [<repo-path>|<namespace/repo[:ref]>]`
+is internally a **degenerate batch** with exactly one `run_repos` entry. The same
 code paths handle both cases:
 
 | Aspect         | Single-repo run                 | Batch run                               |
@@ -761,9 +760,9 @@ Current Build Gate mapping:
 | `run_repos` | Per-repo execution state within a run      | `(run_id, repo_id, attempt)` materializes job chains |
 | `jobs`      | Execution units (pre-gate, mig, heal, etc.)| `jobs` → `diffs`/`logs`/artifacts via `job_id` |
 
-### Pulling Diffs Locally (`run pull` / `mig pull`)
+### Pulling Diffs Locally (`run apply` / `mig pull`)
 
-The `ploy run pull <run-id>` and `ploy mig pull` commands enable developers to reconstruct
+The `ploy run apply <run-id> [path]` and `ploy mig pull` commands enable developers to reconstruct
 Migs-generated changes in their local git repository. This is useful for reviewing,
 testing, or continuing work on changes produced by a run.
 
@@ -776,7 +775,7 @@ testing, or continuing work on changes produced by a run.
 │                                                                             │
 │  1. Resolve repo context                                                    │
 │     ├─ Get origin URL from `git remote get-url <origin>`                    │
-│     ├─ (run pull) Call POST /v1/runs/{run_id}/pull with repo_url             │
+│     ├─ (run apply) Call POST /v1/runs/{run_id}/repos/resolve with repo_url   │
 │     └─ (mig pull) Optionally infer mig via GET /v1/migs?repo_url=...         │
 │               then call POST /v1/migs/{mig_id}/pull with repo_url + mode     │
 │                                                                             │
@@ -801,7 +800,7 @@ testing, or continuing work on changes produced by a run.
 - **Inside git worktree**: The command must be run from within a git repository.
 - **Clean working tree**: No staged or unstaged changes allowed (prevents data loss
   and ensures deterministic patch application).
-- **Resolvable remote**: The specified `--origin` remote must exist and have a URL
+- **Resolvable remote**: The git remote used by the command must exist and have a URL
   that matches the canonical URL stored in `repos` and referenced by `mig_repos` / `run_repos`
   (see "Repo URL rules" below).
 
@@ -817,7 +816,7 @@ testing, or continuing work on changes produced by a run.
 
 **API endpoints consumed:**
 
-- `POST /v1/runs/{run_id}/pull` — Resolve `repo_id` for the current repo within the run.
+- `POST /v1/runs/{run_id}/repos/resolve` — Resolve `repo_id` for the current repo within the run.
 - `POST /v1/migs/{mig_id}/pull` — Resolve `run_id` + `repo_id` for the current repo within the selected run.
 - `GET /v1/runs/{run_id}/repos` — Fetch run repo snapshots (used to read `base_ref` and `source_commit_sha`).
 - `GET /v1/runs/{run_id}/repos/{repo_id}/diffs` — List diffs for the repo execution within a run.
@@ -849,17 +848,14 @@ If your git remote uses SCP-like syntax (example: `git@github.com:org/repo.git`)
 # After a run completes:
 cd /path/to/service-a
 
-# Run-based pull:
-ploy run pull <run-id>
+# Run-based apply:
+ploy run apply <run-id>
 
 # Mig-based pull:
 ploy mig pull <mig-id|name>
 
-# Preview without making changes:
-ploy run pull --dry-run <run-id>
-
-# Use a different remote:
-ploy run pull --origin upstream <run-id>
+# Artifact download for a completed run:
+ploy run pull <run-id> [artifacts-path]
 ```
 
 This section is the canonical CLI reference for local pull workflows.
@@ -880,7 +876,7 @@ This section is the canonical CLI reference for local pull workflows.
 response schema for:
 
 - `GET /v1/runs/{id}/status` (status) — 200 response body.
-- `event: run` SSE payloads on `/v1/runs/{id}/logs`.
+Run status snapshots are available from `GET /v1/runs/{id}/status`.
 
 **Wire contract guarantees:**
 
@@ -1041,15 +1037,6 @@ value is a `StageStatus` object describing that job's execution state.
     - Run stats, including gate summary.
   - Returns `RunSummary` directly (Go type `migsapi.RunSummary`); the canonical JSON shape for run state.
 
-- `GET /v1/runs/{id}/logs` — SSE event stream for run lifecycle events only.
-  - Handler: `getRunLogsHandler`.
-  - Uses the internal hub (runtime implementation) and events service to stream:
-    - `event: run`, data: `RunSummary`.
-    - `event: stage`, data: stage transition.
-    - `event: done`, data: `Status {status:"done"}` sentinel.
-  - Container log frames (`event: log`) and retention hints (`event: retention`) are NOT emitted on this stream; they are served via the job-scoped endpoint `GET /v1/jobs/{job_id}/logs`.
-  - Supports `Last-Event-ID` for resumption.
-
 - `POST /v1/runs/{id}/cancel` — cancel a run.
   - Handler: `cancelRunHandlerV1`.
   - Behaviour:
@@ -1061,9 +1048,8 @@ value is a `StageStatus` object describing that job's execution state.
   - Handler: `listRunRepoDiffsHandler` (download mode is query-driven).
   - Enable node and CLI callers to enumerate and fetch per-step diffs for a repo execution.
 
-- `POST /v1/runs/{id}/logs`, `POST /v1/runs/{id}/diffs`,
-  `POST /v1/runs/{run_id}/jobs/{job_id}/artifact`, `POST /v1/runs/{run_id}/jobs/{job_id}/diff` —
-  write endpoints used by nodeagents to persist logs, diffs, and artifacts.
+- `POST /v1/runs/{run_id}/jobs/{job_id}/artifact`, `POST /v1/runs/{run_id}/jobs/{job_id}/diff` —
+  write endpoints used by nodeagents to persist diffs and artifacts.
 
 ### 3.2 Node endpoints (runtime implementation)
 
@@ -1271,10 +1257,8 @@ The CLI entry points for Migs are implemented in CLI implementation:
     `home`).
   - Constructs and submits `RunSubmitRequest` through runtime implementation.
   - Submits via runtime implementation.
-  - Optional `--follow` displays a summarized per-repo job graph until completion,
-    implemented via runtime implementation. The job graph refreshes on
-    SSE events from `/v1/runs/{id}/logs` but does not stream container logs.
-    Use `ploy run logs <run-id>` to stream logs.
+  - Optional `--follow` displays a summarized per-repo job graph until completion.
+    Container logs are served via `ploy job log <job-id>`.
 
 - `ploy mig run <mig-id|name>`:
   - Creates a run from a mig project via CLI implementation.
@@ -1287,12 +1271,6 @@ The CLI entry points for Migs are implemented in CLI implementation:
   - Optional `--follow` displays the job graph and proceeds to pull diffs.
   - `--dry-run` prints planned actions and does not initiate a run or save pull state.
   - Maintains per-repo pull state in `<git-dir>/ploy/pull_state.json`.
-
-- `ploy run logs <run-id>`:
-  - Streams lifecycle events from `/v1/runs/{id}/logs`, displaying only `run`,
-    `stage`, and `done` frames (see runtime implementation).
-  - Container stdout/stderr is served via `ploy job follow <job-id>`
-    (`GET /v1/jobs/{job_id}/logs`).
 
 - `ploy run status <run-id>`:
   - Fetches the canonical `RunReport` model (run identity, mig name/spec, repos,
