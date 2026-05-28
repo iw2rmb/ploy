@@ -116,6 +116,47 @@ func TestFollowModelAppliesAndClearsPreviewRows(t *testing.T) {
 	}
 }
 
+func TestFollowModelFinalViewUsesStatusSnapshotSemantics(t *testing.T) {
+	t.Parallel()
+
+	report := RunReport{
+		RunID:   domaintypes.NewRunID(),
+		MigID:   domaintypes.NewMigID(),
+		MigName: "final-snapshot",
+		SpecID:  domaintypes.NewSpecID(),
+		Repos: []RunEntry{
+			{
+				RepoID:  domaintypes.NewMigRepoID(),
+				RepoURL: "https://github.com/acme/one.git",
+				BaseRef: "main",
+				Status:  domaintypes.RunRepoStatusSuccess,
+				Jobs: []RunJobEntry{
+					{JobID: domaintypes.NewJobID(), JobType: "mig", Status: domaintypes.JobStatusSuccess},
+				},
+			},
+			{
+				RepoID:  domaintypes.NewMigRepoID(),
+				RepoURL: "https://github.com/acme/two.git",
+				BaseRef: "main",
+				Status:  domaintypes.RunRepoStatusSuccess,
+				Jobs: []RunJobEntry{
+					{JobID: domaintypes.NewJobID(), JobType: "mig", Status: domaintypes.JobStatusSuccess},
+				},
+			},
+		},
+	}
+
+	model := newFollowModel(TextRenderOptions{}, true)
+	next, _ := model.Update(followTerminalMsg{report: report, state: migsapi.RunStateSucceeded})
+	rendered := next.(followModel).View().Content
+	if !strings.Contains(rendered, "github.com/acme/one") || !strings.Contains(rendered, "github.com/acme/two") {
+		t.Fatalf("expected final view to include all repos, got %q", rendered)
+	}
+	if strings.Contains(rendered, "No repos with in-progress jobs.") {
+		t.Fatalf("expected final view to avoid in-progress-only empty text, got %q", rendered)
+	}
+}
+
 func TestShouldTrackJobPreview(t *testing.T) {
 	t.Parallel()
 

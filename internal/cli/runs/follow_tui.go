@@ -126,8 +126,10 @@ func (m followModel) View() tea.View {
 	opts.JobIOPreviews = m.jobIOPreviews
 	opts.ExpandStdout = m.expandStdout
 	opts.ExpandStderr = m.expandStderr
-	opts.FilterRunningRepos = len(m.report.Repos) > 1
-	opts.EmptyReposLine = "No repos with in-progress jobs."
+	if m.finalState == "" {
+		opts.FilterRunningRepos = len(m.report.Repos) > 1
+		opts.EmptyReposLine = "No repos with in-progress jobs."
+	}
 	layout, err := RenderRunReportTextLayout(*m.report, opts)
 	if err != nil {
 		return tea.NewView("")
@@ -207,8 +209,12 @@ func (c FollowRunCommand) Run(ctx context.Context) (migsapi.RunState, error) {
 	}
 	if model.finalState != "" {
 		if model.report != nil {
-			if err := writeFinalStatusSnapshot(c.Output, *model.report, model.renderOpts); err != nil {
-				return "", err
+			if !interactive {
+				if err := writeFinalStatusSnapshot(c.Output, *model.report, model.renderOpts); err != nil {
+					return "", err
+				}
+			} else if isTTYWriter(c.Output) {
+				_, _ = io.WriteString(c.Output, "\n")
 			}
 		}
 		return model.finalState, nil
