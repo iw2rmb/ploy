@@ -22,6 +22,10 @@ type DockerContainerRuntimeOptions struct {
 	// (DOCKER_AUTH_CONFIG format). When set, each image pull reads current
 	// credentials from this file.
 	RegistryAuthConfigFile string
+	// RegistryAuthRefreshSocket is an optional Unix socket owned by the host.
+	// When set, an auth failure on image pull asks the host to refresh registry
+	// auth before retrying the same pull once.
+	RegistryAuthRefreshSocket string
 	// RegistryAuthConfigJSON is a Docker auth config JSON payload (DOCKER_AUTH_CONFIG
 	// format). When set, image pulls use matching registry credentials.
 	RegistryAuthConfigJSON string

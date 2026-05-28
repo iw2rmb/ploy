@@ -274,26 +274,57 @@ func (r *DockerContainerRuntime) ensureImageAvailable(ctx context.Context, image
 }
 
 func (r *DockerContainerRuntime) pullImage(ctx context.Context, imageRef string) error {
+	err := r.pullImageOnce(ctx, imageRef)
+	if err == nil {
+		return nil
+	}
+	if !isDockerAuthPullError(err) {
+		return fmt.Errorf("step: pull image %s: %w", imageRef, err)
+	}
+	if strings.TrimSpace(r.opts.RegistryAuthRefreshSocket) == "" {
+		return fmt.Errorf("step: pull image %s: %w", imageRef, err)
+	}
+	if refreshErr := r.refreshRegistryAuth(ctx, imageRef); refreshErr != nil {
+		return fmt.Errorf("step: refresh registry auth after pull image %s unauthorized: %w", imageRef, refreshErr)
+	}
+	if retryErr := r.pullImageOnce(ctx, imageRef); retryErr != nil {
+		return fmt.Errorf("step: pull image %s after registry auth refresh: %w", imageRef, retryErr)
+	}
+	return nil
+}
+
+func (r *DockerContainerRuntime) pullImageOnce(ctx context.Context, imageRef string) error {
 	registryAuth, err := r.registryAuthForImage(imageRef)
 	if err != nil {
-		return fmt.Errorf("step: pull image %s: %w", imageRef, err)
+		return err
 	}
 
 	reader, err := r.images.ImagePull(ctx, imageRef, client.ImagePullOptions{
 		RegistryAuth: registryAuth,
 	})
 	if err != nil {
-		return fmt.Errorf("step: pull image %s: %w", imageRef, err)
+		return err
 	}
 	defer func() { _ = reader.Close() }()
 	// Drain the response to ensure the pull completes before returning.
 	if _, err := io.Copy(io.Discard, reader); err != nil {
-		return fmt.Errorf("step: pull image %s: %w", imageRef, err)
+		return err
 	}
 	if err := reader.Wait(ctx); err != nil {
-		return fmt.Errorf("step: pull image %s: %w", imageRef, err)
+		return err
 	}
 	return nil
+}
+
+func isDockerAuthPullError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "unauthorized") ||
+		strings.Contains(msg, "authentication required") ||
+		strings.Contains(msg, "no basic auth credentials") ||
+		strings.Contains(msg, "denied: requested access")
 }
 
 // flattenEnv converts a map[string]string environment to []string "K=V" format.
