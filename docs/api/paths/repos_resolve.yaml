@@ -1,0 +1,33 @@
+post:
+  summary: Resolve repository shorthand
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          required: [selector, ref]
+          properties:
+            selector:
+              type: string
+              example: namespace/repo
+            ref:
+              type: string
+              example: master
+  responses:
+    '200':
+      description: Resolved repository identity
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [repo_url, ref, ref_is_sha]
+            properties:
+              repo_url:
+                type: string
+              ref:
+                type: string
+              ref_is_sha:
+                type: boolean
+    '400':
+      description: Invalid selector or missing GitLab domain

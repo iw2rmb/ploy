@@ -14,6 +14,7 @@ info:
     - `/v1/migs/{mig_id}/repos` — repo set management (add/list/delete repos).
     - `/v1/migs/{mig_id}/runs` — create multi-repo batch runs for a mig.
     - `/v1/migs/{mig_id}/pull` — resolve repo execution for `ploy mig pull`.
+    - `/v1/repos/resolve` — expand `namespace/repo[:ref]` shorthand using server-owned GitLab config.
     - `/v1/runs` — single-repo run submission and run listing.
     - `/v1/runs/{run_id}/*` — run lifecycle (inspect/cancel/start).
     - `/v1/runs/{run_id}/repos/{repo_id}/*` — repo-scoped execution surfaces:
@@ -23,7 +24,7 @@ info:
       - `/jobs` — list jobs for a repo execution (for --follow job graph).
       - `/cancel` — cancel a repo execution within a run.
       - `/restart` — restart a repo execution within a run.
-    - `/v1/runs/{run_id}/pull` — resolve repo execution for `ploy run pull`.
+    - `/v1/runs/{run_id}/repos/resolve` — resolve a repo URL inside a run for patch application.
 
     Type semantics and labels:
     - The server and node use strong domain types in code (e.g., `RepoURL`, `GitRef`, `CommitSHA`, `RunID`, resource units). On the wire these remain JSON strings; run, job, and build IDs are KSUID-backed strings, repo and node IDs use NanoID, and only selected resources (diffs, artifact bundles, API/bootstrap tokens) remain UUID-backed.
@@ -100,8 +101,6 @@ paths:
     $ref: "./paths/migs_mig_id_runs.yaml"
   /v1/migs/{mig_id}/pull:
     $ref: "./paths/migs_mig_id_pull.yaml"
-  /v1/runs/{run_id}/logs:
-    $ref: "./paths/runs_id_logs.yaml"
   /v1/artifacts:
     $ref: "./paths/artifacts.yaml"
   /v1/artifacts/{id}:
@@ -165,12 +164,14 @@ paths:
     $ref: "./paths/runs_id_cancel.yaml"
   /v1/runs/{run_id}/repos:
     $ref: "./paths/runs_id_repos.yaml"
+  /v1/runs/{run_id}/repos/resolve:
+    $ref: "./paths/runs_id_repos_resolve.yaml"
   /v1/runs/{run_id}/repos/{repo_id}/restart:
     $ref: "./paths/runs_id_repos_repo_id_restart.yaml"
   # Repo-scoped diffs listing — see docs/migs-lifecycle.md § "Pulling Diffs Locally"
   /v1/runs/{run_id}/repos/{repo_id}/diffs:
     $ref: "./paths/runs_run_id_repos_repo_id_diffs.yaml"
-  # Repo-scoped logs SSE stream — filters run logs to jobs in this repo
+  # Repo-scoped logs SSE stream — filters lifecycle events to jobs in this repo
   /v1/runs/{run_id}/repos/{repo_id}/logs:
     $ref: "./paths/runs_run_id_repos_repo_id_logs.yaml"
   # Repo-scoped artifact listing — filters artifacts to jobs in this repo
@@ -185,9 +186,9 @@ paths:
   # Repo-scoped cancel — cancels a single repo execution within a run
   /v1/runs/{run_id}/repos/{repo_id}/cancel:
     $ref: "./paths/runs_run_id_repos_repo_id_cancel.yaml"
-  /v1/runs/{run_id}/pull:
-    $ref: "./paths/runs_run_id_pull.yaml"
   # Repo-centric endpoints — list repos and show runs for a given repo
+  /v1/repos/resolve:
+    $ref: "./paths/repos_resolve.yaml"
   /v1/repos:
     $ref: "./paths/repos.yaml"
   /v1/repos/{repo_id}/runs:
@@ -325,7 +326,7 @@ components:
       $ref: "./components/schemas/controlplane.yaml#/CreateMigRunRequest"
     CreateMigRunResponse:
       $ref: "./components/schemas/controlplane.yaml#/CreateMigRunResponse"
-    # Pull resolution types — POST /v1/migs/{mig_id}/pull, POST /v1/runs/{run_id}/pull
+    # Pull resolution types — POST /v1/migs/{mig_id}/pull, POST /v1/runs/{run_id}/repos/resolve
     PullResolutionMode:
       $ref: "./components/schemas/controlplane.yaml#/PullResolutionMode"
     MigPullRequest:

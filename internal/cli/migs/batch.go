@@ -56,12 +56,12 @@ func (c CreateBatchCommand) Run(ctx context.Context) (domaintypes.RunSummary, er
 	// Server uses POST /v1/runs for single-repo run submission.
 	req := struct {
 		RepoURL   string          `json:"repo_url"`
-		BaseRef   string          `json:"base_ref"`
+		Ref       string          `json:"ref"`
 		Spec      json.RawMessage `json:"spec"`
 		CreatedBy *string         `json:"created_by,omitempty"`
 	}{
 		RepoURL:   repoURL,
-		BaseRef:   baseRef,
+		Ref:       baseRef,
 		Spec:      c.Spec,
 		CreatedBy: c.CreatedBy,
 	}
@@ -116,6 +116,7 @@ type ListBatchesCommand struct {
 	BaseURL *url.URL
 	Limit   int32 // Max results to return (default 50, max 100).
 	Offset  int32 // Number of results to skip.
+	RepoURL string
 }
 
 // Run executes GET /v1/runs to list batch runs with pagination.
@@ -132,6 +133,9 @@ func (c ListBatchesCommand) Run(ctx context.Context) ([]domaintypes.RunSummary, 
 	}
 	if c.Offset > 0 {
 		q.Set("offset", fmt.Sprintf("%d", c.Offset))
+	}
+	if repoURL := strings.TrimSpace(c.RepoURL); repoURL != "" {
+		q.Set("repo_url", repoURL)
 	}
 	endpoint.RawQuery = q.Encode()
 

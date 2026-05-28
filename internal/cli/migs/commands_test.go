@@ -9,10 +9,8 @@ import (
 	"net/url"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/iw2rmb/ploy/internal/cli/runs"
-	"github.com/iw2rmb/ploy/internal/cli/stream"
 	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	migsapi "github.com/iw2rmb/ploy/internal/migs/api"
@@ -100,7 +98,7 @@ func TestCancelResumeSubmitCommands(t *testing.T) {
 		BaseURL: base,
 		Request: domainapi.RunSubmitRequest{
 			RepoURL: domaintypes.RepoURL("https://example.com/repo.git"),
-			BaseRef: domaintypes.GitRef("main"),
+			Ref:     domaintypes.GitRef("main"),
 			Spec:    []byte("{}"),
 		},
 	}).Run(context.Background())
@@ -127,7 +125,7 @@ func TestSubmitCommand_InvalidRepoURLScheme(t *testing.T) {
 		BaseURL: base,
 		Request: domainapi.RunSubmitRequest{
 			RepoURL: domaintypes.RepoURL("http://example.com/repo.git"),
-			BaseRef: domaintypes.GitRef("main"),
+			Ref:     domaintypes.GitRef("main"),
 		},
 	}).Run(context.Background())
 	if err == nil {
@@ -135,52 +133,6 @@ func TestSubmitCommand_InvalidRepoURLScheme(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "repo_url") {
 		t.Fatalf("expected error to mention repo_url, got %q", err.Error())
-	}
-}
-
-func TestEventsCommandStreamsToTerminal(t *testing.T) {
-	tests := []struct {
-		name          string
-		terminalState migsapi.RunState
-	}{
-		{"succeeded", migsapi.RunStateSucceeded},
-		{"cancelled", migsapi.RunStateCancelled},
-		{"failed", migsapi.RunStateFailed},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			runID := domaintypes.NewRunID()
-
-			// SSE server emits a terminal run event (RunSummary directly, no wrapper).
-			sse := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				w.Header().Set("Content-Type", "text/event-stream")
-				if f, ok := w.(http.Flusher); ok {
-					f.Flush()
-				}
-				runSummary := migsapi.RunSummary{RunID: runID, State: tt.terminalState}
-				b, _ := json.Marshal(runSummary)
-				_, _ = w.Write([]byte("event: run\n"))
-				_, _ = w.Write([]byte("data: "))
-				_, _ = w.Write(b)
-				_, _ = w.Write([]byte("\n\n"))
-				if f, ok := w.(http.Flusher); ok {
-					f.Flush()
-				}
-				time.Sleep(10 * time.Millisecond)
-			}))
-			defer sse.Close()
-			base, _ := url.Parse(sse.URL)
-
-			cli := stream.Client{HTTPClient: sse.Client(), MaxRetries: 0}
-			state, err := (EventsCommand{Client: cli, BaseURL: base, RunID: runID}).Run(context.Background())
-			if err != nil {
-				t.Fatalf("events run err=%v", err)
-			}
-			if state != tt.terminalState {
-				t.Fatalf("events final state=%s, want %s", state, tt.terminalState)
-			}
-		})
 	}
 }
 
@@ -205,7 +157,7 @@ func TestMigsCommandsErrorPaths(t *testing.T) {
 		BaseURL: base,
 		Request: domainapi.RunSubmitRequest{
 			RepoURL: domaintypes.RepoURL("https://example.com/repo.git"),
-			BaseRef: domaintypes.GitRef("main"),
+			Ref:     domaintypes.GitRef("main"),
 			Spec:    []byte("{}"),
 		},
 	}).Run(context.Background()); err == nil {
@@ -214,81 +166,5 @@ func TestMigsCommandsErrorPaths(t *testing.T) {
 	// Cancel
 	if err := (runs.CancelCommand{Client: srv.Client(), BaseURL: base, RunID: runID}).Run(context.Background()); err == nil {
 		t.Fatal("expected cancel error")
-	}
-}
-
-func TestSimplePrinterFormats(t *testing.T) {
-	runID := domaintypes.NewRunID()
-	jobID := domaintypes.NewJobID()
-
-	var b bytes.Buffer
-	p := SimplePrinter{out: &b}
-	p.Run(migsapi.RunSummary{RunID: runID, State: migsapi.RunStateRunning})
-	p.Stage(migsapi.StageStatus{State: migsapi.StageStateFailed, Attempts: 2, CurrentJobID: jobID, LastError: "boom"})
-	if b.Len() == 0 {
-		t.Fatalf("expected printer output")
-	}
-}
-
-// TestEventsCommandIgnoresUnknownFrames verifies that EventsCommand silently
-// ignores event types it does not handle (e.g. log, retention) since the run
-// stream is lifecycle-only.
-func TestEventsCommandIgnoresUnknownFrames(t *testing.T) {
-	t.Parallel()
-
-	runID := domaintypes.NewRunID()
-
-	sse := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/event-stream")
-		fl, ok := w.(http.Flusher)
-		if !ok {
-			t.Fatal("no flusher")
-		}
-		fl.Flush()
-
-		// Send run, unknown types, and terminal run events.
-		events := []string{
-			"event: run\ndata: {\"run_id\":\"" + runID.String() + "\",\"state\":\"running\"}\n\n",
-			"event: log\ndata: {\"timestamp\":\"2025-10-22T10:00:00Z\",\"stream\":\"stdout\",\"line\":\"Should be ignored\"}\n\n",
-			"event: retention\ndata: {\"retained\":true}\n\n",
-			"event: run\ndata: {\"run_id\":\"" + runID.String() + "\",\"state\":\"succeeded\"}\n\n",
-		}
-		for _, evt := range events {
-			_, _ = w.Write([]byte(evt))
-			fl.Flush()
-			time.Sleep(2 * time.Millisecond)
-		}
-	}))
-	defer sse.Close()
-
-	base, _ := url.Parse(sse.URL)
-	var buf bytes.Buffer
-
-	cmd := EventsCommand{
-		Client:  stream.Client{HTTPClient: sse.Client(), MaxRetries: 0},
-		BaseURL: base,
-		RunID:   runID,
-		Output:  &buf,
-	}
-
-	state, err := cmd.Run(context.Background())
-	if err != nil {
-		t.Fatalf("events run: %v", err)
-	}
-	if state != migsapi.RunStateSucceeded {
-		t.Errorf("state=%s, want succeeded", state)
-	}
-
-	out := buf.String()
-	// Log/retention events must NOT appear — they are not handled.
-	if strings.Contains(out, "Should be ignored") {
-		t.Errorf("log events should be ignored on lifecycle-only stream, got: %s", out)
-	}
-	if strings.Contains(out, "retained") {
-		t.Errorf("retention events should be ignored on lifecycle-only stream, got: %s", out)
-	}
-	// Run state should appear via SimplePrinter.
-	if !strings.Contains(out, runID.String()) {
-		t.Errorf("run ID should appear in output, got: %s", out)
 	}
 }

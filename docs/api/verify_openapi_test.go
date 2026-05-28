@@ -47,7 +47,6 @@ func TestOpenAPICompleteness(t *testing.T) {
 		{"/v1/pki/sign/client", "post"},
 		// Runs (single-repo submit + batch lifecycle)
 		{"/v1/runs", "post"},
-		{"/v1/runs/{run_id}/logs", "get"},
 		// Migs (mig project CRUD)
 		{"/v1/migs", "get"},
 		{"/v1/migs", "post"},
@@ -63,14 +62,15 @@ func TestOpenAPICompleteness(t *testing.T) {
 		// RunRepo handlers (repos within a batch)
 		{"/v1/runs/{run_id}/repos", "get"},
 		{"/v1/runs/{run_id}/repos", "post"},
+		{"/v1/runs/{run_id}/repos/resolve", "post"},
 		{"/v1/runs/{run_id}/repos/{repo_id}/restart", "post"},
 		// v1 repo-scoped endpoints
 		{"/v1/runs/{run_id}/repos/{repo_id}/diffs", "get"},
 		{"/v1/runs/{run_id}/repos/{repo_id}/logs", "get"},
 		{"/v1/runs/{run_id}/repos/{repo_id}/artifacts", "get"},
 		{"/v1/runs/{run_id}/repos/{repo_id}/cancel", "post"},
-		{"/v1/runs/{run_id}/pull", "post"},
 		// Repo-centric endpoints
+		{"/v1/repos/resolve", "post"},
 		{"/v1/repos", "get"},
 		{"/v1/repos/{repo_id}/runs", "get"},
 		// Node heartbeat

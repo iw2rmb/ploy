@@ -171,7 +171,7 @@ See [Build Gate docs](../build-gate/README.md) for Build Gate configuration and 
     `stale_nodes`, `stale_attempts`, `repos_updated`, `jobs_cancelled`, and
     `runs_finalized` counters.
   - If a stale attempt is recovered to terminal, check `GET /v1/runs/{id}/status`
-    and `GET /v1/runs/{id}/logs` to confirm final repo/run state and terminal SSE.
+    to confirm final repo/run state.
   Node startup crash reconciliation policy (fixed, no knob):
   - Startup executes one reconciliation pass before the normal claim loop.
   - Terminal replay uses `finished_at >= now-120s` (terminal timestamp only;

@@ -140,8 +140,8 @@ func TestRunsCreateSingleRepo_ValidationErrors(t *testing.T) {
 			wantStatus: http.StatusBadRequest,
 		},
 		{
-			name:       "MissingBaseRef",
-			body:       validRunRequestBodyWithout("base_ref"),
+			name:       "MissingRef",
+			body:       validRunRequestBodyWithout("ref"),
 			wantStatus: http.StatusBadRequest,
 		},
 		{

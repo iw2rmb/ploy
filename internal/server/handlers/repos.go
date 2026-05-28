@@ -3,11 +3,17 @@ package handlers
 import (
 	"log/slog"
 	"net/http"
+	"net/url"
+	"regexp"
+	"strings"
 	"time"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/gitauth"
 	"github.com/iw2rmb/ploy/internal/store"
 )
+
+var gitFullSHARe = regexp.MustCompile(`^[0-9a-fA-F]{40}$`)
 
 // RepoSummary is returned by GET /v1/repos.
 type RepoSummary struct {
@@ -27,6 +33,54 @@ type RepoRunSummary struct {
 	Attempt    int32                     `json:"attempt"`
 	StartedAt  *time.Time                `json:"started_at,omitempty"`
 	FinishedAt *time.Time                `json:"finished_at,omitempty"`
+}
+
+func resolveRepoSelectorHandler(gitAuth gitauth.Options) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Selector string `json:"selector"`
+			Ref      string `json:"ref"`
+		}
+		if err := decodeRequestJSON(w, r, &req, DefaultMaxBodySize); err != nil {
+			return
+		}
+		selector := strings.Trim(strings.TrimSpace(req.Selector), "/")
+		if selector == "" || strings.Contains(selector, "://") || strings.Count(selector, "/") < 1 {
+			writeHTTPError(w, http.StatusBadRequest, "selector must be namespace/repo")
+			return
+		}
+		ref := strings.TrimSpace(req.Ref)
+		if ref == "" {
+			ref = "master"
+		}
+		domain := strings.TrimSpace(gitAuth.GitLabDomain)
+		if domain == "" {
+			writeHTTPError(w, http.StatusBadRequest, "gitlab domain is not configured")
+			return
+		}
+		if !strings.Contains(domain, "://") {
+			domain = "https://" + domain
+		}
+		parsed, err := url.Parse(domain)
+		if err != nil || parsed.Host == "" {
+			writeHTTPError(w, http.StatusBadRequest, "gitlab domain is invalid")
+			return
+		}
+		parsed.User = nil
+		parsed.Path = "/" + selector + ".git"
+		parsed.RawQuery = ""
+		parsed.Fragment = ""
+
+		writeJSON(w, http.StatusOK, struct {
+			RepoURL  string `json:"repo_url"`
+			Ref      string `json:"ref"`
+			RefIsSHA bool   `json:"ref_is_sha"`
+		}{
+			RepoURL:  parsed.String(),
+			Ref:      ref,
+			RefIsSHA: gitFullSHARe.MatchString(ref),
+		})
+	}
 }
 
 // listReposHandler handles GET /v1/repos.

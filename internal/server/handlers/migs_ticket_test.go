@@ -262,8 +262,8 @@ func TestCreateSingleRepoRunHandler_ValidationErrors(t *testing.T) {
 	}{
 		{"empty repo_url", validRunRequestBodyWith(map[string]any{"repo_url": ""}), "empty"},
 		{"no repo_url", validRunRequestBodyWithout("repo_url"), "empty"},
-		{"empty base_ref", validRunRequestBodyWith(map[string]any{"base_ref": ""}), "empty"},
-		{"no base_ref", validRunRequestBodyWithout("base_ref"), "empty"},
+		{"empty ref", validRunRequestBodyWith(map[string]any{"ref": ""}), "empty"},
+		{"no ref", validRunRequestBodyWithout("ref"), "empty"},
 		{"no spec", validRunRequestBodyWithout("spec"), "spec is required"},
 		{"invalid JSON", "not json", "invalid request"},
 		{"http scheme repo_url", validRunRequestBodyWith(map[string]any{"repo_url": "http://github.com/user/repo.git"}), "invalid repo url"},

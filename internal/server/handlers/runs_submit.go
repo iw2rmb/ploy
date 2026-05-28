@@ -3,6 +3,7 @@ package handlers
 import (
 	"log/slog"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -15,9 +16,11 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
+var submitCommitSHARe = regexp.MustCompile(`^[0-9a-f]{40}$`)
+
 // createSingleRepoRunHandler submits a single-repo run and queues it for scheduler-driven execution.
 // Endpoint: POST /v1/runs
-// Request: {repo_url, base_ref, spec}
+// Request: {repo_url, ref, commit_sha?, spec}
 // Response: 201 Created with {run_id, mig_id, spec_id}
 //
 // v1 contract:
@@ -46,7 +49,13 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service, g
 
 		// Validate domain types explicitly to catch missing/zero-value fields.
 		if !validateField(w, "repo_url", req.RepoURL) ||
-			!validateField(w, "base_ref", req.BaseRef) {
+			!validateField(w, "ref", req.Ref) {
+			return
+		}
+		sourceRef := req.Ref.String()
+		commitSHA := strings.TrimSpace(req.CommitSHA)
+		if commitSHA != "" && !submitCommitSHARe.MatchString(commitSHA) {
+			writeHTTPError(w, http.StatusBadRequest, "commit_sha must be a lowercase 40-hex sha")
 			return
 		}
 
@@ -64,15 +73,19 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service, g
 		// query must reject the submit instead of leaving a run with no repos.
 		rawRepoURL := strings.TrimSpace(req.RepoURL.String())
 		normalizedRepoURL := domaintypes.NormalizeRepoURL(rawRepoURL)
-		sourceCommitSHA, seedErr := resolveSourceCommitSHAFromContext(r.Context(), rawRepoURL, req.BaseRef.String(), gitAuth)
-		if seedErr != nil {
-			writeHTTPError(w, http.StatusBadRequest, "failed to resolve source commit for repo %s ref %s: %v", normalizedRepoURL, req.BaseRef.String(), seedErr)
-			slog.Error("create single-repo run: resolve source commit failed",
-				"repo_url", normalizedRepoURL,
-				"base_ref", req.BaseRef.String(),
-				"err", seedErr,
-			)
-			return
+		sourceCommitSHA := commitSHA
+		if sourceCommitSHA == "" {
+			var seedErr error
+			sourceCommitSHA, seedErr = resolveSourceCommitSHAFromContext(r.Context(), rawRepoURL, sourceRef, gitAuth)
+			if seedErr != nil {
+				writeHTTPError(w, http.StatusBadRequest, "failed to resolve source commit for repo %s ref %s: %v", normalizedRepoURL, sourceRef, seedErr)
+				slog.Error("create single-repo run: resolve source commit failed",
+					"repo_url", normalizedRepoURL,
+					"ref", sourceRef,
+					"err", seedErr,
+				)
+				return
+			}
 		}
 
 		// v1 side-effect: Create spec row
@@ -104,10 +117,10 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service, g
 		// Persist normalized URL without embedded credentials.
 		migRepoID := domaintypes.NewMigRepoID()
 		migRepo, err := st.CreateMigRepo(r.Context(), store.CreateMigRepoParams{
-			ID:        migRepoID,
-			MigID:     migID,
-			Url:       normalizedRepoURL,
-			BaseRef:   req.BaseRef.String(),
+			ID:      migRepoID,
+			MigID:   migID,
+			Url:     normalizedRepoURL,
+			BaseRef: sourceRef,
 		})
 		if err != nil {
 			serverError(w, "create single-repo run", "create mig repo", err, "mig_id", migID, "repo_url", normalizedRepoURL)
@@ -186,7 +199,7 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service, g
 			"spec_id", createdSpec.ID,
 			"repo_id", runRepo.RepoID,
 			"repo_url", normalizedRepoURL,
-			"base_ref", req.BaseRef,
+			"ref", sourceRef,
 		)
 	}
 }

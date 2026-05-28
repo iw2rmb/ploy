@@ -16,12 +16,7 @@ func TestRunSubcommandHelpUsesLeafUsage(t *testing.T) {
 		{
 			name:      "run status",
 			baseArgs:  []string{"run", "status"},
-			wantUsage: "ploy run status [--json] <run-id> [flags]",
-		},
-		{
-			name:      "run logs",
-			baseArgs:  []string{"run", "logs"},
-			wantUsage: "ploy run logs <run-id> [flags]",
+			wantUsage: "ploy run status <run-id> [flags]",
 		},
 	}
 

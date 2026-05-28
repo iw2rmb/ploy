@@ -5,7 +5,7 @@
 // pull diffs from the server.
 //
 // Endpoints:
-//   - POST /v1/runs/{run_id}/pull — resolve repo for a specific run
+//   - POST /v1/runs/{run_id}/repos/resolve — resolve repo for a specific run
 //   - POST /v1/migs/{mig_id}/pull — resolve repo for a mig (last succeeded/failed)
 //
 // Implements pull resolution endpoints for mig and run repos.
@@ -26,7 +26,7 @@ import (
 // Request/Response types for pull resolution endpoints
 // -------------------------------------------------------------------------
 
-// runPullRequest is the request body for POST /v1/runs/{run_id}/pull.
+// runPullRequest is the request body for POST /v1/runs/{run_id}/repos/resolve.
 // The client provides a repo_url to resolve to execution identifiers.
 type runPullRequest struct {
 	RepoURL string `json:"repo_url"`
@@ -47,16 +47,18 @@ type migPullRequest struct {
 //   - run_id: the run containing the execution
 //   - repo_id: the mig_repos.id for the matched repo
 type pullResponse struct {
-	RunID  domaintypes.RunID  `json:"run_id"`
-	RepoID domaintypes.RepoID `json:"repo_id"`
+	RunID           domaintypes.RunID  `json:"run_id"`
+	RepoID          domaintypes.RepoID `json:"repo_id"`
+	RepoURL         string             `json:"repo_url,omitempty"`
+	SourceCommitSHA string             `json:"source_commit_sha,omitempty"`
 }
 
 // -------------------------------------------------------------------------
 // Handlers
 // -------------------------------------------------------------------------
 
-// pullRunRepoHandler resolves a repo_url to execution identifiers for a specific run.
-// Endpoint: POST /v1/runs/{run_id}/pull
+// resolveRunRepoHandler resolves a repo_url to execution identifiers for a specific run.
+// Endpoint: POST /v1/runs/{run_id}/repos/resolve
 // Request: {repo_url}
 // Response: 200 OK with {run_id, repo_id}
 //
@@ -66,7 +68,7 @@ type pullResponse struct {
 //   - Uses domaintypes.NormalizeRepoURL for URL comparison.
 //   - If no repo matches: 404 error.
 //   - If multiple repos match: 409 error (ambiguous).
-func pullRunRepoHandler(st store.Store) http.HandlerFunc {
+func resolveRunRepoHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		runID, ok := parseRequiredPathIDOrWriteError[domaintypes.RunID](w, r, "run_id")
 		if !ok {
@@ -124,8 +126,10 @@ func pullRunRepoHandler(st store.Store) http.HandlerFunc {
 		// Single match found — return the pull response.
 		match := matches[0]
 		resp := pullResponse{
-			RunID:  match.RunID,
-			RepoID: match.RepoID,
+			RunID:           match.RunID,
+			RepoID:          match.RepoID,
+			RepoURL:         match.RepoUrl,
+			SourceCommitSHA: match.SourceCommitSha,
 		}
 
 		writeJSON(w, http.StatusOK, resp)

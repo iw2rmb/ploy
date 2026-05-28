@@ -13,7 +13,8 @@ import (
 // Wire shape is stable: JSON field names must not change.
 type RunSubmitRequest struct {
 	RepoURL   domaintypes.RepoURL `json:"repo_url"`
-	BaseRef   domaintypes.GitRef  `json:"base_ref"`
+	Ref       domaintypes.GitRef  `json:"ref"`
+	CommitSHA string              `json:"commit_sha,omitempty"`
 	Spec      json.RawMessage     `json:"spec"`
 	CreatedBy string              `json:"created_by,omitempty"`
 }

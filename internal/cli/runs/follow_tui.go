@@ -255,11 +255,6 @@ func (c FollowRunCommand) coordinate(
 	pollTicker := time.NewTicker(pollInterval)
 	defer pollTicker.Stop()
 
-	streamClient := stream.Client{
-		HTTPClient: c.Client,
-		MaxRetries: c.MaxRetries,
-		Logger:     slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{})),
-	}
 	jobStreamClient := stream.Client{
 		HTTPClient: c.Client,
 		MaxRetries: -1,
@@ -380,23 +375,6 @@ func (c FollowRunCommand) coordinate(
 		}
 	}
 
-	endpoint := strings.TrimRight(c.BaseURL.String(), "/") + "/v1/runs/" + c.RunID.String() + "/logs"
-
-	sseErrCh := make(chan error, 1)
-	go func() {
-		handler := func(evt stream.Event) error {
-			typ := strings.ToLower(strings.TrimSpace(evt.Type))
-			if typ == "run" || typ == "stage" {
-				select {
-				case refreshCh <- struct{}{}:
-				default:
-				}
-			}
-			return nil
-		}
-		sseErrCh <- streamClient.Stream(ctx, endpoint, handler)
-	}()
-
 	consecutiveFailures := 0
 	fetch := func() bool {
 		report, err := GetRunReportCommand{
@@ -439,11 +417,6 @@ func (c FollowRunCommand) coordinate(
 			errCh <- ctx.Err()
 			program.Send(followErrMsg{err: ctx.Err()})
 			return
-		case err := <-sseErrCh:
-			// SSE failures should not terminate follow; polling remains authoritative.
-			if err != nil && ctx.Err() == nil {
-				// no-op: polling ticker keeps state fresh.
-			}
 		case <-refreshCh:
 			if done := fetch(); done {
 				return

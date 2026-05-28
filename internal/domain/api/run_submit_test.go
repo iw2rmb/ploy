@@ -16,7 +16,7 @@ func TestRunSubmitPayload(t *testing.T) {
 		t.Parallel()
 		in := RunSubmitRequest{
 			RepoURL:   domaintypes.RepoURL("https://github.com/example/repo.git"),
-			BaseRef:   domaintypes.GitRef("main"),
+			Ref:       domaintypes.GitRef("main"),
 			Spec:      json.RawMessage(`{"key":"value"}`),
 			CreatedBy: "ci-bot",
 		}
@@ -31,8 +31,8 @@ func TestRunSubmitPayload(t *testing.T) {
 		if out.RepoURL != in.RepoURL {
 			t.Errorf("RepoURL: got %q, want %q", out.RepoURL, in.RepoURL)
 		}
-		if out.BaseRef != in.BaseRef {
-			t.Errorf("BaseRef: got %q, want %q", out.BaseRef, in.BaseRef)
+		if out.Ref != in.Ref {
+			t.Errorf("Ref: got %q, want %q", out.Ref, in.Ref)
 		}
 		if out.CreatedBy != in.CreatedBy {
 			t.Errorf("CreatedBy: got %q, want %q", out.CreatedBy, in.CreatedBy)
@@ -42,16 +42,16 @@ func TestRunSubmitPayload(t *testing.T) {
 	t.Run("wire_field_names", func(t *testing.T) {
 		t.Parallel()
 		in := RunSubmitRequest{
-			RepoURL:   domaintypes.RepoURL("https://github.com/example/repo.git"),
-			BaseRef:   domaintypes.GitRef("main"),
-			Spec:      json.RawMessage(`{}`),
+			RepoURL: domaintypes.RepoURL("https://github.com/example/repo.git"),
+			Ref:     domaintypes.GitRef("main"),
+			Spec:    json.RawMessage(`{}`),
 		}
 		b, err := json.Marshal(in)
 		if err != nil {
 			t.Fatalf("Marshal: %v", err)
 		}
 		js := string(b)
-		for _, want := range []string{`"repo_url":`, `"base_ref":`, `"spec":`} {
+		for _, want := range []string{`"repo_url":`, `"ref":`, `"spec":`} {
 			if !strings.Contains(js, want) {
 				t.Errorf("JSON missing field %s in %s", want, js)
 			}

@@ -117,7 +117,7 @@ WHERE status = 'Fail';
 -- Lists all run_repos for a run with their repo_url (from repos).
 -- Used by:
 -- - GET  /v1/runs/{id}/repos (full repo response without N+1 lookups)
--- - POST /v1/runs/{run_id}/pull (repo resolution by normalized URL)
+-- - POST /v1/runs/{run_id}/repos/resolve (repo resolution by normalized URL)
 SELECT rr.mig_id, rr.run_id, rr.repo_id, rr.repo_base_ref,
        rr.source_commit_sha, rr.repo_sha0,
        rr.status, rr.attempt, rr.last_error, rr.created_at, rr.started_at, rr.finished_at,

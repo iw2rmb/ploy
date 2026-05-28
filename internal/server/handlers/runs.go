@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
@@ -122,6 +123,12 @@ func listRunsHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
+		repoURL := strings.TrimSpace(r.URL.Query().Get("repo_url"))
+		if repoURL != "" {
+			listRunsForRepoURL(w, r, st, repoURL, limit, offset)
+			return
+		}
+
 		runs, err := st.ListRuns(r.Context(), store.ListRunsParams{Limit: limit, Offset: offset})
 		if err != nil {
 			writeHTTPError(w, http.StatusInternalServerError, "failed to list runs: %v", err)
@@ -140,6 +147,58 @@ func listRunsHandler(st store.Store) http.HandlerFunc {
 
 		writeJSON(w, http.StatusOK, resp)
 	}
+}
+
+func listRunsForRepoURL(w http.ResponseWriter, r *http.Request, st store.Store, repoURL string, limit, offset int32) {
+	normalizedURL := domaintypes.NormalizeRepoURL(repoURL)
+	repos, err := st.ListDistinctRepos(r.Context(), repoURL)
+	if err != nil {
+		writeHTTPError(w, http.StatusInternalServerError, "failed to list repos: %v", err)
+		return
+	}
+	var matches []store.ListDistinctReposRow
+	for _, repo := range repos {
+		if domaintypes.NormalizeRepoURL(repo.RepoUrl) == normalizedURL {
+			matches = append(matches, repo)
+		}
+	}
+	if len(matches) == 0 {
+		writeJSON(w, http.StatusOK, struct {
+			Runs []domaintypes.RunSummary `json:"runs"`
+		}{Runs: []domaintypes.RunSummary{}})
+		return
+	}
+	if len(matches) > 1 {
+		writeHTTPError(w, http.StatusConflict, "multiple repos match the given repo_url")
+		return
+	}
+	repoRuns, err := st.ListRunsForRepo(r.Context(), store.ListRunsForRepoParams{
+		RepoID: matches[0].RepoID,
+		Limit:  limit,
+		Offset: offset,
+	})
+	if err != nil {
+		writeHTTPError(w, http.StatusInternalServerError, "failed to list runs for repo: %v", err)
+		return
+	}
+	summaries := make([]domaintypes.RunSummary, 0, len(repoRuns))
+	for _, run := range repoRuns {
+		summary := domaintypes.RunSummary{
+			ID:     run.RunID,
+			Status: run.RunStatus,
+			MigID:  run.MigID,
+		}
+		if run.StartedAt.Valid {
+			summary.StartedAt = &run.StartedAt.Time
+		}
+		if run.FinishedAt.Valid {
+			summary.FinishedAt = &run.FinishedAt.Time
+		}
+		summaries = append(summaries, summary)
+	}
+	writeJSON(w, http.StatusOK, struct {
+		Runs []domaintypes.RunSummary `json:"runs"`
+	}{Runs: summaries})
 }
 
 func getRunHandler(st store.Store) http.HandlerFunc {
