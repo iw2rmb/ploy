@@ -149,7 +149,7 @@ func TestFollowModelFinalViewUsesStatusSnapshotSemantics(t *testing.T) {
 	model := newFollowModel(TextRenderOptions{}, true)
 	next, _ := model.Update(followTerminalMsg{report: report, state: migsapi.RunStateSucceeded})
 	rendered := next.(followModel).View().Content
-	if !strings.Contains(rendered, "github.com/acme/one") || !strings.Contains(rendered, "github.com/acme/two") {
+	if !strings.Contains(rendered, "acme/one") || !strings.Contains(rendered, "acme/two") {
 		t.Fatalf("expected final view to include all repos, got %q", rendered)
 	}
 	if strings.Contains(rendered, "No repos with in-progress jobs.") {
@@ -215,10 +215,10 @@ func TestFollowModelViewFiltersToRunningRepos(t *testing.T) {
 	model.report = &report
 
 	view := strings.TrimSpace(model.View().Content)
-	if !strings.Contains(view, "github.com/acme/running") {
+	if !strings.Contains(view, "acme/running") {
 		t.Fatalf("expected running repo in view, got %q", view)
 	}
-	if strings.Contains(view, "github.com/acme/done") {
+	if strings.Contains(view, "acme/done") {
 		t.Fatalf("expected terminal repo to be hidden, got %q", view)
 	}
 }
@@ -282,7 +282,7 @@ func TestFollowModelViewSingleRepoKeepsRepoVisibleWithoutRunningJobs(t *testing.
 	model.report = &report
 
 	view := strings.TrimSpace(model.View().Content)
-	if !strings.Contains(view, "github.com/acme/done") {
+	if !strings.Contains(view, "acme/done") {
 		t.Fatalf("expected single repo to stay visible in view, got %q", view)
 	}
 	if strings.Contains(view, "No repos with in-progress jobs.") {
@@ -338,7 +338,7 @@ func TestWriteFinalStatusSnapshot_NonTTYUsesStatusRenderer(t *testing.T) {
 	if !strings.Contains(rendered, "   Repos: 2") {
 		t.Fatalf("expected status snapshot with all repos, got %q", rendered)
 	}
-	if !strings.Contains(rendered, "github.com/acme/done") {
+	if !strings.Contains(rendered, "acme/done") {
 		t.Fatalf("expected terminal repo in final status snapshot, got %q", rendered)
 	}
 	if strings.Contains(rendered, "No repos with in-progress jobs.") {

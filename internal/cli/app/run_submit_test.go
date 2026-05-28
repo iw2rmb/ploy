@@ -552,11 +552,11 @@ func TestRunSubmitFollowUsesRunStatusFormat(t *testing.T) {
 	if !strings.Contains(out, "   Spec:  "+specID.String()+" ("+server.URL+"/v1/migs/"+migID.String()+"/specs/latest)") {
 		t.Fatalf("expected run status spec download link, got: %q", out)
 	}
-	if !strings.Contains(out, "github.com/acme/service (https://github.com/acme/service.git) @ ") {
+	if !strings.Contains(out, "acme/service:\x1b[90m01234567\x1b[m @ \x1b[90m-\x1b[m") {
 		t.Fatalf("expected run status repo header, got: %q", out)
 	}
-	if !strings.Contains(out, "\x1b[1mmain") || !strings.Contains(out, "01234567") {
-		t.Fatalf("expected bold base branch and short sha, got: %q", out)
+	if strings.Contains(out, "github.com/acme/service") || strings.Contains(out, "https://github.com/acme/service.git") || strings.Contains(out, "\x1b[1mmain") {
+		t.Fatalf("expected compact repo header without domain/url/branch, got: %q", out)
 	}
 	if strings.Contains(out, " -> ") {
 		t.Fatalf("did not expect target branch annotation, got: %q", out)
@@ -564,7 +564,7 @@ func TestRunSubmitFollowUsesRunStatusFormat(t *testing.T) {
 	if strings.Count(out, "   Mig:   "+migID.String()+"   | java17-upgrade") != 1 {
 		t.Fatalf("expected mig header to render once in follow output, got: %q", out)
 	}
-	if strings.Count(out, "github.com/acme/service (https://github.com/acme/service.git) @ ") != 1 {
+	if strings.Count(out, "acme/service:\x1b[90m01234567\x1b[m @ \x1b[90m-\x1b[m") != 1 {
 		t.Fatalf("expected repo header to render once in follow output, got: %q", out)
 	}
 	if strings.Contains(out, "run_id: ") || strings.Contains(out, "mig_id: ") {
