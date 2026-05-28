@@ -21,8 +21,8 @@ func TestListStaleRunningJobs_FiltersByHeartbeatAndStatus(t *testing.T) {
 		t.Fatalf("cleanup running jobs: %v", err)
 	}
 
-	fx := newV1Fixture(t, ctx, db, "https://github.com/test/stale-list-a", "main", "feature", []byte(`{"type":"stale-list"}`))
-	repoB := createRunRepoForStoreTest(t, ctx, db, fx.Mig.ID, fx.Run.ID, "https://github.com/test/stale-list-b", "main", "feature-b", types.RunRepoStatusQueued)
+	fx := newV1Fixture(t, ctx, db, "https://github.com/test/stale-list-a", "main", []byte(`{"type":"stale-list"}`))
+	repoB := createRunRepoForStoreTest(t, ctx, db, fx.Mig.ID, fx.Run.ID, "https://github.com/test/stale-list-b", "feature-b", types.RunRepoStatusQueued)
 
 	cutoff := time.Now().UTC().Add(-45 * time.Second)
 	cutoffTS := pgtype.Timestamptz{Time: cutoff, Valid: true}
@@ -87,8 +87,8 @@ func TestCountStaleNodesWithRunningJobs_CountsDistinctAssignedStaleNodes(t *test
 		t.Fatalf("cleanup running jobs: %v", err)
 	}
 
-	fx := newV1Fixture(t, ctx, db, "https://github.com/test/stale-node-count-a", "main", "feature", []byte(`{"type":"stale-node-count"}`))
-	repoB := createRunRepoForStoreTest(t, ctx, db, fx.Mig.ID, fx.Run.ID, "https://github.com/test/stale-node-count-b", "main", "feature-b", types.RunRepoStatusQueued)
+	fx := newV1Fixture(t, ctx, db, "https://github.com/test/stale-node-count-a", "main", []byte(`{"type":"stale-node-count"}`))
+	repoB := createRunRepoForStoreTest(t, ctx, db, fx.Mig.ID, fx.Run.ID, "https://github.com/test/stale-node-count-b", "feature-b", types.RunRepoStatusQueued)
 
 	cutoff := time.Now().UTC().Add(-45 * time.Second)
 	cutoffTS := pgtype.Timestamptz{Time: cutoff, Valid: true}
@@ -128,8 +128,8 @@ func TestCountStaleNodesWithRunningJobs_CountsDistinctAssignedStaleNodes(t *test
 func TestCancelActiveJobsByRunRepoAttempt_TransitionsOnlyTargetAttempt(t *testing.T) {
 	ctx, db := openStoreForCancelBulkTests(t)
 
-	fx := newV1Fixture(t, ctx, db, "https://github.com/test/stale-cancel-a", "main", "feature", []byte(`{"type":"stale-cancel"}`))
-	repoB := createRunRepoForStoreTest(t, ctx, db, fx.Mig.ID, fx.Run.ID, "https://github.com/test/stale-cancel-b", "main", "feature-b", types.RunRepoStatusQueued)
+	fx := newV1Fixture(t, ctx, db, "https://github.com/test/stale-cancel-a", "main", []byte(`{"type":"stale-cancel"}`))
+	repoB := createRunRepoForStoreTest(t, ctx, db, fx.Mig.ID, fx.Run.ID, "https://github.com/test/stale-cancel-b", "feature-b", types.RunRepoStatusQueued)
 
 	targetCreated := createJobForStoreTest(t, ctx, db, fx.Run.ID, fx.RunRepo.RepoID, fx.RunRepo.RepoBaseRef, 1, "target-created", types.JobStatusCreated)
 	targetQueued := createJobForStoreTest(t, ctx, db, fx.Run.ID, fx.RunRepo.RepoID, fx.RunRepo.RepoBaseRef, 1, "target-queued", types.JobStatusQueued)

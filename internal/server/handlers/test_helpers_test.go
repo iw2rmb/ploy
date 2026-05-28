@@ -64,10 +64,9 @@ func validSpecBody() map[string]any {
 // validRunRequestBody returns a canonical single-repo run request body.
 func validRunRequestBody() map[string]any {
 	return map[string]any{
-		"repo_url":   "https://github.com/org/repo",
-		"base_ref":   "main",
-		"target_ref": "feature",
-		"spec":       validSpecBody(),
+		"repo_url": "https://github.com/org/repo",
+		"base_ref": "main",
+		"spec":     validSpecBody(),
 	}
 }
 
@@ -144,7 +143,7 @@ func activeMigWithSpec(specID domaintypes.SpecID) *migStore {
 		ArchivedAt: pgtype.Timestamptz{Valid: false},
 	}
 	st.listMigReposByMig.val = []store.MigRepo{
-		{ID: "repo1", MigID: "mig123", RepoID: "repo1", BaseRef: "main", TargetRef: "feature1"},
+		{ID: "repo1", MigID: "mig123", RepoID: "repo1", BaseRef: "main"},
 	}
 	st.getSpec.val = store.Spec{
 		ID:   specID,

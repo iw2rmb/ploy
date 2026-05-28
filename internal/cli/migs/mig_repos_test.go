@@ -25,7 +25,6 @@ func TestAddMigRepoCommand_Run(t *testing.T) {
 		migID       string
 		repoURL     string
 		baseRef     string
-		targetRef   string
 		statusCode  int
 		wantErr     bool
 		wantErrText string
@@ -35,7 +34,6 @@ func TestAddMigRepoCommand_Run(t *testing.T) {
 			migID:      migID,
 			repoURL:    "https://github.com/org/repo.git",
 			baseRef:    "main",
-			targetRef:  "feature-branch",
 			statusCode: http.StatusCreated,
 		},
 		{
@@ -43,7 +41,6 @@ func TestAddMigRepoCommand_Run(t *testing.T) {
 			migID:       migID,
 			repoURL:     "",
 			baseRef:     "main",
-			targetRef:   "feature",
 			wantErr:     true,
 			wantErrText: "repo url is required",
 		},
@@ -52,7 +49,6 @@ func TestAddMigRepoCommand_Run(t *testing.T) {
 			migID:       migID,
 			repoURL:     "https://github.com/org/repo.git",
 			baseRef:     "",
-			targetRef:   "feature",
 			wantErr:     true,
 			wantErrText: "base ref is required",
 		},
@@ -72,7 +68,6 @@ func TestAddMigRepoCommand_Run(t *testing.T) {
 					MigID:     domaintypes.MigID(tc.migID),
 					RepoURL:   tc.repoURL,
 					BaseRef:   tc.baseRef,
-					TargetRef: tc.targetRef,
 					CreatedAt: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
 				}
 
@@ -85,12 +80,11 @@ func TestAddMigRepoCommand_Run(t *testing.T) {
 			baseURL, _ := url.Parse(srv.URL)
 
 			cmd := AddMigRepoCommand{
-				Client:    srv.Client(),
-				BaseURL:   baseURL,
-				MigRef:    domaintypes.MigRef(tc.migID),
-				RepoURL:   tc.repoURL,
-				BaseRef:   tc.baseRef,
-				TargetRef: tc.targetRef,
+				Client:  srv.Client(),
+				BaseURL: baseURL,
+				MigRef:  domaintypes.MigRef(tc.migID),
+				RepoURL: tc.repoURL,
+				BaseRef: tc.baseRef,
 			}
 
 			result, err := cmd.Run(context.Background())
@@ -126,8 +120,8 @@ func TestListMigReposCommand_Run(t *testing.T) {
 
 		resp := domainapi.MigRepoListResponse{
 			Repos: []domainapi.MigRepoSummary{
-				{ID: domaintypes.MigRepoID("repo-001"), MigID: migID, RepoURL: "https://github.com/a/b.git", BaseRef: "main", TargetRef: "feat", CreatedAt: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)},
-				{ID: domaintypes.MigRepoID("repo-002"), MigID: migID, RepoURL: "https://github.com/c/d.git", BaseRef: "main", TargetRef: "fix", CreatedAt: time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC)},
+				{ID: domaintypes.MigRepoID("repo-001"), MigID: migID, RepoURL: "https://github.com/a/b.git", BaseRef: "main", CreatedAt: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)},
+				{ID: domaintypes.MigRepoID("repo-002"), MigID: migID, RepoURL: "https://github.com/c/d.git", BaseRef: "main", CreatedAt: time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC)},
 			},
 		}
 
@@ -213,7 +207,7 @@ func TestImportMigReposCommand_Run(t *testing.T) {
 
 	baseURL, _ := url.Parse(srv.URL)
 
-	csvData := []byte("repo_url,base_ref,target_ref\nhttps://github.com/a/b.git,main,feat\nhttps://github.com/c/d.git,main,fix\n")
+	csvData := []byte("repo_url,base_ref\nhttps://github.com/a/b.git,main\nhttps://github.com/c/d.git,main\n")
 
 	cmd := ImportMigReposCommand{
 		Client:  srv.Client(),

@@ -25,8 +25,8 @@ func (m *jobStore) UpdateRunRepoError(ctx context.Context, params store.UpdateRu
 	return err
 }
 
-func (m *jobStore) UpdateRunRepoRefs(ctx context.Context, params store.UpdateRunRepoRefsParams) error {
-	_, err := m.updateRunRepoRefs.record(params)
+func (m *jobStore) UpdateRunRepoBaseRef(ctx context.Context, params store.UpdateRunRepoBaseRefParams) error {
+	_, err := m.updateRunRepoBaseRef.record(params)
 	return err
 }
 

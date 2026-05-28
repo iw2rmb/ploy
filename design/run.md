@@ -38,7 +38,7 @@ No backward compatibility is required. Removed commands and flags should fail th
 
 ## Why This Is Needed
 
-The current `ploy run` surface exposes internal execution details as user-facing flags: repository URL, base ref, target ref, follow caps, retry counts, job image, job command, job envs, JSON output, artifact directories, old pull mechanics, patch download mechanics, and manual start. That makes the command ambiguous: it mixes run submission, job execution tuning, artifact download, and diff application.
+The current `ploy run` surface exposes internal execution details as user-facing flags: repository URL, base ref, follow caps, retry counts, job image, job command, job envs, JSON output, artifact directories, old pull mechanics, patch download mechanics, and manual start. That makes the command ambiguous: it mixes run submission, job execution tuning, artifact download, and diff application.
 
 The target contract makes one path primary: submit a spec against a local or remote repo, optionally wait for final artifacts, and optionally apply a successful patch to a local repo. Everything else is either implementation detail, existing status inspection, or an operation with a clearer name.
 
@@ -56,7 +56,7 @@ The target contract makes one path primary: submit a spec against a local or rem
 
 ## Non-Goals
 
-- No compatibility shims for root submit flags: `--repo`, `--base-ref`, `--target-ref`, `--spec`, root `--json`, `--job-env`, `--job-image`, `--job-command`, `--artifact-dir`, `--cap`, `--cancel-on-cap`, or `--max-retries`.
+- No compatibility shims for root submit flags: `--repo`, `--base-ref`, `--spec`, root `--json`, `--job-env`, `--job-image`, `--job-command`, `--artifact-dir`, `--cap`, `--cancel-on-cap`, or `--max-retries`.
 - No legacy rejection code that enumerates previous shapes.
 - No `ploy run patch` alias.
 - No reuse of the current `ploy run pull` branch-creation workflow for artifact download.
@@ -66,12 +66,12 @@ The target contract makes one path primary: submit a spec against a local or rem
 ## Current Baseline (Observed)
 
 - Root CLI wiring adds `runcli.NewCommand()` from `internal/cli/run` at `internal/cli/app/root.go:48-51`.
-- `internal/cli/run/run_commands.go:18-59` builds the current Cobra tree. The root command only submits when one of `--repo`, `--base-ref`, `--target-ref`, or `--spec` is present; otherwise it prints help.
-- Root submit flags are registered at `internal/cli/run/run_commands.go:38-50`: `--repo`, `--base-ref`, `--target-ref`, `--spec`, `--follow`, `--cap`, `--cancel-on-cap`, `--max-retries`, `--job-env`, `--job-image`, `--job-command`, `--artifact-dir`, and `--json`.
+- `internal/cli/run/run_commands.go:18-59` builds the current Cobra tree. The root command only submits when one of `--repo`, `--base-ref`, or `--spec` is present; otherwise it prints help.
+- Root submit flags are registered at `internal/cli/run/run_commands.go:38-50`: `--repo`, `--base-ref`, `--spec`, `--follow`, `--cap`, `--cancel-on-cap`, `--max-retries`, `--job-env`, `--job-image`, `--job-command`, `--artifact-dir`, and `--json`.
 - Current subcommands are wired at `internal/cli/run/run_commands.go:52-58`: `ls`, `cancel`, `start`, `status`, `logs`, `pull`, and `patch`.
 - Current list uses `--limit` and `--offset`, then calls `migs.ListBatchesCommand` in `internal/cli/run/run_list.go:22-57`.
-- Current submit requires `--repo`, `--base-ref`, `--target-ref`, and `--spec` in `internal/cli/run/run_submit.go:51-65`.
-- Current submit builds `domainapi.RunSubmitRequest{repo_url, base_ref, target_ref, spec, created_by}` and posts it to `POST /v1/runs` in `internal/cli/run/run_submit.go:93-103` and `internal/cli/run/run_submit.go:272-328`.
+- Current submit requires `--repo`, `--base-ref`, and `--spec` in `internal/cli/run/run_submit.go:51-65`.
+- Current submit builds `domainapi.RunSubmitRequest{repo_url, base_ref, spec, created_by}` and posts it to `POST /v1/runs` in `internal/cli/run/run_submit.go:93-103` and `internal/cli/run/run_submit.go:272-328`.
 - Current spec loading uses `specpayload.Build` in `internal/cli/run/run_submit.go:143-199`. `specpayload.Build` reads the path as a file with `common.ReadFileRooted` at `internal/cli/specpayload/mig_run_spec.go:551-560`; it does not currently implement the target "directory containing mig.yaml" behavior.
 - Current submit follow mode is owned by `followRunSubmit` and uses `runs.FollowRunCommand` with cap/cancel/retry controls in `internal/cli/run/run_submit.go:202-269`.
 - Current artifact download is only attached to successful follow mode when `--artifact-dir` is set in `internal/cli/run/run_submit.go:124-130`.
@@ -83,9 +83,9 @@ The target contract makes one path primary: submit a spec against a local or rem
 - Current `ploy run patch` downloads gzip patch bytes without applying them through `RunPatch` in `internal/cli/run/run_patch.go`.
 - Current `ploy run start` calls `runs.StartCommand` and `POST /v1/runs/{id}/start` through `internal/cli/run/run_start.go:20-49`.
 - The server already has a background batch scheduler whose comment says it eliminates manual `POST /v1/runs/{id}/start` calls at `internal/store/batchscheduler/batch_scheduler.go:1-5`.
-- The server `POST /v1/runs` handler currently requires `repo_url`, `base_ref`, `target_ref`, and `spec` at `internal/server/handlers/runs_submit.go:19-60`, resolves the source commit before storing rows at `internal/server/handlers/runs_submit.go:64-77`, and stores `source_commit_sha` plus `repo_sha0` on `run_repos` at `internal/server/handlers/runs_submit.go:132-141`.
+- The server `POST /v1/runs` handler currently requires `repo_url`, `base_ref`, and `spec` at `internal/server/handlers/runs_submit.go:19-60`, resolves the source commit before storing rows at `internal/server/handlers/runs_submit.go:64-77`, and stores `source_commit_sha` plus `repo_sha0` on `run_repos` at `internal/server/handlers/runs_submit.go:132-141`.
 - `RepoURL` currently accepts only `https://`, `ssh://`, and `file://` values in `internal/domain/types/vcs.go:10-45` and validates that shape at `internal/domain/types/vcs.go:84-92`. The target `namespace/repo` syntax therefore needs control-plane-owned expansion before calling current API shapes.
-- `RunSubmitRequest` currently includes public `target_ref` in `internal/domain/api/run_submit.go:9-20`, so removing `--target-ref` from the CLI still leaves either a server contract cleanup or a hidden CLI-generated value to resolve.
+- `RunSubmitRequest` includes public `base_ref` in `internal/domain/api/run_submit.go:9-20`; it is the source ref for resolving `source_commit_sha`.
 
 ## Target Contract
 
@@ -113,7 +113,7 @@ Repo selection:
 Submit behavior:
 
 - Submit one single-repo run.
-- The user does not provide `base_ref` or `target_ref`.
+- The user provides the source repo/ref once; there is no output branch input.
 - The source commit must be the selected commit:
   - local mode: current `HEAD` SHA;
   - remote branch mode: server-resolved tip of the branch;
@@ -126,7 +126,7 @@ Patch application:
 - `--apply` is allowed only for local repo mode.
 - `--apply` waits for the run to succeed, downloads accumulated diffs for the run repo, and applies them to the selected local repo path.
 - `--apply` must not create or switch branches.
-- `--apply` must not require the old `target_ref` user input.
+- `--apply` must not require any output branch input.
 - Before applying, fail if the selected local repo has any staged or unstaged diff against `HEAD`.
 - Before applying, fail if local `HEAD` does not match the run repo `source_commit_sha`.
 - `--force` bypasses only the local `HEAD` versus run source SHA guard.
@@ -209,7 +209,7 @@ Pagination:
 ### Command Tree
 
 - Rewrite `internal/cli/run/run_commands.go` so root `Use` is `run <spec-path> [<repo>]`.
-- Remove root flags for `--repo`, `--base-ref`, `--target-ref`, `--spec`, `--follow`, `--cap`, `--cancel-on-cap`, `--max-retries`, `--job-env`, `--job-image`, `--job-command`, `--artifact-dir`, and `--json`.
+- Remove root flags for `--repo`, `--base-ref`, `--spec`, `--follow`, `--cap`, `--cancel-on-cap`, `--max-retries`, `--job-env`, `--job-image`, `--job-command`, `--artifact-dir`, and `--json`.
 - Add only the root flags required by the target contract: `--apply` and a string `--pull` flag with `NoOptDefVal` so both bare `--pull` and `--pull=<path>` are accepted.
 - Replace subcommand registration with only `ls`, `cancel`, `status`, `apply`, and artifact-oriented `pull`.
 - Delete `newStartCommand`, `newLogsCommand`, and `newPatchCommand`.
@@ -289,12 +289,8 @@ Remote mode:
 
 ### Server Contract Pressure
 
-The clean target is to remove public `target_ref` from run submission because the new command has no target branch concept. There are two implementation paths:
-
-- Preferred: introduce a new current `RunSubmitRequest` shape with `repo_url`, `ref` or `commit_sha`, and `spec`; remove `target_ref` from submit and avoid storing a generated target branch for `ploy run`.
-- Smaller implementation: keep current `POST /v1/runs` temporarily and set internal `base_ref`/`target_ref` from the resolved source ref, while making `target_ref` non-user-facing. This is easier but leaves a misleading database field and should not become the long-term contract.
-
-Because this DD is for the current command contract and no backward compatibility is required, the preferred path should be implemented unless the server-side migration is judged too large for the first implementation slice.
+The clean target is that run submission has only source identity: repository URL,
+source ref, spec, and creator metadata. No output branch is accepted or stored.
 
 ### Apply Path
 
@@ -461,7 +457,7 @@ Testable outcome:
 
 ## Risks
 
-- Current `POST /v1/runs` requires `target_ref`, even though the target command removes target branch as a user concept.
+- Current `POST /v1/runs` still resolves source SHA from a branch/ref-oriented `base_ref`.
 - Remote SHA submission may require a server contract that accepts commit SHA directly. The current server resolves a source SHA by running `git ls-remote <repo> <base_ref>`, which is branch/ref oriented.
 - `run apply` needs repo resolution for a run. Existing `POST /v1/runs/{run_id}/pull` can resolve by repo URL, but its name and response are tied to old pull semantics.
 - If `run ls` must filter by repo URL, the current API may need a small repo lookup or list-runs filter addition.

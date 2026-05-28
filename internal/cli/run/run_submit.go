@@ -1,4 +1,4 @@
-// run_submit.go implements `ploy run --repo ... --base-ref ... --target-ref ... --spec ...`
+// run_submit.go implements `ploy run --repo ... --base-ref ... --spec ...`
 // for single-repo run submission via POST /v1/runs.
 //
 // This is the CLI entry point for submitting runs directly (without creating
@@ -28,10 +28,9 @@ import (
 
 // SubmitOptions contains Cobra-parsed options for `ploy run --repo ...`.
 type SubmitOptions struct {
-	RepoURL   string
-	BaseRef   string
-	TargetRef string
-	SpecFile  string
+	RepoURL  string
+	BaseRef  string
+	SpecFile string
 
 	Follow      bool
 	CapDuration time.Duration
@@ -56,16 +55,13 @@ func validateRunSubmitFlags(opts SubmitOptions) error {
 	if strings.TrimSpace(opts.BaseRef) == "" {
 		return fmt.Errorf("--base-ref is required")
 	}
-	if strings.TrimSpace(opts.TargetRef) == "" {
-		return fmt.Errorf("--target-ref is required")
-	}
 	if strings.TrimSpace(opts.SpecFile) == "" {
 		return fmt.Errorf("--spec is required")
 	}
 	return nil
 }
 
-// RunSubmit implements the `ploy run --repo ... --base-ref ... --target-ref ... --spec ...` command.
+// RunSubmit implements the `ploy run --repo ... --base-ref ... --spec ...` command.
 // It submits a single-repo run via POST /v1/runs and prints the resulting run_id and mig_id.
 func RunSubmit(ctx context.Context, opts SubmitOptions) error {
 	if opts.Output == nil {
@@ -94,7 +90,6 @@ func RunSubmit(ctx context.Context, opts SubmitOptions) error {
 	request := domainapi.RunSubmitRequest{
 		RepoURL:   domaintypes.RepoURL(strings.TrimSpace(opts.RepoURL)),
 		BaseRef:   domaintypes.GitRef(strings.TrimSpace(opts.BaseRef)),
-		TargetRef: domaintypes.GitRef(strings.TrimSpace(opts.TargetRef)),
 		Spec:      specPayload,
 		CreatedBy: strings.TrimSpace(os.Getenv("USER")),
 	}

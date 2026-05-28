@@ -22,13 +22,12 @@ func singleJobReport(migName string, repoStatus domaintypes.RunRepoStatus, job R
 		SpecID:  domaintypes.NewSpecID(),
 		Repos: []RunEntry{
 			{
-				RepoID:    repoID,
-				RepoURL:   "https://github.com/acme/" + migName + ".git",
-				BaseRef:   "main",
-				TargetRef: "ploy/" + migName,
-				Status:    repoStatus,
-				Attempt:   1,
-				Jobs:      []RunJobEntry{job},
+				RepoID:  repoID,
+				RepoURL: "https://github.com/acme/" + migName + ".git",
+				BaseRef: "main",
+				Status:  repoStatus,
+				Attempt: 1,
+				Jobs:    []RunJobEntry{job},
 			},
 		},
 	}
@@ -141,7 +140,6 @@ func TestRenderRunReportTextHeadersAndArtifacts(t *testing.T) {
 				RepoID:          repoID,
 				RepoURL:         "https://github.com/acme/service.git",
 				BaseRef:         "main",
-				TargetRef:       "ploy/java17",
 				SourceCommitSHA: "0123456789abcdef0123456789abcdef01234567",
 				Attempt:         1,
 				Status:          "Running",
@@ -214,7 +212,7 @@ func TestRenderRunReportTextVisibilityRules(t *testing.T) {
 		notContain []string
 	}{
 		{
-			name: "hides target branch when mr flags disabled",
+			name: "renders compact repo header",
 			report: func() RunReport {
 				repoID := domaintypes.NewMigRepoID()
 				return RunReport{
@@ -227,7 +225,6 @@ func TestRenderRunReportTextVisibilityRules(t *testing.T) {
 							RepoID:          repoID,
 							RepoURL:         "https://github.com/acme/no-mr.git",
 							BaseRef:         "main",
-							TargetRef:       "feature/no-mr",
 							SourceCommitSHA: "fedcba9876543210fedcba9876543210fedcba98",
 							Status:          "Queued",
 							Attempt:         1,
@@ -253,12 +250,11 @@ func TestRenderRunReportTextVisibilityRules(t *testing.T) {
 					SpecID:  domaintypes.NewSpecID(),
 					Repos: []RunEntry{
 						{
-							RepoID:    repoID,
-							RepoURL:   "https://github.com/acme/cancelled.git",
-							BaseRef:   "main",
-							TargetRef: "ploy/cancelled",
-							Status:    "Cancelled",
-							Attempt:   1,
+							RepoID:  repoID,
+							RepoURL: "https://github.com/acme/cancelled.git",
+							BaseRef: "main",
+							Status:  "Cancelled",
+							Attempt: 1,
 							Jobs: []RunJobEntry{
 								{
 									JobID:      cancelledJobID,
@@ -405,7 +401,6 @@ func TestRenderRunReportTextExitOneLiners(t *testing.T) {
 				RepoID:    repoID,
 				RepoURL:   "https://github.com/acme/mig.git",
 				BaseRef:   "main",
-				TargetRef: "ploy/mig",
 				Attempt:   1,
 				Status:    "Fail",
 				LastError: &errText,
@@ -540,13 +535,12 @@ func TestRenderRunReportTextOSC8OnAndOff(t *testing.T) {
 		SpecID:  domaintypes.NewSpecID(),
 		Repos: []RunEntry{
 			{
-				RepoID:    repoID,
-				RepoURL:   "https://github.com/acme/links.git",
-				BaseRef:   "main",
-				TargetRef: "ploy/links",
-				Status:    "Success",
-				Attempt:   1,
-				PatchURL:  patchURL,
+				RepoID:   repoID,
+				RepoURL:  "https://github.com/acme/links.git",
+				BaseRef:  "main",
+				Status:   "Success",
+				Attempt:  1,
+				PatchURL: patchURL,
 				Jobs: []RunJobEntry{
 					{
 						JobID:      jobID,
@@ -838,12 +832,11 @@ func TestRenderRunReportTextSpinnerFrameAndLiveDuration(t *testing.T) {
 		SpecID:  domaintypes.NewSpecID(),
 		Repos: []RunEntry{
 			{
-				RepoID:    repoID,
-				RepoURL:   "https://github.com/acme/live.git",
-				BaseRef:   "main",
-				TargetRef: "ploy/live",
-				Status:    "Running",
-				Attempt:   1,
+				RepoID:  repoID,
+				RepoURL: "https://github.com/acme/live.git",
+				BaseRef: "main",
+				Status:  "Running",
+				Attempt: 1,
 				Jobs: []RunJobEntry{
 					{
 						JobID:      jobID,
@@ -958,12 +951,11 @@ func TestRenderRunReportTextCreatedJobDurationKeepsStepAdjacent(t *testing.T) {
 		SpecID:  domaintypes.NewSpecID(),
 		Repos: []RunEntry{
 			{
-				RepoID:    domaintypes.NewMigRepoID(),
-				RepoURL:   "https://github.com/acme/duration-placeholder.git",
-				BaseRef:   "main",
-				TargetRef: "ploy/duration-placeholder",
-				Status:    "Running",
-				Attempt:   1,
+				RepoID:  domaintypes.NewMigRepoID(),
+				RepoURL: "https://github.com/acme/duration-placeholder.git",
+				BaseRef: "main",
+				Status:  "Running",
+				Attempt: 1,
 				Jobs: []RunJobEntry{
 					{
 						JobID:      domaintypes.NewJobID(),

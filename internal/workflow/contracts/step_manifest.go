@@ -95,8 +95,7 @@ type StepArtifact struct {
 //
 // Ref precedence (set by manifest builders):
 //  1. CommitSHA — pinned commit when available (ensures deterministic validation).
-//  2. TargetRef — branch/tag for feature branches and PR flows.
-//  3. BaseRef — fallback for baseline validations.
+//  2. BaseRef — fallback for baseline validations.
 type StepGateSpec struct {
 	Enabled bool
 	Env     map[string]string
@@ -120,7 +119,7 @@ type StepGateSpec struct {
 	RepoID types.MigRepoID
 
 	// Ref is the Git reference (commit SHA, branch, or tag) for remote gate execution.
-	// Derived from CommitSHA > TargetRef > BaseRef precedence when building manifests.
+	// Derived from CommitSHA > BaseRef precedence when building manifests.
 	Ref types.GitRef
 
 	// DiffPatch is an optional gzipped unified diff (base64-encoded) to apply

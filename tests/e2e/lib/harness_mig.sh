@@ -37,14 +37,6 @@ e2e_mig_run_json() {
         args+=(--base-ref "${raw_args[1]}")
         raw_args=("${raw_args[@]:2}")
         ;;
-      --repo-target-ref)
-        if [[ ${#raw_args[@]} -lt 2 ]]; then
-          echo "error: --repo-target-ref requires a value" >&2
-          return 1
-        fi
-        args+=(--target-ref "${raw_args[1]}")
-        raw_args=("${raw_args[@]:2}")
-        ;;
       --spec)
         if [[ ${#raw_args[@]} -lt 2 ]]; then
           echo "error: --spec requires a value" >&2

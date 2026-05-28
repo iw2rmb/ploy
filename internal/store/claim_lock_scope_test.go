@@ -31,7 +31,7 @@ func TestClaimJobLocksJobAndRunRepoOnly(t *testing.T) {
 		t.Skipf("pgxpool max_conns=%d; need >=2 to exercise concurrent transactions", db.Pool().Config().MaxConns)
 	}
 
-	fx := newV1Fixture(t, ctx, db, "https://github.com/test/lock-scope", "main", "feature", []byte(`{"type":"lock-scope"}`))
+	fx := newV1Fixture(t, ctx, db, "https://github.com/test/lock-scope", "main", []byte(`{"type":"lock-scope"}`))
 
 	jobID := types.NewJobID()
 	createdJob, err := db.CreateJob(ctx, CreateJobParams{

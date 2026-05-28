@@ -80,7 +80,6 @@ type RunRepoResponse struct {
 	RepoID          domaintypes.RepoID        `json:"repo_id"`
 	RepoURL         string                    `json:"repo_url"`
 	BaseRef         string                    `json:"base_ref"`
-	TargetRef       string                    `json:"target_ref"`
 	SourceCommitSHA string                    `json:"source_commit_sha,omitempty"`
 	Status          domaintypes.RunRepoStatus `json:"status"`
 	Attempt         int32                     `json:"attempt"`
@@ -98,7 +97,6 @@ func runRepoToResponse(rr store.RunRepo, repoURL string) RunRepoResponse {
 		RepoID:          rr.RepoID,
 		RepoURL:         repoURL,
 		BaseRef:         rr.RepoBaseRef,
-		TargetRef:       rr.RepoTargetRef,
 		SourceCommitSHA: rr.SourceCommitSha,
 		Status:          rr.Status,
 		Attempt:         rr.Attempt,

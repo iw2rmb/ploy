@@ -44,9 +44,9 @@ type migStore struct {
 
 	upsertMigRepo mockCall[store.UpsertMigRepoParams, store.MigRepo]
 
-	deleteMigRepo     mockResult[struct{}]
-	hasMigRepoHistory mockResult[bool]
-	updateMigRepoRefs mockCall[store.UpdateMigRepoRefsParams, struct{}]
+	deleteMigRepo        mockResult[struct{}]
+	hasMigRepoHistory    mockResult[bool]
+	updateMigRepoBaseRef mockCall[store.UpdateMigRepoBaseRefParams, struct{}]
 
 	listFailedRepoIDsByMig mockCall[string, []types.RepoID]
 
@@ -157,7 +157,7 @@ func (m *migStore) UnarchiveMig(ctx context.Context, id types.MigID) error {
 // MigRepo methods
 
 func (m *migStore) CreateMigRepo(ctx context.Context, params store.CreateMigRepoParams) (store.MigRepo, error) {
-	result := defaultMigRepo(m.createMigRepo.val, params.ID, params.MigID, params.BaseRef, params.TargetRef)
+	result := defaultMigRepo(m.createMigRepo.val, params.ID, params.MigID, params.BaseRef)
 	if m.repoByID == nil {
 		m.repoByID = map[types.RepoID]store.Repo{}
 	}
@@ -187,7 +187,7 @@ func (m *migStore) GetMigRepoByURL(ctx context.Context, arg store.GetMigRepoByUR
 }
 
 func (m *migStore) UpsertMigRepo(ctx context.Context, arg store.UpsertMigRepoParams) (store.MigRepo, error) {
-	result := defaultMigRepo(m.upsertMigRepo.val, arg.ID, arg.MigID, arg.BaseRef, arg.TargetRef)
+	result := defaultMigRepo(m.upsertMigRepo.val, arg.ID, arg.MigID, arg.BaseRef)
 	if m.repoByID == nil {
 		m.repoByID = map[types.RepoID]store.Repo{}
 	}
@@ -209,8 +209,8 @@ func (m *migStore) ListFailedRepoIDsByMig(ctx context.Context, migID types.MigID
 	return m.listFailedRepoIDsByMig.record(migID.String())
 }
 
-func (m *migStore) UpdateMigRepoRefs(ctx context.Context, params store.UpdateMigRepoRefsParams) error {
-	_, err := m.updateMigRepoRefs.record(params)
+func (m *migStore) UpdateMigRepoBaseRef(ctx context.Context, params store.UpdateMigRepoBaseRefParams) error {
+	_, err := m.updateMigRepoBaseRef.record(params)
 	return err
 }
 

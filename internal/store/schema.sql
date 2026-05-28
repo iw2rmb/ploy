@@ -150,7 +150,7 @@ CREATE TABLE IF NOT EXISTS repos (
 CREATE INDEX IF NOT EXISTS repos_created_idx ON repos(created_at);
 
 -- MigRepos (managed repo set for a mig project)
--- Each row represents a repo participating in a mig, with mutable refs.
+-- Each row represents a repo participating in a mig, with a mutable source ref.
 -- Note: id is TEXT (NanoID-backed, 8 chars) for compact, human-friendly repo identifiers.
 -- Application code generates IDs via types.NewMigRepoID() before insertion.
 CREATE TABLE IF NOT EXISTS mig_repos (
@@ -158,7 +158,6 @@ CREATE TABLE IF NOT EXISTS mig_repos (
   mig_id       TEXT NOT NULL REFERENCES migs(id) ON DELETE CASCADE,
   repo_id      TEXT NOT NULL REFERENCES repos(id) ON DELETE RESTRICT,
   base_ref     TEXT NOT NULL,  -- Mutable base ref (e.g., main).
-  target_ref   TEXT NOT NULL,  -- Mutable target ref (e.g., feature-branch).
   created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
   -- Enforce uniqueness: one repo membership per mig.
   UNIQUE (mig_id, repo_id)
@@ -187,7 +186,7 @@ CREATE INDEX IF NOT EXISTS runs_mig_idx ON runs(mig_id);
 
 -- RunRepos tracks per-repo execution state within a run.
 -- v1 model: composite PK (run_id, repo_id); execution_run_id removed (no child runs per repo).
--- repo_base_ref and repo_target_ref are snapshots copied from mig_repos at run creation time.
+-- repo_base_ref is copied from mig_repos at run creation time.
 -- Note: run_id is TEXT (KSUID-backed) to match runs.id.
 -- Note: repo_id is TEXT (NanoID-backed, 8 chars) to match repos.id.
 CREATE TABLE IF NOT EXISTS run_repos (
@@ -195,7 +194,6 @@ CREATE TABLE IF NOT EXISTS run_repos (
   run_id           TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
   repo_id          TEXT NOT NULL REFERENCES repos(id) ON DELETE RESTRICT,  -- FK to repos.id.
   repo_base_ref    TEXT NOT NULL,  -- Snapshot of mig_repos.base_ref at run creation time.
-  repo_target_ref  TEXT NOT NULL,  -- Snapshot of mig_repos.target_ref at run creation time.
   source_commit_sha TEXT NOT NULL DEFAULT '',  -- Immutable source commit resolved at run start.
   repo_sha0        TEXT NOT NULL DEFAULT '',   -- Initial SHA seed for deterministic job SHA chain.
   status           run_repo_status NOT NULL DEFAULT 'Queued',

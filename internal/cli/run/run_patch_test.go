@@ -151,9 +151,8 @@ func TestRunPatch_ResolveRepoViaRepoURL(t *testing.T) {
 		case r.Method == http.MethodPost && r.URL.Path == "/v1/runs/"+runID.String()+"/pull":
 			pullCalled = true
 			resp := map[string]any{
-				"run_id":          runID.String(),
-				"repo_id":         repoID.String(),
-				"repo_target_ref": "migs/target",
+				"run_id":  runID.String(),
+				"repo_id": repoID.String(),
 			}
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(resp)
@@ -235,7 +234,6 @@ func TestRunPatch_AutoResolveSingleRunRepo(t *testing.T) {
 						"repo_id":     repoID.String(),
 						"repo_url":    "https://github.com/example/repo.git",
 						"base_ref":    "main",
-						"target_ref":  "feature",
 						"status":      "success",
 						"attempt":     1,
 						"created_at":  "2026-01-01T00:00:00Z",
@@ -319,7 +317,6 @@ func TestRunPatch_MultiRepoRequiresSelector(t *testing.T) {
 						"repo_id":    repoID1.String(),
 						"repo_url":   "https://github.com/example/repo-1.git",
 						"base_ref":   "main",
-						"target_ref": "feature-1",
 						"status":     "success",
 						"attempt":    1,
 						"created_at": "2026-01-01T00:00:00Z",
@@ -329,7 +326,6 @@ func TestRunPatch_MultiRepoRequiresSelector(t *testing.T) {
 						"repo_id":    repoID2.String(),
 						"repo_url":   "https://github.com/example/repo-2.git",
 						"base_ref":   "main",
-						"target_ref": "feature-2",
 						"status":     "success",
 						"attempt":    1,
 						"created_at": "2026-01-01T00:00:01Z",

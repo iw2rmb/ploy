@@ -13,7 +13,6 @@ import (
 func TestBuildManifestFromRequest(t *testing.T) {
 	t.Run("valid request with all fields", func(t *testing.T) {
 		req := newStartRunRequest(
-			withRunTargetRef("feature-branch"),
 			withRunCommitSHA("abc123"),
 			withRunEnv(map[string]string{"FOO": "bar"}),
 		)
@@ -59,9 +58,6 @@ func TestBuildManifestFromRequest(t *testing.T) {
 		}
 		if repo.BaseRef.String() != req.BaseRef.String() {
 			t.Errorf("expected base ref %q, got %q", req.BaseRef, repo.BaseRef.String())
-		}
-		if repo.TargetRef.String() != req.TargetRef.String() {
-			t.Errorf("expected target ref %q, got %q", req.TargetRef, repo.TargetRef.String())
 		}
 		if repo.Commit.String() != req.CommitSHA.String() {
 			t.Errorf("expected commit %q, got %q", req.CommitSHA, repo.Commit.String())
@@ -131,19 +127,19 @@ func TestBuildManifestFromRequest(t *testing.T) {
 		}
 	})
 
-	t.Run("defaults target_ref from base_ref", func(t *testing.T) {
+	t.Run("keeps base_ref in repo materialization", func(t *testing.T) {
 		req := newStartRunRequest()
 		manifest, err := buildManifestDefault(req)
 		if err != nil {
 			t.Fatalf("buildManifestDefault() error: %v", err)
 		}
-		if manifest.Inputs[0].Hydration.Repo.TargetRef.String() != "main" {
-			t.Errorf("expected target_ref to default to main, got %q", manifest.Inputs[0].Hydration.Repo.TargetRef.String())
+		if manifest.Inputs[0].Hydration.Repo.BaseRef.String() != "main" {
+			t.Errorf("expected base_ref main, got %q", manifest.Inputs[0].Hydration.Repo.BaseRef.String())
 		}
 	})
 
 	t.Run("validates manifest", func(t *testing.T) {
-		req := newStartRunRequest(withRunTargetRef("main"))
+		req := newStartRunRequest()
 		manifest, err := buildManifestDefault(req)
 		if err != nil {
 			t.Fatalf("buildManifestDefault() error: %v", err)
@@ -360,14 +356,12 @@ func TestManifestBuildWithGateRepoMeta(t *testing.T) {
 		tests := []struct {
 			name      string
 			commitSHA string
-			targetRef string
 			baseRef   string
 			wantRef   string
 		}{
-			{"CommitSHA takes precedence", "abc123def456", "feature/gate-wiring", "main", "abc123def456"},
-			{"TargetRef when no CommitSHA", "", "feature/gate-wiring", "main", "feature/gate-wiring"},
-			{"BaseRef as fallback", "", "", "main", "main"},
-			{"empty when no refs provided", "", "", "", ""},
+			{"CommitSHA takes precedence", "abc123def456", "main", "abc123def456"},
+			{"BaseRef as fallback", "", "main", "main"},
+			{"empty when no refs provided", "", "", ""},
 		}
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
@@ -375,7 +369,6 @@ func TestManifestBuildWithGateRepoMeta(t *testing.T) {
 				req := newStartRunRequest(
 					withRunRepoURL("https://gitlab.com/iw2rmb/ploy-orw.git"),
 					withRunBaseRef(tt.baseRef),
-					withRunTargetRef(tt.targetRef),
 					withRunCommitSHA(tt.commitSHA),
 				)
 				manifest, err := buildManifestDefault(req)
@@ -417,7 +410,6 @@ func TestManifestBuildWithGateRepoMeta(t *testing.T) {
 		t.Parallel()
 		req := newStartRunRequest(
 			withRunRepoURL("https://gitlab.com/iw2rmb/ploy-orw.git"),
-			withRunTargetRef("main"),
 			withRunOptions(RunOptions{BuildGate: BuildGateOptions{
 				Images: []contracts.BuildGateImageRule{{
 					Stack: contracts.StackExpectation{Language: "java", Tool: "maven", Release: "17"},

@@ -14,7 +14,6 @@ import (
 type RunSubmitRequest struct {
 	RepoURL   domaintypes.RepoURL `json:"repo_url"`
 	BaseRef   domaintypes.GitRef  `json:"base_ref"`
-	TargetRef domaintypes.GitRef  `json:"target_ref"`
 	Spec      json.RawMessage     `json:"spec"`
 	CreatedBy string              `json:"created_by,omitempty"`
 }

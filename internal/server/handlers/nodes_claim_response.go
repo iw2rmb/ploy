@@ -31,7 +31,6 @@ type claimResponsePayload struct {
 	Status        domaintypes.RunStatus       `json:"status"`
 	NodeID        domaintypes.NodeID          `json:"node_id"`
 	BaseRef       string                      `json:"base_ref"`
-	TargetRef     string                      `json:"target_ref"`
 	CommitSHA     string                      `json:"commit_sha,omitempty"`
 	RepoSHAIn     string                      `json:"repo_sha_in,omitempty"`
 	StartedAt     string                      `json:"started_at"`
@@ -147,7 +146,6 @@ func buildClaimResponsePayload(
 		Status:        run.Status,
 		NodeID:        nodeIDPtrOrZero(job.NodeID),
 		BaseRef:       job.RepoBaseRef,
-		TargetRef:     runRepo.RepoTargetRef,
 		CommitSHA:     commitSHA,
 		RepoSHAIn:     job.RepoShaIn,
 		StartedAt:     run.StartedAt.Time.Format(time.RFC3339),
@@ -183,7 +181,6 @@ func buildActionClaimResponsePayload(
 		Status:        run.Status,
 		NodeID:        nodeIDPtrOrZero(action.NodeID),
 		BaseRef:       runRepo.RepoBaseRef,
-		TargetRef:     runRepo.RepoTargetRef,
 		RepoSHAIn:     "",
 		StartedAt:     run.StartedAt.Time.Format(time.RFC3339),
 		CreatedAt:     run.CreatedAt.Time.Format(time.RFC3339),

@@ -29,7 +29,6 @@ echo "=========================================="
 "$PLOY_BIN" mig run \
   --repo-url "$REPO_URL" \
   --repo-base-ref "$REPO_BASE_REF" \
-  --repo-target-ref "$REPO_TARGET_REF" \
   --spec "$SPEC_FILE" \
   --follow \
   --artifact-dir "$E2E_ARTIFACT_DIR"

@@ -8,7 +8,7 @@ import (
 )
 
 // createRunRepoForStoreTest creates a MigRepo + RunRepo under migID/runID with
-// the given repoURL, baseRef, targetRef, and initial status. If status is
+// the given repoURL, baseRef, and initial status. If status is
 // RunRepoStatusQueued the status update call is skipped (Queued is the default).
 // Used by cancel_bulk_queries_test.go and stale_recovery_queries_test.go to
 // avoid duplicate fixture helpers.
@@ -18,18 +18,17 @@ func createRunRepoForStoreTest(
 	db Store,
 	migID types.MigID,
 	runID types.RunID,
-	repoURL, baseRef, targetRef string,
+	repoURL, baseRef string,
 	status types.RunRepoStatus,
 ) RunRepo {
 	t.Helper()
 
 	repoID := types.NewMigRepoID()
 	mr, err := db.CreateMigRepo(ctx, CreateMigRepoParams{
-		ID:        repoID,
-		MigID:     migID,
-		Url:       repoURL,
-		BaseRef:   baseRef,
-		TargetRef: targetRef,
+		ID:      repoID,
+		MigID:   migID,
+		Url:     repoURL,
+		BaseRef: baseRef,
 	})
 	if err != nil {
 		t.Fatalf("CreateMigRepo(%s) failed: %v", repoURL, err)
@@ -40,7 +39,6 @@ func createRunRepoForStoreTest(
 		RunID:           runID,
 		RepoID:          mr.RepoID,
 		RepoBaseRef:     mr.BaseRef,
-		RepoTargetRef:   mr.TargetRef,
 		SourceCommitSha: "0123456789abcdef0123456789abcdef01234567",
 		RepoSha0:        "0123456789abcdef0123456789abcdef01234567",
 	})
@@ -107,7 +105,7 @@ type v1Fixture struct {
 	RunRepo RunRepo
 }
 
-func newV1Fixture(t *testing.T, ctx context.Context, db Store, repoURL, baseRef, targetRef string, specJSON []byte) v1Fixture {
+func newV1Fixture(t *testing.T, ctx context.Context, db Store, repoURL, baseRef string, specJSON []byte) v1Fixture {
 	t.Helper()
 
 	createdBy := "test-user"
@@ -136,11 +134,10 @@ func newV1Fixture(t *testing.T, ctx context.Context, db Store, repoURL, baseRef,
 
 	migRepoID := types.NewMigRepoID()
 	migRepo, err := db.CreateMigRepo(ctx, CreateMigRepoParams{
-		ID:        migRepoID,
-		MigID:     migID,
-		Url:       repoURL,
-		BaseRef:   baseRef,
-		TargetRef: targetRef,
+		ID:      migRepoID,
+		MigID:   migID,
+		Url:     repoURL,
+		BaseRef: baseRef,
 	})
 	if err != nil {
 		t.Fatalf("CreateMigRepo() failed: %v", err)
@@ -162,7 +159,6 @@ func newV1Fixture(t *testing.T, ctx context.Context, db Store, repoURL, baseRef,
 		RunID:           runID,
 		RepoID:          migRepo.RepoID,
 		RepoBaseRef:     baseRef,
-		RepoTargetRef:   targetRef,
 		SourceCommitSha: "0123456789abcdef0123456789abcdef01234567",
 		RepoSha0:        "0123456789abcdef0123456789abcdef01234567",
 	})

@@ -264,8 +264,6 @@ func TestCreateSingleRepoRunHandler_ValidationErrors(t *testing.T) {
 		{"no repo_url", validRunRequestBodyWithout("repo_url"), "empty"},
 		{"empty base_ref", validRunRequestBodyWith(map[string]any{"base_ref": ""}), "empty"},
 		{"no base_ref", validRunRequestBodyWithout("base_ref"), "empty"},
-		{"empty target_ref", validRunRequestBodyWith(map[string]any{"target_ref": ""}), "empty"},
-		{"no target_ref", validRunRequestBodyWithout("target_ref"), "empty"},
 		{"no spec", validRunRequestBodyWithout("spec"), "spec is required"},
 		{"invalid JSON", "not json", "invalid request"},
 		{"http scheme repo_url", validRunRequestBodyWith(map[string]any{"repo_url": "http://github.com/user/repo.git"}), "invalid repo url"},
@@ -354,11 +352,10 @@ func TestGetRunStatusHandler(t *testing.T) {
 				}
 				st.listRunReposWithURLByRun.val = []store.ListRunReposWithURLByRunRow{
 					{
-						RunID:         runID,
-						RepoID:        "repo_123",
-						RepoBaseRef:   "main",
-						RepoTargetRef: "feature",
-						RepoUrl:       "https://github.com/user/repo.git",
+						RunID:       runID,
+						RepoID:      "repo_123",
+						RepoBaseRef: "main",
+						RepoUrl:     "https://github.com/user/repo.git",
 					},
 				}
 				return st
@@ -379,9 +376,6 @@ func TestGetRunStatusHandler(t *testing.T) {
 				}
 				if resp.Metadata["repo_base_ref"] != "main" {
 					t.Fatalf("expected base_ref main, got %s", resp.Metadata["repo_base_ref"])
-				}
-				if resp.Metadata["repo_target_ref"] != "feature" {
-					t.Fatalf("expected target_ref feature, got %s", resp.Metadata["repo_target_ref"])
 				}
 				if len(resp.Stages) != 1 {
 					t.Fatalf("expected 1 stage, got %d", len(resp.Stages))

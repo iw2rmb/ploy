@@ -108,9 +108,8 @@ func TestPrepareStickyWorkspaceForStep_ChainHeadHydratesWorkspaceWithoutRunBase(
 				Name: "workspace",
 				Hydration: &contracts.StepInputHydration{
 					Repo: &contracts.RepoMaterialization{
-						URL:       types.RepoURL("file://" + repoDir),
-						BaseRef:   types.GitRef("main"),
-						TargetRef: types.GitRef("main"),
+						URL:     types.RepoURL("file://" + repoDir),
+						BaseRef: types.GitRef("main"),
 					},
 				},
 			},

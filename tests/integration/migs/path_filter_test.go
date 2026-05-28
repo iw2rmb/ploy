@@ -45,10 +45,9 @@ func repoRoot(t *testing.T) string {
 
 // parseScenarioORWPass extracts values from tests/e2e/migs/scenario-orw-pass.sh.
 // Defaults align with the scenario script; parsing overrides them if found.
-func parseScenarioORWPass(content string) (repoURL, baseRef, targetRef, group, artifact, version, classname string) {
+func parseScenarioORWPass(content string) (repoURL, baseRef, group, artifact, version, classname string) {
 	repoURL = "https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git"
 	baseRef = "main"
-	targetRef = "e2e/success"
 	group = "org.openrewrite.recipe"
 	artifact = "rewrite-migrate-java"
 	version = "3.20.0"
@@ -57,9 +56,6 @@ func parseScenarioORWPass(content string) (repoURL, baseRef, targetRef, group, a
 	// Parse overrides from the scenario script content.
 	if m := regexp.MustCompile(`(?m)^REPO=\$\{[^:]+:-([^}]+)\}`).FindStringSubmatch(content); len(m) == 2 {
 		repoURL = strings.TrimSpace(m[1])
-	}
-	if m := regexp.MustCompile(`(?m)^TARGET_REF=([^\n]+)$`).FindStringSubmatch(content); len(m) == 2 {
-		targetRef = strings.TrimSpace(m[1])
 	}
 	if m := regexp.MustCompile(`(?m)^RECIPE_GROUP=([^\n]+)$`).FindStringSubmatch(content); len(m) == 2 {
 		group = strings.TrimSpace(m[1])
@@ -75,6 +71,5 @@ func parseScenarioORWPass(content string) (repoURL, baseRef, targetRef, group, a
 	}
 	_ = repoURL
 	_ = baseRef
-	_ = targetRef // kept for future assertions if desired
 	return
 }

@@ -106,7 +106,6 @@ func (c GetRunReportCommand) buildRepoEntry(
 		RepoID:          repo.RepoID,
 		RepoURL:         repo.RepoURL,
 		BaseRef:         repo.BaseRef,
-		TargetRef:       repo.TargetRef,
 		SourceCommitSHA: repo.SourceCommitSHA,
 		Attempt:         repo.Attempt,
 		Status:          repo.Status,
@@ -142,7 +141,6 @@ type runRepoReportSource struct {
 	RepoID          domaintypes.MigRepoID     `json:"repo_id"`
 	RepoURL         string                    `json:"repo_url"`
 	BaseRef         string                    `json:"base_ref"`
-	TargetRef       string                    `json:"target_ref"`
 	SourceCommitSHA string                    `json:"source_commit_sha,omitempty"`
 	Status          domaintypes.RunRepoStatus `json:"status"`
 	Attempt         int32                     `json:"attempt"`

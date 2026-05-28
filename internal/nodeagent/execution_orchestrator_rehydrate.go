@@ -76,16 +76,10 @@ func (r *runController) prepareStickyWorkspaceForStep(
 	if repo == nil {
 		// Derive repo materialization from StartRunRequest, mirroring
 		// buildManifestFromRequest semantics.
-		targetRef := strings.TrimSpace(req.TargetRef.String())
-		if targetRef == "" && strings.TrimSpace(req.BaseRef.String()) != "" {
-			targetRef = strings.TrimSpace(req.BaseRef.String())
-		}
-
 		tmp := contracts.RepoMaterialization{
-			URL:       req.RepoURL,
-			BaseRef:   req.BaseRef,
-			TargetRef: types.GitRef(targetRef),
-			Commit:    req.CommitSHA,
+			URL:     req.RepoURL,
+			BaseRef: req.BaseRef,
+			Commit:  req.CommitSHA,
 		}
 		repo = &tmp
 	}

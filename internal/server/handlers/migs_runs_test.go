@@ -36,8 +36,8 @@ func TestMigRuns_Create(t *testing.T) {
 			name: "all repos",
 			setupFn: func(st *migStore) {
 				st.listMigReposByMig.val = []store.MigRepo{
-					{ID: "migRepo1", MigID: "mig123", RepoID: "global01", BaseRef: "main", TargetRef: "feature1"},
-					{ID: "migRepo2", MigID: "mig123", RepoID: "global02", BaseRef: "main", TargetRef: "feature2"},
+					{ID: "migRepo1", MigID: "mig123", RepoID: "global01", BaseRef: "main"},
+					{ID: "migRepo2", MigID: "mig123", RepoID: "global02", BaseRef: "main"},
 				}
 			},
 			body:       allReposSelector(),
@@ -81,9 +81,9 @@ func TestMigRuns_Create(t *testing.T) {
 			name: "failed repos",
 			setupFn: func(st *migStore) {
 				st.listMigReposByMig.val = []store.MigRepo{
-					{ID: "repo1", MigID: "mig123", RepoID: "repo1", BaseRef: "main", TargetRef: "feature1"},
-					{ID: "repo2", MigID: "mig123", RepoID: "repo2", BaseRef: "main", TargetRef: "feature2"},
-					{ID: "repo3", MigID: "mig123", RepoID: "repo3", BaseRef: "main", TargetRef: "feature3"},
+					{ID: "repo1", MigID: "mig123", RepoID: "repo1", BaseRef: "main"},
+					{ID: "repo2", MigID: "mig123", RepoID: "repo2", BaseRef: "main"},
+					{ID: "repo3", MigID: "mig123", RepoID: "repo3", BaseRef: "main"},
 				}
 				st.listFailedRepoIDsByMig.val = []domaintypes.RepoID{"repo2"}
 			},
@@ -108,9 +108,9 @@ func TestMigRuns_Create(t *testing.T) {
 			name: "explicit repos",
 			setupFn: func(st *migStore) {
 				st.listMigReposByMig.val = []store.MigRepo{
-					{ID: "repo1", MigID: "mig123", RepoID: "repo1", BaseRef: "main", TargetRef: "feature1"},
-					{ID: "repo2", MigID: "mig123", RepoID: "repo2", BaseRef: "main", TargetRef: "feature2"},
-					{ID: "repo3", MigID: "mig123", RepoID: "repo3", BaseRef: "main", TargetRef: "feature3"},
+					{ID: "repo1", MigID: "mig123", RepoID: "repo1", BaseRef: "main"},
+					{ID: "repo2", MigID: "mig123", RepoID: "repo2", BaseRef: "main"},
+					{ID: "repo3", MigID: "mig123", RepoID: "repo3", BaseRef: "main"},
 				}
 				st.repoByID = map[domaintypes.RepoID]store.Repo{
 					"repo1": {ID: "repo1", Url: "https://github.com/org/repo1"},

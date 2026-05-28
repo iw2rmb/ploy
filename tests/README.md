@@ -237,7 +237,6 @@ mkdir -p "${ARTIFACT_DIR}"
 dist/ploy mig run \
   --repo-url https://github.com/example/repo.git \
   --repo-base-ref main \
-  --repo-target-ref feature/test \
   --job-image your-mig:latest \
   --follow \
   --artifact-dir "${ARTIFACT_DIR}"

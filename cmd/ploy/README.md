@@ -18,11 +18,10 @@ ploy help <command>            # Alternative help syntax
 Common command patterns:
 
 ```bash
-ploy run --repo <url> --base-ref <ref> --target-ref <ref> --spec <path|->  # submit a single-repo run
+ploy run --repo <url> --base-ref <ref> --spec <path|->                     # submit a single-repo run
 ploy mig run <mig-id|name> [--repo <url> ...] [--failed]                   # execute a mig project over its repo set
 ploy mig run \
-  [--repo-url <url> --repo-base-ref <branch> [--repo-target-ref <branch>] \
-   --repo-workspace-hint <dir>] \
+  [--repo-url <url> --repo-base-ref <branch> --repo-workspace-hint <dir>] \
   [--migs-plan-timeout <duration>] [--migs-max-parallel <n>] [--cap <duration>] [--cancel-on-cap]
 ploy spec schema                                                            # print the mig JSON Schema
 ploy spec validate docs/schemas/mig.example.yaml                            # validate a mig spec
@@ -40,7 +39,6 @@ Quick capture example:
 TICKET=$(ploy mig run --json \
   --repo-url https://gitlab.com/org/repo.git \
   --repo-base-ref main \
-  --repo-target-ref workflow/upgrade \
   --follow | jq -r '.run_id')
 ```
 
@@ -79,8 +77,8 @@ ploy mig add --name my-mig --spec mig.yaml
 ploy mig spec set my-mig mig.yaml
 
 # Manage the mig's repo set.
-ploy mig repo add my-mig --repo https://github.com/org/repo-a.git --base-ref main --target-ref upgrade
-ploy mig repo add my-mig --repo https://github.com/org/repo-b.git --base-ref main --target-ref upgrade
+ploy mig repo add my-mig --repo https://github.com/org/repo-a.git --base-ref main
+ploy mig repo add my-mig --repo https://github.com/org/repo-b.git --base-ref main
 ploy mig repo list my-mig
 
 # Execute the mig project (all repos by default).
@@ -110,7 +108,6 @@ The run executes immediately against that repository:
 ploy mig run --spec mig.yaml \
   --repo-url https://github.com/example/repo.git \
   --repo-base-ref main \
-  --repo-target-ref feature-branch \
   --follow
 ```
 
@@ -130,13 +127,11 @@ ploy mig run --spec mig.yaml --name my-batch
 ploy mig run repo add \
   --repo-url https://github.com/org/repo-a.git \
   --base-ref main \
-  --target-ref upgrade-deps \
   my-batch
 
 ploy mig run repo add \
   --repo-url https://github.com/org/repo-b.git \
   --base-ref main \
-  --target-ref upgrade-deps \
   my-batch
 
 # Step 3: Optionally stream logs for the entire batch.
@@ -149,15 +144,15 @@ the same transformation (e.g., Java 17 upgrade) applies to many repositories.
 
 ### Restart a Repo Within a Batch
 
-If a repository job fails or needs reprocessing with a different branch, use
+If a repository job fails or needs reprocessing from a different base ref, use
 `mig run repo restart`:
 
 ```bash
-# Restart repo-a with a hotfix branch (discover repo-id from `ploy run status --json`).
+# Restart repo-a with a different base ref (discover repo-id from `ploy run status --json`).
 # Repo IDs are NanoID(8) strings (e.g., "a1b2c3d4").
 ploy mig run repo restart \
   --repo-id <repo-id> \
-  --target-ref hotfix \
+  --base-ref hotfix \
   my-batch
 ```
 
@@ -181,7 +176,7 @@ ploy mig run repo remove \
 | `mig run --name <batch>` | Create a batch run (no repos yet)             |
 | `mig run repo add`       | Attach a repository to an existing batch      |
 | `mig run repo remove`    | Detach a repository from a batch              |
-| `mig run repo restart`   | Re-queue a repo job with optional new branch  |
+| `mig run repo restart`   | Re-queue a repo job with optional new base ref |
 | `run pull <run-id>`      | Pull diffs for the current repo from a run    |
 | `run patch <run-id>`     | Download a stored `.patch.gz` artifact only   |
 | `mig pull [<mig>]`       | Pull diffs for the current repo from a mig    |
@@ -193,8 +188,7 @@ See `docs/migs-lifecycle.md` for the relationship between runs, `run_repos`, and
 
 After a run completes, you can pull the Migs-generated changes into your local
 repository using either `ploy run pull <run-id>` (run-based) or `ploy mig pull` (mig-based).
-These commands reconstruct the Migs branch locally by fetching stored diffs from the
-control plane and applying them to a new branch.
+These commands apply stored diffs from the control plane to the current worktree.
 
 ```bash
 # From a repo that participated in a Migs run:
@@ -211,9 +205,8 @@ ploy mig pull <mig-id|name>
 1. Derives the current repo identity from the git remote (default: `origin`).
 2. Verifies the working tree is clean (no uncommitted changes).
 3. Resolves `(run_id, repo_id)` via `POST /v1/runs/{run_id}/pull` (or `POST /v1/migs/{mig_id}/pull` for mig-based pull).
-4. Fetches the run's `base_ref` from the origin remote (`git fetch <origin> <base_ref> --depth=1`).
-5. Creates a new branch at the fetched commit using the run's `target_ref`.
-6. Downloads and applies all stored Migs diffs via `git apply`.
+4. Fetches repo details and verifies local `HEAD` matches the run's `source_commit_sha`.
+5. Downloads and applies all stored Migs diffs via `git apply`.
 
 **Arguments:**
 - `<run-id>` — Run ID (KSUID string), for `ploy run pull`.
@@ -222,7 +215,7 @@ ploy mig pull <mig-id|name>
 **Flags:**
 - `--origin <remote>` — Git remote to match (default: `origin`). Use this when your
   repository has multiple remotes.
-- `--dry-run` — Validate and print planned actions without creating branches or applying
+- `--dry-run` — Validate and print planned actions without applying
   patches. Useful for previewing what changes would be pulled.
 
 **Examples:**
@@ -398,8 +391,8 @@ ploy completion <shell> --help
   for deterministic file injection via content-addressed bundles.
   See `docs/schemas/mig.example.yaml` for the full schema and
   `tests/e2e/migs/README.md` for usage examples.
-- `--repo-url` / `--repo-base-ref` / `--repo-target-ref` / `--repo-workspace-hint`
-  — Repository materialisation inputs consumed by `mig run`. Allowed `--repo-url` schemes: `https://`, `ssh://`, `file://`. When `--repo-url` is provided, `--repo-base-ref` selects the base branch (commonly `main`). `--repo-target-ref` is optional; when omitted, the node derives a default of `ploy/{run_name|run_id}` (using the run name when set or the run ID, a KSUID string, otherwise) for workspace context. The workspace hint creates an auxiliary directory (e.g. `migs/java`) before Migs stages execute.
+- `--repo-url` / `--repo-base-ref` / `--repo-workspace-hint`
+  — Repository materialisation inputs consumed by `mig run`. Allowed `--repo-url` schemes: `https://`, `ssh://`, `file://`. When `--repo-url` is provided, `--repo-base-ref` selects the source branch (commonly `main`). The workspace hint creates an auxiliary directory (e.g. `migs/java`) before Migs stages execute.
 - `--migs-plan-timeout` — Duration string passed to the Migs planner to timebox
   plan evaluation (`mig run`).
 - `--migs-max-parallel` — Upper bound on concurrent Migs stages emitted by the

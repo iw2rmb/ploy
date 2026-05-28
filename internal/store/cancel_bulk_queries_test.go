@@ -12,12 +12,12 @@ import (
 func TestCancelActiveRunReposByRun_TransitionsOnlyQueuedRunning(t *testing.T) {
 	ctx, db := openStoreForCancelBulkTests(t)
 
-	fx := newV1Fixture(t, ctx, db, "https://github.com/test/cancel-repos-a", "main", "feature", []byte(`{"type":"cancel-repos"}`))
+	fx := newV1Fixture(t, ctx, db, "https://github.com/test/cancel-repos-a", "main", []byte(`{"type":"cancel-repos"}`))
 
-	runningRepo := createRunRepoForStoreTest(t, ctx, db, fx.Mig.ID, fx.Run.ID, "https://github.com/test/cancel-repos-running", "main", "feature-running", types.RunRepoStatusRunning)
-	successRepo := createRunRepoForStoreTest(t, ctx, db, fx.Mig.ID, fx.Run.ID, "https://github.com/test/cancel-repos-success", "main", "feature-success", types.RunRepoStatusSuccess)
-	failRepo := createRunRepoForStoreTest(t, ctx, db, fx.Mig.ID, fx.Run.ID, "https://github.com/test/cancel-repos-fail", "main", "feature-fail", types.RunRepoStatusFail)
-	cancelledRepo := createRunRepoForStoreTest(t, ctx, db, fx.Mig.ID, fx.Run.ID, "https://github.com/test/cancel-repos-cancelled", "main", "feature-cancelled", types.RunRepoStatusCancelled)
+	runningRepo := createRunRepoForStoreTest(t, ctx, db, fx.Mig.ID, fx.Run.ID, "https://github.com/test/cancel-repos-running", "feature-running", types.RunRepoStatusRunning)
+	successRepo := createRunRepoForStoreTest(t, ctx, db, fx.Mig.ID, fx.Run.ID, "https://github.com/test/cancel-repos-success", "feature-success", types.RunRepoStatusSuccess)
+	failRepo := createRunRepoForStoreTest(t, ctx, db, fx.Mig.ID, fx.Run.ID, "https://github.com/test/cancel-repos-fail", "feature-fail", types.RunRepoStatusFail)
+	cancelledRepo := createRunRepoForStoreTest(t, ctx, db, fx.Mig.ID, fx.Run.ID, "https://github.com/test/cancel-repos-cancelled", "feature-cancelled", types.RunRepoStatusCancelled)
 
 	successBefore, err := db.GetRunRepo(ctx, GetRunRepoParams{RunID: fx.Run.ID, RepoID: successRepo.RepoID})
 	if err != nil {
@@ -99,7 +99,7 @@ func TestCancelActiveRunReposByRun_TransitionsOnlyQueuedRunning(t *testing.T) {
 func TestCancelActiveJobsByRun_TransitionsOnlyCreatedQueuedRunning(t *testing.T) {
 	ctx, db := openStoreForCancelBulkTests(t)
 
-	fx := newV1Fixture(t, ctx, db, "https://github.com/test/cancel-jobs-a", "main", "feature", []byte(`{"type":"cancel-jobs"}`))
+	fx := newV1Fixture(t, ctx, db, "https://github.com/test/cancel-jobs-a", "main", []byte(`{"type":"cancel-jobs"}`))
 
 	createdJob := createJobForStoreTest(t, ctx, db, fx.Run.ID, fx.MigRepo.RepoID, fx.RunRepo.RepoBaseRef, 1, "created", types.JobStatusCreated)
 	queuedJob := createJobForStoreTest(t, ctx, db, fx.Run.ID, fx.MigRepo.RepoID, fx.RunRepo.RepoBaseRef, 1, "queued", types.JobStatusQueued)
@@ -242,8 +242,8 @@ func TestCancelActiveJobsByRun_TransitionsOnlyCreatedQueuedRunning(t *testing.T)
 func TestCancelBulkQueries_AreScopedToRunID(t *testing.T) {
 	ctx, db := openStoreForCancelBulkTests(t)
 
-	fxA := newV1Fixture(t, ctx, db, "https://github.com/test/cancel-scope-a", "main", "feature-a", []byte(`{"type":"cancel-scope-a"}`))
-	fxB := newV1Fixture(t, ctx, db, "https://github.com/test/cancel-scope-b", "main", "feature-b", []byte(`{"type":"cancel-scope-b"}`))
+	fxA := newV1Fixture(t, ctx, db, "https://github.com/test/cancel-scope-a", "main", []byte(`{"type":"cancel-scope-a"}`))
+	fxB := newV1Fixture(t, ctx, db, "https://github.com/test/cancel-scope-b", "main", []byte(`{"type":"cancel-scope-b"}`))
 
 	jobA := createJobForStoreTest(t, ctx, db, fxA.Run.ID, fxA.MigRepo.RepoID, fxA.RunRepo.RepoBaseRef, 1, "run-a-created", types.JobStatusCreated)
 	jobB := createJobForStoreTest(t, ctx, db, fxB.Run.ID, fxB.MigRepo.RepoID, fxB.RunRepo.RepoBaseRef, 1, "run-b-created", types.JobStatusCreated)

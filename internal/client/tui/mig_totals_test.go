@@ -37,8 +37,8 @@ func TestCountMigReposCommand(t *testing.T) {
 				w.Header().Set("Content-Type", "application/json")
 				_ = json.NewEncoder(w).Encode(map[string]any{
 					"repos": []map[string]any{
-						{"id": repoID1.String(), "mig_id": migID.String(), "repo_url": "https://github.com/org/a", "base_ref": "main", "target_ref": "main", "created_at": "2026-01-01T00:00:00Z"},
-						{"id": repoID2.String(), "mig_id": migID.String(), "repo_url": "https://github.com/org/b", "base_ref": "main", "target_ref": "main", "created_at": "2026-01-01T00:00:00Z"},
+						{"id": repoID1.String(), "mig_id": migID.String(), "repo_url": "https://github.com/org/a", "base_ref": "main", "created_at": "2026-01-01T00:00:00Z"},
+						{"id": repoID2.String(), "mig_id": migID.String(), "repo_url": "https://github.com/org/b", "base_ref": "main", "created_at": "2026-01-01T00:00:00Z"},
 					},
 				})
 			},

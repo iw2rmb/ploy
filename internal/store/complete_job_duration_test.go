@@ -22,7 +22,6 @@ func TestCompleteJobDurationNeverNull(t *testing.T) {
 	fixture := newV1Fixture(t, ctx, db,
 		"https://github.com/iw2rmb/ploy-duration-test.git",
 		"main",
-		"feature",
 		[]byte(`{"steps":[]}`),
 	)
 

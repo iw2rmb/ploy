@@ -133,7 +133,7 @@ deploy:
   script:
     - mkdir -p ~/.config/ploy/<cluster-id>
     - echo "$PLOY_DESCRIPTOR" > ~/.config/ploy/<cluster-id>/auth.json
-    - ploy run --repo $CI_PROJECT_URL --base-ref main --target-ref ploy/$CI_PIPELINE_ID --spec mig.yaml --follow
+    - ploy run --repo $CI_PROJECT_URL --base-ref main --spec mig.yaml --follow
   variables:
     PLOY_DESCRIPTOR: $PLOY_CLUSTER_DESCRIPTOR  # Set in GitLab CI/CD variables
 ```
@@ -148,7 +148,7 @@ deploy:
     PLOY_DESCRIPTOR: ${{ secrets.PLOY_CLUSTER_DESCRIPTOR }}
 
 - name: Run Migs
-  run: ploy run --repo ${{ github.repositoryUrl }} --base-ref main --target-ref ploy/${{ github.run_id }} --spec mig.yaml --follow
+  run: ploy run --repo ${{ github.repositoryUrl }} --base-ref main --spec mig.yaml --follow
 ```
 
 ## Worker Node Authentication (Local Docker)

@@ -66,7 +66,6 @@ func TestGetRunReportCommandAssemblesCanonicalReport(t *testing.T) {
 						"repo_id":     repoID.String(),
 						"repo_url":    "https://github.com/acme/service.git",
 						"base_ref":    "main",
-						"target_ref":  "ploy/java17",
 						"status":      "Running",
 						"attempt":     2,
 						"last_error":  "build failed",
@@ -96,19 +95,19 @@ func TestGetRunReportCommandAssemblesCanonicalReport(t *testing.T) {
 						"duration_ms":  50,
 						"display_name": "scan",
 					},
-						{
-							"job_id":       jobID2.String(),
-							"name":         "step-2",
-							"job_type":     "post_gate",
-							"job_image":    "ghcr.io/acme/runner:1",
+					{
+						"job_id":       jobID2.String(),
+						"name":         "step-2",
+						"job_type":     "post_gate",
+						"job_image":    "ghcr.io/acme/runner:1",
 						"next_id":      nil,
 						"node_id":      nil,
-							"status":       "Running",
-							"duration_ms":  5,
-							"display_name": "apply",
-						},
+						"status":       "Running",
+						"duration_ms":  5,
+						"display_name": "apply",
 					},
-				})
+				},
+			})
 		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/diffs":
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"diffs": []map[string]any{
@@ -238,7 +237,6 @@ func TestGetRunReportCommandMissingOptionalFields(t *testing.T) {
 						"repo_id":    repoID.String(),
 						"repo_url":   "https://github.com/acme/empty.git",
 						"base_ref":   "main",
-						"target_ref": "ploy/empty",
 						"status":     "Queued",
 						"attempt":    1,
 						"created_at": "2026-02-24T09:01:00Z",

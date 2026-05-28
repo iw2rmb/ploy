@@ -37,17 +37,14 @@ func resolveImage(
 	return resolved, nil
 }
 
-// injectRepoMetadataEnv adds PLOY_REPO_URL, PLOY_BASE_REF, PLOY_TARGET_REF, and
-// PLOY_COMMIT_SHA to env from the request. Only non-empty values are set.
+// injectRepoMetadataEnv adds PLOY_REPO_URL, PLOY_BASE_REF, and PLOY_COMMIT_SHA
+// to env from the request. Only non-empty values are set.
 func injectRepoMetadataEnv(env map[string]string, req StartRunRequest) {
 	if v := strings.TrimSpace(req.RepoURL.String()); v != "" {
 		env["PLOY_REPO_URL"] = v
 	}
 	if v := strings.TrimSpace(req.BaseRef.String()); v != "" {
 		env["PLOY_BASE_REF"] = v
-	}
-	if v := strings.TrimSpace(req.TargetRef.String()); v != "" {
-		env["PLOY_TARGET_REF"] = v
 	}
 	if v := strings.TrimSpace(req.CommitSHA.String()); v != "" {
 		env["PLOY_COMMIT_SHA"] = v
@@ -128,16 +125,10 @@ func buildManifestFromRequest(req StartRunRequest, typedOpts RunOptions, stepInd
 		command = []string{"/bin/sh", "-c", "echo 'Build gate placeholder'"}
 	}
 
-	targetRef := strings.TrimSpace(req.TargetRef.String())
-	if targetRef == "" && strings.TrimSpace(req.BaseRef.String()) != "" {
-		targetRef = strings.TrimSpace(req.BaseRef.String())
-	}
-
 	repo := contracts.RepoMaterialization{
-		URL:       req.RepoURL,
-		BaseRef:   req.BaseRef,
-		TargetRef: types.GitRef(targetRef),
-		Commit:    req.CommitSHA,
+		URL:     req.RepoURL,
+		BaseRef: req.BaseRef,
+		Commit:  req.CommitSHA,
 	}
 
 	// Build manifest options from typed accessors.
@@ -146,12 +137,10 @@ func buildManifestFromRequest(req StartRunRequest, typedOpts RunOptions, stepInd
 		mergedOpts["job_id"] = typedOpts.ServerMetadata.JobID.String()
 	}
 
-	// Derive gate ref: CommitSHA > TargetRef > BaseRef.
+	// Derive gate ref: CommitSHA > BaseRef.
 	gateRef := ""
 	if sha := strings.TrimSpace(req.CommitSHA.String()); sha != "" {
 		gateRef = sha
-	} else if tr := strings.TrimSpace(req.TargetRef.String()); tr != "" {
-		gateRef = tr
 	} else if br := strings.TrimSpace(req.BaseRef.String()); br != "" {
 		gateRef = br
 	}

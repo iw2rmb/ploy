@@ -155,9 +155,8 @@ func HandleMigPull(args []string, stderr io.Writer) error {
 
 	_, _ = fmt.Fprintf(stderr, "mig pull: resolved run %s (mode: %s)\n", resolution.RunID.String(), pullMode)
 	_, _ = fmt.Fprintf(stderr, "  repo ID: %s\n", resolution.RepoID.String())
-	_, _ = fmt.Fprintf(stderr, "  target ref: %s\n", resolution.RepoTargetRef.String())
 
-	// Step 7: Fetch repo details to get base_ref.
+	// Step 7: Fetch repo details to validate the local source commit.
 	repoDetails, err := fetchRunRepoDetails(ctx, httpClient, base, resolution.RunID, resolution.RepoID)
 	if err != nil {
 		return fmt.Errorf("mig pull: fetch repo details: %w", err)
@@ -169,42 +168,26 @@ func HandleMigPull(args []string, stderr io.Writer) error {
 	}
 	_, _ = fmt.Fprintf(stderr, "  base ref: %s\n", baseRef)
 
-	targetRef := strings.TrimSpace(resolution.RepoTargetRef.String())
-	if targetRef == "" {
-		return errors.New("mig pull: target_ref is not available for this run")
+	sourceCommit := strings.TrimSpace(repoDetails.SourceCommitSHA)
+	if sourceCommit == "" {
+		return errors.New("mig pull: source_commit_sha is not available for this run")
 	}
-
-	// Step 8: Fetch the base ref from the origin remote.
-	if err := fetchRef(ctx, *origin, baseRef, stderr, *dryRun); err != nil {
+	if err := ensureHEADMatchesSource(ctx, sourceCommit); err != nil {
 		return fmt.Errorf("mig pull: %w", err)
 	}
+	_, _ = fmt.Fprintf(stderr, "  source commit: %s\n", sourceCommit)
 
-	baseCommit := ""
-	if !*dryRun {
-		commit, err := resolveFetchHeadSHA(ctx)
-		if err != nil {
-			return fmt.Errorf("mig pull: %w", err)
-		}
-		baseCommit = commit
-		_, _ = fmt.Fprintf(stderr, "  base commit: %s\n", baseCommit)
-	}
-
-	// Step 9: Check for branch collisions.
-	if err := checkBranchCollision(ctx, *origin, targetRef, stderr); err != nil {
-		return fmt.Errorf("mig pull: %w", err)
-	}
-
-	// Step 10: Fetch diffs for this repo execution.
+	// Step 8: Fetch diffs for this repo execution.
 	diffs, err := ListRunRepoDiffs(ctx, httpClient, base, resolution.RunID, resolution.RepoID)
 	if err != nil {
 		return fmt.Errorf("mig pull: list diffs: %w", err)
 	}
 	_, _ = fmt.Fprintf(stderr, "  diffs to apply: %d\n", len(diffs))
 
-	// Step 11: Handle --dry-run mode.
+	// Step 9: Handle --dry-run mode.
 	if *dryRun {
-		_, _ = fmt.Fprintf(stderr, "\nWould create branch %q at %q (origin %q) and apply %d Migs diff(s)\n",
-			targetRef, baseRef, *origin, len(diffs))
+		_, _ = fmt.Fprintf(stderr, "\nWould apply %d Migs diff(s) to current worktree at %s\n",
+			len(diffs), sourceCommit)
 		for i, diff := range diffs {
 			_, _ = fmt.Fprintf(stderr, "  diff %d: %s (%d bytes gzipped)\n",
 				i+1, diff.ID, diff.Size)
@@ -212,20 +195,15 @@ func HandleMigPull(args []string, stderr io.Writer) error {
 		return nil
 	}
 
-	// Step 12: Create the target branch at the fetched base commit.
-	if err := createAndCheckoutBranch(ctx, targetRef, baseCommit, stderr); err != nil {
-		return fmt.Errorf("mig pull: %w", err)
-	}
-
-	// Step 13: Download and apply all diffs.
+	// Step 10: Download and apply all diffs.
 	appliedCount, err := downloadAndApplyDiffs(ctx, resolution.RunID, resolution.RepoID, diffs, stderr)
 	if err != nil {
 		return fmt.Errorf("mig pull: %w", err)
 	}
 
 	// Success message.
-	_, _ = fmt.Fprintf(stderr, "\nApplied %d Migs diff(s) from run %s to branch %q (origin %q)\n",
-		appliedCount, resolution.RunID, targetRef, *origin)
+	_, _ = fmt.Fprintf(stderr, "\nApplied %d Migs diff(s) from run %s to current worktree (origin %q)\n",
+		appliedCount, resolution.RunID, *origin)
 	_, _ = fmt.Fprintf(stderr, "  mig: %s\n", migID)
 
 	return nil

@@ -34,10 +34,9 @@ func TestPullRunRepoHandler(t *testing.T) {
 			setup: func(st *runStore) {
 				st.getRun.val = store.Run{ID: runID, MigID: domaintypes.NewMigID()}
 				st.listRunReposWithURLByRun.val = []store.ListRunReposWithURLByRunRow{{
-					RunID:         runID,
-					RepoID:        repoID,
-					RepoTargetRef: "feature-branch",
-					RepoUrl:       "https://github.com/org/repo.git",
+					RunID:   runID,
+					RepoID:  repoID,
+					RepoUrl: "https://github.com/org/repo.git",
 				}}
 			},
 			wantStatus: http.StatusOK,
@@ -53,9 +52,6 @@ func TestPullRunRepoHandler(t *testing.T) {
 				if resp.RepoID != repoID {
 					t.Fatalf("repo_id = %q, want %q", resp.RepoID, repoID)
 				}
-				if resp.RepoTargetRef != "feature-branch" {
-					t.Fatalf("repo_target_ref = %q, want feature-branch", resp.RepoTargetRef)
-				}
 				assertCalled(t, "GetRun", st.getRun.called)
 				assertCalled(t, "ListRunReposWithURLByRun", st.listRunReposWithURLByRun.called)
 				if st.listRunReposWithURLByRun.params != runID.String() {
@@ -70,10 +66,9 @@ func TestPullRunRepoHandler(t *testing.T) {
 			setup: func(st *runStore) {
 				st.getRun.val = store.Run{ID: runID}
 				st.listRunReposWithURLByRun.val = []store.ListRunReposWithURLByRunRow{{
-					RunID:         runID,
-					RepoID:        repoID,
-					RepoTargetRef: "main",
-					RepoUrl:       "https://github.com/org/repo",
+					RunID:   runID,
+					RepoID:  repoID,
+					RepoUrl: "https://github.com/org/repo",
 				}}
 			},
 			wantStatus: http.StatusOK,
@@ -85,10 +80,9 @@ func TestPullRunRepoHandler(t *testing.T) {
 			setup: func(st *runStore) {
 				st.getRun.val = store.Run{ID: runID}
 				st.listRunReposWithURLByRun.val = []store.ListRunReposWithURLByRunRow{{
-					RunID:         runID,
-					RepoID:        repoID,
-					RepoTargetRef: "main",
-					RepoUrl:       "https://github.com/org/repo/",
+					RunID:   runID,
+					RepoID:  repoID,
+					RepoUrl: "https://github.com/org/repo/",
 				}}
 			},
 			wantStatus: http.StatusOK,
@@ -109,10 +103,9 @@ func TestPullRunRepoHandler(t *testing.T) {
 			setup: func(st *runStore) {
 				st.getRun.val = store.Run{ID: runID}
 				st.listRunReposWithURLByRun.val = []store.ListRunReposWithURLByRunRow{{
-					RunID:         runID,
-					RepoID:        repoID,
-					RepoTargetRef: "main",
-					RepoUrl:       "https://github.com/org/repo",
+					RunID:   runID,
+					RepoID:  repoID,
+					RepoUrl: "https://github.com/org/repo",
 				}}
 			},
 			wantStatus: http.StatusNotFound,
@@ -124,8 +117,8 @@ func TestPullRunRepoHandler(t *testing.T) {
 			setup: func(st *runStore) {
 				st.getRun.val = store.Run{ID: runID}
 				st.listRunReposWithURLByRun.val = []store.ListRunReposWithURLByRunRow{
-					{RunID: runID, RepoID: domaintypes.NewRepoID(), RepoTargetRef: "main", RepoUrl: "https://github.com/org/repo"},
-					{RunID: runID, RepoID: domaintypes.NewRepoID(), RepoTargetRef: "develop", RepoUrl: "https://github.com/org/repo.git"},
+					{RunID: runID, RepoID: domaintypes.NewRepoID(), RepoUrl: "https://github.com/org/repo"},
+					{RunID: runID, RepoID: domaintypes.NewRepoID(), RepoUrl: "https://github.com/org/repo.git"},
 				}
 			},
 			wantStatus: http.StatusConflict,
@@ -183,9 +176,8 @@ func TestPullMigRepoHandler(t *testing.T) {
 			setup: func(st *runStore) {
 				setupMigPullRepo(st, migID, repoID, "https://github.com/org/repo")
 				st.getLatestRunRepoByMigAndRepoStatus.val = store.GetLatestRunRepoByMigAndRepoStatusRow{
-					RunID:         runID,
-					RepoID:        repoID,
-					RepoTargetRef: "feature-branch",
+					RunID:  runID,
+					RepoID: repoID,
 				}
 			},
 			verify: func(t *testing.T, _ *runStore, rr *httptest.ResponseRecorder) {
@@ -200,9 +192,6 @@ func TestPullMigRepoHandler(t *testing.T) {
 				if resp.RepoID != repoID {
 					t.Fatalf("repo_id = %q, want %q", resp.RepoID, repoID)
 				}
-				if resp.RepoTargetRef != "feature-branch" {
-					t.Fatalf("repo_target_ref = %q, want feature-branch", resp.RepoTargetRef)
-				}
 			},
 		},
 		{
@@ -214,9 +203,8 @@ func TestPullMigRepoHandler(t *testing.T) {
 			setup: func(st *runStore) {
 				setupMigPullRepo(st, migID, repoID, "https://github.com/org/repo")
 				st.getLatestRunRepoByMigAndRepoStatus.val = store.GetLatestRunRepoByMigAndRepoStatusRow{
-					RunID:         runID,
-					RepoID:        repoID,
-					RepoTargetRef: "bugfix-branch",
+					RunID:  runID,
+					RepoID: repoID,
 				}
 			},
 		},
@@ -287,11 +275,10 @@ func TestPullMigRepoHandler(t *testing.T) {
 func setupMigPullRepo(st *runStore, migID domaintypes.MigID, repoID domaintypes.RepoID, repoURL string) {
 	st.getMig.val = store.Mig{ID: migID, Name: "test-mig"}
 	st.listMigReposByMig.val = []store.MigRepo{{
-		ID:        domaintypes.NewMigRepoID(),
-		MigID:     migID,
-		RepoID:    repoID,
-		BaseRef:   "main",
-		TargetRef: "feature",
+		ID:      domaintypes.NewMigRepoID(),
+		MigID:   migID,
+		RepoID:  repoID,
+		BaseRef: "main",
 	}}
 	st.repoByID = map[domaintypes.RepoID]store.Repo{
 		repoID: {ID: repoID, Url: repoURL},

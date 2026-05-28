@@ -115,7 +115,6 @@ set +e
 RUN_JSON="$(e2e_mig_run_json \
   --repo-url "$REPO" \
   --repo-base-ref "$BASE_REF" \
-  --repo-target-ref "$TARGET_REF" \
   --spec "$SPEC_FILE" \
   --follow 2>&1)"
 RUN_EXIT=$?
@@ -242,7 +241,6 @@ set +e
 RUN_JSON_SYM="$(e2e_mig_run_json \
   --repo-url "$REPO" \
   --repo-base-ref "$BASE_REF" \
-  --repo-target-ref "$TARGET_REF" \
   --spec "$SPEC_FILE_SYM" \
   --follow 2>&1)"
 RUN_EXIT_SYM=$?

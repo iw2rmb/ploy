@@ -40,31 +40,25 @@ func (r WorkflowRun) Validate() error {
 type RepoMaterialization struct {
 	URL           types.RepoURL   `json:"url,omitempty"`
 	BaseRef       types.GitRef    `json:"base_ref,omitempty"`
-	TargetRef     types.GitRef    `json:"target_ref,omitempty"`
 	Commit        types.CommitSHA `json:"commit,omitempty"`
 	WorkspaceHint string          `json:"workspace_hint,omitempty"`
 }
 
 // Validate ensures repo metadata is well formed when provided.
 func (r RepoMaterialization) Validate() error {
-	// URL is optional; when set, validate and require either target ref or commit.
+	// URL is optional; when set, validate and require either base ref or commit.
 	if r.URL != "" {
 		if err := r.URL.Validate(); err != nil {
 			return fmt.Errorf("url: %w", err)
 		}
-		if r.TargetRef == "" && r.Commit == "" {
-			return fmt.Errorf("target_ref or commit is required when repo url is set")
+		if r.BaseRef == "" && r.Commit == "" {
+			return fmt.Errorf("base_ref or commit is required when repo url is set")
 		}
 	}
 	// Validate optional refs/commit when provided.
 	if r.BaseRef != "" {
 		if err := r.BaseRef.Validate(); err != nil {
 			return fmt.Errorf("base_ref: %w", err)
-		}
-	}
-	if r.TargetRef != "" {
-		if err := r.TargetRef.Validate(); err != nil {
-			return fmt.Errorf("target_ref: %w", err)
 		}
 	}
 	if r.Commit != "" {

@@ -42,7 +42,6 @@ func TestMigStatusPrintsMigrationSummary(t *testing.T) {
 						"mig_id":     migID.String(),
 						"repo_url":   "https://github.com/acme/service-a.git",
 						"base_ref":   "main",
-						"target_ref": "ploy/java17-a",
 						"created_at": "2026-02-24T07:31:00Z",
 					},
 					{
@@ -50,7 +49,6 @@ func TestMigStatusPrintsMigrationSummary(t *testing.T) {
 						"mig_id":     migID.String(),
 						"repo_url":   "https://github.com/acme/service-b.git",
 						"base_ref":   "main",
-						"target_ref": "ploy/java17-b",
 						"created_at": "2026-02-24T07:32:00Z",
 					},
 				},

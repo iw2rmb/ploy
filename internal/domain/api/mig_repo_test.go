@@ -22,7 +22,6 @@ func TestMigRepoSummaryDTO(t *testing.T) {
 			MigID:     domaintypes.MigID("migAbc"),
 			RepoURL:   "https://github.com/example/repo.git",
 			BaseRef:   "main",
-			TargetRef: "feature/branch",
 			CreatedAt: now,
 		}
 		b, err := json.Marshal(in)
@@ -45,9 +44,6 @@ func TestMigRepoSummaryDTO(t *testing.T) {
 		if out.BaseRef != in.BaseRef {
 			t.Errorf("BaseRef: got %q, want %q", out.BaseRef, in.BaseRef)
 		}
-		if out.TargetRef != in.TargetRef {
-			t.Errorf("TargetRef: got %q, want %q", out.TargetRef, in.TargetRef)
-		}
 		if !out.CreatedAt.Equal(in.CreatedAt) {
 			t.Errorf("CreatedAt: got %v, want %v", out.CreatedAt, in.CreatedAt)
 		}
@@ -60,7 +56,6 @@ func TestMigRepoSummaryDTO(t *testing.T) {
 			MigID:     domaintypes.MigID("migAbc"),
 			RepoURL:   "https://github.com/example/repo.git",
 			BaseRef:   "main",
-			TargetRef: "feature",
 			CreatedAt: now,
 		}
 		b, err := json.Marshal(in)
@@ -69,7 +64,7 @@ func TestMigRepoSummaryDTO(t *testing.T) {
 		}
 		js := string(b)
 		for _, want := range []string{
-			`"id":`, `"mig_id":`, `"repo_url":`, `"base_ref":`, `"target_ref":`, `"created_at":`,
+			`"id":`, `"mig_id":`, `"repo_url":`, `"base_ref":`, `"created_at":`,
 		} {
 			if !strings.Contains(js, want) {
 				t.Errorf("JSON missing field %s in %s", want, js)
@@ -89,7 +84,6 @@ func TestMigRepoListResponseDTO(t *testing.T) {
 				MigID:     domaintypes.MigID("migAbc"),
 				RepoURL:   "https://github.com/example/repo.git",
 				BaseRef:   "main",
-				TargetRef: "feature",
 				CreatedAt: time.Now(),
 			},
 		},

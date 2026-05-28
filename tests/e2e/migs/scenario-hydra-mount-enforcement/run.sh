@@ -76,7 +76,6 @@ set +e
 RO_JSON="$(e2e_mig_run_json \
   --repo-url "$REPO" \
   --repo-base-ref "$BASE_REF" \
-  --repo-target-ref "${TARGET_REF}-ro" \
   --spec "$SPEC_RO" \
   --follow 2>&1)"
 RO_EXIT=$?
@@ -142,7 +141,6 @@ YAML
 RW_JSON="$(e2e_mig_run_json \
   --repo-url "$REPO" \
   --repo-base-ref "$BASE_REF" \
-  --repo-target-ref "${TARGET_REF}-rw" \
   --spec "$SPEC_RW" \
   --follow 2>&1)" || true
 

@@ -125,7 +125,7 @@ build_gate:
   Use `ploy mig run repo add` to attach multiple repositories under a shared spec, then run it via
   `ploy mig run <mig-id|name> [--follow]`.
   Example: `ploy mig add --name my-batch --spec mig.yaml` followed by
-  `ploy mig run repo add --repo-url https://... --base-ref main --target-ref feature my-batch`.
+  `ploy mig run repo add --repo-url https://... --base-ref main my-batch`.
   See [Migs lifecycle](../migs-lifecycle.md) § "1.4 Batched Migs Runs (`runs` + `run_repos`)"
   for full usage.
 - Container cleanup model:
@@ -147,7 +147,6 @@ by the Migs run.
 Repo metadata (injected from StartRunRequest):
 - `PLOY_REPO_URL` — Git repository URL for cloning/verification (same as the Migs run)
 - `PLOY_BASE_REF` — Base Git reference (branch or tag) for the run
-- `PLOY_TARGET_REF` — Target Git reference for the run
 - `PLOY_COMMIT_SHA` — Pinned commit SHA when available (may be empty)
 
 Server connection details:

@@ -104,15 +104,14 @@ func TestClaimManager_ClaimAndExecute_EmitsRunEventWhenStartRunFails(t *testing.
 		switch r.URL.Path {
 		case "/v1/nodes/" + testNodeID + "/claim":
 			resp := ClaimResponse{
-				RunID:     runID,
-				RepoID:    repoID,
-				JobID:     jobID,
-				JobName:   "mig-0",
-				RepoURL:   types.RepoURL("https://github.com/acme/repo.git"),
-				Status:    "Started",
-				NodeID:    testNodeID,
-				BaseRef:   "main",
-				TargetRef: "feature/x",
+				RunID:   runID,
+				RepoID:  repoID,
+				JobID:   jobID,
+				JobName: "mig-0",
+				RepoURL: types.RepoURL("https://github.com/acme/repo.git"),
+				Status:  "Started",
+				NodeID:  testNodeID,
+				BaseRef: "main",
 			}
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)

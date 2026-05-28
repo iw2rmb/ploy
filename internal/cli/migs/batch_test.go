@@ -233,7 +233,6 @@ func TestCreateBatchCommand_Run(t *testing.T) {
 		name        string
 		repoURL     string
 		baseRef     string
-		targetRef   string
 		batchName   *string
 		runSummary  domaintypes.RunSummary
 		statusCode  int
@@ -244,7 +243,6 @@ func TestCreateBatchCommand_Run(t *testing.T) {
 			name:       "successful create",
 			repoURL:    "https://github.com/org/repo.git",
 			baseRef:    "main",
-			targetRef:  "feature-branch",
 			batchName:  strPtr("test-batch"),
 			runSummary: domaintypes.RunSummary{ID: runID, Status: "Started", MigID: migID1, SpecID: specID1, CreatedAt: time.Now()},
 			statusCode: http.StatusCreated,
@@ -253,7 +251,6 @@ func TestCreateBatchCommand_Run(t *testing.T) {
 			name:       "create without name",
 			repoURL:    "https://github.com/org/repo.git",
 			baseRef:    "main",
-			targetRef:  "hotfix",
 			batchName:  nil,
 			runSummary: domaintypes.RunSummary{ID: runID, Status: "Started", MigID: migID2, SpecID: specID2, CreatedAt: time.Now()},
 			statusCode: http.StatusCreated,
@@ -262,7 +259,6 @@ func TestCreateBatchCommand_Run(t *testing.T) {
 			name:        "missing client",
 			repoURL:     "https://github.com/org/repo.git",
 			baseRef:     "main",
-			targetRef:   "feature",
 			wantErr:     true,
 			wantErrText: "http client required",
 		},
@@ -277,10 +273,9 @@ func TestCreateBatchCommand_Run(t *testing.T) {
 				case r.Method == http.MethodPost && r.URL.Path == basePathPrefix+"/v1/runs":
 					// Decode and verify request body.
 					var req struct {
-						RepoURL   string `json:"repo_url"`
-						BaseRef   string `json:"base_ref"`
-						TargetRef string `json:"target_ref"`
-						Spec      any    `json:"spec"`
+						RepoURL string `json:"repo_url"`
+						BaseRef string `json:"base_ref"`
+						Spec    any    `json:"spec"`
 					}
 					if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 						t.Errorf("decode request body: %v", err)
@@ -324,13 +319,12 @@ func TestCreateBatchCommand_Run(t *testing.T) {
 			}
 
 			cmd := CreateBatchCommand{
-				Client:    client,
-				BaseURL:   baseURL,
-				Name:      tc.batchName,
-				Spec:      []byte("{}"),
-				RepoURL:   tc.repoURL,
-				BaseRef:   tc.baseRef,
-				TargetRef: tc.targetRef,
+				Client:  client,
+				BaseURL: baseURL,
+				Name:    tc.batchName,
+				Spec:    []byte("{}"),
+				RepoURL: tc.repoURL,
+				BaseRef: tc.baseRef,
 			}
 
 			result, err := cmd.Run(context.Background())
@@ -372,11 +366,10 @@ func TestCreateBatchCommand_InvalidRepoURLScheme(t *testing.T) {
 	}
 
 	cmd := CreateBatchCommand{
-		Client:    srv.Client(),
-		BaseURL:   baseURL,
-		RepoURL:   "http://github.com/org/repo.git",
-		BaseRef:   "main",
-		TargetRef: "feature",
+		Client:  srv.Client(),
+		BaseURL: baseURL,
+		RepoURL: "http://github.com/org/repo.git",
+		BaseRef: "main",
 	}
 
 	_, err = cmd.Run(context.Background())

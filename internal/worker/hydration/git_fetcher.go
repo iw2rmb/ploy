@@ -70,9 +70,8 @@ func NewGitFetcher(opts GitFetcherOptions) (GitFetcher, error) {
 // performs this clone independently, ensuring consistent base states across
 // distributed execution.
 //
-// Note: target_ref is intentionally not checked out during hydration. The workspace
-// remains on base_ref so that subsequent diff application produces the correct
-// final state for each step.
+// The workspace remains on base_ref so subsequent diff application produces the
+// correct final state for each step.
 func (g *gitFetcher) Fetch(ctx context.Context, repo *contracts.RepoMaterialization, dest string, auth gitauth.Options) error {
 	if repo == nil {
 		return fmt.Errorf("repo materialization is required")

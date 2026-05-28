@@ -26,14 +26,13 @@ import (
 
 // AddMigRepoCommand adds a repo to a mig's repo set.
 // Endpoint: POST /v1/migs/{mig_id}/repos
-// Adds a repo with URL, base ref, and target ref.
+// Adds a repo with URL and base ref.
 type AddMigRepoCommand struct {
-	Client    *http.Client
-	BaseURL   *url.URL
-	MigRef    domaintypes.MigRef // Required: mig ID or name.
-	RepoURL   string             // Required: git repository URL.
-	BaseRef   string             // Required: base git ref.
-	TargetRef string             // Required: target git ref.
+	Client  *http.Client
+	BaseURL *url.URL
+	MigRef  domaintypes.MigRef // Required: mig ID or name.
+	RepoURL string             // Required: git repository URL.
+	BaseRef string             // Required: base git ref.
 }
 
 // Run executes POST /v1/migs/{mig_id}/repos to add a repo.
@@ -52,20 +51,13 @@ func (c AddMigRepoCommand) Run(ctx context.Context) (domainapi.MigRepoSummary, e
 	if err := baseRef.Validate(); err != nil {
 		return domainapi.MigRepoSummary{}, fmt.Errorf("mig repo add: base ref is required")
 	}
-	targetRef := domaintypes.GitRef(strings.TrimSpace(c.TargetRef))
-	if err := targetRef.Validate(); err != nil {
-		return domainapi.MigRepoSummary{}, fmt.Errorf("mig repo add: target ref is required")
-	}
-
-	// Build request payload with repo_url, base_ref, and target_ref.
+	// Build request payload with repo_url and base_ref.
 	req := struct {
-		RepoURL   domaintypes.RepoURL `json:"repo_url"`
-		BaseRef   domaintypes.GitRef  `json:"base_ref"`
-		TargetRef domaintypes.GitRef  `json:"target_ref"`
+		RepoURL domaintypes.RepoURL `json:"repo_url"`
+		BaseRef domaintypes.GitRef  `json:"base_ref"`
 	}{
-		RepoURL:   repoURL,
-		BaseRef:   baseRef,
-		TargetRef: targetRef,
+		RepoURL: repoURL,
+		BaseRef: baseRef,
 	}
 
 	payload, err := json.Marshal(req)
@@ -101,7 +93,7 @@ func (c AddMigRepoCommand) Run(ctx context.Context) (domainapi.MigRepoSummary, e
 
 // ListMigReposCommand lists repos in a mig's repo set.
 // Endpoint: GET /v1/migs/{mig_id}/repos
-// Returns repos with ID, REPO_URL, BASE_REF, TARGET_REF, ADDED_AT.
+// Returns repos with ID, REPO_URL, BASE_REF, ADDED_AT.
 type ListMigReposCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
@@ -193,12 +185,12 @@ func (c RemoveMigRepoCommand) Run(ctx context.Context) error {
 
 // ImportMigReposCommand bulk imports repos for a mig from CSV.
 // Endpoint: POST /v1/migs/{mig_id}/repos/bulk
-// Imports repos from CSV with header: repo_url,base_ref,target_ref.
+// Imports repos from CSV with header: repo_url,base_ref.
 type ImportMigReposCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
 	MigRef  domaintypes.MigRef // Required: mig ID or name.
-	CSVData []byte             // Required: CSV content with header: repo_url,base_ref,target_ref
+	CSVData []byte             // Required: CSV content with header: repo_url,base_ref
 }
 
 // ImportMigReposResult contains the response from bulk importing repos.

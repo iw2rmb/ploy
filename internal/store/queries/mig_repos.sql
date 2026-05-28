@@ -23,34 +23,32 @@ INSERT INTO mig_repos (
   id,
   mig_id,
   repo_id,
-  base_ref,
-  target_ref
+  base_ref
 )
-VALUES ($1, $2, (SELECT id FROM resolved_repo), $4, $5)
-RETURNING id, mig_id, repo_id, base_ref, target_ref, created_at;
+VALUES ($1, $2, (SELECT id FROM resolved_repo), $4)
+RETURNING id, mig_id, repo_id, base_ref, created_at;
 
 -- name: GetMigRepo :one
-SELECT id, mig_id, repo_id, base_ref, target_ref, created_at
+SELECT id, mig_id, repo_id, base_ref, created_at
 FROM mig_repos
 WHERE id = $1;
 
 -- name: GetMigRepoByURL :one
 -- Gets a mig_repo by mig_id and repo_url (for uniqueness constraint enforcement).
-SELECT mr.id, mr.mig_id, mr.repo_id, mr.base_ref, mr.target_ref, mr.created_at
+SELECT mr.id, mr.mig_id, mr.repo_id, mr.base_ref, mr.created_at
 FROM mig_repos mr
 JOIN repos r ON r.id = mr.repo_id
 WHERE mr.mig_id = $1 AND r.url = $2;
 
 -- name: ListMigReposByMig :many
-SELECT id, mig_id, repo_id, base_ref, target_ref, created_at
+SELECT id, mig_id, repo_id, base_ref, created_at
 FROM mig_repos
 WHERE mig_id = $1
 ORDER BY created_at ASC, id ASC;
 
--- name: UpdateMigRepoRefs :exec
+-- name: UpdateMigRepoBaseRef :exec
 UPDATE mig_repos
-SET base_ref = $2,
-    target_ref = $3
+SET base_ref = $2
 WHERE id = $1;
 
 -- name: DeleteMigRepo :exec
@@ -86,15 +84,13 @@ INSERT INTO mig_repos (
   id,
   mig_id,
   repo_id,
-  base_ref,
-  target_ref
+  base_ref
 )
-VALUES ($1, $2, (SELECT id FROM resolved_repo), $4, $5)
+VALUES ($1, $2, (SELECT id FROM resolved_repo), $4)
 ON CONFLICT (mig_id, repo_id)
 DO UPDATE SET
-  base_ref = EXCLUDED.base_ref,
-  target_ref = EXCLUDED.target_ref
-RETURNING id, mig_id, repo_id, base_ref, target_ref, created_at;
+  base_ref = EXCLUDED.base_ref
+RETURNING id, mig_id, repo_id, base_ref, created_at;
 
 -- name: HasMigRepoHistory :one
 -- Checks if a mig_repo has any historical executions (run_repos references).

@@ -72,7 +72,6 @@ func newClaimJobFixture(t testing.TB, opts claimJobFixtureOptions) *claimJobFixt
 		RunID:           runID,
 		RepoID:          repoID,
 		RepoBaseRef:     "main",
-		RepoTargetRef:   "feature-branch",
 		SourceCommitSha: sourceCommitSHA,
 		RepoSha0:        sourceCommitSHA,
 		Status:          opts.runRepoStatus,

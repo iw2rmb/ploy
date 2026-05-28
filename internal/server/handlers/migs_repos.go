@@ -20,7 +20,7 @@ import (
 
 // addMigRepoHandler adds a repo to a mig's repo set.
 // Endpoint: POST /v1/migs/{mig_id}/repos
-// Request: {repo_url, base_ref, target_ref}
+// Request: {repo_url, base_ref}
 // Response: 201 Created with repo details
 //
 // v1 contract:
@@ -31,9 +31,8 @@ func addMigRepoHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Parse request body with strict validation.
 		var req struct {
-			RepoURL   domaintypes.RepoURL `json:"repo_url"`
-			BaseRef   domaintypes.GitRef  `json:"base_ref"`
-			TargetRef domaintypes.GitRef  `json:"target_ref"`
+			RepoURL domaintypes.RepoURL `json:"repo_url"`
+			BaseRef domaintypes.GitRef  `json:"base_ref"`
 		}
 		if err := decodeRequestJSON(w, r, &req, DefaultMaxBodySize); err != nil {
 			return
@@ -43,8 +42,7 @@ func addMigRepoHandler(st store.Store) http.HandlerFunc {
 		normalizedURL := domaintypes.NormalizeRepoURL(string(req.RepoURL))
 		req.RepoURL = domaintypes.RepoURL(normalizedURL)
 		if !validateField(w, "repo_url", req.RepoURL) ||
-			!validateField(w, "base_ref", req.BaseRef) ||
-			!validateField(w, "target_ref", req.TargetRef) {
+			!validateField(w, "base_ref", req.BaseRef) {
 			return
 		}
 
@@ -66,7 +64,6 @@ func addMigRepoHandler(st store.Store) http.HandlerFunc {
 			MigID:     migID,
 			Url:       normalizedURL,
 			BaseRef:   req.BaseRef.String(),
-			TargetRef: req.TargetRef.String(),
 		})
 		if err != nil {
 			if isUniqueViolation(err) {
@@ -82,7 +79,6 @@ func addMigRepoHandler(st store.Store) http.HandlerFunc {
 			MigID:     repo.MigID,
 			RepoURL:   normalizedURL,
 			BaseRef:   repo.BaseRef,
-			TargetRef: repo.TargetRef,
 			CreatedAt: repo.CreatedAt.Time,
 		})
 
@@ -95,7 +91,7 @@ func addMigRepoHandler(st store.Store) http.HandlerFunc {
 // Response: 200 OK with list of repos
 //
 // v1 contract:
-// - Lists repos: ID, REPO_URL, BASE_REF, TARGET_REF, ADDED_AT.
+// - Lists repos: ID, REPO_URL, BASE_REF, ADDED_AT.
 func listMigReposHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		mig, ok := getMigByIDOrFail(w, r, st, "list mig repos")
@@ -123,7 +119,6 @@ func listMigReposHandler(st store.Store) http.HandlerFunc {
 				MigID:     repo.MigID,
 				RepoURL:   repoURL,
 				BaseRef:   repo.BaseRef,
-				TargetRef: repo.TargetRef,
 				CreatedAt: repo.CreatedAt.Time,
 			})
 		}
@@ -191,7 +186,7 @@ func deleteMigRepoHandler(st store.Store) http.HandlerFunc {
 
 // bulkUpsertMigReposHandler bulk upserts repos for a mig from CSV.
 // Endpoint: POST /v1/migs/{mig_id}/repos/bulk
-// Request: Content-Type: text/csv; body is UTF-8 CSV with header row: repo_url,base_ref,target_ref
+// Request: Content-Type: text/csv; body is UTF-8 CSV with header row: repo_url,base_ref
 // Response: 200 OK with counts {created, updated, failed} and errors array
 //
 // v1 contract:
@@ -224,7 +219,7 @@ func bulkUpsertMigReposHandler(st store.Store) http.HandlerFunc {
 
 		// Parse CSV body.
 		reader := csv.NewReader(bufio.NewReader(r.Body))
-		reader.FieldsPerRecord = 3 // repo_url, base_ref, target_ref
+		reader.FieldsPerRecord = 2 // repo_url, base_ref
 		reader.LazyQuotes = false  // Strict CSV parsing
 		reader.TrimLeadingSpace = false
 
@@ -254,10 +249,9 @@ func bulkUpsertMigReposHandler(st store.Store) http.HandlerFunc {
 				}
 				headerRead = true
 				// Validate header row has expected columns.
-				if len(record) != 3 || strings.ToLower(strings.TrimSpace(record[0])) != "repo_url" ||
-					strings.ToLower(strings.TrimSpace(record[1])) != "base_ref" ||
-					strings.ToLower(strings.TrimSpace(record[2])) != "target_ref" {
-					writeHTTPError(w, http.StatusBadRequest, "CSV header must be: repo_url,base_ref,target_ref")
+				if len(record) != 2 || strings.ToLower(strings.TrimSpace(record[0])) != "repo_url" ||
+					strings.ToLower(strings.TrimSpace(record[1])) != "base_ref" {
+					writeHTTPError(w, http.StatusBadRequest, "CSV header must be: repo_url,base_ref")
 					return
 				}
 				continue
@@ -272,10 +266,9 @@ func bulkUpsertMigReposHandler(st store.Store) http.HandlerFunc {
 			// Parse CSV row.
 			repoURL := strings.TrimSpace(record[0])
 			baseRef := strings.TrimSpace(record[1])
-			targetRef := strings.TrimSpace(record[2])
 
 			// Validate UTF-8.
-			if !utf8.ValidString(repoURL) || !utf8.ValidString(baseRef) || !utf8.ValidString(targetRef) {
+			if !utf8.ValidString(repoURL) || !utf8.ValidString(baseRef) {
 				failed++
 				errs = append(errs, lineError{Line: lineNum, Message: "invalid UTF-8 encoding"})
 				continue
@@ -292,12 +285,6 @@ func bulkUpsertMigReposHandler(st store.Store) http.HandlerFunc {
 				errs = append(errs, lineError{Line: lineNum, Message: "base_ref is required"})
 				continue
 			}
-			if targetRef == "" {
-				failed++
-				errs = append(errs, lineError{Line: lineNum, Message: "target_ref is required"})
-				continue
-			}
-
 			// Normalize and validate repo URL.
 			normalizedURL := domaintypes.NormalizeRepoURL(repoURL)
 			if err := domaintypes.RepoURL(normalizedURL).Validate(); err != nil {
@@ -324,7 +311,6 @@ func bulkUpsertMigReposHandler(st store.Store) http.HandlerFunc {
 				MigID:     migID,
 				Url:       normalizedURL,
 				BaseRef:   baseRef,
-				TargetRef: targetRef,
 			})
 			if err != nil {
 				failed++

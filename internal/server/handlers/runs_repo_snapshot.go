@@ -74,7 +74,6 @@ func getRunRepoSnapshotHandler(st store.Store, snapshots repoSnapshotWriter) htt
 		if err := snapshots.WriteTarGz(r.Context(), snapshot.Metadata{
 			RepoURL:         cleanURL,
 			BaseRef:         metaRow.RepoBaseRef,
-			TargetRef:       metaRow.RepoTargetRef,
 			SourceCommitSHA: sha,
 		}, w); err != nil {
 			if errors.Is(err, snapshot.ErrMaterializeTimeout) || errors.Is(r.Context().Err(), context.DeadlineExceeded) {

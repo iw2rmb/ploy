@@ -42,7 +42,7 @@ image: alpine:3.20
 command: |
   echo "[batch-e2e] Starting repo processing"
   echo "Repo: $PLOY_REPO_URL"
-  echo "Branch: $PLOY_TARGET_REF"
+  echo "Base: $PLOY_BASE_REF"
   sleep 2
   echo "[batch-e2e] Done"
 YAML
@@ -52,7 +52,6 @@ run "$PLOY_BIN" mig run \
   --spec "$SPEC_FILE" \
   --repo-url "https://github.com/placeholder/batch.git" \
   --repo-base-ref main \
-  --repo-target-ref "$BATCH_NAME" \
   > "${E2E_ARTIFACT_DIR}/create-batch.out" 2>&1 || {
   echo "WARN: Batch creation may have failed (expected if control plane not running)"
   cat "${E2E_ARTIFACT_DIR}/create-batch.out" || true
@@ -78,14 +77,12 @@ echo "[2/5] Adding repos to batch"
 run "$PLOY_BIN" mig run repo add \
   --repo-url "https://github.com/example/repo1.git" \
   --base-ref main \
-  --target-ref "feature-${TS}-1" \
   "$RUN_ID" \
   > "${E2E_ARTIFACT_DIR}/add-repo1.out" 2>&1 || true
 
 run "$PLOY_BIN" mig run repo add \
   --repo-url "https://github.com/example/repo2.git" \
   --base-ref main \
-  --target-ref "feature-${TS}-2" \
   "$RUN_ID" \
   > "${E2E_ARTIFACT_DIR}/add-repo2.out" 2>&1 || true
 
@@ -96,12 +93,12 @@ run "$PLOY_BIN" mig run repo status "$RUN_ID" \
 cat "${E2E_ARTIFACT_DIR}/status.out" || true
 
 echo ""
-echo "[4/5] Restarting repo with updated branch (if terminal)"
+echo "[4/5] Restarting repo with updated base ref (if terminal)"
 REPO1_ID="$(grep -oE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' "${E2E_ARTIFACT_DIR}/add-repo1.out" | head -1 || true)"
 if [[ -n "$REPO1_ID" ]]; then
   run "$PLOY_BIN" mig run repo restart \
     --repo-id "$REPO1_ID" \
-    --target-ref "feature-${TS}-1-retry" \
+    --base-ref "main" \
     "$RUN_ID" \
     > "${E2E_ARTIFACT_DIR}/restart-repo1.out" 2>&1 || true
 else

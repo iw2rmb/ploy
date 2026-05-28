@@ -25,24 +25,23 @@ func TestRenderRunReportJSON(t *testing.T) {
 		SpecID:  specID,
 		Repos: []RunEntry{
 			{
-				RepoID:    repoID,
-				RepoURL:   "https://github.com/acme/service.git",
-				BaseRef:   "main",
-				TargetRef: "ploy/java17",
-				Attempt:   1,
-				Status:    "Running",
-				PatchURL:  "https://example.test/patch",
-					Jobs: []RunJobEntry{
-						{
-							JobID:               jobID,
-							JobType:             "step",
-							JobImage:            "ghcr.io/acme/runner:1",
-							Status:              "Running",
-							DurationMs:          1234,
-							DisplayName:         "step-1",
-							Artifacts: []RunJobArtifact{
-								{
-									Name:      "gate-report",
+				RepoID:   repoID,
+				RepoURL:  "https://github.com/acme/service.git",
+				BaseRef:  "main",
+				Attempt:  1,
+				Status:   "Running",
+				PatchURL: "https://example.test/patch",
+				Jobs: []RunJobEntry{
+					{
+						JobID:       jobID,
+						JobType:     "step",
+						JobImage:    "ghcr.io/acme/runner:1",
+						Status:      "Running",
+						DurationMs:  1234,
+						DisplayName: "step-1",
+						Artifacts: []RunJobArtifact{
+							{
+								Name:      "gate-report",
 								CID:       "bafy-gate-report",
 								LookupURL: "https://example.test/v1/artifacts?cid=bafy-gate-report",
 							},
@@ -102,12 +101,11 @@ func TestRenderRunReportJSONOmitsEmptyOptionalFields(t *testing.T) {
 		SpecID:  domaintypes.NewSpecID(),
 		Repos: []RunEntry{
 			{
-				RepoID:    domaintypes.NewMigRepoID(),
-				RepoURL:   "https://github.com/acme/minimal.git",
-				BaseRef:   "main",
-				TargetRef: "ploy/minimal",
-				Status:    "Queued",
-				Attempt:   1,
+				RepoID:  domaintypes.NewMigRepoID(),
+				RepoURL: "https://github.com/acme/minimal.git",
+				BaseRef: "main",
+				Status:  "Queued",
+				Attempt: 1,
 			},
 		},
 	}

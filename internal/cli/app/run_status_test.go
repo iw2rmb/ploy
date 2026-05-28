@@ -113,7 +113,6 @@ func newRunStatusReportServer(t *testing.T, runID domaintypes.RunID, migID domai
 						"repo_id":           repoID.String(),
 						"repo_url":          "https://github.com/acme/service.git",
 						"base_ref":          "main",
-						"target_ref":        "ploy/java17",
 						"source_commit_sha": "0123456789abcdef0123456789abcdef01234567",
 						"status":            "Running",
 						"attempt":           1,

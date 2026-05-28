@@ -17,7 +17,7 @@ import (
 
 // createSingleRepoRunHandler submits a single-repo run and queues it for scheduler-driven execution.
 // Endpoint: POST /v1/runs
-// Request: {repo_url, base_ref, target_ref, spec}
+// Request: {repo_url, base_ref, spec}
 // Response: 201 Created with {run_id, mig_id, spec_id}
 //
 // v1 contract:
@@ -46,8 +46,7 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service, g
 
 		// Validate domain types explicitly to catch missing/zero-value fields.
 		if !validateField(w, "repo_url", req.RepoURL) ||
-			!validateField(w, "base_ref", req.BaseRef) ||
-			!validateField(w, "target_ref", req.TargetRef) {
+			!validateField(w, "base_ref", req.BaseRef) {
 			return
 		}
 
@@ -109,7 +108,6 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service, g
 			MigID:     migID,
 			Url:       normalizedRepoURL,
 			BaseRef:   req.BaseRef.String(),
-			TargetRef: req.TargetRef.String(),
 		})
 		if err != nil {
 			serverError(w, "create single-repo run", "create mig repo", err, "mig_id", migID, "repo_url", normalizedRepoURL)
@@ -135,7 +133,6 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service, g
 			RunID:           run.ID,
 			RepoID:          migRepo.RepoID,
 			RepoBaseRef:     migRepo.BaseRef,
-			RepoTargetRef:   migRepo.TargetRef,
 			SourceCommitSha: sourceCommitSHA,
 			RepoSha0:        sourceCommitSHA,
 		})
@@ -170,8 +167,7 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service, g
 				Submitter:  "",
 				Repository: normalizedRepoURL,
 				Metadata: map[string]string{
-					"repo_base_ref":   migRepo.BaseRef,
-					"repo_target_ref": migRepo.TargetRef,
+					"repo_base_ref": migRepo.BaseRef,
 				},
 				CreatedAt: timeOrZero(run.CreatedAt),
 				UpdatedAt: time.Now().UTC(),
@@ -191,7 +187,6 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service, g
 			"repo_id", runRepo.RepoID,
 			"repo_url", normalizedRepoURL,
 			"base_ref", req.BaseRef,
-			"target_ref", req.TargetRef,
 		)
 	}
 }

@@ -23,7 +23,6 @@ RECIPE_CLASSNAME="org.openrewrite.java.migrate.UpgradeToJava17"
 RUN_JSON="$(e2e_mig_run_json \
   --repo-url "$REPO" \
   --repo-base-ref main \
-  --repo-target-ref "$TARGET_REF" \
   --job-image "$PLOY_CONTAINER_REGISTRY/orw-cli-java-17-maven:latest" \
   --job-env RECIPE_GROUP="$RECIPE_GROUP" \
   --job-env RECIPE_ARTIFACT="$RECIPE_ARTIFACT" \

@@ -23,7 +23,6 @@ var ErrMaterializeTimeout = errors.New("snapshot materialization timed out")
 type Metadata struct {
 	RepoURL         string
 	BaseRef         string
-	TargetRef       string
 	SourceCommitSHA string
 }
 
@@ -70,13 +69,9 @@ func (s *Service) WriteTarGz(ctx context.Context, meta Metadata, w io.Writer) er
 		return fmt.Errorf("create git fetcher: %w", err)
 	}
 	repo := &contracts.RepoMaterialization{
-		URL:       domaintypes.RepoURL(repoURL),
-		BaseRef:   domaintypes.GitRef(strings.TrimSpace(meta.BaseRef)),
-		TargetRef: domaintypes.GitRef(strings.TrimSpace(meta.TargetRef)),
-		Commit:    domaintypes.CommitSHA(commitSHA),
-	}
-	if strings.TrimSpace(repo.TargetRef.String()) == "" {
-		repo.TargetRef = repo.BaseRef
+		URL:     domaintypes.RepoURL(repoURL),
+		BaseRef: domaintypes.GitRef(strings.TrimSpace(meta.BaseRef)),
+		Commit:  domaintypes.CommitSHA(commitSHA),
 	}
 	if err := fetcher.Fetch(ctx, repo, workspace, s.auth); err != nil {
 		if errors.Is(ctx.Err(), context.DeadlineExceeded) {

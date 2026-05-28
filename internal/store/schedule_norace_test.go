@@ -37,7 +37,7 @@ func TestScheduleNextJobNoRace(t *testing.T) {
 		t.Skipf("pgxpool max_conns=%d; need >=2 to exercise concurrent schedulers", db.Pool().Config().MaxConns)
 	}
 
-	fx := newV1Fixture(t, ctx, db, "https://github.com/test/schedule-norace", "main", "feature", []byte(`{"type":"norace"}`))
+	fx := newV1Fixture(t, ctx, db, "https://github.com/test/schedule-norace", "main", []byte(`{"type":"norace"}`))
 
 	// Create multiple jobs in Created status (not Queued).
 	const numJobs = 10
@@ -173,7 +173,7 @@ func TestScheduleNextJobSequential(t *testing.T) {
 	defer db.Close()
 	cleanTestTables(t, ctx, db)
 
-	fx := newV1Fixture(t, ctx, db, "https://github.com/test/schedule-seq", "main", "feature", []byte(`{"type":"sequential"}`))
+	fx := newV1Fixture(t, ctx, db, "https://github.com/test/schedule-seq", "main", []byte(`{"type":"sequential"}`))
 
 	// Create independent jobs (no next_id chaining). ScheduleNextJob orders by
 	// j.id ASC, so all jobs are immediately schedulable in creation order.

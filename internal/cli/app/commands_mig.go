@@ -86,19 +86,17 @@ func newMigRepoCmd(stderr io.Writer) *cobra.Command {
 }
 
 func newMigRepoAddCmd(stderr io.Writer) *cobra.Command {
-	var repoURL, baseRef, targetRef string
-	cmd := &cobra.Command{Use: "add <mig-id|name> --repo <url> --base-ref <ref> --target-ref <ref>", Short: "Add a repo to the mig", Args: cobra.ExactArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
+	var repoURL, baseRef string
+	cmd := &cobra.Command{Use: "add <mig-id|name> --repo <url> --base-ref <ref>", Short: "Add a repo to the mig", Args: cobra.ExactArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
 		return mig.RunRepoAdd(context.Background(), mig.RepoAddOptions{
-			MigRef:    args[0],
-			RepoURL:   repoURL,
-			BaseRef:   baseRef,
-			TargetRef: targetRef,
-			Output:    stderr,
+			MigRef:  args[0],
+			RepoURL: repoURL,
+			BaseRef: baseRef,
+			Output:  stderr,
 		})
 	}}
 	cmd.Flags().StringVar(&repoURL, "repo", "", "Git repository URL")
 	cmd.Flags().StringVar(&baseRef, "base-ref", "", "Base git ref")
-	cmd.Flags().StringVar(&targetRef, "target-ref", "", "Target git ref")
 	return cmd
 }
 
@@ -175,19 +173,17 @@ func newMigRunRepoCmd(stderr io.Writer) *cobra.Command {
 }
 
 func newMigRunRepoAddCmd(stderr io.Writer) *cobra.Command {
-	var repoURL, baseRef, targetRef string
-	cmd := &cobra.Command{Use: "add --repo-url <url> --base-ref <ref> --target-ref <ref> <run-id>", Short: "Add a repo to a batch run", Args: cobra.ExactArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
+	var repoURL, baseRef string
+	cmd := &cobra.Command{Use: "add --repo-url <url> --base-ref <ref> <run-id>", Short: "Add a repo to a batch run", Args: cobra.ExactArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
 		return mig.RunRunRepoAdd(context.Background(), mig.RunRepoAddOptions{
-			RunID:     args[0],
-			RepoURL:   repoURL,
-			BaseRef:   baseRef,
-			TargetRef: targetRef,
-			Output:    stderr,
+			RunID:   args[0],
+			RepoURL: repoURL,
+			BaseRef: baseRef,
+			Output:  stderr,
 		})
 	}}
 	cmd.Flags().StringVar(&repoURL, "repo-url", "", "Git repository URL")
 	cmd.Flags().StringVar(&baseRef, "base-ref", "", "Git base ref")
-	cmd.Flags().StringVar(&targetRef, "target-ref", "", "Git target ref")
 	return cmd
 }
 
@@ -201,19 +197,17 @@ func newMigRunRepoRemoveCmd(stderr io.Writer) *cobra.Command {
 }
 
 func newMigRunRepoRestartCmd(stderr io.Writer) *cobra.Command {
-	var repoID, baseRef, targetRef string
+	var repoID, baseRef string
 	cmd := &cobra.Command{Use: "restart --repo-id <id> <run-id>", Short: "Restart a repo within a batch run", Args: cobra.ExactArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
 		return mig.RunRunRepoRestart(context.Background(), mig.RunRepoRestartOptions{
-			RunID:     args[0],
-			RepoID:    repoID,
-			BaseRef:   baseRef,
-			TargetRef: targetRef,
-			Output:    stderr,
+			RunID:   args[0],
+			RepoID:  repoID,
+			BaseRef: baseRef,
+			Output:  stderr,
 		})
 	}}
 	cmd.Flags().StringVar(&repoID, "repo-id", "", "Repo identifier to restart")
 	cmd.Flags().StringVar(&baseRef, "base-ref", "", "Optional new base ref")
-	cmd.Flags().StringVar(&targetRef, "target-ref", "", "Optional new target ref")
 	return cmd
 }
 

@@ -155,21 +155,19 @@ func TestV1SQLCQueries_MigRepos(t *testing.T) {
 
 	repoID1 := types.NewMigRepoID()
 	inserted, err := db.UpsertMigRepo(ctx, UpsertMigRepoParams{
-		ID:        repoID1,
-		MigID:     mig.ID,
-		Url:       repoURL,
-		BaseRef:   "main",
-		TargetRef: "feature",
+		ID:      repoID1,
+		MigID:   mig.ID,
+		Url:     repoURL,
+		BaseRef: "main",
 	})
 	if err != nil {
 		t.Fatalf("UpsertMigRepo(insert) failed: %v", err)
 	}
 	_, err = db.UpsertMigRepo(ctx, UpsertMigRepoParams{
-		ID:        types.NewMigRepoID(),
-		MigID:     mig.ID,
-		Url:       repoURL,
-		BaseRef:   "main",
-		TargetRef: "feature",
+		ID:      types.NewMigRepoID(),
+		MigID:   mig.ID,
+		Url:     repoURL,
+		BaseRef: "main",
 	})
 	if err != nil {
 		t.Fatalf("UpsertMigRepo(unchanged) failed: %v", err)
@@ -178,11 +176,10 @@ func TestV1SQLCQueries_MigRepos(t *testing.T) {
 	// Conflict path: provide a different id but same (mig_id, repo_url). ID must remain stable.
 	repoID2 := types.NewMigRepoID()
 	updated, err := db.UpsertMigRepo(ctx, UpsertMigRepoParams{
-		ID:        repoID2,
-		MigID:     mig.ID,
-		Url:       repoURL,
-		BaseRef:   "trunk",
-		TargetRef: "feature-2",
+		ID:      repoID2,
+		MigID:   mig.ID,
+		Url:     repoURL,
+		BaseRef: "trunk",
 	})
 	if err != nil {
 		t.Fatalf("UpsertMigRepo(update) failed: %v", err)
@@ -190,8 +187,8 @@ func TestV1SQLCQueries_MigRepos(t *testing.T) {
 	if updated.ID != inserted.ID {
 		t.Fatalf("UpsertMigRepo(update) changed id: got=%q want=%q", updated.ID, inserted.ID)
 	}
-	if updated.BaseRef != "trunk" || updated.TargetRef != "feature-2" {
-		t.Fatalf("UpsertMigRepo(update) did not update refs: base=%q target=%q", updated.BaseRef, updated.TargetRef)
+	if updated.BaseRef != "trunk" {
+		t.Fatalf("UpsertMigRepo(update) did not update base_ref: base=%q", updated.BaseRef)
 	}
 
 	got, err := db.GetMigRepoByURL(ctx, GetMigRepoByURLParams{

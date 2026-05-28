@@ -52,7 +52,6 @@ func TestRunCommandSubmitJSONWritesStdoutOnly(t *testing.T) {
 	if err := executeRunCommand([]string{
 		"--repo", "https://github.com/test/repo",
 		"--base-ref", "main",
-		"--target-ref", "feature",
 		"--spec", specPath,
 		"--json",
 	}, &stdout, &stderr); err != nil {

@@ -119,7 +119,7 @@ func nodeAddrForTest(id types.NodeID) netip.Addr {
 // with no remaining jobs returns an error.
 func TestClaimJob_Basic(t *testing.T) {
 	ctx, db := newTestStore(t)
-	fx := newV1Fixture(t, ctx, db, "https://github.com/test/repo", "main", "feature", []byte(`{"type":"test"}`))
+	fx := newV1Fixture(t, ctx, db, "https://github.com/test/repo", "main", []byte(`{"type":"test"}`))
 
 	if fx.Run.Status != types.RunStatusStarted {
 		t.Errorf("expected status Started, got %s", fx.Run.Status)
@@ -170,7 +170,7 @@ func TestClaimJob_AllJobsClaimedOnce(t *testing.T) {
 
 			wanted := make(map[types.JobID]bool, tt.numJobs)
 			for i := 0; i < tt.numJobs; i++ {
-				fx := newV1Fixture(t, ctx, db, "https://github.com/test/"+tt.name+"/"+strconv.Itoa(i), "main", "feature", []byte(`{}`))
+				fx := newV1Fixture(t, ctx, db, "https://github.com/test/"+tt.name+"/"+strconv.Itoa(i), "main", []byte(`{}`))
 				j := createTestJob(t, ctx, db, fx, "job-"+strconv.Itoa(i))
 				wanted[j.ID] = true
 			}
@@ -203,7 +203,7 @@ func TestClaimJob_AllJobsClaimedOnce(t *testing.T) {
 
 func TestClaimJob_PinsRunRepoAttemptToFirstClaimingNode(t *testing.T) {
 	ctx, db := newTestStore(t)
-	fx := newV1Fixture(t, ctx, db, "https://github.com/test/node-affinity", "main", "feature", []byte(`{}`))
+	fx := newV1Fixture(t, ctx, db, "https://github.com/test/node-affinity", "main", []byte(`{}`))
 
 	first := createTestJob(t, ctx, db, fx, "first")
 	second := createTestJob(t, ctx, db, fx, "second")
@@ -256,7 +256,7 @@ func TestClaimJob_SkipLocked(t *testing.T) {
 
 	const n = 10
 	for i := 0; i < n; i++ {
-		fx := newV1Fixture(t, ctx, db, "https://github.com/test/skip-locked/"+strconv.Itoa(i), "main", "concurrent", []byte(`{}`))
+		fx := newV1Fixture(t, ctx, db, "https://github.com/test/skip-locked/"+strconv.Itoa(i), "main", []byte(`{}`))
 		createTestJob(t, ctx, db, fx, "job-"+strconv.Itoa(i))
 	}
 
@@ -326,7 +326,7 @@ func TestClaimJob_NoPendingJobs(t *testing.T) {
 // TestClaimJob_OnlyPendingJobs verifies ClaimJob skips non-queued jobs.
 func TestClaimJob_OnlyPendingJobs(t *testing.T) {
 	ctx, db := newTestStore(t)
-	fx := newV1Fixture(t, ctx, db, "https://github.com/test/only-pending", "main", "feature", []byte(`{}`))
+	fx := newV1Fixture(t, ctx, db, "https://github.com/test/only-pending", "main", []byte(`{}`))
 
 	// Create a Running job (not claimable).
 	_, err := db.CreateJob(ctx, CreateJobParams{

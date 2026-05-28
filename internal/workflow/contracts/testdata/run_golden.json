@@ -8,7 +8,6 @@
   "repo": {
     "url": "https://gitlab.com/iw2rmb/sample.git",
     "base_ref": "main",
-    "target_ref": "migs/example-grid",
     "commit": "abcdef1234567890",
     "workspace_hint": "ws"
   }

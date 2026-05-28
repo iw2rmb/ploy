@@ -30,7 +30,7 @@ func TestClaimJobOrderingDeterministic(t *testing.T) {
 	defer db.Close()
 	cleanTestTables(t, ctx, db)
 
-	fx := newV1Fixture(t, ctx, db, "https://github.com/test/deterministic-order", "main", "feature", []byte(`{"type":"deterministic"}`))
+	fx := newV1Fixture(t, ctx, db, "https://github.com/test/deterministic-order", "main", []byte(`{"type":"deterministic"}`))
 	run := fx.Run
 
 	// Create jobs with the SAME next_id to test tie-breaking by id.
@@ -144,16 +144,15 @@ func TestClaimJobOrderingScopedByRunRepoAttempt(t *testing.T) {
 	defer db.Close()
 	cleanTestTables(t, ctx, db)
 
-	fx := newV1Fixture(t, ctx, db, "https://github.com/test/scoped-order", "main", "feature", []byte(`{"type":"scoped"}`))
+	fx := newV1Fixture(t, ctx, db, "https://github.com/test/scoped-order", "main", []byte(`{"type":"scoped"}`))
 
 	// Add a second repo to the same run.
 	repo2ID := types.NewMigRepoID()
 	repo2, err := db.CreateMigRepo(ctx, CreateMigRepoParams{
-		ID:        repo2ID,
-		MigID:     fx.Mig.ID,
-		Url:       "https://github.com/test/scoped-order-2",
-		BaseRef:   fx.MigRepo.BaseRef,
-		TargetRef: fx.MigRepo.TargetRef,
+		ID:      repo2ID,
+		MigID:   fx.Mig.ID,
+		Url:     "https://github.com/test/scoped-order-2",
+		BaseRef: fx.MigRepo.BaseRef,
 	})
 	if err != nil {
 		t.Fatalf("CreateMigRepo(repo2) failed: %v", err)
@@ -164,7 +163,6 @@ func TestClaimJobOrderingScopedByRunRepoAttempt(t *testing.T) {
 		RunID:           fx.Run.ID,
 		RepoID:          repo2.RepoID,
 		RepoBaseRef:     fx.RunRepo.RepoBaseRef,
-		RepoTargetRef:   fx.RunRepo.RepoTargetRef,
 		SourceCommitSha: "0123456789abcdef0123456789abcdef01234567",
 		RepoSha0:        "0123456789abcdef0123456789abcdef01234567",
 	})
@@ -189,7 +187,6 @@ func TestClaimJobOrderingScopedByRunRepoAttempt(t *testing.T) {
 		RunID:           run2.ID,
 		RepoID:          fx.MigRepo.RepoID,
 		RepoBaseRef:     fx.RunRepo.RepoBaseRef,
-		RepoTargetRef:   fx.RunRepo.RepoTargetRef,
 		SourceCommitSha: "0123456789abcdef0123456789abcdef01234567",
 		RepoSha0:        "0123456789abcdef0123456789abcdef01234567",
 	})
@@ -202,7 +199,6 @@ func TestClaimJobOrderingScopedByRunRepoAttempt(t *testing.T) {
 		RunID:           run2.ID,
 		RepoID:          repo2.RepoID,
 		RepoBaseRef:     fx.RunRepo.RepoBaseRef,
-		RepoTargetRef:   fx.RunRepo.RepoTargetRef,
 		SourceCommitSha: "0123456789abcdef0123456789abcdef01234567",
 		RepoSha0:        "0123456789abcdef0123456789abcdef01234567",
 	})

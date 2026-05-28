@@ -31,7 +31,6 @@ JSON
 RUN_ID="$("$PLOY_BIN" run --json \
   --repo "$REPO_URL" \
   --base-ref "$BASE_REF" \
-  --target-ref "$TARGET_REF" \
   --spec "$SPEC_FILE" \
   | tee "${E2E_ARTIFACT_DIR}/run-submit.json" | jq -r '.run_id')"
 

@@ -31,7 +31,6 @@ type CreateBatchCommand struct {
 	CreatedBy *string         // Optional creator identifier.
 	RepoURL   string          // Initial repo URL for batch (required by server).
 	BaseRef   string          // Initial base ref.
-	TargetRef string          // Initial target ref.
 }
 
 // Run executes POST /v1/runs to submit the initial repo for a run.
@@ -49,10 +48,6 @@ func (c CreateBatchCommand) Run(ctx context.Context) (domaintypes.RunSummary, er
 	if err := domaintypes.GitRef(baseRef).Validate(); err != nil {
 		return domaintypes.RunSummary{}, fmt.Errorf("batch create: base_ref: %w", err)
 	}
-	targetRef := strings.TrimSpace(c.TargetRef)
-	if err := domaintypes.GitRef(targetRef).Validate(); err != nil {
-		return domaintypes.RunSummary{}, fmt.Errorf("batch create: target_ref: %w", err)
-	}
 	if len(c.Spec) == 0 {
 		return domaintypes.RunSummary{}, fmt.Errorf("batch create: spec is required")
 	}
@@ -62,13 +57,11 @@ func (c CreateBatchCommand) Run(ctx context.Context) (domaintypes.RunSummary, er
 	req := struct {
 		RepoURL   string          `json:"repo_url"`
 		BaseRef   string          `json:"base_ref"`
-		TargetRef string          `json:"target_ref"`
 		Spec      json.RawMessage `json:"spec"`
 		CreatedBy *string         `json:"created_by,omitempty"`
 	}{
 		RepoURL:   repoURL,
 		BaseRef:   baseRef,
-		TargetRef: targetRef,
 		Spec:      c.Spec,
 		CreatedBy: c.CreatedBy,
 	}
