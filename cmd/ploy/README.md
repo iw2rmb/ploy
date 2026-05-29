@@ -19,37 +19,28 @@ Common command patterns:
 
 ```bash
 ploy run <spec-path> [<repo-path>|<namespace/repo[:ref]>] [--apply] [--pull[=path]] # submit a single-repo run
-ploy mig run <mig-id|name> [--repo <url> ...] [--failed]                   # execute a mig project over its repo set
-ploy mig run \
-  [--repo-url <url> --repo-base-ref <branch> --repo-workspace-hint <dir>] \
-  [--migs-plan-timeout <duration>] [--migs-max-parallel <n>] [--cap <duration>] [--cancel-on-cap]
-ploy spec schema                                                            # print the mig JSON Schema
-ploy spec validate docs/schemas/mig.example.yaml                            # validate a mig spec
+ploy run status <run-id> [--json|--follow]                                  # inspect a run
+ploy run apply <run-id> [path] [--force]                                     # apply a run patch locally
+ploy run pull <run-id> [artifacts-path]                                      # download final run artifacts
+ploy mig run <mig-id|name> [--repo <url> ...] [--failed] [--follow]          # execute a mig project over its repo set
+ploy spec schema                                                             # print the mig JSON Schema
+ploy spec validate docs/schemas/mig.example.yaml                             # validate a mig spec
 ```
 
 Run IDs (`<run-id>`) are KSUID-backed strings.
 Treat them as opaque identifiers when passing them between commands or scripts.
 
-Note on `--json` output:
-- When `--json` is supplied (e.g., `ploy mig run --json`), stdout emits a compact JSON summary (fields include `run_id`, `final_state`, and optional `artifact_dir`).
-- Human‑readable progress continues to print to stderr, so scripts can safely pipe stdout to `jq` without mixing formats.
+`ploy run` submits a spec file or directory against one repository source. Local
+repo paths submit `HEAD`; remote selectors use `namespace/repo`, optionally
+suffixed with `:<branch>` or `:<sha>`. Use `--pull[=path]` to wait for success
+and download artifacts, or `--apply` to wait for success and apply the resulting
+patch to a clean local worktree.
 
-Quick capture example:
-```bash
-TICKET=$(ploy mig run --json \
-  --repo-url https://gitlab.com/org/repo.git \
-  --repo-base-ref main \
-  --follow | jq -r '.run_id')
-```
+`ploy mig run` executes an existing mig project over its managed repo set. Use
+`ploy mig add --name <name> --spec <path>`, `ploy mig repo add`, and
+`ploy mig spec set` to manage the project before running it.
 
-`mig run` submits a run to the control plane (server assigns the run id),
-materialises the repository passed via `--repo-*` flags (when provided),
-publishes checkpoints for every stage transition (including lane cache keys),
-executes migs/build/test against a temporary workspace, and cleans up before
-exit. Migs planner hints (`--migs-plan-timeout`, `--migs-max-parallel`)
-flow into stage metadata so the control plane can respect concurrency/timebox controls.
-
-When `--follow` is set, the CLI displays a summarized per-repo job graph that
+When follow mode is used, the CLI displays a summarized per-repo job graph that
 refreshes until the run reaches a terminal state. The job graph shows step index,
 job type, job ID, display name, status glyph, duration, and status for each job.
 For running jobs, follow mode also shows `STD[O]UT` and `STD[E]RR` preview rows
@@ -57,7 +48,8 @@ For running jobs, follow mode also shows `STD[O]UT` and `STD[E]RR` preview rows
 currently running jobs, and `e` for stderr previews. Failed jobs are kept expanded.
 Note: `--follow` does not stream container logs. Use `ploy job log --follow <job-id>` for container log streaming.
 
-`--cap` enforces an overall time limit for `--follow`. If exceeded, the CLI exits the follow; add `--cancel-on-cap` to also cancel the run.
+For `ploy mig run --follow`, `--cap` enforces an overall time limit. If exceeded,
+the CLI exits follow mode; add `--cancel-on-cap` to also cancel the run.
 
 When a `ploy run` submission completes successfully, pass `--pull[=<dir>]` to
 download referenced artifacts and generate `<dir>/manifest.json`. The manifest
@@ -91,58 +83,51 @@ ploy mig run my-mig --repo https://github.com/org/repo-a.git --repo https://gith
 ploy mig run my-mig --failed
 ```
 
-## Batched Mig Runs
+## Run Commands
 
-`mig run` supports two usage patterns: **single-repo runs** and **batch runs** that
-operate over multiple repositories under a shared run spec. In a batch, `ploy mig run`
-submits the spec once, then `ploy mig run repo add` attaches multiple repositories
-under the same run via `run_repos`.
-
-### Single-Repo Run (Default)
-
-A single-repo run specifies all repository parameters inline with the initial command.
-The run executes immediately against that repository:
+For the long-lived current-state reference, see `docs/runs.md`.
 
 ```bash
-# Single repository run — executes migs against one repo and follows job graph.
-ploy mig run --spec mig.yaml \
-  --repo-url https://github.com/example/repo.git \
-  --repo-base-ref main \
-  --follow
+# Submit from the current git worktree.
+ploy run ./mig.yaml
+
+# Submit a selected local repo path.
+ploy run ./mig.yaml ../service-a
+
+# Submit a remote repo selector. Missing ref defaults to master.
+ploy run ./mig.yaml org/service-a:main
+
+# Follow until success and download artifacts.
+ploy run ./mig.yaml org/service-a:main --pull=./artifacts
+
+# Apply a completed run to the current repo.
+ploy run apply <run-id>
+
+# Download artifacts for an existing run.
+ploy run pull <run-id> ./artifacts
 ```
 
-This is the most common usage for quick, ad-hoc transformations.
+## Mig Project Runs
 
-### Batch Run (Multiple Repositories)
-
-Batch runs allow orchestrating the same mig spec across multiple repositories.
-First, create a batch run with a name but no repository; then attach repos
-incrementally:
+`mig run` executes an existing mig project over all repos in its managed set, an
+explicit subset, or repos whose last terminal state was `Fail`.
 
 ```bash
-# Step 1: Create a named batch run (no repository attached yet).
-ploy mig run --spec mig.yaml --name my-batch
+ploy mig add --name java17 --spec mig.yaml
+ploy mig repo add java17 --repo https://github.com/org/repo-a.git --base-ref main
+ploy mig repo add java17 --repo https://github.com/org/repo-b.git --base-ref main
 
-# Step 2: Add repositories to the batch.
-ploy mig run repo add \
-  --repo-url https://github.com/org/repo-a.git \
-  --base-ref main \
-  my-batch
+# Execute all repos.
+ploy mig run java17 --follow
 
-ploy mig run repo add \
-  --repo-url https://github.com/org/repo-b.git \
-  --base-ref main \
-  my-batch
+# Execute only selected repos.
+ploy mig run java17 --repo https://github.com/org/repo-a.git
 
-# Step 3: Optionally follow status for the entire batch.
-ploy run status my-batch --follow
+# Re-run only repos whose last terminal state is Fail.
+ploy mig run java17 --failed
 ```
 
-Each attached repository creates a `run_repo` entry, and jobs execute per-repo
-according to the batch scheduler. Batch runs simplify fleet-wide updates where
-the same transformation (e.g., Java 17 upgrade) applies to many repositories.
-
-### Restart a Repo Within a Batch
+### Restart a Repo Within a Batch Run
 
 If a repository job fails or needs reprocessing from a different base ref, use
 `mig run repo restart`:
@@ -158,7 +143,7 @@ ploy mig run repo restart \
 
 This re-queues the repository under the same batch without recreating the run.
 
-### Remove a Repo From a Batch
+### Remove a Repo From a Batch Run
 
 To remove a repository from an in-progress batch (e.g., if it was added by mistake):
 
@@ -169,11 +154,13 @@ ploy mig run repo remove \
   my-batch
 ```
 
-### Batch Workflow Summary
+### Mig Workflow Summary
 
 | Command                  | Description                                   |
 |--------------------------|-----------------------------------------------|
-| `mig run --name <batch>` | Create a batch run (no repos yet)             |
+| `mig add --name <name>`  | Create a mig project                          |
+| `mig repo add`           | Add a repository to a mig project             |
+| `mig run <mig>`          | Run a mig project                             |
 | `mig run repo add`       | Attach a repository to an existing batch      |
 | `mig run repo remove`    | Detach a repository from a batch              |
 | `mig run repo restart`   | Re-queue a repo job with optional new base ref |
@@ -367,9 +354,8 @@ ploy completion <shell> --help
 
 ## Flags
 
-- `--spec` — Path to a YAML/JSON spec file defining mig parameters and Build Gate settings for `mig run`. CLI flags (e.g., `--job-image`)
-  override corresponding spec values when both are present. Specs use canonical `steps[]`
-  shape for both single-step and multi-step runs. Each step supports
+- Mig spec files use canonical `steps[]` shape for both single-step and
+  multi-step runs. Each step supports
   `image`/`command`/`envs` plus Hydra file-record fields (`in`, `out`, `home`)
   and cross-step input references (`in_from`)
   using shared runtime paths like `/share/java.classpath` or
@@ -377,16 +363,12 @@ ploy completion <shell> --help
   for deterministic file injection via content-addressed bundles.
   See `docs/schemas/mig.example.yaml` for the full schema and
   `tests/e2e/migs/README.md` for usage examples.
-- `--repo-url` / `--repo-base-ref` / `--repo-workspace-hint`
-  — Repository materialisation inputs consumed by `mig run`. Allowed `--repo-url` schemes: `https://`, `ssh://`, `file://`. When `--repo-url` is provided, `--repo-base-ref` selects the source branch (commonly `main`). The workspace hint creates an auxiliary directory (e.g. `migs/java`) before Migs stages execute.
-- `--migs-plan-timeout` — Duration string passed to the Migs planner to timebox
-  plan evaluation (`mig run`).
-- `--migs-max-parallel` — Upper bound on concurrent Migs stages emitted by the
-  planner (`mig run`).
-- `--artifact-dir` — Download final artifacts to the given directory after a
-  successful run (`mig run --follow`). A `manifest.json` file is created with
-  artifact metadata.
-- `--cap` — Overall time limit for `--follow`. When the duration elapses, the CLI stops following; use `--cancel-on-cap` to cancel the run too (e.g., `--cap 5m --cancel-on-cap`).
+- `ploy run --pull[=path]` and `ploy run pull <run-id> [path]` download run
+  artifacts and write `manifest.json`.
+- `ploy mig fetch --run <run-id> --artifact-dir <path>` is the mig-owned artifact
+  retrieval command retained for investigation workflows.
+- `ploy mig run --cap <duration>` applies only with `--follow`. When the duration
+  elapses, the CLI stops following; use `--cancel-on-cap` to cancel the run too.
 
 ## Global Environment Configuration
 
@@ -414,7 +396,7 @@ the target is inferred automatically.
 **Secrets** are redacted in list/show output by default. Use `--raw` with `show` to reveal the
 full value.
 
-**Precedence**: Per-run env vars (in spec files or CLI flags) take precedence over global env.
+**Precedence**: Per-run env vars in spec files take precedence over global env.
 Existing keys in the spec are never overwritten by global config.
 
 ### Commands

@@ -5,9 +5,8 @@
 #
 # Submit with:
 #   dist/ploy mig run \
-#     --repo-url https://gitlab.com/example/my-java-project.git \
-#     --repo-base-ref main \
-#     --spec tests/e2e/migs/scenario-multi-step/mig.yaml \
+#     tests/e2e/migs/scenario-multi-step/mig.yaml \
+#     example/my-java-project:main \
 #     --follow
 
 apiVersion: ploy.mig/v1alpha1

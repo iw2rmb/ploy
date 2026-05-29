@@ -180,7 +180,7 @@ The smoke test suite validates these critical paths:
    - Version and help commands
    - Subcommand help (mig, server, etc.)
    - Flag parsing and validation
-   - Run inspection commands: `run status`, `run logs`, `mig run repo status`
+   - Run inspection commands: `run status`, `job log`, `mig run repo status`
 
 6. **Container execution (e2e):**
    - Mig container lifecycle
@@ -234,12 +234,13 @@ TS=$(date +%y%m%d%H%M%S)
 ARTIFACT_DIR="./tmp/your-scenario/${TS}"
 mkdir -p "${ARTIFACT_DIR}"
 
-dist/ploy mig run \
-  --repo-url https://github.com/example/repo.git \
-  --repo-base-ref main \
-  --job-image your-mig:latest \
-  --follow \
-  --artifact-dir "${ARTIFACT_DIR}"
+cat > "${ARTIFACT_DIR}/mig.yaml" <<'YAML'
+steps:
+  - image: your-mig:latest
+    command: ./run-mig.sh
+YAML
+
+dist/ploy run "${ARTIFACT_DIR}/mig.yaml" example/repo:main --pull="${ARTIFACT_DIR}"
 
 echo "OK: your scenario"
 echo "Artifacts saved to: ${ARTIFACT_DIR}"

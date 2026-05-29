@@ -19,15 +19,21 @@ RECIPE_GROUP="org.openrewrite.recipe"
 RECIPE_ARTIFACT="rewrite-migrate-java"
 RECIPE_VERSION="3.20.0"
 RECIPE_CLASSNAME="org.openrewrite.java.migrate.UpgradeToJava17"
+SPEC_FILE="${E2E_ARTIFACT_DIR}/orw-pass.yaml"
+
+cat > "$SPEC_FILE" <<YAML
+steps:
+  - image: "$PLOY_CONTAINER_REGISTRY/orw-cli-java-17-maven:latest"
+    envs:
+      RECIPE_GROUP: "$RECIPE_GROUP"
+      RECIPE_ARTIFACT: "$RECIPE_ARTIFACT"
+      RECIPE_VERSION: "$RECIPE_VERSION"
+      RECIPE_CLASSNAME: "$RECIPE_CLASSNAME"
+YAML
 
 RUN_JSON="$(e2e_mig_run_json \
-  --repo-url "$REPO" \
-  --repo-base-ref main \
-  --job-image "$PLOY_CONTAINER_REGISTRY/orw-cli-java-17-maven:latest" \
-  --job-env RECIPE_GROUP="$RECIPE_GROUP" \
-  --job-env RECIPE_ARTIFACT="$RECIPE_ARTIFACT" \
-  --job-env RECIPE_VERSION="$RECIPE_VERSION" \
-  --job-env RECIPE_CLASSNAME="$RECIPE_CLASSNAME" \
+  "$SPEC_FILE" \
+  "$(e2e_repo_selector "$REPO" main)" \
   --follow)"
 RUN_ID="$(e2e_mig_run_id "$RUN_JSON")"
 

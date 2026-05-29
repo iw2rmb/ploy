@@ -38,9 +38,9 @@ post:
 
 get:
   tags: [Control]
-  summary: List batch runs
+  summary: List runs
   description: |
-    Return a paginated list of batch runs backed by the `runs` table. Each
+    Return a paginated list of runs backed by the `runs` table. Each
     entry exposes basic run metadata (id, mig_id, spec_id, status, timestamps)
     and optional per-repo status counts aggregated from `run_repos`.
   parameters:
