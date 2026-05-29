@@ -20,8 +20,8 @@ In scope:
 - PostgreSQL schema and sqlc queries for `waves`, `runs`, and removal of
   `run_repos` as an execution table.
 - Server handlers for single-repo run submission, mig wave creation, wave status,
-  wave cancellation, run status, run restart, run artifacts, run diffs, run logs,
-  run jobs, run snapshot, and pull resolution.
+  wave cancellation, run status, run restart, run artifacts, run diffs, run jobs,
+  run snapshot, job logs, and pull resolution.
 - Scheduler, job claim, completion, stale recovery, and run-status reconciliation.
 - Node claim payload, snapshot hydration, sticky workspace paths, repo-local
   artifact paths, and node-side upload paths.
@@ -51,7 +51,7 @@ actual repo execution lives in `run_repos`. A single-repo `ploy run` is document
 and implemented as a degenerate batch: one `runs` row plus one `run_repos` row.
 This leaks into almost every surface:
 
-- Commands like `run patch` must resolve a repo inside a run even when there is
+- Commands like `run apply` must resolve a repo inside a run even when there is
   only one repo.
 - APIs are mostly shaped as `/v1/runs/{run_id}/repos/{repo_id}/...`.
 - Jobs, snapshots, artifacts, diffs, logs, and recovery are scoped by
@@ -133,8 +133,8 @@ for multi-repo mig work.
 - `internal/cli/runs/report_builder.go` builds a run report by calling
   `/v1/runs/{run_id}/repos`, then calling repo-scoped jobs and diffs endpoints for
   each repo.
-- `internal/cli/run/run_patch.go` can omit `--repo-id` only when a run has one
-  repo; otherwise it asks the user to provide `--repo-id` or `--repo-url`.
+- `ploy run apply` currently resolves a repo inside a run before downloading
+  the accumulated patch for that repo.
 - `internal/nodeagent/execution_paths_test.go` documents node-side durable
   artifact paths under `runs/<run-id>/repos/<repo-id>/...`.
 - `docs/migs-lifecycle.md` documents the current model as batched runs using one
@@ -342,7 +342,6 @@ POST /v1/runs/{run_id}/cancel
 POST /v1/runs/{run_id}/restart
 GET  /v1/runs/{run_id}/snapshot
 GET  /v1/runs/{run_id}/diffs
-GET  /v1/runs/{run_id}/logs
 GET  /v1/runs/{run_id}/artifacts
 GET  /v1/runs/{run_id}/jobs
 POST /v1/runs/{run_id}/pull
@@ -380,8 +379,7 @@ Run pull resolution:
 `ploy run` commands operate on one run:
 
 - `ploy run status <run-id>` shows one repo execution.
-- `ploy run patch <run-id>` or its replacement apply path no longer accepts
-  `--repo-id` or `--repo-url`.
+- `ploy run apply <run-id>` does not accept repo selector flags.
 - `ploy run pull <run-id>` downloads artifacts for one run.
 - `ploy run cancel <run-id>` cancels one run.
 
@@ -510,7 +508,7 @@ to find the execution directory.
 
 - Update `internal/cli/runs/report_builder.go` so one run report fetches one run's
   jobs, diffs, artifacts, and logs directly.
-- Remove repo-resolution branches from run patch/apply and artifact commands.
+- Remove repo-resolution branches from run apply and artifact commands.
 - Update mig run command to call `POST /v1/migs/{mig_id}/waves` and follow a wave.
 - Add wave status/follow rendering if the implementation exposes `ploy wave`.
 - Update help goldens and completion artifacts after Cobra command changes.
@@ -588,7 +586,7 @@ Testable outcome:
 
 Scope:
 
-- Update run status/follow/report, run patch/apply, run pull/fetch, mig run, mig
+- Update run status/follow/report, run apply, run pull/fetch, mig run, mig
   pull, and optional wave commands.
 
 Expected result:
@@ -661,8 +659,8 @@ Testable outcome:
 
 ## References
 
-- `design/run.md` for the planned `ploy run` command simplification that benefits
-  from one-repo runs.
+- `docs/runs.md` for the current `ploy run` command contract that benefits from
+  one-repo runs.
 - `docs/migs-lifecycle.md` for the current documented batch model that must be
   replaced after implementation.
 - `internal/store/schema.sql` for current `runs`, `run_repos`, `jobs`, artifacts,
@@ -677,5 +675,5 @@ Testable outcome:
 - `internal/server/handlers/register.go` for current repo-scoped public routes.
 - `internal/server/handlers/runs_repo_snapshot.go` for current repo-scoped
   snapshot materialization.
-- `internal/cli/runs/report_builder.go` and `internal/cli/run/run_patch.go` for
+- `internal/cli/runs/report_builder.go` and `internal/cli/run/run_apply.go` for
   current CLI repo resolution inside a run.

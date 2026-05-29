@@ -26,13 +26,13 @@ echo "PLOY_CONFIG_HOME: $PLOY_CONFIG_HOME"
 echo "Artifacts:        $E2E_ARTIFACT_DIR"
 echo "=========================================="
 
-"$PLOY_BIN" mig run \
-  --repo-url "$REPO_URL" \
-  --repo-base-ref "$REPO_BASE_REF" \
-  --spec "$SPEC_FILE" \
+RUN_JSON="$(e2e_mig_run_json \
+  "$SPEC_FILE" \
+  "$(e2e_repo_selector "$REPO_URL" "$REPO_BASE_REF")" \
   --follow \
-  --artifact-dir "$E2E_ARTIFACT_DIR"
+  --pull "$E2E_ARTIFACT_DIR")"
+RUN_ID="$(e2e_mig_run_id "$RUN_JSON")"
 
 echo ""
-echo "Multi-step mig run completed."
+echo "Multi-step mig run completed: ${RUN_ID}"
 echo "Check the logs above for per-step execution status and diffs."

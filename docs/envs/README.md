@@ -56,7 +56,7 @@ Role model (bearer token claims):
 - `worker` — node agent role. Used by nodes after bootstrap to authenticate with the control plane.
 - `bootstrap` — short-lived token type used during node provisioning to exchange for a node certificate.
 - `USER` — Standard Unix environment variable indicating the current user. The CLI
-  reads this to populate the `Submitter` field when creating mig runs via `ploy mig run`.
+  reads this to populate creator metadata when submitting runs.
 - `PLOY_CONTAINER_REGISTRY` — Registry/repository prefix used by runner templates.
   Images resolve to `$PLOY_CONTAINER_REGISTRY/<name>:latest`. Runtime compose
   assets default to `docker-hosted.artifactory.tcsbank.ru/at-scale/ploy`.
@@ -66,8 +66,11 @@ Role model (bearer token claims):
 
 - `CLUSTER_ID` — Optional cluster ID passed to the server container by the
   external compose assets. Default: `local`.
-- `--spec` — Path to a YAML/JSON spec file for `ploy run` defining mig parameters,
-  Build Gate settings, and file inputs. The spec supports:
+### Run Spec Files
+
+`ploy run <spec-path>` accepts a YAML/JSON spec file, or a directory containing
+`mig.yaml`, defining mig parameters, Build Gate settings, and file inputs. The
+spec supports:
   - `envs` — Environment variables (key-value map, merged by key across precedence layers)
   - `in` — Read-only input files (`src:/in/dst`; CLI compiles local paths to `shortHash:/in/dst`)
   - `out` — Read-write output files (`src:/out/dst`; CLI compiles local paths to `shortHash:/out/dst`)
@@ -125,7 +128,7 @@ build_gate:
   Use `ploy mig run repo add` to attach multiple repositories under a shared spec, then run it via
   `ploy mig run <mig-id|name> [--follow]`.
   Example: `ploy mig add --name my-batch --spec mig.yaml` followed by
-  `ploy mig run repo add --repo-url https://... --base-ref main my-batch`.
+  `ploy mig repo add my-batch --repo https://... --base-ref main`.
   See [Migs lifecycle](../migs-lifecycle.md) § "1.4 Batched Migs Runs (`runs` + `run_repos`)"
   for full usage.
 - Container cleanup model:

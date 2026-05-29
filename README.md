@@ -38,16 +38,14 @@ docker compose -f /Users/v.v.kovalev/@scale/ploy-lib/images/docker-compose.yml u
 Submit and follow a run:
 
 ```bash
-ploy mig run \
-  --repo-url https://github.com/example/repo.git \
-  --repo-base-ref main \
-  --follow
+ploy run ./mig.yaml example/repo:main --pull
 ```
 
 ## Documentation
 
 - API schema: `docs/api/OpenAPI.yaml`
 - Environment variables: `docs/envs/README.md`
+- Runs: `docs/runs.md`
 - Migs lifecycle: `docs/migs-lifecycle.md`
 - TUI usage: `docs/how-to/tui-navigation.md`
 - Java dependency usage extractor: `docs/how-to/java-dependency-usage-extractor.md`

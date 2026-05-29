@@ -20,6 +20,7 @@ bash tests/e2e/migs/scenario-orw-pass.sh
 
 ## Notes
 
-- Specs are submitted with `ploy run --spec ...`.
+- Specs are submitted with `ploy run <spec-path> [<repo-selector>]`.
 - Build Gate and mig jobs execute through the standard job chain (`pre_gate -> mig -> post_gate`).
-- Use `--artifact-dir` when you need run artifacts for investigation.
+- Use `ploy run pull <run-id> [artifacts-path]` or submit with `--pull[=path]`
+  when you need run artifacts for investigation.

@@ -17,6 +17,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)"
 export PLOY_CONFIG_HOME="${PLOY_CONFIG_HOME:-$HOME/.config/ploy}"
 source "$REPO_ROOT/tests/e2e/lib/ensure_local_descriptor.sh"
+source "$REPO_ROOT/tests/e2e/lib/harness_mig.sh"
 ensure_local_descriptor "$REPO_ROOT" "$PLOY_CONFIG_HOME"
 PLOY_DB_DSN="${PLOY_DB_DSN:-}"
 
@@ -83,10 +84,9 @@ echo "[e2e] Ensuring gate env config for Gradle build cache..."
 "$PLOY_BIN" config env set --key PLOY_GRADLE_BUILD_CACHE_PUSH --value "true" --scope gate >/dev/null
 
 echo "[e2e] Submitting run (repo=${REPO_URL}, base=${REPO_BASE_REF})..."
-RUN_JSON="$("$PLOY_BIN" mig run --json \
-  --repo-url "$REPO_URL" \
-  --repo-base-ref "$REPO_BASE_REF" \
-  --spec "$SPEC_FILE" \
+RUN_JSON="$(e2e_mig_run_json \
+  "$SPEC_FILE" \
+  "$(e2e_repo_selector "$REPO_URL" "$REPO_BASE_REF")" \
   --follow)"
 
 RUN_ID="$(printf '%s' "$RUN_JSON" | jq -r '.run_id')"

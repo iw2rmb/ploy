@@ -113,9 +113,8 @@ YAML
 RUN_JSON=""
 set +e
 RUN_JSON="$(e2e_mig_run_json \
-  --repo-url "$REPO" \
-  --repo-base-ref "$BASE_REF" \
-  --spec "$SPEC_FILE" \
+  "$SPEC_FILE" \
+  "$(e2e_repo_selector "$REPO" "$BASE_REF")" \
   --follow 2>&1)"
 RUN_EXIT=$?
 set -e
@@ -239,9 +238,8 @@ YAML
 RUN_JSON_SYM=""
 set +e
 RUN_JSON_SYM="$(e2e_mig_run_json \
-  --repo-url "$REPO" \
-  --repo-base-ref "$BASE_REF" \
-  --spec "$SPEC_FILE_SYM" \
+  "$SPEC_FILE_SYM" \
+  "$(e2e_repo_selector "$REPO" "$BASE_REF")" \
   --follow 2>&1)"
 RUN_EXIT_SYM=$?
 set -e

@@ -1,8 +1,7 @@
-// run_list.go implements batch run ls CLI commands.
+// run_list.go implements run listing CLI commands.
 //
-// This file provides CLI handlers for managing batch runs as a whole, complementing
-// the repo-level operations in mig_run_repo.go. Batch commands delegate to the
-// internal/cli/migs batch client for HTTP communication with the control plane.
+// The command delegates to the internal/cli/migs list client because that client
+// still owns the shared /v1/runs pagination call.
 //
 // Command structure:
 //   - ploy run ls [--limit N] [--offset N]
@@ -26,8 +25,8 @@ type ListOptions struct {
 	Output       io.Writer
 }
 
-// RunList implements `ploy run ls [--limit N] [--offset N]`.
-// Lists batch runs with pagination, showing ID, name, status, and repo counts.
+// RunList implements `ploy run ls [selector] [--limit N] [--offset N]`.
+// It lists runs with pagination, optionally filtered by a resolved repo URL.
 func RunList(ctx context.Context, opts ListOptions) error {
 	out := opts.Output
 	if out == nil {
@@ -54,7 +53,7 @@ func RunList(ctx context.Context, opts ListOptions) error {
 		repoURL = repo.RepoURL
 	}
 
-	// Execute the list command using the batch client.
+	// Execute the list command using the shared runs client.
 	cmd := migs.ListBatchesCommand{
 		Client:  httpClient,
 		BaseURL: base,

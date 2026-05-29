@@ -28,11 +28,8 @@ cat > "$SPEC_FILE" <<'JSON'
 }
 JSON
 
-RUN_ID="$("$PLOY_BIN" run --json \
-  --repo "$REPO_URL" \
-  --base-ref "$BASE_REF" \
-  --spec "$SPEC_FILE" \
-  | tee "${E2E_ARTIFACT_DIR}/run-submit.json" | jq -r '.run_id')"
+RUN_JSON="$(e2e_mig_run_json "$SPEC_FILE" "$(e2e_repo_selector "$REPO_URL" "$BASE_REF")" | tee "${E2E_ARTIFACT_DIR}/run-submit.json")"
+RUN_ID="$(e2e_mig_run_id "$RUN_JSON")"
 
 if [[ -z "${RUN_ID:-}" || "$RUN_ID" == "null" ]]; then
   echo "error: run_id is empty" >&2

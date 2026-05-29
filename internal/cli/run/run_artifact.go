@@ -1,4 +1,4 @@
-// mig_run_artifact.go isolates artifact download and fetching logic.
+// run_artifact.go isolates artifact download and fetching logic.
 //
 // This file contains downloadRunArtifacts which fetches run status
 // and downloads referenced artifacts to disk. It generates deterministic

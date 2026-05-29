@@ -74,9 +74,8 @@ echo "--- Part 1: /in read-only mount enforcement ---"
 RO_JSON=""
 set +e
 RO_JSON="$(e2e_mig_run_json \
-  --repo-url "$REPO" \
-  --repo-base-ref "$BASE_REF" \
-  --spec "$SPEC_RO" \
+  "$SPEC_RO" \
+  "$(e2e_repo_selector "$REPO" "$BASE_REF")" \
   --follow 2>&1)"
 RO_EXIT=$?
 set -e
@@ -139,9 +138,8 @@ steps:
 YAML
 
 RW_JSON="$(e2e_mig_run_json \
-  --repo-url "$REPO" \
-  --repo-base-ref "$BASE_REF" \
-  --spec "$SPEC_RW" \
+  "$SPEC_RW" \
+  "$(e2e_repo_selector "$REPO" "$BASE_REF")" \
   --follow 2>&1)" || true
 
 printf '%s\n' "$RW_JSON" >"${E2E_ARTIFACT_DIR}/run-mount-rw.json"

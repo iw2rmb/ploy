@@ -13,9 +13,8 @@
 #
 # Submit with:
 #   dist/ploy mig run \
-#     --repo-url https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git \
-#     --repo-base-ref main \
-#     --spec tests/e2e/migs/scenario-stack-aware-images/mig-no-default.yaml \
+#     tests/e2e/migs/scenario-stack-aware-images/mig-no-default.yaml \
+#     iw2rmb/ploy-orw-java11-maven:main \
 #     --follow
 
 apiVersion: ploy.mig/v1alpha1

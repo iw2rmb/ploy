@@ -11,7 +11,7 @@ set -euo pipefail
 # Flow:
 #   1. Step writes deterministic content to /out/report.json.
 #   2. Run completes with Success.
-#   3. Artifacts are downloaded via --artifact-dir.
+#   3. Artifacts are downloaded via `ploy run pull`.
 #   4. Assert the downloaded artifact contains the expected content.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -62,11 +62,10 @@ ARTIFACT_DL_DIR="${E2E_ARTIFACT_DIR}/downloaded"
 mkdir -p "$ARTIFACT_DL_DIR"
 
 RUN_JSON="$(e2e_mig_run_json \
-  --repo-url "$REPO" \
-  --repo-base-ref "$BASE_REF" \
-  --spec "$SPEC_FILE" \
+  "$SPEC_FILE" \
+  "$(e2e_repo_selector "$REPO" "$BASE_REF")" \
   --follow \
-  --artifact-dir "$ARTIFACT_DL_DIR")"
+  --pull "$ARTIFACT_DL_DIR")"
 
 printf '%s\n' "$RUN_JSON" >"${E2E_ARTIFACT_DIR}/run-out-upload.json"
 
