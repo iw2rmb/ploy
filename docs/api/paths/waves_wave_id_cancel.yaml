@@ -1,0 +1,6 @@
+post:
+  tags: [Control]
+  summary: Cancel a wave
+  responses:
+    "200":
+      description: Wave cancelled.

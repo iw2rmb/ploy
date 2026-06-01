@@ -211,7 +211,7 @@ func TestCompleteJob_Exit137SetsLastError(t *testing.T) {
 			}))
 
 			assertStatus(t, rr, http.StatusNoContent)
-			assertCalled(t, "UpdateRunRepoError", st.updateRunRepoError.called)
+			assertCalled(t, "UpdateRunError", st.updateRunRepoError.called)
 		})
 	}
 }

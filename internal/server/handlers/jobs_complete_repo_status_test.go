@@ -25,24 +25,24 @@ func TestCompleteJob_RepoTerminalStatus(t *testing.T) {
 		name             string
 		jobStatus        domaintypes.JobStatus
 		reqBody          map[string]any
-		wantRepoStatus   domaintypes.RunRepoStatus
-		wantRunRepoCount domaintypes.RunRepoStatus
+		wantRepoStatus   domaintypes.RunStatus
+		wantRunRepoCount domaintypes.RunStatus
 		wantRunFinished  bool
 	}{
 		{
 			name:             "success",
 			jobStatus:        domaintypes.JobStatusSuccess,
 			reqBody:          map[string]any{"status": "Success", "exit_code": 0, "repo_sha_out": "0123456789abcdef0123456789abcdef01234567"},
-			wantRepoStatus:   domaintypes.RunRepoStatusSuccess,
-			wantRunRepoCount: domaintypes.RunRepoStatusSuccess,
+			wantRepoStatus:   domaintypes.RunStatusSuccess,
+			wantRunRepoCount: domaintypes.RunStatusSuccess,
 			wantRunFinished:  true,
 		},
 		{
 			name:             "fail",
 			jobStatus:        domaintypes.JobStatusFail,
 			reqBody:          map[string]any{"status": "Fail", "exit_code": 1},
-			wantRepoStatus:   domaintypes.RunRepoStatusFail,
-			wantRunRepoCount: domaintypes.RunRepoStatusFail,
+			wantRepoStatus:   domaintypes.RunStatusFail,
+			wantRunRepoCount: domaintypes.RunStatusFail,
 			wantRunFinished:  true,
 		},
 	}
@@ -67,7 +67,7 @@ func TestCompleteJob_RepoTerminalStatus(t *testing.T) {
 						Meta:        withNextIDMeta([]byte(`{}`), 2000),
 					},
 				}),
-				withRunRepoStatusCounts([]store.CountRunReposByStatusRow{
+				withRunStatusCounts([]store.CountRunsByWaveStatusRow{
 					{Status: tt.wantRunRepoCount, Count: 1},
 				}),
 			)
@@ -78,21 +78,18 @@ func TestCompleteJob_RepoTerminalStatus(t *testing.T) {
 
 			assertStatus(t, rr, http.StatusNoContent)
 
-			assertCalled(t, "ListJobsByRunRepoAttempt", st.listJobsByRunRepoAttempt.called)
-			assertCalled(t, "UpdateRunRepoStatus", st.updateRunRepoStatus.called)
-			if len(st.updateRunRepoStatus.calls) == 0 {
-				t.Fatal("expected at least one UpdateRunRepoStatus call")
+			assertCalled(t, "ListJobsByRunAttempt", st.listJobsByRunRepoAttempt.called)
+			assertCalled(t, "UpdateRunStatus", st.updateRunStatus.called)
+			if len(st.updateRunStatus.calls) == 0 {
+				t.Fatal("expected at least one UpdateRunStatus call")
 			}
-			lastRepoUpdate := st.updateRunRepoStatus.calls[len(st.updateRunRepoStatus.calls)-1]
+			lastRepoUpdate := st.updateRunStatus.calls[len(st.updateRunStatus.calls)-1]
 			if lastRepoUpdate.Status != tt.wantRepoStatus {
 				t.Errorf("expected repo status %s, got %s", tt.wantRepoStatus, lastRepoUpdate.Status)
 			}
 
-			if tt.wantRunFinished {
-				assertCalled(t, "UpdateRunStatus", st.updateRunStatus.called)
-				if st.updateRunStatus.params.Status != domaintypes.RunStatusFinished {
-					t.Errorf("expected run status Finished, got %s", st.updateRunStatus.params.Status)
-				}
+			if tt.wantRunFinished && !st.updateWaveStatus.called {
+				t.Errorf("expected wave status update when all runs are terminal")
 			}
 		})
 	}
@@ -164,8 +161,8 @@ func TestCompleteJob_RepoNotTerminalWhileJobsInProgress(t *testing.T) {
 	assertStatus(t, rr, http.StatusNoContent)
 
 	// Verify repo status was NOT updated (jobs still in progress).
-	if st.updateRunRepoStatus.called {
-		t.Error("did not expect UpdateRunRepoStatus to be called while jobs still in progress")
+	if st.updateRunStatus.called {
+		t.Error("did not expect UpdateRunStatus to be called while jobs still in progress")
 	}
 
 	// Verify run status was NOT updated to Finished.
@@ -225,8 +222,8 @@ func TestCompleteJob_RepoStatusUsesLastJobStatus(t *testing.T) {
 				Meta:        withNextIDMeta([]byte(`{}`), 3000),
 			},
 		}),
-		withRunRepoStatusCounts([]store.CountRunReposByStatusRow{
-			{Status: domaintypes.RunRepoStatusSuccess, Count: 1},
+		withRunStatusCounts([]store.CountRunsByWaveStatusRow{
+			{Status: domaintypes.RunStatusSuccess, Count: 1},
 		}),
 	)
 
@@ -242,9 +239,9 @@ func TestCompleteJob_RepoStatusUsesLastJobStatus(t *testing.T) {
 
 	assertStatus(t, rr, http.StatusNoContent)
 
-	assertCalled(t, "UpdateRunRepoStatus", st.updateRunRepoStatus.called)
-	lastRepoUpdate := st.updateRunRepoStatus.calls[len(st.updateRunRepoStatus.calls)-1]
-	if lastRepoUpdate.Status != domaintypes.RunRepoStatusSuccess {
+	assertCalled(t, "UpdateRunStatus", st.updateRunStatus.called)
+	lastRepoUpdate := st.updateRunStatus.calls[len(st.updateRunStatus.calls)-1]
+	if lastRepoUpdate.Status != domaintypes.RunStatusSuccess {
 		t.Errorf("expected repo status Success, got %s", lastRepoUpdate.Status)
 	}
 }
@@ -275,9 +272,9 @@ func TestCompleteJob_MultiRepoRunFinishesWhenAllReposTerminal(t *testing.T) {
 			},
 		}),
 		// But repo B is still Running, so run should NOT become Finished.
-		withRunRepoStatusCounts([]store.CountRunReposByStatusRow{
-			{Status: domaintypes.RunRepoStatusSuccess, Count: 1}, // Repo A
-			{Status: domaintypes.RunRepoStatusRunning, Count: 1}, // Repo B still running
+		withRunStatusCounts([]store.CountRunsByWaveStatusRow{
+			{Status: domaintypes.RunStatusSuccess, Count: 1}, // Repo A
+			{Status: domaintypes.RunStatusRunning, Count: 1}, // Repo B still running
 		}),
 	)
 
@@ -294,13 +291,13 @@ func TestCompleteJob_MultiRepoRunFinishesWhenAllReposTerminal(t *testing.T) {
 	assertStatus(t, rr, http.StatusNoContent)
 
 	// Verify repo A status was updated to Success.
-	if !st.updateRunRepoStatus.called {
-		t.Fatal("expected UpdateRunRepoStatus to be called for repo A")
+	if !st.updateRunStatus.called {
+		t.Fatal("expected UpdateRunStatus to be called for repo A")
 	}
 
-	// Verify run status was NOT updated to Finished (repo B still in progress).
-	if st.updateRunStatus.called {
-		t.Error("did not expect UpdateRunStatus to be called when not all repos are terminal")
+	// Verify wave status was NOT updated to Finished (repo B still in progress).
+	if st.updateWaveStatus.called {
+		t.Error("did not expect UpdateWaveStatus to be called when not all repos are terminal")
 	}
 }
 

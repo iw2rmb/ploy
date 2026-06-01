@@ -1,0 +1,6 @@
+get:
+  tags: [Control]
+  summary: Download the hydrated source snapshot for a run
+  responses:
+    "200":
+      description: Snapshot stream.

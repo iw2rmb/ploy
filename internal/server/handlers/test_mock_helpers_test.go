@@ -41,6 +41,7 @@ func (c *mockCall[P, R]) record(p P) (R, error) {
 // mockCallSlice tracks every invocation, accumulating all params in a slice.
 type mockCallSlice[P, R any] struct {
 	called bool
+	params P
 	calls  []P
 	val    R
 	err    error
@@ -48,6 +49,7 @@ type mockCallSlice[P, R any] struct {
 
 func (c *mockCallSlice[P, R]) record(p P) (R, error) {
 	c.called = true
+	c.params = p
 	c.calls = append(c.calls, p)
 	return c.val, c.err
 }

@@ -6,10 +6,9 @@ package ids
 
 import domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 
-// AttemptKey identifies a unique run-repo-attempt combination used as a map
+// AttemptKey identifies a unique run-attempt combination used as a map
 // key in recovery orchestration scenarios.
 type AttemptKey struct {
 	RunID   domaintypes.RunID
-	RepoID  domaintypes.RepoID
 	Attempt int32
 }

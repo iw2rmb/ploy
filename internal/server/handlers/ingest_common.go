@@ -472,9 +472,8 @@ func runRepoIDFromPathOrRun(w http.ResponseWriter, r *http.Request, st store.Sto
 // listJobsForRunRepoOrFail lists jobs for a given (run_id, repo_id, attempt). On
 // error it writes a 500 response and returns ok=false.
 func listJobsForRunRepoOrFail(w http.ResponseWriter, r *http.Request, st store.Store, runID domaintypes.RunID, repoID domaintypes.RepoID, attempt int32, logPrefix string) ([]store.Job, bool) {
-	jobs, err := st.ListJobsByRunRepoAttempt(r.Context(), store.ListJobsByRunRepoAttemptParams{
+	jobs, err := st.ListJobsByRunAttempt(r.Context(), store.ListJobsByRunAttemptParams{
 		RunID:   runID,
-		RepoID:  repoID,
 		Attempt: attempt,
 	})
 	if err != nil {

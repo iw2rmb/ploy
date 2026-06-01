@@ -726,7 +726,7 @@ CreateDiffRequest:
   required: [patch]
 
 # DiffItem represents a single diff in a list response.
-# Used by GET /v1/runs/{run_id}/repos/{repo_id}/diffs.
+# Used by GET /v1/runs/{run_id}/diffs.
 DiffItem:
   type: object
   properties:
@@ -753,7 +753,7 @@ DiffItem:
   required: [id, job_id, created_at, gzipped_size]
 
 # DiffListResponse is the response for listing diffs.
-# Used by GET /v1/runs/{run_id}/repos/{repo_id}/diffs.
+# Used by GET /v1/runs/{run_id}/diffs.
 DiffListResponse:
   type: object
   properties:
@@ -1138,7 +1138,7 @@ RepoRunSummary:
     - attempt
 
 # -------------------------------------------------------------------------
-# Repo-scoped job listing — GET /v1/runs/{run_id}/repos/{repo_id}/jobs
+# Run-scoped job listing — GET /v1/runs/{run_id}/jobs
 # -------------------------------------------------------------------------
 
 RepoJobItem:
@@ -1237,7 +1237,7 @@ RepoJobItem:
 ListRepoJobsResponse:
   type: object
   description: |
-    Response from GET /v1/runs/{run_id}/repos/{repo_id}/jobs.
+    Response from GET /v1/runs/{run_id}/jobs.
     Lists all jobs for a specific repo execution within a run.
   properties:
     run_id:

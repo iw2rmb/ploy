@@ -102,8 +102,8 @@ func newRunRepoJobsFixture(t *testing.T, metaJSON string) (*runStore, http.Handl
 	jobID := domaintypes.NewJobID()
 
 	st := &runStore{}
-	st.getRunRepo.vals = []store.RunRepo{{
-		RunID:   runID,
+	st.getRunRepo.vals = []store.Run{{
+		ID:      runID,
 		RepoID:  repoID,
 		Attempt: 1,
 	}}
@@ -234,9 +234,11 @@ func (f jobTestFixture) completeJobReq(bodyMap map[string]any) *http.Request {
 // Pass functional options to override or extend the defaults.
 func newJobStoreForFixture(f jobTestFixture, opts ...func(*jobStore)) *jobStore {
 	st := &jobStore{}
+	waveID := domaintypes.NewWaveID()
 	st.getJob.val = f.Job
 	st.listJobsByRun.val = []store.Job{f.Job}
-	st.getRun.val = store.Run{ID: f.RunID, Status: domaintypes.RunStatusStarted}
+	st.getRun.val = store.Run{ID: f.RunID, WaveID: waveID, Status: domaintypes.RunStatusRunning}
+	st.getWave.val = store.Wave{ID: waveID, Status: domaintypes.WaveStatusStarted}
 	for _, o := range opts {
 		o(st)
 	}
@@ -247,7 +249,7 @@ func withRepoAttemptJobs(jobs []store.Job) func(*jobStore) {
 	return func(st *jobStore) { st.listJobsByRunRepoAttempt.val = jobs }
 }
 
-func withRunRepoStatusCounts(rows []store.CountRunReposByStatusRow) func(*jobStore) {
+func withRunStatusCounts(rows []store.CountRunsByWaveStatusRow) func(*jobStore) {
 	return func(st *jobStore) { st.countRunReposByStatus.val = rows }
 }
 
@@ -396,16 +398,14 @@ func assertNoCompletion(t *testing.T, st *jobStore) {
 	}
 }
 
-// assertRepoError fails if UpdateRunRepoError was not called with the expected
-// run/repo IDs and error substrings.
+// assertRepoError fails if UpdateRunError was not called with the expected
+// run ID and error substrings.
 func assertRepoError(t *testing.T, st *jobStore, runID domaintypes.RunID, repoID domaintypes.RepoID, substrings ...string) {
 	t.Helper()
-	assertCalled(t, "UpdateRunRepoError", st.updateRunRepoError.called)
-	if st.updateRunRepoError.params.RunID != runID {
-		t.Fatalf("expected RunID %s, got %s", runID, st.updateRunRepoError.params.RunID)
-	}
-	if st.updateRunRepoError.params.RepoID != repoID {
-		t.Fatalf("expected RepoID %s, got %s", repoID, st.updateRunRepoError.params.RepoID)
+	_ = repoID
+	assertCalled(t, "UpdateRunError", st.updateRunRepoError.called)
+	if st.updateRunRepoError.params.ID != runID {
+		t.Fatalf("expected RunID %s, got %s", runID, st.updateRunRepoError.params.ID)
 	}
 	if st.updateRunRepoError.params.LastError == nil {
 		t.Fatal("expected LastError to be set")

@@ -8,15 +8,15 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-// RepoAttemptReconcileEval is the pure evaluation result for repo-attempt completion.
-type RepoAttemptReconcileEval struct {
+// RunAttemptReconcileEval is the pure evaluation result for run-attempt completion.
+type RunAttemptReconcileEval struct {
 	ShouldUpdate bool
 	Status       domaintypes.RunStatus
 	LastJob      *store.Job
 }
 
-// EvaluateRepoAttemptTerminalStatus determines whether runs.status can be finalized.
-func EvaluateRepoAttemptTerminalStatus(jobs []store.Job) (RepoAttemptReconcileEval, error) {
+// EvaluateRunAttemptTerminalStatus determines whether runs.status can be finalized.
+func EvaluateRunAttemptTerminalStatus(jobs []store.Job) (RunAttemptReconcileEval, error) {
 	var (
 		byNextIDMeta  *store.Job
 		maxNextIDMeta int64
@@ -29,7 +29,7 @@ func EvaluateRepoAttemptTerminalStatus(jobs []store.Job) (RepoAttemptReconcileEv
 		switch job.Status {
 		case domaintypes.JobStatusSuccess, domaintypes.JobStatusFail, domaintypes.JobStatusError, domaintypes.JobStatusCancelled:
 		default:
-			return RepoAttemptReconcileEval{ShouldUpdate: false}, nil
+			return RunAttemptReconcileEval{ShouldUpdate: false}, nil
 		}
 
 		if bestFallback == nil || job.ID.String() > bestFallback.ID.String() {
@@ -49,7 +49,7 @@ func EvaluateRepoAttemptTerminalStatus(jobs []store.Job) (RepoAttemptReconcileEv
 	}
 
 	if bestFallback == nil {
-		return RepoAttemptReconcileEval{ShouldUpdate: false}, nil
+		return RunAttemptReconcileEval{ShouldUpdate: false}, nil
 	}
 
 	lastJob := bestFallback
@@ -69,10 +69,10 @@ func EvaluateRepoAttemptTerminalStatus(jobs []store.Job) (RepoAttemptReconcileEv
 	case domaintypes.JobStatusCancelled:
 		runStatus = domaintypes.RunStatusCancelled
 	default:
-		return RepoAttemptReconcileEval{}, fmt.Errorf("unexpected last job status %q for job_id=%s", lastJob.Status, lastJob.ID)
+		return RunAttemptReconcileEval{}, fmt.Errorf("unexpected last job status %q for job_id=%s", lastJob.Status, lastJob.ID)
 	}
 
-	return RepoAttemptReconcileEval{
+	return RunAttemptReconcileEval{
 		ShouldUpdate: true,
 		Status:       runStatus,
 		LastJob:      lastJob,

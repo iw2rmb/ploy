@@ -12,8 +12,8 @@ type v1RunFixture struct {
 	Spec    store.Spec
 	Mig     store.Mig
 	MigRepo store.MigRepo
+	Wave    store.Wave
 	Run     store.Run
-	RunRepo store.RunRepo
 }
 
 func newV1RunFixture(t *testing.T, ctx context.Context, db store.Store, repoURL, baseRef string, specJSON []byte) v1RunFixture {
@@ -55,34 +55,38 @@ func newV1RunFixture(t *testing.T, ctx context.Context, db store.Store, repoURL,
 	}
 
 	runID := domaintypes.NewRunID()
-	run, err := db.CreateRun(ctx, store.CreateRunParams{
-		ID:        runID,
+	waveID := domaintypes.WaveID(runID.String())
+	wave, err := db.CreateWave(ctx, store.CreateWaveParams{
+		ID:        waveID,
 		MigID:     migID,
 		SpecID:    spec.ID,
 		CreatedBy: &createdBy,
 	})
 	if err != nil {
-		t.Fatalf("CreateRun() failed: %v", err)
+		t.Fatalf("CreateWave() failed: %v", err)
 	}
 
-	runRepo, err := db.CreateRunRepo(ctx, store.CreateRunRepoParams{
+	run, err := db.CreateRun(ctx, store.CreateRunParams{
+		ID:              runID,
+		WaveID:          wave.ID,
 		MigID:           migID,
-		RunID:           run.ID,
+		SpecID:          spec.ID,
 		RepoID:          migRepo.RepoID,
 		RepoBaseRef:     baseRef,
 		SourceCommitSha: "0123456789abcdef0123456789abcdef01234567",
 		RepoSha0:        "0123456789abcdef0123456789abcdef01234567",
+		CreatedBy:       &createdBy,
 	})
 	if err != nil {
-		t.Fatalf("CreateRunRepo() failed: %v", err)
+		t.Fatalf("CreateRun() failed: %v", err)
 	}
 
 	return v1RunFixture{
 		Spec:    spec,
 		Mig:     mig,
 		MigRepo: migRepo,
+		Wave:    wave,
 		Run:     run,
-		RunRepo: runRepo,
 	}
 }
 

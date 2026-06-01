@@ -1,0 +1,6 @@
+get:
+  tags: [Artifacts]
+  summary: List artifact bundles for a run
+  responses:
+    "200":
+      description: Artifact list.

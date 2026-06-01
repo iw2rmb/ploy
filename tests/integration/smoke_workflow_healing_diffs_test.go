@@ -28,7 +28,7 @@ func TestSmokeWorkflow_HealingDiffs(t *testing.T) {
 	migSpec := []byte(`{"type": "healing-test"}`)
 	fixture := newV1RunFixture(t, ctx, db, "https://github.com/example/healing-test", "main", migSpec)
 	run := fixture.Run
-	runRepo := fixture.RunRepo
+	runRepo := fixture.Run
 	t.Logf("✓ Created run: id=%v", run.ID)
 
 	// Create jobs for step 0 and step 1 so diffs can be associated with each step job.

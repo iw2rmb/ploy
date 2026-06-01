@@ -63,12 +63,16 @@ func (m *mockStore) Pool() *pgxpool.Pool {
 	return nil
 }
 
-func (m *mockStore) CancelRunV1(ctx context.Context, runID domaintypes.RunID) error {
+func (m *mockStore) CancelRun(ctx context.Context, runID domaintypes.RunID) error {
 	return nil
 }
 
-func (m *mockStore) CreateRunWithRepos(ctx context.Context, arg store.CreateRunWithReposParams) (store.Run, []store.RunRepo, error) {
-	return store.Run{}, nil, nil
+func (m *mockStore) CancelWave(ctx context.Context, waveID domaintypes.WaveID) error {
+	return nil
+}
+
+func (m *mockStore) CreateWaveWithRuns(ctx context.Context, arg store.CreateWaveWithRunsParams) (store.Wave, []store.Run, error) {
+	return store.Wave{}, nil, nil
 }
 
 func (m *mockStore) UnclaimJob(ctx context.Context, arg store.UnclaimJobParams) error {

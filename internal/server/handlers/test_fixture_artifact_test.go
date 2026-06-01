@@ -29,8 +29,8 @@ type artifactStore struct {
 	getJobByID map[types.JobID]store.Job
 
 	// RunRepo lookup (for repo-scoped queries)
-	getRunRepo               mockCall[store.GetRunRepoParams, store.RunRepo]
-	listJobsByRunRepoAttempt mockCall[store.ListJobsByRunRepoAttemptParams, []store.Job]
+	getRunRepo               mockCall[types.RunID, store.Run]
+	listJobsByRunRepoAttempt mockCall[store.ListJobsByRunAttemptParams, []store.Job]
 }
 
 func (m *artifactStore) ListArtifactBundlesByCID(ctx context.Context, cid *string) ([]store.ArtifactBundle, error) {
@@ -74,10 +74,10 @@ func (m *artifactStore) GetJob(ctx context.Context, id types.JobID) (store.Job, 
 	return m.getJob.record(id)
 }
 
-func (m *artifactStore) GetRunRepo(ctx context.Context, arg store.GetRunRepoParams) (store.RunRepo, error) {
+func (m *artifactStore) GetRun(ctx context.Context, arg types.RunID) (store.Run, error) {
 	return m.getRunRepo.record(arg)
 }
 
-func (m *artifactStore) ListJobsByRunRepoAttempt(ctx context.Context, arg store.ListJobsByRunRepoAttemptParams) ([]store.Job, error) {
+func (m *artifactStore) ListJobsByRunAttempt(ctx context.Context, arg store.ListJobsByRunAttemptParams) ([]store.Job, error) {
 	return m.listJobsByRunRepoAttempt.record(arg)
 }

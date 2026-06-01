@@ -85,7 +85,7 @@ func TestHappyPath_CreateRepoModRun(t *testing.T) {
 	if repo.RepoID.IsZero() {
 		t.Error("expected non-zero repo_id on mig repo")
 	}
-	if run.Status != domaintypes.RunStatusStarted {
+	if run.Status != domaintypes.RunStatusRunning {
 		t.Errorf("Expected status Started, got %s", run.Status)
 	}
 	if repo.BaseRef != baseRef {
@@ -184,7 +184,7 @@ func TestHappyPath_CreateRepoModRun(t *testing.T) {
 	if fetchedRun.ID != run.ID {
 		t.Errorf("Fetched run ID mismatch: expected %v, got %v", run.ID, fetchedRun.ID)
 	}
-	if fetchedRun.Status != domaintypes.RunStatusStarted {
+	if fetchedRun.Status != domaintypes.RunStatusRunning {
 		t.Errorf("Fetched run status: expected Started, got %s", fetchedRun.Status)
 	}
 

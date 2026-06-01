@@ -53,22 +53,21 @@ func TestOpenAPICompleteness(t *testing.T) {
 		{"/v1/migs/{mig_id}", "delete"},
 		{"/v1/migs/{mig_id}/archive", "patch"},
 		{"/v1/migs/{mig_id}/unarchive", "patch"},
-		{"/v1/migs/{mig_id}/runs", "post"},
+		{"/v1/migs/{mig_id}/waves", "post"},
 		// Batch runs lifecycle
 		{"/v1/runs", "get"},
 		{"/v1/runs/{run_id}", "get"},
 		{"/v1/runs/{run_id}/status", "get"},
 		{"/v1/runs/{run_id}/cancel", "post"},
-		// RunRepo handlers (repos within a batch)
-		{"/v1/runs/{run_id}/repos", "get"},
-		{"/v1/runs/{run_id}/repos", "post"},
-		{"/v1/runs/{run_id}/repos/resolve", "post"},
-		{"/v1/runs/{run_id}/repos/{repo_id}/restart", "post"},
-		// v1 repo-scoped endpoints
-		{"/v1/runs/{run_id}/repos/{repo_id}/diffs", "get"},
-		{"/v1/runs/{run_id}/repos/{repo_id}/logs", "get"},
-		{"/v1/runs/{run_id}/repos/{repo_id}/artifacts", "get"},
-		{"/v1/runs/{run_id}/repos/{repo_id}/cancel", "post"},
+		{"/v1/runs/{run_id}/resolve", "post"},
+		{"/v1/runs/{run_id}/snapshot", "get"},
+		{"/v1/runs/{run_id}/diffs", "get"},
+		{"/v1/runs/{run_id}/logs", "get"},
+		{"/v1/runs/{run_id}/artifacts", "get"},
+		{"/v1/runs/{run_id}/jobs", "get"},
+		{"/v1/waves/{wave_id}", "get"},
+		{"/v1/waves/{wave_id}/runs", "get"},
+		{"/v1/waves/{wave_id}/cancel", "post"},
 		// Repo-centric endpoints
 		{"/v1/repos/resolve", "post"},
 		{"/v1/repos", "get"},
@@ -168,9 +167,6 @@ func TestOpenAPICompleteness(t *testing.T) {
 		"PKIClientSignRequest",
 		"Run",
 		"RunSummary",
-		"RunRepoCounts",
-		"RunRepoStatus",         // Per-repo execution status enum.
-		"RunBatchDerivedStatus", // Batch-level aggregate status enum.
 		"CreateRunRequest",
 		"CreateRunResponse",
 		"RunSubmitRequest",
@@ -179,7 +175,6 @@ func TestOpenAPICompleteness(t *testing.T) {
 		"NodeClaimResponse",
 		"Event",
 		"Stage",
-		"RunRepo",
 		"RepoSummary",
 		"RepoRunSummary",
 	}

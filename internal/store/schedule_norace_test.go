@@ -46,9 +46,8 @@ func TestScheduleNextJobNoRace(t *testing.T) {
 		_, err := db.CreateJob(ctx, CreateJobParams{
 			ID:          jobID,
 			RunID:       fx.Run.ID,
-			RepoID:      fx.MigRepo.RepoID,
-			RepoBaseRef: fx.RunRepo.RepoBaseRef,
-			Attempt:     fx.RunRepo.Attempt,
+			RepoBaseRef: fx.Run.RepoBaseRef,
+			Attempt:     fx.Run.Attempt,
 			Name:        "job-norace-" + jobID.String(),
 			JobType:     "mig",
 			JobImage:    "",
@@ -75,8 +74,7 @@ func TestScheduleNextJobNoRace(t *testing.T) {
 			<-start
 			job, err := db.ScheduleNextJob(ctx, ScheduleNextJobParams{
 				RunID:   fx.Run.ID,
-				RepoID:  fx.MigRepo.RepoID,
-				Attempt: fx.RunRepo.Attempt,
+				Attempt: fx.Run.Attempt,
 			})
 			if err != nil {
 				errs <- err
@@ -134,13 +132,12 @@ func TestScheduleNextJobNoRace(t *testing.T) {
 	}
 
 	// Verify no Created jobs remain and exactly numJobs are Queued for the repo attempt.
-	rows, err := db.CountJobsByRunRepoAttemptGroupByStatus(ctx, CountJobsByRunRepoAttemptGroupByStatusParams{
+	rows, err := db.CountJobsByRunAttemptGroupByStatus(ctx, CountJobsByRunAttemptGroupByStatusParams{
 		RunID:   fx.Run.ID,
-		RepoID:  fx.MigRepo.RepoID,
-		Attempt: fx.RunRepo.Attempt,
+		Attempt: fx.Run.Attempt,
 	})
 	if err != nil {
-		t.Fatalf("CountJobsByRunRepoAttemptGroupByStatus() failed: %v", err)
+		t.Fatalf("CountJobsByRunAttemptGroupByStatus() failed: %v", err)
 	}
 	counts := make(map[types.JobStatus]int32, len(rows))
 	for _, r := range rows {
@@ -185,9 +182,8 @@ func TestScheduleNextJobSequential(t *testing.T) {
 		_, err := db.CreateJob(ctx, CreateJobParams{
 			ID:          jobIDs[i],
 			RunID:       fx.Run.ID,
-			RepoID:      fx.MigRepo.RepoID,
-			RepoBaseRef: fx.RunRepo.RepoBaseRef,
-			Attempt:     fx.RunRepo.Attempt,
+			RepoBaseRef: fx.Run.RepoBaseRef,
+			Attempt:     fx.Run.Attempt,
 			Name:        "job-seq-" + jobIDs[i].String(),
 			JobType:     "mig",
 			JobImage:    "",
@@ -216,8 +212,7 @@ func TestScheduleNextJobSequential(t *testing.T) {
 	for i := 0; i < numJobs; i++ {
 		job, err := db.ScheduleNextJob(ctx, ScheduleNextJobParams{
 			RunID:   fx.Run.ID,
-			RepoID:  fx.MigRepo.RepoID,
-			Attempt: fx.RunRepo.Attempt,
+			Attempt: fx.Run.Attempt,
 		})
 		if err != nil {
 			t.Fatalf("ScheduleNextJob(%d) failed: %v", i, err)
@@ -236,8 +231,7 @@ func TestScheduleNextJobSequential(t *testing.T) {
 	// Verify no more jobs to schedule.
 	_, err = db.ScheduleNextJob(ctx, ScheduleNextJobParams{
 		RunID:   fx.Run.ID,
-		RepoID:  fx.MigRepo.RepoID,
-		Attempt: fx.RunRepo.Attempt,
+		Attempt: fx.Run.Attempt,
 	})
 	if !errors.Is(err, pgx.ErrNoRows) {
 		t.Fatalf("expected no rows when no Created jobs remain, got: %v", err)

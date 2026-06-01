@@ -24,7 +24,7 @@ func TestGetJobLogsHandler_ResumeWithLastEventID(t *testing.T) {
 
 	st := &jobStore{}
 	st.getJob.val = store.Job{ID: jobID, RunID: runID}
-	st.getRun.val = store.Run{ID: runID, Status: domaintypes.RunStatusStarted}
+	st.getRun.val = store.Run{ID: runID, Status: domaintypes.RunStatusRunning}
 
 	eventsService, err := createTestEventsServiceWithStore(st)
 	if err != nil {
@@ -92,7 +92,7 @@ func TestGetJobLogsHandler_RetentionFrame(t *testing.T) {
 
 	st := &jobStore{}
 	st.getJob.val = store.Job{ID: jobID, RunID: runID}
-	st.getRun.val = store.Run{ID: runID, Status: domaintypes.RunStatusStarted}
+	st.getRun.val = store.Run{ID: runID, Status: domaintypes.RunStatusRunning}
 
 	eventsService, err := createTestEventsServiceWithStore(st)
 	if err != nil {
@@ -150,7 +150,7 @@ func TestGetJobLogsHandler_BackfillLiveNoDuplicates(t *testing.T) {
 
 	st := &jobStore{}
 	st.getJob.val = store.Job{ID: jobID, RunID: runID, Status: domaintypes.JobStatusRunning}
-	st.getRun.val = store.Run{ID: runID, Status: domaintypes.RunStatusStarted}
+	st.getRun.val = store.Run{ID: runID, Status: domaintypes.RunStatusRunning}
 	st.listLogsByRun.val = []store.Log{
 		{ID: 1, RunID: runID, JobID: &jobID, ObjectKey: &objKey},
 	}
@@ -231,7 +231,7 @@ func TestGetJobLogsHandler_GapLogEventsDelivered(t *testing.T) {
 
 	st := &jobStore{}
 	st.getJob.val = store.Job{ID: jobID, RunID: runID, Status: domaintypes.JobStatusRunning}
-	st.getRun.val = store.Run{ID: runID, Status: domaintypes.RunStatusStarted}
+	st.getRun.val = store.Run{ID: runID, Status: domaintypes.RunStatusRunning}
 	st.listLogsByRun.val = []store.Log{
 		{ID: 1, RunID: runID, JobID: &jobID, ObjectKey: &objKey},
 	}
@@ -316,7 +316,7 @@ func TestGetJobLogsHandler_OverlapDedupDuringBackfill(t *testing.T) {
 
 	st := &jobStore{}
 	st.getJob.val = store.Job{ID: jobID, RunID: runID, Status: domaintypes.JobStatusRunning}
-	st.getRun.val = store.Run{ID: runID, Status: domaintypes.RunStatusStarted}
+	st.getRun.val = store.Run{ID: runID, Status: domaintypes.RunStatusRunning}
 	st.listLogsByRun.val = []store.Log{
 		{ID: 1, RunID: runID, JobID: &jobID, ObjectKey: &objKey},
 	}
@@ -397,7 +397,7 @@ func TestGetJobLogsHandler_RepeatedLiveLineNotDropped(t *testing.T) {
 
 	st := &jobStore{}
 	st.getJob.val = store.Job{ID: jobID, RunID: runID, Status: domaintypes.JobStatusRunning}
-	st.getRun.val = store.Run{ID: runID, Status: domaintypes.RunStatusStarted}
+	st.getRun.val = store.Run{ID: runID, Status: domaintypes.RunStatusRunning}
 	st.listLogsByRun.val = []store.Log{
 		{ID: 1, RunID: runID, JobID: &jobID, ObjectKey: &objKey},
 	}

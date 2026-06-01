@@ -9,78 +9,59 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-// Run repo methods
+// Run mutation and action methods
 
-func (m *jobStore) GetRunRepo(ctx context.Context, arg store.GetRunRepoParams) (store.RunRepo, error) {
-	return m.getRunRepo.record(arg)
-}
-
-func (m *jobStore) UpdateRunRepoStatus(ctx context.Context, params store.UpdateRunRepoStatusParams) error {
-	_, err := m.updateRunRepoStatus.record(params)
-	return err
-}
-
-func (m *jobStore) UpdateRunRepoError(ctx context.Context, params store.UpdateRunRepoErrorParams) error {
+func (m *jobStore) UpdateRunError(ctx context.Context, params store.UpdateRunErrorParams) error {
 	_, err := m.updateRunRepoError.record(params)
 	return err
 }
 
-func (m *jobStore) UpdateRunRepoBaseRef(ctx context.Context, params store.UpdateRunRepoBaseRefParams) error {
+func (m *jobStore) UpdateRunBaseRef(ctx context.Context, params store.UpdateRunBaseRefParams) error {
 	_, err := m.updateRunRepoBaseRef.record(params)
 	return err
 }
 
-func (m *jobStore) IncrementRunRepoAttempt(ctx context.Context, arg store.IncrementRunRepoAttemptParams) error {
+func (m *jobStore) IncrementRunAttempt(ctx context.Context, arg types.RunID) error {
 	_, err := m.incrementRunRepoAttempt.record(arg)
 	return err
 }
 
-func (m *jobStore) CreateRunRepo(ctx context.Context, params store.CreateRunRepoParams) (store.RunRepo, error) {
-	result := defaultRunRepo(m.createRunRepo.val, params)
-	m.createRunRepo.val = result
-	_, err := m.createRunRepo.record(params)
-	return result, err
+func (m *jobStore) ListRunsByWave(ctx context.Context, waveID types.WaveID) ([]store.Run, error) {
+	return m.listRunReposByRun.record(waveID.String())
 }
 
-func (m *jobStore) ListRunReposByRun(ctx context.Context, runID types.RunID) ([]store.RunRepo, error) {
-	return m.listRunReposByRun.record(runID.String())
+func (m *jobStore) ListQueuedRunsByWave(ctx context.Context, waveID types.WaveID) ([]store.Run, error) {
+	return m.listQueuedRunReposByRun.record(waveID.String())
 }
 
-func (m *jobStore) ListQueuedRunReposByRun(ctx context.Context, runID types.RunID) ([]store.RunRepo, error) {
-	return m.listQueuedRunReposByRun.record(runID.String())
+func (m *jobStore) ListRunsWithURLByWave(ctx context.Context, waveID types.WaveID) ([]store.ListRunsWithURLByWaveRow, error) {
+	return m.listRunReposWithURLByRun.record(waveID.String())
 }
 
-func (m *jobStore) ListRunReposWithURLByRun(ctx context.Context, runID types.RunID) ([]store.ListRunReposWithURLByRunRow, error) {
-	return m.listRunReposWithURLByRun.record(runID.String())
-}
-
-func (m *jobStore) CountRunReposByStatus(ctx context.Context, runID types.RunID) ([]store.CountRunReposByStatusRow, error) {
+func (m *jobStore) CountRunsByWaveStatus(ctx context.Context, waveID types.WaveID) ([]store.CountRunsByWaveStatusRow, error) {
 	return m.countRunReposByStatus.ret()
 }
 
-func (m *jobStore) CancelActiveJobsByRunRepoAttempt(ctx context.Context, params store.CancelActiveJobsByRunRepoAttemptParams) (int64, error) {
+func (m *jobStore) CancelActiveJobsByRunAttempt(ctx context.Context, params store.CancelActiveJobsByRunAttemptParams) (int64, error) {
 	return m.cancelActiveJobsByRunRepoAttempt.record(params)
 }
 
-func (m *jobStore) GetLatestRunRepoByMigAndRepoStatus(ctx context.Context, arg store.GetLatestRunRepoByMigAndRepoStatusParams) (store.GetLatestRunRepoByMigAndRepoStatusRow, error) {
+func (m *jobStore) GetLatestRunByMigAndRepoStatus(ctx context.Context, arg store.GetLatestRunByMigAndRepoStatusParams) (store.GetLatestRunByMigAndRepoStatusRow, error) {
 	return m.getLatestRunRepoByMigAndRepoStatus.record(arg)
 }
 
-func (m *jobStore) CreateRunRepoAction(ctx context.Context, params store.CreateRunRepoActionParams) (store.RunRepoAction, error) {
-	m.createRunRepoAction.called = true
-	m.createRunRepoAction.params = params
-	if m.createRunRepoAction.err != nil {
-		return store.RunRepoAction{}, m.createRunRepoAction.err
+func (m *jobStore) CreateRunAction(ctx context.Context, params store.CreateRunActionParams) (store.RunAction, error) {
+	m.createRunAction.called = true
+	m.createRunAction.params = params
+	if m.createRunAction.err != nil {
+		return store.RunAction{}, m.createRunAction.err
 	}
-	result := m.createRunRepoAction.val
+	result := m.createRunAction.val
 	if result.ID.IsZero() {
 		result.ID = params.ID
 	}
 	if result.RunID.IsZero() {
 		result.RunID = params.RunID
-	}
-	if result.RepoID.IsZero() {
-		result.RepoID = params.RepoID
 	}
 	if result.Attempt == 0 {
 		result.Attempt = params.Attempt
@@ -97,37 +78,37 @@ func (m *jobStore) CreateRunRepoAction(ctx context.Context, params store.CreateR
 	return result, nil
 }
 
-func (m *jobStore) GetRunRepoAction(ctx context.Context, id types.JobID) (store.RunRepoAction, error) {
-	m.getRunRepoAction.called = true
-	m.getRunRepoAction.params = id
-	if m.getRunRepoAction.err != nil {
-		return store.RunRepoAction{}, m.getRunRepoAction.err
+func (m *jobStore) GetRunAction(ctx context.Context, id types.JobID) (store.RunAction, error) {
+	m.getRunAction.called = true
+	m.getRunAction.params = id
+	if m.getRunAction.err != nil {
+		return store.RunAction{}, m.getRunAction.err
 	}
-	if m.getRunRepoAction.val.ID.IsZero() {
-		return store.RunRepoAction{}, pgx.ErrNoRows
+	if m.getRunAction.val.ID.IsZero() {
+		return store.RunAction{}, pgx.ErrNoRows
 	}
-	return m.getRunRepoAction.val, nil
+	return m.getRunAction.val, nil
 }
 
-func (m *jobStore) GetRunRepoActionByKey(ctx context.Context, arg store.GetRunRepoActionByKeyParams) (store.RunRepoAction, error) {
-	m.getRunRepoActionByKey.called = true
-	m.getRunRepoActionByKey.params = arg
-	if m.getRunRepoActionByKey.err != nil {
-		return store.RunRepoAction{}, m.getRunRepoActionByKey.err
+func (m *jobStore) GetRunActionByKey(ctx context.Context, arg store.GetRunActionByKeyParams) (store.RunAction, error) {
+	m.getRunActionByKey.called = true
+	m.getRunActionByKey.params = arg
+	if m.getRunActionByKey.err != nil {
+		return store.RunAction{}, m.getRunActionByKey.err
 	}
-	if m.getRunRepoActionByKey.val.ID.IsZero() {
-		return store.RunRepoAction{}, pgx.ErrNoRows
+	if m.getRunActionByKey.val.ID.IsZero() {
+		return store.RunAction{}, pgx.ErrNoRows
 	}
-	return m.getRunRepoActionByKey.val, nil
+	return m.getRunActionByKey.val, nil
 }
 
-func (m *jobStore) UpdateRunRepoActionCompletion(ctx context.Context, params store.UpdateRunRepoActionCompletionParams) error {
-	_, err := m.updateRunRepoActionCompletion.record(params)
+func (m *jobStore) UpdateRunActionCompletion(ctx context.Context, params store.UpdateRunActionCompletionParams) error {
+	_, err := m.updateRunActionCompletion.record(params)
 	return err
 }
 
-func (m *jobStore) ListRunRepoActionsByRunRepoAttempt(ctx context.Context, arg store.ListRunRepoActionsByRunRepoAttemptParams) ([]store.RunRepoAction, error) {
-	return m.listRunRepoActionsByRunRepoAttempt.record(arg)
+func (m *jobStore) ListRunActionsByRunAttempt(ctx context.Context, arg store.ListRunActionsByRunAttemptParams) ([]store.RunAction, error) {
+	return m.listRunActionsByRunRepoAttempt.record(arg)
 }
 
 func (m *jobStore) GetNodeAction(ctx context.Context, id types.JobID) (store.NodeAction, error) {

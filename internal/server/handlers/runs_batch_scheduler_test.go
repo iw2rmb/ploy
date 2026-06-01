@@ -15,23 +15,25 @@ func TestBatchRepoStarter_StartPendingRepos_CreatesJobsWhenNone(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	runID := domaintypes.RunID("run_1")
+	waveID := domaintypes.WaveID("2tWAVETest000000000000000")
+	runID := domaintypes.RunID("2tRUNTest0000000000000000")
 	specID := domaintypes.SpecID("spec_1")
 	repoID := domaintypes.RepoID("repo_1")
 
 	st := &runStore{}
-	st.getRun.val = store.Run{ID: runID, SpecID: specID, Status: domaintypes.RunStatusStarted}
+	st.getWave.val = store.Wave{ID: waveID, SpecID: specID, Status: domaintypes.WaveStatusStarted}
+	st.getRun.val = store.Run{ID: runID, SpecID: specID, Status: domaintypes.RunStatusRunning}
 	st.getSpec.val = store.Spec{ID: specID, Spec: []byte(`{"steps":[{"image":"a"}]}`)}
-	st.listRunReposByRun.val = []store.RunRepo{
-		{RunID: runID, RepoID: repoID, Status: domaintypes.RunRepoStatusQueued, RepoBaseRef: "main", RepoSha0: testRunRepoSHA0, Attempt: 1},
+	st.listRunReposByRun.val = []store.Run{
+		{ID: runID, RepoID: repoID, Status: domaintypes.RunStatusQueued, RepoBaseRef: "main", RepoSha0: testRunRepoSHA0, Attempt: 1},
 	}
-	st.listQueuedRunReposByRun.val = []store.RunRepo{
-		{RunID: runID, RepoID: repoID, Status: domaintypes.RunRepoStatusQueued, RepoBaseRef: "main", RepoSha0: testRunRepoSHA0, Attempt: 1},
+	st.listQueuedRunReposByRun.val = []store.Run{
+		{ID: runID, RepoID: repoID, Status: domaintypes.RunStatusQueued, RepoBaseRef: "main", RepoSha0: testRunRepoSHA0, Attempt: 1},
 	}
 	st.listJobsByRunRepoAttempt.val = []store.Job{}
 
 	starter := NewBatchRepoStarter(st, nil)
-	got, err := starter.StartPendingRepos(ctx, runID)
+	got, err := starter.StartPendingRepos(ctx, waveID)
 	if err != nil {
 		t.Fatalf("StartPendingRepos returned error: %v", err)
 	}
@@ -56,22 +58,24 @@ func TestBatchRepoStarter_StartPendingRepos_InvalidStoredSpec(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	runID := domaintypes.RunID("run_1")
+	waveID := domaintypes.WaveID("2tWAVETest000000000000000")
+	runID := domaintypes.RunID("2tRUNTest0000000000000000")
 	specID := domaintypes.SpecID("spec_1")
 	repoID := domaintypes.RepoID("repo_1")
 
 	st := &runStore{}
-	st.getRun.val = store.Run{ID: runID, SpecID: specID, Status: domaintypes.RunStatusStarted}
+	st.getWave.val = store.Wave{ID: waveID, SpecID: specID, Status: domaintypes.WaveStatusStarted}
+	st.getRun.val = store.Run{ID: runID, SpecID: specID, Status: domaintypes.RunStatusRunning}
 	st.getSpec.val = store.Spec{ID: specID, Spec: []byte(`{"version":"old","steps":[{"image":"a"}]}`)}
-	st.listRunReposByRun.val = []store.RunRepo{
-		{RunID: runID, RepoID: repoID, Status: domaintypes.RunRepoStatusQueued, RepoBaseRef: "main", RepoSha0: testRunRepoSHA0, Attempt: 1},
+	st.listRunReposByRun.val = []store.Run{
+		{ID: runID, RepoID: repoID, Status: domaintypes.RunStatusQueued, RepoBaseRef: "main", RepoSha0: testRunRepoSHA0, Attempt: 1},
 	}
-	st.listQueuedRunReposByRun.val = []store.RunRepo{
-		{RunID: runID, RepoID: repoID, Status: domaintypes.RunRepoStatusQueued, RepoBaseRef: "main", RepoSha0: testRunRepoSHA0, Attempt: 1},
+	st.listQueuedRunReposByRun.val = []store.Run{
+		{ID: runID, RepoID: repoID, Status: domaintypes.RunStatusQueued, RepoBaseRef: "main", RepoSha0: testRunRepoSHA0, Attempt: 1},
 	}
 
 	starter := NewBatchRepoStarter(st, nil)
-	if _, err := starter.StartPendingRepos(ctx, runID); err != nil {
+	if _, err := starter.StartPendingRepos(ctx, waveID); err != nil {
 		t.Fatalf("StartPendingRepos returned error: %v", err)
 	}
 	if !st.updateRunRepoError.called {
@@ -89,18 +93,20 @@ func TestBatchRepoStarter_StartPendingRepos_SchedulesNextJobWhenNoActive(t *test
 	t.Parallel()
 
 	ctx := context.Background()
-	runID := domaintypes.RunID("run_1")
+	waveID := domaintypes.WaveID("2tWAVETest000000000000000")
+	runID := domaintypes.RunID("2tRUNTest0000000000000000")
 	specID := domaintypes.SpecID("spec_1")
 	repoID := domaintypes.RepoID("repo_1")
 
 	st := &runStore{}
-	st.getRun.val = store.Run{ID: runID, SpecID: specID, Status: domaintypes.RunStatusStarted}
+	st.getWave.val = store.Wave{ID: waveID, SpecID: specID, Status: domaintypes.WaveStatusStarted}
+	st.getRun.val = store.Run{ID: runID, SpecID: specID, Status: domaintypes.RunStatusRunning}
 	st.getSpec.val = store.Spec{ID: specID, Spec: []byte(`{"steps":[{"image":"a"}]}`)}
-	st.listRunReposByRun.val = []store.RunRepo{
-		{RunID: runID, RepoID: repoID, Status: domaintypes.RunRepoStatusQueued, RepoBaseRef: "main", RepoSha0: testRunRepoSHA0, Attempt: 1},
+	st.listRunReposByRun.val = []store.Run{
+		{ID: runID, RepoID: repoID, Status: domaintypes.RunStatusQueued, RepoBaseRef: "main", RepoSha0: testRunRepoSHA0, Attempt: 1},
 	}
-	st.listQueuedRunReposByRun.val = []store.RunRepo{
-		{RunID: runID, RepoID: repoID, Status: domaintypes.RunRepoStatusQueued, RepoBaseRef: "main", RepoSha0: testRunRepoSHA0, Attempt: 1},
+	st.listQueuedRunReposByRun.val = []store.Run{
+		{ID: runID, RepoID: repoID, Status: domaintypes.RunStatusQueued, RepoBaseRef: "main", RepoSha0: testRunRepoSHA0, Attempt: 1},
 	}
 	st.listJobsByRunRepoAttempt.val = []store.Job{
 		{ID: domaintypes.JobID("job_1"), RunID: runID, RepoID: repoID, Attempt: 1, Status: domaintypes.JobStatusCreated},
@@ -108,7 +114,7 @@ func TestBatchRepoStarter_StartPendingRepos_SchedulesNextJobWhenNoActive(t *test
 	}
 
 	starter := NewBatchRepoStarter(st, nil)
-	got, err := starter.StartPendingRepos(ctx, runID)
+	got, err := starter.StartPendingRepos(ctx, waveID)
 	if err != nil {
 		t.Fatalf("StartPendingRepos returned error: %v", err)
 	}
@@ -133,13 +139,13 @@ func TestBatchRepoStarter_StartPendingRepos_SkipsTerminalRun(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	runID := domaintypes.RunID("run_1")
+	waveID := domaintypes.WaveID("2tWAVETest000000000000000")
 
 	st := &runStore{}
-	st.getRun.val = store.Run{ID: runID, SpecID: domaintypes.SpecID("spec_1"), Status: domaintypes.RunStatusFinished}
+	st.getWave.val = store.Wave{ID: waveID, SpecID: domaintypes.SpecID("spec_1"), Status: domaintypes.WaveStatusFinished}
 
 	starter := NewBatchRepoStarter(st, nil)
-	got, err := starter.StartPendingRepos(ctx, runID)
+	got, err := starter.StartPendingRepos(ctx, waveID)
 	if err != nil {
 		t.Fatalf("StartPendingRepos returned error: %v", err)
 	}

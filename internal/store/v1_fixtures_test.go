@@ -7,25 +7,23 @@ import (
 	"github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-// createRunRepoForStoreTest creates a MigRepo + RunRepo under migID/runID with
-// the given repoURL, baseRef, and initial status. If status is
-// RunRepoStatusQueued the status update call is skipped (Queued is the default).
-// Used by cancel_bulk_queries_test.go and stale_recovery_queries_test.go to
-// avoid duplicate fixture helpers.
-func createRunRepoForStoreTest(
+const testSHA = "0123456789abcdef0123456789abcdef01234567"
+
+func createRunForStoreTest(
 	t *testing.T,
 	ctx context.Context,
 	db Store,
+	waveID types.WaveID,
 	migID types.MigID,
-	runID types.RunID,
+	specID types.SpecID,
 	repoURL, baseRef string,
-	status types.RunRepoStatus,
-) RunRepo {
+	status types.RunStatus,
+) Run {
 	t.Helper()
 
-	repoID := types.NewMigRepoID()
+	migRepoID := types.NewMigRepoID()
 	mr, err := db.CreateMigRepo(ctx, CreateMigRepoParams{
-		ID:      repoID,
+		ID:      migRepoID,
 		MigID:   migID,
 		Url:     repoURL,
 		BaseRef: baseRef,
@@ -34,38 +32,36 @@ func createRunRepoForStoreTest(
 		t.Fatalf("CreateMigRepo(%s) failed: %v", repoURL, err)
 	}
 
-	rr, err := db.CreateRunRepo(ctx, CreateRunRepoParams{
+	run, err := db.CreateRun(ctx, CreateRunParams{
+		ID:              types.NewRunID(),
+		WaveID:          waveID,
 		MigID:           migID,
-		RunID:           runID,
+		SpecID:          specID,
 		RepoID:          mr.RepoID,
 		RepoBaseRef:     mr.BaseRef,
-		SourceCommitSha: "0123456789abcdef0123456789abcdef01234567",
-		RepoSha0:        "0123456789abcdef0123456789abcdef01234567",
+		SourceCommitSha: testSHA,
+		RepoSha0:        testSHA,
 	})
 	if err != nil {
-		t.Fatalf("CreateRunRepo(%s) failed: %v", repoURL, err)
+		t.Fatalf("CreateRun(%s) failed: %v", repoURL, err)
 	}
 
-	if status != types.RunRepoStatusQueued {
-		if err := db.UpdateRunRepoStatus(ctx, UpdateRunRepoStatusParams{
-			RunID:  runID,
-			RepoID: rr.RepoID,
+	if status != types.RunStatusQueued {
+		if err := db.UpdateRunStatus(ctx, UpdateRunStatusParams{
+			ID:     run.ID,
 			Status: status,
 		}); err != nil {
-			t.Fatalf("UpdateRunRepoStatus(%s -> %s) failed: %v", repoURL, status, err)
+			t.Fatalf("UpdateRunStatus(%s -> %s) failed: %v", repoURL, status, err)
 		}
 	}
 
-	out, err := db.GetRunRepo(ctx, GetRunRepoParams{RunID: runID, RepoID: rr.RepoID})
+	out, err := db.GetRun(ctx, run.ID)
 	if err != nil {
-		t.Fatalf("GetRunRepo(%s) failed: %v", repoURL, err)
+		t.Fatalf("GetRun(%s) failed: %v", repoURL, err)
 	}
 	return out
 }
 
-// createJobForStoreTest creates a job with the given attempt, name, and initial
-// status. Used by cancel_bulk_queries_test.go and stale_recovery_queries_test.go
-// to avoid duplicate fixture helpers.
 func createJobForStoreTest(
 	t *testing.T,
 	ctx context.Context,
@@ -101,8 +97,8 @@ type v1Fixture struct {
 	Mig     Mig
 	Spec    Spec
 	MigRepo MigRepo
+	Wave    Wave
 	Run     Run
-	RunRepo RunRepo
 }
 
 func newV1Fixture(t *testing.T, ctx context.Context, db Store, repoURL, baseRef string, specJSON []byte) v1Fixture {
@@ -143,34 +139,37 @@ func newV1Fixture(t *testing.T, ctx context.Context, db Store, repoURL, baseRef 
 		t.Fatalf("CreateMigRepo() failed: %v", err)
 	}
 
-	runID := types.NewRunID()
-	run, err := db.CreateRun(ctx, CreateRunParams{
-		ID:        runID,
+	waveID := types.NewWaveID()
+	wave, err := db.CreateWave(ctx, CreateWaveParams{
+		ID:        waveID,
 		MigID:     migID,
 		SpecID:    specID,
 		CreatedBy: &createdBy,
 	})
 	if err != nil {
-		t.Fatalf("CreateRun() failed: %v", err)
+		t.Fatalf("CreateWave() failed: %v", err)
 	}
 
-	runRepo, err := db.CreateRunRepo(ctx, CreateRunRepoParams{
+	run, err := db.CreateRun(ctx, CreateRunParams{
+		ID:              types.NewRunID(),
+		WaveID:          waveID,
 		MigID:           migID,
-		RunID:           runID,
+		SpecID:          specID,
 		RepoID:          migRepo.RepoID,
 		RepoBaseRef:     baseRef,
-		SourceCommitSha: "0123456789abcdef0123456789abcdef01234567",
-		RepoSha0:        "0123456789abcdef0123456789abcdef01234567",
+		SourceCommitSha: testSHA,
+		RepoSha0:        testSHA,
+		CreatedBy:       &createdBy,
 	})
 	if err != nil {
-		t.Fatalf("CreateRunRepo() failed: %v", err)
+		t.Fatalf("CreateRun() failed: %v", err)
 	}
 
 	return v1Fixture{
 		Mig:     mig,
 		Spec:    spec,
 		MigRepo: migRepo,
+		Wave:    wave,
 		Run:     run,
-		RunRepo: runRepo,
 	}
 }

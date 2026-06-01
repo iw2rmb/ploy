@@ -8,21 +8,18 @@ import (
 	"github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-func TestCancelRunV1_CancelsRunAndActiveWork(t *testing.T) {
+func TestCancelRun_CancelsRunAndActiveJobs(t *testing.T) {
 	ctx, db := openStoreForCancelBulkTests(t)
 
-	fx := newV1Fixture(t, ctx, db, "https://github.com/test/cancel-run-v1-a", "main", []byte(`{"type":"cancel-run-v1"}`))
+	fx := newV1Fixture(t, ctx, db, "https://github.com/test/cancel-run-a", "main", []byte(`{"type":"cancel-run"}`))
 
-	runningRepo := createRunRepoForStoreTest(t, ctx, db, fx.Mig.ID, fx.Run.ID, "https://github.com/test/cancel-run-v1-running", "feature-running", types.RunRepoStatusRunning)
-	successRepo := createRunRepoForStoreTest(t, ctx, db, fx.Mig.ID, fx.Run.ID, "https://github.com/test/cancel-run-v1-success", "feature-success", types.RunRepoStatusSuccess)
-
-	runningJob := createJobForStoreTest(t, ctx, db, fx.Run.ID, fx.MigRepo.RepoID, fx.RunRepo.RepoBaseRef, 1, "running", types.JobStatusQueued)
+	runningJob := createJobForStoreTest(t, ctx, db, fx.Run.ID, fx.MigRepo.RepoID, fx.Run.RepoBaseRef, 1, "running", types.JobStatusQueued)
 	setJobRunningForCancelBulkTest(t, ctx, db, runningJob.ID)
 	if _, err := db.Pool().Exec(ctx, `UPDATE jobs SET started_at = now() - interval '3 seconds' WHERE id = $1`, runningJob.ID); err != nil {
 		t.Fatalf("set running started_at failed: %v", err)
 	}
 
-	successJob := createJobForStoreTest(t, ctx, db, fx.Run.ID, fx.MigRepo.RepoID, fx.RunRepo.RepoBaseRef, 1, "success", types.JobStatusQueued)
+	successJob := createJobForStoreTest(t, ctx, db, fx.Run.ID, fx.MigRepo.RepoID, fx.Run.RepoBaseRef, 1, "success", types.JobStatusQueued)
 	setJobRunningForCancelBulkTest(t, ctx, db, successJob.ID)
 	if err := db.UpdateJobCompletion(ctx, UpdateJobCompletionParams{
 		ID:       successJob.ID,
@@ -32,8 +29,8 @@ func TestCancelRunV1_CancelsRunAndActiveWork(t *testing.T) {
 		t.Fatalf("UpdateJobCompletion(success) failed: %v", err)
 	}
 
-	if err := db.CancelRunV1(ctx, fx.Run.ID); err != nil {
-		t.Fatalf("CancelRunV1() failed: %v", err)
+	if err := db.CancelRun(ctx, fx.Run.ID); err != nil {
+		t.Fatalf("CancelRun() failed: %v", err)
 	}
 
 	runAfter, err := db.GetRun(ctx, fx.Run.ID)
@@ -45,30 +42,6 @@ func TestCancelRunV1_CancelsRunAndActiveWork(t *testing.T) {
 	}
 	if !runAfter.FinishedAt.Valid {
 		t.Fatal("run finished_at must be set")
-	}
-
-	queuedRepoAfter, err := db.GetRunRepo(ctx, GetRunRepoParams{RunID: fx.Run.ID, RepoID: fx.RunRepo.RepoID})
-	if err != nil {
-		t.Fatalf("GetRunRepo(queued after) failed: %v", err)
-	}
-	if queuedRepoAfter.Status != types.RunRepoStatusCancelled {
-		t.Fatalf("queued repo status=%q, want %q", queuedRepoAfter.Status, types.RunRepoStatusCancelled)
-	}
-
-	runningRepoAfter, err := db.GetRunRepo(ctx, GetRunRepoParams{RunID: fx.Run.ID, RepoID: runningRepo.RepoID})
-	if err != nil {
-		t.Fatalf("GetRunRepo(running after) failed: %v", err)
-	}
-	if runningRepoAfter.Status != types.RunRepoStatusCancelled {
-		t.Fatalf("running repo status=%q, want %q", runningRepoAfter.Status, types.RunRepoStatusCancelled)
-	}
-
-	successRepoAfter, err := db.GetRunRepo(ctx, GetRunRepoParams{RunID: fx.Run.ID, RepoID: successRepo.RepoID})
-	if err != nil {
-		t.Fatalf("GetRunRepo(success after) failed: %v", err)
-	}
-	if successRepoAfter.Status != types.RunRepoStatusSuccess {
-		t.Fatalf("success repo status=%q, want %q", successRepoAfter.Status, types.RunRepoStatusSuccess)
 	}
 
 	runningAfter, err := db.GetJob(ctx, runningJob.ID)
@@ -91,16 +64,18 @@ func TestCancelRunV1_CancelsRunAndActiveWork(t *testing.T) {
 	}
 }
 
-func TestCancelRunV1_RollsBackOnFailure(t *testing.T) {
+func TestCancelRun_RollsBackOnFailure(t *testing.T) {
 	ctx, db := openStoreForCancelBulkTests(t)
 
-	fx := newV1Fixture(t, ctx, db, "https://github.com/test/cancel-run-v1-rollback", "main", []byte(`{"type":"cancel-run-v1-rollback"}`))
-	job := createJobForStoreTest(t, ctx, db, fx.Run.ID, fx.MigRepo.RepoID, fx.RunRepo.RepoBaseRef, 1, "created", types.JobStatusCreated)
+	fx := newV1Fixture(t, ctx, db, "https://github.com/test/cancel-run-rollback", "main", []byte(`{"type":"cancel-run-rollback"}`))
+	if err := db.UpdateRunStatus(ctx, UpdateRunStatusParams{ID: fx.Run.ID, Status: types.RunStatusRunning}); err != nil {
+		t.Fatalf("UpdateRunStatus(running) failed: %v", err)
+	}
+	job := createJobForStoreTest(t, ctx, db, fx.Run.ID, fx.MigRepo.RepoID, fx.Run.RepoBaseRef, 1, "created", types.JobStatusCreated)
 
-	// Inject DB error during CancelActiveJobsByRun so earlier updates must roll back.
 	suffix := strings.NewReplacer("-", "_").Replace(strings.ToLower(types.NewNodeKey()))
-	fnName := fmt.Sprintf("test_cancel_run_v1_fail_fn_%s", suffix)
-	trName := fmt.Sprintf("test_cancel_run_v1_fail_tr_%s", suffix)
+	fnName := fmt.Sprintf("test_cancel_run_fail_fn_%s", suffix)
+	trName := fmt.Sprintf("test_cancel_run_fail_tr_%s", suffix)
 
 	createFnSQL := fmt.Sprintf(`
 CREATE FUNCTION ploy.%s() RETURNS trigger
@@ -129,50 +104,42 @@ EXECUTE FUNCTION ploy.%s();
 		t.Fatalf("create trigger failed: %v", err)
 	}
 
-	err := db.CancelRunV1(ctx, fx.Run.ID)
+	err := db.CancelRun(ctx, fx.Run.ID)
 	if err == nil {
-		t.Fatal("expected CancelRunV1() to fail")
+		t.Fatal("expected CancelRun() to fail")
 	}
 	if !strings.Contains(err.Error(), "cancel active jobs") {
 		t.Fatalf("error=%q, expected context about cancel active jobs", err.Error())
 	}
 
-	runAfter, getRunErr := db.GetRun(ctx, fx.Run.ID)
-	if getRunErr != nil {
-		t.Fatalf("GetRun(after) failed: %v", getRunErr)
+	runAfter, err := db.GetRun(ctx, fx.Run.ID)
+	if err != nil {
+		t.Fatalf("GetRun(after) failed: %v", err)
 	}
-	if runAfter.Status != types.RunStatusStarted {
-		t.Fatalf("run status=%q, want %q after rollback", runAfter.Status, types.RunStatusStarted)
-	}
-
-	repoAfter, getRepoErr := db.GetRunRepo(ctx, GetRunRepoParams{RunID: fx.Run.ID, RepoID: fx.RunRepo.RepoID})
-	if getRepoErr != nil {
-		t.Fatalf("GetRunRepo(after) failed: %v", getRepoErr)
-	}
-	if repoAfter.Status != types.RunRepoStatusQueued {
-		t.Fatalf("repo status=%q, want %q after rollback", repoAfter.Status, types.RunRepoStatusQueued)
+	if runAfter.Status != types.RunStatusRunning {
+		t.Fatalf("run status=%q, want %q after rollback", runAfter.Status, types.RunStatusRunning)
 	}
 
-	jobAfter, getJobErr := db.GetJob(ctx, job.ID)
-	if getJobErr != nil {
-		t.Fatalf("GetJob(after) failed: %v", getJobErr)
+	jobAfter, err := db.GetJob(ctx, job.ID)
+	if err != nil {
+		t.Fatalf("GetJob(after) failed: %v", err)
 	}
 	if jobAfter.Status != types.JobStatusCreated {
 		t.Fatalf("job status=%q, want %q after rollback", jobAfter.Status, types.JobStatusCreated)
 	}
 }
 
-func TestCancelRunV1_IsScopedToRunID(t *testing.T) {
+func TestCancelRun_IsScopedToRunID(t *testing.T) {
 	ctx, db := openStoreForCancelBulkTests(t)
 
-	fxA := newV1Fixture(t, ctx, db, "https://github.com/test/cancel-run-v1-scope-a", "main", []byte(`{"type":"cancel-run-v1-scope-a"}`))
-	fxB := newV1Fixture(t, ctx, db, "https://github.com/test/cancel-run-v1-scope-b", "main", []byte(`{"type":"cancel-run-v1-scope-b"}`))
+	fxA := newV1Fixture(t, ctx, db, "https://github.com/test/cancel-run-scope-a", "main", []byte(`{"type":"cancel-run-scope-a"}`))
+	fxB := newV1Fixture(t, ctx, db, "https://github.com/test/cancel-run-scope-b", "main", []byte(`{"type":"cancel-run-scope-b"}`))
 
-	jobA := createJobForStoreTest(t, ctx, db, fxA.Run.ID, fxA.MigRepo.RepoID, fxA.RunRepo.RepoBaseRef, 1, "a-created", types.JobStatusCreated)
-	jobB := createJobForStoreTest(t, ctx, db, fxB.Run.ID, fxB.MigRepo.RepoID, fxB.RunRepo.RepoBaseRef, 1, "b-created", types.JobStatusCreated)
+	jobA := createJobForStoreTest(t, ctx, db, fxA.Run.ID, fxA.MigRepo.RepoID, fxA.Run.RepoBaseRef, 1, "a-created", types.JobStatusCreated)
+	jobB := createJobForStoreTest(t, ctx, db, fxB.Run.ID, fxB.MigRepo.RepoID, fxB.Run.RepoBaseRef, 1, "b-created", types.JobStatusCreated)
 
-	if err := db.CancelRunV1(ctx, fxA.Run.ID); err != nil {
-		t.Fatalf("CancelRunV1(run A) failed: %v", err)
+	if err := db.CancelRun(ctx, fxA.Run.ID); err != nil {
+		t.Fatalf("CancelRun(run A) failed: %v", err)
 	}
 
 	runAAfter, err := db.GetRun(ctx, fxA.Run.ID)
@@ -187,24 +154,8 @@ func TestCancelRunV1_IsScopedToRunID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetRun(run B) failed: %v", err)
 	}
-	if runBAfter.Status != types.RunStatusStarted {
-		t.Fatalf("run B status=%q, want %q", runBAfter.Status, types.RunStatusStarted)
-	}
-
-	repoAAfter, err := db.GetRunRepo(ctx, GetRunRepoParams{RunID: fxA.Run.ID, RepoID: fxA.RunRepo.RepoID})
-	if err != nil {
-		t.Fatalf("GetRunRepo(run A) failed: %v", err)
-	}
-	if repoAAfter.Status != types.RunRepoStatusCancelled {
-		t.Fatalf("run A repo status=%q, want %q", repoAAfter.Status, types.RunRepoStatusCancelled)
-	}
-
-	repoBAfter, err := db.GetRunRepo(ctx, GetRunRepoParams{RunID: fxB.Run.ID, RepoID: fxB.RunRepo.RepoID})
-	if err != nil {
-		t.Fatalf("GetRunRepo(run B) failed: %v", err)
-	}
-	if repoBAfter.Status != types.RunRepoStatusQueued {
-		t.Fatalf("run B repo status=%q, want %q", repoBAfter.Status, types.RunRepoStatusQueued)
+	if runBAfter.Status != types.RunStatusQueued {
+		t.Fatalf("run B status=%q, want %q", runBAfter.Status, types.RunStatusQueued)
 	}
 
 	jobAAfter, err := db.GetJob(ctx, jobA.ID)
@@ -224,16 +175,16 @@ func TestCancelRunV1_IsScopedToRunID(t *testing.T) {
 	}
 }
 
-func TestCancelRunV1_CancelledRunIsIdempotent(t *testing.T) {
+func TestCancelRun_CancelledRunIsIdempotent(t *testing.T) {
 	ctx, db := openStoreForCancelBulkTests(t)
 
-	fx := newV1Fixture(t, ctx, db, "https://github.com/test/cancel-run-v1-idempotent", "main", []byte(`{"type":"cancel-run-v1-idempotent"}`))
+	fx := newV1Fixture(t, ctx, db, "https://github.com/test/cancel-run-idempotent", "main", []byte(`{"type":"cancel-run-idempotent"}`))
 	if err := db.UpdateRunStatus(ctx, UpdateRunStatusParams{ID: fx.Run.ID, Status: types.RunStatusCancelled}); err != nil {
 		t.Fatalf("UpdateRunStatus(cancelled) failed: %v", err)
 	}
 
-	if err := db.CancelRunV1(ctx, fx.Run.ID); err != nil {
-		t.Fatalf("CancelRunV1(cancelled run) failed: %v", err)
+	if err := db.CancelRun(ctx, fx.Run.ID); err != nil {
+		t.Fatalf("CancelRun(cancelled run) failed: %v", err)
 	}
 
 	runAfter, err := db.GetRun(ctx, fx.Run.ID)

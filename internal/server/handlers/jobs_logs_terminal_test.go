@@ -25,7 +25,7 @@ func TestGetJobLogsHandler_TerminalBackfillIncludesRetention(t *testing.T) {
 
 	st := &jobStore{}
 	st.getJob.val = store.Job{ID: jobID, RunID: runID, Status: domaintypes.JobStatusSuccess}
-	st.getRun.val = store.Run{ID: runID, Status: domaintypes.RunStatusFinished}
+	st.getRun.val = store.Run{ID: runID, Status: domaintypes.RunStatusSuccess}
 	st.listLogsByRun.val = []store.Log{
 		{ID: 1, RunID: runID, JobID: &jobID, ObjectKey: &objKey},
 	}

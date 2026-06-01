@@ -11,13 +11,13 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/lifecycle"
 )
 
-func TestGetRunRepoCounts(t *testing.T) {
+func TestGetRunCounts(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
 	tests := []struct {
 		name              string
-		rows              []store.CountRunReposByStatusRow
+		rows              []store.CountRunsByWaveStatusRow
 		err               error
 		wantTotal         int32
 		wantDerivedStatus string
@@ -25,43 +25,43 @@ func TestGetRunRepoCounts(t *testing.T) {
 	}{
 		{
 			name: "cancelled takes precedence",
-			rows: []store.CountRunReposByStatusRow{
-				{Status: domaintypes.RunRepoStatusQueued, Count: 1},
-				{Status: domaintypes.RunRepoStatusRunning, Count: 1},
-				{Status: domaintypes.RunRepoStatusCancelled, Count: 1},
+			rows: []store.CountRunsByWaveStatusRow{
+				{Status: domaintypes.RunStatusQueued, Count: 1},
+				{Status: domaintypes.RunStatusRunning, Count: 1},
+				{Status: domaintypes.RunStatusCancelled, Count: 1},
 			},
 			wantTotal:         3,
 			wantDerivedStatus: lifecycle.DerivedStatusCancelled,
 		},
 		{
 			name: "running when any running",
-			rows: []store.CountRunReposByStatusRow{
-				{Status: domaintypes.RunRepoStatusQueued, Count: 2},
-				{Status: domaintypes.RunRepoStatusRunning, Count: 1},
+			rows: []store.CountRunsByWaveStatusRow{
+				{Status: domaintypes.RunStatusQueued, Count: 2},
+				{Status: domaintypes.RunStatusRunning, Count: 1},
 			},
 			wantTotal:         3,
 			wantDerivedStatus: lifecycle.DerivedStatusRunning,
 		},
 		{
 			name: "failed when any fail and none running/cancelled",
-			rows: []store.CountRunReposByStatusRow{
-				{Status: domaintypes.RunRepoStatusSuccess, Count: 2},
-				{Status: domaintypes.RunRepoStatusFail, Count: 1},
+			rows: []store.CountRunsByWaveStatusRow{
+				{Status: domaintypes.RunStatusSuccess, Count: 2},
+				{Status: domaintypes.RunStatusFail, Count: 1},
 			},
 			wantTotal:         3,
 			wantDerivedStatus: lifecycle.DerivedStatusFailed,
 		},
 		{
 			name: "completed when all terminal and no fail/cancelled",
-			rows: []store.CountRunReposByStatusRow{
-				{Status: domaintypes.RunRepoStatusSuccess, Count: 3},
+			rows: []store.CountRunsByWaveStatusRow{
+				{Status: domaintypes.RunStatusSuccess, Count: 3},
 			},
 			wantTotal:         3,
 			wantDerivedStatus: lifecycle.DerivedStatusCompleted,
 		},
 		{
 			name:              "pending when queued only",
-			rows:              []store.CountRunReposByStatusRow{{Status: domaintypes.RunRepoStatusQueued, Count: 2}},
+			rows:              []store.CountRunsByWaveStatusRow{{Status: domaintypes.RunStatusQueued, Count: 2}},
 			wantTotal:         2,
 			wantDerivedStatus: lifecycle.DerivedStatusPending,
 		},

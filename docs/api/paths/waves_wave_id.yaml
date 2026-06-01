@@ -1,0 +1,6 @@
+get:
+  tags: [Control]
+  summary: Get a wave
+  responses:
+    "200":
+      description: Wave summary.

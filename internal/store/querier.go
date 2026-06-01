@@ -19,10 +19,10 @@ type Querier interface {
 	// Bulk-cancels active jobs for a run (Created/Queued/Running -> Cancelled).
 	// finished_at is set once; duration_ms is computed from started_at when present.
 	CancelActiveJobsByRun(ctx context.Context, runID types.RunID) (int64, error)
-	// Bulk-cancels active jobs for a specific repo attempt.
+	// Bulk-cancels active jobs for a specific run attempt.
 	// Targets Created/Queued/Running and preserves terminal jobs.
 	// finished_at is set once; duration_ms is computed from started_at when present.
-	CancelActiveJobsByRunRepoAttempt(ctx context.Context, arg CancelActiveJobsByRunRepoAttemptParams) (int64, error)
+	CancelActiveJobsByRunAttempt(ctx context.Context, arg CancelActiveJobsByRunAttemptParams) (int64, error)
 	CancelActiveRunsByWave(ctx context.Context, waveID types.WaveID) (int64, error)
 	CheckAPITokenRevoked(ctx context.Context, tokenID string) (pgtype.Timestamptz, error)
 	CheckBootstrapTokenRevoked(ctx context.Context, tokenID string) (pgtype.Timestamptz, error)
@@ -33,9 +33,9 @@ type Querier interface {
 	ClearRepoSHAChainFromJob(ctx context.Context, arg ClearRepoSHAChainFromJobParams) (int64, error)
 	CountJobsByRun(ctx context.Context, runID types.RunID) (int64, error)
 	CountJobsByRunAndStatus(ctx context.Context, arg CountJobsByRunAndStatusParams) (int64, error)
-	// Counts jobs by status for a specific repo attempt.
-	// Used by repo-scoped terminal detection to determine run_repos.status.
-	CountJobsByRunRepoAttemptGroupByStatus(ctx context.Context, arg CountJobsByRunRepoAttemptGroupByStatusParams) ([]CountJobsByRunRepoAttemptGroupByStatusRow, error)
+	// Counts jobs by status for a specific run attempt.
+	// Used by terminal detection to determine runs.status.
+	CountJobsByRunAttemptGroupByStatus(ctx context.Context, arg CountJobsByRunAttemptGroupByStatusParams) ([]CountJobsByRunAttemptGroupByStatusRow, error)
 	// Counts jobs with optional run_id filter.
 	// run_id: if non-null, count jobs for that run; if null, count all jobs.
 	// Used with ListJobsForTUI to provide total for TUI pagination.
@@ -165,7 +165,7 @@ type Querier interface {
 	ListConfigIn(ctx context.Context) ([]ConfigIn, error)
 	// Returns in entries for a specific section ordered by dst.
 	ListConfigInBySection(ctx context.Context, section string) ([]ConfigIn, error)
-	ListCreatedJobsByRunRepoAttempt(ctx context.Context, arg ListCreatedJobsByRunRepoAttemptParams) ([]Job, error)
+	ListCreatedJobsByRunAttempt(ctx context.Context, arg ListCreatedJobsByRunAttemptParams) ([]Job, error)
 	// Returns diff metadata for a run.
 	ListDiffsByRun(ctx context.Context, runID types.RunID) ([]Diff, error)
 	// Lists distinct repos for a mig with last known run metadata,
@@ -182,7 +182,7 @@ type Querier interface {
 	// Used by ConfigHolder initialization and HTTP list endpoint.
 	ListGlobalEnv(ctx context.Context) ([]ConfigEnv, error)
 	ListJobsByRun(ctx context.Context, runID types.RunID) ([]Job, error)
-	ListJobsByRunRepoAttempt(ctx context.Context, arg ListJobsByRunRepoAttemptParams) ([]Job, error)
+	ListJobsByRunAttempt(ctx context.Context, arg ListJobsByRunAttemptParams) ([]Job, error)
 	// Lists jobs with optional run_id filter, ordered newest-to-oldest by job id.
 	// run_id: if non-null, filter to jobs for that run; if null, return all jobs.
 	// Joins runs and migs to surface mig_name per job for the TUI jobs-list screen.
@@ -224,7 +224,7 @@ type Querier interface {
 	// There is an index on created_at to optimize this query.
 	ListSpecs(ctx context.Context, arg ListSpecsParams) ([]Spec, error)
 	// Lists running jobs whose assigned node is stale at the provided cutoff.
-	// Rows are grouped by (run_id, repo_id, attempt) for deterministic recovery processing.
+	// Rows are grouped by (run_id, attempt) for deterministic recovery processing.
 	ListStaleRunningJobs(ctx context.Context, lastHeartbeat pgtype.Timestamptz) ([]ListStaleRunningJobsRow, error)
 	ListWaves(ctx context.Context, arg ListWavesParams) ([]Wave, error)
 	ListWavesByMig(ctx context.Context, arg ListWavesByMigParams) ([]Wave, error)
@@ -234,7 +234,7 @@ type Querier interface {
 	// The candidate is eligible only when every predecessor that points to it is Success.
 	PromoteJobByIDIfUnblocked(ctx context.Context, id types.JobID) (Job, error)
 	RevokeAPIToken(ctx context.Context, tokenID string) error
-	// Atomically promote the next unblocked job in a repo attempt: Created -> Queued.
+	// Atomically promote the next unblocked job in a run attempt: Created -> Queued.
 	// A created job is unblocked when all predecessor jobs that point to it are Success.
 	ScheduleNextJob(ctx context.Context, arg ScheduleNextJobParams) (Job, error)
 	TrimNodeDaemonLogs(ctx context.Context, arg TrimNodeDaemonLogsParams) error

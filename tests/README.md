@@ -180,7 +180,7 @@ The smoke test suite validates these critical paths:
    - Version and help commands
    - Subcommand help (mig, server, etc.)
    - Flag parsing and validation
-   - Run inspection commands: `run status`, `job log`, `mig run repo status`
+   - Run inspection commands: `run status`, `job log`, `mig run`
 
 6. **Container execution (e2e):**
    - Mig container lifecycle

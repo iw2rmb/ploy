@@ -36,7 +36,7 @@ func TestLabSmoke(t *testing.T) {
 	}
 	defer db.Close()
 
-	// Step 1: Create v1 entities: spec → mig → mig_repo → run → run_repo.
+	// Step 1: Create entities: spec → mig → mig_repo → wave → run.
 	createdBy := "smoke-test"
 	specJSON := []byte(`{"type":"smoke-test","description":"Lab smoke test"}`)
 	specID := domaintypes.NewSpecID()
@@ -76,36 +76,40 @@ func TestLabSmoke(t *testing.T) {
 	}
 
 	runID := domaintypes.NewRunID()
-	run, err := db.CreateRun(ctx, store.CreateRunParams{
-		ID:        runID,
+	waveID := domaintypes.WaveID(runID.String())
+	wave, err := db.CreateWave(ctx, store.CreateWaveParams{
+		ID:        waveID,
 		MigID:     migID,
 		SpecID:    spec.ID,
 		CreatedBy: &createdBy,
+	})
+	if err != nil {
+		t.Fatalf("CreateWave() failed: %v", err)
+	}
+
+	run, err := db.CreateRun(ctx, store.CreateRunParams{
+		ID:              runID,
+		WaveID:          wave.ID,
+		MigID:           migID,
+		SpecID:          spec.ID,
+		RepoID:          migRepo.RepoID,
+		RepoBaseRef:     migRepo.BaseRef,
+		SourceCommitSha: "0123456789abcdef0123456789abcdef01234567",
+		RepoSha0:        "0123456789abcdef0123456789abcdef01234567",
+		CreatedBy:       &createdBy,
 	})
 	if err != nil {
 		t.Fatalf("CreateRun() failed: %v", err)
 	}
 	t.Logf("Created run: id=%v, mig_id=%s, spec_id=%s, status=%s", run.ID, run.MigID, run.SpecID, run.Status)
 
-	runRepo, err := db.CreateRunRepo(ctx, store.CreateRunRepoParams{
-		MigID:           migID,
-		RunID:           run.ID,
-		RepoID:          migRepo.RepoID,
-		RepoBaseRef:     migRepo.BaseRef,
-		SourceCommitSha: "0123456789abcdef0123456789abcdef01234567",
-		RepoSha0:        "0123456789abcdef0123456789abcdef01234567",
-	})
-	if err != nil {
-		t.Fatalf("CreateRunRepo() failed: %v", err)
-	}
-
 	// Step 4: Simulate node operations - Create a job for the run.
 	job, err := db.CreateJob(ctx, store.CreateJobParams{
 		ID:          domaintypes.NewJobID(),
 		RunID:       run.ID,
-		RepoID:      runRepo.RepoID,
-		RepoBaseRef: runRepo.RepoBaseRef,
-		Attempt:     runRepo.Attempt,
+		RepoID:      run.RepoID,
+		RepoBaseRef: run.RepoBaseRef,
+		Attempt:     run.Attempt,
 		Name:        "build",
 		Status:      domaintypes.JobStatusRunning,
 		JobType:     domaintypes.JobTypeMig,

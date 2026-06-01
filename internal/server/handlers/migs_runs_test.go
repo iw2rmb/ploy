@@ -46,14 +46,10 @@ func TestMigRuns_Create(t *testing.T) {
 				t.Helper()
 				assertCalled(t, "GetMig", st.getMig.called)
 				assertCalled(t, "ListMigReposByMig", st.listMigReposByMig.called)
-				assertCalled(t, "CreateRun", st.createRun.called)
-				assertCalled(t, "CreateRunRepo", st.createRunRepo.called)
+				assertCalled(t, "CreateWaveWithRuns", st.createWaveWithRuns.called)
 				assertNotCalled(t, "CreateJob", st.createJob.called)
-				if st.createRun.n != 1 {
-					t.Fatalf("CreateRun calls = %d, want 1", st.createRun.n)
-				}
 				if len(st.createRunRepoParams) != 2 {
-					t.Fatalf("CreateRunRepo calls = %d, want 2", len(st.createRunRepoParams))
+					t.Fatalf("CreateRun calls = %d, want 2", len(st.createRunRepoParams))
 				}
 				if got := st.createRunRepoParams[0].RepoID; got != "global01" {
 					t.Fatalf("first run_repo repo_id = %q, want global01", got)
@@ -62,18 +58,18 @@ func TestMigRuns_Create(t *testing.T) {
 					t.Fatalf("second run_repo repo_id = %q, want global02", got)
 				}
 				for _, params := range st.createRunRepoParams {
-					if params.RunID != st.createRun.params.ID {
-						t.Fatalf("run_repo run_id = %q, want %q", params.RunID, st.createRun.params.ID)
+					if params.WaveID != st.createWaveWithRuns.params.Wave.ID {
+						t.Fatalf("run wave_id = %q, want %q", params.WaveID, st.createWaveWithRuns.params.Wave.ID)
 					}
 					if params.SourceCommitSha != testSourceCommitSHA || params.RepoSha0 != testSourceCommitSHA {
 						t.Fatalf("run_repo SHA seed mismatch: source=%q sha0=%q", params.SourceCommitSha, params.RepoSha0)
 					}
 				}
 				resp := decodeBody[struct {
-					RunID string `json:"run_id"`
+					WaveID string `json:"wave_id"`
 				}](t, rr)
-				if resp.RunID == "" {
-					t.Error("response run_id is empty")
+				if resp.WaveID == "" {
+					t.Error("response wave_id is empty")
 				}
 			},
 		},
@@ -95,12 +91,12 @@ func TestMigRuns_Create(t *testing.T) {
 				if st.listFailedRepoIDsByMig.params != "mig123" {
 					t.Errorf("ListFailedRepoIDsByMig param = %q, want %q", st.listFailedRepoIDsByMig.params, "mig123")
 				}
-				assertCalled(t, "CreateRunRepo", st.createRunRepo.called)
+				assertCalled(t, "CreateWaveWithRuns", st.createWaveWithRuns.called)
 				resp := decodeBody[struct {
-					RunID string `json:"run_id"`
+					WaveID string `json:"wave_id"`
 				}](t, rr)
-				if resp.RunID == "" {
-					t.Error("response run_id is empty")
+				if resp.WaveID == "" {
+					t.Error("response wave_id is empty")
 				}
 			},
 		},
@@ -132,10 +128,10 @@ func TestMigRuns_Create(t *testing.T) {
 				t.Helper()
 				assertCalled(t, "ListMigReposByMig", st.listMigReposByMig.called)
 				resp := decodeBody[struct {
-					RunID string `json:"run_id"`
+					WaveID string `json:"wave_id"`
 				}](t, rr)
-				if resp.RunID == "" {
-					t.Error("response run_id is empty")
+				if resp.WaveID == "" {
+					t.Error("response wave_id is empty")
 				}
 			},
 		},
@@ -149,8 +145,8 @@ func TestMigRuns_Create(t *testing.T) {
 			wantStatus: http.StatusCreated,
 			verify: func(t *testing.T, st *migStore, _ *httptest.ResponseRecorder) {
 				t.Helper()
-				if st.createRun.params.CreatedBy == nil || *st.createRun.params.CreatedBy != "test-user@example.com" {
-					t.Errorf("created_by not propagated; got %v, want test-user@example.com", st.createRun.params.CreatedBy)
+				if st.createWaveWithRuns.params.Wave.CreatedBy == nil || *st.createWaveWithRuns.params.Wave.CreatedBy != "test-user@example.com" {
+					t.Errorf("created_by not propagated to wave; got %v, want test-user@example.com", st.createWaveWithRuns.params.Wave.CreatedBy)
 				}
 			},
 		},
@@ -194,8 +190,7 @@ func TestMigRuns_Create(t *testing.T) {
 		// ── Store errors ─────────────────────────────────────────────────
 		{name: "GetMigError", setupFn: func(st *migStore) { st.getMig.err = errors.New("database connection failed") }, body: allReposSelector(), wantStatus: http.StatusInternalServerError},
 		{name: "ListMigReposError", setupFn: func(st *migStore) { st.listMigReposByMig.err = errors.New("database connection failed") }, body: allReposSelector(), wantStatus: http.StatusInternalServerError},
-		{name: "CreateRunError", setupFn: func(st *migStore) { st.createRun.errs = []error{errors.New("database connection failed")} }, body: allReposSelector(), wantStatus: http.StatusInternalServerError},
-		{name: "CreateRunRepoError", setupFn: func(st *migStore) { st.createRunRepo.err = errors.New("database connection failed") }, body: allReposSelector(), wantStatus: http.StatusInternalServerError},
+		{name: "CreateWaveWithRunsError", setupFn: func(st *migStore) { st.createWaveWithRuns.err = errors.New("database connection failed") }, body: allReposSelector(), wantStatus: http.StatusInternalServerError},
 		{name: "ListFailedReposError", setupFn: func(st *migStore) { st.listFailedRepoIDsByMig.err = errors.New("database connection failed") }, body: map[string]any{"repo_selector": map[string]any{"mode": "failed"}}, wantStatus: http.StatusInternalServerError},
 	}
 
@@ -239,6 +234,5 @@ func TestMigRuns_Create_RejectsWhenSourceCommitSeedFails(t *testing.T) {
 	handler.ServeHTTP(rr, req)
 
 	assertStatus(t, rr, http.StatusBadRequest)
-	assertNotCalled(t, "CreateRun", st.createRun.called)
-	assertNotCalled(t, "CreateRunRepo", st.createRunRepo.called)
+	assertNotCalled(t, "CreateWaveWithRuns", st.createWaveWithRuns.called)
 }

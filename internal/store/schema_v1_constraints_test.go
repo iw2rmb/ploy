@@ -141,11 +141,11 @@ func TestV1Schema_MigReposUniqueness(t *testing.T) {
 	}
 }
 
-// TestV1Schema_RunReposCompositePK verifies the composite PRIMARY KEY (run_id, repo_id).
-// The run_repos table has PRIMARY KEY (run_id, repo_id) to ensure one entry per repo per run.
+// TestV1Schema_RunsCompositePK verifies the composite PRIMARY KEY (run_id, repo_id).
+// The runs table has PRIMARY KEY (run_id, repo_id) to ensure one entry per repo per run.
 //
 // This test is skipped if PLOY_TEST_DB_DSN is not set.
-func TestV1Schema_RunReposCompositePK(t *testing.T) {
+func TestV1Schema_RunsCompositePK(t *testing.T) {
 	dsn := os.Getenv("PLOY_TEST_DB_DSN")
 	if dsn == "" {
 		t.Skip("PLOY_TEST_DB_DSN not set; skipping store integration test")
@@ -219,18 +219,18 @@ func TestV1Schema_RunReposCompositePK(t *testing.T) {
 		t.Fatalf("run insert failed: %v", err)
 	}
 
-	// Insert first run_repos row.
+	// Insert first runs row.
 	_, err = db.Pool().Exec(ctx, `
-			INSERT INTO run_repos (mig_id, run_id, repo_id, repo_base_ref, status, created_at)
+			INSERT INTO runs (mig_id, run_id, repo_id, repo_base_ref, status, created_at)
 			VALUES ($1, $2, $3, $4, $5, now())
 		`, migID.String(), runID.String(), resolvedRepoIDPK, "main", "Queued")
 	if err != nil {
-		t.Fatalf("first run_repos insert failed: %v", err)
+		t.Fatalf("first runs insert failed: %v", err)
 	}
 
-	// Attempt to insert second run_repos row with the same (run_id, repo_id).
+	// Attempt to insert second runs row with the same (run_id, repo_id).
 	_, err = db.Pool().Exec(ctx, `
-			INSERT INTO run_repos (mig_id, run_id, repo_id, repo_base_ref, status, created_at)
+			INSERT INTO runs (mig_id, run_id, repo_id, repo_base_ref, status, created_at)
 			VALUES ($1, $2, $3, $4, $5, now())
 		`, migID.String(), runID.String(), resolvedRepoIDPK, "main", "Queued")
 
@@ -264,7 +264,7 @@ func TestV1Schema_JobsUniqueness(t *testing.T) {
 	}
 	defer db.Close()
 
-	// Create a test mig, spec, mig_repo, run, and run_repo.
+	// Create a test mig, spec, mig_repo, run, and run.
 	migID := domaintypes.NewMigID()
 	specID := domaintypes.NewSpecID()
 	repoID := domaintypes.NewMigRepoID()
@@ -275,7 +275,7 @@ func TestV1Schema_JobsUniqueness(t *testing.T) {
 	defer func() {
 		_, _ = db.Pool().Exec(ctx, "DELETE FROM jobs WHERE id = $1", jobID1.String())
 		_, _ = db.Pool().Exec(ctx, "DELETE FROM jobs WHERE id = $1", jobID2.String())
-		_, _ = db.Pool().Exec(ctx, "DELETE FROM run_repos WHERE run_id = $1 AND repo_id = $2", runID.String(), repoID.String())
+		_, _ = db.Pool().Exec(ctx, "DELETE FROM runs WHERE run_id = $1 AND repo_id = $2", runID.String(), repoID.String())
 		_, _ = db.Pool().Exec(ctx, "DELETE FROM runs WHERE id = $1", runID.String())
 		_, _ = db.Pool().Exec(ctx, "DELETE FROM mig_repos WHERE id = $1", repoID.String())
 		_, _ = db.Pool().Exec(ctx, "DELETE FROM specs WHERE id = $1", specID.String())
@@ -330,13 +330,13 @@ func TestV1Schema_JobsUniqueness(t *testing.T) {
 		t.Fatalf("run insert failed: %v", err)
 	}
 
-	// Insert run_repos.
+	// Insert runs.
 	_, err = db.Pool().Exec(ctx, `
-			INSERT INTO run_repos (mig_id, run_id, repo_id, repo_base_ref, status, created_at)
+			INSERT INTO runs (mig_id, run_id, repo_id, repo_base_ref, status, created_at)
 			VALUES ($1, $2, $3, $4, $5, now())
 		`, migID.String(), runID.String(), resolvedRepoIDJobs, "main", "Queued")
 	if err != nil {
-		t.Fatalf("run_repos insert failed: %v", err)
+		t.Fatalf("runs insert failed: %v", err)
 	}
 
 	// Insert first job.

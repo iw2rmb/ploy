@@ -16,7 +16,7 @@ func assertType[T any](_ T) {}
 // The test exercises struct field types to confirm:
 // - Primary key IDs use domain newtypes (RunID, JobID, NodeID, MigID, SpecID, MigRepoID)
 // - Foreign key references use matching domain newtypes
-// - Status and job_type columns use domain enums (types.JobStatus/types.RunRepoStatus/types.RunStatus/JobType)
+// - Status and job_type columns use domain enums (types.JobStatus/types.RunStatus/types.RunStatus/JobType)
 // - jobs.next_id uses *types.JobID
 // - any derived run id columns (e.g. runs_timing.id) also use types.RunID
 //
@@ -40,8 +40,11 @@ func TestSQLCOverridesCompile(t *testing.T) {
 	// Verify Run struct field types.
 	var run Run
 	assertType[types.RunID](run.ID)
+	assertType[types.WaveID](run.WaveID)
 	assertType[types.MigID](run.MigID)
 	assertType[types.SpecID](run.SpecID)
+	assertType[types.RepoID](run.RepoID)
+	assertType[types.RunStatus](run.Status)
 
 	// Verify Job struct field types including NextID.
 	var job Job
@@ -70,13 +73,6 @@ func TestSQLCOverridesCompile(t *testing.T) {
 	var migRepo MigRepo
 	assertType[types.MigRepoID](migRepo.ID)
 	assertType[types.MigID](migRepo.MigID)
-
-	// Verify RunRepo struct field types.
-	var runRepo RunRepo
-	assertType[types.MigID](runRepo.MigID)
-	assertType[types.RunID](runRepo.RunID)
-	assertType[types.RepoID](runRepo.RepoID)
-	assertType[types.RunRepoStatus](runRepo.Status)
 
 	// Verify Event struct field types.
 	var event Event

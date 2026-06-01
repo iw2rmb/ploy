@@ -20,9 +20,8 @@ func cancelRemainingJobsAfterFailure(
 ) error {
 	now := time.Now().UTC()
 
-	jobs, err := st.ListJobsByRunRepoAttempt(ctx, store.ListJobsByRunRepoAttemptParams{
+	jobs, err := st.ListJobsByRunAttempt(ctx, store.ListJobsByRunAttemptParams{
 		RunID:   failedJob.RunID,
-		RepoID:  failedJob.RepoID,
 		Attempt: failedJob.Attempt,
 	})
 	if err != nil {

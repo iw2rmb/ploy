@@ -15,7 +15,7 @@ import (
 //
 // Method receivers are split across companion files to keep each shard small:
 //   - test_fixture_job_run_test.go      - Artifact/Diff and Run-query methods.
-//   - test_fixture_job_runrepo_test.go  - RunRepo and RunRepoAction methods.
+//   - test_fixture_job_runrepo_test.go  - RunRepo and RunAction methods.
 //   - test_fixture_job_misc_test.go     - Stale recovery, Node, MigRepo, Event,
 //     Ingest, and Spec/Mig/Run creation.
 type jobStore struct {
@@ -29,7 +29,7 @@ type jobStore struct {
 
 	listJobsByRun mockCall[types.RunID, []store.Job]
 
-	listJobsByRunRepoAttempt mockCall[store.ListJobsByRunRepoAttemptParams, []store.Job]
+	listJobsByRunRepoAttempt mockCall[store.ListJobsByRunAttemptParams, []store.Job]
 
 	// Job status/completion
 	updateJobStatus mockCallSlice[store.UpdateJobStatusParams, struct{}]
@@ -51,17 +51,17 @@ type jobStore struct {
 	// Job counts
 	countJobsByRun                         mockResult[int64]
 	countJobsByRunAndStatus                mockResult[int64]
-	countJobsByRunRepoAttemptGroupByStatus mockResult[[]store.CountJobsByRunRepoAttemptGroupByStatusRow]
+	countJobsByRunRepoAttemptGroupByStatus mockResult[[]store.CountJobsByRunAttemptGroupByStatusRow]
 
 	// Job listing (TUI)
 	listJobsForTUI  mockCall[store.ListJobsForTUIParams, []store.ListJobsForTUIRow]
 	countJobsForTUI mockCall[*string, int64]
 
 	// Claiming
-	claimJob           mockCall[types.NodeID, store.Job]
-	claimNodeAction    mockCall[types.NodeID, store.NodeAction]
-	claimRunRepoAction mockCall[types.NodeID, store.RunRepoAction]
-	unclaimJob         mockCall[store.UnclaimJobParams, struct{}]
+	claimJob        mockCall[types.NodeID, store.Job]
+	claimNodeAction mockCall[types.NodeID, store.NodeAction]
+	claimRunAction  mockCall[types.NodeID, store.RunAction]
+	unclaimJob      mockCall[store.UnclaimJobParams, struct{}]
 
 	claimRun mockResult[store.Run]
 
@@ -82,6 +82,7 @@ type jobStore struct {
 
 	// Run queries (for orchestration)
 	getRun        mockCall[string, store.Run]
+	getWave       mockCall[string, store.Wave]
 	getSpec       mockCall[string, store.Spec]
 	getSpecBundle mockCall[string, store.SpecBundle]
 	getRunTiming  mockCall[string, store.RunsTiming]
@@ -90,35 +91,30 @@ type jobStore struct {
 
 	ackRunStart         mockResult[struct{}]
 	updateRunCompletion mockResult[struct{}]
-	updateRunStatus     mockCall[store.UpdateRunStatusParams, struct{}]
+	updateRunStatus     mockCallSlice[store.UpdateRunStatusParams, struct{}]
+	updateWaveStatus    mockCallSlice[store.UpdateWaveStatusParams, struct{}]
 	cancelRunV1         mockCall[string, struct{}]
 	updateRunResume     mockResult[struct{}]
 
-	// Run repo (for orchestration)
-	getRunRepo mockCall[store.GetRunRepoParams, store.RunRepo]
+	// Run mutation and wave listing helpers.
+	updateRunRepoError      mockCall[store.UpdateRunErrorParams, struct{}]
+	updateRunRepoBaseRef    mockCall[store.UpdateRunBaseRefParams, struct{}]
+	incrementRunRepoAttempt mockCall[types.RunID, struct{}]
 
-	updateRunRepoStatus mockCallSlice[store.UpdateRunRepoStatusParams, struct{}]
+	listRunReposByRun        mockCall[string, []store.Run]
+	listQueuedRunReposByRun  mockCall[string, []store.Run]
+	listRunReposWithURLByRun mockCall[string, []store.ListRunsWithURLByWaveRow]
 
-	updateRunRepoError      mockCall[store.UpdateRunRepoErrorParams, struct{}]
-	updateRunRepoBaseRef    mockCall[store.UpdateRunRepoBaseRefParams, struct{}]
-	incrementRunRepoAttempt mockCall[store.IncrementRunRepoAttemptParams, struct{}]
+	countRunReposByStatus mockResult[[]store.CountRunsByWaveStatusRow]
 
-	createRunRepo mockCall[store.CreateRunRepoParams, store.RunRepo]
+	cancelActiveJobsByRunRepoAttempt mockCallSlice[store.CancelActiveJobsByRunAttemptParams, int64]
 
-	listRunReposByRun        mockCall[string, []store.RunRepo]
-	listQueuedRunReposByRun  mockCall[string, []store.RunRepo]
-	listRunReposWithURLByRun mockCall[string, []store.ListRunReposWithURLByRunRow]
-
-	countRunReposByStatus mockResult[[]store.CountRunReposByStatusRow]
-
-	cancelActiveJobsByRunRepoAttempt mockCallSlice[store.CancelActiveJobsByRunRepoAttemptParams, int64]
-
-	getLatestRunRepoByMigAndRepoStatus mockCall[store.GetLatestRunRepoByMigAndRepoStatusParams, store.GetLatestRunRepoByMigAndRepoStatusRow]
-	createRunRepoAction                mockCall[store.CreateRunRepoActionParams, store.RunRepoAction]
-	getRunRepoAction                   mockCall[types.JobID, store.RunRepoAction]
-	getRunRepoActionByKey              mockCall[store.GetRunRepoActionByKeyParams, store.RunRepoAction]
-	updateRunRepoActionCompletion      mockCall[store.UpdateRunRepoActionCompletionParams, struct{}]
-	listRunRepoActionsByRunRepoAttempt mockCall[store.ListRunRepoActionsByRunRepoAttemptParams, []store.RunRepoAction]
+	getLatestRunRepoByMigAndRepoStatus mockCall[store.GetLatestRunByMigAndRepoStatusParams, store.GetLatestRunByMigAndRepoStatusRow]
+	createRunAction                    mockCall[store.CreateRunActionParams, store.RunAction]
+	getRunAction                       mockCall[types.JobID, store.RunAction]
+	getRunActionByKey                  mockCall[store.GetRunActionByKeyParams, store.RunAction]
+	updateRunActionCompletion          mockCall[store.UpdateRunActionCompletionParams, struct{}]
+	listRunActionsByRunRepoAttempt     mockCall[store.ListRunActionsByRunAttemptParams, []store.RunAction]
 	getNodeAction                      mockCall[types.JobID, store.NodeAction]
 	updateNodeActionCompletion         mockCall[store.UpdateNodeActionCompletionParams, struct{}]
 
@@ -150,7 +146,9 @@ type jobStore struct {
 	createMigRepo mockCall[store.CreateMigRepoParams, store.MigRepo]
 
 	// Run creation (for migs_ticket flow)
-	createRun mockCall[store.CreateRunParams, store.Run]
+	createWaveWithRuns mockCall[store.CreateWaveWithRunsParams, store.Wave]
+	createRun          mockCall[store.CreateRunParams, store.Run]
+	createRunRepo      mockCall[store.CreateRunParams, store.Run]
 
 	listRuns mockResult[[]store.Run]
 }
@@ -188,7 +186,7 @@ func (m *jobStore) ListJobsByRun(ctx context.Context, runID types.RunID) ([]stor
 	return result, m.listJobsByRun.err
 }
 
-func (m *jobStore) ListJobsByRunRepoAttempt(ctx context.Context, arg store.ListJobsByRunRepoAttemptParams) ([]store.Job, error) {
+func (m *jobStore) ListJobsByRunAttempt(ctx context.Context, arg store.ListJobsByRunAttemptParams) ([]store.Job, error) {
 	return m.listJobsByRunRepoAttempt.record(arg)
 }
 
@@ -328,7 +326,7 @@ func (m *jobStore) CountJobsByRunAndStatus(ctx context.Context, arg store.CountJ
 	return m.countJobsByRunAndStatus.val, nil
 }
 
-func (m *jobStore) CountJobsByRunRepoAttemptGroupByStatus(ctx context.Context, arg store.CountJobsByRunRepoAttemptGroupByStatusParams) ([]store.CountJobsByRunRepoAttemptGroupByStatusRow, error) {
+func (m *jobStore) CountJobsByRunAttemptGroupByStatus(ctx context.Context, arg store.CountJobsByRunAttemptGroupByStatusParams) ([]store.CountJobsByRunAttemptGroupByStatusRow, error) {
 	return m.countJobsByRunRepoAttemptGroupByStatus.ret()
 }
 
@@ -359,19 +357,19 @@ func (m *jobStore) ClaimJob(ctx context.Context, nodeID types.NodeID) (store.Job
 	return m.claimJob.val, nil
 }
 
-func (m *jobStore) ClaimRunRepoAction(ctx context.Context, nodeID types.NodeID) (store.RunRepoAction, error) {
-	m.claimRunRepoAction.called = true
-	m.claimRunRepoAction.params = nodeID
+func (m *jobStore) ClaimRunAction(ctx context.Context, nodeID types.NodeID) (store.RunAction, error) {
+	m.claimRunAction.called = true
+	m.claimRunAction.params = nodeID
 	if nodeID.IsZero() {
-		return store.RunRepoAction{}, store.ErrEmptyNodeID
+		return store.RunAction{}, store.ErrEmptyNodeID
 	}
-	if m.claimRunRepoAction.err != nil {
-		return store.RunRepoAction{}, m.claimRunRepoAction.err
+	if m.claimRunAction.err != nil {
+		return store.RunAction{}, m.claimRunAction.err
 	}
-	if m.claimRunRepoAction.val.ID.IsZero() {
-		return store.RunRepoAction{}, pgx.ErrNoRows
+	if m.claimRunAction.val.ID.IsZero() {
+		return store.RunAction{}, pgx.ErrNoRows
 	}
-	return m.claimRunRepoAction.val, nil
+	return m.claimRunAction.val, nil
 }
 
 func (m *jobStore) ClaimNodeAction(ctx context.Context, nodeID types.NodeID) (store.NodeAction, error) {

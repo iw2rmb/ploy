@@ -16,36 +16,35 @@ type runStore struct {
 
 	// Run queries
 	getRun       mockCall[string, store.Run]
+	getWave      mockCall[string, store.Wave]
 	getRunTiming mockCall[string, store.RunsTiming]
 
 	listRunsTimings mockResult[[]store.RunsTiming]
 	listRuns        mockResult[[]store.Run]
 
-	deleteRun   mockCall[string, struct{}]
-	cancelRunV1 mockCall[string, struct{}]
+	deleteRun mockCall[string, struct{}]
+	cancelRun mockCall[string, struct{}]
 
 	updateRunStatus mockCall[store.UpdateRunStatusParams, struct{}]
 
 	// Run repo queries
-	countRunReposByStatus    mockResult[[]store.CountRunReposByStatusRow]
-	listRunReposByRun        mockCall[string, []store.RunRepo]
-	listRunReposWithURLByRun mockCall[string, []store.ListRunReposWithURLByRunRow]
+	countRunReposByStatus    mockResult[[]store.CountRunsByWaveStatusRow]
+	listRunReposByRun        mockCall[string, []store.Run]
+	listRunReposWithURLByRun mockCall[string, []store.ListRunsWithURLByWaveRow]
 
-	getLatestRunRepoByMigAndRepoStatus mockCall[store.GetLatestRunRepoByMigAndRepoStatusParams, store.GetLatestRunRepoByMigAndRepoStatusRow]
+	getLatestRunRepoByMigAndRepoStatus mockCall[store.GetLatestRunByMigAndRepoStatusParams, store.GetLatestRunByMigAndRepoStatusRow]
 
-	listQueuedRunReposByRun mockCall[string, []store.RunRepo]
+	listQueuedRunReposByRun mockCall[string, []store.Run]
 
-	getRunRepo mockCallSeq[store.GetRunRepoParams, store.RunRepo]
+	getRunRepo mockCallSeq[types.RunID, store.Run]
 
-	updateRunRepoBaseRef    mockCall[store.UpdateRunRepoBaseRefParams, struct{}]
+	updateRunRepoBaseRef    mockCall[store.UpdateRunBaseRefParams, struct{}]
 	updateMigRepoBaseRef    mockCall[store.UpdateMigRepoBaseRefParams, struct{}]
-	incrementRunRepoAttempt mockCall[store.IncrementRunRepoAttemptParams, struct{}]
-	updateRunRepoError      mockCall[store.UpdateRunRepoErrorParams, struct{}]
-
-	updateRunRepoStatus mockCallSlice[store.UpdateRunRepoStatusParams, struct{}]
+	incrementRunRepoAttempt mockCall[types.RunID, struct{}]
+	updateRunRepoError      mockCall[store.UpdateRunErrorParams, struct{}]
 
 	// Create run repo (for batch add)
-	createRunRepo mockCall[store.CreateRunRepoParams, store.RunRepo]
+	createRunRepo mockCall[store.CreateRunParams, store.Run]
 
 	// Mig repo (for batch operations and pull)
 	createMigRepo mockCall[store.CreateMigRepoParams, store.MigRepo]
@@ -68,7 +67,7 @@ type runStore struct {
 
 	scheduleNextJob mockCall[store.ScheduleNextJobParams, store.Job]
 
-	listJobsByRunRepoAttempt       mockCall[store.ListJobsByRunRepoAttemptParams, []store.Job]
+	listJobsByRunRepoAttempt       mockCall[store.ListJobsByRunAttemptParams, []store.Job]
 	listArtifactBundlesByRunAndJob mockCall[store.ListArtifactBundlesByRunAndJobParams, []store.ArtifactBundle]
 
 	// Ingest (logs, diffs, artifacts)
@@ -88,7 +87,14 @@ type runStore struct {
 // Run query methods
 
 func (m *runStore) GetRun(ctx context.Context, id types.RunID) (store.Run, error) {
+	if len(m.getRunRepo.vals) > 0 || len(m.getRunRepo.errs) > 0 {
+		return m.getRunRepo.record(id)
+	}
 	return m.getRun.record(id.String())
+}
+
+func (m *runStore) GetWave(ctx context.Context, id types.WaveID) (store.Wave, error) {
+	return m.getWave.record(id.String())
 }
 
 func (m *runStore) GetRunTiming(ctx context.Context, id types.RunID) (store.RunsTiming, error) {
@@ -108,8 +114,8 @@ func (m *runStore) DeleteRun(ctx context.Context, id types.RunID) error {
 	return err
 }
 
-func (m *runStore) CancelRunV1(ctx context.Context, runID types.RunID) error {
-	_, err := m.cancelRunV1.record(runID.String())
+func (m *runStore) CancelRun(ctx context.Context, runID types.RunID) error {
+	_, err := m.cancelRun.record(runID.String())
 	return err
 }
 
@@ -120,53 +126,44 @@ func (m *runStore) UpdateRunStatus(ctx context.Context, params store.UpdateRunSt
 
 // Run repo methods
 
-func (m *runStore) CountRunReposByStatus(ctx context.Context, runID types.RunID) ([]store.CountRunReposByStatusRow, error) {
+func (m *runStore) CountRunsByWaveStatus(ctx context.Context, waveID types.WaveID) ([]store.CountRunsByWaveStatusRow, error) {
 	return m.countRunReposByStatus.ret()
 }
 
-func (m *runStore) ListRunReposByRun(ctx context.Context, runID types.RunID) ([]store.RunRepo, error) {
-	return m.listRunReposByRun.record(runID.String())
+func (m *runStore) ListRunsByWave(ctx context.Context, waveID types.WaveID) ([]store.Run, error) {
+	return m.listRunReposByRun.record(waveID.String())
 }
 
-func (m *runStore) ListRunReposWithURLByRun(ctx context.Context, runID types.RunID) ([]store.ListRunReposWithURLByRunRow, error) {
-	return m.listRunReposWithURLByRun.record(runID.String())
+func (m *runStore) ListRunsWithURLByWave(ctx context.Context, waveID types.WaveID) ([]store.ListRunsWithURLByWaveRow, error) {
+	return m.listRunReposWithURLByRun.record(waveID.String())
 }
 
-func (m *runStore) GetLatestRunRepoByMigAndRepoStatus(ctx context.Context, arg store.GetLatestRunRepoByMigAndRepoStatusParams) (store.GetLatestRunRepoByMigAndRepoStatusRow, error) {
+func (m *runStore) GetLatestRunByMigAndRepoStatus(ctx context.Context, arg store.GetLatestRunByMigAndRepoStatusParams) (store.GetLatestRunByMigAndRepoStatusRow, error) {
 	return m.getLatestRunRepoByMigAndRepoStatus.record(arg)
 }
 
-func (m *runStore) ListQueuedRunReposByRun(ctx context.Context, runID types.RunID) ([]store.RunRepo, error) {
-	return m.listQueuedRunReposByRun.record(runID.String())
+func (m *runStore) ListQueuedRunsByWave(ctx context.Context, waveID types.WaveID) ([]store.Run, error) {
+	return m.listQueuedRunReposByRun.record(waveID.String())
 }
 
-func (m *runStore) GetRunRepo(ctx context.Context, arg store.GetRunRepoParams) (store.RunRepo, error) {
-	return m.getRunRepo.record(arg)
-}
-
-func (m *runStore) UpdateRunRepoBaseRef(ctx context.Context, params store.UpdateRunRepoBaseRefParams) error {
+func (m *runStore) UpdateRunBaseRef(ctx context.Context, params store.UpdateRunBaseRefParams) error {
 	_, err := m.updateRunRepoBaseRef.record(params)
 	return err
 }
 
-func (m *runStore) UpdateRunRepoStatus(ctx context.Context, params store.UpdateRunRepoStatusParams) error {
-	_, err := m.updateRunRepoStatus.record(params)
-	return err
-}
-
-func (m *runStore) UpdateRunRepoError(ctx context.Context, params store.UpdateRunRepoErrorParams) error {
+func (m *runStore) UpdateRunError(ctx context.Context, params store.UpdateRunErrorParams) error {
 	_, err := m.updateRunRepoError.record(params)
 	return err
 }
 
-func (m *runStore) CreateRunRepo(ctx context.Context, params store.CreateRunRepoParams) (store.RunRepo, error) {
-	result := defaultRunRepo(m.createRunRepo.val, params)
+func (m *runStore) CreateRun(ctx context.Context, params store.CreateRunParams) (store.Run, error) {
+	result := defaultRun(m.createRunRepo.val, params)
 	m.createRunRepo.val = result
 	_, err := m.createRunRepo.record(params)
 	return result, err
 }
 
-func (m *runStore) IncrementRunRepoAttempt(ctx context.Context, arg store.IncrementRunRepoAttemptParams) error {
+func (m *runStore) IncrementRunAttempt(ctx context.Context, arg types.RunID) error {
 	_, err := m.incrementRunRepoAttempt.record(arg)
 	return err
 }
@@ -248,7 +245,7 @@ func (m *runStore) ScheduleNextJob(ctx context.Context, arg store.ScheduleNextJo
 	return m.scheduleNextJob.val, nil
 }
 
-func (m *runStore) ListJobsByRunRepoAttempt(ctx context.Context, arg store.ListJobsByRunRepoAttemptParams) ([]store.Job, error) {
+func (m *runStore) ListJobsByRunAttempt(ctx context.Context, arg store.ListJobsByRunAttemptParams) ([]store.Job, error) {
 	return m.listJobsByRunRepoAttempt.record(arg)
 }
 

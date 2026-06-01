@@ -30,8 +30,8 @@ func TestRunRepoDiffs_Download(t *testing.T) {
 	repoIDTyped := domaintypes.RepoID(repoID)
 	objKey := "diffs/run/" + runID.String() + "/diff/" + diffID.String() + ".patch.gz"
 
-	st.getRunRepo.val = store.RunRepo{
-		RunID:   runID,
+	st.getRunRepo.val = store.Run{
+		ID:      runID,
 		RepoID:  repoIDTyped,
 		Attempt: 1,
 	}
@@ -87,8 +87,8 @@ func TestRunRepoDiffs_DownloadAccumulated(t *testing.T) {
 	patch1 := "diff --git a/a.txt b/a.txt\n+one\n"
 	patch2 := "diff --git a/b.txt b/b.txt\n+two\n"
 
-	st.getRunRepo.val = store.RunRepo{
-		RunID:   runID,
+	st.getRunRepo.val = store.Run{
+		ID:      runID,
 		RepoID:  repoIDTyped,
 		Attempt: 1,
 	}
@@ -135,7 +135,6 @@ func TestRunRepoDiffs_ReturnsRepoFilteredItems(t *testing.T) {
 	runID := domaintypes.NewRunID()
 	repoAID := "repoAAAA" // NanoID-backed
 	repoBID := "repoBBBB" // NanoID-backed
-	repoBIDTyped := domaintypes.RepoID(repoBID)
 
 	// Setup: diff for repo A (via job_id -> jobs.repo_id join)
 	jobAID := domaintypes.NewJobID()
@@ -168,13 +167,10 @@ func TestRunRepoDiffs_ReturnsRepoFilteredItems(t *testing.T) {
 
 	// Verify repo scope was queried.
 	if !st.getRunRepo.called {
-		t.Fatal("expected GetRunRepo to be called")
+		t.Fatal("expected GetRun to be called")
 	}
-	if st.getRunRepo.params.RunID != runID {
-		t.Errorf("run_id=%q, want %q", st.getRunRepo.params.RunID, runID)
-	}
-	if st.getRunRepo.params.RepoID != repoBIDTyped {
-		t.Errorf("repo_id=%q, want %q", st.getRunRepo.params.RepoID, repoBIDTyped)
+	if st.getRunRepo.params != runID {
+		t.Errorf("run_id=%q, want %q", st.getRunRepo.params, runID)
 	}
 
 	var resp diffListResponse
@@ -199,8 +195,8 @@ func TestRunRepoDiffs_ReturnsOwnDiffs(t *testing.T) {
 	diffID := uuid.New()
 	createdAt := time.Date(2025, 1, 15, 12, 0, 0, 0, time.UTC)
 
-	st.getRunRepo.val = store.RunRepo{
-		RunID:   runID,
+	st.getRunRepo.val = store.Run{
+		ID:      runID,
 		RepoID:  repoIDTyped,
 		Attempt: 1,
 	}
@@ -263,20 +259,6 @@ func TestRunRepoDiffs_MissingRunID(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/v1/runs//repos/repoAAAA/diffs", nil)
 	req.SetPathValue("run_id", "")
 	req.SetPathValue("repo_id", "repoAAAA")
-	listRunRepoDiffsHandler(st, bs).ServeHTTP(rr, req)
-
-	assertStatus(t, rr, http.StatusBadRequest)
-}
-
-// TestRunRepoDiffs_MissingRepoID verifies that missing repo_id returns 400.
-func TestRunRepoDiffs_MissingRepoID(t *testing.T) {
-	st := &artifactStore{}
-	bs := bsmock.New()
-	runID := domaintypes.NewRunID()
-	rr := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID.String()+"/repos//diffs", nil)
-	req.SetPathValue("run_id", runID.String())
-	req.SetPathValue("repo_id", "")
 	listRunRepoDiffsHandler(st, bs).ServeHTTP(rr, req)
 
 	assertStatus(t, rr, http.StatusBadRequest)

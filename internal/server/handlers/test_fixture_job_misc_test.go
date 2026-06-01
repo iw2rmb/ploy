@@ -91,10 +91,30 @@ func (m *jobStore) GetRepo(ctx context.Context, id types.RepoID) (store.Repo, er
 }
 
 func (m *jobStore) CreateRun(ctx context.Context, params store.CreateRunParams) (store.Run, error) {
+	m.createRunRepo.called = true
+	m.createRunRepo.params = params
 	result := defaultRun(m.createRun.val, params)
 	m.createRun.val = result
 	_, err := m.createRun.record(params)
 	return result, err
+}
+
+func (m *jobStore) CreateWaveWithRuns(ctx context.Context, params store.CreateWaveWithRunsParams) (store.Wave, []store.Run, error) {
+	m.createWaveWithRuns.called = true
+	m.createWaveWithRuns.params = params
+	if m.createWaveWithRuns.err != nil {
+		return store.Wave{}, nil, m.createWaveWithRuns.err
+	}
+	wave := defaultWave(m.createWaveWithRuns.val, params.Wave)
+	runs := make([]store.Run, 0, len(params.Runs))
+	for _, runParams := range params.Runs {
+		run, err := m.CreateRun(ctx, runParams)
+		if err != nil {
+			return store.Wave{}, nil, err
+		}
+		runs = append(runs, run)
+	}
+	return wave, runs, nil
 }
 
 func (m *jobStore) ListRuns(ctx context.Context, params store.ListRunsParams) ([]store.Run, error) {

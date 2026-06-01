@@ -44,8 +44,8 @@ func cleanTestTables(t *testing.T, ctx context.Context, db Store) {
 	t.Helper()
 	_, err := db.Pool().Exec(ctx,
 		`TRUNCATE
-			jobs, job_metrics, run_repo_actions, node_actions, sboms, nodes, node_metrics,
-			run_repos, runs, mig_repos, migs, specs, spec_bundles, repos,
+			jobs, job_metrics, run_actions, node_actions, sboms, nodes, node_metrics,
+			runs, runs, mig_repos, migs, specs, spec_bundles, repos,
 			events, diffs, logs, artifact_bundles,
 			api_tokens, bootstrap_tokens,
 			config_env, config_in, config_bundle_map
@@ -62,8 +62,8 @@ func createTestJob(t *testing.T, ctx context.Context, db Store, fx v1Fixture, na
 		ID:          types.NewJobID(),
 		RunID:       fx.Run.ID,
 		RepoID:      fx.MigRepo.RepoID,
-		RepoBaseRef: fx.RunRepo.RepoBaseRef,
-		Attempt:     fx.RunRepo.Attempt,
+		RepoBaseRef: fx.Run.RepoBaseRef,
+		Attempt:     fx.Run.Attempt,
 		Name:        name,
 		JobType:     "mig",
 		JobImage:    "",
@@ -121,7 +121,7 @@ func TestClaimJob_Basic(t *testing.T) {
 	ctx, db := newTestStore(t)
 	fx := newV1Fixture(t, ctx, db, "https://github.com/test/repo", "main", []byte(`{"type":"test"}`))
 
-	if fx.Run.Status != types.RunStatusStarted {
+	if fx.Run.Status != types.RunStatusRunning {
 		t.Errorf("expected status Started, got %s", fx.Run.Status)
 	}
 
@@ -201,7 +201,7 @@ func TestClaimJob_AllJobsClaimedOnce(t *testing.T) {
 	}
 }
 
-func TestClaimJob_PinsRunRepoAttemptToFirstClaimingNode(t *testing.T) {
+func TestClaimJob_PinsRunAttemptToFirstClaimingNode(t *testing.T) {
 	ctx, db := newTestStore(t)
 	fx := newV1Fixture(t, ctx, db, "https://github.com/test/node-affinity", "main", []byte(`{}`))
 
@@ -231,13 +231,10 @@ func TestClaimJob_PinsRunRepoAttemptToFirstClaimingNode(t *testing.T) {
 		t.Fatalf("ClaimJob(nodeA second) = %s, want remaining same-attempt job", claimedSecond.ID)
 	}
 
-	if err := db.IncrementRunRepoAttempt(ctx, IncrementRunRepoAttemptParams{
-		RunID:  fx.Run.ID,
-		RepoID: fx.MigRepo.RepoID,
-	}); err != nil {
-		t.Fatalf("IncrementRunRepoAttempt() failed: %v", err)
+	if err := db.IncrementRunAttempt(ctx, fx.Run.ID); err != nil {
+		t.Fatalf("IncrementRunAttempt() failed: %v", err)
 	}
-	fx.RunRepo.Attempt++
+	fx.Run.Attempt++
 	nextAttemptJob := createTestJob(t, ctx, db, fx, "next-attempt")
 
 	claimedNextAttempt, err := db.ClaimJob(ctx, nodeB.ID)
@@ -333,8 +330,8 @@ func TestClaimJob_OnlyPendingJobs(t *testing.T) {
 		ID:          types.NewJobID(),
 		RunID:       fx.Run.ID,
 		RepoID:      fx.MigRepo.RepoID,
-		RepoBaseRef: fx.RunRepo.RepoBaseRef,
-		Attempt:     fx.RunRepo.Attempt,
+		RepoBaseRef: fx.Run.RepoBaseRef,
+		Attempt:     fx.Run.Attempt,
 		Name:        "running-job",
 		Status:      types.JobStatusRunning,
 		JobType:     "mig",

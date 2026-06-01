@@ -49,6 +49,10 @@ func (m *jobStore) GetRun(ctx context.Context, id types.RunID) (store.Run, error
 	return m.getRun.record(id.String())
 }
 
+func (m *jobStore) GetWave(ctx context.Context, id types.WaveID) (store.Wave, error) {
+	return m.getWave.record(id.String())
+}
+
 func (m *jobStore) GetSpec(ctx context.Context, id types.SpecID) (store.Spec, error) {
 	return m.getSpec.record(id.String())
 }
@@ -72,20 +76,17 @@ func (m *jobStore) ListRunsTimings(ctx context.Context, arg store.ListRunsTiming
 	return m.listRunsTimings.ret()
 }
 
-func (m *jobStore) AckRunStart(ctx context.Context, id string) error {
-	return m.ackRunStart.err
-}
-
-func (m *jobStore) UpdateRunCompletion(ctx context.Context, params store.UpdateRunCompletionParams) error {
-	return m.updateRunCompletion.err
-}
-
 func (m *jobStore) UpdateRunStatus(ctx context.Context, params store.UpdateRunStatusParams) error {
 	_, err := m.updateRunStatus.record(params)
 	return err
 }
 
-func (m *jobStore) CancelRunV1(ctx context.Context, runID types.RunID) error {
+func (m *jobStore) UpdateWaveStatus(ctx context.Context, params store.UpdateWaveStatusParams) error {
+	_, err := m.updateWaveStatus.record(params)
+	return err
+}
+
+func (m *jobStore) CancelRun(ctx context.Context, runID types.RunID) error {
 	_, err := m.cancelRunV1.record(runID.String())
 	return err
 }

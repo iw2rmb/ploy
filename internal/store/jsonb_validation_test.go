@@ -125,14 +125,14 @@ func TestRejectsInvalidJSONBPayloads(t *testing.T) {
 		}
 	})
 
-	t.Run("UpdateRunCompletion/invalid_stats", func(t *testing.T) {
-		err := store.UpdateRunCompletion(ctx, UpdateRunCompletionParams{
-			ID:     types.NewRunID(),
-			Status: types.RunStatusFinished,
+	t.Run("UpdateWaveCompletion/invalid_stats", func(t *testing.T) {
+		err := store.UpdateWaveCompletion(ctx, UpdateWaveCompletionParams{
+			ID:     types.NewWaveID(),
+			Status: types.WaveStatusFinished,
 			Stats:  invalidJSON,
 		})
 		if err == nil {
-			t.Fatal("expected error for invalid runs.stats, got nil")
+			t.Fatal("expected error for invalid waves.stats, got nil")
 		}
 		if !errors.Is(err, ErrInvalidJSON) {
 			t.Fatalf("expected ErrInvalidJSON, got %v", err)

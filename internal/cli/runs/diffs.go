@@ -39,7 +39,7 @@ type ListRepoDiffsCommand struct {
 	RepoID  domaintypes.RepoID
 }
 
-// Run executes GET /v1/runs/{run_id}/repos/{repo_id}/diffs and returns structured diffs.
+// Run executes GET /v1/runs/{run_id}/diffs and returns structured diffs.
 func (c ListRepoDiffsCommand) Run(ctx context.Context) (ListRepoDiffsResult, error) {
 	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
 		return ListRepoDiffsResult{}, fmt.Errorf("list repo diffs: %w", err)
@@ -79,7 +79,7 @@ func (c ListRepoDiffsCommand) Run(ctx context.Context) (ListRepoDiffsResult, err
 // optionally downloads the newest patch. This is the v1 repo-scoped version
 // that replaces the legacy run-scoped DiffsCommand.
 //
-// Uses GET /v1/runs/{run_id}/repos/{repo_id}/diffs endpoint.
+// Uses GET /v1/runs/{run_id}/diffs endpoint.
 // Returns diffs filtered by repo_id via jobs.repo_id join.
 type RepoDiffsCommand struct {
 	Client  *http.Client

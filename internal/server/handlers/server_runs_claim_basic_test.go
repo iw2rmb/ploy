@@ -27,8 +27,8 @@ func TestClaimJob_HappyPath(t *testing.T) {
 				if !f.store.claimJob.called || string(f.store.claimJob.params) != f.nodeID.String() {
 					t.Fatalf("expected ClaimJob to be called with node id")
 				}
-				if len(f.store.updateRunRepoStatus.calls) == 0 {
-					t.Fatalf("expected UpdateRunRepoStatus to be called")
+				if len(f.store.updateRunStatus.calls) == 0 {
+					t.Fatalf("expected UpdateRunStatus to be called")
 				}
 
 				resp := decodeBody[map[string]any](t, rr)
@@ -50,8 +50,8 @@ func TestClaimJob_HappyPath(t *testing.T) {
 				if resp["commit_sha"] != f.sourceCommitSHA {
 					t.Fatalf("expected commit_sha %s, got %v", f.sourceCommitSHA, resp["commit_sha"])
 				}
-				if resp["status"] != "Started" {
-					t.Fatalf("expected status Started, got %v", resp["status"])
+				if resp["status"] != "Queued" {
+					t.Fatalf("expected status Queued, got %v", resp["status"])
 				}
 
 				spec, ok := resp["spec"].(map[string]any)

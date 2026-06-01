@@ -22,7 +22,7 @@ func TestListStaleRunningJobs_FiltersByHeartbeatAndStatus(t *testing.T) {
 	}
 
 	fx := newV1Fixture(t, ctx, db, "https://github.com/test/stale-list-a", "main", []byte(`{"type":"stale-list"}`))
-	repoB := createRunRepoForStoreTest(t, ctx, db, fx.Mig.ID, fx.Run.ID, "https://github.com/test/stale-list-b", "feature-b", types.RunRepoStatusQueued)
+	runB := createRunForStoreTest(t, ctx, db, fx.Wave.ID, fx.Mig.ID, fx.Spec.ID, "https://github.com/test/stale-list-b", "feature-b", types.RunStatusQueued)
 
 	cutoff := time.Now().UTC().Add(-45 * time.Second)
 	cutoffTS := pgtype.Timestamptz{Time: cutoff, Valid: true}
@@ -34,11 +34,11 @@ func TestListStaleRunningJobs_FiltersByHeartbeatAndStatus(t *testing.T) {
 	setNodeHeartbeatForStaleRecoveryQueryTest(t, ctx, db, staleNode.ID, cutoff.Add(-2*time.Minute))
 	setNodeHeartbeatForStaleRecoveryQueryTest(t, ctx, db, freshNode.ID, cutoff.Add(2*time.Minute))
 
-	staleAttemptOneA := createJobForStoreTest(t, ctx, db, fx.Run.ID, fx.RunRepo.RepoID, fx.RunRepo.RepoBaseRef, 1, "stale-attempt1-a", types.JobStatusCreated)
-	staleAttemptOneB := createJobForStoreTest(t, ctx, db, fx.Run.ID, fx.RunRepo.RepoID, fx.RunRepo.RepoBaseRef, 1, "stale-attempt1-b", types.JobStatusCreated)
-	staleAttemptTwo := createJobForStoreTest(t, ctx, db, fx.Run.ID, fx.RunRepo.RepoID, fx.RunRepo.RepoBaseRef, 2, "stale-attempt2", types.JobStatusCreated)
-	freshRunning := createJobForStoreTest(t, ctx, db, fx.Run.ID, repoB.RepoID, repoB.RepoBaseRef, 1, "fresh-running", types.JobStatusCreated)
-	_ = createJobForStoreTest(t, ctx, db, fx.Run.ID, repoB.RepoID, repoB.RepoBaseRef, 1, "stale-non-running", types.JobStatusQueued)
+	staleAttemptOneA := createJobForStoreTest(t, ctx, db, fx.Run.ID, fx.Run.RepoID, fx.Run.RepoBaseRef, 1, "stale-attempt1-a", types.JobStatusCreated)
+	staleAttemptOneB := createJobForStoreTest(t, ctx, db, fx.Run.ID, fx.Run.RepoID, fx.Run.RepoBaseRef, 1, "stale-attempt1-b", types.JobStatusCreated)
+	staleAttemptTwo := createJobForStoreTest(t, ctx, db, fx.Run.ID, fx.Run.RepoID, fx.Run.RepoBaseRef, 2, "stale-attempt2", types.JobStatusCreated)
+	freshRunning := createJobForStoreTest(t, ctx, db, runB.ID, runB.RepoID, runB.RepoBaseRef, 1, "fresh-running", types.JobStatusCreated)
+	_ = createJobForStoreTest(t, ctx, db, runB.ID, runB.RepoID, runB.RepoBaseRef, 1, "stale-non-running", types.JobStatusQueued)
 
 	setJobRunningForStaleRecoveryQueryTest(t, ctx, db, staleAttemptOneA.ID, &staleNode.ID, time.Now().UTC().Add(-3*time.Minute))
 	setJobRunningForStaleRecoveryQueryTest(t, ctx, db, staleAttemptOneB.ID, &nilHeartbeatNode.ID, time.Now().UTC().Add(-2*time.Minute))
@@ -54,18 +54,17 @@ func TestListStaleRunningJobs_FiltersByHeartbeatAndStatus(t *testing.T) {
 	for _, row := range rows {
 		got[ids.AttemptKey{
 			RunID:   row.RunID,
-			RepoID:  row.RepoID,
 			Attempt: row.Attempt,
 		}] = row.RunningJobs
 	}
 
-	if got[ids.AttemptKey{RunID: fx.Run.ID, RepoID: fx.RunRepo.RepoID, Attempt: 1}] != 2 {
-		t.Fatalf("attempt 1 stale running count=%d, want 2", got[ids.AttemptKey{RunID: fx.Run.ID, RepoID: fx.RunRepo.RepoID, Attempt: 1}])
+	if got[ids.AttemptKey{RunID: fx.Run.ID, Attempt: 1}] != 2 {
+		t.Fatalf("attempt 1 stale running count=%d, want 2", got[ids.AttemptKey{RunID: fx.Run.ID, Attempt: 1}])
 	}
-	if got[ids.AttemptKey{RunID: fx.Run.ID, RepoID: fx.RunRepo.RepoID, Attempt: 2}] != 1 {
-		t.Fatalf("attempt 2 stale running count=%d, want 1", got[ids.AttemptKey{RunID: fx.Run.ID, RepoID: fx.RunRepo.RepoID, Attempt: 2}])
+	if got[ids.AttemptKey{RunID: fx.Run.ID, Attempt: 2}] != 1 {
+		t.Fatalf("attempt 2 stale running count=%d, want 1", got[ids.AttemptKey{RunID: fx.Run.ID, Attempt: 2}])
 	}
-	if _, ok := got[ids.AttemptKey{RunID: fx.Run.ID, RepoID: repoB.RepoID, Attempt: 1}]; ok {
+	if _, ok := got[ids.AttemptKey{RunID: runB.ID, Attempt: 1}]; ok {
 		t.Fatal("fresh/non-running repo attempt must not be returned")
 	}
 
@@ -88,7 +87,7 @@ func TestCountStaleNodesWithRunningJobs_CountsDistinctAssignedStaleNodes(t *test
 	}
 
 	fx := newV1Fixture(t, ctx, db, "https://github.com/test/stale-node-count-a", "main", []byte(`{"type":"stale-node-count"}`))
-	repoB := createRunRepoForStoreTest(t, ctx, db, fx.Mig.ID, fx.Run.ID, "https://github.com/test/stale-node-count-b", "feature-b", types.RunRepoStatusQueued)
+	runB := createRunForStoreTest(t, ctx, db, fx.Wave.ID, fx.Mig.ID, fx.Spec.ID, "https://github.com/test/stale-node-count-b", "feature-b", types.RunStatusQueued)
 
 	cutoff := time.Now().UTC().Add(-45 * time.Second)
 	cutoffTS := pgtype.Timestamptz{Time: cutoff, Valid: true}
@@ -102,12 +101,12 @@ func TestCountStaleNodesWithRunningJobs_CountsDistinctAssignedStaleNodes(t *test
 	setNodeHeartbeatForStaleRecoveryQueryTest(t, ctx, db, staleNodeB.ID, cutoff.Add(-3*time.Minute))
 	setNodeHeartbeatForStaleRecoveryQueryTest(t, ctx, db, freshNode.ID, cutoff.Add(2*time.Minute))
 
-	staleAOne := createJobForStoreTest(t, ctx, db, fx.Run.ID, fx.RunRepo.RepoID, fx.RunRepo.RepoBaseRef, 1, "stale-a-1", types.JobStatusCreated)
-	staleATwo := createJobForStoreTest(t, ctx, db, fx.Run.ID, repoB.RepoID, repoB.RepoBaseRef, 1, "stale-a-2", types.JobStatusCreated)
-	staleB := createJobForStoreTest(t, ctx, db, fx.Run.ID, fx.RunRepo.RepoID, fx.RunRepo.RepoBaseRef, 2, "stale-b", types.JobStatusCreated)
-	nilHeartbeat := createJobForStoreTest(t, ctx, db, fx.Run.ID, repoB.RepoID, repoB.RepoBaseRef, 2, "nil-heartbeat", types.JobStatusCreated)
-	orphaned := createJobForStoreTest(t, ctx, db, fx.Run.ID, fx.RunRepo.RepoID, fx.RunRepo.RepoBaseRef, 3, "orphaned", types.JobStatusCreated)
-	fresh := createJobForStoreTest(t, ctx, db, fx.Run.ID, repoB.RepoID, repoB.RepoBaseRef, 3, "fresh", types.JobStatusCreated)
+	staleAOne := createJobForStoreTest(t, ctx, db, fx.Run.ID, fx.Run.RepoID, fx.Run.RepoBaseRef, 1, "stale-a-1", types.JobStatusCreated)
+	staleATwo := createJobForStoreTest(t, ctx, db, runB.ID, runB.RepoID, runB.RepoBaseRef, 1, "stale-a-2", types.JobStatusCreated)
+	staleB := createJobForStoreTest(t, ctx, db, fx.Run.ID, fx.Run.RepoID, fx.Run.RepoBaseRef, 2, "stale-b", types.JobStatusCreated)
+	nilHeartbeat := createJobForStoreTest(t, ctx, db, runB.ID, runB.RepoID, runB.RepoBaseRef, 2, "nil-heartbeat", types.JobStatusCreated)
+	orphaned := createJobForStoreTest(t, ctx, db, fx.Run.ID, fx.Run.RepoID, fx.Run.RepoBaseRef, 3, "orphaned", types.JobStatusCreated)
+	fresh := createJobForStoreTest(t, ctx, db, runB.ID, runB.RepoID, runB.RepoBaseRef, 3, "fresh", types.JobStatusCreated)
 
 	setJobRunningForStaleRecoveryQueryTest(t, ctx, db, staleAOne.ID, &staleNodeA.ID, time.Now().UTC().Add(-2*time.Minute))
 	setJobRunningForStaleRecoveryQueryTest(t, ctx, db, staleATwo.ID, &staleNodeA.ID, time.Now().UTC().Add(-2*time.Minute))
@@ -125,31 +124,30 @@ func TestCountStaleNodesWithRunningJobs_CountsDistinctAssignedStaleNodes(t *test
 	}
 }
 
-func TestCancelActiveJobsByRunRepoAttempt_TransitionsOnlyTargetAttempt(t *testing.T) {
+func TestCancelActiveJobsByRunAttempt_TransitionsOnlyTargetAttempt(t *testing.T) {
 	ctx, db := openStoreForCancelBulkTests(t)
 
 	fx := newV1Fixture(t, ctx, db, "https://github.com/test/stale-cancel-a", "main", []byte(`{"type":"stale-cancel"}`))
-	repoB := createRunRepoForStoreTest(t, ctx, db, fx.Mig.ID, fx.Run.ID, "https://github.com/test/stale-cancel-b", "feature-b", types.RunRepoStatusQueued)
+	runB := createRunForStoreTest(t, ctx, db, fx.Wave.ID, fx.Mig.ID, fx.Spec.ID, "https://github.com/test/stale-cancel-b", "feature-b", types.RunStatusQueued)
 
-	targetCreated := createJobForStoreTest(t, ctx, db, fx.Run.ID, fx.RunRepo.RepoID, fx.RunRepo.RepoBaseRef, 1, "target-created", types.JobStatusCreated)
-	targetQueued := createJobForStoreTest(t, ctx, db, fx.Run.ID, fx.RunRepo.RepoID, fx.RunRepo.RepoBaseRef, 1, "target-queued", types.JobStatusQueued)
-	targetRunning := createJobForStoreTest(t, ctx, db, fx.Run.ID, fx.RunRepo.RepoID, fx.RunRepo.RepoBaseRef, 1, "target-running", types.JobStatusCreated)
-	targetSuccess := createJobForStoreTest(t, ctx, db, fx.Run.ID, fx.RunRepo.RepoID, fx.RunRepo.RepoBaseRef, 1, "target-success", types.JobStatusSuccess)
-	otherAttemptQueued := createJobForStoreTest(t, ctx, db, fx.Run.ID, fx.RunRepo.RepoID, fx.RunRepo.RepoBaseRef, 2, "other-attempt-queued", types.JobStatusQueued)
-	otherRepoQueued := createJobForStoreTest(t, ctx, db, fx.Run.ID, repoB.RepoID, repoB.RepoBaseRef, 1, "other-repo-queued", types.JobStatusQueued)
+	targetCreated := createJobForStoreTest(t, ctx, db, fx.Run.ID, fx.Run.RepoID, fx.Run.RepoBaseRef, 1, "target-created", types.JobStatusCreated)
+	targetQueued := createJobForStoreTest(t, ctx, db, fx.Run.ID, fx.Run.RepoID, fx.Run.RepoBaseRef, 1, "target-queued", types.JobStatusQueued)
+	targetRunning := createJobForStoreTest(t, ctx, db, fx.Run.ID, fx.Run.RepoID, fx.Run.RepoBaseRef, 1, "target-running", types.JobStatusCreated)
+	targetSuccess := createJobForStoreTest(t, ctx, db, fx.Run.ID, fx.Run.RepoID, fx.Run.RepoBaseRef, 1, "target-success", types.JobStatusSuccess)
+	otherAttemptQueued := createJobForStoreTest(t, ctx, db, fx.Run.ID, fx.Run.RepoID, fx.Run.RepoBaseRef, 2, "other-attempt-queued", types.JobStatusQueued)
+	otherRunQueued := createJobForStoreTest(t, ctx, db, runB.ID, runB.RepoID, runB.RepoBaseRef, 1, "other-run-queued", types.JobStatusQueued)
 
 	setJobRunningForStaleRecoveryQueryTest(t, ctx, db, targetRunning.ID, nil, time.Now().UTC().Add(-3*time.Second))
 
-	affected, err := db.CancelActiveJobsByRunRepoAttempt(ctx, CancelActiveJobsByRunRepoAttemptParams{
+	affected, err := db.CancelActiveJobsByRunAttempt(ctx, CancelActiveJobsByRunAttemptParams{
 		RunID:   fx.Run.ID,
-		RepoID:  fx.RunRepo.RepoID,
 		Attempt: 1,
 	})
 	if err != nil {
-		t.Fatalf("CancelActiveJobsByRunRepoAttempt() failed: %v", err)
+		t.Fatalf("CancelActiveJobsByRunAttempt() failed: %v", err)
 	}
 	if affected != 3 {
-		t.Fatalf("CancelActiveJobsByRunRepoAttempt() affected=%d, want 3", affected)
+		t.Fatalf("CancelActiveJobsByRunAttempt() affected=%d, want 3", affected)
 	}
 
 	createdAfter, err := db.GetJob(ctx, targetCreated.ID)
@@ -210,7 +208,7 @@ func TestCancelActiveJobsByRunRepoAttempt_TransitionsOnlyTargetAttempt(t *testin
 		t.Fatalf("otherAttemptQueued status=%q, want %q", otherAttemptAfter.Status, types.JobStatusQueued)
 	}
 
-	otherRepoAfter, err := db.GetJob(ctx, otherRepoQueued.ID)
+	otherRepoAfter, err := db.GetJob(ctx, otherRunQueued.ID)
 	if err != nil {
 		t.Fatalf("GetJob(otherRepoQueued) failed: %v", err)
 	}

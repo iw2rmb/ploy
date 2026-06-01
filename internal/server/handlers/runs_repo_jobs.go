@@ -14,7 +14,7 @@ import (
 )
 
 // listRunRepoJobsHandler returns jobs for a specific repo execution within a run.
-// GET /v1/runs/{run_id}/repos/{repo_id}/jobs
+// GET /v1/runs/{run_id}/jobs
 // Query params: ?attempt=N (optional, defaults to current attempt)
 func listRunRepoJobsHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

@@ -33,8 +33,11 @@ func TestClaimJobOrderingDeterministic(t *testing.T) {
 	fx := newV1Fixture(t, ctx, db, "https://github.com/test/deterministic-order", "main", []byte(`{"type":"deterministic"}`))
 	run := fx.Run
 
-	// Create jobs with the SAME next_id to test tie-breaking by id.
-	const sameStepIndex = float64(5000)
+	if err := db.UpdateRunStatus(ctx, UpdateRunStatusParams{ID: run.ID, Status: types.RunStatusRunning}); err != nil {
+		t.Fatalf("UpdateRunStatus(running) failed: %v", err)
+	}
+
+	// Create jobs with the same scheduling shape to test tie-breaking by id.
 	const numJobs = 5
 
 	jobIDs := make([]types.JobID, numJobs)
@@ -54,8 +57,8 @@ func TestClaimJobOrderingDeterministic(t *testing.T) {
 			ID:          insertIDs[i],
 			RunID:       run.ID,
 			RepoID:      fx.MigRepo.RepoID,
-			RepoBaseRef: fx.RunRepo.RepoBaseRef,
-			Attempt:     fx.RunRepo.Attempt,
+			RepoBaseRef: fx.Run.RepoBaseRef,
+			Attempt:     fx.Run.Attempt,
 			Name:        "job-tie-" + insertIDs[i].String(),
 			JobType:     "mig",
 			JobImage:    "",
@@ -130,7 +133,7 @@ func TestClaimJobOrderingDeterministic(t *testing.T) {
 	t.Logf("Actual claim order:            %v", claimedIDs)
 }
 
-func TestClaimJobOrderingScopedByRunRepoAttempt(t *testing.T) {
+func TestClaimJobOrderingScopedByRunAttempt(t *testing.T) {
 	dsn := os.Getenv("PLOY_TEST_DB_DSN")
 	if dsn == "" {
 		t.Skip("PLOY_TEST_DB_DSN not set; skipping integration test")
@@ -145,68 +148,15 @@ func TestClaimJobOrderingScopedByRunRepoAttempt(t *testing.T) {
 	cleanTestTables(t, ctx, db)
 
 	fx := newV1Fixture(t, ctx, db, "https://github.com/test/scoped-order", "main", []byte(`{"type":"scoped"}`))
+	run2 := createRunForStoreTest(t, ctx, db, fx.Wave.ID, fx.Mig.ID, fx.Spec.ID, "https://github.com/test/scoped-order-2", "main", types.RunStatusQueued)
 
-	// Add a second repo to the same run.
-	repo2ID := types.NewMigRepoID()
-	repo2, err := db.CreateMigRepo(ctx, CreateMigRepoParams{
-		ID:      repo2ID,
-		MigID:   fx.Mig.ID,
-		Url:     "https://github.com/test/scoped-order-2",
-		BaseRef: fx.MigRepo.BaseRef,
-	})
-	if err != nil {
-		t.Fatalf("CreateMigRepo(repo2) failed: %v", err)
+	if err := db.UpdateRunStatus(ctx, UpdateRunStatusParams{ID: fx.Run.ID, Status: types.RunStatusRunning}); err != nil {
+		t.Fatalf("UpdateRunStatus(run1 running) failed: %v", err)
+	}
+	if err := db.UpdateRunStatus(ctx, UpdateRunStatusParams{ID: run2.ID, Status: types.RunStatusRunning}); err != nil {
+		t.Fatalf("UpdateRunStatus(run2 running) failed: %v", err)
 	}
 
-	runRepo2, err := db.CreateRunRepo(ctx, CreateRunRepoParams{
-		MigID:           fx.Mig.ID,
-		RunID:           fx.Run.ID,
-		RepoID:          repo2.RepoID,
-		RepoBaseRef:     fx.RunRepo.RepoBaseRef,
-		SourceCommitSha: "0123456789abcdef0123456789abcdef01234567",
-		RepoSha0:        "0123456789abcdef0123456789abcdef01234567",
-	})
-	if err != nil {
-		t.Fatalf("CreateRunRepo(runRepo2) failed: %v", err)
-	}
-
-	// Add a second run that includes both repos.
-	run2ID := types.NewRunID()
-	run2, err := db.CreateRun(ctx, CreateRunParams{
-		ID:        run2ID,
-		MigID:     fx.Mig.ID,
-		SpecID:    fx.Spec.ID,
-		CreatedBy: fx.Run.CreatedBy,
-	})
-	if err != nil {
-		t.Fatalf("CreateRun(run2) failed: %v", err)
-	}
-
-	run2Repo1, err := db.CreateRunRepo(ctx, CreateRunRepoParams{
-		MigID:           fx.Mig.ID,
-		RunID:           run2.ID,
-		RepoID:          fx.MigRepo.RepoID,
-		RepoBaseRef:     fx.RunRepo.RepoBaseRef,
-		SourceCommitSha: "0123456789abcdef0123456789abcdef01234567",
-		RepoSha0:        "0123456789abcdef0123456789abcdef01234567",
-	})
-	if err != nil {
-		t.Fatalf("CreateRunRepo(run2Repo1) failed: %v", err)
-	}
-
-	run2Repo2, err := db.CreateRunRepo(ctx, CreateRunRepoParams{
-		MigID:           fx.Mig.ID,
-		RunID:           run2.ID,
-		RepoID:          repo2.RepoID,
-		RepoBaseRef:     fx.RunRepo.RepoBaseRef,
-		SourceCommitSha: "0123456789abcdef0123456789abcdef01234567",
-		RepoSha0:        "0123456789abcdef0123456789abcdef01234567",
-	})
-	if err != nil {
-		t.Fatalf("CreateRunRepo(run2Repo2) failed: %v", err)
-	}
-
-	// Determine which run_id/repo_id sort first in the database (collation-safe).
 	var runLowStr string
 	if err := db.Pool().QueryRow(ctx, `SELECT id FROM (VALUES ($1::text), ($2::text)) v(id) ORDER BY id ASC LIMIT 1`, fx.Run.ID, run2.ID).Scan(&runLowStr); err != nil {
 		t.Fatalf("QueryRow(runLow) failed: %v", err)
@@ -217,41 +167,25 @@ func TestClaimJobOrderingScopedByRunRepoAttempt(t *testing.T) {
 		runHigh = run2.ID
 	}
 
-	var repoLowStr string
-	if err := db.Pool().QueryRow(ctx, `SELECT id FROM (VALUES ($1::text), ($2::text)) v(id) ORDER BY id ASC LIMIT 1`, fx.MigRepo.RepoID, repo2.RepoID).Scan(&repoLowStr); err != nil {
-		t.Fatalf("QueryRow(repoLow) failed: %v", err)
-	}
-	repoLow := types.RepoID(repoLowStr)
-	repoHigh := fx.MigRepo.RepoID
-	if repoLowStr == fx.MigRepo.RepoID.String() {
-		repoHigh = repo2.RepoID
+	runByID := map[types.RunID]Run{
+		fx.Run.ID: fx.Run,
+		run2.ID:   run2,
 	}
 
-	type runRepoKey struct {
-		run  types.RunID
-		repo types.RepoID
-	}
-	runRepoByKey := map[runRepoKey]RunRepo{
-		{run: fx.Run.ID, repo: fx.MigRepo.RepoID}: fx.RunRepo,
-		{run: fx.Run.ID, repo: repo2.RepoID}:      runRepo2,
-		{run: run2.ID, repo: fx.MigRepo.RepoID}:   run2Repo1,
-		{run: run2.ID, repo: repo2.RepoID}:        run2Repo2,
-	}
-
-	createJob := func(runID types.RunID, repoID types.RepoID, stepIndex float64) types.JobID {
+	createJob := func(runID types.RunID) types.JobID {
 		t.Helper()
-		rr, ok := runRepoByKey[runRepoKey{run: runID, repo: repoID}]
+		run, ok := runByID[runID]
 		if !ok {
-			t.Fatalf("missing runRepo for run_id=%s repo_id=%s", runID, repoID)
+			t.Fatalf("missing run for run_id=%s", runID)
 		}
 
 		jobID := types.NewJobID()
 		if _, err := db.CreateJob(ctx, CreateJobParams{
 			ID:          jobID,
 			RunID:       runID,
-			RepoID:      repoID,
-			RepoBaseRef: rr.RepoBaseRef,
-			Attempt:     rr.Attempt,
+			RepoID:      run.RepoID,
+			RepoBaseRef: run.RepoBaseRef,
+			Attempt:     run.Attempt,
 			Name:        "job-scoped-" + jobID.String(),
 			JobType:     "mig",
 			JobImage:    "",
@@ -259,18 +193,13 @@ func TestClaimJobOrderingScopedByRunRepoAttempt(t *testing.T) {
 			NextID:      nil,
 			Meta:        []byte(`{}`),
 		}); err != nil {
-			t.Fatalf("CreateJob(run_id=%s repo_id=%s) failed: %v", runID, repoID, err)
+			t.Fatalf("CreateJob(run_id=%s) failed: %v", runID, err)
 		}
 		return jobID
 	}
 
-	// Force conflicts so ordering must respect run_id/repo_id before next_id:
-	// - run_low + repo_low gets the largest next_id
-	// - run_low + repo_high gets a smaller next_id
-	// - run_high + repo_low gets the smallest next_id
-	jobRunLowRepoLow := createJob(runLow, repoLow, float64(2000))
-	jobRunLowRepoHigh := createJob(runLow, repoHigh, float64(1000))
-	jobRunHighRepoLow := createJob(runHigh, repoLow, float64(500))
+	jobRunLow := createJob(runLow)
+	jobRunHigh := createJob(runHigh)
 
 	scopedID := types.NodeID(types.NewNodeKey())
 	node, err := db.CreateNode(ctx, CreateNodeParams{
@@ -283,24 +212,17 @@ func TestClaimJobOrderingScopedByRunRepoAttempt(t *testing.T) {
 		t.Fatalf("CreateNode() failed: %v", err)
 	}
 
-	claimed := make([]types.JobID, 0, 3)
-	for i := 0; i < 3; i++ {
-		job, err := db.ClaimJob(ctx, node.ID)
-		if err != nil {
-			t.Fatalf("ClaimJob(%d) failed: %v", i, err)
-		}
-		claimed = append(claimed, job.ID)
+	first, err := db.ClaimJob(ctx, node.ID)
+	if err != nil {
+		t.Fatalf("ClaimJob(first) failed: %v", err)
+	}
+	second, err := db.ClaimJob(ctx, node.ID)
+	if err != nil {
+		t.Fatalf("ClaimJob(second) failed: %v", err)
 	}
 
-	want := []types.JobID{
-		jobRunLowRepoLow,
-		jobRunLowRepoHigh,
-		jobRunHighRepoLow,
-	}
-	for i := range want {
-		if claimed[i] != want[i] {
-			t.Fatalf("ClaimJob order mismatch at position %d: got %s, want %s (run_low=%s repo_low=%s)",
-				i, claimed[i], want[i], runLow, repoLow)
-		}
+	if first.ID != jobRunLow || second.ID != jobRunHigh {
+		t.Fatalf("ClaimJob order got [%s %s], want [%s %s] (run_low=%s)",
+			first.ID, second.ID, jobRunLow, jobRunHigh, runLow)
 	}
 }

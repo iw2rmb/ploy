@@ -38,7 +38,6 @@ func PrintCommandUsage(w io.Writer, parts ...string) {
 			_, _ = fmt.Fprintln(w, "")
 			_, _ = fmt.Fprintln(w, "Run Execution:")
 			_, _ = fmt.Fprintln(w, "  run <mig>   Run a mig project (with --repo or --failed for repo selection)")
-			_, _ = fmt.Fprintln(w, "  run repo    Manage repos within a batch run")
 			_, _ = fmt.Fprintln(w, "")
 			_, _ = fmt.Fprintln(w, "Artifacts:")
 			_, _ = fmt.Fprintln(w, "  artifacts   List run artifacts by stage")

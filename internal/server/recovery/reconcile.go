@@ -16,24 +16,22 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/lifecycle"
 )
 
-// MaybeUpdateRunRepoStatus derives and persists runs.status from job outcomes.
-func MaybeUpdateRunRepoStatus(
+// MaybeUpdateRunStatus derives and persists runs.status from job outcomes.
+func MaybeUpdateRunStatus(
 	ctx context.Context,
 	st store.Store,
 	runID domaintypes.RunID,
-	repoID domaintypes.RepoID,
 	attempt int32,
 ) (bool, error) {
-	jobs, err := st.ListJobsByRunRepoAttempt(ctx, store.ListJobsByRunRepoAttemptParams{
+	jobs, err := st.ListJobsByRunAttempt(ctx, store.ListJobsByRunAttemptParams{
 		RunID:   runID,
-		RepoID:  repoID,
 		Attempt: attempt,
 	})
 	if err != nil {
-		return false, fmt.Errorf("list jobs by repo attempt: %w", err)
+		return false, fmt.Errorf("list jobs by run attempt: %w", err)
 	}
 
-	eval, err := EvaluateRepoAttemptTerminalStatus(jobs)
+	eval, err := EvaluateRunAttemptTerminalStatus(jobs)
 	if err != nil {
 		return false, err
 	}
@@ -50,7 +48,6 @@ func MaybeUpdateRunRepoStatus(
 
 	slog.Info("run completed",
 		"run_id", runID,
-		"repo_id", repoID,
 		"attempt", attempt,
 		"status", eval.Status,
 	)

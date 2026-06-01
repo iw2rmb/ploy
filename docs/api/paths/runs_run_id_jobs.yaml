@@ -1,0 +1,6 @@
+get:
+  tags: [Control]
+  summary: List jobs for a run
+  responses:
+    "200":
+      description: Job list.

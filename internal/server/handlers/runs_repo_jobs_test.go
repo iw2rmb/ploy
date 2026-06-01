@@ -18,8 +18,8 @@ func TestListRunRepoJobsHandler_NextIDContract(t *testing.T) {
 	nextID := domaintypes.NewJobID()
 
 	st := &runStore{}
-	st.getRunRepo.vals = []store.RunRepo{{
-		RunID:   runID,
+	st.getRunRepo.vals = []store.Run{{
+		ID:   runID,
 		RepoID:  repoID,
 		Attempt: 1,
 	}}
@@ -45,7 +45,7 @@ func TestListRunRepoJobsHandler_NextIDContract(t *testing.T) {
 
 	assertStatus(t, rr, http.StatusOK)
 	if !st.listJobsByRunRepoAttempt.called {
-		t.Fatal("expected ListJobsByRunRepoAttempt to be called")
+		t.Fatal("expected ListJobsByRunAttempt to be called")
 	}
 
 	resp := decodeBody[map[string]any](t, rr)
@@ -84,8 +84,8 @@ func TestListRunRepoJobsHandler_ExposesGateAndMigJobTypes(t *testing.T) {
 	migID := domaintypes.NewJobID()
 
 	st := &runStore{}
-	st.getRunRepo.vals = []store.RunRepo{{
-		RunID:   runID,
+	st.getRunRepo.vals = []store.Run{{
+		ID:   runID,
 		RepoID:  repoID,
 		Attempt: 1,
 	}}
@@ -146,8 +146,8 @@ func TestListRunRepoJobsHandler_AttemptQueryOverride(t *testing.T) {
 	repoID := domaintypes.NewRepoID()
 
 	st := &runStore{}
-	st.getRunRepo.vals = []store.RunRepo{{
-		RunID:   runID,
+	st.getRunRepo.vals = []store.Run{{
+		ID:   runID,
 		RepoID:  repoID,
 		Attempt: 1,
 	}}
@@ -173,8 +173,8 @@ func TestListRunRepoJobsHandler_OrdersJobsByChain(t *testing.T) {
 	post := domaintypes.NewJobID()
 
 	st := &runStore{}
-	st.getRunRepo.vals = []store.RunRepo{{
-		RunID:   runID,
+	st.getRunRepo.vals = []store.Run{{
+		ID:   runID,
 		RepoID:  repoID,
 		Attempt: 1,
 	}}

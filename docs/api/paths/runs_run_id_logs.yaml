@@ -1,0 +1,6 @@
+get:
+  tags: [Artifacts]
+  summary: Stream lifecycle events for a run
+  responses:
+    "200":
+      description: Server-sent event stream.
