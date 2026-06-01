@@ -1,0 +1,6 @@
+get:
+  tags: [Artifacts]
+  summary: List or download diffs for a run
+  responses:
+    "200":
+      description: Diff list or patch stream.

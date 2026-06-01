@@ -11,7 +11,6 @@ import (
 	"time"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	"github.com/iw2rmb/ploy/internal/server/events"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/testutil/workflowkit/ids"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -46,47 +45,25 @@ func TestNewStaleJobRecoveryTask(t *testing.T) {
 	})
 }
 
-func TestStaleJobRecoveryTask_Run_CompletesRunWhenReposTerminal(t *testing.T) {
+func TestStaleJobRecoveryTask_Run_CompletesWaveWhenRunsTerminal(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
+	waveID := domaintypes.NewWaveID()
 	repoID := domaintypes.NewRepoID()
 	st := &staleTaskStore{
-		StaleRows: []store.ListStaleRunningJobsRow{
-			{RunID: runID, RepoID: repoID, Attempt: 2, RunningJobs: 3},
-		},
-		StaleNodesCount:  1,
-		CancelRowsResult: 3,
-		JobsByAttempt: map[ids.AttemptKey][]store.Job{
-			{RunID: runID, RepoID: repoID, Attempt: 2}: {
-				{
-					ID:          domaintypes.NewJobID(),
-					RunID:       runID,
-					RepoID:      repoID,
-					RepoBaseRef: "main",
-					Attempt:     2,
-					Name:        "mig-0",
-					Status:      domaintypes.JobStatusCancelled,
-					JobType:     domaintypes.JobTypeMig,
-					Meta:        []byte(`{"next_id":2000}`),
-				},
-			},
-		},
-		CountByStatus: map[domaintypes.RunID][]store.CountRunReposByStatusRow{
-			runID: {
-				{Status: domaintypes.RunRepoStatusCancelled, Count: 1},
-			},
-		},
-		RunsByID: map[domaintypes.RunID]store.Run{
-			runID: {ID: runID, Status: domaintypes.RunStatusStarted},
-		},
+		StaleRows:         []store.ListStaleRunningJobsRow{{RunID: runID, Attempt: 2, RunningJobs: 3}},
+		StaleNodesCount:   1,
+		CancelRowsResult:  3,
+		JobsByAttempt:     terminalJobs(runID, repoID, 2, domaintypes.JobStatusCancelled),
+		RunsByID:          map[domaintypes.RunID]store.Run{runID: {ID: runID, WaveID: waveID, RepoID: repoID, Status: domaintypes.RunStatusRunning}},
+		WavesByID:         map[domaintypes.WaveID]store.Wave{waveID: {ID: waveID, Status: domaintypes.WaveStatusStarted}},
+		CountRunsByWave:   map[domaintypes.WaveID][]store.CountRunsByWaveStatusRow{waveID: {{Status: domaintypes.RunStatusCancelled, Count: 1}}},
+		ReposByID:         map[domaintypes.RepoID]store.Repo{repoID: {ID: repoID, Url: "https://github.com/user/repo.git"}},
+		UpdateRunStatusOK: true,
 	}
 
-	task, err := NewStaleJobRecoveryTask(Options{
-		Store:          st,
-		Interval:       25 * time.Millisecond,
-		NodeStaleAfter: time.Minute,
-	})
+	task, err := NewStaleJobRecoveryTask(Options{Store: st, Interval: time.Second, NodeStaleAfter: time.Minute})
 	if err != nil {
 		t.Fatalf("NewStaleJobRecoveryTask() error = %v", err)
 	}
@@ -95,75 +72,38 @@ func TestStaleJobRecoveryTask_Run_CompletesRunWhenReposTerminal(t *testing.T) {
 		t.Fatalf("Run() error = %v", err)
 	}
 
-	if !st.StaleJobsParam.Valid {
-		t.Fatal("expected ListStaleRunningJobs call")
-	}
-	if !st.StaleNodeParam.Valid {
-		t.Fatal("expected CountStaleNodesWithRunningJobs call")
-	}
 	if len(st.CancelCalls) != 1 {
 		t.Fatalf("cancel calls = %d, want 1", len(st.CancelCalls))
 	}
-	if len(st.UpdateRepoCalls) == 0 {
-		t.Fatal("expected UpdateRunRepoStatus call")
+	if len(st.UpdateRunCalls) != 1 || st.UpdateRunCalls[0].Status != domaintypes.RunStatusCancelled {
+		t.Fatalf("run updates = %+v, want one Cancelled update", st.UpdateRunCalls)
 	}
-	if len(st.UpdateRepoCalls) != 1 {
-		t.Fatalf("repo status updates = %d, want 1", len(st.UpdateRepoCalls))
+	if !st.CountRunsCalled {
+		t.Fatal("expected CountRunsByWaveStatus call")
 	}
-	if st.UpdateRepoCalls[0].Status != domaintypes.RunRepoStatusCancelled {
-		t.Fatalf("repo status = %q, want %q", st.UpdateRepoCalls[0].Status, domaintypes.RunRepoStatusCancelled)
-	}
-	if !st.GetRunCalled {
-		t.Fatal("expected GetRun call")
-	}
-	if !st.CountStatusCalled {
-		t.Fatal("expected CountRunReposByStatus call")
-	}
-	if len(st.UpdateRunCalls) == 0 {
-		t.Fatal("expected UpdateRunStatus call")
-	}
-	if len(st.UpdateRunCalls) != 1 {
-		t.Fatalf("run status updates = %d, want 1", len(st.UpdateRunCalls))
-	}
-	if st.UpdateRunCalls[0].Status != domaintypes.RunStatusFinished {
-		t.Fatalf("run status = %q, want %q", st.UpdateRunCalls[0].Status, domaintypes.RunStatusFinished)
+	if len(st.UpdateWaveCalls) != 1 || st.UpdateWaveCalls[0].Status != domaintypes.WaveStatusFinished {
+		t.Fatalf("wave updates = %+v, want one Finished update", st.UpdateWaveCalls)
 	}
 }
 
-func TestStaleJobRecoveryTask_Run_DoesNotCompleteRunWhenOtherReposNonTerminal(t *testing.T) {
+func TestStaleJobRecoveryTask_Run_DoesNotCompleteWaveWhenOtherRunsNonTerminal(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
+	waveID := domaintypes.NewWaveID()
 	repoID := domaintypes.NewRepoID()
 	st := &staleTaskStore{
-		StaleRows: []store.ListStaleRunningJobsRow{
-			{RunID: runID, RepoID: repoID, Attempt: 1, RunningJobs: 1},
-		},
+		StaleRows:        []store.ListStaleRunningJobsRow{{RunID: runID, Attempt: 1, RunningJobs: 1}},
 		StaleNodesCount:  1,
 		CancelRowsResult: 1,
-		JobsByAttempt: map[ids.AttemptKey][]store.Job{
-			{RunID: runID, RepoID: repoID, Attempt: 1}: {
-				{
-					ID:          domaintypes.NewJobID(),
-					RunID:       runID,
-					RepoID:      repoID,
-					RepoBaseRef: "main",
-					Attempt:     1,
-					Name:        "mig-0",
-					Status:      domaintypes.JobStatusCancelled,
-					JobType:     domaintypes.JobTypeMig,
-					Meta:        []byte(`{"next_id":1000}`),
-				},
+		JobsByAttempt:    terminalJobs(runID, repoID, 1, domaintypes.JobStatusCancelled),
+		RunsByID:         map[domaintypes.RunID]store.Run{runID: {ID: runID, WaveID: waveID, RepoID: repoID, Status: domaintypes.RunStatusRunning}},
+		WavesByID:        map[domaintypes.WaveID]store.Wave{waveID: {ID: waveID, Status: domaintypes.WaveStatusStarted}},
+		CountRunsByWave: map[domaintypes.WaveID][]store.CountRunsByWaveStatusRow{
+			waveID: {
+				{Status: domaintypes.RunStatusCancelled, Count: 1},
+				{Status: domaintypes.RunStatusRunning, Count: 1},
 			},
-		},
-		CountByStatus: map[domaintypes.RunID][]store.CountRunReposByStatusRow{
-			runID: {
-				{Status: domaintypes.RunRepoStatusCancelled, Count: 1},
-				{Status: domaintypes.RunRepoStatusRunning, Count: 1},
-			},
-		},
-		RunsByID: map[domaintypes.RunID]store.Run{
-			runID: {ID: runID, Status: domaintypes.RunStatusStarted},
 		},
 	}
 
@@ -176,11 +116,11 @@ func TestStaleJobRecoveryTask_Run_DoesNotCompleteRunWhenOtherReposNonTerminal(t 
 		t.Fatalf("Run() error = %v", err)
 	}
 
-	if len(st.UpdateRepoCalls) == 0 {
-		t.Fatal("expected UpdateRunRepoStatus call")
+	if len(st.UpdateRunCalls) != 1 {
+		t.Fatalf("run updates = %d, want 1", len(st.UpdateRunCalls))
 	}
-	if len(st.UpdateRunCalls) > 0 {
-		t.Fatal("did not expect UpdateRunStatus while run has non-terminal repos")
+	if len(st.UpdateWaveCalls) != 0 {
+		t.Fatalf("wave updates = %d, want 0", len(st.UpdateWaveCalls))
 	}
 }
 
@@ -188,36 +128,16 @@ func TestStaleJobRecoveryTask_Run_LogsCycleCounters(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
+	waveID := domaintypes.NewWaveID()
 	repoID := domaintypes.NewRepoID()
 	st := &staleTaskStore{
-		StaleRows: []store.ListStaleRunningJobsRow{
-			{RunID: runID, RepoID: repoID, Attempt: 1, RunningJobs: 2},
-		},
+		StaleRows:        []store.ListStaleRunningJobsRow{{RunID: runID, Attempt: 1, RunningJobs: 2}},
 		StaleNodesCount:  2,
 		CancelRowsResult: 2,
-		JobsByAttempt: map[ids.AttemptKey][]store.Job{
-			{RunID: runID, RepoID: repoID, Attempt: 1}: {
-				{
-					ID:          domaintypes.NewJobID(),
-					RunID:       runID,
-					RepoID:      repoID,
-					RepoBaseRef: "main",
-					Attempt:     1,
-					Name:        "mig-0",
-					Status:      domaintypes.JobStatusCancelled,
-					JobType:     domaintypes.JobTypeMig,
-					Meta:        []byte(`{"next_id":1000}`),
-				},
-			},
-		},
-		CountByStatus: map[domaintypes.RunID][]store.CountRunReposByStatusRow{
-			runID: {
-				{Status: domaintypes.RunRepoStatusCancelled, Count: 1},
-			},
-		},
-		RunsByID: map[domaintypes.RunID]store.Run{
-			runID: {ID: runID, Status: domaintypes.RunStatusStarted},
-		},
+		JobsByAttempt:    terminalJobs(runID, repoID, 1, domaintypes.JobStatusCancelled),
+		RunsByID:         map[domaintypes.RunID]store.Run{runID: {ID: runID, WaveID: waveID, RepoID: repoID, Status: domaintypes.RunStatusRunning}},
+		WavesByID:        map[domaintypes.WaveID]store.Wave{waveID: {ID: waveID, Status: domaintypes.WaveStatusStarted}},
+		CountRunsByWave:  map[domaintypes.WaveID][]store.CountRunsByWaveStatusRow{waveID: {{Status: domaintypes.RunStatusCancelled, Count: 1}}},
 	}
 
 	var logBuf bytes.Buffer
@@ -236,10 +156,6 @@ func TestStaleJobRecoveryTask_Run_LogsCycleCounters(t *testing.T) {
 	}
 
 	lines := strings.Split(strings.TrimSpace(logBuf.String()), "\n")
-	if len(lines) == 0 {
-		t.Fatal("expected recovery logs, got none")
-	}
-
 	foundCycleLog := false
 	for _, line := range lines {
 		var payload map[string]any
@@ -259,146 +175,52 @@ func TestStaleJobRecoveryTask_Run_LogsCycleCounters(t *testing.T) {
 		if got := int64(payload["jobs_cancelled"].(float64)); got != 2 {
 			t.Fatalf("jobs_cancelled=%d, want 2", got)
 		}
-		if got := int64(payload["repos_updated"].(float64)); got != 1 {
-			t.Fatalf("repos_updated=%d, want 1", got)
-		}
-		if got := int64(payload["runs_finalized"].(float64)); got != 1 {
-			t.Fatalf("runs_finalized=%d, want 1", got)
+		if got := int64(payload["runs_updated"].(float64)); got != 1 {
+			t.Fatalf("runs_updated=%d, want 1", got)
 		}
 	}
-
 	if !foundCycleLog {
 		t.Fatal("expected stale-job-recovery cycle log")
 	}
 }
 
-func TestStaleJobRecoveryTask_Run_EmitsTerminalSSEOnlyOncePerRun(t *testing.T) {
-	t.Parallel()
-
-	runID := domaintypes.NewRunID()
-	repoA := domaintypes.NewRepoID()
-	repoB := domaintypes.NewRepoID()
-	st := &staleTaskStore{
-		StaleRows: []store.ListStaleRunningJobsRow{
-			{RunID: runID, RepoID: repoA, Attempt: 1, RunningJobs: 1},
-			{RunID: runID, RepoID: repoB, Attempt: 1, RunningJobs: 1},
-		},
-		StaleNodesCount:  1,
-		CancelRowsResult: 1,
-		JobsByAttempt: map[ids.AttemptKey][]store.Job{
-			{RunID: runID, RepoID: repoA, Attempt: 1}: {
-				{
-					ID:          domaintypes.NewJobID(),
-					RunID:       runID,
-					RepoID:      repoA,
-					RepoBaseRef: "main",
-					Attempt:     1,
-					Name:        "mig-a",
-					Status:      domaintypes.JobStatusCancelled,
-					JobType:     domaintypes.JobTypeMig,
-					Meta:        []byte(`{"next_id":1000}`),
-				},
-			},
-			{RunID: runID, RepoID: repoB, Attempt: 1}: {
-				{
-					ID:          domaintypes.NewJobID(),
-					RunID:       runID,
-					RepoID:      repoB,
-					RepoBaseRef: "main",
-					Attempt:     1,
-					Name:        "mig-b",
-					Status:      domaintypes.JobStatusCancelled,
-					JobType:     domaintypes.JobTypeMig,
-					Meta:        []byte(`{"next_id":2000}`),
-				},
-			},
-		},
-		CountByStatus: map[domaintypes.RunID][]store.CountRunReposByStatusRow{
-			runID: {
-				{Status: domaintypes.RunRepoStatusCancelled, Count: 2},
-			},
-		},
-		RunsByID: map[domaintypes.RunID]store.Run{
-			runID: {ID: runID, Status: domaintypes.RunStatusStarted},
-		},
-	}
-
-	eventsService, err := events.NewService(events.Options{
-		BufferSize:  10,
-		HistorySize: 20,
-	})
-	if err != nil {
-		t.Fatalf("NewEventsService() error = %v", err)
-	}
-
-	task, err := NewStaleJobRecoveryTask(Options{
-		Store:          st,
-		EventsService:  eventsService,
-		Interval:       10 * time.Millisecond,
-		NodeStaleAfter: time.Minute,
-	})
-	if err != nil {
-		t.Fatalf("NewStaleJobRecoveryTask() error = %v", err)
-	}
-
-	if err := task.Run(context.Background()); err != nil {
-		t.Fatalf("Run() error = %v", err)
-	}
-
-	if len(st.UpdateRunCalls) != 1 {
-		t.Fatalf("run status updates = %d, want 1", len(st.UpdateRunCalls))
-	}
-
-	events := eventsService.Hub().Snapshot(runID)
-	var (
-		runEvents  int
-		doneEvents int
-	)
-	for _, evt := range events {
-		if evt.Type == domaintypes.SSEEventRun {
-			runEvents++
-		}
-		if evt.Type == domaintypes.SSEEventDone {
-			doneEvents++
-		}
-	}
-	if runEvents != 1 {
-		t.Fatalf("run events=%d, want 1", runEvents)
-	}
-	if doneEvents != 1 {
-		t.Fatalf("done events=%d, want 1", doneEvents)
+func terminalJobs(runID domaintypes.RunID, repoID domaintypes.RepoID, attempt int32, status domaintypes.JobStatus) map[ids.AttemptKey][]store.Job {
+	return map[ids.AttemptKey][]store.Job{
+		{RunID: runID, Attempt: attempt}: {{
+			ID:          domaintypes.NewJobID(),
+			RunID:       runID,
+			RepoID:      repoID,
+			RepoBaseRef: "main",
+			Attempt:     attempt,
+			Name:        "mig-0",
+			Status:      status,
+			JobType:     domaintypes.JobTypeMig,
+			Meta:        []byte(`{"next_id":1000}`),
+		}},
 	}
 }
 
 type staleTaskStore struct {
 	store.Store
 
-	StaleRows          []store.ListStaleRunningJobsRow
-	StaleNodesCount    int64
-	StaleNodesErr      error
-	CancelRowsResult   int64
-	CancelErr          error
-	JobsByAttempt      map[ids.AttemptKey][]store.Job
-	RunsByID           map[domaintypes.RunID]store.Run
-	GetRunErr          error
-	CountByStatus      map[domaintypes.RunID][]store.CountRunReposByStatusRow
-	CountByStatusErr   error
-	UpdateRepoErr      error
-	UpdateRunErr       error
-	RunReposResult     []store.RunRepo
-	RunReposErr        error
-	RunReposWithURL    []store.ListRunReposWithURLByRunRow
-	RunReposWithURLErr error
-	MigRepoResult      store.MigRepo
-	MigRepoErr         error
+	StaleRows        []store.ListStaleRunningJobsRow
+	StaleNodesCount  int64
+	StaleNodesErr    error
+	CancelRowsResult int64
+	CancelErr        error
+	JobsByAttempt    map[ids.AttemptKey][]store.Job
+	RunsByID         map[domaintypes.RunID]store.Run
+	WavesByID        map[domaintypes.WaveID]store.Wave
+	ReposByID        map[domaintypes.RepoID]store.Repo
+	CountRunsByWave  map[domaintypes.WaveID][]store.CountRunsByWaveStatusRow
 
 	StaleJobsParam    pgtype.Timestamptz
 	StaleNodeParam    pgtype.Timestamptz
-	GetRunCalled      bool
-	CountStatusCalled bool
-	CancelCalls       []store.CancelActiveJobsByRunRepoAttemptParams
-	UpdateRepoCalls   []store.UpdateRunRepoStatusParams
+	CountRunsCalled   bool
+	UpdateRunStatusOK bool
+	CancelCalls       []store.CancelActiveJobsByRunAttemptParams
 	UpdateRunCalls    []store.UpdateRunStatusParams
+	UpdateWaveCalls   []store.UpdateWaveStatusParams
 }
 
 func (s *staleTaskStore) ListStaleRunningJobs(_ context.Context, lastHeartbeat pgtype.Timestamptz) ([]store.ListStaleRunningJobsRow, error) {
@@ -411,43 +233,13 @@ func (s *staleTaskStore) CountStaleNodesWithRunningJobs(_ context.Context, lastH
 	return s.StaleNodesCount, s.StaleNodesErr
 }
 
-func (s *staleTaskStore) CancelActiveJobsByRunRepoAttempt(_ context.Context, arg store.CancelActiveJobsByRunRepoAttemptParams) (int64, error) {
+func (s *staleTaskStore) CancelActiveJobsByRunAttempt(_ context.Context, arg store.CancelActiveJobsByRunAttemptParams) (int64, error) {
 	s.CancelCalls = append(s.CancelCalls, arg)
 	return s.CancelRowsResult, s.CancelErr
 }
 
-func (s *staleTaskStore) ListJobsByRunRepoAttempt(_ context.Context, arg store.ListJobsByRunRepoAttemptParams) ([]store.Job, error) {
-	if s.JobsByAttempt == nil {
-		return nil, nil
-	}
-	return s.JobsByAttempt[ids.AttemptKey{RunID: arg.RunID, RepoID: arg.RepoID, Attempt: arg.Attempt}], nil
-}
-
-func (s *staleTaskStore) UpdateRunRepoStatus(_ context.Context, arg store.UpdateRunRepoStatusParams) error {
-	s.UpdateRepoCalls = append(s.UpdateRepoCalls, arg)
-	return s.UpdateRepoErr
-}
-
-func (s *staleTaskStore) CountRunReposByStatus(_ context.Context, runID domaintypes.RunID) ([]store.CountRunReposByStatusRow, error) {
-	s.CountStatusCalled = true
-	if s.CountByStatusErr != nil {
-		return nil, s.CountByStatusErr
-	}
-	if s.CountByStatus == nil {
-		return nil, nil
-	}
-	return s.CountByStatus[runID], nil
-}
-
-func (s *staleTaskStore) GetRun(_ context.Context, id domaintypes.RunID) (store.Run, error) {
-	s.GetRunCalled = true
-	if s.GetRunErr != nil {
-		return store.Run{}, s.GetRunErr
-	}
-	if s.RunsByID == nil {
-		return store.Run{}, nil
-	}
-	return s.RunsByID[id], nil
+func (s *staleTaskStore) ListJobsByRunAttempt(_ context.Context, arg store.ListJobsByRunAttemptParams) ([]store.Job, error) {
+	return s.JobsByAttempt[ids.AttemptKey{RunID: arg.RunID, Attempt: arg.Attempt}], nil
 }
 
 func (s *staleTaskStore) UpdateRunStatus(_ context.Context, arg store.UpdateRunStatusParams) error {
@@ -458,52 +250,30 @@ func (s *staleTaskStore) UpdateRunStatus(_ context.Context, arg store.UpdateRunS
 		run.Status = arg.Status
 		s.RunsByID[arg.ID] = run
 	}
-	return s.UpdateRunErr
+	return nil
 }
 
-func (s *staleTaskStore) ListRunReposByRun(_ context.Context, _ domaintypes.RunID) ([]store.RunRepo, error) {
-	return s.RunReposResult, s.RunReposErr
+func (s *staleTaskStore) GetRun(_ context.Context, id domaintypes.RunID) (store.Run, error) {
+	return s.RunsByID[id], nil
 }
 
-func (s *staleTaskStore) ListRunReposWithURLByRun(_ context.Context, runID domaintypes.RunID) ([]store.ListRunReposWithURLByRunRow, error) {
-	if s.RunReposWithURLErr != nil {
-		return nil, s.RunReposWithURLErr
-	}
-	if len(s.RunReposWithURL) > 0 {
-		return s.RunReposWithURL, nil
-	}
-	if len(s.RunReposResult) > 0 {
-		var rows []store.ListRunReposWithURLByRunRow
-		for _, rr := range s.RunReposResult {
-			if rr.RunID != runID {
-				continue
-			}
-			rows = append(rows, store.ListRunReposWithURLByRunRow{
-				RunID:       rr.RunID,
-				RepoID:      rr.RepoID,
-				RepoBaseRef: rr.RepoBaseRef,
-				Status:      rr.Status,
-				Attempt:     rr.Attempt,
-				CreatedAt:   rr.CreatedAt,
-				StartedAt:   rr.StartedAt,
-				FinishedAt:  rr.FinishedAt,
-				RepoUrl:     "https://github.com/user/repo.git",
-			})
-		}
-		if len(rows) > 0 {
-			return rows, nil
-		}
-	}
-	for _, stale := range s.StaleRows {
-		if stale.RunID == runID {
-			return []store.ListRunReposWithURLByRunRow{
-				{RunID: runID, RepoID: stale.RepoID, RepoUrl: "https://github.com/user/repo.git"},
-			}, nil
-		}
-	}
-	return nil, nil
+func (s *staleTaskStore) GetWave(_ context.Context, id domaintypes.WaveID) (store.Wave, error) {
+	return s.WavesByID[id], nil
 }
 
-func (s *staleTaskStore) GetMigRepo(_ context.Context, _ domaintypes.MigRepoID) (store.MigRepo, error) {
-	return s.MigRepoResult, s.MigRepoErr
+func (s *staleTaskStore) CountRunsByWaveStatus(_ context.Context, waveID domaintypes.WaveID) ([]store.CountRunsByWaveStatusRow, error) {
+	s.CountRunsCalled = true
+	return s.CountRunsByWave[waveID], nil
+}
+
+func (s *staleTaskStore) UpdateWaveStatus(_ context.Context, arg store.UpdateWaveStatusParams) error {
+	s.UpdateWaveCalls = append(s.UpdateWaveCalls, arg)
+	return nil
+}
+
+func (s *staleTaskStore) GetRepo(_ context.Context, repoID domaintypes.RepoID) (store.Repo, error) {
+	if s.ReposByID == nil {
+		return store.Repo{ID: repoID, Url: "https://github.com/user/repo.git"}, nil
+	}
+	return s.ReposByID[repoID], nil
 }

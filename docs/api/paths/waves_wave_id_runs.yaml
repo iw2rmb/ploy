@@ -1,0 +1,6 @@
+get:
+  tags: [Control]
+  summary: List runs in a wave
+  responses:
+    "200":
+      description: Run list.

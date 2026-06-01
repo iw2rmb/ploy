@@ -1,8 +1,8 @@
 // status.go provides CLI client implementations for fetching diffs and patches.
 //
 // This file implements helpers used by `ploy run apply` and `ploy mig pull`:
-//   - ListRunRepoDiffsCommand: Fetches repo-scoped diffs via GET /v1/runs/{run_id}/repos/{repo_id}/diffs (v1).
-//   - DownloadDiffCommand: Downloads a single diff via GET /v1/runs/{run_id}/repos/{repo_id}/diffs?download=true&diff_id=<uuid>.
+//   - ListRunRepoDiffsCommand: Fetches run-scoped diffs via GET /v1/runs/{run_id}/diffs.
+//   - DownloadDiffCommand: Downloads a single diff via GET /v1/runs/{run_id}/diffs?download=true&diff_id=<uuid>.
 //   - DownloadDiffGzipCommand: Downloads raw gzip bytes for a single diff from the same endpoint.
 package migs
 
@@ -27,8 +27,7 @@ type DiffEntry struct {
 	Summary   domaintypes.DiffSummary `json:"summary,omitempty"`
 }
 
-// ListRunRepoDiffsCommand fetches repo-scoped diffs via GET /v1/runs/{run_id}/repos/{repo_id}/diffs.
-// This is the v1 repo-scoped diffs listing endpoint.
+// ListRunRepoDiffsCommand fetches run-scoped diffs via GET /v1/runs/{run_id}/diffs.
 //
 // Returns diffs filtered by repo_id via jobs.repo_id join.
 // Diffs for repo A are excluded from repo B listing.
@@ -40,7 +39,7 @@ type ListRunRepoDiffsCommand struct {
 	RepoID  domaintypes.RepoID
 }
 
-// Run executes GET /v1/runs/{run_id}/repos/{repo_id}/diffs and returns all diff entries.
+// Run executes GET /v1/runs/{run_id}/diffs and returns all diff entries.
 // Diffs are returned in server-provided order (ordered by next_id, then created_at).
 func (c ListRunRepoDiffsCommand) Run(ctx context.Context) ([]DiffEntry, error) {
 	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
@@ -78,7 +77,7 @@ func (c ListRunRepoDiffsCommand) Run(ctx context.Context) ([]DiffEntry, error) {
 }
 
 // DownloadDiffCommand downloads a single diff patch via:
-// GET /v1/runs/{run_id}/repos/{repo_id}/diffs?download=true&diff_id=<uuid>
+// GET /v1/runs/{run_id}/diffs?download=true&diff_id=<uuid>
 // Returns the decompressed patch bytes ready for application via `git apply`.
 type DownloadDiffCommand struct {
 	Client  *http.Client
@@ -91,7 +90,7 @@ type DownloadDiffCommand struct {
 }
 
 // DownloadDiffGzipCommand downloads a single diff patch as raw gzip bytes via:
-// GET /v1/runs/{run_id}/repos/{repo_id}/diffs?download=true&diff_id=<uuid>
+// GET /v1/runs/{run_id}/diffs?download=true&diff_id=<uuid>
 type DownloadDiffGzipCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
@@ -102,7 +101,7 @@ type DownloadDiffGzipCommand struct {
 	Accumulated bool
 }
 
-// Run executes GET /v1/runs/{run_id}/repos/{repo_id}/diffs?download=true&diff_id=<uuid>
+// Run executes GET /v1/runs/{run_id}/diffs?download=true&diff_id=<uuid>
 // and returns the decompressed patch.
 func (c DownloadDiffCommand) Run(ctx context.Context) ([]byte, error) {
 	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
@@ -147,7 +146,7 @@ func (c DownloadDiffCommand) Run(ctx context.Context) ([]byte, error) {
 	return patch, nil
 }
 
-// Run executes GET /v1/runs/{run_id}/repos/{repo_id}/diffs?download=true&diff_id=<uuid>
+// Run executes GET /v1/runs/{run_id}/diffs?download=true&diff_id=<uuid>
 // and returns raw gzip-compressed patch bytes from the server.
 func (c DownloadDiffGzipCommand) Run(ctx context.Context) ([]byte, error) {
 	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {

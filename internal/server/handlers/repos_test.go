@@ -144,8 +144,7 @@ func TestListRunsForRepoHandler_Success(t *testing.T) {
 		{
 			RunID:       runID,
 			MigID:       migID,
-			RunStatus:   domaintypes.RunStatusFinished,
-			RepoStatus:  domaintypes.RunRepoStatusSuccess,
+			Status:      domaintypes.RunStatusSuccess,
 			RepoBaseRef: "main",
 			Attempt:     1,
 			StartedAt:   pgtype.Timestamptz{Time: now, Valid: true},
@@ -176,10 +175,10 @@ func TestListRunsForRepoHandler_Success(t *testing.T) {
 	if run.MigID != migID {
 		t.Fatalf("unexpected mig_id: %s", run.MigID.String())
 	}
-	if run.RunStatus != "Finished" {
+	if run.RunStatus != domaintypes.RunStatusSuccess {
 		t.Fatalf("unexpected run_status: %s", run.RunStatus)
 	}
-	if run.RepoStatus != "Success" {
+	if run.RepoStatus != domaintypes.RunStatusSuccess {
 		t.Fatalf("unexpected repo_status: %s", run.RepoStatus)
 	}
 	if run.BaseRef != "main" {

@@ -28,7 +28,7 @@ type Options struct {
 	Logger         *slog.Logger
 }
 
-// StaleJobRecoveryTask scans for stale Running jobs and reconciles repo/run state.
+// StaleJobRecoveryTask scans for stale Running jobs and reconciles run/wave state.
 type StaleJobRecoveryTask struct {
 	store          store.Store
 	eventsService  *events.Service
@@ -100,7 +100,7 @@ func (t *StaleJobRecoveryTask) Run(ctx context.Context) error {
 	var (
 		staleNodes    int64
 		cancelledJobs int64
-		reposUpdated  int
+		runsUpdated   int
 		runsFinalized int
 	)
 
@@ -112,15 +112,13 @@ func (t *StaleJobRecoveryTask) Run(ctx context.Context) error {
 
 	finalizedRuns := make(map[string]struct{})
 	for _, stale := range staleRows {
-		affected, err := t.store.CancelActiveJobsByRunRepoAttempt(ctx, store.CancelActiveJobsByRunRepoAttemptParams{
+		affected, err := t.store.CancelActiveJobsByRunAttempt(ctx, store.CancelActiveJobsByRunAttemptParams{
 			RunID:   stale.RunID,
-			RepoID:  stale.RepoID,
 			Attempt: stale.Attempt,
 		})
 		if err != nil {
 			t.logger.Error("stale-job-recovery: cancel active jobs failed",
 				"run_id", stale.RunID,
-				"repo_id", stale.RepoID,
 				"attempt", stale.Attempt,
 				"err", err,
 			)
@@ -128,20 +126,19 @@ func (t *StaleJobRecoveryTask) Run(ctx context.Context) error {
 		}
 		cancelledJobs += affected
 
-		repoUpdated, err := MaybeUpdateRunRepoStatus(ctx, t.store, stale.RunID, stale.RepoID, stale.Attempt)
+		runUpdated, err := MaybeUpdateRunStatus(ctx, t.store, stale.RunID, stale.Attempt)
 		if err != nil {
-			t.logger.Error("stale-job-recovery: reconcile repo status failed",
+			t.logger.Error("stale-job-recovery: reconcile run status failed",
 				"run_id", stale.RunID,
-				"repo_id", stale.RepoID,
 				"attempt", stale.Attempt,
 				"err", err,
 			)
 			continue
 		}
-		if !repoUpdated {
+		if !runUpdated {
 			continue
 		}
-		reposUpdated++
+		runsUpdated++
 		if _, ok := finalizedRuns[stale.RunID.String()]; ok {
 			continue
 		}
@@ -159,7 +156,6 @@ func (t *StaleJobRecoveryTask) Run(ctx context.Context) error {
 		if err != nil {
 			t.logger.Error("stale-job-recovery: reconcile run status failed",
 				"run_id", stale.RunID,
-				"repo_id", stale.RepoID,
 				"attempt", stale.Attempt,
 				"err", err,
 			)
@@ -170,7 +166,6 @@ func (t *StaleJobRecoveryTask) Run(ctx context.Context) error {
 			runsFinalized++
 			t.logger.Info("stale-job-recovery: run finalized",
 				"run_id", stale.RunID,
-				"repo_id", stale.RepoID,
 				"attempt", stale.Attempt,
 			)
 		}
@@ -179,7 +174,7 @@ func (t *StaleJobRecoveryTask) Run(ctx context.Context) error {
 	t.logger.Info("stale-job-recovery: cycle completed",
 		"stale_nodes", staleNodes,
 		"stale_attempts", len(staleRows),
-		"repos_updated", reposUpdated,
+		"runs_updated", runsUpdated,
 		"jobs_cancelled", cancelledJobs,
 		"runs_finalized", runsFinalized,
 	)

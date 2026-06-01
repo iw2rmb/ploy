@@ -31,9 +31,8 @@ func resolveMigInFromClaimEntries(
 		return nil, nil
 	}
 
-	jobs, err := st.ListJobsByRunRepoAttempt(ctx, store.ListJobsByRunRepoAttemptParams{
+	jobs, err := st.ListJobsByRunAttempt(ctx, store.ListJobsByRunAttemptParams{
 		RunID:   job.RunID,
-		RepoID:  job.RepoID,
 		Attempt: job.Attempt,
 	})
 	if err != nil {

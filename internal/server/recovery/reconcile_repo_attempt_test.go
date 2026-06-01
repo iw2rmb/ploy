@@ -8,7 +8,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-func TestReconcileRepo_EvaluateRepoAttemptTerminalStatus(t *testing.T) {
+func TestReconcileRun_EvaluateRunAttemptTerminalStatus(t *testing.T) {
 	t.Parallel()
 
 	mkMeta := func(nextID int64) []byte {
@@ -20,7 +20,7 @@ func TestReconcileRepo_EvaluateRepoAttemptTerminalStatus(t *testing.T) {
 		name       string
 		jobs       []store.Job
 		wantUpdate bool
-		wantStatus domaintypes.RunRepoStatus
+		wantStatus domaintypes.RunStatus
 		wantErr    bool
 	}{
 		{
@@ -37,7 +37,7 @@ func TestReconcileRepo_EvaluateRepoAttemptTerminalStatus(t *testing.T) {
 				{ID: domaintypes.NewJobID(), JobType: domaintypes.JobTypeMig, Status: domaintypes.JobStatusSuccess, Meta: mkMeta(2000)},
 			},
 			wantUpdate: true,
-			wantStatus: domaintypes.RunRepoStatusSuccess,
+			wantStatus: domaintypes.RunStatusSuccess,
 		},
 		{
 			name: "single terminal mig updates status",
@@ -45,15 +45,15 @@ func TestReconcileRepo_EvaluateRepoAttemptTerminalStatus(t *testing.T) {
 				{ID: domaintypes.NewJobID(), JobType: domaintypes.JobTypeMig, Status: domaintypes.JobStatusSuccess},
 			},
 			wantUpdate: true,
-			wantStatus: domaintypes.RunRepoStatusSuccess,
+			wantStatus: domaintypes.RunStatusSuccess,
 		},
 		{
-			name: "error status maps repo to fail",
+			name: "error status maps run to fail",
 			jobs: []store.Job{
 				{ID: domaintypes.NewJobID(), JobType: domaintypes.JobTypeMig, Status: domaintypes.JobStatusError},
 			},
 			wantUpdate: true,
-			wantStatus: domaintypes.RunRepoStatusFail,
+			wantStatus: domaintypes.RunStatusFail,
 		},
 	}
 
@@ -62,7 +62,7 @@ func TestReconcileRepo_EvaluateRepoAttemptTerminalStatus(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			eval, err := EvaluateRepoAttemptTerminalStatus(tc.jobs)
+			eval, err := EvaluateRunAttemptTerminalStatus(tc.jobs)
 			if (err != nil) != tc.wantErr {
 				t.Fatalf("err = %v, wantErr=%v", err, tc.wantErr)
 			}

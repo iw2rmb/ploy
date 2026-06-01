@@ -17,7 +17,7 @@ type claimJobFixtureOptions struct {
 	jobType       domaintypes.JobType
 	jobName       string
 	runStatus     domaintypes.RunStatus
-	runRepoStatus domaintypes.RunRepoStatus
+	runRepoStatus domaintypes.RunStatus
 	specJSON      []byte
 	jobMeta       []byte
 	jobImage      string
@@ -55,10 +55,10 @@ func newClaimJobFixture(t testing.TB, opts claimJobFixtureOptions) *claimJobFixt
 		opts.jobName = "mig-0"
 	}
 	if opts.runStatus == "" {
-		opts.runStatus = domaintypes.RunStatusStarted
+		opts.runStatus = domaintypes.RunStatusQueued
 	}
 	if opts.runRepoStatus == "" {
-		opts.runRepoStatus = domaintypes.RunRepoStatusQueued
+		opts.runRepoStatus = domaintypes.RunStatusQueued
 	}
 	if len(opts.specJSON) == 0 {
 		opts.specJSON = []byte(`{"steps":[{"image":"a"}]}`)
@@ -68,15 +68,6 @@ func newClaimJobFixture(t testing.TB, opts claimJobFixtureOptions) *claimJobFixt
 	}
 
 	st := &jobStore{}
-	st.getRunRepo.val = store.RunRepo{
-		RunID:           runID,
-		RepoID:          repoID,
-		RepoBaseRef:     "main",
-		SourceCommitSha: sourceCommitSHA,
-		RepoSha0:        sourceCommitSHA,
-		Status:          opts.runRepoStatus,
-		Attempt:         1,
-	}
 	st.getNode.val = store.Node{ID: nodeID}
 	st.claimJob.val = store.Job{
 		ID:          jobID,
@@ -92,11 +83,15 @@ func newClaimJobFixture(t testing.TB, opts claimJobFixtureOptions) *claimJobFixt
 		Meta:        opts.jobMeta,
 	}
 	st.getRun.val = store.Run{
-		ID:        runID,
-		SpecID:    specID,
-		Status:    opts.runStatus,
-		CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
-		StartedAt: pgtype.Timestamptz{Time: now, Valid: true},
+		ID:              runID,
+		SpecID:          specID,
+		RepoID:          repoID,
+		RepoBaseRef:     "main",
+		SourceCommitSha: sourceCommitSHA,
+		RepoSha0:        sourceCommitSHA,
+		Status:          opts.runStatus,
+		Attempt:         1,
+		CreatedAt:       pgtype.Timestamptz{Time: now, Valid: true},
 	}
 	st.getMigRepo.val = store.MigRepo{ID: domaintypes.NewMigRepoID(), RepoID: repoID}
 	st.getSpec.val = store.Spec{ID: specID, Spec: opts.specJSON}

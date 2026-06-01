@@ -69,7 +69,7 @@ func TestGetJobLogsHandler_BackfillExcludesNilJobIDLogs(t *testing.T) {
 
 	st := &jobStore{}
 	st.getJob.val = store.Job{ID: jobID, RunID: runID, Status: domaintypes.JobStatusSuccess}
-	st.getRun.val = store.Run{ID: runID, Status: domaintypes.RunStatusFinished}
+	st.getRun.val = store.Run{ID: runID, Status: domaintypes.RunStatusSuccess}
 	st.listLogsByRun.val = []store.Log{
 		{ID: 1, RunID: runID, JobID: &jobID, ObjectKey: &objKeyJob},
 		{ID: 2, RunID: runID, JobID: nil, ObjectKey: &objKeyNil}, // no job_id; must be excluded
@@ -110,7 +110,7 @@ func TestGetJobLogsHandler_BackfillPreservesStderrStream(t *testing.T) {
 
 	st := &jobStore{}
 	st.getJob.val = store.Job{ID: jobID, RunID: runID, Status: domaintypes.JobStatusSuccess}
-	st.getRun.val = store.Run{ID: runID, Status: domaintypes.RunStatusFinished}
+	st.getRun.val = store.Run{ID: runID, Status: domaintypes.RunStatusSuccess}
 	st.listLogsByRun.val = []store.Log{
 		{ID: 1, RunID: runID, JobID: &jobID, ObjectKey: &objKey},
 	}
@@ -154,7 +154,7 @@ func TestGetJobLogsHandler_BackfillExcludesOtherJobLogs(t *testing.T) {
 
 	st := &jobStore{}
 	st.getJob.val = store.Job{ID: jobID, RunID: runID, Status: domaintypes.JobStatusSuccess}
-	st.getRun.val = store.Run{ID: runID, Status: domaintypes.RunStatusFinished}
+	st.getRun.val = store.Run{ID: runID, Status: domaintypes.RunStatusSuccess}
 	st.listLogsByRun.val = []store.Log{
 		{ID: 1, RunID: runID, JobID: &jobID, ObjectKey: &objKeyJob},
 		{ID: 2, RunID: runID, JobID: &otherID, ObjectKey: &objKeyOther},

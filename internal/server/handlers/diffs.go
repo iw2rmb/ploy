@@ -49,10 +49,10 @@ const maxAccumulatedDiffPlainBytes int64 = 64 << 20
 // within a run. This is the v1 repo-scoped endpoint replacing the legacy run-scoped
 // diffs listing endpoint.
 //
-// GET /v1/runs/{run_id}/repos/{repo_id}/diffs
+// GET /v1/runs/{run_id}/diffs
 //
 // Download mode:
-// - GET /v1/runs/{run_id}/repos/{repo_id}/diffs?download=true&diff_id=<uuid>
+// - GET /v1/runs/{run_id}/diffs?download=true&diff_id=<uuid>
 // - Returns the gzipped patch bytes for the requested diff, streamed from object storage.
 //
 // v1 repo-scoped diffs listing:
@@ -282,9 +282,8 @@ func listEffectiveRunRepoDiffs(
 	if rr.RepoID != repoID {
 		return []runRepoDiffRow{}, nil
 	}
-	jobs, err := st.ListJobsByRunRepoAttempt(ctx, store.ListJobsByRunRepoAttemptParams{
+	jobs, err := st.ListJobsByRunAttempt(ctx, store.ListJobsByRunAttemptParams{
 		RunID:   runID,
-		RepoID:  repoID,
 		Attempt: rr.Attempt,
 	})
 	if err != nil {

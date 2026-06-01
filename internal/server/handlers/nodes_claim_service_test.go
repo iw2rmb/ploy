@@ -41,22 +41,17 @@ func TestClaimService_Claim_SuccessBuildsPayloadAndTransitionsRepo(t *testing.T)
 	now := time.Now().UTC()
 
 	st := &jobStore{}
-	st.getRunRepo.val = store.RunRepo{
-		RunID:           runID,
+	st.getNode.val = store.Node{ID: nodeID}
+	st.getRun.val = store.Run{
+		ID:              runID,
+		SpecID:          specID,
 		RepoID:          repoID,
 		RepoBaseRef:     "main",
 		SourceCommitSha: sourceCommitSHA,
 		RepoSha0:        sourceCommitSHA,
-		Status:          domaintypes.RunRepoStatusQueued,
+		Status:          domaintypes.RunStatusQueued,
 		Attempt:         1,
-	}
-	st.getNode.val = store.Node{ID: nodeID}
-	st.getRun.val = store.Run{
-		ID:        runID,
-		SpecID:    specID,
-		Status:    domaintypes.RunStatusStarted,
-		CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
-		StartedAt: pgtype.Timestamptz{Time: now, Valid: true},
+		CreatedAt:       pgtype.Timestamptz{Time: now, Valid: true},
 	}
 	st.getSpec.val = store.Spec{ID: specID, Spec: []byte(`{"steps":[{"image":"img"}]}`)}
 	st.claimJob.val = store.Job{
@@ -77,8 +72,8 @@ func TestClaimService_Claim_SuccessBuildsPayloadAndTransitionsRepo(t *testing.T)
 	if err != nil {
 		t.Fatalf("Claim() error = %v", err)
 	}
-	if !st.updateRunRepoStatus.called {
-		t.Fatal("expected UpdateRunRepoStatus to be called")
+	if !st.updateRunStatus.called {
+		t.Fatal("expected UpdateRunStatus to be called")
 	}
 	if st.unclaimJob.called {
 		t.Fatal("expected UnclaimJob to not be called on successful claim")
@@ -108,20 +103,15 @@ func TestClaimService_Claim_RequeuesClaimedJobWhenPayloadBuildFails(t *testing.T
 	now := time.Now().UTC()
 
 	st := &jobStore{}
-	st.getRunRepo.val = store.RunRepo{
-		RunID:       runID,
-		RepoID:      repoID,
-		RepoBaseRef: "main",
-		Status:      domaintypes.RunRepoStatusQueued,
-		Attempt:     1,
-	}
 	st.getNode.val = store.Node{ID: nodeID}
 	st.getRun.val = store.Run{
-		ID:        runID,
-		SpecID:    specID,
-		Status:    domaintypes.RunStatusStarted,
-		CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
-		StartedAt: pgtype.Timestamptz{Time: now, Valid: true},
+		ID:          runID,
+		SpecID:      specID,
+		RepoID:      repoID,
+		RepoBaseRef: "main",
+		Status:      domaintypes.RunStatusQueued,
+		Attempt:     1,
+		CreatedAt:   pgtype.Timestamptz{Time: now, Valid: true},
 	}
 	st.getSpec.val = store.Spec{ID: specID, Spec: []byte(`{"steps":[{"image":"img"}]}`)}
 	st.claimJob.val = store.Job{
@@ -155,7 +145,7 @@ func TestClaimService_Claim_RequeuesClaimedJobWhenPayloadBuildFails(t *testing.T
 	if got := st.unclaimJob.params.NodeID; got != nodeID {
 		t.Fatalf("unclaim node id = %v, want %s", got, nodeID)
 	}
-	if st.updateRunRepoStatus.called {
-		t.Fatal("expected UpdateRunRepoStatus to not be called when payload build fails")
+	if st.updateRunStatus.called {
+		t.Fatal("expected UpdateRunStatus to not be called when payload build fails")
 	}
 }

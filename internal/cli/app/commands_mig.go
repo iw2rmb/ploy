@@ -160,55 +160,7 @@ func newMigRunCmd(stderr io.Writer) *cobra.Command {
 	runCmd.Flags().DurationVar(&capDuration, "cap", 0, "Optional time cap for --follow")
 	runCmd.Flags().BoolVar(&cancelOnCap, "cancel-on-cap", false, "Cancel run if cap exceeded")
 	runCmd.Flags().IntVar(&maxRetries, "max-retries", 5, "Max SSE reconnect attempts")
-	runCmd.AddCommand(newMigRunRepoCmd(stderr))
 	return runCmd
-}
-
-func newMigRunRepoCmd(stderr io.Writer) *cobra.Command {
-	repoCmd := &cobra.Command{Use: "repo", Short: "Manage repos within a batch run", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, args []string) error { return cmd.Help() }}
-	repoCmd.AddCommand(newMigRunRepoAddCmd(stderr))
-	repoCmd.AddCommand(newMigRunRepoRemoveCmd(stderr))
-	repoCmd.AddCommand(newMigRunRepoRestartCmd(stderr))
-	return repoCmd
-}
-
-func newMigRunRepoAddCmd(stderr io.Writer) *cobra.Command {
-	var repoURL, baseRef string
-	cmd := &cobra.Command{Use: "add --repo-url <url> --base-ref <ref> <run-id>", Short: "Add a repo to a batch run", Args: cobra.ExactArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
-		return mig.RunRunRepoAdd(context.Background(), mig.RunRepoAddOptions{
-			RunID:   args[0],
-			RepoURL: repoURL,
-			BaseRef: baseRef,
-			Output:  stderr,
-		})
-	}}
-	cmd.Flags().StringVar(&repoURL, "repo-url", "", "Git repository URL")
-	cmd.Flags().StringVar(&baseRef, "base-ref", "", "Git base ref")
-	return cmd
-}
-
-func newMigRunRepoRemoveCmd(stderr io.Writer) *cobra.Command {
-	var repoID string
-	cmd := &cobra.Command{Use: "remove --repo-id <id> <run-id>", Short: "Remove/cancel a repo from a batch run", Args: cobra.ExactArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
-		return mig.RunRunRepoRemove(context.Background(), args[0], repoID, stderr)
-	}}
-	cmd.Flags().StringVar(&repoID, "repo-id", "", "Repo identifier to remove")
-	return cmd
-}
-
-func newMigRunRepoRestartCmd(stderr io.Writer) *cobra.Command {
-	var repoID, baseRef string
-	cmd := &cobra.Command{Use: "restart --repo-id <id> <run-id>", Short: "Restart a repo within a batch run", Args: cobra.ExactArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
-		return mig.RunRunRepoRestart(context.Background(), mig.RunRepoRestartOptions{
-			RunID:   args[0],
-			RepoID:  repoID,
-			BaseRef: baseRef,
-			Output:  stderr,
-		})
-	}}
-	cmd.Flags().StringVar(&repoID, "repo-id", "", "Repo identifier to restart")
-	cmd.Flags().StringVar(&baseRef, "base-ref", "", "Optional new base ref")
-	return cmd
 }
 
 func newMigFetchCmd(stderr io.Writer) *cobra.Command {

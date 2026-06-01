@@ -69,9 +69,8 @@ func (s *BatchRepoStarter) StartPendingRepos(ctx context.Context, waveID domaint
 	}
 
 	for _, run := range queuedRuns {
-		jobs, err := s.store.ListJobsByRunRepoAttempt(ctx, store.ListJobsByRunRepoAttemptParams{
+		jobs, err := s.store.ListJobsByRunAttempt(ctx, store.ListJobsByRunAttemptParams{
 			RunID:   run.ID,
-			RepoID:  run.RepoID,
 			Attempt: run.Attempt,
 		})
 		if err != nil {
@@ -106,7 +105,7 @@ func (s *BatchRepoStarter) StartPendingRepos(ctx context.Context, waveID domaint
 			continue
 		}
 
-		if _, err := s.store.ScheduleNextJob(ctx, store.ScheduleNextJobParams{RunID: run.ID, RepoID: run.RepoID, Attempt: run.Attempt}); err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		if _, err := s.store.ScheduleNextJob(ctx, store.ScheduleNextJobParams{RunID: run.ID, Attempt: run.Attempt}); err != nil && !errors.Is(err, pgx.ErrNoRows) {
 			slog.Error("start queued runs: schedule next job failed", "run_id", run.ID, "repo_id", run.RepoID, "attempt", run.Attempt, "err", err)
 			continue
 		}

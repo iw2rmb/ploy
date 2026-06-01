@@ -47,7 +47,7 @@ func TestRunsCreateSingleRepo_Success(t *testing.T) {
 		t.Error("store.CreateRun was not called")
 	}
 	if !st.createRunRepo.called {
-		t.Error("store.CreateRunRepo was not called")
+		t.Error("store.CreateRun was not called")
 	}
 	if st.createJob.called {
 		t.Error("store.CreateJob should not be called during submission")
@@ -245,7 +245,7 @@ func TestRunsCreateSingleRepo_StoreErrors(t *testing.T) {
 			setupFn: func(st *migStore) { st.createRun.errs = []error{errors.New("database connection failed")} },
 		},
 		{
-			name:    "CreateRunRepoError",
+			name:    "CreateRunError",
 			setupFn: func(st *migStore) { st.createRunRepo.err = errors.New("database connection failed") },
 		},
 	}
@@ -290,6 +290,6 @@ func TestRunsCreateSingleRepo_RejectsWhenSourceCommitSeedFails(t *testing.T) {
 		t.Fatal("store.CreateRun should not be called when source commit seed resolution fails")
 	}
 	if st.createRunRepo.called {
-		t.Fatal("store.CreateRunRepo should not be called when source commit seed resolution fails")
+		t.Fatal("store.CreateRun should not be called when source commit seed resolution fails")
 	}
 }

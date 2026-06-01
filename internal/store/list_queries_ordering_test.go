@@ -19,8 +19,8 @@ func TestListQueriesDeterministicOrder(t *testing.T) {
 	}{
 		// jobs.sql - repo/attempt scopes keep deterministic id tie-breakers
 		{"ListJobsByRun", listJobsByRun, "ORDER BY repo_id ASC, attempt ASC, id ASC"},
-		{"ListJobsByRunRepoAttempt", listJobsByRunRepoAttempt, "ORDER BY id ASC"},
-		{"ListCreatedJobsByRunRepoAttempt", listCreatedJobsByRunRepoAttempt, "ORDER BY id ASC"},
+		{"ListJobsByRunAttempt", listJobsByRunAttempt, "ORDER BY id ASC"},
+		{"ListCreatedJobsByRunAttempt", listCreatedJobsByRunAttempt, "ORDER BY id ASC"},
 
 		// runs.sql - created_at needs id tie-breaker
 		{"ListRuns", listRuns, "ORDER BY created_at DESC, id DESC"},
@@ -37,17 +37,17 @@ func TestListQueriesDeterministicOrder(t *testing.T) {
 		// mig_repos.sql - created_at and repo_url need id tie-breakers
 		{"ListMigReposByMig", listMigReposByMig, "ORDER BY created_at ASC, id ASC"},
 		{"ListDistinctRepos", listDistinctRepos, "ORDER BY r.url ASC, mr.repo_id ASC"},
-		{"ListDistinctRepos (lateral)", listDistinctRepos, "ORDER BY rrr.started_at DESC NULLS LAST, rrr.created_at DESC, rrr.run_id DESC"},
+		{"ListDistinctRepos (lateral)", listDistinctRepos, "ORDER BY runs.started_at DESC NULLS LAST, runs.created_at DESC, runs.id DESC"},
 
 		// tokens.sql - created_at needs token_id tie-breaker
 		{"ListAPITokens", listAPITokens, "ORDER BY created_at DESC, token_id DESC"},
 
-		// run_repos.sql - created_at needs repo_id/run_id tie-breakers (composite PK)
-		{"ListRunReposByRun", listRunReposByRun, "ORDER BY created_at ASC, repo_id ASC"},
-		{"ListQueuedRunReposByRun", listQueuedRunReposByRun, "ORDER BY created_at ASC, repo_id ASC"},
-		{"ListRunReposWithURLByRun", listRunReposWithURLByRun, "ORDER BY rr.created_at ASC, rr.repo_id ASC"},
-		{"ListRunsForRepo", listRunsForRepo, "ORDER BY rr.created_at DESC, rr.run_id DESC"},
-		{"ListFailedRepoIDsByMig", listFailedRepoIDsByMig, "ORDER BY rr.repo_id, rr.created_at DESC, rr.run_id DESC"},
+		// runs.sql - created_at needs id tie-breakers.
+		{"ListRunsByWave", listRunsByWave, "ORDER BY created_at ASC, id ASC"},
+		{"ListQueuedRunsByWave", listQueuedRunsByWave, "ORDER BY created_at ASC, id ASC"},
+		{"ListRunsWithURLByWave", listRunsWithURLByWave, "ORDER BY runs.created_at ASC, runs.id ASC"},
+		{"ListRunsForRepo", listRunsForRepo, "ORDER BY runs.created_at DESC, runs.id DESC"},
+		{"ListFailedRepoIDsByMig", listFailedRepoIDsByMig, "ORDER BY repo_id, created_at DESC, id DESC"},
 
 		// logs.sql - chunk order needs id tie-breaker.
 		{"ListLogsByRun", listLogsByRun, "ORDER BY chunk_no ASC, id ASC"},

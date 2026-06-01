@@ -36,7 +36,7 @@ func TestSmokeWorkflow_EndToEnd(t *testing.T) {
 	}`)
 	fixture := newV1RunFixture(t, ctx, db, "https://github.com/example/smoke-workflow", "main", migSpec)
 	run := fixture.Run
-	runRepo := fixture.RunRepo
+	runRepo := fixture.Run
 
 	t.Logf("✓ Created run: id=%v, status=%s", run.ID, run.Status)
 
@@ -236,7 +236,7 @@ index abc1234..def5678 100644
 	// In a real workflow, the runner would update job statuses and then the run status.
 	err = db.UpdateRunStatus(ctx, store.UpdateRunStatusParams{
 		ID:     run.ID,
-		Status: domaintypes.RunStatusFinished,
+		Status: domaintypes.RunStatusSuccess,
 	})
 	if err != nil {
 		t.Fatalf("UpdateRunStatus() failed: %v", err)
@@ -249,7 +249,7 @@ index abc1234..def5678 100644
 	if err != nil {
 		t.Fatalf("GetRun() failed: %v", err)
 	}
-	if fetchedRun.Status != domaintypes.RunStatusFinished {
+	if fetchedRun.Status != domaintypes.RunStatusSuccess {
 		t.Errorf("Fetched run status mismatch: expected 'Finished', got %s", fetchedRun.Status)
 	}
 	t.Logf("✓ Verified run status: %s", fetchedRun.Status)

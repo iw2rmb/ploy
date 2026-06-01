@@ -25,7 +25,7 @@ func TestCreateSingleRepoRunHandler_SingleRepo(t *testing.T) {
 	now := time.Now().UTC()
 	st := &jobStore{}
 	st.createRun.val = store.Run{
-		Status:    domaintypes.RunStatusStarted,
+		Status:    domaintypes.RunStatusRunning,
 		CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
 	}
 
@@ -286,7 +286,7 @@ func TestCreateSingleRepoRunHandler_PublishesEvent(t *testing.T) {
 	now := time.Now().UTC()
 	st := &jobStore{}
 	st.createRun.val = store.Run{
-		Status:    domaintypes.RunStatusStarted,
+		Status:    domaintypes.RunStatusRunning,
 		CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
 	}
 
@@ -346,18 +346,16 @@ func TestGetRunStatusHandler(t *testing.T) {
 					{ID: jobID, RunID: runID, Status: domaintypes.JobStatusQueued, NextID: &nextJobID, Meta: withNextIDMeta([]byte(`{}`), float64(1000))},
 				}
 				st.getRun.val = store.Run{
-					ID:        runID,
-					Status:    domaintypes.RunStatusStarted,
-					CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
+					ID:          runID,
+					RepoID:      "repo_123",
+					RepoBaseRef: "main",
+					Status:      domaintypes.RunStatusRunning,
+					CreatedAt:   pgtype.Timestamptz{Time: now, Valid: true},
 				}
-				st.listRunReposWithURLByRun.val = []store.ListRunReposWithURLByRunRow{
-					{
-						RunID:       runID,
-						RepoID:      "repo_123",
-						RepoBaseRef: "main",
-						RepoUrl:     "https://github.com/user/repo.git",
-					},
+				st.createMigRepo.val = store.MigRepo{
+					RepoID: "repo_123",
 				}
+				st.getRun.val.RepoID = "repo_123"
 				return st
 			},
 			reqRunID:   runIDStr,
@@ -387,7 +385,6 @@ func TestGetRunStatusHandler(t *testing.T) {
 					t.Fatalf("expected stage next_id %s, got %v", nextJobID, got)
 				}
 				assertCalled(t, "GetRun", st.getRun.called)
-				assertCalled(t, "ListRunReposWithURLByRun", st.listRunReposWithURLByRun.called)
 				assertCalled(t, "ListJobsByRun", st.listJobsByRun.called)
 			},
 		},

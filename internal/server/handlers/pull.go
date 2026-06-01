@@ -5,7 +5,7 @@
 // pull diffs from the server.
 //
 // Endpoints:
-//   - POST /v1/runs/{run_id}/repos/resolve — resolve repo for a specific run
+//   - POST /v1/runs/{run_id}/resolve — resolve repo for a specific run
 //   - POST /v1/migs/{mig_id}/pull — resolve repo for a mig (last succeeded/failed)
 //
 // Implements pull resolution endpoints for mig and run repos.
@@ -26,7 +26,7 @@ import (
 // Request/Response types for pull resolution endpoints
 // -------------------------------------------------------------------------
 
-// runPullRequest is the request body for POST /v1/runs/{run_id}/repos/resolve.
+// runPullRequest is the request body for POST /v1/runs/{run_id}/resolve.
 // The client provides a repo_url to resolve to execution identifiers.
 type runPullRequest struct {
 	RepoURL string `json:"repo_url"`
@@ -58,7 +58,7 @@ type pullResponse struct {
 // -------------------------------------------------------------------------
 
 // resolveRunRepoHandler resolves a repo_url to execution identifiers for a specific run.
-// Endpoint: POST /v1/runs/{run_id}/repos/resolve
+// Endpoint: POST /v1/runs/{run_id}/resolve
 // Request: {repo_url}
 // Response: 200 OK with {run_id, repo_id}
 //

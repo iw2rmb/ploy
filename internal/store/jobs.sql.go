@@ -34,7 +34,7 @@ func (q *Queries) CancelActiveJobsByRun(ctx context.Context, runID types.RunID) 
 	return result.RowsAffected(), nil
 }
 
-const cancelActiveJobsByRunRepoAttempt = `-- name: CancelActiveJobsByRunRepoAttempt :execrows
+const cancelActiveJobsByRunAttempt = `-- name: CancelActiveJobsByRunAttempt :execrows
 UPDATE jobs
 SET status = 'Cancelled',
     finished_at = COALESCE(finished_at, now()),
@@ -43,22 +43,20 @@ SET status = 'Cancelled',
       ELSE GREATEST(EXTRACT(EPOCH FROM (COALESCE(finished_at, now()) - started_at)) * 1000, 0)::BIGINT
     END
 WHERE run_id = $1
-  AND repo_id = $2
-  AND attempt = $3
+  AND attempt = $2
   AND status IN ('Created', 'Queued', 'Running')
 `
 
-type CancelActiveJobsByRunRepoAttemptParams struct {
-	RunID   types.RunID  `json:"run_id"`
-	RepoID  types.RepoID `json:"repo_id"`
-	Attempt int32        `json:"attempt"`
+type CancelActiveJobsByRunAttemptParams struct {
+	RunID   types.RunID `json:"run_id"`
+	Attempt int32       `json:"attempt"`
 }
 
-// Bulk-cancels active jobs for a specific repo attempt.
+// Bulk-cancels active jobs for a specific run attempt.
 // Targets Created/Queued/Running and preserves terminal jobs.
 // finished_at is set once; duration_ms is computed from started_at when present.
-func (q *Queries) CancelActiveJobsByRunRepoAttempt(ctx context.Context, arg CancelActiveJobsByRunRepoAttemptParams) (int64, error) {
-	result, err := q.db.Exec(ctx, cancelActiveJobsByRunRepoAttempt, arg.RunID, arg.RepoID, arg.Attempt)
+func (q *Queries) CancelActiveJobsByRunAttempt(ctx context.Context, arg CancelActiveJobsByRunAttemptParams) (int64, error) {
+	result, err := q.db.Exec(ctx, cancelActiveJobsByRunAttempt, arg.RunID, arg.Attempt)
 	if err != nil {
 		return 0, err
 	}
@@ -82,7 +80,6 @@ WITH eligible AS (
       SELECT 1
       FROM jobs owner
       WHERE owner.run_id = j.run_id
-        AND owner.repo_id = j.repo_id
         AND owner.attempt = j.attempt
         AND owner.node_id IS NOT NULL
         AND owner.node_id != n.id
@@ -133,16 +130,14 @@ WITH RECURSIVE chain AS (
   FROM jobs j
   WHERE j.id = $1
     AND j.run_id = $2
-    AND j.repo_id = $3
-    AND j.attempt = $4
+    AND j.attempt = $3
     AND j.status IN ('Created', 'Queued')
   UNION ALL
   SELECT n.id, n.next_id
   FROM jobs n
   JOIN chain c ON n.id = c.next_id
   WHERE n.run_id = $2
-    AND n.repo_id = $3
-    AND n.attempt = $4
+    AND n.attempt = $3
     AND n.status IN ('Created', 'Queued')
 )
 UPDATE jobs AS j
@@ -155,19 +150,13 @@ WHERE j.id = chain.id
 `
 
 type ClearRepoSHAChainFromJobParams struct {
-	ID      types.JobID  `json:"id"`
-	RunID   types.RunID  `json:"run_id"`
-	RepoID  types.RepoID `json:"repo_id"`
-	Attempt int32        `json:"attempt"`
+	ID      types.JobID `json:"id"`
+	RunID   types.RunID `json:"run_id"`
+	Attempt int32       `json:"attempt"`
 }
 
 func (q *Queries) ClearRepoSHAChainFromJob(ctx context.Context, arg ClearRepoSHAChainFromJobParams) (int64, error) {
-	result, err := q.db.Exec(ctx, clearRepoSHAChainFromJob,
-		arg.ID,
-		arg.RunID,
-		arg.RepoID,
-		arg.Attempt,
-	)
+	result, err := q.db.Exec(ctx, clearRepoSHAChainFromJob, arg.ID, arg.RunID, arg.Attempt)
 	if err != nil {
 		return 0, err
 	}
@@ -203,37 +192,35 @@ func (q *Queries) CountJobsByRunAndStatus(ctx context.Context, arg CountJobsByRu
 	return count, err
 }
 
-const countJobsByRunRepoAttemptGroupByStatus = `-- name: CountJobsByRunRepoAttemptGroupByStatus :many
+const countJobsByRunAttemptGroupByStatus = `-- name: CountJobsByRunAttemptGroupByStatus :many
 SELECT status, COUNT(*)::int AS count
 FROM jobs
 WHERE run_id = $1
-  AND repo_id = $2
-  AND attempt = $3
+  AND attempt = $2
 GROUP BY status
 `
 
-type CountJobsByRunRepoAttemptGroupByStatusParams struct {
-	RunID   types.RunID  `json:"run_id"`
-	RepoID  types.RepoID `json:"repo_id"`
-	Attempt int32        `json:"attempt"`
+type CountJobsByRunAttemptGroupByStatusParams struct {
+	RunID   types.RunID `json:"run_id"`
+	Attempt int32       `json:"attempt"`
 }
 
-type CountJobsByRunRepoAttemptGroupByStatusRow struct {
+type CountJobsByRunAttemptGroupByStatusRow struct {
 	Status types.JobStatus `json:"status"`
 	Count  int32           `json:"count"`
 }
 
-// Counts jobs by status for a specific repo attempt.
-// Used by repo-scoped terminal detection to determine run_repos.status.
-func (q *Queries) CountJobsByRunRepoAttemptGroupByStatus(ctx context.Context, arg CountJobsByRunRepoAttemptGroupByStatusParams) ([]CountJobsByRunRepoAttemptGroupByStatusRow, error) {
-	rows, err := q.db.Query(ctx, countJobsByRunRepoAttemptGroupByStatus, arg.RunID, arg.RepoID, arg.Attempt)
+// Counts jobs by status for a specific run attempt.
+// Used by terminal detection to determine runs.status.
+func (q *Queries) CountJobsByRunAttemptGroupByStatus(ctx context.Context, arg CountJobsByRunAttemptGroupByStatusParams) ([]CountJobsByRunAttemptGroupByStatusRow, error) {
+	rows, err := q.db.Query(ctx, countJobsByRunAttemptGroupByStatus, arg.RunID, arg.Attempt)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []CountJobsByRunRepoAttemptGroupByStatusRow{}
+	items := []CountJobsByRunAttemptGroupByStatusRow{}
 	for rows.Next() {
-		var i CountJobsByRunRepoAttemptGroupByStatusRow
+		var i CountJobsByRunAttemptGroupByStatusRow
 		if err := rows.Scan(&i.Status, &i.Count); err != nil {
 			return nil, err
 		}
@@ -467,7 +454,7 @@ func (q *Queries) GetJob(ctx context.Context, id types.JobID) (Job, error) {
 	return i, err
 }
 
-const listCreatedJobsByRunRepoAttempt = `-- name: ListCreatedJobsByRunRepoAttempt :many
+const listCreatedJobsByRunAttempt = `-- name: ListCreatedJobsByRunAttempt :many
 SELECT
   id,
   run_id,
@@ -490,18 +477,17 @@ SELECT
   repo_sha_out8,
   meta
 FROM jobs
-WHERE run_id = $1 AND repo_id = $2 AND attempt = $3 AND status = 'Created'
+WHERE run_id = $1 AND attempt = $2 AND status = 'Created'
 ORDER BY id ASC
 `
 
-type ListCreatedJobsByRunRepoAttemptParams struct {
-	RunID   types.RunID  `json:"run_id"`
-	RepoID  types.RepoID `json:"repo_id"`
-	Attempt int32        `json:"attempt"`
+type ListCreatedJobsByRunAttemptParams struct {
+	RunID   types.RunID `json:"run_id"`
+	Attempt int32       `json:"attempt"`
 }
 
-func (q *Queries) ListCreatedJobsByRunRepoAttempt(ctx context.Context, arg ListCreatedJobsByRunRepoAttemptParams) ([]Job, error) {
-	rows, err := q.db.Query(ctx, listCreatedJobsByRunRepoAttempt, arg.RunID, arg.RepoID, arg.Attempt)
+func (q *Queries) ListCreatedJobsByRunAttempt(ctx context.Context, arg ListCreatedJobsByRunAttemptParams) ([]Job, error) {
+	rows, err := q.db.Query(ctx, listCreatedJobsByRunAttempt, arg.RunID, arg.Attempt)
 	if err != nil {
 		return nil, err
 	}
@@ -609,7 +595,7 @@ func (q *Queries) ListJobsByRun(ctx context.Context, runID types.RunID) ([]Job, 
 	return items, nil
 }
 
-const listJobsByRunRepoAttempt = `-- name: ListJobsByRunRepoAttempt :many
+const listJobsByRunAttempt = `-- name: ListJobsByRunAttempt :many
 SELECT
   id,
   run_id,
@@ -632,18 +618,17 @@ SELECT
   repo_sha_out8,
   meta
 FROM jobs
-WHERE run_id = $1 AND repo_id = $2 AND attempt = $3
+WHERE run_id = $1 AND attempt = $2
 ORDER BY id ASC
 `
 
-type ListJobsByRunRepoAttemptParams struct {
-	RunID   types.RunID  `json:"run_id"`
-	RepoID  types.RepoID `json:"repo_id"`
-	Attempt int32        `json:"attempt"`
+type ListJobsByRunAttemptParams struct {
+	RunID   types.RunID `json:"run_id"`
+	Attempt int32       `json:"attempt"`
 }
 
-func (q *Queries) ListJobsByRunRepoAttempt(ctx context.Context, arg ListJobsByRunRepoAttemptParams) ([]Job, error) {
-	rows, err := q.db.Query(ctx, listJobsByRunRepoAttempt, arg.RunID, arg.RepoID, arg.Attempt)
+func (q *Queries) ListJobsByRunAttempt(ctx context.Context, arg ListJobsByRunAttemptParams) ([]Job, error) {
+	rows, err := q.db.Query(ctx, listJobsByRunAttempt, arg.RunID, arg.Attempt)
 	if err != nil {
 		return nil, err
 	}
@@ -759,7 +744,6 @@ func (q *Queries) ListJobsForTUI(ctx context.Context, arg ListJobsForTUIParams) 
 const listStaleRunningJobs = `-- name: ListStaleRunningJobs :many
 SELECT
   jobs.run_id,
-  jobs.repo_id,
   jobs.attempt,
   COUNT(*)::int AS running_jobs
 FROM jobs
@@ -770,19 +754,18 @@ WHERE jobs.status = 'Running'
     OR nodes.last_heartbeat IS NULL
     OR nodes.last_heartbeat < $1
   )
-GROUP BY jobs.run_id, jobs.repo_id, jobs.attempt
-ORDER BY jobs.run_id ASC, jobs.repo_id ASC, jobs.attempt ASC
+GROUP BY jobs.run_id, jobs.attempt
+ORDER BY jobs.run_id ASC, jobs.attempt ASC
 `
 
 type ListStaleRunningJobsRow struct {
-	RunID       types.RunID  `json:"run_id"`
-	RepoID      types.RepoID `json:"repo_id"`
-	Attempt     int32        `json:"attempt"`
-	RunningJobs int32        `json:"running_jobs"`
+	RunID       types.RunID `json:"run_id"`
+	Attempt     int32       `json:"attempt"`
+	RunningJobs int32       `json:"running_jobs"`
 }
 
 // Lists running jobs whose assigned node is stale at the provided cutoff.
-// Rows are grouped by (run_id, repo_id, attempt) for deterministic recovery processing.
+// Rows are grouped by (run_id, attempt) for deterministic recovery processing.
 func (q *Queries) ListStaleRunningJobs(ctx context.Context, lastHeartbeat pgtype.Timestamptz) ([]ListStaleRunningJobsRow, error) {
 	rows, err := q.db.Query(ctx, listStaleRunningJobs, lastHeartbeat)
 	if err != nil {
@@ -792,12 +775,7 @@ func (q *Queries) ListStaleRunningJobs(ctx context.Context, lastHeartbeat pgtype
 	items := []ListStaleRunningJobsRow{}
 	for rows.Next() {
 		var i ListStaleRunningJobsRow
-		if err := rows.Scan(
-			&i.RunID,
-			&i.RepoID,
-			&i.Attempt,
-			&i.RunningJobs,
-		); err != nil {
+		if err := rows.Scan(&i.RunID, &i.Attempt, &i.RunningJobs); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -885,14 +863,12 @@ WITH next_job AS (
   SELECT j.id
   FROM jobs j
   WHERE j.run_id = $1
-    AND j.repo_id = $2
-    AND j.attempt = $3
+    AND j.attempt = $2
     AND j.status = 'Created'
     AND NOT EXISTS (
       SELECT 1
       FROM jobs p
       WHERE p.run_id = j.run_id
-        AND p.repo_id = j.repo_id
         AND p.attempt = j.attempt
         AND p.next_id = j.id
         AND p.status != 'Success'
@@ -930,15 +906,14 @@ RETURNING
 `
 
 type ScheduleNextJobParams struct {
-	RunID   types.RunID  `json:"run_id"`
-	RepoID  types.RepoID `json:"repo_id"`
-	Attempt int32        `json:"attempt"`
+	RunID   types.RunID `json:"run_id"`
+	Attempt int32       `json:"attempt"`
 }
 
-// Atomically promote the next unblocked job in a repo attempt: Created -> Queued.
+// Atomically promote the next unblocked job in a run attempt: Created -> Queued.
 // A created job is unblocked when all predecessor jobs that point to it are Success.
 func (q *Queries) ScheduleNextJob(ctx context.Context, arg ScheduleNextJobParams) (Job, error) {
-	row := q.db.QueryRow(ctx, scheduleNextJob, arg.RunID, arg.RepoID, arg.Attempt)
+	row := q.db.QueryRow(ctx, scheduleNextJob, arg.RunID, arg.Attempt)
 	var i Job
 	err := row.Scan(
 		&i.ID,

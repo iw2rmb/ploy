@@ -407,7 +407,7 @@ func followPullRun(ctx context.Context, baseURL *url.URL, client *http.Client, r
 // executePullDiffs resolves and applies diffs from the run.
 // Reuses the logic from run_pull.go.
 func executePullDiffs(ctx context.Context, httpClient *http.Client, baseURL *url.URL, runID domaintypes.RunID, repoURL, origin string, dryRun bool, stderr io.Writer) error {
-	// Resolve repo execution via POST /v1/runs/{run_id}/repos/resolve.
+	// Resolve repo execution via POST /v1/runs/{run_id}/resolve.
 	pullCmd := climigs.RunPullCommand{
 		Client:  httpClient,
 		BaseURL: baseURL,

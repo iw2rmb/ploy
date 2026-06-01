@@ -12,19 +12,12 @@ info:
     - `/v1/migs` — mig project CRUD (create/list/delete/archive).
     - `/v1/migs/{mig_id}/specs` and `/v1/migs/{mig_id}/specs/latest` — spec management for mig projects.
     - `/v1/migs/{mig_id}/repos` — repo set management (add/list/delete repos).
-    - `/v1/migs/{mig_id}/runs` — create multi-repo batch runs for a mig.
+    - `/v1/migs/{mig_id}/waves` — create a launch wave for a mig.
     - `/v1/migs/{mig_id}/pull` — resolve repo execution for `ploy mig pull`.
     - `/v1/repos/resolve` — expand `namespace/repo[:ref]` shorthand using server-owned GitLab config.
     - `/v1/runs` — single-repo run submission and run listing.
-    - `/v1/runs/{run_id}/*` — run lifecycle (inspect/cancel).
-    - `/v1/runs/{run_id}/repos/{repo_id}/*` — repo-scoped execution surfaces:
-      - `/diffs` — list diffs for a repo execution.
-      - `/logs` — SSE stream of logs/events for a repo execution.
-      - `/artifacts` — list artifact bundles for a repo execution.
-      - `/jobs` — list jobs for a repo execution (for --follow job graph).
-      - `/cancel` — cancel a repo execution within a run.
-      - `/restart` — restart a repo execution within a run.
-    - `/v1/runs/{run_id}/repos/resolve` — resolve a repo URL inside a run for patch application.
+    - `/v1/runs/{run_id}/*` — run lifecycle, pull resolution, logs, diffs, artifacts, jobs, and worker snapshots.
+    - `/v1/waves/{wave_id}/*` — wave inspect, run listing, and wave cancellation.
 
     Type semantics and labels:
     - The server and node use strong domain types in code (e.g., `RepoURL`, `GitRef`, `CommitSHA`, `RunID`, resource units). On the wire these remain JSON strings; run, job, and build IDs are KSUID-backed strings, repo and node IDs use NanoID, and only selected resources (diffs, artifact bundles, API/bootstrap tokens) remain UUID-backed.
@@ -97,8 +90,8 @@ paths:
     $ref: "./paths/migs_mig_id_repos_repo_id.yaml"
   /v1/migs/{mig_id}/repos/bulk:
     $ref: "./paths/migs_mig_id_repos_bulk.yaml"
-  /v1/migs/{mig_id}/runs:
-    $ref: "./paths/migs_mig_id_runs.yaml"
+  /v1/migs/{mig_id}/waves:
+    $ref: "./paths/migs_mig_id_waves.yaml"
   /v1/migs/{mig_id}/pull:
     $ref: "./paths/migs_mig_id_pull.yaml"
   /v1/artifacts:
@@ -160,30 +153,24 @@ paths:
     $ref: "./paths/migs_id.yaml"
   /v1/runs/{run_id}/cancel:
     $ref: "./paths/runs_id_cancel.yaml"
-  /v1/runs/{run_id}/repos:
-    $ref: "./paths/runs_id_repos.yaml"
-  /v1/runs/{run_id}/repos/resolve:
-    $ref: "./paths/runs_id_repos_resolve.yaml"
-  /v1/runs/{run_id}/repos/{repo_id}/restart:
-    $ref: "./paths/runs_id_repos_repo_id_restart.yaml"
-  # Repo-scoped diffs listing — see docs/migs-lifecycle.md § "Pulling Diffs Locally"
-  /v1/runs/{run_id}/repos/{repo_id}/diffs:
-    $ref: "./paths/runs_run_id_repos_repo_id_diffs.yaml"
-  # Repo-scoped logs SSE stream — filters lifecycle events to jobs in this repo
-  /v1/runs/{run_id}/repos/{repo_id}/logs:
-    $ref: "./paths/runs_run_id_repos_repo_id_logs.yaml"
-  # Repo-scoped artifact listing — filters artifacts to jobs in this repo
-  /v1/runs/{run_id}/repos/{repo_id}/artifacts:
-    $ref: "./paths/runs_run_id_repos_repo_id_artifacts.yaml"
-  # Repo-scoped jobs listing — lists jobs for a repo execution
-  /v1/runs/{run_id}/repos/{repo_id}/jobs:
-    $ref: "./paths/runs_run_id_repos_repo_id_jobs.yaml"
-  # Worker-only repo snapshot download for server-owned hydration
-  /v1/runs/{run_id}/repos/{repo_id}/snapshot:
-    $ref: "./paths/runs_run_id_repos_repo_id_snapshot.yaml"
-  # Repo-scoped cancel — cancels a single repo execution within a run
-  /v1/runs/{run_id}/repos/{repo_id}/cancel:
-    $ref: "./paths/runs_run_id_repos_repo_id_cancel.yaml"
+  /v1/runs/{run_id}/resolve:
+    $ref: "./paths/runs_run_id_resolve.yaml"
+  /v1/runs/{run_id}/snapshot:
+    $ref: "./paths/runs_run_id_snapshot.yaml"
+  /v1/runs/{run_id}/diffs:
+    $ref: "./paths/runs_run_id_diffs.yaml"
+  /v1/runs/{run_id}/logs:
+    $ref: "./paths/runs_run_id_logs.yaml"
+  /v1/runs/{run_id}/artifacts:
+    $ref: "./paths/runs_run_id_artifacts.yaml"
+  /v1/runs/{run_id}/jobs:
+    $ref: "./paths/runs_run_id_jobs.yaml"
+  /v1/waves/{wave_id}:
+    $ref: "./paths/waves_wave_id.yaml"
+  /v1/waves/{wave_id}/runs:
+    $ref: "./paths/waves_wave_id_runs.yaml"
+  /v1/waves/{wave_id}/cancel:
+    $ref: "./paths/waves_wave_id_cancel.yaml"
   # Repo-centric endpoints — list repos and show runs for a given repo
   /v1/repos/resolve:
     $ref: "./paths/repos_resolve.yaml"
@@ -247,14 +234,6 @@ components:
       $ref: "./components/schemas/controlplane.yaml#/Run"
     RunSummary:
       $ref: "./components/schemas/controlplane.yaml#/RunSummary"
-    RunRepo:
-      $ref: "./components/schemas/controlplane.yaml#/RunRepo"
-    RunRepoCounts:
-      $ref: "./components/schemas/controlplane.yaml#/RunRepoCounts"
-    RunRepoStatus:
-      $ref: "./components/schemas/controlplane.yaml#/RunRepoStatus"
-    RunBatchDerivedStatus:
-      $ref: "./components/schemas/controlplane.yaml#/RunBatchDerivedStatus"
     CreateRunRequest:
       $ref: "./components/schemas/controlplane.yaml#/CreateRunRequest"
     CreateRunResponse:
@@ -315,7 +294,7 @@ components:
       $ref: "./components/schemas/controlplane.yaml#/BulkUpsertMigReposResponse"
     BulkUpsertError:
       $ref: "./components/schemas/controlplane.yaml#/BulkUpsertError"
-    # Mig run types — POST /v1/migs/{mig_id}/runs
+    # Mig wave types — POST /v1/migs/{mig_id}/waves
     RepoSelectorMode:
       $ref: "./components/schemas/controlplane.yaml#/RepoSelectorMode"
     MigRepoSelector:
@@ -324,7 +303,7 @@ components:
       $ref: "./components/schemas/controlplane.yaml#/CreateMigRunRequest"
     CreateMigRunResponse:
       $ref: "./components/schemas/controlplane.yaml#/CreateMigRunResponse"
-    # Pull resolution types — POST /v1/migs/{mig_id}/pull, POST /v1/runs/{run_id}/repos/resolve
+    # Pull resolution types — POST /v1/migs/{mig_id}/pull, POST /v1/runs/{run_id}/resolve
     PullResolutionMode:
       $ref: "./components/schemas/controlplane.yaml#/PullResolutionMode"
     MigPullRequest:
@@ -336,12 +315,12 @@ components:
     # Single-repo run submission — POST /v1/runs
     CreateSingleRepoRunResponse:
       $ref: "./components/schemas/controlplane.yaml#/CreateSingleRepoRunResponse"
-    # Repo-scoped diff listing — GET /v1/runs/{run_id}/repos/{repo_id}/diffs
+    # Run-scoped diff listing — GET /v1/runs/{run_id}/diffs
     DiffItem:
       $ref: "./components/schemas/controlplane.yaml#/DiffItem"
     DiffListResponse:
       $ref: "./components/schemas/controlplane.yaml#/DiffListResponse"
-    # Repo-scoped jobs listing — GET /v1/runs/{run_id}/repos/{repo_id}/jobs
+    # Run-scoped jobs listing — GET /v1/runs/{run_id}/jobs
     RepoJobItem:
       $ref: "./components/schemas/controlplane.yaml#/RepoJobItem"
     ListRepoJobsResponse:

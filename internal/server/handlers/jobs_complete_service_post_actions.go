@@ -153,7 +153,7 @@ func (s *CompleteJobService) onSuccess(ctx context.Context, state *completeJobSt
 }
 
 func (s *CompleteJobService) reconcileRepoRun(ctx context.Context, state *completeJobState) {
-	repoUpdated, repoErr := recovery.MaybeUpdateRunRepoStatus(ctx, s.store, state.job.RunID, state.job.RepoID, state.job.Attempt)
+	repoUpdated, repoErr := recovery.MaybeUpdateRunStatus(ctx, s.store, state.job.RunID, state.job.Attempt)
 	if repoErr != nil {
 		slog.Error("complete job: failed to check repo completion",
 			"job_id", state.job.ID,

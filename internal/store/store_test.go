@@ -97,53 +97,24 @@ func TestConnectSearchPath(t *testing.T) {
 func TestCreateRun_RoundTrip_V1(t *testing.T) {
 	ctx, db := newTestStore(t)
 
-	createdBy := "test-user"
+	fx := newV1Fixture(t, ctx, db, "https://github.com/org/repo-roundtrip", "main", []byte(`{"type":"test"}`))
 
-	specID := types.NewSpecID()
-	spec, err := db.CreateSpec(ctx, CreateSpecParams{
-		ID:        specID,
-		Name:      "test-spec",
-		Spec:      []byte(`{"type":"test"}`),
-		CreatedBy: &createdBy,
-	})
-	if err != nil {
-		t.Fatalf("CreateSpec() failed: %v", err)
+	if fx.Run.Status != types.RunStatusQueued {
+		t.Fatalf("CreateRun() status=%q, want %q", fx.Run.Status, types.RunStatusQueued)
 	}
 
-	migID := types.NewMigID()
-	_, err = db.CreateMig(ctx, CreateMigParams{
-		ID:        migID,
-		Name:      "test-mig-" + migID.String(),
-		SpecID:    &spec.ID,
-		CreatedBy: &createdBy,
-	})
-	if err != nil {
-		t.Fatalf("CreateMig() failed: %v", err)
-	}
-
-	runID := types.NewRunID()
-	run, err := db.CreateRun(ctx, CreateRunParams{
-		ID:        runID,
-		MigID:     migID,
-		SpecID:    spec.ID,
-		CreatedBy: &createdBy,
-	})
-	if err != nil {
-		t.Fatalf("CreateRun() failed: %v", err)
-	}
-	if run.Status != types.RunStatusStarted {
-		t.Fatalf("CreateRun() status=%q, want %q", run.Status, types.RunStatusStarted)
-	}
-
-	fetched, err := db.GetRun(ctx, run.ID)
+	fetched, err := db.GetRun(ctx, fx.Run.ID)
 	if err != nil {
 		t.Fatalf("GetRun() failed: %v", err)
 	}
-	if fetched.MigID != migID {
-		t.Fatalf("GetRun().mig_id=%q, want %q", fetched.MigID, migID)
+	if fetched.WaveID != fx.Wave.ID {
+		t.Fatalf("GetRun().wave_id=%q, want %q", fetched.WaveID, fx.Wave.ID)
 	}
-	if fetched.SpecID != spec.ID {
-		t.Fatalf("GetRun().spec_id=%q, want %q", fetched.SpecID, spec.ID)
+	if fetched.MigID != fx.Mig.ID {
+		t.Fatalf("GetRun().mig_id=%q, want %q", fetched.MigID, fx.Mig.ID)
+	}
+	if fetched.SpecID != fx.Spec.ID {
+		t.Fatalf("GetRun().spec_id=%q, want %q", fetched.SpecID, fx.Spec.ID)
 	}
 
 	runs, err := db.ListRuns(ctx, ListRunsParams{Limit: 10, Offset: 0})
@@ -152,7 +123,7 @@ func TestCreateRun_RoundTrip_V1(t *testing.T) {
 	}
 	found := false
 	for _, r := range runs {
-		if r.ID == run.ID {
+		if r.ID == fx.Run.ID {
 			found = true
 			break
 		}
@@ -162,248 +133,185 @@ func TestCreateRun_RoundTrip_V1(t *testing.T) {
 	}
 }
 
-func TestCreateRunWithRepos_CreatesRunAndReposAtomically(t *testing.T) {
+func TestCreateWaveWithRuns_CreatesWaveAndRunsAtomically(t *testing.T) {
 	ctx, db := newTestStore(t)
 
-	createdBy := "test-user"
-	specID := types.NewSpecID()
-	spec, err := db.CreateSpec(ctx, CreateSpecParams{
-		ID:        specID,
-		Name:      "test-spec-" + specID.String(),
-		Spec:      []byte(`{"type":"test"}`),
-		CreatedBy: &createdBy,
-	})
-	if err != nil {
-		t.Fatalf("CreateSpec() failed: %v", err)
-	}
-
-	seedMigID := types.NewMigID()
-	if _, err := db.CreateMig(ctx, CreateMigParams{
-		ID:        seedMigID,
-		Name:      "seed-mig-" + seedMigID.String(),
-		SpecID:    &spec.ID,
-		CreatedBy: &createdBy,
-	}); err != nil {
-		t.Fatalf("CreateMig(seed) failed: %v", err)
-	}
-
-	const repoURL = "https://github.com/org/repo-atomic"
-	if _, err := db.CreateMigRepo(ctx, CreateMigRepoParams{
-		ID:      "global01",
-		MigID:   seedMigID,
-		Url:     repoURL,
-		BaseRef: "main",
-	}); err != nil {
-		t.Fatalf("CreateMigRepo(seed) failed: %v", err)
-	}
-
-	migID := types.NewMigID()
-	if _, err := db.CreateMig(ctx, CreateMigParams{
-		ID:        migID,
-		Name:      "atomic-mig-" + migID.String(),
-		SpecID:    &spec.ID,
-		CreatedBy: &createdBy,
-	}); err != nil {
-		t.Fatalf("CreateMig() failed: %v", err)
-	}
-	migRepo, err := db.CreateMigRepo(ctx, CreateMigRepoParams{
-		ID:      "member01",
-		MigID:   migID,
-		Url:     repoURL,
+	fx := newV1Fixture(t, ctx, db, "https://github.com/org/repo-atomic-a", "main", []byte(`{"type":"test"}`))
+	repoB, err := db.CreateMigRepo(ctx, CreateMigRepoParams{
+		ID:      types.NewMigRepoID(),
+		MigID:   fx.Mig.ID,
+		Url:     "https://github.com/org/repo-atomic-b",
 		BaseRef: "main",
 	})
 	if err != nil {
-		t.Fatalf("CreateMigRepo() failed: %v", err)
-	}
-	if migRepo.ID == types.MigRepoID(migRepo.RepoID.String()) {
-		t.Fatalf("test setup requires distinct mig_repo id and repo id, both were %q", migRepo.ID)
+		t.Fatalf("CreateMigRepo(repo-b) failed: %v", err)
 	}
 
-	runID := types.NewRunID()
-	run, repos, err := db.CreateRunWithRepos(ctx, CreateRunWithReposParams{
-		Run: CreateRunParams{
-			ID:        runID,
-			MigID:     migID,
-			SpecID:    spec.ID,
-			CreatedBy: &createdBy,
+	waveID := types.NewWaveID()
+	wave, runs, err := db.CreateWaveWithRuns(ctx, CreateWaveWithRunsParams{
+		Wave: CreateWaveParams{
+			ID:        waveID,
+			MigID:     fx.Mig.ID,
+			SpecID:    fx.Spec.ID,
+			CreatedBy: fx.Run.CreatedBy,
 		},
-		Repos: []CreateRunRepoParams{{
-			MigID:           migID,
-			RunID:           runID,
-			RepoID:          migRepo.RepoID,
-			RepoBaseRef:     "main",
-			SourceCommitSha: "0123456789abcdef0123456789abcdef01234567",
-			RepoSha0:        "0123456789abcdef0123456789abcdef01234567",
-		}},
-	})
-	if err != nil {
-		t.Fatalf("CreateRunWithRepos() failed: %v", err)
-	}
-	if run.ID != runID || len(repos) != 1 || repos[0].RepoID != migRepo.RepoID {
-		t.Fatalf("unexpected CreateRunWithRepos result: run=%+v repos=%+v", run, repos)
-	}
-
-	rollbackRunID := types.NewRunID()
-	_, _, err = db.CreateRunWithRepos(ctx, CreateRunWithReposParams{
-		Run: CreateRunParams{
-			ID:        rollbackRunID,
-			MigID:     migID,
-			SpecID:    spec.ID,
-			CreatedBy: &createdBy,
-		},
-		Repos: []CreateRunRepoParams{
+		Runs: []CreateRunParams{
 			{
-				MigID:           migID,
-				RunID:           rollbackRunID,
-				RepoID:          migRepo.RepoID,
+				ID:              types.NewRunID(),
+				WaveID:          waveID,
+				MigID:           fx.Mig.ID,
+				SpecID:          fx.Spec.ID,
+				RepoID:          fx.MigRepo.RepoID,
 				RepoBaseRef:     "main",
-				SourceCommitSha: "0123456789abcdef0123456789abcdef01234567",
-				RepoSha0:        "0123456789abcdef0123456789abcdef01234567",
+				SourceCommitSha: testSHA,
+				RepoSha0:        testSHA,
 			},
 			{
-				MigID:           migID,
-				RunID:           rollbackRunID,
+				ID:              types.NewRunID(),
+				WaveID:          waveID,
+				MigID:           fx.Mig.ID,
+				SpecID:          fx.Spec.ID,
+				RepoID:          repoB.RepoID,
+				RepoBaseRef:     "main",
+				SourceCommitSha: testSHA,
+				RepoSha0:        testSHA,
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("CreateWaveWithRuns() failed: %v", err)
+	}
+	if wave.ID != waveID || len(runs) != 2 {
+		t.Fatalf("unexpected CreateWaveWithRuns result: wave=%+v runs=%+v", wave, runs)
+	}
+
+	rollbackWaveID := types.NewWaveID()
+	rollbackRunID := types.NewRunID()
+	_, _, err = db.CreateWaveWithRuns(ctx, CreateWaveWithRunsParams{
+		Wave: CreateWaveParams{
+			ID:        rollbackWaveID,
+			MigID:     fx.Mig.ID,
+			SpecID:    fx.Spec.ID,
+			CreatedBy: fx.Run.CreatedBy,
+		},
+		Runs: []CreateRunParams{
+			{
+				ID:              rollbackRunID,
+				WaveID:          rollbackWaveID,
+				MigID:           fx.Mig.ID,
+				SpecID:          fx.Spec.ID,
 				RepoID:          "missing1",
 				RepoBaseRef:     "main",
-				SourceCommitSha: "0123456789abcdef0123456789abcdef01234567",
-				RepoSha0:        "0123456789abcdef0123456789abcdef01234567",
+				SourceCommitSha: testSHA,
+				RepoSha0:        testSHA,
 			},
 		},
 	})
 	if err == nil {
-		t.Fatal("CreateRunWithRepos() with invalid repo unexpectedly succeeded")
+		t.Fatal("CreateWaveWithRuns() with invalid repo unexpectedly succeeded")
+	}
+	if _, err := db.GetWave(ctx, rollbackWaveID); err != pgx.ErrNoRows {
+		t.Fatalf("GetWave(rollback) err = %v, want pgx.ErrNoRows", err)
 	}
 	if _, err := db.GetRun(ctx, rollbackRunID); err != pgx.ErrNoRows {
 		t.Fatalf("GetRun(rollback) err = %v, want pgx.ErrNoRows", err)
 	}
-	rolledBackRepos, err := db.ListRunReposByRun(ctx, rollbackRunID)
-	if err != nil {
-		t.Fatalf("ListRunReposByRun(rollback) failed: %v", err)
-	}
-	if len(rolledBackRepos) != 0 {
-		t.Fatalf("rollback run repos = %d, want 0", len(rolledBackRepos))
-	}
 }
 
-func TestRunRepo_CRUDAndStateTransitions_V1(t *testing.T) {
+func TestRun_CRUDAndStateTransitions_V1(t *testing.T) {
 	ctx, db := newTestStore(t)
 
 	fx := newV1Fixture(t, ctx, db, "https://github.com/org/repo-a", "main", []byte(`{"type":"batch"}`))
 
-	if fx.RunRepo.Status != types.RunRepoStatusQueued {
-		t.Fatalf("CreateRunRepo() status=%q, want %q", fx.RunRepo.Status, types.RunRepoStatusQueued)
+	if fx.Run.Status != types.RunStatusQueued {
+		t.Fatalf("CreateRun() status=%q, want %q", fx.Run.Status, types.RunStatusQueued)
 	}
-	if fx.RunRepo.Attempt != 1 {
-		t.Fatalf("CreateRunRepo() attempt=%d, want 1", fx.RunRepo.Attempt)
-	}
-
-	// Add a second repo for the mig and run.
-	migRepo2ID := types.NewMigRepoID()
-	migRepo2, err := db.CreateMigRepo(ctx, CreateMigRepoParams{
-		ID:      migRepo2ID,
-		MigID:   fx.Mig.ID,
-		Url:     "https://github.com/org/repo-b",
-		BaseRef: "main",
-	})
-	if err != nil {
-		t.Fatalf("CreateMigRepo() for repo-b failed: %v", err)
-	}
-	rr2, err := db.CreateRunRepo(ctx, CreateRunRepoParams{
-		MigID:           fx.Mig.ID,
-		RunID:           fx.Run.ID,
-		RepoID:          migRepo2.RepoID,
-		RepoBaseRef:     "main",
-		SourceCommitSha: "0123456789abcdef0123456789abcdef01234567",
-		RepoSha0:        "0123456789abcdef0123456789abcdef01234567",
-	})
-	if err != nil {
-		t.Fatalf("CreateRunRepo() for repo-b failed: %v", err)
+	if fx.Run.Attempt != 1 {
+		t.Fatalf("CreateRun() attempt=%d, want 1", fx.Run.Attempt)
 	}
 
-	repos, err := db.ListRunReposByRun(ctx, fx.Run.ID)
+	runs, err := db.ListRunsByWave(ctx, fx.Wave.ID)
 	if err != nil {
-		t.Fatalf("ListRunReposByRun() failed: %v", err)
+		t.Fatalf("ListRunsByWave() failed: %v", err)
 	}
-	if len(repos) < 2 {
-		t.Fatalf("expected at least 2 run_repos, got %d", len(repos))
+	if len(runs) != 1 {
+		t.Fatalf("expected 1 run, got %d", len(runs))
 	}
 
-	// Transition repo-b: Queued -> Running -> Success.
-	if err := db.UpdateRunRepoStatus(ctx, UpdateRunRepoStatusParams{
-		RunID:  rr2.RunID,
-		RepoID: rr2.RepoID,
-		Status: types.RunRepoStatusRunning,
+	// Transition run: Queued -> Running -> Success.
+	if err := db.UpdateRunStatus(ctx, UpdateRunStatusParams{
+		ID:     fx.Run.ID,
+		Status: types.RunStatusRunning,
 	}); err != nil {
-		t.Fatalf("UpdateRunRepoStatus() to Running failed: %v", err)
+		t.Fatalf("UpdateRunStatus() to Running failed: %v", err)
 	}
-	updated, err := db.GetRunRepo(ctx, GetRunRepoParams{RunID: rr2.RunID, RepoID: rr2.RepoID})
+	updated, err := db.GetRun(ctx, fx.Run.ID)
 	if err != nil {
-		t.Fatalf("GetRunRepo() failed: %v", err)
+		t.Fatalf("GetRun() failed: %v", err)
 	}
-	if updated.Status != types.RunRepoStatusRunning {
-		t.Fatalf("run_repo status=%q, want %q", updated.Status, types.RunRepoStatusRunning)
+	if updated.Status != types.RunStatusRunning {
+		t.Fatalf("run status=%q, want %q", updated.Status, types.RunStatusRunning)
 	}
 	if !updated.StartedAt.Valid {
-		t.Fatal("expected started_at to be set for Running repo")
+		t.Fatal("expected started_at to be set for Running run")
 	}
-	if err := db.UpdateRunRepoStatus(ctx, UpdateRunRepoStatusParams{
-		RunID:  rr2.RunID,
-		RepoID: rr2.RepoID,
-		Status: types.RunRepoStatusSuccess,
+	if err := db.UpdateRunStatus(ctx, UpdateRunStatusParams{
+		ID:     fx.Run.ID,
+		Status: types.RunStatusSuccess,
 	}); err != nil {
-		t.Fatalf("UpdateRunRepoStatus() to Success failed: %v", err)
+		t.Fatalf("UpdateRunStatus() to Success failed: %v", err)
 	}
-	final, err := db.GetRunRepo(ctx, GetRunRepoParams{RunID: rr2.RunID, RepoID: rr2.RepoID})
+	final, err := db.GetRun(ctx, fx.Run.ID)
 	if err != nil {
-		t.Fatalf("GetRunRepo() failed: %v", err)
+		t.Fatalf("GetRun() failed: %v", err)
 	}
-	if final.Status != types.RunRepoStatusSuccess {
-		t.Fatalf("run_repo status=%q, want %q", final.Status, types.RunRepoStatusSuccess)
+	if final.Status != types.RunStatusSuccess {
+		t.Fatalf("run status=%q, want %q", final.Status, types.RunStatusSuccess)
 	}
 	if !final.FinishedAt.Valid {
-		t.Fatal("expected finished_at to be set for terminal repo")
+		t.Fatal("expected finished_at to be set for terminal run")
 	}
 
-	// Attempt increment resets repo state.
-	if err := db.IncrementRunRepoAttempt(ctx, IncrementRunRepoAttemptParams{RunID: rr2.RunID, RepoID: rr2.RepoID}); err != nil {
-		t.Fatalf("IncrementRunRepoAttempt() failed: %v", err)
+	// Attempt increment resets run state.
+	if err := db.IncrementRunAttempt(ctx, fx.Run.ID); err != nil {
+		t.Fatalf("IncrementRunAttempt() failed: %v", err)
 	}
-	retry, err := db.GetRunRepo(ctx, GetRunRepoParams{RunID: rr2.RunID, RepoID: rr2.RepoID})
+	retry, err := db.GetRun(ctx, fx.Run.ID)
 	if err != nil {
-		t.Fatalf("GetRunRepo() after increment failed: %v", err)
+		t.Fatalf("GetRun() after increment failed: %v", err)
 	}
 	if retry.Attempt != 2 {
 		t.Fatalf("attempt=%d, want 2", retry.Attempt)
 	}
-	if retry.Status != types.RunRepoStatusQueued {
-		t.Fatalf("status=%q, want %q", retry.Status, types.RunRepoStatusQueued)
+	if retry.Status != types.RunStatusQueued {
+		t.Fatalf("status=%q, want %q", retry.Status, types.RunStatusQueued)
 	}
 
 	msg := "boom"
-	if err := db.UpdateRunRepoError(ctx, UpdateRunRepoErrorParams{RunID: rr2.RunID, RepoID: rr2.RepoID, LastError: &msg}); err != nil {
-		t.Fatalf("UpdateRunRepoError() failed: %v", err)
+	if err := db.UpdateRunError(ctx, UpdateRunErrorParams{ID: fx.Run.ID, LastError: &msg}); err != nil {
+		t.Fatalf("UpdateRunError() failed: %v", err)
 	}
-	got, err := db.GetRunRepo(ctx, GetRunRepoParams{RunID: rr2.RunID, RepoID: rr2.RepoID})
+	got, err := db.GetRun(ctx, fx.Run.ID)
 	if err != nil {
-		t.Fatalf("GetRunRepo() after error failed: %v", err)
+		t.Fatalf("GetRun() after error failed: %v", err)
 	}
 	if got.LastError == nil || *got.LastError != msg {
 		t.Fatalf("last_error=%v, want %q", got.LastError, msg)
 	}
 
-	if err := db.DeleteRunRepo(ctx, DeleteRunRepoParams{RunID: rr2.RunID, RepoID: rr2.RepoID}); err != nil {
-		t.Fatalf("DeleteRunRepo() failed: %v", err)
+	if err := db.DeleteRun(ctx, fx.Run.ID); err != nil {
+		t.Fatalf("DeleteRun() failed: %v", err)
 	}
-	_, err = db.GetRunRepo(ctx, GetRunRepoParams{RunID: rr2.RunID, RepoID: rr2.RepoID})
+	_, err = db.GetRun(ctx, fx.Run.ID)
 	if err == nil {
-		t.Fatal("expected GetRunRepo() after delete to fail")
+		t.Fatal("expected GetRun() after delete to fail")
 	}
 	if err != pgx.ErrNoRows {
 		t.Fatalf("expected pgx.ErrNoRows, got %v", err)
 	}
 }
 
-func TestListRunReposWithURLByRun_ReturnsRepoURLAndOrdering_V1(t *testing.T) {
+func TestListRunsWithURLByWave_ReturnsRepoURLAndOrdering_V1(t *testing.T) {
 	ctx, db := newTestStore(t)
 
 	fx := newV1Fixture(t, ctx, db, "https://github.com/org/repo-a", "main", []byte(`{"type":"batch"}`))
@@ -419,24 +327,26 @@ func TestListRunReposWithURLByRun_ReturnsRepoURLAndOrdering_V1(t *testing.T) {
 		t.Fatalf("CreateMigRepo() for repo-b failed: %v", err)
 	}
 
-	_, err = db.CreateRunRepo(ctx, CreateRunRepoParams{
+	_, err = db.CreateRun(ctx, CreateRunParams{
+		ID:              types.NewRunID(),
+		WaveID:          fx.Wave.ID,
 		MigID:           fx.Mig.ID,
-		RunID:           fx.Run.ID,
+		SpecID:          fx.Spec.ID,
 		RepoID:          migRepo2.RepoID,
 		RepoBaseRef:     migRepo2.BaseRef,
-		SourceCommitSha: "0123456789abcdef0123456789abcdef01234567",
-		RepoSha0:        "0123456789abcdef0123456789abcdef01234567",
+		SourceCommitSha: testSHA,
+		RepoSha0:        testSHA,
 	})
 	if err != nil {
-		t.Fatalf("CreateRunRepo() for repo-b failed: %v", err)
+		t.Fatalf("CreateRun() for repo-b failed: %v", err)
 	}
 
-	rows, err := db.ListRunReposWithURLByRun(ctx, fx.Run.ID)
+	rows, err := db.ListRunsWithURLByWave(ctx, fx.Wave.ID)
 	if err != nil {
-		t.Fatalf("ListRunReposWithURLByRun() failed: %v", err)
+		t.Fatalf("ListRunsWithURLByWave() failed: %v", err)
 	}
 	if len(rows) != 2 {
-		t.Fatalf("expected 2 run repos with urls, got %d", len(rows))
+		t.Fatalf("expected 2 runs with urls, got %d", len(rows))
 	}
 
 	expectedURLByRepoID := map[types.RepoID]string{
@@ -446,8 +356,8 @@ func TestListRunReposWithURLByRun_ReturnsRepoURLAndOrdering_V1(t *testing.T) {
 
 	seen := map[types.RepoID]bool{}
 	for i, row := range rows {
-		if row.RunID != fx.Run.ID {
-			t.Fatalf("row[%d] run_id=%q, want %q", i, row.RunID, fx.Run.ID)
+		if row.WaveID != fx.Wave.ID {
+			t.Fatalf("row[%d] wave_id=%q, want %q", i, row.WaveID, fx.Wave.ID)
 		}
 		if row.RepoUrl == "" {
 			t.Fatalf("row[%d] repo_url is empty", i)

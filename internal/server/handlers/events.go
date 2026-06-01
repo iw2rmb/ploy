@@ -287,7 +287,7 @@ func timestampToString(ts pgtype.Timestamptz) string {
 
 // getRunRepoLogsHandler returns an HTTP handler that streams run lifecycle events
 // over SSE, filtered to stages belonging to a specific repo execution.
-// GET /v1/runs/{run_id}/repos/{repo_id}/logs
+// GET /v1/runs/{run_id}/logs
 //
 // Container log frames are not emitted on this stream (logs moved to job-scoped
 // streams). Only run, stage, and done events are returned.

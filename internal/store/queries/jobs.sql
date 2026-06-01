@@ -49,7 +49,7 @@ FROM jobs
 WHERE run_id = $1
 ORDER BY repo_id ASC, attempt ASC, id ASC;
 
--- name: ListJobsByRunRepoAttempt :many
+-- name: ListJobsByRunAttempt :many
 SELECT
   id,
   run_id,
@@ -72,7 +72,7 @@ SELECT
   repo_sha_out8,
   meta
 FROM jobs
-WHERE run_id = $1 AND repo_id = $2 AND attempt = $3
+WHERE run_id = $1 AND attempt = $2
 ORDER BY id ASC;
 
 -- name: CreateJob :one
@@ -143,8 +143,8 @@ SET status = 'Cancelled',
 WHERE run_id = $1
   AND status IN ('Created', 'Queued', 'Running');
 
--- name: CancelActiveJobsByRunRepoAttempt :execrows
--- Bulk-cancels active jobs for a specific repo attempt.
+-- name: CancelActiveJobsByRunAttempt :execrows
+-- Bulk-cancels active jobs for a specific run attempt.
 -- Targets Created/Queued/Running and preserves terminal jobs.
 -- finished_at is set once; duration_ms is computed from started_at when present.
 UPDATE jobs
@@ -155,8 +155,7 @@ SET status = 'Cancelled',
       ELSE GREATEST(EXTRACT(EPOCH FROM (COALESCE(finished_at, now()) - started_at)) * 1000, 0)::BIGINT
     END
 WHERE run_id = $1
-  AND repo_id = $2
-  AND attempt = $3
+  AND attempt = $2
   AND status IN ('Created', 'Queued', 'Running');
 
 -- name: DeleteJob :exec
@@ -181,7 +180,6 @@ WITH eligible AS (
       SELECT 1
       FROM jobs owner
       WHERE owner.run_id = j.run_id
-        AND owner.repo_id = j.repo_id
         AND owner.attempt = j.attempt
         AND owner.node_id IS NOT NULL
         AND owner.node_id != n.id
@@ -215,10 +213,9 @@ WHERE jobs.id = sqlc.arg(id)
 
 -- name: ListStaleRunningJobs :many
 -- Lists running jobs whose assigned node is stale at the provided cutoff.
--- Rows are grouped by (run_id, repo_id, attempt) for deterministic recovery processing.
+-- Rows are grouped by (run_id, attempt) for deterministic recovery processing.
 SELECT
   jobs.run_id,
-  jobs.repo_id,
   jobs.attempt,
   COUNT(*)::int AS running_jobs
 FROM jobs
@@ -229,8 +226,8 @@ WHERE jobs.status = 'Running'
     OR nodes.last_heartbeat IS NULL
     OR nodes.last_heartbeat < $1
   )
-GROUP BY jobs.run_id, jobs.repo_id, jobs.attempt
-ORDER BY jobs.run_id ASC, jobs.repo_id ASC, jobs.attempt ASC;
+GROUP BY jobs.run_id, jobs.attempt
+ORDER BY jobs.run_id ASC, jobs.attempt ASC;
 
 -- name: CountStaleNodesWithRunningJobs :one
 -- Counts distinct stale nodes that currently have at least one running job.
@@ -252,7 +249,7 @@ SELECT
 FROM jobs j1
 WHERE j1.id = $1;
 
--- name: ListCreatedJobsByRunRepoAttempt :many
+-- name: ListCreatedJobsByRunAttempt :many
 SELECT
   id,
   run_id,
@@ -275,24 +272,22 @@ SELECT
   repo_sha_out8,
   meta
 FROM jobs
-WHERE run_id = $1 AND repo_id = $2 AND attempt = $3 AND status = 'Created'
+WHERE run_id = $1 AND attempt = $2 AND status = 'Created'
 ORDER BY id ASC;
 
 -- name: ScheduleNextJob :one
--- Atomically promote the next unblocked job in a repo attempt: Created -> Queued.
+-- Atomically promote the next unblocked job in a run attempt: Created -> Queued.
 -- A created job is unblocked when all predecessor jobs that point to it are Success.
 WITH next_job AS (
   SELECT j.id
   FROM jobs j
   WHERE j.run_id = $1
-    AND j.repo_id = $2
-    AND j.attempt = $3
+    AND j.attempt = $2
     AND j.status = 'Created'
     AND NOT EXISTS (
       SELECT 1
       FROM jobs p
       WHERE p.run_id = j.run_id
-        AND p.repo_id = j.repo_id
         AND p.attempt = j.attempt
         AND p.next_id = j.id
         AND p.status != 'Success'
@@ -391,16 +386,14 @@ WITH RECURSIVE chain AS (
   FROM jobs j
   WHERE j.id = $1
     AND j.run_id = $2
-    AND j.repo_id = $3
-    AND j.attempt = $4
+    AND j.attempt = $3
     AND j.status IN ('Created', 'Queued')
   UNION ALL
   SELECT n.id, n.next_id
   FROM jobs n
   JOIN chain c ON n.id = c.next_id
   WHERE n.run_id = $2
-    AND n.repo_id = $3
-    AND n.attempt = $4
+    AND n.attempt = $3
     AND n.status IN ('Created', 'Queued')
 )
 UPDATE jobs AS j
@@ -492,14 +485,13 @@ SET repo_sha_in = CASE
 FROM completed
 WHERE next_job.id = completed.next_id;
 
--- name: CountJobsByRunRepoAttemptGroupByStatus :many
--- Counts jobs by status for a specific repo attempt.
--- Used by repo-scoped terminal detection to determine run_repos.status.
+-- name: CountJobsByRunAttemptGroupByStatus :many
+-- Counts jobs by status for a specific run attempt.
+-- Used by terminal detection to determine runs.status.
 SELECT status, COUNT(*)::int AS count
 FROM jobs
 WHERE run_id = $1
-  AND repo_id = $2
-  AND attempt = $3
+  AND attempt = $2
 GROUP BY status;
 
 -- name: ListJobsForTUI :many

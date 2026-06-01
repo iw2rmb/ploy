@@ -1,0 +1,6 @@
+post:
+  tags: [Control]
+  summary: Create a launch wave for a mig
+  responses:
+    "201":
+      description: Wave created.

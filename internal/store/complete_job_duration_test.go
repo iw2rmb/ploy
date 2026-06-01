@@ -18,7 +18,7 @@ import (
 func TestCompleteJobDurationNeverNull(t *testing.T) {
 	ctx, db := newTestStore(t)
 
-	// Create v1 fixture (mig, spec, mig_repo, run, run_repo).
+	// Create v1 fixture (mig, spec, mig_repo, run, run).
 	fixture := newV1Fixture(t, ctx, db,
 		"https://github.com/iw2rmb/ploy-duration-test.git",
 		"main",
@@ -32,8 +32,8 @@ func TestCompleteJobDurationNeverNull(t *testing.T) {
 			ID:          jobID,
 			RunID:       fixture.Run.ID,
 			RepoID:      fixture.MigRepo.RepoID,
-			RepoBaseRef: fixture.RunRepo.RepoBaseRef,
-			Attempt:     fixture.RunRepo.Attempt,
+			RepoBaseRef: fixture.Run.RepoBaseRef,
+			Attempt:     fixture.Run.Attempt,
 			Name:        "test-job-completion-1",
 			Status:      types.JobStatusQueued,
 			JobType:     "mig",
@@ -86,8 +86,8 @@ func TestCompleteJobDurationNeverNull(t *testing.T) {
 			ID:          jobID,
 			RunID:       fixture.Run.ID,
 			RepoID:      fixture.MigRepo.RepoID,
-			RepoBaseRef: fixture.RunRepo.RepoBaseRef,
-			Attempt:     fixture.RunRepo.Attempt,
+			RepoBaseRef: fixture.Run.RepoBaseRef,
+			Attempt:     fixture.Run.Attempt,
 			Name:        "test-job-completion-2",
 			Status:      types.JobStatusQueued,
 			JobType:     "mig",
@@ -140,8 +140,8 @@ func TestCompleteJobDurationNeverNull(t *testing.T) {
 			ID:          jobID,
 			RunID:       fixture.Run.ID,
 			RepoID:      fixture.MigRepo.RepoID,
-			RepoBaseRef: fixture.RunRepo.RepoBaseRef,
-			Attempt:     fixture.RunRepo.Attempt,
+			RepoBaseRef: fixture.Run.RepoBaseRef,
+			Attempt:     fixture.Run.Attempt,
 			Name:        "test-job-running-started-at",
 			Status:      types.JobStatusQueued,
 			JobType:     "mig",
@@ -192,8 +192,8 @@ func TestCompleteJobDurationNeverNull(t *testing.T) {
 			ID:          jobID,
 			RunID:       fixture.Run.ID,
 			RepoID:      fixture.MigRepo.RepoID,
-			RepoBaseRef: fixture.RunRepo.RepoBaseRef,
-			Attempt:     fixture.RunRepo.Attempt,
+			RepoBaseRef: fixture.Run.RepoBaseRef,
+			Attempt:     fixture.Run.Attempt,
 			Name:        "test-job-completion-3",
 			Status:      types.JobStatusQueued,
 			JobType:     "mig",

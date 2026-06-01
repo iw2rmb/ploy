@@ -12,7 +12,7 @@
 //     If exactly one mig matches: use it.
 //     If multiple migs match: error with list of matching migs.
 //   - Uses POST /v1/migs/{mig_id}/pull to resolve the run and repo.
-//   - Pulls diffs via GET /v1/runs/{run_id}/repos/{repo_id}/diffs.
+//   - Pulls diffs via GET /v1/runs/{run_id}/diffs.
 package pull
 
 import (
@@ -40,7 +40,7 @@ import (
 //   - Derives repo identity from git remote URL (origin by default)
 //   - Optionally accepts a mig ID/name; if omitted, infers from current repo
 //   - Uses POST /v1/migs/{mig_id}/pull to resolve run execution identifiers
-//   - Pulls diffs via GET /v1/runs/{run_id}/repos/{repo_id}/diffs
+//   - Pulls diffs via GET /v1/runs/{run_id}/diffs
 //
 // Arguments:
 //   - args: remaining arguments after "pull" has been stripped

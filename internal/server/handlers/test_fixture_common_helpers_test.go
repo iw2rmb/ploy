@@ -38,14 +38,20 @@ func listPaged[T any](items []T, offset, limit int32) []T {
 	return items[offset:end]
 }
 
-// defaultRunRepo fills zero-valued result fields from CreateRunRepoParams,
+// defaultRun fills zero-valued result fields from CreateRunParams,
 // matching the defaulting semantics shared by runStore and migStore mocks.
-func defaultRunRepo(result store.RunRepo, params store.CreateRunRepoParams) store.RunRepo {
+func defaultRun(result store.Run, params store.CreateRunParams) store.Run {
+	if result.ID.IsZero() {
+		result.ID = params.ID
+	}
+	if result.WaveID.IsZero() {
+		result.WaveID = params.WaveID
+	}
 	if result.MigID.IsZero() {
 		result.MigID = params.MigID
 	}
-	if result.RunID.IsZero() {
-		result.RunID = params.RunID
+	if result.SpecID.IsZero() {
+		result.SpecID = params.SpecID
 	}
 	if result.RepoID.IsZero() {
 		result.RepoID = params.RepoID
@@ -54,7 +60,7 @@ func defaultRunRepo(result store.RunRepo, params store.CreateRunRepoParams) stor
 		result.RepoBaseRef = params.RepoBaseRef
 	}
 	if result.Status == "" {
-		result.Status = types.RunRepoStatusQueued
+		result.Status = types.RunStatusQueued
 	}
 	if result.Attempt == 0 {
 		result.Attempt = 1
@@ -80,8 +86,7 @@ func defaultMigRepo(result store.MigRepo, id types.MigRepoID, migID types.MigID,
 	return result
 }
 
-// defaultRun fills zero-valued result fields from CreateRunParams.
-func defaultRun(result store.Run, params store.CreateRunParams) store.Run {
+func defaultWave(result store.Wave, params store.CreateWaveParams) store.Wave {
 	if result.ID.IsZero() {
 		result.ID = params.ID
 	}
@@ -90,6 +95,9 @@ func defaultRun(result store.Run, params store.CreateRunParams) store.Run {
 	}
 	if result.SpecID.IsZero() {
 		result.SpecID = params.SpecID
+	}
+	if result.Status == "" {
+		result.Status = types.WaveStatusStarted
 	}
 	result.CreatedBy = params.CreatedBy
 	return result

@@ -11,7 +11,7 @@ import (
 
 // listRunRepoArtifactsHandler lists artifact bundles produced by jobs belonging to a
 // specific repo execution within a run.
-// GET /v1/runs/{run_id}/repos/{repo_id}/artifacts
+// GET /v1/runs/{run_id}/artifacts
 func listRunRepoArtifactsHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		runID, ok := parseRequiredPathIDOrWriteError[domaintypes.RunID](w, r, "run_id")

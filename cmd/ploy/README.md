@@ -127,33 +127,6 @@ ploy mig run java17 --repo https://github.com/org/repo-a.git
 ploy mig run java17 --failed
 ```
 
-### Restart a Repo Within a Batch Run
-
-If a repository job fails or needs reprocessing from a different base ref, use
-`mig run repo restart`:
-
-```bash
-# Restart repo-a with a different base ref (discover repo-id from `ploy run status --json`).
-# Repo IDs are NanoID(8) strings (e.g., "a1b2c3d4").
-ploy mig run repo restart \
-  --repo-id <repo-id> \
-  --base-ref hotfix \
-  my-batch
-```
-
-This re-queues the repository under the same batch without recreating the run.
-
-### Remove a Repo From a Batch Run
-
-To remove a repository from an in-progress batch (e.g., if it was added by mistake):
-
-```bash
-# Repo IDs are NanoID(8) strings (e.g., "a1b2c3d4").
-ploy mig run repo remove \
-  --repo-id <repo-id> \
-  my-batch
-```
-
 ### Mig Workflow Summary
 
 | Command                  | Description                                   |
@@ -161,15 +134,12 @@ ploy mig run repo remove \
 | `mig add --name <name>`  | Create a mig project                          |
 | `mig repo add`           | Add a repository to a mig project             |
 | `mig run <mig>`          | Run a mig project                             |
-| `mig run repo add`       | Attach a repository to an existing batch      |
-| `mig run repo remove`    | Detach a repository from a batch              |
-| `mig run repo restart`   | Re-queue a repo job with optional new base ref |
 | `run apply <run-id>`     | Apply diffs for the current repo from a run   |
 | `run pull <run-id>`      | Download final artifacts for a run            |
 | `mig pull [<mig>]`       | Pull diffs for the current repo from a mig    |
 | `run status --follow`    | Follow run status until terminal              |
 
-See `docs/migs-lifecycle.md` for the relationship between runs, `run_repos`, and jobs.
+See `docs/migs-lifecycle.md` for the relationship between waves, runs, and jobs.
 
 ### Pull Migs Changes Locally
 
@@ -191,7 +161,7 @@ ploy mig pull <mig-id|name>
 **How it works:**
 1. Derives the current repo identity from the git remote (default: `origin`).
 2. Verifies the working tree is clean (no uncommitted changes).
-3. Resolves `(run_id, repo_id)` via `POST /v1/runs/{run_id}/repos/resolve` (or `POST /v1/migs/{mig_id}/pull` for mig-based pull).
+3. Resolves the run via `POST /v1/runs/{run_id}/resolve` (or `POST /v1/migs/{mig_id}/pull` for mig-based pull).
 4. Fetches repo details and verifies local `HEAD` matches the run's `source_commit_sha`.
 5. Downloads and applies all stored Migs diffs via `git apply`.
 

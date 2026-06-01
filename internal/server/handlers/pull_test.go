@@ -32,12 +32,8 @@ func TestPullRunRepoHandler(t *testing.T) {
 			pathRunID: runID.String(),
 			body:      `{"repo_url":"https://github.com/org/repo"}`,
 			setup: func(st *runStore) {
-				st.getRun.val = store.Run{ID: runID, MigID: domaintypes.NewMigID()}
-				st.listRunReposWithURLByRun.val = []store.ListRunReposWithURLByRunRow{{
-					RunID:   runID,
-					RepoID:  repoID,
-					RepoUrl: "https://github.com/org/repo.git",
-				}}
+				st.getRun.val = store.Run{ID: runID, MigID: domaintypes.NewMigID(), RepoID: repoID}
+				st.repoByID = map[domaintypes.RepoID]store.Repo{repoID: {ID: repoID, Url: "https://github.com/org/repo.git"}}
 			},
 			wantStatus: http.StatusOK,
 			verify: func(t *testing.T, st *runStore, rr *httptest.ResponseRecorder) {
@@ -53,10 +49,6 @@ func TestPullRunRepoHandler(t *testing.T) {
 					t.Fatalf("repo_id = %q, want %q", resp.RepoID, repoID)
 				}
 				assertCalled(t, "GetRun", st.getRun.called)
-				assertCalled(t, "ListRunReposWithURLByRun", st.listRunReposWithURLByRun.called)
-				if st.listRunReposWithURLByRun.params != runID.String() {
-					t.Fatalf("ListRunReposWithURLByRun run_id = %q, want %q", st.listRunReposWithURLByRun.params, runID)
-				}
 			},
 		},
 		{
@@ -64,12 +56,8 @@ func TestPullRunRepoHandler(t *testing.T) {
 			pathRunID: runID.String(),
 			body:      `{"repo_url":"https://github.com/org/repo.git"}`,
 			setup: func(st *runStore) {
-				st.getRun.val = store.Run{ID: runID}
-				st.listRunReposWithURLByRun.val = []store.ListRunReposWithURLByRunRow{{
-					RunID:   runID,
-					RepoID:  repoID,
-					RepoUrl: "https://github.com/org/repo",
-				}}
+				st.getRun.val = store.Run{ID: runID, RepoID: repoID}
+				st.repoByID = map[domaintypes.RepoID]store.Repo{repoID: {ID: repoID, Url: "https://github.com/org/repo"}}
 			},
 			wantStatus: http.StatusOK,
 		},
@@ -78,12 +66,8 @@ func TestPullRunRepoHandler(t *testing.T) {
 			pathRunID: runID.String(),
 			body:      `{"repo_url":"https://github.com/org/repo"}`,
 			setup: func(st *runStore) {
-				st.getRun.val = store.Run{ID: runID}
-				st.listRunReposWithURLByRun.val = []store.ListRunReposWithURLByRunRow{{
-					RunID:   runID,
-					RepoID:  repoID,
-					RepoUrl: "https://github.com/org/repo/",
-				}}
+				st.getRun.val = store.Run{ID: runID, RepoID: repoID}
+				st.repoByID = map[domaintypes.RepoID]store.Repo{repoID: {ID: repoID, Url: "https://github.com/org/repo/"}}
 			},
 			wantStatus: http.StatusOK,
 		},
@@ -101,27 +85,10 @@ func TestPullRunRepoHandler(t *testing.T) {
 			pathRunID: runID.String(),
 			body:      `{"repo_url":"https://github.com/org/missing"}`,
 			setup: func(st *runStore) {
-				st.getRun.val = store.Run{ID: runID}
-				st.listRunReposWithURLByRun.val = []store.ListRunReposWithURLByRunRow{{
-					RunID:   runID,
-					RepoID:  repoID,
-					RepoUrl: "https://github.com/org/repo",
-				}}
+				st.getRun.val = store.Run{ID: runID, RepoID: repoID}
+				st.repoByID = map[domaintypes.RepoID]store.Repo{repoID: {ID: repoID, Url: "https://github.com/org/repo"}}
 			},
 			wantStatus: http.StatusNotFound,
-		},
-		{
-			name:      "multiple normalized matches",
-			pathRunID: runID.String(),
-			body:      `{"repo_url":"https://github.com/org/repo"}`,
-			setup: func(st *runStore) {
-				st.getRun.val = store.Run{ID: runID}
-				st.listRunReposWithURLByRun.val = []store.ListRunReposWithURLByRunRow{
-					{RunID: runID, RepoID: domaintypes.NewRepoID(), RepoUrl: "https://github.com/org/repo"},
-					{RunID: runID, RepoID: domaintypes.NewRepoID(), RepoUrl: "https://github.com/org/repo.git"},
-				}
-			},
-			wantStatus: http.StatusConflict,
 		},
 		{name: "missing repo url", pathRunID: runID.String(), body: `{}`, setup: func(*runStore) {}, wantStatus: http.StatusBadRequest},
 		{name: "missing run id", pathRunID: "", body: `{"repo_url":"https://github.com/org/repo"}`, setup: func(*runStore) {}, wantStatus: http.StatusBadRequest},
@@ -131,7 +98,6 @@ func TestPullRunRepoHandler(t *testing.T) {
 			body:      `{"repo_url":"https://github.com/org/repo"}`,
 			setup: func(st *runStore) {
 				st.getRun.val = store.Run{ID: runID}
-				st.listRunReposWithURLByRun.err = errors.New("database error")
 			},
 			wantStatus: http.StatusInternalServerError,
 		},
@@ -164,7 +130,7 @@ func TestPullMigRepoHandler(t *testing.T) {
 		body       string
 		setup      func(*runStore)
 		wantStatus int
-		wantFilter domaintypes.RunRepoStatus
+		wantFilter domaintypes.RunStatus
 		verify     func(*testing.T, *runStore, *httptest.ResponseRecorder)
 	}{
 		{
@@ -172,10 +138,10 @@ func TestPullMigRepoHandler(t *testing.T) {
 			pathMigID:  migID.String(),
 			body:       `{"repo_url":"https://github.com/org/repo"}`,
 			wantStatus: http.StatusOK,
-			wantFilter: domaintypes.RunRepoStatusSuccess,
+			wantFilter: domaintypes.RunStatusSuccess,
 			setup: func(st *runStore) {
 				setupMigPullRepo(st, migID, repoID, "https://github.com/org/repo")
-				st.getLatestRunRepoByMigAndRepoStatus.val = store.GetLatestRunRepoByMigAndRepoStatusRow{
+				st.getLatestRunRepoByMigAndRepoStatus.val = store.GetLatestRunByMigAndRepoStatusRow{
 					RunID:  runID,
 					RepoID: repoID,
 				}
@@ -199,10 +165,10 @@ func TestPullMigRepoHandler(t *testing.T) {
 			pathMigID:  migID.String(),
 			body:       `{"repo_url":"https://github.com/org/repo","mode":"last-failed"}`,
 			wantStatus: http.StatusOK,
-			wantFilter: domaintypes.RunRepoStatusFail,
+			wantFilter: domaintypes.RunStatusFail,
 			setup: func(st *runStore) {
 				setupMigPullRepo(st, migID, repoID, "https://github.com/org/repo")
-				st.getLatestRunRepoByMigAndRepoStatus.val = store.GetLatestRunRepoByMigAndRepoStatusRow{
+				st.getLatestRunRepoByMigAndRepoStatus.val = store.GetLatestRunByMigAndRepoStatusRow{
 					RunID:  runID,
 					RepoID: repoID,
 				}
@@ -213,10 +179,10 @@ func TestPullMigRepoHandler(t *testing.T) {
 			pathMigID:  migID.String(),
 			body:       `{"repo_url":"https://github.com/org/repo"}`,
 			wantStatus: http.StatusOK,
-			wantFilter: domaintypes.RunRepoStatusSuccess,
+			wantFilter: domaintypes.RunStatusSuccess,
 			setup: func(st *runStore) {
 				setupMigPullRepo(st, migID, repoID, "https://github.com/org/repo.git")
-				st.getLatestRunRepoByMigAndRepoStatus.val = store.GetLatestRunRepoByMigAndRepoStatusRow{RunID: runID, RepoID: repoID}
+				st.getLatestRunRepoByMigAndRepoStatus.val = store.GetLatestRunByMigAndRepoStatusRow{RunID: runID, RepoID: repoID}
 			},
 		},
 		{name: "mig not found", pathMigID: migID.String(), body: `{"repo_url":"https://github.com/org/repo"}`, setup: func(st *runStore) { st.getMig.err = pgx.ErrNoRows }, wantStatus: http.StatusNotFound},
@@ -238,7 +204,7 @@ func TestPullMigRepoHandler(t *testing.T) {
 				st.getLatestRunRepoByMigAndRepoStatus.err = pgx.ErrNoRows
 			},
 			wantStatus: http.StatusNotFound,
-			wantFilter: domaintypes.RunRepoStatusSuccess,
+			wantFilter: domaintypes.RunStatusSuccess,
 		},
 		{name: "invalid mode", pathMigID: migID.String(), body: `{"repo_url":"https://github.com/org/repo","mode":"invalid"}`, setup: func(st *runStore) { st.getMig.val = store.Mig{ID: migID} }, wantStatus: http.StatusBadRequest},
 		{name: "missing repo url", pathMigID: migID.String(), body: `{}`, setup: func(*runStore) {}, wantStatus: http.StatusBadRequest},
