@@ -1,9 +1,10 @@
 get:
   tags: [Control]
-  summary: Readiness probe
+  summary: Readiness probe with process identity
   description: |
-    Reports whether the control plane is ready to serve traffic. The readiness
-    check verifies database connectivity.
+    Reports whether the control plane is ready to serve traffic. This legacy
+    probe uses the same readiness contract as `/readyz` and includes the running
+    binary identity plus database schema version metadata.
   security: []
   responses:
     '200':

@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/iw2rmb/ploy/internal/store"
+	iversion "github.com/iw2rmb/ploy/internal/version"
 )
 
 // healthzHandler responds to process liveness probes. It intentionally avoids
@@ -35,14 +36,42 @@ func readyzHandler(st store.Store) http.HandlerFunc {
 			writeJSON(w, http.StatusServiceUnavailable, resp)
 			return
 		}
+
+		resp["db"] = "ok"
+		currentVersion, err := store.CurrentSchemaVersion(r.Context(), pool)
+		if err != nil {
+			resp["status"] = "degraded"
+			resp["db"] = "degraded"
+			schema := schemaHealth()
+			schema["error"] = err.Error()
+			resp["schema"] = schema
+			writeJSON(w, http.StatusServiceUnavailable, resp)
+			return
+		}
+
+		schema := schemaHealth()
+		schema["current_version"] = currentVersion
+		resp["schema"] = schema
 		writeJSON(w, http.StatusOK, resp)
 	}
 }
 
 func healthResponse(status string) map[string]any {
-	resp := map[string]any{"status": status}
+	resp := map[string]any{
+		"status": status,
+		"binary": map[string]string{
+			"version":  iversion.Version,
+			"commit":   iversion.Commit,
+			"built_at": iversion.BuiltAt,
+		},
+		"schema": schemaHealth(),
+	}
 	if id := os.Getenv("PLOY_CLUSTER_ID"); id != "" {
 		resp["cluster_id"] = id
 	}
 	return resp
+}
+
+func schemaHealth() map[string]any {
+	return map[string]any{"target_version": store.SchemaVersion}
 }

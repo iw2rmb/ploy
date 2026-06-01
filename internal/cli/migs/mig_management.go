@@ -38,12 +38,7 @@ type AddMigCommand struct {
 }
 
 // AddMigResult contains the response from creating a mig.
-type AddMigResult struct {
-	ID        types.MigID   `json:"id"`
-	Name      string        `json:"name"`
-	SpecID    *types.SpecID `json:"spec_id,omitempty"`
-	CreatedAt time.Time     `json:"created_at"`
-}
+type AddMigResult = domainapi.MigSummary
 
 // Run executes POST /v1/migs to create a mig project.
 func (c AddMigCommand) Run(ctx context.Context) (AddMigResult, error) {

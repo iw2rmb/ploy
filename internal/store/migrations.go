@@ -157,6 +157,11 @@ func getCurrentVersion(ctx context.Context, pool *pgxpool.Pool) (int64, error) {
 	return version, nil
 }
 
+// CurrentSchemaVersion returns the highest schema version applied to the database.
+func CurrentSchemaVersion(ctx context.Context, pool *pgxpool.Pool) (int64, error) {
+	return getCurrentVersion(ctx, pool)
+}
+
 // recordMigration inserts a migration version into schema_version within a transaction.
 func recordMigration(ctx context.Context, tx pgx.Tx, version int64) error {
 	_, err := tx.Exec(ctx, `INSERT INTO ploy.schema_version (version, applied_at) VALUES ($1, now())`, version)

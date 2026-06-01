@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -45,11 +46,27 @@ func TestHealthProbeHandlers(t *testing.T) {
 			rr := doRequest(t, tt.handler, http.MethodGet, tt.path, nil)
 			assertStatus(t, rr, tt.wantCode)
 
-			body := decodeBody[map[string]string](t, rr)
+			body := decodeBody[map[string]any](t, rr)
 			for key, want := range tt.wantFields {
-				if body[key] != want {
-					t.Fatalf("%s = %q, want %q", key, body[key], want)
+				if got, ok := body[key].(string); !ok || got != want {
+					t.Fatalf("%s = %#v, want %q", key, body[key], want)
 				}
+			}
+
+			binary, ok := body["binary"].(map[string]any)
+			if !ok {
+				t.Fatalf("binary = %#v, want object", body["binary"])
+			}
+			if binary["version"] == "" || binary["commit"] == "" {
+				t.Fatalf("binary identity is incomplete: %#v", binary)
+			}
+
+			schema, ok := body["schema"].(map[string]any)
+			if !ok {
+				t.Fatalf("schema = %#v, want object", body["schema"])
+			}
+			if got := int64(schema["target_version"].(float64)); got != store.SchemaVersion {
+				t.Fatalf("schema.target_version = %d, want %d", got, store.SchemaVersion)
 			}
 		})
 	}
