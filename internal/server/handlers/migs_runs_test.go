@@ -224,7 +224,7 @@ func TestMigRuns_Create(t *testing.T) {
 				}
 			}
 			handler := createMigRunHandler(st, gitauth.Options{})
-			rr := doRequest(t, handler, http.MethodPost, "/v1/migs/mig123/runs", tt.body, "mig_id", "mig123")
+			rr := doRequest(t, handler, http.MethodPost, "/v1/migs/mig123/waves", tt.body, "mig_id", "mig123")
 			assertStatus(t, rr, tt.wantStatus)
 			if tt.verify != nil {
 				tt.verify(t, st, rr)
@@ -243,7 +243,7 @@ func TestMigRuns_Create_RejectsWhenSourceCommitSeedFails(t *testing.T) {
 
 	body, _ := json.Marshal(allReposSelector())
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/migs/mig123/runs", bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/v1/migs/mig123/waves", bytes.NewReader(body))
 	req.SetPathValue("mig_id", "mig123")
 	req.Header.Set("Content-Type", "application/json")
 	req = req.WithContext(withSourceCommitSHAResolver(req.Context(), func(_ context.Context, _, _ string) (string, error) {

@@ -11,13 +11,4 @@ get:
       content:
         application/json:
           schema:
-            type: object
-            required: [status]
-            additionalProperties: false
-            properties:
-              status:
-                type: string
-                enum: [ok]
-              cluster_id:
-                type: string
-                description: Cluster identifier when PLOY_CLUSTER_ID is set.
+            $ref: "../components/schemas/controlplane.yaml#/ControlPlaneLivenessHealth"

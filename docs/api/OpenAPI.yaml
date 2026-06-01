@@ -4,8 +4,8 @@ info:
   version: "1.0.0"
   description: |
     REST surface exposed by the Ploy control-plane `ployd` deployment. Control
-    routes require authentication, while `/healthz` and `/readyz` are unauthenticated
-    probe endpoints. The server supports both mutual TLS and JWT bearer tokens
+    routes require authentication, while `/health`, `/healthz`, and `/readyz`
+    are unauthenticated probe endpoints. The server supports both mutual TLS and JWT bearer tokens
     (`Authorization: Bearer ...`) depending on client and deployment.
 
     v1 API surfaces:
@@ -43,6 +43,8 @@ security:
   - bearerAuth: []
   - mtls: []
 paths:
+  /health:
+    $ref: "./paths/health.yaml"
   /healthz:
     $ref: "./paths/healthz.yaml"
   /readyz:

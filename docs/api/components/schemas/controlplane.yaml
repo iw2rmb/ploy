@@ -1,4 +1,74 @@
 # RunExecutionStatus defines the lifecycle state for one repository execution.
+ControlPlaneBinaryHealth:
+  type: object
+  additionalProperties: false
+  description: Build identity for the running ployd binary.
+  properties:
+    version:
+      type: string
+      description: Version stamped into the binary at build time.
+    commit:
+      type: string
+      description: Git commit stamped into the binary at build time.
+    built_at:
+      type: string
+      description: UTC build timestamp stamped into the binary.
+  required: [version, commit, built_at]
+
+ControlPlaneSchemaHealth:
+  type: object
+  additionalProperties: false
+  description: Database schema version metadata known to this control-plane binary.
+  properties:
+    target_version:
+      type: integer
+      format: int64
+      description: Schema version expected by the running binary.
+    current_version:
+      type: integer
+      format: int64
+      description: Highest schema version applied in the connected database.
+    error:
+      type: string
+      description: Schema-version lookup error when readiness is degraded.
+  required: [target_version]
+
+ControlPlaneLivenessHealth:
+  type: object
+  additionalProperties: false
+  properties:
+    status:
+      type: string
+      enum: [ok]
+    cluster_id:
+      type: string
+      description: Cluster identifier when PLOY_CLUSTER_ID is set.
+    binary:
+      $ref: "#/ControlPlaneBinaryHealth"
+    schema:
+      $ref: "#/ControlPlaneSchemaHealth"
+  required: [status, binary, schema]
+
+ControlPlaneReadinessHealth:
+  type: object
+  additionalProperties: false
+  properties:
+    status:
+      type: string
+      enum: [ok, degraded]
+    db:
+      type: string
+      enum: [ok, unreachable, degraded]
+      description: Database readiness state for traffic-serving endpoints.
+    cluster_id:
+      type: string
+      description: Cluster identifier when PLOY_CLUSTER_ID is set.
+    binary:
+      $ref: "#/ControlPlaneBinaryHealth"
+    schema:
+      $ref: "#/ControlPlaneSchemaHealth"
+  required: [status, db, binary, schema]
+
 RunExecutionStatus:
   type: string
   description: |
