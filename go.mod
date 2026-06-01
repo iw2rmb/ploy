@@ -10,8 +10,8 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.9.2
-	// KSUID for time-sortable, globally unique identifiers (runs, jobs, builds).
-	// NanoID for compact, human-friendly identifiers (run repos, node keys).
+	// KSUID for time-sortable, globally unique identifiers (waves, runs, jobs).
+	// NanoID for compact, human-friendly identifiers (migs, repos, node keys).
 	github.com/matoous/go-nanoid/v2 v2.1.0
 	// Docker Engine v29 SDK modules (moby). Worker nodes require Docker Engine v29.0+.
 	// See docs/envs/README.md for environment and engine requirements.
