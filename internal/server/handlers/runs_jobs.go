@@ -22,18 +22,14 @@ func listRunJobsHandler(st store.Store) http.HandlerFunc {
 		if !ok {
 			return
 		}
-		repoID, ok := runRepoIDFromPathOrRun(w, r, st, runID)
-		if !ok {
-			return
-		}
 
-		rr, ok := getRunOrRepoMismatchOrFail(w, r, st, runID, repoID, "list run jobs")
+		run, ok := getRunOrFail(w, r, st, runID, "list run jobs")
 		if !ok {
 			return
 		}
 
 		// Use attempt from query param if provided, otherwise use current attempt.
-		attempt := rr.Attempt
+		attempt := run.Attempt
 		if q := r.URL.Query().Get("attempt"); q != "" {
 			parsed, err := strconv.ParseInt(q, 10, 32)
 			if err != nil {
@@ -43,7 +39,7 @@ func listRunJobsHandler(st store.Store) http.HandlerFunc {
 			attempt = int32(parsed)
 		}
 
-		jobs, ok := listJobsForRunAttemptOrFail(w, r, st, runID, repoID, attempt, "list run jobs")
+		jobs, ok := listJobsForRunAttemptOrFail(w, r, st, runID, attempt, "list run jobs")
 		if !ok {
 			return
 		}
@@ -55,7 +51,7 @@ func listRunJobsHandler(st store.Store) http.HandlerFunc {
 
 		resp := migsapi.ListRunJobsResponse{
 			RunID:   runID,
-			RepoID:  repoID,
+			RepoID:  run.RepoID,
 			Attempt: attempt,
 			Jobs:    make([]migsapi.RunJob, 0, len(jobs)),
 		}

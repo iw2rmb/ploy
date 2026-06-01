@@ -8,8 +8,8 @@ import (
 	"io"
 	"sync"
 
-	containertypes "github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/pkg/stdcopy"
+	containertypes "github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
 
 	"github.com/iw2rmb/ploy/internal/workflow/step"

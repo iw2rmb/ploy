@@ -36,7 +36,6 @@ func TestSmokeWorkflow_EndToEnd(t *testing.T) {
 	}`)
 	fixture := newV1RunFixture(t, ctx, db, "https://github.com/example/smoke-workflow", "main", migSpec)
 	run := fixture.Run
-	runRepo := fixture.Run
 
 	t.Logf("✓ Created run: id=%v, status=%s", run.ID, run.Status)
 
@@ -45,9 +44,9 @@ func TestSmokeWorkflow_EndToEnd(t *testing.T) {
 	jobBuildGate, err := db.CreateJob(ctx, store.CreateJobParams{
 		ID:          domaintypes.NewJobID(),
 		RunID:       run.ID,
-		RepoID:      runRepo.RepoID,
-		RepoBaseRef: runRepo.RepoBaseRef,
-		Attempt:     runRepo.Attempt,
+		RepoID:      run.RepoID,
+		RepoBaseRef: run.RepoBaseRef,
+		Attempt:     run.Attempt,
 		Name:        "build-gate",
 		Status:      domaintypes.JobStatusRunning,
 		JobType:     domaintypes.JobTypePreGate,
@@ -64,9 +63,9 @@ func TestSmokeWorkflow_EndToEnd(t *testing.T) {
 	jobMain, err := db.CreateJob(ctx, store.CreateJobParams{
 		ID:          domaintypes.NewJobID(),
 		RunID:       run.ID,
-		RepoID:      runRepo.RepoID,
-		RepoBaseRef: runRepo.RepoBaseRef,
-		Attempt:     runRepo.Attempt,
+		RepoID:      run.RepoID,
+		RepoBaseRef: run.RepoBaseRef,
+		Attempt:     run.Attempt,
 		Name:        "main",
 		Status:      domaintypes.JobStatusCreated,
 		JobType:     domaintypes.JobTypeMig,
@@ -83,9 +82,9 @@ func TestSmokeWorkflow_EndToEnd(t *testing.T) {
 	jobPost, err := db.CreateJob(ctx, store.CreateJobParams{
 		ID:          domaintypes.NewJobID(),
 		RunID:       run.ID,
-		RepoID:      runRepo.RepoID,
-		RepoBaseRef: runRepo.RepoBaseRef,
-		Attempt:     runRepo.Attempt,
+		RepoID:      run.RepoID,
+		RepoBaseRef: run.RepoBaseRef,
+		Attempt:     run.Attempt,
 		Name:        "post-process",
 		Status:      domaintypes.JobStatusCreated,
 		JobType:     domaintypes.JobTypePostGate,
@@ -363,6 +362,6 @@ index abc1234..def5678 100644
 // TestSmokeWorkflow_HealingDiffs validates that healing diffs with job_type and next_id
 // are correctly stored and retrieved alongside mig diffs.
 // This test verifies the unified job+diff model where both mig and healing diffs
-// are exposed through the repo-scoped diff listing.
+// are exposed through the run diff listing.
 //
 // Requires: PLOY_TEST_DB_DSN environment variable.

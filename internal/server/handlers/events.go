@@ -297,22 +297,13 @@ func getRunLogsHandler(st store.Store, _ blobstore.Store, eventsService *events.
 		if !ok {
 			return
 		}
-		repoID, ok := runRepoIDFromPathOrRun(w, r, st, runID)
+
+		run, ok := getRunOrFail(w, r, st, runID, "get run logs")
 		if !ok {
 			return
 		}
 
-		rr, ok := getRunOrRepoMismatchOrFail(w, r, st, runID, repoID, "get run repo logs")
-		if !ok {
-			return
-		}
-
-		run, ok := getRunOrFail(w, r, st, runID, "get run repo logs")
-		if !ok {
-			return
-		}
-
-		jobs, ok := listJobsForRunAttemptOrFail(w, r, st, runID, repoID, rr.Attempt, "get run repo logs")
+		jobs, ok := listJobsForRunAttemptOrFail(w, r, st, runID, run.Attempt, "get run logs")
 		if !ok {
 			return
 		}
@@ -342,7 +333,7 @@ func getRunLogsHandler(st store.Store, _ blobstore.Store, eventsService *events.
 
 		if err := logstream.ServeFiltered(w, r, hub, runID, sinceID, filter); err != nil {
 			if !errors.Is(err, context.Canceled) {
-				slog.Error("stream run repo logs", "run_id", runID.String(), "repo_id", repoID.String(), "err", err)
+				slog.Error("stream run logs", "run_id", runID.String(), "repo_id", run.RepoID.String(), "err", err)
 			}
 		}
 	}

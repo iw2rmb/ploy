@@ -14,13 +14,12 @@ import (
 )
 
 type claimJobFixtureOptions struct {
-	jobType       domaintypes.JobType
-	jobName       string
-	runStatus     domaintypes.RunStatus
-	runRepoStatus domaintypes.RunStatus
-	specJSON      []byte
-	jobMeta       []byte
-	jobImage      string
+	jobType   domaintypes.JobType
+	jobName   string
+	runStatus domaintypes.RunStatus
+	specJSON  []byte
+	jobMeta   []byte
+	jobImage  string
 }
 
 type claimJobFixture struct {
@@ -57,8 +56,8 @@ func newClaimJobFixture(t testing.TB, opts claimJobFixtureOptions) *claimJobFixt
 	if opts.runStatus == "" {
 		opts.runStatus = domaintypes.RunStatusQueued
 	}
-	if opts.runRepoStatus == "" {
-		opts.runRepoStatus = domaintypes.RunStatusQueued
+	if opts.runStatus == "" {
+		opts.runStatus = domaintypes.RunStatusQueued
 	}
 	if len(opts.specJSON) == 0 {
 		opts.specJSON = []byte(`{"steps":[{"image":"a"}]}`)

@@ -36,7 +36,7 @@ func resolveMigInFromClaimEntries(
 		Attempt: job.Attempt,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("list run repo jobs: %w", err)
+		return nil, fmt.Errorf("list run jobs: %w", err)
 	}
 	jobIndex := buildInFromSourceJobIndex(jobs)
 

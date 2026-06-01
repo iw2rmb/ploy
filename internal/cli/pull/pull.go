@@ -417,15 +417,15 @@ func executePullDiffs(ctx context.Context, httpClient *http.Client, baseURL *url
 		return fmt.Errorf("pull: resolve repo: %w", err)
 	}
 	if domaintypes.NormalizeRepoURL(resolution.RepoURL) != domaintypes.NormalizeRepoURL(repoURL) {
-		return fmt.Errorf("pull: local origin %s does not match run repo_url %s", repoURL, resolution.RepoURL)
+		return fmt.Errorf("pull: local origin %s does not match run metadata repo_url %s", repoURL, resolution.RepoURL)
 	}
 
 	_, _ = fmt.Fprintf(stderr, "  repo ID: %s\n", resolution.RepoID.String())
 
-	// Fetch repo details to validate the local source commit.
-	repoDetails, err := fetchRunRepoDetails(ctx, httpClient, baseURL, runID, resolution.RepoID)
+	// Fetch run details to validate the local source commit.
+	repoDetails, err := fetchRunDetails(ctx, httpClient, baseURL, runID)
 	if err != nil {
-		return fmt.Errorf("pull: fetch repo details: %w", err)
+		return fmt.Errorf("pull: fetch run details: %w", err)
 	}
 
 	baseRef := strings.TrimSpace(repoDetails.BaseRef)

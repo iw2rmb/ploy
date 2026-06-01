@@ -102,12 +102,12 @@ func newRunJobsFixture(t *testing.T, metaJSON string) (*runStore, http.Handler, 
 	jobID := domaintypes.NewJobID()
 
 	st := &runStore{}
-	st.getRunRepo.vals = []store.Run{{
+	st.getRunSeq.vals = []store.Run{{
 		ID:      runID,
 		RepoID:  repoID,
 		Attempt: 1,
 	}}
-	st.listJobsByRunRepoAttempt.val = []store.Job{
+	st.listJobsByRunAttempt.val = []store.Job{
 		{
 			ID:      jobID,
 			RunID:   runID,
@@ -192,7 +192,7 @@ func newJobFixture(jobType domaintypes.JobType) jobTestFixture {
 }
 
 // newRepoScopedFixture creates a job fixture pre-configured with a repo ID,
-// base ref "main", and attempt 1 — the common setup for repo-scoped tests.
+// base ref "main", and attempt 1 — the common setup for run-scoped tests.
 func newRepoScopedFixture(jobType domaintypes.JobType) jobTestFixture {
 	f := newJobFixture(jobType)
 	f.Job.RepoID = domaintypes.NewRepoID()
@@ -246,11 +246,11 @@ func newJobStoreForFixture(f jobTestFixture, opts ...func(*jobStore)) *jobStore 
 }
 
 func withRepoAttemptJobs(jobs []store.Job) func(*jobStore) {
-	return func(st *jobStore) { st.listJobsByRunRepoAttempt.val = jobs }
+	return func(st *jobStore) { st.listJobsByRunAttempt.val = jobs }
 }
 
 func withRunStatusCounts(rows []store.CountRunsByWaveStatusRow) func(*jobStore) {
-	return func(st *jobStore) { st.countRunReposByStatus.val = rows }
+	return func(st *jobStore) { st.countRunsByStatus.val = rows }
 }
 
 func withSpec(specID domaintypes.SpecID, specBytes []byte) func(*jobStore) {
@@ -403,14 +403,14 @@ func assertNoCompletion(t *testing.T, st *jobStore) {
 func assertRepoError(t *testing.T, st *jobStore, runID domaintypes.RunID, repoID domaintypes.RepoID, substrings ...string) {
 	t.Helper()
 	_ = repoID
-	assertCalled(t, "UpdateRunError", st.updateRunRepoError.called)
-	if st.updateRunRepoError.params.ID != runID {
-		t.Fatalf("expected RunID %s, got %s", runID, st.updateRunRepoError.params.ID)
+	assertCalled(t, "UpdateRunError", st.updateRunError.called)
+	if st.updateRunError.params.ID != runID {
+		t.Fatalf("expected RunID %s, got %s", runID, st.updateRunError.params.ID)
 	}
-	if st.updateRunRepoError.params.LastError == nil {
+	if st.updateRunError.params.LastError == nil {
 		t.Fatal("expected LastError to be set")
 	}
-	msg := *st.updateRunRepoError.params.LastError
+	msg := *st.updateRunError.params.LastError
 	for _, want := range substrings {
 		if !strings.Contains(msg, want) {
 			t.Errorf("expected error to contain %q, got: %s", want, msg)

@@ -275,7 +275,7 @@ func TestRunController_reportTerminalStatus_PreservesSharedArtifactsOnTerminalSu
 
 	runID := types.NewRunID()
 	repoID := types.NewMigRepoID()
-	shareDir := runRepoSharedArtifactsDir(runID, repoID)
+	shareDir := runSharedArtifactsDir(runID)
 	if err := os.MkdirAll(shareDir, 0o755); err != nil {
 		t.Fatalf("mkdir share dir: %v", err)
 	}

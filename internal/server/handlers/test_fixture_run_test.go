@@ -10,7 +10,7 @@ import (
 )
 
 // runStore is a focused mock for run listing/timing/delete, batch operations,
-// pull resolution, ingest, events, and run-repo-jobs handler tests.
+// pull resolution, ingest, events, and run job handler tests.
 type runStore struct {
 	store.Store
 
@@ -28,24 +28,24 @@ type runStore struct {
 
 	updateRunStatus mockCall[store.UpdateRunStatusParams, struct{}]
 
-	// Run repo queries
-	countRunReposByStatus    mockResult[[]store.CountRunsByWaveStatusRow]
-	listRunReposByRun        mockCall[string, []store.Run]
-	listRunReposWithURLByRun mockCall[string, []store.ListRunsWithURLByWaveRow]
+	// Run queries
+	countRunsByStatus     mockResult[[]store.CountRunsByWaveStatusRow]
+	listRunsByWave        mockCall[string, []store.Run]
+	listRunsWithURLByWave mockCall[string, []store.ListRunsWithURLByWaveRow]
 
-	getLatestRunRepoByMigAndRepoStatus mockCall[store.GetLatestRunByMigAndRepoStatusParams, store.GetLatestRunByMigAndRepoStatusRow]
+	getLatestRunByMigAndRepoStatus mockCall[store.GetLatestRunByMigAndRepoStatusParams, store.GetLatestRunByMigAndRepoStatusRow]
 
-	listQueuedRunReposByRun mockCall[string, []store.Run]
+	listQueuedRunsByWave mockCall[string, []store.Run]
 
-	getRunRepo mockCallSeq[types.RunID, store.Run]
+	getRunSeq mockCallSeq[types.RunID, store.Run]
 
-	updateRunRepoBaseRef    mockCall[store.UpdateRunBaseRefParams, struct{}]
-	updateMigRepoBaseRef    mockCall[store.UpdateMigRepoBaseRefParams, struct{}]
-	incrementRunRepoAttempt mockCall[types.RunID, struct{}]
-	updateRunRepoError      mockCall[store.UpdateRunErrorParams, struct{}]
+	updateRunBaseRef     mockCall[store.UpdateRunBaseRefParams, struct{}]
+	updateMigRepoBaseRef mockCall[store.UpdateMigRepoBaseRefParams, struct{}]
+	incrementRunAttempt  mockCall[types.RunID, struct{}]
+	updateRunError       mockCall[store.UpdateRunErrorParams, struct{}]
 
-	// Create run repo (for batch add)
-	createRunRepo mockCall[store.CreateRunParams, store.Run]
+	// Create run (for batch add)
+	createRun mockCall[store.CreateRunParams, store.Run]
 
 	// Mig repo (for batch operations and pull)
 	createMigRepo mockCall[store.CreateMigRepoParams, store.MigRepo]
@@ -61,14 +61,14 @@ type runStore struct {
 	// Spec (for batch scheduler)
 	getSpec mockCall[string, store.Spec]
 
-	// Job (for batch, ingest, and run-repo-jobs)
+	// Job (for batch, ingest, and run jobs)
 	getJob mockCall[types.JobID, store.Job]
 
 	createJob mockCallSlice[store.CreateJobParams, store.Job]
 
 	scheduleNextJob mockCall[store.ScheduleNextJobParams, store.Job]
 
-	listJobsByRunRepoAttempt       mockCall[store.ListJobsByRunAttemptParams, []store.Job]
+	listJobsByRunAttempt           mockCall[store.ListJobsByRunAttemptParams, []store.Job]
 	listArtifactBundlesByRunAndJob mockCall[store.ListArtifactBundlesByRunAndJobParams, []store.ArtifactBundle]
 
 	// Ingest (logs, diffs, artifacts)
@@ -88,13 +88,13 @@ type runStore struct {
 // Run query methods
 
 func (m *runStore) GetRun(ctx context.Context, id types.RunID) (store.Run, error) {
-	if len(m.getRunRepo.vals) > 0 || len(m.getRunRepo.errs) > 0 {
-		return m.getRunRepo.record(id)
+	if len(m.getRunSeq.vals) > 0 || len(m.getRunSeq.errs) > 0 {
+		return m.getRunSeq.record(id)
 	}
 	return m.getRun.record(id.String())
 }
 
-func (m *runStore) GetWave(ctx context.Context, id types.WaveID) (store.Wave, error) {
+func (m *runStore) GetWave(_ context.Context, id types.WaveID) (store.Wave, error) {
 	return m.getWave.record(id.String())
 }
 
@@ -132,44 +132,44 @@ func (m *runStore) UpdateRunStatus(ctx context.Context, params store.UpdateRunSt
 // Run repo methods
 
 func (m *runStore) CountRunsByWaveStatus(ctx context.Context, waveID types.WaveID) ([]store.CountRunsByWaveStatusRow, error) {
-	return m.countRunReposByStatus.ret()
+	return m.countRunsByStatus.ret()
 }
 
 func (m *runStore) ListRunsByWave(ctx context.Context, waveID types.WaveID) ([]store.Run, error) {
-	return m.listRunReposByRun.record(waveID.String())
+	return m.listRunsByWave.record(waveID.String())
 }
 
 func (m *runStore) ListRunsWithURLByWave(ctx context.Context, waveID types.WaveID) ([]store.ListRunsWithURLByWaveRow, error) {
-	return m.listRunReposWithURLByRun.record(waveID.String())
+	return m.listRunsWithURLByWave.record(waveID.String())
 }
 
 func (m *runStore) GetLatestRunByMigAndRepoStatus(ctx context.Context, arg store.GetLatestRunByMigAndRepoStatusParams) (store.GetLatestRunByMigAndRepoStatusRow, error) {
-	return m.getLatestRunRepoByMigAndRepoStatus.record(arg)
+	return m.getLatestRunByMigAndRepoStatus.record(arg)
 }
 
 func (m *runStore) ListQueuedRunsByWave(ctx context.Context, waveID types.WaveID) ([]store.Run, error) {
-	return m.listQueuedRunReposByRun.record(waveID.String())
+	return m.listQueuedRunsByWave.record(waveID.String())
 }
 
 func (m *runStore) UpdateRunBaseRef(ctx context.Context, params store.UpdateRunBaseRefParams) error {
-	_, err := m.updateRunRepoBaseRef.record(params)
+	_, err := m.updateRunBaseRef.record(params)
 	return err
 }
 
 func (m *runStore) UpdateRunError(ctx context.Context, params store.UpdateRunErrorParams) error {
-	_, err := m.updateRunRepoError.record(params)
+	_, err := m.updateRunError.record(params)
 	return err
 }
 
 func (m *runStore) CreateRun(ctx context.Context, params store.CreateRunParams) (store.Run, error) {
-	result := defaultRun(m.createRunRepo.val, params)
-	m.createRunRepo.val = result
-	_, err := m.createRunRepo.record(params)
+	result := defaultRun(m.createRun.val, params)
+	m.createRun.val = result
+	_, err := m.createRun.record(params)
 	return result, err
 }
 
 func (m *runStore) IncrementRunAttempt(ctx context.Context, arg types.RunID) error {
-	_, err := m.incrementRunRepoAttempt.record(arg)
+	_, err := m.incrementRunAttempt.record(arg)
 	return err
 }
 
@@ -251,7 +251,7 @@ func (m *runStore) ScheduleNextJob(ctx context.Context, arg store.ScheduleNextJo
 }
 
 func (m *runStore) ListJobsByRunAttempt(ctx context.Context, arg store.ListJobsByRunAttemptParams) ([]store.Job, error) {
-	return m.listJobsByRunRepoAttempt.record(arg)
+	return m.listJobsByRunAttempt.record(arg)
 }
 
 func (m *runStore) ListArtifactBundlesByRunAndJob(ctx context.Context, arg store.ListArtifactBundlesByRunAndJobParams) ([]store.ArtifactBundle, error) {

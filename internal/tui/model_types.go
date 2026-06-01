@@ -101,8 +101,8 @@ type runsLoadedMsg struct{ runs []runSummary }
 // jobsLoadedMsg carries jobs fetched from the API.
 type jobsLoadedMsg struct{ jobs []clitui.JobItem }
 
-// jobDetailsLoadedMsg carries the repo-scoped detail payload for a confirmed job.
-type jobDetailsLoadedMsg struct{ detail *cliruns.RepoJobEntry }
+// jobDetailsLoadedMsg carries the run job detail payload for a confirmed job.
+type jobDetailsLoadedMsg struct{ detail *cliruns.RunJobDetailEntry }
 
 // runSummary is a minimal run representation used in the TUI.
 type runSummary struct {

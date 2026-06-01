@@ -140,7 +140,7 @@ func (r *runController) executeStandardJobWithOutcome(ctx context.Context, req S
 	}
 	var outcome standardJobOutcome
 
-	artifactPaths := runRepoJobArtifactPaths(req.RunID, req.RepoID, req.JobID)
+	artifactPaths := runJobArtifactPaths(req.RunID, req.JobID)
 	if err := ensureJobArtifactDirs(artifactPaths); err != nil {
 		return outcome, fmt.Errorf("prepare job artifacts: %w", err)
 	}
@@ -193,7 +193,7 @@ func (r *runController) runContainerJob(
 	outDir, inDir, diffPath string,
 ) (standardJobOutcome, error) {
 	outcome := standardJobOutcome{}
-	shareDir, err := ensureRunRepoShareDir(req.RunID, req.RepoID)
+	shareDir, err := ensureRunShareDir(req.RunID)
 	if err != nil {
 		return outcome, err
 	}
@@ -296,7 +296,7 @@ func (r *runController) runContainerJob(
 	runErr = r.finalizeStandardJobOutputs(req, cfg, outDir, workspace, runErr, result)
 	duration = time.Since(startTime)
 	if runErr != nil || result.ExitCode != 0 {
-		persistContainerInspectArtifact(req, runRepoJobArtifactPaths(req.RunID, req.RepoID, req.JobID), result)
+		persistContainerInspectArtifact(req, runJobArtifactPaths(req.RunID, req.JobID), result)
 	}
 
 	diffUploaded := false
@@ -489,7 +489,7 @@ type tempResource struct {
 }
 
 // prepareStickyWorkspaceWithCleanup wraps prepareStickyWorkspaceForStep and returns a no-op
-// cleanup for sticky run/repo workspaces.
+// cleanup for sticky run workspaces.
 func (r *runController) prepareStickyWorkspaceWithCleanup(
 	ctx context.Context,
 	req StartRunRequest,

@@ -26,7 +26,7 @@ func TestPrepareStickyWorkspaceForStep_ReusesStickyWorkspaceWhenGitDirExists(t *
 		RepoID: types.MigRepoID("repo_sticky_reuse"),
 		JobID:  types.JobID("job_sticky_reuse"),
 	}
-	workspace := runRepoWorkspaceDir(req.RunID, req.RepoID)
+	workspace := runWorkspaceDir(req.RunID)
 	if err := os.MkdirAll(filepath.Join(workspace, ".git"), 0o755); err != nil {
 		t.Fatalf("mkdir sticky .git dir: %v", err)
 	}
@@ -51,7 +51,7 @@ func TestPrepareStickyWorkspaceForStep_RemovesInvalidChainHeadWorkspaceBeforeHyd
 		JobID:   types.JobID("job_sticky_invalid"),
 		JobType: types.JobTypePreGate,
 	}
-	workspace := runRepoWorkspaceDir(req.RunID, req.RepoID)
+	workspace := runWorkspaceDir(req.RunID)
 	if err := os.MkdirAll(workspace, 0o755); err != nil {
 		t.Fatalf("mkdir invalid sticky workspace: %v", err)
 	}
@@ -123,8 +123,8 @@ func TestPrepareStickyWorkspaceForStep_ChainHeadHydratesWorkspaceWithoutRunBase(
 	if err != nil {
 		t.Fatalf("prepareStickyWorkspaceForStep() error = %v", err)
 	}
-	if workspace != runRepoWorkspaceDir(req.RunID, req.RepoID) {
-		t.Fatalf("workspace path = %q, want %q", workspace, runRepoWorkspaceDir(req.RunID, req.RepoID))
+	if workspace != runWorkspaceDir(req.RunID) {
+		t.Fatalf("workspace path = %q, want %q", workspace, runWorkspaceDir(req.RunID))
 	}
 	gitrepo.AssertRepo(t, workspace)
 	if _, err := os.Stat(filepath.Join(runCacheDir(req.RunID), "base")); !os.IsNotExist(err) {

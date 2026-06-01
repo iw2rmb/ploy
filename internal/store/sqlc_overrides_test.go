@@ -30,11 +30,11 @@ func TestSQLCOverridesCompile(t *testing.T) {
 		GetJob(ctx context.Context, id types.JobID) (Job, error)
 		GetNode(ctx context.Context, id types.NodeID) (Node, error)
 		GetMig(ctx context.Context, id types.MigID) (Mig, error)
-			GetSpec(ctx context.Context, id types.SpecID) (Spec, error)
-			GetMigRepo(ctx context.Context, id types.MigRepoID) (MigRepo, error)
-			DeleteSBOMRowsByJob(ctx context.Context, jobID types.JobID) error
-			UpsertSBOMRow(ctx context.Context, arg UpsertSBOMRowParams) error
-		}
+		GetSpec(ctx context.Context, id types.SpecID) (Spec, error)
+		GetMigRepo(ctx context.Context, id types.MigRepoID) (MigRepo, error)
+		DeleteSBOMRowsByJob(ctx context.Context, jobID types.JobID) error
+		UpsertSBOMRow(ctx context.Context, arg UpsertSBOMRowParams) error
+	}
 	var _ typedIDQuerier = (Querier)(nil)
 
 	// Verify Run struct field types.

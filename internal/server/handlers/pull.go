@@ -179,7 +179,7 @@ func pullMigRepoHandler(st store.Store) http.HandlerFunc {
 
 		// Get the latest run row with the specified terminal status.
 		// Select by runs.created_at DESC.
-		latestRunRepo, err := st.GetLatestRunByMigAndRepoStatus(r.Context(), store.GetLatestRunByMigAndRepoStatusParams{
+		latestRun, err := st.GetLatestRunByMigAndRepoStatus(r.Context(), store.GetLatestRunByMigAndRepoStatusParams{
 			MigID:  migID,
 			RepoID: matchedRepoID,
 			Status: targetStatus,
@@ -189,8 +189,8 @@ func pullMigRepoHandler(st store.Store) http.HandlerFunc {
 				writeHTTPError(w, http.StatusNotFound, "no run with status %q found for this repo", mode)
 				return
 			}
-			writeHTTPError(w, http.StatusInternalServerError, "failed to get run repo: %v", err)
-			slog.Error("pull mig repo: get latest run repo failed",
+			writeHTTPError(w, http.StatusInternalServerError, "failed to get run: %v", err)
+			slog.Error("pull mig repo: get latest run failed",
 				"mig_id", migID,
 				"repo_id", matchedRepoID,
 				"status", targetStatus,
@@ -201,16 +201,16 @@ func pullMigRepoHandler(st store.Store) http.HandlerFunc {
 
 		// Return the pull response.
 		resp := pullResponse{
-			RunID:  latestRunRepo.RunID,
-			RepoID: latestRunRepo.RepoID,
+			RunID:  latestRun.RunID,
+			RepoID: latestRun.RepoID,
 		}
 
 		writeJSON(w, http.StatusOK, resp)
 
 		slog.Info("pull mig repo resolved",
 			"mig_id", migID.String(),
-			"run_id", latestRunRepo.RunID,
-			"repo_id", latestRunRepo.RepoID.String(),
+			"run_id", latestRun.RunID,
+			"repo_id", latestRun.RepoID.String(),
 			"mode", mode,
 			"repo_url", req.RepoURL,
 		)

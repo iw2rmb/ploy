@@ -71,13 +71,13 @@ func (r *runController) reportTerminalStatus(
 	if uploadErr := r.uploadStatus(ctx, req.RunID.String(), status.String(), exitCode, stats, req.JobID, repoSHAOut); uploadErr != nil {
 		slog.Error("failed to upload terminal status", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)
 	} else {
-		r.cleanupRunRepoShareOnTerminalSuccess(req, status)
+		r.cleanupRunShareOnTerminalSuccess(req, status)
 	}
 	slog.Info("job terminated", "run_id", req.RunID, "job_id", req.JobID, "status", status,
 		"exit_code", result.ExitCode, "duration", duration)
 }
 
-func (r *runController) cleanupRunRepoShareOnTerminalSuccess(req StartRunRequest, status types.JobStatus) {
+func (r *runController) cleanupRunShareOnTerminalSuccess(req StartRunRequest, status types.JobStatus) {
 	_ = req
 	_ = status
 }

@@ -98,7 +98,7 @@ func (m model) handleEnterFromJobsList() (tea.Model, tea.Cmd) {
 		{title: "Job", desc: m.jobList.ConfirmedJobID().String()},
 	}))
 	m.rootList.Select(2)
-	return m, loadJobDetailsCmd(m.client, m.baseURL, selectedJob.RunID, selectedJob.RepoID, selectedJob.JobID)
+	return m, loadJobDetailsCmd(m.client, m.baseURL, selectedJob.RunID, selectedJob.JobID)
 }
 
 // resolveMigContext populates selectedMigID and selectedMigName from the runs cache.

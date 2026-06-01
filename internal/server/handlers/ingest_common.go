@@ -432,52 +432,15 @@ func getJobInRunOrFail(w http.ResponseWriter, r *http.Request, st store.Store, r
 	return job, true
 }
 
-// getRunOrRepoMismatchOrFail fetches a run by id and validates the repo id. On error it writes the
-// HTTP response (404 for not found, 500 for other errors) and returns ok=false.
-func getRunOrRepoMismatchOrFail(w http.ResponseWriter, r *http.Request, st store.Store, runID domaintypes.RunID, repoID domaintypes.RepoID, logPrefix string) (store.Run, bool) {
-	rr, err := st.GetRun(r.Context(), runID)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			writeHTTPError(w, http.StatusNotFound, "run not found")
-			return store.Run{}, false
-		}
-		slog.Error(logPrefix+": get run failed", "run_id", runID.String(), "repo_id", repoID.String(), "err", err)
-		writeHTTPError(w, http.StatusInternalServerError, "failed to get run: %v", err)
-		return store.Run{}, false
-	}
-	if rr.RepoID != repoID {
-		writeHTTPError(w, http.StatusNotFound, "repo not found")
-		return store.Run{}, false
-	}
-	return rr, true
-}
-
-func runRepoIDFromPathOrRun(w http.ResponseWriter, r *http.Request, st store.Store, runID domaintypes.RunID) (domaintypes.RepoID, bool) {
-	raw := strings.TrimSpace(r.PathValue("repo_id"))
-	if raw != "" {
-		var repoID domaintypes.RepoID
-		if err := repoID.UnmarshalText([]byte(raw)); err != nil {
-			writeHTTPError(w, http.StatusBadRequest, "invalid repo_id")
-			return "", false
-		}
-		return repoID, true
-	}
-	run, ok := getRunOrFail(w, r, st, runID, "resolve run")
-	if !ok {
-		return "", false
-	}
-	return run.RepoID, true
-}
-
-// listJobsForRunAttemptOrFail lists jobs for a given (run_id, repo_id, attempt). On
+// listJobsForRunAttemptOrFail lists jobs for a given (run_id, attempt). On
 // error it writes a 500 response and returns ok=false.
-func listJobsForRunAttemptOrFail(w http.ResponseWriter, r *http.Request, st store.Store, runID domaintypes.RunID, repoID domaintypes.RepoID, attempt int32, logPrefix string) ([]store.Job, bool) {
+func listJobsForRunAttemptOrFail(w http.ResponseWriter, r *http.Request, st store.Store, runID domaintypes.RunID, attempt int32, logPrefix string) ([]store.Job, bool) {
 	jobs, err := st.ListJobsByRunAttempt(r.Context(), store.ListJobsByRunAttemptParams{
 		RunID:   runID,
 		Attempt: attempt,
 	})
 	if err != nil {
-		slog.Error(logPrefix+": list jobs failed", "run_id", runID.String(), "repo_id", repoID.String(), "attempt", attempt, "err", err)
+		slog.Error(logPrefix+": list jobs failed", "run_id", runID.String(), "attempt", attempt, "err", err)
 		writeHTTPError(w, http.StatusInternalServerError, "failed to list jobs: %v", err)
 		return nil, false
 	}

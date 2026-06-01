@@ -13,7 +13,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-const testRunRepoSHASeed = "0123456789abcdef0123456789abcdef01234567"
+const testRunSHASeed = "0123456789abcdef0123456789abcdef01234567"
 
 func TestCancelRunHandlerV1_CancelsRunAndWork(t *testing.T) {
 	t.Parallel()

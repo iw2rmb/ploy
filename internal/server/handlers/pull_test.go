@@ -113,7 +113,7 @@ func TestPullMigRepoHandler(t *testing.T) {
 			wantFilter: domaintypes.RunStatusSuccess,
 			setup: func(st *runStore) {
 				setupMigPullRepo(st, migID, repoID, "https://github.com/org/repo")
-				st.getLatestRunRepoByMigAndRepoStatus.val = store.GetLatestRunByMigAndRepoStatusRow{
+				st.getLatestRunByMigAndRepoStatus.val = store.GetLatestRunByMigAndRepoStatusRow{
 					RunID:  runID,
 					RepoID: repoID,
 				}
@@ -140,7 +140,7 @@ func TestPullMigRepoHandler(t *testing.T) {
 			wantFilter: domaintypes.RunStatusFail,
 			setup: func(st *runStore) {
 				setupMigPullRepo(st, migID, repoID, "https://github.com/org/repo")
-				st.getLatestRunRepoByMigAndRepoStatus.val = store.GetLatestRunByMigAndRepoStatusRow{
+				st.getLatestRunByMigAndRepoStatus.val = store.GetLatestRunByMigAndRepoStatusRow{
 					RunID:  runID,
 					RepoID: repoID,
 				}
@@ -154,7 +154,7 @@ func TestPullMigRepoHandler(t *testing.T) {
 			wantFilter: domaintypes.RunStatusSuccess,
 			setup: func(st *runStore) {
 				setupMigPullRepo(st, migID, repoID, "https://github.com/org/repo.git")
-				st.getLatestRunRepoByMigAndRepoStatus.val = store.GetLatestRunByMigAndRepoStatusRow{RunID: runID, RepoID: repoID}
+				st.getLatestRunByMigAndRepoStatus.val = store.GetLatestRunByMigAndRepoStatusRow{RunID: runID, RepoID: repoID}
 			},
 		},
 		{name: "mig not found", pathMigID: migID.String(), body: `{"repo_url":"https://github.com/org/repo"}`, setup: func(st *runStore) { st.getMig.err = pgx.ErrNoRows }, wantStatus: http.StatusNotFound},
@@ -173,7 +173,7 @@ func TestPullMigRepoHandler(t *testing.T) {
 			body:      `{"repo_url":"https://github.com/org/repo"}`,
 			setup: func(st *runStore) {
 				setupMigPullRepo(st, migID, repoID, "https://github.com/org/repo")
-				st.getLatestRunRepoByMigAndRepoStatus.err = pgx.ErrNoRows
+				st.getLatestRunByMigAndRepoStatus.err = pgx.ErrNoRows
 			},
 			wantStatus: http.StatusNotFound,
 			wantFilter: domaintypes.RunStatusSuccess,
@@ -200,8 +200,8 @@ func TestPullMigRepoHandler(t *testing.T) {
 			tt.setup(st)
 			rr := doRequest(t, pullMigRepoHandler(st), http.MethodPost, "/v1/migs/"+tt.pathMigID+"/pull", tt.body, "mig_id", tt.pathMigID)
 			assertStatus(t, rr, tt.wantStatus)
-			if tt.wantFilter != "" && st.getLatestRunRepoByMigAndRepoStatus.params.Status != tt.wantFilter {
-				t.Fatalf("status filter = %q, want %q", st.getLatestRunRepoByMigAndRepoStatus.params.Status, tt.wantFilter)
+			if tt.wantFilter != "" && st.getLatestRunByMigAndRepoStatus.params.Status != tt.wantFilter {
+				t.Fatalf("status filter = %q, want %q", st.getLatestRunByMigAndRepoStatus.params.Status, tt.wantFilter)
 			}
 			if tt.verify != nil {
 				tt.verify(t, st, rr)

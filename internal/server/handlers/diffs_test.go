@@ -19,7 +19,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-func TestRunRepoDiffs_Download(t *testing.T) {
+func TestRunDiffs_Download(t *testing.T) {
 	st := &artifactStore{}
 	runID := domaintypes.NewRunID()
 	repoID := "repoAAAA"
@@ -29,12 +29,12 @@ func TestRunRepoDiffs_Download(t *testing.T) {
 	repoIDTyped := domaintypes.RepoID(repoID)
 	objKey := "diffs/run/" + runID.String() + "/diff/" + diffID.String() + ".patch.gz"
 
-	st.getRunRepo.val = store.Run{
+	st.getRun.val = store.Run{
 		ID:      runID,
 		RepoID:  repoIDTyped,
 		Attempt: 1,
 	}
-	st.listJobsByRunRepoAttempt.val = []store.Job{
+	st.listJobsByRunAttempt.val = []store.Job{
 		{ID: jobID, RunID: runID, RepoID: repoIDTyped, Attempt: 1},
 	}
 	st.getJobByID = map[domaintypes.JobID]store.Job{
@@ -71,7 +71,7 @@ func TestRunRepoDiffs_Download(t *testing.T) {
 	}
 }
 
-func TestRunRepoDiffs_DownloadAccumulated(t *testing.T) {
+func TestRunDiffs_DownloadAccumulated(t *testing.T) {
 	st := &artifactStore{}
 	runID := domaintypes.NewRunID()
 	repoID := "repoAAAA"
@@ -85,12 +85,12 @@ func TestRunRepoDiffs_DownloadAccumulated(t *testing.T) {
 	patch1 := "diff --git a/a.txt b/a.txt\n+one\n"
 	patch2 := "diff --git a/b.txt b/b.txt\n+two\n"
 
-	st.getRunRepo.val = store.Run{
+	st.getRun.val = store.Run{
 		ID:      runID,
 		RepoID:  repoIDTyped,
 		Attempt: 1,
 	}
-	st.listJobsByRunRepoAttempt.val = []store.Job{
+	st.listJobsByRunAttempt.val = []store.Job{
 		{ID: jobID1, RunID: runID, RepoID: repoIDTyped, Attempt: 1, NextID: &jobID2},
 		{ID: jobID2, RunID: runID, RepoID: repoIDTyped, Attempt: 1},
 	}
@@ -119,17 +119,17 @@ func TestRunRepoDiffs_DownloadAccumulated(t *testing.T) {
 	}
 }
 
-func TestRunRepoDiffs_ReturnsEmptyListWhenRunHasNoDiffJobs(t *testing.T) {
+func TestRunDiffs_ReturnsEmptyListWhenRunHasNoDiffJobs(t *testing.T) {
 	st := &artifactStore{}
 	runID := domaintypes.NewRunID()
 	repoBID := "repoBBBB" // NanoID-backed
 
-	st.getRunRepo.val = store.Run{
+	st.getRun.val = store.Run{
 		ID:      runID,
 		RepoID:  domaintypes.RepoID(repoBID),
 		Attempt: 1,
 	}
-	st.listJobsByRunRepoAttempt.val = []store.Job{}
+	st.listJobsByRunAttempt.val = []store.Job{}
 
 	bs := bsmock.New()
 	rr := httptest.NewRecorder()
@@ -140,11 +140,11 @@ func TestRunRepoDiffs_ReturnsEmptyListWhenRunHasNoDiffJobs(t *testing.T) {
 	assertStatus(t, rr, http.StatusOK)
 
 	// Verify the run was resolved before listing diffs.
-	if !st.getRunRepo.called {
+	if !st.getRun.called {
 		t.Fatal("expected GetRun to be called")
 	}
-	if st.getRunRepo.params != runID {
-		t.Errorf("run_id=%q, want %q", st.getRunRepo.params, runID)
+	if st.getRun.params != runID {
+		t.Errorf("run_id=%q, want %q", st.getRun.params, runID)
 	}
 
 	var resp diffListResponse
@@ -157,9 +157,9 @@ func TestRunRepoDiffs_ReturnsEmptyListWhenRunHasNoDiffJobs(t *testing.T) {
 	}
 }
 
-// TestRunRepoDiffs_ReturnsOwnDiffs verifies that a repo sees its own diffs.
+// TestRunDiffs_ReturnsOwnDiffs verifies that a repo sees its own diffs.
 // This tests the positive case: querying repo A returns repo A's diffs.
-func TestRunRepoDiffs_ReturnsOwnDiffs(t *testing.T) {
+func TestRunDiffs_ReturnsOwnDiffs(t *testing.T) {
 	st := &artifactStore{}
 	runID := domaintypes.NewRunID()
 	repoID := "repoAAAA" // NanoID-backed
@@ -168,12 +168,12 @@ func TestRunRepoDiffs_ReturnsOwnDiffs(t *testing.T) {
 	diffID := uuid.New()
 	createdAt := time.Date(2025, 1, 15, 12, 0, 0, 0, time.UTC)
 
-	st.getRunRepo.val = store.Run{
+	st.getRun.val = store.Run{
 		ID:      runID,
 		RepoID:  repoIDTyped,
 		Attempt: 1,
 	}
-	st.listJobsByRunRepoAttempt.val = []store.Job{{
+	st.listJobsByRunAttempt.val = []store.Job{{
 		ID:      jobID,
 		RunID:   runID,
 		RepoID:  repoIDTyped,
@@ -223,8 +223,8 @@ func TestRunRepoDiffs_ReturnsOwnDiffs(t *testing.T) {
 	}
 }
 
-// TestRunRepoDiffs_MissingRunID verifies that missing run_id returns 400.
-func TestRunRepoDiffs_MissingRunID(t *testing.T) {
+// TestRunDiffs_MissingRunID verifies that missing run_id returns 400.
+func TestRunDiffs_MissingRunID(t *testing.T) {
 	st := &artifactStore{}
 	bs := bsmock.New()
 	rr := httptest.NewRecorder()

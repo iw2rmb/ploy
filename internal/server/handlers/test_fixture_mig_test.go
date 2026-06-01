@@ -54,11 +54,11 @@ type migStore struct {
 
 	// Run creation (for migs_runs, runs_submit). Sequenced for tests that
 	// observe a different result/err for each CreateRun call.
-	createRun mockCallSeq[store.CreateRunParams, store.Run]
+	createRunSeq mockCallSeq[store.CreateRunParams, store.Run]
 
 	createWaveWithRuns mockCall[store.CreateWaveWithRunsParams, store.Wave]
-	createRunRepo       mockCall[store.CreateRunParams, store.Run]
-	createRunRepoParams []store.CreateRunParams
+	createRun          mockCall[store.CreateRunParams, store.Run]
+	createRunParams    []store.CreateRunParams
 
 	// Run/Job queries (for archive validation and migs_ticket)
 	getRun        mockCall[string, store.Run]
@@ -227,14 +227,13 @@ func (m *migStore) GetRepo(ctx context.Context, id types.RepoID) (store.Repo, er
 // Run creation methods
 
 func (m *migStore) CreateRun(ctx context.Context, params store.CreateRunParams) (store.Run, error) {
-	if len(m.createRun.vals) > 0 || len(m.createRun.errs) > 0 {
-		return m.createRun.record(params)
+	if len(m.createRunSeq.vals) > 0 || len(m.createRunSeq.errs) > 0 {
+		return m.createRunSeq.record(params)
 	}
-	// No configured result: synthesize per-call from params.
-	m.createRun.called = true
-	m.createRun.params = params
-	m.createRun.n++
-	return defaultRun(store.Run{}, params), nil
+	result := defaultRun(m.createRun.val, params)
+	m.createRun.val = result
+	_, err := m.createRun.record(params)
+	return result, err
 }
 
 func (m *migStore) CreateWaveWithRuns(ctx context.Context, params store.CreateWaveWithRunsParams) (store.Wave, []store.Run, error) {
@@ -249,11 +248,11 @@ func (m *migStore) CreateWaveWithRuns(ctx context.Context, params store.CreateWa
 	}
 	runs := make([]store.Run, 0, len(params.Runs))
 	for _, runParams := range params.Runs {
-		m.createRunRepoParams = append(m.createRunRepoParams, runParams)
-		m.createRunRepo.called = true
-		m.createRunRepo.params = runParams
-		if m.createRunRepo.err != nil {
-			return store.Wave{}, nil, m.createRunRepo.err
+		m.createRunParams = append(m.createRunParams, runParams)
+		m.createRun.called = true
+		m.createRun.params = runParams
+		if m.createRun.err != nil {
+			return store.Wave{}, nil, m.createRun.err
 		}
 		run, err := m.CreateRun(ctx, runParams)
 		if err != nil {

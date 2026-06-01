@@ -11,7 +11,7 @@ import (
 )
 
 // ===== Repo-Scoped Status Progression Tests =====
-// These tests verify v1 repo-scoped progression behavior.
+// These tests verify v1 run-scoped progression behavior.
 // When a job completes:
 // - runs.status is updated when all jobs for the repo attempt are terminal
 // - runs.status becomes Finished when all repos are terminal
@@ -22,28 +22,28 @@ func TestCompleteJob_RepoTerminalStatus(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name             string
-		jobStatus        domaintypes.JobStatus
-		reqBody          map[string]any
-		wantRepoStatus   domaintypes.RunStatus
-		wantRunRepoCount domaintypes.RunStatus
-		wantRunFinished  bool
+		name            string
+		jobStatus       domaintypes.JobStatus
+		reqBody         map[string]any
+		wantRepoStatus  domaintypes.RunStatus
+		wantRunCount    domaintypes.RunStatus
+		wantRunFinished bool
 	}{
 		{
-			name:             "success",
-			jobStatus:        domaintypes.JobStatusSuccess,
-			reqBody:          map[string]any{"status": "Success", "exit_code": 0, "repo_sha_out": "0123456789abcdef0123456789abcdef01234567"},
-			wantRepoStatus:   domaintypes.RunStatusSuccess,
-			wantRunRepoCount: domaintypes.RunStatusSuccess,
-			wantRunFinished:  true,
+			name:            "success",
+			jobStatus:       domaintypes.JobStatusSuccess,
+			reqBody:         map[string]any{"status": "Success", "exit_code": 0, "repo_sha_out": "0123456789abcdef0123456789abcdef01234567"},
+			wantRepoStatus:  domaintypes.RunStatusSuccess,
+			wantRunCount:    domaintypes.RunStatusSuccess,
+			wantRunFinished: true,
 		},
 		{
-			name:             "fail",
-			jobStatus:        domaintypes.JobStatusFail,
-			reqBody:          map[string]any{"status": "Fail", "exit_code": 1},
-			wantRepoStatus:   domaintypes.RunStatusFail,
-			wantRunRepoCount: domaintypes.RunStatusFail,
-			wantRunFinished:  true,
+			name:            "fail",
+			jobStatus:       domaintypes.JobStatusFail,
+			reqBody:         map[string]any{"status": "Fail", "exit_code": 1},
+			wantRepoStatus:  domaintypes.RunStatusFail,
+			wantRunCount:    domaintypes.RunStatusFail,
+			wantRunFinished: true,
 		},
 	}
 
@@ -68,7 +68,7 @@ func TestCompleteJob_RepoTerminalStatus(t *testing.T) {
 					},
 				}),
 				withRunStatusCounts([]store.CountRunsByWaveStatusRow{
-					{Status: tt.wantRunRepoCount, Count: 1},
+					{Status: tt.wantRunCount, Count: 1},
 				}),
 			)
 
@@ -78,7 +78,7 @@ func TestCompleteJob_RepoTerminalStatus(t *testing.T) {
 
 			assertStatus(t, rr, http.StatusNoContent)
 
-			assertCalled(t, "ListJobsByRunAttempt", st.listJobsByRunRepoAttempt.called)
+			assertCalled(t, "ListJobsByRunAttempt", st.listJobsByRunAttempt.called)
 			assertCalled(t, "UpdateRunStatus", st.updateRunStatus.called)
 			if len(st.updateRunStatus.calls) == 0 {
 				t.Fatal("expected at least one UpdateRunStatus call")
@@ -252,7 +252,7 @@ func TestCompleteJob_MultiRepoRunFinishesWhenAllReposTerminal(t *testing.T) {
 	t.Parallel()
 
 	f := newRepoScopedFixture("mig")
-	// repoIDB is another repo in the run, still Running (not explicitly used but modeled in countRunReposByStatus.val).
+	// repoIDB is another repo in the run, still Running (not explicitly used but modeled in countRunsByStatus.val).
 	_ = domaintypes.NewRepoID() // repoIDB - unused but conceptually part of the multi-repo scenario
 
 	// Job for repo A completing (repo B still has work).

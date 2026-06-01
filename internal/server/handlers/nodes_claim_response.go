@@ -57,7 +57,6 @@ func buildClaimResponsePayload(
 	configHolder *ConfigHolder,
 	run store.Run,
 	spec []byte,
-	runRepo store.Run,
 	repoURL string,
 	job store.Job,
 ) (claimResponsePayload, error) {
@@ -124,7 +123,7 @@ func buildClaimResponsePayload(
 	if err != nil {
 		return claimResponsePayload{}, fmt.Errorf("resolve detected stack for claim: %w", err)
 	}
-	commitSHA := strings.TrimSpace(runRepo.SourceCommitSha)
+	commitSHA := strings.TrimSpace(run.SourceCommitSha)
 	if commitSHA == "" {
 		commitSHA = strings.TrimSpace(job.RepoShaIn)
 	}
@@ -158,9 +157,8 @@ func buildClaimResponsePayload(
 }
 
 func buildActionClaimResponsePayload(
-	run store.Run,
 	spec []byte,
-	runRepo store.Run,
+	run store.Run,
 	repoURL string,
 	action store.RunAction,
 ) claimResponsePayload {
@@ -180,7 +178,7 @@ func buildActionClaimResponsePayload(
 		RepoURL:       repoURL,
 		Status:        run.Status,
 		NodeID:        nodeIDPtrOrZero(action.NodeID),
-		BaseRef:       runRepo.RepoBaseRef,
+		BaseRef:       run.RepoBaseRef,
 		RepoSHAIn:     "",
 		StartedAt:     run.StartedAt.Time.Format(time.RFC3339),
 		CreatedAt:     run.CreatedAt.Time.Format(time.RFC3339),
@@ -217,11 +215,10 @@ func buildAndSendJobClaimResponse(
 	configHolder *ConfigHolder,
 	run store.Run,
 	spec []byte,
-	runRepo store.Run,
 	repoURL string,
 	job store.Job,
 ) error {
-	payload, err := buildClaimResponsePayload(r.Context(), st, bs, configHolder, run, spec, runRepo, repoURL, job)
+	payload, err := buildClaimResponsePayload(r.Context(), st, bs, configHolder, run, spec, repoURL, job)
 	if err != nil {
 		return err
 	}

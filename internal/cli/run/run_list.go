@@ -46,7 +46,7 @@ func RunList(ctx context.Context, opts ListOptions) error {
 	}
 	repoURL := ""
 	if opts.RepoSelector != "" {
-		repo, err := resolveRunRepo(ctx, base, httpClient, opts.RepoSelector)
+		repo, err := resolveSourceRepo(ctx, base, httpClient, opts.RepoSelector)
 		if err != nil {
 			return err
 		}

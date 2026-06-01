@@ -10,7 +10,7 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-func TestOrderRepoJobsByChain_ReconstructsLinkedOrder(t *testing.T) {
+func TestOrderRunJobsByChain_ReconstructsLinkedOrder(t *testing.T) {
 	t.Parallel()
 
 	pre := domaintypes.NewJobID()
@@ -18,7 +18,7 @@ func TestOrderRepoJobsByChain_ReconstructsLinkedOrder(t *testing.T) {
 	mig1 := domaintypes.NewJobID()
 	post := domaintypes.NewJobID()
 
-	jobs := []RepoJobEntry{
+	jobs := []RunJobDetailEntry{
 		// Deliberately out of chain order (mirrors current broken render shape).
 		{JobID: post, JobType: "post_gate", Status: domaintypes.JobStatusCreated, NextID: nil},
 		{JobID: mig1, JobType: "mig", Status: domaintypes.JobStatusCreated, NextID: &post},
@@ -26,7 +26,7 @@ func TestOrderRepoJobsByChain_ReconstructsLinkedOrder(t *testing.T) {
 		{JobID: pre, JobType: "pre_gate", Status: domaintypes.JobStatusRunning, NextID: &mig0},
 	}
 
-	got := orderRepoJobsByChain(jobs)
+	got := orderRunJobsByChain(jobs)
 	if len(got) != 4 {
 		t.Fatalf("expected 4 jobs, got %d", len(got))
 	}
@@ -36,7 +36,7 @@ func TestOrderRepoJobsByChain_ReconstructsLinkedOrder(t *testing.T) {
 	}
 }
 
-func TestListRepoJobsCommand_DecodeJobContract(t *testing.T) {
+func TestListRunJobsCommand_DecodeJobContract(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
@@ -78,14 +78,13 @@ func TestListRepoJobsCommand_DecodeJobContract(t *testing.T) {
 		t.Fatalf("parse base url: %v", err)
 	}
 
-	result, err := ListRepoJobsCommand{
+	result, err := ListRunJobsCommand{
 		Client:  srv.Client(),
 		BaseURL: baseURL,
 		RunID:   runID,
-		RepoID:  repoID,
 	}.Run(context.Background())
 	if err != nil {
-		t.Fatalf("list repo jobs: %v", err)
+		t.Fatalf("list run jobs: %v", err)
 	}
 	if len(result.Jobs) != 1 {
 		t.Fatalf("jobs len=%d, want 1", len(result.Jobs))

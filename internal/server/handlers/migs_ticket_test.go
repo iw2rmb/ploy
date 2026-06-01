@@ -50,7 +50,7 @@ func TestCreateSingleRepoRunHandler_SingleRepo(t *testing.T) {
 		t.Fatal("expected spec_id to be set")
 	}
 
-	if !st.createSpec.called || !st.createMig.called || !st.createMigRepo.called || !st.createRun.called || !st.createRunRepo.called {
+	if !st.createSpec.called || !st.createMig.called || !st.createMigRepo.called || !st.createRun.called {
 		t.Fatal("expected spec/mig/repo/run creation calls to be made")
 	}
 	if len(st.createJob.calls) != 0 {

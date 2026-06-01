@@ -117,15 +117,13 @@ type runDetailsLoadedMsg struct {
 	jobTotal  int
 }
 
-// loadJobDetailsCmd fetches repo-scoped job details for the confirmed job using
-// the run-repo command surface from internal/cli/runs.
-func loadJobDetailsCmd(client *http.Client, baseURL *url.URL, runID domaintypes.RunID, repoID domaintypes.RepoID, jobID domaintypes.JobID) tea.Cmd {
+// loadJobDetailsCmd fetches run job details for the confirmed job.
+func loadJobDetailsCmd(client *http.Client, baseURL *url.URL, runID domaintypes.RunID, jobID domaintypes.JobID) tea.Cmd {
 	return func() tea.Msg {
-		result, err := cliruns.ListRepoJobsCommand{
+		result, err := cliruns.ListRunJobsCommand{
 			Client:  client,
 			BaseURL: baseURL,
 			RunID:   runID,
-			RepoID:  repoID,
 		}.Run(context.Background())
 		if err != nil {
 			return errMsg{err: err}

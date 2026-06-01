@@ -15,7 +15,7 @@ import (
 	"strings"
 )
 
-type resolvedRunRepo struct {
+type resolvedSourceRepo struct {
 	Worktree  string
 	RepoURL   string
 	Ref       string
@@ -23,16 +23,16 @@ type resolvedRunRepo struct {
 	IsLocal   bool
 }
 
-func resolveRunRepo(ctx context.Context, base *url.URL, httpClient *http.Client, selector string) (resolvedRunRepo, error) {
+func resolveSourceRepo(ctx context.Context, base *url.URL, httpClient *http.Client, selector string) (resolvedSourceRepo, error) {
 	selector = strings.TrimSpace(selector)
 	if selector == "" {
 		selector = "."
 	}
 
 	if pathLooksLocal(selector) {
-		return resolveLocalRunRepo(ctx, selector)
+		return resolveLocalSourceRepo(ctx, selector)
 	}
-	return resolveRemoteRunRepo(ctx, base, httpClient, selector)
+	return resolveRemoteSourceRepo(ctx, base, httpClient, selector)
 }
 
 func pathLooksLocal(selector string) bool {
@@ -45,20 +45,20 @@ func pathLooksLocal(selector string) bool {
 	return false
 }
 
-func resolveLocalRunRepo(ctx context.Context, path string) (resolvedRunRepo, error) {
+func resolveLocalSourceRepo(ctx context.Context, path string) (resolvedSourceRepo, error) {
 	worktree, err := gitOutput(ctx, path, "rev-parse", "--show-toplevel")
 	if err != nil {
-		return resolvedRunRepo{}, fmt.Errorf("repo: %s is not a git worktree", path)
+		return resolvedSourceRepo{}, fmt.Errorf("repo: %s is not a git worktree", path)
 	}
 	repoURL, err := gitOutput(ctx, worktree, "remote", "get-url", "origin")
 	if err != nil {
-		return resolvedRunRepo{}, fmt.Errorf("repo: git remote %q not found", "origin")
+		return resolvedSourceRepo{}, fmt.Errorf("repo: git remote %q not found", "origin")
 	}
 	head, err := gitOutput(ctx, worktree, "rev-parse", "HEAD")
 	if err != nil {
-		return resolvedRunRepo{}, fmt.Errorf("repo: resolve HEAD: %w", err)
+		return resolvedSourceRepo{}, fmt.Errorf("repo: resolve HEAD: %w", err)
 	}
-	return resolvedRunRepo{
+	return resolvedSourceRepo{
 		Worktree:  worktree,
 		RepoURL:   repoURL,
 		Ref:       head,
@@ -67,12 +67,12 @@ func resolveLocalRunRepo(ctx context.Context, path string) (resolvedRunRepo, err
 	}, nil
 }
 
-func resolveRemoteRunRepo(ctx context.Context, base *url.URL, httpClient *http.Client, selector string) (resolvedRunRepo, error) {
+func resolveRemoteSourceRepo(ctx context.Context, base *url.URL, httpClient *http.Client, selector string) (resolvedSourceRepo, error) {
 	if base == nil {
-		return resolvedRunRepo{}, errors.New("repo resolve: base url required")
+		return resolvedSourceRepo{}, errors.New("repo resolve: base url required")
 	}
 	if httpClient == nil {
-		return resolvedRunRepo{}, errors.New("repo resolve: http client required")
+		return resolvedSourceRepo{}, errors.New("repo resolve: http client required")
 	}
 
 	namespaceRepo, ref := splitRemoteSelector(selector)
@@ -85,16 +85,16 @@ func resolveRemoteRunRepo(ctx context.Context, base *url.URL, httpClient *http.C
 		Ref:      ref,
 	})
 	if err != nil {
-		return resolvedRunRepo{}, fmt.Errorf("repo resolve: marshal request: %w", err)
+		return resolvedSourceRepo{}, fmt.Errorf("repo resolve: marshal request: %w", err)
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), bytes.NewReader(payload))
 	if err != nil {
-		return resolvedRunRepo{}, fmt.Errorf("repo resolve: build request: %w", err)
+		return resolvedSourceRepo{}, fmt.Errorf("repo resolve: build request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		return resolvedRunRepo{}, fmt.Errorf("repo resolve: http request failed: %w", err)
+		return resolvedSourceRepo{}, fmt.Errorf("repo resolve: http request failed: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
@@ -103,9 +103,9 @@ func resolveRemoteRunRepo(ctx context.Context, base *url.URL, httpClient *http.C
 			Error string `json:"error"`
 		}
 		if err := json.Unmarshal(body, &apiErr); err == nil && strings.TrimSpace(apiErr.Error) != "" {
-			return resolvedRunRepo{}, fmt.Errorf("repo resolve: %s", strings.TrimSpace(apiErr.Error))
+			return resolvedSourceRepo{}, fmt.Errorf("repo resolve: %s", strings.TrimSpace(apiErr.Error))
 		}
-		return resolvedRunRepo{}, fmt.Errorf("repo resolve: %s", strings.TrimSpace(string(body)))
+		return resolvedSourceRepo{}, fmt.Errorf("repo resolve: %s", strings.TrimSpace(string(body)))
 	}
 
 	var resolved struct {
@@ -114,17 +114,17 @@ func resolveRemoteRunRepo(ctx context.Context, base *url.URL, httpClient *http.C
 		RefIsSHA bool   `json:"ref_is_sha"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&resolved); err != nil {
-		return resolvedRunRepo{}, fmt.Errorf("repo resolve: decode response: %w", err)
+		return resolvedSourceRepo{}, fmt.Errorf("repo resolve: decode response: %w", err)
 	}
 	repoURL := strings.TrimSpace(resolved.RepoURL)
 	if repoURL == "" {
-		return resolvedRunRepo{}, errors.New("repo resolve: empty repo_url in response")
+		return resolvedSourceRepo{}, errors.New("repo resolve: empty repo_url in response")
 	}
 	resolvedRef := strings.TrimSpace(resolved.Ref)
 	if resolvedRef == "" {
 		resolvedRef = ref
 	}
-	repo := resolvedRunRepo{RepoURL: repoURL, Ref: resolvedRef}
+	repo := resolvedSourceRepo{RepoURL: repoURL, Ref: resolvedRef}
 	if resolved.RefIsSHA {
 		repo.CommitSHA = resolvedRef
 	}

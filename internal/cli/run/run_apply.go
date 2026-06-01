@@ -48,7 +48,7 @@ func runApply(ctx context.Context, opts ApplyOptions, base *url.URL, httpClient 
 		out = io.Discard
 	}
 
-	local, err := resolveLocalRunRepo(ctx, repoPath)
+	local, err := resolveLocalSourceRepo(ctx, repoPath)
 	if err != nil {
 		return fmt.Errorf("run apply: %w", err)
 	}
@@ -65,7 +65,7 @@ func runApply(ctx context.Context, opts ApplyOptions, base *url.URL, httpClient 
 		return fmt.Errorf("run apply: %w", err)
 	}
 	if domaintypes.NormalizeRepoURL(resolved.RepoURL) != domaintypes.NormalizeRepoURL(local.RepoURL) {
-		return fmt.Errorf("run apply: local origin %s does not match run repo_url %s", local.RepoURL, resolved.RepoURL)
+		return fmt.Errorf("run apply: local origin %s does not match run metadata repo_url %s", local.RepoURL, resolved.RepoURL)
 	}
 	sourceSHA := strings.TrimSpace(resolved.SourceCommitSHA)
 	if sourceSHA == "" {

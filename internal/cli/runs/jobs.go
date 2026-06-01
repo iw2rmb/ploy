@@ -12,27 +12,26 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/jobchain"
 )
 
-type RepoJobEntry = migsapi.RunJob
+type RunJobDetailEntry = migsapi.RunJob
 
-// ListRepoJobsResult contains the response from listing repo jobs.
-type ListRepoJobsResult = migsapi.ListRunJobsResponse
+// ListRunJobsResult contains the response from listing run jobs.
+type ListRunJobsResult = migsapi.ListRunJobsResponse
 
-// ListRepoJobsCommand fetches jobs for a repo execution.
-type ListRepoJobsCommand struct {
+// ListRunJobsCommand fetches jobs for a run execution.
+type ListRunJobsCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
 	RunID   domaintypes.RunID
-	RepoID  domaintypes.RepoID
 	Attempt *int32 // Optional: specific attempt
 }
 
 // Run executes GET /v1/runs/{run_id}/jobs.
-func (c ListRepoJobsCommand) Run(ctx context.Context) (ListRepoJobsResult, error) {
+func (c ListRunJobsCommand) Run(ctx context.Context) (ListRunJobsResult, error) {
 	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
-		return ListRepoJobsResult{}, fmt.Errorf("list repo jobs: %w", err)
+		return ListRunJobsResult{}, fmt.Errorf("list run jobs: %w", err)
 	}
 	if c.RunID.IsZero() {
-		return ListRepoJobsResult{}, fmt.Errorf("list repo jobs: run id required")
+		return ListRunJobsResult{}, fmt.Errorf("list run jobs: run id required")
 	}
 	endpoint := c.BaseURL.JoinPath("v1", "runs", c.RunID.String(), "jobs")
 	if c.Attempt != nil {
@@ -43,35 +42,35 @@ func (c ListRepoJobsCommand) Run(ctx context.Context) (ListRepoJobsResult, error
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
 	if err != nil {
-		return ListRepoJobsResult{}, fmt.Errorf("list repo jobs: build request: %w", err)
+		return ListRunJobsResult{}, fmt.Errorf("list run jobs: build request: %w", err)
 	}
 
 	resp, err := c.Client.Do(req)
 	if err != nil {
-		return ListRepoJobsResult{}, fmt.Errorf("list repo jobs: http request failed: %w", err)
+		return ListRunJobsResult{}, fmt.Errorf("list run jobs: http request failed: %w", err)
 	}
 	defer httpx.DrainAndClose(resp)
 
 	if resp.StatusCode != http.StatusOK {
-		return ListRepoJobsResult{}, httpx.WrapError("list repo jobs", resp.Status, resp.Body)
+		return ListRunJobsResult{}, httpx.WrapError("list run jobs", resp.Status, resp.Body)
 	}
 
-	var result ListRepoJobsResult
+	var result ListRunJobsResult
 	if err := httpx.DecodeResponseJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
-		return ListRepoJobsResult{}, fmt.Errorf("list repo jobs: decode response: %w", err)
+		return ListRunJobsResult{}, fmt.Errorf("list run jobs: decode response: %w", err)
 	}
 
-	result.Jobs = orderRepoJobsByChain(result.Jobs)
+	result.Jobs = orderRunJobsByChain(result.Jobs)
 
 	return result, nil
 }
 
-// orderRepoJobsByChain reconstructs execution order from linked next_id pointers.
+// orderRunJobsByChain reconstructs execution order from linked next_id pointers.
 // Head jobs are derived as jobs that have no predecessor in the same payload.
-func orderRepoJobsByChain(jobs []RepoJobEntry) []RepoJobEntry {
+func orderRunJobsByChain(jobs []migsapi.RunJob) []migsapi.RunJob {
 	return jobchain.Order(
 		jobs,
-		func(job RepoJobEntry) domaintypes.JobID { return job.JobID },
-		func(job RepoJobEntry) *domaintypes.JobID { return job.NextID },
+		func(job migsapi.RunJob) domaintypes.JobID { return job.JobID },
+		func(job migsapi.RunJob) *domaintypes.JobID { return job.NextID },
 	)
 }

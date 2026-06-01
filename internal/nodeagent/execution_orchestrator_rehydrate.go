@@ -17,8 +17,8 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
-// prepareStickyWorkspaceForStep returns the single mutable per-(run,repo)
-// workspace for a linear repo chain. The chain head hydrates sources directly
+// prepareStickyWorkspaceForStep returns the single mutable per-run workspace
+// for a linear job chain. The chain head hydrates sources directly
 // into the sticky workspace; later jobs require that workspace to already exist
 // on this node.
 //
@@ -36,11 +36,7 @@ func (r *runController) prepareStickyWorkspaceForStep(
 	manifest contracts.StepManifest,
 ) (string, error) {
 	runID := req.RunID.String()
-	repoID := req.RepoID
-	if repoID.IsZero() {
-		return "", fmt.Errorf("prepare sticky workspace: repo_id is required")
-	}
-	workspacePath := runRepoWorkspaceDir(req.RunID, repoID)
+	workspacePath := runWorkspaceDir(req.RunID)
 	if hasGitDir(workspacePath) {
 		slog.Info("reusing sticky workspace", "run_id", runID, "job_id", req.JobID, "workspace", workspacePath)
 		return workspacePath, nil

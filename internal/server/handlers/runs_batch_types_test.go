@@ -77,8 +77,8 @@ func TestGetRunCounts(t *testing.T) {
 			t.Parallel()
 
 			st := &runStore{}
-			st.countRunReposByStatus.val = tc.rows
-			st.countRunReposByStatus.err = tc.err
+			st.countRunsByStatus.val = tc.rows
+			st.countRunsByStatus.err = tc.err
 
 			counts, err := getRunCounts(context.Background(), st, runID)
 			if tc.wantErr {

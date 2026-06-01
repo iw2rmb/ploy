@@ -23,39 +23,36 @@ func runCacheDir(runID types.RunID) string {
 	return filepath.Join(runCacheRootDir(), runID.String())
 }
 
-func runRepoRootDir(runID types.RunID, repoID types.MigRepoID) string {
-	if repoID.IsZero() {
-		return ""
-	}
+func runRootDir(runID types.RunID) string {
 	return runCacheDir(runID)
 }
 
-func runRepoWorkspaceDir(runID types.RunID, repoID types.MigRepoID) string {
-	root := runRepoRootDir(runID, repoID)
+func runWorkspaceDir(runID types.RunID) string {
+	root := runRootDir(runID)
 	if root == "" {
 		return ""
 	}
 	return filepath.Join(root, "workspace")
 }
 
-func runRepoArtifactsDir(runID types.RunID, repoID types.MigRepoID) string {
-	root := runRepoRootDir(runID, repoID)
+func runArtifactsDir(runID types.RunID) string {
+	root := runRootDir(runID)
 	if root == "" {
 		return ""
 	}
 	return filepath.Join(root, "artifacts")
 }
 
-func runRepoSharedArtifactsDir(runID types.RunID, repoID types.MigRepoID) string {
-	artifactsDir := runRepoArtifactsDir(runID, repoID)
+func runSharedArtifactsDir(runID types.RunID) string {
+	artifactsDir := runArtifactsDir(runID)
 	if artifactsDir == "" {
 		return ""
 	}
 	return filepath.Join(artifactsDir, "shared")
 }
 
-func runRepoJobArtifactsDir(runID types.RunID, repoID types.MigRepoID, jobID types.JobID) string {
-	artifactsDir := runRepoArtifactsDir(runID, repoID)
+func runJobArtifactsDir(runID types.RunID, jobID types.JobID) string {
+	artifactsDir := runArtifactsDir(runID)
 	if artifactsDir == "" || jobID.IsZero() {
 		return ""
 	}
@@ -71,8 +68,8 @@ type jobArtifactPaths struct {
 	Diff   string
 }
 
-func runRepoJobArtifactPaths(runID types.RunID, repoID types.MigRepoID, jobID types.JobID) jobArtifactPaths {
-	root := runRepoJobArtifactsDir(runID, repoID, jobID)
+func runJobArtifactPaths(runID types.RunID, jobID types.JobID) jobArtifactPaths {
+	root := runJobArtifactsDir(runID, jobID)
 	if root == "" {
 		return jobArtifactPaths{}
 	}
@@ -86,13 +83,13 @@ func runRepoJobArtifactPaths(runID types.RunID, repoID types.MigRepoID, jobID ty
 	}
 }
 
-func ensureRunRepoShareDir(runID types.RunID, repoID types.MigRepoID) (string, error) {
-	shareDir := runRepoSharedArtifactsDir(runID, repoID)
+func ensureRunShareDir(runID types.RunID) (string, error) {
+	shareDir := runSharedArtifactsDir(runID)
 	if strings.TrimSpace(shareDir) == "" {
 		return "", nil
 	}
 	if err := os.MkdirAll(shareDir, 0o750); err != nil {
-		return "", fmt.Errorf("create run/repo shared artifacts dir: %w", err)
+		return "", fmt.Errorf("create run shared artifacts dir: %w", err)
 	}
 	return shareDir, nil
 }
@@ -109,12 +106,12 @@ func ensureJobArtifactDirs(paths jobArtifactPaths) error {
 	return nil
 }
 
-func runRepoJobOutFile(runID types.RunID, repoID types.MigRepoID, jobID types.JobID, outPath string) (string, error) {
+func runJobOutFile(runID types.RunID, jobID types.JobID, outPath string) (string, error) {
 	normalizedOutPath := path.Clean(strings.TrimSpace(outPath))
 	if !strings.HasPrefix(normalizedOutPath, "/out/") || normalizedOutPath == "/out" {
 		return "", fmt.Errorf("source path must stay under /out")
 	}
-	paths := runRepoJobArtifactPaths(runID, repoID, jobID)
+	paths := runJobArtifactPaths(runID, jobID)
 	if strings.TrimSpace(paths.Out) == "" {
 		return "", fmt.Errorf("source job artifacts path is empty")
 	}
