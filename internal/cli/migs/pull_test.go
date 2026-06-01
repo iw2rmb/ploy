@@ -3,6 +3,7 @@ package migs
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -30,24 +31,16 @@ func TestRunPullCommand_Success(t *testing.T) {
 		if r.Method != http.MethodPost {
 			t.Errorf("expected POST method, got %s", r.Method)
 		}
-		if !strings.HasPrefix(r.URL.Path, basePathPrefix+"/v1/runs/") || !strings.HasSuffix(r.URL.Path, "/resolve") {
+		if !strings.HasPrefix(r.URL.Path, basePathPrefix+"/v1/runs/") || !strings.HasSuffix(r.URL.Path, "/pull") {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
 
-		// Verify content type.
-		if ct := r.Header.Get("Content-Type"); ct != "application/json" {
-			t.Errorf("expected Content-Type application/json, got %s", ct)
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Errorf("failed to read request body: %v", err)
 		}
-
-		// Parse and verify request body.
-		var req struct {
-			RepoURL string `json:"repo_url"`
-		}
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			t.Errorf("failed to decode request body: %v", err)
-		}
-		if req.RepoURL == "" {
-			t.Error("expected non-empty repo_url in request")
+		if len(body) != 0 {
+			t.Errorf("expected empty request body, got %q", string(body))
 		}
 
 		// Return a valid response.
@@ -69,7 +62,6 @@ func TestRunPullCommand_Success(t *testing.T) {
 		Client:  server.Client(),
 		BaseURL: baseURL,
 		RunID:   runID,
-		RepoURL: "https://github.com/example/repo.git",
 	}
 
 	result, err := cmd.Run(context.Background())
@@ -109,7 +101,6 @@ func TestRunPullCommand_NotFound(t *testing.T) {
 		Client:  server.Client(),
 		BaseURL: baseURL,
 		RunID:   runID,
-		RepoURL: "https://github.com/example/repo.git",
 	}
 
 	_, err := cmd.Run(context.Background())
@@ -134,15 +125,14 @@ func TestRunPullCommand_ValidationErrors(t *testing.T) {
 	}{
 		{
 			name:    "nil client",
-			cmd:     RunPullCommand{RunID: runID, RepoURL: "https://example.com"},
+			cmd:     RunPullCommand{RunID: runID},
 			wantErr: "http client required",
 		},
 		{
 			name: "nil base url",
 			cmd: RunPullCommand{
-				Client:  http.DefaultClient,
-				RunID:   runID,
-				RepoURL: "https://example.com",
+				Client: http.DefaultClient,
+				RunID:  runID,
 			},
 			wantErr: "base url required",
 		},
@@ -151,18 +141,8 @@ func TestRunPullCommand_ValidationErrors(t *testing.T) {
 			cmd: RunPullCommand{
 				Client:  http.DefaultClient,
 				BaseURL: &url.URL{Scheme: "http", Host: "localhost"},
-				RepoURL: "https://example.com",
 			},
 			wantErr: "run id required",
-		},
-		{
-			name: "empty repo url",
-			cmd: RunPullCommand{
-				Client:  http.DefaultClient,
-				BaseURL: &url.URL{Scheme: "http", Host: "localhost"},
-				RunID:   runID,
-			},
-			wantErr: "repo url required",
 		},
 	}
 

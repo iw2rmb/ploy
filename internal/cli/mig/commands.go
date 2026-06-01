@@ -521,7 +521,7 @@ func listRunsByMigID(ctx context.Context, httpClient *http.Client, baseURL *url.
 	return result, nil
 }
 
-func runSuccessFail(counts *domaintypes.RunRepoCounts) (int32, int32) {
+func runSuccessFail(counts *domaintypes.RunCounts) (int32, int32) {
 	if counts == nil {
 		return 0, 0
 	}

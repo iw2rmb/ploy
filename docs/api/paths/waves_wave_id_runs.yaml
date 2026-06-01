@@ -1,6 +1,22 @@
 get:
   tags: [Control]
   summary: List runs in a wave
+  parameters:
+    - in: path
+      name: wave_id
+      required: true
+      schema: { type: string }
+      description: Wave ID (KSUID string)
   responses:
     "200":
       description: Run list.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              runs:
+                type: array
+                items:
+                  $ref: "../components/schemas/controlplane.yaml#/RunExecution"
+            required: [runs]

@@ -11,7 +11,7 @@ RunExecutionStatus:
   enum: [Queued, Running, Success, Fail, Cancelled]
 
 # RunBatchDerivedStatus represents the batch-level aggregate status computed
-# from the run states in WaveRunCounts.DerivedStatus.
+# from the run states in RunCounts.DerivedStatus.
 RunBatchDerivedStatus:
   type: string
   description: |
@@ -70,7 +70,7 @@ Run:
       nullable: true
   required: [id, mig_id, spec_id, status, created_at]
 
-WaveRunCounts:
+RunCounts:
   type: object
   description: |
     Aggregated run status counts for a wave. Provides a summary of how many
@@ -128,6 +128,9 @@ RunExecution:
     base_ref:
       type: string
       description: Git ref used as the base for comparisons (e.g., main, master).
+    source_commit_sha:
+      type: string
+      description: Lowercase 40-hex source commit SHA for this run.
     status:
       $ref: "#/RunExecutionStatus"
       description: Current execution status for this run.
@@ -225,7 +228,7 @@ RunSummary:
       nullable: true
       description: Timestamp when the run reached a terminal state.
     run_counts:
-      $ref: "#/WaveRunCounts"
+      $ref: "#/RunCounts"
       nullable: true
       description: Aggregated run status counts for the run's wave (optional).
   required:
@@ -407,18 +410,27 @@ CreateMigRunResponse:
 PullResolutionMode:
   type: string
   description: |
-    Selection mode for resolving a mig repo execution for pull.
+    Selection mode for resolving a mig run for pull.
     - last-succeeded: newest terminal Success (default)
     - last-failed: newest terminal Fail
   enum: [last-succeeded, last-failed]
 
-RunPullRequest:
+RunPullResponse:
   type: object
   properties:
+    run_id:
+      type: string
+      description: Run ID (KSUID string)
+    repo_id:
+      type: string
+      description: Repo ID (NanoID 8-character string)
     repo_url:
       type: string
-      description: Repository URL (normalized for matching).
-  required: [repo_url]
+      description: Repository URL for this run.
+    source_commit_sha:
+      type: string
+      description: Lowercase 40-hex source commit SHA for this run.
+  required: [run_id, repo_id, repo_url, source_commit_sha]
 
 MigPullRequest:
   type: object
@@ -1102,7 +1114,7 @@ RepoSummary:
     last_status:
       type: string
       nullable: true
-      description: Status of the most recent per-repo execution (Queued, Running, Success, Fail, Cancelled)
+      description: Status of the most recent per-run (Queued, Running, Success, Fail, Cancelled)
   required:
     - repo_id
     - repo_url
@@ -1155,10 +1167,10 @@ RepoRunSummary:
 # Run-scoped job listing — GET /v1/runs/{run_id}/jobs
 # -------------------------------------------------------------------------
 
-RepoJobItem:
+RunJobItem:
   type: object
   description: |
-    Job entry for a repo execution within a run.
+    Job entry for a run within a run.
     Used by the --follow job graph display in CLI.
   properties:
     job_id:
@@ -1248,11 +1260,11 @@ RepoJobItem:
     - status
     - duration_ms
 
-ListRepoJobsResponse:
+ListRunJobsResponse:
   type: object
   description: |
     Response from GET /v1/runs/{run_id}/jobs.
-    Lists all jobs for a specific repo execution within a run.
+    Lists all jobs for a specific run within a run.
   properties:
     run_id:
       type: string
@@ -1263,12 +1275,12 @@ ListRepoJobsResponse:
     attempt:
       type: integer
       format: int32
-      description: Attempt number for this repo execution
+      description: Attempt number for this run
     jobs:
       type: array
       items:
-        $ref: "#/RepoJobItem"
-      description: Jobs for this repo execution (chain order represented by next_id links)
+        $ref: "#/RunJobItem"
+      description: Jobs for this run (chain order represented by next_id links)
   required:
     - run_id
     - repo_id

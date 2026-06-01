@@ -12,10 +12,10 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/jobchain"
 )
 
-type RepoJobEntry = migsapi.RunRepoJob
+type RepoJobEntry = migsapi.RunJob
 
 // ListRepoJobsResult contains the response from listing repo jobs.
-type ListRepoJobsResult = migsapi.ListRunRepoJobsResponse
+type ListRepoJobsResult = migsapi.ListRunJobsResponse
 
 // ListRepoJobsCommand fetches jobs for a repo execution.
 type ListRepoJobsCommand struct {

@@ -18,7 +18,7 @@ type repoSnapshotWriter interface {
 	WriteTarGz(ctx context.Context, meta snapshot.Metadata, w io.Writer) error
 }
 
-func getRunRepoSnapshotHandler(st store.Store, snapshots repoSnapshotWriter) http.HandlerFunc {
+func getRunSnapshotHandler(st store.Store, snapshots repoSnapshotWriter) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if snapshots == nil {
 			writeHTTPError(w, http.StatusBadGateway, "snapshot service unavailable")

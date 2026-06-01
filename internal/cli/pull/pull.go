@@ -405,18 +405,19 @@ func followPullRun(ctx context.Context, baseURL *url.URL, client *http.Client, r
 }
 
 // executePullDiffs resolves and applies diffs from the run.
-// Reuses the logic from run_pull.go.
 func executePullDiffs(ctx context.Context, httpClient *http.Client, baseURL *url.URL, runID domaintypes.RunID, repoURL, origin string, dryRun bool, stderr io.Writer) error {
-	// Resolve repo execution via POST /v1/runs/{run_id}/resolve.
+	// Resolve repo metadata via POST /v1/runs/{run_id}/pull.
 	pullCmd := climigs.RunPullCommand{
 		Client:  httpClient,
 		BaseURL: baseURL,
 		RunID:   runID,
-		RepoURL: repoURL,
 	}
 	resolution, err := pullCmd.Run(ctx)
 	if err != nil {
 		return fmt.Errorf("pull: resolve repo: %w", err)
+	}
+	if domaintypes.NormalizeRepoURL(resolution.RepoURL) != domaintypes.NormalizeRepoURL(repoURL) {
+		return fmt.Errorf("pull: local origin %s does not match run repo_url %s", repoURL, resolution.RepoURL)
 	}
 
 	_, _ = fmt.Fprintf(stderr, "  repo ID: %s\n", resolution.RepoID.String())
@@ -442,8 +443,8 @@ func executePullDiffs(ctx context.Context, httpClient *http.Client, baseURL *url
 	}
 	_, _ = fmt.Fprintf(stderr, "  source commit: %s\n", sourceCommit)
 
-	// Fetch diffs for this repo execution.
-	diffs, err := ListRunRepoDiffs(ctx, httpClient, baseURL, runID, resolution.RepoID)
+	// Fetch diffs for this run.
+	diffs, err := ListRunDiffs(ctx, httpClient, baseURL, runID, resolution.RepoID)
 	if err != nil {
 		return fmt.Errorf("pull: list diffs: %w", err)
 	}

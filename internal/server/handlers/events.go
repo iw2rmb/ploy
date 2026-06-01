@@ -285,13 +285,13 @@ func timestampToString(ts pgtype.Timestamptz) string {
 
 // --- Merged from events_repo.go ---
 
-// getRunRepoLogsHandler returns an HTTP handler that streams run lifecycle events
-// over SSE, filtered to stages belonging to a specific repo execution.
+// getRunLogsHandler returns an HTTP handler that streams run lifecycle events
+// over SSE, filtered to stages belonging to a specific run.
 // GET /v1/runs/{run_id}/logs
 //
 // Container log frames are not emitted on this stream (logs moved to job-scoped
 // streams). Only run, stage, and done events are returned.
-func getRunRepoLogsHandler(st store.Store, _ blobstore.Store, eventsService *events.Service) http.HandlerFunc {
+func getRunLogsHandler(st store.Store, _ blobstore.Store, eventsService *events.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		runID, ok := parseRequiredPathIDOrWriteError[domaintypes.RunID](w, r, "run_id")
 		if !ok {
@@ -302,7 +302,7 @@ func getRunRepoLogsHandler(st store.Store, _ blobstore.Store, eventsService *eve
 			return
 		}
 
-		rr, ok := getRunRepoOrFail(w, r, st, runID, repoID, "get run repo logs")
+		rr, ok := getRunOrRepoMismatchOrFail(w, r, st, runID, repoID, "get run repo logs")
 		if !ok {
 			return
 		}
@@ -312,7 +312,7 @@ func getRunRepoLogsHandler(st store.Store, _ blobstore.Store, eventsService *eve
 			return
 		}
 
-		jobs, ok := listJobsForRunRepoOrFail(w, r, st, runID, repoID, rr.Attempt, "get run repo logs")
+		jobs, ok := listJobsForRunAttemptOrFail(w, r, st, runID, repoID, rr.Attempt, "get run repo logs")
 		if !ok {
 			return
 		}

@@ -80,7 +80,7 @@ func TestGetRunCounts(t *testing.T) {
 			st.countRunReposByStatus.val = tc.rows
 			st.countRunReposByStatus.err = tc.err
 
-			counts, err := getRunRepoCounts(context.Background(), st, runID)
+			counts, err := getRunCounts(context.Background(), st, runID)
 			if tc.wantErr {
 				if err == nil {
 					t.Fatalf("expected error")

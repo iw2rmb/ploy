@@ -13,16 +13,16 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-func TestPullRunRepoHandler(t *testing.T) {
+func TestPullRunHandler(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
 	repoID := domaintypes.NewRepoID()
+	sourceSHA := "0123456789abcdef0123456789abcdef01234567"
 
 	tests := []struct {
 		name       string
 		pathRunID  string
-		body       string
 		setup      func(*runStore)
 		wantStatus int
 		verify     func(*testing.T, *runStore, *httptest.ResponseRecorder)
@@ -30,9 +30,8 @@ func TestPullRunRepoHandler(t *testing.T) {
 		{
 			name:      "success",
 			pathRunID: runID.String(),
-			body:      `{"repo_url":"https://github.com/org/repo"}`,
 			setup: func(st *runStore) {
-				st.getRun.val = store.Run{ID: runID, MigID: domaintypes.NewMigID(), RepoID: repoID}
+				st.getRun.val = store.Run{ID: runID, MigID: domaintypes.NewMigID(), RepoID: repoID, SourceCommitSha: sourceSHA}
 				st.repoByID = map[domaintypes.RepoID]store.Repo{repoID: {ID: repoID, Url: "https://github.com/org/repo.git"}}
 			},
 			wantStatus: http.StatusOK,
@@ -48,54 +47,27 @@ func TestPullRunRepoHandler(t *testing.T) {
 				if resp.RepoID != repoID {
 					t.Fatalf("repo_id = %q, want %q", resp.RepoID, repoID)
 				}
+				if resp.RepoURL != "https://github.com/org/repo.git" {
+					t.Fatalf("repo_url = %q", resp.RepoURL)
+				}
+				if resp.SourceCommitSHA != sourceSHA {
+					t.Fatalf("source_commit_sha = %q, want %q", resp.SourceCommitSHA, sourceSHA)
+				}
 				assertCalled(t, "GetRun", st.getRun.called)
 			},
 		},
 		{
-			name:      "git suffix normalization",
-			pathRunID: runID.String(),
-			body:      `{"repo_url":"https://github.com/org/repo.git"}`,
-			setup: func(st *runStore) {
-				st.getRun.val = store.Run{ID: runID, RepoID: repoID}
-				st.repoByID = map[domaintypes.RepoID]store.Repo{repoID: {ID: repoID, Url: "https://github.com/org/repo"}}
-			},
-			wantStatus: http.StatusOK,
-		},
-		{
-			name:      "trailing slash normalization",
-			pathRunID: runID.String(),
-			body:      `{"repo_url":"https://github.com/org/repo"}`,
-			setup: func(st *runStore) {
-				st.getRun.val = store.Run{ID: runID, RepoID: repoID}
-				st.repoByID = map[domaintypes.RepoID]store.Repo{repoID: {ID: repoID, Url: "https://github.com/org/repo/"}}
-			},
-			wantStatus: http.StatusOK,
-		},
-		{
 			name:      "run not found",
 			pathRunID: runID.String(),
-			body:      `{"repo_url":"https://github.com/org/repo"}`,
 			setup: func(st *runStore) {
 				st.getRun.err = pgx.ErrNoRows
 			},
 			wantStatus: http.StatusNotFound,
 		},
-		{
-			name:      "repo not found",
-			pathRunID: runID.String(),
-			body:      `{"repo_url":"https://github.com/org/missing"}`,
-			setup: func(st *runStore) {
-				st.getRun.val = store.Run{ID: runID, RepoID: repoID}
-				st.repoByID = map[domaintypes.RepoID]store.Repo{repoID: {ID: repoID, Url: "https://github.com/org/repo"}}
-			},
-			wantStatus: http.StatusNotFound,
-		},
-		{name: "missing repo url", pathRunID: runID.String(), body: `{}`, setup: func(*runStore) {}, wantStatus: http.StatusBadRequest},
-		{name: "missing run id", pathRunID: "", body: `{"repo_url":"https://github.com/org/repo"}`, setup: func(*runStore) {}, wantStatus: http.StatusBadRequest},
+		{name: "missing run id", pathRunID: "", setup: func(*runStore) {}, wantStatus: http.StatusBadRequest},
 		{
 			name:      "store error",
 			pathRunID: runID.String(),
-			body:      `{"repo_url":"https://github.com/org/repo"}`,
 			setup: func(st *runStore) {
 				st.getRun.val = store.Run{ID: runID}
 			},
@@ -108,7 +80,7 @@ func TestPullRunRepoHandler(t *testing.T) {
 			t.Parallel()
 			st := &runStore{}
 			tt.setup(st)
-			rr := doRequest(t, resolveRunRepoHandler(st), http.MethodPost, "/v1/runs/"+tt.pathRunID+"/resolve", tt.body, "run_id", tt.pathRunID)
+			rr := doRequest(t, pullRunHandler(st), http.MethodPost, "/v1/runs/"+tt.pathRunID+"/pull", nil, "run_id", tt.pathRunID)
 			assertStatus(t, rr, tt.wantStatus)
 			if tt.verify != nil {
 				tt.verify(t, st, rr)

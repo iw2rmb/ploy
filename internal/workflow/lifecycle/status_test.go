@@ -60,15 +60,15 @@ func TestDeriveBatchStatus(t *testing.T) {
 
 	tests := []struct {
 		name   string
-		counts *domaintypes.RunRepoCounts
+		counts *domaintypes.RunCounts
 		want   string
 	}{
-		{name: "empty batch", counts: &domaintypes.RunRepoCounts{Total: 0}, want: lifecycle.DerivedStatusPending},
-		{name: "queued only", counts: &domaintypes.RunRepoCounts{Total: 2, Queued: 2}, want: lifecycle.DerivedStatusPending},
-		{name: "running", counts: &domaintypes.RunRepoCounts{Total: 2, Running: 1, Queued: 1}, want: lifecycle.DerivedStatusRunning},
-		{name: "cancelled", counts: &domaintypes.RunRepoCounts{Total: 2, Cancelled: 1, Running: 1}, want: lifecycle.DerivedStatusCancelled},
-		{name: "failed", counts: &domaintypes.RunRepoCounts{Total: 2, Fail: 1, Success: 1}, want: lifecycle.DerivedStatusFailed},
-		{name: "completed", counts: &domaintypes.RunRepoCounts{Total: 2, Success: 2}, want: lifecycle.DerivedStatusCompleted},
+		{name: "empty batch", counts: &domaintypes.RunCounts{Total: 0}, want: lifecycle.DerivedStatusPending},
+		{name: "queued only", counts: &domaintypes.RunCounts{Total: 2, Queued: 2}, want: lifecycle.DerivedStatusPending},
+		{name: "running", counts: &domaintypes.RunCounts{Total: 2, Running: 1, Queued: 1}, want: lifecycle.DerivedStatusRunning},
+		{name: "cancelled", counts: &domaintypes.RunCounts{Total: 2, Cancelled: 1, Running: 1}, want: lifecycle.DerivedStatusCancelled},
+		{name: "failed", counts: &domaintypes.RunCounts{Total: 2, Fail: 1, Success: 1}, want: lifecycle.DerivedStatusFailed},
+		{name: "completed", counts: &domaintypes.RunCounts{Total: 2, Success: 2}, want: lifecycle.DerivedStatusCompleted},
 	}
 
 	for _, tc := range tests {

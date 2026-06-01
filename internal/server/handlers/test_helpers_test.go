@@ -93,9 +93,9 @@ func validRunRequestBodyWithout(keys ...string) map[string]any {
 	return body
 }
 
-// newRunRepoJobsFixture creates a mock store and handler pre-configured for a single
+// newRunJobsFixture creates a mock store and handler pre-configured for a single
 // gate-type job with the given meta JSON. Returns the store, handler, runID, and repoID.
-func newRunRepoJobsFixture(t *testing.T, metaJSON string) (*runStore, http.Handler, domaintypes.RunID, domaintypes.RepoID) {
+func newRunJobsFixture(t *testing.T, metaJSON string) (*runStore, http.Handler, domaintypes.RunID, domaintypes.RepoID) {
 	t.Helper()
 	runID := domaintypes.NewRunID()
 	repoID := domaintypes.NewRepoID()
@@ -119,7 +119,7 @@ func newRunRepoJobsFixture(t *testing.T, metaJSON string) (*runStore, http.Handl
 			Meta:    []byte(metaJSON),
 		},
 	}
-	handler := listRunRepoJobsHandler(st)
+	handler := listRunJobsHandler(st)
 	return st, handler, runID, repoID
 }
 

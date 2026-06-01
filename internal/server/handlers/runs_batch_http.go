@@ -1,11 +1,10 @@
 package handlers
 
 import (
+	"errors"
 	"net/http"
 
-	"github.com/iw2rmb/ploy/internal/blobstore"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	"github.com/iw2rmb/ploy/internal/gitauth"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/workflow/lifecycle"
 )
@@ -36,38 +35,26 @@ func cancelRunHandlerV1(st store.Store) http.HandlerFunc {
 	}
 }
 
-func addRunRepoHandler(store.Store, gitauth.Options) http.HandlerFunc {
-	return removedRunRepoSurface
-}
-
-func listRunReposHandler(st store.Store) http.HandlerFunc {
+func restartRunHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		runID, ok := parseRequiredPathIDOrWriteError[domaintypes.RunID](w, r, "run_id")
 		if !ok {
 			return
 		}
-		run, ok := getRunOrFail(w, r, st, runID, "list run repos")
-		if !ok {
+		run, err := st.RestartRun(r.Context(), runID)
+		if err != nil {
+			switch {
+			case errors.Is(err, store.ErrRunRestartActive):
+				writeHTTPError(w, http.StatusConflict, "run is not terminal")
+			case errors.Is(err, store.ErrRunRestartWaveCancelled):
+				writeHTTPError(w, http.StatusConflict, "owning wave is cancelled")
+			case isNoRowsError(err):
+				writeHTTPError(w, http.StatusNotFound, "run not found")
+			default:
+				writeHTTPError(w, http.StatusInternalServerError, "failed to restart run: %v", err)
+			}
 			return
 		}
-		repoURL := ""
-		if repo, err := st.GetRepo(r.Context(), run.RepoID); err == nil {
-			repoURL = repo.Url
-		}
-		writeJSON(w, http.StatusOK, struct {
-			Repos []RunRepoResponse `json:"repos"`
-		}{Repos: []RunRepoResponse{runRepoToResponse(run, repoURL)}})
+		writeJSON(w, http.StatusOK, runToSummary(run))
 	}
-}
-
-func cancelRunRepoHandlerV1(store.Store) http.HandlerFunc {
-	return removedRunRepoSurface
-}
-
-func restartRunRepoHandler(store.Store, blobstore.Store) http.HandlerFunc {
-	return removedRunRepoSurface
-}
-
-func removedRunRepoSurface(w http.ResponseWriter, _ *http.Request) {
-	writeHTTPError(w, http.StatusGone, "repo-scoped run endpoint was removed; use run-scoped endpoints")
 }

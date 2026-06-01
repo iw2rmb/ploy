@@ -12,7 +12,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-func TestListRunRepoArtifactsHandler_Success_FiltersAndOrders(t *testing.T) {
+func TestListRunArtifactsHandler_Success_FiltersAndOrders(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
@@ -68,7 +68,7 @@ func TestListRunRepoArtifactsHandler_Success_FiltersAndOrders(t *testing.T) {
 		},
 	}
 
-	rr := doRequest(t, listRunRepoArtifactsHandler(st), http.MethodGet,
+	rr := doRequest(t, listRunArtifactsHandler(st), http.MethodGet,
 		"/v1/runs/"+runID.String()+"/artifacts", nil,
 		"run_id", runID.String())
 	assertStatus(t, rr, http.StatusOK)

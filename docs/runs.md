@@ -24,6 +24,7 @@ ploy mig run <mig-id|name> [--repo <repo-url> ... | --failed] [--follow]
 ```bash
 ploy run status <run-id> [--json|--follow]
 ploy run cancel <run-id>
+ploy run restart <run-id>
 ploy wave status <wave-id> [--follow]
 ploy wave runs <wave-id>
 ploy wave cancel <wave-id>
@@ -35,7 +36,8 @@ Run-scoped API surfaces:
 - `GET /v1/runs/{run_id}`
 - `GET /v1/runs/{run_id}/status`
 - `POST /v1/runs/{run_id}/cancel`
-- `POST /v1/runs/{run_id}/resolve`
+- `POST /v1/runs/{run_id}/restart`
+- `POST /v1/runs/{run_id}/pull`
 - `GET /v1/runs/{run_id}/jobs`
 - `GET /v1/runs/{run_id}/diffs`
 - `GET /v1/runs/{run_id}/logs`
@@ -50,7 +52,7 @@ Wave-scoped API surfaces:
 - `POST /v1/waves/{wave_id}/cancel`
 
 There are no repo-scoped run endpoints. Run inspection, artifacts, diffs, jobs,
-logs, cancellation, and pull resolution are all run-scoped.
+logs, cancellation, restart, and pull resolution are all run-scoped.
 
 ## Artifacts And Apply
 
@@ -60,8 +62,9 @@ ploy run apply <run-id> [path] [--force]
 ```
 
 `run pull` downloads final artifacts into a directory. `run apply` applies the
-accumulated run patch into a clean local git worktree. Local `HEAD` must match
-the run `source_commit_sha`; `--force` bypasses only that source-commit guard.
+accumulated run patch into a clean local git worktree. The local origin must
+match the run `repo_url`. Local `HEAD` must match the run `source_commit_sha`;
+`--force` bypasses only that source-commit guard.
 
 ## Storage
 

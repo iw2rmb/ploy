@@ -81,7 +81,7 @@ func newRunApplyServer(t *testing.T, runID, repoID, jobID, sourceSHA string, pat
 	diffID := "11111111-1111-1111-1111-111111111111"
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
-		case r.Method == http.MethodPost && r.URL.Path == "/v1/runs/"+runID+"/resolve":
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/runs/"+runID+"/pull":
 			_ = json.NewEncoder(w).Encode(map[string]string{
 				"run_id":            runID,
 				"repo_id":           repoID,

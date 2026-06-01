@@ -12,7 +12,7 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-func TestListRunRepoDiffsCommand_Success(t *testing.T) {
+func TestListRunDiffsCommand_Success(t *testing.T) {
 	runID := domaintypes.NewRunID()
 	repoID := domaintypes.NewRepoID()
 	jobID1 := domaintypes.NewJobID()
@@ -48,7 +48,7 @@ func TestListRunRepoDiffsCommand_Success(t *testing.T) {
 	defer srv.Close()
 
 	base, _ := url.Parse(srv.URL)
-	cmd := ListRunRepoDiffsCommand{
+	cmd := ListRunDiffsCommand{
 		Client:  srv.Client(),
 		BaseURL: base,
 		RunID:   runID,
@@ -72,7 +72,7 @@ func TestListRunRepoDiffsCommand_Success(t *testing.T) {
 	}
 }
 
-func TestListRunRepoDiffsCommand_EmptyList(t *testing.T) {
+func TestListRunDiffsCommand_EmptyList(t *testing.T) {
 	runID := domaintypes.NewRunID()
 	repoID := domaintypes.NewRepoID()
 
@@ -85,7 +85,7 @@ func TestListRunRepoDiffsCommand_EmptyList(t *testing.T) {
 	defer srv.Close()
 
 	base, _ := url.Parse(srv.URL)
-	cmd := ListRunRepoDiffsCommand{
+	cmd := ListRunDiffsCommand{
 		Client:  srv.Client(),
 		BaseURL: base,
 		RunID:   runID,

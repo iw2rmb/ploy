@@ -55,7 +55,7 @@ func TestRunRepoDiffs_Download(t *testing.T) {
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID.String()+"/diffs?download=true&diff_id="+diffID.String(), nil)
 	req.SetPathValue("run_id", runID.String())
-	listRunRepoDiffsHandler(st, bs).ServeHTTP(rr, req)
+	listRunDiffsHandler(st, bs).ServeHTTP(rr, req)
 	assertStatus(t, rr, http.StatusOK)
 	if ct := rr.Header().Get("Content-Type"); ct != "application/gzip" {
 		t.Fatalf("content-type=%s, want application/gzip", ct)
@@ -110,7 +110,7 @@ func TestRunRepoDiffs_DownloadAccumulated(t *testing.T) {
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID.String()+"/diffs?download=true&accumulated=true&diff_id="+diffID2.String(), nil)
 	req.SetPathValue("run_id", runID.String())
-	listRunRepoDiffsHandler(st, bs).ServeHTTP(rr, req)
+	listRunDiffsHandler(st, bs).ServeHTTP(rr, req)
 
 	assertStatus(t, rr, http.StatusOK)
 	gotPlain := gunzipTestBytes(t, rr.Body.Bytes())
@@ -135,7 +135,7 @@ func TestRunRepoDiffs_ReturnsEmptyListWhenRunHasNoDiffJobs(t *testing.T) {
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID.String()+"/diffs", nil)
 	req.SetPathValue("run_id", runID.String())
-	listRunRepoDiffsHandler(st, bs).ServeHTTP(rr, req)
+	listRunDiffsHandler(st, bs).ServeHTTP(rr, req)
 
 	assertStatus(t, rr, http.StatusOK)
 
@@ -195,7 +195,7 @@ func TestRunRepoDiffs_ReturnsOwnDiffs(t *testing.T) {
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID.String()+"/diffs", nil)
 	req.SetPathValue("run_id", runID.String())
-	listRunRepoDiffsHandler(st, bs).ServeHTTP(rr, req)
+	listRunDiffsHandler(st, bs).ServeHTTP(rr, req)
 
 	assertStatus(t, rr, http.StatusOK)
 
@@ -230,7 +230,7 @@ func TestRunRepoDiffs_MissingRunID(t *testing.T) {
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/v1/runs//diffs", nil)
 	req.SetPathValue("run_id", "")
-	listRunRepoDiffsHandler(st, bs).ServeHTTP(rr, req)
+	listRunDiffsHandler(st, bs).ServeHTTP(rr, req)
 
 	assertStatus(t, rr, http.StatusBadRequest)
 }
