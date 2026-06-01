@@ -22,7 +22,7 @@ import (
 //   - Creates a mig project (mig name == mig id).
 //   - Creates a spec row and sets migs.spec_id.
 //   - Creates a mig repo row for the provided repo_url.
-//   - Creates a run and run repo row.
+//   - Creates a run and run row.
 //   - Response includes run_id, mig_id, spec_id.
 func TestRunsCreateSingleRepo_Success(t *testing.T) {
 	st := &migStore{}
@@ -46,7 +46,7 @@ func TestRunsCreateSingleRepo_Success(t *testing.T) {
 	if !st.createRun.called {
 		t.Error("store.CreateRun was not called")
 	}
-	if !st.createRunRepo.called {
+	if !st.createRun.called {
 		t.Error("store.CreateRun was not called")
 	}
 	if st.createJob.called {
@@ -242,11 +242,11 @@ func TestRunsCreateSingleRepo_StoreErrors(t *testing.T) {
 		},
 		{
 			name:    "CreateRunError",
-			setupFn: func(st *migStore) { st.createRun.errs = []error{errors.New("database connection failed")} },
+			setupFn: func(st *migStore) { st.createRunSeq.errs = []error{errors.New("database connection failed")} },
 		},
 		{
 			name:    "CreateRunError",
-			setupFn: func(st *migStore) { st.createRunRepo.err = errors.New("database connection failed") },
+			setupFn: func(st *migStore) { st.createRun.err = errors.New("database connection failed") },
 		},
 	}
 
@@ -289,7 +289,7 @@ func TestRunsCreateSingleRepo_RejectsWhenSourceCommitSeedFails(t *testing.T) {
 	if st.createRun.called {
 		t.Fatal("store.CreateRun should not be called when source commit seed resolution fails")
 	}
-	if st.createRunRepo.called {
+	if st.createRun.called {
 		t.Fatal("store.CreateRun should not be called when source commit seed resolution fails")
 	}
 }

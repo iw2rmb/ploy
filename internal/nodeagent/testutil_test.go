@@ -576,7 +576,7 @@ func withJobID(id string) startRunOption {
 	return func(r *StartRunRequest) { r.JobID = types.JobID(id) }
 }
 
-func withRunRepoURL(u string) startRunOption {
+func withRunURL(u string) startRunOption {
 	return func(r *StartRunRequest) { r.RepoURL = types.RepoURL(u) }
 }
 

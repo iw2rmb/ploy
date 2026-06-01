@@ -45,9 +45,7 @@ type diffListResponse struct {
 
 const maxAccumulatedDiffPlainBytes int64 = 64 << 20
 
-// listRunDiffsHandler returns a JSON list of diffs for a specific run
-// within a run. This is the v1 repo-scoped endpoint replacing the legacy run-scoped
-// diffs listing endpoint.
+// listRunDiffsHandler returns a JSON list of diffs for a specific run.
 //
 // GET /v1/runs/{run_id}/diffs
 //
@@ -55,27 +53,21 @@ const maxAccumulatedDiffPlainBytes int64 = 64 << 20
 // - GET /v1/runs/{run_id}/diffs?download=true&diff_id=<uuid>
 // - Returns the gzipped patch bytes for the requested diff, streamed from object storage.
 //
-// v1 repo-scoped diffs listing:
-// - Repo attribution comes from joining diffs.job_id → jobs.repo_id
-// - Diffs for repo A are excluded from repo B listing
-// - Response shape is unchanged from legacy endpoint (diffListResponse)
-//
-// Run and job IDs are KSUID-backed strings; repo IDs are NanoID-backed strings.
+// Run and job IDs are KSUID-backed strings.
 func listRunDiffsHandler(st store.Store, bs blobstore.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		runID, ok := parseRequiredPathIDOrWriteError[domaintypes.RunID](w, r, "run_id")
 		if !ok {
 			return
 		}
-
-		repoID, ok := runRepoIDFromPathOrRun(w, r, st, runID)
+		run, ok := getRunOrFail(w, r, st, runID, "list run diffs")
 		if !ok {
 			return
 		}
 
 		// Optional download mode: serve a specific gzipped patch artifact.
 		// When accumulated=true, returns a gzipped patch that contains all diffs
-		// for this repo up to and including diff_id, in list order.
+		// for this run up to and including diff_id, in list order.
 		if r.URL.Query().Get("download") == "true" {
 			diffID, ok := parseRequiredQueryIDOrWriteError[domaintypes.DiffID](w, r, "diff_id")
 			if !ok {
@@ -83,14 +75,14 @@ func listRunDiffsHandler(st store.Store, bs blobstore.Store) http.HandlerFunc {
 			}
 			accumulated := strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("accumulated")), "true")
 			if accumulated {
-				if !downloadAccumulatedRunDiff(w, r, st, bs, runID, repoID, diffID) {
+				if !downloadAccumulatedRunDiff(w, r, st, bs, run, diffID) {
 					return
 				}
 				return
 			}
-			diffs, err := listEffectiveRunDiffs(r.Context(), st, runID, repoID)
+			diffs, err := listEffectiveRunDiffs(r.Context(), st, run)
 			if err != nil {
-				serverError(w, "download run repo diff", "list diffs", err, "run_id", runID.String(), "repo_id", repoID.String(), "diff_id", diffID.String())
+				serverError(w, "download run diff", "list diffs", err, "run_id", runID.String(), "repo_id", run.RepoID.String(), "diff_id", diffID.String())
 				return
 			}
 			diffUUID := uuid.MustParse(diffID.String())
@@ -110,7 +102,7 @@ func listRunDiffsHandler(st store.Store, bs blobstore.Store) http.HandlerFunc {
 
 			// Stream from object storage.
 			rc, size, ok := openBlobForHTTP(w, r, bs, d.ObjectKey, "diff",
-				"run_id", runID.String(), "repo_id", repoID.String(), "diff_id", diffID.String())
+				"run_id", runID.String(), "repo_id", run.RepoID.String(), "diff_id", diffID.String())
 			if !ok {
 				return
 			}
@@ -120,10 +112,10 @@ func listRunDiffsHandler(st store.Store, bs blobstore.Store) http.HandlerFunc {
 			return
 		}
 
-		diffs, err := listEffectiveRunDiffs(r.Context(), st, runID, repoID)
+		diffs, err := listEffectiveRunDiffs(r.Context(), st, run)
 		if err != nil {
 			writeHTTPError(w, http.StatusInternalServerError, "failed to list diffs: %v", err)
-			slog.Error("list run diffs: query failed", "run_id", runID.String(), "repo_id", repoID.String(), "err", err)
+			slog.Error("list run diffs: query failed", "run_id", runID.String(), "repo_id", run.RepoID.String(), "err", err)
 			return
 		}
 
@@ -137,7 +129,7 @@ func listRunDiffsHandler(st store.Store, bs blobstore.Store) http.HandlerFunc {
 			}
 			items = append(items, diffItem{
 				ID:        uuid.UUID(d.ID.Bytes).String(), // diffs.id is still UUID
-				JobID:     row.DisplayJobID,               // current run/repo job ID
+				JobID:     row.DisplayJobID,
 				CreatedAt: d.CreatedAt.Time,
 				Size:      int(d.PatchSize),
 				Summary:   summary,
@@ -153,13 +145,12 @@ func downloadAccumulatedRunDiff(
 	r *http.Request,
 	st store.Store,
 	bs blobstore.Store,
-	runID domaintypes.RunID,
-	repoID domaintypes.RepoID,
+	run store.Run,
 	diffID domaintypes.DiffID,
 ) bool {
-	diffs, err := listEffectiveRunDiffs(r.Context(), st, runID, repoID)
+	diffs, err := listEffectiveRunDiffs(r.Context(), st, run)
 	if err != nil {
-		serverError(w, "download accumulated run repo diff", "list diffs", err, "run_id", runID.String(), "repo_id", repoID.String(), "diff_id", diffID.String())
+		serverError(w, "download accumulated run diff", "list diffs", err, "run_id", run.ID.String(), "repo_id", run.RepoID.String(), "diff_id", diffID.String())
 		return false
 	}
 
@@ -181,7 +172,7 @@ func downloadAccumulatedRunDiff(
 		item := row.Diff
 		if item.ObjectKey == nil || strings.TrimSpace(*item.ObjectKey) == "" {
 			writeHTTPError(w, http.StatusNotFound, "diff blob not found")
-			slog.Error("download accumulated run repo diff: missing object key", "run_id", runID.String(), "repo_id", repoID.String(), "diff_id", diffID.String())
+			slog.Error("download accumulated run diff: missing object key", "run_id", run.ID.String(), "repo_id", run.RepoID.String(), "diff_id", diffID.String())
 			return false
 		}
 
@@ -189,11 +180,11 @@ func downloadAccumulatedRunDiff(
 		if getErr != nil {
 			if errors.Is(getErr, blobstore.ErrNotFound) {
 				writeHTTPError(w, http.StatusNotFound, "diff blob not found")
-				slog.Error("download accumulated run repo diff: missing blob", "run_id", runID.String(), "repo_id", repoID.String(), "diff_id", diffID.String(), "object_key", *item.ObjectKey)
+				slog.Error("download accumulated run diff: missing blob", "run_id", run.ID.String(), "repo_id", run.RepoID.String(), "diff_id", diffID.String(), "object_key", *item.ObjectKey)
 				return false
 			}
 			writeHTTPError(w, http.StatusServiceUnavailable, "failed to retrieve diff blob")
-			slog.Error("download accumulated run repo diff: get blob failed", "run_id", runID.String(), "repo_id", repoID.String(), "diff_id", diffID.String(), "object_key", *item.ObjectKey, "err", getErr)
+			slog.Error("download accumulated run diff: get blob failed", "run_id", run.ID.String(), "repo_id", run.RepoID.String(), "diff_id", diffID.String(), "object_key", *item.ObjectKey, "err", getErr)
 			return false
 		}
 
@@ -201,7 +192,7 @@ func downloadAccumulatedRunDiff(
 		if zerr != nil {
 			_ = rc.Close()
 			writeHTTPError(w, http.StatusInternalServerError, "failed to read diff blob")
-			slog.Error("download accumulated run repo diff: open gzip reader failed", "run_id", runID.String(), "repo_id", repoID.String(), "diff_id", diffID.String(), "object_key", *item.ObjectKey, "err", zerr)
+			slog.Error("download accumulated run diff: open gzip reader failed", "run_id", run.ID.String(), "repo_id", run.RepoID.String(), "diff_id", diffID.String(), "object_key", *item.ObjectKey, "err", zerr)
 			return false
 		}
 
@@ -210,7 +201,7 @@ func downloadAccumulatedRunDiff(
 			_ = zr.Close()
 			_ = rc.Close()
 			writeHTTPError(w, http.StatusRequestEntityTooLarge, "accumulated diff exceeds size limit")
-			slog.Error("download accumulated run repo diff: uncompressed size limit reached", "run_id", runID.String(), "repo_id", repoID.String(), "diff_id", diffID.String(), "limit_bytes", maxAccumulatedDiffPlainBytes)
+			slog.Error("download accumulated run diff: uncompressed size limit reached", "run_id", run.ID.String(), "repo_id", run.RepoID.String(), "diff_id", diffID.String(), "limit_bytes", maxAccumulatedDiffPlainBytes)
 			return false
 		}
 
@@ -219,26 +210,26 @@ func downloadAccumulatedRunDiff(
 			_ = zr.Close()
 			_ = rc.Close()
 			writeHTTPError(w, http.StatusInternalServerError, "failed to read diff blob")
-			slog.Error("download accumulated run repo diff: gunzip copy failed", "run_id", runID.String(), "repo_id", repoID.String(), "diff_id", diffID.String(), "object_key", *item.ObjectKey, "err", copyErr)
+			slog.Error("download accumulated run diff: gunzip copy failed", "run_id", run.ID.String(), "repo_id", run.RepoID.String(), "diff_id", diffID.String(), "object_key", *item.ObjectKey, "err", copyErr)
 			return false
 		}
 		if n > remaining {
 			_ = zr.Close()
 			_ = rc.Close()
 			writeHTTPError(w, http.StatusRequestEntityTooLarge, "accumulated diff exceeds size limit")
-			slog.Error("download accumulated run repo diff: uncompressed size exceeded", "run_id", runID.String(), "repo_id", repoID.String(), "diff_id", diffID.String(), "object_key", *item.ObjectKey, "limit_bytes", maxAccumulatedDiffPlainBytes)
+			slog.Error("download accumulated run diff: uncompressed size exceeded", "run_id", run.ID.String(), "repo_id", run.RepoID.String(), "diff_id", diffID.String(), "object_key", *item.ObjectKey, "limit_bytes", maxAccumulatedDiffPlainBytes)
 			return false
 		}
 
 		if closeErr := zr.Close(); closeErr != nil {
 			_ = rc.Close()
 			writeHTTPError(w, http.StatusInternalServerError, "failed to read diff blob")
-			slog.Error("download accumulated run repo diff: close gzip reader failed", "run_id", runID.String(), "repo_id", repoID.String(), "diff_id", diffID.String(), "object_key", *item.ObjectKey, "err", closeErr)
+			slog.Error("download accumulated run diff: close gzip reader failed", "run_id", run.ID.String(), "repo_id", run.RepoID.String(), "diff_id", diffID.String(), "object_key", *item.ObjectKey, "err", closeErr)
 			return false
 		}
 		if closeErr := rc.Close(); closeErr != nil {
 			writeHTTPError(w, http.StatusInternalServerError, "failed to read diff blob")
-			slog.Error("download accumulated run repo diff: close blob reader failed", "run_id", runID.String(), "repo_id", repoID.String(), "diff_id", diffID.String(), "object_key", *item.ObjectKey, "err", closeErr)
+			slog.Error("download accumulated run diff: close blob reader failed", "run_id", run.ID.String(), "repo_id", run.RepoID.String(), "diff_id", diffID.String(), "object_key", *item.ObjectKey, "err", closeErr)
 			return false
 		}
 	}
@@ -248,12 +239,12 @@ func downloadAccumulatedRunDiff(
 	if _, err := zw.Write(plain.Bytes()); err != nil {
 		_ = zw.Close()
 		writeHTTPError(w, http.StatusInternalServerError, "failed to build accumulated diff")
-		slog.Error("download accumulated run repo diff: write gzip failed", "run_id", runID.String(), "repo_id", repoID.String(), "diff_id", diffID.String(), "err", err)
+		slog.Error("download accumulated run diff: write gzip failed", "run_id", run.ID.String(), "repo_id", run.RepoID.String(), "diff_id", diffID.String(), "err", err)
 		return false
 	}
 	if err := zw.Close(); err != nil {
 		writeHTTPError(w, http.StatusInternalServerError, "failed to build accumulated diff")
-		slog.Error("download accumulated run repo diff: close gzip failed", "run_id", runID.String(), "repo_id", repoID.String(), "diff_id", diffID.String(), "err", err)
+		slog.Error("download accumulated run diff: close gzip failed", "run_id", run.ID.String(), "repo_id", run.RepoID.String(), "diff_id", diffID.String(), "err", err)
 		return false
 	}
 
@@ -261,7 +252,7 @@ func downloadAccumulatedRunDiff(
 	return true
 }
 
-type runRepoDiffRow struct {
+type runDiffRow struct {
 	Diff         store.Diff
 	DisplayJobID domaintypes.JobID
 }
@@ -269,28 +260,17 @@ type runRepoDiffRow struct {
 func listEffectiveRunDiffs(
 	ctx context.Context,
 	st store.Store,
-	runID domaintypes.RunID,
-	repoID domaintypes.RepoID,
-) ([]runRepoDiffRow, error) {
-	rr, err := st.GetRun(ctx, runID)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return []runRepoDiffRow{}, nil
-		}
-		return nil, err
-	}
-	if rr.RepoID != repoID {
-		return []runRepoDiffRow{}, nil
-	}
+	run store.Run,
+) ([]runDiffRow, error) {
 	jobs, err := st.ListJobsByRunAttempt(ctx, store.ListJobsByRunAttemptParams{
-		RunID:   runID,
-		Attempt: rr.Attempt,
+		RunID:   run.ID,
+		Attempt: run.Attempt,
 	})
 	if err != nil {
 		return nil, err
 	}
 	if len(jobs) == 0 {
-		return []runRepoDiffRow{}, nil
+		return []runDiffRow{}, nil
 	}
 
 	orderByID := deriveJobOrderByChain(jobs)
@@ -303,7 +283,7 @@ func listEffectiveRunDiffs(
 		return jobs[i].ID.String() < jobs[j].ID.String()
 	})
 
-	out := make([]runRepoDiffRow, 0, len(jobs))
+	out := make([]runDiffRow, 0, len(jobs))
 	seenDiffIDs := map[string]struct{}{}
 	for _, job := range jobs {
 		sourceJob, sourceErr := resolveEffectiveSourceJob(ctx, st, job.ID)
@@ -322,7 +302,7 @@ func listEffectiveRunDiffs(
 			continue
 		}
 		seenDiffIDs[diffID] = struct{}{}
-		out = append(out, runRepoDiffRow{
+		out = append(out, runDiffRow{
 			Diff:         diff,
 			DisplayJobID: job.ID,
 		})

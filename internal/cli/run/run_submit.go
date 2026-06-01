@@ -59,7 +59,7 @@ func RunSubmit(ctx context.Context, opts SubmitOptions) error {
 		return err
 	}
 
-	repo, err := resolveRunRepo(ctx, base, httpClient, opts.RepoSelector)
+	repo, err := resolveSourceRepo(ctx, base, httpClient, opts.RepoSelector)
 	if err != nil {
 		return err
 	}

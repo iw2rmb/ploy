@@ -21,7 +21,7 @@ import (
 func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest) {
 	startTime := time.Now()
 
-	artifactPaths := runRepoJobArtifactPaths(req.RunID, req.RepoID, req.JobID)
+	artifactPaths := runJobArtifactPaths(req.RunID, req.JobID)
 	uploadRepoArtifactsOnReturn := false
 	closeArtifactLogs := func() {}
 	defer func() {
@@ -116,10 +116,10 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 		return
 	}
 	defer cleanupGateOutLink(workspace)
-	shareDir, err := ensureRunRepoShareDir(req.RunID, req.RepoID)
+	shareDir, err := ensureRunShareDir(req.RunID)
 	if err != nil {
 		uploadRepoArtifactsOnReturn = true
-		slog.Error("failed to ensure run/repo share dir", "run_id", req.RunID, "job_id", req.JobID, "error", err)
+		slog.Error("failed to ensure run share dir", "run_id", req.RunID, "job_id", req.JobID, "error", err)
 		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
 		return
 	}
@@ -210,7 +210,7 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 	if uploadErr := r.uploadStatus(ctx, req.RunID.String(), status.String(), &exitCode, stats, req.JobID, repoSHAOut); uploadErr != nil {
 		slog.Error("failed to upload gate status", "run_id", req.RunID, "job_id", req.JobID, "status", status, "error", uploadErr)
 	} else {
-		r.cleanupRunRepoShareOnTerminalSuccess(req, status)
+		r.cleanupRunShareOnTerminalSuccess(req, status)
 	}
 	slog.Info("gate job "+logVerb, "run_id", req.RunID, "job_id", req.JobID, "job_type", req.JobType, "duration", duration)
 }

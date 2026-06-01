@@ -10,17 +10,17 @@ import (
 type mockRunController struct {
 	mu sync.Mutex
 
-	startCalled  bool
+	startCalled       bool
 	startActionCalled bool
-	stopCalled   bool
-	startErr     error
-	startActionErr error
-	stopErr      error
-	lastStart    StartRunRequest
-	lastStartAction StartActionRequest
-	lastStop     StopRunRequest
-	acquireCalls int
-	releaseCalls int
+	stopCalled        bool
+	startErr          error
+	startActionErr    error
+	stopErr           error
+	lastStart         StartRunRequest
+	lastStartAction   StartActionRequest
+	lastStop          StopRunRequest
+	acquireCalls      int
+	releaseCalls      int
 
 	// slotSem is a mock concurrency semaphore. If nil, AcquireSlot/ReleaseSlot
 	// are no-ops. Tests can set this to simulate concurrency limiting.

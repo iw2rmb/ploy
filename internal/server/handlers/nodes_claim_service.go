@@ -138,7 +138,6 @@ func (s *ClaimService) Claim(ctx context.Context, nodeID domaintypes.NodeID) (Cl
 				slog.Error("claim: get run failed for action", "node_id", nodeID, "action_id", action.ID, "err", getRunErr)
 				return ClaimResult{}, claimInternal("failed to get run for claimed action", getRunErr)
 			}
-			rr := run
 			repoURL, repoErr := repoURLForID(ctx, s.store, run.RepoID)
 			if repoErr != nil {
 				slog.Error("claim: get repo failed for action", "node_id", nodeID, "action_id", action.ID, "repo_id", run.RepoID, "err", repoErr)
@@ -150,7 +149,7 @@ func (s *ClaimService) Claim(ctx context.Context, nodeID domaintypes.NodeID) (Cl
 				return ClaimResult{}, claimInternal("failed to get spec for claimed action", specErr)
 			}
 
-			payload := buildActionClaimResponsePayload(run, spec.Spec, rr, repoURL, action)
+			payload := buildActionClaimResponsePayload(spec.Spec, run, repoURL, action)
 			slog.Info("action claimed",
 				"action_id", action.ID,
 				"action_type", action.ActionType,
@@ -169,9 +168,7 @@ func (s *ClaimService) Claim(ctx context.Context, nodeID domaintypes.NodeID) (Cl
 		return ClaimResult{}, claimInternal("failed to get run for claimed job", err)
 	}
 
-	rr := run
-
-	claimDecision := lifecycle.EvaluateClaimDecision(domaintypes.JobType(job.JobType), rr.Status)
+	claimDecision := lifecycle.EvaluateClaimDecision(domaintypes.JobType(job.JobType), run.Status)
 
 	repoURL, err := repoURLForID(ctx, s.store, job.RepoID)
 	if err != nil {
@@ -185,7 +182,7 @@ func (s *ClaimService) Claim(ctx context.Context, nodeID domaintypes.NodeID) (Cl
 		return ClaimResult{}, claimInternal("failed to get spec for claimed job", err)
 	}
 
-	payload, err := buildClaimResponsePayload(ctx, s.store, s.blobStore, s.configHolder, run, spec.Spec, rr, repoURL, job)
+	payload, err := buildClaimResponsePayload(ctx, s.store, s.blobStore, s.configHolder, run, spec.Spec, repoURL, job)
 	if err != nil {
 		slog.Error("claim: failed to build response", "job_id", job.ID, "run_id", run.ID, "err", err)
 		var terminalErr *ClaimJobTerminalError

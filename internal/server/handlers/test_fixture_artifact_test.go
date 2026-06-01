@@ -24,13 +24,13 @@ type artifactStore struct {
 	getLatestDiffByJobByID  map[types.JobID]store.Diff
 	getLatestDiffByJobError error
 
-	// Job lookup (for repo-scoped artifact/diff filtering)
+	// Job lookup (for run artifact/diff lookup)
 	getJob     mockCall[types.JobID, store.Job]
 	getJobByID map[types.JobID]store.Job
 
-	// RunRepo lookup (for repo-scoped queries)
-	getRunRepo               mockCall[types.RunID, store.Run]
-	listJobsByRunRepoAttempt mockCall[store.ListJobsByRunAttemptParams, []store.Job]
+	// Run lookup (for run-scoped queries)
+	getRun               mockCall[types.RunID, store.Run]
+	listJobsByRunAttempt mockCall[store.ListJobsByRunAttemptParams, []store.Job]
 }
 
 func (m *artifactStore) ListArtifactBundlesByCID(ctx context.Context, cid *string) ([]store.ArtifactBundle, error) {
@@ -75,9 +75,9 @@ func (m *artifactStore) GetJob(ctx context.Context, id types.JobID) (store.Job, 
 }
 
 func (m *artifactStore) GetRun(ctx context.Context, arg types.RunID) (store.Run, error) {
-	return m.getRunRepo.record(arg)
+	return m.getRun.record(arg)
 }
 
 func (m *artifactStore) ListJobsByRunAttempt(ctx context.Context, arg store.ListJobsByRunAttemptParams) ([]store.Job, error) {
-	return m.listJobsByRunRepoAttempt.record(arg)
+	return m.listJobsByRunAttempt.record(arg)
 }

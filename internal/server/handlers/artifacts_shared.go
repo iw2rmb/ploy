@@ -7,7 +7,7 @@ import (
 )
 
 // artifactSummary is the JSON shape returned when listing artifact bundles
-// (by CID or by run-repo). It intentionally omits heavy fields like RunID,
+// (by CID or by run). It intentionally omits heavy fields like RunID,
 // JobID, and CreatedAt — use artifactDetail for the single-artifact endpoint.
 type artifactSummary struct {
 	ID     string  `json:"id"`

@@ -52,7 +52,7 @@ func (r *runController) materializeMigInFromInputs(
 		if sourceJobID.IsZero() {
 			return fmt.Errorf("mig_context.in_from[%d].source_job_id: required", i)
 		}
-		sourcePath, err := runRepoJobOutFile(req.RunID, req.RepoID, sourceJobID, sourceOutPath)
+		sourcePath, err := runJobOutFile(req.RunID, sourceJobID, sourceOutPath)
 		if err != nil {
 			return fmt.Errorf("mig_context.in_from[%d].source_out_path: %w", i, err)
 		}

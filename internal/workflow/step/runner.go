@@ -66,7 +66,7 @@ type Request struct {
 	OutDir    string
 	// InDir is an optional directory mounted at /in for cross-phase inputs.
 	InDir string
-	// ShareDir is an optional directory mounted at /share for run/repo-scoped
+	// ShareDir is an optional directory mounted at /share for run-scoped
 	// shared inputs/outputs across job stages.
 	ShareDir string
 	// StagingDir is an optional path to a directory containing pre-materialized

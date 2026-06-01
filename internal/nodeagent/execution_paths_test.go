@@ -9,12 +9,11 @@ import (
 	types "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-func TestRunRepoArtifactPaths(t *testing.T) {
+func TestRunArtifactPaths(t *testing.T) {
 	cacheHome := t.TempDir()
 	t.Setenv("PLOYD_CACHE_HOME", cacheHome)
 
 	runID := types.NewRunID()
-	repoID := types.NewMigRepoID()
 	jobID := types.NewJobID()
 
 	wantRunRoot := filepath.Join(cacheHome, "runs", runID.String())
@@ -26,20 +25,20 @@ func TestRunRepoArtifactPaths(t *testing.T) {
 	}
 
 	wantRepoRoot := wantRunRoot
-	if got := runRepoRootDir(runID, repoID); got != wantRepoRoot {
-		t.Fatalf("runRepoRootDir() = %q, want %q", got, wantRepoRoot)
+	if got := runRootDir(runID); got != wantRepoRoot {
+		t.Fatalf("runRootDir() = %q, want %q", got, wantRepoRoot)
 	}
-	if got := runRepoWorkspaceDir(runID, repoID); got != filepath.Join(wantRepoRoot, "workspace") {
-		t.Fatalf("runRepoWorkspaceDir() = %q", got)
+	if got := runWorkspaceDir(runID); got != filepath.Join(wantRepoRoot, "workspace") {
+		t.Fatalf("runWorkspaceDir() = %q", got)
 	}
-	if got := runRepoArtifactsDir(runID, repoID); got != filepath.Join(wantRepoRoot, "artifacts") {
-		t.Fatalf("runRepoArtifactsDir() = %q", got)
+	if got := runArtifactsDir(runID); got != filepath.Join(wantRepoRoot, "artifacts") {
+		t.Fatalf("runArtifactsDir() = %q", got)
 	}
-	if got := runRepoSharedArtifactsDir(runID, repoID); got != filepath.Join(wantRepoRoot, "artifacts", "shared") {
-		t.Fatalf("runRepoSharedArtifactsDir() = %q", got)
+	if got := runSharedArtifactsDir(runID); got != filepath.Join(wantRepoRoot, "artifacts", "shared") {
+		t.Fatalf("runSharedArtifactsDir() = %q", got)
 	}
 
-	paths := runRepoJobArtifactPaths(runID, repoID, jobID)
+	paths := runJobArtifactPaths(runID, jobID)
 	wantJobRoot := filepath.Join(wantRepoRoot, "artifacts", jobID.String())
 	if paths.Root != wantJobRoot {
 		t.Fatalf("job artifact root = %q, want %q", paths.Root, wantJobRoot)
@@ -51,15 +50,8 @@ func TestRunRepoArtifactPaths(t *testing.T) {
 		t.Fatalf("job log/diff paths = %+v", paths)
 	}
 
-	repoID = types.MigRepoID("")
-	if got := runRepoRootDir(runID, repoID); got != "" {
-		t.Fatalf("runRepoRootDir zero repo = %q, want empty", got)
-	}
-	if got := runRepoWorkspaceDir(runID, repoID); got != "" {
-		t.Fatalf("runRepoWorkspaceDir zero repo = %q, want empty", got)
-	}
-	if got := runRepoJobArtifactPaths(runID, repoID, jobID); got != (jobArtifactPaths{}) {
-		t.Fatalf("job artifact paths zero repo = %+v, want empty", got)
+	if paths := runJobArtifactPaths(runID, jobID); paths == (jobArtifactPaths{}) {
+		t.Fatal("job artifact paths must not depend on repo_id")
 	}
 }
 

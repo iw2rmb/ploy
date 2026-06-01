@@ -2,7 +2,7 @@ post:
   tags: [Control]
   summary: Resolve repo execution identifiers for pulling diffs (mig)
   description: |
-    Selects the latest run for a specific repo in a mig and returns the repo-scoped
+    Selects the latest run for a specific repo in a mig and returns the run-scoped
     execution identifiers needed to pull diffs.
 
     Behavior:

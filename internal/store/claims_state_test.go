@@ -55,7 +55,7 @@ func cleanTestTables(t *testing.T, ctx context.Context, db Store) {
 	}
 }
 
-// createTestJob creates a Queued job attached to the fixture's run/repo.
+// createTestJob creates a Queued job attached to the fixture's run.
 func createTestJob(t *testing.T, ctx context.Context, db Store, fx v1Fixture, name string) Job {
 	t.Helper()
 	job, err := db.CreateJob(ctx, CreateJobParams{

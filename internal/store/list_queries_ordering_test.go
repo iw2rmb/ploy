@@ -17,8 +17,8 @@ func TestListQueriesDeterministicOrder(t *testing.T) {
 		sql       string
 		wantOrder string
 	}{
-		// jobs.sql - repo/attempt scopes keep deterministic id tie-breakers
-		{"ListJobsByRun", listJobsByRun, "ORDER BY repo_id ASC, attempt ASC, id ASC"},
+		// jobs.sql - run/attempt scopes keep deterministic id tie-breakers
+		{"ListJobsByRun", listJobsByRun, "ORDER BY attempt ASC, id ASC"},
 		{"ListJobsByRunAttempt", listJobsByRunAttempt, "ORDER BY id ASC"},
 		{"ListCreatedJobsByRunAttempt", listCreatedJobsByRunAttempt, "ORDER BY id ASC"},
 

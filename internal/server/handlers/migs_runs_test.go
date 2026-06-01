@@ -48,16 +48,16 @@ func TestMigRuns_Create(t *testing.T) {
 				assertCalled(t, "ListMigReposByMig", st.listMigReposByMig.called)
 				assertCalled(t, "CreateWaveWithRuns", st.createWaveWithRuns.called)
 				assertNotCalled(t, "CreateJob", st.createJob.called)
-				if len(st.createRunRepoParams) != 2 {
-					t.Fatalf("CreateRun calls = %d, want 2", len(st.createRunRepoParams))
+				if len(st.createRunParams) != 2 {
+					t.Fatalf("CreateRun calls = %d, want 2", len(st.createRunParams))
 				}
-				if got := st.createRunRepoParams[0].RepoID; got != "global01" {
+				if got := st.createRunParams[0].RepoID; got != "global01" {
 					t.Fatalf("first run_repo repo_id = %q, want global01", got)
 				}
-				if got := st.createRunRepoParams[1].RepoID; got != "global02" {
+				if got := st.createRunParams[1].RepoID; got != "global02" {
 					t.Fatalf("second run_repo repo_id = %q, want global02", got)
 				}
-				for _, params := range st.createRunRepoParams {
+				for _, params := range st.createRunParams {
 					if params.WaveID != st.createWaveWithRuns.params.Wave.ID {
 						t.Fatalf("run wave_id = %q, want %q", params.WaveID, st.createWaveWithRuns.params.Wave.ID)
 					}

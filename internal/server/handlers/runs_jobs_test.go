@@ -18,12 +18,12 @@ func TestListRunJobsHandler_NextIDContract(t *testing.T) {
 	nextID := domaintypes.NewJobID()
 
 	st := &runStore{}
-	st.getRunRepo.vals = []store.Run{{
+	st.getRunSeq.vals = []store.Run{{
 		ID:      runID,
 		RepoID:  repoID,
 		Attempt: 1,
 	}}
-	st.listJobsByRunRepoAttempt.val = []store.Job{
+	st.listJobsByRunAttempt.val = []store.Job{
 		{
 			ID:         jobID,
 			RunID:      runID,
@@ -44,7 +44,7 @@ func TestListRunJobsHandler_NextIDContract(t *testing.T) {
 	rr := doRequest(t, handler, http.MethodGet, "/v1/runs/"+runID.String()+"/jobs", nil, "run_id", runID.String())
 
 	assertStatus(t, rr, http.StatusOK)
-	if !st.listJobsByRunRepoAttempt.called {
+	if !st.listJobsByRunAttempt.called {
 		t.Fatal("expected ListJobsByRunAttempt to be called")
 	}
 
@@ -84,12 +84,12 @@ func TestListRunJobsHandler_ExposesGateAndMigJobTypes(t *testing.T) {
 	migID := domaintypes.NewJobID()
 
 	st := &runStore{}
-	st.getRunRepo.vals = []store.Run{{
+	st.getRunSeq.vals = []store.Run{{
 		ID:      runID,
 		RepoID:  repoID,
 		Attempt: 1,
 	}}
-	st.listJobsByRunRepoAttempt.val = []store.Job{
+	st.listJobsByRunAttempt.val = []store.Job{
 		{
 			ID:      preGateID,
 			RunID:   runID,
@@ -146,18 +146,18 @@ func TestListRunJobsHandler_AttemptQueryOverride(t *testing.T) {
 	repoID := domaintypes.NewRepoID()
 
 	st := &runStore{}
-	st.getRunRepo.vals = []store.Run{{
+	st.getRunSeq.vals = []store.Run{{
 		ID:      runID,
 		RepoID:  repoID,
 		Attempt: 1,
 	}}
-	st.listJobsByRunRepoAttempt.val = []store.Job{}
+	st.listJobsByRunAttempt.val = []store.Job{}
 
 	handler := listRunJobsHandler(st)
 	rr := doRequest(t, handler, http.MethodGet, "/v1/runs/"+runID.String()+"/jobs?attempt=3", nil, "run_id", runID.String())
 
 	assertStatus(t, rr, http.StatusOK)
-	if got := st.listJobsByRunRepoAttempt.params.Attempt; got != 3 {
+	if got := st.listJobsByRunAttempt.params.Attempt; got != 3 {
 		t.Fatalf("query attempt override not applied: got %d want %d", got, 3)
 	}
 }
@@ -173,12 +173,12 @@ func TestListRunJobsHandler_OrdersJobsByChain(t *testing.T) {
 	post := domaintypes.NewJobID()
 
 	st := &runStore{}
-	st.getRunRepo.vals = []store.Run{{
+	st.getRunSeq.vals = []store.Run{{
 		ID:      runID,
 		RepoID:  repoID,
 		Attempt: 1,
 	}}
-	st.listJobsByRunRepoAttempt.val = []store.Job{
+	st.listJobsByRunAttempt.val = []store.Job{
 		{ID: post, RunID: runID, RepoID: repoID, Attempt: 1, Name: "post-gate", JobType: "post_gate", Status: domaintypes.JobStatusCreated},
 		{ID: mig1, RunID: runID, RepoID: repoID, Attempt: 1, Name: "mig-1", JobType: "mig", NextID: &post, Status: domaintypes.JobStatusCreated},
 		{ID: mig0, RunID: runID, RepoID: repoID, Attempt: 1, Name: "mig-0", JobType: "mig", NextID: &mig1, Status: domaintypes.JobStatusCreated},
@@ -281,7 +281,7 @@ func TestListRunJobsHandler_PrefersGateRuntimeImageAddress(t *testing.T) {
 
 	metaJSON := `{"kind":"gate","gate":{"stack_gate":{"enabled":true,"result":"pass","runtime_image":"ghcr.io/iw2rmb/ploy/gates/maven:jdk17"}}}`
 	st, handler, runID, _ := newRunJobsFixture(t, metaJSON)
-	st.listJobsByRunRepoAttempt.val[0].JobImage = "gate-image-placeholder"
+	st.listJobsByRunAttempt.val[0].JobImage = "gate-image-placeholder"
 
 	rr := doRequest(t, handler, http.MethodGet, "/v1/runs/"+runID.String()+"/jobs", nil, "run_id", runID.String())
 

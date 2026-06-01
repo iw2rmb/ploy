@@ -34,7 +34,7 @@ type Model struct {
 	inner         list.Model
 	jobs          []clitui.JobItem
 	selectedJobID domaintypes.JobID
-	details       *cliruns.RepoJobEntry
+	details       *cliruns.RunJobDetailEntry
 }
 
 // New creates an initialized JobList with the given title.
@@ -118,13 +118,13 @@ func (m Model) ConfirmedJobID() domaintypes.JobID {
 }
 
 // SetDetails stores the fetched job detail payload for the confirmed selection.
-func (m Model) SetDetails(item *cliruns.RepoJobEntry) Model {
+func (m Model) SetDetails(item *cliruns.RunJobDetailEntry) Model {
 	m.details = item
 	return m
 }
 
 // Details returns the cached job detail payload, or nil if not yet loaded.
-func (m Model) Details() *cliruns.RepoJobEntry {
+func (m Model) Details() *cliruns.RunJobDetailEntry {
 	return m.details
 }
 

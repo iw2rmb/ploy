@@ -14,8 +14,7 @@ import (
 // healing, stale recovery, and related orchestration handler tests.
 //
 // Method receivers are split across companion files to keep each shard small:
-//   - test_fixture_job_run_test.go      - Artifact/Diff and Run-query methods.
-//   - test_fixture_job_runrepo_test.go  - RunRepo and RunAction methods.
+//   - test_fixture_job_run_test.go      - Run, RunAction, Artifact, and Diff methods.
 //   - test_fixture_job_misc_test.go     - Stale recovery, Node, MigRepo, Event,
 //     Ingest, and Spec/Mig/Run creation.
 type jobStore struct {
@@ -29,7 +28,7 @@ type jobStore struct {
 
 	listJobsByRun mockCall[types.RunID, []store.Job]
 
-	listJobsByRunRepoAttempt mockCall[store.ListJobsByRunAttemptParams, []store.Job]
+	listJobsByRunAttempt mockCall[store.ListJobsByRunAttemptParams, []store.Job]
 
 	// Job status/completion
 	updateJobStatus mockCallSlice[store.UpdateJobStatusParams, struct{}]
@@ -49,9 +48,9 @@ type jobStore struct {
 	promoteJobByIDIfUnblocked mockCall[types.JobID, store.Job]
 
 	// Job counts
-	countJobsByRun                         mockResult[int64]
-	countJobsByRunAndStatus                mockResult[int64]
-	countJobsByRunRepoAttemptGroupByStatus mockResult[[]store.CountJobsByRunAttemptGroupByStatusRow]
+	countJobsByRun                     mockResult[int64]
+	countJobsByRunAndStatus            mockResult[int64]
+	countJobsByRunAttemptGroupByStatus mockResult[[]store.CountJobsByRunAttemptGroupByStatusRow]
 
 	// Job listing (TUI)
 	listJobsForTUI  mockCall[store.ListJobsForTUIParams, []store.ListJobsForTUIRow]
@@ -97,26 +96,26 @@ type jobStore struct {
 	updateRunResume     mockResult[struct{}]
 
 	// Run mutation and wave listing helpers.
-	updateRunRepoError      mockCall[store.UpdateRunErrorParams, struct{}]
-	updateRunRepoBaseRef    mockCall[store.UpdateRunBaseRefParams, struct{}]
-	incrementRunRepoAttempt mockCall[types.RunID, struct{}]
+	updateRunError      mockCall[store.UpdateRunErrorParams, struct{}]
+	updateRunBaseRef    mockCall[store.UpdateRunBaseRefParams, struct{}]
+	incrementRunAttempt mockCall[types.RunID, struct{}]
 
-	listRunReposByRun        mockCall[string, []store.Run]
-	listQueuedRunReposByRun  mockCall[string, []store.Run]
-	listRunReposWithURLByRun mockCall[string, []store.ListRunsWithURLByWaveRow]
+	listRunsByWave        mockCall[string, []store.Run]
+	listQueuedRunsByWave  mockCall[string, []store.Run]
+	listRunsWithURLByWave mockCall[string, []store.ListRunsWithURLByWaveRow]
 
-	countRunReposByStatus mockResult[[]store.CountRunsByWaveStatusRow]
+	countRunsByStatus mockResult[[]store.CountRunsByWaveStatusRow]
 
-	cancelActiveJobsByRunRepoAttempt mockCallSlice[store.CancelActiveJobsByRunAttemptParams, int64]
+	cancelActiveJobsByRunAttempt mockCallSlice[store.CancelActiveJobsByRunAttemptParams, int64]
 
-	getLatestRunRepoByMigAndRepoStatus mockCall[store.GetLatestRunByMigAndRepoStatusParams, store.GetLatestRunByMigAndRepoStatusRow]
-	createRunAction                    mockCall[store.CreateRunActionParams, store.RunAction]
-	getRunAction                       mockCall[types.JobID, store.RunAction]
-	getRunActionByKey                  mockCall[store.GetRunActionByKeyParams, store.RunAction]
-	updateRunActionCompletion          mockCall[store.UpdateRunActionCompletionParams, struct{}]
-	listRunActionsByRunRepoAttempt     mockCall[store.ListRunActionsByRunAttemptParams, []store.RunAction]
-	getNodeAction                      mockCall[types.JobID, store.NodeAction]
-	updateNodeActionCompletion         mockCall[store.UpdateNodeActionCompletionParams, struct{}]
+	getLatestRunByMigAndRepoStatus mockCall[store.GetLatestRunByMigAndRepoStatusParams, store.GetLatestRunByMigAndRepoStatusRow]
+	createRunAction                mockCall[store.CreateRunActionParams, store.RunAction]
+	getRunAction                   mockCall[types.JobID, store.RunAction]
+	getRunActionByKey              mockCall[store.GetRunActionByKeyParams, store.RunAction]
+	updateRunActionCompletion      mockCall[store.UpdateRunActionCompletionParams, struct{}]
+	listRunActionsByRunAttempt     mockCall[store.ListRunActionsByRunAttemptParams, []store.RunAction]
+	getNodeAction                  mockCall[types.JobID, store.NodeAction]
+	updateNodeActionCompletion     mockCall[store.UpdateNodeActionCompletionParams, struct{}]
 
 	// Stale recovery
 	listStaleRunningJobs           mockCall[pgtype.Timestamptz, []store.ListStaleRunningJobsRow]
@@ -148,7 +147,6 @@ type jobStore struct {
 	// Run creation (for migs_ticket flow)
 	createWaveWithRuns mockCall[store.CreateWaveWithRunsParams, store.Wave]
 	createRun          mockCall[store.CreateRunParams, store.Run]
-	createRunRepo      mockCall[store.CreateRunParams, store.Run]
 
 	listRuns mockResult[[]store.Run]
 }
@@ -187,7 +185,7 @@ func (m *jobStore) ListJobsByRun(ctx context.Context, runID types.RunID) ([]stor
 }
 
 func (m *jobStore) ListJobsByRunAttempt(ctx context.Context, arg store.ListJobsByRunAttemptParams) ([]store.Job, error) {
-	return m.listJobsByRunRepoAttempt.record(arg)
+	return m.listJobsByRunAttempt.record(arg)
 }
 
 // Job status/completion methods
@@ -235,9 +233,9 @@ func (m *jobStore) UpdateJobNextID(ctx context.Context, params store.UpdateJobNe
 	if _, err := m.updateJobNextID.record(params); err != nil {
 		return err
 	}
-	for i := range m.listJobsByRunRepoAttempt.val {
-		if m.listJobsByRunRepoAttempt.val[i].ID == params.ID {
-			m.listJobsByRunRepoAttempt.val[i].NextID = params.NextID
+	for i := range m.listJobsByRunAttempt.val {
+		if m.listJobsByRunAttempt.val[i].ID == params.ID {
+			m.listJobsByRunAttempt.val[i].NextID = params.NextID
 		}
 	}
 	for i := range m.listJobsByRun.val {
@@ -271,15 +269,15 @@ func (m *jobStore) PromoteJobByIDIfUnblocked(ctx context.Context, id types.JobID
 	if !m.promoteJobByIDIfUnblocked.val.ID.IsZero() {
 		return m.promoteJobByIDIfUnblocked.val, nil
 	}
-	for i := range m.listJobsByRunRepoAttempt.val {
-		if m.listJobsByRunRepoAttempt.val[i].ID != id {
+	for i := range m.listJobsByRunAttempt.val {
+		if m.listJobsByRunAttempt.val[i].ID != id {
 			continue
 		}
-		if m.listJobsByRunRepoAttempt.val[i].Status != types.JobStatusCreated {
+		if m.listJobsByRunAttempt.val[i].Status != types.JobStatusCreated {
 			return store.Job{}, pgx.ErrNoRows
 		}
-		m.listJobsByRunRepoAttempt.val[i].Status = types.JobStatusQueued
-		return m.listJobsByRunRepoAttempt.val[i], nil
+		m.listJobsByRunAttempt.val[i].Status = types.JobStatusQueued
+		return m.listJobsByRunAttempt.val[i], nil
 	}
 	for i := range m.listJobsByRun.val {
 		if m.listJobsByRun.val[i].ID != id {
@@ -327,7 +325,7 @@ func (m *jobStore) CountJobsByRunAndStatus(ctx context.Context, arg store.CountJ
 }
 
 func (m *jobStore) CountJobsByRunAttemptGroupByStatus(ctx context.Context, arg store.CountJobsByRunAttemptGroupByStatusParams) ([]store.CountJobsByRunAttemptGroupByStatusRow, error) {
-	return m.countJobsByRunRepoAttemptGroupByStatus.ret()
+	return m.countJobsByRunAttemptGroupByStatus.ret()
 }
 
 // Job listing methods

@@ -11,14 +11,14 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-type runRepoDetails struct {
+type runDetails struct {
 	RepoID          domaintypes.RepoID    `json:"repo_id"`
 	BaseRef         string                `json:"base_ref"`
 	SourceCommitSHA string                `json:"source_commit_sha,omitempty"`
 	Status          domaintypes.RunStatus `json:"status"`
 }
 
-func fetchRunRepoDetails(ctx context.Context, httpClient *http.Client, baseURL *url.URL, runID domaintypes.RunID, repoID domaintypes.RepoID) (*runRepoDetails, error) {
+func fetchRunDetails(ctx context.Context, httpClient *http.Client, baseURL *url.URL, runID domaintypes.RunID) (*runDetails, error) {
 	if baseURL == nil {
 		return nil, errors.New("base url required")
 	}
@@ -47,10 +47,7 @@ func fetchRunRepoDetails(ctx context.Context, httpClient *http.Client, baseURL *
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, fmt.Errorf("decode response: %w", err)
 	}
-	if result.RepoID != repoID {
-		return nil, fmt.Errorf("repo %s not found in run %s", repoID.String(), runID.String())
-	}
-	return &runRepoDetails{
+	return &runDetails{
 		RepoID:          result.RepoID,
 		BaseRef:         result.BaseRef,
 		SourceCommitSHA: result.SourceCommitSHA,

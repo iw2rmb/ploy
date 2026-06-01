@@ -91,8 +91,8 @@ func (m *jobStore) GetRepo(ctx context.Context, id types.RepoID) (store.Repo, er
 }
 
 func (m *jobStore) CreateRun(ctx context.Context, params store.CreateRunParams) (store.Run, error) {
-	m.createRunRepo.called = true
-	m.createRunRepo.params = params
+	m.createRun.called = true
+	m.createRun.params = params
 	result := defaultRun(m.createRun.val, params)
 	m.createRun.val = result
 	_, err := m.createRun.record(params)

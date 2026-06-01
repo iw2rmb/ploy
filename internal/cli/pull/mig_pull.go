@@ -156,10 +156,10 @@ func HandleMigPull(args []string, stderr io.Writer) error {
 	_, _ = fmt.Fprintf(stderr, "mig pull: resolved run %s (mode: %s)\n", resolution.RunID.String(), pullMode)
 	_, _ = fmt.Fprintf(stderr, "  repo ID: %s\n", resolution.RepoID.String())
 
-	// Step 7: Fetch repo details to validate the local source commit.
-	repoDetails, err := fetchRunRepoDetails(ctx, httpClient, base, resolution.RunID, resolution.RepoID)
+	// Step 7: Fetch run details to validate the local source commit.
+	repoDetails, err := fetchRunDetails(ctx, httpClient, base, resolution.RunID)
 	if err != nil {
-		return fmt.Errorf("mig pull: fetch repo details: %w", err)
+		return fmt.Errorf("mig pull: fetch run details: %w", err)
 	}
 
 	baseRef := strings.TrimSpace(repoDetails.BaseRef)

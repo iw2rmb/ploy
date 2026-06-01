@@ -94,7 +94,7 @@ func buildContainerSpec(runID types.RunID, jobID types.JobID, manifest contracts
 	if strings.TrimSpace(inDir) != "" {
 		mounts = append(mounts, ContainerMount{Source: inDir, Target: "/in", ReadOnly: false})
 	}
-	// Optional /share mount for run/repo-scoped shared files.
+	// Optional /share mount for run-scoped shared files.
 	if strings.TrimSpace(shareDir) != "" {
 		mounts = append(mounts, ContainerMount{Source: shareDir, Target: containerShareDir, ReadOnly: false})
 	}

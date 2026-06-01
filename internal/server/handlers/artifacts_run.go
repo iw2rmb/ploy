@@ -9,8 +9,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-// listRunArtifactsHandler lists artifact bundles produced by jobs belonging to a
-// specific run within a run.
+// listRunArtifactsHandler lists artifact bundles produced by jobs belonging to a run.
 // GET /v1/runs/{run_id}/artifacts
 func listRunArtifactsHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -18,17 +17,12 @@ func listRunArtifactsHandler(st store.Store) http.HandlerFunc {
 		if !ok {
 			return
 		}
-		repoID, ok := runRepoIDFromPathOrRun(w, r, st, runID)
+		run, ok := getRunOrFail(w, r, st, runID, "list run artifacts")
 		if !ok {
 			return
 		}
 
-		rr, ok := getRunOrRepoMismatchOrFail(w, r, st, runID, repoID, "list run repo artifacts")
-		if !ok {
-			return
-		}
-
-		jobs, ok := listJobsForRunAttemptOrFail(w, r, st, runID, repoID, rr.Attempt, "list run repo artifacts")
+		jobs, ok := listJobsForRunAttemptOrFail(w, r, st, runID, run.Attempt, "list run artifacts")
 		if !ok {
 			return
 		}
@@ -51,7 +45,7 @@ func listRunArtifactsHandler(st store.Store) http.HandlerFunc {
 			bundles, listErr := listArtifactBundlesByEffectiveJob(r.Context(), st, job)
 			if listErr != nil {
 				writeHTTPError(w, http.StatusInternalServerError, "failed to list artifacts: %v", listErr)
-				slog.Error("list run repo artifacts: list bundles failed", "run_id", runID.String(), "repo_id", repoID.String(), "job_id", job.ID.String(), "err", listErr)
+				slog.Error("list run artifacts: list bundles failed", "run_id", runID.String(), "repo_id", run.RepoID.String(), "job_id", job.ID.String(), "err", listErr)
 				return
 			}
 			for _, bundle := range bundles {

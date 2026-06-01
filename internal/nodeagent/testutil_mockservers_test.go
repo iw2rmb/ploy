@@ -242,8 +242,8 @@ type statusCapture struct {
 }
 
 type statusServerConfig struct {
-	httpStatus    int
-	extraHandler  http.Handler // handler for non-status paths
+	httpStatus   int
+	extraHandler http.Handler // handler for non-status paths
 }
 
 type statusServerOption func(*statusServerConfig)

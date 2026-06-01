@@ -51,8 +51,9 @@ Wave-scoped API surfaces:
 - `GET /v1/waves/{wave_id}/runs`
 - `POST /v1/waves/{wave_id}/cancel`
 
-There are no repo-scoped run endpoints. Run inspection, artifacts, diffs, jobs,
-logs, cancellation, restart, and pull resolution are all run-scoped.
+Run inspection, artifacts, diffs, jobs, logs, cancellation, restart, and pull
+resolution are all addressed by `run_id`; `repo_id` is returned only as
+attribution metadata.
 
 ## Artifacts And Apply
 

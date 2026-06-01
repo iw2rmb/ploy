@@ -84,7 +84,7 @@ WITH eligible AS (
         AND owner.node_id IS NOT NULL
         AND owner.node_id != n.id
   )
-  ORDER BY j.run_id ASC, j.repo_id ASC, j.attempt ASC, j.id ASC
+  ORDER BY j.run_id ASC, j.attempt ASC, j.id ASC
   FOR UPDATE OF j SKIP LOCKED
   LIMIT 1
 )
@@ -551,7 +551,7 @@ SELECT
   meta
 FROM jobs
 WHERE run_id = $1
-ORDER BY repo_id ASC, attempt ASC, id ASC
+ORDER BY attempt ASC, id ASC
 `
 
 func (q *Queries) ListJobsByRun(ctx context.Context, runID types.RunID) ([]Job, error) {

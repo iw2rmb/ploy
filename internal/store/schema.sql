@@ -209,7 +209,7 @@ CREATE INDEX IF NOT EXISTS runs_repo_created_idx ON runs(repo_id, created_at DES
 CREATE INDEX IF NOT EXISTS runs_mig_repo_created_idx ON runs(mig_id, repo_id, created_at DESC, id DESC);
 
 -- Jobs (unified job queue for all execution units: pre-build, step, post-build, heal, re-build)
--- Jobs for a repo attempt form a singly-linked chain through next_id -> jobs.id.
+-- Jobs for a run attempt form a singly-linked chain through next_id -> jobs.id.
 -- Server-driven scheduling: only chain head starts as 'Queued'; successors remain 'Created'
 -- until their predecessor succeeds and they are promoted.
 -- Note: id is TEXT (KSUID-backed); run_id is TEXT to match runs.id.
@@ -254,11 +254,11 @@ ALTER TABLE IF EXISTS jobs
   DROP COLUMN IF EXISTS cache_key;
 CREATE INDEX IF NOT EXISTS jobs_run_idx ON jobs(run_id);
 -- 'Queued' is the claimable job status (jobs transition Created → Queued when ready to claim).
-CREATE INDEX IF NOT EXISTS jobs_pending_idx ON jobs(run_id, repo_id, attempt, id) WHERE status = 'Queued';
+CREATE INDEX IF NOT EXISTS jobs_pending_idx ON jobs(run_id, attempt, id) WHERE status = 'Queued';
 CREATE INDEX IF NOT EXISTS jobs_node_idx ON jobs(node_id) WHERE node_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS jobs_next_id_idx ON jobs(next_id) WHERE next_id IS NOT NULL;
 -- Predecessor lookup used to detect whether a Created job is unblocked for promotion.
-CREATE INDEX IF NOT EXISTS jobs_predecessor_lookup_idx ON jobs(run_id, repo_id, attempt, next_id);
+CREATE INDEX IF NOT EXISTS jobs_predecessor_lookup_idx ON jobs(run_id, attempt, next_id);
 -- Index for repo attribution queries (logs/diffs/events join via job_id → jobs.repo_id).
 CREATE INDEX IF NOT EXISTS jobs_repo_idx ON jobs(repo_id);
 DROP INDEX IF EXISTS jobs_cache_lookup_idx;

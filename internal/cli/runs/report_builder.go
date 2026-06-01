@@ -8,8 +8,6 @@ import (
 	"sort"
 	"strings"
 
-	"golang.org/x/sync/errgroup"
-
 	"github.com/iw2rmb/ploy/internal/cli/httpx"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	migsapi "github.com/iw2rmb/ploy/internal/migs/api"
@@ -22,7 +20,7 @@ type GetRunReportCommand struct {
 	RunID   domaintypes.RunID
 }
 
-// Run assembles run summary, mig identity, repo rows, job rows, and links.
+// Run assembles run summary, mig identity, run job rows, and links.
 func (c GetRunReportCommand) Run(ctx context.Context) (RunReport, error) {
 	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
 		return RunReport{}, fmt.Errorf("run report: %w", err)
@@ -36,10 +34,6 @@ func (c GetRunReportCommand) Run(ctx context.Context) (RunReport, error) {
 		return RunReport{}, err
 	}
 
-	repos, err := listRunRepos(ctx, c.Client, c.BaseURL, c.RunID)
-	if err != nil {
-		return RunReport{}, err
-	}
 	stageArtifacts, err := listRunStageArtifacts(ctx, c.Client, c.BaseURL, c.RunID)
 	if err != nil {
 		return RunReport{}, err
@@ -50,47 +44,40 @@ func (c GetRunReportCommand) Run(ctx context.Context) (RunReport, error) {
 		MigID:   summary.MigID,
 		MigName: summary.MigName,
 		SpecID:  summary.SpecID,
-		Repos:   make([]RunEntry, len(repos)),
+		Repos:   make([]RunEntry, 1),
 	}
 
-	g, gctx := errgroup.WithContext(ctx)
-	for i, repo := range repos {
-		g.Go(func() error {
-			return c.buildRepoEntry(gctx, repo, stageArtifacts, &report.Repos[i])
-		})
-	}
-	if err := g.Wait(); err != nil {
+	if err := c.buildRunEntry(ctx, statusReportSourceFromSummary(c.RunID, summary), stageArtifacts, &report.Repos[0]); err != nil {
 		return RunReport{}, err
 	}
 
 	return report, nil
 }
 
-func (c GetRunReportCommand) buildRepoEntry(
+func (c GetRunReportCommand) buildRunEntry(
 	ctx context.Context,
-	repo runRepoReportSource,
+	run statusReportSource,
 	stageArtifacts map[domaintypes.JobID]map[string]string,
 	out *RunEntry,
 ) error {
-	jobsResult, err := ListRepoJobsCommand{
+	jobsResult, err := ListRunJobsCommand{
 		Client:  c.Client,
 		BaseURL: c.BaseURL,
 		RunID:   c.RunID,
-		RepoID:  repo.RepoID,
-		Attempt: &repo.Attempt,
+		Attempt: &run.Attempt,
 	}.Run(ctx)
 	if err != nil {
-		return fmt.Errorf("run report: list repo jobs (%s): %w", repo.RepoID, err)
+		return fmt.Errorf("run report: list run jobs: %w", err)
 	}
 
-	diffs, err := listRunDiffs(ctx, c.Client, c.BaseURL, c.RunID, repo.RepoID)
+	diffs, err := listRunDiffs(ctx, c.Client, c.BaseURL, c.RunID)
 	if err != nil {
-		return fmt.Errorf("run report: list repo diffs (%s): %w", repo.RepoID, err)
+		return fmt.Errorf("run report: list run diffs: %w", err)
 	}
 
 	repoPatchURL := ""
-	if latest := latestRepoDiff(diffs); latest != nil {
-		repoPatchURL = buildRepoPatchURL(c.BaseURL, c.RunID, repo.RepoID, latest.ID, true)
+	if latest := latestRunDiff(diffs); latest != nil {
+		repoPatchURL = buildRunPatchURL(c.BaseURL, c.RunID, latest.ID, true)
 	}
 
 	jobPatchByID := make(map[domaintypes.JobID]string, len(diffs))
@@ -98,17 +85,17 @@ func (c GetRunReportCommand) buildRepoEntry(
 		if diff.JobID.IsZero() {
 			continue
 		}
-		jobPatchByID[diff.JobID] = buildRepoPatchURL(c.BaseURL, c.RunID, repo.RepoID, diff.ID, true)
+		jobPatchByID[diff.JobID] = buildRunPatchURL(c.BaseURL, c.RunID, diff.ID, true)
 	}
 
 	*out = RunEntry{
-		RepoID:          repo.RepoID,
-		RepoURL:         repo.RepoURL,
-		BaseRef:         repo.BaseRef,
-		SourceCommitSHA: repo.SourceCommitSHA,
-		Attempt:         repo.Attempt,
-		Status:          repo.Status,
-		LastError:       repo.LastError,
+		RepoID:          run.RepoID,
+		RepoURL:         run.RepoURL,
+		BaseRef:         run.BaseRef,
+		SourceCommitSHA: run.SourceCommitSHA,
+		Attempt:         run.Attempt,
+		Status:          run.Status,
+		LastError:       run.LastError,
 		PatchURL:        repoPatchURL,
 		Jobs:            make([]RunJobEntry, 0, len(jobsResult.Jobs)),
 	}
@@ -135,7 +122,7 @@ func (c GetRunReportCommand) buildRepoEntry(
 	return nil
 }
 
-type runRepoReportSource struct {
+type statusReportSource struct {
 	RunID           domaintypes.RunID  `json:"run_id"`
 	RepoID          domaintypes.RepoID `json:"repo_id"`
 	RepoURL         string             `json:"repo_url"`
@@ -146,12 +133,8 @@ type runRepoReportSource struct {
 	LastError       *string
 }
 
-func listRunRepos(ctx context.Context, httpClient *http.Client, baseURL *url.URL, runID domaintypes.RunID) ([]runRepoReportSource, error) {
-	summary, err := GetStatusCommand{Client: httpClient, BaseURL: baseURL, RunID: runID}.Run(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return []runRepoReportSource{{
+func statusReportSourceFromSummary(runID domaintypes.RunID, summary domaintypes.RunSummary) statusReportSource {
+	return statusReportSource{
 		RunID:           runID,
 		RepoID:          summary.RepoID,
 		RepoURL:         summary.RepoURL,
@@ -160,7 +143,7 @@ func listRunRepos(ctx context.Context, httpClient *http.Client, baseURL *url.URL
 		Status:          summary.Status,
 		Attempt:         summary.Attempt,
 		LastError:       summary.LastError,
-	}}, nil
+	}
 }
 
 func listRunStageArtifacts(
@@ -211,7 +194,7 @@ func listRunStageArtifacts(
 	return artifacts, nil
 }
 
-func listRunDiffs(ctx context.Context, httpClient *http.Client, baseURL *url.URL, runID domaintypes.RunID, repoID domaintypes.RepoID) ([]RepoDiffEntry, error) {
+func listRunDiffs(ctx context.Context, httpClient *http.Client, baseURL *url.URL, runID domaintypes.RunID) ([]RunDiffEntry, error) {
 	endpoint := baseURL.JoinPath("v1", "runs", runID.String(), "diffs")
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
 	if err != nil {
@@ -229,21 +212,21 @@ func listRunDiffs(ctx context.Context, httpClient *http.Client, baseURL *url.URL
 	}
 
 	var result struct {
-		Diffs []RepoDiffEntry `json:"diffs"`
+		Diffs []RunDiffEntry `json:"diffs"`
 	}
 	if err := httpx.DecodeResponseJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
 		return nil, fmt.Errorf("run report: decode diffs: %w", err)
 	}
 	if result.Diffs == nil {
-		result.Diffs = make([]RepoDiffEntry, 0)
+		result.Diffs = make([]RunDiffEntry, 0)
 	}
 
 	return result.Diffs, nil
 }
 
-// latestRepoDiff returns the most recent diff entry.
+// latestRunDiff returns the most recent diff entry.
 // The API returns diffs ordered by created_at ascending, so the last element is the latest.
-func latestRepoDiff(diffs []RepoDiffEntry) *RepoDiffEntry {
+func latestRunDiff(diffs []RunDiffEntry) *RunDiffEntry {
 	if len(diffs) == 0 {
 		return nil
 	}
@@ -258,7 +241,7 @@ func buildJobLogURL(baseURL *url.URL, jobID domaintypes.JobID) string {
 	return baseURL.JoinPath("v1", "jobs", jobID.String(), "logs").String()
 }
 
-func buildRepoPatchURL(baseURL *url.URL, runID domaintypes.RunID, repoID domaintypes.RepoID, diffID domaintypes.DiffID, accumulated bool) string {
+func buildRunPatchURL(baseURL *url.URL, runID domaintypes.RunID, diffID domaintypes.DiffID, accumulated bool) string {
 	u := baseURL.JoinPath("v1", "runs", runID.String(), "diffs")
 	q := u.Query()
 	q.Set("download", "true")

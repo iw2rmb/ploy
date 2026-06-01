@@ -23,9 +23,9 @@ func InitialModel(client *http.Client, baseURL *url.URL) model {
 		rootList:      ploy,
 		rightPaneList: newList("", nil),
 		detailsList:   newList("", nil),
-		jobList:   joblist.New("JOBS"),
-		client:    client,
-		baseURL:   baseURL,
+		jobList:       joblist.New("JOBS"),
+		client:        client,
+		baseURL:       baseURL,
 	}
 }
 

@@ -83,7 +83,7 @@ func (r *runController) uploadRepoArtifactsIfPresent(runID types.RunID, repoID t
 	if r.artifactUploader == nil {
 		return
 	}
-	artifactsDir := runRepoArtifactsDir(runID, repoID)
+	artifactsDir := runArtifactsDir(runID)
 	if artifactsDir == "" {
 		return
 	}

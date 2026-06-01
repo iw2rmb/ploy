@@ -28,10 +28,6 @@ func getRunSnapshotHandler(st store.Store, snapshots repoSnapshotWriter) http.Ha
 		if !ok {
 			return
 		}
-		repoID, ok := runRepoIDFromPathOrRun(w, r, st, runID)
-		if !ok {
-			return
-		}
 		nodeID, ok := requireNodeUUIDHeader(w, r)
 		if !ok {
 			return
@@ -40,30 +36,26 @@ func getRunSnapshotHandler(st store.Store, snapshots repoSnapshotWriter) http.Ha
 		metaRow, err := st.GetRunSnapshotMetadata(r.Context(), runID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				writeHTTPError(w, http.StatusNotFound, "repo not found")
+				writeHTTPError(w, http.StatusNotFound, "run not found")
 				return
 			}
-			serverError(w, "repo snapshot", "load metadata", err, "run_id", runID.String(), "repo_id", repoID.String())
-			return
-		}
-		if metaRow.RepoID != repoID {
-			writeHTTPError(w, http.StatusNotFound, "repo not found")
+			serverError(w, "run snapshot", "load metadata", err, "run_id", runID.String())
 			return
 		}
 
-		authorized, err := snapshotAuthorizedForNode(r.Context(), st, runID, repoID, nodeID)
+		authorized, err := snapshotAuthorizedForNode(r.Context(), st, runID, nodeID)
 		if err != nil {
-			serverError(w, "repo snapshot", "authorize", err, "run_id", runID.String(), "repo_id", repoID.String(), "node_id", nodeID.String())
+			serverError(w, "run snapshot", "authorize", err, "run_id", runID.String(), "repo_id", metaRow.RepoID.String(), "node_id", nodeID.String())
 			return
 		}
 		if !authorized {
-			writeHTTPError(w, http.StatusForbidden, "node is not assigned current work for this run repo")
+			writeHTTPError(w, http.StatusForbidden, "node is not assigned current work for this run")
 			return
 		}
 
 		sha := strings.TrimSpace(metaRow.SourceCommitSha)
 		if !sha40Pattern.MatchString(sha) {
-			writeHTTPError(w, http.StatusConflict, "run repo is not snapshot-ready")
+			writeHTTPError(w, http.StatusConflict, "run is not snapshot-ready")
 			return
 		}
 
@@ -87,7 +79,7 @@ func getRunSnapshotHandler(st store.Store, snapshots repoSnapshotWriter) http.Ha
 	}
 }
 
-func snapshotAuthorizedForNode(ctx context.Context, st store.Store, runID domaintypes.RunID, repoID domaintypes.RepoID, nodeID domaintypes.NodeID) (bool, error) {
+func snapshotAuthorizedForNode(ctx context.Context, st store.Store, runID domaintypes.RunID, nodeID domaintypes.NodeID) (bool, error) {
 	ok, err := st.HasRunningJobForRunNode(ctx, store.HasRunningJobForRunNodeParams{
 		RunID:  runID,
 		NodeID: &nodeID,

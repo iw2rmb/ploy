@@ -73,7 +73,7 @@ func TestBuildManifestFromRequest(t *testing.T) {
 
 	t.Run("keeps hydration and gate repo URLs clean", func(t *testing.T) {
 		req := newStartRunRequest(
-			withRunRepoURL("https://gitlab.example.com/group/repo.git"),
+			withRunURL("https://gitlab.example.com/group/repo.git"),
 		)
 
 		manifest, err := buildManifestDefault(req)
@@ -367,7 +367,7 @@ func TestManifestBuildWithGateRepoMeta(t *testing.T) {
 			t.Run(tt.name, func(t *testing.T) {
 				t.Parallel()
 				req := newStartRunRequest(
-					withRunRepoURL("https://gitlab.com/iw2rmb/ploy-orw.git"),
+					withRunURL("https://gitlab.com/iw2rmb/ploy-orw.git"),
 					withRunBaseRef(tt.baseRef),
 					withRunCommitSHA(tt.commitSHA),
 				)
@@ -391,7 +391,7 @@ func TestManifestBuildWithGateRepoMeta(t *testing.T) {
 	t.Run("gate repo metadata trimmed of whitespace", func(t *testing.T) {
 		t.Parallel()
 		req := newStartRunRequest(
-			withRunRepoURL("  https://gitlab.com/iw2rmb/ploy-orw.git  "),
+			withRunURL("  https://gitlab.com/iw2rmb/ploy-orw.git  "),
 			withRunCommitSHA("  abc123  "),
 		)
 		manifest, err := buildManifestDefault(req)
@@ -409,7 +409,7 @@ func TestManifestBuildWithGateRepoMeta(t *testing.T) {
 	t.Run("gate image overrides threaded from build_gate.images", func(t *testing.T) {
 		t.Parallel()
 		req := newStartRunRequest(
-			withRunRepoURL("https://gitlab.com/iw2rmb/ploy-orw.git"),
+			withRunURL("https://gitlab.com/iw2rmb/ploy-orw.git"),
 			withRunOptions(RunOptions{BuildGate: BuildGateOptions{
 				Images: []contracts.BuildGateImageRule{{
 					Stack: contracts.StackExpectation{Language: "java", Tool: "maven", Release: "17"},
