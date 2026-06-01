@@ -35,27 +35,27 @@ type RunJobIOPreview struct {
 	Stderr []string
 }
 
-// RunReportDynamicSection represents one mutable block of lines in rendered run text.
-type RunReportDynamicSection struct {
+// RunStatusReportDynamicSection represents one mutable block of lines in rendered run text.
+type RunStatusReportDynamicSection struct {
 	StartLine int
 	LineCount int
 	Text      string
 }
 
-// RunReportTextLayout is a rendered run report with per-repo mutable sections.
-type RunReportTextLayout struct {
+// RunStatusReportTextLayout is a rendered run status report with per-repo mutable sections.
+type RunStatusReportTextLayout struct {
 	Text            string
 	LineCount       int
-	DynamicSections []RunReportDynamicSection
+	DynamicSections []RunStatusReportDynamicSection
 }
 
-// RenderRunReportText renders a one-shot, follow-style run snapshot.
-func RenderRunReportText(w io.Writer, report RunReport, opts TextRenderOptions) error {
+// RenderRunStatusReportText renders a one-shot, follow-style run snapshot.
+func RenderRunStatusReportText(w io.Writer, report RunStatusReport, opts TextRenderOptions) error {
 	if w == nil {
-		return fmt.Errorf("run report text: output writer required")
+		return fmt.Errorf("run status report text: output writer required")
 	}
 
-	layout, err := RenderRunReportTextLayout(report, opts)
+	layout, err := RenderRunStatusReportTextLayout(report, opts)
 	if err != nil {
 		return err
 	}
@@ -65,7 +65,7 @@ func RenderRunReportText(w io.Writer, report RunReport, opts TextRenderOptions) 
 
 // RenderRunStatusSnapshotText renders a static status snapshot using the same
 // output shape as `ploy run status`.
-func RenderRunStatusSnapshotText(w io.Writer, report RunReport, opts TextRenderOptions) error {
+func RenderRunStatusSnapshotText(w io.Writer, report RunStatusReport, opts TextRenderOptions) error {
 	opts.SpinnerFrame = 0
 	opts.LiveDurations = false
 	opts.Now = time.Time{}
@@ -74,11 +74,11 @@ func RenderRunStatusSnapshotText(w io.Writer, report RunReport, opts TextRenderO
 	opts.ExpandStderr = false
 	opts.FilterRunningRepos = false
 	opts.EmptyReposLine = ""
-	return RenderRunReportText(w, report, opts)
+	return RenderRunStatusReportText(w, report, opts)
 }
 
-// RenderRunReportTextLayout renders run report text plus mutable per-repo row sections.
-func RenderRunReportTextLayout(report RunReport, opts TextRenderOptions) (RunReportTextLayout, error) {
+// RenderRunStatusReportTextLayout renders run status report text plus mutable per-repo row sections.
+func RenderRunStatusReportTextLayout(report RunStatusReport, opts TextRenderOptions) (RunStatusReportTextLayout, error) {
 	now := opts.Now
 	if now.IsZero() {
 		now = time.Now()
@@ -104,7 +104,7 @@ func RenderRunReportTextLayout(report RunReport, opts TextRenderOptions) (RunRep
 	if len(repos) == 0 {
 		block := strings.Join(append(headerLines, emptyReposLine), "\n")
 		rendered := lipgloss.NewStyle().Render(block) + "\n"
-		return RunReportTextLayout{
+		return RunStatusReportTextLayout{
 			Text:            rendered,
 			LineCount:       strings.Count(rendered, "\n"),
 			DynamicSections: nil,
@@ -171,17 +171,17 @@ func RenderRunReportTextLayout(report RunReport, opts TextRenderOptions) (RunRep
 	out.WriteString(frameLayout.Text)
 	rendered := lipgloss.NewStyle().Render(out.String())
 
-	dynamicSections := make([]RunReportDynamicSection, len(frameLayout.Sections))
+	dynamicSections := make([]RunStatusReportDynamicSection, len(frameLayout.Sections))
 	headerLineCount := len(headerLines)
 	for i, section := range frameLayout.Sections {
-		dynamicSections[i] = RunReportDynamicSection{
+		dynamicSections[i] = RunStatusReportDynamicSection{
 			StartLine: headerLineCount + section.StartLine,
 			LineCount: section.LineCount,
 			Text:      section.Text,
 		}
 	}
 
-	return RunReportTextLayout{
+	return RunStatusReportTextLayout{
 		Text:            rendered,
 		LineCount:       strings.Count(rendered, "\n"),
 		DynamicSections: dynamicSections,
@@ -578,7 +578,7 @@ func renderMigHeader(migID, migName string) string {
 	return migID + "   | " + migName
 }
 
-func buildSpecDownloadURL(report RunReport, baseURL *url.URL) string {
+func buildSpecDownloadURL(report RunStatusReport, baseURL *url.URL) string {
 	if baseURL == nil || report.MigID.IsZero() {
 		return ""
 	}

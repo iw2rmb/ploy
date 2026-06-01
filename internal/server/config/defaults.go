@@ -6,15 +6,15 @@ import (
 )
 
 const (
-	defaultHTTPListen             = ":8080"
-	defaultMetricsListen          = ":9100"
-	defaultAdminSocket            = "/run/ployd.sock"
-	defaultPKIRenewBefore         = time.Hour
-	defaultHousekeeping           = 5 * time.Minute
-	defaultDiskPrune              = time.Hour
-	defaultBatchSchedulerInterval = 5 * time.Second
-	defaultStaleJobRecovery       = 30 * time.Second
-	defaultNodeStaleAfter         = time.Minute
+	defaultHTTPListen            = ":8080"
+	defaultMetricsListen         = ":9100"
+	defaultAdminSocket           = "/run/ployd.sock"
+	defaultPKIRenewBefore        = time.Hour
+	defaultHousekeeping          = 5 * time.Minute
+	defaultDiskPrune             = time.Hour
+	defaultWaveSchedulerInterval = 5 * time.Second
+	defaultStaleJobRecovery      = 30 * time.Second
+	defaultNodeStaleAfter        = time.Minute
 )
 
 // defaultConfig returns the baseline configuration with baked-in defaults.
@@ -40,7 +40,7 @@ func defaultConfig() Config {
 		Scheduler: SchedulerConfig{
 			HousekeepingInterval:     defaultHousekeeping,
 			DiskPruneInterval:        defaultDiskPrune,
-			BatchSchedulerInterval:   defaultBatchSchedulerInterval,
+			WaveSchedulerInterval:    defaultWaveSchedulerInterval,
 			StaleJobRecoveryInterval: defaultStaleJobRecovery,
 			NodeStaleAfter:           defaultNodeStaleAfter,
 		},
@@ -81,9 +81,9 @@ func applyDefaults(cfg *Config) {
 		cfg.PKI.RenewBefore = defaultPKIRenewBefore
 	}
 
-	// Batch scheduler interval: 0 disables the scheduler, negative uses default.
-	if cfg.Scheduler.BatchSchedulerInterval < 0 {
-		cfg.Scheduler.BatchSchedulerInterval = defaultBatchSchedulerInterval
+	// Wave scheduler interval: 0 disables the scheduler, negative uses default.
+	if cfg.Scheduler.WaveSchedulerInterval < 0 {
+		cfg.Scheduler.WaveSchedulerInterval = defaultWaveSchedulerInterval
 	}
 	// Stale recovery interval: 0 disables stale-job recovery, negative uses default.
 	if cfg.Scheduler.StaleJobRecoveryInterval < 0 {

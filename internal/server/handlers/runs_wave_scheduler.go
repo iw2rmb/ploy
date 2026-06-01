@@ -11,25 +11,25 @@ import (
 	"github.com/iw2rmb/ploy/internal/blobstore"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
-	"github.com/iw2rmb/ploy/internal/store/batchscheduler"
+	"github.com/iw2rmb/ploy/internal/store/wavescheduler"
 	"github.com/iw2rmb/ploy/internal/workflow/lifecycle"
 )
 
-// BatchRepoStarter starts execution for pending repos in batch runs.
-// It implements the batchscheduler.RepoStarter interface.
-type BatchRepoStarter struct {
+// WaveRunStarter starts execution for queued runs in waves.
+// It implements the wavescheduler.RunStarter interface.
+type WaveRunStarter struct {
 	store store.Store
 	bs    blobstore.Store
 }
 
-// NewBatchRepoStarter creates a new BatchRepoStarter with the given store.
-func NewBatchRepoStarter(st store.Store, bs blobstore.Store) *BatchRepoStarter {
-	return &BatchRepoStarter{store: st, bs: bs}
+// NewWaveRunStarter creates a new WaveRunStarter with the given store.
+func NewWaveRunStarter(st store.Store, bs blobstore.Store) *WaveRunStarter {
+	return &WaveRunStarter{store: st, bs: bs}
 }
 
-// StartPendingRepos creates (or advances) job queues for queued runs in a wave.
-func (s *BatchRepoStarter) StartPendingRepos(ctx context.Context, waveID domaintypes.WaveID) (batchscheduler.StartPendingReposResult, error) {
-	result := batchscheduler.StartPendingReposResult{}
+// StartQueuedRuns creates (or advances) job queues for queued runs in a wave.
+func (s *WaveRunStarter) StartQueuedRuns(ctx context.Context, waveID domaintypes.WaveID) (wavescheduler.StartQueuedRunsResult, error) {
+	result := wavescheduler.StartQueuedRunsResult{}
 
 	wave, err := s.store.GetWave(ctx, waveID)
 	if err != nil {

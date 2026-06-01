@@ -22,8 +22,8 @@ import (
 //   - Creates a mig project (mig name == mig id).
 //   - Creates a spec row and sets migs.spec_id.
 //   - Creates a mig repo row for the provided repo_url.
-//   - Creates a run and run row.
-//   - Response includes run_id, mig_id, spec_id.
+//   - Creates a wave and one run row.
+//   - Response includes wave_id, run_id, mig_id, spec_id.
 func TestRunsCreateSingleRepo_Success(t *testing.T) {
 	st := &migStore{}
 	eventsService, _ := createTestEventsService()
@@ -66,12 +66,16 @@ func TestRunsCreateSingleRepo_Success(t *testing.T) {
 
 	// Verify response shape matches v1 contract.
 	var resp struct {
+		WaveID string `json:"wave_id"`
 		RunID  string `json:"run_id"`
 		MigID  string `json:"mig_id"`
 		SpecID string `json:"spec_id"`
 	}
 	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode response: %v", err)
+	}
+	if resp.WaveID == "" {
+		t.Error("response wave_id is empty")
 	}
 	if resp.RunID == "" {
 		t.Error("response run_id is empty")

@@ -21,15 +21,15 @@ var submitCommitSHARe = regexp.MustCompile(`^[0-9a-f]{40}$`)
 // createSingleRepoRunHandler submits a single-repo run and queues it for scheduler-driven execution.
 // Endpoint: POST /v1/runs
 // Request: {repo_url, ref, commit_sha?, spec}
-// Response: 201 Created with {run_id, mig_id, spec_id}
+// Response: 201 Created with {wave_id, run_id, mig_id, spec_id}
 //
 // v1 contract:
 // - Submits a single-repo run via POST /v1/runs.
 // - Creates a mig project as a side-effect; mig name == mig id.
 // - Creates an initial spec row and sets migs.spec_id.
 // - Creates a mig repo row for the provided repo_url.
-// - Creates a run and queued run_repo row.
-// - Job materialization is deferred to the batch scheduler and gated on prep readiness.
+// - Creates a wave and one queued run row.
+// - Job materialization is deferred to the wave scheduler and gated on prep readiness.
 //
 // This handler replaces the previous POST /v1/migs endpoint for run submission.
 func createSingleRepoRunHandler(st store.Store, eventsService *events.Service, gitAuth gitauth.Options) http.HandlerFunc {
@@ -154,12 +154,8 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service, g
 		}
 		run := runs[0]
 
-		// Build response with run_id, mig_id, and spec_id.
-		resp := struct {
-			RunID  domaintypes.RunID  `json:"run_id"`
-			MigID  domaintypes.MigID  `json:"mig_id"`
-			SpecID domaintypes.SpecID `json:"spec_id"`
-		}{
+		resp := domainapi.CreateSingleRepoRunResponse{
+			WaveID: wave.ID,
 			RunID:  run.ID,
 			MigID:  migID,
 			SpecID: createdSpec.ID,

@@ -11,7 +11,7 @@ import (
 )
 
 // GetStatusCommand retrieves detailed status for a single run using
-// the batch summary view (ID, repo refs, repo counts).
+// the run summary view (ID, repo refs, repo counts).
 type GetStatusCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL

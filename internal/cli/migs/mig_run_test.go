@@ -69,6 +69,7 @@ func TestCreateMigRunCommand_Run(t *testing.T) {
 			t.Parallel()
 
 			waveID := domaintypes.NewWaveID()
+			specID := domaintypes.NewSpecID()
 
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				if r.Method != http.MethodPost {
@@ -100,7 +101,7 @@ func TestCreateMigRunCommand_Run(t *testing.T) {
 					t.Errorf("expected mode all, got %s", req.RepoSelector.Mode)
 				}
 
-				resp := CreateMigRunResult{WaveID: waveID}
+				resp := CreateMigRunResult{WaveID: waveID, MigID: domaintypes.MigID(tc.migID), SpecID: specID, RunCount: 2}
 
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(tc.statusCode)
@@ -133,6 +134,15 @@ func TestCreateMigRunCommand_Run(t *testing.T) {
 			}
 			if result.WaveID != waveID {
 				t.Errorf("got WaveID %q, want %q", result.WaveID.String(), waveID.String())
+			}
+			if result.MigID.String() != tc.migID {
+				t.Errorf("got MigID %q, want %q", result.MigID.String(), tc.migID)
+			}
+			if result.SpecID != specID {
+				t.Errorf("got SpecID %q, want %q", result.SpecID.String(), specID.String())
+			}
+			if result.RunCount != 2 {
+				t.Errorf("got RunCount %d, want 2", result.RunCount)
 			}
 		})
 	}

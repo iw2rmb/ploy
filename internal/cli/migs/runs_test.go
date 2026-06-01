@@ -13,8 +13,8 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-// TestListBatchesCommand_Run validates ListBatchesCommand with pagination.
-func TestListBatchesCommand_Run(t *testing.T) {
+// TestListRunsCommand_Run validates ListRunsCommand with pagination.
+func TestListRunsCommand_Run(t *testing.T) {
 	t.Parallel()
 
 	const basePathPrefix = "/api"
@@ -38,7 +38,7 @@ func TestListBatchesCommand_Run(t *testing.T) {
 		wantErrText string
 	}{
 		{
-			name:   "list batches with results",
+			name:   "list runs with results",
 			limit:  50,
 			offset: 0,
 			serverResp: []domaintypes.RunSummary{
@@ -120,7 +120,7 @@ func TestListBatchesCommand_Run(t *testing.T) {
 				t.Fatalf("parse server URL: %v", err)
 			}
 
-			cmd := ListBatchesCommand{
+			cmd := ListRunsCommand{
 				Client:  srv.Client(),
 				BaseURL: baseURL,
 				Limit:   tc.limit,
@@ -147,8 +147,8 @@ func TestListBatchesCommand_Run(t *testing.T) {
 	}
 }
 
-// TestCreateBatchCommand_Run validates CreateBatchCommand responses.
-func TestCreateBatchCommand_Run(t *testing.T) {
+// TestCreateRunCommand_Run validates CreateRunCommand responses.
+func TestCreateRunCommand_Run(t *testing.T) {
 	t.Parallel()
 
 	const basePathPrefix = "/api"
@@ -162,7 +162,7 @@ func TestCreateBatchCommand_Run(t *testing.T) {
 		name        string
 		repoURL     string
 		baseRef     string
-		batchName   *string
+		runName     *string
 		runSummary  domaintypes.RunSummary
 		statusCode  int
 		wantErr     bool
@@ -172,7 +172,7 @@ func TestCreateBatchCommand_Run(t *testing.T) {
 			name:       "successful create",
 			repoURL:    "https://github.com/org/repo.git",
 			baseRef:    "main",
-			batchName:  strPtr("test-batch"),
+			runName:    strPtr("test-run"),
 			runSummary: domaintypes.RunSummary{ID: runID, Status: "Started", MigID: migID1, SpecID: specID1, CreatedAt: time.Now()},
 			statusCode: http.StatusCreated,
 		},
@@ -180,7 +180,7 @@ func TestCreateBatchCommand_Run(t *testing.T) {
 			name:       "create without name",
 			repoURL:    "https://github.com/org/repo.git",
 			baseRef:    "main",
-			batchName:  nil,
+			runName:    nil,
 			runSummary: domaintypes.RunSummary{ID: runID, Status: "Started", MigID: migID2, SpecID: specID2, CreatedAt: time.Now()},
 			statusCode: http.StatusCreated,
 		},
@@ -250,10 +250,10 @@ func TestCreateBatchCommand_Run(t *testing.T) {
 				client = srv.Client()
 			}
 
-			cmd := CreateBatchCommand{
+			cmd := CreateRunCommand{
 				Client:  client,
 				BaseURL: baseURL,
-				Name:    tc.batchName,
+				Name:    tc.runName,
 				Spec:    []byte("{}"),
 				RepoURL: tc.repoURL,
 				BaseRef: tc.baseRef,
@@ -273,7 +273,7 @@ func TestCreateBatchCommand_Run(t *testing.T) {
 				t.Fatalf("Run() error: %v", err)
 			}
 			if result.ID == "" {
-				t.Error("expected non-empty batch ID")
+				t.Error("expected non-empty run ID")
 			}
 			if result.Status != "Started" {
 				t.Errorf("got status %q, want %q", result.Status, "Started")
@@ -282,7 +282,7 @@ func TestCreateBatchCommand_Run(t *testing.T) {
 	}
 }
 
-func TestCreateBatchCommand_InvalidRepoURLScheme(t *testing.T) {
+func TestCreateRunCommand_InvalidRepoURLScheme(t *testing.T) {
 	t.Parallel()
 
 	const basePathPrefix = "/api"
@@ -297,7 +297,7 @@ func TestCreateBatchCommand_InvalidRepoURLScheme(t *testing.T) {
 		t.Fatalf("parse server URL: %v", err)
 	}
 
-	cmd := CreateBatchCommand{
+	cmd := CreateRunCommand{
 		Client:  srv.Client(),
 		BaseURL: baseURL,
 		RepoURL: "http://github.com/org/repo.git",
@@ -313,8 +313,8 @@ func TestCreateBatchCommand_InvalidRepoURLScheme(t *testing.T) {
 	}
 }
 
-// TestBatchCommand_Errors validates error handling for missing required fields.
-func TestBatchCommand_Errors(t *testing.T) {
+// TestRunCommand_Errors validates error handling for missing required fields.
+func TestRunCommand_Errors(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -326,12 +326,12 @@ func TestBatchCommand_Errors(t *testing.T) {
 	}{
 		{
 			name:    "list missing client",
-			cmd:     &listWrapper{ListBatchesCommand{BaseURL: &url.URL{Scheme: "http", Host: "localhost"}}},
+			cmd:     &listWrapper{ListRunsCommand{BaseURL: &url.URL{Scheme: "http", Host: "localhost"}}},
 			wantErr: "http client required",
 		},
 		{
 			name:    "list missing base URL",
-			cmd:     &listWrapper{ListBatchesCommand{Client: http.DefaultClient}},
+			cmd:     &listWrapper{ListRunsCommand{Client: http.DefaultClient}},
 			wantErr: "base url required",
 		},
 	}
@@ -366,7 +366,7 @@ func TestHTTPError(t *testing.T) {
 
 	baseURL, _ := url.Parse(srv.URL + basePathPrefix)
 
-	cmd := ListBatchesCommand{
+	cmd := ListRunsCommand{
 		Client:  srv.Client(),
 		BaseURL: baseURL,
 	}
@@ -389,6 +389,6 @@ func strPtr(s string) *string {
 }
 
 // Wrapper types to unify Run() signature for error tests.
-type listWrapper struct{ ListBatchesCommand }
+type listWrapper struct{ ListRunsCommand }
 
-func (w *listWrapper) Run(ctx context.Context) (any, error) { return w.ListBatchesCommand.Run(ctx) }
+func (w *listWrapper) Run(ctx context.Context) (any, error) { return w.ListRunsCommand.Run(ctx) }

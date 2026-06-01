@@ -62,7 +62,7 @@ func getWaveCounts(ctx context.Context, st store.Store, waveID domaintypes.WaveI
 			counts.Cancelled = row.Count
 		}
 	}
-	counts.DerivedStatus = lifecycle.DeriveBatchStatus(counts)
+	counts.DerivedStatus = lifecycle.DeriveWaveStatus(counts)
 	return counts, nil
 }
 

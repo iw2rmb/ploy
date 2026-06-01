@@ -32,7 +32,10 @@ type CreateMigRunCommand struct {
 
 // CreateMigRunResult contains the response from creating a mig wave.
 type CreateMigRunResult struct {
-	WaveID domaintypes.WaveID `json:"wave_id"`
+	WaveID   domaintypes.WaveID `json:"wave_id"`
+	MigID    domaintypes.MigID  `json:"mig_id"`
+	SpecID   domaintypes.SpecID `json:"spec_id"`
+	RunCount int                `json:"run_count"`
 }
 
 // Run executes POST /v1/migs/{mig_id}/waves to create a wave with repo selection.

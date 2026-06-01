@@ -72,15 +72,15 @@ func getRunCounts(ctx context.Context, st store.Store, runID domaintypes.RunID) 
 		}
 	}
 
-	// Derive batch-level status from repo counts.
-	counts.DerivedStatus = lifecycle.DeriveBatchStatus(counts)
+	// Derive wave-level status from run counts.
+	counts.DerivedStatus = lifecycle.DeriveWaveStatus(counts)
 
 	return counts, nil
 }
 
-// RunResponse represents one repository run within a wave for API responses.
+// RunResponse represents one runsitory run within a wave for API responses.
 // Exposes repo URL, refs, attempt count, status, error, and timing fields.
-// v1 model: runs stores one repository execution; repo_id refers to repos.id.
+// v1 model: runs stores one runsitory execution; repo_id refers to runs.id.
 type RunResponse struct {
 	RunID           domaintypes.RunID     `json:"run_id"`
 	RepoID          domaintypes.RepoID    `json:"repo_id"`
@@ -156,13 +156,13 @@ func listRunsHandler(st store.Store) http.HandlerFunc {
 
 func listRunsForRepoURL(w http.ResponseWriter, r *http.Request, st store.Store, repoURL string, limit, offset int32) {
 	normalizedURL := domaintypes.NormalizeRepoURL(repoURL)
-	repos, err := st.ListDistinctRepos(r.Context(), repoURL)
+	runs, err := st.ListDistinctRepos(r.Context(), repoURL)
 	if err != nil {
-		writeHTTPError(w, http.StatusInternalServerError, "failed to list repos: %v", err)
+		writeHTTPError(w, http.StatusInternalServerError, "failed to list runs: %v", err)
 		return
 	}
 	var matches []store.ListDistinctReposRow
-	for _, repo := range repos {
+	for _, repo := range runs {
 		if domaintypes.NormalizeRepoURL(repo.RepoUrl) == normalizedURL {
 			matches = append(matches, repo)
 		}
@@ -174,7 +174,7 @@ func listRunsForRepoURL(w http.ResponseWriter, r *http.Request, st store.Store, 
 		return
 	}
 	if len(matches) > 1 {
-		writeHTTPError(w, http.StatusConflict, "multiple repos match the given repo_url")
+		writeHTTPError(w, http.StatusConflict, "multiple runs match the given repo_url")
 		return
 	}
 	repoRuns, err := st.ListRunsForRepo(r.Context(), store.ListRunsForRepoParams{

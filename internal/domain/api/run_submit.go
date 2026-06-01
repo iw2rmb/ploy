@@ -18,3 +18,11 @@ type RunSubmitRequest struct {
 	Spec      json.RawMessage     `json:"spec"`
 	CreatedBy string              `json:"created_by,omitempty"`
 }
+
+// CreateSingleRepoRunResponse is returned by POST /v1/runs.
+type CreateSingleRepoRunResponse struct {
+	WaveID domaintypes.WaveID `json:"wave_id"`
+	RunID  domaintypes.RunID  `json:"run_id"`
+	MigID  domaintypes.MigID  `json:"mig_id"`
+	SpecID domaintypes.SpecID `json:"spec_id"`
+}

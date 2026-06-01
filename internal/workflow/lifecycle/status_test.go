@@ -55,7 +55,7 @@ func TestIsTerminalWaveStatus(t *testing.T) {
 	}
 }
 
-func TestDeriveBatchStatus(t *testing.T) {
+func TestDeriveWaveStatus(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -63,7 +63,7 @@ func TestDeriveBatchStatus(t *testing.T) {
 		counts *domaintypes.RunCounts
 		want   string
 	}{
-		{name: "empty batch", counts: &domaintypes.RunCounts{Total: 0}, want: lifecycle.DerivedStatusPending},
+		{name: "empty wave", counts: &domaintypes.RunCounts{Total: 0}, want: lifecycle.DerivedStatusPending},
 		{name: "queued only", counts: &domaintypes.RunCounts{Total: 2, Queued: 2}, want: lifecycle.DerivedStatusPending},
 		{name: "running", counts: &domaintypes.RunCounts{Total: 2, Running: 1, Queued: 1}, want: lifecycle.DerivedStatusRunning},
 		{name: "cancelled", counts: &domaintypes.RunCounts{Total: 2, Cancelled: 1, Running: 1}, want: lifecycle.DerivedStatusCancelled},
@@ -74,8 +74,8 @@ func TestDeriveBatchStatus(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			if got := lifecycle.DeriveBatchStatus(tc.counts); got != tc.want {
-				t.Fatalf("DeriveBatchStatus() = %q, want %q", got, tc.want)
+			if got := lifecycle.DeriveWaveStatus(tc.counts); got != tc.want {
+				t.Fatalf("DeriveWaveStatus() = %q, want %q", got, tc.want)
 			}
 		})
 	}

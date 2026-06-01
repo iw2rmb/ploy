@@ -9,7 +9,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-// runStore is a focused mock for run listing/timing/delete, batch operations,
+// runStore is a focused mock for run listing/timing/delete, wave operations,
 // pull resolution, ingest, events, and run job handler tests.
 type runStore struct {
 	store.Store
@@ -44,10 +44,10 @@ type runStore struct {
 	incrementRunAttempt  mockCall[types.RunID, struct{}]
 	updateRunError       mockCall[store.UpdateRunErrorParams, struct{}]
 
-	// Create run (for batch add)
+	// Create run (for run create)
 	createRun mockCall[store.CreateRunParams, store.Run]
 
-	// Mig repo (for batch operations and pull)
+	// Mig repo (for wave operations and pull)
 	createMigRepo mockCall[store.CreateMigRepoParams, store.MigRepo]
 
 	getMig mockResult[store.Mig]
@@ -58,10 +58,10 @@ type runStore struct {
 
 	repoByID map[types.RepoID]store.Repo
 
-	// Spec (for batch scheduler)
+	// Spec (for wave scheduler)
 	getSpec mockCall[string, store.Spec]
 
-	// Job (for batch, ingest, and run jobs)
+	// Job (for wave scheduler, ingest, and run jobs)
 	getJob mockCall[types.JobID, store.Job]
 
 	createJob mockCallSlice[store.CreateJobParams, store.Job]
@@ -79,7 +79,7 @@ type runStore struct {
 	// Events
 	createEvent mockResult[store.Event]
 
-	// Run creation tripwire (for batch scheduler assertions; runStore has no
+	// Run creation tripwire (for wave scheduler assertions; runStore has no
 	// CreateRun method, so this flag stays at its zero value — the check exists
 	// only to fail loudly if the code path is ever wired into the mock).
 	createRunCalled bool
@@ -173,7 +173,7 @@ func (m *runStore) IncrementRunAttempt(ctx context.Context, arg types.RunID) err
 	return err
 }
 
-// Mig/Repo methods (for batch and pull)
+// Mig/Repo methods (for wave scheduler and pull)
 
 func (m *runStore) CreateMigRepo(ctx context.Context, params store.CreateMigRepoParams) (store.MigRepo, error) {
 	result := defaultMigRepo(m.createMigRepo.val, params.ID, params.MigID, params.BaseRef)
@@ -225,7 +225,7 @@ func (m *runStore) GetSpec(ctx context.Context, id types.SpecID) (store.Spec, er
 	return m.getSpec.record(id.String())
 }
 
-// Job methods (for batch, ingest)
+// Job methods (for wave scheduler, ingest)
 
 func (m *runStore) GetJob(ctx context.Context, id types.JobID) (store.Job, error) {
 	return m.getJob.record(id)

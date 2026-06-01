@@ -15,7 +15,7 @@ import (
 // Usage:
 //
 //	buf := &bytes.Buffer{}
-//	err := executeCmd([]string{"mig", "run", "status", "batch-123"}, buf)
+//	err := executeCmd([]string{"mig", "run", "status", "run-123"}, buf)
 //
 // The stderr parameter receives all CLI output (both success and error messages).
 func executeCmd(args []string, stderr io.Writer) error {

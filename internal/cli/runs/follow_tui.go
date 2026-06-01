@@ -25,11 +25,11 @@ import (
 const defaultFollowPollInterval = 1 * time.Second
 
 type followReportMsg struct {
-	report RunReport
+	report RunStatusReport
 }
 
 type followTerminalMsg struct {
-	report RunReport
+	report RunStatusReport
 	state  migsapi.RunState
 }
 
@@ -47,7 +47,7 @@ type followModel struct {
 	renderOpts      TextRenderOptions
 	spinner         spinner.Model
 	spinnerFrame    int
-	report          *RunReport
+	report          *RunStatusReport
 	finalState      migsapi.RunState
 	renderErr       error
 	jobIOPreviews   map[domaintypes.JobID]RunJobIOPreview
@@ -130,7 +130,7 @@ func (m followModel) View() tea.View {
 		opts.FilterRunningRepos = len(m.report.Repos) > 1
 		opts.EmptyReposLine = "No repos with in-progress jobs."
 	}
-	layout, err := RenderRunReportTextLayout(*m.report, opts)
+	layout, err := RenderRunStatusReportTextLayout(*m.report, opts)
 	if err != nil {
 		return tea.NewView("")
 	}
@@ -349,7 +349,7 @@ func (c FollowRunCommand) coordinate(
 			stopTracker(jobID)
 		}()
 	}
-	reconcileTrackers := func(report RunReport) {
+	reconcileTrackers := func(report RunStatusReport) {
 		statusByJob := make(map[domaintypes.JobID]string)
 		for _, repo := range report.Repos {
 			for _, job := range repo.Jobs {
@@ -377,7 +377,7 @@ func (c FollowRunCommand) coordinate(
 
 	consecutiveFailures := 0
 	fetch := func() bool {
-		report, err := GetRunReportCommand{
+		report, err := GetRunStatusReportCommand{
 			Client:  c.Client,
 			BaseURL: c.BaseURL,
 			RunID:   c.RunID,
@@ -430,7 +430,7 @@ func (c FollowRunCommand) coordinate(
 }
 
 // DeriveRunStateFromReport computes terminal run state from repo statuses.
-func DeriveRunStateFromReport(report RunReport) migsapi.RunState {
+func DeriveRunStateFromReport(report RunStatusReport) migsapi.RunState {
 	if len(report.Repos) == 0 {
 		return ""
 	}
@@ -503,7 +503,7 @@ func shouldTrackJobPreview(status string) bool {
 	}
 }
 
-func writeFinalStatusSnapshot(w io.Writer, report RunReport, opts TextRenderOptions) error {
+func writeFinalStatusSnapshot(w io.Writer, report RunStatusReport, opts TextRenderOptions) error {
 	if isTTYWriter(w) {
 		_, _ = io.WriteString(w, "\x1b[2J\x1b[H")
 	}

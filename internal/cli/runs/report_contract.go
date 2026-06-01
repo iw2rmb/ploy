@@ -6,8 +6,8 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-// RunReport is the canonical status report contract shared by all status renderers.
-type RunReport struct {
+// RunStatusReport is the canonical status report contract shared by all status renderers.
+type RunStatusReport struct {
 	RunID   domaintypes.RunID  `json:"run_id"`
 	MigID   domaintypes.MigID  `json:"mig_id"`
 	MigName string             `json:"mig_name"`
