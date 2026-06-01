@@ -1,10 +1,10 @@
 get:
   tags: [Control]
-  summary: Inspect a batch run
+  summary: Inspect a run
   description: |
-    Return a detailed summary for a single batch run identified by its run ID.
-    The response includes run metadata (mig_id, spec_id, status, timestamps) and
-    optional aggregated repo status counts from `run_repos`.
+    Return a detailed summary for one repository execution identified by its run ID.
+    The response includes run metadata, repository identity, refs, execution status,
+    timestamps, and optional wave-level run counts.
   parameters:
     - in: path
       name: id

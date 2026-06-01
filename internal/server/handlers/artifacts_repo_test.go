@@ -36,7 +36,7 @@ func TestListRunRepoArtifactsHandler_Success_FiltersAndOrders(t *testing.T) {
 
 	st := &artifactStore{}
 	st.getRunRepo.val = store.Run{
-		ID:   runID,
+		ID:      runID,
 		RepoID:  repoID,
 		Status:  domaintypes.RunStatusRunning,
 		Attempt: 1,
@@ -69,8 +69,8 @@ func TestListRunRepoArtifactsHandler_Success_FiltersAndOrders(t *testing.T) {
 	}
 
 	rr := doRequest(t, listRunRepoArtifactsHandler(st), http.MethodGet,
-		"/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/artifacts", nil,
-		"run_id", runID.String(), "repo_id", repoID.String())
+		"/v1/runs/"+runID.String()+"/artifacts", nil,
+		"run_id", runID.String())
 	assertStatus(t, rr, http.StatusOK)
 
 	type listResp struct {

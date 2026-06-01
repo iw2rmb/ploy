@@ -13,10 +13,10 @@ import (
 // ===== Repo-Scoped Status Progression Tests =====
 // These tests verify v1 repo-scoped progression behavior.
 // When a job completes:
-// - run_repos.status is updated when all jobs for the repo attempt are terminal
+// - runs.status is updated when all jobs for the repo attempt are terminal
 // - runs.status becomes Finished when all repos are terminal
 
-// TestCompleteJob_RepoTerminalStatus verifies that run_repos.status is updated
+// TestCompleteJob_RepoTerminalStatus verifies that runs.status is updated
 // correctly when the last job in a repo attempt completes.
 func TestCompleteJob_RepoTerminalStatus(t *testing.T) {
 	t.Parallel()
@@ -95,7 +95,7 @@ func TestCompleteJob_RepoTerminalStatus(t *testing.T) {
 	}
 }
 
-// TestCompleteJob_RepoNotTerminalWhileJobsInProgress verifies that run_repos.status
+// TestCompleteJob_RepoNotTerminalWhileJobsInProgress verifies that runs.status
 // is NOT updated when there are still non-terminal jobs for the repo attempt.
 func TestCompleteJob_RepoNotTerminalWhileJobsInProgress(t *testing.T) {
 	t.Parallel()
@@ -175,7 +175,7 @@ func TestCompleteJob_RepoNotTerminalWhileJobsInProgress(t *testing.T) {
 }
 
 // TestCompleteJob_RepoStatusUsesLastJobStatus verifies that when all jobs are
-// terminal, run_repos.status is derived from the terminal status of the last job
+// terminal, runs.status is derived from the terminal status of the last job
 // (highest next_id), ignoring earlier failures.
 func TestCompleteJob_RepoStatusUsesLastJobStatus(t *testing.T) {
 	t.Parallel()

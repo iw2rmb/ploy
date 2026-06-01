@@ -116,7 +116,7 @@ type SpecID = StringID[specIDTag]
 type MigRepoID = StringID[migRepoIDTag]
 
 // RepoID identifies a global repository record.
-// Uses NanoID(8) and maps to repos.id / run_repos.repo_id / jobs.repo_id.
+// Uses NanoID(8) and maps to repos.id / runs.repo_id / jobs.repo_id.
 type RepoID = StringID[repoIDTag]
 
 // SpecBundleID identifies a spec bundle upload record in the spec_bundles table.

@@ -1,7 +1,5 @@
--- Manual psql wrapper for the wave model data migration.
--- ployd embeds the transaction body from internal/store/migrations/wave_model_20260601.sql.
-
-BEGIN;
+-- Wave model data migration body embedded by ployd startup.
+-- The operator-facing wrapper is scripts/migrate_wave_model_20260601.sql.
 
 LOCK TABLE ploy.runs, ploy.run_repos, ploy.jobs, ploy.migs, ploy.mig_repos, ploy.run_repo_actions IN ACCESS EXCLUSIVE MODE;
 
@@ -214,9 +212,3 @@ BEGIN
   FROM ploy.wave_migration_orphan_runs_20260601;
   RAISE NOTICE 'wave migration quarantined % orphan parent runs', orphan_count;
 END $$;
-
-INSERT INTO ploy.schema_version (version, applied_at)
-VALUES (2026060101, now())
-ON CONFLICT (version) DO NOTHING;
-
-COMMIT;

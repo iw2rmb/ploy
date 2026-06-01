@@ -134,7 +134,7 @@ func (p JobStatsPayload) ValidateJobMeta() error {
 	return nil
 }
 
-// formatStackGateError formats a Stack Gate failure for run_repos.last_error.
+// formatStackGateError formats a Stack Gate failure for runs.last_error.
 // Returns nil if job meta doesn't contain a stack gate failure.
 func formatStackGateError(jobType domaintypes.JobType, jobMeta json.RawMessage) *string {
 	if len(jobMeta) == 0 {
@@ -202,7 +202,7 @@ func formatStackGateError(jobType domaintypes.JobType, jobMeta json.RawMessage) 
 	return &result
 }
 
-// formatExit137Error formats a deterministic run_repos.last_error message for
+// formatExit137Error formats a deterministic runs.last_error message for
 // jobs that exited with code 137 (typically SIGKILL/OOM kill).
 func formatExit137Error(jobLabel string, exitCode *int32) *string {
 	if exitCode == nil || *exitCode != 137 {

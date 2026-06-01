@@ -110,23 +110,6 @@ func newRunStatusReportServer(t *testing.T, runID domaintypes.RunID, migID domai
 					},
 				},
 			})
-		case r.Method == http.MethodGet && r.URL.Path == "/v1/runs/"+runID.String()+"/repos":
-			lastErr := "compile\nfailed at step 2"
-			_ = json.NewEncoder(w).Encode(map[string]any{
-				"repos": []map[string]any{
-					{
-						"run_id":            runID.String(),
-						"repo_id":           repoID.String(),
-						"repo_url":          "https://github.com/acme/service.git",
-						"base_ref":          "main",
-						"source_commit_sha": "0123456789abcdef0123456789abcdef01234567",
-						"status":            "Running",
-						"attempt":           1,
-						"last_error":        lastErr,
-						"created_at":        "2026-02-24T08:01:00Z",
-					},
-				},
-			})
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/runs/"+runID.String()+"/jobs":
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"run_id":  runID.String(),

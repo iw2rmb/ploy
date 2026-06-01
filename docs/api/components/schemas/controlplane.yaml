@@ -1,28 +1,26 @@
-# RunRepoStatus defines the per-repo execution state within a batch run.
-# Tracks the lifecycle of individual repositories as they progress through
-# the batch processing pipeline (Queued → Running → terminal).
-RunRepoStatus:
+# RunExecutionStatus defines the lifecycle state for one repository execution.
+RunExecutionStatus:
   type: string
   description: |
-    Per-repo execution status within a batch run.
-    - Queued: Repo is queued and waiting to start execution.
-    - Running: Repo execution is in progress (claimed by a node).
-    - Success: Repo completed successfully.
-    - Fail: Repo execution failed.
-    - Cancelled: Repo was cancelled (explicit user action or run cancelled).
+    Execution status for a run.
+    - Queued: The run is queued and waiting to start execution.
+    - Running: Execution is in progress (claimed by a node).
+    - Success: The run completed successfully.
+    - Fail: The run failed.
+    - Cancelled: The run was cancelled.
   enum: [Queued, Running, Success, Fail, Cancelled]
 
 # RunBatchDerivedStatus represents the batch-level aggregate status computed
-# from the per-repo states in RunRepoCounts.DerivedStatus.
+# from the run states in WaveRunCounts.DerivedStatus.
 RunBatchDerivedStatus:
   type: string
   description: |
-    Batch-level status derived from aggregated per-repo states.
-    - pending: No repos have started (all queued or no repos).
-    - running: At least one repo is currently running.
-    - completed: All repos are terminal with no failures.
-    - failed: At least one repo failed (and none running).
-    - cancelled: Batch was stopped and repos were cancelled.
+    Wave-level status derived from aggregated run states.
+    - pending: No runs have started (all queued or no runs).
+    - running: At least one run is currently running.
+    - completed: All runs are terminal with no failures.
+    - failed: At least one run failed (and none running).
+    - cancelled: The wave was stopped and runs were cancelled.
   enum: [pending, running, completed, failed, cancelled]
 
 Run:
@@ -47,8 +45,7 @@ Run:
       nullable: true
       description: User or system that created the run.
     status:
-      type: string
-      description: "Run status. Values: Started, Finished, Cancelled."
+      $ref: "#/RunExecutionStatus"
     created_at:
       type: string
       format: date-time
@@ -73,56 +70,55 @@ Run:
       nullable: true
   required: [id, mig_id, spec_id, status, created_at]
 
-RunRepoCounts:
+WaveRunCounts:
   type: object
   description: |
-    Aggregated per-repo status counts for a batch run. Provides a summary of
-    how many repos are in each lifecycle state (queued, running, terminal).
-    The derived_status field computes a single batch-level status from these
+    Aggregated run status counts for a wave. Provides a summary of how many
+    runs are in each lifecycle state (queued, running, terminal). The
+    derived_status field computes a single wave-level status from these
     counts for easy display in CLI/UI surfaces.
   properties:
     total:
       type: integer
       format: int32
-      description: Total number of repos in the batch.
+      description: Total number of runs in the wave.
     queued:
       type: integer
       format: int32
-      description: Repos waiting to start execution.
+      description: Runs waiting to start execution.
     running:
       type: integer
       format: int32
-      description: Repos currently executing.
+      description: Runs currently executing.
     success:
       type: integer
       format: int32
-      description: Repos that completed successfully.
+      description: Runs that completed successfully.
     fail:
       type: integer
       format: int32
-      description: Repos that failed execution.
+      description: Runs that failed execution.
     cancelled:
       type: integer
       format: int32
-      description: Repos stopped while running.
+      description: Runs stopped while running.
     derived_status:
       $ref: "#/RunBatchDerivedStatus"
       description: |
-        Batch-level status computed from per-repo states. Precedence order:
+        Wave-level status computed from run states. Precedence order:
         cancelled > running > failed > completed > pending.
   required: [total]
 
-RunRepo:
+RunExecution:
   type: object
   description: |
-    Repo entry within a batch run, backed by the `run_repos` table.
-    Represents a single repository's execution state within the batch,
-    tracking refs, status, attempt count, and timing information.
+    Single repository execution row, backed by the `runs` table. Tracks refs,
+    status, attempt count, and timing information.
     Note: repo_id is NanoID(8), run_id is KSUID (27 characters).
   properties:
     run_id:
       type: string
-      description: Parent batch run ID (KSUID string).
+      description: Run ID (KSUID string).
     repo_id:
       type: string
       description: Repository ID (repos.id, NanoID string).
@@ -133,13 +129,13 @@ RunRepo:
       type: string
       description: Git ref used as the base for comparisons (e.g., main, master).
     status:
-      $ref: "#/RunRepoStatus"
-      description: Current execution status for this repo.
+      $ref: "#/RunExecutionStatus"
+      description: Current execution status for this run.
     attempt:
       type: integer
       format: int32
       description: |
-        Retry attempt number for this repo within the batch.
+        Retry attempt number for this run.
         Starts at 1, incremented on each restart.
     last_error:
       type: string
@@ -150,7 +146,7 @@ RunRepo:
     created_at:
       type: string
       format: date-time
-      description: Timestamp when the repo entry was created.
+      description: Timestamp when the run was created.
     started_at:
       type: string
       format: date-time
@@ -173,7 +169,7 @@ RunRepo:
 RunSummary:
   type: object
   description: |
-    Run summary with optional aggregated repo status counts.
+    Run summary for one repository execution, with optional aggregated wave counts.
     Note: id is now a KSUID-backed string (27 characters).
   properties:
     id:
@@ -189,9 +185,27 @@ RunSummary:
       minLength: 1
       description: Spec identifier for the run. Must be non-empty.
     status:
+      $ref: "#/RunExecutionStatus"
+    repo_id:
       type: string
-      description: |
-        Run status. Values: Started, Finished, Cancelled.
+      description: Repository ID (repos.id, NanoID string).
+    repo_url:
+      type: string
+      description: Git repository URL (https, ssh, or file scheme).
+    base_ref:
+      type: string
+      description: Git ref used as the base for comparisons.
+    source_commit_sha:
+      type: string
+      description: Lowercase 40-hex source commit SHA for this run.
+    attempt:
+      type: integer
+      format: int32
+      description: Current attempt number for this run.
+    last_error:
+      type: string
+      nullable: true
+      description: Human-readable error message from the most recent failed attempt.
     created_by:
       type: string
       nullable: true
@@ -210,10 +224,10 @@ RunSummary:
       format: date-time
       nullable: true
       description: Timestamp when the run reached a terminal state.
-    repo_counts:
-      $ref: "#/RunRepoCounts"
+    run_counts:
+      $ref: "#/WaveRunCounts"
       nullable: true
-      description: Aggregated per-repo status counts (optional).
+      description: Aggregated run status counts for the run's wave (optional).
   required:
     - id
     - mig_id
@@ -387,8 +401,8 @@ CreateMigRunRequest:
 CreateMigRunResponse:
   type: object
   properties:
-    run_id: { type: string, description: "Run ID (KSUID string)" }
-  required: [run_id]
+    wave_id: { type: string, description: "Wave ID (KSUID string)" }
+  required: [wave_id]
 
 PullResolutionMode:
   type: string

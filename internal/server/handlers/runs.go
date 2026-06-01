@@ -14,7 +14,7 @@ import (
 
 // --- Batch types and helpers (from runs_batch_types.go) ---
 
-// NOTE: Run IDs in this file are KSUID-backed strings; run_repo IDs are NanoID(8)-backed strings.
+// NOTE: Run IDs in this file are KSUID-backed strings; repo IDs are NanoID(8)-backed strings.
 // Both are now string types in the store layer; no UUID parsing is needed.
 
 // runToSummary converts a store.Run to a RunSummary.
@@ -82,8 +82,7 @@ func getRunRepoCounts(ctx context.Context, st store.Store, runID domaintypes.Run
 
 // RunRepoResponse represents a single repo within a batch for API responses.
 // Exposes repo URL, refs, attempt count, status, error, and timing fields.
-// v1 model: run_repos uses composite PK (run_id, repo_id), where repo_id refers
-// to mig_repos.id (NanoID(8)).
+// v1 model: runs stores one repository execution; repo_id refers to repos.id.
 type RunRepoResponse struct {
 	RunID           domaintypes.RunID     `json:"run_id"`
 	RepoID          domaintypes.RepoID    `json:"repo_id"`

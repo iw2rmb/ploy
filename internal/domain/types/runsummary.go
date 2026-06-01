@@ -2,9 +2,9 @@ package types
 
 import "time"
 
-// RunSummary represents a v1 run summary with optional aggregated repo
-// status counts. It is the canonical domain shape for control-plane run
-// summary responses and is shared between server handlers, CLI, and OpenAPI.
+// RunSummary represents a v1 run summary with optional aggregated wave counts.
+// It is the canonical domain shape for control-plane run summary responses and
+// is shared between server handlers, CLI, and OpenAPI.
 type RunSummary struct {
 	ID              RunID          `json:"id"`
 	Status          RunStatus      `json:"status"`
@@ -24,8 +24,8 @@ type RunSummary struct {
 	Counts          *RunRepoCounts `json:"run_counts,omitempty"`
 }
 
-// RunRepoCounts aggregates the count of repos by status within a batch.
-// DerivedStatus provides a single batch-level status derived from repo states.
+// RunRepoCounts aggregates the count of runs by status within a wave.
+// DerivedStatus provides a single wave-level status derived from run states.
 type RunRepoCounts struct {
 	Total         int32  `json:"total"`
 	Queued        int32  `json:"queued"`

@@ -133,7 +133,7 @@ func listMigReposHandler(st store.Store) http.HandlerFunc {
 //
 // v1 contract:
 // - Deletes a repo from the mig repo set.
-// - Refuse deletion if the repo has historical executions (run_repos.repo_id references).
+// - Refuse deletion if the repo has historical executions (runs.repo_id references).
 func deleteMigRepoHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		mig, ok := getMigByIDOrFail(w, r, st, "delete mig repo")
@@ -162,7 +162,7 @@ func deleteMigRepoHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Check if repo has historical executions (run_repos references).
+		// Check if repo has historical executions (runs references).
 		hasHistory, err := st.HasMigRepoHistory(r.Context(), repo.RepoID)
 		if err != nil {
 			serverError(w, "delete mig repo", "check repo history", err, "repo_id", repoID)
@@ -192,7 +192,7 @@ func deleteMigRepoHandler(st store.Store) http.HandlerFunc {
 // v1 contract:
 // - Continues on per-line errors; may partially apply.
 // - Upserts by (mig_id, repo_url): inserts new rows, updates refs for existing.
-// - Does not affect historical run data (run_repos snapshots remain unchanged).
+// - Does not affect historical run data (run snapshots remain unchanged).
 // - CSV parsing rules:
 //   - delimiter: ,
 //   - UTF-8 text; unicode allowed
