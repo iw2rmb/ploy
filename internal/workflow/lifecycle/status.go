@@ -42,7 +42,7 @@ func IsTerminalWaveStatus(status domaintypes.WaveStatus) bool {
 
 // DeriveBatchStatus computes a single batch-level status from repo counts.
 // Precedence order: cancelled > running > failed > completed > pending.
-func DeriveBatchStatus(counts *domaintypes.RunRepoCounts) string {
+func DeriveBatchStatus(counts *domaintypes.RunCounts) string {
 	if counts.Total == 0 {
 		return DerivedStatusPending
 	}

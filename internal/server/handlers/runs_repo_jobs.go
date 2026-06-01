@@ -13,10 +13,10 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/jobchain"
 )
 
-// listRunRepoJobsHandler returns jobs for a specific repo execution within a run.
+// listRunJobsHandler returns jobs for a run.
 // GET /v1/runs/{run_id}/jobs
 // Query params: ?attempt=N (optional, defaults to current attempt)
-func listRunRepoJobsHandler(st store.Store) http.HandlerFunc {
+func listRunJobsHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		runID, ok := parseRequiredPathIDOrWriteError[domaintypes.RunID](w, r, "run_id")
 		if !ok {
@@ -27,7 +27,7 @@ func listRunRepoJobsHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		rr, ok := getRunRepoOrFail(w, r, st, runID, repoID, "list run repo jobs")
+		rr, ok := getRunOrRepoMismatchOrFail(w, r, st, runID, repoID, "list run jobs")
 		if !ok {
 			return
 		}
@@ -43,7 +43,7 @@ func listRunRepoJobsHandler(st store.Store) http.HandlerFunc {
 			attempt = int32(parsed)
 		}
 
-		jobs, ok := listJobsForRunRepoOrFail(w, r, st, runID, repoID, attempt, "list run repo jobs")
+		jobs, ok := listJobsForRunAttemptOrFail(w, r, st, runID, repoID, attempt, "list run jobs")
 		if !ok {
 			return
 		}
@@ -53,25 +53,25 @@ func listRunRepoJobsHandler(st store.Store) http.HandlerFunc {
 			func(job store.Job) *domaintypes.JobID { return job.NextID },
 		)
 
-		resp := migsapi.ListRunRepoJobsResponse{
+		resp := migsapi.ListRunJobsResponse{
 			RunID:   runID,
 			RepoID:  repoID,
 			Attempt: attempt,
-			Jobs:    make([]migsapi.RunRepoJob, 0, len(jobs)),
+			Jobs:    make([]migsapi.RunJob, 0, len(jobs)),
 		}
 
 		for _, job := range jobs {
-			resp.Jobs = append(resp.Jobs, runRepoJobFromStore(job))
+			resp.Jobs = append(resp.Jobs, runJobFromStore(job))
 		}
 
 		writeJSON(w, http.StatusOK, resp)
 	}
 }
 
-// runRepoJobFromStore projects a store.Job into the API shape, applying job
-// metadata and timestamp conversions.
-func runRepoJobFromStore(job store.Job) migsapi.RunRepoJob {
-	jr := migsapi.RunRepoJob{
+// runJobFromStore projects a store.Job into the API shape, applying metadata
+// and timestamp conversions.
+func runJobFromStore(job store.Job) migsapi.RunJob {
+	jr := migsapi.RunJob{
 		JobID:      job.ID,
 		Name:       string(job.JobType),
 		JobType:    job.JobType,
@@ -87,7 +87,7 @@ func runRepoJobFromStore(job store.Job) migsapi.RunRepoJob {
 
 	if len(job.Meta) > 0 {
 		if meta, err := contracts.UnmarshalJobMeta(job.Meta); err == nil {
-			if resolvedName := deriveRunRepoJobName(job, meta); resolvedName != "" {
+			if resolvedName := deriveRunJobName(job, meta); resolvedName != "" {
 				jr.Name = resolvedName
 			}
 			if meta.MigStepName != "" {
@@ -122,7 +122,7 @@ func runRepoJobFromStore(job store.Job) migsapi.RunRepoJob {
 	return jr
 }
 
-func deriveRunRepoJobName(job store.Job, meta *contracts.JobMeta) string {
+func deriveRunJobName(job store.Job, meta *contracts.JobMeta) string {
 	switch domaintypes.JobType(job.JobType) {
 	case domaintypes.JobTypePreGate:
 		return "pre-gate"

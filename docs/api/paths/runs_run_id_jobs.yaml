@@ -1,6 +1,21 @@
 get:
   tags: [Control]
   summary: List jobs for a run
+  parameters:
+    - in: path
+      name: run_id
+      required: true
+      schema: { type: string }
+      description: Run ID (KSUID string)
+    - in: query
+      name: attempt
+      required: false
+      schema: { type: integer, format: int32 }
+      description: Attempt number; defaults to the run's current attempt.
   responses:
     "200":
       description: Job list.
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/controlplane.yaml#/ListRunJobsResponse"

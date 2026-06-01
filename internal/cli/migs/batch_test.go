@@ -48,7 +48,7 @@ func TestListBatchesCommand_Run(t *testing.T) {
 					MigID:     migID1,
 					SpecID:    specID1,
 					CreatedAt: time.Now(),
-					Counts: &domaintypes.RunRepoCounts{
+					Counts: &domaintypes.RunCounts{
 						Total:         5,
 						Queued:        2,
 						Running:       1,

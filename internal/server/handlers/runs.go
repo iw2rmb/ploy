@@ -12,8 +12,6 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/lifecycle"
 )
 
-// --- Batch types and helpers (from runs_batch_types.go) ---
-
 // NOTE: Run IDs in this file are KSUID-backed strings; repo IDs are NanoID(8)-backed strings.
 // Both are now string types in the store layer; no UUID parsing is needed.
 
@@ -45,9 +43,9 @@ func runToSummary(run store.Run) domaintypes.RunSummary {
 	return summary
 }
 
-// getRunRepoCounts fetches and aggregates run counts by status for the run's wave.
+// getRunCounts fetches and aggregates run counts by status for the run's wave.
 // runID is now a KSUID-backed domain type.
-func getRunRepoCounts(ctx context.Context, st store.Store, runID domaintypes.RunID) (*domaintypes.RunRepoCounts, error) {
+func getRunCounts(ctx context.Context, st store.Store, runID domaintypes.RunID) (*domaintypes.RunCounts, error) {
 	run, err := st.GetRun(ctx, runID)
 	if err != nil {
 		return nil, err
@@ -57,7 +55,7 @@ func getRunRepoCounts(ctx context.Context, st store.Store, runID domaintypes.Run
 		return nil, err
 	}
 
-	counts := &domaintypes.RunRepoCounts{}
+	counts := &domaintypes.RunCounts{}
 	for _, row := range rows {
 		counts.Total += row.Count
 		switch row.Status {
@@ -80,10 +78,10 @@ func getRunRepoCounts(ctx context.Context, st store.Store, runID domaintypes.Run
 	return counts, nil
 }
 
-// RunRepoResponse represents a single repo within a batch for API responses.
+// RunResponse represents one repository run within a wave for API responses.
 // Exposes repo URL, refs, attempt count, status, error, and timing fields.
 // v1 model: runs stores one repository execution; repo_id refers to repos.id.
-type RunRepoResponse struct {
+type RunResponse struct {
 	RunID           domaintypes.RunID     `json:"run_id"`
 	RepoID          domaintypes.RepoID    `json:"repo_id"`
 	RepoURL         string                `json:"repo_url"`
@@ -97,10 +95,10 @@ type RunRepoResponse struct {
 	FinishedAt      *time.Time            `json:"finished_at,omitempty"`
 }
 
-// runRepoToResponse converts a store.Run to a RunRepoResponse.
+// runToResponse converts a store.Run to a RunResponse.
 // Wraps raw store strings in domain types for type-safe API output.
-func runRepoToResponse(rr store.Run, repoURL string) RunRepoResponse {
-	resp := RunRepoResponse{
+func runToResponse(rr store.Run, repoURL string) RunResponse {
+	resp := RunResponse{
 		RunID:           rr.ID,
 		RepoID:          rr.RepoID,
 		RepoURL:         repoURL,
@@ -231,7 +229,7 @@ func getRunHandler(st store.Store) http.HandlerFunc {
 				summary.RepoURL = repo.Url
 			}
 		}
-		if counts, _ := getRunRepoCounts(r.Context(), st, run.ID); counts != nil && counts.Total > 0 {
+		if counts, _ := getRunCounts(r.Context(), st, run.ID); counts != nil && counts.Total > 0 {
 			summary.Counts = counts
 		}
 

@@ -140,7 +140,7 @@ func HandleMigPull(args []string, stderr io.Writer) error {
 
 	_, _ = fmt.Fprintf(stderr, "mig pull: using mig %q\n", migID)
 
-	// Step 6: Resolve repo execution via POST /v1/migs/{mig_id}/pull.
+	// Step 6: Resolve run via POST /v1/migs/{mig_id}/pull.
 	pullCmd := migs.MigPullCommand{
 		Client:  httpClient,
 		BaseURL: base,
@@ -177,8 +177,8 @@ func HandleMigPull(args []string, stderr io.Writer) error {
 	}
 	_, _ = fmt.Fprintf(stderr, "  source commit: %s\n", sourceCommit)
 
-	// Step 8: Fetch diffs for this repo execution.
-	diffs, err := ListRunRepoDiffs(ctx, httpClient, base, resolution.RunID, resolution.RepoID)
+	// Step 8: Fetch diffs for this run.
+	diffs, err := ListRunDiffs(ctx, httpClient, base, resolution.RunID, resolution.RepoID)
 	if err != nil {
 		return fmt.Errorf("mig pull: list diffs: %w", err)
 	}

@@ -1,0 +1,38 @@
+post:
+  tags: [Control]
+  summary: Resolve pull metadata for a run
+  description: |
+    Returns the single repository identity and source commit for a run. The
+    request body is empty; clients validate any local repository URL against the
+    returned `repo_url`.
+  parameters:
+    - in: path
+      name: run_id
+      required: true
+      schema: { type: string }
+      description: Run ID (KSUID string)
+  responses:
+    "200":
+      description: Run pull metadata.
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/controlplane.yaml#/RunPullResponse"
+    "400":
+      description: Bad request.
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/common.yaml#/Error"
+    "404":
+      description: Run not found.
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/common.yaml#/Error"
+    "500":
+      description: Internal server error.
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/common.yaml#/Error"

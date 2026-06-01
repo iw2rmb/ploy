@@ -27,7 +27,7 @@ func TestRunSummaryJSON(t *testing.T) {
 			CreatedAt:  now,
 			StartedAt:  &started,
 			FinishedAt: &finished,
-			Counts: &RunRepoCounts{
+			Counts: &RunCounts{
 				Total:         10,
 				Queued:        2,
 				Running:       3,

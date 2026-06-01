@@ -1,6 +1,0 @@
-post:
-  tags: [Control]
-  summary: Resolve the repository for a run
-  responses:
-    "200":
-      description: Repository resolved.

@@ -30,7 +30,7 @@ type ListRepoDiffsResult struct {
 	Diffs []RepoDiffEntry
 }
 
-// ListRepoDiffsCommand fetches the diff listing for a repo execution.
+// ListRepoDiffsCommand fetches the diff listing for a run.
 // It returns structured data suitable for machine consumption (e.g., TUI).
 type ListRepoDiffsCommand struct {
 	Client  *http.Client
@@ -75,7 +75,7 @@ func (c ListRepoDiffsCommand) Run(ctx context.Context) (ListRepoDiffsResult, err
 	return ListRepoDiffsResult{Diffs: raw.Diffs}, nil
 }
 
-// RepoDiffsCommand lists diffs for a specific repo execution within a run and
+// RepoDiffsCommand lists diffs for a specific run within a run and
 // optionally downloads the newest patch. This is the v1 repo-scoped version
 // that replaces the legacy run-scoped DiffsCommand.
 //
@@ -95,10 +95,10 @@ type RepoDiffsCommand struct {
 // Run executes the command.
 func (c RepoDiffsCommand) Run(ctx context.Context) error {
 	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
-		return fmt.Errorf("run repo diffs: %w", err)
+		return fmt.Errorf("run diffs: %w", err)
 	}
 	if c.RunID.IsZero() {
-		return errors.New("run repo diffs: run id required")
+		return errors.New("run diffs: run id required")
 	}
 	runID := c.RunID.String()
 	out := c.Output
@@ -118,7 +118,7 @@ func (c RepoDiffsCommand) Run(ctx context.Context) error {
 	}
 	defer httpx.DrainAndClose(resp)
 	if resp.StatusCode != http.StatusOK {
-		return httpx.WrapError("run repo diffs", resp.Status, resp.Body)
+		return httpx.WrapError("run diffs", resp.Status, resp.Body)
 	}
 	var listing struct {
 		Diffs []RepoDiffEntry `json:"diffs"`
@@ -139,7 +139,7 @@ func (c RepoDiffsCommand) Run(ctx context.Context) error {
 	}
 
 	if len(listing.Diffs) == 0 {
-		return errors.New("run repo diffs: no diffs available for this repo execution")
+		return errors.New("run diffs: no diffs available for this run")
 	}
 	// Newest first by API; take first.
 	diffID := listing.Diffs[0].ID
@@ -159,7 +159,7 @@ func (c RepoDiffsCommand) Run(ctx context.Context) error {
 	}
 	defer httpx.DrainAndClose(resp2)
 	if resp2.StatusCode != http.StatusOK {
-		return httpx.WrapError("run repo diffs", resp2.Status, resp2.Body)
+		return httpx.WrapError("run diffs", resp2.Status, resp2.Body)
 	}
 	patch, err := httpx.GunzipToBytes(io.LimitReader(resp2.Body, httpx.MaxDownloadBodyBytes), httpx.MaxGunzipOutputBytes)
 	if err != nil {

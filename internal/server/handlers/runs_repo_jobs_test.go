@@ -9,7 +9,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-func TestListRunRepoJobsHandler_NextIDContract(t *testing.T) {
+func TestListRunJobsHandler_NextIDContract(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
@@ -40,7 +40,7 @@ func TestListRunRepoJobsHandler_NextIDContract(t *testing.T) {
 		},
 	}
 
-	handler := listRunRepoJobsHandler(st)
+	handler := listRunJobsHandler(st)
 	rr := doRequest(t, handler, http.MethodGet, "/v1/runs/"+runID.String()+"/jobs", nil, "run_id", runID.String())
 
 	assertStatus(t, rr, http.StatusOK)
@@ -75,7 +75,7 @@ func TestListRunRepoJobsHandler_NextIDContract(t *testing.T) {
 	}
 }
 
-func TestListRunRepoJobsHandler_ExposesGateAndMigJobTypes(t *testing.T) {
+func TestListRunJobsHandler_ExposesGateAndMigJobTypes(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
@@ -112,7 +112,7 @@ func TestListRunRepoJobsHandler_ExposesGateAndMigJobTypes(t *testing.T) {
 		},
 	}
 
-	handler := listRunRepoJobsHandler(st)
+	handler := listRunJobsHandler(st)
 	rr := doRequest(t, handler, http.MethodGet, "/v1/runs/"+runID.String()+"/jobs", nil, "run_id", runID.String())
 	assertStatus(t, rr, http.StatusOK)
 
@@ -139,7 +139,7 @@ func TestListRunRepoJobsHandler_ExposesGateAndMigJobTypes(t *testing.T) {
 	}
 }
 
-func TestListRunRepoJobsHandler_AttemptQueryOverride(t *testing.T) {
+func TestListRunJobsHandler_AttemptQueryOverride(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
@@ -153,7 +153,7 @@ func TestListRunRepoJobsHandler_AttemptQueryOverride(t *testing.T) {
 	}}
 	st.listJobsByRunRepoAttempt.val = []store.Job{}
 
-	handler := listRunRepoJobsHandler(st)
+	handler := listRunJobsHandler(st)
 	rr := doRequest(t, handler, http.MethodGet, "/v1/runs/"+runID.String()+"/jobs?attempt=3", nil, "run_id", runID.String())
 
 	assertStatus(t, rr, http.StatusOK)
@@ -162,7 +162,7 @@ func TestListRunRepoJobsHandler_AttemptQueryOverride(t *testing.T) {
 	}
 }
 
-func TestListRunRepoJobsHandler_OrdersJobsByChain(t *testing.T) {
+func TestListRunJobsHandler_OrdersJobsByChain(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
@@ -185,7 +185,7 @@ func TestListRunRepoJobsHandler_OrdersJobsByChain(t *testing.T) {
 		{ID: pre, RunID: runID, RepoID: repoID, Attempt: 1, Name: "pre-gate", JobType: "pre_gate", NextID: &mig0, Status: domaintypes.JobStatusQueued},
 	}
 
-	handler := listRunRepoJobsHandler(st)
+	handler := listRunJobsHandler(st)
 	rr := doRequest(t, handler, http.MethodGet, "/v1/runs/"+runID.String()+"/jobs", nil, "run_id", runID.String())
 
 	assertStatus(t, rr, http.StatusOK)
@@ -218,11 +218,11 @@ func TestListRunRepoJobsHandler_OrdersJobsByChain(t *testing.T) {
 	}
 }
 
-func TestListRunRepoJobsHandler_ExposesGateBugSummary(t *testing.T) {
+func TestListRunJobsHandler_ExposesGateBugSummary(t *testing.T) {
 	t.Parallel()
 
 	metaJSON := `{"kind":"gate","gate":{"bug_summary":"missing ; in Foo.java"}}`
-	_, handler, runID, _ := newRunRepoJobsFixture(t, metaJSON)
+	_, handler, runID, _ := newRunJobsFixture(t, metaJSON)
 	rr := doRequest(t, handler, http.MethodGet, "/v1/runs/"+runID.String()+"/jobs", nil, "run_id", runID.String())
 
 	assertStatus(t, rr, http.StatusOK)
@@ -243,11 +243,11 @@ func TestListRunRepoJobsHandler_ExposesGateBugSummary(t *testing.T) {
 	}
 }
 
-func TestListRunRepoJobsHandler_ExposesGateStackDetection(t *testing.T) {
+func TestListRunJobsHandler_ExposesGateStackDetection(t *testing.T) {
 	t.Parallel()
 
 	metaJSON := `{"kind":"gate","gate":{"detected_stack":{"language":"java","tool":"maven","release":"17"},"bug_summary":"build failed"}}`
-	_, handler, runID, _ := newRunRepoJobsFixture(t, metaJSON)
+	_, handler, runID, _ := newRunJobsFixture(t, metaJSON)
 	rr := doRequest(t, handler, http.MethodGet, "/v1/runs/"+runID.String()+"/jobs", nil, "run_id", runID.String())
 
 	assertStatus(t, rr, http.StatusOK)
@@ -276,11 +276,11 @@ func TestListRunRepoJobsHandler_ExposesGateStackDetection(t *testing.T) {
 	}
 }
 
-func TestListRunRepoJobsHandler_PrefersGateRuntimeImageAddress(t *testing.T) {
+func TestListRunJobsHandler_PrefersGateRuntimeImageAddress(t *testing.T) {
 	t.Parallel()
 
 	metaJSON := `{"kind":"gate","gate":{"stack_gate":{"enabled":true,"result":"pass","runtime_image":"ghcr.io/iw2rmb/ploy/gates/maven:jdk17"}}}`
-	st, handler, runID, _ := newRunRepoJobsFixture(t, metaJSON)
+	st, handler, runID, _ := newRunJobsFixture(t, metaJSON)
 	st.listJobsByRunRepoAttempt.val[0].JobImage = "gate-image-placeholder"
 
 	rr := doRequest(t, handler, http.MethodGet, "/v1/runs/"+runID.String()+"/jobs", nil, "run_id", runID.String())
@@ -303,10 +303,10 @@ func TestListRunRepoJobsHandler_PrefersGateRuntimeImageAddress(t *testing.T) {
 	}
 }
 
-func TestListRunRepoJobsHandler_InvalidMeta_DoesNotFailResponse(t *testing.T) {
+func TestListRunJobsHandler_InvalidMeta_DoesNotFailResponse(t *testing.T) {
 	t.Parallel()
 
-	_, handler, runID, _ := newRunRepoJobsFixture(t, `{"gate":{"bug_summary":"missing kind"}}`)
+	_, handler, runID, _ := newRunJobsFixture(t, `{"gate":{"bug_summary":"missing kind"}}`)
 	rr := doRequest(t, handler, http.MethodGet, "/v1/runs/"+runID.String()+"/jobs", nil, "run_id", runID.String())
 
 	assertStatus(t, rr, http.StatusOK)

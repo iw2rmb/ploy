@@ -13,7 +13,7 @@ info:
     - `/v1/migs/{mig_id}/specs` and `/v1/migs/{mig_id}/specs/latest` — spec management for mig projects.
     - `/v1/migs/{mig_id}/repos` — repo set management (add/list/delete repos).
     - `/v1/migs/{mig_id}/waves` — create a launch wave for a mig.
-    - `/v1/migs/{mig_id}/pull` — resolve repo execution for `ploy mig pull`.
+    - `/v1/migs/{mig_id}/pull` — resolve run for `ploy mig pull`.
     - `/v1/repos/resolve` — expand `namespace/repo[:ref]` shorthand using server-owned GitLab config.
     - `/v1/runs` — single-repo run submission and run listing.
     - `/v1/runs/{run_id}/*` — run lifecycle, pull resolution, logs, diffs, artifacts, jobs, and worker snapshots.
@@ -153,8 +153,10 @@ paths:
     $ref: "./paths/migs_id.yaml"
   /v1/runs/{run_id}/cancel:
     $ref: "./paths/runs_id_cancel.yaml"
-  /v1/runs/{run_id}/resolve:
-    $ref: "./paths/runs_run_id_resolve.yaml"
+  /v1/runs/{run_id}/restart:
+    $ref: "./paths/runs_run_id_restart.yaml"
+  /v1/runs/{run_id}/pull:
+    $ref: "./paths/runs_run_id_pull.yaml"
   /v1/runs/{run_id}/snapshot:
     $ref: "./paths/runs_run_id_snapshot.yaml"
   /v1/runs/{run_id}/diffs:
@@ -234,6 +236,10 @@ components:
       $ref: "./components/schemas/controlplane.yaml#/Run"
     RunSummary:
       $ref: "./components/schemas/controlplane.yaml#/RunSummary"
+    RunCounts:
+      $ref: "./components/schemas/controlplane.yaml#/RunCounts"
+    RunExecution:
+      $ref: "./components/schemas/controlplane.yaml#/RunExecution"
     CreateRunRequest:
       $ref: "./components/schemas/controlplane.yaml#/CreateRunRequest"
     CreateRunResponse:
@@ -303,13 +309,13 @@ components:
       $ref: "./components/schemas/controlplane.yaml#/CreateMigRunRequest"
     CreateMigRunResponse:
       $ref: "./components/schemas/controlplane.yaml#/CreateMigRunResponse"
-    # Pull resolution types — POST /v1/migs/{mig_id}/pull, POST /v1/runs/{run_id}/resolve
+    # Pull resolution types — POST /v1/migs/{mig_id}/pull, POST /v1/runs/{run_id}/pull
     PullResolutionMode:
       $ref: "./components/schemas/controlplane.yaml#/PullResolutionMode"
     MigPullRequest:
       $ref: "./components/schemas/controlplane.yaml#/MigPullRequest"
-    RunPullRequest:
-      $ref: "./components/schemas/controlplane.yaml#/RunPullRequest"
+    RunPullResponse:
+      $ref: "./components/schemas/controlplane.yaml#/RunPullResponse"
     PullResolutionResponse:
       $ref: "./components/schemas/controlplane.yaml#/PullResolutionResponse"
     # Single-repo run submission — POST /v1/runs
@@ -321,10 +327,10 @@ components:
     DiffListResponse:
       $ref: "./components/schemas/controlplane.yaml#/DiffListResponse"
     # Run-scoped jobs listing — GET /v1/runs/{run_id}/jobs
-    RepoJobItem:
-      $ref: "./components/schemas/controlplane.yaml#/RepoJobItem"
-    ListRepoJobsResponse:
-      $ref: "./components/schemas/controlplane.yaml#/ListRepoJobsResponse"
+    RunJobItem:
+      $ref: "./components/schemas/controlplane.yaml#/RunJobItem"
+    ListRunJobsResponse:
+      $ref: "./components/schemas/controlplane.yaml#/ListRunJobsResponse"
     # Spec bundle upload/download schemas
     SpecBundleUploadResponse:
       $ref: "./paths/spec_bundles.yaml#/components/schemas/SpecBundleUploadResponse"

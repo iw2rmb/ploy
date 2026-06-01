@@ -6,8 +6,8 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-// RunRepoJob represents a job within a repo execution.
-type RunRepoJob struct {
+// RunJob represents a job within a run.
+type RunJob struct {
 	JobID       domaintypes.JobID     `json:"job_id"`
 	Name        string                `json:"name"`
 	JobType     domaintypes.JobType   `json:"job_type"`
@@ -30,10 +30,10 @@ type RunRepoJob struct {
 	Tooling string `json:"tooling,omitempty"`
 }
 
-// ListRunRepoJobsResponse is the response for GET /v1/runs/{run_id}/jobs.
-type ListRunRepoJobsResponse struct {
+// ListRunJobsResponse is the response for GET /v1/runs/{run_id}/jobs.
+type ListRunJobsResponse struct {
 	RunID   domaintypes.RunID  `json:"run_id"`
 	RepoID  domaintypes.RepoID `json:"repo_id"`
 	Attempt int32              `json:"attempt"`
-	Jobs    []RunRepoJob       `json:"jobs"`
+	Jobs    []RunJob           `json:"jobs"`
 }

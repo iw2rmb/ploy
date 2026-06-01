@@ -323,7 +323,7 @@ func newSuccessfulRunSubmitServer(t *testing.T, cfg successfulRunSubmitConfig) *
 					"status":    "Success",
 				}},
 			})
-		case r.Method == http.MethodPost && r.URL.Path == "/v1/runs/"+cfg.RunID+"/resolve":
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/runs/"+cfg.RunID+"/pull":
 			_ = json.NewEncoder(w).Encode(map[string]string{
 				"run_id":            cfg.RunID,
 				"repo_id":           cfg.RepoID,

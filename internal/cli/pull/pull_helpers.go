@@ -99,8 +99,8 @@ func ensureHEADMatchesSource(ctx context.Context, sourceCommit string) error {
 	return nil
 }
 
-func ListRunRepoDiffs(ctx context.Context, httpClient *http.Client, baseURL *url.URL, runID domaintypes.RunID, repoID domaintypes.RepoID) ([]migs.DiffEntry, error) {
-	cmd := migs.ListRunRepoDiffsCommand{
+func ListRunDiffs(ctx context.Context, httpClient *http.Client, baseURL *url.URL, runID domaintypes.RunID, repoID domaintypes.RepoID) ([]migs.DiffEntry, error) {
+	cmd := migs.ListRunDiffsCommand{
 		Client:  httpClient,
 		BaseURL: baseURL,
 		RunID:   runID,

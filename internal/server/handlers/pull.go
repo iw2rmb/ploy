@@ -1,14 +1,12 @@
 // Package handlers implements HTTP handlers for the ploy server API.
 //
 // pull.go implements the "pull resolution" endpoints for fetching diffs.
-// These endpoints help CLI clients resolve repo execution identifiers needed to
+// These endpoints help CLI clients resolve run identifiers needed to
 // pull diffs from the server.
 //
 // Endpoints:
-//   - POST /v1/runs/{run_id}/resolve — resolve repo for a specific run
+//   - POST /v1/runs/{run_id}/pull — resolve repo metadata for a run
 //   - POST /v1/migs/{mig_id}/pull — resolve repo for a mig (last succeeded/failed)
-//
-// Implements pull resolution endpoints for mig and run repos.
 package handlers
 
 import (
@@ -25,12 +23,6 @@ import (
 // -------------------------------------------------------------------------
 // Request/Response types for pull resolution endpoints
 // -------------------------------------------------------------------------
-
-// runPullRequest is the request body for POST /v1/runs/{run_id}/resolve.
-// The client provides a repo_url to resolve to execution identifiers.
-type runPullRequest struct {
-	RepoURL string `json:"repo_url"`
-}
 
 // migPullRequest is the request body for POST /v1/migs/{mig_id}/pull.
 // The client provides a repo_url and optional mode to select which run to resolve.
@@ -57,37 +49,18 @@ type pullResponse struct {
 // Handlers
 // -------------------------------------------------------------------------
 
-// resolveRunRepoHandler resolves a repo_url to execution identifiers for a specific run.
-// Endpoint: POST /v1/runs/{run_id}/resolve
-// Request: {repo_url}
-// Response: 200 OK with {run_id, repo_id}
-//
-// v1 contract:
-//   - Server matches the repo by joining runs to mig_repos by repo_id,
-//     filtering by run_id, and comparing normalized repo_url.
-//   - Uses domaintypes.NormalizeRepoURL for URL comparison.
-//   - If no repo matches: 404 error.
-//   - If multiple repos match: 409 error (ambiguous).
-func resolveRunRepoHandler(st store.Store) http.HandlerFunc {
+// pullRunHandler returns the single repo identity attached to a run.
+// Endpoint: POST /v1/runs/{run_id}/pull
+// Request: no body
+// Response: 200 OK with {run_id, repo_id, repo_url, source_commit_sha}
+func pullRunHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		runID, ok := parseRequiredPathIDOrWriteError[domaintypes.RunID](w, r, "run_id")
 		if !ok {
 			return
 		}
 
-		var req runPullRequest
-		if err := decodeRequestJSON(w, r, &req, DefaultMaxBodySize); err != nil {
-			return
-		}
-
-		if req.RepoURL == "" {
-			writeHTTPError(w, http.StatusBadRequest, "repo_url is required")
-			return
-		}
-
-		normalizedURL := domaintypes.NormalizeRepoURL(req.RepoURL)
-
-		run, ok := getRunOrFail(w, r, st, runID, "pull run repo")
+		run, ok := getRunOrFail(w, r, st, runID, "pull run")
 		if !ok {
 			return
 		}
@@ -95,11 +68,6 @@ func resolveRunRepoHandler(st store.Store) http.HandlerFunc {
 		repoURL, err := repoURLForID(r.Context(), st, run.RepoID)
 		if err != nil {
 			serverError(w, "pull run", "get repo", err, "run_id", runID, "repo_id", run.RepoID)
-			return
-		}
-
-		if domaintypes.NormalizeRepoURL(repoURL) != normalizedURL {
-			writeHTTPError(w, http.StatusNotFound, "no matching repo found in run")
 			return
 		}
 
@@ -112,10 +80,10 @@ func resolveRunRepoHandler(st store.Store) http.HandlerFunc {
 
 		writeJSON(w, http.StatusOK, resp)
 
-		slog.Info("pull run repo resolved",
+		slog.Info("pull run resolved",
 			"run_id", runID.String(),
 			"repo_id", run.RepoID,
-			"repo_url", req.RepoURL,
+			"repo_url", repoURL,
 		)
 	}
 }

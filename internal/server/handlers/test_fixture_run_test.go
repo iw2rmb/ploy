@@ -22,8 +22,9 @@ type runStore struct {
 	listRunsTimings mockResult[[]store.RunsTiming]
 	listRuns        mockResult[[]store.Run]
 
-	deleteRun mockCall[string, struct{}]
-	cancelRun mockCall[string, struct{}]
+	deleteRun  mockCall[string, struct{}]
+	cancelRun  mockCall[string, struct{}]
+	restartRun mockCall[string, store.Run]
 
 	updateRunStatus mockCall[store.UpdateRunStatusParams, struct{}]
 
@@ -117,6 +118,10 @@ func (m *runStore) DeleteRun(ctx context.Context, id types.RunID) error {
 func (m *runStore) CancelRun(ctx context.Context, runID types.RunID) error {
 	_, err := m.cancelRun.record(runID.String())
 	return err
+}
+
+func (m *runStore) RestartRun(ctx context.Context, runID types.RunID) (store.Run, error) {
+	return m.restartRun.record(runID.String())
 }
 
 func (m *runStore) UpdateRunStatus(ctx context.Context, params store.UpdateRunStatusParams) error {

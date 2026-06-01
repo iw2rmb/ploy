@@ -1,7 +1,7 @@
 // pull.go provides CLI client implementations for pull resolution APIs.
 //
 // These commands call the server endpoints:
-//   - POST /v1/runs/{run_id}/resolve (resolve repo for a run)
+//   - POST /v1/runs/{run_id}/pull (resolve repo metadata for a run)
 //   - POST /v1/migs/{mig_id}/pull (resolve repo for a mig)
 //
 // These endpoints help CLI clients resolve repo execution identifiers needed to
@@ -40,21 +40,15 @@ type PullResolution struct {
 // Run Pull Resolution Command
 // =============================================================================
 
-// RunPullCommand resolves a repo_url to execution identifiers for a specific run.
-// Endpoint: POST /v1/runs/{run_id}/resolve
-//
-// Server matches the repo by joining runs to mig_repos by repo_id,
-// filtering by run_id, and comparing normalized repo_url.
-// Returns 404 if no repo matches, 409 if multiple repos match (ambiguous).
+// RunPullCommand resolves execution identifiers and source metadata for a run.
+// Endpoint: POST /v1/runs/{run_id}/pull
 type RunPullCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
 	RunID   domaintypes.RunID
-	RepoURL string // Repository URL to match
 }
 
-// Run executes POST /v1/runs/{run_id}/resolve with the provided repo_url.
-// Returns the PullResolution containing run_id and repo_id.
+// Run executes POST /v1/runs/{run_id}/pull with no request body.
 func (c RunPullCommand) Run(ctx context.Context) (*PullResolution, error) {
 	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
 		return nil, fmt.Errorf("run pull: %w", err)
@@ -62,32 +56,13 @@ func (c RunPullCommand) Run(ctx context.Context) (*PullResolution, error) {
 	if c.RunID.IsZero() {
 		return nil, fmt.Errorf("run pull: run id required")
 	}
-	repoURL := strings.TrimSpace(c.RepoURL)
-	if repoURL == "" {
-		return nil, fmt.Errorf("run pull: repo url required")
-	}
-	if err := domaintypes.RepoURL(repoURL).Validate(); err != nil {
-		return nil, fmt.Errorf("run pull: repo url must be a valid repo url")
-	}
 
-	endpoint := c.BaseURL.JoinPath("v1", "runs", c.RunID.String(), "resolve")
+	endpoint := c.BaseURL.JoinPath("v1", "runs", c.RunID.String(), "pull")
 
-	// Build request body: {"repo_url": "..."}
-	reqBody := struct {
-		RepoURL string `json:"repo_url"`
-	}{
-		RepoURL: repoURL,
-	}
-	bodyBytes, err := json.Marshal(reqBody)
-	if err != nil {
-		return nil, fmt.Errorf("run pull: marshal request: %w", err)
-	}
-
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), bytes.NewReader(bodyBytes))
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("run pull: build request: %w", err)
 	}
-	httpReq.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.Client.Do(httpReq)
 	if err != nil {
@@ -105,6 +80,12 @@ func (c RunPullCommand) Run(ctx context.Context) (*PullResolution, error) {
 	}
 	if result.RepoID.IsZero() {
 		return nil, fmt.Errorf("run pull: empty repo_id in response")
+	}
+	if strings.TrimSpace(result.RepoURL) == "" {
+		return nil, fmt.Errorf("run pull: empty repo_url in response")
+	}
+	if strings.TrimSpace(result.SourceCommitSHA) == "" {
+		return nil, fmt.Errorf("run pull: empty source_commit_sha in response")
 	}
 
 	return &result, nil

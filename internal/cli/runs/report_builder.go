@@ -83,7 +83,7 @@ func (c GetRunReportCommand) buildRepoEntry(
 		return fmt.Errorf("run report: list repo jobs (%s): %w", repo.RepoID, err)
 	}
 
-	diffs, err := listRunRepoDiffs(ctx, c.Client, c.BaseURL, c.RunID, repo.RepoID)
+	diffs, err := listRunDiffs(ctx, c.Client, c.BaseURL, c.RunID, repo.RepoID)
 	if err != nil {
 		return fmt.Errorf("run report: list repo diffs (%s): %w", repo.RepoID, err)
 	}
@@ -211,7 +211,7 @@ func listRunStageArtifacts(
 	return artifacts, nil
 }
 
-func listRunRepoDiffs(ctx context.Context, httpClient *http.Client, baseURL *url.URL, runID domaintypes.RunID, repoID domaintypes.RepoID) ([]RepoDiffEntry, error) {
+func listRunDiffs(ctx context.Context, httpClient *http.Client, baseURL *url.URL, runID domaintypes.RunID, repoID domaintypes.RepoID) ([]RepoDiffEntry, error) {
 	endpoint := baseURL.JoinPath("v1", "runs", runID.String(), "diffs")
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
 	if err != nil {

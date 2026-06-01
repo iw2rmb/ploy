@@ -10,15 +10,15 @@ import (
 )
 
 type WaveSummary struct {
-	ID         domaintypes.WaveID         `json:"id"`
-	MigID      domaintypes.MigID          `json:"mig_id"`
-	SpecID     domaintypes.SpecID         `json:"spec_id"`
-	CreatedBy  *string                    `json:"created_by,omitempty"`
-	Status     domaintypes.WaveStatus     `json:"status"`
-	CreatedAt  string                     `json:"created_at"`
-	StartedAt  *string                    `json:"started_at,omitempty"`
-	FinishedAt *string                    `json:"finished_at,omitempty"`
-	Counts     *domaintypes.RunRepoCounts `json:"run_counts,omitempty"`
+	ID         domaintypes.WaveID     `json:"id"`
+	MigID      domaintypes.MigID      `json:"mig_id"`
+	SpecID     domaintypes.SpecID     `json:"spec_id"`
+	CreatedBy  *string                `json:"created_by,omitempty"`
+	Status     domaintypes.WaveStatus `json:"status"`
+	CreatedAt  string                 `json:"created_at"`
+	StartedAt  *string                `json:"started_at,omitempty"`
+	FinishedAt *string                `json:"finished_at,omitempty"`
+	Counts     *domaintypes.RunCounts `json:"run_counts,omitempty"`
 }
 
 func waveToSummary(wave store.Wave) WaveSummary {
@@ -41,12 +41,12 @@ func waveToSummary(wave store.Wave) WaveSummary {
 	return summary
 }
 
-func getWaveCounts(ctx context.Context, st store.Store, waveID domaintypes.WaveID) (*domaintypes.RunRepoCounts, error) {
+func getWaveCounts(ctx context.Context, st store.Store, waveID domaintypes.WaveID) (*domaintypes.RunCounts, error) {
 	rows, err := st.CountRunsByWaveStatus(ctx, waveID)
 	if err != nil {
 		return nil, err
 	}
-	counts := &domaintypes.RunRepoCounts{}
+	counts := &domaintypes.RunCounts{}
 	for _, row := range rows {
 		counts.Total += row.Count
 		switch row.Status {
@@ -100,9 +100,9 @@ func listWaveRunsHandler(st store.Store) http.HandlerFunc {
 			serverError(w, "list wave runs", "list runs", err, "wave_id", waveID)
 			return
 		}
-		out := make([]RunRepoResponse, 0, len(runs))
+		out := make([]RunResponse, 0, len(runs))
 		for _, run := range runs {
-			out = append(out, runRepoToResponse(store.Run{
+			out = append(out, runToResponse(store.Run{
 				ID:              run.ID,
 				WaveID:          run.WaveID,
 				MigID:           run.MigID,
@@ -122,7 +122,7 @@ func listWaveRunsHandler(st store.Store) http.HandlerFunc {
 			}, run.RepoUrl))
 		}
 		writeJSON(w, http.StatusOK, struct {
-			Runs []RunRepoResponse `json:"runs"`
+			Runs []RunResponse `json:"runs"`
 		}{Runs: out})
 	}
 }

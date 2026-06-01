@@ -45,7 +45,7 @@ type diffListResponse struct {
 
 const maxAccumulatedDiffPlainBytes int64 = 64 << 20
 
-// listRunRepoDiffsHandler returns a JSON list of diffs for a specific repo execution
+// listRunDiffsHandler returns a JSON list of diffs for a specific run
 // within a run. This is the v1 repo-scoped endpoint replacing the legacy run-scoped
 // diffs listing endpoint.
 //
@@ -61,7 +61,7 @@ const maxAccumulatedDiffPlainBytes int64 = 64 << 20
 // - Response shape is unchanged from legacy endpoint (diffListResponse)
 //
 // Run and job IDs are KSUID-backed strings; repo IDs are NanoID-backed strings.
-func listRunRepoDiffsHandler(st store.Store, bs blobstore.Store) http.HandlerFunc {
+func listRunDiffsHandler(st store.Store, bs blobstore.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		runID, ok := parseRequiredPathIDOrWriteError[domaintypes.RunID](w, r, "run_id")
 		if !ok {
@@ -83,12 +83,12 @@ func listRunRepoDiffsHandler(st store.Store, bs blobstore.Store) http.HandlerFun
 			}
 			accumulated := strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("accumulated")), "true")
 			if accumulated {
-				if !downloadAccumulatedRunRepoDiff(w, r, st, bs, runID, repoID, diffID) {
+				if !downloadAccumulatedRunDiff(w, r, st, bs, runID, repoID, diffID) {
 					return
 				}
 				return
 			}
-			diffs, err := listEffectiveRunRepoDiffs(r.Context(), st, runID, repoID)
+			diffs, err := listEffectiveRunDiffs(r.Context(), st, runID, repoID)
 			if err != nil {
 				serverError(w, "download run repo diff", "list diffs", err, "run_id", runID.String(), "repo_id", repoID.String(), "diff_id", diffID.String())
 				return
@@ -120,10 +120,10 @@ func listRunRepoDiffsHandler(st store.Store, bs blobstore.Store) http.HandlerFun
 			return
 		}
 
-		diffs, err := listEffectiveRunRepoDiffs(r.Context(), st, runID, repoID)
+		diffs, err := listEffectiveRunDiffs(r.Context(), st, runID, repoID)
 		if err != nil {
 			writeHTTPError(w, http.StatusInternalServerError, "failed to list diffs: %v", err)
-			slog.Error("list run repo diffs: query failed", "run_id", runID.String(), "repo_id", repoID.String(), "err", err)
+			slog.Error("list run diffs: query failed", "run_id", runID.String(), "repo_id", repoID.String(), "err", err)
 			return
 		}
 
@@ -148,7 +148,7 @@ func listRunRepoDiffsHandler(st store.Store, bs blobstore.Store) http.HandlerFun
 	}
 }
 
-func downloadAccumulatedRunRepoDiff(
+func downloadAccumulatedRunDiff(
 	w http.ResponseWriter,
 	r *http.Request,
 	st store.Store,
@@ -157,7 +157,7 @@ func downloadAccumulatedRunRepoDiff(
 	repoID domaintypes.RepoID,
 	diffID domaintypes.DiffID,
 ) bool {
-	diffs, err := listEffectiveRunRepoDiffs(r.Context(), st, runID, repoID)
+	diffs, err := listEffectiveRunDiffs(r.Context(), st, runID, repoID)
 	if err != nil {
 		serverError(w, "download accumulated run repo diff", "list diffs", err, "run_id", runID.String(), "repo_id", repoID.String(), "diff_id", diffID.String())
 		return false
@@ -266,7 +266,7 @@ type runRepoDiffRow struct {
 	DisplayJobID domaintypes.JobID
 }
 
-func listEffectiveRunRepoDiffs(
+func listEffectiveRunDiffs(
 	ctx context.Context,
 	st store.Store,
 	runID domaintypes.RunID,

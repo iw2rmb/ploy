@@ -9,10 +9,10 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-// listRunRepoArtifactsHandler lists artifact bundles produced by jobs belonging to a
-// specific repo execution within a run.
+// listRunArtifactsHandler lists artifact bundles produced by jobs belonging to a
+// specific run within a run.
 // GET /v1/runs/{run_id}/artifacts
-func listRunRepoArtifactsHandler(st store.Store) http.HandlerFunc {
+func listRunArtifactsHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		runID, ok := parseRequiredPathIDOrWriteError[domaintypes.RunID](w, r, "run_id")
 		if !ok {
@@ -23,12 +23,12 @@ func listRunRepoArtifactsHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		rr, ok := getRunRepoOrFail(w, r, st, runID, repoID, "list run repo artifacts")
+		rr, ok := getRunOrRepoMismatchOrFail(w, r, st, runID, repoID, "list run repo artifacts")
 		if !ok {
 			return
 		}
 
-		jobs, ok := listJobsForRunRepoOrFail(w, r, st, runID, repoID, rr.Attempt, "list run repo artifacts")
+		jobs, ok := listJobsForRunAttemptOrFail(w, r, st, runID, repoID, rr.Attempt, "list run repo artifacts")
 		if !ok {
 			return
 		}

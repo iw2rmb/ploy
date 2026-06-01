@@ -60,10 +60,12 @@ func runApply(ctx context.Context, opts ApplyOptions, base *url.URL, httpClient 
 		Client:  httpClient,
 		BaseURL: base,
 		RunID:   runID,
-		RepoURL: local.RepoURL,
 	}.Run(ctx)
 	if err != nil {
 		return fmt.Errorf("run apply: %w", err)
+	}
+	if domaintypes.NormalizeRepoURL(resolved.RepoURL) != domaintypes.NormalizeRepoURL(local.RepoURL) {
+		return fmt.Errorf("run apply: local origin %s does not match run repo_url %s", local.RepoURL, resolved.RepoURL)
 	}
 	sourceSHA := strings.TrimSpace(resolved.SourceCommitSHA)
 	if sourceSHA == "" {
@@ -73,7 +75,7 @@ func runApply(ctx context.Context, opts ApplyOptions, base *url.URL, httpClient 
 		return fmt.Errorf("run apply: local HEAD %s does not match run source_commit_sha %s; use --force to apply anyway", local.CommitSHA, sourceSHA)
 	}
 
-	diffs, err := migs.ListRunRepoDiffsCommand{
+	diffs, err := migs.ListRunDiffsCommand{
 		Client:  httpClient,
 		BaseURL: base,
 		RunID:   runID,

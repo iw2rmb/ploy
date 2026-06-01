@@ -73,7 +73,8 @@ Run operations:
 - `GET /v1/runs/{run_id}`
 - `GET /v1/runs/{run_id}/status`
 - `POST /v1/runs/{run_id}/cancel`
-- `POST /v1/runs/{run_id}/resolve`
+- `POST /v1/runs/{run_id}/restart`
+- `POST /v1/runs/{run_id}/pull`
 - `GET /v1/runs/{run_id}/jobs`
 - `GET /v1/runs/{run_id}/diffs`
 - `GET /v1/runs/{run_id}/logs`

@@ -78,7 +78,8 @@ SET attempt = attempt + 1,
     status = 'Queued',
     last_error = NULL,
     started_at = NULL,
-    finished_at = NULL
+    finished_at = NULL,
+    stats = '{}'::jsonb
 WHERE id = $1;
 
 -- name: UpdateRunBaseRef :exec

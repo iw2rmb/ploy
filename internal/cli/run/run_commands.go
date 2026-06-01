@@ -41,6 +41,7 @@ func NewCommand() *cobra.Command {
 
 	cmd.AddCommand(newListCommand())
 	cmd.AddCommand(newCancelCommand())
+	cmd.AddCommand(newRestartCommand())
 	cmd.AddCommand(newStatusCommand())
 	cmd.AddCommand(newPullCommand())
 	cmd.AddCommand(newApplyCommand())
@@ -76,6 +77,21 @@ func newCancelCommand() *cobra.Command {
 			opts.RunID = args[0]
 			opts.Output = cmd.OutOrStdout()
 			return RunCancel(cmd.Context(), opts)
+		},
+	}
+	return cmd
+}
+
+func newRestartCommand() *cobra.Command {
+	opts := RestartOptions{}
+	cmd := &cobra.Command{
+		Use:   "restart <run-id>",
+		Short: "Restart a terminal run",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			opts.RunID = args[0]
+			opts.Output = cmd.OutOrStdout()
+			return RunRestart(cmd.Context(), opts)
 		},
 	}
 	return cmd

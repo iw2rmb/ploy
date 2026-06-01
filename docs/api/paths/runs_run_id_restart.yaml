@@ -1,0 +1,44 @@
+post:
+  tags: [Control]
+  summary: Restart a run
+  description: |
+    Restarts a terminal run by incrementing its attempt and setting it back to
+    `Queued`. Active runs and runs whose owning wave is `Cancelled` return
+    `409 Conflict`.
+  parameters:
+    - in: path
+      name: run_id
+      required: true
+      schema: { type: string }
+      description: Run ID (KSUID string)
+  responses:
+    "200":
+      description: Updated run summary.
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/controlplane.yaml#/RunSummary"
+    "400":
+      description: Bad request.
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/common.yaml#/Error"
+    "404":
+      description: Run not found.
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/common.yaml#/Error"
+    "409":
+      description: Run is active or the owning wave is cancelled.
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/common.yaml#/Error"
+    "500":
+      description: Internal server error.
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/common.yaml#/Error"

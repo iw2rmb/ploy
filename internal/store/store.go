@@ -17,6 +17,12 @@ var ErrEmptyNodeID = errors.New("store: ClaimJob requires non-empty nodeID")
 // ErrInvalidJSON is returned when a JSONB column receives invalid JSON bytes.
 var ErrInvalidJSON = errors.New("store: invalid JSON for JSONB column")
 
+// ErrRunRestartActive is returned when a non-terminal run is restarted.
+var ErrRunRestartActive = errors.New("store: only terminal runs can be restarted")
+
+// ErrRunRestartWaveCancelled is returned when the owning wave was cancelled.
+var ErrRunRestartWaveCancelled = errors.New("store: cannot restart a run in a cancelled wave")
+
 // Store defines the interface for database operations.
 // The sqlc-generated Queries type implements the query methods via Querier.
 type Store interface {
@@ -24,6 +30,7 @@ type Store interface {
 	CancelRun(ctx context.Context, runID types.RunID) error
 	CancelWave(ctx context.Context, waveID types.WaveID) error
 	CreateWaveWithRuns(ctx context.Context, arg CreateWaveWithRunsParams) (Wave, []Run, error)
+	RestartRun(ctx context.Context, runID types.RunID) (Run, error)
 	Close()
 	Pool() *pgxpool.Pool
 }
@@ -168,6 +175,68 @@ func (s *PgStore) CancelRun(ctx context.Context, runID types.RunID) error {
 
 	committed = true
 	return nil
+}
+
+// RestartRun atomically resets one terminal run to Queued on the next attempt.
+func (s *PgStore) RestartRun(ctx context.Context, runID types.RunID) (Run, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return Run{}, fmt.Errorf("restart run: begin tx: %w", err)
+	}
+
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tx.Rollback(ctx)
+		}
+	}()
+
+	qtx := s.Queries.WithTx(tx)
+
+	run, err := qtx.GetRun(ctx, runID)
+	if err != nil {
+		return Run{}, fmt.Errorf("restart run: get run: %w", err)
+	}
+	if run.Status != types.RunStatusSuccess && run.Status != types.RunStatusFail && run.Status != types.RunStatusCancelled {
+		return Run{}, ErrRunRestartActive
+	}
+
+	wave, err := qtx.GetWave(ctx, run.WaveID)
+	if err != nil {
+		return Run{}, fmt.Errorf("restart run: get wave: %w", err)
+	}
+	if wave.Status == types.WaveStatusCancelled {
+		return Run{}, ErrRunRestartWaveCancelled
+	}
+
+	if _, err := qtx.CancelActiveJobsByRunAttempt(ctx, CancelActiveJobsByRunAttemptParams{
+		RunID:   runID,
+		Attempt: run.Attempt,
+	}); err != nil {
+		return Run{}, fmt.Errorf("restart run: cancel active jobs: %w", err)
+	}
+
+	if err := qtx.IncrementRunAttempt(ctx, runID); err != nil {
+		return Run{}, fmt.Errorf("restart run: increment attempt: %w", err)
+	}
+
+	if wave.Status == types.WaveStatusFinished {
+		if err := qtx.UpdateWaveStatus(ctx, UpdateWaveStatusParams{ID: wave.ID, Status: types.WaveStatusStarted}); err != nil {
+			return Run{}, fmt.Errorf("restart run: revive wave: %w", err)
+		}
+	}
+
+	updated, err := qtx.GetRun(ctx, runID)
+	if err != nil {
+		return Run{}, fmt.Errorf("restart run: reload run: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return Run{}, fmt.Errorf("restart run: commit tx: %w", err)
+	}
+
+	committed = true
+	return updated, nil
 }
 
 // CancelWave atomically cancels one wave and all active child runs/jobs.
