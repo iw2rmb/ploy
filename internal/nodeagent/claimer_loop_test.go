@@ -65,7 +65,7 @@ func TestClaimAndExecute_ActionPayloadStartsActionWithoutSpec(t *testing.T) {
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"work_type":   "action",
 				"action_id":   actionID.String(),
-				"action_type": "run_repo.followup",
+				"action_type": "run.followup",
 				"node_id":     testNodeID,
 			})
 		default:
@@ -86,8 +86,8 @@ func TestClaimAndExecute_ActionPayloadStartsActionWithoutSpec(t *testing.T) {
 	if !controller.startActionCalled {
 		t.Fatal("StartAction was not called")
 	}
-	if controller.lastStartAction.ActionID != actionID || controller.lastStartAction.ActionType != "run_repo.followup" {
-		t.Fatalf("StartAction request = (%s,%s), want (%s,%s)", controller.lastStartAction.ActionID, controller.lastStartAction.ActionType, actionID, "run_repo.followup")
+	if controller.lastStartAction.ActionID != actionID || controller.lastStartAction.ActionType != "run.followup" {
+		t.Fatalf("StartAction request = (%s,%s), want (%s,%s)", controller.lastStartAction.ActionID, controller.lastStartAction.ActionType, actionID, "run.followup")
 	}
 	if controller.startCalled {
 		t.Fatal("StartRun should not be called for node action payload")

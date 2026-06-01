@@ -14,7 +14,7 @@ import (
 // createMigRunHandler creates a launch wave from the mig + spec + selected repos.
 // Endpoint: POST /v1/migs/{mig_id}/waves
 // Request: {repo_selector: {mode, repos?}, created_by?}
-// Response: 201 Created with {wave_id}
+// Response: 201 Created with {wave_id, mig_id, spec_id, run_count}
 //
 // v1 contract:
 // - repo_selector.mode: "all" | "failed" | "explicit"
@@ -24,7 +24,7 @@ import (
 // - Archived migs cannot be executed.
 // - Copies migs.spec_id → runs.spec_id for immutability.
 // - Creates run rows snapshotting source refs from mig_repos.
-// - Job materialization is deferred to the batch scheduler and gated on prep readiness.
+// - Job materialization is deferred to the wave scheduler and gated on prep readiness.
 func createMigRunHandler(st store.Store, gitAuth gitauth.Options) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Parse request body with strict validation.
@@ -131,11 +131,16 @@ func createMigRunHandler(st store.Store, gitAuth gitauth.Options) http.HandlerFu
 			return
 		}
 
-		// Build response with wave_id.
 		resp := struct {
-			WaveID domaintypes.WaveID `json:"wave_id"`
+			WaveID   domaintypes.WaveID `json:"wave_id"`
+			MigID    domaintypes.MigID  `json:"mig_id"`
+			SpecID   domaintypes.SpecID `json:"spec_id"`
+			RunCount int                `json:"run_count"`
 		}{
-			WaveID: wave.ID,
+			WaveID:   wave.ID,
+			MigID:    migID,
+			SpecID:   *mig.SpecID,
+			RunCount: len(runs),
 		}
 
 		writeJSON(w, http.StatusCreated, resp)

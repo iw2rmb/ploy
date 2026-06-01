@@ -12,7 +12,7 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-func TestGetRunReportCommandAssemblesCanonicalReport(t *testing.T) {
+func TestGetRunStatusReportCommandAssemblesCanonicalReport(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
@@ -126,13 +126,13 @@ func TestGetRunReportCommandAssemblesCanonicalReport(t *testing.T) {
 		t.Fatalf("parse base URL: %v", err)
 	}
 
-	report, err := GetRunReportCommand{
+	report, err := GetRunStatusReportCommand{
 		Client:  server.Client(),
 		BaseURL: baseURL,
 		RunID:   runID,
 	}.Run(context.Background())
 	if err != nil {
-		t.Fatalf("GetRunReportCommand.Run error: %v", err)
+		t.Fatalf("GetRunStatusReportCommand.Run error: %v", err)
 	}
 
 	if report.RunID != runID {
@@ -191,7 +191,7 @@ func TestGetRunReportCommandAssemblesCanonicalReport(t *testing.T) {
 	})
 }
 
-func TestGetRunReportCommandMissingOptionalFields(t *testing.T) {
+func TestGetRunStatusReportCommandMissingOptionalFields(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
@@ -252,13 +252,13 @@ func TestGetRunReportCommandMissingOptionalFields(t *testing.T) {
 		t.Fatalf("parse base URL: %v", err)
 	}
 
-	report, err := GetRunReportCommand{
+	report, err := GetRunStatusReportCommand{
 		Client:  server.Client(),
 		BaseURL: baseURL,
 		RunID:   runID,
 	}.Run(context.Background())
 	if err != nil {
-		t.Fatalf("GetRunReportCommand.Run error: %v", err)
+		t.Fatalf("GetRunStatusReportCommand.Run error: %v", err)
 	}
 
 	if len(report.Repos) != 1 {
@@ -276,7 +276,7 @@ func TestGetRunReportCommandMissingOptionalFields(t *testing.T) {
 	assertURL(t, report.Repos[0].Jobs[0].JobLogURL, "/api/v1/jobs/"+jobID.String()+"/logs", nil)
 }
 
-func TestGetRunReportCommandEmptyReposUsesEmptySlices(t *testing.T) {
+func TestGetRunStatusReportCommandEmptyReposUsesEmptySlices(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
@@ -320,13 +320,13 @@ func TestGetRunReportCommandEmptyReposUsesEmptySlices(t *testing.T) {
 		t.Fatalf("parse base URL: %v", err)
 	}
 
-	report, err := GetRunReportCommand{
+	report, err := GetRunStatusReportCommand{
 		Client:  server.Client(),
 		BaseURL: baseURL,
 		RunID:   runID,
 	}.Run(context.Background())
 	if err != nil {
-		t.Fatalf("GetRunReportCommand.Run error: %v", err)
+		t.Fatalf("GetRunStatusReportCommand.Run error: %v", err)
 	}
 
 	if len(report.Repos) != 1 {
@@ -334,7 +334,7 @@ func TestGetRunReportCommandEmptyReposUsesEmptySlices(t *testing.T) {
 	}
 }
 
-func TestGetRunReportCommandValidation(t *testing.T) {
+func TestGetRunStatusReportCommandValidation(t *testing.T) {
 	t.Parallel()
 
 	baseURL, err := url.Parse("http://127.0.0.1:12345")
@@ -344,12 +344,12 @@ func TestGetRunReportCommandValidation(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		cmd     GetRunReportCommand
+		cmd     GetRunStatusReportCommand
 		wantErr string
 	}{
 		{
 			name: "missing client",
-			cmd: GetRunReportCommand{
+			cmd: GetRunStatusReportCommand{
 				BaseURL: baseURL,
 				RunID:   domaintypes.NewRunID(),
 			},
@@ -357,7 +357,7 @@ func TestGetRunReportCommandValidation(t *testing.T) {
 		},
 		{
 			name: "missing base url",
-			cmd: GetRunReportCommand{
+			cmd: GetRunStatusReportCommand{
 				Client: http.DefaultClient,
 				RunID:  domaintypes.NewRunID(),
 			},
@@ -365,7 +365,7 @@ func TestGetRunReportCommandValidation(t *testing.T) {
 		},
 		{
 			name: "missing run id",
-			cmd: GetRunReportCommand{
+			cmd: GetRunStatusReportCommand{
 				Client:  http.DefaultClient,
 				BaseURL: baseURL,
 			},

@@ -52,7 +52,7 @@ func newListCommand() *cobra.Command {
 	opts := ListOptions{Limit: 50}
 	cmd := &cobra.Command{
 		Use:   "ls [<path>|<namespace/repo[:ref]>]",
-		Short: "List batch runs with pagination",
+		Short: "List runs with pagination",
 		Args:  cobra.RangeArgs(0, 1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) > 0 {
@@ -175,7 +175,7 @@ func RunStatus(ctx context.Context, opts StatusOptions) error {
 	if err != nil {
 		return err
 	}
-	report, err := runcmd.GetRunReportCommand{
+	report, err := runcmd.GetRunStatusReportCommand{
 		Client:  httpClient,
 		BaseURL: base,
 		RunID:   domaintypes.RunID(runID),
@@ -185,7 +185,7 @@ func RunStatus(ctx context.Context, opts StatusOptions) error {
 	}
 
 	if opts.JSONOut {
-		return runcmd.RenderRunReportJSON(out, report)
+		return runcmd.RenderRunStatusReportJSON(out, report)
 	}
 
 	token, err := common.ResolveControlPlaneToken()
@@ -193,7 +193,7 @@ func RunStatus(ctx context.Context, opts StatusOptions) error {
 		return err
 	}
 	if opts.Follow {
-		final, err := followRunReports(ctx, base, httpClient, domaintypes.RunID(runID), out, 5, time.Second)
+		final, err := followRunStatusReports(ctx, base, httpClient, domaintypes.RunID(runID), out, 5, time.Second)
 		if err != nil {
 			return err
 		}

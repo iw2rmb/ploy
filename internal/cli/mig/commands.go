@@ -156,7 +156,7 @@ type RepoAddOptions struct {
 	Output  io.Writer
 }
 
-func RunRepoAdd(ctx context.Context, opts RepoAddOptions) error {
+func MigRepoAdd(ctx context.Context, opts RepoAddOptions) error {
 	base, httpClient, err := common.ResolveControlPlaneHTTP(ctx)
 	if err != nil {
 		return err
@@ -179,7 +179,7 @@ func RunRepoAdd(ctx context.Context, opts RepoAddOptions) error {
 	return nil
 }
 
-func RunRepoList(ctx context.Context, migRef string, output io.Writer) error {
+func MigRepoList(ctx context.Context, migRef string, output io.Writer) error {
 	base, httpClient, err := common.ResolveControlPlaneHTTP(ctx)
 	if err != nil {
 		return err
@@ -214,7 +214,7 @@ func RunRepoList(ctx context.Context, migRef string, output io.Writer) error {
 	return w.Flush()
 }
 
-func RunRepoRemove(ctx context.Context, migRef, repoID string, output io.Writer) error {
+func MigRepoRemove(ctx context.Context, migRef, repoID string, output io.Writer) error {
 	base, httpClient, err := common.ResolveControlPlaneHTTP(ctx)
 	if err != nil {
 		return err
@@ -235,7 +235,7 @@ func RunRepoRemove(ctx context.Context, migRef, repoID string, output io.Writer)
 	return nil
 }
 
-func RunRepoImport(ctx context.Context, migRef, filePath string, output io.Writer) error {
+func MigRepoImport(ctx context.Context, migRef, filePath string, output io.Writer) error {
 	csvData, err := os.ReadFile(filePath)
 	if err != nil {
 		return fmt.Errorf("read csv file: %w", err)
@@ -269,6 +269,7 @@ type RunOptions struct {
 	RepoURLs    []string
 	Failed      bool
 	Follow      bool
+	JSON        bool
 	Cap         time.Duration
 	CancelOnCap bool
 	MaxRetries  int
@@ -294,7 +295,15 @@ func RunProject(ctx context.Context, opts RunOptions) error {
 	if err != nil {
 		return err
 	}
-	_, _ = fmt.Fprintln(opts.Output, result.WaveID)
+	if opts.JSON {
+		enc := json.NewEncoder(opts.Output)
+		enc.SetIndent("", "  ")
+		if err := enc.Encode(result); err != nil {
+			return err
+		}
+	} else {
+		_, _ = fmt.Fprintln(opts.Output, result.WaveID)
+	}
 
 	if opts.Follow {
 		return followMigWaveProject(ctx, base, httpClient, result.WaveID, opts.Cap, opts.CancelOnCap, opts.Output)
@@ -499,7 +508,7 @@ func listRunsByMigID(ctx context.Context, httpClient *http.Client, baseURL *url.
 	var offset int32
 	result := make([]domaintypes.RunSummary, 0)
 	for {
-		page, err := migs.ListBatchesCommand{
+		page, err := migs.ListRunsCommand{
 			Client:  httpClient,
 			BaseURL: baseURL,
 			Limit:   pageSize,

@@ -178,9 +178,6 @@ func TestListRunsForRepoHandler_Success(t *testing.T) {
 	if run.RunStatus != domaintypes.RunStatusSuccess {
 		t.Fatalf("unexpected run_status: %s", run.RunStatus)
 	}
-	if run.RepoStatus != domaintypes.RunStatusSuccess {
-		t.Fatalf("unexpected repo_status: %s", run.RepoStatus)
-	}
 	if run.BaseRef != "main" {
 		t.Fatalf("unexpected base_ref: %s", run.BaseRef)
 	}

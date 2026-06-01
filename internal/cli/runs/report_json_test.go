@@ -9,7 +9,7 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-func TestRenderRunReportJSON(t *testing.T) {
+func TestRenderRunStatusReportJSON(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
@@ -18,7 +18,7 @@ func TestRenderRunReportJSON(t *testing.T) {
 	repoID := domaintypes.NewRepoID()
 	jobID := domaintypes.NewJobID()
 
-	report := RunReport{
+	report := RunStatusReport{
 		RunID:   runID,
 		MigID:   migID,
 		MigName: "java17-upgrade",
@@ -55,8 +55,8 @@ func TestRenderRunReportJSON(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	if err := RenderRunReportJSON(&buf, report); err != nil {
-		t.Fatalf("RenderRunReportJSON error: %v", err)
+	if err := RenderRunStatusReportJSON(&buf, report); err != nil {
+		t.Fatalf("RenderRunStatusReportJSON error: %v", err)
 	}
 
 	var parsed map[string]any
@@ -91,10 +91,10 @@ func TestRenderRunReportJSON(t *testing.T) {
 	}
 }
 
-func TestRenderRunReportJSONOmitsEmptyOptionalFields(t *testing.T) {
+func TestRenderRunStatusReportJSONOmitsEmptyOptionalFields(t *testing.T) {
 	t.Parallel()
 
-	report := RunReport{
+	report := RunStatusReport{
 		RunID:   domaintypes.NewRunID(),
 		MigID:   domaintypes.NewMigID(),
 		MigName: "minimal",
@@ -111,8 +111,8 @@ func TestRenderRunReportJSONOmitsEmptyOptionalFields(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	if err := RenderRunReportJSON(&buf, report); err != nil {
-		t.Fatalf("RenderRunReportJSON error: %v", err)
+	if err := RenderRunStatusReportJSON(&buf, report); err != nil {
+		t.Fatalf("RenderRunStatusReportJSON error: %v", err)
 	}
 
 	out := buf.String()
@@ -128,10 +128,10 @@ func TestRenderRunReportJSONOmitsEmptyOptionalFields(t *testing.T) {
 	}
 }
 
-func TestRenderRunReportJSONRequiresWriter(t *testing.T) {
+func TestRenderRunStatusReportJSONRequiresWriter(t *testing.T) {
 	t.Parallel()
 
-	err := RenderRunReportJSON(nil, RunReport{})
+	err := RenderRunStatusReportJSON(nil, RunStatusReport{})
 	if err == nil {
 		t.Fatal("expected error for nil writer")
 	}

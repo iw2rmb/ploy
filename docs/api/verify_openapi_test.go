@@ -45,7 +45,7 @@ func TestOpenAPICompleteness(t *testing.T) {
 		{"/v1/pki/sign", "post"},
 		{"/v1/pki/sign/admin", "post"},
 		{"/v1/pki/sign/client", "post"},
-		// Runs (single-repo submit + batch lifecycle)
+		// Runs (single-repo submit + run lifecycle)
 		{"/v1/runs", "post"},
 		// Migs (mig project CRUD)
 		{"/v1/migs", "get"},
@@ -54,7 +54,7 @@ func TestOpenAPICompleteness(t *testing.T) {
 		{"/v1/migs/{mig_id}/archive", "patch"},
 		{"/v1/migs/{mig_id}/unarchive", "patch"},
 		{"/v1/migs/{mig_id}/waves", "post"},
-		// Batch runs lifecycle
+		// Run lifecycle
 		{"/v1/runs", "get"},
 		{"/v1/runs/{run_id}", "get"},
 		{"/v1/runs/{run_id}/status", "get"},

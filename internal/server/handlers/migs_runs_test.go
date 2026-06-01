@@ -52,24 +52,36 @@ func TestMigRuns_Create(t *testing.T) {
 					t.Fatalf("CreateRun calls = %d, want 2", len(st.createRunParams))
 				}
 				if got := st.createRunParams[0].RepoID; got != "global01" {
-					t.Fatalf("first run_repo repo_id = %q, want global01", got)
+					t.Fatalf("first run repo_id = %q, want global01", got)
 				}
 				if got := st.createRunParams[1].RepoID; got != "global02" {
-					t.Fatalf("second run_repo repo_id = %q, want global02", got)
+					t.Fatalf("second run repo_id = %q, want global02", got)
 				}
 				for _, params := range st.createRunParams {
 					if params.WaveID != st.createWaveWithRuns.params.Wave.ID {
 						t.Fatalf("run wave_id = %q, want %q", params.WaveID, st.createWaveWithRuns.params.Wave.ID)
 					}
 					if params.SourceCommitSha != testSourceCommitSHA || params.RepoSha0 != testSourceCommitSHA {
-						t.Fatalf("run_repo SHA seed mismatch: source=%q sha0=%q", params.SourceCommitSha, params.RepoSha0)
+						t.Fatalf("run SHA seed mismatch: source=%q sha0=%q", params.SourceCommitSha, params.RepoSha0)
 					}
 				}
 				resp := decodeBody[struct {
-					WaveID string `json:"wave_id"`
+					WaveID   string `json:"wave_id"`
+					MigID    string `json:"mig_id"`
+					SpecID   string `json:"spec_id"`
+					RunCount int    `json:"run_count"`
 				}](t, rr)
 				if resp.WaveID == "" {
 					t.Error("response wave_id is empty")
+				}
+				if resp.MigID != "mig123" {
+					t.Errorf("response mig_id = %q, want mig123", resp.MigID)
+				}
+				if resp.SpecID == "" {
+					t.Error("response spec_id is empty")
+				}
+				if resp.RunCount != 2 {
+					t.Errorf("response run_count = %d, want 2", resp.RunCount)
 				}
 			},
 		},
@@ -93,10 +105,14 @@ func TestMigRuns_Create(t *testing.T) {
 				}
 				assertCalled(t, "CreateWaveWithRuns", st.createWaveWithRuns.called)
 				resp := decodeBody[struct {
-					WaveID string `json:"wave_id"`
+					WaveID   string `json:"wave_id"`
+					RunCount int    `json:"run_count"`
 				}](t, rr)
 				if resp.WaveID == "" {
 					t.Error("response wave_id is empty")
+				}
+				if resp.RunCount != 1 {
+					t.Errorf("response run_count = %d, want 1", resp.RunCount)
 				}
 			},
 		},
@@ -128,10 +144,14 @@ func TestMigRuns_Create(t *testing.T) {
 				t.Helper()
 				assertCalled(t, "ListMigReposByMig", st.listMigReposByMig.called)
 				resp := decodeBody[struct {
-					WaveID string `json:"wave_id"`
+					WaveID   string `json:"wave_id"`
+					RunCount int    `json:"run_count"`
 				}](t, rr)
 				if resp.WaveID == "" {
 					t.Error("response wave_id is empty")
+				}
+				if resp.RunCount != 2 {
+					t.Errorf("response run_count = %d, want 2", resp.RunCount)
 				}
 			},
 		},
@@ -158,7 +178,7 @@ func TestMigRuns_Create(t *testing.T) {
 		{
 			name: "ArchivedMig",
 			store: func() *migStore {
-				specID := domaintypes.SpecID("spec123")
+				specID := domaintypes.NewSpecID()
 				s := &migStore{}
 				s.getMig.val = store.Mig{
 					ID: "mig123", Name: "test-mig", SpecID: &specID,
@@ -180,7 +200,7 @@ func TestMigRuns_Create(t *testing.T) {
 		{
 			name: "NoReposSelected",
 			store: func() *migStore {
-				specID := domaintypes.SpecID("spec123")
+				specID := domaintypes.NewSpecID()
 				st := activeMigWithSpec(specID)
 				st.listFailedRepoIDsByMig.val = []domaintypes.RepoID{}
 				return st
@@ -198,7 +218,7 @@ func TestMigRuns_Create(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			st := tt.store
 			if st == nil {
-				st = activeMigWithSpec(domaintypes.SpecID("spec123"))
+				st = activeMigWithSpec(domaintypes.NewSpecID())
 				if tt.setupFn != nil {
 					tt.setupFn(st)
 				}
@@ -214,7 +234,7 @@ func TestMigRuns_Create(t *testing.T) {
 }
 
 func TestMigRuns_Create_RejectsWhenSourceCommitSeedFails(t *testing.T) {
-	specID := domaintypes.SpecID("spec123")
+	specID := domaintypes.NewSpecID()
 	st := activeMigWithSpec(specID)
 	st.repoByID = map[domaintypes.RepoID]store.Repo{
 		"repo1": {ID: "repo1", Url: "https://github.com/org/repo1"},

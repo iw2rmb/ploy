@@ -92,7 +92,7 @@ func RunSubmit(ctx context.Context, opts SubmitOptions) error {
 		return nil
 	}
 
-	final, err := followRunReports(ctx, base, httpClient, runID, followOut, opts.MaxRetries, time.Second)
+	final, err := followRunStatusReports(ctx, base, httpClient, runID, followOut, opts.MaxRetries, time.Second)
 	if err != nil {
 		return err
 	}
@@ -158,7 +158,7 @@ func buildRunSubmitSpecPayload(ctx context.Context, base *url.URL, client *http.
 	return specPayload, nil
 }
 
-func followRunReports(ctx context.Context, baseURL *url.URL, client *http.Client, runID domaintypes.RunID, out io.Writer, maxRetries int, pollInterval time.Duration) (migsapi.RunState, error) {
+func followRunStatusReports(ctx context.Context, baseURL *url.URL, client *http.Client, runID domaintypes.RunID, out io.Writer, maxRetries int, pollInterval time.Duration) (migsapi.RunState, error) {
 	renderOpts := common.FollowRunRenderOptions(baseURL, out)
 	if maxRetries == 0 {
 		maxRetries = 5

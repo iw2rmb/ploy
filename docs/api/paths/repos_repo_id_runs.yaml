@@ -2,7 +2,7 @@ get:
   summary: List runs for a repository
   description: |
     Returns the run history for a specific repository identified by `repos.id`.
-    Results include both the parent run status and the per-repo status within each batch.
+    Results include the run status for each repository execution.
   operationId: listRunsForRepo
   tags:
     - Control

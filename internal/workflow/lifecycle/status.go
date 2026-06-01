@@ -6,17 +6,17 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-// Derived batch status constants representing the batch-level state computed from repo statuses.
+// Derived wave status constants representing the wave-level state computed from run statuses.
 const (
-	// DerivedStatusPending indicates no repos have started (all queued or no repos).
+	// DerivedStatusPending indicates no runs have started (all queued or no runs).
 	DerivedStatusPending = "pending"
-	// DerivedStatusRunning indicates at least one repo is currently running.
+	// DerivedStatusRunning indicates at least one run is currently running.
 	DerivedStatusRunning = "running"
-	// DerivedStatusCompleted indicates all repos finished with no failures.
+	// DerivedStatusCompleted indicates all runs finished with no failures.
 	DerivedStatusCompleted = "completed"
-	// DerivedStatusFailed indicates at least one repo failed (and none running).
+	// DerivedStatusFailed indicates at least one run failed (and none running).
 	DerivedStatusFailed = "failed"
-	// DerivedStatusCancelled indicates the batch was stopped and repos were cancelled.
+	// DerivedStatusCancelled indicates the wave was stopped and runs were cancelled.
 	DerivedStatusCancelled = "cancelled"
 )
 
@@ -40,9 +40,9 @@ func IsTerminalWaveStatus(status domaintypes.WaveStatus) bool {
 	}
 }
 
-// DeriveBatchStatus computes a single batch-level status from repo counts.
+// DeriveWaveStatus computes a single wave-level status from run counts.
 // Precedence order: cancelled > running > failed > completed > pending.
-func DeriveBatchStatus(counts *domaintypes.RunCounts) string {
+func DeriveWaveStatus(counts *domaintypes.RunCounts) string {
 	if counts.Total == 0 {
 		return DerivedStatusPending
 	}
@@ -68,8 +68,8 @@ type RunCompletionEval struct {
 	RunState     migsapi.RunState
 }
 
-// EvaluateRunCompletionFromRepoCounts determines whether a run can be marked Finished.
-// Returns ShouldFinish=true when all repos are in terminal states, along with the
+// EvaluateWaveCompletionFromRunCounts determines whether a wave can be marked Finished.
+// Returns ShouldFinish=true when all runs are in terminal states, along with the
 // derived run state (succeeded, failed, or cancelled).
 func EvaluateWaveCompletionFromRunCounts(counts []store.CountRunsByWaveStatusRow) RunCompletionEval {
 	var (

@@ -144,7 +144,7 @@ paths:
     $ref: "./paths/nodes_id_daemon_logs.yaml"
   /v1/nodes/{id}/actions:
     $ref: "./paths/nodes_id_actions.yaml"
-  # Batch runs endpoints (list/inspect/cancel)
+  # Run endpoints (list/inspect/cancel)
   /v1/runs:
     $ref: "./paths/runs.yaml"
   /v1/runs/{run_id}:

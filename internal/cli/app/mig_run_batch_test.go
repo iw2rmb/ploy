@@ -115,8 +115,8 @@ func TestRunListEmptyResult(t *testing.T) {
 	}
 
 	output := buf.String()
-	if !strings.Contains(output, "No batch runs found") {
-		t.Errorf("output should contain 'No batch runs found': %s", output)
+	if !strings.Contains(output, "No runs found") {
+		t.Errorf("output should contain 'No runs found': %s", output)
 	}
 }
 
@@ -155,9 +155,9 @@ func TestRunListInvalidLimit(t *testing.T) {
 	}
 }
 
-// TestMigRunBatchStatusNotFound validates run status command handles 404.
+// TestMigRunStatusNotFound validates run status command handles 404.
 // Not parallel because useServerDescriptor uses t.Setenv.
-func TestMigRunBatchStatusNotFound(t *testing.T) {
+func TestMigRunStatusNotFound(t *testing.T) {
 	runID := domaintypes.NewRunID().String()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet && r.URL.Path == "/v1/runs/"+runID {

@@ -28,7 +28,6 @@ type RepoRunSummary struct {
 	RunID      domaintypes.RunID     `json:"run_id"`
 	MigID      domaintypes.MigID     `json:"mig_id"`
 	RunStatus  domaintypes.RunStatus `json:"run_status"`
-	RepoStatus domaintypes.RunStatus `json:"repo_status"`
 	BaseRef    string                `json:"base_ref"`
 	Attempt    int32                 `json:"attempt"`
 	StartedAt  *time.Time            `json:"started_at,omitempty"`
@@ -159,12 +158,11 @@ func listRunsForRepoHandler(st store.Store) http.HandlerFunc {
 		summaries := make([]RepoRunSummary, 0, len(runs))
 		for _, run := range runs {
 			summary := RepoRunSummary{
-				RunID:      run.RunID,
-				MigID:      run.MigID,
-				RunStatus:  run.Status,
-				RepoStatus: run.Status,
-				BaseRef:    run.RepoBaseRef,
-				Attempt:    run.Attempt,
+				RunID:     run.RunID,
+				MigID:     run.MigID,
+				RunStatus: run.Status,
+				BaseRef:   run.RepoBaseRef,
+				Attempt:   run.Attempt,
 			}
 			if run.StartedAt.Valid {
 				t := run.StartedAt.Time

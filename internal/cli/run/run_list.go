@@ -54,7 +54,7 @@ func RunList(ctx context.Context, opts ListOptions) error {
 	}
 
 	// Execute the list command using the shared runs client.
-	cmd := migs.ListBatchesCommand{
+	cmd := migs.ListRunsCommand{
 		Client:  httpClient,
 		BaseURL: base,
 		Limit:   int32(opts.Limit),
@@ -62,20 +62,20 @@ func RunList(ctx context.Context, opts ListOptions) error {
 		RepoURL: repoURL,
 	}
 
-	batches, err := cmd.Run(ctx)
+	runs, err := cmd.Run(ctx)
 	if err != nil {
 		return err
 	}
 
-	if len(batches) == 0 {
-		_, _ = fmt.Fprintln(out, "No batch runs found.")
+	if len(runs) == 0 {
+		_, _ = fmt.Fprintln(out, "No runs found.")
 		return nil
 	}
 
 	// Print results in tabular format.
 	tw := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
 	_, _ = fmt.Fprintln(tw, "ID\tSTATUS\tMOD\tSPEC\tREPOS\tDERIVED STATUS")
-	for _, b := range batches {
+	for _, b := range runs {
 		repos := "-"
 		derived := "-"
 		if b.Counts != nil {

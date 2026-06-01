@@ -13,33 +13,33 @@ import (
 	migsapi "github.com/iw2rmb/ploy/internal/migs/api"
 )
 
-// GetRunReportCommand builds the canonical RunReport payload for a run.
-type GetRunReportCommand struct {
+// GetRunStatusReportCommand builds the canonical RunStatusReport payload for a run.
+type GetRunStatusReportCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
 	RunID   domaintypes.RunID
 }
 
 // Run assembles run summary, mig identity, run job rows, and links.
-func (c GetRunReportCommand) Run(ctx context.Context) (RunReport, error) {
+func (c GetRunStatusReportCommand) Run(ctx context.Context) (RunStatusReport, error) {
 	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
-		return RunReport{}, fmt.Errorf("run report: %w", err)
+		return RunStatusReport{}, fmt.Errorf("run status report: %w", err)
 	}
 	if c.RunID.IsZero() {
-		return RunReport{}, fmt.Errorf("run report: run id required")
+		return RunStatusReport{}, fmt.Errorf("run status report: run id required")
 	}
 
 	summary, err := GetStatusCommand(c).Run(ctx)
 	if err != nil {
-		return RunReport{}, err
+		return RunStatusReport{}, err
 	}
 
 	stageArtifacts, err := listRunStageArtifacts(ctx, c.Client, c.BaseURL, c.RunID)
 	if err != nil {
-		return RunReport{}, err
+		return RunStatusReport{}, err
 	}
 
-	report := RunReport{
+	report := RunStatusReport{
 		RunID:   summary.ID,
 		MigID:   summary.MigID,
 		MigName: summary.MigName,
@@ -48,13 +48,13 @@ func (c GetRunReportCommand) Run(ctx context.Context) (RunReport, error) {
 	}
 
 	if err := c.buildRunEntry(ctx, statusReportSourceFromSummary(c.RunID, summary), stageArtifacts, &report.Repos[0]); err != nil {
-		return RunReport{}, err
+		return RunStatusReport{}, err
 	}
 
 	return report, nil
 }
 
-func (c GetRunReportCommand) buildRunEntry(
+func (c GetRunStatusReportCommand) buildRunEntry(
 	ctx context.Context,
 	run statusReportSource,
 	stageArtifacts map[domaintypes.JobID]map[string]string,
@@ -67,12 +67,12 @@ func (c GetRunReportCommand) buildRunEntry(
 		Attempt: &run.Attempt,
 	}.Run(ctx)
 	if err != nil {
-		return fmt.Errorf("run report: list run jobs: %w", err)
+		return fmt.Errorf("run status report: list run jobs: %w", err)
 	}
 
 	diffs, err := listRunDiffs(ctx, c.Client, c.BaseURL, c.RunID)
 	if err != nil {
-		return fmt.Errorf("run report: list run diffs: %w", err)
+		return fmt.Errorf("run status report: list run diffs: %w", err)
 	}
 
 	repoPatchURL := ""
@@ -155,22 +155,22 @@ func listRunStageArtifacts(
 	endpoint := baseURL.JoinPath("v1", "runs", runID.String(), "status")
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
 	if err != nil {
-		return nil, fmt.Errorf("run report: build run stage artifacts request: %w", err)
+		return nil, fmt.Errorf("run status report: build run stage artifacts request: %w", err)
 	}
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("run report: fetch run stage artifacts failed: %w", err)
+		return nil, fmt.Errorf("run status report: fetch run stage artifacts failed: %w", err)
 	}
 	defer httpx.DrainAndClose(resp)
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, httpx.WrapError("run report: fetch run stage artifacts", resp.Status, resp.Body)
+		return nil, httpx.WrapError("run status report: fetch run stage artifacts", resp.Status, resp.Body)
 	}
 
 	var summary migsapi.RunSummary
 	if err := httpx.DecodeResponseJSON(resp.Body, &summary, httpx.MaxJSONBodyBytes); err != nil {
-		return nil, fmt.Errorf("run report: decode run stage artifacts: %w", err)
+		return nil, fmt.Errorf("run status report: decode run stage artifacts: %w", err)
 	}
 
 	artifacts := make(map[domaintypes.JobID]map[string]string, len(summary.Stages))
@@ -198,24 +198,24 @@ func listRunDiffs(ctx context.Context, httpClient *http.Client, baseURL *url.URL
 	endpoint := baseURL.JoinPath("v1", "runs", runID.String(), "diffs")
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
 	if err != nil {
-		return nil, fmt.Errorf("run report: build diffs request: %w", err)
+		return nil, fmt.Errorf("run status report: build diffs request: %w", err)
 	}
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("run report: fetch diffs failed: %w", err)
+		return nil, fmt.Errorf("run status report: fetch diffs failed: %w", err)
 	}
 	defer httpx.DrainAndClose(resp)
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, httpx.WrapError("run report: fetch diffs", resp.Status, resp.Body)
+		return nil, httpx.WrapError("run status report: fetch diffs", resp.Status, resp.Body)
 	}
 
 	var result struct {
 		Diffs []RunDiffEntry `json:"diffs"`
 	}
 	if err := httpx.DecodeResponseJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
-		return nil, fmt.Errorf("run report: decode diffs: %w", err)
+		return nil, fmt.Errorf("run status report: decode diffs: %w", err)
 	}
 	if result.Diffs == nil {
 		result.Diffs = make([]RunDiffEntry, 0)

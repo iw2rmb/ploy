@@ -78,7 +78,7 @@ func newMigRepoCmd(stderr io.Writer) *cobra.Command {
 	repoCmd := &cobra.Command{Use: "repo", Short: "Manage repos in a mig", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, args []string) error { return cmd.Help() }}
 	repoCmd.AddCommand(newMigRepoAddCmd(stderr))
 	repoCmd.AddCommand(&cobra.Command{Use: "list <mig-id|name>", Short: "List repos in the mig", Args: cobra.ExactArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
-		return mig.RunRepoList(context.Background(), args[0], stderr)
+		return mig.MigRepoList(context.Background(), args[0], stderr)
 	}})
 	repoCmd.AddCommand(newMigRepoRemoveCmd(stderr))
 	repoCmd.AddCommand(newMigRepoImportCmd(stderr))
@@ -88,7 +88,7 @@ func newMigRepoCmd(stderr io.Writer) *cobra.Command {
 func newMigRepoAddCmd(stderr io.Writer) *cobra.Command {
 	var repoURL, baseRef string
 	cmd := &cobra.Command{Use: "add <mig-id|name> --repo <url> --base-ref <ref>", Short: "Add a repo to the mig", Args: cobra.ExactArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
-		return mig.RunRepoAdd(context.Background(), mig.RepoAddOptions{
+		return mig.MigRepoAdd(context.Background(), mig.RepoAddOptions{
 			MigRef:  args[0],
 			RepoURL: repoURL,
 			BaseRef: baseRef,
@@ -103,7 +103,7 @@ func newMigRepoAddCmd(stderr io.Writer) *cobra.Command {
 func newMigRepoRemoveCmd(stderr io.Writer) *cobra.Command {
 	var repoID string
 	cmd := &cobra.Command{Use: "remove <mig-id|name> --repo-id <id>", Short: "Remove a repo from the mig", Args: cobra.ExactArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
-		return mig.RunRepoRemove(context.Background(), args[0], repoID, stderr)
+		return mig.MigRepoRemove(context.Background(), args[0], repoID, stderr)
 	}}
 	cmd.Flags().StringVar(&repoID, "repo-id", "", "Repo ID to remove")
 	return cmd
@@ -112,7 +112,7 @@ func newMigRepoRemoveCmd(stderr io.Writer) *cobra.Command {
 func newMigRepoImportCmd(stderr io.Writer) *cobra.Command {
 	var file string
 	cmd := &cobra.Command{Use: "import <mig-id|name> --file <path>", Short: "Import repos from CSV", Args: cobra.ExactArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
-		return mig.RunRepoImport(context.Background(), args[0], file, stderr)
+		return mig.MigRepoImport(context.Background(), args[0], file, stderr)
 	}}
 	cmd.Flags().StringVar(&file, "file", "", "Path to CSV file")
 	return cmd
@@ -139,7 +139,7 @@ func newMigPullCmd(stderr io.Writer) *cobra.Command {
 
 func newMigRunCmd(stderr io.Writer) *cobra.Command {
 	var repos []string
-	var failed, follow, cancelOnCap bool
+	var failed, follow, jsonOutput, cancelOnCap bool
 	var capDuration time.Duration
 	var maxRetries int
 	runCmd := &cobra.Command{Use: "run <mig-id|name>", Short: "Run a mig project", Args: cobra.ExactArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
@@ -148,6 +148,7 @@ func newMigRunCmd(stderr io.Writer) *cobra.Command {
 			RepoURLs:    repos,
 			Failed:      failed,
 			Follow:      follow,
+			JSON:        jsonOutput,
 			Cap:         capDuration,
 			CancelOnCap: cancelOnCap,
 			MaxRetries:  maxRetries,
@@ -157,6 +158,7 @@ func newMigRunCmd(stderr io.Writer) *cobra.Command {
 	runCmd.Flags().StringArrayVar(&repos, "repo", nil, "Explicit repo URL(s) to run")
 	runCmd.Flags().BoolVar(&failed, "failed", false, "Run repos with last terminal state Fail")
 	runCmd.Flags().BoolVar(&follow, "follow", false, "Follow run until completion")
+	runCmd.Flags().BoolVar(&jsonOutput, "json", false, "Print created wave as JSON")
 	runCmd.Flags().DurationVar(&capDuration, "cap", 0, "Optional time cap for --follow")
 	runCmd.Flags().BoolVar(&cancelOnCap, "cancel-on-cap", false, "Cancel run if cap exceeded")
 	runCmd.Flags().IntVar(&maxRetries, "max-retries", 5, "Max SSE reconnect attempts")

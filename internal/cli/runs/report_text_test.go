@@ -11,11 +11,11 @@ import (
 	"github.com/iw2rmb/ploy/internal/testutil/assertx"
 )
 
-// singleJobReport builds a minimal RunReport with one repo and one job,
+// singleJobReport builds a minimal RunStatusReport with one repo and one job,
 // reducing boilerplate in tests that only vary job-level fields.
-func singleJobReport(migName string, repoStatus domaintypes.RunStatus, job RunJobEntry) RunReport {
+func singleJobReport(migName string, repoStatus domaintypes.RunStatus, job RunJobEntry) RunStatusReport {
 	repoID := domaintypes.NewRepoID()
-	return RunReport{
+	return RunStatusReport{
 		RunID:   domaintypes.NewRunID(),
 		MigID:   domaintypes.NewMigID(),
 		MigName: migName,
@@ -33,11 +33,11 @@ func singleJobReport(migName string, repoStatus domaintypes.RunStatus, job RunJo
 	}
 }
 
-func renderText(t *testing.T, report RunReport, opts TextRenderOptions) string {
+func renderText(t *testing.T, report RunStatusReport, opts TextRenderOptions) string {
 	t.Helper()
 	var buf bytes.Buffer
-	if err := RenderRunReportText(&buf, report, opts); err != nil {
-		t.Fatalf("RenderRunReportText error: %v", err)
+	if err := RenderRunStatusReportText(&buf, report, opts); err != nil {
+		t.Fatalf("RenderRunStatusReportText error: %v", err)
 	}
 	return buf.String()
 }
@@ -119,7 +119,7 @@ func TestRepoNodeID(t *testing.T) {
 	}
 }
 
-func TestRenderRunReportTextHeadersAndArtifacts(t *testing.T) {
+func TestRenderRunStatusReportTextHeadersAndArtifacts(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
@@ -130,7 +130,7 @@ func TestRenderRunReportTextHeadersAndArtifacts(t *testing.T) {
 	migJobID := domaintypes.NewJobID()
 	nodeID := domaintypes.NodeID(domaintypes.NewNodeKey())
 
-	report := RunReport{
+	report := RunStatusReport{
 		RunID:   runID,
 		MigID:   migID,
 		MigName: "java17-upgrade",
@@ -202,20 +202,20 @@ func TestRenderRunReportTextHeadersAndArtifacts(t *testing.T) {
 	}
 }
 
-func TestRenderRunReportTextVisibilityRules(t *testing.T) {
+func TestRenderRunStatusReportTextVisibilityRules(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name       string
-		report     RunReport
+		report     RunStatusReport
 		contains   []string
 		notContain []string
 	}{
 		{
 			name: "renders compact repo header",
-			report: func() RunReport {
+			report: func() RunStatusReport {
 				repoID := domaintypes.NewRepoID()
-				return RunReport{
+				return RunStatusReport{
 					RunID:   domaintypes.NewRunID(),
 					MigID:   domaintypes.NewMigID(),
 					MigName: "no-mr-target",
@@ -239,11 +239,11 @@ func TestRenderRunReportTextVisibilityRules(t *testing.T) {
 		},
 		{
 			name: "hides patch artifacts for cancelled jobs",
-			report: func() RunReport {
+			report: func() RunStatusReport {
 				runID := domaintypes.NewRunID()
 				repoID := domaintypes.NewRepoID()
 				cancelledJobID := domaintypes.NewJobID()
-				return RunReport{
+				return RunStatusReport{
 					RunID:   runID,
 					MigID:   domaintypes.NewMigID(),
 					MigName: "cancelled-run",
@@ -288,12 +288,12 @@ func TestRenderRunReportTextVisibilityRules(t *testing.T) {
 	}
 }
 
-func TestRenderRunReportTextLayout_FilterRunningRepos(t *testing.T) {
+func TestRenderRunStatusReportTextLayout_FilterRunningRepos(t *testing.T) {
 	t.Parallel()
 
 	runningJobID := domaintypes.NewJobID()
 	doneJobID := domaintypes.NewJobID()
-	report := RunReport{
+	report := RunStatusReport{
 		RunID:   domaintypes.NewRunID(),
 		MigID:   domaintypes.NewMigID(),
 		MigName: "running-only",
@@ -328,22 +328,22 @@ func TestRenderRunReportTextLayout_FilterRunningRepos(t *testing.T) {
 		},
 	}
 
-	layout, err := RenderRunReportTextLayout(report, TextRenderOptions{
+	layout, err := RenderRunStatusReportTextLayout(report, TextRenderOptions{
 		FilterRunningRepos: true,
 		EnableOSC8:         false,
 	})
 	if err != nil {
-		t.Fatalf("RenderRunReportTextLayout error: %v", err)
+		t.Fatalf("RenderRunStatusReportTextLayout error: %v", err)
 	}
 	assertx.Contains(t, layout.Text, "   Repos: 1")
 	assertx.Contains(t, layout.Text, "acme/running")
 	assertx.NotContains(t, layout.Text, "acme/done")
 }
 
-func TestRenderRunReportTextLayout_FilterRunningReposEmptyMessage(t *testing.T) {
+func TestRenderRunStatusReportTextLayout_FilterRunningReposEmptyMessage(t *testing.T) {
 	t.Parallel()
 
-	report := RunReport{
+	report := RunStatusReport{
 		RunID:   domaintypes.NewRunID(),
 		MigID:   domaintypes.NewMigID(),
 		MigName: "none-running",
@@ -365,20 +365,20 @@ func TestRenderRunReportTextLayout_FilterRunningReposEmptyMessage(t *testing.T) 
 		},
 	}
 
-	layout, err := RenderRunReportTextLayout(report, TextRenderOptions{
+	layout, err := RenderRunStatusReportTextLayout(report, TextRenderOptions{
 		FilterRunningRepos: true,
 		EmptyReposLine:     "No repos with in-progress jobs.",
 		EnableOSC8:         false,
 	})
 	if err != nil {
-		t.Fatalf("RenderRunReportTextLayout error: %v", err)
+		t.Fatalf("RenderRunStatusReportTextLayout error: %v", err)
 	}
 	assertx.Contains(t, layout.Text, "No repos with in-progress jobs.")
 	assertx.Contains(t, layout.Text, "   Repos: 0")
 	assertx.NotContains(t, layout.Text, "acme/done")
 }
 
-func TestRenderRunReportTextExitOneLiners(t *testing.T) {
+func TestRenderRunStatusReportTextExitOneLiners(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
@@ -391,7 +391,7 @@ func TestRenderRunReportTextExitOneLiners(t *testing.T) {
 	failCode := int32(137)
 	migCode := int32(0)
 
-	report := RunReport{
+	report := RunStatusReport{
 		RunID:   runID,
 		MigID:   migID,
 		MigName: "healing-run",
@@ -437,7 +437,7 @@ func TestRenderRunReportTextExitOneLiners(t *testing.T) {
 	assertx.NotContains(t, out, "Exit 0")
 }
 
-func TestRenderRunReportTextExitOneLinerVariants(t *testing.T) {
+func TestRenderRunStatusReportTextExitOneLinerVariants(t *testing.T) {
 	t.Parallel()
 
 	failCode := int32(1)
@@ -514,7 +514,7 @@ func TestRenderRunReportTextExitOneLinerVariants(t *testing.T) {
 	}
 }
 
-func TestRenderRunReportTextOSC8OnAndOff(t *testing.T) {
+func TestRenderRunStatusReportTextOSC8OnAndOff(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
@@ -528,7 +528,7 @@ func TestRenderRunReportTextOSC8OnAndOff(t *testing.T) {
 		t.Fatalf("parse base url: %v", err)
 	}
 
-	report := RunReport{
+	report := RunStatusReport{
 		RunID:   runID,
 		MigID:   migID,
 		MigName: "links-run",
@@ -581,19 +581,19 @@ func TestRenderRunReportTextOSC8OnAndOff(t *testing.T) {
 	assertx.Contains(t, linkedOut, "auth_token=test-token")
 }
 
-func TestRenderRunReportTextIOPreviewModes(t *testing.T) {
+func TestRenderRunStatusReportTextIOPreviewModes(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name       string
-		report     RunReport
+		report     RunStatusReport
 		opts       TextRenderOptions
 		contains   []string
 		notContain []string
 	}{
 		{
 			name: "running collapsed",
-			report: func() RunReport {
+			report: func() RunStatusReport {
 				jobID := domaintypes.NewJobID()
 				job := RunJobEntry{
 					JobID:      jobID,
@@ -617,7 +617,7 @@ func TestRenderRunReportTextIOPreviewModes(t *testing.T) {
 		},
 		{
 			name: "running expanded",
-			report: func() RunReport {
+			report: func() RunStatusReport {
 				jobID := domaintypes.NewJobID()
 				job := RunJobEntry{
 					JobID:      jobID,
@@ -645,7 +645,7 @@ func TestRenderRunReportTextIOPreviewModes(t *testing.T) {
 		},
 		{
 			name: "failed hides preview",
-			report: func() RunReport {
+			report: func() RunStatusReport {
 				jobID := domaintypes.NewJobID()
 				job := RunJobEntry{
 					JobID:      jobID,
@@ -672,7 +672,7 @@ func TestRenderRunReportTextIOPreviewModes(t *testing.T) {
 		},
 		{
 			name: "success hides preview even when expand flags are set",
-			report: func() RunReport {
+			report: func() RunStatusReport {
 				jobID := domaintypes.NewJobID()
 				job := RunJobEntry{
 					JobID:      jobID,
@@ -692,7 +692,7 @@ func TestRenderRunReportTextIOPreviewModes(t *testing.T) {
 		},
 		{
 			name: "running expanded collapses overly wrapped line",
-			report: func() RunReport {
+			report: func() RunStatusReport {
 				jobID := domaintypes.NewJobID()
 				job := RunJobEntry{
 					JobID:      jobID,
@@ -793,11 +793,11 @@ func TestRenderRunReportTextIOPreviewModes(t *testing.T) {
 	}
 }
 
-func TestRenderRunReportTextMigHeaderOnlyIDWhenNameMatches(t *testing.T) {
+func TestRenderRunStatusReportTextMigHeaderOnlyIDWhenNameMatches(t *testing.T) {
 	t.Parallel()
 
 	migID := domaintypes.NewMigID()
-	report := RunReport{
+	report := RunStatusReport{
 		RunID:   domaintypes.NewRunID(),
 		MigID:   migID,
 		MigName: migID.String(),
@@ -817,7 +817,7 @@ func TestRenderRunReportTextMigHeaderOnlyIDWhenNameMatches(t *testing.T) {
 	assertx.NotContains(t, lines[1], "|")
 }
 
-func TestRenderRunReportTextSpinnerFrameAndLiveDuration(t *testing.T) {
+func TestRenderRunStatusReportTextSpinnerFrameAndLiveDuration(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
@@ -825,7 +825,7 @@ func TestRenderRunReportTextSpinnerFrameAndLiveDuration(t *testing.T) {
 	jobID := domaintypes.NewJobID()
 	startedAt := time.Date(2026, time.February, 26, 10, 0, 0, 0, time.UTC)
 
-	report := RunReport{
+	report := RunStatusReport{
 		RunID:   runID,
 		MigID:   domaintypes.NewMigID(),
 		MigName: "live-run",
@@ -882,7 +882,7 @@ func TestRenderRunStatusSnapshotText_NormalizesFollowOnlyOptions(t *testing.T) {
 
 	runningJobID := domaintypes.NewJobID()
 	doneJobID := domaintypes.NewJobID()
-	report := RunReport{
+	report := RunStatusReport{
 		RunID:   domaintypes.NewRunID(),
 		MigID:   domaintypes.NewMigID(),
 		MigName: "status-snapshot",
@@ -941,10 +941,10 @@ func TestRenderRunStatusSnapshotText_NormalizesFollowOnlyOptions(t *testing.T) {
 	assertx.NotContains(t, rendered, "preview")
 }
 
-func TestRenderRunReportTextCreatedJobDurationKeepsStepAdjacent(t *testing.T) {
+func TestRenderRunStatusReportTextCreatedJobDurationKeepsStepAdjacent(t *testing.T) {
 	t.Parallel()
 
-	report := RunReport{
+	report := RunStatusReport{
 		RunID:   domaintypes.NewRunID(),
 		MigID:   domaintypes.NewMigID(),
 		MigName: "duration-placeholder",

@@ -127,8 +127,8 @@ build_gate:
 - `--name` — Creates a mig project with `ploy mig add --name <name> [--spec <path|->]`.
   Use `ploy mig repo add` to attach repositories under a shared spec, then run them via
   `ploy mig run <mig-id|name> [--follow]`.
-  Example: `ploy mig add --name my-batch --spec mig.yaml` followed by
-  `ploy mig repo add my-batch --repo https://... --base-ref main`.
+  Example: `ploy mig add --name my-wave --spec mig.yaml` followed by
+  `ploy mig repo add my-wave --repo https://... --base-ref main`.
   See [Migs lifecycle](../migs-lifecycle.md) for full usage.
 - Container cleanup model:
   - Containers are retained after step/gate completion.

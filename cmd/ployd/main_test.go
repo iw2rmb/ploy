@@ -312,7 +312,7 @@ func TestRun_StaleRecoverySchedulerEnabled(t *testing.T) {
 	var cfg apiconfig.Config
 	cfg.HTTP.Listen = "127.0.0.1:0"
 	cfg.Metrics.Listen = "127.0.0.1:0"
-	cfg.Scheduler.BatchSchedulerInterval = 0
+	cfg.Scheduler.WaveSchedulerInterval = 0
 	cfg.Scheduler.StaleJobRecoveryInterval = 10 * time.Millisecond
 	cfg.Scheduler.NodeStaleAfter = time.Minute
 

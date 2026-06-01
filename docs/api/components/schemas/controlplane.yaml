@@ -10,9 +10,9 @@ RunExecutionStatus:
     - Cancelled: The run was cancelled.
   enum: [Queued, Running, Success, Fail, Cancelled]
 
-# RunBatchDerivedStatus represents the batch-level aggregate status computed
+# WaveDerivedStatus represents the wave-level aggregate status computed
 # from the run states in RunCounts.DerivedStatus.
-RunBatchDerivedStatus:
+WaveDerivedStatus:
   type: string
   description: |
     Wave-level status derived from aggregated run states.
@@ -103,7 +103,7 @@ RunCounts:
       format: int32
       description: Runs stopped while running.
     derived_status:
-      $ref: "#/RunBatchDerivedStatus"
+      $ref: "#/WaveDerivedStatus"
       description: |
         Wave-level status computed from run states. Precedence order:
         cancelled > running > failed > completed > pending.
@@ -281,10 +281,11 @@ RunSubmitRequest:
 CreateSingleRepoRunResponse:
   type: object
   properties:
+    wave_id: { type: string, description: "Wave ID (KSUID string)" }
     run_id: { type: string, description: "Run ID (KSUID string)" }
     mig_id: { type: string, description: "Mig ID (NanoID string)" }
     spec_id: { type: string, description: "Spec ID (NanoID string)" }
-  required: [run_id, mig_id, spec_id]
+  required: [wave_id, run_id, mig_id, spec_id]
 
 CreateMigRequest:
   type: object
@@ -405,7 +406,13 @@ CreateMigRunResponse:
   type: object
   properties:
     wave_id: { type: string, description: "Wave ID (KSUID string)" }
-  required: [wave_id]
+    mig_id: { type: string, description: "Mig ID (NanoID string)" }
+    spec_id: { type: string, description: "Spec ID (NanoID string)" }
+    run_count:
+      type: integer
+      format: int32
+      description: Number of runs created in the wave.
+  required: [wave_id, mig_id, spec_id, run_count]
 
 PullResolutionMode:
   type: string
@@ -1123,7 +1130,7 @@ RepoRunSummary:
   type: object
   description: |
     Run summary for a specific repository, returned by GET /v1/repos/{repo_id}/runs.
-    Includes both the parent run status and per-repo status within the batch.
+    Includes the run status for that repository execution.
     Note: run_id is now a KSUID-backed string (27 characters).
   properties:
     run_id:
@@ -1134,17 +1141,14 @@ RepoRunSummary:
       description: Mig (project) identifier for the run
     run_status:
       type: string
-      description: Parent run status (Started, Finished, Cancelled)
-    repo_status:
-      type: string
-      description: Per-repo status within the batch (Queued, Running, Success, Fail, Cancelled)
+      description: Run status (Queued, Running, Success, Fail, Cancelled)
     base_ref:
       type: string
       description: Git base ref for the run
     attempt:
       type: integer
       format: int32
-      description: Retry attempt number for this repo in the batch
+      description: Retry attempt number for this run
     started_at:
       type: string
       format: date-time
@@ -1159,7 +1163,6 @@ RepoRunSummary:
     - run_id
     - mig_id
     - run_status
-    - repo_status
     - base_ref
     - attempt
 

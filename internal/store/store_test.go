@@ -221,7 +221,7 @@ func TestCreateWaveWithRuns_CreatesWaveAndRunsAtomically(t *testing.T) {
 func TestRun_CRUDAndStateTransitions_V1(t *testing.T) {
 	ctx, db := newTestStore(t)
 
-	fx := newV1Fixture(t, ctx, db, "https://github.com/org/repo-a", "main", []byte(`{"type":"batch"}`))
+	fx := newV1Fixture(t, ctx, db, "https://github.com/org/repo-a", "main", []byte(`{"type":"wave"}`))
 
 	if fx.Run.Status != types.RunStatusQueued {
 		t.Fatalf("CreateRun() status=%q, want %q", fx.Run.Status, types.RunStatusQueued)
@@ -314,7 +314,7 @@ func TestRun_CRUDAndStateTransitions_V1(t *testing.T) {
 func TestListRunsWithURLByWave_ReturnsRepoURLAndOrdering_V1(t *testing.T) {
 	ctx, db := newTestStore(t)
 
-	fx := newV1Fixture(t, ctx, db, "https://github.com/org/repo-a", "main", []byte(`{"type":"batch"}`))
+	fx := newV1Fixture(t, ctx, db, "https://github.com/org/repo-a", "main", []byte(`{"type":"wave"}`))
 
 	migRepo2ID := types.NewMigRepoID()
 	migRepo2, err := db.CreateMigRepo(ctx, CreateMigRepoParams{

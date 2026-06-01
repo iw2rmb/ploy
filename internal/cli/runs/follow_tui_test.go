@@ -14,7 +14,7 @@ import (
 func TestDeriveRunStateFromReport_IgnoresHistoricalJobFailureWhenRepoSucceeded(t *testing.T) {
 	t.Parallel()
 
-	report := RunReport{
+	report := RunStatusReport{
 		Repos: []RunEntry{
 			{
 				Status: domaintypes.RunStatusSuccess,
@@ -34,7 +34,7 @@ func TestDeriveRunStateFromReport_IgnoresHistoricalJobFailureWhenRepoSucceeded(t
 func TestDeriveRunStateFromReport_RunningJobKeepsRunNonTerminal(t *testing.T) {
 	t.Parallel()
 
-	report := RunReport{
+	report := RunStatusReport{
 		Repos: []RunEntry{
 			{
 				Status: domaintypes.RunStatusCancelled,
@@ -53,7 +53,7 @@ func TestDeriveRunStateFromReport_RunningJobKeepsRunNonTerminal(t *testing.T) {
 func TestDeriveRunStateFromReport_MixedSuccessAndCancelledIsCancelled(t *testing.T) {
 	t.Parallel()
 
-	report := RunReport{
+	report := RunStatusReport{
 		Repos: []RunEntry{
 			{
 				Status: domaintypes.RunStatusSuccess,
@@ -119,7 +119,7 @@ func TestFollowModelAppliesAndClearsPreviewRows(t *testing.T) {
 func TestFollowModelFinalViewUsesStatusSnapshotSemantics(t *testing.T) {
 	t.Parallel()
 
-	report := RunReport{
+	report := RunStatusReport{
 		RunID:   domaintypes.NewRunID(),
 		MigID:   domaintypes.NewMigID(),
 		MigName: "final-snapshot",
@@ -187,7 +187,7 @@ func TestShouldTrackJobPreview(t *testing.T) {
 func TestFollowModelViewFiltersToRunningRepos(t *testing.T) {
 	t.Parallel()
 
-	report := RunReport{
+	report := RunStatusReport{
 		RunID:   domaintypes.NewRunID(),
 		MigID:   domaintypes.NewMigID(),
 		MigName: "follow-filter",
@@ -226,7 +226,7 @@ func TestFollowModelViewFiltersToRunningRepos(t *testing.T) {
 func TestFollowModelViewShowsNoRunningReposMessage(t *testing.T) {
 	t.Parallel()
 
-	report := RunReport{
+	report := RunStatusReport{
 		RunID:   domaintypes.NewRunID(),
 		MigID:   domaintypes.NewMigID(),
 		MigName: "follow-empty",
@@ -262,7 +262,7 @@ func TestFollowModelViewShowsNoRunningReposMessage(t *testing.T) {
 func TestFollowModelViewSingleRepoKeepsRepoVisibleWithoutRunningJobs(t *testing.T) {
 	t.Parallel()
 
-	report := RunReport{
+	report := RunStatusReport{
 		RunID:   domaintypes.NewRunID(),
 		MigID:   domaintypes.NewMigID(),
 		MigName: "follow-single-repo",
@@ -293,7 +293,7 @@ func TestFollowModelViewSingleRepoKeepsRepoVisibleWithoutRunningJobs(t *testing.
 func TestWriteFinalStatusSnapshot_NonTTYUsesStatusRenderer(t *testing.T) {
 	t.Parallel()
 
-	report := RunReport{
+	report := RunStatusReport{
 		RunID:   domaintypes.NewRunID(),
 		MigID:   domaintypes.NewMigID(),
 		MigName: "final-snapshot",
