@@ -20,7 +20,7 @@ func TestRunSummaryJSON(t *testing.T) {
 
 		original := RunSummary{
 			ID:         RunID("2NQPoBfVkc8dFmGAQqJnUwMu9jR"),
-			Status:     RunStatusStarted,
+			Status:     RunStatusRunning,
 			MigID:      MigID("mig-x1"),
 			SpecID:     SpecID("spec-y2Z"),
 			CreatedBy:  ptr("test-user"),
@@ -68,7 +68,7 @@ func TestRunSummaryJSON(t *testing.T) {
 		// JSON with empty mig_id should fail to unmarshal.
 		jsonData := `{
 			"id": "2NQPoBfVkc8dFmGAQqJnUwMu9jR",
-			"status": "Started",
+			"status": "Queued",
 			"mig_id": "",
 			"spec_id": "spec-y2Z",
 			"created_at": "2024-01-01T00:00:00Z"
@@ -87,7 +87,7 @@ func TestRunSummaryJSON(t *testing.T) {
 		// JSON with empty spec_id should fail to unmarshal.
 		jsonData := `{
 			"id": "2NQPoBfVkc8dFmGAQqJnUwMu9jR",
-			"status": "Started",
+			"status": "Queued",
 			"mig_id": "mig-x1",
 			"spec_id": "",
 			"created_at": "2024-01-01T00:00:00Z"
@@ -106,7 +106,7 @@ func TestRunSummaryJSON(t *testing.T) {
 		// JSON with whitespace-only mig_id should fail to unmarshal.
 		jsonData := `{
 			"id": "2NQPoBfVkc8dFmGAQqJnUwMu9jR",
-			"status": "Started",
+			"status": "Queued",
 			"mig_id": "   ",
 			"spec_id": "spec-y2Z",
 			"created_at": "2024-01-01T00:00:00Z"
@@ -125,7 +125,7 @@ func TestRunSummaryJSON(t *testing.T) {
 		// JSON with whitespace-only spec_id should fail to unmarshal.
 		jsonData := `{
 			"id": "2NQPoBfVkc8dFmGAQqJnUwMu9jR",
-			"status": "Started",
+			"status": "Queued",
 			"mig_id": "mig-x1",
 			"spec_id": "   ",
 			"created_at": "2024-01-01T00:00:00Z"
@@ -144,7 +144,7 @@ func TestRunSummaryJSON(t *testing.T) {
 		// JSON with empty id should fail to unmarshal.
 		jsonData := `{
 			"id": "",
-			"status": "Started",
+			"status": "Queued",
 			"mig_id": "mig-x1",
 			"spec_id": "spec-y2",
 			"created_at": "2024-01-01T00:00:00Z"
@@ -165,7 +165,7 @@ func TestRunSummaryJSON(t *testing.T) {
 			ID:        RunID("run-1"),
 			MigID:     MigID("mig-1"),
 			SpecID:    SpecID("spec-1"),
-			Status:    RunStatusStarted,
+			Status:    RunStatusQueued,
 			CreatedAt: time.Now(),
 		}
 

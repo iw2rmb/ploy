@@ -61,15 +61,9 @@ func getRunStatusHandler(st store.Store) http.HandlerFunc {
 			repoURL  string
 			repoBase string
 		)
-		runRepos, err := st.ListRunReposWithURLByRun(r.Context(), run.ID)
-		if err != nil {
-			serverError(w, "get run status", "list run repos", err, "run_id", run.ID)
-			return
-		}
-		if len(runRepos) > 0 {
-			rr := runRepos[0]
-			repoBase = rr.RepoBaseRef
-			repoURL = rr.RepoUrl
+		repoBase = run.RepoBaseRef
+		if repo, err := st.GetRepo(r.Context(), run.RepoID); err == nil {
+			repoURL = repo.Url
 		}
 
 		summary := migsapi.RunSummary{
@@ -77,10 +71,14 @@ func getRunStatusHandler(st store.Store) http.HandlerFunc {
 			State:      runState,
 			Submitter:  "",
 			Repository: repoURL,
-			Metadata:   map[string]string{"repo_base_ref": repoBase},
-			CreatedAt:  timeOrZero(run.CreatedAt),
-			UpdatedAt:  time.Now().UTC(),
-			Stages:     make(map[domaintypes.JobID]migsapi.StageStatus),
+			Metadata: map[string]string{
+				"repo_id":           run.RepoID.String(),
+				"repo_base_ref":     repoBase,
+				"source_commit_sha": run.SourceCommitSha,
+			},
+			CreatedAt: timeOrZero(run.CreatedAt),
+			UpdatedAt: time.Now().UTC(),
+			Stages:    make(map[domaintypes.JobID]migsapi.StageStatus),
 		}
 
 		// Surface gate summary and resume metadata from runs.stats if present.

@@ -84,9 +84,10 @@ func createMigRunHandler(st store.Store, gitAuth gitauth.Options) http.HandlerFu
 			return
 		}
 
-		runID := domaintypes.NewRunID()
-		runRepos := make([]store.CreateRunRepoParams, 0, len(selectedRepos))
+		waveID := domaintypes.NewWaveID()
+		runs := make([]store.CreateRunParams, 0, len(selectedRepos))
 		for _, migRepo := range selectedRepos {
+			runID := domaintypes.NewRunID()
 			repoURL, urlErr := repoURLForID(r.Context(), st, migRepo.RepoID)
 			if urlErr != nil {
 				serverError(w, "create mig run", "get repo", urlErr, "repo_id", migRepo.RepoID)
@@ -104,9 +105,11 @@ func createMigRunHandler(st store.Store, gitAuth gitauth.Options) http.HandlerFu
 				)
 				return
 			}
-			runRepos = append(runRepos, store.CreateRunRepoParams{
+			runs = append(runs, store.CreateRunParams{
+				ID:              runID,
+				WaveID:          waveID,
 				MigID:           migID,
-				RunID:           runID,
+				SpecID:          *mig.SpecID,
 				RepoID:          migRepo.RepoID,
 				RepoBaseRef:     migRepo.BaseRef,
 				SourceCommitSha: sourceCommitSHA,
@@ -114,31 +117,31 @@ func createMigRunHandler(st store.Store, gitAuth gitauth.Options) http.HandlerFu
 			})
 		}
 
-		run, _, err := st.CreateRunWithRepos(r.Context(), store.CreateRunWithReposParams{
-			Run: store.CreateRunParams{
-				ID:        runID,
+		wave, _, err := st.CreateWaveWithRuns(r.Context(), store.CreateWaveWithRunsParams{
+			Wave: store.CreateWaveParams{
+				ID:        waveID,
 				MigID:     migID,
 				SpecID:    *mig.SpecID,
 				CreatedBy: req.CreatedBy,
 			},
-			Repos: runRepos,
+			Runs: runs,
 		})
 		if err != nil {
-			serverError(w, "create mig run", "create run with repos", err, "mig_id", migID.String(), "run_id", runID)
+			serverError(w, "create mig wave", "create wave with runs", err, "mig_id", migID.String(), "wave_id", waveID)
 			return
 		}
 
 		// Build response with run_id.
 		resp := struct {
-			RunID domaintypes.RunID `json:"run_id"`
+			WaveID domaintypes.WaveID `json:"wave_id"`
 		}{
-			RunID: run.ID,
+			WaveID: wave.ID,
 		}
 
 		writeJSON(w, http.StatusCreated, resp)
 
 		slog.Info("mig run created",
-			"run_id", run.ID,
+			"wave_id", wave.ID,
 			"mig_id", migID.String(),
 			"spec_id", *mig.SpecID,
 			"repo_count", len(selectedRepos),

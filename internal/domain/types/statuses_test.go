@@ -57,28 +57,28 @@ func TestStatusScanRejectsUnknown(t *testing.T) {
 	t.Run("run", func(t *testing.T) {
 		t.Parallel()
 		var status RunStatus
-		if err := status.Scan([]byte("Finished")); err != nil {
+		if err := status.Scan([]byte("Success")); err != nil {
 			t.Fatalf("Scan valid run status failed: %v", err)
 		}
-		if status != RunStatusFinished {
-			t.Fatalf("run status=%q want %q", status, RunStatusFinished)
+		if status != RunStatusSuccess {
+			t.Fatalf("run status=%q want %q", status, RunStatusSuccess)
 		}
-		if err := status.Scan("finished"); err == nil {
+		if err := status.Scan("success"); err == nil {
 			t.Fatal("expected lowercase run status scan to fail")
 		}
 	})
 
-	t.Run("run_repo", func(t *testing.T) {
+	t.Run("wave", func(t *testing.T) {
 		t.Parallel()
-		var status RunRepoStatus
-		if err := status.Scan("Success"); err != nil {
-			t.Fatalf("Scan valid run repo status failed: %v", err)
+		var status WaveStatus
+		if err := status.Scan("Finished"); err != nil {
+			t.Fatalf("Scan valid wave status failed: %v", err)
 		}
-		if status != RunRepoStatusSuccess {
-			t.Fatalf("run repo status=%q want %q", status, RunRepoStatusSuccess)
+		if status != WaveStatusFinished {
+			t.Fatalf("wave status=%q want %q", status, WaveStatusFinished)
 		}
-		if err := status.Scan("success"); err == nil {
-			t.Fatal("expected lowercase run repo status scan to fail")
+		if err := status.Scan("finished"); err == nil {
+			t.Fatal("expected lowercase wave status scan to fail")
 		}
 	})
 }

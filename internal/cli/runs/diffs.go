@@ -36,7 +36,7 @@ type ListRepoDiffsCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
 	RunID   domaintypes.RunID
-	RepoID  domaintypes.MigRepoID
+	RepoID  domaintypes.RepoID
 }
 
 // Run executes GET /v1/runs/{run_id}/repos/{repo_id}/diffs and returns structured diffs.
@@ -47,11 +47,7 @@ func (c ListRepoDiffsCommand) Run(ctx context.Context) (ListRepoDiffsResult, err
 	if c.RunID.IsZero() {
 		return ListRepoDiffsResult{}, errors.New("list repo diffs: run id required")
 	}
-	if c.RepoID.IsZero() {
-		return ListRepoDiffsResult{}, errors.New("list repo diffs: repo id required")
-	}
-
-	endpoint := c.BaseURL.JoinPath("v1", "runs", c.RunID.String(), "repos", c.RepoID.String(), "diffs")
+	endpoint := c.BaseURL.JoinPath("v1", "runs", c.RunID.String(), "diffs")
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
 	if err != nil {
 		return ListRepoDiffsResult{}, fmt.Errorf("list repo diffs: build request: %w", err)
@@ -88,8 +84,8 @@ func (c ListRepoDiffsCommand) Run(ctx context.Context) (ListRepoDiffsResult, err
 type RepoDiffsCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
-	RunID   domaintypes.RunID     // Run ID (KSUID-backed)
-	RepoID  domaintypes.MigRepoID // Repo ID (NanoID-backed)
+	RunID   domaintypes.RunID  // Run ID (KSUID-backed)
+	RepoID  domaintypes.RepoID // Repo ID (NanoID-backed)
 	Output  io.Writer
 
 	Download bool   // when true, download newest diff and print to stdout (gunzipped)
@@ -104,18 +100,14 @@ func (c RepoDiffsCommand) Run(ctx context.Context) error {
 	if c.RunID.IsZero() {
 		return errors.New("run repo diffs: run id required")
 	}
-	if c.RepoID.IsZero() {
-		return errors.New("run repo diffs: repo id required")
-	}
 	runID := c.RunID.String()
-	repoID := c.RepoID.String()
 	out := c.Output
 	if out == nil {
 		out = io.Discard
 	}
 
 	// List diffs via repo-scoped endpoint
-	listURL := c.BaseURL.JoinPath("v1", "runs", runID, "repos", repoID, "diffs")
+	listURL := c.BaseURL.JoinPath("v1", "runs", runID, "diffs")
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, listURL.String(), nil)
 	if err != nil {
 		return err
@@ -152,8 +144,7 @@ func (c RepoDiffsCommand) Run(ctx context.Context) error {
 	// Newest first by API; take first.
 	diffID := listing.Diffs[0].ID
 
-	// Download gzipped patch via repo-scoped endpoint (download mode).
-	dlURL := c.BaseURL.JoinPath("v1", "runs", runID, "repos", repoID, "diffs")
+	dlURL := c.BaseURL.JoinPath("v1", "runs", runID, "diffs")
 	q := dlURL.Query()
 	q.Set("download", "true")
 	q.Set("diff_id", diffID.String())

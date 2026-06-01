@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/cli/common"
+	"github.com/iw2rmb/ploy/internal/cli/httpx"
 	"github.com/iw2rmb/ploy/internal/cli/migs"
 	runcli "github.com/iw2rmb/ploy/internal/cli/run"
 	"github.com/iw2rmb/ploy/internal/cli/runs"
@@ -166,11 +167,11 @@ func RunRepoAdd(ctx context.Context, opts RepoAddOptions) error {
 		return err
 	}
 	result, err := (migs.AddMigRepoCommand{
-		Client:    httpClient,
-		BaseURL:   base,
-		MigRef:    domaintypes.MigRef(migID),
-		RepoURL:   opts.RepoURL,
-		BaseRef:   opts.BaseRef,
+		Client:  httpClient,
+		BaseURL: base,
+		MigRef:  domaintypes.MigRef(migID),
+		RepoURL: opts.RepoURL,
+		BaseRef: opts.BaseRef,
 	}).Run(ctx)
 	if err != nil {
 		return err
@@ -294,12 +295,59 @@ func RunProject(ctx context.Context, opts RunOptions) error {
 	if err != nil {
 		return err
 	}
-	_, _ = fmt.Fprintln(opts.Output, result.RunID)
+	_, _ = fmt.Fprintln(opts.Output, result.WaveID)
 
 	if opts.Follow {
-		return followMigRunProject(ctx, base, httpClient, result.RunID, opts.Cap, opts.CancelOnCap, opts.MaxRetries, opts.Output)
+		return followMigWaveProject(ctx, base, httpClient, result.WaveID, opts.Cap, opts.CancelOnCap, opts.Output)
 	}
 	return nil
+}
+
+func followMigWaveProject(ctx context.Context, baseURL *url.URL, client *http.Client, waveID domaintypes.WaveID, capDuration time.Duration, cancelOnCap bool, output io.Writer) error {
+	followCtx := ctx
+	var cancel context.CancelFunc
+	if capDuration > 0 {
+		followCtx, cancel = context.WithTimeout(ctx, capDuration)
+		defer cancel()
+	}
+	for {
+		req, err := http.NewRequestWithContext(followCtx, http.MethodGet, baseURL.JoinPath("v1", "waves", waveID.String()).String(), nil)
+		if err != nil {
+			return err
+		}
+		resp, err := client.Do(req)
+		if err != nil {
+			if capDuration > 0 && followCtx.Err() == context.DeadlineExceeded {
+				if cancelOnCap {
+					_, _ = fmt.Fprintln(output, "Follow timed out; requesting wave cancellation...")
+					cancelReq, _ := http.NewRequestWithContext(context.Background(), http.MethodPost, baseURL.JoinPath("v1", "waves", waveID.String(), "cancel").String(), nil)
+					if cancelReq != nil {
+						if cancelResp, cancelErr := client.Do(cancelReq); cancelErr == nil {
+							_ = cancelResp.Body.Close()
+						}
+					}
+				}
+				return nil
+			}
+			return err
+		}
+		var body struct {
+			Status string `json:"status"`
+		}
+		decodeErr := httpx.DecodeResponseJSON(resp.Body, &body, httpx.MaxJSONBodyBytes)
+		_ = resp.Body.Close()
+		if decodeErr != nil {
+			return decodeErr
+		}
+		_, _ = fmt.Fprintf(output, "wave %s %s\n", waveID, body.Status)
+		if body.Status == "Finished" {
+			return nil
+		}
+		if body.Status == "Cancelled" {
+			return fmt.Errorf("mig wave ended in cancelled")
+		}
+		time.Sleep(time.Second)
+	}
 }
 
 func RunFetch(ctx context.Context, runID, artifactDir string, output io.Writer) error {

@@ -40,14 +40,14 @@ func TestListRepoJobsCommand_DecodeJobContract(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewMigRepoID()
+	repoID := domaintypes.NewRepoID()
 	jobID := domaintypes.NewJobID()
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			t.Fatalf("method=%s, want GET", r.Method)
 		}
-		wantPath := "/api/v1/runs/" + runID.String() + "/repos/" + repoID.String() + "/jobs"
+		wantPath := "/api/v1/runs/" + runID.String() + "/jobs"
 		if r.URL.Path != wantPath {
 			t.Fatalf("path=%s, want %s", r.URL.Path, wantPath)
 		}

@@ -45,16 +45,15 @@ func JobStatusFromExitCodeForJobType(jobType domaintypes.JobType, exitCode int) 
 
 // ClaimDecision is the pure output of claim transition evaluation.
 type ClaimDecision struct {
-	// AdvanceRunRepoToRunning is true when the RunRepo should be transitioned
+	// AdvanceRunToRunning is true when the run should be transitioned
 	// from Queued to Running.
-	AdvanceRunRepoToRunning bool
+	AdvanceRunToRunning bool
 }
 
-// EvaluateClaimDecision computes whether the RunRepo should advance to Running.
-// Jobs advance the RunRepo from Queued to Running on first claim.
-func EvaluateClaimDecision(jobType domaintypes.JobType, rrStatus domaintypes.RunRepoStatus) ClaimDecision {
+// EvaluateClaimDecision computes whether the run should advance to Running.
+func EvaluateClaimDecision(jobType domaintypes.JobType, runStatus domaintypes.RunStatus) ClaimDecision {
 	return ClaimDecision{
-		AdvanceRunRepoToRunning: !jobType.IsZero() && rrStatus == domaintypes.RunRepoStatusQueued,
+		AdvanceRunToRunning: !jobType.IsZero() && runStatus == domaintypes.RunStatusQueued,
 	}
 }
 

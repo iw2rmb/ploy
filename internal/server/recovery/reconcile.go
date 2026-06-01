@@ -16,7 +16,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/lifecycle"
 )
 
-// MaybeUpdateRunRepoStatus derives and persists run_repos.status from job outcomes.
+// MaybeUpdateRunRepoStatus derives and persists runs.status from job outcomes.
 func MaybeUpdateRunRepoStatus(
 	ctx context.Context,
 	st store.Store,
@@ -41,15 +41,14 @@ func MaybeUpdateRunRepoStatus(
 		return false, nil
 	}
 
-	if err := st.UpdateRunRepoStatus(ctx, store.UpdateRunRepoStatusParams{
-		RunID:  runID,
-		RepoID: repoID,
+	if err := st.UpdateRunStatus(ctx, store.UpdateRunStatusParams{
+		ID:     runID,
 		Status: eval.Status,
 	}); err != nil {
-		return false, fmt.Errorf("update run repo status: %w", err)
+		return false, fmt.Errorf("update run status: %w", err)
 	}
 
-	slog.Info("run repo completed",
+	slog.Info("run completed",
 		"run_id", runID,
 		"repo_id", repoID,
 		"attempt", attempt,
@@ -59,41 +58,41 @@ func MaybeUpdateRunRepoStatus(
 	return true, nil
 }
 
-// MaybeCompleteRunIfAllReposTerminal transitions runs.status to Finished only when
-// all run_repos are terminal and publishes run/done SSE events.
+// MaybeCompleteRunIfAllReposTerminal completes the owning wave when all child runs are terminal.
 func MaybeCompleteRunIfAllReposTerminal(ctx context.Context, st store.Store, eventsService *events.Service, run store.Run) (bool, error) {
 	runID := run.ID
-	if lifecycle.IsTerminalRunStatus(run.Status) {
+	wave, err := st.GetWave(ctx, run.WaveID)
+	if err != nil {
+		return false, fmt.Errorf("get wave: %w", err)
+	}
+	if lifecycle.IsTerminalWaveStatus(wave.Status) {
 		return false, nil
 	}
 
-	counts, err := st.CountRunReposByStatus(ctx, runID)
+	counts, err := st.CountRunsByWaveStatus(ctx, run.WaveID)
 	if err != nil {
-		return false, fmt.Errorf("count run repos: %w", err)
+		return false, fmt.Errorf("count wave runs: %w", err)
 	}
 
-	eval := lifecycle.EvaluateRunCompletionFromRepoCounts(counts)
+	eval := lifecycle.EvaluateWaveCompletionFromRunCounts(counts)
 	if !eval.ShouldFinish {
 		return false, nil
 	}
 
-	currentRun, err := st.GetRun(ctx, runID)
+	currentWave, err := st.GetWave(ctx, run.WaveID)
 	if err != nil {
-		return false, fmt.Errorf("get run for completion check: %w", err)
+		return false, fmt.Errorf("get wave for completion check: %w", err)
 	}
-	if lifecycle.IsTerminalRunStatus(currentRun.Status) {
+	if lifecycle.IsTerminalWaveStatus(currentWave.Status) {
 		return false, nil
 	}
 
-	if err := st.UpdateRunStatus(ctx, store.UpdateRunStatusParams{ID: runID, Status: domaintypes.RunStatusFinished}); err != nil {
-		return false, fmt.Errorf("update run status: %w", err)
+	if err := st.UpdateWaveStatus(ctx, store.UpdateWaveStatusParams{ID: run.WaveID, Status: domaintypes.WaveStatusFinished}); err != nil {
+		return false, fmt.Errorf("update wave status: %w", err)
 	}
 
 	if eventsService != nil {
-		repoURL := ""
-		if repos, err := st.ListRunReposWithURLByRun(ctx, runID); err == nil && len(repos) > 0 {
-			repoURL = repos[0].RepoUrl
-		}
+		repoURL, _ := repoURLForID(ctx, st, run.RepoID)
 
 		summary := migsapi.RunSummary{
 			RunID:      runID,
@@ -111,8 +110,16 @@ func MaybeCompleteRunIfAllReposTerminal(ctx context.Context, st store.Store, eve
 		}
 	}
 
-	slog.Info("run completed", "run_id", runID, "status", domaintypes.RunStatusFinished)
+	slog.Info("wave completed", "wave_id", run.WaveID, "status", domaintypes.WaveStatusFinished)
 	return true, nil
+}
+
+func repoURLForID(ctx context.Context, st store.Store, repoID domaintypes.RepoID) (string, error) {
+	repo, err := st.GetRepo(ctx, repoID)
+	if err != nil {
+		return "", err
+	}
+	return repo.Url, nil
 }
 
 func timeOrZero(ts pgtype.Timestamptz) time.Time {

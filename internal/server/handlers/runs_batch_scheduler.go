@@ -27,67 +27,68 @@ func NewBatchRepoStarter(st store.Store, bs blobstore.Store) *BatchRepoStarter {
 	return &BatchRepoStarter{store: st, bs: bs}
 }
 
-// StartPendingRepos creates (or advances) repo-scoped job queues for queued run_repos rows.
-// v1 removes per-repo execution runs; jobs are created directly for (run_id, repo_id, attempt).
-func (s *BatchRepoStarter) StartPendingRepos(ctx context.Context, runID domaintypes.RunID) (batchscheduler.StartPendingReposResult, error) {
+// StartPendingRepos creates (or advances) job queues for queued runs in a wave.
+func (s *BatchRepoStarter) StartPendingRepos(ctx context.Context, waveID domaintypes.WaveID) (batchscheduler.StartPendingReposResult, error) {
 	result := batchscheduler.StartPendingReposResult{}
-	runIDStr := runID.String()
 
-	run, err := s.store.GetRun(ctx, runID)
+	wave, err := s.store.GetWave(ctx, waveID)
 	if err != nil {
-		return result, fmt.Errorf("get run: %w", err)
+		return result, fmt.Errorf("get wave: %w", err)
 	}
 
-	// Skip terminal runs — no more repos to start.
-	if lifecycle.IsTerminalRunStatus(run.Status) {
+	if lifecycle.IsTerminalWaveStatus(wave.Status) {
 		return result, nil
 	}
 
-	spec, err := s.store.GetSpec(ctx, run.SpecID)
+	spec, err := s.store.GetSpec(ctx, wave.SpecID)
 	if err != nil {
 		return result, fmt.Errorf("get spec: %w", err)
 	}
 
-	allRepos, err := s.store.ListRunReposByRun(ctx, runID)
+	allRuns, err := s.store.ListRunsByWave(ctx, waveID)
 	if err != nil {
-		return result, fmt.Errorf("list run repos: %w", err)
+		return result, fmt.Errorf("list runs by wave: %w", err)
 	}
-	for _, rr := range allRepos {
-		if lifecycle.IsTerminalRunRepoStatus(rr.Status) {
+	for _, run := range allRuns {
+		if lifecycle.IsTerminalRunStatus(run.Status) {
 			result.AlreadyDone++
 			continue
 		}
-		if rr.Status == domaintypes.RunRepoStatusQueued {
+		if run.Status == domaintypes.RunStatusQueued {
 			result.Pending++
 		}
 	}
 
-	queuedRepos, err := s.store.ListQueuedRunReposByRun(ctx, runID)
+	queuedRuns, err := s.store.ListQueuedRunsByWave(ctx, waveID)
 	if err != nil {
-		return result, fmt.Errorf("list queued repos: %w", err)
+		return result, fmt.Errorf("list queued runs: %w", err)
 	}
 
-	if len(queuedRepos) == 0 {
+	if len(queuedRuns) == 0 {
 		return result, nil
 	}
 
-	for _, rr := range queuedRepos {
+	for _, run := range queuedRuns {
 		jobs, err := s.store.ListJobsByRunRepoAttempt(ctx, store.ListJobsByRunRepoAttemptParams{
-			RunID:   runID,
-			RepoID:  rr.RepoID,
-			Attempt: rr.Attempt,
+			RunID:   run.ID,
+			RepoID:  run.RepoID,
+			Attempt: run.Attempt,
 		})
 		if err != nil {
-			slog.Error("start queued repos: list jobs failed", "run_id", runIDStr, "repo_id", rr.RepoID, "attempt", rr.Attempt, "err", err)
+			slog.Error("start queued runs: list jobs failed", "run_id", run.ID, "repo_id", run.RepoID, "attempt", run.Attempt, "err", err)
 			continue
 		}
 
 		if len(jobs) == 0 {
-			if err := createJobsFromSpec(ctx, s.store, runID, rr.RepoID, rr.RepoBaseRef, rr.Attempt, rr.RepoSha0, spec.Spec, s.bs); err != nil {
-				slog.Error("start queued repos: create jobs failed", "run_id", runIDStr, "repo_id", rr.RepoID, "attempt", rr.Attempt, "err", err)
-				if updateErr := s.store.UpdateRunRepoError(ctx, store.UpdateRunRepoErrorParams{RunID: runID, RepoID: rr.RepoID, LastError: ptr(fmt.Sprintf("create jobs: %v", err))}); updateErr != nil {
-					slog.Error("start queued repos: update repo error failed", "run_id", runIDStr, "repo_id", rr.RepoID, "err", updateErr)
+			if err := createJobsFromSpec(ctx, s.store, run.ID, run.RepoID, run.RepoBaseRef, run.Attempt, run.RepoSha0, spec.Spec, s.bs); err != nil {
+				slog.Error("start queued runs: create jobs failed", "run_id", run.ID, "repo_id", run.RepoID, "attempt", run.Attempt, "err", err)
+				if updateErr := s.store.UpdateRunError(ctx, store.UpdateRunErrorParams{ID: run.ID, LastError: ptr(fmt.Sprintf("create jobs: %v", err))}); updateErr != nil {
+					slog.Error("start queued runs: update run error failed", "run_id", run.ID, "repo_id", run.RepoID, "err", updateErr)
 				}
+				continue
+			}
+			if err := s.store.UpdateRunStatus(ctx, store.UpdateRunStatusParams{ID: run.ID, Status: domaintypes.RunStatusRunning}); err != nil {
+				slog.Error("start queued runs: mark running failed", "run_id", run.ID, "err", err)
 				continue
 			}
 			result.Started++
@@ -105,8 +106,12 @@ func (s *BatchRepoStarter) StartPendingRepos(ctx context.Context, runID domainty
 			continue
 		}
 
-		if _, err := s.store.ScheduleNextJob(ctx, store.ScheduleNextJobParams{RunID: runID, RepoID: rr.RepoID, Attempt: rr.Attempt}); err != nil && !errors.Is(err, pgx.ErrNoRows) {
-			slog.Error("start queued repos: schedule next job failed", "run_id", runIDStr, "repo_id", rr.RepoID, "attempt", rr.Attempt, "err", err)
+		if _, err := s.store.ScheduleNextJob(ctx, store.ScheduleNextJobParams{RunID: run.ID, RepoID: run.RepoID, Attempt: run.Attempt}); err != nil && !errors.Is(err, pgx.ErrNoRows) {
+			slog.Error("start queued runs: schedule next job failed", "run_id", run.ID, "repo_id", run.RepoID, "attempt", run.Attempt, "err", err)
+			continue
+		}
+		if err := s.store.UpdateRunStatus(ctx, store.UpdateRunStatusParams{ID: run.ID, Status: domaintypes.RunStatusRunning}); err != nil {
+			slog.Error("start queued runs: mark running failed", "run_id", run.ID, "err", err)
 			continue
 		}
 		result.Started++

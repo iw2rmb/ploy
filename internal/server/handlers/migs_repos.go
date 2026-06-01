@@ -60,10 +60,10 @@ func addMigRepoHandler(st store.Store) http.HandlerFunc {
 		// Create the mig_repo row.
 		repoID := domaintypes.NewMigRepoID()
 		repo, err := st.CreateMigRepo(r.Context(), store.CreateMigRepoParams{
-			ID:        repoID,
-			MigID:     migID,
-			Url:       normalizedURL,
-			BaseRef:   req.BaseRef.String(),
+			ID:      repoID,
+			MigID:   migID,
+			Url:     normalizedURL,
+			BaseRef: req.BaseRef.String(),
 		})
 		if err != nil {
 			if isUniqueViolation(err) {
@@ -307,10 +307,10 @@ func bulkUpsertMigReposHandler(st store.Store) http.HandlerFunc {
 
 			// Upsert the repo.
 			_, err = st.UpsertMigRepo(r.Context(), store.UpsertMigRepoParams{
-				ID:        domaintypes.NewMigRepoID(), // Only used for insert
-				MigID:     migID,
-				Url:       normalizedURL,
-				BaseRef:   baseRef,
+				ID:      domaintypes.NewMigRepoID(), // Only used for insert
+				MigID:   migID,
+				Url:     normalizedURL,
+				BaseRef: baseRef,
 			})
 			if err != nil {
 				failed++

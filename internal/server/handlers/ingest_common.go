@@ -432,20 +432,41 @@ func getJobInRunOrFail(w http.ResponseWriter, r *http.Request, st store.Store, r
 	return job, true
 }
 
-// getRunRepoOrFail fetches a run_repo by (run_id, repo_id). On error it writes the
+// getRunRepoOrFail fetches a run by id and validates the repo id. On error it writes the
 // HTTP response (404 for not found, 500 for other errors) and returns ok=false.
-func getRunRepoOrFail(w http.ResponseWriter, r *http.Request, st store.Store, runID domaintypes.RunID, repoID domaintypes.RepoID, logPrefix string) (store.RunRepo, bool) {
-	rr, err := st.GetRunRepo(r.Context(), store.GetRunRepoParams{RunID: runID, RepoID: repoID})
+func getRunRepoOrFail(w http.ResponseWriter, r *http.Request, st store.Store, runID domaintypes.RunID, repoID domaintypes.RepoID, logPrefix string) (store.Run, bool) {
+	rr, err := st.GetRun(r.Context(), runID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			writeHTTPError(w, http.StatusNotFound, "repo not found")
-			return store.RunRepo{}, false
+			return store.Run{}, false
 		}
 		slog.Error(logPrefix+": get run repo failed", "run_id", runID.String(), "repo_id", repoID.String(), "err", err)
 		writeHTTPError(w, http.StatusInternalServerError, "failed to get repo: %v", err)
-		return store.RunRepo{}, false
+		return store.Run{}, false
+	}
+	if rr.RepoID != repoID {
+		writeHTTPError(w, http.StatusNotFound, "repo not found")
+		return store.Run{}, false
 	}
 	return rr, true
+}
+
+func runRepoIDFromPathOrRun(w http.ResponseWriter, r *http.Request, st store.Store, runID domaintypes.RunID) (domaintypes.RepoID, bool) {
+	raw := strings.TrimSpace(r.PathValue("repo_id"))
+	if raw != "" {
+		var repoID domaintypes.RepoID
+		if err := repoID.UnmarshalText([]byte(raw)); err != nil {
+			writeHTTPError(w, http.StatusBadRequest, "invalid repo_id")
+			return "", false
+		}
+		return repoID, true
+	}
+	run, ok := getRunOrFail(w, r, st, runID, "resolve run repo")
+	if !ok {
+		return "", false
+	}
+	return run.RepoID, true
 }
 
 // listJobsForRunRepoOrFail lists jobs for a given (run_id, repo_id, attempt). On

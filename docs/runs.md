@@ -1,87 +1,77 @@
-# Runs
+# Runs And Waves
 
-`ploy run` is the single-repo run command. It submits one mig spec against one
-repository source and then exposes explicit inspection, artifact download, and
-patch-application commands.
+`ploy run` submits one repository execution. A run is the execution boundary:
+jobs, logs, diffs, artifacts, snapshots, apply, pull, status, and cancellation
+are addressed by `run_id`.
+
+A `wave` groups one launch. Single-repo submit creates one wave with one run.
+Mig launches create one wave with one run per selected repo.
 
 ## Submit
 
 ```bash
 ploy run <spec-path> [<repo-path>|<namespace/repo[:ref]>] [--apply] [--pull[=path]]
+ploy mig run <mig-id|name> [--repo <repo-url> ... | --failed] [--follow]
 ```
 
-- `<spec-path>` is required. A directory resolves to `<spec-path>/mig.yaml`.
-- If the repo argument is omitted, `.` is used.
-- A local repo path submits the selected worktree's `HEAD`. Local staged and
-  unstaged changes are ignored during submit.
-- A remote selector uses `namespace/repo`, `namespace/repo:<branch>`, or
-  `namespace/repo:<sha>`. The default ref is `master`.
+- `ploy run` prints `run_id`, `mig_id`, and `spec_id`.
+- `ploy mig run` prints `wave_id`.
 - Remote selector expansion is server-owned through `POST /v1/repos/resolve`.
-  The CLI does not infer the repository host from local config.
-- `--apply` is allowed only for local repo submissions.
-- `--pull` waits for a successful terminal state and downloads final artifacts.
-  Bare `--pull` creates a temporary directory; `--pull=<path>` uses that path.
+- Mig wave creation uses `POST /v1/migs/{mig_id}/waves`.
 
-Submit prints the created `run_id` and `mig_id` when it returns immediately. When
-`--pull` or `--apply` is used, the command follows the run until a terminal state
-because both operations depend on successful completion.
-
-## Inspect
+## Inspect And Control
 
 ```bash
-ploy run status <run-id>
-ploy run status <run-id> --json
-ploy run status <run-id> --follow
-ploy run ls [<path>|<namespace/repo[:ref]>] [--limit N] [--offset N]
+ploy run status <run-id> [--json|--follow]
 ploy run cancel <run-id>
-```
-
-- `status` renders the current run report.
-- `status --json` prints the same report as JSON.
-- `status --follow` polls report/status endpoints until the run reaches a
-  terminal state. It does not depend on a run-level log stream.
-- `ls` lists recent runs globally or for a resolved repo selector.
-
-Container logs are job-scoped:
-
-```bash
+ploy wave status <wave-id> [--follow]
+ploy wave runs <wave-id>
+ploy wave cancel <wave-id>
 ploy job log <job-id>
-ploy job log --format structured <job-id>
-ploy job log --follow <job-id>
 ```
 
-The default job log format is raw. Use `--format structured` when timestamps and
-stream labels are needed.
+Run-scoped API surfaces:
 
-## Artifacts
+- `GET /v1/runs/{run_id}`
+- `GET /v1/runs/{run_id}/status`
+- `POST /v1/runs/{run_id}/cancel`
+- `POST /v1/runs/{run_id}/resolve`
+- `GET /v1/runs/{run_id}/jobs`
+- `GET /v1/runs/{run_id}/diffs`
+- `GET /v1/runs/{run_id}/logs`
+- `GET /v1/runs/{run_id}/artifacts`
+- `GET /v1/runs/{run_id}/snapshot`
+
+Wave-scoped API surfaces:
+
+- `POST /v1/migs/{mig_id}/waves`
+- `GET /v1/waves/{wave_id}`
+- `GET /v1/waves/{wave_id}/runs`
+- `POST /v1/waves/{wave_id}/cancel`
+
+There are no repo-scoped run endpoints under
+`/v1/runs/{run_id}/repos/{repo_id}`.
+
+## Artifacts And Apply
 
 ```bash
 ploy run pull <run-id> [artifacts-path]
-```
-
-`run pull` downloads final artifacts and writes `manifest.json` into the selected
-directory. It does not inspect a git worktree, create branches, or apply diffs.
-
-## Apply
-
-```bash
 ploy run apply <run-id> [path] [--force]
 ```
 
-`run apply` applies the accumulated patch for the run repo into a local git
-worktree.
+`run pull` downloads final artifacts into a directory. `run apply` applies the
+accumulated run patch into a clean local git worktree. Local `HEAD` must match
+the run `source_commit_sha`; `--force` bypasses only that source-commit guard.
 
-Rules:
+## Storage
 
-- The target path must be inside a git worktree.
-- The worktree must have no staged or unstaged diff against `HEAD`.
-- Local `HEAD` must match the run repo `source_commit_sha`.
-- `--force` bypasses only the `HEAD` versus `source_commit_sha` guard.
-- `--force` never bypasses the clean-worktree guard.
-- The command does not create or switch branches.
+Node-local durable state is rooted at:
 
-## Compatibility
+```text
+$PLOYD_CACHE_HOME/runs/{run_id}/workspace
+$PLOYD_CACHE_HOME/runs/{run_id}/artifacts
+$PLOYD_CACHE_HOME/runs/{run_id}/artifacts/{job_id}/{in,out,stdout.log,stderr.log,diff.patch}
+```
 
-The current command surface has no compatibility aliases for older submit,
-manual-start, run-log, or patch-download shapes. Contract acceptance is defined
-by the current Cobra command tree and the current API schema only.
+The control plane stores launch grouping in `waves`, execution state in `runs`,
+and work units in `jobs`.

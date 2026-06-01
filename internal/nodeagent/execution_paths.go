@@ -27,7 +27,7 @@ func runRepoRootDir(runID types.RunID, repoID types.MigRepoID) string {
 	if repoID.IsZero() {
 		return ""
 	}
-	return filepath.Join(runCacheDir(runID), "repos", repoID.String())
+	return runCacheDir(runID)
 }
 
 func runRepoWorkspaceDir(runID types.RunID, repoID types.MigRepoID) string {

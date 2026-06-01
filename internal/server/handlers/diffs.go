@@ -68,7 +68,7 @@ func listRunRepoDiffsHandler(st store.Store, bs blobstore.Store) http.HandlerFun
 			return
 		}
 
-		repoID, ok := parseRequiredPathIDOrWriteError[domaintypes.RepoID](w, r, "repo_id")
+		repoID, ok := runRepoIDFromPathOrRun(w, r, st, runID)
 		if !ok {
 			return
 		}
@@ -272,12 +272,15 @@ func listEffectiveRunRepoDiffs(
 	runID domaintypes.RunID,
 	repoID domaintypes.RepoID,
 ) ([]runRepoDiffRow, error) {
-	rr, err := st.GetRunRepo(ctx, store.GetRunRepoParams{RunID: runID, RepoID: repoID})
+	rr, err := st.GetRun(ctx, runID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return []runRepoDiffRow{}, nil
 		}
 		return nil, err
+	}
+	if rr.RepoID != repoID {
+		return []runRepoDiffRow{}, nil
 	}
 	jobs, err := st.ListJobsByRunRepoAttempt(ctx, store.ListJobsByRunRepoAttemptParams{
 		RunID:   runID,

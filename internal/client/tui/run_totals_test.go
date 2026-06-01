@@ -35,11 +35,11 @@ func TestGetRunTotalsCommand(t *testing.T) {
 				w.Header().Set("Content-Type", "application/json")
 				_ = json.NewEncoder(w).Encode(map[string]any{
 					"id":         runID.String(),
-					"status":     "Finished",
+					"status":     "Success",
 					"mig_id":     migID.String(),
 					"spec_id":    specID.String(),
 					"created_at": time.Now().Format(time.RFC3339),
-					"repo_counts": map[string]any{
+					"run_counts": map[string]any{
 						"total":          int32(3),
 						"queued":         int32(0),
 						"running":        int32(0),
@@ -67,7 +67,7 @@ func TestGetRunTotalsCommand(t *testing.T) {
 				w.Header().Set("Content-Type", "application/json")
 				_ = json.NewEncoder(w).Encode(map[string]any{
 					"id":         runID.String(),
-					"status":     "Started",
+					"status":     "Running",
 					"mig_id":     migID.String(),
 					"spec_id":    specID.String(),
 					"created_at": time.Now().Format(time.RFC3339),

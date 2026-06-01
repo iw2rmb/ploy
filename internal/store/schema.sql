@@ -19,8 +19,8 @@ CREATE TABLE IF NOT EXISTS ploy.schema_version (
 -- Enums
 --
 -- Status model (see docs/migs-lifecycle.md § "State machines"):
--- - run_status: Started | Cancelled | Finished
--- - run_repo_status: Queued | Running | Cancelled | Fail | Success
+-- - wave_status: Started | Cancelled | Finished
+-- - run_status: Queued | Running | Cancelled | Fail | Success
 -- - job_status: Created | Queued | Running | Success | Fail | Error | Cancelled
 -- - job_type: pre_gate | mig | post_gate
 --
@@ -31,9 +31,9 @@ BEGIN
     SELECT 1
     FROM pg_type t
     JOIN pg_namespace n ON n.oid = t.typnamespace
-    WHERE t.typname = 'run_status' AND n.nspname = 'ploy'
+    WHERE t.typname = 'wave_status' AND n.nspname = 'ploy'
   ) THEN
-    CREATE TYPE run_status AS ENUM ('Started', 'Cancelled', 'Finished');
+    CREATE TYPE wave_status AS ENUM ('Started', 'Cancelled', 'Finished');
   END IF;
 END $$;
 
@@ -61,17 +61,15 @@ BEGIN
   END IF;
 END $$;
 
--- RunRepoStatus tracks per-repo execution state within a batched run.
--- Status values: Queued, Running, Cancelled, Fail, Success.
 DO $$
 BEGIN
   IF NOT EXISTS (
     SELECT 1
     FROM pg_type t
     JOIN pg_namespace n ON n.oid = t.typnamespace
-    WHERE t.typname = 'run_repo_status' AND n.nspname = 'ploy'
+    WHERE t.typname = 'run_status' AND n.nspname = 'ploy'
   ) THEN
-    CREATE TYPE run_repo_status AS ENUM ('Queued', 'Running', 'Cancelled', 'Fail', 'Success');
+    CREATE TYPE run_status AS ENUM ('Queued', 'Running', 'Cancelled', 'Fail', 'Success');
   END IF;
 END $$;
 
@@ -164,56 +162,51 @@ CREATE TABLE IF NOT EXISTS mig_repos (
 );
 CREATE INDEX IF NOT EXISTS mig_repos_mig_created_idx ON mig_repos(mig_id, created_at);
 
--- Runs (execution of one spec_id over a specific set of repos)
--- v1 model: A run represents the execution of a mig's spec over its repo set.
--- No repo-level fields here; repo attribution comes from run_repos and jobs.repo_id.
+-- Waves group runs created by one launch.
+-- Note: id is TEXT (KSUID-backed) to preserve historical single-repo launch IDs.
+CREATE TABLE IF NOT EXISTS waves (
+  id           TEXT PRIMARY KEY,
+  mig_id       TEXT NOT NULL REFERENCES migs(id) ON DELETE RESTRICT,
+  spec_id      TEXT NOT NULL REFERENCES specs(id) ON DELETE RESTRICT,
+  created_by   TEXT,
+  status       wave_status NOT NULL DEFAULT 'Started',
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  started_at   TIMESTAMPTZ,
+  finished_at  TIMESTAMPTZ,
+  stats        JSONB NOT NULL DEFAULT '{}'::jsonb
+);
+CREATE INDEX IF NOT EXISTS waves_mig_created_idx ON waves(mig_id, created_at DESC, id DESC);
+CREATE INDEX IF NOT EXISTS waves_status_idx ON waves(status) WHERE status IN ('Started');
+
+-- Runs are single-repository executions within a wave.
 -- Note: id is TEXT (KSUID-backed) rather than UUID; application code generates IDs
 -- via types.NewRunID() before insertion.
 CREATE TABLE IF NOT EXISTS runs (
-  id           TEXT PRIMARY KEY,  -- KSUID-backed string ID (27 chars); no default, app-generated.
-  mig_id       TEXT NOT NULL REFERENCES migs(id) ON DELETE RESTRICT,  -- Mig project this run belongs to.
-  spec_id      TEXT NOT NULL REFERENCES specs(id) ON DELETE RESTRICT,  -- Spec used for this run (immutable snapshot).
-  created_by   TEXT,
-  status       run_status NOT NULL DEFAULT 'Started',
-  created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
-  started_at   TIMESTAMPTZ,  -- Set on run creation.
-  finished_at  TIMESTAMPTZ,  -- Set when status transitions to terminal (Finished or Cancelled).
-  stats        JSONB NOT NULL DEFAULT '{}'::jsonb
-);
-CREATE INDEX IF NOT EXISTS runs_status_idx ON runs(status);
-CREATE INDEX IF NOT EXISTS runs_created_idx ON runs(created_at);
-CREATE INDEX IF NOT EXISTS runs_mig_idx ON runs(mig_id);
-
--- RunRepos tracks per-repo execution state within a run.
--- v1 model: composite PK (run_id, repo_id); execution_run_id removed (no child runs per repo).
--- repo_base_ref is copied from mig_repos at run creation time.
--- Note: run_id is TEXT (KSUID-backed) to match runs.id.
--- Note: repo_id is TEXT (NanoID-backed, 8 chars) to match repos.id.
-CREATE TABLE IF NOT EXISTS run_repos (
-  mig_id           TEXT NOT NULL REFERENCES migs(id) ON DELETE RESTRICT,  -- Copied from runs.mig_id.
-  run_id           TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
-  repo_id          TEXT NOT NULL REFERENCES repos(id) ON DELETE RESTRICT,  -- FK to repos.id.
-  repo_base_ref    TEXT NOT NULL,  -- Snapshot of mig_repos.base_ref at run creation time.
-  source_commit_sha TEXT NOT NULL DEFAULT '',  -- Immutable source commit resolved at run start.
-  repo_sha0        TEXT NOT NULL DEFAULT '',   -- Initial SHA seed for deterministic job SHA chain.
-  status           run_repo_status NOT NULL DEFAULT 'Queued',
-  attempt          INTEGER NOT NULL DEFAULT 1 CHECK (attempt >= 1),
-  last_error       TEXT,
-  created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
-  started_at       TIMESTAMPTZ,  -- Set when status changes Queued → Running.
-  finished_at      TIMESTAMPTZ,  -- Set when status changes to terminal (Fail, Success, Cancelled).
-  CONSTRAINT run_repos_mig_repo_membership_fkey
+  id                TEXT PRIMARY KEY,
+  wave_id           TEXT NOT NULL REFERENCES waves(id) ON DELETE CASCADE,
+  mig_id            TEXT NOT NULL REFERENCES migs(id) ON DELETE RESTRICT,
+  spec_id           TEXT NOT NULL REFERENCES specs(id) ON DELETE RESTRICT,
+  repo_id           TEXT NOT NULL REFERENCES repos(id) ON DELETE RESTRICT,
+  repo_base_ref     TEXT NOT NULL,
+  source_commit_sha TEXT NOT NULL DEFAULT '',
+  repo_sha0         TEXT NOT NULL DEFAULT '',
+  created_by        TEXT,
+  status            run_status NOT NULL DEFAULT 'Queued',
+  attempt           INTEGER NOT NULL DEFAULT 1 CHECK (attempt >= 1),
+  last_error        TEXT,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  started_at        TIMESTAMPTZ,
+  finished_at       TIMESTAMPTZ,
+  stats             JSONB NOT NULL DEFAULT '{}'::jsonb,
+  CONSTRAINT runs_mig_repo_membership_fkey
     FOREIGN KEY (mig_id, repo_id)
     REFERENCES mig_repos(mig_id, repo_id)
-    ON DELETE RESTRICT,
-  PRIMARY KEY (run_id, repo_id)  -- Composite PK: one row per repo per run.
+    ON DELETE RESTRICT
 );
--- Index for listing repos by run (batch lookups).
-CREATE INDEX IF NOT EXISTS run_repos_run_idx ON run_repos(run_id);
--- Partial index for scheduling: find Queued/Running repos efficiently (v1 status values).
-CREATE INDEX IF NOT EXISTS run_repos_status_idx ON run_repos(status) WHERE status IN ('Queued','Running');
--- Index for repo history queries (list runs per repo).
-CREATE INDEX IF NOT EXISTS run_repos_repo_created_idx ON run_repos(repo_id, created_at);
+CREATE INDEX IF NOT EXISTS runs_wave_created_idx ON runs(wave_id, created_at ASC, id ASC);
+CREATE INDEX IF NOT EXISTS runs_status_idx ON runs(status) WHERE status IN ('Queued','Running');
+CREATE INDEX IF NOT EXISTS runs_repo_created_idx ON runs(repo_id, created_at DESC, id DESC);
+CREATE INDEX IF NOT EXISTS runs_mig_repo_created_idx ON runs(mig_id, repo_id, created_at DESC, id DESC);
 
 -- Jobs (unified job queue for all execution units: pre-build, step, post-build, heal, re-build)
 -- Jobs for a repo attempt form a singly-linked chain through next_id -> jobs.id.
@@ -270,11 +263,10 @@ CREATE INDEX IF NOT EXISTS jobs_predecessor_lookup_idx ON jobs(run_id, repo_id, 
 CREATE INDEX IF NOT EXISTS jobs_repo_idx ON jobs(repo_id);
 DROP INDEX IF EXISTS jobs_cache_lookup_idx;
 
--- Repo-scoped action queue for terminal follow-up work.
-CREATE TABLE IF NOT EXISTS run_repo_actions (
+-- Run-attempt scoped action queue for terminal follow-up work.
+CREATE TABLE IF NOT EXISTS run_actions (
   id              TEXT PRIMARY KEY,  -- KSUID-backed string ID; app-generated.
   run_id          TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
-  repo_id         TEXT NOT NULL REFERENCES repos(id) ON DELETE RESTRICT,
   attempt         INTEGER NOT NULL,
   action_type     TEXT NOT NULL,
   status          job_status NOT NULL DEFAULT 'Queued',
@@ -284,10 +276,10 @@ CREATE TABLE IF NOT EXISTS run_repo_actions (
   duration_ms     BIGINT NOT NULL DEFAULT 0 CHECK (duration_ms >= 0),
   meta            JSONB NOT NULL DEFAULT '{}'::jsonb,
   created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
-  UNIQUE (run_id, repo_id, attempt, action_type)
+  UNIQUE (run_id, attempt, action_type)
 );
-CREATE INDEX IF NOT EXISTS run_repo_actions_pending_idx ON run_repo_actions(run_id, repo_id, attempt, id) WHERE status = 'Queued';
-CREATE INDEX IF NOT EXISTS run_repo_actions_node_idx ON run_repo_actions(node_id) WHERE node_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS run_actions_pending_idx ON run_actions(run_id, attempt, id) WHERE status = 'Queued';
+CREATE INDEX IF NOT EXISTS run_actions_node_idx ON run_actions(node_id) WHERE node_id IS NOT NULL;
 
 -- Historical node-scoped maintenance queue. Host systemd services now own node
 -- maintenance; existing rows remain readable for old action results.

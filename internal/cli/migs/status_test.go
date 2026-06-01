@@ -14,7 +14,7 @@ import (
 
 func TestListRunRepoDiffsCommand_Success(t *testing.T) {
 	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewMigRepoID()
+	repoID := domaintypes.NewRepoID()
 	jobID1 := domaintypes.NewJobID()
 	jobID2 := domaintypes.NewJobID()
 	jobID3 := domaintypes.NewJobID()
@@ -34,7 +34,7 @@ func TestListRunRepoDiffsCommand_Success(t *testing.T) {
 	}
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/diffs", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/v1/runs/"+runID.String()+"/diffs", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			t.Errorf("expected GET, got %s", r.Method)
 		}
@@ -74,7 +74,7 @@ func TestListRunRepoDiffsCommand_Success(t *testing.T) {
 
 func TestListRunRepoDiffsCommand_EmptyList(t *testing.T) {
 	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewMigRepoID()
+	repoID := domaintypes.NewRepoID()
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -105,7 +105,7 @@ func TestListRunRepoDiffsCommand_EmptyList(t *testing.T) {
 // TestDownloadDiffCommand_Success verifies successful download and decompression.
 func TestDownloadDiffCommand_Success(t *testing.T) {
 	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewMigRepoID()
+	repoID := domaintypes.NewRepoID()
 
 	patchContent := "diff --git a/test.txt b/test.txt\n+added line\n"
 
@@ -113,7 +113,7 @@ func TestDownloadDiffCommand_Success(t *testing.T) {
 		if r.Method != http.MethodGet {
 			t.Errorf("expected GET, got %s", r.Method)
 		}
-		wantPath := "/v1/runs/" + runID.String() + "/repos/" + repoID.String() + "/diffs"
+		wantPath := "/v1/runs/" + runID.String() + "/diffs"
 		if r.URL.Path != wantPath {
 			t.Errorf("expected path %s, got %s", wantPath, r.URL.Path)
 		}
@@ -154,10 +154,10 @@ func TestDownloadDiffCommand_Success(t *testing.T) {
 // TestDownloadDiffCommand_EmptyPatch verifies handling of empty patches.
 func TestDownloadDiffCommand_EmptyPatch(t *testing.T) {
 	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewMigRepoID()
+	repoID := domaintypes.NewRepoID()
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		wantPath := "/v1/runs/" + runID.String() + "/repos/" + repoID.String() + "/diffs"
+		wantPath := "/v1/runs/" + runID.String() + "/diffs"
 		if r.URL.Path != wantPath {
 			t.Errorf("expected path %s, got %s", wantPath, r.URL.Path)
 		}
@@ -196,12 +196,12 @@ func TestDownloadDiffCommand_EmptyPatch(t *testing.T) {
 // TestDownloadDiffGzipCommand_Success verifies raw gzip bytes are returned as-is.
 func TestDownloadDiffGzipCommand_Success(t *testing.T) {
 	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewMigRepoID()
+	repoID := domaintypes.NewRepoID()
 	diffID := domaintypes.DiffID("550e8400-e29b-41d4-a716-4466554400cc")
 	rawGzip := []byte{0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00}
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		wantPath := "/v1/runs/" + runID.String() + "/repos/" + repoID.String() + "/diffs"
+		wantPath := "/v1/runs/" + runID.String() + "/diffs"
 		if r.URL.Path != wantPath {
 			t.Errorf("expected path %s, got %s", wantPath, r.URL.Path)
 		}

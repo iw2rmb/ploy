@@ -114,7 +114,7 @@ func (r *runController) downloadSnapshot(ctx context.Context, req StartRunReques
 		return fmt.Errorf("create workspace: %w", err)
 	}
 
-	apiPath := fmt.Sprintf("/v1/runs/%s/repos/%s/snapshot", req.RunID, req.RepoID)
+	apiPath := fmt.Sprintf("/v1/runs/%s/snapshot", req.RunID)
 	u := MustBuildURL(r.cfg.ServerURL, apiPath)
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {

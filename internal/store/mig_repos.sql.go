@@ -127,11 +127,11 @@ func (q *Queries) GetMigRepoByURL(ctx context.Context, arg GetMigRepoByURLParams
 
 const hasMigRepoHistory = `-- name: HasMigRepoHistory :one
 SELECT EXISTS(
-  SELECT 1 FROM run_repos WHERE repo_id = $1 LIMIT 1
+  SELECT 1 FROM runs WHERE repo_id = $1 LIMIT 1
 ) AS has_history
 `
 
-// Checks if a mig_repo has any historical executions (run_repos references).
+// Checks if a mig_repo has any historical executions.
 // Returns true if the repo cannot be deleted due to history, false otherwise.
 func (q *Queries) HasMigRepoHistory(ctx context.Context, repoID types.RepoID) (bool, error) {
 	row := q.db.QueryRow(ctx, hasMigRepoHistory, repoID)
@@ -150,12 +150,12 @@ FROM mig_repos mr
 JOIN repos r ON r.id = mr.repo_id
 LEFT JOIN LATERAL (
   SELECT
-    rrr.started_at AS last_run_at,
-    rrr.status AS last_status
-  FROM run_repos rrr
-  WHERE rrr.repo_id = mr.repo_id
-    AND rrr.mig_id = mr.mig_id
-  ORDER BY rrr.started_at DESC NULLS LAST, rrr.created_at DESC, rrr.run_id DESC
+    runs.started_at AS last_run_at,
+    runs.status AS last_status
+  FROM runs
+  WHERE runs.repo_id = mr.repo_id
+    AND runs.mig_id = mr.mig_id
+  ORDER BY runs.started_at DESC NULLS LAST, runs.created_at DESC, runs.id DESC
   LIMIT 1
 ) rr ON true
 WHERE ($1::text IS NULL OR $1 = '' OR r.url ILIKE '%' || $1 || '%')

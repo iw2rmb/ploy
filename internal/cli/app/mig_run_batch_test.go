@@ -45,11 +45,11 @@ func TestRunListCallsControlPlane(t *testing.T) {
 				"runs": []map[string]any{
 					{
 						"id":         runID1,
-						"status":     "Started",
+						"status":     "Running",
 						"mig_id":     migID1,
 						"spec_id":    specID1,
 						"created_at": now,
-						"repo_counts": map[string]any{
+						"run_counts": map[string]any{
 							"total":          5,
 							"success":        2,
 							"derived_status": "running",
@@ -57,7 +57,7 @@ func TestRunListCallsControlPlane(t *testing.T) {
 					},
 					{
 						"id":         runID2,
-						"status":     "Finished",
+						"status":     "Success",
 						"mig_id":     migID2,
 						"spec_id":    specID2,
 						"created_at": now,
@@ -85,7 +85,7 @@ func TestRunListCallsControlPlane(t *testing.T) {
 	if !strings.Contains(output, runID1) {
 		t.Errorf("output should contain %s: %s", runID1, output)
 	}
-	if !strings.Contains(output, "Started") {
+	if !strings.Contains(output, "Running") {
 		t.Errorf("output should contain Started: %s", output)
 	}
 	if !strings.Contains(output, "running") {

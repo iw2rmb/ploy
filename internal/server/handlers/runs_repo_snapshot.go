@@ -28,7 +28,7 @@ func getRunRepoSnapshotHandler(st store.Store, snapshots repoSnapshotWriter) htt
 		if !ok {
 			return
 		}
-		repoID, ok := parseRequiredPathIDOrWriteError[domaintypes.RepoID](w, r, "repo_id")
+		repoID, ok := runRepoIDFromPathOrRun(w, r, st, runID)
 		if !ok {
 			return
 		}
@@ -37,16 +37,17 @@ func getRunRepoSnapshotHandler(st store.Store, snapshots repoSnapshotWriter) htt
 			return
 		}
 
-		metaRow, err := st.GetRunRepoSnapshotMetadata(r.Context(), store.GetRunRepoSnapshotMetadataParams{
-			RunID:  runID,
-			RepoID: repoID,
-		})
+		metaRow, err := st.GetRunSnapshotMetadata(r.Context(), runID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				writeHTTPError(w, http.StatusNotFound, "repo not found")
 				return
 			}
 			serverError(w, "repo snapshot", "load metadata", err, "run_id", runID.String(), "repo_id", repoID.String())
+			return
+		}
+		if metaRow.RepoID != repoID {
+			writeHTTPError(w, http.StatusNotFound, "repo not found")
 			return
 		}
 
@@ -87,9 +88,8 @@ func getRunRepoSnapshotHandler(st store.Store, snapshots repoSnapshotWriter) htt
 }
 
 func snapshotAuthorizedForNode(ctx context.Context, st store.Store, runID domaintypes.RunID, repoID domaintypes.RepoID, nodeID domaintypes.NodeID) (bool, error) {
-	ok, err := st.HasRunningJobForRunRepoNode(ctx, store.HasRunningJobForRunRepoNodeParams{
+	ok, err := st.HasRunningJobForRunNode(ctx, store.HasRunningJobForRunNodeParams{
 		RunID:  runID,
-		RepoID: repoID,
 		NodeID: &nodeID,
 	})
 	if err != nil {
@@ -98,9 +98,8 @@ func snapshotAuthorizedForNode(ctx context.Context, st store.Store, runID domain
 	if ok {
 		return true, nil
 	}
-	return st.HasRunningActionForRunRepoNode(ctx, store.HasRunningActionForRunRepoNodeParams{
+	return st.HasRunningActionForRunNode(ctx, store.HasRunningActionForRunNodeParams{
 		RunID:  runID,
-		RepoID: repoID,
 		NodeID: &nodeID,
 	})
 }

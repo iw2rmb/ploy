@@ -25,7 +25,7 @@ func TestRunRepoArtifactPaths(t *testing.T) {
 		t.Fatalf("run cache path uses old ploy/run layout: %s", runCacheDir(runID))
 	}
 
-	wantRepoRoot := filepath.Join(wantRunRoot, "repos", repoID.String())
+	wantRepoRoot := wantRunRoot
 	if got := runRepoRootDir(runID, repoID); got != wantRepoRoot {
 		t.Fatalf("runRepoRootDir() = %q, want %q", got, wantRepoRoot)
 	}

@@ -125,7 +125,7 @@ func loadJobDetailsCmd(client *http.Client, baseURL *url.URL, runID domaintypes.
 			Client:  client,
 			BaseURL: baseURL,
 			RunID:   runID,
-			RepoID:  domaintypes.MigRepoID(string(repoID)),
+			RepoID:  repoID,
 		}.Run(context.Background())
 		if err != nil {
 			return errMsg{err: err}

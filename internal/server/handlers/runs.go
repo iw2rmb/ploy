@@ -22,13 +22,17 @@ import (
 // run.ID is now a string (KSUID), so no UUID conversion is needed.
 func runToSummary(run store.Run) domaintypes.RunSummary {
 	summary := domaintypes.RunSummary{
-		// run.ID is now a string (KSUID); cast directly to domain type.
-		ID:        run.ID,
-		Status:    run.Status,
-		MigID:     run.MigID,
-		SpecID:    run.SpecID,
-		CreatedBy: run.CreatedBy,
-		CreatedAt: run.CreatedAt.Time,
+		ID:              run.ID,
+		Status:          run.Status,
+		MigID:           run.MigID,
+		SpecID:          run.SpecID,
+		RepoID:          run.RepoID,
+		BaseRef:         run.RepoBaseRef,
+		SourceCommitSHA: run.SourceCommitSha,
+		Attempt:         run.Attempt,
+		LastError:       run.LastError,
+		CreatedBy:       run.CreatedBy,
+		CreatedAt:       run.CreatedAt.Time,
 	}
 
 	if run.StartedAt.Valid {
@@ -41,10 +45,14 @@ func runToSummary(run store.Run) domaintypes.RunSummary {
 	return summary
 }
 
-// getRunRepoCounts fetches and aggregates repo counts by status for a run.
+// getRunRepoCounts fetches and aggregates run counts by status for the run's wave.
 // runID is now a KSUID-backed domain type.
 func getRunRepoCounts(ctx context.Context, st store.Store, runID domaintypes.RunID) (*domaintypes.RunRepoCounts, error) {
-	rows, err := st.CountRunReposByStatus(ctx, runID)
+	run, err := st.GetRun(ctx, runID)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := st.CountRunsByWaveStatus(ctx, run.WaveID)
 	if err != nil {
 		return nil, err
 	}
@@ -53,15 +61,15 @@ func getRunRepoCounts(ctx context.Context, st store.Store, runID domaintypes.Run
 	for _, row := range rows {
 		counts.Total += row.Count
 		switch row.Status {
-		case domaintypes.RunRepoStatusQueued:
+		case domaintypes.RunStatusQueued:
 			counts.Queued = row.Count
-		case domaintypes.RunRepoStatusRunning:
+		case domaintypes.RunStatusRunning:
 			counts.Running = row.Count
-		case domaintypes.RunRepoStatusSuccess:
+		case domaintypes.RunStatusSuccess:
 			counts.Success = row.Count
-		case domaintypes.RunRepoStatusFail:
+		case domaintypes.RunStatusFail:
 			counts.Fail = row.Count
-		case domaintypes.RunRepoStatusCancelled:
+		case domaintypes.RunStatusCancelled:
 			counts.Cancelled = row.Count
 		}
 	}
@@ -77,24 +85,24 @@ func getRunRepoCounts(ctx context.Context, st store.Store, runID domaintypes.Run
 // v1 model: run_repos uses composite PK (run_id, repo_id), where repo_id refers
 // to mig_repos.id (NanoID(8)).
 type RunRepoResponse struct {
-	RunID           domaintypes.RunID         `json:"run_id"`
-	RepoID          domaintypes.RepoID        `json:"repo_id"`
-	RepoURL         string                    `json:"repo_url"`
-	BaseRef         string                    `json:"base_ref"`
-	SourceCommitSHA string                    `json:"source_commit_sha,omitempty"`
-	Status          domaintypes.RunRepoStatus `json:"status"`
-	Attempt         int32                     `json:"attempt"`
-	LastError       *string                   `json:"last_error,omitempty"`
-	CreatedAt       time.Time                 `json:"created_at"`
-	StartedAt       *time.Time                `json:"started_at,omitempty"`
-	FinishedAt      *time.Time                `json:"finished_at,omitempty"`
+	RunID           domaintypes.RunID     `json:"run_id"`
+	RepoID          domaintypes.RepoID    `json:"repo_id"`
+	RepoURL         string                `json:"repo_url"`
+	BaseRef         string                `json:"base_ref"`
+	SourceCommitSHA string                `json:"source_commit_sha,omitempty"`
+	Status          domaintypes.RunStatus `json:"status"`
+	Attempt         int32                 `json:"attempt"`
+	LastError       *string               `json:"last_error,omitempty"`
+	CreatedAt       time.Time             `json:"created_at"`
+	StartedAt       *time.Time            `json:"started_at,omitempty"`
+	FinishedAt      *time.Time            `json:"finished_at,omitempty"`
 }
 
-// runRepoToResponse converts a store.RunRepo to a RunRepoResponse.
+// runRepoToResponse converts a store.Run to a RunRepoResponse.
 // Wraps raw store strings in domain types for type-safe API output.
-func runRepoToResponse(rr store.RunRepo, repoURL string) RunRepoResponse {
+func runRepoToResponse(rr store.Run, repoURL string) RunRepoResponse {
 	resp := RunRepoResponse{
-		RunID:           rr.RunID,
+		RunID:           rr.ID,
 		RepoID:          rr.RepoID,
 		RepoURL:         repoURL,
 		BaseRef:         rr.RepoBaseRef,
@@ -185,7 +193,7 @@ func listRunsForRepoURL(w http.ResponseWriter, r *http.Request, st store.Store, 
 	for _, run := range repoRuns {
 		summary := domaintypes.RunSummary{
 			ID:     run.RunID,
-			Status: run.RunStatus,
+			Status: run.Status,
 			MigID:  run.MigID,
 		}
 		if run.StartedAt.Valid {
@@ -217,6 +225,11 @@ func getRunHandler(st store.Store) http.HandlerFunc {
 		if !run.MigID.IsZero() {
 			if mig, err := st.GetMig(r.Context(), run.MigID); err == nil {
 				summary.MigName = mig.Name
+			}
+		}
+		if !run.RepoID.IsZero() {
+			if repo, err := st.GetRepo(r.Context(), run.RepoID); err == nil {
+				summary.RepoURL = repo.Url
 			}
 		}
 		if counts, _ := getRunRepoCounts(r.Context(), st, run.ID); counts != nil && counts.Total > 0 {

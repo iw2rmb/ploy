@@ -18,14 +18,14 @@ sql:
             go_type:
               import: "github.com/iw2rmb/ploy/internal/domain/types"
               type: "JobStatus"
-          - db_type: "run_repo_status"
-            go_type:
-              import: "github.com/iw2rmb/ploy/internal/domain/types"
-              type: "RunRepoStatus"
           - db_type: "run_status"
             go_type:
               import: "github.com/iw2rmb/ploy/internal/domain/types"
               type: "RunStatus"
+          - db_type: "wave_status"
+            go_type:
+              import: "github.com/iw2rmb/ploy/internal/domain/types"
+              type: "WaveStatus"
           - column: "jobs.job_type"
             go_type:
               import: "github.com/iw2rmb/ploy/internal/domain/types"
@@ -33,6 +33,8 @@ sql:
           # Primary key ID columns → domain newtypes (end-to-end typed IDs)
           - column: "runs.id"
             go_type: "github.com/iw2rmb/ploy/internal/domain/types.RunID"
+          - column: "waves.id"
+            go_type: "github.com/iw2rmb/ploy/internal/domain/types.WaveID"
           - column: "jobs.id"
             go_type: "github.com/iw2rmb/ploy/internal/domain/types.JobID"
           - column: "nodes.id"
@@ -49,6 +51,14 @@ sql:
           - column: "runs.mig_id"
             go_type: "github.com/iw2rmb/ploy/internal/domain/types.MigID"
           - column: "runs.spec_id"
+            go_type: "github.com/iw2rmb/ploy/internal/domain/types.SpecID"
+          - column: "runs.wave_id"
+            go_type: "github.com/iw2rmb/ploy/internal/domain/types.WaveID"
+          - column: "runs.repo_id"
+            go_type: "github.com/iw2rmb/ploy/internal/domain/types.RepoID"
+          - column: "waves.mig_id"
+            go_type: "github.com/iw2rmb/ploy/internal/domain/types.MigID"
+          - column: "waves.spec_id"
             go_type: "github.com/iw2rmb/ploy/internal/domain/types.SpecID"
           - column: "runs_timing.id"
             go_type: "github.com/iw2rmb/ploy/internal/domain/types.RunID"
@@ -121,12 +131,6 @@ sql:
               import: "github.com/iw2rmb/ploy/internal/domain/types"
               type: "JobID"
               pointer: true
-          - column: "run_repos.mig_id"
-            go_type: "github.com/iw2rmb/ploy/internal/domain/types.MigID"
-          - column: "run_repos.run_id"
-            go_type: "github.com/iw2rmb/ploy/internal/domain/types.RunID"
-          - column: "run_repos.repo_id"
-            go_type: "github.com/iw2rmb/ploy/internal/domain/types.RepoID"
           - column: "node_metrics.node_id"
             go_type: "github.com/iw2rmb/ploy/internal/domain/types.NodeID"
           - column: "node_diagnostics.node_id"
@@ -147,13 +151,11 @@ sql:
               import: "github.com/iw2rmb/ploy/internal/domain/types"
               type: "JobID"
               pointer: true
-          - column: "run_repo_actions.id"
+          - column: "run_actions.id"
             go_type: "github.com/iw2rmb/ploy/internal/domain/types.JobID"
-          - column: "run_repo_actions.run_id"
+          - column: "run_actions.run_id"
             go_type: "github.com/iw2rmb/ploy/internal/domain/types.RunID"
-          - column: "run_repo_actions.repo_id"
-            go_type: "github.com/iw2rmb/ploy/internal/domain/types.RepoID"
-          - column: "run_repo_actions.node_id"
+          - column: "run_actions.node_id"
             go_type:
               import: "github.com/iw2rmb/ploy/internal/domain/types"
               type: "NodeID"

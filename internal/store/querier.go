@@ -23,18 +23,13 @@ type Querier interface {
 	// Targets Created/Queued/Running and preserves terminal jobs.
 	// finished_at is set once; duration_ms is computed from started_at when present.
 	CancelActiveJobsByRunRepoAttempt(ctx context.Context, arg CancelActiveJobsByRunRepoAttemptParams) (int64, error)
-	// Bulk-cancels active repos for a run (Queued/Running -> Cancelled).
-	CancelActiveRunReposByRun(ctx context.Context, runID types.RunID) (int64, error)
+	CancelActiveRunsByWave(ctx context.Context, waveID types.WaveID) (int64, error)
 	CheckAPITokenRevoked(ctx context.Context, tokenID string) (pgtype.Timestamptz, error)
 	CheckBootstrapTokenRevoked(ctx context.Context, tokenID string) (pgtype.Timestamptz, error)
-	// Atomically claim the next claimable job for a node (unified queue).
-	// v1:
-	// - claimable jobs have status='Queued'
-	// - jobs are claimable only when runs.status='Started'
-	// - nodeID must be non-empty
+	// Atomically claim the next claimable job for a node.
 	ClaimJob(ctx context.Context, nodeID types.NodeID) (Job, error)
 	ClaimNodeAction(ctx context.Context, nodeID types.NodeID) (NodeAction, error)
-	ClaimRunRepoAction(ctx context.Context, nodeID types.NodeID) (RunRepoAction, error)
+	ClaimRunAction(ctx context.Context, nodeID types.NodeID) (RunAction, error)
 	ClearRepoSHAChainFromJob(ctx context.Context, arg ClearRepoSHAChainFromJobParams) (int64, error)
 	CountJobsByRun(ctx context.Context, runID types.RunID) (int64, error)
 	CountJobsByRunAndStatus(ctx context.Context, arg CountJobsByRunAndStatusParams) (int64, error)
@@ -45,7 +40,7 @@ type Querier interface {
 	// run_id: if non-null, count jobs for that run; if null, count all jobs.
 	// Used with ListJobsForTUI to provide total for TUI pagination.
 	CountJobsForTUI(ctx context.Context, runID *string) (int64, error)
-	CountRunReposByStatus(ctx context.Context, runID types.RunID) ([]CountRunReposByStatusRow, error)
+	CountRunsByWaveStatus(ctx context.Context, waveID types.WaveID) ([]CountRunsByWaveStatusRow, error)
 	// Counts distinct stale nodes that currently have at least one running job.
 	// Excludes NULL node_id rows (orphaned running jobs) from node count.
 	CountStaleNodesWithRunningJobs(ctx context.Context, lastHeartbeat pgtype.Timestamptz) (int64, error)
@@ -67,16 +62,12 @@ type Querier interface {
 	CreateNode(ctx context.Context, arg CreateNodeParams) (Node, error)
 	CreateNodeAction(ctx context.Context, arg CreateNodeActionParams) (NodeAction, error)
 	CreateNodeDaemonLog(ctx context.Context, arg CreateNodeDaemonLogParams) (NodeDaemonLog, error)
-	// v1: Creates a new run for a mig + spec snapshot. Runs are created in Started state.
-	// Note: `id` is a required TEXT parameter (KSUID-backed); caller generates via types.NewRunID().
 	CreateRun(ctx context.Context, arg CreateRunParams) (Run, error)
-	// v1: Creates a new run_repos row scoped to (run_id, repo_id).
-	// Note: attempt defaults to 1; status defaults to 'Queued'.
-	CreateRunRepo(ctx context.Context, arg CreateRunRepoParams) (RunRepo, error)
-	CreateRunRepoAction(ctx context.Context, arg CreateRunRepoActionParams) (RunRepoAction, error)
+	CreateRunAction(ctx context.Context, arg CreateRunActionParams) (RunAction, error)
 	CreateSpec(ctx context.Context, arg CreateSpecParams) (Spec, error)
 	// Creates a new spec bundle metadata row. Blob data is stored in object storage.
 	CreateSpecBundle(ctx context.Context, arg CreateSpecBundleParams) (SpecBundle, error)
+	CreateWave(ctx context.Context, arg CreateWaveParams) (Wave, error)
 	DeleteArtifactBundle(ctx context.Context, id pgtype.UUID) error
 	DeleteArtifactBundlesOlderThan(ctx context.Context, createdAt pgtype.Timestamptz) error
 	// Removes a bundle map entry by hash.
@@ -108,11 +99,11 @@ type Querier interface {
 	DeleteMigRepo(ctx context.Context, id types.MigRepoID) error
 	DeleteNode(ctx context.Context, id types.NodeID) error
 	DeleteRun(ctx context.Context, id types.RunID) error
-	DeleteRunRepo(ctx context.Context, arg DeleteRunRepoParams) error
 	DeleteSBOMRowsByJob(ctx context.Context, jobID types.JobID) error
 	// Deletes a spec bundle metadata row by ID.
 	// Called by blobpersist as rollback when object storage upload fails.
 	DeleteSpecBundle(ctx context.Context, id string) error
+	DeleteWave(ctx context.Context, id types.WaveID) error
 	// Transitional: returns current job id and linked successor id.
 	GetAdjacentJobIndices(ctx context.Context, id types.JobID) (GetAdjacentJobIndicesRow, error)
 	// Returns artifact bundle metadata including object_key for object-storage retrieval.
@@ -124,11 +115,7 @@ type Querier interface {
 	GetGlobalEnv(ctx context.Context, arg GetGlobalEnvParams) (ConfigEnv, error)
 	GetJob(ctx context.Context, id types.JobID) (Job, error)
 	GetLatestDiffByJob(ctx context.Context, jobID *types.JobID) (Diff, error)
-	// v1: Gets the newest run_repos row for a specific repo_id in a mig,
-	// filtered by terminal status (Success or Fail).
-	// Used by POST /v1/migs/{mig_id}/pull to select last-succeeded or last-failed.
-	// Order by created_at DESC to get the newest matching run_repos row.
-	GetLatestRunRepoByMigAndRepoStatus(ctx context.Context, arg GetLatestRunRepoByMigAndRepoStatusParams) (GetLatestRunRepoByMigAndRepoStatusRow, error)
+	GetLatestRunByMigAndRepoStatus(ctx context.Context, arg GetLatestRunByMigAndRepoStatusParams) (GetLatestRunByMigAndRepoStatusRow, error)
 	// Returns log metadata including object_key for object-storage retrieval.
 	GetLog(ctx context.Context, id int64) (Log, error)
 	GetMig(ctx context.Context, id types.MigID) (Mig, error)
@@ -140,10 +127,9 @@ type Querier interface {
 	GetNodeAction(ctx context.Context, id types.JobID) (NodeAction, error)
 	GetRepo(ctx context.Context, id types.RepoID) (Repo, error)
 	GetRun(ctx context.Context, id types.RunID) (Run, error)
-	GetRunRepo(ctx context.Context, arg GetRunRepoParams) (RunRepo, error)
-	GetRunRepoAction(ctx context.Context, id types.JobID) (RunRepoAction, error)
-	GetRunRepoActionByKey(ctx context.Context, arg GetRunRepoActionByKeyParams) (RunRepoAction, error)
-	GetRunRepoSnapshotMetadata(ctx context.Context, arg GetRunRepoSnapshotMetadataParams) (GetRunRepoSnapshotMetadataRow, error)
+	GetRunAction(ctx context.Context, id types.JobID) (RunAction, error)
+	GetRunActionByKey(ctx context.Context, arg GetRunActionByKeyParams) (RunAction, error)
+	GetRunSnapshotMetadata(ctx context.Context, id types.RunID) (GetRunSnapshotMetadataRow, error)
 	GetRunTiming(ctx context.Context, id types.RunID) (RunsTiming, error)
 	GetSpec(ctx context.Context, id types.SpecID) (Spec, error)
 	// Returns spec bundle metadata including object_key for object-storage retrieval.
@@ -151,13 +137,13 @@ type Querier interface {
 	// Returns the most recently created spec bundle for a given cid.
 	// Used for deduplication: callers should check by CID before uploading.
 	GetSpecBundleByCID(ctx context.Context, cid string) (SpecBundle, error)
-	// Checks if a mig_repo has any historical executions (run_repos references).
+	GetWave(ctx context.Context, id types.WaveID) (Wave, error)
+	// Checks if a mig_repo has any historical executions.
 	// Returns true if the repo cannot be deleted due to history, false otherwise.
 	HasMigRepoHistory(ctx context.Context, repoID types.RepoID) (bool, error)
-	HasRunningActionForRunRepoNode(ctx context.Context, arg HasRunningActionForRunRepoNodeParams) (bool, error)
-	HasRunningJobForRunRepoNode(ctx context.Context, arg HasRunningJobForRunRepoNodeParams) (bool, error)
-	// Increments attempt and resets status/timing for a fresh repo execution attempt.
-	IncrementRunRepoAttempt(ctx context.Context, arg IncrementRunRepoAttemptParams) error
+	HasRunningActionForRunNode(ctx context.Context, arg HasRunningActionForRunNodeParams) (bool, error)
+	HasRunningJobForRunNode(ctx context.Context, arg HasRunningJobForRunNodeParams) (bool, error)
+	IncrementRunAttempt(ctx context.Context, id types.RunID) error
 	InsertAPIToken(ctx context.Context, arg InsertAPITokenParams) error
 	InsertBootstrapToken(ctx context.Context, arg InsertBootstrapTokenParams) error
 	ListAPITokens(ctx context.Context, clusterID *string) ([]ListAPITokensRow, error)
@@ -189,10 +175,6 @@ type Querier interface {
 	ListEventPartitions(ctx context.Context) ([]string, error)
 	ListEventsByRun(ctx context.Context, runID types.RunID) ([]Event, error)
 	ListEventsByRunSince(ctx context.Context, arg ListEventsByRunSinceParams) ([]Event, error)
-	// Lists repo_ids whose last terminal run_repos status is 'Fail' for a given mig.
-	// "Last terminal state" per repo_id is determined by looking at the newest run_repos
-	// row where status in (Fail, Success, Cancelled) and selecting those where status='Fail'.
-	// Uses a subquery to get the last terminal status per repo, then filters for 'Fail'.
 	ListFailedRepoIDsByMig(ctx context.Context, migID types.MigID) ([]types.RepoID, error)
 	// config_env.sql — CRUD queries for global environment variables (config_env table).
 	// Provides ListGlobalEnv, GetGlobalEnv, UpsertGlobalEnv, DeleteGlobalEnv.
@@ -226,21 +208,13 @@ type Querier interface {
 	// ListNodeMetricsPartitions retrieves all partition names for the node_metrics table.
 	ListNodeMetricsPartitions(ctx context.Context) ([]string, error)
 	ListNodes(ctx context.Context) ([]Node, error)
-	ListQueuedRunReposByRun(ctx context.Context, runID types.RunID) ([]RunRepo, error)
-	ListRunRepoActionsByRunRepoAttempt(ctx context.Context, arg ListRunRepoActionsByRunRepoAttemptParams) ([]RunRepoAction, error)
-	// Lists all repos associated with a run, ordered by creation time.
-	ListRunReposByRun(ctx context.Context, runID types.RunID) ([]RunRepo, error)
-	// Lists all run_repos for a run with their repo_url (from repos).
-	// Used by:
-	// - GET  /v1/runs/{id}/repos (full repo response without N+1 lookups)
-	// - POST /v1/runs/{run_id}/repos/resolve (repo resolution by normalized URL)
-	ListRunReposWithURLByRun(ctx context.Context, runID types.RunID) ([]ListRunReposWithURLByRunRow, error)
+	ListQueuedRunsByWave(ctx context.Context, waveID types.WaveID) ([]Run, error)
+	ListRunActionsByRunAttempt(ctx context.Context, arg ListRunActionsByRunAttemptParams) ([]RunAction, error)
 	ListRuns(ctx context.Context, arg ListRunsParams) ([]Run, error)
-	// Lists runs for a given repo_id (repos.id).
+	ListRunsByWave(ctx context.Context, waveID types.WaveID) ([]Run, error)
 	ListRunsForRepo(ctx context.Context, arg ListRunsForRepoParams) ([]ListRunsForRepoRow, error)
 	ListRunsTimings(ctx context.Context, arg ListRunsTimingsParams) ([]RunsTiming, error)
-	// Lists runs that have queued work (at least one Queued run_repos row).
-	ListRunsWithQueuedRepos(ctx context.Context) ([]types.RunID, error)
+	ListRunsWithURLByWave(ctx context.Context, waveID types.WaveID) ([]ListRunsWithURLByWaveRow, error)
 	// Lists spec bundles ordered by created_at descending (most recent first).
 	ListSpecBundles(ctx context.Context, arg ListSpecBundlesParams) ([]SpecBundle, error)
 	// Lists spec bundles whose last_ref_at is before the given threshold.
@@ -252,6 +226,9 @@ type Querier interface {
 	// Lists running jobs whose assigned node is stale at the provided cutoff.
 	// Rows are grouped by (run_id, repo_id, attempt) for deterministic recovery processing.
 	ListStaleRunningJobs(ctx context.Context, lastHeartbeat pgtype.Timestamptz) ([]ListStaleRunningJobsRow, error)
+	ListWaves(ctx context.Context, arg ListWavesParams) ([]Wave, error)
+	ListWavesByMig(ctx context.Context, arg ListWavesByMigParams) ([]Wave, error)
+	ListWavesWithQueuedRuns(ctx context.Context) ([]types.WaveID, error)
 	MarkBootstrapTokenCertIssued(ctx context.Context, tokenID string) error
 	// Atomically promote a specific linked successor job: Created -> Queued.
 	// The candidate is eligible only when every predecessor that points to it is Success.
@@ -283,22 +260,16 @@ type Querier interface {
 	UpdateNodeCertMetadata(ctx context.Context, arg UpdateNodeCertMetadataParams) error
 	UpdateNodeDrained(ctx context.Context, arg UpdateNodeDrainedParams) error
 	UpdateNodeHeartbeat(ctx context.Context, arg UpdateNodeHeartbeatParams) error
-	UpdateRunCompletion(ctx context.Context, arg UpdateRunCompletionParams) error
-	UpdateRunRepoActionCompletion(ctx context.Context, arg UpdateRunRepoActionCompletionParams) error
-	// Updates the source ref snapshot for the run repo.
-	UpdateRunRepoBaseRef(ctx context.Context, arg UpdateRunRepoBaseRefParams) error
-	UpdateRunRepoError(ctx context.Context, arg UpdateRunRepoErrorParams) error
-	// Updates repo status + timing fields.
-	// started_at: set when transitioning to Running.
-	// finished_at: set when transitioning to a terminal status.
-	UpdateRunRepoStatus(ctx context.Context, arg UpdateRunRepoStatusParams) error
-	// Increments resume_count and updates last_resumed_at timestamp in runs.stats.
-	// Uses JSONB merge (||) to preserve existing stats while adding resume metadata.
+	UpdateRunActionCompletion(ctx context.Context, arg UpdateRunActionCompletionParams) error
+	UpdateRunBaseRef(ctx context.Context, arg UpdateRunBaseRefParams) error
+	UpdateRunError(ctx context.Context, arg UpdateRunErrorParams) error
 	UpdateRunResume(ctx context.Context, id types.RunID) error
 	UpdateRunStatus(ctx context.Context, arg UpdateRunStatusParams) error
 	// Updates last_ref_at to now() for the given spec bundle.
 	// Call this whenever a spec or run references the bundle to keep GC metadata fresh.
 	UpdateSpecBundleLastRefAt(ctx context.Context, id string) error
+	UpdateWaveCompletion(ctx context.Context, arg UpdateWaveCompletionParams) error
+	UpdateWaveStatus(ctx context.Context, arg UpdateWaveStatusParams) error
 	// Inserts or updates a bundle map entry (upsert on primary key hash).
 	// Refreshes bundle_id and updated_at on conflict.
 	UpsertConfigBundleMap(ctx context.Context, arg UpsertConfigBundleMapParams) error

@@ -87,56 +87,34 @@ func resolveRunRepoHandler(st store.Store) http.HandlerFunc {
 
 		normalizedURL := domaintypes.NormalizeRepoURL(req.RepoURL)
 
-		if _, ok := getRunOrFail(w, r, st, runID, "pull run repo"); !ok {
+		run, ok := getRunOrFail(w, r, st, runID, "pull run repo")
+		if !ok {
 			return
 		}
 
-		// List all repos in this run with their URLs.
-		// We need to iterate and compare normalized URLs to find matches.
-		runRepos, err := st.ListRunReposWithURLByRun(r.Context(), runID)
+		repoURL, err := repoURLForID(r.Context(), st, run.RepoID)
 		if err != nil {
-			serverError(w, "pull run repo", "list run repos", err, "run_id", runID)
+			serverError(w, "pull run", "get repo", err, "run_id", runID, "repo_id", run.RepoID)
 			return
 		}
 
-		// Find matching repos by normalized URL.
-		var matches []store.ListRunReposWithURLByRunRow
-		for _, rr := range runRepos {
-			if domaintypes.NormalizeRepoURL(rr.RepoUrl) == normalizedURL {
-				matches = append(matches, rr)
-			}
-		}
-
-		// Handle match results.
-		if len(matches) == 0 {
+		if domaintypes.NormalizeRepoURL(repoURL) != normalizedURL {
 			writeHTTPError(w, http.StatusNotFound, "no matching repo found in run")
 			return
 		}
-		if len(matches) > 1 {
-			// Multiple repos match the same normalized URL — this is ambiguous.
-			writeHTTPError(w, http.StatusConflict, "multiple repos match the given repo_url")
-			slog.Warn("pull run repo: multiple matches",
-				"run_id", runID,
-				"repo_url", req.RepoURL,
-				"match_count", len(matches),
-			)
-			return
-		}
 
-		// Single match found — return the pull response.
-		match := matches[0]
 		resp := pullResponse{
-			RunID:           match.RunID,
-			RepoID:          match.RepoID,
-			RepoURL:         match.RepoUrl,
-			SourceCommitSHA: match.SourceCommitSha,
+			RunID:           run.ID,
+			RepoID:          run.RepoID,
+			RepoURL:         repoURL,
+			SourceCommitSHA: run.SourceCommitSha,
 		}
 
 		writeJSON(w, http.StatusOK, resp)
 
 		slog.Info("pull run repo resolved",
 			"run_id", runID.String(),
-			"repo_id", match.RepoID,
+			"repo_id", run.RepoID,
 			"repo_url", req.RepoURL,
 		)
 	}
@@ -186,12 +164,12 @@ func pullMigRepoHandler(st store.Store) http.HandlerFunc {
 			mode = "last-succeeded"
 		}
 
-		var targetStatus domaintypes.RunRepoStatus
+		var targetStatus domaintypes.RunStatus
 		switch mode {
 		case "last-succeeded":
-			targetStatus = domaintypes.RunRepoStatusSuccess
+			targetStatus = domaintypes.RunStatusSuccess
 		case "last-failed":
-			targetStatus = domaintypes.RunRepoStatusFail
+			targetStatus = domaintypes.RunStatusFail
 		default:
 			writeHTTPError(w, http.StatusBadRequest, "invalid mode: %q (must be 'last-succeeded' or 'last-failed')", mode)
 			return
@@ -233,7 +211,7 @@ func pullMigRepoHandler(st store.Store) http.HandlerFunc {
 
 		// Get the latest run_repos row with the specified terminal status.
 		// Select by run_repos.created_at DESC.
-		latestRunRepo, err := st.GetLatestRunRepoByMigAndRepoStatus(r.Context(), store.GetLatestRunRepoByMigAndRepoStatusParams{
+		latestRunRepo, err := st.GetLatestRunByMigAndRepoStatus(r.Context(), store.GetLatestRunByMigAndRepoStatusParams{
 			MigID:  migID,
 			RepoID: matchedRepoID,
 			Status: targetStatus,

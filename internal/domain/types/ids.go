@@ -60,6 +60,7 @@ func idValidator[T any]() func(string) error {
 // Tag types for each string ID. Types with format validation implement IDValidator.
 type (
 	runIDTag        struct{}
+	waveIDTag       struct{}
 	stepIDTag       struct{}
 	jobIDTag        struct{}
 	clusterIDTag    struct{}
@@ -72,6 +73,7 @@ type (
 )
 
 func (runIDTag) ValidateID(s string) error     { return validateKSUID(s, ErrInvalidRunID) }
+func (waveIDTag) ValidateID(s string) error    { return validateKSUID(s, ErrInvalidWaveID) }
 func (jobIDTag) ValidateID(s string) error     { return validateKSUID(s, ErrInvalidJobID) }
 func (nodeIDTag) ValidateID(s string) error    { return validateNanoID(s, 6, ErrInvalidNodeID) }
 func (migIDTag) ValidateID(s string) error     { return validateNanoID(s, 6, ErrInvalidMigID) }
@@ -84,6 +86,9 @@ func (specBundleIDTag) ValidateID(s string) error {
 
 // RunID identifies a run instance (workflow execution).
 type RunID = StringID[runIDTag]
+
+// WaveID identifies one launch wave.
+type WaveID = StringID[waveIDTag]
 
 // StepID identifies a step within a stage.
 type StepID = StringID[stepIDTag]
@@ -164,6 +169,7 @@ func (v *MigRef) UnmarshalJSON(b []byte) error { return UnmarshalJSONToText(b, v
 // Validation errors for ID types.
 var (
 	ErrInvalidRunID        = errors.New("invalid run id")
+	ErrInvalidWaveID       = errors.New("invalid wave id")
 	ErrInvalidJobID        = errors.New("invalid job id")
 	ErrInvalidNodeID       = errors.New("invalid node id")
 	ErrInvalidMigID        = errors.New("invalid mig id")

@@ -17,15 +17,15 @@ type RunReport struct {
 
 // RunEntry captures repo-level status, job graph data, and report links for a single repo attempt.
 type RunEntry struct {
-	RepoID          domaintypes.MigRepoID     `json:"repo_id"`
-	RepoURL         string                    `json:"repo_url"`
-	BaseRef         string                    `json:"base_ref"`
-	SourceCommitSHA string                    `json:"source_commit_sha,omitempty"`
-	Attempt         int32                     `json:"attempt"`
-	Status          domaintypes.RunRepoStatus `json:"status"`
-	LastError       *string                   `json:"last_error,omitempty"`
-	PatchURL        string                    `json:"patch_url,omitempty"`
-	Jobs            []RunJobEntry             `json:"jobs"`
+	RepoID          domaintypes.RepoID    `json:"repo_id"`
+	RepoURL         string                `json:"repo_url"`
+	BaseRef         string                `json:"base_ref"`
+	SourceCommitSHA string                `json:"source_commit_sha,omitempty"`
+	Attempt         int32                 `json:"attempt"`
+	Status          domaintypes.RunStatus `json:"status"`
+	LastError       *string               `json:"last_error,omitempty"`
+	PatchURL        string                `json:"patch_url,omitempty"`
+	Jobs            []RunJobEntry         `json:"jobs"`
 }
 
 // RunJobEntry is one row in the follow-style job graph.

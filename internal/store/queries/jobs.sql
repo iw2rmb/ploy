@@ -164,24 +164,19 @@ DELETE FROM jobs
 WHERE id = $1;
 
 -- name: ClaimJob :one
--- Atomically claim the next claimable job for a node (unified queue).
--- v1:
--- - claimable jobs have status='Queued'
--- - jobs are claimable only when runs.status='Started'
--- - nodeID must be non-empty
+-- Atomically claim the next claimable job for a node.
 WITH eligible AS (
   SELECT j.id, n.id AS node_id
   FROM nodes n
   JOIN jobs j ON TRUE
-  JOIN run_repos rr ON rr.run_id = j.run_id
-    AND rr.repo_id = j.repo_id
-    AND rr.attempt = j.attempt
   JOIN runs r ON j.run_id = r.id
+  JOIN waves w ON w.id = r.wave_id
   WHERE n.id = @node_id
     AND @node_id::TEXT != ''
     AND j.status = 'Queued'
     AND j.node_id IS NULL
-    AND r.status = 'Started'
+    AND r.status = 'Running'
+    AND w.status = 'Started'
     AND NOT EXISTS (
       SELECT 1
       FROM jobs owner
@@ -190,9 +185,9 @@ WITH eligible AS (
         AND owner.attempt = j.attempt
         AND owner.node_id IS NOT NULL
         AND owner.node_id != n.id
-    )
+  )
   ORDER BY j.run_id ASC, j.repo_id ASC, j.attempt ASC, j.id ASC
-  FOR UPDATE OF rr, j SKIP LOCKED
+  FOR UPDATE OF j SKIP LOCKED
   LIMIT 1
 )
 UPDATE jobs

@@ -17,7 +17,7 @@ func TestRunStatusReportTextContract(t *testing.T) {
 	runID := domaintypes.NewRunID()
 	migID := domaintypes.NewMigID()
 	specID := domaintypes.NewSpecID()
-	repoID := domaintypes.NewMigRepoID()
+	repoID := domaintypes.NewRepoID()
 	preGateID := domaintypes.NewJobID()
 	healID := domaintypes.NewJobID()
 	postGateID := domaintypes.NewJobID()
@@ -61,7 +61,7 @@ func TestRunStatusReportTextContract(t *testing.T) {
 	assertx.NotContains(t, out, "Exit 0")
 }
 
-func newRunStatusReportServer(t *testing.T, runID domaintypes.RunID, migID domaintypes.MigID, specID domaintypes.SpecID, repoID domaintypes.MigRepoID, preGateID domaintypes.JobID, healID domaintypes.JobID, postGateID domaintypes.JobID) *httptest.Server {
+func newRunStatusReportServer(t *testing.T, runID domaintypes.RunID, migID domaintypes.MigID, specID domaintypes.SpecID, repoID domaintypes.RepoID, preGateID domaintypes.JobID, healID domaintypes.JobID, postGateID domaintypes.JobID) *httptest.Server {
 	t.Helper()
 
 	diffID := "11111111-1111-1111-1111-111111111111"
@@ -69,12 +69,18 @@ func newRunStatusReportServer(t *testing.T, runID domaintypes.RunID, migID domai
 		switch {
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/runs/"+runID.String():
 			_ = json.NewEncoder(w).Encode(map[string]any{
-				"id":         runID.String(),
-				"status":     "running",
-				"mig_id":     migID.String(),
-				"mig_name":   "java17-upgrade",
-				"spec_id":    specID.String(),
-				"created_at": "2026-02-24T08:00:00Z",
+				"id":                runID.String(),
+				"status":            "Running",
+				"mig_id":            migID.String(),
+				"mig_name":          "java17-upgrade",
+				"spec_id":           specID.String(),
+				"repo_id":           repoID.String(),
+				"repo_url":          "https://github.com/acme/service.git",
+				"base_ref":          "main",
+				"source_commit_sha": "0123456789abcdef0123456789abcdef01234567",
+				"attempt":           1,
+				"last_error":        "compile\nfailed at step 2",
+				"created_at":        "2026-02-24T08:00:00Z",
 			})
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/runs/"+runID.String()+"/status":
 			_ = json.NewEncoder(w).Encode(map[string]any{
@@ -121,7 +127,7 @@ func newRunStatusReportServer(t *testing.T, runID domaintypes.RunID, migID domai
 					},
 				},
 			})
-		case r.Method == http.MethodGet && r.URL.Path == "/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/jobs":
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/runs/"+runID.String()+"/jobs":
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"run_id":  runID.String(),
 				"repo_id": repoID.String(),
@@ -162,7 +168,7 @@ func newRunStatusReportServer(t *testing.T, runID domaintypes.RunID, migID domai
 					},
 				},
 			})
-		case r.Method == http.MethodGet && r.URL.Path == "/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/diffs":
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/runs/"+runID.String()+"/diffs":
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"diffs": []map[string]any{
 					{
@@ -200,7 +206,7 @@ func TestRunStatusJSONGate(t *testing.T) {
 			runID := domaintypes.NewRunID()
 			migID := domaintypes.NewMigID()
 			specID := domaintypes.NewSpecID()
-			repoID := domaintypes.NewMigRepoID()
+			repoID := domaintypes.NewRepoID()
 			preGateID := domaintypes.NewJobID()
 			healID := domaintypes.NewJobID()
 			postGateID := domaintypes.NewJobID()
@@ -271,7 +277,7 @@ func TestRunStatusFollowUsesReportPolling(t *testing.T) {
 		RunID:   runID,
 		MigID:   domaintypes.NewMigID().String(),
 		SpecID:  domaintypes.NewSpecID().String(),
-		RepoID:  domaintypes.NewMigRepoID().String(),
+		RepoID:  domaintypes.NewRepoID().String(),
 		JobID:   domaintypes.NewJobID().String(),
 		RepoURL: "https://gitlab.example.com/acme/service.git",
 		Ref:     "main",

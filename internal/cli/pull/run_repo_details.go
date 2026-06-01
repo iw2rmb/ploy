@@ -12,18 +12,18 @@ import (
 )
 
 type runRepoDetails struct {
-	RepoID          domaintypes.MigRepoID `json:"repo_id"`
+	RepoID          domaintypes.RepoID    `json:"repo_id"`
 	BaseRef         string                `json:"base_ref"`
 	SourceCommitSHA string                `json:"source_commit_sha,omitempty"`
-	Status          string                `json:"status"`
+	Status          domaintypes.RunStatus `json:"status"`
 }
 
-func fetchRunRepoDetails(ctx context.Context, httpClient *http.Client, baseURL *url.URL, runID domaintypes.RunID, repoID domaintypes.MigRepoID) (*runRepoDetails, error) {
+func fetchRunRepoDetails(ctx context.Context, httpClient *http.Client, baseURL *url.URL, runID domaintypes.RunID, repoID domaintypes.RepoID) (*runRepoDetails, error) {
 	if baseURL == nil {
 		return nil, errors.New("base url required")
 	}
 
-	endpoint := baseURL.JoinPath("v1", "runs", runID.String(), "repos")
+	endpoint := baseURL.JoinPath("v1", "runs", runID.String())
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("build request: %w", err)
@@ -39,15 +39,21 @@ func fetchRunRepoDetails(ctx context.Context, httpClient *http.Client, baseURL *
 	}
 
 	var result struct {
-		Repos []runRepoDetails `json:"repos"`
+		RepoID          domaintypes.RepoID    `json:"repo_id"`
+		BaseRef         string                `json:"base_ref"`
+		SourceCommitSHA string                `json:"source_commit_sha,omitempty"`
+		Status          domaintypes.RunStatus `json:"status"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, fmt.Errorf("decode response: %w", err)
 	}
-	for _, repo := range result.Repos {
-		if repo.RepoID == repoID {
-			return &repo, nil
-		}
+	if result.RepoID != repoID {
+		return nil, fmt.Errorf("repo %s not found in run %s", repoID.String(), runID.String())
 	}
-	return nil, fmt.Errorf("repo %s not found in run %s", repoID.String(), runID.String())
+	return &runRepoDetails{
+		RepoID:          result.RepoID,
+		BaseRef:         result.BaseRef,
+		SourceCommitSHA: result.SourceCommitSHA,
+		Status:          result.Status,
+	}, nil
 }

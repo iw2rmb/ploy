@@ -1,7 +1,7 @@
 // pull.go provides CLI client implementations for pull resolution APIs.
 //
 // These commands call the server endpoints:
-//   - POST /v1/runs/{run_id}/repos/resolve (resolve repo for a run)
+//   - POST /v1/runs/{run_id}/resolve (resolve repo for a run)
 //   - POST /v1/migs/{mig_id}/pull (resolve repo for a mig)
 //
 // These endpoints help CLI clients resolve repo execution identifiers needed to
@@ -30,10 +30,10 @@ import (
 //   - RunID: the run containing the execution
 //   - RepoID: the mig_repos.id for the matched repo
 type PullResolution struct {
-	RunID           domaintypes.RunID     `json:"run_id"`
-	RepoID          domaintypes.MigRepoID `json:"repo_id"`
-	RepoURL         string                `json:"repo_url,omitempty"`
-	SourceCommitSHA string                `json:"source_commit_sha,omitempty"`
+	RunID           domaintypes.RunID  `json:"run_id"`
+	RepoID          domaintypes.RepoID `json:"repo_id"`
+	RepoURL         string             `json:"repo_url,omitempty"`
+	SourceCommitSHA string             `json:"source_commit_sha,omitempty"`
 }
 
 // =============================================================================
@@ -41,7 +41,7 @@ type PullResolution struct {
 // =============================================================================
 
 // RunPullCommand resolves a repo_url to execution identifiers for a specific run.
-// Endpoint: POST /v1/runs/{run_id}/repos/resolve
+// Endpoint: POST /v1/runs/{run_id}/resolve
 //
 // Server matches the repo by joining run_repos to mig_repos by repo_id,
 // filtering by run_id, and comparing normalized repo_url.
@@ -53,7 +53,7 @@ type RunPullCommand struct {
 	RepoURL string // Repository URL to match
 }
 
-// Run executes POST /v1/runs/{run_id}/repos/resolve with the provided repo_url.
+// Run executes POST /v1/runs/{run_id}/resolve with the provided repo_url.
 // Returns the PullResolution containing run_id and repo_id.
 func (c RunPullCommand) Run(ctx context.Context) (*PullResolution, error) {
 	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
@@ -70,8 +70,7 @@ func (c RunPullCommand) Run(ctx context.Context) (*PullResolution, error) {
 		return nil, fmt.Errorf("run pull: repo url must be a valid repo url")
 	}
 
-	// Build endpoint: POST /v1/runs/{run_id}/repos/resolve
-	endpoint := c.BaseURL.JoinPath("v1", "runs", c.RunID.String(), "repos", "resolve")
+	endpoint := c.BaseURL.JoinPath("v1", "runs", c.RunID.String(), "resolve")
 
 	// Build request body: {"repo_url": "..."}
 	reqBody := struct {
