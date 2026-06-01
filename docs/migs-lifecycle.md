@@ -49,7 +49,8 @@ Durable execution state lives in:
 - `runs`: one repo execution row, including `wave_id`, `repo_id`,
   `repo_base_ref`, `source_commit_sha`, `repo_sha0`, `attempt`, `status`, and
   `last_error`.
-- `jobs`: job chain rows scoped by `(run_id, repo_id, attempt)`.
+- `jobs`: job chain rows scoped operationally by `(run_id, attempt)`; `repo_id`
+  remains on each row for attribution.
 
 `run_id` is sufficient for run operations. The repo selector is stored on the
 run and is not part of public run routes.
@@ -103,6 +104,7 @@ The node downloads source snapshots from `GET /v1/runs/{run_id}/snapshot`.
 
 ## Production Migration
 
-The one-time production SQL rewrite is stored in
-`scripts/migrate_wave_model_20260601.sql`. Run it only with writers stopped and
-after verifying there are no active jobs.
+The one-time production SQL rewrite is embedded in `ployd` startup and runs only
+when the old pre-wave schema is detected. The manual wrapper is
+`scripts/migrate_wave_model_20260601.sql`; use it only if startup migration is not
+available. In both cases, run with writers stopped and no active jobs.

@@ -228,8 +228,8 @@ CREATE TABLE IF NOT EXISTS jobs (
   id              TEXT PRIMARY KEY,  -- KSUID-backed string ID (27 chars); no default, app-generated.
   run_id          TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
   repo_id         TEXT NOT NULL REFERENCES repos(id) ON DELETE RESTRICT,  -- FK to repos.id for repo attribution.
-  repo_base_ref   TEXT NOT NULL,  -- Copied from run_repos.repo_base_ref at job creation time.
-  attempt         INTEGER NOT NULL,  -- Copied from run_repos.attempt at job creation time.
+  repo_base_ref   TEXT NOT NULL,  -- Copied from runs.repo_base_ref at job creation time.
+  attempt         INTEGER NOT NULL,  -- Copied from runs.attempt at job creation time.
   status          job_status NOT NULL DEFAULT 'Created',  -- v1: 'Created' or 'Queued' (first job per repo attempt).
   job_type        job_type NOT NULL,
   job_image       TEXT NOT NULL DEFAULT '',

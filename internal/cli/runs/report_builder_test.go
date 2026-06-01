@@ -63,23 +63,6 @@ func TestGetRunReportCommandAssemblesCanonicalReport(t *testing.T) {
 					},
 				},
 			})
-		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/runs/"+runID.String()+"/repos":
-			_ = json.NewEncoder(w).Encode(map[string]any{
-				"repos": []map[string]any{
-					{
-						"run_id":      runID.String(),
-						"repo_id":     repoID.String(),
-						"repo_url":    "https://github.com/acme/service.git",
-						"base_ref":    "main",
-						"status":      "Running",
-						"attempt":     2,
-						"last_error":  "build failed",
-						"created_at":  "2026-02-24T08:01:00Z",
-						"started_at":  "2026-02-24T08:02:00Z",
-						"finished_at": nil,
-					},
-				},
-			})
 		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/runs/"+runID.String()+"/jobs":
 			if got := r.URL.Query().Get("attempt"); got != "2" {
 				t.Fatalf("expected attempt=2, got %q", got)
@@ -237,20 +220,6 @@ func TestGetRunReportCommandMissingOptionalFields(t *testing.T) {
 				"run_id": runID.String(),
 				"state":  "queued",
 				"stages": map[string]any{},
-			})
-		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/runs/"+runID.String()+"/repos":
-			_ = json.NewEncoder(w).Encode(map[string]any{
-				"repos": []map[string]any{
-					{
-						"run_id":     runID.String(),
-						"repo_id":    repoID.String(),
-						"repo_url":   "https://github.com/acme/empty.git",
-						"base_ref":   "main",
-						"status":     "Queued",
-						"attempt":    1,
-						"created_at": "2026-02-24T09:01:00Z",
-					},
-				},
 			})
 		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/runs/"+runID.String()+"/jobs":
 			_ = json.NewEncoder(w).Encode(map[string]any{

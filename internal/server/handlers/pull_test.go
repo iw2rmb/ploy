@@ -108,7 +108,7 @@ func TestPullRunRepoHandler(t *testing.T) {
 			t.Parallel()
 			st := &runStore{}
 			tt.setup(st)
-			rr := doRequest(t, resolveRunRepoHandler(st), http.MethodPost, "/v1/runs/"+tt.pathRunID+"/repos/resolve", tt.body, "run_id", tt.pathRunID)
+			rr := doRequest(t, resolveRunRepoHandler(st), http.MethodPost, "/v1/runs/"+tt.pathRunID+"/resolve", tt.body, "run_id", tt.pathRunID)
 			assertStatus(t, rr, tt.wantStatus)
 			if tt.verify != nil {
 				tt.verify(t, st, rr)

@@ -1,12 +1,11 @@
 post:
   tags: [Control]
-  summary: Cancel a batch run
+  summary: Cancel a run
   description: |
-    Cancel a batch run identified by its run ID. Transitions the run status to
-    `Cancelled` and marks all `Queued`/`Running` `run_repos` as `Cancelled`, and
-    cancels/removes `Created`/`Queued`/`Running` jobs from the queue. The operation
-    is idempotent: if the run is already in a terminal state (`Finished` or `Cancelled`), the handler
-    returns the current summary with `200 OK`.
+    Cancel a run identified by its run ID. Transitions the run status to `Cancelled`
+    and cancels/removes `Created`/`Queued`/`Running` jobs from the queue. The
+    operation is idempotent: if the run is already terminal, the handler returns
+    the current summary with `200 OK`.
 
   parameters:
     - in: path

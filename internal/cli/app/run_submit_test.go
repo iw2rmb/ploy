@@ -311,19 +311,6 @@ func newSuccessfulRunSubmitServer(t *testing.T, cfg successfulRunSubmitConfig) *
 					},
 				},
 			})
-		case r.Method == http.MethodGet && r.URL.Path == "/v1/runs/"+cfg.RunID+"/repos":
-			_ = json.NewEncoder(w).Encode(map[string]any{
-				"repos": []map[string]any{{
-					"run_id":            cfg.RunID,
-					"repo_id":           cfg.RepoID,
-					"repo_url":          cfg.RepoURL,
-					"base_ref":          cfg.Ref,
-					"source_commit_sha": sourceSHA,
-					"status":            "Success",
-					"attempt":           1,
-					"created_at":        "2026-05-28T00:00:00Z",
-				}},
-			})
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/runs/"+cfg.RunID+"/jobs":
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"run_id":  cfg.RunID,

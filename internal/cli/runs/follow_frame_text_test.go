@@ -227,7 +227,7 @@ func TestRenderFollowFrameText_RendersEmptyLineForRepoWithoutRows(t *testing.T) 
 func TestRenderFollowFrameText_OSC8LinkDoesNotInflateSiblingColumnPadding(t *testing.T) {
 	t.Parallel()
 
-	longURL := "https://example.test/v1/runs/run-1/repos/repo-1/diffs?download=true&diff_id=" + strings.Repeat("x", 300)
+	longURL := "https://example.test/v1/runs/run-1/diffs?download=true&diff_id=" + strings.Repeat("x", 300)
 	patchLink := "\x1b]8;;" + longURL + "\x1b\\Patch\x1b]8;;\x1b\\"
 	frame := FollowFrame{
 		Repos: []FollowRepoFrame{

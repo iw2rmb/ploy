@@ -262,7 +262,7 @@ func createJobsFromSpec(
 			GateCycle: d.gateCycle,
 		})
 	}
-	// Seed deterministic SHA chain from run_repos.repo_sha0 at chain head.
+	// Seed deterministic SHA chain from runs.repo_sha0 at chain head.
 	planned[0].RepoSHAIn = repoSHA0
 	for i := range planned {
 		if i+1 < len(planned) {

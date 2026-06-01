@@ -1,7 +1,7 @@
 // Package migs provides CLI client implementations for Migs operations.
-// This file implements the mig run command for creating runs from a mig project.
+// This file implements the mig run command for creating waves from a mig project.
 //
-// This command calls POST /v1/migs/{mig_id}/runs with repo selection.
+// This command calls POST /v1/migs/{mig_id}/waves with repo selection.
 // Implements: ploy mig run <mig-id|name> [--repo <repo-url> ...] [--failed]
 package migs
 
@@ -18,9 +18,9 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-// CreateMigRunCommand creates a batch run from a mig project with repo selection.
-// Endpoint: POST /v1/migs/{mig_id}/runs
-// Creates a run with repo selection based on mode: all, explicit, or failed.
+// CreateMigRunCommand creates a launch wave from a mig project with repo selection.
+// Endpoint: POST /v1/migs/{mig_id}/waves
+// Creates a wave with run selection based on mode: all, explicit, or failed.
 type CreateMigRunCommand struct {
 	Client    *http.Client
 	BaseURL   *url.URL
@@ -30,12 +30,12 @@ type CreateMigRunCommand struct {
 	CreatedBy *string            // Optional: creator identifier.
 }
 
-// CreateMigRunResult contains the response from creating a mig run.
+// CreateMigRunResult contains the response from creating a mig wave.
 type CreateMigRunResult struct {
 	WaveID domaintypes.WaveID `json:"wave_id"`
 }
 
-// Run executes POST /v1/migs/{mig_id}/runs to create a run with repo selection.
+// Run executes POST /v1/migs/{mig_id}/waves to create a wave with repo selection.
 // Flag behavior:
 //   - --repo ... selects explicit repos (by repo_url identity within the mig)
 //   - --failed selects repos with last terminal state Fail

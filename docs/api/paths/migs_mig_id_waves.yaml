@@ -1,6 +1,49 @@
 post:
   tags: [Control]
   summary: Create a launch wave for a mig
+  description: |
+    Create a launch wave from the mig's current spec over a selected set of repos.
+    Each selected repo becomes one run in the wave and jobs are materialized by the
+    scheduler after repo prep is ready.
+
+    Repo selection modes:
+    - all: all repos in the mig repo set
+    - failed: repos whose last terminal run state is Fail
+    - explicit: only repos matching the provided repo URLs (normalized)
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: "../components/schemas/controlplane.yaml#/CreateMigRunRequest"
   responses:
     "201":
       description: Wave created.
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/controlplane.yaml#/CreateMigRunResponse"
+    "400":
+      description: Bad request.
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/common.yaml#/Error"
+    "404":
+      description: Mig or repo not found.
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/common.yaml#/Error"
+    "409":
+      description: Mig is archived.
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/common.yaml#/Error"
+    "500":
+      description: Internal server error.
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/common.yaml#/Error"

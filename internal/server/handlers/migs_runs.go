@@ -11,19 +11,19 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-// createMigRunHandler creates a batch run from the mig + spec + selected repos.
-// Endpoint: POST /v1/migs/{mig_id}/runs
+// createMigRunHandler creates a launch wave from the mig + spec + selected repos.
+// Endpoint: POST /v1/migs/{mig_id}/waves
 // Request: {repo_selector: {mode, repos?}, created_by?}
-// Response: 201 Created with {run_id}
+// Response: 201 Created with {wave_id}
 //
 // v1 contract:
 // - repo_selector.mode: "all" | "failed" | "explicit"
-// - For "failed": selects repos whose last terminal run_repos status is 'Fail'.
+// - For "failed": selects repos whose last terminal run status is 'Fail'.
 // - For "explicit": uses repo_selector.repos array of repo_urls.
 // - Must use migs.spec_id; if NULL, return error.
 // - Archived migs cannot be executed.
 // - Copies migs.spec_id → runs.spec_id for immutability.
-// - Creates run_repos rows snapshotting source refs from mig_repos.
+// - Creates run rows snapshotting source refs from mig_repos.
 // - Job materialization is deferred to the batch scheduler and gated on prep readiness.
 func createMigRunHandler(st store.Store, gitAuth gitauth.Options) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -131,7 +131,7 @@ func createMigRunHandler(st store.Store, gitAuth gitauth.Options) http.HandlerFu
 			return
 		}
 
-		// Build response with run_id.
+		// Build response with wave_id.
 		resp := struct {
 			WaveID domaintypes.WaveID `json:"wave_id"`
 		}{
@@ -155,7 +155,7 @@ func createMigRunHandler(st store.Store, gitAuth gitauth.Options) http.HandlerFu
 //
 // Modes:
 // - "all": all repos in the mig's repo set
-// - "failed": repos whose last terminal run_repos status is 'Fail'
+// - "failed": repos whose last terminal run status is 'Fail'
 // - "explicit": specific repos by URL (normalized for matching)
 func selectReposForRun(ctx context.Context, st store.Store, migID domaintypes.MigID, mode string, repoURLs []string) ([]store.MigRepo, error) {
 	// Get all repos for the mig.

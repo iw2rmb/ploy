@@ -37,8 +37,8 @@ type runPullRequest struct {
 type migPullRequest struct {
 	RepoURL string `json:"repo_url"`
 	// Mode selects which run to return:
-	//   - "last-succeeded" (default): newest terminal run_repos with status=Success
-	//   - "last-failed": newest terminal run_repos with status=Fail
+	//   - "last-succeeded" (default): newest terminal runs with status=Success
+	//   - "last-failed": newest terminal runs with status=Fail
 	Mode string `json:"mode,omitempty"`
 }
 
@@ -63,7 +63,7 @@ type pullResponse struct {
 // Response: 200 OK with {run_id, repo_id}
 //
 // v1 contract:
-//   - Server matches the repo by joining run_repos to mig_repos by repo_id,
+//   - Server matches the repo by joining runs to mig_repos by repo_id,
 //     filtering by run_id, and comparing normalized repo_url.
 //   - Uses domaintypes.NormalizeRepoURL for URL comparison.
 //   - If no repo matches: 404 error.
@@ -127,11 +127,11 @@ func resolveRunRepoHandler(st store.Store) http.HandlerFunc {
 //
 // v1 contract:
 //   - Server performs the lookup using mig_id + repo_url → mig_repos.id.
-//   - Then selects the appropriate run_repos by created_at DESC, filtering by
+//   - Then selects the appropriate runs by created_at DESC, filtering by
 //     the requested terminal status (Success or Fail).
 //   - Mode values:
-//   - "last-succeeded" (default): newest run_repos with status=Success
-//   - "last-failed": newest run_repos with status=Fail
+//   - "last-succeeded" (default): newest runs with status=Success
+//   - "last-failed": newest runs with status=Fail
 //   - Uses domaintypes.NormalizeRepoURL for URL comparison.
 //   - If no repo matches: 404 error.
 //   - If no run with matching status found: 404 error.
@@ -209,8 +209,8 @@ func pullMigRepoHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Get the latest run_repos row with the specified terminal status.
-		// Select by run_repos.created_at DESC.
+		// Get the latest run row with the specified terminal status.
+		// Select by runs.created_at DESC.
 		latestRunRepo, err := st.GetLatestRunByMigAndRepoStatus(r.Context(), store.GetLatestRunByMigAndRepoStatusParams{
 			MigID:  migID,
 			RepoID: matchedRepoID,

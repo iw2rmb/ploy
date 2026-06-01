@@ -9,7 +9,7 @@ post:
     - Creates a mig project (mig name == mig id).
     - Creates a spec row and sets migs.spec_id.
     - Creates a mig repo row for the provided repo_url.
-    - Creates a run and queued run repo row.
+    - Creates a wave and a queued run row.
   requestBody:
     required: true
     content:
@@ -40,9 +40,9 @@ get:
   tags: [Control]
   summary: List runs
   description: |
-    Return a paginated list of runs backed by the `runs` table. Each
-    entry exposes basic run metadata (id, mig_id, spec_id, status, timestamps)
-    and optional per-repo status counts aggregated from `run_repos`.
+    Return a paginated list of runs backed by the `runs` table. Each entry exposes
+    run metadata, repository identity, refs, status, timestamps, and optional
+    wave-level run counts.
   parameters:
     - in: query
       name: limit
@@ -66,7 +66,7 @@ get:
       required: false
       schema:
         type: string
-      description: Optional repository URL filter. The server normalizes the URL before matching run repos.
+      description: Optional repository URL filter. The server normalizes the URL before matching runs.
   responses:
     "200":
       description: OK

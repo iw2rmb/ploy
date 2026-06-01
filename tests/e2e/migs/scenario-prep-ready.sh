@@ -38,7 +38,7 @@ fi
 
 REPO_ID=""
 for _ in $(seq 1 30); do
-  REPO_ID="$(e2e_api_get "/v1/runs/${RUN_ID}/repos" | jq -r '.repos[0].repo_id // empty')"
+  REPO_ID="$(e2e_api_get "/v1/runs/${RUN_ID}" | jq -r '.repo_id // empty')"
   if [[ -n "$REPO_ID" ]]; then
     break
   fi
@@ -62,7 +62,7 @@ deadline=$((SECONDS + 180))
 : > "${E2E_ARTIFACT_DIR}/prep-status.log"
 while (( SECONDS < deadline )); do
   PREP_JSON="$(e2e_api_get "/v1/repos/${REPO_ID}/prep")"
-  JOBS_JSON="$(e2e_api_get "/v1/runs/${RUN_ID}/repos/${REPO_ID}/jobs")"
+  JOBS_JSON="$(e2e_api_get "/v1/runs/${RUN_ID}/jobs")"
 
   prep_status="$(printf '%s' "$PREP_JSON" | jq -r '.prep_status')"
   jobs_count="$(printf '%s' "$JOBS_JSON" | jq '.jobs | length')"
@@ -115,7 +115,7 @@ fi
 
 jobs_count=0
 for _ in $(seq 1 60); do
-  JOBS_JSON="$(e2e_api_get "/v1/runs/${RUN_ID}/repos/${REPO_ID}/jobs")"
+  JOBS_JSON="$(e2e_api_get "/v1/runs/${RUN_ID}/jobs")"
   jobs_count="$(printf '%s' "$JOBS_JSON" | jq '.jobs | length')"
   if (( jobs_count > 0 )); then
     printf '%s\n' "$JOBS_JSON" > "${E2E_ARTIFACT_DIR}/jobs-after-ready.json"

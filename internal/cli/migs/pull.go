@@ -43,7 +43,7 @@ type PullResolution struct {
 // RunPullCommand resolves a repo_url to execution identifiers for a specific run.
 // Endpoint: POST /v1/runs/{run_id}/resolve
 //
-// Server matches the repo by joining run_repos to mig_repos by repo_id,
+// Server matches the repo by joining runs to mig_repos by repo_id,
 // filtering by run_id, and comparing normalized repo_url.
 // Returns 404 if no repo matches, 409 if multiple repos match (ambiguous).
 type RunPullCommand struct {
@@ -128,11 +128,11 @@ const (
 // Endpoint: POST /v1/migs/{mig_id}/pull
 //
 // Server performs the lookup using mig_id + repo_url to find mig_repos.id,
-// then selects the appropriate run_repos by created_at DESC, filtering by
+// then selects the appropriate runs by created_at DESC, filtering by
 // the requested terminal status (Success or Fail).
 // Mode values:
-//   - "last-succeeded" (default): newest run_repos with status=Success
-//   - "last-failed": newest run_repos with status=Fail
+//   - "last-succeeded" (default): newest runs with status=Success
+//   - "last-failed": newest runs with status=Fail
 //
 // Returns 404 if no repo matches or no run with matching status found.
 type MigPullCommand struct {

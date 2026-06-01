@@ -182,7 +182,7 @@ func TestCompleteJob_EmptyJobMetaObjectWithWhitespaceIsIgnored(t *testing.T) {
 // ===== Error Propagation Tests =====
 
 // TestCompleteJob_Exit137SetsLastError verifies that failed jobs with exit code
-// 137 persist a deterministic run_repos.last_error message.
+// 137 persist a deterministic runs.last_error message.
 func TestCompleteJob_Exit137SetsLastError(t *testing.T) {
 	t.Parallel()
 
@@ -217,7 +217,7 @@ func TestCompleteJob_Exit137SetsLastError(t *testing.T) {
 }
 
 // TestCompleteJob_GateFailureSetsLastError verifies that when a gate job fails
-// with Stack Gate mismatch metadata, the handler sets run_repos.last_error.
+// with Stack Gate mismatch metadata, the handler sets runs.last_error.
 func TestCompleteJob_GateFailureSetsLastError(t *testing.T) {
 	t.Parallel()
 

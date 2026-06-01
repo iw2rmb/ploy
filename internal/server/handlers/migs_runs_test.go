@@ -19,7 +19,7 @@ import (
 )
 
 // =============================================================================
-// POST /v1/migs/{mig_id}/runs — Create Multi-Repo Run
+// POST /v1/migs/{mig_id}/waves — Create Multi-Repo Wave
 // =============================================================================
 
 func TestMigRuns_Create(t *testing.T) {

@@ -71,13 +71,13 @@ func TestPathParamsUseDomainTypes(t *testing.T) {
 		}
 	})
 
-	t.Run("POST /v1/migs/{mig_id}/runs rejects empty mig_id before store calls", func(t *testing.T) {
+	t.Run("POST /v1/migs/{mig_id}/waves rejects empty mig_id before store calls", func(t *testing.T) {
 		t.Parallel()
 
 		st := &migStore{}
 		h := createMigRunHandler(st, gitauth.Options{})
 
-		req := httptest.NewRequest(http.MethodPost, "/v1/migs//runs", nil)
+		req := httptest.NewRequest(http.MethodPost, "/v1/migs//waves", nil)
 		req.SetPathValue("mig_id", "")
 		rr := httptest.NewRecorder()
 

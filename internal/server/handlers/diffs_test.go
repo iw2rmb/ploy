@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	bsmock "github.com/iw2rmb/ploy/internal/blobstore/mock"
@@ -54,9 +53,8 @@ func TestRunRepoDiffs_Download(t *testing.T) {
 	_, _ = bs.Put(context.TODO(), objKey, "application/gzip", patch)
 
 	rr := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID.String()+"/repos/"+repoID+"/diffs?download=true&diff_id="+diffID.String(), nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID.String()+"/diffs?download=true&diff_id="+diffID.String(), nil)
 	req.SetPathValue("run_id", runID.String())
-	req.SetPathValue("repo_id", repoID)
 	listRunRepoDiffsHandler(st, bs).ServeHTTP(rr, req)
 	assertStatus(t, rr, http.StatusOK)
 	if ct := rr.Header().Get("Content-Type"); ct != "application/gzip" {
@@ -110,9 +108,8 @@ func TestRunRepoDiffs_DownloadAccumulated(t *testing.T) {
 	_, _ = bs.Put(context.TODO(), objKey2, "application/gzip", gzipTestBytes(t, []byte(patch2)))
 
 	rr := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID.String()+"/repos/"+repoID+"/diffs?download=true&accumulated=true&diff_id="+diffID2.String(), nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID.String()+"/diffs?download=true&accumulated=true&diff_id="+diffID2.String(), nil)
 	req.SetPathValue("run_id", runID.String())
-	req.SetPathValue("repo_id", repoID)
 	listRunRepoDiffsHandler(st, bs).ServeHTTP(rr, req)
 
 	assertStatus(t, rr, http.StatusOK)
@@ -122,50 +119,27 @@ func TestRunRepoDiffs_DownloadAccumulated(t *testing.T) {
 	}
 }
 
-// TestRunRepoDiffs_ReturnsRepoFilteredItems verifies that diffs for repo A are
-// excluded from repo B listing. This is the primary v1 repo-scoped test.
-//
-// The test sets up:
-// - Two repos (repo A and repo B) for a run
-// - A diff that belongs to repo A (via job_id -> jobs.repo_id join)
-// - A query for repo B
-// - Expects an empty result (repo A's diff excluded from repo B listing)
-func TestRunRepoDiffs_ReturnsRepoFilteredItems(t *testing.T) {
+func TestRunRepoDiffs_ReturnsEmptyListWhenRunHasNoDiffJobs(t *testing.T) {
 	st := &artifactStore{}
 	runID := domaintypes.NewRunID()
-	repoAID := "repoAAAA" // NanoID-backed
 	repoBID := "repoBBBB" // NanoID-backed
 
-	// Setup: diff for repo A (via job_id -> jobs.repo_id join)
-	jobAID := domaintypes.NewJobID()
-	jobAIDStr := jobAID.String()
-	diffAID := uuid.New()
-	createdAt := time.Date(2025, 1, 15, 12, 0, 0, 0, time.UTC)
-
-	// This diff belongs to repo A. When querying for repo B, the store query
-	// joins diffs.job_id -> jobs.repo_id and filters by repo_id=repoBID,
-	// so this diff should NOT appear in repo B results.
-	//
-	// For this test, we simulate the store returning empty results when
-	// querying for repo B (because the diff belongs to repo A).
-	_ = diffAID   // unused in expected repo B result
-	_ = jobAIDStr // unused in expected repo B result
-	_ = createdAt // unused in expected repo B result
-	_ = repoAID   // repo A owns the diff
-
-	// Query for repo B: expect empty list (repo A's diff filtered out)
-	st.getRunRepo.err = pgx.ErrNoRows // Equivalent externally: no repo execution rows.
+	st.getRunRepo.val = store.Run{
+		ID:      runID,
+		RepoID:  domaintypes.RepoID(repoBID),
+		Attempt: 1,
+	}
+	st.listJobsByRunRepoAttempt.val = []store.Job{}
 
 	bs := bsmock.New()
 	rr := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID.String()+"/repos/"+repoBID+"/diffs", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID.String()+"/diffs", nil)
 	req.SetPathValue("run_id", runID.String())
-	req.SetPathValue("repo_id", repoBID)
 	listRunRepoDiffsHandler(st, bs).ServeHTTP(rr, req)
 
 	assertStatus(t, rr, http.StatusOK)
 
-	// Verify repo scope was queried.
+	// Verify the run was resolved before listing diffs.
 	if !st.getRunRepo.called {
 		t.Fatal("expected GetRun to be called")
 	}
@@ -178,9 +152,8 @@ func TestRunRepoDiffs_ReturnsRepoFilteredItems(t *testing.T) {
 		t.Fatalf("decode: %v", err)
 	}
 
-	// Key assertion: repo A's diff excluded from repo B listing
 	if len(resp.Diffs) != 0 {
-		t.Fatalf("expected 0 diffs for repo B (repo A's diff should be excluded), got %d", len(resp.Diffs))
+		t.Fatalf("expected 0 diffs, got %d", len(resp.Diffs))
 	}
 }
 
@@ -220,9 +193,8 @@ func TestRunRepoDiffs_ReturnsOwnDiffs(t *testing.T) {
 
 	bs := bsmock.New()
 	rr := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID.String()+"/repos/"+repoID+"/diffs", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID.String()+"/diffs", nil)
 	req.SetPathValue("run_id", runID.String())
-	req.SetPathValue("repo_id", repoID)
 	listRunRepoDiffsHandler(st, bs).ServeHTTP(rr, req)
 
 	assertStatus(t, rr, http.StatusOK)
@@ -256,9 +228,8 @@ func TestRunRepoDiffs_MissingRunID(t *testing.T) {
 	st := &artifactStore{}
 	bs := bsmock.New()
 	rr := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/v1/runs//repos/repoAAAA/diffs", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/runs//diffs", nil)
 	req.SetPathValue("run_id", "")
-	req.SetPathValue("repo_id", "repoAAAA")
 	listRunRepoDiffsHandler(st, bs).ServeHTTP(rr, req)
 
 	assertStatus(t, rr, http.StatusBadRequest)
