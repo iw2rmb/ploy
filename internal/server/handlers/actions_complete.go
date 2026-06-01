@@ -60,7 +60,7 @@ func completeAction(
 	status domaintypes.JobStatus,
 	stats JobStatsPayload,
 ) error {
-	action, err := st.GetRunRepoAction(ctx, actionID)
+	action, err := st.GetRunAction(ctx, actionID)
 	if err != nil {
 		if isNoRowsError(err) {
 			return completeNodeAction(ctx, st, actionID, nodeID, status, stats)
@@ -82,7 +82,7 @@ func completeAction(
 	if err != nil {
 		return err
 	}
-	if err := st.UpdateRunRepoActionCompletion(ctx, store.UpdateRunRepoActionCompletionParams{
+	if err := st.UpdateRunActionCompletion(ctx, store.UpdateRunActionCompletionParams{
 		ID:     actionID,
 		Status: status,
 		Meta:   metaBytes,

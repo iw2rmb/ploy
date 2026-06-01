@@ -68,14 +68,14 @@ func TestCreateMigRunCommand_Run(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			runID := domaintypes.NewRunID()
+			waveID := domaintypes.NewWaveID()
 
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				if r.Method != http.MethodPost {
 					t.Errorf("expected POST, got %s", r.Method)
 				}
-				if !strings.Contains(r.URL.Path, "/runs") {
-					t.Errorf("expected path to contain /runs, got %s", r.URL.Path)
+				if !strings.Contains(r.URL.Path, "/waves") {
+					t.Errorf("expected path to contain /waves, got %s", r.URL.Path)
 				}
 
 				// Verify request body.
@@ -100,7 +100,7 @@ func TestCreateMigRunCommand_Run(t *testing.T) {
 					t.Errorf("expected mode all, got %s", req.RepoSelector.Mode)
 				}
 
-				resp := CreateMigRunResult{RunID: runID}
+				resp := CreateMigRunResult{WaveID: waveID}
 
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(tc.statusCode)
@@ -131,8 +131,8 @@ func TestCreateMigRunCommand_Run(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Run() error: %v", err)
 			}
-			if result.RunID != runID {
-				t.Errorf("got RunID %q, want %q", result.RunID.String(), runID.String())
+			if result.WaveID != waveID {
+				t.Errorf("got WaveID %q, want %q", result.WaveID.String(), waveID.String())
 			}
 		})
 	}

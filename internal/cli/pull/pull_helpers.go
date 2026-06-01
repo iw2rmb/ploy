@@ -99,7 +99,7 @@ func ensureHEADMatchesSource(ctx context.Context, sourceCommit string) error {
 	return nil
 }
 
-func ListRunRepoDiffs(ctx context.Context, httpClient *http.Client, baseURL *url.URL, runID domaintypes.RunID, repoID domaintypes.MigRepoID) ([]migs.DiffEntry, error) {
+func ListRunRepoDiffs(ctx context.Context, httpClient *http.Client, baseURL *url.URL, runID domaintypes.RunID, repoID domaintypes.RepoID) ([]migs.DiffEntry, error) {
 	cmd := migs.ListRunRepoDiffsCommand{
 		Client:  httpClient,
 		BaseURL: baseURL,
@@ -111,7 +111,7 @@ func ListRunRepoDiffs(ctx context.Context, httpClient *http.Client, baseURL *url
 
 // downloadAndApplyDiffs downloads and applies all diffs to the working tree.
 // Returns the count of successfully applied diffs (excluding empty patches).
-func downloadAndApplyDiffs(ctx context.Context, runID domaintypes.RunID, repoID domaintypes.MigRepoID, diffs []migs.DiffEntry, stderr io.Writer) (int, error) {
+func downloadAndApplyDiffs(ctx context.Context, runID domaintypes.RunID, repoID domaintypes.RepoID, diffs []migs.DiffEntry, stderr io.Writer) (int, error) {
 	if len(diffs) == 0 {
 		return 0, nil
 	}

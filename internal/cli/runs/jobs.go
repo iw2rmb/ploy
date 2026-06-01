@@ -22,11 +22,11 @@ type ListRepoJobsCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
 	RunID   domaintypes.RunID
-	RepoID  domaintypes.MigRepoID
+	RepoID  domaintypes.RepoID
 	Attempt *int32 // Optional: specific attempt
 }
 
-// Run executes GET /v1/runs/{run_id}/repos/{repo_id}/jobs.
+// Run executes GET /v1/runs/{run_id}/jobs.
 func (c ListRepoJobsCommand) Run(ctx context.Context) (ListRepoJobsResult, error) {
 	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
 		return ListRepoJobsResult{}, fmt.Errorf("list repo jobs: %w", err)
@@ -34,11 +34,7 @@ func (c ListRepoJobsCommand) Run(ctx context.Context) (ListRepoJobsResult, error
 	if c.RunID.IsZero() {
 		return ListRepoJobsResult{}, fmt.Errorf("list repo jobs: run id required")
 	}
-	if c.RepoID.IsZero() {
-		return ListRepoJobsResult{}, fmt.Errorf("list repo jobs: repo id required")
-	}
-
-	endpoint := c.BaseURL.JoinPath("v1", "runs", c.RunID.String(), "repos", c.RepoID.String(), "jobs")
+	endpoint := c.BaseURL.JoinPath("v1", "runs", c.RunID.String(), "jobs")
 	if c.Attempt != nil {
 		q := endpoint.Query()
 		q.Set("attempt", fmt.Sprintf("%d", *c.Attempt))

@@ -9,37 +9,113 @@ import (
 	"context"
 
 	"github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const cancelActiveRunsByWave = `-- name: CancelActiveRunsByWave :execrows
+UPDATE runs
+SET status = 'Cancelled',
+    finished_at = COALESCE(finished_at, now())
+WHERE wave_id = $1
+  AND status IN ('Queued', 'Running')
+`
+
+func (q *Queries) CancelActiveRunsByWave(ctx context.Context, waveID types.WaveID) (int64, error) {
+	result, err := q.db.Exec(ctx, cancelActiveRunsByWave, waveID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const countRunsByWaveStatus = `-- name: CountRunsByWaveStatus :many
+SELECT status, COUNT(*)::int AS count
+FROM runs
+WHERE wave_id = $1
+GROUP BY status
+`
+
+type CountRunsByWaveStatusRow struct {
+	Status types.RunStatus `json:"status"`
+	Count  int32           `json:"count"`
+}
+
+func (q *Queries) CountRunsByWaveStatus(ctx context.Context, waveID types.WaveID) ([]CountRunsByWaveStatusRow, error) {
+	rows, err := q.db.Query(ctx, countRunsByWaveStatus, waveID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []CountRunsByWaveStatusRow{}
+	for rows.Next() {
+		var i CountRunsByWaveStatusRow
+		if err := rows.Scan(&i.Status, &i.Count); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const createRun = `-- name: CreateRun :one
-INSERT INTO runs (id, mig_id, spec_id, created_by, status, started_at)
-VALUES ($1, $2, $3, $4, 'Started', now())
-RETURNING id, mig_id, spec_id, created_by, status, created_at, started_at, finished_at, stats
+INSERT INTO runs (
+  id,
+  wave_id,
+  mig_id,
+  spec_id,
+  repo_id,
+  repo_base_ref,
+  source_commit_sha,
+  repo_sha0,
+  created_by,
+  status
+)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'Queued')
+RETURNING id, wave_id, mig_id, spec_id, repo_id, repo_base_ref, source_commit_sha, repo_sha0,
+          created_by, status, attempt, last_error, created_at, started_at, finished_at, stats
 `
 
 type CreateRunParams struct {
-	ID        types.RunID  `json:"id"`
-	MigID     types.MigID  `json:"mig_id"`
-	SpecID    types.SpecID `json:"spec_id"`
-	CreatedBy *string      `json:"created_by"`
+	ID              types.RunID  `json:"id"`
+	WaveID          types.WaveID `json:"wave_id"`
+	MigID           types.MigID  `json:"mig_id"`
+	SpecID          types.SpecID `json:"spec_id"`
+	RepoID          types.RepoID `json:"repo_id"`
+	RepoBaseRef     string       `json:"repo_base_ref"`
+	SourceCommitSha string       `json:"source_commit_sha"`
+	RepoSha0        string       `json:"repo_sha0"`
+	CreatedBy       *string      `json:"created_by"`
 }
 
-// v1: Creates a new run for a mig + spec snapshot. Runs are created in Started state.
-// Note: `id` is a required TEXT parameter (KSUID-backed); caller generates via types.NewRunID().
 func (q *Queries) CreateRun(ctx context.Context, arg CreateRunParams) (Run, error) {
 	row := q.db.QueryRow(ctx, createRun,
 		arg.ID,
+		arg.WaveID,
 		arg.MigID,
 		arg.SpecID,
+		arg.RepoID,
+		arg.RepoBaseRef,
+		arg.SourceCommitSha,
+		arg.RepoSha0,
 		arg.CreatedBy,
 	)
 	var i Run
 	err := row.Scan(
 		&i.ID,
+		&i.WaveID,
 		&i.MigID,
 		&i.SpecID,
+		&i.RepoID,
+		&i.RepoBaseRef,
+		&i.SourceCommitSha,
+		&i.RepoSha0,
 		&i.CreatedBy,
 		&i.Status,
+		&i.Attempt,
+		&i.LastError,
 		&i.CreatedAt,
 		&i.StartedAt,
 		&i.FinishedAt,
@@ -58,8 +134,37 @@ func (q *Queries) DeleteRun(ctx context.Context, id types.RunID) error {
 	return err
 }
 
+const getLatestRunByMigAndRepoStatus = `-- name: GetLatestRunByMigAndRepoStatus :one
+SELECT id AS run_id, repo_id
+FROM runs
+WHERE mig_id = $1
+  AND repo_id = $2
+  AND status = $3
+ORDER BY created_at DESC
+LIMIT 1
+`
+
+type GetLatestRunByMigAndRepoStatusParams struct {
+	MigID  types.MigID     `json:"mig_id"`
+	RepoID types.RepoID    `json:"repo_id"`
+	Status types.RunStatus `json:"status"`
+}
+
+type GetLatestRunByMigAndRepoStatusRow struct {
+	RunID  types.RunID  `json:"run_id"`
+	RepoID types.RepoID `json:"repo_id"`
+}
+
+func (q *Queries) GetLatestRunByMigAndRepoStatus(ctx context.Context, arg GetLatestRunByMigAndRepoStatusParams) (GetLatestRunByMigAndRepoStatusRow, error) {
+	row := q.db.QueryRow(ctx, getLatestRunByMigAndRepoStatus, arg.MigID, arg.RepoID, arg.Status)
+	var i GetLatestRunByMigAndRepoStatusRow
+	err := row.Scan(&i.RunID, &i.RepoID)
+	return i, err
+}
+
 const getRun = `-- name: GetRun :one
-SELECT id, mig_id, spec_id, created_by, status, created_at, started_at, finished_at, stats
+SELECT id, wave_id, mig_id, spec_id, repo_id, repo_base_ref, source_commit_sha, repo_sha0,
+       created_by, status, attempt, last_error, created_at, started_at, finished_at, stats
 FROM runs
 WHERE id = $1
 `
@@ -69,14 +174,54 @@ func (q *Queries) GetRun(ctx context.Context, id types.RunID) (Run, error) {
 	var i Run
 	err := row.Scan(
 		&i.ID,
+		&i.WaveID,
 		&i.MigID,
 		&i.SpecID,
+		&i.RepoID,
+		&i.RepoBaseRef,
+		&i.SourceCommitSha,
+		&i.RepoSha0,
 		&i.CreatedBy,
 		&i.Status,
+		&i.Attempt,
+		&i.LastError,
 		&i.CreatedAt,
 		&i.StartedAt,
 		&i.FinishedAt,
 		&i.Stats,
+	)
+	return i, err
+}
+
+const getRunSnapshotMetadata = `-- name: GetRunSnapshotMetadata :one
+SELECT
+  runs.id AS run_id,
+  runs.repo_id,
+  runs.repo_base_ref,
+  runs.source_commit_sha,
+  repos.url AS repo_url
+FROM runs
+JOIN repos ON repos.id = runs.repo_id
+WHERE runs.id = $1
+`
+
+type GetRunSnapshotMetadataRow struct {
+	RunID           types.RunID  `json:"run_id"`
+	RepoID          types.RepoID `json:"repo_id"`
+	RepoBaseRef     string       `json:"repo_base_ref"`
+	SourceCommitSha string       `json:"source_commit_sha"`
+	RepoUrl         string       `json:"repo_url"`
+}
+
+func (q *Queries) GetRunSnapshotMetadata(ctx context.Context, id types.RunID) (GetRunSnapshotMetadataRow, error) {
+	row := q.db.QueryRow(ctx, getRunSnapshotMetadata, id)
+	var i GetRunSnapshotMetadataRow
+	err := row.Scan(
+		&i.RunID,
+		&i.RepoID,
+		&i.RepoBaseRef,
+		&i.SourceCommitSha,
+		&i.RepoUrl,
 	)
 	return i, err
 }
@@ -96,8 +241,123 @@ func (q *Queries) GetRunTiming(ctx context.Context, id types.RunID) (RunsTiming,
 	return i, err
 }
 
+const hasRunningJobForRunNode = `-- name: HasRunningJobForRunNode :one
+SELECT EXISTS (
+  SELECT 1
+  FROM jobs
+  WHERE run_id = $1
+    AND node_id = $2
+    AND status = 'Running'
+)::boolean
+`
+
+type HasRunningJobForRunNodeParams struct {
+	RunID  types.RunID   `json:"run_id"`
+	NodeID *types.NodeID `json:"node_id"`
+}
+
+func (q *Queries) HasRunningJobForRunNode(ctx context.Context, arg HasRunningJobForRunNodeParams) (bool, error) {
+	row := q.db.QueryRow(ctx, hasRunningJobForRunNode, arg.RunID, arg.NodeID)
+	var column_1 bool
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
+const incrementRunAttempt = `-- name: IncrementRunAttempt :exec
+UPDATE runs
+SET attempt = attempt + 1,
+    status = 'Queued',
+    last_error = NULL,
+    started_at = NULL,
+    finished_at = NULL
+WHERE id = $1
+`
+
+func (q *Queries) IncrementRunAttempt(ctx context.Context, id types.RunID) error {
+	_, err := q.db.Exec(ctx, incrementRunAttempt, id)
+	return err
+}
+
+const listFailedRepoIDsByMig = `-- name: ListFailedRepoIDsByMig :many
+SELECT repo_id FROM (
+  SELECT DISTINCT ON (repo_id) repo_id, status
+  FROM runs
+  WHERE mig_id = $1
+    AND status IN ('Fail', 'Success', 'Cancelled')
+  ORDER BY repo_id, created_at DESC, id DESC
+) AS last_status
+WHERE status = 'Fail'
+`
+
+func (q *Queries) ListFailedRepoIDsByMig(ctx context.Context, migID types.MigID) ([]types.RepoID, error) {
+	rows, err := q.db.Query(ctx, listFailedRepoIDsByMig, migID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []types.RepoID{}
+	for rows.Next() {
+		var repo_id types.RepoID
+		if err := rows.Scan(&repo_id); err != nil {
+			return nil, err
+		}
+		items = append(items, repo_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listQueuedRunsByWave = `-- name: ListQueuedRunsByWave :many
+SELECT id, wave_id, mig_id, spec_id, repo_id, repo_base_ref, source_commit_sha, repo_sha0,
+       created_by, status, attempt, last_error, created_at, started_at, finished_at, stats
+FROM runs
+WHERE wave_id = $1
+  AND status = 'Queued'
+ORDER BY created_at ASC, id ASC
+`
+
+func (q *Queries) ListQueuedRunsByWave(ctx context.Context, waveID types.WaveID) ([]Run, error) {
+	rows, err := q.db.Query(ctx, listQueuedRunsByWave, waveID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Run{}
+	for rows.Next() {
+		var i Run
+		if err := rows.Scan(
+			&i.ID,
+			&i.WaveID,
+			&i.MigID,
+			&i.SpecID,
+			&i.RepoID,
+			&i.RepoBaseRef,
+			&i.SourceCommitSha,
+			&i.RepoSha0,
+			&i.CreatedBy,
+			&i.Status,
+			&i.Attempt,
+			&i.LastError,
+			&i.CreatedAt,
+			&i.StartedAt,
+			&i.FinishedAt,
+			&i.Stats,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listRuns = `-- name: ListRuns :many
-SELECT id, mig_id, spec_id, created_by, status, created_at, started_at, finished_at, stats
+SELECT id, wave_id, mig_id, spec_id, repo_id, repo_base_ref, source_commit_sha, repo_sha0,
+       created_by, status, attempt, last_error, created_at, started_at, finished_at, stats
 FROM runs
 ORDER BY created_at DESC, id DESC
 LIMIT $1 OFFSET $2
@@ -119,14 +379,128 @@ func (q *Queries) ListRuns(ctx context.Context, arg ListRunsParams) ([]Run, erro
 		var i Run
 		if err := rows.Scan(
 			&i.ID,
+			&i.WaveID,
 			&i.MigID,
 			&i.SpecID,
+			&i.RepoID,
+			&i.RepoBaseRef,
+			&i.SourceCommitSha,
+			&i.RepoSha0,
 			&i.CreatedBy,
 			&i.Status,
+			&i.Attempt,
+			&i.LastError,
 			&i.CreatedAt,
 			&i.StartedAt,
 			&i.FinishedAt,
 			&i.Stats,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listRunsByWave = `-- name: ListRunsByWave :many
+SELECT id, wave_id, mig_id, spec_id, repo_id, repo_base_ref, source_commit_sha, repo_sha0,
+       created_by, status, attempt, last_error, created_at, started_at, finished_at, stats
+FROM runs
+WHERE wave_id = $1
+ORDER BY created_at ASC, id ASC
+`
+
+func (q *Queries) ListRunsByWave(ctx context.Context, waveID types.WaveID) ([]Run, error) {
+	rows, err := q.db.Query(ctx, listRunsByWave, waveID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Run{}
+	for rows.Next() {
+		var i Run
+		if err := rows.Scan(
+			&i.ID,
+			&i.WaveID,
+			&i.MigID,
+			&i.SpecID,
+			&i.RepoID,
+			&i.RepoBaseRef,
+			&i.SourceCommitSha,
+			&i.RepoSha0,
+			&i.CreatedBy,
+			&i.Status,
+			&i.Attempt,
+			&i.LastError,
+			&i.CreatedAt,
+			&i.StartedAt,
+			&i.FinishedAt,
+			&i.Stats,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listRunsForRepo = `-- name: ListRunsForRepo :many
+SELECT
+  runs.id AS run_id,
+  runs.wave_id,
+  runs.mig_id,
+  runs.status,
+  runs.repo_base_ref,
+  runs.attempt,
+  runs.started_at,
+  runs.finished_at
+FROM runs
+WHERE runs.repo_id = $1
+ORDER BY runs.created_at DESC, runs.id DESC
+LIMIT $2 OFFSET $3
+`
+
+type ListRunsForRepoParams struct {
+	RepoID types.RepoID `json:"repo_id"`
+	Limit  int32        `json:"limit"`
+	Offset int32        `json:"offset"`
+}
+
+type ListRunsForRepoRow struct {
+	RunID       types.RunID        `json:"run_id"`
+	WaveID      types.WaveID       `json:"wave_id"`
+	MigID       types.MigID        `json:"mig_id"`
+	Status      types.RunStatus    `json:"status"`
+	RepoBaseRef string             `json:"repo_base_ref"`
+	Attempt     int32              `json:"attempt"`
+	StartedAt   pgtype.Timestamptz `json:"started_at"`
+	FinishedAt  pgtype.Timestamptz `json:"finished_at"`
+}
+
+func (q *Queries) ListRunsForRepo(ctx context.Context, arg ListRunsForRepoParams) ([]ListRunsForRepoRow, error) {
+	rows, err := q.db.Query(ctx, listRunsForRepo, arg.RepoID, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListRunsForRepoRow{}
+	for rows.Next() {
+		var i ListRunsForRepoRow
+		if err := rows.Scan(
+			&i.RunID,
+			&i.WaveID,
+			&i.MigID,
+			&i.Status,
+			&i.RepoBaseRef,
+			&i.Attempt,
+			&i.StartedAt,
+			&i.FinishedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -172,20 +546,133 @@ func (q *Queries) ListRunsTimings(ctx context.Context, arg ListRunsTimingsParams
 	return items, nil
 }
 
-const updateRunCompletion = `-- name: UpdateRunCompletion :exec
+const listRunsWithURLByWave = `-- name: ListRunsWithURLByWave :many
+SELECT runs.id, runs.wave_id, runs.mig_id, runs.spec_id, runs.repo_id, runs.repo_base_ref,
+       runs.source_commit_sha, runs.repo_sha0, runs.created_by, runs.status, runs.attempt,
+       runs.last_error, runs.created_at, runs.started_at, runs.finished_at, runs.stats,
+       repos.url AS repo_url
+FROM runs
+JOIN repos ON repos.id = runs.repo_id
+WHERE runs.wave_id = $1
+ORDER BY runs.created_at ASC, runs.id ASC
+`
+
+type ListRunsWithURLByWaveRow struct {
+	ID              types.RunID        `json:"id"`
+	WaveID          types.WaveID       `json:"wave_id"`
+	MigID           types.MigID        `json:"mig_id"`
+	SpecID          types.SpecID       `json:"spec_id"`
+	RepoID          types.RepoID       `json:"repo_id"`
+	RepoBaseRef     string             `json:"repo_base_ref"`
+	SourceCommitSha string             `json:"source_commit_sha"`
+	RepoSha0        string             `json:"repo_sha0"`
+	CreatedBy       *string            `json:"created_by"`
+	Status          types.RunStatus    `json:"status"`
+	Attempt         int32              `json:"attempt"`
+	LastError       *string            `json:"last_error"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	StartedAt       pgtype.Timestamptz `json:"started_at"`
+	FinishedAt      pgtype.Timestamptz `json:"finished_at"`
+	Stats           []byte             `json:"stats"`
+	RepoUrl         string             `json:"repo_url"`
+}
+
+func (q *Queries) ListRunsWithURLByWave(ctx context.Context, waveID types.WaveID) ([]ListRunsWithURLByWaveRow, error) {
+	rows, err := q.db.Query(ctx, listRunsWithURLByWave, waveID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListRunsWithURLByWaveRow{}
+	for rows.Next() {
+		var i ListRunsWithURLByWaveRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.WaveID,
+			&i.MigID,
+			&i.SpecID,
+			&i.RepoID,
+			&i.RepoBaseRef,
+			&i.SourceCommitSha,
+			&i.RepoSha0,
+			&i.CreatedBy,
+			&i.Status,
+			&i.Attempt,
+			&i.LastError,
+			&i.CreatedAt,
+			&i.StartedAt,
+			&i.FinishedAt,
+			&i.Stats,
+			&i.RepoUrl,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listWavesWithQueuedRuns = `-- name: ListWavesWithQueuedRuns :many
+SELECT DISTINCT wave_id
+FROM runs
+JOIN waves ON waves.id = runs.wave_id
+WHERE waves.status = 'Started'
+  AND runs.status = 'Queued'
+ORDER BY wave_id
+`
+
+func (q *Queries) ListWavesWithQueuedRuns(ctx context.Context) ([]types.WaveID, error) {
+	rows, err := q.db.Query(ctx, listWavesWithQueuedRuns)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []types.WaveID{}
+	for rows.Next() {
+		var wave_id types.WaveID
+		if err := rows.Scan(&wave_id); err != nil {
+			return nil, err
+		}
+		items = append(items, wave_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const updateRunBaseRef = `-- name: UpdateRunBaseRef :exec
 UPDATE runs
-SET status = $2, finished_at = now(), stats = $3
+SET repo_base_ref = $2
 WHERE id = $1
 `
 
-type UpdateRunCompletionParams struct {
-	ID     types.RunID     `json:"id"`
-	Status types.RunStatus `json:"status"`
-	Stats  []byte          `json:"stats"`
+type UpdateRunBaseRefParams struct {
+	ID          types.RunID `json:"id"`
+	RepoBaseRef string      `json:"repo_base_ref"`
 }
 
-func (q *Queries) UpdateRunCompletion(ctx context.Context, arg UpdateRunCompletionParams) error {
-	_, err := q.db.Exec(ctx, updateRunCompletion, arg.ID, arg.Status, arg.Stats)
+func (q *Queries) UpdateRunBaseRef(ctx context.Context, arg UpdateRunBaseRefParams) error {
+	_, err := q.db.Exec(ctx, updateRunBaseRef, arg.ID, arg.RepoBaseRef)
+	return err
+}
+
+const updateRunError = `-- name: UpdateRunError :exec
+UPDATE runs
+SET last_error = $2
+WHERE id = $1
+`
+
+type UpdateRunErrorParams struct {
+	ID        types.RunID `json:"id"`
+	LastError *string     `json:"last_error"`
+}
+
+func (q *Queries) UpdateRunError(ctx context.Context, arg UpdateRunErrorParams) error {
+	_, err := q.db.Exec(ctx, updateRunError, arg.ID, arg.LastError)
 	return err
 }
 
@@ -198,8 +685,6 @@ SET stats = stats || jsonb_build_object(
 WHERE id = $1
 `
 
-// Increments resume_count and updates last_resumed_at timestamp in runs.stats.
-// Uses JSONB merge (||) to preserve existing stats while adding resume metadata.
 func (q *Queries) UpdateRunResume(ctx context.Context, id types.RunID) error {
 	_, err := q.db.Exec(ctx, updateRunResume, id)
 	return err
@@ -208,10 +693,8 @@ func (q *Queries) UpdateRunResume(ctx context.Context, id types.RunID) error {
 const updateRunStatus = `-- name: UpdateRunStatus :exec
 UPDATE runs
 SET status = $2,
-    finished_at = CASE
-      WHEN $2 IN ('Cancelled'::run_status, 'Finished'::run_status) THEN COALESCE(finished_at, now())
-      ELSE NULL
-    END
+    started_at = CASE WHEN $2 = 'Running'::run_status AND started_at IS NULL THEN now() ELSE started_at END,
+    finished_at = CASE WHEN $2 IN ('Success'::run_status, 'Fail'::run_status, 'Cancelled'::run_status) THEN COALESCE(finished_at, now()) ELSE finished_at END
 WHERE id = $1
 `
 

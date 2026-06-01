@@ -13,8 +13,8 @@ import (
 
 // singleJobReport builds a minimal RunReport with one repo and one job,
 // reducing boilerplate in tests that only vary job-level fields.
-func singleJobReport(migName string, repoStatus domaintypes.RunRepoStatus, job RunJobEntry) RunReport {
-	repoID := domaintypes.NewMigRepoID()
+func singleJobReport(migName string, repoStatus domaintypes.RunStatus, job RunJobEntry) RunReport {
+	repoID := domaintypes.NewRepoID()
 	return RunReport{
 		RunID:   domaintypes.NewRunID(),
 		MigID:   domaintypes.NewMigID(),
@@ -45,7 +45,7 @@ func renderText(t *testing.T, report RunReport, opts TextRenderOptions) string {
 func TestRenderRepoPathLabel(t *testing.T) {
 	t.Parallel()
 
-	repoID := domaintypes.NewMigRepoID()
+	repoID := domaintypes.NewRepoID()
 	tests := []struct {
 		name string
 		repo RunEntry
@@ -125,7 +125,7 @@ func TestRenderRunReportTextHeadersAndArtifacts(t *testing.T) {
 	runID := domaintypes.NewRunID()
 	migID := domaintypes.NewMigID()
 	specID := domaintypes.NewSpecID()
-	repoID := domaintypes.NewMigRepoID()
+	repoID := domaintypes.NewRepoID()
 	preGateID := domaintypes.NewJobID()
 	migJobID := domaintypes.NewJobID()
 	nodeID := domaintypes.NodeID(domaintypes.NewNodeKey())
@@ -160,7 +160,7 @@ func TestRenderRunReportTextHeadersAndArtifacts(t *testing.T) {
 						Status:     "Success",
 						DurationMs: 3000,
 						JobLogURL:  "https://example.test/v1/jobs/" + migJobID.String() + "/logs",
-						PatchURL:   "https://example.test/v1/runs/" + runID.String() + "/repos/" + repoID.String() + "/diffs?download=true&diff_id=abc",
+						PatchURL:   "https://example.test/v1/runs/" + runID.String() + "/diffs?download=true&diff_id=abc",
 					},
 				},
 			},
@@ -214,7 +214,7 @@ func TestRenderRunReportTextVisibilityRules(t *testing.T) {
 		{
 			name: "renders compact repo header",
 			report: func() RunReport {
-				repoID := domaintypes.NewMigRepoID()
+				repoID := domaintypes.NewRepoID()
 				return RunReport{
 					RunID:   domaintypes.NewRunID(),
 					MigID:   domaintypes.NewMigID(),
@@ -241,7 +241,7 @@ func TestRenderRunReportTextVisibilityRules(t *testing.T) {
 			name: "hides patch artifacts for cancelled jobs",
 			report: func() RunReport {
 				runID := domaintypes.NewRunID()
-				repoID := domaintypes.NewMigRepoID()
+				repoID := domaintypes.NewRepoID()
 				cancelledJobID := domaintypes.NewJobID()
 				return RunReport{
 					RunID:   runID,
@@ -300,10 +300,10 @@ func TestRenderRunReportTextLayout_FilterRunningRepos(t *testing.T) {
 		SpecID:  domaintypes.NewSpecID(),
 		Repos: []RunEntry{
 			{
-				RepoID:  domaintypes.NewMigRepoID(),
+				RepoID:  domaintypes.NewRepoID(),
 				RepoURL: "https://github.com/acme/running.git",
 				BaseRef: "main",
-				Status:  domaintypes.RunRepoStatusRunning,
+				Status:  domaintypes.RunStatusRunning,
 				Jobs: []RunJobEntry{
 					{
 						JobID:   runningJobID,
@@ -313,10 +313,10 @@ func TestRenderRunReportTextLayout_FilterRunningRepos(t *testing.T) {
 				},
 			},
 			{
-				RepoID:  domaintypes.NewMigRepoID(),
+				RepoID:  domaintypes.NewRepoID(),
 				RepoURL: "https://github.com/acme/done.git",
 				BaseRef: "main",
-				Status:  domaintypes.RunRepoStatusFail,
+				Status:  domaintypes.RunStatusFail,
 				Jobs: []RunJobEntry{
 					{
 						JobID:   doneJobID,
@@ -350,10 +350,10 @@ func TestRenderRunReportTextLayout_FilterRunningReposEmptyMessage(t *testing.T) 
 		SpecID:  domaintypes.NewSpecID(),
 		Repos: []RunEntry{
 			{
-				RepoID:  domaintypes.NewMigRepoID(),
+				RepoID:  domaintypes.NewRepoID(),
 				RepoURL: "https://github.com/acme/done.git",
 				BaseRef: "main",
-				Status:  domaintypes.RunRepoStatusSuccess,
+				Status:  domaintypes.RunStatusSuccess,
 				Jobs: []RunJobEntry{
 					{
 						JobID:   domaintypes.NewJobID(),
@@ -384,7 +384,7 @@ func TestRenderRunReportTextExitOneLiners(t *testing.T) {
 	runID := domaintypes.NewRunID()
 	migID := domaintypes.NewMigID()
 	specID := domaintypes.NewSpecID()
-	repoID := domaintypes.NewMigRepoID()
+	repoID := domaintypes.NewRepoID()
 	preGateID := domaintypes.NewJobID()
 	migJobID := domaintypes.NewJobID()
 	errText := "compile\nfailed at step 2"
@@ -519,10 +519,10 @@ func TestRenderRunReportTextOSC8OnAndOff(t *testing.T) {
 
 	runID := domaintypes.NewRunID()
 	migID := domaintypes.NewMigID()
-	repoID := domaintypes.NewMigRepoID()
+	repoID := domaintypes.NewRepoID()
 	jobID := domaintypes.NewJobID()
 	jobLogURL := "https://example.test/v1/jobs/" + jobID.String() + "/logs"
-	patchURL := "https://example.test/v1/runs/" + runID.String() + "/repos/" + repoID.String() + "/diffs?download=true&diff_id=abc"
+	patchURL := "https://example.test/v1/runs/" + runID.String() + "/diffs?download=true&diff_id=abc"
 	baseURL, err := url.Parse("https://example.test")
 	if err != nil {
 		t.Fatalf("parse base url: %v", err)
@@ -564,7 +564,7 @@ func TestRenderRunReportTextOSC8OnAndOff(t *testing.T) {
 	assertx.NotContains(t, plainOut, "github.com/acme/links")
 	assertx.NotContains(t, plainOut, "https://github.com/acme/links.git")
 	assertx.NotContains(t, plainOut, "https://github.com/acme/links.git?auth_token=")
-	assertx.Contains(t, plainOut, "Patch (https://example.test/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/diffs?")
+	assertx.Contains(t, plainOut, "Patch (https://example.test/v1/runs/"+runID.String()+"/diffs?")
 	assertx.Contains(t, plainOut, "auth_token=test-token")
 	assertx.Contains(t, plainOut, "diff_id=abc")
 	assertx.Contains(t, plainOut, "download=true")
@@ -577,7 +577,7 @@ func TestRenderRunReportTextOSC8OnAndOff(t *testing.T) {
 	assertx.Contains(t, linkedOut, "\x1b]8;;https://example.test/v1/migs/"+migID.String()+"/specs/latest?auth_token=test-token")
 	assertx.Contains(t, linkedOut, "\x1b]8;;https://github.com/acme/links.git\x1b\\acme/links\x1b]8;;\x1b\\")
 	assertx.NotContains(t, linkedOut, "github.com/acme/links.git?auth_token=")
-	assertx.Contains(t, linkedOut, "\x1b]8;;https://example.test/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/diffs?")
+	assertx.Contains(t, linkedOut, "\x1b]8;;https://example.test/v1/runs/"+runID.String()+"/diffs?")
 	assertx.Contains(t, linkedOut, "auth_token=test-token")
 }
 
@@ -821,7 +821,7 @@ func TestRenderRunReportTextSpinnerFrameAndLiveDuration(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewMigRepoID()
+	repoID := domaintypes.NewRepoID()
 	jobID := domaintypes.NewJobID()
 	startedAt := time.Date(2026, time.February, 26, 10, 0, 0, 0, time.UTC)
 
@@ -889,10 +889,10 @@ func TestRenderRunStatusSnapshotText_NormalizesFollowOnlyOptions(t *testing.T) {
 		SpecID:  domaintypes.NewSpecID(),
 		Repos: []RunEntry{
 			{
-				RepoID:  domaintypes.NewMigRepoID(),
+				RepoID:  domaintypes.NewRepoID(),
 				RepoURL: "https://github.com/acme/running.git",
 				BaseRef: "main",
-				Status:  domaintypes.RunRepoStatusRunning,
+				Status:  domaintypes.RunStatusRunning,
 				Jobs: []RunJobEntry{
 					{
 						JobID:   runningJobID,
@@ -902,10 +902,10 @@ func TestRenderRunStatusSnapshotText_NormalizesFollowOnlyOptions(t *testing.T) {
 				},
 			},
 			{
-				RepoID:  domaintypes.NewMigRepoID(),
+				RepoID:  domaintypes.NewRepoID(),
 				RepoURL: "https://github.com/acme/done.git",
 				BaseRef: "main",
-				Status:  domaintypes.RunRepoStatusSuccess,
+				Status:  domaintypes.RunStatusSuccess,
 				Jobs: []RunJobEntry{
 					{
 						JobID:   doneJobID,
@@ -951,7 +951,7 @@ func TestRenderRunReportTextCreatedJobDurationKeepsStepAdjacent(t *testing.T) {
 		SpecID:  domaintypes.NewSpecID(),
 		Repos: []RunEntry{
 			{
-				RepoID:  domaintypes.NewMigRepoID(),
+				RepoID:  domaintypes.NewRepoID(),
 				RepoURL: "https://github.com/acme/duration-placeholder.git",
 				BaseRef: "main",
 				Status:  "Running",

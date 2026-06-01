@@ -1,12 +1,10 @@
-// Package batchscheduler provides a background worker for scheduling queued repos within batch runs.
+// Package batchscheduler provides a background worker for scheduling queued runs within waves.
 //
-// The batch scheduler continuously monitors batch runs (parent runs with associated run_repos)
-// and starts execution for any queued repos. This eliminates the need for manual POST /v1/runs/{id}/start
-// calls and ensures repos are processed automatically after being added to a batch.
+// The scheduler continuously monitors waves and starts execution for queued runs.
 //
 // State transitions:
-//   - Batch run: Started → Finished/Cancelled (terminal)
-//   - Run repo: Queued → Running → Success/Fail/Cancelled (terminal)
+//   - Wave: Started → Finished/Cancelled (terminal)
+//   - Run: Queued → Running → Success/Fail/Cancelled (terminal)
 //
 // The scheduler focuses on per-batch processing without cross-batch FIFO ordering.
 package batchscheduler
@@ -27,7 +25,7 @@ var ErrNilStore = errors.New("batchscheduler: store is required")
 // ErrNilRepoStarter is returned when New is called with a nil RepoStarter.
 var ErrNilRepoStarter = errors.New("batchscheduler: repo starter is required")
 
-// StartPendingReposResult contains the result of starting pending repos in a batch run.
+// StartPendingReposResult contains the result of starting pending runs in a wave.
 // This type is defined here to avoid circular imports with the handlers package.
 // It mirrors handlers.StartPendingReposResult for interface compatibility.
 type StartPendingReposResult struct {
@@ -42,10 +40,9 @@ type StartPendingReposResult struct {
 // RepoStarter is the interface for starting execution of pending repos.
 // Implemented by handlers.BatchRepoStarter to decouple scheduler from HTTP layer.
 type RepoStarter interface {
-	// StartPendingRepos starts execution for all pending repos in a batch run.
-	// runID is a types.RunID (KSUID-backed) identifier for the batch run.
+	// StartPendingRepos starts execution for all pending runs in a wave.
 	// Returns StartPendingReposResult with counts of started, already done, and pending repos.
-	StartPendingRepos(ctx context.Context, runID types.RunID) (StartPendingReposResult, error)
+	StartPendingRepos(ctx context.Context, waveID types.WaveID) (StartPendingReposResult, error)
 }
 
 // Options configures the batch scheduler.
@@ -121,28 +118,27 @@ func (s *Scheduler) Run(ctx context.Context) error {
 		return nil
 	}
 
-	// Find runs with queued repos.
-	runIDs, err := s.store.ListRunsWithQueuedRepos(ctx)
+	waveIDs, err := s.store.ListWavesWithQueuedRuns(ctx)
 	if err != nil {
-		s.logger.Error("batch-scheduler: failed to list runs with queued repos", "err", err)
+		s.logger.Error("batch-scheduler: failed to list waves with queued runs", "err", err)
 		return nil // Non-fatal; retry on next cycle.
 	}
 
-	if len(runIDs) == 0 {
+	if len(waveIDs) == 0 {
 		// No work to do; quiet exit.
 		return nil
 	}
 
-	s.logger.Debug("batch-scheduler: found runs with pending repos", "count", len(runIDs))
+	s.logger.Debug("batch-scheduler: found waves with pending runs", "count", len(waveIDs))
 
 	// Process each batch run.
 	// runIDs are KSUID-backed strings from ListBatchRunsWithPendingRepos.
 	var totalStarted int
-	for _, runID := range runIDs {
-		result, err := s.repoStarter.StartPendingRepos(ctx, runID)
+	for _, waveID := range waveIDs {
+		result, err := s.repoStarter.StartPendingRepos(ctx, waveID)
 		if err != nil {
-			s.logger.Error("batch-scheduler: failed to start repos",
-				"run_id", runID,
+			s.logger.Error("batch-scheduler: failed to start runs",
+				"wave_id", waveID,
 				"err", err,
 			)
 			continue // Try other runs.
@@ -150,7 +146,7 @@ func (s *Scheduler) Run(ctx context.Context) error {
 
 		if result.Started > 0 {
 			s.logger.Info("batch-scheduler: started repos",
-				"run_id", runID,
+				"wave_id", waveID,
 				"started", result.Started,
 				"already_done", result.AlreadyDone,
 				"pending", result.Pending,
@@ -161,7 +157,7 @@ func (s *Scheduler) Run(ctx context.Context) error {
 
 	if totalStarted > 0 {
 		s.logger.Info("batch-scheduler: cycle completed",
-			"runs_processed", len(runIDs),
+			"waves_processed", len(waveIDs),
 			"repos_started", totalStarted,
 		)
 	}

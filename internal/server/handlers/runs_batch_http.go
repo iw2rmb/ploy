@@ -1,14 +1,7 @@
 package handlers
 
 import (
-	"errors"
-	"log/slog"
 	"net/http"
-	"strings"
-	"time"
-
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/iw2rmb/ploy/internal/blobstore"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
@@ -17,347 +10,64 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/lifecycle"
 )
 
-// cancelRunHandlerV1 returns an HTTP handler that cancels a v1 run.
-// POST /v1/runs/{run_id}/cancel (v1 API) — Performs transactional cancellation of a run.
-// This handler delegates cancellation to store.CancelRunV1, which atomically:
-// - Sets runs.status=Cancelled (for non-terminal runs)
-// - Cancels all repos with status Queued or Running → Cancelled
-// - Cancels waiting/running jobs (Created/Queued/Running → Cancelled)
 func cancelRunHandlerV1(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		runID, ok := parseRequiredPathIDOrWriteError[domaintypes.RunID](w, r, "run_id")
 		if !ok {
 			return
 		}
-
 		run, ok := getRunOrFail(w, r, st, runID, "cancel run")
 		if !ok {
 			return
 		}
-
-		// Idempotent: if already terminal, return current state.
-		if lifecycle.IsTerminalRunStatus(run.Status) {
-			summary := runToSummary(run)
-			if counts, _ := getRunRepoCounts(r.Context(), st, run.ID); counts != nil && counts.Total > 0 {
-				summary.Counts = counts
-			}
-			writeJSON(w, http.StatusOK, summary)
-			return
-		}
-
-		if err := st.CancelRunV1(r.Context(), runID); err != nil {
-			writeHTTPError(w, http.StatusInternalServerError, "failed to cancel run: %v", err)
-			slog.Error("cancel run: transactional cancel failed", "run_id", runID.String(), "err", err)
-			return
-		}
-
-		// Return updated run summary.
-		run, err := st.GetRun(r.Context(), runID)
-		if err != nil {
-			writeHTTPError(w, http.StatusInternalServerError, "failed to load updated run: %v", err)
-			slog.Error("cancel run: reload run failed", "run_id", runID.String(), "err", err)
-			return
-		}
-		summary := runToSummary(run)
-		if counts, _ := getRunRepoCounts(r.Context(), st, run.ID); counts != nil && counts.Total > 0 {
-			summary.Counts = counts
-		}
-		writeJSON(w, http.StatusOK, summary)
-	}
-}
-
-// addRunRepoHandler adds a repo to an existing run (and to the mig repo set).
-// POST /v1/runs/{run_id}/repos — Body {repo_url, base_ref}.
-func addRunRepoHandler(st store.Store, gitAuth gitauth.Options) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		runID, ok := parseRequiredPathIDOrWriteError[domaintypes.RunID](w, r, "run_id")
-		if !ok {
-			return
-		}
-
-		run, ok := getActiveRunOrFail(w, r, st, runID, "add run repo")
-		if !ok {
-			return
-		}
-
-		var req struct {
-			RepoURL domaintypes.RepoURL `json:"repo_url"`
-			BaseRef domaintypes.GitRef  `json:"base_ref"`
-		}
-		if err := decodeRequestJSON(w, r, &req, DefaultMaxBodySize); err != nil {
-			return
-		}
-		if !validateField(w, "repo_url", req.RepoURL) ||
-			!validateField(w, "base_ref", req.BaseRef) {
-			return
-		}
-
-		rawRepoURL := strings.TrimSpace(req.RepoURL.String())
-		normalizedRepoURL := domaintypes.NormalizeRepoURL(rawRepoURL)
-
-		migRepoID := domaintypes.NewMigRepoID()
-		migRepo, err := st.CreateMigRepo(r.Context(), store.CreateMigRepoParams{
-			ID:      migRepoID,
-			MigID:   run.MigID,
-			Url:     normalizedRepoURL,
-			BaseRef: req.BaseRef.String(),
-		})
-		if err != nil {
-			if isUniqueViolation(err) {
-				writeHTTPError(w, http.StatusConflict, "repo already exists for mig")
+		if !lifecycle.IsTerminalRunStatus(run.Status) {
+			if err := st.CancelRun(r.Context(), runID); err != nil {
+				writeHTTPError(w, http.StatusInternalServerError, "failed to cancel run: %v", err)
 				return
 			}
-			serverError(w, "add run repo", "create mig repo", err, "run_id", runID.String())
-			return
+			var err error
+			run, err = st.GetRun(r.Context(), runID)
+			if err != nil {
+				writeHTTPError(w, http.StatusInternalServerError, "failed to load updated run: %v", err)
+				return
+			}
 		}
-
-		sourceCommitSHA, seedErr := resolveSourceCommitSHAFromContext(r.Context(), rawRepoURL, migRepo.BaseRef, gitAuth)
-		if seedErr != nil {
-			writeHTTPError(w, http.StatusBadRequest, "failed to resolve source commit for repo %s ref %s: %v", normalizedRepoURL, migRepo.BaseRef, seedErr)
-			slog.Error("add run repo: resolve source commit failed",
-				"run_id", runID.String(),
-				"repo_id", migRepo.RepoID,
-				"repo_url", normalizedRepoURL,
-				"base_ref", migRepo.BaseRef,
-				"err", seedErr,
-			)
-			return
-		}
-
-		runRepo, err := st.CreateRunRepo(r.Context(), store.CreateRunRepoParams{
-			MigID:           run.MigID,
-			RunID:           runID,
-			RepoID:          migRepo.RepoID,
-			RepoBaseRef:     migRepo.BaseRef,
-			SourceCommitSha: sourceCommitSHA,
-			RepoSha0:        sourceCommitSHA,
-		})
-		if err != nil {
-			serverError(w, "add run repo", "create run repo", err, "run_id", runID.String(), "repo_id", migRepo.RepoID)
-			return
-		}
-
-		writeJSON(w, http.StatusCreated, runRepoToResponse(runRepo, normalizedRepoURL))
+		writeJSON(w, http.StatusOK, runToSummary(run))
 	}
 }
 
-// listRunReposHandler lists repos for a run.
-// GET /v1/runs/{run_id}/repos
+func addRunRepoHandler(store.Store, gitauth.Options) http.HandlerFunc {
+	return removedRunRepoSurface
+}
+
 func listRunReposHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		runID, ok := parseRequiredPathIDOrWriteError[domaintypes.RunID](w, r, "run_id")
 		if !ok {
 			return
 		}
-
-		repos, err := st.ListRunReposWithURLByRun(r.Context(), runID)
-		if err != nil {
-			writeHTTPError(w, http.StatusInternalServerError, "failed to list run repos: %v", err)
-			slog.Error("list run repos: fetch failed", "run_id", runID.String(), "err", err)
+		run, ok := getRunOrFail(w, r, st, runID, "list run repos")
+		if !ok {
 			return
 		}
-
-		reposResp := make([]RunRepoResponse, 0, len(repos))
-		for _, rr := range repos {
-			reposResp = append(reposResp, runRepoToResponse(store.RunRepo{
-				MigID:           rr.MigID,
-				RunID:           rr.RunID,
-				RepoID:          rr.RepoID,
-				RepoBaseRef:     rr.RepoBaseRef,
-				SourceCommitSha: rr.SourceCommitSha,
-				Status:          rr.Status,
-				Attempt:         rr.Attempt,
-				LastError:       rr.LastError,
-				CreatedAt:       rr.CreatedAt,
-				StartedAt:       rr.StartedAt,
-				FinishedAt:      rr.FinishedAt,
-			}, rr.RepoUrl))
+		repoURL := ""
+		if repo, err := st.GetRepo(r.Context(), run.RepoID); err == nil {
+			repoURL = repo.Url
 		}
-
-		resp := struct {
+		writeJSON(w, http.StatusOK, struct {
 			Repos []RunRepoResponse `json:"repos"`
-		}{Repos: reposResp}
-
-		writeJSON(w, http.StatusOK, resp)
+		}{Repos: []RunRepoResponse{runRepoToResponse(run, repoURL)}})
 	}
 }
 
-// cancelRunRepoHandlerV1 cancels a repo execution within a run (v1 API).
-// POST /v1/runs/{run_id}/repos/{repo_id}/cancel
-func cancelRunRepoHandlerV1(st store.Store) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		runID, ok := parseRequiredPathIDOrWriteError[domaintypes.RunID](w, r, "run_id")
-		if !ok {
-			return
-		}
-		repoID, ok := parseRequiredPathIDOrWriteError[domaintypes.RepoID](w, r, "repo_id")
-		if !ok {
-			return
-		}
-
-		rr, err := st.GetRunRepo(r.Context(), store.GetRunRepoParams{RunID: runID, RepoID: repoID})
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				writeHTTPError(w, http.StatusNotFound, "repo not found")
-				return
-			}
-			serverError(w, "cancel run repo", "get repo", err, "run_id", runID.String(), "repo_id", repoID.String())
-			return
-		}
-
-		if lifecycle.IsTerminalRunRepoStatus(rr.Status) {
-			repoURL := ""
-			if resolvedURL, err := repoURLForID(r.Context(), st, rr.RepoID); err == nil {
-				repoURL = resolvedURL
-			}
-			writeJSON(w, http.StatusOK, runRepoToResponse(rr, repoURL))
-			return
-		}
-
-		if err := st.UpdateRunRepoStatus(r.Context(), store.UpdateRunRepoStatusParams{RunID: runID, RepoID: repoID, Status: domaintypes.RunRepoStatusCancelled}); err != nil {
-			slog.Error("cancel run repo: update status failed", "run_id", runID.String(), "repo_id", repoID.String(), "err", err)
-		}
-
-		now := time.Now().UTC()
-		jobs, err := st.ListJobsByRunRepoAttempt(r.Context(), store.ListJobsByRunRepoAttemptParams{RunID: runID, RepoID: repoID, Attempt: rr.Attempt})
-		if err == nil {
-			for _, job := range jobs {
-				if job.Status != domaintypes.JobStatusCreated && job.Status != domaintypes.JobStatusQueued && job.Status != domaintypes.JobStatusRunning {
-					continue
-				}
-				dur := int64(0)
-				if job.StartedAt.Valid {
-					if d := now.Sub(job.StartedAt.Time).Milliseconds(); d > 0 {
-						dur = d
-					}
-				}
-				if err := st.UpdateJobStatus(r.Context(), store.UpdateJobStatusParams{
-					ID:         job.ID,
-					Status:     domaintypes.JobStatusCancelled,
-					StartedAt:  job.StartedAt,
-					FinishedAt: pgtype.Timestamptz{Time: now, Valid: true},
-					DurationMs: dur,
-				}); err != nil {
-					writeHTTPError(w, http.StatusInternalServerError, "failed to cancel job %s: %v", job.ID.String(), err)
-					slog.Error("cancel run repo: update job status failed", "run_id", runID.String(), "repo_id", repoID.String(), "job_id", job.ID.String(), "err", err)
-					return
-				}
-			}
-		}
-
-		rr, err = st.GetRunRepo(r.Context(), store.GetRunRepoParams{RunID: runID, RepoID: repoID})
-		if err != nil {
-			serverError(w, "cancel run repo", "reload repo", err, "run_id", runID.String(), "repo_id", repoID.String())
-			return
-		}
-		repoURL := ""
-		if resolvedURL, err := repoURLForID(r.Context(), st, rr.RepoID); err == nil {
-			repoURL = resolvedURL
-		}
-		writeJSON(w, http.StatusOK, runRepoToResponse(rr, repoURL))
-	}
+func cancelRunRepoHandlerV1(store.Store) http.HandlerFunc {
+	return removedRunRepoSurface
 }
 
-// restartRunRepoHandler restarts a repo execution by incrementing attempt and creating new repo-scoped jobs.
-// POST /v1/runs/{run_id}/repos/{repo_id}/restart
-func restartRunRepoHandler(st store.Store, bs blobstore.Store) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		runID, ok := parseRequiredPathIDOrWriteError[domaintypes.RunID](w, r, "run_id")
-		if !ok {
-			return
-		}
-		repoID, ok := parseRequiredPathIDOrWriteError[domaintypes.RepoID](w, r, "repo_id")
-		if !ok {
-			return
-		}
+func restartRunRepoHandler(store.Store, blobstore.Store) http.HandlerFunc {
+	return removedRunRepoSurface
+}
 
-		run, ok := getRunOrFail(w, r, st, runID, "restart run repo")
-		if !ok {
-			return
-		}
-
-		runRepo, err := st.GetRunRepo(r.Context(), store.GetRunRepoParams{RunID: runID, RepoID: repoID})
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				writeHTTPError(w, http.StatusNotFound, "repo not found")
-				return
-			}
-			serverError(w, "restart run repo", "get repo", err, "run_id", runID.String(), "repo_id", repoID.String())
-			return
-		}
-
-		var req struct {
-			BaseRef *domaintypes.GitRef `json:"base_ref,omitempty"`
-		}
-		if r.ContentLength > 0 || r.Header.Get("Transfer-Encoding") == "chunked" {
-			if err := decodeRequestJSON(w, r, &req, DefaultMaxBodySize); err != nil {
-				return
-			}
-			if req.BaseRef != nil && !validateField(w, "base_ref", *req.BaseRef) {
-				return
-			}
-		}
-
-		// If the run is terminal, reopen it to Started for the restart attempt.
-		if lifecycle.IsTerminalRunStatus(run.Status) {
-			if err := st.UpdateRunStatus(r.Context(), store.UpdateRunStatusParams{ID: runID, Status: domaintypes.RunStatusStarted}); err != nil {
-				writeHTTPError(w, http.StatusInternalServerError, "failed to reopen run: %v", err)
-				return
-			}
-		}
-
-		if req.BaseRef != nil {
-			newBase := runRepo.RepoBaseRef
-			if req.BaseRef != nil {
-				newBase = req.BaseRef.String()
-			}
-			if err := st.UpdateRunRepoBaseRef(r.Context(), store.UpdateRunRepoBaseRefParams{RunID: runID, RepoID: repoID, RepoBaseRef: newBase}); err != nil {
-				serverError(w, "restart run repo", "update run repo base ref", err, "run_id", runID.String(), "repo_id", repoID.String())
-				return
-			}
-			migRepos, listErr := st.ListMigReposByMig(r.Context(), run.MigID)
-			if listErr != nil {
-				serverError(w, "restart run repo", "list mig repos", listErr, "run_id", runID.String(), "repo_id", repoID.String(), "mig_id", run.MigID.String())
-				return
-			}
-			for _, migRepo := range migRepos {
-				if migRepo.RepoID == repoID {
-					if err := st.UpdateMigRepoBaseRef(r.Context(), store.UpdateMigRepoBaseRefParams{ID: migRepo.ID, BaseRef: newBase}); err != nil {
-						serverError(w, "restart run repo", "update mig repo base ref", err, "run_id", runID.String(), "repo_id", repoID.String(), "mig_repo_id", migRepo.ID.String())
-						return
-					}
-					break
-				}
-			}
-		}
-
-		if err := st.IncrementRunRepoAttempt(r.Context(), store.IncrementRunRepoAttemptParams{RunID: runID, RepoID: repoID}); err != nil {
-			writeHTTPError(w, http.StatusInternalServerError, "failed to restart repo: %v", err)
-			slog.Error("restart run repo: increment attempt failed", "run_id", runID.String(), "repo_id", repoID.String(), "err", err)
-			return
-		}
-
-		runRepo, err = st.GetRunRepo(r.Context(), store.GetRunRepoParams{RunID: runID, RepoID: repoID})
-		if err != nil {
-			writeHTTPError(w, http.StatusInternalServerError, "failed to reload repo: %v", err)
-			return
-		}
-
-		spec, err := st.GetSpec(r.Context(), run.SpecID)
-		if err != nil {
-			writeHTTPError(w, http.StatusInternalServerError, "failed to load spec: %v", err)
-			return
-		}
-		if err := createJobsFromSpec(r.Context(), st, runID, runRepo.RepoID, runRepo.RepoBaseRef, runRepo.Attempt, runRepo.RepoSha0, spec.Spec, bs); err != nil {
-			writeHTTPError(w, http.StatusInternalServerError, "failed to create jobs: %v", err)
-			return
-		}
-
-		repoURL := ""
-		if resolvedURL, err := repoURLForID(r.Context(), st, runRepo.RepoID); err == nil {
-			repoURL = resolvedURL
-		}
-
-		writeJSON(w, http.StatusOK, runRepoToResponse(runRepo, repoURL))
-	}
+func removedRunRepoSurface(w http.ResponseWriter, _ *http.Request) {
+	writeHTTPError(w, http.StatusGone, "repo-scoped run endpoint was removed; use run-scoped endpoints")
 }

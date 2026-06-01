@@ -123,7 +123,7 @@ func (s *ClaimService) Claim(ctx context.Context, nodeID domaintypes.NodeID) (Cl
 	job, err := s.store.ClaimJob(ctx, nodeID)
 	if err != nil {
 		if isNoRowsError(err) {
-			action, actionErr := s.store.ClaimRunRepoAction(ctx, nodeID)
+			action, actionErr := s.store.ClaimRunAction(ctx, nodeID)
 			if actionErr != nil {
 				if isNoRowsError(actionErr) {
 					slog.Debug("claim: no work available", "node_id", nodeID)
@@ -138,14 +138,10 @@ func (s *ClaimService) Claim(ctx context.Context, nodeID domaintypes.NodeID) (Cl
 				slog.Error("claim: get run failed for action", "node_id", nodeID, "action_id", action.ID, "err", getRunErr)
 				return ClaimResult{}, claimInternal("failed to get run for claimed action", getRunErr)
 			}
-			rr, getRunRepoErr := s.store.GetRunRepo(ctx, store.GetRunRepoParams{RunID: action.RunID, RepoID: action.RepoID})
-			if getRunRepoErr != nil {
-				slog.Error("claim: get run repo failed for action", "node_id", nodeID, "action_id", action.ID, "err", getRunRepoErr)
-				return ClaimResult{}, claimInternal("failed to get run repo for claimed action", getRunRepoErr)
-			}
-			repoURL, repoErr := repoURLForID(ctx, s.store, action.RepoID)
+			rr := run
+			repoURL, repoErr := repoURLForID(ctx, s.store, run.RepoID)
 			if repoErr != nil {
-				slog.Error("claim: get repo failed for action", "node_id", nodeID, "action_id", action.ID, "repo_id", action.RepoID, "err", repoErr)
+				slog.Error("claim: get repo failed for action", "node_id", nodeID, "action_id", action.ID, "repo_id", run.RepoID, "err", repoErr)
 				return ClaimResult{}, claimInternal("failed to get repo for claimed action", repoErr)
 			}
 			spec, specErr := s.store.GetSpec(ctx, run.SpecID)
@@ -173,11 +169,7 @@ func (s *ClaimService) Claim(ctx context.Context, nodeID domaintypes.NodeID) (Cl
 		return ClaimResult{}, claimInternal("failed to get run for claimed job", err)
 	}
 
-	rr, err := s.store.GetRunRepo(ctx, store.GetRunRepoParams{RunID: job.RunID, RepoID: job.RepoID})
-	if err != nil {
-		slog.Error("claim: get run repo failed for job", "node_id", nodeID, "job_id", job.ID, "err", err)
-		return ClaimResult{}, claimInternal("failed to get run repo for claimed job", err)
-	}
+	rr := run
 
 	claimDecision := lifecycle.EvaluateClaimDecision(domaintypes.JobType(job.JobType), rr.Status)
 
@@ -230,13 +222,12 @@ func (s *ClaimService) Claim(ctx context.Context, nodeID domaintypes.NodeID) (Cl
 		}
 		return ClaimResult{}, claimInternal("failed to build claim response", err)
 	}
-	if claimDecision.AdvanceRunRepoToRunning {
-		if err := s.store.UpdateRunRepoStatus(ctx, store.UpdateRunRepoStatusParams{
-			RunID:  job.RunID,
-			RepoID: job.RepoID,
-			Status: domaintypes.RunRepoStatusRunning,
+	if claimDecision.AdvanceRunToRunning {
+		if err := s.store.UpdateRunStatus(ctx, store.UpdateRunStatusParams{
+			ID:     job.RunID,
+			Status: domaintypes.RunStatusRunning,
 		}); err != nil {
-			slog.Error("claim: failed to transition run repo to Running", "node_id", nodeID, "job_id", job.ID, "run_id", job.RunID, "repo_id", job.RepoID, "err", err)
+			slog.Error("claim: failed to transition run to Running", "node_id", nodeID, "job_id", job.ID, "run_id", job.RunID, "repo_id", job.RepoID, "err", err)
 		}
 	}
 	slog.Info("job claimed",

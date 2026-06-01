@@ -16,8 +16,10 @@ func TestIsTerminalRunStatus(t *testing.T) {
 		status domaintypes.RunStatus
 		want   bool
 	}{
-		{domaintypes.RunStatusStarted, false},
-		{domaintypes.RunStatusFinished, true},
+		{domaintypes.RunStatusQueued, false},
+		{domaintypes.RunStatusRunning, false},
+		{domaintypes.RunStatusSuccess, true},
+		{domaintypes.RunStatusFail, true},
 		{domaintypes.RunStatusCancelled, true},
 	}
 
@@ -31,25 +33,23 @@ func TestIsTerminalRunStatus(t *testing.T) {
 	}
 }
 
-func TestIsTerminalRunRepoStatus(t *testing.T) {
+func TestIsTerminalWaveStatus(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		status domaintypes.RunRepoStatus
+		status domaintypes.WaveStatus
 		want   bool
 	}{
-		{domaintypes.RunRepoStatusQueued, false},
-		{domaintypes.RunRepoStatusRunning, false},
-		{domaintypes.RunRepoStatusSuccess, true},
-		{domaintypes.RunRepoStatusFail, true},
-		{domaintypes.RunRepoStatusCancelled, true},
+		{domaintypes.WaveStatusStarted, false},
+		{domaintypes.WaveStatusFinished, true},
+		{domaintypes.WaveStatusCancelled, true},
 	}
 
 	for _, tc := range tests {
 		t.Run(string(tc.status), func(t *testing.T) {
 			t.Parallel()
-			if got := lifecycle.IsTerminalRunRepoStatus(tc.status); got != tc.want {
-				t.Fatalf("IsTerminalRunRepoStatus(%s) = %v, want %v", tc.status, got, tc.want)
+			if got := lifecycle.IsTerminalWaveStatus(tc.status); got != tc.want {
+				t.Fatalf("IsTerminalWaveStatus(%s) = %v, want %v", tc.status, got, tc.want)
 			}
 		})
 	}
@@ -81,51 +81,51 @@ func TestDeriveBatchStatus(t *testing.T) {
 	}
 }
 
-func TestEvaluateRunCompletionFromRepoCounts(t *testing.T) {
+func TestEvaluateWaveCompletionFromRunCounts(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
 		name       string
-		counts     []store.CountRunReposByStatusRow
+		counts     []store.CountRunsByWaveStatusRow
 		wantFinish bool
 		wantState  migsapi.RunState
 	}{
 		{
 			name: "all success",
-			counts: []store.CountRunReposByStatusRow{
-				{Status: domaintypes.RunRepoStatusSuccess, Count: 2},
+			counts: []store.CountRunsByWaveStatusRow{
+				{Status: domaintypes.RunStatusSuccess, Count: 2},
 			},
 			wantFinish: true,
 			wantState:  migsapi.RunStateSucceeded,
 		},
 		{
 			name: "fail dominates",
-			counts: []store.CountRunReposByStatusRow{
-				{Status: domaintypes.RunRepoStatusSuccess, Count: 1},
-				{Status: domaintypes.RunRepoStatusFail, Count: 1},
+			counts: []store.CountRunsByWaveStatusRow{
+				{Status: domaintypes.RunStatusSuccess, Count: 1},
+				{Status: domaintypes.RunStatusFail, Count: 1},
 			},
 			wantFinish: true,
 			wantState:  migsapi.RunStateFailed,
 		},
 		{
 			name: "cancelled when no fail",
-			counts: []store.CountRunReposByStatusRow{
-				{Status: domaintypes.RunRepoStatusCancelled, Count: 1},
+			counts: []store.CountRunsByWaveStatusRow{
+				{Status: domaintypes.RunStatusCancelled, Count: 1},
 			},
 			wantFinish: true,
 			wantState:  migsapi.RunStateCancelled,
 		},
 		{
 			name: "running blocks completion",
-			counts: []store.CountRunReposByStatusRow{
-				{Status: domaintypes.RunRepoStatusSuccess, Count: 1},
-				{Status: domaintypes.RunRepoStatusRunning, Count: 1},
+			counts: []store.CountRunsByWaveStatusRow{
+				{Status: domaintypes.RunStatusSuccess, Count: 1},
+				{Status: domaintypes.RunStatusRunning, Count: 1},
 			},
 			wantFinish: false,
 		},
 		{
 			name:       "empty counts",
-			counts:     []store.CountRunReposByStatusRow{},
+			counts:     []store.CountRunsByWaveStatusRow{},
 			wantFinish: false,
 		},
 	}
@@ -135,7 +135,7 @@ func TestEvaluateRunCompletionFromRepoCounts(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			eval := lifecycle.EvaluateRunCompletionFromRepoCounts(tc.counts)
+			eval := lifecycle.EvaluateWaveCompletionFromRunCounts(tc.counts)
 			if eval.ShouldFinish != tc.wantFinish {
 				t.Fatalf("ShouldFinish = %v, want %v", eval.ShouldFinish, tc.wantFinish)
 			}

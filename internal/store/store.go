@@ -21,16 +21,17 @@ var ErrInvalidJSON = errors.New("store: invalid JSON for JSONB column")
 // The sqlc-generated Queries type implements the query methods via Querier.
 type Store interface {
 	Querier
-	CancelRunV1(ctx context.Context, runID types.RunID) error
-	CreateRunWithRepos(ctx context.Context, arg CreateRunWithReposParams) (Run, []RunRepo, error)
+	CancelRun(ctx context.Context, runID types.RunID) error
+	CancelWave(ctx context.Context, waveID types.WaveID) error
+	CreateWaveWithRuns(ctx context.Context, arg CreateWaveWithRunsParams) (Wave, []Run, error)
 	Close()
 	Pool() *pgxpool.Pool
 }
 
-// CreateRunWithReposParams contains the complete DB materialization for a mig run.
-type CreateRunWithReposParams struct {
-	Run   CreateRunParams
-	Repos []CreateRunRepoParams
+// CreateWaveWithRunsParams contains the complete DB materialization for one launch.
+type CreateWaveWithRunsParams struct {
+	Wave CreateWaveParams
+	Runs []CreateRunParams
 }
 
 // PgStore wraps a pgxpool connection pool and implements Store.
@@ -85,15 +86,15 @@ func (s *PgStore) Pool() *pgxpool.Pool {
 	return s.pool
 }
 
-// CreateRunWithRepos atomically creates a run and its selected run_repos rows.
-func (s *PgStore) CreateRunWithRepos(ctx context.Context, arg CreateRunWithReposParams) (Run, []RunRepo, error) {
-	if len(arg.Repos) == 0 {
-		return Run{}, nil, errors.New("create run with repos: repos required")
+// CreateWaveWithRuns atomically creates a wave and its selected run rows.
+func (s *PgStore) CreateWaveWithRuns(ctx context.Context, arg CreateWaveWithRunsParams) (Wave, []Run, error) {
+	if len(arg.Runs) == 0 {
+		return Wave{}, nil, errors.New("create wave with runs: runs required")
 	}
 
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
-		return Run{}, nil, fmt.Errorf("create run with repos: begin tx: %w", err)
+		return Wave{}, nil, fmt.Errorf("create wave with runs: begin tx: %w", err)
 	}
 
 	committed := false
@@ -105,35 +106,33 @@ func (s *PgStore) CreateRunWithRepos(ctx context.Context, arg CreateRunWithRepos
 
 	qtx := s.Queries.WithTx(tx)
 
-	run, err := qtx.CreateRun(ctx, arg.Run)
+	wave, err := qtx.CreateWave(ctx, arg.Wave)
 	if err != nil {
-		return Run{}, nil, fmt.Errorf("create run with repos: create run: %w", err)
+		return Wave{}, nil, fmt.Errorf("create wave with runs: create wave: %w", err)
 	}
 
-	runRepos := make([]RunRepo, 0, len(arg.Repos))
-	for _, repo := range arg.Repos {
-		runRepo, err := qtx.CreateRunRepo(ctx, repo)
+	runs := make([]Run, 0, len(arg.Runs))
+	for _, runParams := range arg.Runs {
+		run, err := qtx.CreateRun(ctx, runParams)
 		if err != nil {
-			return Run{}, nil, fmt.Errorf("create run with repos: create run repo %s: %w", repo.RepoID, err)
+			return Wave{}, nil, fmt.Errorf("create wave with runs: create run %s: %w", runParams.ID, err)
 		}
-		runRepos = append(runRepos, runRepo)
+		runs = append(runs, run)
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		return Run{}, nil, fmt.Errorf("create run with repos: commit tx: %w", err)
+		return Wave{}, nil, fmt.Errorf("create wave with runs: commit tx: %w", err)
 	}
 
 	committed = true
-	return run, runRepos, nil
+	return wave, runs, nil
 }
 
-// CancelRunV1 atomically cancels a v1 run and all active child work.
-// It updates run status (if non-terminal), then bulk-cancels active repos/jobs
-// in a single transaction.
-func (s *PgStore) CancelRunV1(ctx context.Context, runID types.RunID) error {
+// CancelRun atomically cancels one run and all active child jobs.
+func (s *PgStore) CancelRun(ctx context.Context, runID types.RunID) error {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
-		return fmt.Errorf("cancel run v1: begin tx: %w", err)
+		return fmt.Errorf("cancel run: begin tx: %w", err)
 	}
 
 	committed := false
@@ -147,30 +146,69 @@ func (s *PgStore) CancelRunV1(ctx context.Context, runID types.RunID) error {
 
 	run, err := qtx.GetRun(ctx, runID)
 	if err != nil {
-		return fmt.Errorf("cancel run v1: get run: %w", err)
+		return fmt.Errorf("cancel run: get run: %w", err)
 	}
 
-	if run.Status != types.RunStatusFinished && run.Status != types.RunStatusCancelled {
+	if run.Status != types.RunStatusSuccess && run.Status != types.RunStatusFail && run.Status != types.RunStatusCancelled {
 		if err := qtx.UpdateRunStatus(ctx, UpdateRunStatusParams{
 			ID:     runID,
 			Status: types.RunStatusCancelled,
 		}); err != nil {
-			return fmt.Errorf("cancel run v1: update run status: %w", err)
+			return fmt.Errorf("cancel run: update run status: %w", err)
 		}
 	}
 
-	if _, err := qtx.CancelActiveRunReposByRun(ctx, runID); err != nil {
-		return fmt.Errorf("cancel run v1: cancel active repos: %w", err)
-	}
-
 	if _, err := qtx.CancelActiveJobsByRun(ctx, runID); err != nil {
-		return fmt.Errorf("cancel run v1: cancel active jobs: %w", err)
+		return fmt.Errorf("cancel run: cancel active jobs: %w", err)
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		return fmt.Errorf("cancel run v1: commit tx: %w", err)
+		return fmt.Errorf("cancel run: commit tx: %w", err)
 	}
 
+	committed = true
+	return nil
+}
+
+// CancelWave atomically cancels one wave and all active child runs/jobs.
+func (s *PgStore) CancelWave(ctx context.Context, waveID types.WaveID) error {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("cancel wave: begin tx: %w", err)
+	}
+
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tx.Rollback(ctx)
+		}
+	}()
+
+	qtx := s.Queries.WithTx(tx)
+	wave, err := qtx.GetWave(ctx, waveID)
+	if err != nil {
+		return fmt.Errorf("cancel wave: get wave: %w", err)
+	}
+	if wave.Status != types.WaveStatusFinished && wave.Status != types.WaveStatusCancelled {
+		if err := qtx.UpdateWaveStatus(ctx, UpdateWaveStatusParams{ID: waveID, Status: types.WaveStatusCancelled}); err != nil {
+			return fmt.Errorf("cancel wave: update wave status: %w", err)
+		}
+	}
+	if _, err := qtx.CancelActiveRunsByWave(ctx, waveID); err != nil {
+		return fmt.Errorf("cancel wave: cancel active runs: %w", err)
+	}
+	runs, err := qtx.ListRunsByWave(ctx, waveID)
+	if err != nil {
+		return fmt.Errorf("cancel wave: list runs: %w", err)
+	}
+	for _, run := range runs {
+		if _, err := qtx.CancelActiveJobsByRun(ctx, run.ID); err != nil {
+			return fmt.Errorf("cancel wave: cancel jobs for run %s: %w", run.ID, err)
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("cancel wave: commit tx: %w", err)
+	}
 	committed = true
 	return nil
 }
@@ -273,10 +311,10 @@ func (s *PgStore) UpdateJobCompletionWithMeta(ctx context.Context, arg UpdateJob
 	return s.Queries.UpdateJobCompletionWithMeta(ctx, arg)
 }
 
-// UpdateRunCompletion validates the Stats JSONB field and completes a run.
-func (s *PgStore) UpdateRunCompletion(ctx context.Context, arg UpdateRunCompletionParams) error {
+// UpdateWaveCompletion validates the Stats JSONB field and completes a wave.
+func (s *PgStore) UpdateWaveCompletion(ctx context.Context, arg UpdateWaveCompletionParams) error {
 	if err := validateJSONB(arg.Stats); err != nil {
-		return fmt.Errorf("runs.stats: %w", err)
+		return fmt.Errorf("waves.stats: %w", err)
 	}
-	return s.Queries.UpdateRunCompletion(ctx, arg)
+	return s.Queries.UpdateWaveCompletion(ctx, arg)
 }

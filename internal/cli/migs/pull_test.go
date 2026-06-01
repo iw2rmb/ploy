@@ -22,7 +22,7 @@ func TestRunPullCommand_Success(t *testing.T) {
 
 	const basePathPrefix = "/api"
 	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewMigRepoID()
+	repoID := domaintypes.NewRepoID()
 
 	// Create a mock server that returns a valid response.
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -30,7 +30,7 @@ func TestRunPullCommand_Success(t *testing.T) {
 		if r.Method != http.MethodPost {
 			t.Errorf("expected POST method, got %s", r.Method)
 		}
-		if !strings.HasPrefix(r.URL.Path, basePathPrefix+"/v1/runs/") || !strings.HasSuffix(r.URL.Path, "/repos/resolve") {
+		if !strings.HasPrefix(r.URL.Path, basePathPrefix+"/v1/runs/") || !strings.HasSuffix(r.URL.Path, "/resolve") {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
 
@@ -191,7 +191,7 @@ func TestMigPullCommand_Success(t *testing.T) {
 
 	const basePathPrefix = "/api"
 	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewMigRepoID()
+	repoID := domaintypes.NewRepoID()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Verify request method and path.
@@ -254,7 +254,7 @@ func TestMigPullCommand_WithLastFailed(t *testing.T) {
 
 	const basePathPrefix = "/api"
 	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewMigRepoID()
+	repoID := domaintypes.NewRepoID()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Parse request body.
@@ -307,7 +307,7 @@ func TestMigPullCommand_DefaultMode(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewMigRepoID()
+	repoID := domaintypes.NewRepoID()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Parse request body.

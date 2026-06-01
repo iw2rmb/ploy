@@ -27,10 +27,14 @@ func StageStatusFromDomain(status domaintypes.JobStatus) (StageState, error) {
 // RunStatusFromDomain converts domain RunStatus to migs API RunState.
 func RunStatusFromDomain(status domaintypes.RunStatus) (RunState, error) {
 	switch status {
-	case domaintypes.RunStatusStarted:
+	case domaintypes.RunStatusQueued:
+		return RunStatePending, nil
+	case domaintypes.RunStatusRunning:
 		return RunStateRunning, nil
-	case domaintypes.RunStatusFinished:
+	case domaintypes.RunStatusSuccess:
 		return RunStateSucceeded, nil
+	case domaintypes.RunStatusFail:
+		return RunStateFailed, nil
 	case domaintypes.RunStatusCancelled:
 		return RunStateCancelled, nil
 	default:

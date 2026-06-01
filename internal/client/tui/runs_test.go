@@ -35,7 +35,7 @@ func TestListRunsCommand(t *testing.T) {
 					"runs": []map[string]any{
 						{
 							"id":         runID.String(),
-							"status":     "Started",
+							"status":     "Running",
 							"mig_id":     migID.String(),
 							"spec_id":    specID.String(),
 							"created_at": time.Now().Format(time.RFC3339),

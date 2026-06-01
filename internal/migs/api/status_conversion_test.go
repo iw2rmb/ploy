@@ -48,8 +48,10 @@ func TestRunStatusFromDomain(t *testing.T) {
 		want    RunState
 		wantErr bool
 	}{
-		{name: "started", input: domaintypes.RunStatusStarted, want: RunStateRunning},
-		{name: "finished", input: domaintypes.RunStatusFinished, want: RunStateSucceeded},
+		{name: "queued", input: domaintypes.RunStatusQueued, want: RunStatePending},
+		{name: "running", input: domaintypes.RunStatusRunning, want: RunStateRunning},
+		{name: "success", input: domaintypes.RunStatusSuccess, want: RunStateSucceeded},
+		{name: "fail", input: domaintypes.RunStatusFail, want: RunStateFailed},
 		{name: "cancelled", input: domaintypes.RunStatusCancelled, want: RunStateCancelled},
 		{name: "unknown", input: domaintypes.RunStatus("unknown"), wantErr: true},
 	}

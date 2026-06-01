@@ -37,7 +37,7 @@ type ListRunRepoDiffsCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
 	RunID   domaintypes.RunID // Run ID (KSUID-backed domain type)
-	RepoID  domaintypes.MigRepoID
+	RepoID  domaintypes.RepoID
 }
 
 // Run executes GET /v1/runs/{run_id}/repos/{repo_id}/diffs and returns all diff entries.
@@ -49,12 +49,7 @@ func (c ListRunRepoDiffsCommand) Run(ctx context.Context) ([]DiffEntry, error) {
 	if c.RunID.IsZero() {
 		return nil, fmt.Errorf("list run repo diffs: run id required")
 	}
-	if c.RepoID.IsZero() {
-		return nil, fmt.Errorf("list run repo diffs: repo id required")
-	}
-
-	// Build endpoint: /v1/runs/{run_id}/repos/{repo_id}/diffs
-	endpoint := c.BaseURL.JoinPath("v1", "runs", c.RunID.String(), "repos", c.RepoID.String(), "diffs")
+	endpoint := c.BaseURL.JoinPath("v1", "runs", c.RunID.String(), "diffs")
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
 	if err != nil {
@@ -89,7 +84,7 @@ type DownloadDiffCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
 	RunID   domaintypes.RunID // Run ID (KSUID-backed domain type)
-	RepoID  domaintypes.MigRepoID
+	RepoID  domaintypes.RepoID
 	DiffID  domaintypes.DiffID
 	// Accumulated requests cumulative patch content up to DiffID.
 	Accumulated bool
@@ -101,7 +96,7 @@ type DownloadDiffGzipCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
 	RunID   domaintypes.RunID // Run ID (KSUID-backed domain type)
-	RepoID  domaintypes.MigRepoID
+	RepoID  domaintypes.RepoID
 	DiffID  domaintypes.DiffID
 	// Accumulated requests cumulative patch content up to DiffID.
 	Accumulated bool
@@ -116,15 +111,11 @@ func (c DownloadDiffCommand) Run(ctx context.Context) ([]byte, error) {
 	if c.RunID.IsZero() {
 		return nil, fmt.Errorf("download diff: run id required")
 	}
-	if c.RepoID.IsZero() {
-		return nil, fmt.Errorf("download diff: repo id required")
-	}
 	if c.DiffID.IsZero() {
 		return nil, fmt.Errorf("download diff: diff id required")
 	}
 
-	// Build endpoint: /v1/runs/{run_id}/repos/{repo_id}/diffs?download=true&diff_id=<uuid>
-	endpoint := c.BaseURL.JoinPath("v1", "runs", c.RunID.String(), "repos", c.RepoID.String(), "diffs")
+	endpoint := c.BaseURL.JoinPath("v1", "runs", c.RunID.String(), "diffs")
 	q := endpoint.Query()
 	q.Set("download", "true")
 	q.Set("diff_id", c.DiffID.String())
@@ -165,14 +156,11 @@ func (c DownloadDiffGzipCommand) Run(ctx context.Context) ([]byte, error) {
 	if c.RunID.IsZero() {
 		return nil, fmt.Errorf("download diff gzip: run id required")
 	}
-	if c.RepoID.IsZero() {
-		return nil, fmt.Errorf("download diff gzip: repo id required")
-	}
 	if c.DiffID.IsZero() {
 		return nil, fmt.Errorf("download diff gzip: diff id required")
 	}
 
-	endpoint := c.BaseURL.JoinPath("v1", "runs", c.RunID.String(), "repos", c.RepoID.String(), "diffs")
+	endpoint := c.BaseURL.JoinPath("v1", "runs", c.RunID.String(), "diffs")
 	q := endpoint.Query()
 	q.Set("download", "true")
 	q.Set("diff_id", c.DiffID.String())

@@ -112,7 +112,7 @@ func TestCountMigRunsCommand(t *testing.T) {
 	makeRun := func(id domaintypes.RunID, mid domaintypes.MigID) map[string]any {
 		return map[string]any{
 			"id":         id.String(),
-			"status":     "Finished",
+			"status":     "Success",
 			"mig_id":     mid.String(),
 			"spec_id":    specID.String(),
 			"created_at": time.Now().Format(time.RFC3339),
@@ -225,7 +225,7 @@ func TestCountMigRunsCommand_PaginatesAllPages(t *testing.T) {
 			}
 			runs[i] = map[string]any{
 				"id":         domaintypes.NewRunID().String(),
-				"status":     "Finished",
+				"status":     "Success",
 				"mig_id":     mid.String(),
 				"spec_id":    specID.String(),
 				"created_at": time.Now().Format(time.RFC3339),

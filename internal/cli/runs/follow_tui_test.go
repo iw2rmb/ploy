@@ -17,7 +17,7 @@ func TestDeriveRunStateFromReport_IgnoresHistoricalJobFailureWhenRepoSucceeded(t
 	report := RunReport{
 		Repos: []RunEntry{
 			{
-				Status: domaintypes.RunRepoStatusSuccess,
+				Status: domaintypes.RunStatusSuccess,
 				Jobs: []RunJobEntry{
 					{Status: domaintypes.JobStatusFail},
 					{Status: domaintypes.JobStatusSuccess},
@@ -37,7 +37,7 @@ func TestDeriveRunStateFromReport_RunningJobKeepsRunNonTerminal(t *testing.T) {
 	report := RunReport{
 		Repos: []RunEntry{
 			{
-				Status: domaintypes.RunRepoStatusCancelled,
+				Status: domaintypes.RunStatusCancelled,
 				Jobs: []RunJobEntry{
 					{Status: domaintypes.JobStatusRunning},
 				},
@@ -56,13 +56,13 @@ func TestDeriveRunStateFromReport_MixedSuccessAndCancelledIsCancelled(t *testing
 	report := RunReport{
 		Repos: []RunEntry{
 			{
-				Status: domaintypes.RunRepoStatusSuccess,
+				Status: domaintypes.RunStatusSuccess,
 				Jobs: []RunJobEntry{
 					{Status: domaintypes.JobStatusSuccess},
 				},
 			},
 			{
-				Status: domaintypes.RunRepoStatusCancelled,
+				Status: domaintypes.RunStatusCancelled,
 				Jobs: []RunJobEntry{
 					{Status: domaintypes.JobStatusCancelled},
 				},
@@ -126,19 +126,19 @@ func TestFollowModelFinalViewUsesStatusSnapshotSemantics(t *testing.T) {
 		SpecID:  domaintypes.NewSpecID(),
 		Repos: []RunEntry{
 			{
-				RepoID:  domaintypes.NewMigRepoID(),
+				RepoID:  domaintypes.NewRepoID(),
 				RepoURL: "https://github.com/acme/one.git",
 				BaseRef: "main",
-				Status:  domaintypes.RunRepoStatusSuccess,
+				Status:  domaintypes.RunStatusSuccess,
 				Jobs: []RunJobEntry{
 					{JobID: domaintypes.NewJobID(), JobType: "mig", Status: domaintypes.JobStatusSuccess},
 				},
 			},
 			{
-				RepoID:  domaintypes.NewMigRepoID(),
+				RepoID:  domaintypes.NewRepoID(),
 				RepoURL: "https://github.com/acme/two.git",
 				BaseRef: "main",
-				Status:  domaintypes.RunRepoStatusSuccess,
+				Status:  domaintypes.RunStatusSuccess,
 				Jobs: []RunJobEntry{
 					{JobID: domaintypes.NewJobID(), JobType: "mig", Status: domaintypes.JobStatusSuccess},
 				},
@@ -194,17 +194,17 @@ func TestFollowModelViewFiltersToRunningRepos(t *testing.T) {
 		SpecID:  domaintypes.NewSpecID(),
 		Repos: []RunEntry{
 			{
-				RepoID:  domaintypes.NewMigRepoID(),
+				RepoID:  domaintypes.NewRepoID(),
 				RepoURL: "https://github.com/acme/running.git",
-				Status:  domaintypes.RunRepoStatusRunning,
+				Status:  domaintypes.RunStatusRunning,
 				Jobs: []RunJobEntry{
 					{JobID: domaintypes.NewJobID(), JobType: "mig", Status: domaintypes.JobStatusRunning},
 				},
 			},
 			{
-				RepoID:  domaintypes.NewMigRepoID(),
+				RepoID:  domaintypes.NewRepoID(),
 				RepoURL: "https://github.com/acme/done.git",
-				Status:  domaintypes.RunRepoStatusSuccess,
+				Status:  domaintypes.RunStatusSuccess,
 				Jobs: []RunJobEntry{
 					{JobID: domaintypes.NewJobID(), JobType: "mig", Status: domaintypes.JobStatusSuccess},
 				},
@@ -233,17 +233,17 @@ func TestFollowModelViewShowsNoRunningReposMessage(t *testing.T) {
 		SpecID:  domaintypes.NewSpecID(),
 		Repos: []RunEntry{
 			{
-				RepoID:  domaintypes.NewMigRepoID(),
+				RepoID:  domaintypes.NewRepoID(),
 				RepoURL: "https://github.com/acme/done.git",
-				Status:  domaintypes.RunRepoStatusFail,
+				Status:  domaintypes.RunStatusFail,
 				Jobs: []RunJobEntry{
 					{JobID: domaintypes.NewJobID(), JobType: "mig", Status: domaintypes.JobStatusFail},
 				},
 			},
 			{
-				RepoID:  domaintypes.NewMigRepoID(),
+				RepoID:  domaintypes.NewRepoID(),
 				RepoURL: "https://github.com/acme/success.git",
-				Status:  domaintypes.RunRepoStatusSuccess,
+				Status:  domaintypes.RunStatusSuccess,
 				Jobs: []RunJobEntry{
 					{JobID: domaintypes.NewJobID(), JobType: "mig", Status: domaintypes.JobStatusSuccess},
 				},
@@ -269,9 +269,9 @@ func TestFollowModelViewSingleRepoKeepsRepoVisibleWithoutRunningJobs(t *testing.
 		SpecID:  domaintypes.NewSpecID(),
 		Repos: []RunEntry{
 			{
-				RepoID:  domaintypes.NewMigRepoID(),
+				RepoID:  domaintypes.NewRepoID(),
 				RepoURL: "https://github.com/acme/done.git",
-				Status:  domaintypes.RunRepoStatusSuccess,
+				Status:  domaintypes.RunStatusSuccess,
 				Jobs: []RunJobEntry{
 					{JobID: domaintypes.NewJobID(), JobType: "mig", Status: domaintypes.JobStatusSuccess},
 				},
@@ -300,19 +300,19 @@ func TestWriteFinalStatusSnapshot_NonTTYUsesStatusRenderer(t *testing.T) {
 		SpecID:  domaintypes.NewSpecID(),
 		Repos: []RunEntry{
 			{
-				RepoID:  domaintypes.NewMigRepoID(),
+				RepoID:  domaintypes.NewRepoID(),
 				RepoURL: "https://github.com/acme/running.git",
 				BaseRef: "main",
-				Status:  domaintypes.RunRepoStatusRunning,
+				Status:  domaintypes.RunStatusRunning,
 				Jobs: []RunJobEntry{
 					{JobID: domaintypes.NewJobID(), JobType: "mig", Status: domaintypes.JobStatusRunning},
 				},
 			},
 			{
-				RepoID:  domaintypes.NewMigRepoID(),
+				RepoID:  domaintypes.NewRepoID(),
 				RepoURL: "https://github.com/acme/done.git",
 				BaseRef: "main",
-				Status:  domaintypes.RunRepoStatusSuccess,
+				Status:  domaintypes.RunStatusSuccess,
 				Jobs: []RunJobEntry{
 					{JobID: domaintypes.NewJobID(), JobType: "mig", Status: domaintypes.JobStatusSuccess},
 				},

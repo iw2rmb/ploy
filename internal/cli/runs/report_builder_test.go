@@ -18,7 +18,7 @@ func TestGetRunReportCommandAssemblesCanonicalReport(t *testing.T) {
 	runID := domaintypes.NewRunID()
 	migID := domaintypes.NewMigID()
 	specID := domaintypes.NewSpecID()
-	repoID := domaintypes.NewMigRepoID()
+	repoID := domaintypes.NewRepoID()
 	jobID1 := domaintypes.NewJobID()
 	jobID2 := domaintypes.NewJobID()
 	diffID1 := domaintypes.DiffID("11111111-1111-1111-1111-111111111111")
@@ -29,10 +29,15 @@ func TestGetRunReportCommandAssemblesCanonicalReport(t *testing.T) {
 		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/runs/"+runID.String():
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"id":         runID.String(),
-				"status":     "Started",
+				"status":     "Running",
 				"mig_id":     migID.String(),
 				"mig_name":   "java17-upgrade",
 				"spec_id":    specID.String(),
+				"repo_id":    repoID.String(),
+				"repo_url":   "https://github.com/acme/service.git",
+				"base_ref":   "main",
+				"attempt":    2,
+				"last_error": "build failed",
 				"created_at": "2026-02-24T08:00:00Z",
 			})
 		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/runs/"+runID.String()+"/status":
@@ -75,7 +80,7 @@ func TestGetRunReportCommandAssemblesCanonicalReport(t *testing.T) {
 					},
 				},
 			})
-		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/jobs":
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/runs/"+runID.String()+"/jobs":
 			if got := r.URL.Query().Get("attempt"); got != "2" {
 				t.Fatalf("expected attempt=2, got %q", got)
 			}
@@ -108,7 +113,7 @@ func TestGetRunReportCommandAssemblesCanonicalReport(t *testing.T) {
 					},
 				},
 			})
-		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/diffs":
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/runs/"+runID.String()+"/diffs":
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"diffs": []map[string]any{
 					{
@@ -161,7 +166,7 @@ func TestGetRunReportCommandAssemblesCanonicalReport(t *testing.T) {
 	if entry.PatchURL == "" {
 		t.Fatalf("expected repo patch URL to be populated")
 	}
-	assertURL(t, entry.PatchURL, "/api/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/diffs", map[string]string{
+	assertURL(t, entry.PatchURL, "/api/v1/runs/"+runID.String()+"/diffs", map[string]string{
 		"download":    "true",
 		"diff_id":     diffID2.String(),
 		"accumulated": "true",
@@ -173,7 +178,7 @@ func TestGetRunReportCommandAssemblesCanonicalReport(t *testing.T) {
 
 	job0 := entry.Jobs[0]
 	assertURL(t, job0.JobLogURL, "/api/v1/jobs/"+jobID1.String()+"/logs", nil)
-	assertURL(t, job0.PatchURL, "/api/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/diffs", map[string]string{
+	assertURL(t, job0.PatchURL, "/api/v1/runs/"+runID.String()+"/diffs", map[string]string{
 		"download":    "true",
 		"diff_id":     diffID2.String(),
 		"accumulated": "true",
@@ -209,7 +214,7 @@ func TestGetRunReportCommandMissingOptionalFields(t *testing.T) {
 	runID := domaintypes.NewRunID()
 	migID := domaintypes.NewMigID()
 	specID := domaintypes.NewSpecID()
-	repoID := domaintypes.NewMigRepoID()
+	repoID := domaintypes.NewRepoID()
 	jobID := domaintypes.NewJobID()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -217,10 +222,14 @@ func TestGetRunReportCommandMissingOptionalFields(t *testing.T) {
 		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/runs/"+runID.String():
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"id":         runID.String(),
-				"status":     "Started",
+				"status":     "Queued",
 				"mig_id":     migID.String(),
 				"mig_name":   "empty-diffs",
 				"spec_id":    specID.String(),
+				"repo_id":    repoID.String(),
+				"repo_url":   "https://github.com/acme/empty.git",
+				"base_ref":   "main",
+				"attempt":    1,
 				"created_at": "2026-02-24T09:00:00Z",
 			})
 		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/runs/"+runID.String()+"/status":
@@ -243,7 +252,7 @@ func TestGetRunReportCommandMissingOptionalFields(t *testing.T) {
 					},
 				},
 			})
-		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/jobs":
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/runs/"+runID.String()+"/jobs":
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"run_id":  runID.String(),
 				"repo_id": repoID.String(),
@@ -261,7 +270,7 @@ func TestGetRunReportCommandMissingOptionalFields(t *testing.T) {
 					},
 				},
 			})
-		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/diffs":
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/runs/"+runID.String()+"/diffs":
 			_ = json.NewEncoder(w).Encode(map[string]any{"diffs": []map[string]any{}})
 		default:
 			http.NotFound(w, r)
@@ -304,16 +313,21 @@ func TestGetRunReportCommandEmptyReposUsesEmptySlices(t *testing.T) {
 	runID := domaintypes.NewRunID()
 	migID := domaintypes.NewMigID()
 	specID := domaintypes.NewSpecID()
+	repoID := domaintypes.NewRepoID()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/runs/"+runID.String():
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"id":         runID.String(),
-				"status":     "Started",
+				"status":     "Running",
 				"mig_id":     migID.String(),
 				"mig_name":   "no-repos",
 				"spec_id":    specID.String(),
+				"repo_id":    repoID.String(),
+				"repo_url":   "https://github.com/acme/no-repos.git",
+				"base_ref":   "main",
+				"attempt":    1,
 				"created_at": "2026-02-24T10:00:00Z",
 			})
 		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/runs/"+runID.String()+"/status":
@@ -322,8 +336,10 @@ func TestGetRunReportCommandEmptyReposUsesEmptySlices(t *testing.T) {
 				"state":  "running",
 				"stages": map[string]any{},
 			})
-		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/runs/"+runID.String()+"/repos":
-			_ = json.NewEncoder(w).Encode(map[string]any{"repos": []map[string]any{}})
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/runs/"+runID.String()+"/jobs":
+			_ = json.NewEncoder(w).Encode(map[string]any{"jobs": []map[string]any{}})
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/runs/"+runID.String()+"/diffs":
+			_ = json.NewEncoder(w).Encode(map[string]any{"diffs": []map[string]any{}})
 		default:
 			http.NotFound(w, r)
 		}
@@ -344,11 +360,8 @@ func TestGetRunReportCommandEmptyReposUsesEmptySlices(t *testing.T) {
 		t.Fatalf("GetRunReportCommand.Run error: %v", err)
 	}
 
-	if report.Repos == nil {
-		t.Fatal("expected repos slice to be non-nil")
-	}
-	if len(report.Repos) != 0 {
-		t.Fatalf("expected empty repos, got %d", len(report.Repos))
+	if len(report.Repos) != 1 {
+		t.Fatalf("expected one run entry, got %d", len(report.Repos))
 	}
 }
 

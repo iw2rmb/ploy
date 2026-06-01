@@ -20,20 +20,20 @@ const (
 	DerivedStatusCancelled = "cancelled"
 )
 
-// IsTerminalRunStatus reports whether the run status is terminal (no further transitions).
+// IsTerminalRunStatus reports whether the run status is terminal.
 func IsTerminalRunStatus(status domaintypes.RunStatus) bool {
 	switch status {
-	case domaintypes.RunStatusFinished, domaintypes.RunStatusCancelled:
+	case domaintypes.RunStatusSuccess, domaintypes.RunStatusFail, domaintypes.RunStatusCancelled:
 		return true
 	default:
 		return false
 	}
 }
 
-// IsTerminalRunRepoStatus reports whether the run repo status is terminal.
-func IsTerminalRunRepoStatus(status domaintypes.RunRepoStatus) bool {
+// IsTerminalWaveStatus reports whether the wave status is terminal.
+func IsTerminalWaveStatus(status domaintypes.WaveStatus) bool {
 	switch status {
-	case domaintypes.RunRepoStatusSuccess, domaintypes.RunRepoStatusFail, domaintypes.RunRepoStatusCancelled:
+	case domaintypes.WaveStatusFinished, domaintypes.WaveStatusCancelled:
 		return true
 	default:
 		return false
@@ -71,7 +71,7 @@ type RunCompletionEval struct {
 // EvaluateRunCompletionFromRepoCounts determines whether a run can be marked Finished.
 // Returns ShouldFinish=true when all repos are in terminal states, along with the
 // derived run state (succeeded, failed, or cancelled).
-func EvaluateRunCompletionFromRepoCounts(counts []store.CountRunReposByStatusRow) RunCompletionEval {
+func EvaluateWaveCompletionFromRunCounts(counts []store.CountRunsByWaveStatusRow) RunCompletionEval {
 	var (
 		total        int32
 		terminal     int32
@@ -81,13 +81,13 @@ func EvaluateRunCompletionFromRepoCounts(counts []store.CountRunReposByStatusRow
 	for _, row := range counts {
 		total += row.Count
 		switch row.Status {
-		case domaintypes.RunRepoStatusSuccess, domaintypes.RunRepoStatusFail, domaintypes.RunRepoStatusCancelled:
+		case domaintypes.RunStatusSuccess, domaintypes.RunStatusFail, domaintypes.RunStatusCancelled:
 			terminal += row.Count
 		}
-		if row.Status == domaintypes.RunRepoStatusFail && row.Count > 0 {
+		if row.Status == domaintypes.RunStatusFail && row.Count > 0 {
 			anyFail = true
 		}
-		if row.Status == domaintypes.RunRepoStatusCancelled && row.Count > 0 {
+		if row.Status == domaintypes.RunStatusCancelled && row.Count > 0 {
 			anyCancelled = true
 		}
 	}

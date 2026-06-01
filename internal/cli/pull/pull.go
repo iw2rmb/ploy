@@ -23,6 +23,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/iw2rmb/ploy/internal/cli/common"
+	"github.com/iw2rmb/ploy/internal/cli/httpx"
 	"io"
 	"net/http"
 	"net/url"
@@ -331,7 +332,34 @@ func initiatePullRun(ctx context.Context, httpClient *http.Client, baseURL *url.
 		return "", fmt.Errorf("pull: create run: %w", err)
 	}
 
-	return result.RunID, nil
+	return firstRunIDForWave(ctx, httpClient, baseURL, result.WaveID)
+}
+
+func firstRunIDForWave(ctx context.Context, httpClient *http.Client, baseURL *url.URL, waveID domaintypes.WaveID) (domaintypes.RunID, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, baseURL.JoinPath("v1", "waves", waveID.String(), "runs").String(), nil)
+	if err != nil {
+		return "", err
+	}
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer httpx.DrainAndClose(resp)
+	if resp.StatusCode != http.StatusOK {
+		return "", httpx.WrapError("pull: list wave runs", resp.Status, resp.Body)
+	}
+	var payload struct {
+		Runs []struct {
+			RunID domaintypes.RunID `json:"run_id"`
+		} `json:"runs"`
+	}
+	if err := httpx.DecodeResponseJSON(resp.Body, &payload, httpx.MaxJSONBodyBytes); err != nil {
+		return "", err
+	}
+	if len(payload.Runs) == 0 || payload.Runs[0].RunID.IsZero() {
+		return "", fmt.Errorf("wave %s has no runs", waveID)
+	}
+	return payload.Runs[0].RunID, nil
 }
 
 // followPullRun follows the run until terminal state.
@@ -456,26 +484,14 @@ func isTerminalRunState(s migsapi.RunState) bool {
 
 func mapRunSummaryToRunState(summary domaintypes.RunSummary) (migsapi.RunState, error) {
 	switch summary.Status {
-	case domaintypes.RunStatusStarted:
+	case domaintypes.RunStatusQueued, domaintypes.RunStatusRunning:
 		return migsapi.RunStateRunning, nil
 	case domaintypes.RunStatusCancelled:
 		return migsapi.RunStateCancelled, nil
-	case domaintypes.RunStatusFinished:
-		if summary.Counts != nil {
-			switch strings.ToLower(strings.TrimSpace(summary.Counts.DerivedStatus)) {
-			case "completed":
-				return migsapi.RunStateSucceeded, nil
-			case "error":
-				return migsapi.RunStateError, nil
-			case "failed":
-				return migsapi.RunStateFailed, nil
-			case "cancelled":
-				return migsapi.RunStateCancelled, nil
-			case "running", "pending":
-				return migsapi.RunStateRunning, nil
-			}
-		}
+	case domaintypes.RunStatusSuccess:
 		return migsapi.RunStateSucceeded, nil
+	case domaintypes.RunStatusFail:
+		return migsapi.RunStateFailed, nil
 	default:
 		return "", fmt.Errorf("unknown run status %q", summary.Status)
 	}

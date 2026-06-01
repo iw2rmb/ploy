@@ -11,11 +11,11 @@ import (
 // RepoAttemptReconcileEval is the pure evaluation result for repo-attempt completion.
 type RepoAttemptReconcileEval struct {
 	ShouldUpdate bool
-	Status       domaintypes.RunRepoStatus
+	Status       domaintypes.RunStatus
 	LastJob      *store.Job
 }
 
-// EvaluateRepoAttemptTerminalStatus determines whether run_repos.status can be finalized.
+// EvaluateRepoAttemptTerminalStatus determines whether runs.status can be finalized.
 func EvaluateRepoAttemptTerminalStatus(jobs []store.Job) (RepoAttemptReconcileEval, error) {
 	var (
 		byNextIDMeta  *store.Job
@@ -60,21 +60,21 @@ func EvaluateRepoAttemptTerminalStatus(jobs []store.Job) (RepoAttemptReconcileEv
 		lastJob = byNextIDMeta
 	}
 
-	var repoStatus domaintypes.RunRepoStatus
+	var runStatus domaintypes.RunStatus
 	switch lastJob.Status {
 	case domaintypes.JobStatusSuccess:
-		repoStatus = domaintypes.RunRepoStatusSuccess
+		runStatus = domaintypes.RunStatusSuccess
 	case domaintypes.JobStatusFail, domaintypes.JobStatusError:
-		repoStatus = domaintypes.RunRepoStatusFail
+		runStatus = domaintypes.RunStatusFail
 	case domaintypes.JobStatusCancelled:
-		repoStatus = domaintypes.RunRepoStatusCancelled
+		runStatus = domaintypes.RunStatusCancelled
 	default:
 		return RepoAttemptReconcileEval{}, fmt.Errorf("unexpected last job status %q for job_id=%s", lastJob.Status, lastJob.ID)
 	}
 
 	return RepoAttemptReconcileEval{
 		ShouldUpdate: true,
-		Status:       repoStatus,
+		Status:       runStatus,
 		LastJob:      lastJob,
 	}, nil
 }

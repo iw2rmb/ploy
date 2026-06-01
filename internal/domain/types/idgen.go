@@ -20,6 +20,11 @@ func NewRunID() RunID {
 	return RunID(ksuid.New().String())
 }
 
+// NewWaveID generates a new unique WaveID using KSUID.
+func NewWaveID() WaveID {
+	return WaveID(ksuid.New().String())
+}
+
 // NewJobID generates a new unique JobID using KSUID.
 // Jobs are the unit of work assignment to nodes, and KSUID provides
 // time-sortable identifiers that allow efficient queries by creation time.

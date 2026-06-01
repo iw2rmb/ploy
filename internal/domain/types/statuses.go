@@ -61,64 +61,22 @@ func (s JobStatus) Value() (driver.Value, error) {
 	return string(s), nil
 }
 
-// RunRepoStatus is the canonical per-repo status within a run.
-type RunRepoStatus string
-
-const (
-	RunRepoStatusQueued    RunRepoStatus = "Queued"
-	RunRepoStatusRunning   RunRepoStatus = "Running"
-	RunRepoStatusCancelled RunRepoStatus = "Cancelled"
-	RunRepoStatusFail      RunRepoStatus = "Fail"
-	RunRepoStatusSuccess   RunRepoStatus = "Success"
-)
-
-func (s RunRepoStatus) String() string { return string(s) }
-
-func (s RunRepoStatus) Validate() error {
-	switch s {
-	case RunRepoStatusQueued, RunRepoStatusRunning, RunRepoStatusCancelled, RunRepoStatusFail, RunRepoStatusSuccess:
-		return nil
-	default:
-		return fmt.Errorf("invalid run repo status %q", s)
-	}
-}
-
-func (s *RunRepoStatus) Scan(src interface{}) error {
-	switch v := src.(type) {
-	case []byte:
-		*s = RunRepoStatus(v)
-	case string:
-		*s = RunRepoStatus(v)
-	default:
-		return fmt.Errorf("unsupported scan type for RunRepoStatus: %T", src)
-	}
-	if err := s.Validate(); err != nil {
-		return fmt.Errorf("unknown RunRepoStatus value: %q", string(*s))
-	}
-	return nil
-}
-
-func (s RunRepoStatus) Value() (driver.Value, error) {
-	if err := s.Validate(); err != nil {
-		return nil, err
-	}
-	return string(s), nil
-}
-
-// RunStatus is the canonical lifecycle status for a run.
+// RunStatus is the canonical lifecycle status for one repo execution.
 type RunStatus string
 
 const (
-	RunStatusStarted   RunStatus = "Started"
+	RunStatusQueued    RunStatus = "Queued"
+	RunStatusRunning   RunStatus = "Running"
 	RunStatusCancelled RunStatus = "Cancelled"
-	RunStatusFinished  RunStatus = "Finished"
+	RunStatusFail      RunStatus = "Fail"
+	RunStatusSuccess   RunStatus = "Success"
 )
 
 func (s RunStatus) String() string { return string(s) }
 
 func (s RunStatus) Validate() error {
 	switch s {
-	case RunStatusStarted, RunStatusCancelled, RunStatusFinished:
+	case RunStatusQueued, RunStatusRunning, RunStatusCancelled, RunStatusFail, RunStatusSuccess:
 		return nil
 	default:
 		return fmt.Errorf("invalid run status %q", s)
@@ -141,6 +99,48 @@ func (s *RunStatus) Scan(src interface{}) error {
 }
 
 func (s RunStatus) Value() (driver.Value, error) {
+	if err := s.Validate(); err != nil {
+		return nil, err
+	}
+	return string(s), nil
+}
+
+// WaveStatus is the canonical lifecycle status for a launch wave.
+type WaveStatus string
+
+const (
+	WaveStatusStarted   WaveStatus = "Started"
+	WaveStatusCancelled WaveStatus = "Cancelled"
+	WaveStatusFinished  WaveStatus = "Finished"
+)
+
+func (s WaveStatus) String() string { return string(s) }
+
+func (s WaveStatus) Validate() error {
+	switch s {
+	case WaveStatusStarted, WaveStatusCancelled, WaveStatusFinished:
+		return nil
+	default:
+		return fmt.Errorf("invalid wave status %q", s)
+	}
+}
+
+func (s *WaveStatus) Scan(src interface{}) error {
+	switch v := src.(type) {
+	case []byte:
+		*s = WaveStatus(v)
+	case string:
+		*s = WaveStatus(v)
+	default:
+		return fmt.Errorf("unsupported scan type for WaveStatus: %T", src)
+	}
+	if err := s.Validate(); err != nil {
+		return fmt.Errorf("unknown WaveStatus value: %q", string(*s))
+	}
+	return nil
+}
+
+func (s WaveStatus) Value() (driver.Value, error) {
 	if err := s.Validate(); err != nil {
 		return nil, err
 	}

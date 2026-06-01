@@ -15,7 +15,7 @@ func TestRenderRunReportJSON(t *testing.T) {
 	runID := domaintypes.NewRunID()
 	migID := domaintypes.NewMigID()
 	specID := domaintypes.NewSpecID()
-	repoID := domaintypes.NewMigRepoID()
+	repoID := domaintypes.NewRepoID()
 	jobID := domaintypes.NewJobID()
 
 	report := RunReport{
@@ -101,7 +101,7 @@ func TestRenderRunReportJSONOmitsEmptyOptionalFields(t *testing.T) {
 		SpecID:  domaintypes.NewSpecID(),
 		Repos: []RunEntry{
 			{
-				RepoID:  domaintypes.NewMigRepoID(),
+				RepoID:  domaintypes.NewRepoID(),
 				RepoURL: "https://github.com/acme/minimal.git",
 				BaseRef: "main",
 				Status:  "Queued",

@@ -16,6 +16,7 @@ Available Commands:
   spec        Inspect and validate mig specs
   tui         Interactive TUI for migrations, runs, and jobs
   version     Print version information
+  wave        Inspect and control launch waves
 
 Flags:
   -h, --help      help for ploy

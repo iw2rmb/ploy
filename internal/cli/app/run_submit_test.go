@@ -199,7 +199,7 @@ func TestRunSubmitPullDownloadsFinalArtifacts(t *testing.T) {
 		RunID:   runID,
 		MigID:   domaintypes.NewMigID().String(),
 		SpecID:  domaintypes.NewSpecID().String(),
-		RepoID:  domaintypes.NewMigRepoID().String(),
+		RepoID:  domaintypes.NewRepoID().String(),
 		JobID:   domaintypes.NewJobID().String(),
 		RepoURL: "https://gitlab.example.com/acme/service.git",
 		Ref:     "main",
@@ -233,7 +233,7 @@ func TestRunSubmitApplyAppliesFinalPatch(t *testing.T) {
 		RunID:     runID,
 		MigID:     domaintypes.NewMigID().String(),
 		SpecID:    domaintypes.NewSpecID().String(),
-		RepoID:    domaintypes.NewMigRepoID().String(),
+		RepoID:    domaintypes.NewRepoID().String(),
 		JobID:     domaintypes.NewJobID().String(),
 		RepoURL:   "https://gitlab.example.com/acme/service.git",
 		Ref:       sourceSHA,
@@ -289,11 +289,16 @@ func newSuccessfulRunSubmitServer(t *testing.T, cfg successfulRunSubmitConfig) *
 			})
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/runs/"+cfg.RunID:
 			_ = json.NewEncoder(w).Encode(map[string]any{
-				"id":         cfg.RunID,
-				"status":     "Finished",
-				"mig_id":     cfg.MigID,
-				"spec_id":    cfg.SpecID,
-				"created_at": "2026-05-28T00:00:00Z",
+				"id":                cfg.RunID,
+				"status":            "Success",
+				"mig_id":            cfg.MigID,
+				"spec_id":           cfg.SpecID,
+				"repo_id":           cfg.RepoID,
+				"repo_url":          cfg.RepoURL,
+				"base_ref":          cfg.Ref,
+				"source_commit_sha": sourceSHA,
+				"attempt":           1,
+				"created_at":        "2026-05-28T00:00:00Z",
 			})
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/runs/"+cfg.RunID+"/status":
 			_ = json.NewEncoder(w).Encode(map[string]any{
@@ -319,7 +324,7 @@ func newSuccessfulRunSubmitServer(t *testing.T, cfg successfulRunSubmitConfig) *
 					"created_at":        "2026-05-28T00:00:00Z",
 				}},
 			})
-		case r.Method == http.MethodGet && r.URL.Path == "/v1/runs/"+cfg.RunID+"/repos/"+cfg.RepoID+"/jobs":
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/runs/"+cfg.RunID+"/jobs":
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"run_id":  cfg.RunID,
 				"repo_id": cfg.RepoID,
@@ -331,14 +336,14 @@ func newSuccessfulRunSubmitServer(t *testing.T, cfg successfulRunSubmitConfig) *
 					"status":    "Success",
 				}},
 			})
-		case r.Method == http.MethodPost && r.URL.Path == "/v1/runs/"+cfg.RunID+"/repos/resolve":
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/runs/"+cfg.RunID+"/resolve":
 			_ = json.NewEncoder(w).Encode(map[string]string{
 				"run_id":            cfg.RunID,
 				"repo_id":           cfg.RepoID,
 				"repo_url":          cfg.RepoURL,
 				"source_commit_sha": sourceSHA,
 			})
-		case r.Method == http.MethodGet && r.URL.Path == "/v1/runs/"+cfg.RunID+"/repos/"+cfg.RepoID+"/diffs" && r.URL.Query().Get("download") != "true":
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/runs/"+cfg.RunID+"/diffs" && r.URL.Query().Get("download") != "true":
 			diffs := []map[string]any{}
 			if len(cfg.Patch) > 0 {
 				diffs = append(diffs, map[string]any{
@@ -349,7 +354,7 @@ func newSuccessfulRunSubmitServer(t *testing.T, cfg successfulRunSubmitConfig) *
 				})
 			}
 			_ = json.NewEncoder(w).Encode(map[string]any{"diffs": diffs})
-		case r.Method == http.MethodGet && r.URL.Path == "/v1/runs/"+cfg.RunID+"/repos/"+cfg.RepoID+"/diffs" && r.URL.Query().Get("download") == "true":
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/runs/"+cfg.RunID+"/diffs" && r.URL.Query().Get("download") == "true":
 			w.Header().Set("Content-Type", "application/gzip")
 			gz := gzip.NewWriter(w)
 			_, _ = gz.Write(cfg.Patch)

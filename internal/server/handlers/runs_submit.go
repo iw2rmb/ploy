@@ -127,32 +127,32 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service, g
 			return
 		}
 
-		// Create run
 		runID := domaintypes.NewRunID()
-		run, err := st.CreateRun(r.Context(), store.CreateRunParams{
-			ID:        runID,
-			MigID:     migID,
-			SpecID:    createdSpec.ID,
-			CreatedBy: createdByPtr,
+		waveID := domaintypes.WaveID(runID.String())
+		wave, runs, err := st.CreateWaveWithRuns(r.Context(), store.CreateWaveWithRunsParams{
+			Wave: store.CreateWaveParams{
+				ID:        waveID,
+				MigID:     migID,
+				SpecID:    createdSpec.ID,
+				CreatedBy: createdByPtr,
+			},
+			Runs: []store.CreateRunParams{{
+				ID:              runID,
+				WaveID:          waveID,
+				MigID:           migID,
+				SpecID:          createdSpec.ID,
+				RepoID:          migRepo.RepoID,
+				RepoBaseRef:     migRepo.BaseRef,
+				SourceCommitSha: sourceCommitSHA,
+				RepoSha0:        sourceCommitSHA,
+				CreatedBy:       createdByPtr,
+			}},
 		})
 		if err != nil {
 			serverError(w, "create single-repo run", "create run", err, "run_id", runID)
 			return
 		}
-
-		// Create run_repo entry.
-		runRepo, err := st.CreateRunRepo(r.Context(), store.CreateRunRepoParams{
-			MigID:           migID,
-			RunID:           run.ID,
-			RepoID:          migRepo.RepoID,
-			RepoBaseRef:     migRepo.BaseRef,
-			SourceCommitSha: sourceCommitSHA,
-			RepoSha0:        sourceCommitSHA,
-		})
-		if err != nil {
-			serverError(w, "create single-repo run", "create run repo", err, "run_id", run.ID, "repo_id", migRepo.RepoID)
-			return
-		}
+		run := runs[0]
 
 		// Build response with run_id, mig_id, and spec_id.
 		resp := struct {
@@ -180,7 +180,9 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service, g
 				Submitter:  "",
 				Repository: normalizedRepoURL,
 				Metadata: map[string]string{
-					"repo_base_ref": migRepo.BaseRef,
+					"repo_id":           run.RepoID.String(),
+					"repo_base_ref":     migRepo.BaseRef,
+					"source_commit_sha": run.SourceCommitSha,
 				},
 				CreatedAt: timeOrZero(run.CreatedAt),
 				UpdatedAt: time.Now().UTC(),
@@ -195,9 +197,10 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service, g
 
 		slog.Info("single-repo run created",
 			"run_id", run.ID,
+			"wave_id", wave.ID,
 			"mig_id", migID.String(),
 			"spec_id", createdSpec.ID,
-			"repo_id", runRepo.RepoID,
+			"repo_id", run.RepoID,
 			"repo_url", normalizedRepoURL,
 			"ref", sourceRef,
 		)

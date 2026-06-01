@@ -57,7 +57,7 @@ func buildClaimResponsePayload(
 	configHolder *ConfigHolder,
 	run store.Run,
 	spec []byte,
-	runRepo store.RunRepo,
+	runRepo store.Run,
 	repoURL string,
 	job store.Job,
 ) (claimResponsePayload, error) {
@@ -160,15 +160,15 @@ func buildClaimResponsePayload(
 func buildActionClaimResponsePayload(
 	run store.Run,
 	spec []byte,
-	runRepo store.RunRepo,
+	runRepo store.Run,
 	repoURL string,
-	action store.RunRepoAction,
+	action store.RunAction,
 ) claimResponsePayload {
 	return claimResponsePayload{
 		WorkType:      "action",
 		RunID:         run.ID,
 		Name:          nil,
-		RepoID:        action.RepoID,
+		RepoID:        run.RepoID,
 		Attempt:       action.Attempt,
 		JobID:         "",
 		JobName:       "",
@@ -217,7 +217,7 @@ func buildAndSendJobClaimResponse(
 	configHolder *ConfigHolder,
 	run store.Run,
 	spec []byte,
-	runRepo store.RunRepo,
+	runRepo store.Run,
 	repoURL string,
 	job store.Job,
 ) error {

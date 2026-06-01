@@ -13,17 +13,17 @@ import (
 )
 
 // mockStore implements store.Store for testing.
-// Uses types.RunID (KSUID-backed) per the typed IDs migration.
+// Uses types.WaveID (KSUID-backed) per the typed IDs migration.
 type mockStore struct {
 	store.Store
-	listRunsWithQueuedReposResult []types.RunID
-	listRunsWithQueuedReposErr    error
-	listRunsWithQueuedReposCalled bool
+	listWavesWithQueuedRunsResult []types.WaveID
+	listWavesWithQueuedRunsErr    error
+	listWavesWithQueuedRunsCalled bool
 }
 
-func (m *mockStore) ListRunsWithQueuedRepos(ctx context.Context) ([]types.RunID, error) {
-	m.listRunsWithQueuedReposCalled = true
-	return m.listRunsWithQueuedReposResult, m.listRunsWithQueuedReposErr
+func (m *mockStore) ListWavesWithQueuedRuns(ctx context.Context) ([]types.WaveID, error) {
+	m.listWavesWithQueuedRunsCalled = true
+	return m.listWavesWithQueuedRunsResult, m.listWavesWithQueuedRunsErr
 }
 
 func (m *mockStore) Close() {}
@@ -33,35 +33,35 @@ func (m *mockStore) Pool() *pgxpool.Pool {
 }
 
 // mockRepoStarter implements RepoStarter for testing.
-// Uses types.RunID (KSUID-backed) per the typed IDs migration.
+// Uses types.WaveID (KSUID-backed) per the typed IDs migration.
 type mockRepoStarter struct {
-	startCalls   []types.RunID
-	startResults map[types.RunID]StartPendingReposResult
-	startErrors  map[types.RunID]error
+	startCalls   []types.WaveID
+	startResults map[types.WaveID]StartPendingReposResult
+	startErrors  map[types.WaveID]error
 }
 
 func newMockRepoStarter() *mockRepoStarter {
 	return &mockRepoStarter{
-		startCalls:   []types.RunID{},
-		startResults: make(map[types.RunID]StartPendingReposResult),
-		startErrors:  make(map[types.RunID]error),
+		startCalls:   []types.WaveID{},
+		startResults: make(map[types.WaveID]StartPendingReposResult),
+		startErrors:  make(map[types.WaveID]error),
 	}
 }
 
-func (m *mockRepoStarter) StartPendingRepos(ctx context.Context, runID types.RunID) (StartPendingReposResult, error) {
-	m.startCalls = append(m.startCalls, runID)
-	if err, ok := m.startErrors[runID]; ok && err != nil {
+func (m *mockRepoStarter) StartPendingRepos(ctx context.Context, waveID types.WaveID) (StartPendingReposResult, error) {
+	m.startCalls = append(m.startCalls, waveID)
+	if err, ok := m.startErrors[waveID]; ok && err != nil {
 		return StartPendingReposResult{}, err
 	}
-	if result, ok := m.startResults[runID]; ok {
+	if result, ok := m.startResults[waveID]; ok {
 		return result, nil
 	}
 	return StartPendingReposResult{}, nil
 }
 
-// newTestRunID generates a new types.RunID (KSUID-backed) for test IDs.
-func newTestRunID() types.RunID {
-	return types.NewRunID()
+// newTestWaveID generates a new types.WaveID (KSUID-backed) for test IDs.
+func newTestWaveID() types.WaveID {
+	return types.NewWaveID()
 }
 
 func TestNew(t *testing.T) {
@@ -129,7 +129,7 @@ func TestScheduler_Run(t *testing.T) {
 
 	t.Run("no runs with pending repos", func(t *testing.T) {
 		mockSt := &mockStore{
-			listRunsWithQueuedReposResult: []types.RunID{},
+			listWavesWithQueuedRunsResult: []types.WaveID{},
 		}
 		mockStarter := newMockRepoStarter()
 
@@ -145,8 +145,8 @@ func TestScheduler_Run(t *testing.T) {
 			t.Errorf("expected no error, got %v", err)
 		}
 
-		if !mockSt.listRunsWithQueuedReposCalled {
-			t.Error("expected ListRunsWithQueuedRepos to be called")
+		if !mockSt.listWavesWithQueuedRunsCalled {
+			t.Error("expected ListWavesWithQueuedRuns to be called")
 		}
 
 		if len(mockStarter.startCalls) != 0 {
@@ -155,17 +155,17 @@ func TestScheduler_Run(t *testing.T) {
 	})
 
 	t.Run("starts repos for each batch run", func(t *testing.T) {
-		// Use types.RunID (KSUID-backed) per the typed IDs migration.
-		runID1 := newTestRunID()
-		runID2 := newTestRunID()
+		// Use types.WaveID (KSUID-backed) per the typed IDs migration.
+		waveID1 := newTestWaveID()
+		waveID2 := newTestWaveID()
 
 		mockSt := &mockStore{
-			listRunsWithQueuedReposResult: []types.RunID{runID1, runID2},
+			listWavesWithQueuedRunsResult: []types.WaveID{waveID1, waveID2},
 		}
 
 		mockStarter := newMockRepoStarter()
-		mockStarter.startResults[runID1] = StartPendingReposResult{Started: 2, AlreadyDone: 0, Pending: 0}
-		mockStarter.startResults[runID2] = StartPendingReposResult{Started: 1, AlreadyDone: 1, Pending: 0}
+		mockStarter.startResults[waveID1] = StartPendingReposResult{Started: 2, AlreadyDone: 0, Pending: 0}
+		mockStarter.startResults[waveID2] = StartPendingReposResult{Started: 1, AlreadyDone: 1, Pending: 0}
 
 		sched, err := New(Options{
 			Store:       mockSt,
@@ -184,31 +184,31 @@ func TestScheduler_Run(t *testing.T) {
 		}
 
 		// Verify both runs were processed.
-		processedRuns := make(map[types.RunID]bool)
-		for _, runID := range mockStarter.startCalls {
-			processedRuns[runID] = true
+		processedWaves := make(map[types.WaveID]bool)
+		for _, waveID := range mockStarter.startCalls {
+			processedWaves[waveID] = true
 		}
 
-		if !processedRuns[runID1] {
-			t.Errorf("expected runID1 %s to be processed", runID1)
+		if !processedWaves[waveID1] {
+			t.Errorf("expected waveID1 %s to be processed", waveID1)
 		}
-		if !processedRuns[runID2] {
-			t.Errorf("expected runID2 %s to be processed", runID2)
+		if !processedWaves[waveID2] {
+			t.Errorf("expected waveID2 %s to be processed", waveID2)
 		}
 	})
 
 	t.Run("continues on error", func(t *testing.T) {
-		// Use types.RunID (KSUID-backed) per the typed IDs migration.
-		runID1 := newTestRunID()
-		runID2 := newTestRunID()
+		// Use types.WaveID (KSUID-backed) per the typed IDs migration.
+		waveID1 := newTestWaveID()
+		waveID2 := newTestWaveID()
 
 		mockSt := &mockStore{
-			listRunsWithQueuedReposResult: []types.RunID{runID1, runID2},
+			listWavesWithQueuedRunsResult: []types.WaveID{waveID1, waveID2},
 		}
 
 		mockStarter := newMockRepoStarter()
-		mockStarter.startErrors[runID1] = errors.New("failed to start repos")
-		mockStarter.startResults[runID2] = StartPendingReposResult{Started: 3, AlreadyDone: 0, Pending: 0}
+		mockStarter.startErrors[waveID1] = errors.New("failed to start repos")
+		mockStarter.startResults[waveID2] = StartPendingReposResult{Started: 3, AlreadyDone: 0, Pending: 0}
 
 		sched, err := New(Options{
 			Store:       mockSt,
@@ -231,7 +231,7 @@ func TestScheduler_Run(t *testing.T) {
 
 	t.Run("handles list error gracefully", func(t *testing.T) {
 		mockSt := &mockStore{
-			listRunsWithQueuedReposErr: errors.New("database error"),
+			listWavesWithQueuedRunsErr: errors.New("database error"),
 		}
 		mockStarter := newMockRepoStarter()
 
@@ -249,8 +249,8 @@ func TestScheduler_Run(t *testing.T) {
 		}
 
 		// List was called but no starts should happen.
-		if !mockSt.listRunsWithQueuedReposCalled {
-			t.Error("expected ListRunsWithQueuedRepos to be called")
+		if !mockSt.listWavesWithQueuedRunsCalled {
+			t.Error("expected ListWavesWithQueuedRuns to be called")
 		}
 		if len(mockStarter.startCalls) != 0 {
 			t.Errorf("expected no StartPendingRepos calls, got %d", len(mockStarter.startCalls))

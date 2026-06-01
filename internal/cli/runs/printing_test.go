@@ -75,4 +75,3 @@ func TestPrintRetentionSummary(t *testing.T) {
 		})
 	}
 }
-

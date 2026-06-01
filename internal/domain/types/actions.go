@@ -5,13 +5,13 @@ import (
 	"strings"
 )
 
-type RunRepoActionType string
+type RunActionType string
 
-func (v RunRepoActionType) String() string { return string(v) }
+func (v RunActionType) String() string { return string(v) }
 
-func (v RunRepoActionType) IsZero() bool { return IsEmpty(string(v)) }
+func (v RunActionType) IsZero() bool { return IsEmpty(string(v)) }
 
-func (v RunRepoActionType) Validate() error {
+func (v RunActionType) Validate() error {
 	s := strings.TrimSpace(string(v))
 	if s == "" {
 		return fmt.Errorf("invalid action_type %q", s)

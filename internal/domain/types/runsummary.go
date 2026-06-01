@@ -6,16 +6,22 @@ import "time"
 // status counts. It is the canonical domain shape for control-plane run
 // summary responses and is shared between server handlers, CLI, and OpenAPI.
 type RunSummary struct {
-	ID         RunID          `json:"id"`
-	Status     RunStatus      `json:"status"`
-	MigID      MigID          `json:"mig_id"`
-	MigName    string         `json:"mig_name,omitempty"`
-	SpecID     SpecID         `json:"spec_id"`
-	CreatedBy  *string        `json:"created_by,omitempty"`
-	CreatedAt  time.Time      `json:"created_at"`
-	StartedAt  *time.Time     `json:"started_at,omitempty"`
-	FinishedAt *time.Time     `json:"finished_at,omitempty"`
-	Counts     *RunRepoCounts `json:"repo_counts,omitempty"`
+	ID              RunID          `json:"id"`
+	Status          RunStatus      `json:"status"`
+	MigID           MigID          `json:"mig_id"`
+	MigName         string         `json:"mig_name,omitempty"`
+	SpecID          SpecID         `json:"spec_id"`
+	RepoID          RepoID         `json:"repo_id,omitempty"`
+	RepoURL         string         `json:"repo_url,omitempty"`
+	BaseRef         string         `json:"base_ref,omitempty"`
+	SourceCommitSHA string         `json:"source_commit_sha,omitempty"`
+	Attempt         int32          `json:"attempt,omitempty"`
+	LastError       *string        `json:"last_error,omitempty"`
+	CreatedBy       *string        `json:"created_by,omitempty"`
+	CreatedAt       time.Time      `json:"created_at"`
+	StartedAt       *time.Time     `json:"started_at,omitempty"`
+	FinishedAt      *time.Time     `json:"finished_at,omitempty"`
+	Counts          *RunRepoCounts `json:"run_counts,omitempty"`
 }
 
 // RunRepoCounts aggregates the count of repos by status within a batch.

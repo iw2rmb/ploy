@@ -15,8 +15,8 @@ import (
 func TestMigStatusPrintsMigrationSummary(t *testing.T) {
 	migID := domaintypes.MigID("mig001")
 	specID := domaintypes.NewSpecID()
-	repoID1 := domaintypes.NewMigRepoID()
-	repoID2 := domaintypes.NewMigRepoID()
+	repoID1 := domaintypes.NewRepoID()
+	repoID2 := domaintypes.NewRepoID()
 	runID1 := domaintypes.NewRunID()
 	runID2 := domaintypes.NewRunID()
 
@@ -62,7 +62,7 @@ func TestMigStatusPrintsMigrationSummary(t *testing.T) {
 						"mig_id":     migID.String(),
 						"spec_id":    specID.String(),
 						"created_at": "2026-02-24T08:00:00Z",
-						"repo_counts": map[string]any{
+						"run_counts": map[string]any{
 							"total":          2,
 							"queued":         0,
 							"running":        1,
@@ -78,7 +78,7 @@ func TestMigStatusPrintsMigrationSummary(t *testing.T) {
 						"mig_id":     migID.String(),
 						"spec_id":    specID.String(),
 						"created_at": "2026-02-24T08:10:00Z",
-						"repo_counts": map[string]any{
+						"run_counts": map[string]any{
 							"total":          2,
 							"queued":         0,
 							"running":        0,

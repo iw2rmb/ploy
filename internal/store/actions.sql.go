@@ -11,37 +11,36 @@ import (
 	"github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-const claimRunRepoAction = `-- name: ClaimRunRepoAction :one
+const claimRunAction = `-- name: ClaimRunAction :one
 WITH eligible AS (
   SELECT a.id, n.id AS node_id
   FROM nodes n
-  JOIN run_repo_actions a ON TRUE
+  JOIN run_actions a ON TRUE
   JOIN runs r ON r.id = a.run_id
   WHERE n.id = $1
     AND $1::TEXT != ''
     AND a.status = 'Queued'
     AND a.node_id IS NULL
-    AND r.status = 'Finished'
-  ORDER BY a.run_id ASC, a.repo_id ASC, a.attempt ASC, a.id ASC
+    AND r.status IN ('Success', 'Fail', 'Cancelled')
+  ORDER BY a.run_id ASC, a.attempt ASC, a.id ASC
   FOR UPDATE OF a SKIP LOCKED
   LIMIT 1
 )
-UPDATE run_repo_actions a
+UPDATE run_actions a
 SET status = 'Running',
     node_id = eligible.node_id,
     started_at = now()
 FROM eligible
 WHERE a.id = eligible.id
-RETURNING a.id, a.run_id, a.repo_id, a.attempt, a.action_type, a.status, a.node_id, a.started_at, a.finished_at, a.duration_ms, a.meta, a.created_at
+RETURNING a.id, a.run_id, a.attempt, a.action_type, a.status, a.node_id, a.started_at, a.finished_at, a.duration_ms, a.meta, a.created_at
 `
 
-func (q *Queries) ClaimRunRepoAction(ctx context.Context, nodeID types.NodeID) (RunRepoAction, error) {
-	row := q.db.QueryRow(ctx, claimRunRepoAction, nodeID)
-	var i RunRepoAction
+func (q *Queries) ClaimRunAction(ctx context.Context, nodeID types.NodeID) (RunAction, error) {
+	row := q.db.QueryRow(ctx, claimRunAction, nodeID)
+	var i RunAction
 	err := row.Scan(
 		&i.ID,
 		&i.RunID,
-		&i.RepoID,
 		&i.Attempt,
 		&i.ActionType,
 		&i.Status,
@@ -55,45 +54,41 @@ func (q *Queries) ClaimRunRepoAction(ctx context.Context, nodeID types.NodeID) (
 	return i, err
 }
 
-const createRunRepoAction = `-- name: CreateRunRepoAction :one
-INSERT INTO run_repo_actions (
+const createRunAction = `-- name: CreateRunAction :one
+INSERT INTO run_actions (
   id,
   run_id,
-  repo_id,
   attempt,
   action_type,
   status,
   meta
 )
-VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, run_id, repo_id, attempt, action_type, status, node_id, started_at, finished_at, duration_ms, meta, created_at
+VALUES ($1, $2, $3, $4, $5, $6)
+RETURNING id, run_id, attempt, action_type, status, node_id, started_at, finished_at, duration_ms, meta, created_at
 `
 
-type CreateRunRepoActionParams struct {
+type CreateRunActionParams struct {
 	ID         types.JobID     `json:"id"`
 	RunID      types.RunID     `json:"run_id"`
-	RepoID     types.RepoID    `json:"repo_id"`
 	Attempt    int32           `json:"attempt"`
 	ActionType string          `json:"action_type"`
 	Status     types.JobStatus `json:"status"`
 	Meta       []byte          `json:"meta"`
 }
 
-func (q *Queries) CreateRunRepoAction(ctx context.Context, arg CreateRunRepoActionParams) (RunRepoAction, error) {
-	row := q.db.QueryRow(ctx, createRunRepoAction,
+func (q *Queries) CreateRunAction(ctx context.Context, arg CreateRunActionParams) (RunAction, error) {
+	row := q.db.QueryRow(ctx, createRunAction,
 		arg.ID,
 		arg.RunID,
-		arg.RepoID,
 		arg.Attempt,
 		arg.ActionType,
 		arg.Status,
 		arg.Meta,
 	)
-	var i RunRepoAction
+	var i RunAction
 	err := row.Scan(
 		&i.ID,
 		&i.RunID,
-		&i.RepoID,
 		&i.Attempt,
 		&i.ActionType,
 		&i.Status,
@@ -107,19 +102,18 @@ func (q *Queries) CreateRunRepoAction(ctx context.Context, arg CreateRunRepoActi
 	return i, err
 }
 
-const getRunRepoAction = `-- name: GetRunRepoAction :one
-SELECT id, run_id, repo_id, attempt, action_type, status, node_id, started_at, finished_at, duration_ms, meta, created_at
-FROM run_repo_actions
+const getRunAction = `-- name: GetRunAction :one
+SELECT id, run_id, attempt, action_type, status, node_id, started_at, finished_at, duration_ms, meta, created_at
+FROM run_actions
 WHERE id = $1
 `
 
-func (q *Queries) GetRunRepoAction(ctx context.Context, id types.JobID) (RunRepoAction, error) {
-	row := q.db.QueryRow(ctx, getRunRepoAction, id)
-	var i RunRepoAction
+func (q *Queries) GetRunAction(ctx context.Context, id types.JobID) (RunAction, error) {
+	row := q.db.QueryRow(ctx, getRunAction, id)
+	var i RunAction
 	err := row.Scan(
 		&i.ID,
 		&i.RunID,
-		&i.RepoID,
 		&i.Attempt,
 		&i.ActionType,
 		&i.Status,
@@ -133,34 +127,26 @@ func (q *Queries) GetRunRepoAction(ctx context.Context, id types.JobID) (RunRepo
 	return i, err
 }
 
-const getRunRepoActionByKey = `-- name: GetRunRepoActionByKey :one
-SELECT id, run_id, repo_id, attempt, action_type, status, node_id, started_at, finished_at, duration_ms, meta, created_at
-FROM run_repo_actions
+const getRunActionByKey = `-- name: GetRunActionByKey :one
+SELECT id, run_id, attempt, action_type, status, node_id, started_at, finished_at, duration_ms, meta, created_at
+FROM run_actions
 WHERE run_id = $1
-  AND repo_id = $2
-  AND attempt = $3
-  AND action_type = $4
+  AND attempt = $2
+  AND action_type = $3
 `
 
-type GetRunRepoActionByKeyParams struct {
-	RunID      types.RunID  `json:"run_id"`
-	RepoID     types.RepoID `json:"repo_id"`
-	Attempt    int32        `json:"attempt"`
-	ActionType string       `json:"action_type"`
+type GetRunActionByKeyParams struct {
+	RunID      types.RunID `json:"run_id"`
+	Attempt    int32       `json:"attempt"`
+	ActionType string      `json:"action_type"`
 }
 
-func (q *Queries) GetRunRepoActionByKey(ctx context.Context, arg GetRunRepoActionByKeyParams) (RunRepoAction, error) {
-	row := q.db.QueryRow(ctx, getRunRepoActionByKey,
-		arg.RunID,
-		arg.RepoID,
-		arg.Attempt,
-		arg.ActionType,
-	)
-	var i RunRepoAction
+func (q *Queries) GetRunActionByKey(ctx context.Context, arg GetRunActionByKeyParams) (RunAction, error) {
+	row := q.db.QueryRow(ctx, getRunActionByKey, arg.RunID, arg.Attempt, arg.ActionType)
+	var i RunAction
 	err := row.Scan(
 		&i.ID,
 		&i.RunID,
-		&i.RepoID,
 		&i.Attempt,
 		&i.ActionType,
 		&i.Status,
@@ -174,58 +160,53 @@ func (q *Queries) GetRunRepoActionByKey(ctx context.Context, arg GetRunRepoActio
 	return i, err
 }
 
-const hasRunningActionForRunRepoNode = `-- name: HasRunningActionForRunRepoNode :one
+const hasRunningActionForRunNode = `-- name: HasRunningActionForRunNode :one
 SELECT EXISTS (
   SELECT 1
-  FROM run_repo_actions
+  FROM run_actions
   WHERE run_id = $1
-    AND repo_id = $2
-    AND node_id = $3
+    AND node_id = $2
     AND status = 'Running'
 )::boolean
 `
 
-type HasRunningActionForRunRepoNodeParams struct {
+type HasRunningActionForRunNodeParams struct {
 	RunID  types.RunID   `json:"run_id"`
-	RepoID types.RepoID  `json:"repo_id"`
 	NodeID *types.NodeID `json:"node_id"`
 }
 
-func (q *Queries) HasRunningActionForRunRepoNode(ctx context.Context, arg HasRunningActionForRunRepoNodeParams) (bool, error) {
-	row := q.db.QueryRow(ctx, hasRunningActionForRunRepoNode, arg.RunID, arg.RepoID, arg.NodeID)
+func (q *Queries) HasRunningActionForRunNode(ctx context.Context, arg HasRunningActionForRunNodeParams) (bool, error) {
+	row := q.db.QueryRow(ctx, hasRunningActionForRunNode, arg.RunID, arg.NodeID)
 	var column_1 bool
 	err := row.Scan(&column_1)
 	return column_1, err
 }
 
-const listRunRepoActionsByRunRepoAttempt = `-- name: ListRunRepoActionsByRunRepoAttempt :many
-SELECT id, run_id, repo_id, attempt, action_type, status, node_id, started_at, finished_at, duration_ms, meta, created_at
-FROM run_repo_actions
+const listRunActionsByRunAttempt = `-- name: ListRunActionsByRunAttempt :many
+SELECT id, run_id, attempt, action_type, status, node_id, started_at, finished_at, duration_ms, meta, created_at
+FROM run_actions
 WHERE run_id = $1
-  AND repo_id = $2
-  AND attempt = $3
+  AND attempt = $2
 ORDER BY id ASC
 `
 
-type ListRunRepoActionsByRunRepoAttemptParams struct {
-	RunID   types.RunID  `json:"run_id"`
-	RepoID  types.RepoID `json:"repo_id"`
-	Attempt int32        `json:"attempt"`
+type ListRunActionsByRunAttemptParams struct {
+	RunID   types.RunID `json:"run_id"`
+	Attempt int32       `json:"attempt"`
 }
 
-func (q *Queries) ListRunRepoActionsByRunRepoAttempt(ctx context.Context, arg ListRunRepoActionsByRunRepoAttemptParams) ([]RunRepoAction, error) {
-	rows, err := q.db.Query(ctx, listRunRepoActionsByRunRepoAttempt, arg.RunID, arg.RepoID, arg.Attempt)
+func (q *Queries) ListRunActionsByRunAttempt(ctx context.Context, arg ListRunActionsByRunAttemptParams) ([]RunAction, error) {
+	rows, err := q.db.Query(ctx, listRunActionsByRunAttempt, arg.RunID, arg.Attempt)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []RunRepoAction{}
+	items := []RunAction{}
 	for rows.Next() {
-		var i RunRepoAction
+		var i RunAction
 		if err := rows.Scan(
 			&i.ID,
 			&i.RunID,
-			&i.RepoID,
 			&i.Attempt,
 			&i.ActionType,
 			&i.Status,
@@ -246,8 +227,8 @@ func (q *Queries) ListRunRepoActionsByRunRepoAttempt(ctx context.Context, arg Li
 	return items, nil
 }
 
-const updateRunRepoActionCompletion = `-- name: UpdateRunRepoActionCompletion :exec
-UPDATE run_repo_actions
+const updateRunActionCompletion = `-- name: UpdateRunActionCompletion :exec
+UPDATE run_actions
 SET status = $2,
     finished_at = now(),
     duration_ms = COALESCE(EXTRACT(EPOCH FROM (now() - started_at)) * 1000, 0)::BIGINT,
@@ -255,13 +236,13 @@ SET status = $2,
 WHERE id = $1
 `
 
-type UpdateRunRepoActionCompletionParams struct {
+type UpdateRunActionCompletionParams struct {
 	ID     types.JobID     `json:"id"`
 	Status types.JobStatus `json:"status"`
 	Meta   []byte          `json:"meta"`
 }
 
-func (q *Queries) UpdateRunRepoActionCompletion(ctx context.Context, arg UpdateRunRepoActionCompletionParams) error {
-	_, err := q.db.Exec(ctx, updateRunRepoActionCompletion, arg.ID, arg.Status, arg.Meta)
+func (q *Queries) UpdateRunActionCompletion(ctx context.Context, arg UpdateRunActionCompletionParams) error {
+	_, err := q.db.Exec(ctx, updateRunActionCompletion, arg.ID, arg.Status, arg.Meta)
 	return err
 }

@@ -25,14 +25,14 @@ type RepoSummary struct {
 
 // RepoRunSummary is returned by GET /v1/repos/{repo_id}/runs.
 type RepoRunSummary struct {
-	RunID      domaintypes.RunID         `json:"run_id"`
-	MigID      domaintypes.MigID         `json:"mig_id"`
-	RunStatus  domaintypes.RunStatus     `json:"run_status"`
-	RepoStatus domaintypes.RunRepoStatus `json:"repo_status"`
-	BaseRef    string                    `json:"base_ref"`
-	Attempt    int32                     `json:"attempt"`
-	StartedAt  *time.Time                `json:"started_at,omitempty"`
-	FinishedAt *time.Time                `json:"finished_at,omitempty"`
+	RunID      domaintypes.RunID     `json:"run_id"`
+	MigID      domaintypes.MigID     `json:"mig_id"`
+	RunStatus  domaintypes.RunStatus `json:"run_status"`
+	RepoStatus domaintypes.RunStatus `json:"repo_status"`
+	BaseRef    string                `json:"base_ref"`
+	Attempt    int32                 `json:"attempt"`
+	StartedAt  *time.Time            `json:"started_at,omitempty"`
+	FinishedAt *time.Time            `json:"finished_at,omitempty"`
 }
 
 func resolveRepoSelectorHandler(gitAuth gitauth.Options) http.HandlerFunc {
@@ -161,8 +161,8 @@ func listRunsForRepoHandler(st store.Store) http.HandlerFunc {
 			summary := RepoRunSummary{
 				RunID:      run.RunID,
 				MigID:      run.MigID,
-				RunStatus:  run.RunStatus,
-				RepoStatus: run.RepoStatus,
+				RunStatus:  run.Status,
+				RepoStatus: run.Status,
 				BaseRef:    run.RepoBaseRef,
 				Attempt:    run.Attempt,
 			}

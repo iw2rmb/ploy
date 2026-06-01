@@ -81,14 +81,14 @@ func newRunApplyServer(t *testing.T, runID, repoID, jobID, sourceSHA string, pat
 	diffID := "11111111-1111-1111-1111-111111111111"
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
-		case r.Method == http.MethodPost && r.URL.Path == "/v1/runs/"+runID+"/repos/resolve":
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/runs/"+runID+"/resolve":
 			_ = json.NewEncoder(w).Encode(map[string]string{
 				"run_id":            runID,
 				"repo_id":           repoID,
 				"repo_url":          "https://gitlab.example.com/acme/service.git",
 				"source_commit_sha": sourceSHA,
 			})
-		case r.Method == http.MethodGet && r.URL.Path == "/v1/runs/"+runID+"/repos/"+repoID+"/diffs" && r.URL.Query().Get("download") != "true":
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/runs/"+runID+"/diffs" && r.URL.Query().Get("download") != "true":
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"diffs": []map[string]any{{
 					"id":           diffID,
@@ -97,7 +97,7 @@ func newRunApplyServer(t *testing.T, runID, repoID, jobID, sourceSHA string, pat
 					"gzipped_size": len(patch),
 				}},
 			})
-		case r.Method == http.MethodGet && r.URL.Path == "/v1/runs/"+runID+"/repos/"+repoID+"/diffs" && r.URL.Query().Get("download") == "true":
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/runs/"+runID+"/diffs" && r.URL.Query().Get("download") == "true":
 			w.Header().Set("Content-Type", "application/gzip")
 			gz := gzip.NewWriter(w)
 			_, _ = gz.Write(patch)

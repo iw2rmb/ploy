@@ -7,7 +7,6 @@ import (
 	"net/url"
 	"sort"
 	"strings"
-	"time"
 
 	"golang.org/x/sync/errgroup"
 
@@ -137,47 +136,31 @@ func (c GetRunReportCommand) buildRepoEntry(
 }
 
 type runRepoReportSource struct {
-	RunID           domaintypes.RunID         `json:"run_id"`
-	RepoID          domaintypes.MigRepoID     `json:"repo_id"`
-	RepoURL         string                    `json:"repo_url"`
-	BaseRef         string                    `json:"base_ref"`
-	SourceCommitSHA string                    `json:"source_commit_sha,omitempty"`
-	Status          domaintypes.RunRepoStatus `json:"status"`
-	Attempt         int32                     `json:"attempt"`
-	LastError       *string                   `json:"last_error,omitempty"`
-	CreatedAt       time.Time                 `json:"created_at"`
-	StartedAt       *time.Time                `json:"started_at,omitempty"`
-	FinishedAt      *time.Time                `json:"finished_at,omitempty"`
+	RunID           domaintypes.RunID  `json:"run_id"`
+	RepoID          domaintypes.RepoID `json:"repo_id"`
+	RepoURL         string             `json:"repo_url"`
+	BaseRef         string             `json:"base_ref"`
+	SourceCommitSHA string             `json:"source_commit_sha,omitempty"`
+	Status          domaintypes.RunStatus
+	Attempt         int32
+	LastError       *string
 }
 
 func listRunRepos(ctx context.Context, httpClient *http.Client, baseURL *url.URL, runID domaintypes.RunID) ([]runRepoReportSource, error) {
-	endpoint := baseURL.JoinPath("v1", "runs", runID.String(), "repos")
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
+	summary, err := GetStatusCommand{Client: httpClient, BaseURL: baseURL, RunID: runID}.Run(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("run report: build run repos request: %w", err)
+		return nil, err
 	}
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("run report: fetch run repos failed: %w", err)
-	}
-	defer httpx.DrainAndClose(resp)
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, httpx.WrapError("run report: fetch run repos", resp.Status, resp.Body)
-	}
-
-	var result struct {
-		Repos []runRepoReportSource `json:"repos"`
-	}
-	if err := httpx.DecodeResponseJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
-		return nil, fmt.Errorf("run report: decode run repos: %w", err)
-	}
-	if result.Repos == nil {
-		result.Repos = make([]runRepoReportSource, 0)
-	}
-
-	return result.Repos, nil
+	return []runRepoReportSource{{
+		RunID:           runID,
+		RepoID:          summary.RepoID,
+		RepoURL:         summary.RepoURL,
+		BaseRef:         summary.BaseRef,
+		SourceCommitSHA: summary.SourceCommitSHA,
+		Status:          summary.Status,
+		Attempt:         summary.Attempt,
+		LastError:       summary.LastError,
+	}}, nil
 }
 
 func listRunStageArtifacts(
@@ -228,8 +211,8 @@ func listRunStageArtifacts(
 	return artifacts, nil
 }
 
-func listRunRepoDiffs(ctx context.Context, httpClient *http.Client, baseURL *url.URL, runID domaintypes.RunID, repoID domaintypes.MigRepoID) ([]RepoDiffEntry, error) {
-	endpoint := baseURL.JoinPath("v1", "runs", runID.String(), "repos", repoID.String(), "diffs")
+func listRunRepoDiffs(ctx context.Context, httpClient *http.Client, baseURL *url.URL, runID domaintypes.RunID, repoID domaintypes.RepoID) ([]RepoDiffEntry, error) {
+	endpoint := baseURL.JoinPath("v1", "runs", runID.String(), "diffs")
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("run report: build diffs request: %w", err)
@@ -275,8 +258,8 @@ func buildJobLogURL(baseURL *url.URL, jobID domaintypes.JobID) string {
 	return baseURL.JoinPath("v1", "jobs", jobID.String(), "logs").String()
 }
 
-func buildRepoPatchURL(baseURL *url.URL, runID domaintypes.RunID, repoID domaintypes.MigRepoID, diffID domaintypes.DiffID, accumulated bool) string {
-	u := baseURL.JoinPath("v1", "runs", runID.String(), "repos", repoID.String(), "diffs")
+func buildRepoPatchURL(baseURL *url.URL, runID domaintypes.RunID, repoID domaintypes.RepoID, diffID domaintypes.DiffID, accumulated bool) string {
+	u := baseURL.JoinPath("v1", "runs", runID.String(), "diffs")
 	q := u.Query()
 	q.Set("download", "true")
 	q.Set("diff_id", diffID.String())

@@ -32,7 +32,7 @@ type CreateMigRunCommand struct {
 
 // CreateMigRunResult contains the response from creating a mig run.
 type CreateMigRunResult struct {
-	RunID domaintypes.RunID `json:"run_id"`
+	WaveID domaintypes.WaveID `json:"wave_id"`
 }
 
 // Run executes POST /v1/migs/{mig_id}/runs to create a run with repo selection.
@@ -95,8 +95,7 @@ func (c CreateMigRunCommand) Run(ctx context.Context) (CreateMigRunResult, error
 		return CreateMigRunResult{}, fmt.Errorf("mig run: marshal request: %w", err)
 	}
 
-	// POST /v1/migs/{mig_id}/runs
-	endpoint := c.BaseURL.JoinPath("v1", "migs", c.MigRef.String(), "runs")
+	endpoint := c.BaseURL.JoinPath("v1", "migs", c.MigRef.String(), "waves")
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), bytes.NewReader(payload))
 	if err != nil {
 		return CreateMigRunResult{}, fmt.Errorf("mig run: build request: %w", err)

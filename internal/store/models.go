@@ -235,36 +235,27 @@ type Repo struct {
 }
 
 type Run struct {
-	ID         types.RunID        `json:"id"`
-	MigID      types.MigID        `json:"mig_id"`
-	SpecID     types.SpecID       `json:"spec_id"`
-	CreatedBy  *string            `json:"created_by"`
-	Status     types.RunStatus    `json:"status"`
-	CreatedAt  pgtype.Timestamptz `json:"created_at"`
-	StartedAt  pgtype.Timestamptz `json:"started_at"`
-	FinishedAt pgtype.Timestamptz `json:"finished_at"`
-	Stats      []byte             `json:"stats"`
+	ID              types.RunID        `json:"id"`
+	WaveID          types.WaveID       `json:"wave_id"`
+	MigID           types.MigID        `json:"mig_id"`
+	SpecID          types.SpecID       `json:"spec_id"`
+	RepoID          types.RepoID       `json:"repo_id"`
+	RepoBaseRef     string             `json:"repo_base_ref"`
+	SourceCommitSha string             `json:"source_commit_sha"`
+	RepoSha0        string             `json:"repo_sha0"`
+	CreatedBy       *string            `json:"created_by"`
+	Status          types.RunStatus    `json:"status"`
+	Attempt         int32              `json:"attempt"`
+	LastError       *string            `json:"last_error"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	StartedAt       pgtype.Timestamptz `json:"started_at"`
+	FinishedAt      pgtype.Timestamptz `json:"finished_at"`
+	Stats           []byte             `json:"stats"`
 }
 
-type RunRepo struct {
-	MigID           types.MigID         `json:"mig_id"`
-	RunID           types.RunID         `json:"run_id"`
-	RepoID          types.RepoID        `json:"repo_id"`
-	RepoBaseRef     string              `json:"repo_base_ref"`
-	SourceCommitSha string              `json:"source_commit_sha"`
-	RepoSha0        string              `json:"repo_sha0"`
-	Status          types.RunRepoStatus `json:"status"`
-	Attempt         int32               `json:"attempt"`
-	LastError       *string             `json:"last_error"`
-	CreatedAt       pgtype.Timestamptz  `json:"created_at"`
-	StartedAt       pgtype.Timestamptz  `json:"started_at"`
-	FinishedAt      pgtype.Timestamptz  `json:"finished_at"`
-}
-
-type RunRepoAction struct {
+type RunAction struct {
 	ID         types.JobID        `json:"id"`
 	RunID      types.RunID        `json:"run_id"`
-	RepoID     types.RepoID       `json:"repo_id"`
 	Attempt    int32              `json:"attempt"`
 	ActionType string             `json:"action_type"`
 	Status     types.JobStatus    `json:"status"`
@@ -307,4 +298,16 @@ type SpecBundle struct {
 	CreatedBy *string            `json:"created_by"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 	LastRefAt pgtype.Timestamptz `json:"last_ref_at"`
+}
+
+type Wave struct {
+	ID         types.WaveID       `json:"id"`
+	MigID      types.MigID        `json:"mig_id"`
+	SpecID     types.SpecID       `json:"spec_id"`
+	CreatedBy  *string            `json:"created_by"`
+	Status     types.WaveStatus   `json:"status"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+	StartedAt  pgtype.Timestamptz `json:"started_at"`
+	FinishedAt pgtype.Timestamptz `json:"finished_at"`
+	Stats      []byte             `json:"stats"`
 }

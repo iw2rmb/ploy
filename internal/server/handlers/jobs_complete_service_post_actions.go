@@ -27,9 +27,8 @@ func (s *CompleteJobService) onFail(ctx context.Context, state *completeJobState
 
 	if state.input.Status == domaintypes.JobStatusFail {
 		if errMsg := formatExit137Error(string(state.job.JobType), state.input.ExitCode); errMsg != nil {
-			if updateErr := s.store.UpdateRunRepoError(ctx, store.UpdateRunRepoErrorParams{
-				RunID:     state.job.RunID,
-				RepoID:    state.job.RepoID,
+			if updateErr := s.store.UpdateRunError(ctx, store.UpdateRunErrorParams{
+				ID:        state.job.RunID,
 				LastError: errMsg,
 			}); updateErr != nil {
 				slog.Error("complete job: failed to set repo last_error for exit code 137",
@@ -43,9 +42,8 @@ func (s *CompleteJobService) onFail(ctx context.Context, state *completeJobState
 	if state.input.Status == domaintypes.JobStatusError {
 		if errMsg := state.input.StatsPayload.ErrorMessage(); errMsg != "" {
 			errText := errMsg
-			if updateErr := s.store.UpdateRunRepoError(ctx, store.UpdateRunRepoErrorParams{
-				RunID:     state.job.RunID,
-				RepoID:    state.job.RepoID,
+			if updateErr := s.store.UpdateRunError(ctx, store.UpdateRunErrorParams{
+				ID:        state.job.RunID,
 				LastError: &errText,
 			}); updateErr != nil {
 				slog.Error("complete job: failed to set repo last_error from stats.error",
@@ -60,9 +58,8 @@ func (s *CompleteJobService) onFail(ctx context.Context, state *completeJobState
 	jobType := state.routedJobType()
 	if state.input.Status == domaintypes.JobStatusFail && lifecycle.IsGateJobType(jobType) {
 		if errMsg := formatStackGateError(jobType, state.persistedMeta); errMsg != nil {
-			if updateErr := s.store.UpdateRunRepoError(ctx, store.UpdateRunRepoErrorParams{
-				RunID:     state.job.RunID,
-				RepoID:    state.job.RepoID,
+			if updateErr := s.store.UpdateRunError(ctx, store.UpdateRunErrorParams{
+				ID:        state.job.RunID,
 				LastError: errMsg,
 			}); updateErr != nil {
 				slog.Error("complete job: failed to set repo last_error",

@@ -18,7 +18,7 @@ func listRunRepoArtifactsHandler(st store.Store) http.HandlerFunc {
 		if !ok {
 			return
 		}
-		repoID, ok := parseRequiredPathIDOrWriteError[domaintypes.RepoID](w, r, "repo_id")
+		repoID, ok := runRepoIDFromPathOrRun(w, r, st, runID)
 		if !ok {
 			return
 		}
