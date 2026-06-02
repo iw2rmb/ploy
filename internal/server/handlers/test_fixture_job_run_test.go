@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
@@ -150,6 +151,15 @@ func (m *jobStore) UpdateWaveStatus(ctx context.Context, params store.UpdateWave
 
 func (m *jobStore) ListArtifactBundlesByRunAndJob(ctx context.Context, arg store.ListArtifactBundlesByRunAndJobParams) ([]store.ArtifactBundle, error) {
 	return m.listArtifactBundlesByRunAndJob.record(arg)
+}
+
+func (m *jobStore) CreateArtifactBundle(ctx context.Context, arg store.CreateArtifactBundleParams) (store.ArtifactBundle, error) {
+	return m.createArtifactBundle.ret()
+}
+
+func (m *jobStore) DeleteArtifactBundle(ctx context.Context, id pgtype.UUID) error {
+	_, err := m.deleteArtifactBundle.record(id)
+	return err
 }
 
 func (m *jobStore) GetNodeAction(ctx context.Context, id types.JobID) (store.NodeAction, error) {
