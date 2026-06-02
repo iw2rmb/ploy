@@ -97,6 +97,10 @@ the created run and mig IDs.
 prints the full wave creation response: `wave_id`, `mig_id`, `spec_id`, and
 `run_count`.
 
+`ploy mig run` accepts optional positional `namespace/repo[:ref]` selectors. The
+CLI resolves them to repo URLs for explicit repo identity selection; launch refs
+are still snapshotted from the mig repo set.
+
 `ploy run ls` lists runs. Empty output is `No runs found.`
 
 ## Scheduler

@@ -4,7 +4,7 @@
 # a diff artifact while execution continues on the same sticky workspace.
 #
 # Submit with:
-#   dist/ploy mig run \
+#   dist/ploy run \
 #     tests/e2e/migs/scenario-multi-step/mig.yaml \
 #     example/my-java-project:main \
 #     --follow

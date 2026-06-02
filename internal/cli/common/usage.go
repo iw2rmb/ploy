@@ -37,7 +37,7 @@ func PrintCommandUsage(w io.Writer, parts ...string) {
 			_, _ = fmt.Fprintln(w, "  status      Show migration status and per-run summary")
 			_, _ = fmt.Fprintln(w, "")
 			_, _ = fmt.Fprintln(w, "Run Execution:")
-			_, _ = fmt.Fprintln(w, "  run <mig>   Run a mig project (with --repo or --failed for repo selection)")
+			_, _ = fmt.Fprintln(w, "  run <mig>   Run a mig project (with optional repo selectors or --failed)")
 			_, _ = fmt.Fprintln(w, "")
 			_, _ = fmt.Fprintln(w, "Artifacts:")
 			_, _ = fmt.Fprintln(w, "  artifacts   List run artifacts by stage")

@@ -56,14 +56,10 @@ run "$PLOY_BIN" mig add --name "$WAVE_NAME" --spec "$SPEC_FILE" \
 
 echo ""
 echo "[2/5] Adding repos to mig"
-run "$PLOY_BIN" mig repo add "$WAVE_NAME" \
-  --repo "https://github.com/example/repo1.git" \
-  --base-ref main \
+run "$PLOY_BIN" mig repo add "$WAVE_NAME" "example/repo1:main" \
   > "${E2E_ARTIFACT_DIR}/add-repo1.out" 2>&1 || true
 
-run "$PLOY_BIN" mig repo add "$WAVE_NAME" \
-  --repo "https://github.com/example/repo2.git" \
-  --base-ref main \
+run "$PLOY_BIN" mig repo add "$WAVE_NAME" "example/repo2:main" \
   > "${E2E_ARTIFACT_DIR}/add-repo2.out" 2>&1 || true
 
 echo ""

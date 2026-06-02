@@ -143,7 +143,14 @@ func listRunsHandler(st store.Store) http.HandlerFunc {
 
 		summaries := make([]domaintypes.RunSummary, 0, len(runs))
 		for _, run := range runs {
-			summaries = append(summaries, runToSummary(run))
+			summary := runToSummary(run)
+			repoURL, err := repoURLForID(r.Context(), st, run.RepoID)
+			if err != nil {
+				writeHTTPError(w, http.StatusInternalServerError, "failed to resolve run repo: %v", err)
+				return
+			}
+			summary.RepoURL = repoURL
+			summaries = append(summaries, summary)
 		}
 
 		resp := struct {
@@ -188,17 +195,13 @@ func listRunsForRepoURL(w http.ResponseWriter, r *http.Request, st store.Store, 
 	}
 	summaries := make([]domaintypes.RunSummary, 0, len(repoRuns))
 	for _, run := range repoRuns {
-		summary := domaintypes.RunSummary{
-			ID:     run.RunID,
-			Status: run.Status,
-			MigID:  run.MigID,
+		stored, err := st.GetRun(r.Context(), run.RunID)
+		if err != nil {
+			writeHTTPError(w, http.StatusInternalServerError, "failed to resolve run: %v", err)
+			return
 		}
-		if run.StartedAt.Valid {
-			summary.StartedAt = &run.StartedAt.Time
-		}
-		if run.FinishedAt.Valid {
-			summary.FinishedAt = &run.FinishedAt.Time
-		}
+		summary := runToSummary(stored)
+		summary.RepoURL = matches[0].RepoUrl
 		summaries = append(summaries, summary)
 	}
 	writeJSON(w, http.StatusOK, struct {

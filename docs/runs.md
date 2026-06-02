@@ -11,7 +11,7 @@ Mig launches create one wave with one run per selected repo.
 
 ```bash
 ploy run <spec-path> [<repo-path>|<namespace/repo[:ref]>] [--apply] [--pull[=path]]
-ploy mig run <mig-id|name> [--repo <repo-url> ... | --failed] [--follow] [--json]
+ploy mig run <mig-id|name> [<namespace/repo[:ref]> ... | --failed] [--follow] [--json]
 ```
 
 - `ploy run` prints `run_id` and `mig_id`.
@@ -19,6 +19,9 @@ ploy mig run <mig-id|name> [--repo <repo-url> ... | --failed] [--follow] [--json
 - `ploy mig run` prints `wave_id`; `--json` prints `wave_id`, `mig_id`,
   `spec_id`, and `run_count`.
 - Remote selector expansion is server-owned through `POST /v1/repos/resolve`.
+- `ploy mig run` resolves positional repo selectors to repo identity for
+  explicit selection; the run source ref still comes from the mig repo's stored
+  `base_ref`.
 - Mig wave creation uses `POST /v1/migs/{mig_id}/waves`.
 
 ## Inspect And Control

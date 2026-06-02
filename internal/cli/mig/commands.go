@@ -150,10 +150,9 @@ func RunSpecSet(ctx context.Context, migRef, specPath string, output io.Writer) 
 }
 
 type RepoAddOptions struct {
-	MigRef  string
-	RepoURL string
-	BaseRef string
-	Output  io.Writer
+	MigRef       string
+	RepoSelector string
+	Output       io.Writer
 }
 
 func MigRepoAdd(ctx context.Context, opts RepoAddOptions) error {
@@ -165,12 +164,16 @@ func MigRepoAdd(ctx context.Context, opts RepoAddOptions) error {
 	if err != nil {
 		return err
 	}
+	resolvedRepo, err := common.ResolveRemoteRepoSelector(ctx, base, httpClient, opts.RepoSelector)
+	if err != nil {
+		return err
+	}
 	result, err := (migs.AddMigRepoCommand{
 		Client:  httpClient,
 		BaseURL: base,
 		MigRef:  domaintypes.MigRef(migID),
-		RepoURL: opts.RepoURL,
-		BaseRef: opts.BaseRef,
+		RepoURL: resolvedRepo.RepoURL,
+		BaseRef: resolvedRepo.Ref,
 	}).Run(ctx)
 	if err != nil {
 		return err
@@ -265,18 +268,21 @@ func MigRepoImport(ctx context.Context, migRef, filePath string, output io.Write
 }
 
 type RunOptions struct {
-	MigRef      string
-	RepoURLs    []string
-	Failed      bool
-	Follow      bool
-	JSON        bool
-	Cap         time.Duration
-	CancelOnCap bool
-	MaxRetries  int
-	Output      io.Writer
+	MigRef        string
+	RepoSelectors []string
+	Failed        bool
+	Follow        bool
+	JSON          bool
+	Cap           time.Duration
+	CancelOnCap   bool
+	MaxRetries    int
+	Output        io.Writer
 }
 
 func RunProject(ctx context.Context, opts RunOptions) error {
+	if opts.Failed && len(opts.RepoSelectors) > 0 {
+		return fmt.Errorf("mig run: --failed and repo selectors are mutually exclusive")
+	}
 	base, httpClient, err := common.ResolveControlPlaneHTTP(ctx)
 	if err != nil {
 		return err
@@ -285,11 +291,15 @@ func RunProject(ctx context.Context, opts RunOptions) error {
 	if err != nil {
 		return err
 	}
+	repoURLs, err := resolveMigRunRepoSelectors(ctx, base, httpClient, opts.RepoSelectors)
+	if err != nil {
+		return err
+	}
 	result, err := (migs.CreateMigRunCommand{
 		Client:   httpClient,
 		BaseURL:  base,
 		MigRef:   domaintypes.MigRef(migID),
-		RepoURLs: opts.RepoURLs,
+		RepoURLs: repoURLs,
 		Failed:   opts.Failed,
 	}).Run(ctx)
 	if err != nil {
@@ -309,6 +319,21 @@ func RunProject(ctx context.Context, opts RunOptions) error {
 		return followMigWaveProject(ctx, base, httpClient, result.WaveID, opts.Cap, opts.CancelOnCap, opts.Output)
 	}
 	return nil
+}
+
+func resolveMigRunRepoSelectors(ctx context.Context, base *url.URL, client *http.Client, selectors []string) ([]string, error) {
+	if len(selectors) == 0 {
+		return nil, nil
+	}
+	repoURLs := make([]string, 0, len(selectors))
+	for _, selector := range selectors {
+		resolved, err := common.ResolveRemoteRepoSelector(ctx, base, client, selector)
+		if err != nil {
+			return nil, err
+		}
+		repoURLs = append(repoURLs, resolved.RepoURL)
+	}
+	return repoURLs, nil
 }
 
 func followMigWaveProject(ctx context.Context, baseURL *url.URL, client *http.Client, waveID domaintypes.WaveID, capDuration time.Duration, cancelOnCap bool, output io.Writer) error {

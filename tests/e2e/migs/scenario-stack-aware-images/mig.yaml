@@ -11,7 +11,7 @@
 # "java-maven" stack, so the java-maven image is selected.
 #
 # Submit with:
-#   dist/ploy mig run \
+#   dist/ploy run \
 #     tests/e2e/migs/scenario-stack-aware-images/mig.yaml \
 #     iw2rmb/ploy-orw-java11-maven:main \
 #     --follow

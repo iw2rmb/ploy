@@ -49,7 +49,7 @@ func TestCreateMigRunCommand_Run(t *testing.T) {
 			statusCode: http.StatusCreated,
 		},
 		{
-			name:        "mutually exclusive flags",
+			name:        "mutually exclusive selection",
 			migID:       migID,
 			repoURLs:    []string{"https://github.com/a/b.git"},
 			failed:      true,
@@ -148,7 +148,7 @@ func TestCreateMigRunCommand_Run(t *testing.T) {
 	}
 }
 
-// TestCreateMigRunCommand_SelectorMutualExclusion validates --repo and --failed are mutually exclusive.
+// TestCreateMigRunCommand_SelectorMutualExclusion validates failed mode and explicit repo selection are mutually exclusive.
 func TestCreateMigRunCommand_SelectorMutualExclusion(t *testing.T) {
 	t.Parallel()
 
@@ -171,7 +171,7 @@ func TestCreateMigRunCommand_SelectorMutualExclusion(t *testing.T) {
 
 	_, err := cmd.Run(context.Background())
 	if err == nil {
-		t.Fatal("expected error for mutually exclusive flags")
+		t.Fatal("expected error for mutually exclusive selection")
 	}
 	if !strings.Contains(err.Error(), "mutually exclusive") {
 		t.Errorf("expected error to mention mutually exclusive, got %q", err.Error())
