@@ -20,7 +20,7 @@ var waveModelMigrationSQL string
 // Increment this when schema.sql changes to trigger current-contract maintenance
 // on existing databases. This uses a timestamp-like versioning scheme
 // (YYYYMMDDNN) for clarity.
-const SchemaVersion int64 = 2026060202
+const SchemaVersion int64 = 2026060203
 
 const waveModelSchemaVersion int64 = 2026060101
 
@@ -126,6 +126,42 @@ ALTER TABLE IF EXISTS ploy.runs
   ALTER COLUMN stats SET DEFAULT '{}'::jsonb
 `); err != nil {
 		return fmt.Errorf("align runs defaults: %w", err)
+	}
+	if _, err := tx.Exec(ctx, `
+DO $$
+BEGIN
+  IF to_regclass('ploy.node_daemon_logs') IS NOT NULL THEN
+    DELETE FROM ploy.node_daemon_logs
+    WHERE component <> 'node';
+  END IF;
+END $$;
+`); err != nil {
+		return fmt.Errorf("delete obsolete node daemon logs: %w", err)
+	}
+	if _, err := tx.Exec(ctx, `
+DO $$
+BEGIN
+  IF to_regclass('ploy.node_diagnostics') IS NOT NULL THEN
+    DELETE FROM ploy.node_diagnostics
+    WHERE component <> 'node';
+  END IF;
+END $$;
+`); err != nil {
+		return fmt.Errorf("delete obsolete node diagnostics: %w", err)
+	}
+	if _, err := tx.Exec(ctx, `
+ALTER TABLE IF EXISTS ploy.node_diagnostics
+  DROP CONSTRAINT IF EXISTS node_diagnostics_component_check,
+  ADD CONSTRAINT node_diagnostics_component_check CHECK (component IN ('node'))
+`); err != nil {
+		return fmt.Errorf("align node diagnostics component constraint: %w", err)
+	}
+	if _, err := tx.Exec(ctx, `
+ALTER TABLE IF EXISTS ploy.node_daemon_logs
+  DROP CONSTRAINT IF EXISTS node_daemon_logs_component_check,
+  ADD CONSTRAINT node_daemon_logs_component_check CHECK (component IN ('node'))
+`); err != nil {
+		return fmt.Errorf("align node daemon logs component constraint: %w", err)
 	}
 	return nil
 }

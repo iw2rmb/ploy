@@ -5,6 +5,8 @@ import (
 	"os"
 	"testing"
 	"time"
+
+	"github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 func TestRunMigrations(t *testing.T) {
@@ -150,5 +152,77 @@ func TestGetCurrentVersion(t *testing.T) {
 	}
 	if version != 5 {
 		t.Fatalf("version after insert: got %d, want 5", version)
+	}
+}
+
+func TestRunMigrations_RemovesObsoleteNodeUpdaterDiagnostics(t *testing.T) {
+	dsn := os.Getenv("PLOY_TEST_DB_DSN")
+	if dsn == "" {
+		t.Skip("PLOY_TEST_DB_DSN not set; skipping migration test")
+	}
+	ctx := context.Background()
+
+	st, err := NewStore(ctx, dsn)
+	if err != nil {
+		t.Fatalf("NewStore: %v", err)
+	}
+	defer st.Close()
+	cleanTestTables(t, ctx, st)
+
+	nodeID := types.NodeID(types.NewNodeKey())
+	_, err = st.CreateNode(ctx, CreateNodeParams{
+		ID:          nodeID,
+		Name:        nodeNameForTest(nodeID),
+		IpAddress:   nodeAddrForTest(nodeID),
+		Concurrency: 1,
+	})
+	if err != nil {
+		t.Fatalf("CreateNode: %v", err)
+	}
+
+	setupStatements := []struct {
+		name string
+		sql  string
+		args []any
+	}{
+		{name: "drop diagnostics constraint", sql: `ALTER TABLE ploy.node_diagnostics DROP CONSTRAINT IF EXISTS node_diagnostics_component_check`},
+		{name: "allow old diagnostics component", sql: `ALTER TABLE ploy.node_diagnostics ADD CONSTRAINT node_diagnostics_component_check CHECK (component IN ('node', 'node-updater'))`},
+		{name: "drop logs constraint", sql: `ALTER TABLE ploy.node_daemon_logs DROP CONSTRAINT IF EXISTS node_daemon_logs_component_check`},
+		{name: "allow old logs component", sql: `ALTER TABLE ploy.node_daemon_logs ADD CONSTRAINT node_daemon_logs_component_check CHECK (component IN ('node', 'node-updater'))`},
+		{name: "insert obsolete diagnostic", sql: `INSERT INTO ploy.node_diagnostics (node_id, component, status, details) VALUES ($1, 'node-updater', 'ok', '{}'::jsonb)`, args: []any{nodeID.String()}},
+		{name: "insert obsolete daemon log", sql: `INSERT INTO ploy.node_daemon_logs (node_id, component, stream, message) VALUES ($1, 'node-updater', 'system', 'old updater row')`, args: []any{nodeID.String()}},
+		{name: "remove current version", sql: `DELETE FROM ploy.schema_version WHERE version >= $1`, args: []any{SchemaVersion}},
+		{name: "restore prior version", sql: `INSERT INTO ploy.schema_version (version, applied_at) VALUES (2026060202, now()) ON CONFLICT (version) DO UPDATE SET applied_at = EXCLUDED.applied_at`},
+	}
+	for _, stmt := range setupStatements {
+		if _, err := st.Pool().Exec(ctx, stmt.sql, stmt.args...); err != nil {
+			t.Fatalf("%s: %v", stmt.name, err)
+		}
+	}
+
+	if err := RunMigrations(ctx, st.Pool()); err != nil {
+		t.Fatalf("RunMigrations: %v", err)
+	}
+
+	var diagCount, logCount int
+	if err := st.Pool().QueryRow(ctx, `SELECT count(*) FROM ploy.node_diagnostics WHERE component = 'node-updater'`).Scan(&diagCount); err != nil {
+		t.Fatalf("count obsolete diagnostics: %v", err)
+	}
+	if diagCount != 0 {
+		t.Fatalf("obsolete diagnostics count = %d, want 0", diagCount)
+	}
+	if err := st.Pool().QueryRow(ctx, `SELECT count(*) FROM ploy.node_daemon_logs WHERE component = 'node-updater'`).Scan(&logCount); err != nil {
+		t.Fatalf("count obsolete daemon logs: %v", err)
+	}
+	if logCount != 0 {
+		t.Fatalf("obsolete daemon logs count = %d, want 0", logCount)
+	}
+
+	_, err = st.Pool().Exec(ctx, `
+INSERT INTO ploy.node_diagnostics (node_id, component, status, details)
+VALUES ($1, 'node-updater', 'ok', '{}'::jsonb)
+`, nodeID.String())
+	if err == nil {
+		t.Fatal("expected node_diagnostics node-updater insert to fail")
 	}
 }

@@ -67,3 +67,8 @@ ploy cluster node actions <node-id> --limit 20
 
 - `GET /v1/nodes/{id}/actions?limit=N` for historical action status.
 - `GET /v1/nodes/{id}/diagnostics` for node diagnostics and storage details.
+
+Node diagnostics only report the long-lived node daemon component. Host-owned
+maintenance services such as `ploy-node-update.service` are inspected through
+systemd/journald on the node host, not through a persistent diagnostics
+component.
