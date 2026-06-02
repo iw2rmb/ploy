@@ -44,16 +44,13 @@ func TestRunListCallsControlPlane(t *testing.T) {
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"runs": []map[string]any{
 					{
-						"id":         runID1,
-						"status":     "Running",
-						"mig_id":     migID1,
-						"spec_id":    specID1,
-						"created_at": now,
-						"run_counts": map[string]any{
-							"total":          5,
-							"success":        2,
-							"derived_status": "running",
-						},
+						"id":                runID1,
+						"status":            "Running",
+						"mig_id":            migID1,
+						"spec_id":           specID1,
+						"repo_url":          "https://gitlab.example.com/team/service.git",
+						"source_commit_sha": "0123456789abcdef0123456789abcdef01234567",
+						"created_at":        now,
 					},
 					{
 						"id":         runID2,
@@ -88,8 +85,14 @@ func TestRunListCallsControlPlane(t *testing.T) {
 	if !strings.Contains(output, "Running") {
 		t.Errorf("output should contain Started: %s", output)
 	}
-	if !strings.Contains(output, "running") {
-		t.Errorf("output should contain derived status running: %s", output)
+	if !strings.Contains(output, "MIG") || strings.Contains(output, "MOD") {
+		t.Errorf("output should use MIG column, got: %s", output)
+	}
+	if strings.Contains(output, "DERIVED STATUS") {
+		t.Errorf("output should not contain derived status column: %s", output)
+	}
+	if !strings.Contains(output, "REPO") || !strings.Contains(output, "team/service:01234567") {
+		t.Errorf("output should contain repo label: %s", output)
 	}
 }
 
@@ -152,6 +155,75 @@ func TestRunListInvalidLimit(t *testing.T) {
 			t.Parallel()
 			clienv.RunExpectError(t, executeCmd, tc.args, tc.wantErr)
 		})
+	}
+}
+
+func TestMigRunRepoSelectorResolvesToExplicitRepoURL(t *testing.T) {
+	migID := domaintypes.NewMigID().String()
+	waveID := domaintypes.NewWaveID().String()
+	specID := domaintypes.NewSpecID().String()
+	var capturedResolve map[string]string
+	var capturedWave struct {
+		RepoSelector struct {
+			Mode  string   `json:"mode"`
+			Repos []string `json:"repos,omitempty"`
+		} `json:"repo_selector"`
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/migs":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"migs": []map[string]any{{
+					"id":         migID,
+					"name":       "my-wave",
+					"created_at": time.Now().UTC(),
+					"archived":   false,
+				}},
+			})
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/repos/resolve":
+			if err := json.NewDecoder(r.Body).Decode(&capturedResolve); err != nil {
+				t.Fatalf("decode resolve request: %v", err)
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"repo_url":   "https://gitlab.example.com/acme/service.git",
+				"ref":        "feature/test",
+				"ref_is_sha": false,
+			})
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/migs/"+migID+"/waves":
+			if err := json.NewDecoder(r.Body).Decode(&capturedWave); err != nil {
+				t.Fatalf("decode wave request: %v", err)
+			}
+			w.WriteHeader(http.StatusCreated)
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"wave_id":   waveID,
+				"mig_id":    migID,
+				"spec_id":   specID,
+				"run_count": 1,
+			})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	clienv.UseServerDescriptor(t, server.URL)
+
+	var buf bytes.Buffer
+	if err := executeCmd([]string{"mig", "run", "my-wave", "acme/service:feature/test"}, &buf); err != nil {
+		t.Fatalf("mig run error: %v", err)
+	}
+	if capturedResolve["selector"] != "acme/service" || capturedResolve["ref"] != "feature/test" {
+		t.Fatalf("unexpected resolve request: %#v", capturedResolve)
+	}
+	if capturedWave.RepoSelector.Mode != "explicit" {
+		t.Fatalf("repo selector mode = %q", capturedWave.RepoSelector.Mode)
+	}
+	if len(capturedWave.RepoSelector.Repos) != 1 || capturedWave.RepoSelector.Repos[0] != "https://gitlab.example.com/acme/service.git" {
+		t.Fatalf("unexpected explicit repos: %#v", capturedWave.RepoSelector.Repos)
+	}
+	if !strings.Contains(buf.String(), waveID) {
+		t.Fatalf("expected wave id in output, got %q", buf.String())
 	}
 }
 

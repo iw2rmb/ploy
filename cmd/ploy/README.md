@@ -22,7 +22,7 @@ ploy run <spec-path> [<repo-path>|<namespace/repo[:ref]>] [--apply] [--pull[=pat
 ploy run status <run-id> [--json|--follow]                                  # inspect a run
 ploy run apply <run-id> [path] [--force]                                     # apply a run patch locally
 ploy run pull <run-id> [artifacts-path]                                      # download final run artifacts
-ploy mig run <mig-id|name> [--repo <url> ...] [--failed] [--follow]          # execute a mig project over its repo set
+ploy mig run <mig-id|name> [<namespace/repo[:ref]> ...] [--failed] [--follow] # execute a mig project over its repo set
 ploy spec schema                                                             # print the mig JSON Schema
 ploy spec validate docs/schemas/mig.example.yaml                             # validate a mig spec
 ```
@@ -69,15 +69,15 @@ ploy mig add --name my-mig --spec mig.yaml
 ploy mig spec set my-mig mig.yaml
 
 # Manage the mig's repo set.
-ploy mig repo add my-mig --repo https://github.com/org/repo-a.git --base-ref main
-ploy mig repo add my-mig --repo https://github.com/org/repo-b.git --base-ref main
+ploy mig repo add my-mig org/repo-a:main
+ploy mig repo add my-mig org/repo-b:main
 ploy mig repo list my-mig
 
 # Execute the mig project (all repos by default).
 ploy mig run my-mig
 
-# Execute only specific repos (repeatable).
-ploy mig run my-mig --repo https://github.com/org/repo-a.git --repo https://github.com/org/repo-b.git
+# Execute only specific repos.
+ploy mig run my-mig org/repo-a:main org/repo-b:main
 
 # Re-run only repos whose last terminal state is Fail.
 ploy mig run my-mig --failed
@@ -114,14 +114,14 @@ explicit subset, or repos whose last terminal state was `Fail`.
 
 ```bash
 ploy mig add --name java17 --spec mig.yaml
-ploy mig repo add java17 --repo https://github.com/org/repo-a.git --base-ref main
-ploy mig repo add java17 --repo https://github.com/org/repo-b.git --base-ref main
+ploy mig repo add java17 org/repo-a:main
+ploy mig repo add java17 org/repo-b:main
 
 # Execute all repos.
 ploy mig run java17 --follow
 
 # Execute only selected repos.
-ploy mig run java17 --repo https://github.com/org/repo-a.git
+ploy mig run java17 org/repo-a:main
 
 # Re-run only repos whose last terminal state is Fail.
 ploy mig run java17 --failed

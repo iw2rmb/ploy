@@ -3,16 +3,15 @@ package run
 import (
 	"bytes"
 	"context"
-	"encoding/json"
-	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/iw2rmb/ploy/internal/cli/common"
 )
 
 type resolvedSourceRepo struct {
@@ -68,83 +67,11 @@ func resolveLocalSourceRepo(ctx context.Context, path string) (resolvedSourceRep
 }
 
 func resolveRemoteSourceRepo(ctx context.Context, base *url.URL, httpClient *http.Client, selector string) (resolvedSourceRepo, error) {
-	if base == nil {
-		return resolvedSourceRepo{}, errors.New("repo resolve: base url required")
-	}
-	if httpClient == nil {
-		return resolvedSourceRepo{}, errors.New("repo resolve: http client required")
-	}
-
-	namespaceRepo, ref := splitRemoteSelector(selector)
-	endpoint := base.JoinPath("v1", "repos", "resolve")
-	payload, err := json.Marshal(struct {
-		Selector string `json:"selector"`
-		Ref      string `json:"ref"`
-	}{
-		Selector: namespaceRepo,
-		Ref:      ref,
-	})
+	resolved, err := common.ResolveRemoteRepoSelector(ctx, base, httpClient, selector)
 	if err != nil {
-		return resolvedSourceRepo{}, fmt.Errorf("repo resolve: marshal request: %w", err)
+		return resolvedSourceRepo{}, err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), bytes.NewReader(payload))
-	if err != nil {
-		return resolvedSourceRepo{}, fmt.Errorf("repo resolve: build request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return resolvedSourceRepo{}, fmt.Errorf("repo resolve: http request failed: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		var apiErr struct {
-			Error string `json:"error"`
-		}
-		if err := json.Unmarshal(body, &apiErr); err == nil && strings.TrimSpace(apiErr.Error) != "" {
-			return resolvedSourceRepo{}, fmt.Errorf("repo resolve: %s", strings.TrimSpace(apiErr.Error))
-		}
-		return resolvedSourceRepo{}, fmt.Errorf("repo resolve: %s", strings.TrimSpace(string(body)))
-	}
-
-	var resolved struct {
-		RepoURL  string `json:"repo_url"`
-		Ref      string `json:"ref"`
-		RefIsSHA bool   `json:"ref_is_sha"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&resolved); err != nil {
-		return resolvedSourceRepo{}, fmt.Errorf("repo resolve: decode response: %w", err)
-	}
-	repoURL := strings.TrimSpace(resolved.RepoURL)
-	if repoURL == "" {
-		return resolvedSourceRepo{}, errors.New("repo resolve: empty repo_url in response")
-	}
-	resolvedRef := strings.TrimSpace(resolved.Ref)
-	if resolvedRef == "" {
-		resolvedRef = ref
-	}
-	repo := resolvedSourceRepo{RepoURL: repoURL, Ref: resolvedRef}
-	if resolved.RefIsSHA {
-		repo.CommitSHA = resolvedRef
-	}
-	return repo, nil
-}
-
-func splitRemoteSelector(selector string) (string, string) {
-	selector = strings.TrimSpace(selector)
-	ref := "master"
-	if slash := strings.Index(selector, "/"); slash >= 0 {
-		if colon := strings.Index(selector[slash+1:], ":"); colon >= 0 {
-			idx := slash + 1 + colon
-			ref = strings.TrimSpace(selector[idx+1:])
-			selector = selector[:idx]
-		}
-	}
-	if ref == "" {
-		ref = "master"
-	}
-	return selector, ref
+	return resolvedSourceRepo{RepoURL: resolved.RepoURL, Ref: resolved.Ref, CommitSHA: resolved.CommitSHA}, nil
 }
 
 func gitOutput(ctx context.Context, dir string, args ...string) (string, error) {

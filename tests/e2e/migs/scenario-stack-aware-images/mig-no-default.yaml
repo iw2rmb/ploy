@@ -12,7 +12,7 @@
 # Expected error: "no image specified for stack \"java-maven\" and no default provided"
 #
 # Submit with:
-#   dist/ploy mig run \
+#   dist/ploy run \
 #     tests/e2e/migs/scenario-stack-aware-images/mig-no-default.yaml \
 #     iw2rmb/ploy-orw-java11-maven:main \
 #     --follow

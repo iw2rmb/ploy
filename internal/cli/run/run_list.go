@@ -12,10 +12,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 	"text/tabwriter"
 
 	"github.com/iw2rmb/ploy/internal/cli/common"
 	"github.com/iw2rmb/ploy/internal/cli/migs"
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 type ListOptions struct {
@@ -74,18 +76,39 @@ func RunList(ctx context.Context, opts ListOptions) error {
 
 	// Print results in tabular format.
 	tw := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
-	_, _ = fmt.Fprintln(tw, "ID\tSTATUS\tMOD\tSPEC\tREPOS\tDERIVED STATUS")
+	_, _ = fmt.Fprintln(tw, "ID\tSTATUS\tMIG\tSPEC\tREPO")
 	for _, b := range runs {
-		repos := "-"
-		derived := "-"
-		if b.Counts != nil {
-			// Format repo counts as: succeeded/total (e.g., "3/5").
-			repos = fmt.Sprintf("%d/%d", b.Counts.Success, b.Counts.Total)
-			derived = b.Counts.DerivedStatus
-		}
-		_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n",
-			b.ID, b.Status, b.MigID, b.SpecID, repos, derived)
+		_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n",
+			b.ID, b.Status, b.MigID, b.SpecID, formatRunListRepo(b.RepoURL, b.SourceCommitSHA))
 	}
 	_ = tw.Flush()
 	return nil
+}
+
+func formatRunListRepo(repoURL, sourceCommitSHA string) string {
+	repo := formatRepoNamespace(repoURL)
+	sha := strings.TrimSpace(sourceCommitSHA)
+	if len(sha) > 8 {
+		sha = sha[:8]
+	}
+	if repo == "" {
+		return "-"
+	}
+	if sha == "" {
+		return repo
+	}
+	return repo + ":" + sha
+}
+
+func formatRepoNamespace(repoURL string) string {
+	display := domaintypes.NormalizeRepoURLSchemless(repoURL)
+	display = strings.Trim(display, "/")
+	if display == "" {
+		return ""
+	}
+	parts := strings.Split(display, "/")
+	if len(parts) <= 2 {
+		return display
+	}
+	return strings.Join(parts[1:], "/")
 }

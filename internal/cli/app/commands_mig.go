@@ -86,17 +86,13 @@ func newMigRepoCmd(stderr io.Writer) *cobra.Command {
 }
 
 func newMigRepoAddCmd(stderr io.Writer) *cobra.Command {
-	var repoURL, baseRef string
-	cmd := &cobra.Command{Use: "add <mig-id|name> --repo <url> --base-ref <ref>", Short: "Add a repo to the mig", Args: cobra.ExactArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
+	cmd := &cobra.Command{Use: "add <mig-id|name> <namespace/repo[:ref]>", Short: "Add a repo to the mig", Args: cobra.ExactArgs(2), RunE: func(cmd *cobra.Command, args []string) error {
 		return mig.MigRepoAdd(context.Background(), mig.RepoAddOptions{
-			MigRef:  args[0],
-			RepoURL: repoURL,
-			BaseRef: baseRef,
-			Output:  stderr,
+			MigRef:       args[0],
+			RepoSelector: args[1],
+			Output:       stderr,
 		})
 	}}
-	cmd.Flags().StringVar(&repoURL, "repo", "", "Git repository URL")
-	cmd.Flags().StringVar(&baseRef, "base-ref", "", "Base git ref")
 	return cmd
 }
 
@@ -138,24 +134,22 @@ func newMigPullCmd(stderr io.Writer) *cobra.Command {
 }
 
 func newMigRunCmd(stderr io.Writer) *cobra.Command {
-	var repos []string
 	var failed, follow, jsonOutput, cancelOnCap bool
 	var capDuration time.Duration
 	var maxRetries int
-	runCmd := &cobra.Command{Use: "run <mig-id|name>", Short: "Run a mig project", Args: cobra.ExactArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
+	runCmd := &cobra.Command{Use: "run <mig-id|name> [<namespace/repo[:ref]> ...]", Short: "Run a mig project", Args: cobra.MinimumNArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
 		return mig.RunProject(context.Background(), mig.RunOptions{
-			MigRef:      args[0],
-			RepoURLs:    repos,
-			Failed:      failed,
-			Follow:      follow,
-			JSON:        jsonOutput,
-			Cap:         capDuration,
-			CancelOnCap: cancelOnCap,
-			MaxRetries:  maxRetries,
-			Output:      stderr,
+			MigRef:        args[0],
+			RepoSelectors: args[1:],
+			Failed:        failed,
+			Follow:        follow,
+			JSON:          jsonOutput,
+			Cap:           capDuration,
+			CancelOnCap:   cancelOnCap,
+			MaxRetries:    maxRetries,
+			Output:        stderr,
 		})
 	}}
-	runCmd.Flags().StringArrayVar(&repos, "repo", nil, "Explicit repo URL(s) to run")
 	runCmd.Flags().BoolVar(&failed, "failed", false, "Run repos with last terminal state Fail")
 	runCmd.Flags().BoolVar(&follow, "follow", false, "Follow run until completion")
 	runCmd.Flags().BoolVar(&jsonOutput, "json", false, "Print created wave as JSON")

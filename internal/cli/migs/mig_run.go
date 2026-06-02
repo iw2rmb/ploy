@@ -2,7 +2,10 @@
 // This file implements the mig run command for creating waves from a mig project.
 //
 // This command calls POST /v1/migs/{mig_id}/waves with repo selection.
-// Implements: ploy mig run <mig-id|name> [--repo <repo-url> ...] [--failed]
+// Implements the control-plane call for `ploy mig run` after the public CLI has
+// resolved any positional repo selectors to canonical repo URLs.
+// User-facing selector resolution happens in internal/cli/mig before this
+// command sends canonical repo URLs to the control-plane API.
 package migs
 
 import (
@@ -25,7 +28,7 @@ type CreateMigRunCommand struct {
 	Client    *http.Client
 	BaseURL   *url.URL
 	MigRef    domaintypes.MigRef // Required: mig ID or name.
-	RepoURLs  []string           // Optional: explicit repo URLs for "explicit" mode.
+	RepoURLs  []string           // Optional: canonical repo URLs for "explicit" mode.
 	Failed    bool               // If true, use "failed" mode; otherwise "all" or "explicit".
 	CreatedBy *string            // Optional: creator identifier.
 }
@@ -39,10 +42,10 @@ type CreateMigRunResult struct {
 }
 
 // Run executes POST /v1/migs/{mig_id}/waves to create a wave with repo selection.
-// Flag behavior:
-//   - --repo ... selects explicit repos (by repo_url identity within the mig)
+// Selection behavior:
+//   - canonical repo URLs select explicit repos by repo_url identity within the mig
 //   - --failed selects repos with last terminal state Fail
-//   - omitted selects all repos in the mig repo set
+//   - omitted repo selection selects all repos in the mig repo set
 func (c CreateMigRunCommand) Run(ctx context.Context) (CreateMigRunResult, error) {
 	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
 		return CreateMigRunResult{}, fmt.Errorf("mig run: %w", err)
@@ -51,30 +54,26 @@ func (c CreateMigRunCommand) Run(ctx context.Context) (CreateMigRunResult, error
 		return CreateMigRunResult{}, fmt.Errorf("mig run: mig id is required")
 	}
 
-	// Validate flag mutual exclusion: --failed and --repo cannot both be specified.
 	if c.Failed && len(c.RepoURLs) > 0 {
-		return CreateMigRunResult{}, fmt.Errorf("mig run: --failed and --repo are mutually exclusive")
+		return CreateMigRunResult{}, fmt.Errorf("mig run: failed and explicit repos are mutually exclusive")
 	}
 
-	// Determine repo_selector mode based on flags.
+	// Determine repo_selector mode based on selection input.
 	var mode string
 	var repoURLs []domaintypes.RepoURL
 	switch {
 	case c.Failed:
-		// --failed → repos whose last terminal state is Fail.
 		mode = "failed"
 	case len(c.RepoURLs) > 0:
-		// --repo ... → explicit repos by URL.
 		mode = "explicit"
 		for _, raw := range c.RepoURLs {
 			u := domaintypes.RepoURL(strings.TrimSpace(raw))
 			if err := u.Validate(); err != nil {
-				return CreateMigRunResult{}, fmt.Errorf("mig run: --repo must be a valid repo url")
+				return CreateMigRunResult{}, fmt.Errorf("mig run: explicit repo must be a valid repo url")
 			}
 			repoURLs = append(repoURLs, u)
 		}
 	default:
-		// No flags → all repos in the mig repo set.
 		mode = "all"
 	}
 
