@@ -75,7 +75,6 @@ type runStore struct {
 	sbomRowsByJobType              map[types.JobType][]store.ListRunSBOMRowsByJobTypeRow
 	deleteSBOMRowsByJob            mockCallSlice[types.JobID, struct{}]
 	upsertSBOMRow                  mockCallSlice[store.UpsertSBOMRowParams, struct{}]
-	sbomJobTypeByJobID             map[types.JobID]types.JobType
 
 	// Ingest (logs, diffs, artifacts)
 	createLog            mockResult[store.Log]
@@ -304,14 +303,6 @@ func (m *runStore) DeleteSBOMRowsByJob(ctx context.Context, jobID types.JobID) e
 
 func (m *runStore) UpsertSBOMRow(ctx context.Context, arg store.UpsertSBOMRowParams) error {
 	_, err := m.upsertSBOMRow.record(arg)
-	if err == nil && m.sbomRowsByJobType != nil && m.sbomJobTypeByJobID != nil {
-		if jobType, ok := m.sbomJobTypeByJobID[arg.JobID]; ok {
-			m.sbomRowsByJobType[jobType] = append(m.sbomRowsByJobType[jobType], store.ListRunSBOMRowsByJobTypeRow{
-				Lib: arg.Lib,
-				Ver: arg.Ver,
-			})
-		}
-	}
 	return err
 }
 

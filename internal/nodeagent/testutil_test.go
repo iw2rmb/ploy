@@ -450,6 +450,7 @@ func newTestController(t *testing.T, cfg Config) *runController {
 		artifactUploader:  uploader,
 		statusUploader:    uploader,
 		jobImageNameSaver: uploader,
+		jobSBOMUploader:   uploader,
 		nodeEventUploader: uploader,
 		httpClient:        uploader.client,
 	}

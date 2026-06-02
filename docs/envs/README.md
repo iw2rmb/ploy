@@ -137,7 +137,8 @@ build_gate:
     `DOCKER_ROOT_DIR`, `PLOYD_CACHE_HOME`, `PLOY_BUILDGATE_CACHE_ROOT`, and `TMPDIR`.
 - Gate status visibility: Use `GET /v1/runs/{id}/status` to view gate results (format: `Gate: passed duration=1234ms` or `Gate: failed pre-gate duration=567ms`) via `Metadata["gate_summary"]`.
 - SBOM persistence contract:
-  - Successful gate outputs under `/out/*` are the evidence source for SBOM row persistence.
+  - Gate post-tasks persist package rows from `/share/sbom.spdx.json` for both `pre_gate` and `post_gate`.
+  - SBOM row persistence is independent from artifact bundle upload.
   - No dedicated SBOM environment variables exist in this slice; stack identity comes from gate metadata (`lang`, `release`, `tool`) and claim context.
 
 ## Healing Container Environment

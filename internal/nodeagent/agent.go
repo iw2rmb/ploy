@@ -46,6 +46,7 @@ func New(cfg Config) (*Agent, error) {
 		artifactUploader:  uploader,
 		statusUploader:    uploader,
 		jobImageNameSaver: uploader,
+		jobSBOMUploader:   uploader,
 		nodeEventUploader: uploader,
 		httpClient:        uploader.client,
 	}

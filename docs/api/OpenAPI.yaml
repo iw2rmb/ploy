@@ -133,6 +133,9 @@ paths:
   # Job-level runtime image persistence — nodes persist the resolved container image name (jobs.job_image)
   /v1/jobs/{job_id}/image:
     $ref: "./paths/jobs_job_id_image.yaml"
+  # Job-level SBOM persistence — nodes replace package rows detected by gate post-tasks
+  /v1/jobs/{job_id}/sbom:
+    $ref: "./paths/jobs_job_id_sbom.yaml"
   # Node events endpoint
   /v1/nodes/{id}/events:
     $ref: "./paths/nodes_id_events.yaml"

@@ -995,7 +995,7 @@ func TestRenderRunStatusReportTextSBOMDiffBlock(t *testing.T) {
 	}
 
 	out := renderText(t, report, TextRenderOptions{})
-	assertx.Contains(t, out, "\n\nSBOM diff\nalpha                    1.0              -> 2.0\n\n")
+	assertx.Contains(t, out, "\n\nSBOM diff\nalpha 1.0              -> 2.0\n\n")
 	if strings.Index(out, "SBOM diff") < strings.Index(out, "post_gate") {
 		t.Fatalf("SBOM diff block must be after jobs frame, got %q", out)
 	}

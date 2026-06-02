@@ -100,6 +100,35 @@ func TestExtractRowsFromBundle_InvalidSBOMDoesNotBlockRows(t *testing.T) {
 	}
 }
 
+func TestExtractRowsFromJSON_ParsesSPDX(t *testing.T) {
+	t.Parallel()
+
+	raw := []byte(`{
+	  "spdxVersion": "SPDX-2.3",
+	  "packages": [
+	    {"name":"Org.Example:Lib-A","versionInfo":"1.0.0"},
+	    {"name":"org.example:lib-a","versionInfo":"1.0.0"},
+	    {"name":"org.example:lib-b","versionInfo":"2.0.0"}
+	  ]
+	}`)
+	jobID := types.JobID("job-json")
+	repoID := types.RepoID("repo-json")
+
+	rows, err := ExtractRowsFromJSON(raw, jobID, repoID)
+	if err != nil {
+		t.Fatalf("ExtractRowsFromJSON error: %v", err)
+	}
+	if len(rows) != 2 {
+		t.Fatalf("row count = %d, want 2: %+v", len(rows), rows)
+	}
+	if rows[0] != (Row{JobID: jobID, RepoID: repoID, Lib: "org.example:lib-a", Ver: "1.0.0"}) {
+		t.Fatalf("rows[0] = %+v", rows[0])
+	}
+	if rows[1] != (Row{JobID: jobID, RepoID: repoID, Lib: "org.example:lib-b", Ver: "2.0.0"}) {
+		t.Fatalf("rows[1] = %+v", rows[1])
+	}
+}
+
 func mustBundle(t *testing.T, files map[string]string) []byte {
 	t.Helper()
 	var buf bytes.Buffer

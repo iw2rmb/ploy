@@ -10,12 +10,11 @@ import (
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	migsapi "github.com/iw2rmb/ploy/internal/migs/api"
-	"github.com/iw2rmb/ploy/internal/server/blobpersist"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
-func getRunSBOMHandler(st store.Store, bp *blobpersist.Service) http.HandlerFunc {
+func getRunSBOMHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		runID, ok := parseRequiredPathIDOrWriteError[domaintypes.RunID](w, r, "run_id")
 		if !ok {
@@ -52,26 +51,26 @@ func getRunSBOMHandler(st store.Store, bp *blobpersist.Service) http.HandlerFunc
 
 		switch view {
 		case "pre":
-			packages, err := listRunSBOMPackages(r, st, bp, run, domaintypes.JobTypePreGate)
+			packages, err := listRunSBOMPackages(r, st, run.ID, domaintypes.JobTypePreGate)
 			if err != nil {
 				serverError(w, "get run sbom", "list pre sbom rows", err, "run_id", runID.String())
 				return
 			}
 			writeJSON(w, http.StatusOK, migsapi.RunSBOMPackagesResponse{RunID: runID, View: view, Packages: packages})
 		case "post":
-			packages, err := listRunSBOMPackages(r, st, bp, run, domaintypes.JobTypePostGate)
+			packages, err := listRunSBOMPackages(r, st, run.ID, domaintypes.JobTypePostGate)
 			if err != nil {
 				serverError(w, "get run sbom", "list post sbom rows", err, "run_id", runID.String())
 				return
 			}
 			writeJSON(w, http.StatusOK, migsapi.RunSBOMPackagesResponse{RunID: runID, View: view, Packages: packages})
 		case "diff":
-			pre, err := listRunSBOMPackages(r, st, bp, run, domaintypes.JobTypePreGate)
+			pre, err := listRunSBOMPackages(r, st, run.ID, domaintypes.JobTypePreGate)
 			if err != nil {
 				serverError(w, "get run sbom", "list pre sbom rows", err, "run_id", runID.String())
 				return
 			}
-			post, err := listRunSBOMPackages(r, st, bp, run, domaintypes.JobTypePostGate)
+			post, err := listRunSBOMPackages(r, st, run.ID, domaintypes.JobTypePostGate)
 			if err != nil {
 				serverError(w, "get run sbom", "list post sbom rows", err, "run_id", runID.String())
 				return
@@ -81,19 +80,10 @@ func getRunSBOMHandler(st store.Store, bp *blobpersist.Service) http.HandlerFunc
 	}
 }
 
-func listRunSBOMPackages(r *http.Request, st store.Store, bp *blobpersist.Service, run store.Run, jobType domaintypes.JobType) ([]migsapi.RunSBOMPackage, error) {
-	rows, err := listRunSBOMRows(r, st, run.ID, jobType)
+func listRunSBOMPackages(r *http.Request, st store.Store, runID domaintypes.RunID, jobType domaintypes.JobType) ([]migsapi.RunSBOMPackage, error) {
+	rows, err := listRunSBOMRows(r, st, runID, jobType)
 	if err != nil {
 		return nil, err
-	}
-	if len(rows) == 0 && bp != nil {
-		if err := backfillRunSBOMRows(r, st, bp, run, jobType); err != nil {
-			return nil, err
-		}
-		rows, err = listRunSBOMRows(r, st, run.ID, jobType)
-		if err != nil {
-			return nil, err
-		}
 	}
 	packages := make([]migsapi.RunSBOMPackage, 0, len(rows))
 	for _, row := range rows {
@@ -110,25 +100,6 @@ func listRunSBOMRows(r *http.Request, st store.Store, runID domaintypes.RunID, j
 		RunID:   runID,
 		JobType: jobType,
 	})
-}
-
-func backfillRunSBOMRows(r *http.Request, st store.Store, bp *blobpersist.Service, run store.Run, jobType domaintypes.JobType) error {
-	jobs, err := st.ListJobsByRunAttempt(r.Context(), store.ListJobsByRunAttemptParams{
-		RunID:   run.ID,
-		Attempt: run.Attempt,
-	})
-	if err != nil {
-		return err
-	}
-	for _, job := range jobs {
-		if job.JobType != jobType || job.Status != domaintypes.JobStatusSuccess {
-			continue
-		}
-		if _, err := maybePersistSBOMRowsForJob(r.Context(), st, bp, run.ID, job.RepoID, job.ID); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 func diffSBOMPackages(pre, post []migsapi.RunSBOMPackage) []migsapi.RunSBOMDiffPackage {

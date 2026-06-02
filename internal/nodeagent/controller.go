@@ -29,6 +29,7 @@ type runController struct {
 	artifactUploader  *baseUploader
 	statusUploader    *baseUploader
 	jobImageNameSaver *baseUploader
+	jobSBOMUploader   *baseUploader
 	nodeEventUploader *baseUploader
 
 	// httpClient is the shared HTTP client for components created during job execution

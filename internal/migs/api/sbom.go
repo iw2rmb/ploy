@@ -7,6 +7,15 @@ type RunSBOMPackage struct {
 	Version string `json:"version"`
 }
 
+type JobSBOMUploadRequest struct {
+	Packages []RunSBOMPackage `json:"packages"`
+}
+
+type JobSBOMUploadResponse struct {
+	JobID    domaintypes.JobID `json:"job_id"`
+	RowCount int               `json:"row_count"`
+}
+
 type RunSBOMPackagesResponse struct {
 	RunID    domaintypes.RunID `json:"run_id"`
 	View     string            `json:"view"`

@@ -12,7 +12,6 @@ this level; each concern lives in its own subpackage.
 - scheduler: Background tasks and TTL worker orchestration.
 - recovery: Stale-job recovery and run-status reconciliation.
 - blobpersist: Blob persistence service used by handlers for spec bundles, logs, and diffs.
-- sbom: SBOM extraction helpers used during job completion.
 - pki: Certificate authority and rotation logic.
 - config: Server-only configuration types, defaults, and loader.
   Node-agent configuration lives under `internal/nodeagent/config.go`.

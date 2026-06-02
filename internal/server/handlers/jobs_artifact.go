@@ -11,7 +11,6 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/server/blobpersist"
 	"github.com/iw2rmb/ploy/internal/store"
-	"github.com/iw2rmb/ploy/internal/workflow/lifecycle"
 )
 
 // nodeUUIDHeader is the HTTP header key that carries the worker node's ID
@@ -132,11 +131,6 @@ func createJobArtifactHandler(st store.Store, bp *blobpersist.Service) http.Hand
 			slog.Error("artifact: create failed", "run_id", runID.String(), "job_id", jobID.String(), "err", err)
 			return
 		}
-		if err := persistSBOMRowsForSuccessfulGateArtifact(r, st, bp, job); err != nil {
-			writeHTTPError(w, http.StatusInternalServerError, "failed to persist sbom rows: %v", err)
-			slog.Error("artifact: persist sbom rows failed", "run_id", runID.String(), "job_id", jobID.String(), "err", err)
-			return
-		}
 		writeJSON(w, http.StatusCreated, map[string]any{
 			"artifact_bundle_id": uuid.UUID(artifact.ID.Bytes).String(),
 			"cid":                strings.TrimSpace(*artifact.Cid),
@@ -149,12 +143,4 @@ func createJobArtifactHandler(st store.Store, bp *blobpersist.Service) http.Hand
 			"artifact_bundle_id", artifact.ID.Bytes,
 		)
 	}
-}
-
-func persistSBOMRowsForSuccessfulGateArtifact(r *http.Request, st store.Store, bp *blobpersist.Service, job store.Job) error {
-	if job.Status != domaintypes.JobStatusSuccess || !lifecycle.IsGateJobType(job.JobType) {
-		return nil
-	}
-	_, err := maybePersistSBOMRowsForJob(r.Context(), st, bp, job.RunID, job.RepoID, job.ID)
-	return err
 }

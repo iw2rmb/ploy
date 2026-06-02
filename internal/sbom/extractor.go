@@ -23,6 +23,12 @@ type Row struct {
 	Ver    string
 }
 
+// Package is one normalized package/version pair parsed from an SBOM document.
+type Package struct {
+	Name    string
+	Version string
+}
+
 // ExtractRowsFromBundle parses supported SBOM files from a gzipped tar bundle
 // and returns normalized rows keyed to the provided job/repo provenance.
 func ExtractRowsFromBundle(bundle []byte, jobID types.JobID, repoID types.RepoID) ([]Row, error) {
@@ -98,6 +104,65 @@ func ExtractRowsFromBundle(bundle []byte, jobID types.JobID, repoID types.RepoID
 		return rows[i].Lib < rows[j].Lib
 	})
 	return rows, firstParseErr
+}
+
+// ExtractRowsFromJSON parses one supported SBOM JSON document and returns
+// normalized rows keyed to the provided job/repo provenance.
+func ExtractRowsFromJSON(raw []byte, jobID types.JobID, repoID types.RepoID) ([]Row, error) {
+	packages, err := ExtractPackagesFromJSON(raw)
+	if err != nil {
+		return nil, err
+	}
+
+	rows := make([]Row, 0, len(packages))
+	for _, pkg := range packages {
+		rows = append(rows, Row{
+			JobID:  jobID,
+			RepoID: repoID,
+			Lib:    pkg.Name,
+			Ver:    pkg.Version,
+		})
+	}
+	return rows, nil
+}
+
+// ExtractPackagesFromJSON parses one supported SBOM JSON document and returns
+// normalized package/version pairs without attaching producer provenance.
+func ExtractPackagesFromJSON(raw []byte) ([]Package, error) {
+	pkgs, parsed, err := parseSBOMJSON(raw)
+	if err != nil {
+		return nil, err
+	}
+	if !parsed || len(pkgs) == 0 {
+		return nil, nil
+	}
+
+	seen := map[string]struct{}{}
+	packages := make([]Package, 0, len(pkgs))
+	for _, pkg := range pkgs {
+		lib := normalizeLib(pkg.Name)
+		ver := normalizeVer(pkg.Version)
+		if lib == "" || ver == "" {
+			continue
+		}
+		key := lib + "\x00" + ver
+		if _, exists := seen[key]; exists {
+			continue
+		}
+		seen[key] = struct{}{}
+		packages = append(packages, Package{
+			Name:    lib,
+			Version: ver,
+		})
+	}
+
+	sort.Slice(packages, func(i, j int) bool {
+		if packages[i].Name == packages[j].Name {
+			return packages[i].Version < packages[j].Version
+		}
+		return packages[i].Name < packages[j].Name
+	})
+	return packages, nil
 }
 
 type packageTuple struct {
