@@ -20,7 +20,7 @@ var waveModelMigrationSQL string
 // Increment this when schema.sql changes to trigger current-contract maintenance
 // on existing databases. This uses a timestamp-like versioning scheme
 // (YYYYMMDDNN) for clarity.
-const SchemaVersion int64 = 2026060201
+const SchemaVersion int64 = 2026060202
 
 const waveModelSchemaVersion int64 = 2026060101
 
@@ -116,6 +116,16 @@ func applyCurrentSchemaMaintenance(ctx context.Context, pool *pgxpool.Pool, curr
 func applyCurrentSchemaMaintenanceSQL(ctx context.Context, tx pgx.Tx) error {
 	if _, err := tx.Exec(ctx, `ALTER TABLE IF EXISTS ploy.mig_repos DROP COLUMN IF EXISTS target_ref`); err != nil {
 		return fmt.Errorf("drop mig_repos.target_ref: %w", err)
+	}
+	if _, err := tx.Exec(ctx, `
+ALTER TABLE IF EXISTS ploy.runs
+  ALTER COLUMN source_commit_sha SET DEFAULT '',
+  ALTER COLUMN repo_sha0 SET DEFAULT '',
+  ALTER COLUMN status SET DEFAULT 'Queued',
+  ALTER COLUMN attempt SET DEFAULT 1,
+  ALTER COLUMN stats SET DEFAULT '{}'::jsonb
+`); err != nil {
+		return fmt.Errorf("align runs defaults: %w", err)
 	}
 	return nil
 }
