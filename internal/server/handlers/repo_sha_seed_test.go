@@ -3,6 +3,8 @@ package handlers
 import (
 	"context"
 	"errors"
+	"os/exec"
+	"runtime"
 	"testing"
 	"time"
 
@@ -114,5 +116,26 @@ func TestResolveSourceCommitSHAFromContextAppliesTimeout(t *testing.T) {
 	}
 	if elapsed := time.Since(start); elapsed > time.Second {
 		t.Fatalf("resolveSourceCommitSHAFromContext() elapsed = %s, want bounded timeout", elapsed)
+	}
+}
+
+func TestProcessGroupCancelBoundsGrandchildPipe(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("process group cancellation uses Unix signals")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "sh", "-c", "sleep 5 & wait")
+	configureProcessGroupCancel(cmd)
+
+	start := time.Now()
+	_, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatal("CombinedOutput() error = nil, want timeout/cancel error")
+	}
+	if elapsed := time.Since(start); elapsed > time.Second {
+		t.Fatalf("CombinedOutput() elapsed = %s, want bounded cancellation", elapsed)
 	}
 }
