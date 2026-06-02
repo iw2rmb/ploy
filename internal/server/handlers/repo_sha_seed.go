@@ -78,6 +78,7 @@ func resolveSourceCommitSHA(ctx context.Context, repoURL, ref string, auth gitau
 func gitLSRemote(ctx context.Context, repoURL, ref string, auth gitauth.Options) (string, error) {
 	prepared := gitauth.PrepareURL(repoURL, auth)
 	cmd := exec.CommandContext(ctx, "git", "ls-remote", prepared.URL, ref)
+	configureProcessGroupCancel(cmd)
 	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GIT_ASKPASS=echo")
 	cmd.Env = append(cmd.Env, prepared.Env...)
 	out, err := cmd.CombinedOutput()
