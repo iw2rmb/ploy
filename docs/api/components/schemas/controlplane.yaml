@@ -1369,6 +1369,25 @@ RunSBOMPackage:
       type: string
   required: [package, version]
 
+JobSBOMUploadRequest:
+  type: object
+  properties:
+    packages:
+      type: array
+      items:
+        $ref: "#/RunSBOMPackage"
+  required: [packages]
+
+JobSBOMUploadResponse:
+  type: object
+  properties:
+    job_id:
+      type: string
+    row_count:
+      type: integer
+      minimum: 0
+  required: [job_id, row_count]
+
 RunSBOMPackagesResponse:
   type: object
   properties:

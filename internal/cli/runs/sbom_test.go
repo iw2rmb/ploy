@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -26,6 +27,7 @@ func TestGetRunSBOMCommandDiffAndRender(t *testing.T) {
 			View:  "diff",
 			Packages: []migsapi.RunSBOMDiffPackage{
 				{Package: "alpha", VersionPre: "1.0", VersionPost: "2.0", Change: "changed"},
+				{Package: "com.example:very-long-package", VersionPost: "4.0", Change: "added"},
 				{Package: "beta", VersionPost: "1.0", Change: "added"},
 				{Package: "gamma", VersionPre: "3.0", Change: "removed"},
 			},
@@ -54,11 +56,13 @@ func TestGetRunSBOMCommandDiffAndRender(t *testing.T) {
 	if err := RenderRunSBOM(&out, result); err != nil {
 		t.Fatalf("RenderRunSBOM error: %v", err)
 	}
+	packageWidth := len("com.example:very-long-package")
 	want := strings.Join([]string{
 		"SBOM diff",
-		"alpha                    1.0              -> 2.0",
-		"beta                     -                -> 1.0",
-		"gamma                    3.0              -> -",
+		fmt.Sprintf("%-*s %-16s -> %s", packageWidth, "alpha", "1.0", "2.0"),
+		fmt.Sprintf("%-*s %-16s -> %s", packageWidth, "com.example:very-long-package", "-", "4.0"),
+		fmt.Sprintf("%-*s %-16s -> %s", packageWidth, "beta", "-", "1.0"),
+		fmt.Sprintf("%-*s %-16s -> %s", packageWidth, "gamma", "3.0", "-"),
 		"",
 	}, "\n")
 	if out.String() != want {

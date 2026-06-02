@@ -16,6 +16,7 @@ import (
 	"strings"
 
 	"github.com/iw2rmb/ploy/internal/domain/types"
+	migsapi "github.com/iw2rmb/ploy/internal/migs/api"
 )
 
 // ArtifactBundleEntry defines one filesystem source and its archive path inside
@@ -107,6 +108,17 @@ func (b *baseUploader) SaveJobImageName(ctx context.Context, jobID types.JobID, 
 		fmt.Sprintf("/v1/jobs/%s/image", jobID.String()),
 		map[string]any{"image": image},
 		"save job image name",
+		postJSONRetryModeDefault,
+	)
+}
+
+// UploadJobSBOM replaces persisted SBOM package rows for a gate job.
+func (b *baseUploader) UploadJobSBOM(ctx context.Context, jobID types.JobID, packages []migsapi.RunSBOMPackage) error {
+	return b.postJSONWithRetry(
+		ctx,
+		fmt.Sprintf("/v1/jobs/%s/sbom", jobID.String()),
+		migsapi.JobSBOMUploadRequest{Packages: packages},
+		"upload job sbom",
 		postJSONRetryModeDefault,
 	)
 }

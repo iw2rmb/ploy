@@ -165,6 +165,20 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 		r.persistFirstGateFailureLog(req.RunID, gateResult)
 	}
 
+	if err := r.persistGateSBOM(ctx, req, shareDir); err != nil {
+		duration := time.Since(startTime)
+		uploadRepoArtifactsOnReturn = true
+		slog.Error("gate sbom persistence failed; marking gate job as error",
+			"run_id", req.RunID,
+			"job_id", req.JobID,
+			"job_type", req.JobType,
+			"duration", duration,
+			"error", err,
+		)
+		r.uploadGateErrorStatus(ctx, req, err, duration)
+		return
+	}
+
 	duration := time.Since(startTime)
 
 	// Determine status and exit code based on gate outcome.

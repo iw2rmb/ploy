@@ -298,7 +298,7 @@ CREATE TABLE IF NOT EXISTS node_actions (
 CREATE INDEX IF NOT EXISTS node_actions_pending_idx ON node_actions(node_id, id) WHERE status = 'Queued';
 CREATE INDEX IF NOT EXISTS node_actions_node_idx ON node_actions(node_id, created_at DESC);
 
--- SBOM package rows extracted from successful gate job artifact bundles.
+-- SBOM package rows persisted by gate job post-task uploads.
 -- Time attribution is available via sboms.job_id -> jobs.created_at.
 CREATE TABLE IF NOT EXISTS sboms (
   job_id      TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,

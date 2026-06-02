@@ -91,6 +91,8 @@ func TestOpenAPICompleteness(t *testing.T) {
 		{"/v1/jobs/{job_id}/status", "get"},
 		// Job-level runtime image persistence
 		{"/v1/jobs/{job_id}/image", "post"},
+		// Job-level SBOM persistence
+		{"/v1/jobs/{job_id}/sbom", "post"},
 		// Node events
 		{"/v1/nodes/{id}/events", "post"},
 		// Node logs

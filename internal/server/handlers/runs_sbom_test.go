@@ -1,13 +1,10 @@
 package handlers
 
 import (
-	"context"
 	"net/http"
 	"testing"
 
-	bsmock "github.com/iw2rmb/ploy/internal/blobstore/mock"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	"github.com/iw2rmb/ploy/internal/server/blobpersist"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -137,7 +134,7 @@ func TestGetRunSBOMHandler_ViewsAndValidation(t *testing.T) {
 			st.getRun.val = store.Run{ID: runID, SpecID: specID, RepoID: repoID, Attempt: 1}
 			st.getSpec.val = store.Spec{ID: specID, Spec: tt.spec}
 
-			handler := getRunSBOMHandler(st, nil)
+			handler := getRunSBOMHandler(st)
 			rr := doRequest(t, handler, http.MethodGet, "/v1/runs/"+runID.String()+"/sbom/"+tt.view, nil, "run_id", runID.String(), "view", tt.view)
 
 			assertStatus(t, rr, tt.wantStatus)
@@ -164,66 +161,5 @@ func TestGetRunSBOMHandler_ViewsAndValidation(t *testing.T) {
 			}
 			tt.want(t, body)
 		})
-	}
-}
-
-func TestGetRunSBOMHandler_BackfillsRowsFromExistingGateArtifacts(t *testing.T) {
-	t.Parallel()
-
-	runID := domaintypes.NewRunID()
-	specID := domaintypes.NewSpecID()
-	repoID := domaintypes.NewRepoID()
-	jobID := domaintypes.NewJobID()
-	objKey := "artifacts/run/" + runID.String() + "/bundle/sbom.tar.gz"
-	st := &runStore{
-		sbomRowsByJobType: map[domaintypes.JobType][]store.ListRunSBOMRowsByJobTypeRow{},
-		sbomJobTypeByJobID: map[domaintypes.JobID]domaintypes.JobType{
-			jobID: domaintypes.JobTypePostGate,
-		},
-	}
-	st.getRun.val = store.Run{ID: runID, SpecID: specID, RepoID: repoID, Attempt: 1}
-	st.getSpec.val = store.Spec{ID: specID, Spec: []byte(`{"steps":[{"image":"docker.io/test/mig:latest"}]}`)}
-	st.listJobsByRunAttempt.val = []store.Job{{
-		ID:      jobID,
-		RunID:   runID,
-		RepoID:  repoID,
-		Attempt: 1,
-		Status:  domaintypes.JobStatusSuccess,
-		JobType: domaintypes.JobTypePostGate,
-	}}
-	st.listArtifactBundlesByRunAndJob.val = []store.ArtifactBundle{{
-		RunID:     runID,
-		JobID:     &jobID,
-		ObjectKey: &objKey,
-	}}
-	bs := bsmock.New()
-	bundle := mustTarGzPayload(t, map[string][]byte{
-		"artifacts/shared/sbom.spdx.json": []byte(`{
-  "spdxVersion":"SPDX-2.3",
-  "packages":[{"name":"org.example:lib-a","versionInfo":"1.0.0"}]
-}`),
-	})
-	if _, err := bs.Put(context.Background(), objKey, "application/gzip", bundle); err != nil {
-		t.Fatalf("put blob: %v", err)
-	}
-	handler := getRunSBOMHandler(st, blobpersist.New(st, bs))
-
-	rr := doRequest(t, handler, http.MethodGet, "/v1/runs/"+runID.String()+"/sbom/post", nil, "run_id", runID.String(), "view", "post")
-
-	assertStatus(t, rr, http.StatusOK)
-	if len(st.listRunSBOMRowsByJobType.calls) != 2 {
-		t.Fatalf("ListRunSBOMRowsByJobType calls=%d, want 2", len(st.listRunSBOMRowsByJobType.calls))
-	}
-	if len(st.upsertSBOMRow.calls) != 1 {
-		t.Fatalf("upsert calls=%d, want 1", len(st.upsertSBOMRow.calls))
-	}
-	body := decodeBody[map[string]any](t, rr)
-	packages := body["packages"].([]any)
-	if len(packages) != 1 {
-		t.Fatalf("packages len=%d, want 1", len(packages))
-	}
-	first := packages[0].(map[string]any)
-	if first["package"] != "org.example:lib-a" || first["version"] != "1.0.0" {
-		t.Fatalf("first package=%v, want org.example:lib-a 1.0.0", first)
 	}
 }

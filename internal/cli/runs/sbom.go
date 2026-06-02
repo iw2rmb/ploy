@@ -106,6 +106,7 @@ func formatSBOMPackageTable(packages []migsapi.RunSBOMPackage) string {
 func formatSBOMDiffBlock(packages []migsapi.RunSBOMDiffPackage) string {
 	var b strings.Builder
 	b.WriteString("SBOM diff\n")
+	packageWidth := maxSBOMDiffPackageWidth(packages)
 	for _, pkg := range packages {
 		pre := strings.TrimSpace(pkg.VersionPre)
 		if pre == "" {
@@ -115,7 +116,17 @@ func formatSBOMDiffBlock(packages []migsapi.RunSBOMDiffPackage) string {
 		if post == "" {
 			post = "-"
 		}
-		_, _ = fmt.Fprintf(&b, "%-24s %-16s -> %s\n", pkg.Package, pre, post)
+		_, _ = fmt.Fprintf(&b, "%-*s %-16s -> %s\n", packageWidth, pkg.Package, pre, post)
 	}
 	return strings.TrimRight(b.String(), "\n")
+}
+
+func maxSBOMDiffPackageWidth(packages []migsapi.RunSBOMDiffPackage) int {
+	width := 0
+	for _, pkg := range packages {
+		if n := len(pkg.Package); n > width {
+			width = n
+		}
+	}
+	return width
 }

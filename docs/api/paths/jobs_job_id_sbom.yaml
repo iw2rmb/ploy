@@ -1,0 +1,52 @@
+# Job-level SBOM persistence endpoint — replaces package rows for a gate job.
+# Nodes call this endpoint after gate execution and before job completion.
+parameters:
+  - in: path
+    name: job_id
+    required: true
+    schema: { type: string }
+    description: Job ID (KSUID string)
+  - in: header
+    name: PLOY_NODE_UUID
+    required: true
+    schema: { type: string }
+    description: Worker node ID (NanoID 6-character string) saving SBOM rows
+
+post:
+  tags: [Control]
+  summary: Replace persisted SBOM package rows for a gate job
+  description: |
+    Nodes call this endpoint as a gate post-task for both `pre_gate` and
+    `post_gate`. The server deletes existing SBOM rows for the job and inserts
+    the supplied package/version rows.
+
+    This endpoint is independent from artifact bundle upload. Artifact bundles
+    may be uploaded or retained separately, but they are not the source of DB
+    SBOM persistence.
+
+    Ownership is enforced: only the node that claimed the job may save SBOM
+    rows while the job is `Running`, and only gate jobs (`pre_gate`,
+    `post_gate`) are accepted.
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: "../components/schemas/controlplane.yaml#/JobSBOMUploadRequest"
+  responses:
+    '200':
+      description: SBOM rows replaced
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/controlplane.yaml#/JobSBOMUploadResponse"
+    '400':
+      description: Bad request (missing job_id, missing node header, or invalid JSON)
+    '403':
+      description: Forbidden — job is not assigned to the calling node
+    '404':
+      description: Job not found (invalid job ID)
+    '409':
+      description: Conflict — job is not `Running` or is not a gate job
+    '500':
+      description: Internal server error

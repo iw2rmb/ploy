@@ -89,7 +89,7 @@ func TestRunCommandSBOMDiff(t *testing.T) {
 	if stderr.Len() != 0 {
 		t.Fatalf("expected empty stderr, got %q", stderr.String())
 	}
-	if want := "SBOM diff\nalpha                    1.0              -> 2.0\n"; stdout.String() != want {
+	if want := "SBOM diff\nalpha 1.0              -> 2.0\n"; stdout.String() != want {
 		t.Fatalf("stdout=%q, want %q", stdout.String(), want)
 	}
 }
