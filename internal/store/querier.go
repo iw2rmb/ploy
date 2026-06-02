@@ -210,6 +210,7 @@ type Querier interface {
 	ListNodes(ctx context.Context) ([]Node, error)
 	ListQueuedRunsByWave(ctx context.Context, waveID types.WaveID) ([]Run, error)
 	ListRunActionsByRunAttempt(ctx context.Context, arg ListRunActionsByRunAttemptParams) ([]RunAction, error)
+	ListRunSBOMRowsByJobType(ctx context.Context, arg ListRunSBOMRowsByJobTypeParams) ([]ListRunSBOMRowsByJobTypeRow, error)
 	ListRuns(ctx context.Context, arg ListRunsParams) ([]Run, error)
 	ListRunsByWave(ctx context.Context, waveID types.WaveID) ([]Run, error)
 	ListRunsForRepo(ctx context.Context, arg ListRunsForRepoParams) ([]ListRunsForRepoRow, error)

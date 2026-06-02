@@ -43,6 +43,7 @@ func NewCommand() *cobra.Command {
 	cmd.AddCommand(newCancelCommand())
 	cmd.AddCommand(newRestartCommand())
 	cmd.AddCommand(newStatusCommand())
+	cmd.AddCommand(newSBOMCommand())
 	cmd.AddCommand(newPullCommand())
 	cmd.AddCommand(newApplyCommand())
 	return cmd
@@ -114,6 +115,23 @@ func newStatusCommand() *cobra.Command {
 	return cmd
 }
 
+func newSBOMCommand() *cobra.Command {
+	opts := SBOMOptions{}
+	cmd := &cobra.Command{
+		Use:          "sbom {pre|post|diff} <run-id>",
+		Short:        "Show persisted run SBOM packages",
+		Args:         cobra.ExactArgs(2),
+		SilenceUsage: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			opts.View = args[0]
+			opts.RunID = args[1]
+			opts.Output = cmd.OutOrStdout()
+			return RunSBOM(cmd.Context(), opts)
+		},
+	}
+	return cmd
+}
+
 func newPullCommand() *cobra.Command {
 	opts := ArtifactPullOptions{}
 	cmd := &cobra.Command{
@@ -156,6 +174,38 @@ type StatusOptions struct {
 	JSONOut bool
 	Follow  bool
 	Output  io.Writer
+}
+
+type SBOMOptions struct {
+	View   string
+	RunID  string
+	Output io.Writer
+}
+
+func RunSBOM(ctx context.Context, opts SBOMOptions) error {
+	runID := strings.TrimSpace(opts.RunID)
+	if runID == "" {
+		return errors.New("run id required")
+	}
+	out := opts.Output
+	if out == nil {
+		out = io.Discard
+	}
+
+	base, httpClient, err := common.ResolveControlPlaneHTTP(ctx)
+	if err != nil {
+		return err
+	}
+	result, err := runcmd.GetRunSBOMCommand{
+		Client:  httpClient,
+		BaseURL: base,
+		RunID:   domaintypes.RunID(runID),
+		View:    opts.View,
+	}.Run(ctx)
+	if err != nil {
+		return err
+	}
+	return runcmd.RenderRunSBOM(out, result)
 }
 
 func RunStatus(ctx context.Context, opts StatusOptions) error {

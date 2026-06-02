@@ -1,0 +1,31 @@
+get:
+  tags: [Control]
+  summary: Show persisted SBOM packages for a run
+  parameters:
+    - in: path
+      name: run_id
+      required: true
+      schema: { type: string }
+      description: Run ID (KSUID string)
+    - in: path
+      name: view
+      required: true
+      schema:
+        type: string
+        enum: [pre, post, diff]
+      description: SBOM view to return.
+  responses:
+    "200":
+      description: SBOM package list or diff.
+      content:
+        application/json:
+          schema:
+            oneOf:
+              - $ref: "../components/schemas/controlplane.yaml#/RunSBOMPackagesResponse"
+              - $ref: "../components/schemas/controlplane.yaml#/RunSBOMDiffResponse"
+    "400":
+      description: Invalid view or build gate disabled for the run.
+      content:
+        text/plain:
+          schema:
+            type: string

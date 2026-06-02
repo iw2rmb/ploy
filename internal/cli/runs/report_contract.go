@@ -4,15 +4,17 @@ import (
 	"time"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	migsapi "github.com/iw2rmb/ploy/internal/migs/api"
 )
 
 // RunStatusReport is the canonical status report contract shared by all status renderers.
 type RunStatusReport struct {
-	RunID   domaintypes.RunID  `json:"run_id"`
-	MigID   domaintypes.MigID  `json:"mig_id"`
-	MigName string             `json:"mig_name"`
-	SpecID  domaintypes.SpecID `json:"spec_id"`
-	Repos   []RunEntry         `json:"repos"`
+	RunID    domaintypes.RunID            `json:"run_id"`
+	MigID    domaintypes.MigID            `json:"mig_id"`
+	MigName  string                       `json:"mig_name"`
+	SpecID   domaintypes.SpecID           `json:"spec_id"`
+	Repos    []RunEntry                   `json:"repos"`
+	SBOMDiff []migsapi.RunSBOMDiffPackage `json:"sbom_diff,omitempty"`
 }
 
 // RunEntry captures repo-level status, job graph data, and report links for a single repo attempt.

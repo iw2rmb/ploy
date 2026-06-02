@@ -16,7 +16,7 @@ info:
     - `/v1/migs/{mig_id}/pull` — resolve run for `ploy mig pull`.
     - `/v1/repos/resolve` — expand `namespace/repo[:ref]` shorthand using server-owned GitLab config.
     - `/v1/runs` — single-repo run submission and run listing.
-    - `/v1/runs/{run_id}/*` — run lifecycle, pull resolution, logs, diffs, artifacts, jobs, and worker snapshots.
+    - `/v1/runs/{run_id}/*` — run lifecycle, pull resolution, logs, diffs, artifacts, jobs, SBOM views, and worker snapshots.
     - `/v1/waves/{wave_id}/*` — wave inspect, run listing, and wave cancellation.
 
     Type semantics and labels:
@@ -169,6 +169,8 @@ paths:
     $ref: "./paths/runs_run_id_artifacts.yaml"
   /v1/runs/{run_id}/jobs:
     $ref: "./paths/runs_run_id_jobs.yaml"
+  /v1/runs/{run_id}/sbom/{view}:
+    $ref: "./paths/runs_run_id_sbom_view.yaml"
   /v1/waves/{wave_id}:
     $ref: "./paths/waves_wave_id.yaml"
   /v1/waves/{wave_id}/runs:

@@ -21,6 +21,47 @@ func (q *Queries) DeleteSBOMRowsByJob(ctx context.Context, jobID types.JobID) er
 	return err
 }
 
+const listRunSBOMRowsByJobType = `-- name: ListRunSBOMRowsByJobType :many
+SELECT DISTINCT s.lib, s.ver
+FROM sboms s
+JOIN jobs j ON j.id = s.job_id
+JOIN runs r ON r.id = j.run_id
+WHERE j.run_id = $1
+  AND j.attempt = r.attempt
+  AND j.job_type = $2
+ORDER BY s.lib ASC, s.ver ASC
+`
+
+type ListRunSBOMRowsByJobTypeParams struct {
+	RunID   types.RunID   `json:"run_id"`
+	JobType types.JobType `json:"job_type"`
+}
+
+type ListRunSBOMRowsByJobTypeRow struct {
+	Lib string `json:"lib"`
+	Ver string `json:"ver"`
+}
+
+func (q *Queries) ListRunSBOMRowsByJobType(ctx context.Context, arg ListRunSBOMRowsByJobTypeParams) ([]ListRunSBOMRowsByJobTypeRow, error) {
+	rows, err := q.db.Query(ctx, listRunSBOMRowsByJobType, arg.RunID, arg.JobType)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListRunSBOMRowsByJobTypeRow{}
+	for rows.Next() {
+		var i ListRunSBOMRowsByJobTypeRow
+		if err := rows.Scan(&i.Lib, &i.Ver); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const upsertSBOMRow = `-- name: UpsertSBOMRow :exec
 INSERT INTO sboms (job_id, repo_id, lib, ver)
 VALUES ($1, $2, $3, $4)

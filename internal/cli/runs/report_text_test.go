@@ -8,6 +8,7 @@ import (
 	"time"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	migsapi "github.com/iw2rmb/ploy/internal/migs/api"
 	"github.com/iw2rmb/ploy/internal/testutil/assertx"
 )
 
@@ -978,4 +979,28 @@ func TestRenderRunStatusReportTextCreatedJobDurationKeepsStepAdjacent(t *testing
 	out := stripCSI(renderText(t, report, TextRenderOptions{EnableOSC8: false}))
 	assertx.Contains(t, out, "-  post_gate")
 	assertx.NotContains(t, out, "-          post_gate")
+}
+
+func TestRenderRunStatusReportTextSBOMDiffBlock(t *testing.T) {
+	t.Parallel()
+
+	report := singleJobReport("sbom", domaintypes.RunStatusSuccess, RunJobEntry{
+		JobID:      domaintypes.NewJobID(),
+		JobType:    domaintypes.JobTypePostGate,
+		Status:     domaintypes.JobStatusSuccess,
+		DurationMs: 1000,
+	})
+	report.SBOMDiff = []migsapi.RunSBOMDiffPackage{
+		{Package: "alpha", VersionPre: "1.0", VersionPost: "2.0", Change: "changed"},
+	}
+
+	out := renderText(t, report, TextRenderOptions{})
+	assertx.Contains(t, out, "\n\nSBOM diff\nalpha                    1.0              -> 2.0\n\n")
+	if strings.Index(out, "SBOM diff") < strings.Index(out, "post_gate") {
+		t.Fatalf("SBOM diff block must be after jobs frame, got %q", out)
+	}
+
+	report.SBOMDiff = nil
+	out = renderText(t, report, TextRenderOptions{})
+	assertx.NotContains(t, out, "SBOM diff")
 }

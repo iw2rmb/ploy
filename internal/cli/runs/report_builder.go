@@ -50,6 +50,18 @@ func (c GetRunStatusReportCommand) Run(ctx context.Context) (RunStatusReport, er
 	if err := c.buildRunEntry(ctx, statusReportSourceFromSummary(c.RunID, summary), stageArtifacts, &report.Repos[0]); err != nil {
 		return RunStatusReport{}, err
 	}
+	if hasSuccessfulPostGate(report.Repos[0].Jobs) {
+		sbom, err := GetRunSBOMCommand{
+			Client:  c.Client,
+			BaseURL: c.BaseURL,
+			RunID:   c.RunID,
+			View:    "diff",
+		}.Run(ctx)
+		if err != nil {
+			return RunStatusReport{}, fmt.Errorf("run status report: fetch sbom diff: %w", err)
+		}
+		report.SBOMDiff = sbom.DiffPackages
+	}
 
 	return report, nil
 }
@@ -291,4 +303,13 @@ func buildArtifactLookupURL(baseURL *url.URL, cid string) string {
 	q.Set("cid", strings.TrimSpace(cid))
 	u.RawQuery = q.Encode()
 	return u.String()
+}
+
+func hasSuccessfulPostGate(jobs []RunJobEntry) bool {
+	for _, job := range jobs {
+		if job.JobType == domaintypes.JobTypePostGate && isSuccessfulStatus(job.Status.String()) {
+			return true
+		}
+	}
+	return false
 }

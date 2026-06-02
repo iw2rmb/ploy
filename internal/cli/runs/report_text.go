@@ -169,6 +169,12 @@ func RenderRunStatusReportTextLayout(report RunStatusReport, opts TextRenderOpti
 		out.WriteByte('\n')
 	}
 	out.WriteString(frameLayout.Text)
+	if len(report.SBOMDiff) > 0 {
+		out.WriteByte('\n')
+		out.WriteString(formatSBOMDiffBlock(report.SBOMDiff))
+		out.WriteByte('\n')
+		out.WriteByte('\n')
+	}
 	rendered := lipgloss.NewStyle().Render(out.String())
 
 	dynamicSections := make([]RunStatusReportDynamicSection, len(frameLayout.Sections))

@@ -33,6 +33,7 @@ func TestSQLCOverridesCompile(t *testing.T) {
 		GetSpec(ctx context.Context, id types.SpecID) (Spec, error)
 		GetMigRepo(ctx context.Context, id types.MigRepoID) (MigRepo, error)
 		DeleteSBOMRowsByJob(ctx context.Context, jobID types.JobID) error
+		ListRunSBOMRowsByJobType(ctx context.Context, arg ListRunSBOMRowsByJobTypeParams) ([]ListRunSBOMRowsByJobTypeRow, error)
 		UpsertSBOMRow(ctx context.Context, arg UpsertSBOMRowParams) error
 	}
 	var _ typedIDQuerier = (Querier)(nil)
