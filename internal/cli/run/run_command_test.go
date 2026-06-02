@@ -63,3 +63,54 @@ func TestRunCommandSubmitRemoteSelector(t *testing.T) {
 		t.Fatalf("expected run id in stdout, got %q", stdout.String())
 	}
 }
+
+func TestRunCommandSBOMDiff(t *testing.T) {
+	runID := domaintypes.NewRunID()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Path != "/v1/runs/"+runID.String()+"/sbom/diff" {
+			http.NotFound(w, r)
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"run_id": runID.String(),
+			"view":   "diff",
+			"packages": []map[string]any{
+				{"package": "alpha", "version_pre": "1.0", "version_post": "2.0", "change": "changed"},
+			},
+		})
+	}))
+	defer server.Close()
+	clienv.UseServerDescriptor(t, server.URL)
+
+	var stdout, stderr bytes.Buffer
+	if err := executeRunCommand([]string{"sbom", "diff", runID.String()}, &stdout, &stderr); err != nil {
+		t.Fatalf("run sbom diff: %v", err)
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("expected empty stderr, got %q", stderr.String())
+	}
+	if want := "SBOM diff\nalpha                    1.0              -> 2.0\n"; stdout.String() != want {
+		t.Fatalf("stdout=%q, want %q", stdout.String(), want)
+	}
+}
+
+func TestRunCommandSBOMDisabledBuildGateError(t *testing.T) {
+	runID := domaintypes.NewRunID()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "build gate disabled for run", http.StatusBadRequest)
+	}))
+	defer server.Close()
+	clienv.UseServerDescriptor(t, server.URL)
+
+	var stdout, stderr bytes.Buffer
+	err := executeRunCommand([]string{"sbom", "diff", runID.String()}, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if err.Error() != "build gate disabled for run" {
+		t.Fatalf("error=%q, want control-plane body", err.Error())
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("expected empty stdout, got %q", stdout.String())
+	}
+}

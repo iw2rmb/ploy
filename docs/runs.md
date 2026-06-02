@@ -28,6 +28,7 @@ ploy mig run <mig-id|name> [<namespace/repo[:ref]> ... | --failed] [--follow] [-
 
 ```bash
 ploy run status <run-id> [--json|--follow]
+ploy run sbom {pre|post|diff} <run-id>
 ploy run cancel <run-id>
 ploy run restart <run-id>
 ploy wave status <wave-id> [--follow]
@@ -48,6 +49,7 @@ Run-scoped API surfaces:
 - `GET /v1/runs/{run_id}/logs`
 - `GET /v1/runs/{run_id}/artifacts`
 - `GET /v1/runs/{run_id}/snapshot`
+- `GET /v1/runs/{run_id}/sbom/{pre|post|diff}`
 
 Wave-scoped API surfaces:
 
@@ -59,6 +61,10 @@ Wave-scoped API surfaces:
 Run inspection, artifacts, diffs, jobs, logs, cancellation, restart, and pull
 resolution are all addressed by `run_id`; `repo_id` is returned only as
 attribution metadata.
+
+`ploy run sbom pre|post|diff <run-id>` reads persisted package rows from the
+current run attempt. The `diff` view omits unchanged package versions and marks
+changed, added, and removed package versions.
 
 ## Artifacts And Apply
 

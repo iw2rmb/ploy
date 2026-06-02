@@ -67,6 +67,7 @@ func TestOpenAPICompleteness(t *testing.T) {
 		{"/v1/runs/{run_id}/logs", "get"},
 		{"/v1/runs/{run_id}/artifacts", "get"},
 		{"/v1/runs/{run_id}/jobs", "get"},
+		{"/v1/runs/{run_id}/sbom/{view}", "get"},
 		{"/v1/waves/{wave_id}", "get"},
 		{"/v1/waves/{wave_id}/runs", "get"},
 		{"/v1/waves/{wave_id}/cancel", "post"},

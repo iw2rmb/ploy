@@ -70,6 +70,8 @@ type runStore struct {
 
 	listJobsByRunAttempt           mockCall[store.ListJobsByRunAttemptParams, []store.Job]
 	listArtifactBundlesByRunAndJob mockCall[store.ListArtifactBundlesByRunAndJobParams, []store.ArtifactBundle]
+	listRunSBOMRowsByJobType       mockCallSlice[store.ListRunSBOMRowsByJobTypeParams, []store.ListRunSBOMRowsByJobTypeRow]
+	sbomRowsByJobType              map[types.JobType][]store.ListRunSBOMRowsByJobTypeRow
 
 	// Ingest (logs, diffs, artifacts)
 	createLog            mockResult[store.Log]
@@ -256,6 +258,19 @@ func (m *runStore) ListJobsByRunAttempt(ctx context.Context, arg store.ListJobsB
 
 func (m *runStore) ListArtifactBundlesByRunAndJob(ctx context.Context, arg store.ListArtifactBundlesByRunAndJobParams) ([]store.ArtifactBundle, error) {
 	return m.listArtifactBundlesByRunAndJob.record(arg)
+}
+
+func (m *runStore) ListRunSBOMRowsByJobType(ctx context.Context, arg store.ListRunSBOMRowsByJobTypeParams) ([]store.ListRunSBOMRowsByJobTypeRow, error) {
+	m.listRunSBOMRowsByJobType.called = true
+	m.listRunSBOMRowsByJobType.params = arg
+	m.listRunSBOMRowsByJobType.calls = append(m.listRunSBOMRowsByJobType.calls, arg)
+	if m.listRunSBOMRowsByJobType.err != nil {
+		return nil, m.listRunSBOMRowsByJobType.err
+	}
+	if m.sbomRowsByJobType != nil {
+		return m.sbomRowsByJobType[arg.JobType], nil
+	}
+	return m.listRunSBOMRowsByJobType.val, nil
 }
 
 // Ingest methods

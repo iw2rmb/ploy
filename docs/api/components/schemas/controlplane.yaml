@@ -1359,3 +1359,54 @@ ListRunJobsResponse:
     - repo_id
     - attempt
     - jobs
+
+RunSBOMPackage:
+  type: object
+  properties:
+    package:
+      type: string
+    version:
+      type: string
+  required: [package, version]
+
+RunSBOMPackagesResponse:
+  type: object
+  properties:
+    run_id:
+      type: string
+    view:
+      type: string
+      enum: [pre, post]
+    packages:
+      type: array
+      items:
+        $ref: "#/RunSBOMPackage"
+  required: [run_id, view, packages]
+
+RunSBOMDiffPackage:
+  type: object
+  properties:
+    package:
+      type: string
+    version_pre:
+      type: string
+    version_post:
+      type: string
+    change:
+      type: string
+      enum: [added, removed, changed]
+  required: [package, version_pre, version_post, change]
+
+RunSBOMDiffResponse:
+  type: object
+  properties:
+    run_id:
+      type: string
+    view:
+      type: string
+      const: diff
+    packages:
+      type: array
+      items:
+        $ref: "#/RunSBOMDiffPackage"
+  required: [run_id, view, packages]

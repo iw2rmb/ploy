@@ -334,6 +334,92 @@ func TestGetRunStatusReportCommandEmptyReposUsesEmptySlices(t *testing.T) {
 	}
 }
 
+func TestGetRunStatusReportCommandFetchesSBOMDiffAfterSuccessfulPostGate(t *testing.T) {
+	t.Parallel()
+
+	runID := domaintypes.NewRunID()
+	migID := domaintypes.NewMigID()
+	specID := domaintypes.NewSpecID()
+	repoID := domaintypes.NewRepoID()
+	postGateID := domaintypes.NewJobID()
+	sbomCalled := false
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/runs/"+runID.String():
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"id":         runID.String(),
+				"status":     "Succeeded",
+				"mig_id":     migID.String(),
+				"mig_name":   "sbom-diff",
+				"spec_id":    specID.String(),
+				"repo_id":    repoID.String(),
+				"repo_url":   "https://github.com/acme/sbom.git",
+				"base_ref":   "main",
+				"attempt":    1,
+				"created_at": "2026-02-24T10:00:00Z",
+			})
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/runs/"+runID.String()+"/status":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"run_id": runID.String(),
+				"state":  "succeeded",
+				"stages": map[string]any{},
+			})
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/runs/"+runID.String()+"/jobs":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"run_id":  runID.String(),
+				"repo_id": repoID.String(),
+				"attempt": 1,
+				"jobs": []map[string]any{
+					{
+						"job_id":      postGateID.String(),
+						"name":        "post-gate",
+						"job_type":    "post_gate",
+						"job_image":   "gate:latest",
+						"next_id":     nil,
+						"node_id":     nil,
+						"status":      "Success",
+						"duration_ms": 100,
+					},
+				},
+			})
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/runs/"+runID.String()+"/diffs":
+			_ = json.NewEncoder(w).Encode(map[string]any{"diffs": []map[string]any{}})
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/runs/"+runID.String()+"/sbom/diff":
+			sbomCalled = true
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"run_id": runID.String(),
+				"view":   "diff",
+				"packages": []map[string]any{
+					{"package": "alpha", "version_pre": "1.0", "version_post": "2.0", "change": "changed"},
+				},
+			})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(server.Close)
+
+	baseURL, err := url.Parse(server.URL + "/api")
+	if err != nil {
+		t.Fatalf("parse base URL: %v", err)
+	}
+	report, err := GetRunStatusReportCommand{
+		Client:  server.Client(),
+		BaseURL: baseURL,
+		RunID:   runID,
+	}.Run(context.Background())
+	if err != nil {
+		t.Fatalf("GetRunStatusReportCommand.Run error: %v", err)
+	}
+	if !sbomCalled {
+		t.Fatal("expected sbom diff endpoint to be called")
+	}
+	if len(report.SBOMDiff) != 1 || report.SBOMDiff[0].Package != "alpha" {
+		t.Fatalf("SBOMDiff=%+v, want alpha diff", report.SBOMDiff)
+	}
+}
+
 func TestGetRunStatusReportCommandValidation(t *testing.T) {
 	t.Parallel()
 
