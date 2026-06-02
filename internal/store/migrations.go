@@ -17,9 +17,12 @@ var schemaSQL string
 var waveModelMigrationSQL string
 
 // SchemaVersion is the version number for the embedded schema.sql.
-// Increment this when schema.sql changes to trigger re-application on existing databases.
-// This uses a timestamp-like versioning scheme (YYYYMMDDNN) for clarity.
-const SchemaVersion int64 = 2026060101
+// Increment this when schema.sql changes to trigger current-contract maintenance
+// on existing databases. This uses a timestamp-like versioning scheme
+// (YYYYMMDDNN) for clarity.
+const SchemaVersion int64 = 2026060201
+
+const waveModelSchemaVersion int64 = 2026060101
 
 // RunMigrations ensures the database schema is present and records the version.
 // Uses execMigrationSQL for statement-by-statement execution within a transaction.
@@ -40,6 +43,13 @@ func RunMigrations(ctx context.Context, pool *pgxpool.Pool) error {
 
 	if currentVersion >= SchemaVersion {
 		slog.Info("schema already at target version", "current", currentVersion, "target", SchemaVersion)
+		return nil
+	}
+
+	if currentVersion >= waveModelSchemaVersion {
+		if err := applyCurrentSchemaMaintenance(ctx, pool, currentVersion); err != nil {
+			return err
+		}
 		return nil
 	}
 
@@ -65,6 +75,9 @@ func RunMigrations(ctx context.Context, pool *pgxpool.Pool) error {
 		return fmt.Errorf("execute schema: %w", err)
 	}
 
+	if err := applyCurrentSchemaMaintenanceSQL(ctx, tx); err != nil {
+		return err
+	}
 	if err := recordMigration(ctx, tx, SchemaVersion); err != nil {
 		return fmt.Errorf("record migration: %w", err)
 	}
@@ -74,6 +87,36 @@ func RunMigrations(ctx context.Context, pool *pgxpool.Pool) error {
 	}
 
 	slog.Info("schema applied successfully", "version", SchemaVersion)
+	return nil
+}
+
+func applyCurrentSchemaMaintenance(ctx context.Context, pool *pgxpool.Pool, currentVersion int64) error {
+	slog.Info("applying current schema maintenance", "from_version", currentVersion, "to_version", SchemaVersion)
+
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin maintenance transaction: %w", err)
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck
+
+	if err := applyCurrentSchemaMaintenanceSQL(ctx, tx); err != nil {
+		return err
+	}
+	if err := recordMigration(ctx, tx, SchemaVersion); err != nil {
+		return fmt.Errorf("record maintenance: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit maintenance: %w", err)
+	}
+
+	slog.Info("current schema maintenance applied", "version", SchemaVersion)
+	return nil
+}
+
+func applyCurrentSchemaMaintenanceSQL(ctx context.Context, tx pgx.Tx) error {
+	if _, err := tx.Exec(ctx, `ALTER TABLE IF EXISTS ploy.mig_repos DROP COLUMN IF EXISTS target_ref`); err != nil {
+		return fmt.Errorf("drop mig_repos.target_ref: %w", err)
+	}
 	return nil
 }
 
