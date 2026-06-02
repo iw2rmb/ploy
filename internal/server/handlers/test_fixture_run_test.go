@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
@@ -72,11 +73,15 @@ type runStore struct {
 	listArtifactBundlesByRunAndJob mockCall[store.ListArtifactBundlesByRunAndJobParams, []store.ArtifactBundle]
 	listRunSBOMRowsByJobType       mockCallSlice[store.ListRunSBOMRowsByJobTypeParams, []store.ListRunSBOMRowsByJobTypeRow]
 	sbomRowsByJobType              map[types.JobType][]store.ListRunSBOMRowsByJobTypeRow
+	deleteSBOMRowsByJob            mockCallSlice[types.JobID, struct{}]
+	upsertSBOMRow                  mockCallSlice[store.UpsertSBOMRowParams, struct{}]
+	sbomJobTypeByJobID             map[types.JobID]types.JobType
 
 	// Ingest (logs, diffs, artifacts)
 	createLog            mockResult[store.Log]
 	createDiff           mockCall[store.CreateDiffParams, store.Diff]
 	createArtifactBundle mockResult[store.ArtifactBundle]
+	deleteArtifactBundle mockCall[pgtype.UUID, struct{}]
 
 	// Events
 	createEvent mockResult[store.Event]
@@ -285,6 +290,29 @@ func (m *runStore) CreateDiff(ctx context.Context, params store.CreateDiffParams
 
 func (m *runStore) CreateArtifactBundle(ctx context.Context, params store.CreateArtifactBundleParams) (store.ArtifactBundle, error) {
 	return m.createArtifactBundle.ret()
+}
+
+func (m *runStore) DeleteArtifactBundle(ctx context.Context, id pgtype.UUID) error {
+	_, err := m.deleteArtifactBundle.record(id)
+	return err
+}
+
+func (m *runStore) DeleteSBOMRowsByJob(ctx context.Context, jobID types.JobID) error {
+	_, err := m.deleteSBOMRowsByJob.record(jobID)
+	return err
+}
+
+func (m *runStore) UpsertSBOMRow(ctx context.Context, arg store.UpsertSBOMRowParams) error {
+	_, err := m.upsertSBOMRow.record(arg)
+	if err == nil && m.sbomRowsByJobType != nil && m.sbomJobTypeByJobID != nil {
+		if jobType, ok := m.sbomJobTypeByJobID[arg.JobID]; ok {
+			m.sbomRowsByJobType[jobType] = append(m.sbomRowsByJobType[jobType], store.ListRunSBOMRowsByJobTypeRow{
+				Lib: arg.Lib,
+				Ver: arg.Ver,
+			})
+		}
+	}
+	return err
 }
 
 // Event methods

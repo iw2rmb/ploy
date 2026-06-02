@@ -76,6 +76,7 @@ type jobStore struct {
 	getLatestDiffByJobByID  map[types.JobID]store.Diff
 	getLatestDiffByJobError error
 	createArtifactBundle    mockResult[store.ArtifactBundle]
+	deleteArtifactBundle    mockCall[pgtype.UUID, struct{}]
 
 	listArtifactBundlesByRunAndJob mockCall[store.ListArtifactBundlesByRunAndJobParams, []store.ArtifactBundle]
 

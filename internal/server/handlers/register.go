@@ -106,7 +106,7 @@ func registerRunRoutes(s *httpserver.Server, deps routeDeps) {
 	s.RegisterRouteFuncAllowQueryToken("GET /v1/runs/{run_id}/logs", getRunLogsHandler(deps.st, deps.bs, deps.eventsService), auth.RoleControlPlane)
 	s.RegisterRouteFunc("GET /v1/runs/{run_id}/artifacts", listRunArtifactsHandler(deps.st), auth.RoleControlPlane)
 	s.RegisterRouteFunc("GET /v1/runs/{run_id}/jobs", listRunJobsHandler(deps.st), auth.RoleControlPlane)
-	s.RegisterRouteFunc("GET /v1/runs/{run_id}/sbom/{view}", getRunSBOMHandler(deps.st), auth.RoleControlPlane)
+	s.RegisterRouteFunc("GET /v1/runs/{run_id}/sbom/{view}", getRunSBOMHandler(deps.st, deps.bp), auth.RoleControlPlane)
 
 	s.RegisterRouteFunc("GET /v1/waves/{wave_id}", getWaveHandler(deps.st), auth.RoleControlPlane)
 	s.RegisterRouteFunc("GET /v1/waves/{wave_id}/runs", listWaveRunsHandler(deps.st), auth.RoleControlPlane)
