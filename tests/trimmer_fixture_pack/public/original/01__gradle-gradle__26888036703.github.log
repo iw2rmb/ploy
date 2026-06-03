@@ -1,0 +1,1396 @@
+submit-gradle	Set up job	﻿2026-06-03T13:30:17.6986511Z Current runner version: '2.334.0'
+submit-gradle	Set up job	2026-06-03T13:30:17.7011562Z ##[group]Runner Image Provisioner
+submit-gradle	Set up job	2026-06-03T13:30:17.7012570Z Hosted Compute Agent
+submit-gradle	Set up job	2026-06-03T13:30:17.7013233Z Version: 20260520.533
+submit-gradle	Set up job	2026-06-03T13:30:17.7013964Z Commit: 189110e25284a9812c124fd27b339e2fb4f2f9db
+submit-gradle	Set up job	2026-06-03T13:30:17.7014703Z Build Date: 2026-05-20T17:44:04Z
+submit-gradle	Set up job	2026-06-03T13:30:17.7015428Z Worker ID: {7661d5e0-9dbe-4d54-8430-d7ba332257f5}
+submit-gradle	Set up job	2026-06-03T13:30:17.7016215Z Azure Region: westcentralus
+submit-gradle	Set up job	2026-06-03T13:30:17.7016843Z ##[endgroup]
+submit-gradle	Set up job	2026-06-03T13:30:17.7018158Z ##[group]Operating System
+submit-gradle	Set up job	2026-06-03T13:30:17.7018802Z Ubuntu
+submit-gradle	Set up job	2026-06-03T13:30:17.7019557Z 24.04.4
+submit-gradle	Set up job	2026-06-03T13:30:17.7020221Z LTS
+submit-gradle	Set up job	2026-06-03T13:30:17.7020763Z ##[endgroup]
+submit-gradle	Set up job	2026-06-03T13:30:17.7021364Z ##[group]Runner Image
+submit-gradle	Set up job	2026-06-03T13:30:17.7022038Z Image: ubuntu-24.04
+submit-gradle	Set up job	2026-06-03T13:30:17.7022603Z Version: 20260525.161.1
+submit-gradle	Set up job	2026-06-03T13:30:17.7023807Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20260525.161/images/ubuntu/Ubuntu2404-Readme.md
+submit-gradle	Set up job	2026-06-03T13:30:17.7025935Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20260525.161
+submit-gradle	Set up job	2026-06-03T13:30:17.7026955Z ##[endgroup]
+submit-gradle	Set up job	2026-06-03T13:30:17.7028160Z ##[group]GITHUB_TOKEN Permissions
+submit-gradle	Set up job	2026-06-03T13:30:17.7030230Z Contents: write
+submit-gradle	Set up job	2026-06-03T13:30:17.7030902Z Metadata: read
+submit-gradle	Set up job	2026-06-03T13:30:17.7031635Z ##[endgroup]
+submit-gradle	Set up job	2026-06-03T13:30:17.7033781Z Secret source: Actions
+submit-gradle	Set up job	2026-06-03T13:30:17.7034645Z Prepare workflow directory
+submit-gradle	Set up job	2026-06-03T13:30:17.7549327Z Prepare all required actions
+submit-gradle	Set up job	2026-06-03T13:30:17.7585654Z Getting action download info
+submit-gradle	Set up job	2026-06-03T13:30:18.4491145Z Download action repository 'actions/checkout@0c366fd6a839edf440554fa01a7085ccba70ac98' (SHA:0c366fd6a839edf440554fa01a7085ccba70ac98)
+submit-gradle	Set up job	2026-06-03T13:30:19.1276529Z Download action repository 'actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654' (SHA:be666c2fcd27ec809703dec50e508c2fdc7f6654)
+submit-gradle	Set up job	2026-06-03T13:30:20.2552073Z Download action repository 'actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7' (SHA:668228422ae6a00e4ad889ee87cd7109ec5666a7)
+submit-gradle	Set up job	2026-06-03T13:30:20.4190264Z Download action repository 'actions/gradle-build-tools-actions@8379f6a1328ee0e06e2bb424dadb7b159856a326' (SHA:8379f6a1328ee0e06e2bb424dadb7b159856a326)
+submit-gradle	Set up job	2026-06-03T13:30:22.4108580Z Complete job name: submit-gradle
+submit-gradle	checkout	﻿2026-06-03T13:30:22.4721926Z ##[group]Run actions/checkout@0c366fd6a839edf440554fa01a7085ccba70ac98
+submit-gradle	checkout	2026-06-03T13:30:22.4722748Z with:
+submit-gradle	checkout	2026-06-03T13:30:22.4723288Z   ref: refs/heads/bhegyi/provider-api/master-based-setters
+submit-gradle	checkout	2026-06-03T13:30:22.4723775Z   repository: gradle/gradle
+submit-gradle	checkout	2026-06-03T13:30:22.4726738Z   token: ***
+submit-gradle	checkout	2026-06-03T13:30:22.4727091Z   ssh-strict: true
+submit-gradle	checkout	2026-06-03T13:30:22.4727455Z   ssh-user: git
+submit-gradle	checkout	2026-06-03T13:30:22.4727870Z   persist-credentials: true
+submit-gradle	checkout	2026-06-03T13:30:22.4728253Z   clean: true
+submit-gradle	checkout	2026-06-03T13:30:22.4728643Z   sparse-checkout-cone-mode: true
+submit-gradle	checkout	2026-06-03T13:30:22.4729226Z   fetch-depth: 1
+submit-gradle	checkout	2026-06-03T13:30:22.4729624Z   fetch-tags: false
+submit-gradle	checkout	2026-06-03T13:30:22.4730013Z   show-progress: true
+submit-gradle	checkout	2026-06-03T13:30:22.4730376Z   lfs: false
+submit-gradle	checkout	2026-06-03T13:30:22.4730773Z   submodules: false
+submit-gradle	checkout	2026-06-03T13:30:22.4731137Z   set-safe-directory: true
+submit-gradle	checkout	2026-06-03T13:30:22.4731784Z env:
+submit-gradle	checkout	2026-06-03T13:30:22.4732158Z   JAVA_VERSION: 21
+submit-gradle	checkout	2026-06-03T13:30:22.4732494Z   JAVA_DISTRIB: temurin
+submit-gradle	checkout	2026-06-03T13:30:22.4732814Z   SKIP_CACHE: 
+submit-gradle	checkout	2026-06-03T13:30:22.4733324Z ##[endgroup]
+submit-gradle	checkout	2026-06-03T13:30:22.5715319Z Syncing repository: gradle/gradle
+submit-gradle	checkout	2026-06-03T13:30:22.5716922Z ##[group]Getting Git version info
+submit-gradle	checkout	2026-06-03T13:30:22.5717585Z Working directory is '/home/runner/work/gradle/gradle'
+submit-gradle	checkout	2026-06-03T13:30:22.5718398Z [command]/usr/bin/git version
+submit-gradle	checkout	2026-06-03T13:30:22.5763755Z git version 2.54.0
+submit-gradle	checkout	2026-06-03T13:30:22.5817683Z ##[endgroup]
+submit-gradle	checkout	2026-06-03T13:30:22.5832004Z Temporarily overriding HOME='/home/runner/work/_temp/54231db5-33b2-4a1e-a89d-bdb7f9d20dae' before making global git config changes
+submit-gradle	checkout	2026-06-03T13:30:22.5833549Z Adding repository directory to the temporary git global config as a safe directory
+submit-gradle	checkout	2026-06-03T13:30:22.5838149Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/gradle/gradle
+submit-gradle	checkout	2026-06-03T13:30:22.5886990Z Deleting the contents of '/home/runner/work/gradle/gradle'
+submit-gradle	checkout	2026-06-03T13:30:22.5891239Z ##[group]Initializing the repository
+submit-gradle	checkout	2026-06-03T13:30:22.5895713Z [command]/usr/bin/git init /home/runner/work/gradle/gradle
+submit-gradle	checkout	2026-06-03T13:30:22.5997269Z hint: Using 'master' as the name for the initial branch. This default branch name
+submit-gradle	checkout	2026-06-03T13:30:22.5998381Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+submit-gradle	checkout	2026-06-03T13:30:22.5999789Z hint: to use in all of your new repositories, which will suppress this warning,
+submit-gradle	checkout	2026-06-03T13:30:22.6000563Z hint: call:
+submit-gradle	checkout	2026-06-03T13:30:22.6001141Z hint:
+submit-gradle	checkout	2026-06-03T13:30:22.6001947Z hint: 	git config --global init.defaultBranch <name>
+submit-gradle	checkout	2026-06-03T13:30:22.6002636Z hint:
+submit-gradle	checkout	2026-06-03T13:30:22.6003346Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+submit-gradle	checkout	2026-06-03T13:30:22.6004350Z hint: 'development'. The just-created branch can be renamed via this command:
+submit-gradle	checkout	2026-06-03T13:30:22.6005108Z hint:
+submit-gradle	checkout	2026-06-03T13:30:22.6005900Z hint: 	git branch -m <name>
+submit-gradle	checkout	2026-06-03T13:30:22.6006459Z hint:
+submit-gradle	checkout	2026-06-03T13:30:22.6007169Z hint: Disable this message with "git config set advice.defaultBranchName false"
+submit-gradle	checkout	2026-06-03T13:30:22.6012725Z Initialized empty Git repository in /home/runner/work/gradle/gradle/.git/
+submit-gradle	checkout	2026-06-03T13:30:22.6022958Z [command]/usr/bin/git remote add origin https://github.com/gradle/gradle
+submit-gradle	checkout	2026-06-03T13:30:22.6064675Z ##[endgroup]
+submit-gradle	checkout	2026-06-03T13:30:22.6065292Z ##[group]Disabling automatic garbage collection
+submit-gradle	checkout	2026-06-03T13:30:22.6067991Z [command]/usr/bin/git config --local gc.auto 0
+submit-gradle	checkout	2026-06-03T13:30:22.6097822Z ##[endgroup]
+submit-gradle	checkout	2026-06-03T13:30:22.6098874Z ##[group]Setting up auth
+submit-gradle	checkout	2026-06-03T13:30:22.6099838Z Removing SSH command configuration
+submit-gradle	checkout	2026-06-03T13:30:22.6105356Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+submit-gradle	checkout	2026-06-03T13:30:22.6138522Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+submit-gradle	checkout	2026-06-03T13:30:22.6545821Z Removing HTTP extra header
+submit-gradle	checkout	2026-06-03T13:30:22.6547360Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+submit-gradle	checkout	2026-06-03T13:30:22.6555998Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+submit-gradle	checkout	2026-06-03T13:30:22.6740596Z Removing includeIf entries pointing to credentials config files
+submit-gradle	checkout	2026-06-03T13:30:22.6748742Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+submit-gradle	checkout	2026-06-03T13:30:22.6786035Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+submit-gradle	checkout	2026-06-03T13:30:22.7022783Z [command]/usr/bin/git config --file /home/runner/work/_temp/git-credentials-b454b528-96b1-470e-8c5c-46d9610bb92c.config http.https://github.com/.extraheader AUTHORIZATION: basic ***
+submit-gradle	checkout	2026-06-03T13:30:22.7059614Z [command]/usr/bin/git config --local includeIf.gitdir:/home/runner/work/gradle/gradle/.git.path /home/runner/work/_temp/git-credentials-b454b528-96b1-470e-8c5c-46d9610bb92c.config
+submit-gradle	checkout	2026-06-03T13:30:22.7090437Z [command]/usr/bin/git config --local includeIf.gitdir:/home/runner/work/gradle/gradle/.git/worktrees/*.path /home/runner/work/_temp/git-credentials-b454b528-96b1-470e-8c5c-46d9610bb92c.config
+submit-gradle	checkout	2026-06-03T13:30:22.7122911Z [command]/usr/bin/git config --local includeIf.gitdir:/github/workspace/.git.path /github/runner_temp/git-credentials-b454b528-96b1-470e-8c5c-46d9610bb92c.config
+submit-gradle	checkout	2026-06-03T13:30:22.7154780Z [command]/usr/bin/git config --local includeIf.gitdir:/github/workspace/.git/worktrees/*.path /github/runner_temp/git-credentials-b454b528-96b1-470e-8c5c-46d9610bb92c.config
+submit-gradle	checkout	2026-06-03T13:30:22.7181631Z ##[endgroup]
+submit-gradle	checkout	2026-06-03T13:30:22.7182223Z ##[group]Fetching the repository
+submit-gradle	checkout	2026-06-03T13:30:22.7190632Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +refs/heads/bhegyi/provider-api/master-based-setters:refs/remotes/origin/bhegyi/provider-api/master-based-setters
+submit-gradle	checkout	2026-06-03T13:30:30.0194261Z From https://github.com/gradle/gradle
+submit-gradle	checkout	2026-06-03T13:30:30.0195389Z  * [new branch]        bhegyi/provider-api/master-based-setters -> origin/bhegyi/provider-api/master-based-setters
+submit-gradle	checkout	2026-06-03T13:30:30.0235063Z ##[endgroup]
+submit-gradle	checkout	2026-06-03T13:30:30.0235720Z ##[group]Determining the checkout info
+submit-gradle	checkout	2026-06-03T13:30:30.0236571Z ##[endgroup]
+submit-gradle	checkout	2026-06-03T13:30:30.0242584Z [command]/usr/bin/git sparse-checkout disable
+submit-gradle	checkout	2026-06-03T13:30:30.0290195Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+submit-gradle	checkout	2026-06-03T13:30:30.0320749Z ##[group]Checking out the ref
+submit-gradle	checkout	2026-06-03T13:30:30.0326069Z [command]/usr/bin/git checkout --progress --force -B bhegyi/provider-api/master-based-setters refs/remotes/origin/bhegyi/provider-api/master-based-setters
+submit-gradle	checkout	2026-06-03T13:30:31.0959810Z Updating files:  43% (12309/28488)
+submit-gradle	checkout	2026-06-03T13:30:31.1135732Z Updating files:  44% (12535/28488)
+submit-gradle	checkout	2026-06-03T13:30:31.1405418Z Updating files:  45% (12820/28488)
+submit-gradle	checkout	2026-06-03T13:30:31.1680802Z Updating files:  46% (13105/28488)
+submit-gradle	checkout	2026-06-03T13:30:31.2060852Z Updating files:  47% (13390/28488)
+submit-gradle	checkout	2026-06-03T13:30:31.2288308Z Updating files:  48% (13675/28488)
+submit-gradle	checkout	2026-06-03T13:30:31.2459561Z Updating files:  49% (13960/28488)
+submit-gradle	checkout	2026-06-03T13:30:31.2625666Z Updating files:  50% (14244/28488)
+submit-gradle	checkout	2026-06-03T13:30:31.2870758Z Updating files:  51% (14529/28488)
+submit-gradle	checkout	2026-06-03T13:30:31.3080269Z Updating files:  52% (14814/28488)
+submit-gradle	checkout	2026-06-03T13:30:31.3251274Z Updating files:  53% (15099/28488)
+submit-gradle	checkout	2026-06-03T13:30:31.3403051Z Updating files:  54% (15384/28488)
+submit-gradle	checkout	2026-06-03T13:30:31.3584158Z Updating files:  55% (15669/28488)
+submit-gradle	checkout	2026-06-03T13:30:31.3787844Z Updating files:  56% (15954/28488)
+submit-gradle	checkout	2026-06-03T13:30:31.3991503Z Updating files:  57% (16239/28488)
+submit-gradle	checkout	2026-06-03T13:30:31.4163380Z Updating files:  58% (16524/28488)
+submit-gradle	checkout	2026-06-03T13:30:31.4341011Z Updating files:  59% (16808/28488)
+submit-gradle	checkout	2026-06-03T13:30:31.4529780Z Updating files:  60% (17093/28488)
+submit-gradle	checkout	2026-06-03T13:30:31.4683327Z Updating files:  61% (17378/28488)
+submit-gradle	checkout	2026-06-03T13:30:31.4809974Z Updating files:  62% (17663/28488)
+submit-gradle	checkout	2026-06-03T13:30:31.4968357Z Updating files:  63% (17948/28488)
+submit-gradle	checkout	2026-06-03T13:30:31.5290786Z Updating files:  64% (18233/28488)
+submit-gradle	checkout	2026-06-03T13:30:31.5552305Z Updating files:  65% (18518/28488)
+submit-gradle	checkout	2026-06-03T13:30:31.6713476Z Updating files:  66% (18803/28488)
+submit-gradle	checkout	2026-06-03T13:30:31.6953611Z Updating files:  67% (19087/28488)
+submit-gradle	checkout	2026-06-03T13:30:31.7108803Z Updating files:  68% (19372/28488)
+submit-gradle	checkout	2026-06-03T13:30:31.7354611Z Updating files:  69% (19657/28488)
+submit-gradle	checkout	2026-06-03T13:30:31.7506290Z Updating files:  70% (19942/28488)
+submit-gradle	checkout	2026-06-03T13:30:31.7649888Z Updating files:  71% (20227/28488)
+submit-gradle	checkout	2026-06-03T13:30:31.7796885Z Updating files:  72% (20512/28488)
+submit-gradle	checkout	2026-06-03T13:30:31.7936826Z Updating files:  73% (20797/28488)
+submit-gradle	checkout	2026-06-03T13:30:31.8139552Z Updating files:  74% (21082/28488)
+submit-gradle	checkout	2026-06-03T13:30:31.8358224Z Updating files:  75% (21366/28488)
+submit-gradle	checkout	2026-06-03T13:30:31.8583902Z Updating files:  76% (21651/28488)
+submit-gradle	checkout	2026-06-03T13:30:31.8764428Z Updating files:  77% (21936/28488)
+submit-gradle	checkout	2026-06-03T13:30:31.8915486Z Updating files:  78% (22221/28488)
+submit-gradle	checkout	2026-06-03T13:30:31.9058183Z Updating files:  79% (22506/28488)
+submit-gradle	checkout	2026-06-03T13:30:31.9203129Z Updating files:  80% (22791/28488)
+submit-gradle	checkout	2026-06-03T13:30:31.9359442Z Updating files:  81% (23076/28488)
+submit-gradle	checkout	2026-06-03T13:30:31.9548761Z Updating files:  82% (23361/28488)
+submit-gradle	checkout	2026-06-03T13:30:31.9758056Z Updating files:  83% (23646/28488)
+submit-gradle	checkout	2026-06-03T13:30:31.9953255Z Updating files:  84% (23930/28488)
+submit-gradle	checkout	2026-06-03T13:30:32.0141001Z Updating files:  85% (24215/28488)
+submit-gradle	checkout	2026-06-03T13:30:32.0323798Z Updating files:  86% (24500/28488)
+submit-gradle	checkout	2026-06-03T13:30:32.0504964Z Updating files:  87% (24785/28488)
+submit-gradle	checkout	2026-06-03T13:30:32.0635626Z Updating files:  88% (25070/28488)
+submit-gradle	checkout	2026-06-03T13:30:32.0787288Z Updating files:  89% (25355/28488)
+submit-gradle	checkout	2026-06-03T13:30:32.0812485Z Updating files:  90% (25640/28488)
+submit-gradle	checkout	2026-06-03T13:30:32.0975319Z Updating files:  90% (25680/28488)
+submit-gradle	checkout	2026-06-03T13:30:32.1117893Z Updating files:  91% (25925/28488)
+submit-gradle	checkout	2026-06-03T13:30:32.1256335Z Updating files:  92% (26209/28488)
+submit-gradle	checkout	2026-06-03T13:30:32.1392999Z Updating files:  93% (26494/28488)
+submit-gradle	checkout	2026-06-03T13:30:32.1549258Z Updating files:  94% (26779/28488)
+submit-gradle	checkout	2026-06-03T13:30:32.1729215Z Updating files:  95% (27064/28488)
+submit-gradle	checkout	2026-06-03T13:30:32.1922109Z Updating files:  96% (27349/28488)
+submit-gradle	checkout	2026-06-03T13:30:32.2093049Z Updating files:  97% (27634/28488)
+submit-gradle	checkout	2026-06-03T13:30:32.2259962Z Updating files:  98% (27919/28488)
+submit-gradle	checkout	2026-06-03T13:30:32.2608708Z Updating files:  99% (28204/28488)
+submit-gradle	checkout	2026-06-03T13:30:32.2609408Z Updating files: 100% (28488/28488)
+submit-gradle	checkout	2026-06-03T13:30:32.2609836Z Updating files: 100% (28488/28488), done.
+submit-gradle	checkout	2026-06-03T13:30:32.3154117Z Switched to a new branch 'bhegyi/provider-api/master-based-setters'
+submit-gradle	checkout	2026-06-03T13:30:32.3156943Z branch 'bhegyi/provider-api/master-based-setters' set up to track 'origin/bhegyi/provider-api/master-based-setters'.
+submit-gradle	checkout	2026-06-03T13:30:32.3210554Z ##[endgroup]
+submit-gradle	checkout	2026-06-03T13:30:32.3253998Z [command]/usr/bin/git log -1 --format=%H
+submit-gradle	checkout	2026-06-03T13:30:32.3279776Z 80c4869a7cbeee0872ba4ca2fe7cafc310bf36b4
+submit-gradle	setup-ecosystem	﻿2026-06-03T13:30:32.3541741Z ##[group]Run actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654
+submit-gradle	setup-ecosystem	2026-06-03T13:30:32.3542152Z with:
+submit-gradle	setup-ecosystem	2026-06-03T13:30:32.3542379Z   overwrite-settings: false
+submit-gradle	setup-ecosystem	2026-06-03T13:30:32.3542627Z   java-version: 21
+submit-gradle	setup-ecosystem	2026-06-03T13:30:32.3542847Z   distribution: temurin
+submit-gradle	setup-ecosystem	2026-06-03T13:30:32.3543083Z   java-package: jdk
+submit-gradle	setup-ecosystem	2026-06-03T13:30:32.3543308Z   check-latest: false
+submit-gradle	setup-ecosystem	2026-06-03T13:30:32.3543540Z   server-id: github
+submit-gradle	setup-ecosystem	2026-06-03T13:30:32.3543771Z   server-username: GITHUB_ACTOR
+submit-gradle	setup-ecosystem	2026-06-03T13:30:32.3544037Z   server-password: GITHUB_TOKEN
+submit-gradle	setup-ecosystem	2026-06-03T13:30:32.3544285Z   job-status: success
+submit-gradle	setup-ecosystem	2026-06-03T13:30:32.3546989Z   token: ***
+submit-gradle	setup-ecosystem	2026-06-03T13:30:32.3547195Z env:
+submit-gradle	setup-ecosystem	2026-06-03T13:30:32.3547390Z   JAVA_VERSION: 21
+submit-gradle	setup-ecosystem	2026-06-03T13:30:32.3547612Z   JAVA_DISTRIB: temurin
+submit-gradle	setup-ecosystem	2026-06-03T13:30:32.3547867Z   SKIP_CACHE: 
+submit-gradle	setup-ecosystem	2026-06-03T13:30:32.3548079Z ##[endgroup]
+submit-gradle	setup-ecosystem	2026-06-03T13:30:32.5022395Z ##[group]Installed distributions
+submit-gradle	setup-ecosystem	2026-06-03T13:30:32.5188007Z Resolved Java 21.0.11+10 from tool-cache
+submit-gradle	setup-ecosystem	2026-06-03T13:30:32.5188547Z Setting Java 21.0.11+10 as the default
+submit-gradle	setup-ecosystem	2026-06-03T13:30:32.5199977Z Creating toolchains.xml for JDK version 21 from temurin
+submit-gradle	setup-ecosystem	2026-06-03T13:30:32.5271323Z Writing to /home/runner/.m2/toolchains.xml
+submit-gradle	setup-ecosystem	2026-06-03T13:30:32.5271812Z 
+submit-gradle	setup-ecosystem	2026-06-03T13:30:32.5271958Z Java configuration:
+submit-gradle	setup-ecosystem	2026-06-03T13:30:32.5272345Z   Distribution: temurin
+submit-gradle	setup-ecosystem	2026-06-03T13:30:32.5272637Z   Version: 21.0.11+10
+submit-gradle	setup-ecosystem	2026-06-03T13:30:32.5273103Z   Path: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/21.0.11-10/x64
+submit-gradle	setup-ecosystem	2026-06-03T13:30:32.5273436Z 
+submit-gradle	setup-ecosystem	2026-06-03T13:30:32.5273797Z ##[endgroup]
+submit-gradle	setup-ecosystem	2026-06-03T13:30:32.5291611Z Creating settings.xml with server-id: github
+submit-gradle	setup-ecosystem	2026-06-03T13:30:32.5292023Z Writing to /home/runner/.m2/settings.xml
+submit-gradle	log-toolchain-versions	﻿2026-06-03T13:30:32.5426022Z ##[group]Run version=$(gradle --version | grep -E '^Gradle' | grep -o '[0-9.]\+')
+submit-gradle	log-toolchain-versions	2026-06-03T13:30:32.5426685Z ^[[36;1mversion=$(gradle --version | grep -E '^Gradle' | grep -o '[0-9.]\+')^[[0m
+submit-gradle	log-toolchain-versions	2026-06-03T13:30:32.5427201Z ^[[36;1mecho "::notice::Using Java 21 (temurin) with Gradle ${version}"^[[0m
+submit-gradle	log-toolchain-versions	2026-06-03T13:30:32.5427582Z ^[[36;1mif [ ! -f "gradlew" ]; then^[[0m
+submit-gradle	log-toolchain-versions	2026-06-03T13:30:32.5427921Z ^[[36;1m  echo GRADLE_VERSION=${version} >> "$GITHUB_OUTPUT"^[[0m
+submit-gradle	log-toolchain-versions	2026-06-03T13:30:32.5428248Z ^[[36;1mfi^[[0m
+submit-gradle	log-toolchain-versions	2026-06-03T13:30:32.5461855Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+submit-gradle	log-toolchain-versions	2026-06-03T13:30:32.5462232Z env:
+submit-gradle	log-toolchain-versions	2026-06-03T13:30:32.5462442Z   JAVA_VERSION: 21
+submit-gradle	log-toolchain-versions	2026-06-03T13:30:32.5462667Z   JAVA_DISTRIB: temurin
+submit-gradle	log-toolchain-versions	2026-06-03T13:30:32.5462898Z   SKIP_CACHE: 
+submit-gradle	log-toolchain-versions	2026-06-03T13:30:32.5463228Z   JAVA_HOME: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/21.0.11-10/x64
+submit-gradle	log-toolchain-versions	2026-06-03T13:30:32.5463733Z   JAVA_HOME_21_X64: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/21.0.11-10/x64
+submit-gradle	log-toolchain-versions	2026-06-03T13:30:32.5464120Z ##[endgroup]
+submit-gradle	log-toolchain-versions	2026-06-03T13:30:37.4044844Z ##[notice]Using Java 21 (temurin) with Gradle 9.5.1
+submit-gradle	check-cache-strategy	﻿2026-06-03T13:30:37.4095070Z ##[group]Run if [[ -n "" ]]; then
+submit-gradle	check-cache-strategy	2026-06-03T13:30:37.4095401Z ^[[36;1mif [[ -n "" ]]; then^[[0m
+submit-gradle	check-cache-strategy	2026-06-03T13:30:37.4095804Z ^[[36;1m  echo "actions/cache disabled via 'GH_DEPENDENCY_SUBMISSION_SKIP_CACHE'"^[[0m
+submit-gradle	check-cache-strategy	2026-06-03T13:30:37.4096209Z ^[[36;1melse^[[0m
+submit-gradle	check-cache-strategy	2026-06-03T13:30:37.4096656Z ^[[36;1m  echo "Caching '~/.gradle'. Set 'GH_DEPENDENCY_SUBMISSION_SKIP_CACHE=true' to skip caching in future."^[[0m
+submit-gradle	check-cache-strategy	2026-06-03T13:30:37.4097147Z ^[[36;1mfi^[[0m
+submit-gradle	check-cache-strategy	2026-06-03T13:30:37.4124099Z shell: /usr/bin/bash -e {0}
+submit-gradle	check-cache-strategy	2026-06-03T13:30:37.4124361Z env:
+submit-gradle	check-cache-strategy	2026-06-03T13:30:37.4124558Z   JAVA_VERSION: 21
+submit-gradle	check-cache-strategy	2026-06-03T13:30:37.4124781Z   JAVA_DISTRIB: temurin
+submit-gradle	check-cache-strategy	2026-06-03T13:30:37.4125010Z   SKIP_CACHE: 
+submit-gradle	check-cache-strategy	2026-06-03T13:30:37.4125335Z   JAVA_HOME: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/21.0.11-10/x64
+submit-gradle	check-cache-strategy	2026-06-03T13:30:37.4125845Z   JAVA_HOME_21_X64: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/21.0.11-10/x64
+submit-gradle	check-cache-strategy	2026-06-03T13:30:37.4126225Z ##[endgroup]
+submit-gradle	check-cache-strategy	2026-06-03T13:30:37.4174292Z Caching '~/.gradle'. Set 'GH_DEPENDENCY_SUBMISSION_SKIP_CACHE=true' to skip caching in future.
+submit-gradle	configure-cache	﻿2026-06-03T13:30:43.1229638Z ##[group]Run actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7
+submit-gradle	configure-cache	2026-06-03T13:30:43.1230350Z with:
+submit-gradle	configure-cache	2026-06-03T13:30:43.1230649Z   path: ~/.gradle
+submit-gradle	configure-cache	2026-06-03T13:30:43.1231343Z   key: Linux-jdk21-temurin-gradle-5ef5d10fb14649efc952d8b78412b336d1537e415fdc64398d737d7f474bd67f
+submit-gradle	configure-cache	2026-06-03T13:30:43.1231895Z   restore-keys: Linux-jdk21-temurin-gradle-
+submit-gradle	configure-cache	2026-06-03T13:30:43.1232204Z   enableCrossOsArchive: false
+submit-gradle	configure-cache	2026-06-03T13:30:43.1232470Z   fail-on-cache-miss: false
+submit-gradle	configure-cache	2026-06-03T13:30:43.1232714Z   lookup-only: false
+submit-gradle	configure-cache	2026-06-03T13:30:43.1232942Z   save-always: false
+submit-gradle	configure-cache	2026-06-03T13:30:43.1233148Z env:
+submit-gradle	configure-cache	2026-06-03T13:30:43.1233345Z   JAVA_VERSION: 21
+submit-gradle	configure-cache	2026-06-03T13:30:43.1233562Z   JAVA_DISTRIB: temurin
+submit-gradle	configure-cache	2026-06-03T13:30:43.1233793Z   SKIP_CACHE: 
+submit-gradle	configure-cache	2026-06-03T13:30:43.1234127Z   JAVA_HOME: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/21.0.11-10/x64
+submit-gradle	configure-cache	2026-06-03T13:30:43.1234644Z   JAVA_HOME_21_X64: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/21.0.11-10/x64
+submit-gradle	configure-cache	2026-06-03T13:30:43.1235046Z ##[endgroup]
+submit-gradle	configure-cache	2026-06-03T13:30:43.5424643Z Cache hit for: Linux-jdk21-temurin-gradle-5ef5d10fb14649efc952d8b78412b336d1537e415fdc64398d737d7f474bd67f
+submit-gradle	configure-cache	2026-06-03T13:30:44.7842512Z Received 20971520 of 637417201 (3.3%), 20.0 MBs/sec
+submit-gradle	configure-cache	2026-06-03T13:30:45.7844948Z Received 180355072 of 637417201 (28.3%), 85.9 MBs/sec
+submit-gradle	configure-cache	2026-06-03T13:30:46.7936194Z Received 402653184 of 637417201 (63.2%), 127.5 MBs/sec
+submit-gradle	configure-cache	2026-06-03T13:30:47.7937067Z Received 532676608 of 637417201 (83.6%), 126.7 MBs/sec
+submit-gradle	configure-cache	2026-06-03T13:30:48.7952962Z Received 591396864 of 637417201 (92.8%), 112.5 MBs/sec
+submit-gradle	configure-cache	2026-06-03T13:30:49.0628646Z Received 637417201 of 637417201 (100.0%), 115.1 MBs/sec
+submit-gradle	configure-cache	2026-06-03T13:30:49.0630789Z Cache Size: ~608 MB (637417201 B)
+submit-gradle	configure-cache	2026-06-03T13:30:49.0739540Z [command]/usr/bin/tar -xf /home/runner/work/_temp/52a503b3-2da6-4ab6-b553-837b1106a444/cache.tzst -P -C /home/runner/work/gradle/gradle --use-compress-program unzstd
+submit-gradle	configure-cache	2026-06-03T13:30:55.0485036Z Cache restored successfully
+submit-gradle	configure-cache	2026-06-03T13:30:55.0859161Z Cache restored from key: Linux-jdk21-temurin-gradle-5ef5d10fb14649efc952d8b78412b336d1537e415fdc64398d737d7f474bd67f
+submit-gradle	validate-project	﻿2026-06-03T13:30:55.1003218Z ##[group]Run if ./gradlew help; then
+submit-gradle	validate-project	2026-06-03T13:30:55.1003579Z ^[[36;1mif ./gradlew help; then^[[0m
+submit-gradle	validate-project	2026-06-03T13:30:55.1004013Z ^[[36;1m  echo "::debug::Gradle validate repository root is a Gradle project with wrapper."^[[0m
+submit-gradle	validate-project	2026-06-03T13:30:55.1004513Z ^[[36;1m  echo "{valid-project}={true}" >> "$GITHUB_OUTPUT"^[[0m
+submit-gradle	validate-project	2026-06-03T13:30:55.1004856Z ^[[36;1melif gradle help; then^[[0m
+submit-gradle	validate-project	2026-06-03T13:30:55.1005236Z ^[[36;1m  echo "::debug::Gradle validate repository root is a Gradle project."^[[0m
+submit-gradle	validate-project	2026-06-03T13:30:55.1005676Z ^[[36;1m  echo "{valid-project}={true}" >> "$GITHUB_OUTPUT"^[[0m
+submit-gradle	validate-project	2026-06-03T13:30:55.1005990Z ^[[36;1melse^[[0m
+submit-gradle	validate-project	2026-06-03T13:30:55.1006269Z ^[[36;1m  echo "{valid-project}={false}" >> "$GITHUB_OUTPUT"^[[0m
+submit-gradle	validate-project	2026-06-03T13:30:55.1006788Z ^[[36;1m  echo "### :warning: Gradle validation failed in repository root" >> $GITHUB_STEP_SUMMARY^[[0m
+submit-gradle	validate-project	2026-06-03T13:30:55.1007893Z ^[[36;1m  echo "We were unable to validate a Gradle project in the repository root. If your repository requires additional setup steps, you may need to check in your own workflow." >> $GITHUB_STEP_SUMMARY^[[0m
+submit-gradle	validate-project	2026-06-03T13:30:55.1008713Z ^[[36;1m  echo "" >> $GITHUB_STEP_SUMMARY^[[0m
+submit-gradle	validate-project	2026-06-03T13:30:55.1010216Z ^[[36;1m  echo "For more information on submitting Gradle dependencies from your own workflow, refer to [the submission action](https://github.com/gradle/actions)" >> $GITHUB_STEP_SUMMARY^[[0m
+submit-gradle	validate-project	2026-06-03T13:30:55.1011597Z ^[[36;1m  echo "::warning:: Gradle validation failed in the repository root."^[[0m
+submit-gradle	validate-project	2026-06-03T13:30:55.1011985Z ^[[36;1m  exit 1^[[0m
+submit-gradle	validate-project	2026-06-03T13:30:55.1012202Z ^[[36;1mfi^[[0m
+submit-gradle	validate-project	2026-06-03T13:30:55.1039225Z shell: /usr/bin/bash -e {0}
+submit-gradle	validate-project	2026-06-03T13:30:55.1039488Z env:
+submit-gradle	validate-project	2026-06-03T13:30:55.1039700Z   JAVA_VERSION: 21
+submit-gradle	validate-project	2026-06-03T13:30:55.1039925Z   JAVA_DISTRIB: temurin
+submit-gradle	validate-project	2026-06-03T13:30:55.1040158Z   SKIP_CACHE: 
+submit-gradle	validate-project	2026-06-03T13:30:55.1040487Z   JAVA_HOME: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/21.0.11-10/x64
+submit-gradle	validate-project	2026-06-03T13:30:55.1041034Z   JAVA_HOME_21_X64: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/21.0.11-10/x64
+submit-gradle	validate-project	2026-06-03T13:30:55.1041426Z ##[endgroup]
+submit-gradle	validate-project	2026-06-03T13:30:56.0670091Z Starting a Gradle Daemon, 1 incompatible and 1 stopped Daemons could not be reused, use --status for details
+submit-gradle	validate-project	2026-06-03T13:31:02.1666850Z Isolated Projects is an incubating feature.
+submit-gradle	validate-project	2026-06-03T13:31:03.2666382Z Calculating task graph as no cached configuration is available for tasks: help
+submit-gradle	validate-project	2026-06-03T13:31:10.9720460Z > Task :build-logic-settings:configuration-cache-compatibility:checkKotlinGradlePluginConfigurationErrors SKIPPED
+submit-gradle	validate-project	2026-06-03T13:31:10.9739166Z > Task :build-logic-settings:architecture-docs:checkKotlinGradlePluginConfigurationErrors SKIPPED
+submit-gradle	validate-project	2026-06-03T13:31:10.9740966Z > Task :build-logic-settings:build-environment:checkKotlinGradlePluginConfigurationErrors SKIPPED
+submit-gradle	validate-project	2026-06-03T13:31:10.9742524Z > Task :build-logic-settings:version-catalogs:checkKotlinGradlePluginConfigurationErrors SKIPPED
+submit-gradle	validate-project	2026-06-03T13:31:11.0710298Z > Task :build-logic-settings:architecture-docs:extractPrecompiledScriptPluginPlugins FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:11.1700446Z > Task :build-logic-settings:architecture-docs:generateScriptPluginAdapters FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:11.1729904Z > Task :build-logic-settings:architecture-docs:pluginDescriptors
+submit-gradle	validate-project	2026-06-03T13:31:11.2711280Z > Task :build-logic-settings:architecture-docs:processResources
+submit-gradle	validate-project	2026-06-03T13:31:11.2740535Z > Task :build-logic-settings:default-settings-plugins:checkKotlinGradlePluginConfigurationErrors SKIPPED
+submit-gradle	validate-project	2026-06-03T13:31:11.6665447Z > Task :build-logic-settings:build-environment:generateExternalPluginSpecBuilders FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:11.6679260Z > Task :build-logic-settings:version-catalogs:generateExternalPluginSpecBuilders FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:11.6680690Z > Task :build-logic-settings:build-environment:extractPrecompiledScriptPluginPlugins FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:11.6682051Z > Task :build-logic-settings:version-catalogs:extractPrecompiledScriptPluginPlugins FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:11.7680681Z > Task :build-logic-settings:configuration-cache-compatibility:generateExternalPluginSpecBuilders FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:11.7700195Z > Task :build-logic-settings:configuration-cache-compatibility:extractPrecompiledScriptPluginPlugins FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:11.8682784Z > Task :build-logic-settings:configuration-cache-compatibility:compilePluginsBlocks FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:11.8684459Z > Task :build-logic-settings:configuration-cache-compatibility:generatePrecompiledScriptPluginAccessors FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:11.8687383Z > Task :build-logic-settings:configuration-cache-compatibility:generateScriptPluginAdapters FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:12.0666975Z > Task :build-logic-settings:version-catalogs:compilePluginsBlocks FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:12.0705828Z > Task :build-logic-settings:version-catalogs:generatePrecompiledScriptPluginAccessors FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:12.0707509Z > Task :build-logic-settings:version-catalogs:generateScriptPluginAdapters FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:12.1665477Z > Task :build-logic-settings:configuration-cache-compatibility:compileKotlin FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:12.1674133Z > Task :build-logic-settings:configuration-cache-compatibility:compileJava NO-SOURCE
+submit-gradle	validate-project	2026-06-03T13:31:12.1675308Z > Task :build-logic-settings:configuration-cache-compatibility:pluginDescriptors
+submit-gradle	validate-project	2026-06-03T13:31:12.1676351Z > Task :build-logic-settings:configuration-cache-compatibility:processResources
+submit-gradle	validate-project	2026-06-03T13:31:12.1677223Z > Task :build-logic-settings:configuration-cache-compatibility:classes
+submit-gradle	validate-project	2026-06-03T13:31:12.1678176Z > Task :build-logic-settings:version-catalogs:compileKotlin FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:12.1678929Z > Task :build-logic-settings:version-catalogs:compileJava NO-SOURCE
+submit-gradle	validate-project	2026-06-03T13:31:12.1679811Z > Task :build-logic-settings:version-catalogs:pluginDescriptors
+submit-gradle	validate-project	2026-06-03T13:31:12.1680498Z > Task :build-logic-settings:version-catalogs:processResources
+submit-gradle	validate-project	2026-06-03T13:31:12.1681122Z > Task :build-logic-settings:version-catalogs:classes
+submit-gradle	validate-project	2026-06-03T13:31:12.1681818Z > Task :build-logic-settings:configuration-cache-compatibility:jar
+submit-gradle	validate-project	2026-06-03T13:31:12.1682426Z > Task :build-logic-settings:version-catalogs:jar
+submit-gradle	validate-project	2026-06-03T13:31:12.6678855Z > Task :build-logic-settings:build-environment:compilePluginsBlocks FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:12.6720173Z > Task :build-logic-settings:build-environment:generatePrecompiledScriptPluginAccessors FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:12.6743487Z > Task :build-logic-settings:build-environment:generateScriptPluginAdapters FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:12.6746408Z > Task :build-logic-settings:build-environment:compileKotlin FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:12.6748824Z > Task :build-logic-settings:build-environment:compileJava NO-SOURCE
+submit-gradle	validate-project	2026-06-03T13:31:12.7665649Z > Task :build-logic-settings:build-environment:pluginDescriptors
+submit-gradle	validate-project	2026-06-03T13:31:12.7669505Z > Task :build-logic-settings:build-environment:processResources
+submit-gradle	validate-project	2026-06-03T13:31:12.7670599Z > Task :build-logic-settings:build-environment:classes
+submit-gradle	validate-project	2026-06-03T13:31:12.7671451Z > Task :build-logic-settings:build-environment:jar
+submit-gradle	validate-project	2026-06-03T13:31:12.8694191Z > Task :build-logic-settings:architecture-docs:generateExternalPluginSpecBuilders FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:12.9666280Z > Task :build-logic-settings:architecture-docs:compilePluginsBlocks FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:12.9720179Z > Task :build-logic-settings:architecture-docs:generatePrecompiledScriptPluginAccessors FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:12.9749756Z > Task :build-logic-settings:architecture-docs:compileKotlin FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:12.9750662Z > Task :build-logic-settings:architecture-docs:compileJava NO-SOURCE
+submit-gradle	validate-project	2026-06-03T13:31:12.9751379Z > Task :build-logic-settings:architecture-docs:classes
+submit-gradle	validate-project	2026-06-03T13:31:13.0665515Z > Task :build-logic-settings:architecture-docs:jar
+submit-gradle	validate-project	2026-06-03T13:31:13.0670796Z > Task :build-logic-settings:default-settings-plugins:generateExternalPluginSpecBuilders FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:13.0671832Z > Task :build-logic-settings:default-settings-plugins:extractPrecompiledScriptPluginPlugins FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:13.1680530Z > Task :build-logic-settings:default-settings-plugins:compilePluginsBlocks FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:13.1690366Z > Task :build-logic-settings:default-settings-plugins:generatePrecompiledScriptPluginAccessors FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:13.1731282Z > Task :build-logic-settings:default-settings-plugins:generateScriptPluginAdapters FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:13.1732747Z > Task :build-logic-settings:default-settings-plugins:compileKotlin FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:13.1733838Z > Task :build-logic-settings:default-settings-plugins:compileJava NO-SOURCE
+submit-gradle	validate-project	2026-06-03T13:31:13.1734820Z > Task :build-logic-settings:default-settings-plugins:pluginDescriptors
+submit-gradle	validate-project	2026-06-03T13:31:13.1736195Z > Task :build-logic-settings:default-settings-plugins:processResources
+submit-gradle	validate-project	2026-06-03T13:31:13.1737135Z > Task :build-logic-settings:default-settings-plugins:classes
+submit-gradle	validate-project	2026-06-03T13:31:13.2667696Z > Task :build-logic-settings:default-settings-plugins:jar
+submit-gradle	validate-project	2026-06-03T13:31:14.8673168Z Type-safe project accessors is an incubating feature.
+submit-gradle	validate-project	2026-06-03T13:31:17.2665969Z > Task :build-logic-commons:build-platform-plugin:checkKotlinGradlePluginConfigurationErrors SKIPPED
+submit-gradle	validate-project	2026-06-03T13:31:17.2696821Z > Task :build-logic-commons:gradle-plugin:checkKotlinGradlePluginConfigurationErrors SKIPPED
+submit-gradle	validate-project	2026-06-03T13:31:17.2698294Z > Task :build-logic-commons:basics:checkKotlinGradlePluginConfigurationErrors SKIPPED
+submit-gradle	validate-project	2026-06-03T13:31:17.2699891Z > Task :build-logic-commons:module-identity:checkKotlinGradlePluginConfigurationErrors SKIPPED
+submit-gradle	validate-project	2026-06-03T13:31:17.2701276Z > Task :build-logic-commons:module-identity:extractPrecompiledScriptPluginPlugins FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:17.2702544Z > Task :build-logic-commons:module-identity:generateScriptPluginAdapters FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:17.2703789Z > Task :build-logic-commons:gradle-plugin:extractPrecompiledScriptPluginPlugins FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:17.2704910Z > Task :build-logic-commons:module-identity:pluginDescriptors
+submit-gradle	validate-project	2026-06-03T13:31:17.2705838Z > Task :build-logic-commons:module-identity:processResources
+submit-gradle	validate-project	2026-06-03T13:31:17.2706862Z > Task :build-logic-commons:gradle-plugin:generateScriptPluginAdapters FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:17.2707885Z > Task :build-logic-commons:gradle-plugin:pluginDescriptors
+submit-gradle	validate-project	2026-06-03T13:31:17.2708736Z > Task :build-logic-commons:gradle-plugin:processResources
+submit-gradle	validate-project	2026-06-03T13:31:17.8679474Z > Task :build-logic-commons:basics:generateExternalPluginSpecBuilders FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:17.8690360Z > Task :build-logic-commons:basics:extractPrecompiledScriptPluginPlugins FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:18.0677411Z > Task :build-logic-commons:basics:compilePluginsBlocks FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:18.0680782Z > Task :build-logic-commons:basics:generatePrecompiledScriptPluginAccessors FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:18.1665068Z > Task :build-logic-commons:basics:generateScriptPluginAdapters FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:18.1676691Z > Task :build-logic-commons:basics:compileKotlin FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:18.2691165Z > Task :build-logic-commons:basics:compileJava FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:18.3669637Z > Task :build-logic-commons:module-identity:generateExternalPluginSpecBuilders FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:18.3670936Z > Task :build-logic-commons:basics:pluginDescriptors
+submit-gradle	validate-project	2026-06-03T13:31:18.3671962Z > Task :build-logic-commons:basics:processResources
+submit-gradle	validate-project	2026-06-03T13:31:18.3680761Z > Task :build-logic-commons:basics:classes
+submit-gradle	validate-project	2026-06-03T13:31:18.3681620Z > Task :build-logic-commons:basics:jar
+submit-gradle	validate-project	2026-06-03T13:31:18.4666776Z > Task :build-logic-commons:module-identity:compilePluginsBlocks FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:18.4673059Z > Task :build-logic-commons:module-identity:generatePrecompiledScriptPluginAccessors FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:18.5664894Z > Task :build-logic-commons:module-identity:compileKotlin FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:18.5665684Z > Task :build-logic-commons:module-identity:compileJava NO-SOURCE
+submit-gradle	validate-project	2026-06-03T13:31:18.5666317Z > Task :build-logic-commons:module-identity:classes
+submit-gradle	validate-project	2026-06-03T13:31:18.5666797Z > Task :build-logic-commons:module-identity:jar
+submit-gradle	validate-project	2026-06-03T13:31:18.8667027Z > Task :build-logic-commons:build-platform-plugin:generateExternalPluginSpecBuilders FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:18.8681886Z > Task :build-logic-commons:build-platform-plugin:extractPrecompiledScriptPluginPlugins FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:18.9699400Z > Task :build-logic-commons:build-platform-plugin:compilePluginsBlocks FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:18.9710259Z > Task :build-logic-commons:build-platform-plugin:generatePrecompiledScriptPluginAccessors FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:18.9740222Z > Task :build-logic-commons:build-platform-plugin:generateScriptPluginAdapters FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:18.9769754Z > Task :build-logic-commons:build-platform-plugin:compileKotlin FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:18.9800287Z > Task :build-logic-commons:build-platform-plugin:compileJava NO-SOURCE
+submit-gradle	validate-project	2026-06-03T13:31:19.0690478Z > Task :build-logic-commons:build-platform-plugin:pluginDescriptors
+submit-gradle	validate-project	2026-06-03T13:31:19.0731711Z > Task :build-logic-commons:build-platform-plugin:processResources
+submit-gradle	validate-project	2026-06-03T13:31:19.0759955Z > Task :build-logic-commons:build-platform-plugin:classes
+submit-gradle	validate-project	2026-06-03T13:31:19.0776772Z > Task :build-logic-commons:gradle-plugin:generateExternalPluginSpecBuilders FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:19.0811539Z > Task :build-logic-commons:build-platform-plugin:jar
+submit-gradle	validate-project	2026-06-03T13:31:19.1684821Z > Task :build-logic-commons:gradle-plugin:compilePluginsBlocks FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:19.2676354Z > Task :build-logic-commons:gradle-plugin:generatePrecompiledScriptPluginAccessors FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:19.5680590Z > Task :build-logic-commons:gradle-plugin:compileKotlin FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:19.5681847Z > Task :build-logic-commons:gradle-plugin:compileJava NO-SOURCE
+submit-gradle	validate-project	2026-06-03T13:31:19.5682843Z > Task :build-logic-commons:gradle-plugin:classes
+submit-gradle	validate-project	2026-06-03T13:31:19.6720807Z > Task :build-logic-commons:gradle-plugin:jar
+submit-gradle	validate-project	2026-06-03T13:31:22.3665012Z > Task :build-logic:build-update-utils:checkKotlinGradlePluginConfigurationErrors SKIPPED
+submit-gradle	validate-project	2026-06-03T13:31:22.3676426Z > Task :build-logic:dependency-modules:checkKotlinGradlePluginConfigurationErrors SKIPPED
+submit-gradle	validate-project	2026-06-03T13:31:22.3677910Z > Task :build-logic:cleanup:checkKotlinGradlePluginConfigurationErrors SKIPPED
+submit-gradle	validate-project	2026-06-03T13:31:22.3679252Z > Task :build-logic:idea:checkKotlinGradlePluginConfigurationErrors SKIPPED
+submit-gradle	validate-project	2026-06-03T13:31:22.3680842Z > Task :build-logic:dependency-modules:generateExternalPluginSpecBuilders FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:22.3682082Z > Task :build-logic:dependency-modules:extractPrecompiledScriptPluginPlugins FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:22.3683192Z > Task :build-logic:cleanup:generateExternalPluginSpecBuilders FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:22.3684062Z > Task :build-logic:cleanup:extractPluginRequests NO-SOURCE
+submit-gradle	validate-project	2026-06-03T13:31:22.3684871Z > Task :build-logic:cleanup:generatePluginAdapters NO-SOURCE
+submit-gradle	validate-project	2026-06-03T13:31:22.3685772Z > Task :build-logic:cleanup:extractPrecompiledScriptPluginPlugins FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:22.4665405Z > Task :build-logic:cleanup:compilePluginsBlocks FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:22.4709998Z > Task :build-logic:dependency-modules:compilePluginsBlocks FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:22.5665178Z > Task :build-logic:dependency-modules:generatePrecompiledScriptPluginAccessors FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:22.5675375Z > Task :build-logic:dependency-modules:generateScriptPluginAdapters FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:22.6690724Z > Task :build-logic:dependency-modules:compileKotlin FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:22.6719586Z > Task :build-logic:dependency-modules:compileJava NO-SOURCE
+submit-gradle	validate-project	2026-06-03T13:31:22.6729763Z > Task :build-logic:jvm:checkKotlinGradlePluginConfigurationErrors SKIPPED
+submit-gradle	validate-project	2026-06-03T13:31:22.6749641Z > Task :build-logic:jvm:generateExternalPluginSpecBuilders FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:22.6770218Z > Task :build-logic:dependency-modules:pluginDescriptors
+submit-gradle	validate-project	2026-06-03T13:31:22.6799871Z > Task :build-logic:dependency-modules:processResources
+submit-gradle	validate-project	2026-06-03T13:31:22.6829521Z > Task :build-logic:dependency-modules:classes
+submit-gradle	validate-project	2026-06-03T13:31:22.6849908Z > Task :build-logic:dependency-modules:jar
+submit-gradle	validate-project	2026-06-03T13:31:22.6850894Z > Task :build-logic:jvm:extractPrecompiledScriptPluginPlugins FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:22.7675725Z > Task :build-logic:jvm:compilePluginsBlocks FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:22.7699871Z > Task :build-logic:cleanup:generatePrecompiledScriptPluginAccessors FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:22.7720064Z > Task :build-logic:cleanup:generateScriptPluginAdapters FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:22.8688879Z > Task :build-logic:jvm:generatePrecompiledScriptPluginAccessors FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:22.8716715Z > Task :build-logic:jvm:generateScriptPluginAdapters FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:22.8765722Z > Task :build-logic:cleanup:compileKotlin FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:23.0680112Z > Task :build-logic:jvm:compileKotlin FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:23.0699603Z > Task :build-logic:jvm:compileJava NO-SOURCE
+submit-gradle	validate-project	2026-06-03T13:31:23.0712261Z > Task :build-logic:jvm:pluginDescriptors
+submit-gradle	validate-project	2026-06-03T13:31:23.0726687Z > Task :build-logic:jvm:processResources
+submit-gradle	validate-project	2026-06-03T13:31:23.0763583Z > Task :build-logic:jvm:classes
+submit-gradle	validate-project	2026-06-03T13:31:23.1687656Z > Task :build-logic:jvm:jar
+submit-gradle	validate-project	2026-06-03T13:31:23.2688025Z > Task :build-logic:build-update-utils:generateExternalPluginSpecBuilders FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:23.2739924Z > Task :build-logic:build-update-utils:extractPluginRequests NO-SOURCE
+submit-gradle	validate-project	2026-06-03T13:31:23.2757851Z > Task :build-logic:build-update-utils:generatePluginAdapters NO-SOURCE
+submit-gradle	validate-project	2026-06-03T13:31:23.2759465Z > Task :build-logic:build-update-utils:extractPrecompiledScriptPluginPlugins FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:23.3669935Z > Task :build-logic:build-update-utils:compilePluginsBlocks FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:23.3685934Z > Task :build-logic:build-update-utils:generatePrecompiledScriptPluginAccessors FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:23.3709764Z > Task :build-logic:build-update-utils:generateScriptPluginAdapters FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:23.4700336Z > Task :build-logic:build-update-utils:compileKotlin FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:23.4719644Z > Task :build-logic:build-update-utils:compileJava NO-SOURCE
+submit-gradle	validate-project	2026-06-03T13:31:23.4749604Z > Task :build-logic:build-update-utils:compileGroovy NO-SOURCE
+submit-gradle	validate-project	2026-06-03T13:31:23.4764851Z > Task :build-logic:build-update-utils:compileGroovyPlugins NO-SOURCE
+submit-gradle	validate-project	2026-06-03T13:31:23.4809684Z > Task :build-logic:build-update-utils:pluginDescriptors
+submit-gradle	validate-project	2026-06-03T13:31:23.4839538Z > Task :build-logic:build-update-utils:processResources
+submit-gradle	validate-project	2026-06-03T13:31:23.4840196Z > Task :build-logic:build-update-utils:classes
+submit-gradle	validate-project	2026-06-03T13:31:23.5670081Z > Task :build-logic:cleanup:compileJava FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:23.5689700Z > Task :build-logic:cleanup:compileGroovy NO-SOURCE
+submit-gradle	validate-project	2026-06-03T13:31:23.5719915Z > Task :build-logic:documentation:checkKotlinGradlePluginConfigurationErrors SKIPPED
+submit-gradle	validate-project	2026-06-03T13:31:23.5729611Z > Task :build-logic:documentation:extractPluginRequests NO-SOURCE
+submit-gradle	validate-project	2026-06-03T13:31:23.5759608Z > Task :build-logic:documentation:generatePluginAdapters NO-SOURCE
+submit-gradle	validate-project	2026-06-03T13:31:23.5779912Z > Task :build-logic:integration-testing:checkKotlinGradlePluginConfigurationErrors SKIPPED
+submit-gradle	validate-project	2026-06-03T13:31:23.5809507Z > Task :build-logic:build-update-utils:jar
+submit-gradle	validate-project	2026-06-03T13:31:23.5815690Z > Task :build-logic:documentation:compileKotlin NO-SOURCE
+submit-gradle	validate-project	2026-06-03T13:31:23.5839666Z > Task :build-logic:documentation:compileJava NO-SOURCE
+submit-gradle	validate-project	2026-06-03T13:31:23.9665682Z > Task :build-logic:integration-testing:generateExternalPluginSpecBuilders FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:23.9697132Z > Task :build-logic:cleanup:compileGroovyPlugins NO-SOURCE
+submit-gradle	validate-project	2026-06-03T13:31:23.9719664Z > Task :build-logic:cleanup:pluginDescriptors
+submit-gradle	validate-project	2026-06-03T13:31:23.9749617Z > Task :build-logic:cleanup:processResources
+submit-gradle	validate-project	2026-06-03T13:31:23.9759346Z > Task :build-logic:cleanup:classes
+submit-gradle	validate-project	2026-06-03T13:31:24.0683117Z > Task :build-logic:cleanup:jar
+submit-gradle	validate-project	2026-06-03T13:31:24.0684280Z > Task :build-logic:integration-testing:extractPrecompiledScriptPluginPlugins FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:24.0685435Z > Task :build-logic:integration-testing:compilePluginsBlocks FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:24.6665563Z > Task :build-logic:integration-testing:generatePrecompiledScriptPluginAccessors FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:24.6689846Z > Task :build-logic:integration-testing:generateScriptPluginAdapters FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:24.8669596Z > Task :build-logic:integration-testing:compileKotlin FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:24.8692811Z > Task :build-logic:integration-testing:compileJava NO-SOURCE
+submit-gradle	validate-project	2026-06-03T13:31:24.8725146Z > Task :build-logic:documentation:compileGroovy FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:24.8739851Z > Task :build-logic:documentation:compileGroovyPlugins NO-SOURCE
+submit-gradle	validate-project	2026-06-03T13:31:24.8783676Z > Task :build-logic:profiling:checkKotlinGradlePluginConfigurationErrors SKIPPED
+submit-gradle	validate-project	2026-06-03T13:31:24.8799592Z > Task :build-logic:documentation:pluginDescriptors
+submit-gradle	validate-project	2026-06-03T13:31:24.8800271Z > Task :build-logic:documentation:processResources
+submit-gradle	validate-project	2026-06-03T13:31:24.8800854Z > Task :build-logic:documentation:classes
+submit-gradle	validate-project	2026-06-03T13:31:24.8801554Z > Task :build-logic:profiling:generateExternalPluginSpecBuilders FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:24.8802334Z > Task :build-logic:integration-testing:pluginDescriptors
+submit-gradle	validate-project	2026-06-03T13:31:24.8803318Z > Task :build-logic:integration-testing:processResources
+submit-gradle	validate-project	2026-06-03T13:31:24.8803916Z > Task :build-logic:integration-testing:classes
+submit-gradle	validate-project	2026-06-03T13:31:24.9669675Z > Task :build-logic:documentation:jar
+submit-gradle	validate-project	2026-06-03T13:31:24.9733362Z > Task :build-logic:profiling:extractPrecompiledScriptPluginPlugins FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:24.9759874Z > Task :build-logic:profiling:compilePluginsBlocks FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:24.9770410Z > Task :build-logic:profiling:generateScriptPluginAdapters FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:24.9800306Z > Task :build-logic:root-build:checkKotlinGradlePluginConfigurationErrors SKIPPED
+submit-gradle	validate-project	2026-06-03T13:31:24.9801230Z > Task :build-logic:profiling:pluginDescriptors
+submit-gradle	validate-project	2026-06-03T13:31:24.9801933Z > Task :build-logic:profiling:processResources
+submit-gradle	validate-project	2026-06-03T13:31:24.9802766Z > Task :build-logic:root-build:extractPrecompiledScriptPluginPlugins FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:24.9803754Z > Task :build-logic:root-build:generateScriptPluginAdapters FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:24.9804563Z > Task :build-logic:root-build:pluginDescriptors
+submit-gradle	validate-project	2026-06-03T13:31:24.9805193Z > Task :build-logic:root-build:processResources
+submit-gradle	validate-project	2026-06-03T13:31:24.9806222Z > Task :build-logic:lifecycle:checkKotlinGradlePluginConfigurationErrors SKIPPED
+submit-gradle	validate-project	2026-06-03T13:31:25.0713539Z > Task :build-logic:lifecycle:generateExternalPluginSpecBuilders FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:25.0714635Z > Task :build-logic:lifecycle:extractPrecompiledScriptPluginPlugins FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:25.0715405Z > Task :build-logic:integration-testing:jar
+submit-gradle	validate-project	2026-06-03T13:31:25.0716021Z > Task :build-logic:lifecycle:compilePluginsBlocks FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:25.0716868Z > Task :build-logic:lifecycle:generatePrecompiledScriptPluginAccessors FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:25.0717770Z > Task :build-logic:lifecycle:generateScriptPluginAdapters FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:25.1695615Z > Task :build-logic:lifecycle:compileKotlin FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:25.1720248Z > Task :build-logic:lifecycle:compileJava NO-SOURCE
+submit-gradle	validate-project	2026-06-03T13:31:25.1721256Z > Task :build-logic:lifecycle:pluginDescriptors
+submit-gradle	validate-project	2026-06-03T13:31:25.1722226Z > Task :build-logic:lifecycle:processResources
+submit-gradle	validate-project	2026-06-03T13:31:25.1723034Z > Task :build-logic:lifecycle:classes
+submit-gradle	validate-project	2026-06-03T13:31:25.1723711Z > Task :build-logic:lifecycle:jar
+submit-gradle	validate-project	2026-06-03T13:31:25.2680460Z > Task :build-logic:profiling:generatePrecompiledScriptPluginAccessors FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:25.3663667Z > Task :build-logic:profiling:compileKotlin FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:25.3664668Z > Task :build-logic:profiling:compileJava NO-SOURCE
+submit-gradle	validate-project	2026-06-03T13:31:25.3665614Z > Task :build-logic:profiling:classes
+submit-gradle	validate-project	2026-06-03T13:31:25.3666244Z > Task :build-logic:profiling:jar
+submit-gradle	validate-project	2026-06-03T13:31:29.8671541Z > Task :build-logic:idea:generateExternalPluginSpecBuilders FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:29.8676411Z > Task :build-logic:idea:extractPrecompiledScriptPluginPlugins FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:29.8680634Z > Task :build-logic:idea:compilePluginsBlocks FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:29.9666082Z > Task :build-logic:idea:generatePrecompiledScriptPluginAccessors FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:29.9667166Z > Task :build-logic:idea:generateScriptPluginAdapters FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:29.9667781Z > Task :build-logic:idea:compileKotlin FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:29.9676652Z > Task :build-logic:idea:compileJava NO-SOURCE
+submit-gradle	validate-project	2026-06-03T13:31:29.9677194Z > Task :build-logic:idea:pluginDescriptors
+submit-gradle	validate-project	2026-06-03T13:31:29.9677696Z > Task :build-logic:idea:processResources
+submit-gradle	validate-project	2026-06-03T13:31:29.9678171Z > Task :build-logic:idea:classes
+submit-gradle	validate-project	2026-06-03T13:31:29.9678579Z > Task :build-logic:idea:jar
+submit-gradle	validate-project	2026-06-03T13:31:30.0670278Z > Task :build-logic:root-build:generateExternalPluginSpecBuilders FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:30.0679785Z > Task :build-logic:root-build:compilePluginsBlocks FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:30.1664932Z > Task :build-logic:root-build:generatePrecompiledScriptPluginAccessors FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:30.1667952Z > Task :build-logic:root-build:compileKotlin FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:30.1669224Z > Task :build-logic:root-build:compileJava NO-SOURCE
+submit-gradle	validate-project	2026-06-03T13:31:30.1670741Z > Task :build-logic:root-build:classes
+submit-gradle	validate-project	2026-06-03T13:31:30.2663922Z > Task :build-logic:root-build:jar
+submit-gradle	validate-project	2026-06-03T13:31:38.9740343Z > Task :build-logic:binary-compatibility:checkKotlinGradlePluginConfigurationErrors SKIPPED
+submit-gradle	validate-project	2026-06-03T13:31:38.9786362Z > Task :build-logic:buildquality:checkKotlinGradlePluginConfigurationErrors SKIPPED
+submit-gradle	validate-project	2026-06-03T13:31:38.9798319Z > Task :build-logic-commons:publishing:checkKotlinGradlePluginConfigurationErrors SKIPPED
+submit-gradle	validate-project	2026-06-03T13:31:38.9800154Z > Task :build-logic:binary-compatibility:extractPluginRequests FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:38.9801353Z > Task :build-logic:buildquality:extractPrecompiledScriptPluginPlugins FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:38.9802715Z > Task :build-logic:binary-compatibility:generatePluginAdapters FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:38.9803915Z > Task :build-logic:buildquality:generateScriptPluginAdapters FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:38.9805225Z > Task :build-logic:kotlin-dsl:checkKotlinGradlePluginConfigurationErrors SKIPPED
+submit-gradle	validate-project	2026-06-03T13:31:38.9806607Z > Task :build-logic:kotlin-dsl-shared-runtime:checkKotlinGradlePluginConfigurationErrors SKIPPED
+submit-gradle	validate-project	2026-06-03T13:31:39.0670442Z > Task :build-logic:kotlin-dsl-shared-runtime:compileKotlin FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:39.0700793Z > Task :build-logic:kotlin-dsl-shared-runtime:compileJava NO-SOURCE
+submit-gradle	validate-project	2026-06-03T13:31:39.1760702Z > Task :build-logic:kotlin-dsl:generateExternalPluginSpecBuilders FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:39.1830835Z > Task :build-logic:kotlin-dsl:extractPrecompiledScriptPluginPlugins FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:39.1876961Z > Task :build-logic:kotlin-dsl:compilePluginsBlocks FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:39.1879987Z > Task :build-logic:kotlin-dsl-shared-runtime:processResources NO-SOURCE
+submit-gradle	validate-project	2026-06-03T13:31:39.1880962Z > Task :build-logic:kotlin-dsl-shared-runtime:classes UP-TO-DATE
+submit-gradle	validate-project	2026-06-03T13:31:39.1882329Z > Task :build-logic:kotlin-dsl-shared-runtime:jar
+submit-gradle	validate-project	2026-06-03T13:31:39.2705563Z > Task :build-logic:binary-compatibility:compileKotlin FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:39.2707910Z > Task :build-logic:kotlin-dsl:generatePrecompiledScriptPluginAccessors FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:39.2737569Z > Task :build-logic:kotlin-dsl:generateScriptPluginAdapters FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:39.2744920Z > Task :build-logic:binary-compatibility:compileJava FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:39.3671762Z > Task :build-logic:binary-compatibility:compileGroovy FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:39.3700213Z > Task :build-logic:binary-compatibility:compileGroovyPlugins FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:39.3719812Z > Task :build-logic:binary-compatibility:pluginDescriptors
+submit-gradle	validate-project	2026-06-03T13:31:39.4666271Z > Task :build-logic:binary-compatibility:processResources
+submit-gradle	validate-project	2026-06-03T13:31:39.4689585Z > Task :build-logic:binary-compatibility:classes
+submit-gradle	validate-project	2026-06-03T13:31:39.4749671Z > Task :build-logic:kotlin-dsl:compileKotlin FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:39.4809855Z > Task :build-logic:kotlin-dsl:compileJava NO-SOURCE
+submit-gradle	validate-project	2026-06-03T13:31:39.4819263Z > Task :build-logic:packaging:checkKotlinGradlePluginConfigurationErrors SKIPPED
+submit-gradle	validate-project	2026-06-03T13:31:39.4820396Z > Task :build-logic:binary-compatibility:jar
+submit-gradle	validate-project	2026-06-03T13:31:39.4821224Z > Task :build-logic:kotlin-dsl:pluginDescriptors
+submit-gradle	validate-project	2026-06-03T13:31:39.4822136Z > Task :build-logic:packaging:generateExternalPluginSpecBuilders FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:39.4823305Z > Task :build-logic:kotlin-dsl:processResources
+submit-gradle	validate-project	2026-06-03T13:31:39.4824018Z > Task :build-logic:kotlin-dsl:classes
+submit-gradle	validate-project	2026-06-03T13:31:39.4824885Z > Task :build-logic:packaging:extractPrecompiledScriptPluginPlugins FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:39.5692377Z > Task :build-logic:packaging:compilePluginsBlocks FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:39.5720278Z > Task :build-logic:packaging:generateScriptPluginAdapters FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:39.5737862Z > Task :build-logic:uber-plugins:checkKotlinGradlePluginConfigurationErrors SKIPPED
+submit-gradle	validate-project	2026-06-03T13:31:39.5739288Z > Task :build-logic:buildquality:pluginDescriptors
+submit-gradle	validate-project	2026-06-03T13:31:39.5740080Z > Task :build-logic:buildquality:processResources
+submit-gradle	validate-project	2026-06-03T13:31:39.5740817Z > Task :build-logic:packaging:pluginDescriptors
+submit-gradle	validate-project	2026-06-03T13:31:39.5741904Z > Task :build-logic:packaging:processResources
+submit-gradle	validate-project	2026-06-03T13:31:39.5742859Z > Task :build-logic-commons:publishing:generateExternalPluginSpecBuilders FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:39.5744021Z > Task :build-logic:uber-plugins:extractPrecompiledScriptPluginPlugins FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:39.5745122Z > Task :build-logic:uber-plugins:generateScriptPluginAdapters FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:39.5746243Z > Task :build-logic-commons:publishing:extractPrecompiledScriptPluginPlugins FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:39.5747177Z > Task :build-logic:uber-plugins:pluginDescriptors
+submit-gradle	validate-project	2026-06-03T13:31:39.5747886Z > Task :build-logic:uber-plugins:processResources
+submit-gradle	validate-project	2026-06-03T13:31:39.5748604Z > Task :build-logic:kotlin-dsl:jar
+submit-gradle	validate-project	2026-06-03T13:31:39.6665403Z > Task :build-logic-commons:publishing:compilePluginsBlocks FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:39.6668691Z > Task :build-logic-commons:publishing:generatePrecompiledScriptPluginAccessors FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:39.6670324Z > Task :build-logic-commons:publishing:generateScriptPluginAdapters FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:39.7690728Z > Task :build-logic:packaging:generatePrecompiledScriptPluginAccessors FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:39.7719365Z > Task :build-logic-commons:publishing:compileKotlin FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:39.7744022Z > Task :build-logic-commons:publishing:compileJava NO-SOURCE
+submit-gradle	validate-project	2026-06-03T13:31:39.7769777Z > Task :build-logic-commons:publishing:pluginDescriptors
+submit-gradle	validate-project	2026-06-03T13:31:39.7793499Z > Task :build-logic-commons:publishing:processResources
+submit-gradle	validate-project	2026-06-03T13:31:39.7819649Z > Task :build-logic-commons:publishing:classes
+submit-gradle	validate-project	2026-06-03T13:31:39.8664197Z > Task :build-logic:packaging:compileKotlin FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:39.8666361Z > Task :build-logic:packaging:compileJava NO-SOURCE
+submit-gradle	validate-project	2026-06-03T13:31:39.8667361Z > Task :build-logic:packaging:classes
+submit-gradle	validate-project	2026-06-03T13:31:39.8668028Z > Task :build-logic-commons:publishing:jar
+submit-gradle	validate-project	2026-06-03T13:31:39.9663076Z > Task :build-logic:packaging:jar
+submit-gradle	validate-project	2026-06-03T13:31:41.5664673Z > Task :build-logic:performance-testing:compileGroovy FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:41.5666300Z > Task :build-logic:performance-testing:checkKotlinGradlePluginConfigurationErrors SKIPPED
+submit-gradle	validate-project	2026-06-03T13:31:41.5667702Z > Task :build-logic:performance-testing:extractPluginRequests FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:41.5668828Z > Task :build-logic:performance-testing:generatePluginAdapters FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:41.6710470Z > Task :build-logic:performance-testing:compileKotlin FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:41.6769457Z > Task :build-logic:performance-testing:compileJava FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:41.6834909Z > Task :build-logic:performance-testing:compileGroovyPlugins FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:41.6859856Z > Task :build-logic:performance-testing:pluginDescriptors
+submit-gradle	validate-project	2026-06-03T13:31:41.6935050Z > Task :build-logic:performance-testing:processResources
+submit-gradle	validate-project	2026-06-03T13:31:41.6985442Z > Task :build-logic:performance-testing:classes
+submit-gradle	validate-project	2026-06-03T13:31:41.7664600Z > Task :build-logic:buildquality:generateExternalPluginSpecBuilders FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:41.7689650Z > Task :build-logic:performance-testing:jar
+submit-gradle	validate-project	2026-06-03T13:31:41.7716951Z > Task :build-logic:buildquality:compilePluginsBlocks FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:41.8664391Z > Task :build-logic:buildquality:generatePrecompiledScriptPluginAccessors FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:41.9682015Z > Task :build-logic:buildquality:compileKotlin FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:41.9711809Z > Task :build-logic:buildquality:compileJava NO-SOURCE
+submit-gradle	validate-project	2026-06-03T13:31:41.9769601Z > Task :build-logic:buildquality:classes
+submit-gradle	validate-project	2026-06-03T13:31:42.0664224Z > Task :build-logic:uber-plugins:generateExternalPluginSpecBuilders FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:42.0666361Z > Task :build-logic:uber-plugins:compilePluginsBlocks FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:42.0667192Z > Task :build-logic:buildquality:jar
+submit-gradle	validate-project	2026-06-03T13:31:42.3680476Z > Task :build-logic:uber-plugins:generatePrecompiledScriptPluginAccessors FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:42.9663672Z > Task :build-logic:uber-plugins:compileKotlin FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:42.9665443Z > Task :build-logic:uber-plugins:compileJava NO-SOURCE
+submit-gradle	validate-project	2026-06-03T13:31:42.9666846Z > Task :build-logic:uber-plugins:classes
+submit-gradle	validate-project	2026-06-03T13:31:43.4663775Z > Task :build-logic:uber-plugins:jar
+submit-gradle	validate-project	2026-06-03T13:31:51.6667413Z > Task :build-logic:integration-testing-kotlin:checkKotlinGradlePluginConfigurationErrors SKIPPED
+submit-gradle	validate-project	2026-06-03T13:31:51.7710532Z > Task :build-logic:integration-testing-kotlin:generateExternalPluginSpecBuilders FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:51.7744758Z > Task :build-logic:integration-testing-kotlin:extractPrecompiledScriptPluginPlugins FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:51.7794719Z > Task :build-logic:integration-testing-kotlin:compilePluginsBlocks FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:51.8686977Z > Task :build-logic:integration-testing-kotlin:generatePrecompiledScriptPluginAccessors FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:51.8701453Z > Task :build-logic:integration-testing-kotlin:generateScriptPluginAdapters FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:52.1670698Z > Task :build-logic:integration-testing-kotlin:compileKotlin FROM-CACHE
+submit-gradle	validate-project	2026-06-03T13:31:52.1707217Z > Task :build-logic:integration-testing-kotlin:compileJava NO-SOURCE
+submit-gradle	validate-project	2026-06-03T13:31:52.1759746Z > Task :build-logic:integration-testing-kotlin:pluginDescriptors
+submit-gradle	validate-project	2026-06-03T13:31:52.1789716Z > Task :build-logic:integration-testing-kotlin:processResources
+submit-gradle	validate-project	2026-06-03T13:31:52.1819707Z > Task :build-logic:integration-testing-kotlin:classes
+submit-gradle	validate-project	2026-06-03T13:31:52.2683795Z > Task :build-logic:integration-testing-kotlin:jar
+submit-gradle	validate-project	2026-06-03T13:32:07.2695714Z 
+submit-gradle	validate-project	2026-06-03T13:32:07.2737428Z > Task :help
+submit-gradle	validate-project	2026-06-03T13:32:07.2737801Z 
+submit-gradle	validate-project	2026-06-03T13:32:07.2738427Z Welcome to Gradle 9.6.0-milestone-2.
+submit-gradle	validate-project	2026-06-03T13:32:07.2808668Z 
+submit-gradle	validate-project	2026-06-03T13:32:07.2819802Z To run a build, run gradlew <task> ...
+submit-gradle	validate-project	2026-06-03T13:32:07.2839502Z 
+submit-gradle	validate-project	2026-06-03T13:32:07.2859873Z To see a list of available tasks, run gradlew tasks
+submit-gradle	validate-project	2026-06-03T13:32:07.2860555Z 
+submit-gradle	validate-project	2026-06-03T13:32:07.2861048Z To see more detail about a task, run gradlew help --task <task>
+submit-gradle	validate-project	2026-06-03T13:32:07.2861707Z 
+submit-gradle	validate-project	2026-06-03T13:32:07.2862140Z To see a list of command-line options, run gradlew --help
+submit-gradle	validate-project	2026-06-03T13:32:07.2862763Z 
+submit-gradle	validate-project	2026-06-03T13:32:07.2863522Z For more detail on using Gradle, see https://docs.gradle.org/9.6.0-milestone-2/userguide/command_line_interface.html
+submit-gradle	validate-project	2026-06-03T13:32:07.2864448Z 
+submit-gradle	validate-project	2026-06-03T13:32:07.2864837Z For troubleshooting, visit https://help.gradle.org
+submit-gradle	validate-project	2026-06-03T13:32:07.2865981Z gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run_2-1780493464786.json
+submit-gradle	validate-project	2026-06-03T13:32:07.3679538Z 
+submit-gradle	validate-project	2026-06-03T13:32:07.3710565Z [Incubating] Problems report is available at: file:///home/runner/work/gradle/gradle/build/reports/problems/problems-report.html
+submit-gradle	validate-project	2026-06-03T13:32:07.3711642Z 
+submit-gradle	validate-project	2026-06-03T13:32:07.3739239Z Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+submit-gradle	validate-project	2026-06-03T13:32:07.3769376Z 
+submit-gradle	validate-project	2026-06-03T13:32:07.3800186Z You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+submit-gradle	validate-project	2026-06-03T13:32:07.3801280Z 
+submit-gradle	validate-project	2026-06-03T13:32:07.3830879Z For more on this, please refer to https://docs.gradle.org/9.6.0-milestone-2/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+submit-gradle	validate-project	2026-06-03T13:32:07.3859538Z 
+submit-gradle	validate-project	2026-06-03T13:32:07.3860002Z BUILD SUCCESSFUL in 1m 12s
+submit-gradle	validate-project	2026-06-03T13:32:07.3860716Z 243 actionable tasks: 83 executed, 160 from cache
+submit-gradle	validate-project	2026-06-03T13:32:07.5663498Z Configuration cache entry stored.
+submit-gradle	submit-dependency-snapshot	﻿2026-06-03T13:32:07.9320619Z ##[group]Run actions/gradle-build-tools-actions/dependency-submission@8379f6a1328ee0e06e2bb424dadb7b159856a326
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:07.9321209Z with:
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:07.9321426Z   cache-disabled: true
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:07.9321668Z   cache-read-only: true
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:07.9321906Z   cache-write-only: false
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:07.9322166Z   cache-overwrite-existing: false
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:07.9322438Z   cache-cleanup: on-success
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:07.9322730Z   gradle-home-cache-includes: caches
+submit-gradle	submit-dependency-snapshot	notifications
+submit-gradle	submit-dependency-snapshot	
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:07.9323055Z   add-job-summary: always
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:07.9323518Z   add-job-summary-as-pr-comment: never
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:07.9323850Z   dependency-graph: generate-submit-and-upload
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:07.9324211Z   dependency-graph-report-dir: dependency-graph-reports
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:07.9324579Z   dependency-graph-continue-on-failure: false
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:07.9324890Z   build-scan-publish: false
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:07.9325141Z   validate-wrappers: false
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:07.9325391Z   allow-snapshot-wrappers: false
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:07.9325705Z   gradle-home-cache-strict-match: false
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:07.9325990Z   workflow-job-context: null
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:07.9328732Z   github-token: ***
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:07.9329161Z env:
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:07.9329362Z   JAVA_VERSION: 21
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:07.9329582Z   JAVA_DISTRIB: temurin
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:07.9329807Z   SKIP_CACHE: 
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:07.9330137Z   JAVA_HOME: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/21.0.11-10/x64
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:07.9330646Z   JAVA_HOME_21_X64: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/21.0.11-10/x64
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:07.9331189Z   GITHUB_DEPENDENCY_GRAPH_REF: refs/heads/bhegyi/provider-api/master-based-setters
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:07.9331691Z   GITHUB_DEPENDENCY_GRAPH_SHA: 80c4869a7cbeee0872ba4ca2fe7cafc310bf36b4
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:07.9332159Z   GITHUB_DEPENDENCY_GRAPH_DETECTOR_NAME: Automatic Dependency Submission
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:07.9332581Z   GITHUB_DEPENDENCY_GRAPH_DETECTOR_VERSION: 1e74d6c58b14
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:07.9333115Z   GITHUB_DEPENDENCY_GRAPH_DETECTOR_URL: https://github.com/actions/gradle-dependency-submission-action
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:07.9333714Z   DEPENDENCY_GRAPH_EXCLUDE_CONFIGURATIONS: ^detachedConfiguration([0-9]+)$
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:07.9334101Z ##[endgroup]
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:08.2989877Z Gradle User Home already exists at /home/runner/.gradle
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:08.2990432Z Cache is disabled: will not restore state from previous builds.
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:08.3008433Z Merged default JDK locations into /home/runner/.m2/toolchains.xml
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:08.3018149Z Enabling dependency graph generation
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:08.3037420Z [command]/home/runner/work/gradle/gradle/gradlew -Dorg.gradle.configureondemand=false -Dorg.gradle.dependency.verification=off -Dorg.gradle.unsafe.isolated-projects=false :ForceDependencyResolutionPlugin_resolveAllDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:09.0313837Z Parallel Configuration Cache is an incubating feature.
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:09.0320356Z Calculating task graph as no cached configuration is available for tasks: :ForceDependencyResolutionPlugin_resolveAllDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:09.0322282Z Generating dependency graph into '/home/runner/work/gradle/gradle/dependency-graph-reports/dynamicdependency-graphauto-submission-submit-gradle.json'
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:09.1292322Z Resolving dependency graph plugin 1.4.0 from plugin repository: https://plugins.gradle.org/m2
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:09.1350374Z Resolving dependency graph plugin 1.4.0 from plugin repository: https://plugins.gradle.org/m2
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:09.4367463Z > Task :build-logic-settings:architecture-docs:checkKotlinGradlePluginConfigurationErrors SKIPPED
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:09.4399957Z > Task :build-logic-settings:configuration-cache-compatibility:checkKotlinGradlePluginConfigurationErrors SKIPPED
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:09.4430007Z > Task :build-logic-settings:build-environment:checkKotlinGradlePluginConfigurationErrors SKIPPED
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:09.4432227Z > Task :build-logic-settings:version-catalogs:checkKotlinGradlePluginConfigurationErrors SKIPPED
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:09.4456119Z > Task :build-logic-settings:architecture-docs:extractPrecompiledScriptPluginPlugins UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:09.4486562Z > Task :build-logic-settings:architecture-docs:generateScriptPluginAdapters UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:09.4509910Z > Task :build-logic-settings:version-catalogs:generateExternalPluginSpecBuilders UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:09.4539923Z > Task :build-logic-settings:version-catalogs:extractPrecompiledScriptPluginPlugins UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:09.4560216Z > Task :build-logic-settings:build-environment:generateExternalPluginSpecBuilders UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:09.4561786Z > Task :build-logic-settings:architecture-docs:pluginDescriptors UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:09.4562943Z > Task :build-logic-settings:build-environment:extractPrecompiledScriptPluginPlugins UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:09.4564103Z > Task :build-logic-settings:architecture-docs:processResources UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:09.4565337Z > Task :build-logic-settings:default-settings-plugins:checkKotlinGradlePluginConfigurationErrors SKIPPED
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:09.4566806Z > Task :build-logic-settings:configuration-cache-compatibility:generateExternalPluginSpecBuilders UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:09.4568369Z > Task :build-logic-settings:configuration-cache-compatibility:extractPrecompiledScriptPluginPlugins UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:09.4569868Z > Task :build-logic-settings:version-catalogs:compilePluginsBlocks UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:09.4570884Z > Task :build-logic-settings:build-environment:compilePluginsBlocks UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:09.4572061Z > Task :build-logic-settings:version-catalogs:generatePrecompiledScriptPluginAccessors UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:09.5324642Z > Task :build-logic-settings:build-environment:generatePrecompiledScriptPluginAccessors UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:09.5326006Z > Task :build-logic-settings:version-catalogs:generateScriptPluginAdapters UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:09.5326953Z > Task :build-logic-settings:build-environment:generateScriptPluginAdapters UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:09.5327989Z > Task :build-logic-settings:default-settings-plugins:generateExternalPluginSpecBuilders UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:09.5333031Z > Task :build-logic-settings:configuration-cache-compatibility:compilePluginsBlocks UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:09.5334309Z > Task :build-logic-settings:default-settings-plugins:extractPrecompiledScriptPluginPlugins UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:09.5335695Z > Task :build-logic-settings:configuration-cache-compatibility:generatePrecompiledScriptPluginAccessors UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:09.5337038Z > Task :build-logic-settings:configuration-cache-compatibility:generateScriptPluginAdapters UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:09.5338074Z > Task :build-logic-settings:version-catalogs:compileKotlin UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:09.5338860Z > Task :build-logic-settings:build-environment:compileKotlin UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:09.5339937Z > Task :build-logic-settings:default-settings-plugins:compilePluginsBlocks UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:09.5340810Z > Task :build-logic-settings:build-environment:compileJava NO-SOURCE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:09.5341707Z > Task :build-logic-settings:configuration-cache-compatibility:compileKotlin UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:09.5342653Z > Task :build-logic-settings:build-environment:pluginDescriptors UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:09.5343452Z > Task :build-logic-settings:version-catalogs:compileJava NO-SOURCE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:09.5344314Z > Task :build-logic-settings:configuration-cache-compatibility:compileJava NO-SOURCE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:09.5390648Z > Task :build-logic-settings:configuration-cache-compatibility:pluginDescriptors UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:09.5429988Z > Task :build-logic-settings:build-environment:processResources UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:09.5489762Z > Task :build-logic-settings:build-environment:classes UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:09.5518290Z > Task :build-logic-settings:build-environment:jar UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:09.5549974Z > Task :build-logic-settings:default-settings-plugins:generatePrecompiledScriptPluginAccessors UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:09.5609705Z > Task :build-logic-settings:version-catalogs:pluginDescriptors UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:09.5639891Z > Task :build-logic-settings:configuration-cache-compatibility:processResources UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:09.5669775Z > Task :build-logic-settings:configuration-cache-compatibility:classes UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:09.5699698Z > Task :build-logic-settings:version-catalogs:processResources UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:09.5726385Z > Task :build-logic-settings:version-catalogs:classes UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:09.5770308Z > Task :build-logic-settings:default-settings-plugins:generateScriptPluginAdapters UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:09.5799996Z > Task :build-logic-settings:version-catalogs:jar UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:09.5887647Z > Task :build-logic-settings:configuration-cache-compatibility:jar UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:09.6049994Z > Task :build-logic-settings:architecture-docs:generateExternalPluginSpecBuilders UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:09.6190158Z > Task :build-logic-settings:default-settings-plugins:compileKotlin UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:09.6239933Z > Task :build-logic-settings:default-settings-plugins:compileJava NO-SOURCE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:09.6319838Z > Task :build-logic-settings:default-settings-plugins:pluginDescriptors UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:09.6400890Z > Task :build-logic-settings:default-settings-plugins:processResources UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:09.6459820Z > Task :build-logic-settings:default-settings-plugins:classes UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:09.6492319Z > Task :build-logic-settings:architecture-docs:compilePluginsBlocks UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:09.6509751Z > Task :build-logic-settings:default-settings-plugins:jar UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:09.6590236Z > Task :build-logic-settings:architecture-docs:generatePrecompiledScriptPluginAccessors UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:09.6599825Z > Task :build-logic-settings:architecture-docs:compileKotlin UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:09.6629809Z > Task :build-logic-settings:architecture-docs:compileJava NO-SOURCE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:09.6670002Z > Task :build-logic-settings:architecture-docs:classes UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:09.6700120Z > Task :build-logic-settings:architecture-docs:jar UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:09.7320494Z Resolving dependency graph plugin 1.4.0 from plugin repository: https://plugins.gradle.org/m2
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:09.7358175Z Resolving dependency graph plugin 1.4.0 from plugin repository: https://plugins.gradle.org/m2
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:09.7391281Z Type-safe project accessors is an incubating feature.
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:10.6309944Z > Task :build-logic-commons:basics:checkKotlinGradlePluginConfigurationErrors SKIPPED
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:10.6333019Z > Task :build-logic-commons:build-platform-plugin:checkKotlinGradlePluginConfigurationErrors SKIPPED
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:10.6390424Z > Task :build-logic-commons:gradle-plugin:checkKotlinGradlePluginConfigurationErrors SKIPPED
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:10.6450094Z > Task :build-logic-commons:module-identity:checkKotlinGradlePluginConfigurationErrors SKIPPED
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:10.6510044Z > Task :build-logic-commons:module-identity:extractPrecompiledScriptPluginPlugins UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:10.6511616Z > Task :build-logic-commons:module-identity:generateScriptPluginAdapters UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:10.6539903Z > Task :build-logic-commons:module-identity:pluginDescriptors UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:10.6570121Z > Task :build-logic-commons:module-identity:processResources UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:10.6571375Z > Task :build-logic-commons:gradle-plugin:extractPrecompiledScriptPluginPlugins UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:10.6572519Z > Task :build-logic-commons:gradle-plugin:generateScriptPluginAdapters UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:10.6573559Z > Task :build-logic-commons:gradle-plugin:pluginDescriptors UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:10.6574476Z > Task :build-logic-commons:gradle-plugin:processResources UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:10.6575558Z > Task :build-logic-commons:build-platform-plugin:generateExternalPluginSpecBuilders UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:10.6576767Z > Task :build-logic-commons:build-platform-plugin:extractPrecompiledScriptPluginPlugins UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:10.7292161Z > Task :build-logic-commons:build-platform-plugin:compilePluginsBlocks UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:10.7320659Z > Task :build-logic-commons:build-platform-plugin:generatePrecompiledScriptPluginAccessors UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:10.7322091Z > Task :build-logic-commons:build-platform-plugin:generateScriptPluginAdapters UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:10.7323311Z > Task :build-logic-commons:basics:generateExternalPluginSpecBuilders UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:10.7324534Z > Task :build-logic-commons:basics:extractPrecompiledScriptPluginPlugins UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:10.7325980Z > Task :build-logic-commons:build-platform-plugin:compileKotlin UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:10.7326985Z > Task :build-logic-commons:build-platform-plugin:compileJava NO-SOURCE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:10.7328018Z > Task :build-logic-commons:build-platform-plugin:pluginDescriptors UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:10.7329307Z > Task :build-logic-commons:build-platform-plugin:processResources UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:10.7330337Z > Task :build-logic-commons:build-platform-plugin:classes UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:10.7331273Z > Task :build-logic-commons:build-platform-plugin:jar UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:10.7332188Z > Task :build-logic-commons:basics:compilePluginsBlocks UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:10.7333266Z > Task :build-logic-commons:basics:generatePrecompiledScriptPluginAccessors UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:10.7334388Z > Task :build-logic-commons:basics:generateScriptPluginAdapters UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:10.7335326Z > Task :build-logic-commons:basics:compileKotlin UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:10.7336152Z > Task :build-logic-commons:basics:compileJava UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:10.7337002Z > Task :build-logic-commons:basics:pluginDescriptors UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:10.7337890Z > Task :build-logic-commons:basics:processResources UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:10.7338703Z > Task :build-logic-commons:basics:classes UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:10.7339660Z > Task :build-logic-commons:basics:jar UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:10.7340619Z > Task :build-logic-commons:module-identity:generateExternalPluginSpecBuilders UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:10.7341713Z > Task :build-logic-commons:module-identity:compilePluginsBlocks UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:10.7342875Z > Task :build-logic-commons:module-identity:generatePrecompiledScriptPluginAccessors UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:10.7344012Z > Task :build-logic-commons:module-identity:compileKotlin UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:10.7344932Z > Task :build-logic-commons:module-identity:compileJava NO-SOURCE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:10.7345800Z > Task :build-logic-commons:module-identity:classes UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:10.7346650Z > Task :build-logic-commons:module-identity:jar UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:10.7347646Z > Task :build-logic-commons:gradle-plugin:generateExternalPluginSpecBuilders UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:10.7348696Z > Task :build-logic-commons:gradle-plugin:compilePluginsBlocks UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:10.7350040Z > Task :build-logic-commons:gradle-plugin:generatePrecompiledScriptPluginAccessors UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:10.8288389Z > Task :build-logic-commons:gradle-plugin:compileKotlin UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:10.8290328Z > Task :build-logic-commons:gradle-plugin:compileJava NO-SOURCE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:10.8291623Z > Task :build-logic-commons:gradle-plugin:classes UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:10.8293677Z > Task :build-logic-commons:gradle-plugin:jar UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.5371176Z > Task :build-logic:build-update-utils:checkKotlinGradlePluginConfigurationErrors SKIPPED
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.5373203Z > Task :build-logic:jvm:checkKotlinGradlePluginConfigurationErrors SKIPPED
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.5464897Z > Task :build-logic:jvm:extractPrecompiledScriptPluginPlugins UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.5536980Z > Task :build-logic:idea:checkKotlinGradlePluginConfigurationErrors SKIPPED
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.5556269Z > Task :build-logic:dependency-modules:checkKotlinGradlePluginConfigurationErrors SKIPPED
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.5567529Z > Task :build-logic:cleanup:checkKotlinGradlePluginConfigurationErrors SKIPPED
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.5569219Z > Task :build-logic:jvm:generateScriptPluginAdapters UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.5570394Z > Task :build-logic:jvm:pluginDescriptors UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.5571301Z > Task :build-logic:cleanup:generateExternalPluginSpecBuilders UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.5572250Z > Task :build-logic:cleanup:extractPluginRequests NO-SOURCE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.5573098Z > Task :build-logic:cleanup:generatePluginAdapters NO-SOURCE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.5574147Z > Task :build-logic:cleanup:extractPrecompiledScriptPluginPlugins UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.5575387Z > Task :build-logic:jvm:processResources UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.5576333Z > Task :build-logic:build-update-utils:extractPluginRequests NO-SOURCE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.5577296Z > Task :build-logic:build-update-utils:generatePluginAdapters NO-SOURCE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.5578265Z > Task :build-logic:idea:generateExternalPluginSpecBuilders UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.5579528Z > Task :build-logic:build-update-utils:extractPrecompiledScriptPluginPlugins UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.5580656Z > Task :build-logic:idea:extractPrecompiledScriptPluginPlugins UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.5581659Z > Task :build-logic:build-update-utils:generateScriptPluginAdapters UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.5582996Z > Task :build-logic:build-update-utils:pluginDescriptors UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.5584016Z > Task :build-logic:build-update-utils:processResources UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.5585130Z > Task :build-logic:documentation:checkKotlinGradlePluginConfigurationErrors SKIPPED
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.5586241Z > Task :build-logic:documentation:extractPluginRequests NO-SOURCE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.5587134Z > Task :build-logic:documentation:generatePluginAdapters NO-SOURCE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.5588197Z > Task :build-logic:integration-testing:checkKotlinGradlePluginConfigurationErrors SKIPPED
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.5589575Z > Task :build-logic:integration-testing:extractPrecompiledScriptPluginPlugins UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.5590710Z > Task :build-logic:integration-testing:generateScriptPluginAdapters UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.5592247Z > Task :build-logic:profiling:checkKotlinGradlePluginConfigurationErrors SKIPPED
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.5593382Z > Task :build-logic:documentation:pluginDescriptors UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.5594415Z > Task :build-logic:dependency-modules:generateExternalPluginSpecBuilders UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.5595726Z > Task :build-logic:dependency-modules:extractPrecompiledScriptPluginPlugins UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.5596808Z > Task :build-logic:documentation:processResources UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.5597669Z > Task :build-logic:cleanup:compilePluginsBlocks UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.5598717Z > Task :build-logic:integration-testing:pluginDescriptors UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.5600023Z > Task :build-logic:integration-testing:processResources UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.5601110Z > Task :build-logic:profiling:extractPrecompiledScriptPluginPlugins UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.5602669Z > Task :build-logic:profiling:generateScriptPluginAdapters UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.5603667Z > Task :build-logic:idea:compilePluginsBlocks UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.5604654Z > Task :build-logic:root-build:checkKotlinGradlePluginConfigurationErrors SKIPPED
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.5605578Z > Task :build-logic:profiling:pluginDescriptors UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.5606306Z > Task :build-logic:profiling:processResources UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.5607121Z > Task :build-logic:idea:generatePrecompiledScriptPluginAccessors UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.5608178Z > Task :build-logic:cleanup:generatePrecompiledScriptPluginAccessors UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.5609321Z > Task :build-logic:cleanup:generateScriptPluginAdapters UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.5610231Z > Task :build-logic:idea:generateScriptPluginAdapters UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.5611211Z > Task :build-logic:root-build:extractPrecompiledScriptPluginPlugins UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.5612702Z > Task :build-logic:root-build:generateScriptPluginAdapters UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.6325266Z > Task :build-logic:root-build:pluginDescriptors UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.6326388Z > Task :build-logic:root-build:processResources UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.6327688Z > Task :build-logic:lifecycle:checkKotlinGradlePluginConfigurationErrors SKIPPED
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.6328863Z > Task :build-logic:dependency-modules:compilePluginsBlocks UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.6330030Z > Task :build-logic:idea:compileKotlin UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.6331296Z > Task :build-logic:idea:compileJava NO-SOURCE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.6332104Z > Task :build-logic:idea:pluginDescriptors UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.6332931Z > Task :build-logic:idea:processResources UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.6333681Z > Task :build-logic:idea:classes UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.6334385Z > Task :build-logic:idea:jar UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.6335360Z > Task :build-logic:dependency-modules:generatePrecompiledScriptPluginAccessors UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.6336609Z > Task :build-logic:dependency-modules:generateScriptPluginAdapters UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.6337694Z > Task :build-logic:lifecycle:generateExternalPluginSpecBuilders UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.6338582Z > Task :build-logic:cleanup:compileKotlin UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.6339647Z > Task :build-logic:lifecycle:extractPrecompiledScriptPluginPlugins UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.6340584Z > Task :build-logic:cleanup:compileJava UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.6341354Z > Task :build-logic:cleanup:compileGroovy NO-SOURCE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.6342200Z > Task :build-logic:cleanup:compileGroovyPlugins NO-SOURCE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.6343271Z > Task :build-logic:cleanup:pluginDescriptors UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.6344179Z > Task :build-logic:cleanup:processResources UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.6344963Z > Task :build-logic:cleanup:classes UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.6345695Z > Task :build-logic:cleanup:jar UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.6346501Z > Task :build-logic:lifecycle:compilePluginsBlocks UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.6347393Z > Task :build-logic:dependency-modules:compileKotlin UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.6348300Z > Task :build-logic:dependency-modules:compileJava NO-SOURCE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.6349530Z > Task :build-logic:lifecycle:generatePrecompiledScriptPluginAccessors UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.6350638Z > Task :build-logic:dependency-modules:pluginDescriptors UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.6351584Z > Task :build-logic:dependency-modules:processResources UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.6352478Z > Task :build-logic:dependency-modules:classes UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.6353375Z > Task :build-logic:lifecycle:generateScriptPluginAdapters UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.6354270Z > Task :build-logic:dependency-modules:jar UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.6355080Z > Task :build-logic:lifecycle:compileKotlin UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.6355874Z > Task :build-logic:lifecycle:compileJava NO-SOURCE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.6356978Z > Task :build-logic:lifecycle:pluginDescriptors UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.6362420Z > Task :build-logic:lifecycle:processResources UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.6363299Z > Task :build-logic:lifecycle:classes UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.7291195Z > Task :build-logic:lifecycle:jar UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.7325609Z > Task :build-logic:jvm:generateExternalPluginSpecBuilders UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.7326180Z > Task :build-logic:jvm:compilePluginsBlocks UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.7326671Z > Task :build-logic:jvm:generatePrecompiledScriptPluginAccessors UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.7327175Z > Task :build-logic:jvm:compileKotlin UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.7327515Z > Task :build-logic:jvm:compileJava NO-SOURCE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.7327832Z > Task :build-logic:jvm:classes UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.7328133Z > Task :build-logic:jvm:jar UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.7339998Z > Task :build-logic:build-update-utils:generateExternalPluginSpecBuilders UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.7341747Z > Task :build-logic:integration-testing:generateExternalPluginSpecBuilders UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.7342881Z > Task :build-logic:build-update-utils:compilePluginsBlocks UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.7343984Z > Task :build-logic:build-update-utils:generatePrecompiledScriptPluginAccessors UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.8290068Z > Task :build-logic:integration-testing:compilePluginsBlocks UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.8334411Z > Task :build-logic:build-update-utils:compileKotlin UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.8359953Z > Task :build-logic:integration-testing:generatePrecompiledScriptPluginAccessors UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.8361157Z > Task :build-logic:build-update-utils:compileJava NO-SOURCE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.8361602Z > Task :build-logic:build-update-utils:compileGroovy NO-SOURCE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.8362061Z > Task :build-logic:build-update-utils:compileGroovyPlugins NO-SOURCE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.8362493Z > Task :build-logic:build-update-utils:classes UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.8362873Z > Task :build-logic:build-update-utils:jar UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.8363232Z > Task :build-logic:documentation:compileKotlin NO-SOURCE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.8363592Z > Task :build-logic:documentation:compileJava NO-SOURCE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.9292239Z > Task :build-logic:documentation:compileGroovy UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.9331824Z > Task :build-logic:documentation:compileGroovyPlugins NO-SOURCE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.9332813Z > Task :build-logic:documentation:classes UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.9333562Z > Task :build-logic:documentation:jar UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.9334395Z > Task :build-logic:integration-testing:compileKotlin UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.9335262Z > Task :build-logic:integration-testing:compileJava NO-SOURCE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.9336097Z > Task :build-logic:integration-testing:classes UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.9336876Z > Task :build-logic:integration-testing:jar UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.9337865Z > Task :build-logic:profiling:generateExternalPluginSpecBuilders UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.9338798Z > Task :build-logic:profiling:compilePluginsBlocks UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.9339903Z > Task :build-logic:profiling:generatePrecompiledScriptPluginAccessors UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.9340897Z > Task :build-logic:profiling:compileKotlin UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.9341675Z > Task :build-logic:profiling:compileJava NO-SOURCE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.9342394Z > Task :build-logic:profiling:classes UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.9343088Z > Task :build-logic:profiling:jar UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.9343942Z > Task :build-logic:root-build:generateExternalPluginSpecBuilders UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.9344940Z > Task :build-logic:root-build:compilePluginsBlocks UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:11.9345936Z > Task :build-logic:root-build:generatePrecompiledScriptPluginAccessors UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.0310542Z > Task :build-logic:root-build:compileKotlin UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.0311737Z > Task :build-logic:root-build:compileJava NO-SOURCE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.0312652Z > Task :build-logic:root-build:classes UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.0313423Z > Task :build-logic:root-build:jar UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.2301218Z > Task :build-logic:binary-compatibility:checkKotlinGradlePluginConfigurationErrors SKIPPED
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.2359985Z > Task :build-logic:buildquality:checkKotlinGradlePluginConfigurationErrors SKIPPED
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.2387984Z > Task :build-logic-commons:publishing:checkKotlinGradlePluginConfigurationErrors SKIPPED
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.2450333Z > Task :build-logic:buildquality:extractPrecompiledScriptPluginPlugins UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.2480890Z > Task :build-logic:binary-compatibility:extractPluginRequests UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.2533136Z > Task :build-logic:binary-compatibility:generatePluginAdapters UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.2558550Z > Task :build-logic:buildquality:generateScriptPluginAdapters UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.2613317Z > Task :build-logic:kotlin-dsl:checkKotlinGradlePluginConfigurationErrors SKIPPED
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.2629889Z > Task :build-logic:kotlin-dsl-shared-runtime:checkKotlinGradlePluginConfigurationErrors SKIPPED
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.2659813Z > Task :build-logic:kotlin-dsl-shared-runtime:compileKotlin UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.2720686Z > Task :build-logic:kotlin-dsl-shared-runtime:compileJava NO-SOURCE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.2780649Z > Task :build-logic:binary-compatibility:compileKotlin UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.2795452Z > Task :build-logic-commons:publishing:generateExternalPluginSpecBuilders UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.2833176Z > Task :build-logic-commons:publishing:extractPrecompiledScriptPluginPlugins UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.2922497Z > Task :build-logic:performance-testing:compileGroovy UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.2990107Z > Task :build-logic:performance-testing:checkKotlinGradlePluginConfigurationErrors SKIPPED
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.3341803Z > Task :build-logic:performance-testing:extractPluginRequests UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.3366049Z > Task :build-logic:performance-testing:generatePluginAdapters UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.3389749Z > Task :build-logic:binary-compatibility:compileJava UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.3419858Z > Task :build-logic:kotlin-dsl:generateExternalPluginSpecBuilders UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.3449766Z > Task :build-logic:kotlin-dsl:extractPrecompiledScriptPluginPlugins UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.3490143Z > Task :build-logic:performance-testing:compileKotlin UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.3492962Z > Task :build-logic-commons:publishing:compilePluginsBlocks UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.3518567Z > Task :build-logic:binary-compatibility:compileGroovy UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.3519787Z > Task :build-logic-commons:publishing:generatePrecompiledScriptPluginAccessors UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.3521053Z > Task :build-logic:binary-compatibility:compileGroovyPlugins UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.3579706Z > Task :build-logic:binary-compatibility:pluginDescriptors UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.3609625Z > Task :build-logic:binary-compatibility:processResources UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.3610663Z > Task :build-logic:binary-compatibility:classes UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.3639688Z > Task :build-logic-commons:publishing:generateScriptPluginAdapters UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.3668208Z > Task :build-logic:binary-compatibility:jar UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.3699729Z > Task :build-logic:kotlin-dsl-shared-runtime:processResources NO-SOURCE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.3700807Z > Task :build-logic:kotlin-dsl:compilePluginsBlocks UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.3729632Z > Task :build-logic:performance-testing:compileJava UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.3759699Z > Task :build-logic:kotlin-dsl-shared-runtime:classes UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.3760720Z > Task :build-logic:performance-testing:compileGroovyPlugins UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.3769963Z > Task :build-logic:kotlin-dsl-shared-runtime:jar UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.3770952Z > Task :build-logic:performance-testing:pluginDescriptors UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.3771917Z > Task :build-logic:performance-testing:processResources UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.3772769Z > Task :build-logic:performance-testing:classes UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.3773551Z > Task :build-logic:performance-testing:jar UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.3774498Z > Task :build-logic:packaging:checkKotlinGradlePluginConfigurationErrors SKIPPED
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.3775594Z > Task :build-logic:packaging:extractPrecompiledScriptPluginPlugins UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.3776574Z > Task :build-logic-commons:publishing:compileKotlin UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.3777426Z > Task :build-logic-commons:publishing:compileJava NO-SOURCE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.3778301Z > Task :build-logic-commons:publishing:pluginDescriptors UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.3779495Z > Task :build-logic:packaging:generateScriptPluginAdapters UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.3780455Z > Task :build-logic:uber-plugins:checkKotlinGradlePluginConfigurationErrors SKIPPED
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.3781739Z > Task :build-logic-commons:publishing:processResources UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.3782987Z > Task :build-logic-commons:publishing:classes UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.3783816Z > Task :build-logic:packaging:pluginDescriptors UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.3784591Z > Task :build-logic-commons:publishing:jar UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.3785509Z > Task :build-logic:kotlin-dsl:generatePrecompiledScriptPluginAccessors UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.3786500Z > Task :build-logic:packaging:processResources UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.3787468Z > Task :build-logic:uber-plugins:extractPrecompiledScriptPluginPlugins UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.3788776Z > Task :build-logic:uber-plugins:generateScriptPluginAdapters UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.3789923Z > Task :build-logic:uber-plugins:pluginDescriptors UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.3790825Z > Task :build-logic:kotlin-dsl:generateScriptPluginAdapters UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.3791720Z > Task :build-logic:uber-plugins:processResources UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.3792766Z > Task :build-logic:buildquality:generateExternalPluginSpecBuilders UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.4332873Z > Task :build-logic:kotlin-dsl:compileKotlin UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.4366329Z > Task :build-logic:buildquality:compilePluginsBlocks UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.4389649Z > Task :build-logic:kotlin-dsl:compileJava NO-SOURCE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.4416392Z > Task :build-logic:kotlin-dsl:pluginDescriptors UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.4417420Z > Task :build-logic:kotlin-dsl:processResources UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.4418195Z > Task :build-logic:kotlin-dsl:classes UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.4418919Z > Task :build-logic:kotlin-dsl:jar UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.4419973Z > Task :build-logic:buildquality:generatePrecompiledScriptPluginAccessors UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.4421168Z > Task :build-logic:packaging:generateExternalPluginSpecBuilders UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.4422205Z > Task :build-logic:packaging:compilePluginsBlocks UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.4423194Z > Task :build-logic:packaging:generatePrecompiledScriptPluginAccessors UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.4424166Z > Task :build-logic:buildquality:compileKotlin UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.4424936Z > Task :build-logic:buildquality:compileJava NO-SOURCE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.4425708Z > Task :build-logic:buildquality:pluginDescriptors UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.4426526Z > Task :build-logic:buildquality:processResources UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.4427313Z > Task :build-logic:buildquality:classes UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.4428010Z > Task :build-logic:buildquality:jar UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.5304561Z > Task :build-logic:packaging:compileKotlin UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.5332920Z > Task :build-logic:packaging:compileJava NO-SOURCE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.5333922Z > Task :build-logic:packaging:classes UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.5359657Z > Task :build-logic:packaging:jar UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.5401148Z > Task :build-logic:uber-plugins:generateExternalPluginSpecBuilders UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.5430030Z > Task :build-logic:uber-plugins:compilePluginsBlocks UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.5437863Z > Task :build-logic:uber-plugins:generatePrecompiledScriptPluginAccessors UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.5439298Z > Task :build-logic:uber-plugins:compileKotlin UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.6310679Z > Task :build-logic:uber-plugins:compileJava NO-SOURCE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.6336313Z > Task :build-logic:uber-plugins:classes UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:12.6337225Z > Task :build-logic:uber-plugins:jar UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:16.6310520Z > Task :build-logic:integration-testing-kotlin:checkKotlinGradlePluginConfigurationErrors SKIPPED
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:16.6312274Z > Task :build-logic:integration-testing-kotlin:generateExternalPluginSpecBuilders UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:16.6339985Z > Task :build-logic:integration-testing-kotlin:extractPrecompiledScriptPluginPlugins UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:16.6369901Z > Task :build-logic:integration-testing-kotlin:compilePluginsBlocks UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:16.6371092Z > Task :build-logic:integration-testing-kotlin:generatePrecompiledScriptPluginAccessors UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:16.6400401Z > Task :build-logic:integration-testing-kotlin:generateScriptPluginAdapters UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:16.7311043Z > Task :build-logic:integration-testing-kotlin:compileKotlin UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:16.7328870Z > Task :build-logic:integration-testing-kotlin:compileJava NO-SOURCE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:16.7360201Z > Task :build-logic:integration-testing-kotlin:pluginDescriptors UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:16.7390194Z > Task :build-logic:integration-testing-kotlin:processResources UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:16.7402840Z > Task :build-logic:integration-testing-kotlin:classes UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:16.7403820Z > Task :build-logic:integration-testing-kotlin:jar UP-TO-DATE
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.3330179Z > Task :build-logic:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.3360939Z > Task :build-logic-settings:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.3380003Z > Task :build-logic-settings:architecture-docs:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.3390878Z > Task :build-logic-settings:build-environment:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.3420727Z > Task :build-logic-settings:configuration-cache-compatibility:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.3450535Z > Task :build-logic-commons:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.3479948Z > Task :build-logic-commons:basics:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.3482223Z > Task :build-logic-commons:build-platform:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.3510572Z > Task :build-logic-commons:build-platform-plugin:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.3570058Z > Task :build-logic:binary-compatibility:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.3600030Z > Task :build-logic-settings:default-settings-plugins:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.3609990Z > Task :build-logic:build-update-utils:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.3630588Z > Task :build-logic-settings:version-catalogs:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.3660365Z > Task :build-logic-settings:ForceDependencyResolutionPlugin_resolveAllDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.3689947Z > Task :build-logic:buildquality:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.3790145Z > Task :build-logic-commons:gradle-plugin:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.3809978Z > Task :build-logic-commons:module-identity:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.3840466Z > Task :build-logic-commons:publishing:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.3869911Z > Task :build-logic:dependency-modules:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.3871564Z > Task :build-logic-commons:code-quality-rules:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.3898261Z > Task :build-logic-commons:ForceDependencyResolutionPlugin_resolveAllDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.3919764Z > Task :build-logic:cleanup:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.3960029Z > Task :build-logic:documentation:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.3964937Z > Task :build-logic:idea:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.3989721Z > Task :ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4019776Z > Task :ant:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4039844Z > Task :ant-api:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4069901Z > Task :ant-worker:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4079682Z > Task :antlr:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4109631Z > Task :api-metadata:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4110453Z > Task :ant-impl:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4111190Z > Task :base-asm:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4112327Z > Task :base-compiler-worker:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4113310Z > Task :base-diagnostics:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4114291Z > Task :base-ide-plugins:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4115303Z > Task :base-services-groovy:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4116302Z > Task :base-services:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4117385Z > Task :build-logic:integration-testing:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4118487Z > Task :bean-serialization-services:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4119557Z > Task :build-logic:integration-testing-kotlin:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4120600Z > Task :build-cache-base:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4121536Z > Task :build-logic:jvm:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4122467Z > Task :build-cache-core:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4123437Z > Task :build-logic:kotlin-dsl:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4124474Z > Task :build-cache-example-client:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4125699Z > Task :build-logic:kotlin-dsl-shared-runtime:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4126802Z > Task :build-logic:lifecycle:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4127769Z > Task :architecture-test:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4128724Z > Task :build-cache-local:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4129930Z > Task :build-cache-http:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4131249Z > Task :build-cache-packaging:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4132325Z > Task :build-configuration:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4133347Z > Task :build-cache:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4134300Z > Task :build-discovery:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4135313Z > Task :build-discovery-impl:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4136281Z > Task :build-init:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4137229Z > Task :build-init-specs:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4138223Z > Task :build-init-specs-api:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4139491Z > Task :build-discovery-reporting:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4140614Z > Task :build-logic:packaging:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4141631Z > Task :build-operations:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4142604Z > Task :build-option:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4143687Z > Task :build-logic:performance-testing:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4145029Z > Task :build-operations-trace:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4146060Z > Task :build-process-services:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4147091Z > Task :build-logic:profiling:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4148078Z > Task :build-state:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4149186Z > Task :build-cache-spi:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4150402Z > Task :build-logic:root-build:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4151404Z > Task :classloaders:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4152699Z > Task :build-profile:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4153632Z > Task :classpath:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4154568Z > Task :client-services:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4155596Z > Task :build-logic:uber-plugins:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4156563Z > Task :cli:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4157442Z > Task :code-quality:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4158418Z > Task :code-quality-workers:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4159577Z > Task :collections:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4160551Z > Task :composite-builds:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4161498Z > Task :concurrent:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4162382Z > Task :build-logic:ForceDependencyResolutionPlugin_resolveAllDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4163382Z > Task :configuration-cache-base:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4164524Z > Task :configuration-problems-base:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4165539Z > Task :core-api:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4166511Z > Task :core-flow-services-api:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4167471Z > Task :core:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4168379Z > Task :core-platform:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4169479Z > Task :credentials:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4170525Z > Task :core-serialization-codecs:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4171619Z > Task :configuration-cache:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4172642Z > Task :credentials-api:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4173624Z > Task :daemon-logging:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4174579Z > Task :daemon-main:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4175548Z > Task :daemon-protocol:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4176550Z > Task :credentials-impl:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4177623Z > Task :core-kotlin-extensions:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4178762Z > Task :daemon-server-worker:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4179802Z > Task :daemon-services:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4181118Z > Task :declarative-dsl-api:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4182476Z > Task :daemon-server:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4183415Z > Task :declarative-dsl-evaluator:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4184397Z > Task :declarative-dsl-provider:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4185294Z > Task :daemon-messaging:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4186232Z > Task :declarative-dsl-tooling-models:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4187413Z > Task :dependency-management:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4188518Z > Task :dependency-management-serialization-codecs:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4189755Z > Task :distributions-core:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4190679Z > Task :distributions-basics:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4191612Z > Task :distributions-full:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4192593Z > Task :distributions-integ-tests:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4193593Z > Task :distributions-jvm:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4194592Z > Task :distributions-native:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4195714Z > Task :declarative-dsl-tooling-builders:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4196797Z > Task :distributions-dependencies:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4197838Z > Task :docs-asciidoctor-extensions:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4198686Z > Task :docs:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4199829Z > Task :domain-object-collections:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4200759Z > Task :declarative-dsl-core:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4201631Z > Task :ear:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4202493Z > Task :encryption-services:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4203403Z > Task :enterprise-logging:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4204357Z > Task :enterprise-operations:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4205450Z > Task :enterprise-plugin-performance:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4206558Z > Task :docs-asciidoctor-extensions-base:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4207653Z > Task :execution:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4208693Z > Task :distributions-publishing:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4209956Z > Task :file-collections:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4210963Z > Task :file-operations:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4211887Z > Task :file-temp:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4212839Z > Task :file-watching:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4213753Z > Task :files:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4214691Z > Task :execution-e2e-tests:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4215675Z > Task :functional:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4216605Z > Task :gradle-cli:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4217817Z > Task :gradle-cli-main:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4218783Z > Task :enterprise:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4219888Z > Task :graph-isolation:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4220832Z > Task :graph-serialization:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4221855Z > Task :enterprise-workers:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4222991Z > Task :groovy-loader:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4223838Z > Task :groovy-support:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4224701Z > Task :groovydoc-worker:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4225711Z > Task :guava-serialization-codecs:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4226711Z > Task :hashing:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4227619Z > Task :hashing-services:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4228502Z > Task :ide:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4229556Z > Task :ide-native:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4230451Z > Task :ide-plugins:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4231417Z > Task :groovy-compiler-worker:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4232726Z > Task :input-tracking:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4233726Z > Task :ide-model-impls:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4234755Z > Task :instrumentation-agent:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4235915Z > Task :instrumentation-agent-services:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4237115Z > Task :instrumentation-reporting:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4238183Z > Task :flow-services:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4239295Z > Task :integ-test:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4240286Z > Task :installation-beacon:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4241464Z > Task :internal-architecture-testing:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4242682Z > Task :internal-distribution-testing:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4243884Z > Task :instrumentation-declarations:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4245143Z > Task :internal-instrumentation-processor:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4246366Z > Task :internal-integ-testing:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4247482Z > Task :internal-performance-testing:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4248558Z > Task :internal-testing:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4249607Z > Task :io:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4250534Z > Task :internal-build-reports:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4251651Z > Task :internal-instrumentation-api:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4252935Z > Task :jacoco:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4253772Z > Task :ivy:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4254652Z > Task :jacoco-workers:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4255914Z > Task :java-api-extractor:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4256959Z > Task :java-compiler-worker:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4257969Z > Task :java-platform:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4259123Z > Task :java-compiler-plugin:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4259985Z > Task :javadoc:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4260956Z > Task :jvm-compiler-worker:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4261890Z > Task :kotlin-dsl:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4262726Z > Task :jvm-services:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4263639Z > Task :kotlin-dsl-plugins:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4264699Z > Task :kotlin-dsl-provider-plugins:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4265773Z > Task :kotlin-dsl-tooling-builders:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4266747Z > Task :kotlin-dsl-tooling-model-impls:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4267759Z > Task :kotlin-dsl-tooling-models:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4285117Z > Task :language-groovy:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4310016Z > Task :isolated-action-services:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4336125Z > Task :language-jvm:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4370000Z > Task :kotlin-dsl-integ-tests:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4383003Z > Task :logging:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4399865Z > Task :logging-api:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4418875Z > Task :language-java:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4420034Z > Task :messaging:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4420874Z > Task :model-core:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4421731Z > Task :model-groovy:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4422588Z > Task :model-reflect:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4423390Z > Task :maven:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4424212Z > Task :normalization:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4425115Z > Task :language-native:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4425961Z > Task :launcher:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4426819Z > Task :normalization-api:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4427723Z > Task :normalization-java:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4428606Z > Task :performance:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4429653Z > Task :persistent-cache:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4430533Z > Task :platform-base:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4431387Z > Task :platform-jvm:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4432274Z > Task :plugin-development:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4433116Z > Task :native:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4434263Z > Task :plugins-application:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4435148Z > Task :plugins-groovy:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4435997Z > Task :plugin-use:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4436863Z > Task :plugins-java-base:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4437794Z > Task :plugins-java-library:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4438788Z > Task :plugins-jvm-test-fixtures:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4440094Z > Task :plugins-java:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4441009Z > Task :plugins-model-native:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4441931Z > Task :platform-native:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4442883Z > Task :plugins-version-catalog:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4443855Z > Task :precondition-tester:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4444732Z > Task :problems:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4445562Z > Task :problems-api:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4446448Z > Task :problems-rendering:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4447411Z > Task :plugins-jvm-test-suite:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4448399Z > Task :plugins-distribution:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4459793Z > Task :process-services:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4460932Z > Task :process-services-api:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4462051Z > Task :process-services-base:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4463226Z > Task :plugins-test-report-aggregation:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4464377Z > Task :project-features-api:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4465449Z > Task :project-features-demos:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4466424Z > Task :public-api:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4467368Z > Task :public-api-tests:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4468364Z > Task :report-rendering:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4469500Z > Task :reporting:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4470502Z > Task :request-handler-worker:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4471569Z > Task :project-features:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4472547Z > Task :resources-gcs:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4473557Z > Task :process-memory-services:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4474590Z > Task :resources-http:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4475530Z > Task :resources-s3:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4476443Z > Task :resources-sftp:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4477355Z > Task :samples:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4478235Z > Task :scala:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4479290Z > Task :scala-compiler-worker:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4480581Z > Task :scaladoc-worker:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4481609Z > Task :scoped-persistent-cache:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4482660Z > Task :serialization:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4483562Z > Task :publish:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4484503Z > Task :service-provider:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4485564Z > Task :service-registry-builder:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4486844Z > Task :service-registry-impl:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4487845Z > Task :resources:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4488784Z > Task :smoke-ide-test:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4489899Z > Task :smoke-test:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4490817Z > Task :snapshots:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4491694Z > Task :soak:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4492559Z > Task :signing:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4493440Z > Task :security:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4494671Z > Task :start-parameter:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4495713Z > Task :stdlib-java-extensions:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4496812Z > Task :stdlib-kotlin-extensions:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4498024Z > Task :stdlib-serialization-codecs:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4499188Z > Task :test-kit:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4500121Z > Task :test-suites-base:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4501106Z > Task :testing-base:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4502157Z > Task :testing-base-infrastructure:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4503237Z > Task :service-lookup:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4504202Z > Task :testing-native:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4505122Z > Task :time:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4506028Z > Task :toolchains-jvm:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4507041Z > Task :toolchains-jvm-shared:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4508039Z > Task :tooling-api:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4509189Z > Task :software-diagnostics:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4510242Z > Task :tooling-api-provider:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4511249Z > Task :tooling-native:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4512289Z > Task :tooling-native-model-impls:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4513378Z > Task :unit-test-fixtures:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4514403Z > Task :version-control:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4515361Z > Task :testing-jvm:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4516401Z > Task :testing-jvm-infrastructure:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4517507Z > Task :tooling-api-builders:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4518769Z > Task :versioned-cache:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4519831Z > Task :war:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4520719Z > Task :worker-main:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4521711Z > Task :worker-process-services:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4522705Z > Task :workers:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4523802Z > Task :wrapper-main:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4524781Z > Task :wrapper-shared:ForceDependencyResolutionPlugin_resolveProjectDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4525646Z > Task :ForceDependencyResolutionPlugin_resolveAllDependencies
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.4526913Z gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__actions_gradle-build-tools-actions-1780493529010.json
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.5310276Z 
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.5330741Z [Incubating] Problems report is available at: file:///home/runner/work/gradle/gradle/build/reports/problems/problems-report.html
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.5359755Z 
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.5369901Z Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.5370837Z 
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.5371741Z You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.5372815Z 
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.5373894Z For more on this, please refer to https://docs.gradle.org/9.6.0-milestone-2/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.5375329Z 525 actionable tasks: 283 executed, 242 up-to-date
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.5375932Z 
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.5376267Z FAILURE: Build failed with an exception.
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.5376789Z 
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.5377102Z * What went wrong:
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.5377615Z Failed to notify build listener.
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.5378233Z > Index 0 out of bounds for length 0
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.5378883Z > There is 1 more failure with an identical cause.
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.5379653Z 
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.5379926Z * Try:
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.5380502Z > Run with --stacktrace option to get the stack trace.
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.5381282Z > Run with --info or --debug option to get more log output.
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.5382060Z > Get more help at https://help.gradle.org.
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.5382579Z 
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.5382902Z BUILD FAILED in 47s
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:55.9277289Z Configuration cache entry stored.
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:56.0853154Z ##[error]Gradle build failed: see console output for details
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:56.0901922Z Found dependency graph files: 
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:56.0909522Z No dependency graph files found to submit.
+submit-gradle	submit-dependency-snapshot	2026-06-03T13:32:56.0910277Z No dependency graph files found to upload.
+submit-gradle	Post submit-dependency-snapshot	﻿2026-06-03T13:32:56.1160076Z Post job cleanup.
+submit-gradle	Post submit-dependency-snapshot	2026-06-03T13:32:56.3813008Z In post-action step
+submit-gradle	Post submit-dependency-snapshot	2026-06-03T13:32:56.3822724Z Cache is disabled: will not save state for later builds.
+submit-gradle	Post submit-dependency-snapshot	2026-06-03T13:32:56.3828333Z Generating Job Summary
+submit-gradle	Post submit-dependency-snapshot	2026-06-03T13:32:56.3863923Z Completed post-action step
+submit-gradle	Post setup-ecosystem	﻿2026-06-03T13:32:56.4057297Z Post job cleanup.
+submit-gradle	Post checkout	﻿2026-06-03T13:32:56.5454177Z Post job cleanup.
+submit-gradle	Post checkout	2026-06-03T13:32:56.6522596Z [command]/usr/bin/git version
+submit-gradle	Post checkout	2026-06-03T13:32:56.6579617Z git version 2.54.0
+submit-gradle	Post checkout	2026-06-03T13:32:56.6650945Z Temporarily overriding HOME='/home/runner/work/_temp/3e93a5c4-2d48-4d78-a80a-4eb1b4d2b5c0' before making global git config changes
+submit-gradle	Post checkout	2026-06-03T13:32:56.6652464Z Adding repository directory to the temporary git global config as a safe directory
+submit-gradle	Post checkout	2026-06-03T13:32:56.6657698Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/gradle/gradle
+submit-gradle	Post checkout	2026-06-03T13:32:56.6696399Z Removing SSH command configuration
+submit-gradle	Post checkout	2026-06-03T13:32:56.6703205Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+submit-gradle	Post checkout	2026-06-03T13:32:56.6739541Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+submit-gradle	Post checkout	2026-06-03T13:32:56.7040375Z Removing HTTP extra header
+submit-gradle	Post checkout	2026-06-03T13:32:56.7046129Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+submit-gradle	Post checkout	2026-06-03T13:32:56.7083692Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+submit-gradle	Post checkout	2026-06-03T13:32:56.7379944Z Removing includeIf entries pointing to credentials config files
+submit-gradle	Post checkout	2026-06-03T13:32:56.7386878Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+submit-gradle	Post checkout	2026-06-03T13:32:56.7414713Z includeif.gitdir:/home/runner/work/gradle/gradle/.git.path
+submit-gradle	Post checkout	2026-06-03T13:32:56.7415719Z includeif.gitdir:/home/runner/work/gradle/gradle/.git/worktrees/*.path
+submit-gradle	Post checkout	2026-06-03T13:32:56.7416604Z includeif.gitdir:/github/workspace/.git.path
+submit-gradle	Post checkout	2026-06-03T13:32:56.7417378Z includeif.gitdir:/github/workspace/.git/worktrees/*.path
+submit-gradle	Post checkout	2026-06-03T13:32:56.7423926Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/home/runner/work/gradle/gradle/.git.path
+submit-gradle	Post checkout	2026-06-03T13:32:56.7446660Z /home/runner/work/_temp/git-credentials-b454b528-96b1-470e-8c5c-46d9610bb92c.config
+submit-gradle	Post checkout	2026-06-03T13:32:56.7457383Z [command]/usr/bin/git config --local --unset includeif.gitdir:/home/runner/work/gradle/gradle/.git.path /home/runner/work/_temp/git-credentials-b454b528-96b1-470e-8c5c-46d9610bb92c.config
+submit-gradle	Post checkout	2026-06-03T13:32:56.7493625Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/home/runner/work/gradle/gradle/.git/worktrees/*.path
+submit-gradle	Post checkout	2026-06-03T13:32:56.7516656Z /home/runner/work/_temp/git-credentials-b454b528-96b1-470e-8c5c-46d9610bb92c.config
+submit-gradle	Post checkout	2026-06-03T13:32:56.7526508Z [command]/usr/bin/git config --local --unset includeif.gitdir:/home/runner/work/gradle/gradle/.git/worktrees/*.path /home/runner/work/_temp/git-credentials-b454b528-96b1-470e-8c5c-46d9610bb92c.config
+submit-gradle	Post checkout	2026-06-03T13:32:56.7559923Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git.path
+submit-gradle	Post checkout	2026-06-03T13:32:56.7582762Z /github/runner_temp/git-credentials-b454b528-96b1-470e-8c5c-46d9610bb92c.config
+submit-gradle	Post checkout	2026-06-03T13:32:56.7591348Z [command]/usr/bin/git config --local --unset includeif.gitdir:/github/workspace/.git.path /github/runner_temp/git-credentials-b454b528-96b1-470e-8c5c-46d9610bb92c.config
+submit-gradle	Post checkout	2026-06-03T13:32:56.7624463Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git/worktrees/*.path
+submit-gradle	Post checkout	2026-06-03T13:32:56.7646536Z /github/runner_temp/git-credentials-b454b528-96b1-470e-8c5c-46d9610bb92c.config
+submit-gradle	Post checkout	2026-06-03T13:32:56.7655892Z [command]/usr/bin/git config --local --unset includeif.gitdir:/github/workspace/.git/worktrees/*.path /github/runner_temp/git-credentials-b454b528-96b1-470e-8c5c-46d9610bb92c.config
+submit-gradle	Post checkout	2026-06-03T13:32:56.7691482Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+submit-gradle	Post checkout	2026-06-03T13:32:56.7984991Z Removing credentials config '/home/runner/work/_temp/git-credentials-b454b528-96b1-470e-8c5c-46d9610bb92c.config'
+submit-gradle	Complete job	﻿2026-06-03T13:32:56.8156855Z Cleaning up orphan processes
+submit-gradle	Complete job	2026-06-03T13:32:56.8452909Z Terminate orphan process: pid (2516) (java)
+submit-gradle	Complete job	2026-06-03T13:32:56.8492897Z ##[warning]Node.js 20 actions are deprecated. The following actions are running on Node.js 20 and may not work as expected: actions/gradle-build-tools-actions/dependency-submission@8379f6a1328ee0e06e2bb424dadb7b159856a326. Actions will be forced to run with Node.js 24 by default starting June 16th, 2026. Node.js 20 will be removed from the runner on September 16th, 2026. Please check if updated versions of these actions are available that support Node.js 24. To opt into Node.js 24 now, set the FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true environment variable on the runner or in your workflow file. Once Node.js 24 becomes the default, you can temporarily opt out by setting ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

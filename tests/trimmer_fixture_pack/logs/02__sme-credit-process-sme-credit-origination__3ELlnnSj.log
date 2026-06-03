@@ -1,0 +1,188 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.12.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :sme-credit-origination:checkKotlinGradlePluginConfigurationErrors
+> Task :processes:downsell:checkKotlinGradlePluginConfigurationErrors
+> Task :processes:pledgeEnrichment:checkKotlinGradlePluginConfigurationErrors
+> Task :processes:common:checkKotlinGradlePluginConfigurationErrors
+> Task :common:camunda-history-sender-lib:checkKotlinGradlePluginConfigurationErrors
+> Task :clients:swagger:checkKotlinGradlePluginConfigurationErrors
+> Task :processes:scoring:checkKotlinGradlePluginConfigurationErrors
+> Task :clients:swagger:resolveSwaggerTemplate NO-SOURCE
+> Task :processes:scoring:processResources UP-TO-DATE
+> Task :processes:pledgeEnrichment:processResources UP-TO-DATE
+> Task :processes:common:processResources UP-TO-DATE
+> Task :processes:downsell:processResources UP-TO-DATE
+> Task :products:overdraft:checkKotlinGradlePluginConfigurationErrors
+> Task :products:turnover:long-term-credit:checkKotlinGradlePluginConfigurationErrors
+> Task :products:turnover:turnover:checkKotlinGradlePluginConfigurationErrors
+> Task :products:turnover:revolving-credit:checkKotlinGradlePluginConfigurationErrors
+> Task :products:turnover:turnover-common:checkKotlinGradlePluginConfigurationErrors
+> Task :products:turnover:revolving-credit:processResources UP-TO-DATE
+> Task :products:overdraft:processResources UP-TO-DATE
+> Task :products:turnover:turnover-common:processResources UP-TO-DATE
+> Task :products:turnover:long-term-credit:processResources UP-TO-DATE
+> Task :products:turnover:turnover:processResources UP-TO-DATE
+> Task :clients:avro:generateAvroProtocol FROM-CACHE
+> Task :clients:swagger:generateSwaggerCodeScanDocAdapterModel FROM-CACHE
+> Task :clients:swagger:generateSwaggerCodeSmeApplicationStorageModel FROM-CACHE
+> Task :clients:swagger:generateSwaggerCode NO-SOURCE
+> Task :clients:protobuf:extractIncludeProto
+> Task :clients:protobuf:extractProto
+> Task :clients:protobuf:generateProto FROM-CACHE
+> Task :clients:protobuf:compileJava UP-TO-DATE
+> Task :clients:avro:generateAvroJava FROM-CACHE
+> Task :common:camunda-history-sender-lib:kaptGenerateStubsKotlin FROM-CACHE
+> Task :common:camunda-history-sender-lib:kaptKotlin FROM-CACHE
+> Task :common:camunda-history-sender-lib:compileKotlin FROM-CACHE
+> Task :common:camunda-history-sender-lib:processResources UP-TO-DATE
+> Task :common:camunda-history-sender-lib:compileJava NO-SOURCE
+> Task :clients:avro:compileJava FROM-CACHE
+
+> Task :clients:swagger:shardGatewayOpenApiGenerate
+################################################################################
+# Thanks for using OpenAPI Generator.                                          #
+# Please consider donation to help us maintain this project 🙏                 #
+# https://opencollective.com/openapi_generator/donate                          #
+#                                                                              #
+# This generator's contributed by Jim Schubert (https://github.com/jimschubert)#
+# Please support his work directly via https://patreon.com/jimschubert 🙏      #
+################################################################################
+Successfully generated code to /workspace/clients/swagger/build/generated/openapi
+
+> Task :products:turnover:turnover-interbank:b2bCreditInterbankOpenApiGenerate
+Unknown `format` BigDecimal detected for type `number`. Defaulting to `number`
+Unknown `format` BigDecimal detected for type `number`. Defaulting to `number`
+Unknown `format` BigDecimal detected for type `number`. Defaulting to `number`
+Empty operationId found for path: delete /api/tasks/{taskId}. Renamed to auto-generated operationId: apiTasksTaskIdDelete
+Empty operationId found for path: put /api/tasks/{taskId}/restart. Renamed to auto-generated operationId: apiTasksTaskIdRestartPut
+Empty operationId found for path: post /api/payment-schedule. Renamed to auto-generated operationId: apiPaymentSchedulePost
+Empty operationId found for path: delete /api/tasks/expired-offer-reject/{applicationId}. Renamed to auto-generated operationId: apiTasksExpiredOfferRejectApplicationIdDelete
+################################################################################
+# Thanks for using OpenAPI Generator.                                          #
+# Please consider donation to help us maintain this project 🙏                 #
+# https://opencollective.com/openapi_generator/donate                          #
+#                                                                              #
+# This generator's contributed by Jim Schubert (https://github.com/jimschubert)#
+# Please support his work directly via https://patreon.com/jimschubert 🙏      #
+################################################################################
+Successfully generated code to /workspace/products/turnover/turnover-interbank/build/generated/openapi
+
+> Task :products:turnover:turnover-interbank:checkKotlinGradlePluginConfigurationErrors
+
+> Task :clients:swagger:stageMgmtOpenApiGenerate
+Illegal schema found with $ref combined with other properties, no properties should be defined alongside a $ref:
+ class ObjectSchema {
+    class Schema {
+        type: object
+        format: null
+        $ref: #/components/schemas/StageStatusDto
+        description: null
+        title: null
+        multipleOf: null
+        maximum: null
+        exclusiveMaximum: null
+        minimum: null
+        exclusiveMinimum: null
+        maxLength: null
+        minLength: null
+        pattern: null
+        maxItems: null
+        minItems: null
+        uniqueItems: null
+        maxProperties: null
+        minProperties: null
+        required: null
+        not: null
+        properties: null
+        additionalProperties: null
+        nullable: null
+        readOnly: null
+        writeOnly: null
+        example: null
+        externalDocs: null
+        deprecated: null
+        discriminator: null
+        xml: null
+    }
+}################################################################################
+
+# Thanks for using OpenAPI Generator.                                          #
+# Please consider donation to help us maintain this project 🙏                 #
+# https://opencollective.com/openapi_generator/donate                          #
+#                                                                              #
+# This generator's contributed by Jim Schubert (https://github.com/jimschubert)#
+# Please support his work directly via https://patreon.com/jimschubert 🙏      #
+################################################################################
+Successfully generated code to /workspace/clients/swagger/build/generated/openapi
+
+> Task :clients:swagger:compileKotlin FROM-CACHE
+> Task :clients:swagger:compileJava FROM-CACHE
+
+> Task :products:turnover:turnover-interbank:revizorKafkaApiGenerate
+Empty operationId found for path: POST /'rvz.source.payments'. Renamed to auto-generated operationId: rvz_source_paymentsPOST
+Empty operationId found for path: post /'rvz.source.payments'. Renamed to auto-generated operationId: rvz_source_paymentsPost
+################################################################################
+# Thanks for using OpenAPI Generator.                                          #
+# Please consider donation to help us maintain this project 🙏                 #
+# https://opencollective.com/openapi_generator/donate                          #
+################################################################################
+Successfully generated code to /workspace/products/turnover/turnover-interbank/build/generated/openapi
+
+> Task :products:turnover:turnover-interbank:turnoverInterbankOpenApiGenerate
+################################################################################
+# Thanks for using OpenAPI Generator.                                          #
+# Please consider donation to help us maintain this project 🙏                 #
+# https://opencollective.com/openapi_generator/donate                          #
+################################################################################
+Successfully generated code to /workspace/products/turnover/turnover-interbank/build/generated/openapi
+
+> Task :products:turnover:turnover-interbank:processResources UP-TO-DATE
+
+> Task :processes:common:compileKotlin FAILED
+
+[Incubating] Problems report is available at: file:///workspace/build/reports/problems/problems-report.html
+e: file:///workspace/processes/common/src/main/kotlin/ru/tinkoff/bpm/smecreditorigination/async/sender/KafkaMessageSender.kt:79:47 Unresolved reference: addCallback
+e: file:///workspace/processes/common/src/main/kotlin/ru/tinkoff/bpm/smecreditorigination/async/sender/KafkaMessageSender.kt:87:38 Unresolved reference: it
+e: file:///workspace/processes/common/src/main/kotlin/ru/tinkoff/bpm/smecreditorigination/async/sender/KafkaMessageSender.kt:132:19 Unresolved reference: addCallback
+e: file:///workspace/processes/common/src/main/kotlin/ru/tinkoff/bpm/smecreditorigination/async/sender/KafkaMessageSender.kt:140:38 Unresolved reference: it
+e: file:///workspace/processes/common/src/main/kotlin/ru/tinkoff/bpm/smecreditorigination/async/sender/OfferProductCreatedSender.kt:26:70 Unresolved reference: addCallback
+e: file:///workspace/processes/common/src/main/kotlin/ru/tinkoff/bpm/smecreditorigination/async/sender/OfferSellStatusSender.kt:23:81 Unresolved reference: addCallback
+e: file:///workspace/processes/common/src/main/kotlin/ru/tinkoff/bpm/smecreditorigination/configuration/DssProxyConfiguration.kt:59:13 Cannot access class 'org.apache.hc.client5.http.classic.HttpClient'. Check your module classpath for missing or conflicting dependencies
+e: file:///workspace/processes/common/src/main/kotlin/ru/tinkoff/bpm/smecreditorigination/configuration/DssProxyConfiguration.kt:59:52 Type mismatch: inferred type is org.apache.http.client.HttpClient but org.apache.hc.client5.http.classic.HttpClient! was expected
+e: file:///workspace/processes/common/src/main/kotlin/ru/tinkoff/bpm/smecreditorigination/configuration/DssProxyConfiguration.kt:65:14 Overload resolution ambiguity: 
+public open fun requestFactory(requestFactoryFunction: Function<ClientHttpRequestFactorySettings!, ClientHttpRequestFactory!>!): RestTemplateBuilder! defined in org.springframework.boot.web.client.RestTemplateBuilder
+public open fun requestFactory(requestFactorySupplier: Supplier<ClientHttpRequestFactory!>!): RestTemplateBuilder! defined in org.springframework.boot.web.client.RestTemplateBuilder
+e: file:///workspace/processes/common/src/main/kotlin/ru/tinkoff/bpm/smecreditorigination/configuration/kafka/KafkaConfiguration.kt:15:43 Unresolved reference: SeekToCurrentErrorHandler
+e: file:///workspace/processes/common/src/main/kotlin/ru/tinkoff/bpm/smecreditorigination/configuration/kafka/KafkaConfiguration.kt:51:9 Unresolved reference: SeekToCurrentErrorHandler
+e: file:///workspace/processes/common/src/main/kotlin/ru/tinkoff/bpm/smecreditorigination/configuration/kafka/KafkaConfiguration.kt:53:17 Unresolved reference: addNotRetryableExceptions
+e: file:///workspace/processes/common/src/main/kotlin/ru/tinkoff/bpm/smecreditorigination/configuration/kafka/SchemaRegistrationComponent.kt:14:25 Unresolved reference: PostConstruct
+e: file:///workspace/processes/common/src/main/kotlin/ru/tinkoff/bpm/smecreditorigination/configuration/kafka/SchemaRegistrationComponent.kt:30:6 Unresolved reference: PostConstruct
+e: file:///workspace/processes/common/src/main/kotlin/ru/tinkoff/bpm/smecreditorigination/configuration/properties/ConditionsAgreementConfigurationProperties.kt:7:1 This annotation is not applicable to target 'class'
+e: file:///workspace/processes/common/src/main/kotlin/ru/tinkoff/bpm/smecreditorigination/configuration/properties/KafkaClusterProperties.kt:7:1 This annotation is not applicable to target 'class'
+e: file:///workspace/processes/common/src/main/kotlin/ru/tinkoff/bpm/smecreditorigination/configuration/properties/OldWayForApplicationProperties.kt:7:1 This annotation is not applicable to target 'class'
+e: file:///workspace/processes/common/src/main/kotlin/ru/tinkoff/bpm/smecreditorigination/configuration/properties/OriginationClientAuthProperties.kt:7:1 This annotation is not applicable to target 'class'
+e: file:///workspace/processes/common/src/main/kotlin/ru/tinkoff/bpm/smecreditorigination/configuration/properties/ProvisionConfigurationProperties.kt:7:1 This annotation is not applicable to target 'class'
+e: file:///workspace/processes/common/src/main/kotlin/ru/tinkoff/bpm/smecreditorigination/configuration/properties/ScoringPauseTimerProperties.kt:8:1 This annotation is not applicable to target 'class'
+e: file:///workspace/processes/common/src/main/kotlin/ru/tinkoff/bpm/smecreditorigination/configuration/properties/ShardingProperties.kt:7:1 This annotation is not applicable to target 'class'
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':processes:common:compileKotlin'.
+> A failure occurred while executing org.jetbrains.kotlin.compilerRunner.GradleCompilerRunnerWithWorkers$GradleKotlinCompilerWorkAction
+   > Compilation error. See log for more details
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/8.12.1/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD FAILED in 29s
+44 actionable tasks: 21 executed, 11 from cache, 12 up-to-date

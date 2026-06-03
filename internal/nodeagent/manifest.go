@@ -51,6 +51,12 @@ func injectRepoMetadataEnv(env map[string]string, req StartRunRequest) {
 	}
 }
 
+func injectNodeOwnedMigEnv(env map[string]string, req StartRunRequest) {
+	if v := strings.TrimSpace(req.ServerURL); v != "" {
+		env["PLOY_SERVER_URL"] = v
+	}
+}
+
 // --- Main manifest builders ---
 
 // buildMigManifest converts a StartRunRequest into a StepManifest.
@@ -119,6 +125,7 @@ func buildMigManifest(req StartRunRequest, typedOpts RunOptions, stepIndex int, 
 	}
 
 	injectStackTupleEnv(env, stackExp)
+	injectNodeOwnedMigEnv(env, req)
 
 	// Inject placeholder command only for default ubuntu image.
 	if len(command) == 0 && image == defaultImage {

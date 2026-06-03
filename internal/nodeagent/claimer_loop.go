@@ -224,6 +224,7 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 		DetectedStack: claim.DetectedStack,
 		TypedOptions:  typedOpts, // Strongly-typed run options (canonical source of truth)
 		Env:           envFromSpec,
+		ServerURL:     c.cfg.ServerURL,
 	}
 
 	// Invoke controller.StartRun to execute the claimed job.

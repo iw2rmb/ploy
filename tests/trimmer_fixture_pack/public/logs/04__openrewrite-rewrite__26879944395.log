@@ -1,0 +1,340 @@
+Cached resource https://repo.maven.apache.org/maven2/com/eed3si9n/sjson-new-core_2.13/0.9.0/sjson-new-core_2.13-0.9.0.pom is up-to-date (lastModified: Mon Jun 08 05:21:02 UTC 2020).
+Cached resource https://repo.maven.apache.org/maven2/org/scala-sbt/core-macros_2.13/1.11.5/core-macros_2.13-1.11.5.pom is up-to-date (lastModified: Sun Aug 24 19:34:28 UTC 2025).
+Cached resource https://repo.maven.apache.org/maven2/org/jline/jline-terminal-jni/3.27.1/jline-terminal-jni-3.27.1.pom is up-to-date (lastModified: Tue Oct 15 19:06:09 UTC 2024).
+Cached resource https://repo.maven.apache.org/maven2/org/scala-sbt/jline/jline/2.14.7-sbt-9a88bc413e2b34a4580c001c654d1a7f4f65bf18/jline-2.14.7-sbt-9a88bc413e2b34a4580c001c654d1a7f4f65bf18.pom is up-to-date (lastModified: Fri Dec 06 04:24:44 UTC 2024).
+Cached resource https://repo.maven.apache.org/maven2/com/lmax/disruptor/3.4.2/disruptor-3.4.2.pom is up-to-date (lastModified: Sun Apr 08 22:41:10 UTC 2018).
+Cached resource https://repo.maven.apache.org/maven2/org/jline/jline-native/3.27.1/jline-native-3.27.1.pom is up-to-date (lastModified: Tue Oct 15 19:06:09 UTC 2024).
+Failed to get resource: HEAD. [HTTP 403: https://central.sonatype.com/repository/maven-snapshots/org/jline/jline-parent/3.27.1/jline-parent-3.27.1.pom)]
+Cached resource https://repo.maven.apache.org/maven2/org/jline/jline-parent/3.27.1/jline-parent-3.27.1.pom is up-to-date (lastModified: Tue Oct 15 19:06:09 UTC 2024).
+Failed to get resource: HEAD. [HTTP 403: https://central.sonatype.com/repository/maven-snapshots/com/eed3si9n/sjson-new-scalajson_2.13/0.10.1/sjson-new-scalajson_2.13-0.10.1.pom)]
+Failed to get resource: HEAD. [HTTP 403: https://central.sonatype.com/repository/maven-snapshots/org/apache/logging/log4j/log4j-api/2.17.1/log4j-api-2.17.1.pom)]
+Failed to get resource: HEAD. [HTTP 403: https://central.sonatype.com/repository/maven-snapshots/org/scala-lang/scala-reflect/2.13.16/scala-reflect-2.13.16.pom)]
+Cached resource https://repo.maven.apache.org/maven2/com/eed3si9n/sjson-new-scalajson_2.13/0.10.1/sjson-new-scalajson_2.13-0.10.1.pom is up-to-date (lastModified: Sat Jul 06 20:08:17 UTC 2024).
+Cached resource https://repo.maven.apache.org/maven2/org/scala-lang/scala-reflect/2.13.16/scala-reflect-2.13.16.pom is up-to-date (lastModified: Fri Jan 10 18:22:57 UTC 2025).
+Cached resource https://repo.maven.apache.org/maven2/org/apache/logging/log4j/log4j-api/2.17.1/log4j-api-2.17.1.pom is up-to-date (lastModified: Mon Dec 27 23:30:22 UTC 2021).
+Failed to get resource: HEAD. [HTTP 403: https://central.sonatype.com/repository/maven-snapshots/org/apache/logging/log4j/log4j/2.17.1/log4j-2.17.1.pom)]
+Cached resource https://repo.maven.apache.org/maven2/org/apache/logging/log4j/log4j/2.17.1/log4j-2.17.1.pom is up-to-date (lastModified: Mon Dec 27 23:29:58 UTC 2021).
+Failed to get resource: HEAD. [HTTP 403: https://central.sonatype.com/repository/maven-snapshots/org/apache/logging/logging-parent/3/logging-parent-3.pom)]
+Cached resource https://repo.maven.apache.org/maven2/org/apache/logging/logging-parent/3/logging-parent-3.pom is up-to-date (lastModified: Sun Aug 16 18:42:26 UTC 2020).
+Failed to get resource: HEAD. [HTTP 403: https://central.sonatype.com/repository/maven-snapshots/org/apache/apache/23/apache-23.pom)]
+Cached resource https://repo.maven.apache.org/maven2/org/apache/apache/23/apache-23.pom is up-to-date (lastModified: Wed Jan 22 15:11:04 UTC 2020).
+Failed to get resource: HEAD. [HTTP 403: https://central.sonatype.com/repository/maven-snapshots/org/apache/logging/log4j/log4j-core/2.17.1/log4j-core-2.17.1.pom)]
+Cached resource https://repo.maven.apache.org/maven2/org/apache/logging/log4j/log4j-core/2.17.1/log4j-core-2.17.1.pom is up-to-date (lastModified: Mon Dec 27 23:30:56 UTC 2021).
+Failed to get resource: HEAD. [HTTP 403: https://central.sonatype.com/repository/maven-snapshots/org/jline/jline/3.27.1/jline-3.27.1.pom)]
+Failed to get resource: HEAD. [HTTP 403: https://central.sonatype.com/repository/maven-snapshots/io/github/java-diff-utils/java-diff-utils/4.15/java-diff-utils-4.15.pom)]
+Cached resource https://repo.maven.apache.org/maven2/io/github/java-diff-utils/java-diff-utils/4.15/java-diff-utils-4.15.pom is up-to-date (lastModified: Sat Nov 23 21:59:34 UTC 2024).
+Cached resource https://repo.maven.apache.org/maven2/org/jline/jline/3.27.1/jline-3.27.1.pom is up-to-date (lastModified: Tue Oct 15 19:06:09 UTC 2024).
+Failed to get resource: HEAD. [HTTP 403: https://central.sonatype.com/repository/maven-snapshots/io/github/java-diff-utils/java-diff-utils-parent/4.15/java-diff-utils-parent-4.15.pom)]
+Cached resource https://repo.maven.apache.org/maven2/io/github/java-diff-utils/java-diff-utils-parent/4.15/java-diff-utils-parent-4.15.pom is up-to-date (lastModified: Sat Nov 23 21:58:56 UTC 2024).
+Failed to get resource: HEAD. [HTTP 403: https://central.sonatype.com/repository/maven-snapshots/org/scala-sbt/util-position_2.13/1.11.5/util-position_2.13-1.11.5.pom)]
+Cached resource https://repo.maven.apache.org/maven2/org/scala-sbt/util-position_2.13/1.11.5/util-position_2.13-1.11.5.pom is up-to-date (lastModified: Sun Aug 24 19:34:28 UTC 2025).
+Failed to get resource: HEAD. [HTTP 403: https://central.sonatype.com/repository/maven-snapshots/org/fusesource/jansi/jansi/2.4.1/jansi-2.4.1.pom)]
+Cached resource https://repo.maven.apache.org/maven2/org/fusesource/jansi/jansi/2.4.1/jansi-2.4.1.pom is up-to-date (lastModified: Thu Oct 12 08:40:32 UTC 2023).
+Failed to get resource: HEAD. [HTTP 403: https://central.sonatype.com/repository/maven-snapshots/org/fusesource/fusesource-pom/1.12/fusesource-pom-1.12.pom)]
+Cached resource https://repo.maven.apache.org/maven2/org/fusesource/fusesource-pom/1.12/fusesource-pom-1.12.pom is up-to-date (lastModified: Wed Jun 12 18:15:42 UTC 2019).
+Failed to get resource: HEAD. [HTTP 403: https://central.sonatype.com/repository/maven-snapshots/com/eed3si9n/sjson-new-core_2.13/0.10.1/sjson-new-core_2.13-0.10.1.pom)]
+Cached resource https://repo.maven.apache.org/maven2/com/eed3si9n/sjson-new-core_2.13/0.10.1/sjson-new-core_2.13-0.10.1.pom is up-to-date (lastModified: Sat Jul 06 20:07:58 UTC 2024).
+Failed to get resource: HEAD. [HTTP 403: https://central.sonatype.com/repository/maven-snapshots/com/eed3si9n/shaded-jawn-parser_2.13/1.3.2/shaded-jawn-parser_2.13-1.3.2.pom)]
+Failed to get resource: HEAD. [HTTP 403: https://central.sonatype.com/repository/maven-snapshots/com/eed3si9n/shaded-scalajson_2.13/1.0.0-M4/shaded-scalajson_2.13-1.0.0-M4.pom)]
+Cached resource https://repo.maven.apache.org/maven2/com/eed3si9n/shaded-scalajson_2.13/1.0.0-M4/shaded-scalajson_2.13-1.0.0-M4.pom is up-to-date (lastModified: Sat Jul 13 19:58:44 UTC 2019).
+Cached resource https://repo.maven.apache.org/maven2/com/eed3si9n/shaded-jawn-parser_2.13/1.3.2/shaded-jawn-parser_2.13-1.3.2.pom is up-to-date (lastModified: Sun Jan 09 23:51:06 UTC 2022).
+Cached resource https://repo.maven.apache.org/maven2/org/scala-sbt/zinc-persist_2.13/1.12.0/zinc-persist_2.13-1.12.0.jar is up-to-date (lastModified: Sun Jan 04 23:17:00 UTC 2026).
+Cached resource https://repo.maven.apache.org/maven2/org/scala-sbt/zinc_2.13/1.12.0/zinc_2.13-1.12.0.jar is up-to-date (lastModified: Sun Jan 04 23:17:00 UTC 2026).
+Cached resource https://repo.maven.apache.org/maven2/org/scala-sbt/zinc-classfile_2.13/1.12.0/zinc-classfile_2.13-1.12.0.jar is up-to-date (lastModified: Sun Jan 04 23:17:01 UTC 2026).
+Cached resource https://repo.maven.apache.org/maven2/org/scala-sbt/zinc-core_2.13/1.12.0/zinc-core_2.13-1.12.0.jar is up-to-date (lastModified: Sun Jan 04 23:17:01 UTC 2026).
+Cached resource https://repo.maven.apache.org/maven2/org/scala-sbt/zinc-apiinfo_2.13/1.12.0/zinc-apiinfo_2.13-1.12.0.jar is up-to-date (lastModified: Sun Jan 04 23:17:01 UTC 2026).
+Cached resource https://repo.maven.apache.org/maven2/org/scala-sbt/zinc-compile-core_2.13/1.12.0/zinc-compile-core_2.13-1.12.0.jar is up-to-date (lastModified: Sun Jan 04 23:17:01 UTC 2026).
+Cached resource https://repo.maven.apache.org/maven2/org/scala-sbt/util-logging_2.13/1.11.5/util-logging_2.13-1.11.5.jar is up-to-date (lastModified: Sun Aug 24 19:34:29 UTC 2025).
+Cached resource https://repo.maven.apache.org/maven2/org/scala-sbt/zinc-classpath_2.13/1.12.0/zinc-classpath_2.13-1.12.0.jar is up-to-date (lastModified: Sun Jan 04 23:17:01 UTC 2026).
+Cached resource https://repo.maven.apache.org/maven2/org/apache/logging/log4j/log4j-core/2.17.1/log4j-core-2.17.1.jar is up-to-date (lastModified: Mon Dec 27 23:30:54 UTC 2021).
+Cached resource https://repo.maven.apache.org/maven2/org/scala-sbt/collections_2.13/1.11.5/collections_2.13-1.11.5.jar is up-to-date (lastModified: Sun Aug 24 19:34:28 UTC 2025).
+Cached resource https://repo.maven.apache.org/maven2/org/scala-sbt/core-macros_2.13/1.11.5/core-macros_2.13-1.11.5.jar is up-to-date (lastModified: Sun Aug 24 19:34:28 UTC 2025).
+Cached resource https://repo.maven.apache.org/maven2/org/scala-sbt/io_2.13/1.10.5/io_2.13-1.10.5.jar is up-to-date (lastModified: Mon Mar 17 00:51:53 UTC 2025).
+Cached resource https://repo.maven.apache.org/maven2/org/scala-lang/modules/scala-parallel-collections_2.13/0.2.0/scala-parallel-collections_2.13-0.2.0.jar is up-to-date (lastModified: Sat Jun 08 16:17:59 UTC 2019).
+Cached resource https://repo.maven.apache.org/maven2/org/scala-sbt/util-relation_2.13/1.11.5/util-relation_2.13-1.11.5.jar is up-to-date (lastModified: Sun Aug 24 19:34:28 UTC 2025).
+Cached resource https://repo.maven.apache.org/maven2/org/scala-sbt/sbinary_2.13/0.5.1/sbinary_2.13-0.5.1.jar is up-to-date (lastModified: Sun Apr 12 20:25:21 UTC 2020).
+Cached resource https://repo.maven.apache.org/maven2/org/scala-sbt/util-control_2.13/1.11.5/util-control_2.13-1.11.5.jar is up-to-date (lastModified: Sun Aug 24 19:34:28 UTC 2025).
+Cached resource https://repo.maven.apache.org/maven2/org/scala-lang/modules/scala-parser-combinators_2.13/1.1.2/scala-parser-combinators_2.13-1.1.2.jar is up-to-date (lastModified: Fri Jun 07 18:35:36 UTC 2019).
+Cached resource https://repo.maven.apache.org/maven2/com/eed3si9n/sjson-new-scalajson_2.13/0.10.1/sjson-new-scalajson_2.13-0.10.1.jar is up-to-date (lastModified: Sat Jul 06 20:08:18 UTC 2024).
+Cached resource https://repo.maven.apache.org/maven2/org/scala-lang/modules/scala-xml_2.13/2.3.0/scala-xml_2.13-2.3.0.jar is up-to-date (lastModified: Mon Apr 15 18:17:41 UTC 2024).
+Cached resource https://repo.maven.apache.org/maven2/org/scala-lang/scala-compiler/2.13.16/scala-compiler-2.13.16.jar is up-to-date (lastModified: Fri Jan 10 18:28:00 UTC 2025).
+Cached resource https://repo.maven.apache.org/maven2/org/scala-lang/scala-reflect/2.13.16/scala-reflect-2.13.16.jar is up-to-date (lastModified: Fri Jan 10 18:22:56 UTC 2025).
+Cached resource https://repo.maven.apache.org/maven2/org/scala-sbt/util-position_2.13/1.11.5/util-position_2.13-1.11.5.jar is up-to-date (lastModified: Sun Aug 24 19:34:28 UTC 2025).
+Cached resource https://repo.maven.apache.org/maven2/com/eed3si9n/sjson-new-core_2.13/0.10.1/sjson-new-core_2.13-0.10.1.jar is up-to-date (lastModified: Sat Jul 06 20:07:58 UTC 2024).
+Cached resource https://repo.maven.apache.org/maven2/com/eed3si9n/shaded-jawn-parser_2.13/1.3.2/shaded-jawn-parser_2.13-1.3.2.jar is up-to-date (lastModified: Sun Jan 09 23:51:06 UTC 2022).
+Cached resource https://repo.maven.apache.org/maven2/com/eed3si9n/shaded-scalajson_2.13/1.0.0-M4/shaded-scalajson_2.13-1.0.0-M4.jar is up-to-date (lastModified: Sat Jul 13 19:58:43 UTC 2019).
+Cached resource https://repo.maven.apache.org/maven2/org/scala-sbt/compiler-interface/1.12.0/compiler-interface-1.12.0.jar is up-to-date (lastModified: Sun Jan 04 23:17:01 UTC 2026).
+Cached resource https://repo.maven.apache.org/maven2/org/scala-lang/scala-library/2.13.16/scala-library-2.13.16.jar is up-to-date (lastModified: Fri Jan 10 18:20:44 UTC 2025).
+Cached resource https://repo.maven.apache.org/maven2/org/scala-sbt/compiler-bridge_2.13/1.12.0/compiler-bridge_2.13-1.12.0.jar is up-to-date (lastModified: Sun Jan 04 23:17:01 UTC 2026).
+Cached resource https://repo.maven.apache.org/maven2/net/openhft/zero-allocation-hashing/0.16/zero-allocation-hashing-0.16.jar is up-to-date (lastModified: Wed Jul 27 16:53:52 UTC 2022).
+Cached resource https://repo.maven.apache.org/maven2/org/scala-sbt/launcher-interface/1.4.4/launcher-interface-1.4.4.jar is up-to-date (lastModified: Fri Oct 18 06:12:40 UTC 2024).
+Cached resource https://repo.maven.apache.org/maven2/org/scala-sbt/zinc-persist-core-assembly/1.12.0/zinc-persist-core-assembly-1.12.0.jar is up-to-date (lastModified: Sun Jan 04 23:17:01 UTC 2026).
+Cached resource https://repo.maven.apache.org/maven2/org/scala-sbt/util-interface/1.11.5/util-interface-1.11.5.jar is up-to-date (lastModified: Sun Aug 24 19:34:28 UTC 2025).
+Cached resource https://repo.maven.apache.org/maven2/com/swoval/file-tree-views/2.1.12/file-tree-views-2.1.12.jar is up-to-date (lastModified: Thu Sep 21 16:39:58 UTC 2023).
+Cached resource https://repo.maven.apache.org/maven2/org/scala-sbt/jline/jline/2.14.7-sbt-9a88bc413e2b34a4580c001c654d1a7f4f65bf18/jline-2.14.7-sbt-9a88bc413e2b34a4580c001c654d1a7f4f65bf18.jar is up-to-date (lastModified: Fri Dec 06 04:24:43 UTC 2024).
+Cached resource https://repo.maven.apache.org/maven2/org/jline/jline-terminal-jni/3.27.1/jline-terminal-jni-3.27.1.jar is up-to-date (lastModified: Tue Oct 15 19:06:10 UTC 2024).
+
+Cached resource https://repo.maven.apache.org/maven2/org/apache/logging/log4j/log4j-api/2.17.1/log4j-api-2.17.1.jar is up-to-date (lastModified: Mon Dec 27 23:30:20 UTC 2021).
+FAILURE: Build failed with an exception.
+
+Cached resource https://repo.maven.apache.org/maven2/org/jline/jline-native/3.27.1/jline-native-3.27.1.jar is up-to-date (lastModified: Tue Oct 15 19:06:11 UTC 2024).
+* What went wrong:
+Execution failed for task ':rewrite-core:publishNebulaPublicationToSonatypeRepository' (registered by plugin class 'org.gradle.api.publish.maven.plugins.MavenPublishPlugin').
+Cached resource https://repo.maven.apache.org/maven2/org/jline/jline-terminal/3.27.1/jline-terminal-3.27.1.jar is up-to-date (lastModified: Tue Oct 15 19:06:15 UTC 2024).
+> Failed to publish publication 'nebula' to repository 'sonatype'
+Cached resource https://repo.maven.apache.org/maven2/io/github/java-diff-utils/java-diff-utils/4.15/java-diff-utils-4.15.jar is up-to-date (lastModified: Sat Nov 23 21:59:35 UTC 2024).
+   > Could not GET 'https://central.sonatype.com/repository/maven-snapshots/org/openrewrite/rewrite-core/8.84.0-SNAPSHOT/maven-metadata.xml'. Received status code 403 from server: Forbidden
+
+Cached resource https://repo.maven.apache.org/maven2/com/lmax/disruptor/3.4.2/disruptor-3.4.2.jar is up-to-date (lastModified: Sun Apr 08 22:41:08 UTC 2018).
+* Try:
+Cached resource https://repo.maven.apache.org/maven2/org/jline/jline/3.27.1/jline-3.27.1-jdk8.jar is up-to-date (lastModified: Tue Oct 15 19:06:13 UTC 2024).
+Cached resource https://repo.maven.apache.org/maven2/org/fusesource/jansi/jansi/2.4.1/jansi-2.4.1.jar is up-to-date (lastModified: Thu Oct 12 08:40:31 UTC 2023).
+> Run with --debug option to get more log output.
+Build cache key for task ':rewrite-scala:compileScala' is 5fee89845e822ad052eae6f65efc4731
+> Get more help at https://help.gradle.org.
+Skipping task ':rewrite-scala:compileScala' as it is up-to-date.
+
+
+* Exception is:
+> Task :rewrite-scala:compileScala UP-TO-DATE
+org.gradle.api.tasks.TaskExecutionException: Execution failed for task ':rewrite-core:publishNebulaPublicationToSonatypeRepository' (registered by plugin class 'org.gradle.api.publish.maven.plugins.MavenPublishPlugin').
+	at org.gradle.api.internal.tasks.execution.ExecuteActionsTaskExecuter.lambda$executeIfValid$1(ExecuteActionsTaskExecuter.java:135)
+	at org.gradle.internal.Try$Failure.ifSuccessfulOrElse(Try.java:288)
+	at org.gradle.api.internal.tasks.execution.ExecuteActionsTaskExecuter.executeIfValid(ExecuteActionsTaskExecuter.java:133)
+	at org.gradle.api.internal.tasks.execution.ExecuteActionsTaskExecuter.execute(ExecuteActionsTaskExecuter.java:121)
+	at org.gradle.api.internal.tasks.execution.ProblemsTaskPathTrackingTaskExecuter.execute(ProblemsTaskPathTrackingTaskExecuter.java:41)
+	at org.gradle.api.internal.tasks.execution.ResolveTaskExecutionModeExecuter.execute(ResolveTaskExecutionModeExecuter.java:51)
+	at org.gradle.api.internal.tasks.execution.FinalizePropertiesTaskExecuter.execute(FinalizePropertiesTaskExecuter.java:46)
+	at org.gradle.api.internal.tasks.execution.SkipTaskWithNoActionsExecuter.execute(SkipTaskWithNoActionsExecuter.java:57)
+	at org.gradle.api.internal.tasks.execution.SkipOnlyIfTaskExecuter.execute(SkipOnlyIfTaskExecuter.java:74)
+	at org.gradle.api.internal.tasks.execution.CatchExceptionTaskExecuter.execute(CatchExceptionTaskExecuter.java:36)
+	at org.gradle.api.internal.tasks.execution.EventFiringTaskExecuter$1.executeTask(EventFiringTaskExecuter.java:77)
+	at org.gradle.api.internal.tasks.execution.EventFiringTaskExecuter$1.call(EventFiringTaskExecuter.java:55)
+	at org.gradle.api.internal.tasks.execution.EventFiringTaskExecuter$1.call(EventFiringTaskExecuter.java:52)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:210)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:205)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:67)
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__openrewrite_gh-automation_4-1780486745708.json
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:60)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:167)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:60)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.call(DefaultBuildOperationRunner.java:54)
+	at org.gradle.api.internal.tasks.execution.EventFiringTaskExecuter.execute(EventFiringTaskExecuter.java:52)
+	at org.gradle.execution.plan.DefaultNodeExecutor.executeLocalTaskNode(DefaultNodeExecutor.java:55)
+	at org.gradle.execution.plan.DefaultNodeExecutor.execute(DefaultNodeExecutor.java:34)
+	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$InvokeNodeExecutorsAction.execute(DefaultTaskExecutionGraph.java:355)
+	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$InvokeNodeExecutorsAction.execute(DefaultTaskExecutionGraph.java:343)
+	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$BuildOperationAwareExecutionAction.lambda$execute$0(DefaultTaskExecutionGraph.java:339)
+	at org.gradle.internal.operations.CurrentBuildOperationRef.with(CurrentBuildOperationRef.java:84)
+	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$BuildOperationAwareExecutionAction.execute(DefaultTaskExecutionGraph.java:339)
+	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$BuildOperationAwareExecutionAction.execute(DefaultTaskExecutionGraph.java:328)
+	at org.gradle.execution.plan.DefaultPlanExecutor$ExecutorWorker.execute(DefaultPlanExecutor.java:459)
+	at org.gradle.execution.plan.DefaultPlanExecutor$ExecutorWorker.run(DefaultPlanExecutor.java:376)
+	at org.gradle.internal.concurrent.ExecutorPolicy$CatchAndRecordFailures.onExecute(ExecutorPolicy.java:64)
+	at org.gradle.internal.concurrent.AbstractManagedExecutor$1.run(AbstractManagedExecutor.java:47)
+Caused by: org.gradle.api.artifacts.PublishException: Failed to publish publication 'nebula' to repository 'sonatype'
+	at org.gradle.api.publish.internal.PublishOperation.run(PublishOperation.java:46)
+	at org.gradle.api.publish.maven.tasks.PublishToMavenRepository.doPublish(PublishToMavenRepository.java:123)
+	at org.gradle.api.publish.maven.tasks.PublishToMavenRepository.publish(PublishToMavenRepository.java:97)
+	at org.gradle.internal.reflect.JavaMethod.invoke(JavaMethod.java:125)
+	at org.gradle.api.internal.project.taskfactory.StandardTaskAction.doExecute(StandardTaskAction.java:58)
+	at org.gradle.api.internal.project.taskfactory.StandardTaskAction.execute(StandardTaskAction.java:51)
+	at org.gradle.api.internal.project.taskfactory.StandardTaskAction.execute(StandardTaskAction.java:29)
+	at org.gradle.api.internal.tasks.execution.TaskExecution$3.run(TaskExecution.java:259)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$1.execute(DefaultBuildOperationRunner.java:30)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$1.execute(DefaultBuildOperationRunner.java:27)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:67)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:60)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:167)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:60)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.run(DefaultBuildOperationRunner.java:48)
+	at org.gradle.api.internal.tasks.execution.TaskExecution.executeAction(TaskExecution.java:244)
+	at org.gradle.api.internal.tasks.execution.TaskExecution.executeActions(TaskExecution.java:227)
+	at org.gradle.api.internal.tasks.execution.TaskExecution.executeWithPreviousOutputFiles(TaskExecution.java:210)
+	at org.gradle.api.internal.tasks.execution.TaskExecution.execute(TaskExecution.java:176)
+	at org.gradle.internal.execution.steps.ExecuteStep.executeInternal(ExecuteStep.java:167)
+	at org.gradle.internal.execution.steps.ExecuteStep.access$000(ExecuteStep.java:47)
+	at org.gradle.internal.execution.steps.ExecuteStep$1.call(ExecuteStep.java:137)
+	at org.gradle.internal.execution.steps.ExecuteStep$1.call(ExecuteStep.java:134)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:210)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:205)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:67)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:60)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:167)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:60)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.call(DefaultBuildOperationRunner.java:54)
+	at org.gradle.internal.execution.steps.ExecuteStep.execute(ExecuteStep.java:134)
+	at org.gradle.internal.execution.steps.ExecuteStep$Mutable.execute(ExecuteStep.java:80)
+	at org.gradle.internal.execution.steps.CancelExecutionStep.execute(CancelExecutionStep.java:42)
+	at org.gradle.internal.execution.steps.TimeoutStep.executeWithoutTimeout(TimeoutStep.java:75)
+	at org.gradle.internal.execution.steps.TimeoutStep.execute(TimeoutStep.java:55)
+	at org.gradle.internal.execution.steps.PreCreateOutputParentsStep.execute(PreCreateOutputParentsStep.java:51)
+	at org.gradle.internal.execution.steps.PreCreateOutputParentsStep.execute(PreCreateOutputParentsStep.java:29)
+	at org.gradle.internal.execution.steps.RemovePreviousOutputsStep.executeMutable(RemovePreviousOutputsStep.java:67)
+	at org.gradle.internal.execution.steps.RemovePreviousOutputsStep.executeMutable(RemovePreviousOutputsStep.java:39)
+	at org.gradle.internal.execution.steps.MutableStep.execute(MutableStep.java:26)
+	at org.gradle.internal.execution.steps.BroadcastChangingOutputsStep.execute(BroadcastChangingOutputsStep.java:42)
+	at org.gradle.internal.execution.steps.BroadcastChangingOutputsStep.execute(BroadcastChangingOutputsStep.java:24)
+	at org.gradle.internal.execution.steps.CaptureOutputsAfterExecutionStep.execute(CaptureOutputsAfterExecutionStep.java:69)
+	at org.gradle.internal.execution.steps.CaptureOutputsAfterExecutionStep.execute(CaptureOutputsAfterExecutionStep.java:46)
+	at org.gradle.internal.execution.steps.ResolveInputChangesStep.executeMutable(ResolveInputChangesStep.java:39)
+	at org.gradle.internal.execution.steps.ResolveInputChangesStep.executeMutable(ResolveInputChangesStep.java:28)
+	at org.gradle.internal.execution.steps.MutableStep.execute(MutableStep.java:26)
+	at org.gradle.internal.execution.steps.BuildCacheStep.executeWithoutCache(BuildCacheStep.java:189)
+	at org.gradle.internal.execution.steps.BuildCacheStep.lambda$execute$1(BuildCacheStep.java:76)
+	at org.gradle.internal.Either$Right.fold(Either.java:176)
+	at org.gradle.internal.execution.caching.CachingState.fold(CachingState.java:62)
+	at org.gradle.internal.execution.steps.BuildCacheStep.execute(BuildCacheStep.java:74)
+	at org.gradle.internal.execution.steps.BuildCacheStep.execute(BuildCacheStep.java:49)
+	at org.gradle.internal.execution.steps.StoreExecutionStateStep.executeMutable(StoreExecutionStateStep.java:46)
+	at org.gradle.internal.execution.steps.StoreExecutionStateStep.executeMutable(StoreExecutionStateStep.java:35)
+	at org.gradle.internal.execution.steps.MutableStep.execute(MutableStep.java:26)
+	at org.gradle.internal.execution.steps.SkipUpToDateStep.executeBecause(SkipUpToDateStep.java:75)
+	at org.gradle.internal.execution.steps.SkipUpToDateStep.lambda$execute$2(SkipUpToDateStep.java:53)
+	at org.gradle.internal.execution.steps.SkipUpToDateStep.execute(SkipUpToDateStep.java:53)
+	at org.gradle.internal.execution.steps.SkipUpToDateStep.execute(SkipUpToDateStep.java:35)
+	at org.gradle.internal.execution.steps.legacy.MarkSnapshottingInputsFinishedStep.execute(MarkSnapshottingInputsFinishedStep.java:37)
+	at org.gradle.internal.execution.steps.legacy.MarkSnapshottingInputsFinishedStep.execute(MarkSnapshottingInputsFinishedStep.java:27)
+	at org.gradle.internal.execution.steps.ResolveMutableCachingStateStep.executeDelegate(ResolveMutableCachingStateStep.java:70)
+	at org.gradle.internal.execution.steps.ResolveMutableCachingStateStep.executeDelegate(ResolveMutableCachingStateStep.java:32)
+	at org.gradle.internal.execution.steps.AbstractResolveCachingStateStep.execute(AbstractResolveCachingStateStep.java:69)
+	at org.gradle.internal.execution.steps.AbstractResolveCachingStateStep.execute(AbstractResolveCachingStateStep.java:37)
+	at org.gradle.internal.execution.steps.ResolveChangesStep.executeMutable(ResolveChangesStep.java:63)
+	at org.gradle.internal.execution.steps.ResolveChangesStep.executeMutable(ResolveChangesStep.java:34)
+	at org.gradle.internal.execution.steps.MutableStep.execute(MutableStep.java:26)
+	at org.gradle.internal.execution.steps.ValidateStep$Mutable.executeDelegate(ValidateStep.java:79)
+	at org.gradle.internal.execution.steps.ValidateStep$Mutable.executeDelegate(ValidateStep.java:65)
+	at org.gradle.internal.execution.steps.ValidateStep.execute(ValidateStep.java:99)
+	at org.gradle.internal.execution.steps.ValidateStep$Mutable.execute(ValidateStep.java:65)
+	at org.gradle.internal.execution.steps.CaptureMutableStateBeforeExecutionStep.executeMutable(CaptureMutableStateBeforeExecutionStep.java:86)
+	at org.gradle.internal.execution.steps.CaptureMutableStateBeforeExecutionStep.execute(CaptureMutableStateBeforeExecutionStep.java:65)
+	at org.gradle.internal.execution.steps.CaptureMutableStateBeforeExecutionStep.execute(CaptureMutableStateBeforeExecutionStep.java:45)
+	at org.gradle.internal.execution.steps.SkipEmptyMutableWorkStep.executeWithNonEmptySources(SkipEmptyMutableWorkStep.java:210)
+	at org.gradle.internal.execution.steps.SkipEmptyMutableWorkStep.executeMutable(SkipEmptyMutableWorkStep.java:85)
+	at org.gradle.internal.execution.steps.SkipEmptyMutableWorkStep.executeMutable(SkipEmptyMutableWorkStep.java:53)
+	at org.gradle.internal.execution.steps.MutableStep.execute(MutableStep.java:26)
+	at org.gradle.internal.execution.steps.legacy.MarkSnapshottingInputsStartedStep.execute(MarkSnapshottingInputsStartedStep.java:38)
+	at org.gradle.internal.execution.steps.LoadPreviousExecutionStateStep.executeMutable(LoadPreviousExecutionStateStep.java:36)
+	at org.gradle.internal.execution.steps.LoadPreviousExecutionStateStep.executeMutable(LoadPreviousExecutionStateStep.java:23)
+	at org.gradle.internal.execution.steps.MutableStep.execute(MutableStep.java:26)
+	at org.gradle.internal.execution.steps.HandleStaleOutputsStep.executeMutable(HandleStaleOutputsStep.java:77)
+	at org.gradle.internal.execution.steps.HandleStaleOutputsStep.executeMutable(HandleStaleOutputsStep.java:43)
+	at org.gradle.internal.execution.steps.MutableStep.execute(MutableStep.java:26)
+	at org.gradle.internal.execution.steps.AssignMutableWorkspaceStep.lambda$executeMutable$0(AssignMutableWorkspaceStep.java:34)
+	at org.gradle.api.internal.tasks.execution.TaskExecution$4.withWorkspace(TaskExecution.java:305)
+	at org.gradle.internal.execution.steps.AssignMutableWorkspaceStep.executeMutable(AssignMutableWorkspaceStep.java:30)
+	at org.gradle.internal.execution.steps.AssignMutableWorkspaceStep.executeMutable(AssignMutableWorkspaceStep.java:21)
+	at org.gradle.internal.execution.steps.MutableStep.execute(MutableStep.java:26)
+	at org.gradle.internal.execution.steps.ChoosePipelineStep.execute(ChoosePipelineStep.java:40)
+	at org.gradle.internal.execution.steps.ChoosePipelineStep.execute(ChoosePipelineStep.java:23)
+	at org.gradle.internal.execution.steps.ExecuteWorkBuildOperationFiringStep.lambda$execute$2(ExecuteWorkBuildOperationFiringStep.java:67)
+	at org.gradle.internal.execution.steps.ExecuteWorkBuildOperationFiringStep.execute(ExecuteWorkBuildOperationFiringStep.java:67)
+	at org.gradle.internal.execution.steps.ExecuteWorkBuildOperationFiringStep.execute(ExecuteWorkBuildOperationFiringStep.java:39)
+	at org.gradle.internal.execution.steps.IdentityCacheStep.execute(IdentityCacheStep.java:46)
+	at org.gradle.internal.execution.steps.IdentityCacheStep.execute(IdentityCacheStep.java:34)
+	at org.gradle.internal.execution.steps.IdentifyStep.execute(IdentifyStep.java:56)
+	at org.gradle.internal.execution.steps.IdentifyStep.execute(IdentifyStep.java:38)
+	at org.gradle.internal.execution.impl.DefaultExecutionEngine$1.execute(DefaultExecutionEngine.java:68)
+	at org.gradle.api.internal.tasks.execution.ExecuteActionsTaskExecuter.executeIfValid(ExecuteActionsTaskExecuter.java:132)
+	... 30 more
+Caused by: org.gradle.internal.resource.transport.http.HttpErrorStatusCodeException: Could not GET 'https://central.sonatype.com/repository/maven-snapshots/org/openrewrite/rewrite-core/8.84.0-SNAPSHOT/maven-metadata.xml'. Received status code 403 from server: Forbidden
+	at org.gradle.internal.resource.transport.http.ApacheCommonsHttpClient.processResponse(ApacheCommonsHttpClient.java:310)
+	at org.gradle.internal.resource.transport.http.ApacheCommonsHttpClient.performGet(ApacheCommonsHttpClient.java:121)
+	at org.gradle.internal.resource.transport.http.HttpResourceAccessor.openResource(HttpResourceAccessor.java:49)
+	at org.gradle.internal.resource.transport.http.HttpResourceAccessor.openResource(HttpResourceAccessor.java:32)
+	at org.gradle.internal.resource.transfer.AbstractExternalResourceAccessor.withContent(AbstractExternalResourceAccessor.java:32)
+	at org.gradle.internal.resource.transfer.DefaultExternalResourceConnector.withContent(DefaultExternalResourceConnector.java:59)
+	at org.gradle.internal.resource.transfer.ProgressLoggingExternalResourceAccessor$DownloadOperation.call(ProgressLoggingExternalResourceAccessor.java:136)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:210)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:205)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:67)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:60)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:167)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:60)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.call(DefaultBuildOperationRunner.java:54)
+	at org.gradle.internal.resource.transfer.ProgressLoggingExternalResourceAccessor.withContent(ProgressLoggingExternalResourceAccessor.java:49)
+	at org.gradle.internal.resource.transfer.ExternalResourceAccessor.withContent(ExternalResourceAccessor.java:62)
+	at org.gradle.internal.resource.transfer.AccessorBackedExternalResource.withContentIfPresent(AccessorBackedExternalResource.java:92)
+	at org.gradle.api.publish.maven.internal.publisher.AbstractMavenPublisher$1.call(AbstractMavenPublisher.java:175)
+	at org.gradle.api.publish.maven.internal.publisher.AbstractMavenPublisher$1.call(AbstractMavenPublisher.java:171)
+	at org.gradle.api.internal.artifacts.repositories.transport.NetworkOperationBackOffAndRetry.withBackoffAndRetry(NetworkOperationBackOffAndRetry.java:53)
+	at org.gradle.api.publish.maven.internal.publisher.AbstractMavenPublisher.readExistingMetadata(AbstractMavenPublisher.java:171)
+	at org.gradle.api.publish.maven.internal.publisher.MavenRemotePublisher.getNextBuildNumber(MavenRemotePublisher.java:111)
+	at org.gradle.api.publish.maven.internal.publisher.MavenRemotePublisher.createSnapshotMetadata(MavenRemotePublisher.java:80)
+	at org.gradle.api.publish.maven.internal.publisher.AbstractMavenPublisher.computeSnapshotMetadata(AbstractMavenPublisher.java:88)
+	at org.gradle.api.publish.maven.internal.publisher.AbstractMavenPublisher.publish(AbstractMavenPublisher.java:72)
+	at org.gradle.api.publish.maven.internal.publisher.MavenRemotePublisher.publish(MavenRemotePublisher.java:66)
+	at org.gradle.api.publish.maven.internal.publisher.ValidatingMavenPublisher.publish(ValidatingMavenPublisher.java:50)
+	at org.gradle.api.publish.maven.tasks.PublishToMavenRepository$1.publish(PublishToMavenRepository.java:121)
+	at org.gradle.api.publish.internal.PublishOperation.run(PublishOperation.java:43)
+	... 132 more
+
+
+BUILD FAILED in 1m 2s
+87 actionable tasks: 25 executed, 62 up-to-date
+
+Publishing Build Scan to Develocity...
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-scans/__openrewrite_gh-automation_4-1780486745708.json
+https://ge.openrewrite.org/s/ccbtm7zfinmfg
+
+Process completed with exit code 1.
+Post job cleanup.
+Cleanup maven settings: /home/runner/.m2/settings.xml - file was removed
+Post job cleanup.
+Post job cleanup.
+In post-action step
+##[group]Stopping Gradle daemons
+Stopping Gradle daemons for /home/runner/.gradle/wrapper/dists/gradle-9.5.1-bin/y6l85d6ack7csxlvggdotxu5/gradle-9.5.1
+Stopping Gradle daemons for /home/runner/.gradle/wrapper/dists/gradle-8.14.5-bin/690y85m0j9nfaub7xoiayko8a/gradle-8.14.5
+Stopping Gradle daemons for /home/runner/.gradle/wrapper/dists/gradle-8.14.3-bin/4fxp32eij48ii4i8pfmgwv16x/gradle-8.14.3
+Stopping Gradle daemons for /home/runner/.gradle/wrapper/dists/gradle-9.0.0-bin/cdq3vy5wu42etqk8mwqwtg0j/gradle-9.0.0
+Stopping Gradle daemons for /home/runner/.gradle/wrapper/dists/gradle-8.6-bin/aeg5kowy6wn733futcoeb8h73/gradle-8.6
+[command]/home/runner/.gradle/wrapper/dists/gradle-9.5.1-bin/y6l85d6ack7csxlvggdotxu5/gradle-9.5.1/bin/gradle --stop
+[command]/home/runner/.gradle/wrapper/dists/gradle-9.0.0-bin/cdq3vy5wu42etqk8mwqwtg0j/gradle-9.0.0/bin/gradle --stop
+[command]/home/runner/.gradle/wrapper/dists/gradle-8.14.3-bin/4fxp32eij48ii4i8pfmgwv16x/gradle-8.14.3/bin/gradle --stop
+[command]/home/runner/.gradle/wrapper/dists/gradle-8.6-bin/aeg5kowy6wn733futcoeb8h73/gradle-8.6/bin/gradle --stop
+[command]/home/runner/.gradle/wrapper/dists/gradle-8.14.5-bin/690y85m0j9nfaub7xoiayko8a/gradle-8.14.5/bin/gradle --stop
+No Gradle daemons are running.
+Stopping Daemon(s)
+1 Daemon stopped
+Stopping Daemon(s)
+Stopping Daemon(s)
+1 Daemon stopped
+1 Daemon stopped
+Stopping Daemon(s)
+1 Daemon stopped
+##[endgroup]
+Not performing cache-cleanup due to build failure
+##[group]Caching Gradle state
+[command]/usr/bin/tar --posix -cf cache.tzst --exclude cache.tzst -P -C /home/runner/work/rewrite/rewrite --files-from manifest.txt --use-compress-program zstdmt
+[command]/usr/bin/tar --posix -cf cache.tzst --exclude cache.tzst -P -C /home/runner/work/rewrite/rewrite --files-from manifest.txt --use-compress-program zstdmt
+[command]/usr/bin/tar --posix -cf cache.tzst --exclude cache.tzst -P -C /home/runner/work/rewrite/rewrite --files-from manifest.txt --use-compress-program zstdmt
+[command]/usr/bin/tar --posix -cf cache.tzst --exclude cache.tzst -P -C /home/runner/work/rewrite/rewrite --files-from manifest.txt --use-compress-program zstdmt
+[command]/usr/bin/tar --posix -cf cache.tzst --exclude cache.tzst -P -C /home/runner/work/rewrite/rewrite --files-from manifest.txt --use-compress-program zstdmt
+[command]/usr/bin/tar --posix -cf cache.tzst --exclude cache.tzst -P -C /home/runner/work/rewrite/rewrite --files-from manifest.txt --use-compress-program zstdmt
+[command]/usr/bin/tar --posix -cf cache.tzst --exclude cache.tzst -P -C /home/runner/work/rewrite/rewrite --files-from manifest.txt --use-compress-program zstdmt
+[command]/usr/bin/tar --posix -cf cache.tzst --exclude cache.tzst -P -C /home/runner/work/rewrite/rewrite --files-from manifest.txt --use-compress-program zstdmt
+[command]/usr/bin/tar --posix -cf cache.tzst --exclude cache.tzst -P -C /home/runner/work/rewrite/rewrite --files-from manifest.txt --use-compress-program zstdmt
+Failed to save cache entry with path '/home/runner/.gradle/caches/8.14.5/generated-gradle-jars/gradle-test-kit-8.14.5.jar' and key: gradle-generated-gradle-jars-v1-44950fce8f17cdd92648c2a585c22992: ReserveCacheError: Unable to reserve cache with key gradle-generated-gradle-jars-v1-44950fce8f17cdd92648c2a585c22992, another job may be creating this cache.
+Failed to save cache entry with path '/home/runner/.gradle/wrapper/dists/gradle-8.6-bin/3nbusrw8llz7dy12zdt7x95u8' and key: gradle-wrapper-zips-v1-4ee6aa28d13fc2f729351ce2c88beef6: ReserveCacheError: Unable to reserve cache with key gradle-wrapper-zips-v1-4ee6aa28d13fc2f729351ce2c88beef6, another job may be creating this cache.
+Failed to save cache entry with path '/home/runner/.gradle/wrapper/dists/gradle-8.14.5-bin/690y85m0j9nfaub7xoiayko8a' and key: gradle-wrapper-zips-v1-757181886b05e0ae9a93551c58d4d054: ReserveCacheError: Unable to reserve cache with key gradle-wrapper-zips-v1-757181886b05e0ae9a93551c58d4d054, another job may be creating this cache.
+Failed to save cache entry with path '/home/runner/.gradle/wrapper/dists/gradle-8.6-bin/aeg5kowy6wn733futcoeb8h73' and key: gradle-wrapper-zips-v1-78597f12950b4f7cdd915ad81069cd38: ReserveCacheError: Unable to reserve cache with key gradle-wrapper-zips-v1-78597f12950b4f7cdd915ad81069cd38, another job may be creating this cache.
+Failed to save cache entry with path '/home/runner/.gradle/caches/8.14.5/generated-gradle-jars/gradle-api-8.14.5.jar' and key: gradle-generated-gradle-jars-v1-25b2c315cd2e13470e39deb0538ff4bf: ReserveCacheError: Unable to reserve cache with key gradle-generated-gradle-jars-v1-25b2c315cd2e13470e39deb0538ff4bf, another job may be creating this cache.
+Failed to save cache entry with path '/home/runner/.gradle/caches/9.0.0/generated-gradle-jars/gradle-api-9.0.0.jar' and key: gradle-generated-gradle-jars-v1-998f666cf95b15164a53e350e73f3833: ReserveCacheError: Unable to reserve cache with key gradle-generated-gradle-jars-v1-998f666cf95b15164a53e350e73f3833, another job may be creating this cache.
+Failed to save cache entry with path '/home/runner/.gradle/caches/8.14.3/generated-gradle-jars/gradle-api-8.14.3.jar' and key: gradle-generated-gradle-jars-v1-4434c59050703a48bf14168622b59891: ReserveCacheError: Unable to reserve cache with key gradle-generated-gradle-jars-v1-4434c59050703a48bf14168622b59891, another job may be creating this cache.
+Failed to save cache entry with path '/home/runner/.gradle/wrapper/dists/gradle-9.0.0-bin/cdq3vy5wu42etqk8mwqwtg0j' and key: gradle-wrapper-zips-v1-01961df866a4e9b834d5230f7c73ca1f: ReserveCacheError: Unable to reserve cache with key gradle-wrapper-zips-v1-01961df866a4e9b834d5230f7c73ca1f, another job may be creating this cache.
+Failed to save cache entry with path '/home/runner/.gradle/wrapper/dists/gradle-8.14.3-bin/4fxp32eij48ii4i8pfmgwv16x' and key: gradle-wrapper-zips-v1-a24e380bec9c7036b13a7981abbf01c5: ReserveCacheError: Unable to reserve cache with key gradle-wrapper-zips-v1-a24e380bec9c7036b13a7981abbf01c5, another job may be creating this cache.
+[command]/usr/bin/tar --posix -cf cache.tzst --exclude cache.tzst -P -C /home/runner/work/rewrite/rewrite --files-from manifest.txt --use-compress-program zstdmt
+[command]/usr/bin/tar --posix -cf cache.tzst --exclude cache.tzst -P -C /home/runner/work/rewrite/rewrite --files-from manifest.txt --use-compress-program zstdmt
+[command]/usr/bin/tar --posix -cf cache.tzst --exclude cache.tzst -P -C /home/runner/work/rewrite/rewrite --files-from manifest.txt --use-compress-program zstdmt
+Failed to save cache entry with path '/home/runner/.gradle/caches/*/kotlin-dsl/accessors/*/,/home/runner/.gradle/caches/*/kotlin-dsl/scripts/*/' and key: gradle-kotlin-dsl-v1-4899fc13644771896d46973a9ac20ed0: ReserveCacheError: Unable to reserve cache with key gradle-kotlin-dsl-v1-4899fc13644771896d46973a9ac20ed0, another job may be creating this cache.
+[command]/usr/bin/tar --posix -cf cache.tzst --exclude cache.tzst -P -C /home/runner/work/rewrite/rewrite --files-from manifest.txt --use-compress-program zstdmt
+Sent 1674975 of 1674975 (100.0%), 21.0 MBs/sec
+Saved cache entry with key gradle-groovy-dsl-v1-d571f89be334d9188393a0f53432c7e5 from /home/runner/.gradle/caches/*/groovy-dsl/*/ in 2556ms
+Sent 3079439 of 3079439 (100.0%), 18.8 MBs/sec
+Saved cache entry with key gradle-instrumented-jars-v1-775d1c5423b358fad8ad1f0a23471e19 from /home/runner/.gradle/caches/jars-*/*/ in 5261ms
+[command]/usr/bin/tar --posix -cf cache.tzst --exclude cache.tzst -P -C /home/runner/work/rewrite/rewrite --files-from manifest.txt --use-compress-program zstdmt
+Sent 0 of 1608067135 (0.0%), 0.0 MBs/sec
+Sent 536870912 of 1608067135 (33.4%), 255.5 MBs/sec
+Sent 536870912 of 1608067135 (33.4%), 170.4 MBs/sec
+Sent 1073741824 of 1608067135 (66.8%), 255.7 MBs/sec

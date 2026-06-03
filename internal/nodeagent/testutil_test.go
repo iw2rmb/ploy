@@ -597,6 +597,10 @@ func withRunOptions(opts RunOptions) startRunOption {
 	return func(r *StartRunRequest) { r.TypedOptions = opts }
 }
 
+func withRunServerURL(serverURL string) startRunOption {
+	return func(r *StartRunRequest) { r.ServerURL = serverURL }
+}
+
 // newStartRunRequest returns a StartRunRequest with fixed IDs and sensible
 // defaults (RepoURL, BaseRef "main", empty TypedOptions). Uses fixed IDs that
 // satisfy manifest validation (lowercase alphanumeric, 3-64 chars).

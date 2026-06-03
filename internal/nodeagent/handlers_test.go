@@ -116,6 +116,9 @@ func TestHandleRunStart(t *testing.T) {
 			if tt.wantCalled && mock.lastStart.RunID.String() != tt.request.RunID.String() {
 				t.Errorf("controller received RunID = %q, want %q", mock.lastStart.RunID, tt.request.RunID)
 			}
+			if tt.wantCalled && mock.lastStart.ServerURL != cfg.ServerURL {
+				t.Errorf("controller received ServerURL = %q, want %q", mock.lastStart.ServerURL, cfg.ServerURL)
+			}
 
 			if mock.acquireCalls != tt.wantAcquire {
 				t.Errorf("controller.AcquireSlot calls = %d, want %d", mock.acquireCalls, tt.wantAcquire)

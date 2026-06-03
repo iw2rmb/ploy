@@ -1,0 +1,11 @@
+{
+  "tool": "gradle",
+  "message": "* What went wrong:\nExecution failed for task ':npmCiOrInstall'.\n\u003e Process 'command '/home/runner/work/spring-framework/spring-framework/.gradle/nodejs/node-v24.15.0-linux-x64/bin/npm'' finished with non-zero exit value 1\n\nBUILD FAILED in 15s\n",
+  "evidence": {
+    "errors": [
+      {
+        "message": "Execution failed for task ':npmCiOrInstall'.\n\u003e Process 'command '/home/runner/work/spring-framework/spring-framework/.gradle/nodejs/node-v24.15.0-linux-x64/bin/npm'' finished with non-zero exit value 1"
+      }
+    ]
+  }
+}

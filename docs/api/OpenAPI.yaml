@@ -39,6 +39,8 @@ tags:
     description: Core control-plane surfaces (repos, migs run lifecycle, runs).
   - name: Artifacts
     description: Artifact bundles, diffs, and logs stored in PostgreSQL.
+  - name: Utility
+    description: Stateless utility endpoints that do not read or mutate stored control-plane state.
 security:
   - bearerAuth: []
   - mtls: []
@@ -136,6 +138,9 @@ paths:
   # Job-level SBOM persistence — nodes replace package rows detected by gate post-tasks
   /v1/jobs/{job_id}/sbom:
     $ref: "./paths/jobs_job_id_sbom.yaml"
+  # Stateless utility endpoints
+  /v1/trimmer/java/gradle:
+    $ref: "./paths/trimmer_java_gradle.yaml"
   # Node events endpoint
   /v1/nodes/{id}/events:
     $ref: "./paths/nodes_id_events.yaml"
@@ -273,6 +278,15 @@ components:
       $ref: "./components/schemas/controlplane.yaml#/NodeCreateLogResponse"
     NodeAction:
       $ref: "./components/schemas/controlplane.yaml#/NodeAction"
+    # Utility schemas
+    GradleTrimmerRequest:
+      $ref: "./components/schemas/trimmer.yaml#/GradleTrimmerRequest"
+    GradleTrimmerResult:
+      $ref: "./components/schemas/trimmer.yaml#/GradleTrimmerResult"
+    GradleTrimmerEvidence:
+      $ref: "./components/schemas/trimmer.yaml#/GradleTrimmerEvidence"
+    GradleTrimmerError:
+      $ref: "./components/schemas/trimmer.yaml#/GradleTrimmerError"
     # Build Gate HTTP schemas removed: gate runs as jobs in the Migs pipeline.
     # Nodes claim gate work via the unified /v1/nodes/{id}/claim endpoint using NodeClaimResponse.
     # Repo-centric API types

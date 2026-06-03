@@ -1,0 +1,29 @@
+{
+  "tool": "gradle",
+  "evidence": {
+    "task": "compileKotlin",
+    "errors": [
+      {
+        "message": "None of the following functions can be called with the arguments supplied:",
+        "base": "/workspace/src/main/kotlin/ru/tinkoff/bpm/topcashloanpledgefiller/configuration/",
+        "files": [
+          "RestClientConfiguration.kt:42:14"
+        ]
+      },
+      {
+        "message": "Cannot access class 'org.apache.hc.client5.http.classic.HttpClient'. Check your module classpath for missing or conflicting dependencies",
+        "base": "/workspace/src/main/kotlin/ru/tinkoff/bpm/topcashloanpledgefiller/configuration/",
+        "files": [
+          "RestClientConfiguration.kt:47:35"
+        ]
+      },
+      {
+        "message": "Type mismatch: inferred type is CloseableHttpClient! but HttpClient was expected",
+        "base": "/workspace/src/main/kotlin/ru/tinkoff/bpm/topcashloanpledgefiller/configuration/",
+        "files": [
+          "RestClientConfiguration.kt:48:9"
+        ]
+      }
+    ]
+  }
+}

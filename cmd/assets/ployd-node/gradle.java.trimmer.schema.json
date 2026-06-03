@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Ploy Gradle Trimmer Evidence",
   "description": "Schema for structured Gradle build-gate trimmer evidence forwarded as /in/errors.yaml.",
-  "$comment": "Gradle compile-java evidence uses compact file references: line number is encoded as path suffix ':<line>'.",
+  "$comment": "Gradle compiler evidence uses compact file references: line number is encoded as path suffix ':<line>' or ':<line>:<col>'.",
   "type": "object",
   "required": ["errors"],
   "additionalProperties": false,
@@ -45,34 +45,20 @@
         },
         "base": {
           "type": "string",
-          "$comment": "Common base directory for all files in this error. When present, files[].path is relative to this base.",
+          "$comment": "Common base directory for all files in this error. When present, files entries are relative to this base.",
           "pattern": "/$"
         },
         "snippet": {
           "type": "string",
-          "$comment": "Common snippet hoisted from files[].snippet when all file snippets in this error are identical and non-empty."
+          "$comment": "Common snippet hoisted when all file snippets in this error are identical and non-empty."
         },
         "files": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/file"
+            "type": "string",
+            "minLength": 1,
+            "$comment": "File path with location suffix. Path may be relative when error.base is provided."
           }
-        }
-      }
-    },
-    "file": {
-      "type": "object",
-      "required": ["path"],
-      "additionalProperties": false,
-      "properties": {
-        "path": {
-          "type": "string",
-          "minLength": 1,
-          "$comment": "File path. For compile-java diagnostics, line is encoded as '<path>:<line>'. Path may be relative when error.base is provided."
-        },
-        "snippet": {
-          "type": "string",
-          "$comment": "Per-file snippet when snippets are not hoisted to error.snippet."
         }
       }
     }

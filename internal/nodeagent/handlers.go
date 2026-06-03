@@ -58,6 +58,7 @@ type StartRunRequest struct {
 	// directly rather than parsing raw maps.
 	TypedOptions RunOptions        `json:"-"`   // Not serialized; populated by claimer_loop from parsed spec
 	Env          map[string]string `json:"env"` // Environment variables merged from spec
+	ServerURL    string            `json:"server_url,omitempty"`
 }
 
 // StartActionRequest describes an action execution request from the server claim API.
@@ -110,6 +111,7 @@ func (s *Server) handleRunStart(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	req.ServerURL = s.cfg.ServerURL
 
 	ctx := r.Context()
 	if err := s.controller.AcquireSlot(ctx); err != nil {

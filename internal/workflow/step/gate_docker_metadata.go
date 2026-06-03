@@ -11,7 +11,7 @@ import (
 
 // gateExecutionMetadata normalizes a finished gate container run into
 // BuildGateStageMetadata. On success it surfaces gradle build-cache hits; on
-// failure it extracts a tool-aware log finding from the captured output.
+// failure it preserves the captured output without tool-specific trimming.
 func gateExecutionMetadata(
 	workspace string,
 	language string,
@@ -45,28 +45,28 @@ func gateExecutionMetadata(
 		}
 	}
 	if !passed {
-		trimmed, evidence := GateLogFindingContent(tool, string(logs))
-		msg := strings.TrimSpace(trimmed)
+		msg := string(capGateLogBytes(logs))
 		if msg == "" {
 			msg = fmt.Sprintf("%s build failed (exit %d)", tool, res.ExitCode)
 		}
-		finding := contracts.BuildGateLogFinding{Severity: "error", Message: msg}
-		if strings.TrimSpace(evidence) != "" {
-			finding.Evidence = evidence
-		}
-		meta.LogFindings = append(meta.LogFindings, finding)
+		meta.LogFindings = append(meta.LogFindings, contracts.BuildGateLogFinding{Severity: "error", Message: msg})
 	}
 	attachLogsTextAndDigest(meta, logs)
 	return meta
 }
 
 func attachLogsTextAndDigest(meta *contracts.BuildGateStageMetadata, logs []byte) {
-	const maxLogBytes = 10 << 20 // 10 MiB safety cap in memory
-	if len(logs) > maxLogBytes {
-		logs = logs[:maxLogBytes]
-	}
+	logs = capGateLogBytes(logs)
 	meta.LogsText = string(logs)
 	meta.LogDigest = sha256Digest(logs)
+}
+
+func capGateLogBytes(logs []byte) []byte {
+	const maxLogBytes = 10 << 20 // 10 MiB safety cap in memory
+	if len(logs) > maxLogBytes {
+		return logs[:maxLogBytes]
+	}
+	return logs
 }
 
 func sha256Digest(b []byte) types.Sha256Digest {

@@ -1,0 +1,126 @@
+Received 175998262 of 175998262 (100.0%), 62.4 MBs/sec
+Cache Size: ~168 MB (175998262 B)
+Received 136697271 of 136697271 (100.0%), 48.2 MBs/sec
+Cache Size: ~130 MB (136697271 B)
+[command]/usr/bin/tar -xf /home/runner/work/_temp/417f1207-a04b-422d-b77e-e19093bd32fd/cache.tzst -P -C /home/runner/work/spring-framework/spring-framework --use-compress-program unzstd
+[command]/usr/bin/tar -xf /home/runner/work/_temp/29ecf7c8-f356-4053-8928-2b4f1e502f18/cache.tzst -P -C /home/runner/work/spring-framework/spring-framework --use-compress-program unzstd
+Received 192937984 of 320728736 (60.2%), 61.0 MBs/sec
+Received 139590358 of 139590358 (100.0%), 41.4 MBs/sec
+Cache Size: ~133 MB (139590358 B)
+[command]/usr/bin/tar -xf /home/runner/work/_temp/703d65e9-1425-4a03-9fa8-f3b0ea4140ef/cache.tzst -P -C /home/runner/work/spring-framework/spring-framework --use-compress-program unzstd
+Cache restored successfully
+Restored cache entry with key gradle-wrapper-zips-v1-5ae5d3da5e8e0c748d04bcdd9bc97bdb to /home/runner/.gradle/wrapper/dists/gradle-8.14.3-bin/cv11ve7ro1n3o1j4so8xd9n66 in 3932ms
+Cache restored successfully
+Restored cache entry with key gradle-wrapper-zips-v1-32a3a100d181ec75e824fde1164fcedd to /home/runner/.gradle/wrapper/dists/gradle-9.5.1-bin/iq79hdu3mqx29lgffhp8bfmx in 4157ms
+Received 320728736 of 320728736 (100.0%), 76.4 MBs/sec
+Cache Size: ~306 MB (320728736 B)
+[command]/usr/bin/tar -xf /home/runner/work/_temp/b68f4e83-5e49-407d-a853-cd28105de846/cache.tzst -P -C /home/runner/work/spring-framework/spring-framework --use-compress-program unzstd
+Cache restored successfully
+Restored cache entry with key gradle-dependencies-v1-056ef7a12758961ecc3da01d5942ab6a to /home/runner/.gradle/caches/modules-*/files-*/*/*/*/* in 5156ms
+Cache restored successfully
+Restored cache entry with key gradle-transforms-v1-917540b421cf73c210d3df7f8f4ef25e to /home/runner/.gradle/caches/transforms-4/*/,/home/runner/.gradle/caches/*/transforms/*/ in 6010ms
+##[endgroup]
+##[group]All Gradle Wrapper jars are valid
+✓ Found known Gradle Wrapper JAR files:
+  7d3a4ac4de1c32b59bc6a4eb8ecb8e612ccd0cf1ae1e99f66902da64df296172 gradle/wrapper/gradle-wrapper.jar
+##[endgroup]
+##[group]Run git fetch --depth 1 https://github.com/$GITHUB_REPOSITORY main
+^[[36;1mgit fetch --depth 1 https://github.com/$GITHUB_REPOSITORY main^[[0m
+^[[36;1mecho BUILD_REFNAME=main >> $GITHUB_ENV^[[0m
+^[[36;1mecho BUILD_VERSION=$(git cat-file --textconv FETCH_HEAD:gradle.properties | sed -n '/^version=/ { s/^version=//;p }') >> $GITHUB_ENV^[[0m
+shell: /usr/bin/bash -e {0}
+env:
+  GRADLE_ENTERPRISE_SECRET_ACCESS_KEY: 
+  JAVA_HOME: /opt/hostedtoolcache/Java_Liberica_jdk/17.0.19-11/x64
+  JAVA_HOME_25_X64: /opt/hostedtoolcache/Java_Liberica_jdk/25.0.3-11/x64
+  JAVA_HOME_17_X64: /opt/hostedtoolcache/Java_Liberica_jdk/17.0.19-11/x64
+  GRADLE_ACTION_ID: gradle/actions/setup-gradle
+  GRADLE_USER_HOME: /home/runner/.gradle
+  GRADLE_BUILD_ACTION_SETUP_COMPLETED: true
+  GRADLE_BUILD_ACTION_CACHE_RESTORED: true
+  DEVELOCITY_INJECTION_INIT_SCRIPT_NAME: gradle-actions.inject-develocity.init.gradle
+  DEVELOCITY_INJECTION_CUSTOM_VALUE: gradle-actions
+  GITHUB_DEPENDENCY_GRAPH_ENABLED: false
+##[endgroup]
+From https://github.com/spring-projects/spring-framework
+ * branch            main       -> FETCH_HEAD
+##[group]Run ./gradlew antora
+^[[36;1m./gradlew antora^[[0m
+shell: /usr/bin/bash -e {0}
+env:
+  GRADLE_ENTERPRISE_SECRET_ACCESS_KEY: 
+  JAVA_HOME: /opt/hostedtoolcache/Java_Liberica_jdk/17.0.19-11/x64
+  JAVA_HOME_25_X64: /opt/hostedtoolcache/Java_Liberica_jdk/25.0.3-11/x64
+  JAVA_HOME_17_X64: /opt/hostedtoolcache/Java_Liberica_jdk/17.0.19-11/x64
+  GRADLE_ACTION_ID: gradle/actions/setup-gradle
+  GRADLE_USER_HOME: /home/runner/.gradle
+  GRADLE_BUILD_ACTION_SETUP_COMPLETED: true
+  GRADLE_BUILD_ACTION_CACHE_RESTORED: true
+  DEVELOCITY_INJECTION_INIT_SCRIPT_NAME: gradle-actions.inject-develocity.init.gradle
+  DEVELOCITY_INJECTION_CUSTOM_VALUE: gradle-actions
+  GITHUB_DEPENDENCY_GRAPH_ENABLED: false
+  BUILD_REFNAME: main
+  BUILD_VERSION: 7.1.0-SNAPSHOT
+##[endgroup]
+Starting a Gradle Daemon (subsequent builds will be faster)
+> Task :nodeSetup
+> Task :npmSetup SKIPPED
+
+npm error code ECONNRESET
+npm error network aborted
+npm error network This is a problem related to network connectivity.
+> Task :npmCiOrInstall
+npm error network In most cases you are behind a proxy or have bad network settings.
+npm error network
+npm error network If you are behind a proxy, please make sure that the 'proxy' config is set properly.  See: 'npm help config'
+npm error A complete log of this run can be found in: /home/runner/.npm/_logs/2026-06-03T09_52_13_815Z-debug-0.log
+
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':npmCiOrInstall'.
+> Process 'command '/home/runner/work/spring-framework/spring-framework/.gradle/nodejs/node-v24.15.0-linux-x64/bin/npm'' finished with non-zero exit value 1
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to generate a Build Scan (Powered by Develocity).
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 15s
+> Task :npmCiOrInstall FAILED
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run_2-1780480328628.json
+2 actionable tasks: 2 executed
+Process completed with exit code 1.
+Post job cleanup.
+In post-action step
+##[group]Stopping Gradle daemons
+Stopping Gradle daemons for /home/runner/.gradle/wrapper/dists/gradle-9.1.0-bin/9agqghryom9wkf8r80qlhnts3/gradle-9.1.0
+[command]/home/runner/.gradle/wrapper/dists/gradle-9.1.0-bin/9agqghryom9wkf8r80qlhnts3/gradle-9.1.0/bin/gradle --stop
+Stopping Daemon(s)
+1 Daemon stopped
+##[endgroup]
+Not performing cache-cleanup due to build failure
+##[group]Caching Gradle state
+Cache hit occurred on the cache key gradle-home-v1|Linux-X64|build-and-deploy-docs[93e0cb76373f62da1ce2d0bbe865e6d4]-ed3d91b929c66a5c178c102acae2e6588202d2a8, not saving cache.
+##[endgroup]
+Generating Job Summary
+Completed post-action step
+Post job cleanup.
+Post job cleanup.
+[command]/usr/bin/git version
+git version 2.54.0
+Temporarily overriding HOME='/home/runner/work/_temp/5cb559ab-f7d1-4e85-96aa-b2321fa729f6' before making global git config changes
+Adding repository directory to the temporary git global config as a safe directory
+[command]/usr/bin/git config --global --add safe.directory /home/runner/work/spring-framework/spring-framework
+[command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+[command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+[command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+http.https://github.com/.extraheader
+[command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+[command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+[command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+[command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+Cleaning up orphan processes
+##[warning]Node.js 20 actions are deprecated. The following actions are running on Node.js 20 and may not work as expected: actions/checkout@v4, actions/setup-java@v4, gradle/actions/setup-gradle@ac638b010cf58a27ee6c972d7336334ccaf61c96. Actions will be forced to run with Node.js 24 by default starting June 16th, 2026. Node.js 20 will be removed from the runner on September 16th, 2026. Please check if updated versions of these actions are available that support Node.js 24. To opt into Node.js 24 now, set the FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true environment variable on the runner or in your workflow file. Once Node.js 24 becomes the default, you can temporarily opt out by setting ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

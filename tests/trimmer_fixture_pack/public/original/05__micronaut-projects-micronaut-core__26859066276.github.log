@@ -1,0 +1,419 @@
+build (17)	UNKNOWN STEP	﻿2026-06-03T02:01:04.7343801Z Current runner version: '2.334.0'
+build (17)	UNKNOWN STEP	2026-06-03T02:01:04.7369219Z ##[group]Runner Image Provisioner
+build (17)	UNKNOWN STEP	2026-06-03T02:01:04.7370447Z Hosted Compute Agent
+build (17)	UNKNOWN STEP	2026-06-03T02:01:04.7371538Z Version: 20260520.533
+build (17)	UNKNOWN STEP	2026-06-03T02:01:04.7372583Z Commit: 189110e25284a9812c124fd27b339e2fb4f2f9db
+build (17)	UNKNOWN STEP	2026-06-03T02:01:04.7373736Z Build Date: 2026-05-20T17:44:04Z
+build (17)	UNKNOWN STEP	2026-06-03T02:01:04.7374705Z Worker ID: {03d8fd37-2b98-42c3-a9e0-f0c8b52baf22}
+build (17)	UNKNOWN STEP	2026-06-03T02:01:04.7375548Z Azure Region: eastus2
+build (17)	UNKNOWN STEP	2026-06-03T02:01:04.7376250Z ##[endgroup]
+build (17)	UNKNOWN STEP	2026-06-03T02:01:04.7378274Z ##[group]Operating System
+build (17)	UNKNOWN STEP	2026-06-03T02:01:04.7379087Z Ubuntu
+build (17)	UNKNOWN STEP	2026-06-03T02:01:04.7379725Z 24.04.4
+build (17)	UNKNOWN STEP	2026-06-03T02:01:04.7380395Z LTS
+build (17)	UNKNOWN STEP	2026-06-03T02:01:04.7380987Z ##[endgroup]
+build (17)	UNKNOWN STEP	2026-06-03T02:01:04.7381681Z ##[group]Runner Image
+build (17)	UNKNOWN STEP	2026-06-03T02:01:04.7382374Z Image: ubuntu-24.04
+build (17)	UNKNOWN STEP	2026-06-03T02:01:04.7383016Z Version: 20260525.161.1
+build (17)	UNKNOWN STEP	2026-06-03T02:01:04.7385222Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20260525.161/images/ubuntu/Ubuntu2404-Readme.md
+build (17)	UNKNOWN STEP	2026-06-03T02:01:04.7386953Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20260525.161
+build (17)	UNKNOWN STEP	2026-06-03T02:01:04.7388039Z ##[endgroup]
+build (17)	UNKNOWN STEP	2026-06-03T02:01:04.7391127Z ##[group]GITHUB_TOKEN Permissions
+build (17)	UNKNOWN STEP	2026-06-03T02:01:04.7393708Z Actions: write
+build (17)	UNKNOWN STEP	2026-06-03T02:01:04.7394469Z ArtifactMetadata: write
+build (17)	UNKNOWN STEP	2026-06-03T02:01:04.7395374Z Attestations: write
+build (17)	UNKNOWN STEP	2026-06-03T02:01:04.7396079Z Checks: write
+build (17)	UNKNOWN STEP	2026-06-03T02:01:04.7396707Z CodeQuality: write
+build (17)	UNKNOWN STEP	2026-06-03T02:01:04.7397365Z Contents: write
+build (17)	UNKNOWN STEP	2026-06-03T02:01:04.7398058Z Deployments: write
+build (17)	UNKNOWN STEP	2026-06-03T02:01:04.7398771Z Discussions: write
+build (17)	UNKNOWN STEP	2026-06-03T02:01:04.7399464Z Issues: write
+build (17)	UNKNOWN STEP	2026-06-03T02:01:04.7400096Z Metadata: read
+build (17)	UNKNOWN STEP	2026-06-03T02:01:04.7400804Z Models: read
+build (17)	UNKNOWN STEP	2026-06-03T02:01:04.7401427Z Packages: write
+build (17)	UNKNOWN STEP	2026-06-03T02:01:04.7402183Z Pages: write
+build (17)	UNKNOWN STEP	2026-06-03T02:01:04.7402875Z PullRequests: write
+build (17)	UNKNOWN STEP	2026-06-03T02:01:04.7403569Z RepositoryProjects: write
+build (17)	UNKNOWN STEP	2026-06-03T02:01:04.7404290Z SecurityEvents: write
+build (17)	UNKNOWN STEP	2026-06-03T02:01:04.7405198Z Statuses: write
+build (17)	UNKNOWN STEP	2026-06-03T02:01:04.7406272Z VulnerabilityAlerts: read
+build (17)	UNKNOWN STEP	2026-06-03T02:01:04.7406961Z ##[endgroup]
+build (17)	UNKNOWN STEP	2026-06-03T02:01:04.7409845Z Secret source: Actions
+build (17)	UNKNOWN STEP	2026-06-03T02:01:04.7411011Z Prepare workflow directory
+build (17)	UNKNOWN STEP	2026-06-03T02:01:04.7738581Z Prepare all required actions
+build (17)	UNKNOWN STEP	2026-06-03T02:01:04.7776278Z Getting action download info
+build (17)	UNKNOWN STEP	2026-06-03T02:01:05.2069062Z Download action repository 'actions/checkout@v4' (SHA:34e114876b0b11c390a56381ad16ebd13914f8d5)
+build (17)	UNKNOWN STEP	2026-06-03T02:01:05.3340964Z Download action repository 'actions/setup-java@v4' (SHA:c1e323688fd81a25caa38c78aa6df2d33d3e20d9)
+build (17)	UNKNOWN STEP	2026-06-03T02:01:05.6842612Z Download action repository 'gradle/actions@v4' (SHA:ed408507eac070d1f99cc633dbcf757c94c7933a)
+build (17)	UNKNOWN STEP	2026-06-03T02:01:06.5255870Z Complete job name: build (17)
+build (17)	UNKNOWN STEP	2026-06-03T02:01:06.5961719Z ##[group]Run sudo rm -rf "/usr/local/share/boost"
+build (17)	UNKNOWN STEP	2026-06-03T02:01:06.5963325Z ^[[36;1msudo rm -rf "/usr/local/share/boost"^[[0m
+build (17)	UNKNOWN STEP	2026-06-03T02:01:06.5964956Z ^[[36;1msudo rm -rf "$AGENT_TOOLSDIRECTORY"^[[0m
+build (17)	UNKNOWN STEP	2026-06-03T02:01:06.5966303Z ^[[36;1msudo apt-get clean^[[0m
+build (17)	UNKNOWN STEP	2026-06-03T02:01:06.5967432Z ^[[36;1mdf -h^[[0m
+build (17)	UNKNOWN STEP	2026-06-03T02:01:06.6001826Z shell: /usr/bin/bash -e {0}
+build (17)	UNKNOWN STEP	2026-06-03T02:01:06.6003202Z ##[endgroup]
+build (17)	UNKNOWN STEP	2026-06-03T02:01:15.3511149Z Filesystem      Size  Used Avail Use% Mounted on
+build (17)	UNKNOWN STEP	2026-06-03T02:01:15.3511730Z /dev/root       145G   50G   95G  35% /
+build (17)	UNKNOWN STEP	2026-06-03T02:01:15.3512076Z tmpfs           7.9G   84K  7.9G   1% /dev/shm
+build (17)	UNKNOWN STEP	2026-06-03T02:01:15.3512424Z tmpfs           3.2G  1.0M  3.2G   1% /run
+build (17)	UNKNOWN STEP	2026-06-03T02:01:15.3512783Z tmpfs           5.0M     0  5.0M   0% /run/lock
+build (17)	UNKNOWN STEP	2026-06-03T02:01:15.3513172Z efivarfs        128M   32K  128M   1% /sys/firmware/efi/efivars
+build (17)	UNKNOWN STEP	2026-06-03T02:01:15.3513584Z /dev/sda16      881M   64M  756M   8% /boot
+build (17)	UNKNOWN STEP	2026-06-03T02:01:15.3513993Z /dev/sda15      105M  6.2M   99M   6% /boot/efi
+build (17)	UNKNOWN STEP	2026-06-03T02:01:15.3514351Z tmpfs           1.6G   12K  1.6G   1% /run/user/1001
+build (17)	UNKNOWN STEP	2026-06-03T02:01:15.3697021Z ##[group]Run actions/checkout@v4
+build (17)	UNKNOWN STEP	2026-06-03T02:01:15.3697358Z with:
+build (17)	UNKNOWN STEP	2026-06-03T02:01:15.3697656Z   repository: micronaut-projects/micronaut-core
+build (17)	UNKNOWN STEP	2026-06-03T02:01:15.3700923Z   token: ***
+build (17)	UNKNOWN STEP	2026-06-03T02:01:15.3701174Z   ssh-strict: true
+build (17)	UNKNOWN STEP	2026-06-03T02:01:15.3701430Z   ssh-user: git
+build (17)	UNKNOWN STEP	2026-06-03T02:01:15.3701709Z   persist-credentials: true
+build (17)	UNKNOWN STEP	2026-06-03T02:01:15.3701983Z   clean: true
+build (17)	UNKNOWN STEP	2026-06-03T02:01:15.3702232Z   sparse-checkout-cone-mode: true
+build (17)	UNKNOWN STEP	2026-06-03T02:01:15.3702534Z   fetch-depth: 1
+build (17)	UNKNOWN STEP	2026-06-03T02:01:15.3702808Z   fetch-tags: false
+build (17)	UNKNOWN STEP	2026-06-03T02:01:15.3703064Z   show-progress: true
+build (17)	UNKNOWN STEP	2026-06-03T02:01:15.3703307Z   lfs: false
+build (17)	UNKNOWN STEP	2026-06-03T02:01:15.3703524Z   submodules: false
+build (17)	UNKNOWN STEP	2026-06-03T02:01:15.3703773Z   set-safe-directory: true
+build (17)	UNKNOWN STEP	2026-06-03T02:01:15.3704070Z ##[endgroup]
+build (17)	UNKNOWN STEP	2026-06-03T02:01:15.4947907Z Syn***ng repository: micronaut-projects/micronaut-core
+build (17)	UNKNOWN STEP	2026-06-03T02:01:15.4950160Z ##[group]Getting Git version info
+build (17)	UNKNOWN STEP	2026-06-03T02:01:15.4950988Z Working directory is '/home/runner/work/micronaut-core/micronaut-core'
+build (17)	UNKNOWN STEP	2026-06-03T02:01:15.4952054Z [command]/usr/bin/git version
+build (17)	UNKNOWN STEP	2026-06-03T02:01:15.4993605Z git version 2.54.0
+build (17)	UNKNOWN STEP	2026-06-03T02:01:15.5018326Z ##[endgroup]
+build (17)	UNKNOWN STEP	2026-06-03T02:01:15.5033891Z Temporarily overriding HOME='/home/runner/work/_temp/819b199e-b188-4038-813a-9ac63744b826' before making global git config changes
+build (17)	UNKNOWN STEP	2026-06-03T02:01:15.5035497Z Adding repository directory to the temporary git global config as a safe directory
+build (17)	UNKNOWN STEP	2026-06-03T02:01:15.5048117Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/micronaut-core/micronaut-core
+build (17)	UNKNOWN STEP	2026-06-03T02:01:15.5089797Z Deleting the contents of '/home/runner/work/micronaut-core/micronaut-core'
+build (17)	UNKNOWN STEP	2026-06-03T02:01:15.5093009Z ##[group]Initializing the repository
+build (17)	UNKNOWN STEP	2026-06-03T02:01:15.5097270Z [command]/usr/bin/git init /home/runner/work/micronaut-core/micronaut-core
+build (17)	UNKNOWN STEP	2026-06-03T02:01:15.5170213Z hint: Using 'master' as the name for the initial branch. This default branch name
+build (17)	UNKNOWN STEP	2026-06-03T02:01:15.5171207Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+build (17)	UNKNOWN STEP	2026-06-03T02:01:15.5171869Z hint: to use in all of your new repositories, which will suppress this warning,
+build (17)	UNKNOWN STEP	2026-06-03T02:01:15.5172568Z hint: call:
+build (17)	UNKNOWN STEP	2026-06-03T02:01:15.5173017Z hint:
+build (17)	UNKNOWN STEP	2026-06-03T02:01:15.5173542Z hint: 	git config --global init.defaultBranch <name>
+build (17)	UNKNOWN STEP	2026-06-03T02:01:15.5174013Z hint:
+build (17)	UNKNOWN STEP	2026-06-03T02:01:15.5174446Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+build (17)	UNKNOWN STEP	2026-06-03T02:01:15.5175637Z hint: 'development'. The just-created branch can be renamed via this command:
+build (17)	UNKNOWN STEP	2026-06-03T02:01:15.5176445Z hint:
+build (17)	UNKNOWN STEP	2026-06-03T02:01:15.5176965Z hint: 	git branch -m <name>
+build (17)	UNKNOWN STEP	2026-06-03T02:01:15.5177504Z hint:
+build (17)	UNKNOWN STEP	2026-06-03T02:01:15.5178209Z hint: Disable this message with "git config set advice.defaultBranchName false"
+build (17)	UNKNOWN STEP	2026-06-03T02:01:15.5179410Z Initialized empty Git repository in /home/runner/work/micronaut-core/micronaut-core/.git/
+build (17)	UNKNOWN STEP	2026-06-03T02:01:15.5187638Z [command]/usr/bin/git remote add origin https://github.com/micronaut-projects/micronaut-core
+build (17)	UNKNOWN STEP	2026-06-03T02:01:15.5225288Z ##[endgroup]
+build (17)	UNKNOWN STEP	2026-06-03T02:01:15.5226002Z ##[group]Disabling automatic garbage collection
+build (17)	UNKNOWN STEP	2026-06-03T02:01:15.5230338Z [command]/usr/bin/git config --local gc.auto 0
+build (17)	UNKNOWN STEP	2026-06-03T02:01:15.5258667Z ##[endgroup]
+build (17)	UNKNOWN STEP	2026-06-03T02:01:15.5259278Z ##[group]Setting up auth
+build (17)	UNKNOWN STEP	2026-06-03T02:01:15.5265400Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+build (17)	UNKNOWN STEP	2026-06-03T02:01:15.5296635Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+build (17)	UNKNOWN STEP	2026-06-03T02:01:15.5600916Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+build (17)	UNKNOWN STEP	2026-06-03T02:01:15.5630257Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+build (17)	UNKNOWN STEP	2026-06-03T02:01:15.5858800Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+build (17)	UNKNOWN STEP	2026-06-03T02:01:15.5888909Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+build (17)	UNKNOWN STEP	2026-06-03T02:01:15.6132455Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+build (17)	UNKNOWN STEP	2026-06-03T02:01:15.6167097Z ##[endgroup]
+build (17)	UNKNOWN STEP	2026-06-03T02:01:15.6167761Z ##[group]Fetching the repository
+build (17)	UNKNOWN STEP	2026-06-03T02:01:15.6175522Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +fa21e0d48c77bb596960e299d517ba2157bc8f34:refs/remotes/origin/5.1.x
+build (17)	UNKNOWN STEP	2026-06-03T02:01:17.3821342Z From https://github.com/micronaut-projects/micronaut-core
+build (17)	UNKNOWN STEP	2026-06-03T02:01:17.3822385Z  * [new ref]         fa21e0d48c77bb596960e299d517ba2157bc8f34 -> origin/5.1.x
+build (17)	UNKNOWN STEP	2026-06-03T02:01:17.3853700Z ##[endgroup]
+build (17)	UNKNOWN STEP	2026-06-03T02:01:17.3854183Z ##[group]Determining the checkout info
+build (17)	UNKNOWN STEP	2026-06-03T02:01:17.3856202Z ##[endgroup]
+build (17)	UNKNOWN STEP	2026-06-03T02:01:17.3861199Z [command]/usr/bin/git sparse-checkout disable
+build (17)	UNKNOWN STEP	2026-06-03T02:01:17.3903044Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+build (17)	UNKNOWN STEP	2026-06-03T02:01:17.3928719Z ##[group]Checking out the ref
+build (17)	UNKNOWN STEP	2026-06-03T02:01:17.3932657Z [command]/usr/bin/git checkout --progress --force -B 5.1.x refs/remotes/origin/5.1.x
+build (17)	UNKNOWN STEP	2026-06-03T02:01:17.8570743Z Switched to a new branch '5.1.x'
+build (17)	UNKNOWN STEP	2026-06-03T02:01:17.8571339Z branch '5.1.x' set up to track 'origin/5.1.x'.
+build (17)	UNKNOWN STEP	2026-06-03T02:01:17.8590831Z ##[endgroup]
+build (17)	UNKNOWN STEP	2026-06-03T02:01:17.8635351Z [command]/usr/bin/git log -1 --format=%H
+build (17)	UNKNOWN STEP	2026-06-03T02:01:17.8658695Z fa21e0d48c77bb596960e299d517ba2157bc8f34
+build (17)	UNKNOWN STEP	2026-06-03T02:01:17.8863460Z ##[group]Run actions/setup-java@v4
+build (17)	UNKNOWN STEP	2026-06-03T02:01:17.8863793Z with:
+build (17)	UNKNOWN STEP	2026-06-03T02:01:17.8864024Z   distribution: corretto
+build (17)	UNKNOWN STEP	2026-06-03T02:01:17.8864279Z   java-version: 17
+build (17)	UNKNOWN STEP	2026-06-03T02:01:17.8864680Z   java-package: jdk
+build (17)	UNKNOWN STEP	2026-06-03T02:01:17.8864921Z   check-latest: false
+build (17)	UNKNOWN STEP	2026-06-03T02:01:17.8865161Z   server-id: github
+build (17)	UNKNOWN STEP	2026-06-03T02:01:17.8865401Z   server-username: GITHUB_ACTOR
+build (17)	UNKNOWN STEP	2026-06-03T02:01:17.8865686Z   server-password: GITHUB_TOKEN
+build (17)	UNKNOWN STEP	2026-06-03T02:01:17.8865962Z   overwrite-settings: true
+build (17)	UNKNOWN STEP	2026-06-03T02:01:17.8866226Z   job-status: success
+build (17)	UNKNOWN STEP	2026-06-03T02:01:17.8869055Z   token: ***
+build (17)	UNKNOWN STEP	2026-06-03T02:01:17.8869274Z ##[endgroup]
+build (17)	UNKNOWN STEP	2026-06-03T02:01:18.0829924Z ##[group]Installed distributions
+build (17)	UNKNOWN STEP	2026-06-03T02:01:18.0853180Z Trying to resolve the latest version from remote
+build (17)	UNKNOWN STEP	2026-06-03T02:01:18.2597283Z Resolved latest version as 17.0.19+10.1
+build (17)	UNKNOWN STEP	2026-06-03T02:01:18.2597863Z Trying to download...
+build (17)	UNKNOWN STEP	2026-06-03T02:01:18.2598988Z Downloading Java 17.0.19+10.1 (Corretto) from https://corretto.aws/downloads/resources/17.0.19.10.1/amazon-corretto-17.0.19.10.1-linux-x64.tar.gz ...
+build (17)	UNKNOWN STEP	2026-06-03T02:01:19.3105408Z Extracting Java archive...
+build (17)	UNKNOWN STEP	2026-06-03T02:01:19.3216173Z [command]/usr/bin/tar xz --warning=no-unknown-keyword --overwrite -C /home/runner/work/_temp/fdcc51fb-5391-48cd-9a48-03735acfbf91 -f /home/runner/work/_temp/12d72da0-4a00-4939-a1ab-f630cb4d309b
+build (17)	UNKNOWN STEP	2026-06-03T02:01:22.0401861Z Java 17.0.19+10.1 was downloaded
+build (17)	UNKNOWN STEP	2026-06-03T02:01:22.0402199Z Setting Java 17.0.19+10.1 as the default
+build (17)	UNKNOWN STEP	2026-06-03T02:01:22.0412097Z Creating toolchains.xml for JDK version 17 from corretto
+build (17)	UNKNOWN STEP	2026-06-03T02:01:22.0492280Z Writing to /home/runner/.m2/toolchains.xml
+build (17)	UNKNOWN STEP	2026-06-03T02:01:22.0492720Z 
+build (17)	UNKNOWN STEP	2026-06-03T02:01:22.0492890Z Java configuration:
+build (17)	UNKNOWN STEP	2026-06-03T02:01:22.0493262Z   Distribution: corretto
+build (17)	UNKNOWN STEP	2026-06-03T02:01:22.0493634Z   Version: 17.0.19+10.1
+build (17)	UNKNOWN STEP	2026-06-03T02:01:22.0494108Z   Path: /opt/hostedtoolcache/Java_Corretto_jdk/17.0.19-10.1/x64
+build (17)	UNKNOWN STEP	2026-06-03T02:01:22.0494678Z 
+build (17)	UNKNOWN STEP	2026-06-03T02:01:22.0495311Z ##[endgroup]
+build (17)	UNKNOWN STEP	2026-06-03T02:01:22.0532189Z Creating settings.xml with server-id: github
+build (17)	UNKNOWN STEP	2026-06-03T02:01:22.0532705Z Writing to /home/runner/.m2/settings.xml
+build (17)	UNKNOWN STEP	2026-06-03T02:01:22.0768446Z ##[group]Run gradle/actions/setup-gradle@v4
+build (17)	UNKNOWN STEP	2026-06-03T02:01:22.0768758Z with:
+build (17)	UNKNOWN STEP	2026-06-03T02:01:22.0768984Z   cache-disabled: false
+build (17)	UNKNOWN STEP	2026-06-03T02:01:22.0769247Z   cache-read-only: false
+build (17)	UNKNOWN STEP	2026-06-03T02:01:22.0769504Z   cache-write-only: false
+build (17)	UNKNOWN STEP	2026-06-03T02:01:22.0769769Z   cache-overwrite-existing: false
+build (17)	UNKNOWN STEP	2026-06-03T02:01:22.0770060Z   cache-cleanup: on-success
+build (17)	UNKNOWN STEP	2026-06-03T02:01:22.0770554Z   gradle-home-cache-includes: caches
+build (17)	UNKNOWN STEP	notifications
+build (17)	UNKNOWN STEP	
+build (17)	UNKNOWN STEP	2026-06-03T02:01:22.0770916Z   add-job-summary: always
+build (17)	UNKNOWN STEP	2026-06-03T02:01:22.0771190Z   add-job-summary-as-pr-comment: never
+build (17)	UNKNOWN STEP	2026-06-03T02:01:22.0771489Z   dependency-graph: disabled
+build (17)	UNKNOWN STEP	2026-06-03T02:01:22.0771828Z   dependency-graph-report-dir: dependency-graph-reports
+build (17)	UNKNOWN STEP	2026-06-03T02:01:22.0772200Z   dependency-graph-continue-on-failure: true
+build (17)	UNKNOWN STEP	2026-06-03T02:01:22.0772526Z   build-scan-publish: false
+build (17)	UNKNOWN STEP	2026-06-03T02:01:22.0772790Z   validate-wrappers: true
+build (17)	UNKNOWN STEP	2026-06-03T02:01:22.0773049Z   allow-snapshot-wrappers: false
+build (17)	UNKNOWN STEP	2026-06-03T02:01:22.0773394Z   gradle-home-cache-strict-match: false
+build (17)	UNKNOWN STEP	2026-06-03T02:01:22.0773707Z   workflow-job-context: {
+build (17)	UNKNOWN STEP	  "java": "17"
+build (17)	UNKNOWN STEP	}
+build (17)	UNKNOWN STEP	2026-06-03T02:01:22.0776763Z   github-token: ***
+build (17)	UNKNOWN STEP	2026-06-03T02:01:22.0777005Z env:
+build (17)	UNKNOWN STEP	2026-06-03T02:01:22.0777323Z   JAVA_HOME: /opt/hostedtoolcache/Java_Corretto_jdk/17.0.19-10.1/x64
+build (17)	UNKNOWN STEP	2026-06-03T02:01:22.0777796Z   JAVA_HOME_17_X64: /opt/hostedtoolcache/Java_Corretto_jdk/17.0.19-10.1/x64
+build (17)	UNKNOWN STEP	2026-06-03T02:01:22.0778179Z ##[endgroup]
+build (17)	UNKNOWN STEP	2026-06-03T02:01:22.4593038Z Merged default JDK locations into /home/runner/.m2/toolchains.xml
+build (17)	UNKNOWN STEP	2026-06-03T02:01:22.4595101Z Preparing cache for cleanup.
+build (17)	UNKNOWN STEP	2026-06-03T02:01:22.4598803Z ##[group]Restore Gradle state from cache
+build (17)	UNKNOWN STEP	2026-06-03T02:01:22.5532371Z Cache hit for restore-key: gradle-home-v1|Linux-X64|build[491fedaeebe4f3908a91ad77d47d0005]-ac0628c0e1242e415f2d2478f176ffccd42a8e4b
+build (17)	UNKNOWN STEP	2026-06-03T02:01:22.6160829Z Received 13311 of 13311 (100.0%), 0.6 MBs/sec
+build (17)	UNKNOWN STEP	2026-06-03T02:01:22.6162687Z Cache Size: ~0 MB (13311 B)
+build (17)	UNKNOWN STEP	2026-06-03T02:01:22.6190474Z [command]/usr/bin/tar -xf /home/runner/work/_temp/50c5af29-d576-4f35-a6c0-6159bd3779a5/cache.tzst -P -C /home/runner/work/micronaut-core/micronaut-core --use-compress-program unzstd
+build (17)	UNKNOWN STEP	2026-06-03T02:01:22.6274077Z Cache restored successfully
+build (17)	UNKNOWN STEP	2026-06-03T02:01:22.6279418Z Restored cache entry with key gradle-home-v1|Linux-X64|build[491fedaeebe4f3908a91ad77d47d0005]-fa21e0d48c77bb596960e299d517ba2157bc8f34 to /home/runner/.gradle/caches,/home/runner/.gradle/notifications,/home/runner/.gradle/.setup-gradle in 167ms
+build (17)	UNKNOWN STEP	2026-06-03T02:01:22.7068920Z Cache hit for: gradle-instrumented-jars-v1-2fd0374d072bc644a24d26eb9a317e10
+build (17)	UNKNOWN STEP	2026-06-03T02:01:22.7094884Z Cache hit for: gradle-wrapper-zips-v1-32a3a100d181ec75e824fde1164fcedd
+build (17)	UNKNOWN STEP	2026-06-03T02:01:22.7140714Z Cache hit for: gradle-groovy-dsl-v1-14deecfc585bbf20d0f0547a98bd774f
+build (17)	UNKNOWN STEP	2026-06-03T02:01:22.7821482Z Received 66155 of 66155 (100.0%), 1.5 MBs/sec
+build (17)	UNKNOWN STEP	2026-06-03T02:01:22.7822069Z Cache Size: ~0 MB (66155 B)
+build (17)	UNKNOWN STEP	2026-06-03T02:01:22.7829245Z Received 102957 of 102957 (100.0%), 2.1 MBs/sec
+build (17)	UNKNOWN STEP	2026-06-03T02:01:22.7830163Z Cache Size: ~0 MB (102957 B)
+build (17)	UNKNOWN STEP	2026-06-03T02:01:22.7867482Z [command]/usr/bin/tar -xf /home/runner/work/_temp/24117672-fcd3-4ab4-93ad-16e6a7abc7b1/cache.tzst -P -C /home/runner/work/micronaut-core/micronaut-core --use-compress-program unzstd
+build (17)	UNKNOWN STEP	2026-06-03T02:01:22.7894015Z [command]/usr/bin/tar -xf /home/runner/work/_temp/a2551c55-428b-4236-87dc-978c8527d0d1/cache.tzst -P -C /home/runner/work/micronaut-core/micronaut-core --use-compress-program unzstd
+build (17)	UNKNOWN STEP	2026-06-03T02:01:22.8845720Z Cache restored successfully
+build (17)	UNKNOWN STEP	2026-06-03T02:01:22.8851936Z Restored cache entry with key gradle-instrumented-jars-v1-2fd0374d072bc644a24d26eb9a317e10 to /home/runner/.gradle/caches/jars-*/*/ in 257ms
+build (17)	UNKNOWN STEP	2026-06-03T02:01:22.8929822Z Cache restored successfully
+build (17)	UNKNOWN STEP	2026-06-03T02:01:22.8932593Z Restored cache entry with key gradle-groovy-dsl-v1-14deecfc585bbf20d0f0547a98bd774f to /home/runner/.gradle/caches/*/groovy-dsl/*/ in 265ms
+build (17)	UNKNOWN STEP	2026-06-03T02:01:23.5709335Z Received 139574240 of 139574240 (100.0%), 163.9 MBs/sec
+build (17)	UNKNOWN STEP	2026-06-03T02:01:23.5710325Z Cache Size: ~133 MB (139574240 B)
+build (17)	UNKNOWN STEP	2026-06-03T02:01:23.5727496Z [command]/usr/bin/tar -xf /home/runner/work/_temp/e324986d-9027-49fe-8350-407c3bc9ea08/cache.tzst -P -C /home/runner/work/micronaut-core/micronaut-core --use-compress-program unzstd
+build (17)	UNKNOWN STEP	2026-06-03T02:01:23.7946411Z Cache restored successfully
+build (17)	UNKNOWN STEP	2026-06-03T02:01:23.8010967Z Restored cache entry with key gradle-wrapper-zips-v1-32a3a100d181ec75e824fde1164fcedd to /home/runner/.gradle/wrapper/dists/gradle-9.5.1-bin/iq79hdu3mqx29lgffhp8bfmx in 1172ms
+build (17)	UNKNOWN STEP	2026-06-03T02:01:23.8075027Z ##[endgroup]
+build (17)	UNKNOWN STEP	2026-06-03T02:01:23.9716874Z ##[group]All Gradle Wrapper jars are valid
+build (17)	UNKNOWN STEP	2026-06-03T02:01:23.9718019Z ✓ Found known Gradle Wrapper JAR files:
+build (17)	UNKNOWN STEP	2026-06-03T02:01:23.9718893Z   497c8c2a7e5031f6aa847f88104aa80a93532ec32ee17bdb8d1d2f67a194a9c7 gradle/wrapper/gradle-wrapper.jar
+build (17)	UNKNOWN STEP	2026-06-03T02:01:23.9720047Z ##[endgroup]
+build (17)	UNKNOWN STEP	2026-06-03T02:01:23.9889657Z ##[group]Run [ -f ./setup.sh ] && ./setup.sh || true
+build (17)	UNKNOWN STEP	2026-06-03T02:01:23.9890093Z ^[[36;1m[ -f ./setup.sh ] && ./setup.sh || true^[[0m
+build (17)	UNKNOWN STEP	2026-06-03T02:01:23.9918788Z shell: /usr/bin/bash -e {0}
+build (17)	UNKNOWN STEP	2026-06-03T02:01:23.9919084Z env:
+build (17)	UNKNOWN STEP	2026-06-03T02:01:23.9919428Z   JAVA_HOME: /opt/hostedtoolcache/Java_Corretto_jdk/17.0.19-10.1/x64
+build (17)	UNKNOWN STEP	2026-06-03T02:01:23.9919946Z   JAVA_HOME_17_X64: /opt/hostedtoolcache/Java_Corretto_jdk/17.0.19-10.1/x64
+build (17)	UNKNOWN STEP	2026-06-03T02:01:23.9920400Z   GRADLE_ACTION_ID: gradle/actions/setup-gradle
+build (17)	UNKNOWN STEP	2026-06-03T02:01:23.9920756Z   GRADLE_USER_HOME: /home/runner/.gradle
+build (17)	UNKNOWN STEP	2026-06-03T02:01:23.9921116Z   GRADLE_BUILD_ACTION_SETUP_COMPLETED: true
+build (17)	UNKNOWN STEP	2026-06-03T02:01:23.9921461Z   GRADLE_BUILD_ACTION_CACHE_RESTORED: true
+build (17)	UNKNOWN STEP	2026-06-03T02:01:23.9921991Z   DEVELOCITY_INJECTION_INIT_SCRIPT_NAME: gradle-actions.inject-develo***ty.init.gradle
+build (17)	UNKNOWN STEP	2026-06-03T02:01:23.9922514Z   DEVELOCITY_INJECTION_CUSTOM_VALUE: gradle-actions
+build (17)	UNKNOWN STEP	2026-06-03T02:01:23.9922881Z   GITHUB_DEPENDENCY_GRAPH_ENABLED: false
+build (17)	UNKNOWN STEP	2026-06-03T02:01:23.9923474Z   GRADLE_ENTERPRISE_ACCESS_KEY: ***
+build (17)	UNKNOWN STEP	2026-06-03T02:01:23.9923812Z   GRADLE_ENTERPRISE_CACHE_USERNAME: ***
+build (17)	UNKNOWN STEP	2026-06-03T02:01:23.9924168Z   GRADLE_ENTERPRISE_CACHE_PASSWORD: ***
+build (17)	UNKNOWN STEP	2026-06-03T02:01:23.9924469Z ##[endgroup]
+build (17)	UNKNOWN STEP	2026-06-03T02:01:24.6361400Z Starting a Gradle Daemon (subsequent builds will be faster)
+build (17)	UNKNOWN STEP	2026-06-03T02:01:28.6353580Z 
+build (17)	UNKNOWN STEP	2026-06-03T02:01:28.6354211Z FAILURE: Build failed with an exception.
+build (17)	UNKNOWN STEP	2026-06-03T02:01:28.6354900Z 
+build (17)	UNKNOWN STEP	2026-06-03T02:01:28.6355077Z * What went wrong:
+build (17)	UNKNOWN STEP	2026-06-03T02:01:28.6355644Z Could not resolve all artifacts for configuration 'classpath'.
+build (17)	UNKNOWN STEP	2026-06-03T02:01:28.6356143Z 
+build (17)	UNKNOWN STEP	2026-06-03T02:01:28.6356688Z > Could not resolve io.micronaut.build.internal:micronaut-gradle-plugins:8.0.0-M17.
+build (17)	UNKNOWN STEP	2026-06-03T02:01:28.6379960Z   Required by:
+build (17)	UNKNOWN STEP	2026-06-03T02:01:28.6415746Z       settings file 'settings.gradle' > io.micronaut.build.shared.settings:io.micronaut.build.shared.settings.gradle.plugin:8.0.0-M17
+build (17)	UNKNOWN STEP	2026-06-03T02:01:28.6423685Z [Incubating] Problems report is available at: file:///home/runner/work/micronaut-core/micronaut-core/build/reports/problems/problems-report.html
+build (17)	UNKNOWN STEP	2026-06-03T02:01:28.6444166Z    > Dependency requires at least JVM runtime version 21. This build uses a Java 17 JVM.
+build (17)	UNKNOWN STEP	2026-06-03T02:01:28.6469563Z 
+build (17)	UNKNOWN STEP	2026-06-03T02:01:28.6509812Z * Try:
+build (17)	UNKNOWN STEP	2026-06-03T02:01:28.6510285Z > Run this build using a Java 21 or newer JVM.
+build (17)	UNKNOWN STEP	2026-06-03T02:01:28.6510948Z > Run with --stacktrace option to get the stack trace.
+build (17)	UNKNOWN STEP	2026-06-03T02:01:28.6511637Z > Run with --info or --debug option to get more log output.
+build (17)	UNKNOWN STEP	2026-06-03T02:01:28.6512539Z > Run with --scan to get full insights from a Build Scan (powered by Develo***ty).
+build (17)	UNKNOWN STEP	2026-06-03T02:01:28.6513353Z > Get more help at https://help.gradle.org.
+build (17)	UNKNOWN STEP	2026-06-03T02:01:28.6513728Z 
+build (17)	UNKNOWN STEP	2026-06-03T02:01:28.6514060Z BUILD FAILED in 4s
+build (17)	UNKNOWN STEP	2026-06-03T02:01:29.1227893Z ##[group]Run ./gradlew check --no-daemon --parallel --continue
+build (17)	UNKNOWN STEP	2026-06-03T02:01:29.1228419Z ^[[36;1m./gradlew check --no-daemon --parallel --continue^[[0m
+build (17)	UNKNOWN STEP	2026-06-03T02:01:29.1256031Z shell: /usr/bin/bash -e {0}
+build (17)	UNKNOWN STEP	2026-06-03T02:01:29.1256324Z env:
+build (17)	UNKNOWN STEP	2026-06-03T02:01:29.1256685Z   JAVA_HOME: /opt/hostedtoolcache/Java_Corretto_jdk/17.0.19-10.1/x64
+build (17)	UNKNOWN STEP	2026-06-03T02:01:29.1257204Z   JAVA_HOME_17_X64: /opt/hostedtoolcache/Java_Corretto_jdk/17.0.19-10.1/x64
+build (17)	UNKNOWN STEP	2026-06-03T02:01:29.1257657Z   GRADLE_ACTION_ID: gradle/actions/setup-gradle
+build (17)	UNKNOWN STEP	2026-06-03T02:01:29.1258016Z   GRADLE_USER_HOME: /home/runner/.gradle
+build (17)	UNKNOWN STEP	2026-06-03T02:01:29.1258363Z   GRADLE_BUILD_ACTION_SETUP_COMPLETED: true
+build (17)	UNKNOWN STEP	2026-06-03T02:01:29.1258713Z   GRADLE_BUILD_ACTION_CACHE_RESTORED: true
+build (17)	UNKNOWN STEP	2026-06-03T02:01:29.1259235Z   DEVELOCITY_INJECTION_INIT_SCRIPT_NAME: gradle-actions.inject-develo***ty.init.gradle
+build (17)	UNKNOWN STEP	2026-06-03T02:01:29.1259946Z   DEVELOCITY_INJECTION_CUSTOM_VALUE: gradle-actions
+build (17)	UNKNOWN STEP	2026-06-03T02:01:29.1260375Z   GITHUB_DEPENDENCY_GRAPH_ENABLED: false
+build (17)	UNKNOWN STEP	2026-06-03T02:01:29.1261088Z   GH_TOKEN_PUBLIC_REPOS_READONLY: ***
+build (17)	UNKNOWN STEP	2026-06-03T02:01:29.1261468Z   GH_USERNAME: ***
+build (17)	UNKNOWN STEP	2026-06-03T02:01:29.1261748Z   MICRONAUT_TEST_USE_VENDOR: true
+build (17)	UNKNOWN STEP	2026-06-03T02:01:29.1262069Z   TESTCONTAINERS_RYUK_DISABLED: true
+build (17)	UNKNOWN STEP	2026-06-03T02:01:29.1262607Z   GRADLE_ENTERPRISE_ACCESS_KEY: ***
+build (17)	UNKNOWN STEP	2026-06-03T02:01:29.1262935Z   GRADLE_ENTERPRISE_CACHE_USERNAME: ***
+build (17)	UNKNOWN STEP	2026-06-03T02:01:29.1263297Z   GRADLE_ENTERPRISE_CACHE_PASSWORD: ***
+build (17)	UNKNOWN STEP	2026-06-03T02:01:29.1263613Z   PREDICTIVE_TEST_SELECTION: false
+build (17)	UNKNOWN STEP	2026-06-03T02:01:29.1263917Z ##[endgroup]
+build (17)	UNKNOWN STEP	2026-06-03T02:01:29.7712520Z To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.5.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+build (17)	UNKNOWN STEP	2026-06-03T02:01:30.6716373Z Daemon will be stopped at the end of the build 
+build (17)	UNKNOWN STEP	2026-06-03T02:01:33.2694045Z 
+build (17)	UNKNOWN STEP	2026-06-03T02:01:33.2708426Z [Incubating] Problems report is available at: file:///home/runner/work/micronaut-core/micronaut-core/build/reports/problems/problems-report.html
+build (17)	UNKNOWN STEP	2026-06-03T02:01:33.2709476Z 
+build (17)	UNKNOWN STEP	2026-06-03T02:01:33.2721172Z FAILURE: Build failed with an exception.
+build (17)	UNKNOWN STEP	2026-06-03T02:01:33.2721776Z 
+build (17)	UNKNOWN STEP	2026-06-03T02:01:33.2722238Z * What went wrong:
+build (17)	UNKNOWN STEP	2026-06-03T02:01:33.2722948Z Could not resolve all artifacts for configuration 'classpath'.
+build (17)	UNKNOWN STEP	2026-06-03T02:01:33.2724008Z > Could not resolve io.micronaut.build.internal:micronaut-gradle-plugins:8.0.0-M17.
+build (17)	UNKNOWN STEP	2026-06-03T02:01:33.2725266Z   Required by:
+build (17)	UNKNOWN STEP	2026-06-03T02:01:33.2726212Z       settings file 'settings.gradle' > io.micronaut.build.shared.settings:io.micronaut.build.shared.settings.gradle.plugin:8.0.0-M17
+build (17)	UNKNOWN STEP	2026-06-03T02:01:33.2727407Z    > Dependency requires at least JVM runtime version 21. This build uses a Java 17 JVM.
+build (17)	UNKNOWN STEP	2026-06-03T02:01:33.2727987Z 
+build (17)	UNKNOWN STEP	2026-06-03T02:01:33.2728136Z * Try:
+build (17)	UNKNOWN STEP	2026-06-03T02:01:33.2728557Z > Run this build using a Java 21 or newer JVM.
+build (17)	UNKNOWN STEP	2026-06-03T02:01:33.2729158Z > Run with --stacktrace option to get the stack trace.
+build (17)	UNKNOWN STEP	2026-06-03T02:01:33.2729776Z > Run with --info or --debug option to get more log output.
+build (17)	UNKNOWN STEP	2026-06-03T02:01:33.2730592Z > Run with --scan to get full insights from a Build Scan (powered by Develo***ty).
+build (17)	UNKNOWN STEP	2026-06-03T02:01:33.2731304Z > Get more help at https://help.gradle.org.
+build (17)	UNKNOWN STEP	2026-06-03T02:01:33.2731648Z 
+build (17)	UNKNOWN STEP	2026-06-03T02:01:33.2732084Z BUILD FAILED in 4s
+build (17)	UNKNOWN STEP	2026-06-03T02:01:33.6773710Z ##[error]Process completed with exit code 1.
+build (17)	UNKNOWN STEP	2026-06-03T02:01:33.6901379Z Post job cleanup.
+build (17)	UNKNOWN STEP	2026-06-03T02:01:33.9988891Z In post-action step
+build (17)	UNKNOWN STEP	2026-06-03T02:01:33.9997187Z ##[group]Stopping Gradle daemons
+build (17)	UNKNOWN STEP	2026-06-03T02:01:33.9998222Z ##[endgroup]
+build (17)	UNKNOWN STEP	2026-06-03T02:01:34.0028789Z ##[group]Provision Gradle >= 8.11
+build (17)	UNKNOWN STEP	2026-06-03T02:01:38.7651858Z Gradle version 9.5.1 is available at /usr/bin/gradle and >= 8.11. Not installing.
+build (17)	UNKNOWN STEP	2026-06-03T02:01:38.7652722Z ##[endgroup]
+build (17)	UNKNOWN STEP	2026-06-03T02:01:38.7657484Z ##[group]Executing Gradle to clean up caches
+build (17)	UNKNOWN STEP	2026-06-03T02:01:38.7657905Z Cleaning up caches last used before 1780452082459
+build (17)	UNKNOWN STEP	2026-06-03T02:01:38.7662316Z [command]/usr/bin/gradle -g /home/runner/.gradle -I init.gradle --info --no-daemon --no-scan --build-cache -DGITHUB_DEPENDENCY_GRAPH_ENABLED=false -DGRADLE_ACTIONS_SKIP_BUILD_RESULT_CAPTURE=true noop
+build (17)	UNKNOWN STEP	2026-06-03T02:01:39.1313335Z Initialized native services in: /home/runner/.gradle/native
+build (17)	UNKNOWN STEP	2026-06-03T02:01:39.1339698Z Initialized jansi services in: /home/runner/.gradle/native
+build (17)	UNKNOWN STEP	2026-06-03T02:01:39.2593945Z The current JVM process isn't compatible with build requirement. The maximum heap size is insuffi***ent.
+build (17)	UNKNOWN STEP	2026-06-03T02:01:39.2595153Z 
+build (17)	UNKNOWN STEP	2026-06-03T02:01:39.6569404Z To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.5.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+build (17)	UNKNOWN STEP	2026-06-03T02:01:39.7574219Z Starting process 'Gradle build daemon'. Working directory: /home/runner/.gradle/daemon/9.5.1 Command: /opt/hostedtoolcache/Java_Corretto_jdk/17.0.19-10.1/x64/bin/java --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang.invoke=ALL-UNNAMED --add-opens=java.base/java.util=ALL-UNNAMED --add-opens=java.prefs/java.util.prefs=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED --add-opens=java.base/java.nio.charset=ALL-UNNAMED --add-opens=java.base/java.net=ALL-UNNAMED --add-opens=java.base/java.util.concurrent=ALL-UNNAMED --add-opens=java.base/java.util.concurrent.atomic=ALL-UNNAMED --add-opens=java.xml/javax.xml.namespace=ALL-UNNAMED --add-opens=java.base/java.time=ALL-UNNAMED -XX:MaxMetaspaceSize=384m -XX:+HeapDumpOnOutOfMemoryError -Xms256m -Xmx512m -Dfile.encoding=UTF-8 -Duser.country -Duser.language=en -Duser.variant -cp /usr/share/gradle-9.5.1/lib/gradle-daemon-main-9.5.1.jar -javaagent:/usr/share/gradle-9.5.1/lib/agents/gradle-instrumentation-agent-9.5.1.jar org.gradle.launcher.daemon.bootstrap.GradleDaemon 9.5.1
+build (17)	UNKNOWN STEP	2026-06-03T02:01:39.7579340Z Successfully started process 'Gradle build daemon'
+build (17)	UNKNOWN STEP	2026-06-03T02:01:44.3565058Z An attempt to start the daemon took 4.738 secs.
+build (17)	UNKNOWN STEP	2026-06-03T02:01:44.4583783Z The client will now receive all logging from the daemon (pid: 2662). The daemon log file: /home/runner/.gradle/daemon/9.5.1/daemon-2662.out.log
+build (17)	UNKNOWN STEP	2026-06-03T02:01:44.4585850Z Daemon will be stopped at the end of the build 
+build (17)	UNKNOWN STEP	2026-06-03T02:01:45.4561847Z Using 4 worker leases.
+build (17)	UNKNOWN STEP	2026-06-03T02:01:45.5566197Z Operational build model parameters: {cachingModelBuilding=false, configurationCache=false, configurationCacheDisabledReason=null, configurationCacheParallelLoad=false, configurationCacheParallelStore=false, configureOnDemand=false, invalidateCoupledProjects=false, isolatedProjects=false, modelAsProjectDependency=false, modelBuilding=false, parallelModelBuilding=false, parallelProjectConfiguration=false, parallelProjectExecution=false, resilientModelBuilding=false}
+build (17)	UNKNOWN STEP	2026-06-03T02:01:46.3564342Z Received JVM installation metadata from '/opt/hostedtoolcache/Java_Corretto_jdk/17.0.19-10.1/x64': {JAVA_HOME=/opt/hostedtoolcache/Java_Corretto_jdk/17.0.19-10.1/x64, JAVA_VERSION=17.0.19, JAVA_VENDOR=Amazon.com Inc., RUNTIME_NAME=OpenJDK Runtime Environment, RUNTIME_VERSION=17.0.19+10-LTS, VM_NAME=OpenJDK 64-Bit Server VM, VM_VERSION=17.0.19+10-LTS, VM_VENDOR=Amazon.com Inc., OS_ARCH=amd64}
+build (17)	UNKNOWN STEP	2026-06-03T02:01:46.8564008Z Watching the file system is configured to be enabled if available
+build (17)	UNKNOWN STEP	2026-06-03T02:01:46.8565767Z Now considering [/home/runner/work/_temp/dummy-cleanup-project] as hierarchies to watch
+build (17)	UNKNOWN STEP	2026-06-03T02:01:46.8566602Z File system watching is active
+build (17)	UNKNOWN STEP	2026-06-03T02:01:47.5562402Z Caching disabled for Groovy DSL script compilation (cp_init) because:
+build (17)	UNKNOWN STEP	2026-06-03T02:01:47.5563031Z   Build cache is disabled
+build (17)	UNKNOWN STEP	2026-06-03T02:01:47.5563328Z   Not worth caching.
+build (17)	UNKNOWN STEP	2026-06-03T02:01:47.5563918Z Compiling initialization script '/home/runner/work/_temp/dummy-cleanup-project/init.gradle' using SubsetScriptTransformer.
+build (17)	UNKNOWN STEP	2026-06-03T02:01:48.4636003Z Caching disabled for Groovy DSL script compilation (init) because:
+build (17)	UNKNOWN STEP	2026-06-03T02:01:48.4645298Z   Build cache is disabled
+build (17)	UNKNOWN STEP	2026-06-03T02:01:48.4649996Z   Not worth caching.
+build (17)	UNKNOWN STEP	2026-06-03T02:01:48.4651102Z Compiling initialization script '/home/runner/work/_temp/dummy-cleanup-project/init.gradle' using BuildScriptTransformer.
+build (17)	UNKNOWN STEP	2026-06-03T02:01:49.1574188Z gradle/actions: Not capturing build results
+build (17)	UNKNOWN STEP	2026-06-03T02:01:49.4605817Z Starting Build
+build (17)	UNKNOWN STEP	2026-06-03T02:01:49.5563810Z Settings evaluated using settings file '/home/runner/work/_temp/dummy-cleanup-project/settings.gradle'.
+build (17)	UNKNOWN STEP	2026-06-03T02:01:49.5595917Z Using local directory build cache for the root build (location = /home/runner/.gradle/caches/build-cache-1, remove unused entries = older than 2026-06-03 02:01:22 UTC).
+build (17)	UNKNOWN STEP	2026-06-03T02:01:49.6563679Z Projects loaded. Root project using build file '/home/runner/work/_temp/dummy-cleanup-project/build.gradle'.
+build (17)	UNKNOWN STEP	2026-06-03T02:01:49.6565414Z Included projects: [root project 'dummy-cleanup-project']
+build (17)	UNKNOWN STEP	2026-06-03T02:01:49.9585599Z 
+build (17)	UNKNOWN STEP	2026-06-03T02:01:49.9615667Z > Configure project :
+build (17)	UNKNOWN STEP	2026-06-03T02:01:49.9645804Z Evaluating root project 'dummy-cleanup-project' using build file '/home/runner/work/_temp/dummy-cleanup-project/build.gradle'.
+build (17)	UNKNOWN STEP	2026-06-03T02:01:49.9654435Z All projects evaluated.
+build (17)	UNKNOWN STEP	2026-06-03T02:01:49.9675300Z Task name matched 'noop'
+build (17)	UNKNOWN STEP	2026-06-03T02:01:49.9697319Z Selected primary task 'noop' from project :
+build (17)	UNKNOWN STEP	2026-06-03T02:01:49.9735272Z Tasks to be executed: [task ':noop']
+build (17)	UNKNOWN STEP	2026-06-03T02:01:49.9736252Z Tasks that were excluded: []
+build (17)	UNKNOWN STEP	2026-06-03T02:01:49.9765465Z Resolve mutations for :noop (Thread[Execution worker Thread 2,5,main]) started.
+build (17)	UNKNOWN STEP	2026-06-03T02:01:50.0578875Z :noop (Thread[Execution worker Thread 2,5,main]) started.
+build (17)	UNKNOWN STEP	2026-06-03T02:01:50.0579765Z 
+build (17)	UNKNOWN STEP	2026-06-03T02:01:50.0580132Z > Task :noop UP-TO-DATE
+build (17)	UNKNOWN STEP	2026-06-03T02:01:50.0580997Z Skipping task ':noop' as it has no actions.
+build (17)	UNKNOWN STEP	2026-06-03T02:01:50.1545227Z 
+build (17)	UNKNOWN STEP	2026-06-03T02:01:50.1575555Z BUILD SUCCESSFUL in 11s
+build (17)	UNKNOWN STEP	2026-06-03T02:01:50.1605829Z Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.5.1/userguide/configuration_cache_enabling.html
+build (17)	UNKNOWN STEP	2026-06-03T02:01:50.1607463Z Build cache (/home/runner/.gradle/caches/build-cache-1) removing files not accessed on or after Wed Jun 03 02:01:22 UTC 2026.
+build (17)	UNKNOWN STEP	2026-06-03T02:01:50.1639333Z Build cache (/home/runner/.gradle/caches/build-cache-1) cleanup deleted 0 files/directories.
+build (17)	UNKNOWN STEP	2026-06-03T02:01:50.1655586Z Build cache (/home/runner/.gradle/caches/build-cache-1) cleaned up in 0.003 secs.
+build (17)	UNKNOWN STEP	2026-06-03T02:01:50.1656939Z groovy-dsl removing files not accessed on or after Wed Jun 03 02:01:22 UTC 2026.
+build (17)	UNKNOWN STEP	2026-06-03T02:01:50.1657953Z groovy-dsl cleanup deleted 2 files/directories.
+build (17)	UNKNOWN STEP	2026-06-03T02:01:50.1658686Z groovy-dsl cleaned up in 0.017 secs.
+build (17)	UNKNOWN STEP	2026-06-03T02:01:50.1659534Z jars (/home/runner/.gradle/caches/jars-9) cleanup deleted 0 files/directories.
+build (17)	UNKNOWN STEP	2026-06-03T02:01:50.1660916Z jars (/home/runner/.gradle/caches/jars-9) removing files not accessed on or after Wed Jun 03 02:01:22 UTC 2026.
+build (17)	UNKNOWN STEP	2026-06-03T02:01:50.1675628Z jars (/home/runner/.gradle/caches/jars-9) cleanup deleted 1 files/directories.
+build (17)	UNKNOWN STEP	2026-06-03T02:01:50.1676890Z jars (/home/runner/.gradle/caches/jars-9) cleaned up in 0.005 secs.
+build (17)	UNKNOWN STEP	2026-06-03T02:01:50.1678000Z artifact cache (/home/runner/.gradle/caches/modules-2) cleanup deleted 0 files/directories.
+build (17)	UNKNOWN STEP	2026-06-03T02:01:50.1679508Z artifact cache (/home/runner/.gradle/caches/modules-2) [subdir: /home/runner/.gradle/caches/modules-2/resources-2.1] cleanup deleted 0 files/directories.
+build (17)	UNKNOWN STEP	2026-06-03T02:01:50.1681772Z artifact cache (/home/runner/.gradle/caches/modules-2) [subdir: /home/runner/.gradle/caches/modules-2/resources-2.1] removing files not accessed on or after Wed Jun 03 02:01:22 UTC 2026.
+build (17)	UNKNOWN STEP	2026-06-03T02:01:50.1683756Z artifact cache (/home/runner/.gradle/caches/modules-2) [subdir: /home/runner/.gradle/caches/modules-2/resources-2.1] cleanup deleted 0 files/directories.
+build (17)	UNKNOWN STEP	2026-06-03T02:01:50.1685764Z artifact cache (/home/runner/.gradle/caches/modules-2) [subdir: /home/runner/.gradle/caches/modules-2/files-2.1] cleanup deleted 0 files/directories.
+build (17)	UNKNOWN STEP	2026-06-03T02:01:50.1687725Z artifact cache (/home/runner/.gradle/caches/modules-2) [subdir: /home/runner/.gradle/caches/modules-2/files-2.1] removing files not accessed on or after Wed Jun 03 02:01:22 UTC 2026.
+build (17)	UNKNOWN STEP	2026-06-03T02:01:50.1689612Z artifact cache (/home/runner/.gradle/caches/modules-2) [subdir: /home/runner/.gradle/caches/modules-2/files-2.1] cleanup deleted 0 files/directories.
+build (17)	UNKNOWN STEP	2026-06-03T02:01:50.1691417Z artifact cache (/home/runner/.gradle/caches/modules-2) [subdir: /home/runner/.gradle/caches/modules-2/metadata-2.107] cleanup deleted 0 files/directories.
+build (17)	UNKNOWN STEP	2026-06-03T02:01:50.1692917Z artifact cache (/home/runner/.gradle/caches/modules-2) cleanup deleted 0 files/directories.
+build (17)	UNKNOWN STEP	2026-06-03T02:01:50.1694092Z artifact cache (/home/runner/.gradle/caches/modules-2) cleaned up in 0.002 secs.
+build (17)	UNKNOWN STEP	2026-06-03T02:01:50.2118563Z ##[endgroup]
+build (17)	UNKNOWN STEP	2026-06-03T02:01:50.2119599Z ##[group]Caching Gradle state
+build (17)	UNKNOWN STEP	2026-06-03T02:01:50.2739412Z [command]/usr/bin/tar --posix -cf cache.tzst --exclude cache.tzst -P -C /home/runner/work/micronaut-core/micronaut-core --files-from manifest.txt --use-compress-program zstdmt
+build (17)	UNKNOWN STEP	2026-06-03T02:01:50.3309320Z [command]/usr/bin/tar --posix -cf cache.tzst --exclude cache.tzst -P -C /home/runner/work/micronaut-core/micronaut-core --files-from manifest.txt --use-compress-program zstdmt
+build (17)	UNKNOWN STEP	2026-06-03T02:01:50.4589596Z Sent 66428 of 66428 (100.0%), 1.6 MBs/sec
+build (17)	UNKNOWN STEP	2026-06-03T02:01:50.5067363Z Sent 103792 of 103792 (100.0%), 1.3 MBs/sec
+build (17)	UNKNOWN STEP	2026-06-03T02:01:50.5486663Z Saved cache entry with key gradle-instrumented-jars-v1-eb5e930e2ad84989e2525d4d34edbe74 from /home/runner/.gradle/caches/jars-*/*/ in 297ms
+build (17)	UNKNOWN STEP	2026-06-03T02:01:50.6367583Z Saved cache entry with key gradle-groovy-dsl-v1-40b199044083bdf946384d77ccddf615 from /home/runner/.gradle/caches/*/groovy-dsl/*/ in 360ms
+build (17)	UNKNOWN STEP	2026-06-03T02:01:50.6617606Z [command]/usr/bin/tar --posix -cf cache.tzst --exclude cache.tzst -P -C /home/runner/work/micronaut-core/micronaut-core --files-from manifest.txt --use-compress-program zstdmt
+build (17)	UNKNOWN STEP	2026-06-03T02:01:50.7580585Z Sent 13248 of 13248 (100.0%), 0.4 MBs/sec
+build (17)	UNKNOWN STEP	2026-06-03T02:01:50.8521757Z Saved cache entry with key gradle-home-v1|Linux-X64|build[491fedaeebe4f3908a91ad77d47d0005]-fa21e0d48c77bb596960e299d517ba2157bc8f34 from /home/runner/.gradle/caches,/home/runner/.gradle/notifications,/home/runner/.gradle/.setup-gradle in 200ms
+build (17)	UNKNOWN STEP	2026-06-03T02:01:50.8523069Z ##[endgroup]
+build (17)	UNKNOWN STEP	2026-06-03T02:01:50.8527665Z Generating Job Summary
+build (17)	UNKNOWN STEP	2026-06-03T02:01:50.8543620Z Completed post-action step
+build (17)	UNKNOWN STEP	2026-06-03T02:01:50.8711677Z Post job cleanup.
+build (17)	UNKNOWN STEP	2026-06-03T02:01:51.0498959Z Post job cleanup.
+build (17)	UNKNOWN STEP	2026-06-03T02:01:51.1488082Z [command]/usr/bin/git version
+build (17)	UNKNOWN STEP	2026-06-03T02:01:51.1523942Z git version 2.54.0
+build (17)	UNKNOWN STEP	2026-06-03T02:01:51.1563838Z Temporarily overriding HOME='/home/runner/work/_temp/8f5626cc-a438-42fd-9c28-bf6269fa894e' before making global git config changes
+build (17)	UNKNOWN STEP	2026-06-03T02:01:51.1565168Z Adding repository directory to the temporary git global config as a safe directory
+build (17)	UNKNOWN STEP	2026-06-03T02:01:51.1580266Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/micronaut-core/micronaut-core
+build (17)	UNKNOWN STEP	2026-06-03T02:01:51.1612894Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+build (17)	UNKNOWN STEP	2026-06-03T02:01:51.1647572Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+build (17)	UNKNOWN STEP	2026-06-03T02:01:51.1897680Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+build (17)	UNKNOWN STEP	2026-06-03T02:01:51.1921519Z http.https://github.com/.extraheader
+build (17)	UNKNOWN STEP	2026-06-03T02:01:51.1933405Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+build (17)	UNKNOWN STEP	2026-06-03T02:01:51.1964381Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+build (17)	UNKNOWN STEP	2026-06-03T02:01:51.2205362Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+build (17)	UNKNOWN STEP	2026-06-03T02:01:51.2236419Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+build (17)	UNKNOWN STEP	2026-06-03T02:01:51.2588702Z Cleaning up orphan processes
+build (17)	UNKNOWN STEP	2026-06-03T02:01:51.2932146Z Terminate orphan process: pid (2424) (java)
+build (17)	UNKNOWN STEP	2026-06-03T02:01:51.2952079Z ##[warning]Node.js 20 actions are deprecated. The following actions are running on Node.js 20 and may not work as expected: actions/checkout@v4, actions/setup-java@v4, gradle/actions/setup-gradle@v4. Actions will be forced to run with Node.js 24 by default starting June 16th, 2026. Node.js 20 will be removed from the runner on September 16th, 2026. Please check if updated versions of these actions are available that support Node.js 24. To opt into Node.js 24 now, set the FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true environment variable on the runner or in your workflow file. Once Node.js 24 becomes the default, you can temporarily opt out by setting ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

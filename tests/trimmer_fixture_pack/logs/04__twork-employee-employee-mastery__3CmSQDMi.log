@@ -1,0 +1,81 @@
+...............10%................20%................30%................40%................50%................60%...............70%................80%................90%................100%
+
+Welcome to Gradle 7.6.4!
+
+Here are the highlights of this release:
+ - Added support for Java 19.
+ - Introduced `--rerun` flag for individual task rerun.
+ - Improved dependency block for test suites to be strongly typed.
+ - Added a pluggable system for Java toolchains provisioning.
+
+For more details see https://docs.gradle.org/7.6.4/release-notes.html
+
+To honour the JVM settings for this build a single-use Daemon process will be forked. See https://docs.gradle.org/7.6.4/userguide/gradle_daemon.html#sec:disabling_the_daemon.
+Daemon will be stopped at the end of the build 
+> Task :generateAvroProtocol NO-SOURCE
+> Task :generateAvroJava
+
+> Task :compileJava
+/workspace/src/main/java/ru/tinkoff/tcrm/backend/attribute/dto/EmployeeAttributeDto.java:6: warning: Generating equals/hashCode implementation but without a call to superclass, even though this class does not extend java.lang.Object. If this is intentional, add '@EqualsAndHashCode(callSuper=false)' to your type.
+@Data
+^
+/workspace/src/main/java/ru/tinkoff/tcrm/backend/profile/dto/CriteriaFeatureDto.java:7: warning: Generating equals/hashCode implementation but without a call to superclass, even though this class does not extend java.lang.Object. If this is intentional, add '@EqualsAndHashCode(callSuper=false)' to your type.
+@Data
+^
+/workspace/src/main/java/ru/tinkoff/tcrm/backend/employeemastery/dto/EmployeeMasteryDto.java:7: warning: Generating equals/hashCode implementation but without a call to superclass, even though this class does not extend java.lang.Object. If this is intentional, add '@EqualsAndHashCode(callSuper=false)' to your type.
+@Data
+^
+/workspace/src/main/java/ru/tinkoff/tcrm/backend/attribute/domain/EmployeeAttribute.java:16: warning: Generating equals/hashCode implementation but without a call to superclass, even though this class does not extend java.lang.Object. If this is intentional, add '@EqualsAndHashCode(callSuper=false)' to your type.
+@Data
+^
+/workspace/src/main/java/ru/tinkoff/tcrm/backend/operatorvector/domain/VectorState.java:14: warning: Generating equals/hashCode implementation but without a call to superclass, even though this class does not extend java.lang.Object. If this is intentional, add '@EqualsAndHashCode(callSuper=false)' to your type.
+@Data
+^
+/workspace/src/main/java/ru/tinkoff/tcrm/backend/common/security/SecurityConfig.java:68: error: cannot find symbol
+                        .expressionHandler(customWebSecurityExpressionHandler())
+                        ^
+  symbol:   method expressionHandler(SecurityExpressionHandler<FilterInvocation>)
+  location: variable requests of type AuthorizeHttpRequestsConfigurer<HttpSecurity>.AuthorizationManagerRequestMatcherRegistry
+/workspace/src/main/java/ru/tinkoff/tcrm/backend/employeemastery/entitylistener/EmployeeMasteryHibernateListener.java:18: error: EmployeeMasteryHibernateListener is not abstract and does not override abstract method requiresPostCommitHandling(EntityPersister) in PostActionEventListener
+public class EmployeeMasteryHibernateListener implements HibernateEntityListener {
+       ^
+/workspace/src/main/java/ru/tinkoff/tcrm/backend/employeemastery/entitylistener/EmployeeMasteryHibernateListener.java:51: error: method does not override or implement a method from a supertype
+    @Override
+    ^
+/workspace/src/main/java/ru/tinkoff/tcrm/backend/score/entitylistener/EmployeeMasteryScoreHibernateListener.java:18: error: EmployeeMasteryScoreHibernateListener is not abstract and does not override abstract method requiresPostCommitHandling(EntityPersister) in PostActionEventListener
+public class EmployeeMasteryScoreHibernateListener implements HibernateEntityListener {
+       ^
+/workspace/src/main/java/ru/tinkoff/tcrm/backend/score/entitylistener/EmployeeMasteryScoreHibernateListener.java:59: error: method does not override or implement a method from a supertype
+    @Override
+    ^
+/workspace/src/main/java/ru/tinkoff/tcrm/backend/attribute/entitylistener/EmployeeAttributeHibernateListener.java:19: error: EmployeeAttributeHibernateListener is not abstract and does not override abstract method requiresPostCommitHandling(EntityPersister) in PostActionEventListener
+public class EmployeeAttributeHibernateListener implements HibernateEntityListener {
+       ^
+/workspace/src/main/java/ru/tinkoff/tcrm/backend/attribute/entitylistener/EmployeeAttributeHibernateListener.java:84: error: method does not override or implement a method from a supertype
+    @Override
+    ^
+Note: Some input files use or override a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+Note: /workspace/src/main/java/ru/tinkoff/tcrm/backend/common/security/JwtUtils.java uses unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+7 errors
+5 warnings
+
+> Task :compileJava FAILED
+> Task :autoLintGradle
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':compileJava'.
+> Compilation failed; see the compiler error output for details.
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+
+* Get more help at https://help.gradle.org
+
+BUILD FAILED in 1m 53s
+3 actionable tasks: 3 executed
