@@ -24,30 +24,30 @@ const maxSpecBundleSize = 50 << 20 // 50 MiB
 
 const specBundleLastRefUpdateTimeout = 5 * time.Second
 
-type specBundleIntegrityErrorKind string
+type integrityErrorKind string
 
 const (
-	specBundleIntegrityMetadataMissing  specBundleIntegrityErrorKind = "metadata_missing"
-	specBundleIntegrityObjectKeyMissing specBundleIntegrityErrorKind = "object_key_missing"
-	specBundleIntegrityBlobMissing      specBundleIntegrityErrorKind = "blob_missing"
+	integrityMetadataMissing  integrityErrorKind = "metadata_missing"
+	integrityObjectKeyMissing integrityErrorKind = "object_key_missing"
+	integrityBlobMissing      integrityErrorKind = "blob_missing"
 )
 
-type specBundleIntegrityError struct {
-	kind     specBundleIntegrityErrorKind
+type integrityError struct {
+	kind     integrityErrorKind
 	bundleID string
 	err      error
 }
 
-func (e *specBundleIntegrityError) Error() string {
+func (e *integrityError) Error() string {
 	if e == nil {
 		return ""
 	}
 	switch e.kind {
-	case specBundleIntegrityMetadataMissing:
+	case integrityMetadataMissing:
 		return fmt.Sprintf("spec bundle %q metadata is missing", e.bundleID)
-	case specBundleIntegrityObjectKeyMissing:
+	case integrityObjectKeyMissing:
 		return fmt.Sprintf("spec bundle %q metadata has no object key", e.bundleID)
-	case specBundleIntegrityBlobMissing:
+	case integrityBlobMissing:
 		return fmt.Sprintf("spec bundle %q blob is missing from object storage", e.bundleID)
 	default:
 		if e.err != nil {
@@ -57,14 +57,14 @@ func (e *specBundleIntegrityError) Error() string {
 	}
 }
 
-func (e *specBundleIntegrityError) Unwrap() error {
+func (e *integrityError) Unwrap() error {
 	if e == nil {
 		return nil
 	}
 	return e.err
 }
 
-func probeSpecBundleIntegrity(ctx context.Context, st store.Store, bs blobstore.Store, bundleID string) (store.SpecBundle, error) {
+func probeIntegrity(ctx context.Context, st store.Store, bs blobstore.Store, bundleID string) (store.SpecBundle, error) {
 	id := strings.TrimSpace(bundleID)
 	if id == "" {
 		return store.SpecBundle{}, fmt.Errorf("spec bundle id is required")
@@ -76,8 +76,8 @@ func probeSpecBundleIntegrity(ctx context.Context, st store.Store, bs blobstore.
 	bundle, err := st.GetSpecBundle(ctx, id)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return store.SpecBundle{}, &specBundleIntegrityError{
-				kind:     specBundleIntegrityMetadataMissing,
+			return store.SpecBundle{}, &integrityError{
+				kind:     integrityMetadataMissing,
 				bundleID: id,
 				err:      err,
 			}
@@ -85,8 +85,8 @@ func probeSpecBundleIntegrity(ctx context.Context, st store.Store, bs blobstore.
 		return store.SpecBundle{}, fmt.Errorf("get spec bundle %q: %w", id, err)
 	}
 	if bundle.ObjectKey == nil || strings.TrimSpace(*bundle.ObjectKey) == "" {
-		return store.SpecBundle{}, &specBundleIntegrityError{
-			kind:     specBundleIntegrityObjectKeyMissing,
+		return store.SpecBundle{}, &integrityError{
+			kind:     integrityObjectKeyMissing,
 			bundleID: id,
 		}
 	}
@@ -95,8 +95,8 @@ func probeSpecBundleIntegrity(ctx context.Context, st store.Store, bs blobstore.
 	reader, _, err := bs.Get(ctx, key)
 	if err != nil {
 		if errors.Is(err, blobstore.ErrNotFound) {
-			return store.SpecBundle{}, &specBundleIntegrityError{
-				kind:     specBundleIntegrityBlobMissing,
+			return store.SpecBundle{}, &integrityError{
+				kind:     integrityBlobMissing,
 				bundleID: id,
 				err:      err,
 			}

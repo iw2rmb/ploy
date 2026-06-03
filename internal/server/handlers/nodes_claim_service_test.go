@@ -13,7 +13,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-func TestClaimService_Claim_ReturnsNoWorkWhenQueueEmpty(t *testing.T) {
+func TestClaim_Claim_ReturnsNoWorkWhenQueueEmpty(t *testing.T) {
 	t.Parallel()
 
 	nodeID := domaintypes.NodeID(domaintypes.NewNodeKey())
@@ -21,15 +21,15 @@ func TestClaimService_Claim_ReturnsNoWorkWhenQueueEmpty(t *testing.T) {
 	st.claimJob.err = pgx.ErrNoRows
 	st.getNode.val = store.Node{ID: nodeID}
 
-	svc := NewClaimService(st, nil, &ConfigHolder{}, nil)
+	svc := newClaimer(st, nil, &ConfigHolder{}, nil)
 	_, err := svc.Claim(context.Background(), nodeID)
-	var noWork *ClaimNoWork
+	var noWork *claimNoWork
 	if !errors.As(err, &noWork) {
-		t.Fatalf("expected ClaimNoWork, got %T (%v)", err, err)
+		t.Fatalf("expected claimNoWork, got %T (%v)", err, err)
 	}
 }
 
-func TestClaimService_Claim_SuccessBuildsPayloadAndTransitionsRepo(t *testing.T) {
+func TestClaim_Claim_SuccessBuildsPayloadAndTransitionsRepo(t *testing.T) {
 	t.Parallel()
 
 	nodeID := domaintypes.NodeID(domaintypes.NewNodeKey())
@@ -67,7 +67,7 @@ func TestClaimService_Claim_SuccessBuildsPayloadAndTransitionsRepo(t *testing.T)
 		Meta:        []byte(`{}`),
 	}
 
-	svc := NewClaimService(st, nil, &ConfigHolder{}, nil)
+	svc := newClaimer(st, nil, &ConfigHolder{}, nil)
 	result, err := svc.Claim(context.Background(), nodeID)
 	if err != nil {
 		t.Fatalf("Claim() error = %v", err)
@@ -92,7 +92,7 @@ func TestClaimService_Claim_SuccessBuildsPayloadAndTransitionsRepo(t *testing.T)
 	}
 }
 
-func TestClaimService_Claim_RequeuesClaimedJobWhenPayloadBuildFails(t *testing.T) {
+func TestClaim_Claim_RequeuesClaimedJobWhenPayloadBuildFails(t *testing.T) {
 	t.Parallel()
 
 	nodeID := domaintypes.NodeID(domaintypes.NewNodeKey())
@@ -127,14 +127,14 @@ func TestClaimService_Claim_RequeuesClaimedJobWhenPayloadBuildFails(t *testing.T
 		Meta:        []byte(`{}`),
 	}
 
-	svc := NewClaimService(st, nil, &ConfigHolder{}, nil)
+	svc := newClaimer(st, nil, &ConfigHolder{}, nil)
 	_, err := svc.Claim(context.Background(), nodeID)
 	if err == nil {
 		t.Fatal("expected Claim() to fail")
 	}
-	var internalErr *ClaimInternal
+	var internalErr *claimInternalError
 	if !errors.As(err, &internalErr) {
-		t.Fatalf("expected ClaimInternal, got %T (%v)", err, err)
+		t.Fatalf("expected claimInternalError, got %T (%v)", err, err)
 	}
 	if !st.unclaimJob.called {
 		t.Fatal("expected UnclaimJob to be called on payload build failure")

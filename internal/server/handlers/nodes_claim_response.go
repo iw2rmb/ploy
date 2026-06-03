@@ -14,7 +14,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
-type claimResponsePayload struct {
+type workClaimPayload struct {
 	WorkType      string                      `json:"work_type"`
 	RunID         domaintypes.RunID           `json:"id"`
 	Name          *string                     `json:"name,omitempty"`
@@ -41,7 +41,7 @@ type claimResponsePayload struct {
 	DetectedStack *contracts.StackExpectation `json:"detected_stack,omitempty"`
 }
 
-type nodeActionClaimResponsePayload struct {
+type nodeActionClaimPayload struct {
 	WorkType   string             `json:"work_type"`
 	ActionID   domaintypes.JobID  `json:"action_id"`
 	ActionType string             `json:"action_type"`
@@ -50,7 +50,7 @@ type nodeActionClaimResponsePayload struct {
 	CreatedAt  string             `json:"created_at"`
 }
 
-func buildClaimResponsePayload(
+func buildJobClaimPayload(
 	ctx context.Context,
 	st store.Store,
 	_ blobstore.Store,
@@ -59,10 +59,10 @@ func buildClaimResponsePayload(
 	spec []byte,
 	repoURL string,
 	job store.Job,
-) (claimResponsePayload, error) {
+) (workClaimPayload, error) {
 	jobType := domaintypes.JobType(job.JobType)
 	if err := jobType.Validate(); err != nil {
-		return claimResponsePayload{}, fmt.Errorf("invalid claimed job job_type %q for job_id=%s: %w", job.JobType, job.ID, err)
+		return workClaimPayload{}, fmt.Errorf("invalid claimed job job_type %q for job_id=%s: %w", job.JobType, job.ID, err)
 	}
 
 	globalEnv := map[string][]GlobalEnvVar{}
@@ -83,7 +83,7 @@ func buildClaimResponsePayload(
 		bundleMap:     bundleMap,
 	})
 	if err != nil {
-		return claimResponsePayload{}, err
+		return workClaimPayload{}, err
 	}
 
 	var migContext *contracts.MigClaimContext
@@ -104,14 +104,14 @@ func buildClaimResponsePayload(
 	if jobType == domaintypes.JobTypeMig && migContext != nil {
 		migSpec, parseErr := contracts.ParseMigSpecJSON(mergedSpec)
 		if parseErr != nil {
-			return claimResponsePayload{}, &ClaimJobTerminalError{
+			return workClaimPayload{}, &claimTerminalError{
 				Message: fmt.Sprintf("parse mig spec for in_from resolution (job %s)", job.ID),
 				Err:     parseErr,
 			}
 		}
 		resolvedInFrom, resolveErr := resolveMigInFromClaimEntries(ctx, st, job, migSpec, migContext.StepIndex)
 		if resolveErr != nil {
-			return claimResponsePayload{}, &ClaimJobTerminalError{
+			return workClaimPayload{}, &claimTerminalError{
 				Message: fmt.Sprintf("resolve in_from claim context for job %s", job.ID),
 				Err:     resolveErr,
 			}
@@ -121,14 +121,14 @@ func buildClaimResponsePayload(
 
 	detectedStack, err := resolveClaimDetectedStack(ctx, st, job)
 	if err != nil {
-		return claimResponsePayload{}, fmt.Errorf("resolve detected stack for claim: %w", err)
+		return workClaimPayload{}, fmt.Errorf("resolve detected stack for claim: %w", err)
 	}
 	commitSHA := strings.TrimSpace(run.SourceCommitSha)
 	if commitSHA == "" {
 		commitSHA = strings.TrimSpace(job.RepoShaIn)
 	}
 
-	return claimResponsePayload{
+	return workClaimPayload{
 		WorkType:      "job",
 		RunID:         run.ID,
 		Name:          nil,
@@ -156,13 +156,13 @@ func buildClaimResponsePayload(
 	}, nil
 }
 
-func buildActionClaimResponsePayload(
+func buildRunActionClaimPayload(
 	spec []byte,
 	run store.Run,
 	repoURL string,
 	action store.RunAction,
-) claimResponsePayload {
-	return claimResponsePayload{
+) workClaimPayload {
+	return workClaimPayload{
 		WorkType:      "action",
 		RunID:         run.ID,
 		Name:          nil,
@@ -189,8 +189,8 @@ func buildActionClaimResponsePayload(
 	}
 }
 
-func buildNodeActionClaimResponsePayload(action store.NodeAction) nodeActionClaimResponsePayload {
-	payload := nodeActionClaimResponsePayload{
+func buildNodeActionClaimPayload(action store.NodeAction) nodeActionClaimPayload {
+	payload := nodeActionClaimPayload{
 		WorkType:   "action",
 		ActionID:   action.ID,
 		ActionType: action.ActionType,
@@ -218,7 +218,7 @@ func buildAndSendJobClaimResponse(
 	repoURL string,
 	job store.Job,
 ) error {
-	payload, err := buildClaimResponsePayload(r.Context(), st, bs, configHolder, run, spec, repoURL, job)
+	payload, err := buildJobClaimPayload(r.Context(), st, bs, configHolder, run, spec, repoURL, job)
 	if err != nil {
 		return err
 	}

@@ -20,7 +20,7 @@ func (state *completeJobState) routedJobType() domaintypes.JobType {
 	return ""
 }
 
-func (s *CompleteJobService) onFail(ctx context.Context, state *completeJobState) {
+func (s *completionService) onFail(ctx context.Context, state *completeJobState) {
 	if state.input.Status != domaintypes.JobStatusFail && state.input.Status != domaintypes.JobStatusError {
 		return
 	}
@@ -86,7 +86,7 @@ func (s *CompleteJobService) onFail(ctx context.Context, state *completeJobState
 	}
 }
 
-func (s *CompleteJobService) onCancelled(ctx context.Context, state *completeJobState) {
+func (s *completionService) onCancelled(ctx context.Context, state *completeJobState) {
 	if state.input.Status != domaintypes.JobStatusCancelled {
 		return
 	}
@@ -104,7 +104,7 @@ func (s *CompleteJobService) onCancelled(ctx context.Context, state *completeJob
 	}
 }
 
-func (s *CompleteJobService) onSuccess(ctx context.Context, state *completeJobState) {
+func (s *completionService) onSuccess(ctx context.Context, state *completeJobState) {
 	if state.input.Status != domaintypes.JobStatusSuccess {
 		return
 	}
@@ -126,7 +126,7 @@ func (s *CompleteJobService) onSuccess(ctx context.Context, state *completeJobSt
 	}
 }
 
-func (s *CompleteJobService) reconcileRepoRun(ctx context.Context, state *completeJobState) {
+func (s *completionService) reconcileRepoRun(ctx context.Context, state *completeJobState) {
 	repoUpdated, repoErr := recovery.MaybeUpdateRunStatus(ctx, s.store, state.job.RunID, state.job.Attempt)
 	if repoErr != nil {
 		slog.Error("complete job: failed to check repo completion",

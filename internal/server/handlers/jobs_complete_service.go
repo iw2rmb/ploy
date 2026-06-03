@@ -18,32 +18,32 @@ type completeRunCache struct {
 }
 
 type completeJobState struct {
-	input         CompleteJobInput
+	input         completionInput
 	job           store.Job
 	jobType       domaintypes.JobType
-	serviceType   completeJobServiceType
+	serviceType   completionServiceType
 	serviceTypeOK bool
 	persistedMeta []byte
 	runCache      completeRunCache
 }
 
-func (s *CompleteJobService) Complete(ctx context.Context, input CompleteJobInput) (CompleteJobResult, error) {
+func (s *completionService) Complete(ctx context.Context, input completionInput) (completionResult, error) {
 	job, err := s.store.GetJob(ctx, input.JobID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return CompleteJobResult{}, completeNotFound("job not found")
+			return completionResult{}, completeNotFound("job not found")
 		}
-		return CompleteJobResult{}, completeInternal("failed to get job", err)
+		return completionResult{}, completeInternal("failed to get job", err)
 	}
 
 	if job.NodeID == nil || *job.NodeID != input.NodeID {
-		return CompleteJobResult{}, completeForbidden("job not assigned to this node")
+		return completionResult{}, completeForbidden("job not assigned to this node")
 	}
 	if job.Status != domaintypes.JobStatusRunning {
-		return CompleteJobResult{}, completeConflict("job status is %s, expected Running", job.Status)
+		return completionResult{}, completeConflict("job status is %s, expected Running", job.Status)
 	}
 	jobType := domaintypes.JobType(job.JobType)
-	serviceType, serviceTypeOK := routeCompleteJobServiceType(jobType)
+	serviceType, serviceTypeOK := routeCompletionServiceType(jobType)
 	if !serviceTypeOK {
 		slog.Error("complete job: invalid job_type in job record; treating as non-gate for post-completion routing",
 			"job_id", input.JobID,
@@ -60,10 +60,10 @@ func (s *CompleteJobService) Complete(ctx context.Context, input CompleteJobInpu
 
 	if input.Status == domaintypes.JobStatusSuccess && job.NextID != nil {
 		if !sha40Pattern.MatchString(job.RepoShaIn) {
-			return CompleteJobResult{}, completeConflict("job repo_sha_in must match ^[0-9a-f]{40}$ for chain progression")
+			return completionResult{}, completeConflict("job repo_sha_in must match ^[0-9a-f]{40}$ for chain progression")
 		}
 		if input.RepoSHAOut == "" {
-			return CompleteJobResult{}, completeBadRequest("repo_sha_out is required for successful jobs with next_id")
+			return completionResult{}, completeBadRequest("repo_sha_out is required for successful jobs with next_id")
 		}
 	}
 
@@ -81,7 +81,7 @@ func (s *CompleteJobService) Complete(ctx context.Context, input CompleteJobInpu
 				"node_id", input.NodeID,
 				"err", err,
 			)
-			return CompleteJobResult{}, completeInternal("failed to persist job metrics", err)
+			return completionResult{}, completeInternal("failed to persist job metrics", err)
 		}
 	}
 
@@ -90,7 +90,7 @@ func (s *CompleteJobService) Complete(ctx context.Context, input CompleteJobInpu
 		mergedMeta, mergeErr := mergeCompletionJobMeta(job.Meta, input.StatsPayload.JobMeta)
 		if mergeErr != nil {
 			slog.Error("complete job: merge metadata failed", "job_id", input.JobID, "err", mergeErr)
-			return CompleteJobResult{}, completeInternal("failed to merge job metadata", mergeErr)
+			return completionResult{}, completeInternal("failed to merge job metadata", mergeErr)
 		}
 		if err := s.store.UpdateJobCompletionWithMeta(ctx, store.UpdateJobCompletionWithMetaParams{
 			ID:         job.ID,
@@ -105,7 +105,7 @@ func (s *CompleteJobService) Complete(ctx context.Context, input CompleteJobInpu
 				"node_id", input.NodeID,
 				"err", err,
 			)
-			return CompleteJobResult{}, completeInternal("failed to complete job", err)
+			return completionResult{}, completeInternal("failed to complete job", err)
 		}
 		persistedMeta = mergedMeta
 	} else {
@@ -121,7 +121,7 @@ func (s *CompleteJobService) Complete(ctx context.Context, input CompleteJobInpu
 				"node_id", input.NodeID,
 				"err", err,
 			)
-			return CompleteJobResult{}, completeInternal("failed to complete job", err)
+			return completionResult{}, completeInternal("failed to complete job", err)
 		}
 	}
 
@@ -167,10 +167,10 @@ func (s *CompleteJobService) Complete(ctx context.Context, input CompleteJobInpu
 	s.onSuccess(ctx, state)
 	s.reconcileRepoRun(ctx, state)
 
-	return CompleteJobResult{}, nil
+	return completionResult{}, nil
 }
 
-func (s *CompleteJobService) loadRunForPostCompletion(ctx context.Context, state *completeJobState, purpose string) (store.Run, bool) {
+func (s *completionService) loadRunForPostCompletion(ctx context.Context, state *completeJobState, purpose string) (store.Run, bool) {
 	if state.runCache.ok {
 		return state.runCache.run, true
 	}

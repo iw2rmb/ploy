@@ -13,8 +13,8 @@ import (
 // ===== Happy-Path & Error-Propagation Tests =====
 // completeJobHandler marks a job as completed via POST /v1/jobs/{job_id}/complete.
 
-// TestCompleteJob_Success verifies a job is completed successfully with valid payload.
-func TestCompleteJob_Success(t *testing.T) {
+// TestCompletion_Success verifies a job is completed successfully with valid payload.
+func TestCompletion_Success(t *testing.T) {
 	t.Parallel()
 
 	f := newJobFixture("mig")
@@ -32,8 +32,8 @@ func TestCompleteJob_Success(t *testing.T) {
 	assertCalled(t, "UpdateJobCompletion", st.updateJobCompletion.called)
 }
 
-// TestCompleteJob_WithExitCodeAndStats verifies job completion with exit_code and stats.
-func TestCompleteJob_WithExitCodeAndStats(t *testing.T) {
+// TestCompletion_WithExitCodeAndStats verifies job completion with exit_code and stats.
+func TestCompletion_WithExitCodeAndStats(t *testing.T) {
 	t.Parallel()
 
 	f := newJobFixture("mig")
@@ -56,7 +56,7 @@ func TestCompleteJob_WithExitCodeAndStats(t *testing.T) {
 	}
 }
 
-func TestCompleteJob_WithRepoSHAOut_Persists(t *testing.T) {
+func TestCompletion_WithRepoSHAOut_Persists(t *testing.T) {
 	t.Parallel()
 
 	f := newJobFixture("mig")
@@ -76,7 +76,7 @@ func TestCompleteJob_WithRepoSHAOut_Persists(t *testing.T) {
 	}
 }
 
-func TestCompleteJob_WithJobResources_PersistsJobMetrics(t *testing.T) {
+func TestCompletion_WithJobResources_PersistsJobMetrics(t *testing.T) {
 	t.Parallel()
 
 	f := newJobFixture("mig")
@@ -116,9 +116,9 @@ func TestCompleteJob_WithJobResources_PersistsJobMetrics(t *testing.T) {
 	}
 }
 
-// TestCompleteJob_WithJobMetaInStats verifies that when stats.job_meta is provided,
+// TestCompletion_WithJobMetaInStats verifies that when stats.job_meta is provided,
 // the handler uses UpdateJobCompletionWithMeta to persist jobs.meta JSONB.
-func TestCompleteJob_WithJobMetaInStats(t *testing.T) {
+func TestCompletion_WithJobMetaInStats(t *testing.T) {
 	t.Parallel()
 
 	f := newJobFixture("")
@@ -149,9 +149,9 @@ func TestCompleteJob_WithJobMetaInStats(t *testing.T) {
 	assertMetaKind(t, st.updateJobCompletionWithMeta.params.Meta, "gate")
 }
 
-// TestCompleteJob_EmptyJobMetaObjectWithWhitespaceIsIgnored verifies that an empty
+// TestCompletion_EmptyJobMetaObjectWithWhitespaceIsIgnored verifies that an empty
 // job_meta object (even if it contains whitespace like "{ }") is treated as absent.
-func TestCompleteJob_EmptyJobMetaObjectWithWhitespaceIsIgnored(t *testing.T) {
+func TestCompletion_EmptyJobMetaObjectWithWhitespaceIsIgnored(t *testing.T) {
 	t.Parallel()
 
 	f := newJobFixture("")
@@ -181,9 +181,9 @@ func TestCompleteJob_EmptyJobMetaObjectWithWhitespaceIsIgnored(t *testing.T) {
 
 // ===== Error Propagation Tests =====
 
-// TestCompleteJob_Exit137SetsLastError verifies that failed jobs with exit code
+// TestCompletion_Exit137SetsLastError verifies that failed jobs with exit code
 // 137 persist a deterministic runs.last_error message.
-func TestCompleteJob_Exit137SetsLastError(t *testing.T) {
+func TestCompletion_Exit137SetsLastError(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -216,9 +216,9 @@ func TestCompleteJob_Exit137SetsLastError(t *testing.T) {
 	}
 }
 
-// TestCompleteJob_GateFailureSetsLastError verifies that when a gate job fails
+// TestCompletion_GateFailureSetsLastError verifies that when a gate job fails
 // with Stack Gate mismatch metadata, the handler sets runs.last_error.
-func TestCompleteJob_GateFailureSetsLastError(t *testing.T) {
+func TestCompletion_GateFailureSetsLastError(t *testing.T) {
 	t.Parallel()
 
 	f := newRepoScopedFixture("pre_gate")
