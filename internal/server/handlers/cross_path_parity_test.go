@@ -17,7 +17,7 @@ import (
 // Nodeagent step: lifecycle.JobStatusFromRunError maps execution errors to job statuses.
 // This is the canonical call used in runController.uploadFailureStatus and executeContainerJob.
 //
-// Server step: CompleteJobService.Complete routes the resulting status through its full
+// Server step: completionService.Complete routes the resulting status through its full
 // post-action pipeline (onFail/onCancelled/reconcileRepoRun). Assertions target concrete
 // store side-effects rather than re-examining lifecycle function return values in isolation.
 func TestCrossPathParity_StandardJobErrorToChainAction(t *testing.T) {
@@ -79,13 +79,13 @@ func TestCrossPathParity_StandardJobErrorToChainAction(t *testing.T) {
 			st.getJob.val = job
 			st.listJobsByRunAttempt.val = []store.Job{job, successor}
 
-			svc := NewCompleteJobService(st, nil, nil)
+			svc := newCompletionService(st, nil, nil)
 
 			// Nodeagent path: map execution error to job status (mirrors runController.uploadFailureStatus).
 			status := lifecycle.JobStatusFromRunError(tc.err)
 
-			// Server path: drive CompleteJobService.Complete with the status emitted by the nodeagent.
-			_, err := svc.Complete(context.Background(), CompleteJobInput{
+			// Server path: drive completionService.Complete with the status emitted by the nodeagent.
+			_, err := svc.Complete(context.Background(), completionInput{
 				JobID:      jobID,
 				NodeID:     nodeID,
 				Status:     status,
@@ -110,7 +110,7 @@ func TestCrossPathParity_StandardJobErrorToChainAction(t *testing.T) {
 }
 
 // TestCrossPathParity_GateJobStatusToChainAction exercises the gate-specific server completion
-// paths by driving CompleteJobService.Complete with the three status values that gate nodeagent
+// paths by driving completionService.Complete with the three status values that gate nodeagent
 // paths emit (execution_orchestrator_gate.go).
 //
 // Gate status assignment is deliberate and explicit — not via lifecycle.JobStatusFromRunError:
@@ -118,7 +118,7 @@ func TestCrossPathParity_StandardJobErrorToChainAction(t *testing.T) {
 //   - Test failures        → Fail
 //   - Test successes       → Success   (advances the job chain)
 //
-// This suite locks that CompleteJobService routes each gate status to the correct post-action
+// This suite locks that completionService routes each gate status to the correct post-action
 // chain, ensuring the server remains consistent with the gate nodeagent's intentional semantics.
 func TestCrossPathParity_GateJobStatusToChainAction(t *testing.T) {
 	t.Parallel()
@@ -212,9 +212,9 @@ func TestCrossPathParity_GateJobStatusToChainAction(t *testing.T) {
 			st.getJob.val = job
 			st.listJobsByRunAttempt.val = []store.Job{job, successor}
 
-			svc := NewCompleteJobService(st, nil, nil)
+			svc := newCompletionService(st, nil, nil)
 
-			input := CompleteJobInput{
+			input := completionInput{
 				JobID:      jobID,
 				NodeID:     nodeID,
 				Status:     tc.status,

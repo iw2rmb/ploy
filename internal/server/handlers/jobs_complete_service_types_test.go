@@ -6,18 +6,18 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-func TestRouteCompleteJobServiceType(t *testing.T) {
+func TestRouteCompletionServiceType(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
 		name    string
 		jobType domaintypes.JobType
-		want    completeJobServiceType
+		want    completionServiceType
 		wantOK  bool
 	}{
-		{name: "pre_gate", jobType: domaintypes.JobTypePreGate, want: completeJobServiceTypeGate, wantOK: true},
-		{name: "post_gate", jobType: domaintypes.JobTypePostGate, want: completeJobServiceTypeGate, wantOK: true},
-		{name: "mig", jobType: domaintypes.JobTypeMig, want: completeJobServiceTypeStep, wantOK: true},
+		{name: "pre_gate", jobType: domaintypes.JobTypePreGate, want: completionServiceTypeGate, wantOK: true},
+		{name: "post_gate", jobType: domaintypes.JobTypePostGate, want: completionServiceTypeGate, wantOK: true},
+		{name: "mig", jobType: domaintypes.JobTypeMig, want: completionServiceTypeStep, wantOK: true},
 		{name: "unknown", jobType: domaintypes.JobType("unknown"), want: "", wantOK: false},
 	}
 
@@ -26,12 +26,12 @@ func TestRouteCompleteJobServiceType(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, ok := routeCompleteJobServiceType(tc.jobType)
+			got, ok := routeCompletionServiceType(tc.jobType)
 			if ok != tc.wantOK {
-				t.Fatalf("routeCompleteJobServiceType(%q) ok = %v, want %v", tc.jobType, ok, tc.wantOK)
+				t.Fatalf("routeCompletionServiceType(%q) ok = %v, want %v", tc.jobType, ok, tc.wantOK)
 			}
 			if got != tc.want {
-				t.Fatalf("routeCompleteJobServiceType(%q) type = %q, want %q", tc.jobType, got, tc.want)
+				t.Fatalf("routeCompletionServiceType(%q) type = %q, want %q", tc.jobType, got, tc.want)
 			}
 		})
 	}

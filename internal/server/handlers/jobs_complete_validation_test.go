@@ -19,7 +19,7 @@ const testLogDigest = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 
 // ===== Input Validation & Auth Tests =====
 
-func TestCompleteJob_RequestRejection(t *testing.T) {
+func TestCompletion_RequestRejection(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -128,7 +128,7 @@ func TestCompleteJob_RequestRejection(t *testing.T) {
 
 // ===== Payload & State Rejection Tests =====
 
-func TestCompleteJob_PayloadRejection(t *testing.T) {
+func TestCompletion_PayloadRejection(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -206,7 +206,7 @@ func TestCompleteJob_PayloadRejection(t *testing.T) {
 
 // ===== JobMeta Validation Tests =====
 
-func TestCompleteJob_InvalidJobMeta(t *testing.T) {
+func TestCompletion_InvalidJobMeta(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -252,7 +252,7 @@ func TestCompleteJob_InvalidJobMeta(t *testing.T) {
 
 // ===== Valid Completion Tests =====
 
-func TestCompleteJob_ValidCompletion(t *testing.T) {
+func TestCompletion_ValidCompletion(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {

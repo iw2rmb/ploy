@@ -9,8 +9,8 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-// CompleteJobInput holds validated completion payload and caller identity.
-type CompleteJobInput struct {
+// completionInput holds validated completion payload and caller identity.
+type completionInput struct {
 	JobID        domaintypes.JobID
 	NodeID       domaintypes.NodeID
 	Status       domaintypes.JobStatus
@@ -20,93 +20,93 @@ type CompleteJobInput struct {
 	RepoSHAOut   string
 }
 
-// CompleteJobResult is returned on successful completion.
-type CompleteJobResult struct{}
+// completionResult is returned on successful completion.
+type completionResult struct{}
 
-// CompleteJobService orchestrates job completion workflow.
-type CompleteJobService struct {
+// completionService orchestrates job completion workflow.
+type completionService struct {
 	store         store.Store
 	eventsService *events.Service
 	blobpersist   *blobpersist.Service
 }
 
-type completeJobServiceType string
+type completionServiceType string
 
 const (
-	completeJobServiceTypeGate completeJobServiceType = "gate"
-	completeJobServiceTypeStep completeJobServiceType = "step"
+	completionServiceTypeGate completionServiceType = "gate"
+	completionServiceTypeStep completionServiceType = "step"
 )
 
-func routeCompleteJobServiceType(jobType domaintypes.JobType) (completeJobServiceType, bool) {
+func routeCompletionServiceType(jobType domaintypes.JobType) (completionServiceType, bool) {
 	switch jobType {
 	case domaintypes.JobTypePreGate, domaintypes.JobTypePostGate:
-		return completeJobServiceTypeGate, true
+		return completionServiceTypeGate, true
 	case domaintypes.JobTypeMig:
-		return completeJobServiceTypeStep, true
+		return completionServiceTypeStep, true
 	default:
 		return "", false
 	}
 }
 
-func NewCompleteJobService(st store.Store, eventsService *events.Service, bp *blobpersist.Service) *CompleteJobService {
-	return &CompleteJobService{
+func newCompletionService(st store.Store, eventsService *events.Service, bp *blobpersist.Service) *completionService {
+	return &completionService{
 		store:         st,
 		eventsService: eventsService,
 		blobpersist:   bp,
 	}
 }
 
-// CompleteJobBadRequest maps to HTTP 400.
-type CompleteJobBadRequest struct{ Message string }
+// completionBadRequest maps to HTTP 400.
+type completionBadRequest struct{ Message string }
 
-func (e *CompleteJobBadRequest) Error() string { return e.Message }
+func (e *completionBadRequest) Error() string { return e.Message }
 
-// CompleteJobForbidden maps to HTTP 403.
-type CompleteJobForbidden struct{ Message string }
+// completionForbidden maps to HTTP 403.
+type completionForbidden struct{ Message string }
 
-func (e *CompleteJobForbidden) Error() string { return e.Message }
+func (e *completionForbidden) Error() string { return e.Message }
 
-// CompleteJobConflict maps to HTTP 409.
-type CompleteJobConflict struct{ Message string }
+// completionConflict maps to HTTP 409.
+type completionConflict struct{ Message string }
 
-func (e *CompleteJobConflict) Error() string { return e.Message }
+func (e *completionConflict) Error() string { return e.Message }
 
-// CompleteJobNotFound maps to HTTP 404.
-type CompleteJobNotFound struct{ Message string }
+// completionNotFound maps to HTTP 404.
+type completionNotFound struct{ Message string }
 
-func (e *CompleteJobNotFound) Error() string { return e.Message }
+func (e *completionNotFound) Error() string { return e.Message }
 
-// CompleteJobInternal maps to HTTP 500.
-type CompleteJobInternal struct {
+// completionInternal maps to HTTP 500.
+type completionInternal struct {
 	Message string
 	Err     error
 }
 
-func (e *CompleteJobInternal) Error() string {
+func (e *completionInternal) Error() string {
 	if e.Err == nil {
 		return e.Message
 	}
 	return fmt.Sprintf("%s: %v", e.Message, e.Err)
 }
 
-func (e *CompleteJobInternal) Unwrap() error { return e.Err }
+func (e *completionInternal) Unwrap() error { return e.Err }
 
 func completeBadRequest(format string, args ...any) error {
-	return &CompleteJobBadRequest{Message: fmt.Sprintf(format, args...)}
+	return &completionBadRequest{Message: fmt.Sprintf(format, args...)}
 }
 
 func completeForbidden(format string, args ...any) error {
-	return &CompleteJobForbidden{Message: fmt.Sprintf(format, args...)}
+	return &completionForbidden{Message: fmt.Sprintf(format, args...)}
 }
 
 func completeConflict(format string, args ...any) error {
-	return &CompleteJobConflict{Message: fmt.Sprintf(format, args...)}
+	return &completionConflict{Message: fmt.Sprintf(format, args...)}
 }
 
 func completeNotFound(format string, args ...any) error {
-	return &CompleteJobNotFound{Message: fmt.Sprintf(format, args...)}
+	return &completionNotFound{Message: fmt.Sprintf(format, args...)}
 }
 
 func completeInternal(message string, err error) error {
-	return &CompleteJobInternal{Message: message, Err: err}
+	return &completionInternal{Message: message, Err: err}
 }

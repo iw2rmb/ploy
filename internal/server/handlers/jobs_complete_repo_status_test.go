@@ -16,9 +16,9 @@ import (
 // - runs.status is updated when all jobs for the repo attempt are terminal
 // - runs.status becomes Finished when all repos are terminal
 
-// TestCompleteJob_RepoTerminalStatus verifies that runs.status is updated
+// TestCompletion_RepoTerminalStatus verifies that runs.status is updated
 // correctly when the last job in a repo attempt completes.
-func TestCompleteJob_RepoTerminalStatus(t *testing.T) {
+func TestCompletion_RepoTerminalStatus(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -95,9 +95,9 @@ func TestCompleteJob_RepoTerminalStatus(t *testing.T) {
 	}
 }
 
-// TestCompleteJob_RepoNotTerminalWhileJobsInProgress verifies that runs.status
+// TestCompletion_RepoNotTerminalWhileJobsInProgress verifies that runs.status
 // is NOT updated when there are still non-terminal jobs for the repo attempt.
-func TestCompleteJob_RepoNotTerminalWhileJobsInProgress(t *testing.T) {
+func TestCompletion_RepoNotTerminalWhileJobsInProgress(t *testing.T) {
 	t.Parallel()
 
 	f := newRepoScopedFixture("pre_gate")
@@ -174,10 +174,10 @@ func TestCompleteJob_RepoNotTerminalWhileJobsInProgress(t *testing.T) {
 	assertCalled(t, "PromoteJobByIDIfUnblocked", st.promoteJobByIDIfUnblocked.called)
 }
 
-// TestCompleteJob_RepoStatusUsesLastJobStatus verifies that when all jobs are
+// TestCompletion_RepoStatusUsesLastJobStatus verifies that when all jobs are
 // terminal, runs.status is derived from the terminal status of the last job
 // (highest next_id), ignoring earlier failures.
-func TestCompleteJob_RepoStatusUsesLastJobStatus(t *testing.T) {
+func TestCompletion_RepoStatusUsesLastJobStatus(t *testing.T) {
 	t.Parallel()
 
 	f := newRepoScopedFixture("post_gate")
@@ -246,9 +246,9 @@ func TestCompleteJob_RepoStatusUsesLastJobStatus(t *testing.T) {
 	}
 }
 
-// TestCompleteJob_MultiRepoRunFinishesWhenAllReposTerminal verifies that runs.status
+// TestCompletion_MultiRepoRunFinishesWhenAllReposTerminal verifies that runs.status
 // becomes Finished only when ALL repos reach terminal state, not just one.
-func TestCompleteJob_MultiRepoRunFinishesWhenAllReposTerminal(t *testing.T) {
+func TestCompletion_MultiRepoRunFinishesWhenAllReposTerminal(t *testing.T) {
 	t.Parallel()
 
 	f := newRepoScopedFixture("mig")
@@ -301,9 +301,9 @@ func TestCompleteJob_MultiRepoRunFinishesWhenAllReposTerminal(t *testing.T) {
 	}
 }
 
-// TestCompleteJob_RejectsV0Status verifies that v0 status strings are rejected.
+// TestCompletion_RejectsV0Status verifies that v0 status strings are rejected.
 // v1 API uses capitalized status strings: Success, Fail, Cancelled.
-func TestCompleteJob_RejectsV0Status(t *testing.T) {
+func TestCompletion_RejectsV0Status(t *testing.T) {
 	t.Parallel()
 
 	for _, v0status := range []string{"succeeded", "failed", "canceled"} {

@@ -9,7 +9,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-func TestCompleteJobService_Complete_ReturnsConflictForNonRunningJob(t *testing.T) {
+func TestCompletionService_Complete_ReturnsConflictForNonRunningJob(t *testing.T) {
 	t.Parallel()
 
 	nodeID := domaintypes.NodeID(domaintypes.NewNodeKey())
@@ -25,20 +25,20 @@ func TestCompleteJobService_Complete_ReturnsConflictForNonRunningJob(t *testing.
 		RepoShaIn: "0123456789abcdef0123456789abcdef01234567",
 	}
 
-	svc := NewCompleteJobService(st, nil, nil)
-	_, err := svc.Complete(context.Background(), CompleteJobInput{
+	svc := newCompletionService(st, nil, nil)
+	_, err := svc.Complete(context.Background(), completionInput{
 		JobID:      jobID,
 		NodeID:     nodeID,
 		Status:     domaintypes.JobStatusSuccess,
 		StatsBytes: []byte("{}"),
 	})
-	var conflict *CompleteJobConflict
+	var conflict *completionConflict
 	if !errors.As(err, &conflict) {
-		t.Fatalf("expected CompleteJobConflict, got %T (%v)", err, err)
+		t.Fatalf("expected completionConflict, got %T (%v)", err, err)
 	}
 }
 
-func TestCompleteJobService_Complete_SuccessPromotesNextJob(t *testing.T) {
+func TestCompletionService_Complete_SuccessPromotesNextJob(t *testing.T) {
 	t.Parallel()
 
 	nodeID := domaintypes.NodeID(domaintypes.NewNodeKey())
@@ -61,8 +61,8 @@ func TestCompleteJobService_Complete_SuccessPromotesNextJob(t *testing.T) {
 		NextID:      &nextID,
 	}
 
-	svc := NewCompleteJobService(st, nil, nil)
-	_, err := svc.Complete(context.Background(), CompleteJobInput{
+	svc := newCompletionService(st, nil, nil)
+	_, err := svc.Complete(context.Background(), completionInput{
 		JobID:        jobID,
 		NodeID:       nodeID,
 		Status:       domaintypes.JobStatusSuccess,

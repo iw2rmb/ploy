@@ -13,26 +13,26 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/lifecycle"
 )
 
-// ClaimResult is the domain output from claim orchestration.
-type ClaimResult struct {
-	Payload  claimResponsePayload
+// claimResult is the domain output from claim orchestration.
+type claimResult struct {
+	Payload  workClaimPayload
 	Response any
 }
 
-// ClaimService orchestrates the claim pipeline.
-type ClaimService struct {
+// claimService orchestrates the claim pipeline.
+type claimService struct {
 	store         store.Store
 	blobStore     blobstore.Store
 	configHolder  *ConfigHolder
 	eventsService *events.Service
 }
 
-func NewClaimService(st store.Store, bs blobstore.Store, configHolder *ConfigHolder, eventsService ...*events.Service) *ClaimService {
+func newClaimer(st store.Store, bs blobstore.Store, configHolder *ConfigHolder, eventsService ...*events.Service) *claimService {
 	var evtSvc *events.Service
 	if len(eventsService) > 0 {
 		evtSvc = eventsService[0]
 	}
-	svc := &ClaimService{
+	svc := &claimService{
 		store:         st,
 		blobStore:     bs,
 		configHolder:  configHolder,
@@ -41,29 +41,29 @@ func NewClaimService(st store.Store, bs blobstore.Store, configHolder *ConfigHol
 	return svc
 }
 
-// ClaimBadRequest maps to HTTP 400.
-type ClaimBadRequest struct{ Message string }
+// claimBadRequest maps to HTTP 400.
+type claimBadRequest struct{ Message string }
 
-func (e *ClaimBadRequest) Error() string { return e.Message }
+func (e *claimBadRequest) Error() string { return e.Message }
 
-// ClaimNotFound maps to HTTP 404.
-type ClaimNotFound struct{ Message string }
+// claimNotFound maps to HTTP 404.
+type claimNotFound struct{ Message string }
 
-func (e *ClaimNotFound) Error() string { return e.Message }
+func (e *claimNotFound) Error() string { return e.Message }
 
-// ClaimNoWork maps to HTTP 204.
-type ClaimNoWork struct{}
+// claimNoWork maps to HTTP 204.
+type claimNoWork struct{}
 
-func (e *ClaimNoWork) Error() string { return "no work available" }
+func (e *claimNoWork) Error() string { return "no work available" }
 
-// ClaimInternal maps to HTTP 500.
-type ClaimInternal struct {
+// claimInternalError maps to HTTP 500.
+type claimInternalError struct {
 	Message string
 	Detail  string
 	Err     error
 }
 
-func (e *ClaimInternal) Error() string {
+func (e *claimInternalError) Error() string {
 	if e.Detail != "" {
 		return fmt.Sprintf("%s: %s", e.Message, e.Detail)
 	}
@@ -73,16 +73,16 @@ func (e *ClaimInternal) Error() string {
 	return fmt.Sprintf("%s: %v", e.Message, e.Err)
 }
 
-func (e *ClaimInternal) Unwrap() error { return e.Err }
+func (e *claimInternalError) Unwrap() error { return e.Err }
 
-// ClaimJobTerminalError marks claim-time payload errors that are deterministic
+// claimTerminalError marks claim-time payload errors that are deterministic
 // for the claimed job payload and must fail the job instead of requeueing it.
-type ClaimJobTerminalError struct {
+type claimTerminalError struct {
 	Message string
 	Err     error
 }
 
-func (e *ClaimJobTerminalError) Error() string {
+func (e *claimTerminalError) Error() string {
 	if e == nil {
 		return ""
 	}
@@ -95,7 +95,7 @@ func (e *ClaimJobTerminalError) Error() string {
 	return fmt.Sprintf("%s: %v", e.Message, e.Err)
 }
 
-func (e *ClaimJobTerminalError) Unwrap() error {
+func (e *claimTerminalError) Unwrap() error {
 	if e == nil {
 		return nil
 	}
@@ -103,21 +103,21 @@ func (e *ClaimJobTerminalError) Unwrap() error {
 }
 
 func claimInternal(message string, err error) error {
-	return &ClaimInternal{
+	return &claimInternalError{
 		Message: message,
 		Detail:  safeErrorString(err),
 		Err:     err,
 	}
 }
 
-func (s *ClaimService) Claim(ctx context.Context, nodeID domaintypes.NodeID) (ClaimResult, error) {
+func (s *claimService) Claim(ctx context.Context, nodeID domaintypes.NodeID) (claimResult, error) {
 	_, err := s.store.GetNode(ctx, nodeID)
 	if err != nil {
 		if isNoRowsError(err) {
-			return ClaimResult{}, &ClaimNotFound{Message: "node not found"}
+			return claimResult{}, &claimNotFound{Message: "node not found"}
 		}
 		slog.Error("claim: node check failed", "node_id", nodeID, "err_type", fmt.Sprintf("%T", err), "err", safeErrorString(err))
-		return ClaimResult{}, claimInternal("failed to check node", err)
+		return claimResult{}, claimInternal("failed to check node", err)
 	}
 
 	job, err := s.store.ClaimJob(ctx, nodeID)
@@ -127,45 +127,45 @@ func (s *ClaimService) Claim(ctx context.Context, nodeID domaintypes.NodeID) (Cl
 			if actionErr != nil {
 				if isNoRowsError(actionErr) {
 					slog.Debug("claim: no work available", "node_id", nodeID)
-					return ClaimResult{}, &ClaimNoWork{}
+					return claimResult{}, &claimNoWork{}
 				}
 				slog.Error("claim: database action-claim error", "node_id", nodeID, "err_type", fmt.Sprintf("%T", actionErr), "err", safeErrorString(actionErr))
-				return ClaimResult{}, claimInternal("failed to claim action", actionErr)
+				return claimResult{}, claimInternal("failed to claim action", actionErr)
 			}
 
 			run, getRunErr := s.store.GetRun(ctx, action.RunID)
 			if getRunErr != nil {
 				slog.Error("claim: get run failed for action", "node_id", nodeID, "action_id", action.ID, "err", getRunErr)
-				return ClaimResult{}, claimInternal("failed to get run for claimed action", getRunErr)
+				return claimResult{}, claimInternal("failed to get run for claimed action", getRunErr)
 			}
 			repoURL, repoErr := repoURLForID(ctx, s.store, run.RepoID)
 			if repoErr != nil {
 				slog.Error("claim: get repo failed for action", "node_id", nodeID, "action_id", action.ID, "repo_id", run.RepoID, "err", repoErr)
-				return ClaimResult{}, claimInternal("failed to get repo for claimed action", repoErr)
+				return claimResult{}, claimInternal("failed to get repo for claimed action", repoErr)
 			}
 			spec, specErr := s.store.GetSpec(ctx, run.SpecID)
 			if specErr != nil {
 				slog.Error("claim: get spec failed for action", "node_id", nodeID, "action_id", action.ID, "spec_id", run.SpecID, "err", specErr)
-				return ClaimResult{}, claimInternal("failed to get spec for claimed action", specErr)
+				return claimResult{}, claimInternal("failed to get spec for claimed action", specErr)
 			}
 
-			payload := buildActionClaimResponsePayload(spec.Spec, run, repoURL, action)
+			payload := buildRunActionClaimPayload(spec.Spec, run, repoURL, action)
 			slog.Info("action claimed",
 				"action_id", action.ID,
 				"action_type", action.ActionType,
 				"run_id", run.ID,
 				"node_id", nodeID,
 			)
-			return ClaimResult{Payload: payload}, nil
+			return claimResult{Payload: payload}, nil
 		}
 		slog.Error("claim: database error", "node_id", nodeID, "err_type", fmt.Sprintf("%T", err), "err", safeErrorString(err))
-		return ClaimResult{}, claimInternal("failed to claim job", err)
+		return claimResult{}, claimInternal("failed to claim job", err)
 	}
 
 	run, err := s.store.GetRun(ctx, job.RunID)
 	if err != nil {
 		slog.Error("claim: get run failed for job", "node_id", nodeID, "job_id", job.ID, "err", err)
-		return ClaimResult{}, claimInternal("failed to get run for claimed job", err)
+		return claimResult{}, claimInternal("failed to get run for claimed job", err)
 	}
 
 	claimDecision := lifecycle.EvaluateClaimDecision(domaintypes.JobType(job.JobType), run.Status)
@@ -173,22 +173,22 @@ func (s *ClaimService) Claim(ctx context.Context, nodeID domaintypes.NodeID) (Cl
 	repoURL, err := repoURLForID(ctx, s.store, job.RepoID)
 	if err != nil {
 		slog.Error("claim: get repo failed for job", "node_id", nodeID, "job_id", job.ID, "repo_id", job.RepoID, "err", err)
-		return ClaimResult{}, claimInternal("failed to get repo for claimed job", err)
+		return claimResult{}, claimInternal("failed to get repo for claimed job", err)
 	}
 
 	spec, err := s.store.GetSpec(ctx, run.SpecID)
 	if err != nil {
 		slog.Error("claim: get spec failed for job", "node_id", nodeID, "job_id", job.ID, "spec_id", run.SpecID, "err", err)
-		return ClaimResult{}, claimInternal("failed to get spec for claimed job", err)
+		return claimResult{}, claimInternal("failed to get spec for claimed job", err)
 	}
 
-	payload, err := buildClaimResponsePayload(ctx, s.store, s.blobStore, s.configHolder, run, spec.Spec, repoURL, job)
+	payload, err := buildJobClaimPayload(ctx, s.store, s.blobStore, s.configHolder, run, spec.Spec, repoURL, job)
 	if err != nil {
 		slog.Error("claim: failed to build response", "job_id", job.ID, "run_id", run.ID, "err", err)
-		var terminalErr *ClaimJobTerminalError
+		var terminalErr *claimTerminalError
 		if errors.As(err, &terminalErr) {
-			completeSvc := NewCompleteJobService(s.store, nil, nil)
-			_, completeErr := completeSvc.Complete(ctx, CompleteJobInput{
+			completeSvc := newCompletionService(s.store, nil, nil)
+			_, completeErr := completeSvc.Complete(ctx, completionInput{
 				JobID:        job.ID,
 				NodeID:       nodeID,
 				Status:       domaintypes.JobStatusError,
@@ -201,7 +201,7 @@ func (s *ClaimService) Claim(ctx context.Context, nodeID domaintypes.NodeID) (Cl
 					"node_id", nodeID,
 					"error", terminalErr.Error(),
 				)
-				return ClaimResult{}, &ClaimNoWork{}
+				return claimResult{}, &claimNoWork{}
 			}
 			slog.Error("claim: failed to mark claimed job as Error after terminal payload error",
 				"job_id", job.ID,
@@ -217,7 +217,7 @@ func (s *ClaimService) Claim(ctx context.Context, nodeID domaintypes.NodeID) (Cl
 		}); unclaimErr != nil {
 			slog.Error("claim: failed to unclaim job after payload build error", "job_id", job.ID, "run_id", run.ID, "node_id", nodeID, "err", unclaimErr)
 		}
-		return ClaimResult{}, claimInternal("failed to build claim response", err)
+		return claimResult{}, claimInternal("failed to build claim response", err)
 	}
 	if claimDecision.AdvanceRunToRunning {
 		if err := s.store.UpdateRunStatus(ctx, store.UpdateRunStatusParams{
@@ -233,5 +233,5 @@ func (s *ClaimService) Claim(ctx context.Context, nodeID domaintypes.NodeID) (Cl
 		"next_id", job.NextID,
 		"node_id", nodeID,
 	)
-	return ClaimResult{Payload: payload}, nil
+	return claimResult{Payload: payload}, nil
 }

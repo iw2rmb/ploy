@@ -14,7 +14,7 @@ import (
 )
 
 func claimJobHandlerWithEvents(st store.Store, bs blobstore.Store, eventsService *events.Service, configHolder *ConfigHolder) http.HandlerFunc {
-	service := NewClaimService(st, bs, configHolder, eventsService)
+	service := newClaimer(st, bs, configHolder, eventsService)
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		nodeID, ok := parseRequiredPathIDOrWriteError[domaintypes.NodeID](w, r, "id")
@@ -25,16 +25,16 @@ func claimJobHandlerWithEvents(st store.Store, bs blobstore.Store, eventsService
 		result, err := service.Claim(r.Context(), nodeID)
 		if err != nil {
 			switch e := err.(type) {
-			case *ClaimBadRequest:
+			case *claimBadRequest:
 				writeHTTPError(w, http.StatusBadRequest, "%s", e.Message)
 				return
-			case *ClaimNotFound:
+			case *claimNotFound:
 				writeHTTPError(w, http.StatusNotFound, "%s", e.Message)
 				return
-			case *ClaimNoWork:
+			case *claimNoWork:
 				w.WriteHeader(http.StatusNoContent)
 				return
-			case *ClaimInternal:
+			case *claimInternalError:
 				writeHTTPError(w, http.StatusInternalServerError, "%s", e.Error())
 				return
 			default:

@@ -25,7 +25,7 @@ type completeJobRequest struct {
 
 // completeJobHandler marks a job as completed with terminal status and stats.
 func completeJobHandler(st store.Store, eventsService *events.Service, bp *blobpersist.Service) http.HandlerFunc {
-	service := NewCompleteJobService(st, eventsService, bp)
+	service := newCompletionService(st, eventsService, bp)
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -45,13 +45,13 @@ func completeJobHandler(st store.Store, eventsService *events.Service, bp *blobp
 			return
 		}
 
-		normalizedStatus, statsPayload, statsBytes, repoSHAOut, nodeID, err := validateCompleteJobRequest(r, req)
+		normalizedStatus, statsPayload, statsBytes, repoSHAOut, nodeID, err := validateCompletionRequest(r, req)
 		if err != nil {
 			writeHTTPError(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
-		_, err = service.Complete(ctx, CompleteJobInput{
+		_, err = service.Complete(ctx, completionInput{
 			JobID:        jobID,
 			NodeID:       nodeID,
 			Status:       normalizedStatus,
@@ -62,19 +62,19 @@ func completeJobHandler(st store.Store, eventsService *events.Service, bp *blobp
 		})
 		if err != nil {
 			switch e := err.(type) {
-			case *CompleteJobBadRequest:
+			case *completionBadRequest:
 				writeHTTPError(w, http.StatusBadRequest, "%s", e.Message)
 				return
-			case *CompleteJobForbidden:
+			case *completionForbidden:
 				writeHTTPError(w, http.StatusForbidden, "%s", e.Message)
 				return
-			case *CompleteJobConflict:
+			case *completionConflict:
 				writeHTTPError(w, http.StatusConflict, "%s", e.Message)
 				return
-			case *CompleteJobNotFound:
+			case *completionNotFound:
 				writeHTTPError(w, http.StatusNotFound, "%s", e.Message)
 				return
-			case *CompleteJobInternal:
+			case *completionInternal:
 				writeHTTPError(w, http.StatusInternalServerError, "%s", e.Error())
 				return
 			default:
@@ -88,7 +88,7 @@ func completeJobHandler(st store.Store, eventsService *events.Service, bp *blobp
 	}
 }
 
-func validateCompleteJobRequest(r *http.Request, req completeJobRequest) (
+func validateCompletionRequest(r *http.Request, req completeJobRequest) (
 	domaintypes.JobStatus,
 	JobStatsPayload,
 	[]byte,

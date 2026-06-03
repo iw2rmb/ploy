@@ -29,18 +29,18 @@ func TestOnSuccess_GateSuccessPromotesLinkedNext(t *testing.T) {
 
 	st := &jobStore{}
 	st.promoteJobByIDIfUnblocked.val = next
-	svc := &CompleteJobService{
+	svc := &completionService{
 		store:       st,
 		blobpersist: blobpersist.New(st, bsmock.New()),
 	}
 	state := &completeJobState{
-		input: CompleteJobInput{
+		input: completionInput{
 			Status:     domaintypes.JobStatusSuccess,
 			RepoSHAOut: "0123456789abcdef0123456789abcdef01234567",
 		},
 		job:           job,
 		jobType:       domaintypes.JobTypePostGate,
-		serviceType:   completeJobServiceTypeGate,
+		serviceType:   completionServiceTypeGate,
 		serviceTypeOK: true,
 	}
 

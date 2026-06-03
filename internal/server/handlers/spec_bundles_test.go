@@ -270,7 +270,7 @@ func TestSpecBundleDownloadLastRefInvokedWhenRequestCanceledImmediatelyAfterResp
 	}
 }
 
-func TestProbeSpecBundleIntegrity(t *testing.T) {
+func TestProbeIntegrity(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		st := &configStore{}
 		bs := bsmock.New()
@@ -281,9 +281,9 @@ func TestProbeSpecBundleIntegrity(t *testing.T) {
 			t.Fatalf("seed blob store: %v", err)
 		}
 
-		got, err := probeSpecBundleIntegrity(context.Background(), st, bs, bundleID)
+		got, err := probeIntegrity(context.Background(), st, bs, bundleID)
 		if err != nil {
-			t.Fatalf("probeSpecBundleIntegrity() error: %v", err)
+			t.Fatalf("probeIntegrity() error: %v", err)
 		}
 		if got.ID != bundleID {
 			t.Fatalf("bundle id=%q, want %q", got.ID, bundleID)
@@ -296,16 +296,16 @@ func TestProbeSpecBundleIntegrity(t *testing.T) {
 		bs := bsmock.New()
 		bundleID := "bundle_missing_meta"
 
-		_, err := probeSpecBundleIntegrity(context.Background(), st, bs, bundleID)
+		_, err := probeIntegrity(context.Background(), st, bs, bundleID)
 		if err == nil {
 			t.Fatal("expected metadata missing error")
 		}
-		var integrityErr *specBundleIntegrityError
+		var integrityErr *integrityError
 		if !errors.As(err, &integrityErr) {
-			t.Fatalf("expected specBundleIntegrityError, got %T (%v)", err, err)
+			t.Fatalf("expected integrityError, got %T (%v)", err, err)
 		}
-		if integrityErr.kind != specBundleIntegrityMetadataMissing {
-			t.Fatalf("kind=%q, want %q", integrityErr.kind, specBundleIntegrityMetadataMissing)
+		if integrityErr.kind != integrityMetadataMissing {
+			t.Fatalf("kind=%q, want %q", integrityErr.kind, integrityMetadataMissing)
 		}
 		if got := integrityErr.Error(); got != `spec bundle "bundle_missing_meta" metadata is missing` {
 			t.Fatalf("message=%q", got)
@@ -317,16 +317,16 @@ func TestProbeSpecBundleIntegrity(t *testing.T) {
 		st.getSpecBundle.val = store.SpecBundle{ID: "bundle_missing_key"}
 		bs := bsmock.New()
 
-		_, err := probeSpecBundleIntegrity(context.Background(), st, bs, "bundle_missing_key")
+		_, err := probeIntegrity(context.Background(), st, bs, "bundle_missing_key")
 		if err == nil {
 			t.Fatal("expected object key missing error")
 		}
-		var integrityErr *specBundleIntegrityError
+		var integrityErr *integrityError
 		if !errors.As(err, &integrityErr) {
-			t.Fatalf("expected specBundleIntegrityError, got %T (%v)", err, err)
+			t.Fatalf("expected integrityError, got %T (%v)", err, err)
 		}
-		if integrityErr.kind != specBundleIntegrityObjectKeyMissing {
-			t.Fatalf("kind=%q, want %q", integrityErr.kind, specBundleIntegrityObjectKeyMissing)
+		if integrityErr.kind != integrityObjectKeyMissing {
+			t.Fatalf("kind=%q, want %q", integrityErr.kind, integrityObjectKeyMissing)
 		}
 	})
 
@@ -336,16 +336,16 @@ func TestProbeSpecBundleIntegrity(t *testing.T) {
 		st.getSpecBundle.val = store.SpecBundle{ID: "bundle_missing_blob", ObjectKey: &key}
 		bs := bsmock.New()
 
-		_, err := probeSpecBundleIntegrity(context.Background(), st, bs, "bundle_missing_blob")
+		_, err := probeIntegrity(context.Background(), st, bs, "bundle_missing_blob")
 		if err == nil {
 			t.Fatal("expected blob missing error")
 		}
-		var integrityErr *specBundleIntegrityError
+		var integrityErr *integrityError
 		if !errors.As(err, &integrityErr) {
-			t.Fatalf("expected specBundleIntegrityError, got %T (%v)", err, err)
+			t.Fatalf("expected integrityError, got %T (%v)", err, err)
 		}
-		if integrityErr.kind != specBundleIntegrityBlobMissing {
-			t.Fatalf("kind=%q, want %q", integrityErr.kind, specBundleIntegrityBlobMissing)
+		if integrityErr.kind != integrityBlobMissing {
+			t.Fatalf("kind=%q, want %q", integrityErr.kind, integrityBlobMissing)
 		}
 		if got := integrityErr.Error(); got != `spec bundle "bundle_missing_blob" blob is missing from object storage` {
 			t.Fatalf("message=%q", got)
