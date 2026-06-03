@@ -1,3 +1,10 @@
+// execution.go contains the high-level run lifecycle orchestration.
+//
+// This file owns executeRun, the main entry point for executing a single run.
+// It coordinates runtime initialization and dispatches to specialized job
+// handlers based on job type. Job implementations live in:
+//   - container_job.go — mig jobs + standard executor
+//   - gate_job.go — gate validation jobs
 package nodeagent
 
 import (
@@ -5,65 +12,231 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"path/filepath"
+	"runtime/debug"
+	"strconv"
+	"strings"
+	"time"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
-	gitpkg "github.com/iw2rmb/ploy/internal/nodeagent/git"
+	"github.com/iw2rmb/ploy/internal/workflow/contracts"
+	"github.com/iw2rmb/ploy/internal/workflow/lifecycle"
+	"github.com/iw2rmb/ploy/internal/workflow/step"
 )
 
-// advanceWorkspaceBaseline commits successful mig changes in the sticky
-// workspace so the next mig diff is incremental against the previous step.
-func advanceWorkspaceBaseline(ctx context.Context, workspace string, runID types.RunID, jobID types.JobID, diffUploaded bool) error {
-	message := fmt.Sprintf("Ploy: apply changes for run %s job %s", runID.String(), jobID.String())
-	committed, err := gitpkg.EnsureCommit(ctx, workspace, "ploy-baseline", "ploy-baseline@ploy.local", message)
-	if err == nil && committed {
-		slog.Info("advanced sticky workspace baseline", "run_id", runID.String(), "job_id", jobID.String(), "diff_uploaded", diffUploaded)
-	}
-	return err
+type noopWorkspaceHydrator struct{}
+
+func (noopWorkspaceHydrator) Hydrate(context.Context, contracts.StepManifest, string) error {
+	return nil
 }
 
-// --- Workspace and file utilities ---
-
-const defaultBearerTokenPath = "/etc/ploy/bearer-token"
-
-// bearerTokenPath returns the path to the worker bearer token file,
-// overridable for tests via PLOY_NODE_BEARER_TOKEN_PATH.
-func bearerTokenPath() string {
-	if v := os.Getenv("PLOY_NODE_BEARER_TOKEN_PATH"); v != "" {
-		return v
-	}
-	return defaultBearerTokenPath
-}
-
-// createWorkspaceDir creates a temporary workspace directory for a single run.
-func createWorkspaceDir() (string, error) {
-	base := os.Getenv("PLOYD_CACHE_HOME")
-	if base == "" {
-		base = os.TempDir()
-	}
-	if err := os.MkdirAll(base, 0o750); err != nil {
-		return "", err
-	}
-	absBase, err := filepath.Abs(base)
-	if err == nil {
-		base = absBase
-	}
-	return os.MkdirTemp(base, "ploy-run-*")
-}
-
-// listFilesRecursive returns whether directory has any files and a slice of absolute file paths.
-func listFilesRecursive(root string) (bool, []string) {
-	var out []string
-	_ = filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			slog.Warn("file walk error", "path", path, "error", err)
-			return nil
+// executeRun orchestrates job execution based on job type.
+// Dispatches to specialized handlers: gate jobs and mig jobs.
+//
+// Job types:
+//   - pre_gate, post_gate: Run build gate validation
+//   - mig: Run container with mig execution
+//
+// Each job is atomic - there's no multi-step loop. The server creates
+// individual jobs (pre-gate, mig-0, ..., post-gate) and nodes execute
+// them independently.
+func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
+	defer func() {
+		// Recover from panics to prevent job leaks and slot exhaustion.
+		// Log the panic and stack trace for debugging.
+		if p := recover(); p != nil {
+			stack := string(debug.Stack())
+			slog.Error("executeRun panic recovered",
+				"run_id", req.RunID,
+				"job_id", req.JobID,
+				"panic", p,
+				"stack", stack,
+			)
+			r.emitRunEvent(
+				req.RunID,
+				jobIDPtr(req.JobID),
+				"error",
+				"node panic recovered during job execution",
+				map[string]any{
+					"component": "run_controller",
+					"panic":     fmt.Sprintf("%v", p),
+					"stack":     stack,
+				},
+			)
 		}
-		if info == nil || info.IsDir() {
-			return nil
-		}
-		out = append(out, path)
-		return nil
+
+		r.mu.Lock()
+		// Use typed JobID directly as map key — no string conversion needed.
+		delete(r.jobs, req.JobID)
+		r.mu.Unlock()
+
+		// Release the concurrency slot acquired in claimAndExecute.
+		// This frees the slot for the next job to be claimed.
+		r.ReleaseSlot()
+	}()
+
+	slog.Info("starting job execution",
+		"run_id", req.RunID,
+		"job_id", req.JobID,
+		"job_type", req.JobType,
+		"next_id", req.NextID,
+	)
+
+	jobType := req.JobType
+
+	// Dispatch based on job type from claim payload.
+	switch jobType {
+	case types.JobTypePreGate, types.JobTypePostGate:
+		req.JobType = jobType
+		r.executeGateJob(ctx, req)
+	case types.JobTypeMig:
+		req.JobType = jobType
+		r.executeMigJob(ctx, req)
+	default:
+		err := fmt.Errorf("invalid job_type %q", jobType)
+		slog.Error("cannot execute job with invalid type", "run_id", req.RunID, "job_id", req.JobID, "job_type", jobType, "error", err)
+		r.uploadFailureStatus(ctx, req, err, 0)
+	}
+}
+
+// migStepIndexFromJobName derives the mig step index from server-created job names.
+// Expected shape is "mig-N". For single-step runs without an indexed name, returns 0.
+func migStepIndexFromJobName(jobName string, stepsLen int) (int, error) {
+	name := strings.TrimSpace(jobName)
+	if stepsLen <= 1 {
+		return 0, nil
+	}
+
+	if !strings.HasPrefix(name, "mig-") {
+		return 0, fmt.Errorf("mig job_name must start with mig- for multi-step runs, got %q", name)
+	}
+	raw := strings.TrimPrefix(name, "mig-")
+	idx, err := strconv.Atoi(raw)
+	if err != nil {
+		return 0, fmt.Errorf("parse mig index from job_name %q: %w", name, err)
+	}
+	if idx < 0 || idx >= stepsLen {
+		return 0, fmt.Errorf("mig index out of range for job_name %q: idx=%d steps_len=%d", name, idx, stepsLen)
+	}
+	return idx, nil
+}
+
+// uploadFailureStatus uploads a failure status for early errors.
+// Uses exit code -1 to indicate pre-execution infrastructure failures.
+// v1 uses capitalized job status values: Success, Fail, Error, Cancelled.
+func (r *runController) uploadFailureStatus(ctx context.Context, req StartRunRequest, err error, duration time.Duration) {
+	status := lifecycle.JobStatusFromRunError(err)
+	var exitCode *int32
+	if status == types.JobStatusError {
+		var preExecutionExitCode int32 = -1 // -1 indicates pre-execution failure
+		exitCode = &preExecutionExitCode
+	}
+
+	r.emitRunException(
+		req,
+		"node failed before container execution",
+		err,
+		map[string]any{
+			"component":   "run_controller",
+			"status":      status.String(),
+			"duration_ms": duration.Milliseconds(),
+		},
+	)
+
+	errText := normalizedExecutionError(err)
+
+	// Build stats using typed builder to eliminate map[string]any construction.
+	stats := types.NewRunStatsBuilder().
+		DurationMs(duration.Milliseconds()).
+		Error(errText).
+		MustBuild()
+	if uploadErr := r.uploadStatus(ctx, req.RunID.String(), status.String(), exitCode, stats, req.JobID); uploadErr != nil {
+		slog.Error("failed to upload failure status", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)
+	}
+}
+
+// initializeRuntime creates and configures all runtime components needed for step execution.
+// Returns a configured step.Runner, diff generator, and log streamer.
+//
+// Parameters:
+//   - ctx: context for initialization operations
+//   - runID: run identifier for logging and telemetry
+//   - jobID: job identifier for associating log chunks with specific jobs; pass a zero value
+//     only when job attribution is not available
+func (r *runController) initializeRuntime(ctx context.Context, runID types.RunID, jobID types.JobID) (step.Runner, step.DiffGenerator, *LogStreamer, error) {
+	// Initialize container runtime with image pull enabled.
+	// Fallback to nil if Docker is unavailable (simulated execution mode).
+	network := os.Getenv("PLOY_DOCKER_NETWORK")
+	containerRuntime, err := step.NewDockerContainerRuntime(step.DockerContainerRuntimeOptions{
+		PullImage:                 true,
+		Network:                   network,
+		RegistryAuthConfigFile:    resolveDockerRegistryAuthConfigFile(),
+		RegistryAuthRefreshSocket: resolveDockerRegistryAuthRefreshSocket(),
 	})
-	return len(out) > 0, out
+	if err != nil {
+		slog.Warn("docker unavailable; falling back to stub runtime", "run_id", runID, "error", err)
+		containerRuntime = nil
+	}
+
+	// Initialize diff generator for workspace change detection.
+	diffGenerator := step.NewFilesystemDiffGenerator()
+
+	// Initialize gate executor using local Docker-based execution.
+	// All gates run via the container runtime.
+	gateExecutor := step.NewDockerGateExecutor(containerRuntime)
+
+	// Initialize log streamer to stream logs as gzipped chunks to the server.
+	// The jobID parameter associates log chunks with a specific job, enabling
+	// per-job log attribution in the control plane.
+	logStreamer, err := NewLogStreamer(r.cfg, runID, jobID, r.httpClient)
+	if err != nil {
+		return step.Runner{}, nil, nil, fmt.Errorf("create log streamer: %w", err)
+	}
+
+	// Assemble the step runner with all components.
+	runner := step.Runner{
+		Workspace:  noopWorkspaceHydrator{},
+		Containers: containerRuntime,
+		Gate:       gateExecutor,
+		LogWriter:  logStreamer,
+	}
+
+	return runner, diffGenerator, logStreamer, nil
+}
+
+func resolveDockerRegistryAuthConfigFile() string {
+	return strings.TrimSpace(os.Getenv("PLOY_DOCKER_AUTH_CONFIG_FILE"))
+}
+
+func resolveDockerRegistryAuthRefreshSocket() string {
+	return strings.TrimSpace(os.Getenv("PLOY_DOCKER_AUTH_REFRESH_SOCKET"))
+}
+
+// executionContext holds runtime components initialized for a container job.
+type executionContext struct {
+	runner        step.Runner
+	diffGenerator step.DiffGenerator
+	logStreamer   *LogStreamer
+}
+
+// initExecutionContext initializes runtime components and returns a cleanup function
+// that closes the logStreamer (must be deferred).
+func (r *runController) initExecutionContext(ctx context.Context, runID types.RunID, jobID types.JobID) (executionContext, func(), error) {
+	runner, diffGenerator, logStreamer, err := r.initializeRuntime(ctx, runID, jobID)
+	if err != nil {
+		return executionContext{}, nil, err
+	}
+
+	execCtx := executionContext{
+		runner:        runner,
+		diffGenerator: diffGenerator,
+		logStreamer:   logStreamer,
+	}
+
+	cleanup := func() {
+		if err := logStreamer.Close(); err != nil {
+			slog.Warn("failed to close log streamer", "run_id", runID, "job_id", jobID, "error", err)
+		}
+	}
+
+	return execCtx, cleanup, nil
 }
