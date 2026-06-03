@@ -1,4 +1,4 @@
-// execution_orchestrator_jobs_upload.go contains upload, status reporting,
+// job_reporting.go contains upload, status reporting,
 // diff generation, and artifact helpers used by job executors.
 package nodeagent
 
@@ -95,9 +95,9 @@ func (r *runController) computeRepoSHAOut(ctx context.Context, req StartRunReque
 	return repoSHAOut, nil
 }
 
-// uploadJobDiff is the shared implementation for generating, summarizing, and uploading
+// uploadDiff is the shared implementation for generating, summarizing, and uploading
 // a diff for the current workspace state.
-func (r *runController) uploadJobDiff(
+func (r *runController) uploadDiff(
 	ctx context.Context,
 	runID types.RunID,
 	jobID types.JobID,

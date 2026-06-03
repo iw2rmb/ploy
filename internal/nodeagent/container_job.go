@@ -1,5 +1,5 @@
-// execution_orchestrator_jobs.go contains mig job implementations,
-// the shared standard job executor, and workspace lifecycle helpers.
+// container_job.go contains mig job implementations,
+// the shared container job executor, and workspace lifecycle helpers.
 package nodeagent
 
 import (
@@ -78,7 +78,7 @@ func (r *runController) executeMigJob(ctx context.Context, req StartRunRequest) 
 			return r.materializeInFrom(ctx, req, inDir)
 		},
 		UploadDiff: func(ctx context.Context, runID types.RunID, jobID types.JobID, jobName string, diffGen step.DiffGenerator, workspace string, result step.Result, diffPath string) (bool, error) {
-			return r.uploadJobDiff(ctx, runID, jobID, diffGen, workspace, result, types.DiffJobTypeMig, diffPath)
+			return r.uploadDiff(ctx, runID, jobID, diffGen, workspace, result, types.DiffJobTypeMig, diffPath)
 		},
 		StartTime: startTime,
 	}
@@ -117,7 +117,7 @@ type jobOutcome struct {
 // executeContainerJob orchestrates the common lifecycle of a container job:
 // runtime init, sticky workspace preparation, directory prep, execution, and uploading.
 func (r *runController) executeContainerJob(ctx context.Context, req StartRunRequest, cfg containerJobConfig) {
-	outcome, execErr := r.executeContainerJobWithOutcome(ctx, req, cfg)
+	outcome, execErr := r.executeContainerWithOutcome(ctx, req, cfg)
 	if execErr == nil {
 		if outcome.runErr != nil || outcome.result.ExitCode != 0 {
 			r.uploadRepoArtifactsIfPresent(req.RunID, req.RepoID, req.JobID)
@@ -133,7 +133,7 @@ func (r *runController) executeContainerJob(ctx context.Context, req StartRunReq
 	r.uploadFailureStatus(ctx, req, execErr, time.Since(startTime))
 }
 
-func (r *runController) executeContainerJobWithOutcome(ctx context.Context, req StartRunRequest, cfg containerJobConfig) (jobOutcome, error) {
+func (r *runController) executeContainerWithOutcome(ctx context.Context, req StartRunRequest, cfg containerJobConfig) (jobOutcome, error) {
 	startTime := cfg.StartTime
 	if startTime.IsZero() {
 		startTime = time.Now()
@@ -145,7 +145,7 @@ func (r *runController) executeContainerJobWithOutcome(ctx context.Context, req 
 		return outcome, fmt.Errorf("prepare job artifacts: %w", err)
 	}
 
-	execCtx, cleanup, err := r.initJobExecutionContext(ctx, req.RunID, req.JobID)
+	execCtx, cleanup, err := r.initExecutionContext(ctx, req.RunID, req.JobID)
 	if err != nil {
 		return outcome, fmt.Errorf("initialize runtime: %w", err)
 	}
@@ -187,7 +187,7 @@ func (r *runController) runContainerJob(
 	ctx context.Context,
 	req StartRunRequest,
 	cfg containerJobConfig,
-	execCtx jobExecutionContext,
+	execCtx executionContext,
 	workspace string,
 	startTime time.Time,
 	outDir, inDir, diffPath string,

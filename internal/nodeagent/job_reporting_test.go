@@ -122,7 +122,7 @@ func (g staticDiffGenerator) Generate(context.Context, string) ([]byte, error) {
 	return g.diff, g.err
 }
 
-func TestRunController_uploadJobDiffWritesInspectabilityCopy(t *testing.T) {
+func TestRunController_uploadDiffWritesInspectabilityCopy(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -158,7 +158,7 @@ func TestRunController_uploadJobDiffWritesInspectabilityCopy(t *testing.T) {
 				}
 			}
 
-			uploaded, err := controller.uploadJobDiff(
+			uploaded, err := controller.uploadDiff(
 				context.Background(),
 				"test-run",
 				"test-job",
@@ -169,7 +169,7 @@ func TestRunController_uploadJobDiffWritesInspectabilityCopy(t *testing.T) {
 				patchPath,
 			)
 			if err != nil {
-				t.Fatalf("uploadJobDiff() error = %v", err)
+				t.Fatalf("uploadDiff() error = %v", err)
 			}
 			if uploaded != tt.wantUpload {
 				t.Fatalf("uploaded = %v, want %v", uploaded, tt.wantUpload)

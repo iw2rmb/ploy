@@ -197,7 +197,7 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 		repoSHAOut, repoSHAErr = r.computeRepoSHAOut(ctx, req, workspace, "")
 		if repoSHAErr != nil {
 			uploadRepoArtifactsOnReturn = true
-			stats := r.buildGateJobStats(gateResult, duration)
+			stats := r.buildGateStats(gateResult, duration)
 			var errorExitCode int32 = -1
 			if uploadErr := r.uploadStatus(ctx, req.RunID.String(), types.JobStatusError.String(), &errorExitCode, stats, req.JobID); uploadErr != nil {
 				slog.Error("failed to upload gate error status after repo_sha_out failure",
@@ -220,7 +220,7 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 	}
 
 	// Build stats with gate metadata.
-	stats := r.buildGateJobStats(gateResult, duration)
+	stats := r.buildGateStats(gateResult, duration)
 	if uploadErr := r.uploadStatus(ctx, req.RunID.String(), status.String(), &exitCode, stats, req.JobID, repoSHAOut); uploadErr != nil {
 		slog.Error("failed to upload gate status", "run_id", req.RunID, "job_id", req.JobID, "status", status, "error", uploadErr)
 	} else {
@@ -354,9 +354,9 @@ func cleanupGateOutLink(workspace string) {
 	}
 }
 
-// buildGateJobStats constructs stats payload for gate job completion.
+// buildGateStats constructs stats payload for gate job completion.
 // Uses typed builder to eliminate map[string]any construction.
-func (r *runController) buildGateJobStats(gateResult *contracts.BuildGateStageMetadata, duration time.Duration) types.RunStats {
+func (r *runController) buildGateStats(gateResult *contracts.BuildGateStageMetadata, duration time.Duration) types.RunStats {
 	builder := types.NewRunStatsBuilder().
 		DurationMs(duration.Milliseconds())
 
