@@ -8,7 +8,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
-// Manifest builder unit tests: buildManifestFromRequest scenarios.
+// Manifest builder unit tests: buildMigManifest scenarios.
 
 func TestBuildManifestFromRequest(t *testing.T) {
 	t.Run("valid request with all fields", func(t *testing.T) {
@@ -151,7 +151,7 @@ func TestBuildManifestFromRequest(t *testing.T) {
 
 	t.Run("command option string maps to shell", func(t *testing.T) {
 		req := newStartRunRequest(withRunOptions(RunOptions{
-			Execution: MigContainerSpec{Command: contracts.CommandSpec{Shell: "echo hi"}},
+			Execution: ContainerSpec{Command: contracts.CommandSpec{Shell: "echo hi"}},
 		}))
 		manifest, err := buildManifestDefault(req)
 		if err != nil {
@@ -164,7 +164,7 @@ func TestBuildManifestFromRequest(t *testing.T) {
 
 	t.Run("no command injected when custom image provided", func(t *testing.T) {
 		req := newStartRunRequest(withRunOptions(RunOptions{
-			Execution: MigContainerSpec{Image: contracts.JobImage{Universal: "docker.io/example/migs-openrewrite:latest"}},
+			Execution: ContainerSpec{Image: contracts.JobImage{Universal: "docker.io/example/migs-openrewrite:latest"}},
 		}))
 		manifest, err := buildManifestDefault(req)
 		if err != nil {
@@ -183,7 +183,7 @@ func TestBuildManifestFromRequest(t *testing.T) {
 		t.Setenv("MIG_TAG", "v2")
 
 		req := newStartRunRequest(withRunOptions(RunOptions{
-			Execution: MigContainerSpec{
+			Execution: ContainerSpec{
 				Image: contracts.JobImage{
 					Universal: "${PLOY_CONTAINER_REGISTRY}/my-image-${stack.language}-${stack.release}-${stack.tool}:${MIG_TAG}",
 				},
@@ -195,9 +195,9 @@ func TestBuildManifestFromRequest(t *testing.T) {
 			Tool:     "maven",
 		}
 
-		manifest, err := buildManifestFromRequest(req, req.TypedOptions, 0, contracts.MigStackJavaMaven)
+		manifest, err := buildMigManifest(req, req.TypedOptions, 0, contracts.MigStackJavaMaven)
 		if err != nil {
-			t.Fatalf("buildManifestFromRequest() error: %v", err)
+			t.Fatalf("buildMigManifest() error: %v", err)
 		}
 		if got, want := manifest.Image, "registry.example/ploy/my-image-java-17-maven:v2"; got != want {
 			t.Fatalf("image=%q, want %q", got, want)
@@ -206,7 +206,7 @@ func TestBuildManifestFromRequest(t *testing.T) {
 
 	t.Run("single-step image template fails when stack value is unavailable", func(t *testing.T) {
 		req := newStartRunRequest(withRunOptions(RunOptions{
-			Execution: MigContainerSpec{
+			Execution: ContainerSpec{
 				Image: contracts.JobImage{
 					Universal: "ghcr.io/acme/my-image-${stack.language}-${stack.release}-${stack.tool}:latest",
 				},
@@ -217,7 +217,7 @@ func TestBuildManifestFromRequest(t *testing.T) {
 			Tool:     "maven",
 		}
 
-		_, err := buildManifestFromRequest(req, req.TypedOptions, 0, contracts.MigStackJavaMaven)
+		_, err := buildMigManifest(req, req.TypedOptions, 0, contracts.MigStackJavaMaven)
 		if err == nil {
 			t.Fatal("expected error for missing stack.release placeholder")
 		}
@@ -241,13 +241,13 @@ func TestBuildManifestFromRequest(t *testing.T) {
 		req := newStartRunRequest(
 			withRunEnv(map[string]string{"BASE_VAR": "base_value"}),
 			withRunOptions(RunOptions{
-				Steps: []StepMig{
-					{MigContainerSpec: MigContainerSpec{
+				Steps: []StepOptions{
+					{ContainerSpec: ContainerSpec{
 						Image:   contracts.JobImage{Universal: "migs-orw:latest"},
 						Command: contracts.CommandSpec{Exec: []string{"--apply", "--dir", "/workspace"}},
 						Env:     map[string]string{"STEP_VAR": "step0"},
 					}},
-					{MigContainerSpec: MigContainerSpec{
+					{ContainerSpec: ContainerSpec{
 						Image:   contracts.JobImage{Universal: "migs-fmt:latest"},
 						Command: contracts.CommandSpec{Shell: "fmt --check"},
 						Env:     map[string]string{"STEP_VAR": "step1"},
@@ -297,7 +297,7 @@ func TestBuildManifestFromRequest(t *testing.T) {
 		req := newStartRunRequest(
 			withRunEnv(map[string]string{"SHARED_VAR": "base", "UNIQUE_BASE": "base"}),
 			withRunOptions(RunOptions{
-				Steps: []StepMig{{MigContainerSpec: MigContainerSpec{
+				Steps: []StepOptions{{ContainerSpec: ContainerSpec{
 					Image: contracts.JobImage{Universal: "migs-step:latest"},
 					Env:   map[string]string{"SHARED_VAR": "step_override"},
 				}}},
@@ -317,7 +317,7 @@ func TestBuildManifestFromRequest(t *testing.T) {
 
 	t.Run("multi-step run: step index out of range returns error", func(t *testing.T) {
 		req := newStartRunRequest(withRunOptions(RunOptions{
-			Steps: []StepMig{{MigContainerSpec: MigContainerSpec{Image: contracts.JobImage{Universal: "migs-step:latest"}}}},
+			Steps: []StepOptions{{ContainerSpec: ContainerSpec{Image: contracts.JobImage{Universal: "migs-step:latest"}}}},
 		}))
 		_, err := buildManifestAtStep(req, 1)
 		if err == nil {
@@ -330,7 +330,7 @@ func TestBuildManifestFromRequest(t *testing.T) {
 
 	t.Run("single-step run: stepIndex is ignored when Steps is empty", func(t *testing.T) {
 		req := newStartRunRequest(withRunOptions(RunOptions{
-			Execution: MigContainerSpec{
+			Execution: ContainerSpec{
 				Image:   contracts.JobImage{Universal: "single-mig:latest"},
 				Command: contracts.CommandSpec{Shell: "run-single"},
 			},
@@ -440,7 +440,7 @@ func TestBuildGateManifestFromRequest_IgnoresStackAwareJobImages(t *testing.T) {
 	t.Parallel()
 
 	req := newStartRunRequest(withRunOptions(RunOptions{
-		Steps: []StepMig{{MigContainerSpec: MigContainerSpec{
+		Steps: []StepOptions{{ContainerSpec: ContainerSpec{
 			Image: contracts.JobImage{ByStack: map[contracts.MigStack]string{
 				contracts.MigStackJavaMaven:  "docker.io/example/orw-cli:latest",
 				contracts.MigStackJavaGradle: "docker.io/example/orw-cli:latest",
@@ -448,9 +448,9 @@ func TestBuildGateManifestFromRequest_IgnoresStackAwareJobImages(t *testing.T) {
 		}}},
 	}))
 
-	manifest, err := buildGateManifestFromRequest(req, req.TypedOptions)
+	manifest, err := buildGateManifest(req, req.TypedOptions)
 	if err != nil {
-		t.Fatalf("buildGateManifestFromRequest() error: %v", err)
+		t.Fatalf("buildGateManifest() error: %v", err)
 	}
 	if manifest.Image != "ubuntu:latest" {
 		t.Errorf("gate manifest image=%q, want ubuntu:latest", manifest.Image)

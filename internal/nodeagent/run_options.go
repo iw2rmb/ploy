@@ -10,9 +10,9 @@ import (
 // RunOptions holds all typed configuration options for a run execution.
 type RunOptions struct {
 	BuildGate      BuildGateOptions
-	Execution      MigContainerSpec
+	Execution      ContainerSpec
 	ServerMetadata ServerMetadataOptions
-	Steps          []StepMig
+	Steps          []StepOptions
 	StackGate      *contracts.StepGateStackSpec
 
 	// BundleMap maps content hashes to spec bundle download identifiers.
@@ -28,9 +28,9 @@ type BuildGateOptions struct {
 	Post     *contracts.BuildGatePhaseConfig
 }
 
-// MigContainerSpec describes a container's image, command, and env.
-// Used for healing migs, execution options, and step migs.
-type MigContainerSpec struct {
+// ContainerSpec describes a container's image, command, and env.
+// Used for execution options and step entries.
+type ContainerSpec struct {
 	Image   contracts.JobImage
 	Command contracts.CommandSpec
 	Env     map[string]string
@@ -46,15 +46,15 @@ type ServerMetadataOptions struct {
 	JobID domaintypes.JobID
 }
 
-// StepMig describes a single mig step in a multi-step run (steps[] array).
+// StepOptions describes a single mig step in a multi-step run (steps[] array).
 // Each step has its own container spec and optional Stack Gate validation.
-type StepMig struct {
-	MigContainerSpec
+type StepOptions struct {
+	ContainerSpec
 	Stack *contracts.StackGateSpec
 }
 
-// migsSpecToRunOptions converts contracts.MigSpec directly to RunOptions.
-func migsSpecToRunOptions(spec *contracts.MigSpec) RunOptions {
+// runOptionsFromSpec converts contracts.MigSpec directly to RunOptions.
+func runOptionsFromSpec(spec *contracts.MigSpec) RunOptions {
 	if spec == nil {
 		return RunOptions{}
 	}
@@ -78,10 +78,10 @@ func migsSpecToRunOptions(spec *contracts.MigSpec) RunOptions {
 	}
 
 	if len(spec.Steps) > 1 {
-		runOpts.Steps = make([]StepMig, 0, len(spec.Steps))
+		runOpts.Steps = make([]StepOptions, 0, len(spec.Steps))
 		for _, step := range spec.Steps {
-			runOpts.Steps = append(runOpts.Steps, StepMig{
-				MigContainerSpec: MigContainerSpec{
+			runOpts.Steps = append(runOpts.Steps, StepOptions{
+				ContainerSpec: ContainerSpec{
 					Image:   step.Image,
 					Command: step.Command,
 					Env:     copyStringMap(step.Envs),

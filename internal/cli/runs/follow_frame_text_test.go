@@ -169,7 +169,7 @@ func TestRenderFollowFrameText_ExitRowsDoNotShiftColumns(t *testing.T) {
 						ExitOneLiner: "└ Exit 1: long failure details that should not affect table alignment",
 					},
 					{
-						Cells: []string{ColoredStatusGlyph("running", 0), "heal", "job-2"},
+						Cells: []string{ColoredStatusGlyph("running", 0), "post_gate", "job-2"},
 					},
 					{
 						Cells: []string{ColoredStatusGlyph("queued", 0), "mig", "job-3"},
@@ -187,23 +187,23 @@ func TestRenderFollowFrameText_ExitRowsDoNotShiftColumns(t *testing.T) {
 
 	header := stripCSI(lines[0])
 	rowPreGate := stripCSI(lines[1])
-	rowHeal := stripCSI(lines[3])
+	rowPostGate := stripCSI(lines[3])
 	rowMig := stripCSI(lines[4])
 
 	idxHeader := strings.Index(header, "Step")
 	idxPreGate := strings.Index(rowPreGate, "pre_gate")
-	idxHeal := strings.Index(rowHeal, "heal")
+	idxPostGate := strings.Index(rowPostGate, "post_gate")
 	idxMig := strings.Index(rowMig, "mig")
-	if idxHeader == -1 || idxPreGate == -1 || idxHeal == -1 || idxMig == -1 {
+	if idxHeader == -1 || idxPreGate == -1 || idxPostGate == -1 || idxMig == -1 {
 		t.Fatalf("failed to locate step values in output %q", out)
 	}
 
 	colHeader := utf8.RuneCountInString(header[:idxHeader])
 	colPreGate := utf8.RuneCountInString(rowPreGate[:idxPreGate])
-	colHeal := utf8.RuneCountInString(rowHeal[:idxHeal])
+	colPostGate := utf8.RuneCountInString(rowPostGate[:idxPostGate])
 	colMig := utf8.RuneCountInString(rowMig[:idxMig])
-	if colHeader != colPreGate || colPreGate != colHeal || colHeal != colMig {
-		t.Fatalf("expected stable step column with exit rows; got header=%d pre_gate=%d heal=%d mig=%d in %q", colHeader, colPreGate, colHeal, colMig, out)
+	if colHeader != colPreGate || colPreGate != colPostGate || colPostGate != colMig {
+		t.Fatalf("expected stable step column with exit rows; got header=%d pre_gate=%d post_gate=%d mig=%d in %q", colHeader, colPreGate, colPostGate, colMig, out)
 	}
 }
 

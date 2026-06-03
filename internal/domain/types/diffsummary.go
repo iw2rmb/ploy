@@ -117,7 +117,7 @@ func (d DiffSummary) LinesRemoved() (int, bool) {
 }
 
 // JobType returns the job_type field when present.
-// Common values: "mig", "healing".
+// Common value: "mig".
 func (d DiffSummary) JobType() string {
 	acc := d.decode()
 	if acc.JobType == nil {

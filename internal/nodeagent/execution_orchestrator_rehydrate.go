@@ -17,7 +17,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
-// prepareStickyWorkspaceForStep returns the single mutable per-run workspace
+// prepareStickyWorkspace returns the single mutable per-run workspace
 // for a linear job chain. The chain head hydrates sources directly
 // into the sticky workspace; later jobs require that workspace to already exist
 // on this node.
@@ -30,13 +30,13 @@ import (
 // Returns:
 //   - workspacePath: Path to the sticky workspace ready for execution.
 //   - error: Non-nil if workspace preparation fails.
-func (r *runController) prepareStickyWorkspaceForStep(
+func (r *runController) prepareStickyWorkspace(
 	ctx context.Context,
 	req StartRunRequest,
 	manifest contracts.StepManifest,
 ) (string, error) {
 	runID := req.RunID.String()
-	workspacePath := runWorkspaceDir(req.RunID)
+	workspacePath := workspaceDir(req.RunID)
 	if hasGitDir(workspacePath) {
 		slog.Info("reusing sticky workspace", "run_id", runID, "job_id", req.JobID, "workspace", workspacePath)
 		return workspacePath, nil
@@ -59,8 +59,8 @@ func (r *runController) prepareStickyWorkspaceForStep(
 	}
 
 	// Determine repo materialization:
-	// - Prefer manifest inputs that already carry hydration.Repo (gate/mig jobs).
-	// - Fallback to StartRunRequest repo fields (healing jobs and other callers).
+	// - Prefer manifest inputs that already carry hydration.Repo.
+	// - Fallback to StartRunRequest repo fields for callers without hydration.
 	var repo *contracts.RepoMaterialization
 	for _, input := range manifest.Inputs {
 		if input.Hydration != nil && input.Hydration.Repo != nil {
@@ -71,7 +71,7 @@ func (r *runController) prepareStickyWorkspaceForStep(
 
 	if repo == nil {
 		// Derive repo materialization from StartRunRequest, mirroring
-		// buildManifestFromRequest semantics.
+		// buildMigManifest semantics.
 		tmp := contracts.RepoMaterialization{
 			URL:     req.RepoURL,
 			BaseRef: req.BaseRef,

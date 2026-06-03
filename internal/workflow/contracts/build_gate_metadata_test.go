@@ -7,10 +7,6 @@ import (
 	"testing"
 )
 
-func confidencePtr(v float64) *float64 {
-	return &v
-}
-
 // TestBuildGateStageMetadata_DetectedStack verifies that DetectedStack correctly
 // derives the MigStack from the first static check's tool name.
 func TestBuildGateStageMetadata_DetectedStack(t *testing.T) {
@@ -285,20 +281,11 @@ func TestBuildGateStageMetadata_JSONRoundTrip(t *testing.T) {
 		requireJSONRoundTrip(t, original)
 	})
 
-	t.Run("recovery fields", func(t *testing.T) {
+	t.Run("bug summary", func(t *testing.T) {
 		t.Parallel()
-		original := BuildGateStageMetadata{
+		requireJSONRoundTrip(t, BuildGateStageMetadata{
 			BugSummary: "Missing semicolon on line 42",
-			Recovery: &BuildGateRecoveryMetadata{
-				LoopKind:     "healing",
-				ErrorKind:    "infra",
-				StrategyID:   "infra-default",
-				Confidence:   confidencePtr(0.75),
-				Reason:       "docker daemon unavailable",
-				Expectations: json.RawMessage(`{"artifacts":[{"path":"/out/errors.yaml","schema":"yaml"}]}`),
-			},
-		}
-		requireJSONRoundTrip(t, original)
+		})
 	})
 }
 
@@ -334,91 +321,6 @@ func TestBuildGateStageMetadata_BugSummary_Validation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			meta := BuildGateStageMetadata{BugSummary: tt.bugSummary}
-			requireValidationErr(t, meta.Validate(), tt.wantSubstr)
-		})
-	}
-}
-
-func TestBuildGateStageMetadata_Recovery_Validation(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name       string
-		recovery   BuildGateRecoveryMetadata
-		wantSubstr string
-	}{
-		// Happy paths.
-		{
-			name: "valid with all optional fields",
-			recovery: BuildGateRecoveryMetadata{
-				LoopKind:     "healing",
-				ErrorKind:    "infra",
-				StrategyID:   "infra-default",
-				Confidence:   confidencePtr(0.8),
-				Reason:       "pre_gate network timeout",
-				Expectations: json.RawMessage(`{"artifacts":[{"path":"/out/errors.yaml","schema":"yaml"}]}`),
-			},
-		},
-		// Enum validation.
-		{
-			name:       "invalid loop_kind",
-			recovery:   BuildGateRecoveryMetadata{LoopKind: "prepare", ErrorKind: "infra"},
-			wantSubstr: "loop_kind",
-		},
-		{
-			name:       "invalid error_kind",
-			recovery:   BuildGateRecoveryMetadata{LoopKind: "healing", ErrorKind: "routing"},
-			wantSubstr: "error_kind",
-		},
-		{
-			name:       "custom error_kind rejected",
-			recovery:   BuildGateRecoveryMetadata{LoopKind: "healing", ErrorKind: "custom"},
-			wantSubstr: "error_kind",
-		},
-		// Confidence bounds.
-		{
-			name:       "confidence below range",
-			recovery:   BuildGateRecoveryMetadata{LoopKind: "healing", ErrorKind: "code", Confidence: confidencePtr(-0.1)},
-			wantSubstr: "confidence",
-		},
-		{
-			name:       "confidence above range",
-			recovery:   BuildGateRecoveryMetadata{LoopKind: "healing", ErrorKind: "code", Confidence: confidencePtr(1.1)},
-			wantSubstr: "confidence",
-		},
-		// String field constraints.
-		{
-			name:       "multiline strategy_id",
-			recovery:   BuildGateRecoveryMetadata{LoopKind: "healing", ErrorKind: "code", StrategyID: "line1\nline2"},
-			wantSubstr: "strategy_id",
-		},
-		{
-			name:       "too long strategy_id",
-			recovery:   BuildGateRecoveryMetadata{LoopKind: "healing", ErrorKind: "code", StrategyID: strings.Repeat("x", 201)},
-			wantSubstr: "strategy_id",
-		},
-		{
-			name:       "multiline reason",
-			recovery:   BuildGateRecoveryMetadata{LoopKind: "healing", ErrorKind: "code", Reason: "line1\nline2"},
-			wantSubstr: "reason",
-		},
-		{
-			name:       "too long reason",
-			recovery:   BuildGateRecoveryMetadata{LoopKind: "healing", ErrorKind: "code", Reason: strings.Repeat("x", 201)},
-			wantSubstr: "reason",
-		},
-		// Expectations type.
-		{
-			name:       "invalid expectations type",
-			recovery:   BuildGateRecoveryMetadata{LoopKind: "healing", ErrorKind: "infra", Expectations: json.RawMessage(`"scalar"`)},
-			wantSubstr: "expectations",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			meta := BuildGateStageMetadata{Recovery: &tt.recovery}
 			requireValidationErr(t, meta.Validate(), tt.wantSubstr)
 		})
 	}

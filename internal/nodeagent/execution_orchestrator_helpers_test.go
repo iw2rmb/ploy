@@ -211,7 +211,7 @@ func TestPrepareStickyWorkspaceWithCleanup_StickyWorkspaceIsNotRemoved(t *testin
 		RepoID: types.MigRepoID("repo_sticky_cleanup"),
 		JobID:  types.JobID("job_sticky_cleanup"),
 	}
-	workspace := runWorkspaceDir(req.RunID)
+	workspace := workspaceDir(req.RunID)
 	if err := os.MkdirAll(filepath.Join(workspace, ".git"), 0o755); err != nil {
 		t.Fatalf("mkdir sticky .git dir: %v", err)
 	}

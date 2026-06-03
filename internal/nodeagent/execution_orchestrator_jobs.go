@@ -56,7 +56,7 @@ func (r *runController) executeMigJob(ctx context.Context, req StartRunRequest) 
 			return
 		}
 	}
-	manifest, err := buildManifestFromRequest(req, typedOpts, stepIdx, stack)
+	manifest, err := buildMigManifest(req, typedOpts, stepIdx, stack)
 	if err != nil {
 		slog.Error("failed to build manifest", "run_id", req.RunID, "error", err)
 		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
@@ -71,11 +71,11 @@ func (r *runController) executeMigJob(ctx context.Context, req StartRunRequest) 
 		"resolved_image", manifest.Image,
 	)
 
-	cfg := standardJobConfig{
+	cfg := containerJobConfig{
 		Manifest: manifest,
 		DiffType: types.DiffJobTypeMig,
 		PopulateInDir: func(inDir string) error {
-			return r.materializeMigInFromInputs(ctx, req, inDir)
+			return r.materializeInFrom(ctx, req, inDir)
 		},
 		UploadDiff: func(ctx context.Context, runID types.RunID, jobID types.JobID, jobName string, diffGen step.DiffGenerator, workspace string, result step.Result, diffPath string) (bool, error) {
 			return r.uploadJobDiff(ctx, runID, jobID, diffGen, workspace, result, types.DiffJobTypeMig, diffPath)
@@ -83,17 +83,17 @@ func (r *runController) executeMigJob(ctx context.Context, req StartRunRequest) 
 		StartTime: startTime,
 	}
 
-	r.executeStandardJob(ctx, req, cfg)
+	r.executeContainerJob(ctx, req, cfg)
 }
 
-// standardJobConfig configures the execution of a standard container job.
-type standardJobConfig struct {
+// containerJobConfig configures the execution of a standard container job.
+type containerJobConfig struct {
 	Manifest contracts.StepManifest
 	DiffType types.DiffJobType
 
 	PopulateInDir   func(inDir string) error
 	PrepareManifest func(manifest *contracts.StepManifest, workspace string) error
-	RuntimeSync     func(outDir, workspace string) error
+	SyncOutputs     func(outDir, workspace string) error
 	ValidateOutputs func(outDir, workspace string) error
 	FinalizeOutputs func(outDir, workspace string) error
 	TrySkip         func(ctx context.Context, manifest contracts.StepManifest, workspace, outDir string) (bool, error)
@@ -107,17 +107,17 @@ type standardJobConfig struct {
 	StartTime time.Time
 }
 
-type standardJobOutcome struct {
+type jobOutcome struct {
 	runErr     error
 	result     step.Result
 	repoSHAOut string
 	duration   time.Duration
 }
 
-// executeStandardJob orchestrates the common lifecycle of a container job:
+// executeContainerJob orchestrates the common lifecycle of a container job:
 // runtime init, sticky workspace preparation, directory prep, execution, and uploading.
-func (r *runController) executeStandardJob(ctx context.Context, req StartRunRequest, cfg standardJobConfig) {
-	outcome, execErr := r.executeStandardJobWithOutcome(ctx, req, cfg)
+func (r *runController) executeContainerJob(ctx context.Context, req StartRunRequest, cfg containerJobConfig) {
+	outcome, execErr := r.executeContainerJobWithOutcome(ctx, req, cfg)
 	if execErr == nil {
 		if outcome.runErr != nil || outcome.result.ExitCode != 0 {
 			r.uploadRepoArtifactsIfPresent(req.RunID, req.RepoID, req.JobID)
@@ -133,14 +133,14 @@ func (r *runController) executeStandardJob(ctx context.Context, req StartRunRequ
 	r.uploadFailureStatus(ctx, req, execErr, time.Since(startTime))
 }
 
-func (r *runController) executeStandardJobWithOutcome(ctx context.Context, req StartRunRequest, cfg standardJobConfig) (standardJobOutcome, error) {
+func (r *runController) executeContainerJobWithOutcome(ctx context.Context, req StartRunRequest, cfg containerJobConfig) (jobOutcome, error) {
 	startTime := cfg.StartTime
 	if startTime.IsZero() {
 		startTime = time.Now()
 	}
-	var outcome standardJobOutcome
+	var outcome jobOutcome
 
-	artifactPaths := runJobArtifactPaths(req.RunID, req.JobID)
+	artifactPaths := artifactPaths(req.RunID, req.JobID)
 	if err := ensureJobArtifactDirs(artifactPaths); err != nil {
 		return outcome, fmt.Errorf("prepare job artifacts: %w", err)
 	}
@@ -182,17 +182,17 @@ func (r *runController) executeStandardJobWithOutcome(ctx context.Context, req S
 }
 
 // runContainerJob executes the container, uploads artifacts/diffs, and reports terminal status.
-// Extracted from executeStandardJob to keep function sizes under ~100 lines.
+// Extracted from executeContainerJob to keep function sizes under ~100 lines.
 func (r *runController) runContainerJob(
 	ctx context.Context,
 	req StartRunRequest,
-	cfg standardJobConfig,
+	cfg containerJobConfig,
 	execCtx jobExecutionContext,
 	workspace string,
 	startTime time.Time,
 	outDir, inDir, diffPath string,
-) (standardJobOutcome, error) {
-	outcome := standardJobOutcome{}
+) (jobOutcome, error) {
+	outcome := jobOutcome{}
 	shareDir, err := ensureRunShareDir(req.RunID)
 	if err != nil {
 		return outcome, err
@@ -230,7 +230,7 @@ func (r *runController) runContainerJob(
 					runErr = fmt.Errorf("validate job outputs: %w", validateErr)
 				}
 			}
-			runErr = r.finalizeStandardJobOutputs(req, cfg, outDir, workspace, runErr, step.Result{})
+			runErr = r.finalizeOutputs(req, cfg, outDir, workspace, runErr, step.Result{})
 			repoSHAOut := ""
 			if runErr == nil {
 				var repoSHAErr error
@@ -247,7 +247,7 @@ func (r *runController) runContainerJob(
 				statsBuilder.Error(normalizedExecutionError(runErr))
 			}
 			stats := statsBuilder.MustBuild()
-			outcome = standardJobOutcome{
+			outcome = jobOutcome{
 				runErr:     runErr,
 				result:     step.Result{},
 				repoSHAOut: repoSHAOut,
@@ -268,7 +268,7 @@ func (r *runController) runContainerJob(
 	}
 
 	// Materialize Hydra resources into a staging directory for mount planning.
-	stopRuntimeSync := r.startRuntimeOutputSyncLoop(ctx, req, cfg, outDir, workspace)
+	stopOutputSync := r.startOutputSync(ctx, req, cfg, outDir, workspace)
 	if bundleErr := r.withMaterializedResources(ctx, manifest, req.TypedOptions.BundleMap, "ploy-staging-*", func(stagingDir string) error {
 		result, runErr = execCtx.runner.Run(ctx, step.Request{
 			RunID:      req.RunID,
@@ -283,20 +283,20 @@ func (r *runController) runContainerJob(
 		duration = time.Since(startTime)
 		return nil
 	}); bundleErr != nil {
-		stopRuntimeSync()
+		stopOutputSync()
 		return outcome, bundleErr
 	}
-	stopRuntimeSync()
+	stopOutputSync()
 
 	if runErr == nil && result.ExitCode == 0 && cfg.ValidateOutputs != nil {
 		if validateErr := cfg.ValidateOutputs(outDir, workspace); validateErr != nil {
 			runErr = fmt.Errorf("validate job outputs: %w", validateErr)
 		}
 	}
-	runErr = r.finalizeStandardJobOutputs(req, cfg, outDir, workspace, runErr, result)
+	runErr = r.finalizeOutputs(req, cfg, outDir, workspace, runErr, result)
 	duration = time.Since(startTime)
 	if runErr != nil || result.ExitCode != 0 {
-		persistContainerInspectArtifact(req, runJobArtifactPaths(req.RunID, req.JobID), result)
+		persistContainerInspectArtifact(req, artifactPaths(req.RunID, req.JobID), result)
 	}
 
 	diffUploaded := false
@@ -356,7 +356,7 @@ func (r *runController) runContainerJob(
 	}
 
 	stats := statsBuilder.MustBuild()
-	outcome = standardJobOutcome{
+	outcome = jobOutcome{
 		runErr:     runErr,
 		result:     result,
 		repoSHAOut: repoSHAOut,
@@ -368,9 +368,9 @@ func (r *runController) runContainerJob(
 	return outcome, nil
 }
 
-func (r *runController) finalizeStandardJobOutputs(
+func (r *runController) finalizeOutputs(
 	req StartRunRequest,
-	cfg standardJobConfig,
+	cfg containerJobConfig,
 	outDir, workspace string,
 	runErr error,
 	result step.Result,
@@ -393,13 +393,13 @@ func (r *runController) finalizeStandardJobOutputs(
 	return runErr
 }
 
-func (r *runController) startRuntimeOutputSyncLoop(
+func (r *runController) startOutputSync(
 	ctx context.Context,
 	req StartRunRequest,
-	cfg standardJobConfig,
+	cfg containerJobConfig,
 	outDir, workspace string,
 ) func() {
-	if cfg.RuntimeSync == nil {
+	if cfg.SyncOutputs == nil {
 		return func() {}
 	}
 
@@ -416,7 +416,7 @@ func (r *runController) startRuntimeOutputSyncLoop(
 			case <-stop:
 				return
 			case <-ticker.C:
-				if err := cfg.RuntimeSync(outDir, workspace); err != nil {
+				if err := cfg.SyncOutputs(outDir, workspace); err != nil {
 					slog.Warn("runtime output sync failed",
 						"run_id", req.RunID,
 						"job_id", req.JobID,
@@ -429,7 +429,7 @@ func (r *runController) startRuntimeOutputSyncLoop(
 	return func() {
 		close(stop)
 		<-done
-		if err := cfg.RuntimeSync(outDir, workspace); err != nil {
+		if err := cfg.SyncOutputs(outDir, workspace); err != nil {
 			slog.Warn("runtime output sync final pass failed",
 				"run_id", req.RunID,
 				"job_id", req.JobID,
@@ -488,14 +488,14 @@ type tempResource struct {
 	cleanup func()
 }
 
-// prepareStickyWorkspaceWithCleanup wraps prepareStickyWorkspaceForStep and returns a no-op
+// prepareStickyWorkspaceWithCleanup wraps prepareStickyWorkspace and returns a no-op
 // cleanup for sticky run workspaces.
 func (r *runController) prepareStickyWorkspaceWithCleanup(
 	ctx context.Context,
 	req StartRunRequest,
 	manifest contracts.StepManifest,
 ) (tempResource, error) {
-	workspace, err := r.prepareStickyWorkspaceForStep(ctx, req, manifest)
+	workspace, err := r.prepareStickyWorkspace(ctx, req, manifest)
 	if err != nil {
 		return tempResource{}, err
 	}

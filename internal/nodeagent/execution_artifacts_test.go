@@ -72,7 +72,7 @@ func TestUploadRepoArtifactsIfPresent(t *testing.T) {
 	jobID := types.NewJobID()
 	env := newUploadTestEnv(t, runID.String(), jobID.String())
 
-	paths := runJobArtifactPaths(runID, jobID)
+	paths := artifactPaths(runID, jobID)
 	if err := ensureJobArtifactDirs(paths); err != nil {
 		t.Fatalf("ensureJobArtifactDirs() error = %v", err)
 	}

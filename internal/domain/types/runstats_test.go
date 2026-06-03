@@ -397,19 +397,6 @@ func TestRunStatsBuilder(t *testing.T) {
 		}
 	})
 
-	t.Run("with healing warning", func(t *testing.T) {
-		stats := NewRunStatsBuilder().
-			ExitCode(1).
-			HealingWarning("no_workspace_changes").
-			MustBuild()
-
-		// Verify the stats is non-empty and contains the exit code.
-		code, found := stats.ExitCode()
-		if !found || code != 1 {
-			t.Errorf("ExitCode() = (%d, %v), want (1, true)", code, found)
-		}
-	})
-
 	t.Run("empty builder", func(t *testing.T) {
 		stats := NewRunStatsBuilder().Build()
 		if stats != nil {

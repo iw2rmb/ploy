@@ -23,7 +23,6 @@ const maxRequestBodySize = 10 << 20 // 10 MiB
 // access. The typed options include:
 //
 //   - BuildGate: enabled flag and image overrides for gate validation.
-//   - Healing: retry policy and healing mig spec.
 //   - Execution: container image, command, and retention settings.
 //   - Artifacts: artifact name and workspace-relative paths to upload.
 //   - ServerMetadata: server-injected job ID for upload correlation.
@@ -55,7 +54,7 @@ type StartRunRequest struct {
 	DetectedStack *contracts.StackExpectation `json:"detected_stack,omitempty"`
 	// TypedOptions contains strongly-typed run configuration. This is the canonical
 	// source of truth for all option keys understood by the nodeagent. Execution,
-	// healing, manifest building, and artifact upload paths all consume TypedOptions
+	// manifest building, and artifact upload paths all consume TypedOptions
 	// directly rather than parsing raw maps.
 	TypedOptions RunOptions        `json:"-"`   // Not serialized; populated by claimer_loop from parsed spec
 	Env          map[string]string `json:"env"` // Environment variables merged from spec

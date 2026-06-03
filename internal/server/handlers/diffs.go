@@ -24,9 +24,9 @@ import (
 
 // diffItem represents a single diff in a list response.
 //
-// C2: Each diff is tagged with job_id and job_type (in summary) to enable unified rehydration.
+// Each diff is tagged with job_id and job_type (in summary) to enable unified rehydration.
 // - job_id: References the job that produced this diff; job's next_id provides ordering.
-// - job_type: "mig" for main mig diffs, "healing" for healing diffs (in summary).
+// - job_type: "mig" for mig diffs.
 // Rehydration queries fetch all diffs ordered by job next_id.
 //
 // NOTE: job_id is now a KSUID-backed JobID type (no UUID parsing).

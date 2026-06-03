@@ -395,7 +395,7 @@ func TestRenderRunStatusReportTextExitOneLiners(t *testing.T) {
 	report := RunStatusReport{
 		RunID:   runID,
 		MigID:   migID,
-		MigName: "healing-run",
+		MigName: "java17-run",
 		SpecID:  specID,
 		Repos: []RunEntry{
 			{

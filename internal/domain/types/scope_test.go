@@ -28,7 +28,6 @@ func TestGlobalEnvTarget_Validate(t *testing.T) {
 		// Old scope values are invalid (hard cut).
 		{name: "old scope all is invalid", target: "all", wantErr: true},
 		{name: "old scope migs is invalid", target: "migs", wantErr: true},
-		{name: "old scope heal is invalid", target: "heal", wantErr: true},
 		{name: "old scope gate is invalid", target: "gate", wantErr: true},
 
 		// Case sensitivity.

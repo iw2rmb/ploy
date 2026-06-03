@@ -7,7 +7,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
-// manifestBuilder abstracts over the three manifest builder paths for table-driven ID tests.
+// manifestBuilder abstracts over manifest builder paths for table-driven ID tests.
 type manifestBuilder struct {
 	name   string
 	build  func(req StartRunRequest) (contracts.StepManifest, error)
@@ -23,17 +23,9 @@ var manifestBuilders = []manifestBuilder{
 	{
 		name: "gate",
 		build: func(r StartRunRequest) (contracts.StepManifest, error) {
-			return buildGateManifestFromRequest(r, r.TypedOptions)
+			return buildGateManifest(r, r.TypedOptions)
 		},
 		wantID: func(r StartRunRequest) string { return r.JobID.String() },
-	},
-	{
-		name: "healing",
-		build: func(r StartRunRequest) (contracts.StepManifest, error) {
-			mig := MigContainerSpec{Image: contracts.JobImage{Universal: "healer:latest"}}
-			return buildHealingManifest(r, mig, 0, "", contracts.MigStackUnknown)
-		},
-		wantID: func(r StartRunRequest) string { return r.JobID.String() + "-heal-0" },
 	},
 }
 
@@ -99,7 +91,7 @@ func TestBuildManifestFromRequest_PropagatesJobID(t *testing.T) {
 
 	m, err := buildManifestDefault(req)
 	if err != nil {
-		t.Fatalf("buildManifestFromRequest error: %v", err)
+		t.Fatalf("buildMigManifest error: %v", err)
 	}
 
 	if jid, ok := m.OptionString("job_id"); !ok || jid == "" {

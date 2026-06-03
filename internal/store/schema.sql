@@ -208,7 +208,7 @@ CREATE INDEX IF NOT EXISTS runs_status_idx ON runs(status) WHERE status IN ('Que
 CREATE INDEX IF NOT EXISTS runs_repo_created_idx ON runs(repo_id, created_at DESC, id DESC);
 CREATE INDEX IF NOT EXISTS runs_mig_repo_created_idx ON runs(mig_id, repo_id, created_at DESC, id DESC);
 
--- Jobs (unified job queue for all execution units: pre-build, step, post-build, heal, re-build)
+-- Jobs (unified job queue for all execution units: pre-build, step, and post-build)
 -- Jobs for a run attempt form a singly-linked chain through next_id -> jobs.id.
 -- Server-driven scheduling: only chain head starts as 'Queued'; successors remain 'Created'
 -- until their predecessor succeeds and they are promoted.
@@ -326,7 +326,7 @@ CREATE INDEX IF NOT EXISTS events_run_time_idx ON events USING BRIN (time) WITH 
 CREATE INDEX IF NOT EXISTS events_run_idx ON events(run_id);
 
 -- Diffs (per-run, small count)
--- Each execution job (mig, healing, pre_gate, post_gate) may produce a diff.
+-- Each execution job (mig, pre_gate, post_gate) may produce a diff.
 -- Diffs store `job_id` and `run_id` for association; summary JSONB may include
 -- step metadata for ordering and classification (for example: job_type, next_id).
 -- Note: run_id and job_id are TEXT (KSUID-backed) to match their parent tables.

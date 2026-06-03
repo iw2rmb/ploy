@@ -53,10 +53,10 @@ func injectRepoMetadataEnv(env map[string]string, req StartRunRequest) {
 
 // --- Main manifest builders ---
 
-// buildManifestFromRequest converts a StartRunRequest into a StepManifest.
+// buildMigManifest converts a StartRunRequest into a StepManifest.
 // For multi-step runs, stepIndex selects the step; for single-step runs it is ignored.
 // The stack parameter resolves stack-specific images (pass MigStackUnknown if unknown).
-func buildManifestFromRequest(req StartRunRequest, typedOpts RunOptions, stepIndex int, stack contracts.MigStack) (contracts.StepManifest, error) {
+func buildMigManifest(req StartRunRequest, typedOpts RunOptions, stepIndex int, stack contracts.MigStack) (contracts.StepManifest, error) {
 	if req.RunID.IsZero() {
 		return contracts.StepManifest{}, errors.New("run_id required")
 	}
@@ -191,16 +191,16 @@ func buildManifestFromRequest(req StartRunRequest, typedOpts RunOptions, stepInd
 	return manifest, nil
 }
 
-// buildGateManifestFromRequest builds a StepManifest for gate jobs (pre_gate,
+// buildGateManifest builds a StepManifest for gate jobs (pre_gate,
 // post_gate). Gate jobs use the default image since stack detection
 // happens inside the Build Gate itself.
-func buildGateManifestFromRequest(req StartRunRequest, typedOpts RunOptions) (contracts.StepManifest, error) {
+func buildGateManifest(req StartRunRequest, typedOpts RunOptions) (contracts.StepManifest, error) {
 	sanitized := typedOpts
 	sanitized.Steps = nil
 	sanitized.Execution.Image = contracts.JobImage{}
 	sanitized.Execution.Command = contracts.CommandSpec{}
 
-	manifest, err := buildManifestFromRequest(req, sanitized, 0, contracts.MigStackUnknown)
+	manifest, err := buildMigManifest(req, sanitized, 0, contracts.MigStackUnknown)
 	if err != nil {
 		return manifest, err
 	}
@@ -212,75 +212,12 @@ func buildGateManifestFromRequest(req StartRunRequest, typedOpts RunOptions) (co
 	return manifest, nil
 }
 
-// isAmataHealingImage returns true if the image name indicates an Amata-based healing container.
-func isAmataHealingImage(image string) bool {
-	return strings.Contains(strings.ToLower(image), "amata")
-}
-
-// buildHealingManifest constructs a StepManifest from a typed MigContainerSpec.
-// The healing mig runs with /workspace (RW), /out (RW), and /in (RO) mounts.
-// When codexSession is non-empty and the image is Amata-based, CODEX_RESUME=1 is injected.
-func buildHealingManifest(req StartRunRequest, mig MigContainerSpec, index int, codexSession string, stack contracts.MigStack) (contracts.StepManifest, error) {
-	if req.JobID.IsZero() {
-		return contracts.StepManifest{}, errors.New("job_id required")
-	}
-
-	stackExp := stackExpectationForRequest(req, stack)
-	image, err := resolveImage(mig.Image, stack, stackExp, fmt.Sprintf("healing mig[%d]", index))
-	if err != nil {
-		return contracts.StepManifest{}, err
-	}
-
-	command := mig.Command.ToSlice()
-
-	env := make(map[string]string, len(req.Env)+len(mig.Env)+4)
-	for k, v := range req.Env {
-		env[k] = v
-	}
-	for k, v := range mig.Env {
-		env[k] = v
-	}
-	injectRepoMetadataEnv(env, req)
-	injectStackTupleEnv(env, stackExpectationForRequest(req, stack))
-
-	if codexSession != "" && isAmataHealingImage(image) {
-		env["CODEX_RESUME"] = "1"
-	}
-
-	healingStepID := types.StepID(fmt.Sprintf("%s-heal-%d", req.JobID, index))
-
-	manifest := contracts.StepManifest{
-		ID:         healingStepID,
-		Name:       fmt.Sprintf("Healing mig %d for run %s", index, req.RunID),
-		Image:      image,
-		Command:    command,
-		WorkingDir: "/workspace",
-		Envs:       env,
-		In:         mig.In,
-		Out:        mig.Out,
-		Home:       mig.Home,
-		Gate:       &contracts.StepGateSpec{Enabled: false},
-		Inputs: []contracts.StepInput{
-			{
-				Name:      "workspace",
-				MountPath: "/workspace",
-				Mode:      contracts.StepInputModeReadWrite,
-			},
-		},
-		Options: map[string]any{
-			"mount_docker_socket": true,
-		},
-	}
-
-	return manifest, nil
-}
-
 // --- Stack Gate chaining ---
 
 // validateAndDeriveStackGateChaining validates and derives Stack Gate chaining for multi-step runs.
 // For steps after the first, it derives inbound expectations from the previous step's outbound
-// when omitted, and rejects mismatched explicit inbound. Migifies steps in place.
-func validateAndDeriveStackGateChaining(steps []StepMig) error {
+// when omitted, and rejects mismatched explicit inbound. Updates steps in place.
+func validateAndDeriveStackGateChaining(steps []StepOptions) error {
 	if len(steps) <= 1 {
 		return nil
 	}

@@ -358,10 +358,3 @@ index abc1234..def5678 100644
 
 	t.Log("✓✓✓ Smoke workflow end-to-end test completed successfully")
 }
-
-// TestSmokeWorkflow_HealingDiffs validates that healing diffs with job_type and next_id
-// are correctly stored and retrieved alongside mig diffs.
-// This test verifies the unified job+diff model where both mig and healing diffs
-// are exposed through the run diff listing.
-//
-// Requires: PLOY_TEST_DB_DSN environment variable.

@@ -21,7 +21,7 @@ import (
 func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest) {
 	startTime := time.Now()
 
-	artifactPaths := runJobArtifactPaths(req.RunID, req.JobID)
+	artifactPaths := artifactPaths(req.RunID, req.JobID)
 	uploadRepoArtifactsOnReturn := false
 	closeArtifactLogs := func() {}
 	defer func() {
@@ -92,7 +92,7 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 		}
 	}
 
-	manifest, err := buildGateManifestFromRequest(req, typedOpts)
+	manifest, err := buildGateManifest(req, typedOpts)
 	if err != nil {
 		uploadRepoArtifactsOnReturn = true
 		slog.Error("failed to build manifest", "run_id", req.RunID, "error", err)
@@ -102,7 +102,7 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 
 	applyGatePhaseOverrides(&manifest, req, typedOpts)
 
-	workspace, err := r.prepareStickyWorkspaceForStep(ctx, req, manifest)
+	workspace, err := r.prepareStickyWorkspace(ctx, req, manifest)
 	if err != nil {
 		uploadRepoArtifactsOnReturn = true
 		slog.Error("failed to prepare sticky workspace", "run_id", req.RunID, "error", err)
@@ -298,13 +298,13 @@ func (r *runController) persistGateStack(runID types.RunID, meta *contracts.Buil
 	if stack == "" {
 		stack = contracts.MigStackUnknown
 	}
-	persistOnce(runCacheDir(runID), "build-gate-stack.txt", []byte(string(stack)), "build gate stack", runID)
+	persistOnce(runDir(runID), "build-gate-stack.txt", []byte(string(stack)), "build gate stack", runID)
 }
 
 // loadPersistedStack reads the persisted stack for a run.
 // Returns MigStackUnknown if no stack file exists or on error.
 func (r *runController) loadPersistedStack(runID types.RunID) contracts.MigStack {
-	stackPath := filepath.Join(runCacheDir(runID), "build-gate-stack.txt")
+	stackPath := filepath.Join(runDir(runID), "build-gate-stack.txt")
 	data, err := os.ReadFile(stackPath)
 	if err != nil {
 		if !os.IsNotExist(err) {
@@ -330,7 +330,7 @@ func (r *runController) persistFirstGateFailureLog(runID types.RunID, meta *cont
 	if strings.TrimSpace(logPayload) == "" {
 		return
 	}
-	persistOnce(runCacheDir(runID), "build-gate-first.log", []byte(logPayload), "first build gate failure log", runID)
+	persistOnce(runDir(runID), "build-gate-first.log", []byte(logPayload), "first build gate failure log", runID)
 }
 
 func exposeGateOutDir(workspace, outDir string) error {

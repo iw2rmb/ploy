@@ -141,29 +141,6 @@ build_gate:
   - SBOM row persistence is independent from artifact bundle upload.
   - No dedicated SBOM environment variables exist in this slice; stack identity comes from gate metadata (`lang`, `release`, `tool`) and claim context.
 
-## Healing Container Environment
-
-The node agent injects the following environment variables into healing containers to support
-Build Gate verification. These vars enable healing migs to derive the same Git baseline used
-by the Migs run.
-
-Repo metadata (injected from StartRunRequest):
-- `PLOY_REPO_URL` — Git repository URL for cloning/verification (same as the Migs run)
-- `PLOY_BASE_REF` — Base Git reference (branch or tag) for the run
-- `PLOY_COMMIT_SHA` — Pinned commit SHA when available (may be empty)
-
-Server connection details:
-- `PLOY_SERVER_URL` — Control plane base URL (e.g., `https://<server>:8443`)
-- `PLOY_HOST_WORKSPACE` — Host filesystem path to workspace for in-container tooling
-- `PLOY_CLIENT_CERT_PATH` — Path to client certificate (`/etc/ploy/certs/client.crt`)
-- `PLOY_CLIENT_KEY_PATH` — Path to client key (`/etc/ploy/certs/client.key`)
-- `PLOY_API_TOKEN` — Bearer token for API authentication (when configured on node).
-
-Healing runtime context:
-- `PLOY_GATE_PHASE` — phase that failed (`pre_gate|post_gate`)
-- `PLOY_LOOP_KIND` — loop context (`healing`)
-
-See [Build Gate docs](../build-gate/README.md) for Build Gate configuration and execution details.
 - `PLOYD_HTTP_LISTEN` — Server HTTP listen address (default `:8080`).
 - `PLOYD_METRICS_LISTEN` — Server metrics listen address (default `:9100`).
 - `PLOYD_SCHEDULER_STALE_JOB_RECOVERY_INTERVAL` — Stale-job recovery interval
@@ -369,7 +346,7 @@ Precedence at server startup:
 the config file are treated as unset unless the environment variable is actually present.
 
 - `PLOY_DOCKER_NETWORK` — Optional Docker network name to attach runtime containers (Build Gate
-  and healing migs) to. When set on the node, the node agent's Docker runtime uses this network
+  and mig jobs) to. When set on the node, the node agent's Docker runtime uses this network
   so containers (e.g., `codex`) can reach the control-plane service by its Docker network
   hostname (e.g., `server:8080` in the local Docker stack). When unset, the default Docker
   network is used.
@@ -426,7 +403,7 @@ ploy config env unset --key OLD_VAR
 | `server` | Server process | Server-side credentials and configuration |
 | `nodes` | Node agent processes | Node-level configuration |
 | `gates` | Gate jobs (`pre_gate`, `post_gate`) | Build gate credentials |
-| `steps` | Step jobs (`mig`, `heal`) | Mig execution credentials |
+| `steps` | Step jobs (`mig`) | Mig execution credentials |
 
 The `set` command uses **`--on` selectors** for convenience:
 
@@ -450,7 +427,7 @@ The `show` and `unset` commands use **`--from`** to specify the target:
    pair and cached in the control-plane's `ConfigHolder` at startup.
 2. **Claim-time merge**: When a node claims a job via `/v1/nodes/{id}/claim`, the server
    merges matching global env vars into the job's spec based on target-to-job-type mapping
-   (gates → pre_gate/post_gate; steps → mig/heal).
+   (gates → pre_gate/post_gate; steps → mig).
    The job spec must be a JSON object; invalid/non-object specs are rejected at submission
    time (400). If a persisted spec in the DB is invalid or non-object, claim fails with a 500.
 3. **Precedence**: Per-run env vars (in spec or CLI flags) take precedence—existing keys
@@ -466,7 +443,7 @@ The `show` and `unset` commands use **`--from`** to specify the target:
 | Variable | Consumer | Description |
 |----------|----------|-------------|
 | `home` (spec field) | `codex` | Per-run file mounts relative to `$HOME` |
-| `in` (typed) | `codex`, healing | Read-only input file mounts |
+| `in` (typed) | `codex` | Read-only input file mounts |
 | `OPENAI_API_KEY` | Future OpenAI-integrated migs | API key for LLM operations |
 | `PLOY_GRADLE_BUILD_CACHE_URL` | Build Gate (Gradle) | HTTP URL of the remote Gradle Build Cache endpoint (e.g. `http://gradle-build-cache:5071/cache/`). When unset, remote cache is disabled. |
 | `PLOY_GRADLE_BUILD_CACHE_PUSH` | Build Gate (Gradle) | Whether to push results to the remote cache. Defaults to `true` when `PLOY_GRADLE_BUILD_CACHE_URL` is set. |
@@ -511,29 +488,17 @@ Required typed file input:
 |------|-------------|
 | `/share/java.classpath` | Newline-delimited absolute classpath entries produced by SBOM/build-gate and mounted into ORW jobs. Gradle cache entries must use `/root/.gradle/...` (not `/home/gradle/.gradle/...`). |
 
-Healing execution (custom recipe via Amata lane):
-
-- Canonical command:
-  - `heal-orw --apply --dir /workspace --out /out/orw-task`
-- ORW wrapper behavior:
-  - `orw-cli` always passes `--classpath-file /share/java.classpath` to the OpenRewrite runner.
-  - Missing/invalid `/share/java.classpath` is treated as deterministic `input` failure.
+ORW wrapper behavior:
+- `orw-cli` always passes `--classpath-file /share/java.classpath` to the OpenRewrite runner.
+- Missing/invalid `/share/java.classpath` is treated as deterministic `input` failure.
 - `rewrite.yml` support:
   - Config resolution order is: `ORW_CONFIG_PATH` -> `/out/rewrite.yml`.
   - When a config file is found, ORW activates top-level `name:` by default.
   - Use `ORW_ACTIVE_RECIPES` to override active recipe names.
   - In YAML mode, runtime fills recipe coordinates with defaults when missing.
   - For custom recipe artifacts, set `RECIPE_GROUP`/`RECIPE_ARTIFACT`/`RECIPE_CLASSNAME` explicitly.
-- `heal-orw` requires canonical stack tuple env:
-  - `PLOY_STACK_LANGUAGE`
-  - `PLOY_STACK_TOOL`
-  - `PLOY_STACK_RELEASE`
-- `heal-orw` supports only `java+maven` and `java+gradle` tuples.
-- On missing or unsupported stack tuple, `heal-orw` writes deterministic
-  failure metadata to `/out/orw-task/report.json`.
 - Before the first ORW run, `orw-cli` pre-scans workspace `.proto` files and appends proto3/edition paths to `ORW_EXCLUDE_PATHS`.
-- Failure artifacts are written to `/out/orw-task/report.json` and
-  `/out/orw-task/transform.log`.
+- Failure artifacts are written to `/out/orw-task/report.json` and `/out/orw-task/transform.log`.
 
 `report.json` contract (`/out/report.json`):
 
@@ -564,7 +529,6 @@ Run/API metadata propagation:
 ### How Official Images Consume These Variables
 
 **Amata image (`amata`)** ships OpenRewrite helpers:
-- `heal-orw` — canonical wrapper that resolves build-system and invokes ORW runtime.
 - `orw-cli` — ORW contract wrapper producing deterministic `/out/report.json`.
 - `rewrite` — bundled OpenRewrite CLI runner executable used by `orw-cli`.
 
@@ -591,7 +555,7 @@ and, when not writable, the node falls back to `${TMPDIR:-/tmp}/ploy/gates`.
 - Gradle gates mount that path to `/root/.gradle`.
 - Maven gates mount that path to `/root/.m2`.
 
-**Java non-gate jobs (`mig`, `heal`)**: Use the same centralized
+**Java non-gate jobs (`mig`)**: Use the same centralized
 cache-root policy as Build Gate when stack tuple env is set to Java:
 - `PLOY_STACK_LANGUAGE=java`
 - `PLOY_STACK_TOOL=gradle|maven`

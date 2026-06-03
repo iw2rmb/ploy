@@ -12,8 +12,8 @@ acts as a no-op for all other tools.
 
 - Keep **full logs** available for humans and artifacts (for download and
   post-mortem analysis).
-- Provide a **focused failure slice** for machine consumers (e.g. Codex healing,
-  incident detection, UI summaries).
+- Provide a **focused failure slice** for machine consumers (e.g. incident
+  detection and UI summaries).
 - Avoid tool/framework-specific heuristics in the node agent or CLI; keep them
   co-located with gate execution.
 
@@ -56,8 +56,8 @@ This yields a trimmed view that:
 For Gradle logs, the trimmer produces:
 
 - A human-focused trimmed message.
-- Optional structured evidence payload (`log_findings[0].evidence`) that can be
-  forwarded to healing as `/in/errors.yaml`.
+- Optional structured evidence payload (`log_findings[0].evidence`) for
+  artifact and API consumers.
 
 Human-focused trimming:
 
@@ -116,23 +116,21 @@ This design keeps the **canonical gate result** (`LogsText`, resource usage,
 static checks) intact while also providing a compact, tool-aware error segment
 for downstream consumers.
 
-## Healing and Codex Considerations
+## Consumer Considerations
 
-Healing migs (including `codex`) receive the first failing gate log in
-`/in/build-gate.log`. The node agent now prefers the trimmed view when
-available:
+The node agent prefers the trimmed view when it publishes gate failure metadata:
 
 - When `BuildGateStageMetadata.LogFindings` contains at least one entry, the
-  first finding's `Message` is written to `/in/build-gate.log` for healing migs.
+  first finding's `Message` is exposed as the compact gate failure message.
 - When `BuildGateStageMetadata.LogFindings[0].Evidence` is present and valid
-  YAML/JSON, the node writes `/in/errors.yaml` for heal/post-gate jobs.
+  YAML/JSON, the structured evidence remains available in gate metadata.
 - When no trimmed view is available (unknown tool / legacy gate), the agent
   falls back to `BuildGateStageMetadata.LogsText`.
 
 This behavior ensures:
 
-- `codex` and other healing migs see a focused failure slice for known
-  tools (Maven/Gradle).
+- API and UI consumers see a focused failure slice for known tools
+  (Maven/Gradle).
 - Structured Gradle failure context can be consumed deterministically through
   `/in/errors.yaml` when available.
 - Full logs remain available via artifacts and `LogsText` for manual inspection.

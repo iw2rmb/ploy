@@ -11,7 +11,7 @@ import (
 )
 
 // JobKind identifies the execution type for a job in the unified queue.
-// All execution units (migs, gates, builds, healers) are now stored in
+// All execution units (migs, gates, builds) are stored in
 // the jobs table with their kind indicated by this field.
 type JobKind string
 
@@ -74,14 +74,7 @@ type JobMeta struct {
 	// GateCycleName stores the concrete gate cycle name used by gate jobs.
 	// Examples: pre-gate, post-gate.
 	GateCycleName string `json:"gate_cycle_name,omitempty"`
-
-	// RecoveryMetadata stores universal recovery loop metadata.
-	// Allowed for gate and mig jobs; rejected for build jobs.
-	RecoveryMetadata *RecoveryJobMetadata `json:"recovery,omitempty"`
 }
-
-// RecoveryJobMetadata captures loop context persisted at job level.
-type RecoveryJobMetadata = BuildGateRecoveryMetadata
 
 // BuildMeta captures metadata for build tool invocations stored in jobs.meta.
 // This consolidates fields previously tracked in the separate builds table.
@@ -113,15 +106,6 @@ func (m JobMeta) Validate() error {
 	if m.GateMetadata != nil {
 		if err := m.GateMetadata.Validate(); err != nil {
 			return fmt.Errorf("gate metadata invalid: %w", err)
-		}
-	}
-	// RecoveryMetadata is allowed for gate and mig jobs only.
-	if m.RecoveryMetadata != nil {
-		if m.Kind != JobKindGate && m.Kind != JobKindMig {
-			return fmt.Errorf("recovery metadata present but kind is %q (only allowed for %q or %q)", m.Kind, JobKindGate, JobKindMig)
-		}
-		if err := m.RecoveryMetadata.Validate(); err != nil {
-			return fmt.Errorf("recovery metadata invalid: %w", err)
 		}
 	}
 	if m.MigStepIndex != nil {

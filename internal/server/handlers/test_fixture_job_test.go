@@ -11,7 +11,7 @@ import (
 )
 
 // jobStore is a focused mock for job completion, status, listing, claiming,
-// healing, stale recovery, and related orchestration handler tests.
+// stale recovery and related orchestration handler tests.
 //
 // Method receivers are split across companion files to keep each shard small:
 //   - test_fixture_job_run_test.go      - Run, RunAction, Artifact, and Diff methods.

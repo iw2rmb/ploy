@@ -19,10 +19,10 @@ func TestRunStatusReportTextContract(t *testing.T) {
 	specID := domaintypes.NewSpecID()
 	repoID := domaintypes.NewRepoID()
 	preGateID := domaintypes.NewJobID()
-	healID := domaintypes.NewJobID()
+	migJobID := domaintypes.NewJobID()
 	postGateID := domaintypes.NewJobID()
 
-	server := newRunStatusReportServer(t, runID, migID, specID, repoID, preGateID, healID, postGateID)
+	server := newRunStatusReportServer(t, runID, migID, specID, repoID, preGateID, migJobID, postGateID)
 	defer server.Close()
 
 	clienv.UseServerDescriptor(t, server.URL)
@@ -53,7 +53,7 @@ func TestRunStatusReportTextContract(t *testing.T) {
 	if strings.Count(out, "Patch (") != 1 {
 		t.Fatalf("expected exactly one patch link, got %q", out)
 	}
-	assertx.Contains(t, out, "/v1/jobs/"+healID.String()+"/logs")
+	assertx.Contains(t, out, "/v1/jobs/"+migJobID.String()+"/logs")
 	assertx.Contains(t, out, "⣾")
 	assertx.Contains(t, out, "✗")
 	assertx.Contains(t, out, "└  Exit 137: ")
@@ -61,7 +61,7 @@ func TestRunStatusReportTextContract(t *testing.T) {
 	assertx.NotContains(t, out, "Exit 0")
 }
 
-func newRunStatusReportServer(t *testing.T, runID domaintypes.RunID, migID domaintypes.MigID, specID domaintypes.SpecID, repoID domaintypes.RepoID, preGateID domaintypes.JobID, healID domaintypes.JobID, postGateID domaintypes.JobID) *httptest.Server {
+func newRunStatusReportServer(t *testing.T, runID domaintypes.RunID, migID domaintypes.MigID, specID domaintypes.SpecID, repoID domaintypes.RepoID, preGateID domaintypes.JobID, migJobID domaintypes.JobID, postGateID domaintypes.JobID) *httptest.Server {
 	t.Helper()
 
 	diffID := "11111111-1111-1111-1111-111111111111"
@@ -95,12 +95,12 @@ func newRunStatusReportServer(t *testing.T, runID domaintypes.RunID, migID domai
 							"gate-report": "bafy-gate-report",
 						},
 					},
-					healID.String(): map[string]any{
+					migJobID.String(): map[string]any{
 						"state":        "succeeded",
 						"attempts":     1,
 						"max_attempts": 1,
 						"artifacts": map[string]any{
-							"healing-notes": "bafy-heal-notes",
+							"mig-notes": "bafy-mig-notes",
 						},
 					},
 					postGateID.String(): map[string]any{
@@ -121,14 +121,14 @@ func newRunStatusReportServer(t *testing.T, runID domaintypes.RunID, migID domai
 						"name":        "pre-gate",
 						"job_type":    "pre_gate",
 						"job_image":   "ghcr.io/acme/pre-gate:1",
-						"next_id":     healID.String(),
+						"next_id":     migJobID.String(),
 						"node_id":     nil,
 						"status":      "Failed",
 						"exit_code":   137,
 						"duration_ms": 1500,
 					},
 					{
-						"job_id":      healID.String(),
+						"job_id":      migJobID.String(),
 						"name":        "mig-0",
 						"job_type":    "mig",
 						"job_image":   "ghcr.io/acme/mig:1",
@@ -156,7 +156,7 @@ func newRunStatusReportServer(t *testing.T, runID domaintypes.RunID, migID domai
 				"diffs": []map[string]any{
 					{
 						"id":           diffID,
-						"job_id":       healID.String(),
+						"job_id":       migJobID.String(),
 						"created_at":   "2026-02-24T08:03:00Z",
 						"gzipped_size": 128,
 						"summary":      nil,
@@ -191,10 +191,10 @@ func TestRunStatusJSONGate(t *testing.T) {
 			specID := domaintypes.NewSpecID()
 			repoID := domaintypes.NewRepoID()
 			preGateID := domaintypes.NewJobID()
-			healID := domaintypes.NewJobID()
+			migJobID := domaintypes.NewJobID()
 			postGateID := domaintypes.NewJobID()
 
-			server := newRunStatusReportServer(t, runID, migID, specID, repoID, preGateID, healID, postGateID)
+			server := newRunStatusReportServer(t, runID, migID, specID, repoID, preGateID, migJobID, postGateID)
 			defer server.Close()
 
 			clienv.UseServerDescriptor(t, server.URL)

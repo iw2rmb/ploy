@@ -352,7 +352,7 @@ credentials and other shared settings without embedding them in every spec file.
 - `server` — Inject into the server process
 - `nodes` — Inject into node agent processes
 - `gates` — Inject into gate jobs (`pre_gate`, `post_gate`)
-- `steps` — Inject into step jobs (`mig`, `heal`)
+- `steps` — Inject into step jobs (`mig`)
 
 The `set` command uses **`--on` selectors** for convenience:
 - `all` → server, nodes, gates, steps (all targets)

@@ -1,9 +1,7 @@
 package contracts
 
 import (
-	"encoding/json"
 	"fmt"
-	"math"
 	"strings"
 	"unicode/utf8"
 
@@ -17,9 +15,8 @@ type BuildGateStageMetadata struct {
 	// ExecutedCommand is the exact gate command shell payload executed by the
 	// gate container.
 	ExecutedCommand string `json:"executed_command,omitempty"`
-	// Detected captures the resolved gate stack identity used for this
-	// gate execution. It is the canonical source for stack-aware recovery
-	// validation, including optional release matching.
+	// Detected captures the resolved gate stack identity used for this gate
+	// execution, including optional release matching.
 	Detected    *StackExpectation     `json:"detected_stack,omitempty"`
 	LogFindings []BuildGateLogFinding `json:"log_findings,omitempty"`
 	// RuntimeImage is the container image name used to run the gate container.
@@ -34,16 +31,14 @@ type BuildGateStageMetadata struct {
 	// Resources summarizes container limits and observed usage for the gate run.
 	// Not serialized in JSON APIs.
 	Resources *BuildGateResourceUsage `json:"-"`
-	// BugSummary is a short one-line description of the build failure produced
-	// by the heal workflow. Max 200 chars, no newlines.
+	// BugSummary is a short one-line description of the gate failure.
+	// Max 200 chars, no newlines.
 	BugSummary string `json:"bug_summary,omitempty"`
-	// Recovery carries loop context for the universal recovery loop contract.
-	Recovery *BuildGateRecoveryMetadata `json:"recovery,omitempty"`
 }
 
 // DetectedStack returns the MigStack derived from the first static check's tool.
 // This provides deterministic stack identification for stack-aware image selection
-// in mig steps and healing jobs.
+// in mig steps.
 //
 // The detected stack is derived from the Build Gate's tool detection:
 //   - "maven" tool → MigStackJavaMaven
@@ -51,8 +46,8 @@ type BuildGateStageMetadata struct {
 //   - "java" tool → MigStackJava
 //   - unknown/empty → MigStackUnknown
 //
-// This method ensures the same stack value is visible to both mig and healing
-// executions, enabling consistent image resolution across gate retries.
+// This method ensures the same stack value is visible to mig executions,
+// enabling consistent image resolution.
 func (m BuildGateStageMetadata) DetectedStack() MigStack {
 	if m.Detected != nil && strings.TrimSpace(m.Detected.Tool) != "" {
 		return ToolToMigStack(m.Detected.Tool)
@@ -127,145 +122,7 @@ func (m BuildGateStageMetadata) Validate() error {
 			return fmt.Errorf("bug_summary: must be at most 200 characters, got %d", utf8.RuneCountInString(m.BugSummary))
 		}
 	}
-	if m.Recovery != nil {
-		if err := m.Recovery.Validate(); err != nil {
-			return fmt.Errorf("recovery invalid: %w", err)
-		}
-	}
 	return nil
-}
-
-// BuildGateRecoveryMetadata captures classification and strategy context
-// for a failed gate within the universal recovery loop.
-type BuildGateRecoveryMetadata struct {
-	LoopKind   string   `json:"loop_kind"`
-	ErrorKind  string   `json:"error_kind"`
-	StrategyID string   `json:"strategy_id,omitempty"`
-	Confidence *float64 `json:"confidence,omitempty"`
-	Reason     string   `json:"reason,omitempty"`
-	// Expectations carries strategy-specific structured expectations emitted by
-	// heal classification. Reserved for downstream strategy/artifact handling.
-	Expectations json.RawMessage `json:"expectations,omitempty"`
-	// DepsBumps carries cumulative dependency bump state for deps healing loops.
-	// Values are non-empty versions or nil (meaning dependency disable/remove).
-	DepsBumps map[string]*string `json:"deps_bumps,omitempty"`
-}
-
-// RecoveryClaimContext carries typed recovery inputs in node claim responses
-// for healing jobs. This payload makes recovery execution independent
-// from node-local run cache files.
-type RecoveryClaimContext struct {
-	LoopKind string `json:"loop_kind,omitempty"`
-	// DetectedStack is the gate-detected stack used for image resolution.
-	DetectedStack MigStack `json:"detected_stack,omitempty"`
-	// ResolvedHealingImage is the concrete healing image selected for this chain.
-	ResolvedHealingImage string `json:"resolved_healing_image,omitempty"`
-	// Expectations carries recovery expectations payload.
-	Expectations json.RawMessage `json:"expectations,omitempty"`
-	// DepsBumps carries cumulative dependency bump state for deps healing.
-	DepsBumps map[string]*string `json:"deps_bumps,omitempty"`
-	// BuildGateLog is the failed gate log snippet intended for /in/build-gate.log.
-	BuildGateLog string `json:"build_gate_log,omitempty"`
-	// Errors carries structured gate errors payload intended for /in/errors.yaml.
-	Errors json.RawMessage `json:"errors,omitempty"`
-}
-
-const (
-	recoveryLoopKindHealing = "healing"
-	recoveryErrorKindInfra  = "infra"
-	recoveryErrorKindCode   = "code"
-	recoveryErrorKindDeps   = "deps"
-	recoveryErrorKindMixed  = "mixed"
-	recoveryErrorKindUnk    = "unknown"
-)
-
-// Validate ensures recovery metadata entries are well formed.
-func (m BuildGateRecoveryMetadata) Validate() error {
-	if strings.TrimSpace(m.LoopKind) == "" {
-		return fmt.Errorf("loop_kind is required")
-	}
-	if _, ok := normalizeRecoveryLoopKind(m.LoopKind); !ok {
-		return fmt.Errorf("loop_kind invalid: %q", m.LoopKind)
-	}
-	if strings.TrimSpace(m.ErrorKind) == "" {
-		return fmt.Errorf("error_kind is required")
-	}
-	if _, ok := normalizeRecoveryErrorKind(m.ErrorKind); !ok {
-		return fmt.Errorf("error_kind invalid: %q", m.ErrorKind)
-	}
-	if m.StrategyID != "" {
-		if strings.ContainsAny(m.StrategyID, "\n\r") {
-			return fmt.Errorf("strategy_id: must be single-line")
-		}
-		if utf8.RuneCountInString(m.StrategyID) > 200 {
-			return fmt.Errorf("strategy_id: must be at most 200 characters, got %d", utf8.RuneCountInString(m.StrategyID))
-		}
-	}
-	if m.Confidence != nil {
-		if math.IsNaN(*m.Confidence) || math.IsInf(*m.Confidence, 0) {
-			return fmt.Errorf("confidence: must be finite")
-		}
-		if *m.Confidence < 0 || *m.Confidence > 1 {
-			return fmt.Errorf("confidence: must be between 0 and 1, got %v", *m.Confidence)
-		}
-	}
-	if m.Reason != "" {
-		if strings.ContainsAny(m.Reason, "\n\r") {
-			return fmt.Errorf("reason: must be single-line")
-		}
-		if utf8.RuneCountInString(m.Reason) > 200 {
-			return fmt.Errorf("reason: must be at most 200 characters, got %d", utf8.RuneCountInString(m.Reason))
-		}
-	}
-	if len(m.Expectations) > 0 {
-		var raw any
-		if err := json.Unmarshal(m.Expectations, &raw); err != nil {
-			return fmt.Errorf("expectations: invalid JSON: %w", err)
-		}
-		switch raw.(type) {
-		case map[string]any, []any:
-			// allowed
-		default:
-			return fmt.Errorf("expectations: must be object or array JSON")
-		}
-	}
-	if m.DepsBumps != nil {
-		for lib, ver := range m.DepsBumps {
-			if strings.TrimSpace(lib) == "" {
-				return fmt.Errorf("deps_bumps: key must be non-empty")
-			}
-			if ver != nil && strings.TrimSpace(*ver) == "" {
-				return fmt.Errorf("deps_bumps[%q]: version must be non-empty when present", lib)
-			}
-		}
-	}
-	return nil
-}
-
-func normalizeRecoveryLoopKind(raw string) (string, bool) {
-	switch strings.TrimSpace(raw) {
-	case recoveryLoopKindHealing:
-		return recoveryLoopKindHealing, true
-	default:
-		return "", false
-	}
-}
-
-func normalizeRecoveryErrorKind(raw string) (string, bool) {
-	switch strings.TrimSpace(raw) {
-	case recoveryErrorKindInfra:
-		return recoveryErrorKindInfra, true
-	case recoveryErrorKindCode:
-		return recoveryErrorKindCode, true
-	case recoveryErrorKindDeps:
-		return recoveryErrorKindDeps, true
-	case recoveryErrorKindMixed:
-		return recoveryErrorKindMixed, true
-	case recoveryErrorKindUnk:
-		return recoveryErrorKindUnk, true
-	default:
-		return "", false
-	}
 }
 
 // BuildGateResourceUsage captures container limits and observed usage metrics
