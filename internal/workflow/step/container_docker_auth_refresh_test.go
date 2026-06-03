@@ -13,7 +13,7 @@ import (
 	"github.com/moby/moby/client"
 )
 
-func TestDockerContainerRuntimeCreate_ImagePullAuthRefreshRetry(t *testing.T) {
+func TestContainerRuntimeCreate_ImagePullAuthRefreshRetry(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -93,7 +93,7 @@ func TestDockerContainerRuntimeCreate_ImagePullAuthRefreshRetry(t *testing.T) {
 				pullErrs:     tt.pullErrs,
 				pullWaitErrs: tt.pullWaitErrs,
 			}
-			rt := newDockerContainerRuntimeWithClient(fake, DockerContainerRuntimeOptions{
+			rt := newContainerRuntimeWithClient(fake, ContainerRuntimeOptions{
 				PullImage:                 true,
 				RegistryAuthRefreshSocket: socketPath,
 			})

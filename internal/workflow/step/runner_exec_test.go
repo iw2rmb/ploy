@@ -70,14 +70,14 @@ func TestRunner_Run_TimingCapture(t *testing.T) {
 		t.Errorf("Run() HydrationDuration = %v, expected >= %v", result.Timings.HydrationDuration, hydrationDelay)
 	}
 
-	if time.Duration(result.Timings.BuildGateDuration) < gateDelay {
-		t.Errorf("Run() BuildGateDuration = %v, expected >= %v", result.Timings.BuildGateDuration, gateDelay)
+	if time.Duration(result.Timings.GateDuration) < gateDelay {
+		t.Errorf("Run() GateDuration = %v, expected >= %v", result.Timings.GateDuration, gateDelay)
 	}
 
 	// Total duration should be sum of all stages (with some tolerance)
 	minExpected := result.Timings.HydrationDuration +
 		result.Timings.ExecutionDuration +
-		result.Timings.BuildGateDuration +
+		result.Timings.GateDuration +
 		result.Timings.DiffDuration +
 		result.Timings.PublishDuration
 

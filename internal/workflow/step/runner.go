@@ -22,7 +22,7 @@ import (
 //
 //  2. Pre-mig Build Gate — When Gate is enabled (Manifest.Gate.Enabled), run static validation on the
 //     workspace before executing the mig container. If the gate fails,
-//     Runner.Run returns ErrBuildGateFailed without executing container
+//     Runner.Run returns ErrGateFailed without executing container
 //     stages.
 //
 //  3. Container Execution — Create, start, and wait on the container via
@@ -80,7 +80,7 @@ type Result struct {
 	ContainerInspectJSON []byte
 	// Per-stage timings captured during execution.
 	Timings            StageTiming
-	BuildGate          *contracts.BuildGateStageMetadata
+	Gate               *contracts.BuildGateStageMetadata
 	ContainerResources *ContainerResourceUsage
 }
 
@@ -95,14 +95,14 @@ type ContainerResourceUsage struct {
 type StageTiming struct {
 	HydrationDuration types.Duration
 	ExecutionDuration types.Duration
-	BuildGateDuration types.Duration
+	GateDuration      types.Duration
 	DiffDuration      types.Duration
 	PublishDuration   types.Duration
 	TotalDuration     types.Duration
 }
 
-// ErrBuildGateFailed is returned when the pre-mig Build Gate fails.
-var ErrBuildGateFailed = errors.New("build gate failed")
+// ErrGateFailed is returned when the pre-mig Build Gate fails.
+var ErrGateFailed = errors.New("build gate failed")
 
 // Run executes a step and returns the result.
 func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
@@ -118,8 +118,8 @@ func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 
 	// Stage 2: Pre-mig Build Gate validation.
 	gateMetadata, gateDuration, err := r.runGate(ctx, req, "pre-mig validation failed")
-	result.BuildGate = gateMetadata
-	result.Timings.BuildGateDuration = gateDuration
+	result.Gate = gateMetadata
+	result.Timings.GateDuration = gateDuration
 	if err != nil {
 		result.Timings.TotalDuration = types.Duration(time.Since(totalStart))
 		return result, err

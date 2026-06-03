@@ -21,7 +21,7 @@ func (m *testStreamingContainerRuntime) StreamLogs(ctx context.Context, handle C
 	return nil
 }
 
-func TestDockerGateExecutor_StreamsLogsToExecutionWriter(t *testing.T) {
+func TestGateExecutor_StreamsLogsToExecutionWriter(t *testing.T) {
 	t.Parallel()
 
 	var live strings.Builder
@@ -40,7 +40,7 @@ func TestDockerGateExecutor_StreamsLogsToExecutionWriter(t *testing.T) {
 		},
 	}
 
-	executor := NewDockerGateExecutor(rt)
+	executor := NewGateExecutor(rt)
 	workspace := createMavenWorkspace(t, "17")
 	spec := &contracts.StepGateSpec{Enabled: true}
 

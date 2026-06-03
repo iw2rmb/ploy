@@ -13,7 +13,7 @@ import (
 func TestGateDocker_StackGate_PreCheckPass(t *testing.T) {
 	t.Parallel()
 
-	executor, rt, workspace := newDockerGateTestHarness(t)
+	executor, rt, workspace := newGateTestHarness(t)
 
 	spec := &contracts.StepGateSpec{
 		Enabled: true,
@@ -66,7 +66,7 @@ func TestGateDocker_StackGate_PreCheckPass(t *testing.T) {
 func TestGateDocker_StackGate_PreCheckFailure(t *testing.T) {
 	t.Setenv("PLOY_CONTAINER_REGISTRY", "ghcr.io/iw2rmb/ploy")
 	expectedRuntimeImage, err := resolveImageForExpectation(
-		buildGateDefaultGatesCatalogPath(),
+		defaultCatalogFilePath(),
 		nil,
 		contracts.StackExpectation{Language: "java", Tool: "maven", Release: "17"},
 		true,
@@ -133,7 +133,7 @@ java { toolchain { languageVersion = JavaLanguageVersion.of(17) } }`
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			workspace := tt.workspace(t)
-			executor, rt, _ := newDockerGateTestHarness(t)
+			executor, rt, _ := newGateTestHarness(t)
 
 			spec := &contracts.StepGateSpec{
 				Enabled: true,
@@ -209,7 +209,7 @@ java { toolchain { languageVersion = JavaLanguageVersion.of(17) } }`
 func TestGateDocker_StackGate_ImageResolution(t *testing.T) {
 	t.Setenv("PLOY_CONTAINER_REGISTRY", "ghcr.io/iw2rmb/ploy")
 	defaultMappingImage, err := resolveImageForExpectation(
-		buildGateDefaultGatesCatalogPath(),
+		defaultCatalogFilePath(),
 		nil,
 		contracts.StackExpectation{Language: "java", Tool: "maven", Release: "17"},
 		true,
@@ -248,7 +248,7 @@ func TestGateDocker_StackGate_ImageResolution(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			executor, rt, workspace := newDockerGateTestHarness(t)
+			executor, rt, workspace := newGateTestHarness(t)
 
 			spec := &contracts.StepGateSpec{
 				Enabled:        true,
@@ -288,7 +288,7 @@ func TestGateDocker_StackGate_NoMatchingDefaultRule_ReturnsNoImageRule(t *testin
 	t.Parallel()
 
 	workspace := createPythonWorkspace(t, "3.11")
-	executor, rt, _ := newDockerGateTestHarness(t)
+	executor, rt, _ := newGateTestHarness(t)
 
 	spec := &contracts.StepGateSpec{
 		Enabled: true,

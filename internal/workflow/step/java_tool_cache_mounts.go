@@ -18,7 +18,7 @@ func buildJavaToolCacheMountsFromStackEnv(env map[string]string) ([]ContainerMou
 	tools := []string{"maven", "gradle"}
 	mounts := make([]ContainerMount, 0, len(tools))
 	for _, tool := range tools {
-		toolMounts, err := buildGateToolCacheMounts("java", tool, release)
+		toolMounts, err := buildToolCacheMounts("java", tool, release)
 		if err != nil {
 			return nil, err
 		}

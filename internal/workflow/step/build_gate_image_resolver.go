@@ -21,15 +21,15 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
-// DefaultGatesCatalogPath is the repository-relative location of the default
+// defaultCatalogPath is the repository-relative location of the default
 // Build Gate gates catalog.
 //
 // The ploy Docker images install this file at /etc/ploy/gates/gates.yaml.
-const DefaultGatesCatalogPath = "gates/gates.yaml"
+const defaultCatalogPath = "gates/gates.yaml"
 
 var (
-	errBuildGateImageMapping   = errors.New("build gate image mapping")
-	errBuildGateImageRuleMatch = errors.New("build gate image rule match")
+	errImageMapping   = errors.New("build gate image mapping")
+	errImageRuleMatch = errors.New("build gate image rule match")
 )
 
 func resolveImageForExpectation(
@@ -38,13 +38,13 @@ func resolveImageForExpectation(
 	exp contracts.StackExpectation,
 	required bool,
 ) (string, error) {
-	resolver, err := NewBuildGateImageResolver(mappingPath, overrides, required)
+	resolver, err := newImageResolver(mappingPath, overrides, required)
 	if err != nil {
-		return "", fmt.Errorf("%w: %w", errBuildGateImageMapping, err)
+		return "", fmt.Errorf("%w: %w", errImageMapping, err)
 	}
 	resolved, err := resolver.Resolve(exp)
 	if err != nil {
-		return "", fmt.Errorf("%w: %w", errBuildGateImageRuleMatch, err)
+		return "", fmt.Errorf("%w: %w", errImageRuleMatch, err)
 	}
 	return resolved, nil
 }
@@ -60,17 +60,17 @@ func resolveExpectedRuntimeImageForStackGate(
 	return resolveImageForExpectation(mappingPath, overrides, *expect, true)
 }
 
-// BuildGateImageResolver resolves stack expectations to container images.
+// imageResolver resolves stack expectations to container images.
 // Rules are merged from multiple sources with higher-precedence sources
 // appearing later in the rules slice (so they are checked first).
-type BuildGateImageResolver struct {
+type imageResolver struct {
 	// rules holds merged rules from all sources.
 	// Higher precedence rules appear later and are checked last to allow
 	// them to override lower precedence matches.
 	rules []contracts.BuildGateImageRule
 }
 
-// NewBuildGateImageResolver creates a resolver by loading and merging rules
+// newImageResolver creates a resolver by loading and merging rules
 // from multiple sources.
 //
 // Parameters:
@@ -86,21 +86,21 @@ type BuildGateImageResolver struct {
 //   - requireDefaultFile is true and defaultPath is set but file doesn't exist
 //   - File exists but is invalid YAML or fails validation
 //   - Any source has duplicate selectors
-func NewBuildGateImageResolver(
+func newImageResolver(
 	defaultPath string,
 	migOverride []contracts.BuildGateImageRule,
 	requireDefaultFile bool,
-) (*BuildGateImageResolver, error) {
+) (*imageResolver, error) {
 	var allRules []contracts.BuildGateImageRule
 
 	// Load default catalog if path is provided.
 	if defaultPath != "" {
-		fileRules, err := loadGatesCatalogFile(defaultPath, requireDefaultFile)
+		fileRules, err := loadCatalogFile(defaultPath, requireDefaultFile)
 		if err != nil {
 			return nil, err
 		}
 		if len(fileRules) > 0 {
-			fileRules, err = normalizeBuildGateImageRules(fileRules, "default_catalog")
+			fileRules, err = normalizeImageRules(fileRules, "default_catalog")
 			if err != nil {
 				return nil, fmt.Errorf("default gates catalog: %w", err)
 			}
@@ -115,7 +115,7 @@ func NewBuildGateImageResolver(
 
 	// Add mig override rules (highest precedence).
 	if len(migOverride) > 0 {
-		normalizedOverrides, err := normalizeBuildGateImageRules(migOverride, "mig_override")
+		normalizedOverrides, err := normalizeImageRules(migOverride, "mig_override")
 		if err != nil {
 			return nil, fmt.Errorf("mig override: %w", err)
 		}
@@ -126,10 +126,10 @@ func NewBuildGateImageResolver(
 		allRules = append(allRules, normalizedOverrides...)
 	}
 
-	return &BuildGateImageResolver{rules: allRules}, nil
+	return &imageResolver{rules: allRules}, nil
 }
 
-func normalizeBuildGateImageRules(
+func normalizeImageRules(
 	rules []contracts.BuildGateImageRule,
 	prefix string,
 ) ([]contracts.BuildGateImageRule, error) {
@@ -163,7 +163,7 @@ func normalizeBuildGateImageRules(
 // Conflicts between different sources are allowed and resolved by precedence order.
 //
 // Returns an error if no matching rule is found.
-func (r *BuildGateImageResolver) Resolve(exp contracts.StackExpectation) (string, error) {
+func (r *imageResolver) Resolve(exp contracts.StackExpectation) (string, error) {
 	if len(r.rules) == 0 {
 		return "", fmt.Errorf("no image mapping rules available for stack %s:%s:%s",
 			exp.Language, exp.Release, exp.Tool)
@@ -206,10 +206,10 @@ func (r *BuildGateImageResolver) Resolve(exp contracts.StackExpectation) (string
 	return "", fmt.Errorf("internal error: no match found at specificity %d", maxSpecificity)
 }
 
-// loadGatesCatalogFile loads image rules from a YAML gates catalog.
+// loadCatalogFile loads image rules from a YAML gates catalog.
 // If the file doesn't exist and required is true, returns an error.
 // If the file doesn't exist and required is false, returns nil.
-func loadGatesCatalogFile(path string, required bool) ([]contracts.BuildGateImageRule, error) {
+func loadCatalogFile(path string, required bool) ([]contracts.BuildGateImageRule, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {

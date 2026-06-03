@@ -48,14 +48,14 @@ func TestRunner_Run_GateEnabledDisabled(t *testing.T) {
 			if gateExecuted != tt.wantGateRun {
 				t.Errorf("Run() gate executed = %v, want %v", gateExecuted, tt.wantGateRun)
 			}
-			if (result.BuildGate != nil) != tt.wantMeta {
-				t.Errorf("Run() BuildGate populated = %v, want %v", result.BuildGate != nil, tt.wantMeta)
+			if (result.Gate != nil) != tt.wantMeta {
+				t.Errorf("Run() Gate populated = %v, want %v", result.Gate != nil, tt.wantMeta)
 			}
-			if tt.wantMeta && len(result.BuildGate.StaticChecks) != 1 {
-				t.Errorf("Run() BuildGate.StaticChecks = %d, want 1", len(result.BuildGate.StaticChecks))
+			if tt.wantMeta && len(result.Gate.StaticChecks) != 1 {
+				t.Errorf("Run() Gate.StaticChecks = %d, want 1", len(result.Gate.StaticChecks))
 			}
-			if tt.wantTiming && result.Timings.BuildGateDuration == 0 {
-				t.Errorf("Run() BuildGateDuration not captured when gate enabled")
+			if tt.wantTiming && result.Timings.GateDuration == 0 {
+				t.Errorf("Run() GateDuration not captured when gate enabled")
 			}
 		})
 	}
@@ -81,7 +81,7 @@ func TestRunner_Run_GateFailureScenarios(t *testing.T) {
 			},
 		},
 		{
-			name: "failed checks/ErrBuildGateFailed",
+			name: "failed checks/ErrGateFailed",
 			executeFn: func(ctx context.Context, spec *contracts.StepGateSpec, workspace string) (*contracts.BuildGateStageMetadata, error) {
 				return &contracts.BuildGateStageMetadata{
 					StaticChecks: []contracts.BuildGateStaticCheckReport{
@@ -90,21 +90,21 @@ func TestRunner_Run_GateFailureScenarios(t *testing.T) {
 					LogsText: "[ERROR] BUILD FAILURE\n[ERROR] Failed to compile",
 				}, nil
 			},
-			wantErrIs: ErrBuildGateFailed,
+			wantErrIs: ErrGateFailed,
 			assertResult: func(t *testing.T, result Result) {
 				t.Helper()
-				if result.BuildGate == nil {
-					t.Errorf("Run() BuildGate metadata should be populated on gate failure")
+				if result.Gate == nil {
+					t.Errorf("Run() Gate metadata should be populated on gate failure")
 				} else {
-					if len(result.BuildGate.StaticChecks) != 1 {
-						t.Errorf("Run() BuildGate.StaticChecks = %d, want 1", len(result.BuildGate.StaticChecks))
+					if len(result.Gate.StaticChecks) != 1 {
+						t.Errorf("Run() Gate.StaticChecks = %d, want 1", len(result.Gate.StaticChecks))
 					}
-					if result.BuildGate.StaticChecks[0].Passed {
-						t.Errorf("Run() BuildGate.StaticChecks[0].Passed = true, want false")
+					if result.Gate.StaticChecks[0].Passed {
+						t.Errorf("Run() Gate.StaticChecks[0].Passed = true, want false")
 					}
 				}
-				if result.Timings.BuildGateDuration == 0 {
-					t.Errorf("Run() BuildGateDuration should be captured on gate failure")
+				if result.Timings.GateDuration == 0 {
+					t.Errorf("Run() GateDuration should be captured on gate failure")
 				}
 				if result.Timings.TotalDuration == 0 {
 					t.Errorf("Run() TotalDuration should be captured on gate failure")
@@ -160,8 +160,8 @@ func TestRunGateStage_NilMetadata(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for nil gate metadata (gate not passed)")
 	}
-	if !errors.Is(err, ErrBuildGateFailed) {
-		t.Errorf("expected ErrBuildGateFailed, got %v", err)
+	if !errors.Is(err, ErrGateFailed) {
+		t.Errorf("expected ErrGateFailed, got %v", err)
 	}
 }
 
@@ -193,13 +193,13 @@ func TestRunGateOnly(t *testing.T) {
 				if crt.createCalled {
 					t.Errorf("RunGateOnly() should not create containers")
 				}
-				if result.BuildGate == nil {
-					t.Errorf("RunGateOnly() BuildGate metadata not captured")
-				} else if len(result.BuildGate.StaticChecks) != 1 {
-					t.Errorf("RunGateOnly() BuildGate.StaticChecks = %d, want 1", len(result.BuildGate.StaticChecks))
+				if result.Gate == nil {
+					t.Errorf("RunGateOnly() Gate metadata not captured")
+				} else if len(result.Gate.StaticChecks) != 1 {
+					t.Errorf("RunGateOnly() Gate.StaticChecks = %d, want 1", len(result.Gate.StaticChecks))
 				}
-				if result.Timings.BuildGateDuration == 0 {
-					t.Errorf("RunGateOnly() BuildGateDuration not captured when gate enabled")
+				if result.Timings.GateDuration == 0 {
+					t.Errorf("RunGateOnly() GateDuration not captured when gate enabled")
 				}
 				if result.Timings.TotalDuration == 0 {
 					t.Errorf("RunGateOnly() TotalDuration not captured")
@@ -221,8 +221,8 @@ func TestRunGateOnly(t *testing.T) {
 				if crt.createCalled {
 					t.Errorf("RunGateOnly() should not create containers")
 				}
-				if result.BuildGate != nil {
-					t.Errorf("RunGateOnly() BuildGate metadata should be nil when disabled")
+				if result.Gate != nil {
+					t.Errorf("RunGateOnly() Gate metadata should be nil when disabled")
 				}
 				if result.ExitCode != 0 {
 					t.Errorf("RunGateOnly() ExitCode = %d, want 0", result.ExitCode)
@@ -240,16 +240,16 @@ func TestRunGateOnly(t *testing.T) {
 					LogsText: "[ERROR] BUILD FAILURE",
 				}, nil
 			},
-			wantErr: ErrBuildGateFailed,
+			wantErr: ErrGateFailed,
 			assertResult: func(t *testing.T, result Result, crt *testContainerRuntime) {
 				t.Helper()
-				if result.BuildGate == nil {
-					t.Errorf("RunGateOnly() BuildGate metadata should be populated on gate failure")
-				} else if result.BuildGate.StaticChecks[0].Passed {
-					t.Errorf("RunGateOnly() BuildGate.StaticChecks[0].Passed = true, want false")
+				if result.Gate == nil {
+					t.Errorf("RunGateOnly() Gate metadata should be populated on gate failure")
+				} else if result.Gate.StaticChecks[0].Passed {
+					t.Errorf("RunGateOnly() Gate.StaticChecks[0].Passed = true, want false")
 				}
-				if result.Timings.BuildGateDuration == 0 {
-					t.Errorf("RunGateOnly() BuildGateDuration should be captured on gate failure")
+				if result.Timings.GateDuration == 0 {
+					t.Errorf("RunGateOnly() GateDuration should be captured on gate failure")
 				}
 				if result.Timings.TotalDuration == 0 {
 					t.Errorf("RunGateOnly() TotalDuration should be captured on gate failure")
@@ -262,8 +262,8 @@ func TestRunGateOnly(t *testing.T) {
 			nilGate:     true,
 			assertResult: func(t *testing.T, result Result, crt *testContainerRuntime) {
 				t.Helper()
-				if result.BuildGate != nil {
-					t.Errorf("RunGateOnly() BuildGate should be nil when gate executor is nil")
+				if result.Gate != nil {
+					t.Errorf("RunGateOnly() Gate should be nil when gate executor is nil")
 				}
 			},
 		},

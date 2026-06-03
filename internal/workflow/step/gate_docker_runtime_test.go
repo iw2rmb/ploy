@@ -10,8 +10,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func TestDockerGateExecutor_DoesNotRemoveContainerAfterExecution(t *testing.T) {
-	executor, rt, workspace := newDockerGateTestHarness(t)
+func TestGateExecutor_DoesNotRemoveContainerAfterExecution(t *testing.T) {
+	executor, rt, workspace := newGateTestHarness(t)
 	spec := &contracts.StepGateSpec{Enabled: true}
 
 	_, err := executor.Execute(context.Background(), spec, workspace)
@@ -27,7 +27,7 @@ func TestDockerGateExecutor_DoesNotRemoveContainerAfterExecution(t *testing.T) {
 	}
 }
 
-func TestDockerGateExecutor_ReportsRuntimeImageBeforeContainerCreate(t *testing.T) {
+func TestGateExecutor_ReportsRuntimeImageBeforeContainerCreate(t *testing.T) {
 	var (
 		observerCalled bool
 		observedImage  string
@@ -41,7 +41,7 @@ func TestDockerGateExecutor_ReportsRuntimeImageBeforeContainerCreate(t *testing.
 			return ContainerHandle("mock"), nil
 		},
 	}
-	executor := NewDockerGateExecutor(rt)
+	executor := NewGateExecutor(rt)
 
 	ctx := WithGateRuntimeImageObserver(context.Background(), func(_ context.Context, image string) {
 		observerCalled = true
@@ -63,8 +63,8 @@ func TestDockerGateExecutor_ReportsRuntimeImageBeforeContainerCreate(t *testing.
 	}
 }
 
-func TestDockerGateExecutor_PassesContainerLabelsFromContext(t *testing.T) {
-	executor, rt, workspace := newDockerGateTestHarness(t)
+func TestGateExecutor_PassesContainerLabelsFromContext(t *testing.T) {
+	executor, rt, workspace := newGateTestHarness(t)
 	spec := &contracts.StepGateSpec{Enabled: true}
 	ctx := WithGateContainerLabels(context.Background(), map[string]string{
 		types.LabelRunID: "run-123",
@@ -85,14 +85,14 @@ func TestDockerGateExecutor_PassesContainerLabelsFromContext(t *testing.T) {
 	}
 }
 
-// TestDockerGateExecutor_EnvPassthrough verifies that environment variables from
+// TestGateExecutor_EnvPassthrough verifies that environment variables from
 // StepGateSpec.Env are passed through to the Docker container. This ensures that
 // global env vars injected by the control plane are available to image-level
 // startup hooks.
-func TestDockerGateExecutor_EnvPassthrough(t *testing.T) {
+func TestGateExecutor_EnvPassthrough(t *testing.T) {
 	t.Parallel()
 
-	executor, rt, workspace := newDockerGateTestHarness(t)
+	executor, rt, workspace := newGateTestHarness(t)
 
 	spec := &contracts.StepGateSpec{
 		Enabled: true,
@@ -123,9 +123,9 @@ func TestDockerGateExecutor_EnvPassthrough(t *testing.T) {
 	}
 }
 
-// TestDockerGateExecutor_EmptyEnv verifies that the gate executor handles
+// TestGateExecutor_EmptyEnv verifies that the gate executor handles
 // empty or nil env maps gracefully without errors.
-func TestDockerGateExecutor_EmptyEnv(t *testing.T) {
+func TestGateExecutor_EmptyEnv(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
@@ -141,7 +141,7 @@ func TestDockerGateExecutor_EmptyEnv(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			executor, rt, workspace := newDockerGateTestHarness(t)
+			executor, rt, workspace := newGateTestHarness(t)
 
 			spec := &contracts.StepGateSpec{
 				Enabled: true,
@@ -165,7 +165,7 @@ func TestDockerGateExecutor_EmptyEnv(t *testing.T) {
 	}
 }
 
-func TestDockerGateExecutor_FailureStructuredEvidence(t *testing.T) {
+func TestGateExecutor_FailureStructuredEvidence(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -210,7 +210,7 @@ BUILD FAILED in 1s
 					return []byte(tt.logs), nil
 				},
 			}
-			executor := NewDockerGateExecutor(rt)
+			executor := NewGateExecutor(rt)
 			meta, err := executor.Execute(context.Background(), &contracts.StepGateSpec{Enabled: true}, workspace)
 			if err != nil {
 				t.Fatalf("Execute() unexpected error: %v", err)

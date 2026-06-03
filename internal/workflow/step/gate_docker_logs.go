@@ -12,7 +12,7 @@ import (
 // by the Gradle gate init script, returning the sorted unique task list. The
 // file is removed after a successful read so subsequent runs start clean.
 func readGradleBuildCacheHits(workspace string) []string {
-	path := filepath.Join(workspace, BuildGateGradleCacheHitsHostFile)
+	path := filepath.Join(workspace, gradleCacheHitsHostFile)
 	f, err := os.Open(path)
 	if err != nil {
 		return nil

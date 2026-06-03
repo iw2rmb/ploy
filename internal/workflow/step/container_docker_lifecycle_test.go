@@ -12,11 +12,11 @@ import (
 )
 
 // -----------------------------------------------------------------------------
-// DockerContainerRuntime basic lifecycle tests (start, wait, remove)
+// containerRuntime basic lifecycle tests (start, wait, remove)
 // -----------------------------------------------------------------------------
 
-// TestDockerContainerRuntimeStart verifies container start with moby client.
-func TestDockerContainerRuntimeStart(t *testing.T) {
+// TestContainerRuntimeStart verifies container start with moby client.
+func TestContainerRuntimeStart(t *testing.T) {
 	t.Parallel()
 	testCases := []struct {
 		name     string
@@ -42,7 +42,7 @@ func TestDockerContainerRuntimeStart(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			fake := &fakeDockerClient{startErr: tc.startErr}
-			rt := newDockerContainerRuntimeWithClient(fake, DockerContainerRuntimeOptions{})
+			rt := newContainerRuntimeWithClient(fake, ContainerRuntimeOptions{})
 
 			err := rt.Start(context.Background(), tc.handle)
 
@@ -62,8 +62,8 @@ func TestDockerContainerRuntimeStart(t *testing.T) {
 	}
 }
 
-// TestDockerContainerRuntimeWait verifies container wait with moby client.
-func TestDockerContainerRuntimeWait(t *testing.T) {
+// TestContainerRuntimeWait verifies container wait with moby client.
+func TestContainerRuntimeWait(t *testing.T) {
 	t.Parallel()
 	testCases := []struct {
 		name            string
@@ -137,7 +137,7 @@ func TestDockerContainerRuntimeWait(t *testing.T) {
 					},
 				}
 			}
-			rt := newDockerContainerRuntimeWithClient(fake, DockerContainerRuntimeOptions{})
+			rt := newContainerRuntimeWithClient(fake, ContainerRuntimeOptions{})
 
 			result, err := rt.Wait(context.Background(), tc.handle)
 			// Wait should always call ContainerWait with NotRunning condition.
@@ -178,8 +178,8 @@ func TestDockerContainerRuntimeWait(t *testing.T) {
 	}
 }
 
-// TestDockerContainerRuntimeRemove verifies container removal with moby client.
-func TestDockerContainerRuntimeRemove(t *testing.T) {
+// TestContainerRuntimeRemove verifies container removal with moby client.
+func TestContainerRuntimeRemove(t *testing.T) {
 	t.Parallel()
 	testCases := []struct {
 		name      string
@@ -205,7 +205,7 @@ func TestDockerContainerRuntimeRemove(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			fake := &fakeDockerClient{removeErr: tc.removeErr}
-			rt := newDockerContainerRuntimeWithClient(fake, DockerContainerRuntimeOptions{})
+			rt := newContainerRuntimeWithClient(fake, ContainerRuntimeOptions{})
 
 			err := rt.Remove(context.Background(), tc.handle)
 
@@ -228,11 +228,11 @@ func TestDockerContainerRuntimeRemove(t *testing.T) {
 	}
 }
 
-// TestDockerContainerRuntimeNilClient verifies misconfigured runtime methods
+// TestContainerRuntimeNilClient verifies misconfigured runtime methods
 // fail with a clear error instead of panicking.
-func TestDockerContainerRuntimeNilClient(t *testing.T) {
+func TestContainerRuntimeNilClient(t *testing.T) {
 	t.Parallel()
-	rt := &DockerContainerRuntime{client: nil}
+	rt := &containerRuntime{client: nil}
 	ctx := context.Background()
 
 	testCases := []struct {

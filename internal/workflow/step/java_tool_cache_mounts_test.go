@@ -10,7 +10,7 @@ import (
 
 func TestBuildContainerSpec_JavaToolCacheMountsFromStackEnv(t *testing.T) {
 	cacheRoot := t.TempDir()
-	t.Setenv(buildGateCacheRootEnv, cacheRoot)
+	t.Setenv(gateCacheRootEnv, cacheRoot)
 
 	tests := []struct {
 		name       string
@@ -24,8 +24,8 @@ func TestBuildContainerSpec_JavaToolCacheMountsFromStackEnv(t *testing.T) {
 				contracts.PLOYStackReleaseEnv:  "17",
 			},
 			wantMounts: map[string]string{
-				BuildGateGradleUserHomeDir: filepath.Join(cacheRoot, "java", "gradle", "17"),
-				BuildGateMavenUserHomeDir:  filepath.Join(cacheRoot, "java", "maven", "17"),
+				gradleUserHomeDir: filepath.Join(cacheRoot, "java", "gradle", "17"),
+				mavenUserHomeDir:  filepath.Join(cacheRoot, "java", "maven", "17"),
 			},
 		},
 		{
@@ -62,7 +62,7 @@ func TestBuildContainerSpec_JavaToolCacheMountsFromStackEnv(t *testing.T) {
 
 			gotMounts := map[string]ContainerMount{}
 			for _, mount := range spec.Mounts {
-				if mount.Target != BuildGateGradleUserHomeDir && mount.Target != BuildGateMavenUserHomeDir {
+				if mount.Target != gradleUserHomeDir && mount.Target != mavenUserHomeDir {
 					continue
 				}
 				gotMounts[mount.Target] = mount

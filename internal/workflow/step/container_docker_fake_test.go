@@ -30,7 +30,7 @@ func writeMultiplexedFrame(buf *bytes.Buffer, streamType stdcopy.StdType, payloa
 }
 
 // -----------------------------------------------------------------------------
-// Fake Docker client for testing DockerContainerRuntime lifecycle methods.
+// Fake Docker client for testing containerRuntime lifecycle methods.
 // Implements dockerClientAPI using moby Engine v29 SDK types.
 // -----------------------------------------------------------------------------
 

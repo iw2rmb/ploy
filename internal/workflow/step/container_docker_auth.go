@@ -23,7 +23,7 @@ type dockerAuthEntry struct {
 	RegistryToken string `json:"registrytoken"`
 }
 
-func (r *DockerContainerRuntime) registryAuthForImage(imageRef string) (string, error) {
+func (r *containerRuntime) registryAuthForImage(imageRef string) (string, error) {
 	raw, err := r.registryAuthConfigJSON()
 	if err != nil {
 		return "", err
@@ -57,7 +57,7 @@ func (r *DockerContainerRuntime) registryAuthForImage(imageRef string) (string, 
 	return encoded, nil
 }
 
-func (r *DockerContainerRuntime) registryAuthConfigJSON() (string, error) {
+func (r *containerRuntime) registryAuthConfigJSON() (string, error) {
 	if path := strings.TrimSpace(r.opts.RegistryAuthConfigFile); path != "" {
 		data, err := os.ReadFile(path)
 		if err != nil {
