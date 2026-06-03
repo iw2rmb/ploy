@@ -122,15 +122,15 @@ func parseSpec(spec json.RawMessage) (map[string]string, RunOptions, error) {
 	// - For single-step runs, step env is merged into env (step overrides).
 	// - For multi-step runs, env contains only the global env; step env is applied
 	//   at manifest build time via typedOpts.Steps[stepIndex].Env.
-	env = migsSpecToEnv(migsSpec)
+	env = envFromSpec(migsSpec)
 
 	// Direct conversion from typed MigSpec to RunOptions.
-	typedOpts = migsSpecToRunOptions(migsSpec)
+	typedOpts = runOptionsFromSpec(migsSpec)
 
 	return env, typedOpts, nil
 }
 
-func migsSpecToEnv(spec *contracts.MigSpec) map[string]string {
+func envFromSpec(spec *contracts.MigSpec) map[string]string {
 	if spec == nil {
 		return map[string]string{}
 	}

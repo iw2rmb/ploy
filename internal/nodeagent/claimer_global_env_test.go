@@ -3,13 +3,13 @@
 //
 // This test file covers the env propagation path:
 //
-//	spec JSON → parseSpec → StartRunRequest.Env → buildManifestFromRequest → manifest.Env
+//	spec JSON → parseSpec → StartRunRequest.Env → buildMigManifest → manifest.Env
 //
 // The tests ensure that:
 //   - Global env vars (e.g., APP_TLS_CERT, APP_AUTH_JSON, OPENAI_API_KEY)
 //     pass through the full claim → manifest pipeline without filtering.
 //   - Per-run env values override global env when both are present.
-//   - Gate manifests (buildGateManifestFromRequest) preserve env vars.
+//   - Gate manifests (buildGateManifest) preserve env vars.
 //   - Multi-step runs (steps[]) merge base env with step-specific env.
 //
 // These tests complement the server-side spec_utils_global_env_test.go which
@@ -111,7 +111,7 @@ func TestParseSpec_GlobalEnvFromServerClaim(t *testing.T) {
 }
 
 // TestGlobalEnvPropagation_SpecToManifest verifies the complete env propagation
-// chain from spec JSON → parseSpec → StartRunRequest → buildManifestFromRequest.
+// chain from spec JSON → parseSpec → StartRunRequest → buildMigManifest.
 //
 // This end-to-end test ensures that global env vars injected by the server
 // arrive intact in the final StepManifest used by the container runtime.
@@ -145,9 +145,9 @@ func TestGlobalEnvPropagation_SpecToManifest(t *testing.T) {
 
 	// Step 3: Build manifest (simulates manifest.go).
 	// Pass MigStackUnknown explicitly to indicate tests operate without stack detection.
-	manifest, err := buildManifestFromRequest(req, typedOpts, 0, contracts.MigStackUnknown)
+	manifest, err := buildMigManifest(req, typedOpts, 0, contracts.MigStackUnknown)
 	if err != nil {
-		t.Fatalf("buildManifestFromRequest() error: %v", err)
+		t.Fatalf("buildMigManifest() error: %v", err)
 	}
 
 	// Verify all global env vars are present in the manifest.
@@ -171,7 +171,7 @@ func TestGlobalEnvPropagation_SpecToManifest(t *testing.T) {
 }
 
 // TestGlobalEnvPropagation_GateManifest verifies that global env vars are
-// preserved in gate manifests built via buildGateManifestFromRequest.
+// preserved in gate manifests built via buildGateManifest.
 //
 // Gate jobs (pre_gate, post_gate) use a separate manifest builder
 // that sanitizes stack-aware image configuration but should preserve env vars.
@@ -209,9 +209,9 @@ func TestGlobalEnvPropagation_GateManifest(t *testing.T) {
 	}
 
 	// Build gate manifest (should not fail on stack-aware image map).
-	gateManifest, err := buildGateManifestFromRequest(req, typedOpts)
+	gateManifest, err := buildGateManifest(req, typedOpts)
 	if err != nil {
-		t.Fatalf("buildGateManifestFromRequest() error: %v", err)
+		t.Fatalf("buildGateManifest() error: %v", err)
 	}
 
 	// Verify global env vars are preserved in gate manifest.
@@ -299,9 +299,9 @@ func TestGlobalEnvPropagation_MultiStepRun(t *testing.T) {
 
 	// Build manifest for step 0 (should have step override).
 	// Pass MigStackUnknown explicitly to indicate tests operate without stack detection.
-	manifest0, err := buildManifestFromRequest(req, typedOpts, 0, contracts.MigStackUnknown)
+	manifest0, err := buildMigManifest(req, typedOpts, 0, contracts.MigStackUnknown)
 	if err != nil {
-		t.Fatalf("buildManifestFromRequest(step=0) error: %v", err)
+		t.Fatalf("buildMigManifest(step=0) error: %v", err)
 	}
 
 	// Verify step 0 env merge.
@@ -320,9 +320,9 @@ func TestGlobalEnvPropagation_MultiStepRun(t *testing.T) {
 
 	// Build manifest for step 1 (should not have step0 override).
 	// Pass MigStackUnknown explicitly to indicate tests operate without stack detection.
-	manifest1, err := buildManifestFromRequest(req, typedOpts, 1, contracts.MigStackUnknown)
+	manifest1, err := buildMigManifest(req, typedOpts, 1, contracts.MigStackUnknown)
 	if err != nil {
-		t.Fatalf("buildManifestFromRequest(step=1) error: %v", err)
+		t.Fatalf("buildMigManifest(step=1) error: %v", err)
 	}
 
 	// Verify step 1 env merge (SHARED_VAR should be global default).
@@ -334,67 +334,6 @@ func TestGlobalEnvPropagation_MultiStepRun(t *testing.T) {
 	}
 	if manifest1.Envs["SHARED_VAR"] != "global_default" {
 		t.Errorf("step1: SHARED_VAR=%q, want global_default (no step override)", manifest1.Envs["SHARED_VAR"])
-	}
-}
-
-// TestGlobalEnvPropagation_HealingManifest verifies that global env vars from
-// req.Env are merged into healing manifests as a base layer, with mig.Env
-// overriding on collision.
-//
-// The merge order is: req.Env (base) → mig.Env (override) → repo metadata.
-// This ensures target-based global env propagated via the claim spec reaches
-// heal job containers.
-func TestGlobalEnvPropagation_HealingManifest(t *testing.T) {
-	t.Parallel()
-
-	req := StartRunRequest{
-		RunID:   types.RunID("run-healing-env-test"),
-		JobID:   types.JobID("job-healing-env-test"),
-		RepoURL: types.RepoURL("https://gitlab.com/test/repo.git"),
-		BaseRef: types.GitRef("main"),
-		Env: map[string]string{
-			"GLOBAL_VAR":   "global_value",
-			"APP_TLS_CERT": "global-cert-bundle",
-			"SHARED_VAR":   "from_req",
-		},
-	}
-
-	// Healing mig with its own env that overrides req.Env on collision.
-	healingMig := MigContainerSpec{
-		Image: contracts.JobImage{Universal: "docker.io/amata:latest"},
-		Env: map[string]string{
-			"APP_TLS_CERT":     "healing-cert-bundle",
-			"APP_AUTH_JSON":    `{"healing":"auth"}`,
-			"HEALING_SPECIFIC": "healing_value",
-		},
-	}
-
-	// Pass MigStackUnknown explicitly to indicate tests operate without stack detection.
-	manifest, err := buildHealingManifest(req, healingMig, 0, "", contracts.MigStackUnknown)
-	if err != nil {
-		t.Fatalf("buildHealingManifest() error: %v", err)
-	}
-
-	// Verify env vars are preserved with correct precedence.
-	expectedEnv := map[string]string{
-		"GLOBAL_VAR":       "global_value",        // from req.Env (no override)
-		"APP_TLS_CERT":     "healing-cert-bundle", // mig.Env overrides req.Env
-		"APP_AUTH_JSON":    `{"healing":"auth"}`,  // from mig.Env only
-		"HEALING_SPECIFIC": "healing_value",       // from mig.Env only
-		"SHARED_VAR":       "from_req",            // from req.Env (no mig override)
-		"PLOY_REPO_URL":    "https://gitlab.com/test/repo.git",
-		"PLOY_BASE_REF":    "main",
-	}
-
-	for key, wantVal := range expectedEnv {
-		gotVal, ok := manifest.Envs[key]
-		if !ok {
-			t.Errorf("healingManifest.Env missing key %q", key)
-			continue
-		}
-		if gotVal != wantVal {
-			t.Errorf("healingManifest.Env[%q] = %q, want %q", key, gotVal, wantVal)
-		}
 	}
 }
 
@@ -430,9 +369,9 @@ func TestGlobalEnvPropagation_NoFiltering(t *testing.T) {
 	}
 
 	// Pass MigStackUnknown explicitly to indicate tests operate without stack detection.
-	manifest, err := buildManifestFromRequest(req, typedOpts, 0, contracts.MigStackUnknown)
+	manifest, err := buildMigManifest(req, typedOpts, 0, contracts.MigStackUnknown)
 	if err != nil {
-		t.Fatalf("buildManifestFromRequest() error: %v", err)
+		t.Fatalf("buildMigManifest() error: %v", err)
 	}
 
 	// Verify all keys are present without filtering.
@@ -473,15 +412,15 @@ func TestGlobalEnvPropagation_DetectedStackTupleInjected(t *testing.T) {
 			Release:  "17",
 		},
 		TypedOptions: RunOptions{
-			Execution: MigContainerSpec{
+			Execution: ContainerSpec{
 				Image: contracts.JobImage{Universal: "docker.io/test/mig:latest"},
 			},
 		},
 	}
 
-	manifest, err := buildManifestFromRequest(req, req.TypedOptions, 0, contracts.MigStackUnknown)
+	manifest, err := buildMigManifest(req, req.TypedOptions, 0, contracts.MigStackUnknown)
 	if err != nil {
-		t.Fatalf("buildManifestFromRequest() error: %v", err)
+		t.Fatalf("buildMigManifest() error: %v", err)
 	}
 	if got := manifest.Envs[contracts.PLOYStackLanguageEnv]; got != "java" {
 		t.Fatalf("manifest.Envs[%s]=%q, want java", contracts.PLOYStackLanguageEnv, got)

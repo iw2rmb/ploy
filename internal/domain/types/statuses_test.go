@@ -92,7 +92,6 @@ func TestDiffJobTypeValidate(t *testing.T) {
 		wantErr bool
 	}{
 		{name: "mig", input: DiffJobTypeMig},
-		{name: "healing", input: DiffJobTypeHealing},
 		{name: "invalid", input: DiffJobType("other"), wantErr: true},
 	}
 

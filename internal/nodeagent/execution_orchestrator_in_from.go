@@ -12,7 +12,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
-func (r *runController) materializeMigInFromInputs(
+func (r *runController) materializeInFrom(
 	ctx context.Context,
 	req StartRunRequest,
 	inDir string,
@@ -52,7 +52,7 @@ func (r *runController) materializeMigInFromInputs(
 		if sourceJobID.IsZero() {
 			return fmt.Errorf("mig_context.in_from[%d].source_job_id: required", i)
 		}
-		sourcePath, err := runJobOutFile(req.RunID, sourceJobID, sourceOutPath)
+		sourcePath, err := jobOutFile(req.RunID, sourceJobID, sourceOutPath)
 		if err != nil {
 			return fmt.Errorf("mig_context.in_from[%d].source_out_path: %w", i, err)
 		}
@@ -72,7 +72,7 @@ func (r *runController) materializeMigInFromInputs(
 		if err := os.Remove(destPath); err != nil && !os.IsNotExist(err) {
 			return fmt.Errorf("remove existing in_from destination %s: %w", destPath, err)
 		}
-		if err := copyInFromFile(sourcePath, destPath, info.Mode().Perm()); err != nil {
+		if err := copyFileAtomic(sourcePath, destPath, info.Mode().Perm()); err != nil {
 			return fmt.Errorf("materialize in_from destination %s: %w", destPath, err)
 		}
 	}
@@ -80,7 +80,7 @@ func (r *runController) materializeMigInFromInputs(
 	return nil
 }
 
-func copyInFromFile(sourcePath, destPath string, mode os.FileMode) error {
+func copyFileAtomic(sourcePath, destPath string, mode os.FileMode) error {
 	src, err := os.Open(sourcePath)
 	if err != nil {
 		return fmt.Errorf("open source: %w", err)

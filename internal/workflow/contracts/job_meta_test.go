@@ -57,28 +57,6 @@ func TestJobMeta_Validate(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "valid gate job with recovery metadata",
-			meta: JobMeta{
-				Kind: JobKindGate,
-				RecoveryMetadata: &RecoveryJobMetadata{
-					LoopKind:  "healing",
-					ErrorKind: "infra",
-				},
-			},
-			wantErr: false,
-		},
-		{
-			name: "valid mig job with recovery metadata",
-			meta: JobMeta{
-				Kind: JobKindMig,
-				RecoveryMetadata: &RecoveryJobMetadata{
-					LoopKind:  "healing",
-					ErrorKind: "code",
-				},
-			},
-			wantErr: false,
-		},
-		{
 			name: "valid build job with metadata",
 			meta: JobMeta{
 				Kind: JobKindBuild,
@@ -115,28 +93,6 @@ func TestJobMeta_Validate(t *testing.T) {
 			meta: JobMeta{
 				Kind:         JobKindBuild,
 				GateMetadata: &BuildGateStageMetadata{},
-			},
-			wantErr: true,
-		},
-		{
-			name: "recovery metadata on build job",
-			meta: JobMeta{
-				Kind: JobKindBuild,
-				RecoveryMetadata: &RecoveryJobMetadata{
-					LoopKind:  "healing",
-					ErrorKind: "infra",
-				},
-			},
-			wantErr: true,
-		},
-		{
-			name: "invalid recovery metadata",
-			meta: JobMeta{
-				Kind: JobKindGate,
-				RecoveryMetadata: &RecoveryJobMetadata{
-					LoopKind:  "healing",
-					ErrorKind: "invalid",
-				},
 			},
 			wantErr: true,
 		},
@@ -439,46 +395,5 @@ func TestBuildMeta_JSON(t *testing.T) {
 	}
 	if len(got.Metrics) != len(bm.Metrics) {
 		t.Errorf("Metrics len = %d, want %d", len(got.Metrics), len(bm.Metrics))
-	}
-}
-
-func TestJobMeta_Recovery_RoundTrip(t *testing.T) {
-	t.Parallel()
-	original := &JobMeta{
-		Kind: JobKindMig,
-		RecoveryMetadata: &RecoveryJobMetadata{
-			LoopKind:   "healing",
-			ErrorKind:  "code",
-			StrategyID: "code-default",
-			Reason:     "compile failure persisted after gate",
-		},
-	}
-	data, err := MarshalJobMeta(original)
-	if err != nil {
-		t.Fatalf("MarshalJobMeta() error = %v", err)
-	}
-	got, err := UnmarshalJobMeta(data)
-	if err != nil {
-		t.Fatalf("UnmarshalJobMeta() error = %v", err)
-	}
-	if got.RecoveryMetadata == nil {
-		t.Fatal("RecoveryMetadata = nil, want non-nil")
-	}
-	if got.RecoveryMetadata.LoopKind != original.RecoveryMetadata.LoopKind {
-		t.Fatalf("RecoveryMetadata.LoopKind = %q, want %q", got.RecoveryMetadata.LoopKind, original.RecoveryMetadata.LoopKind)
-	}
-	if got.RecoveryMetadata.ErrorKind != original.RecoveryMetadata.ErrorKind {
-		t.Fatalf("RecoveryMetadata.ErrorKind = %q, want %q", got.RecoveryMetadata.ErrorKind, original.RecoveryMetadata.ErrorKind)
-	}
-	if got.RecoveryMetadata.StrategyID != original.RecoveryMetadata.StrategyID {
-		t.Fatalf("RecoveryMetadata.StrategyID = %q, want %q", got.RecoveryMetadata.StrategyID, original.RecoveryMetadata.StrategyID)
-	}
-}
-
-func TestUnmarshalJobMeta_RecoveryOnBuildJobRejected(t *testing.T) {
-	t.Parallel()
-	_, err := UnmarshalJobMeta([]byte(`{"kind":"build","recovery":{"loop_kind":"healing","error_kind":"infra"}}`))
-	if err == nil {
-		t.Fatal("expected error for recovery metadata on build job")
 	}
 }

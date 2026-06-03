@@ -6,15 +6,14 @@ import "fmt"
 type DiffJobType string
 
 const (
-	DiffJobTypeMig     DiffJobType = "mig"
-	DiffJobTypeHealing DiffJobType = "healing"
+	DiffJobTypeMig DiffJobType = "mig"
 )
 
 func (t DiffJobType) String() string { return string(t) }
 
 func (t DiffJobType) Validate() error {
 	switch t {
-	case DiffJobTypeMig, DiffJobTypeHealing:
+	case DiffJobTypeMig:
 		return nil
 	default:
 		return fmt.Errorf("invalid diff job type %q", t)

@@ -115,49 +115,6 @@ func ChainPredecessor(jobID domaintypes.JobID, jobsByID map[domaintypes.JobID]st
 	return nil
 }
 
-// ========== Internal helpers ==========
-
-func clonePtr[T any](p *T) *T {
-	if p == nil {
-		return nil
-	}
-	v := *p
-	return &v
-}
-
-// CloneRecoveryMetadata returns a deep copy of src, or nil if src is nil.
-func CloneRecoveryMetadata(src *contracts.BuildGateRecoveryMetadata) *contracts.BuildGateRecoveryMetadata {
-	if src == nil {
-		return nil
-	}
-	out := *src
-	out.Confidence = clonePtr(src.Confidence)
-	if len(src.Expectations) > 0 {
-		out.Expectations = append([]byte(nil), src.Expectations...)
-	}
-	if src.DepsBumps != nil {
-		out.DepsBumps = CloneDepsBumpsMap(src.DepsBumps)
-	}
-	return &out
-}
-
-// CloneDepsBumpsMap returns a deep copy of a dependency-bump version map.
-func CloneDepsBumpsMap(src map[string]*string) map[string]*string {
-	if src == nil {
-		return nil
-	}
-	out := make(map[string]*string, len(src))
-	for k, v := range src {
-		if v == nil {
-			out[k] = nil
-			continue
-		}
-		ver := *v
-		out[k] = &ver
-	}
-	return out
-}
-
 // StackExpectationFromMigStack converts a detected MigStack to a StackExpectation,
 // or returns nil for unknown stacks.
 func StackExpectationFromMigStack(stack contracts.MigStack) *contracts.StackExpectation {

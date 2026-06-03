@@ -25,7 +25,6 @@ type runStatsAccessor struct {
 	ExitCode      *int                  `json:"exit_code,omitempty"`
 	DurationMs    *int64                `json:"duration_ms,omitempty"`
 	Error         *string               `json:"error,omitempty"`
-	HealingWarn   *string               `json:"healing_warning,omitempty"`
 	ResumeCount   *int                  `json:"resume_count,omitempty"`
 	LastResumedAt *string               `json:"last_resumed_at,omitempty"`
 	Metadata      map[string]string     `json:"metadata,omitempty"`
@@ -249,12 +248,6 @@ func (b *RunStatsBuilder) DurationMs(ms int64) *RunStatsBuilder {
 // Error sets the error field for failure diagnostics.
 func (b *RunStatsBuilder) Error(msg string) *RunStatsBuilder {
 	b.acc.Error = &msg
-	return b
-}
-
-// HealingWarning sets the healing_warning field.
-func (b *RunStatsBuilder) HealingWarning(warn string) *RunStatsBuilder {
-	b.acc.HealingWarn = &warn
 	return b
 }
 

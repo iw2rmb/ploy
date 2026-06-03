@@ -18,7 +18,7 @@ get:
     - `server` — Inject into the server process
     - `nodes` — Inject into node agent processes
     - `gates` — Inject into gate jobs (pre_gate, post_gate)
-    - `steps` — Inject into step jobs (mig, heal)
+    - `steps` — Inject into step jobs (mig)
 
     **Precedence:** Per-run env vars (in spec or CLI flags) take precedence over
     global env. Existing keys in the spec are never overwritten.

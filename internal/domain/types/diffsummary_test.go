@@ -109,11 +109,6 @@ func TestDiffSummary_JobType(t *testing.T) {
 			want: "mig",
 		},
 		{
-			name: "healing mig type",
-			json: `{"job_type": "healing"}`,
-			want: "healing",
-		},
-		{
 			name: "missing mig type",
 			json: `{}`,
 			want: "",
@@ -261,7 +256,7 @@ func TestDiffSummaryBuilder(t *testing.T) {
 	t.Run("JSON roundtrip", func(t *testing.T) {
 		original := NewDiffSummaryBuilder().
 			ExitCode(0).
-			JobType("healing").
+			JobType("mig").
 			FilesChanged(5).
 			MustBuild()
 
@@ -284,8 +279,8 @@ func TestDiffSummaryBuilder(t *testing.T) {
 		}
 
 		jobType := parsed.JobType()
-		if jobType != "healing" {
-			t.Errorf("JobType() = %q, want %q", jobType, "healing")
+		if jobType != "mig" {
+			t.Errorf("JobType() = %q, want %q", jobType, "mig")
 		}
 
 		files, found := parsed.FilesChanged()

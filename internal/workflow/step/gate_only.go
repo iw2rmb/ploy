@@ -25,8 +25,7 @@ import (
 //   - Timings for hydration and gate phases only.
 //   - ExitCode is always 0 (no container was executed).
 //
-// On gate failure, returns ErrBuildGateFailed so callers can detect failures
-// and trigger healing if configured.
+// On gate failure, returns ErrBuildGateFailed so callers can detect failures.
 func RunGateOnly(ctx context.Context, r *Runner, req Request) (Result, error) {
 	totalStart := time.Now()
 	var result Result

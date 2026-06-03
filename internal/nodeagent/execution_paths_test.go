@@ -17,28 +17,28 @@ func TestRunArtifactPaths(t *testing.T) {
 	jobID := types.NewJobID()
 
 	wantRunRoot := filepath.Join(cacheHome, "runs", runID.String())
-	if got := runCacheDir(runID); got != wantRunRoot {
-		t.Fatalf("runCacheDir() = %q, want %q", got, wantRunRoot)
+	if got := runDir(runID); got != wantRunRoot {
+		t.Fatalf("runDir() = %q, want %q", got, wantRunRoot)
 	}
-	if strings.Contains(runCacheDir(runID), filepath.Join("ploy", "run")) {
-		t.Fatalf("run cache path uses old ploy/run layout: %s", runCacheDir(runID))
+	if strings.Contains(runDir(runID), filepath.Join("ploy", "run")) {
+		t.Fatalf("run cache path uses old ploy/run layout: %s", runDir(runID))
 	}
 
 	wantRepoRoot := wantRunRoot
-	if got := runRootDir(runID); got != wantRepoRoot {
-		t.Fatalf("runRootDir() = %q, want %q", got, wantRepoRoot)
+	if got := runDir(runID); got != wantRepoRoot {
+		t.Fatalf("runDir() = %q, want %q", got, wantRepoRoot)
 	}
-	if got := runWorkspaceDir(runID); got != filepath.Join(wantRepoRoot, "workspace") {
-		t.Fatalf("runWorkspaceDir() = %q", got)
+	if got := workspaceDir(runID); got != filepath.Join(wantRepoRoot, "workspace") {
+		t.Fatalf("workspaceDir() = %q", got)
 	}
-	if got := runArtifactsDir(runID); got != filepath.Join(wantRepoRoot, "artifacts") {
-		t.Fatalf("runArtifactsDir() = %q", got)
+	if got := artifactsDir(runID); got != filepath.Join(wantRepoRoot, "artifacts") {
+		t.Fatalf("artifactsDir() = %q", got)
 	}
-	if got := runSharedArtifactsDir(runID); got != filepath.Join(wantRepoRoot, "artifacts", "shared") {
-		t.Fatalf("runSharedArtifactsDir() = %q", got)
+	if got := sharedArtifactsDir(runID); got != filepath.Join(wantRepoRoot, "artifacts", "shared") {
+		t.Fatalf("sharedArtifactsDir() = %q", got)
 	}
 
-	paths := runJobArtifactPaths(runID, jobID)
+	paths := artifactPaths(runID, jobID)
 	wantJobRoot := filepath.Join(wantRepoRoot, "artifacts", jobID.String())
 	if paths.Root != wantJobRoot {
 		t.Fatalf("job artifact root = %q, want %q", paths.Root, wantJobRoot)
@@ -50,7 +50,7 @@ func TestRunArtifactPaths(t *testing.T) {
 		t.Fatalf("job log/diff paths = %+v", paths)
 	}
 
-	if paths := runJobArtifactPaths(runID, jobID); paths == (jobArtifactPaths{}) {
+	if paths := artifactPaths(runID, jobID); paths == (jobArtifactPaths{}) {
 		t.Fatal("job artifact paths must not depend on repo_id")
 	}
 }

@@ -6,7 +6,7 @@ set -euo pipefail
 #  1) Create a tiny Maven project that fails to compile (missing symbol).
 #  2) Run the Build Gate container (maven:jdk17) and capture logs.
 #  3) Save logs to /in/build-gate.log (artifact to pass to LLM; /in is read-only cross-phase input).
-#  4) Run migs/mig-llm stub to heal the missing symbol.
+#  4) Run migs/mig-llm stub to fix the missing symbol.
 #  5) Re-run the Build Gate and expect success.
 
 ROOT_DIR=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
@@ -37,7 +37,7 @@ cat >"$WORKDIR/pom.xml" <<'POM'
 </project>
 POM
 
-# Failing class referencing UnknownClass (healed by migs-llm stub)
+# Failing class referencing UnknownClass (fixed by migs-llm stub)
 cat >"$WORKDIR/src/main/java/e2e/FailMissingSymbol.java" <<'JAVA'
 package e2e;
 
@@ -71,21 +71,21 @@ fi
 
 echo "[scenario] Build Gate failed as expected; artifact saved to /in/build-gate.log"
 
-# Run LLM healer stub (migs/mig-llm) to create e2e/UnknownClass.java
+# Run LLM mig stub (migs/mig-llm) to create e2e/UnknownClass.java
 OUTDIR="$WORKDIR/out"
 mkdir -p "$OUTDIR"
 bash "$ROOT_DIR/migs/mig-llm/mig-llm.sh" --execute --input "$WORKDIR" --out "$OUTDIR/plan.json"
 
 if [[ ! -f "$WORKDIR/src/main/java/e2e/UnknownClass.java" ]]; then
-  echo "FAIL: LLM healer did not create UnknownClass.java"
+  echo "FAIL: LLM mig did not create UnknownClass.java"
   exit 1
 fi
 
-echo "[scenario] LLM healing created e2e/UnknownClass.java"
+echo "[scenario] LLM mig created e2e/UnknownClass.java"
 
 # Re-run Build Gate; expect success
 docker run --rm -v "$WORKDIR":/workspace -w /workspace \
   maven:jdk17 /bin/sh -lc \
   'mvn -B -q -DskipTests=false -Dstyle.color=never -f /workspace/pom.xml test' >/dev/null 2>&1
 
-echo "OK: build-gate failure produces artifact and can be healed by LLM stub"
+echo "OK: build-gate failure produces artifact and can be fixed by LLM mig stub"

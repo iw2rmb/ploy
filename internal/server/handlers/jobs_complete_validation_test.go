@@ -318,18 +318,6 @@ func TestCompleteJob_ValidCompletion(t *testing.T) {
 				}
 			},
 		},
-		{
-			name:         "field_persistence/mig_action_summary",
-			wantWithMeta: true, wantMetaKind: "mig",
-			body: map[string]any{"status": "Success", "exit_code": 0, "stats": map[string]any{
-				"job_meta": map[string]any{"kind": "mig", "action_summary": "Fixed missing import in Main.java"},
-			}},
-			checkMeta: func(t *testing.T, meta map[string]any) {
-				if as, ok := meta["action_summary"].(string); !ok || as != "Fixed missing import in Main.java" {
-					t.Fatalf("expected action_summary = %q, got %#v", "Fixed missing import in Main.java", meta["action_summary"])
-				}
-			},
-		},
 	}
 
 	for _, tt := range tests {

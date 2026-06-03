@@ -5,6 +5,7 @@
 //   - in:   "shortHash:dst"      where dst starts with /in/
 //   - out:  "shortHash:dst"      where dst starts with /out/
 //   - home: "shortHash:dst{:ro}" where dst is $HOME-relative (no leading /)
+//
 // shortHash is a hex-only, colon-free prefix of the full content hash.
 package contracts
 
@@ -178,7 +179,7 @@ func ValidateHydraHomeEntries(entries []string, prefix string) error {
 }
 
 // validateHydraFields validates the Hydra fields (in, out, home) on a
-// container spec (step or heal action).
+// container spec.
 func validateHydraFields(in, out, home []string, prefix string) error {
 	if err := ValidateHydraInEntries(in, prefix+".in"); err != nil {
 		return err

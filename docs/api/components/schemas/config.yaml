@@ -12,7 +12,7 @@ GlobalEnvTarget:
     - `server` — Inject into the server process
     - `nodes` — Inject into node agent processes
     - `gates` — Inject into gate jobs (pre_gate, post_gate)
-    - `steps` — Inject into step jobs (mig, heal)
+    - `steps` — Inject into step jobs (mig)
   enum: [server, nodes, gates, steps]
   example: "gates"
 

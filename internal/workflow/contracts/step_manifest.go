@@ -123,10 +123,7 @@ type StepGateSpec struct {
 	Ref types.GitRef
 
 	// DiffPatch is an optional gzipped unified diff (base64-encoded) to apply
-	// on top of the cloned repo_url+ref baseline for gate validation retries,
-	// avoiding full archive uploads.
-	//
-	// Set by gate retry execution after healing migs.
+	// on top of the cloned repo_url+ref baseline, avoiding full archive uploads.
 	// The diff captures all changes relative to the initial repo_url+ref clone.
 	DiffPatch []byte
 

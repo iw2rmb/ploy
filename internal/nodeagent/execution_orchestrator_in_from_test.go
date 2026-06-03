@@ -82,9 +82,9 @@ func TestMaterializeMigInFromInputs(t *testing.T) {
 			t.Setenv("PLOYD_CACHE_HOME", cacheHome)
 
 			if tt.createSource {
-				sourcePath, err := runJobOutFile(runID, sourceJobID, tt.ref.SourceOutPath)
+				sourcePath, err := jobOutFile(runID, sourceJobID, tt.ref.SourceOutPath)
 				if err != nil {
-					t.Fatalf("runJobOutFile() error = %v", err)
+					t.Fatalf("jobOutFile() error = %v", err)
 				}
 				if err := os.MkdirAll(filepath.Dir(sourcePath), 0o755); err != nil {
 					t.Fatalf("mkdir source parent: %v", err)
@@ -94,9 +94,9 @@ func TestMaterializeMigInFromInputs(t *testing.T) {
 				}
 			}
 
-			inDir := runJobArtifactPaths(runID, currentJobID).In
+			inDir := artifactPaths(runID, currentJobID).In
 			rc := &runController{}
-			err := rc.materializeMigInFromInputs(context.Background(), StartRunRequest{
+			err := rc.materializeInFrom(context.Background(), StartRunRequest{
 				RunID:   runID,
 				RepoID:  repoID,
 				JobID:   currentJobID,
@@ -114,7 +114,7 @@ func TestMaterializeMigInFromInputs(t *testing.T) {
 				return
 			}
 			if err != nil {
-				t.Fatalf("materializeMigInFromInputs() error = %v", err)
+				t.Fatalf("materializeInFrom() error = %v", err)
 			}
 
 			target := filepath.Join(inDir, tt.wantTargetRel)

@@ -23,8 +23,7 @@ import (
 //  2. Pre-mig Build Gate — When Gate is enabled (Manifest.Gate.Enabled), run static validation on the
 //     workspace before executing the mig container. If the gate fails,
 //     Runner.Run returns ErrBuildGateFailed without executing container
-//     stages. The node agent orchestration layer handles healing when
-//     configured; Runner itself does not perform healing.
+//     stages.
 //
 //  3. Container Execution — Create, start, and wait on the container via
 //     ContainerRuntime. Logs are forwarded to LogWriter if present.
@@ -38,13 +37,12 @@ import (
 //
 // However, nodeagent step execution MUST pass manifests with Gate.Enabled=false.
 // The nodeagent orchestration layer owns all gate lifecycle management via
-// runGateWithHealing, which handles:
+// the gate job chain, which handles:
 //   - A single pre-run gate before the step loop begins.
 //   - Per-step post-mig gates after each container execution.
-//   - Healing retries when gates fail and healing is configured.
 //
 // Passing Gate.Enabled=true from nodeagent would cause duplicate pre-mig gates
-// (one from runGateWithHealing, one from Runner.Run) and break the single-gate-
+// (one from the nodeagent, one from Runner.Run) and break the single-gate-
 // per-run invariant. The nodeagent is the authoritative gate orchestrator.
 type Runner struct {
 	Workspace  WorkspaceHydrator
@@ -103,8 +101,7 @@ type StageTiming struct {
 	TotalDuration     types.Duration
 }
 
-// ErrBuildGateFailed is returned when the pre-mig Build Gate fails
-// and no healing is configured to continue.
+// ErrBuildGateFailed is returned when the pre-mig Build Gate fails.
 var ErrBuildGateFailed = errors.New("build gate failed")
 
 // Run executes a step and returns the result.

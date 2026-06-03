@@ -211,7 +211,7 @@ func resolveDockerRegistryAuthRefreshSocket() string {
 	return strings.TrimSpace(os.Getenv("PLOY_DOCKER_AUTH_REFRESH_SOCKET"))
 }
 
-// jobExecutionContext holds runtime components initialized for a mig/heal job.
+// jobExecutionContext holds runtime components initialized for a container job.
 type jobExecutionContext struct {
 	runner        step.Runner
 	diffGenerator step.DiffGenerator

@@ -9,7 +9,7 @@ import (
 
 // assertStackInbound checks that a step has a derived/explicit inbound with
 // the expected language and release values.
-func assertStackInbound(t *testing.T, step StepMig, idx int, wantLang, wantRelease string) {
+func assertStackInbound(t *testing.T, step StepOptions, idx int, wantLang, wantRelease string) {
 	t.Helper()
 	if step.Stack == nil {
 		t.Fatalf("steps[%d].Stack should not be nil", idx)
@@ -31,11 +31,11 @@ func assertStackInbound(t *testing.T, step StepMig, idx int, wantLang, wantRelea
 	}
 }
 
-// stepMig is a shorthand for building test StepMig values.
-func stepMig(image string, stack *contracts.StackGateSpec) StepMig {
-	return StepMig{
-		MigContainerSpec: MigContainerSpec{Image: contracts.JobImage{Universal: image}},
-		Stack:            stack,
+// stepMig is a shorthand for building test StepOptions values.
+func stepMig(image string, stack *contracts.StackGateSpec) StepOptions {
+	return StepOptions{
+		ContainerSpec: ContainerSpec{Image: contracts.JobImage{Universal: image}},
+		Stack:         stack,
 	}
 }
 
@@ -61,39 +61,39 @@ func disabledOutbound(lang string) *contracts.StackGatePhaseSpec {
 func TestValidateAndDeriveStackGateChaining(t *testing.T) {
 	tests := []struct {
 		name    string
-		steps   []StepMig
+		steps   []StepOptions
 		wantErr string
-		check   func(t *testing.T, steps []StepMig)
+		check   func(t *testing.T, steps []StepOptions)
 	}{
 		{
 			name: "single step no chaining",
-			steps: []StepMig{stepMig("test:latest", &contracts.StackGateSpec{
+			steps: []StepOptions{stepMig("test:latest", &contracts.StackGateSpec{
 				Inbound: inbound("java", ""),
 			})},
 		},
 		{
 			name: "derives inbound from previous outbound",
-			steps: []StepMig{
+			steps: []StepOptions{
 				stepMig("mig1:latest", &contracts.StackGateSpec{Outbound: outbound("java", "17")}),
 				stepMig("mig2:latest", nil),
 			},
-			check: func(t *testing.T, steps []StepMig) {
+			check: func(t *testing.T, steps []StepOptions) {
 				assertStackInbound(t, steps[1], 1, "java", "17")
 			},
 		},
 		{
 			name: "derives inbound when Stack exists but Inbound is nil",
-			steps: []StepMig{
+			steps: []StepOptions{
 				stepMig("mig1:latest", &contracts.StackGateSpec{Outbound: outbound("java", "11")}),
 				stepMig("mig2:latest", &contracts.StackGateSpec{Outbound: outbound("java", "17")}),
 			},
-			check: func(t *testing.T, steps []StepMig) {
+			check: func(t *testing.T, steps []StepOptions) {
 				assertStackInbound(t, steps[1], 1, "java", "11")
 			},
 		},
 		{
 			name: "rejects mismatched explicit inbound",
-			steps: []StepMig{
+			steps: []StepOptions{
 				stepMig("mig1:latest", &contracts.StackGateSpec{Outbound: outbound("java", "17")}),
 				stepMig("mig2:latest", &contracts.StackGateSpec{Inbound: inbound("java", "11")}),
 			},
@@ -101,18 +101,18 @@ func TestValidateAndDeriveStackGateChaining(t *testing.T) {
 		},
 		{
 			name: "matching explicit inbound passes",
-			steps: []StepMig{
+			steps: []StepOptions{
 				stepMig("mig1:latest", &contracts.StackGateSpec{Outbound: outbound("java", "17")}),
 				stepMig("mig2:latest", &contracts.StackGateSpec{Inbound: inbound("java", "17")}),
 			},
 		},
 		{
 			name: "skips chaining when previous outbound disabled",
-			steps: []StepMig{
+			steps: []StepOptions{
 				stepMig("mig1:latest", &contracts.StackGateSpec{Outbound: disabledOutbound("java")}),
 				stepMig("mig2:latest", nil),
 			},
-			check: func(t *testing.T, steps []StepMig) {
+			check: func(t *testing.T, steps []StepOptions) {
 				if steps[1].Stack != nil {
 					t.Error("steps[1].Stack should remain nil when previous outbound is disabled")
 				}
@@ -120,11 +120,11 @@ func TestValidateAndDeriveStackGateChaining(t *testing.T) {
 		},
 		{
 			name: "skips chaining when previous has no Stack",
-			steps: []StepMig{
+			steps: []StepOptions{
 				stepMig("mig1:latest", nil),
 				stepMig("mig2:latest", nil),
 			},
-			check: func(t *testing.T, steps []StepMig) {
+			check: func(t *testing.T, steps []StepOptions) {
 				if steps[1].Stack != nil {
 					t.Error("steps[1].Stack should remain nil")
 				}
@@ -132,7 +132,7 @@ func TestValidateAndDeriveStackGateChaining(t *testing.T) {
 		},
 		{
 			name: "three step chain",
-			steps: []StepMig{
+			steps: []StepOptions{
 				stepMig("mig1:latest", &contracts.StackGateSpec{
 					Inbound:  inbound("java", "8"),
 					Outbound: outbound("java", "11"),
@@ -142,7 +142,7 @@ func TestValidateAndDeriveStackGateChaining(t *testing.T) {
 				}),
 				stepMig("mig3:latest", nil),
 			},
-			check: func(t *testing.T, steps []StepMig) {
+			check: func(t *testing.T, steps []StepOptions) {
 				assertStackInbound(t, steps[1], 1, "java", "11")
 				assertStackInbound(t, steps[2], 2, "java", "17")
 			},
@@ -276,8 +276,8 @@ func TestBuildGateManifestFromRequest_StackGateThreading(t *testing.T) {
 		{
 			name: "outbound expectations for post gate",
 			opts: RunOptions{
-				Steps: []StepMig{{
-					MigContainerSpec: MigContainerSpec{Image: contracts.JobImage{Universal: "test:latest"}},
+				Steps: []StepOptions{{
+					ContainerSpec: ContainerSpec{Image: contracts.JobImage{Universal: "test:latest"}},
 					Stack: &contracts.StackGateSpec{
 						Inbound:  inbound("java", "11"),
 						Outbound: outbound("java", "17"),
@@ -302,7 +302,7 @@ func TestBuildGateManifestFromRequest_StackGateThreading(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			req := newStartRunRequest()
-			manifest, err := buildGateManifestFromRequest(req, tc.opts)
+			manifest, err := buildGateManifest(req, tc.opts)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}

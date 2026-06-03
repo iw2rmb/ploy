@@ -10,8 +10,8 @@ import (
 	types "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-// runCacheRootDir returns the durable run cache root under PLOYD_CACHE_HOME.
-func runCacheRootDir() string {
+// cacheRootDir returns the durable run cache root under PLOYD_CACHE_HOME.
+func cacheRootDir() string {
 	baseRoot := os.Getenv("PLOYD_CACHE_HOME")
 	if baseRoot == "" {
 		baseRoot = os.TempDir()
@@ -19,40 +19,36 @@ func runCacheRootDir() string {
 	return filepath.Join(baseRoot, "runs")
 }
 
-func runCacheDir(runID types.RunID) string {
-	return filepath.Join(runCacheRootDir(), runID.String())
+func runDir(runID types.RunID) string {
+	return filepath.Join(cacheRootDir(), runID.String())
 }
 
-func runRootDir(runID types.RunID) string {
-	return runCacheDir(runID)
-}
-
-func runWorkspaceDir(runID types.RunID) string {
-	root := runRootDir(runID)
+func workspaceDir(runID types.RunID) string {
+	root := runDir(runID)
 	if root == "" {
 		return ""
 	}
 	return filepath.Join(root, "workspace")
 }
 
-func runArtifactsDir(runID types.RunID) string {
-	root := runRootDir(runID)
+func artifactsDir(runID types.RunID) string {
+	root := runDir(runID)
 	if root == "" {
 		return ""
 	}
 	return filepath.Join(root, "artifacts")
 }
 
-func runSharedArtifactsDir(runID types.RunID) string {
-	artifactsDir := runArtifactsDir(runID)
+func sharedArtifactsDir(runID types.RunID) string {
+	artifactsDir := artifactsDir(runID)
 	if artifactsDir == "" {
 		return ""
 	}
 	return filepath.Join(artifactsDir, "shared")
 }
 
-func runJobArtifactsDir(runID types.RunID, jobID types.JobID) string {
-	artifactsDir := runArtifactsDir(runID)
+func jobArtifactsDir(runID types.RunID, jobID types.JobID) string {
+	artifactsDir := artifactsDir(runID)
 	if artifactsDir == "" || jobID.IsZero() {
 		return ""
 	}
@@ -68,8 +64,8 @@ type jobArtifactPaths struct {
 	Diff   string
 }
 
-func runJobArtifactPaths(runID types.RunID, jobID types.JobID) jobArtifactPaths {
-	root := runJobArtifactsDir(runID, jobID)
+func artifactPaths(runID types.RunID, jobID types.JobID) jobArtifactPaths {
+	root := jobArtifactsDir(runID, jobID)
 	if root == "" {
 		return jobArtifactPaths{}
 	}
@@ -84,7 +80,7 @@ func runJobArtifactPaths(runID types.RunID, jobID types.JobID) jobArtifactPaths 
 }
 
 func ensureRunShareDir(runID types.RunID) (string, error) {
-	shareDir := runSharedArtifactsDir(runID)
+	shareDir := sharedArtifactsDir(runID)
 	if strings.TrimSpace(shareDir) == "" {
 		return "", nil
 	}
@@ -106,12 +102,12 @@ func ensureJobArtifactDirs(paths jobArtifactPaths) error {
 	return nil
 }
 
-func runJobOutFile(runID types.RunID, jobID types.JobID, outPath string) (string, error) {
+func jobOutFile(runID types.RunID, jobID types.JobID, outPath string) (string, error) {
 	normalizedOutPath := path.Clean(strings.TrimSpace(outPath))
 	if !strings.HasPrefix(normalizedOutPath, "/out/") || normalizedOutPath == "/out" {
 		return "", fmt.Errorf("source path must stay under /out")
 	}
-	paths := runJobArtifactPaths(runID, jobID)
+	paths := artifactPaths(runID, jobID)
 	if strings.TrimSpace(paths.Out) == "" {
 		return "", fmt.Errorf("source job artifacts path is empty")
 	}

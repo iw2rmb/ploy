@@ -26,18 +26,18 @@ func TestPrepareStickyWorkspaceForStep_ReusesStickyWorkspaceWhenGitDirExists(t *
 		RepoID: types.MigRepoID("repo_sticky_reuse"),
 		JobID:  types.JobID("job_sticky_reuse"),
 	}
-	workspace := runWorkspaceDir(req.RunID)
+	workspace := workspaceDir(req.RunID)
 	if err := os.MkdirAll(filepath.Join(workspace, ".git"), 0o755); err != nil {
 		t.Fatalf("mkdir sticky .git dir: %v", err)
 	}
 
 	rc := &runController{cfg: Config{}}
-	got, err := rc.prepareStickyWorkspaceForStep(context.Background(), req, contracts.StepManifest{})
+	got, err := rc.prepareStickyWorkspace(context.Background(), req, contracts.StepManifest{})
 	if err != nil {
-		t.Fatalf("prepareStickyWorkspaceForStep() error = %v, want nil", err)
+		t.Fatalf("prepareStickyWorkspace() error = %v, want nil", err)
 	}
 	if got != workspace {
-		t.Fatalf("prepareStickyWorkspaceForStep() path = %q, want %q", got, workspace)
+		t.Fatalf("prepareStickyWorkspace() path = %q, want %q", got, workspace)
 	}
 }
 
@@ -51,7 +51,7 @@ func TestPrepareStickyWorkspaceForStep_RemovesInvalidChainHeadWorkspaceBeforeHyd
 		JobID:   types.JobID("job_sticky_invalid"),
 		JobType: types.JobTypePreGate,
 	}
-	workspace := runWorkspaceDir(req.RunID)
+	workspace := workspaceDir(req.RunID)
 	if err := os.MkdirAll(workspace, 0o755); err != nil {
 		t.Fatalf("mkdir invalid sticky workspace: %v", err)
 	}
@@ -61,8 +61,8 @@ func TestPrepareStickyWorkspaceForStep_RemovesInvalidChainHeadWorkspaceBeforeHyd
 	}
 
 	rc := &runController{cfg: Config{}}
-	if _, err := rc.prepareStickyWorkspaceForStep(context.Background(), req, contracts.StepManifest{}); err == nil {
-		t.Fatal("prepareStickyWorkspaceForStep() error = nil, want non-nil due to missing repo hydration input")
+	if _, err := rc.prepareStickyWorkspace(context.Background(), req, contracts.StepManifest{}); err == nil {
+		t.Fatal("prepareStickyWorkspace() error = nil, want non-nil due to missing repo hydration input")
 	}
 	if _, err := os.Stat(invalidMarker); !os.IsNotExist(err) {
 		t.Fatalf("invalid sticky marker should be removed before rebuild, stat err = %v", err)
@@ -81,8 +81,8 @@ func TestPrepareStickyWorkspaceForStep_MissingNonHeadWorkspaceFails(t *testing.T
 	}
 
 	rc := &runController{cfg: Config{}}
-	if _, err := rc.prepareStickyWorkspaceForStep(context.Background(), req, contracts.StepManifest{}); err == nil {
-		t.Fatal("prepareStickyWorkspaceForStep() error = nil, want missing sticky workspace error")
+	if _, err := rc.prepareStickyWorkspace(context.Background(), req, contracts.StepManifest{}); err == nil {
+		t.Fatal("prepareStickyWorkspace() error = nil, want missing sticky workspace error")
 	}
 }
 
@@ -119,15 +119,15 @@ func TestPrepareStickyWorkspaceForStep_ChainHeadHydratesWorkspaceWithoutRunBase(
 	srv := snapshotFixtureServer(t, repoDir)
 	defer srv.Close()
 	rc := &runController{cfg: Config{ServerURL: srv.URL, NodeID: types.NodeID("node01")}, httpClient: srv.Client()}
-	workspace, err := rc.prepareStickyWorkspaceForStep(context.Background(), req, manifest)
+	workspace, err := rc.prepareStickyWorkspace(context.Background(), req, manifest)
 	if err != nil {
-		t.Fatalf("prepareStickyWorkspaceForStep() error = %v", err)
+		t.Fatalf("prepareStickyWorkspace() error = %v", err)
 	}
-	if workspace != runWorkspaceDir(req.RunID) {
-		t.Fatalf("workspace path = %q, want %q", workspace, runWorkspaceDir(req.RunID))
+	if workspace != workspaceDir(req.RunID) {
+		t.Fatalf("workspace path = %q, want %q", workspace, workspaceDir(req.RunID))
 	}
 	gitrepo.AssertRepo(t, workspace)
-	if _, err := os.Stat(filepath.Join(runCacheDir(req.RunID), "base")); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(runDir(req.RunID), "base")); !os.IsNotExist(err) {
 		t.Fatalf("run base dir should not be created, stat err = %v", err)
 	}
 }

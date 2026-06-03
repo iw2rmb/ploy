@@ -11,11 +11,11 @@ import (
 )
 
 // TestCrossPathParity_StandardJobErrorToChainAction exercises the joint nodeagent→server
-// completion path for standard mig/heal job error scenarios through concrete production
+// completion path for mig job error scenarios through concrete production
 // code paths.
 //
 // Nodeagent step: lifecycle.JobStatusFromRunError maps execution errors to job statuses.
-// This is the canonical call used in runController.uploadFailureStatus and executeStandardJob.
+// This is the canonical call used in runController.uploadFailureStatus and executeContainerJob.
 //
 // Server step: CompleteJobService.Complete routes the resulting status through its full
 // post-action pipeline (onFail/onCancelled/reconcileRepoRun). Assertions target concrete
@@ -35,10 +35,10 @@ func TestCrossPathParity_StandardJobErrorToChainAction(t *testing.T) {
 	}{
 		// context.Canceled: non-gate jobs → Cancelled → onCancelled → CancelRemainder.
 		{name: "ctx_canceled/mig/has-next", err: context.Canceled, jobType: domaintypes.JobTypeMig, hasNext: true, wantCancelSuccessor: true},
-		{name: "ctx_deadline/heal/has-next", err: context.DeadlineExceeded, jobType: domaintypes.JobTypeMig, hasNext: true, wantCancelSuccessor: true},
+		{name: "ctx_deadline/mig/has-next", err: context.DeadlineExceeded, jobType: domaintypes.JobTypeMig, hasNext: true, wantCancelSuccessor: true},
 		// Runtime errors: non-gate jobs → Error → CancelRemainder.
 		{name: "runtime_error/mig/has-next", err: errors.New("container exited unexpectedly"), jobType: domaintypes.JobTypeMig, hasNext: true, wantCancelSuccessor: true},
-		{name: "runtime_error/heal/has-next", err: errors.New("image pull failed"), jobType: domaintypes.JobTypeMig, hasNext: true, wantCancelSuccessor: true},
+		{name: "runtime_error/mig_pull/has-next", err: errors.New("image pull failed"), jobType: domaintypes.JobTypeMig, hasNext: true, wantCancelSuccessor: true},
 	}
 
 	for _, tc := range cases {
@@ -114,8 +114,8 @@ func TestCrossPathParity_StandardJobErrorToChainAction(t *testing.T) {
 // paths emit (execution_orchestrator_gate.go).
 //
 // Gate status assignment is deliberate and explicit — not via lifecycle.JobStatusFromRunError:
-//   - Infrastructure errors → Error     (prevents healing activation)
-//   - Test failures        → Fail      (triggers EvaluateGateFailure / healing evaluation)
+//   - Infrastructure errors → Error
+//   - Test failures        → Fail
 //   - Test successes       → Success   (advances the job chain)
 //
 // This suite locks that CompleteJobService routes each gate status to the correct post-action
@@ -128,14 +128,14 @@ func TestCrossPathParity_GateJobStatusToChainAction(t *testing.T) {
 		jobType domaintypes.JobType
 		status  domaintypes.JobStatus
 		hasNext bool
-		// wantGetRunCalled: loadRunForPostCompletion was invoked (uniquely identifies healing path).
+		// wantGetRunCalled: loadRunForPostCompletion was invoked.
 		wantGetRunCalled bool
 		// wantCancelSuccessor: UpdateJobStatus issued for the queued successor.
 		wantCancelSuccessor bool
 		// wantAdvanceNext: PromoteJobByIDIfUnblocked was called.
 		wantAdvanceNext bool
 	}{
-		// Gate infra errors always produce Error → CancelRemainder (no healing path entered).
+		// Gate infra errors always produce Error → CancelRemainder.
 		{
 			name:    "pre_gate/infra_error/has-next",
 			jobType: domaintypes.JobTypePreGate, status: domaintypes.JobStatusError, hasNext: true,
@@ -146,7 +146,7 @@ func TestCrossPathParity_GateJobStatusToChainAction(t *testing.T) {
 			jobType: domaintypes.JobTypePostGate, status: domaintypes.JobStatusError, hasNext: true,
 			wantCancelSuccessor: true,
 		},
-		// pre-gate failures are terminal for this repo attempt and do not trigger healing.
+		// pre-gate failures are terminal for this repo attempt.
 		{
 			name:    "pre_gate/test_fail/has-next",
 			jobType: domaintypes.JobTypePreGate, status: domaintypes.JobStatusFail, hasNext: true,
@@ -229,9 +229,9 @@ func TestCrossPathParity_GateJobStatusToChainAction(t *testing.T) {
 				t.Fatalf("Complete() error = %v", err)
 			}
 
-			// getRun.called uniquely identifies the healing evaluation path (loadRunForPostCompletion).
+			// getRun.called reflects loadRunForPostCompletion.
 			if tc.wantGetRunCalled != st.getRun.called {
-				t.Fatalf("GetRun called = %v, want %v (jobType=%s status=%s — healing path entered?)",
+				t.Fatalf("GetRun called = %v, want %v (jobType=%s status=%s)",
 					st.getRun.called, tc.wantGetRunCalled, tc.jobType, tc.status)
 			}
 

@@ -68,13 +68,13 @@ func TestFinalizeStandardJobOutputs(t *testing.T) {
 			t.Parallel()
 
 			rc := &runController{}
-			cfg := standardJobConfig{
+			cfg := containerJobConfig{
 				FinalizeOutputs: func(_, _ string) error {
 					return tt.finalizeErr
 				},
 			}
 
-			got := rc.finalizeStandardJobOutputs(
+			got := rc.finalizeOutputs(
 				StartRunRequest{},
 				cfg,
 				t.TempDir(),
@@ -119,7 +119,7 @@ func TestStartRuntimeOutputSyncLoop(t *testing.T) {
 		t.Parallel()
 
 		rc := &runController{}
-		stop := rc.startRuntimeOutputSyncLoop(context.Background(), StartRunRequest{}, standardJobConfig{}, t.TempDir(), t.TempDir())
+		stop := rc.startOutputSync(context.Background(), StartRunRequest{}, containerJobConfig{}, t.TempDir(), t.TempDir())
 		stop()
 	})
 
@@ -128,11 +128,11 @@ func TestStartRuntimeOutputSyncLoop(t *testing.T) {
 
 		rc := &runController{}
 		var calls atomic.Int32
-		stop := rc.startRuntimeOutputSyncLoop(
+		stop := rc.startOutputSync(
 			context.Background(),
 			StartRunRequest{},
-			standardJobConfig{
-				RuntimeSync: func(_, _ string) error {
+			containerJobConfig{
+				SyncOutputs: func(_, _ string) error {
 					calls.Add(1)
 					return nil
 				},
