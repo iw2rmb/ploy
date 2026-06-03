@@ -11,11 +11,11 @@ import (
 )
 
 // -----------------------------------------------------------------------------
-// DockerContainerRuntime log retrieval and streaming tests
+// containerRuntime log retrieval and streaming tests
 // -----------------------------------------------------------------------------
 
-// TestDockerContainerRuntimeLogs verifies log retrieval with moby client.
-func TestDockerContainerRuntimeLogs(t *testing.T) {
+// TestContainerRuntimeLogs verifies log retrieval with moby client.
+func TestContainerRuntimeLogs(t *testing.T) {
 	t.Parallel()
 
 	// Build multiplexed log data using Docker wire format.
@@ -54,7 +54,7 @@ func TestDockerContainerRuntimeLogs(t *testing.T) {
 				logsData: tc.logsData,
 				logsErr:  tc.logsErr,
 			}
-			rt := newDockerContainerRuntimeWithClient(fake, DockerContainerRuntimeOptions{})
+			rt := newContainerRuntimeWithClient(fake, ContainerRuntimeOptions{})
 
 			logs, err := rt.Logs(context.Background(), tc.handle)
 
@@ -99,7 +99,7 @@ func TestDockerContainerRuntimeLogs(t *testing.T) {
 // =============================================================================
 
 // TestDockerLogStreamingV29_ThroughRuntime validates log streaming through the
-// full DockerContainerRuntime.Logs method to ensure the integration is correct.
+// full containerRuntime.Logs method to ensure the integration is correct.
 func TestDockerLogStreamingV29_ThroughRuntime(t *testing.T) {
 	t.Parallel()
 
@@ -140,7 +140,7 @@ func TestDockerLogStreamingV29_ThroughRuntime(t *testing.T) {
 			t.Parallel()
 
 			fake := &fakeDockerClient{logsData: tc.logsData}
-			rt := newDockerContainerRuntimeWithClient(fake, DockerContainerRuntimeOptions{})
+			rt := newContainerRuntimeWithClient(fake, ContainerRuntimeOptions{})
 
 			logs, err := rt.Logs(context.Background(), ContainerHandle("test-container"))
 			if err != nil {
@@ -178,7 +178,7 @@ func TestDockerLogStreamingV29_FallbackOnDemuxError(t *testing.T) {
 	// Note: The current implementation reads from the already-consumed reader,
 	// which returns empty. This test documents the current behavior.
 	fake := &fakeDockerClient{logsData: invalidStream}
-	rt := newDockerContainerRuntimeWithClient(fake, DockerContainerRuntimeOptions{})
+	rt := newContainerRuntimeWithClient(fake, ContainerRuntimeOptions{})
 
 	logs, err := rt.Logs(context.Background(), ContainerHandle("fallback-test"))
 	if err != nil {

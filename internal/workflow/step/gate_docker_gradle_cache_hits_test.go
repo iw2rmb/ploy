@@ -14,7 +14,7 @@ func TestReadGradleBuildCacheHits_DeduplicatesSortsAndRemovesFile(t *testing.T) 
 	t.Parallel()
 
 	workspace := t.TempDir()
-	hitsPath := filepath.Join(workspace, BuildGateGradleCacheHitsHostFile)
+	hitsPath := filepath.Join(workspace, gradleCacheHitsHostFile)
 	content := []byte("\n:compileJava\n:test\n:compileJava\n")
 	if err := os.WriteFile(hitsPath, content, 0o644); err != nil {
 		t.Fatalf("write hits file: %v", err)
@@ -31,11 +31,11 @@ func TestReadGradleBuildCacheHits_DeduplicatesSortsAndRemovesFile(t *testing.T) 
 	}
 }
 
-func TestDockerGateExecutor_MountsGradleCacheHitsFile(t *testing.T) {
+func TestGateExecutor_MountsGradleCacheHitsFile(t *testing.T) {
 	t.Parallel()
 
 	rt := &testContainerRuntime{}
-	executor := NewDockerGateExecutor(rt)
+	executor := NewGateExecutor(rt)
 	workspace := createGradleWorkspace(t, "17")
 
 	spec := &contracts.StepGateSpec{Enabled: true}
@@ -46,5 +46,5 @@ func TestDockerGateExecutor_MountsGradleCacheHitsFile(t *testing.T) {
 		t.Fatal("expected Create to be called")
 	}
 
-	requireMount(t, rt.captured.Mounts, BuildGateGradleCacheHitsContainerFile, filepath.Join(workspace, BuildGateGradleCacheHitsHostFile), false)
+	requireMount(t, rt.captured.Mounts, gradleCacheHitsContainerFile, filepath.Join(workspace, gradleCacheHitsHostFile), false)
 }

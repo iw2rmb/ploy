@@ -11,8 +11,8 @@ type WorkspaceHydrator interface {
 	Hydrate(ctx context.Context, manifest contracts.StepManifest, workspace string) error
 }
 
-// DockerContainerRuntimeOptions holds configuration for Docker runtime.
-type DockerContainerRuntimeOptions struct {
+// ContainerRuntimeOptions holds configuration for Docker runtime.
+type ContainerRuntimeOptions struct {
 	// PullImage controls whether the runtime refreshes the image before container
 	// creation.
 	PullImage bool
@@ -41,7 +41,7 @@ type ContainerRuntime interface {
 }
 
 // GateExecutor validates build artifacts.
-// The primary implementation is dockerGateExecutor (gate_docker.go) which runs
+// The primary implementation is gateExecutor (gate_docker.go) which runs
 // validation containers locally via the container runtime.
 type GateExecutor interface {
 	Execute(ctx context.Context, spec *contracts.StepGateSpec, workspace string) (*contracts.BuildGateStageMetadata, error)

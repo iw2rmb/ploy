@@ -7,7 +7,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func TestTrimBuildGateLog(t *testing.T) {
+func TestTrimGateLog(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -187,7 +187,7 @@ BUILD FAILED in 2s
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			trimmed := TrimBuildGateLog(tt.tool, tt.logText)
+			trimmed := TrimGateLog(tt.tool, tt.logText)
 
 			if tt.wantTrimmed && trimmed == tt.logText {
 				t.Fatal("expected log to be trimmed, but got original")
@@ -218,7 +218,7 @@ BUILD FAILED in 2s
 	}
 }
 
-func TestBuildGateLogFindingContent(t *testing.T) {
+func TestGateLogFindingContent(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -318,7 +318,7 @@ BUILD FAILED in 1s
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			trimmed, evidence := BuildGateLogFindingContent(tt.tool, tt.logText)
+			trimmed, evidence := GateLogFindingContent(tt.tool, tt.logText)
 			if strings.TrimSpace(trimmed) == "" {
 				t.Fatal("expected non-empty trimmed message")
 			}

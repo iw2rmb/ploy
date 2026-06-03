@@ -13,11 +13,11 @@ import (
 )
 
 // -----------------------------------------------------------------------------
-// DockerContainerRuntime creation tests
+// containerRuntime creation tests
 // -----------------------------------------------------------------------------
 
-// TestDockerContainerRuntimeCreate verifies container creation with moby client.
-func TestDockerContainerRuntimeCreate(t *testing.T) {
+// TestContainerRuntimeCreate verifies container creation with moby client.
+func TestContainerRuntimeCreate(t *testing.T) {
 	t.Parallel()
 	testCases := []struct {
 		name        string
@@ -151,7 +151,7 @@ func TestDockerContainerRuntimeCreate(t *testing.T) {
 				imageInspectErr: tc.inspectErr,
 				pullErr:         tc.pullErr,
 			}
-			rt := newDockerContainerRuntimeWithClient(fake, DockerContainerRuntimeOptions{
+			rt := newContainerRuntimeWithClient(fake, ContainerRuntimeOptions{
 				PullImage: tc.pullImage,
 			})
 
@@ -198,7 +198,7 @@ func TestDockerContainerRuntimeCreate(t *testing.T) {
 	}
 }
 
-func TestDockerContainerRuntimeCreate_ImagePullUsesRegistryAuth(t *testing.T) {
+func TestContainerRuntimeCreate_ImagePullUsesRegistryAuth(t *testing.T) {
 	t.Parallel()
 
 	authJSON := `{"auths":{"ghcr.io":{"username":"octocat","password":"secret"}}}`
@@ -206,7 +206,7 @@ func TestDockerContainerRuntimeCreate_ImagePullUsesRegistryAuth(t *testing.T) {
 		createResult:    client.ContainerCreateResult{ID: "pulled-container"},
 		imageInspectErr: cerrdefs.ErrNotFound,
 	}
-	rt := newDockerContainerRuntimeWithClient(fake, DockerContainerRuntimeOptions{
+	rt := newContainerRuntimeWithClient(fake, ContainerRuntimeOptions{
 		PullImage:              true,
 		RegistryAuthConfigJSON: authJSON,
 	})
@@ -243,14 +243,14 @@ func TestDockerContainerRuntimeCreate_ImagePullUsesRegistryAuth(t *testing.T) {
 	}
 }
 
-func TestDockerContainerRuntimeCreate_InvalidRegistryAuthConfig(t *testing.T) {
+func TestContainerRuntimeCreate_InvalidRegistryAuthConfig(t *testing.T) {
 	t.Parallel()
 
 	fake := &fakeDockerClient{
 		createResult:    client.ContainerCreateResult{ID: "pulled-container"},
 		imageInspectErr: cerrdefs.ErrNotFound,
 	}
-	rt := newDockerContainerRuntimeWithClient(fake, DockerContainerRuntimeOptions{
+	rt := newContainerRuntimeWithClient(fake, ContainerRuntimeOptions{
 		PullImage:              true,
 		RegistryAuthConfigJSON: `{"auths":`,
 	})
@@ -264,7 +264,7 @@ func TestDockerContainerRuntimeCreate_InvalidRegistryAuthConfig(t *testing.T) {
 	}
 }
 
-func TestDockerContainerRuntimeCreate_DockerHubRegistryAuthAlias(t *testing.T) {
+func TestContainerRuntimeCreate_DockerHubRegistryAuthAlias(t *testing.T) {
 	t.Parallel()
 
 	encodedUserPass := base64.StdEncoding.EncodeToString([]byte("hub-user:hub-token"))
@@ -273,7 +273,7 @@ func TestDockerContainerRuntimeCreate_DockerHubRegistryAuthAlias(t *testing.T) {
 		createResult:    client.ContainerCreateResult{ID: "pulled-container"},
 		imageInspectErr: cerrdefs.ErrNotFound,
 	}
-	rt := newDockerContainerRuntimeWithClient(fake, DockerContainerRuntimeOptions{
+	rt := newContainerRuntimeWithClient(fake, ContainerRuntimeOptions{
 		PullImage:              true,
 		RegistryAuthConfigJSON: authJSON,
 	})
@@ -307,11 +307,11 @@ func TestDockerContainerRuntimeCreate_DockerHubRegistryAuthAlias(t *testing.T) {
 	}
 }
 
-// TestDockerContainerRuntimeEnvPassthrough verifies that ContainerSpec.Env is
+// TestContainerRuntimeEnvPassthrough verifies that ContainerSpec.Env is
 // correctly converted to Docker's Env []string format and passed to the container.
 // This test confirms the flattenEnv function works correctly and that env vars
 // injected by the control plane reach the moby API.
-func TestDockerContainerRuntimeEnvPassthrough(t *testing.T) {
+func TestContainerRuntimeEnvPassthrough(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
@@ -356,7 +356,7 @@ func TestDockerContainerRuntimeEnvPassthrough(t *testing.T) {
 			fake := &fakeDockerClient{
 				createResult: client.ContainerCreateResult{ID: "env-test-" + tc.name},
 			}
-			rt := newDockerContainerRuntimeWithClient(fake, DockerContainerRuntimeOptions{})
+			rt := newContainerRuntimeWithClient(fake, ContainerRuntimeOptions{})
 
 			spec := ContainerSpec{
 				Image: "alpine:latest",
@@ -408,13 +408,13 @@ func TestDockerContainerRuntimeEnvPassthrough(t *testing.T) {
 	}
 }
 
-// TestDockerContainerRuntimeNetworkMode verifies network option is applied.
-func TestDockerContainerRuntimeNetworkMode(t *testing.T) {
+// TestContainerRuntimeNetworkMode verifies network option is applied.
+func TestContainerRuntimeNetworkMode(t *testing.T) {
 	t.Parallel()
 	fake := &fakeDockerClient{
 		createResult: client.ContainerCreateResult{ID: "net-container"},
 	}
-	rt := newDockerContainerRuntimeWithClient(fake, DockerContainerRuntimeOptions{
+	rt := newContainerRuntimeWithClient(fake, ContainerRuntimeOptions{
 		Network: "custom-network",
 	})
 

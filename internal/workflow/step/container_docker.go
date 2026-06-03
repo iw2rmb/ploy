@@ -18,7 +18,7 @@ import (
 	"github.com/moby/moby/client"
 )
 
-// dockerClientAPI abstracts the core moby client methods used by DockerContainerRuntime.
+// dockerClientAPI abstracts the core moby client methods used by containerRuntime.
 // This interface enables dependency injection for testing without requiring a live
 // Docker daemon.
 type dockerClientAPI interface {
@@ -41,29 +41,29 @@ type dockerStatsAPI interface {
 	ContainerStats(ctx context.Context, containerID string, options client.ContainerStatsOptions) (client.ContainerStatsResult, error)
 }
 
-// DockerContainerRuntime executes containers using the local Docker daemon.
-type DockerContainerRuntime struct {
+// containerRuntime executes containers using the local Docker daemon.
+type containerRuntime struct {
 	client dockerClientAPI
 	images dockerImageAPI
 	stats  dockerStatsAPI
-	opts   DockerContainerRuntimeOptions
+	opts   ContainerRuntimeOptions
 }
 
-// NewDockerContainerRuntime constructs a Docker-backed container runtime.
+// NewContainerRuntime constructs a Docker-backed container runtime.
 // It uses client.FromEnv to read DOCKER_HOST and related environment variables,
 // and WithAPIVersionNegotiation to auto-negotiate API version with the daemon.
-func NewDockerContainerRuntime(opts DockerContainerRuntimeOptions) (ContainerRuntime, error) {
+func NewContainerRuntime(opts ContainerRuntimeOptions) (ContainerRuntime, error) {
 	cli, err := client.New(client.FromEnv)
 	if err != nil {
 		return nil, fmt.Errorf("step: configure docker runtime: %w", err)
 	}
-	return &DockerContainerRuntime{client: cli, images: cli, stats: cli, opts: opts}, nil
+	return &containerRuntime{client: cli, images: cli, stats: cli, opts: opts}, nil
 }
 
-// newDockerContainerRuntimeWithClient constructs a DockerContainerRuntime with
+// newContainerRuntimeWithClient constructs a containerRuntime with
 // an injected dockerClientAPI. Used for testing with fake Docker clients.
-func newDockerContainerRuntimeWithClient(cli dockerClientAPI, opts DockerContainerRuntimeOptions) *DockerContainerRuntime {
-	rt := &DockerContainerRuntime{client: cli, opts: opts}
+func newContainerRuntimeWithClient(cli dockerClientAPI, opts ContainerRuntimeOptions) *containerRuntime {
+	rt := &containerRuntime{client: cli, opts: opts}
 	if img, ok := cli.(dockerImageAPI); ok {
 		rt.images = img
 	}
@@ -76,7 +76,7 @@ func newDockerContainerRuntimeWithClient(cli dockerClientAPI, opts DockerContain
 // Create prepares a container based on the provided ContainerSpec.
 // HostConfig.AutoRemove is set to false so logs remain retrievable after exit;
 // explicit removal is owned by the caller (node-runtime disk-pressure flow).
-func (r *DockerContainerRuntime) Create(ctx context.Context, spec ContainerSpec) (handle ContainerHandle, err error) {
+func (r *containerRuntime) Create(ctx context.Context, spec ContainerSpec) (handle ContainerHandle, err error) {
 	// Guard against unexpected panics inside the Docker SDK JSON/request path.
 	// Panics here must not terminate the node process.
 	defer func() {
@@ -133,7 +133,7 @@ func (r *DockerContainerRuntime) Create(ctx context.Context, spec ContainerSpec)
 
 // Start launches the container. ContainerStart is async — the container may still
 // be initializing when Start returns successfully. Use Wait to block until exit.
-func (r *DockerContainerRuntime) Start(ctx context.Context, handle ContainerHandle) error {
+func (r *containerRuntime) Start(ctx context.Context, handle ContainerHandle) error {
 	if r == nil || r.client == nil {
 		return errors.New("step: docker runtime not configured")
 	}
@@ -144,7 +144,7 @@ func (r *DockerContainerRuntime) Start(ctx context.Context, handle ContainerHand
 // Wait blocks until the container reaches WaitConditionNotRunning (fully stopped),
 // then inspects the container to extract start/finish timestamps. On context
 // cancellation the container is force-removed so callers don't leak resources.
-func (r *DockerContainerRuntime) Wait(ctx context.Context, handle ContainerHandle) (ContainerResult, error) {
+func (r *containerRuntime) Wait(ctx context.Context, handle ContainerHandle) (ContainerResult, error) {
 	if r == nil || r.client == nil {
 		return ContainerResult{}, errors.New("step: docker runtime not configured")
 	}
@@ -179,7 +179,7 @@ func (r *DockerContainerRuntime) Wait(ctx context.Context, handle ContainerHandl
 	return ContainerResult{}, errors.New("step: container wait interrupted")
 }
 
-func (r *DockerContainerRuntime) forceRemoveOnWaitCancel(handle ContainerHandle) {
+func (r *containerRuntime) forceRemoveOnWaitCancel(handle ContainerHandle) {
 	cleanupCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	_, err := r.client.ContainerRemove(cleanupCtx, string(handle), client.ContainerRemoveOptions{Force: true})
@@ -206,7 +206,7 @@ func isContainerNotFound(err error) bool {
 // On demux errors (corrupted stream, or TTY mode where the stream is not
 // multiplexed) we fall back to ReadAll on the remaining bytes to avoid total
 // data loss.
-func (r *DockerContainerRuntime) Logs(ctx context.Context, handle ContainerHandle) ([]byte, error) {
+func (r *containerRuntime) Logs(ctx context.Context, handle ContainerHandle) ([]byte, error) {
 	if r == nil || r.client == nil {
 		return nil, errors.New("step: docker runtime not configured")
 	}
@@ -231,7 +231,7 @@ func (r *DockerContainerRuntime) Logs(ctx context.Context, handle ContainerHandl
 // StreamLogs follows container logs and writes demultiplexed stdout/stderr into
 // the provided writers. This is used for live job log uploads while a container
 // is still running.
-func (r *DockerContainerRuntime) StreamLogs(ctx context.Context, handle ContainerHandle, stdout, stderr io.Writer) error {
+func (r *containerRuntime) StreamLogs(ctx context.Context, handle ContainerHandle, stdout, stderr io.Writer) error {
 	if r == nil || r.client == nil {
 		return errors.New("step: docker runtime not configured")
 	}
@@ -259,7 +259,7 @@ func (r *DockerContainerRuntime) StreamLogs(ctx context.Context, handle Containe
 
 // Remove deletes the container with Force=true. Removing an already-removed
 // container may return a 404 error; the operation is idempotent in effect.
-func (r *DockerContainerRuntime) Remove(ctx context.Context, handle ContainerHandle) error {
+func (r *containerRuntime) Remove(ctx context.Context, handle ContainerHandle) error {
 	if r == nil || r.client == nil {
 		return errors.New("step: docker runtime not configured")
 	}
@@ -269,11 +269,11 @@ func (r *DockerContainerRuntime) Remove(ctx context.Context, handle ContainerHan
 
 // ensureImageAvailable refreshes the image before container creation. Job images
 // commonly use mutable tags such as latest, so local presence is not enough.
-func (r *DockerContainerRuntime) ensureImageAvailable(ctx context.Context, imageRef string) error {
+func (r *containerRuntime) ensureImageAvailable(ctx context.Context, imageRef string) error {
 	return r.pullImage(ctx, imageRef)
 }
 
-func (r *DockerContainerRuntime) pullImage(ctx context.Context, imageRef string) error {
+func (r *containerRuntime) pullImage(ctx context.Context, imageRef string) error {
 	err := r.pullImageOnce(ctx, imageRef)
 	if err == nil {
 		return nil
@@ -293,7 +293,7 @@ func (r *DockerContainerRuntime) pullImage(ctx context.Context, imageRef string)
 	return nil
 }
 
-func (r *DockerContainerRuntime) pullImageOnce(ctx context.Context, imageRef string) error {
+func (r *containerRuntime) pullImageOnce(ctx context.Context, imageRef string) error {
 	registryAuth, err := r.registryAuthForImage(imageRef)
 	if err != nil {
 		return err

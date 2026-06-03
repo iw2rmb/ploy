@@ -82,7 +82,7 @@ func imageResolutionTerminal(stackCtx gateStackContext, err error) *gateExecutio
 	if stackCtx.stackGate != nil {
 		code := "STACK_GATE_IMAGE_MAPPING_ERROR"
 		prefix := "image mapping error"
-		if errors.Is(err, errBuildGateImageRuleMatch) {
+		if errors.Is(err, errImageRuleMatch) {
 			code = "STACK_GATE_NO_IMAGE_RULE"
 			prefix = "no matching image rule"
 		}
@@ -91,11 +91,11 @@ func imageResolutionTerminal(stackCtx gateStackContext, err error) *gateExecutio
 	}
 
 	code := "BUILD_GATE_IMAGE_MAPPING_ERROR"
-	if errors.Is(err, errBuildGateImageRuleMatch) {
+	if errors.Is(err, errImageRuleMatch) {
 		code = "BUILD_GATE_NO_IMAGE_RULE"
 	}
-	return buildGateFailureTerminal(stackCtx.language, stackCtx.tool, code, err.Error(), "",
-		buildGateInternalError(code, err.Error()), "")
+	return gateFailureTerminal(stackCtx.language, stackCtx.tool, code, err.Error(), "",
+		gateInternalError(code, err.Error()), "")
 }
 
 func commandResolutionTerminal(
@@ -111,11 +111,11 @@ func commandResolutionTerminal(
 	if stackCtx.stackGate != nil {
 		return stackGateFailureTerminal(stackCtx.stackGate, stackCtx.language, unknownCode, err.Error(), "", "unknown", runtimeImage, nil)
 	}
-	return buildGateFailureTerminal(stackCtx.language, stackCtx.tool, unknownCode, err.Error(), "",
-		buildGateInternalError(unknownCode, err.Error()), runtimeImage)
+	return gateFailureTerminal(stackCtx.language, stackCtx.tool, unknownCode, err.Error(), "",
+		gateInternalError(unknownCode, err.Error()), runtimeImage)
 }
 
-func buildGateInternalError(code string, message string) error {
+func gateInternalError(code string, message string) error {
 	code = strings.TrimSpace(code)
 	message = strings.TrimSpace(message)
 	if code == "" {
@@ -127,15 +127,15 @@ func buildGateInternalError(code string, message string) error {
 	return fmt.Errorf("%s: %s", code, message)
 }
 
-// buildGateFailureTerminal builds a terminal for non-stack-gate (build-gate) failures.
+// gateFailureTerminal builds a terminal for non-stack-gate (build-gate) failures.
 // runtimeImage may be empty; when non-empty it is recorded on the metadata and
 // reported to the runtime-image observer.
-func buildGateFailureTerminal(
+func gateFailureTerminal(
 	language, tool, code, message, evidence string,
 	err error,
 	runtimeImage string,
 ) *gateExecutionTerminal {
-	meta := buildGateFailureMetadata(language, tool, code, message, evidence)
+	meta := gateFailureMetadata(language, tool, code, message, evidence)
 	runtimeImage = strings.TrimSpace(runtimeImage)
 	if runtimeImage != "" {
 		meta.RuntimeImage = runtimeImage
@@ -168,7 +168,7 @@ func stackGateFailureTerminal(
 		}
 	}
 
-	meta := buildGateFailureMetadata(language, "stack-gate", code, message, evidence)
+	meta := gateFailureMetadata(language, "stack-gate", code, message, evidence)
 	if sg != nil {
 		meta.StackGate = sg
 	}
@@ -183,7 +183,7 @@ func stackGateFailureTerminal(
 	}
 }
 
-func buildGateFailureMetadata(
+func gateFailureMetadata(
 	language string,
 	tool string,
 	code string,

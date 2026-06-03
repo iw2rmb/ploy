@@ -129,10 +129,10 @@ func resolveDetectedStackContext(
 	if exp == nil {
 		code := "BUILD_GATE_STACK_DETECT_FAILED"
 		msg := "stack detection produced incomplete result; language and release are required"
-		return gateStackContext{}, buildGateFailureTerminal("", "stackdetect",
+		return gateStackContext{}, gateFailureTerminal("", "stackdetect",
 			code,
 			msg,
-			"", buildGateInternalError(code, msg), "")
+			"", gateInternalError(code, msg), "")
 	}
 
 	normalized := normalizeStackExpectation(exp)
@@ -154,7 +154,7 @@ func resolveDetectedStackContext(
 func resolveForcedStackDetectContext(stackDetectCfg *contracts.BuildGateStackConfig) (gateStackContext, *gateExecutionTerminal) {
 	expected := configuredStackExpectation(stackDetectCfg)
 	if !stackExpectationComplete(expected) {
-		return gateStackContext{}, buildGateStackConfigTerminal()
+		return gateStackContext{}, gateStackConfigTerminal()
 	}
 	normalized := normalizeStackExpectation(expected)
 	return gateStackContext{
@@ -172,14 +172,14 @@ func resolveStrictStackDetectContext(
 ) (gateStackContext, *gateExecutionTerminal) {
 	expected := configuredStackExpectation(stackDetectCfg)
 	if !stackExpectationComplete(expected) {
-		return gateStackContext{}, buildGateStackConfigTerminal()
+		return gateStackContext{}, gateStackConfigTerminal()
 	}
 	if detectErr != nil || !observationComplete(obs) {
 		return gateStackContext{}, stackDetectionFailureTerminal(detectErr,
 			"stack detection produced incomplete result; language, tool, and release are required")
 	}
 	if matched, reason := matchStackWithOptions(obs, expected, stackMatchOptions{}); !matched {
-		return gateStackContext{}, buildGateFailureTerminal(expected.Language, "stackdetect",
+		return gateStackContext{}, gateFailureTerminal(expected.Language, "stackdetect",
 			"BUILD_GATE_STACK_MISMATCH", reason, formatEvidenceForLog(obs.Evidence), nil, "")
 	}
 	normalized := normalizeStackExpectation(expected)
@@ -198,7 +198,7 @@ func resolveFallbackStackDetectContext(
 ) (gateStackContext, *gateExecutionTerminal) {
 	expected := configuredStackExpectation(stackDetectCfg)
 	if !stackExpectationComplete(expected) {
-		return gateStackContext{}, buildGateStackConfigTerminal()
+		return gateStackContext{}, gateStackConfigTerminal()
 	}
 	if detectErr != nil || !observationComplete(obs) {
 		normalized := normalizeStackExpectation(expected)
@@ -262,15 +262,15 @@ func stackDetectionFailureTerminal(detectErr error, incompleteMsg string) *gateE
 		msg = incompleteMsg
 	}
 	code := "BUILD_GATE_STACK_DETECT_FAILED"
-	return buildGateFailureTerminal("", "stackdetect",
-		code, msg, evidence, buildGateInternalError(code, msg), "")
+	return gateFailureTerminal("", "stackdetect",
+		code, msg, evidence, gateInternalError(code, msg), "")
 }
 
-func buildGateStackConfigTerminal() *gateExecutionTerminal {
+func gateStackConfigTerminal() *gateExecutionTerminal {
 	code := "BUILD_GATE_STACK_CONFIG_INVALID"
 	msg := "build gate stack mode requires language, tool, and release"
-	return buildGateFailureTerminal("", "stackdetect",
-		code, msg, "", buildGateInternalError(code, msg), "")
+	return gateFailureTerminal("", "stackdetect",
+		code, msg, "", gateInternalError(code, msg), "")
 }
 
 func resolveStackGateRuntimeImageForTerminal(

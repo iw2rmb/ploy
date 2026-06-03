@@ -15,7 +15,7 @@ func collectDockerResourceUsage(
 	h ContainerHandle,
 	spec ContainerSpec,
 ) *contracts.BuildGateResourceUsage {
-	d, ok := rt.(*DockerContainerRuntime)
+	d, ok := rt.(*containerRuntime)
 	if !ok || d == nil || d.stats == nil {
 		return nil
 	}

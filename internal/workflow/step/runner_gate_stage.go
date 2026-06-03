@@ -36,7 +36,7 @@ func (r *Runner) runGate(ctx context.Context, req Request, failMsg string) (*con
 		gatePassed = gateMetadata.StaticChecks[0].Passed
 	}
 	if !gatePassed {
-		return gateMetadata, types.Duration(time.Since(stageStart)), fmt.Errorf("%w: %s", ErrBuildGateFailed, failMsg)
+		return gateMetadata, types.Duration(time.Since(stageStart)), fmt.Errorf("%w: %s", ErrGateFailed, failMsg)
 	}
 	return gateMetadata, types.Duration(time.Since(stageStart)), nil
 }

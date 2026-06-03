@@ -9,10 +9,10 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
-// buildGateExecutionMetadata normalizes a finished gate container run into
+// gateExecutionMetadata normalizes a finished gate container run into
 // BuildGateStageMetadata. On success it surfaces gradle build-cache hits; on
 // failure it extracts a tool-aware log finding from the captured output.
-func buildGateExecutionMetadata(
+func gateExecutionMetadata(
 	workspace string,
 	language string,
 	tool string,
@@ -45,7 +45,7 @@ func buildGateExecutionMetadata(
 		}
 	}
 	if !passed {
-		trimmed, evidence := BuildGateLogFindingContent(tool, string(logs))
+		trimmed, evidence := GateLogFindingContent(tool, string(logs))
 		msg := strings.TrimSpace(trimmed)
 		if msg == "" {
 			msg = fmt.Sprintf("%s build failed (exit %d)", tool, res.ExitCode)

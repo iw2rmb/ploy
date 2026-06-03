@@ -41,18 +41,18 @@ type gradleStructuredFileRef struct {
 	Snippet string `yaml:"snippet,omitempty"`
 }
 
-// TrimBuildGateLog returns a trimmed view of build gate logs for known tools.
+// TrimGateLog returns a trimmed view of build gate logs for known tools.
 // For Maven and Gradle, it keeps the most relevant failure region (stack trace
 // and summary) and drops earlier noise such as plugin startup banners or task
 // noise. For unknown tools, it returns the original logText unchanged.
-func TrimBuildGateLog(tool, logText string) string {
-	trimmed, _ := BuildGateLogFindingContent(tool, logText)
+func TrimGateLog(tool, logText string) string {
+	trimmed, _ := GateLogFindingContent(tool, logText)
 	return trimmed
 }
 
-// BuildGateLogFindingContent returns the human-focused trimmed message and an
+// GateLogFindingContent returns the human-focused trimmed message and an
 // optional structured evidence payload for known build tools.
-func BuildGateLogFindingContent(tool, logText string) (string, string) {
+func GateLogFindingContent(tool, logText string) (string, string) {
 	tool = strings.ToLower(strings.TrimSpace(tool))
 	switch tool {
 	case "maven":

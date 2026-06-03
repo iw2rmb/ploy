@@ -21,11 +21,11 @@ import (
 //   - Returns immediately after gate validation (pass or fail).
 //
 // The returned Result contains:
-//   - BuildGate metadata (if gate was executed).
+//   - Gate metadata (if gate was executed).
 //   - Timings for hydration and gate phases only.
 //   - ExitCode is always 0 (no container was executed).
 //
-// On gate failure, returns ErrBuildGateFailed so callers can detect failures.
+// On gate failure, returns ErrGateFailed so callers can detect failures.
 func RunGateOnly(ctx context.Context, r *Runner, req Request) (Result, error) {
 	totalStart := time.Now()
 	var result Result
@@ -39,8 +39,8 @@ func RunGateOnly(ctx context.Context, r *Runner, req Request) (Result, error) {
 
 	// Stage 2: Build Gate validation — the primary purpose of RunGateOnly.
 	gateMetadata, gateDuration, err := r.runGate(ctx, req, "gate validation failed")
-	result.BuildGate = gateMetadata
-	result.Timings.BuildGateDuration = gateDuration
+	result.Gate = gateMetadata
+	result.Timings.GateDuration = gateDuration
 	if err != nil {
 		result.Timings.TotalDuration = types.Duration(time.Since(totalStart))
 		return result, err

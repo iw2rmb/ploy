@@ -7,7 +7,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
-func TestDockerGateExecutor_UsesImageOwnedCommand(t *testing.T) {
+func TestGateExecutor_UsesImageOwnedCommand(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
@@ -46,7 +46,7 @@ func TestDockerGateExecutor_UsesImageOwnedCommand(t *testing.T) {
 			t.Parallel()
 
 			rt := &testContainerRuntime{}
-			executor := NewDockerGateExecutor(rt)
+			executor := NewGateExecutor(rt)
 
 			tmpDir := tc.workspace(t)
 			spec := tc.spec()

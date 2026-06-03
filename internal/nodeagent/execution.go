@@ -166,7 +166,7 @@ func (r *runController) initializeRuntime(ctx context.Context, runID types.RunID
 	// Initialize container runtime with image pull enabled.
 	// Fallback to nil if Docker is unavailable (simulated execution mode).
 	network := os.Getenv("PLOY_DOCKER_NETWORK")
-	containerRuntime, err := step.NewDockerContainerRuntime(step.DockerContainerRuntimeOptions{
+	containerRuntime, err := step.NewContainerRuntime(step.ContainerRuntimeOptions{
 		PullImage:                 true,
 		Network:                   network,
 		RegistryAuthConfigFile:    resolveDockerRegistryAuthConfigFile(),
@@ -182,7 +182,7 @@ func (r *runController) initializeRuntime(ctx context.Context, runID types.RunID
 
 	// Initialize gate executor using local Docker-based execution.
 	// All gates run via the container runtime.
-	gateExecutor := step.NewDockerGateExecutor(containerRuntime)
+	gateExecutor := step.NewGateExecutor(containerRuntime)
 
 	// Initialize log streamer to stream logs as gzipped chunks to the server.
 	// The jobID parameter associates log chunks with a specific job, enabling

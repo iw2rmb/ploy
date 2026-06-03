@@ -8,7 +8,7 @@ import (
 type gateShareDirKey struct{}
 
 // WithGateShareDir attaches an optional host share directory to gate execution
-// context. When set, dockerGateExecutor mounts it at /share.
+// context. When set, gateExecutor mounts it at /share.
 func WithGateShareDir(ctx context.Context, shareDir string) context.Context {
 	shareDir = strings.TrimSpace(shareDir)
 	if shareDir == "" {

@@ -8,13 +8,13 @@ import (
 	"testing"
 )
 
-func TestDockerContainerRuntimeRegistryAuthFileReloadsPerPull(t *testing.T) {
+func TestContainerRuntimeRegistryAuthFileReloadsPerPull(t *testing.T) {
 	t.Parallel()
 
 	authFile := filepath.Join(t.TempDir(), "docker-auth.json")
 	writeAuthFile(t, authFile, "first-user", "first-token")
 
-	rt := newDockerContainerRuntimeWithClient(&fakeDockerClient{}, DockerContainerRuntimeOptions{
+	rt := newContainerRuntimeWithClient(&fakeDockerClient{}, ContainerRuntimeOptions{
 		RegistryAuthConfigFile: authFile,
 	})
 
@@ -49,7 +49,7 @@ func writeAuthFile(t *testing.T, path, username, password string) {
 	}
 }
 
-func decodeRegistryAuthForImage(t *testing.T, rt *DockerContainerRuntime, imageRef string) map[string]any {
+func decodeRegistryAuthForImage(t *testing.T, rt *containerRuntime, imageRef string) map[string]any {
 	t.Helper()
 	encoded, err := rt.registryAuthForImage(imageRef)
 	if err != nil {

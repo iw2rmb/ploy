@@ -186,13 +186,13 @@ func newGateTestRequest(m contracts.StepManifest) Request {
 	}
 }
 
-// newDockerGateTestHarness creates a DockerGateExecutor backed by a
+// newGateTestHarness creates a GateExecutor backed by a
 // testContainerRuntime and a temporary Maven workspace. Returns the executor,
 // the runtime (for assertions), and the workspace path.
-func newDockerGateTestHarness(t *testing.T) (GateExecutor, *testContainerRuntime, string) {
+func newGateTestHarness(t *testing.T) (GateExecutor, *testContainerRuntime, string) {
 	t.Helper()
 	rt := &testContainerRuntime{}
-	executor := NewDockerGateExecutor(rt)
+	executor := NewGateExecutor(rt)
 	workspace := createMavenWorkspace(t, "17")
 	return executor, rt, workspace
 }

@@ -334,7 +334,7 @@ func (r *runController) persistFirstGateFailureLog(runID types.RunID, meta *cont
 }
 
 func exposeGateOutDir(workspace, outDir string) error {
-	linkPath := filepath.Join(workspace, step.BuildGateWorkspaceOutDir)
+	linkPath := filepath.Join(workspace, step.GateWorkspaceOutDir)
 	if err := os.RemoveAll(linkPath); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("remove previous gate out link: %w", err)
 	}
@@ -348,7 +348,7 @@ func exposeGateOutDir(workspace, outDir string) error {
 }
 
 func cleanupGateOutLink(workspace string) {
-	outDir := filepath.Join(workspace, step.BuildGateWorkspaceOutDir)
+	outDir := filepath.Join(workspace, step.GateWorkspaceOutDir)
 	if err := os.RemoveAll(outDir); err != nil && !os.IsNotExist(err) {
 		slog.Warn("failed to remove gate out link", "path", outDir, "error", err)
 	}

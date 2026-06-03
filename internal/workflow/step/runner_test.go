@@ -72,8 +72,8 @@ func TestRunner_Run(t *testing.T) {
 			if result.Timings.ExecutionDuration < 0 {
 				t.Errorf("Run() ExecutionDuration invalid: %v", result.Timings.ExecutionDuration)
 			}
-			if result.Timings.BuildGateDuration < 0 {
-				t.Errorf("Run() BuildGateDuration invalid: %v", result.Timings.BuildGateDuration)
+			if result.Timings.GateDuration < 0 {
+				t.Errorf("Run() GateDuration invalid: %v", result.Timings.GateDuration)
 			}
 		})
 	}

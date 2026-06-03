@@ -24,50 +24,50 @@ import (
 )
 
 const (
-	// BuildGateGradleCacheHitsHostFile is the workspace-local file mounted into
+	// gradleCacheHitsHostFile is the workspace-local file mounted into
 	// Gradle gate containers for cache-hit signaling from the init script.
-	BuildGateGradleCacheHitsHostFile = ".ploy-gradle-build-cache-hits"
-	// BuildGateGradleCacheHitsContainerFile is the in-container path consumed by
+	gradleCacheHitsHostFile = ".ploy-gradle-build-cache-hits"
+	// gradleCacheHitsContainerFile is the in-container path consumed by
 	// the Gradle init script to write cache-hit markers.
-	BuildGateGradleCacheHitsContainerFile = "/tmp/gradle-build-cache-hits"
+	gradleCacheHitsContainerFile = "/tmp/gradle-build-cache-hits"
 
-	// BuildGateWorkspaceOutDir is a workspace-local host directory mounted
+	// GateWorkspaceOutDir is a workspace-local host directory mounted
 	// into gate containers as /out for deterministic artifact collection.
-	BuildGateWorkspaceOutDir = ".ploy-gate-out"
-	// BuildGateWorkspaceInDir is an optional workspace-local host directory
+	GateWorkspaceOutDir = ".ploy-gate-out"
+	// gateWorkspaceInDir is an optional workspace-local host directory
 	// mounted into gate containers as /in for cross-step runtime inputs.
-	BuildGateWorkspaceInDir = ".ploy-gate-in"
-	// BuildGateContainerInDir is the writable input mount path inside gate
+	gateWorkspaceInDir = ".ploy-gate-in"
+	// gateContainerInDir is the writable input mount path inside gate
 	// containers used by orchestrator-provided runtime inputs.
-	BuildGateContainerInDir = "/in"
-	// BuildGateContainerOutDir is the writable output mount path inside gate
+	gateContainerInDir = "/in"
+	// gateContainerOutDir is the writable output mount path inside gate
 	// containers used by runtime-generated artifacts (for example Gradle reports).
-	BuildGateContainerOutDir = "/out"
-	// BuildGateGradleUserHomeDir is the native Gradle home path in gate-gradle images.
-	BuildGateGradleUserHomeDir = "/root/.gradle"
-	// BuildGateMavenUserHomeDir is the native Maven repository path in Maven gate images.
-	BuildGateMavenUserHomeDir = "/root/.m2"
+	gateContainerOutDir = "/out"
+	// gradleUserHomeDir is the native Gradle home path in gate-gradle images.
+	gradleUserHomeDir = "/root/.gradle"
+	// mavenUserHomeDir is the native Maven repository path in Maven gate images.
+	mavenUserHomeDir = "/root/.m2"
 )
 
-var errBuildGateRuntimeUnavailable = errors.New("build gate runtime unavailable")
+var errGateRuntimeUnavailable = errors.New("build gate runtime unavailable")
 
-// dockerGateExecutor runs build validation inside language images using the
+// gateExecutor runs build validation inside language images using the
 // same container runtime as step execution.
-type dockerGateExecutor struct {
+type gateExecutor struct {
 	rt ContainerRuntime
 }
 
-// NewDockerGateExecutor constructs a GateExecutor that uses the provided
+// NewGateExecutor constructs a GateExecutor that uses the provided
 // ContainerRuntime to run build commands.
-func NewDockerGateExecutor(rt ContainerRuntime) GateExecutor {
-	return &dockerGateExecutor{rt: rt}
+func NewGateExecutor(rt ContainerRuntime) GateExecutor {
+	return &gateExecutor{rt: rt}
 }
 
 // Execute resolves the gate plan (stack, image, command), runs the command in
 // a container, and returns BuildGateStageMetadata. The workspace is mounted at
 // /workspace; nil spec or Enabled=false yields (nil, nil). A nil runtime fails
-// immediately with errBuildGateRuntimeUnavailable.
-func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGateSpec, workspace string) (*contracts.BuildGateStageMetadata, error) {
+// immediately with errGateRuntimeUnavailable.
+func (e *gateExecutor) Execute(ctx context.Context, spec *contracts.StepGateSpec, workspace string) (*contracts.BuildGateStageMetadata, error) {
 	if ctx != nil && ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
@@ -75,10 +75,10 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 		return nil, nil
 	}
 	if e.rt == nil {
-		return nil, errBuildGateRuntimeUnavailable
+		return nil, errGateRuntimeUnavailable
 	}
 
-	catalogPath := buildGateDefaultGatesCatalogPath()
+	catalogPath := defaultCatalogFilePath()
 
 	plan, terminal := resolveGateExecutionPlan(ctx, workspace, spec, catalogPath)
 	if terminal != nil {
@@ -95,9 +95,9 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 		return nil, err
 	}
 
-	limitMem, _ := parseBytesLimitEnv(buildGateLimitMemoryEnv)
-	limitCPUMillis := parseInt64LimitEnv(buildGateLimitCPUEnv)
-	limitDisk, storageSizeOpt := parseBytesLimitEnv(buildGateLimitDiskEnv)
+	limitMem, _ := parseBytesLimitEnv(gateLimitMemoryEnv)
+	limitCPUMillis := parseInt64LimitEnv(gateLimitCPUEnv)
+	limitDisk, storageSizeOpt := parseBytesLimitEnv(gateLimitDiskEnv)
 	envCopy := contracts.MergeEnv(spec.Env, plan.env)
 	mounts = appendDockerHostSocketMount(mounts, envCopy)
 
@@ -141,7 +141,7 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 		}
 	}
 
-	meta := buildGateExecutionMetadata(workspace, plan.language, plan.tool, plan.release, plan.image, res, logs)
+	meta := gateExecutionMetadata(workspace, plan.language, plan.tool, plan.release, plan.image, res, logs)
 	meta.Resources = collectDockerResourceUsage(ctx, e.rt, h, specC)
 
 	if plan.stackGate != nil {
@@ -154,21 +154,21 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 // /out, optional /in, optional /share, tool cache, and gradle cache-hits file
 // when the tool is gradle.
 func assembleGateMounts(ctx context.Context, workspace string, plan gateExecutionPlan) ([]ContainerMount, error) {
-	gateOutDir := filepath.Join(workspace, BuildGateWorkspaceOutDir)
+	gateOutDir := filepath.Join(workspace, GateWorkspaceOutDir)
 	if err := os.MkdirAll(gateOutDir, 0o750); err != nil {
 		return nil, fmt.Errorf("prepare build gate out dir: %w", err)
 	}
 	mounts := []ContainerMount{
 		{Source: workspace, Target: "/workspace", ReadOnly: false},
-		{Source: gateOutDir, Target: BuildGateContainerOutDir, ReadOnly: false},
+		{Source: gateOutDir, Target: gateContainerOutDir, ReadOnly: false},
 	}
 
-	gateInDir := filepath.Join(workspace, BuildGateWorkspaceInDir)
+	gateInDir := filepath.Join(workspace, gateWorkspaceInDir)
 	if info, statErr := os.Stat(gateInDir); statErr == nil {
 		if !info.IsDir() {
 			return nil, fmt.Errorf("build gate in path is not a directory: %s", gateInDir)
 		}
-		mounts = append(mounts, ContainerMount{Source: gateInDir, Target: BuildGateContainerInDir, ReadOnly: false})
+		mounts = append(mounts, ContainerMount{Source: gateInDir, Target: gateContainerInDir, ReadOnly: false})
 	} else if !errors.Is(statErr, os.ErrNotExist) {
 		return nil, fmt.Errorf("stat build gate in dir: %w", statErr)
 	}
@@ -184,20 +184,20 @@ func assembleGateMounts(ctx context.Context, workspace string, plan gateExecutio
 		mounts = append(mounts, ContainerMount{Source: gateShareDir, Target: containerShareDir, ReadOnly: false})
 	}
 
-	toolCacheMounts, err := buildGateToolCacheMounts(plan.language, plan.tool, plan.release)
+	toolCacheMounts, err := buildToolCacheMounts(plan.language, plan.tool, plan.release)
 	if err != nil {
 		return nil, fmt.Errorf("prepare build gate tool cache mounts: %w", err)
 	}
 	mounts = append(mounts, toolCacheMounts...)
 
 	if strings.EqualFold(plan.tool, "gradle") {
-		gradleCacheHitsHostPath := filepath.Join(workspace, BuildGateGradleCacheHitsHostFile)
+		gradleCacheHitsHostPath := filepath.Join(workspace, gradleCacheHitsHostFile)
 		if err := os.WriteFile(gradleCacheHitsHostPath, nil, 0o600); err != nil {
 			return nil, fmt.Errorf("prepare gradle cache hits file: %w", err)
 		}
 		mounts = append(mounts, ContainerMount{
 			Source:   gradleCacheHitsHostPath,
-			Target:   BuildGateGradleCacheHitsContainerFile,
+			Target:   gradleCacheHitsContainerFile,
 			ReadOnly: false,
 		})
 	}
@@ -205,11 +205,11 @@ func assembleGateMounts(ctx context.Context, workspace string, plan gateExecutio
 	return mounts, nil
 }
 
-// buildGateDefaultGatesCatalogPath resolves the active gates catalog file:
+// defaultCatalogFilePath resolves the active gates catalog file:
 // the installed copy at /etc/ploy/gates/gates.yaml when present, otherwise
-// the repo-relative DefaultGatesCatalogPath discovered by walking up to a
+// the repo-relative defaultCatalogPath discovered by walking up to a
 // go.mod ancestor.
-func buildGateDefaultGatesCatalogPath() string {
+func defaultCatalogFilePath() string {
 	installed := "/etc/ploy/gates/gates.yaml"
 	if info, err := os.Stat(installed); err == nil && !info.IsDir() {
 		return installed
@@ -219,7 +219,7 @@ func buildGateDefaultGatesCatalogPath() string {
 		dir := wd
 		for {
 			if info, serr := os.Stat(filepath.Join(dir, "go.mod")); serr == nil && !info.IsDir() {
-				candidate := filepath.Join(dir, DefaultGatesCatalogPath)
+				candidate := filepath.Join(dir, defaultCatalogPath)
 				if info, serr := os.Stat(candidate); serr == nil && !info.IsDir() {
 					return candidate
 				}
@@ -232,5 +232,5 @@ func buildGateDefaultGatesCatalogPath() string {
 			dir = parent
 		}
 	}
-	return DefaultGatesCatalogPath
+	return defaultCatalogPath
 }

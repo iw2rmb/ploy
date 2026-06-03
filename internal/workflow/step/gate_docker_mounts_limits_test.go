@@ -11,10 +11,10 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
-// TestDockerGateExecutor_Mounts consolidates the mount-shape assertions for the
+// TestGateExecutor_Mounts consolidates the mount-shape assertions for the
 // docker gate executor: each row builds a workspace, spec, and context, then
 // expects either a specific mount to be present or a specific target absent.
-func TestDockerGateExecutor_Mounts(t *testing.T) {
+func TestGateExecutor_Mounts(t *testing.T) {
 	type expectMount struct {
 		source   string
 		target   string
@@ -60,7 +60,7 @@ func TestDockerGateExecutor_Mounts(t *testing.T) {
 			build: func(t *testing.T) (string, *contracts.StepGateSpec, context.Context, expectMount, string) {
 				workspace := createMavenWorkspace(t, "17")
 				return workspace, &contracts.StepGateSpec{Enabled: true}, context.Background(),
-					expectMount{source: filepath.Join(workspace, BuildGateWorkspaceOutDir), target: BuildGateContainerOutDir}, ""
+					expectMount{source: filepath.Join(workspace, GateWorkspaceOutDir), target: gateContainerOutDir}, ""
 			},
 			expectMount: true,
 		},
@@ -68,12 +68,12 @@ func TestDockerGateExecutor_Mounts(t *testing.T) {
 			name: "in dir mounted when present",
 			build: func(t *testing.T) (string, *contracts.StepGateSpec, context.Context, expectMount, string) {
 				workspace := createMavenWorkspace(t, "17")
-				inDir := filepath.Join(workspace, BuildGateWorkspaceInDir)
+				inDir := filepath.Join(workspace, gateWorkspaceInDir)
 				if err := os.MkdirAll(inDir, 0o755); err != nil {
 					t.Fatalf("MkdirAll(%q): %v", inDir, err)
 				}
 				return workspace, &contracts.StepGateSpec{Enabled: true}, context.Background(),
-					expectMount{source: inDir, target: BuildGateContainerInDir}, ""
+					expectMount{source: inDir, target: gateContainerInDir}, ""
 			},
 			expectMount: true,
 		},
@@ -90,24 +90,24 @@ func TestDockerGateExecutor_Mounts(t *testing.T) {
 		{
 			name: "gradle workspace mounts native cache",
 			build: func(t *testing.T) (string, *contracts.StepGateSpec, context.Context, expectMount, string) {
-				cacheRoot, err := resolveBuildGateCacheRoot()
+				cacheRoot, err := resolveGateCacheRoot()
 				if err != nil {
-					t.Fatalf("resolveBuildGateCacheRoot() error: %v", err)
+					t.Fatalf("resolveGateCacheRoot() error: %v", err)
 				}
 				return createGradleWorkspace(t, "17"), &contracts.StepGateSpec{Enabled: true}, context.Background(),
-					expectMount{source: filepath.Join(cacheRoot, "java", "gradle", "17"), target: BuildGateGradleUserHomeDir}, ""
+					expectMount{source: filepath.Join(cacheRoot, "java", "gradle", "17"), target: gradleUserHomeDir}, ""
 			},
 			expectMount: true,
 		},
 		{
 			name: "maven workspace mounts native cache",
 			build: func(t *testing.T) (string, *contracts.StepGateSpec, context.Context, expectMount, string) {
-				cacheRoot, err := resolveBuildGateCacheRoot()
+				cacheRoot, err := resolveGateCacheRoot()
 				if err != nil {
-					t.Fatalf("resolveBuildGateCacheRoot() error: %v", err)
+					t.Fatalf("resolveGateCacheRoot() error: %v", err)
 				}
 				return createMavenWorkspace(t, "17"), &contracts.StepGateSpec{Enabled: true}, context.Background(),
-					expectMount{source: filepath.Join(cacheRoot, "java", "maven", "17"), target: BuildGateMavenUserHomeDir}, ""
+					expectMount{source: filepath.Join(cacheRoot, "java", "maven", "17"), target: mavenUserHomeDir}, ""
 			},
 			expectMount: true,
 		},
@@ -118,7 +118,7 @@ func TestDockerGateExecutor_Mounts(t *testing.T) {
 			t.Parallel()
 
 			rt := &testContainerRuntime{}
-			executor := NewDockerGateExecutor(rt)
+			executor := NewGateExecutor(rt)
 			workspace, spec, ctx, want, absent := tt.build(t)
 
 			if _, err := executor.Execute(ctx, spec, workspace); err != nil {
@@ -144,13 +144,13 @@ func TestDockerGateExecutor_Mounts(t *testing.T) {
 
 func TestResolveBuildGateCacheRoot_UsesOverrideEnv(t *testing.T) {
 	override := filepath.Join(t.TempDir(), "gate-cache")
-	t.Setenv(buildGateCacheRootEnv, override)
-	got, err := resolveBuildGateCacheRoot()
+	t.Setenv(gateCacheRootEnv, override)
+	got, err := resolveGateCacheRoot()
 	if err != nil {
-		t.Fatalf("resolveBuildGateCacheRoot() error: %v", err)
+		t.Fatalf("resolveGateCacheRoot() error: %v", err)
 	}
 	if got != override {
-		t.Fatalf("resolveBuildGateCacheRoot()=%q, want %q", got, override)
+		t.Fatalf("resolveGateCacheRoot()=%q, want %q", got, override)
 	}
 	info, err := os.Stat(override)
 	if err != nil {
@@ -161,7 +161,7 @@ func TestResolveBuildGateCacheRoot_UsesOverrideEnv(t *testing.T) {
 	}
 }
 
-func TestDockerGateExecutor_LimitEnvParsing(t *testing.T) {
+func TestGateExecutor_LimitEnvParsing(t *testing.T) {
 	memHuman, err := units.RAMInBytes("1GiB")
 	if err != nil {
 		t.Fatalf("RAMInBytes(1GiB) error: %v", err)
@@ -225,12 +225,12 @@ func TestDockerGateExecutor_LimitEnvParsing(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			t.Setenv(buildGateLimitMemoryEnv, tc.memEnv)
-			t.Setenv(buildGateLimitCPUEnv, tc.cpuEnv)
-			t.Setenv(buildGateLimitDiskEnv, tc.diskEnv)
+			t.Setenv(gateLimitMemoryEnv, tc.memEnv)
+			t.Setenv(gateLimitCPUEnv, tc.cpuEnv)
+			t.Setenv(gateLimitDiskEnv, tc.diskEnv)
 
 			rt := &testContainerRuntime{}
-			executor := NewDockerGateExecutor(rt)
+			executor := NewGateExecutor(rt)
 			workspace := createMavenWorkspace(t, "17")
 
 			spec := &contracts.StepGateSpec{Enabled: true}

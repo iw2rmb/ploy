@@ -13,7 +13,7 @@ func TestGateDocker_StackDetect_FallbackUsesConfiguredStackOnMissingVersion(t *t
 
 	workspace := createMavenWorkspaceNoJavaVersion(t)
 
-	executor, rt, _ := newDockerGateTestHarness(t)
+	executor, rt, _ := newGateTestHarness(t)
 
 	spec := &contracts.StepGateSpec{
 		Enabled: true,
@@ -55,7 +55,7 @@ func TestGateDocker_StackDetect_StrictCancelsOnDetectionFailure(t *testing.T) {
 
 	workspace := createMavenWorkspaceNoJavaVersion(t)
 
-	executor, rt, _ := newDockerGateTestHarness(t)
+	executor, rt, _ := newGateTestHarness(t)
 
 	spec := &contracts.StepGateSpec{
 		Enabled: true,

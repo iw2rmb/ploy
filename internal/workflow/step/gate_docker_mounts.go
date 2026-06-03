@@ -27,12 +27,12 @@ func appendDockerHostSocketMount(mounts []ContainerMount, env map[string]string)
 	})
 }
 
-func buildGateToolCacheMounts(language, tool, release string) ([]ContainerMount, error) {
-	target := buildGateToolCacheTarget(tool)
+func buildToolCacheMounts(language, tool, release string) ([]ContainerMount, error) {
+	target := toolCacheTarget(tool)
 	if target == "" {
 		return nil, nil
 	}
-	cacheRoot, err := resolveBuildGateCacheRoot()
+	cacheRoot, err := resolveGateCacheRoot()
 	if err != nil {
 		return nil, err
 	}
@@ -52,31 +52,31 @@ func buildGateToolCacheMounts(language, tool, release string) ([]ContainerMount,
 	}}, nil
 }
 
-func resolveBuildGateCacheRoot() (string, error) {
-	if override := strings.TrimSpace(os.Getenv(buildGateCacheRootEnv)); override != "" {
+func resolveGateCacheRoot() (string, error) {
+	if override := strings.TrimSpace(os.Getenv(gateCacheRootEnv)); override != "" {
 		if err := os.MkdirAll(override, 0o750); err != nil {
 			return "", err
 		}
 		return override, nil
 	}
-	if err := os.MkdirAll(buildGateCacheRootDir, 0o750); err == nil {
-		return buildGateCacheRootDir, nil
+	if err := os.MkdirAll(gateCacheRootDir, 0o750); err == nil {
+		return gateCacheRootDir, nil
 	} else if !os.IsPermission(err) {
 		return "", err
 	}
-	fallback := filepath.Join(os.TempDir(), buildGateTmpCacheRoot)
+	fallback := filepath.Join(os.TempDir(), gateTmpCacheRoot)
 	if err := os.MkdirAll(fallback, 0o750); err != nil {
 		return "", err
 	}
 	return fallback, nil
 }
 
-func buildGateToolCacheTarget(tool string) string {
+func toolCacheTarget(tool string) string {
 	switch strings.ToLower(strings.TrimSpace(tool)) {
 	case "gradle":
-		return BuildGateGradleUserHomeDir
+		return gradleUserHomeDir
 	case "maven":
-		return BuildGateMavenUserHomeDir
+		return mavenUserHomeDir
 	default:
 		return ""
 	}

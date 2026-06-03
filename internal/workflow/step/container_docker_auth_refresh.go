@@ -19,7 +19,7 @@ type registryAuthRefreshResponse struct {
 	Error string `json:"error,omitempty"`
 }
 
-func (r *DockerContainerRuntime) refreshRegistryAuth(ctx context.Context, imageRef string) error {
+func (r *containerRuntime) refreshRegistryAuth(ctx context.Context, imageRef string) error {
 	socketPath := strings.TrimSpace(r.opts.RegistryAuthRefreshSocket)
 	if socketPath == "" {
 		return nil

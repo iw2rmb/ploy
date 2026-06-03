@@ -23,7 +23,7 @@ The trimmer is implemented as:
 
 - `internal/workflow/step/build_gate_log_trimmer.go`
   - Public entry point:
-    - `TrimBuildGateLog(tool, logText string) string`
+    - `TrimGateLog(tool, logText string) string`
   - Known `tool` values:
     - `"maven"` — Maven / Surefire logs.
     - `"gradle"` — Gradle test logs.
@@ -104,7 +104,7 @@ The trimmer is invoked inside the Docker-based gate executor:
 - When the gate command exits with a non-zero status:
   - `Tool` is set to the detected build tool (e.g. `"maven"`, `"gradle"`, `"go"`,
     `"cargo"`, `"pip"`, `"poetry"`).
-  - `BuildGateLogFindingContent(tool, string(logs))` computes:
+  - `GateLogFindingContent(tool, string(logs))` computes:
     - trimmed message for `BuildGateStageMetadata.LogFindings[0].Message`
     - optional structured evidence for `BuildGateStageMetadata.LogFindings[0].Evidence`
 - `BuildGateStageMetadata.LogsText` still carries the full (truncated, ≤10 MiB)
@@ -145,7 +145,7 @@ To add support for new stacks:
 
 1. Implement a tool-specific trimmer in
    `build_gate_log_trimmer.go` (e.g. `trimGoVetLog`, `trimESLintLog`).
-2. Update `TrimBuildGateLog` to dispatch on the new `tool` value.
+2. Update `TrimGateLog` to dispatch on the new `tool` value.
 3. Ensure the corresponding `BuildGateStaticCheckReport.Tool` is set in the
    relevant gate adapter (e.g. `"go-vet"`, `"eslint"`).
 4. Add unit tests under
