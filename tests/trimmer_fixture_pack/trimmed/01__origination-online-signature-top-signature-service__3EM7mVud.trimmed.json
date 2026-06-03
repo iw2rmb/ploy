@@ -1,0 +1,47 @@
+{
+  "tool": "gradle",
+  "evidence": {
+    "task": "compileKotlin",
+    "errors": [
+      {
+        "message": "Cannot access 'field name: String': it is private in 'org/springframework/http/HttpMethod'.",
+        "base": "/workspace/src/main/kotlin/ru/tinkoff/bpm/topsignatureservice/",
+        "files": [
+          "audit/AuditService.kt:218:38",
+          "integration/rest/roleapp/RoleAppClientImpl.kt:43:42",
+          "integration/rest/tid/TIdClientImpl.kt:35:41",
+          "logging/TssKLogger.kt:91:55",
+          "logging/TssKLogger.kt:99:45"
+        ]
+      },
+      {
+        "message": "Unresolved reference 'reasonPhrase'.",
+        "base": "/workspace/src/main/kotlin/ru/tinkoff/bpm/topsignatureservice/audit/",
+        "files": [
+          "RequestWrapper.kt:49:47"
+        ]
+      },
+      {
+        "message": "This annotation is not applicable to target 'class'.",
+        "base": "/workspace/src/main/kotlin/ru/tinkoff/bpm/topsignatureservice/",
+        "files": [
+          "codes/configuration/ConfirmationCodeProperties.kt:7:1",
+          "codes/configuration/PrintProperties.kt:7:1",
+          "configuration/ProductConfiguration.kt:45:1",
+          "configuration/ResendNotificationSchedulerProperties.kt:7:1",
+          "configuration/kafka/KafkaProperties.kt:7:1",
+          "configuration/kafka/dwh/DwhConfigProperties.kt:6:1",
+          "configuration/kafka/notification/NotificationCenterConfigProperties.kt:7:1",
+          "configuration/thermostat/ThermostatProperties.kt:9:1"
+        ]
+      },
+      {
+        "message": "None of the following candidates is applicable:",
+        "base": "/workspace/src/main/kotlin/ru/tinkoff/bpm/topsignatureservice/integration/rest/docsmate/",
+        "files": [
+          "DocsmateTokenResponseClient.kt:42:35"
+        ]
+      }
+    ]
+  }
+}

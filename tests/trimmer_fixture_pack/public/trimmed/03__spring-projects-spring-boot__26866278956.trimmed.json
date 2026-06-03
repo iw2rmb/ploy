@@ -1,0 +1,11 @@
+{
+  "tool": "gradle",
+  "message": "* What went wrong:\nExecution failed for task ':module:spring-boot-r2dbc:dockerTest'.\n\u003e There were failing tests. See the report at: file:///home/runner/work/spring-boot/spring-boot/module/spring-boot-r2dbc/build/reports/tests/dockerTest/index.html\n\nBUILD FAILED in 1h 5m 33s\n",
+  "evidence": {
+    "errors": [
+      {
+        "message": "Execution failed for task ':module:spring-boot-r2dbc:dockerTest'.\n\u003e There were failing tests. See the report at: file:///home/runner/work/spring-boot/spring-boot/module/spring-boot-r2dbc/build/reports/tests/dockerTest/index.html"
+      }
+    ]
+  }
+}

@@ -315,6 +315,51 @@ func TestBuildManifestFromRequest(t *testing.T) {
 		}
 	})
 
+	t.Run("single-step run: injects node-owned server url after spec env", func(t *testing.T) {
+		req := newStartRunRequest(
+			withRunServerURL("https://ploy.example"),
+			withRunEnv(map[string]string{"PLOY_SERVER_URL": "https://user.example", "APP_VAR": "value"}),
+		)
+		manifest, err := buildManifestDefault(req)
+		if err != nil {
+			t.Fatalf("buildManifestDefault() error: %v", err)
+		}
+		if got := manifest.Envs["PLOY_SERVER_URL"]; got != "https://ploy.example" {
+			t.Fatalf("PLOY_SERVER_URL=%q, want node-owned server URL", got)
+		}
+		if got := manifest.Envs["APP_VAR"]; got != "value" {
+			t.Fatalf("APP_VAR=%q, want value", got)
+		}
+	})
+
+	t.Run("multi-step run: injects node-owned server url after step env", func(t *testing.T) {
+		req := newStartRunRequest(
+			withRunServerURL("https://ploy.example"),
+			withRunEnv(map[string]string{"PLOY_SERVER_URL": "https://base.example"}),
+			withRunOptions(RunOptions{
+				Steps: []StepOptions{
+					{ContainerSpec: ContainerSpec{
+						Image: contracts.JobImage{Universal: "migs-step0:latest"},
+						Env:   map[string]string{"PLOY_SERVER_URL": "https://step0.example"},
+					}},
+					{ContainerSpec: ContainerSpec{
+						Image: contracts.JobImage{Universal: "migs-step1:latest"},
+						Env:   map[string]string{"PLOY_SERVER_URL": "https://step1.example"},
+					}},
+				},
+			}),
+		)
+		for step := range req.TypedOptions.Steps {
+			manifest, err := buildManifestAtStep(req, step)
+			if err != nil {
+				t.Fatalf("buildManifestAtStep(%d) error: %v", step, err)
+			}
+			if got := manifest.Envs["PLOY_SERVER_URL"]; got != "https://ploy.example" {
+				t.Fatalf("step %d PLOY_SERVER_URL=%q, want node-owned server URL", step, got)
+			}
+		}
+	})
+
 	t.Run("multi-step run: step index out of range returns error", func(t *testing.T) {
 		req := newStartRunRequest(withRunOptions(RunOptions{
 			Steps: []StepOptions{{ContainerSpec: ContainerSpec{Image: contracts.JobImage{Universal: "migs-step:latest"}}}},

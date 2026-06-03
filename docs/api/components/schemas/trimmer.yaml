@@ -1,0 +1,60 @@
+GradleTrimmerRequest:
+  type: object
+  required: [log]
+  additionalProperties: false
+  properties:
+    log:
+      type: string
+      minLength: 1
+      description: Raw Gradle log text to trim.
+
+GradleTrimmerResult:
+  type: object
+  required: [tool]
+  additionalProperties: false
+  properties:
+    tool:
+      type: string
+      enum: [gradle]
+    message:
+      type: string
+      description: Compact human-readable Gradle failure text, capped at 200 lines and 64 KiB. Omitted when structured compiler evidence is complete.
+    evidence:
+      $ref: "#/GradleTrimmerEvidence"
+
+GradleTrimmerEvidence:
+  type: object
+  additionalProperties: false
+  properties:
+    task:
+      type: string
+    errors:
+      type: array
+      items:
+        $ref: "#/GradleTrimmerError"
+
+GradleTrimmerError:
+  type: object
+  required: [message]
+  additionalProperties: false
+  properties:
+    message:
+      type: string
+    plugin:
+      type: string
+    version:
+      type: string
+    symbol:
+      type: string
+    location:
+      type: string
+    base:
+      type: string
+    snippet:
+      type: string
+    files:
+      type: array
+      items:
+        type: string
+        minLength: 1
+        description: File path with location suffix, relative to `base` when `base` is present.

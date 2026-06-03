@@ -1,0 +1,49 @@
+{
+  "tool": "gradle",
+  "evidence": {
+    "task": "compileJava",
+    "errors": [
+      {
+        "message": "cannot find symbol",
+        "symbol": "method expressionHandler(SecurityExpressionHandler\u003cFilterInvocation\u003e)",
+        "location": "variable requests of type AuthorizeHttpRequestsConfigurer\u003cHttpSecurity\u003e.AuthorizationManagerRequestMatcherRegistry",
+        "base": "/workspace/src/main/java/ru/tinkoff/tcrm/backend/common/security/",
+        "snippet": ".expressionHandler(customWebSecurityExpressionHandler())",
+        "files": [
+          "SecurityConfig.java:68"
+        ]
+      },
+      {
+        "message": "EmployeeMasteryHibernateListener is not abstract and does not override abstract method requiresPostCommitHandling(EntityPersister) in PostActionEventListener",
+        "base": "/workspace/src/main/java/ru/tinkoff/tcrm/backend/employeemastery/entitylistener/",
+        "files": [
+          "EmployeeMasteryHibernateListener.java:18"
+        ]
+      },
+      {
+        "message": "method does not override or implement a method from a supertype",
+        "base": "/workspace/src/main/java/ru/tinkoff/tcrm/backend/",
+        "snippet": "@Override",
+        "files": [
+          "attribute/entitylistener/EmployeeAttributeHibernateListener.java:84",
+          "employeemastery/entitylistener/EmployeeMasteryHibernateListener.java:51",
+          "score/entitylistener/EmployeeMasteryScoreHibernateListener.java:59"
+        ]
+      },
+      {
+        "message": "EmployeeMasteryScoreHibernateListener is not abstract and does not override abstract method requiresPostCommitHandling(EntityPersister) in PostActionEventListener",
+        "base": "/workspace/src/main/java/ru/tinkoff/tcrm/backend/score/entitylistener/",
+        "files": [
+          "EmployeeMasteryScoreHibernateListener.java:18"
+        ]
+      },
+      {
+        "message": "EmployeeAttributeHibernateListener is not abstract and does not override abstract method requiresPostCommitHandling(EntityPersister) in PostActionEventListener",
+        "base": "/workspace/src/main/java/ru/tinkoff/tcrm/backend/attribute/entitylistener/",
+        "files": [
+          "EmployeeAttributeHibernateListener.java:19"
+        ]
+      }
+    ]
+  }
+}

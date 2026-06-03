@@ -1,0 +1,137 @@
+> Task :plugins-jvm-test-suite:ForceDependencyResolutionPlugin_resolveProjectDependencies
+> Task :plugins-distribution:ForceDependencyResolutionPlugin_resolveProjectDependencies
+> Task :process-services:ForceDependencyResolutionPlugin_resolveProjectDependencies
+> Task :process-services-api:ForceDependencyResolutionPlugin_resolveProjectDependencies
+> Task :process-services-base:ForceDependencyResolutionPlugin_resolveProjectDependencies
+> Task :plugins-test-report-aggregation:ForceDependencyResolutionPlugin_resolveProjectDependencies
+> Task :project-features-api:ForceDependencyResolutionPlugin_resolveProjectDependencies
+> Task :project-features-demos:ForceDependencyResolutionPlugin_resolveProjectDependencies
+> Task :public-api:ForceDependencyResolutionPlugin_resolveProjectDependencies
+> Task :public-api-tests:ForceDependencyResolutionPlugin_resolveProjectDependencies
+> Task :report-rendering:ForceDependencyResolutionPlugin_resolveProjectDependencies
+> Task :reporting:ForceDependencyResolutionPlugin_resolveProjectDependencies
+> Task :request-handler-worker:ForceDependencyResolutionPlugin_resolveProjectDependencies
+> Task :project-features:ForceDependencyResolutionPlugin_resolveProjectDependencies
+> Task :resources-gcs:ForceDependencyResolutionPlugin_resolveProjectDependencies
+> Task :process-memory-services:ForceDependencyResolutionPlugin_resolveProjectDependencies
+> Task :resources-http:ForceDependencyResolutionPlugin_resolveProjectDependencies
+> Task :resources-s3:ForceDependencyResolutionPlugin_resolveProjectDependencies
+> Task :resources-sftp:ForceDependencyResolutionPlugin_resolveProjectDependencies
+> Task :samples:ForceDependencyResolutionPlugin_resolveProjectDependencies
+> Task :scala:ForceDependencyResolutionPlugin_resolveProjectDependencies
+> Task :scala-compiler-worker:ForceDependencyResolutionPlugin_resolveProjectDependencies
+> Task :scaladoc-worker:ForceDependencyResolutionPlugin_resolveProjectDependencies
+> Task :scoped-persistent-cache:ForceDependencyResolutionPlugin_resolveProjectDependencies
+> Task :serialization:ForceDependencyResolutionPlugin_resolveProjectDependencies
+> Task :publish:ForceDependencyResolutionPlugin_resolveProjectDependencies
+> Task :service-provider:ForceDependencyResolutionPlugin_resolveProjectDependencies
+> Task :service-registry-builder:ForceDependencyResolutionPlugin_resolveProjectDependencies
+> Task :service-registry-impl:ForceDependencyResolutionPlugin_resolveProjectDependencies
+> Task :resources:ForceDependencyResolutionPlugin_resolveProjectDependencies
+> Task :smoke-ide-test:ForceDependencyResolutionPlugin_resolveProjectDependencies
+> Task :smoke-test:ForceDependencyResolutionPlugin_resolveProjectDependencies
+> Task :snapshots:ForceDependencyResolutionPlugin_resolveProjectDependencies
+> Task :soak:ForceDependencyResolutionPlugin_resolveProjectDependencies
+> Task :signing:ForceDependencyResolutionPlugin_resolveProjectDependencies
+> Task :security:ForceDependencyResolutionPlugin_resolveProjectDependencies
+> Task :start-parameter:ForceDependencyResolutionPlugin_resolveProjectDependencies
+> Task :stdlib-java-extensions:ForceDependencyResolutionPlugin_resolveProjectDependencies
+> Task :stdlib-kotlin-extensions:ForceDependencyResolutionPlugin_resolveProjectDependencies
+> Task :stdlib-serialization-codecs:ForceDependencyResolutionPlugin_resolveProjectDependencies
+> Task :test-kit:ForceDependencyResolutionPlugin_resolveProjectDependencies
+> Task :test-suites-base:ForceDependencyResolutionPlugin_resolveProjectDependencies
+> Task :testing-base:ForceDependencyResolutionPlugin_resolveProjectDependencies
+> Task :testing-base-infrastructure:ForceDependencyResolutionPlugin_resolveProjectDependencies
+> Task :service-lookup:ForceDependencyResolutionPlugin_resolveProjectDependencies
+> Task :testing-native:ForceDependencyResolutionPlugin_resolveProjectDependencies
+> Task :time:ForceDependencyResolutionPlugin_resolveProjectDependencies
+> Task :toolchains-jvm:ForceDependencyResolutionPlugin_resolveProjectDependencies
+> Task :toolchains-jvm-shared:ForceDependencyResolutionPlugin_resolveProjectDependencies
+> Task :tooling-api:ForceDependencyResolutionPlugin_resolveProjectDependencies
+> Task :software-diagnostics:ForceDependencyResolutionPlugin_resolveProjectDependencies
+> Task :tooling-api-provider:ForceDependencyResolutionPlugin_resolveProjectDependencies
+> Task :tooling-native:ForceDependencyResolutionPlugin_resolveProjectDependencies
+> Task :tooling-native-model-impls:ForceDependencyResolutionPlugin_resolveProjectDependencies
+> Task :unit-test-fixtures:ForceDependencyResolutionPlugin_resolveProjectDependencies
+> Task :version-control:ForceDependencyResolutionPlugin_resolveProjectDependencies
+> Task :testing-jvm:ForceDependencyResolutionPlugin_resolveProjectDependencies
+> Task :testing-jvm-infrastructure:ForceDependencyResolutionPlugin_resolveProjectDependencies
+> Task :tooling-api-builders:ForceDependencyResolutionPlugin_resolveProjectDependencies
+> Task :versioned-cache:ForceDependencyResolutionPlugin_resolveProjectDependencies
+> Task :war:ForceDependencyResolutionPlugin_resolveProjectDependencies
+> Task :worker-main:ForceDependencyResolutionPlugin_resolveProjectDependencies
+> Task :worker-process-services:ForceDependencyResolutionPlugin_resolveProjectDependencies
+> Task :workers:ForceDependencyResolutionPlugin_resolveProjectDependencies
+> Task :wrapper-main:ForceDependencyResolutionPlugin_resolveProjectDependencies
+> Task :wrapper-shared:ForceDependencyResolutionPlugin_resolveProjectDependencies
+> Task :ForceDependencyResolutionPlugin_resolveAllDependencies
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__actions_gradle-build-tools-actions-1780493529010.json
+
+[Incubating] Problems report is available at: file:///home/runner/work/gradle/gradle/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.6.0-milestone-2/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+525 actionable tasks: 283 executed, 242 up-to-date
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Failed to notify build listener.
+> Index 0 out of bounds for length 0
+> There is 1 more failure with an identical cause.
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 47s
+Configuration cache entry stored.
+Gradle build failed: see console output for details
+Found dependency graph files: 
+No dependency graph files found to submit.
+No dependency graph files found to upload.
+Post job cleanup.
+In post-action step
+Cache is disabled: will not save state for later builds.
+Generating Job Summary
+Completed post-action step
+Post job cleanup.
+Post job cleanup.
+[command]/usr/bin/git version
+git version 2.54.0
+Temporarily overriding HOME='/home/runner/work/_temp/3e93a5c4-2d48-4d78-a80a-4eb1b4d2b5c0' before making global git config changes
+Adding repository directory to the temporary git global config as a safe directory
+[command]/usr/bin/git config --global --add safe.directory /home/runner/work/gradle/gradle
+Removing SSH command configuration
+[command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+[command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+Removing HTTP extra header
+[command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+[command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+Removing includeIf entries pointing to credentials config files
+[command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+includeif.gitdir:/home/runner/work/gradle/gradle/.git.path
+includeif.gitdir:/home/runner/work/gradle/gradle/.git/worktrees/*.path
+includeif.gitdir:/github/workspace/.git.path
+includeif.gitdir:/github/workspace/.git/worktrees/*.path
+[command]/usr/bin/git config --local --get-all includeif.gitdir:/home/runner/work/gradle/gradle/.git.path
+/home/runner/work/_temp/git-credentials-b454b528-96b1-470e-8c5c-46d9610bb92c.config
+[command]/usr/bin/git config --local --unset includeif.gitdir:/home/runner/work/gradle/gradle/.git.path /home/runner/work/_temp/git-credentials-b454b528-96b1-470e-8c5c-46d9610bb92c.config
+[command]/usr/bin/git config --local --get-all includeif.gitdir:/home/runner/work/gradle/gradle/.git/worktrees/*.path
+/home/runner/work/_temp/git-credentials-b454b528-96b1-470e-8c5c-46d9610bb92c.config
+[command]/usr/bin/git config --local --unset includeif.gitdir:/home/runner/work/gradle/gradle/.git/worktrees/*.path /home/runner/work/_temp/git-credentials-b454b528-96b1-470e-8c5c-46d9610bb92c.config
+[command]/usr/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git.path
+/github/runner_temp/git-credentials-b454b528-96b1-470e-8c5c-46d9610bb92c.config
+[command]/usr/bin/git config --local --unset includeif.gitdir:/github/workspace/.git.path /github/runner_temp/git-credentials-b454b528-96b1-470e-8c5c-46d9610bb92c.config
+[command]/usr/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git/worktrees/*.path
+/github/runner_temp/git-credentials-b454b528-96b1-470e-8c5c-46d9610bb92c.config
+[command]/usr/bin/git config --local --unset includeif.gitdir:/github/workspace/.git/worktrees/*.path /github/runner_temp/git-credentials-b454b528-96b1-470e-8c5c-46d9610bb92c.config
+[command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+Removing credentials config '/home/runner/work/_temp/git-credentials-b454b528-96b1-470e-8c5c-46d9610bb92c.config'
+Cleaning up orphan processes
+Terminate orphan process: pid (2516) (java)
+##[warning]Node.js 20 actions are deprecated. The following actions are running on Node.js 20 and may not work as expected: actions/gradle-build-tools-actions/dependency-submission@8379f6a1328ee0e06e2bb424dadb7b159856a326. Actions will be forced to run with Node.js 24 by default starting June 16th, 2026. Node.js 20 will be removed from the runner on September 16th, 2026. Please check if updated versions of these actions are available that support Node.js 24. To opt into Node.js 24 now, set the FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true environment variable on the runner or in your workflow file. Once Node.js 24 becomes the default, you can temporarily opt out by setting ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

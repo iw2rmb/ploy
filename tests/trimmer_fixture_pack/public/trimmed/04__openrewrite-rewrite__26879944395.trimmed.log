@@ -1,0 +1,7 @@
+* What went wrong:
+Execution failed for task ':rewrite-core:publishNebulaPublicationToSonatypeRepository' (registered by plugin class 'org.gradle.api.publish.maven.plugins.MavenPublishPlugin').
+> Failed to publish publication 'nebula' to repository 'sonatype'
+   > Could not GET 'https://central.sonatype.com/repository/maven-snapshots/org/openrewrite/rewrite-core/8.84.0-SNAPSHOT/maven-metadata.xml'. Received status code 403 from server: Forbidden
+
+BUILD FAILED in 1m 2s
+87 actionable tasks: 25 executed, 62 up-to-date

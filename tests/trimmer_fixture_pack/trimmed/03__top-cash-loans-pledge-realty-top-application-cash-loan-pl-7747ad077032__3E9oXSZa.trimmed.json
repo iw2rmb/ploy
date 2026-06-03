@@ -1,0 +1,29 @@
+{
+  "tool": "gradle",
+  "evidence": {
+    "task": "compileKotlin",
+    "errors": [
+      {
+        "message": "Type argument is not within its bounds: should be subtype of 'Filter!'",
+        "base": "/workspace/top-application-cash-loan-pledge-product-process/src/main/kotlin/ru/tinkoff/bpm/topapplicationcashloanpledgeproductprocess/configuration/",
+        "files": [
+          "CorsConfiguration.kt:13:53"
+        ]
+      },
+      {
+        "message": "Type mismatch: inferred type is CorsFilter! but Filter! was expected",
+        "base": "/workspace/top-application-cash-loan-pledge-product-process/src/main/kotlin/ru/tinkoff/bpm/topapplicationcashloanpledgeproductprocess/configuration/",
+        "files": [
+          "CorsConfiguration.kt:21:39"
+        ]
+      },
+      {
+        "message": "Overload resolution ambiguity:",
+        "base": "/workspace/top-application-cash-loan-pledge-product-process/src/main/kotlin/ru/tinkoff/bpm/topapplicationcashloanpledgeproductprocess/configuration/rest/",
+        "files": [
+          "RestClientConfiguration.kt:136:14"
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,6 @@
+* What went wrong:
+Failed to notify build listener.
+> Index 0 out of bounds for length 0
+> There is 1 more failure with an identical cause.
+
+BUILD FAILED in 47s

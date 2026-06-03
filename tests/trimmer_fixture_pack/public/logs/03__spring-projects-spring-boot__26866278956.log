@@ -1,0 +1,160 @@
+efivarfs        128M   32K  128M   1% /sys/firmware/efi/efivars
+/dev/sda16      881M   64M  756M   8% /boot
+/dev/sda15      105M  6.2M   99M   6% /boot/efi
+tmpfs           1.6G   12K  1.6G   1% /run/user/1001
+
+
+> Task :module:spring-boot-pulsar:check
+> Task :module:spring-boot-pulsar:build
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::loadLibrary has been called by net.jpountz.util.Native in an unnamed module (file:/home/runner/.gradle/caches/modules-2/files-2.1/org.lz4/lz4-java/1.8.0/4b986a99445e49ea5fbf5d149c4b63f6ed6c6780/lz4-java-1.8.0.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+> Task :module:spring-boot-r2dbc:dockerTest
+
+SqlServerR2dbcDockerComposeConnectionDetailsFactoryIntegrationTests > runCreatesConnectionDetailsThatCanBeUsedToAccessDatabase(R2dbcConnectionDetails) FAILED
+    org.springframework.dao.DataAccessResourceFailureException at ConnectionFactoryUtils.java:102
+        Caused by: io.r2dbc.mssql.client.ReactorNettyClient$MssqlConnectionClosedException at ReactorNettyClient.java:88
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::loadLibrary has been called by io.netty.util.internal.NativeLibraryUtil in an unnamed module (file:/home/runner/.gradle/caches/modules-2/files-2.1/io.netty/netty-common/4.2.15.Final/7222492c1af9c2d4d78d521eea340a619e242fda/netty-common-4.2.15.Final.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+
+> Task :module:spring-boot-r2dbc:dockerTest
+
+SqlServerR2dbcDockerComposeConnectionDetailsFactoryIntegrationTests > runCreatesConnectionDetailsThatCanBeUsedToAccessDatabase(R2dbcConnectionDetails) FAILED
+    org.springframework.dao.DataAccessResourceFailureException at ConnectionFactoryUtils.java:102
+        Caused by: io.r2dbc.mssql.client.ReactorNettyClient$MssqlConnectionClosedException at ReactorNettyClient.java:88
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::loadLibrary has been called by io.netty.util.internal.NativeLibraryUtil in an unnamed module (file:/home/runner/.gradle/caches/modules-2/files-2.1/io.netty/netty-common/4.2.15.Final/7222492c1af9c2d4d78d521eea340a619e242fda/netty-common-4.2.15.Final.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+
+
+> Task :module:spring-boot-r2dbc:dockerTest
+
+SqlServerR2dbcDockerComposeConnectionDetailsFactoryIntegrationTests > runCreatesConnectionDetailsThatCanBeUsedToAccessDatabase(R2dbcConnectionDetails) FAILED
+    org.springframework.dao.DataAccessResourceFailureException at ConnectionFactoryUtils.java:102
+        Caused by: io.r2dbc.mssql.client.ReactorNettyClient$MssqlConnectionClosedException at ReactorNettyClient.java:88
+WARNING: A restricted method in java.lang.System has been called
+
+WARNING: java.lang.System::loadLibrary has been called by io.netty.util.internal.NativeLibraryUtil in an unnamed module (file:/home/runner/.gradle/caches/modules-2/files-2.1/io.netty/netty-common/4.2.15.Final/7222492c1af9c2d4d78d521eea340a619e242fda/netty-common-4.2.15.Final.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+
+> Task :module:spring-boot-r2dbc:dockerTest
+
+SqlServerR2dbcDockerComposeConnectionDetailsFactoryIntegrationTests > runCreatesConnectionDetailsThatCanBeUsedToAccessDatabase(R2dbcConnectionDetails) FAILED
+    org.springframework.dao.DataAccessResourceFailureException at ConnectionFactoryUtils.java:102
+        Caused by: io.r2dbc.mssql.client.ReactorNettyClient$MssqlConnectionClosedException at ReactorNettyClient.java:88
+
+
+14 tests completed, 4 failed
+> Task :module:spring-boot-r2dbc:dockerTest FAILED
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/build-1780465795079.json
+
+Found test failures in 1 test task:
+
+
+[Incubating] Problems report is available at: file:///home/runner/work/spring-boot/spring-boot/build/reports/problems/problems-report.html
+:module:spring-boot-r2dbc:dockerTest
+
+    org.springframework.boot.r2dbc.docker.compose.SqlServerR2dbcDockerComposeConnectionDetailsFactoryIntegrationTests > runCreatesConnectionDetailsThatCanBeUsedToAccessDatabase(R2dbcConnectionDetails)
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.5.0/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+8755 actionable tasks: 7092 executed, 1662 from cache, 1 up-to-date
+    org.springframework.boot.r2dbc.docker.compose.SqlServerR2dbcDockerComposeConnectionDetailsFactoryIntegrationTests > runCreatesConnectionDetailsThatCanBeUsedToAccessDatabase(R2dbcConnectionDetails)
+    org.springframework.boot.r2dbc.docker.compose.SqlServerR2dbcDockerComposeConnectionDetailsFactoryIntegrationTests > runCreatesConnectionDetailsThatCanBeUsedToAccessDatabase(R2dbcConnectionDetails)
+    org.springframework.boot.r2dbc.docker.compose.SqlServerR2dbcDockerComposeConnectionDetailsFactoryIntegrationTests > runCreatesConnectionDetailsThatCanBeUsedToAccessDatabase(R2dbcConnectionDetails)
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':module:spring-boot-r2dbc:dockerTest'.
+> There were failing tests. See the report at: file:///home/runner/work/spring-boot/spring-boot/module/spring-boot-r2dbc/build/reports/tests/dockerTest/index.html
+
+BUILD FAILED in 1h 5m 33s
+The remote build cache was disabled during the build due to errors.
+Process completed with exit code 1.
+##[group]Run actions/upload-artifact@v7
+with:
+  name: build-reports
+  path: **/build/reports/
+  if-no-files-found: warn
+  compression-level: 6
+  overwrite: false
+  include-hidden-files: false
+  archive: true
+env:
+  JAVA_HOME: /opt/hostedtoolcache/Java_Liberica_jdk/25.0.3-11/x64
+  JAVA_HOME_25_X64: /opt/hostedtoolcache/Java_Liberica_jdk/25.0.3-11/x64
+  GRADLE_ACTION_ID: gradle/actions/setup-gradle
+  GRADLE_USER_HOME: /home/runner/.gradle
+  GRADLE_BUILD_ACTION_SETUP_COMPLETED: true
+  GRADLE_BUILD_ACTION_CACHE_RESTORED: true
+  DEVELOCITY_INJECTION_INIT_SCRIPT_NAME: gradle-actions.inject-develocity.init.gradle
+  DEVELOCITY_INJECTION_CUSTOM_VALUE: gradle-actions
+  GITHUB_DEPENDENCY_GRAPH_ENABLED: false
+##[endgroup]
+With the provided path, there will be 11989 files uploaded
+Artifact name is valid!
+Root directory input is valid!
+Uploading artifact: build-reports.zip
+Beginning upload of artifact content to blob storage
+Uploaded bytes 8388608
+Uploaded bytes 15868035
+Finished uploading artifact content to blob storage!
+SHA256 digest of uploaded artifact is 7b84d97dad8c3b32182c24f5d77048268fba0a8324d9650386b7a80e55586e25
+Finalizing artifact upload
+Artifact build-reports successfully finalized. Artifact ID 7377711226
+Artifact build-reports has been successfully uploaded! Final size is 15868035 bytes. Artifact ID is 7377711226
+Artifact download URL: https://github.com/spring-projects/spring-boot/actions/runs/26866278956/artifacts/7377711226
+Post job cleanup.
+Post job cleanup.
+In post-action step
+Cache is read-only: will not save state for use in subsequent builds.
+Generating Job Summary
+Completed post-action step
+Post job cleanup.
+Post job cleanup.
+[command]/usr/bin/git version
+git version 2.54.0
+Temporarily overriding HOME='/home/runner/work/_temp/e0ad2ded-059f-429b-9b74-020fc2459c9f' before making global git config changes
+Adding repository directory to the temporary git global config as a safe directory
+[command]/usr/bin/git config --global --add safe.directory /home/runner/work/spring-boot/spring-boot
+Removing SSH command configuration
+[command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+[command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+Removing HTTP extra header
+[command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+[command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+Removing includeIf entries pointing to credentials config files
+[command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+includeif.gitdir:/home/runner/work/spring-boot/spring-boot/.git.path
+includeif.gitdir:/home/runner/work/spring-boot/spring-boot/.git/worktrees/*.path
+includeif.gitdir:/github/workspace/.git.path
+includeif.gitdir:/github/workspace/.git/worktrees/*.path
+[command]/usr/bin/git config --local --get-all includeif.gitdir:/home/runner/work/spring-boot/spring-boot/.git.path
+/home/runner/work/_temp/git-credentials-0751445f-cf07-4365-bcec-117353a09b35.config
+[command]/usr/bin/git config --local --unset includeif.gitdir:/home/runner/work/spring-boot/spring-boot/.git.path /home/runner/work/_temp/git-credentials-0751445f-cf07-4365-bcec-117353a09b35.config
+[command]/usr/bin/git config --local --get-all includeif.gitdir:/home/runner/work/spring-boot/spring-boot/.git/worktrees/*.path
+/home/runner/work/_temp/git-credentials-0751445f-cf07-4365-bcec-117353a09b35.config
+[command]/usr/bin/git config --local --unset includeif.gitdir:/home/runner/work/spring-boot/spring-boot/.git/worktrees/*.path /home/runner/work/_temp/git-credentials-0751445f-cf07-4365-bcec-117353a09b35.config
+[command]/usr/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git.path
+/github/runner_temp/git-credentials-0751445f-cf07-4365-bcec-117353a09b35.config
+[command]/usr/bin/git config --local --unset includeif.gitdir:/github/workspace/.git.path /github/runner_temp/git-credentials-0751445f-cf07-4365-bcec-117353a09b35.config
+[command]/usr/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git/worktrees/*.path
+/github/runner_temp/git-credentials-0751445f-cf07-4365-bcec-117353a09b35.config
+[command]/usr/bin/git config --local --unset includeif.gitdir:/github/workspace/.git/worktrees/*.path /github/runner_temp/git-credentials-0751445f-cf07-4365-bcec-117353a09b35.config
+[command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+Removing credentials config '/home/runner/work/_temp/git-credentials-0751445f-cf07-4365-bcec-117353a09b35.config'
+Cleaning up orphan processes

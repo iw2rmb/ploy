@@ -1,0 +1,5 @@
+* What went wrong:
+Execution failed for task ':npmCiOrInstall'.
+> Process 'command '/home/runner/work/spring-framework/spring-framework/.gradle/nodejs/node-v24.15.0-linux-x64/bin/npm'' finished with non-zero exit value 1
+
+BUILD FAILED in 15s

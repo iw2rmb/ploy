@@ -7,7 +7,6 @@ import (
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
-	"gopkg.in/yaml.v3"
 )
 
 func TestGateExecutor_DoesNotRemoveContainerAfterExecution(t *testing.T) {
@@ -165,17 +164,16 @@ func TestGateExecutor_EmptyEnv(t *testing.T) {
 	}
 }
 
-func TestGateExecutor_FailureStructuredEvidence(t *testing.T) {
+func TestGateExecutor_FailurePreservesRawLogsWithoutEvidence(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name         string
-		workspaceFn  func(t *testing.T) string
-		logs         string
-		wantEvidence bool
+		name        string
+		workspaceFn func(t *testing.T) string
+		logs        string
 	}{
 		{
-			name:        "gradle failure emits structured evidence",
+			name:        "gradle failure preserves raw logs",
 			workspaceFn: func(t *testing.T) string { return createGradleWorkspace(t, "17") },
 			logs: `
 * What went wrong:
@@ -183,16 +181,14 @@ An exception occurred applying plugin request [id: 'org.springframework.boot', v
 > Failed to apply plugin 'org.springframework.boot'.
 BUILD FAILED in 1s
 `,
-			wantEvidence: true,
 		},
 		{
-			name:        "maven failure has no structured evidence",
+			name:        "maven failure preserves raw logs",
 			workspaceFn: func(t *testing.T) string { return createMavenWorkspace(t, "17") },
 			logs: `
 [ERROR] COMPILATION ERROR :
 [ERROR] /workspace/src/main/java/A.java:[1,1] cannot find symbol
 `,
-			wantEvidence: false,
 		},
 	}
 
@@ -220,30 +216,11 @@ BUILD FAILED in 1s
 			}
 
 			finding := meta.LogFindings[0]
-			if strings.TrimSpace(finding.Message) == "" {
-				t.Fatal("expected non-empty finding message")
+			if finding.Message != tt.logs {
+				t.Fatalf("finding message should preserve raw logs:\nwant:\n%s\ngot:\n%s", tt.logs, finding.Message)
 			}
-
-			if !tt.wantEvidence {
-				if strings.TrimSpace(finding.Evidence) != "" {
-					t.Fatalf("expected empty evidence, got:\n%s", finding.Evidence)
-				}
-				return
-			}
-
-			if strings.TrimSpace(finding.Evidence) == "" {
-				t.Fatal("expected non-empty evidence")
-			}
-			var payload map[string]any
-			if err := yaml.Unmarshal([]byte(finding.Evidence), &payload); err != nil {
-				t.Fatalf("invalid evidence yaml: %v", err)
-			}
-			if _, hasMode := payload["mode"]; hasMode {
-				t.Fatalf("unexpected mode discriminator in evidence:\n%s", finding.Evidence)
-			}
-			errorsRaw, ok := payload["errors"].([]any)
-			if !ok || len(errorsRaw) == 0 {
-				t.Fatalf("expected non-empty errors array in evidence: %#v", payload["errors"])
+			if strings.TrimSpace(finding.Evidence) != "" {
+				t.Fatalf("expected empty evidence, got:\n%s", finding.Evidence)
 			}
 		})
 	}
