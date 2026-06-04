@@ -18,7 +18,7 @@ ploy help <command>            # Alternative help syntax
 Common command patterns:
 
 ```bash
-ploy run <spec-path> [<repo-path>|<namespace/repo[:ref]>] [--apply] [--pull[=path]] # submit a single-repo run
+ploy run <spec-path> [<repo-path>|<namespace/repo[:ref]>] [--follow] [--apply] [--pull[=path]] # submit a single-repo run
 ploy run status <run-id> [--json|--follow]                                  # inspect a run
 ploy run apply <run-id> [path] [--force]                                     # apply a run patch locally
 ploy run pull <run-id> [artifacts-path]                                      # download final run artifacts
@@ -32,9 +32,10 @@ Treat them as opaque identifiers when passing them between commands or scripts.
 
 `ploy run` submits a spec file or directory against one repository source. Local
 repo paths submit `HEAD`; remote selectors use `namespace/repo`, optionally
-suffixed with `:<branch>` or `:<sha>`. Use `--pull[=path]` to wait for success
-and download artifacts, or `--apply` to wait for success and apply the resulting
-patch to a clean local worktree.
+suffixed with `:<branch>` or `:<sha>`. Use `--follow` to wait for the run's
+terminal status, `--pull[=path]` to wait for success and download artifacts, or
+`--apply` to wait for success and apply the resulting patch to a clean local
+worktree.
 
 `ploy mig run` executes an existing mig project over its managed repo set. Use
 `ploy mig add --name <name> --spec <path>`, `ploy mig repo add`, and
@@ -96,6 +97,9 @@ ploy run ./mig.yaml ../service-a
 
 # Submit a remote repo selector. Missing ref defaults to master.
 ploy run ./mig.yaml org/service-a:main
+
+# Follow until terminal.
+ploy run ./mig.yaml org/service-a:main --follow
 
 # Follow until success and download artifacts.
 ploy run ./mig.yaml org/service-a:main --pull=./artifacts

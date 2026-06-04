@@ -158,7 +158,8 @@ func TestBuildSpecPayload_ErrorCases(t *testing.T) {
 		specFile string            // literal path (bypasses temp file creation)
 		spec     string            // YAML content to write to temp file
 		setenv   map[string]string // env vars; empty value "" → replaced with tmpDir
-		wantErr  string            // exact match; empty → just assert err != nil
+		files    map[string]string
+		wantErr  string // substring match; empty → just assert err != nil
 	}{
 		{
 			name:     "non-existent file",
@@ -209,6 +210,32 @@ build_gate:
 `,
 			wantErr: "resolve image env placeholders: build_gate.images[0].image: unresolved environment variables: PLOY_TEST_MISSING_GATE_IMAGE",
 		},
+		{
+			name: "missing hydra input file",
+			spec: `
+steps:
+  - image: docker.io/test/mig:latest
+    in:
+      - ./missing.yaml:missing.yaml
+`,
+			wantErr: "validate local file records: steps[0].in[0]: source",
+		},
+		{
+			name: "amata include not mounted",
+			spec: `
+steps:
+  - image: docker.io/test/mig:latest
+    in:
+      - ./amata.yaml:amata.yaml
+      - ./gradle-classpath.yaml:gradle-classpath.yaml
+`,
+			files: map[string]string{
+				"amata.yaml":            "flows:\n  main: !include ./gradle-assemble.yaml#/flows/gradle_assemble_audit\n",
+				"gradle-classpath.yaml": "flows: {}\n",
+				"gradle-assemble.yaml":  "flows:\n  gradle_assemble_audit:\n    steps: []\n",
+			},
+			wantErr: "validate local file records: steps[0].in include ./gradle-assemble.yaml#/flows/gradle_assemble_audit: target /in/gradle-assemble.yaml is not mounted by this step's in entries",
+		},
 	}
 
 	for _, tt := range tests {
@@ -228,6 +255,9 @@ build_gate:
 					}
 					t.Setenv(k, v)
 				}
+				for rel, content := range tt.files {
+					writeFile(t, filepath.Join(tmpDir, rel), content)
+				}
 				specPath := filepath.Join(tmpDir, "spec.yaml")
 				writeFile(t, specPath, tt.spec)
 				_, err = callBuildSpecPayload(t, specPath, specPayloadOpts{})
@@ -236,8 +266,8 @@ build_gate:
 			if err == nil {
 				t.Fatal("expected error")
 			}
-			if tt.wantErr != "" && err.Error() != tt.wantErr {
-				t.Fatalf("error = %q, want %q", err.Error(), tt.wantErr)
+			if tt.wantErr != "" && !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("error = %q, want containing %q", err.Error(), tt.wantErr)
 			}
 		})
 	}

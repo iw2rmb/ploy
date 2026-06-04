@@ -219,6 +219,37 @@ func TestRunSubmitPullDownloadsFinalArtifacts(t *testing.T) {
 	}
 }
 
+func TestRunSubmitFollowUsesStatusFollowRenderer(t *testing.T) {
+	specPath := filepath.Join(t.TempDir(), "spec.yaml")
+	if err := os.WriteFile(specPath, []byte("steps:\n  - image: alpine\n"), 0o644); err != nil {
+		t.Fatalf("write spec file: %v", err)
+	}
+	runID := domaintypes.NewRunID().String()
+	server := newSuccessfulRunSubmitServer(t, successfulRunSubmitConfig{
+		RunID:   runID,
+		MigID:   domaintypes.NewMigID().String(),
+		SpecID:  domaintypes.NewSpecID().String(),
+		RepoID:  domaintypes.NewRepoID().String(),
+		JobID:   domaintypes.NewJobID().String(),
+		RepoURL: "https://gitlab.example.com/acme/service.git",
+		Ref:     "main",
+	})
+	defer server.Close()
+	clienv.UseServerDescriptor(t, server.URL)
+
+	var buf bytes.Buffer
+	if err := executeCmd([]string{"run", "--follow", specPath, "acme/service"}, &buf); err != nil {
+		t.Fatalf("run --follow error: %v", err)
+	}
+	out := buf.String()
+	if !strings.Contains(out, "acme/service") {
+		t.Fatalf("expected final status snapshot, got %q", out)
+	}
+	if strings.Contains(out, "run_id: "+runID) {
+		t.Fatalf("expected follow output without submit id prelude, got %q", out)
+	}
+}
+
 func TestRunSubmitApplyAppliesFinalPatch(t *testing.T) {
 	specPath := filepath.Join(t.TempDir(), "spec.yaml")
 	if err := os.WriteFile(specPath, []byte("steps:\n  - image: alpine\n"), 0o644); err != nil {

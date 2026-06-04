@@ -28,6 +28,7 @@ const osTempArtifactDirSentinel = "__ploy_os_tmp__"
 type SubmitOptions struct {
 	SpecPath     string
 	RepoSelector string
+	Follow       bool
 	Apply        bool
 
 	PullArtifacts bool
@@ -85,7 +86,7 @@ func RunSubmit(ctx context.Context, opts SubmitOptions) error {
 		return err
 	}
 
-	needsFinal := opts.PullArtifacts || opts.Apply
+	needsFinal := opts.Follow || opts.PullArtifacts || opts.Apply
 	if !needsFinal {
 		_, _ = fmt.Fprintf(out, "run_id: %s\n", runID.String())
 		_, _ = fmt.Fprintf(out, "mig_id: %s\n", migID.String())

@@ -54,6 +54,10 @@ func Normalize(ctx context.Context, base *url.URL, client *http.Client, data []b
 		return nil, err
 	}
 
+	if err := validateLocalFileRecords(raw, specBaseDir); err != nil {
+		return nil, fmt.Errorf("validate local file records: %w", err)
+	}
+
 	if err := compileHydraRecordsInPlace(ctx, base, client, raw, specBaseDir); err != nil {
 		return nil, err
 	}
@@ -94,6 +98,12 @@ func ValidateLocal(data []byte, specBaseDir string) (json.RawMessage, error) {
 	}
 	if err := normalizeStepInEntriesInPlace(raw); err != nil {
 		return nil, err
+	}
+	if err := validateLocalFileRecords(raw, specBaseDir); err != nil {
+		return nil, fmt.Errorf("validate local file records: %w", err)
+	}
+	if err := compileHydraRecordsLocalInPlace(raw, specBaseDir); err != nil {
+		return nil, fmt.Errorf("compile local file records: %w", err)
 	}
 	jsonBytes, err := json.Marshal(raw)
 	if err != nil {
@@ -667,6 +677,10 @@ func Build(
 
 	if err := validateSpecShape(specMap); err != nil {
 		return nil, err
+	}
+
+	if err := validateLocalFileRecords(specMap, specBaseDir); err != nil {
+		return nil, fmt.Errorf("validate local file records: %w", err)
 	}
 
 	if err := compileHydraRecordsInPlace(ctx, base, client, specMap, specBaseDir); err != nil {
