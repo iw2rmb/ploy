@@ -36,6 +36,7 @@ func TestHandleSpecValidate(t *testing.T) {
 	tests := []struct {
 		name    string
 		spec    string
+		files   map[string]string
 		wantErr string
 	}{
 		{
@@ -52,6 +53,20 @@ func TestHandleSpecValidate(t *testing.T) {
 			spec:    "steps:\n  - image: docker.io/test/mig:latest\nbuild_gate:\n  enabled: true\n",
 			wantErr: "additional properties 'enabled' not allowed",
 		},
+		{
+			name:    "missing hydra input file",
+			spec:    "steps:\n  - image: docker.io/test/mig:latest\n    in:\n      - ./missing.yaml:missing.yaml\n",
+			wantErr: "validate local file records",
+		},
+		{
+			name: "amata include not mounted",
+			spec: "steps:\n  - image: docker.io/test/mig:latest\n    in:\n      - ./amata.yaml:amata.yaml\n",
+			files: map[string]string{
+				"amata.yaml":           "flows:\n  audit: !include ./gradle-assemble.yaml#/flows/audit\n",
+				"gradle-assemble.yaml": "flows:\n  audit:\n    steps: []\n",
+			},
+			wantErr: "target /in/gradle-assemble.yaml is not mounted",
+		},
 	}
 
 	for _, tt := range tests {
@@ -60,6 +75,11 @@ func TestHandleSpecValidate(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "spec.yaml")
 			if err := os.WriteFile(path, []byte(tt.spec), 0o644); err != nil {
 				t.Fatalf("write spec: %v", err)
+			}
+			for rel, content := range tt.files {
+				if err := os.WriteFile(filepath.Join(filepath.Dir(path), rel), []byte(content), 0o644); err != nil {
+					t.Fatalf("write %s: %v", rel, err)
+				}
 			}
 			var stdout bytes.Buffer
 			var stderr bytes.Buffer

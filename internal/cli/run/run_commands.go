@@ -28,11 +28,16 @@ func NewCommand() *cobra.Command {
 			}
 			submit.PullArtifacts = cmd.Flags().Changed("pull")
 			submit.Output = cmd.OutOrStdout()
-			submit.FollowOutput = cmd.ErrOrStderr()
+			if submit.Follow && !submit.PullArtifacts && !submit.Apply {
+				submit.FollowOutput = cmd.OutOrStdout()
+			} else {
+				submit.FollowOutput = cmd.ErrOrStderr()
+			}
 			return RunSubmit(cmd.Context(), submit)
 		},
 	}
 
+	cmd.Flags().BoolVar(&submit.Follow, "follow", false, "Follow run status until completion")
 	cmd.Flags().BoolVar(&submit.Apply, "apply", false, "Apply the resulting patch to a local repo after success")
 	cmd.Flags().StringVar(&submit.PullPath, "pull", "", "Download final artifacts after success; optional path")
 	if flag := cmd.Flags().Lookup("pull"); flag != nil {
