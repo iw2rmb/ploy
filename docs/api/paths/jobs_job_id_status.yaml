@@ -1,15 +1,20 @@
-# Job-level status polling endpoint.
+# Job-level status endpoint.
 # Workers call this endpoint to detect remote cancellation while a job is running.
+# Control-plane callers use it for operator inspection by job ID.
 get:
   operationId: getJobStatus
   tags: [ Jobs ]
-  summary: Get current status for a claimed job
+  summary: Get current status for a job
   description: |
-    Returns the canonical job status from the control plane for a specific `job_id`.
+    Returns the canonical job status and execution metadata from the control plane
+    for a specific `job_id`.
 
-    Ownership is enforced: only the worker node currently assigned to the job
-    can read the status. Workers use this to stop local execution when the job
-    is cancelled remotely (for example, after `POST /v1/runs/{run_id}/cancel`).
+    Worker callers use this to stop local execution when the job is cancelled
+    remotely (for example, after `POST /v1/runs/{run_id}/cancel`). Worker
+    ownership is enforced with `PLOY_NODE_UUID`; only the node currently
+    assigned to the job can read status as a worker.
+
+    Control-plane callers can inspect the job by ID without `PLOY_NODE_UUID`.
   parameters:
     - in: path
       name: job_id
@@ -19,10 +24,10 @@ get:
       description: Job ID (KSUID string)
     - in: header
       name: PLOY_NODE_UUID
-      required: true
+      required: false
       schema:
         type: string
-      description: Worker node ID (NanoID 6-character string)
+      description: Worker node ID (NanoID 6-character string). Required for worker callers.
   responses:
     '200':
       description: Current job status
@@ -30,14 +35,78 @@ get:
         application/json:
           schema:
             type: object
-            required: [ job_id, status ]
+            required:
+              - job_id
+              - run_id
+              - repo_id
+              - attempt
+              - name
+              - job_type
+              - status
+              - job_image
+              - node_id
+              - exit_code
+              - started_at
+              - finished_at
+              - duration_ms
+              - repo_sha_in
+              - repo_sha_out
+              - repo_sha_in8
+              - repo_sha_out8
             properties:
               job_id:
                 type: string
+                description: Job ID (KSUID string)
+              run_id:
+                type: string
+                description: Run ID (KSUID string)
+              repo_id:
+                type: string
+                description: Repo ID (NanoID 8-character string)
+              attempt:
+                type: integer
+                format: int32
+              name:
+                type: string
+                description: Human-readable job name
+              job_type:
+                type: string
+                enum: [pre_gate, mig, post_gate]
               status:
                 type: string
                 description: Canonical job status enum value
                 enum: [ Created, Queued, Running, Success, Fail, Error, Cancelled ]
+              job_image:
+                type: string
+                description: Runtime container image for the job, when available
+              node_id:
+                type: string
+                nullable: true
+                description: Assigned worker node ID, or null when unassigned
+              exit_code:
+                type: integer
+                format: int32
+                nullable: true
+                description: Process exit code, or null before completion
+              started_at:
+                type: string
+                format: date-time
+                nullable: true
+              finished_at:
+                type: string
+                format: date-time
+                nullable: true
+              duration_ms:
+                type: integer
+                format: int64
+              repo_sha_in:
+                type: string
+              repo_sha_out:
+                type: string
+              repo_sha_in8:
+                type: string
+              repo_sha_out8:
+                type: string
     '400':
       description: Bad request (missing/invalid `job_id` or node header)
       content:

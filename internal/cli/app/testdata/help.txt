@@ -9,7 +9,7 @@ Available Commands:
   completion  Generate the autocompletion script for the specified shell
   config      Inspect or update cluster configuration
   help        Help about any command
-  job         Inspect and follow job logs
+  job         Inspect jobs and follow logs
   mig         Plan and run Migs workflows
   pull        Pull Migs diffs for current repo HEAD
   run         Submit and inspect runs

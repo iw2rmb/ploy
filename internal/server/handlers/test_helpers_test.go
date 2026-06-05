@@ -212,7 +212,11 @@ func (f jobTestFixture) jobStatusReq(overrideNodeID string) *http.Request {
 		nodeID = overrideNodeID
 	}
 	req.Header.Set(nodeUUIDHeader, nodeID)
-	return req
+	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
+		Role:       auth.RoleWorker,
+		CommonName: f.NodeIDStr,
+	})
+	return req.WithContext(ctx)
 }
 
 // completeJobReq builds an HTTP request for POST /v1/jobs/{job_id}/complete
