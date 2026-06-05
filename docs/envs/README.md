@@ -76,7 +76,8 @@ spec supports:
   - `out` — Read-write output files (`src:/out/dst`; CLI compiles local paths to `shortHash:/out/dst`)
   - `home` — Home-relative files (`src:dst{:ro}`; CLI compiles to `shortHash:dst{:ro}`)
   - `tmp` — Per-job writable temporary files (`src:/tmp/dst` or `src:dst`; CLI compiles to `shortHash:/tmp/dst`)
-  - `steps[]` — Multi-step spec steps (each with its own `image`/`command`/`envs`/`in`/`out`/`home`/`tmp`)
+  - `steps[]` — Multi-step spec steps (each with its own `image`/`command`/`envs`/`options`/`in`/`out`/`home`/`tmp`)
+  - `steps[].options.mount_docker_socket` — Optional boolean. When true, the node mounts the host Docker socket at `/var/run/docker.sock` if that socket exists.
   - `build_gate.pre.stack` / `build_gate.post.stack` — Stack-detection policy for gate phases
   - `build_gate.images` — Build Gate image overrides selected by stack rules
   - See [mig.example.yaml](../schemas/mig.example.yaml) for the full schema.

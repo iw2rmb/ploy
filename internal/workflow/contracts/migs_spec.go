@@ -103,6 +103,9 @@ type MigStep struct {
 	// Envs holds environment variables specific to this step.
 	Envs map[string]string `json:"envs,omitempty" yaml:"envs,omitempty"`
 
+	// Options holds strict, step-scoped runtime options.
+	Options MigStepOptions `json:"options,omitempty,omitzero" yaml:"options,omitempty"`
+
 	// In lists canonical read-only input entries ("shortHash:/in/dst").
 	In []string `json:"in,omitempty" yaml:"in,omitempty"`
 
@@ -118,6 +121,15 @@ type MigStep struct {
 	// Stack configures Stack Gate validation for this step.
 	// Inbound validates pre-mig expectations; Outbound validates post-mig expectations.
 	Stack *StackGateSpec `json:"stack,omitempty" yaml:"stack,omitempty"`
+}
+
+// MigStepOptions describes strict runtime options accepted under steps[].options.
+type MigStepOptions struct {
+	MountDockerSocket bool `json:"mount_docker_socket,omitempty" yaml:"mount_docker_socket,omitempty"`
+}
+
+func (o MigStepOptions) IsZero() bool {
+	return !o.MountDockerSocket
 }
 
 // Validate checks that the spec is structurally valid.

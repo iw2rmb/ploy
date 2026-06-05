@@ -246,6 +246,7 @@ func TestBuildManifestFromRequest(t *testing.T) {
 						Image:   contracts.JobImage{Universal: "migs-orw:latest"},
 						Command: contracts.CommandSpec{Exec: []string{"--apply", "--dir", "/workspace"}},
 						Env:     map[string]string{"STEP_VAR": "step0"},
+						Options: map[string]any{"mount_docker_socket": true},
 					}},
 					{ContainerSpec: ContainerSpec{
 						Image:   contracts.JobImage{Universal: "migs-fmt:latest"},
@@ -273,6 +274,9 @@ func TestBuildManifestFromRequest(t *testing.T) {
 		if m0.Envs["STEP_VAR"] != "step0" {
 			t.Errorf("step 0: STEP_VAR=%q, want step0", m0.Envs["STEP_VAR"])
 		}
+		if got, ok := m0.OptionBool("mount_docker_socket"); !ok || !got {
+			t.Fatalf("step 0: mount_docker_socket option = %v, %v; want true, true", got, ok)
+		}
 
 		// Step 1.
 		m1, err := buildManifestAtStep(req, 1)
@@ -290,6 +294,9 @@ func TestBuildManifestFromRequest(t *testing.T) {
 		}
 		if m1.Envs["STEP_VAR"] != "step1" {
 			t.Errorf("step 1: STEP_VAR=%q, want step1", m1.Envs["STEP_VAR"])
+		}
+		if _, ok := m1.OptionBool("mount_docker_socket"); ok {
+			t.Fatalf("step 1: mount_docker_socket option should be absent")
 		}
 	})
 
@@ -312,6 +319,35 @@ func TestBuildManifestFromRequest(t *testing.T) {
 		}
 		if manifest.Envs["UNIQUE_BASE"] != "base" {
 			t.Errorf("expected base env preserved: UNIQUE_BASE=base, got %q", manifest.Envs["UNIQUE_BASE"])
+		}
+	})
+
+	t.Run("single-step run: step env and options are forwarded from typed options", func(t *testing.T) {
+		req := newStartRunRequest(
+			withRunEnv(map[string]string{"DOCKER_HOST": "tcp://remote:2375", "BASE_VAR": "base"}),
+			withRunOptions(RunOptions{
+				Execution: ContainerSpec{
+					Image:   contracts.JobImage{Universal: "migs-step:latest"},
+					Env:     map[string]string{"DOCKER_HOST": "unix:///var/run/docker.sock", "STEP_VAR": "step"},
+					Options: map[string]any{"mount_docker_socket": true},
+				},
+			}),
+		)
+		manifest, err := buildManifestDefault(req)
+		if err != nil {
+			t.Fatalf("buildManifestDefault() error: %v", err)
+		}
+		if got := manifest.Envs["DOCKER_HOST"]; got != "unix:///var/run/docker.sock" {
+			t.Fatalf("DOCKER_HOST=%q, want step env override", got)
+		}
+		if got := manifest.Envs["BASE_VAR"]; got != "base" {
+			t.Fatalf("BASE_VAR=%q, want base", got)
+		}
+		if got := manifest.Envs["STEP_VAR"]; got != "step" {
+			t.Fatalf("STEP_VAR=%q, want step", got)
+		}
+		if got, ok := manifest.OptionBool("mount_docker_socket"); !ok || !got {
+			t.Fatalf("mount_docker_socket option = %v, %v; want true, true", got, ok)
 		}
 	})
 

@@ -19,6 +19,8 @@ steps:
     command: ["/bin/sh", "-lc", "orw-cli --apply --dir /workspace --out /out"]
     envs:
       RECIPE_CLASSNAME: org.openrewrite.java.migrate.UpgradeToJava17
+    options:
+      mount_docker_socket: false
     in:
       - 0123456789ab:/in/settings.xml
     out:

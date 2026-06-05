@@ -73,6 +73,13 @@
         "outbound": { "$ref": "#/definitions/stepStackPhase" }
       }
     },
+    "stepOptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mount_docker_socket": { "type": "boolean" }
+      }
+    },
     "step": {
       "type": "object",
       "additionalProperties": false,
@@ -81,6 +88,7 @@
         "image": { "$ref": "#/definitions/image" },
         "command": { "$ref": "#/definitions/command" },
         "envs": { "$ref": "#/definitions/stringMap" },
+        "options": { "$ref": "#/definitions/stepOptions" },
         "in": { "$ref": "#/definitions/hydraEntries" },
         "out": { "$ref": "#/definitions/hydraEntries" },
         "home": { "$ref": "#/definitions/hydraEntries" },

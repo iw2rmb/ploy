@@ -11,6 +11,7 @@ func TestMigSpec_RoundTrip(t *testing.T) {
 			Image:   JobImage{Universal: "ghcr.io/iw2rmb/ploy/mig:latest"},
 			Command: CommandSpec{Shell: "echo hello"},
 			Envs:    map[string]string{"FOO": "bar"},
+			Options: MigStepOptions{MountDockerSocket: true},
 		}},
 		BuildGate: &BuildGateConfig{},
 	}
@@ -30,6 +31,9 @@ func TestMigSpec_RoundTrip(t *testing.T) {
 	}
 	if parsed.Steps[0].Command.Shell != original.Steps[0].Command.Shell {
 		t.Errorf("command.Shell = %q, want %q", parsed.Steps[0].Command.Shell, original.Steps[0].Command.Shell)
+	}
+	if !parsed.Steps[0].Options.MountDockerSocket {
+		t.Errorf("options.mount_docker_socket = false, want true")
 	}
 	if parsed.BuildGate == nil || parsed.BuildGate.Disabled {
 		t.Errorf("build_gate.disabled should be false")
