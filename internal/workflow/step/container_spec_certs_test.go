@@ -37,7 +37,7 @@ func TestBuildContainerSpec_CertMountOptions(t *testing.T) {
 		},
 	}
 
-	spec, err := buildContainerSpec(types.RunID("run-certs"), types.JobID("job-certs"), manifest, "/tmp/ws", "", "", "", "")
+	spec, err := buildContainerSpec(types.RunID("run-certs"), types.JobID("job-certs"), manifest, "/tmp/ws", "", "", "", "", "")
 	if err != nil {
 		t.Fatalf("buildContainerSpec error: %v", err)
 	}
@@ -69,7 +69,7 @@ func TestBuildContainerSpec_CertMountOptionsSkipEmptyOrMissing(t *testing.T) {
 		},
 	}
 
-	spec, err := buildContainerSpec(types.RunID("run-certs-skip"), types.JobID("job-certs-skip"), manifest, "/tmp/ws", "", "", "", "")
+	spec, err := buildContainerSpec(types.RunID("run-certs-skip"), types.JobID("job-certs-skip"), manifest, "/tmp/ws", "", "", "", "", "")
 	if err != nil {
 		t.Fatalf("buildContainerSpec error: %v", err)
 	}

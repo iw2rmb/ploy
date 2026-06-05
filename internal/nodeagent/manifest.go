@@ -79,7 +79,7 @@ func buildMigManifest(req StartRunRequest, typedOpts RunOptions, stepIndex int, 
 	env := make(map[string]string, len(req.Env))
 	stackExp := stackExpectationForRequest(req, stack)
 
-	var hydraIn, hydraOut, hydraHome []string
+	var hydraIn, hydraOut, hydraHome, hydraTmp []string
 	if len(typedOpts.Steps) > 0 {
 		// Multi-step run.
 		if stepIndex < 0 || stepIndex >= len(typedOpts.Steps) {
@@ -98,6 +98,7 @@ func buildMigManifest(req StartRunRequest, typedOpts RunOptions, stepIndex int, 
 		hydraIn = stepMig.In
 		hydraOut = stepMig.Out
 		hydraHome = stepMig.Home
+		hydraTmp = stepMig.Tmp
 
 		for k, v := range req.Env {
 			env[k] = v
@@ -118,6 +119,7 @@ func buildMigManifest(req StartRunRequest, typedOpts RunOptions, stepIndex int, 
 		hydraIn = typedOpts.Execution.In
 		hydraOut = typedOpts.Execution.Out
 		hydraHome = typedOpts.Execution.Home
+		hydraTmp = typedOpts.Execution.Tmp
 
 		for k, v := range req.Env {
 			env[k] = v
@@ -170,6 +172,7 @@ func buildMigManifest(req StartRunRequest, typedOpts RunOptions, stepIndex int, 
 		In:         hydraIn,
 		Out:        hydraOut,
 		Home:       hydraHome,
+		Tmp:        hydraTmp,
 		BundleMap:  typedOpts.BundleMap,
 		Gate: &contracts.StepGateSpec{
 			Enabled:        true,

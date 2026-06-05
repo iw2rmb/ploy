@@ -25,6 +25,8 @@ steps:
       - fedcba987654:/out/report.json
     home:
       - 111111111111:.config/app.toml:ro
+    tmp:
+      - 333333333333:/tmp/ploy/lib/ploy-java-tools.jar
     stack:
       inbound:
         enabled: true

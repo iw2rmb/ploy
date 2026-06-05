@@ -39,6 +39,7 @@ type ContainerSpec struct {
 	In   []string // canonical read-only input entries (shortHash:/in/dst)
 	Out  []string // canonical read-write output entries (shortHash:/out/dst)
 	Home []string // canonical home-relative entries (shortHash:dst{:ro})
+	Tmp  []string // canonical writable temporary entries (shortHash:/tmp/dst)
 }
 
 // ServerMetadataOptions holds server-injected metadata for uploads and tracking.
@@ -75,6 +76,7 @@ func runOptionsFromSpec(spec *contracts.MigSpec) RunOptions {
 		runOpts.Execution.In = step.In
 		runOpts.Execution.Out = step.Out
 		runOpts.Execution.Home = step.Home
+		runOpts.Execution.Tmp = step.Tmp
 	}
 
 	if len(spec.Steps) > 1 {
@@ -88,6 +90,7 @@ func runOptionsFromSpec(spec *contracts.MigSpec) RunOptions {
 					In:      step.In,
 					Out:     step.Out,
 					Home:    step.Home,
+					Tmp:     step.Tmp,
 				},
 				Stack: step.Stack,
 			})

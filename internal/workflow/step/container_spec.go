@@ -68,8 +68,8 @@ type ContainerResult struct {
 // The runID and jobID parameters thread workflow identifiers into container labels
 // for correlation with telemetry and log aggregation systems.
 // stagingDir is an optional path to a staging directory for materialized Hydra
-// resources; each In/Out/Home/CA entry is mounted from stagingDir/<shortHash>.
-func buildContainerSpec(runID types.RunID, jobID types.JobID, manifest contracts.StepManifest, workspace string, outDir string, inDir string, shareDir string, stagingDir string) (ContainerSpec, error) {
+// resources; each In/Out/Home/Tmp/CA entry is mounted from stagingDir/<shortHash>.
+func buildContainerSpec(runID types.RunID, jobID types.JobID, manifest contracts.StepManifest, workspace string, outDir string, inDir string, shareDir string, tmpDir string, stagingDir string) (ContainerSpec, error) {
 	// Mount the first input at its mount path; fallback to working dir.
 	mounts := make([]ContainerMount, 0, len(manifest.Inputs))
 	// Always mount the hydrated workspace to the declared mount (first input), respecting mode.
@@ -97,6 +97,11 @@ func buildContainerSpec(runID types.RunID, jobID types.JobID, manifest contracts
 	// Optional /share mount for run-scoped shared files.
 	if strings.TrimSpace(shareDir) != "" {
 		mounts = append(mounts, ContainerMount{Source: shareDir, Target: containerShareDir, ReadOnly: false})
+	}
+	// Optional /tmp mount for per-job temporary files. The host directory is
+	// lifecycle-scoped by nodeagent and never lives under repo artifacts.
+	if strings.TrimSpace(tmpDir) != "" {
+		mounts = append(mounts, ContainerMount{Source: tmpDir, Target: "/tmp", ReadOnly: false})
 	}
 	javaCacheMounts, err := buildJavaToolCacheMountsFromStackEnv(manifest.Envs)
 	if err != nil {
@@ -153,6 +158,18 @@ func buildContainerSpec(runID types.RunID, jobID types.JobID, manifest contracts
 				Target:   homeDir + "/" + parsed.Dst,
 				ReadOnly: parsed.ReadOnly,
 			})
+		}
+		// Tmp entries: validate destinations and enforce tmpDir presence.
+		// Tmp entries are seeded into tmpDir by SeedTmpDirFromStaging and
+		// covered by the single writable /tmp mount.
+		for _, entry := range manifest.Tmp {
+			parsed, err := contracts.ParseStoredTmpEntry(entry)
+			if err != nil {
+				return ContainerSpec{}, fmt.Errorf("tmp entry %q: %w", entry, err)
+			}
+			if strings.TrimSpace(tmpDir) == "" {
+				return ContainerSpec{}, fmt.Errorf("tmp entry %q: tmpDir required for destination %s", entry, parsed.Dst)
+			}
 		}
 	}
 
@@ -277,6 +294,32 @@ func SeedInDirFromStaging(manifest contracts.StepManifest, stagingDir, inDir str
 		}
 		if err := copyPath(src, dst); err != nil {
 			return fmt.Errorf("seed in %s: %w", parsed.Dst, err)
+		}
+	}
+	return nil
+}
+
+// SeedTmpDirFromStaging copies materialized Hydra tmp entry content from the
+// staging directory into tmpDir so that the single /tmp mount exposes all tmp
+// files while keeping them outside durable repo artifacts.
+func SeedTmpDirFromStaging(manifest contracts.StepManifest, stagingDir, tmpDir string) error {
+	if stagingDir == "" || tmpDir == "" {
+		return nil
+	}
+	cleanTmpDir := filepath.Clean(tmpDir)
+	for _, entry := range manifest.Tmp {
+		parsed, err := contracts.ParseStoredTmpEntry(entry)
+		if err != nil {
+			return fmt.Errorf("tmp entry %q: %w", entry, err)
+		}
+		rel := strings.TrimPrefix(parsed.Dst, "/tmp/")
+		src := filepath.Join(stagingDir, parsed.Hash, "content")
+		dst := filepath.Clean(filepath.Join(tmpDir, rel))
+		if dst != cleanTmpDir && !strings.HasPrefix(dst, cleanTmpDir+string(filepath.Separator)) {
+			return fmt.Errorf("tmp entry %q: resolved path %s escapes tmpDir", entry, dst)
+		}
+		if err := copyPath(src, dst); err != nil {
+			return fmt.Errorf("seed tmp %s: %w", parsed.Dst, err)
 		}
 	}
 	return nil

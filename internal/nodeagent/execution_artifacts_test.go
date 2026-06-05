@@ -82,6 +82,13 @@ func TestUploadRepoArtifactsIfPresent(t *testing.T) {
 	if err := os.WriteFile(paths.Stdout, []byte("log"), 0o644); err != nil {
 		t.Fatalf("write stdout: %v", err)
 	}
+	tmpDir := filepath.Join(runDir(runID), "tmp", jobID.String())
+	if err := os.MkdirAll(tmpDir, 0o777); err != nil {
+		t.Fatalf("create tmp dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(tmpDir, "tool.jar"), []byte("tmp"), 0o644); err != nil {
+		t.Fatalf("write tmp file: %v", err)
+	}
 
 	env.Controller.uploadRepoArtifactsIfPresent(runID, repoID, jobID)
 
@@ -89,6 +96,12 @@ func TestUploadRepoArtifactsIfPresent(t *testing.T) {
 		"artifacts/" + jobID.String() + "/out/result.txt",
 		"artifacts/" + jobID.String() + "/stdout.log",
 	})
+	entries := tarEntriesFromBundle(t, (*env.Calls)[0].Bundle)
+	for name := range entries {
+		if name == "tmp/"+jobID.String()+"/tool.jar" || name == "artifacts/"+jobID.String()+"/tmp/tool.jar" {
+			t.Fatalf("tmp file leaked into repo-artifacts as %q", name)
+		}
+	}
 }
 
 func mustReadFile(t *testing.T, path string) []byte {

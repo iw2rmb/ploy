@@ -23,7 +23,7 @@ import (
 const maxSpecBundleFileBytes int64 = 32 << 20
 
 // materializeHydraResources collects unique content hashes from the manifest's
-// In/Out/Home entries, downloads each referenced spec bundle by its bundleID
+// In/Out/Home/Tmp entries, downloads each referenced spec bundle by its bundleID
 // (resolved via bundleMap), verifies the SHA-256 digest, and extracts the
 // archive into stagingDir/<hash>. Returns nil when no entries require
 // materialization.
@@ -69,7 +69,7 @@ func (r *runController) materializeResource(ctx context.Context, bundleID, hash,
 }
 
 // collectUniqueHashes extracts all unique content hashes referenced by the
-// manifest's In, Out, and Home entries. Returns a deduplicated slice.
+// manifest's In, Out, Home, and Tmp entries. Returns a deduplicated slice.
 func collectUniqueHashes(manifest contracts.StepManifest) []string {
 	seen := make(map[string]struct{})
 	var hashes []string
@@ -100,6 +100,17 @@ func collectUniqueHashes(manifest contracts.StepManifest) []string {
 		parsed, err := contracts.ParseStoredHomeEntry(entry)
 		if err != nil {
 			slog.Warn("skip invalid Home entry during hash collection", "entry", entry, "error", err)
+			continue
+		}
+		if _, ok := seen[parsed.Hash]; !ok {
+			seen[parsed.Hash] = struct{}{}
+			hashes = append(hashes, parsed.Hash)
+		}
+	}
+	for _, entry := range manifest.Tmp {
+		parsed, err := contracts.ParseStoredTmpEntry(entry)
+		if err != nil {
+			slog.Warn("skip invalid Tmp entry during hash collection", "entry", entry, "error", err)
 			continue
 		}
 		if _, ok := seen[parsed.Hash]; !ok {

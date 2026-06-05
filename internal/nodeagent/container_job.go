@@ -267,18 +267,21 @@ func (r *runController) runContainerJob(
 	// Materialize Hydra resources into a staging directory for mount planning.
 	stopOutputSync := r.startOutputSync(ctx, req, cfg, outDir, workspace)
 	if bundleErr := r.withMaterializedResources(ctx, manifest, req.TypedOptions.BundleMap, "ploy-staging-*", func(stagingDir string) error {
-		result, runErr = execCtx.runner.Run(ctx, step.Request{
-			RunID:      req.RunID,
-			JobID:      req.JobID,
-			Manifest:   manifest,
-			Workspace:  workspace,
-			OutDir:     outDir,
-			InDir:      inDir,
-			ShareDir:   shareDir,
-			StagingDir: stagingDir,
+		return withJobTmpDir(manifest, func(tmpDir string) error {
+			result, runErr = execCtx.runner.Run(ctx, step.Request{
+				RunID:      req.RunID,
+				JobID:      req.JobID,
+				Manifest:   manifest,
+				Workspace:  workspace,
+				OutDir:     outDir,
+				InDir:      inDir,
+				ShareDir:   shareDir,
+				TmpDir:     tmpDir,
+				StagingDir: stagingDir,
+			})
+			duration = time.Since(startTime)
+			return nil
 		})
-		duration = time.Since(startTime)
-		return nil
 	}); bundleErr != nil {
 		stopOutputSync()
 		return outcome, bundleErr
@@ -462,7 +465,22 @@ func withTempDir(prefix string, fn func(path string) error) error {
 	return fn(dir)
 }
 
-// withMaterializedResources materializes Hydra resources (In/Out/Home) from the
+// withJobTmpDir creates a per-job host /tmp backing directory only when the
+// manifest declares tmp entries. The directory is writable like container /tmp
+// and removed after the job.
+func withJobTmpDir(manifest contracts.StepManifest, fn func(path string) error) error {
+	if len(manifest.Tmp) == 0 {
+		return fn("")
+	}
+	return withTempDir("ploy-job-tmp-*", func(dir string) error {
+		if err := os.Chmod(dir, 0o1777); err != nil {
+			return fmt.Errorf("chmod job tmp dir: %w", err)
+		}
+		return fn(dir)
+	})
+}
+
+// withMaterializedResources materializes Hydra resources (In/Out/Home/Tmp) from the
 // manifest into a staging directory and passes the staging path to fn. When the
 // manifest has no Hydra entries, fn receives "".
 func (r *runController) withMaterializedResources(ctx context.Context, manifest contracts.StepManifest, bundleMap map[string]string, prefix string, fn func(stagingDir string) error) error {
