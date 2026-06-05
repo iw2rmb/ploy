@@ -34,6 +34,7 @@ ploy run restart <run-id>
 ploy wave status <wave-id> [--follow]
 ploy wave runs <wave-id>
 ploy wave cancel <wave-id>
+ploy job status <job-id>
 ploy job log <job-id>
 ```
 
@@ -57,6 +58,11 @@ Wave-scoped API surfaces:
 - `GET /v1/waves/{wave_id}`
 - `GET /v1/waves/{wave_id}/runs`
 - `POST /v1/waves/{wave_id}/cancel`
+
+Job-scoped API surfaces:
+
+- `GET /v1/jobs/{job_id}/status`
+- `GET /v1/jobs/{job_id}/logs`
 
 Run inspection, artifacts, diffs, jobs, logs, cancellation, restart, and pull
 resolution are all addressed by `run_id`; `repo_id` is returned only as

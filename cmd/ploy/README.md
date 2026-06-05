@@ -22,6 +22,7 @@ ploy run <spec-path> [<repo-path>|<namespace/repo[:ref]>] [--follow] [--apply] [
 ploy run status <run-id> [--json|--follow]                                  # inspect a run
 ploy run apply <run-id> [path] [--force]                                     # apply a run patch locally
 ploy run pull <run-id> [artifacts-path]                                      # download final run artifacts
+ploy job status <job-id>                                                     # inspect one job as JSON
 ploy mig run <mig-id|name> [<namespace/repo[:ref]> ...] [--failed] [--follow] # execute a mig project over its repo set
 ploy spec schema                                                             # print the mig JSON Schema
 ploy spec validate docs/schemas/mig.example.yaml                             # validate a mig spec
@@ -48,6 +49,8 @@ For running jobs, follow mode also shows `STD[O]UT` and `STD[E]RR` preview rows
 (collapsed by default). Press `o` to expand/collapse stdout previews for all
 currently running jobs, and `e` for stderr previews. Failed jobs are kept expanded.
 Note: `--follow` does not stream container logs. Use `ploy job log --follow <job-id>` for container log streaming.
+Use `ploy job status <job-id>` to print the current job row and execution fields
+as JSON for investigation scripts.
 
 For `ploy mig run --follow`, `--cap` enforces an overall time limit. If exceeded,
 the CLI exits follow mode; add `--cancel-on-cap` to also cancel the run.
@@ -142,6 +145,7 @@ ploy mig run java17 --failed
 | `run pull <run-id>`      | Download final artifacts for a run            |
 | `mig pull [<mig>]`       | Pull diffs for the current repo from a mig    |
 | `run status --follow`    | Follow run status until terminal              |
+| `job status <job-id>`    | Print one job status as JSON                  |
 
 See `docs/migs-lifecycle.md` for the relationship between waves, runs, and jobs.
 

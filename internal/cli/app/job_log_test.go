@@ -3,6 +3,7 @@ package app
 import (
 	"bufio"
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -13,6 +14,60 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/testutil/clienv"
 )
+
+func TestJobStatusJSONOutput(t *testing.T) {
+	jobID := domaintypes.NewJobID()
+	runID := domaintypes.NewRunID()
+	repoID := domaintypes.NewRepoID()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Path != "/v1/jobs/"+jobID.String()+"/status" {
+			http.NotFound(w, r)
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"job_id":        jobID.String(),
+			"run_id":        runID.String(),
+			"repo_id":       repoID.String(),
+			"attempt":       1,
+			"name":          "mig-0",
+			"job_type":      "mig",
+			"status":        "Running",
+			"job_image":     "ghcr.io/acme/mig:1",
+			"node_id":       nil,
+			"exit_code":     nil,
+			"started_at":    nil,
+			"finished_at":   nil,
+			"duration_ms":   0,
+			"repo_sha_in":   "0123456789abcdef0123456789abcdef01234567",
+			"repo_sha_out":  "",
+			"repo_sha_in8":  "01234567",
+			"repo_sha_out8": "",
+		})
+	}))
+	defer server.Close()
+
+	clienv.UseServerDescriptor(t, server.URL)
+
+	buf := &bytes.Buffer{}
+	err := executeCmd([]string{"job", "status", jobID.String()}, buf)
+	if err != nil {
+		t.Fatalf("job status: %v", err)
+	}
+
+	var parsed map[string]any
+	if err := json.Unmarshal(buf.Bytes(), &parsed); err != nil {
+		t.Fatalf("expected valid JSON output, got %q (err=%v)", buf.String(), err)
+	}
+	if got := parsed["job_id"]; got != jobID.String() {
+		t.Fatalf("job_id = %#v, want %s", got, jobID.String())
+	}
+	if got := parsed["status"]; got != "Running" {
+		t.Fatalf("status = %#v, want Running", got)
+	}
+	if got := parsed["run_id"]; got != runID.String() {
+		t.Fatalf("run_id = %#v, want %s", got, runID.String())
+	}
+}
 
 func TestJobLogStructuredOutput(t *testing.T) {
 	jobID := domaintypes.NewJobID()

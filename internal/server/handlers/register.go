@@ -153,7 +153,7 @@ func registerJobRoutes(s *httpserver.Server, deps routeDeps) {
 	s.RegisterRouteFunc("POST /v1/jobs/{job_id}/logs", createJobLogsHandler(deps.st, deps.bp, deps.eventsService), auth.RoleWorker)
 	s.RegisterRouteFunc("POST /v1/jobs/{job_id}/complete", completeJobHandler(deps.st, deps.eventsService, deps.bp), auth.RoleWorker)
 	s.RegisterRouteFunc("POST /v1/actions/{action_id}/complete", completeActionHandler(deps.st), auth.RoleWorker)
-	s.RegisterRouteFunc("GET /v1/jobs/{job_id}/status", getJobStatusHandler(deps.st), auth.RoleWorker)
+	s.RegisterRouteFunc("GET /v1/jobs/{job_id}/status", getJobStatusHandler(deps.st), auth.RoleWorker, auth.RoleControlPlane)
 	s.RegisterRouteFunc("POST /v1/jobs/{job_id}/image", saveJobImageNameHandler(deps.st), auth.RoleWorker)
 	s.RegisterRouteFunc("POST /v1/jobs/{job_id}/sbom", saveJobSBOMHandler(deps.st), auth.RoleWorker)
 }

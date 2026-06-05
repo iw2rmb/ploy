@@ -11,15 +11,31 @@ import (
 )
 
 // newJobCmd creates the cobra command tree for 'ploy job' and its subcommands.
-func newJobCmd(stderr io.Writer) *cobra.Command {
+func newJobCmd(stdout, stderr io.Writer) *cobra.Command {
 	jobCmd := &cobra.Command{
 		Use:   "job",
-		Short: "Inspect and follow job logs",
+		Short: "Inspect jobs and follow logs",
 		Args:  cobra.NoArgs,
 		RunE:  func(cmd *cobra.Command, args []string) error { return cmd.Help() },
 	}
+	jobCmd.AddCommand(newJobStatusCmd(stdout))
 	jobCmd.AddCommand(newJobLogCmd(stderr))
 	return jobCmd
+}
+
+func newJobStatusCmd(stdout io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "status <job-id>",
+		Short: "Print job status as JSON",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return job.RunStatus(cmd.Context(), job.StatusOptions{
+				JobID:  args[0],
+				Output: stdout,
+			})
+		},
+	}
+	return cmd
 }
 
 func newJobLogCmd(stderr io.Writer) *cobra.Command {

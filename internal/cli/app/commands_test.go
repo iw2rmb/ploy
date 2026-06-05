@@ -77,6 +77,7 @@ func TestCobraCommandTreeRouting(t *testing.T) {
 		{name: "cluster unknown", args: []string{"cluster", "unknown"}, wantErr: `unknown command "unknown"`},
 		{name: "cluster node unknown", args: []string{"cluster", "node", "unknown"}, wantErr: `unknown command "unknown"`},
 		{name: "job follow unknown", args: []string{"job", "follow"}, wantErr: `unknown command "follow"`},
+		{name: "job status help", args: []string{"job", "status", "--help"}, wantOK: true, wantOut: "ploy job status <job-id> [flags]"},
 		{name: "help run status", args: []string{"help", "run", "status"}, wantOK: true, wantOut: "ploy run status <run-id> [flags]"},
 		{name: "run status help", args: []string{"run", "status", "--help"}, wantOK: true, wantOut: "ploy run status <run-id> [flags]"},
 		{name: "token list help", args: []string{"cluster", "token", "list", "--help"}, wantOK: true, wantOut: "ploy cluster token list [flags]"},
