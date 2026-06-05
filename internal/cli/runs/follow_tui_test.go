@@ -290,7 +290,7 @@ func TestFollowModelViewSingleRepoKeepsRepoVisibleWithoutRunningJobs(t *testing.
 	}
 }
 
-func TestWriteFinalStatusSnapshot_NonTTYUsesStatusRenderer(t *testing.T) {
+func TestWriteFinalStatusSnapshot_UsesStatusRenderer(t *testing.T) {
 	t.Parallel()
 
 	report := RunStatusReport{
@@ -320,28 +320,51 @@ func TestWriteFinalStatusSnapshot_NonTTYUsesStatusRenderer(t *testing.T) {
 		},
 	}
 
-	var out bytes.Buffer
-	opts := TextRenderOptions{
-		FilterRunningRepos: true,
-		EmptyReposLine:     "No repos with in-progress jobs.",
-		LiveDurations:      true,
-		SpinnerFrame:       3,
-	}
-	if err := writeFinalStatusSnapshot(&out, report, opts); err != nil {
-		t.Fatalf("writeFinalStatusSnapshot() error: %v", err)
+	tests := []struct {
+		name              string
+		clearBeforeRender bool
+		wantClearPrefix   bool
+	}{
+		{name: "without clear", clearBeforeRender: false, wantClearPrefix: false},
+		{name: "with clear", clearBeforeRender: true, wantClearPrefix: true},
 	}
 
-	rendered := out.String()
-	if strings.Contains(rendered, "\x1b[2J\x1b[H") {
-		t.Fatalf("expected no clear sequence for non-tty output, got %q", rendered)
-	}
-	if !strings.Contains(rendered, "   Repos: 2") {
-		t.Fatalf("expected status snapshot with all repos, got %q", rendered)
-	}
-	if !strings.Contains(rendered, "acme/done") {
-		t.Fatalf("expected terminal repo in final status snapshot, got %q", rendered)
-	}
-	if strings.Contains(rendered, "No repos with in-progress jobs.") {
-		t.Fatalf("expected status snapshot semantics, got %q", rendered)
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			var out bytes.Buffer
+			opts := TextRenderOptions{
+				FilterRunningRepos: true,
+				EmptyReposLine:     "No repos with in-progress jobs.",
+				LiveDurations:      true,
+				SpinnerFrame:       3,
+				JobIOPreviews: map[domaintypes.JobID]RunJobIOPreview{
+					report.Repos[0].Jobs[0].JobID: {Stdout: []string{"preview"}},
+				},
+				ExpandStdout: true,
+			}
+			if err := writeFinalStatusSnapshot(&out, report, opts, tc.clearBeforeRender); err != nil {
+				t.Fatalf("writeFinalStatusSnapshot() error: %v", err)
+			}
+
+			rendered := out.String()
+			if got := strings.HasPrefix(rendered, clearScreenSequence); got != tc.wantClearPrefix {
+				t.Fatalf("clear prefix = %v, want %v in %q", got, tc.wantClearPrefix, rendered)
+			}
+			if !strings.Contains(rendered, "   Repos: 2") {
+				t.Fatalf("expected status snapshot with all repos, got %q", rendered)
+			}
+			if !strings.Contains(rendered, "acme/done") {
+				t.Fatalf("expected terminal repo in final status snapshot, got %q", rendered)
+			}
+			if strings.Contains(rendered, "No repos with in-progress jobs.") {
+				t.Fatalf("expected status snapshot semantics, got %q", rendered)
+			}
+			if strings.Contains(rendered, "preview") {
+				t.Fatalf("expected follow preview to be omitted from final status snapshot, got %q", rendered)
+			}
+		})
 	}
 }

@@ -280,3 +280,34 @@ func TestRunStatusFollowUsesReportPolling(t *testing.T) {
 		t.Fatalf("follow output should not include removed log endpoint: %q", out)
 	}
 }
+
+func TestRunStatusFollowFailedRunPrintsFinalSnapshot(t *testing.T) {
+	runID := domaintypes.NewRunID().String()
+	server := newSuccessfulRunSubmitServer(t, successfulRunSubmitConfig{
+		RunID:     runID,
+		MigID:     domaintypes.NewMigID().String(),
+		SpecID:    domaintypes.NewSpecID().String(),
+		RepoID:    domaintypes.NewRepoID().String(),
+		JobID:     domaintypes.NewJobID().String(),
+		RepoURL:   "https://gitlab.example.com/acme/service.git",
+		Ref:       "main",
+		RunStatus: domaintypes.RunStatusFail.String(),
+		RunState:  "failed",
+		JobStatus: domaintypes.JobStatusFail.String(),
+	})
+	defer server.Close()
+	clienv.UseServerDescriptor(t, server.URL)
+
+	var buf bytes.Buffer
+	err := executeCmd([]string{"run", "status", "--follow", runID}, &buf)
+	if err == nil || !strings.Contains(err.Error(), "run ended in failed") {
+		t.Fatalf("expected failed run error, got %v", err)
+	}
+	out := buf.String()
+	if !strings.Contains(out, "acme/service") {
+		t.Fatalf("expected final status snapshot, got %q", out)
+	}
+	if strings.Contains(out, "No repos with in-progress jobs.") {
+		t.Fatalf("expected static status snapshot semantics, got %q", out)
+	}
+}

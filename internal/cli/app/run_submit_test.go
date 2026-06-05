@@ -293,6 +293,9 @@ type successfulRunSubmitConfig struct {
 	RepoURL   string
 	Ref       string
 	SourceSHA string
+	RunStatus string
+	RunState  string
+	JobStatus string
 	Patch     []byte
 }
 
@@ -303,6 +306,19 @@ func newSuccessfulRunSubmitServer(t *testing.T, cfg successfulRunSubmitConfig) *
 	if sourceSHA == "" {
 		sourceSHA = "0123456789abcdef0123456789abcdef01234567"
 	}
+	runStatus := cfg.RunStatus
+	if runStatus == "" {
+		runStatus = domaintypes.RunStatusSuccess.String()
+	}
+	runState := cfg.RunState
+	if runState == "" {
+		runState = stageStateForJobStatus(runStatus)
+	}
+	jobStatus := cfg.JobStatus
+	if jobStatus == "" {
+		jobStatus = runStatus
+	}
+	jobState := stageStateForJobStatus(jobStatus)
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.Method == http.MethodPost && r.URL.Path == "/v1/repos/resolve":
@@ -321,7 +337,7 @@ func newSuccessfulRunSubmitServer(t *testing.T, cfg successfulRunSubmitConfig) *
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/runs/"+cfg.RunID:
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"id":                cfg.RunID,
-				"status":            "Success",
+				"status":            runStatus,
 				"mig_id":            cfg.MigID,
 				"spec_id":           cfg.SpecID,
 				"repo_id":           cfg.RepoID,
@@ -334,10 +350,10 @@ func newSuccessfulRunSubmitServer(t *testing.T, cfg successfulRunSubmitConfig) *
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/runs/"+cfg.RunID+"/status":
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"run_id": cfg.RunID,
-				"state":  "succeeded",
+				"state":  runState,
 				"stages": map[string]any{
 					cfg.JobID: map[string]any{
-						"state":     "succeeded",
+						"state":     jobState,
 						"artifacts": map[string]string{},
 					},
 				},
@@ -351,7 +367,7 @@ func newSuccessfulRunSubmitServer(t *testing.T, cfg successfulRunSubmitConfig) *
 					"job_id":    cfg.JobID,
 					"job_type":  "mig",
 					"job_image": "alpine",
-					"status":    "Success",
+					"status":    jobStatus,
 				}},
 			})
 		case r.Method == http.MethodPost && r.URL.Path == "/v1/runs/"+cfg.RunID+"/pull":
@@ -381,4 +397,23 @@ func newSuccessfulRunSubmitServer(t *testing.T, cfg successfulRunSubmitConfig) *
 			http.NotFound(w, r)
 		}
 	}))
+}
+
+func stageStateForJobStatus(status string) string {
+	switch status {
+	case domaintypes.JobStatusSuccess.String():
+		return "succeeded"
+	case domaintypes.JobStatusFail.String():
+		return "failed"
+	case domaintypes.JobStatusCancelled.String():
+		return "cancelled"
+	case domaintypes.JobStatusRunning.String():
+		return "running"
+	case domaintypes.JobStatusQueued.String():
+		return "queued"
+	case domaintypes.JobStatusCreated.String():
+		return "created"
+	default:
+		return strings.ToLower(status)
+	}
 }
