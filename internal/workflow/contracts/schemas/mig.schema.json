@@ -84,6 +84,7 @@
         "in": { "$ref": "#/definitions/hydraEntries" },
         "out": { "$ref": "#/definitions/hydraEntries" },
         "home": { "$ref": "#/definitions/hydraEntries" },
+        "tmp": { "$ref": "#/definitions/hydraEntries" },
         "stack": { "$ref": "#/definitions/stepStack" }
       }
     },

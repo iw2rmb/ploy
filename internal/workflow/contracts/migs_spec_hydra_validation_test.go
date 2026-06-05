@@ -36,6 +36,12 @@ func TestMigSpecValidate_HydraFieldsStep(t *testing.T) {
 			}`,
 		},
 		{
+			name: "valid tmp entry",
+			input: `{
+				"steps": [{"image": "img:latest", "tmp": ["abcdef0:/tmp/ploy/lib.jar"]}]
+			}`,
+		},
+		{
 			name: "in entry wrong domain",
 			input: `{
 				"steps": [{"image": "img:latest", "in": ["abcdef0:/tmp/config.json"]}]
@@ -71,11 +77,39 @@ func TestMigSpecValidate_HydraFieldsStep(t *testing.T) {
 			wantErr: "steps[0].in[0]",
 		},
 		{
+			name: "tmp entry outside tmp rejected",
+			input: `{
+				"steps": [{"image": "img:latest", "tmp": ["abcdef0:/var/tmp/tool.jar"]}]
+			}`,
+			wantErr: "steps[0].tmp[0]",
+		},
+		{
+			name: "tmp entry path traversal rejected",
+			input: `{
+				"steps": [{"image": "img:latest", "tmp": ["abcdef0:/tmp/../../etc/passwd"]}]
+			}`,
+			wantErr: "steps[0].tmp[0]",
+		},
+		{
 			name: "duplicate in destinations rejected",
 			input: `{
 				"steps": [{"image": "img:latest", "in": ["abcdef0:/in/a", "bbbbbbb:/in/a"]}]
 			}`,
 			wantErr: "steps[0].in[1]",
+		},
+		{
+			name: "duplicate tmp destinations rejected",
+			input: `{
+				"steps": [{"image": "img:latest", "tmp": ["abcdef0:/tmp/a", "bbbbbbb:/tmp/a"]}]
+			}`,
+			wantErr: "steps[0].tmp[1]",
+		},
+		{
+			name: "tmp non-string rejected by schema",
+			input: `{
+				"steps": [{"image": "img:latest", "tmp": [42]}]
+			}`,
+			wantErr: "steps",
 		},
 		{
 			name: "no hydra fields is valid",

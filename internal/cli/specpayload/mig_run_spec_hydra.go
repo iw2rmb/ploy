@@ -1,17 +1,19 @@
 // mig_run_spec_hydra.go implements the Hydra file-record compiler for CLI spec processing.
 //
-// The compiler resolves authoring-form in/out/home entries into canonical
+// The compiler resolves authoring-form in/out/home/tmp entries into canonical
 // shortHash:dst form suitable for contract validation and server submission.
 //
 // Authoring input formats:
 //   - in:   src:dst          (right-biased split, dst treated as /in-relative)
 //   - out:  src:dst          (right-biased split, dst treated as /out-relative)
 //   - home: src:dst{:ro}     (right-biased split, dst is $HOME-relative)
+//   - tmp:  src:dst          (right-biased split, dst treated as /tmp-relative or /tmp absolute)
 //
 // After compilation, entries are rewritten to:
 //   - in:   shortHash:/in/dst
 //   - out:  shortHash:/out/dst
 //   - home: shortHash:dst{:ro}
+//   - tmp:  shortHash:/tmp/dst
 package specpayload
 
 import (
@@ -95,6 +97,24 @@ func parseAuthoringHomeEntry(s string) (src, dst string, readOnly bool, err erro
 	return src, dst, readOnly, nil
 }
 
+// parseAuthoringTmpEntry parses an authoring `tmp` entry: "src:dst".
+// Uses right-biased splitting. Absolute destinations must stay under /tmp;
+// relative destinations are normalized under /tmp.
+func parseAuthoringTmpEntry(s string) (src, dst string, err error) {
+	src, rawDst, err := splitRightBiasedColon(s)
+	if err != nil {
+		return "", "", fmt.Errorf("tmp entry %q: %w", s, err)
+	}
+	dst, err = normalizeAuthoringTmpDestination(rawDst)
+	if err != nil {
+		return "", "", fmt.Errorf("tmp entry %q: %w", s, err)
+	}
+	if err := guardAuthoringTraversal(dst); err != nil {
+		return "", "", fmt.Errorf("tmp entry %q: %w", s, err)
+	}
+	return src, dst, nil
+}
+
 func normalizeAuthoringDestination(dst, root string) (string, error) {
 	trimmed := strings.TrimSpace(dst)
 	if trimmed == "" {
@@ -109,6 +129,25 @@ func normalizeAuthoringDestination(dst, root string) (string, error) {
 	}
 
 	return root + relative, nil
+}
+
+func normalizeAuthoringTmpDestination(dst string) (string, error) {
+	trimmed := strings.TrimSpace(dst)
+	if trimmed == "" {
+		return "", fmt.Errorf("destination required")
+	}
+	if strings.HasPrefix(trimmed, "/") {
+		cleaned := path.Clean(trimmed)
+		if !strings.HasPrefix(cleaned, "/tmp/") {
+			return "", fmt.Errorf("destination must start with /tmp/")
+		}
+		return cleaned, nil
+	}
+	relative := path.Clean(trimmed)
+	if relative == "" || relative == "." {
+		return "", fmt.Errorf("destination required")
+	}
+	return "/tmp/" + relative, nil
 }
 
 // splitRightBiasedColon splits at the last colon, returning (left, right).
@@ -139,7 +178,7 @@ func guardAuthoringTraversal(p string) error {
 }
 
 // compileHydraRecordsInPlace walks all container blocks in the spec and compiles
-// authoring-form in/out/home entries into canonical shortHash:dst form.
+// authoring-form in/out/home/tmp entries into canonical shortHash:dst form.
 // Returns nil immediately when no authoring entries are present.
 func compileHydraRecordsInPlace(ctx context.Context, base *url.URL, client *http.Client, spec map[string]any, specBaseDir string) error {
 	type blockRef struct {
@@ -199,7 +238,7 @@ func compileHydraRecordsInPlace(ctx context.Context, base *url.URL, client *http
 // hasAuthoringEntries checks whether a block contains any non-canonical entries
 // that require compilation.
 func hasAuthoringEntries(block map[string]any) bool {
-	for _, key := range []string{"in", "out", "home"} {
+	for _, key := range []string{"in", "out", "home", "tmp"} {
 		entries, ok := block[key].([]any)
 		if !ok {
 			continue
@@ -235,7 +274,10 @@ func compileHydraBlock(ctx context.Context, base *url.URL, client *http.Client, 
 	if err := compileOutEntries(ctx, base, client, block, prefix, specBaseDir, seen, bundleMap); err != nil {
 		return err
 	}
-	return compileHomeEntries(ctx, base, client, block, prefix, specBaseDir, seen, bundleMap)
+	if err := compileHomeEntries(ctx, base, client, block, prefix, specBaseDir, seen, bundleMap); err != nil {
+		return err
+	}
+	return compileTmpEntries(ctx, base, client, block, prefix, specBaseDir, seen, bundleMap)
 }
 
 func compileInEntries(ctx context.Context, base *url.URL, client *http.Client, block map[string]any, prefix, specBaseDir string, seen map[string]string, bundleMap map[string]string) error {
@@ -334,6 +376,36 @@ func compileHomeEntries(ctx context.Context, base *url.URL, client *http.Client,
 		compiled[i] = canonical
 	}
 	block["home"] = compiled
+	return nil
+}
+
+func compileTmpEntries(ctx context.Context, base *url.URL, client *http.Client, block map[string]any, prefix, specBaseDir string, seen map[string]string, bundleMap map[string]string) error {
+	entries, ok := block["tmp"].([]any)
+	if !ok || len(entries) == 0 {
+		return nil
+	}
+	compiled := make([]any, len(entries))
+	for i, e := range entries {
+		s, ok := e.(string)
+		if !ok {
+			return fmt.Errorf("%s.tmp[%d]: expected string, got %T", prefix, i, e)
+		}
+		idx := strings.Index(s, ":")
+		if idx > 0 && shortHashPattern.MatchString(s[:idx]) {
+			compiled[i] = s
+			continue
+		}
+		src, dst, err := parseAuthoringTmpEntry(s)
+		if err != nil {
+			return fmt.Errorf("%s.tmp[%d]: %w", prefix, i, err)
+		}
+		hash, err := compileFileRecord(ctx, base, client, src, specBaseDir, seen, bundleMap)
+		if err != nil {
+			return fmt.Errorf("%s.tmp[%d]: %w", prefix, i, err)
+		}
+		compiled[i] = hash + ":" + dst
+	}
+	block["tmp"] = compiled
 	return nil
 }
 

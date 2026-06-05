@@ -58,7 +58,10 @@ func compileLocalHydraBlock(step map[string]any, prefix, specBaseDir string) err
 	if err := compileLocalOutEntries(step, prefix, specBaseDir); err != nil {
 		return err
 	}
-	return compileLocalHomeEntries(step, prefix, specBaseDir)
+	if err := compileLocalHomeEntries(step, prefix, specBaseDir); err != nil {
+		return err
+	}
+	return compileLocalTmpEntries(step, prefix, specBaseDir)
 }
 
 func compileLocalInEntries(step map[string]any, prefix, specBaseDir string) error {
@@ -156,6 +159,35 @@ func compileLocalHomeEntries(step map[string]any, prefix, specBaseDir string) er
 	return nil
 }
 
+func compileLocalTmpEntries(step map[string]any, prefix, specBaseDir string) error {
+	entries, ok := step["tmp"].([]any)
+	if !ok || len(entries) == 0 {
+		return nil
+	}
+	compiled := make([]any, len(entries))
+	for i, raw := range entries {
+		entry, ok := raw.(string)
+		if !ok {
+			return fmt.Errorf("%s.tmp[%d]: expected string, got %T", prefix, i, raw)
+		}
+		if isAlreadyCanonical("tmp", entry) {
+			compiled[i] = entry
+			continue
+		}
+		src, dst, err := parseAuthoringTmpEntry(entry)
+		if err != nil {
+			return fmt.Errorf("%s.tmp[%d]: %w", prefix, i, err)
+		}
+		hash, err := localFileRecordHash(src, specBaseDir)
+		if err != nil {
+			return fmt.Errorf("%s.tmp[%d]: %w", prefix, i, err)
+		}
+		compiled[i] = hash + ":" + dst
+	}
+	step["tmp"] = compiled
+	return nil
+}
+
 func localFileRecordHash(srcPath, specBaseDir string) (string, error) {
 	resolved, err := resolvePath(srcPath, specBaseDir)
 	if err != nil {
@@ -177,6 +209,9 @@ func validateLocalStepFileRecords(step map[string]any, prefix, specBaseDir strin
 		return err
 	}
 	if err := validateLocalHomeEntries(step, prefix, specBaseDir); err != nil {
+		return err
+	}
+	if err := validateLocalTmpEntries(step, prefix, specBaseDir); err != nil {
 		return err
 	}
 	return validateMountedYAMLIncludes(mounts, prefix)
@@ -261,6 +296,30 @@ func validateLocalHomeEntries(step map[string]any, prefix, specBaseDir string) e
 		}
 		if _, _, err := statLocalFileRecordSource(src, specBaseDir); err != nil {
 			return fmt.Errorf("%s.home[%d]: %w", prefix, i, err)
+		}
+	}
+	return nil
+}
+
+func validateLocalTmpEntries(step map[string]any, prefix, specBaseDir string) error {
+	entries, ok := step["tmp"].([]any)
+	if !ok || len(entries) == 0 {
+		return nil
+	}
+	for i, raw := range entries {
+		entry, ok := raw.(string)
+		if !ok {
+			return fmt.Errorf("%s.tmp[%d]: expected string, got %T", prefix, i, raw)
+		}
+		if isAlreadyCanonical("tmp", entry) {
+			continue
+		}
+		src, _, err := parseAuthoringTmpEntry(entry)
+		if err != nil {
+			return fmt.Errorf("%s.tmp[%d]: %w", prefix, i, err)
+		}
+		if _, _, err := statLocalFileRecordSource(src, specBaseDir); err != nil {
+			return fmt.Errorf("%s.tmp[%d]: %w", prefix, i, err)
 		}
 	}
 	return nil

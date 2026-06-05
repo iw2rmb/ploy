@@ -1,10 +1,11 @@
 // hydra.go defines Hydra canonical stored-entry parsers and validators for
-// the envs/in/out/home contract fields.
+// the envs/in/out/home/tmp contract fields.
 //
 // Canonical stored-entry formats:
 //   - in:   "shortHash:dst"      where dst starts with /in/
 //   - out:  "shortHash:dst"      where dst starts with /out/
 //   - home: "shortHash:dst{:ro}" where dst is $HOME-relative (no leading /)
+//   - tmp:  "shortHash:dst"      where dst starts with /tmp/
 //
 // shortHash is a hex-only, colon-free prefix of the full content hash.
 package contracts
@@ -103,6 +104,23 @@ func ParseStoredHomeEntry(s string) (ParsedStoredEntry, error) {
 	return ParsedStoredEntry{Hash: hash, Dst: dst, ReadOnly: readOnly}, nil
 }
 
+// ParseStoredTmpEntry parses a canonical `tmp` entry: "shortHash:dst".
+// dst must be absolute and start with "/tmp/".
+func ParseStoredTmpEntry(s string) (ParsedStoredEntry, error) {
+	hash, dst, err := splitHashDst(s)
+	if err != nil {
+		return ParsedStoredEntry{}, fmt.Errorf("tmp entry %q: %w", s, err)
+	}
+	dst = path.Clean(dst)
+	if !strings.HasPrefix(dst, "/tmp/") {
+		return ParsedStoredEntry{}, fmt.Errorf("tmp entry %q: destination must start with /tmp/", s)
+	}
+	if err := guardPathTraversal(dst); err != nil {
+		return ParsedStoredEntry{}, fmt.Errorf("tmp entry %q: %w", s, err)
+	}
+	return ParsedStoredEntry{Hash: hash, Dst: dst, ReadOnly: false}, nil
+}
+
 // CanonicalHomeEntry reconstructs the canonical stored home entry string
 // from parsed fields: "hash:dst" or "hash:dst:ro".
 func (p ParsedStoredEntry) CanonicalHomeEntry() string {
@@ -178,9 +196,25 @@ func ValidateHydraHomeEntries(entries []string, prefix string) error {
 	return nil
 }
 
-// validateHydraFields validates the Hydra fields (in, out, home) on a
+// ValidateHydraTmpEntries validates a slice of canonical `tmp` entries.
+func ValidateHydraTmpEntries(entries []string, prefix string) error {
+	seen := make(map[string]struct{}, len(entries))
+	for i, entry := range entries {
+		parsed, err := ParseStoredTmpEntry(entry)
+		if err != nil {
+			return fmt.Errorf("%s[%d]: %w", prefix, i, err)
+		}
+		if _, dup := seen[parsed.Dst]; dup {
+			return fmt.Errorf("%s[%d]: duplicate destination %q", prefix, i, parsed.Dst)
+		}
+		seen[parsed.Dst] = struct{}{}
+	}
+	return nil
+}
+
+// validateHydraFields validates the Hydra fields (in, out, home, tmp) on a
 // container spec.
-func validateHydraFields(in, out, home []string, prefix string) error {
+func validateHydraFields(in, out, home, tmp []string, prefix string) error {
 	if err := ValidateHydraInEntries(in, prefix+".in"); err != nil {
 		return err
 	}
@@ -188,6 +222,9 @@ func validateHydraFields(in, out, home []string, prefix string) error {
 		return err
 	}
 	if err := ValidateHydraHomeEntries(home, prefix+".home"); err != nil {
+		return err
+	}
+	if err := ValidateHydraTmpEntries(tmp, prefix+".tmp"); err != nil {
 		return err
 	}
 	return nil

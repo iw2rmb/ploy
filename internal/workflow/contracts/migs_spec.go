@@ -78,7 +78,7 @@ type MigSpec struct {
 	// Applies globally to all steps.
 	BuildGate *BuildGateConfig `json:"build_gate,omitempty" yaml:"build_gate,omitempty"`
 
-	// BundleMap maps content hashes used in In/Out/Home entries to their
+	// BundleMap maps content hashes used in In/Out/Home/Tmp entries to their
 	// spec bundle download identifiers (bundle IDs). Populated by the CLI
 	// compiler during spec submission. The nodeagent uses this to resolve
 	// shortHash → bundleID for resource download during materialization.
@@ -112,6 +112,9 @@ type MigStep struct {
 	// Home lists canonical home-relative entries ("shortHash:dst{:ro}").
 	Home []string `json:"home,omitempty" yaml:"home,omitempty"`
 
+	// Tmp lists canonical writable temporary entries ("shortHash:/tmp/dst").
+	Tmp []string `json:"tmp,omitempty" yaml:"tmp,omitempty"`
+
 	// Stack configures Stack Gate validation for this step.
 	// Inbound validates pre-mig expectations; Outbound validates post-mig expectations.
 	Stack *StackGateSpec `json:"stack,omitempty" yaml:"stack,omitempty"`
@@ -138,7 +141,7 @@ func (s MigSpec) Validate() error {
 				return err
 			}
 		}
-		if err := validateHydraFields(mig.In, mig.Out, mig.Home, fmt.Sprintf("steps[%d]", i)); err != nil {
+		if err := validateHydraFields(mig.In, mig.Out, mig.Home, mig.Tmp, fmt.Sprintf("steps[%d]", i)); err != nil {
 			return err
 		}
 	}

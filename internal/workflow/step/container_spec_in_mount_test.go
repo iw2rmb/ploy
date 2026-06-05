@@ -22,7 +22,7 @@ func TestBuildContainerSpec_InMountPresent(t *testing.T) {
 		}},
 	}
 
-	spec, err := buildContainerSpec(types.RunID("run-in"), types.JobID("job-in"), manifest, "/tmp/ws", "", "/tmp/in", "", "")
+	spec, err := buildContainerSpec(types.RunID("run-in"), types.JobID("job-in"), manifest, "/tmp/ws", "", "/tmp/in", "", "", "")
 	if err != nil {
 		t.Fatalf("buildContainerSpec error: %v", err)
 	}
@@ -48,7 +48,7 @@ func TestBuildContainerSpec_InMountSkipsNestedHydraInMounts(t *testing.T) {
 		In: []string{"abcdef0:/in/amata.yaml"},
 	}
 
-	spec, err := buildContainerSpec(types.RunID("run-in"), types.JobID("job-in"), manifest, "/tmp/ws", "", "/tmp/in", "", "/tmp/staging")
+	spec, err := buildContainerSpec(types.RunID("run-in"), types.JobID("job-in"), manifest, "/tmp/ws", "", "/tmp/in", "", "", "/tmp/staging")
 	if err != nil {
 		t.Fatalf("buildContainerSpec error: %v", err)
 	}
@@ -70,7 +70,7 @@ func TestBuildContainerSpec_ShareMountPresent(t *testing.T) {
 		}},
 	}
 
-	spec, err := buildContainerSpec(types.RunID("run-share"), types.JobID("job-share"), manifest, "/tmp/ws", "", "", "/tmp/share", "")
+	spec, err := buildContainerSpec(types.RunID("run-share"), types.JobID("job-share"), manifest, "/tmp/ws", "", "", "/tmp/share", "", "")
 	if err != nil {
 		t.Fatalf("buildContainerSpec error: %v", err)
 	}

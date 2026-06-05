@@ -223,10 +223,87 @@ func TestParseStoredHomeEntry(t *testing.T) {
 	}
 }
 
+func TestParseStoredTmpEntry(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		wantHash string
+		wantDst  string
+		wantErr  string
+	}{
+		{
+			name:     "valid entry",
+			input:    "abcdef0:/tmp/ploy/lib.jar",
+			wantHash: "abcdef0",
+			wantDst:  "/tmp/ploy/lib.jar",
+		},
+		{
+			name:     "double slash cleaned",
+			input:    "abcdef0:/tmp//ploy/tool",
+			wantHash: "abcdef0",
+			wantDst:  "/tmp/ploy/tool",
+		},
+		{
+			name:    "outside tmp rejected",
+			input:   "abcdef0:/var/tmp/tool",
+			wantErr: "destination must start with /tmp/",
+		},
+		{
+			name:    "traversal rejected",
+			input:   "abcdef0:/tmp/../../etc/passwd",
+			wantErr: "destination must start with /tmp/",
+		},
+		{
+			name:    "empty destination",
+			input:   "abcdef0:",
+			wantErr: "destination required",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			parsed, err := ParseStoredTmpEntry(tc.input)
+			if tc.wantErr != "" {
+				if err == nil {
+					t.Fatalf("expected error containing %q, got nil", tc.wantErr)
+				}
+				if !strings.Contains(err.Error(), tc.wantErr) {
+					t.Fatalf("error %q does not contain %q", err.Error(), tc.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if parsed.Hash != tc.wantHash {
+				t.Errorf("hash = %q, want %q", parsed.Hash, tc.wantHash)
+			}
+			if parsed.Dst != tc.wantDst {
+				t.Errorf("dst = %q, want %q", parsed.Dst, tc.wantDst)
+			}
+			if parsed.ReadOnly {
+				t.Errorf("tmp entries must be read-write")
+			}
+		})
+	}
+}
+
 func TestValidateHydraInEntries_DuplicateDst(t *testing.T) {
 	err := ValidateHydraInEntries([]string{
 		"abcdef0:/in/a",
 		"bbbbbbb:/in/a",
+	}, "test")
+	if err == nil {
+		t.Fatal("expected duplicate destination error")
+	}
+	if !strings.Contains(err.Error(), "duplicate destination") {
+		t.Fatalf("error %q does not mention duplicate destination", err.Error())
+	}
+}
+
+func TestValidateHydraTmpEntries_DuplicateDst(t *testing.T) {
+	err := ValidateHydraTmpEntries([]string{
+		"abcdef0:/tmp/ploy/tool.jar",
+		"bbbbbbb:/tmp/ploy/tool.jar",
 	}, "test")
 	if err == nil {
 		t.Fatal("expected duplicate destination error")

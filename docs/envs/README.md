@@ -75,22 +75,24 @@ spec supports:
   - `in` — Read-only input files (`src:/in/dst`; CLI compiles local paths to `shortHash:/in/dst`)
   - `out` — Read-write output files (`src:/out/dst`; CLI compiles local paths to `shortHash:/out/dst`)
   - `home` — Home-relative files (`src:dst{:ro}`; CLI compiles to `shortHash:dst{:ro}`)
-  - `steps[]` — Multi-step spec steps (each with its own `image`/`command`/`envs`/`in`/`out`/`home`)
+  - `tmp` — Per-job writable temporary files (`src:/tmp/dst` or `src:dst`; CLI compiles to `shortHash:/tmp/dst`)
+  - `steps[]` — Multi-step spec steps (each with its own `image`/`command`/`envs`/`in`/`out`/`home`/`tmp`)
   - `build_gate.pre.stack` / `build_gate.post.stack` — Stack-detection policy for gate phases
   - `build_gate.images` — Build Gate image overrides selected by stack rules
   - See [mig.example.yaml](../schemas/mig.example.yaml) for the full schema.
 
 ### Hydra file-record compilation
 
-The CLI compiles local file paths in `in`, `out`, and `home` fields into
+The CLI compiles local file paths in `in`, `out`, `home`, and `tmp` fields into
 canonical `shortHash:dst` records before spec submission:
 
 1. Resolves each source path relative to the spec file directory.
 2. Computes a content hash, uploads the archive when missing, and rewrites
    the entry to `shortHash:dst` form.
-3. The node agent downloads bundles by hash and mounts them at the declared
-   destination (read-only for `in`, read-write for `out`, configurable
-   for `home`).
+3. The node agent downloads bundles by hash and mounts or seeds them at the
+   declared destination: `in` is read-only, `out` is read-write and uploaded as
+   job output, `home` uses its `:ro` mode, and `tmp` is a per-job writable
+   `/tmp` mount that is removed after the job and excluded from repo artifacts.
 
 **Example spec fragment (before CLI compile):**
 ```yaml
@@ -98,6 +100,8 @@ steps:
   - image: docker.io/your-dh-user/migs-openrewrite:latest
     in:
       - ./recipe.yaml:/in/recipe.yaml
+    tmp:
+      - ./lib/ploy-java-tools.jar:/tmp/ploy/lib/ploy-java-tools.jar
 
 build_gate:
   post:
@@ -113,7 +117,9 @@ build_gate:
 steps:
   - image: docker.io/your-dh-user/migs-openrewrite:latest
     in:
-      - "a1b2c3d4e5f6g7:/in/recipe.yaml"
+      - "a1b2c3d4e5f6:/in/recipe.yaml"
+    tmp:
+      - "abcdef123456:/tmp/ploy/lib/ploy-java-tools.jar"
 
 build_gate:
   post:

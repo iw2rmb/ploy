@@ -67,8 +67,11 @@ type Request struct {
 	// ShareDir is an optional directory mounted at /share for run-scoped
 	// shared inputs/outputs across job stages.
 	ShareDir string
+	// TmpDir is an optional per-job directory seeded from Manifest.Tmp and
+	// mounted at /tmp for writable, non-artifact temporary files.
+	TmpDir string
 	// StagingDir is an optional path to a directory containing pre-materialized
-	// Hydra resources. Each In/Out/Home entry is mounted from StagingDir/<shortHash>.
+	// Hydra resources. Each In/Out/Home/Tmp entry is mounted from StagingDir/<shortHash>.
 	StagingDir string
 }
 
@@ -137,6 +140,9 @@ func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 	if err := SeedInDirFromStaging(req.Manifest, req.StagingDir, req.InDir); err != nil {
 		return Result{}, fmt.Errorf("seed in dir from staging: %w", err)
 	}
+	if err := SeedTmpDirFromStaging(req.Manifest, req.StagingDir, req.TmpDir); err != nil {
+		return Result{}, fmt.Errorf("seed tmp dir from staging: %w", err)
+	}
 
 	// Stage 3: Execute container via configured runtime.
 	executionStart := time.Now()
@@ -147,7 +153,7 @@ func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 		result.ExitCode = 0
 		result.Timings.ExecutionDuration = types.Duration(time.Since(executionStart))
 	} else {
-		spec, err := buildContainerSpec(req.RunID, req.JobID, req.Manifest, req.Workspace, req.OutDir, req.InDir, req.ShareDir, req.StagingDir)
+		spec, err := buildContainerSpec(req.RunID, req.JobID, req.Manifest, req.Workspace, req.OutDir, req.InDir, req.ShareDir, req.TmpDir, req.StagingDir)
 		if err != nil {
 			return Result{}, fmt.Errorf("build container spec: %w", err)
 		}

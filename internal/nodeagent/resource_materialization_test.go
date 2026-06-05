@@ -443,16 +443,23 @@ func TestHydraResources_MixedMaterializationAndMountPlanning(t *testing.T) {
 	}, nil)
 	homeHash := digestOf(homeArchive)[:12]
 
+	tmpArchive := buildTestTarGz(t, map[string][]byte{
+		"content": []byte("tmp tool"),
+	}, nil)
+	tmpHash := digestOf(tmpArchive)[:12]
+
 	archives := map[string][]byte{
 		inHash:   inArchive,
 		outHash:  outArchive,
 		homeHash: homeArchive,
+		tmpHash:  tmpArchive,
 	}
 
 	bundleMap := map[string]string{
 		inHash:   "bun-in",
 		outHash:  "bun-out",
 		homeHash: "bun-home",
+		tmpHash:  "bun-tmp",
 	}
 
 	// Serve bundles by bundleID.
@@ -474,6 +481,7 @@ func TestHydraResources_MixedMaterializationAndMountPlanning(t *testing.T) {
 		In:        []string{inHash + ":/in/config.json"},
 		Out:       []string{outHash + ":/out/results"},
 		Home:      []string{homeHash + ":.auth.json:ro"},
+		Tmp:       []string{tmpHash + ":/tmp/ploy/tool.jar"},
 		BundleMap: bundleMap,
 	}
 
@@ -486,7 +494,7 @@ func TestHydraResources_MixedMaterializationAndMountPlanning(t *testing.T) {
 	}
 
 	// 2. Verify all unique hashes were staged.
-	for _, hash := range []string{inHash, outHash, homeHash} {
+	for _, hash := range []string{inHash, outHash, homeHash, tmpHash} {
 		if _, err := os.Stat(filepath.Join(stagingDir, hash)); err != nil {
 			t.Errorf("staging dir for hash %s missing: %v", hash, err)
 		}
@@ -517,6 +525,14 @@ func TestHydraResources_MixedMaterializationAndMountPlanning(t *testing.T) {
 		t.Errorf("Home content = %q", gotHome)
 	}
 
+	gotTmp, err := os.ReadFile(filepath.Join(stagingDir, tmpHash, "content"))
+	if err != nil {
+		t.Fatalf("read Tmp content: %v", err)
+	}
+	if string(gotTmp) != "tmp tool" {
+		t.Errorf("Tmp content = %q", gotTmp)
+	}
+
 	// 4. Verify hash deduplication: same hash should not be materialized twice.
 	hashes := collectUniqueHashes(manifest)
 	seen := make(map[string]bool)
@@ -526,8 +542,8 @@ func TestHydraResources_MixedMaterializationAndMountPlanning(t *testing.T) {
 		}
 		seen[h] = true
 	}
-	if len(hashes) != 3 {
-		t.Errorf("expected 3 unique hashes, got %d: %v", len(hashes), hashes)
+	if len(hashes) != 4 {
+		t.Errorf("expected 4 unique hashes, got %d: %v", len(hashes), hashes)
 	}
 
 	// 5. Execute out mount planning via SeedOutDirFromStaging and verify
@@ -542,6 +558,20 @@ func TestHydraResources_MixedMaterializationAndMountPlanning(t *testing.T) {
 	}
 	if string(seededOut) != "seed content" {
 		t.Errorf("seeded out = %q, want %q", seededOut, "seed content")
+	}
+
+	// 6. Execute tmp seeding and verify seeded content at the correct path
+	//    under the per-job tmp directory.
+	tmpDir := t.TempDir()
+	if err := step.SeedTmpDirFromStaging(manifest, stagingDir, tmpDir); err != nil {
+		t.Fatalf("SeedTmpDirFromStaging: %v", err)
+	}
+	seededTmp, err := os.ReadFile(filepath.Join(tmpDir, "ploy", "tool.jar"))
+	if err != nil {
+		t.Fatalf("seeded tmp content missing: %v", err)
+	}
+	if string(seededTmp) != "tmp tool" {
+		t.Errorf("seeded tmp = %q, want %q", seededTmp, "tmp tool")
 	}
 
 	// 6. Assert mount source layout for in/home matches buildContainerSpec
@@ -579,6 +609,7 @@ func TestHydraResources_MixedMaterializationAndMountPlanning(t *testing.T) {
 		In:        manifest.In,
 		Out:       manifest.Out,
 		Home:      manifest.Home,
+		Tmp:       manifest.Tmp,
 		BundleMap: bundleMap,
 	}
 
@@ -590,6 +621,7 @@ func TestHydraResources_MixedMaterializationAndMountPlanning(t *testing.T) {
 		Manifest:   fullManifest,
 		Workspace:  t.TempDir(),
 		OutDir:     outDir2,
+		TmpDir:     tmpDir,
 		StagingDir: stagingDir,
 	})
 	if runErr != nil {
@@ -640,5 +672,24 @@ func TestHydraResources_MixedMaterializationAndMountPlanning(t *testing.T) {
 	}
 	if !foundOut {
 		t.Errorf("mount /out (out) not found in spec mounts: %+v", spy.capturedSpec.Mounts)
+	}
+
+	var foundTmp bool
+	for _, m := range spy.capturedSpec.Mounts {
+		if m.Target == "/tmp" {
+			foundTmp = true
+			if m.Source != tmpDir {
+				t.Errorf("mount /tmp (tmp): source = %q, want %q", m.Source, tmpDir)
+			}
+			if m.ReadOnly {
+				t.Errorf("mount /tmp (tmp): readOnly = true, want false")
+			}
+		}
+		if m.Target == "/tmp/ploy/tool.jar" {
+			t.Errorf("unexpected nested tmp mount: %+v", m)
+		}
+	}
+	if !foundTmp {
+		t.Errorf("mount /tmp (tmp) not found in spec mounts: %+v", spy.capturedSpec.Mounts)
 	}
 }
