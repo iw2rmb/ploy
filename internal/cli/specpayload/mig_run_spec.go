@@ -33,9 +33,23 @@ import (
 var specEnvPlaceholderRE = regexp.MustCompile(`\$\{([A-Za-z_][A-Za-z0-9_]*)\}|\$([A-Za-z_][A-Za-z0-9_]*)`)
 
 func Normalize(ctx context.Context, base *url.URL, client *http.Client, data []byte, specBaseDir string) (json.RawMessage, error) {
+	return normalizeWithStepSelector(ctx, base, client, data, specBaseDir, "")
+}
+
+func normalizeWithStepSelector(ctx context.Context, base *url.URL, client *http.Client, data []byte, specBaseDir string, stepSelector string) (json.RawMessage, error) {
 	raw, err := parseSpecInputToMap(data, specBaseDir)
 	if err != nil {
 		return nil, fmt.Errorf("parse spec (not valid JSON or YAML): %w", err)
+	}
+	sourcePath, err := composeSpecRootPath(specBaseDir)
+	if err != nil {
+		return nil, err
+	}
+	if err := expandSpecRefsInPlace(raw, sourcePath); err != nil {
+		return nil, fmt.Errorf("expand refs: %w", err)
+	}
+	if err := selectStepInPlace(raw, stepSelector, sourcePath); err != nil {
+		return nil, err
 	}
 	if err := preprocessMigsSpecInPlace(raw, specBaseDir); err != nil {
 		return nil, err
@@ -89,6 +103,13 @@ func ValidateLocal(data []byte, specBaseDir string) (json.RawMessage, error) {
 	raw, err := parseSpecInputToMap(data, specBaseDir)
 	if err != nil {
 		return nil, fmt.Errorf("parse spec (not valid JSON or YAML): %w", err)
+	}
+	sourcePath, err := composeSpecRootPath(specBaseDir)
+	if err != nil {
+		return nil, err
+	}
+	if err := expandSpecRefsInPlace(raw, sourcePath); err != nil {
+		return nil, fmt.Errorf("expand refs: %w", err)
 	}
 	if err := preprocessMigsSpecInPlace(raw, specBaseDir); err != nil {
 		return nil, err
@@ -553,14 +574,34 @@ func Build(
 	retain bool,
 	migCommand string,
 ) ([]byte, error) {
+	return BuildSelected(ctx, base, client, specFile, "", migEnvs, migImage, retain, migCommand)
+}
+
+func BuildSelected(
+	ctx context.Context,
+	base *url.URL,
+	client *http.Client,
+	specFile string,
+	stepSelector string,
+	migEnvs []string,
+	migImage string,
+	retain bool,
+	migCommand string,
+) ([]byte, error) {
 	_ = retain
 
 	// Start with spec from file (if provided)
 	var specMap map[string]any
 	specBaseDir := ""
+	specSourcePath := ""
 	if specFile != "" {
 		cleanSpecPath := filepath.Clean(specFile)
 		specBaseDir = filepath.Dir(cleanSpecPath)
+		absSpecPath, err := filepath.Abs(cleanSpecPath)
+		if err != nil {
+			return nil, fmt.Errorf("resolve spec file %s: %w", cleanSpecPath, err)
+		}
+		specSourcePath = absSpecPath
 		data, err := common.ReadFileRooted(cleanSpecPath)
 		if err != nil {
 			return nil, fmt.Errorf("read spec file %s: %w", cleanSpecPath, err)
@@ -571,6 +612,18 @@ func Build(
 		}
 	} else {
 		specMap = make(map[string]any)
+		sourcePath, err := composeSpecRootPath(specBaseDir)
+		if err != nil {
+			return nil, err
+		}
+		specSourcePath = sourcePath
+	}
+
+	if err := expandSpecRefsInPlace(specMap, specSourcePath); err != nil {
+		return nil, fmt.Errorf("expand refs: %w", err)
+	}
+	if err := selectStepInPlace(specMap, stepSelector, specSourcePath); err != nil {
+		return nil, err
 	}
 
 	if err := preprocessMigsSpecInPlace(specMap, specBaseDir); err != nil {
@@ -745,5 +798,5 @@ func Load(ctx context.Context, base *url.URL, client *http.Client, path string) 
 		specBaseDir = wd
 	}
 
-	return Normalize(ctx, base, client, data, specBaseDir)
+	return normalizeWithStepSelector(ctx, base, client, data, specBaseDir, "")
 }

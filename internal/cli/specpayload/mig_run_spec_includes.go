@@ -363,6 +363,8 @@ func normalizeIncludedLocalPaths(node *yaml.Node, sourcePath string) error {
 			normalizeMountEntries(value, sourcePath, false)
 		case "home":
 			normalizeMountEntries(value, sourcePath, true)
+		case "ref":
+			normalizeRefEntry(value, sourcePath)
 		}
 
 		if err := normalizeIncludedLocalPaths(value, sourcePath); err != nil {
@@ -370,6 +372,24 @@ func normalizeIncludedLocalPaths(node *yaml.Node, sourcePath string) error {
 		}
 	}
 	return nil
+}
+
+func normalizeRefEntry(node *yaml.Node, sourcePath string) {
+	node = derefAlias(node)
+	if node.Kind != yaml.ScalarNode {
+		return
+	}
+	raw := strings.TrimSpace(node.Value)
+	idx := strings.LastIndex(raw, ":")
+	if idx <= 0 {
+		return
+	}
+	pathPart := strings.TrimSpace(raw[:idx])
+	stepName := strings.TrimSpace(raw[idx+1:])
+	if pathPart == "" || stepName == "" || filepath.IsAbs(pathPart) {
+		return
+	}
+	node.Value = filepath.Clean(filepath.Join(filepath.Dir(sourcePath), pathPart)) + ":" + stepName
 }
 
 func normalizeMountEntries(node *yaml.Node, sourcePath string, isHome bool) {
