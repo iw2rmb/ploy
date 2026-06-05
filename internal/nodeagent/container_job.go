@@ -74,9 +74,6 @@ func (r *runController) executeMigJob(ctx context.Context, req StartRunRequest) 
 	cfg := containerJobConfig{
 		Manifest: manifest,
 		DiffType: types.DiffJobTypeMig,
-		PopulateInDir: func(inDir string) error {
-			return r.materializeInFrom(ctx, req, inDir)
-		},
 		UploadDiff: func(ctx context.Context, runID types.RunID, jobID types.JobID, jobName string, diffGen step.DiffGenerator, workspace string, result step.Result, diffPath string) (bool, error) {
 			return r.uploadDiff(ctx, runID, jobID, diffGen, workspace, result, types.DiffJobTypeMig, diffPath)
 		},

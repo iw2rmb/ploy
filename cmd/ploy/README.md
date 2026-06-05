@@ -277,9 +277,6 @@ ploy completion <shell> --help
 - Mig spec files use canonical `steps[]` shape for both single-step and
   multi-step runs. Each step supports
   `image`/`command`/`envs` plus Hydra file-record fields (`in`, `out`, `home`)
-  and cross-step input references (`in_from`)
-  using shared runtime paths like `/share/java.classpath` or
-  `extract-usage@mig://out/dependency-usage.nofilter.json`
   for deterministic file injection via content-addressed bundles.
   CLI-authored specs can use `steps[].ref` entries such as
   `ref: ../shared/mig.yaml:deprecations`; refs are expanded before submission

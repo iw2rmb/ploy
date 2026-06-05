@@ -48,17 +48,6 @@
       "type": "array",
       "items": { "type": "string" }
     },
-    "inFrom": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "from": { "type": "string" },
-          "to": { "type": "string" }
-        }
-      }
-    },
     "stackExpectation": {
       "type": "object",
       "additionalProperties": false,
@@ -93,7 +82,6 @@
         "command": { "$ref": "#/definitions/command" },
         "envs": { "$ref": "#/definitions/stringMap" },
         "in": { "$ref": "#/definitions/hydraEntries" },
-        "in_from": { "$ref": "#/definitions/inFrom" },
         "out": { "$ref": "#/definitions/hydraEntries" },
         "home": { "$ref": "#/definitions/hydraEntries" },
         "stack": { "$ref": "#/definitions/stepStack" }

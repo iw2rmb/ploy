@@ -6,8 +6,7 @@ import (
 
 // MigClaimContext carries the concrete mig step selected for execution.
 type MigClaimContext struct {
-	StepIndex int                 `json:"step_index"`
-	InFrom    []ResolvedInFromRef `json:"in_from,omitempty"`
+	StepIndex int `json:"step_index"`
 }
 
 // GateClaimContext carries concrete gate execution routing.

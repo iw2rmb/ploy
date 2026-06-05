@@ -35,7 +35,7 @@ const (
 	// into gate containers as /out for deterministic artifact collection.
 	GateWorkspaceOutDir = ".ploy-gate-out"
 	// gateWorkspaceInDir is an optional workspace-local host directory
-	// mounted into gate containers as /in for cross-step runtime inputs.
+	// mounted into gate containers as /in for orchestrator-provided inputs.
 	gateWorkspaceInDir = ".ploy-gate-in"
 	// gateContainerInDir is the writable input mount path inside gate
 	// containers used by orchestrator-provided runtime inputs.

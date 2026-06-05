@@ -37,24 +37,6 @@ func ParseMigSpecJSON(data []byte) (*MigSpec, error) {
 	if err := spec.Validate(); err != nil {
 		return nil, err
 	}
-	normalizeInFromTargets(&spec)
 
 	return &spec, nil
-}
-
-func normalizeInFromTargets(spec *MigSpec) {
-	for i := range spec.Steps {
-		for j := range spec.Steps[i].InFrom {
-			ref := &spec.Steps[i].InFrom[j]
-			parsed, err := ParseInFromURI(ref.From)
-			if err != nil {
-				continue
-			}
-			to, err := NormalizeInFromTarget(ref.To, parsed.OutPath)
-			if err != nil {
-				continue
-			}
-			ref.To = to
-		}
-	}
 }
