@@ -10,7 +10,8 @@ func TestParseMigSpecJSON_SingleStep(t *testing.T) {
 		"steps": [{
 			"image": "ghcr.io/iw2rmb/ploy/mig:latest",
 			"command": "echo hello",
-			"envs": {"FOO": "bar", "BAZ": "qux"}
+			"envs": {"FOO": "bar", "BAZ": "qux"},
+			"options": {"mount_docker_socket": true}
 		}],
 		"build_gate": {}
 	}`
@@ -46,6 +47,9 @@ func TestParseMigSpecJSON_SingleStep(t *testing.T) {
 	}
 	if step.Envs["BAZ"] != "qux" {
 		t.Errorf("envs[BAZ] = %q, want %q", step.Envs["BAZ"], "qux")
+	}
+	if !step.Options.MountDockerSocket {
+		t.Errorf("options.mount_docker_socket = false, want true")
 	}
 
 	// Verify build_gate.
@@ -230,6 +234,18 @@ func TestParseMigSpecJSON_SchemaValidationErrors(t *testing.T) {
 			}`,
 			wantErr: []string{
 				"build_gate: additional properties 'enabled' not allowed",
+			},
+		},
+		{
+			name: "unknown step option field",
+			input: `{
+				"steps": [{
+					"image": "ghcr.io/iw2rmb/ploy/mig:latest",
+					"options": {"docker_socket": true}
+				}]
+			}`,
+			wantErr: []string{
+				"steps[0].options: additional properties 'docker_socket' not allowed",
 			},
 		},
 	}

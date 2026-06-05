@@ -80,6 +80,7 @@ func buildMigManifest(req StartRunRequest, typedOpts RunOptions, stepIndex int, 
 	stackExp := stackExpectationForRequest(req, stack)
 
 	var hydraIn, hydraOut, hydraHome, hydraTmp []string
+	var stepOptions map[string]any
 	if len(typedOpts.Steps) > 0 {
 		// Multi-step run.
 		if stepIndex < 0 || stepIndex >= len(typedOpts.Steps) {
@@ -99,6 +100,7 @@ func buildMigManifest(req StartRunRequest, typedOpts RunOptions, stepIndex int, 
 		hydraOut = stepMig.Out
 		hydraHome = stepMig.Home
 		hydraTmp = stepMig.Tmp
+		stepOptions = stepMig.Options
 
 		for k, v := range req.Env {
 			env[k] = v
@@ -120,8 +122,12 @@ func buildMigManifest(req StartRunRequest, typedOpts RunOptions, stepIndex int, 
 		hydraOut = typedOpts.Execution.Out
 		hydraHome = typedOpts.Execution.Home
 		hydraTmp = typedOpts.Execution.Tmp
+		stepOptions = typedOpts.Execution.Options
 
 		for k, v := range req.Env {
+			env[k] = v
+		}
+		for k, v := range typedOpts.Execution.Env {
 			env[k] = v
 		}
 	}
@@ -142,6 +148,9 @@ func buildMigManifest(req StartRunRequest, typedOpts RunOptions, stepIndex int, 
 
 	// Build manifest options from typed accessors.
 	mergedOpts := make(map[string]any)
+	for k, v := range stepOptions {
+		mergedOpts[k] = v
+	}
 	if !typedOpts.ServerMetadata.JobID.IsZero() {
 		mergedOpts["job_id"] = typedOpts.ServerMetadata.JobID.String()
 	}

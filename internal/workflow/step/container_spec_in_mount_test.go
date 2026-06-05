@@ -1,6 +1,7 @@
 package step
 
 import (
+	"os"
 	"testing"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
@@ -76,4 +77,31 @@ func TestBuildContainerSpec_ShareMountPresent(t *testing.T) {
 	}
 
 	requireMount(t, spec.Mounts, "/share", "/tmp/share", false)
+}
+
+func TestBuildContainerSpec_DockerSocketMountOption(t *testing.T) {
+	const sock = "/var/run/docker.sock"
+	if fi, err := os.Stat(sock); err != nil || fi.IsDir() {
+		t.Skipf("%s is not available on this host", sock)
+	}
+
+	manifest := contracts.StepManifest{
+		ID:      types.StepID("step-docker-socket"),
+		Name:    "With Docker socket",
+		Image:   "alpine:3",
+		Options: map[string]any{"mount_docker_socket": true},
+		Inputs: []contracts.StepInput{{
+			Name:        "src",
+			MountPath:   "/workspace",
+			Mode:        contracts.StepInputModeReadWrite,
+			SnapshotCID: types.CID("bafy123"),
+		}},
+	}
+
+	spec, err := buildContainerSpec(types.RunID("run-docker"), types.JobID("job-docker"), manifest, "/tmp/ws", "", "", "", "", "")
+	if err != nil {
+		t.Fatalf("buildContainerSpec error: %v", err)
+	}
+
+	requireMount(t, spec.Mounts, sock, sock, false)
 }

@@ -357,6 +357,8 @@ func TestBuildSpecPayload_BasicParsing(t *testing.T) {
 			spec: `
 steps:
   - image: docker.io/test/mig:latest
+    options:
+      mount_docker_socket: true
 envs:
   KEY1: value1
   KEY2: value2
@@ -414,6 +416,13 @@ build_gate:
 			steps := mustSteps(t, result, 1)
 			assertField(t, steps[0], "image", tt.wantStepImage)
 			assertAbsent(t, steps[0], "retain_container")
+			if optionsRaw, ok := steps[0]["options"]; ok {
+				options, ok := optionsRaw.(map[string]any)
+				if !ok {
+					t.Fatalf("steps[0].options = %T, want object", optionsRaw)
+				}
+				assertField(t, options, "mount_docker_socket", true)
+			}
 
 			if tt.wantEnv != nil {
 				envs := mustDig(t, result, "envs")

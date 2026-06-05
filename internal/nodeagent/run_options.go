@@ -34,6 +34,7 @@ type ContainerSpec struct {
 	Image   contracts.JobImage
 	Command contracts.CommandSpec
 	Env     map[string]string
+	Options map[string]any
 
 	// Hydra resource entries for staged materialization and mount planning.
 	In   []string // canonical read-only input entries (shortHash:/in/dst)
@@ -73,6 +74,8 @@ func runOptionsFromSpec(spec *contracts.MigSpec) RunOptions {
 		step := spec.Steps[0]
 		runOpts.Execution.Image = step.Image
 		runOpts.Execution.Command = step.Command
+		runOpts.Execution.Env = copyStringMap(step.Envs)
+		runOpts.Execution.Options = manifestOptionsFromStepOptions(step.Options)
 		runOpts.Execution.In = step.In
 		runOpts.Execution.Out = step.Out
 		runOpts.Execution.Home = step.Home
@@ -87,6 +90,7 @@ func runOptionsFromSpec(spec *contracts.MigSpec) RunOptions {
 					Image:   step.Image,
 					Command: step.Command,
 					Env:     copyStringMap(step.Envs),
+					Options: manifestOptionsFromStepOptions(step.Options),
 					In:      step.In,
 					Out:     step.Out,
 					Home:    step.Home,
@@ -104,6 +108,17 @@ func runOptionsFromSpec(spec *contracts.MigSpec) RunOptions {
 	runOpts.BundleMap = spec.BundleMap
 
 	return runOpts
+}
+
+func manifestOptionsFromStepOptions(opts contracts.MigStepOptions) map[string]any {
+	if opts.IsZero() {
+		return nil
+	}
+	out := make(map[string]any, 1)
+	if opts.MountDockerSocket {
+		out["mount_docker_socket"] = true
+	}
+	return out
 }
 
 // copyStringMap creates a shallow copy of a string map.
