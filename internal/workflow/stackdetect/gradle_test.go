@@ -272,6 +272,11 @@ func TestJavaVersionAssignmentRegex(t *testing.T) {
 			expected: "11",
 		},
 		{
+			name:     "java language version factory",
+			input:    `javaVersion = JavaLanguageVersion.of("21")`,
+			expected: "21",
+		},
+		{
 			name:     "no match",
 			input:    `sourceCompatibility = 17`,
 			expected: "",
@@ -329,6 +334,48 @@ java {
 			wantRelease: "17",
 		},
 		{
+			name:     "toolchain languageVersion assign JavaVersion constant",
+			fileName: "build.gradle.kts",
+			content: `
+plugins { java }
+
+java {
+    toolchain {
+        languageVersion = JavaVersion.VERSION_21
+    }
+}
+`,
+			wantRelease: "21",
+		},
+		{
+			name:     "toolchain languageVersion assign unqualified constant",
+			fileName: "build.gradle.kts",
+			content: `
+plugins { java }
+
+java {
+    toolchain {
+        languageVersion = VERSION_17
+    }
+}
+`,
+			wantRelease: "17",
+		},
+		{
+			name:     "toolchain languageVersion assign numeric",
+			fileName: "build.gradle.kts",
+			content: `
+plugins { java }
+
+java {
+    toolchain {
+        languageVersion = 11
+    }
+}
+`,
+			wantRelease: "11",
+		},
+		{
 			name:     "toolchain languageVersion set KTS",
 			fileName: "build.gradle.kts",
 			content: `
@@ -337,6 +384,48 @@ plugins { java }
 java {
     toolchain {
         languageVersion.set(JavaLanguageVersion.of("21"))
+    }
+}
+`,
+			wantRelease: "21",
+		},
+		{
+			name:     "toolchain languageVersion set JavaVersion constant",
+			fileName: "build.gradle.kts",
+			content: `
+plugins { java }
+
+java {
+    toolchain {
+        languageVersion.set(JavaVersion.VERSION_17)
+    }
+}
+`,
+			wantRelease: "17",
+		},
+		{
+			name:     "toolchain languageVersion set unqualified constant",
+			fileName: "build.gradle.kts",
+			content: `
+plugins { java }
+
+java {
+    toolchain {
+        languageVersion.set(VERSION_11)
+    }
+}
+`,
+			wantRelease: "11",
+		},
+		{
+			name:     "toolchain languageVersion set numeric",
+			fileName: "build.gradle.kts",
+			content: `
+plugins { java }
+
+java {
+    toolchain {
+        languageVersion.set(21)
     }
 }
 `,
@@ -353,6 +442,16 @@ dependencyManagerRootExtension {
 			wantRelease: "21",
 		},
 		{
+			name:     "dependency manager javaVersion assignment JavaLanguageVersion factory",
+			fileName: "build.gradle.kts",
+			content: `
+dependencyManagerRootExtension {
+    javaVersion = JavaLanguageVersion.of(21)
+}
+`,
+			wantRelease: "21",
+		},
+		{
 			name:     "dependency manager javaVersion assignment unqualified",
 			fileName: "build.gradle.kts",
 			content: `
@@ -361,6 +460,46 @@ dependencyManagerRootExtension {
 }
 `,
 			wantRelease: "17",
+		},
+		{
+			name:     "dependency manager javaVersion set qualified",
+			fileName: "build.gradle.kts",
+			content: `
+dependencyManagerRootExtension {
+    javaVersion.set(JavaVersion.VERSION_21)
+}
+`,
+			wantRelease: "21",
+		},
+		{
+			name:     "dependency manager javaVersion set unqualified",
+			fileName: "build.gradle.kts",
+			content: `
+dependencyManagerRootExtension {
+    javaVersion.set(VERSION_17)
+}
+`,
+			wantRelease: "17",
+		},
+		{
+			name:     "dependency manager javaVersion set numeric",
+			fileName: "build.gradle.kts",
+			content: `
+dependencyManagerRootExtension {
+    javaVersion.set(11)
+}
+`,
+			wantRelease: "11",
+		},
+		{
+			name:     "dependency manager javaVersion set JavaLanguageVersion factory",
+			fileName: "build.gradle.kts",
+			content: `
+dependencyManagerRootExtension {
+    javaVersion.set(JavaLanguageVersion.of("21"))
+}
+`,
+			wantRelease: "21",
 		},
 		{
 			name:     "version catalog jvm target",
