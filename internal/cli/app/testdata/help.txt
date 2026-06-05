@@ -11,7 +11,6 @@ Available Commands:
   help        Help about any command
   job         Inspect jobs and follow logs
   mig         Plan and run Migs workflows
-  pull        Pull Migs diffs for current repo HEAD
   run         Submit and inspect runs
   spec        Inspect and validate mig specs
   tui         Interactive TUI for migrations, runs, and jobs
