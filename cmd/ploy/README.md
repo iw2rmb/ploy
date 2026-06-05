@@ -1,9 +1,9 @@
 # Ploy Workflow CLI
 
-`ploy` is a single-purpose CLI that claims workflow runs from the Ploy control plane,
-reconstructs the default migs→build→test DAG, and dispatches stages via the
-configured runtime adapter. Global environment management
-is available under `ploy config env`.
+`ploy` is the operator CLI for the Ploy control plane. It submits runs, manages
+mig projects, follows run and job status, applies run diffs locally, downloads
+run artifacts, and administers clusters. Global environment management is
+available under `ploy config env`.
 
 ## Usage
 
@@ -169,7 +169,7 @@ ploy mig pull <mig-id|name>
 **How it works:**
 1. Derives the current repo identity from the git remote (default: `origin`).
 2. Verifies the working tree is clean (no uncommitted changes).
-3. Resolves the run via `POST /v1/runs/{run_id}/resolve` (or `POST /v1/migs/{mig_id}/pull` for mig-based pull).
+3. Resolves the run via `POST /v1/runs/{run_id}/pull` (or `POST /v1/migs/{mig_id}/pull` for mig-based pull).
 4. Fetches repo details and verifies local `HEAD` matches the run's `source_commit_sha`.
 5. Downloads and applies all stored Migs diffs via `git apply`.
 
@@ -202,64 +202,6 @@ ploy mig pull --last-failed <mig-id|name>
 - Working tree must be clean (commit or stash changes first).
 - The origin remote URL must match the `repo_url` used when the run was created.
 - The run must exist and have diffs available.
-
-### Local Repo Pull Workflow (`ploy pull`)
-
-For a streamlined local development workflow, `ploy pull` manages the entire
-run lifecycle for your current repo HEAD. It tracks run state locally and
-handles run initiation, following, and diff pulling automatically.
-
-```bash
-# In your local repo, initiate/reuse a run and pull diffs when done.
-ploy pull --follow
-
-# Force a new run even if one already exists for this HEAD.
-ploy pull --new-run --follow
-
-# Preview what would happen without making changes.
-ploy pull --dry-run
-```
-
-**How it works:**
-1. Reads the current HEAD SHA via `git rev-parse HEAD`.
-2. Checks for saved pull state in `<git-dir>/ploy/pull_state.json`.
-3. If no state exists or `--new-run` is set: infers the mig from the repo
-   and creates a mig-project run scoped to this repo (unless `--dry-run`, which
-   prints intended actions and exits without initiating a run or saving state).
-4. If state exists and SHA matches: reuses the saved run ID.
-5. If SHA mismatch: requires `--new-run` to initiate a fresh run.
-6. With `--follow`: displays a job graph until run completes.
-7. On success: pulls diffs using the same repo-resolution and diff-application path as `ploy mig pull`.
-
-**Flags:**
-- `--new-run` — Force initiating a new run, overwriting any saved pull state.
-- `--follow` — Follow the run until completion (displays job graph).
-- `--origin <remote>` — Git remote to match (default: `origin`).
-- `--dry-run` — Validate and print planned actions without mutating. Does not initiate
-  a run or save pull state.
-- `--cap <duration>` — Optional time cap for `--follow` (e.g., `30m`, `1h`).
-- `--cancel-on-cap` — Cancel run if cap exceeded.
-
-**Examples:**
-
-```bash
-# Full workflow: initiate (or reuse) run, follow until done, pull diffs.
-ploy pull --follow
-
-# Force a fresh run even if the current HEAD already has one.
-ploy pull --new-run --follow
-
-# Check if a previous run succeeded and pull diffs (no --follow).
-ploy pull
-
-# Preview what would happen.
-ploy pull --dry-run
-```
-
----
-
-`upload` uses the cached bearer-token cluster descriptor to post gzipped bundles to the control‑plane API. The CLI always targets the default descriptor under `PLOY_CONFIG_HOME` (or home default).
-It targets `POST /v1/runs/{id}/artifact_bundles` and enforces the 10 MiB bundle cap locally before sending.
 
 ## Interactive TUI (`ploy tui`)
 
@@ -346,8 +288,6 @@ ploy completion <shell> --help
   `tests/e2e/migs/README.md` for usage examples.
 - `ploy run --pull[=path]` and `ploy run pull <run-id> [path]` download run
   artifacts and write `manifest.json`.
-- `ploy mig fetch --run <run-id> --artifact-dir <path>` is the mig-owned artifact
-  retrieval command retained for investigation workflows.
 - `ploy mig run --cap <duration>` applies only with `--follow`. When the duration
   elapses, the CLI stops following; use `--cancel-on-cap` to cancel the run too.
 
@@ -421,12 +361,12 @@ Gate results are surfaced via `GET /v1/runs/{id}/status`:
 
 See `docs/build-gate/README.md` for current gate contract and execution details.
 
-## Job Graph and DAG State
+## Job Graph And DAG State
 
 Migs runs execute as a directed acyclic graph (DAG) of jobs. The graph structure
-surfaces via `GET /v1/runs/{id}/status` in `RunSummary.stages` and through the
-Run status includes a `stages` map. Each job has a `next_id` for execution ordering
-and optional metadata identifying the job phase.
+surfaces via `ploy run status <run-id> --json` and
+`GET /v1/runs/{id}/status`. Run status includes a `stages` map. Each job has a
+`next_id` for execution ordering and optional metadata identifying the job phase.
 
 **Job phases (job_type):**
 - `pre_gate` — Build Gate validation before migs run
@@ -439,9 +379,10 @@ and optional metadata identifying the job phase.
 pre-gate → mig-0 → post-gate
 ```
 
-**CLI inspection:**
+**Status inspection:**
 
-Use `GET /v1/runs/{id}/status` to view run-level state:
+Use `ploy run status <run-id> --json` or `GET /v1/runs/{id}/status` to view
+run-level state:
 
 ```bash
 $ curl -sk "$PLOY_CONTROL_PLANE_URL/v1/runs/migs-abc123/status" | jq .
@@ -465,22 +406,15 @@ See `internal/migs/api/types.go` for the full schema.
 
 ## Exit Codes
 
-- `0` — success (run claimed, stages completed, workspace cleaned).
-- `1` — error (missing flags, unsupported subcommand, stage failure, or
-  downstream error).
-
-## Environment
-- `PLOY_RUNTIME_ADAPTER` — Optional runtime adapter selector. Defaults to
-  `local-step`; other adapters (e.g., `k8s`) can register here and
-  unknown names cause the CLI to fail fast.
+- `0` — command completed successfully.
+- `1` — command failed, including argument errors, unknown commands, API errors,
+  run/job failures surfaced by follow mode, or downstream tool errors.
 
 ## Development
 
 - Build via `make build` (outputs to `dist/ploy`).
-- Run unit tests with `make test` (ensures `go test -cover ./...` stays ≥60%
-  overall, ≥90% on the runner package).
-- Roadmap slices should extend `internal/workflow/runner` and keep the CLI
-  focused on stateless execution against the new control-plane contracts.
+- Run unit tests with `make test`.
+- Run coverage with `make test-coverage` or `make coverage-all`.
 - See `docs/schemas/mig.example.yaml` for the current mig spec shape.
-- Review `docs/DOCS.md` for the documentation matrix and editing conventions
-  that keep the CLI guides aligned.
+- Review `docs/runs.md`, `docs/migs-lifecycle.md`, and `docs/envs/README.md`
+  when changing command behavior or durable CLI documentation.
