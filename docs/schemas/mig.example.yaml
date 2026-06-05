@@ -41,9 +41,9 @@ steps:
 
   - name: summarize
     image: docker.io/your-dh-user/mig-summary:latest
-    in_from:
-      - from: migrate-java@mig://out/report.json
-        to: /in/report.json
+    command: ["/bin/sh", "-lc", "summary-tool --workspace /workspace --out /out"]
+    out:
+      - 222222222222:/out/summary.json
 
 # Build Gate settings apply globally.
 build_gate:

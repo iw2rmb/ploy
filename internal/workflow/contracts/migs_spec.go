@@ -106,15 +106,6 @@ type MigStep struct {
 	// In lists canonical read-only input entries ("shortHash:/in/dst").
 	In []string `json:"in,omitempty" yaml:"in,omitempty"`
 
-	// InFrom lists cross-step /out → /in references in canonical form.
-	// Source selector forms:
-	//   <type>://out/<path>
-	//   <name>@<type>://out/<path>
-	// Legacy compatibility alias:
-	//   <step-name>://out/<path> (equivalent to <step-name>@mig://...)
-	// and targets a destination under /in.
-	InFrom []InFromRef `json:"in_from,omitempty" yaml:"in_from,omitempty"`
-
 	// Out lists canonical read-write output entries ("shortHash:/out/dst").
 	Out []string `json:"out,omitempty" yaml:"out,omitempty"`
 
@@ -151,10 +142,6 @@ func (s MigSpec) Validate() error {
 			return err
 		}
 	}
-	if err := validateInFromReferences(s.Steps); err != nil {
-		return err
-	}
-
 	// Validate build gate images.
 	if s.BuildGate != nil && len(s.BuildGate.Images) > 0 {
 		mapping := BuildGateImageMapping{Images: s.BuildGate.Images}
