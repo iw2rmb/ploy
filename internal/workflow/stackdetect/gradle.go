@@ -27,17 +27,22 @@ var (
 	// kotlinOptions { ... jvmTarget = "17" } or kotlinOptions { ... jvmTarget = JavaVersion.VERSION_17 }
 	kotlinOptionsJvmTargetBlockRegex = regexp.MustCompile(`(?s)kotlinOptions\s*\{.*?jvmTarget\s*=\s*(?:"?(\d+(?:\.\d+)?)"?|(?:JavaVersion\.)?VERSION_([0-9_]+))`)
 
+	javaVersionValuePattern = `(?:JavaLanguageVersion\.of\(\s*"?(\d+(?:\.\d+)?)"?\s*\)|"?(\d+(?:\.\d+)?)"?|(?:JavaVersion\.)?VERSION_([0-9_]+))`
+
 	// java { toolchain { languageVersion = JavaLanguageVersion.of(17) } }
-	// java { toolchain { languageVersion = JavaLanguageVersion.of("17") } }
-	toolchainLanguageVersionAssignRegex = regexp.MustCompile(`(?s)toolchain\s*\{.*?languageVersion\s*=\s*JavaLanguageVersion\.of\(\s*"?(\d+(?:\.\d+)?)"?\s*\)`)
+	// java { toolchain { languageVersion = JavaVersion.VERSION_17 } }
+	toolchainLanguageVersionAssignRegex = regexp.MustCompile(`(?s)toolchain\s*\{.*?\blanguageVersion\s*=\s*` + javaVersionValuePattern)
 
 	// java { toolchain { languageVersion.set(JavaLanguageVersion.of(17)) } }
-	// java { toolchain { languageVersion.set(JavaLanguageVersion.of("17")) } }
-	toolchainLanguageVersionSetRegex = regexp.MustCompile(`(?s)toolchain\s*\{.*?languageVersion\.set\(\s*JavaLanguageVersion\.of\(\s*"?(\d+(?:\.\d+)?)"?\s*\)\s*\)`)
+	// java { toolchain { languageVersion.set(JavaVersion.VERSION_17) } }
+	toolchainLanguageVersionSetRegex = regexp.MustCompile(`(?s)toolchain\s*\{.*?\blanguageVersion\.set\(\s*` + javaVersionValuePattern + `\s*\)`)
 
 	// dependencyManagerRootExtension { javaVersion = JavaVersion.VERSION_21 }.
-	// Also supports unqualified form: javaVersion = VERSION_21.
-	javaVersionAssignmentRegex = regexp.MustCompile(`\bjavaVersion\s*=\s*(?:"?(\d+(?:\.\d+)?)"?|(?:JavaVersion\.)?VERSION_([0-9_]+))`)
+	// Also supports JavaLanguageVersion.of(21), unqualified VERSION_21, and numeric values.
+	javaVersionAssignmentRegex = regexp.MustCompile(`\bjavaVersion\s*=\s*` + javaVersionValuePattern)
+
+	// dependencyManagerRootExtension { javaVersion.set(JavaVersion.VERSION_21) }.
+	javaVersionSetRegex = regexp.MustCompile(`\bjavaVersion\.set\(\s*` + javaVersionValuePattern + `\s*\)`)
 
 	// Dynamic logic patterns that should trigger "unknown".
 	dynamicPatterns = []*regexp.Regexp{
@@ -193,14 +198,39 @@ func detectGradle(ctx context.Context, workspace, gradlePath string) (*Observati
 
 	// 4. Generic javaVersion assignment often used by custom Gradle extensions.
 	javaVersionAssignment := extractCompatibilityVersion(javaVersionAssignmentRegex, text)
-	if javaVersionAssignment != "" {
+	javaVersionSet := extractCompatibilityVersion(javaVersionSetRegex, text)
+	if javaVersionAssignment != "" || javaVersionSet != "" {
+		var evidence []EvidenceItem
+
+		if javaVersionAssignment != "" {
+			evidence = append(evidence, EvidenceItem{
+				Path: relativePath, Key: "javaVersion", Value: javaVersionAssignment,
+			})
+		}
+		if javaVersionSet != "" {
+			evidence = append(evidence, EvidenceItem{
+				Path: relativePath, Key: "javaVersion", Value: javaVersionSet,
+			})
+		}
+
+		if javaVersionAssignment != "" && javaVersionSet != "" && javaVersionAssignment != javaVersionSet {
+			return nil, &DetectionError{
+				Reason:   "unknown",
+				Message:  "javaVersion differs between assignments",
+				Evidence: evidence,
+			}
+		}
+
+		version := javaVersionAssignment
+		if version == "" {
+			version = javaVersionSet
+		}
+
 		return &Observation{
 			Language: "java",
 			Tool:     "gradle",
-			Release:  &javaVersionAssignment,
-			Evidence: []EvidenceItem{{
-				Path: relativePath, Key: "javaVersion", Value: javaVersionAssignment,
-			}},
+			Release:  &version,
+			Evidence: evidence,
 		}, nil
 	}
 
