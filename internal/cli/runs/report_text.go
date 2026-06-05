@@ -133,7 +133,7 @@ func RenderRunStatusReportTextLayout(report RunStatusReport, opts TextRenderOpti
 			jobIdx := len(repoFrame.Rows)
 			patchURL := strings.TrimSpace(job.PatchURL)
 			state := ColoredStatusGlyph(job.Status.String(), opts.SpinnerFrame)
-			step := renderStepName(job.JobType.String())
+			step := renderStepName(job.DisplayName, job.JobType.String())
 			jobIDLabel := valueOrDash(job.JobID.String())
 			if jobIDLabel != "-" {
 				jobIDLabel = colorizeNeutralText(jobIDLabel)
@@ -254,8 +254,11 @@ func appendAuthToken(rawURL, token string) string {
 	return parsed.String()
 }
 
-func renderStepName(jobType string) string {
-	step := normalizeStatus(jobType)
+func renderStepName(displayName string, jobType string) string {
+	step := strings.TrimSpace(displayName)
+	if step == "" {
+		step = normalizeStatus(jobType)
+	}
 	if step == "" {
 		step = "-"
 	}

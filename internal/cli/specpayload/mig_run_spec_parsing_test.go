@@ -539,6 +539,224 @@ build_gate:
 	assertField(t, steps[2], "image", "docker.io/test/mig-step3:latest")
 }
 
+func TestBuildSpecPayload_RefExpansion(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		setup     func(t *testing.T, rootDir string) string
+		wantImage string
+		wantEnv   map[string]any
+	}{
+		{
+			name: "relative file ref imports selected step only",
+			setup: func(t *testing.T, rootDir string) string {
+				libDir := filepath.Join(rootDir, "lib")
+				if err := os.MkdirAll(libDir, 0o755); err != nil {
+					t.Fatalf("mkdir lib: %v", err)
+				}
+				writeFile(t, filepath.Join(libDir, "mig.yaml"), `
+envs:
+  IGNORED: top-level
+build_gate:
+  disabled: true
+steps:
+  - name: ignored
+    image: docker.io/test/ignored:latest
+  - name: reuse
+    image: docker.io/test/reuse:latest
+    envs:
+      STEP_ENV: kept
+`)
+				return `
+envs:
+  ROOT_ENV: kept
+build_gate:
+  disabled: false
+steps:
+  - ref: ./lib/mig.yaml:reuse
+`
+			},
+			wantImage: "docker.io/test/reuse:latest",
+			wantEnv:   map[string]any{"STEP_ENV": "kept"},
+		},
+		{
+			name: "directory ref uses mig yaml",
+			setup: func(t *testing.T, rootDir string) string {
+				libDir := filepath.Join(rootDir, "reusable")
+				if err := os.MkdirAll(libDir, 0o755); err != nil {
+					t.Fatalf("mkdir reusable: %v", err)
+				}
+				writeFile(t, filepath.Join(libDir, "mig.yaml"), `
+steps:
+  - name: reuse
+    image: docker.io/test/from-dir:latest
+`)
+				return `
+steps:
+  - ref: ./reusable:reuse
+`
+			},
+			wantImage: "docker.io/test/from-dir:latest",
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			rootDir := t.TempDir()
+			spec := tt.setup(t, rootDir)
+			result := buildAndParseSpec(t, rootDir, spec, ".yaml", specPayloadOpts{})
+			steps := mustSteps(t, result, 1)
+			assertField(t, steps[0], "image", tt.wantImage)
+			assertField(t, steps[0], "name", "reuse")
+			if tt.wantEnv != nil {
+				envs := mustDig(t, steps[0], "envs")
+				for key, want := range tt.wantEnv {
+					assertField(t, envs, key, want)
+				}
+			}
+			if topEnvs, ok := result["envs"].(map[string]any); ok {
+				if _, exists := topEnvs["IGNORED"]; exists {
+					t.Fatalf("referenced top-level envs must not be imported: %#v", topEnvs)
+				}
+			}
+			if _, ok := result["build_gate"]; ok {
+				buildGate := mustDig(t, result, "build_gate")
+				assertField(t, buildGate, "disabled", false)
+			}
+		})
+	}
+}
+
+func TestBuildSpecPayload_RefExpansionErrors(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		files   map[string]string
+		spec    string
+		wantErr string
+	}{
+		{
+			name: "missing selector step name",
+			spec: `
+steps:
+  - ref: "./lib.yaml:"
+`,
+			files:   map[string]string{"lib.yaml": "steps: []\n"},
+			wantErr: "step name is required",
+		},
+		{
+			name: "missing step names in referenced spec",
+			spec: `
+steps:
+  - ref: ./lib.yaml:reuse
+`,
+			files:   map[string]string{"lib.yaml": "steps:\n  - image: docker.io/test/reuse:latest\n"},
+			wantErr: "steps[0].name is required for step selection",
+		},
+		{
+			name: "duplicate step names in referenced spec",
+			spec: `
+steps:
+  - ref: ./lib.yaml:reuse
+`,
+			files:   map[string]string{"lib.yaml": "steps:\n  - name: reuse\n    image: docker.io/test/a:latest\n  - name: reuse\n    image: docker.io/test/b:latest\n"},
+			wantErr: "duplicate",
+		},
+		{
+			name: "missing referenced step",
+			spec: `
+steps:
+  - ref: ./lib.yaml:missing
+`,
+			files:   map[string]string{"lib.yaml": "steps:\n  - name: reuse\n    image: docker.io/test/reuse:latest\n"},
+			wantErr: "step \"missing\" not found",
+		},
+		{
+			name: "ref step cannot mix keys",
+			spec: `
+steps:
+  - ref: ./lib.yaml:reuse
+    image: docker.io/test/inline:latest
+`,
+			files:   map[string]string{"lib.yaml": "steps:\n  - name: reuse\n    image: docker.io/test/reuse:latest\n"},
+			wantErr: "ref step must not contain other keys",
+		},
+		{
+			name: "cycle",
+			spec: `
+steps:
+  - name: root
+    image: docker.io/test/root:latest
+  - ref: ./lib.yaml:reuse
+`,
+			files:   map[string]string{"lib.yaml": "steps:\n  - ref: ./spec.yaml:root\n  - name: reuse\n    image: docker.io/test/reuse:latest\n"},
+			wantErr: "spec ref cycle detected",
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			tmpDir := t.TempDir()
+			for rel, content := range tt.files {
+				writeFile(t, filepath.Join(tmpDir, rel), content)
+			}
+			specPath := filepath.Join(tmpDir, "spec.yaml")
+			writeFile(t, specPath, tt.spec)
+			_, err := callBuildSpecPayload(t, specPath, specPayloadOpts{})
+			if err == nil {
+				t.Fatal("expected error")
+			}
+			if !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("error = %q, want containing %q", err.Error(), tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestValidateLocal_RefExpansionNormalizesLocalPathsFromSourceSpec(t *testing.T) {
+	t.Parallel()
+
+	rootDir := t.TempDir()
+	libDir := filepath.Join(rootDir, "library")
+	if err := os.MkdirAll(libDir, 0o755); err != nil {
+		t.Fatalf("mkdir library: %v", err)
+	}
+	writeFile(t, filepath.Join(libDir, "input.txt"), "hello\n")
+	writeFile(t, filepath.Join(libDir, "mig.yaml"), `
+steps:
+  - name: with-files
+    image: docker.io/test/reuse:latest
+    in:
+      - ./input.txt:input.txt
+`)
+	specPath := filepath.Join(rootDir, "spec.yaml")
+	writeFile(t, specPath, `
+steps:
+  - ref: ./library/mig.yaml:with-files
+`)
+
+	payload, err := ValidateLocalFile(specPath)
+	if err != nil {
+		t.Fatalf("ValidateLocalFile: %v", err)
+	}
+	result := unmarshalPayload(t, payload)
+	steps := mustSteps(t, result, 1)
+	inEntries, ok := steps[0]["in"].([]any)
+	if !ok || len(inEntries) != 1 {
+		t.Fatalf("steps[0].in = %#v, want one entry", steps[0]["in"])
+	}
+	entry, ok := inEntries[0].(string)
+	if !ok || !shortHashPattern.MatchString(strings.Split(entry, ":")[0]) || !strings.HasSuffix(entry, ":/in/input.txt") {
+		t.Fatalf("steps[0].in[0] = %q, want canonical input entry", entry)
+	}
+}
+
 func TestBuildSpecPayload_RelativePathsResolveFromSpecDir(t *testing.T) {
 	specDir := t.TempDir()
 	t.Chdir(t.TempDir())

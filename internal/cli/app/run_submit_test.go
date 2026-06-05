@@ -188,6 +188,69 @@ func TestRunSubmitSpecDirectoryUsesMigYAML(t *testing.T) {
 	}
 }
 
+func TestRunSubmitStepSelectorSubmitsOneStepAndPreservesBuildGate(t *testing.T) {
+	specPath := filepath.Join(t.TempDir(), "spec.yaml")
+	if err := os.WriteFile(specPath, []byte(`
+steps:
+  - name: bootstrap
+    image: alpine:latest
+    command: echo bootstrap
+  - name: deprecations
+    image: alpine:latest
+    command: echo deprecations
+build_gate:
+  disabled: false
+`), 0o644); err != nil {
+		t.Fatalf("write spec file: %v", err)
+	}
+
+	var capturedSubmit map[string]any
+	runID := domaintypes.NewRunID().String()
+	migID := domaintypes.NewMigID().String()
+	specID := domaintypes.NewSpecID().String()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/repos/resolve":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"repo_url":   "https://gitlab.example.com/acme/service.git",
+				"ref":        "master",
+				"ref_is_sha": false,
+			})
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/runs":
+			if err := json.NewDecoder(r.Body).Decode(&capturedSubmit); err != nil {
+				t.Fatalf("decode submit request: %v", err)
+			}
+			w.WriteHeader(http.StatusCreated)
+			_ = json.NewEncoder(w).Encode(map[string]string{"run_id": runID, "mig_id": migID, "spec_id": specID})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	clienv.UseServerDescriptor(t, server.URL)
+
+	var buf bytes.Buffer
+	if err := executeCmd([]string{"run", specPath + ":deprecations", "acme/service"}, &buf); err != nil {
+		t.Fatalf("run submit selected step error: %v", err)
+	}
+	spec, ok := capturedSubmit["spec"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected spec object, got %#v", capturedSubmit["spec"])
+	}
+	steps, ok := spec["steps"].([]any)
+	if !ok || len(steps) != 1 {
+		t.Fatalf("steps = %#v, want one selected step", spec["steps"])
+	}
+	step := steps[0].(map[string]any)
+	if step["name"] != "deprecations" || step["command"] != "echo deprecations" {
+		t.Fatalf("selected step = %#v", step)
+	}
+	buildGate, ok := spec["build_gate"].(map[string]any)
+	if !ok || buildGate["disabled"] != false {
+		t.Fatalf("build_gate = %#v, want disabled=false preserved", spec["build_gate"])
+	}
+}
+
 func TestRunSubmitPullDownloadsFinalArtifacts(t *testing.T) {
 	specPath := filepath.Join(t.TempDir(), "spec.yaml")
 	if err := os.WriteFile(specPath, []byte("steps:\n  - image: alpine\n"), 0o644); err != nil {

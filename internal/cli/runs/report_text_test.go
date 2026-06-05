@@ -203,6 +203,57 @@ func TestRenderRunStatusReportTextHeadersAndArtifacts(t *testing.T) {
 	}
 }
 
+func TestRenderRunStatusReportTextUsesDisplayName(t *testing.T) {
+	t.Parallel()
+
+	jobID := domaintypes.NewJobID()
+	report := singleJobReport("named-step", domaintypes.RunStatusRunning, RunJobEntry{
+		JobID:       jobID,
+		JobType:     "mig",
+		DisplayName: "deprecations",
+		Status:      domaintypes.JobStatusRunning,
+		JobLogURL:   "https://example.test/v1/jobs/" + jobID.String() + "/logs",
+	})
+
+	tests := []struct {
+		name   string
+		render func(t *testing.T, report RunStatusReport) string
+	}{
+		{
+			name: "follow report text",
+			render: func(t *testing.T, report RunStatusReport) string {
+				t.Helper()
+				var buf bytes.Buffer
+				if err := RenderRunStatusReportText(&buf, report, TextRenderOptions{EnableOSC8: false}); err != nil {
+					t.Fatalf("RenderRunStatusReportText error: %v", err)
+				}
+				return buf.String()
+			},
+		},
+		{
+			name: "snapshot text",
+			render: func(t *testing.T, report RunStatusReport) string {
+				t.Helper()
+				var buf bytes.Buffer
+				if err := RenderRunStatusSnapshotText(&buf, report, TextRenderOptions{EnableOSC8: false}); err != nil {
+					t.Fatalf("RenderRunStatusSnapshotText error: %v", err)
+				}
+				return buf.String()
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			plain := stripCSI(tt.render(t, report))
+			assertx.Contains(t, plain, "deprecations")
+			assertx.NotContains(t, plain, "  mig  ")
+		})
+	}
+}
+
 func TestRenderRunStatusReportTextVisibilityRules(t *testing.T) {
 	t.Parallel()
 

@@ -50,7 +50,11 @@ func RunSubmit(ctx context.Context, opts SubmitOptions) error {
 		followOut = out
 	}
 
-	specPath, err := resolveRunSpecPath(opts.SpecPath)
+	specArg, stepSelector, err := splitRunSpecSelector(opts.SpecPath)
+	if err != nil {
+		return err
+	}
+	specPath, err := resolveRunSpecPath(specArg)
 	if err != nil {
 		return err
 	}
@@ -68,7 +72,7 @@ func RunSubmit(ctx context.Context, opts SubmitOptions) error {
 		return errors.New("--apply requires a local repo")
 	}
 
-	specPayload, err := buildRunSubmitSpecPayload(ctx, base, httpClient, specPath)
+	specPayload, err := buildRunSubmitSpecPayload(ctx, base, httpClient, specPath, stepSelector)
 	if err != nil {
 		return err
 	}
@@ -121,6 +125,29 @@ func RunSubmit(ctx context.Context, opts SubmitOptions) error {
 	return nil
 }
 
+func splitRunSpecSelector(specArg string) (string, string, error) {
+	specArg = strings.TrimSpace(specArg)
+	if specArg == "" {
+		return "", "", errors.New("spec path required")
+	}
+	if _, err := os.Stat(specArg); err == nil {
+		return specArg, "", nil
+	}
+	idx := strings.LastIndex(specArg, ":")
+	if idx < 0 {
+		return specArg, "", nil
+	}
+	specPath := strings.TrimSpace(specArg[:idx])
+	stepSelector := strings.TrimSpace(specArg[idx+1:])
+	if specPath == "" {
+		return "", "", errors.New("spec path required")
+	}
+	if stepSelector == "" {
+		return "", "", errors.New("step name required")
+	}
+	return specPath, stepSelector, nil
+}
+
 func resolveRunSpecPath(specPath string) (string, error) {
 	specPath = strings.TrimSpace(specPath)
 	if specPath == "" {
@@ -139,12 +166,13 @@ func resolveRunSpecPath(specPath string) (string, error) {
 	return specPath, nil
 }
 
-func buildRunSubmitSpecPayload(ctx context.Context, base *url.URL, client *http.Client, specPath string) (json.RawMessage, error) {
-	specPayload, err := specpayload.Build(
+func buildRunSubmitSpecPayload(ctx context.Context, base *url.URL, client *http.Client, specPath string, stepSelector string) (json.RawMessage, error) {
+	specPayload, err := specpayload.BuildSelected(
 		ctx,
 		base,
 		client,
 		specPath,
+		stepSelector,
 		nil,
 		"",
 		false,

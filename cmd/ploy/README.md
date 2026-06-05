@@ -18,7 +18,7 @@ ploy help <command>            # Alternative help syntax
 Common command patterns:
 
 ```bash
-ploy run <spec-path> [<repo-path>|<namespace/repo[:ref]>] [--follow] [--apply] [--pull[=path]] # submit a single-repo run
+ploy run <spec-path>[:<step-name>] [<repo-path>|<namespace/repo[:ref]>] [--follow] [--apply] [--pull[=path]] # submit a single-repo run
 ploy run status <run-id> [--json|--follow]                                  # inspect a run
 ploy run apply <run-id> [path] [--force]                                     # apply a run patch locally
 ploy run pull <run-id> [artifacts-path]                                      # download final run artifacts
@@ -31,12 +31,12 @@ ploy spec validate docs/schemas/mig.example.yaml                             # v
 Run IDs (`<run-id>`) are KSUID-backed strings.
 Treat them as opaque identifiers when passing them between commands or scripts.
 
-`ploy run` submits a spec file or directory against one repository source. Local
-repo paths submit `HEAD`; remote selectors use `namespace/repo`, optionally
-suffixed with `:<branch>` or `:<sha>`. Use `--follow` to wait for the run's
-terminal status, `--pull[=path]` to wait for success and download artifacts, or
-`--apply` to wait for success and apply the resulting patch to a clean local
-worktree.
+`ploy run` submits a spec file or directory against one repository source. Add
+`:<step-name>` to submit only one named step from the expanded spec. Local repo
+paths submit `HEAD`; remote selectors use `namespace/repo`, optionally suffixed
+with `:<branch>` or `:<sha>`. Use `--follow` to wait for the run's terminal
+status, `--pull[=path]` to wait for success and download artifacts, or `--apply`
+to wait for success and apply the resulting patch to a clean local worktree.
 
 `ploy mig run` executes an existing mig project over its managed repo set. Use
 `ploy mig add --name <name> --spec <path>`, `ploy mig repo add`, and
@@ -339,6 +339,9 @@ ploy completion <shell> --help
   using shared runtime paths like `/share/java.classpath` or
   `extract-usage@mig://out/dependency-usage.nofilter.json`
   for deterministic file injection via content-addressed bundles.
+  CLI-authored specs can use `steps[].ref` entries such as
+  `ref: ../shared/mig.yaml:deprecations`; refs are expanded before submission
+  and only the selected step is imported.
   See `docs/schemas/mig.example.yaml` for the full schema and
   `tests/e2e/migs/README.md` for usage examples.
 - `ploy run --pull[=path]` and `ploy run pull <run-id> [path]` download run
