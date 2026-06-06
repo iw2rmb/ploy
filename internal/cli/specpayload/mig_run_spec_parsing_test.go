@@ -737,12 +737,18 @@ func TestValidateLocal_RefExpansionNormalizesLocalPathsFromSourceSpec(t *testing
 		t.Fatalf("mkdir library: %v", err)
 	}
 	writeFile(t, filepath.Join(libDir, "input.txt"), "hello\n")
+	writeFile(t, filepath.Join(libDir, "auth.toml"), "auth\n")
+	writeFile(t, filepath.Join(libDir, "tool.jar"), "tool\n")
 	writeFile(t, filepath.Join(libDir, "mig.yaml"), `
 steps:
   - name: with-files
     image: docker.io/test/reuse:latest
     in:
       - ./input.txt:input.txt
+    home:
+      - ./auth.toml:.codex/config.toml:ro
+    tmp:
+      - ./tool.jar:lib/tool.jar
 `)
 	specPath := filepath.Join(rootDir, "spec.yaml")
 	writeFile(t, specPath, `
@@ -763,6 +769,22 @@ steps:
 	entry, ok := inEntries[0].(string)
 	if !ok || !shortHashPattern.MatchString(strings.Split(entry, ":")[0]) || !strings.HasSuffix(entry, ":/in/input.txt") {
 		t.Fatalf("steps[0].in[0] = %q, want canonical input entry", entry)
+	}
+	homeEntries, ok := steps[0]["home"].([]any)
+	if !ok || len(homeEntries) != 1 {
+		t.Fatalf("steps[0].home = %#v, want one entry", steps[0]["home"])
+	}
+	homeEntry, ok := homeEntries[0].(string)
+	if !ok || !shortHashPattern.MatchString(strings.Split(homeEntry, ":")[0]) || !strings.HasSuffix(homeEntry, ":.codex/config.toml:ro") {
+		t.Fatalf("steps[0].home[0] = %q, want canonical home entry", homeEntry)
+	}
+	tmpEntries, ok := steps[0]["tmp"].([]any)
+	if !ok || len(tmpEntries) != 1 {
+		t.Fatalf("steps[0].tmp = %#v, want one entry", steps[0]["tmp"])
+	}
+	tmpEntry, ok := tmpEntries[0].(string)
+	if !ok || !shortHashPattern.MatchString(strings.Split(tmpEntry, ":")[0]) || !strings.HasSuffix(tmpEntry, ":/tmp/lib/tool.jar") {
+		t.Fatalf("steps[0].tmp[0] = %q, want canonical tmp entry", tmpEntry)
 	}
 }
 
