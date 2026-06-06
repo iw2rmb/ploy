@@ -207,6 +207,9 @@ Runtime behavior: the node's Docker client is created from standard Docker env v
   set, this file is read for each job image pull so host auth refreshes take
   effect without recreating the node container. If set and unreadable, image
   pulls fail explicitly instead of silently pulling without credentials.
+  Job containers that mount `/var/run/docker.sock` also receive the containing
+  auth directory read-only as `/root/.docker`, so Docker clients inside the job
+  use the same refreshed registry credentials.
   Example:
   `{"auths":{"ghcr.io":{"auth":"<base64(username:token)>"}}}`.
 - `PLOY_DOCKER_AUTH_REFRESH_SOCKET` — Optional Unix socket used only after

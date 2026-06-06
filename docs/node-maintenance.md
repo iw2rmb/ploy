@@ -25,6 +25,11 @@ Private-registry auth is read only from that file in `DOCKER_AUTH_CONFIG`
 format. The file is read for every Docker pull, so host refreshes take effect
 without recreating the node container.
 
+Job containers that mount `/var/run/docker.sock` also receive
+`/etc/ploy/docker-auth-config` read-only as `/root/.docker`. Docker clients
+inside those job containers, including Testcontainers, therefore use the same
+host-refreshed credentials as node-owned image pulls.
+
 Do not inject `PLOY_DOCKER_AUTH_CONFIG` or `DOCKER_AUTH_CONFIG` into the node
 container for job image pulls. Inline env values are immutable for the lifetime
 of the container and can outlive refreshed credentials.

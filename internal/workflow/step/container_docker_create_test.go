@@ -307,6 +307,118 @@ func TestContainerRuntimeCreate_DockerHubRegistryAuthAlias(t *testing.T) {
 	}
 }
 
+func TestContainerRuntimeCreate_DockerSocketMountGetsRegistryAuthConfig(t *testing.T) {
+	t.Parallel()
+
+	const (
+		dockerSocketTarget = "/var/run/docker.sock"
+		authConfigFile     = "/etc/ploy/docker-auth-config/config.json"
+		authConfigDir      = "/etc/ploy/docker-auth-config"
+		authConfigTarget   = "/root/.docker"
+	)
+
+	testCases := []struct {
+		name                   string
+		registryAuthConfigFile string
+		mounts                 []ContainerMount
+		wantAuthMount          bool
+		wantAuthSource         string
+		wantAuthMountCount     int
+	}{
+		{
+			name:                   "socket mount gets auth config",
+			registryAuthConfigFile: authConfigFile,
+			mounts: []ContainerMount{
+				{Source: dockerSocketTarget, Target: dockerSocketTarget, ReadOnly: false},
+			},
+			wantAuthMount:      true,
+			wantAuthSource:     authConfigDir,
+			wantAuthMountCount: 1,
+		},
+		{
+			name:                   "no socket mount does not get auth config",
+			registryAuthConfigFile: authConfigFile,
+			mounts: []ContainerMount{
+				{Source: "/workspace", Target: "/workspace", ReadOnly: false},
+			},
+			wantAuthMount:      false,
+			wantAuthMountCount: 0,
+		},
+		{
+			name: "socket mount without configured auth config does not get auth config",
+			mounts: []ContainerMount{
+				{Source: dockerSocketTarget, Target: dockerSocketTarget, ReadOnly: false},
+			},
+			wantAuthMount:      false,
+			wantAuthMountCount: 0,
+		},
+		{
+			name:                   "explicit auth dir mount is preserved",
+			registryAuthConfigFile: authConfigFile,
+			mounts: []ContainerMount{
+				{Source: dockerSocketTarget, Target: dockerSocketTarget, ReadOnly: false},
+				{Source: "/custom/docker", Target: authConfigTarget, ReadOnly: true},
+			},
+			wantAuthMount:      true,
+			wantAuthSource:     "/custom/docker",
+			wantAuthMountCount: 1,
+		},
+		{
+			name:                   "explicit auth config file mount is preserved",
+			registryAuthConfigFile: authConfigFile,
+			mounts: []ContainerMount{
+				{Source: dockerSocketTarget, Target: dockerSocketTarget, ReadOnly: false},
+				{Source: "/custom/config.json", Target: "/root/.docker/config.json", ReadOnly: true},
+			},
+			wantAuthMount:      false,
+			wantAuthMountCount: 0,
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			fake := &fakeDockerClient{
+				createResult: client.ContainerCreateResult{ID: "docker-auth-mount"},
+			}
+			rt := newContainerRuntimeWithClient(fake, ContainerRuntimeOptions{
+				RegistryAuthConfigFile: tc.registryAuthConfigFile,
+			})
+
+			_, err := rt.Create(context.Background(), ContainerSpec{
+				Image:  "alpine:latest",
+				Mounts: tc.mounts,
+			})
+			if err != nil {
+				t.Fatalf("Create() error = %v", err)
+			}
+
+			var authMounts []string
+			var gotReadOnly bool
+			for _, m := range fake.createOpts.HostConfig.Mounts {
+				if m.Target == authConfigTarget {
+					authMounts = append(authMounts, m.Source)
+					gotReadOnly = m.ReadOnly
+				}
+			}
+			if len(authMounts) != tc.wantAuthMountCount {
+				t.Fatalf("auth mount count = %d, want %d; mounts=%+v", len(authMounts), tc.wantAuthMountCount, fake.createOpts.HostConfig.Mounts)
+			}
+			if !tc.wantAuthMount {
+				return
+			}
+			if authMounts[0] != tc.wantAuthSource {
+				t.Fatalf("auth mount source = %q, want %q", authMounts[0], tc.wantAuthSource)
+			}
+			if !gotReadOnly {
+				t.Fatal("auth config mount should be read-only")
+			}
+		})
+	}
+}
+
 // TestContainerRuntimeEnvPassthrough verifies that ContainerSpec.Env is
 // correctly converted to Docker's Env []string format and passed to the container.
 // This test confirms the flattenEnv function works correctly and that env vars
