@@ -203,6 +203,7 @@ func normalizeStepLocalPaths(step map[string]any, sourcePath string) {
 	normalizeStepMountList(step, "in", sourcePath, false)
 	normalizeStepMountList(step, "out", sourcePath, false)
 	normalizeStepMountList(step, "home", sourcePath, true)
+	normalizeStepMountList(step, "tmp", sourcePath, false)
 }
 
 func normalizeStepMountList(step map[string]any, key string, sourcePath string, isHome bool) {
