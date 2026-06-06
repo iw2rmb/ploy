@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"path/filepath"
 	"runtime/debug"
 	"strings"
 	"time"
@@ -106,7 +107,7 @@ func (r *containerRuntime) Create(ctx context.Context, spec ContainerSpec) (hand
 	}
 	hostCfg := &container.HostConfig{
 		AutoRemove: false,
-		Mounts:     convertMounts(spec.Mounts),
+		Mounts:     convertMounts(r.withDockerAuthMount(spec.Mounts)),
 	}
 	if spec.LimitNanoCPUs > 0 || spec.LimitMemoryBytes > 0 {
 		hostCfg.NanoCPUs = spec.LimitNanoCPUs
@@ -129,6 +130,30 @@ func (r *containerRuntime) Create(ctx context.Context, spec ContainerSpec) (hand
 		return "", fmt.Errorf("step: create container: %w", err)
 	}
 	return ContainerHandle(created.ID), nil
+}
+
+func (r *containerRuntime) withDockerAuthMount(mounts []ContainerMount) []ContainerMount {
+	authConfigFile := strings.TrimSpace(r.opts.RegistryAuthConfigFile)
+	if authConfigFile == "" ||
+		!hasMountTarget(mounts, "/var/run/docker.sock") ||
+		hasMountTarget(mounts, "/root/.docker") ||
+		hasMountTarget(mounts, "/root/.docker/config.json") {
+		return mounts
+	}
+	return append(append([]ContainerMount{}, mounts...), ContainerMount{
+		Source:   filepath.Dir(authConfigFile),
+		Target:   "/root/.docker",
+		ReadOnly: true,
+	})
+}
+
+func hasMountTarget(mounts []ContainerMount, target string) bool {
+	for _, m := range mounts {
+		if m.Target == target {
+			return true
+		}
+	}
+	return false
 }
 
 // Start launches the container. ContainerStart is async — the container may still
