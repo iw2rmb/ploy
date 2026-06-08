@@ -77,6 +77,7 @@ spec supports:
   - `home` — Home-relative files (`src:dst{:ro}`; CLI compiles to `shortHash:dst{:ro}`)
   - `tmp` — Per-job writable temporary files (`src:/tmp/dst` or `src:dst`; CLI compiles to `shortHash:/tmp/dst`)
   - `steps[]` — Multi-step spec steps (each with its own `image`/`command`/`envs`/`options`/`in`/`out`/`home`/`tmp`)
+  - `steps[].ref` — CLI-only step reference (`path/to/mig.yaml:step-name`). A ref wrapper may include `envs`; those envs are merged into the imported step and override matching imported step envs before submission.
   - `steps[].options.mount_docker_socket` — Optional boolean. When true, the node mounts the host Docker socket at `/var/run/docker.sock` if that socket exists.
   - `build_gate.pre.stack` / `build_gate.post.stack` — Stack-detection policy for gate phases
   - `build_gate.images` — Build Gate image overrides selected by stack rules

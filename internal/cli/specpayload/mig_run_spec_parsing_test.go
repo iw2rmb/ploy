@@ -590,6 +590,32 @@ steps:
 			wantEnv:   map[string]any{"STEP_ENV": "kept"},
 		},
 		{
+			name: "ref wrapper envs overlay imported step envs",
+			setup: func(t *testing.T, rootDir string) string {
+				writeFile(t, filepath.Join(rootDir, "lib.yaml"), `
+steps:
+  - name: reuse
+    image: docker.io/test/reuse:latest
+    envs:
+      IMPORTED_ONLY: imported
+      SHARED: imported
+`)
+				return `
+steps:
+  - ref: ./lib.yaml:reuse
+    envs:
+      WRAPPER_ONLY: wrapper
+      SHARED: wrapper
+`
+			},
+			wantImage: "docker.io/test/reuse:latest",
+			wantEnv: map[string]any{
+				"IMPORTED_ONLY": "imported",
+				"WRAPPER_ONLY":  "wrapper",
+				"SHARED":        "wrapper",
+			},
+		},
+		{
 			name: "directory ref uses mig yaml",
 			setup: func(t *testing.T, rootDir string) string {
 				libDir := filepath.Join(rootDir, "reusable")
@@ -685,14 +711,24 @@ steps:
 			wantErr: "step \"missing\" not found",
 		},
 		{
-			name: "ref step cannot mix keys",
+			name: "ref step cannot mix non-env keys",
 			spec: `
 steps:
   - ref: ./lib.yaml:reuse
     image: docker.io/test/inline:latest
 `,
 			files:   map[string]string{"lib.yaml": "steps:\n  - name: reuse\n    image: docker.io/test/reuse:latest\n"},
-			wantErr: "ref step must not contain other keys",
+			wantErr: "ref step may contain only ref and envs",
+		},
+		{
+			name: "ref step envs must be object",
+			spec: `
+steps:
+  - ref: ./lib.yaml:reuse
+    envs: invalid
+`,
+			files:   map[string]string{"lib.yaml": "steps:\n  - name: reuse\n    image: docker.io/test/reuse:latest\n"},
+			wantErr: "steps[0].envs: expected object",
 		},
 		{
 			name: "cycle",

@@ -280,7 +280,8 @@ ploy completion <shell> --help
   for deterministic file injection via content-addressed bundles.
   CLI-authored specs can use `steps[].ref` entries such as
   `ref: ../shared/mig.yaml:deprecations`; refs are expanded before submission
-  and only the selected step is imported.
+  and only the selected step is imported. A ref wrapper may also declare
+  `envs`; those envs are merged into the imported step and win on key conflicts.
   See `docs/schemas/mig.example.yaml` for the full schema and
   `tests/e2e/migs/README.md` for usage examples.
 - `ploy run --pull[=path]` and `ploy run pull <run-id> [path]` download run
