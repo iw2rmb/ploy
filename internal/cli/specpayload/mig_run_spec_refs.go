@@ -44,8 +44,8 @@ func expandSpecRefsInPlaceWithStack(spec map[string]any, sourcePath string, stac
 		if !hasRef {
 			continue
 		}
-		if len(step) != 1 {
-			return fmt.Errorf("steps[%d]: ref step must not contain other keys", i)
+		if err := validateRefWrapperKeys(step, i); err != nil {
+			return err
 		}
 		ref, ok := refRaw.(string)
 		if !ok || strings.TrimSpace(ref) == "" {
@@ -55,7 +55,51 @@ func expandSpecRefsInPlaceWithStack(spec map[string]any, sourcePath string, stac
 		if err != nil {
 			return fmt.Errorf("steps[%d].ref: %w", i, err)
 		}
+		if err := applyRefStepEnvOverlay(imported, step, i); err != nil {
+			return err
+		}
 		steps[i] = imported
+	}
+	return nil
+}
+
+func validateRefWrapperKeys(step map[string]any, index int) error {
+	for key := range step {
+		if key != "ref" && key != "envs" {
+			return fmt.Errorf("steps[%d]: ref step may contain only ref and envs", index)
+		}
+	}
+	return nil
+}
+
+func applyRefStepEnvOverlay(imported map[string]any, wrapper map[string]any, index int) error {
+	rawOverlay, ok := wrapper["envs"]
+	if !ok {
+		return nil
+	}
+	overlay, ok := rawOverlay.(map[string]any)
+	if !ok {
+		return fmt.Errorf("steps[%d].envs: expected object, got %T", index, rawOverlay)
+	}
+
+	merged := make(map[string]any)
+	if rawImported, ok := imported["envs"]; ok {
+		importedEnvs, ok := rawImported.(map[string]any)
+		if !ok {
+			return fmt.Errorf("steps[%d].ref envs: imported step envs must be object, got %T", index, rawImported)
+		}
+		for k, v := range importedEnvs {
+			merged[k] = v
+		}
+	}
+	for k, v := range overlay {
+		if _, ok := v.(string); !ok {
+			return fmt.Errorf("steps[%d].envs[%s]: expected string, got %T", index, k, v)
+		}
+		merged[k] = v
+	}
+	if len(merged) > 0 {
+		imported["envs"] = merged
 	}
 	return nil
 }
