@@ -46,10 +46,11 @@ func TestPrepareStickyWorkspaceForStep_RemovesInvalidChainHeadWorkspaceBeforeHyd
 	t.Setenv("PLOYD_CACHE_HOME", cacheHome)
 
 	req := StartRunRequest{
-		RunID:   types.RunID("run_sticky_invalid"),
-		RepoID:  types.MigRepoID("repo_sticky_invalid"),
-		JobID:   types.JobID("job_sticky_invalid"),
-		JobType: types.JobTypePreGate,
+		RunID:     types.RunID("run_sticky_invalid"),
+		RepoID:    types.MigRepoID("repo_sticky_invalid"),
+		JobID:     types.JobID("job_sticky_invalid"),
+		JobType:   types.JobTypePreGate,
+		RepoSHAIn: types.CommitSHA("0123456789abcdef0123456789abcdef01234567"),
 	}
 	workspace := workspaceDir(req.RunID)
 	if err := os.MkdirAll(workspace, 0o755); err != nil {
@@ -91,44 +92,58 @@ func TestPrepareStickyWorkspaceForStep_ChainHeadHydratesWorkspaceWithoutRunBase(
 		t.Skip("git command not found")
 	}
 
-	cacheHome := t.TempDir()
-	t.Setenv("PLOYD_CACHE_HOME", cacheHome)
-	repoDir := gitrepo.SetupBasic(t)
-
-	req := StartRunRequest{
-		RunID:     types.RunID("run_sticky_hydrate"),
-		RepoID:    types.MigRepoID("repo_sticky_hydrate"),
-		JobID:     types.JobID("job_sticky_hydrate"),
-		JobType:   types.JobTypePreGate,
-		CommitSHA: types.CommitSHA(gitrepo.RevParse(t, repoDir, "HEAD")),
+	tests := []struct {
+		name    string
+		jobType types.JobType
+	}{
+		{name: "pre gate chain head", jobType: types.JobTypePreGate},
+		{name: "mig chain head", jobType: types.JobTypeMig},
 	}
-	manifest := contracts.StepManifest{
-		Inputs: []contracts.StepInput{
-			{
-				Name: "workspace",
-				Hydration: &contracts.StepInputHydration{
-					Repo: &contracts.RepoMaterialization{
-						URL:     types.RepoURL("file://" + repoDir),
-						BaseRef: types.GitRef("main"),
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cacheHome := t.TempDir()
+			t.Setenv("PLOYD_CACHE_HOME", cacheHome)
+			repoDir := gitrepo.SetupBasic(t)
+			head := gitrepo.RevParse(t, repoDir, "HEAD")
+
+			req := StartRunRequest{
+				RunID:     types.RunID("run_sticky_hydrate"),
+				RepoID:    types.MigRepoID("repo_sticky_hydrate"),
+				JobID:     types.JobID("job_sticky_hydrate"),
+				JobType:   tt.jobType,
+				CommitSHA: types.CommitSHA(head),
+				RepoSHAIn: types.CommitSHA(head),
+			}
+			manifest := contracts.StepManifest{
+				Inputs: []contracts.StepInput{
+					{
+						Name: "workspace",
+						Hydration: &contracts.StepInputHydration{
+							Repo: &contracts.RepoMaterialization{
+								URL:     types.RepoURL("file://" + repoDir),
+								BaseRef: types.GitRef("main"),
+							},
+						},
 					},
 				},
-			},
-		},
-	}
+			}
 
-	srv := snapshotFixtureServer(t, repoDir)
-	defer srv.Close()
-	rc := &runController{cfg: Config{ServerURL: srv.URL, NodeID: types.NodeID("node01")}, httpClient: srv.Client()}
-	workspace, err := rc.prepareStickyWorkspace(context.Background(), req, manifest)
-	if err != nil {
-		t.Fatalf("prepareStickyWorkspace() error = %v", err)
-	}
-	if workspace != workspaceDir(req.RunID) {
-		t.Fatalf("workspace path = %q, want %q", workspace, workspaceDir(req.RunID))
-	}
-	gitrepo.AssertRepo(t, workspace)
-	if _, err := os.Stat(filepath.Join(runDir(req.RunID), "base")); !os.IsNotExist(err) {
-		t.Fatalf("run base dir should not be created, stat err = %v", err)
+			srv := snapshotFixtureServer(t, repoDir)
+			defer srv.Close()
+			rc := &runController{cfg: Config{ServerURL: srv.URL, NodeID: types.NodeID("node01")}, httpClient: srv.Client()}
+			workspace, err := rc.prepareStickyWorkspace(context.Background(), req, manifest)
+			if err != nil {
+				t.Fatalf("prepareStickyWorkspace() error = %v", err)
+			}
+			if workspace != workspaceDir(req.RunID) {
+				t.Fatalf("workspace path = %q, want %q", workspace, workspaceDir(req.RunID))
+			}
+			gitrepo.AssertRepo(t, workspace)
+			if _, err := os.Stat(filepath.Join(runDir(req.RunID), "base")); !os.IsNotExist(err) {
+				t.Fatalf("run base dir should not be created, stat err = %v", err)
+			}
+		})
 	}
 }
 
