@@ -13,7 +13,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	types "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
@@ -42,7 +41,7 @@ func (r *runController) prepareStickyWorkspace(
 		return workspacePath, nil
 	}
 
-	if req.JobType != types.JobTypePreGate {
+	if strings.TrimSpace(req.RepoSHAIn.String()) == "" {
 		return "", fmt.Errorf("sticky workspace missing for %s job; linear repo chains must continue on the node that hydrated the chain head", req.JobType)
 	}
 
