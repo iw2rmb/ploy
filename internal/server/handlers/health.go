@@ -67,5 +67,5 @@ func healthResponse(status string) map[string]any {
 }
 
 func schemaHealth() map[string]any {
-	return map[string]any{"target_version": store.SchemaVersion}
+	return map[string]any{"target_version": store.TargetSchemaVersion}
 }

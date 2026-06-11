@@ -61,8 +61,8 @@ func TestHealthProbeHandlers(t *testing.T) {
 			if !ok {
 				t.Fatalf("schema = %#v, want object", body["schema"])
 			}
-			if got := int64(schema["target_version"].(float64)); got != store.SchemaVersion {
-				t.Fatalf("schema.target_version = %d, want %d", got, store.SchemaVersion)
+			if got := int32(schema["target_version"].(float64)); got != store.TargetSchemaVersion {
+				t.Fatalf("schema.target_version = %d, want %d", got, store.TargetSchemaVersion)
 			}
 		})
 	}

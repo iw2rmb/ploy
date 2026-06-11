@@ -2,257 +2,180 @@ package store
 
 import (
 	"context"
-	_ "embed"
+	"embed"
+	"errors"
 	"fmt"
+	"io/fs"
 	"log/slog"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jackc/tern/v2/migrate"
 )
 
-//go:embed schema.sql
-var schemaSQL string
+//go:embed migrations/tern/*.sql
+var embeddedTernMigrations embed.FS
 
-//go:embed migrations/wave_model_20260601.sql
-var waveModelMigrationSQL string
+const (
+	legacyCurrentSchemaVersion int64 = 2026060203
+	ternVersionTable                 = "ploy.tern_schema_version"
 
-// SchemaVersion is the version number for the embedded schema.sql.
-// Increment this when schema.sql changes to trigger current-contract maintenance
-// on existing databases. This uses a timestamp-like versioning scheme
-// (YYYYMMDDNN) for clarity.
-const SchemaVersion int64 = 2026060203
+	// TargetSchemaVersion is the highest embedded Tern migration version.
+	TargetSchemaVersion int32 = 2
+)
 
-const waveModelSchemaVersion int64 = 2026060101
+// ErrUnsupportedSchema is returned when an existing database cannot be safely
+// baselined into the Tern migration chain.
+var ErrUnsupportedSchema = errors.New("store: unsupported database schema for Tern adoption")
 
-// RunMigrations ensures the database schema is present and records the version.
-// Uses execMigrationSQL for statement-by-statement execution within a transaction.
-// Schema versions are tracked in ploy.schema_version for deterministic migrations.
+// RunMigrations applies embedded Tern migrations. Existing databases from the
+// final custom migration state are baselined at Tern version 1 so cleanup
+// migration 2 can run normally on adoption.
 func RunMigrations(ctx context.Context, pool *pgxpool.Pool) error {
-	slog.Info("running migrations", "target_version", SchemaVersion)
+	slog.Info("running migrations", "target_version", TargetSchemaVersion)
 
-	// Ensure schema_version table exists before checking version.
-	// This must happen outside the main transaction so we can read version.
-	if err := ensureVersionTable(ctx, pool); err != nil {
-		return fmt.Errorf("ensure version table: %w", err)
-	}
-
-	currentVersion, err := getCurrentVersion(ctx, pool)
-	if err != nil {
-		return fmt.Errorf("get current version: %w", err)
-	}
-
-	if currentVersion >= SchemaVersion {
-		slog.Info("schema already at target version", "current", currentVersion, "target", SchemaVersion)
-		return nil
-	}
-
-	if currentVersion >= waveModelSchemaVersion {
-		if err := applyCurrentSchemaMaintenance(ctx, pool, currentVersion); err != nil {
-			return err
-		}
-		return nil
-	}
-
-	needsWaveMigration, err := needsWaveModelMigration(ctx, pool)
-	if err != nil {
-		return fmt.Errorf("inspect schema state: %w", err)
-	}
-
-	slog.Info("applying schema", "from_version", currentVersion, "to_version", SchemaVersion)
-
-	tx, err := pool.Begin(ctx)
-	if err != nil {
-		return fmt.Errorf("begin transaction: %w", err)
-	}
-	defer tx.Rollback(ctx) //nolint:errcheck
-
-	if needsWaveMigration {
-		slog.Info("applying wave model data migration")
-		if err := execMigrationSQL(ctx, tx, waveModelMigrationSQL); err != nil {
-			return fmt.Errorf("execute wave model migration: %w", err)
-		}
-	} else if err := execMigrationSQL(ctx, tx, schemaSQL); err != nil {
-		return fmt.Errorf("execute schema: %w", err)
-	}
-
-	if err := applyCurrentSchemaMaintenanceSQL(ctx, tx); err != nil {
-		return err
-	}
-	if err := recordMigration(ctx, tx, SchemaVersion); err != nil {
-		return fmt.Errorf("record migration: %w", err)
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		return fmt.Errorf("commit migration: %w", err)
-	}
-
-	slog.Info("schema applied successfully", "version", SchemaVersion)
-	return nil
-}
-
-func applyCurrentSchemaMaintenance(ctx context.Context, pool *pgxpool.Pool, currentVersion int64) error {
-	slog.Info("applying current schema maintenance", "from_version", currentVersion, "to_version", SchemaVersion)
-
-	tx, err := pool.Begin(ctx)
-	if err != nil {
-		return fmt.Errorf("begin maintenance transaction: %w", err)
-	}
-	defer tx.Rollback(ctx) //nolint:errcheck
-
-	if err := applyCurrentSchemaMaintenanceSQL(ctx, tx); err != nil {
-		return err
-	}
-	if err := recordMigration(ctx, tx, SchemaVersion); err != nil {
-		return fmt.Errorf("record maintenance: %w", err)
-	}
-	if err := tx.Commit(ctx); err != nil {
-		return fmt.Errorf("commit maintenance: %w", err)
-	}
-
-	slog.Info("current schema maintenance applied", "version", SchemaVersion)
-	return nil
-}
-
-func applyCurrentSchemaMaintenanceSQL(ctx context.Context, tx pgx.Tx) error {
-	if _, err := tx.Exec(ctx, `ALTER TABLE IF EXISTS ploy.mig_repos DROP COLUMN IF EXISTS target_ref`); err != nil {
-		return fmt.Errorf("drop mig_repos.target_ref: %w", err)
-	}
-	if _, err := tx.Exec(ctx, `
-ALTER TABLE IF EXISTS ploy.runs
-  ALTER COLUMN source_commit_sha SET DEFAULT '',
-  ALTER COLUMN repo_sha0 SET DEFAULT '',
-  ALTER COLUMN status SET DEFAULT 'Queued',
-  ALTER COLUMN attempt SET DEFAULT 1,
-  ALTER COLUMN stats SET DEFAULT '{}'::jsonb
-`); err != nil {
-		return fmt.Errorf("align runs defaults: %w", err)
-	}
-	if _, err := tx.Exec(ctx, `
-DO $$
-BEGIN
-  IF to_regclass('ploy.node_daemon_logs') IS NOT NULL THEN
-    DELETE FROM ploy.node_daemon_logs
-    WHERE component <> 'node';
-  END IF;
-END $$;
-`); err != nil {
-		return fmt.Errorf("delete obsolete node daemon logs: %w", err)
-	}
-	if _, err := tx.Exec(ctx, `
-DO $$
-BEGIN
-  IF to_regclass('ploy.node_diagnostics') IS NOT NULL THEN
-    DELETE FROM ploy.node_diagnostics
-    WHERE component <> 'node';
-  END IF;
-END $$;
-`); err != nil {
-		return fmt.Errorf("delete obsolete node diagnostics: %w", err)
-	}
-	if _, err := tx.Exec(ctx, `
-ALTER TABLE IF EXISTS ploy.node_diagnostics
-  DROP CONSTRAINT IF EXISTS node_diagnostics_component_check,
-  ADD CONSTRAINT node_diagnostics_component_check CHECK (component IN ('node'))
-`); err != nil {
-		return fmt.Errorf("align node diagnostics component constraint: %w", err)
-	}
-	if _, err := tx.Exec(ctx, `
-ALTER TABLE IF EXISTS ploy.node_daemon_logs
-  DROP CONSTRAINT IF EXISTS node_daemon_logs_component_check,
-  ADD CONSTRAINT node_daemon_logs_component_check CHECK (component IN ('node'))
-`); err != nil {
-		return fmt.Errorf("align node daemon logs component constraint: %w", err)
-	}
-	return nil
-}
-
-func needsWaveModelMigration(ctx context.Context, pool *pgxpool.Pool) (bool, error) {
-	var state struct {
-		hasRunRepos       bool
-		hasWaves          bool
-		hasRunRepoStatus  bool
-		hasWaveStatus     bool
-		hasRunsWaveID     bool
-		hasRunRepoActions bool
-	}
-	err := pool.QueryRow(ctx, `
-SELECT
-  to_regclass('ploy.run_repos') IS NOT NULL AS has_run_repos,
-  to_regclass('ploy.waves') IS NOT NULL AS has_waves,
-  EXISTS (
-    SELECT 1
-    FROM pg_type t
-    JOIN pg_namespace n ON n.oid = t.typnamespace
-    WHERE n.nspname = 'ploy' AND t.typname = 'run_repo_status'
-  ) AS has_run_repo_status,
-  EXISTS (
-    SELECT 1
-    FROM pg_type t
-    JOIN pg_namespace n ON n.oid = t.typnamespace
-    WHERE n.nspname = 'ploy' AND t.typname = 'wave_status'
-  ) AS has_wave_status,
-  EXISTS (
-    SELECT 1
-    FROM information_schema.columns
-    WHERE table_schema = 'ploy' AND table_name = 'runs' AND column_name = 'wave_id'
-  ) AS has_runs_wave_id,
-  to_regclass('ploy.run_repo_actions') IS NOT NULL AS has_run_repo_actions
-`).Scan(
-		&state.hasRunRepos,
-		&state.hasWaves,
-		&state.hasRunRepoStatus,
-		&state.hasWaveStatus,
-		&state.hasRunsWaveID,
-		&state.hasRunRepoActions,
-	)
-	if err != nil {
-		return false, err
-	}
-
-	if !state.hasRunRepos {
-		return false, nil
-	}
-	if !state.hasWaves && state.hasRunRepoStatus && !state.hasWaveStatus && !state.hasRunsWaveID && state.hasRunRepoActions {
-		return true, nil
-	}
-	return false, fmt.Errorf("old run_repos table exists but schema is not the expected pre-wave shape: waves=%t run_repo_status=%t wave_status=%t runs.wave_id=%t run_repo_actions=%t",
-		state.hasWaves, state.hasRunRepoStatus, state.hasWaveStatus, state.hasRunsWaveID, state.hasRunRepoActions)
-}
-
-// ensureVersionTable creates the schema_version table if it doesn't exist.
-// The table is also defined in schema.sql; this function allows versioning
-// to work independently for migration tracking.
-func ensureVersionTable(ctx context.Context, pool *pgxpool.Pool) error {
-	// Use separate Exec calls to avoid multi-statement execution issues
-	// with the extended protocol.
 	if _, err := pool.Exec(ctx, `CREATE SCHEMA IF NOT EXISTS ploy`); err != nil {
+		return fmt.Errorf("ensure ploy schema: %w", err)
+	}
+
+	acquired, err := pool.Acquire(ctx)
+	if err != nil {
+		return fmt.Errorf("acquire migration connection: %w", err)
+	}
+	defer acquired.Release()
+
+	migrator, err := newTernMigrator(ctx, acquired.Conn())
+	if err != nil {
 		return err
 	}
-	_, err := pool.Exec(ctx, `CREATE TABLE IF NOT EXISTS ploy.schema_version (
-        version BIGINT PRIMARY KEY,
-        applied_at TIMESTAMPTZ NOT NULL
-    )`)
-	return err
+
+	currentVersion, err := migrator.GetCurrentVersion(ctx)
+	if err != nil {
+		return fmt.Errorf("get current Tern version: %w", err)
+	}
+
+	if currentVersion == 0 {
+		state, err := inspectTernAdoptionState(ctx, acquired.Conn())
+		if err != nil {
+			return fmt.Errorf("inspect schema state: %w", err)
+		}
+		switch {
+		case state.fresh:
+			// Empty database: run the full Tern chain from version 0.
+		case state.knownCurrentLegacy:
+			slog.Info("baselining legacy schema for Tern", "legacy_version", state.legacyVersion, "tern_version", int32(1))
+			if err := migrator.SetVersion(ctx, 1); err != nil {
+				return fmt.Errorf("baseline legacy schema: %w", err)
+			}
+		default:
+			return fmt.Errorf("%w: expected empty database or ploy.schema_version >= %d",
+				ErrUnsupportedSchema, legacyCurrentSchemaVersion)
+		}
+	}
+
+	if err := migrator.Migrate(ctx); err != nil {
+		return fmt.Errorf("run Tern migrations: %w", err)
+	}
+
+	version, err := migrator.GetCurrentVersion(ctx)
+	if err != nil {
+		return fmt.Errorf("get migrated Tern version: %w", err)
+	}
+	slog.Info("schema migrations complete", "version", version)
+	return nil
 }
 
-// getCurrentVersion returns the highest applied migration version.
-// Returns 0 if no migrations have been applied.
-func getCurrentVersion(ctx context.Context, pool *pgxpool.Pool) (int64, error) {
-	var version int64
-	err := pool.QueryRow(ctx, "SELECT COALESCE(MAX(version), 0) FROM ploy.schema_version").Scan(&version)
+// CurrentSchemaVersion returns the applied Tern schema version.
+func CurrentSchemaVersion(ctx context.Context, pool *pgxpool.Pool) (int32, error) {
+	var version int32
+	err := pool.QueryRow(ctx, `SELECT version FROM ploy.tern_schema_version`).Scan(&version)
 	if err != nil {
 		return 0, err
 	}
 	return version, nil
 }
 
-// CurrentSchemaVersion returns the highest schema version applied to the database.
-func CurrentSchemaVersion(ctx context.Context, pool *pgxpool.Pool) (int64, error) {
-	return getCurrentVersion(ctx, pool)
+func newTernMigrator(ctx context.Context, conn *pgx.Conn) (*migrate.Migrator, error) {
+	migrationsFS, err := fs.Sub(embeddedTernMigrations, "migrations/tern")
+	if err != nil {
+		return nil, fmt.Errorf("load embedded migrations: %w", err)
+	}
+
+	migrator, err := migrate.NewMigrator(ctx, conn, ternVersionTable)
+	if err != nil {
+		return nil, fmt.Errorf("create Tern migrator: %w", err)
+	}
+	if err := migrator.LoadMigrations(migrationsFS); err != nil {
+		return nil, fmt.Errorf("load Tern migrations: %w", err)
+	}
+	migrator.OnStart = func(sequence int32, name, direction, _ string) {
+		slog.Info("running schema migration", "version", sequence, "name", name, "direction", direction)
+	}
+	return migrator, nil
 }
 
-// recordMigration inserts a migration version into schema_version within a transaction.
-func recordMigration(ctx context.Context, tx pgx.Tx, version int64) error {
-	_, err := tx.Exec(ctx, `INSERT INTO ploy.schema_version (version, applied_at) VALUES ($1, now())`, version)
-	return err
+type ternAdoptionState struct {
+	fresh              bool
+	knownCurrentLegacy bool
+	legacyVersion      int64
+}
+
+func inspectTernAdoptionState(ctx context.Context, conn *pgx.Conn) (ternAdoptionState, error) {
+	objectCount, err := countPloyObjectsExcludingTern(ctx, conn)
+	if err != nil {
+		return ternAdoptionState{}, err
+	}
+	if objectCount == 0 {
+		return ternAdoptionState{fresh: true}, nil
+	}
+
+	legacyVersion, err := currentLegacyVersion(ctx, conn)
+	if err != nil {
+		return ternAdoptionState{}, err
+	}
+
+	return ternAdoptionState{
+		knownCurrentLegacy: legacyVersion >= legacyCurrentSchemaVersion,
+		legacyVersion:      legacyVersion,
+	}, nil
+}
+
+func countPloyObjectsExcludingTern(ctx context.Context, conn *pgx.Conn) (int, error) {
+	var count int
+	err := conn.QueryRow(ctx, `
+SELECT (
+  SELECT count(*)
+  FROM pg_class c
+  JOIN pg_namespace n ON n.oid = c.relnamespace
+  WHERE n.nspname = 'ploy'
+    AND c.relkind IN ('r', 'p', 'v', 'm', 'S')
+    AND c.relname <> 'tern_schema_version'
+) + (
+  SELECT count(*)
+  FROM pg_type t
+  JOIN pg_namespace n ON n.oid = t.typnamespace
+  WHERE n.nspname = 'ploy'
+    AND t.typtype = 'e'
+)
+`).Scan(&count)
+	if err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
+func currentLegacyVersion(ctx context.Context, conn *pgx.Conn) (int64, error) {
+	var hasLegacyVersionTable bool
+	if err := conn.QueryRow(ctx, `SELECT to_regclass('ploy.schema_version') IS NOT NULL`).Scan(&hasLegacyVersionTable); err != nil {
+		return 0, err
+	}
+	if !hasLegacyVersionTable {
+		return 0, nil
+	}
+
+	var version int64
+	if err := conn.QueryRow(ctx, `SELECT COALESCE(MAX(version), 0) FROM ploy.schema_version`).Scan(&version); err != nil {
+		return 0, err
+	}
+	return version, nil
 }
