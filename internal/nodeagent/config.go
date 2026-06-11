@@ -11,7 +11,7 @@ import (
 )
 
 // Config holds node agent configuration.
-// Uses domain types (NodeID, ClusterID) for type-safe identification.
+// Uses domain types for type-safe node identification.
 type Config struct {
 	// HTTP configuration for the node agent API server.
 	HTTP HTTPConfig `yaml:"http"`
@@ -21,9 +21,6 @@ type Config struct {
 
 	// NodeID identifies this node (NanoID-backed).
 	NodeID domaintypes.NodeID `yaml:"node_id"`
-
-	// ClusterID identifies the cluster this node belongs to.
-	ClusterID domaintypes.ClusterID `yaml:"cluster_id"`
 
 	// Concurrency defines the maximum number of concurrent runs.
 	Concurrency int `yaml:"concurrency"`
@@ -60,12 +57,12 @@ type TLSConfig struct {
 	// KeyPath is the path to the node private key.
 	KeyPath string `yaml:"key_path"`
 
-	// CAPath is the path to the cluster CA certificate.
+	// CAPath is the path to the CA certificate.
 	CAPath string `yaml:"ca_path"`
 
 	// BootstrapCAPath is the path to the CA certificate used to verify
 	// the server during bootstrap (before mTLS certificates are obtained).
-	// If empty, the cluster CA at CAPath is used if it exists; otherwise
+	// If empty, the CA at CAPath is used if it exists; otherwise
 	// system roots are used (for public PKI scenarios).
 	BootstrapCAPath string `yaml:"bootstrap_ca_path"`
 }
@@ -130,9 +127,6 @@ func (c Config) validate() error {
 		return errors.New("node_id is required")
 	}
 	if c.HTTP.TLS.Enabled {
-		if c.ClusterID.IsZero() {
-			return errors.New("cluster_id is required when TLS is enabled")
-		}
 		if c.HTTP.TLS.CertPath == "" {
 			return errors.New("http.tls.cert_path is required when TLS is enabled")
 		}

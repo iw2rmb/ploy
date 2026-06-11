@@ -108,17 +108,17 @@ func generateTestPKI(t *testing.T) *testPKI {
 	t.Helper()
 	now := time.Now().UTC()
 
-	ca, err := pki.GenerateCA("test-cluster", now)
+	ca, err := pki.GenerateCA(now)
 	if err != nil {
 		t.Fatalf("generate CA: %v", err)
 	}
 
-	serverCert, err := pki.IssueServerCert(ca, "test-cluster", "127.0.0.1", now)
+	serverCert, err := pki.IssueServerCert(ca, "127.0.0.1", now)
 	if err != nil {
 		t.Fatalf("issue server cert: %v", err)
 	}
 
-	nodeKey, nodeCSR, err := pki.GenerateNodeCSR(string(testNodeID), "test-cluster", "127.0.0.1")
+	nodeKey, nodeCSR, err := pki.GenerateNodeCSR(string(testNodeID), "127.0.0.1")
 	if err != nil {
 		t.Fatalf("generate node CSR: %v", err)
 	}

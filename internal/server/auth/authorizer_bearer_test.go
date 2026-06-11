@@ -84,11 +84,9 @@ func (m *mockQuerier) BootstrapTokenLastUsedCalled() bool {
 // Shared constants and helpers
 // ---------------------------------------------------------------------------
 
-const testClusterID = "test-cluster"
-
 func mustGenerateAPIToken(t *testing.T, role string, expiresAt time.Time) string {
 	t.Helper()
-	tok, err := GenerateAPIToken(testSecret, testClusterID, role, expiresAt)
+	tok, err := GenerateAPIToken(testSecret, role, expiresAt)
 	if err != nil {
 		t.Fatalf("GenerateAPIToken: %v", err)
 	}
@@ -140,7 +138,7 @@ func TestAuthorizerBearerToken_Rejected(t *testing.T) {
 	expiredToken := mustGenerateAPIToken(t, string(RoleControlPlane), time.Now().Add(-1*time.Hour))
 
 	wrongSecretToken := func() string {
-		tok, err := GenerateAPIToken("secret-two-12345678901234567890", testClusterID, string(RoleControlPlane), time.Now().Add(24*time.Hour))
+		tok, err := GenerateAPIToken("secret-two-12345678901234567890", string(RoleControlPlane), time.Now().Add(24*time.Hour))
 		if err != nil {
 			t.Fatalf("GenerateAPIToken: %v", err)
 		}
@@ -261,7 +259,7 @@ func TestAuthorizerBearerToken_RoleExtraction(t *testing.T) {
 
 func TestAuthorizerBearerToken_BootstrapToken(t *testing.T) {
 	nodeID := domaintypes.NodeID(domaintypes.NewNodeKey())
-	tokenString, err := GenerateBootstrapToken(testSecret, testClusterID, nodeID, time.Now().Add(15*time.Minute))
+	tokenString, err := GenerateBootstrapToken(testSecret, nodeID, time.Now().Add(15*time.Minute))
 	if err != nil {
 		t.Fatalf("GenerateBootstrapToken: %v", err)
 	}

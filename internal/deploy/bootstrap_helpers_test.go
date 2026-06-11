@@ -1,45 +1,9 @@
 package deploy
 
 import (
-	"regexp"
 	"strings"
 	"testing"
 )
-
-var clusterIDPattern = regexp.MustCompile(`^[a-z]+-[a-z]+-[0-9]{4}$`)
-
-func TestGenerateClusterID(t *testing.T) {
-	t.Run("generates valid cluster ID", func(t *testing.T) {
-		id, err := GenerateClusterID()
-		if err != nil {
-			t.Fatalf("GenerateClusterID() error = %v, want nil", err)
-		}
-
-		if strings.TrimSpace(id) == "" {
-			t.Fatalf("GenerateClusterID() = %q, want non-empty", id)
-		}
-
-		if !clusterIDPattern.MatchString(id) {
-			t.Errorf("GenerateClusterID() = %q, want haikunator pattern adjective-noun-4digit token", id)
-		}
-	})
-
-	t.Run("generates unique IDs", func(t *testing.T) {
-		id1, err := GenerateClusterID()
-		if err != nil {
-			t.Fatalf("GenerateClusterID() error = %v", err)
-		}
-
-		id2, err := GenerateClusterID()
-		if err != nil {
-			t.Fatalf("GenerateClusterID() error = %v", err)
-		}
-
-		if id1 == id2 {
-			t.Errorf("GenerateClusterID() generated duplicate IDs: %q", id1)
-		}
-	})
-}
 
 // nanoIDAlphabet is the URL-safe alphabet used by NewNodeKey().
 const nanoIDAlphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_-"
@@ -86,20 +50,17 @@ func TestRandomHexString(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := RandomHexString(tt.length)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("RandomHexString() error = %v, wantErr %v", err, tt.wantErr)
-				return
+				t.Fatalf("RandomHexString() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			if tt.wantErr {
 				return
 			}
-
 			if len(got) != tt.length {
-				t.Errorf("RandomHexString(%d) length = %d, want %d", tt.length, len(got), tt.length)
+				t.Fatalf("RandomHexString() length = %d, want %d", len(got), tt.length)
 			}
-
 			for _, c := range got {
-				if (c < '0' || c > '9') && (c < 'a' || c > 'f') {
-					t.Errorf("invalid hex character %q in result %q", c, got)
+				if !strings.ContainsRune("0123456789abcdef", c) {
+					t.Fatalf("RandomHexString() contains non-hex char %q in %q", c, got)
 				}
 			}
 		})

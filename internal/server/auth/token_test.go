@@ -14,12 +14,11 @@ const testSecret = "test-secret-key-for-jwt-signing-at-least-32-chars-long"
 // TestGenerateAPIToken_ClaimsAndRoles validates token generation for all roles,
 // verifying all required claims are present and correct.
 func TestGenerateAPIToken_ClaimsAndRoles(t *testing.T) {
-	clusterID := "prod-cluster"
 	expiresAt := time.Now().Add(365 * 24 * time.Hour)
 
 	for _, role := range []Role{RoleControlPlane, RoleWorker, RoleCLIAdmin} {
 		t.Run(string(role), func(t *testing.T) {
-			tokenString, err := GenerateAPIToken(testSecret, clusterID, string(role), expiresAt)
+			tokenString, err := GenerateAPIToken(testSecret, string(role), expiresAt)
 			if err != nil {
 				t.Fatalf("GenerateAPIToken error: %v", err)
 			}
@@ -32,9 +31,6 @@ func TestGenerateAPIToken_ClaimsAndRoles(t *testing.T) {
 				t.Fatalf("ValidateToken error: %v", err)
 			}
 
-			if claims.ClusterID.String() != clusterID {
-				t.Errorf("ClusterID=%s want %s", claims.ClusterID, clusterID)
-			}
 			if claims.Role != string(role) {
 				t.Errorf("Role=%s want %s", claims.Role, role)
 			}
@@ -65,7 +61,7 @@ func TestGenerateAPIToken_UniqueTokenIDs(t *testing.T) {
 	expiresAt := time.Now().Add(24 * time.Hour)
 	ids := make(map[string]bool)
 	for i := 0; i < 100; i++ {
-		tokenString, err := GenerateAPIToken(testSecret, "test-cluster", string(RoleControlPlane), expiresAt)
+		tokenString, err := GenerateAPIToken(testSecret, string(RoleControlPlane), expiresAt)
 		if err != nil {
 			t.Fatalf("GenerateAPIToken error: %v", err)
 		}
@@ -87,11 +83,10 @@ func TestGenerateAPIToken_UniqueTokenIDs(t *testing.T) {
 }
 
 func TestGenerateBootstrapToken(t *testing.T) {
-	clusterID := "test-cluster"
 	nodeID := domaintypes.NodeID(domaintypes.NewNodeKey())
 	expiresAt := time.Now().Add(15 * time.Minute)
 
-	tokenString, err := GenerateBootstrapToken(testSecret, clusterID, nodeID, expiresAt)
+	tokenString, err := GenerateBootstrapToken(testSecret, nodeID, expiresAt)
 	if err != nil {
 		t.Fatalf("GenerateBootstrapToken error: %v", err)
 	}
@@ -104,9 +99,6 @@ func TestGenerateBootstrapToken(t *testing.T) {
 		t.Fatalf("ValidateToken error: %v", err)
 	}
 
-	if claims.ClusterID.String() != clusterID {
-		t.Errorf("ClusterID=%s want %s", claims.ClusterID, clusterID)
-	}
 	if claims.TokenType != TokenTypeBootstrap {
 		t.Errorf("TokenType=%s want %s", claims.TokenType, TokenTypeBootstrap)
 	}
@@ -141,16 +133,16 @@ func TestValidateToken_Errors(t *testing.T) {
 	}
 
 	// Pre-generate tokens for the secret/expiry cases.
-	validToken, err := GenerateAPIToken(testSecret, "test-cluster", string(RoleControlPlane), time.Now().Add(24*time.Hour))
+	validToken, err := GenerateAPIToken(testSecret, string(RoleControlPlane), time.Now().Add(24*time.Hour))
 	if err != nil {
 		t.Fatalf("GenerateAPIToken error: %v", err)
 	}
-	expiredToken, err := GenerateAPIToken(testSecret, "test-cluster", string(RoleControlPlane), time.Now().Add(-1*time.Hour))
+	expiredToken, err := GenerateAPIToken(testSecret, string(RoleControlPlane), time.Now().Add(-1*time.Hour))
 	if err != nil {
 		t.Fatalf("GenerateAPIToken error: %v", err)
 	}
 	// Token signed with a different secret.
-	wrongSecretToken, err := GenerateAPIToken("secret-one-12345678901234567890", "test-cluster", string(RoleControlPlane), time.Now().Add(24*time.Hour))
+	wrongSecretToken, err := GenerateAPIToken("secret-one-12345678901234567890", string(RoleControlPlane), time.Now().Add(24*time.Hour))
 	if err != nil {
 		t.Fatalf("GenerateAPIToken error: %v", err)
 	}
@@ -183,7 +175,6 @@ func TestValidateToken_Errors(t *testing.T) {
 
 func TestValidateToken_WrongSigningMethod(t *testing.T) {
 	claims := &TokenClaims{
-		ClusterID: "test-cluster",
 		Role:      string(RoleControlPlane),
 		TokenType: TokenTypeAPI,
 		RegisteredClaims: jwt.RegisteredClaims{

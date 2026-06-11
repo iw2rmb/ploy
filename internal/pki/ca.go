@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	// CAValidity is the default validity period for the cluster CA certificate.
+	// CAValidity is the default validity period for the CA certificate.
 	CAValidity = 10 * 365 * 24 * time.Hour // 10 years
 
 	// NodeCertValidity is the default validity period for node certificates.
@@ -51,9 +51,8 @@ type IssuedCert struct {
 	Key         *ecdsa.PrivateKey
 }
 
-// GenerateCA creates a new certificate authority for the cluster.
-// The clusterID is used in the CA subject common name.
-func GenerateCA(clusterID string, now time.Time) (*CABundle, error) {
+// GenerateCA creates a new certificate authority.
+func GenerateCA(now time.Time) (*CABundle, error) {
 	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		return nil, fmt.Errorf("generate CA key: %w", err)
@@ -67,7 +66,7 @@ func GenerateCA(clusterID string, now time.Time) (*CABundle, error) {
 	template := &x509.Certificate{
 		SerialNumber: serial,
 		Subject: pkix.Name{
-			CommonName:   fmt.Sprintf("ploy-cluster-%s-ca", clusterID),
+			CommonName:   "ploy-ca",
 			Organization: []string{"Ploy"},
 		},
 		NotBefore:             now.Add(-1 * time.Minute),
@@ -105,11 +104,10 @@ func GenerateCA(clusterID string, now time.Time) (*CABundle, error) {
 }
 
 // IssueServerCert issues a server certificate signed by the CA.
-// It sets the subject CN to "ployd-<clusterID>" and includes a DNS SAN
-// of the form "ployd.<clusterID>.ploy". The provided serverIP is also
-// added to IP SANs for direct addressing.
-func IssueServerCert(ca *CABundle, clusterID, serverIP string, now time.Time) (*IssuedCert, error) {
-	return issueCert(ca, fmt.Sprintf("ployd-%s", clusterID), []string{fmt.Sprintf("ployd.%s.ploy", clusterID)}, []string{serverIP}, now, ServerCertValidity)
+// It sets the subject CN to "ployd" and includes a "ployd.ploy" DNS SAN.
+// The provided serverIP is also added to IP SANs for direct addressing.
+func IssueServerCert(ca *CABundle, serverIP string, now time.Time) (*IssuedCert, error) {
+	return issueCert(ca, "ployd", []string{"ployd.ploy"}, []string{serverIP}, now, ServerCertValidity)
 }
 
 // SignNodeCSR signs a node certificate signing request using the cluster CA.
@@ -173,14 +171,14 @@ func SignNodeCSR(ca *CABundle, csrPEM []byte, now time.Time) (*IssuedCert, error
 // GenerateNodeCSR generates a private key and CSR for a node.
 // The nodeID is used in the certificate CN as "node:<nodeID>".
 // The nodeIP is included in SANs along with the DNS name.
-func GenerateNodeCSR(nodeID, clusterID, nodeIP string) (*IssuedCert, []byte, error) {
+func GenerateNodeCSR(nodeID, nodeIP string) (*IssuedCert, []byte, error) {
 	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		return nil, nil, fmt.Errorf("generate node key: %w", err)
 	}
 
 	cn := fmt.Sprintf("node:%s", nodeID)
-	dnsName := fmt.Sprintf("node-%s.%s.ploy", nodeID, clusterID)
+	dnsName := fmt.Sprintf("node-%s.ploy", nodeID)
 
 	var ipAddrs []net.IP
 	if nodeIP != "" {

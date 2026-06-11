@@ -78,7 +78,7 @@ func TestHandleConfigEnvSetValidOnSelectors(t *testing.T) {
 				w.WriteHeader(http.StatusOK)
 			}))
 			defer srv.Close()
-			clienv.UseServerDescriptor(t, srv.URL)
+			clienv.UseControlPlaneEnv(t, srv.URL)
 			buf := &bytes.Buffer{}
 			err := executeConfigEnvSet([]string{"--key", "FOO", "--value", "bar", "--on", sel}, buf)
 			if err != nil {
@@ -111,7 +111,7 @@ func TestHandleConfigEnvSetMultipleOnSelectors(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer srv.Close()
-	clienv.UseServerDescriptor(t, srv.URL)
+	clienv.UseControlPlaneEnv(t, srv.URL)
 	buf := &bytes.Buffer{}
 	err := executeConfigEnvSet([]string{"--key", "FOO", "--value", "bar", "--on", "gates", "--on", "steps"}, buf)
 	if err != nil {

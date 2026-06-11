@@ -3,13 +3,11 @@ package controlplane
 import (
 	"strings"
 	"testing"
-
-	"github.com/iw2rmb/ploy/internal/cli/config"
 )
 
-// FuzzBaseURLFromDescriptor checks that various address shapes produce a URL
+// FuzzBaseURLFromServerURL checks that various address shapes produce a URL
 // or return an error only when address is empty.
-func FuzzBaseURLFromDescriptor(f *testing.F) {
+func FuzzBaseURLFromServerURL(f *testing.F) {
 	seeds := []string{
 		"203.0.113.10",
 		"203.0.113.10:9000",
@@ -25,8 +23,7 @@ func FuzzBaseURLFromDescriptor(f *testing.F) {
 		f.Add(s)
 	}
 	f.Fuzz(func(t *testing.T, address string) {
-		desc := config.Descriptor{Address: address}
-		url, err := BaseURLFromDescriptor(desc)
+		url, err := BaseURLFromServerURL(address)
 		if strings.TrimSpace(address) == "" {
 			if err == nil {
 				t.Fatalf("expected error for empty address, got url=%q", url)

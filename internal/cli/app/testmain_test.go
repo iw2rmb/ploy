@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"os"
 	"testing"
-
-	cliconfig "github.com/iw2rmb/ploy/internal/cli/config"
 )
 
 // Ensure CLI package tests never touch the real ~/.config/ploy.
@@ -16,14 +14,8 @@ func TestMain(m *testing.M) {
 		os.Exit(2)
 	}
 	_ = os.Setenv("PLOY_CONFIG_HOME", tmpHome)
-	// Ensure an isolated default descriptor exists for all CLI tests.
-	_, _ = cliconfig.SaveDescriptor(cliconfig.Descriptor{
-		ClusterID:       cliconfig.ClusterID("test-cluster"),
-		Address:         "http://127.0.0.1:8080",
-		SSHIdentityPath: "/tmp/id_rsa",
-		Token:           "test-token",
-	})
-	_ = cliconfig.SetDefault(cliconfig.ClusterID("test-cluster"))
+	_ = os.Setenv("PLOY_SERVER_URL", "http://127.0.0.1:8080")
+	_ = os.Setenv("PLOY_AUTH_TOKEN", "test-token")
 
 	code := m.Run()
 

@@ -25,7 +25,7 @@ func TestRunStatusReportTextContract(t *testing.T) {
 	server := newRunStatusReportServer(t, runID, migID, specID, repoID, preGateID, migJobID, postGateID)
 	defer server.Close()
 
-	clienv.UseServerDescriptor(t, server.URL)
+	clienv.UseControlPlaneEnv(t, server.URL)
 
 	var buf bytes.Buffer
 	err := executeCmd([]string{"run", "status", runID.String()}, &buf)
@@ -197,7 +197,7 @@ func TestRunStatusJSONGate(t *testing.T) {
 			server := newRunStatusReportServer(t, runID, migID, specID, repoID, preGateID, migJobID, postGateID)
 			defer server.Close()
 
-			clienv.UseServerDescriptor(t, server.URL)
+			clienv.UseControlPlaneEnv(t, server.URL)
 
 			var buf bytes.Buffer
 			err := executeCmd(tt.args(runID.String()), &buf)
@@ -266,7 +266,7 @@ func TestRunStatusFollowUsesReportPolling(t *testing.T) {
 		Ref:     "main",
 	})
 	defer server.Close()
-	clienv.UseServerDescriptor(t, server.URL)
+	clienv.UseControlPlaneEnv(t, server.URL)
 
 	var buf bytes.Buffer
 	if err := executeCmd([]string{"run", "status", "--follow", runID}, &buf); err != nil {
@@ -296,7 +296,7 @@ func TestRunStatusFollowFailedRunPrintsFinalSnapshot(t *testing.T) {
 		JobStatus: domaintypes.JobStatusFail.String(),
 	})
 	defer server.Close()
-	clienv.UseServerDescriptor(t, server.URL)
+	clienv.UseControlPlaneEnv(t, server.URL)
 
 	var buf bytes.Buffer
 	err := executeCmd([]string{"run", "status", "--follow", runID}, &buf)

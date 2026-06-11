@@ -21,7 +21,7 @@ func TestRunCancelCallsControlPlane(t *testing.T) {
 	}))
 	defer server.Close()
 
-	clienv.UseServerDescriptor(t, server.URL)
+	clienv.UseControlPlaneEnv(t, server.URL)
 	clienv.RunExpectOK(t, executeCmd, []string{"run", "cancel", "run-7"})
 	if !called {
 		t.Fatalf("expected /v1/runs/{id}/cancel to be called")

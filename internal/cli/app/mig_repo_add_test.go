@@ -59,7 +59,7 @@ func TestMigRepoAddResolvesRunStyleSelector(t *testing.T) {
 	}))
 	defer server.Close()
 
-	clienv.UseServerDescriptor(t, server.URL)
+	clienv.UseControlPlaneEnv(t, server.URL)
 
 	var buf bytes.Buffer
 	if err := executeCmd([]string{"mig", "repo", "add", "my-wave", "acme/service:feature/test"}, &buf); err != nil {

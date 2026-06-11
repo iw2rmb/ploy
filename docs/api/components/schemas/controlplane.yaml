@@ -40,9 +40,6 @@ ControlPlaneLivenessHealth:
     status:
       type: string
       enum: [ok]
-    cluster_id:
-      type: string
-      description: Cluster identifier when PLOY_CLUSTER_ID is set.
     binary:
       $ref: "#/ControlPlaneBinaryHealth"
     schema:
@@ -60,9 +57,6 @@ ControlPlaneReadinessHealth:
       type: string
       enum: [ok, unreachable, degraded]
       description: Database readiness state for traffic-serving endpoints.
-    cluster_id:
-      type: string
-      description: Cluster identifier when PLOY_CLUSTER_ID is set.
     binary:
       $ref: "#/ControlPlaneBinaryHealth"
     schema:

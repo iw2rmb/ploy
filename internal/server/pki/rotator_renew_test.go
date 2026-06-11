@@ -20,11 +20,11 @@ func TestDefaultRotator_Renew_WithEnvCA(t *testing.T) {
 	now := time.Now().UTC()
 
 	// Create a CA and an initial server cert/key on disk
-	ca, err := corepki.GenerateCA("test", now)
+	ca, err := corepki.GenerateCA(now)
 	if err != nil {
 		t.Fatalf("generate CA: %v", err)
 	}
-	issued, err := corepki.IssueServerCert(ca, "alpha", "127.0.0.1", now)
+	issued, err := corepki.IssueServerCert(ca, "127.0.0.1", now)
 	if err != nil {
 		t.Fatalf("issue server cert: %v", err)
 	}

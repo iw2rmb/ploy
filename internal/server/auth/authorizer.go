@@ -319,13 +319,11 @@ func (a *Authorizer) identityFromBearerToken(ctx context.Context, tokenString st
 	a.logger.Info("auth: bearer token validated successfully",
 		"token_id", claims.ID,
 		"token_type", claims.TokenType,
-		"role", claims.Role,
-		"cluster_id", claims.ClusterID)
+		"role", claims.Role)
 
 	return Identity{
 		Role:       Role(claims.Role),
 		CommonName: claims.ID, // Use token ID as identifier
-		// ClusterID is in claims but not in Identity struct yet
 	}, nil
 }
 

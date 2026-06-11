@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       api_host:
-        description: "api.<cluster-id>.ploy"
+        description: "api.ploy"
         required: true
         type: string
 

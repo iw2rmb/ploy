@@ -57,7 +57,7 @@ func TestHandleConfigEnvListSuccess(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	clienv.UseServerDescriptor(t, srv.URL)
+	clienv.UseControlPlaneEnv(t, srv.URL)
 
 	buf := &bytes.Buffer{}
 	err := executeConfigEnvList(nil, buf)
@@ -98,7 +98,7 @@ func TestHandleConfigEnvListEmpty(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	clienv.UseServerDescriptor(t, srv.URL)
+	clienv.UseControlPlaneEnv(t, srv.URL)
 
 	buf := &bytes.Buffer{}
 	err := executeConfigEnvList(nil, buf)
@@ -133,7 +133,7 @@ func TestHandleConfigEnvShowSuccess(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	clienv.UseServerDescriptor(t, srv.URL)
+	clienv.UseControlPlaneEnv(t, srv.URL)
 
 	buf := &bytes.Buffer{}
 	err := executeConfigEnvShow([]string{"--key", "DEPLOY_TOKEN"}, buf)
@@ -173,7 +173,7 @@ func TestHandleConfigEnvShowWithFrom(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	clienv.UseServerDescriptor(t, srv.URL)
+	clienv.UseControlPlaneEnv(t, srv.URL)
 
 	buf := &bytes.Buffer{}
 	err := executeConfigEnvShow([]string{"--key", "DEPLOY_TOKEN", "--from", "gates"}, buf)
@@ -225,7 +225,7 @@ func TestHandleConfigEnvShow_ErrorResponses(t *testing.T) {
 			}))
 			defer srv.Close()
 
-			clienv.UseServerDescriptor(t, srv.URL)
+			clienv.UseControlPlaneEnv(t, srv.URL)
 
 			buf := &bytes.Buffer{}
 			err := executeConfigEnvShow(tt.args, buf)
@@ -255,7 +255,7 @@ func TestHandleConfigEnvShowRaw(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	clienv.UseServerDescriptor(t, srv.URL)
+	clienv.UseControlPlaneEnv(t, srv.URL)
 
 	buf := &bytes.Buffer{}
 	err := executeConfigEnvShow([]string{"--key", "SECRET_KEY", "--raw"}, buf)
@@ -303,7 +303,7 @@ func TestHandleConfigEnvSetSuccessInline(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	clienv.UseServerDescriptor(t, srv.URL)
+	clienv.UseControlPlaneEnv(t, srv.URL)
 
 	buf := &bytes.Buffer{}
 	err := executeConfigEnvSet([]string{"--key", "OPENAI_API_KEY", "--value", "sk-test-12345"}, buf)
@@ -363,7 +363,7 @@ func TestHandleConfigEnvSetSingleTarget(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	clienv.UseServerDescriptor(t, srv.URL)
+	clienv.UseControlPlaneEnv(t, srv.URL)
 
 	buf := &bytes.Buffer{}
 	err := executeConfigEnvSet([]string{"--key", "FOO", "--value", "bar", "--on", "gates"}, buf)
@@ -411,7 +411,7 @@ func TestHandleConfigEnvSetSuccessFromFile(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	clienv.UseServerDescriptor(t, srv.URL)
+	clienv.UseControlPlaneEnv(t, srv.URL)
 
 	buf := &bytes.Buffer{}
 	err := executeConfigEnvSet([]string{"--key", "MY_CUSTOM_CERT", "--file", filePath, "--on", "all"}, buf)
@@ -449,7 +449,7 @@ func TestHandleConfigEnvSetSecretFalse(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	clienv.UseServerDescriptor(t, srv.URL)
+	clienv.UseControlPlaneEnv(t, srv.URL)
 
 	buf := &bytes.Buffer{}
 	err := executeConfigEnvSet([]string{
@@ -475,7 +475,7 @@ func TestHandleConfigEnvSetServerError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	clienv.UseServerDescriptor(t, srv.URL)
+	clienv.UseControlPlaneEnv(t, srv.URL)
 
 	buf := &bytes.Buffer{}
 	err := executeConfigEnvSet([]string{"--key", "FOO", "--value", "bar", "--on", "gates"}, buf)
@@ -498,7 +498,7 @@ func TestHandleConfigEnvUnsetSuccess(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	clienv.UseServerDescriptor(t, srv.URL)
+	clienv.UseControlPlaneEnv(t, srv.URL)
 
 	buf := &bytes.Buffer{}
 	err := executeConfigEnvUnset([]string{"--key", "DEPLOY_TOKEN"}, buf)
@@ -530,7 +530,7 @@ func TestHandleConfigEnvUnsetWithFrom(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	clienv.UseServerDescriptor(t, srv.URL)
+	clienv.UseControlPlaneEnv(t, srv.URL)
 
 	buf := &bytes.Buffer{}
 	err := executeConfigEnvUnset([]string{"--key", "DEPLOY_TOKEN", "--from", "gates"}, buf)
@@ -575,7 +575,7 @@ func TestHandleConfigEnvUnset_ErrorResponses(t *testing.T) {
 			}))
 			defer srv.Close()
 
-			clienv.UseServerDescriptor(t, srv.URL)
+			clienv.UseControlPlaneEnv(t, srv.URL)
 
 			buf := &bytes.Buffer{}
 			err := executeConfigEnvUnset(tt.args, buf)
@@ -596,7 +596,7 @@ func TestHandleConfigEnvUnsetNotFound(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	clienv.UseServerDescriptor(t, srv.URL)
+	clienv.UseControlPlaneEnv(t, srv.URL)
 
 	buf := &bytes.Buffer{}
 	err := executeConfigEnvUnset([]string{"--key", "MISSING_KEY"}, buf)
@@ -619,7 +619,7 @@ func TestHandleConfigEnvListServerError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	clienv.UseServerDescriptor(t, srv.URL)
+	clienv.UseControlPlaneEnv(t, srv.URL)
 
 	buf := &bytes.Buffer{}
 	err := executeConfigEnvList(nil, buf)
@@ -644,7 +644,7 @@ func TestHandleConfigEnvShowRedactsShortSecrets(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	clienv.UseServerDescriptor(t, srv.URL)
+	clienv.UseControlPlaneEnv(t, srv.URL)
 
 	buf := &bytes.Buffer{}
 	err := executeConfigEnvShow([]string{"--key", "SHORT"}, buf)

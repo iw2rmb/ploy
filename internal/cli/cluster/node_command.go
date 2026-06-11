@@ -17,7 +17,6 @@ import (
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/cli/common"
-	"github.com/iw2rmb/ploy/internal/cli/config"
 	"github.com/iw2rmb/ploy/internal/deploy"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
@@ -49,20 +48,20 @@ func handleNode(args []string, stderr io.Writer) error {
 // and unknown subcommand handling.
 //
 // NOTE: Node commands are now accessed via `ploy cluster node` instead of the
-// former `ploy node`. This reflects the restructuring of cluster management
-// operations under a unified `ploy cluster` namespace.
+// former `ploy node`. This keeps node operations under the existing
+// `ploy cluster` command group.
 func printNodeUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "Usage: ploy cluster node <command>")
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Commands:")
-	_, _ = fmt.Fprintln(w, "  add       Add a worker node to the cluster")
+	_, _ = fmt.Fprintln(w, "  add       Add a worker node")
 	_, _ = fmt.Fprintln(w, "  actions   List recent worker node maintenance actions")
 }
 
 // printNodeAddUsage prints usage information for the node add command.
 // NOTE: Node add is now accessed via `ploy cluster node add`.
 func printNodeAddUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy cluster node add --cluster-id <id> --address <ip> --server-url <url>")
+	_, _ = fmt.Fprintln(w, "Usage: ploy cluster node add --address <ip> --server-url <url>")
 }
 
 func printNodeActionsUsage(w io.Writer) {
@@ -167,7 +166,6 @@ func handleNodeAdd(args []string, stderr io.Writer) error {
 	fs := flag.NewFlagSet("node add", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	var (
-		clusterID    common.StringValue
 		address      common.StringValue
 		serverURL    common.StringValue
 		identity     common.StringValue
@@ -176,7 +174,6 @@ func handleNodeAdd(args []string, stderr io.Writer) error {
 		sshPort      common.IntValue
 		dryRun       bool
 	)
-	fs.Var(&clusterID, "cluster-id", "Cluster identifier to join")
 	fs.Var(&address, "address", "Node IP or hostname")
 	fs.Var(&serverURL, "server-url", "Ploy server URL (required; e.g. https://<server-host>:8443)")
 	fs.Var(&identity, "identity", "SSH private key used for provisioning (default: ~/.ssh/id_rsa)")
@@ -192,17 +189,12 @@ func handleNodeAdd(args []string, stderr io.Writer) error {
 		printNodeAddUsage(stderr)
 		return fmt.Errorf("unexpected arguments: %s", strings.Join(fs.Args(), " "))
 	}
-	if !clusterID.IsSet || strings.TrimSpace(clusterID.Value) == "" {
-		printNodeAddUsage(stderr)
-		return errors.New("cluster-id is required")
-	}
 	if !address.IsSet || strings.TrimSpace(address.Value) == "" {
 		printNodeAddUsage(stderr)
 		return errors.New("address is required")
 	}
 
 	nodeCfg := nodeAddConfig{
-		ClusterID:       domaintypes.ClusterID(strings.TrimSpace(clusterID.Value)),
 		Address:         address.Value,
 		ServerURL:       serverURL.Value,
 		User:            userFlag.Value,
@@ -216,7 +208,6 @@ func handleNodeAdd(args []string, stderr io.Writer) error {
 }
 
 type nodeAddConfig struct {
-	ClusterID       domaintypes.ClusterID
 	Address         string
 	ServerURL       string
 	User            string
@@ -260,7 +251,7 @@ func runNodeAdd(cfg nodeAddConfig, stderr io.Writer) error {
 		_, _ = fmt.Fprintln(stderr, "[DRY RUN] Validating node add configuration...")
 	}
 
-	_, _ = fmt.Fprintf(stderr, "Adding node to cluster %s\n", cfg.ClusterID.String())
+	_, _ = fmt.Fprintln(stderr, "Adding node")
 	_, _ = fmt.Fprintf(stderr, "  Node Address: %s\n", cfg.Address)
 	_, _ = fmt.Fprintf(stderr, "  SSH User: %s\n", user)
 	_, _ = fmt.Fprintf(stderr, "  SSH Port: %d\n", sshPort)
@@ -306,7 +297,6 @@ func runNodeAdd(cfg nodeAddConfig, stderr io.Writer) error {
 
 	// Prepare environment variables for bootstrap script
 	scriptEnv := map[string]string{
-		"CLUSTER_ID":           cfg.ClusterID.String(),
 		"NODE_ID":              nodeID,
 		"NODE_ADDRESS":         cfg.Address,
 		"BOOTSTRAP_PRIMARY":    "false",
@@ -329,7 +319,7 @@ func runNodeAdd(cfg nodeAddConfig, stderr io.Writer) error {
 		Stdout:          os.Stdout,
 		Stderr:          stderr,
 		ScriptEnv:       scriptEnv,
-		ScriptArgs:      []string{"--cluster-id", cfg.ClusterID.String(), "--node-id", nodeID, "--node-address", cfg.Address},
+		ScriptArgs:      []string{"--node-id", nodeID, "--node-address", cfg.Address},
 		ServiceChecks:   []string{"ployd-node"},
 	}
 
@@ -337,24 +327,10 @@ func runNodeAdd(cfg nodeAddConfig, stderr io.Writer) error {
 		return fmt.Errorf("node add: provision host: %w", err)
 	}
 
-	// Refresh cluster descriptor without clobbering TLS fields if present.
-	// Prefer existing descriptor CA/client cert for future mTLS operations.
-	existing, loadErr := config.LoadDefault()
-	desc := config.Descriptor{
-		ClusterID:       cfg.ClusterID,
-		Address:         serverURL,
-		SSHIdentityPath: identityPath,
-	}
-	if loadErr != nil || strings.TrimSpace(string(existing.ClusterID)) == "" {
-		if _, err := config.SaveDescriptor(desc); err != nil {
-			_, _ = fmt.Fprintf(stderr, "Warning: failed to save/refresh cluster descriptor: %v\n", err)
-		}
-	}
-
 	_, _ = fmt.Fprintln(stderr, "\nNode provisioning complete!")
 	_, _ = fmt.Fprintf(stderr, "Node ID: %s\n", nodeID)
 	_, _ = fmt.Fprintf(stderr, "Node address: %s\n", cfg.Address)
-	_, _ = fmt.Fprintln(stderr, "\nThe node is now connected to the cluster and ready to accept runs.")
+	_, _ = fmt.Fprintln(stderr, "\nThe node is now connected and ready to accept runs.")
 
 	return nil
 }
@@ -427,7 +403,7 @@ func signNodeCSR(ctx context.Context, serverURL, nodeID string, csrPEM []byte) (
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	// Use descriptor-backed mTLS client when available
+	// Use the configured control-plane HTTP client.
 	_, client, err := common.ResolveControlPlaneHTTP(ctx)
 	if err != nil {
 		return "", "", fmt.Errorf("resolve control-plane client: %w", err)

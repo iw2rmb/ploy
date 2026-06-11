@@ -33,7 +33,7 @@ func TestMigArtifactsListsStageArtifacts(t *testing.T) {
 	}))
 	defer server.Close()
 
-	clienv.UseServerDescriptor(t, server.URL)
+	clienv.UseControlPlaneEnv(t, server.URL)
 	out := clienv.RunExpectOK(t, executeCmd, []string{"mig", "artifacts", runID})
 	assertx.Contains(t, out, stageA.String())
 	assertx.Contains(t, out, stageB.String())

@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"net/http"
-	"os"
 
 	"github.com/iw2rmb/ploy/internal/store"
 	iversion "github.com/iw2rmb/ploy/internal/version"
@@ -16,9 +15,8 @@ func healthzHandler() http.HandlerFunc {
 	}
 }
 
-// readyzHandler responds to readiness probes, including the cluster ID when
-// available from the environment (PLOY_CLUSTER_ID). It pings the database to
-// verify the control plane can serve traffic.
+// readyzHandler responds to readiness probes. It pings the database to verify
+// the control plane can serve traffic.
 func readyzHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		resp := healthResponse("ok")
@@ -57,7 +55,7 @@ func readyzHandler(st store.Store) http.HandlerFunc {
 }
 
 func healthResponse(status string) map[string]any {
-	resp := map[string]any{
+	return map[string]any{
 		"status": status,
 		"binary": map[string]string{
 			"version":  iversion.Version,
@@ -66,10 +64,6 @@ func healthResponse(status string) map[string]any {
 		},
 		"schema": schemaHealth(),
 	}
-	if id := os.Getenv("PLOY_CLUSTER_ID"); id != "" {
-		resp["cluster_id"] = id
-	}
-	return resp
 }
 
 func schemaHealth() map[string]any {

@@ -79,7 +79,6 @@ func TestStringIDs(t *testing.T) {
 	t.Run("RunID", func(t *testing.T) { testStringID[runIDTag](t, "RunID", NewRunID().String()) })
 	t.Run("StepID", func(t *testing.T) { testStringID[stepIDTag](t, "StepID", "step-1") })
 	t.Run("JobID", func(t *testing.T) { testStringID[jobIDTag](t, "JobID", NewJobID().String()) })
-	t.Run("ClusterID", func(t *testing.T) { testStringID[clusterIDTag](t, "ClusterID", "c-1") })
 	t.Run("NodeID", func(t *testing.T) { testStringID[nodeIDTag](t, "NodeID", NewNodeKey()) })
 	t.Run("MigID", func(t *testing.T) { testStringID[migIDTag](t, "MigID", NewMigID().String()) })
 	t.Run("SpecID", func(t *testing.T) { testStringID[specIDTag](t, "SpecID", NewSpecID().String()) })

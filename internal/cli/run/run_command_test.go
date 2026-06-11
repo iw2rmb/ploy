@@ -50,7 +50,7 @@ func TestRunCommandSubmitRemoteSelector(t *testing.T) {
 		}
 	}))
 	defer server.Close()
-	clienv.UseServerDescriptor(t, server.URL)
+	clienv.UseControlPlaneEnv(t, server.URL)
 
 	var stdout, stderr bytes.Buffer
 	if err := executeRunCommand([]string{specPath, "team/repo"}, &stdout, &stderr); err != nil {
@@ -80,7 +80,7 @@ func TestRunCommandSBOMDiff(t *testing.T) {
 		})
 	}))
 	defer server.Close()
-	clienv.UseServerDescriptor(t, server.URL)
+	clienv.UseControlPlaneEnv(t, server.URL)
 
 	var stdout, stderr bytes.Buffer
 	if err := executeRunCommand([]string{"sbom", "diff", runID.String()}, &stdout, &stderr); err != nil {
@@ -100,7 +100,7 @@ func TestRunCommandSBOMDisabledBuildGateError(t *testing.T) {
 		http.Error(w, "build gate disabled for run", http.StatusBadRequest)
 	}))
 	defer server.Close()
-	clienv.UseServerDescriptor(t, server.URL)
+	clienv.UseControlPlaneEnv(t, server.URL)
 
 	var stdout, stderr bytes.Buffer
 	err := executeRunCommand([]string{"sbom", "diff", runID.String()}, &stdout, &stderr)

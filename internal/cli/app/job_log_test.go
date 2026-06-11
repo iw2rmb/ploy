@@ -46,7 +46,7 @@ func TestJobStatusJSONOutput(t *testing.T) {
 	}))
 	defer server.Close()
 
-	clienv.UseServerDescriptor(t, server.URL)
+	clienv.UseControlPlaneEnv(t, server.URL)
 
 	buf := &bytes.Buffer{}
 	err := executeCmd([]string{"job", "status", jobID.String()}, buf)
@@ -79,7 +79,7 @@ func TestJobLogStructuredOutput(t *testing.T) {
 	})
 	defer server.Close()
 
-	clienv.UseServerDescriptor(t, server.URL)
+	clienv.UseControlPlaneEnv(t, server.URL)
 
 	buf := &bytes.Buffer{}
 	err := executeCmd([]string{"job", "log", "--format", "structured", jobID.String()}, buf)
@@ -109,7 +109,7 @@ func TestJobLogRawOutput(t *testing.T) {
 	})
 	defer server.Close()
 
-	clienv.UseServerDescriptor(t, server.URL)
+	clienv.UseControlPlaneEnv(t, server.URL)
 
 	buf := &bytes.Buffer{}
 	err := executeCmd([]string{"job", "log", jobID.String()}, buf)
@@ -130,7 +130,7 @@ func TestJobLogRawOutput(t *testing.T) {
 }
 
 func TestJobLogInvalidFormat(t *testing.T) {
-	clienv.UseServerDescriptor(t, "http://example.invalid")
+	clienv.UseControlPlaneEnv(t, "http://example.invalid")
 
 	buf := &bytes.Buffer{}
 	err := executeCmd([]string{"job", "log", "--format", "yaml", "job-123"}, buf)
@@ -167,7 +167,7 @@ func TestJobLogFollowReconnects(t *testing.T) {
 	})
 	defer server.Close()
 
-	clienv.UseServerDescriptor(t, server.URL)
+	clienv.UseControlPlaneEnv(t, server.URL)
 
 	buf := &bytes.Buffer{}
 	err := executeCmd([]string{"job", "log", "--follow", jobID.String()}, buf)

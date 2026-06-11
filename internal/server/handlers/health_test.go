@@ -9,8 +9,6 @@ import (
 )
 
 func TestHealthProbeHandlers(t *testing.T) {
-	t.Setenv("PLOY_CLUSTER_ID", "cluster-test")
-
 	tests := []struct {
 		name       string
 		path       string
@@ -24,8 +22,7 @@ func TestHealthProbeHandlers(t *testing.T) {
 			handler:  healthzHandler(),
 			wantCode: http.StatusOK,
 			wantFields: map[string]string{
-				"status":     "ok",
-				"cluster_id": "cluster-test",
+				"status": "ok",
 			},
 		},
 		{
@@ -34,9 +31,8 @@ func TestHealthProbeHandlers(t *testing.T) {
 			handler:  readyzHandler(&jobStore{}),
 			wantCode: http.StatusServiceUnavailable,
 			wantFields: map[string]string{
-				"status":     "degraded",
-				"db":         "unreachable",
-				"cluster_id": "cluster-test",
+				"status": "degraded",
+				"db":     "unreachable",
 			},
 		},
 	}

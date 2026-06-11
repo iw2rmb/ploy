@@ -454,7 +454,6 @@ CREATE TABLE IF NOT EXISTS api_tokens (
   id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   token_hash   TEXT NOT NULL UNIQUE,
   token_id     TEXT NOT NULL UNIQUE,
-  cluster_id   TEXT,
   role         TEXT NOT NULL,
   description  TEXT,
   issued_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -472,7 +471,6 @@ CREATE TABLE IF NOT EXISTS bootstrap_tokens (
   token_hash     TEXT NOT NULL UNIQUE,
   token_id       TEXT NOT NULL UNIQUE,
   node_id        TEXT REFERENCES nodes(id) ON DELETE CASCADE,  -- NanoID string FK to nodes.id.
-  cluster_id     TEXT,
   issued_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
   expires_at     TIMESTAMPTZ,
   used_at        TIMESTAMPTZ,

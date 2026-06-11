@@ -15,7 +15,7 @@ import (
 
 func TestGenerateCA(t *testing.T) {
 	now := time.Now().UTC()
-	ca, err := GenerateCA("test-cluster", now)
+	ca, err := GenerateCA(now)
 	if err != nil {
 		t.Fatalf("GenerateCA failed: %v", err)
 	}
@@ -48,20 +48,20 @@ func TestGenerateCA(t *testing.T) {
 	if ca.Cert.KeyUsage&x509.KeyUsageCertSign == 0 {
 		t.Fatal("expected CA certificate to have CertSign key usage")
 	}
-	if !strings.Contains(ca.Cert.Subject.CommonName, "test-cluster") {
-		t.Fatalf("expected cluster ID in subject CN, got: %s", ca.Cert.Subject.CommonName)
+	if ca.Cert.Subject.CommonName != "ploy-ca" {
+		t.Fatalf("expected CA subject CN ploy-ca, got: %s", ca.Cert.Subject.CommonName)
 	}
 }
 
 func TestIssueServerCert(t *testing.T) {
 	now := time.Now().UTC()
-	ca, err := GenerateCA("test-cluster", now)
+	ca, err := GenerateCA(now)
 	if err != nil {
 		t.Fatalf("GenerateCA failed: %v", err)
 	}
 
 	serverIP := "192.168.1.10"
-	cert, err := IssueServerCert(ca, "test-cluster", serverIP, now)
+	cert, err := IssueServerCert(ca, serverIP, now)
 	if err != nil {
 		t.Fatalf("IssueServerCert failed: %v", err)
 	}
@@ -111,11 +111,10 @@ func TestIssueServerCert(t *testing.T) {
 		t.Fatalf("expected server IP %s in SANs, got: %v", serverIP, cert.Cert.IPAddresses)
 	}
 
-	// New naming: CN should be "ployd-<cluster>", DNS SAN should be "ployd.<cluster>.ploy".
-	if got, want := cert.Cert.Subject.CommonName, "ployd-test-cluster"; got != want {
+	if got, want := cert.Cert.Subject.CommonName, "ployd"; got != want {
 		t.Fatalf("unexpected server cert CN: got %q want %q", got, want)
 	}
-	wantDNS := "ployd.test-cluster.ploy"
+	wantDNS := "ployd.ploy"
 	hasDNS := false
 	for _, dns := range cert.Cert.DNSNames {
 		if dns == wantDNS {
@@ -130,7 +129,7 @@ func TestIssueServerCert(t *testing.T) {
 
 func TestSignNodeCSR(t *testing.T) {
 	now := time.Now().UTC()
-	ca, err := GenerateCA("test-cluster", now)
+	ca, err := GenerateCA(now)
 	if err != nil {
 		t.Fatalf("GenerateCA failed: %v", err)
 	}
@@ -147,7 +146,7 @@ func TestSignNodeCSR(t *testing.T) {
 			CommonName:   "node:test-node-1",
 			Organization: []string{"Ploy"},
 		},
-		DNSNames:    []string{"node.test-node-1.test-cluster.ploy"},
+		DNSNames:    []string{"node-test-node-1.ploy"},
 		IPAddresses: []net.IP{nodeIP},
 	}
 	csrDER, err := x509.CreateCertificateRequest(rand.Reader, csrTemplate, nodeKey)
@@ -190,7 +189,7 @@ func TestSignNodeCSR(t *testing.T) {
 	if cert.Cert.Subject.CommonName != "node:test-node-1" {
 		t.Fatalf("expected CN 'node:test-node-1', got: %s", cert.Cert.Subject.CommonName)
 	}
-	if len(cert.Cert.DNSNames) != 1 || cert.Cert.DNSNames[0] != "node.test-node-1.test-cluster.ploy" {
+	if len(cert.Cert.DNSNames) != 1 || cert.Cert.DNSNames[0] != "node-test-node-1.ploy" {
 		t.Fatalf("expected DNS name preserved, got: %v", cert.Cert.DNSNames)
 	}
 	if len(cert.Cert.IPAddresses) != 1 || !cert.Cert.IPAddresses[0].Equal(nodeIP) {
@@ -218,7 +217,7 @@ func TestSignNodeCSR(t *testing.T) {
 
 func TestSignNodeCSRInvalidPEM(t *testing.T) {
 	now := time.Now().UTC()
-	ca, err := GenerateCA("test-cluster", now)
+	ca, err := GenerateCA(now)
 	if err != nil {
 		t.Fatalf("GenerateCA failed: %v", err)
 	}
@@ -244,7 +243,7 @@ func TestSignNodeCSRInvalidPEM(t *testing.T) {
 
 func TestLoadCA(t *testing.T) {
 	now := time.Now().UTC()
-	original, err := GenerateCA("test-cluster", now)
+	original, err := GenerateCA(now)
 	if err != nil {
 		t.Fatalf("GenerateCA failed: %v", err)
 	}
@@ -296,10 +295,9 @@ func TestLoadCAInvalidPEM(t *testing.T) {
 
 func TestGenerateNodeCSR(t *testing.T) {
 	nodeID := "node-abc123"
-	clusterID := "cluster-xyz789"
 	nodeIP := "192.168.1.20"
 
-	keyBundle, csrPEM, err := GenerateNodeCSR(nodeID, clusterID, nodeIP)
+	keyBundle, csrPEM, err := GenerateNodeCSR(nodeID, nodeIP)
 	if err != nil {
 		t.Fatalf("GenerateNodeCSR failed: %v", err)
 	}
@@ -343,7 +341,7 @@ func TestGenerateNodeCSR(t *testing.T) {
 	}
 
 	// Check DNS names.
-	expectedDNS := "node-" + nodeID + "." + clusterID + ".ploy"
+	expectedDNS := "node-" + nodeID + ".ploy"
 	if len(csr.DNSNames) != 1 || csr.DNSNames[0] != expectedDNS {
 		t.Fatalf("expected DNS name %q, got: %v", expectedDNS, csr.DNSNames)
 	}

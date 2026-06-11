@@ -26,7 +26,7 @@ API tokens are stored in the `api_tokens` table in PostgreSQL.
 Ploy supports three roles:
 
 - **`cli-admin`**: Full administrative access, including token management
-- **`control-plane`**: Standard CLI access for running Migs and viewing cluster state
+- **`control-plane`**: Standard CLI access for running Migs and viewing control-plane state
 - **`worker`**: Node agent role
 
 ## Managing API Tokens
@@ -52,7 +52,7 @@ Token created successfully.
 
 WARNING: Save this token securely. It will not be shown again.
 
-Token:     eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjbHVzdGVyX2lkIjoiYWxwaGEtY2x1c3RlciIsInJvbGUiOiJjb250cm9sLXBsYW5lIiwidG9rZW5fdHlwZSI6ImFwaSIsImV4cCI6MTc0NTI1NjAwMCwiaWF0IjoxNzM3NDgwMDAwLCJqdGkiOiJhYmMxMjMifQ.signature
+Token:     eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiY29udHJvbC1wbGFuZSIsInRva2VuX3R5cGUiOiJhcGkiLCJleHAiOjE3NDUyNTYwMDAsImlhdCI6MTczNzQ4MDAwMCwianRpIjoiYWJjMTIzIn0.signature
 Token ID:  abc123
 Role:      control-plane
 Expires:   2026-01-19T12:00:00Z
@@ -64,7 +64,7 @@ Store this token in a secure location (e.g., password manager, CI/CD secrets).
 
 ### List Tokens
 
-View all API tokens in the cluster:
+View all API tokens:
 
 ```bash
 ploy cluster token list
@@ -107,53 +107,49 @@ ploy cluster token revoke abc123 --confirm
 
 ### CLI Configuration
 
-Store your token in the cluster descriptor under `PLOY_CONFIG_HOME` (or home default).
-The local Docker cluster uses `PLOY_CONFIG_HOME="$HOME/.config/ploy/local"` and
-`address: "http://127.0.0.1:${PLOY_SERVER_PORT:-8080}"`.
+Configure CLI authentication with environment variables:
 
-```json
-{
-  "cluster_id": "local",
-  "address": "http://127.0.0.1:8080",
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-}
+```bash
+export PLOY_SERVER_URL="http://127.0.0.1:${PLOY_SERVER_PORT:-8080}"
+export PLOY_AUTH_TOKEN="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 ```
 
-If you set `PLOY_SERVER_PORT` to a non-default value, use that port in `address`.
-
-The CLI automatically uses this token for all requests.
+If `PLOY_AUTH_TOKEN` is non-empty, the CLI sends it as
+`Authorization: Bearer <token>` on HTTP requests.
 
 ### CI/CD Integration
 
-For CI/CD pipelines, store the token as a secret and pass it via environment variable or config file:
+For CI/CD pipelines, store the server URL and token as secrets and pass them as
+environment variables:
 
 **GitLab CI:**
 ```yaml
 deploy:
   script:
-    - mkdir -p ~/.config/ploy/<cluster-id>
-    - echo "$PLOY_DESCRIPTOR" > ~/.config/ploy/<cluster-id>/auth.json
     - ploy run mig.yaml "$CI_PROJECT_PATH:main" --pull
   variables:
-    PLOY_DESCRIPTOR: $PLOY_CLUSTER_DESCRIPTOR  # Set in GitLab CI/CD variables
+    PLOY_SERVER_URL: $PLOY_SERVER_URL
+    PLOY_AUTH_TOKEN: $PLOY_AUTH_TOKEN
 ```
 
 **GitHub Actions:**
 ```yaml
 - name: Configure Ploy
-  run: |
-    mkdir -p ~/.config/ploy
-    echo "$PLOY_DESCRIPTOR" > ~/.config/ploy/<cluster-id>/auth.json
+  run: ploy version
   env:
-    PLOY_DESCRIPTOR: ${{ secrets.PLOY_CLUSTER_DESCRIPTOR }}
+    PLOY_SERVER_URL: ${{ secrets.PLOY_SERVER_URL }}
+    PLOY_AUTH_TOKEN: ${{ secrets.PLOY_AUTH_TOKEN }}
 
 - name: Run Migs
   run: ploy run mig.yaml "${{ github.repository }}:main" --pull
+  env:
+    PLOY_SERVER_URL: ${{ secrets.PLOY_SERVER_URL }}
+    PLOY_AUTH_TOKEN: ${{ secrets.PLOY_AUTH_TOKEN }}
 ```
 
-## Worker Node Authentication (Local Docker)
+## Worker Node Authentication
 
-In the local Docker cluster, the worker node uses a long-lived bearer token stored at
+The worker node uses a long-lived bearer token stored at
 `/etc/ploy/bearer-token` in the node container. The compose stack mounts the host
 file selected by `WORKER_TOKEN_PATH`.
 
@@ -170,7 +166,7 @@ file selected by `WORKER_TOKEN_PATH`.
 
 ### Token Storage
 
-- **Local development**: Store in `~/.config/ploy/<cluster-id>/auth.json` with file permissions `0600`.
+- **Local development**: Export `PLOY_SERVER_URL` and `PLOY_AUTH_TOKEN` in your shell or shell profile.
 - **CI/CD**: Use CI/CD secret management (GitLab CI/CD variables, GitHub Secrets, etc.).
 - **Production servers**: Use a secrets management service (HashiCorp Vault, AWS Secrets Manager, etc.).
 
@@ -196,7 +192,7 @@ Your token has exceeded its `expires_at` timestamp. Create a new token:
 ploy cluster token create --role cli-admin --expires 365 --description "Replacement token"
 ```
 
-Update your cluster descriptor with the new token.
+Update `PLOY_AUTH_TOKEN` with the new token.
 
 ### "Token revoked"
 

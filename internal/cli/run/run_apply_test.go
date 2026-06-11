@@ -26,7 +26,7 @@ func TestRunApplyAppliesAccumulatedPatch(t *testing.T) {
 
 	server := newRunApplyServer(t, runID, repoID, jobID, sourceSHA, patch)
 	defer server.Close()
-	clienv.UseServerDescriptor(t, server.URL)
+	clienv.UseControlPlaneEnv(t, server.URL)
 
 	var out bytes.Buffer
 	if err := RunApply(context.Background(), ApplyOptions{RunID: runID, RepoPath: repoDir, Output: &out}); err != nil {
@@ -47,7 +47,7 @@ func TestRunApplyRejectsDirtyIndexEvenWithForce(t *testing.T) {
 		t.Fatalf("server should not be called for dirty repo: %s %s", r.Method, r.URL.Path)
 	}))
 	defer server.Close()
-	clienv.UseServerDescriptor(t, server.URL)
+	clienv.UseControlPlaneEnv(t, server.URL)
 
 	err := RunApply(context.Background(), ApplyOptions{RunID: "run-123", RepoPath: repoDir, Force: true})
 	if err == nil || !strings.Contains(err.Error(), "working tree must have no staged or unstaged diff") {
@@ -63,7 +63,7 @@ func TestRunApplyRejectsSHAMismatchUnlessForced(t *testing.T) {
 	patch := []byte("diff --git a/README.md b/README.md\nindex 5b4f9e0..98a5560 100644\n--- a/README.md\n+++ b/README.md\n@@ -1 +1 @@\n-# Test Repo\n+# Forced Repo\n")
 	server := newRunApplyServer(t, runID, repoID, jobID, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", patch)
 	defer server.Close()
-	clienv.UseServerDescriptor(t, server.URL)
+	clienv.UseControlPlaneEnv(t, server.URL)
 
 	err := RunApply(context.Background(), ApplyOptions{RunID: runID, RepoPath: repoDir})
 	if err == nil || !strings.Contains(err.Error(), "does not match run source_commit_sha") {

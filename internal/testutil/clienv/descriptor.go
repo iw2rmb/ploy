@@ -2,18 +2,16 @@ package clienv
 
 import (
 	"testing"
-
-	cliconfig "github.com/iw2rmb/ploy/internal/cli/config"
 )
 
-func UseServerDescriptor(t testing.TB, baseURL string) {
+func UseControlPlaneEnv(t testing.TB, baseURL string) {
 	t.Helper()
-	cfgHome := t.TempDir()
-	t.Setenv("PLOY_CONFIG_HOME", cfgHome)
-	if _, err := cliconfig.SaveDescriptor(cliconfig.Descriptor{ClusterID: cliconfig.ClusterID("test-cluster"), Address: baseURL}); err != nil {
-		t.Fatalf("SaveDescriptor: %v", err)
-	}
-	if err := cliconfig.SetDefault(cliconfig.ClusterID("test-cluster")); err != nil {
-		t.Fatalf("SetDefault: %v", err)
-	}
+	t.Setenv("PLOY_SERVER_URL", baseURL)
+	t.Setenv("PLOY_AUTH_TOKEN", "")
+}
+
+func UseControlPlaneEnvWithToken(t testing.TB, baseURL, token string) {
+	t.Helper()
+	UseControlPlaneEnv(t, baseURL)
+	t.Setenv("PLOY_AUTH_TOKEN", token)
 }

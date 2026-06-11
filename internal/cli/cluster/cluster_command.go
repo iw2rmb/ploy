@@ -7,13 +7,12 @@ import (
 	"io"
 )
 
-// Handle routes cluster subcommands (node, token) to
-// their respective handlers. This provides a unified namespace for cluster
-// management operations under `ploy cluster`.
+// Handle routes node and token subcommands to their respective handlers under
+// the existing `ploy cluster` command group.
 //
 // The cluster command is the primary entry point for:
-//   - node:   Manage worker nodes in a cluster (delegates to handleNode)
-//   - token:  Manage API tokens bound to a cluster (delegates to handleToken)
+//   - node:   Manage worker nodes (delegates to handleNode)
+//   - token:  Manage API tokens (delegates to handleToken)
 func Handle(args []string, stderr io.Writer) error {
 	// Handle --help and -h flags to print usage and exit cleanly.
 	// This mirrors the pattern used by other routers (handleServer, handleNode, etc.)
@@ -50,6 +49,6 @@ func printClusterUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "Usage: ploy cluster <command>")
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Commands:")
-	_, _ = fmt.Fprintln(w, "  node     Manage worker nodes in a cluster")
-	_, _ = fmt.Fprintln(w, "  token    Manage API tokens bound to a cluster")
+	_, _ = fmt.Fprintln(w, "  node     Manage worker nodes")
+	_, _ = fmt.Fprintln(w, "  token    Manage API tokens")
 }

@@ -96,7 +96,7 @@ func TestMigStatusPrintsMigrationSummary(t *testing.T) {
 	}))
 	defer server.Close()
 
-	clienv.UseServerDescriptor(t, server.URL)
+	clienv.UseControlPlaneEnv(t, server.URL)
 
 	var buf bytes.Buffer
 	err := executeCmd([]string{"mig", "status", migID.String()}, &buf)

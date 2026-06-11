@@ -9,15 +9,14 @@ import (
 )
 
 func main() {
-	if len(os.Args) != 5 {
-		fmt.Fprintf(os.Stderr, "Usage: %s <secret> <cluster_id> <role> <expires_days>\n", os.Args[0])
+	if len(os.Args) != 4 {
+		fmt.Fprintf(os.Stderr, "Usage: %s <secret> <role> <expires_days>\n", os.Args[0])
 		os.Exit(1)
 	}
 
 	secret := os.Args[1]
-	clusterID := os.Args[2]
-	role := os.Args[3]
-	expiresDays := os.Args[4]
+	role := os.Args[2]
+	expiresDays := os.Args[3]
 
 	// Parse expires days
 	var days int
@@ -27,7 +26,7 @@ func main() {
 	}
 
 	expiresAt := time.Now().AddDate(0, 0, days)
-	token, err := auth.GenerateAPIToken(secret, clusterID, role, expiresAt)
+	token, err := auth.GenerateAPIToken(secret, role, expiresAt)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to generate token: %v\n", err)
 		os.Exit(1)

@@ -146,7 +146,7 @@ type Querier interface {
 	IncrementRunAttempt(ctx context.Context, id types.RunID) error
 	InsertAPIToken(ctx context.Context, arg InsertAPITokenParams) error
 	InsertBootstrapToken(ctx context.Context, arg InsertBootstrapTokenParams) error
-	ListAPITokens(ctx context.Context, clusterID *string) ([]ListAPITokensRow, error)
+	ListAPITokens(ctx context.Context) ([]ListAPITokensRow, error)
 	// ListArtifactBundlePartitions retrieves all partition names for the artifact_bundles table.
 	ListArtifactBundlePartitions(ctx context.Context) ([]string, error)
 	// Returns artifact bundle metadata including object_key for object-storage retrieval.
