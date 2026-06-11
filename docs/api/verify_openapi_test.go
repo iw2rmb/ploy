@@ -81,7 +81,6 @@ func TestOpenAPICompleteness(t *testing.T) {
 		{"/v1/nodes", "get"},
 		{"/v1/nodes/{id}/drain", "post"},
 		{"/v1/nodes/{id}/undrain", "post"},
-		{"/v1/nodes/{id}/actions", "get"},
 		// Node claim (also handles run status transition and SSE event publishing;
 		// the separate /v1/nodes/{id}/ack endpoint has been removed)
 		{"/v1/nodes/{id}/claim", "post"},

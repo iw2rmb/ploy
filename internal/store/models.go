@@ -172,19 +172,6 @@ type Node struct {
 	CreatedAt       pgtype.Timestamptz `json:"created_at"`
 }
 
-type NodeAction struct {
-	ID         types.JobID        `json:"id"`
-	NodeID     types.NodeID       `json:"node_id"`
-	ActionType string             `json:"action_type"`
-	Status     types.JobStatus    `json:"status"`
-	StartedAt  pgtype.Timestamptz `json:"started_at"`
-	FinishedAt pgtype.Timestamptz `json:"finished_at"`
-	DurationMs int64              `json:"duration_ms"`
-	Meta       []byte             `json:"meta"`
-	Result     []byte             `json:"result"`
-	CreatedAt  pgtype.Timestamptz `json:"created_at"`
-}
-
 type NodeDaemonLog struct {
 	ID        int64              `json:"id"`
 	NodeID    types.NodeID       `json:"node_id"`
@@ -244,20 +231,6 @@ type Run struct {
 	StartedAt       pgtype.Timestamptz `json:"started_at"`
 	FinishedAt      pgtype.Timestamptz `json:"finished_at"`
 	Stats           []byte             `json:"stats"`
-}
-
-type RunAction struct {
-	ID         types.JobID        `json:"id"`
-	RunID      types.RunID        `json:"run_id"`
-	Attempt    int32              `json:"attempt"`
-	ActionType string             `json:"action_type"`
-	Status     types.JobStatus    `json:"status"`
-	NodeID     *types.NodeID      `json:"node_id"`
-	StartedAt  pgtype.Timestamptz `json:"started_at"`
-	FinishedAt pgtype.Timestamptz `json:"finished_at"`
-	DurationMs int64              `json:"duration_ms"`
-	Meta       []byte             `json:"meta"`
-	CreatedAt  pgtype.Timestamptz `json:"created_at"`
 }
 
 type RunsTiming struct {

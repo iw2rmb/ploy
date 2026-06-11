@@ -62,16 +62,8 @@ or `ploy-node-update.timer`.
 
 ## CLI and API
 
-Node maintenance actions are no longer enqueued through the control plane.
-
-Useful read-only surfaces remain:
-
-```sh
-ploy cluster node actions <node-id> --limit 20
-```
-
-- `GET /v1/nodes/{id}/actions?limit=N` for historical action status.
-- `GET /v1/nodes/{id}/diagnostics` for node diagnostics and storage details.
+Node maintenance actions are not enqueued or listed through the control plane.
+Use `GET /v1/nodes/{id}/diagnostics` for node diagnostics and storage details.
 
 Node diagnostics only report the long-lived node daemon component. Host-owned
 maintenance services such as `ploy-node-update.service` are inspected through

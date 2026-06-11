@@ -15,7 +15,6 @@ import (
 )
 
 type workClaimPayload struct {
-	WorkType      string                      `json:"work_type"`
 	RunID         domaintypes.RunID           `json:"id"`
 	Name          *string                     `json:"name,omitempty"`
 	RepoID        domaintypes.RepoID          `json:"repo_id"`
@@ -23,8 +22,6 @@ type workClaimPayload struct {
 	JobID         domaintypes.JobID           `json:"job_id"`
 	JobName       string                      `json:"job_name"`
 	JobType       domaintypes.JobType         `json:"job_type"`
-	ActionID      *domaintypes.JobID          `json:"action_id,omitempty"`
-	ActionType    string                      `json:"action_type,omitempty"`
 	JobImage      string                      `json:"job_image"`
 	NextID        *domaintypes.JobID          `json:"next_id"`
 	RepoURL       string                      `json:"repo_url"`
@@ -39,15 +36,6 @@ type workClaimPayload struct {
 	MigContext    *contracts.MigClaimContext  `json:"mig_context,omitempty"`
 	GateContext   *contracts.GateClaimContext `json:"gate_context,omitempty"`
 	DetectedStack *contracts.StackExpectation `json:"detected_stack,omitempty"`
-}
-
-type nodeActionClaimPayload struct {
-	WorkType   string             `json:"work_type"`
-	ActionID   domaintypes.JobID  `json:"action_id"`
-	ActionType string             `json:"action_type"`
-	NodeID     domaintypes.NodeID `json:"node_id"`
-	StartedAt  string             `json:"started_at,omitempty"`
-	CreatedAt  string             `json:"created_at"`
 }
 
 func buildJobClaimPayload(
@@ -112,7 +100,6 @@ func buildJobClaimPayload(
 	}
 
 	return workClaimPayload{
-		WorkType:      "job",
 		RunID:         run.ID,
 		Name:          nil,
 		RepoID:        job.RepoID,
@@ -120,8 +107,6 @@ func buildJobClaimPayload(
 		JobID:         job.ID,
 		JobName:       strings.TrimSpace(job.Name),
 		JobType:       jobType,
-		ActionID:      nil,
-		ActionType:    "",
 		JobImage:      job.JobImage,
 		NextID:        job.NextID,
 		RepoURL:       repoURL,
@@ -137,55 +122,6 @@ func buildJobClaimPayload(
 		GateContext:   gateContext,
 		DetectedStack: detectedStack,
 	}, nil
-}
-
-func buildRunActionClaimPayload(
-	spec []byte,
-	run store.Run,
-	repoURL string,
-	action store.RunAction,
-) workClaimPayload {
-	return workClaimPayload{
-		WorkType:      "action",
-		RunID:         run.ID,
-		Name:          nil,
-		RepoID:        run.RepoID,
-		Attempt:       action.Attempt,
-		JobID:         "",
-		JobName:       "",
-		JobType:       "",
-		ActionID:      &action.ID,
-		ActionType:    action.ActionType,
-		JobImage:      "",
-		NextID:        nil,
-		RepoURL:       repoURL,
-		Status:        run.Status,
-		NodeID:        nodeIDPtrOrZero(action.NodeID),
-		BaseRef:       run.RepoBaseRef,
-		RepoSHAIn:     "",
-		StartedAt:     run.StartedAt.Time.Format(time.RFC3339),
-		CreatedAt:     run.CreatedAt.Time.Format(time.RFC3339),
-		Spec:          spec,
-		MigContext:    nil,
-		GateContext:   nil,
-		DetectedStack: nil,
-	}
-}
-
-func buildNodeActionClaimPayload(action store.NodeAction) nodeActionClaimPayload {
-	payload := nodeActionClaimPayload{
-		WorkType:   "action",
-		ActionID:   action.ID,
-		ActionType: action.ActionType,
-		NodeID:     action.NodeID,
-	}
-	if action.StartedAt.Valid {
-		payload.StartedAt = action.StartedAt.Time.Format(time.RFC3339)
-	}
-	if action.CreatedAt.Valid {
-		payload.CreatedAt = action.CreatedAt.Time.Format(time.RFC3339)
-	}
-	return payload
 }
 
 // buildAndSendJobClaimResponse constructs and sends the claim response for a job.

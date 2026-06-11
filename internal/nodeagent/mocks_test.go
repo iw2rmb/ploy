@@ -10,17 +10,14 @@ import (
 type mockRunController struct {
 	mu sync.Mutex
 
-	startCalled       bool
-	startActionCalled bool
-	stopCalled        bool
-	startErr          error
-	startActionErr    error
-	stopErr           error
-	lastStart         StartRunRequest
-	lastStartAction   StartActionRequest
-	lastStop          StopRunRequest
-	acquireCalls      int
-	releaseCalls      int
+	startCalled  bool
+	stopCalled   bool
+	startErr     error
+	stopErr      error
+	lastStart    StartRunRequest
+	lastStop     StopRunRequest
+	acquireCalls int
+	releaseCalls int
 
 	// slotSem is a mock concurrency semaphore. If nil, AcquireSlot/ReleaseSlot
 	// are no-ops. Tests can set this to simulate concurrency limiting.
@@ -33,14 +30,6 @@ func (m *mockRunController) StartRun(ctx context.Context, req StartRunRequest) e
 	m.startCalled = true
 	m.lastStart = req
 	return m.startErr
-}
-
-func (m *mockRunController) StartAction(ctx context.Context, req StartActionRequest) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.startActionCalled = true
-	m.lastStartAction = req
-	return m.startActionErr
 }
 
 func (m *mockRunController) StopRun(ctx context.Context, req StopRunRequest) error {
@@ -98,10 +87,6 @@ func (m *mockRunController) ReleaseCalls() int {
 type mockController struct{}
 
 func (m *mockController) StartRun(ctx context.Context, req StartRunRequest) error {
-	return nil
-}
-
-func (m *mockController) StartAction(ctx context.Context, req StartActionRequest) error {
 	return nil
 }
 
