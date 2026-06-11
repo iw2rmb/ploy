@@ -93,8 +93,6 @@ func TestOpenAPICompleteness(t *testing.T) {
 		{"/v1/jobs/{job_id}/image", "post"},
 		// Job-level SBOM persistence
 		{"/v1/jobs/{job_id}/sbom", "post"},
-		// Stateless utility endpoints
-		{"/v1/trimmer/java/gradle", "post"},
 		// Node events
 		{"/v1/nodes/{id}/events", "post"},
 		// Node logs
@@ -185,10 +183,6 @@ func TestOpenAPICompleteness(t *testing.T) {
 		"Stage",
 		"RepoSummary",
 		"RepoRunSummary",
-		"GradleTrimmerRequest",
-		"GradleTrimmerResult",
-		"GradleTrimmerEvidence",
-		"GradleTrimmerError",
 	}
 
 	for _, schema := range requiredSchemas {
@@ -252,7 +246,6 @@ func TestSchemaFilesValid(t *testing.T) {
 		"components/schemas/config.yaml",
 		"components/schemas/controlplane.yaml",
 		"components/schemas/pki.yaml",
-		"components/schemas/trimmer.yaml",
 	}
 
 	for _, file := range schemaFiles {
