@@ -63,7 +63,6 @@ type (
 	waveIDTag       struct{}
 	stepIDTag       struct{}
 	jobIDTag        struct{}
-	clusterIDTag    struct{}
 	nodeIDTag       struct{}
 	migIDTag        struct{}
 	specIDTag       struct{}
@@ -97,10 +96,7 @@ type StepID = StringID[stepIDTag]
 // Jobs are the unit of work assignment to nodes (claim, execute, complete).
 type JobID = StringID[jobIDTag]
 
-// ClusterID identifies a CLI/server cluster descriptor.
-type ClusterID = StringID[clusterIDTag]
-
-// NodeID identifies a worker node in the cluster.
+// NodeID identifies a worker node.
 type NodeID = StringID[nodeIDTag]
 
 // MigID identifies a mig project.

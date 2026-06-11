@@ -1,138 +1,47 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# ensure_local_descriptor recreates the local default cluster descriptor when it
-# is missing or broken. If generated-tokens.env is absent or stale, it mints a
-# token through the running local server.
+# ensure_local_descriptor prepares env-only CLI auth for legacy e2e callers.
+# It keeps the historical function name because multiple e2e scripts source it.
 ensure_local_descriptor() {
   local repo_root="${1:?repo_root is required}"
   local base_dir="${2:?config_home is required}"
-  local marker="${base_dir}/default"
-  local descriptor_path=""
-  local server_url=""
-  local cluster_id="${CLUSTER_ID:-local}"
-  local token=""
-  local generated_tokens=""
+  local server_url="${PLOY_SERVER_URL:-http://localhost:${PLOY_SERVER_PORT:-8080}}"
+  local token="${PLOY_AUTH_TOKEN:-}"
+  local generated_tokens="${base_dir}/generated-tokens.env"
 
-  if e2e_descriptor_marker_valid "$marker" "$base_dir"; then
-    descriptor_path="$(e2e_resolve_descriptor_path "$marker" "$base_dir")"
-    server_url="$(e2e_descriptor_value "$descriptor_path" "address")"
-    token="$(e2e_descriptor_value "$descriptor_path" "token")"
-    if token_works "$server_url" "$token"; then
-      return 0
-    fi
-    echo "[e2e] Existing descriptor token is invalid; attempting recovery..." >&2
-    cluster_id="$(e2e_descriptor_value "$descriptor_path" "cluster_id")"
-    if [[ -z "$cluster_id" ]]; then
-      cluster_id="local"
-    fi
+  if token_works "$server_url" "$token"; then
+    export PLOY_SERVER_URL="$server_url"
+    export PLOY_AUTH_TOKEN="$token"
+    return 0
   fi
 
-  if [[ -z "$server_url" ]]; then
-    server_url="${PLOY_SERVER_URL:-http://localhost:${PLOY_SERVER_PORT:-8080}}"
-  fi
-
-  generated_tokens="${base_dir}/generated-tokens.env"
   if [[ -f "$generated_tokens" ]]; then
     # shellcheck disable=SC1090
     source "$generated_tokens"
-    if [[ -n "${ADMIN_TOKEN:-}" ]]; then
-      write_descriptor "$base_dir" "$marker" "$cluster_id" "$server_url" "$ADMIN_TOKEN"
-      if token_works "$server_url" "$ADMIN_TOKEN"; then
-        return 0
-      fi
-      echo "[e2e] Token from ${generated_tokens} is invalid for ${server_url}; trying minted token..." >&2
+    if token_works "$server_url" "${ADMIN_TOKEN:-}"; then
+      export PLOY_SERVER_URL="$server_url"
+      export PLOY_AUTH_TOKEN="$ADMIN_TOKEN"
+      return 0
     fi
+    echo "[e2e] Token from ${generated_tokens} is invalid for ${server_url}; trying minted token..." >&2
   fi
 
-  if token="$(mint_valid_local_admin_token "$server_url" "$cluster_id" "$repo_root" "$base_dir")"; then
-    write_descriptor "$base_dir" "$marker" "$cluster_id" "$server_url" "$token"
+  if token="$(mint_valid_local_admin_token "$server_url" "$repo_root" "$base_dir")"; then
+    mkdir -p "$base_dir"
+    {
+      printf 'ADMIN_TOKEN=%q\n' "$token"
+      printf 'PLOY_SERVER_URL=%q\n' "$server_url"
+    } > "$generated_tokens"
+    export PLOY_SERVER_URL="$server_url"
+    export PLOY_AUTH_TOKEN="$token"
+    echo "[e2e] Prepared PLOY_SERVER_URL and PLOY_AUTH_TOKEN for ${server_url}" >&2
     return 0
   fi
 
-  echo "error: failed to prepare a valid local descriptor at ${marker}" >&2
+  echo "error: failed to prepare valid local CLI auth for ${server_url}" >&2
   echo "hint: start the local stack with /Users/v.v.kovalev/@scale/ploy-lib/images/docker-compose.yml and retry" >&2
   return 1
-}
-
-e2e_descriptor_marker_valid() {
-  local marker="$1"
-  local base_dir="$2"
-
-  if [[ -f "$marker" ]]; then
-    return 0
-  fi
-
-  if [[ ! -L "$marker" ]]; then
-    return 1
-  fi
-
-  local target
-  target="$(readlink "$marker" || true)"
-  if [[ -z "$target" ]]; then
-    return 1
-  fi
-
-  if [[ "$target" = /* ]]; then
-    [[ -f "$target" ]]
-    return
-  fi
-
-  [[ -f "${base_dir}/${target}" ]]
-}
-
-e2e_resolve_descriptor_path() {
-  local marker="$1"
-  local base_dir="$2"
-  local target=""
-
-  if [[ -L "$marker" ]]; then
-    target="$(readlink "$marker")"
-    if [[ "$target" = /* ]]; then
-      printf '%s\n' "$target"
-      return
-    fi
-    printf '%s\n' "${base_dir}/${target}"
-    return
-  fi
-
-  printf '%s\n' "$marker"
-}
-
-e2e_descriptor_value() {
-  local descriptor_path="$1"
-  local key="$2"
-  python3 - "$descriptor_path" "$key" <<'PY'
-import json, sys
-path, key = sys.argv[1], sys.argv[2]
-try:
-    with open(path, "r", encoding="utf-8") as f:
-        data = json.load(f)
-except Exception:
-    print("")
-    raise SystemExit(0)
-value = data.get(key, "")
-print(value if isinstance(value, str) else "")
-PY
-}
-
-write_descriptor() {
-  local base_dir="$1"
-  local marker="$2"
-  local cluster_id="$3"
-  local server_url="$4"
-  local token="$5"
-
-  mkdir -p "${base_dir}/${cluster_id}"
-  cat > "${base_dir}/${cluster_id}/auth.json" <<JSON
-{
-  "cluster_id": "${cluster_id}",
-  "address": "${server_url}",
-  "token": "${token}"
-}
-JSON
-  ln -sf "${cluster_id}/auth.json" "$marker"
-  echo "[e2e] Rebuilt default descriptor at ${marker}" >&2
 }
 
 token_works() {
@@ -150,25 +59,14 @@ token_works() {
     -H "Authorization: Bearer ${token}" \
     "${server_url}/v1/migs" || true)"
 
-  if [[ "$code" == "200" ]]; then
-    rm -f "$body"
-    return 0
-  fi
-
-  if grep -q "invalid token" "$body"; then
-    rm -f "$body"
-    return 1
-  fi
-
   rm -f "$body"
-  return 1
+  [[ "$code" == "200" ]]
 }
 
 mint_valid_local_admin_token() {
   local server_url="$1"
-  local cluster_id="$2"
-  local repo_root="$3"
-  local base_dir="$4"
+  local repo_root="$2"
+  local base_dir="$3"
   local secret=""
   local token=""
   local -a secrets=()
@@ -191,7 +89,7 @@ mint_valid_local_admin_token() {
 
   for secret in "${secrets[@]}"; do
     [[ -z "$secret" ]] && continue
-    token="$(mint_admin_token "$secret" "$cluster_id")"
+    token="$(mint_admin_token "$secret")"
     if token_works "$server_url" "$token"; then
       printf '%s\n' "$token"
       return 0
@@ -214,25 +112,25 @@ running_server_secret() {
 
 mint_admin_token() {
   local secret="$1"
-  local cluster_id="$2"
-  python3 - "$secret" "$cluster_id" <<'PY'
+  python3 - "$secret" <<'PY'
 import base64, hashlib, hmac, json, secrets, sys, time
+
 secret = sys.argv[1].encode("utf-8")
-cluster_id = sys.argv[2]
 now = int(time.time())
 header = {"alg": "HS256", "typ": "JWT"}
 payload = {
-    "cluster_id": cluster_id,
     "role": "cli-admin",
     "token_type": "api",
     "iat": now,
     "exp": now + 365 * 24 * 60 * 60,
     "jti": secrets.token_urlsafe(16),
 }
+
 def enc(obj):
     return base64.urlsafe_b64encode(
         json.dumps(obj, separators=(",", ":")).encode("utf-8")
     ).decode("utf-8").rstrip("=")
+
 head = enc(header)
 body = enc(payload)
 sig = base64.urlsafe_b64encode(

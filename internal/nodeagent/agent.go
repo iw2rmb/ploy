@@ -157,9 +157,9 @@ func (a *Agent) bootstrap(ctx context.Context) error {
 	}
 	bootstrapToken := strings.TrimSpace(string(tokenBytes))
 
-	// Generate private key and CSR (convert domain types to strings for pki package)
+	// Generate private key and CSR.
 	slog.Info("generating private key and CSR")
-	keyBundle, csrPEM, err := pki.GenerateNodeCSR(a.cfg.NodeID.String(), a.cfg.ClusterID.String(), "")
+	keyBundle, csrPEM, err := pki.GenerateNodeCSR(a.cfg.NodeID.String(), "")
 	if err != nil {
 		return fmt.Errorf("generate CSR: %w", err)
 	}

@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"log/slog"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/server/auth"
@@ -44,18 +43,10 @@ func createAPITokenHandler(st store.Store, tokenSecret string) http.HandlerFunc 
 			req.ExpiresInDays = 365
 		}
 
-		// Get cluster ID from environment.
-		clusterID := os.Getenv("PLOY_CLUSTER_ID")
-		if clusterID == "" {
-			writeHTTPError(w, http.StatusInternalServerError, "server misconfigured: PLOY_CLUSTER_ID not set")
-			slog.Error("create api token: PLOY_CLUSTER_ID not set")
-			return
-		}
-
 		// Generate token.
 		now := time.Now()
 		expiresAt := now.AddDate(0, 0, req.ExpiresInDays)
-		token, err := auth.GenerateAPIToken(tokenSecret, clusterID, string(normalizedRole), expiresAt)
+		token, err := auth.GenerateAPIToken(tokenSecret, string(normalizedRole), expiresAt)
 		if err != nil {
 			writeHTTPError(w, http.StatusInternalServerError, "failed to generate token: %v", err)
 			slog.Error("create api token: generation failed", "err", err)
@@ -89,7 +80,6 @@ func createAPITokenHandler(st store.Store, tokenSecret string) http.HandlerFunc 
 		err = st.InsertAPIToken(r.Context(), store.InsertAPITokenParams{
 			TokenHash:   tokenHash,
 			TokenID:     claims.ID,
-			ClusterID:   &clusterID,
 			Role:        string(normalizedRole),
 			Description: description,
 			IssuedAt:    pgtype.Timestamptz{Time: now, Valid: true},
@@ -128,23 +118,15 @@ func createAPITokenHandler(st store.Store, tokenSecret string) http.HandlerFunc 
 	}
 }
 
-// listAPITokensHandler lists all API tokens for the current cluster.
+// listAPITokensHandler lists all API tokens.
 // Requires cli-admin role (enforced by middleware).
 //
 // GET /v1/tokens
 // Response: { "tokens": [{ "token_id": "...", "role": "...", ... }] }
 func listAPITokensHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Get cluster ID from environment.
-		clusterID := os.Getenv("PLOY_CLUSTER_ID")
-		if clusterID == "" {
-			writeHTTPError(w, http.StatusInternalServerError, "server misconfigured: PLOY_CLUSTER_ID not set")
-			slog.Error("list api tokens: PLOY_CLUSTER_ID not set")
-			return
-		}
-
 		// Query tokens from database.
-		tokens, err := st.ListAPITokens(r.Context(), &clusterID)
+		tokens, err := st.ListAPITokens(r.Context())
 		if err != nil {
 			writeHTTPError(w, http.StatusInternalServerError, "failed to list tokens: %v", err)
 			slog.Error("list api tokens: database query failed", "err", err)

@@ -13,7 +13,6 @@ import (
 	"testing"
 
 	"github.com/iw2rmb/ploy/internal/cli/common"
-	cliconfig "github.com/iw2rmb/ploy/internal/cli/config"
 	"github.com/iw2rmb/ploy/internal/deploy"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/testutil/assertx"
@@ -34,7 +33,6 @@ func newTestNodeAddConfig(t *testing.T) nodeAddConfig {
 		t.Fatalf("create test identity: %v", err)
 	}
 	return nodeAddConfig{
-		ClusterID:       "test-cluster",
 		Address:         "10.0.0.10",
 		ServerURL:       "https://10.0.0.5:8443",
 		User:            "testuser",
@@ -43,20 +41,9 @@ func newTestNodeAddConfig(t *testing.T) nodeAddConfig {
 	}
 }
 
-func TestHandleNodeAddRequiresClusterIDAndAddress(t *testing.T) {
+func TestHandleNodeAddRequiresAddress(t *testing.T) {
 	buf := &bytes.Buffer{}
-	// No flags at all -> cluster-id required first
 	err := handleNodeAdd(nil, buf)
-	if err == nil {
-		t.Fatalf("expected error when --cluster-id is missing")
-	}
-	if !strings.Contains(err.Error(), "cluster-id is required") {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	// Provide cluster-id but no address
-	buf.Reset()
-	err = handleNodeAdd([]string{"--cluster-id", "abc"}, buf)
 	if err == nil {
 		t.Fatalf("expected error when --address is missing")
 	}
@@ -71,7 +58,6 @@ func TestHandleNodeAddRequiresServerURL(t *testing.T) {
 		t.Fatalf("create test identity: %v", err)
 	}
 	clienv.RunExpectError(t, handleNodeAdd, []string{
-		"--cluster-id", "c1",
 		"--address", "10.0.0.5",
 		"--identity", idPath,
 		"--ployd-node-binary", "/dev/null",
@@ -185,7 +171,7 @@ func TestSignNodeCSR_Success(t *testing.T) {
 		})
 	}))
 	defer srv.Close()
-	configureDefaultClusterForNodeTest(t, srv.URL)
+	clienv.UseControlPlaneEnv(t, srv.URL)
 
 	// Act
 	cert, ca, err := signNodeCSR(context.Background(), srv.URL, nodeID, []byte("CSR-PEM"))
@@ -214,23 +200,11 @@ func TestSignNodeCSR_Non200(t *testing.T) {
 		http.Error(w, "bad csr", http.StatusBadRequest)
 	}))
 	defer srv.Close()
-	configureDefaultClusterForNodeTest(t, srv.URL)
+	clienv.UseControlPlaneEnv(t, srv.URL)
 
 	_, _, err := signNodeCSR(context.Background(), srv.URL, nodeID, []byte("CSR-PEM"))
 	if err == nil || !strings.Contains(err.Error(), "server returned 400: bad csr") {
 		t.Fatalf("expected status error, got: %v", err)
-	}
-}
-
-func configureDefaultClusterForNodeTest(t *testing.T, serverURL string) {
-	t.Helper()
-	clienv.IsolateConfigHomeAllowDefault(t)
-	clusterID := cliconfig.ClusterID("test")
-	if _, err := cliconfig.SaveDescriptor(cliconfig.Descriptor{ClusterID: clusterID, Address: serverURL}); err != nil {
-		t.Fatalf("SaveDescriptor: %v", err)
-	}
-	if err := cliconfig.SetDefault(clusterID); err != nil {
-		t.Fatalf("SetDefault: %v", err)
 	}
 }
 

@@ -41,7 +41,6 @@ func (q *Queries) CheckBootstrapTokenRevoked(ctx context.Context, tokenID string
 const getBootstrapToken = `-- name: GetBootstrapToken :one
 SELECT
     node_id,
-    cluster_id,
     issued_at,
     expires_at,
     used_at,
@@ -54,7 +53,6 @@ LIMIT 1
 
 type GetBootstrapTokenRow struct {
 	NodeID       *types.NodeID      `json:"node_id"`
-	ClusterID    *string            `json:"cluster_id"`
 	IssuedAt     pgtype.Timestamptz `json:"issued_at"`
 	ExpiresAt    pgtype.Timestamptz `json:"expires_at"`
 	UsedAt       pgtype.Timestamptz `json:"used_at"`
@@ -67,7 +65,6 @@ func (q *Queries) GetBootstrapToken(ctx context.Context, tokenID string) (GetBoo
 	var i GetBootstrapTokenRow
 	err := row.Scan(
 		&i.NodeID,
-		&i.ClusterID,
 		&i.IssuedAt,
 		&i.ExpiresAt,
 		&i.UsedAt,
@@ -81,21 +78,19 @@ const insertAPIToken = `-- name: InsertAPIToken :exec
 INSERT INTO api_tokens (
     token_hash,
     token_id,
-    cluster_id,
     role,
     description,
     issued_at,
     expires_at,
     created_by
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8
+    $1, $2, $3, $4, $5, $6, $7
 )
 `
 
 type InsertAPITokenParams struct {
 	TokenHash   string             `json:"token_hash"`
 	TokenID     string             `json:"token_id"`
-	ClusterID   *string            `json:"cluster_id"`
 	Role        string             `json:"role"`
 	Description *string            `json:"description"`
 	IssuedAt    pgtype.Timestamptz `json:"issued_at"`
@@ -107,7 +102,6 @@ func (q *Queries) InsertAPIToken(ctx context.Context, arg InsertAPITokenParams) 
 	_, err := q.db.Exec(ctx, insertAPIToken,
 		arg.TokenHash,
 		arg.TokenID,
-		arg.ClusterID,
 		arg.Role,
 		arg.Description,
 		arg.IssuedAt,
@@ -122,12 +116,11 @@ INSERT INTO bootstrap_tokens (
     token_hash,
     token_id,
     node_id,
-    cluster_id,
     issued_at,
     expires_at,
     issued_by
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7
+    $1, $2, $3, $4, $5, $6
 )
 `
 
@@ -135,7 +128,6 @@ type InsertBootstrapTokenParams struct {
 	TokenHash string             `json:"token_hash"`
 	TokenID   string             `json:"token_id"`
 	NodeID    *types.NodeID      `json:"node_id"`
-	ClusterID *string            `json:"cluster_id"`
 	IssuedAt  pgtype.Timestamptz `json:"issued_at"`
 	ExpiresAt pgtype.Timestamptz `json:"expires_at"`
 	IssuedBy  *string            `json:"issued_by"`
@@ -146,7 +138,6 @@ func (q *Queries) InsertBootstrapToken(ctx context.Context, arg InsertBootstrapT
 		arg.TokenHash,
 		arg.TokenID,
 		arg.NodeID,
-		arg.ClusterID,
 		arg.IssuedAt,
 		arg.ExpiresAt,
 		arg.IssuedBy,
@@ -165,7 +156,6 @@ SELECT
     revoked_at,
     created_by
 FROM api_tokens
-WHERE cluster_id = $1
 ORDER BY created_at DESC, token_id DESC
 `
 
@@ -180,8 +170,8 @@ type ListAPITokensRow struct {
 	CreatedBy   *string            `json:"created_by"`
 }
 
-func (q *Queries) ListAPITokens(ctx context.Context, clusterID *string) ([]ListAPITokensRow, error) {
-	rows, err := q.db.Query(ctx, listAPITokens, clusterID)
+func (q *Queries) ListAPITokens(ctx context.Context) ([]ListAPITokensRow, error) {
+	rows, err := q.db.Query(ctx, listAPITokens)
 	if err != nil {
 		return nil, err
 	}

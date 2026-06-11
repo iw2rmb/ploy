@@ -152,7 +152,7 @@ func runConfigEnvList(stdout io.Writer) error {
 		stdout = io.Discard
 	}
 
-	// Resolve control plane URL and HTTP client from the default cluster descriptor.
+	// Resolve control plane URL and HTTP client from environment.
 	ctx := context.Background()
 	baseURL, client, err := common.ResolveControlPlaneHTTP(ctx)
 	if err != nil {

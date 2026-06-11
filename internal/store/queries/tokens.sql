@@ -22,14 +22,13 @@ WHERE token_id = $1 AND used_at IS NULL;
 INSERT INTO api_tokens (
     token_hash,
     token_id,
-    cluster_id,
     role,
     description,
     issued_at,
     expires_at,
     created_by
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8
+    $1, $2, $3, $4, $5, $6, $7
 );
 
 -- name: ListAPITokens :many
@@ -43,7 +42,6 @@ SELECT
     revoked_at,
     created_by
 FROM api_tokens
-WHERE cluster_id = $1
 ORDER BY created_at DESC, token_id DESC;
 
 -- name: RevokeAPIToken :exec
@@ -56,18 +54,16 @@ INSERT INTO bootstrap_tokens (
     token_hash,
     token_id,
     node_id,
-    cluster_id,
     issued_at,
     expires_at,
     issued_by
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7
+    $1, $2, $3, $4, $5, $6
 );
 
 -- name: GetBootstrapToken :one
 SELECT
     node_id,
-    cluster_id,
     issued_at,
     expires_at,
     used_at,

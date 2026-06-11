@@ -16,21 +16,17 @@ const (
 	TokenTypeBootstrap = "bootstrap" // Short-lived tokens for node bootstrapping
 )
 
-// TokenClaims is a JWT claims structure with domain types for cluster identifier.
-// ClusterID is validated on unmarshal (non-empty after trimming spaces).
+// TokenClaims is the JWT claims structure used by API and bootstrap bearer tokens.
 type TokenClaims struct {
-	ClusterID domaintypes.ClusterID `json:"cluster_id"`
-	Role      string                `json:"role"`              // "cli-admin", "control-plane", "worker"
-	TokenType string                `json:"token_type"`        // "api" or "bootstrap"
-	NodeID    domaintypes.NodeID    `json:"node_id,omitempty"` // Only for bootstrap tokens
+	Role      string             `json:"role"`              // "cli-admin", "control-plane", "worker"
+	TokenType string             `json:"token_type"`        // "api" or "bootstrap"
+	NodeID    domaintypes.NodeID `json:"node_id,omitempty"` // Only for bootstrap tokens
 	jwt.RegisteredClaims
 }
 
 // GenerateAPIToken creates a long-lived bearer token for CLI usage.
-// clusterID is passed as a string and converted to domain type for validation.
-func GenerateAPIToken(secret, clusterID, role string, expiresAt time.Time) (string, error) {
+func GenerateAPIToken(secret, role string, expiresAt time.Time) (string, error) {
 	claims := &TokenClaims{
-		ClusterID: domaintypes.ClusterID(clusterID),
 		Role:      role,
 		TokenType: TokenTypeAPI,
 		RegisteredClaims: jwt.RegisteredClaims{
@@ -45,13 +41,11 @@ func GenerateAPIToken(secret, clusterID, role string, expiresAt time.Time) (stri
 }
 
 // GenerateBootstrapToken creates a short-lived token for node bootstrapping.
-// clusterID is passed as a string and converted to domain type for validation.
-func GenerateBootstrapToken(secret, clusterID string, nodeID domaintypes.NodeID, expiresAt time.Time) (string, error) {
+func GenerateBootstrapToken(secret string, nodeID domaintypes.NodeID, expiresAt time.Time) (string, error) {
 	if nodeID.IsZero() {
 		return "", fmt.Errorf("node_id: %w", domaintypes.ErrEmpty)
 	}
 	claims := &TokenClaims{
-		ClusterID: domaintypes.ClusterID(clusterID),
 		Role:      string(RoleWorker),
 		TokenType: TokenTypeBootstrap,
 		NodeID:    nodeID,

@@ -99,7 +99,6 @@ func PrefixedScript(env map[string]string) string {
 	// Write all environment variables to /etc/ploy/cluster.env
 	// Use unquoted heredoc to allow variable expansion
 	b.WriteString("  cat > /etc/ploy/cluster.env <<ENVFILE\n")
-	b.WriteString("PLOY_CLUSTER_ID=${CLUSTER_ID}\n")
 	b.WriteString("PLOY_DB_DSN=${PLOY_DB_DSN}\n")
 	b.WriteString("PLOY_AUTH_SECRET=${PLOY_AUTH_SECRET}\n")
 	b.WriteString("PLOY_OBJECTSTORE_ENDPOINT=${PLOY_OBJECTSTORE_ENDPOINT}\n")
@@ -175,11 +174,10 @@ func PrefixedScript(env map[string]string) string {
 	b.WriteString("      sleep 1\n")
 	b.WriteString("    done\n")
 	b.WriteString("    sudo -u postgres psql -d ploy -c \"\n")
-	b.WriteString("INSERT INTO ploy.api_tokens (token_hash, token_id, cluster_id, role, description, issued_at, expires_at)\n")
+	b.WriteString("INSERT INTO ploy.api_tokens (token_hash, token_id, role, description, issued_at, expires_at)\n")
 	b.WriteString("VALUES (\n")
 	b.WriteString("  '${PLOY_INITIAL_TOKEN_HASH}',\n")
 	b.WriteString("  '${PLOY_INITIAL_TOKEN_ID}',\n")
-	b.WriteString("  '${CLUSTER_ID}',\n")
 	b.WriteString("  'cli-admin',\n")
 	b.WriteString("  'Initial admin token - please rotate',\n")
 	b.WriteString("  NOW(),\n")
@@ -229,7 +227,6 @@ func PrefixedScript(env map[string]string) string {
 	b.WriteString("  cat > /etc/ploy/ployd-node.yaml <<EOF\n")
 	b.WriteString("server_url: ${PLOY_SERVER_URL:-}\n")
 	b.WriteString("node_id: ${NODE_ID:-}\n")
-	b.WriteString("cluster_id: ${CLUSTER_ID:-}\n")
 	b.WriteString("http:\n")
 	b.WriteString("  listen: :8444\n")
 	b.WriteString("  tls:\n")

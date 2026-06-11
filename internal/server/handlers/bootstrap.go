@@ -52,18 +52,10 @@ func createBootstrapTokenHandler(st store.Store, tokenSecret string) http.Handle
 			req.ExpiresInMinutes = 15
 		}
 
-		// Get cluster ID from environment.
-		clusterID := os.Getenv("PLOY_CLUSTER_ID")
-		if clusterID == "" {
-			writeHTTPError(w, http.StatusInternalServerError, "server misconfigured: PLOY_CLUSTER_ID not set")
-			slog.Error("create bootstrap token: PLOY_CLUSTER_ID not set")
-			return
-		}
-
 		// Generate bootstrap token.
 		now := time.Now()
 		expiresAt := now.Add(time.Duration(req.ExpiresInMinutes) * time.Minute)
-		token, err := auth.GenerateBootstrapToken(tokenSecret, clusterID, nodeID, expiresAt)
+		token, err := auth.GenerateBootstrapToken(tokenSecret, nodeID, expiresAt)
 		if err != nil {
 			writeHTTPError(w, http.StatusInternalServerError, "failed to generate token: %v", err)
 			slog.Error("create bootstrap token: generation failed", "err", err)
@@ -93,7 +85,6 @@ func createBootstrapTokenHandler(st store.Store, tokenSecret string) http.Handle
 			TokenHash: tokenHash,
 			TokenID:   claims.ID,
 			NodeID:    &nodeID,
-			ClusterID: &clusterID,
 			IssuedAt:  pgtype.Timestamptz{Time: now, Valid: true},
 			ExpiresAt: pgtype.Timestamptz{Time: expiresAt, Valid: true},
 			IssuedBy:  issuedBy,
@@ -341,14 +332,8 @@ func issueWorkerToken() (string, error) {
 		return "", fmt.Errorf("server misconfigured: PLOY_AUTH_SECRET not set")
 	}
 
-	clusterID := os.Getenv("PLOY_CLUSTER_ID")
-	if clusterID == "" {
-		slog.Error("bootstrap certificate: PLOY_CLUSTER_ID not set")
-		return "", fmt.Errorf("server misconfigured: PLOY_CLUSTER_ID not set")
-	}
-
 	tokenExpiry := time.Now().AddDate(1, 0, 0)
-	token, err := auth.GenerateAPIToken(secret, clusterID, string(auth.RoleWorker), tokenExpiry)
+	token, err := auth.GenerateAPIToken(secret, string(auth.RoleWorker), tokenExpiry)
 	if err != nil {
 		slog.Error("bootstrap certificate: generate worker token failed", "err", err)
 		return "", fmt.Errorf("failed to generate worker token: %w", err)

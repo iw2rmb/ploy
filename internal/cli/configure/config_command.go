@@ -10,7 +10,7 @@ import (
 func NewCommand(stdout, stderr io.Writer) *cobra.Command {
 	configCmd := &cobra.Command{
 		Use:   "config",
-		Short: "Inspect or update cluster configuration",
+		Short: "Inspect or update control-plane configuration",
 		Args:  cobra.NoArgs,
 		RunE:  func(cmd *cobra.Command, args []string) error { return cmd.Help() },
 	}

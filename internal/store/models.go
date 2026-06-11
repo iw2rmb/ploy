@@ -15,7 +15,6 @@ type ApiToken struct {
 	ID          pgtype.UUID        `json:"id"`
 	TokenHash   string             `json:"token_hash"`
 	TokenID     string             `json:"token_id"`
-	ClusterID   *string            `json:"cluster_id"`
 	Role        string             `json:"role"`
 	Description *string            `json:"description"`
 	IssuedAt    pgtype.Timestamptz `json:"issued_at"`
@@ -43,7 +42,6 @@ type BootstrapToken struct {
 	TokenHash    string             `json:"token_hash"`
 	TokenID      string             `json:"token_id"`
 	NodeID       *types.NodeID      `json:"node_id"`
-	ClusterID    *string            `json:"cluster_id"`
 	IssuedAt     pgtype.Timestamptz `json:"issued_at"`
 	ExpiresAt    pgtype.Timestamptz `json:"expires_at"`
 	UsedAt       pgtype.Timestamptz `json:"used_at"`

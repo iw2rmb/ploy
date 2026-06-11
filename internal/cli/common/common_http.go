@@ -7,28 +7,26 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
-	"github.com/iw2rmb/ploy/internal/cli/config"
+	"github.com/iw2rmb/ploy/internal/cli/controlplane"
 )
 
-// resolveControlPlaneHTTP selects the base URL and HTTP client using the
-// default cluster descriptor marker at ~/.config/ploy/default.
+// ResolveControlPlaneHTTP selects the base URL and HTTP client using
+// PLOY_SERVER_URL and PLOY_AUTH_TOKEN.
 // Returns a client configured for bearer token authentication.
 func ResolveControlPlaneHTTP(_ context.Context) (*url.URL, *http.Client, error) {
-	// Load default cluster descriptor (required).
-	desc, err := config.LoadDefault()
+	rawBase := strings.TrimSpace(os.Getenv("PLOY_SERVER_URL"))
+	baseURL, err := controlplane.BaseURLFromServerURL(rawBase)
 	if err != nil {
-		return nil, nil, fmt.Errorf("load default cluster descriptor: %w", err)
-	}
-	if strings.TrimSpace(desc.Address) == "" {
-		return nil, nil, fmt.Errorf("default cluster descriptor missing address")
+		return nil, nil, err
 	}
 
-	u, err := url.Parse(desc.Address)
+	u, err := url.Parse(baseURL)
 	if err != nil {
-		return nil, nil, fmt.Errorf("parse cluster address: %w", err)
+		return nil, nil, fmt.Errorf("parse PLOY_SERVER_URL: %w", err)
 	}
 
 	// Build transport: TLS only when using https.
@@ -46,10 +44,10 @@ func ResolveControlPlaneHTTP(_ context.Context) (*url.URL, *http.Client, error) 
 
 	// Wrap transport with bearer token injector if token is available
 	finalTransport := transport
-	if strings.TrimSpace(desc.Token) != "" {
+	if token := strings.TrimSpace(os.Getenv("PLOY_AUTH_TOKEN")); token != "" {
 		finalTransport = &bearerTokenTransport{
 			base:  transport,
-			token: strings.TrimSpace(desc.Token),
+			token: token,
 		}
 	}
 
@@ -61,14 +59,10 @@ func ResolveControlPlaneHTTP(_ context.Context) (*url.URL, *http.Client, error) 
 	return u, client, nil
 }
 
-// resolveControlPlaneToken returns the configured default cluster bearer token.
+// ResolveControlPlaneToken returns the configured bearer token.
 // It is used for rendering browser-friendly artifact links with auth_token query parameters.
 func ResolveControlPlaneToken() (string, error) {
-	desc, err := config.LoadDefault()
-	if err != nil {
-		return "", fmt.Errorf("load default cluster descriptor: %w", err)
-	}
-	return strings.TrimSpace(desc.Token), nil
+	return strings.TrimSpace(os.Getenv("PLOY_AUTH_TOKEN")), nil
 }
 
 // bearerTokenTransport wraps an http.RoundTripper and adds Authorization header to all requests.
@@ -87,19 +81,14 @@ func (t *bearerTokenTransport) RoundTrip(req *http.Request) (*http.Response, err
 // makeAuthenticatedRequest creates an HTTP request with bearer token authorization.
 // This helper should be used for all API calls that require authentication.
 func MakeAuthenticatedRequest(ctx context.Context, method, endpoint string, body io.Reader) (*http.Request, error) {
-	desc, err := config.LoadDefault()
-	if err != nil {
-		return nil, fmt.Errorf("load descriptor: %w", err)
-	}
-
 	req, err := http.NewRequestWithContext(ctx, method, endpoint, body)
 	if err != nil {
 		return nil, err
 	}
 
 	// Add bearer token if available
-	if strings.TrimSpace(desc.Token) != "" {
-		req.Header.Set("Authorization", "Bearer "+desc.Token)
+	if token := strings.TrimSpace(os.Getenv("PLOY_AUTH_TOKEN")); token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
 	}
 
 	return req, nil

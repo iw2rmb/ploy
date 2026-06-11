@@ -79,8 +79,6 @@ func runMain() int {
 		return 1
 	}
 
-	// No cluster table initialization; cluster-id is provided via environment.
-
 	// Load auth secret from env or config
 	authSecret := os.Getenv("PLOY_AUTH_SECRET")
 	if authSecret == "" && cfg.Auth.BearerTokens.Secret != "" {

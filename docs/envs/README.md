@@ -35,17 +35,17 @@ defaults change, or components adopt additional configuration.
 - `PLOY_CONTAINER_SOCKET_PATH` — Optional host socket path mounted into the local
   `node` container at `/var/run/docker.sock`.
   Docker script default: `/var/run/docker.sock`.
-- (removed) `PLOY_CONTROL_PLANE_URL` — The CLI no longer supports overriding the control‑plane URL. It always uses the
-  default descriptor at `~/.config/ploy/default` (or `PLOY_CONFIG_HOME` path) and negotiates mTLS when the
-  descriptor specifies HTTPS.
+- `PLOY_SERVER_URL` — Required control-plane base URL for CLI commands that call
+  the API. Values without a scheme default to `http` and port `8080`.
+- `PLOY_AUTH_TOKEN` — Optional bearer token for CLI API authentication. When set,
+  CLI HTTP requests send `Authorization: Bearer <token>`.
+- (removed) `PLOY_CONTROL_PLANE_URL` — Legacy control-plane URL override. Use
+  `PLOY_SERVER_URL`.
 - `PLOY_BUILDGATE_TIMEOUT` — Optional maximum duration for Build Gate HTTP polling (e.g., `5m`). When the request
   context has no deadline, HTTP-based gate executors use this value as the polling timeout; defaults to `10m` when unset or invalid.
-- `PLOY_CONFIG_HOME` — Optional override for the base directory where cluster descriptors
-  are stored. When unset, the CLI falls back to `~/.config/ploy`.
-  Priority: `PLOY_CONFIG_HOME` → `~/.config/ploy`.
-
-Local cluster descriptors (written under `~/.config/ploy/{cluster}/`) now use bearer token authentication:
-- `token` — Bearer token for authenticating with the control plane. Generate using `ploy cluster token create`.
+- `PLOY_CONFIG_HOME` — Optional override for local CLI overlay configuration.
+  `config.yaml` is read from this directory. When unset, the CLI falls back to
+  `~/.config/ploy`.
 
 Role model (bearer token claims):
 
@@ -64,8 +64,6 @@ Role model (bearer token claims):
 - `PLOY_OBJECTSTORE_ACCESS_KEY` — S3 access key ID provided by environment.
 - `PLOY_OBJECTSTORE_SECRET_KEY` — S3 secret access key provided by environment.
 
-- `CLUSTER_ID` — Optional cluster ID passed to the server container by the
-  external compose assets. Default: `local`.
 ### Run Spec Files
 
 `ploy run <spec-path>` accepts a YAML/JSON spec file, or a directory containing
@@ -169,7 +167,7 @@ build_gate:
   - There is currently no environment variable or scheduler key to tune the 120s window.
 - `PLOYD_NODE_ID` — Node identifier for the ployd daemon. Set during bootstrap as a NanoID(6)
   string (6 characters from URL-safe alphabet A-Za-z0-9_-). This compact format balances
-  brevity with sufficient uniqueness for typical cluster sizes. Note: currently exported by
+  brevity with sufficient uniqueness for typical node fleet sizes. Note: currently exported by
   bootstrap but not consumed at runtime; node identity is specified in the node YAML (`node_id`).
 - `PLOYD_HOME_DIR` — Home directory for the ployd daemon. Exported by bootstrap as `/root` for
   systemd context; not currently read by the codebase.
@@ -299,8 +297,9 @@ workers download through the snapshot endpoint.
 
 ## Control Plane
 
-- (removed) `PLOY_CONTROL_PLANE_URL` — Legacy override removed. Components derive the endpoint and token from
-  the default cluster descriptor under `PLOY_CONFIG_HOME` (or home default).
+- (removed) `PLOY_CONTROL_PLANE_URL` — Legacy override removed. CLI commands use
+  `PLOY_SERVER_URL`; nodes receive `PLOY_SERVER_URL` in their generated config
+  during provisioning.
 
 ### Server (Control Plane)
 
@@ -331,9 +330,9 @@ GitLab source hydration:
 
 ### PKI
 
-- `PLOY_SERVER_CA_CERT` — PEM-encoded cluster CA certificate used to sign node certificates during
+- `PLOY_SERVER_CA_CERT` — PEM-encoded CA certificate used to sign node certificates during
   bootstrap. Required for the `/v1/pki/bootstrap` endpoint to issue certificates.
-- `PLOY_SERVER_CA_KEY` — PEM-encoded cluster CA private key used to sign node CSRs during bootstrap.
+- `PLOY_SERVER_CA_KEY` — PEM-encoded CA private key used to sign node CSRs during bootstrap.
   Required alongside `PLOY_SERVER_CA_CERT`. When either value is missing (empty or whitespace-only),
   the bootstrap endpoint responds with `503 PKI not configured`.
   If values are set but invalid (malformed PEM), the server returns `500 Internal Server Error`
@@ -374,7 +373,7 @@ are stored in the object store.
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `PLOY_OBJECTSTORE_ENDPOINT` | S3-compatible endpoint URL (e.g., `http://garage:3900`) | - |
-| `PLOY_OBJECTSTORE_BUCKET` | Bucket name for blob storage | `${CLUSTER_ID:-local}` in runtime compose |
+| `PLOY_OBJECTSTORE_BUCKET` | Bucket name for blob storage | `local` in runtime compose |
 | `PLOY_OBJECTSTORE_ACCESS_KEY` | Access key ID | - |
 | `PLOY_OBJECTSTORE_SECRET_KEY` | Secret access key | - |
 | `PLOY_OBJECTSTORE_SECURE` | Use TLS (true/false) | `false` |
@@ -384,7 +383,7 @@ are stored in the object store.
 ## Global Env Configuration
 
 The control plane supports centralized global environment variables that are automatically injected
-into cluster components based on target rules. This enables cluster-wide configuration of credentials,
+into components based on target rules. This enables shared configuration of credentials,
 and API keys without embedding them in every spec file.
 
 ### Configuration via CLI

@@ -5,9 +5,9 @@ Usage:
   ploy [command]
 
 Available Commands:
-  cluster     Manage clusters (nodes, tokens)
+  cluster     Manage nodes and API tokens
   completion  Generate the autocompletion script for the specified shell
-  config      Inspect or update cluster configuration
+  config      Inspect or update control-plane configuration
   help        Help about any command
   job         Inspect jobs and follow logs
   mig         Plan and run Migs workflows

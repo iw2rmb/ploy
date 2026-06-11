@@ -2,7 +2,7 @@
 
 `ploy` is the operator CLI for the Ploy control plane. It submits runs, manages
 mig projects, follows run and job status, applies run diffs locally, downloads
-run artifacts, and administers clusters. Global environment management is
+run artifacts, and administers nodes and tokens. Global environment management is
 available under `ploy config env`.
 
 ## Usage
@@ -228,8 +228,8 @@ ploy tui
 - `Esc` — return to the previous screen.
 - `q` — quit.
 
-No new environment variables are required. The TUI reuses the same cluster descriptor
-and bearer token as all other `ploy` commands (see `docs/envs/README.md`).
+The TUI uses the same `PLOY_SERVER_URL` and optional `PLOY_AUTH_TOKEN` environment
+variables as all other `ploy` commands (see `docs/envs/README.md`).
 
 ## Shell Completion
 
@@ -292,7 +292,7 @@ ploy completion <shell> --help
 ## Global Environment Configuration
 
 The `ploy config env` commands manage global environment variables that are automatically
-injected into cluster components. This provides a centralized way to configure
+injected into target components. This provides a centralized way to configure
 credentials and other shared settings without embedding them in every spec file.
 
 ### Key Concepts

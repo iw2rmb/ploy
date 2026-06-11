@@ -104,7 +104,7 @@ func TestRunSubmitSelectorCases(t *testing.T) {
 				}
 			}))
 			defer server.Close()
-			clienv.UseServerDescriptor(t, server.URL)
+			clienv.UseControlPlaneEnv(t, server.URL)
 
 			var buf bytes.Buffer
 			if err := executeCmd([]string{"run", specPath, tc.selector}, &buf); err != nil {
@@ -171,7 +171,7 @@ func TestRunSubmitSpecDirectoryUsesMigYAML(t *testing.T) {
 		}
 	}))
 	defer server.Close()
-	clienv.UseServerDescriptor(t, server.URL)
+	clienv.UseControlPlaneEnv(t, server.URL)
 
 	var buf bytes.Buffer
 	if err := executeCmd([]string{"run", specDir, "acme/service"}, &buf); err != nil {
@@ -227,7 +227,7 @@ build_gate:
 		}
 	}))
 	defer server.Close()
-	clienv.UseServerDescriptor(t, server.URL)
+	clienv.UseControlPlaneEnv(t, server.URL)
 
 	var buf bytes.Buffer
 	if err := executeCmd([]string{"run", specPath + ":deprecations", "acme/service"}, &buf); err != nil {
@@ -268,7 +268,7 @@ func TestRunSubmitPullDownloadsFinalArtifacts(t *testing.T) {
 		Ref:     "main",
 	})
 	defer server.Close()
-	clienv.UseServerDescriptor(t, server.URL)
+	clienv.UseControlPlaneEnv(t, server.URL)
 
 	var buf bytes.Buffer
 	if err := executeCmd([]string{"run", "--pull=" + artifactDir, specPath, "acme/service"}, &buf); err != nil {
@@ -298,7 +298,7 @@ func TestRunSubmitFollowUsesStatusFollowRenderer(t *testing.T) {
 		Ref:     "main",
 	})
 	defer server.Close()
-	clienv.UseServerDescriptor(t, server.URL)
+	clienv.UseControlPlaneEnv(t, server.URL)
 
 	var buf bytes.Buffer
 	if err := executeCmd([]string{"run", "--follow", specPath, "acme/service"}, &buf); err != nil {
@@ -335,7 +335,7 @@ func TestRunSubmitApplyAppliesFinalPatch(t *testing.T) {
 		Patch:     patch,
 	})
 	defer server.Close()
-	clienv.UseServerDescriptor(t, server.URL)
+	clienv.UseControlPlaneEnv(t, server.URL)
 
 	var buf bytes.Buffer
 	if err := executeCmd([]string{"run", "--apply", specPath, repoDir}, &buf); err != nil {

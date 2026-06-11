@@ -1,6 +1,6 @@
 # ployd-node - Node Agent
 
-The `ployd-node` binary is the node agent that runs on worker nodes in the Ploy cluster. It polls the control-plane server for jobs and executes them.
+The `ployd-node` binary is the node agent that runs on worker nodes. It polls the control-plane server for jobs and executes them.
 
 ## Features
 
@@ -86,7 +86,7 @@ ployd-node -config /path/to/config.yaml
 
 - TLS 1.3 minimum version
 - Mutual TLS (mTLS) required for all endpoints
-- Client certificates verified against cluster CA
+- Client certificates verified against the configured CA
 - Structured daemon logs as newline-delimited JSON on stdout/stderr
 
 ### Testing

@@ -13,7 +13,7 @@ Use this flow for any "why did run/job fail?" request.
 
 ## 1) Use control-plane endpoints first
 - Do not start with broad repo searches.
-- Use `~/.config/ploy/default` for the `round-leaf-6114` server URL and token.
+- Use `PLOY_SERVER_URL` and `PLOY_AUTH_TOKEN` for control-plane CLI access.
 - Treat API/CLI output as the first source of truth.
 - If API-visible logs/artifacts are empty, ambiguous, or insufficient, SSH to the node and inspect runtime evidence directly.
 - Never paste auth tokens into responses or shell output summaries.

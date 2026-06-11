@@ -11,7 +11,7 @@
 #
 # Modes:
 #   --quick: Run fast unit, CLI, and integration tests (no e2e)
-#   --full:  Run all tests including e2e scenarios (requires cluster)
+#   --full:  Run all tests including e2e scenarios (requires control-plane auth)
 #
 # Environment:
 #   PLOY_TEST_DB_DSN: PostgreSQL connection string for integration tests
@@ -211,11 +211,9 @@ run_e2e_selftest() {
         return 0
     fi
 
-    # Check if cluster is configured
-    local config_home="${PLOY_CONFIG_HOME:-$HOME/.config/ploy}"
-    local default_marker="${config_home}/default"
-    if [[ ! -e "$default_marker" ]]; then
-        log_warn "Skipping e2e selftest (no cluster configured at ${default_marker})"
+    # Check if control-plane auth is configured
+    if [[ -z "${PLOY_SERVER_URL:-}" || -z "${PLOY_AUTH_TOKEN:-}" ]]; then
+        log_warn "Skipping e2e selftest (PLOY_SERVER_URL/PLOY_AUTH_TOKEN not configured)"
         return 0
     fi
 

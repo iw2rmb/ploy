@@ -67,7 +67,7 @@ func TestRunListCallsControlPlane(t *testing.T) {
 	}))
 	defer server.Close()
 
-	clienv.UseServerDescriptor(t, server.URL)
+	clienv.UseControlPlaneEnv(t, server.URL)
 
 	var buf bytes.Buffer
 	err := executeCmd([]string{"run", "ls", "--limit", "10", "--offset", "5"}, &buf)
@@ -109,7 +109,7 @@ func TestRunListEmptyResult(t *testing.T) {
 	}))
 	defer server.Close()
 
-	clienv.UseServerDescriptor(t, server.URL)
+	clienv.UseControlPlaneEnv(t, server.URL)
 
 	var buf bytes.Buffer
 	err := executeCmd([]string{"run", "ls"}, &buf)
@@ -207,7 +207,7 @@ func TestMigRunRepoSelectorResolvesToExplicitRepoURL(t *testing.T) {
 	}))
 	defer server.Close()
 
-	clienv.UseServerDescriptor(t, server.URL)
+	clienv.UseControlPlaneEnv(t, server.URL)
 
 	var buf bytes.Buffer
 	if err := executeCmd([]string{"mig", "run", "my-wave", "acme/service:feature/test"}, &buf); err != nil {
@@ -240,7 +240,7 @@ func TestMigRunStatusNotFound(t *testing.T) {
 	}))
 	defer server.Close()
 
-	clienv.UseServerDescriptor(t, server.URL)
+	clienv.UseControlPlaneEnv(t, server.URL)
 
 	var buf bytes.Buffer
 	err := executeCmd([]string{"run", "status", runID}, &buf)

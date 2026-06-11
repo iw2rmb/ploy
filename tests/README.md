@@ -15,7 +15,7 @@ tests/
 │   ├── server_insecure_test.go
 │   ├── smoke_workflow_test.go  # Comprehensive workflow validation
 │   └── migs/                   # Mig-specific integration tests
-├── e2e/                     # End-to-end scenarios (require cluster)
+├── e2e/                     # End-to-end scenarios (require control-plane auth)
 │   └── migs/
 │       ├── README.md        # E2E documentation
 │       ├── scenario-selftest.sh
@@ -43,8 +43,9 @@ tests/
    ```
    The database must exist and have migrations applied. See `internal/store/migrations/` for schema.
 
-3. **For e2e tests, configure a cluster:**
-   - Ensure `${PLOY_CONFIG_HOME:-$HOME/.config/ploy}/default` exists with cluster descriptor.
+3. **For e2e tests, configure control-plane auth:**
+   - Export `PLOY_SERVER_URL` and `PLOY_AUTH_TOKEN`, or let the local e2e
+     harness mint a token from the local stack secret.
 
 ### Running Smoke Tests
 
@@ -98,7 +99,7 @@ go test -v ./tests/integration -run=TestServerStartStop_InsecureMode
 go test -v ./tests/integration -run=TestSmokeWorkflow_EndToEnd
 ```
 
-**E2E tests (require cluster):**
+**E2E tests (require control-plane auth):**
 ```bash
 # Selftest: minimal container execution
 bash tests/e2e/migs/scenario-selftest.sh
@@ -134,8 +135,8 @@ See `tests/e2e/migs/README.md` for detailed e2e documentation.
 
 ### E2E Tests
 - **Location:** `tests/e2e/migs/`
-- **Purpose:** Validate complete workflows with real containers and cluster
-- **Prerequisites:** Configured cluster, Docker images, optional GitLab PAT
+- **Purpose:** Validate complete workflows with real containers and a control plane
+- **Prerequisites:** `PLOY_SERVER_URL`, `PLOY_AUTH_TOKEN`, Docker images, optional GitLab PAT
 - **Scenarios:**
   - `scenario-selftest.sh`: Minimal container execution (echo test)
   - `scenario-prep-ready.sh`: Prep success lifecycle + run gating
@@ -253,7 +254,7 @@ echo "Artifacts saved to: ${ARTIFACT_DIR}"
 3. **Fail-fast:** Tests exit early on first failure for quick feedback
 4. **Self-documenting:** Clear test names and log output
 5. **Isolated:** Each test cleans up after itself (via `t.Cleanup` or transaction rollback)
-6. **Skippable:** Tests skip gracefully when prerequisites are missing (e.g., no DSN, no cluster)
+6. **Skippable:** Tests skip gracefully when prerequisites are missing (e.g., no DSN, no control-plane auth)
 
 ## CI Integration
 
@@ -271,7 +272,7 @@ The smoke test suite is designed for CI environments:
   run: bash tests/smoke_tests.sh --full
   env:
     PLOY_TEST_DB_DSN: ${{ secrets.TEST_PG_DSN }}
-    SKIP_E2E: "1"  # Skip e2e if cluster not available in CI
+    SKIP_E2E: "1"  # Skip e2e if control-plane auth is not available in CI
 ```
 
 ## Troubleshooting
@@ -280,9 +281,9 @@ The smoke test suite is designed for CI environments:
 - Ensure PostgreSQL is running and `PLOY_TEST_DB_DSN` is correct.
 - Verify database exists and migrations are applied.
 
-### E2E tests fail: "cluster not configured"
-- Ensure `${PLOY_CONFIG_HOME:-$HOME/.config/ploy}/default` exists.
-- Verify cluster is accessible (network, credentials).
+### E2E tests fail: "auth not configured"
+- Ensure `PLOY_SERVER_URL` and `PLOY_AUTH_TOKEN` are set.
+- Verify the control plane is accessible (network, credentials).
 
 ### E2E tests fail: "image not found"
 - Ensure Docker images are built and pushed to registry.

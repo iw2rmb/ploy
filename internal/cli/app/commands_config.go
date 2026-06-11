@@ -43,13 +43,11 @@ func newSpecCmd(stdout, stderr io.Writer) *cobra.Command {
 
 // newClusterCmd creates the cobra command for 'ploy cluster' and its subcommands.
 // This wires the cluster router into a proper cobra command hierarchy.
-// The cluster command provides a unified namespace for cluster management:
-//   - node:    Manage worker nodes in a cluster
-//   - token:   Manage API tokens bound to a cluster
+// The cluster command provides a unified namespace for node and token operations.
 func newClusterCmd(stderr io.Writer) *cobra.Command {
 	clusterCmd := &cobra.Command{
 		Use:   "cluster",
-		Short: "Manage clusters (nodes, tokens)",
+		Short: "Manage nodes and API tokens",
 		Args:  cobra.NoArgs,
 		RunE:  func(cmd *cobra.Command, args []string) error { return cmd.Help() },
 	}
@@ -61,7 +59,7 @@ func newClusterCmd(stderr io.Writer) *cobra.Command {
 func newClusterNodeCmd(stderr io.Writer) *cobra.Command {
 	nodeCmd := &cobra.Command{
 		Use:   "node",
-		Short: "Manage worker nodes in a cluster",
+		Short: "Manage worker nodes",
 		Args:  cobra.NoArgs,
 		RunE:  func(cmd *cobra.Command, args []string) error { return cmd.Help() },
 	}
@@ -88,16 +86,15 @@ func newClusterNodeActionsCmd(stderr io.Writer) *cobra.Command {
 }
 
 func newClusterNodeAddCmd(stderr io.Writer) *cobra.Command {
-	var clusterID, address, serverURL, identity, user, ploydNodeBinary string
+	var address, serverURL, identity, user, ploydNodeBinary string
 	var sshPort int
 	var dryRun bool
 	cmd := &cobra.Command{
-		Use:   "add --cluster-id <id> --address <ip> --server-url <url>",
-		Short: "Add a worker node to the cluster",
+		Use:   "add --address <ip> --server-url <url>",
+		Short: "Add a worker node",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			runArgs := []string{"node", "add"}
-			runArgs = addChangedString(cmd, runArgs, "cluster-id", clusterID)
 			runArgs = addChangedString(cmd, runArgs, "address", address)
 			runArgs = addChangedString(cmd, runArgs, "server-url", serverURL)
 			runArgs = addChangedString(cmd, runArgs, "identity", identity)
@@ -108,7 +105,6 @@ func newClusterNodeAddCmd(stderr io.Writer) *cobra.Command {
 			return cluster.Handle(runArgs, stderr)
 		},
 	}
-	cmd.Flags().StringVar(&clusterID, "cluster-id", "", "Cluster identifier to join")
 	cmd.Flags().StringVar(&address, "address", "", "Node IP or hostname")
 	cmd.Flags().StringVar(&serverURL, "server-url", "", "Ploy server URL")
 	cmd.Flags().StringVar(&identity, "identity", "", "SSH private key used for provisioning")
@@ -122,7 +118,7 @@ func newClusterNodeAddCmd(stderr io.Writer) *cobra.Command {
 func newClusterTokenCmd(stderr io.Writer) *cobra.Command {
 	tokenCmd := &cobra.Command{
 		Use:   "token",
-		Short: "Manage API tokens bound to a cluster",
+		Short: "Manage API tokens",
 		Args:  cobra.NoArgs,
 		RunE:  func(cmd *cobra.Command, args []string) error { return cmd.Help() },
 	}
