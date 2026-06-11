@@ -1,5 +1,0 @@
-* What went wrong:
-Execution failed for task ':module:spring-boot-r2dbc:dockerTest'.
-> There were failing tests. See the report at: file:///home/runner/work/spring-boot/spring-boot/module/spring-boot-r2dbc/build/reports/tests/dockerTest/index.html
-
-BUILD FAILED in 1h 5m 33s

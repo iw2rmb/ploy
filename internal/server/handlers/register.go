@@ -45,7 +45,6 @@ func RegisterRoutes(s *httpserver.Server, st store.Store, bs blobstore.Store, bp
 	registerSpecBundleRoutes(s, deps)
 	registerJobArtifactRoutes(s, deps)
 	registerJobRoutes(s, deps)
-	registerTrimmerRoutes(s, deps)
 }
 
 func registerHealthRoutes(s *httpserver.Server, deps routeDeps) {
@@ -156,8 +155,4 @@ func registerJobRoutes(s *httpserver.Server, deps routeDeps) {
 	s.RegisterRouteFunc("GET /v1/jobs/{job_id}/status", getJobStatusHandler(deps.st), auth.RoleWorker, auth.RoleControlPlane)
 	s.RegisterRouteFunc("POST /v1/jobs/{job_id}/image", saveJobImageNameHandler(deps.st), auth.RoleWorker)
 	s.RegisterRouteFunc("POST /v1/jobs/{job_id}/sbom", saveJobSBOMHandler(deps.st), auth.RoleWorker)
-}
-
-func registerTrimmerRoutes(s *httpserver.Server, deps routeDeps) {
-	s.RegisterRouteFunc("POST /v1/trimmer/java/gradle", javaGradleTrimmerHandler())
 }
