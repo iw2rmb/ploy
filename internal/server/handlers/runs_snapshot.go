@@ -90,8 +90,5 @@ func snapshotAuthorizedForNode(ctx context.Context, st store.Store, runID domain
 	if ok {
 		return true, nil
 	}
-	return st.HasRunningActionForRunNode(ctx, store.HasRunningActionForRunNodeParams{
-		RunID:  runID,
-		NodeID: &nodeID,
-	})
+	return false, nil
 }

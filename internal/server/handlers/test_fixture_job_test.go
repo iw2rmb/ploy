@@ -14,7 +14,7 @@ import (
 // stale recovery and related orchestration handler tests.
 //
 // Method receivers are split across companion files to keep each shard small:
-//   - test_fixture_job_run_test.go      - Run, RunAction, Artifact, and Diff methods.
+//   - test_fixture_job_run_test.go      - Run, Artifact, and Diff methods.
 //   - test_fixture_job_misc_test.go     - Stale recovery, Node, MigRepo, Event,
 //     Ingest, and Spec/Mig/Run creation.
 type jobStore struct {
@@ -57,10 +57,8 @@ type jobStore struct {
 	countJobsForTUI mockCall[*string, int64]
 
 	// Claiming
-	claimJob        mockCall[types.NodeID, store.Job]
-	claimNodeAction mockCall[types.NodeID, store.NodeAction]
-	claimRunAction  mockCall[types.NodeID, store.RunAction]
-	unclaimJob      mockCall[store.UnclaimJobParams, struct{}]
+	claimJob   mockCall[types.NodeID, store.Job]
+	unclaimJob mockCall[store.UnclaimJobParams, struct{}]
 
 	claimRun mockResult[store.Run]
 
@@ -110,13 +108,6 @@ type jobStore struct {
 	cancelActiveJobsByRunAttempt mockCallSlice[store.CancelActiveJobsByRunAttemptParams, int64]
 
 	getLatestRunByMigAndRepoStatus mockCall[store.GetLatestRunByMigAndRepoStatusParams, store.GetLatestRunByMigAndRepoStatusRow]
-	createRunAction                mockCall[store.CreateRunActionParams, store.RunAction]
-	getRunAction                   mockCall[types.JobID, store.RunAction]
-	getRunActionByKey              mockCall[store.GetRunActionByKeyParams, store.RunAction]
-	updateRunActionCompletion      mockCall[store.UpdateRunActionCompletionParams, struct{}]
-	listRunActionsByRunAttempt     mockCall[store.ListRunActionsByRunAttemptParams, []store.RunAction]
-	getNodeAction                  mockCall[types.JobID, store.NodeAction]
-	updateNodeActionCompletion     mockCall[store.UpdateNodeActionCompletionParams, struct{}]
 
 	// Stale recovery
 	listStaleRunningJobs           mockCall[pgtype.Timestamptz, []store.ListStaleRunningJobsRow]
@@ -354,36 +345,6 @@ func (m *jobStore) ClaimJob(ctx context.Context, nodeID types.NodeID) (store.Job
 		return store.Job{}, pgx.ErrNoRows
 	}
 	return m.claimJob.val, nil
-}
-
-func (m *jobStore) ClaimRunAction(ctx context.Context, nodeID types.NodeID) (store.RunAction, error) {
-	m.claimRunAction.called = true
-	m.claimRunAction.params = nodeID
-	if nodeID.IsZero() {
-		return store.RunAction{}, store.ErrEmptyNodeID
-	}
-	if m.claimRunAction.err != nil {
-		return store.RunAction{}, m.claimRunAction.err
-	}
-	if m.claimRunAction.val.ID.IsZero() {
-		return store.RunAction{}, pgx.ErrNoRows
-	}
-	return m.claimRunAction.val, nil
-}
-
-func (m *jobStore) ClaimNodeAction(ctx context.Context, nodeID types.NodeID) (store.NodeAction, error) {
-	m.claimNodeAction.called = true
-	m.claimNodeAction.params = nodeID
-	if nodeID.IsZero() {
-		return store.NodeAction{}, store.ErrEmptyNodeID
-	}
-	if m.claimNodeAction.err != nil {
-		return store.NodeAction{}, m.claimNodeAction.err
-	}
-	if m.claimNodeAction.val.ID.IsZero() {
-		return store.NodeAction{}, pgx.ErrNoRows
-	}
-	return m.claimNodeAction.val, nil
 }
 
 func (m *jobStore) UnclaimJob(ctx context.Context, arg store.UnclaimJobParams) error {

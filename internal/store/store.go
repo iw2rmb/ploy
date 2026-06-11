@@ -348,22 +348,6 @@ func (s *PgStore) UpsertNodeDiagnostic(ctx context.Context, arg UpsertNodeDiagno
 	return s.Queries.UpsertNodeDiagnostic(ctx, arg)
 }
 
-// CreateNodeAction validates metadata before enqueueing node-scoped maintenance.
-func (s *PgStore) CreateNodeAction(ctx context.Context, arg CreateNodeActionParams) (NodeAction, error) {
-	if err := validateJSONB(arg.Meta); err != nil {
-		return NodeAction{}, fmt.Errorf("node_actions.meta: %w", err)
-	}
-	return s.Queries.CreateNodeAction(ctx, arg)
-}
-
-// UpdateNodeActionCompletion validates action result JSON before persistence.
-func (s *PgStore) UpdateNodeActionCompletion(ctx context.Context, arg UpdateNodeActionCompletionParams) error {
-	if err := validateJSONB(arg.Result); err != nil {
-		return fmt.Errorf("node_actions.result: %w", err)
-	}
-	return s.Queries.UpdateNodeActionCompletion(ctx, arg)
-}
-
 // UpdateJobMeta validates the Meta JSONB field and updates job metadata.
 func (s *PgStore) UpdateJobMeta(ctx context.Context, arg UpdateJobMetaParams) error {
 	if err := validateJSONB(arg.Meta); err != nil {

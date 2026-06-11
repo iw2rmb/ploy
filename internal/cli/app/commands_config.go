@@ -64,25 +64,7 @@ func newClusterNodeCmd(stderr io.Writer) *cobra.Command {
 		RunE:  func(cmd *cobra.Command, args []string) error { return cmd.Help() },
 	}
 	nodeCmd.AddCommand(newClusterNodeAddCmd(stderr))
-	nodeCmd.AddCommand(newClusterNodeActionsCmd(stderr))
 	return nodeCmd
-}
-
-func newClusterNodeActionsCmd(stderr io.Writer) *cobra.Command {
-	var limit int
-	cmd := &cobra.Command{
-		Use:   "actions [--limit <n>] <node-id>",
-		Short: "List recent worker node maintenance actions",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			runArgs := []string{"node", "actions"}
-			runArgs = addChangedInt(cmd, runArgs, "limit", limit)
-			runArgs = append(runArgs, args...)
-			return cluster.Handle(runArgs, stderr)
-		},
-	}
-	cmd.Flags().IntVar(&limit, "limit", 20, "Maximum actions to show")
-	return cmd
 }
 
 func newClusterNodeAddCmd(stderr io.Writer) *cobra.Command {

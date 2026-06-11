@@ -3,14 +3,13 @@ package handlers
 import (
 	"context"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-// Run mutation and action methods
+// Run mutation methods
 
 func (m *jobStore) UpdateRunError(ctx context.Context, params store.UpdateRunErrorParams) error {
 	_, err := m.updateRunError.record(params)
@@ -49,67 +48,6 @@ func (m *jobStore) CancelActiveJobsByRunAttempt(ctx context.Context, params stor
 
 func (m *jobStore) GetLatestRunByMigAndRepoStatus(ctx context.Context, arg store.GetLatestRunByMigAndRepoStatusParams) (store.GetLatestRunByMigAndRepoStatusRow, error) {
 	return m.getLatestRunByMigAndRepoStatus.record(arg)
-}
-
-func (m *jobStore) CreateRunAction(ctx context.Context, params store.CreateRunActionParams) (store.RunAction, error) {
-	m.createRunAction.called = true
-	m.createRunAction.params = params
-	if m.createRunAction.err != nil {
-		return store.RunAction{}, m.createRunAction.err
-	}
-	result := m.createRunAction.val
-	if result.ID.IsZero() {
-		result.ID = params.ID
-	}
-	if result.RunID.IsZero() {
-		result.RunID = params.RunID
-	}
-	if result.Attempt == 0 {
-		result.Attempt = params.Attempt
-	}
-	if result.ActionType == "" {
-		result.ActionType = params.ActionType
-	}
-	if result.Status == "" {
-		result.Status = params.Status
-	}
-	if len(result.Meta) == 0 {
-		result.Meta = params.Meta
-	}
-	return result, nil
-}
-
-func (m *jobStore) GetRunAction(ctx context.Context, id types.JobID) (store.RunAction, error) {
-	m.getRunAction.called = true
-	m.getRunAction.params = id
-	if m.getRunAction.err != nil {
-		return store.RunAction{}, m.getRunAction.err
-	}
-	if m.getRunAction.val.ID.IsZero() {
-		return store.RunAction{}, pgx.ErrNoRows
-	}
-	return m.getRunAction.val, nil
-}
-
-func (m *jobStore) GetRunActionByKey(ctx context.Context, arg store.GetRunActionByKeyParams) (store.RunAction, error) {
-	m.getRunActionByKey.called = true
-	m.getRunActionByKey.params = arg
-	if m.getRunActionByKey.err != nil {
-		return store.RunAction{}, m.getRunActionByKey.err
-	}
-	if m.getRunActionByKey.val.ID.IsZero() {
-		return store.RunAction{}, pgx.ErrNoRows
-	}
-	return m.getRunActionByKey.val, nil
-}
-
-func (m *jobStore) UpdateRunActionCompletion(ctx context.Context, params store.UpdateRunActionCompletionParams) error {
-	_, err := m.updateRunActionCompletion.record(params)
-	return err
-}
-
-func (m *jobStore) ListRunActionsByRunAttempt(ctx context.Context, arg store.ListRunActionsByRunAttemptParams) ([]store.RunAction, error) {
-	return m.listRunActionsByRunAttempt.record(arg)
 }
 
 func (m *jobStore) GetRun(ctx context.Context, id types.RunID) (store.Run, error) {
@@ -159,14 +97,5 @@ func (m *jobStore) CreateArtifactBundle(ctx context.Context, arg store.CreateArt
 
 func (m *jobStore) DeleteArtifactBundle(ctx context.Context, id pgtype.UUID) error {
 	_, err := m.deleteArtifactBundle.record(id)
-	return err
-}
-
-func (m *jobStore) GetNodeAction(ctx context.Context, id types.JobID) (store.NodeAction, error) {
-	return m.getNodeAction.record(id)
-}
-
-func (m *jobStore) UpdateNodeActionCompletion(ctx context.Context, params store.UpdateNodeActionCompletionParams) error {
-	_, err := m.updateNodeActionCompletion.record(params)
 	return err
 }

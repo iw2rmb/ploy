@@ -123,7 +123,6 @@ func registerNodeRoutes(s *httpserver.Server, deps routeDeps) {
 	s.RegisterRouteFunc("GET /v1/nodes", listNodesHandler(deps.st), auth.RoleControlPlane)
 	s.RegisterRouteFunc("POST /v1/nodes/{id}/drain", drainNodeHandler(deps.st), auth.RoleControlPlane)
 	s.RegisterRouteFunc("POST /v1/nodes/{id}/undrain", undrainNodeHandler(deps.st), auth.RoleControlPlane)
-	s.RegisterRouteFunc("GET /v1/nodes/{id}/actions", listNodeActionsHandler(deps.st), auth.RoleControlPlane)
 
 	s.RegisterRouteFunc("POST /v1/nodes/{id}/heartbeat", heartbeatHandler(deps.st), auth.RoleWorker)
 	s.RegisterRouteFunc("POST /v1/nodes/{id}/claim", claimJobHandlerWithEvents(deps.st, deps.bs, deps.eventsService, deps.configHolder), auth.RoleWorker)
@@ -151,7 +150,6 @@ func registerJobRoutes(s *httpserver.Server, deps routeDeps) {
 	s.RegisterRouteFuncAllowQueryToken("GET /v1/jobs/{job_id}/logs", getJobLogsHandler(deps.st, deps.bs, deps.eventsService), auth.RoleControlPlane)
 	s.RegisterRouteFunc("POST /v1/jobs/{job_id}/logs", createJobLogsHandler(deps.st, deps.bp, deps.eventsService), auth.RoleWorker)
 	s.RegisterRouteFunc("POST /v1/jobs/{job_id}/complete", completeJobHandler(deps.st, deps.eventsService, deps.bp), auth.RoleWorker)
-	s.RegisterRouteFunc("POST /v1/actions/{action_id}/complete", completeActionHandler(deps.st), auth.RoleWorker)
 	s.RegisterRouteFunc("GET /v1/jobs/{job_id}/status", getJobStatusHandler(deps.st), auth.RoleWorker, auth.RoleControlPlane)
 	s.RegisterRouteFunc("POST /v1/jobs/{job_id}/image", saveJobImageNameHandler(deps.st), auth.RoleWorker)
 	s.RegisterRouteFunc("POST /v1/jobs/{job_id}/sbom", saveJobSBOMHandler(deps.st), auth.RoleWorker)

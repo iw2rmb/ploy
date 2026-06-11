@@ -147,8 +147,6 @@ paths:
     $ref: "./paths/nodes_id_diagnostics.yaml"
   /v1/nodes/{id}/daemon-logs:
     $ref: "./paths/nodes_id_daemon_logs.yaml"
-  /v1/nodes/{id}/actions:
-    $ref: "./paths/nodes_id_actions.yaml"
   # Run endpoints (list/inspect/cancel)
   /v1/runs:
     $ref: "./paths/runs.yaml"
@@ -271,8 +269,6 @@ components:
       $ref: "./components/schemas/controlplane.yaml#/Node"
     NodeCreateLogResponse:
       $ref: "./components/schemas/controlplane.yaml#/NodeCreateLogResponse"
-    NodeAction:
-      $ref: "./components/schemas/controlplane.yaml#/NodeAction"
     # Build Gate HTTP schemas removed: gate runs as jobs in the Migs pipeline.
     # Nodes claim gate work via the unified /v1/nodes/{id}/claim endpoint using NodeClaimResponse.
     # Repo-centric API types

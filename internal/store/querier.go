@@ -28,8 +28,6 @@ type Querier interface {
 	CheckBootstrapTokenRevoked(ctx context.Context, tokenID string) (pgtype.Timestamptz, error)
 	// Atomically claim the next claimable job for a node.
 	ClaimJob(ctx context.Context, nodeID types.NodeID) (Job, error)
-	ClaimNodeAction(ctx context.Context, nodeID types.NodeID) (NodeAction, error)
-	ClaimRunAction(ctx context.Context, nodeID types.NodeID) (RunAction, error)
 	ClearRepoSHAChainFromJob(ctx context.Context, arg ClearRepoSHAChainFromJobParams) (int64, error)
 	CountJobsByRun(ctx context.Context, runID types.RunID) (int64, error)
 	CountJobsByRunAndStatus(ctx context.Context, arg CountJobsByRunAndStatusParams) (int64, error)
@@ -60,10 +58,8 @@ type Querier interface {
 	// Creates a new node with an application-supplied NanoID(6) as the primary key.
 	// The `id` parameter must be generated via types.NewNodeKey() before calling.
 	CreateNode(ctx context.Context, arg CreateNodeParams) (Node, error)
-	CreateNodeAction(ctx context.Context, arg CreateNodeActionParams) (NodeAction, error)
 	CreateNodeDaemonLog(ctx context.Context, arg CreateNodeDaemonLogParams) (NodeDaemonLog, error)
 	CreateRun(ctx context.Context, arg CreateRunParams) (Run, error)
-	CreateRunAction(ctx context.Context, arg CreateRunActionParams) (RunAction, error)
 	CreateSpec(ctx context.Context, arg CreateSpecParams) (Spec, error)
 	// Creates a new spec bundle metadata row. Blob data is stored in object storage.
 	CreateSpecBundle(ctx context.Context, arg CreateSpecBundleParams) (SpecBundle, error)
@@ -124,11 +120,8 @@ type Querier interface {
 	// Gets a mig_repo by mig_id and repo_url (for uniqueness constraint enforcement).
 	GetMigRepoByURL(ctx context.Context, arg GetMigRepoByURLParams) (MigRepo, error)
 	GetNode(ctx context.Context, id types.NodeID) (Node, error)
-	GetNodeAction(ctx context.Context, id types.JobID) (NodeAction, error)
 	GetRepo(ctx context.Context, id types.RepoID) (Repo, error)
 	GetRun(ctx context.Context, id types.RunID) (Run, error)
-	GetRunAction(ctx context.Context, id types.JobID) (RunAction, error)
-	GetRunActionByKey(ctx context.Context, arg GetRunActionByKeyParams) (RunAction, error)
 	GetRunSnapshotMetadata(ctx context.Context, id types.RunID) (GetRunSnapshotMetadataRow, error)
 	GetRunTiming(ctx context.Context, id types.RunID) (RunsTiming, error)
 	GetSpec(ctx context.Context, id types.SpecID) (Spec, error)
@@ -141,7 +134,6 @@ type Querier interface {
 	// Checks if a mig_repo has any historical executions.
 	// Returns true if the repo cannot be deleted due to history, false otherwise.
 	HasMigRepoHistory(ctx context.Context, repoID types.RepoID) (bool, error)
-	HasRunningActionForRunNode(ctx context.Context, arg HasRunningActionForRunNodeParams) (bool, error)
 	HasRunningJobForRunNode(ctx context.Context, arg HasRunningJobForRunNodeParams) (bool, error)
 	IncrementRunAttempt(ctx context.Context, id types.RunID) error
 	InsertAPIToken(ctx context.Context, arg InsertAPITokenParams) error
@@ -202,14 +194,12 @@ type Querier interface {
 	// archived_only: if true, return only archived migs; if false, return only active migs; if null, return all.
 	// name_filter: if non-empty, filter by name substring (case-insensitive); if null/empty, no name filtering.
 	ListMigs(ctx context.Context, arg ListMigsParams) ([]Mig, error)
-	ListNodeActions(ctx context.Context, arg ListNodeActionsParams) ([]NodeAction, error)
 	ListNodeDaemonLogs(ctx context.Context, arg ListNodeDaemonLogsParams) ([]NodeDaemonLog, error)
 	ListNodeDiagnostics(ctx context.Context, nodeID types.NodeID) ([]NodeDiagnostic, error)
 	// ListNodeMetricsPartitions retrieves all partition names for the node_metrics table.
 	ListNodeMetricsPartitions(ctx context.Context) ([]string, error)
 	ListNodes(ctx context.Context) ([]Node, error)
 	ListQueuedRunsByWave(ctx context.Context, waveID types.WaveID) ([]Run, error)
-	ListRunActionsByRunAttempt(ctx context.Context, arg ListRunActionsByRunAttemptParams) ([]RunAction, error)
 	ListRunSBOMRowsByJobType(ctx context.Context, arg ListRunSBOMRowsByJobTypeParams) ([]ListRunSBOMRowsByJobTypeRow, error)
 	ListRuns(ctx context.Context, arg ListRunsParams) ([]Run, error)
 	ListRunsByWave(ctx context.Context, waveID types.WaveID) ([]Run, error)
@@ -257,11 +247,9 @@ type Querier interface {
 	UpdateJobStatus(ctx context.Context, arg UpdateJobStatusParams) error
 	UpdateMigRepoBaseRef(ctx context.Context, arg UpdateMigRepoBaseRefParams) error
 	UpdateMigSpec(ctx context.Context, arg UpdateMigSpecParams) error
-	UpdateNodeActionCompletion(ctx context.Context, arg UpdateNodeActionCompletionParams) error
 	UpdateNodeCertMetadata(ctx context.Context, arg UpdateNodeCertMetadataParams) error
 	UpdateNodeDrained(ctx context.Context, arg UpdateNodeDrainedParams) error
 	UpdateNodeHeartbeat(ctx context.Context, arg UpdateNodeHeartbeatParams) error
-	UpdateRunActionCompletion(ctx context.Context, arg UpdateRunActionCompletionParams) error
 	UpdateRunBaseRef(ctx context.Context, arg UpdateRunBaseRefParams) error
 	UpdateRunError(ctx context.Context, arg UpdateRunErrorParams) error
 	UpdateRunResume(ctx context.Context, id types.RunID) error
