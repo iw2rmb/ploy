@@ -221,11 +221,6 @@ type NodeMetric struct {
 	DiskFreeBytes  int64              `json:"disk_free_bytes"`
 }
 
-type PloySchemaVersion struct {
-	Version   int64              `json:"version"`
-	AppliedAt pgtype.Timestamptz `json:"applied_at"`
-}
-
 type Repo struct {
 	ID        types.RepoID       `json:"id"`
 	Url       string             `json:"url"`

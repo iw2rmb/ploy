@@ -105,7 +105,8 @@ The node downloads source snapshots from `GET /v1/runs/{run_id}/snapshot`.
 
 ## Production Migration
 
-The one-time production SQL rewrite is embedded in `ployd` startup and runs only
-when the old pre-wave schema is detected. The manual wrapper is
-`scripts/migrate_wave_model_20260601.sql`; use it only if startup migration is not
-available. In both cases, run with writers stopped and no active jobs.
+`ployd` applies embedded Tern migrations on startup and stores migration state in
+`ploy.tern_schema_version`. Fresh databases run the full migration chain.
+Existing databases at the final custom migration version are baselined to Tern
+version `1`, then cleanup migration `2` runs normally. Older pre-current
+databases are not upgraded automatically.
