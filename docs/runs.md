@@ -84,6 +84,10 @@ accumulated run patch into a clean local git worktree. The local origin must
 match the run `repo_url`. Local `HEAD` must match the run `source_commit_sha`;
 `--force` bypasses only that source-commit guard.
 
+Nodes upload final repo artifacts when a job fails or errors, when `post_gate`
+succeeds, and when a terminal `mig` succeeds for a run with
+`build_gate.disabled: true`.
+
 ## Storage
 
 Node-local durable state is rooted at:

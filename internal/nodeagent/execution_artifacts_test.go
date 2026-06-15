@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/workflow/step"
 )
 
 type splitBufferWriter struct {
@@ -101,6 +102,73 @@ func TestUploadRepoArtifactsIfPresent(t *testing.T) {
 		if name == "tmp/"+jobID.String()+"/tool.jar" || name == "artifacts/"+jobID.String()+"/tmp/tool.jar" {
 			t.Fatalf("tmp file leaked into repo-artifacts as %q", name)
 		}
+	}
+}
+
+func TestShouldUploadRepoArtifactsAfterContainerJob(t *testing.T) {
+	nextID := types.NewJobID()
+	tests := []struct {
+		name    string
+		req     StartRunRequest
+		outcome jobOutcome
+		want    bool
+	}{
+		{
+			name:    "failure uploads",
+			req:     StartRunRequest{JobType: types.JobTypeMig},
+			outcome: jobOutcome{result: step.Result{ExitCode: 1}},
+			want:    true,
+		},
+		{
+			name: "terminal mig with disabled build gate uploads",
+			req: StartRunRequest{
+				JobType: types.JobTypeMig,
+				TypedOptions: RunOptions{BuildGate: BuildGateOptions{
+					Disabled: true,
+				}},
+			},
+			outcome: jobOutcome{result: step.Result{ExitCode: 0}},
+			want:    true,
+		},
+		{
+			name: "non-terminal mig with disabled build gate waits for successor",
+			req: StartRunRequest{
+				JobType: types.JobTypeMig,
+				NextID:  &nextID,
+				TypedOptions: RunOptions{BuildGate: BuildGateOptions{
+					Disabled: true,
+				}},
+			},
+			outcome: jobOutcome{result: step.Result{ExitCode: 0}},
+			want:    false,
+		},
+		{
+			name: "terminal mig with enabled build gate does not upload",
+			req: StartRunRequest{
+				JobType: types.JobTypeMig,
+			},
+			outcome: jobOutcome{result: step.Result{ExitCode: 0}},
+			want:    false,
+		},
+		{
+			name: "terminal non-mig with disabled build gate does not upload",
+			req: StartRunRequest{
+				JobType: types.JobTypePostGate,
+				TypedOptions: RunOptions{BuildGate: BuildGateOptions{
+					Disabled: true,
+				}},
+			},
+			outcome: jobOutcome{result: step.Result{ExitCode: 0}},
+			want:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := shouldUploadRepoArtifactsAfterContainerJob(tt.req, tt.outcome); got != tt.want {
+				t.Fatalf("shouldUploadRepoArtifactsAfterContainerJob() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
 

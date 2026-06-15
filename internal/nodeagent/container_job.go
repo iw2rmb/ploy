@@ -116,7 +116,7 @@ type jobOutcome struct {
 func (r *runController) executeContainerJob(ctx context.Context, req StartRunRequest, cfg containerJobConfig) {
 	outcome, execErr := r.executeContainerWithOutcome(ctx, req, cfg)
 	if execErr == nil {
-		if outcome.runErr != nil || outcome.result.ExitCode != 0 {
+		if shouldUploadRepoArtifactsAfterContainerJob(req, outcome) {
 			r.uploadRepoArtifactsIfPresent(req.RunID, req.RepoID, req.JobID)
 		}
 		return
@@ -128,6 +128,15 @@ func (r *runController) executeContainerJob(ctx context.Context, req StartRunReq
 	slog.Error("standard job execution failed", "run_id", req.RunID, "job_id", req.JobID, "error", execErr)
 	r.uploadRepoArtifactsIfPresent(req.RunID, req.RepoID, req.JobID)
 	r.uploadFailureStatus(ctx, req, execErr, time.Since(startTime))
+}
+
+func shouldUploadRepoArtifactsAfterContainerJob(req StartRunRequest, outcome jobOutcome) bool {
+	if outcome.runErr != nil || outcome.result.ExitCode != 0 {
+		return true
+	}
+	return req.JobType == types.JobTypeMig &&
+		req.TypedOptions.BuildGate.Disabled &&
+		(req.NextID == nil || req.NextID.IsZero())
 }
 
 func (r *runController) executeContainerWithOutcome(ctx context.Context, req StartRunRequest, cfg containerJobConfig) (jobOutcome, error) {
