@@ -89,23 +89,41 @@ func TestGetRunSBOMHandler_ViewsAndValidation(t *testing.T) {
 			wantStatus: http.StatusOK,
 			wantCalls:  []domaintypes.JobType{domaintypes.JobTypePreGate, domaintypes.JobTypePostGate},
 			want: func(t *testing.T, body map[string]any) {
-				packages := body["packages"].([]any)
-				if len(packages) != 3 {
-					t.Fatalf("packages len=%d, want 3: %v", len(packages), packages)
-				}
-				want := []map[string]string{
-					{"package": "added-lib", "version_pre": "", "version_post": "1.0.0", "change": "added"},
-					{"package": "changed-lib", "version_pre": "1.0.0", "version_post": "2.0.0", "change": "changed"},
-					{"package": "removed-lib", "version_pre": "1.0.0", "version_post": "", "change": "removed"},
-				}
-				for i, item := range packages {
-					got := item.(map[string]any)
-					for key, value := range want[i] {
-						if got[key] != value {
-							t.Fatalf("packages[%d][%s]=%v, want %q; package=%v", i, key, got[key], value, got)
-						}
-					}
-				}
+				assertSBOMDiffPackages(t, body,
+					map[string]string{"package": "added-lib", "version_pre": "", "version_post": "1.0.0", "change": "added"},
+					map[string]string{"package": "changed-lib", "version_pre": "1.0.0", "version_post": "2.0.0", "change": "changed"},
+					map[string]string{"package": "removed-lib", "version_pre": "1.0.0", "version_post": "", "change": "removed"},
+				)
+			},
+		},
+		{
+			name: "diff pairs one removed version with one added version as changed",
+			view: "diff",
+			spec: []byte(`{"steps":[{"image":"docker.io/test/mig:latest"}]}`),
+			rows: map[domaintypes.JobType][]store.ListRunSBOMRowsByJobTypeRow{
+				domaintypes.JobTypePreGate: {
+					{Lib: "commons-io:commons-io", Ver: "2.11.0"},
+					{Lib: "commons-io:commons-io", Ver: "2.8.0"},
+					{Lib: "multi-post-lib", Ver: "1.0.0"},
+					{Lib: "org.jetbrains.kotlin:kotlin-stdlib", Ver: "1.5.31"},
+				},
+				domaintypes.JobTypePostGate: {
+					{Lib: "commons-io:commons-io", Ver: "2.17.0"},
+					{Lib: "multi-post-lib", Ver: "2.0.0"},
+					{Lib: "multi-post-lib", Ver: "3.0.0"},
+					{Lib: "org.jetbrains.kotlin:kotlin-stdlib", Ver: "1.7.10"},
+				},
+			},
+			wantStatus: http.StatusOK,
+			wantCalls:  []domaintypes.JobType{domaintypes.JobTypePreGate, domaintypes.JobTypePostGate},
+			want: func(t *testing.T, body map[string]any) {
+				assertSBOMDiffPackages(t, body,
+					map[string]string{"package": "commons-io:commons-io", "version_pre": "2.11.0", "version_post": "", "change": "removed"},
+					map[string]string{"package": "commons-io:commons-io", "version_pre": "2.8.0", "version_post": "2.17.0", "change": "changed"},
+					map[string]string{"package": "multi-post-lib", "version_pre": "1.0.0", "version_post": "3.0.0", "change": "changed"},
+					map[string]string{"package": "multi-post-lib", "version_pre": "", "version_post": "2.0.0", "change": "added"},
+					map[string]string{"package": "org.jetbrains.kotlin:kotlin-stdlib", "version_pre": "1.5.31", "version_post": "1.7.10", "change": "changed"},
+				)
 			},
 		},
 		{
@@ -161,5 +179,22 @@ func TestGetRunSBOMHandler_ViewsAndValidation(t *testing.T) {
 			}
 			tt.want(t, body)
 		})
+	}
+}
+
+func assertSBOMDiffPackages(t *testing.T, body map[string]any, want ...map[string]string) {
+	t.Helper()
+
+	packages := body["packages"].([]any)
+	if len(packages) != len(want) {
+		t.Fatalf("packages len=%d, want %d: %v", len(packages), len(want), packages)
+	}
+	for i, item := range packages {
+		got := item.(map[string]any)
+		for key, value := range want[i] {
+			if got[key] != value {
+				t.Fatalf("packages[%d][%s]=%v, want %q; package=%v", i, key, got[key], value, got)
+			}
+		}
 	}
 }

@@ -124,35 +124,59 @@ func diffSBOMPackages(pre, post []migsapi.RunSBOMPackage) []migsapi.RunSBOMDiffP
 	for _, pkg := range packages {
 		preVersions := sortedSetValues(preByPackage[pkg])
 		postVersions := sortedSetValues(postByPackage[pkg])
-		if len(preVersions) == 1 && len(postVersions) == 1 && preVersions[0] != postVersions[0] {
+		preOnly := versionsAbsentFrom(preVersions, postByPackage[pkg])
+		postOnly := versionsAbsentFrom(postVersions, preByPackage[pkg])
+
+		if len(preOnly) > 0 && len(postOnly) > 0 {
+			pairedPre := preOnly[len(preOnly)-1]
+			pairedPost := postOnly[len(postOnly)-1]
+			for _, version := range preOnly[:len(preOnly)-1] {
+				out = append(out, migsapi.RunSBOMDiffPackage{
+					Package:    pkg,
+					VersionPre: version,
+					Change:     "removed",
+				})
+			}
 			out = append(out, migsapi.RunSBOMDiffPackage{
 				Package:     pkg,
-				VersionPre:  preVersions[0],
-				VersionPost: postVersions[0],
+				VersionPre:  pairedPre,
+				VersionPost: pairedPost,
 				Change:      "changed",
 			})
+			for _, version := range postOnly[:len(postOnly)-1] {
+				out = append(out, migsapi.RunSBOMDiffPackage{
+					Package:     pkg,
+					VersionPost: version,
+					Change:      "added",
+				})
+			}
 			continue
 		}
-		for _, version := range preVersions {
-			if _, ok := postByPackage[pkg][version]; ok {
-				continue
-			}
+		for _, version := range preOnly {
 			out = append(out, migsapi.RunSBOMDiffPackage{
 				Package:    pkg,
 				VersionPre: version,
 				Change:     "removed",
 			})
 		}
-		for _, version := range postVersions {
-			if _, ok := preByPackage[pkg][version]; ok {
-				continue
-			}
+		for _, version := range postOnly {
 			out = append(out, migsapi.RunSBOMDiffPackage{
 				Package:     pkg,
 				VersionPost: version,
 				Change:      "added",
 			})
 		}
+	}
+	return out
+}
+
+func versionsAbsentFrom(sortedVersions []string, other map[string]struct{}) []string {
+	out := make([]string, 0, len(sortedVersions))
+	for _, version := range sortedVersions {
+		if _, ok := other[version]; ok {
+			continue
+		}
+		out = append(out, version)
 	}
 	return out
 }
