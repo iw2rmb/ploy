@@ -395,42 +395,104 @@ func TestRenderRunStatusReportTextLayout_FilterRunningRepos(t *testing.T) {
 	assertx.NotContains(t, layout.Text, "acme/done")
 }
 
-func TestRenderRunStatusReportTextLayout_FilterRunningReposEmptyMessage(t *testing.T) {
+func TestRenderRunStatusReportTextLayout_FilterRunningReposEmptyMessages(t *testing.T) {
 	t.Parallel()
 
-	report := RunStatusReport{
-		RunID:   domaintypes.NewRunID(),
-		MigID:   domaintypes.NewMigID(),
-		MigName: "none-running",
-		SpecID:  domaintypes.NewSpecID(),
-		Repos: []RunEntry{
-			{
-				RepoID:  domaintypes.NewRepoID(),
-				RepoURL: "https://github.com/acme/done.git",
-				BaseRef: "main",
-				Status:  domaintypes.RunStatusSuccess,
-				Jobs: []RunJobEntry{
+	tests := []struct {
+		name       string
+		report     RunStatusReport
+		contains   []string
+		notContain []string
+	}{
+		{
+			name: "terminal",
+			report: RunStatusReport{
+				RunID:   domaintypes.NewRunID(),
+				MigID:   domaintypes.NewMigID(),
+				MigName: "none-running",
+				SpecID:  domaintypes.NewSpecID(),
+				Repos: []RunEntry{
 					{
-						JobID:   domaintypes.NewJobID(),
-						JobType: "mig",
-						Status:  domaintypes.JobStatusSuccess,
+						RepoID:  domaintypes.NewRepoID(),
+						RepoURL: "https://github.com/acme/done.git",
+						BaseRef: "main",
+						Status:  domaintypes.RunStatusSuccess,
+						Jobs: []RunJobEntry{
+							{
+								JobID:   domaintypes.NewJobID(),
+								JobType: "mig",
+								Status:  domaintypes.JobStatusSuccess,
+							},
+						},
 					},
 				},
 			},
+			contains:   []string{"No repos with in-progress jobs.", "   Repo:  acme/done:"},
+			notContain: []string{"   Repos:", "Waiting for"},
+		},
+		{
+			name: "waiting",
+			report: RunStatusReport{
+				RunID:       domaintypes.NewRunID(),
+				MigID:       domaintypes.NewMigID(),
+				MigName:     "waiting",
+				SpecID:      domaintypes.NewSpecID(),
+				WaitingRuns: 3,
+				Repos: []RunEntry{
+					{
+						RepoID:  domaintypes.NewRepoID(),
+						RepoURL: "https://github.com/acme/waiting-a.git",
+						BaseRef: "main",
+						Status:  domaintypes.RunStatusQueued,
+						Jobs: []RunJobEntry{
+							{
+								JobID:   domaintypes.NewJobID(),
+								JobType: "mig",
+								Status:  domaintypes.JobStatusQueued,
+							},
+						},
+					},
+					{
+						RepoID:  domaintypes.NewRepoID(),
+						RepoURL: "https://github.com/acme/waiting-b.git",
+						BaseRef: "main",
+						Status:  domaintypes.RunStatusRunning,
+						Jobs: []RunJobEntry{
+							{
+								JobID:   domaintypes.NewJobID(),
+								JobType: "mig",
+								Status:  domaintypes.JobStatusCreated,
+							},
+						},
+					},
+				},
+			},
+			contains:   []string{"   Waiting for 3 run(s) to finish.", "   Repo:  acme/waiting-a:"},
+			notContain: []string{"No repos with in-progress jobs.", "   Repos:"},
 		},
 	}
 
-	layout, err := RenderRunStatusReportTextLayout(report, TextRenderOptions{
-		FilterRunningRepos: true,
-		EmptyReposLine:     "No repos with in-progress jobs.",
-		EnableOSC8:         false,
-	})
-	if err != nil {
-		t.Fatalf("RenderRunStatusReportTextLayout error: %v", err)
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			layout, err := RenderRunStatusReportTextLayout(tc.report, TextRenderOptions{
+				FilterRunningRepos: true,
+				EmptyReposLine:     "No repos with in-progress jobs.",
+				EnableOSC8:         false,
+			})
+			if err != nil {
+				t.Fatalf("RenderRunStatusReportTextLayout error: %v", err)
+			}
+			for _, needle := range tc.contains {
+				assertx.Contains(t, layout.Text, needle)
+			}
+			for _, needle := range tc.notContain {
+				assertx.NotContains(t, layout.Text, needle)
+			}
+		})
 	}
-	assertx.Contains(t, layout.Text, "No repos with in-progress jobs.")
-	assertx.NotContains(t, layout.Text, "   Repos:")
-	assertx.Contains(t, layout.Text, "   Repo:  acme/done:")
 }
 
 func TestRenderRunStatusReportTextExitOneLiners(t *testing.T) {

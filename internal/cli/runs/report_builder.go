@@ -46,6 +46,9 @@ func (c GetRunStatusReportCommand) Run(ctx context.Context) (RunStatusReport, er
 		SpecID:  summary.SpecID,
 		Repos:   make([]RunEntry, 1),
 	}
+	if summary.Status == domaintypes.RunStatusQueued && summary.Counts != nil && summary.Counts.Running > 0 {
+		report.WaitingRuns = int(summary.Counts.Running)
+	}
 
 	if err := c.buildRunEntry(ctx, statusReportSourceFromSummary(c.RunID, summary), stageArtifacts, &report.Repos[0]); err != nil {
 		return RunStatusReport{}, err
