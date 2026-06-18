@@ -3,7 +3,7 @@ parameters:
     name: id
     required: true
     schema: { type: string }
-    description: Node ID (NanoID 6-character string)
+    description: Unique URL-safe node ID
 post:
   tags: [Control]
   summary: Mark node as drained

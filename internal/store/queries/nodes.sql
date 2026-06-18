@@ -7,8 +7,7 @@ SELECT * FROM nodes
 ORDER BY created_at DESC, id DESC;
 
 -- name: CreateNode :one
--- Creates a new node with an application-supplied NanoID(6) as the primary key.
--- The `id` parameter must be generated via types.NewNodeKey() before calling.
+-- Creates a new node with an application-supplied URL-safe ID as the primary key.
 INSERT INTO nodes (
   id,
   name,

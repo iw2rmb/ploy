@@ -74,12 +74,12 @@ func TestCompletion_RequestRejection(t *testing.T) {
 			wantStatus: http.StatusBadRequest,
 		},
 		{
-			name: "bad_node_header/invalid_format",
+			name: "bad_node_header/invalid_characters",
 			buildReq: func(f jobTestFixture) *http.Request {
 				body, _ := json.Marshal(map[string]any{"status": "Success"})
 				req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+f.JobID.String()+"/complete", bytes.NewReader(body))
 				req.SetPathValue("job_id", f.JobID.String())
-				req.Header.Set(nodeUUIDHeader, "not-a-nanoid")
+				req.Header.Set(nodeUUIDHeader, "not a node")
 				ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{Role: auth.RoleWorker, CommonName: "ignored"})
 				return req.WithContext(ctx)
 			},

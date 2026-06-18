@@ -65,7 +65,7 @@ get:
     **Enriched fields (optional, omitempty):**
     | Field        | Type   | Description                                                      |
     |--------------|--------|------------------------------------------------------------------|
-    | `node_id`    | string | Node ID (NanoID 6-character string) that produced this log line  |
+    | `node_id`    | string | Unique URL-safe node ID that produced this log line              |
     | `job_id`     | string | Job ID (KSUID string) that produced this log line                |
     | `job_type`   | string | Job phase: `pre_gate`, `mig`, `post_gate` |
     | `next_id`    | number | Optional step metadata used for log enrichment                   |

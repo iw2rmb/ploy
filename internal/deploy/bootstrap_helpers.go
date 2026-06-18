@@ -59,7 +59,7 @@ func RandomHexString(length int) (string, error) {
 	return hexStr, nil
 }
 
-// GenerateNodeID creates a new node identifier using NanoID(6).
+// GenerateNodeID creates a URL-safe node identifier.
 func GenerateNodeID() string {
 	return types.NewNodeKey()
 }

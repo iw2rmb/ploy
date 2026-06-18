@@ -13,7 +13,7 @@ post:
           properties:
             node_id:
               type: string
-              description: Node ID (NanoID string).
+              description: Unique URL-safe node ID.
             expires_in_minutes:
               type: integer
               description: Optional expiration in minutes (default 15).

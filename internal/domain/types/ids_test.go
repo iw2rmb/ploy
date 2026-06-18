@@ -95,7 +95,7 @@ func TestIDs_RejectInvalidFormats(t *testing.T) {
 	}{
 		{"RunID", func(b []byte) error { var v RunID; return v.UnmarshalText(b) }, "abc123"},
 		{"JobID", func(b []byte) error { var v JobID; return v.UnmarshalText(b) }, "job123"},
-		{"NodeID_long", func(b []byte) error { var v NodeID; return v.UnmarshalText(b) }, "too-long"},
+		{"NodeID_too_long", func(b []byte) error { var v NodeID; return v.UnmarshalText(b) }, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
 		{"NodeID_chars", func(b []byte) error { var v NodeID; return v.UnmarshalText(b) }, "ab cd1"},
 		{"MigID", func(b []byte) error { var v MigID; return v.UnmarshalText(b) }, "abcdefg"},
 		{"SpecID", func(b []byte) error { var v SpecID; return v.UnmarshalText(b) }, "short"},

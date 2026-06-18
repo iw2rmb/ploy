@@ -278,7 +278,7 @@ func resolvePloydNodeBinaryPath(v common.StringValue) (string, error) {
 // pkiSignRequest is the JSON request body for POST /v1/pki/sign.
 // Uses domain type (NodeID) for type-safe identification.
 type pkiSignRequest struct {
-	NodeID domaintypes.NodeID `json:"node_id"` // Node ID (NanoID-backed)
+	NodeID domaintypes.NodeID `json:"node_id"` // URL-safe node ID.
 	CSR    string             `json:"csr"`
 }
 

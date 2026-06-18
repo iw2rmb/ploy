@@ -165,10 +165,9 @@ build_gate:
   - Completion replay uses canonical `POST /v1/jobs/{job_id}/complete`; startup
     replay treats `409 Conflict` as idempotent success.
   - There is currently no environment variable or scheduler key to tune the 120s window.
-- `PLOYD_NODE_ID` — Node identifier for the ployd daemon. Set during bootstrap as a NanoID(6)
-  string (6 characters from URL-safe alphabet A-Za-z0-9_-). This compact format balances
-  brevity with sufficient uniqueness for typical node fleet sizes. Note: currently exported by
-  bootstrap but not consumed at runtime; node identity is specified in the node YAML (`node_id`).
+- `PLOYD_NODE_ID` — Node identifier for the ployd daemon. Set during bootstrap as a
+  unique URL-safe string. Note: currently exported by bootstrap but not consumed at runtime;
+  node identity is specified in the node YAML (`node_id`).
 - `PLOYD_HOME_DIR` — Home directory for the ployd daemon. Exported by bootstrap as `/root` for
   systemd context; not currently read by the codebase.
 - `PLOYD_CACHE_HOME` — Cache directory for working data. Defaults to `/var/cache/ploy` when set

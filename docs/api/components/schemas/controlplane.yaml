@@ -717,7 +717,7 @@ NodeClaimResponse:
       type: string
       description: "Run status. Values: Started, Finished, Cancelled."
     node_id:
-      { type: string, description: "Node ID (NanoID 6-character string)" }
+      { type: string, description: "Unique URL-safe node ID" }
     base_ref: { type: string }
     next_id:
       type: string
@@ -1011,11 +1011,11 @@ CreateArtifactBundleRequest:
   required: [bundle]
 
 # Node describes a registered worker node.
-# Note: node IDs are now NanoID(6) strings (6 characters from URL-safe alphabet).
+# Note: node IDs are unique URL-safe strings.
 Node:
   type: object
   properties:
-    id: { type: string, description: "Node ID (NanoID 6-character string)" }
+    id: { type: string, description: "Unique URL-safe node ID" }
     name: { type: string }
     ip_address: { type: string }
     version: { type: string, nullable: true }
@@ -1241,7 +1241,7 @@ RunJobItem:
     node_id:
       type: string
       nullable: true
-      description: Node ID that claimed/executed this job (NanoID 6-character string)
+      description: Unique URL-safe node ID that claimed/executed this job
     status:
       type: string
       description: Job status (Created, Queued, Running, Success, Fail, Error, Cancelled)

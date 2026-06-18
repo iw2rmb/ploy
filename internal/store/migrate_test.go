@@ -32,6 +32,7 @@ func TestRunMigrationsTernStates(t *testing.T) {
 			assert: func(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
 				assertTernVersion(t, ctx, pool, TargetSchemaVersion)
 				assertTableAbsent(t, ctx, pool, "schema_version")
+				assertConstraintAbsent(t, ctx, pool, "bootstrap_tokens", "bootstrap_tokens_node_id_fkey")
 
 				if err := RunMigrations(ctx, pool); err != nil {
 					t.Fatalf("RunMigrations second run: %v", err)
@@ -48,6 +49,7 @@ func TestRunMigrationsTernStates(t *testing.T) {
 				assertColumnAbsent(t, ctx, pool, "api_tokens", "cluster_id")
 				assertColumnAbsent(t, ctx, pool, "bootstrap_tokens", "cluster_id")
 				assertColumnAbsent(t, ctx, pool, "mig_repos", "target_ref")
+				assertConstraintAbsent(t, ctx, pool, "bootstrap_tokens", "bootstrap_tokens_node_id_fkey")
 				assertNoObsoleteNodeUpdaterRows(t, ctx, pool)
 			},
 		},
@@ -162,6 +164,7 @@ VALUES ($1, $2, $3, 1)
 		{name: "insert legacy current version", sql: `INSERT INTO ploy.schema_version (version, applied_at) VALUES ($1, now())`, args: []any{legacyCurrentSchemaVersion}},
 		{name: "restore api token cluster column", sql: `ALTER TABLE ploy.api_tokens ADD COLUMN cluster_id TEXT`},
 		{name: "restore bootstrap token cluster column", sql: `ALTER TABLE ploy.bootstrap_tokens ADD COLUMN cluster_id TEXT`},
+		{name: "restore bootstrap token node foreign key", sql: `ALTER TABLE ploy.bootstrap_tokens ADD CONSTRAINT bootstrap_tokens_node_id_fkey FOREIGN KEY (node_id) REFERENCES ploy.nodes(id) ON DELETE CASCADE`},
 		{name: "restore target ref column", sql: `ALTER TABLE ploy.mig_repos ADD COLUMN target_ref TEXT`},
 		{name: "drop diagnostics constraint", sql: `ALTER TABLE ploy.node_diagnostics DROP CONSTRAINT IF EXISTS node_diagnostics_component_check`},
 		{name: "allow old diagnostics component", sql: `ALTER TABLE ploy.node_diagnostics ADD CONSTRAINT node_diagnostics_component_check CHECK (component IN ('node', 'node-updater'))`},
@@ -225,6 +228,24 @@ SELECT EXISTS (
 	}
 	if exists {
 		t.Fatalf("column ploy.%s.%s exists, want absent", table, column)
+	}
+}
+
+func assertConstraintAbsent(t *testing.T, ctx context.Context, pool *pgxpool.Pool, table, constraint string) {
+	t.Helper()
+	var exists bool
+	err := pool.QueryRow(ctx, `
+SELECT EXISTS (
+  SELECT 1
+  FROM information_schema.table_constraints
+  WHERE table_schema = 'ploy' AND table_name = $1 AND constraint_name = $2
+)
+`, table, constraint).Scan(&exists)
+	if err != nil {
+		t.Fatalf("check constraint %s.%s: %v", table, constraint, err)
+	}
+	if exists {
+		t.Fatalf("constraint ploy.%s.%s exists, want absent", table, constraint)
 	}
 }
 

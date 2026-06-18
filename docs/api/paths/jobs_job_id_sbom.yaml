@@ -10,7 +10,7 @@ parameters:
     name: PLOY_NODE_UUID
     required: true
     schema: { type: string }
-    description: Worker node ID (NanoID 6-character string) saving SBOM rows
+    description: Worker node ID saving SBOM rows
 
 post:
   tags: [Control]

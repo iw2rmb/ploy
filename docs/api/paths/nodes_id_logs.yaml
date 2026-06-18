@@ -2,9 +2,9 @@ parameters:
   - in: path
     name: id
     required: true
-    # Node IDs are NanoID strings (6 characters, URL-safe alphabet).
+    # Node IDs are unique URL-safe strings.
     schema: { type: string }
-    description: Node ID (NanoID 6-character string)
+    description: Unique URL-safe node ID
 post:
   tags: [Artifacts]
   summary: Ingest a gzipped log chunk for a run (node → server)
