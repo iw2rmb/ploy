@@ -74,7 +74,7 @@ type (
 func (runIDTag) ValidateID(s string) error     { return validateKSUID(s, ErrInvalidRunID) }
 func (waveIDTag) ValidateID(s string) error    { return validateKSUID(s, ErrInvalidWaveID) }
 func (jobIDTag) ValidateID(s string) error     { return validateKSUID(s, ErrInvalidJobID) }
-func (nodeIDTag) ValidateID(s string) error    { return validateNanoID(s, 6, ErrInvalidNodeID) }
+func (nodeIDTag) ValidateID(s string) error    { return validateURLSafeID(s, 64, ErrInvalidNodeID) }
 func (migIDTag) ValidateID(s string) error     { return validateNanoID(s, 6, ErrInvalidMigID) }
 func (specIDTag) ValidateID(s string) error    { return validateNanoID(s, 8, ErrInvalidSpecID) }
 func (migRepoIDTag) ValidateID(s string) error { return validateNanoID(s, 8, ErrInvalidMigRepoID) }
@@ -96,7 +96,7 @@ type StepID = StringID[stepIDTag]
 // Jobs are the unit of work assignment to nodes (claim, execute, complete).
 type JobID = StringID[jobIDTag]
 
-// NodeID identifies a worker node.
+// NodeID identifies a worker node. Values are operator-chosen URL-safe strings.
 type NodeID = StringID[nodeIDTag]
 
 // MigID identifies a mig project.
@@ -246,6 +246,18 @@ func validateKSUID(s string, errInvalid error) error {
 
 func validateNanoID(s string, length int, errInvalid error) error {
 	if len(s) != length {
+		return errInvalid
+	}
+	for i := 0; i < len(s); i++ {
+		if !nanoIDAlphabetTable[s[i]] {
+			return errInvalid
+		}
+	}
+	return nil
+}
+
+func validateURLSafeID(s string, maxLength int, errInvalid error) error {
+	if len(s) > maxLength {
 		return errInvalid
 	}
 	for i := 0; i < len(s); i++ {

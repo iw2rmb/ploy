@@ -55,8 +55,7 @@ type Querier interface {
 	CreateLog(ctx context.Context, arg CreateLogParams) (Log, error)
 	CreateMig(ctx context.Context, arg CreateMigParams) (Mig, error)
 	CreateMigRepo(ctx context.Context, arg CreateMigRepoParams) (MigRepo, error)
-	// Creates a new node with an application-supplied NanoID(6) as the primary key.
-	// The `id` parameter must be generated via types.NewNodeKey() before calling.
+	// Creates a new node with an application-supplied URL-safe ID as the primary key.
 	CreateNode(ctx context.Context, arg CreateNodeParams) (Node, error)
 	CreateNodeDaemonLog(ctx context.Context, arg CreateNodeDaemonLogParams) (NodeDaemonLog, error)
 	CreateRun(ctx context.Context, arg CreateRunParams) (Run, error)

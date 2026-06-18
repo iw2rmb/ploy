@@ -31,7 +31,7 @@ var errCANotConfigured = errors.New("CA not configured")
 // Requires control-plane or cli-admin role (enforced by middleware).
 //
 // POST /v1/bootstrap/tokens
-// Request: { "node_id": "<nanoid>", "expires_in_minutes": 15 }
+// Request: { "node_id": "<node-id>", "expires_in_minutes": 15 }
 // Response: { "token": "eyJ...", "node_id": "...", "expires_at": "..." }
 func createBootstrapTokenHandler(st store.Store, tokenSecret string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

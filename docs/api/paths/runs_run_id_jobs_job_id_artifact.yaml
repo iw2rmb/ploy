@@ -15,7 +15,7 @@ parameters:
     name: PLOY_NODE_UUID
     required: true
     schema: { type: string }
-    description: Worker node ID (NanoID 6-character string) uploading the artifact bundle
+    description: Worker node ID uploading the artifact bundle
 post:
   tags: [Artifacts]
   summary: Upload gzipped artifact bundle for a job (node → server)

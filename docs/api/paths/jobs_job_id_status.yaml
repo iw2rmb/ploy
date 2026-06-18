@@ -27,7 +27,7 @@ get:
       required: false
       schema:
         type: string
-      description: Worker node ID (NanoID 6-character string). Required for worker callers.
+      description: Worker node ID. Required for worker callers.
   responses:
     '200':
       description: Current job status

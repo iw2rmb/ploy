@@ -6,7 +6,7 @@ PKISignRequest:
       type: string
       description: |
         Node identifier requesting a signed certificate.
-        Node IDs are NanoID(6) strings (6 URL-safe characters).
+        Node IDs are unique URL-safe strings.
     csr:
       type: string
       description: |

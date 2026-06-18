@@ -15,7 +15,7 @@ parameters:
     name: PLOY_NODE_UUID
     required: true
     schema: { type: string }
-    description: Worker node ID (NanoID 6-character string) uploading the diff
+    description: Worker node ID uploading the diff
 post:
   tags: [Artifacts]
   summary: Upload gzipped unified diff for a job (node → server)

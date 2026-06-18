@@ -34,8 +34,7 @@ type CreateNodeParams struct {
 	Concurrency int32        `json:"concurrency"`
 }
 
-// Creates a new node with an application-supplied NanoID(6) as the primary key.
-// The `id` parameter must be generated via types.NewNodeKey() before calling.
+// Creates a new node with an application-supplied URL-safe ID as the primary key.
 func (q *Queries) CreateNode(ctx context.Context, arg CreateNodeParams) (Node, error) {
 	row := q.db.QueryRow(ctx, createNode,
 		arg.ID,

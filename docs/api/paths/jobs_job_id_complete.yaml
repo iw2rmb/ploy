@@ -12,7 +12,7 @@ parameters:
     name: PLOY_NODE_UUID
     required: true
     schema: { type: string }
-    description: Worker node ID (NanoID 6-character string) reporting job completion
+    description: Worker node ID reporting job completion
 
 post:
   tags: [Control]

@@ -311,7 +311,7 @@ func TestPKISignRequestNodeIDShape(t *testing.T) {
 	}
 
 	if format, ok := nodeID["format"]; ok {
-		t.Fatalf("PKISignRequest.node_id.format = %v, want no explicit format (NanoID string, not UUID)", format)
+		t.Fatalf("PKISignRequest.node_id.format = %v, want no explicit format (URL-safe string, not UUID)", format)
 	}
 }
 

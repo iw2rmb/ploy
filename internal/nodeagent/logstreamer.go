@@ -290,7 +290,7 @@ func (ls *LogStreamer) sendChunk(data []byte, chunkNo int32) error {
 		return nil
 	}
 
-	// Use cfg.NodeID directly as a string. Node IDs are NanoID(6) strings
+	// Use cfg.NodeID directly as a string. Node IDs are URL-safe strings.
 	// that don't require UUID parsing.
 	nodeID := ls.cfg.NodeID
 

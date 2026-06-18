@@ -123,7 +123,7 @@ func TestDrainUndrain_InvalidID(t *testing.T) {
 	}{
 		{"empty id", "", "x"},
 		{"whitespace", "   ", "x"},
-		{"invalid nanoid", "not-a-nanoid", "x"},
+		{"invalid characters", "not a node", "x"},
 	}
 
 	for _, h := range handlers {

@@ -2,7 +2,8 @@ ALTER TABLE IF EXISTS ploy.api_tokens
   DROP COLUMN IF EXISTS cluster_id;
 
 ALTER TABLE IF EXISTS ploy.bootstrap_tokens
-  DROP COLUMN IF EXISTS cluster_id;
+  DROP COLUMN IF EXISTS cluster_id,
+  DROP CONSTRAINT IF EXISTS bootstrap_tokens_node_id_fkey;
 
 ALTER TABLE IF EXISTS ploy.mig_repos
   DROP COLUMN IF EXISTS target_ref;
