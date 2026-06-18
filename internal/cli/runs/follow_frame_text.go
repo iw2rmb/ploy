@@ -22,8 +22,7 @@ type FollowFrameRender struct {
 
 // FollowFrame is a reusable follow-style text frame.
 type FollowFrame struct {
-	TopLines []string
-	Repos    []FollowRepoFrame
+	Repos []FollowRepoFrame
 }
 
 // FollowRepoFrame is one repo block inside a follow-style frame.
@@ -64,12 +63,8 @@ func RenderFollowFrameTextLayout(frame FollowFrame) FollowFrameRender {
 		lineNo++
 	}
 
-	for _, line := range frame.TopLines {
-		appendLine(line)
-	}
-
 	for i, repo := range frame.Repos {
-		if i > 0 || len(frame.TopLines) > 0 {
+		if i > 0 {
 			appendLine("")
 		}
 		if strings.TrimSpace(repo.HeaderLine) != "" {

@@ -119,6 +119,8 @@ func TestFollowModelAppliesAndClearsPreviewRows(t *testing.T) {
 func TestFollowModelFinalViewUsesStatusSnapshotSemantics(t *testing.T) {
 	t.Parallel()
 
+	firstJobID := domaintypes.NewJobID()
+	secondJobID := domaintypes.NewJobID()
 	report := RunStatusReport{
 		RunID:   domaintypes.NewRunID(),
 		MigID:   domaintypes.NewMigID(),
@@ -131,7 +133,7 @@ func TestFollowModelFinalViewUsesStatusSnapshotSemantics(t *testing.T) {
 				BaseRef: "main",
 				Status:  domaintypes.RunStatusSuccess,
 				Jobs: []RunJobEntry{
-					{JobID: domaintypes.NewJobID(), JobType: "mig", Status: domaintypes.JobStatusSuccess},
+					{JobID: firstJobID, JobType: "mig", Status: domaintypes.JobStatusSuccess},
 				},
 			},
 			{
@@ -140,7 +142,7 @@ func TestFollowModelFinalViewUsesStatusSnapshotSemantics(t *testing.T) {
 				BaseRef: "main",
 				Status:  domaintypes.RunStatusSuccess,
 				Jobs: []RunJobEntry{
-					{JobID: domaintypes.NewJobID(), JobType: "mig", Status: domaintypes.JobStatusSuccess},
+					{JobID: secondJobID, JobType: "mig", Status: domaintypes.JobStatusSuccess},
 				},
 			},
 		},
@@ -149,8 +151,8 @@ func TestFollowModelFinalViewUsesStatusSnapshotSemantics(t *testing.T) {
 	model := newFollowModel(TextRenderOptions{}, true)
 	next, _ := model.Update(followTerminalMsg{report: report, state: migsapi.RunStateSucceeded})
 	rendered := next.(followModel).View().Content
-	if !strings.Contains(rendered, "acme/one") || !strings.Contains(rendered, "acme/two") {
-		t.Fatalf("expected final view to include all repos, got %q", rendered)
+	if !strings.Contains(rendered, firstJobID.String()) || !strings.Contains(rendered, secondJobID.String()) {
+		t.Fatalf("expected final view to include all job rows, got %q", rendered)
 	}
 	if strings.Contains(rendered, "No repos with in-progress jobs.") {
 		t.Fatalf("expected final view to avoid in-progress-only empty text, got %q", rendered)
@@ -293,6 +295,7 @@ func TestFollowModelViewSingleRepoKeepsRepoVisibleWithoutRunningJobs(t *testing.
 func TestWriteFinalStatusSnapshot_UsesStatusRenderer(t *testing.T) {
 	t.Parallel()
 
+	doneJobID := domaintypes.NewJobID()
 	report := RunStatusReport{
 		RunID:   domaintypes.NewRunID(),
 		MigID:   domaintypes.NewMigID(),
@@ -314,7 +317,7 @@ func TestWriteFinalStatusSnapshot_UsesStatusRenderer(t *testing.T) {
 				BaseRef: "main",
 				Status:  domaintypes.RunStatusSuccess,
 				Jobs: []RunJobEntry{
-					{JobID: domaintypes.NewJobID(), JobType: "mig", Status: domaintypes.JobStatusSuccess},
+					{JobID: doneJobID, JobType: "mig", Status: domaintypes.JobStatusSuccess},
 				},
 			},
 		},
@@ -353,11 +356,11 @@ func TestWriteFinalStatusSnapshot_UsesStatusRenderer(t *testing.T) {
 			if got := strings.HasPrefix(rendered, clearScreenSequence); got != tc.wantClearPrefix {
 				t.Fatalf("clear prefix = %v, want %v in %q", got, tc.wantClearPrefix, rendered)
 			}
-			if !strings.Contains(rendered, "   Repos: 2") {
-				t.Fatalf("expected status snapshot with all repos, got %q", rendered)
+			if strings.Contains(rendered, "   Repos:") {
+				t.Fatalf("did not expect repo count in final status snapshot, got %q", rendered)
 			}
-			if !strings.Contains(rendered, "acme/done") {
-				t.Fatalf("expected terminal repo in final status snapshot, got %q", rendered)
+			if !strings.Contains(rendered, doneJobID.String()) {
+				t.Fatalf("expected terminal job row in final status snapshot, got %q", rendered)
 			}
 			if strings.Contains(rendered, "No repos with in-progress jobs.") {
 				t.Fatalf("expected status snapshot semantics, got %q", rendered)

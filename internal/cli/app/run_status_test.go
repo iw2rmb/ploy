@@ -34,14 +34,16 @@ func TestRunStatusReportTextContract(t *testing.T) {
 	}
 
 	out := buf.String()
-	if !strings.HasPrefix(out, "\n   Mig:   ") {
-		t.Fatalf("expected leading blank line before Mig header, got %q", out)
+	if !strings.HasPrefix(out, "\n   Run:   ") {
+		t.Fatalf("expected leading blank line before Run header, got %q", out)
 	}
-	assertx.Contains(t, out, "   Mig:   "+migID.String()+"   | java17-upgrade")
-	assertx.Contains(t, out, "   Spec:  "+specID.String()+" ("+server.URL+"/v1/migs/"+migID.String()+"/specs/latest)")
-	assertx.Contains(t, out, "   Repos: 1")
-	assertx.Contains(t, out, "\n   Repos: 1\n   Run:   "+runID.String()+"\n\n")
-	assertx.Contains(t, out, "acme/service:\x1b[90m01234567\x1b[m @ \x1b[90m-\x1b[m")
+	assertx.NotContains(t, out, "   Mig:")
+	assertx.NotContains(t, out, "   Repos:")
+	assertx.Contains(t, out, "\n   Run:   "+runID.String()+
+		"\n   Repo:  acme/service:\x1b[90m01234567\x1b[m"+
+		"\n   Spec:  "+specID.String()+" ("+server.URL+"/v1/migs/"+migID.String()+"/specs/latest)"+
+		"\n   Node:  \x1b[90m-\x1b[m\n\n")
+	assertx.NotContains(t, out, " @ ")
 	assertx.NotContains(t, out, "github.com/acme/service")
 	assertx.NotContains(t, out, "https://github.com/acme/service.git")
 	assertx.NotContains(t, out, "\x1b[1mmain")

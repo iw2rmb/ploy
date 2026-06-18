@@ -91,13 +91,14 @@ func RenderRunStatusReportTextLayout(report RunStatusReport, opts TextRenderOpti
 	if emptyReposLine == "" {
 		emptyReposLine = "No repos found in this run."
 	}
+	headerRepo := firstRunRepo(report.Repos)
 
 	headerLines := []string{
 		"",
-		fmt.Sprintf("   Mig:   %s", renderMigHeader(report.MigID.String(), report.MigName)),
-		fmt.Sprintf("   Spec:  %s", renderOptionalLink(valueOrDash(report.SpecID.String()), buildSpecDownloadURL(report, opts.BaseURL), opts.EnableOSC8, opts.AuthToken)),
-		fmt.Sprintf("   Repos: %d", len(repos)),
 		fmt.Sprintf("   Run:   %s", valueOrDash(report.RunID.String())),
+		fmt.Sprintf("   Repo:  %s", renderRepoHeaderValue(headerRepo, opts)),
+		fmt.Sprintf("   Spec:  %s", renderOptionalLink(valueOrDash(report.SpecID.String()), buildSpecDownloadURL(report, opts.BaseURL), opts.EnableOSC8, opts.AuthToken)),
+		fmt.Sprintf("   Node:  %s", colorizeNeutralText(repoNodeID(headerRepo))),
 		"",
 	}
 
@@ -117,7 +118,7 @@ func RenderRunStatusReportTextLayout(report RunStatusReport, opts TextRenderOpti
 
 	for _, repo := range repos {
 		repoFrame := FollowRepoFrame{
-			HeaderLine: renderRepoHeaderLine(repo, opts),
+			HeaderLine: "",
 		}
 
 		if len(repo.Jobs) == 0 {
@@ -265,12 +266,21 @@ func renderStepName(displayName string, jobType string) string {
 	return lipgloss.NewStyle().Bold(true).Render(step)
 }
 
-func renderRepoHeaderLine(repo RunEntry, opts TextRenderOptions) string {
+func firstRunRepo(repos []RunEntry) RunEntry {
+	if len(repos) == 0 {
+		return RunEntry{}
+	}
+	return repos[0]
+}
+
+func renderRepoHeaderValue(repo RunEntry, opts TextRenderOptions) string {
 	repoLabel := renderOptionalOSC8Link(renderRepoPathLabel(repo), repo.RepoURL, opts.EnableOSC8)
 	shortSHA := formatShortSHA(strings.TrimSpace(repo.SourceCommitSHA))
-	nodeID := colorizeNeutralText(repoNodeID(repo))
+	if repoLabel == "-" && shortSHA == "-" {
+		return "-"
+	}
 
-	return fmt.Sprintf("   %s:%s @ %s", repoLabel, colorizeNeutralText(shortSHA), nodeID)
+	return fmt.Sprintf("%s:%s", repoLabel, colorizeNeutralText(shortSHA))
 }
 
 func renderRepoPathLabel(repo RunEntry) string {
@@ -576,15 +586,6 @@ func renderExitCode(exitCode *int32) string {
 		return "?"
 	}
 	return strconv.FormatInt(int64(*exitCode), 10)
-}
-
-func renderMigHeader(migID, migName string) string {
-	migID = valueOrDash(strings.TrimSpace(migID))
-	migName = strings.TrimSpace(migName)
-	if migName == "" || migName == migID {
-		return migID
-	}
-	return migID + "   | " + migName
 }
 
 func buildSpecDownloadURL(report RunStatusReport, baseURL *url.URL) string {

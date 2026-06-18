@@ -24,7 +24,6 @@ func TestRenderFollowFrameText_RendersRowsAndExitOneLiner(t *testing.T) {
 	t.Parallel()
 
 	frame := FollowFrame{
-		TopLines: []string{"  Repos: 1"},
 		Repos: []FollowRepoFrame{
 			{
 				HeaderLine: "  Repo 1/1: example.com/acme/repo",
@@ -41,7 +40,6 @@ func TestRenderFollowFrameText_RendersRowsAndExitOneLiner(t *testing.T) {
 
 	out, lines := RenderFollowFrameText(frame)
 
-	assertx.Contains(t, out, "Repos: 1")
 	assertx.Contains(t, out, "Repo 1/1: example.com/acme/repo")
 	assertx.Contains(t, out, "Step")
 	assertx.Contains(t, out, "Duration")

@@ -174,14 +174,16 @@ func TestRenderRunStatusReportTextHeadersAndArtifacts(t *testing.T) {
 	}
 
 	out := renderText(t, report, TextRenderOptions{EnableOSC8: false, BaseURL: baseURL})
-	if !strings.HasPrefix(out, "\n   Mig:   ") {
-		t.Fatalf("expected leading blank line before Mig header, got %q", out)
+	if !strings.HasPrefix(out, "\n   Run:   ") {
+		t.Fatalf("expected leading blank line before Run header, got %q", out)
 	}
-	assertx.Contains(t, out, "   Mig:   "+migID.String()+"   | java17-upgrade")
-	assertx.Contains(t, out, "   Spec:  "+specID.String()+" (https://example.test/v1/migs/"+migID.String()+"/specs/latest)")
-	assertx.Contains(t, out, "   Repos: 1")
-	assertx.Contains(t, out, "\n   Repos: 1\n   Run:   "+runID.String()+"\n\n")
-	assertx.Contains(t, out, "   acme/service:"+colorizeNeutralText("01234567")+" @ "+colorizeNeutralText(nodeID.String()))
+	assertx.NotContains(t, out, "   Mig:")
+	assertx.NotContains(t, out, "   Repos:")
+	assertx.Contains(t, out, "\n   Run:   "+runID.String()+
+		"\n   Repo:  acme/service:"+colorizeNeutralText("01234567")+
+		"\n   Spec:  "+specID.String()+" (https://example.test/v1/migs/"+migID.String()+"/specs/latest)"+
+		"\n   Node:  "+colorizeNeutralText(nodeID.String())+"\n\n")
+	assertx.NotContains(t, out, " @ ")
 	assertx.NotContains(t, out, "["+repoID.String()+"]")
 	assertx.NotContains(t, out, "github.com/acme/service")
 	assertx.NotContains(t, out, "https://github.com/acme/service.git")
@@ -199,7 +201,7 @@ func TestRenderRunStatusReportTextHeadersAndArtifacts(t *testing.T) {
 	assertx.Contains(t, plain, "    2.5s  pre_gate")
 	assertx.Contains(t, plain, "mig       Patch (https://example.test/v1/runs/")
 	if strings.Count(plain, nodeID.String()) != 1 {
-		t.Fatalf("expected node id only in repo header, got %q", plain)
+		t.Fatalf("expected node id only in Node header, got %q", plain)
 	}
 }
 
@@ -285,7 +287,8 @@ func TestRenderRunStatusReportTextVisibilityRules(t *testing.T) {
 				}
 			}(),
 			contains: []string{
-				"acme/no-mr:" + colorizeNeutralText("fedcba98") + " @ " + colorizeNeutralText("-"),
+				"   Repo:  acme/no-mr:" + colorizeNeutralText("fedcba98"),
+				"   Node:  " + colorizeNeutralText("-"),
 			},
 			notContain: []string{"github.com/acme/no-mr", "https://github.com/acme/no-mr.git", "feature/no-mr", " -> "},
 		},
@@ -387,7 +390,7 @@ func TestRenderRunStatusReportTextLayout_FilterRunningRepos(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RenderRunStatusReportTextLayout error: %v", err)
 	}
-	assertx.Contains(t, layout.Text, "   Repos: 1")
+	assertx.NotContains(t, layout.Text, "   Repos:")
 	assertx.Contains(t, layout.Text, "acme/running")
 	assertx.NotContains(t, layout.Text, "acme/done")
 }
@@ -426,8 +429,8 @@ func TestRenderRunStatusReportTextLayout_FilterRunningReposEmptyMessage(t *testi
 		t.Fatalf("RenderRunStatusReportTextLayout error: %v", err)
 	}
 	assertx.Contains(t, layout.Text, "No repos with in-progress jobs.")
-	assertx.Contains(t, layout.Text, "   Repos: 0")
-	assertx.NotContains(t, layout.Text, "acme/done")
+	assertx.NotContains(t, layout.Text, "   Repos:")
+	assertx.Contains(t, layout.Text, "   Repo:  acme/done:")
 }
 
 func TestRenderRunStatusReportTextExitOneLiners(t *testing.T) {
@@ -845,30 +848,6 @@ func TestRenderRunStatusReportTextIOPreviewModes(t *testing.T) {
 	}
 }
 
-func TestRenderRunStatusReportTextMigHeaderOnlyIDWhenNameMatches(t *testing.T) {
-	t.Parallel()
-
-	migID := domaintypes.NewMigID()
-	report := RunStatusReport{
-		RunID:   domaintypes.NewRunID(),
-		MigID:   migID,
-		MigName: migID.String(),
-		SpecID:  domaintypes.NewSpecID(),
-		Repos:   []RunEntry{},
-	}
-
-	out := renderText(t, report, TextRenderOptions{})
-	if !strings.HasPrefix(out, "\n   Mig:   ") {
-		t.Fatalf("expected leading blank line before Mig header, got %q", out)
-	}
-	assertx.Contains(t, out, "   Mig:   "+migID.String()+"\n")
-	lines := strings.Split(out, "\n")
-	if len(lines) < 2 {
-		t.Fatalf("expected at least 2 lines, got %q", out)
-	}
-	assertx.NotContains(t, lines[1], "|")
-}
-
 func TestRenderRunStatusReportTextSpinnerFrameAndLiveDuration(t *testing.T) {
 	t.Parallel()
 
@@ -986,9 +965,9 @@ func TestRenderRunStatusSnapshotText_NormalizesFollowOnlyOptions(t *testing.T) {
 	}
 
 	rendered := out.String()
-	assertx.Contains(t, rendered, "   Repos: 2")
+	assertx.NotContains(t, rendered, "   Repos:")
 	assertx.Contains(t, rendered, "acme/running")
-	assertx.Contains(t, rendered, "acme/done")
+	assertx.Contains(t, rendered, doneJobID.String())
 	assertx.NotContains(t, rendered, "No repos with in-progress jobs.")
 	assertx.NotContains(t, rendered, "preview")
 }
