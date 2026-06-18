@@ -467,8 +467,13 @@ func TestRenderRunStatusReportTextLayout_FilterRunningReposEmptyMessages(t *test
 					},
 				},
 			},
-			contains:   []string{"   Waiting for 3 run(s) to finish.", "   Repo:  acme/waiting-a:"},
-			notContain: []string{"No repos with in-progress jobs.", "   Repos:"},
+			contains: []string{
+				"\n   Run:   ",
+				"\n   Repo:  acme/waiting-a:",
+				"\n   Spec:  ",
+				"\n\n   Waiting for 3 run(s) to finish.",
+			},
+			notContain: []string{"No repos with in-progress jobs.", "   Repos:", "   Node:"},
 		},
 	}
 

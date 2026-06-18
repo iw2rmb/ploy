@@ -98,14 +98,15 @@ func RenderRunStatusReportTextLayout(report RunStatusReport, opts TextRenderOpti
 		fmt.Sprintf("   Run:   %s", valueOrDash(report.RunID.String())),
 		fmt.Sprintf("   Repo:  %s", renderRepoHeaderValue(headerRepo, opts)),
 		fmt.Sprintf("   Spec:  %s", renderOptionalLink(valueOrDash(report.SpecID.String()), buildSpecDownloadURL(report, opts.BaseURL), opts.EnableOSC8, opts.AuthToken)),
-		fmt.Sprintf("   Node:  %s", colorizeNeutralText(repoNodeID(headerRepo))),
-		"",
 	}
 
 	if len(repos) == 0 {
 		if waiting := waitingRunCount(report); opts.FilterRunningRepos && waiting > 0 {
 			emptyReposLine = fmt.Sprintf("   Waiting for %d run(s) to finish.", waiting)
+		} else {
+			headerLines = append(headerLines, fmt.Sprintf("   Node:  %s", colorizeNeutralText(repoNodeID(headerRepo))))
 		}
+		headerLines = append(headerLines, "")
 		block := strings.Join(append(headerLines, emptyReposLine), "\n")
 		rendered := lipgloss.NewStyle().Render(block) + "\n"
 		return RunStatusReportTextLayout{
@@ -168,6 +169,7 @@ func RenderRunStatusReportTextLayout(report RunStatusReport, opts TextRenderOpti
 	frameLayout := RenderFollowFrameTextLayout(frame)
 
 	var out strings.Builder
+	headerLines = append(headerLines, fmt.Sprintf("   Node:  %s", colorizeNeutralText(repoNodeID(headerRepo))), "")
 	for _, line := range headerLines {
 		out.WriteString(line)
 		out.WriteByte('\n')

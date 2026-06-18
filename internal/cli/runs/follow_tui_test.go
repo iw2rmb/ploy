@@ -296,6 +296,9 @@ func TestFollowModelViewShowsWaitingMessageForQueuedRuns(t *testing.T) {
 	if !strings.Contains(view, "Waiting for 3 run(s) to finish.") {
 		t.Fatalf("expected waiting message in view, got %q", view)
 	}
+	if strings.Contains(view, "Node:") {
+		t.Fatalf("did not expect node row in waiting view, got %q", view)
+	}
 	if strings.Contains(view, "No repos with in-progress jobs.") {
 		t.Fatalf("did not expect empty-running message in waiting view, got %q", view)
 	}
