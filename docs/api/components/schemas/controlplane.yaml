@@ -1389,3 +1389,89 @@ RunSBOMDiffResponse:
       items:
         $ref: "#/RunSBOMDiffPackage"
   required: [run_id, view, packages]
+
+NamedSpecSource:
+  type: object
+  additionalProperties: false
+  properties:
+    domain:
+      type: string
+      minLength: 1
+      description: Source host/domain, without credentials.
+    repo:
+      type: string
+      minLength: 1
+      description: Repository path under the domain, without a trailing .git.
+  required: [domain, repo]
+
+PublishNamedSpecRequest:
+  type: object
+  additionalProperties: false
+  properties:
+    name:
+      type: string
+      pattern: "^[0-9a-z._-]+$"
+    description:
+      type: string
+    source:
+      $ref: "#/NamedSpecSource"
+    sha:
+      type: string
+      pattern: "^[0-9a-f]{40}$"
+    source_committed_at:
+      type: string
+      format: date-time
+    spec:
+      type: object
+      additionalProperties: true
+      description: Prepared mig spec JSON. Must parse as apiVersion ploy.mig/v1alpha1 and have root name matching the request name.
+    created_by:
+      type: string
+  required: [name, source, sha, source_committed_at, spec]
+
+NamedSpecSummary:
+  type: object
+  additionalProperties: false
+  properties:
+    id:
+      type: string
+    name:
+      type: string
+    description:
+      type: string
+    source:
+      $ref: "#/NamedSpecSource"
+    sha:
+      type: string
+      pattern: "^[0-9a-f]{40}$"
+    source_committed_at:
+      type: string
+      format: date-time
+    created_at:
+      type: string
+      format: date-time
+    skipped:
+      type: boolean
+      description: True when publish returned an existing idempotent row.
+  required: [id, name, description, source, sha, source_committed_at, created_at, skipped]
+
+NamedSpecListResponse:
+  type: object
+  additionalProperties: false
+  properties:
+    specs:
+      type: array
+      items:
+        $ref: "#/NamedSpecSummary"
+  required: [specs]
+
+NamedSpecResolveResponse:
+  allOf:
+    - $ref: "#/NamedSpecSummary"
+    - type: object
+      additionalProperties: false
+      properties:
+        spec:
+          type: object
+          additionalProperties: true
+      required: [spec]

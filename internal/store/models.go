@@ -247,12 +247,16 @@ type Sbom struct {
 }
 
 type Spec struct {
-	ID         types.SpecID       `json:"id"`
-	Name       string             `json:"name"`
-	Spec       []byte             `json:"spec"`
-	CreatedBy  *string            `json:"created_by"`
-	CreatedAt  pgtype.Timestamptz `json:"created_at"`
-	ArchivedAt pgtype.Timestamptz `json:"archived_at"`
+	ID                types.SpecID       `json:"id"`
+	Name              string             `json:"name"`
+	Description       string             `json:"description"`
+	Source            []byte             `json:"source"`
+	Sha               string             `json:"sha"`
+	SourceCommittedAt pgtype.Timestamptz `json:"source_committed_at"`
+	Spec              []byte             `json:"spec"`
+	CreatedBy         *string            `json:"created_by"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	ArchivedAt        pgtype.Timestamptz `json:"archived_at"`
 }
 
 type SpecBundle struct {

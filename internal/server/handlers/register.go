@@ -42,6 +42,7 @@ func RegisterRoutes(s *httpserver.Server, st store.Store, bs blobstore.Store, bp
 	registerRunRoutes(s, deps)
 	registerRepoRoutes(s, deps)
 	registerNodeRoutes(s, deps)
+	registerGlobalSpecRoutes(s, deps)
 	registerSpecBundleRoutes(s, deps)
 	registerJobArtifactRoutes(s, deps)
 	registerJobRoutes(s, deps)
@@ -138,6 +139,12 @@ func registerSpecBundleRoutes(s *httpserver.Server, deps routeDeps) {
 	s.RegisterRouteFunc("HEAD /v1/spec-bundles", probeSpecBundleHandler(deps.st), auth.RoleControlPlane)
 	s.RegisterRouteFunc("POST /v1/spec-bundles", uploadSpecBundleHandler(deps.st, deps.bp), auth.RoleControlPlane)
 	s.RegisterRouteFunc("GET /v1/spec-bundles/{id}", downloadSpecBundleHandler(deps.st, deps.bs), auth.RoleWorker, auth.RoleControlPlane)
+}
+
+func registerGlobalSpecRoutes(s *httpserver.Server, deps routeDeps) {
+	s.RegisterRouteFunc("POST /v1/specs", publishNamedSpecHandler(deps.st), auth.RoleControlPlane)
+	s.RegisterRouteFunc("GET /v1/specs", listNamedSpecsHandler(deps.st), auth.RoleControlPlane)
+	s.RegisterRouteFunc("GET /v1/specs/resolve", resolveNamedSpecHandler(deps.st), auth.RoleControlPlane)
 }
 
 func registerJobArtifactRoutes(s *httpserver.Server, deps routeDeps) {

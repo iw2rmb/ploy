@@ -55,6 +55,7 @@ type Querier interface {
 	CreateLog(ctx context.Context, arg CreateLogParams) (Log, error)
 	CreateMig(ctx context.Context, arg CreateMigParams) (Mig, error)
 	CreateMigRepo(ctx context.Context, arg CreateMigRepoParams) (MigRepo, error)
+	CreateNamedSpec(ctx context.Context, arg CreateNamedSpecParams) (Spec, error)
 	// Creates a new node with an application-supplied URL-safe ID as the primary key.
 	CreateNode(ctx context.Context, arg CreateNodeParams) (Node, error)
 	CreateNodeDaemonLog(ctx context.Context, arg CreateNodeDaemonLogParams) (NodeDaemonLog, error)
@@ -118,6 +119,7 @@ type Querier interface {
 	GetMigRepo(ctx context.Context, id types.MigRepoID) (MigRepo, error)
 	// Gets a mig_repo by mig_id and repo_url (for uniqueness constraint enforcement).
 	GetMigRepoByURL(ctx context.Context, arg GetMigRepoByURLParams) (MigRepo, error)
+	GetNamedSpecByNameSourceSHA(ctx context.Context, arg GetNamedSpecByNameSourceSHAParams) (Spec, error)
 	GetNode(ctx context.Context, id types.NodeID) (Node, error)
 	GetRepo(ctx context.Context, id types.RepoID) (Repo, error)
 	GetRun(ctx context.Context, id types.RunID) (Run, error)
@@ -178,6 +180,7 @@ type Querier interface {
 	// run_id: if non-null, filter to jobs for that run; if null, return all jobs.
 	// Joins runs and migs to surface mig_name per job for the TUI jobs-list screen.
 	ListJobsForTUI(ctx context.Context, arg ListJobsForTUIParams) ([]ListJobsForTUIRow, error)
+	ListLatestNamedSpecs(ctx context.Context, arg ListLatestNamedSpecsParams) ([]ListLatestNamedSpecsRow, error)
 	// ListLogPartitions retrieves all partition names for the logs table.
 	ListLogPartitions(ctx context.Context) ([]string, error)
 	// Returns log metadata including object_key for object-storage retrieval.
@@ -223,6 +226,9 @@ type Querier interface {
 	// Atomically promote a specific linked successor job: Created -> Queued.
 	// The candidate is eligible only when every predecessor that points to it is Success.
 	PromoteJobByIDIfUnblocked(ctx context.Context, id types.JobID) (Job, error)
+	ResolveLatestNamedSpecByDomainRepoName(ctx context.Context, arg ResolveLatestNamedSpecByDomainRepoNameParams) ([]ResolveLatestNamedSpecByDomainRepoNameRow, error)
+	ResolveLatestNamedSpecByName(ctx context.Context, name string) ([]ResolveLatestNamedSpecByNameRow, error)
+	ResolveLatestNamedSpecByRepoName(ctx context.Context, arg ResolveLatestNamedSpecByRepoNameParams) ([]ResolveLatestNamedSpecByRepoNameRow, error)
 	RevokeAPIToken(ctx context.Context, tokenID string) error
 	// Atomically promote the next unblocked job in a run attempt: Created -> Queued.
 	// A created job is unblocked when all predecessor jobs that point to it are Success.

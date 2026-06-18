@@ -85,6 +85,34 @@ func TestRejectsInvalidJSONBPayloads(t *testing.T) {
 		}
 	})
 
+	t.Run("CreateNamedSpec/invalid_source", func(t *testing.T) {
+		_, err := store.CreateNamedSpec(ctx, CreateNamedSpecParams{
+			ID:     types.NewSpecID(),
+			Source: invalidJSON,
+			Spec:   validJSON,
+		})
+		if err == nil {
+			t.Fatal("expected error for invalid specs.source, got nil")
+		}
+		if !errors.Is(err, ErrInvalidJSON) {
+			t.Fatalf("expected ErrInvalidJSON, got %v", err)
+		}
+	})
+
+	t.Run("CreateNamedSpec/invalid_spec", func(t *testing.T) {
+		_, err := store.CreateNamedSpec(ctx, CreateNamedSpecParams{
+			ID:     types.NewSpecID(),
+			Source: validJSON,
+			Spec:   invalidJSON,
+		})
+		if err == nil {
+			t.Fatal("expected error for invalid specs.spec, got nil")
+		}
+		if !errors.Is(err, ErrInvalidJSON) {
+			t.Fatalf("expected ErrInvalidJSON, got %v", err)
+		}
+	})
+
 	t.Run("CreateDiff/invalid_summary", func(t *testing.T) {
 		_, err := store.CreateDiff(ctx, CreateDiffParams{
 			RunID:   types.NewRunID(),
