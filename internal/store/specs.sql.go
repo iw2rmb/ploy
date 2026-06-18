@@ -9,12 +9,57 @@ import (
 	"context"
 
 	"github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/jackc/pgx/v5/pgtype"
 )
+
+const createNamedSpec = `-- name: CreateNamedSpec :one
+INSERT INTO specs (id, name, description, source, sha, source_committed_at, spec, created_by)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+RETURNING id, name, description, source, sha, source_committed_at, spec, created_by, created_at, archived_at
+`
+
+type CreateNamedSpecParams struct {
+	ID                types.SpecID       `json:"id"`
+	Name              string             `json:"name"`
+	Description       string             `json:"description"`
+	Source            []byte             `json:"source"`
+	Sha               string             `json:"sha"`
+	SourceCommittedAt pgtype.Timestamptz `json:"source_committed_at"`
+	Spec              []byte             `json:"spec"`
+	CreatedBy         *string            `json:"created_by"`
+}
+
+func (q *Queries) CreateNamedSpec(ctx context.Context, arg CreateNamedSpecParams) (Spec, error) {
+	row := q.db.QueryRow(ctx, createNamedSpec,
+		arg.ID,
+		arg.Name,
+		arg.Description,
+		arg.Source,
+		arg.Sha,
+		arg.SourceCommittedAt,
+		arg.Spec,
+		arg.CreatedBy,
+	)
+	var i Spec
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Description,
+		&i.Source,
+		&i.Sha,
+		&i.SourceCommittedAt,
+		&i.Spec,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.ArchivedAt,
+	)
+	return i, err
+}
 
 const createSpec = `-- name: CreateSpec :one
 INSERT INTO specs (id, name, spec, created_by)
 VALUES ($1, $2, $3, $4)
-RETURNING id, name, spec, created_by, created_at, archived_at
+RETURNING id, name, description, source, sha, source_committed_at, spec, created_by, created_at, archived_at
 `
 
 type CreateSpecParams struct {
@@ -35,6 +80,50 @@ func (q *Queries) CreateSpec(ctx context.Context, arg CreateSpecParams) (Spec, e
 	err := row.Scan(
 		&i.ID,
 		&i.Name,
+		&i.Description,
+		&i.Source,
+		&i.Sha,
+		&i.SourceCommittedAt,
+		&i.Spec,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.ArchivedAt,
+	)
+	return i, err
+}
+
+const getNamedSpecByNameSourceSHA = `-- name: GetNamedSpecByNameSourceSHA :one
+SELECT id, name, description, source, sha, source_committed_at, spec, created_by, created_at, archived_at
+FROM specs
+WHERE name = $1
+  AND source->>'domain' = $2::text
+  AND source->>'repo' = $3::text
+  AND sha = $4::text
+  AND sha <> ''
+`
+
+type GetNamedSpecByNameSourceSHAParams struct {
+	Name   string `json:"name"`
+	Domain string `json:"domain"`
+	Repo   string `json:"repo"`
+	Sha    string `json:"sha"`
+}
+
+func (q *Queries) GetNamedSpecByNameSourceSHA(ctx context.Context, arg GetNamedSpecByNameSourceSHAParams) (Spec, error) {
+	row := q.db.QueryRow(ctx, getNamedSpecByNameSourceSHA,
+		arg.Name,
+		arg.Domain,
+		arg.Repo,
+		arg.Sha,
+	)
+	var i Spec
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Description,
+		&i.Source,
+		&i.Sha,
+		&i.SourceCommittedAt,
 		&i.Spec,
 		&i.CreatedBy,
 		&i.CreatedAt,
@@ -44,7 +133,7 @@ func (q *Queries) CreateSpec(ctx context.Context, arg CreateSpecParams) (Spec, e
 }
 
 const getSpec = `-- name: GetSpec :one
-SELECT id, name, spec, created_by, created_at, archived_at
+SELECT id, name, description, source, sha, source_committed_at, spec, created_by, created_at, archived_at
 FROM specs
 WHERE id = $1
 `
@@ -55,6 +144,10 @@ func (q *Queries) GetSpec(ctx context.Context, id types.SpecID) (Spec, error) {
 	err := row.Scan(
 		&i.ID,
 		&i.Name,
+		&i.Description,
+		&i.Source,
+		&i.Sha,
+		&i.SourceCommittedAt,
 		&i.Spec,
 		&i.CreatedBy,
 		&i.CreatedAt,
@@ -63,8 +156,71 @@ func (q *Queries) GetSpec(ctx context.Context, id types.SpecID) (Spec, error) {
 	return i, err
 }
 
+const listLatestNamedSpecs = `-- name: ListLatestNamedSpecs :many
+WITH latest AS (
+  SELECT DISTINCT ON (name, source->>'domain', source->>'repo')
+    id, name, description, source, sha, source_committed_at, spec, created_by, created_at, archived_at
+  FROM specs
+  WHERE name <> '' AND sha <> ''
+  ORDER BY name, source->>'domain', source->>'repo', source_committed_at DESC NULLS LAST, created_at DESC, id DESC
+)
+SELECT id, name, description, source, sha, source_committed_at, spec, created_by, created_at, archived_at
+FROM latest
+ORDER BY source_committed_at DESC NULLS LAST, created_at DESC, id DESC
+LIMIT $1 OFFSET $2
+`
+
+type ListLatestNamedSpecsParams struct {
+	Limit  int32 `json:"limit"`
+	Offset int32 `json:"offset"`
+}
+
+type ListLatestNamedSpecsRow struct {
+	ID                string             `json:"id"`
+	Name              string             `json:"name"`
+	Description       string             `json:"description"`
+	Source            []byte             `json:"source"`
+	Sha               string             `json:"sha"`
+	SourceCommittedAt pgtype.Timestamptz `json:"source_committed_at"`
+	Spec              []byte             `json:"spec"`
+	CreatedBy         *string            `json:"created_by"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	ArchivedAt        pgtype.Timestamptz `json:"archived_at"`
+}
+
+func (q *Queries) ListLatestNamedSpecs(ctx context.Context, arg ListLatestNamedSpecsParams) ([]ListLatestNamedSpecsRow, error) {
+	rows, err := q.db.Query(ctx, listLatestNamedSpecs, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListLatestNamedSpecsRow{}
+	for rows.Next() {
+		var i ListLatestNamedSpecsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Description,
+			&i.Source,
+			&i.Sha,
+			&i.SourceCommittedAt,
+			&i.Spec,
+			&i.CreatedBy,
+			&i.CreatedAt,
+			&i.ArchivedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listSpecs = `-- name: ListSpecs :many
-SELECT id, name, spec, created_by, created_at, archived_at
+SELECT id, name, description, source, sha, source_committed_at, spec, created_by, created_at, archived_at
 FROM specs
 ORDER BY created_at DESC, id DESC
 LIMIT $1 OFFSET $2
@@ -89,6 +245,197 @@ func (q *Queries) ListSpecs(ctx context.Context, arg ListSpecsParams) ([]Spec, e
 		if err := rows.Scan(
 			&i.ID,
 			&i.Name,
+			&i.Description,
+			&i.Source,
+			&i.Sha,
+			&i.SourceCommittedAt,
+			&i.Spec,
+			&i.CreatedBy,
+			&i.CreatedAt,
+			&i.ArchivedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const resolveLatestNamedSpecByDomainRepoName = `-- name: ResolveLatestNamedSpecByDomainRepoName :many
+WITH latest AS (
+  SELECT DISTINCT ON (name, source->>'domain', source->>'repo')
+    id, name, description, source, sha, source_committed_at, spec, created_by, created_at, archived_at
+  FROM specs
+  WHERE name = $1::text
+    AND source->>'domain' = $2::text
+    AND source->>'repo' = $3::text
+    AND sha <> ''
+  ORDER BY name, source->>'domain', source->>'repo', source_committed_at DESC NULLS LAST, created_at DESC, id DESC
+)
+SELECT id, name, description, source, sha, source_committed_at, spec, created_by, created_at, archived_at
+FROM latest
+ORDER BY source->>'domain', source->>'repo', name
+`
+
+type ResolveLatestNamedSpecByDomainRepoNameParams struct {
+	Name   string `json:"name"`
+	Domain string `json:"domain"`
+	Repo   string `json:"repo"`
+}
+
+type ResolveLatestNamedSpecByDomainRepoNameRow struct {
+	ID                string             `json:"id"`
+	Name              string             `json:"name"`
+	Description       string             `json:"description"`
+	Source            []byte             `json:"source"`
+	Sha               string             `json:"sha"`
+	SourceCommittedAt pgtype.Timestamptz `json:"source_committed_at"`
+	Spec              []byte             `json:"spec"`
+	CreatedBy         *string            `json:"created_by"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	ArchivedAt        pgtype.Timestamptz `json:"archived_at"`
+}
+
+func (q *Queries) ResolveLatestNamedSpecByDomainRepoName(ctx context.Context, arg ResolveLatestNamedSpecByDomainRepoNameParams) ([]ResolveLatestNamedSpecByDomainRepoNameRow, error) {
+	rows, err := q.db.Query(ctx, resolveLatestNamedSpecByDomainRepoName, arg.Name, arg.Domain, arg.Repo)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ResolveLatestNamedSpecByDomainRepoNameRow{}
+	for rows.Next() {
+		var i ResolveLatestNamedSpecByDomainRepoNameRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Description,
+			&i.Source,
+			&i.Sha,
+			&i.SourceCommittedAt,
+			&i.Spec,
+			&i.CreatedBy,
+			&i.CreatedAt,
+			&i.ArchivedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const resolveLatestNamedSpecByName = `-- name: ResolveLatestNamedSpecByName :many
+WITH latest AS (
+  SELECT DISTINCT ON (name, source->>'domain', source->>'repo')
+    id, name, description, source, sha, source_committed_at, spec, created_by, created_at, archived_at
+  FROM specs
+  WHERE name = $1::text AND sha <> ''
+  ORDER BY name, source->>'domain', source->>'repo', source_committed_at DESC NULLS LAST, created_at DESC, id DESC
+)
+SELECT id, name, description, source, sha, source_committed_at, spec, created_by, created_at, archived_at
+FROM latest
+ORDER BY source->>'domain', source->>'repo', name
+`
+
+type ResolveLatestNamedSpecByNameRow struct {
+	ID                string             `json:"id"`
+	Name              string             `json:"name"`
+	Description       string             `json:"description"`
+	Source            []byte             `json:"source"`
+	Sha               string             `json:"sha"`
+	SourceCommittedAt pgtype.Timestamptz `json:"source_committed_at"`
+	Spec              []byte             `json:"spec"`
+	CreatedBy         *string            `json:"created_by"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	ArchivedAt        pgtype.Timestamptz `json:"archived_at"`
+}
+
+func (q *Queries) ResolveLatestNamedSpecByName(ctx context.Context, name string) ([]ResolveLatestNamedSpecByNameRow, error) {
+	rows, err := q.db.Query(ctx, resolveLatestNamedSpecByName, name)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ResolveLatestNamedSpecByNameRow{}
+	for rows.Next() {
+		var i ResolveLatestNamedSpecByNameRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Description,
+			&i.Source,
+			&i.Sha,
+			&i.SourceCommittedAt,
+			&i.Spec,
+			&i.CreatedBy,
+			&i.CreatedAt,
+			&i.ArchivedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const resolveLatestNamedSpecByRepoName = `-- name: ResolveLatestNamedSpecByRepoName :many
+WITH latest AS (
+  SELECT DISTINCT ON (name, source->>'domain', source->>'repo')
+    id, name, description, source, sha, source_committed_at, spec, created_by, created_at, archived_at
+  FROM specs
+  WHERE name = $1::text
+    AND source->>'repo' = $2::text
+    AND sha <> ''
+  ORDER BY name, source->>'domain', source->>'repo', source_committed_at DESC NULLS LAST, created_at DESC, id DESC
+)
+SELECT id, name, description, source, sha, source_committed_at, spec, created_by, created_at, archived_at
+FROM latest
+ORDER BY source->>'domain', source->>'repo', name
+`
+
+type ResolveLatestNamedSpecByRepoNameParams struct {
+	Name string `json:"name"`
+	Repo string `json:"repo"`
+}
+
+type ResolveLatestNamedSpecByRepoNameRow struct {
+	ID                string             `json:"id"`
+	Name              string             `json:"name"`
+	Description       string             `json:"description"`
+	Source            []byte             `json:"source"`
+	Sha               string             `json:"sha"`
+	SourceCommittedAt pgtype.Timestamptz `json:"source_committed_at"`
+	Spec              []byte             `json:"spec"`
+	CreatedBy         *string            `json:"created_by"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	ArchivedAt        pgtype.Timestamptz `json:"archived_at"`
+}
+
+func (q *Queries) ResolveLatestNamedSpecByRepoName(ctx context.Context, arg ResolveLatestNamedSpecByRepoNameParams) ([]ResolveLatestNamedSpecByRepoNameRow, error) {
+	rows, err := q.db.Query(ctx, resolveLatestNamedSpecByRepoName, arg.Name, arg.Repo)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ResolveLatestNamedSpecByRepoNameRow{}
+	for rows.Next() {
+		var i ResolveLatestNamedSpecByRepoNameRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Description,
+			&i.Source,
+			&i.Sha,
+			&i.SourceCommittedAt,
 			&i.Spec,
 			&i.CreatedBy,
 			&i.CreatedAt,

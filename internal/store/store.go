@@ -332,6 +332,17 @@ func (s *PgStore) CreateSpec(ctx context.Context, arg CreateSpecParams) (Spec, e
 	return s.Queries.CreateSpec(ctx, arg)
 }
 
+// CreateNamedSpec validates JSONB fields and creates a new named spec.
+func (s *PgStore) CreateNamedSpec(ctx context.Context, arg CreateNamedSpecParams) (Spec, error) {
+	if err := validateJSONB(arg.Source); err != nil {
+		return Spec{}, fmt.Errorf("specs.source: %w", err)
+	}
+	if err := validateJSONB(arg.Spec); err != nil {
+		return Spec{}, fmt.Errorf("specs.spec: %w", err)
+	}
+	return s.Queries.CreateNamedSpec(ctx, arg)
+}
+
 // CreateDiff validates the Summary JSONB field and creates a new diff.
 func (s *PgStore) CreateDiff(ctx context.Context, arg CreateDiffParams) (Diff, error) {
 	if err := validateJSONB(arg.Summary); err != nil {

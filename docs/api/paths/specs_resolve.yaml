@@ -1,0 +1,25 @@
+get:
+  tags: [Control]
+  summary: Resolve a named spec selector
+  description: |
+    Resolves a selector to exactly one latest named spec. Accepted selectors are
+    `<spec-name>`, `<namespace/repo>:<spec-name>`, and `<domain>/<namespace/repo>:<spec-name>`.
+  parameters:
+    - in: query
+      name: selector
+      required: true
+      schema:
+        type: string
+        minLength: 1
+      description: Named spec selector to resolve.
+  responses:
+    '200':
+      description: OK
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/controlplane.yaml#/NamedSpecResolveResponse'
+    '400': { description: Bad request, invalid selector grammar }
+    '404': { description: No matching named spec }
+    '409': { description: Selector matched more than one latest named spec }
+    '500': { description: Internal server error }

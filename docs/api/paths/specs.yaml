@@ -1,0 +1,69 @@
+get:
+  tags: [Control]
+  summary: List latest named specs
+  description: |
+    Lists one latest named spec per `name + source.domain + source.repo`.
+    Missing `named` and `named=true` are accepted; any other `named` value is rejected.
+  parameters:
+    - in: query
+      name: named
+      required: false
+      schema:
+        type: string
+        enum: ["true"]
+      description: Optional named-spec filter. Only `true` is accepted when provided.
+    - in: query
+      name: limit
+      required: false
+      schema:
+        type: integer
+        format: int32
+        minimum: 1
+        maximum: 100
+      description: Maximum number of specs to return (default 50, max 100).
+    - in: query
+      name: offset
+      required: false
+      schema:
+        type: integer
+        format: int32
+        minimum: 0
+      description: Number of specs to skip.
+  responses:
+    '200':
+      description: OK
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/controlplane.yaml#/NamedSpecListResponse'
+    '400': { description: Bad request }
+    '500': { description: Internal server error }
+
+post:
+  tags: [Control]
+  summary: Publish a named spec
+  description: |
+    Publishes one immutable named spec for a source repository commit.
+    Re-publishing the same `name + source + sha` is idempotent and returns `skipped=true`.
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: '../components/schemas/controlplane.yaml#/PublishNamedSpecRequest'
+  responses:
+    '201':
+      description: Created
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/controlplane.yaml#/NamedSpecSummary'
+    '200':
+      description: Existing row returned for an idempotent publish
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/controlplane.yaml#/NamedSpecSummary'
+    '400': { description: Bad request }
+    '409': { description: Unique conflict that did not resolve to the same row }
+    '500': { description: Internal server error }
