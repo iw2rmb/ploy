@@ -150,12 +150,12 @@ func TestParseMigSpecJSON_StackSpecificImage(t *testing.T) {
 	}
 }
 
-// TestParseMigSpecJSON_APIVersionAndKind tests parsing of optional metadata fields.
-// These fields are informational (typically from YAML manifests converted to JSON).
-func TestParseMigSpecJSON_APIVersionAndKind(t *testing.T) {
+// TestParseMigSpecJSON_RootMetadata tests parsing of optional root metadata fields.
+func TestParseMigSpecJSON_RootMetadata(t *testing.T) {
 	input := `{
 		"apiVersion": "ploy.mig/v1alpha1",
-		"kind": "MigRunSpec",
+		"name": "upgrade-java_17.v1",
+		"description": "Upgrade Java projects to release 17",
 		"steps": [{
 			"image": "ghcr.io/iw2rmb/ploy/mig:latest",
 			"command": "echo hello",
@@ -172,8 +172,11 @@ func TestParseMigSpecJSON_APIVersionAndKind(t *testing.T) {
 	if spec.APIVersion != "ploy.mig/v1alpha1" {
 		t.Errorf("apiVersion = %q, want %q", spec.APIVersion, "ploy.mig/v1alpha1")
 	}
-	if spec.Kind != "MigRunSpec" {
-		t.Errorf("kind = %q, want %q", spec.Kind, "MigRunSpec")
+	if spec.Name != "upgrade-java_17.v1" {
+		t.Errorf("name = %q, want %q", spec.Name, "upgrade-java_17.v1")
+	}
+	if spec.Description != "Upgrade Java projects to release 17" {
+		t.Errorf("description = %q, want %q", spec.Description, "Upgrade Java projects to release 17")
 	}
 	if spec.Steps[0].Image.Universal != "ghcr.io/iw2rmb/ploy/mig:latest" {
 		t.Errorf("image = %q, want %q", spec.Steps[0].Image.Universal, "ghcr.io/iw2rmb/ploy/mig:latest")
@@ -246,6 +249,37 @@ func TestParseMigSpecJSON_SchemaValidationErrors(t *testing.T) {
 			}`,
 			wantErr: []string{
 				"steps[0].options: additional properties 'docker_socket' not allowed",
+			},
+		},
+		{
+			name: "root kind is not accepted",
+			input: `{
+				"apiVersion": "ploy.mig/v1alpha1",
+				"kind": "MigRunSpec",
+				"steps": [{"image": "ghcr.io/iw2rmb/ploy/mig:latest"}]
+			}`,
+			wantErr: []string{
+				"additional properties 'kind' not allowed",
+			},
+		},
+		{
+			name: "root name rejects uppercase",
+			input: `{
+				"name": "UpgradeJava",
+				"steps": [{"image": "ghcr.io/iw2rmb/ploy/mig:latest"}]
+			}`,
+			wantErr: []string{
+				"name: 'UpgradeJava' does not match pattern '^[0-9a-z._-]+$'",
+			},
+		},
+		{
+			name: "root name rejects empty string",
+			input: `{
+				"name": "",
+				"steps": [{"image": "ghcr.io/iw2rmb/ploy/mig:latest"}]
+			}`,
+			wantErr: []string{
+				"name: '' does not match pattern '^[0-9a-z._-]+$'",
 			},
 		},
 	}

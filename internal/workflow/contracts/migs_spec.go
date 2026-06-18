@@ -59,9 +59,11 @@ type MigSpec struct {
 	// Informational only; the control plane forwards specs as opaque JSON.
 	APIVersion string `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
 
-	// Kind is an optional schema kind identifier (e.g., "MigRunSpec").
-	// Informational only; the control plane forwards specs as opaque JSON.
-	Kind string `json:"kind,omitempty" yaml:"kind,omitempty"`
+	// Name is an optional stable name for publishing and selecting this spec.
+	Name string `json:"name,omitempty" yaml:"name,omitempty"`
+
+	// Description is optional human-readable context for this spec.
+	Description string `json:"description,omitempty" yaml:"description,omitempty"`
 
 	// --- Steps (required) ---
 
