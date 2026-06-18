@@ -1,7 +1,8 @@
 # Current mig spec contract. Validate with:
 #   ploy spec validate docs/schemas/mig.example.yaml
 apiVersion: ploy.mig/v1alpha1
-kind: MigRunSpec
+name: migrate-java
+description: Upgrade Java projects and summarize migration output.
 
 # Environment variables applied to every step. Step-level envs override these.
 envs:

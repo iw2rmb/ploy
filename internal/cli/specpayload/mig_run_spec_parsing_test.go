@@ -521,7 +521,8 @@ func TestBuildSpecPayload_MultiStepMigs(t *testing.T) {
 	t.Parallel()
 	result := runBuildSpecPayload(t, `
 apiVersion: ploy.mig/v1alpha1
-kind: MigRunSpec
+name: multi-step-migs
+description: Multi-step parsing fixture.
 steps:
   - image: docker.io/test/mig-step1:latest
     envs:
