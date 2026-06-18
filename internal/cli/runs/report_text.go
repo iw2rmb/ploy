@@ -103,6 +103,9 @@ func RenderRunStatusReportTextLayout(report RunStatusReport, opts TextRenderOpti
 	}
 
 	if len(repos) == 0 {
+		if waiting := waitingRunCount(report); opts.FilterRunningRepos && waiting > 0 {
+			emptyReposLine = fmt.Sprintf("   Waiting for %d run(s) to finish.", waiting)
+		}
 		block := strings.Join(append(headerLines, emptyReposLine), "\n")
 		rendered := lipgloss.NewStyle().Render(block) + "\n"
 		return RunStatusReportTextLayout{
@@ -387,6 +390,36 @@ func filterRunningRepos(repos []RunEntry) []RunEntry {
 func repoHasRunningJob(repo RunEntry) bool {
 	for _, job := range repo.Jobs {
 		if isRunningStatus(job.Status.String()) {
+			return true
+		}
+	}
+	return false
+}
+
+func waitingRunCount(report RunStatusReport) int {
+	if report.WaitingRuns > 0 {
+		return report.WaitingRuns
+	}
+
+	count := 0
+	for _, repo := range report.Repos {
+		if runIsWaiting(repo) {
+			count++
+		}
+	}
+	return count
+}
+
+func runIsWaiting(repo RunEntry) bool {
+	switch normalizeStatus(repo.Status.String()) {
+	case "queued", "pending":
+		return true
+	case "success", "succeeded", "finished", "completed", "fail", "failed", "crash", "crashed", "error", "cancelled", "canceled":
+		return false
+	}
+	for _, job := range repo.Jobs {
+		switch normalizeStatus(job.Status.String()) {
+		case "created", "queued", "pending":
 			return true
 		}
 	}

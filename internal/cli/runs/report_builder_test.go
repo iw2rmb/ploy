@@ -214,6 +214,9 @@ func TestGetRunStatusReportCommandMissingOptionalFields(t *testing.T) {
 				"base_ref":   "main",
 				"attempt":    1,
 				"created_at": "2026-02-24T09:00:00Z",
+				"run_counts": map[string]any{
+					"running": 2,
+				},
 			})
 		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/runs/"+runID.String()+"/status":
 			_ = json.NewEncoder(w).Encode(map[string]any{
@@ -263,6 +266,9 @@ func TestGetRunStatusReportCommandMissingOptionalFields(t *testing.T) {
 
 	if len(report.Repos) != 1 {
 		t.Fatalf("expected 1 repo entry, got %d", len(report.Repos))
+	}
+	if report.WaitingRuns != 2 {
+		t.Fatalf("expected waiting_runs=2, got %d", report.WaitingRuns)
 	}
 	if report.Repos[0].PatchURL != "" {
 		t.Fatalf("expected empty repo patch URL, got %q", report.Repos[0].PatchURL)

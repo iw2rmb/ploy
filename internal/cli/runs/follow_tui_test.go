@@ -261,6 +261,46 @@ func TestFollowModelViewShowsNoRunningReposMessage(t *testing.T) {
 	}
 }
 
+func TestFollowModelViewShowsWaitingMessageForQueuedRuns(t *testing.T) {
+	t.Parallel()
+
+	report := RunStatusReport{
+		RunID:       domaintypes.NewRunID(),
+		MigID:       domaintypes.NewMigID(),
+		MigName:     "follow-waiting",
+		SpecID:      domaintypes.NewSpecID(),
+		WaitingRuns: 3,
+		Repos: []RunEntry{
+			{
+				RepoID:  domaintypes.NewRepoID(),
+				RepoURL: "https://github.com/acme/waiting-a.git",
+				Status:  domaintypes.RunStatusQueued,
+				Jobs: []RunJobEntry{
+					{JobID: domaintypes.NewJobID(), JobType: "mig", Status: domaintypes.JobStatusQueued},
+				},
+			},
+			{
+				RepoID:  domaintypes.NewRepoID(),
+				RepoURL: "https://github.com/acme/waiting-b.git",
+				Status:  domaintypes.RunStatusRunning,
+				Jobs: []RunJobEntry{
+					{JobID: domaintypes.NewJobID(), JobType: "mig", Status: domaintypes.JobStatusCreated},
+				},
+			},
+		},
+	}
+	model := newFollowModel(TextRenderOptions{}, true)
+	model.report = &report
+
+	view := strings.TrimSpace(model.View().Content)
+	if !strings.Contains(view, "Waiting for 3 run(s) to finish.") {
+		t.Fatalf("expected waiting message in view, got %q", view)
+	}
+	if strings.Contains(view, "No repos with in-progress jobs.") {
+		t.Fatalf("did not expect empty-running message in waiting view, got %q", view)
+	}
+}
+
 func TestFollowModelViewSingleRepoKeepsRepoVisibleWithoutRunningJobs(t *testing.T) {
 	t.Parallel()
 
