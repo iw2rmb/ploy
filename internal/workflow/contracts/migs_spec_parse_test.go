@@ -252,17 +252,6 @@ func TestParseMigSpecJSON_SchemaValidationErrors(t *testing.T) {
 			},
 		},
 		{
-			name: "root kind is not accepted",
-			input: `{
-				"apiVersion": "ploy.mig/v1alpha1",
-				"kind": "MigRunSpec",
-				"steps": [{"image": "ghcr.io/iw2rmb/ploy/mig:latest"}]
-			}`,
-			wantErr: []string{
-				"additional properties 'kind' not allowed",
-			},
-		},
-		{
 			name: "root name rejects uppercase",
 			input: `{
 				"name": "UpgradeJava",

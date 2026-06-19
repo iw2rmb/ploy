@@ -62,7 +62,7 @@ func handlePush(args []string, stdout, stderr io.Writer) error {
 		return err
 	}
 
-	matches, err := discoverNamedSpecs(source.Worktree)
+	matches, err := discoverNamedSpecs(ctx, source.Worktree)
 	if err != nil {
 		return err
 	}
@@ -140,29 +140,23 @@ type discoveredNamedSpec struct {
 	probe namedSpecProbe
 }
 
-func discoverNamedSpecs(worktree string) ([]discoveredNamedSpec, error) {
+func discoverNamedSpecs(ctx context.Context, worktree string) ([]discoveredNamedSpec, error) {
 	var matches []discoveredNamedSpec
-	if err := filepath.WalkDir(worktree, func(path string, entry os.DirEntry, err error) error {
-		if err != nil {
-			return err
+	paths, err := gitOutputBytes(ctx, worktree, "ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", "*.yaml")
+	if err != nil {
+		return nil, fmt.Errorf("discover named specs: %w", err)
+	}
+	for _, raw := range bytes.Split(paths, []byte{0}) {
+		if len(raw) == 0 {
+			continue
 		}
-		if entry.IsDir() {
-			if entry.Name() == ".git" {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if !entry.Type().IsRegular() || filepath.Ext(entry.Name()) != ".yaml" {
-			return nil
-		}
+		rel := string(raw)
+		path := filepath.Join(worktree, filepath.FromSlash(rel))
 		probe, ok := probeNamedSpecFile(path)
 		if !ok {
-			return nil
+			continue
 		}
 		matches = append(matches, discoveredNamedSpec{path: path, probe: probe})
-		return nil
-	}); err != nil {
-		return nil, fmt.Errorf("discover named specs: %w", err)
 	}
 	sort.Slice(matches, func(i, j int) bool {
 		return matches[i].path < matches[j].path
@@ -252,6 +246,14 @@ func resolveGitSpecSource(ctx context.Context, gitFolder string) (gitSpecSource,
 }
 
 func gitOutput(ctx context.Context, dir string, args ...string) (string, error) {
+	out, err := gitOutputBytes(ctx, dir, args...)
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+
+func gitOutputBytes(ctx context.Context, dir string, args ...string) ([]byte, error) {
 	cmd := exec.CommandContext(ctx, "git", args...)
 	cmd.Dir = dir
 	var stderr bytes.Buffer
@@ -260,11 +262,11 @@ func gitOutput(ctx context.Context, dir string, args ...string) (string, error) 
 	if err != nil {
 		detail := strings.TrimSpace(stderr.String())
 		if detail != "" {
-			return "", fmt.Errorf("git %s: %s", strings.Join(args, " "), detail)
+			return nil, fmt.Errorf("git %s: %s", strings.Join(args, " "), detail)
 		}
-		return "", fmt.Errorf("git %s: %w", strings.Join(args, " "), err)
+		return nil, fmt.Errorf("git %s: %w", strings.Join(args, " "), err)
 	}
-	return strings.TrimSpace(string(out)), nil
+	return out, nil
 }
 
 func parseNamedSpecSourceOrigin(rawOrigin string) (string, string, error) {
@@ -373,10 +375,10 @@ func renderNamedSpecSource(source domainapi.NamedSpecSource) string {
 }
 
 func shortSHA(sha string) string {
-	if len(sha) <= 12 {
+	if len(sha) <= 8 {
 		return sha
 	}
-	return sha[:12]
+	return sha[:8]
 }
 
 func formatSpecTime(t time.Time) string {
