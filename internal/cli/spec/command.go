@@ -27,6 +27,10 @@ func Handle(args []string, stdout, stderr io.Writer) error {
 		return handleSchema(args[1:], stdout, stderr)
 	case "validate":
 		return handleValidate(args[1:], stderr)
+	case "push":
+		return handlePush(args[1:], stdout, stderr)
+	case "ls":
+		return handleList(args[1:], stdout, stderr)
 	default:
 		return fmt.Errorf("unknown spec subcommand %q", args[0])
 	}

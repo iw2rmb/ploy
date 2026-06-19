@@ -26,6 +26,8 @@ ploy job status <job-id>                                                     # i
 ploy mig run <mig-id|name> [<namespace/repo[:ref]> ...] [--failed] [--follow] # execute a mig project over its repo set
 ploy spec schema                                                             # print the mig JSON Schema
 ploy spec validate docs/schemas/mig.example.yaml                             # validate a mig spec
+ploy spec push [<git-folder>]                                                # publish named specs from a clean git worktree
+ploy spec ls                                                                 # list published named specs
 ```
 
 Run IDs (`<run-id>`) are KSUID-backed strings.
@@ -41,6 +43,13 @@ to wait for success and apply the resulting patch to a clean local worktree.
 `ploy mig run` executes an existing mig project over its managed repo set. Use
 `ploy mig add --name <name> --spec <path>`, `ploy mig repo add`, and
 `ploy mig spec set` to manage the project before running it.
+
+`ploy spec push` publishes named specs from a clean git worktree. It scans
+committed `.yaml` files, selects roots with `apiVersion: ploy.mig/v1alpha1` and
+a non-empty `name`, prepares the spec the same way as `ploy run`, and records
+the `origin` source, `HEAD` SHA, and commit date. Untracked or modified files
+stop publishing before any spec is uploaded. `ploy spec ls` lists the latest
+published named specs.
 
 When follow mode is used, the CLI displays a summarized per-repo job graph that
 refreshes until the run reaches a terminal state. The job graph shows step index,
@@ -113,6 +122,27 @@ ploy run apply <run-id>
 # Download artifacts for an existing run.
 ploy run pull <run-id> ./artifacts
 ```
+
+## Named Spec Commands
+
+Named specs are committed mig specs that can be published for later selection.
+The publish command derives source identity from `origin`, so the remote must
+normalize to `domain/namespace/repo`.
+
+```bash
+# Publish named specs from the current git worktree.
+ploy spec push
+
+# Publish named specs from another worktree.
+ploy spec push ../migs
+
+# List latest published named specs.
+ploy spec ls
+```
+
+Publish output shows `updated` for newly stored specs and `skipped` when the
+same name, source, and SHA already exists. List output shows `NAME`, `SOURCE`,
+`SHA`, and `DATE`.
 
 ## Mig Project Runs
 

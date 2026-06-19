@@ -38,6 +38,22 @@ func newSpecCmd(stdout, stderr io.Writer) *cobra.Command {
 			return spec.Handle(append([]string{"validate"}, args...), stdout, stderr)
 		},
 	})
+	specCmd.AddCommand(&cobra.Command{
+		Use:   "push [<git-folder>]",
+		Short: "Publish named mig specs from a git worktree",
+		Args:  cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return spec.Handle(append([]string{"push"}, args...), stdout, stderr)
+		},
+	})
+	specCmd.AddCommand(&cobra.Command{
+		Use:   "ls",
+		Short: "List published named mig specs",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return spec.Handle([]string{"ls"}, stdout, stderr)
+		},
+	})
 	return specCmd
 }
 
