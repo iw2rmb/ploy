@@ -181,6 +181,16 @@ func TestHandleSpecPush(t *testing.T) {
 			wantPosts: 0,
 		},
 		{
+			name:   "ignored yaml is excluded from discovery",
+			origin: "https://github.com/acme/service.git",
+			files: map[string]string{
+				".gitignore":   "ignored.yaml\n",
+				"ignored.yaml": namedSpecYAML("ignored", ""),
+			},
+			wantOut:   []string{"No named specs found"},
+			wantPosts: 0,
+		},
+		{
 			name:   "skipped response renders skipped",
 			origin: "https://github.com/acme/service.git",
 			files: map[string]string{
@@ -262,6 +272,7 @@ func TestHandleSpecPush(t *testing.T) {
 			if len(requests) != tt.wantPosts {
 				t.Fatalf("publish posts = %d, want %d", len(requests), tt.wantPosts)
 			}
+			assertRenderedRequestSHAs(t, stdout.String(), requests)
 			if tt.assertRequests != nil {
 				tt.assertRequests(t, requests)
 			}
@@ -279,10 +290,13 @@ func TestHandleSpecList(t *testing.T) {
 	if err := Handle([]string{"ls"}, &stdout, &stderr); err != nil {
 		t.Fatalf("Handle(ls) error = %v", err)
 	}
-	for _, want := range []string{"NAME", "SOURCE", "upgrade-java", "github.com/acme/service", "0123456789ab"} {
+	for _, want := range []string{"NAME", "SOURCE", "upgrade-java", "github.com/acme/service", "01234567"} {
 		if !strings.Contains(stdout.String(), want) {
 			t.Fatalf("stdout = %q, want containing %q", stdout.String(), want)
 		}
+	}
+	if strings.Contains(stdout.String(), "012345678") {
+		t.Fatalf("stdout = %q, want 8-character SHA rendering", stdout.String())
 	}
 }
 
@@ -430,6 +444,21 @@ func (s *namedSpecTestServer) requests() []domainapi.PublishNamedSpecRequest {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return append([]domainapi.PublishNamedSpecRequest(nil), s.captured...)
+}
+
+func assertRenderedRequestSHAs(t *testing.T, stdout string, requests []domainapi.PublishNamedSpecRequest) {
+	t.Helper()
+	for _, req := range requests {
+		if len(req.SHA) <= 8 {
+			continue
+		}
+		if !strings.Contains(stdout, req.SHA[:8]) {
+			t.Fatalf("stdout = %q, want rendered SHA %q", stdout, req.SHA[:8])
+		}
+		if strings.Contains(stdout, req.SHA[:9]) {
+			t.Fatalf("stdout = %q, want 8-character SHA rendering", stdout)
+		}
+	}
 }
 
 func initSpecPushRepo(t *testing.T, origin string, files map[string]string) string {
