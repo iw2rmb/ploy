@@ -21,6 +21,7 @@ func TestGatePlanResolver_StackDetectModePolicy(t *testing.T) {
 		wantCode      string
 		wantErrPrefix string
 		wantImage     string
+		wantTool      string
 		wantRelease   string
 	}{
 		{
@@ -36,6 +37,23 @@ func TestGatePlanResolver_StackDetectModePolicy(t *testing.T) {
 			workspace:   func(t *testing.T) string { return filepath.Join(t.TempDir(), "missing-workspace") },
 			stackDetect: &contracts.BuildGateStackConfig{Mode: contracts.BuildGateStackModeForced, Language: "java", Tool: "maven", Release: "17"},
 			wantImage:   "planner-test:java17",
+			wantTool:    "maven",
+			wantRelease: "17",
+		},
+		{
+			name:        "strict_partial_uses_detected_maven_stack",
+			workspace:   func(t *testing.T) string { return createMavenWorkspace(t, "17") },
+			stackDetect: &contracts.BuildGateStackConfig{Mode: contracts.BuildGateStackModeStrict, Language: "java", Release: "17"},
+			wantImage:   "planner-test:java17",
+			wantTool:    "maven",
+			wantRelease: "17",
+		},
+		{
+			name:        "strict_partial_uses_detected_gradle_stack",
+			workspace:   func(t *testing.T) string { return createGradleWorkspace(t, "17") },
+			stackDetect: &contracts.BuildGateStackConfig{Mode: contracts.BuildGateStackModeStrict, Language: "java", Release: "17"},
+			wantImage:   "planner-test:gradle17",
+			wantTool:    "gradle",
 			wantRelease: "17",
 		},
 		{
@@ -58,6 +76,7 @@ func TestGatePlanResolver_StackDetectModePolicy(t *testing.T) {
 			workspace:   func(t *testing.T) string { return createMavenWorkspaceNoJavaVersion(t) },
 			stackDetect: &contracts.BuildGateStackConfig{Mode: contracts.BuildGateStackModeFallback, Language: "java", Tool: "maven", Release: "17"},
 			wantImage:   "planner-test:java17",
+			wantTool:    "maven",
 			wantRelease: "17",
 		},
 		{
@@ -65,6 +84,7 @@ func TestGatePlanResolver_StackDetectModePolicy(t *testing.T) {
 			workspace:   func(t *testing.T) string { return filepath.Join(t.TempDir(), "missing-workspace") },
 			stackDetect: &contracts.BuildGateStackConfig{Mode: contracts.BuildGateStackModeFallback, Language: "java", Tool: "maven", Release: "17"},
 			wantImage:   "planner-test:java17",
+			wantTool:    "maven",
 			wantRelease: "17",
 		},
 		{
@@ -72,6 +92,7 @@ func TestGatePlanResolver_StackDetectModePolicy(t *testing.T) {
 			workspace:   func(t *testing.T) string { return createMavenWorkspace(t, "11") },
 			stackDetect: &contracts.BuildGateStackConfig{Mode: contracts.BuildGateStackModeFallback, Language: "java", Tool: "maven", Release: "17"},
 			wantImage:   "planner-test:java11",
+			wantTool:    "maven",
 			wantRelease: "11",
 		},
 	}
@@ -91,6 +112,10 @@ func TestGatePlanResolver_StackDetectModePolicy(t *testing.T) {
 					{
 						Stack: contracts.StackExpectation{Language: "java", Tool: "maven", Release: "17"},
 						Image: "planner-test:java17",
+					},
+					{
+						Stack: contracts.StackExpectation{Language: "java", Tool: "gradle", Release: "17"},
+						Image: "planner-test:gradle17",
 					},
 				},
 				StackDetect: tc.stackDetect,
@@ -123,7 +148,7 @@ func TestGatePlanResolver_StackDetectModePolicy(t *testing.T) {
 			if got, want := plan.image, tc.wantImage; got != want {
 				t.Fatalf("plan image = %q, want %q", got, want)
 			}
-			if got, want := plan.tool, "maven"; got != want {
+			if got, want := plan.tool, tc.wantTool; got != want {
 				t.Fatalf("plan tool = %q, want %q", got, want)
 			}
 			if got, want := plan.language, "java"; got != want {

@@ -108,8 +108,24 @@
       },
       "allOf": [
         {
-          "if": { "required": ["mode"] },
+          "if": {
+            "required": ["mode"],
+            "properties": { "mode": { "enum": ["forced", "fallback"] } }
+          },
           "then": { "required": ["language", "tool", "release"] }
+        },
+        {
+          "if": {
+            "required": ["mode"],
+            "properties": { "mode": { "const": "strict" } }
+          },
+          "then": {
+            "anyOf": [
+              { "required": ["language"] },
+              { "required": ["tool"] },
+              { "required": ["release"] }
+            ]
+          }
         },
         {
           "if": { "not": { "required": ["mode"] } },

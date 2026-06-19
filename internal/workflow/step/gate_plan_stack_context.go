@@ -154,7 +154,7 @@ func resolveDetectedStackContext(
 func resolveForcedStackDetectContext(stackDetectCfg *contracts.BuildGateStackConfig) (gateStackContext, *gateExecutionTerminal) {
 	expected := configuredStackExpectation(stackDetectCfg)
 	if !stackExpectationComplete(expected) {
-		return gateStackContext{}, gateStackConfigTerminal()
+		return gateStackContext{}, gateStackConfigTerminal("build gate stack mode requires language, tool, and release")
 	}
 	normalized := normalizeStackExpectation(expected)
 	return gateStackContext{
@@ -171,8 +171,8 @@ func resolveStrictStackDetectContext(
 	detectErr error,
 ) (gateStackContext, *gateExecutionTerminal) {
 	expected := configuredStackExpectation(stackDetectCfg)
-	if !stackExpectationComplete(expected) {
-		return gateStackContext{}, gateStackConfigTerminal()
+	if expected == nil || expected.IsEmpty() {
+		return gateStackContext{}, gateStackConfigTerminal("strict build gate stack mode requires language, tool, or release")
 	}
 	if detectErr != nil || !observationComplete(obs) {
 		return gateStackContext{}, stackDetectionFailureTerminal(detectErr,
@@ -182,7 +182,7 @@ func resolveStrictStackDetectContext(
 		return gateStackContext{}, gateFailureTerminal(expected.Language, "stackdetect",
 			"BUILD_GATE_STACK_MISMATCH", reason, formatEvidenceForLog(obs.Evidence), nil, "")
 	}
-	normalized := normalizeStackExpectation(expected)
+	normalized := normalizeStackExpectation(observationToStackExpectation(obs))
 	return gateStackContext{
 		expectation: normalized,
 		language:    normalized.Language,
@@ -198,7 +198,7 @@ func resolveFallbackStackDetectContext(
 ) (gateStackContext, *gateExecutionTerminal) {
 	expected := configuredStackExpectation(stackDetectCfg)
 	if !stackExpectationComplete(expected) {
-		return gateStackContext{}, gateStackConfigTerminal()
+		return gateStackContext{}, gateStackConfigTerminal("build gate stack mode requires language, tool, and release")
 	}
 	if detectErr != nil || !observationComplete(obs) {
 		normalized := normalizeStackExpectation(expected)
@@ -266,9 +266,8 @@ func stackDetectionFailureTerminal(detectErr error, incompleteMsg string) *gateE
 		code, msg, evidence, gateInternalError(code, msg), "")
 }
 
-func gateStackConfigTerminal() *gateExecutionTerminal {
+func gateStackConfigTerminal(msg string) *gateExecutionTerminal {
 	code := "BUILD_GATE_STACK_CONFIG_INVALID"
-	msg := "build gate stack mode requires language, tool, and release"
 	return gateFailureTerminal("", "stackdetect",
 		code, msg, "", gateInternalError(code, msg), "")
 }
