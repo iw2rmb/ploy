@@ -1,6 +1,7 @@
 package contracts
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 )
@@ -186,6 +187,73 @@ func TestParseMigSpecJSON_RootMetadata(t *testing.T) {
 	}
 }
 
+func TestParseMigSpecJSON_UnknownFieldsAcceptedAndIgnored(t *testing.T) {
+	input := `{
+		"apiVersion": "ploy.mig/v1alpha1",
+		"kind": "Mig",
+		"name": "upgrade-java",
+		"steps": [{
+			"image": "ghcr.io/iw2rmb/ploy/mig:latest",
+			"x-step-note": "stored metadata",
+			"options": {
+				"mount_docker_socket": true,
+				"docker_socket": false
+			},
+			"stack": {
+				"inbound": {
+					"enabled": true,
+					"expect": {
+						"language": "java",
+						"x-detected-by": "scanner"
+					},
+					"x-phase-note": "metadata"
+				},
+				"x-stack-note": "metadata"
+			}
+		}],
+		"build_gate": {
+			"enabled": true,
+			"pre": {
+				"stack": {
+					"mode": "strict",
+					"language": "java",
+					"x-policy-note": "metadata"
+				},
+				"x-phase-note": "metadata"
+			}
+		}
+	}`
+
+	spec, err := ParseMigSpecJSON([]byte(input))
+	if err != nil {
+		t.Fatalf("ParseMigSpecJSON failed: %v", err)
+	}
+	if spec.Name != "upgrade-java" {
+		t.Fatalf("name = %q, want upgrade-java", spec.Name)
+	}
+	if len(spec.Steps) != 1 {
+		t.Fatalf("len(steps) = %d, want 1", len(spec.Steps))
+	}
+	if !spec.Steps[0].Options.MountDockerSocket {
+		t.Fatalf("options.mount_docker_socket = false, want true")
+	}
+	if spec.Steps[0].Stack == nil || spec.Steps[0].Stack.Inbound == nil || spec.Steps[0].Stack.Inbound.Expect.Language != "java" {
+		t.Fatalf("known nested stack fields not preserved: %+v", spec.Steps[0].Stack)
+	}
+	if spec.BuildGate == nil || spec.BuildGate.Pre == nil || spec.BuildGate.Pre.Stack.Language != "java" {
+		t.Fatalf("known build gate fields not preserved: %+v", spec.BuildGate)
+	}
+	encoded, err := json.Marshal(spec)
+	if err != nil {
+		t.Fatalf("marshal parsed spec: %v", err)
+	}
+	for _, unwanted := range []string{`"kind"`, `"x-step-note"`, `"docker_socket"`, `"x-policy-note"`} {
+		if strings.Contains(string(encoded), unwanted) {
+			t.Fatalf("parsed typed spec retained unknown field %s in %s", unwanted, encoded)
+		}
+	}
+}
+
 // TestParseMigSpecJSON_Empty tests empty input handling.
 func TestParseMigSpecJSON_Empty(t *testing.T) {
 	_, err := ParseMigSpecJSON(nil)
@@ -226,29 +294,29 @@ func TestParseMigSpecJSON_SchemaValidationErrors(t *testing.T) {
 			}`,
 			wantErr: []string{
 				"missing property 'steps'",
-				"additional properties 'mig' not allowed",
 			},
 		},
 		{
-			name: "unknown nested build gate field",
+			name: "known nested build gate mode rejects invalid value",
 			input: `{
 				"steps": [{"image": "ghcr.io/iw2rmb/ploy/mig:latest"}],
-				"build_gate": {"enabled": true}
+				"build_gate": {"pre": {"stack": {"mode": "permissive", "language": "java"}}}
 			}`,
 			wantErr: []string{
-				"build_gate: additional properties 'enabled' not allowed",
+				"build_gate.pre.stack.mode",
 			},
 		},
 		{
-			name: "unknown step option field",
+			name: "known step option rejects invalid type",
 			input: `{
 				"steps": [{
 					"image": "ghcr.io/iw2rmb/ploy/mig:latest",
-					"options": {"docker_socket": true}
+					"options": {"mount_docker_socket": "true"}
 				}]
 			}`,
 			wantErr: []string{
-				"steps[0].options: additional properties 'docker_socket' not allowed",
+				"steps[0].options.mount_docker_socket",
+				"boolean",
 			},
 		},
 		{

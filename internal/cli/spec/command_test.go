@@ -55,14 +55,12 @@ func TestHandleSpecValidate(t *testing.T) {
 			spec: "steps:\n  - image: docker.io/test/mig:latest\n",
 		},
 		{
-			name:    "unknown root key",
-			spec:    "version: old\nsteps:\n  - image: docker.io/test/mig:latest\n",
-			wantErr: "validate spec",
+			name: "unknown root key accepted",
+			spec: "version: old\nsteps:\n  - image: docker.io/test/mig:latest\n",
 		},
 		{
-			name:    "unknown nested build gate key",
-			spec:    "steps:\n  - image: docker.io/test/mig:latest\nbuild_gate:\n  enabled: true\n",
-			wantErr: "additional properties 'enabled' not allowed",
+			name: "unknown nested build gate key accepted",
+			spec: "steps:\n  - image: docker.io/test/mig:latest\nbuild_gate:\n  enabled: true\n",
 		},
 		{
 			name:    "missing hydra input file",

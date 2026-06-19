@@ -141,60 +141,29 @@ func TestListRunsHandlerOwnershipFilter(t *testing.T) {
 }
 
 func TestListRunsHandlerRepoURLAppliesOwnershipFilter(t *testing.T) {
-	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewRepoID()
-	owner := "alice"
-	other := "bob"
 	tests := []struct {
-		name      string
-		target    string
-		createdBy *string
-		wantCount int
+		name          string
+		target        string
+		wantAll       bool
+		wantCreatedBy string
+		wantRepoURL   string
 	}{
 		{
-			name:      "filters out other creator",
-			target:    "/v1/runs?repo_url=https://gitlab.example.com/team/service&created_by=alice",
-			createdBy: &other,
-			wantCount: 0,
+			name:          "repo url normalized with owner",
+			target:        "/v1/runs?repo_url=https://gitlab.example.com/team/service.git/&created_by=alice&limit=1",
+			wantCreatedBy: "alice",
+			wantRepoURL:   "https://gitlab.example.com/team/service",
 		},
 		{
-			name:      "all includes other creator",
-			target:    "/v1/runs?repo_url=https://gitlab.example.com/team/service&created_by=alice&all=true",
-			createdBy: &other,
-			wantCount: 1,
-		},
-		{
-			name:      "matching creator included",
-			target:    "/v1/runs?repo_url=https://gitlab.example.com/team/service&created_by=alice",
-			createdBy: &owner,
-			wantCount: 1,
+			name:        "all bypasses owner filtering",
+			target:      "/v1/runs?repo_url=https://gitlab.example.com/team/service&created_by=alice&all=true",
+			wantAll:     true,
+			wantRepoURL: "https://gitlab.example.com/team/service",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			st := &runStore{
-				listDistinctRepos: mockCall[string, []store.ListDistinctReposRow]{
-					val: []store.ListDistinctReposRow{{
-						RepoID:  repoID,
-						RepoUrl: "https://gitlab.example.com/team/service",
-					}},
-				},
-				listRunsForRepo: mockCall[store.ListRunsForRepoParams, []store.ListRunsForRepoRow]{
-					val: []store.ListRunsForRepoRow{{RunID: runID}},
-				},
-				getRun: mockCall[string, store.Run]{
-					val: store.Run{
-						ID:        runID,
-						WaveID:    domaintypes.WaveID(runID.String()),
-						MigID:     domaintypes.NewMigID(),
-						SpecID:    domaintypes.NewSpecID(),
-						RepoID:    repoID,
-						Status:    domaintypes.RunStatusRunning,
-						CreatedBy: tt.createdBy,
-						CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
-					},
-				},
-			}
+			st := &runStore{}
 			req := httptest.NewRequest(http.MethodGet, tt.target, nil)
 			rr := httptest.NewRecorder()
 
@@ -203,14 +172,26 @@ func TestListRunsHandlerRepoURLAppliesOwnershipFilter(t *testing.T) {
 			if rr.Code != http.StatusOK {
 				t.Fatalf("status = %d, body = %s", rr.Code, rr.Body.String())
 			}
-			var resp struct {
-				Runs []domaintypes.RunSummary `json:"runs"`
+			if !st.listRunsWithMetadata.called {
+				t.Fatal("ListRunsWithMetadata was not called")
 			}
-			if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
-				t.Fatalf("decode response: %v", err)
+			if st.listDistinctRepos.called {
+				t.Fatal("ListDistinctRepos should not be called for repo_url filtering")
 			}
-			if len(resp.Runs) != tt.wantCount {
-				t.Fatalf("runs length = %d, want %d", len(resp.Runs), tt.wantCount)
+			if st.listRunsForRepo.called {
+				t.Fatal("ListRunsForRepo should not be called for repo_url filtering")
+			}
+			if st.getRun.called {
+				t.Fatal("GetRun should not be called for repo_url filtering")
+			}
+			if st.listRunsWithMetadata.params.AllRuns != tt.wantAll {
+				t.Fatalf("AllRuns = %v, want %v", st.listRunsWithMetadata.params.AllRuns, tt.wantAll)
+			}
+			if st.listRunsWithMetadata.params.CreatedBy != tt.wantCreatedBy {
+				t.Fatalf("CreatedBy = %q, want %q", st.listRunsWithMetadata.params.CreatedBy, tt.wantCreatedBy)
+			}
+			if st.listRunsWithMetadata.params.RepoUrl != tt.wantRepoURL {
+				t.Fatalf("RepoUrl = %q, want %q", st.listRunsWithMetadata.params.RepoUrl, tt.wantRepoURL)
 			}
 		})
 	}
