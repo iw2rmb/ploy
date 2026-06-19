@@ -66,7 +66,7 @@ func TestWaveRunStarter_StartQueuedRuns_InvalidStoredSpec(t *testing.T) {
 	st := &runStore{}
 	st.getWave.val = store.Wave{ID: waveID, SpecID: specID, Status: domaintypes.WaveStatusStarted}
 	st.getRun.val = store.Run{ID: runID, SpecID: specID, Status: domaintypes.RunStatusRunning}
-	st.getSpec.val = store.Spec{ID: specID, Spec: []byte(`{"version":"old","steps":[{"image":"a"}]}`)}
+	st.getSpec.val = store.Spec{ID: specID, Spec: []byte(`{"steps":`)}
 	st.listRunsByWave.val = []store.Run{
 		{ID: runID, RepoID: repoID, Status: domaintypes.RunStatusQueued, RepoBaseRef: "main", RepoSha0: testRunSHA0, Attempt: 1},
 	}

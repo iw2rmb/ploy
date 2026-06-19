@@ -133,6 +133,94 @@ func TestCreateRun_RoundTrip_V1(t *testing.T) {
 	}
 }
 
+func TestListRunsWithMetadataRepoURLFiltersBeforePagination(t *testing.T) {
+	ctx, db := newTestStore(t)
+
+	fx := newV1Fixture(t, ctx, db, "https://github.com/org/repo-list-filter", "main", []byte(`{"steps":[{"image":"test-image"}]}`))
+	alice := "alice"
+	bob := "bob"
+
+	ownerRun, err := db.CreateRun(ctx, CreateRunParams{
+		ID:              types.NewRunID(),
+		WaveID:          fx.Wave.ID,
+		MigID:           fx.Mig.ID,
+		SpecID:          fx.Spec.ID,
+		RepoID:          fx.MigRepo.RepoID,
+		RepoBaseRef:     "main",
+		SourceCommitSha: testSHA,
+		RepoSha0:        testSHA,
+		CreatedBy:       &alice,
+	})
+	if err != nil {
+		t.Fatalf("CreateRun(owner) failed: %v", err)
+	}
+	otherRun, err := db.CreateRun(ctx, CreateRunParams{
+		ID:              types.NewRunID(),
+		WaveID:          fx.Wave.ID,
+		MigID:           fx.Mig.ID,
+		SpecID:          fx.Spec.ID,
+		RepoID:          fx.MigRepo.RepoID,
+		RepoBaseRef:     "main",
+		SourceCommitSha: testSHA,
+		RepoSha0:        testSHA,
+		CreatedBy:       &bob,
+	})
+	if err != nil {
+		t.Fatalf("CreateRun(other) failed: %v", err)
+	}
+	if _, err := db.Pool().Exec(ctx, "UPDATE runs SET created_at = now() - interval '3 seconds' WHERE id = $1", fx.Run.ID); err != nil {
+		t.Fatalf("set fixture created_at failed: %v", err)
+	}
+	if _, err := db.Pool().Exec(ctx, "UPDATE runs SET created_at = now() - interval '2 seconds' WHERE id = $1", ownerRun.ID); err != nil {
+		t.Fatalf("set owner created_at failed: %v", err)
+	}
+	if _, err := db.Pool().Exec(ctx, "UPDATE runs SET created_at = now() - interval '1 second' WHERE id = $1", otherRun.ID); err != nil {
+		t.Fatalf("set other created_at failed: %v", err)
+	}
+
+	tests := []struct {
+		name      string
+		params    ListRunsWithMetadataParams
+		wantRunID types.RunID
+	}{
+		{
+			name: "repo and created_by filter before limit",
+			params: ListRunsWithMetadataParams{
+				CreatedBy:  alice,
+				RepoUrl:    "https://github.com/org/repo-list-filter",
+				LimitRows:  1,
+				OffsetRows: 0,
+			},
+			wantRunID: ownerRun.ID,
+		},
+		{
+			name: "all bypasses created_by filter",
+			params: ListRunsWithMetadataParams{
+				AllRuns:    true,
+				CreatedBy:  alice,
+				RepoUrl:    "https://github.com/org/repo-list-filter",
+				LimitRows:  1,
+				OffsetRows: 0,
+			},
+			wantRunID: otherRun.ID,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rows, err := db.ListRunsWithMetadata(ctx, tt.params)
+			if err != nil {
+				t.Fatalf("ListRunsWithMetadata() failed: %v", err)
+			}
+			if len(rows) != 1 {
+				t.Fatalf("rows length = %d, want 1", len(rows))
+			}
+			if rows[0].ID != tt.wantRunID {
+				t.Fatalf("run id = %q, want %q", rows[0].ID, tt.wantRunID)
+			}
+		})
+	}
+}
+
 func TestCreateWaveWithRuns_CreatesWaveAndRunsAtomically(t *testing.T) {
 	ctx, db := newTestStore(t)
 

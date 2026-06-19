@@ -232,6 +232,7 @@ Create a new API token.
 ```json
 {
   "role": "control-plane",
+  "username": "ci-bot",
   "description": "CI/CD pipeline token",
   "expires_in_days": 365
 }
@@ -243,6 +244,7 @@ Create a new API token.
   "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
   "token_id": "abc123",
   "role": "control-plane",
+  "username": "ci-bot",
   "expires_at": "2026-01-19T12:00:00Z",
   "warning": "Save this token securely. It will not be shown again."
 }
@@ -261,6 +263,7 @@ List all API tokens.
     {
       "token_id": "abc123",
       "role": "control-plane",
+      "username": "ci-bot",
       "description": "CI/CD pipeline token",
       "issued_at": "2025-01-19T12:00:00Z",
       "expires_at": "2026-01-19T12:00:00Z",

@@ -36,7 +36,11 @@ SELECT
 FROM runs
 JOIN repos ON repos.id = runs.repo_id
 JOIN specs ON specs.id = runs.spec_id
-WHERE sqlc.arg(all_runs)::boolean OR runs.created_by = sqlc.arg(created_by)::text
+WHERE (sqlc.arg(all_runs)::boolean OR runs.created_by = sqlc.arg(created_by)::text)
+  AND (
+    sqlc.arg(repo_url)::text = ''
+    OR repos.url = sqlc.arg(repo_url)::text
+  )
 ORDER BY runs.created_at DESC, runs.id DESC
 LIMIT sqlc.arg(limit_rows)::int OFFSET sqlc.arg(offset_rows)::int;
 

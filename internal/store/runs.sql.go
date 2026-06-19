@@ -572,14 +572,19 @@ SELECT
 FROM runs
 JOIN repos ON repos.id = runs.repo_id
 JOIN specs ON specs.id = runs.spec_id
-WHERE $1::boolean OR runs.created_by = $2::text
+WHERE ($1::boolean OR runs.created_by = $2::text)
+  AND (
+    $3::text = ''
+    OR repos.url = $3::text
+  )
 ORDER BY runs.created_at DESC, runs.id DESC
-LIMIT $4::int OFFSET $3::int
+LIMIT $5::int OFFSET $4::int
 `
 
 type ListRunsWithMetadataParams struct {
 	AllRuns    bool   `json:"all_runs"`
 	CreatedBy  string `json:"created_by"`
+	RepoUrl    string `json:"repo_url"`
 	OffsetRows int32  `json:"offset_rows"`
 	LimitRows  int32  `json:"limit_rows"`
 }
@@ -611,6 +616,7 @@ func (q *Queries) ListRunsWithMetadata(ctx context.Context, arg ListRunsWithMeta
 	rows, err := q.db.Query(ctx, listRunsWithMetadata,
 		arg.AllRuns,
 		arg.CreatedBy,
+		arg.RepoUrl,
 		arg.OffsetRows,
 		arg.LimitRows,
 	)

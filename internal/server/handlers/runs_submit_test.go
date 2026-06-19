@@ -49,9 +49,6 @@ func TestRunsCreateSingleRepo_Success(t *testing.T) {
 	if !st.createRun.called {
 		t.Error("store.CreateRun was not called")
 	}
-	if !st.createRun.called {
-		t.Error("store.CreateRun was not called")
-	}
 	if st.createJob.called {
 		t.Error("store.CreateJob should not be called during submission")
 	}
@@ -178,52 +175,64 @@ func TestRunsCreateSingleRepo_ValidationErrors(t *testing.T) {
 	}
 }
 
-// TestRunsCreateSingleRepo_WithCreatedBy verifies POST /v1/runs accepts optional created_by.
-func TestRunsCreateSingleRepo_WithCreatedBy(t *testing.T) {
-	st := &migStore{}
-	eventsService, _ := createTestEventsService()
-	handler := createSingleRepoRunHandler(st, eventsService, gitauth.Options{})
-
-	rr := doRequest(t, handler, http.MethodPost, "/v1/runs", validRunRequestBodyWith(map[string]any{
-		"created_by": "test-user@example.com",
-	}))
-	assertStatus(t, rr, http.StatusCreated)
-
-	// Verify created_by was propagated to store calls.
-	if st.createSpec.params.CreatedBy == nil || *st.createSpec.params.CreatedBy != "test-user@example.com" {
-		t.Error("created_by not propagated to CreateSpec")
-	}
-	if st.createMig.params.CreatedBy == nil || *st.createMig.params.CreatedBy != "test-user@example.com" {
-		t.Error("created_by not propagated to CreateMig")
-	}
-	if st.createRun.params.CreatedBy == nil || *st.createRun.params.CreatedBy != "test-user@example.com" {
-		t.Error("created_by not propagated to CreateRun")
-	}
-}
-
-func TestRunsCreateSingleRepo_UsesTokenUsernameBeforeRequestCreatedBy(t *testing.T) {
-	tokenUser := "token-user"
-	st := &migStore{
-		getAPITokenByID: mockCall[string, store.GetAPITokenByIDRow]{
-			val: store.GetAPITokenByIDRow{Username: &tokenUser},
+func TestRunsCreateSingleRepoCreatedByResolution(t *testing.T) {
+	tests := []struct {
+		name           string
+		requestCreated string
+		identity       auth.Identity
+		tokenUsername  *string
+		wantCreatedBy  string
+		wantTokenQuery bool
+	}{
+		{
+			name:           "request created_by propagates",
+			requestCreated: "test-user@example.com",
+			wantCreatedBy:  "test-user@example.com",
+		},
+		{
+			name:           "token username wins over request created_by",
+			requestCreated: "request-user",
+			identity:       auth.Identity{Role: auth.RoleControlPlane, TokenID: "token-1"},
+			tokenUsername:  stringPtrOrNil("token-user"),
+			wantCreatedBy:  "token-user",
+			wantTokenQuery: true,
 		},
 	}
-	handler := createSingleRepoRunHandler(st, nil, gitauth.Options{})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			st := &migStore{
+				getAPITokenByID: mockCall[string, store.GetAPITokenByIDRow]{
+					val: store.GetAPITokenByIDRow{Username: tt.tokenUsername},
+				},
+			}
+			handler := createSingleRepoRunHandler(st, nil, gitauth.Options{})
+			body, _ := json.Marshal(validRunRequestBodyWith(map[string]any{"created_by": tt.requestCreated}))
+			req := httptest.NewRequest(http.MethodPost, "/v1/runs", bytes.NewReader(body))
+			req.Header.Set("Content-Type", "application/json")
+			if tt.identity.TokenID != "" {
+				req = req.WithContext(auth.ContextWithIdentity(req.Context(), tt.identity))
+			}
+			rr := httptest.NewRecorder()
 
-	body, _ := json.Marshal(validRunRequestBodyWith(map[string]any{"created_by": "request-user"}))
-	req := httptest.NewRequest(http.MethodPost, "/v1/runs", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	req = req.WithContext(auth.ContextWithIdentity(req.Context(), auth.Identity{Role: auth.RoleControlPlane, TokenID: "token-1"}))
-	rr := httptest.NewRecorder()
+			handler.ServeHTTP(rr, req)
 
-	handler.ServeHTTP(rr, req)
-
-	assertStatus(t, rr, http.StatusCreated)
-	if !st.getAPITokenByID.called || st.getAPITokenByID.params != "token-1" {
-		t.Fatalf("GetAPITokenByID call = %v %q", st.getAPITokenByID.called, st.getAPITokenByID.params)
-	}
-	if st.createRun.params.CreatedBy == nil || *st.createRun.params.CreatedBy != tokenUser {
-		t.Fatalf("run created_by = %v, want %q", st.createRun.params.CreatedBy, tokenUser)
+			assertStatus(t, rr, http.StatusCreated)
+			if st.getAPITokenByID.called != tt.wantTokenQuery {
+				t.Fatalf("GetAPITokenByID called = %v, want %v", st.getAPITokenByID.called, tt.wantTokenQuery)
+			}
+			if tt.wantTokenQuery && st.getAPITokenByID.params != tt.identity.TokenID {
+				t.Fatalf("GetAPITokenByID token = %q, want %q", st.getAPITokenByID.params, tt.identity.TokenID)
+			}
+			if st.createSpec.params.CreatedBy == nil || *st.createSpec.params.CreatedBy != tt.wantCreatedBy {
+				t.Fatalf("spec created_by = %v, want %q", st.createSpec.params.CreatedBy, tt.wantCreatedBy)
+			}
+			if st.createMig.params.CreatedBy == nil || *st.createMig.params.CreatedBy != tt.wantCreatedBy {
+				t.Fatalf("mig created_by = %v, want %q", st.createMig.params.CreatedBy, tt.wantCreatedBy)
+			}
+			if st.createRun.params.CreatedBy == nil || *st.createRun.params.CreatedBy != tt.wantCreatedBy {
+				t.Fatalf("run created_by = %v, want %q", st.createRun.params.CreatedBy, tt.wantCreatedBy)
+			}
+		})
 	}
 }
 
@@ -301,10 +310,6 @@ func TestRunsCreateSingleRepo_StoreErrors(t *testing.T) {
 		{
 			name:    "CreateRunError",
 			setupFn: func(st *migStore) { st.createRunSeq.errs = []error{errors.New("database connection failed")} },
-		},
-		{
-			name:    "CreateRunError",
-			setupFn: func(st *migStore) { st.createRun.err = errors.New("database connection failed") },
 		},
 	}
 

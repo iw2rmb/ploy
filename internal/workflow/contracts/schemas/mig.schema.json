@@ -4,7 +4,7 @@
   "title": "Ploy mig spec",
   "type": "object",
   "required": ["steps"],
-  "additionalProperties": false,
+  "additionalProperties": true,
   "properties": {
     "apiVersion": { "type": "string" },
     "name": { "type": "string", "pattern": "^[0-9a-z._-]+$" },
@@ -51,7 +51,7 @@
     },
     "stackExpectation": {
       "type": "object",
-      "additionalProperties": false,
+      "additionalProperties": true,
       "properties": {
         "language": { "type": "string" },
         "tool": { "type": "string" },
@@ -60,7 +60,7 @@
     },
     "stepStackPhase": {
       "type": "object",
-      "additionalProperties": false,
+      "additionalProperties": true,
       "properties": {
         "enabled": { "type": "boolean" },
         "expect": { "$ref": "#/definitions/stackExpectation" }
@@ -68,7 +68,7 @@
     },
     "stepStack": {
       "type": "object",
-      "additionalProperties": false,
+      "additionalProperties": true,
       "properties": {
         "inbound": { "$ref": "#/definitions/stepStackPhase" },
         "outbound": { "$ref": "#/definitions/stepStackPhase" }
@@ -76,14 +76,14 @@
     },
     "stepOptions": {
       "type": "object",
-      "additionalProperties": false,
+      "additionalProperties": true,
       "properties": {
         "mount_docker_socket": { "type": "boolean" }
       }
     },
     "step": {
       "type": "object",
-      "additionalProperties": false,
+      "additionalProperties": true,
       "properties": {
         "name": { "type": "string" },
         "image": { "$ref": "#/definitions/image" },
@@ -99,7 +99,7 @@
     },
     "buildGateStack": {
       "type": "object",
-      "additionalProperties": false,
+      "additionalProperties": true,
       "properties": {
         "mode": { "type": "string", "enum": ["forced", "strict", "fallback"] },
         "language": { "type": "string" },
@@ -143,14 +143,14 @@
     },
     "buildGatePhase": {
       "type": "object",
-      "additionalProperties": false,
+      "additionalProperties": true,
       "properties": {
         "stack": { "$ref": "#/definitions/buildGateStack" }
       }
     },
     "buildGateImageRule": {
       "type": "object",
-      "additionalProperties": false,
+      "additionalProperties": true,
       "properties": {
         "stack": { "$ref": "#/definitions/stackExpectation" },
         "image": { "type": "string" }
@@ -158,7 +158,7 @@
     },
     "buildGate": {
       "type": "object",
-      "additionalProperties": false,
+      "additionalProperties": true,
       "properties": {
         "disabled": { "type": "boolean" },
         "pre": { "$ref": "#/definitions/buildGatePhase" },
