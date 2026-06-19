@@ -11,6 +11,35 @@ FROM runs
 ORDER BY created_at DESC, id DESC
 LIMIT $1 OFFSET $2;
 
+-- name: ListRunsWithMetadata :many
+SELECT
+  runs.id,
+  runs.wave_id,
+  runs.mig_id,
+  runs.spec_id,
+  runs.repo_id,
+  runs.repo_base_ref,
+  runs.source_commit_sha,
+  runs.repo_sha0,
+  runs.created_by,
+  runs.status,
+  runs.attempt,
+  runs.last_error,
+  runs.created_at,
+  runs.started_at,
+  runs.finished_at,
+  runs.stats,
+  repos.url AS repo_url,
+  specs.name AS spec_name,
+  COALESCE(specs.source->>'domain', '')::text AS spec_source_domain,
+  COALESCE(specs.source->>'repo', '')::text AS spec_source_repo
+FROM runs
+JOIN repos ON repos.id = runs.repo_id
+JOIN specs ON specs.id = runs.spec_id
+WHERE sqlc.arg(all_runs)::boolean OR runs.created_by = sqlc.arg(created_by)::text
+ORDER BY runs.created_at DESC, runs.id DESC
+LIMIT sqlc.arg(limit_rows)::int OFFSET sqlc.arg(offset_rows)::int;
+
 -- name: ListRunsByWave :many
 SELECT id, wave_id, mig_id, spec_id, repo_id, repo_base_ref, source_commit_sha, repo_sha0,
        created_by, status, attempt, last_error, created_at, started_at, finished_at, stats

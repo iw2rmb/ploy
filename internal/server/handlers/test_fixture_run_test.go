@@ -20,8 +20,10 @@ type runStore struct {
 	getWave      mockCall[string, store.Wave]
 	getRunTiming mockCall[string, store.RunsTiming]
 
-	listRunsTimings mockResult[[]store.RunsTiming]
-	listRuns        mockResult[[]store.Run]
+	listRunsTimings      mockResult[[]store.RunsTiming]
+	listRuns             mockResult[[]store.Run]
+	listRunsWithMetadata mockCall[store.ListRunsWithMetadataParams, []store.ListRunsWithMetadataRow]
+	getAPITokenByID      mockCall[string, store.GetAPITokenByIDRow]
 
 	deleteRun  mockCall[string, struct{}]
 	cancelRun  mockCall[string, struct{}]
@@ -56,6 +58,8 @@ type runStore struct {
 	getMigRepo mockResult[store.MigRepo]
 
 	listMigReposByMig mockResult[[]store.MigRepo]
+	listDistinctRepos mockCall[string, []store.ListDistinctReposRow]
+	listRunsForRepo   mockCall[store.ListRunsForRepoParams, []store.ListRunsForRepoRow]
 
 	repoByID map[types.RepoID]store.Repo
 
@@ -114,6 +118,14 @@ func (m *runStore) ListRunsTimings(ctx context.Context, arg store.ListRunsTiming
 
 func (m *runStore) ListRuns(ctx context.Context, params store.ListRunsParams) ([]store.Run, error) {
 	return listPaged(m.listRuns.val, params.Offset, params.Limit), m.listRuns.err
+}
+
+func (m *runStore) ListRunsWithMetadata(ctx context.Context, params store.ListRunsWithMetadataParams) ([]store.ListRunsWithMetadataRow, error) {
+	return m.listRunsWithMetadata.record(params)
+}
+
+func (m *runStore) GetAPITokenByID(ctx context.Context, tokenID string) (store.GetAPITokenByIDRow, error) {
+	return m.getAPITokenByID.record(tokenID)
 }
 
 func (m *runStore) DeleteRun(ctx context.Context, id types.RunID) error {
@@ -209,6 +221,14 @@ func (m *runStore) GetMigRepo(ctx context.Context, id types.MigRepoID) (store.Mi
 
 func (m *runStore) ListMigReposByMig(ctx context.Context, migID types.MigID) ([]store.MigRepo, error) {
 	return m.listMigReposByMig.ret()
+}
+
+func (m *runStore) ListDistinctRepos(ctx context.Context, filter string) ([]store.ListDistinctReposRow, error) {
+	return m.listDistinctRepos.record(filter)
+}
+
+func (m *runStore) ListRunsForRepo(ctx context.Context, arg store.ListRunsForRepoParams) ([]store.ListRunsForRepoRow, error) {
+	return m.listRunsForRepo.record(arg)
 }
 
 func (m *runStore) UpdateMigRepoBaseRef(ctx context.Context, params store.UpdateMigRepoBaseRefParams) error {

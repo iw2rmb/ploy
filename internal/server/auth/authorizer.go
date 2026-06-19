@@ -77,6 +77,7 @@ type Identity struct {
 	Role       Role
 	CommonName string
 	Serial     string
+	TokenID    string
 }
 
 type identityKey struct{}
@@ -324,6 +325,7 @@ func (a *Authorizer) identityFromBearerToken(ctx context.Context, tokenString st
 	return Identity{
 		Role:       Role(claims.Role),
 		CommonName: claims.ID, // Use token ID as identifier
+		TokenID:    claims.ID,
 	}, nil
 }
 

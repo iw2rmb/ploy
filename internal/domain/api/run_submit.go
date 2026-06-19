@@ -15,6 +15,7 @@ type RunSubmitRequest struct {
 	RepoURL   domaintypes.RepoURL `json:"repo_url"`
 	Ref       domaintypes.GitRef  `json:"ref"`
 	CommitSHA string              `json:"commit_sha,omitempty"`
+	SpecID    domaintypes.SpecID  `json:"spec_id,omitempty"`
 	Spec      json.RawMessage     `json:"spec"`
 	CreatedBy string              `json:"created_by,omitempty"`
 }

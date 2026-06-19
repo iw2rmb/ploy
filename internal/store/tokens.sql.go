@@ -38,6 +38,51 @@ func (q *Queries) CheckBootstrapTokenRevoked(ctx context.Context, tokenID string
 	return revoked_at, err
 }
 
+const getAPITokenByID = `-- name: GetAPITokenByID :one
+SELECT
+    token_id,
+    role,
+    username,
+    description,
+    issued_at,
+    expires_at,
+    last_used_at,
+    revoked_at,
+    created_by
+FROM api_tokens
+WHERE token_id = $1
+LIMIT 1
+`
+
+type GetAPITokenByIDRow struct {
+	TokenID     string             `json:"token_id"`
+	Role        string             `json:"role"`
+	Username    *string            `json:"username"`
+	Description *string            `json:"description"`
+	IssuedAt    pgtype.Timestamptz `json:"issued_at"`
+	ExpiresAt   pgtype.Timestamptz `json:"expires_at"`
+	LastUsedAt  pgtype.Timestamptz `json:"last_used_at"`
+	RevokedAt   pgtype.Timestamptz `json:"revoked_at"`
+	CreatedBy   *string            `json:"created_by"`
+}
+
+func (q *Queries) GetAPITokenByID(ctx context.Context, tokenID string) (GetAPITokenByIDRow, error) {
+	row := q.db.QueryRow(ctx, getAPITokenByID, tokenID)
+	var i GetAPITokenByIDRow
+	err := row.Scan(
+		&i.TokenID,
+		&i.Role,
+		&i.Username,
+		&i.Description,
+		&i.IssuedAt,
+		&i.ExpiresAt,
+		&i.LastUsedAt,
+		&i.RevokedAt,
+		&i.CreatedBy,
+	)
+	return i, err
+}
+
 const getBootstrapToken = `-- name: GetBootstrapToken :one
 SELECT
     node_id,
@@ -79,12 +124,13 @@ INSERT INTO api_tokens (
     token_hash,
     token_id,
     role,
+    username,
     description,
     issued_at,
     expires_at,
     created_by
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7
+    $1, $2, $3, $4, $5, $6, $7, $8
 )
 `
 
@@ -92,6 +138,7 @@ type InsertAPITokenParams struct {
 	TokenHash   string             `json:"token_hash"`
 	TokenID     string             `json:"token_id"`
 	Role        string             `json:"role"`
+	Username    *string            `json:"username"`
 	Description *string            `json:"description"`
 	IssuedAt    pgtype.Timestamptz `json:"issued_at"`
 	ExpiresAt   pgtype.Timestamptz `json:"expires_at"`
@@ -103,6 +150,7 @@ func (q *Queries) InsertAPIToken(ctx context.Context, arg InsertAPITokenParams) 
 		arg.TokenHash,
 		arg.TokenID,
 		arg.Role,
+		arg.Username,
 		arg.Description,
 		arg.IssuedAt,
 		arg.ExpiresAt,
@@ -149,6 +197,7 @@ const listAPITokens = `-- name: ListAPITokens :many
 SELECT
     token_id,
     role,
+    username,
     description,
     issued_at,
     expires_at,
@@ -162,6 +211,7 @@ ORDER BY created_at DESC, token_id DESC
 type ListAPITokensRow struct {
 	TokenID     string             `json:"token_id"`
 	Role        string             `json:"role"`
+	Username    *string            `json:"username"`
 	Description *string            `json:"description"`
 	IssuedAt    pgtype.Timestamptz `json:"issued_at"`
 	ExpiresAt   pgtype.Timestamptz `json:"expires_at"`
@@ -182,6 +232,7 @@ func (q *Queries) ListAPITokens(ctx context.Context) ([]ListAPITokensRow, error)
 		if err := rows.Scan(
 			&i.TokenID,
 			&i.Role,
+			&i.Username,
 			&i.Description,
 			&i.IssuedAt,
 			&i.ExpiresAt,

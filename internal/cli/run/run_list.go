@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"text/tabwriter"
 
@@ -24,6 +25,7 @@ type ListOptions struct {
 	Limit        int
 	Offset       int
 	RepoSelector string
+	All          bool
 	Output       io.Writer
 }
 
@@ -62,6 +64,10 @@ func RunList(ctx context.Context, opts ListOptions) error {
 		Limit:   int32(opts.Limit),
 		Offset:  int32(opts.Offset),
 		RepoURL: repoURL,
+		All:     opts.All,
+	}
+	if !opts.All {
+		cmd.CreatedBy = strings.TrimSpace(os.Getenv("USER"))
 	}
 
 	runs, err := cmd.Run(ctx)
@@ -76,13 +82,26 @@ func RunList(ctx context.Context, opts ListOptions) error {
 
 	// Print results in tabular format.
 	tw := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
-	_, _ = fmt.Fprintln(tw, "ID\tSTATUS\tMIG\tSPEC\tREPO")
+	_, _ = fmt.Fprintln(tw, "ID\tSTATUS\tSPEC\tREPO")
 	for _, b := range runs {
-		_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n",
-			b.ID, b.Status, b.MigID, b.SpecID, formatRunListRepo(b.RepoURL, b.SourceCommitSHA))
+		_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n",
+			b.ID, b.Status, formatRunListSpec(b), formatRunListRepo(b.RepoURL, b.SourceCommitSHA))
 	}
 	_ = tw.Flush()
 	return nil
+}
+
+func formatRunListSpec(summary domaintypes.RunSummary) string {
+	domain := strings.Trim(strings.TrimSpace(summary.SpecSourceDomain), "/")
+	repo := strings.Trim(strings.TrimSpace(summary.SpecSourceRepo), "/")
+	name := strings.TrimSpace(summary.SpecName)
+	if domain != "" && repo != "" && name != "" {
+		return domain + "/" + repo + ":" + name
+	}
+	if !summary.SpecID.IsZero() {
+		return summary.SpecID.String()
+	}
+	return "-"
 }
 
 func formatRunListRepo(repoURL, sourceCommitSHA string) string {

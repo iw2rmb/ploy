@@ -66,10 +66,12 @@ func handleTokenCreate(args []string, stderr io.Writer) error {
 	fs.SetOutput(io.Discard)
 	var (
 		role          common.StringValue
+		username      common.StringValue
 		description   common.StringValue
 		expiresInDays common.IntValue
 	)
 	fs.Var(&role, "role", "Token role: cli-admin, control-plane, or worker (required)")
+	fs.Var(&username, "username", "Durable username for control-plane tokens")
 	fs.Var(&description, "description", "Human-readable description of the token")
 	fs.Var(&expiresInDays, "expires", "Expiration in days (default: 365)")
 
@@ -84,6 +86,11 @@ func handleTokenCreate(args []string, stderr io.Writer) error {
 		printTokenCreateUsage(stderr)
 		return errors.New("--role is required")
 	}
+	normalizedRole := strings.TrimSpace(role.Value)
+	if normalizedRole == "control-plane" && (!username.IsSet || strings.TrimSpace(username.Value) == "") {
+		printTokenCreateUsage(stderr)
+		return errors.New("--username is required for control-plane tokens")
+	}
 
 	ctx := context.Background()
 	baseURL, client, err := common.ResolveControlPlaneHTTP(ctx)
@@ -94,6 +101,9 @@ func handleTokenCreate(args []string, stderr io.Writer) error {
 	// Prepare request
 	reqBody := map[string]interface{}{
 		"role": role.Value,
+	}
+	if username.IsSet && strings.TrimSpace(username.Value) != "" {
+		reqBody["username"] = strings.TrimSpace(username.Value)
 	}
 	if description.IsSet && strings.TrimSpace(description.Value) != "" {
 		reqBody["description"] = description.Value
@@ -132,6 +142,7 @@ func handleTokenCreate(args []string, stderr io.Writer) error {
 		Token     string    `json:"token"`
 		TokenID   string    `json:"token_id"`
 		Role      string    `json:"role"`
+		Username  *string   `json:"username"`
 		ExpiresAt time.Time `json:"expires_at"`
 		Warning   string    `json:"warning"`
 	}
@@ -145,6 +156,9 @@ func handleTokenCreate(args []string, stderr io.Writer) error {
 	fmt.Println("=================================================================")
 	fmt.Printf("Token ID:    %s\n", result.TokenID)
 	fmt.Printf("Role:        %s\n", result.Role)
+	if result.Username != nil && strings.TrimSpace(*result.Username) != "" {
+		fmt.Printf("Username:    %s\n", *result.Username)
+	}
 	fmt.Printf("Expires:     %s\n", result.ExpiresAt.Format(time.RFC3339))
 	fmt.Println()
 	fmt.Println("TOKEN (save this securely - it will not be shown again):")
@@ -160,10 +174,11 @@ func handleTokenCreate(args []string, stderr io.Writer) error {
 
 // printTokenCreateUsage prints the token create subcommand usage information.
 func printTokenCreateUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy cluster token create --role <role> [--description <desc>] [--expires <days>]")
+	_, _ = fmt.Fprintln(w, "Usage: ploy cluster token create --role <role> [--username <user>] [--description <desc>] [--expires <days>]")
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Flags:")
 	_, _ = fmt.Fprintln(w, "  --role          Token role: cli-admin, control-plane, or worker (required)")
+	_, _ = fmt.Fprintln(w, "  --username      Durable username for control-plane tokens (required with --role control-plane)")
 	_, _ = fmt.Fprintln(w, "  --description   Human-readable description")
 	_, _ = fmt.Fprintln(w, "  --expires       Expiration in days (default: 365)")
 }
@@ -218,6 +233,7 @@ func handleTokenList(args []string, stderr io.Writer) error {
 		Tokens []struct {
 			TokenID     string     `json:"token_id"`
 			Role        string     `json:"role"`
+			Username    *string    `json:"username"`
 			Description *string    `json:"description"`
 			IssuedAt    time.Time  `json:"issued_at"`
 			ExpiresAt   time.Time  `json:"expires_at"`
@@ -236,8 +252,12 @@ func handleTokenList(args []string, stderr io.Writer) error {
 
 	// Display as table
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	_, _ = fmt.Fprintln(w, "TOKEN ID\tROLE\tDESCRIPTION\tEXPIRES\tLAST USED\tSTATUS")
+	_, _ = fmt.Fprintln(w, "TOKEN ID\tROLE\tUSERNAME\tDESCRIPTION\tEXPIRES\tLAST USED\tSTATUS")
 	for _, t := range result.Tokens {
+		username := "-"
+		if t.Username != nil && strings.TrimSpace(*t.Username) != "" {
+			username = strings.TrimSpace(*t.Username)
+		}
 		desc := "-"
 		if t.Description != nil {
 			desc = *t.Description
@@ -265,8 +285,8 @@ func handleTokenList(args []string, stderr io.Writer) error {
 			tokenIDDisplay = tokenIDDisplay[:12] + "..."
 		}
 
-		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n",
-			tokenIDDisplay, t.Role, desc, expires, lastUsed, status)
+		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+			tokenIDDisplay, t.Role, username, desc, expires, lastUsed, status)
 	}
 	_ = w.Flush()
 

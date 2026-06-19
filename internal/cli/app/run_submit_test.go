@@ -376,6 +376,13 @@ build_gate:
 			if capturedSubmit["ref"] != "feature/run" {
 				t.Fatalf("ref = %v", capturedSubmit["ref"])
 			}
+			if tc.wantResolveSelector != "" {
+				if capturedSubmit["spec_id"] != namedResolvedSpecID {
+					t.Fatalf("spec_id = %v, want %s", capturedSubmit["spec_id"], namedResolvedSpecID)
+				}
+			} else if _, ok := capturedSubmit["spec_id"]; ok {
+				t.Fatalf("local submit request must not contain spec_id: %#v", capturedSubmit)
+			}
 			if !strings.Contains(buf.String(), "run_id: "+runID) || !strings.Contains(buf.String(), "mig_id: "+migID) {
 				t.Fatalf("unexpected output: %q", buf.String())
 			}
@@ -385,6 +392,8 @@ build_gate:
 
 func namedRunSpecResolveBody(command string) map[string]any {
 	return map[string]any{
+		"id":   namedResolvedSpecID,
+		"name": "upgrade-java",
 		"spec": map[string]any{
 			"steps": []map[string]any{{
 				"image":   "alpine:latest",
@@ -393,6 +402,8 @@ func namedRunSpecResolveBody(command string) map[string]any {
 		},
 	}
 }
+
+const namedResolvedSpecID = "spec1234"
 
 func TestRunSubmitPullDownloadsFinalArtifacts(t *testing.T) {
 	specPath := filepath.Join(t.TempDir(), "spec.yaml")

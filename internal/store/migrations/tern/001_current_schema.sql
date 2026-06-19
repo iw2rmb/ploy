@@ -429,6 +429,7 @@ CREATE TABLE IF NOT EXISTS api_tokens (
   token_hash   TEXT NOT NULL UNIQUE,
   token_id     TEXT NOT NULL UNIQUE,
   role         TEXT NOT NULL,
+  username     TEXT,
   description  TEXT,
   issued_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
   expires_at   TIMESTAMPTZ,

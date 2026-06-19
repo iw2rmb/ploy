@@ -73,6 +73,7 @@ func RunSubmit(ctx context.Context, opts SubmitOptions) error {
 		RepoURL:   domaintypes.RepoURL(repo.RepoURL),
 		Ref:       domaintypes.GitRef(repo.Ref),
 		CommitSHA: repo.CommitSHA,
+		SpecID:    specPayload.SpecID,
 		Spec:      specPayload.Spec,
 		CreatedBy: strings.TrimSpace(os.Getenv("USER")),
 	}
@@ -119,6 +120,7 @@ func RunSubmit(ctx context.Context, opts SubmitOptions) error {
 
 type runSubmitSpecPayload struct {
 	Spec        json.RawMessage
+	SpecID      domaintypes.SpecID
 	DisplayName string
 }
 
@@ -253,6 +255,7 @@ func resolveNamedRunSubmitSpecPayload(ctx context.Context, base *url.URL, client
 	}
 	return runSubmitSpecPayload{
 		Spec:        resolved.Spec,
+		SpecID:      domaintypes.SpecID(strings.TrimSpace(resolved.ID)),
 		DisplayName: namedSpecDisplayName(resolved),
 	}, nil
 }

@@ -14,6 +14,9 @@ post:
             role:
               type: string
               description: Token role (`cli-admin`, `control-plane`, or `worker`).
+            username:
+              type: string
+              description: Durable username for this token. Required for `control-plane` tokens.
             description:
               type: string
               description: Optional human description.
@@ -32,6 +35,7 @@ post:
               token: { type: string, description: JWT token (shown once) }
               token_id: { type: string }
               role: { type: string }
+              username: { type: string, nullable: true }
               expires_at: { type: string, format: date-time }
               warning: { type: string }
             required: [token, token_id, role, expires_at, warning]
@@ -65,6 +69,7 @@ get:
                   properties:
                     token_id: { type: string }
                     role: { type: string }
+                    username: { type: string, nullable: true }
                     description: { type: string, nullable: true }
                     issued_at: { type: string, format: date-time }
                     expires_at: { type: string, format: date-time }
