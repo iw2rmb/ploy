@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/cli/common"
+	"github.com/iw2rmb/ploy/internal/cli/httpx"
 	"github.com/iw2rmb/ploy/internal/cli/runs"
 	"github.com/iw2rmb/ploy/internal/cli/specpayload"
 	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
@@ -50,16 +51,12 @@ func RunSubmit(ctx context.Context, opts SubmitOptions) error {
 		followOut = out
 	}
 
-	specArg, stepSelector, err := splitRunSpecSelector(opts.SpecPath)
-	if err != nil {
-		return err
-	}
-	specPath, err := resolveRunSpecPath(specArg)
+	base, httpClient, err := common.ResolveControlPlaneHTTP(ctx)
 	if err != nil {
 		return err
 	}
 
-	base, httpClient, err := common.ResolveControlPlaneHTTP(ctx)
+	specPayload, err := resolveRunSubmitSpecPayload(ctx, base, httpClient, opts.SpecPath)
 	if err != nil {
 		return err
 	}
@@ -70,11 +67,6 @@ func RunSubmit(ctx context.Context, opts SubmitOptions) error {
 	}
 	if opts.Apply && !repo.IsLocal {
 		return errors.New("--apply requires a local repo")
-	}
-
-	specPayload, err := buildRunSubmitSpecPayload(ctx, base, httpClient, specPath, stepSelector)
-	if err != nil {
-		return err
 	}
 
 	request := domainapi.RunSubmitRequest{
@@ -125,27 +117,68 @@ func RunSubmit(ctx context.Context, opts SubmitOptions) error {
 	return nil
 }
 
-func splitRunSpecSelector(specArg string) (string, string, error) {
+func resolveRunSubmitSpecPayload(ctx context.Context, base *url.URL, client *http.Client, specArg string) (json.RawMessage, error) {
 	specArg = strings.TrimSpace(specArg)
 	if specArg == "" {
-		return "", "", errors.New("spec path required")
+		return nil, errors.New("spec path required")
 	}
+	if info, err := os.Stat(specArg); err == nil {
+		specPath, err := normalizeRunSpecPath(specArg, info)
+		if err != nil {
+			return nil, err
+		}
+		return buildRunSubmitSpecPayload(ctx, base, client, specPath, "")
+	}
+
+	localPath, stepSelector, ok, err := splitLocalRunSpecSelector(specArg)
+	if err != nil {
+		return nil, err
+	}
+	if ok {
+		specPath, err := resolveRunSpecPath(localPath)
+		if err != nil {
+			return nil, err
+		}
+		return buildRunSubmitSpecPayload(ctx, base, client, specPath, stepSelector)
+	}
+
+	if pathExplicitlyLocal(specArg) {
+		specPath, err := resolveRunSpecPath(specArg)
+		if err != nil {
+			return nil, err
+		}
+		return buildRunSubmitSpecPayload(ctx, base, client, specPath, "")
+	}
+
+	return resolveNamedRunSubmitSpecPayload(ctx, base, client, specArg)
+}
+
+func splitLocalRunSpecSelector(specArg string) (string, string, bool, error) {
 	if _, err := os.Stat(specArg); err == nil {
-		return specArg, "", nil
+		return specArg, "", true, nil
 	}
 	idx := strings.LastIndex(specArg, ":")
 	if idx < 0 {
-		return specArg, "", nil
+		return "", "", false, nil
 	}
 	specPath := strings.TrimSpace(specArg[:idx])
 	stepSelector := strings.TrimSpace(specArg[idx+1:])
+	if !pathExplicitlyLocal(specPath) {
+		if _, err := os.Stat(specPath); err != nil {
+			return "", "", false, nil
+		}
+	}
 	if specPath == "" {
-		return "", "", errors.New("spec path required")
+		return "", "", true, errors.New("spec path required")
 	}
 	if stepSelector == "" {
-		return "", "", errors.New("step name required")
+		return "", "", true, errors.New("step name required")
 	}
-	return specPath, stepSelector, nil
+	return specPath, stepSelector, true, nil
+}
+
+func pathExplicitlyLocal(path string) bool {
+	return strings.HasPrefix(path, "./") || strings.HasPrefix(path, "../") || filepath.IsAbs(path)
 }
 
 func resolveRunSpecPath(specPath string) (string, error) {
@@ -157,6 +190,10 @@ func resolveRunSpecPath(specPath string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("load spec: %w", err)
 	}
+	return normalizeRunSpecPath(specPath, info)
+}
+
+func normalizeRunSpecPath(specPath string, info os.FileInfo) (string, error) {
 	if info.IsDir() {
 		specPath = filepath.Join(specPath, "mig.yaml")
 		if _, err := os.Stat(specPath); err != nil {
@@ -164,6 +201,49 @@ func resolveRunSpecPath(specPath string) (string, error) {
 		}
 	}
 	return specPath, nil
+}
+
+func resolveNamedRunSubmitSpecPayload(ctx context.Context, base *url.URL, client *http.Client, selector string) (json.RawMessage, error) {
+	if base == nil {
+		return nil, fmt.Errorf("run submit: base url required")
+	}
+	if client == nil {
+		return nil, fmt.Errorf("run submit: http client required")
+	}
+
+	endpoint := base.JoinPath("v1", "specs", "resolve")
+	query := endpoint.Query()
+	query.Set("selector", selector)
+	endpoint.RawQuery = query.Encode()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
+	if err != nil {
+		return nil, fmt.Errorf("run submit: resolve named spec: build request: %w", err)
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("run submit: resolve named spec: http request failed: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	switch resp.StatusCode {
+	case http.StatusOK:
+	case http.StatusNotFound:
+		return nil, fmt.Errorf("run submit: named spec not found: %s", selector)
+	case http.StatusBadRequest, http.StatusConflict:
+		return nil, fmt.Errorf("run submit: %s", httpx.ReadErrorMessage(resp.Body, resp.Status, httpx.MaxErrorBodyBytes))
+	default:
+		return nil, fmt.Errorf("run submit: resolve named spec: %s", httpx.ReadErrorMessage(resp.Body, resp.Status, httpx.MaxErrorBodyBytes))
+	}
+
+	var resolved domainapi.NamedSpecResolveResponse
+	if err := httpx.DecodeResponseJSON(resp.Body, &resolved, httpx.MaxJSONBodyBytes); err != nil {
+		return nil, fmt.Errorf("run submit: resolve named spec: decode response: %w", err)
+	}
+	if len(resolved.Spec) == 0 {
+		return nil, fmt.Errorf("run submit: resolve named spec: empty spec in response")
+	}
+	return resolved.Spec, nil
 }
 
 func buildRunSubmitSpecPayload(ctx context.Context, base *url.URL, client *http.Client, specPath string, stepSelector string) (json.RawMessage, error) {
