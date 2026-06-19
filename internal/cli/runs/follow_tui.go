@@ -139,14 +139,15 @@ func (m followModel) View() tea.View {
 
 // FollowRunCommand drives `run --follow` rendering with Bubble Tea v2.
 type FollowRunCommand struct {
-	Client       *http.Client
-	BaseURL      *url.URL
-	RunID        domaintypes.RunID
-	Output       io.Writer
-	EnableOSC8   bool
-	AuthToken    string
-	MaxRetries   int
-	PollInterval time.Duration
+	Client          *http.Client
+	BaseURL         *url.URL
+	RunID           domaintypes.RunID
+	Output          io.Writer
+	EnableOSC8      bool
+	AuthToken       string
+	SpecDisplayName string
+	MaxRetries      int
+	PollInterval    time.Duration
 }
 
 // Run executes follow-mode rendering until the run reaches a terminal state.
@@ -180,9 +181,10 @@ func (c FollowRunCommand) Run(ctx context.Context) (migsapi.RunState, error) {
 
 	program := tea.NewProgram(
 		newFollowModel(TextRenderOptions{
-			EnableOSC8: c.EnableOSC8,
-			AuthToken:  c.AuthToken,
-			BaseURL:    c.BaseURL,
+			EnableOSC8:      c.EnableOSC8,
+			AuthToken:       c.AuthToken,
+			BaseURL:         c.BaseURL,
+			SpecDisplayName: c.SpecDisplayName,
 		}, interactive),
 		tea.WithContext(coordCtx),
 		tea.WithInput(input),
