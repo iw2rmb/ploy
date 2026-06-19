@@ -70,6 +70,7 @@ func newListCommand() *cobra.Command {
 	}
 	cmd.Flags().IntVar(&opts.Limit, "limit", 50, "Max number of runs to return")
 	cmd.Flags().IntVar(&opts.Offset, "offset", 0, "Number of runs to skip")
+	cmd.Flags().BoolVar(&opts.All, "all", false, "List runs from all creators")
 	return cmd
 }
 

@@ -9,7 +9,10 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/gitauth"
+	"github.com/iw2rmb/ploy/internal/server/auth"
+	"github.com/iw2rmb/ploy/internal/store"
 )
 
 // =============================================================================
@@ -195,6 +198,57 @@ func TestRunsCreateSingleRepo_WithCreatedBy(t *testing.T) {
 	}
 	if st.createRun.params.CreatedBy == nil || *st.createRun.params.CreatedBy != "test-user@example.com" {
 		t.Error("created_by not propagated to CreateRun")
+	}
+}
+
+func TestRunsCreateSingleRepo_UsesTokenUsernameBeforeRequestCreatedBy(t *testing.T) {
+	tokenUser := "token-user"
+	st := &migStore{
+		getAPITokenByID: mockCall[string, store.GetAPITokenByIDRow]{
+			val: store.GetAPITokenByIDRow{Username: &tokenUser},
+		},
+	}
+	handler := createSingleRepoRunHandler(st, nil, gitauth.Options{})
+
+	body, _ := json.Marshal(validRunRequestBodyWith(map[string]any{"created_by": "request-user"}))
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req = req.WithContext(auth.ContextWithIdentity(req.Context(), auth.Identity{Role: auth.RoleControlPlane, TokenID: "token-1"}))
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	assertStatus(t, rr, http.StatusCreated)
+	if !st.getAPITokenByID.called || st.getAPITokenByID.params != "token-1" {
+		t.Fatalf("GetAPITokenByID call = %v %q", st.getAPITokenByID.called, st.getAPITokenByID.params)
+	}
+	if st.createRun.params.CreatedBy == nil || *st.createRun.params.CreatedBy != tokenUser {
+		t.Fatalf("run created_by = %v, want %q", st.createRun.params.CreatedBy, tokenUser)
+	}
+}
+
+func TestRunsCreateSingleRepo_UsesExistingNamedSpecID(t *testing.T) {
+	specID := "spec1234"
+	st := &migStore{
+		getSpec: mockCall[string, store.Spec]{
+			val: store.Spec{ID: domaintypes.SpecID(specID)},
+		},
+	}
+	handler := createSingleRepoRunHandler(st, nil, gitauth.Options{})
+
+	rr := doRequest(t, handler, http.MethodPost, "/v1/runs", validRunRequestBodyWith(map[string]any{
+		"spec_id": specID,
+	}))
+
+	assertStatus(t, rr, http.StatusCreated)
+	if st.createSpec.called {
+		t.Fatal("CreateSpec should not be called for named spec_id submissions")
+	}
+	if !st.getSpec.called || st.getSpec.params != specID {
+		t.Fatalf("GetSpec call = %v %q", st.getSpec.called, st.getSpec.params)
+	}
+	if got := st.createRun.params.SpecID.String(); got != specID {
+		t.Fatalf("run spec_id = %q, want %q", got, specID)
 	}
 }
 

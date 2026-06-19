@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"log/slog"
 	"net/http"
 	"regexp"
@@ -14,6 +15,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/server/events"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
+	"github.com/jackc/pgx/v5"
 )
 
 var submitCommitSHARe = regexp.MustCompile(`^[0-9a-f]{40}$`)
@@ -42,9 +44,10 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service, g
 		if err := decodeRequestJSON(w, r, &req, maxBodySize); err != nil {
 			return
 		}
-		var createdByPtr *string
-		if req.CreatedBy != "" {
-			createdByPtr = &req.CreatedBy
+		createdByPtr, err := resolvedCreatedBy(r.Context(), st, req.CreatedBy)
+		if err != nil {
+			writeHTTPError(w, http.StatusInternalServerError, "failed to resolve caller identity: %v", err)
+			return
 		}
 
 		// Validate domain types explicitly to catch missing/zero-value fields.
@@ -88,16 +91,26 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service, g
 			}
 		}
 
-		// v1 side-effect: Create spec row
-		specID := domaintypes.NewSpecID()
-		createdSpec, err := st.CreateSpec(r.Context(), store.CreateSpecParams{
-			ID:        specID,
-			Name:      "",
-			Spec:      req.Spec,
-			CreatedBy: createdByPtr,
-		})
-		if err != nil {
-			serverError(w, "create single-repo run", "create spec", err)
+		specID := req.SpecID
+		if specID.IsZero() {
+			specID = domaintypes.NewSpecID()
+			createdSpec, err := st.CreateSpec(r.Context(), store.CreateSpecParams{
+				ID:        specID,
+				Name:      "",
+				Spec:      req.Spec,
+				CreatedBy: createdByPtr,
+			})
+			if err != nil {
+				serverError(w, "create single-repo run", "create spec", err)
+				return
+			}
+			specID = createdSpec.ID
+		} else if _, err := st.GetSpec(r.Context(), specID); err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				writeHTTPError(w, http.StatusBadRequest, "spec_id not found")
+				return
+			}
+			serverError(w, "create single-repo run", "get spec", err, "spec_id", specID)
 			return
 		}
 
@@ -106,7 +119,7 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service, g
 		if _, err := st.CreateMig(r.Context(), store.CreateMigParams{
 			ID:        migID,
 			Name:      migID.String(),
-			SpecID:    &createdSpec.ID,
+			SpecID:    &specID,
 			CreatedBy: createdByPtr,
 		}); err != nil {
 			serverError(w, "create single-repo run", "create mig", err, "mig_id", migID)
@@ -133,14 +146,14 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service, g
 			Wave: store.CreateWaveParams{
 				ID:        waveID,
 				MigID:     migID,
-				SpecID:    createdSpec.ID,
+				SpecID:    specID,
 				CreatedBy: createdByPtr,
 			},
 			Runs: []store.CreateRunParams{{
 				ID:              runID,
 				WaveID:          waveID,
 				MigID:           migID,
-				SpecID:          createdSpec.ID,
+				SpecID:          specID,
 				RepoID:          migRepo.RepoID,
 				RepoBaseRef:     migRepo.BaseRef,
 				SourceCommitSha: sourceCommitSHA,
@@ -158,7 +171,7 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service, g
 			WaveID: wave.ID,
 			RunID:  run.ID,
 			MigID:  migID,
-			SpecID: createdSpec.ID,
+			SpecID: specID,
 		}
 
 		// Publish queued event to SSE hub for the run
@@ -195,7 +208,7 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service, g
 			"run_id", run.ID,
 			"wave_id", wave.ID,
 			"mig_id", migID.String(),
-			"spec_id", createdSpec.ID,
+			"spec_id", specID,
 			"repo_id", run.RepoID,
 			"repo_url", normalizedRepoURL,
 			"ref", sourceRef,

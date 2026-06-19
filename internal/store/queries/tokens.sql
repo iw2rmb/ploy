@@ -23,18 +23,35 @@ INSERT INTO api_tokens (
     token_hash,
     token_id,
     role,
+    username,
     description,
     issued_at,
     expires_at,
     created_by
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7
+    $1, $2, $3, $4, $5, $6, $7, $8
 );
+
+-- name: GetAPITokenByID :one
+SELECT
+    token_id,
+    role,
+    username,
+    description,
+    issued_at,
+    expires_at,
+    last_used_at,
+    revoked_at,
+    created_by
+FROM api_tokens
+WHERE token_id = $1
+LIMIT 1;
 
 -- name: ListAPITokens :many
 SELECT
     token_id,
     role,
+    username,
     description,
     issued_at,
     expires_at,

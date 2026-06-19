@@ -37,13 +37,13 @@ Create a new API token with the `ploy cluster token create` command:
 
 ```bash
 # Create a token for CI/CD with control-plane access
-ploy cluster token create --role control-plane --expires 90 --description "CI/CD pipeline"
+ploy cluster token create --role control-plane --username ci-bot --expires 90 --description "CI/CD pipeline"
 
 # Create an admin token
 ploy cluster token create --role cli-admin --expires 365 --description "Admin workstation"
 
 # Create a short-lived token for testing
-ploy cluster token create --role control-plane --expires 1 --description "Temporary test token"
+ploy cluster token create --role control-plane --username test-user --expires 1 --description "Temporary test token"
 ```
 
 **Output:**
@@ -55,6 +55,7 @@ WARNING: Save this token securely. It will not be shown again.
 Token:     eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiY29udHJvbC1wbGFuZSIsInRva2VuX3R5cGUiOiJhcGkiLCJleHAiOjE3NDUyNTYwMDAsImlhdCI6MTczNzQ4MDAwMCwianRpIjoiYWJjMTIzIn0.signature
 Token ID:  abc123
 Role:      control-plane
+Username:  ci-bot
 Expires:   2026-01-19T12:00:00Z
 
 Store this token in a secure location (e.g., password manager, CI/CD secrets).
@@ -72,10 +73,10 @@ ploy cluster token list
 
 **Output:**
 ```
-TOKEN ID     ROLE             DESCRIPTION           ISSUED AT                 EXPIRES AT                LAST USED
-abc123       control-plane    CI/CD pipeline        2025-01-19T12:00:00Z     2026-04-19T12:00:00Z     2025-11-19T10:30:00Z
-def456       cli-admin        Admin workstation     2025-10-01T08:00:00Z     2026-10-01T08:00:00Z     2025-11-18T15:45:00Z
-ghi789       control-plane    Dev team access       2025-11-01T10:00:00Z     2026-02-01T10:00:00Z     (never)
+TOKEN ID     ROLE             USERNAME  DESCRIPTION        EXPIRES     LAST USED   STATUS
+abc123       control-plane    ci-bot    CI/CD pipeline     2026-04-19  2025-11-19  active
+def456       cli-admin        -         Admin workstation  2026-10-01  2025-11-18  active
+ghi789       control-plane    dev-team  Dev team access    2026-02-01  never       active
 ```
 
 **Note**: The full token is not displayed for security reasons. Only the token ID is shown.
@@ -176,7 +177,7 @@ Monitor token usage in the database:
 
 ```sql
 -- Find tokens that haven't been used recently
-SELECT token_id, role, description, issued_at, last_used_at
+SELECT token_id, role, username, description, issued_at, last_used_at
 FROM api_tokens
 WHERE last_used_at < NOW() - INTERVAL '30 days'
   AND revoked_at IS NULL;

@@ -16,6 +16,7 @@ import (
 // TestRunListCallsControlPlane validates ls command calls the API.
 // Not parallel because useServerDescriptor uses t.Setenv.
 func TestRunListCallsControlPlane(t *testing.T) {
+	t.Setenv("USER", "test-user")
 	var called bool
 
 	runID1 := domaintypes.NewRunID().String()
@@ -38,19 +39,28 @@ func TestRunListCallsControlPlane(t *testing.T) {
 			if offset != "5" {
 				t.Errorf("expected offset=5, got %s", offset)
 			}
+			if got := r.URL.Query().Get("created_by"); got != "test-user" {
+				t.Errorf("expected created_by=test-user, got %s", got)
+			}
+			if got := r.URL.Query().Get("all"); got != "" {
+				t.Errorf("expected all to be omitted, got %s", got)
+			}
 
 			now := time.Now()
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"runs": []map[string]any{
 					{
-						"id":                runID1,
-						"status":            "Running",
-						"mig_id":            migID1,
-						"spec_id":           specID1,
-						"repo_url":          "https://gitlab.example.com/team/service.git",
-						"source_commit_sha": "0123456789abcdef0123456789abcdef01234567",
-						"created_at":        now,
+						"id":                 runID1,
+						"status":             "Running",
+						"mig_id":             migID1,
+						"spec_id":            specID1,
+						"repo_url":           "https://gitlab.example.com/team/service.git",
+						"source_commit_sha":  "0123456789abcdef0123456789abcdef01234567",
+						"spec_name":          "upgrade-java",
+						"spec_source_domain": "gitlab.example.com",
+						"spec_source_repo":   "team/specs",
+						"created_at":         now,
 					},
 					{
 						"id":         runID2,
@@ -85,14 +95,20 @@ func TestRunListCallsControlPlane(t *testing.T) {
 	if !strings.Contains(output, "Running") {
 		t.Errorf("output should contain Started: %s", output)
 	}
-	if !strings.Contains(output, "MIG") || strings.Contains(output, "MOD") {
-		t.Errorf("output should use MIG column, got: %s", output)
+	if strings.Contains(output, "MIG") || strings.Contains(output, "MOD") {
+		t.Errorf("output should not contain removed MIG/MOD columns, got: %s", output)
+	}
+	if !strings.Contains(output, "ID") || !strings.Contains(output, "STATUS") || !strings.Contains(output, "SPEC") || !strings.Contains(output, "REPO") {
+		t.Errorf("output should contain ID STATUS SPEC REPO columns, got: %s", output)
 	}
 	if strings.Contains(output, "DERIVED STATUS") {
 		t.Errorf("output should not contain derived status column: %s", output)
 	}
 	if !strings.Contains(output, "REPO") || !strings.Contains(output, "team/service:01234567") {
 		t.Errorf("output should contain repo label: %s", output)
+	}
+	if !strings.Contains(output, "gitlab.example.com/team/specs:upgrade-java") {
+		t.Errorf("output should contain named spec label: %s", output)
 	}
 }
 

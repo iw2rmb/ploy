@@ -16,8 +16,9 @@ type migStore struct {
 	// Spec
 	createSpec mockCall[store.CreateSpecParams, store.Spec]
 
-	getSpec       mockCall[string, store.Spec]
-	updateMigSpec mockCall[store.UpdateMigSpecParams, struct{}]
+	getSpec         mockCall[string, store.Spec]
+	getAPITokenByID mockCall[string, store.GetAPITokenByIDRow]
+	updateMigSpec   mockCall[store.UpdateMigSpecParams, struct{}]
 
 	// Mig CRUD
 	createMig mockCall[store.CreateMigParams, store.Mig]
@@ -86,6 +87,10 @@ func (m *migStore) CreateSpec(ctx context.Context, params store.CreateSpecParams
 
 func (m *migStore) GetSpec(ctx context.Context, id types.SpecID) (store.Spec, error) {
 	return m.getSpec.record(id.String())
+}
+
+func (m *migStore) GetAPITokenByID(ctx context.Context, tokenID string) (store.GetAPITokenByIDRow, error) {
+	return m.getAPITokenByID.record(tokenID)
 }
 
 func (m *migStore) UpdateMigSpec(ctx context.Context, params store.UpdateMigSpecParams) error {

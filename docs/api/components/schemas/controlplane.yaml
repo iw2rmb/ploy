@@ -251,6 +251,15 @@ RunSummary:
       type: string
       minLength: 1
       description: Spec identifier for the run. Must be non-empty.
+    spec_name:
+      type: string
+      description: Named spec name when the run references a named spec.
+    spec_source_domain:
+      type: string
+      description: Named spec source domain when available.
+    spec_source_repo:
+      type: string
+      description: Named spec source repository path when available.
     status:
       $ref: "#/RunExecutionStatus"
     repo_id:
@@ -335,6 +344,9 @@ RunSubmitRequest:
     commit_sha:
       type: string
       description: Optional lowercase 40-hex commit SHA. When provided, the server uses it directly as the source commit.
+    spec_id:
+      type: string
+      description: Optional existing named spec ID. When present, the run references this specs row instead of creating an anonymous specs row.
     spec:
       type: object
       additionalProperties: true

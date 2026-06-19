@@ -302,6 +302,7 @@ The completion command is powered by Cobra and provides:
 
 Note: Token management commands are nested under `ploy cluster token`:
 - `ploy cluster token create|list|revoke` — Manage API tokens
+- `ploy cluster token create --role control-plane` requires `--username`.
 
 For persistent setup instructions specific to your shell, run:
 ```bash
@@ -322,6 +323,8 @@ ploy completion <shell> --help
   `tests/e2e/migs/README.md` for usage examples.
 - `ploy run --pull[=path]` and `ploy run pull <run-id> [path]` download run
   artifacts and write `manifest.json`.
+- `ploy run ls` lists only runs owned by the resolved token username by default;
+  `--all` lists every run. The table columns are `ID STATUS SPEC REPO`.
 - `ploy mig run --cap <duration>` applies only with `--follow`. When the duration
   elapses, the CLI stops following; use `--cancel-on-cap` to cancel the run too.
 

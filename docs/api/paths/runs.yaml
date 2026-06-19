@@ -7,7 +7,8 @@ post:
 
     Side-effects:
     - Creates a mig project (mig name == mig id).
-    - Creates a spec row and sets migs.spec_id.
+    - Creates an anonymous spec row and sets migs.spec_id, unless `spec_id`
+      references an existing named spec row.
     - Creates a mig repo row for the provided repo_url.
     - Creates a wave and a queued run row.
   requestBody:
@@ -40,9 +41,11 @@ get:
   tags: [Control]
   summary: List runs
   description: |
-    Return a paginated list of runs backed by the `runs` table. Each entry exposes
-    run metadata, repository identity, refs, status, timestamps, and optional
-    wave-level run counts.
+    Return a paginated list of runs backed by the `runs` table. By default the
+    list is scoped to the resolved caller username. `all=true` disables that
+    ownership filter. Each entry exposes run metadata, repository identity,
+    spec display metadata, refs, status, timestamps, and optional wave-level
+    run counts.
   parameters:
     - in: query
       name: limit
@@ -67,6 +70,18 @@ get:
       schema:
         type: string
       description: Optional repository URL filter. The server normalizes the URL before matching runs.
+    - in: query
+      name: created_by
+      required: false
+      schema:
+        type: string
+      description: Fallback creator filter used when the authenticated token has no username.
+    - in: query
+      name: all
+      required: false
+      schema:
+        type: boolean
+      description: When true, return runs for all creators.
   responses:
     "200":
       description: OK

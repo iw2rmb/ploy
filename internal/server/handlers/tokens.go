@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/server/auth"
@@ -23,6 +24,7 @@ func createAPITokenHandler(st store.Store, tokenSecret string) http.HandlerFunc 
 		// Parse request with strict validation.
 		var req struct {
 			Role          string `json:"role"`
+			Username      string `json:"username,omitempty"`
 			Description   string `json:"description"`
 			ExpiresInDays int    `json:"expires_in_days"`
 		}
@@ -35,6 +37,11 @@ func createAPITokenHandler(st store.Store, tokenSecret string) http.HandlerFunc 
 		normalizedRole := auth.NormalizeRole(req.Role)
 		if normalizedRole == "" {
 			writeHTTPError(w, http.StatusBadRequest, "invalid role: must be one of cli-admin, control-plane, or worker")
+			return
+		}
+		username := strings.TrimSpace(req.Username)
+		if normalizedRole == auth.RoleControlPlane && username == "" {
+			writeHTTPError(w, http.StatusBadRequest, "username is required for control-plane tokens")
 			return
 		}
 
@@ -81,6 +88,7 @@ func createAPITokenHandler(st store.Store, tokenSecret string) http.HandlerFunc 
 			TokenHash:   tokenHash,
 			TokenID:     claims.ID,
 			Role:        string(normalizedRole),
+			Username:    stringPtrOrNil(username),
 			Description: description,
 			IssuedAt:    pgtype.Timestamptz{Time: now, Valid: true},
 			ExpiresAt:   pgtype.Timestamptz{Time: expiresAt, Valid: true},
@@ -97,12 +105,14 @@ func createAPITokenHandler(st store.Store, tokenSecret string) http.HandlerFunc 
 			Token     string    `json:"token"`
 			TokenID   string    `json:"token_id"`
 			Role      string    `json:"role"`
+			Username  *string   `json:"username,omitempty"`
 			ExpiresAt time.Time `json:"expires_at"`
 			Warning   string    `json:"warning"`
 		}{
 			Token:     token,
 			TokenID:   claims.ID,
 			Role:      string(normalizedRole),
+			Username:  stringPtrOrNil(username),
 			ExpiresAt: expiresAt,
 			Warning:   "Save this token securely. It will not be shown again.",
 		}
@@ -116,6 +126,14 @@ func createAPITokenHandler(st store.Store, tokenSecret string) http.HandlerFunc 
 			"created_by", createdBy,
 		)
 	}
+}
+
+func stringPtrOrNil(value string) *string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil
+	}
+	return &value
 }
 
 // listAPITokensHandler lists all API tokens.
@@ -137,6 +155,7 @@ func listAPITokensHandler(st store.Store) http.HandlerFunc {
 		type tokenResponse struct {
 			TokenID     string     `json:"token_id"`
 			Role        string     `json:"role"`
+			Username    *string    `json:"username,omitempty"`
 			Description *string    `json:"description,omitempty"`
 			IssuedAt    time.Time  `json:"issued_at"`
 			ExpiresAt   time.Time  `json:"expires_at"`
@@ -159,6 +178,7 @@ func listAPITokensHandler(st store.Store) http.HandlerFunc {
 			responseTokens = append(responseTokens, tokenResponse{
 				TokenID:     t.TokenID,
 				Role:        t.Role,
+				Username:    t.Username,
 				Description: t.Description,
 				IssuedAt:    t.IssuedAt.Time,
 				ExpiresAt:   t.ExpiresAt.Time,

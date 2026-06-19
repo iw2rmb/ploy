@@ -2,14 +2,17 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"net/http"
 	"strings"
 	"time"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/server/auth"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/workflow/lifecycle"
+	"github.com/jackc/pgx/v5"
 )
 
 // NOTE: Run IDs in this file are KSUID-backed strings; repo IDs are NanoID(8)-backed strings.
@@ -41,6 +44,52 @@ func runToSummary(run store.Run) domaintypes.RunSummary {
 	}
 
 	return summary
+}
+
+func runMetadataToSummary(run store.ListRunsWithMetadataRow) domaintypes.RunSummary {
+	summary := domaintypes.RunSummary{
+		ID:               run.ID,
+		Status:           run.Status,
+		MigID:            run.MigID,
+		SpecID:           run.SpecID,
+		SpecName:         run.SpecName,
+		SpecSourceDomain: run.SpecSourceDomain,
+		SpecSourceRepo:   run.SpecSourceRepo,
+		RepoID:           run.RepoID,
+		RepoURL:          run.RepoUrl,
+		BaseRef:          run.RepoBaseRef,
+		SourceCommitSHA:  run.SourceCommitSha,
+		Attempt:          run.Attempt,
+		LastError:        run.LastError,
+		CreatedBy:        run.CreatedBy,
+		CreatedAt:        run.CreatedAt.Time,
+	}
+	if run.StartedAt.Valid {
+		summary.StartedAt = &run.StartedAt.Time
+	}
+	if run.FinishedAt.Valid {
+		summary.FinishedAt = &run.FinishedAt.Time
+	}
+	return summary
+}
+
+func resolvedCreatedBy(ctx context.Context, st store.Store, fallback string) (*string, error) {
+	if identity, ok := auth.IdentityFromContext(ctx); ok && strings.TrimSpace(identity.TokenID) != "" {
+		token, err := st.GetAPITokenByID(ctx, identity.TokenID)
+		if err != nil {
+			if !errors.Is(err, pgx.ErrNoRows) {
+				return nil, err
+			}
+		} else if token.Username != nil {
+			if username := strings.TrimSpace(*token.Username); username != "" {
+				return &username, nil
+			}
+		}
+	}
+	if fallback = strings.TrimSpace(fallback); fallback != "" {
+		return &fallback, nil
+	}
+	return nil, nil
 }
 
 // getRunCounts fetches and aggregates run counts by status for the run's wave.
@@ -128,13 +177,33 @@ func listRunsHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
+		allRuns := strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("all")), "true")
+		createdBy := strings.TrimSpace(r.URL.Query().Get("created_by"))
+		if !allRuns {
+			resolved, err := resolvedCreatedBy(r.Context(), st, createdBy)
+			if err != nil {
+				writeHTTPError(w, http.StatusInternalServerError, "failed to resolve caller identity: %v", err)
+				return
+			}
+			if resolved != nil {
+				createdBy = *resolved
+			}
+		} else {
+			createdBy = ""
+		}
+
 		repoURL := strings.TrimSpace(r.URL.Query().Get("repo_url"))
 		if repoURL != "" {
-			listRunsForRepoURL(w, r, st, repoURL, limit, offset)
+			listRunsForRepoURL(w, r, st, repoURL, limit, offset, allRuns, createdBy)
 			return
 		}
 
-		runs, err := st.ListRuns(r.Context(), store.ListRunsParams{Limit: limit, Offset: offset})
+		runs, err := st.ListRunsWithMetadata(r.Context(), store.ListRunsWithMetadataParams{
+			AllRuns:    allRuns,
+			CreatedBy:  createdBy,
+			LimitRows:  limit,
+			OffsetRows: offset,
+		})
 		if err != nil {
 			writeHTTPError(w, http.StatusInternalServerError, "failed to list runs: %v", err)
 			slog.Error("list runs: fetch failed", "err", err)
@@ -143,14 +212,7 @@ func listRunsHandler(st store.Store) http.HandlerFunc {
 
 		summaries := make([]domaintypes.RunSummary, 0, len(runs))
 		for _, run := range runs {
-			summary := runToSummary(run)
-			repoURL, err := repoURLForID(r.Context(), st, run.RepoID)
-			if err != nil {
-				writeHTTPError(w, http.StatusInternalServerError, "failed to resolve run repo: %v", err)
-				return
-			}
-			summary.RepoURL = repoURL
-			summaries = append(summaries, summary)
+			summaries = append(summaries, runMetadataToSummary(run))
 		}
 
 		resp := struct {
@@ -161,7 +223,7 @@ func listRunsHandler(st store.Store) http.HandlerFunc {
 	}
 }
 
-func listRunsForRepoURL(w http.ResponseWriter, r *http.Request, st store.Store, repoURL string, limit, offset int32) {
+func listRunsForRepoURL(w http.ResponseWriter, r *http.Request, st store.Store, repoURL string, limit, offset int32, allRuns bool, createdBy string) {
 	normalizedURL := domaintypes.NormalizeRepoURL(repoURL)
 	runs, err := st.ListDistinctRepos(r.Context(), repoURL)
 	if err != nil {
@@ -199,6 +261,11 @@ func listRunsForRepoURL(w http.ResponseWriter, r *http.Request, st store.Store, 
 		if err != nil {
 			writeHTTPError(w, http.StatusInternalServerError, "failed to resolve run: %v", err)
 			return
+		}
+		if !allRuns {
+			if stored.CreatedBy == nil || *stored.CreatedBy != createdBy {
+				continue
+			}
 		}
 		summary := runToSummary(stored)
 		summary.RepoURL = matches[0].RepoUrl

@@ -100,6 +100,7 @@ type Querier interface {
 	// Called by blobpersist as rollback when object storage upload fails.
 	DeleteSpecBundle(ctx context.Context, id string) error
 	DeleteWave(ctx context.Context, id types.WaveID) error
+	GetAPITokenByID(ctx context.Context, tokenID string) (GetAPITokenByIDRow, error)
 	// Transitional: returns current job id and linked successor id.
 	GetAdjacentJobIndices(ctx context.Context, id types.JobID) (GetAdjacentJobIndicesRow, error)
 	// Returns artifact bundle metadata including object_key for object-storage retrieval.
@@ -207,6 +208,7 @@ type Querier interface {
 	ListRunsByWave(ctx context.Context, waveID types.WaveID) ([]Run, error)
 	ListRunsForRepo(ctx context.Context, arg ListRunsForRepoParams) ([]ListRunsForRepoRow, error)
 	ListRunsTimings(ctx context.Context, arg ListRunsTimingsParams) ([]RunsTiming, error)
+	ListRunsWithMetadata(ctx context.Context, arg ListRunsWithMetadataParams) ([]ListRunsWithMetadataRow, error)
 	ListRunsWithURLByWave(ctx context.Context, waveID types.WaveID) ([]ListRunsWithURLByWaveRow, error)
 	// Lists spec bundles ordered by created_at descending (most recent first).
 	ListSpecBundles(ctx context.Context, arg ListSpecBundlesParams) ([]SpecBundle, error)

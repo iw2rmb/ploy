@@ -32,6 +32,8 @@ func TestListRunsCommand_Run(t *testing.T) {
 		name        string
 		limit       int32
 		offset      int32
+		createdBy   string
+		all         bool
 		serverResp  []domaintypes.RunSummary
 		wantCount   int
 		wantErr     bool
@@ -82,6 +84,24 @@ func TestListRunsCommand_Run(t *testing.T) {
 			},
 			wantCount: 1,
 		},
+		{
+			name:      "scoped by created_by",
+			limit:     10,
+			createdBy: "alice",
+			serverResp: []domaintypes.RunSummary{
+				{ID: runIDPage, Status: "Started", MigID: migIDPage, SpecID: specIDPage},
+			},
+			wantCount: 1,
+		},
+		{
+			name:  "all runs",
+			limit: 10,
+			all:   true,
+			serverResp: []domaintypes.RunSummary{
+				{ID: runIDPage, Status: "Started", MigID: migIDPage, SpecID: specIDPage},
+			},
+			wantCount: 1,
+		},
 	}
 
 	for _, tc := range tests {
@@ -105,6 +125,16 @@ func TestListRunsCommand_Run(t *testing.T) {
 						t.Error("expected limit query param")
 					}
 				}
+				if got := r.URL.Query().Get("created_by"); got != tc.createdBy {
+					t.Errorf("created_by = %q, want %q", got, tc.createdBy)
+				}
+				wantAll := ""
+				if tc.all {
+					wantAll = "true"
+				}
+				if got := r.URL.Query().Get("all"); got != wantAll {
+					t.Errorf("all = %q, want %q", got, wantAll)
+				}
 
 				resp := struct {
 					Runs []domaintypes.RunSummary `json:"runs"`
@@ -121,10 +151,12 @@ func TestListRunsCommand_Run(t *testing.T) {
 			}
 
 			cmd := ListRunsCommand{
-				Client:  srv.Client(),
-				BaseURL: baseURL,
-				Limit:   tc.limit,
-				Offset:  tc.offset,
+				Client:    srv.Client(),
+				BaseURL:   baseURL,
+				Limit:     tc.limit,
+				Offset:    tc.offset,
+				CreatedBy: tc.createdBy,
+				All:       tc.all,
 			}
 
 			result, err := cmd.Run(context.Background())

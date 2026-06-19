@@ -141,7 +141,7 @@ func newClusterTokenCmd(stderr io.Writer) *cobra.Command {
 }
 
 func newClusterTokenCreateCmd(stderr io.Writer) *cobra.Command {
-	var role, description string
+	var role, username, description string
 	var expires int
 	cmd := &cobra.Command{
 		Use:   "create --role <role>",
@@ -150,6 +150,7 @@ func newClusterTokenCreateCmd(stderr io.Writer) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			runArgs := []string{"token", "create"}
 			runArgs = addChangedString(cmd, runArgs, "role", role)
+			runArgs = addChangedString(cmd, runArgs, "username", username)
 			runArgs = addChangedString(cmd, runArgs, "description", description)
 			if cmd.Flags().Changed("expires") {
 				runArgs = append(runArgs, "--expires", fmt.Sprintf("%d", expires))
@@ -158,6 +159,7 @@ func newClusterTokenCreateCmd(stderr io.Writer) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&role, "role", "", "Token role: cli-admin, control-plane, or worker")
+	cmd.Flags().StringVar(&username, "username", "", "Durable username for control-plane tokens")
 	cmd.Flags().StringVar(&description, "description", "", "Human-readable description")
 	cmd.Flags().IntVar(&expires, "expires", 365, "Expiration in days")
 	return cmd

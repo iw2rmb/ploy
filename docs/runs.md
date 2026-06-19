@@ -16,6 +16,8 @@ ploy mig run <mig-id|name> [<namespace/repo[:ref]> ... | --failed] [--follow] [-
 
 - `ploy run` prints `run_id` and `mig_id`.
 - `POST /v1/runs` returns `wave_id`, `run_id`, `mig_id`, and `spec_id`.
+- Named-spec submissions pass `spec_id`; the run references that existing
+  specs row. Local file and directory submissions create anonymous specs rows.
 - `ploy mig run` prints `wave_id`; `--json` prints `wave_id`, `mig_id`,
   `spec_id`, and `run_count`.
 - Remote selector expansion is server-owned through `POST /v1/repos/resolve`.
@@ -27,6 +29,7 @@ ploy mig run <mig-id|name> [<namespace/repo[:ref]> ... | --failed] [--follow] [-
 ## Inspect And Control
 
 ```bash
+ploy run ls [--all] [--limit N] [--offset N]
 ploy run status <run-id> [--json|--follow]
 ploy run sbom {pre|post|diff} <run-id>
 ploy run cancel <run-id>
@@ -37,6 +40,11 @@ ploy wave cancel <wave-id>
 ploy job status <job-id>
 ploy job log <job-id>
 ```
+
+`ploy run ls` shows `ID STATUS SPEC REPO`. Without `--all`, the server filters
+to the authenticated token username, falling back to the CLI user's `$USER`
+when the token has no username. Named specs render as
+`domain/namespace/repo:spec-name`; anonymous specs render as `spec_id`.
 
 Run-scoped API surfaces:
 

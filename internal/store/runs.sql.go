@@ -547,6 +547,112 @@ func (q *Queries) ListRunsTimings(ctx context.Context, arg ListRunsTimingsParams
 	return items, nil
 }
 
+const listRunsWithMetadata = `-- name: ListRunsWithMetadata :many
+SELECT
+  runs.id,
+  runs.wave_id,
+  runs.mig_id,
+  runs.spec_id,
+  runs.repo_id,
+  runs.repo_base_ref,
+  runs.source_commit_sha,
+  runs.repo_sha0,
+  runs.created_by,
+  runs.status,
+  runs.attempt,
+  runs.last_error,
+  runs.created_at,
+  runs.started_at,
+  runs.finished_at,
+  runs.stats,
+  repos.url AS repo_url,
+  specs.name AS spec_name,
+  COALESCE(specs.source->>'domain', '')::text AS spec_source_domain,
+  COALESCE(specs.source->>'repo', '')::text AS spec_source_repo
+FROM runs
+JOIN repos ON repos.id = runs.repo_id
+JOIN specs ON specs.id = runs.spec_id
+WHERE $1::boolean OR runs.created_by = $2::text
+ORDER BY runs.created_at DESC, runs.id DESC
+LIMIT $4::int OFFSET $3::int
+`
+
+type ListRunsWithMetadataParams struct {
+	AllRuns    bool   `json:"all_runs"`
+	CreatedBy  string `json:"created_by"`
+	OffsetRows int32  `json:"offset_rows"`
+	LimitRows  int32  `json:"limit_rows"`
+}
+
+type ListRunsWithMetadataRow struct {
+	ID               types.RunID        `json:"id"`
+	WaveID           types.WaveID       `json:"wave_id"`
+	MigID            types.MigID        `json:"mig_id"`
+	SpecID           types.SpecID       `json:"spec_id"`
+	RepoID           types.RepoID       `json:"repo_id"`
+	RepoBaseRef      string             `json:"repo_base_ref"`
+	SourceCommitSha  string             `json:"source_commit_sha"`
+	RepoSha0         string             `json:"repo_sha0"`
+	CreatedBy        *string            `json:"created_by"`
+	Status           types.RunStatus    `json:"status"`
+	Attempt          int32              `json:"attempt"`
+	LastError        *string            `json:"last_error"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	StartedAt        pgtype.Timestamptz `json:"started_at"`
+	FinishedAt       pgtype.Timestamptz `json:"finished_at"`
+	Stats            []byte             `json:"stats"`
+	RepoUrl          string             `json:"repo_url"`
+	SpecName         string             `json:"spec_name"`
+	SpecSourceDomain string             `json:"spec_source_domain"`
+	SpecSourceRepo   string             `json:"spec_source_repo"`
+}
+
+func (q *Queries) ListRunsWithMetadata(ctx context.Context, arg ListRunsWithMetadataParams) ([]ListRunsWithMetadataRow, error) {
+	rows, err := q.db.Query(ctx, listRunsWithMetadata,
+		arg.AllRuns,
+		arg.CreatedBy,
+		arg.OffsetRows,
+		arg.LimitRows,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListRunsWithMetadataRow{}
+	for rows.Next() {
+		var i ListRunsWithMetadataRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.WaveID,
+			&i.MigID,
+			&i.SpecID,
+			&i.RepoID,
+			&i.RepoBaseRef,
+			&i.SourceCommitSha,
+			&i.RepoSha0,
+			&i.CreatedBy,
+			&i.Status,
+			&i.Attempt,
+			&i.LastError,
+			&i.CreatedAt,
+			&i.StartedAt,
+			&i.FinishedAt,
+			&i.Stats,
+			&i.RepoUrl,
+			&i.SpecName,
+			&i.SpecSourceDomain,
+			&i.SpecSourceRepo,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listRunsWithURLByWave = `-- name: ListRunsWithURLByWave :many
 SELECT runs.id, runs.wave_id, runs.mig_id, runs.spec_id, runs.repo_id, runs.repo_base_ref,
        runs.source_commit_sha, runs.repo_sha0, runs.created_by, runs.status, runs.attempt,
