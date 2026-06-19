@@ -73,7 +73,7 @@ func RunSubmit(ctx context.Context, opts SubmitOptions) error {
 		RepoURL:   domaintypes.RepoURL(repo.RepoURL),
 		Ref:       domaintypes.GitRef(repo.Ref),
 		CommitSHA: repo.CommitSHA,
-		Spec:      specPayload,
+		Spec:      specPayload.Spec,
 		CreatedBy: strings.TrimSpace(os.Getenv("USER")),
 	}
 
@@ -89,7 +89,7 @@ func RunSubmit(ctx context.Context, opts SubmitOptions) error {
 		return nil
 	}
 
-	final, err := followRunStatusReports(ctx, base, httpClient, runID, followOut, opts.MaxRetries, time.Second)
+	final, err := followRunStatusReports(ctx, base, httpClient, runID, followOut, specPayload.DisplayName, opts.MaxRetries, time.Second)
 	if err != nil {
 		return err
 	}
@@ -117,37 +117,45 @@ func RunSubmit(ctx context.Context, opts SubmitOptions) error {
 	return nil
 }
 
-func resolveRunSubmitSpecPayload(ctx context.Context, base *url.URL, client *http.Client, specArg string) (json.RawMessage, error) {
+type runSubmitSpecPayload struct {
+	Spec        json.RawMessage
+	DisplayName string
+}
+
+func resolveRunSubmitSpecPayload(ctx context.Context, base *url.URL, client *http.Client, specArg string) (runSubmitSpecPayload, error) {
 	specArg = strings.TrimSpace(specArg)
 	if specArg == "" {
-		return nil, errors.New("spec path required")
+		return runSubmitSpecPayload{}, errors.New("spec path required")
 	}
 	if info, err := os.Stat(specArg); err == nil {
 		specPath, err := normalizeRunSpecPath(specArg, info)
 		if err != nil {
-			return nil, err
+			return runSubmitSpecPayload{}, err
 		}
-		return buildRunSubmitSpecPayload(ctx, base, client, specPath, "")
+		spec, err := buildRunSubmitSpecPayload(ctx, base, client, specPath, "")
+		return runSubmitSpecPayload{Spec: spec}, err
 	}
 
 	localPath, stepSelector, ok, err := splitLocalRunSpecSelector(specArg)
 	if err != nil {
-		return nil, err
+		return runSubmitSpecPayload{}, err
 	}
 	if ok {
 		specPath, err := resolveRunSpecPath(localPath)
 		if err != nil {
-			return nil, err
+			return runSubmitSpecPayload{}, err
 		}
-		return buildRunSubmitSpecPayload(ctx, base, client, specPath, stepSelector)
+		spec, err := buildRunSubmitSpecPayload(ctx, base, client, specPath, stepSelector)
+		return runSubmitSpecPayload{Spec: spec}, err
 	}
 
 	if pathExplicitlyLocal(specArg) {
 		specPath, err := resolveRunSpecPath(specArg)
 		if err != nil {
-			return nil, err
+			return runSubmitSpecPayload{}, err
 		}
-		return buildRunSubmitSpecPayload(ctx, base, client, specPath, "")
+		spec, err := buildRunSubmitSpecPayload(ctx, base, client, specPath, "")
+		return runSubmitSpecPayload{Spec: spec}, err
 	}
 
 	return resolveNamedRunSubmitSpecPayload(ctx, base, client, specArg)
@@ -203,12 +211,12 @@ func normalizeRunSpecPath(specPath string, info os.FileInfo) (string, error) {
 	return specPath, nil
 }
 
-func resolveNamedRunSubmitSpecPayload(ctx context.Context, base *url.URL, client *http.Client, selector string) (json.RawMessage, error) {
+func resolveNamedRunSubmitSpecPayload(ctx context.Context, base *url.URL, client *http.Client, selector string) (runSubmitSpecPayload, error) {
 	if base == nil {
-		return nil, fmt.Errorf("run submit: base url required")
+		return runSubmitSpecPayload{}, fmt.Errorf("run submit: base url required")
 	}
 	if client == nil {
-		return nil, fmt.Errorf("run submit: http client required")
+		return runSubmitSpecPayload{}, fmt.Errorf("run submit: http client required")
 	}
 
 	endpoint := base.JoinPath("v1", "specs", "resolve")
@@ -218,32 +226,45 @@ func resolveNamedRunSubmitSpecPayload(ctx context.Context, base *url.URL, client
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
 	if err != nil {
-		return nil, fmt.Errorf("run submit: resolve named spec: build request: %w", err)
+		return runSubmitSpecPayload{}, fmt.Errorf("run submit: resolve named spec: build request: %w", err)
 	}
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("run submit: resolve named spec: http request failed: %w", err)
+		return runSubmitSpecPayload{}, fmt.Errorf("run submit: resolve named spec: http request failed: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	switch resp.StatusCode {
 	case http.StatusOK:
 	case http.StatusNotFound:
-		return nil, fmt.Errorf("run submit: named spec not found: %s", selector)
+		return runSubmitSpecPayload{}, fmt.Errorf("run submit: named spec not found: %s", selector)
 	case http.StatusBadRequest, http.StatusConflict:
-		return nil, fmt.Errorf("run submit: %s", httpx.ReadErrorMessage(resp.Body, resp.Status, httpx.MaxErrorBodyBytes))
+		return runSubmitSpecPayload{}, fmt.Errorf("run submit: %s", httpx.ReadErrorMessage(resp.Body, resp.Status, httpx.MaxErrorBodyBytes))
 	default:
-		return nil, fmt.Errorf("run submit: resolve named spec: %s", httpx.ReadErrorMessage(resp.Body, resp.Status, httpx.MaxErrorBodyBytes))
+		return runSubmitSpecPayload{}, fmt.Errorf("run submit: resolve named spec: %s", httpx.ReadErrorMessage(resp.Body, resp.Status, httpx.MaxErrorBodyBytes))
 	}
 
 	var resolved domainapi.NamedSpecResolveResponse
 	if err := httpx.DecodeResponseJSON(resp.Body, &resolved, httpx.MaxJSONBodyBytes); err != nil {
-		return nil, fmt.Errorf("run submit: resolve named spec: decode response: %w", err)
+		return runSubmitSpecPayload{}, fmt.Errorf("run submit: resolve named spec: decode response: %w", err)
 	}
 	if len(resolved.Spec) == 0 {
-		return nil, fmt.Errorf("run submit: resolve named spec: empty spec in response")
+		return runSubmitSpecPayload{}, fmt.Errorf("run submit: resolve named spec: empty spec in response")
 	}
-	return resolved.Spec, nil
+	return runSubmitSpecPayload{
+		Spec:        resolved.Spec,
+		DisplayName: namedSpecDisplayName(resolved),
+	}, nil
+}
+
+func namedSpecDisplayName(resolved domainapi.NamedSpecResolveResponse) string {
+	domain := strings.Trim(strings.TrimSpace(resolved.Source.Domain), "/")
+	repo := strings.Trim(strings.TrimSpace(resolved.Source.Repo), "/")
+	name := strings.TrimSpace(resolved.Name)
+	if domain == "" || repo == "" || name == "" {
+		return ""
+	}
+	return domain + "/" + repo + ":" + name
 }
 
 func buildRunSubmitSpecPayload(ctx context.Context, base *url.URL, client *http.Client, specPath string, stepSelector string) (json.RawMessage, error) {
@@ -267,20 +288,22 @@ func buildRunSubmitSpecPayload(ctx context.Context, base *url.URL, client *http.
 	return specPayload, nil
 }
 
-func followRunStatusReports(ctx context.Context, baseURL *url.URL, client *http.Client, runID domaintypes.RunID, out io.Writer, maxRetries int, pollInterval time.Duration) (migsapi.RunState, error) {
+func followRunStatusReports(ctx context.Context, baseURL *url.URL, client *http.Client, runID domaintypes.RunID, out io.Writer, specDisplayName string, maxRetries int, pollInterval time.Duration) (migsapi.RunState, error) {
 	renderOpts := common.FollowRunRenderOptions(baseURL, out)
+	renderOpts.SpecDisplayName = specDisplayName
 	if maxRetries == 0 {
 		maxRetries = 5
 	}
 	return runs.FollowRunCommand{
-		Client:       client,
-		BaseURL:      baseURL,
-		RunID:        runID,
-		Output:       out,
-		EnableOSC8:   renderOpts.EnableOSC8,
-		AuthToken:    renderOpts.AuthToken,
-		MaxRetries:   maxRetries,
-		PollInterval: pollInterval,
+		Client:          client,
+		BaseURL:         baseURL,
+		RunID:           runID,
+		Output:          out,
+		EnableOSC8:      renderOpts.EnableOSC8,
+		AuthToken:       renderOpts.AuthToken,
+		SpecDisplayName: renderOpts.SpecDisplayName,
+		MaxRetries:      maxRetries,
+		PollInterval:    pollInterval,
 	}.Run(ctx)
 }
 

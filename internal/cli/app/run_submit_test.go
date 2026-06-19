@@ -425,34 +425,74 @@ func TestRunSubmitPullDownloadsFinalArtifacts(t *testing.T) {
 	}
 }
 
-func TestRunSubmitFollowUsesStatusFollowRenderer(t *testing.T) {
-	specPath := filepath.Join(t.TempDir(), "spec.yaml")
-	if err := os.WriteFile(specPath, []byte("steps:\n  - image: alpine\n"), 0o644); err != nil {
-		t.Fatalf("write spec file: %v", err)
+func TestRunSubmitFollowOutputCases(t *testing.T) {
+	tests := []struct {
+		name         string
+		specArg      func(t *testing.T) string
+		configure    func(*successfulRunSubmitConfig)
+		wantContain  string
+		wantNoSpecID bool
+	}{
+		{
+			name: "local spec uses status follow renderer",
+			specArg: func(t *testing.T) string {
+				t.Helper()
+				specPath := filepath.Join(t.TempDir(), "spec.yaml")
+				if err := os.WriteFile(specPath, []byte("steps:\n  - image: alpine\n"), 0o644); err != nil {
+					t.Fatalf("write spec file: %v", err)
+				}
+				return specPath
+			},
+			wantContain: "acme/service",
+		},
+		{
+			name:    "named spec displays source reference instead of spec id",
+			specArg: func(t *testing.T) string { return "upgrade-java" },
+			configure: func(cfg *successfulRunSubmitConfig) {
+				cfg.NamedSpecName = "upgrade-java"
+				cfg.NamedSpecDomain = "gitlab.example.com"
+				cfg.NamedSpecRepo = "acme/specs"
+			},
+			wantContain:  "Spec:  gitlab.example.com/acme/specs:upgrade-java",
+			wantNoSpecID: true,
+		},
 	}
-	runID := domaintypes.NewRunID().String()
-	server := newSuccessfulRunSubmitServer(t, successfulRunSubmitConfig{
-		RunID:   runID,
-		MigID:   domaintypes.NewMigID().String(),
-		SpecID:  domaintypes.NewSpecID().String(),
-		RepoID:  domaintypes.NewRepoID().String(),
-		JobID:   domaintypes.NewJobID().String(),
-		RepoURL: "https://gitlab.example.com/acme/service.git",
-		Ref:     "main",
-	})
-	defer server.Close()
-	clienv.UseControlPlaneEnv(t, server.URL)
 
-	var buf bytes.Buffer
-	if err := executeCmd([]string{"run", "--follow", specPath, "acme/service"}, &buf); err != nil {
-		t.Fatalf("run --follow error: %v", err)
-	}
-	out := buf.String()
-	if !strings.Contains(out, "acme/service") {
-		t.Fatalf("expected final status snapshot, got %q", out)
-	}
-	if strings.Contains(out, "run_id: "+runID) {
-		t.Fatalf("expected follow output without submit id prelude, got %q", out)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			specID := domaintypes.NewSpecID().String()
+			runID := domaintypes.NewRunID().String()
+			cfg := successfulRunSubmitConfig{
+				RunID:   runID,
+				MigID:   domaintypes.NewMigID().String(),
+				SpecID:  specID,
+				RepoID:  domaintypes.NewRepoID().String(),
+				JobID:   domaintypes.NewJobID().String(),
+				RepoURL: "https://gitlab.example.com/acme/service.git",
+				Ref:     "main",
+			}
+			if tc.configure != nil {
+				tc.configure(&cfg)
+			}
+			server := newSuccessfulRunSubmitServer(t, cfg)
+			defer server.Close()
+			clienv.UseControlPlaneEnv(t, server.URL)
+
+			var buf bytes.Buffer
+			if err := executeCmd([]string{"run", "--follow", tc.specArg(t), "acme/service"}, &buf); err != nil {
+				t.Fatalf("run --follow error: %v", err)
+			}
+			out := buf.String()
+			if !strings.Contains(out, tc.wantContain) {
+				t.Fatalf("expected %q in follow output, got %q", tc.wantContain, out)
+			}
+			if tc.wantNoSpecID && strings.Contains(out, "Spec:  "+specID) {
+				t.Fatalf("expected named spec reference instead of spec id, got %q", out)
+			}
+			if strings.Contains(out, "run_id: "+runID) {
+				t.Fatalf("expected follow output without submit id prelude, got %q", out)
+			}
+		})
 	}
 }
 
@@ -503,6 +543,10 @@ type successfulRunSubmitConfig struct {
 	RunState  string
 	JobStatus string
 	Patch     []byte
+
+	NamedSpecName   string
+	NamedSpecDomain string
+	NamedSpecRepo   string
 }
 
 func newSuccessfulRunSubmitServer(t *testing.T, cfg successfulRunSubmitConfig) *httptest.Server {
@@ -527,6 +571,17 @@ func newSuccessfulRunSubmitServer(t *testing.T, cfg successfulRunSubmitConfig) *
 	jobState := stageStateForJobStatus(jobStatus)
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/specs/resolve" && cfg.NamedSpecName != "":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"name":   cfg.NamedSpecName,
+				"source": map[string]string{"domain": cfg.NamedSpecDomain, "repo": cfg.NamedSpecRepo},
+				"spec": map[string]any{
+					"steps": []map[string]any{{
+						"image":   "alpine:latest",
+						"command": "echo named",
+					}},
+				},
+			})
 		case r.Method == http.MethodPost && r.URL.Path == "/v1/repos/resolve":
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"repo_url":   cfg.RepoURL,

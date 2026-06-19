@@ -203,6 +203,10 @@ func TestRenderRunStatusReportTextHeadersAndArtifacts(t *testing.T) {
 	if strings.Count(plain, nodeID.String()) != 1 {
 		t.Fatalf("expected node id only in Node header, got %q", plain)
 	}
+
+	namedOut := renderText(t, report, TextRenderOptions{EnableOSC8: false, BaseURL: baseURL, SpecDisplayName: "github.com/acme/specs:upgrade-java"})
+	assertx.Contains(t, namedOut, "\n   Spec:  github.com/acme/specs:upgrade-java (https://example.test/v1/migs/"+migID.String()+"/specs/latest)")
+	assertx.NotContains(t, namedOut, "\n   Spec:  "+specID.String())
 }
 
 func TestRenderRunStatusReportTextUsesDisplayName(t *testing.T) {

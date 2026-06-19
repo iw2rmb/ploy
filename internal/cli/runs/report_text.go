@@ -27,6 +27,7 @@ type TextRenderOptions struct {
 	ExpandStderr       bool
 	FilterRunningRepos bool
 	EmptyReposLine     string
+	SpecDisplayName    string
 }
 
 // RunJobIOPreview contains bounded stdout/stderr previews for a single job.
@@ -97,7 +98,7 @@ func RenderRunStatusReportTextLayout(report RunStatusReport, opts TextRenderOpti
 		"",
 		fmt.Sprintf("   Run:   %s", valueOrDash(report.RunID.String())),
 		fmt.Sprintf("   Repo:  %s", renderRepoHeaderValue(headerRepo, opts)),
-		fmt.Sprintf("   Spec:  %s", renderOptionalLink(valueOrDash(report.SpecID.String()), buildSpecDownloadURL(report, opts.BaseURL), opts.EnableOSC8, opts.AuthToken)),
+		fmt.Sprintf("   Spec:  %s", renderOptionalLink(renderSpecHeaderValue(report, opts), buildSpecDownloadURL(report, opts.BaseURL), opts.EnableOSC8, opts.AuthToken)),
 	}
 
 	if len(repos) == 0 {
@@ -286,6 +287,13 @@ func renderRepoHeaderValue(repo RunEntry, opts TextRenderOptions) string {
 	}
 
 	return fmt.Sprintf("%s:%s", repoLabel, colorizeNeutralText(shortSHA))
+}
+
+func renderSpecHeaderValue(report RunStatusReport, opts TextRenderOptions) string {
+	if displayName := strings.TrimSpace(opts.SpecDisplayName); displayName != "" {
+		return displayName
+	}
+	return valueOrDash(report.SpecID.String())
 }
 
 func renderRepoPathLabel(repo RunEntry) string {
