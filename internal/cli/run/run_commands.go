@@ -18,7 +18,7 @@ import (
 func NewCommand() *cobra.Command {
 	submit := SubmitOptions{MaxRetries: 5}
 	cmd := &cobra.Command{
-		Use:   "run <spec-path>[:<step-name>] [<repo-path>|<namespace/repo[:ref]>]",
+		Use:   "run (<spec-path>[:<step-name>]|<name>|<namespace/repo>:<name>|<domain>/<namespace/repo>:<name>) [<repo-path>|<namespace/repo[:ref]>]",
 		Short: "Submit and inspect runs",
 		Args:  cobra.RangeArgs(1, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {
