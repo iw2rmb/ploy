@@ -9,12 +9,14 @@ func TestParseMigSpecJSON_BuildGateStackConfig(t *testing.T) {
 	tests := []struct {
 		name        string
 		mode        BuildGateStackMode
-		releaseJSON string
+		stackJSON   string
+		wantTool    string
 		wantRelease string
 	}{
-		{name: "forced", mode: BuildGateStackModeForced, releaseJSON: "11", wantRelease: "11"},
-		{name: "strict", mode: BuildGateStackModeStrict, releaseJSON: `"17"`, wantRelease: "17"},
-		{name: "fallback", mode: BuildGateStackModeFallback, releaseJSON: `"21"`, wantRelease: "21"},
+		{name: "forced", mode: BuildGateStackModeForced, stackJSON: `"language": "java", "tool": "maven", "release": 11`, wantTool: "maven", wantRelease: "11"},
+		{name: "strict full tuple", mode: BuildGateStackModeStrict, stackJSON: `"language": "java", "tool": "maven", "release": "17"`, wantTool: "maven", wantRelease: "17"},
+		{name: "strict partial tuple", mode: BuildGateStackModeStrict, stackJSON: `"language": "java", "release": "17"`, wantRelease: "17"},
+		{name: "fallback", mode: BuildGateStackModeFallback, stackJSON: `"language": "java", "tool": "maven", "release": "21"`, wantTool: "maven", wantRelease: "21"},
 	}
 
 	for _, tt := range tests {
@@ -27,9 +29,7 @@ func TestParseMigSpecJSON_BuildGateStackConfig(t *testing.T) {
 					"pre": {
 						"stack": {
 							"mode": "` + string(tt.mode) + `",
-							"language": "java",
-							"tool": "maven",
-							"release": ` + tt.releaseJSON + `
+							` + tt.stackJSON + `
 						}
 					}
 				}
@@ -53,8 +53,8 @@ func TestParseMigSpecJSON_BuildGateStackConfig(t *testing.T) {
 			if stack.Language != "java" {
 				t.Errorf("build_gate.pre.stack.language = %q, want %q", stack.Language, "java")
 			}
-			if stack.Tool != "maven" {
-				t.Errorf("build_gate.pre.stack.tool = %q, want %q", stack.Tool, "maven")
+			if stack.Tool != tt.wantTool {
+				t.Errorf("build_gate.pre.stack.tool = %q, want %q", stack.Tool, tt.wantTool)
 			}
 			if stack.Release != tt.wantRelease {
 				t.Errorf("build_gate.pre.stack.release = %q, want %q", stack.Release, tt.wantRelease)
@@ -70,26 +70,34 @@ func TestParseMigSpecJSON_BuildGateStackConfig_Invalid(t *testing.T) {
 		wantErr string
 	}{
 		{
-			name: "mode without language",
+			name: "fallback without language",
 			input: `{
 				"steps": [{"image": "ghcr.io/iw2rmb/ploy/mig:latest"}],
-				"build_gate": {"pre": {"stack": {"mode": "strict", "tool": "maven", "release": "11"}}}
+				"build_gate": {"pre": {"stack": {"mode": "fallback", "tool": "maven", "release": "11"}}}
 			}`,
 			wantErr: "build_gate.pre.stack",
 		},
 		{
-			name: "mode without tool",
+			name: "forced without tool",
 			input: `{
 				"steps": [{"image": "ghcr.io/iw2rmb/ploy/mig:latest"}],
-				"build_gate": {"post": {"stack": {"mode": "strict", "language": "java", "release": "17"}}}
+				"build_gate": {"post": {"stack": {"mode": "forced", "language": "java", "release": "17"}}}
 			}`,
 			wantErr: "build_gate.post.stack",
 		},
 		{
-			name: "mode without release",
+			name: "fallback without release",
 			input: `{
 				"steps": [{"image": "ghcr.io/iw2rmb/ploy/mig:latest"}],
-				"build_gate": {"post": {"stack": {"mode": "strict", "language": "java", "tool": "maven"}}}
+				"build_gate": {"post": {"stack": {"mode": "fallback", "language": "java", "tool": "maven"}}}
+			}`,
+			wantErr: "build_gate.post.stack",
+		},
+		{
+			name: "strict without expectation",
+			input: `{
+				"steps": [{"image": "ghcr.io/iw2rmb/ploy/mig:latest"}],
+				"build_gate": {"post": {"stack": {"mode": "strict"}}}
 			}`,
 			wantErr: "build_gate.post.stack",
 		},

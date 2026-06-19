@@ -207,6 +207,13 @@ func validateBuildGateStackConfig(stack *BuildGateStackConfig, prefix string) er
 		return fmt.Errorf("%s.mode: must be one of forced, strict, fallback", prefix)
 	}
 
+	if mode == BuildGateStackModeStrict {
+		if strings.TrimSpace(stack.Language) == "" && strings.TrimSpace(stack.Tool) == "" && strings.TrimSpace(stack.Release) == "" {
+			return fmt.Errorf("%s: strict mode requires language, tool, or release", prefix)
+		}
+		return nil
+	}
+
 	if strings.TrimSpace(stack.Language) == "" {
 		return fmt.Errorf("%s.language: required", prefix)
 	}
