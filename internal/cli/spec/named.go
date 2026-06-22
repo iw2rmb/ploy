@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"text/tabwriter"
@@ -37,6 +38,13 @@ type gitSpecSource struct {
 	Domain      string
 	Repo        string
 }
+
+type specArchiveAction struct {
+	Selector string
+	Archive  bool
+}
+
+var namedSpecSHAPrefixRE = regexp.MustCompile(`^[0-9a-f]{8,40}$`)
 
 func handlePush(args []string, stdout, stderr io.Writer) error {
 	if common.WantsHelp(args) {
@@ -113,9 +121,19 @@ func handleList(args []string, stdout, stderr io.Writer) error {
 		printListUsage(stderr)
 		return nil
 	}
-	if len(args) > 0 {
+	archived := false
+	for _, arg := range args {
+		switch arg {
+		case "--archived":
+			archived = true
+		default:
+			printListUsage(stderr)
+			return errors.New("spec ls takes only --archived")
+		}
+	}
+	if len(args) > 1 {
 		printListUsage(stderr)
-		return errors.New("spec ls takes no arguments")
+		return errors.New("spec ls takes at most one flag")
 	}
 
 	ctx := context.Background()
@@ -123,7 +141,7 @@ func handleList(args []string, stdout, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	specs, err := listNamedSpecs(ctx, base, client)
+	specs, err := listNamedSpecs(ctx, base, client, archived)
 	if err != nil {
 		return err
 	}
@@ -132,7 +150,70 @@ func handleList(args []string, stdout, stderr io.Writer) error {
 }
 
 func printListUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy spec ls")
+	_, _ = fmt.Fprintln(w, "Usage: ploy spec ls [--archived]")
+}
+
+func parseSpecArchiveArgs(args []string) (specArchiveAction, bool, error) {
+	var selector string
+	hasArchive := false
+	hasUnarchive := false
+	for _, arg := range args {
+		switch arg {
+		case "--archive":
+			hasArchive = true
+		case "--unarchive":
+			hasUnarchive = true
+		default:
+			if strings.HasPrefix(arg, "-") {
+				return specArchiveAction{}, false, fmt.Errorf("unknown spec flag %q", arg)
+			}
+			if selector != "" {
+				return specArchiveAction{}, false, errors.New("spec archive action takes exactly one selector")
+			}
+			selector = strings.TrimSpace(arg)
+		}
+	}
+	if hasArchive && hasUnarchive {
+		return specArchiveAction{}, false, errors.New("--archive and --unarchive are mutually exclusive")
+	}
+	if !hasArchive && !hasUnarchive {
+		return specArchiveAction{}, false, nil
+	}
+	if selector == "" {
+		return specArchiveAction{}, false, errors.New("spec selector required")
+	}
+	return specArchiveAction{Selector: selector, Archive: hasArchive}, true, nil
+}
+
+func handleArchiveAction(action specArchiveAction, stdout, stderr io.Writer) error {
+	if common.WantsHelp([]string{action.Selector}) {
+		printArchiveUsage(stderr)
+		return nil
+	}
+	ctx := context.Background()
+	base, client, err := common.ResolveControlPlaneHTTP(ctx)
+	if err != nil {
+		return err
+	}
+	currentArchived := !action.Archive
+	resolved, err := resolveNamedSpecForAction(ctx, base, client, action.Selector, currentArchived)
+	if err != nil {
+		return err
+	}
+	updated, err := updateNamedSpecArchiveState(ctx, base, client, resolved.ID, action.Archive)
+	if err != nil {
+		return err
+	}
+	state := "archived"
+	if !action.Archive {
+		state = "unarchived"
+	}
+	_, _ = fmt.Fprintf(stdout, "Spec %s: %s@%s\n", state, renderNamedSpecSource(updated.Source)+":"+updated.Name, shortSHA(updated.SHA))
+	return nil
+}
+
+func printArchiveUsage(w io.Writer) {
+	_, _ = fmt.Fprintln(w, "Usage: ploy spec <selector>[@sha] (--archive|--unarchive)")
 }
 
 type discoveredNamedSpec struct {
@@ -318,10 +399,11 @@ func publishNamedSpec(ctx context.Context, base *url.URL, client *http.Client, r
 	return summary, nil
 }
 
-func listNamedSpecs(ctx context.Context, base *url.URL, client *http.Client) ([]domainapi.NamedSpecSummary, error) {
+func listNamedSpecs(ctx context.Context, base *url.URL, client *http.Client, archived bool) ([]domainapi.NamedSpecSummary, error) {
 	endpoint := base.JoinPath("v1", "specs")
 	q := endpoint.Query()
 	q.Set("named", "true")
+	q.Set("archived", fmt.Sprintf("%t", archived))
 	endpoint.RawQuery = q.Encode()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
 	if err != nil {
@@ -340,6 +422,81 @@ func listNamedSpecs(ctx context.Context, base *url.URL, client *http.Client) ([]
 		return nil, fmt.Errorf("list named specs: decode response: %w", err)
 	}
 	return list.Specs, nil
+}
+
+func resolveNamedSpecForAction(ctx context.Context, base *url.URL, client *http.Client, selector string, archived bool) (domainapi.NamedSpecResolveResponse, error) {
+	selector, shaPrefix, err := splitNamedSpecVersionSelector(selector)
+	if err != nil {
+		return domainapi.NamedSpecResolveResponse{}, err
+	}
+	endpoint := base.JoinPath("v1", "specs", "resolve")
+	q := endpoint.Query()
+	q.Set("selector", selector)
+	q.Set("archived", fmt.Sprintf("%t", archived))
+	if shaPrefix != "" {
+		q.Set("sha", shaPrefix)
+	}
+	endpoint.RawQuery = q.Encode()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
+	if err != nil {
+		return domainapi.NamedSpecResolveResponse{}, fmt.Errorf("resolve named spec: build request: %w", err)
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return domainapi.NamedSpecResolveResponse{}, fmt.Errorf("resolve named spec: http request: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		return domainapi.NamedSpecResolveResponse{}, common.ControlPlaneHTTPError(resp)
+	}
+	var resolved domainapi.NamedSpecResolveResponse
+	if err := json.NewDecoder(resp.Body).Decode(&resolved); err != nil {
+		return domainapi.NamedSpecResolveResponse{}, fmt.Errorf("resolve named spec: decode response: %w", err)
+	}
+	return resolved, nil
+}
+
+func updateNamedSpecArchiveState(ctx context.Context, base *url.URL, client *http.Client, specID string, archived bool) (domainapi.NamedSpecSummary, error) {
+	endpoint := base.JoinPath("v1", "specs", specID)
+	body, err := json.Marshal(domainapi.UpdateNamedSpecRequest{Archived: archived})
+	if err != nil {
+		return domainapi.NamedSpecSummary{}, fmt.Errorf("update named spec: marshal request: %w", err)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPatch, endpoint.String(), bytes.NewReader(body))
+	if err != nil {
+		return domainapi.NamedSpecSummary{}, fmt.Errorf("update named spec: build request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := client.Do(req)
+	if err != nil {
+		return domainapi.NamedSpecSummary{}, fmt.Errorf("update named spec: http request: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		return domainapi.NamedSpecSummary{}, common.ControlPlaneHTTPError(resp)
+	}
+	var summary domainapi.NamedSpecSummary
+	if err := json.NewDecoder(resp.Body).Decode(&summary); err != nil {
+		return domainapi.NamedSpecSummary{}, fmt.Errorf("update named spec: decode response: %w", err)
+	}
+	return summary, nil
+}
+
+func splitNamedSpecVersionSelector(selector string) (string, string, error) {
+	selector = strings.TrimSpace(selector)
+	idx := strings.LastIndex(selector, "@")
+	if idx < 0 {
+		return selector, "", nil
+	}
+	base := strings.TrimSpace(selector[:idx])
+	shaPrefix := strings.TrimSpace(selector[idx+1:])
+	if base == "" || shaPrefix == "" {
+		return "", "", fmt.Errorf("invalid named spec selector: %s", selector)
+	}
+	if !namedSpecSHAPrefixRE.MatchString(shaPrefix) {
+		return "", "", errors.New("sha must be a lowercase 8-40 character hex prefix")
+	}
+	return base, shaPrefix, nil
 }
 
 func renderPushResults(out io.Writer, specs []domainapi.NamedSpecSummary) {

@@ -193,6 +193,8 @@ paths:
   # Named specs - publish/list/resolve committed specs by name.
   /v1/specs:
     $ref: "./paths/specs.yaml"
+  /v1/specs/{spec_id}:
+    $ref: "./paths/specs_spec_id.yaml"
   /v1/specs/resolve:
     $ref: "./paths/specs_resolve.yaml"
   # Job diff upload endpoint (run-scoped, no node ID)
@@ -353,6 +355,8 @@ components:
       $ref: "./components/schemas/controlplane.yaml#/NamedSpecListResponse"
     NamedSpecResolveResponse:
       $ref: "./components/schemas/controlplane.yaml#/NamedSpecResolveResponse"
+    UpdateNamedSpecRequest:
+      $ref: "./components/schemas/controlplane.yaml#/UpdateNamedSpecRequest"
     # Legacy removed:
     # - Node schemas (nodes.yaml) — node registry handled via mTLS RPC
     # - GitLab schemas (gitlab.yaml) — GitLab signer removed

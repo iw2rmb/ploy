@@ -1439,7 +1439,16 @@ PublishNamedSpecRequest:
       description: Prepared mig spec JSON. Must parse as apiVersion ploy.mig/v1alpha1 and have root name matching the request name.
     created_by:
       type: string
+      description: Optional client fallback; authenticated token username is authoritative when available.
   required: [name, source, sha, source_committed_at, spec]
+
+UpdateNamedSpecRequest:
+  type: object
+  additionalProperties: false
+  properties:
+    archived:
+      type: boolean
+  required: [archived]
 
 NamedSpecSummary:
   type: object
@@ -1459,9 +1468,19 @@ NamedSpecSummary:
     source_committed_at:
       type: string
       format: date-time
+    created_by:
+      type: string
+      nullable: true
+    updated_by:
+      type: string
+      nullable: true
     created_at:
       type: string
       format: date-time
+    archived_at:
+      type: string
+      format: date-time
+      nullable: true
     skipped:
       type: boolean
       description: True when publish returned an existing idempotent row.

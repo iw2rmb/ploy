@@ -24,9 +24,13 @@ type specStore struct {
 	getNamedSpecByNameSourceSHA mockCallSeq[store.GetNamedSpecByNameSourceSHAParams, store.Spec]
 	createNamedSpec             mockCall[store.CreateNamedSpecParams, store.Spec]
 	listLatestNamedSpecs        mockCall[store.ListLatestNamedSpecsParams, []store.ListLatestNamedSpecsRow]
-	resolveByName               mockCall[string, []store.ResolveLatestNamedSpecByNameRow]
+	resolveByName               mockCall[store.ResolveLatestNamedSpecByNameParams, []store.ResolveLatestNamedSpecByNameRow]
 	resolveByRepoName           mockCall[store.ResolveLatestNamedSpecByRepoNameParams, []store.ResolveLatestNamedSpecByRepoNameRow]
 	resolveByDomainRepoName     mockCall[store.ResolveLatestNamedSpecByDomainRepoNameParams, []store.ResolveLatestNamedSpecByDomainRepoNameRow]
+	resolveVersionByName        mockCall[store.ResolveNamedSpecVersionByNameParams, []store.Spec]
+	resolveVersionByRepoName    mockCall[store.ResolveNamedSpecVersionByRepoNameParams, []store.Spec]
+	resolveVersionByDomainRepo  mockCall[store.ResolveNamedSpecVersionByDomainRepoNameParams, []store.Spec]
+	updateNamedSpecArchiveState mockCall[store.UpdateNamedSpecArchiveStateParams, store.Spec]
 }
 
 func (s *specStore) GetNamedSpecByNameSourceSHA(ctx context.Context, arg store.GetNamedSpecByNameSourceSHAParams) (store.Spec, error) {
@@ -44,8 +48,8 @@ func (s *specStore) ListLatestNamedSpecs(ctx context.Context, arg store.ListLate
 	return s.listLatestNamedSpecs.record(arg)
 }
 
-func (s *specStore) ResolveLatestNamedSpecByName(ctx context.Context, name string) ([]store.ResolveLatestNamedSpecByNameRow, error) {
-	return s.resolveByName.record(name)
+func (s *specStore) ResolveLatestNamedSpecByName(ctx context.Context, arg store.ResolveLatestNamedSpecByNameParams) ([]store.ResolveLatestNamedSpecByNameRow, error) {
+	return s.resolveByName.record(arg)
 }
 
 func (s *specStore) ResolveLatestNamedSpecByRepoName(ctx context.Context, arg store.ResolveLatestNamedSpecByRepoNameParams) ([]store.ResolveLatestNamedSpecByRepoNameRow, error) {
@@ -54,6 +58,22 @@ func (s *specStore) ResolveLatestNamedSpecByRepoName(ctx context.Context, arg st
 
 func (s *specStore) ResolveLatestNamedSpecByDomainRepoName(ctx context.Context, arg store.ResolveLatestNamedSpecByDomainRepoNameParams) ([]store.ResolveLatestNamedSpecByDomainRepoNameRow, error) {
 	return s.resolveByDomainRepoName.record(arg)
+}
+
+func (s *specStore) ResolveNamedSpecVersionByName(ctx context.Context, arg store.ResolveNamedSpecVersionByNameParams) ([]store.Spec, error) {
+	return s.resolveVersionByName.record(arg)
+}
+
+func (s *specStore) ResolveNamedSpecVersionByRepoName(ctx context.Context, arg store.ResolveNamedSpecVersionByRepoNameParams) ([]store.Spec, error) {
+	return s.resolveVersionByRepoName.record(arg)
+}
+
+func (s *specStore) ResolveNamedSpecVersionByDomainRepoName(ctx context.Context, arg store.ResolveNamedSpecVersionByDomainRepoNameParams) ([]store.Spec, error) {
+	return s.resolveVersionByDomainRepo.record(arg)
+}
+
+func (s *specStore) UpdateNamedSpecArchiveState(ctx context.Context, arg store.UpdateNamedSpecArchiveStateParams) (store.Spec, error) {
+	return s.updateNamedSpecArchiveState.record(arg)
 }
 
 func TestNamedSpecs_Publish(t *testing.T) {
@@ -190,14 +210,34 @@ func TestNamedSpecs_List(t *testing.T) {
 				if st.listLatestNamedSpecs.params.Limit != 50 || st.listLatestNamedSpecs.params.Offset != 0 {
 					t.Fatalf("pagination=%+v, want default", st.listLatestNamedSpecs.params)
 				}
+				if st.listLatestNamedSpecs.params.Archived {
+					t.Fatalf("archived=%v, want false", st.listLatestNamedSpecs.params.Archived)
+				}
 				resp := decodeBody[domainapi.NamedSpecListResponse](t, rr)
 				if len(resp.Specs) != 1 || resp.Specs[0].Source.Domain != "github.com" {
 					t.Fatalf("response mismatch: %+v", resp)
 				}
 			},
 		},
+		{
+			name:  "archived true",
+			query: "archived=true",
+			store: func() *specStore {
+				st := &specStore{}
+				st.listLatestNamedSpecs.val = []store.ListLatestNamedSpecsRow{testNamedListRow("spec002", "upgrade-java", "github.com", "acme/service", now)}
+				return st
+			}(),
+			wantStatus: http.StatusOK,
+			verify: func(t *testing.T, st *specStore, rr *httptest.ResponseRecorder) {
+				t.Helper()
+				if !st.listLatestNamedSpecs.params.Archived {
+					t.Fatalf("archived=%v, want true", st.listLatestNamedSpecs.params.Archived)
+				}
+			},
+		},
 		{name: "named false rejected", store: &specStore{}, query: "named=false", wantStatus: http.StatusBadRequest},
 		{name: "bad limit rejected", store: &specStore{}, query: "named=true&limit=bad", wantStatus: http.StatusBadRequest},
+		{name: "bad archived rejected", store: &specStore{}, query: "archived=maybe", wantStatus: http.StatusBadRequest},
 	}
 
 	for _, tt := range tests {
@@ -255,7 +295,7 @@ func TestNamedSpecs_Resolve(t *testing.T) {
 				return st
 			}(),
 			wantStatus: http.StatusConflict,
-			wantBody:   "github.com/acme/service:upgrade-java, gitlab.example.com/acme/service:upgrade-java",
+			wantBody:   "github.com/acme/service:upgrade-java@01234567, gitlab.example.com/acme/service:upgrade-java@01234567",
 		},
 		{
 			name:       "none",
@@ -281,10 +321,50 @@ func TestNamedSpecs_Resolve(t *testing.T) {
 			verify: func(t *testing.T, st *specStore, rr *httptest.ResponseRecorder) {
 				t.Helper()
 				assertCalled(t, "ResolveLatestNamedSpecByRepoName", st.resolveByRepoName.called)
-				if st.resolveByRepoName.params.Repo != "acme/service" {
-					t.Fatalf("repo param=%q, want acme/service", st.resolveByRepoName.params.Repo)
+				if st.resolveByRepoName.params.Repo != "acme/service" || st.resolveByRepoName.params.Archived {
+					t.Fatalf("repo params=%+v, want active acme/service", st.resolveByRepoName.params)
 				}
 			},
+		},
+		{
+			name:     "versioned selector uses sha and archived params",
+			selector: "github.com/acme/service:upgrade-java&sha=01234567&archived=true",
+			store: func() *specStore {
+				st := &specStore{}
+				st.resolveVersionByDomainRepo.val = []store.Spec{testNamedStoreSpec("spec004", "upgrade-java", "github.com", "acme/service", "0123456789abcdef0123456789abcdef01234567", now)}
+				return st
+			}(),
+			wantStatus: http.StatusOK,
+			verify: func(t *testing.T, st *specStore, rr *httptest.ResponseRecorder) {
+				t.Helper()
+				assertCalled(t, "ResolveNamedSpecVersionByDomainRepoName", st.resolveVersionByDomainRepo.called)
+				if st.resolveVersionByDomainRepo.params.ShaPrefix != "01234567" || !st.resolveVersionByDomainRepo.params.Archived {
+					t.Fatalf("version params=%+v, want sha prefix archived", st.resolveVersionByDomainRepo.params)
+				}
+			},
+		},
+		{
+			name:     "versioned selector suffix",
+			selector: "upgrade-java@01234567",
+			store: func() *specStore {
+				st := &specStore{}
+				st.resolveVersionByName.val = []store.Spec{testNamedStoreSpec("spec005", "upgrade-java", "github.com", "acme/service", "0123456789abcdef0123456789abcdef01234567", now)}
+				return st
+			}(),
+			wantStatus: http.StatusOK,
+			verify: func(t *testing.T, st *specStore, rr *httptest.ResponseRecorder) {
+				t.Helper()
+				assertCalled(t, "ResolveNamedSpecVersionByName", st.resolveVersionByName.called)
+				if st.resolveVersionByName.params.ShaPrefix != "01234567" || st.resolveVersionByName.params.Archived {
+					t.Fatalf("version params=%+v, want active sha prefix", st.resolveVersionByName.params)
+				}
+			},
+		},
+		{
+			name:       "bad sha prefix",
+			selector:   "upgrade-java&sha=ABC",
+			store:      &specStore{},
+			wantStatus: http.StatusBadRequest,
 		},
 	}
 
@@ -295,6 +375,58 @@ func TestNamedSpecs_Resolve(t *testing.T) {
 			if tt.wantBody != "" && !strings.Contains(rr.Body.String(), tt.wantBody) {
 				t.Fatalf("body %q does not contain %q", rr.Body.String(), tt.wantBody)
 			}
+			if tt.verify != nil {
+				tt.verify(t, tt.store, rr)
+			}
+		})
+	}
+}
+
+func TestNamedSpecs_UpdateArchiveState(t *testing.T) {
+	now := time.Date(2026, 6, 18, 10, 21, 0, 0, time.UTC)
+	tests := []struct {
+		name       string
+		store      *specStore
+		body       map[string]any
+		wantStatus int
+		verify     func(t *testing.T, st *specStore, rr *httptest.ResponseRecorder)
+	}{
+		{
+			name: "archive",
+			store: func() *specStore {
+				st := &specStore{}
+				st.updateNamedSpecArchiveState.val = testNamedStoreSpec("spec001", "upgrade-java", "github.com", "acme/service", "0123456789abcdef0123456789abcdef01234567", now)
+				st.updateNamedSpecArchiveState.val.ArchivedAt = pgtype.Timestamptz{Time: now.Add(time.Minute), Valid: true}
+				return st
+			}(),
+			body:       map[string]any{"archived": true},
+			wantStatus: http.StatusOK,
+			verify: func(t *testing.T, st *specStore, rr *httptest.ResponseRecorder) {
+				t.Helper()
+				if st.updateNamedSpecArchiveState.params.ID != "spec001" || !st.updateNamedSpecArchiveState.params.Archived {
+					t.Fatalf("update params=%+v, want spec001 archived", st.updateNamedSpecArchiveState.params)
+				}
+				resp := decodeBody[domainapi.NamedSpecSummary](t, rr)
+				if resp.ArchivedAt == nil {
+					t.Fatalf("archived_at missing in response")
+				}
+			},
+		},
+		{
+			name: "missing",
+			store: func() *specStore {
+				st := &specStore{}
+				st.updateNamedSpecArchiveState.err = pgx.ErrNoRows
+				return st
+			}(),
+			body:       map[string]any{"archived": false},
+			wantStatus: http.StatusNotFound,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rr := doRequest(t, updateNamedSpecHandler(tt.store), http.MethodPatch, "/v1/specs/spec001", tt.body, "spec_id", "spec001")
+			assertStatus(t, rr, tt.wantStatus)
 			if tt.verify != nil {
 				tt.verify(t, tt.store, rr)
 			}

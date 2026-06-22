@@ -30,7 +30,8 @@ ploy mig run <mig-id|name> [<namespace/repo[:ref]> ...] [--failed] [--follow] # 
 ploy spec schema                                                             # print the mig JSON Schema
 ploy spec validate docs/schemas/mig.example.yaml                             # validate a mig spec
 ploy spec push [<git-folder>]                                                # publish named specs from a clean git worktree
-ploy spec ls                                                                 # list published named specs
+ploy spec ls [--archived]                                                    # list published named specs
+ploy spec <selector>[@sha] (--archive|--unarchive)                           # archive or unarchive a named spec version
 ```
 
 Run IDs (`<run-id>`) are KSUID-backed strings.
@@ -40,11 +41,14 @@ Treat them as opaque identifiers when passing them between commands or scripts.
 spec against one repository source. Add `:<step-name>` to a local spec path to
 submit only one named step from the expanded spec. Named spec selectors use
 `<name>`, `<namespace/repo>:<name>`, or
-`<domain>/<namespace/repo>:<name>`. Local repo paths submit `HEAD`; remote
-selectors use `namespace/repo`, optionally suffixed with `:<branch>` or
-`:<sha>`. Use `--follow` to wait for the run's terminal status,
-`--pull[=path]` to wait for success and download artifacts, or `--apply` to
-wait for success and apply the resulting patch to a clean local worktree.
+`<domain>/<namespace/repo>:<name>`. Add `@<sha-prefix>` to select a specific
+published version. Use repeatable `--env:<step> KEY=VALUE` flags to override
+`steps[].envs` for exactly one named step; later values win for the same
+step/key. Local repo paths submit `HEAD`; remote selectors use `namespace/repo`,
+optionally suffixed with `:<branch>` or `:<sha>`. Use `--follow` to wait for the
+run's terminal status, `--pull[=path]` to wait for success and download
+artifacts, or `--apply` to wait for success and apply the resulting patch to a
+clean local worktree.
 
 `ploy mig run` executes an existing mig project over its managed repo set. Use
 `ploy mig add --name <name> --spec <path>`, `ploy mig repo add`, and
@@ -144,11 +148,19 @@ ploy spec push ../migs
 
 # List latest published named specs.
 ploy spec ls
+
+# List archived named specs.
+ploy spec ls --archived
+
+# Archive or unarchive a named spec version.
+ploy spec github.com/acme/service:upgrade-java@01234567 --archive
+ploy spec github.com/acme/service:upgrade-java@01234567 --unarchive
 ```
 
 Publish output shows `updated` for newly stored specs and `skipped` when the
 same name, source, and SHA already exists. List output shows `NAME`, `SOURCE`,
-`SHA`, and `DATE`.
+`SHA`, and `DATE`. Archive and unarchive resolve active or archived rows,
+respectively, then update the resolved named spec row.
 
 ## Mig Project Runs
 

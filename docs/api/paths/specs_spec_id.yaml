@@ -1,0 +1,26 @@
+patch:
+  tags: [Control]
+  summary: Update named spec archive state
+  parameters:
+    - in: path
+      name: spec_id
+      required: true
+      schema:
+        type: string
+      description: Named spec ID to update.
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: '../components/schemas/controlplane.yaml#/UpdateNamedSpecRequest'
+  responses:
+    '200':
+      description: OK
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/controlplane.yaml#/NamedSpecSummary'
+    '400': { description: Bad request }
+    '404': { description: Named spec not found }
+    '500': { description: Internal server error }

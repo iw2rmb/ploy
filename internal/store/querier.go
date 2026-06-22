@@ -229,8 +229,11 @@ type Querier interface {
 	// The candidate is eligible only when every predecessor that points to it is Success.
 	PromoteJobByIDIfUnblocked(ctx context.Context, id types.JobID) (Job, error)
 	ResolveLatestNamedSpecByDomainRepoName(ctx context.Context, arg ResolveLatestNamedSpecByDomainRepoNameParams) ([]ResolveLatestNamedSpecByDomainRepoNameRow, error)
-	ResolveLatestNamedSpecByName(ctx context.Context, name string) ([]ResolveLatestNamedSpecByNameRow, error)
+	ResolveLatestNamedSpecByName(ctx context.Context, arg ResolveLatestNamedSpecByNameParams) ([]ResolveLatestNamedSpecByNameRow, error)
 	ResolveLatestNamedSpecByRepoName(ctx context.Context, arg ResolveLatestNamedSpecByRepoNameParams) ([]ResolveLatestNamedSpecByRepoNameRow, error)
+	ResolveNamedSpecVersionByDomainRepoName(ctx context.Context, arg ResolveNamedSpecVersionByDomainRepoNameParams) ([]Spec, error)
+	ResolveNamedSpecVersionByName(ctx context.Context, arg ResolveNamedSpecVersionByNameParams) ([]Spec, error)
+	ResolveNamedSpecVersionByRepoName(ctx context.Context, arg ResolveNamedSpecVersionByRepoNameParams) ([]Spec, error)
 	RevokeAPIToken(ctx context.Context, tokenID string) error
 	// Atomically promote the next unblocked job in a run attempt: Created -> Queued.
 	// A created job is unblocked when all predecessor jobs that point to it are Success.
@@ -254,6 +257,7 @@ type Querier interface {
 	UpdateJobStatus(ctx context.Context, arg UpdateJobStatusParams) error
 	UpdateMigRepoBaseRef(ctx context.Context, arg UpdateMigRepoBaseRefParams) error
 	UpdateMigSpec(ctx context.Context, arg UpdateMigSpecParams) error
+	UpdateNamedSpecArchiveState(ctx context.Context, arg UpdateNamedSpecArchiveStateParams) (Spec, error)
 	UpdateNodeCertMetadata(ctx context.Context, arg UpdateNodeCertMetadataParams) error
 	UpdateNodeDrained(ctx context.Context, arg UpdateNodeDrainedParams) error
 	UpdateNodeHeartbeat(ctx context.Context, arg UpdateNodeHeartbeatParams) error
