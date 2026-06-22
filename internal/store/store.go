@@ -6,8 +6,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/netip"
+	"time"
 
 	"github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -23,16 +28,36 @@ var ErrRunRestartActive = errors.New("store: only terminal runs can be restarted
 // ErrRunRestartWaveCancelled is returned when the owning wave was cancelled.
 var ErrRunRestartWaveCancelled = errors.New("store: cannot restart a run in a cancelled wave")
 
+// ErrBootstrapTokenInvalid is returned when a bootstrap token is missing,
+// revoked, already consumed, or bound to a different node.
+var ErrBootstrapTokenInvalid = errors.New("store: bootstrap token invalid")
+
+// ErrBootstrapNodeExists is returned when bootstrap completion targets an
+// already-enrolled node ID.
+var ErrBootstrapNodeExists = errors.New("store: bootstrap node already exists")
+
 // Store defines the interface for database operations.
 // The sqlc-generated Queries type implements the query methods via Querier.
 type Store interface {
 	Querier
 	CancelRun(ctx context.Context, runID types.RunID) error
 	CancelWave(ctx context.Context, waveID types.WaveID) error
+	CompleteBootstrapEnrollment(ctx context.Context, arg CompleteBootstrapEnrollmentParams) error
 	CreateWaveWithRuns(ctx context.Context, arg CreateWaveWithRunsParams) (Wave, []Run, error)
 	RestartRun(ctx context.Context, runID types.RunID) (Run, error)
 	Close()
 	Pool() *pgxpool.Pool
+}
+
+// CompleteBootstrapEnrollmentParams contains the certificate metadata recorded
+// when a one-time bootstrap token successfully enrolls a new node.
+type CompleteBootstrapEnrollmentParams struct {
+	TokenID         string
+	NodeID          types.NodeID
+	CertSerial      string
+	CertFingerprint string
+	CertNotBefore   time.Time
+	CertNotAfter    time.Time
 }
 
 // CreateWaveWithRunsParams contains the complete DB materialization for one launch.
@@ -91,6 +116,103 @@ func (s *PgStore) Close() {
 // such as partition management.
 func (s *PgStore) Pool() *pgxpool.Pool {
 	return s.pool
+}
+
+// CompleteBootstrapEnrollment atomically consumes one bootstrap token and
+// creates the node it was minted for.
+func (s *PgStore) CompleteBootstrapEnrollment(ctx context.Context, arg CompleteBootstrapEnrollmentParams) error {
+	if arg.TokenID == "" || arg.NodeID.IsZero() {
+		return ErrBootstrapTokenInvalid
+	}
+
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("complete bootstrap enrollment: begin tx: %w", err)
+	}
+
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tx.Rollback(ctx)
+		}
+	}()
+
+	qtx := s.Queries.WithTx(tx)
+
+	var storedNodeID pgtype.Text
+	var usedAt pgtype.Timestamptz
+	var revokedAt pgtype.Timestamptz
+	err = tx.QueryRow(ctx, `
+SELECT node_id, used_at, revoked_at
+FROM bootstrap_tokens
+WHERE token_id = $1
+FOR UPDATE
+`, arg.TokenID).Scan(&storedNodeID, &usedAt, &revokedAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrBootstrapTokenInvalid
+		}
+		return fmt.Errorf("complete bootstrap enrollment: lock bootstrap token: %w", err)
+	}
+	if !storedNodeID.Valid || storedNodeID.String != arg.NodeID.String() || usedAt.Valid || revokedAt.Valid {
+		return ErrBootstrapTokenInvalid
+	}
+
+	var existing int
+	err = tx.QueryRow(ctx, `SELECT 1 FROM nodes WHERE id = $1 LIMIT 1`, arg.NodeID).Scan(&existing)
+	if err == nil {
+		return ErrBootstrapNodeExists
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return fmt.Errorf("complete bootstrap enrollment: check node: %w", err)
+	}
+
+	ipAddr, _ := netip.ParseAddr("0.0.0.0")
+	if _, err := qtx.CreateNode(ctx, CreateNodeParams{
+		ID:          arg.NodeID,
+		Name:        "node-" + arg.NodeID.String(),
+		IpAddress:   ipAddr,
+		Version:     nil,
+		Concurrency: 1,
+	}); err != nil {
+		if isNodeIdentityUniqueViolation(err) {
+			return ErrBootstrapNodeExists
+		}
+		return fmt.Errorf("complete bootstrap enrollment: create node: %w", err)
+	}
+
+	if err := qtx.UpdateNodeCertMetadata(ctx, UpdateNodeCertMetadataParams{
+		ID:              arg.NodeID,
+		CertSerial:      &arg.CertSerial,
+		CertFingerprint: &arg.CertFingerprint,
+		CertNotBefore:   pgtype.Timestamptz{Time: arg.CertNotBefore, Valid: true},
+		CertNotAfter:    pgtype.Timestamptz{Time: arg.CertNotAfter, Valid: true},
+	}); err != nil {
+		return fmt.Errorf("complete bootstrap enrollment: update cert metadata: %w", err)
+	}
+
+	if _, err := tx.Exec(ctx, `
+UPDATE bootstrap_tokens
+SET used_at = NOW(), cert_issued_at = NOW()
+WHERE token_id = $1
+`, arg.TokenID); err != nil {
+		return fmt.Errorf("complete bootstrap enrollment: consume bootstrap token: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("complete bootstrap enrollment: commit tx: %w", err)
+	}
+
+	committed = true
+	return nil
+}
+
+func isNodeIdentityUniqueViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	if !errors.As(err, &pgErr) || pgErr.Code != "23505" {
+		return false
+	}
+	return pgErr.ConstraintName == "nodes_pkey" || pgErr.ConstraintName == "nodes_name_key"
 }
 
 // CreateWaveWithRuns atomically creates a wave and its selected run rows.

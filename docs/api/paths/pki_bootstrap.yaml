@@ -36,6 +36,8 @@ post:
       description: Bad request
     '401':
       description: Unauthorized (missing/invalid/expired bootstrap token)
+    '409':
+      description: Conflict (node ID already exists before bootstrap completion)
     '503':
       description: PKI not configured
     '500':

@@ -292,9 +292,9 @@ func TestAuthorizerBearerToken_BootstrapToken(t *testing.T) {
 		t.Error("handler was not called")
 	}
 
-	time.Sleep(50 * time.Millisecond)
-	if !mq.BootstrapTokenLastUsedCalled() {
-		t.Error("expected UpdateBootstrapTokenLastUsed to be called")
+	auth.Wait()
+	if mq.BootstrapTokenLastUsedCalled() {
+		t.Error("bootstrap token auth must not mark used_at")
 	}
 }
 

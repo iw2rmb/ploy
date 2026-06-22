@@ -71,6 +71,10 @@ func (m *mockStore) CancelWave(ctx context.Context, waveID domaintypes.WaveID) e
 	return nil
 }
 
+func (m *mockStore) CompleteBootstrapEnrollment(ctx context.Context, arg store.CompleteBootstrapEnrollmentParams) error {
+	return nil
+}
+
 func (m *mockStore) RestartRun(ctx context.Context, runID domaintypes.RunID) (store.Run, error) {
 	return store.Run{}, nil
 }
