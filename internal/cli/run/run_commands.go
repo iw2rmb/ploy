@@ -12,11 +12,13 @@ import (
 	runcmd "github.com/iw2rmb/ploy/internal/cli/runs"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 // NewCommand constructs the Cobra command tree for `ploy run`.
 func NewCommand() *cobra.Command {
 	submit := SubmitOptions{MaxRetries: 5}
+	envFlags := newStepEnvFlagValue(&submit.StepEnvOverrides)
 	cmd := &cobra.Command{
 		Use:   "run (<spec-path>[:<step-name>]|<name>|<namespace/repo>:<name>|<domain>/<namespace/repo>:<name>) [<repo-path>|<namespace/repo[:ref]>]",
 		Short: "Submit and inspect runs",
@@ -40,6 +42,15 @@ func NewCommand() *cobra.Command {
 	cmd.Flags().BoolVar(&submit.Follow, "follow", false, "Follow run status until completion")
 	cmd.Flags().BoolVar(&submit.Apply, "apply", false, "Apply the resulting patch to a local repo after success")
 	cmd.Flags().StringVar(&submit.PullPath, "pull", "", "Download final artifacts after success; optional path")
+	cmd.Flags().Var(envFlags, "env", "Step-scoped environment override; use --env:<step> KEY=VALUE")
+	_ = cmd.Flags().MarkHidden("env")
+	cmd.Flags().SetNormalizeFunc(func(_ *pflag.FlagSet, name string) pflag.NormalizedName {
+		if strings.HasPrefix(name, "env:") {
+			envFlags.currentStep = strings.TrimPrefix(name, "env:")
+			return pflag.NormalizedName("env")
+		}
+		return pflag.NormalizedName(name)
+	})
 	if flag := cmd.Flags().Lookup("pull"); flag != nil {
 		flag.NoOptDefVal = osTempArtifactDirSentinel
 	}
@@ -52,6 +63,36 @@ func NewCommand() *cobra.Command {
 	cmd.AddCommand(newPullCommand())
 	cmd.AddCommand(newApplyCommand())
 	return cmd
+}
+
+type stepEnvFlagValue struct {
+	overrides   *map[string][]string
+	currentStep string
+}
+
+func newStepEnvFlagValue(overrides *map[string][]string) *stepEnvFlagValue {
+	return &stepEnvFlagValue{overrides: overrides}
+}
+
+func (v *stepEnvFlagValue) Set(raw string) error {
+	step := strings.TrimSpace(v.currentStep)
+	v.currentStep = ""
+	if step == "" {
+		return errors.New("--env requires a step name; use --env:<step> KEY=VALUE")
+	}
+	if *v.overrides == nil {
+		*v.overrides = make(map[string][]string)
+	}
+	(*v.overrides)[step] = append((*v.overrides)[step], raw)
+	return nil
+}
+
+func (v *stepEnvFlagValue) String() string {
+	return ""
+}
+
+func (v *stepEnvFlagValue) Type() string {
+	return "KEY=VALUE"
 }
 
 func newListCommand() *cobra.Command {

@@ -80,7 +80,7 @@ func TestNamedSpecs_LatestListAndResolve(t *testing.T) {
 		}
 	}
 
-	latest, err := db.ListLatestNamedSpecs(ctx, ListLatestNamedSpecsParams{Limit: 10, Offset: 0})
+	latest, err := db.ListLatestNamedSpecs(ctx, ListLatestNamedSpecsParams{Limit: 10, Offset: 0, Archived: false})
 	if err != nil {
 		t.Fatalf("ListLatestNamedSpecs() failed: %v", err)
 	}
@@ -98,7 +98,7 @@ func TestNamedSpecs_LatestListAndResolve(t *testing.T) {
 		{
 			name: "by name returns latest per source",
 			query: func() ([]string, error) {
-				rows, err := db.ResolveLatestNamedSpecByName(ctx, "upgrade-java")
+				rows, err := db.ResolveLatestNamedSpecByName(ctx, ResolveLatestNamedSpecByNameParams{Name: "upgrade-java", Archived: false})
 				return resolveNameSHAs(rows), err
 			},
 			wantCount: 2,
@@ -106,7 +106,7 @@ func TestNamedSpecs_LatestListAndResolve(t *testing.T) {
 		{
 			name: "by repo and name matches any domain",
 			query: func() ([]string, error) {
-				rows, err := db.ResolveLatestNamedSpecByRepoName(ctx, ResolveLatestNamedSpecByRepoNameParams{Name: "upgrade-java", Repo: "acme/service"})
+				rows, err := db.ResolveLatestNamedSpecByRepoName(ctx, ResolveLatestNamedSpecByRepoNameParams{Name: "upgrade-java", Repo: "acme/service", Archived: false})
 				return resolveRepoNameSHAs(rows), err
 			},
 			wantCount: 2,
@@ -114,7 +114,7 @@ func TestNamedSpecs_LatestListAndResolve(t *testing.T) {
 		{
 			name: "by domain repo and name is exact",
 			query: func() ([]string, error) {
-				rows, err := db.ResolveLatestNamedSpecByDomainRepoName(ctx, ResolveLatestNamedSpecByDomainRepoNameParams{Name: "upgrade-java", Domain: "github.com", Repo: "acme/service"})
+				rows, err := db.ResolveLatestNamedSpecByDomainRepoName(ctx, ResolveLatestNamedSpecByDomainRepoNameParams{Name: "upgrade-java", Domain: "github.com", Repo: "acme/service", Archived: false})
 				return resolveDomainRepoNameSHAs(rows), err
 			},
 			wantCount: 1,
@@ -123,7 +123,7 @@ func TestNamedSpecs_LatestListAndResolve(t *testing.T) {
 		{
 			name: "missing returns empty",
 			query: func() ([]string, error) {
-				rows, err := db.ResolveLatestNamedSpecByName(ctx, "missing")
+				rows, err := db.ResolveLatestNamedSpecByName(ctx, ResolveLatestNamedSpecByNameParams{Name: "missing", Archived: false})
 				return resolveNameSHAs(rows), err
 			},
 			wantCount: 0,
@@ -134,6 +134,121 @@ func TestNamedSpecs_LatestListAndResolve(t *testing.T) {
 			shas, err := tt.query()
 			if err != nil {
 				t.Fatalf("resolve failed: %v", err)
+			}
+			if len(shas) != tt.wantCount {
+				t.Fatalf("count=%d, want %d, shas=%v", len(shas), tt.wantCount, shas)
+			}
+			if tt.wantSHA != "" && shas[0] != tt.wantSHA {
+				t.Fatalf("sha=%q, want %q", shas[0], tt.wantSHA)
+			}
+		})
+	}
+}
+
+func TestNamedSpecs_ArchiveFilterVersionResolveAndUpdatedBy(t *testing.T) {
+	ctx, db := newTestStore(t)
+	base := time.Now().UTC()
+	creator := "creator"
+	updater := "archiver"
+	activeSHA := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	archivedSHA := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	ambiguousSHA1 := "abcdef1200000000000000000000000000000000"
+	ambiguousSHA2 := "abcdef12ffffffffffffffffffffffffffffffff"
+
+	for _, row := range []struct {
+		name   string
+		domain string
+		repo   string
+		sha    string
+		at     time.Time
+	}{
+		{name: "upgrade-java", domain: "github.com", repo: "acme/service", sha: activeSHA, at: base.Add(-2 * time.Hour)},
+		{name: "upgrade-java", domain: "github.com", repo: "acme/service", sha: archivedSHA, at: base.Add(-1 * time.Hour)},
+		{name: "upgrade-java", domain: "gitlab.example.com", repo: "acme/service", sha: ambiguousSHA1, at: base},
+		{name: "upgrade-java", domain: "gitea.example.com", repo: "acme/service", sha: ambiguousSHA2, at: base},
+	} {
+		created, err := db.CreateNamedSpec(ctx, CreateNamedSpecParams{
+			ID:                types.NewSpecID(),
+			Name:              row.name,
+			Source:            mustNamedSpecSourceJSON(t, row.domain, row.repo),
+			Sha:               row.sha,
+			SourceCommittedAt: pgtype.Timestamptz{Time: row.at, Valid: true},
+			Spec:              []byte(`{"apiVersion":"ploy.mig/v1alpha1","name":"` + row.name + `","steps":[{"image":"img"}]}`),
+			CreatedBy:         &creator,
+		})
+		if err != nil {
+			t.Fatalf("CreateNamedSpec(%s) failed: %v", row.sha, err)
+		}
+		if created.CreatedBy == nil || *created.CreatedBy != creator || created.UpdatedBy == nil || *created.UpdatedBy != creator {
+			t.Fatalf("created identity = created_by:%v updated_by:%v, want %q", created.CreatedBy, created.UpdatedBy, creator)
+		}
+		if row.sha == archivedSHA {
+			updated, err := db.UpdateNamedSpecArchiveState(ctx, UpdateNamedSpecArchiveStateParams{ID: created.ID.String(), Archived: true, UpdatedBy: &updater})
+			if err != nil {
+				t.Fatalf("UpdateNamedSpecArchiveState() failed: %v", err)
+			}
+			if !updated.ArchivedAt.Valid || updated.UpdatedBy == nil || *updated.UpdatedBy != updater {
+				t.Fatalf("archive state = archived_at:%v updated_by:%v", updated.ArchivedAt, updated.UpdatedBy)
+			}
+		}
+	}
+
+	tests := []struct {
+		name      string
+		query     func() ([]string, error)
+		wantCount int
+		wantSHA   string
+	}{
+		{
+			name: "active list picks latest active before grouping",
+			query: func() ([]string, error) {
+				rows, err := db.ListLatestNamedSpecs(ctx, ListLatestNamedSpecsParams{Limit: 10, Archived: false})
+				return listNamedSHAsForSource(rows, "github.com", "acme/service"), err
+			},
+			wantCount: 1,
+			wantSHA:   activeSHA,
+		},
+		{
+			name: "archived list picks latest archived",
+			query: func() ([]string, error) {
+				rows, err := db.ListLatestNamedSpecs(ctx, ListLatestNamedSpecsParams{Limit: 10, Archived: true})
+				return listNamedSHAsForSource(rows, "github.com", "acme/service"), err
+			},
+			wantCount: 1,
+			wantSHA:   archivedSHA,
+		},
+		{
+			name: "active version prefix ignores archived row",
+			query: func() ([]string, error) {
+				rows, err := db.ResolveNamedSpecVersionByDomainRepoName(ctx, ResolveNamedSpecVersionByDomainRepoNameParams{Name: "upgrade-java", Domain: "github.com", Repo: "acme/service", ShaPrefix: activeSHA[:8], Archived: false})
+				return specSHAs(rows), err
+			},
+			wantCount: 1,
+			wantSHA:   activeSHA,
+		},
+		{
+			name: "archived version prefix resolves archived row",
+			query: func() ([]string, error) {
+				rows, err := db.ResolveNamedSpecVersionByDomainRepoName(ctx, ResolveNamedSpecVersionByDomainRepoNameParams{Name: "upgrade-java", Domain: "github.com", Repo: "acme/service", ShaPrefix: archivedSHA[:8], Archived: true})
+				return specSHAs(rows), err
+			},
+			wantCount: 1,
+			wantSHA:   archivedSHA,
+		},
+		{
+			name: "ambiguous sha prefix returns multiple matches",
+			query: func() ([]string, error) {
+				rows, err := db.ResolveNamedSpecVersionByName(ctx, ResolveNamedSpecVersionByNameParams{Name: "upgrade-java", ShaPrefix: "abcdef12", Archived: false})
+				return specSHAs(rows), err
+			},
+			wantCount: 2,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			shas, err := tt.query()
+			if err != nil {
+				t.Fatalf("query failed: %v", err)
 			}
 			if len(shas) != tt.wantCount {
 				t.Fatalf("count=%d, want %d, shas=%v", len(shas), tt.wantCount, shas)
@@ -224,6 +339,31 @@ func resolveDomainRepoNameSHAs(rows []ResolveLatestNamedSpecByDomainRepoNameRow)
 	shas := make([]string, 0, len(rows))
 	for _, row := range rows {
 		shas = append(shas, row.Sha)
+	}
+	return shas
+}
+
+func specSHAs(rows []Spec) []string {
+	shas := make([]string, 0, len(rows))
+	for _, row := range rows {
+		shas = append(shas, row.Sha)
+	}
+	return shas
+}
+
+func listNamedSHAsForSource(rows []ListLatestNamedSpecsRow, domain, repo string) []string {
+	var shas []string
+	for _, row := range rows {
+		var source struct {
+			Domain string `json:"domain"`
+			Repo   string `json:"repo"`
+		}
+		if err := json.Unmarshal(row.Source, &source); err != nil {
+			continue
+		}
+		if source.Domain == domain && source.Repo == repo {
+			shas = append(shas, row.Sha)
+		}
 	}
 	return shas
 }

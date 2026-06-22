@@ -2,8 +2,10 @@ get:
   tags: [Control]
   summary: Resolve a named spec selector
   description: |
-    Resolves a selector to exactly one latest named spec. Accepted selectors are
+    Resolves a selector to exactly one named spec. Accepted selectors are
     `<spec-name>`, `<namespace/repo>:<spec-name>`, and `<domain>/<namespace/repo>:<spec-name>`.
+    Select a specific version with `selector@sha` or the `sha` query parameter.
+    Without `sha`, resolution uses the latest row after archive filtering.
   parameters:
     - in: query
       name: selector
@@ -12,6 +14,20 @@ get:
         type: string
         minLength: 1
       description: Named spec selector to resolve.
+    - in: query
+      name: sha
+      required: false
+      schema:
+        type: string
+        pattern: "^[0-9a-f]{8,40}$"
+      description: Optional unique lowercase SHA prefix selecting a specific named spec version. Conflicts with a different `@sha` suffix in `selector`.
+    - in: query
+      name: archived
+      required: false
+      schema:
+        type: boolean
+        default: false
+      description: Resolve archived rows when true; active rows when false or omitted.
   responses:
     '200':
       description: OK

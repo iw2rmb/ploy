@@ -3,6 +3,7 @@ get:
   summary: List latest named specs
   description: |
     Lists one latest named spec per `name + source.domain + source.repo`.
+    The archive filter is applied before latest-per-source grouping.
     Missing `named` and `named=true` are accepted; any other `named` value is rejected.
   parameters:
     - in: query
@@ -29,6 +30,13 @@ get:
         format: int32
         minimum: 0
       description: Number of specs to skip.
+    - in: query
+      name: archived
+      required: false
+      schema:
+        type: boolean
+        default: false
+      description: List archived rows when true; active rows when false or omitted.
   responses:
     '200':
       description: OK

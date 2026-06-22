@@ -113,6 +113,7 @@ CREATE TABLE IF NOT EXISTS specs (
   source_committed_at TIMESTAMPTZ NULL,
   spec                JSONB NOT NULL,  -- Canonical Migs spec JSON.
   created_by          TEXT,
+  updated_by          TEXT,
   created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
   archived_at         TIMESTAMPTZ NULL,  -- Optional archiving support; not currently enforced.
   CONSTRAINT specs_sha_check CHECK (sha = '' OR sha ~ '^[0-9a-f]{40}$'),

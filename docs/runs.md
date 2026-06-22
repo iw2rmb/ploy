@@ -10,14 +10,20 @@ Mig launches create one wave with one run per selected repo.
 ## Submit
 
 ```bash
-ploy run <spec-path> [<repo-path>|<namespace/repo[:ref]>] [--apply] [--pull[=path]]
+ploy run <spec-path>|<named-spec>[@sha] [<repo-path>|<namespace/repo[:ref]>] [--apply] [--pull[=path]]
 ploy mig run <mig-id|name> [<namespace/repo[:ref]> ... | --failed] [--follow] [--json]
 ```
 
 - `ploy run` prints `run_id` and `mig_id`.
 - `POST /v1/runs` returns `wave_id`, `run_id`, `mig_id`, and `spec_id`.
 - Named-spec submissions pass `spec_id`; the run references that existing
-  specs row. Local file and directory submissions create anonymous specs rows.
+  specs row. Add `@<8-40 lowercase hex SHA prefix>` to select a specific named
+  spec version. Local file and directory submissions create anonymous specs
+  rows.
+- `ploy run ... --env:<step> KEY=VALUE` overrides `steps[].envs` for exactly
+  one step named `<step>`. The flag is repeatable, values may be empty, and
+  later values win for the same step/key. Named specs with env overrides submit
+  a mutated anonymous spec instead of referencing the named `spec_id`.
 - `ploy mig run` prints `wave_id`; `--json` prints `wave_id`, `mig_id`,
   `spec_id`, and `run_count`.
 - Remote selector expansion is server-owned through `POST /v1/repos/resolve`.

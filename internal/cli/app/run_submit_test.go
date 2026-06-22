@@ -151,6 +151,7 @@ func TestRunSubmitSpecSelectionCases(t *testing.T) {
 		resolveStatus       int
 		resolveBody         any
 		wantResolveSelector string
+		wantResolveSHA      string
 		wantCommand         string
 		wantStepName        string
 		wantStepCount       int
@@ -243,6 +244,17 @@ build_gate:
 			wantRepoResolve:     map[string]string{"selector": "acme/target", "ref": "feature/run"},
 		},
 		{
+			name:                "versioned named selector",
+			specArg:             func(t *testing.T) string { return "upgrade-java@01234567" },
+			resolveStatus:       http.StatusOK,
+			resolveBody:         namedRunSpecResolveBody("echo versioned"),
+			wantResolveSelector: "upgrade-java",
+			wantResolveSHA:      "01234567",
+			wantCommand:         "echo versioned",
+			wantStepCount:       1,
+			wantRepoResolve:     map[string]string{"selector": "acme/target", "ref": "feature/run"},
+		},
+		{
 			name:                "ambiguous named selector returns server message before run submit",
 			specArg:             func(t *testing.T) string { return "upgrade-java" },
 			resolveStatus:       http.StatusConflict,
@@ -274,6 +286,7 @@ build_gate:
 			migID := domaintypes.NewMigID().String()
 			specID := domaintypes.NewSpecID().String()
 			var capturedSpecResolveSelector string
+			var capturedSpecResolveSHA string
 			var capturedRepoResolve map[string]any
 			var capturedSubmit map[string]any
 			runSubmitCalled := false
@@ -285,6 +298,7 @@ build_gate:
 						t.Fatalf("named spec resolver should not be called for local selector")
 					}
 					capturedSpecResolveSelector = r.URL.Query().Get("selector")
+					capturedSpecResolveSHA = r.URL.Query().Get("sha")
 					status := tc.resolveStatus
 					if status == 0 {
 						status = http.StatusOK
@@ -340,6 +354,9 @@ build_gate:
 			}
 			if tc.wantResolveSelector != "" && capturedSpecResolveSelector != tc.wantResolveSelector {
 				t.Fatalf("spec resolve selector = %q, want %q", capturedSpecResolveSelector, tc.wantResolveSelector)
+			}
+			if capturedSpecResolveSHA != tc.wantResolveSHA {
+				t.Fatalf("spec resolve sha = %q, want %q", capturedSpecResolveSHA, tc.wantResolveSHA)
 			}
 			if tc.wantRepoResolve != nil {
 				if capturedRepoResolve["selector"] != tc.wantRepoResolve["selector"] || capturedRepoResolve["ref"] != tc.wantRepoResolve["ref"] {
@@ -404,6 +421,166 @@ func namedRunSpecResolveBody(command string) map[string]any {
 }
 
 const namedResolvedSpecID = "spec1234"
+
+func TestRunSubmitNamedSpecVersionAndEnvOverrides(t *testing.T) {
+	t.Setenv("USER", "test-user")
+	runID := domaintypes.NewRunID().String()
+	migID := domaintypes.NewMigID().String()
+	specID := domaintypes.NewSpecID().String()
+	var capturedResolve map[string]string
+	var capturedSubmit map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/specs/resolve":
+			capturedResolve = map[string]string{
+				"selector": r.URL.Query().Get("selector"),
+				"sha":      r.URL.Query().Get("sha"),
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"id":     namedResolvedSpecID,
+				"name":   "upgrade-java",
+				"source": map[string]string{"domain": "gitlab.example.com", "repo": "acme/specs"},
+				"spec": map[string]any{
+					"steps": []map[string]any{
+						{"name": "build", "image": "alpine:latest", "envs": map[string]string{"A": "base"}},
+						{"name": "test", "image": "alpine:latest"},
+					},
+				},
+			})
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/repos/resolve":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"repo_url":   "https://gitlab.example.com/acme/target.git",
+				"ref":        "main",
+				"ref_is_sha": false,
+			})
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/runs":
+			if err := json.NewDecoder(r.Body).Decode(&capturedSubmit); err != nil {
+				t.Fatalf("decode submit request: %v", err)
+			}
+			w.WriteHeader(http.StatusCreated)
+			_ = json.NewEncoder(w).Encode(map[string]string{"run_id": runID, "mig_id": migID, "spec_id": specID})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	clienv.UseControlPlaneEnv(t, server.URL)
+
+	var buf bytes.Buffer
+	err := executeCmd([]string{"run", "upgrade-java@01234567", "acme/target", "--env:build", "A=1", "--env:build", "A=2", "--env:test", "EMPTY="}, &buf)
+	if err != nil {
+		t.Fatalf("run submit error: %v", err)
+	}
+	if capturedResolve["selector"] != "upgrade-java" || capturedResolve["sha"] != "01234567" {
+		t.Fatalf("resolve query = %#v", capturedResolve)
+	}
+	if _, ok := capturedSubmit["spec_id"]; ok {
+		t.Fatalf("named spec with env overrides must submit anonymous spec: %#v", capturedSubmit)
+	}
+	spec := capturedSubmit["spec"].(map[string]any)
+	steps := spec["steps"].([]any)
+	buildEnv := steps[0].(map[string]any)["envs"].(map[string]any)
+	if buildEnv["A"] != "2" {
+		t.Fatalf("build env A = %v, want last override 2", buildEnv["A"])
+	}
+	testEnv := steps[1].(map[string]any)["envs"].(map[string]any)
+	if testEnv["EMPTY"] != "" {
+		t.Fatalf("test EMPTY = %v, want empty string", testEnv["EMPTY"])
+	}
+}
+
+func TestRunSubmitLocalSpecEnvOverride(t *testing.T) {
+	specPath := filepath.Join(t.TempDir(), "spec.yaml")
+	if err := os.WriteFile(specPath, []byte("steps:\n  - name: build\n    image: alpine:latest\n"), 0o644); err != nil {
+		t.Fatalf("write spec file: %v", err)
+	}
+	runID := domaintypes.NewRunID().String()
+	migID := domaintypes.NewMigID().String()
+	specID := domaintypes.NewSpecID().String()
+	var capturedSubmit map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/repos/resolve":
+			_ = json.NewEncoder(w).Encode(map[string]any{"repo_url": "https://gitlab.example.com/acme/target.git", "ref": "main", "ref_is_sha": false})
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/runs":
+			if err := json.NewDecoder(r.Body).Decode(&capturedSubmit); err != nil {
+				t.Fatalf("decode submit request: %v", err)
+			}
+			w.WriteHeader(http.StatusCreated)
+			_ = json.NewEncoder(w).Encode(map[string]string{"run_id": runID, "mig_id": migID, "spec_id": specID})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	clienv.UseControlPlaneEnv(t, server.URL)
+
+	var buf bytes.Buffer
+	if err := executeCmd([]string{"run", specPath, "acme/target", "--env:build", "A=1"}, &buf); err != nil {
+		t.Fatalf("run submit error: %v", err)
+	}
+	if _, ok := capturedSubmit["spec_id"]; ok {
+		t.Fatalf("local spec must submit anonymous spec: %#v", capturedSubmit)
+	}
+	spec := capturedSubmit["spec"].(map[string]any)
+	envs := spec["steps"].([]any)[0].(map[string]any)["envs"].(map[string]any)
+	if envs["A"] != "1" {
+		t.Fatalf("env A = %v, want 1", envs["A"])
+	}
+}
+
+func TestRunSubmitEnvOverrideValidation(t *testing.T) {
+	t.Setenv("USER", "test-user")
+	tests := []struct {
+		name    string
+		spec    string
+		args    []string
+		wantErr string
+	}{
+		{
+			name:    "missing step",
+			spec:    "steps:\n  - name: build\n    image: alpine:latest\n",
+			args:    []string{"--env:test", "A=1"},
+			wantErr: `step "test" not found`,
+		},
+		{
+			name:    "duplicate step",
+			spec:    "steps:\n  - name: build\n    image: alpine:latest\n  - name: build\n    image: alpine:latest\n",
+			args:    []string{"--env:build", "A=1"},
+			wantErr: `step name "build" is not unique`,
+		},
+		{
+			name:    "malformed assignment",
+			spec:    "steps:\n  - name: build\n    image: alpine:latest\n",
+			args:    []string{"--env:build", "A"},
+			wantErr: "must be KEY=VALUE",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			specPath := filepath.Join(t.TempDir(), "spec.yaml")
+			if err := os.WriteFile(specPath, []byte(tt.spec), 0o644); err != nil {
+				t.Fatalf("write spec file: %v", err)
+			}
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method == http.MethodPost && r.URL.Path == "/v1/repos/resolve" {
+					_ = json.NewEncoder(w).Encode(map[string]any{"repo_url": "https://gitlab.example.com/acme/target.git", "ref": "main", "ref_is_sha": false})
+					return
+				}
+				t.Fatalf("unexpected request after env validation failure: %s %s", r.Method, r.URL.Path)
+			}))
+			defer server.Close()
+			clienv.UseControlPlaneEnv(t, server.URL)
+
+			var buf bytes.Buffer
+			args := append([]string{"run", specPath, "acme/target"}, tt.args...)
+			err := executeCmd(args, &buf)
+			if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("error = %v, want containing %q", err, tt.wantErr)
+			}
+		})
+	}
+}
 
 func TestRunSubmitPullDownloadsFinalArtifacts(t *testing.T) {
 	specPath := filepath.Join(t.TempDir(), "spec.yaml")

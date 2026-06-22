@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -21,9 +22,12 @@ import (
 	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	migsapi "github.com/iw2rmb/ploy/internal/migs/api"
+	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
 const osTempArtifactDirSentinel = "__ploy_os_tmp__"
+
+var namedSpecSHAPrefixRE = regexp.MustCompile(`^[0-9a-f]{8,40}$`)
 
 // SubmitOptions contains Cobra-parsed options for `ploy run <spec-path> [repo]`.
 type SubmitOptions struct {
@@ -36,6 +40,8 @@ type SubmitOptions struct {
 	PullPath      string
 
 	MaxRetries int
+
+	StepEnvOverrides map[string][]string
 
 	Output       io.Writer
 	FollowOutput io.Writer
@@ -59,6 +65,14 @@ func RunSubmit(ctx context.Context, opts SubmitOptions) error {
 	specPayload, err := resolveRunSubmitSpecPayload(ctx, base, httpClient, opts.SpecPath)
 	if err != nil {
 		return err
+	}
+	if len(opts.StepEnvOverrides) > 0 {
+		mutated, err := applyStepEnvOverrides(specPayload.Spec, opts.StepEnvOverrides)
+		if err != nil {
+			return err
+		}
+		specPayload.Spec = mutated
+		specPayload.SpecID = ""
 	}
 
 	repo, err := resolveSourceRepo(ctx, base, httpClient, opts.RepoSelector)
@@ -221,9 +235,16 @@ func resolveNamedRunSubmitSpecPayload(ctx context.Context, base *url.URL, client
 		return runSubmitSpecPayload{}, fmt.Errorf("run submit: http client required")
 	}
 
+	selector, shaPrefix, err := splitNamedSpecVersionSelector(selector)
+	if err != nil {
+		return runSubmitSpecPayload{}, err
+	}
 	endpoint := base.JoinPath("v1", "specs", "resolve")
 	query := endpoint.Query()
 	query.Set("selector", selector)
+	if shaPrefix != "" {
+		query.Set("sha", shaPrefix)
+	}
 	endpoint.RawQuery = query.Encode()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
@@ -260,6 +281,23 @@ func resolveNamedRunSubmitSpecPayload(ctx context.Context, base *url.URL, client
 	}, nil
 }
 
+func splitNamedSpecVersionSelector(selector string) (string, string, error) {
+	selector = strings.TrimSpace(selector)
+	idx := strings.LastIndex(selector, "@")
+	if idx < 0 {
+		return selector, "", nil
+	}
+	base := strings.TrimSpace(selector[:idx])
+	shaPrefix := strings.TrimSpace(selector[idx+1:])
+	if base == "" || shaPrefix == "" {
+		return "", "", fmt.Errorf("run submit: invalid named spec selector: %s", selector)
+	}
+	if !namedSpecSHAPrefixRE.MatchString(shaPrefix) {
+		return "", "", fmt.Errorf("run submit: sha must be a lowercase 8-40 character hex prefix")
+	}
+	return base, shaPrefix, nil
+}
+
 func namedSpecDisplayName(resolved domainapi.NamedSpecResolveResponse) string {
 	domain := strings.Trim(strings.TrimSpace(resolved.Source.Domain), "/")
 	repo := strings.Trim(strings.TrimSpace(resolved.Source.Repo), "/")
@@ -289,6 +327,83 @@ func buildRunSubmitSpecPayload(ctx context.Context, base *url.URL, client *http.
 		return nil, fmt.Errorf("load spec: spec is empty")
 	}
 	return specPayload, nil
+}
+
+func applyStepEnvOverrides(spec json.RawMessage, overrides map[string][]string) (json.RawMessage, error) {
+	var specMap map[string]any
+	if err := json.Unmarshal(spec, &specMap); err != nil {
+		return nil, fmt.Errorf("run submit: parse spec for env overrides: %w", err)
+	}
+	rawSteps, ok := specMap["steps"].([]any)
+	if !ok {
+		return nil, errors.New("run submit: spec steps must be an array for env overrides")
+	}
+	stepsByName := make(map[string]map[string]any, len(rawSteps))
+	for i, rawStep := range rawSteps {
+		step, ok := rawStep.(map[string]any)
+		if !ok {
+			return nil, fmt.Errorf("run submit: steps[%d] must be an object for env overrides", i)
+		}
+		name, _ := step["name"].(string)
+		name = strings.TrimSpace(name)
+		if name == "" {
+			continue
+		}
+		if _, exists := stepsByName[name]; exists {
+			return nil, fmt.Errorf("run submit: step name %q is not unique", name)
+		}
+		stepsByName[name] = step
+	}
+	for stepName, assignments := range overrides {
+		step, ok := stepsByName[stepName]
+		if !ok {
+			return nil, fmt.Errorf("run submit: step %q not found for env override", stepName)
+		}
+		envs, err := stepEnvMap(step, stepName)
+		if err != nil {
+			return nil, err
+		}
+		for _, assignment := range assignments {
+			key, value, err := splitStepEnvAssignment(assignment)
+			if err != nil {
+				return nil, err
+			}
+			envs[key] = value
+		}
+		step["envs"] = envs
+	}
+	mutated, err := json.Marshal(specMap)
+	if err != nil {
+		return nil, fmt.Errorf("run submit: marshal env-overridden spec: %w", err)
+	}
+	if _, err := contracts.ParseMigSpecJSON(mutated); err != nil {
+		return nil, fmt.Errorf("run submit: validate env-overridden spec: %w", err)
+	}
+	return json.RawMessage(mutated), nil
+}
+
+func stepEnvMap(step map[string]any, stepName string) (map[string]any, error) {
+	raw, ok := step["envs"]
+	if !ok || raw == nil {
+		return make(map[string]any), nil
+	}
+	envs, ok := raw.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("run submit: step %q envs must be an object", stepName)
+	}
+	return envs, nil
+}
+
+func splitStepEnvAssignment(raw string) (string, string, error) {
+	idx := strings.Index(raw, "=")
+	if idx < 0 {
+		return "", "", fmt.Errorf("run submit: env override %q must be KEY=VALUE", raw)
+	}
+	key := strings.TrimSpace(raw[:idx])
+	if key == "" {
+		return "", "", fmt.Errorf("run submit: env override %q has an empty key", raw)
+	}
+	return key, raw[idx+1:], nil
 }
 
 func followRunStatusReports(ctx context.Context, baseURL *url.URL, client *http.Client, runID domaintypes.RunID, out io.Writer, specDisplayName string, maxRetries int, pollInterval time.Duration) (migsapi.RunState, error) {

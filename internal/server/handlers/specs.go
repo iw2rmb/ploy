@@ -20,8 +20,9 @@ import (
 )
 
 var (
-	namedSpecNameRE = regexp.MustCompile(`^[0-9a-z._-]+$`)
-	namedSpecSHARE  = regexp.MustCompile(`^[0-9a-f]{40}$`)
+	namedSpecNameRE      = regexp.MustCompile(`^[0-9a-z._-]+$`)
+	namedSpecSHARE       = regexp.MustCompile(`^[0-9a-f]{40}$`)
+	namedSpecSHAPrefixRE = regexp.MustCompile(`^[0-9a-f]{8,40}$`)
 )
 
 func publishNamedSpecHandler(st store.Store) http.HandlerFunc {
@@ -51,6 +52,12 @@ func publishNamedSpecHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
+		createdBy, err := resolvedCreatedBy(r.Context(), st, stringPtrValue(req.CreatedBy))
+		if err != nil {
+			serverError(w, "publish named spec", "resolve created_by", err)
+			return
+		}
+
 		created, err := st.CreateNamedSpec(r.Context(), store.CreateNamedSpecParams{
 			ID:                domaintypes.NewSpecID(),
 			Name:              req.Name,
@@ -59,7 +66,7 @@ func publishNamedSpecHandler(st store.Store) http.HandlerFunc {
 			Sha:               req.SHA,
 			SourceCommittedAt: pgtype.Timestamptz{Time: req.SourceCommittedAt, Valid: true},
 			Spec:              req.Spec,
-			CreatedBy:         req.CreatedBy,
+			CreatedBy:         createdBy,
 		})
 		if err == nil {
 			writeJSON(w, http.StatusCreated, namedSpecSummaryFromSpec(created, false))
@@ -100,8 +107,13 @@ func listNamedSpecsHandler(st store.Store) http.HandlerFunc {
 			writeHTTPError(w, http.StatusBadRequest, "%s", err)
 			return
 		}
+		archived, err := parseBoolQueryDefault(r, "archived", false)
+		if err != nil {
+			writeHTTPError(w, http.StatusBadRequest, "%s", err)
+			return
+		}
 
-		rows, err := st.ListLatestNamedSpecs(r.Context(), store.ListLatestNamedSpecsParams{Limit: limit, Offset: offset})
+		rows, err := st.ListLatestNamedSpecs(r.Context(), store.ListLatestNamedSpecsParams{Limit: limit, Offset: offset, Archived: archived})
 		if err != nil {
 			serverError(w, "list named specs", "list named specs", err)
 			return
@@ -122,13 +134,37 @@ func listNamedSpecsHandler(st store.Store) http.HandlerFunc {
 func resolveNamedSpecHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		selector := strings.TrimSpace(r.URL.Query().Get("selector"))
+		shaPrefix := strings.TrimSpace(r.URL.Query().Get("sha"))
+		if strings.Contains(selector, "@") {
+			var selectorSHA string
+			var err error
+			selector, selectorSHA, err = splitNamedSpecVersionSelector(selector)
+			if err != nil {
+				writeHTTPError(w, http.StatusBadRequest, "%s", err)
+				return
+			}
+			if shaPrefix != "" && shaPrefix != selectorSHA {
+				writeHTTPError(w, http.StatusBadRequest, "selector sha and sha query parameter conflict")
+				return
+			}
+			shaPrefix = selectorSHA
+		}
 		parsed, err := parseNamedSpecSelector(selector)
 		if err != nil {
 			writeHTTPError(w, http.StatusBadRequest, "%s", err)
 			return
 		}
+		if shaPrefix != "" && !namedSpecSHAPrefixRE.MatchString(shaPrefix) {
+			writeHTTPError(w, http.StatusBadRequest, "sha must be a lowercase 8-40 character hex prefix")
+			return
+		}
+		archived, err := parseBoolQueryDefault(r, "archived", false)
+		if err != nil {
+			writeHTTPError(w, http.StatusBadRequest, "%s", err)
+			return
+		}
 
-		matches, err := resolveNamedSpecRows(r.Context(), st, parsed)
+		matches, err := resolveNamedSpecRows(r.Context(), st, parsed, shaPrefix, archived)
 		if err != nil {
 			serverError(w, "resolve named spec", "resolve named spec", err, "selector", selector)
 			return
@@ -152,6 +188,39 @@ func resolveNamedSpecHandler(st store.Store) http.HandlerFunc {
 			NamedSpecSummary: summary,
 			Spec:             json.RawMessage(match.spec),
 		})
+	}
+}
+
+func updateNamedSpecHandler(st store.Store) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		specID := strings.TrimSpace(r.PathValue("spec_id"))
+		if specID == "" {
+			writeHTTPError(w, http.StatusBadRequest, "spec_id is required")
+			return
+		}
+		var req domainapi.UpdateNamedSpecRequest
+		if err := decodeRequestJSON(w, r, &req, maxMigSpecSize); err != nil {
+			return
+		}
+		updatedBy, err := resolvedCreatedBy(r.Context(), st, "")
+		if err != nil {
+			serverError(w, "update named spec", "resolve updated_by", err, "spec_id", specID)
+			return
+		}
+		updated, err := st.UpdateNamedSpecArchiveState(r.Context(), store.UpdateNamedSpecArchiveStateParams{
+			ID:        specID,
+			Archived:  req.Archived,
+			UpdatedBy: updatedBy,
+		})
+		if errors.Is(err, pgx.ErrNoRows) {
+			writeHTTPError(w, http.StatusNotFound, "named spec not found")
+			return
+		}
+		if err != nil {
+			serverError(w, "update named spec", "update archive state", err, "spec_id", specID)
+			return
+		}
+		writeJSON(w, http.StatusOK, namedSpecSummaryFromSpec(updated, false))
 	}
 }
 
@@ -257,6 +326,22 @@ func parseNamedSpecSelector(selector string) (namedSpecSelector, error) {
 	return namedSpecSelector{name: name, domain: pathParts[0], repo: strings.Join(pathParts[1:], "/")}, nil
 }
 
+func splitNamedSpecVersionSelector(selector string) (string, string, error) {
+	idx := strings.LastIndex(selector, "@")
+	if idx < 0 {
+		return selector, "", nil
+	}
+	base := strings.TrimSpace(selector[:idx])
+	shaPrefix := strings.TrimSpace(selector[idx+1:])
+	if base == "" || shaPrefix == "" {
+		return "", "", fmt.Errorf("invalid named spec selector: %s", selector)
+	}
+	if !namedSpecSHAPrefixRE.MatchString(shaPrefix) {
+		return "", "", fmt.Errorf("sha must be a lowercase 8-40 character hex prefix")
+	}
+	return base, shaPrefix, nil
+}
+
 type namedSpecResolveMatch struct {
 	id                string
 	name              string
@@ -265,28 +350,53 @@ type namedSpecResolveMatch struct {
 	sha               string
 	sourceCommittedAt pgtype.Timestamptz
 	spec              []byte
+	createdBy         *string
+	updatedBy         *string
 	createdAt         pgtype.Timestamptz
+	archivedAt        pgtype.Timestamptz
 }
 
-func resolveNamedSpecRows(ctx context.Context, st store.Store, selector namedSpecSelector) ([]namedSpecResolveMatch, error) {
+func resolveNamedSpecRows(ctx context.Context, st store.Store, selector namedSpecSelector, shaPrefix string, archived bool) ([]namedSpecResolveMatch, error) {
+	if shaPrefix != "" {
+		return resolveNamedSpecVersionRows(ctx, st, selector, shaPrefix, archived)
+	}
 	if selector.domain != "" {
 		rows, err := st.ResolveLatestNamedSpecByDomainRepoName(ctx, store.ResolveLatestNamedSpecByDomainRepoNameParams{
-			Name: selector.name, Domain: selector.domain, Repo: selector.repo,
+			Name: selector.name, Domain: selector.domain, Repo: selector.repo, Archived: archived,
 		})
 		return mapNamedSpecResolveRows(rows, func(row store.ResolveLatestNamedSpecByDomainRepoNameRow) namedSpecResolveMatch {
-			return namedSpecResolveMatch{id: row.ID, name: row.Name, description: row.Description, source: row.Source, sha: row.Sha, sourceCommittedAt: row.SourceCommittedAt, spec: row.Spec, createdAt: row.CreatedAt}
+			return namedSpecResolveMatch{id: row.ID, name: row.Name, description: row.Description, source: row.Source, sha: row.Sha, sourceCommittedAt: row.SourceCommittedAt, spec: row.Spec, createdBy: row.CreatedBy, updatedBy: row.UpdatedBy, createdAt: row.CreatedAt, archivedAt: row.ArchivedAt}
 		}), err
 	}
 	if selector.repo != "" {
-		rows, err := st.ResolveLatestNamedSpecByRepoName(ctx, store.ResolveLatestNamedSpecByRepoNameParams{Name: selector.name, Repo: selector.repo})
+		rows, err := st.ResolveLatestNamedSpecByRepoName(ctx, store.ResolveLatestNamedSpecByRepoNameParams{Name: selector.name, Repo: selector.repo, Archived: archived})
 		return mapNamedSpecResolveRows(rows, func(row store.ResolveLatestNamedSpecByRepoNameRow) namedSpecResolveMatch {
-			return namedSpecResolveMatch{id: row.ID, name: row.Name, description: row.Description, source: row.Source, sha: row.Sha, sourceCommittedAt: row.SourceCommittedAt, spec: row.Spec, createdAt: row.CreatedAt}
+			return namedSpecResolveMatch{id: row.ID, name: row.Name, description: row.Description, source: row.Source, sha: row.Sha, sourceCommittedAt: row.SourceCommittedAt, spec: row.Spec, createdBy: row.CreatedBy, updatedBy: row.UpdatedBy, createdAt: row.CreatedAt, archivedAt: row.ArchivedAt}
 		}), err
 	}
-	rows, err := st.ResolveLatestNamedSpecByName(ctx, selector.name)
+	rows, err := st.ResolveLatestNamedSpecByName(ctx, store.ResolveLatestNamedSpecByNameParams{Name: selector.name, Archived: archived})
 	return mapNamedSpecResolveRows(rows, func(row store.ResolveLatestNamedSpecByNameRow) namedSpecResolveMatch {
-		return namedSpecResolveMatch{id: row.ID, name: row.Name, description: row.Description, source: row.Source, sha: row.Sha, sourceCommittedAt: row.SourceCommittedAt, spec: row.Spec, createdAt: row.CreatedAt}
+		return namedSpecResolveMatch{id: row.ID, name: row.Name, description: row.Description, source: row.Source, sha: row.Sha, sourceCommittedAt: row.SourceCommittedAt, spec: row.Spec, createdBy: row.CreatedBy, updatedBy: row.UpdatedBy, createdAt: row.CreatedAt, archivedAt: row.ArchivedAt}
 	}), err
+}
+
+func resolveNamedSpecVersionRows(ctx context.Context, st store.Store, selector namedSpecSelector, shaPrefix string, archived bool) ([]namedSpecResolveMatch, error) {
+	if selector.domain != "" {
+		rows, err := st.ResolveNamedSpecVersionByDomainRepoName(ctx, store.ResolveNamedSpecVersionByDomainRepoNameParams{
+			Name: selector.name, Domain: selector.domain, Repo: selector.repo, ShaPrefix: shaPrefix, Archived: archived,
+		})
+		return mapNamedSpecResolveRows(rows, specToNamedSpecResolveMatch), err
+	}
+	if selector.repo != "" {
+		rows, err := st.ResolveNamedSpecVersionByRepoName(ctx, store.ResolveNamedSpecVersionByRepoNameParams{
+			Name: selector.name, Repo: selector.repo, ShaPrefix: shaPrefix, Archived: archived,
+		})
+		return mapNamedSpecResolveRows(rows, specToNamedSpecResolveMatch), err
+	}
+	rows, err := st.ResolveNamedSpecVersionByName(ctx, store.ResolveNamedSpecVersionByNameParams{
+		Name: selector.name, ShaPrefix: shaPrefix, Archived: archived,
+	})
+	return mapNamedSpecResolveRows(rows, specToNamedSpecResolveMatch), err
 }
 
 func mapNamedSpecResolveRows[T any](rows []T, mapper func(T) namedSpecResolveMatch) []namedSpecResolveMatch {
@@ -299,16 +409,22 @@ func mapNamedSpecResolveRows[T any](rows []T, mapper func(T) namedSpecResolveMat
 
 func namedSpecSummaryFromSpec(row store.Spec, skipped bool) domainapi.NamedSpecSummary {
 	source, _ := decodeNamedSpecSource(row.Source)
-	return domainapi.NamedSpecSummary{
+	summary := domainapi.NamedSpecSummary{
 		ID:                row.ID.String(),
 		Name:              row.Name,
 		Description:       row.Description,
 		Source:            source,
 		SHA:               row.Sha,
 		SourceCommittedAt: row.SourceCommittedAt.Time,
+		CreatedBy:         row.CreatedBy,
+		UpdatedBy:         row.UpdatedBy,
 		CreatedAt:         row.CreatedAt.Time,
 		Skipped:           skipped,
 	}
+	if row.ArchivedAt.Valid {
+		summary.ArchivedAt = &row.ArchivedAt.Time
+	}
+	return summary
 }
 
 func namedSpecSummaryFromListRow(row store.ListLatestNamedSpecsRow, skipped bool) (domainapi.NamedSpecSummary, error) {
@@ -316,7 +432,11 @@ func namedSpecSummaryFromListRow(row store.ListLatestNamedSpecsRow, skipped bool
 	if err != nil {
 		return domainapi.NamedSpecSummary{}, err
 	}
-	return domainapi.NamedSpecSummary{ID: row.ID, Name: row.Name, Description: row.Description, Source: source, SHA: row.Sha, SourceCommittedAt: row.SourceCommittedAt.Time, CreatedAt: row.CreatedAt.Time, Skipped: skipped}, nil
+	summary := domainapi.NamedSpecSummary{ID: row.ID, Name: row.Name, Description: row.Description, Source: source, SHA: row.Sha, SourceCommittedAt: row.SourceCommittedAt.Time, CreatedBy: row.CreatedBy, UpdatedBy: row.UpdatedBy, CreatedAt: row.CreatedAt.Time, Skipped: skipped}
+	if row.ArchivedAt.Valid {
+		summary.ArchivedAt = &row.ArchivedAt.Time
+	}
+	return summary, nil
 }
 
 func namedSpecSummaryFromResolveMatch(row namedSpecResolveMatch, skipped bool) (domainapi.NamedSpecSummary, error) {
@@ -324,7 +444,27 @@ func namedSpecSummaryFromResolveMatch(row namedSpecResolveMatch, skipped bool) (
 	if err != nil {
 		return domainapi.NamedSpecSummary{}, err
 	}
-	return domainapi.NamedSpecSummary{ID: row.id, Name: row.name, Description: row.description, Source: source, SHA: row.sha, SourceCommittedAt: row.sourceCommittedAt.Time, CreatedAt: row.createdAt.Time, Skipped: skipped}, nil
+	summary := domainapi.NamedSpecSummary{ID: row.id, Name: row.name, Description: row.description, Source: source, SHA: row.sha, SourceCommittedAt: row.sourceCommittedAt.Time, CreatedBy: row.createdBy, UpdatedBy: row.updatedBy, CreatedAt: row.createdAt.Time, Skipped: skipped}
+	if row.archivedAt.Valid {
+		summary.ArchivedAt = &row.archivedAt.Time
+	}
+	return summary, nil
+}
+
+func specToNamedSpecResolveMatch(row store.Spec) namedSpecResolveMatch {
+	return namedSpecResolveMatch{
+		id:                row.ID.String(),
+		name:              row.Name,
+		description:       row.Description,
+		source:            row.Source,
+		sha:               row.Sha,
+		sourceCommittedAt: row.SourceCommittedAt,
+		spec:              row.Spec,
+		createdBy:         row.CreatedBy,
+		updatedBy:         row.UpdatedBy,
+		createdAt:         row.CreatedAt,
+		archivedAt:        row.ArchivedAt,
+	}
 }
 
 func decodeNamedSpecSource(raw []byte) (domainapi.NamedSpecSource, error) {
@@ -345,8 +485,36 @@ func formatNamedSpecChoices(matches []namedSpecResolveMatch) string {
 		if err != nil {
 			continue
 		}
-		choices = append(choices, source.Domain+"/"+source.Repo+":"+match.name)
+		choices = append(choices, source.Domain+"/"+source.Repo+":"+match.name+"@"+shortNamedSpecSHA(match.sha))
 	}
 	sort.Strings(choices)
 	return strings.Join(choices, ", ")
+}
+
+func parseBoolQueryDefault(r *http.Request, name string, defaultValue bool) (bool, error) {
+	raw := strings.TrimSpace(r.URL.Query().Get(name))
+	switch raw {
+	case "":
+		return defaultValue, nil
+	case "true":
+		return true, nil
+	case "false":
+		return false, nil
+	default:
+		return false, fmt.Errorf("%s must be true or false", name)
+	}
+}
+
+func stringPtrValue(ptr *string) string {
+	if ptr == nil {
+		return ""
+	}
+	return *ptr
+}
+
+func shortNamedSpecSHA(sha string) string {
+	if len(sha) <= 8 {
+		return sha
+	}
+	return sha[:8]
 }

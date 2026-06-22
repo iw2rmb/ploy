@@ -32,6 +32,13 @@ func Handle(args []string, stdout, stderr io.Writer) error {
 	case "ls":
 		return handleList(args[1:], stdout, stderr)
 	default:
+		action, ok, err := parseSpecArchiveArgs(args)
+		if err != nil {
+			return err
+		}
+		if ok {
+			return handleArchiveAction(action, stdout, stderr)
+		}
 		return fmt.Errorf("unknown spec subcommand %q", args[0])
 	}
 }

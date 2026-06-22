@@ -1,0 +1,2 @@
+ALTER TABLE IF EXISTS ploy.specs
+  ADD COLUMN IF NOT EXISTS updated_by TEXT;

@@ -30,7 +30,10 @@ type NamedSpecSummary struct {
 	Source            NamedSpecSource `json:"source"`
 	SHA               string          `json:"sha"`
 	SourceCommittedAt time.Time       `json:"source_committed_at"`
+	CreatedBy         *string         `json:"created_by,omitempty"`
+	UpdatedBy         *string         `json:"updated_by,omitempty"`
 	CreatedAt         time.Time       `json:"created_at"`
+	ArchivedAt        *time.Time      `json:"archived_at,omitempty"`
 	Skipped           bool            `json:"skipped"`
 }
 
@@ -43,4 +46,9 @@ type NamedSpecListResponse struct {
 type NamedSpecResolveResponse struct {
 	NamedSpecSummary
 	Spec json.RawMessage `json:"spec"`
+}
+
+// UpdateNamedSpecRequest is the canonical request DTO for PATCH /v1/specs/{spec_id}.
+type UpdateNamedSpecRequest struct {
+	Archived bool `json:"archived"`
 }

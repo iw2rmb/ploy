@@ -50,4 +50,4 @@ ploy run ./mig.yaml example/repo:main --pull
 - TUI usage: `docs/how-to/tui-navigation.md`
 - Java dependency usage extractor: `docs/how-to/java-dependency-usage-extractor.md`
 
-License: see `LICENSE` when present.
+License: MIT. See `LICENSE`.

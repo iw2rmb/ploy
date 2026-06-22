@@ -256,6 +256,7 @@ type Spec struct {
 	SourceCommittedAt pgtype.Timestamptz `json:"source_committed_at"`
 	Spec              []byte             `json:"spec"`
 	CreatedBy         *string            `json:"created_by"`
+	UpdatedBy         *string            `json:"updated_by"`
 	CreatedAt         pgtype.Timestamptz `json:"created_at"`
 	ArchivedAt        pgtype.Timestamptz `json:"archived_at"`
 }

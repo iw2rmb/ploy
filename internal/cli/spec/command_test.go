@@ -279,22 +279,105 @@ func TestHandleSpecPush(t *testing.T) {
 }
 
 func TestHandleSpecList(t *testing.T) {
-	server := newNamedSpecTestServer(t, nil)
-	t.Setenv("PLOY_SERVER_URL", server.url)
-	t.Setenv("PLOY_AUTH_TOKEN", "test-token")
+	tests := []struct {
+		name         string
+		args         []string
+		wantArchived string
+	}{
+		{name: "active default", args: []string{"ls"}, wantArchived: "false"},
+		{name: "archived flag", args: []string{"ls", "--archived"}, wantArchived: "true"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := newNamedSpecTestServer(t, nil)
+			t.Setenv("PLOY_SERVER_URL", server.url)
+			t.Setenv("PLOY_AUTH_TOKEN", "test-token")
 
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-	if err := Handle([]string{"ls"}, &stdout, &stderr); err != nil {
-		t.Fatalf("Handle(ls) error = %v", err)
+			var stdout bytes.Buffer
+			var stderr bytes.Buffer
+			if err := Handle(tt.args, &stdout, &stderr); err != nil {
+				t.Fatalf("Handle(%v) error = %v", tt.args, err)
+			}
+			for _, want := range []string{"NAME", "SOURCE", "upgrade-java", "github.com/acme/service", "01234567"} {
+				if !strings.Contains(stdout.String(), want) {
+					t.Fatalf("stdout = %q, want containing %q", stdout.String(), want)
+				}
+			}
+			if strings.Contains(stdout.String(), "012345678") {
+				t.Fatalf("stdout = %q, want 8-character SHA rendering", stdout.String())
+			}
+			if got := server.listArchived(); got != tt.wantArchived {
+				t.Fatalf("archived query = %q, want %q", got, tt.wantArchived)
+			}
+		})
 	}
-	for _, want := range []string{"NAME", "SOURCE", "upgrade-java", "github.com/acme/service", "01234567"} {
-		if !strings.Contains(stdout.String(), want) {
-			t.Fatalf("stdout = %q, want containing %q", stdout.String(), want)
-		}
+}
+
+func TestHandleSpecArchiveAction(t *testing.T) {
+	tests := []struct {
+		name          string
+		args          []string
+		wantResolve   map[string]string
+		wantPatchBody bool
+		wantOut       string
+	}{
+		{
+			name:          "archive versioned selector",
+			args:          []string{"github.com/acme/service:upgrade-java@01234567", "--archive"},
+			wantResolve:   map[string]string{"selector": "github.com/acme/service:upgrade-java", "sha": "01234567", "archived": "false"},
+			wantPatchBody: true,
+			wantOut:       "Spec archived: github.com/acme/service:upgrade-java@01234567",
+		},
+		{
+			name:          "unarchive archived selector",
+			args:          []string{"upgrade-java@01234567", "--unarchive"},
+			wantResolve:   map[string]string{"selector": "upgrade-java", "sha": "01234567", "archived": "true"},
+			wantPatchBody: false,
+			wantOut:       "Spec unarchived: github.com/acme/service:upgrade-java@01234567",
+		},
 	}
-	if strings.Contains(stdout.String(), "012345678") {
-		t.Fatalf("stdout = %q, want 8-character SHA rendering", stdout.String())
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := newNamedSpecTestServer(t, nil)
+			t.Setenv("PLOY_SERVER_URL", server.url)
+			t.Setenv("PLOY_AUTH_TOKEN", "test-token")
+
+			var stdout bytes.Buffer
+			var stderr bytes.Buffer
+			if err := Handle(tt.args, &stdout, &stderr); err != nil {
+				t.Fatalf("Handle(%v) error = %v", tt.args, err)
+			}
+			if !strings.Contains(stdout.String(), tt.wantOut) {
+				t.Fatalf("stdout = %q, want containing %q", stdout.String(), tt.wantOut)
+			}
+			if got := server.resolveQuery(); got["selector"] != tt.wantResolve["selector"] || got["sha"] != tt.wantResolve["sha"] || got["archived"] != tt.wantResolve["archived"] {
+				t.Fatalf("resolve query = %#v, want %#v", got, tt.wantResolve)
+			}
+			if got := server.patchArchived(); got != tt.wantPatchBody {
+				t.Fatalf("patch archived = %v, want %v", got, tt.wantPatchBody)
+			}
+		})
+	}
+}
+
+func TestHandleSpecArchiveActionValidation(t *testing.T) {
+	tests := []struct {
+		name    string
+		args    []string
+		wantErr string
+	}{
+		{name: "mutually exclusive", args: []string{"upgrade-java", "--archive", "--unarchive"}, wantErr: "mutually exclusive"},
+		{name: "bad sha prefix", args: []string{"upgrade-java@ABC", "--archive"}, wantErr: "sha must be"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var stdout bytes.Buffer
+			var stderr bytes.Buffer
+			err := Handle(tt.args, &stdout, &stderr)
+			if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("Handle(%v) error = %v, want containing %q", tt.args, err, tt.wantErr)
+			}
+		})
 	}
 }
 
@@ -371,6 +454,9 @@ type namedSpecTestServer struct {
 	mu       sync.Mutex
 	captured []domainapi.PublishNamedSpecRequest
 	skipped  map[string]bool
+	listQ    map[string]string
+	resolveQ map[string]string
+	patch    *domainapi.UpdateNamedSpecRequest
 }
 
 func newNamedSpecTestServer(t *testing.T, skipped map[string]bool) *namedSpecTestServer {
@@ -421,6 +507,9 @@ func newNamedSpecTestServer(t *testing.T, skipped map[string]bool) *namedSpecTes
 				http.Error(w, "missing named=true", http.StatusBadRequest)
 				return
 			}
+			s.mu.Lock()
+			s.listQ = queryMap(r, "archived")
+			s.mu.Unlock()
 			_ = json.NewEncoder(w).Encode(domainapi.NamedSpecListResponse{Specs: []domainapi.NamedSpecSummary{{
 				ID:                "spec001",
 				Name:              "upgrade-java",
@@ -429,6 +518,38 @@ func newNamedSpecTestServer(t *testing.T, skipped map[string]bool) *namedSpecTes
 				SourceCommittedAt: time.Date(2026, 6, 19, 12, 0, 0, 0, time.UTC),
 				CreatedAt:         time.Date(2026, 6, 19, 12, 1, 0, 0, time.UTC),
 			}}})
+		case r.URL.Path == "/v1/specs/resolve" && r.Method == http.MethodGet:
+			s.mu.Lock()
+			s.resolveQ = queryMap(r, "selector", "sha", "archived")
+			s.mu.Unlock()
+			_ = json.NewEncoder(w).Encode(domainapi.NamedSpecResolveResponse{
+				NamedSpecSummary: domainapi.NamedSpecSummary{
+					ID:                "spec001",
+					Name:              "upgrade-java",
+					Source:            domainapi.NamedSpecSource{Domain: "github.com", Repo: "acme/service"},
+					SHA:               "0123456789abcdef0123456789abcdef01234567",
+					SourceCommittedAt: time.Date(2026, 6, 19, 12, 0, 0, 0, time.UTC),
+					CreatedAt:         time.Date(2026, 6, 19, 12, 1, 0, 0, time.UTC),
+				},
+				Spec: json.RawMessage(`{"steps":[{"image":"img"}]}`),
+			})
+		case r.URL.Path == "/v1/specs/spec001" && r.Method == http.MethodPatch:
+			var req domainapi.UpdateNamedSpecRequest
+			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+			s.mu.Lock()
+			s.patch = &req
+			s.mu.Unlock()
+			_ = json.NewEncoder(w).Encode(domainapi.NamedSpecSummary{
+				ID:                "spec001",
+				Name:              "upgrade-java",
+				Source:            domainapi.NamedSpecSource{Domain: "github.com", Repo: "acme/service"},
+				SHA:               "0123456789abcdef0123456789abcdef01234567",
+				SourceCommittedAt: time.Date(2026, 6, 19, 12, 0, 0, 0, time.UTC),
+				CreatedAt:         time.Date(2026, 6, 19, 12, 1, 0, 0, time.UTC),
+			})
 		default:
 			http.Error(w, fmt.Sprintf("unexpected %s %s", r.Method, r.URL.String()), http.StatusInternalServerError)
 		}
@@ -442,6 +563,39 @@ func (s *namedSpecTestServer) requests() []domainapi.PublishNamedSpecRequest {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return append([]domainapi.PublishNamedSpecRequest(nil), s.captured...)
+}
+
+func (s *namedSpecTestServer) listArchived() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.listQ["archived"]
+}
+
+func (s *namedSpecTestServer) resolveQuery() map[string]string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return map[string]string{
+		"selector": s.resolveQ["selector"],
+		"sha":      s.resolveQ["sha"],
+		"archived": s.resolveQ["archived"],
+	}
+}
+
+func (s *namedSpecTestServer) patchArchived() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.patch == nil {
+		return false
+	}
+	return s.patch.Archived
+}
+
+func queryMap(r *http.Request, keys ...string) map[string]string {
+	out := make(map[string]string, len(keys))
+	for _, key := range keys {
+		out[key] = r.URL.Query().Get(key)
+	}
+	return out
 }
 
 func assertRenderedRequestSHAs(t *testing.T, stdout string, requests []domainapi.PublishNamedSpecRequest) {
