@@ -190,6 +190,9 @@ func handleArchiveAction(action specArchiveAction, stdout, stderr io.Writer) err
 		printArchiveUsage(stderr)
 		return nil
 	}
+	if _, _, err := splitNamedSpecVersionSelector(action.Selector); err != nil {
+		return err
+	}
 	ctx := context.Background()
 	base, client, err := common.ResolveControlPlaneHTTP(ctx)
 	if err != nil {
