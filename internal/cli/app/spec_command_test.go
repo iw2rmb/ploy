@@ -81,6 +81,7 @@ func newAppSpecServer(t *testing.T) *httptest.Server {
 				Source:            domainapi.NamedSpecSource{Domain: "github.com", Repo: "acme/service"},
 				SHA:               "0123456789abcdef0123456789abcdef01234567",
 				SourceCommittedAt: time.Date(2026, 6, 19, 12, 0, 0, 0, time.UTC),
+				CreatedAt:         time.Date(2026, 6, 19, 12, 1, 0, 0, time.UTC),
 			}}})
 		case r.URL.Path == "/v1/specs" && r.Method == http.MethodPost:
 			var req domainapi.PublishNamedSpecRequest
@@ -95,6 +96,7 @@ func newAppSpecServer(t *testing.T) *httptest.Server {
 				Source:            req.Source,
 				SHA:               req.SHA,
 				SourceCommittedAt: req.SourceCommittedAt,
+				CreatedAt:         req.SourceCommittedAt.Add(time.Minute),
 			})
 		default:
 			http.Error(w, "unexpected", http.StatusInternalServerError)

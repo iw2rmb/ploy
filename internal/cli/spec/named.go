@@ -510,7 +510,7 @@ func renderPushResults(out io.Writer, specs []domainapi.NamedSpecSummary) {
 		if spec.Skipped {
 			state = "skipped"
 		}
-		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", state, spec.Name, renderNamedSpecSource(spec.Source), shortSHA(spec.SHA), formatSpecTime(spec.SourceCommittedAt))
+		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", state, spec.Name, renderNamedSpecSource(spec.Source), shortSHA(spec.SHA), formatSpecTime(spec.CreatedAt))
 	}
 	_ = w.Flush()
 }
@@ -519,7 +519,7 @@ func renderListResults(out io.Writer, specs []domainapi.NamedSpecSummary) {
 	w := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
 	_, _ = fmt.Fprintln(w, "NAME\tSOURCE\tSHA\tDATE")
 	for _, spec := range specs {
-		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", spec.Name, renderNamedSpecSource(spec.Source), shortSHA(spec.SHA), formatSpecTime(spec.SourceCommittedAt))
+		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", spec.Name, renderNamedSpecSource(spec.Source), shortSHA(spec.SHA), formatSpecTime(spec.CreatedAt))
 	}
 	_ = w.Flush()
 }
