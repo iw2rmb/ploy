@@ -36,5 +36,7 @@ post:
       description: Unauthorized
     '403':
       description: Forbidden (requires control-plane or cli-admin role)
+    '409':
+      description: Conflict (node ID already exists)
     '500':
       description: Server error

@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"context"
 	"crypto/ecdsa"
 	"crypto/sha256"
 	"crypto/x509"
@@ -12,7 +11,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"net/netip"
 	"os"
 	"strings"
 	"time"
@@ -50,6 +48,15 @@ func createBootstrapTokenHandler(st store.Store, tokenSecret string) http.Handle
 		// Default expiration to 15 minutes if not specified.
 		if req.ExpiresInMinutes <= 0 {
 			req.ExpiresInMinutes = 15
+		}
+
+		if _, err := st.GetNode(r.Context(), nodeID); err == nil {
+			writeHTTPError(w, http.StatusConflict, "node already exists")
+			return
+		} else if !errors.Is(err, pgx.ErrNoRows) {
+			writeHTTPError(w, http.StatusInternalServerError, "failed to check node: %v", err)
+			slog.Error("create bootstrap token: node lookup failed", "node_id", nodeID.String(), "err", err)
+			return
 		}
 
 		// Generate bootstrap token.
@@ -165,22 +172,28 @@ func bootstrapCertificateHandler(st store.Store, tokenSecret string) http.Handle
 			return
 		}
 
-		if err := registerNodeIfNew(r.Context(), st, claims.NodeID); err != nil {
-			writeHTTPError(w, http.StatusInternalServerError, "failed to register node: %v", err)
-			return
-		}
-
-		// Mark bootstrap token as used (best-effort, cert already issued).
-		if err := st.UpdateBootstrapTokenLastUsed(r.Context(), claims.ID); err != nil {
-			slog.Error("bootstrap certificate: failed to mark token as used", "token_id", claims.ID, "err", err)
-		}
-		if err := st.MarkBootstrapTokenCertIssued(r.Context(), claims.ID); err != nil {
-			slog.Error("bootstrap certificate: failed to mark cert as issued", "token_id", claims.ID, "err", err)
-		}
-
 		workerToken, err := issueWorkerToken()
 		if err != nil {
 			writeHTTPError(w, http.StatusInternalServerError, "%s", err)
+			return
+		}
+
+		if err := st.CompleteBootstrapEnrollment(r.Context(), store.CompleteBootstrapEnrollmentParams{
+			TokenID:         claims.ID,
+			NodeID:          claims.NodeID,
+			CertSerial:      cert.Serial,
+			CertFingerprint: cert.Fingerprint,
+			CertNotBefore:   cert.NotBefore,
+			CertNotAfter:    cert.NotAfter,
+		}); err != nil {
+			switch {
+			case errors.Is(err, store.ErrBootstrapTokenInvalid):
+				writeHTTPError(w, http.StatusUnauthorized, "token not found or invalid")
+			case errors.Is(err, store.ErrBootstrapNodeExists):
+				writeHTTPError(w, http.StatusConflict, "node already exists")
+			default:
+				writeHTTPError(w, http.StatusInternalServerError, "failed to complete bootstrap enrollment: %v", err)
+			}
 			return
 		}
 
@@ -241,24 +254,32 @@ func validateBootstrapToken(r *http.Request, st store.Store, tokenSecret string)
 		return nil, fmt.Errorf("token expired")
 	}
 
-	revoked, err := st.CheckBootstrapTokenRevoked(r.Context(), claims.ID)
-	if err != nil {
-		slog.Error("bootstrap certificate: token revocation check failed", "token_id", claims.ID, "err", err)
-		return nil, fmt.Errorf("failed to verify token revocation")
-	}
-	if revoked.Valid {
-		return nil, fmt.Errorf("token revoked")
-	}
-
 	tokenInfo, err := st.GetBootstrapToken(r.Context(), claims.ID)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			slog.Warn("bootstrap certificate: token not found in database", "token_id", claims.ID)
+			return nil, fmt.Errorf("token not found or invalid")
+		}
 		slog.Warn("bootstrap certificate: token not found in database", "token_id", claims.ID, "err", err)
 		return nil, fmt.Errorf("token not found or invalid")
+	}
+
+	if tokenInfo.RevokedAt.Valid {
+		return nil, fmt.Errorf("token revoked")
 	}
 
 	if tokenInfo.UsedAt.Valid {
 		slog.Warn("bootstrap certificate: token already used", "token_id", claims.ID)
 		return nil, fmt.Errorf("token already used")
+	}
+
+	if tokenInfo.NodeID == nil || *tokenInfo.NodeID != claims.NodeID {
+		slog.Warn("bootstrap certificate: token node mismatch",
+			"token_id", claims.ID,
+			"claim_node_id", claims.NodeID.String(),
+			"stored_node_id", tokenInfo.NodeID,
+		)
+		return nil, fmt.Errorf("token not found or invalid")
 	}
 
 	return claims, nil
@@ -294,34 +315,6 @@ func parseAndVerifyCSR(csrPEM string, expectedCN string) (*x509.CertificateReque
 	}
 
 	return parsed, nil
-}
-
-// registerNodeIfNew creates a node record with defaults if it doesn't already exist.
-func registerNodeIfNew(ctx context.Context, st store.Store, nodeID domaintypes.NodeID) error {
-	if nodeID.IsZero() {
-		return fmt.Errorf("invalid node_id")
-	}
-
-	if _, err := st.GetNode(ctx, nodeID); err == nil {
-		return nil // already exists
-	} else if !errors.Is(err, pgx.ErrNoRows) {
-		slog.Error("bootstrap certificate: failed to check node before register", "node_id", nodeID.String(), "err", err)
-		return err
-	}
-
-	ipAddr, _ := netip.ParseAddr("0.0.0.0")
-	if _, err := st.CreateNode(ctx, store.CreateNodeParams{
-		ID:          nodeID,
-		Name:        "node-" + nodeID.String(),
-		IpAddress:   ipAddr,
-		Version:     nil,
-		Concurrency: 1,
-	}); err != nil {
-		slog.Error("bootstrap certificate: failed to register node", "node_id", nodeID.String(), "err", err)
-		return err
-	}
-	slog.Info("node registered", "node_id", nodeID.String())
-	return nil
 }
 
 // issueWorkerToken generates a long-lived worker bearer token for API authentication.

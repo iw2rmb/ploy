@@ -309,13 +309,15 @@ func (a *Authorizer) identityFromBearerToken(ctx context.Context, tokenString st
 		return Identity{}, errors.New("token revoked")
 	}
 
-	// Update last_used_at/used_at asynchronously for all token types.
-	// Tracked via WaitGroup so Wait() can drain in-flight updates on shutdown.
-	a.wg.Add(1)
-	go func() {
-		defer a.wg.Done()
-		a.updateTokenLastUsed(context.Background(), claims.ID, claims.TokenType)
-	}()
+	// API token last_used_at is telemetry. Bootstrap token used_at is the
+	// one-time enrollment consumption marker and is set only by /v1/pki/bootstrap.
+	if claims.TokenType == TokenTypeAPI {
+		a.wg.Add(1)
+		go func() {
+			defer a.wg.Done()
+			a.updateTokenLastUsed(context.Background(), claims.ID, claims.TokenType)
+		}()
+	}
 
 	a.logger.Info("auth: bearer token validated successfully",
 		"token_id", claims.ID,
@@ -368,8 +370,6 @@ func (a *Authorizer) updateTokenLastUsed(ctx context.Context, tokenID, tokenType
 	switch tokenType {
 	case TokenTypeAPI:
 		err = a.querier.UpdateAPITokenLastUsed(ctx, tokenID)
-	case TokenTypeBootstrap:
-		err = a.querier.UpdateBootstrapTokenLastUsed(ctx, tokenID)
 	}
 
 	if err != nil {

@@ -54,6 +54,14 @@ func TestRunMigrationsTernStates(t *testing.T) {
 			},
 		},
 		{
+			name:  "version 4 database with stale bootstrap token node foreign key is repaired",
+			setup: setupTernVersion4WithStaleBootstrapTokenFK,
+			assert: func(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
+				assertTernVersion(t, ctx, pool, TargetSchemaVersion)
+				assertConstraintAbsent(t, ctx, pool, "bootstrap_tokens", "bootstrap_tokens_node_id_fkey")
+			},
+		},
+		{
 			name:    "unsupported existing database fails clearly",
 			setup:   setupUnsupportedExistingSchema,
 			wantErr: ErrUnsupportedSchema,
@@ -78,6 +86,39 @@ func TestRunMigrationsTernStates(t *testing.T) {
 			}
 			tt.assert(t, ctx, st.Pool())
 		})
+	}
+}
+
+func setupTernVersion4WithStaleBootstrapTokenFK(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
+	t.Helper()
+	resetPloySchema(t, ctx, pool)
+	if err := RunMigrations(ctx, pool); err != nil {
+		t.Fatalf("create version 5 schema fixture: %v", err)
+	}
+	setTernVersion(t, ctx, pool, 4)
+	if _, err := pool.Exec(ctx, `
+ALTER TABLE ploy.bootstrap_tokens
+  ADD CONSTRAINT bootstrap_tokens_node_id_fkey
+  FOREIGN KEY (node_id) REFERENCES ploy.nodes(id) ON DELETE CASCADE
+`); err != nil {
+		t.Fatalf("restore bootstrap token node foreign key: %v", err)
+	}
+	assertTernVersion(t, ctx, pool, 4)
+}
+
+func setTernVersion(t *testing.T, ctx context.Context, pool *pgxpool.Pool, version int32) {
+	t.Helper()
+	acquired, err := pool.Acquire(ctx)
+	if err != nil {
+		t.Fatalf("acquire migration connection: %v", err)
+	}
+	defer acquired.Release()
+	migrator, err := newTernMigrator(ctx, acquired.Conn())
+	if err != nil {
+		t.Fatalf("new Tern migrator: %v", err)
+	}
+	if err := migrator.SetVersion(ctx, version); err != nil {
+		t.Fatalf("set Tern version %d: %v", version, err)
 	}
 }
 
