@@ -271,6 +271,7 @@ func TestHandleSpecPush(t *testing.T) {
 				t.Fatalf("publish posts = %d, want %d", len(requests), tt.wantPosts)
 			}
 			assertRenderedRequestSHAs(t, stdout.String(), requests)
+			assertRenderedCreatedAt(t, stdout.String(), requests)
 			if tt.assertRequests != nil {
 				tt.assertRequests(t, requests)
 			}
@@ -298,7 +299,7 @@ func TestHandleSpecList(t *testing.T) {
 			if err := Handle(tt.args, &stdout, &stderr); err != nil {
 				t.Fatalf("Handle(%v) error = %v", tt.args, err)
 			}
-			for _, want := range []string{"NAME", "SOURCE", "upgrade-java", "github.com/acme/service", "01234567"} {
+			for _, want := range []string{"NAME", "SOURCE", "upgrade-java", "github.com/acme/service", "01234567", "2026-06-19T12:01:00Z"} {
 				if !strings.Contains(stdout.String(), want) {
 					t.Fatalf("stdout = %q, want containing %q", stdout.String(), want)
 				}
@@ -609,6 +610,16 @@ func assertRenderedRequestSHAs(t *testing.T, stdout string, requests []domainapi
 		}
 		if strings.Contains(stdout, req.SHA[:9]) {
 			t.Fatalf("stdout = %q, want 8-character SHA rendering", stdout)
+		}
+	}
+}
+
+func assertRenderedCreatedAt(t *testing.T, stdout string, requests []domainapi.PublishNamedSpecRequest) {
+	t.Helper()
+	for _, req := range requests {
+		wantCreatedAt := formatSpecTime(req.SourceCommittedAt.Add(time.Minute))
+		if !strings.Contains(stdout, wantCreatedAt) {
+			t.Fatalf("stdout = %q, want rendered created_at %q", stdout, wantCreatedAt)
 		}
 	}
 }
