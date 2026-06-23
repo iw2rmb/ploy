@@ -20,6 +20,8 @@ func TestGitFetcher_Fetch(t *testing.T) {
 	}
 
 	repoWithFeatureBranch := setupRepoWithFeatureBranch(t)
+	repoWithCommits := setupRepoWithCommits(t)
+	secondCommitSHA := gitrepo.RevParse(t, repoWithCommits, "HEAD~1")
 
 	tests := []struct {
 		name      string
@@ -27,6 +29,7 @@ func TestGitFetcher_Fetch(t *testing.T) {
 		dest      string
 		wantErr   bool
 		errSubstr string
+		wantHead  string
 	}{
 		{
 			name:      "nil repo",
@@ -61,6 +64,15 @@ func TestGitFetcher_Fetch(t *testing.T) {
 			dest: t.TempDir(),
 		},
 		{
+			name: "valid repo with base_ref commit sha",
+			repo: &contracts.RepoMaterialization{
+				URL:     types.RepoURL("file://" + repoWithCommits),
+				BaseRef: types.GitRef(secondCommitSHA),
+			},
+			dest:     t.TempDir(),
+			wantHead: secondCommitSHA,
+		},
+		{
 			name: "valid repo with commit_sha HEAD",
 			repo: &contracts.RepoMaterialization{
 				URL:     types.RepoURL("file://" + gitrepo.SetupBasic(t)),
@@ -90,6 +102,12 @@ func TestGitFetcher_Fetch(t *testing.T) {
 
 			if !tt.wantErr {
 				gitrepo.AssertRepo(t, tt.dest)
+				if tt.wantHead != "" {
+					got := gitrepo.RevParse(t, tt.dest, "HEAD")
+					if got != tt.wantHead {
+						t.Fatalf("HEAD = %s, want %s", got, tt.wantHead)
+					}
+				}
 			}
 		})
 	}
