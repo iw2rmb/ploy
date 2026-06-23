@@ -84,6 +84,12 @@ func (g *gitFetcher) Fetch(ctx context.Context, repo *contracts.RepoMaterializat
 	url := strings.TrimSpace(string(repo.URL))
 	baseRef := strings.TrimSpace(string(repo.BaseRef))
 	commitSHA := strings.TrimSpace(string(repo.Commit))
+	if baseRefCommitSHA := normalizeFullCommitSHA(baseRef); baseRefCommitSHA != "" {
+		if commitSHA == "" {
+			commitSHA = baseRefCommitSHA
+		}
+		baseRef = ""
+	}
 
 	// If destination already looks like a hydrated clone of this repo, skip re-clone.
 	// This makes hydration idempotent when the orchestrator reuses the same workspace
