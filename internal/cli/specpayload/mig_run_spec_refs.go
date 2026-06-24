@@ -58,6 +58,7 @@ func expandSpecRefsInPlaceWithStack(spec map[string]any, sourcePath string, stac
 		if err := applyRefStepEnvOverlay(imported, step, i); err != nil {
 			return err
 		}
+		applyRefStepImageOverride(imported, step)
 		steps[i] = imported
 	}
 	return nil
@@ -65,11 +66,17 @@ func expandSpecRefsInPlaceWithStack(spec map[string]any, sourcePath string, stac
 
 func validateRefWrapperKeys(step map[string]any, index int) error {
 	for key := range step {
-		if key != "ref" && key != "envs" {
-			return fmt.Errorf("steps[%d]: ref step may contain only ref and envs", index)
+		if key != "ref" && key != "envs" && key != "image" {
+			return fmt.Errorf("steps[%d]: ref step may contain only ref, envs, and image", index)
 		}
 	}
 	return nil
+}
+
+func applyRefStepImageOverride(imported map[string]any, wrapper map[string]any) {
+	if image, ok := wrapper["image"]; ok {
+		imported["image"] = image
+	}
 }
 
 func applyRefStepEnvOverlay(imported map[string]any, wrapper map[string]any, index int) error {

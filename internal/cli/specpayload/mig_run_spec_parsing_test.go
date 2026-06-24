@@ -555,7 +555,7 @@ func TestBuildSpecPayload_RefExpansion(t *testing.T) {
 	tests := []struct {
 		name      string
 		setup     func(t *testing.T, rootDir string) string
-		wantImage string
+		wantImage any
 		wantEnv   map[string]any
 	}{
 		{
@@ -617,6 +617,54 @@ steps:
 			},
 		},
 		{
+			name: "ref wrapper image replaces imported image with env overlay",
+			setup: func(t *testing.T, rootDir string) string {
+				writeFile(t, filepath.Join(rootDir, "lib.yaml"), `
+steps:
+  - name: reuse
+    image: docker.io/test/reuse:latest
+    envs:
+      SHARED: imported
+      IMPORTED_ONLY: imported
+`)
+				return `
+steps:
+  - ref: ./lib.yaml:reuse
+    image: docker.io/test/override:latest
+    envs:
+      SHARED: wrapper
+      WRAPPER_ONLY: wrapper
+`
+			},
+			wantImage: "docker.io/test/override:latest",
+			wantEnv: map[string]any{
+				"IMPORTED_ONLY": "imported",
+				"WRAPPER_ONLY":  "wrapper",
+				"SHARED":        "wrapper",
+			},
+		},
+		{
+			name: "ref wrapper image supports stack map",
+			setup: func(t *testing.T, rootDir string) string {
+				writeFile(t, filepath.Join(rootDir, "lib.yaml"), `
+steps:
+  - name: reuse
+    image: docker.io/test/reuse:latest
+`)
+				return `
+steps:
+  - ref: ./lib.yaml:reuse
+    image:
+      default: docker.io/test/default:latest
+      java-maven: docker.io/test/maven:latest
+`
+			},
+			wantImage: map[string]any{
+				"default":    "docker.io/test/default:latest",
+				"java-maven": "docker.io/test/maven:latest",
+			},
+		},
+		{
 			name: "directory ref uses mig yaml",
 			setup: func(t *testing.T, rootDir string) string {
 				libDir := filepath.Join(rootDir, "reusable")
@@ -645,7 +693,17 @@ steps:
 			spec := tt.setup(t, rootDir)
 			result := buildAndParseSpec(t, rootDir, spec, ".yaml", specPayloadOpts{})
 			steps := mustSteps(t, result, 1)
-			assertField(t, steps[0], "image", tt.wantImage)
+			switch wantImage := tt.wantImage.(type) {
+			case string:
+				assertField(t, steps[0], "image", wantImage)
+			case map[string]any:
+				image := mustDig(t, steps[0], "image")
+				for key, want := range wantImage {
+					assertField(t, image, key, want)
+				}
+			default:
+				t.Fatalf("unsupported wantImage type %T", tt.wantImage)
+			}
 			assertField(t, steps[0], "name", "reuse")
 			if tt.wantEnv != nil {
 				envs := mustDig(t, steps[0], "envs")
@@ -712,14 +770,14 @@ steps:
 			wantErr: "step \"missing\" not found",
 		},
 		{
-			name: "ref step cannot mix non-env keys",
+			name: "ref step cannot mix non-wrapper keys",
 			spec: `
 steps:
   - ref: ./lib.yaml:reuse
-    image: docker.io/test/inline:latest
+    command: ["echo", "inline"]
 `,
 			files:   map[string]string{"lib.yaml": "steps:\n  - name: reuse\n    image: docker.io/test/reuse:latest\n"},
-			wantErr: "ref step may contain only ref and envs",
+			wantErr: "ref step may contain only ref, envs, and image",
 		},
 		{
 			name: "ref step envs must be object",
