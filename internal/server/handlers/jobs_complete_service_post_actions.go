@@ -25,33 +25,16 @@ func (s *completionService) onFail(ctx context.Context, state *completeJobState)
 		return
 	}
 
-	if state.input.Status == domaintypes.JobStatusFail {
-		if errMsg := formatExit137Error(string(state.job.JobType), state.input.ExitCode); errMsg != nil {
-			if updateErr := s.store.UpdateRunError(ctx, store.UpdateRunErrorParams{
-				ID:        state.job.RunID,
-				LastError: errMsg,
-			}); updateErr != nil {
-				slog.Error("complete job: failed to set repo last_error for exit code 137",
-					"job_id", state.job.ID,
-					"repo_id", state.job.RepoID,
-					"err", updateErr,
-				)
-			}
-		}
-	}
-	if state.input.Status == domaintypes.JobStatusError {
-		if errMsg := state.input.StatsPayload.ErrorMessage(); errMsg != "" {
-			errText := errMsg
-			if updateErr := s.store.UpdateRunError(ctx, store.UpdateRunErrorParams{
-				ID:        state.job.RunID,
-				LastError: &errText,
-			}); updateErr != nil {
-				slog.Error("complete job: failed to set repo last_error from stats.error",
-					"job_id", state.job.ID,
-					"repo_id", state.job.RepoID,
-					"err", updateErr,
-				)
-			}
+	if errMsg := lastErrorFromTerminalJob(state); errMsg != nil {
+		if updateErr := s.store.UpdateRunError(ctx, store.UpdateRunErrorParams{
+			ID:        state.job.RunID,
+			LastError: errMsg,
+		}); updateErr != nil {
+			slog.Error("complete job: failed to set repo last_error from terminal job",
+				"job_id", state.job.ID,
+				"repo_id", state.job.RepoID,
+				"err", updateErr,
+			)
 		}
 	}
 
@@ -84,6 +67,17 @@ func (s *completionService) onFail(ctx context.Context, state *completeJobState)
 			)
 		}
 	}
+}
+
+func lastErrorFromTerminalJob(state *completeJobState) *string {
+	if errMsg := state.input.StatsPayload.ErrorMessage(); errMsg != "" {
+		errText := errMsg
+		return &errText
+	}
+	if state.input.Status == domaintypes.JobStatusFail {
+		return formatExit137Error(string(state.job.JobType), state.input.ExitCode)
+	}
+	return nil
 }
 
 func (s *completionService) onCancelled(ctx context.Context, state *completeJobState) {

@@ -569,6 +569,7 @@ func TestRenderRunStatusReportTextExitOneLinerVariants(t *testing.T) {
 	failCode := int32(1)
 	failCode42 := int32(42)
 	longSummary := strings.Repeat("x", 210)
+	amataPromptError := "prompt is invalid at flow \"@for_each:main:1\""
 
 	prefix42 := "└  Exit 42: "
 	indent42 := strings.Repeat(" ", len(prefix42))
@@ -577,10 +578,11 @@ func TestRenderRunStatusReportTextExitOneLinerVariants(t *testing.T) {
 		indent42 + colorizeErrorText(strings.Repeat("x", 10))
 
 	tests := []struct {
-		name       string
-		job        RunJobEntry
-		contains   []string
-		notContain []string
+		name          string
+		job           RunJobEntry
+		repoLastError *string
+		contains      []string
+		notContain    []string
 	}{
 		{
 			name: "prefers bug summary over error",
@@ -595,6 +597,19 @@ func TestRenderRunStatusReportTextExitOneLinerVariants(t *testing.T) {
 			},
 			contains:   []string{"0.8s"},
 			notContain: []string{"<code>"},
+		},
+		{
+			name: "uses repo last error for failed mig without summary",
+			job: RunJobEntry{
+				JobID:      domaintypes.NewJobID(),
+				JobType:    "mig",
+				JobImage:   "ghcr.io/acme/mig:1",
+				Status:     "Failed",
+				ExitCode:   &failCode,
+				DurationMs: 1000,
+			},
+			repoLastError: &amataPromptError,
+			contains:      []string{"└  Exit 1: ", amataPromptError},
 		},
 		{
 			name: "gate without repo error emits nothing",
@@ -629,6 +644,7 @@ func TestRenderRunStatusReportTextExitOneLinerVariants(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			report := singleJobReport("exit-variant", "Fail", tc.job)
+			report.Repos[0].LastError = tc.repoLastError
 			out := renderText(t, report, TextRenderOptions{EnableOSC8: false})
 			for _, needle := range tc.contains {
 				assertx.Contains(t, out, needle)
