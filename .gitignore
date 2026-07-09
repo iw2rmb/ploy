@@ -64,18 +64,10 @@ tests/e2e/deploy/e2e-logs/
 .codex/
 .tmp/
 
+.amata/
+
 /ploy
 /ployd
 /ployd-node
-
-# amata
-.amata
-images/amata/amata
-images/amata/amata-linux-*
-
-.crush
-.refresh.sh
-
-images/orw/orw-cli-java-17-gradle/rewrite-runner/target
 
 AGENTS.md
