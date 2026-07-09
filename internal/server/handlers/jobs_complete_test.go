@@ -181,19 +181,56 @@ func TestCompletion_EmptyJobMetaObjectWithWhitespaceIsIgnored(t *testing.T) {
 
 // ===== Error Propagation Tests =====
 
-// TestCompletion_Exit137SetsLastError verifies that failed jobs with exit code
-// 137 persist a deterministic runs.last_error message.
-func TestCompletion_Exit137SetsLastError(t *testing.T) {
+func TestCompletion_TerminalErrorsSetLastError(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name      string
-		storeOpts []func(*jobStore)
+		name           string
+		body           map[string]any
+		storeOpts      []func(*jobStore)
+		wantSubstrings []string
 	}{
-		{name: "normal"},
-		{name: "run_lookup_fails", storeOpts: []func(*jobStore){
-			withGetRunErr(errors.New("transient run lookup failure")),
-		}},
+		{
+			name: "fail with stats error",
+			body: map[string]any{
+				"status":    "Fail",
+				"exit_code": 1,
+				"stats": map[string]any{
+					"error": `prompt is invalid at flow "@for_each:main:1"`,
+				},
+			},
+			wantSubstrings: []string{`prompt is invalid at flow "@for_each:main:1"`},
+		},
+		{
+			name: "error with stats error",
+			body: map[string]any{
+				"status":    "Error",
+				"exit_code": 2,
+				"stats": map[string]any{
+					"error": "runtime failed",
+				},
+			},
+			wantSubstrings: []string{"runtime failed"},
+		},
+		{
+			name: "exit 137 fallback",
+			body: map[string]any{
+				"status":    "Fail",
+				"exit_code": 137,
+			},
+			wantSubstrings: []string{"exit code 137", "likely out of memory"},
+		},
+		{
+			name: "exit 137 fallback with run lookup failure",
+			body: map[string]any{
+				"status":    "Fail",
+				"exit_code": 137,
+			},
+			storeOpts: []func(*jobStore){
+				withGetRunErr(errors.New("transient run lookup failure")),
+			},
+			wantSubstrings: []string{"exit code 137", "likely out of memory"},
+		},
 	}
 
 	for _, tt := range tests {
@@ -205,13 +242,10 @@ func TestCompletion_Exit137SetsLastError(t *testing.T) {
 
 			handler := completeJobHandler(st, nil, nil)
 			rr := httptest.NewRecorder()
-			handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
-				"status":    "Fail",
-				"exit_code": 137,
-			}))
+			handler.ServeHTTP(rr, f.completeJobReq(tt.body))
 
 			assertStatus(t, rr, http.StatusNoContent)
-			assertCalled(t, "UpdateRunError", st.updateRunError.called)
+			assertRepoError(t, st, f.RunID, f.Job.RepoID, tt.wantSubstrings...)
 		})
 	}
 }
