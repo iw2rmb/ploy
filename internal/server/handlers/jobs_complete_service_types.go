@@ -6,6 +6,7 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/server/blobpersist"
 	"github.com/iw2rmb/ploy/internal/server/events"
+	"github.com/iw2rmb/ploy/internal/server/gitlabtokens"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -28,6 +29,7 @@ type completionService struct {
 	store         store.Store
 	eventsService *events.Service
 	blobpersist   *blobpersist.Service
+	gitLabTokens  *gitlabtokens.Registry
 }
 
 type completionServiceType string
@@ -48,11 +50,16 @@ func routeCompletionServiceType(jobType domaintypes.JobType) (completionServiceT
 	}
 }
 
-func newCompletionService(st store.Store, eventsService *events.Service, bp *blobpersist.Service) *completionService {
+func newCompletionService(st store.Store, eventsService *events.Service, bp *blobpersist.Service, registries ...*gitlabtokens.Registry) *completionService {
+	var registry *gitlabtokens.Registry
+	if len(registries) > 0 {
+		registry = registries[0]
+	}
 	return &completionService{
 		store:         st,
 		eventsService: eventsService,
 		blobpersist:   bp,
+		gitLabTokens:  registry,
 	}
 }
 

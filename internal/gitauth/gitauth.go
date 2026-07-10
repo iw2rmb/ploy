@@ -96,14 +96,14 @@ func gitLabCredentials(repoURL url.URL, opts Options) (string, string, bool) {
 	if pat == "" {
 		return "", "", false
 	}
-	domainHost := normalizeGitLabDomainHost(opts.GitLabDomain)
+	domainHost := NormalizeGitLabDomainHost(opts.GitLabDomain)
 	if domainHost != "" && !strings.EqualFold(repoURL.Hostname(), domainHost) {
 		return "", "", false
 	}
 	return "oauth2", pat, true
 }
 
-func normalizeGitLabDomainHost(raw string) string {
+func NormalizeGitLabDomainHost(raw string) string {
 	trimmed := strings.TrimSpace(raw)
 	if trimmed == "" {
 		return ""

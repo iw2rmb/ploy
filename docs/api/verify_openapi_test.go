@@ -180,6 +180,7 @@ func TestOpenAPICompleteness(t *testing.T) {
 		"CreateRunRequest",
 		"CreateRunResponse",
 		"RunSubmitRequest",
+		"RunRestartRequest",
 		"MigsRunSummary", // Canonical Migs run status schema (POST/GET /v1/migs responses, SSE events).
 		"StageStatus",    // Job execution state within RunSummary.stages map.
 		"NodeClaimResponse",

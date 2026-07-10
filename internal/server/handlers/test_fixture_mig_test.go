@@ -57,9 +57,10 @@ type migStore struct {
 	// observe a different result/err for each CreateRun call.
 	createRunSeq mockCallSeq[store.CreateRunParams, store.Run]
 
-	createWaveWithRuns mockCall[store.CreateWaveWithRunsParams, store.Wave]
-	createRun          mockCall[store.CreateRunParams, store.Run]
-	createRunParams    []store.CreateRunParams
+	createWaveWithRuns     mockCall[store.CreateWaveWithRunsParams, store.Wave]
+	createWaveWithRunsHook func(store.CreateWaveWithRunsParams)
+	createRun              mockCall[store.CreateRunParams, store.Run]
+	createRunParams        []store.CreateRunParams
 
 	// Run/Job queries (for archive validation and migs_ticket)
 	getRun        mockCall[string, store.Run]
@@ -244,6 +245,9 @@ func (m *migStore) CreateRun(ctx context.Context, params store.CreateRunParams) 
 func (m *migStore) CreateWaveWithRuns(ctx context.Context, params store.CreateWaveWithRunsParams) (store.Wave, []store.Run, error) {
 	m.createWaveWithRuns.called = true
 	m.createWaveWithRuns.params = params
+	if m.createWaveWithRunsHook != nil {
+		m.createWaveWithRunsHook(params)
+	}
 	if m.createWaveWithRuns.err != nil {
 		return store.Wave{}, nil, m.createWaveWithRuns.err
 	}

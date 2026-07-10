@@ -276,6 +276,7 @@ type RunOptions struct {
 	Cap           time.Duration
 	CancelOnCap   bool
 	MaxRetries    int
+	GitLabToken   string
 	Output        io.Writer
 }
 
@@ -296,11 +297,12 @@ func RunProject(ctx context.Context, opts RunOptions) error {
 		return err
 	}
 	result, err := (migs.CreateMigRunCommand{
-		Client:   httpClient,
-		BaseURL:  base,
-		MigRef:   domaintypes.MigRef(migID),
-		RepoURLs: repoURLs,
-		Failed:   opts.Failed,
+		Client:      httpClient,
+		BaseURL:     base,
+		MigRef:      domaintypes.MigRef(migID),
+		RepoURLs:    repoURLs,
+		Failed:      opts.Failed,
+		GitLabToken: opts.GitLabToken,
 	}).Run(ctx)
 	if err != nil {
 		return err

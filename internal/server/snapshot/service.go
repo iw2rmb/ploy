@@ -14,26 +14,32 @@ import (
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/gitauth"
+	"github.com/iw2rmb/ploy/internal/gitlabtoken"
+	"github.com/iw2rmb/ploy/internal/server/gitlabtokens"
 	"github.com/iw2rmb/ploy/internal/worker/hydration"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
 var ErrMaterializeTimeout = errors.New("snapshot materialization timed out")
+var ErrEphemeralGitLabTokenUnavailable = gitlabtoken.ErrMissingToken
 
 type Metadata struct {
 	RepoURL         string
 	BaseRef         string
 	SourceCommitSHA string
+	GitLabTokenHash string
 }
 
 type Service struct {
-	cacheDir string
-	auth     gitauth.Options
+	cacheDir    string
+	auth        gitauth.Options
+	tokenLookup *gitlabtokens.Registry
 }
 
 type Options struct {
-	CacheDir string
-	Auth     gitauth.Options
+	CacheDir    string
+	Auth        gitauth.Options
+	TokenLookup *gitlabtokens.Registry
 }
 
 func NewService(opts Options) *Service {
@@ -41,7 +47,7 @@ func NewService(opts Options) *Service {
 	if cacheDir == "" {
 		cacheDir = os.TempDir()
 	}
-	return &Service{cacheDir: cacheDir, auth: opts.Auth}
+	return &Service{cacheDir: cacheDir, auth: opts.Auth, tokenLookup: opts.TokenLookup}
 }
 
 func (s *Service) WriteTarGz(ctx context.Context, meta Metadata, w io.Writer) error {
@@ -73,9 +79,17 @@ func (s *Service) WriteTarGz(ctx context.Context, meta Metadata, w io.Writer) er
 		BaseRef: domaintypes.GitRef(strings.TrimSpace(meta.BaseRef)),
 		Commit:  domaintypes.CommitSHA(commitSHA),
 	}
-	if err := fetcher.Fetch(ctx, repo, workspace, s.auth); err != nil {
+	auth, err := s.authForMetadata(meta, repoURL)
+	if err != nil {
+		return err
+	}
+	usesEphemeralToken := strings.TrimSpace(meta.GitLabTokenHash) != ""
+	if err := fetcher.Fetch(ctx, repo, workspace, auth); err != nil {
 		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			return ErrMaterializeTimeout
+		}
+		if usesEphemeralToken {
+			return fmt.Errorf("materialize repo snapshot using provided GitLab token failed: %w", err)
 		}
 		return fmt.Errorf("materialize repo snapshot: %w", err)
 	}
@@ -83,6 +97,20 @@ func (s *Service) WriteTarGz(ctx context.Context, meta Metadata, w io.Writer) er
 		return err
 	}
 	return writeDirectoryTarGz(workspace, w)
+}
+
+func (s *Service) authForMetadata(meta Metadata, repoURL string) (gitauth.Options, error) {
+	hash := strings.TrimSpace(meta.GitLabTokenHash)
+	if hash == "" {
+		return s.auth, nil
+	}
+	token, ok := s.tokenLookup.Token(hash)
+	if !ok {
+		return gitauth.Options{}, ErrEphemeralGitLabTokenUnavailable
+	}
+	auth := s.auth
+	auth.GitLabPAT = token
+	return auth, nil
 }
 
 func normalizeFullCommitSHA(raw string) string {

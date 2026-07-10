@@ -18,15 +18,16 @@ ploy help <command>            # Alternative help syntax
 Common command patterns:
 
 ```bash
-ploy run <spec-path>[:<step-name>] [<repo-path>|<namespace/repo[:ref]>] [--follow] [--apply] [--pull[=path]] # submit a single-repo run
-ploy run <name> [<repo-path>|<namespace/repo[:ref]>] [--follow] [--pull[=path]]                         # submit a named spec
+ploy run <spec-path>[:<step-name>] [<repo-path>|<namespace/repo[:ref]>] [--follow] [--apply] [--pull[=path]] [--gitlab-token-env ENV_NAME|--gitlab-token-prompt] # submit a single-repo run
+ploy run <name> [<repo-path>|<namespace/repo[:ref]>] [--follow] [--pull[=path]] [--gitlab-token-env ENV_NAME|--gitlab-token-prompt]                         # submit a named spec
 ploy run <namespace/repo>:<name> [<repo-path>|<namespace/repo[:ref]>]                                    # submit a named spec from a repo
 ploy run <domain>/<namespace/repo>:<name> [<repo-path>|<namespace/repo[:ref]>]                           # submit a named spec from a domain/repo
 ploy run status <run-id> [--json|--follow]                                  # inspect a run
+ploy run restart <run-id> [--gitlab-token-env ENV_NAME|--gitlab-token-prompt] # restart a terminal run
 ploy run apply <run-id> [path] [--force]                                     # apply a run patch locally
 ploy run pull <run-id> [artifacts-path]                                      # download final run artifacts
 ploy job status <job-id>                                                     # inspect one job as JSON
-ploy mig run <mig-id|name> [<namespace/repo[:ref]> ...] [--failed] [--follow] # execute a mig project over its repo set
+ploy mig run <mig-id|name> [<namespace/repo[:ref]> ...] [--failed] [--follow] [--gitlab-token-env ENV_NAME|--gitlab-token-prompt] # execute a mig project over its repo set
 ploy spec schema                                                             # print the mig JSON Schema
 ploy spec validate docs/schemas/mig.example.yaml                             # validate a mig spec
 ploy spec push [<git-folder>]                                                # publish named specs from a clean git worktree
@@ -48,7 +49,14 @@ step/key. Local repo paths submit `HEAD`; remote selectors use `namespace/repo`,
 optionally suffixed with `:<branch>` or `:<sha>`. Use `--follow` to wait for the
 run's terminal status, `--pull[=path]` to wait for success and download
 artifacts, or `--apply` to wait for success and apply the resulting patch to a
-clean local worktree.
+clean local worktree. Use `--gitlab-token-env ENV_NAME` to submit a run-scoped
+ephemeral GitLab token from an environment variable, or `--gitlab-token-prompt`
+to enter it at the prompt. The flags are mutually exclusive. The server stores
+only the token's SHA-256 marker in run metadata and keeps the token in memory
+while the run or wave is active. Ephemeral GitLab tokens require
+`PLOY_GITLAB_DOMAIN` and are accepted only for HTTPS repos on that configured
+host. The same token flags are available on `ploy run restart` to attach a
+fresh token marker to the restarted attempt.
 
 `ploy mig run` executes an existing mig project over its managed repo set. Use
 `ploy mig add --name <name> --spec <path>`, `ploy mig repo add`, and

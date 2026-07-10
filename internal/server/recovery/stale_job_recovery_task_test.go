@@ -11,6 +11,7 @@ import (
 	"time"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/server/gitlabtokens"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/testutil/workflowkit/ids"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -62,8 +63,10 @@ func TestStaleJobRecoveryTask_Run_CompletesWaveWhenRunsTerminal(t *testing.T) {
 		ReposByID:         map[domaintypes.RepoID]store.Repo{repoID: {ID: repoID, Url: "https://github.com/user/repo.git"}},
 		UpdateRunStatusOK: true,
 	}
+	registry := gitlabtokens.NewRegistry()
+	registry.Register("hash", "glpat-secret", []domaintypes.RunID{runID})
 
-	task, err := NewStaleJobRecoveryTask(Options{Store: st, Interval: time.Second, NodeStaleAfter: time.Minute})
+	task, err := NewStaleJobRecoveryTask(Options{Store: st, Interval: time.Second, NodeStaleAfter: time.Minute, GitLabTokens: registry})
 	if err != nil {
 		t.Fatalf("NewStaleJobRecoveryTask() error = %v", err)
 	}
@@ -83,6 +86,9 @@ func TestStaleJobRecoveryTask_Run_CompletesWaveWhenRunsTerminal(t *testing.T) {
 	}
 	if len(st.UpdateWaveCalls) != 1 || st.UpdateWaveCalls[0].Status != domaintypes.WaveStatusFinished {
 		t.Fatalf("wave updates = %+v, want one Finished update", st.UpdateWaveCalls)
+	}
+	if _, ok := registry.Token("hash"); ok {
+		t.Fatal("expected stale recovery to release finalized wave token")
 	}
 }
 
@@ -214,13 +220,14 @@ type staleTaskStore struct {
 	ReposByID        map[domaintypes.RepoID]store.Repo
 	CountRunsByWave  map[domaintypes.WaveID][]store.CountRunsByWaveStatusRow
 
-	StaleJobsParam    pgtype.Timestamptz
-	StaleNodeParam    pgtype.Timestamptz
-	CountRunsCalled   bool
-	UpdateRunStatusOK bool
-	CancelCalls       []store.CancelActiveJobsByRunAttemptParams
-	UpdateRunCalls    []store.UpdateRunStatusParams
-	UpdateWaveCalls   []store.UpdateWaveStatusParams
+	StaleJobsParam      pgtype.Timestamptz
+	StaleNodeParam      pgtype.Timestamptz
+	CountRunsCalled     bool
+	ListRunsByWaveCalls []domaintypes.WaveID
+	UpdateRunStatusOK   bool
+	CancelCalls         []store.CancelActiveJobsByRunAttemptParams
+	UpdateRunCalls      []store.UpdateRunStatusParams
+	UpdateWaveCalls     []store.UpdateWaveStatusParams
 }
 
 func (s *staleTaskStore) ListStaleRunningJobs(_ context.Context, lastHeartbeat pgtype.Timestamptz) ([]store.ListStaleRunningJobsRow, error) {
@@ -264,6 +271,17 @@ func (s *staleTaskStore) GetWave(_ context.Context, id domaintypes.WaveID) (stor
 func (s *staleTaskStore) CountRunsByWaveStatus(_ context.Context, waveID domaintypes.WaveID) ([]store.CountRunsByWaveStatusRow, error) {
 	s.CountRunsCalled = true
 	return s.CountRunsByWave[waveID], nil
+}
+
+func (s *staleTaskStore) ListRunsByWave(_ context.Context, waveID domaintypes.WaveID) ([]store.Run, error) {
+	s.ListRunsByWaveCalls = append(s.ListRunsByWaveCalls, waveID)
+	runs := make([]store.Run, 0, len(s.RunsByID))
+	for _, run := range s.RunsByID {
+		if run.WaveID == waveID {
+			runs = append(runs, run)
+		}
+	}
+	return runs, nil
 }
 
 func (s *staleTaskStore) UpdateWaveStatus(_ context.Context, arg store.UpdateWaveStatusParams) error {

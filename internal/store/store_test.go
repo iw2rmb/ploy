@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/gitlabtoken"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -130,6 +131,33 @@ func TestCreateRun_RoundTrip_V1(t *testing.T) {
 	}
 	if !found {
 		t.Fatal("expected ListRuns() to include created run")
+	}
+
+	hash := gitlabtoken.Hash("glpat-store-secret")
+	stats, err := gitlabtoken.RunStatsWithMarker(hash)
+	if err != nil {
+		t.Fatalf("build token marker stats: %v", err)
+	}
+	runWithStats, err := db.CreateRun(ctx, CreateRunParams{
+		ID:              types.NewRunID(),
+		WaveID:          fx.Wave.ID,
+		MigID:           fx.Mig.ID,
+		SpecID:          fx.Spec.ID,
+		RepoID:          fx.MigRepo.RepoID,
+		RepoBaseRef:     "main",
+		SourceCommitSha: testSHA,
+		RepoSha0:        testSHA,
+		Stats:           stats,
+	})
+	if err != nil {
+		t.Fatalf("CreateRun(with stats) failed: %v", err)
+	}
+	fetchedWithStats, err := db.GetRun(ctx, runWithStats.ID)
+	if err != nil {
+		t.Fatalf("GetRun(with stats) failed: %v", err)
+	}
+	if got := gitlabtoken.HashFromRunStats(fetchedWithStats.Stats); got != hash {
+		t.Fatalf("stats token hash marker = %q, want %q", got, hash)
 	}
 }
 
@@ -361,7 +389,7 @@ func TestRun_CRUDAndStateTransitions_V1(t *testing.T) {
 	}
 
 	// Attempt increment resets run state.
-	if err := db.IncrementRunAttempt(ctx, fx.Run.ID); err != nil {
+	if err := db.IncrementRunAttempt(ctx, IncrementRunAttemptParams{ID: fx.Run.ID}); err != nil {
 		t.Fatalf("IncrementRunAttempt() failed: %v", err)
 	}
 	retry, err := db.GetRun(ctx, fx.Run.ID)

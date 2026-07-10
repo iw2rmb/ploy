@@ -27,7 +27,7 @@ type runStore struct {
 
 	deleteRun  mockCall[string, struct{}]
 	cancelRun  mockCall[string, struct{}]
-	restartRun mockCall[string, store.Run]
+	restartRun mockCall[store.RestartRunParams, store.Run]
 
 	updateRunStatus mockCall[store.UpdateRunStatusParams, struct{}]
 
@@ -44,7 +44,7 @@ type runStore struct {
 
 	updateRunBaseRef     mockCall[store.UpdateRunBaseRefParams, struct{}]
 	updateMigRepoBaseRef mockCall[store.UpdateMigRepoBaseRefParams, struct{}]
-	incrementRunAttempt  mockCall[types.RunID, struct{}]
+	incrementRunAttempt  mockCall[store.IncrementRunAttemptParams, struct{}]
 	updateRunError       mockCall[store.UpdateRunErrorParams, struct{}]
 
 	// Create run (for run create)
@@ -138,8 +138,8 @@ func (m *runStore) CancelRun(ctx context.Context, runID types.RunID) error {
 	return err
 }
 
-func (m *runStore) RestartRun(ctx context.Context, runID types.RunID) (store.Run, error) {
-	return m.restartRun.record(runID.String())
+func (m *runStore) RestartRun(ctx context.Context, arg store.RestartRunParams) (store.Run, error) {
+	return m.restartRun.record(arg)
 }
 
 func (m *runStore) UpdateRunStatus(ctx context.Context, params store.UpdateRunStatusParams) error {
@@ -186,7 +186,7 @@ func (m *runStore) CreateRun(ctx context.Context, params store.CreateRunParams) 
 	return result, err
 }
 
-func (m *runStore) IncrementRunAttempt(ctx context.Context, arg types.RunID) error {
+func (m *runStore) IncrementRunAttempt(ctx context.Context, arg store.IncrementRunAttemptParams) error {
 	_, err := m.incrementRunAttempt.record(arg)
 	return err
 }

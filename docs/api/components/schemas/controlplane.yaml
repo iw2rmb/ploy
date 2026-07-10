@@ -352,7 +352,17 @@ RunSubmitRequest:
       additionalProperties: true
       description: Migs spec JSON object (must be a JSON object).
     created_by: { type: string, nullable: true }
+    gitlab_token:
+      type: string
+      description: Request-only ephemeral GitLab token. Accepted only for HTTPS repos whose host matches the configured GitLab domain; the server stores only a server-generated SHA-256 marker in run metadata.
   required: [repo_url, ref, spec]
+
+RunRestartRequest:
+  type: object
+  properties:
+    gitlab_token:
+      type: string
+      description: Request-only ephemeral GitLab token for the restarted attempt. Accepted only when the run repo is HTTPS and its host matches the configured GitLab domain; the server stores only a server-generated SHA-256 marker in run metadata.
 
 CreateSingleRepoRunResponse:
   type: object
@@ -476,6 +486,9 @@ CreateMigRunRequest:
     repo_selector:
       $ref: "#/MigRepoSelector"
     created_by: { type: string, nullable: true }
+    gitlab_token:
+      type: string
+      description: Request-only ephemeral GitLab token. Accepted only for selected HTTPS repos whose hosts match the configured GitLab domain; the server stores only a server-generated SHA-256 marker in created run metadata.
   required: [repo_selector]
 
 CreateMigRunResponse:

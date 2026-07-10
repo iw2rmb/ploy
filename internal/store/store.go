@@ -44,7 +44,7 @@ type Store interface {
 	CancelWave(ctx context.Context, waveID types.WaveID) error
 	CompleteBootstrapEnrollment(ctx context.Context, arg CompleteBootstrapEnrollmentParams) error
 	CreateWaveWithRuns(ctx context.Context, arg CreateWaveWithRunsParams) (Wave, []Run, error)
-	RestartRun(ctx context.Context, runID types.RunID) (Run, error)
+	RestartRun(ctx context.Context, arg RestartRunParams) (Run, error)
 	Close()
 	Pool() *pgxpool.Pool
 }
@@ -64,6 +64,11 @@ type CompleteBootstrapEnrollmentParams struct {
 type CreateWaveWithRunsParams struct {
 	Wave CreateWaveParams
 	Runs []CreateRunParams
+}
+
+type RestartRunParams struct {
+	RunID types.RunID
+	Stats []byte
 }
 
 // PgStore wraps a pgxpool connection pool and implements Store.
@@ -235,6 +240,12 @@ func (s *PgStore) CreateWaveWithRuns(ctx context.Context, arg CreateWaveWithRuns
 
 	qtx := s.Queries.WithTx(tx)
 
+	for _, runParams := range arg.Runs {
+		if err := validateJSONBValue(runParams.Stats); err != nil {
+			return Wave{}, nil, fmt.Errorf("create wave with runs: runs.stats: %w", err)
+		}
+	}
+
 	wave, err := qtx.CreateWave(ctx, arg.Wave)
 	if err != nil {
 		return Wave{}, nil, fmt.Errorf("create wave with runs: create wave: %w", err)
@@ -300,7 +311,16 @@ func (s *PgStore) CancelRun(ctx context.Context, runID types.RunID) error {
 }
 
 // RestartRun atomically resets one terminal run to Queued on the next attempt.
-func (s *PgStore) RestartRun(ctx context.Context, runID types.RunID) (Run, error) {
+func (s *PgStore) RestartRun(ctx context.Context, arg RestartRunParams) (Run, error) {
+	runID := arg.RunID
+	stats := arg.Stats
+	if len(stats) == 0 {
+		stats = nil
+	}
+	if err := validateJSONB(stats); err != nil {
+		return Run{}, fmt.Errorf("restart run: runs.stats: %w", err)
+	}
+
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return Run{}, fmt.Errorf("restart run: begin tx: %w", err)
@@ -338,7 +358,7 @@ func (s *PgStore) RestartRun(ctx context.Context, runID types.RunID) (Run, error
 		return Run{}, fmt.Errorf("restart run: cancel active jobs: %w", err)
 	}
 
-	if err := qtx.IncrementRunAttempt(ctx, runID); err != nil {
+	if err := qtx.IncrementRunAttempt(ctx, IncrementRunAttemptParams{ID: runID, Stats: stats}); err != nil {
 		return Run{}, fmt.Errorf("restart run: increment attempt: %w", err)
 	}
 
@@ -438,6 +458,21 @@ func validateJSONB(raw []byte) error {
 	return nil
 }
 
+func validateJSONBValue(raw any) error {
+	switch v := raw.(type) {
+	case nil:
+		return nil
+	case []byte:
+		return validateJSONB(v)
+	case json.RawMessage:
+		return validateJSONB(v)
+	case string:
+		return validateJSONB([]byte(v))
+	default:
+		return nil
+	}
+}
+
 // CreateJob validates the Meta JSONB field and creates a new job.
 func (s *PgStore) CreateJob(ctx context.Context, arg CreateJobParams) (Job, error) {
 	if err := validateJSONB(arg.Meta); err != nil {
@@ -452,6 +487,14 @@ func (s *PgStore) CreateSpec(ctx context.Context, arg CreateSpecParams) (Spec, e
 		return Spec{}, fmt.Errorf("specs.spec: %w", err)
 	}
 	return s.Queries.CreateSpec(ctx, arg)
+}
+
+// CreateRun validates the Stats JSONB field and creates a run.
+func (s *PgStore) CreateRun(ctx context.Context, arg CreateRunParams) (Run, error) {
+	if err := validateJSONBValue(arg.Stats); err != nil {
+		return Run{}, fmt.Errorf("runs.stats: %w", err)
+	}
+	return s.Queries.CreateRun(ctx, arg)
 }
 
 // CreateNamedSpec validates JSONB fields and creates a new named spec.

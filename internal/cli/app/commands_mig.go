@@ -5,6 +5,7 @@ import (
 	"io"
 	"time"
 
+	"github.com/iw2rmb/ploy/internal/cli/gitlabtokenflag"
 	"github.com/iw2rmb/ploy/internal/cli/mig"
 	"github.com/iw2rmb/ploy/internal/cli/pull"
 	"github.com/spf13/cobra"
@@ -137,7 +138,13 @@ func newMigRunCmd(stderr io.Writer) *cobra.Command {
 	var failed, follow, jsonOutput, cancelOnCap bool
 	var capDuration time.Duration
 	var maxRetries int
+	var gitLabTokenEnv string
+	var gitLabTokenPrompt bool
 	runCmd := &cobra.Command{Use: "run <mig-id|name> [<namespace/repo[:ref]> ...]", Short: "Run a mig project", Args: cobra.MinimumNArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
+		token, err := gitlabtokenflag.Resolve(gitLabTokenEnv, gitLabTokenPrompt, cmd.InOrStdin(), cmd.ErrOrStderr())
+		if err != nil {
+			return err
+		}
 		return mig.RunProject(context.Background(), mig.RunOptions{
 			MigRef:        args[0],
 			RepoSelectors: args[1:],
@@ -147,6 +154,7 @@ func newMigRunCmd(stderr io.Writer) *cobra.Command {
 			Cap:           capDuration,
 			CancelOnCap:   cancelOnCap,
 			MaxRetries:    maxRetries,
+			GitLabToken:   token,
 			Output:        stderr,
 		})
 	}}
@@ -156,6 +164,8 @@ func newMigRunCmd(stderr io.Writer) *cobra.Command {
 	runCmd.Flags().DurationVar(&capDuration, "cap", 0, "Optional time cap for --follow")
 	runCmd.Flags().BoolVar(&cancelOnCap, "cancel-on-cap", false, "Cancel run if cap exceeded")
 	runCmd.Flags().IntVar(&maxRetries, "max-retries", 5, "Max SSE reconnect attempts")
+	runCmd.Flags().StringVar(&gitLabTokenEnv, "gitlab-token-env", "", "Read run-scoped ephemeral GitLab token from this environment variable")
+	runCmd.Flags().BoolVar(&gitLabTokenPrompt, "gitlab-token-prompt", false, "Prompt for a run-scoped ephemeral GitLab token")
 	return runCmd
 }
 

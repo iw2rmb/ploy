@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/gitlabtoken"
 )
 
 func TestRestartRun_RequeuesTerminalRunAndRevivesFinishedWave(t *testing.T) {
@@ -23,7 +24,7 @@ func TestRestartRun_RequeuesTerminalRunAndRevivesFinishedWave(t *testing.T) {
 	}
 	activeJob := createJobForStoreTest(t, ctx, db, fx.Run.ID, fx.Run.RepoID, fx.Run.RepoBaseRef, fx.Run.Attempt, "active", types.JobStatusCreated)
 
-	restarted, err := db.RestartRun(ctx, fx.Run.ID)
+	restarted, err := db.RestartRun(ctx, RestartRunParams{RunID: fx.Run.ID})
 	if err != nil {
 		t.Fatalf("RestartRun() failed: %v", err)
 	}
@@ -38,6 +39,9 @@ func TestRestartRun_RequeuesTerminalRunAndRevivesFinishedWave(t *testing.T) {
 	}
 	if restarted.StartedAt.Valid || restarted.FinishedAt.Valid {
 		t.Fatalf("run timing not cleared: started=%v finished=%v", restarted.StartedAt.Valid, restarted.FinishedAt.Valid)
+	}
+	if string(restarted.Stats) != "{}" {
+		t.Fatalf("run stats=%s, want {}", string(restarted.Stats))
 	}
 
 	wave, err := db.GetWave(ctx, fx.Wave.ID)
@@ -96,11 +100,33 @@ func TestRestartRun_RejectsActiveRunsAndCancelledWaves(t *testing.T) {
 			fx := newV1Fixture(t, ctx, db, "https://github.com/test/restart-"+strings.ReplaceAll(tt.name, " ", "-"), "main", []byte(`{"type":"restart-run-reject"}`))
 			tt.setup(fx)
 
-			_, err := db.RestartRun(ctx, fx.Run.ID)
+			_, err := db.RestartRun(ctx, RestartRunParams{RunID: fx.Run.ID})
 			if !errors.Is(err, tt.wantErr) {
 				t.Fatalf("RestartRun() error=%v, want %v", err, tt.wantErr)
 			}
 		})
+	}
+}
+
+func TestRestartRun_WritesStatsForNewAttempt(t *testing.T) {
+	ctx, db := newTestStore(t)
+
+	fx := newV1Fixture(t, ctx, db, "https://github.com/test/restart-run-stats", "main", []byte(`{"type":"restart-run-stats"}`))
+	if err := db.UpdateRunStatus(ctx, UpdateRunStatusParams{ID: fx.Run.ID, Status: types.RunStatusFail}); err != nil {
+		t.Fatalf("UpdateRunStatus(fail) failed: %v", err)
+	}
+	hash := gitlabtoken.Hash("glpat-restart-secret")
+	stats, err := gitlabtoken.RunStatsWithMarker(hash)
+	if err != nil {
+		t.Fatalf("RunStatsWithMarker() failed: %v", err)
+	}
+
+	restarted, err := db.RestartRun(ctx, RestartRunParams{RunID: fx.Run.ID, Stats: stats})
+	if err != nil {
+		t.Fatalf("RestartRun() failed: %v", err)
+	}
+	if got := gitlabtoken.HashFromRunStats(restarted.Stats); got != hash {
+		t.Fatalf("token hash marker=%q, want %q", got, hash)
 	}
 }
 
