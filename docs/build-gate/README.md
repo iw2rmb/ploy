@@ -50,15 +50,18 @@ build_gate:
 
 Modes:
 
-- `forced`: skip detection and use the configured stack.
+- `forced`: force the configured language and release. When `tool` is set,
+  detection is skipped; when `tool` is omitted, Build Gate detects only the
+  tool and requires the detected language to match.
 - `strict`: run detection and fail when detected values differ from the configured stack fields.
 - `fallback`: use complete detection, otherwise use the configured stack.
 
-`forced` and `fallback` require `language`, `tool`, and `release`, because the
-configured stack can become the runtime stack. `strict` requires at least one of
-those fields and treats omitted fields as "any"; successful strict detection
-still uses the complete detected stack for image and command resolution. An
-absent or empty `stack` object keeps normal auto-detection.
+`forced` requires `language` and `release`; `tool` is optional. `fallback`
+requires `language`, `tool`, and `release`, because the configured stack can
+become the runtime stack. `strict` requires at least one of those fields and
+treats omitted fields as "any"; successful strict detection still uses the
+complete detected stack for image and command resolution. An absent or empty
+`stack` object keeps normal auto-detection.
 
 Set `build_gate.disabled: true` when no Build Gate jobs should be created.
 

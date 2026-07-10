@@ -22,6 +22,9 @@ func NewCommand() *cobra.Command {
 	envFlags := newStepEnvFlagValue(&submit.StepEnvOverrides)
 	var gitLabTokenEnv string
 	var gitLabTokenPrompt bool
+	var buildGateForced string
+	var buildGateForcedPre string
+	var buildGateForcedPost string
 	cmd := &cobra.Command{
 		Use:   "run (<spec-path>[:<step-name>]|<name>|<namespace/repo>:<name>|<domain>/<namespace/repo>:<name>) [<repo-path>|<namespace/repo[:ref]>]",
 		Short: "Submit and inspect runs",
@@ -39,6 +42,15 @@ func NewCommand() *cobra.Command {
 			} else {
 				submit.FollowOutput = cmd.ErrOrStderr()
 			}
+			overrides, err := parseBuildGateForcedFlags(
+				cmd.Flags().Changed("build-gate-forced"), buildGateForced,
+				cmd.Flags().Changed("build-gate-forced-pre"), buildGateForcedPre,
+				cmd.Flags().Changed("build-gate-forced-post"), buildGateForcedPost,
+			)
+			if err != nil {
+				return err
+			}
+			submit.BuildGateForced = overrides
 			token, err := gitlabtokenflag.Resolve(gitLabTokenEnv, gitLabTokenPrompt, cmd.InOrStdin(), cmd.ErrOrStderr())
 			if err != nil {
 				return err
@@ -53,6 +65,9 @@ func NewCommand() *cobra.Command {
 	cmd.Flags().StringVar(&submit.PullPath, "pull", "", "Download final artifacts after success; optional path")
 	cmd.Flags().StringVar(&gitLabTokenEnv, "gitlab-token-env", "", "Read run-scoped ephemeral GitLab token from this environment variable")
 	cmd.Flags().BoolVar(&gitLabTokenPrompt, "gitlab-token-prompt", false, "Prompt for a run-scoped ephemeral GitLab token")
+	cmd.Flags().StringVar(&buildGateForced, "build-gate-forced", "", "Force Build Gate pre/post stack as <lang>@<release>[/<tool>]")
+	cmd.Flags().StringVar(&buildGateForcedPre, "build-gate-forced-pre", "", "Force Build Gate pre stack as <lang>@<release>[/<tool>]")
+	cmd.Flags().StringVar(&buildGateForcedPost, "build-gate-forced-post", "", "Force Build Gate post stack as <lang>@<release>[/<tool>]")
 	cmd.Flags().Var(envFlags, "env", "Step-scoped environment override; use --env:<step> KEY=VALUE")
 	_ = cmd.Flags().MarkHidden("env")
 	cmd.Flags().SetNormalizeFunc(func(_ *pflag.FlagSet, name string) pflag.NormalizedName {

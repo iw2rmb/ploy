@@ -110,7 +110,14 @@
         {
           "if": {
             "required": ["mode"],
-            "properties": { "mode": { "enum": ["forced", "fallback"] } }
+            "properties": { "mode": { "const": "forced" } }
+          },
+          "then": { "required": ["language", "release"] }
+        },
+        {
+          "if": {
+            "required": ["mode"],
+            "properties": { "mode": { "const": "fallback" } }
           },
           "then": { "required": ["language", "tool", "release"] }
         },

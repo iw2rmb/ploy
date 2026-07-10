@@ -217,7 +217,7 @@ func validateBuildGateStackConfig(stack *BuildGateStackConfig, prefix string) er
 	if strings.TrimSpace(stack.Language) == "" {
 		return fmt.Errorf("%s.language: required", prefix)
 	}
-	if strings.TrimSpace(stack.Tool) == "" {
+	if mode == BuildGateStackModeFallback && strings.TrimSpace(stack.Tool) == "" {
 		return fmt.Errorf("%s.tool: required", prefix)
 	}
 	if strings.TrimSpace(stack.Release) == "" {

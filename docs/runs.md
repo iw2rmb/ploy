@@ -10,7 +10,7 @@ Mig launches create one wave with one run per selected repo.
 ## Submit
 
 ```bash
-ploy run <spec-path>|<named-spec>[@sha] [<repo-path>|<namespace/repo[:ref]>] [--apply] [--pull[=path]] [--gitlab-token-env ENV_NAME|--gitlab-token-prompt]
+ploy run <spec-path>|<named-spec>[@sha] [<repo-path>|<namespace/repo[:ref]>] [--apply] [--pull[=path]] [--build-gate-forced <lang>@<release>[/<tool>]] [--gitlab-token-env ENV_NAME|--gitlab-token-prompt]
 ploy mig run <mig-id|name> [<namespace/repo[:ref]> ... | --failed] [--follow] [--json] [--gitlab-token-env ENV_NAME|--gitlab-token-prompt]
 ```
 
@@ -30,6 +30,13 @@ ploy mig run <mig-id|name> [<namespace/repo[:ref]> ... | --failed] [--follow] [-
   one step named `<step>`. The flag is repeatable, values may be empty, and
   later values win for the same step/key. Named specs with env overrides submit
   a mutated anonymous spec instead of referencing the named `spec_id`.
+- `ploy run ... --build-gate-forced <lang>@<release>[/<tool>]` overrides both
+  `build_gate.pre.stack` and `build_gate.post.stack` with `mode: forced`.
+  Use `--build-gate-forced-pre` or `--build-gate-forced-post` to override one
+  phase. The global flag cannot be combined with phase-specific flags. These
+  overrides create missing `build_gate`, `pre`, or `post` objects, preserve
+  `build_gate.images`, set `build_gate.disabled: false`, and submit named specs
+  as mutated anonymous specs.
 - `ploy mig run` prints `wave_id`; `--json` prints `wave_id`, `mig_id`,
   `spec_id`, and `run_count`.
 - Remote selector expansion is server-owned through `POST /v1/repos/resolve`.
