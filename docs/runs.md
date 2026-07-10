@@ -10,11 +10,17 @@ Mig launches create one wave with one run per selected repo.
 ## Submit
 
 ```bash
-ploy run <spec-path>|<named-spec>[@sha] [<repo-path>|<namespace/repo[:ref]>] [--apply] [--pull[=path]]
-ploy mig run <mig-id|name> [<namespace/repo[:ref]> ... | --failed] [--follow] [--json]
+ploy run <spec-path>|<named-spec>[@sha] [<repo-path>|<namespace/repo[:ref]>] [--apply] [--pull[=path]] [--gitlab-token-env ENV_NAME|--gitlab-token-prompt]
+ploy mig run <mig-id|name> [<namespace/repo[:ref]> ... | --failed] [--follow] [--json] [--gitlab-token-env ENV_NAME|--gitlab-token-prompt]
 ```
 
 - `ploy run` prints `run_id` and `mig_id`.
+- `--gitlab-token-env ENV_NAME` reads a run-scoped ephemeral GitLab token from
+  the named environment variable. `--gitlab-token-prompt` prompts for the token.
+  The flags are mutually exclusive. The server stores only a SHA-256 marker in
+  run metadata and keeps the token in memory while the run or wave is active.
+  Ephemeral GitLab tokens require a configured GitLab domain and are accepted
+  only for HTTPS repos on that host.
 - `POST /v1/runs` returns `wave_id`, `run_id`, `mig_id`, and `spec_id`.
 - Named-spec submissions pass `spec_id`; the run references that existing
   specs row. Add `@<8-40 lowercase hex SHA prefix>` to select a specific named
@@ -39,7 +45,7 @@ ploy run ls [--all] [--limit N] [--offset N]
 ploy run status <run-id> [--json|--follow]
 ploy run sbom {pre|post|diff} <run-id>
 ploy run cancel <run-id>
-ploy run restart <run-id>
+ploy run restart <run-id> [--gitlab-token-env ENV_NAME|--gitlab-token-prompt]
 ploy wave status <wave-id> [--follow]
 ploy wave runs <wave-id>
 ploy wave cancel <wave-id>
@@ -81,6 +87,12 @@ Job-scoped API surfaces:
 Run inspection, artifacts, diffs, jobs, logs, cancellation, restart, and pull
 resolution are all addressed by `run_id`; `repo_id` is returned only as
 attribution metadata.
+
+`ploy run restart` increments the run attempt and clears previous run stats.
+When a new ephemeral GitLab token is provided, the restarted attempt receives a
+new server-generated SHA-256 marker. Ephemeral GitLab tokens require a
+configured GitLab domain and are accepted only when every target repo uses
+HTTPS and its host matches that configured domain.
 
 `ploy run sbom pre|post|diff <run-id>` reads persisted package rows from the
 current run attempt. The `diff` view omits unchanged package versions and marks

@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/server/gitlabtokens"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/workflow/lifecycle"
 )
@@ -127,7 +128,7 @@ func listWaveRunsHandler(st store.Store) http.HandlerFunc {
 	}
 }
 
-func cancelWaveHandler(st store.Store) http.HandlerFunc {
+func cancelWaveHandler(st store.Store, registry *gitlabtokens.Registry) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		waveID, ok := parseRequiredPathIDOrWriteError[domaintypes.WaveID](w, r, "wave_id")
 		if !ok {
@@ -137,6 +138,7 @@ func cancelWaveHandler(st store.Store) http.HandlerFunc {
 			writeHTTPError(w, http.StatusInternalServerError, "failed to cancel wave: %v", err)
 			return
 		}
+		registry.ReleaseWave(r.Context(), st, waveID)
 		wave, err := st.GetWave(r.Context(), waveID)
 		if err != nil {
 			serverError(w, "cancel wave", "reload wave", err, "wave_id", waveID)

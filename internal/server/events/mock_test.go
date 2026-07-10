@@ -75,7 +75,7 @@ func (m *mockStore) CompleteBootstrapEnrollment(ctx context.Context, arg store.C
 	return nil
 }
 
-func (m *mockStore) RestartRun(ctx context.Context, runID domaintypes.RunID) (store.Run, error) {
+func (m *mockStore) RestartRun(ctx context.Context, arg store.RestartRunParams) (store.Run, error) {
 	return store.Run{}, nil
 }
 

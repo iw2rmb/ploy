@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/cli/common"
+	"github.com/iw2rmb/ploy/internal/cli/gitlabtokenflag"
 	runcmd "github.com/iw2rmb/ploy/internal/cli/runs"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/spf13/cobra"
@@ -19,11 +20,14 @@ import (
 func NewCommand() *cobra.Command {
 	submit := SubmitOptions{MaxRetries: 5}
 	envFlags := newStepEnvFlagValue(&submit.StepEnvOverrides)
+	var gitLabTokenEnv string
+	var gitLabTokenPrompt bool
 	cmd := &cobra.Command{
 		Use:   "run (<spec-path>[:<step-name>]|<name>|<namespace/repo>:<name>|<domain>/<namespace/repo>:<name>) [<repo-path>|<namespace/repo[:ref]>]",
 		Short: "Submit and inspect runs",
 		Args:  cobra.RangeArgs(1, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			submit.RepoSelector = ""
 			submit.SpecPath = args[0]
 			if len(args) > 1 {
 				submit.RepoSelector = args[1]
@@ -35,6 +39,11 @@ func NewCommand() *cobra.Command {
 			} else {
 				submit.FollowOutput = cmd.ErrOrStderr()
 			}
+			token, err := gitlabtokenflag.Resolve(gitLabTokenEnv, gitLabTokenPrompt, cmd.InOrStdin(), cmd.ErrOrStderr())
+			if err != nil {
+				return err
+			}
+			submit.GitLabToken = token
 			return RunSubmit(cmd.Context(), submit)
 		},
 	}
@@ -42,6 +51,8 @@ func NewCommand() *cobra.Command {
 	cmd.Flags().BoolVar(&submit.Follow, "follow", false, "Follow run status until completion")
 	cmd.Flags().BoolVar(&submit.Apply, "apply", false, "Apply the resulting patch to a local repo after success")
 	cmd.Flags().StringVar(&submit.PullPath, "pull", "", "Download final artifacts after success; optional path")
+	cmd.Flags().StringVar(&gitLabTokenEnv, "gitlab-token-env", "", "Read run-scoped ephemeral GitLab token from this environment variable")
+	cmd.Flags().BoolVar(&gitLabTokenPrompt, "gitlab-token-prompt", false, "Prompt for a run-scoped ephemeral GitLab token")
 	cmd.Flags().Var(envFlags, "env", "Step-scoped environment override; use --env:<step> KEY=VALUE")
 	_ = cmd.Flags().MarkHidden("env")
 	cmd.Flags().SetNormalizeFunc(func(_ *pflag.FlagSet, name string) pflag.NormalizedName {
@@ -132,6 +143,8 @@ func newCancelCommand() *cobra.Command {
 
 func newRestartCommand() *cobra.Command {
 	opts := RestartOptions{}
+	var gitLabTokenEnv string
+	var gitLabTokenPrompt bool
 	cmd := &cobra.Command{
 		Use:   "restart <run-id>",
 		Short: "Restart a terminal run",
@@ -139,9 +152,16 @@ func newRestartCommand() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.RunID = args[0]
 			opts.Output = cmd.OutOrStdout()
+			token, err := gitlabtokenflag.Resolve(gitLabTokenEnv, gitLabTokenPrompt, cmd.InOrStdin(), cmd.ErrOrStderr())
+			if err != nil {
+				return err
+			}
+			opts.GitLabToken = token
 			return RunRestart(cmd.Context(), opts)
 		},
 	}
+	cmd.Flags().StringVar(&gitLabTokenEnv, "gitlab-token-env", "", "Read run-scoped ephemeral GitLab token from this environment variable")
+	cmd.Flags().BoolVar(&gitLabTokenPrompt, "gitlab-token-prompt", false, "Prompt for a run-scoped ephemeral GitLab token")
 	return cmd
 }
 

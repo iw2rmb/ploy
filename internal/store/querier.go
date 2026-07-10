@@ -137,7 +137,7 @@ type Querier interface {
 	// Returns true if the repo cannot be deleted due to history, false otherwise.
 	HasMigRepoHistory(ctx context.Context, repoID types.RepoID) (bool, error)
 	HasRunningJobForRunNode(ctx context.Context, arg HasRunningJobForRunNodeParams) (bool, error)
-	IncrementRunAttempt(ctx context.Context, id types.RunID) error
+	IncrementRunAttempt(ctx context.Context, arg IncrementRunAttemptParams) error
 	InsertAPIToken(ctx context.Context, arg InsertAPITokenParams) error
 	InsertBootstrapToken(ctx context.Context, arg InsertBootstrapTokenParams) error
 	ListAPITokens(ctx context.Context) ([]ListAPITokensRow, error)

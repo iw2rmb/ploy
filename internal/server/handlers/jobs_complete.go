@@ -10,6 +10,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/server/auth"
 	"github.com/iw2rmb/ploy/internal/server/blobpersist"
 	"github.com/iw2rmb/ploy/internal/server/events"
+	"github.com/iw2rmb/ploy/internal/server/gitlabtokens"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -24,8 +25,8 @@ type completeJobRequest struct {
 }
 
 // completeJobHandler marks a job as completed with terminal status and stats.
-func completeJobHandler(st store.Store, eventsService *events.Service, bp *blobpersist.Service) http.HandlerFunc {
-	service := newCompletionService(st, eventsService, bp)
+func completeJobHandler(st store.Store, eventsService *events.Service, bp *blobpersist.Service, registries ...*gitlabtokens.Registry) http.HandlerFunc {
+	service := newCompletionService(st, eventsService, bp, registries...)
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()

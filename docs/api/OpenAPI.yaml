@@ -258,6 +258,8 @@ components:
       $ref: "./components/schemas/controlplane.yaml#/CreateRunResponse"
     RunSubmitRequest:
       $ref: "./components/schemas/controlplane.yaml#/RunSubmitRequest"
+    RunRestartRequest:
+      $ref: "./components/schemas/controlplane.yaml#/RunRestartRequest"
     MigsRunSummary:
       $ref: "./components/schemas/controlplane.yaml#/MigsRunSummary"
     StageStatus:

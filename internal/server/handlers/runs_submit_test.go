@@ -7,13 +7,34 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/gitauth"
+	"github.com/iw2rmb/ploy/internal/gitlabtoken"
 	"github.com/iw2rmb/ploy/internal/server/auth"
+	"github.com/iw2rmb/ploy/internal/server/gitlabtokens"
 	"github.com/iw2rmb/ploy/internal/store"
 )
+
+func asJSONBytes(t *testing.T, v any) []byte {
+	t.Helper()
+	switch raw := v.(type) {
+	case nil:
+		return nil
+	case []byte:
+		return raw
+	case string:
+		return []byte(raw)
+	default:
+		b, err := json.Marshal(raw)
+		if err != nil {
+			t.Fatalf("marshal JSON value: %v", err)
+		}
+		return b
+	}
+}
 
 // =============================================================================
 // POST /v1/runs — Create Single-Repo Run (v1 API)
@@ -123,6 +144,292 @@ func TestRunsCreateSingleRepo_RepoURLNormalized(t *testing.T) {
 	expectedURL := "https://github.com/org/repo"
 	if st.createMigRepo.params.Url != expectedURL {
 		t.Errorf("mig_repo URL = %q, want %q (normalized)", st.createMigRepo.params.Url, expectedURL)
+	}
+}
+
+func TestRunsCreateSingleRepo_SSHRepoURLAcceptedWithoutGitLabToken(t *testing.T) {
+	st := &migStore{}
+	handler := createSingleRepoRunHandler(st, nil, gitauth.Options{})
+
+	rr := doRequest(t, handler, http.MethodPost, "/v1/runs", validRunRequestBodyWith(map[string]any{
+		"repo_url": "ssh://git@gitlab.example.com/org/repo.git",
+	}))
+
+	assertStatus(t, rr, http.StatusCreated)
+	if st.createMigRepo.params.Url != "ssh://gitlab.example.com/org/repo" {
+		t.Fatalf("mig_repo URL = %q, want normalized ssh URL", st.createMigRepo.params.Url)
+	}
+}
+
+func TestSubmitGitLabTokenBehavior(t *testing.T) {
+	token := "glpat-server-secret"
+	hash := gitlabtoken.Hash(token)
+
+	tests := []struct {
+		name              string
+		newHandler        func(st *migStore, registry *gitlabtokens.Registry) http.HandlerFunc
+		path              string
+		body              func() any
+		wantRuns          int
+		wantStatus        int
+		wantRegistryAfter bool
+	}{
+		{
+			name: "single run computes marker and registers token",
+			newHandler: func(st *migStore, registry *gitlabtokens.Registry) http.HandlerFunc {
+				return createSingleRepoRunHandler(st, nil, gitauth.Options{GitLabDomain: "gitlab.example.com"}, registry)
+			},
+			path: "/v1/runs",
+			body: func() any {
+				return validRunRequestBodyWith(map[string]any{
+					"repo_url":     "https://gitlab.example.com/org/repo",
+					"gitlab_token": token,
+				})
+			},
+			wantRuns:          1,
+			wantStatus:        http.StatusCreated,
+			wantRegistryAfter: true,
+		},
+		{
+			name: "single run releases pre-registered token when create fails",
+			newHandler: func(st *migStore, registry *gitlabtokens.Registry) http.HandlerFunc {
+				st.createWaveWithRuns.err = errors.New("database connection failed")
+				return createSingleRepoRunHandler(st, nil, gitauth.Options{GitLabDomain: "gitlab.example.com"}, registry)
+			},
+			path: "/v1/runs",
+			body: func() any {
+				return validRunRequestBodyWith(map[string]any{
+					"repo_url":     "https://gitlab.example.com/org/repo",
+					"gitlab_token": token,
+				})
+			},
+			wantStatus: http.StatusInternalServerError,
+		},
+		{
+			name: "mig wave computes same marker for every run",
+			newHandler: func(st *migStore, registry *gitlabtokens.Registry) http.HandlerFunc {
+				specID := domaintypes.NewSpecID()
+				migSt := activeMigWithSpec(specID)
+				*st = *migSt
+				st.listMigReposByMig.val = []store.MigRepo{
+					{ID: "migRepo1", MigID: "mig123", RepoID: "repo1", BaseRef: "main"},
+					{ID: "migRepo2", MigID: "mig123", RepoID: "repo2", BaseRef: "main"},
+				}
+				st.repoByID = map[domaintypes.RepoID]store.Repo{
+					"repo1": {ID: "repo1", Url: "https://gitlab.example.com/org/repo1"},
+					"repo2": {ID: "repo2", Url: "https://gitlab.example.com/org/repo2"},
+				}
+				return createMigRunHandler(st, gitauth.Options{GitLabDomain: "gitlab.example.com"}, registry)
+			},
+			path: "/v1/migs/mig123/waves",
+			body: func() any {
+				body := allReposSelector()
+				body["gitlab_token"] = token
+				return body
+			},
+			wantRuns:          2,
+			wantStatus:        http.StatusCreated,
+			wantRegistryAfter: true,
+		},
+		{
+			name: "mig wave releases pre-registered token when create fails",
+			newHandler: func(st *migStore, registry *gitlabtokens.Registry) http.HandlerFunc {
+				specID := domaintypes.NewSpecID()
+				migSt := activeMigWithSpec(specID)
+				*st = *migSt
+				st.listMigReposByMig.val = []store.MigRepo{
+					{ID: "migRepo1", MigID: "mig123", RepoID: "repo1", BaseRef: "main"},
+					{ID: "migRepo2", MigID: "mig123", RepoID: "repo2", BaseRef: "main"},
+				}
+				st.repoByID = map[domaintypes.RepoID]store.Repo{
+					"repo1": {ID: "repo1", Url: "https://gitlab.example.com/org/repo1"},
+					"repo2": {ID: "repo2", Url: "https://gitlab.example.com/org/repo2"},
+				}
+				st.createWaveWithRuns.err = errors.New("database connection failed")
+				return createMigRunHandler(st, gitauth.Options{GitLabDomain: "gitlab.example.com"}, registry)
+			},
+			path: "/v1/migs/mig123/waves",
+			body: func() any {
+				body := allReposSelector()
+				body["gitlab_token"] = token
+				return body
+			},
+			wantStatus: http.StatusInternalServerError,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			st := &migStore{}
+			registry := gitlabtokens.NewRegistry()
+			handler := tt.newHandler(st, registry)
+			observedDuringCreate := false
+			st.createWaveWithRunsHook = func(params store.CreateWaveWithRunsParams) {
+				if len(params.Runs) == 0 {
+					t.Fatalf("CreateWaveWithRuns called without runs")
+				}
+				gotToken, ok := registry.Token(hash)
+				if !ok || gotToken != token {
+					t.Fatalf("registry token during CreateWaveWithRuns = %q, %v; want token", gotToken, ok)
+				}
+				observedDuringCreate = true
+			}
+			rr := doRequest(t, handler, http.MethodPost, tt.path, tt.body(), "mig_id", "mig123")
+			assertStatus(t, rr, tt.wantStatus)
+			if !observedDuringCreate {
+				t.Fatalf("expected CreateWaveWithRuns registry observation")
+			}
+			if len(st.createRunParams) != tt.wantRuns {
+				t.Fatalf("CreateRun calls = %d, want %d", len(st.createRunParams), tt.wantRuns)
+			}
+			for _, params := range st.createRunParams {
+				stats := asJSONBytes(t, params.Stats)
+				if got := gitlabtoken.HashFromRunStats(stats); got != hash {
+					t.Fatalf("run %s token hash marker = %q, want %q", params.ID, got, hash)
+				}
+				if strings.Contains(string(stats), token) {
+					t.Fatalf("run %s stats leaked token", params.ID)
+				}
+			}
+			gotToken, ok := registry.Token(hash)
+			if ok != tt.wantRegistryAfter {
+				t.Fatalf("registry token present after submit = %v, want %v", ok, tt.wantRegistryAfter)
+			}
+			if tt.wantRegistryAfter && gotToken != token {
+				t.Fatalf("registry token after submit = %q, want token", gotToken)
+			}
+		})
+	}
+}
+
+func TestSubmitGitLabTokenDomainValidation(t *testing.T) {
+	token := "glpat-server-secret"
+	hash := gitlabtoken.Hash(token)
+
+	tests := []struct {
+		name       string
+		newHandler func(st *migStore, registry *gitlabtokens.Registry) http.HandlerFunc
+		path       string
+		body       any
+		wantError  string
+	}{
+		{
+			name: "single run rejects token without configured GitLab domain",
+			newHandler: func(st *migStore, registry *gitlabtokens.Registry) http.HandlerFunc {
+				return createSingleRepoRunHandler(st, nil, gitauth.Options{}, registry)
+			},
+			path: "/v1/runs",
+			body: validRunRequestBodyWith(map[string]any{
+				"repo_url":     "https://gitlab.example.com/org/repo",
+				"gitlab_token": token,
+			}),
+			wantError: "ephemeral GitLab token requires a configured GitLab domain",
+		},
+		{
+			name: "single run rejects token for different repo host",
+			newHandler: func(st *migStore, registry *gitlabtokens.Registry) http.HandlerFunc {
+				return createSingleRepoRunHandler(st, nil, gitauth.Options{GitLabDomain: "gitlab.example.com"}, registry)
+			},
+			path: "/v1/runs",
+			body: validRunRequestBodyWith(map[string]any{
+				"repo_url":     "https://github.com/org/repo",
+				"gitlab_token": token,
+			}),
+			wantError: "ephemeral GitLab token is only allowed for repos on configured GitLab domain gitlab.example.com, got github.com",
+		},
+		{
+			name: "single run rejects token for ssh repo on configured GitLab domain",
+			newHandler: func(st *migStore, registry *gitlabtokens.Registry) http.HandlerFunc {
+				return createSingleRepoRunHandler(st, nil, gitauth.Options{GitLabDomain: "gitlab.example.com"}, registry)
+			},
+			path: "/v1/runs",
+			body: validRunRequestBodyWith(map[string]any{
+				"repo_url":     "ssh://git@gitlab.example.com/org/repo",
+				"gitlab_token": token,
+			}),
+			wantError: "ephemeral GitLab token is only allowed for https repos on configured GitLab domain gitlab.example.com, got ssh://gitlab.example.com",
+		},
+		{
+			name: "single run rejects token for file repo",
+			newHandler: func(st *migStore, registry *gitlabtokens.Registry) http.HandlerFunc {
+				return createSingleRepoRunHandler(st, nil, gitauth.Options{GitLabDomain: "gitlab.example.com"}, registry)
+			},
+			path: "/v1/runs",
+			body: validRunRequestBodyWith(map[string]any{
+				"repo_url":     "file:///tmp/repo",
+				"gitlab_token": token,
+			}),
+			wantError: "ephemeral GitLab token is only allowed for https repos on configured GitLab domain gitlab.example.com, got file://",
+		},
+		{
+			name: "mig wave rejects token when any selected repo is on another host",
+			newHandler: func(st *migStore, registry *gitlabtokens.Registry) http.HandlerFunc {
+				specID := domaintypes.NewSpecID()
+				migSt := activeMigWithSpec(specID)
+				*st = *migSt
+				st.listMigReposByMig.val = []store.MigRepo{
+					{ID: "migRepo1", MigID: "mig123", RepoID: "repo1", BaseRef: "main"},
+					{ID: "migRepo2", MigID: "mig123", RepoID: "repo2", BaseRef: "main"},
+				}
+				st.repoByID = map[domaintypes.RepoID]store.Repo{
+					"repo1": {ID: "repo1", Url: "https://gitlab.example.com/org/repo1"},
+					"repo2": {ID: "repo2", Url: "https://github.com/org/repo2"},
+				}
+				return createMigRunHandler(st, gitauth.Options{GitLabDomain: "gitlab.example.com"}, registry)
+			},
+			path: "/v1/migs/mig123/waves",
+			body: func() any {
+				body := allReposSelector()
+				body["gitlab_token"] = token
+				return body
+			}(),
+			wantError: "ephemeral GitLab token is only allowed for repos on configured GitLab domain gitlab.example.com, got github.com",
+		},
+		{
+			name: "mig wave rejects token when selected repo uses ssh",
+			newHandler: func(st *migStore, registry *gitlabtokens.Registry) http.HandlerFunc {
+				specID := domaintypes.NewSpecID()
+				migSt := activeMigWithSpec(specID)
+				*st = *migSt
+				st.listMigReposByMig.val = []store.MigRepo{
+					{ID: "migRepo1", MigID: "mig123", RepoID: "repo1", BaseRef: "main"},
+					{ID: "migRepo2", MigID: "mig123", RepoID: "repo2", BaseRef: "main"},
+				}
+				st.repoByID = map[domaintypes.RepoID]store.Repo{
+					"repo1": {ID: "repo1", Url: "https://gitlab.example.com/org/repo1"},
+					"repo2": {ID: "repo2", Url: "ssh://git@gitlab.example.com/org/repo2"},
+				}
+				return createMigRunHandler(st, gitauth.Options{GitLabDomain: "gitlab.example.com"}, registry)
+			},
+			path: "/v1/migs/mig123/waves",
+			body: func() any {
+				body := allReposSelector()
+				body["gitlab_token"] = token
+				return body
+			}(),
+			wantError: "ephemeral GitLab token is only allowed for https repos on configured GitLab domain gitlab.example.com, got ssh://gitlab.example.com",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			st := &migStore{}
+			registry := gitlabtokens.NewRegistry()
+			handler := tt.newHandler(st, registry)
+
+			rr := doRequest(t, handler, http.MethodPost, tt.path, tt.body, "mig_id", "mig123")
+
+			assertStatus(t, rr, http.StatusBadRequest)
+			if !strings.Contains(rr.Body.String(), tt.wantError) {
+				t.Fatalf("response body = %q, want containing %q", rr.Body.String(), tt.wantError)
+			}
+			if st.createWaveWithRuns.called {
+				t.Fatalf("CreateWaveWithRuns should not be called")
+			}
+			if _, ok := registry.Token(hash); ok {
+				t.Fatalf("registry token should not be registered")
+			}
+		})
 	}
 }
 

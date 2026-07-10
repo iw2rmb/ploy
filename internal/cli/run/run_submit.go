@@ -43,6 +43,8 @@ type SubmitOptions struct {
 
 	StepEnvOverrides map[string][]string
 
+	GitLabToken string
+
 	Output       io.Writer
 	FollowOutput io.Writer
 }
@@ -83,6 +85,11 @@ func RunSubmit(ctx context.Context, opts SubmitOptions) error {
 		return errors.New("--apply requires a local repo")
 	}
 
+	var gitLabToken *string
+	if strings.TrimSpace(opts.GitLabToken) != "" {
+		gitLabToken = &opts.GitLabToken
+	}
+
 	request := domainapi.RunSubmitRequest{
 		RepoURL:   domaintypes.RepoURL(repo.RepoURL),
 		Ref:       domaintypes.GitRef(repo.Ref),
@@ -90,6 +97,8 @@ func RunSubmit(ctx context.Context, opts SubmitOptions) error {
 		SpecID:    specPayload.SpecID,
 		Spec:      specPayload.Spec,
 		CreatedBy: strings.TrimSpace(os.Getenv("USER")),
+
+		GitLabToken: gitLabToken,
 	}
 
 	runID, migID, err := submitSingleRepoRun(ctx, base, httpClient, request)

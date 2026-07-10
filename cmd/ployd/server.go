@@ -14,6 +14,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/server/blobpersist"
 	"github.com/iw2rmb/ploy/internal/server/config"
 	"github.com/iw2rmb/ploy/internal/server/events"
+	"github.com/iw2rmb/ploy/internal/server/gitlabtokens"
 	"github.com/iw2rmb/ploy/internal/server/handlers"
 	"github.com/iw2rmb/ploy/internal/server/httpserver"
 	"github.com/iw2rmb/ploy/internal/server/metrics"
@@ -63,6 +64,7 @@ func run(ctx context.Context, cfg config.Config, st store.Store, authorizer *aut
 	if err != nil {
 		return fmt.Errorf("create events service: %w", err)
 	}
+	gitLabTokenRegistry := gitlabtokens.NewRegistry()
 
 	// Initialize wave scheduler for processing queued runs in waves.
 	// The scheduler is disabled when WaveSchedulerInterval is 0.
@@ -90,6 +92,7 @@ func run(ctx context.Context, cfg config.Config, st store.Store, authorizer *aut
 			Interval:       cfg.Scheduler.StaleJobRecoveryInterval,
 			NodeStaleAfter: cfg.Scheduler.NodeStaleAfter,
 			Logger:         slog.Default(),
+			GitLabTokens:   gitLabTokenRegistry,
 		})
 		if err != nil {
 			return fmt.Errorf("create stale job recovery task: %w", err)
@@ -198,12 +201,13 @@ func run(ctx context.Context, cfg config.Config, st store.Store, authorizer *aut
 		GitLabDomain: cfg.GitLab.Domain,
 	}
 	snapshotService := snapshot.NewService(snapshot.Options{
-		CacheDir: os.Getenv("PLOYD_CACHE_HOME"),
-		Auth:     gitAuth,
+		CacheDir:    os.Getenv("PLOYD_CACHE_HOME"),
+		Auth:        gitAuth,
+		TokenLookup: gitLabTokenRegistry,
 	})
 
 	// Register HTTP routes.
-	handlers.RegisterRoutes(httpSrv, st, bs, bp, eventsService, configHolder, tokenSecret, gitAuth, snapshotService)
+	handlers.RegisterRoutes(httpSrv, st, bs, bp, eventsService, configHolder, tokenSecret, gitAuth, snapshotService, gitLabTokenRegistry)
 
 	// Initialize metrics server.
 	metricsSrv := metrics.NewServer(cfg.Metrics.Listen)

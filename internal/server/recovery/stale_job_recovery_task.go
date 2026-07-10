@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/server/events"
+	"github.com/iw2rmb/ploy/internal/server/gitlabtokens"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -26,6 +27,7 @@ type Options struct {
 	Interval       time.Duration
 	NodeStaleAfter time.Duration
 	Logger         *slog.Logger
+	GitLabTokens   *gitlabtokens.Registry
 }
 
 // StaleJobRecoveryTask scans for stale Running jobs and reconciles run/wave state.
@@ -35,6 +37,7 @@ type StaleJobRecoveryTask struct {
 	interval       time.Duration
 	nodeStaleAfter time.Duration
 	logger         *slog.Logger
+	gitLabTokens   *gitlabtokens.Registry
 }
 
 // NewStaleJobRecoveryTask constructs a stale recovery task.
@@ -64,6 +67,7 @@ func NewStaleJobRecoveryTask(opts Options) (*StaleJobRecoveryTask, error) {
 		interval:       interval,
 		nodeStaleAfter: nodeStaleAfter,
 		logger:         logger,
+		gitLabTokens:   opts.GitLabTokens,
 	}, nil
 }
 
@@ -162,6 +166,7 @@ func (t *StaleJobRecoveryTask) Run(ctx context.Context) error {
 			continue
 		}
 		if finalized {
+			t.gitLabTokens.ReleaseWave(ctx, t.store, run.WaveID)
 			finalizedRuns[stale.RunID.String()] = struct{}{}
 			runsFinalized++
 			t.logger.Info("stale-job-recovery: run finalized",

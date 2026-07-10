@@ -51,7 +51,7 @@ func TestListRunSBOMRowsByJobType_CurrentAttemptScope(t *testing.T) {
 	oldPre := createSBOMJobForStoreTest(t, ctx, db, fx.Run, types.JobTypePreGate, 1, "old-pre")
 	upsertSBOMForStoreTest(t, ctx, db, oldPre, fx.Run.RepoID, "old-lib", "0.1.0")
 
-	if err := db.IncrementRunAttempt(ctx, fx.Run.ID); err != nil {
+	if err := db.IncrementRunAttempt(ctx, IncrementRunAttemptParams{ID: fx.Run.ID}); err != nil {
 		t.Fatalf("IncrementRunAttempt() failed: %v", err)
 	}
 	run, err := db.GetRun(ctx, fx.Run.ID)

@@ -6,8 +6,11 @@ import (
 	"log/slog"
 	"net/http"
 
+	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/gitauth"
+	"github.com/iw2rmb/ploy/internal/gitlabtoken"
+	"github.com/iw2rmb/ploy/internal/server/gitlabtokens"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -25,20 +28,14 @@ import (
 // - Copies migs.spec_id → runs.spec_id for immutability.
 // - Creates run rows snapshotting source refs from mig_repos.
 // - Job materialization is deferred to the wave scheduler and gated on prep readiness.
-func createMigRunHandler(st store.Store, gitAuth gitauth.Options) http.HandlerFunc {
+func createMigRunHandler(st store.Store, gitAuth gitauth.Options, registries ...*gitlabtokens.Registry) http.HandlerFunc {
+	tokenRegistry := optionalGitLabTokenRegistry(registries)
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Parse request body with strict validation.
-		var req struct {
-			RepoSelector struct {
-				Mode  string   `json:"mode"`            // "all" | "failed" | "explicit"
-				Repos []string `json:"repos,omitempty"` // repo_urls for "explicit" mode
-			} `json:"repo_selector"`
-			CreatedBy *string `json:"created_by,omitempty"`
-		}
+		var req domainapi.CreateMigRunRequest
 		if err := decodeRequestJSON(w, r, &req, DefaultMaxBodySize); err != nil {
 			return
 		}
-
 		// Validate repo_selector.mode is one of the allowed values.
 		switch req.RepoSelector.Mode {
 		case "all", "failed", "explicit":
@@ -72,7 +69,11 @@ func createMigRunHandler(st store.Store, gitAuth gitauth.Options) http.HandlerFu
 		}
 
 		// Select repos based on mode.
-		selectedRepos, err := selectReposForRun(r.Context(), st, migID, req.RepoSelector.Mode, req.RepoSelector.Repos)
+		repoSelectors := make([]string, 0, len(req.RepoSelector.Repos))
+		for _, repo := range req.RepoSelector.Repos {
+			repoSelectors = append(repoSelectors, repo.String())
+		}
+		selectedRepos, err := selectReposForRun(r.Context(), st, migID, req.RepoSelector.Mode, repoSelectors)
 		if err != nil {
 			serverError(w, "create mig run", "select repos", err, "mig_id", migID.String(), "mode", req.RepoSelector.Mode)
 			return
@@ -84,18 +85,45 @@ func createMigRunHandler(st store.Store, gitAuth gitauth.Options) http.HandlerFu
 			return
 		}
 
-		waveID := domaintypes.NewWaveID()
-		runs := make([]store.CreateRunParams, 0, len(selectedRepos))
+		selectedRepoURLs := make(map[domaintypes.RepoID]string, len(selectedRepos))
+		repoURLs := make([]string, 0, len(selectedRepos))
 		for _, migRepo := range selectedRepos {
-			runID := domaintypes.NewRunID()
 			repoURL, urlErr := repoURLForID(r.Context(), st, migRepo.RepoID)
 			if urlErr != nil {
 				serverError(w, "create mig run", "get repo", urlErr, "repo_id", migRepo.RepoID)
 				return
 			}
-			sourceCommitSHA, seedErr := resolveSourceCommitSHAFromContext(r.Context(), repoURL, migRepo.BaseRef, gitAuth)
+			selectedRepoURLs[migRepo.RepoID] = repoURL
+			repoURLs = append(repoURLs, repoURL)
+		}
+
+		gitLabTokenHash, gitLabToken, err := validateGitLabTokenRequestForRepos(req.GitLabToken, gitAuth.GitLabDomain, repoURLs)
+		if err != nil {
+			writeHTTPError(w, http.StatusBadRequest, "%v", err)
+			return
+		}
+
+		runStats, err := gitlabtoken.RunStatsWithMarker(gitLabTokenHash)
+		if err != nil {
+			writeHTTPError(w, http.StatusBadRequest, "%v", err)
+			return
+		}
+
+		waveID := domaintypes.NewWaveID()
+		runs := make([]store.CreateRunParams, 0, len(selectedRepos))
+		runIDs := make([]domaintypes.RunID, 0, len(selectedRepos))
+		for _, migRepo := range selectedRepos {
+			runID := domaintypes.NewRunID()
+			runIDs = append(runIDs, runID)
+			repoURL := selectedRepoURLs[migRepo.RepoID]
+			resolveAuth := gitAuthWithEphemeralToken(gitAuth, gitLabToken)
+			sourceCommitSHA, seedErr := resolveSourceCommitSHAFromContext(r.Context(), repoURL, migRepo.BaseRef, resolveAuth)
 			if seedErr != nil {
-				writeHTTPError(w, http.StatusBadRequest, "failed to resolve source commit for repo %s ref %s: %v", repoURL, migRepo.BaseRef, seedErr)
+				if gitLabToken != "" {
+					writeHTTPError(w, http.StatusBadRequest, "failed to resolve source commit for repo %s ref %s using provided GitLab token: %v", repoURL, migRepo.BaseRef, seedErr)
+				} else {
+					writeHTTPError(w, http.StatusBadRequest, "failed to resolve source commit for repo %s ref %s: %v", repoURL, migRepo.BaseRef, seedErr)
+				}
 				slog.Error("create mig run: resolve source commit failed",
 					"run_id", runID,
 					"repo_id", migRepo.RepoID,
@@ -114,9 +142,13 @@ func createMigRunHandler(st store.Store, gitAuth gitauth.Options) http.HandlerFu
 				RepoBaseRef:     migRepo.BaseRef,
 				SourceCommitSha: sourceCommitSHA,
 				RepoSha0:        sourceCommitSHA,
+				Stats:           runStats,
 			})
 		}
 
+		if gitLabTokenHash != "" {
+			tokenRegistry.Register(gitLabTokenHash, gitLabToken, runIDs)
+		}
 		wave, _, err := st.CreateWaveWithRuns(r.Context(), store.CreateWaveWithRunsParams{
 			Wave: store.CreateWaveParams{
 				ID:        waveID,
@@ -127,6 +159,9 @@ func createMigRunHandler(st store.Store, gitAuth gitauth.Options) http.HandlerFu
 			Runs: runs,
 		})
 		if err != nil {
+			if gitLabTokenHash != "" {
+				tokenRegistry.ReleaseRuns(runIDs)
+			}
 			serverError(w, "create mig wave", "create wave with runs", err, "mig_id", migID.String(), "wave_id", waveID)
 			return
 		}

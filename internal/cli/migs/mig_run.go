@@ -18,6 +18,7 @@ import (
 	"strings"
 
 	"github.com/iw2rmb/ploy/internal/cli/httpx"
+	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
@@ -31,6 +32,8 @@ type CreateMigRunCommand struct {
 	RepoURLs  []string           // Optional: canonical repo URLs for "explicit" mode.
 	Failed    bool               // If true, use "failed" mode; otherwise "all" or "explicit".
 	CreatedBy *string            // Optional: creator identifier.
+
+	GitLabToken string
 }
 
 // CreateMigRunResult contains the response from creating a mig wave.
@@ -77,17 +80,18 @@ func (c CreateMigRunCommand) Run(ctx context.Context) (CreateMigRunResult, error
 		mode = "all"
 	}
 
-	// Build request payload with repo_selector mode and optional repos list.
-	req := struct {
-		RepoSelector struct {
-			Mode  string                `json:"mode"`
-			Repos []domaintypes.RepoURL `json:"repos,omitempty"`
-		} `json:"repo_selector"`
-		CreatedBy *string `json:"created_by,omitempty"`
-	}{
-		CreatedBy: c.CreatedBy,
+	var gitLabToken *string
+	if strings.TrimSpace(c.GitLabToken) != "" {
+		gitLabToken = &c.GitLabToken
 	}
-	req.RepoSelector.Mode = mode
+
+	req := domainapi.CreateMigRunRequest{
+		RepoSelector: domainapi.MigRepoSelector{
+			Mode: mode,
+		},
+		CreatedBy:   c.CreatedBy,
+		GitLabToken: gitLabToken,
+	}
 	if mode == "explicit" {
 		req.RepoSelector.Repos = repoURLs
 	}

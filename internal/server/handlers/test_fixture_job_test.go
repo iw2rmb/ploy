@@ -97,7 +97,7 @@ type jobStore struct {
 	// Run mutation and wave listing helpers.
 	updateRunError      mockCall[store.UpdateRunErrorParams, struct{}]
 	updateRunBaseRef    mockCall[store.UpdateRunBaseRefParams, struct{}]
-	incrementRunAttempt mockCall[types.RunID, struct{}]
+	incrementRunAttempt mockCall[store.IncrementRunAttemptParams, struct{}]
 
 	listRunsByWave        mockCall[string, []store.Run]
 	listQueuedRunsByWave  mockCall[string, []store.Run]

@@ -71,9 +71,10 @@ INSERT INTO runs (
   source_commit_sha,
   repo_sha0,
   created_by,
-  status
+  status,
+  stats
 )
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'Queued')
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'Queued', COALESCE($10, '{}'::jsonb))
 RETURNING id, wave_id, mig_id, spec_id, repo_id, repo_base_ref, source_commit_sha, repo_sha0,
           created_by, status, attempt, last_error, created_at, started_at, finished_at, stats
 `
@@ -88,6 +89,7 @@ type CreateRunParams struct {
 	SourceCommitSha string       `json:"source_commit_sha"`
 	RepoSha0        string       `json:"repo_sha0"`
 	CreatedBy       *string      `json:"created_by"`
+	Stats           interface{}  `json:"stats"`
 }
 
 func (q *Queries) CreateRun(ctx context.Context, arg CreateRunParams) (Run, error) {
@@ -101,6 +103,7 @@ func (q *Queries) CreateRun(ctx context.Context, arg CreateRunParams) (Run, erro
 		arg.SourceCommitSha,
 		arg.RepoSha0,
 		arg.CreatedBy,
+		arg.Stats,
 	)
 	var i Run
 	err := row.Scan(
@@ -199,7 +202,8 @@ SELECT
   runs.repo_id,
   runs.repo_base_ref,
   runs.source_commit_sha,
-  repos.url AS repo_url
+  repos.url AS repo_url,
+  runs.stats
 FROM runs
 JOIN repos ON repos.id = runs.repo_id
 WHERE runs.id = $1
@@ -211,6 +215,7 @@ type GetRunSnapshotMetadataRow struct {
 	RepoBaseRef     string       `json:"repo_base_ref"`
 	SourceCommitSha string       `json:"source_commit_sha"`
 	RepoUrl         string       `json:"repo_url"`
+	Stats           []byte       `json:"stats"`
 }
 
 func (q *Queries) GetRunSnapshotMetadata(ctx context.Context, id types.RunID) (GetRunSnapshotMetadataRow, error) {
@@ -222,6 +227,7 @@ func (q *Queries) GetRunSnapshotMetadata(ctx context.Context, id types.RunID) (G
 		&i.RepoBaseRef,
 		&i.SourceCommitSha,
 		&i.RepoUrl,
+		&i.Stats,
 	)
 	return i, err
 }
@@ -270,12 +276,17 @@ SET attempt = attempt + 1,
     last_error = NULL,
     started_at = NULL,
     finished_at = NULL,
-    stats = '{}'::jsonb
+    stats = COALESCE($2, '{}'::jsonb)
 WHERE id = $1
 `
 
-func (q *Queries) IncrementRunAttempt(ctx context.Context, id types.RunID) error {
-	_, err := q.db.Exec(ctx, incrementRunAttempt, id)
+type IncrementRunAttemptParams struct {
+	ID    types.RunID `json:"id"`
+	Stats []byte      `json:"stats"`
+}
+
+func (q *Queries) IncrementRunAttempt(ctx context.Context, arg IncrementRunAttemptParams) error {
+	_, err := q.db.Exec(ctx, incrementRunAttempt, arg.ID, arg.Stats)
 	return err
 }
 

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/iw2rmb/ploy/internal/gitlabtoken"
 	"github.com/jackc/pgx/v5"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
@@ -68,9 +69,14 @@ func getRunSnapshotHandler(st store.Store, snapshots repoSnapshotWriter) http.Ha
 			RepoURL:         cleanURL,
 			BaseRef:         metaRow.RepoBaseRef,
 			SourceCommitSHA: sha,
+			GitLabTokenHash: gitlabtoken.HashFromRunStats(metaRow.Stats),
 		}, w); err != nil {
 			if errors.Is(err, snapshot.ErrMaterializeTimeout) || errors.Is(r.Context().Err(), context.DeadlineExceeded) {
 				writeHTTPError(w, http.StatusGatewayTimeout, "snapshot materialization timed out")
+				return
+			}
+			if errors.Is(err, snapshot.ErrEphemeralGitLabTokenUnavailable) {
+				writeHTTPError(w, http.StatusConflict, "%s", gitlabtoken.MissingTokenMessage)
 				return
 			}
 			writeHTTPError(w, http.StatusBadGateway, "snapshot materialization failed: %v", err)

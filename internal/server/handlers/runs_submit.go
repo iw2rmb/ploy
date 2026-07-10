@@ -11,8 +11,10 @@ import (
 	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/gitauth"
+	"github.com/iw2rmb/ploy/internal/gitlabtoken"
 	migsapi "github.com/iw2rmb/ploy/internal/migs/api"
 	"github.com/iw2rmb/ploy/internal/server/events"
+	"github.com/iw2rmb/ploy/internal/server/gitlabtokens"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"github.com/jackc/pgx/v5"
@@ -34,7 +36,8 @@ var submitCommitSHARe = regexp.MustCompile(`^[0-9a-f]{40}$`)
 // - Job materialization is deferred to the wave scheduler and gated on prep readiness.
 //
 // This handler replaces the previous POST /v1/migs endpoint for run submission.
-func createSingleRepoRunHandler(st store.Store, eventsService *events.Service, gitAuth gitauth.Options) http.HandlerFunc {
+func createSingleRepoRunHandler(st store.Store, eventsService *events.Service, gitAuth gitauth.Options, registries ...*gitlabtokens.Registry) http.HandlerFunc {
+	tokenRegistry := optionalGitLabTokenRegistry(registries)
 	// Spec can be large (JSON blobs), so we allow up to 4 MiB.
 	const maxBodySize = 4 << 20
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -76,12 +79,22 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service, g
 		// query must reject the submit instead of leaving a run with no repos.
 		rawRepoURL := strings.TrimSpace(req.RepoURL.String())
 		normalizedRepoURL := domaintypes.NormalizeRepoURL(rawRepoURL)
+		gitLabTokenHash, gitLabToken, err := validateGitLabTokenRequestForRepos(req.GitLabToken, gitAuth.GitLabDomain, []string{rawRepoURL})
+		if err != nil {
+			writeHTTPError(w, http.StatusBadRequest, "%v", err)
+			return
+		}
 		sourceCommitSHA := commitSHA
 		if sourceCommitSHA == "" {
 			var seedErr error
-			sourceCommitSHA, seedErr = resolveSourceCommitSHAFromContext(r.Context(), rawRepoURL, sourceRef, gitAuth)
+			resolveAuth := gitAuthWithEphemeralToken(gitAuth, gitLabToken)
+			sourceCommitSHA, seedErr = resolveSourceCommitSHAFromContext(r.Context(), rawRepoURL, sourceRef, resolveAuth)
 			if seedErr != nil {
-				writeHTTPError(w, http.StatusBadRequest, "failed to resolve source commit for repo %s ref %s: %v", normalizedRepoURL, sourceRef, seedErr)
+				if gitLabToken != "" {
+					writeHTTPError(w, http.StatusBadRequest, "failed to resolve source commit for repo %s ref %s using provided GitLab token: %v", normalizedRepoURL, sourceRef, seedErr)
+				} else {
+					writeHTTPError(w, http.StatusBadRequest, "failed to resolve source commit for repo %s ref %s: %v", normalizedRepoURL, sourceRef, seedErr)
+				}
 				slog.Error("create single-repo run: resolve source commit failed",
 					"repo_url", normalizedRepoURL,
 					"ref", sourceRef,
@@ -142,6 +155,14 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service, g
 
 		runID := domaintypes.NewRunID()
 		waveID := domaintypes.WaveID(runID.String())
+		runStats, err := gitlabtoken.RunStatsWithMarker(gitLabTokenHash)
+		if err != nil {
+			writeHTTPError(w, http.StatusBadRequest, "%v", err)
+			return
+		}
+		if gitLabTokenHash != "" {
+			tokenRegistry.Register(gitLabTokenHash, gitLabToken, []domaintypes.RunID{runID})
+		}
 		wave, runs, err := st.CreateWaveWithRuns(r.Context(), store.CreateWaveWithRunsParams{
 			Wave: store.CreateWaveParams{
 				ID:        waveID,
@@ -159,9 +180,13 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service, g
 				SourceCommitSha: sourceCommitSHA,
 				RepoSha0:        sourceCommitSHA,
 				CreatedBy:       createdByPtr,
+				Stats:           runStats,
 			}},
 		})
 		if err != nil {
+			if gitLabTokenHash != "" {
+				tokenRegistry.ReleaseRuns([]domaintypes.RunID{runID})
+			}
 			serverError(w, "create single-repo run", "create run", err, "run_id", runID)
 			return
 		}

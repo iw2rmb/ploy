@@ -6,6 +6,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/server/auth"
 	"github.com/iw2rmb/ploy/internal/server/blobpersist"
 	"github.com/iw2rmb/ploy/internal/server/events"
+	"github.com/iw2rmb/ploy/internal/server/gitlabtokens"
 	"github.com/iw2rmb/ploy/internal/server/httpserver"
 	"github.com/iw2rmb/ploy/internal/store"
 )
@@ -18,11 +19,16 @@ type routeDeps struct {
 	configHolder  *ConfigHolder
 	tokenSecret   string
 	gitAuth       gitauth.Options
+	gitLabTokens  *gitlabtokens.Registry
 	snapshots     repoSnapshotWriter
 }
 
 // RegisterRoutes mounts all HTTP endpoints on the given server.
-func RegisterRoutes(s *httpserver.Server, st store.Store, bs blobstore.Store, bp *blobpersist.Service, eventsService *events.Service, configHolder *ConfigHolder, tokenSecret string, gitAuth gitauth.Options, snapshots repoSnapshotWriter) {
+func RegisterRoutes(s *httpserver.Server, st store.Store, bs blobstore.Store, bp *blobpersist.Service, eventsService *events.Service, configHolder *ConfigHolder, tokenSecret string, gitAuth gitauth.Options, snapshots repoSnapshotWriter, registries ...*gitlabtokens.Registry) {
+	var registry *gitlabtokens.Registry
+	if len(registries) > 0 {
+		registry = registries[0]
+	}
 	deps := routeDeps{
 		st:            st,
 		bs:            bs,
@@ -31,6 +37,7 @@ func RegisterRoutes(s *httpserver.Server, st store.Store, bs blobstore.Store, bp
 		configHolder:  configHolder,
 		tokenSecret:   tokenSecret,
 		gitAuth:       gitAuth,
+		gitLabTokens:  registry,
 		snapshots:     snapshots,
 	}
 	registerHealthRoutes(s, deps)
@@ -73,7 +80,7 @@ func registerBootstrapRoutes(s *httpserver.Server, deps routeDeps) {
 }
 
 func registerMigRoutes(s *httpserver.Server, deps routeDeps) {
-	s.RegisterRouteFunc("POST /v1/runs", createSingleRepoRunHandler(deps.st, deps.eventsService, deps.gitAuth), auth.RoleControlPlane)
+	s.RegisterRouteFunc("POST /v1/runs", createSingleRepoRunHandler(deps.st, deps.eventsService, deps.gitAuth, deps.gitLabTokens), auth.RoleControlPlane)
 
 	s.RegisterRouteFunc("POST /v1/migs", createMigHandler(deps.st), auth.RoleControlPlane)
 	s.RegisterRouteFunc("GET /v1/migs", listMigsHandler(deps.st), auth.RoleControlPlane)
@@ -86,7 +93,7 @@ func registerMigRoutes(s *httpserver.Server, deps routeDeps) {
 	s.RegisterRouteFunc("GET /v1/migs/{mig_id}/repos", listMigReposHandler(deps.st), auth.RoleControlPlane)
 	s.RegisterRouteFunc("DELETE /v1/migs/{mig_id}/repos/{repo_id}", deleteMigRepoHandler(deps.st), auth.RoleControlPlane)
 	s.RegisterRouteFunc("POST /v1/migs/{mig_id}/repos/bulk", bulkUpsertMigReposHandler(deps.st), auth.RoleControlPlane)
-	s.RegisterRouteFunc("POST /v1/migs/{mig_id}/waves", createMigRunHandler(deps.st, deps.gitAuth), auth.RoleControlPlane)
+	s.RegisterRouteFunc("POST /v1/migs/{mig_id}/waves", createMigRunHandler(deps.st, deps.gitAuth, deps.gitLabTokens), auth.RoleControlPlane)
 	s.RegisterRouteFunc("POST /v1/migs/{mig_id}/pull", pullMigRepoHandler(deps.st), auth.RoleControlPlane)
 }
 
@@ -99,8 +106,8 @@ func registerRunRoutes(s *httpserver.Server, deps routeDeps) {
 	s.RegisterRouteFunc("GET /v1/runs", listRunsHandler(deps.st), auth.RoleControlPlane)
 	s.RegisterRouteFunc("GET /v1/runs/{run_id}", getRunHandler(deps.st), auth.RoleControlPlane)
 	s.RegisterRouteFunc("GET /v1/runs/{run_id}/status", getRunStatusHandler(deps.st), auth.RoleControlPlane)
-	s.RegisterRouteFunc("POST /v1/runs/{run_id}/cancel", cancelRunHandlerV1(deps.st), auth.RoleControlPlane)
-	s.RegisterRouteFunc("POST /v1/runs/{run_id}/restart", restartRunHandler(deps.st), auth.RoleControlPlane)
+	s.RegisterRouteFunc("POST /v1/runs/{run_id}/cancel", cancelRunHandlerV1(deps.st, deps.gitLabTokens), auth.RoleControlPlane)
+	s.RegisterRouteFunc("POST /v1/runs/{run_id}/restart", restartRunHandler(deps.st, deps.gitAuth, deps.gitLabTokens), auth.RoleControlPlane)
 	s.RegisterRouteFunc("POST /v1/runs/{run_id}/pull", pullRunHandler(deps.st), auth.RoleControlPlane)
 	s.RegisterRouteFunc("GET /v1/runs/{run_id}/snapshot", getRunSnapshotHandler(deps.st, deps.snapshots), auth.RoleWorker)
 	s.RegisterRouteFuncAllowQueryToken("GET /v1/runs/{run_id}/diffs", listRunDiffsHandler(deps.st, deps.bs), auth.RoleControlPlane, auth.RoleWorker)
@@ -111,7 +118,7 @@ func registerRunRoutes(s *httpserver.Server, deps routeDeps) {
 
 	s.RegisterRouteFunc("GET /v1/waves/{wave_id}", getWaveHandler(deps.st), auth.RoleControlPlane)
 	s.RegisterRouteFunc("GET /v1/waves/{wave_id}/runs", listWaveRunsHandler(deps.st), auth.RoleControlPlane)
-	s.RegisterRouteFunc("POST /v1/waves/{wave_id}/cancel", cancelWaveHandler(deps.st), auth.RoleControlPlane)
+	s.RegisterRouteFunc("POST /v1/waves/{wave_id}/cancel", cancelWaveHandler(deps.st, deps.gitLabTokens), auth.RoleControlPlane)
 }
 
 func registerRepoRoutes(s *httpserver.Server, deps routeDeps) {
@@ -157,7 +164,7 @@ func registerJobRoutes(s *httpserver.Server, deps routeDeps) {
 	s.RegisterRouteFunc("GET /v1/jobs", listJobsHandler(deps.st), auth.RoleControlPlane)
 	s.RegisterRouteFuncAllowQueryToken("GET /v1/jobs/{job_id}/logs", getJobLogsHandler(deps.st, deps.bs, deps.eventsService), auth.RoleControlPlane)
 	s.RegisterRouteFunc("POST /v1/jobs/{job_id}/logs", createJobLogsHandler(deps.st, deps.bp, deps.eventsService), auth.RoleWorker)
-	s.RegisterRouteFunc("POST /v1/jobs/{job_id}/complete", completeJobHandler(deps.st, deps.eventsService, deps.bp), auth.RoleWorker)
+	s.RegisterRouteFunc("POST /v1/jobs/{job_id}/complete", completeJobHandler(deps.st, deps.eventsService, deps.bp, deps.gitLabTokens), auth.RoleWorker)
 	s.RegisterRouteFunc("GET /v1/jobs/{job_id}/status", getJobStatusHandler(deps.st), auth.RoleWorker, auth.RoleControlPlane)
 	s.RegisterRouteFunc("POST /v1/jobs/{job_id}/image", saveJobImageNameHandler(deps.st), auth.RoleWorker)
 	s.RegisterRouteFunc("POST /v1/jobs/{job_id}/sbom", saveJobSBOMHandler(deps.st), auth.RoleWorker)

@@ -139,11 +139,16 @@ func (s *completionService) reconcileRepoRun(ctx context.Context, state *complet
 	if !ok {
 		return
 	}
-	if _, completeErr := recovery.MaybeCompleteRunIfAllReposTerminal(ctx, s.store, s.eventsService, run); completeErr != nil {
+	completed, completeErr := recovery.MaybeCompleteRunIfAllReposTerminal(ctx, s.store, s.eventsService, run)
+	if completeErr != nil {
 		slog.Error("complete job: failed to check run completion",
 			"job_id", state.job.ID,
 			"next_id", state.job.NextID,
 			"err", completeErr,
 		)
+		return
+	}
+	if completed {
+		s.gitLabTokens.ReleaseWave(ctx, s.store, run.WaveID)
 	}
 }

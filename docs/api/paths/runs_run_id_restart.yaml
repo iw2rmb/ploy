@@ -4,13 +4,20 @@ post:
   description: |
     Restarts a terminal run by incrementing its attempt and setting it back to
     `Queued`. Active runs and runs whose owning wave is `Cancelled` return
-    `409 Conflict`.
+    `409 Conflict`. The optional request body can provide a request-only
+    ephemeral GitLab token for the restarted attempt.
   parameters:
     - in: path
       name: run_id
       required: true
       schema: { type: string }
       description: Run ID (KSUID string)
+  requestBody:
+    required: false
+    content:
+      application/json:
+        schema:
+          $ref: "../components/schemas/controlplane.yaml#/RunRestartRequest"
   responses:
     "200":
       description: Updated run summary.

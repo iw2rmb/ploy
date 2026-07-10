@@ -18,6 +18,8 @@ type RunSubmitRequest struct {
 	SpecID    domaintypes.SpecID  `json:"spec_id,omitempty"`
 	Spec      json.RawMessage     `json:"spec"`
 	CreatedBy string              `json:"created_by,omitempty"`
+
+	GitLabToken *string `json:"gitlab_token,omitempty"`
 }
 
 // CreateSingleRepoRunResponse is returned by POST /v1/runs.
@@ -26,4 +28,20 @@ type CreateSingleRepoRunResponse struct {
 	RunID  domaintypes.RunID  `json:"run_id"`
 	MigID  domaintypes.MigID  `json:"mig_id"`
 	SpecID domaintypes.SpecID `json:"spec_id"`
+}
+
+type CreateMigRunRequest struct {
+	RepoSelector MigRepoSelector `json:"repo_selector"`
+	CreatedBy    *string         `json:"created_by,omitempty"`
+
+	GitLabToken *string `json:"gitlab_token,omitempty"`
+}
+
+type RunRestartRequest struct {
+	GitLabToken *string `json:"gitlab_token,omitempty"`
+}
+
+type MigRepoSelector struct {
+	Mode  string                `json:"mode"`
+	Repos []domaintypes.RepoURL `json:"repos,omitempty"`
 }

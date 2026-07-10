@@ -21,7 +21,7 @@ func (m *jobStore) UpdateRunBaseRef(ctx context.Context, params store.UpdateRunB
 	return err
 }
 
-func (m *jobStore) IncrementRunAttempt(ctx context.Context, arg types.RunID) error {
+func (m *jobStore) IncrementRunAttempt(ctx context.Context, arg store.IncrementRunAttemptParams) error {
 	_, err := m.incrementRunAttempt.record(arg)
 	return err
 }

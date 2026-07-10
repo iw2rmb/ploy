@@ -287,8 +287,8 @@ GitLab credentials are server-owned `ployd` environment only. They are used by
 the control plane to resolve source SHAs and materialize repo snapshots that
 workers download through the snapshot endpoint.
 
-- `PLOY_GITLAB_DOMAIN` — GitLab base URL or host (for example `https://gitlab.com` or `gitlab.com`). Optional; when set, token auth is scoped to that host.
-- `PLOY_GITLAB_TOKEN` — GitLab Personal Access Token used by `ployd` for source resolution and snapshot materialization. It is not accepted in specs, CLI flags, or node manifests.
+- `PLOY_GITLAB_DOMAIN` — GitLab base URL or host (for example `https://gitlab.com` or `gitlab.com`). Token auth is scoped to this host. Submit-time ephemeral GitLab tokens are rejected when this value is empty or the target repo URL is not HTTPS.
+- `PLOY_GITLAB_TOKEN` — GitLab Personal Access Token used by `ployd` for default source resolution and snapshot materialization. It is not accepted in specs or node manifests. Submitters can provide a run-scoped ephemeral token with `ploy run --gitlab-token-env ENV_NAME`, `ploy run --gitlab-token-prompt`, `ploy run restart --gitlab-token-env ENV_NAME`, `ploy run restart --gitlab-token-prompt`, `ploy mig run --gitlab-token-env ENV_NAME`, or `ploy mig run --gitlab-token-prompt`; the server stores only its SHA-256 marker in run metadata.
 
 ## gapi
 

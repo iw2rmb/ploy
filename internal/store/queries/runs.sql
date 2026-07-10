@@ -87,9 +87,10 @@ INSERT INTO runs (
   source_commit_sha,
   repo_sha0,
   created_by,
-  status
+  status,
+  stats
 )
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'Queued')
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'Queued', COALESCE(sqlc.narg(stats), '{}'::jsonb))
 RETURNING id, wave_id, mig_id, spec_id, repo_id, repo_base_ref, source_commit_sha, repo_sha0,
           created_by, status, attempt, last_error, created_at, started_at, finished_at, stats;
 
@@ -112,7 +113,7 @@ SET attempt = attempt + 1,
     last_error = NULL,
     started_at = NULL,
     finished_at = NULL,
-    stats = '{}'::jsonb
+    stats = COALESCE($2, '{}'::jsonb)
 WHERE id = $1;
 
 -- name: UpdateRunBaseRef :exec
@@ -169,7 +170,8 @@ SELECT
   runs.repo_id,
   runs.repo_base_ref,
   runs.source_commit_sha,
-  repos.url AS repo_url
+  repos.url AS repo_url,
+  runs.stats
 FROM runs
 JOIN repos ON repos.id = runs.repo_id
 WHERE runs.id = $1;
