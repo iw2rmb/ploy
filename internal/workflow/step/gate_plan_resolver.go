@@ -44,7 +44,7 @@ func resolveGateExecutionPlan(
 	var stackCtx gateStackContext
 	var terminal *gateExecutionTerminal
 	if useForcedStackDetect(spec) {
-		stackCtx, terminal = resolveForcedStackDetectContext(spec.StackDetect)
+		stackCtx, terminal = resolveForcedStackDetectContext(ctx, workspace, spec.StackDetect)
 	} else {
 		obs, detectErr := stackdetect.Detect(ctx, workspace)
 		stackCtx, terminal = resolveGateStackContext(ctx, workspace, spec, obs, detectErr, mappingPath)

@@ -96,15 +96,15 @@ func resolveStackGateContext(
 }
 
 func resolveDetectedStackContext(
-	_ context.Context,
-	_ string,
+	ctx context.Context,
+	workspace string,
 	spec *contracts.StepGateSpec,
 	obs *stackdetect.Observation,
 	detectErr error,
 ) (gateStackContext, *gateExecutionTerminal) {
 	switch stackDetectMode(spec.StackDetect) {
 	case contracts.BuildGateStackModeForced:
-		return resolveForcedStackDetectContext(spec.StackDetect)
+		return resolveForcedStackDetectContext(ctx, workspace, spec.StackDetect)
 	case contracts.BuildGateStackModeStrict:
 		return resolveStrictStackDetectContext(spec.StackDetect, obs, detectErr)
 	case contracts.BuildGateStackModeFallback:
@@ -151,12 +151,51 @@ func resolveDetectedStackContext(
 	}, nil
 }
 
-func resolveForcedStackDetectContext(stackDetectCfg *contracts.BuildGateStackConfig) (gateStackContext, *gateExecutionTerminal) {
+func resolveForcedStackDetectContext(
+	ctx context.Context,
+	workspace string,
+	stackDetectCfg *contracts.BuildGateStackConfig,
+) (gateStackContext, *gateExecutionTerminal) {
 	expected := configuredStackExpectation(stackDetectCfg)
-	if !stackExpectationComplete(expected) {
-		return gateStackContext{}, gateStackConfigTerminal("build gate stack mode requires language, tool, and release")
+	if expected == nil || strings.TrimSpace(expected.Language) == "" || strings.TrimSpace(expected.Release) == "" {
+		return gateStackContext{}, gateStackConfigTerminal("forced build gate stack mode requires language and release")
+	}
+	if strings.TrimSpace(expected.Tool) == "" {
+		return resolveForcedStackDetectToolContext(ctx, workspace, expected)
 	}
 	normalized := normalizeStackExpectation(expected)
+	return gateStackContext{
+		expectation: normalized,
+		language:    normalized.Language,
+		tool:        normalized.Tool,
+		release:     normalized.Release,
+	}, nil
+}
+
+func resolveForcedStackDetectToolContext(
+	ctx context.Context,
+	workspace string,
+	expected *contracts.StackExpectation,
+) (gateStackContext, *gateExecutionTerminal) {
+	obs, detectErr := stackdetect.DetectTool(ctx, workspace)
+	if detectErr != nil {
+		return gateStackContext{}, stackDetectionFailureTerminal(detectErr,
+			"stack tool detection failed")
+	}
+	if obs == nil || strings.TrimSpace(obs.Language) == "" || strings.TrimSpace(obs.Tool) == "" {
+		return gateStackContext{}, stackDetectionFailureTerminal(nil,
+			"stack tool detection produced incomplete result; language and tool are required")
+	}
+	if got, want := strings.TrimSpace(obs.Language), strings.TrimSpace(expected.Language); got != want {
+		reason := "language mismatch: detected " + got + ", expected " + want
+		return gateStackContext{}, gateFailureTerminal(want, "stackdetect",
+			"BUILD_GATE_STACK_MISMATCH", reason, formatEvidenceForLog(obs.Evidence), nil, "")
+	}
+	normalized := contracts.StackExpectation{
+		Language: strings.TrimSpace(expected.Language),
+		Tool:     strings.TrimSpace(obs.Tool),
+		Release:  strings.TrimSpace(expected.Release),
+	}
 	return gateStackContext{
 		expectation: normalized,
 		language:    normalized.Language,

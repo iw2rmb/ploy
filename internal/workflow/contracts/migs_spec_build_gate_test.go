@@ -14,6 +14,7 @@ func TestParseMigSpecJSON_BuildGateStackConfig(t *testing.T) {
 		wantRelease string
 	}{
 		{name: "forced", mode: BuildGateStackModeForced, stackJSON: `"language": "java", "tool": "maven", "release": 11`, wantTool: "maven", wantRelease: "11"},
+		{name: "forced without tool", mode: BuildGateStackModeForced, stackJSON: `"language": "java", "release": "17"`, wantRelease: "17"},
 		{name: "strict full tuple", mode: BuildGateStackModeStrict, stackJSON: `"language": "java", "tool": "maven", "release": "17"`, wantTool: "maven", wantRelease: "17"},
 		{name: "strict partial tuple", mode: BuildGateStackModeStrict, stackJSON: `"language": "java", "release": "17"`, wantRelease: "17"},
 		{name: "fallback", mode: BuildGateStackModeFallback, stackJSON: `"language": "java", "tool": "maven", "release": "21"`, wantTool: "maven", wantRelease: "21"},
@@ -78,10 +79,18 @@ func TestParseMigSpecJSON_BuildGateStackConfig_Invalid(t *testing.T) {
 			wantErr: "build_gate.pre.stack",
 		},
 		{
-			name: "forced without tool",
+			name: "forced without language",
 			input: `{
 				"steps": [{"image": "ghcr.io/iw2rmb/ploy/mig:latest"}],
-				"build_gate": {"post": {"stack": {"mode": "forced", "language": "java", "release": "17"}}}
+				"build_gate": {"post": {"stack": {"mode": "forced", "release": "17"}}}
+			}`,
+			wantErr: "build_gate.post.stack",
+		},
+		{
+			name: "forced without release",
+			input: `{
+				"steps": [{"image": "ghcr.io/iw2rmb/ploy/mig:latest"}],
+				"build_gate": {"post": {"stack": {"mode": "forced", "language": "java"}}}
 			}`,
 			wantErr: "build_gate.post.stack",
 		},

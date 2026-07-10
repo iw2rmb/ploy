@@ -18,8 +18,8 @@ ploy help <command>            # Alternative help syntax
 Common command patterns:
 
 ```bash
-ploy run <spec-path>[:<step-name>] [<repo-path>|<namespace/repo[:ref]>] [--follow] [--apply] [--pull[=path]] [--gitlab-token-env ENV_NAME|--gitlab-token-prompt] # submit a single-repo run
-ploy run <name> [<repo-path>|<namespace/repo[:ref]>] [--follow] [--pull[=path]] [--gitlab-token-env ENV_NAME|--gitlab-token-prompt]                         # submit a named spec
+ploy run <spec-path>[:<step-name>] [<repo-path>|<namespace/repo[:ref]>] [--follow] [--apply] [--pull[=path]] [--build-gate-forced <lang>@<release>[/<tool>]] [--gitlab-token-env ENV_NAME|--gitlab-token-prompt] # submit a single-repo run
+ploy run <name> [<repo-path>|<namespace/repo[:ref]>] [--follow] [--pull[=path]] [--build-gate-forced-pre <lang>@<release>[/<tool>]] [--gitlab-token-env ENV_NAME|--gitlab-token-prompt]                         # submit a named spec
 ploy run <namespace/repo>:<name> [<repo-path>|<namespace/repo[:ref]>]                                    # submit a named spec from a repo
 ploy run <domain>/<namespace/repo>:<name> [<repo-path>|<namespace/repo[:ref]>]                           # submit a named spec from a domain/repo
 ploy run status <run-id> [--json|--follow]                                  # inspect a run
@@ -45,15 +45,21 @@ submit only one named step from the expanded spec. Named spec selectors use
 `<domain>/<namespace/repo>:<name>`. Add `@<sha-prefix>` to select a specific
 published version. Use repeatable `--env:<step> KEY=VALUE` flags to override
 `steps[].envs` for exactly one named step; later values win for the same
-step/key. Local repo paths submit `HEAD`; remote selectors use `namespace/repo`,
-optionally suffixed with `:<branch>` or `:<sha>`. Use `--follow` to wait for the
-run's terminal status, `--pull[=path]` to wait for success and download
-artifacts, or `--apply` to wait for success and apply the resulting patch to a
-clean local worktree. Use `--gitlab-token-env ENV_NAME` to submit a run-scoped
-ephemeral GitLab token from an environment variable, or `--gitlab-token-prompt`
-to enter it at the prompt. The flags are mutually exclusive. The server stores
-only the token's SHA-256 marker in run metadata and keeps the token in memory
-while the run or wave is active. Ephemeral GitLab tokens require
+step/key. Use `--build-gate-forced <lang>@<release>[/<tool>]` to override both
+Build Gate phases with `mode: forced`; use `--build-gate-forced-pre` and
+`--build-gate-forced-post` for phase-specific overrides. The global flag is
+mutually exclusive with phase-specific flags. These overrides preserve
+`build_gate.images`, set `build_gate.disabled: false`, and make named specs
+submit a mutated anonymous spec. Local repo paths submit `HEAD`; remote
+selectors use `namespace/repo`, optionally suffixed with `:<branch>` or
+`:<sha>`. Use `--follow` to wait for the run's terminal status,
+`--pull[=path]` to wait for success and download artifacts, or `--apply` to
+wait for success and apply the resulting patch to a clean local worktree. Use
+`--gitlab-token-env ENV_NAME` to submit a run-scoped ephemeral GitLab token from
+an environment variable, or `--gitlab-token-prompt` to enter it at the prompt.
+The flags are mutually exclusive. The server stores only the token's SHA-256
+marker in run metadata and keeps the token in memory while the run or wave is
+active. Ephemeral GitLab tokens require
 `PLOY_GITLAB_DOMAIN` and are accepted only for HTTPS repos on that configured
 host. The same token flags are available on `ploy run restart` to attach a
 fresh token marker to the restarted attempt.
