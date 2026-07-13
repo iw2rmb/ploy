@@ -95,11 +95,13 @@ func TestRunListCallsControlPlane(t *testing.T) {
 	if !strings.Contains(output, "Running") {
 		t.Errorf("output should contain Started: %s", output)
 	}
-	if strings.Contains(output, "MIG") || strings.Contains(output, "MOD") {
-		t.Errorf("output should not contain removed MIG/MOD columns, got: %s", output)
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+	if len(lines) == 0 {
+		t.Fatalf("output should contain a header row, got: %s", output)
 	}
-	if !strings.Contains(output, "ID") || !strings.Contains(output, "STATUS") || !strings.Contains(output, "SPEC") || !strings.Contains(output, "REPO") {
-		t.Errorf("output should contain ID STATUS SPEC REPO columns, got: %s", output)
+	headerFields := strings.Fields(lines[0])
+	if strings.Join(headerFields, " ") != "ID STATUS SPEC REPO" {
+		t.Errorf("output should contain only ID STATUS SPEC REPO columns, got header %q in output: %s", lines[0], output)
 	}
 	if strings.Contains(output, "DERIVED STATUS") {
 		t.Errorf("output should not contain derived status column: %s", output)
