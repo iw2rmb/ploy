@@ -108,7 +108,7 @@ type StepGateSpec struct {
 	ImageOverrides []BuildGateImageRule
 
 	// StackDetect configures stack detection behavior for this gate.
-	// mode=forced skips detection and uses the configured stack.
+	// mode=forced uses the configured language/release and detects tool when omitted.
 	// mode=strict requires detection to match the configured stack.
 	// mode=fallback uses detection when complete, otherwise the configured stack.
 	StackDetect *BuildGateStackConfig
