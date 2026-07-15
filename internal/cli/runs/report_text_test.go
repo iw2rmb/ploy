@@ -569,7 +569,7 @@ func TestRenderRunStatusReportTextExitOneLinerVariants(t *testing.T) {
 	failCode := int32(1)
 	failCode42 := int32(42)
 	longSummary := strings.Repeat("x", 210)
-	amataPromptError := "prompt is invalid at flow \"@for_each:main:1\""
+	amataProviderError := "exceeded retry limit, last status: 429 Too Many Requests, request id: req_123"
 
 	prefix42 := "└  Exit 42: "
 	indent42 := strings.Repeat(" ", len(prefix42))
@@ -608,8 +608,8 @@ func TestRenderRunStatusReportTextExitOneLinerVariants(t *testing.T) {
 				ExitCode:   &failCode,
 				DurationMs: 1000,
 			},
-			repoLastError: &amataPromptError,
-			contains:      []string{"└  Exit 1: ", amataPromptError},
+			repoLastError: &amataProviderError,
+			contains:      []string{"└  Exit 1: ", amataProviderError},
 		},
 		{
 			name: "gate without repo error emits nothing",

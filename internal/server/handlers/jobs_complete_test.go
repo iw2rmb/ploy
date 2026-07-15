@@ -196,10 +196,10 @@ func TestCompletion_TerminalErrorsSetLastError(t *testing.T) {
 				"status":    "Fail",
 				"exit_code": 1,
 				"stats": map[string]any{
-					"error": `prompt is invalid at flow "@for_each:main:1"`,
+					"error": "exceeded retry limit, last status: 429 Too Many Requests, request id: req_123",
 				},
 			},
-			wantSubstrings: []string{`prompt is invalid at flow "@for_each:main:1"`},
+			wantSubstrings: []string{"429 Too Many Requests"},
 		},
 		{
 			name: "error with stats error",

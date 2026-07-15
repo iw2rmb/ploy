@@ -58,9 +58,10 @@ func TestRunStatusReportTextContract(t *testing.T) {
 	assertx.Contains(t, out, "/v1/jobs/"+migJobID.String()+"/logs")
 	assertx.Contains(t, out, "⣾")
 	assertx.Contains(t, out, "✗")
-	assertx.Contains(t, out, "└  Exit 137: ")
-	assertx.Contains(t, out, "compile failed at step 2")
+	assertx.Contains(t, out, "└  Exit 1: ")
+	assertx.Contains(t, out, "429 Too Many Requests")
 	assertx.NotContains(t, out, "Exit 0")
+	assertx.NotContains(t, out, "Exit 137")
 }
 
 func newRunStatusReportServer(t *testing.T, runID domaintypes.RunID, migID domaintypes.MigID, specID domaintypes.SpecID, repoID domaintypes.RepoID, preGateID domaintypes.JobID, migJobID domaintypes.JobID, postGateID domaintypes.JobID) *httptest.Server {
@@ -81,7 +82,7 @@ func newRunStatusReportServer(t *testing.T, runID domaintypes.RunID, migID domai
 				"base_ref":          "main",
 				"source_commit_sha": "0123456789abcdef0123456789abcdef01234567",
 				"attempt":           1,
-				"last_error":        "compile\nfailed at step 2",
+				"last_error":        "exceeded retry limit, last status: 429 Too Many Requests, request id: req_123",
 				"created_at":        "2026-02-24T08:00:00Z",
 			})
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/runs/"+runID.String()+"/status":
@@ -90,7 +91,7 @@ func newRunStatusReportServer(t *testing.T, runID domaintypes.RunID, migID domai
 				"state":  "running",
 				"stages": map[string]any{
 					preGateID.String(): map[string]any{
-						"state":        "failed",
+						"state":        "succeeded",
 						"attempts":     1,
 						"max_attempts": 1,
 						"artifacts": map[string]any{
@@ -98,7 +99,7 @@ func newRunStatusReportServer(t *testing.T, runID domaintypes.RunID, migID domai
 						},
 					},
 					migJobID.String(): map[string]any{
-						"state":        "succeeded",
+						"state":        "failed",
 						"attempts":     1,
 						"max_attempts": 1,
 						"artifacts": map[string]any{
@@ -125,8 +126,8 @@ func newRunStatusReportServer(t *testing.T, runID domaintypes.RunID, migID domai
 						"job_image":   "ghcr.io/acme/pre-gate:1",
 						"next_id":     migJobID.String(),
 						"node_id":     nil,
-						"status":      "Failed",
-						"exit_code":   137,
+						"status":      "Success",
+						"exit_code":   0,
 						"duration_ms": 1500,
 					},
 					{
@@ -136,10 +137,9 @@ func newRunStatusReportServer(t *testing.T, runID domaintypes.RunID, migID domai
 						"job_image":   "ghcr.io/acme/mig:1",
 						"next_id":     postGateID.String(),
 						"node_id":     nil,
-						"status":      "Success",
-						"exit_code":   0,
+						"status":      "Failed",
+						"exit_code":   1,
 						"duration_ms": 1200,
-						"bug_summary": "Missing dependency lockfile",
 					},
 					{
 						"job_id":      postGateID.String(),
