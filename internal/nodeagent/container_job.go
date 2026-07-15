@@ -362,6 +362,8 @@ func (r *runController) runContainerJob(
 	}
 	if runErr != nil {
 		statsBuilder.Error(normalizedExecutionError(runErr))
+	} else if result.ExitCode != 0 {
+		statsBuilder.Error(deriveContainerExitError(req, result, artifactPaths(req.RunID, req.JobID)))
 	}
 
 	stats := statsBuilder.MustBuild()
