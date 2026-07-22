@@ -362,7 +362,13 @@ func (r *runController) buildGateStats(gateResult *contracts.BuildGateStageMetad
 
 	if gateResult != nil {
 		// Use Gate helper for simple gate stats.
-		builder.Gate(gateResultPassed(gateResult), duration.Milliseconds())
+		passed := gateResultPassed(gateResult)
+		builder.Gate(passed, duration.Milliseconds())
+		if !passed {
+			if errorText := gateFailureErrorFromMetadata(gateResult); errorText != "" {
+				builder.Error(errorText)
+			}
+		}
 		if resources := runStatsJobResourcesFromGateUsage(gateResult.Resources); resources != nil {
 			builder.JobResources(resources)
 		}
