@@ -28,21 +28,29 @@ var (
 	kotlinOptionsJvmTargetBlockRegex = regexp.MustCompile(`(?s)kotlinOptions\s*\{.*?jvmTarget\s*=\s*(?:"?(\d+(?:\.\d+)?)"?|(?:JavaVersion\.)?VERSION_([0-9_]+))`)
 
 	javaVersionValuePattern = `(?:JavaLanguageVersion\.of\(\s*"?(\d+(?:\.\d+)?)"?\s*\)|"?(\d+(?:\.\d+)?)"?|(?:JavaVersion\.)?VERSION_([0-9_]+))`
+	gradlePropertyPattern   = `([A-Za-z_][A-Za-z0-9_]*)`
 
 	// java { toolchain { languageVersion = JavaLanguageVersion.of(17) } }
 	// java { toolchain { languageVersion = JavaVersion.VERSION_17 } }
-	toolchainLanguageVersionAssignRegex = regexp.MustCompile(`(?s)toolchain\s*\{.*?\blanguageVersion\s*=\s*` + javaVersionValuePattern)
+	toolchainLanguageVersionAssignRegex         = regexp.MustCompile(`(?s)toolchain\s*\{.*?\blanguageVersion\s*=\s*` + javaVersionValuePattern)
+	toolchainLanguageVersionAssignPropertyRegex = regexp.MustCompile(`(?s)toolchain\s*\{.*?\blanguageVersion\s*=\s*JavaLanguageVersion\.of\(\s*` + gradlePropertyPattern + `\s*\)`)
 
 	// java { toolchain { languageVersion.set(JavaLanguageVersion.of(17)) } }
 	// java { toolchain { languageVersion.set(JavaVersion.VERSION_17) } }
-	toolchainLanguageVersionSetRegex = regexp.MustCompile(`(?s)toolchain\s*\{.*?\blanguageVersion\.set\(\s*` + javaVersionValuePattern + `\s*\)`)
+	toolchainLanguageVersionSetRegex                = regexp.MustCompile(`(?s)toolchain\s*\{.*?\blanguageVersion\.set\(\s*` + javaVersionValuePattern + `\s*\)`)
+	toolchainLanguageVersionSetFactoryPropertyRegex = regexp.MustCompile(`(?s)toolchain\s*\{.*?\blanguageVersion\.set\(\s*JavaLanguageVersion\.of\(\s*` + gradlePropertyPattern + `\s*\)\s*\)`)
+	toolchainLanguageVersionSetPropertyRegex        = regexp.MustCompile(`(?s)toolchain\s*\{.*?\blanguageVersion\.set\(\s*` + gradlePropertyPattern + `\s*\)`)
 
 	// dependencyManagerRootExtension { javaVersion = JavaVersion.VERSION_21 }.
 	// Also supports JavaLanguageVersion.of(21), unqualified VERSION_21, and numeric values.
-	javaVersionAssignmentRegex = regexp.MustCompile(`\bjavaVersion\s*=\s*` + javaVersionValuePattern)
+	javaVersionAssignmentRegex                = regexp.MustCompile(`\bjavaVersion\s*=\s*` + javaVersionValuePattern)
+	javaVersionAssignmentFactoryPropertyRegex = regexp.MustCompile(`\bjavaVersion\s*=\s*JavaLanguageVersion\.of\(\s*` + gradlePropertyPattern + `\s*\)`)
+	javaVersionAssignmentPropertyRegex        = regexp.MustCompile(`(?m)\bjavaVersion\s*=\s*` + gradlePropertyPattern + `\s*(?:$|[;}])`)
 
 	// dependencyManagerRootExtension { javaVersion.set(JavaVersion.VERSION_21) }.
-	javaVersionSetRegex = regexp.MustCompile(`\bjavaVersion\.set\(\s*` + javaVersionValuePattern + `\s*\)`)
+	javaVersionSetRegex                = regexp.MustCompile(`\bjavaVersion\.set\(\s*` + javaVersionValuePattern + `\s*\)`)
+	javaVersionSetFactoryPropertyRegex = regexp.MustCompile(`\bjavaVersion\.set\(\s*JavaLanguageVersion\.of\(\s*` + gradlePropertyPattern + `\s*\)\s*\)`)
+	javaVersionSetPropertyRegex        = regexp.MustCompile(`\bjavaVersion\.set\(\s*` + gradlePropertyPattern + `\s*\)`)
 
 	// Dynamic logic patterns that should trigger "unknown".
 	dynamicPatterns = []*regexp.Regexp{
@@ -75,6 +83,7 @@ func detectGradle(ctx context.Context, workspace, gradlePath string) (*Observati
 
 	text := string(content)
 	relativePath := relPath(workspace, gradlePath)
+	propertyResolver := gradlePropertiesResolver{workspace: workspace}
 
 	// 1. Check sourceCompatibility and targetCompatibility.
 	sourceVersion := extractCompatibilityVersion(sourceCompatibilityRegex, text)
@@ -158,20 +167,37 @@ func detectGradle(ctx context.Context, workspace, gradlePath string) (*Observati
 	}
 
 	// 3. Java toolchain languageVersion.
-	toolchainVersionAssign := extractCompatibilityVersion(toolchainLanguageVersionAssignRegex, text)
-	toolchainVersionSet := extractCompatibilityVersion(toolchainLanguageVersionSetRegex, text)
+	toolchainAssignRef := extractGradleVersionRef(
+		toolchainLanguageVersionAssignRegex,
+		text,
+		toolchainLanguageVersionAssignPropertyRegex,
+	)
+	toolchainSetRef := extractGradleVersionRef(
+		toolchainLanguageVersionSetRegex,
+		text,
+		toolchainLanguageVersionSetFactoryPropertyRegex,
+		toolchainLanguageVersionSetPropertyRegex,
+	)
+	toolchainVersionAssign, toolchainAssignEvidence, err := resolveGradleVersionRef(
+		&propertyResolver, toolchainAssignRef, relativePath, "java.toolchain.languageVersion",
+	)
+	if err != nil {
+		return nil, err
+	}
+	toolchainVersionSet, toolchainSetEvidence, err := resolveGradleVersionRef(
+		&propertyResolver, toolchainSetRef, relativePath, "java.toolchain.languageVersion",
+	)
+	if err != nil {
+		return nil, err
+	}
 	if toolchainVersionAssign != "" || toolchainVersionSet != "" {
 		var evidence []EvidenceItem
 
 		if toolchainVersionAssign != "" {
-			evidence = append(evidence, EvidenceItem{
-				Path: relativePath, Key: "java.toolchain.languageVersion", Value: toolchainVersionAssign,
-			})
+			evidence = append(evidence, toolchainAssignEvidence...)
 		}
 		if toolchainVersionSet != "" {
-			evidence = append(evidence, EvidenceItem{
-				Path: relativePath, Key: "java.toolchain.languageVersion", Value: toolchainVersionSet,
-			})
+			evidence = append(evidence, toolchainSetEvidence...)
 		}
 
 		// If both forms are present, they must match.
@@ -197,20 +223,38 @@ func detectGradle(ctx context.Context, workspace, gradlePath string) (*Observati
 	}
 
 	// 4. Generic javaVersion assignment often used by custom Gradle extensions.
-	javaVersionAssignment := extractCompatibilityVersion(javaVersionAssignmentRegex, text)
-	javaVersionSet := extractCompatibilityVersion(javaVersionSetRegex, text)
+	javaVersionAssignmentRef := extractGradleVersionRef(
+		javaVersionAssignmentRegex,
+		text,
+		javaVersionAssignmentFactoryPropertyRegex,
+		javaVersionAssignmentPropertyRegex,
+	)
+	javaVersionSetRef := extractGradleVersionRef(
+		javaVersionSetRegex,
+		text,
+		javaVersionSetFactoryPropertyRegex,
+		javaVersionSetPropertyRegex,
+	)
+	javaVersionAssignment, javaVersionAssignmentEvidence, err := resolveGradleVersionRef(
+		&propertyResolver, javaVersionAssignmentRef, relativePath, "javaVersion",
+	)
+	if err != nil {
+		return nil, err
+	}
+	javaVersionSet, javaVersionSetEvidence, err := resolveGradleVersionRef(
+		&propertyResolver, javaVersionSetRef, relativePath, "javaVersion",
+	)
+	if err != nil {
+		return nil, err
+	}
 	if javaVersionAssignment != "" || javaVersionSet != "" {
 		var evidence []EvidenceItem
 
 		if javaVersionAssignment != "" {
-			evidence = append(evidence, EvidenceItem{
-				Path: relativePath, Key: "javaVersion", Value: javaVersionAssignment,
-			})
+			evidence = append(evidence, javaVersionAssignmentEvidence...)
 		}
 		if javaVersionSet != "" {
-			evidence = append(evidence, EvidenceItem{
-				Path: relativePath, Key: "javaVersion", Value: javaVersionSet,
-			})
+			evidence = append(evidence, javaVersionSetEvidence...)
 		}
 
 		if javaVersionAssignment != "" && javaVersionSet != "" && javaVersionAssignment != javaVersionSet {
@@ -261,6 +305,42 @@ func detectGradle(ctx context.Context, workspace, gradlePath string) (*Observati
 		Reason:  "unknown",
 		Message: "no supported Java version configuration found in " + filepath.Base(gradlePath),
 	}
+}
+
+type gradleVersionRef struct {
+	value    string
+	property string
+}
+
+func extractGradleVersionRef(literalRegex *regexp.Regexp, text string, propertyRegexes ...*regexp.Regexp) gradleVersionRef {
+	if value := extractCompatibilityVersion(literalRegex, text); value != "" {
+		return gradleVersionRef{value: value}
+	}
+	for _, propertyRegex := range propertyRegexes {
+		matches := propertyRegex.FindStringSubmatch(text)
+		if len(matches) >= 2 && matches[1] != "" {
+			return gradleVersionRef{property: matches[1]}
+		}
+	}
+	return gradleVersionRef{}
+}
+
+func resolveGradleVersionRef(
+	resolver *gradlePropertiesResolver,
+	ref gradleVersionRef,
+	buildPath string,
+	buildKey string,
+) (string, []EvidenceItem, error) {
+	value, propertyEvidence, err := resolver.resolve(ref)
+	if err != nil || value == "" {
+		return value, nil, err
+	}
+
+	evidence := []EvidenceItem{{Path: buildPath, Key: buildKey, Value: value}}
+	if propertyEvidence != nil {
+		evidence = append(evidence, *propertyEvidence)
+	}
+	return value, evidence, nil
 }
 
 type gradleVersionCatalog struct {

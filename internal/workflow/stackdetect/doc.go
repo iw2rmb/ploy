@@ -40,6 +40,9 @@
 // Gradle (build.gradle/.kts) precedence:
 //  1. sourceCompatibility / targetCompatibility (must match if both present)
 //  2. kotlinOptions.jvmTarget (best-effort; used only if source/target are absent)
+//  3. java.toolchain.languageVersion
+//  4. javaVersion assignment
+//  5. gradle/libs.versions.toml [versions].jvmTarget
 //
 // # Error Handling
 //
@@ -52,5 +55,8 @@
 // This package performs static analysis only:
 //   - Maven property interpolation is limited to local parent POMs
 //   - Gradle detection uses regex patterns (no Groovy/Kotlin parsing)
-//   - Dynamic version logic in Gradle (variables, findProperty, etc.) returns "unknown"
+//   - Direct references from supported Java-version fields to numeric values in
+//     root gradle.properties are resolved
+//   - Other dynamic Gradle version logic (expressions, providers, environment
+//     variables, etc.) returns "unknown"
 package stackdetect
