@@ -25,6 +25,7 @@ This design covers:
 - Gradle configuration in `/Users/v.v.kovalev/@gitlab/ploy/deploy/images`;
 - node-local Gradle Build Cache configuration;
 - dependency-cache seeding and immutable publication;
+- portable Java classpath materialization for downstream jobs;
 - Gradle cache cleanup in Ploy and the deploy host services;
 - recovery of abandoned job cache directories.
 
@@ -35,7 +36,9 @@ This design does not cover:
 - replacement of the Gradle Build Cache server product;
 - a cache shared between different worker nodes;
 - artifact-repository retention;
-- changes to project-owned Gradle task input and output declarations.
+- changes to project-owned Gradle task input and output declarations;
+- protection against deliberate cache credential disclosure by project code
+  that Ploy authorizes as a cache producer.
 
 ## Observed Constraint
 
@@ -57,6 +60,10 @@ caches.
 The per-node Gradle Build Cache service is running and reachable through the
 `gradle-build-cache` network name. Current job specifications do not provide
 its URL to Gradle.
+
+The Gradle gate writes absolute dependency paths to `/share/java.classpath`.
+Downstream ORW jobs read this file without running Gradle. The current shared
+`/root/.gradle` mount keeps these paths valid across jobs.
 
 ## Target Contract
 
@@ -84,26 +91,69 @@ from that directory.
 Each node can expose one active dependency-cache generation at:
 
 ```text
-$PLOY_BUILDGATE_CACHE_ROOT/java/gradle/dependencies/<generation>/modules-2
+$PLOY_BUILDGATE_CACHE_ROOT/java/gradle/dependencies/<generation>/
+└── modules-2/
 ```
 
-A job mounts the resolved generation read-only at
+A job mounts the complete generation directory read-only at
 `/opt/ploy/gradle-dependencies`. Ploy sets
 `GRADLE_RO_DEP_CACHE=/opt/ploy/gradle-dependencies` in that job.
 
 The active generation is immutable. A running job keeps the same resolved
 generation path for its complete lifetime.
 
-A dedicated seeder writes only to a staging Gradle User Home. The seeder
-publishes a generation by copying `modules-2` without lock files or
-`gc.properties`, then making the copied generation read-only.
+A dedicated seeder writes only to a staging Gradle User Home. An explicit
+deploy maintenance action triggers the seeder with immutable project source
+snapshots and their exact Gradle wrappers.
+
+The seed configuration lists every source snapshot and Gradle version that
+must populate the generation. The seeder records these inputs in a generation
+manifest.
+
+The seeder starts from a copy of the active generation when one exists. It
+runs every configured seed build against the staging User Home. It uses each
+seed build's wrapper to populate the cache formats required by that Gradle
+version.
+
+The seeder publishes a generation by copying the staging `caches/modules-2`
+directory without lock files or `gc.properties`. It then makes the complete
+generation read-only.
 
 The seeder never writes the active generation. The seeder publishes only after
-its Gradle build completes. An incomplete seed is discarded.
+all configured seed builds and version checks succeed. An incomplete seed is
+discarded.
+
+Before publication, the seeder runs each seed input offline with an empty
+writable User Home and the copied generation as `GRADLE_RO_DEP_CACHE`.
+Publication fails if a configured seed cannot resolve its dependencies from
+that generation.
 
 A dependency that is absent from the read-only generation is downloaded into
 the job-owned writable Gradle User Home. A cache miss cannot modify shared
 state.
+
+### Run-owned Java classpath
+
+The Gradle gate materializes external classpath entries before Ploy deletes the
+job-owned Gradle User Home. The materialized files use this run-owned layout:
+
+```text
+/share/java-classpath/<content-sha256>/<file-name>
+```
+
+The gate copies each classpath file or directory outside `/workspace` to this
+layout. A directory hash covers its relative names and file content. The
+content hash prevents collisions between entries with the same name.
+
+The gate writes the materialized `/share` path to `/share/java.classpath`.
+Workspace output paths remain below `/workspace`.
+
+`/share/java.classpath` cannot contain paths below `/root/.gradle` or
+`/opt/ploy/gradle-dependencies`. A downstream job needs only the existing
+workspace and `/share` mounts.
+
+The run owns the materialized classpath. Ploy removes it with the run. The
+materialized classpath is a job handoff artifact, not a shared cache.
 
 ### Per-node task-output cache
 
@@ -130,6 +180,11 @@ All Gradle jobs can read remote task outputs. Only `pre_gate` sets push to true
 and supplies writer credentials. `post_gate` and migration jobs set push to
 false and receive no writer credentials.
 
+Ploy treats project code executed in an authorized `pre_gate` as trusted for
+node-local cache writes. The credential boundary prevents accidental writes by
+other job roles. It does not protect against deliberate disclosure by an
+authorized producer.
+
 The HTTP service owns entry retention and size enforcement inside its Docker
 volume. Ploy and the host cleanup script do not remove individual files from
 that volume.
@@ -144,8 +199,11 @@ An image entrypoint installs the policy into the empty job-owned Gradle User
 Home before the first Gradle process starts. The installation is idempotent and
 changes only Ploy-owned configuration files.
 
-Every supported Gradle execution path performs the same installation. Gate,
-migration, and ORW images cannot depend on files hidden below a runtime mount.
+Every image that invokes Gradle performs the same installation. This includes
+Gradle gate images and Gradle-capable migration images.
+
+The ORW Gradle-lane image does not install Gradle policy because it does not
+run Gradle. It consumes the run-owned Java classpath from `/share`.
 
 The remote build-cache init script reads the node-projected endpoint. For a
 producer, the script also reads the node-projected writer credentials. A
@@ -168,10 +226,8 @@ generation only when no running job has that generation mounted.
 The HTTP Gradle Build Cache service owns remote task-output cleanup. Its target
 size and maximum artifact size remain deployment settings.
 
-The host cleanup service remains an emergency storage backstop. It can remove
-complete abandoned job directories after it verifies that no Ploy job is
-running. It cannot delete files inside Gradle-managed caches, active dependency
-generations, or the HTTP cache volume.
+The host cleanup service continues to clean non-Gradle node storage. It does
+not traverse `$PLOY_BUILDGATE_CACHE_ROOT/java/gradle`.
 
 ## Enforcement
 
@@ -186,6 +242,10 @@ and require different writable sources.
 Container mount construction will set the dependency generation mount to
 read-only. Tests will reject a writable dependency generation.
 
+The Gradle cache layout will require the dependency mount source to contain a
+`modules-2` child. It will set `GRADLE_RO_DEP_CACHE` to the parent container
+path.
+
 The node agent will use an allowlisted node-cache configuration type. The type
 will project the HTTP endpoint into a Gradle job. It will project the writer
 credentials and push permission only into `pre_gate`.
@@ -194,16 +254,21 @@ The node-cache configuration will use node-only source names that are distinct
 from the job environment names. Server and per-run environment cannot override
 the projected endpoint, credentials, or push permission.
 
+The classpath collector will reject a final dependency path outside
+`/workspace` and `/share/java-classpath`. Tests will cover a dependency from
+the read-only cache and a dependency from the job-owned writable cache.
+
 Image tests will start a container with an empty directory mounted at
 `/root/.gradle`. The test will verify that the effective Gradle process loads
 the Ploy init scripts and configures the expected remote endpoint.
 
 The dependency seeder will publish through a staging directory and one atomic
-generation switch. A failed copy or failed permission change will leave the
-previous generation active.
+generation switch. The generation manifest will record seed source identities
+and Gradle versions. A failed seed, offline check, copy, or permission change
+will leave the previous generation active.
 
-The deploy cleanup test will fail if the host script traverses an active
-dependency generation or deletes below a Gradle `caches` directory.
+The deploy cleanup test will fail if the host script traverses
+`$PLOY_BUILDGATE_CACHE_ROOT/java/gradle`.
 
 ## Implementation Slice
 
@@ -228,12 +293,21 @@ Owning worktrees: `/Users/v.v.kovalev/@iw2rmb/ploy` and
 `/Users/v.v.kovalev/@gitlab/ploy/deploy`.
 
 Change Ploy to allocate `jobs/<job-id>` as the only writable Gradle User Home.
-Move image policy to an immutable image directory. Change every Gradle image
-entrypoint to install that policy into the job home before Gradle starts.
+Move image policy to an immutable image directory. Change each image that
+invokes Gradle to install that policy into the job home before Gradle starts.
+
+Change the gate classpath collector to materialize external entries below
+`/share/java-classpath` and write only portable paths before the gate exits.
+After the container stops, collect required outputs and delete the job home.
+
+Remove host-side Gradle init-script seeding after every Gradle-capable image
+uses the immutable policy source. Retire legacy release-lane homes as complete
+directories while the node is drained.
 
 Deliver the Ploy and image changes as one combined rollout. The step is
 complete when two concurrent same-release jobs use different writable homes
-and both load the Ploy init scripts.
+and both load the Ploy init scripts. A downstream ORW job must read the
+materialized classpath after the producing job home is absent.
 
 ### Step 3: Connect the per-node task-output cache
 
@@ -246,50 +320,61 @@ read-write user. Add a typed node-agent projection that supplies writer access
 only to `pre_gate`. Remove the Gradle build-cache variables from the documented
 control-plane global configuration surface.
 
-The step is complete when a clean producer stores a task output, a separate
-job reports `FROM-CACHE`, and a non-producer cannot send an HTTP cache write.
+The step is complete when a clean producer stores a task output and a separate
+job reports `FROM-CACHE`. An anonymous HTTP write must fail. A non-producer job
+must receive no writer credential and must configure push as false.
 
 ### Step 4: Publish a read-only dependency generation
 
 Owning worktrees: `/Users/v.v.kovalev/@iw2rmb/ploy` and
 `/Users/v.v.kovalev/@gitlab/ploy/deploy`.
 
-Add the deploy-owned seeder with staging and immutable generation publication.
-Add the Ploy read-only mount and `GRADLE_RO_DEP_CACHE` projection. Resolve the
-active generation to a physical path before container creation.
+Add the deploy-owned seeder with explicit seed inputs, a Gradle-version
+manifest, offline verification, staging, immutable generation publication, and
+safe retirement of old generations. Add the Ploy read-only generation-root
+mount and `GRADLE_RO_DEP_CACHE` projection. Resolve the active generation to a
+physical path before container creation.
 
 The step is complete when two concurrent jobs read one generation, a missing
 dependency is written only to each job home, and the active generation remains
-unchanged for both jobs.
+unchanged for both jobs. Every configured seed input must resolve offline with
+its recorded Gradle version. A retired generation must remain until its last
+container mount is gone.
 
-### Step 5: Make job completion the cleanup trigger
+### Step 5: Recover abandoned job homes when idle
 
-Owning worktrees: `/Users/v.v.kovalev/@iw2rmb/ploy` and
-`/Users/v.v.kovalev/@gitlab/ploy/deploy`.
+Owning worktree: `/Users/v.v.kovalev/@iw2rmb/ploy`.
 
-Delete the current job's Gradle User Home after container shutdown and output
-collection. Run an abandoned-home and retired-generation sweep when the node
-has no active jobs. Keep the hourly host timer as a whole-directory recovery
-backstop.
+After every job, run an abandoned-home sweep when the node has no active jobs.
+Run the same sweep during node startup reconciliation. Keep retired
+dependency-generation removal in the deploy-owned seeder lifecycle.
 
-The step is complete when a finished job leaves no writable Gradle home, an
-active job blocks the idle sweep, and a node restart can remove an abandoned
-home without modifying shared cache contents.
+The step is complete when an active job blocks the idle sweep and a node restart
+can remove an abandoned home without modifying shared cache contents.
 
 ## Completion
 
 The complete design is implemented when all of these checks pass:
 
 - Two concurrent jobs never share a writable Gradle mount source.
-- Every Gradle image works with an initially empty job Gradle User Home.
+- Every image that invokes Gradle works with an initially empty job Gradle User
+  Home.
 - Every shared dependency mount is read-only.
+- `GRADLE_RO_DEP_CACHE` names a directory that contains `modules-2`.
 - A dependency miss changes only the job-owned Gradle User Home.
 - An active dependency generation cannot change.
+- Every published generation passes offline resolution for its recorded seed
+  inputs and Gradle versions.
+- `/share/java.classpath` contains no Gradle User Home or read-only cache path.
+- An ORW job consumes the materialized classpath after the gate job home is
+  deleted.
 - A remote task-output cache hit is visible in Ploy gate metadata.
-- A non-producer job cannot push a remote task output.
+- An anonymous HTTP cache write is rejected.
+- A non-producer job receives no writer credential and configures push as
+  false.
 - Job completion removes the complete job-owned Gradle User Home.
 - Idle cleanup removes abandoned whole directories only.
-- Host cleanup does not descend into Gradle-managed cache entries.
+- Host cleanup does not traverse the Gradle cache root.
 - The existing gate, Java tool-cache, deploy service, and Gradle cache E2E tests
   pass.
 - A beta canary completes pre-gate, migration jobs, and post-gate for two

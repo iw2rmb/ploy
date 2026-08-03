@@ -63,6 +63,10 @@ The complete mount is created by
 same mount policy is used for non-gate Java jobs by
 [`buildJavaToolCacheMountsFromStackEnv`](../internal/workflow/step/java_tool_cache_mounts.go).
 
+The gate writes absolute dependency paths to `/share/java.classpath`. The ORW
+Gradle-lane image does not run Gradle, but it reads this classpath file. Its
+mount of the same `/root/.gradle` directory keeps the dependency paths valid.
+
 ### 3. Image Gradle configuration
 
 Each Gradle gate image stores `gradle.properties` and `cache.init.gradle` in
@@ -209,6 +213,16 @@ configuration.
 
 This difference currently leaves the per-node HTTP service disconnected. It
 also makes image ownership of Gradle policy unreliable.
+
+### Cache-dependent classpath
+
+The generated Java classpath can contain absolute paths below
+`/root/.gradle`. A later job needs the same cache content at the same path even
+when that job does not run Gradle.
+
+The classpath contract therefore depends on the shared writable User Home. A
+change to private job homes must first copy dependency files to a run-owned
+path and write that portable path to `/share/java.classpath`.
 
 ### Unrestricted remote writes
 
