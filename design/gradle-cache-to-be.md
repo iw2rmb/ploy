@@ -135,25 +135,32 @@ state.
 ### Run-owned Java classpath
 
 The Gradle gate materializes external classpath entries before Ploy deletes the
-job-owned Gradle User Home. The materialized files use this run-owned layout:
+job-owned Gradle User Home. Ploy stores these entries outside the uploaded
+artifact tree:
 
 ```text
-/share/java-classpath/<content-sha256>/<file-name>
+$PLOYD_CACHE_HOME/runs/<run-id>/runtime-share/java-classpath/<content-sha256>/<file-name>
 ```
+
+Ploy mounts the run-owned `runtime-share` directory at `/run-share` in the gate
+and each downstream Java job that consumes the classpath.
 
 The gate copies each classpath file or directory outside `/workspace` to this
 layout. A directory hash covers its relative names and file content. The
 content hash prevents collisions between entries with the same name.
 
-The gate writes the materialized `/share` path to `/share/java.classpath`.
-Workspace output paths remain below `/workspace`.
+The gate writes each materialized `/run-share/java-classpath` path to the
+existing `/share/java.classpath` manifest. Workspace output paths remain below
+`/workspace`.
 
 `/share/java.classpath` cannot contain paths below `/root/.gradle` or
 `/opt/ploy/gradle-dependencies`. A downstream job needs only the existing
-workspace and `/share` mounts.
+workspace and `/share` mounts plus the run-owned `/run-share` mount.
 
-The run owns the materialized classpath. Ploy removes it with the run. The
-materialized classpath is a job handoff artifact, not a shared cache.
+The repository artifact upload includes `/share/java.classpath`, but it excludes
+the complete `runtime-share` directory. Ploy removes `runtime-share` with the
+run. The materialized classpath is a runtime handoff, not a durable artifact or
+shared cache.
 
 ### Per-node task-output cache
 
@@ -203,7 +210,8 @@ Every image that invokes Gradle performs the same installation. This includes
 Gradle gate images and Gradle-capable migration images.
 
 The ORW Gradle-lane image does not install Gradle policy because it does not
-run Gradle. It consumes the run-owned Java classpath from `/share`.
+run Gradle. It reads the classpath manifest from `/share` and the materialized
+entries from `/run-share`.
 
 The remote build-cache init script reads the node-projected endpoint. For a
 producer, the script also reads the node-projected writer credentials. A
@@ -255,8 +263,13 @@ from the job environment names. Server and per-run environment cannot override
 the projected endpoint, credentials, or push permission.
 
 The classpath collector will reject a final dependency path outside
-`/workspace` and `/share/java-classpath`. Tests will cover a dependency from
-the read-only cache and a dependency from the job-owned writable cache.
+`/workspace` and `/run-share/java-classpath`. Tests will cover a dependency
+from the read-only cache and a dependency from the job-owned writable cache.
+
+Ploy will create `runtime-share` as a sibling of `artifacts`, not a child. The
+repository artifact bundler will continue to archive only `artifacts`. A bundle
+test will use a materialized dependency larger than the upload limit and verify
+that the dependency is absent from the archive.
 
 Image tests will start a container with an empty directory mounted at
 `/root/.gradle`. The test will verify that the effective Gradle process loads
@@ -296,8 +309,10 @@ Change Ploy to allocate `jobs/<job-id>` as the only writable Gradle User Home.
 Move image policy to an immutable image directory. Change each image that
 invokes Gradle to install that policy into the job home before Gradle starts.
 
-Change the gate classpath collector to materialize external entries below
-`/share/java-classpath` and write only portable paths before the gate exits.
+Add a non-uploaded run `runtime-share` directory and mount it at `/run-share`
+for the gate and downstream classpath consumers. Change the gate classpath
+collector to materialize external entries below
+`/run-share/java-classpath` and write only portable paths before the gate exits.
 After the container stops, collect required outputs and delete the job home.
 
 Remove host-side Gradle init-script seeding after every Gradle-capable image
@@ -365,7 +380,9 @@ The complete design is implemented when all of these checks pass:
 - An active dependency generation cannot change.
 - Every published generation passes offline resolution for its recorded seed
   inputs and Gradle versions.
-- `/share/java.classpath` contains no Gradle User Home or read-only cache path.
+- `/share/java.classpath` contains only `/workspace` or
+  `/run-share/java-classpath` entries.
+- Repository artifact bundles exclude `runtime-share` dependency content.
 - An ORW job consumes the materialized classpath after the gate job home is
   deleted.
 - A remote task-output cache hit is visible in Ploy gate metadata.
