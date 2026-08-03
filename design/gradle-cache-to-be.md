@@ -163,7 +163,9 @@ The mount builder creates this projection:
 | job-type node config | `/ploy/config/job` | read-only |
 
 The workspace mount remains controlled by the existing input contract. The
-generic mount builder rejects duplicate or overlapping targets.
+generic mount builder rejects duplicate targets and undeclared overlaps. It
+permits a nested target only when an existing typed Ploy mount contract owns
+that target, such as a read-only Hydra home input below the resolved `HOME`.
 
 Ploy resolves `HOME` from the job manifest. The default remains `/root`. Ploy
 mounts the complete job `home` directory at that path.
@@ -265,7 +267,7 @@ Every Gradle-capable image sets:
 GRADLE_USER_HOME=$PLOY_JOB_CACHE_DIR/gradle/user-home
 ```
 
-The image entrypoint creates this directory. The entrypoint copies Ploy-owned
+The image entrypoint creates this directory. The entrypoint copies deploy-owned
 Gradle policy from an immutable image directory such as
 `/usr/local/lib/ploy/gradle-user-home`.
 
@@ -399,12 +401,16 @@ Ploy will define one `JobDirectories` value in `internal/nodeagent`. The value
 will be the only authority for job `cache`, `home`, `in`, `out`, `staging`,
 `tmp`, logs, diff, and inspection paths.
 
-Ploy will pass one typed `JobMounts` value to ordinary container execution and
-gate execution. Loose path arguments and the gate share-directory context
-value will be removed.
+`internal/nodeagent` will convert `JobDirectories` into one typed
+`internal/workflow/step.JobMounts` value. Only `JobMounts` will cross into
+ordinary container execution and gate execution. Loose path arguments and the
+gate share-directory context value will be removed. This dependency direction
+keeps `internal/workflow/step` independent of `internal/nodeagent`.
 
 The common mount builder will reject an empty source, a relative target, a
-target escape, a duplicate target, or an unexpected writable node mount.
+target escape, a duplicate target, an undeclared overlap, or an unexpected
+writable node mount. A typed nested-mount contract is the only permitted
+overlap.
 
 The node-cache mount will always be read-only. No job manifest can change its
 source, target, or mode.
@@ -457,8 +463,9 @@ layout and `ploy mig fetch` returns the unchanged logical artifact layout.
 Owning worktrees: `/Users/v.v.kovalev/@iw2rmb/ploy-gradle` and
 `/Users/v.v.kovalev/@gitlab/ploy/deploy`.
 
-Add the typed common mount builder. Pass `JobDirectories` directly to gate and
-migration execution. Add `PLOY_NODE_CACHE_ROOT` and
+Add the typed common mount builder. Convert `JobDirectories` to
+`internal/workflow/step.JobMounts` in `internal/nodeagent`. Pass only
+`JobMounts` to gate and migration execution. Add `PLOY_NODE_CACHE_ROOT` and
 `PLOY_NODE_JOB_CONFIG_ROOT` to node deployment. Create empty deploy-owned
 roots. Add the generic job-cache, node-cache, and node-configuration mounts.
 Keep the complete job-home and runtime-share mounts disabled in this slice.
@@ -542,8 +549,10 @@ Owning worktree: `/Users/v.v.kovalev/@iw2rmb/ploy-gradle`.
 Delete `buildJavaToolCacheMountsFromStackEnv`, `buildToolCacheMounts`,
 `toolCacheTarget`, Gradle and Maven home constants, and the Gradle cache-hit
 mount and parser. Remove `PLOY_BUILDGATE_CACHE_ROOT` from Ploy configuration
-and diagnostics. Keep stack values only where they select images or build
-commands.
+and diagnostics. Replace its storage aggregate with `PLOY_NODE_CACHE_ROOT`.
+Update the current environment documentation, node-maintenance documentation,
+and heartbeat and diagnostics API descriptions in the same slice. Keep stack
+values only where they select images or build commands.
 
 The slice is complete when Ploy runtime code contains no Gradle or Maven cache
 path and all cache tests use only the generic job-storage contract.
