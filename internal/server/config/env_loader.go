@@ -22,6 +22,11 @@ func LoadFromEnv() (Config, error) {
 	cfg.ObjectStore.Region = strings.TrimSpace(os.Getenv("PLOY_OBJECTSTORE_REGION"))
 	cfg.GitLab.Domain = strings.TrimSpace(os.Getenv("PLOY_GITLAB_DOMAIN"))
 	cfg.GitLab.Token = strings.TrimSpace(os.Getenv("PLOY_GITLAB_TOKEN"))
+	var err error
+	cfg.SpecRepos, err = parseSpecRepos(os.Getenv("PLOY_SPECS_REPOS"))
+	if err != nil {
+		return Config{}, err
+	}
 
 	if secure, ok, err := envBool("PLOY_OBJECTSTORE_SECURE"); err != nil {
 		return Config{}, err

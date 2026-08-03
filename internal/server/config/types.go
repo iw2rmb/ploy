@@ -2,6 +2,8 @@ package config
 
 import (
 	"time"
+
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // HTTPConfig configures the HTTP server.
@@ -82,6 +84,9 @@ type GitLabConfig struct {
 	Domain string
 	Token  string
 }
+
+// SpecRepos contains the startup-only Git repositories used for named-spec discovery.
+type SpecRepos []domaintypes.RepoURL
 
 // ObjectStoreConfig configures S3-compatible object storage (e.g., Garage).
 type ObjectStoreConfig struct {

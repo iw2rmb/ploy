@@ -31,7 +31,7 @@ ploy mig run <mig-id|name> [<namespace/repo[:ref]> ...] [--failed] [--follow] [-
 ploy spec schema                                                             # print the mig JSON Schema
 ploy spec validate docs/schemas/mig.example.yaml                             # validate a mig spec
 ploy spec push [<git-folder>]                                                # publish named specs from a clean git worktree
-ploy spec ls [--archived]                                                    # list published named specs
+ploy spec ls                                                                 # list named specs from configured Git repositories
 ploy spec <selector>[@sha] (--archive|--unarchive)                           # archive or unarchive a named spec version
 ```
 
@@ -72,8 +72,9 @@ fresh token marker to the restarted attempt.
 committed `.yaml` files, selects roots with `apiVersion: ploy.mig/v1alpha1` and
 a non-empty `name`, prepares the spec the same way as `ploy run`, and records
 the `origin` source, `HEAD` SHA, and commit date. Untracked or modified files
-stop publishing before any spec is uploaded. `ploy spec ls` lists the latest
-published named specs.
+stop publishing before any spec is uploaded. `ploy spec ls` refreshes the
+configured spec repositories and lists tracked named YAML files from their
+default branches.
 
 When follow mode is used, the CLI displays a summarized per-repo job graph that
 refreshes until the run reaches a terminal state. The job graph shows step index,
@@ -160,11 +161,8 @@ ploy spec push
 # Publish named specs from another worktree.
 ploy spec push ../migs
 
-# List latest published named specs.
+# List named specs from configured Git repositories.
 ploy spec ls
-
-# List archived named specs.
-ploy spec ls --archived
 
 # Archive or unarchive a named spec version.
 ploy spec github.com/acme/service:upgrade-java@01234567 --archive
@@ -173,7 +171,7 @@ ploy spec github.com/acme/service:upgrade-java@01234567 --unarchive
 
 Publish output shows `updated` for newly stored specs and `skipped` when the
 same name, source, and SHA already exists. List output shows `NAME`, `SOURCE`,
-`SHA`, and `DATE`. Archive and unarchive resolve active or archived rows,
+`PATH`, and `SHA`. Archive and unarchive resolve active or archived rows,
 respectively, then update the resolved named spec row.
 
 ## Mig Project Runs

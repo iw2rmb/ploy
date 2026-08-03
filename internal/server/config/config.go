@@ -11,6 +11,7 @@ type Config struct {
 	Logging     LoggingConfig     `yaml:"logging"`
 	Postgres    PostgresConfig    `yaml:"postgres"`
 	GitLab      GitLabConfig      `yaml:"-"`
+	SpecRepos   SpecRepos         `yaml:"-"`
 	ObjectStore ObjectStoreConfig `yaml:"object_store"`
 	FilePath    string            `yaml:"-"`
 }

@@ -22,6 +22,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/server/recovery"
 	"github.com/iw2rmb/ploy/internal/server/scheduler"
 	"github.com/iw2rmb/ploy/internal/server/snapshot"
+	"github.com/iw2rmb/ploy/internal/server/speccatalog"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/store/ttlworker"
 	"github.com/iw2rmb/ploy/internal/store/wavescheduler"
@@ -29,6 +30,19 @@ import (
 
 // run executes the main server loop and blocks until the context is canceled.
 func run(ctx context.Context, cfg config.Config, st store.Store, authorizer *auth.Authorizer, tokenSecret string, bs blobstore.Store, bp *blobpersist.Service) error {
+	gitAuth := gitauth.Options{
+		GitLabPAT:    cfg.GitLab.Token,
+		GitLabDomain: cfg.GitLab.Domain,
+	}
+	specCatalog, err := speccatalog.New(speccatalog.Options{
+		Repositories: []domaintypes.RepoURL(cfg.SpecRepos),
+		CacheDir:     os.Getenv("PLOYD_CACHE_HOME"),
+		Auth:         gitAuth,
+	})
+	if err != nil {
+		return fmt.Errorf("create named spec catalog: %w", err)
+	}
+
 	// Initialize PKI manager for certificate renewal.
 	rotator := pki.NewDefaultRotator(slog.Default())
 	pkiManager, err := pki.New(pki.Options{
@@ -196,10 +210,6 @@ func run(ctx context.Context, cfg config.Config, st store.Store, authorizer *aut
 		configHolder.AddBundleMapping(e.Hash, e.BundleID)
 	}
 
-	gitAuth := gitauth.Options{
-		GitLabPAT:    cfg.GitLab.Token,
-		GitLabDomain: cfg.GitLab.Domain,
-	}
 	snapshotService := snapshot.NewService(snapshot.Options{
 		CacheDir:    os.Getenv("PLOYD_CACHE_HOME"),
 		Auth:        gitAuth,
@@ -207,7 +217,7 @@ func run(ctx context.Context, cfg config.Config, st store.Store, authorizer *aut
 	})
 
 	// Register HTTP routes.
-	handlers.RegisterRoutes(httpSrv, st, bs, bp, eventsService, configHolder, tokenSecret, gitAuth, snapshotService, gitLabTokenRegistry)
+	handlers.RegisterRoutes(httpSrv, st, bs, bp, eventsService, configHolder, tokenSecret, gitAuth, snapshotService, specCatalog, gitLabTokenRegistry)
 
 	// Initialize metrics server.
 	metricsSrv := metrics.NewServer(cfg.Metrics.Listen)

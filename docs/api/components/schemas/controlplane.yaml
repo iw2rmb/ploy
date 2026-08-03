@@ -1506,8 +1506,30 @@ NamedSpecListResponse:
     specs:
       type: array
       items:
-        $ref: "#/NamedSpecSummary"
+        $ref: "#/NamedSpecCatalogEntry"
   required: [specs]
+
+NamedSpecCatalogEntry:
+  type: object
+  additionalProperties: false
+  properties:
+    name:
+      type: string
+      minLength: 1
+    description:
+      type: string
+    source:
+      type: string
+      minLength: 1
+      description: Credential-free normalized repository URL.
+    path:
+      type: string
+      minLength: 1
+      description: Repository-relative YAML path.
+    sha:
+      type: string
+      pattern: "^[0-9a-f]{40}$"
+  required: [name, description, source, path, sha]
 
 NamedSpecResolveResponse:
   allOf:

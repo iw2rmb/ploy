@@ -15,6 +15,7 @@ import (
 
 	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	"github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/server/speccatalog"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -188,56 +189,38 @@ func TestNamedSpecs_Publish(t *testing.T) {
 }
 
 func TestNamedSpecs_List(t *testing.T) {
-	now := time.Date(2026, 6, 18, 10, 21, 0, 0, time.UTC)
 	tests := []struct {
 		name       string
 		query      string
-		store      *specStore
+		catalog    *specCatalogStub
 		wantStatus int
-		verify     func(t *testing.T, st *specStore, rr *httptest.ResponseRecorder)
+		wantBody   string
+		verify     func(t *testing.T, catalog *specCatalogStub, rr *httptest.ResponseRecorder)
 	}{
 		{
-			name: "default named",
-			store: func() *specStore {
-				st := &specStore{}
-				st.listLatestNamedSpecs.val = []store.ListLatestNamedSpecsRow{testNamedListRow("spec001", "upgrade-java", "github.com", "acme/service", now)}
-				return st
-			}(),
+			name: "live catalog",
+			catalog: &specCatalogStub{entries: []speccatalog.Entry{{
+				Name: "upgrade-java", Description: "Upgrade Java", Source: "https://github.com/acme/service", Path: "migs/upgrade.yaml", SHA: "0123456789abcdef0123456789abcdef01234567",
+			}}},
 			wantStatus: http.StatusOK,
-			verify: func(t *testing.T, st *specStore, rr *httptest.ResponseRecorder) {
+			verify: func(t *testing.T, catalog *specCatalogStub, rr *httptest.ResponseRecorder) {
 				t.Helper()
-				assertCalled(t, "ListLatestNamedSpecs", st.listLatestNamedSpecs.called)
-				if st.listLatestNamedSpecs.params.Limit != 50 || st.listLatestNamedSpecs.params.Offset != 0 {
-					t.Fatalf("pagination=%+v, want default", st.listLatestNamedSpecs.params)
-				}
-				if st.listLatestNamedSpecs.params.Archived {
-					t.Fatalf("archived=%v, want false", st.listLatestNamedSpecs.params.Archived)
+				if catalog.calls != 1 {
+					t.Fatalf("catalog List calls = %d, want 1", catalog.calls)
 				}
 				resp := decodeBody[domainapi.NamedSpecListResponse](t, rr)
-				if len(resp.Specs) != 1 || resp.Specs[0].Source.Domain != "github.com" {
+				if len(resp.Specs) != 1 || resp.Specs[0].Source != "https://github.com/acme/service" || resp.Specs[0].Path != "migs/upgrade.yaml" {
 					t.Fatalf("response mismatch: %+v", resp)
 				}
 			},
 		},
 		{
-			name:  "archived true",
-			query: "archived=true",
-			store: func() *specStore {
-				st := &specStore{}
-				st.listLatestNamedSpecs.val = []store.ListLatestNamedSpecsRow{testNamedListRow("spec002", "upgrade-java", "github.com", "acme/service", now)}
-				return st
-			}(),
-			wantStatus: http.StatusOK,
-			verify: func(t *testing.T, st *specStore, rr *httptest.ResponseRecorder) {
-				t.Helper()
-				if !st.listLatestNamedSpecs.params.Archived {
-					t.Fatalf("archived=%v, want true", st.listLatestNamedSpecs.params.Archived)
-				}
-			},
+			name:       "empty configuration unavailable",
+			catalog:    &specCatalogStub{err: speccatalog.ErrNoRepositories},
+			wantStatus: http.StatusServiceUnavailable,
+			wantBody:   "no spec repositories configured",
 		},
-		{name: "named false rejected", store: &specStore{}, query: "named=false", wantStatus: http.StatusBadRequest},
-		{name: "bad limit rejected", store: &specStore{}, query: "named=true&limit=bad", wantStatus: http.StatusBadRequest},
-		{name: "bad archived rejected", store: &specStore{}, query: "archived=maybe", wantStatus: http.StatusBadRequest},
+		{name: "legacy query rejected", catalog: &specCatalogStub{}, query: "archived=true", wantStatus: http.StatusBadRequest, wantBody: "does not accept query parameters"},
 	}
 
 	for _, tt := range tests {
@@ -246,13 +229,27 @@ func TestNamedSpecs_List(t *testing.T) {
 			if tt.query != "" {
 				path += "?" + tt.query
 			}
-			rr := doRequest(t, listNamedSpecsHandler(tt.store), http.MethodGet, path, nil)
+			rr := doRequest(t, listNamedSpecsHandler(tt.catalog), http.MethodGet, path, nil)
 			assertStatus(t, rr, tt.wantStatus)
+			if tt.wantBody != "" && !strings.Contains(rr.Body.String(), tt.wantBody) {
+				t.Fatalf("body = %q, want containing %q", rr.Body.String(), tt.wantBody)
+			}
 			if tt.verify != nil {
-				tt.verify(t, tt.store, rr)
+				tt.verify(t, tt.catalog, rr)
 			}
 		})
 	}
+}
+
+type specCatalogStub struct {
+	entries []speccatalog.Entry
+	err     error
+	calls   int
+}
+
+func (s *specCatalogStub) List(context.Context) ([]speccatalog.Entry, error) {
+	s.calls++
+	return s.entries, s.err
 }
 
 func TestNamedSpecs_Resolve(t *testing.T) {

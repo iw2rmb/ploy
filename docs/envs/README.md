@@ -319,6 +319,7 @@ TLS/mTLS (config YAML):
 GitLab source hydration:
 - `PLOY_GITLAB_DOMAIN` — GitLab base URL or host. Optional; when set, token auth is scoped to that host.
 - `PLOY_GITLAB_TOKEN` — GitLab Personal Access Token used by `ployd` for source resolution and snapshot materialization.
+- `PLOY_SPECS_REPOS` — Optional comma-separated full Git repository URLs used by `ploy spec ls`. `ployd` reads the list at startup, rejects empty entries and normalized duplicates, and refreshes each repository's default branch beneath `PLOYD_CACHE_HOME`. The cache falls back to the system temporary directory when `PLOYD_CACHE_HOME` is unset.
 
 ### Authentication
 

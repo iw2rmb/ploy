@@ -15,6 +15,7 @@ import (
 
 	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/server/speccatalog"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
@@ -95,40 +96,29 @@ func publishNamedSpecHandler(st store.Store) http.HandlerFunc {
 	}
 }
 
-func listNamedSpecsHandler(st store.Store) http.HandlerFunc {
+func listNamedSpecsHandler(catalog specCatalogLister) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		named := strings.TrimSpace(r.URL.Query().Get("named"))
-		if named != "" && named != "true" {
-			writeHTTPError(w, http.StatusBadRequest, "named must be true when provided")
+		if r.URL.RawQuery != "" {
+			writeHTTPError(w, http.StatusBadRequest, "spec listing does not accept query parameters")
 			return
 		}
-		limit, offset, err := parsePagination(r)
+		entries, err := catalog.List(r.Context())
 		if err != nil {
-			writeHTTPError(w, http.StatusBadRequest, "%s", err)
+			writeHTTPError(w, http.StatusServiceUnavailable, "%s", err)
 			return
 		}
-		archived, err := parseBoolQueryDefault(r, "archived", false)
-		if err != nil {
-			writeHTTPError(w, http.StatusBadRequest, "%s", err)
-			return
-		}
-
-		rows, err := st.ListLatestNamedSpecs(r.Context(), store.ListLatestNamedSpecsParams{Limit: limit, Offset: offset, Archived: archived})
-		if err != nil {
-			serverError(w, "list named specs", "list named specs", err)
-			return
-		}
-		summaries := make([]domainapi.NamedSpecSummary, 0, len(rows))
-		for _, row := range rows {
-			summary, err := namedSpecSummaryFromListRow(row, false)
-			if err != nil {
-				serverError(w, "list named specs", "decode named spec source", err, "spec_id", row.ID)
-				return
-			}
-			summaries = append(summaries, summary)
+		summaries := make([]domainapi.NamedSpecCatalogEntry, 0, len(entries))
+		for _, entry := range entries {
+			summaries = append(summaries, domainapi.NamedSpecCatalogEntry{
+				Name: entry.Name, Description: entry.Description, Source: entry.Source, Path: entry.Path, SHA: entry.SHA,
+			})
 		}
 		writeJSON(w, http.StatusOK, domainapi.NamedSpecListResponse{Specs: summaries})
 	}
+}
+
+type specCatalogLister interface {
+	List(context.Context) ([]speccatalog.Entry, error)
 }
 
 func resolveNamedSpecHandler(st store.Store) http.HandlerFunc {

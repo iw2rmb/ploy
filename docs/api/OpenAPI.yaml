@@ -353,6 +353,8 @@ components:
       $ref: "./components/schemas/controlplane.yaml#/PublishNamedSpecRequest"
     NamedSpecSummary:
       $ref: "./components/schemas/controlplane.yaml#/NamedSpecSummary"
+    NamedSpecCatalogEntry:
+      $ref: "./components/schemas/controlplane.yaml#/NamedSpecCatalogEntry"
     NamedSpecListResponse:
       $ref: "./components/schemas/controlplane.yaml#/NamedSpecListResponse"
     NamedSpecResolveResponse:

@@ -22,14 +22,8 @@ import (
 	"github.com/iw2rmb/ploy/internal/cli/specpayload"
 	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	"gopkg.in/yaml.v3"
+	"github.com/iw2rmb/ploy/internal/specdiscovery"
 )
-
-type namedSpecProbe struct {
-	APIVersion  string `yaml:"apiVersion"`
-	Name        string `yaml:"name"`
-	Description string `yaml:"description"`
-}
 
 type gitSpecSource struct {
 	Worktree    string
@@ -121,19 +115,9 @@ func handleList(args []string, stdout, stderr io.Writer) error {
 		printListUsage(stderr)
 		return nil
 	}
-	archived := false
-	for _, arg := range args {
-		switch arg {
-		case "--archived":
-			archived = true
-		default:
-			printListUsage(stderr)
-			return errors.New("spec ls takes only --archived")
-		}
-	}
-	if len(args) > 1 {
+	if len(args) > 0 {
 		printListUsage(stderr)
-		return errors.New("spec ls takes at most one flag")
+		return errors.New("spec ls takes no arguments")
 	}
 
 	ctx := context.Background()
@@ -141,7 +125,7 @@ func handleList(args []string, stdout, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	specs, err := listNamedSpecs(ctx, base, client, archived)
+	specs, err := listNamedSpecs(ctx, base, client)
 	if err != nil {
 		return err
 	}
@@ -150,7 +134,7 @@ func handleList(args []string, stdout, stderr io.Writer) error {
 }
 
 func printListUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy spec ls [--archived]")
+	_, _ = fmt.Fprintln(w, "Usage: ploy spec ls")
 }
 
 func parseSpecArchiveArgs(args []string) (specArchiveAction, bool, error) {
@@ -221,7 +205,7 @@ func printArchiveUsage(w io.Writer) {
 
 type discoveredNamedSpec struct {
 	path  string
-	probe namedSpecProbe
+	probe specdiscovery.Entry
 }
 
 func discoverNamedSpecs(ctx context.Context, worktree string) ([]discoveredNamedSpec, error) {
@@ -248,45 +232,12 @@ func discoverNamedSpecs(ctx context.Context, worktree string) ([]discoveredNamed
 	return matches, nil
 }
 
-func probeNamedSpecFile(path string) (namedSpecProbe, bool) {
+func probeNamedSpecFile(path string) (specdiscovery.Entry, bool) {
 	data, err := common.ReadFileRooted(path)
 	if err != nil {
-		return namedSpecProbe{}, false
+		return specdiscovery.Entry{}, false
 	}
-	var doc yaml.Node
-	if err := yaml.Unmarshal(data, &doc); err != nil {
-		return namedSpecProbe{}, false
-	}
-	root := &doc
-	if doc.Kind == yaml.DocumentNode && len(doc.Content) > 0 {
-		root = doc.Content[0]
-	}
-	if root.Kind != yaml.MappingNode {
-		return namedSpecProbe{}, false
-	}
-	var probe namedSpecProbe
-	for i := 0; i+1 < len(root.Content); i += 2 {
-		key := root.Content[i]
-		value := root.Content[i+1]
-		if key.Kind != yaml.ScalarNode || value.Kind != yaml.ScalarNode {
-			continue
-		}
-		switch key.Value {
-		case "apiVersion":
-			probe.APIVersion = value.Value
-		case "name":
-			probe.Name = value.Value
-		case "description":
-			probe.Description = value.Value
-		}
-	}
-	probe.APIVersion = strings.TrimSpace(probe.APIVersion)
-	probe.Name = strings.TrimSpace(probe.Name)
-	probe.Description = strings.TrimSpace(probe.Description)
-	if probe.APIVersion != "ploy.mig/v1alpha1" || probe.Name == "" {
-		return namedSpecProbe{}, false
-	}
-	return probe, true
+	return specdiscovery.ProbeYAML(data)
 }
 
 func resolveGitSpecSource(ctx context.Context, gitFolder string) (gitSpecSource, error) {
@@ -402,12 +353,8 @@ func publishNamedSpec(ctx context.Context, base *url.URL, client *http.Client, r
 	return summary, nil
 }
 
-func listNamedSpecs(ctx context.Context, base *url.URL, client *http.Client, archived bool) ([]domainapi.NamedSpecSummary, error) {
+func listNamedSpecs(ctx context.Context, base *url.URL, client *http.Client) ([]domainapi.NamedSpecCatalogEntry, error) {
 	endpoint := base.JoinPath("v1", "specs")
-	q := endpoint.Query()
-	q.Set("named", "true")
-	q.Set("archived", fmt.Sprintf("%t", archived))
-	endpoint.RawQuery = q.Encode()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("list named specs: build request: %w", err)
@@ -515,11 +462,11 @@ func renderPushResults(out io.Writer, specs []domainapi.NamedSpecSummary) {
 	_ = w.Flush()
 }
 
-func renderListResults(out io.Writer, specs []domainapi.NamedSpecSummary) {
+func renderListResults(out io.Writer, specs []domainapi.NamedSpecCatalogEntry) {
 	w := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
-	_, _ = fmt.Fprintln(w, "NAME\tSOURCE\tSHA\tDATE")
+	_, _ = fmt.Fprintln(w, "NAME\tSOURCE\tPATH\tSHA")
 	for _, spec := range specs {
-		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", spec.Name, renderNamedSpecSource(spec.Source), shortSHA(spec.SHA), formatSpecTime(spec.CreatedAt))
+		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", spec.Name, domaintypes.NormalizeRepoURLSchemless(spec.Source), spec.Path, shortSHA(spec.SHA))
 	}
 	_ = w.Flush()
 }

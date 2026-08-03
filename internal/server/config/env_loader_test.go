@@ -40,6 +40,7 @@ func TestLoadFromEnv_Overrides(t *testing.T) {
 	t.Setenv("PLOYD_SCHEDULER_STALE_JOB_RECOVERY_INTERVAL", "45s")
 	t.Setenv("PLOY_GITLAB_DOMAIN", "https://gitlab.example.com")
 	t.Setenv("PLOY_GITLAB_TOKEN", "glpat-test")
+	t.Setenv("PLOY_SPECS_REPOS", " https://gitlab.example.com/platform/migs.git , ssh://git@gitlab.example.com/team/scenarios.git ")
 
 	cfg, err := config.LoadFromEnv()
 	if err != nil {
@@ -71,6 +72,43 @@ func TestLoadFromEnv_Overrides(t *testing.T) {
 	}
 	if cfg.GitLab.Token != "glpat-test" {
 		t.Fatalf("GitLab.Token = %q", cfg.GitLab.Token)
+	}
+	if len(cfg.SpecRepos) != 2 || cfg.SpecRepos[0].String() != "https://gitlab.example.com/platform/migs.git" || cfg.SpecRepos[1].String() != "ssh://git@gitlab.example.com/team/scenarios.git" {
+		t.Fatalf("SpecRepos = %#v, want two trimmed repositories", cfg.SpecRepos)
+	}
+}
+
+func TestLoadFromEnv_SpecReposValidation(t *testing.T) {
+	tests := []struct {
+		name        string
+		value       string
+		errContains string
+	}{
+		{name: "whitespace configures none", value: "   "},
+		{name: "empty entry", value: "https://git.example.com/acme/one.git, ,https://git.example.com/acme/two.git", errContains: "entry 2 is empty"},
+		{name: "duplicate normalized URL", value: "https://git.example.com/acme/one.git,https://git.example.com/acme/one/", errContains: "duplicate repository"},
+		{name: "unsupported scheme", value: "git://git.example.com/acme/one.git", errContains: "invalid repository URL"},
+		{name: "missing repository path", value: "https://git.example.com", errContains: "invalid repository URL"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			clearEnvForLoadFromEnv(t)
+			t.Setenv("PLOY_SPECS_REPOS", tt.value)
+			cfg, err := config.LoadFromEnv()
+			if tt.errContains == "" {
+				if err != nil {
+					t.Fatalf("LoadFromEnv() error = %v", err)
+				}
+				if len(cfg.SpecRepos) != 0 {
+					t.Fatalf("SpecRepos = %#v, want empty", cfg.SpecRepos)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), tt.errContains) {
+				t.Fatalf("LoadFromEnv() error = %v, want containing %q", err, tt.errContains)
+			}
+		})
 	}
 }
 
@@ -114,6 +152,7 @@ func clearEnvForLoadFromEnv(t *testing.T) {
 		"PLOY_OBJECTSTORE_REGION",
 		"PLOY_GITLAB_DOMAIN",
 		"PLOY_GITLAB_TOKEN",
+		"PLOY_SPECS_REPOS",
 		"PLOYD_HTTP_LISTEN",
 		"PLOYD_HTTP_READ_TIMEOUT",
 		"PLOYD_HTTP_WRITE_TIMEOUT",

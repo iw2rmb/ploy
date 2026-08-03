@@ -75,13 +75,11 @@ func newAppSpecServer(t *testing.T) *httptest.Server {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.URL.Path == "/v1/specs" && r.Method == http.MethodGet:
-			_ = json.NewEncoder(w).Encode(domainapi.NamedSpecListResponse{Specs: []domainapi.NamedSpecSummary{{
-				ID:                "spec001",
-				Name:              "upgrade-java",
-				Source:            domainapi.NamedSpecSource{Domain: "github.com", Repo: "acme/service"},
-				SHA:               "0123456789abcdef0123456789abcdef01234567",
-				SourceCommittedAt: time.Date(2026, 6, 19, 12, 0, 0, 0, time.UTC),
-				CreatedAt:         time.Date(2026, 6, 19, 12, 1, 0, 0, time.UTC),
+			_ = json.NewEncoder(w).Encode(domainapi.NamedSpecListResponse{Specs: []domainapi.NamedSpecCatalogEntry{{
+				Name:   "upgrade-java",
+				Source: "https://github.com/acme/service",
+				Path:   "migs/upgrade.yaml",
+				SHA:    "0123456789abcdef0123456789abcdef01234567",
 			}}})
 		case r.URL.Path == "/v1/specs" && r.Method == http.MethodPost:
 			var req domainapi.PublishNamedSpecRequest

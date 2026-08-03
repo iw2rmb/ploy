@@ -8,6 +8,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/server/events"
 	"github.com/iw2rmb/ploy/internal/server/gitlabtokens"
 	"github.com/iw2rmb/ploy/internal/server/httpserver"
+	"github.com/iw2rmb/ploy/internal/server/speccatalog"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -21,10 +22,11 @@ type routeDeps struct {
 	gitAuth       gitauth.Options
 	gitLabTokens  *gitlabtokens.Registry
 	snapshots     repoSnapshotWriter
+	specCatalog   specCatalogLister
 }
 
 // RegisterRoutes mounts all HTTP endpoints on the given server.
-func RegisterRoutes(s *httpserver.Server, st store.Store, bs blobstore.Store, bp *blobpersist.Service, eventsService *events.Service, configHolder *ConfigHolder, tokenSecret string, gitAuth gitauth.Options, snapshots repoSnapshotWriter, registries ...*gitlabtokens.Registry) {
+func RegisterRoutes(s *httpserver.Server, st store.Store, bs blobstore.Store, bp *blobpersist.Service, eventsService *events.Service, configHolder *ConfigHolder, tokenSecret string, gitAuth gitauth.Options, snapshots repoSnapshotWriter, specCatalog speccatalog.Catalog, registries ...*gitlabtokens.Registry) {
 	var registry *gitlabtokens.Registry
 	if len(registries) > 0 {
 		registry = registries[0]
@@ -39,6 +41,7 @@ func RegisterRoutes(s *httpserver.Server, st store.Store, bs blobstore.Store, bp
 		gitAuth:       gitAuth,
 		gitLabTokens:  registry,
 		snapshots:     snapshots,
+		specCatalog:   specCatalog,
 	}
 	registerHealthRoutes(s, deps)
 	registerConfigRoutes(s, deps)
@@ -150,7 +153,7 @@ func registerSpecBundleRoutes(s *httpserver.Server, deps routeDeps) {
 
 func registerGlobalSpecRoutes(s *httpserver.Server, deps routeDeps) {
 	s.RegisterRouteFunc("POST /v1/specs", publishNamedSpecHandler(deps.st), auth.RoleControlPlane)
-	s.RegisterRouteFunc("GET /v1/specs", listNamedSpecsHandler(deps.st), auth.RoleControlPlane)
+	s.RegisterRouteFunc("GET /v1/specs", listNamedSpecsHandler(deps.specCatalog), auth.RoleControlPlane)
 	s.RegisterRouteFunc("GET /v1/specs/resolve", resolveNamedSpecHandler(deps.st), auth.RoleControlPlane)
 	s.RegisterRouteFunc("PATCH /v1/specs/{spec_id}", updateNamedSpecHandler(deps.st), auth.RoleControlPlane)
 }

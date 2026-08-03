@@ -281,12 +281,12 @@ func TestHandleSpecPush(t *testing.T) {
 
 func TestHandleSpecList(t *testing.T) {
 	tests := []struct {
-		name         string
-		args         []string
-		wantArchived string
+		name    string
+		args    []string
+		wantErr string
 	}{
-		{name: "active default", args: []string{"ls"}, wantArchived: "false"},
-		{name: "archived flag", args: []string{"ls", "--archived"}, wantArchived: "true"},
+		{name: "live catalog", args: []string{"ls"}},
+		{name: "archive filter removed", args: []string{"ls", "--archived"}, wantErr: "spec ls takes no arguments"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -296,10 +296,17 @@ func TestHandleSpecList(t *testing.T) {
 
 			var stdout bytes.Buffer
 			var stderr bytes.Buffer
-			if err := Handle(tt.args, &stdout, &stderr); err != nil {
+			err := Handle(tt.args, &stdout, &stderr)
+			if tt.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+					t.Fatalf("Handle(%v) error = %v, want containing %q", tt.args, err, tt.wantErr)
+				}
+				return
+			}
+			if err != nil {
 				t.Fatalf("Handle(%v) error = %v", tt.args, err)
 			}
-			for _, want := range []string{"NAME", "SOURCE", "upgrade-java", "github.com/acme/service", "01234567", "2026-06-19T12:01:00Z"} {
+			for _, want := range []string{"NAME", "SOURCE", "PATH", "upgrade-java", "github.com/acme/service", "migs/upgrade.yaml", "01234567"} {
 				if !strings.Contains(stdout.String(), want) {
 					t.Fatalf("stdout = %q, want containing %q", stdout.String(), want)
 				}
@@ -307,8 +314,8 @@ func TestHandleSpecList(t *testing.T) {
 			if strings.Contains(stdout.String(), "012345678") {
 				t.Fatalf("stdout = %q, want 8-character SHA rendering", stdout.String())
 			}
-			if got := server.listArchived(); got != tt.wantArchived {
-				t.Fatalf("archived query = %q, want %q", got, tt.wantArchived)
+			if got := server.listQuery(); got != "" {
+				t.Fatalf("list query = %q, want empty", got)
 			}
 		})
 	}
@@ -455,7 +462,7 @@ type namedSpecTestServer struct {
 	mu       sync.Mutex
 	captured []domainapi.PublishNamedSpecRequest
 	skipped  map[string]bool
-	listQ    map[string]string
+	listQ    string
 	resolveQ map[string]string
 	patch    *domainapi.UpdateNamedSpecRequest
 }
@@ -504,20 +511,14 @@ func newNamedSpecTestServer(t *testing.T, skipped map[string]bool) *namedSpecTes
 				Skipped:           skipped,
 			})
 		case r.URL.Path == "/v1/specs" && r.Method == http.MethodGet:
-			if got := r.URL.Query().Get("named"); got != "true" {
-				http.Error(w, "missing named=true", http.StatusBadRequest)
-				return
-			}
 			s.mu.Lock()
-			s.listQ = queryMap(r, "archived")
+			s.listQ = r.URL.RawQuery
 			s.mu.Unlock()
-			_ = json.NewEncoder(w).Encode(domainapi.NamedSpecListResponse{Specs: []domainapi.NamedSpecSummary{{
-				ID:                "spec001",
-				Name:              "upgrade-java",
-				Source:            domainapi.NamedSpecSource{Domain: "github.com", Repo: "acme/service"},
-				SHA:               "0123456789abcdef0123456789abcdef01234567",
-				SourceCommittedAt: time.Date(2026, 6, 19, 12, 0, 0, 0, time.UTC),
-				CreatedAt:         time.Date(2026, 6, 19, 12, 1, 0, 0, time.UTC),
+			_ = json.NewEncoder(w).Encode(domainapi.NamedSpecListResponse{Specs: []domainapi.NamedSpecCatalogEntry{{
+				Name:   "upgrade-java",
+				Source: "https://github.com/acme/service",
+				Path:   "migs/upgrade.yaml",
+				SHA:    "0123456789abcdef0123456789abcdef01234567",
 			}}})
 		case r.URL.Path == "/v1/specs/resolve" && r.Method == http.MethodGet:
 			s.mu.Lock()
@@ -566,10 +567,10 @@ func (s *namedSpecTestServer) requests() []domainapi.PublishNamedSpecRequest {
 	return append([]domainapi.PublishNamedSpecRequest(nil), s.captured...)
 }
 
-func (s *namedSpecTestServer) listArchived() string {
+func (s *namedSpecTestServer) listQuery() string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.listQ["archived"]
+	return s.listQ
 }
 
 func (s *namedSpecTestServer) resolveQuery() map[string]string {
