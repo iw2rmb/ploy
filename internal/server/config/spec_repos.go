@@ -46,9 +46,16 @@ func validateSpecRepoURL(raw string) (domaintypes.RepoURL, string, error) {
 		return "", "", fmt.Errorf("invalid repository URL")
 	}
 	switch strings.ToLower(parsed.Scheme) {
-	case "https", "ssh":
+	case "https":
 		if parsed.Host == "" || strings.Trim(parsed.Path, "/") == "" {
 			return "", "", fmt.Errorf("invalid repository URL")
+		}
+	case "ssh":
+		if parsed.Host == "" || strings.Trim(parsed.Path, "/") == "" {
+			return "", "", fmt.Errorf("invalid repository URL")
+		}
+		if _, passwordSet := parsed.User.Password(); passwordSet {
+			return "", "", fmt.Errorf("password-bearing SSH repository URLs are not supported")
 		}
 	case "file":
 		if parsed.Path == "" || !strings.HasPrefix(parsed.Path, "/") {

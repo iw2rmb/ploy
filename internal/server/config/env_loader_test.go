@@ -80,15 +80,17 @@ func TestLoadFromEnv_Overrides(t *testing.T) {
 
 func TestLoadFromEnv_SpecReposValidation(t *testing.T) {
 	tests := []struct {
-		name        string
-		value       string
-		errContains string
+		name           string
+		value          string
+		errContains    string
+		errNotContains string
 	}{
 		{name: "whitespace configures none", value: "   "},
 		{name: "empty entry", value: "https://git.example.com/acme/one.git, ,https://git.example.com/acme/two.git", errContains: "entry 2 is empty"},
 		{name: "duplicate normalized URL", value: "https://git.example.com/acme/one.git,https://git.example.com/acme/one/", errContains: "duplicate repository"},
 		{name: "unsupported scheme", value: "git://git.example.com/acme/one.git", errContains: "invalid repository URL"},
 		{name: "missing repository path", value: "https://git.example.com", errContains: "invalid repository URL"},
+		{name: "SSH password", value: "ssh://git:secret@git.example.com/acme/one.git", errContains: "password-bearing SSH", errNotContains: "secret"},
 	}
 
 	for _, tt := range tests {
@@ -107,6 +109,9 @@ func TestLoadFromEnv_SpecReposValidation(t *testing.T) {
 			}
 			if err == nil || !strings.Contains(err.Error(), tt.errContains) {
 				t.Fatalf("LoadFromEnv() error = %v, want containing %q", err, tt.errContains)
+			}
+			if tt.errNotContains != "" && strings.Contains(err.Error(), tt.errNotContains) {
+				t.Fatalf("LoadFromEnv() error = %q, must not contain %q", err, tt.errNotContains)
 			}
 		})
 	}
