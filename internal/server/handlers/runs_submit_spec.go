@@ -18,7 +18,6 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -228,12 +227,9 @@ func persistRunSubmissionSpec(ctx context.Context, st store.Store, spec runSubmi
 		return "", fmt.Errorf("marshal named spec source: %w", err)
 	}
 	lookup := store.GetGitSpecSnapshotParams{
-		Name: spec.name, Domain: spec.source.Domain, Repo: spec.source.Repo, Path: spec.source.Path, Sha: spec.sha,
+		Name: spec.name, Domain: spec.source.Domain, Repo: spec.source.Repo, Path: spec.source.Path, Sha: spec.sha, Spec: spec.canonical,
 	}
 	if existing, err := st.GetGitSpecSnapshot(ctx, lookup); err == nil {
-		if !bytes.Equal(existing.Spec, spec.canonical) {
-			return "", errors.New("stored Git spec snapshot differs from the compiled source at the same commit")
-		}
 		return existing.ID, nil
 	} else if !errors.Is(err, pgx.ErrNoRows) {
 		return "", fmt.Errorf("lookup Git spec snapshot: %w", err)
@@ -249,19 +245,8 @@ func persistRunSubmissionSpec(ctx context.Context, st store.Store, spec runSubmi
 		Spec:              spec.canonical,
 		CreatedBy:         createdBy,
 	})
-	if err == nil {
-		return created.ID, nil
-	}
-	var pgErr *pgconn.PgError
-	if !errors.As(err, &pgErr) || pgErr.Code != "23505" {
+	if err != nil {
 		return "", err
 	}
-	existing, lookupErr := st.GetGitSpecSnapshot(ctx, lookup)
-	if lookupErr != nil {
-		return "", fmt.Errorf("reload Git spec snapshot after conflict: %w", lookupErr)
-	}
-	if !bytes.Equal(existing.Spec, spec.canonical) {
-		return "", errors.New("stored Git spec snapshot differs from the compiled source at the same commit")
-	}
-	return existing.ID, nil
+	return created.ID, nil
 }

@@ -51,7 +51,7 @@ func TestNamedSpecs_CreateLookupAndUniqueIndex(t *testing.T) {
 	assertUniqueViolation(t, err)
 }
 
-func TestGitSpecSnapshotUniquenessIncludesSourcePath(t *testing.T) {
+func TestGitSpecSnapshotIdentityIncludesSourcePath(t *testing.T) {
 	ctx, db := newTestStore(t)
 	sha := "abcdefabcdefabcdefabcdefabcdefabcdefabcd"
 	create := func(path string) Spec {
@@ -79,13 +79,52 @@ func TestGitSpecSnapshotUniquenessIncludesSourcePath(t *testing.T) {
 		t.Fatal("different source paths reused one snapshot row")
 	}
 	fetched, err := db.GetGitSpecSnapshot(ctx, GetGitSpecSnapshotParams{
-		Name: "upgrade", Domain: "git.example.com", Repo: "team/specs", Path: "nested/two.yaml", Sha: sha,
+		Name: "upgrade", Domain: "git.example.com", Repo: "team/specs", Path: "nested/two.yaml", Sha: sha, Spec: second.Spec,
 	})
 	if err != nil {
 		t.Fatalf("GetGitSpecSnapshot: %v", err)
 	}
 	if fetched.ID != second.ID {
 		t.Fatalf("snapshot id = %s, want %s", fetched.ID, second.ID)
+	}
+}
+
+func TestGitSpecSnapshotIdentityIncludesCanonicalSpec(t *testing.T) {
+	ctx, db := newTestStore(t)
+	sha := "abcdefabcdefabcdefabcdefabcdefabcdefabcd"
+	source, err := json.Marshal(map[string]string{
+		"domain": "git.example.com", "repo": "team/specs", "url": "https://git.example.com/team/specs", "path": "upgrade.yaml",
+	})
+	if err != nil {
+		t.Fatalf("marshal source: %v", err)
+	}
+	create := func(spec []byte) Spec {
+		t.Helper()
+		created, err := db.CreateNamedSpec(ctx, CreateNamedSpecParams{
+			ID: types.NewSpecID(), Name: "upgrade", Source: source, Sha: sha,
+			SourceCommittedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true}, Spec: spec,
+		})
+		if err != nil {
+			t.Fatalf("CreateNamedSpec: %v", err)
+		}
+		return created
+	}
+
+	first := create([]byte(`{"apiVersion":"ploy.mig/v1alpha1","name":"upgrade","steps":[{"envs":{"MODE":"one"},"image":"img"}]}`))
+	second := create([]byte(`{"apiVersion":"ploy.mig/v1alpha1","name":"upgrade","steps":[{"envs":{"MODE":"two"},"image":"img"}]}`))
+	if first.ID == second.ID {
+		t.Fatal("different canonical specs reused one snapshot row")
+	}
+	for _, want := range []Spec{first, second} {
+		got, err := db.GetGitSpecSnapshot(ctx, GetGitSpecSnapshotParams{
+			Name: "upgrade", Domain: "git.example.com", Repo: "team/specs", Path: "upgrade.yaml", Sha: sha, Spec: want.Spec,
+		})
+		if err != nil {
+			t.Fatalf("GetGitSpecSnapshot: %v", err)
+		}
+		if got.ID != want.ID {
+			t.Fatalf("snapshot id = %s, want %s", got.ID, want.ID)
+		}
 	}
 }
 

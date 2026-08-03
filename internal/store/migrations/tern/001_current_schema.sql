@@ -128,8 +128,11 @@ CREATE TABLE IF NOT EXISTS specs (
 );
 CREATE INDEX IF NOT EXISTS specs_created_idx ON specs(created_at);
 CREATE UNIQUE INDEX IF NOT EXISTS specs_named_source_sha_name_idx
-ON specs (name, (source->>'domain'), (source->>'repo'), (COALESCE(source->>'path', '')), sha)
-WHERE name <> '' AND sha <> '';
+ON specs (name, (source->>'domain'), (source->>'repo'), sha)
+WHERE name <> '' AND sha <> '' AND COALESCE(source->>'path', '') = '';
+CREATE INDEX IF NOT EXISTS specs_git_snapshot_lookup_idx
+ON specs (name, (source->>'domain'), (source->>'repo'), (source->>'path'), sha)
+WHERE name <> '' AND sha <> '' AND COALESCE(source->>'path', '') <> '';
 
 -- Migs (code modification projects)
 -- A mig is a long-lived project with a unique name that references a spec and manages a repo set.

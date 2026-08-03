@@ -103,6 +103,9 @@ WHERE name = $1::text
   AND COALESCE(source->>'path', '') = $4::text
   AND sha = $5::text
   AND sha <> ''
+  AND spec = $6::jsonb
+ORDER BY created_at, id
+LIMIT 1
 `
 
 type GetGitSpecSnapshotParams struct {
@@ -111,6 +114,7 @@ type GetGitSpecSnapshotParams struct {
 	Repo   string `json:"repo"`
 	Path   string `json:"path"`
 	Sha    string `json:"sha"`
+	Spec   []byte `json:"spec"`
 }
 
 func (q *Queries) GetGitSpecSnapshot(ctx context.Context, arg GetGitSpecSnapshotParams) (Spec, error) {
@@ -120,6 +124,7 @@ func (q *Queries) GetGitSpecSnapshot(ctx context.Context, arg GetGitSpecSnapshot
 		arg.Repo,
 		arg.Path,
 		arg.Sha,
+		arg.Spec,
 	)
 	var i Spec
 	err := row.Scan(

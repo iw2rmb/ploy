@@ -30,7 +30,10 @@ WHERE name = sqlc.arg(name)::text
   AND source->>'repo' = sqlc.arg(repo)::text
   AND COALESCE(source->>'path', '') = sqlc.arg(path)::text
   AND sha = sqlc.arg(sha)::text
-  AND sha <> '';
+  AND sha <> ''
+  AND spec = sqlc.arg(spec)::jsonb
+ORDER BY created_at, id
+LIMIT 1;
 
 -- name: ListSpecs :many
 -- Lists specs ordered by created_at descending (most recent first).

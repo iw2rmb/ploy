@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -10,8 +11,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5"
+
 	"github.com/iw2rmb/ploy/internal/gitauth"
 	"github.com/iw2rmb/ploy/internal/server/speccatalog"
+	"github.com/iw2rmb/ploy/internal/store"
 )
 
 type runSpecCatalogStub struct {
@@ -32,6 +36,35 @@ func (s *runSpecCatalogStub) WithResolvedSource(_ context.Context, selector stri
 type runBundleStoreStub struct {
 	cids     []string
 	archives [][]byte
+}
+
+type namedSnapshotStore struct {
+	*migStore
+	snapshots []store.Spec
+}
+
+func (s *namedSnapshotStore) CreateNamedSpec(_ context.Context, params store.CreateNamedSpecParams) (store.Spec, error) {
+	created := store.Spec{
+		ID: params.ID, Name: params.Name, Description: params.Description, Source: params.Source,
+		Sha: params.Sha, SourceCommittedAt: params.SourceCommittedAt, Spec: params.Spec, CreatedBy: params.CreatedBy,
+	}
+	s.snapshots = append(s.snapshots, created)
+	return created, nil
+}
+
+func (s *namedSnapshotStore) GetGitSpecSnapshot(_ context.Context, params store.GetGitSpecSnapshotParams) (store.Spec, error) {
+	for _, snapshot := range s.snapshots {
+		var source map[string]string
+		if err := json.Unmarshal(snapshot.Source, &source); err != nil {
+			return store.Spec{}, err
+		}
+		if snapshot.Name == params.Name && snapshot.Sha == params.Sha &&
+			source["domain"] == params.Domain && source["repo"] == params.Repo && source["path"] == params.Path &&
+			bytes.Equal(snapshot.Spec, params.Spec) {
+			return snapshot, nil
+		}
+	}
+	return store.Spec{}, pgx.ErrNoRows
 }
 
 func (s *runBundleStoreStub) Ensure(_ context.Context, cid string, archive []byte) (string, error) {
@@ -115,6 +148,40 @@ steps:
 	}
 	if st.createRun.params.SpecID != st.createNamedSpec.val.ID {
 		t.Fatalf("run spec id = %s, want persisted snapshot %s", st.createRun.params.SpecID, st.createNamedSpec.val.ID)
+	}
+}
+
+func TestRunsCreateSingleRepo_NamedSpecOverrideVariantsPersistDistinctSnapshots(t *testing.T) {
+	root := t.TempDir()
+	writeNamedRunTestFile(t, filepath.Join(root, "upgrade.yaml"), `
+apiVersion: ploy.mig/v1alpha1
+name: upgrade-java
+steps:
+  - name: rewrite
+    image: alpine:latest
+    envs:
+      MODE: base
+`)
+	catalog := &runSpecCatalogStub{root: root, entry: speccatalog.Entry{
+		Name: "upgrade-java", Source: "https://git.example.com/team/specs", Path: "upgrade.yaml",
+		SHA: "0123456789abcdef0123456789abcdef01234567", CommittedAt: time.Now().UTC(),
+	}}
+	st := &namedSnapshotStore{migStore: &migStore{}}
+	handler := createSingleRepoRunHandler(st, nil, gitauth.Options{}, runSubmitSpecServices{catalog: catalog})
+
+	for _, mode := range []string{"one", "two", "two"} {
+		rr := doRequest(t, handler, http.MethodPost, "/v1/runs", validRunRequestBodyWith(map[string]any{
+			"spec": nil, "spec_selector": "upgrade-java",
+			"spec_overrides": map[string]any{"step_envs": map[string]any{"rewrite": []string{"MODE=" + mode}}},
+		}))
+		assertStatus(t, rr, http.StatusCreated)
+	}
+
+	if len(st.snapshots) != 2 {
+		t.Fatalf("persisted snapshots = %d, want one for each distinct canonical override result", len(st.snapshots))
+	}
+	if string(st.snapshots[0].Spec) == string(st.snapshots[1].Spec) {
+		t.Fatal("override variants persisted identical canonical specs")
 	}
 }
 
