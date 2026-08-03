@@ -24,7 +24,8 @@ var specEnvPlaceholderRE = regexp.MustCompile(`\$\{([A-Za-z_][A-Za-z0-9_]*)\}|\$
 type Source interface {
 	ResolveSpec(path string) (string, error)
 	ResolveBaseDir(path string) (string, error)
-	Resolve(path, baseDir string) (string, error)
+	ResolveReference(path, baseDir string) (string, error)
+	ResolveFileRecord(path, baseDir string) (string, error)
 	ReadFile(path string) ([]byte, error)
 	Stat(path string) (fs.FileInfo, error)
 	ReadDir(path string) ([]fs.DirEntry, error)
@@ -375,7 +376,7 @@ func (c *Compiler) resolvePath(path string, baseDir ...string) (string, error) {
 	if len(baseDir) > 0 {
 		base = baseDir[0]
 	}
-	return c.source.Resolve(path, base)
+	return c.source.ResolveFileRecord(path, base)
 }
 
 func (c *Compiler) parseSpecInputToMap(data []byte, specBaseDir string) (map[string]any, error) {

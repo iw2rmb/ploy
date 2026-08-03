@@ -39,7 +39,22 @@ func (localSource) ResolveBaseDir(path string) (string, error) {
 	return filepath.Clean(resolved), nil
 }
 
-func (localSource) Resolve(path, baseDir string) (string, error) {
+func (localSource) ResolveReference(path, baseDir string) (string, error) {
+	trimmed := strings.TrimSpace(path)
+	if trimmed == "" {
+		return "", fmt.Errorf("path is empty")
+	}
+	if !filepath.IsAbs(trimmed) && strings.TrimSpace(baseDir) != "" {
+		trimmed = filepath.Join(baseDir, trimmed)
+	}
+	resolved, err := filepath.Abs(trimmed)
+	if err != nil {
+		return "", fmt.Errorf("resolve absolute path %s: %w", trimmed, err)
+	}
+	return filepath.Clean(resolved), nil
+}
+
+func (localSource) ResolveFileRecord(path, baseDir string) (string, error) {
 	trimmed := strings.TrimSpace(path)
 	if trimmed == "" {
 		return "", fmt.Errorf("path is empty")

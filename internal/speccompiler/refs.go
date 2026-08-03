@@ -156,7 +156,7 @@ func (c *Compiler) parseSpecStepRef(rawRef, sourcePath string) (string, string, 
 		return "", "", fmt.Errorf("step name is required")
 	}
 
-	specPath, err := c.source.Resolve(pathPart, filepath.Dir(sourcePath))
+	specPath, err := c.source.ResolveReference(pathPart, filepath.Dir(sourcePath))
 	if err != nil {
 		return "", "", fmt.Errorf("resolve referenced spec: %w", err)
 	}

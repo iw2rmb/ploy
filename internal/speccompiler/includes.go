@@ -130,7 +130,7 @@ func (c *Compiler) parseIncludeRef(sourcePath string, raw string) (string, strin
 		return "", "", fmt.Errorf("decode spec %s: !include path must not be empty", sourcePath)
 	}
 
-	resolvedPath, err := c.source.Resolve(pathPart, filepath.Dir(sourcePath))
+	resolvedPath, err := c.source.ResolveReference(pathPart, filepath.Dir(sourcePath))
 	if err != nil {
 		return "", "", fmt.Errorf("decode spec %s: resolve !include path %q: %w", sourcePath, pathPart, err)
 	}

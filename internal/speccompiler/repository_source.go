@@ -39,7 +39,7 @@ func (s *RepositorySource) Close() error {
 }
 
 func (s *RepositorySource) ResolveSpec(path string) (string, error) {
-	return s.Resolve(path, "")
+	return s.resolve(path, "")
 }
 
 func (s *RepositorySource) ResolveBaseDir(path string) (string, error) {
@@ -60,7 +60,15 @@ func (s *RepositorySource) ResolveBaseDir(path string) (string, error) {
 	return resolvedPath, nil
 }
 
-func (s *RepositorySource) Resolve(path, baseDir string) (string, error) {
+func (s *RepositorySource) ResolveReference(path, baseDir string) (string, error) {
+	return s.resolve(path, baseDir)
+}
+
+func (s *RepositorySource) ResolveFileRecord(path, baseDir string) (string, error) {
+	return s.resolve(path, baseDir)
+}
+
+func (s *RepositorySource) resolve(path, baseDir string) (string, error) {
 	raw := strings.TrimSpace(path)
 	if raw == "" {
 		return "", fmt.Errorf("path is empty")

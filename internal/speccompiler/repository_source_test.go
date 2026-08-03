@@ -22,8 +22,8 @@ func TestRepositorySourceRejectsNonRepositoryPaths(t *testing.T) {
 
 	for _, path := range []string{"../outside.yaml", "/tmp/outside.yaml", "~/outside.yaml", "$OUTSIDE/spec.yaml"} {
 		t.Run(path, func(t *testing.T) {
-			if _, err := source.Resolve(path, repository); err == nil {
-				t.Fatalf("Resolve(%q) succeeded, want repository-boundary error", path)
+			if _, err := source.ResolveReference(path, repository); err == nil {
+				t.Fatalf("ResolveReference(%q) succeeded, want repository-boundary error", path)
 			}
 		})
 	}
