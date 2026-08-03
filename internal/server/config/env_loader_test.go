@@ -82,10 +82,12 @@ func TestLoadFromEnv_SpecReposValidation(t *testing.T) {
 	tests := []struct {
 		name           string
 		value          string
+		wantRepos      int
 		errContains    string
 		errNotContains string
 	}{
 		{name: "whitespace configures none", value: "   "},
+		{name: "SSH without userinfo", value: "ssh://git.example.com/acme/one.git", wantRepos: 1},
 		{name: "empty entry", value: "https://git.example.com/acme/one.git, ,https://git.example.com/acme/two.git", errContains: "entry 2 is empty"},
 		{name: "duplicate normalized URL", value: "https://git.example.com/acme/one.git,https://git.example.com/acme/one/", errContains: "duplicate repository"},
 		{name: "unsupported scheme", value: "git://git.example.com/acme/one.git", errContains: "invalid repository URL"},
@@ -102,8 +104,8 @@ func TestLoadFromEnv_SpecReposValidation(t *testing.T) {
 				if err != nil {
 					t.Fatalf("LoadFromEnv() error = %v", err)
 				}
-				if len(cfg.SpecRepos) != 0 {
-					t.Fatalf("SpecRepos = %#v, want empty", cfg.SpecRepos)
+				if len(cfg.SpecRepos) != tt.wantRepos {
+					t.Fatalf("SpecRepos = %#v, want %d repositories", cfg.SpecRepos, tt.wantRepos)
 				}
 				return
 			}
