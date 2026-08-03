@@ -11,6 +11,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/cli/common"
 	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/speccompiler"
 )
 
 const osTempArtifactDirSentinel = "__ploy_os_tmp__"
@@ -56,15 +57,15 @@ func RunSubmit(ctx context.Context, opts SubmitOptions) error {
 		return err
 	}
 	if len(opts.StepEnvOverrides) > 0 {
-		mutated, err := applyStepEnvOverrides(specPayload.Spec, opts.StepEnvOverrides)
+		mutated, err := speccompiler.ApplyStepEnvOverrides(specPayload.Spec, opts.StepEnvOverrides)
 		if err != nil {
 			return err
 		}
 		specPayload.Spec = mutated
 		specPayload.SpecID = ""
 	}
-	if opts.BuildGateForced.hasAny() {
-		mutated, err := applyBuildGateForcedOverrides(specPayload.Spec, opts.BuildGateForced)
+	if opts.BuildGateForced.HasAny() {
+		mutated, err := speccompiler.ApplyBuildGateForcedOverrides(specPayload.Spec, opts.BuildGateForced)
 		if err != nil {
 			return err
 		}

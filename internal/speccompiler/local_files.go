@@ -1,4 +1,4 @@
-package specpayload
+package speccompiler
 
 import (
 	"fmt"
@@ -17,7 +17,7 @@ type localInMount struct {
 	isDir bool
 }
 
-func validateLocalFileRecords(spec map[string]any, specBaseDir string) error {
+func (c *Compiler) validateLocalFileRecords(spec map[string]any, specBaseDir string) error {
 	steps, ok := spec["steps"].([]any)
 	if !ok {
 		return nil
@@ -27,14 +27,14 @@ func validateLocalFileRecords(spec map[string]any, specBaseDir string) error {
 		if !ok {
 			continue
 		}
-		if err := validateLocalStepFileRecords(step, fmt.Sprintf("steps[%d]", i), specBaseDir); err != nil {
+		if err := c.validateLocalStepFileRecords(step, fmt.Sprintf("steps[%d]", i), specBaseDir); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func compileHydraRecordsLocalInPlace(spec map[string]any, specBaseDir string) error {
+func (c *Compiler) compileHydraRecordsLocalInPlace(spec map[string]any, specBaseDir string) error {
 	steps, ok := spec["steps"].([]any)
 	if !ok {
 		return nil
@@ -44,27 +44,27 @@ func compileHydraRecordsLocalInPlace(spec map[string]any, specBaseDir string) er
 		if !ok {
 			continue
 		}
-		if err := compileLocalHydraBlock(step, fmt.Sprintf("steps[%d]", i), specBaseDir); err != nil {
+		if err := c.compileLocalHydraBlock(step, fmt.Sprintf("steps[%d]", i), specBaseDir); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func compileLocalHydraBlock(step map[string]any, prefix, specBaseDir string) error {
-	if err := compileLocalInEntries(step, prefix, specBaseDir); err != nil {
+func (c *Compiler) compileLocalHydraBlock(step map[string]any, prefix, specBaseDir string) error {
+	if err := c.compileLocalInEntries(step, prefix, specBaseDir); err != nil {
 		return err
 	}
-	if err := compileLocalOutEntries(step, prefix, specBaseDir); err != nil {
+	if err := c.compileLocalOutEntries(step, prefix, specBaseDir); err != nil {
 		return err
 	}
-	if err := compileLocalHomeEntries(step, prefix, specBaseDir); err != nil {
+	if err := c.compileLocalHomeEntries(step, prefix, specBaseDir); err != nil {
 		return err
 	}
-	return compileLocalTmpEntries(step, prefix, specBaseDir)
+	return c.compileLocalTmpEntries(step, prefix, specBaseDir)
 }
 
-func compileLocalInEntries(step map[string]any, prefix, specBaseDir string) error {
+func (c *Compiler) compileLocalInEntries(step map[string]any, prefix, specBaseDir string) error {
 	entries, ok := step["in"].([]any)
 	if !ok || len(entries) == 0 {
 		return nil
@@ -83,7 +83,7 @@ func compileLocalInEntries(step map[string]any, prefix, specBaseDir string) erro
 		if err != nil {
 			return fmt.Errorf("%s.in[%d]: %w", prefix, i, err)
 		}
-		hash, err := localFileRecordHash(src, specBaseDir)
+		hash, err := c.localFileRecordHash(src, specBaseDir)
 		if err != nil {
 			return fmt.Errorf("%s.in[%d]: %w", prefix, i, err)
 		}
@@ -93,7 +93,7 @@ func compileLocalInEntries(step map[string]any, prefix, specBaseDir string) erro
 	return nil
 }
 
-func compileLocalOutEntries(step map[string]any, prefix, specBaseDir string) error {
+func (c *Compiler) compileLocalOutEntries(step map[string]any, prefix, specBaseDir string) error {
 	entries, ok := step["out"].([]any)
 	if !ok || len(entries) == 0 {
 		return nil
@@ -112,7 +112,7 @@ func compileLocalOutEntries(step map[string]any, prefix, specBaseDir string) err
 		if err != nil {
 			return fmt.Errorf("%s.out[%d]: %w", prefix, i, err)
 		}
-		hash, err := localFileRecordHash(src, specBaseDir)
+		hash, err := c.localFileRecordHash(src, specBaseDir)
 		if err != nil {
 			return fmt.Errorf("%s.out[%d]: %w", prefix, i, err)
 		}
@@ -122,7 +122,7 @@ func compileLocalOutEntries(step map[string]any, prefix, specBaseDir string) err
 	return nil
 }
 
-func compileLocalHomeEntries(step map[string]any, prefix, specBaseDir string) error {
+func (c *Compiler) compileLocalHomeEntries(step map[string]any, prefix, specBaseDir string) error {
 	entries, ok := step["home"].([]any)
 	if !ok || len(entries) == 0 {
 		return nil
@@ -145,7 +145,7 @@ func compileLocalHomeEntries(step map[string]any, prefix, specBaseDir string) er
 		if err != nil {
 			return fmt.Errorf("%s.home[%d]: %w", prefix, i, err)
 		}
-		hash, err := localFileRecordHash(src, specBaseDir)
+		hash, err := c.localFileRecordHash(src, specBaseDir)
 		if err != nil {
 			return fmt.Errorf("%s.home[%d]: %w", prefix, i, err)
 		}
@@ -159,7 +159,7 @@ func compileLocalHomeEntries(step map[string]any, prefix, specBaseDir string) er
 	return nil
 }
 
-func compileLocalTmpEntries(step map[string]any, prefix, specBaseDir string) error {
+func (c *Compiler) compileLocalTmpEntries(step map[string]any, prefix, specBaseDir string) error {
 	entries, ok := step["tmp"].([]any)
 	if !ok || len(entries) == 0 {
 		return nil
@@ -178,7 +178,7 @@ func compileLocalTmpEntries(step map[string]any, prefix, specBaseDir string) err
 		if err != nil {
 			return fmt.Errorf("%s.tmp[%d]: %w", prefix, i, err)
 		}
-		hash, err := localFileRecordHash(src, specBaseDir)
+		hash, err := c.localFileRecordHash(src, specBaseDir)
 		if err != nil {
 			return fmt.Errorf("%s.tmp[%d]: %w", prefix, i, err)
 		}
@@ -188,36 +188,36 @@ func compileLocalTmpEntries(step map[string]any, prefix, specBaseDir string) err
 	return nil
 }
 
-func localFileRecordHash(srcPath, specBaseDir string) (string, error) {
-	resolved, err := resolvePath(srcPath, specBaseDir)
+func (c *Compiler) localFileRecordHash(srcPath, specBaseDir string) (string, error) {
+	resolved, err := c.resolvePath(srcPath, specBaseDir)
 	if err != nil {
 		return "", fmt.Errorf("resolve source: %w", err)
 	}
-	archiveBytes, err := buildSourceArchive(resolved)
+	archiveBytes, err := c.buildSourceArchive(resolved)
 	if err != nil {
 		return "", fmt.Errorf("build archive: %w", err)
 	}
-	return computeArchiveShortHash(archiveBytes), nil
+	return ArchiveShortHash(archiveBytes), nil
 }
 
-func validateLocalStepFileRecords(step map[string]any, prefix, specBaseDir string) error {
-	mounts, err := collectLocalInMounts(step, prefix, specBaseDir)
+func (c *Compiler) validateLocalStepFileRecords(step map[string]any, prefix, specBaseDir string) error {
+	mounts, err := c.collectLocalInMounts(step, prefix, specBaseDir)
 	if err != nil {
 		return err
 	}
-	if err := validateLocalOutEntries(step, prefix, specBaseDir); err != nil {
+	if err := c.validateLocalOutEntries(step, prefix, specBaseDir); err != nil {
 		return err
 	}
-	if err := validateLocalHomeEntries(step, prefix, specBaseDir); err != nil {
+	if err := c.validateLocalHomeEntries(step, prefix, specBaseDir); err != nil {
 		return err
 	}
-	if err := validateLocalTmpEntries(step, prefix, specBaseDir); err != nil {
+	if err := c.validateLocalTmpEntries(step, prefix, specBaseDir); err != nil {
 		return err
 	}
-	return validateMountedYAMLIncludes(mounts, prefix)
+	return c.validateMountedYAMLIncludes(mounts, prefix)
 }
 
-func collectLocalInMounts(step map[string]any, prefix, specBaseDir string) ([]localInMount, error) {
+func (c *Compiler) collectLocalInMounts(step map[string]any, prefix, specBaseDir string) ([]localInMount, error) {
 	entries, ok := step["in"].([]any)
 	if !ok || len(entries) == 0 {
 		return nil, nil
@@ -240,7 +240,7 @@ func collectLocalInMounts(step map[string]any, prefix, specBaseDir string) ([]lo
 		if err != nil {
 			return nil, fmt.Errorf("%s.in[%d]: %w", prefix, i, err)
 		}
-		resolved, info, err := statLocalFileRecordSource(src, specBaseDir)
+		resolved, info, err := c.statLocalFileRecordSource(src, specBaseDir)
 		if err != nil {
 			return nil, fmt.Errorf("%s.in[%d]: %w", prefix, i, err)
 		}
@@ -249,7 +249,7 @@ func collectLocalInMounts(step map[string]any, prefix, specBaseDir string) ([]lo
 	return mounts, nil
 }
 
-func validateLocalOutEntries(step map[string]any, prefix, specBaseDir string) error {
+func (c *Compiler) validateLocalOutEntries(step map[string]any, prefix, specBaseDir string) error {
 	entries, ok := step["out"].([]any)
 	if !ok || len(entries) == 0 {
 		return nil
@@ -266,14 +266,14 @@ func validateLocalOutEntries(step map[string]any, prefix, specBaseDir string) er
 		if err != nil {
 			return fmt.Errorf("%s.out[%d]: %w", prefix, i, err)
 		}
-		if _, _, err := statLocalFileRecordSource(src, specBaseDir); err != nil {
+		if _, _, err := c.statLocalFileRecordSource(src, specBaseDir); err != nil {
 			return fmt.Errorf("%s.out[%d]: %w", prefix, i, err)
 		}
 	}
 	return nil
 }
 
-func validateLocalHomeEntries(step map[string]any, prefix, specBaseDir string) error {
+func (c *Compiler) validateLocalHomeEntries(step map[string]any, prefix, specBaseDir string) error {
 	entries, ok := step["home"].([]any)
 	if !ok || len(entries) == 0 {
 		return nil
@@ -294,14 +294,14 @@ func validateLocalHomeEntries(step map[string]any, prefix, specBaseDir string) e
 		if err != nil {
 			return fmt.Errorf("%s.home[%d]: %w", prefix, i, err)
 		}
-		if _, _, err := statLocalFileRecordSource(src, specBaseDir); err != nil {
+		if _, _, err := c.statLocalFileRecordSource(src, specBaseDir); err != nil {
 			return fmt.Errorf("%s.home[%d]: %w", prefix, i, err)
 		}
 	}
 	return nil
 }
 
-func validateLocalTmpEntries(step map[string]any, prefix, specBaseDir string) error {
+func (c *Compiler) validateLocalTmpEntries(step map[string]any, prefix, specBaseDir string) error {
 	entries, ok := step["tmp"].([]any)
 	if !ok || len(entries) == 0 {
 		return nil
@@ -318,26 +318,26 @@ func validateLocalTmpEntries(step map[string]any, prefix, specBaseDir string) er
 		if err != nil {
 			return fmt.Errorf("%s.tmp[%d]: %w", prefix, i, err)
 		}
-		if _, _, err := statLocalFileRecordSource(src, specBaseDir); err != nil {
+		if _, _, err := c.statLocalFileRecordSource(src, specBaseDir); err != nil {
 			return fmt.Errorf("%s.tmp[%d]: %w", prefix, i, err)
 		}
 	}
 	return nil
 }
 
-func statLocalFileRecordSource(srcPath, specBaseDir string) (string, os.FileInfo, error) {
-	resolved, err := resolvePath(srcPath, specBaseDir)
+func (c *Compiler) statLocalFileRecordSource(srcPath, specBaseDir string) (string, os.FileInfo, error) {
+	resolved, err := c.resolvePath(srcPath, specBaseDir)
 	if err != nil {
 		return "", nil, fmt.Errorf("resolve source: %w", err)
 	}
-	info, err := os.Stat(resolved)
+	info, err := c.source.Stat(resolved)
 	if err != nil {
 		return "", nil, fmt.Errorf("source %s: %w", resolved, err)
 	}
 	return resolved, info, nil
 }
 
-func validateMountedYAMLIncludes(mounts []localInMount, prefix string) error {
+func (c *Compiler) validateMountedYAMLIncludes(mounts []localInMount, prefix string) error {
 	byDst := make(map[string]localInMount, len(mounts))
 	for _, mount := range mounts {
 		if mount.dst != "" {
@@ -346,14 +346,14 @@ func validateMountedYAMLIncludes(mounts []localInMount, prefix string) error {
 	}
 	seen := make(map[string]struct{})
 	for _, mount := range mounts {
-		if err := validateMountYAMLIncludes(mount, byDst, seen, prefix); err != nil {
+		if err := c.validateMountYAMLIncludes(mount, byDst, seen, prefix); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func validateMountYAMLIncludes(mount localInMount, byDst map[string]localInMount, seen map[string]struct{}, prefix string) error {
+func (c *Compiler) validateMountYAMLIncludes(mount localInMount, byDst map[string]localInMount, seen map[string]struct{}, prefix string) error {
 	if mount.src == "" || mount.isDir || !isYAMLPath(mount.src) {
 		return nil
 	}
@@ -363,7 +363,7 @@ func validateMountYAMLIncludes(mount localInMount, byDst map[string]localInMount
 	}
 	seen[key] = struct{}{}
 
-	refs, err := collectYAMLIncludeRefs(mount.src)
+	refs, err := c.collectYAMLIncludeRefs(mount.src)
 	if err != nil {
 		return fmt.Errorf("%s.in include scan %s: %w", prefix, mount.dst, err)
 	}
@@ -373,7 +373,7 @@ func validateMountYAMLIncludes(mount localInMount, byDst map[string]localInMount
 			return fmt.Errorf("%s.in include %s: %w", prefix, ref, err)
 		}
 		if include.localPath != "" {
-			if _, err := os.Stat(include.localPath); err != nil {
+			if _, err := c.source.Stat(include.localPath); err != nil {
 				return fmt.Errorf("%s.in include %s: source %s: %w", prefix, ref, include.localPath, err)
 			}
 		}
@@ -381,15 +381,15 @@ func validateMountYAMLIncludes(mount localInMount, byDst map[string]localInMount
 		if !ok {
 			return fmt.Errorf("%s.in include %s: target %s is not mounted by this step's in entries", prefix, ref, include.runtimePath)
 		}
-		if err := validateMountYAMLIncludes(target, byDst, seen, prefix); err != nil {
+		if err := c.validateMountYAMLIncludes(target, byDst, seen, prefix); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func collectYAMLIncludeRefs(filePath string) ([]string, error) {
-	data, err := os.ReadFile(filePath)
+func (c *Compiler) collectYAMLIncludeRefs(filePath string) ([]string, error) {
+	data, err := c.source.ReadFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("read: %w", err)
 	}

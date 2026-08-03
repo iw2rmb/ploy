@@ -162,7 +162,7 @@ steps:
 	if !ok {
 		t.Fatalf("expected steps[0].tmp[0] to be shortHash:dst, got %q", stepTmpEntry)
 	}
-	if !shortHashPattern.MatchString(tmpHash) {
+	if !isArchiveShortHash(tmpHash) {
 		t.Fatalf("tmp short hash %q is invalid", tmpHash)
 	}
 	if tmpDst != "/tmp/ploy/lib/ploy-java-tools.jar" {

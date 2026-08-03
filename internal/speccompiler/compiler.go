@@ -1,74 +1,116 @@
-// mig_run_spec.go separates spec file handling from mig run execution.
-//
-// This file contains Build, which parses YAML/JSON spec files
-// and compiles Hydra file-record entries (in/out/home) into canonical
-// shortHash:dst form. Specs use a single canonical shape:
+// Package speccompiler compiles authoring specs into canonical run snapshots.
+// Specs use a single canonical shape:
 //   - steps[] array with one entry per step (even single-step runs)
 //   - global build gate policy under build_gate
-//
-// Spec parsing includes validation and error handling for missing files.
-// Isolating spec handling from execution flow enables focused testing
-// of file I/O and parsing logic without coupling to HTTP submission.
-package specpayload
+package speccompiler
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
-	"net/url"
-	"os"
+	"io/fs"
 	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
 
-	"github.com/iw2rmb/ploy/internal/cli/common"
-	cliconfig "github.com/iw2rmb/ploy/internal/cli/config"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"gopkg.in/yaml.v3"
 )
 
 var specEnvPlaceholderRE = regexp.MustCompile(`\$\{([A-Za-z_][A-Za-z0-9_]*)\}|\$([A-Za-z_][A-Za-z0-9_]*)`)
 
-func Normalize(ctx context.Context, base *url.URL, client *http.Client, data []byte, specBaseDir string) (json.RawMessage, error) {
-	return normalizeWithStepSelector(ctx, base, client, data, specBaseDir, "")
+// Source owns path policy and file access for one compilation source.
+type Source interface {
+	ResolveSpec(path string) (string, error)
+	ResolveBaseDir(path string) (string, error)
+	Resolve(path, baseDir string) (string, error)
+	ReadFile(path string) ([]byte, error)
+	Stat(path string) (fs.FileInfo, error)
+	ReadDir(path string) ([]fs.DirEntry, error)
+	WorkingDir() (string, error)
 }
 
-func normalizeWithStepSelector(ctx context.Context, base *url.URL, client *http.Client, data []byte, specBaseDir string, stepSelector string) (json.RawMessage, error) {
-	raw, err := parseSpecInputToMap(data, specBaseDir)
+// BundleStore persists a content-addressed source archive and returns its ID.
+type BundleStore interface {
+	Ensure(ctx context.Context, cid string, archive []byte) (string, error)
+}
+
+// Options supplies the caller-owned dependencies used during compilation.
+type Options struct {
+	Source       Source
+	LookupEnv    func(string) (string, bool)
+	ApplyOverlay func(map[string]any) error
+	Bundles      BundleStore
+}
+
+// Compiler is safe for concurrent use when its supplied dependencies are safe.
+type Compiler struct {
+	source       Source
+	lookupEnv    func(string) (string, bool)
+	applyOverlay func(map[string]any) error
+	bundles      BundleStore
+}
+
+func New(opts Options) (*Compiler, error) {
+	if opts.Source == nil {
+		return nil, fmt.Errorf("spec compiler source is required")
+	}
+	if opts.LookupEnv == nil {
+		opts.LookupEnv = func(string) (string, bool) { return "", false }
+	}
+	if opts.ApplyOverlay == nil {
+		opts.ApplyOverlay = func(map[string]any) error { return nil }
+	}
+	return &Compiler{
+		source:       opts.Source,
+		lookupEnv:    opts.LookupEnv,
+		applyOverlay: opts.ApplyOverlay,
+		bundles:      opts.Bundles,
+	}, nil
+}
+
+func (c *Compiler) Normalize(ctx context.Context, data []byte, specBaseDir string) (json.RawMessage, error) {
+	return c.normalizeWithStepSelector(ctx, data, specBaseDir, "")
+}
+
+func (c *Compiler) normalizeWithStepSelector(ctx context.Context, data []byte, specBaseDir string, stepSelector string) (json.RawMessage, error) {
+	var err error
+	specBaseDir, err = c.source.ResolveBaseDir(specBaseDir)
+	if err != nil {
+		return nil, fmt.Errorf("resolve spec base directory: %w", err)
+	}
+	raw, err := c.parseSpecInputToMap(data, specBaseDir)
 	if err != nil {
 		return nil, fmt.Errorf("parse spec (not valid JSON or YAML): %w", err)
 	}
-	sourcePath, err := composeSpecRootPath(specBaseDir)
+	sourcePath, err := c.composeSpecRootPath(specBaseDir)
 	if err != nil {
 		return nil, err
 	}
-	if err := expandSpecRefsInPlace(raw, sourcePath); err != nil {
+	if err := c.expandSpecRefsInPlace(raw, sourcePath); err != nil {
 		return nil, fmt.Errorf("expand refs: %w", err)
 	}
 	if err := selectStepInPlace(raw, stepSelector, sourcePath); err != nil {
 		return nil, err
 	}
-	if err := preprocessMigsSpecInPlace(raw, specBaseDir); err != nil {
+	if err := c.preprocessMigsSpecInPlace(raw); err != nil {
 		return nil, err
 	}
 
-	// Apply local config.yaml overlay before Hydra compilation so that
-	// overlay file paths are also compiled to canonical form.
-	if err := applyConfigOverlayInPlace(raw); err != nil {
+	// Apply overlays before file-record compilation so added paths become canonical too.
+	if err := c.applyOverlay(raw); err != nil {
 		return nil, err
 	}
 	if err := validateSpecShape(raw); err != nil {
 		return nil, err
 	}
 
-	if err := validateLocalFileRecords(raw, specBaseDir); err != nil {
+	if err := c.validateLocalFileRecords(raw, specBaseDir); err != nil {
 		return nil, fmt.Errorf("validate local file records: %w", err)
 	}
 
-	if err := compileHydraRecordsInPlace(ctx, base, client, raw, specBaseDir); err != nil {
+	if err := c.compileHydraRecordsInPlace(ctx, raw, specBaseDir); err != nil {
 		return nil, err
 	}
 
@@ -84,39 +126,47 @@ func normalizeWithStepSelector(ctx context.Context, base *url.URL, client *http.
 	return jsonBytes, nil
 }
 
-// ValidateLocalFile validates a JSON/YAML spec after local-only normalization.
-func ValidateLocalFile(path string) (json.RawMessage, error) {
-	cleanSpecPath := filepath.Clean(path)
-	data, err := common.ReadFileRooted(cleanSpecPath)
+// ValidateFile validates a JSON/YAML spec without persisting bundles.
+func (c *Compiler) ValidateFile(path string) (json.RawMessage, error) {
+	cleanSpecPath, err := c.source.ResolveSpec(path)
+	if err != nil {
+		return nil, fmt.Errorf("resolve spec file %s: %w", path, err)
+	}
+	data, err := c.source.ReadFile(cleanSpecPath)
 	if err != nil {
 		return nil, fmt.Errorf("read spec file %s: %w", cleanSpecPath, err)
 	}
-	return ValidateLocal(data, filepath.Dir(cleanSpecPath))
+	return c.Validate(data, filepath.Dir(cleanSpecPath))
 }
 
-// ValidateLocal validates a JSON/YAML spec without network bundle compilation.
-func ValidateLocal(data []byte, specBaseDir string) (json.RawMessage, error) {
-	raw, err := parseSpecInputToMap(data, specBaseDir)
+// Validate validates a JSON/YAML spec without persisting bundles.
+func (c *Compiler) Validate(data []byte, specBaseDir string) (json.RawMessage, error) {
+	var err error
+	specBaseDir, err = c.source.ResolveBaseDir(specBaseDir)
+	if err != nil {
+		return nil, fmt.Errorf("resolve spec base directory: %w", err)
+	}
+	raw, err := c.parseSpecInputToMap(data, specBaseDir)
 	if err != nil {
 		return nil, fmt.Errorf("parse spec (not valid JSON or YAML): %w", err)
 	}
-	sourcePath, err := composeSpecRootPath(specBaseDir)
+	sourcePath, err := c.composeSpecRootPath(specBaseDir)
 	if err != nil {
 		return nil, err
 	}
-	if err := expandSpecRefsInPlace(raw, sourcePath); err != nil {
+	if err := c.expandSpecRefsInPlace(raw, sourcePath); err != nil {
 		return nil, fmt.Errorf("expand refs: %w", err)
 	}
-	if err := preprocessMigsSpecInPlace(raw, specBaseDir); err != nil {
+	if err := c.preprocessMigsSpecInPlace(raw); err != nil {
 		return nil, err
 	}
-	if err := applyConfigOverlayInPlace(raw); err != nil {
+	if err := c.applyOverlay(raw); err != nil {
 		return nil, err
 	}
-	if err := validateLocalFileRecords(raw, specBaseDir); err != nil {
+	if err := c.validateLocalFileRecords(raw, specBaseDir); err != nil {
 		return nil, fmt.Errorf("validate local file records: %w", err)
 	}
-	if err := compileHydraRecordsLocalInPlace(raw, specBaseDir); err != nil {
+	if err := c.compileHydraRecordsLocalInPlace(raw, specBaseDir); err != nil {
 		return nil, fmt.Errorf("compile local file records: %w", err)
 	}
 	jsonBytes, err := json.Marshal(raw)
@@ -129,20 +179,20 @@ func ValidateLocal(data []byte, specBaseDir string) (json.RawMessage, error) {
 	return jsonBytes, nil
 }
 
-func preprocessMigsSpecInPlace(spec map[string]any, specBaseDir string) error {
-	if err := resolveImageEnvInPlace(spec); err != nil {
+func (c *Compiler) preprocessMigsSpecInPlace(spec map[string]any) error {
+	if err := c.resolveImageEnvInPlace(spec); err != nil {
 		return fmt.Errorf("resolve image env placeholders: %w", err)
 	}
 
 	// Expand $VAR/${VAR} placeholders in envs values at all levels.
-	if err := resolveEnvsInPlace(spec); err != nil {
+	if err := c.resolveEnvsInPlace(spec); err != nil {
 		return fmt.Errorf("resolve envs (top-level): %w", err)
 	}
 
 	if steps, ok := spec["steps"].([]any); ok {
 		for i, s := range steps {
 			if stepEntry, ok := s.(map[string]any); ok {
-				if err := resolveEnvsInPlace(stepEntry); err != nil {
+				if err := c.resolveEnvsInPlace(stepEntry); err != nil {
 					return fmt.Errorf("resolve envs (steps[%d]): %w", i, err)
 				}
 			}
@@ -153,7 +203,7 @@ func preprocessMigsSpecInPlace(spec map[string]any, specBaseDir string) error {
 }
 
 // resolveEnvsInPlace expands $VAR and ${VAR} placeholders in envs string values.
-func resolveEnvsInPlace(spec map[string]any) error {
+func (c *Compiler) resolveEnvsInPlace(spec map[string]any) error {
 	envsRaw, ok := spec["envs"]
 	if !ok {
 		return nil
@@ -165,7 +215,7 @@ func resolveEnvsInPlace(spec map[string]any) error {
 			if !ok {
 				return fmt.Errorf("envs[%s]: expected string, got %T", k, v)
 			}
-			expanded, err := expandSpecEnvValue(s)
+			expanded, err := c.expandSpecEnvValue(s)
 			if err != nil {
 				return fmt.Errorf("envs[%s]: %w", k, err)
 			}
@@ -174,7 +224,7 @@ func resolveEnvsInPlace(spec map[string]any) error {
 	case map[string]string:
 		expanded := make(map[string]any, len(envs))
 		for k, v := range envs {
-			exp, err := expandSpecEnvValue(v)
+			exp, err := c.expandSpecEnvValue(v)
 			if err != nil {
 				return fmt.Errorf("envs[%s]: %w", k, err)
 			}
@@ -185,14 +235,14 @@ func resolveEnvsInPlace(spec map[string]any) error {
 	return nil
 }
 
-func resolveImageEnvInPlace(spec map[string]any) error {
+func (c *Compiler) resolveImageEnvInPlace(spec map[string]any) error {
 	if steps, ok := spec["steps"].([]any); ok {
 		for i, raw := range steps {
 			step, ok := raw.(map[string]any)
 			if !ok {
 				continue
 			}
-			if err := resolveImageInSection(step, fmt.Sprintf("steps[%d]", i)); err != nil {
+			if err := c.resolveImageInSection(step, fmt.Sprintf("steps[%d]", i)); err != nil {
 				return err
 			}
 		}
@@ -203,7 +253,7 @@ func resolveImageEnvInPlace(spec map[string]any) error {
 		if !ok {
 			return fmt.Errorf("build_gate: expected object, got %T", buildGateRaw)
 		}
-		if err := resolveBuildGateImageRulesInPlace(buildGate); err != nil {
+		if err := c.resolveBuildGateImageRulesInPlace(buildGate); err != nil {
 			return err
 		}
 	}
@@ -211,7 +261,7 @@ func resolveImageEnvInPlace(spec map[string]any) error {
 	return nil
 }
 
-func resolveBuildGateImageRulesInPlace(buildGate map[string]any) error {
+func (c *Compiler) resolveBuildGateImageRulesInPlace(buildGate map[string]any) error {
 	rawImages, exists := buildGate["images"]
 	if !exists || rawImages == nil {
 		return nil
@@ -281,7 +331,7 @@ func stackExpectationFromBuildGateRule(rule map[string]any, index int) (*contrac
 	return exp, nil
 }
 
-func resolveImageInSection(section map[string]any, prefix string) error {
+func (c *Compiler) resolveImageInSection(section map[string]any, prefix string) error {
 	raw, exists := section["image"]
 	if !exists {
 		return nil
@@ -289,7 +339,7 @@ func resolveImageInSection(section map[string]any, prefix string) error {
 
 	switch image := raw.(type) {
 	case string:
-		expanded, err := expandSpecEnvValue(image)
+		expanded, err := c.expandSpecEnvValue(image)
 		if err != nil {
 			return fmt.Errorf("%s.image: %w", prefix, err)
 		}
@@ -300,7 +350,7 @@ func resolveImageInSection(section map[string]any, prefix string) error {
 			if !ok {
 				continue
 			}
-			expanded, err := expandSpecEnvValue(value)
+			expanded, err := c.expandSpecEnvValue(value)
 			if err != nil {
 				return fmt.Errorf("%s.image[%q]: %w", prefix, stack, err)
 			}
@@ -308,7 +358,7 @@ func resolveImageInSection(section map[string]any, prefix string) error {
 		}
 	case map[string]string:
 		for stack, value := range image {
-			expanded, err := expandSpecEnvValue(value)
+			expanded, err := c.expandSpecEnvValue(value)
 			if err != nil {
 				return fmt.Errorf("%s.image[%q]: %w", prefix, stack, err)
 			}
@@ -320,40 +370,22 @@ func resolveImageInSection(section map[string]any, prefix string) error {
 	return nil
 }
 
-func resolvePath(path string, baseDir ...string) (string, error) {
-	resolvedBaseDir := ""
+func (c *Compiler) resolvePath(path string, baseDir ...string) (string, error) {
+	base := ""
 	if len(baseDir) > 0 {
-		resolvedBaseDir = baseDir[0]
+		base = baseDir[0]
 	}
-	trimmed := strings.TrimSpace(path)
-	if trimmed == "" {
-		return "", fmt.Errorf("path is empty")
-	}
-	expanded := strings.TrimSpace(os.ExpandEnv(trimmed))
-	if expanded == "" {
-		return "", fmt.Errorf("path is empty")
-	}
-	if strings.HasPrefix(expanded, "~/") {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return "", fmt.Errorf("resolve home dir for path %s: %w", expanded, err)
-		}
-		return filepath.Join(home, expanded[2:]), nil
-	}
-	if !filepath.IsAbs(expanded) && strings.TrimSpace(resolvedBaseDir) != "" {
-		return filepath.Join(resolvedBaseDir, expanded), nil
-	}
-	return expanded, nil
+	return c.source.Resolve(path, base)
 }
 
-func parseSpecInputToMap(data []byte, specBaseDir string) (map[string]any, error) {
+func (c *Compiler) parseSpecInputToMap(data []byte, specBaseDir string) (map[string]any, error) {
 	var obj map[string]any
 	if err := json.Unmarshal(data, &obj); err != nil {
-		specRootPath, rootErr := composeSpecRootPath(specBaseDir)
+		specRootPath, rootErr := c.composeSpecRootPath(specBaseDir)
 		if rootErr != nil {
 			return nil, rootErr
 		}
-		composed, composeErr := composeSpecYAML(data, specRootPath)
+		composed, composeErr := c.composeSpecYAML(data, specRootPath)
 		if composeErr != nil {
 			return nil, composeErr
 		}
@@ -367,23 +399,19 @@ func parseSpecInputToMap(data []byte, specBaseDir string) (map[string]any, error
 	return obj, nil
 }
 
-func composeSpecRootPath(specBaseDir string) (string, error) {
+func (c *Compiler) composeSpecRootPath(specBaseDir string) (string, error) {
 	base := strings.TrimSpace(specBaseDir)
 	if base == "" {
-		wd, err := os.Getwd()
+		wd, err := c.source.WorkingDir()
 		if err != nil {
 			return "", fmt.Errorf("resolve working directory for spec: %w", err)
 		}
 		base = wd
 	}
-	resolved, err := filepath.Abs(base)
-	if err != nil {
-		return "", fmt.Errorf("resolve absolute spec directory %s: %w", base, err)
-	}
-	return filepath.Join(resolved, ".root-spec.yaml"), nil
+	return filepath.Join(base, ".root-spec.yaml"), nil
 }
 
-func expandSpecEnvValue(raw string) (string, error) {
+func (c *Compiler) expandSpecEnvValue(raw string) (string, error) {
 	if !strings.Contains(raw, "$") {
 		return raw, nil
 	}
@@ -397,7 +425,7 @@ func expandSpecEnvValue(raw string) (string, error) {
 			name = strings.TrimPrefix(match, "$")
 		}
 
-		if v, ok := os.LookupEnv(name); ok {
+		if v, ok := c.lookupEnv(name); ok {
 			return v
 		}
 		missing[name] = struct{}{}
@@ -417,133 +445,80 @@ func expandSpecEnvValue(raw string) (string, error) {
 	return "", fmt.Errorf("unresolved environment variables: %s", strings.Join(names, ", "))
 }
 
-// applyConfigOverlayInPlace loads the local config.yaml overlay and merges it
-// into the spec using deterministic rules. This runs after preprocessing and
-// before Hydra compilation so overlay file paths also get compiled.
-//
-// Routing:
-//   - steps[] entries receive the "mig" job section overlay
-//   - top-level envs receive the "mig" section envs (primary job type)
-func applyConfigOverlayInPlace(spec map[string]any) error {
-	ov, err := cliconfig.LoadOverlay()
-	if err != nil {
-		return fmt.Errorf("config overlay: %w", err)
-	}
-	if ov.Defaults == nil || ov.Defaults.Job == nil {
-		return nil
-	}
-
-	migCfg := ov.JobSection("mig")
-	// Apply mig overlay to top-level envs.
-	if migCfg != nil && len(migCfg.Envs) > 0 {
-		cliconfig.MergeJobConfigIntoSpec(spec, &cliconfig.JobConfig{Envs: migCfg.Envs})
-	}
-
-	// Apply mig overlay to each step block.
-	if steps, ok := spec["steps"].([]any); ok {
-		for _, s := range steps {
-			step, ok := s.(map[string]any)
-			if !ok {
-				continue
-			}
-			cliconfig.MergeJobConfigIntoSpec(step, migCfg)
-		}
-	}
-
-	return nil
+// Overrides contains caller-supplied values that take precedence over source values.
+type Overrides struct {
+	Envs    []string
+	Image   string
+	Command string
 }
 
-// Build loads a spec from file (YAML or JSON) and merges it with CLI flag overrides.
-// CLI flags take precedence over spec file values. Returns raw JSON bytes.
+// Build loads a spec and compiles it into canonical JSON.
 //
 // Processing order:
 //  1. Load spec file (YAML or JSON format) if provided
 //  2. Preprocess: resolve !include composition, image env, envs expansion
 //  3. Compile Hydra records: in/out/home authoring entries → canonical shortHash:dst form
-//  4. Apply CLI flag overrides (higher precedence than spec file) to top-level fields
+//  4. Apply caller overrides (higher precedence than source values) to top-level fields
 //  5. Validate the current spec contract
 //
-// Returns nil payload when neither spec file nor CLI overrides are provided.
+// Returns nil payload when neither a spec file nor overrides are provided.
 //
 // Multi-step semantics (steps[] array):
 //   - Each entry in steps[] represents a sequential transformation step.
 //   - All steps share the same repository and global build_gate policy.
-//   - The CLI preserves steps[] without modification; image/command overrides do not apply when len(steps) > 1.
-//   - The server copies steps[] indexes into jobs.next_id and diffs.next_id.
-func Build(
-	ctx context.Context,
-	base *url.URL,
-	client *http.Client,
-	specFile string,
-	migEnvs []string,
-	migImage string,
-	retain bool,
-	migCommand string,
-) ([]byte, error) {
-	return BuildSelected(ctx, base, client, specFile, "", migEnvs, migImage, retain, migCommand)
+//   - Image and command overrides do not apply when len(steps) > 1.
+func (c *Compiler) Build(ctx context.Context, specFile string, overrides Overrides) ([]byte, error) {
+	return c.BuildSelected(ctx, specFile, "", overrides)
 }
 
-func BuildSelected(
-	ctx context.Context,
-	base *url.URL,
-	client *http.Client,
-	specFile string,
-	stepSelector string,
-	migEnvs []string,
-	migImage string,
-	retain bool,
-	migCommand string,
-) ([]byte, error) {
-	_ = retain
-
+func (c *Compiler) BuildSelected(ctx context.Context, specFile string, stepSelector string, overrides Overrides) ([]byte, error) {
 	// Start with spec from file (if provided)
 	var specMap map[string]any
 	specBaseDir := ""
 	specSourcePath := ""
 	if specFile != "" {
-		cleanSpecPath := filepath.Clean(specFile)
-		specBaseDir = filepath.Dir(cleanSpecPath)
-		absSpecPath, err := filepath.Abs(cleanSpecPath)
+		cleanSpecPath, err := c.source.ResolveSpec(specFile)
 		if err != nil {
-			return nil, fmt.Errorf("resolve spec file %s: %w", cleanSpecPath, err)
+			return nil, fmt.Errorf("resolve spec file %s: %w", specFile, err)
 		}
-		specSourcePath = absSpecPath
-		data, err := common.ReadFileRooted(cleanSpecPath)
+		specBaseDir = filepath.Dir(cleanSpecPath)
+		specSourcePath = cleanSpecPath
+		data, err := c.source.ReadFile(cleanSpecPath)
 		if err != nil {
 			return nil, fmt.Errorf("read spec file %s: %w", cleanSpecPath, err)
 		}
-		specMap, err = parseSpecInputToMap(data, specBaseDir)
+		specMap, err = c.parseSpecInputToMap(data, specBaseDir)
 		if err != nil {
 			return nil, fmt.Errorf("parse spec file %s (not valid JSON or YAML): %w", cleanSpecPath, err)
 		}
 	} else {
 		specMap = make(map[string]any)
-		sourcePath, err := composeSpecRootPath(specBaseDir)
+		sourcePath, err := c.composeSpecRootPath(specBaseDir)
 		if err != nil {
 			return nil, err
 		}
 		specSourcePath = sourcePath
 	}
 
-	if err := expandSpecRefsInPlace(specMap, specSourcePath); err != nil {
+	if err := c.expandSpecRefsInPlace(specMap, specSourcePath); err != nil {
 		return nil, fmt.Errorf("expand refs: %w", err)
 	}
 	if err := selectStepInPlace(specMap, stepSelector, specSourcePath); err != nil {
 		return nil, err
 	}
 
-	if err := preprocessMigsSpecInPlace(specMap, specBaseDir); err != nil {
+	if err := c.preprocessMigsSpecInPlace(specMap); err != nil {
 		return nil, err
 	}
 
-	if err := applyConfigOverlayInPlace(specMap); err != nil {
+	if err := c.applyOverlay(specMap); err != nil {
 		return nil, err
 	}
 
-	// Merge CLI flag overrides (CLI flags take precedence)
-	hasOverrides := len(migEnvs) > 0 || migImage != "" || migCommand != ""
+	// Caller overrides take precedence over source values.
+	hasOverrides := len(overrides.Envs) > 0 || overrides.Image != "" || overrides.Command != ""
 
-	// Only proceed if we have a spec file or CLI overrides
+	// Only proceed if there is a spec file or an override.
 	if len(specMap) == 0 && !hasOverrides {
 		return nil, nil
 	}
@@ -554,7 +529,7 @@ func BuildSelected(
 		}
 	}
 
-	if len(migEnvs) > 0 {
+	if len(overrides.Envs) > 0 {
 		// Start from existing envs.
 		current := make(map[string]any)
 		if existingEnvs, ok := specMap["envs"].(map[string]any); ok {
@@ -565,8 +540,8 @@ func BuildSelected(
 			}
 		}
 
-		// Apply CLI overrides (higher precedence than spec file)
-		for _, kv := range migEnvs {
+		// Later override entries win, matching command-line order.
+		for _, kv := range overrides.Envs {
 			kv = strings.TrimSpace(kv)
 			if kv == "" {
 				continue
@@ -594,7 +569,7 @@ func BuildSelected(
 	if steps, ok := specMap["steps"].([]any); ok {
 		stepsLen = len(steps)
 	}
-	if stepsLen <= 1 && (migImage != "" || migCommand != "") {
+	if stepsLen <= 1 && (overrides.Image != "" || overrides.Command != "") {
 		// Ensure steps[0] exists and is a map.
 		var step0 map[string]any
 		if stepsLen == 1 {
@@ -607,21 +582,21 @@ func BuildSelected(
 			specMap["steps"] = []any{step0}
 		}
 
-		if migImage != "" {
-			step0["image"] = migImage
+		if overrides.Image != "" {
+			step0["image"] = overrides.Image
 		}
-		if migCommand != "" {
+		if overrides.Command != "" {
 			// Allow JSON array for command to pass argv directly to containers with ENTRYPOINT.
 			// Fallback to plain string when not a JSON array.
 			var asArray []string
-			if strings.HasPrefix(migCommand, "[") && strings.HasSuffix(migCommand, "]") {
-				if err := json.Unmarshal([]byte(migCommand), &asArray); err == nil && len(asArray) > 0 {
+			if strings.HasPrefix(overrides.Command, "[") && strings.HasSuffix(overrides.Command, "]") {
+				if err := json.Unmarshal([]byte(overrides.Command), &asArray); err == nil && len(asArray) > 0 {
 					step0["command"] = asArray
 				} else {
-					step0["command"] = migCommand
+					step0["command"] = overrides.Command
 				}
 			} else {
-				step0["command"] = migCommand
+				step0["command"] = overrides.Command
 			}
 		}
 	}
@@ -634,11 +609,11 @@ func BuildSelected(
 		return nil, err
 	}
 
-	if err := validateLocalFileRecords(specMap, specBaseDir); err != nil {
+	if err := c.validateLocalFileRecords(specMap, specBaseDir); err != nil {
 		return nil, fmt.Errorf("validate local file records: %w", err)
 	}
 
-	if err := compileHydraRecordsInPlace(ctx, base, client, specMap, specBaseDir); err != nil {
+	if err := c.compileHydraRecordsInPlace(ctx, specMap, specBaseDir); err != nil {
 		return nil, err
 	}
 
@@ -649,7 +624,7 @@ func BuildSelected(
 	}
 
 	// Validate spec using the canonical parser to catch structural issues early.
-	// This ensures the CLI surfaces validation errors before submission.
+	// Validate the final snapshot before returning it to either caller.
 	if _, err := contracts.ParseMigSpecJSON(jsonBytes); err != nil {
 		return nil, fmt.Errorf("validate spec: %w", err)
 	}
@@ -666,39 +641,4 @@ func validateSpecShape(spec map[string]any) error {
 		return fmt.Errorf("validate spec: %w", err)
 	}
 	return nil
-}
-
-// Load loads a spec from a file path or stdin when path is "-".
-func Load(ctx context.Context, base *url.URL, client *http.Client, path string) (json.RawMessage, error) {
-	var data []byte
-	var err error
-
-	if path == "-" {
-		data, err = io.ReadAll(os.Stdin)
-		if err != nil {
-			return nil, fmt.Errorf("read stdin: %w", err)
-		}
-	} else {
-		data, err = common.ReadFileRooted(path)
-		if err != nil {
-			return nil, fmt.Errorf("read file %s: %w", path, err)
-		}
-	}
-
-	if len(data) == 0 {
-		return nil, fmt.Errorf("spec is empty")
-	}
-
-	specBaseDir := ""
-	if path != "-" {
-		specBaseDir = filepath.Dir(path)
-	} else {
-		wd, wdErr := os.Getwd()
-		if wdErr != nil {
-			return nil, fmt.Errorf("resolve working directory for stdin spec: %w", wdErr)
-		}
-		specBaseDir = wd
-	}
-
-	return normalizeWithStepSelector(ctx, base, client, data, specBaseDir, "")
 }

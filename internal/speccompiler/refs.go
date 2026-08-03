@@ -1,12 +1,9 @@
-package specpayload
+package speccompiler
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
-
-	"github.com/iw2rmb/ploy/internal/cli/common"
 )
 
 type specRefStack struct {
@@ -26,11 +23,11 @@ func (s specRefStack) with(id string) (specRefStack, error) {
 	return specRefStack{ids: next}, nil
 }
 
-func expandSpecRefsInPlace(spec map[string]any, sourcePath string) error {
-	return expandSpecRefsInPlaceWithStack(spec, sourcePath, specRefStack{})
+func (c *Compiler) expandSpecRefsInPlace(spec map[string]any, sourcePath string) error {
+	return c.expandSpecRefsInPlaceWithStack(spec, sourcePath, filepath.Dir(sourcePath), specRefStack{})
 }
 
-func expandSpecRefsInPlaceWithStack(spec map[string]any, sourcePath string, stack specRefStack) error {
+func (c *Compiler) expandSpecRefsInPlaceWithStack(spec map[string]any, sourcePath, outputBaseDir string, stack specRefStack) error {
 	steps, ok := spec["steps"].([]any)
 	if !ok {
 		return nil
@@ -51,7 +48,7 @@ func expandSpecRefsInPlaceWithStack(spec map[string]any, sourcePath string, stac
 		if !ok || strings.TrimSpace(ref) == "" {
 			return fmt.Errorf("steps[%d].ref: required string", i)
 		}
-		imported, err := loadReferencedStep(ref, sourcePath, stack)
+		imported, err := c.loadReferencedStep(ref, sourcePath, outputBaseDir, stack)
 		if err != nil {
 			return fmt.Errorf("steps[%d].ref: %w", i, err)
 		}
@@ -111,8 +108,8 @@ func applyRefStepEnvOverlay(imported map[string]any, wrapper map[string]any, ind
 	return nil
 }
 
-func loadReferencedStep(rawRef, sourcePath string, stack specRefStack) (map[string]any, error) {
-	refSpecPath, stepName, err := parseSpecStepRef(rawRef, sourcePath)
+func (c *Compiler) loadReferencedStep(rawRef, sourcePath, outputBaseDir string, stack specRefStack) (map[string]any, error) {
+	refSpecPath, stepName, err := c.parseSpecStepRef(rawRef, sourcePath)
 	if err != nil {
 		return nil, err
 	}
@@ -123,16 +120,16 @@ func loadReferencedStep(rawRef, sourcePath string, stack specRefStack) (map[stri
 		return nil, err
 	}
 
-	data, err := common.ReadFileRooted(refSpecPath)
+	data, err := c.source.ReadFile(refSpecPath)
 	if err != nil {
 		return nil, fmt.Errorf("read referenced spec %s: %w", refSpecPath, err)
 	}
 	specBaseDir := filepath.Dir(refSpecPath)
-	spec, err := parseSpecInputToMap(data, specBaseDir)
+	spec, err := c.parseSpecInputToMap(data, specBaseDir)
 	if err != nil {
 		return nil, fmt.Errorf("parse referenced spec %s: %w", refSpecPath, err)
 	}
-	if err := expandSpecRefsInPlaceWithStack(spec, refSpecPath, nextStack); err != nil {
+	if err := c.expandSpecRefsInPlaceWithStack(spec, refSpecPath, outputBaseDir, nextStack); err != nil {
 		return nil, err
 	}
 
@@ -140,11 +137,11 @@ func loadReferencedStep(rawRef, sourcePath string, stack specRefStack) (map[stri
 	if err != nil {
 		return nil, err
 	}
-	normalizeStepLocalPaths(step, refSpecPath)
+	normalizeStepLocalPaths(step, refSpecPath, outputBaseDir)
 	return step, nil
 }
 
-func parseSpecStepRef(rawRef, sourcePath string) (string, string, error) {
+func (c *Compiler) parseSpecStepRef(rawRef, sourcePath string) (string, string, error) {
 	ref := strings.TrimSpace(rawRef)
 	idx := strings.LastIndex(ref, ":")
 	if idx < 0 {
@@ -159,27 +156,22 @@ func parseSpecStepRef(rawRef, sourcePath string) (string, string, error) {
 		return "", "", fmt.Errorf("step name is required")
 	}
 
-	specPath := pathPart
-	if !filepath.IsAbs(specPath) {
-		specPath = filepath.Join(filepath.Dir(sourcePath), specPath)
+	specPath, err := c.source.Resolve(pathPart, filepath.Dir(sourcePath))
+	if err != nil {
+		return "", "", fmt.Errorf("resolve referenced spec: %w", err)
 	}
-	specPath = filepath.Clean(specPath)
 
-	info, err := os.Stat(specPath)
+	info, err := c.source.Stat(specPath)
 	if err != nil {
 		return "", "", fmt.Errorf("load referenced spec: %w", err)
 	}
 	if info.IsDir() {
 		specPath = filepath.Join(specPath, "mig.yaml")
-		if _, err := os.Stat(specPath); err != nil {
+		if _, err := c.source.Stat(specPath); err != nil {
 			return "", "", fmt.Errorf("load referenced spec: %w", err)
 		}
 	}
-	absSpecPath, err := filepath.Abs(specPath)
-	if err != nil {
-		return "", "", fmt.Errorf("resolve referenced spec %s: %w", specPath, err)
-	}
-	return absSpecPath, stepName, nil
+	return specPath, stepName, nil
 }
 
 func selectStepInPlace(spec map[string]any, stepSelector string, sourcePath string) error {
@@ -250,14 +242,14 @@ func cloneSpecValue(v any) any {
 	}
 }
 
-func normalizeStepLocalPaths(step map[string]any, sourcePath string) {
-	normalizeStepMountList(step, "in", sourcePath, false)
-	normalizeStepMountList(step, "out", sourcePath, false)
-	normalizeStepMountList(step, "home", sourcePath, true)
-	normalizeStepMountList(step, "tmp", sourcePath, false)
+func normalizeStepLocalPaths(step map[string]any, sourcePath, outputBaseDir string) {
+	normalizeStepMountList(step, "in", sourcePath, outputBaseDir, false)
+	normalizeStepMountList(step, "out", sourcePath, outputBaseDir, false)
+	normalizeStepMountList(step, "home", sourcePath, outputBaseDir, true)
+	normalizeStepMountList(step, "tmp", sourcePath, outputBaseDir, false)
 }
 
-func normalizeStepMountList(step map[string]any, key string, sourcePath string, isHome bool) {
+func normalizeStepMountList(step map[string]any, key, sourcePath, outputBaseDir string, isHome bool) {
 	raw, ok := step[key].([]any)
 	if !ok {
 		return
@@ -267,11 +259,11 @@ func normalizeStepMountList(step map[string]any, key string, sourcePath string, 
 		if !ok {
 			continue
 		}
-		raw[i] = normalizeMountEntrySource(entry, sourcePath, isHome)
+		raw[i] = normalizeMountEntrySource(entry, sourcePath, outputBaseDir, isHome)
 	}
 }
 
-func normalizeMountEntrySource(entry string, sourcePath string, isHome bool) string {
+func normalizeMountEntrySource(entry, sourcePath, outputBaseDir string, isHome bool) string {
 	body := strings.TrimSpace(entry)
 	if body == "" {
 		return entry
@@ -291,5 +283,5 @@ func normalizeMountEntrySource(entry string, sourcePath string, isHome bool) str
 
 	src := strings.TrimSpace(body[:idx])
 	dst := body[idx:]
-	return normalizeLocalSourcePath(sourcePath, src) + dst + suffix
+	return normalizeLocalSourcePath(sourcePath, outputBaseDir, src) + dst + suffix
 }

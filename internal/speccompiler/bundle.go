@@ -1,24 +1,13 @@
-// mig_run_spec_bundle.go provides archive building and upload primitives
-// for the Hydra file-record compiler.
-//
-// buildSourceArchive creates deterministic tar.gz payloads from files and
-// directories. uploadSpecBundle uploads payloads to the server's spec-bundle
-// store with built-in deduplication by content hash.
-package specpayload
+// bundle.go provides deterministic archive primitives for file records.
+package speccompiler
 
 import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
-	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
-	"github.com/iw2rmb/ploy/internal/cli/common"
-	"io"
-	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
 	"time"
@@ -31,8 +20,8 @@ import (
 // so that identical source data and metadata produce the same archive regardless
 // of source path. File and directory permissions plus modification times are
 // preserved from the source.
-func buildSourceArchive(resolvedPath string) ([]byte, error) {
-	info, err := os.Stat(resolvedPath)
+func (c *Compiler) buildSourceArchive(resolvedPath string) ([]byte, error) {
+	info, err := c.source.Stat(resolvedPath)
 	if err != nil {
 		return nil, fmt.Errorf("stat %s: %w", resolvedPath, err)
 	}
@@ -51,11 +40,11 @@ func buildSourceArchive(resolvedPath string) ([]byte, error) {
 		if err := tw.WriteHeader(dirHdr); err != nil {
 			return nil, fmt.Errorf("write dir header: %w", err)
 		}
-		if err := addDirToTar(tw, resolvedPath, "content"); err != nil {
+		if err := c.addDirToTar(tw, resolvedPath, "content"); err != nil {
 			return nil, fmt.Errorf("walk dir: %w", err)
 		}
 	} else {
-		data, err := common.ReadFileRooted(resolvedPath)
+		data, err := c.source.ReadFile(resolvedPath)
 		if err != nil {
 			return nil, fmt.Errorf("read file %s: %w", resolvedPath, err)
 		}
@@ -116,8 +105,8 @@ func buildInlineContentArchive(content []byte) ([]byte, error) {
 // addDirToTar recursively adds all files under dirPath to tw with paths relative
 // to the entry name prefix. Entries within each directory are sorted for determinism.
 // Symlinks are skipped silently.
-func addDirToTar(tw *tar.Writer, dirPath, namePrefix string) error {
-	entries, err := os.ReadDir(dirPath)
+func (c *Compiler) addDirToTar(tw *tar.Writer, dirPath, namePrefix string) error {
+	entries, err := c.source.ReadDir(dirPath)
 	if err != nil {
 		return fmt.Errorf("read dir %s: %w", dirPath, err)
 	}
@@ -147,11 +136,11 @@ func addDirToTar(tw *tar.Writer, dirPath, namePrefix string) error {
 			if err := tw.WriteHeader(dirHdr); err != nil {
 				return fmt.Errorf("write dir header %s: %w", childName, err)
 			}
-			if err := addDirToTar(tw, childPath, childName); err != nil {
+			if err := c.addDirToTar(tw, childPath, childName); err != nil {
 				return err
 			}
 		} else {
-			data, err := common.ReadFileRooted(childPath)
+			data, err := c.source.ReadFile(childPath)
 			if err != nil {
 				return fmt.Errorf("read file %s: %w", childPath, err)
 			}
@@ -175,90 +164,7 @@ func addDirToTar(tw *tar.Writer, dirPath, namePrefix string) error {
 
 // computeSpecBundleCID computes the content identifier for a spec bundle archive
 // using the same scheme as the server (bafy-prefixed SHA256 prefix).
-func computeSpecBundleCID(data []byte) string {
+func BundleCID(data []byte) string {
 	hash := sha256.Sum256(data)
 	return "bafy" + hex.EncodeToString(hash[:])[:32]
-}
-
-// probeSpecBundleByCID checks whether a spec bundle with the given CID already
-// exists on the server via HEAD /v1/spec-bundles?cid={cid}. Returns the
-// bundle ID from the X-Bundle-ID response header (empty when not provided),
-// true if a bundle with the CID exists, false for 404, and an error for other
-// statuses.
-func probeSpecBundleByCID(ctx context.Context, base *url.URL, client *http.Client, cid string) (bundleID string, exists bool, err error) {
-	endpoint := base.JoinPath("v1", "spec-bundles")
-	q := endpoint.Query()
-	q.Set("cid", cid)
-	endpoint.RawQuery = q.Encode()
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodHead, endpoint.String(), nil)
-	if err != nil {
-		return "", false, fmt.Errorf("spec-bundle probe: build request: %w", err)
-	}
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", false, fmt.Errorf("spec-bundle probe: http request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	switch resp.StatusCode {
-	case http.StatusOK:
-		return resp.Header.Get("X-Bundle-ID"), true, nil
-	case http.StatusNotFound:
-		return "", false, nil
-	default:
-		return "", false, fmt.Errorf("spec-bundle probe: unexpected status %s", resp.Status)
-	}
-}
-
-// uploadSpecBundle POSTs archiveBytes to POST base/v1/spec-bundles with Content-Type
-// application/octet-stream. Accepts 200 (deduplicated) and 201 (new upload).
-// Returns bundle_id, cid, and digest from the JSON response.
-func uploadSpecBundle(ctx context.Context, base *url.URL, client *http.Client, archiveBytes []byte) (bundleID, cid, digest string, err error) {
-	endpoint := base.JoinPath("v1", "spec-bundles")
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), bytes.NewReader(archiveBytes))
-	if err != nil {
-		return "", "", "", fmt.Errorf("spec-bundle upload: build request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/octet-stream")
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", "", "", fmt.Errorf("spec-bundle upload: http request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-		body, _ := io.ReadAll(resp.Body)
-		var apiErr struct {
-			Error string `json:"error"`
-		}
-		if jsonErr := json.Unmarshal(body, &apiErr); jsonErr == nil {
-			if msg := apiErr.Error; msg != "" {
-				return "", "", "", fmt.Errorf("spec-bundle upload: server error: %s", msg)
-			}
-		}
-		return "", "", "", fmt.Errorf("spec-bundle upload: unexpected status %s", resp.Status)
-	}
-
-	var response struct {
-		BundleID string `json:"bundle_id"`
-		CID      string `json:"cid"`
-		Digest   string `json:"digest"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
-		return "", "", "", fmt.Errorf("spec-bundle upload: decode response: %w", err)
-	}
-	if response.BundleID == "" {
-		return "", "", "", fmt.Errorf("spec-bundle upload: empty bundle_id in response")
-	}
-	if response.CID == "" {
-		return "", "", "", fmt.Errorf("spec-bundle upload: empty cid in response")
-	}
-	if response.Digest == "" {
-		return "", "", "", fmt.Errorf("spec-bundle upload: empty digest in response")
-	}
-	return response.BundleID, response.CID, response.Digest, nil
 }

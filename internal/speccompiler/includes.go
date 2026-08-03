@@ -1,9 +1,8 @@
-package specpayload
+package speccompiler
 
 import (
 	"errors"
 	"fmt"
-	"github.com/iw2rmb/ploy/internal/cli/common"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -15,7 +14,7 @@ var errSpecIncludeCycle = errors.New("spec include cycle detected")
 
 // composeSpecYAML resolves !include macros and deep merge keys (<<) in YAML specs.
 // It returns composed YAML bytes ready for map decoding.
-func composeSpecYAML(data []byte, sourcePath string) ([]byte, error) {
+func (c *Compiler) composeSpecYAML(data []byte, sourcePath string) ([]byte, error) {
 	rootNode, err := loadYAMLDocumentBytes(data, sourcePath)
 	if err != nil {
 		return nil, err
@@ -24,7 +23,7 @@ func composeSpecYAML(data []byte, sourcePath string) ([]byte, error) {
 	cache := map[string]*yaml.Node{
 		sourcePath: rootNode,
 	}
-	if err := resolveIncludes(rootNode, sourcePath, cache, []string{sourcePath}); err != nil {
+	if err := c.resolveIncludes(rootNode, sourcePath, filepath.Dir(sourcePath), cache, []string{sourcePath}); err != nil {
 		return nil, err
 	}
 	if err := expandDeepMergeKeys(rootNode.Content[0]); err != nil {
@@ -49,16 +48,16 @@ func loadYAMLDocumentBytes(data []byte, sourcePath string) (*yaml.Node, error) {
 	return &root, nil
 }
 
-func resolveIncludes(node *yaml.Node, sourcePath string, cache map[string]*yaml.Node, stack []string) error {
+func (c *Compiler) resolveIncludes(node *yaml.Node, sourcePath, outputBaseDir string, cache map[string]*yaml.Node, stack []string) error {
 	if node == nil {
 		return nil
 	}
 	if node.Kind == yaml.AliasNode && node.Alias != nil {
-		return resolveIncludes(node.Alias, sourcePath, cache, stack)
+		return c.resolveIncludes(node.Alias, sourcePath, outputBaseDir, cache, stack)
 	}
 
 	if node.Kind == yaml.ScalarNode && node.Tag == "!include" {
-		targetFile, pointer, err := parseIncludeRef(sourcePath, node.Value)
+		targetFile, pointer, err := c.parseIncludeRef(sourcePath, node.Value)
 		if err != nil {
 			return err
 		}
@@ -71,7 +70,7 @@ func resolveIncludes(node *yaml.Node, sourcePath string, cache map[string]*yaml.
 			return fmt.Errorf("%w: %s", errSpecIncludeCycle, strings.Join(cycle, " -> "))
 		}
 
-		targetRoot, err := loadYAMLFromCache(targetFile, cache)
+		targetRoot, err := c.loadYAMLFromCache(targetFile, cache)
 		if err != nil {
 			return err
 		}
@@ -81,10 +80,10 @@ func resolveIncludes(node *yaml.Node, sourcePath string, cache map[string]*yaml.
 		}
 
 		replacement := cloneNode(selected)
-		if err := normalizeIncludedLocalPaths(replacement, targetFile); err != nil {
+		if err := normalizeIncludedLocalPaths(replacement, targetFile, outputBaseDir); err != nil {
 			return err
 		}
-		if err := resolveIncludes(replacement, targetFile, cache, append(stack, targetID)); err != nil {
+		if err := c.resolveIncludes(replacement, targetFile, outputBaseDir, cache, append(stack, targetID)); err != nil {
 			return err
 		}
 		replaceNode(node, replacement)
@@ -92,18 +91,18 @@ func resolveIncludes(node *yaml.Node, sourcePath string, cache map[string]*yaml.
 	}
 
 	for _, child := range node.Content {
-		if err := resolveIncludes(child, sourcePath, cache, stack); err != nil {
+		if err := c.resolveIncludes(child, sourcePath, outputBaseDir, cache, stack); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func loadYAMLFromCache(filePath string, cache map[string]*yaml.Node) (*yaml.Node, error) {
+func (c *Compiler) loadYAMLFromCache(filePath string, cache map[string]*yaml.Node) (*yaml.Node, error) {
 	if root, ok := cache[filePath]; ok {
 		return root, nil
 	}
-	data, err := common.ReadFileRooted(filePath)
+	data, err := c.source.ReadFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("read spec %s: %w", filePath, err)
 	}
@@ -115,7 +114,7 @@ func loadYAMLFromCache(filePath string, cache map[string]*yaml.Node) (*yaml.Node
 	return root, nil
 }
 
-func parseIncludeRef(sourcePath string, raw string) (string, string, error) {
+func (c *Compiler) parseIncludeRef(sourcePath string, raw string) (string, string, error) {
 	value := strings.TrimSpace(raw)
 	if value == "" {
 		return "", "", fmt.Errorf("decode spec %s: !include path must not be empty", sourcePath)
@@ -131,11 +130,10 @@ func parseIncludeRef(sourcePath string, raw string) (string, string, error) {
 		return "", "", fmt.Errorf("decode spec %s: !include path must not be empty", sourcePath)
 	}
 
-	resolvedPath := pathPart
-	if !filepath.IsAbs(resolvedPath) {
-		resolvedPath = filepath.Join(filepath.Dir(sourcePath), resolvedPath)
+	resolvedPath, err := c.source.Resolve(pathPart, filepath.Dir(sourcePath))
+	if err != nil {
+		return "", "", fmt.Errorf("decode spec %s: resolve !include path %q: %w", sourcePath, pathPart, err)
 	}
-	resolvedPath = filepath.Clean(resolvedPath)
 
 	if pointer != "" && !strings.HasPrefix(pointer, "/") {
 		return "", "", fmt.Errorf("decode spec %s: !include fragment must start with /", sourcePath)
@@ -329,14 +327,14 @@ func derefAlias(node *yaml.Node) *yaml.Node {
 	return node
 }
 
-func normalizeIncludedLocalPaths(node *yaml.Node, sourcePath string) error {
+func normalizeIncludedLocalPaths(node *yaml.Node, sourcePath, outputBaseDir string) error {
 	if node == nil {
 		return nil
 	}
 	node = derefAlias(node)
 	if node.Kind == yaml.SequenceNode {
 		for _, child := range node.Content {
-			if err := normalizeIncludedLocalPaths(child, sourcePath); err != nil {
+			if err := normalizeIncludedLocalPaths(child, sourcePath, outputBaseDir); err != nil {
 				return err
 			}
 		}
@@ -350,7 +348,7 @@ func normalizeIncludedLocalPaths(node *yaml.Node, sourcePath string) error {
 		key := node.Content[i]
 		value := derefAlias(node.Content[i+1])
 		if key.Kind != yaml.ScalarNode {
-			if err := normalizeIncludedLocalPaths(value, sourcePath); err != nil {
+			if err := normalizeIncludedLocalPaths(value, sourcePath, outputBaseDir); err != nil {
 				return err
 			}
 			continue
@@ -358,23 +356,23 @@ func normalizeIncludedLocalPaths(node *yaml.Node, sourcePath string) error {
 
 		switch key.Value {
 		case "in":
-			normalizeMountEntries(value, sourcePath, false)
+			normalizeMountEntries(value, sourcePath, outputBaseDir, false)
 		case "out":
-			normalizeMountEntries(value, sourcePath, false)
+			normalizeMountEntries(value, sourcePath, outputBaseDir, false)
 		case "home":
-			normalizeMountEntries(value, sourcePath, true)
+			normalizeMountEntries(value, sourcePath, outputBaseDir, true)
 		case "ref":
-			normalizeRefEntry(value, sourcePath)
+			normalizeRefEntry(value, sourcePath, outputBaseDir)
 		}
 
-		if err := normalizeIncludedLocalPaths(value, sourcePath); err != nil {
+		if err := normalizeIncludedLocalPaths(value, sourcePath, outputBaseDir); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func normalizeRefEntry(node *yaml.Node, sourcePath string) {
+func normalizeRefEntry(node *yaml.Node, sourcePath, outputBaseDir string) {
 	node = derefAlias(node)
 	if node.Kind != yaml.ScalarNode {
 		return
@@ -389,10 +387,10 @@ func normalizeRefEntry(node *yaml.Node, sourcePath string) {
 	if pathPart == "" || stepName == "" || filepath.IsAbs(pathPart) {
 		return
 	}
-	node.Value = filepath.Clean(filepath.Join(filepath.Dir(sourcePath), pathPart)) + ":" + stepName
+	node.Value = rebaseLocalSourcePath(sourcePath, outputBaseDir, pathPart) + ":" + stepName
 }
 
-func normalizeMountEntries(node *yaml.Node, sourcePath string, isHome bool) {
+func normalizeMountEntries(node *yaml.Node, sourcePath, outputBaseDir string, isHome bool) {
 	if node.Kind != yaml.SequenceNode {
 		return
 	}
@@ -422,11 +420,11 @@ func normalizeMountEntries(node *yaml.Node, sourcePath string, isHome bool) {
 
 		src := strings.TrimSpace(body[:idx])
 		dst := body[idx:]
-		entry.Value = normalizeLocalSourcePath(sourcePath, src) + dst + suffix
+		entry.Value = normalizeLocalSourcePath(sourcePath, outputBaseDir, src) + dst + suffix
 	}
 }
 
-func normalizeLocalSourcePath(sourcePath, raw string) string {
+func normalizeLocalSourcePath(sourcePath, outputBaseDir, raw string) string {
 	trimmed := strings.TrimSpace(raw)
 	if trimmed == "" || strings.HasPrefix(trimmed, "$") || strings.HasPrefix(trimmed, "~/") || filepath.IsAbs(trimmed) {
 		return trimmed
@@ -434,7 +432,16 @@ func normalizeLocalSourcePath(sourcePath, raw string) string {
 	if strings.Contains(trimmed, "\n") || strings.Contains(trimmed, "\r") {
 		return trimmed
 	}
-	return filepath.Clean(filepath.Join(filepath.Dir(sourcePath), trimmed))
+	return rebaseLocalSourcePath(sourcePath, outputBaseDir, trimmed)
+}
+
+func rebaseLocalSourcePath(sourcePath, outputBaseDir, path string) string {
+	resolved := filepath.Clean(filepath.Join(filepath.Dir(sourcePath), path))
+	relative, err := filepath.Rel(outputBaseDir, resolved)
+	if err != nil {
+		return resolved
+	}
+	return relative
 }
 
 func replaceNode(dst *yaml.Node, src *yaml.Node) {
