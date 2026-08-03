@@ -11,35 +11,6 @@ get:
         application/json:
           schema:
             $ref: '../components/schemas/controlplane.yaml#/NamedSpecListResponse'
-    '400': { description: Bad request }
+    '400': { description: Query parameters are not supported }
     '503': { description: No repositories are configured, or a repository cannot be refreshed or scanned }
-    '500': { description: Internal server error }
-
-post:
-  tags: [Control]
-  summary: Publish a named spec
-  description: |
-    Publishes one immutable named spec for a source repository commit.
-    Re-publishing the same `name + source + sha` is idempotent and returns `skipped=true`.
-  requestBody:
-    required: true
-    content:
-      application/json:
-        schema:
-          $ref: '../components/schemas/controlplane.yaml#/PublishNamedSpecRequest'
-  responses:
-    '201':
-      description: Created
-      content:
-        application/json:
-          schema:
-            $ref: '../components/schemas/controlplane.yaml#/NamedSpecSummary'
-    '200':
-      description: Existing row returned for an idempotent publish
-      content:
-        application/json:
-          schema:
-            $ref: '../components/schemas/controlplane.yaml#/NamedSpecSummary'
-    '400': { description: Bad request }
-    '409': { description: Unique conflict that did not resolve to the same row }
     '500': { description: Internal server error }

@@ -30,9 +30,7 @@ ploy job status <job-id>                                                     # i
 ploy mig run <mig-id|name> [<namespace/repo[:ref]> ...] [--failed] [--follow] [--gitlab-token-env ENV_NAME|--gitlab-token-prompt] # execute a mig project over its repo set
 ploy spec schema                                                             # print the mig JSON Schema
 ploy spec validate docs/schemas/mig.example.yaml                             # validate a mig spec
-ploy spec push [<git-folder>]                                                # store legacy named-spec snapshot rows
 ploy spec ls                                                                 # list named specs from configured Git repositories
-ploy spec <selector>[@sha] (--archive|--unarchive)                           # archive or unarchive a named spec version
 ```
 
 Run IDs (`<run-id>`) are KSUID-backed strings.
@@ -67,10 +65,8 @@ fresh token marker to the restarted attempt.
 `ploy mig add --name <name> --spec <path>`, `ploy mig repo add`, and
 `ploy mig spec set` to manage the project before running it.
 
-`ploy spec push` stores legacy named-spec snapshot rows from a clean Git
-worktree. Git-backed `ploy spec ls` and named `ploy run` do not read those rows.
-They refresh the configured spec repositories and use tracked named YAML files
-from their default branches.
+`ploy spec ls` and named `ploy run` refresh the configured spec repositories
+and use tracked named YAML files from their default branches.
 
 When follow mode is used, the CLI displays a summarized per-repo job graph that
 refreshes until the run reaches a terminal state. The job graph shows step index,
@@ -151,23 +147,12 @@ configured through `PLOY_SPECS_REPOS`. `ploy spec ls` and named `ploy run`
 refresh those repositories directly.
 
 ```bash
-# Store legacy named-spec rows from the current Git worktree.
-ploy spec push
-
-# Store legacy named-spec rows from another worktree.
-ploy spec push ../migs
-
 # List named specs from configured Git repositories.
 ploy spec ls
-
-# Archive or unarchive a named spec version.
-ploy spec github.com/acme/service:upgrade-java@01234567 --archive
-ploy spec github.com/acme/service:upgrade-java@01234567 --unarchive
 ```
 
-The legacy push and archive commands update stored rows. Git-backed list and
-run operations do not read those rows. List output shows `NAME`, `SOURCE`,
-`PATH`, and `SHA` from the configured repositories.
+List output shows `NAME`, `SOURCE`, `PATH`, and `SHA` from the configured
+repositories.
 
 ## Mig Project Runs
 

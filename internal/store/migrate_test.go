@@ -32,6 +32,9 @@ func TestRunMigrationsTernStates(t *testing.T) {
 			assert: func(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
 				assertTernVersion(t, ctx, pool, TargetSchemaVersion)
 				assertTableAbsent(t, ctx, pool, "schema_version")
+				assertColumnAbsent(t, ctx, pool, "specs", "updated_by")
+				assertColumnAbsent(t, ctx, pool, "specs", "archived_at")
+				assertTableAbsent(t, ctx, pool, "specs_named_source_sha_name_idx")
 				assertConstraintAbsent(t, ctx, pool, "bootstrap_tokens", "bootstrap_tokens_node_id_fkey")
 
 				if err := RunMigrations(ctx, pool); err != nil {
@@ -49,6 +52,9 @@ func TestRunMigrationsTernStates(t *testing.T) {
 				assertColumnAbsent(t, ctx, pool, "api_tokens", "cluster_id")
 				assertColumnAbsent(t, ctx, pool, "bootstrap_tokens", "cluster_id")
 				assertColumnAbsent(t, ctx, pool, "mig_repos", "target_ref")
+				assertColumnAbsent(t, ctx, pool, "specs", "updated_by")
+				assertColumnAbsent(t, ctx, pool, "specs", "archived_at")
+				assertTableAbsent(t, ctx, pool, "specs_named_source_sha_name_idx")
 				assertConstraintAbsent(t, ctx, pool, "bootstrap_tokens", "bootstrap_tokens_node_id_fkey")
 				assertNoObsoleteNodeUpdaterRows(t, ctx, pool)
 			},

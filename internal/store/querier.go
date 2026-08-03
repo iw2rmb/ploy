@@ -48,6 +48,7 @@ type Querier interface {
 	// Creates a new diff entry associated with a job. Blob data is stored in object storage.
 	CreateDiff(ctx context.Context, arg CreateDiffParams) (Diff, error)
 	CreateEvent(ctx context.Context, arg CreateEventParams) (Event, error)
+	CreateGitSpecSnapshot(ctx context.Context, arg CreateGitSpecSnapshotParams) (Spec, error)
 	// Note: `id` is a required TEXT parameter (KSUID-backed); caller generates via types.NewJobID().
 	CreateJob(ctx context.Context, arg CreateJobParams) (Job, error)
 	// Creates a new log chunk metadata. Blob data is stored in object storage.
@@ -55,7 +56,6 @@ type Querier interface {
 	CreateLog(ctx context.Context, arg CreateLogParams) (Log, error)
 	CreateMig(ctx context.Context, arg CreateMigParams) (Mig, error)
 	CreateMigRepo(ctx context.Context, arg CreateMigRepoParams) (MigRepo, error)
-	CreateNamedSpec(ctx context.Context, arg CreateNamedSpecParams) (Spec, error)
 	// Creates a new node with an application-supplied URL-safe ID as the primary key.
 	CreateNode(ctx context.Context, arg CreateNodeParams) (Node, error)
 	CreateNodeDaemonLog(ctx context.Context, arg CreateNodeDaemonLogParams) (NodeDaemonLog, error)
@@ -121,7 +121,6 @@ type Querier interface {
 	GetMigRepo(ctx context.Context, id types.MigRepoID) (MigRepo, error)
 	// Gets a mig_repo by mig_id and repo_url (for uniqueness constraint enforcement).
 	GetMigRepoByURL(ctx context.Context, arg GetMigRepoByURLParams) (MigRepo, error)
-	GetNamedSpecByNameSourceSHA(ctx context.Context, arg GetNamedSpecByNameSourceSHAParams) (Spec, error)
 	GetNode(ctx context.Context, id types.NodeID) (Node, error)
 	GetRepo(ctx context.Context, id types.RepoID) (Repo, error)
 	GetRun(ctx context.Context, id types.RunID) (Run, error)
@@ -182,7 +181,6 @@ type Querier interface {
 	// run_id: if non-null, filter to jobs for that run; if null, return all jobs.
 	// Joins runs and migs to surface mig_name per job for the TUI jobs-list screen.
 	ListJobsForTUI(ctx context.Context, arg ListJobsForTUIParams) ([]ListJobsForTUIRow, error)
-	ListLatestNamedSpecs(ctx context.Context, arg ListLatestNamedSpecsParams) ([]ListLatestNamedSpecsRow, error)
 	// ListLogPartitions retrieves all partition names for the logs table.
 	ListLogPartitions(ctx context.Context) ([]string, error)
 	// Returns log metadata including object_key for object-storage retrieval.
@@ -229,12 +227,6 @@ type Querier interface {
 	// Atomically promote a specific linked successor job: Created -> Queued.
 	// The candidate is eligible only when every predecessor that points to it is Success.
 	PromoteJobByIDIfUnblocked(ctx context.Context, id types.JobID) (Job, error)
-	ResolveLatestNamedSpecByDomainRepoName(ctx context.Context, arg ResolveLatestNamedSpecByDomainRepoNameParams) ([]ResolveLatestNamedSpecByDomainRepoNameRow, error)
-	ResolveLatestNamedSpecByName(ctx context.Context, arg ResolveLatestNamedSpecByNameParams) ([]ResolveLatestNamedSpecByNameRow, error)
-	ResolveLatestNamedSpecByRepoName(ctx context.Context, arg ResolveLatestNamedSpecByRepoNameParams) ([]ResolveLatestNamedSpecByRepoNameRow, error)
-	ResolveNamedSpecVersionByDomainRepoName(ctx context.Context, arg ResolveNamedSpecVersionByDomainRepoNameParams) ([]Spec, error)
-	ResolveNamedSpecVersionByName(ctx context.Context, arg ResolveNamedSpecVersionByNameParams) ([]Spec, error)
-	ResolveNamedSpecVersionByRepoName(ctx context.Context, arg ResolveNamedSpecVersionByRepoNameParams) ([]Spec, error)
 	RevokeAPIToken(ctx context.Context, tokenID string) error
 	// Atomically promote the next unblocked job in a run attempt: Created -> Queued.
 	// A created job is unblocked when all predecessor jobs that point to it are Success.
@@ -258,7 +250,6 @@ type Querier interface {
 	UpdateJobStatus(ctx context.Context, arg UpdateJobStatusParams) error
 	UpdateMigRepoBaseRef(ctx context.Context, arg UpdateMigRepoBaseRefParams) error
 	UpdateMigSpec(ctx context.Context, arg UpdateMigSpecParams) error
-	UpdateNamedSpecArchiveState(ctx context.Context, arg UpdateNamedSpecArchiveStateParams) (Spec, error)
 	UpdateNodeCertMetadata(ctx context.Context, arg UpdateNodeCertMetadataParams) error
 	UpdateNodeDrained(ctx context.Context, arg UpdateNodeDrainedParams) error
 	UpdateNodeHeartbeat(ctx context.Context, arg UpdateNodeHeartbeatParams) error

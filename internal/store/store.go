@@ -497,15 +497,15 @@ func (s *PgStore) CreateRun(ctx context.Context, arg CreateRunParams) (Run, erro
 	return s.Queries.CreateRun(ctx, arg)
 }
 
-// CreateNamedSpec validates JSONB fields and creates a new named spec.
-func (s *PgStore) CreateNamedSpec(ctx context.Context, arg CreateNamedSpecParams) (Spec, error) {
+// CreateGitSpecSnapshot validates JSONB fields and creates an immutable snapshot.
+func (s *PgStore) CreateGitSpecSnapshot(ctx context.Context, arg CreateGitSpecSnapshotParams) (Spec, error) {
 	if err := validateJSONB(arg.Source); err != nil {
 		return Spec{}, fmt.Errorf("specs.source: %w", err)
 	}
 	if err := validateJSONB(arg.Spec); err != nil {
 		return Spec{}, fmt.Errorf("specs.spec: %w", err)
 	}
-	return s.Queries.CreateNamedSpec(ctx, arg)
+	return s.Queries.CreateGitSpecSnapshot(ctx, arg)
 }
 
 // CreateDiff validates the Summary JSONB field and creates a new diff.

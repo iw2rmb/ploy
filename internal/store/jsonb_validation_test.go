@@ -85,8 +85,8 @@ func TestRejectsInvalidJSONBPayloads(t *testing.T) {
 		}
 	})
 
-	t.Run("CreateNamedSpec/invalid_source", func(t *testing.T) {
-		_, err := store.CreateNamedSpec(ctx, CreateNamedSpecParams{
+	t.Run("CreateGitSpecSnapshot/invalid_source", func(t *testing.T) {
+		_, err := store.CreateGitSpecSnapshot(ctx, CreateGitSpecSnapshotParams{
 			ID:     types.NewSpecID(),
 			Source: invalidJSON,
 			Spec:   validJSON,
@@ -99,8 +99,8 @@ func TestRejectsInvalidJSONBPayloads(t *testing.T) {
 		}
 	})
 
-	t.Run("CreateNamedSpec/invalid_spec", func(t *testing.T) {
-		_, err := store.CreateNamedSpec(ctx, CreateNamedSpecParams{
+	t.Run("CreateGitSpecSnapshot/invalid_spec", func(t *testing.T) {
+		_, err := store.CreateGitSpecSnapshot(ctx, CreateGitSpecSnapshotParams{
 			ID:     types.NewSpecID(),
 			Source: validJSON,
 			Spec:   invalidJSON,

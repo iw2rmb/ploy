@@ -16,31 +16,12 @@ func newConfigCmd(stdout, stderr io.Writer) *cobra.Command {
 
 // newSpecCmd creates the cobra command tree for 'ploy spec' and its subcommands.
 func newSpecCmd(stdout, stderr io.Writer) *cobra.Command {
-	var archive bool
-	var unarchive bool
 	specCmd := &cobra.Command{
 		Use:   "spec",
 		Short: "Inspect and validate mig specs",
-		Args:  cobra.MaximumNArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			if archive && unarchive {
-				return fmt.Errorf("--archive and --unarchive are mutually exclusive")
-			}
-			if archive || unarchive {
-				runArgs := append([]string{}, args...)
-				if archive {
-					runArgs = append(runArgs, "--archive")
-				}
-				if unarchive {
-					runArgs = append(runArgs, "--unarchive")
-				}
-				return spec.Handle(runArgs, stdout, stderr)
-			}
-			return cmd.Help()
-		},
+		Args:  cobra.NoArgs,
+		RunE:  func(cmd *cobra.Command, args []string) error { return cmd.Help() },
 	}
-	specCmd.Flags().BoolVar(&archive, "archive", false, "Archive a named spec")
-	specCmd.Flags().BoolVar(&unarchive, "unarchive", false, "Unarchive a named spec")
 	specCmd.AddCommand(&cobra.Command{
 		Use:   "schema",
 		Short: "Print the mig JSON schema",
@@ -57,28 +38,14 @@ func newSpecCmd(stdout, stderr io.Writer) *cobra.Command {
 			return spec.Handle(append([]string{"validate"}, args...), stdout, stderr)
 		},
 	})
-	specCmd.AddCommand(&cobra.Command{
-		Use:   "push [<git-folder>]",
-		Short: "Publish named mig specs from a git worktree",
-		Args:  cobra.MaximumNArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return spec.Handle(append([]string{"push"}, args...), stdout, stderr)
-		},
-	})
-	var listArchived bool
 	listCmd := &cobra.Command{
 		Use:   "ls",
-		Short: "List published named mig specs",
+		Short: "List named mig specs",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			runArgs := []string{"ls"}
-			if listArchived {
-				runArgs = append(runArgs, "--archived")
-			}
-			return spec.Handle(runArgs, stdout, stderr)
+			return spec.Handle([]string{"ls"}, stdout, stderr)
 		},
 	}
-	listCmd.Flags().BoolVar(&listArchived, "archived", false, "List archived named specs")
 	specCmd.AddCommand(listCmd)
 	return specCmd
 }

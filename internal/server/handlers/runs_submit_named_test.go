@@ -43,7 +43,7 @@ type namedSnapshotStore struct {
 	snapshots []store.Spec
 }
 
-func (s *namedSnapshotStore) CreateNamedSpec(_ context.Context, params store.CreateNamedSpecParams) (store.Spec, error) {
+func (s *namedSnapshotStore) CreateGitSpecSnapshot(_ context.Context, params store.CreateGitSpecSnapshotParams) (store.Spec, error) {
 	created := store.Spec{
 		ID: params.ID, Name: params.Name, Description: params.Description, Source: params.Source,
 		Sha: params.Sha, SourceCommittedAt: params.SourceCommittedAt, Spec: params.Spec, CreatedBy: params.CreatedBy,
@@ -119,10 +119,10 @@ steps:
 	if len(bundles.cids) != 1 || len(bundles.archives[0]) == 0 {
 		t.Fatalf("persisted bundles = %d, want one materialized archive", len(bundles.cids))
 	}
-	if !st.createNamedSpec.called {
-		t.Fatal("CreateNamedSpec was not called")
+	if !st.createGitSpecSnapshot.called {
+		t.Fatal("CreateGitSpecSnapshot was not called")
 	}
-	created := st.createNamedSpec.params
+	created := st.createGitSpecSnapshot.params
 	if created.Name != "upgrade-java" || created.Description != "Upgrade Java" || created.Sha != catalog.entry.SHA || !created.SourceCommittedAt.Valid || !created.SourceCommittedAt.Time.Equal(committedAt) {
 		t.Fatalf("named snapshot metadata = %+v", created)
 	}
@@ -146,8 +146,8 @@ steps:
 	if pre["mode"] != "forced" || pre["language"] != "java" || pre["release"] != "21" || pre["tool"] != "gradle" {
 		t.Fatalf("forced pre stack = %#v", pre)
 	}
-	if st.createRun.params.SpecID != st.createNamedSpec.val.ID {
-		t.Fatalf("run spec id = %s, want persisted snapshot %s", st.createRun.params.SpecID, st.createNamedSpec.val.ID)
+	if st.createRun.params.SpecID != st.createGitSpecSnapshot.val.ID {
+		t.Fatalf("run spec id = %s, want persisted snapshot %s", st.createRun.params.SpecID, st.createGitSpecSnapshot.val.ID)
 	}
 }
 
@@ -213,7 +213,7 @@ func TestRunsCreateSingleRepo_NamedSpecFailuresDoNotCreateDurableRows(t *testing
 			if !strings.Contains(rr.Body.String(), tc.wantBody) {
 				t.Fatalf("body = %q, want %q", rr.Body.String(), tc.wantBody)
 			}
-			if st.createSpec.called || st.createNamedSpec.called || st.createMig.called || st.createRun.called {
+			if st.createSpec.called || st.createGitSpecSnapshot.called || st.createMig.called || st.createRun.called {
 				t.Fatal("catalog failure created durable rows")
 			}
 		})
@@ -235,7 +235,7 @@ func TestRunsCreateSingleRepo_InvalidNamedSpecDoesNotCreateDurableRows(t *testin
 	}))
 
 	assertStatus(t, rr, http.StatusBadRequest)
-	if st.createSpec.called || st.createNamedSpec.called || st.createMig.called || st.createRun.called {
+	if st.createSpec.called || st.createGitSpecSnapshot.called || st.createMig.called || st.createRun.called {
 		t.Fatal("compile failure created durable rows")
 	}
 }

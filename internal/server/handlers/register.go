@@ -155,10 +155,7 @@ func registerSpecBundleRoutes(s *httpserver.Server, deps routeDeps) {
 }
 
 func registerGlobalSpecRoutes(s *httpserver.Server, deps routeDeps) {
-	s.RegisterRouteFunc("POST /v1/specs", publishNamedSpecHandler(deps.st), auth.RoleControlPlane)
 	s.RegisterRouteFunc("GET /v1/specs", listNamedSpecsHandler(deps.specCatalog), auth.RoleControlPlane)
-	s.RegisterRouteFunc("GET /v1/specs/resolve", resolveNamedSpecHandler(deps.st), auth.RoleControlPlane)
-	s.RegisterRouteFunc("PATCH /v1/specs/{spec_id}", updateNamedSpecHandler(deps.st), auth.RoleControlPlane)
 }
 
 func registerJobArtifactRoutes(s *httpserver.Server, deps routeDeps) {

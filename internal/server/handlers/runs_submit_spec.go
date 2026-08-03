@@ -34,9 +34,16 @@ type runSubmissionSpec struct {
 	canonical   json.RawMessage
 	name        string
 	description string
-	source      domainapi.NamedSpecSource
+	source      gitSpecSnapshotSource
 	sha         string
 	committedAt time.Time
+}
+
+type gitSpecSnapshotSource struct {
+	Domain string `json:"domain"`
+	Repo   string `json:"repo"`
+	URL    string `json:"url"`
+	Path   string `json:"path"`
 }
 
 func (s runSubmissionSpec) named() bool {
@@ -129,7 +136,7 @@ func resolveRunSubmissionSpec(ctx context.Context, req domainapi.RunSubmitReques
 			canonical:   canonical,
 			name:        entry.Name,
 			description: entry.Description,
-			source: domainapi.NamedSpecSource{
+			source: gitSpecSnapshotSource{
 				Domain: domain,
 				Repo:   repo,
 				URL:    entry.Source,
@@ -235,7 +242,7 @@ func persistRunSubmissionSpec(ctx context.Context, st store.Store, spec runSubmi
 		return "", fmt.Errorf("lookup Git spec snapshot: %w", err)
 	}
 
-	created, err := st.CreateNamedSpec(ctx, store.CreateNamedSpecParams{
+	created, err := st.CreateGitSpecSnapshot(ctx, store.CreateGitSpecSnapshotParams{
 		ID:                domaintypes.NewSpecID(),
 		Name:              spec.name,
 		Description:       spec.description,

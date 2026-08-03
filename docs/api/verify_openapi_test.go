@@ -50,9 +50,6 @@ func TestOpenAPICompleteness(t *testing.T) {
 		{"/v1/runs", "post"},
 		// Named specs
 		{"/v1/specs", "get"},
-		{"/v1/specs", "post"},
-		{"/v1/specs/{spec_id}", "patch"},
-		{"/v1/specs/resolve", "get"},
 		// Migs (mig project CRUD)
 		{"/v1/migs", "get"},
 		{"/v1/migs", "post"},
@@ -190,12 +187,8 @@ func TestOpenAPICompleteness(t *testing.T) {
 		"Stage",
 		"RepoSummary",
 		"RepoRunSummary",
-		"NamedSpecSource",
-		"PublishNamedSpecRequest",
-		"NamedSpecSummary",
+		"NamedSpecCatalogEntry",
 		"NamedSpecListResponse",
-		"NamedSpecResolveResponse",
-		"UpdateNamedSpecRequest",
 	}
 
 	for _, schema := range requiredSchemas {
