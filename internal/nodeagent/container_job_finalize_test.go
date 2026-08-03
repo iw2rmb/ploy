@@ -186,9 +186,9 @@ func TestRunContainerJobNonzeroExitReportsDerivedStatsError(t *testing.T) {
 
 			runID := types.NewRunID()
 			jobID := types.NewJobID()
-			paths := artifactPaths(runID, jobID)
-			if err := ensureJobArtifactDirs(paths); err != nil {
-				t.Fatalf("ensure job artifact dirs: %v", err)
+			paths := jobDirectories(runID, jobID)
+			if err := ensureJobDirectories(paths); err != nil {
+				t.Fatalf("ensure job directories: %v", err)
 			}
 			artifactLogs, err := newArtifactLogWriter(nil, paths)
 			if err != nil {
@@ -243,9 +243,7 @@ func TestRunContainerJobNonzeroExitReportsDerivedStatsError(t *testing.T) {
 				execCtx,
 				workspace,
 				time.Now(),
-				paths.Out,
-				paths.In,
-				paths.Diff,
+				paths,
 			)
 			if err != nil {
 				t.Fatalf("runContainerJob() error = %v", err)

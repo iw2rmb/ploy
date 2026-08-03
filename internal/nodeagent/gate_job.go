@@ -21,7 +21,7 @@ import (
 func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest) {
 	startTime := time.Now()
 
-	artifactPaths := artifactPaths(req.RunID, req.JobID)
+	jobDirs := jobDirectories(req.RunID, req.JobID)
 	uploadRepoArtifactsOnReturn := false
 	closeArtifactLogs := func() {}
 	defer func() {
@@ -30,12 +30,6 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 			r.uploadRepoArtifactsIfPresent(req.RunID, req.RepoID, req.JobID)
 		}
 	}()
-	if err := ensureJobArtifactDirs(artifactPaths); err != nil {
-		uploadRepoArtifactsOnReturn = true
-		slog.Error("failed to prepare job artifacts", "run_id", req.RunID, "job_id", req.JobID, "error", err)
-		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
-		return
-	}
 
 	// Initialize runtime components.
 	// Pass jobID to associate log chunks with this specific gate job.
@@ -47,7 +41,7 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 		return
 	}
 	defer func() { _ = logStreamer.Close() }()
-	artifactLogs, err := newArtifactLogWriter(logStreamer, artifactPaths)
+	artifactLogs, err := newArtifactLogWriter(logStreamer, jobDirs)
 	if err != nil {
 		uploadRepoArtifactsOnReturn = true
 		slog.Error("failed to prepare job artifact logs", "run_id", req.RunID, "job_id", req.JobID, "error", err)
@@ -109,7 +103,7 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
 		return
 	}
-	if err := exposeGateOutDir(workspace, artifactPaths.Out); err != nil {
+	if err := exposeGateOutDir(workspace, jobDirs.Out); err != nil {
 		uploadRepoArtifactsOnReturn = true
 		slog.Error("failed to expose gate out dir", "run_id", req.RunID, "job_id", req.JobID, "error", err)
 		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))

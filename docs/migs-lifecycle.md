@@ -93,13 +93,24 @@ Node-local run state is stored under:
 
 ```text
 $PLOYD_CACHE_HOME/runs/{run_id}/workspace
-$PLOYD_CACHE_HOME/runs/{run_id}/artifacts
-$PLOYD_CACHE_HOME/runs/{run_id}/artifacts/{job_id}/in
-$PLOYD_CACHE_HOME/runs/{run_id}/artifacts/{job_id}/out
-$PLOYD_CACHE_HOME/runs/{run_id}/artifacts/{job_id}/stdout.log
-$PLOYD_CACHE_HOME/runs/{run_id}/artifacts/{job_id}/stderr.log
-$PLOYD_CACHE_HOME/runs/{run_id}/artifacts/{job_id}/diff.patch
+$PLOYD_CACHE_HOME/runs/{run_id}/share
+$PLOYD_CACHE_HOME/runs/{run_id}/runtime-share
+$PLOYD_CACHE_HOME/runs/{run_id}/jobs/{job_id}/cache
+$PLOYD_CACHE_HOME/runs/{run_id}/jobs/{job_id}/home
+$PLOYD_CACHE_HOME/runs/{run_id}/jobs/{job_id}/in
+$PLOYD_CACHE_HOME/runs/{run_id}/jobs/{job_id}/out
+$PLOYD_CACHE_HOME/runs/{run_id}/jobs/{job_id}/staging
+$PLOYD_CACHE_HOME/runs/{run_id}/jobs/{job_id}/tmp
+$PLOYD_CACHE_HOME/runs/{run_id}/jobs/{job_id}/stdout.log
+$PLOYD_CACHE_HOME/runs/{run_id}/jobs/{job_id}/stderr.log
+$PLOYD_CACHE_HOME/runs/{run_id}/jobs/{job_id}/diff.patch
+$PLOYD_CACHE_HOME/runs/{run_id}/jobs/{job_id}/container.inspect.json
 ```
+
+The node removes each job's `cache`, `home`, `staging`, and `tmp` directories
+after execution. The node retains `in`, `out`, logs, diffs, and container
+inspection data. Uploaded bundles keep the logical `artifacts/{job_id}/...`
+paths and exclude job runtime directories and `runtime-share`.
 
 The node downloads source snapshots from `GET /v1/runs/{run_id}/snapshot`.
 

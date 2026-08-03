@@ -36,7 +36,10 @@ func (c *ClaimManager) startRecoveredRunningMonitors(ctx context.Context, recove
 }
 
 func (c *ClaimManager) monitorRecoveredRunningContainer(ctx context.Context, recovered recoveredRunningContainer) {
-	defer c.controller.ReleaseSlot()
+	defer func() {
+		c.controller.ReleaseSlot()
+		c.sweepAbandonedRuntimeIfIdle()
+	}()
 
 	if err := c.waitAndUploadRecoveredContainer(ctx, recovered); err != nil {
 		slog.Warn("recovered running container monitor failed",

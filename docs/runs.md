@@ -123,13 +123,20 @@ succeeds, and when a terminal `mig` succeeds for a run with
 
 ## Storage
 
-Node-local durable state is rooted at:
+Node-local run state uses these paths:
 
 ```text
 $PLOYD_CACHE_HOME/runs/{run_id}/workspace
-$PLOYD_CACHE_HOME/runs/{run_id}/artifacts
-$PLOYD_CACHE_HOME/runs/{run_id}/artifacts/{job_id}/{in,out,stdout.log,stderr.log,diff.patch}
+$PLOYD_CACHE_HOME/runs/{run_id}/share
+$PLOYD_CACHE_HOME/runs/{run_id}/runtime-share
+$PLOYD_CACHE_HOME/runs/{run_id}/jobs/{job_id}/{cache,home,in,out,staging,tmp}
+$PLOYD_CACHE_HOME/runs/{run_id}/jobs/{job_id}/{stdout.log,stderr.log,diff.patch,container.inspect.json}
 ```
+
+The node removes `cache`, `home`, `staging`, and `tmp` after job execution.
+The node retains the other job paths as durable artifacts. Artifact bundles map
+the durable paths to `artifacts/{job_id}/...` and map `share` to
+`artifacts/shared/...`. The bundle format does not expose the host layout.
 
 The control plane stores launch grouping in `waves`, execution state in `runs`,
 and work units in `jobs`.

@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
@@ -30,7 +31,7 @@ func (w *splitBufferWriter) StderrWriter() io.Writer {
 
 func TestArtifactLogWriterWritesFilesAndLiveStreams(t *testing.T) {
 	root := t.TempDir()
-	paths := jobArtifactPaths{
+	paths := JobDirectories{
 		Stdout: filepath.Join(root, "stdout.log"),
 		Stderr: filepath.Join(root, "stderr.log"),
 	}
@@ -71,11 +72,18 @@ func TestUploadRepoArtifactsIfPresent(t *testing.T) {
 	runID := types.NewRunID()
 	repoID := types.NewMigRepoID()
 	jobID := types.NewJobID()
+	previousJobID := types.NewJobID()
 	env := newUploadTestEnv(t, runID.String(), jobID.String())
 
-	paths := artifactPaths(runID, jobID)
-	if err := ensureJobArtifactDirs(paths); err != nil {
-		t.Fatalf("ensureJobArtifactDirs() error = %v", err)
+	paths := jobDirectories(runID, jobID)
+	if err := ensureRunDirectories(runID); err != nil {
+		t.Fatalf("ensureRunDirectories() error = %v", err)
+	}
+	if err := ensureJobDirectories(paths); err != nil {
+		t.Fatalf("ensureJobDirectories() error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(paths.In, "request.txt"), []byte("in"), 0o644); err != nil {
+		t.Fatalf("write input: %v", err)
 	}
 	if err := os.WriteFile(filepath.Join(paths.Out, "result.txt"), []byte("ok"), 0o644); err != nil {
 		t.Fatalf("write result: %v", err)
@@ -83,24 +91,52 @@ func TestUploadRepoArtifactsIfPresent(t *testing.T) {
 	if err := os.WriteFile(paths.Stdout, []byte("log"), 0o644); err != nil {
 		t.Fatalf("write stdout: %v", err)
 	}
-	tmpDir := filepath.Join(runDir(runID), "tmp", jobID.String())
-	if err := os.MkdirAll(tmpDir, 0o777); err != nil {
-		t.Fatalf("create tmp dir: %v", err)
+	if err := os.WriteFile(paths.Stderr, []byte("error log"), 0o644); err != nil {
+		t.Fatalf("write stderr: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(tmpDir, "tool.jar"), []byte("tmp"), 0o644); err != nil {
-		t.Fatalf("write tmp file: %v", err)
+	if err := os.WriteFile(paths.Diff, []byte("diff"), 0o644); err != nil {
+		t.Fatalf("write diff: %v", err)
+	}
+	if err := os.WriteFile(paths.ContainerInspect, []byte("{}"), 0o644); err != nil {
+		t.Fatalf("write container inspect: %v", err)
+	}
+	for _, runtimeDir := range []string{paths.Cache, paths.Home, paths.Staging, paths.Tmp} {
+		if err := os.WriteFile(filepath.Join(runtimeDir, "private.bin"), []byte("runtime"), 0o644); err != nil {
+			t.Fatalf("write runtime file: %v", err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(runShareDir(runID), "java.classpath"), []byte("entry"), 0o644); err != nil {
+		t.Fatalf("write shared artifact: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(runRuntimeShareDir(runID), "dependency.jar"), []byte("runtime share"), 0o644); err != nil {
+		t.Fatalf("write runtime share: %v", err)
+	}
+	previousPaths := jobDirectories(runID, previousJobID)
+	if err := ensureJobDirectories(previousPaths); err != nil {
+		t.Fatalf("ensure previous job directories: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(previousPaths.Out, "previous.txt"), []byte("previous"), 0o644); err != nil {
+		t.Fatalf("write previous job output: %v", err)
 	}
 
 	env.Controller.uploadRepoArtifactsIfPresent(runID, repoID, jobID)
 
 	assertUpload(t, env.Calls, true, "repo-artifacts", []string{
+		"artifacts/" + jobID.String() + "/in/request.txt",
 		"artifacts/" + jobID.String() + "/out/result.txt",
 		"artifacts/" + jobID.String() + "/stdout.log",
+		"artifacts/" + jobID.String() + "/stderr.log",
+		"artifacts/" + jobID.String() + "/diff.patch",
+		"artifacts/" + jobID.String() + "/container.inspect.json",
+		"artifacts/" + previousJobID.String() + "/out/previous.txt",
+		"artifacts/shared/java.classpath",
 	})
 	entries := tarEntriesFromBundle(t, (*env.Calls)[0].Bundle)
 	for name := range entries {
-		if name == "tmp/"+jobID.String()+"/tool.jar" || name == "artifacts/"+jobID.String()+"/tmp/tool.jar" {
-			t.Fatalf("tmp file leaked into repo-artifacts as %q", name)
+		for _, forbidden := range []string{"/cache/", "/home/", "/staging/", "/tmp/", "runtime-share"} {
+			if strings.Contains("/"+name, forbidden) {
+				t.Fatalf("runtime file leaked into repo-artifacts as %q", name)
+			}
 		}
 	}
 }

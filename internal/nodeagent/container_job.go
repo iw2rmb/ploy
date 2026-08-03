@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"os"
 	"path"
 	"path/filepath"
 	"strings"
@@ -146,17 +145,14 @@ func (r *runController) executeContainerWithOutcome(ctx context.Context, req Sta
 	}
 	var outcome jobOutcome
 
-	artifactPaths := artifactPaths(req.RunID, req.JobID)
-	if err := ensureJobArtifactDirs(artifactPaths); err != nil {
-		return outcome, fmt.Errorf("prepare job artifacts: %w", err)
-	}
+	jobDirs := jobDirectories(req.RunID, req.JobID)
 
 	execCtx, cleanup, err := r.initExecutionContext(ctx, req.RunID, req.JobID)
 	if err != nil {
 		return outcome, fmt.Errorf("initialize runtime: %w", err)
 	}
 	defer cleanup()
-	artifactLogs, err := newArtifactLogWriter(execCtx.logStreamer, artifactPaths)
+	artifactLogs, err := newArtifactLogWriter(execCtx.logStreamer, jobDirs)
 	if err != nil {
 		return outcome, fmt.Errorf("prepare job artifact logs: %w", err)
 	}
@@ -175,11 +171,11 @@ func (r *runController) executeContainerWithOutcome(ctx context.Context, req Sta
 	workspace := wsResult.path
 
 	if cfg.PopulateInDir != nil {
-		if err := cfg.PopulateInDir(artifactPaths.In); err != nil {
+		if err := cfg.PopulateInDir(jobDirs.In); err != nil {
 			return outcome, fmt.Errorf("populate in dir: %w", err)
 		}
 	}
-	stepOutcome, err := r.runContainerJob(ctx, req, cfg, execCtx, workspace, startTime, artifactPaths.Out, artifactPaths.In, artifactPaths.Diff)
+	stepOutcome, err := r.runContainerJob(ctx, req, cfg, execCtx, workspace, startTime, jobDirs)
 	if err != nil {
 		return outcome, err
 	}
@@ -196,9 +192,10 @@ func (r *runController) runContainerJob(
 	execCtx executionContext,
 	workspace string,
 	startTime time.Time,
-	outDir, inDir, diffPath string,
+	jobDirs JobDirectories,
 ) (jobOutcome, error) {
 	outcome := jobOutcome{}
+	outDir, inDir, diffPath := jobDirs.Out, jobDirs.In, jobDirs.Diff
 	shareDir, err := ensureRunShareDir(req.RunID)
 	if err != nil {
 		return outcome, err
@@ -273,28 +270,29 @@ func (r *runController) runContainerJob(
 		preWorkspaceTree = tree
 	}
 
-	// Materialize Hydra resources into a staging directory for mount planning.
-	stopOutputSync := r.startOutputSync(ctx, req, cfg, outDir, workspace)
-	if bundleErr := r.withMaterializedResources(ctx, manifest, req.TypedOptions.BundleMap, "ploy-staging-*", func(stagingDir string) error {
-		return withJobTmpDir(manifest, func(tmpDir string) error {
-			result, runErr = execCtx.runner.Run(ctx, step.Request{
-				RunID:      req.RunID,
-				JobID:      req.JobID,
-				Manifest:   manifest,
-				Workspace:  workspace,
-				OutDir:     outDir,
-				InDir:      inDir,
-				ShareDir:   shareDir,
-				TmpDir:     tmpDir,
-				StagingDir: stagingDir,
-			})
-			duration = time.Since(startTime)
-			return nil
-		})
-	}); bundleErr != nil {
-		stopOutputSync()
-		return outcome, bundleErr
+	stagingDir, err := r.materializeJobResources(ctx, manifest, req.TypedOptions.BundleMap, jobDirs.Staging)
+	if err != nil {
+		return outcome, err
 	}
+	tmpDir := ""
+	if len(manifest.Tmp) > 0 {
+		tmpDir = jobDirs.Tmp
+	}
+
+	// Materialized inputs and writable temporary state stay below the job root.
+	stopOutputSync := r.startOutputSync(ctx, req, cfg, outDir, workspace)
+	result, runErr = execCtx.runner.Run(ctx, step.Request{
+		RunID:      req.RunID,
+		JobID:      req.JobID,
+		Manifest:   manifest,
+		Workspace:  workspace,
+		OutDir:     outDir,
+		InDir:      inDir,
+		ShareDir:   shareDir,
+		TmpDir:     tmpDir,
+		StagingDir: stagingDir,
+	})
+	duration = time.Since(startTime)
 	stopOutputSync()
 
 	if runErr == nil && result.ExitCode == 0 && cfg.ValidateOutputs != nil {
@@ -305,7 +303,7 @@ func (r *runController) runContainerJob(
 	runErr = r.finalizeOutputs(req, cfg, outDir, workspace, runErr, result)
 	duration = time.Since(startTime)
 	if runErr != nil || result.ExitCode != 0 {
-		persistContainerInspectArtifact(req, artifactPaths(req.RunID, req.JobID), result)
+		persistContainerInspectArtifact(req, jobDirs, result)
 	}
 
 	diffUploaded := false
@@ -363,7 +361,7 @@ func (r *runController) runContainerJob(
 	if runErr != nil {
 		statsBuilder.Error(normalizedExecutionError(runErr))
 	} else if result.ExitCode != 0 {
-		statsBuilder.Error(deriveContainerExitError(req, result, artifactPaths(req.RunID, req.JobID)))
+		statsBuilder.Error(deriveContainerExitError(req, result, jobDirs))
 	}
 
 	stats := statsBuilder.MustBuild()
@@ -461,50 +459,17 @@ func normalizeBundlePath(name string) string {
 	return strings.TrimPrefix(cleaned, "/")
 }
 
-// withTempDir creates a temporary directory, calls fn, then removes the directory.
-func withTempDir(prefix string, fn func(path string) error) error {
-	dir, err := os.MkdirTemp("", prefix)
-	if err != nil {
-		return fmt.Errorf("create temp dir %s: %w", prefix, err)
-	}
-	defer func() {
-		if err := os.RemoveAll(dir); err != nil {
-			slog.Warn("failed to remove temp dir", "path", dir, "error", err)
-		}
-	}()
-
-	return fn(dir)
-}
-
-// withJobTmpDir creates a per-job host /tmp backing directory only when the
-// manifest declares tmp entries. The directory is writable like container /tmp
-// and removed after the job.
-func withJobTmpDir(manifest contracts.StepManifest, fn func(path string) error) error {
-	if len(manifest.Tmp) == 0 {
-		return fn("")
-	}
-	return withTempDir("ploy-job-tmp-*", func(dir string) error {
-		if err := os.Chmod(dir, 0o1777); err != nil {
-			return fmt.Errorf("chmod job tmp dir: %w", err)
-		}
-		return fn(dir)
-	})
-}
-
-// withMaterializedResources materializes Hydra resources (In/Out/Home/Tmp) from the
-// manifest into a staging directory and passes the staging path to fn. When the
-// manifest has no Hydra entries, fn receives "".
-func (r *runController) withMaterializedResources(ctx context.Context, manifest contracts.StepManifest, bundleMap map[string]string, prefix string, fn func(stagingDir string) error) error {
+// materializeJobResources returns an empty staging path when the manifest has
+// no Hydra resources, preserving the existing optional mount contract.
+func (r *runController) materializeJobResources(ctx context.Context, manifest contracts.StepManifest, bundleMap map[string]string, stagingDir string) (string, error) {
 	hashes := collectUniqueHashes(manifest)
 	if len(hashes) == 0 {
-		return fn("")
+		return "", nil
 	}
-	return withTempDir(prefix, func(dir string) error {
-		if err := r.materializeHydraResources(ctx, manifest, bundleMap, dir); err != nil {
-			return fmt.Errorf("materialize hydra resources: %w", err)
-		}
-		return fn(dir)
-	})
+	if err := r.materializeHydraResources(ctx, manifest, bundleMap, stagingDir); err != nil {
+		return "", fmt.Errorf("materialize hydra resources: %w", err)
+	}
+	return stagingDir, nil
 }
 
 // tempResource holds a temporary path and its cleanup function.

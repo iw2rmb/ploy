@@ -68,42 +68,6 @@ func TestResolveDockerRegistryAuthRefreshSocket(t *testing.T) {
 	}
 }
 
-func TestWithTempDir(t *testing.T) {
-	tests := []struct {
-		name    string
-		fnErr   error
-		wantErr error
-	}{
-		{name: "creates_and_cleans_up", fnErr: nil, wantErr: nil},
-		{name: "cleans_up_on_error", fnErr: os.ErrInvalid, wantErr: os.ErrInvalid},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			var capturedDir string
-			err := withTempDir("test-*", func(dir string) error {
-				capturedDir = dir
-				if _, statErr := os.Stat(dir); os.IsNotExist(statErr) {
-					t.Fatalf("temp directory does not exist: %s", dir)
-				}
-				if tt.fnErr == nil {
-					testFile := filepath.Join(dir, "test.txt")
-					if writeErr := os.WriteFile(testFile, []byte("test"), 0o644); writeErr != nil {
-						t.Fatalf("failed to create test file: %v", writeErr)
-					}
-				}
-				return tt.fnErr
-			})
-			if err != tt.wantErr {
-				t.Fatalf("withTempDir error = %v, want %v", err, tt.wantErr)
-			}
-			if _, statErr := os.Stat(capturedDir); !os.IsNotExist(statErr) {
-				t.Fatalf("temp directory was not cleaned up: %s", capturedDir)
-			}
-		})
-	}
-}
-
 func TestClearManifestHydration(t *testing.T) {
 	tests := []struct {
 		name   string

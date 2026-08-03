@@ -21,12 +21,12 @@ type artifactLogWriter struct {
 	closeErr  error
 }
 
-func newArtifactLogWriter(live io.Writer, paths jobArtifactPaths) (*artifactLogWriter, error) {
-	stdout, err := os.OpenFile(paths.Stdout, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
+func newArtifactLogWriter(live io.Writer, dirs JobDirectories) (*artifactLogWriter, error) {
+	stdout, err := os.OpenFile(dirs.Stdout, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
 	if err != nil {
 		return nil, fmt.Errorf("open stdout log: %w", err)
 	}
-	stderr, err := os.OpenFile(paths.Stderr, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
+	stderr, err := os.OpenFile(dirs.Stderr, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
 	if err != nil {
 		_ = stdout.Close()
 		return nil, fmt.Errorf("open stderr log: %w", err)
@@ -83,29 +83,92 @@ func (r *runController) uploadRepoArtifactsIfPresent(runID types.RunID, repoID t
 	if r.artifactUploader == nil {
 		return
 	}
-	artifactsDir := artifactsDir(runID)
-	if artifactsDir == "" {
+	entries, hasFiles, err := repoArtifactBundleEntries(runID)
+	if err != nil {
+		slog.Warn("failed to select repo artifacts", "run_id", runID, "repo_id", repoID, "job_id", jobID, "error", err)
 		return
 	}
-	hasFiles, _ := listFilesRecursive(artifactsDir)
 	if !hasFiles {
 		return
 	}
-	entries := []ArtifactBundleEntry{{
-		SourcePath:  artifactsDir,
-		ArchivePath: "artifacts",
-	}}
 	if _, _, err := r.artifactUploader.UploadArtifactEntries(context.Background(), runID, jobID, entries, "repo-artifacts"); err != nil {
 		slog.Warn("failed to upload repo artifacts", "run_id", runID, "repo_id", repoID, "job_id", jobID, "error", err)
 	}
 }
 
-func persistContainerInspectArtifact(req StartRunRequest, paths jobArtifactPaths, result step.Result) {
-	if len(result.ContainerInspectJSON) == 0 || paths.Root == "" {
+func repoArtifactBundleEntries(runID types.RunID) ([]ArtifactBundleEntry, bool, error) {
+	jobEntries, err := os.ReadDir(jobsDir(runID))
+	if err != nil && !os.IsNotExist(err) {
+		return nil, false, fmt.Errorf("read run jobs directory: %w", err)
+	}
+
+	entries := make([]ArtifactBundleEntry, 0, len(jobEntries)*6+1)
+	hasFiles := false
+	for _, entry := range jobEntries {
+		if !entry.IsDir() {
+			continue
+		}
+		var jobID types.JobID
+		if err := jobID.UnmarshalText([]byte(entry.Name())); err != nil {
+			continue
+		}
+		dirs := jobDirectories(runID, jobID)
+		archiveRoot := filepath.ToSlash(filepath.Join("artifacts", jobID.String()))
+		for _, item := range []struct {
+			source string
+			name   string
+		}{
+			{source: dirs.In, name: "in"},
+			{source: dirs.Out, name: "out"},
+			{source: dirs.Stdout, name: "stdout.log"},
+			{source: dirs.Stderr, name: "stderr.log"},
+			{source: dirs.Diff, name: "diff.patch"},
+			{source: dirs.ContainerInspect, name: "container.inspect.json"},
+		} {
+			info, statErr := os.Lstat(item.source)
+			if os.IsNotExist(statErr) {
+				continue
+			}
+			if statErr != nil {
+				return nil, false, fmt.Errorf("stat durable job artifact %s: %w", item.source, statErr)
+			}
+			entries = append(entries, ArtifactBundleEntry{
+				SourcePath:  item.source,
+				ArchivePath: filepath.ToSlash(filepath.Join(archiveRoot, item.name)),
+			})
+			if info.IsDir() {
+				dirHasFiles, _ := listFilesRecursive(item.source)
+				hasFiles = hasFiles || dirHasFiles
+			} else {
+				hasFiles = true
+			}
+		}
+	}
+
+	shareDir := runShareDir(runID)
+	if info, statErr := os.Lstat(shareDir); statErr == nil {
+		entries = append(entries, ArtifactBundleEntry{
+			SourcePath:  shareDir,
+			ArchivePath: "artifacts/shared",
+		})
+		if info.IsDir() {
+			shareHasFiles, _ := listFilesRecursive(shareDir)
+			hasFiles = hasFiles || shareHasFiles
+		} else {
+			hasFiles = true
+		}
+	} else if !os.IsNotExist(statErr) {
+		return nil, false, fmt.Errorf("stat durable run share %s: %w", shareDir, statErr)
+	}
+
+	return entries, hasFiles, nil
+}
+
+func persistContainerInspectArtifact(req StartRunRequest, dirs JobDirectories, result step.Result) {
+	if len(result.ContainerInspectJSON) == 0 || dirs.ContainerInspect == "" {
 		return
 	}
-	path := filepath.Join(paths.Root, "container.inspect.json")
-	if err := os.WriteFile(path, result.ContainerInspectJSON, 0o600); err != nil {
+	if err := os.WriteFile(dirs.ContainerInspect, result.ContainerInspectJSON, 0o600); err != nil {
 		slog.Warn("failed to write container inspect artifact", "run_id", req.RunID, "job_id", req.JobID, "container_id", result.ContainerID, "error", err)
 	}
 }

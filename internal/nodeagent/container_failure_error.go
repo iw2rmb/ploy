@@ -18,14 +18,14 @@ const (
 	maxDerivedJobErrorText     = 2048
 )
 
-func deriveContainerExitError(req StartRunRequest, result step.Result, paths jobArtifactPaths) string {
+func deriveContainerExitError(req StartRunRequest, result step.Result, dirs JobDirectories) string {
 	if result.ExitCode == 0 {
 		return ""
 	}
-	if msg := amataFailureMessageFromStdout(paths.Stdout); msg != "" {
+	if msg := amataFailureMessageFromStdout(dirs.Stdout); msg != "" {
 		return msg
 	}
-	if msg := finalMeaningfulLogLine(paths.Stderr); msg != "" {
+	if msg := finalMeaningfulLogLine(dirs.Stderr); msg != "" {
 		return msg
 	}
 	return formatContainerExitError(req.JobType, result.ExitCode)

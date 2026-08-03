@@ -16,7 +16,8 @@ const MaxConcurrency = 64
 // Runs are tracked by job_id to support multiple jobs per run.
 // Concurrency is enforced via the jobSem semaphore.
 type runController struct {
-	mu sync.Mutex
+	mu      sync.Mutex
+	sweepMu sync.Mutex
 
 	cfg Config
 

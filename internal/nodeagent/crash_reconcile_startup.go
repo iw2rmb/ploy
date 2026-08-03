@@ -41,7 +41,14 @@ func (c *ClaimManager) runStartupReconcilePass(ctx context.Context) error {
 
 	c.startRecoveredRunningMonitors(ctx, snapshot.Running)
 	c.reconcileRecoveredTerminalContainers(ctx, snapshot.RecentTerminal)
+	c.sweepAbandonedRuntimeIfIdle()
 	return nil
+}
+
+func (c *ClaimManager) sweepAbandonedRuntimeIfIdle() {
+	if sweeper, ok := c.controller.(interface{ sweepAbandonedRuntimeIfIdle() }); ok {
+		sweeper.sweepAbandonedRuntimeIfIdle()
+	}
 }
 
 func (c *ClaimManager) reconcileRecoveredTerminalContainers(ctx context.Context, recovered []recoveredTerminalContainer) {

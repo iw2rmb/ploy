@@ -72,6 +72,7 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 		// Release the concurrency slot acquired in claimAndExecute.
 		// This frees the slot for the next job to be claimed.
 		r.ReleaseSlot()
+		r.sweepAbandonedRuntimeIfIdle()
 	}()
 
 	slog.Info("starting job execution",
@@ -80,6 +81,20 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 		"job_type", req.JobType,
 		"next_id", req.NextID,
 	)
+	jobDirs := jobDirectories(req.RunID, req.JobID)
+	defer func() {
+		if err := cleanupJobRuntime(jobDirs); err != nil {
+			slog.Warn("failed to remove job runtime directories", "run_id", req.RunID, "job_id", req.JobID, "error", err)
+		}
+	}()
+	if err := ensureRunDirectories(req.RunID); err != nil {
+		r.uploadFailureStatus(ctx, req, fmt.Errorf("prepare run directories: %w", err), 0)
+		return
+	}
+	if err := ensureJobDirectories(jobDirs); err != nil {
+		r.uploadFailureStatus(ctx, req, fmt.Errorf("prepare job directories: %w", err), 0)
+		return
+	}
 
 	jobType := req.JobType
 

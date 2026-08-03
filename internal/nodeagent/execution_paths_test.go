@@ -9,13 +9,12 @@ import (
 	types "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-func TestRunArtifactPaths(t *testing.T) {
+func TestJobDirectoriesUseUniversalLayout(t *testing.T) {
 	cacheHome := t.TempDir()
 	t.Setenv("PLOYD_CACHE_HOME", cacheHome)
 
 	runID := types.NewRunID()
 	jobID := types.NewJobID()
-
 	wantRunRoot := filepath.Join(cacheHome, "runs", runID.String())
 	if got := runDir(runID); got != wantRunRoot {
 		t.Fatalf("runDir() = %q, want %q", got, wantRunRoot)
@@ -23,51 +22,107 @@ func TestRunArtifactPaths(t *testing.T) {
 	if strings.Contains(runDir(runID), filepath.Join("ploy", "run")) {
 		t.Fatalf("run cache path uses old ploy/run layout: %s", runDir(runID))
 	}
-
-	wantRepoRoot := wantRunRoot
-	if got := runDir(runID); got != wantRepoRoot {
-		t.Fatalf("runDir() = %q, want %q", got, wantRepoRoot)
-	}
-	if got := workspaceDir(runID); got != filepath.Join(wantRepoRoot, "workspace") {
+	if got := workspaceDir(runID); got != filepath.Join(wantRunRoot, "workspace") {
 		t.Fatalf("workspaceDir() = %q", got)
 	}
-	if got := artifactsDir(runID); got != filepath.Join(wantRepoRoot, "artifacts") {
-		t.Fatalf("artifactsDir() = %q", got)
+	if got := runShareDir(runID); got != filepath.Join(wantRunRoot, "share") {
+		t.Fatalf("runShareDir() = %q", got)
 	}
-	if got := sharedArtifactsDir(runID); got != filepath.Join(wantRepoRoot, "artifacts", "shared") {
-		t.Fatalf("sharedArtifactsDir() = %q", got)
-	}
-
-	paths := artifactPaths(runID, jobID)
-	wantJobRoot := filepath.Join(wantRepoRoot, "artifacts", jobID.String())
-	if paths.Root != wantJobRoot {
-		t.Fatalf("job artifact root = %q, want %q", paths.Root, wantJobRoot)
-	}
-	if paths.In != filepath.Join(wantJobRoot, "in") || paths.Out != filepath.Join(wantJobRoot, "out") {
-		t.Fatalf("job in/out paths = %q/%q", paths.In, paths.Out)
-	}
-	if paths.Stdout != filepath.Join(wantJobRoot, "stdout.log") || paths.Stderr != filepath.Join(wantJobRoot, "stderr.log") || paths.Diff != filepath.Join(wantJobRoot, "diff.patch") {
-		t.Fatalf("job log/diff paths = %+v", paths)
+	if got := runRuntimeShareDir(runID); got != filepath.Join(wantRunRoot, "runtime-share") {
+		t.Fatalf("runRuntimeShareDir() = %q", got)
 	}
 
-	if paths := artifactPaths(runID, jobID); paths == (jobArtifactPaths{}) {
-		t.Fatal("job artifact paths must not depend on repo_id")
+	dirs := jobDirectories(runID, jobID)
+	wantJobRoot := filepath.Join(wantRunRoot, "jobs", jobID.String())
+	if dirs.Root != wantJobRoot {
+		t.Fatalf("job root = %q, want %q", dirs.Root, wantJobRoot)
+	}
+	want := map[string]string{
+		"cache":                  dirs.Cache,
+		"home":                   dirs.Home,
+		"in":                     dirs.In,
+		"out":                    dirs.Out,
+		"staging":                dirs.Staging,
+		"tmp":                    dirs.Tmp,
+		"stdout.log":             dirs.Stdout,
+		"stderr.log":             dirs.Stderr,
+		"diff.patch":             dirs.Diff,
+		"container.inspect.json": dirs.ContainerInspect,
+	}
+	for name, got := range want {
+		if got != filepath.Join(wantJobRoot, name) {
+			t.Errorf("job path %s = %q", name, got)
+		}
 	}
 }
 
-func TestEnsureJobArtifactDirs(t *testing.T) {
-	root := filepath.Join(t.TempDir(), "artifacts", "job")
-	paths := jobArtifactPaths{
-		Root: root,
-		In:   filepath.Join(root, "in"),
-		Out:  filepath.Join(root, "out"),
+func TestConcurrentJobsHaveDistinctOwnedDirectories(t *testing.T) {
+	cacheHome := t.TempDir()
+	t.Setenv("PLOYD_CACHE_HOME", cacheHome)
+
+	runID := types.NewRunID()
+	first := jobDirectories(runID, types.NewJobID())
+	second := jobDirectories(runID, types.NewJobID())
+	for name, paths := range map[string][2]string{
+		"cache":   {first.Cache, second.Cache},
+		"home":    {first.Home, second.Home},
+		"in":      {first.In, second.In},
+		"out":     {first.Out, second.Out},
+		"staging": {first.Staging, second.Staging},
+		"tmp":     {first.Tmp, second.Tmp},
+	} {
+		if paths[0] == paths[1] {
+			t.Errorf("concurrent jobs share %s directory %q", name, paths[0])
+		}
 	}
-	if err := ensureJobArtifactDirs(paths); err != nil {
-		t.Fatalf("ensureJobArtifactDirs() error = %v", err)
+}
+
+func TestEnsureAndCleanupJobDirectoriesPreserveDurableArtifacts(t *testing.T) {
+	cacheHome := t.TempDir()
+	t.Setenv("PLOYD_CACHE_HOME", cacheHome)
+
+	runID := types.NewRunID()
+	dirs := jobDirectories(runID, types.NewJobID())
+	if err := ensureRunDirectories(runID); err != nil {
+		t.Fatalf("ensureRunDirectories() error = %v", err)
 	}
-	for _, dir := range []string{paths.In, paths.Out} {
+	if err := ensureJobDirectories(dirs); err != nil {
+		t.Fatalf("ensureJobDirectories() error = %v", err)
+	}
+	for _, dir := range []string{dirs.Cache, dirs.Home, dirs.In, dirs.Out, dirs.Staging, dirs.Tmp, runShareDir(runID), runRuntimeShareDir(runID)} {
 		if info, err := os.Stat(dir); err != nil || !info.IsDir() {
-			t.Fatalf("expected dir %s, info=%v err=%v", dir, info, err)
+			t.Fatalf("expected directory %s, info=%v err=%v", dir, info, err)
+		}
+	}
+
+	for _, path := range []string{
+		filepath.Join(dirs.Cache, "cache.bin"),
+		filepath.Join(dirs.Home, "home.txt"),
+		filepath.Join(dirs.Staging, "staged.bin"),
+		filepath.Join(dirs.Tmp, "tmp.bin"),
+		filepath.Join(dirs.In, "input.txt"),
+		filepath.Join(dirs.Out, "output.txt"),
+		dirs.Stdout,
+		dirs.Stderr,
+		dirs.Diff,
+		dirs.ContainerInspect,
+	} {
+		if err := os.WriteFile(path, []byte("data"), 0o600); err != nil {
+			t.Fatalf("write %s: %v", path, err)
+		}
+	}
+
+	if err := cleanupJobRuntime(dirs); err != nil {
+		t.Fatalf("cleanupJobRuntime() error = %v", err)
+	}
+	for _, dir := range []string{dirs.Cache, dirs.Home, dirs.Staging, dirs.Tmp} {
+		if _, err := os.Stat(dir); !os.IsNotExist(err) {
+			t.Errorf("runtime directory remains after cleanup: %s", dir)
+		}
+	}
+	for _, path := range []string{dirs.In, dirs.Out, dirs.Stdout, dirs.Stderr, dirs.Diff, dirs.ContainerInspect} {
+		if _, err := os.Stat(path); err != nil {
+			t.Errorf("durable artifact was removed: %s: %v", path, err)
 		}
 	}
 }
