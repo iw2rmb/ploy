@@ -143,47 +143,47 @@ func uploadSpecBundleHandler(st store.Store, bp *blobpersist.Service) http.Handl
 		createdBy := strings.TrimSpace(r.URL.Query().Get("created_by"))
 
 		cid, digest := computeCIDAndDigest(data)
-
-		// Deduplication: if a bundle with this CID already exists, reuse it.
-		existing, err := st.GetSpecBundleByCID(r.Context(), cid)
-		if err == nil {
-			// Update last_ref_at to keep GC metadata fresh.
-			if refErr := st.UpdateSpecBundleLastRefAt(r.Context(), existing.ID); refErr != nil {
-				slog.Warn("spec bundle upload: failed to update last_ref_at on deduplicated bundle",
-					"bundle_id", existing.ID, "err", refErr)
-			}
-			writeSpecBundleUploadResponse(w, existing, true)
-			return
-		}
-		if !errors.Is(err, pgx.ErrNoRows) {
-			writeHTTPError(w, http.StatusInternalServerError, "failed to check for existing bundle: %v", err)
-			slog.Error("spec bundle upload: cid lookup failed", "cid", cid, "err", err)
-			return
-		}
-
-		bundleID := domaintypes.NewSpecBundleID()
 		var createdByPtr *string
 		if createdBy != "" {
 			createdByPtr = &createdBy
 		}
-		params := store.CreateSpecBundleParams{
-			ID:        string(bundleID),
-			Cid:       cid,
-			Digest:    digest,
-			Size:      int64(len(data)),
-			CreatedBy: createdByPtr,
-		}
-
-		bundle, err := bp.CreateSpecBundle(r.Context(), params, data)
+		bundle, deduplicated, err := ensureSpecBundle(r.Context(), st, bp, cid, digest, data, createdByPtr)
 		if err != nil {
 			writeHTTPError(w, http.StatusInternalServerError, "failed to persist spec bundle: %v", err)
-			slog.Error("spec bundle upload: persist failed", "bundle_id", bundleID, "err", err)
+			slog.Error("spec bundle upload: persist failed", "cid", cid, "err", err)
 			return
 		}
 
 		slog.Info("spec bundle uploaded", "bundle_id", bundle.ID, "size", bundle.Size)
-		writeSpecBundleUploadResponse(w, bundle, false)
+		writeSpecBundleUploadResponse(w, bundle, deduplicated)
 	}
+}
+
+func ensureSpecBundle(ctx context.Context, st store.Store, bp *blobpersist.Service, cid, digest string, data []byte, createdBy *string) (store.SpecBundle, bool, error) {
+	existing, err := st.GetSpecBundleByCID(ctx, cid)
+	if err == nil {
+		if refErr := st.UpdateSpecBundleLastRefAt(ctx, existing.ID); refErr != nil {
+			slog.Warn("spec bundle: failed to update last_ref_at on deduplicated bundle", "bundle_id", existing.ID, "err", refErr)
+		}
+		return existing, true, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return store.SpecBundle{}, false, fmt.Errorf("check existing bundle: %w", err)
+	}
+	if bp == nil {
+		return store.SpecBundle{}, false, errors.New("blob persistence service is required")
+	}
+	bundle, err := bp.CreateSpecBundle(ctx, store.CreateSpecBundleParams{
+		ID:        domaintypes.NewSpecBundleID().String(),
+		Cid:       cid,
+		Digest:    digest,
+		Size:      int64(len(data)),
+		CreatedBy: createdBy,
+	}, data)
+	if err != nil {
+		return store.SpecBundle{}, false, err
+	}
+	return bundle, false, nil
 }
 
 type specBundleUploadResponse struct {

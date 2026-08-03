@@ -32,7 +32,7 @@ func TestServiceList_ClonesDiscoversAndRefreshesDefaultBranch(t *testing.T) {
 	if len(first) != 1 || first[0].Name != "upgrade-java" || first[0].Description != "Upgrade Java" || first[0].Path != "scenarios/upgrade.yaml" {
 		t.Fatalf("List() initial = %#v, want one discovered root mapping", first)
 	}
-	if !fullCommitSHA(first[0].SHA) || first[0].Source != strings.TrimSuffix(remote.url, ".git") {
+	if !fullCommitSHA(first[0].SHA) || first[0].CommittedAt.IsZero() || first[0].Source != strings.TrimSuffix(remote.url, ".git") {
 		t.Fatalf("List() source identity = %#v", first[0])
 	}
 
@@ -52,6 +52,18 @@ func TestServiceList_ClonesDiscoversAndRefreshesDefaultBranch(t *testing.T) {
 	}
 	if second[0].SHA == first[0].SHA {
 		t.Fatalf("List() SHA = %q, want changed commit", second[0].SHA)
+	}
+	if err := service.WithResolvedSource(context.Background(), "current-java", func(entry Entry, root string) error {
+		content, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(entry.Path)))
+		if err != nil {
+			return err
+		}
+		if !strings.Contains(string(content), "name: current-java") || entry.SHA != second[0].SHA {
+			return fmt.Errorf("resolved source = %q at %s", content, entry.SHA)
+		}
+		return nil
+	}); err != nil {
+		t.Fatalf("WithResolvedSource() error = %v", err)
 	}
 }
 

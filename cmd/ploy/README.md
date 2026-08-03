@@ -30,7 +30,7 @@ ploy job status <job-id>                                                     # i
 ploy mig run <mig-id|name> [<namespace/repo[:ref]> ...] [--failed] [--follow] [--gitlab-token-env ENV_NAME|--gitlab-token-prompt] # execute a mig project over its repo set
 ploy spec schema                                                             # print the mig JSON Schema
 ploy spec validate docs/schemas/mig.example.yaml                             # validate a mig spec
-ploy spec push [<git-folder>]                                                # publish named specs from a clean git worktree
+ploy spec push [<git-folder>]                                                # store legacy named-spec snapshot rows
 ploy spec ls                                                                 # list named specs from configured Git repositories
 ploy spec <selector>[@sha] (--archive|--unarchive)                           # archive or unarchive a named spec version
 ```
@@ -38,19 +38,18 @@ ploy spec <selector>[@sha] (--archive|--unarchive)                           # a
 Run IDs (`<run-id>`) are KSUID-backed strings.
 Treat them as opaque identifiers when passing them between commands or scripts.
 
-`ploy run` submits a local spec file, local spec directory, or published named
+`ploy run` submits a local spec file, local spec directory, or Git-backed named
 spec against one repository source. Add `:<step-name>` to a local spec path to
 submit only one named step from the expanded spec. Named spec selectors use
 `<name>`, `<namespace/repo>:<name>`, or
-`<domain>/<namespace/repo>:<name>`. Add `@<sha-prefix>` to select a specific
-published version. Use repeatable `--env:<step> KEY=VALUE` flags to override
+`<domain>/<namespace/repo>:<name>`. Use repeatable `--env:<step> KEY=VALUE` flags to override
 `steps[].envs` for exactly one named step; later values win for the same
 step/key. Use `--build-gate-forced <lang>@<release>[/<tool>]` to override both
 Build Gate phases with `mode: forced`; use `--build-gate-forced-pre` and
 `--build-gate-forced-post` for phase-specific overrides. The global flag is
 mutually exclusive with phase-specific flags. These overrides preserve
-`build_gate.images`, set `build_gate.disabled: false`, and make named specs
-submit a mutated anonymous spec. Local repo paths submit `HEAD`; remote
+`build_gate.images` and set `build_gate.disabled: false`. The server applies
+named-spec overrides after it compiles the selected YAML. Local repo paths submit `HEAD`; remote
 selectors use `namespace/repo`, optionally suffixed with `:<branch>` or
 `:<sha>`. Use `--follow` to wait for the run's terminal status,
 `--pull[=path]` to wait for success and download artifacts, or `--apply` to
@@ -68,13 +67,10 @@ fresh token marker to the restarted attempt.
 `ploy mig add --name <name> --spec <path>`, `ploy mig repo add`, and
 `ploy mig spec set` to manage the project before running it.
 
-`ploy spec push` publishes named specs from a clean git worktree. It scans
-committed `.yaml` files, selects roots with `apiVersion: ploy.mig/v1alpha1` and
-a non-empty `name`, prepares the spec the same way as `ploy run`, and records
-the `origin` source, `HEAD` SHA, and commit date. Untracked or modified files
-stop publishing before any spec is uploaded. `ploy spec ls` refreshes the
-configured spec repositories and lists tracked named YAML files from their
-default branches.
+`ploy spec push` stores legacy named-spec snapshot rows from a clean Git
+worktree. Git-backed `ploy spec ls` and named `ploy run` do not read those rows.
+They refresh the configured spec repositories and use tracked named YAML files
+from their default branches.
 
 When follow mode is used, the CLI displays a summarized per-repo job graph that
 refreshes until the run reaches a terminal state. The job graph shows step index,
@@ -150,15 +146,15 @@ ploy run pull <run-id> ./artifacts
 
 ## Named Spec Commands
 
-Named specs are committed mig specs that can be published for later selection.
-The publish command derives source identity from `origin`, so the remote must
-normalize to `domain/namespace/repo`.
+Named specs are tracked mig YAML files on the default branches of repositories
+configured through `PLOY_SPECS_REPOS`. `ploy spec ls` and named `ploy run`
+refresh those repositories directly.
 
 ```bash
-# Publish named specs from the current git worktree.
+# Store legacy named-spec rows from the current Git worktree.
 ploy spec push
 
-# Publish named specs from another worktree.
+# Store legacy named-spec rows from another worktree.
 ploy spec push ../migs
 
 # List named specs from configured Git repositories.
@@ -169,10 +165,9 @@ ploy spec github.com/acme/service:upgrade-java@01234567 --archive
 ploy spec github.com/acme/service:upgrade-java@01234567 --unarchive
 ```
 
-Publish output shows `updated` for newly stored specs and `skipped` when the
-same name, source, and SHA already exists. List output shows `NAME`, `SOURCE`,
-`PATH`, and `SHA`. Archive and unarchive resolve active or archived rows,
-respectively, then update the resolved named spec row.
+The legacy push and archive commands update stored rows. Git-backed list and
+run operations do not read those rows. List output shows `NAME`, `SOURCE`,
+`PATH`, and `SHA` from the configured repositories.
 
 ## Mig Project Runs
 

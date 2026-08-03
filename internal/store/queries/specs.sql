@@ -22,6 +22,16 @@ WHERE name = $1
   AND sha = sqlc.arg(sha)::text
   AND sha <> '';
 
+-- name: GetGitSpecSnapshot :one
+SELECT id, name, description, source, sha, source_committed_at, spec, created_by, updated_by, created_at, archived_at
+FROM specs
+WHERE name = sqlc.arg(name)::text
+  AND source->>'domain' = sqlc.arg(domain)::text
+  AND source->>'repo' = sqlc.arg(repo)::text
+  AND COALESCE(source->>'path', '') = sqlc.arg(path)::text
+  AND sha = sqlc.arg(sha)::text
+  AND sha <> '';
+
 -- name: ListSpecs :many
 -- Lists specs ordered by created_at descending (most recent first).
 -- There is an index on created_at to optimize this query.

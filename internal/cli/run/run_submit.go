@@ -12,6 +12,7 @@ import (
 	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/speccompiler"
+	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
 const osTempArtifactDirSentinel = "__ploy_os_tmp__"
@@ -56,21 +57,19 @@ func RunSubmit(ctx context.Context, opts SubmitOptions) error {
 	if err != nil {
 		return err
 	}
-	if len(opts.StepEnvOverrides) > 0 {
+	if specPayload.SpecSelector == "" && len(opts.StepEnvOverrides) > 0 {
 		mutated, err := speccompiler.ApplyStepEnvOverrides(specPayload.Spec, opts.StepEnvOverrides)
 		if err != nil {
 			return err
 		}
 		specPayload.Spec = mutated
-		specPayload.SpecID = ""
 	}
-	if opts.BuildGateForced.HasAny() {
+	if specPayload.SpecSelector == "" && opts.BuildGateForced.HasAny() {
 		mutated, err := speccompiler.ApplyBuildGateForcedOverrides(specPayload.Spec, opts.BuildGateForced)
 		if err != nil {
 			return err
 		}
 		specPayload.Spec = mutated
-		specPayload.SpecID = ""
 	}
 
 	repo, err := resolveSourceRepo(ctx, base, httpClient, opts.RepoSelector)
@@ -87,12 +86,13 @@ func RunSubmit(ctx context.Context, opts SubmitOptions) error {
 	}
 
 	request := domainapi.RunSubmitRequest{
-		RepoURL:   domaintypes.RepoURL(repo.RepoURL),
-		Ref:       domaintypes.GitRef(repo.Ref),
-		CommitSHA: repo.CommitSHA,
-		SpecID:    specPayload.SpecID,
-		Spec:      specPayload.Spec,
-		CreatedBy: strings.TrimSpace(os.Getenv("USER")),
+		RepoURL:       domaintypes.RepoURL(repo.RepoURL),
+		Ref:           domaintypes.GitRef(repo.Ref),
+		CommitSHA:     repo.CommitSHA,
+		Spec:          specPayload.Spec,
+		SpecSelector:  specPayload.SpecSelector,
+		SpecOverrides: namedRunSpecOverrides(specPayload.SpecSelector, opts),
+		CreatedBy:     strings.TrimSpace(os.Getenv("USER")),
 
 		GitLabToken: gitLabToken,
 	}
@@ -109,4 +109,30 @@ func RunSubmit(ctx context.Context, opts SubmitOptions) error {
 		return nil
 	}
 	return finalizeRunSubmit(ctx, runID, repo.Worktree, specPayload.DisplayName, followOut, base, httpClient, opts)
+}
+
+func namedRunSpecOverrides(selector string, opts SubmitOptions) *domainapi.RunSpecOverrides {
+	if selector == "" || (len(opts.StepEnvOverrides) == 0 && !opts.BuildGateForced.HasAny()) {
+		return nil
+	}
+	overrides := &domainapi.RunSpecOverrides{}
+	if len(opts.StepEnvOverrides) > 0 {
+		overrides.StepEnvs = make(map[string][]string, len(opts.StepEnvOverrides))
+		for step, assignments := range opts.StepEnvOverrides {
+			overrides.StepEnvs[step] = append([]string(nil), assignments...)
+		}
+	}
+	if opts.BuildGateForced.HasAny() {
+		forced := &domainapi.RunBuildGateForcedOverrides{}
+		convert := func(stack *contracts.BuildGateStackConfig) *domainapi.RunBuildGateForcedStack {
+			if stack == nil {
+				return nil
+			}
+			return &domainapi.RunBuildGateForcedStack{Language: stack.Language, Release: stack.Release, Tool: stack.Tool}
+		}
+		forced.Pre = convert(opts.BuildGateForced.Pre)
+		forced.Post = convert(opts.BuildGateForced.Post)
+		overrides.BuildGateForced = forced
+	}
+	return overrides
 }

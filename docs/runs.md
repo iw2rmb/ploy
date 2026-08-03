@@ -10,7 +10,7 @@ Mig launches create one wave with one run per selected repo.
 ## Submit
 
 ```bash
-ploy run <spec-path>|<named-spec>[@sha] [<repo-path>|<namespace/repo[:ref]>] [--apply] [--pull[=path]] [--build-gate-forced <lang>@<release>[/<tool>]] [--gitlab-token-env ENV_NAME|--gitlab-token-prompt]
+ploy run <spec-path>|<named-spec> [<repo-path>|<namespace/repo[:ref]>] [--apply] [--pull[=path]] [--build-gate-forced <lang>@<release>[/<tool>]] [--gitlab-token-env ENV_NAME|--gitlab-token-prompt]
 ploy mig run <mig-id|name> [<namespace/repo[:ref]> ... | --failed] [--follow] [--json] [--gitlab-token-env ENV_NAME|--gitlab-token-prompt]
 ```
 
@@ -22,21 +22,21 @@ ploy mig run <mig-id|name> [<namespace/repo[:ref]> ... | --failed] [--follow] [-
   Ephemeral GitLab tokens require a configured GitLab domain and are accepted
   only for HTTPS repos on that host.
 - `POST /v1/runs` returns `wave_id`, `run_id`, `mig_id`, and `spec_id`.
-- Named-spec submissions pass `spec_id`; the run references that existing
-  specs row. Add `@<8-40 lowercase hex SHA prefix>` to select a specific named
-  spec version. Local file and directory submissions create anonymous specs
-  rows.
+- Named-spec submissions pass `spec_selector`. The server refreshes the
+  configured Git repositories, compiles the selected YAML, and stores an
+  immutable spec snapshot with its repository URL, YAML path, and full source
+  SHA. Local file and directory submissions remain client-compiled.
 - `ploy run ... --env:<step> KEY=VALUE` overrides `steps[].envs` for exactly
   one step named `<step>`. The flag is repeatable, values may be empty, and
-  later values win for the same step/key. Named specs with env overrides submit
-  a mutated anonymous spec instead of referencing the named `spec_id`.
+  later values win for the same step/key. For named specs, the CLI sends the
+  ordered overrides to the server, which applies them after compilation.
 - `ploy run ... --build-gate-forced <lang>@<release>[/<tool>]` overrides both
   `build_gate.pre.stack` and `build_gate.post.stack` with `mode: forced`.
   Use `--build-gate-forced-pre` or `--build-gate-forced-post` to override one
   phase. The global flag cannot be combined with phase-specific flags. These
   overrides create missing `build_gate`, `pre`, or `post` objects, preserve
-  `build_gate.images`, set `build_gate.disabled: false`, and submit named specs
-  as mutated anonymous specs.
+  `build_gate.images`, and set `build_gate.disabled: false`. For named specs,
+  the server applies the structured phase overrides after compilation.
 - `ploy mig run` prints `wave_id`; `--json` prints `wave_id`, `mig_id`,
   `spec_id`, and `run_count`.
 - Remote selector expansion is server-owned through `POST /v1/repos/resolve`.

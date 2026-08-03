@@ -14,7 +14,9 @@ type migStore struct {
 	store.Store
 
 	// Spec
-	createSpec mockCall[store.CreateSpecParams, store.Spec]
+	createSpec      mockCall[store.CreateSpecParams, store.Spec]
+	createNamedSpec mockCall[store.CreateNamedSpecParams, store.Spec]
+	getGitSpec      mockCall[store.GetGitSpecSnapshotParams, store.Spec]
 
 	getSpec         mockCall[string, store.Spec]
 	getAPITokenByID mockCall[string, store.GetAPITokenByIDRow]
@@ -84,6 +86,19 @@ func (m *migStore) CreateSpec(ctx context.Context, params store.CreateSpecParams
 	m.createSpec.params = params
 	result := store.Spec{ID: params.ID, Spec: params.Spec, CreatedBy: params.CreatedBy}
 	return result, m.createSpec.err
+}
+
+func (m *migStore) CreateNamedSpec(ctx context.Context, params store.CreateNamedSpecParams) (store.Spec, error) {
+	result := store.Spec{ID: params.ID, Name: params.Name, Description: params.Description, Source: params.Source, Sha: params.Sha, SourceCommittedAt: params.SourceCommittedAt, Spec: params.Spec, CreatedBy: params.CreatedBy}
+	m.createNamedSpec.val = result
+	return m.createNamedSpec.record(params)
+}
+
+func (m *migStore) GetGitSpecSnapshot(ctx context.Context, params store.GetGitSpecSnapshotParams) (store.Spec, error) {
+	if !m.getGitSpec.called && m.getGitSpec.err == nil && m.getGitSpec.val.ID.IsZero() {
+		m.getGitSpec.err = pgx.ErrNoRows
+	}
+	return m.getGitSpec.record(params)
 }
 
 func (m *migStore) GetSpec(ctx context.Context, id types.SpecID) (store.Spec, error) {

@@ -29,7 +29,7 @@ func TestCreateSingleRepoRunHandler_SingleRepo(t *testing.T) {
 		CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
 	}
 
-	handler := createSingleRepoRunHandler(st, nil, gitauth.Options{})
+	handler := createSingleRepoRunHandler(st, nil, gitauth.Options{}, runSubmitSpecServices{})
 	rr := doRequest(t, handler, http.MethodPost, "/v1/runs", validRunRequestBody())
 
 	assertStatus(t, rr, http.StatusCreated)
@@ -253,7 +253,7 @@ func TestCreateSingleRepoRunHandler_ValidationErrors(t *testing.T) {
 	t.Parallel()
 
 	st := &jobStore{}
-	handler := createSingleRepoRunHandler(st, nil, gitauth.Options{})
+	handler := createSingleRepoRunHandler(st, nil, gitauth.Options{}, runSubmitSpecServices{})
 
 	tests := []struct {
 		name       string
@@ -264,7 +264,7 @@ func TestCreateSingleRepoRunHandler_ValidationErrors(t *testing.T) {
 		{"no repo_url", validRunRequestBodyWithout("repo_url"), "empty"},
 		{"empty ref", validRunRequestBodyWith(map[string]any{"ref": ""}), "empty"},
 		{"no ref", validRunRequestBodyWithout("ref"), "empty"},
-		{"no spec", validRunRequestBodyWithout("spec"), "spec is required"},
+		{"no spec", validRunRequestBodyWithout("spec"), "exactly one of spec or spec_selector is required"},
 		{"invalid JSON", "not json", "invalid request"},
 		{"http scheme repo_url", validRunRequestBodyWith(map[string]any{"repo_url": "http://github.com/user/repo.git"}), "invalid repo url"},
 		{"git scheme repo_url", validRunRequestBodyWith(map[string]any{"repo_url": "git://github.com/user/repo.git"}), "invalid repo url"},
@@ -291,7 +291,7 @@ func TestCreateSingleRepoRunHandler_PublishesEvent(t *testing.T) {
 	}
 
 	eventsService, _ := createTestEventsService()
-	handler := createSingleRepoRunHandler(st, eventsService, gitauth.Options{})
+	handler := createSingleRepoRunHandler(st, eventsService, gitauth.Options{}, runSubmitSpecServices{})
 
 	rr := doRequest(t, handler, http.MethodPost, "/v1/runs", validRunRequestBody())
 	assertStatus(t, rr, http.StatusCreated)

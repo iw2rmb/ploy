@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/iw2rmb/ploy/internal/gitauth"
 )
@@ -30,6 +31,9 @@ func (execGitRunner) Run(ctx context.Context, dir string, env []string, args ...
 }
 
 func (r *repository) refreshNow(ctx context.Context) ([]Entry, error) {
+	r.checkoutMu.Lock()
+	defer r.checkoutMu.Unlock()
+
 	prepared := gitauth.PrepareURL(r.cloneURL, r.auth)
 	if _, err := os.Stat(filepath.Join(r.checkout, ".git")); err == nil {
 		if _, err := r.runner.Run(ctx, r.checkout, prepared.Env, "fetch", "--depth", "1", "--no-tags", "origin", "HEAD"); err != nil {
@@ -55,7 +59,15 @@ func (r *repository) refreshNow(ctx context.Context) ([]Entry, error) {
 	if !fullCommitSHA(sha) {
 		return nil, fmt.Errorf("git rev-parse returned invalid commit SHA %q", sha)
 	}
-	return r.scan(ctx, sha)
+	committedAtRaw, err := r.runner.Run(ctx, r.checkout, nil, "show", "-s", "--format=%cI", "HEAD")
+	if err != nil {
+		return nil, err
+	}
+	committedAt, err := time.Parse(time.RFC3339, strings.TrimSpace(string(committedAtRaw)))
+	if err != nil {
+		return nil, fmt.Errorf("parse spec repository commit time: %w", err)
+	}
+	return r.scan(ctx, sha, committedAt)
 }
 
 func (r *repository) clone(ctx context.Context, prepared gitauth.PreparedURL) error {

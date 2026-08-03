@@ -16,31 +16,19 @@ func TestRunSubmitEnvOverrides(t *testing.T) {
 	t.Setenv("USER", "test-user")
 
 	tests := []struct {
-		name             string
-		specArg          func(t *testing.T) string
-		args             []string
-		wantResolve      map[string]string
-		wantSpecID       bool
-		wantStepEnv      map[int]map[string]any
-		namedResolveSpec map[string]any
+		name         string
+		specArg      func(t *testing.T) string
+		args         []string
+		wantSelector string
+		wantStepEnv  map[int]map[string]any
 	}{
 		{
-			name: "named spec version submits overridden anonymous spec",
+			name: "named spec sends ordered env overrides to server",
 			specArg: func(t *testing.T) string {
-				return "upgrade-java@01234567"
+				return "upgrade-java"
 			},
-			args:        []string{"--env:build", "A=1", "--env:build", "A=2", "--env:test", "EMPTY="},
-			wantResolve: map[string]string{"selector": "upgrade-java", "sha": "01234567"},
-			wantStepEnv: map[int]map[string]any{
-				0: {"A": "2"},
-				1: {"EMPTY": ""},
-			},
-			namedResolveSpec: map[string]any{
-				"steps": []map[string]any{
-					{"name": "build", "image": "alpine:latest", "envs": map[string]string{"A": "base"}},
-					{"name": "test", "image": "alpine:latest"},
-				},
-			},
+			args:         []string{"--env:build", "A=1", "--env:build", "A=2", "--env:test", "EMPTY="},
+			wantSelector: "upgrade-java",
 		},
 		{
 			name: "local spec submits overridden anonymous spec",
@@ -59,21 +47,9 @@ func TestRunSubmitEnvOverrides(t *testing.T) {
 			runID := domaintypes.NewRunID().String()
 			migID := domaintypes.NewMigID().String()
 			specID := domaintypes.NewSpecID().String()
-			var capturedResolve map[string]string
 			var capturedSubmit map[string]any
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				switch {
-				case r.Method == http.MethodGet && r.URL.Path == "/v1/specs/resolve":
-					capturedResolve = map[string]string{
-						"selector": r.URL.Query().Get("selector"),
-						"sha":      r.URL.Query().Get("sha"),
-					}
-					_ = json.NewEncoder(w).Encode(map[string]any{
-						"id":     namedResolvedSpecID,
-						"name":   "upgrade-java",
-						"source": map[string]string{"domain": "gitlab.example.com", "repo": "acme/specs"},
-						"spec":   tc.namedResolveSpec,
-					})
 				case r.Method == http.MethodPost && r.URL.Path == "/v1/repos/resolve":
 					_ = json.NewEncoder(w).Encode(map[string]any{
 						"repo_url":   "https://gitlab.example.com/acme/target.git",
@@ -98,21 +74,29 @@ func TestRunSubmitEnvOverrides(t *testing.T) {
 			if err := executeCmd(args, &buf); err != nil {
 				t.Fatalf("run submit error: %v", err)
 			}
-			if tc.wantResolve != nil && (capturedResolve["selector"] != tc.wantResolve["selector"] || capturedResolve["sha"] != tc.wantResolve["sha"]) {
-				t.Fatalf("resolve query = %#v, want %#v", capturedResolve, tc.wantResolve)
-			}
-			if _, ok := capturedSubmit["spec_id"]; ok != tc.wantSpecID {
-				t.Fatalf("spec_id present = %v, want %v; request=%#v", ok, tc.wantSpecID, capturedSubmit)
-			}
-			steps := capturedSubmitSteps(t, capturedSubmit)
-			for idx, wantEnv := range tc.wantStepEnv {
-				envs, ok := steps[idx].(map[string]any)["envs"].(map[string]any)
-				if !ok {
-					t.Fatalf("steps[%d].envs = %#v, want object", idx, steps[idx].(map[string]any)["envs"])
+			if tc.wantSelector != "" {
+				if capturedSubmit["spec_selector"] != tc.wantSelector {
+					t.Fatalf("spec_selector = %v, want %q", capturedSubmit["spec_selector"], tc.wantSelector)
 				}
-				for key, wantValue := range wantEnv {
-					if envs[key] != wantValue {
-						t.Fatalf("steps[%d].envs[%s] = %v, want %v", idx, key, envs[key], wantValue)
+				overrides := capturedSubmit["spec_overrides"].(map[string]any)
+				stepEnvs := overrides["step_envs"].(map[string]any)
+				if got := stepEnvs["build"].([]any); len(got) != 2 || got[0] != "A=1" || got[1] != "A=2" {
+					t.Fatalf("build overrides = %#v, want ordered assignments", got)
+				}
+				if got := stepEnvs["test"].([]any); len(got) != 1 || got[0] != "EMPTY=" {
+					t.Fatalf("test overrides = %#v, want empty assignment", got)
+				}
+			} else {
+				steps := capturedSubmitSteps(t, capturedSubmit)
+				for idx, wantEnv := range tc.wantStepEnv {
+					envs, ok := steps[idx].(map[string]any)["envs"].(map[string]any)
+					if !ok {
+						t.Fatalf("steps[%d].envs = %#v, want object", idx, steps[idx].(map[string]any)["envs"])
+					}
+					for key, wantValue := range wantEnv {
+						if envs[key] != wantValue {
+							t.Fatalf("steps[%d].envs[%s] = %v, want %v", idx, key, envs[key], wantValue)
+						}
 					}
 				}
 			}
@@ -124,15 +108,14 @@ func TestRunSubmitBuildGateForcedOverride(t *testing.T) {
 	t.Setenv("USER", "test-user")
 
 	tests := []struct {
-		name            string
-		specArg         func(t *testing.T) string
-		args            []string
-		wantSpecID      bool
-		wantDisabled    bool
-		wantImages      bool
-		wantPreStack    map[string]any
-		wantPostStack   map[string]any
-		wantResolveSpec bool
+		name          string
+		specArg       func(t *testing.T) string
+		args          []string
+		wantNamed     bool
+		wantDisabled  bool
+		wantImages    bool
+		wantPreStack  map[string]any
+		wantPostStack map[string]any
 	}{
 		{
 			name: "global flag writes pre and post and re-enables disabled build gate",
@@ -197,20 +180,18 @@ build_gate:
 			wantPostStack: map[string]any{"mode": "strict", "language": "java", "release": "11"},
 		},
 		{
-			name:            "named spec override submits mutated anonymous spec",
-			specArg:         func(t *testing.T) string { return "upgrade-java" },
-			args:            []string{"--build-gate-forced-pre", "java@17/maven"},
-			wantDisabled:    false,
-			wantPreStack:    map[string]any{"mode": "forced", "language": "java", "release": "17", "tool": "maven"},
-			wantResolveSpec: true,
+			name:         "named spec sends build gate override to server",
+			specArg:      func(t *testing.T) string { return "upgrade-java" },
+			args:         []string{"--build-gate-forced-pre", "java@17/maven"},
+			wantNamed:    true,
+			wantPreStack: map[string]any{"language": "java", "release": "17", "tool": "maven"},
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			var capturedSubmit map[string]any
-			specResolveCalled := false
-			server := newBuildGateForcedOverrideServer(t, &capturedSubmit, &specResolveCalled)
+			server := newBuildGateForcedOverrideServer(t, &capturedSubmit)
 			defer server.Close()
 			clienv.UseControlPlaneEnv(t, server.URL)
 
@@ -220,11 +201,19 @@ build_gate:
 			if err := executeCmd(args, &buf); err != nil {
 				t.Fatalf("run submit error: %v", err)
 			}
-			if specResolveCalled != tc.wantResolveSpec {
-				t.Fatalf("spec resolve called = %v, want %v", specResolveCalled, tc.wantResolveSpec)
-			}
-			if _, ok := capturedSubmit["spec_id"]; ok != tc.wantSpecID {
-				t.Fatalf("spec_id present = %v, want %v; request=%#v", ok, tc.wantSpecID, capturedSubmit)
+			if tc.wantNamed {
+				if capturedSubmit["spec_selector"] != "upgrade-java" {
+					t.Fatalf("spec_selector = %v, want upgrade-java", capturedSubmit["spec_selector"])
+				}
+				overrides := capturedSubmit["spec_overrides"].(map[string]any)
+				forced := overrides["build_gate_forced"].(map[string]any)
+				pre := forced["pre"].(map[string]any)
+				for key, want := range tc.wantPreStack {
+					if pre[key] != want {
+						t.Fatalf("pre.%s = %v, want %v", key, pre[key], want)
+					}
+				}
+				return
 			}
 			buildGate := capturedSubmitBuildGate(t, capturedSubmit)
 			if buildGate["disabled"] != tc.wantDisabled {
@@ -242,22 +231,13 @@ build_gate:
 	}
 }
 
-func newBuildGateForcedOverrideServer(t *testing.T, capturedSubmit *map[string]any, specResolveCalled *bool) *httptest.Server {
+func newBuildGateForcedOverrideServer(t *testing.T, capturedSubmit *map[string]any) *httptest.Server {
 	t.Helper()
 	runID := domaintypes.NewRunID().String()
 	migID := domaintypes.NewMigID().String()
 	specID := domaintypes.NewSpecID().String()
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
-		case r.Method == http.MethodGet && r.URL.Path == "/v1/specs/resolve":
-			*specResolveCalled = true
-			_ = json.NewEncoder(w).Encode(map[string]any{
-				"id":   namedResolvedSpecID,
-				"name": "upgrade-java",
-				"spec": map[string]any{
-					"steps": []map[string]any{{"image": "alpine:latest"}},
-				},
-			})
 		case r.Method == http.MethodPost && r.URL.Path == "/v1/repos/resolve":
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"repo_url":   "https://gitlab.example.com/acme/target.git",

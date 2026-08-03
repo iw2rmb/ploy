@@ -94,6 +94,50 @@ func (q *Queries) CreateSpec(ctx context.Context, arg CreateSpecParams) (Spec, e
 	return i, err
 }
 
+const getGitSpecSnapshot = `-- name: GetGitSpecSnapshot :one
+SELECT id, name, description, source, sha, source_committed_at, spec, created_by, updated_by, created_at, archived_at
+FROM specs
+WHERE name = $1::text
+  AND source->>'domain' = $2::text
+  AND source->>'repo' = $3::text
+  AND COALESCE(source->>'path', '') = $4::text
+  AND sha = $5::text
+  AND sha <> ''
+`
+
+type GetGitSpecSnapshotParams struct {
+	Name   string `json:"name"`
+	Domain string `json:"domain"`
+	Repo   string `json:"repo"`
+	Path   string `json:"path"`
+	Sha    string `json:"sha"`
+}
+
+func (q *Queries) GetGitSpecSnapshot(ctx context.Context, arg GetGitSpecSnapshotParams) (Spec, error) {
+	row := q.db.QueryRow(ctx, getGitSpecSnapshot,
+		arg.Name,
+		arg.Domain,
+		arg.Repo,
+		arg.Path,
+		arg.Sha,
+	)
+	var i Spec
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Description,
+		&i.Source,
+		&i.Sha,
+		&i.SourceCommittedAt,
+		&i.Spec,
+		&i.CreatedBy,
+		&i.UpdatedBy,
+		&i.CreatedAt,
+		&i.ArchivedAt,
+	)
+	return i, err
+}
+
 const getNamedSpecByNameSourceSHA = `-- name: GetNamedSpecByNameSourceSHA :one
 SELECT id, name, description, source, sha, source_committed_at, spec, created_by, updated_by, created_at, archived_at
 FROM specs

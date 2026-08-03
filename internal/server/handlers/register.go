@@ -22,7 +22,7 @@ type routeDeps struct {
 	gitAuth       gitauth.Options
 	gitLabTokens  *gitlabtokens.Registry
 	snapshots     repoSnapshotWriter
-	specCatalog   specCatalogLister
+	specCatalog   speccatalog.Catalog
 }
 
 // RegisterRoutes mounts all HTTP endpoints on the given server.
@@ -83,7 +83,10 @@ func registerBootstrapRoutes(s *httpserver.Server, deps routeDeps) {
 }
 
 func registerMigRoutes(s *httpserver.Server, deps routeDeps) {
-	s.RegisterRouteFunc("POST /v1/runs", createSingleRepoRunHandler(deps.st, deps.eventsService, deps.gitAuth, deps.gitLabTokens), auth.RoleControlPlane)
+	s.RegisterRouteFunc("POST /v1/runs", createSingleRepoRunHandler(deps.st, deps.eventsService, deps.gitAuth, runSubmitSpecServices{
+		catalog: deps.specCatalog,
+		bundles: runSpecBundleStore{store: deps.st, blobs: deps.bp},
+	}, deps.gitLabTokens), auth.RoleControlPlane)
 
 	s.RegisterRouteFunc("POST /v1/migs", createMigHandler(deps.st), auth.RoleControlPlane)
 	s.RegisterRouteFunc("GET /v1/migs", listMigsHandler(deps.st), auth.RoleControlPlane)

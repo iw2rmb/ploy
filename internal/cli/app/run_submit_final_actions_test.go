@@ -48,7 +48,6 @@ func TestRunSubmitFollowOutputCases(t *testing.T) {
 	tests := []struct {
 		name         string
 		specArg      func(t *testing.T) string
-		configure    func(*successfulRunSubmitConfig)
 		wantContain  string
 		wantNoSpecID bool
 	}{
@@ -60,14 +59,9 @@ func TestRunSubmitFollowOutputCases(t *testing.T) {
 			wantContain: "acme/service",
 		},
 		{
-			name:    "named spec displays source reference instead of spec id",
-			specArg: func(t *testing.T) string { return "upgrade-java" },
-			configure: func(cfg *successfulRunSubmitConfig) {
-				cfg.NamedSpecName = "upgrade-java"
-				cfg.NamedSpecDomain = "gitlab.example.com"
-				cfg.NamedSpecRepo = "acme/specs"
-			},
-			wantContain:  "Spec:  gitlab.example.com/acme/specs:upgrade-java",
+			name:         "named spec displays source reference instead of spec id",
+			specArg:      func(t *testing.T) string { return "upgrade-java" },
+			wantContain:  "Spec:  upgrade-java",
 			wantNoSpecID: true,
 		},
 	}
@@ -84,9 +78,6 @@ func TestRunSubmitFollowOutputCases(t *testing.T) {
 				JobID:   domaintypes.NewJobID().String(),
 				RepoURL: "https://gitlab.example.com/acme/service.git",
 				Ref:     "main",
-			}
-			if tc.configure != nil {
-				tc.configure(&cfg)
 			}
 			server := newSuccessfulRunSubmitServer(t, cfg)
 			defer server.Close()
@@ -154,10 +145,6 @@ type successfulRunSubmitConfig struct {
 	RunState  string
 	JobStatus string
 	Patch     []byte
-
-	NamedSpecName   string
-	NamedSpecDomain string
-	NamedSpecRepo   string
 }
 
 func newSuccessfulRunSubmitServer(t *testing.T, cfg successfulRunSubmitConfig) *httptest.Server {
@@ -182,17 +169,6 @@ func newSuccessfulRunSubmitServer(t *testing.T, cfg successfulRunSubmitConfig) *
 	jobState := stageStateForJobStatus(jobStatus)
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
-		case r.Method == http.MethodGet && r.URL.Path == "/v1/specs/resolve" && cfg.NamedSpecName != "":
-			_ = json.NewEncoder(w).Encode(map[string]any{
-				"name":   cfg.NamedSpecName,
-				"source": map[string]string{"domain": cfg.NamedSpecDomain, "repo": cfg.NamedSpecRepo},
-				"spec": map[string]any{
-					"steps": []map[string]any{{
-						"image":   "alpine:latest",
-						"command": "echo named",
-					}},
-				},
-			})
 		case r.Method == http.MethodPost && r.URL.Path == "/v1/repos/resolve":
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"repo_url":   cfg.RepoURL,

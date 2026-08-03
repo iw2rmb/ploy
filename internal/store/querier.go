@@ -107,6 +107,7 @@ type Querier interface {
 	GetArtifactBundle(ctx context.Context, id pgtype.UUID) (ArtifactBundle, error)
 	GetBootstrapToken(ctx context.Context, tokenID string) (GetBootstrapTokenRow, error)
 	GetEvent(ctx context.Context, id int64) (Event, error)
+	GetGitSpecSnapshot(ctx context.Context, arg GetGitSpecSnapshotParams) (Spec, error)
 	// Retrieves a single environment entry by key and target.
 	// Returns pgx.ErrNoRows if the (key, target) pair does not exist.
 	GetGlobalEnv(ctx context.Context, arg GetGlobalEnvParams) (ConfigEnv, error)

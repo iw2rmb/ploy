@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/gitauth"
@@ -27,12 +28,16 @@ type Entry struct {
 	Source      string
 	Path        string
 	SHA         string
+	CommittedAt time.Time
+
+	repository *repository
 }
 
 // Catalog refreshes and resolves the configured Git-backed named-spec catalog.
 type Catalog interface {
 	List(context.Context) ([]Entry, error)
 	Resolve(context.Context, string) (Entry, error)
+	WithResolvedSource(context.Context, string, func(Entry, string) error) error
 }
 
 type Options struct {
@@ -52,8 +57,9 @@ type repository struct {
 	auth     gitauth.Options
 	runner   gitRunner
 
-	mu       sync.Mutex
-	inFlight *refreshCall
+	mu         sync.Mutex
+	inFlight   *refreshCall
+	checkoutMu sync.RWMutex
 }
 
 type refreshCall struct {
@@ -131,6 +137,42 @@ func (s *Service) Resolve(ctx context.Context, selector string) (Entry, error) {
 		return Entry{}, err
 	}
 	return resolveEntries(entries, selector)
+}
+
+// WithResolvedSource keeps the selected checkout at the resolved commit for
+// the complete callback so a concurrent catalog refresh cannot change the
+// files while the caller compiles them.
+func (s *Service) WithResolvedSource(ctx context.Context, selector string, use func(Entry, string) error) error {
+	for {
+		entries, err := s.List(ctx)
+		if err != nil {
+			return err
+		}
+		entry, err := resolveEntries(entries, selector)
+		if err != nil {
+			return err
+		}
+		repo := entry.repository
+		if repo == nil {
+			return fmt.Errorf("named spec source repository is unavailable")
+		}
+
+		repo.checkoutMu.RLock()
+		shaRaw, verifyErr := repo.runner.Run(ctx, repo.checkout, nil, "rev-parse", "--verify", "HEAD^{commit}")
+		if verifyErr == nil && strings.TrimSpace(string(shaRaw)) == entry.SHA {
+			return func() error {
+				defer repo.checkoutMu.RUnlock()
+				return use(entry, repo.checkout)
+			}()
+		}
+		repo.checkoutMu.RUnlock()
+		if verifyErr != nil {
+			return fmt.Errorf("verify resolved spec repository %s: %w", entry.Source, verifyErr)
+		}
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+	}
 }
 
 func (r *repository) refresh(ctx context.Context) ([]Entry, error) {

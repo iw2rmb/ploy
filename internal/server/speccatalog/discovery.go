@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"time"
 	"unicode/utf8"
 
 	"github.com/iw2rmb/ploy/internal/specdiscovery"
 )
 
-func (r *repository) scan(ctx context.Context, sha string) ([]Entry, error) {
+func (r *repository) scan(ctx context.Context, sha string, committedAt time.Time) ([]Entry, error) {
 	paths, err := r.runner.Run(ctx, r.checkout, nil, "ls-files", "-z", "--cached", "--", "*.yaml")
 	if err != nil {
 		return nil, err
@@ -38,6 +39,8 @@ func (r *repository) scan(ctx context.Context, sha string) ([]Entry, error) {
 			Source:      r.source,
 			Path:        path,
 			SHA:         sha,
+			CommittedAt: committedAt,
+			repository:  r,
 		})
 	}
 	return entries, nil

@@ -9,21 +9,15 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 
-	"github.com/iw2rmb/ploy/internal/cli/httpx"
 	"github.com/iw2rmb/ploy/internal/cli/specpayload"
-	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
-	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-var namedSpecSHAPrefixRE = regexp.MustCompile(`^[0-9a-f]{8,40}$`)
-
 type runSubmitSpecPayload struct {
-	Spec        json.RawMessage
-	SpecID      domaintypes.SpecID
-	DisplayName string
+	Spec         json.RawMessage
+	SpecSelector string
+	DisplayName  string
 }
 
 func resolveRunSubmitSpecPayload(ctx context.Context, base *url.URL, client *http.Client, specArg string) (runSubmitSpecPayload, error) {
@@ -62,7 +56,7 @@ func resolveRunSubmitSpecPayload(ctx context.Context, base *url.URL, client *htt
 		return runSubmitSpecPayload{Spec: spec}, err
 	}
 
-	return resolveNamedRunSubmitSpecPayload(ctx, base, client, specArg)
+	return runSubmitSpecPayload{SpecSelector: specArg, DisplayName: specArg}, nil
 }
 
 func splitLocalRunSpecSelector(specArg string) (string, string, bool, error) {
@@ -113,87 +107,6 @@ func normalizeRunSpecPath(specPath string, info os.FileInfo) (string, error) {
 		}
 	}
 	return specPath, nil
-}
-
-func resolveNamedRunSubmitSpecPayload(ctx context.Context, base *url.URL, client *http.Client, selector string) (runSubmitSpecPayload, error) {
-	if base == nil {
-		return runSubmitSpecPayload{}, fmt.Errorf("run submit: base url required")
-	}
-	if client == nil {
-		return runSubmitSpecPayload{}, fmt.Errorf("run submit: http client required")
-	}
-
-	selector, shaPrefix, err := splitNamedSpecVersionSelector(selector)
-	if err != nil {
-		return runSubmitSpecPayload{}, err
-	}
-	endpoint := base.JoinPath("v1", "specs", "resolve")
-	query := endpoint.Query()
-	query.Set("selector", selector)
-	if shaPrefix != "" {
-		query.Set("sha", shaPrefix)
-	}
-	endpoint.RawQuery = query.Encode()
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
-	if err != nil {
-		return runSubmitSpecPayload{}, fmt.Errorf("run submit: resolve named spec: build request: %w", err)
-	}
-	resp, err := client.Do(req)
-	if err != nil {
-		return runSubmitSpecPayload{}, fmt.Errorf("run submit: resolve named spec: http request failed: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	switch resp.StatusCode {
-	case http.StatusOK:
-	case http.StatusNotFound:
-		return runSubmitSpecPayload{}, fmt.Errorf("run submit: named spec not found: %s", selector)
-	case http.StatusBadRequest, http.StatusConflict:
-		return runSubmitSpecPayload{}, fmt.Errorf("run submit: %s", httpx.ReadErrorMessage(resp.Body, resp.Status, httpx.MaxErrorBodyBytes))
-	default:
-		return runSubmitSpecPayload{}, fmt.Errorf("run submit: resolve named spec: %s", httpx.ReadErrorMessage(resp.Body, resp.Status, httpx.MaxErrorBodyBytes))
-	}
-
-	var resolved domainapi.NamedSpecResolveResponse
-	if err := httpx.DecodeResponseJSON(resp.Body, &resolved, httpx.MaxJSONBodyBytes); err != nil {
-		return runSubmitSpecPayload{}, fmt.Errorf("run submit: resolve named spec: decode response: %w", err)
-	}
-	if len(resolved.Spec) == 0 {
-		return runSubmitSpecPayload{}, fmt.Errorf("run submit: resolve named spec: empty spec in response")
-	}
-	return runSubmitSpecPayload{
-		Spec:        resolved.Spec,
-		SpecID:      domaintypes.SpecID(strings.TrimSpace(resolved.ID)),
-		DisplayName: namedSpecDisplayName(resolved),
-	}, nil
-}
-
-func splitNamedSpecVersionSelector(selector string) (string, string, error) {
-	selector = strings.TrimSpace(selector)
-	idx := strings.LastIndex(selector, "@")
-	if idx < 0 {
-		return selector, "", nil
-	}
-	base := strings.TrimSpace(selector[:idx])
-	shaPrefix := strings.TrimSpace(selector[idx+1:])
-	if base == "" || shaPrefix == "" {
-		return "", "", fmt.Errorf("run submit: invalid named spec selector: %s", selector)
-	}
-	if !namedSpecSHAPrefixRE.MatchString(shaPrefix) {
-		return "", "", fmt.Errorf("run submit: sha must be a lowercase 8-40 character hex prefix")
-	}
-	return base, shaPrefix, nil
-}
-
-func namedSpecDisplayName(resolved domainapi.NamedSpecResolveResponse) string {
-	domain := strings.Trim(strings.TrimSpace(resolved.Source.Domain), "/")
-	repo := strings.Trim(strings.TrimSpace(resolved.Source.Repo), "/")
-	name := strings.TrimSpace(resolved.Name)
-	if domain == "" || repo == "" || name == "" {
-		return ""
-	}
-	return domain + "/" + repo + ":" + name
 }
 
 func buildRunSubmitSpecPayload(ctx context.Context, base *url.URL, client *http.Client, specPath string, stepSelector string) (json.RawMessage, error) {

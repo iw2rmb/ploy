@@ -5,10 +5,12 @@ import (
 	"time"
 )
 
-// NamedSpecSource identifies the committed repository that published a named spec.
+// NamedSpecSource identifies the committed repository source attributed to a named spec snapshot.
 type NamedSpecSource struct {
 	Domain string `json:"domain"`
 	Repo   string `json:"repo"`
+	URL    string `json:"url,omitempty"`
+	Path   string `json:"path,omitempty"`
 }
 
 // PublishNamedSpecRequest is the canonical request DTO for POST /v1/specs.

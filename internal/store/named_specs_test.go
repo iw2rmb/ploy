@@ -51,6 +51,44 @@ func TestNamedSpecs_CreateLookupAndUniqueIndex(t *testing.T) {
 	assertUniqueViolation(t, err)
 }
 
+func TestGitSpecSnapshotUniquenessIncludesSourcePath(t *testing.T) {
+	ctx, db := newTestStore(t)
+	sha := "abcdefabcdefabcdefabcdefabcdefabcdefabcd"
+	create := func(path string) Spec {
+		t.Helper()
+		source, err := json.Marshal(map[string]string{
+			"domain": "git.example.com", "repo": "team/specs", "url": "https://git.example.com/team/specs", "path": path,
+		})
+		if err != nil {
+			t.Fatalf("marshal source: %v", err)
+		}
+		created, err := db.CreateNamedSpec(ctx, CreateNamedSpecParams{
+			ID: types.NewSpecID(), Name: "upgrade", Source: source, Sha: sha,
+			SourceCommittedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
+			Spec:              []byte(`{"apiVersion":"ploy.mig/v1alpha1","name":"upgrade","steps":[{"image":"img"}]}`),
+		})
+		if err != nil {
+			t.Fatalf("CreateNamedSpec(%s): %v", path, err)
+		}
+		return created
+	}
+
+	first := create("one.yaml")
+	second := create("nested/two.yaml")
+	if first.ID == second.ID {
+		t.Fatal("different source paths reused one snapshot row")
+	}
+	fetched, err := db.GetGitSpecSnapshot(ctx, GetGitSpecSnapshotParams{
+		Name: "upgrade", Domain: "git.example.com", Repo: "team/specs", Path: "nested/two.yaml", Sha: sha,
+	})
+	if err != nil {
+		t.Fatalf("GetGitSpecSnapshot: %v", err)
+	}
+	if fetched.ID != second.ID {
+		t.Fatalf("snapshot id = %s, want %s", fetched.ID, second.ID)
+	}
+}
+
 func TestNamedSpecs_LatestListAndResolve(t *testing.T) {
 	ctx, db := newTestStore(t)
 	base := time.Now().UTC()

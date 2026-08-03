@@ -21,6 +21,14 @@ type AmbiguousError struct {
 	Choices  []Entry
 }
 
+type InvalidSelectorError struct {
+	Selector string
+}
+
+func (e *InvalidSelectorError) Error() string {
+	return fmt.Sprintf("invalid named spec selector: %s", e.Selector)
+}
+
 func (e *AmbiguousError) Error() string {
 	choices := make([]string, 0, len(e.Choices))
 	for _, choice := range e.Choices {
@@ -61,12 +69,12 @@ func resolveEntries(entries []Entry, rawSelector string) (Entry, error) {
 func parseSelector(raw string) (selector, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" || strings.Contains(raw, "@") {
-		return selector{}, fmt.Errorf("invalid named spec selector: %s", raw)
+		return selector{}, &InvalidSelectorError{Selector: raw}
 	}
 	colon := strings.LastIndexByte(raw, ':')
 	if colon < 0 {
 		if !selectorNameRE.MatchString(raw) {
-			return selector{}, fmt.Errorf("invalid named spec selector: %s", raw)
+			return selector{}, &InvalidSelectorError{Selector: raw}
 		}
 		return selector{name: raw}, nil
 	}
@@ -75,11 +83,11 @@ func parseSelector(raw string) (selector, error) {
 	name := strings.TrimSpace(raw[colon+1:])
 	parts := strings.Split(qualifier, "/")
 	if qualifier == "" || !selectorNameRE.MatchString(name) || len(parts) < 2 {
-		return selector{}, fmt.Errorf("invalid named spec selector: %s", raw)
+		return selector{}, &InvalidSelectorError{Selector: raw}
 	}
 	for _, part := range parts {
 		if part == "" {
-			return selector{}, fmt.Errorf("invalid named spec selector: %s", raw)
+			return selector{}, &InvalidSelectorError{Selector: raw}
 		}
 	}
 	if len(parts) == 2 {

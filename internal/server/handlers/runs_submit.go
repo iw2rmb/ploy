@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"errors"
 	"log/slog"
 	"net/http"
 	"regexp"
@@ -16,15 +15,13 @@ import (
 	"github.com/iw2rmb/ploy/internal/server/events"
 	"github.com/iw2rmb/ploy/internal/server/gitlabtokens"
 	"github.com/iw2rmb/ploy/internal/store"
-	"github.com/iw2rmb/ploy/internal/workflow/contracts"
-	"github.com/jackc/pgx/v5"
 )
 
 var submitCommitSHARe = regexp.MustCompile(`^[0-9a-f]{40}$`)
 
 // createSingleRepoRunHandler submits a single-repo run and queues it for scheduler-driven execution.
 // Endpoint: POST /v1/runs
-// Request: {repo_url, ref, commit_sha?, spec}
+// Request: {repo_url, ref, commit_sha?, spec|spec_selector, spec_overrides?}
 // Response: 201 Created with {wave_id, run_id, mig_id, spec_id}
 //
 // v1 contract:
@@ -36,7 +33,7 @@ var submitCommitSHARe = regexp.MustCompile(`^[0-9a-f]{40}$`)
 // - Job materialization is deferred to the wave scheduler and gated on prep readiness.
 //
 // This handler replaces the previous POST /v1/migs endpoint for run submission.
-func createSingleRepoRunHandler(st store.Store, eventsService *events.Service, gitAuth gitauth.Options, registries ...*gitlabtokens.Registry) http.HandlerFunc {
+func createSingleRepoRunHandler(st store.Store, eventsService *events.Service, gitAuth gitauth.Options, specServices runSubmitSpecServices, registries ...*gitlabtokens.Registry) http.HandlerFunc {
 	tokenRegistry := optionalGitLabTokenRegistry(registries)
 	// Spec can be large (JSON blobs), so we allow up to 4 MiB.
 	const maxBodySize = 4 << 20
@@ -64,14 +61,8 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service, g
 			writeHTTPError(w, http.StatusBadRequest, "commit_sha must be a lowercase 40-hex sha")
 			return
 		}
-
-		// Validate spec (cannot be empty for single-repo run submission)
-		if len(req.Spec) == 0 {
-			writeHTTPError(w, http.StatusBadRequest, "spec is required")
-			return
-		}
-		if _, err := contracts.ParseMigSpecJSON(req.Spec); err != nil {
-			writeHTTPError(w, http.StatusBadRequest, "spec: %v", err)
+		if err := validateRunSubmissionSpecRequest(req); err != nil {
+			writeHTTPError(w, http.StatusBadRequest, "%v", err)
 			return
 		}
 
@@ -104,26 +95,14 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service, g
 			}
 		}
 
-		specID := req.SpecID
-		if specID.IsZero() {
-			specID = domaintypes.NewSpecID()
-			createdSpec, err := st.CreateSpec(r.Context(), store.CreateSpecParams{
-				ID:        specID,
-				Name:      "",
-				Spec:      req.Spec,
-				CreatedBy: createdByPtr,
-			})
-			if err != nil {
-				serverError(w, "create single-repo run", "create spec", err)
-				return
-			}
-			specID = createdSpec.ID
-		} else if _, err := st.GetSpec(r.Context(), specID); err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				writeHTTPError(w, http.StatusBadRequest, "spec_id not found")
-				return
-			}
-			serverError(w, "create single-repo run", "get spec", err, "spec_id", specID)
+		submissionSpec, err := resolveRunSubmissionSpec(r.Context(), req, specServices)
+		if err != nil {
+			writeRunSubmissionSpecError(w, err)
+			return
+		}
+		specID, err := persistRunSubmissionSpec(r.Context(), st, submissionSpec, createdByPtr)
+		if err != nil {
+			serverError(w, "create single-repo run", "persist spec snapshot", err)
 			return
 		}
 

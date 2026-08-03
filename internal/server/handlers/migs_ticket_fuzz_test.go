@@ -14,7 +14,7 @@ import (
 // path with a nil-backed mock store; success is not required.
 func FuzzCreateSingleRepoRunHandler(f *testing.F) {
 	st := &jobStore{}
-	h := createSingleRepoRunHandler(st, nil, gitauth.Options{})
+	h := createSingleRepoRunHandler(st, nil, gitauth.Options{}, runSubmitSpecServices{})
 
 	// Seed with a few typical cases.
 	seeds := [][]byte{

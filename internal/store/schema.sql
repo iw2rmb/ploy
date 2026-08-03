@@ -128,7 +128,7 @@ CREATE TABLE IF NOT EXISTS specs (
 );
 CREATE INDEX IF NOT EXISTS specs_created_idx ON specs(created_at);
 CREATE UNIQUE INDEX IF NOT EXISTS specs_named_source_sha_name_idx
-ON specs (name, (source->>'domain'), (source->>'repo'), sha)
+ON specs (name, (source->>'domain'), (source->>'repo'), (COALESCE(source->>'path', '')), sha)
 WHERE name <> '' AND sha <> '';
 
 -- Migs (code modification projects)

@@ -258,6 +258,10 @@ components:
       $ref: "./components/schemas/controlplane.yaml#/CreateRunResponse"
     RunSubmitRequest:
       $ref: "./components/schemas/controlplane.yaml#/RunSubmitRequest"
+    RunSpecOverrides:
+      $ref: "./components/schemas/controlplane.yaml#/RunSpecOverrides"
+    RunBuildGateForcedStack:
+      $ref: "./components/schemas/controlplane.yaml#/RunBuildGateForcedStack"
     RunRestartRequest:
       $ref: "./components/schemas/controlplane.yaml#/RunRestartRequest"
     MigsRunSummary:

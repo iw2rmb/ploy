@@ -344,18 +344,51 @@ RunSubmitRequest:
     commit_sha:
       type: string
       description: Optional lowercase 40-hex commit SHA. When provided, the server uses it directly as the source commit.
-    spec_id:
-      type: string
-      description: Optional existing named spec ID. When present, the run references this specs row instead of creating an anonymous specs row.
     spec:
       type: object
       additionalProperties: true
-      description: Migs spec JSON object (must be a JSON object).
+      description: Canonical Migs spec JSON object compiled by the CLI for a local source.
+    spec_selector:
+      type: string
+      description: Named spec selector resolved and compiled from configured Git repositories by the server.
+    spec_overrides:
+      $ref: "#/RunSpecOverrides"
     created_by: { type: string, nullable: true }
     gitlab_token:
       type: string
       description: Request-only ephemeral GitLab token. Accepted only for HTTPS repos whose host matches the configured GitLab domain; the server stores only a server-generated SHA-256 marker in run metadata.
-  required: [repo_url, ref, spec]
+  required: [repo_url, ref]
+  oneOf:
+    - required: [spec]
+      not:
+        required: [spec_selector]
+    - required: [spec_selector]
+      not:
+        required: [spec]
+
+RunSpecOverrides:
+  type: object
+  description: Overrides applied by the server only to a named spec.
+  properties:
+    step_envs:
+      type: object
+      additionalProperties:
+        type: array
+        items: { type: string }
+      description: Ordered KEY=VALUE assignments grouped by step name.
+    build_gate_forced:
+      type: object
+      properties:
+        pre: { $ref: "#/RunBuildGateForcedStack" }
+        post: { $ref: "#/RunBuildGateForcedStack" }
+
+RunBuildGateForcedStack:
+  type: object
+  properties:
+    language: { type: string }
+    release: { type: string }
+    tool: { type: string }
+  required: [language, release]
 
 RunRestartRequest:
   type: object
