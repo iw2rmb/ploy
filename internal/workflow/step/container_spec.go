@@ -93,6 +93,10 @@ func buildContainerSpec(runID types.RunID, jobID types.JobID, manifest contracts
 	if err != nil {
 		return ContainerSpec{}, fmt.Errorf("prepare java tool cache mounts: %w", err)
 	}
+	javaCacheMounts, err = omitLegacyCacheMountsOverlappingHomeInputs(javaCacheMounts, manifest.Home, homeDir)
+	if err != nil {
+		return ContainerSpec{}, fmt.Errorf("prepare java tool cache mounts: %w", err)
+	}
 	mounts = append(mounts, javaCacheMounts...)
 
 	// In, out, and tmp entries are seeded into their common parent mounts.
@@ -198,6 +202,38 @@ func buildContainerSpec(runID types.RunID, jobID types.JobID, manifest contracts
 		LimitDiskBytes:   diskBytes,
 		StorageSizeOpt:   storageSizeOpt,
 	}, nil
+}
+
+func omitLegacyCacheMountsOverlappingHomeInputs(mounts []ContainerMount, entries []string, homeDir string) ([]ContainerMount, error) {
+	if len(mounts) == 0 || len(entries) == 0 {
+		return mounts, nil
+	}
+	homeTargets := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		parsed, err := contracts.ParseStoredHomeEntry(entry)
+		if err != nil {
+			return nil, fmt.Errorf("home entry %q: %w", entry, err)
+		}
+		homeTargets = append(homeTargets, path.Join(homeDir, parsed.Dst))
+	}
+
+	filtered := make([]ContainerMount, 0, len(mounts))
+	for _, mount := range mounts {
+		conflicts := false
+		for _, target := range homeTargets {
+			_, _, overlaps := mountOverlap(mount.Target, target)
+			if mount.Target == target || overlaps {
+				conflicts = true
+				break
+			}
+		}
+		// Hydra owns explicit home inputs while legacy tool caches still use
+		// nested HOME mounts. Later cache slices remove this compatibility case.
+		if !conflicts {
+			filtered = append(filtered, mount)
+		}
+	}
+	return filtered, nil
 }
 
 // SeedOutDirFromStaging copies materialized Hydra out entry content from the

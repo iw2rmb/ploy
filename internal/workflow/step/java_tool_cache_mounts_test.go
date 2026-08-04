@@ -13,9 +13,11 @@ func TestBuildContainerSpec_JavaToolCacheMountsFromStackEnv(t *testing.T) {
 	t.Setenv(gateCacheRootEnv, cacheRoot)
 
 	tests := []struct {
-		name       string
-		env        map[string]string
-		wantMounts map[string]string
+		name           string
+		env            map[string]string
+		home           []string
+		wantMounts     map[string]string
+		wantHomeTarget string
 	}{
 		{
 			name: "java stack mounts both caches",
@@ -23,6 +25,42 @@ func TestBuildContainerSpec_JavaToolCacheMountsFromStackEnv(t *testing.T) {
 				contracts.PLOYStackLanguageEnv: "java",
 				contracts.PLOYStackReleaseEnv:  "17",
 			},
+			wantMounts: map[string]string{
+				gradleUserHomeDir: filepath.Join(cacheRoot, "java", "gradle", "17"),
+				mavenUserHomeDir:  filepath.Join(cacheRoot, "java", "maven", "17"),
+			},
+		},
+		{
+			name: "writable Gradle home input suppresses overlapping legacy cache",
+			env: map[string]string{
+				contracts.PLOYStackLanguageEnv: "java",
+				contracts.PLOYStackReleaseEnv:  "17",
+			},
+			home: []string{"abc0001:.gradle/gradle.properties"},
+			wantMounts: map[string]string{
+				mavenUserHomeDir: filepath.Join(cacheRoot, "java", "maven", "17"),
+			},
+		},
+		{
+			name: "read-only Maven home input suppresses overlapping legacy cache",
+			env: map[string]string{
+				contracts.PLOYStackLanguageEnv: "java",
+				contracts.PLOYStackReleaseEnv:  "17",
+			},
+			home: []string{"abc0002:.m2/settings.xml:ro"},
+			wantMounts: map[string]string{
+				gradleUserHomeDir: filepath.Join(cacheRoot, "java", "gradle", "17"),
+			},
+			wantHomeTarget: "/root/.m2/settings.xml",
+		},
+		{
+			name: "custom home input does not suppress root legacy caches",
+			env: map[string]string{
+				"HOME":                         "/home/worker",
+				contracts.PLOYStackLanguageEnv: "java",
+				contracts.PLOYStackReleaseEnv:  "17",
+			},
+			home: []string{"abc0003:.gradle/gradle.properties"},
 			wantMounts: map[string]string{
 				gradleUserHomeDir: filepath.Join(cacheRoot, "java", "gradle", "17"),
 				mavenUserHomeDir:  filepath.Join(cacheRoot, "java", "maven", "17"),
@@ -47,6 +85,7 @@ func TestBuildContainerSpec_JavaToolCacheMountsFromStackEnv(t *testing.T) {
 				Name:  "Java cache mount",
 				Image: "ghcr.io/example/mig:latest",
 				Envs:  tt.env,
+				Home:  tt.home,
 				Inputs: []contracts.StepInput{{
 					Name:        "src",
 					MountPath:   "/workspace",
@@ -88,6 +127,18 @@ func TestBuildContainerSpec_JavaToolCacheMountsFromStackEnv(t *testing.T) {
 				}
 				if gotMount.ReadOnly {
 					t.Fatalf("cache mount must be writable: %+v", gotMount)
+				}
+			}
+			if tt.wantHomeTarget != "" {
+				var gotHomeMount *ContainerMount
+				for i := range spec.Mounts {
+					if spec.Mounts[i].Target == tt.wantHomeTarget {
+						gotHomeMount = &spec.Mounts[i]
+						break
+					}
+				}
+				if gotHomeMount == nil || !gotHomeMount.ReadOnly {
+					t.Fatalf("read-only home mount %q missing: %+v", tt.wantHomeTarget, spec.Mounts)
 				}
 			}
 		})

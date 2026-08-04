@@ -562,7 +562,8 @@ If `$HOME/.claude-code-router/config.json` exists at startup, `amata` runs:
 - `eval "$(ccr activate)"`
 
 **Build Gate Gradle images (`gate-gradle:*`)**: Store Gradle defaults outside
-`HOME` and install them under `~/.gradle/` at startup. The init script enables a
+`HOME` and install them under the configured `GRADLE_USER_HOME` at startup.
+Current images set `GRADLE_USER_HOME=/root/.gradle`. The init script enables a
 remote Gradle Build Cache when `PLOY_GRADLE_BUILD_CACHE_URL` is set (push
 behavior controlled by `PLOY_GRADLE_BUILD_CACHE_PUSH`).
 
@@ -583,6 +584,9 @@ Runtime mounts:
 - Gradle tuple -> `$PLOY_BUILDGATE_CACHE_ROOT/java/gradle/<release>` to `/root/.gradle`
 - Maven tuple -> `$PLOY_BUILDGATE_CACHE_ROOT/java/maven/<release>` to `/root/.m2`
 - `java.classpath` portability requirement for Gradle entries: `/root/.gradle/...` only.
+
+An explicit Hydra `home` input below one of these targets takes precedence.
+Ploy omits only the overlapping legacy tool-cache mount for that job.
 
 When `PLOY_STACK_RELEASE` is empty, runtime uses `unknown-release` as the lane key.
 Image-name marker fallback is not used.
