@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -67,7 +68,7 @@ type ContainerResult struct {
 // for correlation with telemetry and log aggregation systems.
 func buildContainerSpec(runID types.RunID, jobID types.JobID, manifest contracts.StepManifest, workspace string, jobMounts JobMounts) (ContainerSpec, error) {
 	// Mount the first input at its mount path; fallback to working dir.
-	mounts := make([]ContainerMount, 0, len(manifest.Inputs)+8)
+	mounts := make([]ContainerMount, 0, len(manifest.Inputs)+9)
 	// Always mount the hydrated workspace to the declared mount (first input), respecting mode.
 	if len(manifest.Inputs) > 0 {
 		in := manifest.Inputs[0]
@@ -79,7 +80,11 @@ func buildContainerSpec(runID types.RunID, jobID types.JobID, manifest contracts
 	} else {
 		mounts = append(mounts, ContainerMount{Source: workspace, Target: "/workspace", ReadOnly: false})
 	}
-	commonMounts, err := buildCommonJobMounts(jobMounts)
+	homeDir, err := resolveJobHome(manifest.Envs)
+	if err != nil {
+		return ContainerSpec{}, fmt.Errorf("resolve job home: %w", err)
+	}
+	commonMounts, err := buildCommonJobMounts(jobMounts, homeDir)
 	if err != nil {
 		return ContainerSpec{}, fmt.Errorf("prepare common job mounts: %w", err)
 	}
@@ -107,22 +112,29 @@ func buildContainerSpec(runID types.RunID, jobID types.JobID, manifest contracts
 		}
 	}
 
-	// Home stays on its existing nested-mount contract until the complete job
-	// home projection is enabled in the next slice.
-	homeDir := jobDefaultHomeContainer
-	if h := manifest.Envs["HOME"]; h != "" {
-		homeDir = h
-	}
+	nested := make([]nestedMountContract, 0, len(manifest.Home)+len(javaCacheMounts))
+	// Writable Hydra home content is copied into the job home before container
+	// creation. Read-only content remains a nested mount so its mode is retained.
 	for _, entry := range manifest.Home {
 		parsed, err := contracts.ParseStoredHomeEntry(entry)
 		if err != nil {
 			return ContainerSpec{}, fmt.Errorf("home entry %q: %w", entry, err)
 		}
+		if !parsed.ReadOnly {
+			continue
+		}
+		target := path.Join(homeDir, parsed.Dst)
 		mounts = append(mounts, ContainerMount{
 			Source:   filepath.Join(jobMounts.Staging, parsed.Hash, "content"),
-			Target:   homeDir + "/" + parsed.Dst,
-			ReadOnly: parsed.ReadOnly,
+			Target:   target,
+			ReadOnly: true,
 		})
+		nested = append(nested, nestedMountContract{parent: homeDir, child: target})
+	}
+	for _, mount := range javaCacheMounts {
+		if parent, child, overlaps := mountOverlap(homeDir, mount.Target); overlaps && parent == homeDir {
+			nested = append(nested, nestedMountContract{parent: parent, child: child})
+		}
 	}
 
 	// Optional: mount host Docker socket for containers that request it via manifest options
@@ -147,7 +159,7 @@ func buildContainerSpec(runID types.RunID, jobID types.JobID, manifest contracts
 			})
 		}
 	}
-	if err := validateContainerMounts(mounts, nil); err != nil {
+	if err := validateContainerMounts(mounts, nested); err != nil {
 		return ContainerSpec{}, fmt.Errorf("validate container mounts: %w", err)
 	}
 	env, err := applyReservedJobEnv(manifest.Envs, jobMounts)
@@ -261,6 +273,34 @@ func SeedTmpDirFromStaging(manifest contracts.StepManifest, stagingDir, tmpDir s
 		}
 		if err := copyPath(src, dst); err != nil {
 			return fmt.Errorf("seed tmp %s: %w", parsed.Dst, err)
+		}
+	}
+	return nil
+}
+
+// SeedHomeDirFromStaging copies writable Hydra home entries into the job-owned
+// home. Read-only entries remain bind mounts so the container cannot mutate
+// their materialized sources.
+func SeedHomeDirFromStaging(manifest contracts.StepManifest, stagingDir, homeDir string) error {
+	if stagingDir == "" || homeDir == "" {
+		return nil
+	}
+	cleanHomeDir := filepath.Clean(homeDir)
+	for _, entry := range manifest.Home {
+		parsed, err := contracts.ParseStoredHomeEntry(entry)
+		if err != nil {
+			return fmt.Errorf("home entry %q: %w", entry, err)
+		}
+		if parsed.ReadOnly {
+			continue
+		}
+		src := filepath.Join(stagingDir, parsed.Hash, "content")
+		dst := filepath.Clean(filepath.Join(homeDir, filepath.FromSlash(parsed.Dst)))
+		if dst != cleanHomeDir && !strings.HasPrefix(dst, cleanHomeDir+string(filepath.Separator)) {
+			return fmt.Errorf("home entry %q: resolved path %s escapes homeDir", entry, dst)
+		}
+		if err := copyPath(src, dst); err != nil {
+			return fmt.Errorf("seed home %s: %w", parsed.Dst, err)
 		}
 	}
 	return nil

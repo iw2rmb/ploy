@@ -78,7 +78,12 @@ func (e *gateExecutor) Execute(ctx context.Context, spec *contracts.StepGateSpec
 
 	reportGateRuntimeImage(ctx, plan.image)
 
-	mounts, err := assembleGateMounts(workspace, plan, jobMounts)
+	envCopy := contracts.MergeEnv(spec.Env, plan.env)
+	homeDir, err := resolveJobHome(envCopy)
+	if err != nil {
+		return nil, fmt.Errorf("resolve build gate home: %w", err)
+	}
+	mounts, err := assembleGateMounts(workspace, plan, jobMounts, homeDir)
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +91,6 @@ func (e *gateExecutor) Execute(ctx context.Context, spec *contracts.StepGateSpec
 	limitMem, _ := parseBytesLimitEnv(gateLimitMemoryEnv)
 	limitCPUMillis := parseInt64LimitEnv(gateLimitCPUEnv)
 	limitDisk, storageSizeOpt := parseBytesLimitEnv(gateLimitDiskEnv)
-	envCopy := contracts.MergeEnv(spec.Env, plan.env)
 	envCopy, err = applyReservedJobEnv(envCopy, jobMounts)
 	if err != nil {
 		return nil, fmt.Errorf("prepare build gate environment: %w", err)
@@ -95,6 +99,13 @@ func (e *gateExecutor) Execute(ctx context.Context, spec *contracts.StepGateSpec
 	nested := []nestedMountContract(nil)
 	if strings.EqualFold(plan.tool, "gradle") {
 		nested = append(nested, nestedMountContract{parent: jobTmpContainerDir, child: gradleCacheHitsContainerFile})
+	}
+	for _, mount := range mounts {
+		if parent, child, overlaps := mountOverlap(homeDir, mount.Target); overlaps && parent == homeDir && child != homeDir {
+			if child == gradleUserHomeDir || child == mavenUserHomeDir {
+				nested = append(nested, nestedMountContract{parent: parent, child: child})
+			}
+		}
 	}
 	if err := validateContainerMounts(mounts, nested); err != nil {
 		return nil, fmt.Errorf("validate build gate mounts: %w", err)
@@ -150,8 +161,8 @@ func (e *gateExecutor) Execute(ctx context.Context, spec *contracts.StepGateSpec
 }
 
 // assembleGateMounts adds gate-specific mounts to the common job projection.
-func assembleGateMounts(workspace string, plan gateExecutionPlan, jobMounts JobMounts) ([]ContainerMount, error) {
-	commonMounts, err := buildCommonJobMounts(jobMounts)
+func assembleGateMounts(workspace string, plan gateExecutionPlan, jobMounts JobMounts, homeDir string) ([]ContainerMount, error) {
+	commonMounts, err := buildCommonJobMounts(jobMounts, homeDir)
 	if err != nil {
 		return nil, fmt.Errorf("prepare common job mounts: %w", err)
 	}

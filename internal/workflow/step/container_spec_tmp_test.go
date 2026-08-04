@@ -59,14 +59,15 @@ func TestBuildContainerSpec_HydraSingleMount(t *testing.T) {
 			negTarget:  "/out/results",
 		},
 		{
-			name: "home mount default rw",
+			name: "writable home content uses complete home mount",
 			setup: func(m *contracts.StepManifest) (string, string) {
 				m.Home = []string{"ccccccc:.codex/auth.json"}
 				return "", ""
 			},
-			wantTarget: "/root/.codex/auth.json",
-			wantSrcSfx: filepath.Join("ccccccc", "content"),
+			wantTarget: "/root",
+			wantSrcSfx: "home",
 			wantRO:     false,
+			negTarget:  "/root/.codex/auth.json",
 		},
 		{
 			name: "home mount with :ro",
@@ -79,14 +80,15 @@ func TestBuildContainerSpec_HydraSingleMount(t *testing.T) {
 			wantRO:     true,
 		},
 		{
-			name: "home uses HOME env override",
+			name: "complete home uses HOME env override",
 			setup: func(m *contracts.StepManifest) (string, string) {
-				m.Envs = map[string]string{"HOME": "/root"}
+				m.Envs = map[string]string{"HOME": "/home/worker"}
 				m.Home = []string{"ccccccc:.codex/auth.json"}
 				return "", ""
 			},
-			wantTarget: "/root/.codex/auth.json",
-			wantSrcSfx: filepath.Join("ccccccc", "content"),
+			wantTarget: "/home/worker",
+			wantSrcSfx: "home",
+			negTarget:  "/home/worker/.codex/auth.json",
 		},
 		{
 			name: "tmp uses single writable mount",
@@ -153,7 +155,7 @@ func TestBuildContainerSpec_HydraEdgeCases(t *testing.T) {
 			setup: func(m *contracts.StepManifest) (string, string, string) {
 				return "", "", t.TempDir()
 			},
-			wantMounts: 9,
+			wantMounts: 10,
 		},
 		{
 			name: "out invalid entry rejected",
@@ -229,8 +231,8 @@ func TestBuildContainerSpec_HydraMixedMountPlan(t *testing.T) {
 	requireNoMount(t, spec.Mounts, "/out/results")
 	requireNoMount(t, spec.Mounts, "/tmp/ploy/tool.jar")
 
-	if len(spec.Mounts) != 10 {
-		t.Errorf("got %d mounts, want 10: %+v", len(spec.Mounts), spec.Mounts)
+	if len(spec.Mounts) != 11 {
+		t.Errorf("got %d mounts, want 11: %+v", len(spec.Mounts), spec.Mounts)
 	}
 }
 
@@ -389,5 +391,41 @@ func TestSeedTmpDirFromStaging(t *testing.T) {
 	}
 	if string(got) != "jar" {
 		t.Errorf("seeded tmp content = %q, want %q", got, "jar")
+	}
+}
+
+func TestSeedHomeDirFromStagingCopiesOnlyWritableEntries(t *testing.T) {
+	stagingDir := t.TempDir()
+	homeDir := t.TempDir()
+	for hash, body := range map[string]string{
+		"abc0003": "writable",
+		"abc0004": "read-only",
+	} {
+		contentPath := filepath.Join(stagingDir, hash, "content")
+		if err := os.MkdirAll(filepath.Dir(contentPath), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(contentPath, []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	manifest := contracts.StepManifest{Home: []string{
+		"abc0003:.codex/auth.json",
+		"abc0004:.codex/config.toml:ro",
+	}}
+	if err := SeedHomeDirFromStaging(manifest, stagingDir, homeDir); err != nil {
+		t.Fatalf("SeedHomeDirFromStaging() error = %v", err)
+	}
+
+	got, err := os.ReadFile(filepath.Join(homeDir, ".codex", "auth.json"))
+	if err != nil {
+		t.Fatalf("read writable home entry: %v", err)
+	}
+	if string(got) != "writable" {
+		t.Fatalf("writable home entry = %q", got)
+	}
+	if _, err := os.Stat(filepath.Join(homeDir, ".codex", "config.toml")); !os.IsNotExist(err) {
+		t.Fatalf("read-only home entry was copied: %v", err)
 	}
 }

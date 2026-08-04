@@ -11,7 +11,7 @@ import (
 
 func TestCommonJobMountsUseGenericProjection(t *testing.T) {
 	mounts := newTestMigJobMounts(t)
-	got, err := buildCommonJobMounts(mounts)
+	got, err := buildCommonJobMounts(mounts, jobDefaultHomeContainer)
 	if err != nil {
 		t.Fatalf("buildCommonJobMounts() error = %v", err)
 	}
@@ -20,11 +20,11 @@ func TestCommonJobMountsUseGenericProjection(t *testing.T) {
 	requireMount(t, got, jobOutContainerDir, mounts.Out, false)
 	requireMount(t, got, jobTmpContainerDir, mounts.Tmp, false)
 	requireMount(t, got, jobCacheContainerDir, mounts.Cache, false)
+	requireMount(t, got, jobDefaultHomeContainer, mounts.Home, false)
 	requireMount(t, got, jobShareContainerDir, mounts.Share, false)
 	requireMount(t, got, nodeCacheContainerDir, mounts.NodeCache, true)
 	requireMount(t, got, nodeConfigContainerDir, mounts.CommonConfig, true)
 	requireMount(t, got, jobConfigContainerDir, mounts.JobConfig, true)
-	requireNoMount(t, got, jobDefaultHomeContainer)
 	requireNoMount(t, got, jobRuntimeContainerDir)
 }
 
@@ -32,8 +32,10 @@ func TestReservedJobEnvironmentOverridesCallerValues(t *testing.T) {
 	mounts := newTestJobMounts(t, types.JobTypePostGate)
 	base := map[string]string{
 		"CALLER_VALUE":       "preserved",
+		"HOME":               "/home/job",
 		ployJobCacheDirEnv:   "/caller/cache",
 		ployNodeCacheDirEnv:  "/caller/node-cache",
+		ployJobHomeDirEnv:    "/caller/home",
 		ployRunShareDirEnv:   "/caller/share",
 		ployNodeConfigDirEnv: "/caller/common-config",
 		ployJobConfigDirEnv:  "/caller/job-config",
@@ -46,8 +48,10 @@ func TestReservedJobEnvironmentOverridesCallerValues(t *testing.T) {
 	}
 	want := map[string]string{
 		"CALLER_VALUE":       "preserved",
+		"HOME":               "/home/job",
 		ployJobCacheDirEnv:   jobCacheContainerDir,
 		ployNodeCacheDirEnv:  nodeCacheContainerDir,
+		ployJobHomeDirEnv:    "/home/job",
 		ployRunShareDirEnv:   jobShareContainerDir,
 		ployNodeConfigDirEnv: nodeConfigContainerDir,
 		ployJobConfigDirEnv:  jobConfigContainerDir,
@@ -58,6 +62,17 @@ func TestReservedJobEnvironmentOverridesCallerValues(t *testing.T) {
 	}
 	if base[ployJobCacheDirEnv] != "/caller/cache" {
 		t.Fatal("applyReservedJobEnv() mutated caller environment")
+	}
+}
+
+func TestJobHomeRejectsInvalidTarget(t *testing.T) {
+	mounts := newTestMigJobMounts(t)
+	for _, home := range []string{"relative/home", "/home/../root"} {
+		t.Run(home, func(t *testing.T) {
+			if _, err := buildCommonJobMounts(mounts, home); err == nil {
+				t.Fatalf("buildCommonJobMounts(%q) error = nil", home)
+			}
+		})
 	}
 }
 
@@ -160,6 +175,7 @@ func TestGateAndMigrationUseSameGenericProjection(t *testing.T) {
 		jobOutContainerDir,
 		jobTmpContainerDir,
 		jobCacheContainerDir,
+		jobDefaultHomeContainer,
 		jobShareContainerDir,
 		nodeCacheContainerDir,
 		nodeConfigContainerDir,
@@ -178,6 +194,7 @@ func TestGateAndMigrationUseSameGenericProjection(t *testing.T) {
 	for _, key := range []string{
 		ployJobCacheDirEnv,
 		ployNodeCacheDirEnv,
+		ployJobHomeDirEnv,
 		ployRunShareDirEnv,
 		ployNodeConfigDirEnv,
 		ployJobConfigDirEnv,

@@ -26,6 +26,7 @@ const (
 const (
 	ployJobCacheDirEnv   = "PLOY_JOB_CACHE_DIR"
 	ployNodeCacheDirEnv  = "PLOY_NODE_CACHE_DIR"
+	ployJobHomeDirEnv    = "PLOY_JOB_HOME_DIR"
 	ployRunShareDirEnv   = "PLOY_RUN_SHARE_DIR"
 	ployNodeConfigDirEnv = "PLOY_NODE_CONFIG_DIR"
 	ployJobConfigDirEnv  = "PLOY_JOB_CONFIG_DIR"
@@ -33,8 +34,8 @@ const (
 )
 
 // JobMounts is the workflow boundary for job, run, and node host storage.
-// Home and RuntimeShare are carried now but remain unmounted until their
-// dedicated rollout slices enable those projections.
+// RuntimeShare is carried now but remains unmounted until its dedicated
+// rollout slice enables that projection.
 type JobMounts struct {
 	Cache        string
 	Home         string
@@ -55,8 +56,11 @@ type nestedMountContract struct {
 	child  string
 }
 
-func buildCommonJobMounts(jobMounts JobMounts) ([]ContainerMount, error) {
+func buildCommonJobMounts(jobMounts JobMounts, homeTarget string) ([]ContainerMount, error) {
 	if err := validateJobMountSources(jobMounts); err != nil {
+		return nil, err
+	}
+	if err := validateJobHomeTarget(homeTarget); err != nil {
 		return nil, err
 	}
 	mounts := []ContainerMount{
@@ -64,6 +68,7 @@ func buildCommonJobMounts(jobMounts JobMounts) ([]ContainerMount, error) {
 		{Source: jobMounts.Out, Target: jobOutContainerDir, ReadOnly: false},
 		{Source: jobMounts.Tmp, Target: jobTmpContainerDir, ReadOnly: false},
 		{Source: jobMounts.Cache, Target: jobCacheContainerDir, ReadOnly: false},
+		{Source: jobMounts.Home, Target: homeTarget, ReadOnly: false},
 		{Source: jobMounts.Share, Target: jobShareContainerDir, ReadOnly: false},
 		{Source: jobMounts.NodeCache, Target: nodeCacheContainerDir, ReadOnly: true},
 		{Source: jobMounts.CommonConfig, Target: nodeConfigContainerDir, ReadOnly: true},
@@ -107,15 +112,41 @@ func applyReservedJobEnv(base map[string]string, jobMounts JobMounts) (map[strin
 	if err := validateJobMountSources(jobMounts); err != nil {
 		return nil, err
 	}
+	homeTarget, err := resolveJobHome(base)
+	if err != nil {
+		return nil, err
+	}
 	env := contracts.MergeEnv(base, map[string]string{
 		ployJobCacheDirEnv:   jobCacheContainerDir,
 		ployNodeCacheDirEnv:  nodeCacheContainerDir,
+		ployJobHomeDirEnv:    homeTarget,
 		ployRunShareDirEnv:   jobShareContainerDir,
 		ployNodeConfigDirEnv: nodeConfigContainerDir,
 		ployJobConfigDirEnv:  jobConfigContainerDir,
 		ployJobTypeEnv:       jobMounts.JobType.String(),
 	})
 	return env, nil
+}
+
+func resolveJobHome(env map[string]string) (string, error) {
+	homeTarget := jobDefaultHomeContainer
+	if configured := env["HOME"]; configured != "" {
+		homeTarget = configured
+	}
+	if err := validateJobHomeTarget(homeTarget); err != nil {
+		return "", err
+	}
+	return homeTarget, nil
+}
+
+func validateJobHomeTarget(homeTarget string) error {
+	if !path.IsAbs(homeTarget) {
+		return fmt.Errorf("job HOME target %q is not absolute", homeTarget)
+	}
+	if clean := path.Clean(homeTarget); clean != homeTarget {
+		return fmt.Errorf("job HOME target %q is not canonical", homeTarget)
+	}
+	return nil
 }
 
 func validateContainerMounts(mounts []ContainerMount, nested []nestedMountContract) error {

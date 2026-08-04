@@ -112,8 +112,8 @@ func TestGateExecutor_EnvPassthrough(t *testing.T) {
 	}
 
 	// Verify all env vars from spec.Env are passed verbatim to the container spec.
-	if len(rt.captured.Env) != len(spec.Env)+6 {
-		t.Fatalf("env count = %d, want %d: %v", len(rt.captured.Env), len(spec.Env)+6, rt.captured.Env)
+	if len(rt.captured.Env) != len(spec.Env)+7 {
+		t.Fatalf("env count = %d, want %d: %v", len(rt.captured.Env), len(spec.Env)+7, rt.captured.Env)
 	}
 	for key, want := range spec.Env {
 		if got := rt.captured.Env[key]; got != want {
@@ -156,7 +156,7 @@ func TestGateExecutor_EmptyEnv(t *testing.T) {
 				t.Fatal("expected Create to be called")
 			}
 
-			if len(rt.captured.Env) != 6 {
+			if len(rt.captured.Env) != 7 {
 				t.Errorf("expected only reserved job env for %s, got %v", tc.name, rt.captured.Env)
 			}
 		})

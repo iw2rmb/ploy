@@ -90,9 +90,11 @@ canonical `shortHash:dst` records before spec submission:
 2. Computes a content hash, uploads the archive when missing, and rewrites
    the entry to `shortHash:dst` form.
 3. The node agent downloads bundles by hash and mounts or seeds them at the
-   declared destination: `in` is read-only, `out` is read-write and uploaded as
-   job output, `home` uses its `:ro` mode, and `tmp` is a per-job writable
-   `/tmp` mount that is removed after the job and excluded from repo artifacts.
+   declared destination. `in` is read-only. `out` is read-write and uploaded as
+   job output. The node seeds writable `home` entries into the job-owned home
+   and keeps `home` entries with `:ro` as nested read-only mounts. `tmp` is a
+   per-job writable `/tmp` mount. The node removes `home` and `tmp` after the
+   job and excludes them from repo artifacts.
 
 **Example spec fragment (before CLI compile):**
 ```yaml
@@ -452,7 +454,7 @@ The `show` and `unset` commands use **`--from`** to specify the target:
 
 | Variable | Consumer | Description |
 |----------|----------|-------------|
-| `home` (spec field) | `codex` | Per-run file mounts relative to `$HOME` |
+| `home` (spec field) | `codex` | Per-job files relative to `$HOME`; `:ro` keeps a read-only nested mount |
 | `in` (typed) | `codex` | Read-only input file mounts |
 | `OPENAI_API_KEY` | Future OpenAI-integrated migs | API key for LLM operations |
 | `PLOY_GRADLE_BUILD_CACHE_URL` | Build Gate (Gradle) | HTTP URL of the remote Gradle Build Cache endpoint (e.g. `http://gradle-build-cache:5071/cache/`). When unset, remote cache is disabled. |
@@ -542,21 +544,27 @@ Run/API metadata propagation:
 - `orw-cli` — ORW contract wrapper producing deterministic `/out/report.json`.
 - `rewrite` — bundled OpenRewrite CLI runner executable used by `orw-cli`.
 
-Config files are delivered via Hydra `home` mounts to their
-expected paths under `$HOME`. No env-based materialization is performed:
-- `auth.json` → `$HOME/.codex/auth.json` (via `home` mount)
-- `config.toml` → `$HOME/.codex/config.toml` (via `home` mount)
-- `config.json` → `$HOME/.claude-code-router/config.json` (via `home` mount)
-- `crush.json` → `$HOME/.config/crush/crush.json` (via `home` mount)
+Config files are delivered through Hydra `home` entries to their expected paths
+under `$HOME`. Writable entries are copied into the job home. Entries with
+`:ro` remain read-only nested mounts:
+
+- `auth.json` → `$HOME/.codex/auth.json`
+- `config.toml` → `$HOME/.codex/config.toml`
+- `config.json` → `$HOME/.claude-code-router/config.json`
+- `crush.json` → `$HOME/.config/crush/crush.json`
 
 `amata` sets `CODEX_HOME=$HOME/.codex` by default. Configure delivery via
-the run spec `home` field.
+the run spec `home` field. The image installs its default Codex configuration
+only when Hydra content has not already supplied that path.
 
-If `/root/.claude-code-router/config.json` exists at startup, `amata` runs:
+If `$HOME/.claude-code-router/config.json` exists at startup, `amata` runs:
 - `ccr start`
 - `eval "$(ccr activate)"`
 
-**Build Gate Gradle images (`gate-gradle:*`)**: Ship a Gradle init script under `~/.gradle/init.d/` that enables a remote Gradle Build Cache when `PLOY_GRADLE_BUILD_CACHE_URL` is set (push behavior controlled by `PLOY_GRADLE_BUILD_CACHE_PUSH`).
+**Build Gate Gradle images (`gate-gradle:*`)**: Store Gradle defaults outside
+`HOME` and install them under `~/.gradle/` at startup. The init script enables a
+remote Gradle Build Cache when `PLOY_GRADLE_BUILD_CACHE_URL` is set (push
+behavior controlled by `PLOY_GRADLE_BUILD_CACHE_PUSH`).
 
 Build Gate jobs also use node-local persistent tool caches under
 `$PLOY_BUILDGATE_CACHE_ROOT/<language>/<tool>/<release>`.

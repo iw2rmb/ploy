@@ -129,6 +129,9 @@ func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 	if err := SeedTmpDirFromStaging(req.Manifest, req.JobMounts.Staging, req.JobMounts.Tmp); err != nil {
 		return Result{}, fmt.Errorf("seed tmp dir from staging: %w", err)
 	}
+	if err := SeedHomeDirFromStaging(req.Manifest, req.JobMounts.Staging, req.JobMounts.Home); err != nil {
+		return Result{}, fmt.Errorf("seed home dir from staging: %w", err)
+	}
 
 	// Stage 3: Execute container via configured runtime.
 	executionStart := time.Now()

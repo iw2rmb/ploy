@@ -42,8 +42,8 @@ func TestBuildContainerSpec_CertMountOptions(t *testing.T) {
 		t.Fatalf("buildContainerSpec error: %v", err)
 	}
 
-	if len(spec.Mounts) != 12 {
-		t.Fatalf("got %d mounts, want 12: %+v", len(spec.Mounts), spec.Mounts)
+	if len(spec.Mounts) != 13 {
+		t.Fatalf("got %d mounts, want 13: %+v", len(spec.Mounts), spec.Mounts)
 	}
 
 	requireMount(t, spec.Mounts, "/etc/ploy/certs/ca.crt", caPath, true)
@@ -74,7 +74,7 @@ func TestBuildContainerSpec_CertMountOptionsSkipEmptyOrMissing(t *testing.T) {
 		t.Fatalf("buildContainerSpec error: %v", err)
 	}
 
-	if len(spec.Mounts) != 9 {
+	if len(spec.Mounts) != 10 {
 		t.Fatalf("got %d mounts, want workspace plus common mounts: %+v", len(spec.Mounts), spec.Mounts)
 	}
 }

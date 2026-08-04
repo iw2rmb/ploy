@@ -28,7 +28,7 @@ func TestBuildContainerSpec_InMountPresent(t *testing.T) {
 		t.Fatalf("buildContainerSpec error: %v", err)
 	}
 
-	if len(spec.Mounts) != 9 {
+	if len(spec.Mounts) != 10 {
 		t.Fatalf("got %d mounts, want workspace plus common mounts: %+v", len(spec.Mounts), spec.Mounts)
 	}
 	requireMount(t, spec.Mounts, "/in", "/tmp/in", false)

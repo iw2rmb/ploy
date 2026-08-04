@@ -478,9 +478,12 @@ func TestHydraResources_MixedMaterializationAndMountPlanning(t *testing.T) {
 	defer srv.Close()
 
 	manifest := contracts.StepManifest{
-		In:        []string{inHash + ":/in/config.json"},
-		Out:       []string{outHash + ":/out/results"},
-		Home:      []string{homeHash + ":.auth.json:ro"},
+		In:  []string{inHash + ":/in/config.json"},
+		Out: []string{outHash + ":/out/results"},
+		Home: []string{
+			homeHash + ":.auth.json:ro",
+			homeHash + ":.codex/auth.json",
+		},
 		Tmp:       []string{tmpHash + ":/tmp/ploy/tool.jar"},
 		BundleMap: bundleMap,
 	}
@@ -653,6 +656,18 @@ func TestHydraResources_MixedMaterializationAndMountPlanning(t *testing.T) {
 	}
 	if string(seededIn) != `{"config":"value"}` {
 		t.Errorf("Runner seeded in = %q, want config payload", seededIn)
+	}
+	seededHome, err := os.ReadFile(filepath.Join(mountRoot, "home", ".codex", "auth.json"))
+	if err != nil {
+		t.Fatalf("Runner seeded writable home content missing: %v", err)
+	}
+	if string(seededHome) != `{"auth":"token"}` {
+		t.Errorf("Runner seeded home = %q, want auth payload", seededHome)
+	}
+	for _, mount := range spy.capturedSpec.Mounts {
+		if mount.Target == "/root/.codex/auth.json" {
+			t.Fatal("writable home content used a nested mount")
+		}
 	}
 
 	// Assert mount targets and modes from captured container spec.
