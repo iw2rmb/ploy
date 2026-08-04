@@ -50,8 +50,6 @@ type ContainerMount struct {
 	ReadOnly bool
 }
 
-const containerShareDir = "/share"
-
 // ContainerHandle identifies a prepared container by its ID.
 type ContainerHandle string
 
@@ -67,11 +65,9 @@ type ContainerResult struct {
 // buildContainerSpec assembles a ContainerSpec from the manifest and workspace path.
 // The runID and jobID parameters thread workflow identifiers into container labels
 // for correlation with telemetry and log aggregation systems.
-// stagingDir is an optional path to a staging directory for materialized Hydra
-// resources; each In/Out/Home/Tmp/CA entry is mounted from stagingDir/<shortHash>.
-func buildContainerSpec(runID types.RunID, jobID types.JobID, manifest contracts.StepManifest, workspace string, outDir string, inDir string, shareDir string, tmpDir string, stagingDir string) (ContainerSpec, error) {
+func buildContainerSpec(runID types.RunID, jobID types.JobID, manifest contracts.StepManifest, workspace string, jobMounts JobMounts) (ContainerSpec, error) {
 	// Mount the first input at its mount path; fallback to working dir.
-	mounts := make([]ContainerMount, 0, len(manifest.Inputs))
+	mounts := make([]ContainerMount, 0, len(manifest.Inputs)+8)
 	// Always mount the hydrated workspace to the declared mount (first input), respecting mode.
 	if len(manifest.Inputs) > 0 {
 		in := manifest.Inputs[0]
@@ -83,94 +79,50 @@ func buildContainerSpec(runID types.RunID, jobID types.JobID, manifest contracts
 	} else {
 		mounts = append(mounts, ContainerMount{Source: workspace, Target: "/workspace", ReadOnly: false})
 	}
-	// Optional /out mount for additional artifacts
-	if strings.TrimSpace(outDir) != "" {
-		mounts = append(mounts, ContainerMount{Source: outDir, Target: "/out", ReadOnly: false})
+	commonMounts, err := buildCommonJobMounts(jobMounts)
+	if err != nil {
+		return ContainerSpec{}, fmt.Errorf("prepare common job mounts: %w", err)
 	}
-	// Optional /in mount for cross-phase inputs.
-	// Keep the top-level mount writable so nested Hydra file mounts under /in/*
-	// can be created by the container runtime. Individual Hydra /in entries remain
-	// read-only mounts.
-	if strings.TrimSpace(inDir) != "" {
-		mounts = append(mounts, ContainerMount{Source: inDir, Target: "/in", ReadOnly: false})
-	}
-	// Optional /share mount for run-scoped shared files.
-	if strings.TrimSpace(shareDir) != "" {
-		mounts = append(mounts, ContainerMount{Source: shareDir, Target: containerShareDir, ReadOnly: false})
-	}
-	// Optional /tmp mount for per-job temporary files. The host directory is
-	// lifecycle-scoped by nodeagent and never lives under repo artifacts.
-	if strings.TrimSpace(tmpDir) != "" {
-		mounts = append(mounts, ContainerMount{Source: tmpDir, Target: "/tmp", ReadOnly: false})
-	}
+	mounts = append(mounts, commonMounts...)
 	javaCacheMounts, err := buildJavaToolCacheMountsFromStackEnv(manifest.Envs)
 	if err != nil {
 		return ContainerSpec{}, fmt.Errorf("prepare java tool cache mounts: %w", err)
 	}
-	mounts = appendMountsIfTargetMissing(mounts, javaCacheMounts)
+	mounts = append(mounts, javaCacheMounts...)
 
-	// Mount Hydra materialized resources from the staging directory.
-	// Each entry references a shortHash; staged content lives at stagingDir/<shortHash>.
-	if strings.TrimSpace(stagingDir) != "" {
-		// In entries:
-		// - when inDir is present, entries are seeded into inDir and exposed via
-		//   the single /in mount (no nested bind mounts under /in/*).
-		// - when inDir is absent, mount read-only at the declared destination.
-		for _, entry := range manifest.In {
-			parsed, err := contracts.ParseStoredInEntry(entry)
-			if err != nil {
-				return ContainerSpec{}, fmt.Errorf("in entry %q: %w", entry, err)
-			}
-			if strings.TrimSpace(inDir) != "" {
-				continue
-			}
-			mounts = append(mounts, ContainerMount{
-				Source:   filepath.Join(stagingDir, parsed.Hash, "content"),
-				Target:   parsed.Dst,
-				ReadOnly: true,
-			})
+	// In, out, and tmp entries are seeded into their common parent mounts.
+	for _, entry := range manifest.In {
+		if _, err := contracts.ParseStoredInEntry(entry); err != nil {
+			return ContainerSpec{}, fmt.Errorf("in entry %q: %w", entry, err)
 		}
-		// Out entries: validate destinations and enforce outDir presence.
-		// Out entries are seeded into outDir by SeedOutDirFromStaging and
-		// covered by the single /out mount — no separate mounts are created.
-		for _, entry := range manifest.Out {
-			parsed, err := contracts.ParseStoredOutEntry(entry)
-			if err != nil {
-				return ContainerSpec{}, fmt.Errorf("out entry %q: %w", entry, err)
-			}
-			if strings.TrimSpace(outDir) == "" {
-				return ContainerSpec{}, fmt.Errorf("out entry %q: outDir required for destination %s", entry, parsed.Dst)
-			}
+	}
+	for _, entry := range manifest.Out {
+		if _, err := contracts.ParseStoredOutEntry(entry); err != nil {
+			return ContainerSpec{}, fmt.Errorf("out entry %q: %w", entry, err)
 		}
-		// Home entries: mount at $HOME/<dst> with mode from entry.
-		// Resolve HOME from manifest envs; fall back to /root.
-		homeDir := "/root"
-		if h := manifest.Envs["HOME"]; h != "" {
-			homeDir = h
+	}
+	for _, entry := range manifest.Tmp {
+		if _, err := contracts.ParseStoredTmpEntry(entry); err != nil {
+			return ContainerSpec{}, fmt.Errorf("tmp entry %q: %w", entry, err)
 		}
-		for _, entry := range manifest.Home {
-			parsed, err := contracts.ParseStoredHomeEntry(entry)
-			if err != nil {
-				return ContainerSpec{}, fmt.Errorf("home entry %q: %w", entry, err)
-			}
-			mounts = append(mounts, ContainerMount{
-				Source:   filepath.Join(stagingDir, parsed.Hash, "content"),
-				Target:   homeDir + "/" + parsed.Dst,
-				ReadOnly: parsed.ReadOnly,
-			})
+	}
+
+	// Home stays on its existing nested-mount contract until the complete job
+	// home projection is enabled in the next slice.
+	homeDir := jobDefaultHomeContainer
+	if h := manifest.Envs["HOME"]; h != "" {
+		homeDir = h
+	}
+	for _, entry := range manifest.Home {
+		parsed, err := contracts.ParseStoredHomeEntry(entry)
+		if err != nil {
+			return ContainerSpec{}, fmt.Errorf("home entry %q: %w", entry, err)
 		}
-		// Tmp entries: validate destinations and enforce tmpDir presence.
-		// Tmp entries are seeded into tmpDir by SeedTmpDirFromStaging and
-		// covered by the single writable /tmp mount.
-		for _, entry := range manifest.Tmp {
-			parsed, err := contracts.ParseStoredTmpEntry(entry)
-			if err != nil {
-				return ContainerSpec{}, fmt.Errorf("tmp entry %q: %w", entry, err)
-			}
-			if strings.TrimSpace(tmpDir) == "" {
-				return ContainerSpec{}, fmt.Errorf("tmp entry %q: tmpDir required for destination %s", entry, parsed.Dst)
-			}
-		}
+		mounts = append(mounts, ContainerMount{
+			Source:   filepath.Join(jobMounts.Staging, parsed.Hash, "content"),
+			Target:   homeDir + "/" + parsed.Dst,
+			ReadOnly: parsed.ReadOnly,
+		})
 	}
 
 	// Optional: mount host Docker socket for containers that request it via manifest options
@@ -194,6 +146,13 @@ func buildContainerSpec(runID types.RunID, jobID types.JobID, manifest contracts
 				ReadOnly: opt.readOnly,
 			})
 		}
+	}
+	if err := validateContainerMounts(mounts, nil); err != nil {
+		return ContainerSpec{}, fmt.Errorf("validate container mounts: %w", err)
+	}
+	env, err := applyReservedJobEnv(manifest.Envs, jobMounts)
+	if err != nil {
+		return ContainerSpec{}, fmt.Errorf("prepare job environment: %w", err)
 	}
 	wd := manifest.WorkingDir
 	if wd == "" && len(manifest.Inputs) > 0 {
@@ -219,7 +178,7 @@ func buildContainerSpec(runID types.RunID, jobID types.JobID, manifest contracts
 		Image:            manifest.Image,
 		Command:          append([]string{}, manifest.Command...),
 		WorkingDir:       wd,
-		Env:              manifest.Envs,
+		Env:              env,
 		Mounts:           mounts,
 		Labels:           labels,
 		LimitNanoCPUs:    nanoCPUs,
@@ -227,24 +186,6 @@ func buildContainerSpec(runID types.RunID, jobID types.JobID, manifest contracts
 		LimitDiskBytes:   diskBytes,
 		StorageSizeOpt:   storageSizeOpt,
 	}, nil
-}
-
-func appendMountsIfTargetMissing(existing []ContainerMount, additional []ContainerMount) []ContainerMount {
-	if len(additional) == 0 {
-		return existing
-	}
-	seen := make(map[string]struct{}, len(existing))
-	for _, mount := range existing {
-		seen[mount.Target] = struct{}{}
-	}
-	for _, mount := range additional {
-		if _, ok := seen[mount.Target]; ok {
-			continue
-		}
-		existing = append(existing, mount)
-		seen[mount.Target] = struct{}{}
-	}
-	return existing
 }
 
 // SeedOutDirFromStaging copies materialized Hydra out entry content from the

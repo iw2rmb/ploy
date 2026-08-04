@@ -40,14 +40,14 @@ func TestBuildContainerSpec_HydraSingleMount(t *testing.T) {
 		negTarget  string // mount target that must NOT exist
 	}{
 		{
-			name: "in mounted read-only",
+			name: "in uses single writable mount",
 			setup: func(m *contracts.StepManifest) (string, string) {
 				m.In = []string{"abcdef0:/in/config.json"}
 				return "", ""
 			},
-			wantTarget: "/in/config.json",
-			wantSrcSfx: filepath.Join("abcdef0", "content"),
-			wantRO:     true,
+			wantTarget: "/in",
+			wantRO:     false,
+			negTarget:  "/in/config.json",
 		},
 		{
 			name: "out seeded into outDir not separate mount",
@@ -106,7 +106,7 @@ func TestBuildContainerSpec_HydraSingleMount(t *testing.T) {
 			manifest := baseManifestForHydra(t)
 			outDir, tmpDir := tt.setup(&manifest)
 
-			spec, err := buildContainerSpec(
+			spec, err := buildContainerSpecForTest(
 				types.RunID("run-"+tt.name), types.JobID("job-"+tt.name),
 				manifest, "/ws", outDir, "", "", tmpDir, stagingDir,
 			)
@@ -149,28 +149,11 @@ func TestBuildContainerSpec_HydraEdgeCases(t *testing.T) {
 		wantMounts      int    // expected mount count when no error
 	}{
 		{
-			name: "skipped without staging dir",
-			setup: func(m *contracts.StepManifest) (string, string, string) {
-				m.In = []string{"abcdef0:/in/config.json"}
-				return "", "", ""
-			},
-			wantMounts: 1,
-		},
-		{
 			name: "no hydra fields valid",
 			setup: func(m *contracts.StepManifest) (string, string, string) {
 				return "", "", t.TempDir()
 			},
-			wantMounts: 1,
-		},
-		{
-			name: "out requires outDir",
-			setup: func(m *contracts.StepManifest) (string, string, string) {
-				m.Out = []string{"fff0000:/out/results"}
-				return "", "", t.TempDir()
-			},
-			wantErr:         true,
-			wantErrContains: "outDir required",
+			wantMounts: 9,
 		},
 		{
 			name: "out invalid entry rejected",
@@ -179,15 +162,6 @@ func TestBuildContainerSpec_HydraEdgeCases(t *testing.T) {
 				return t.TempDir(), "", t.TempDir()
 			},
 			wantErr: true,
-		},
-		{
-			name: "tmp requires tmpDir",
-			setup: func(m *contracts.StepManifest) (string, string, string) {
-				m.Tmp = []string{"abcdef0:/tmp/tool.jar"}
-				return "", "", t.TempDir()
-			},
-			wantErr:         true,
-			wantErrContains: "tmpDir required",
 		},
 		{
 			name: "tmp invalid entry rejected",
@@ -205,7 +179,7 @@ func TestBuildContainerSpec_HydraEdgeCases(t *testing.T) {
 			manifest := baseManifestForHydra(t)
 			outDir, tmpDir, stagingDir := tt.setup(&manifest)
 
-			spec, err := buildContainerSpec(
+			spec, err := buildContainerSpecForTest(
 				types.RunID("run-edge"), types.JobID("job-edge"),
 				manifest, "/ws", outDir, "", "", tmpDir, stagingDir,
 			)
@@ -239,7 +213,7 @@ func TestBuildContainerSpec_HydraMixedMountPlan(t *testing.T) {
 	manifest.Home = []string{"ddd3333:.config/app.toml:ro"}
 	manifest.Tmp = []string{"eee4444:/tmp/ploy/tool.jar"}
 
-	spec, err := buildContainerSpec(
+	spec, err := buildContainerSpecForTest(
 		types.RunID("run-mixed"), types.JobID("job-mixed"),
 		manifest, "/ws", outDir, "", "", tmpDir, stagingDir,
 	)
@@ -250,13 +224,13 @@ func TestBuildContainerSpec_HydraMixedMountPlan(t *testing.T) {
 	requireMount(t, spec.Mounts, "/workspace", "/ws", false)
 	requireMount(t, spec.Mounts, "/out", outDir, false)
 	requireMount(t, spec.Mounts, "/tmp", tmpDir, false)
-	requireMount(t, spec.Mounts, "/in/data.json", filepath.Join(stagingDir, "bbb1111", "content"), true)
+	requireNoMount(t, spec.Mounts, "/in/data.json")
 	requireMount(t, spec.Mounts, "/root/.config/app.toml", filepath.Join(stagingDir, "ddd3333", "content"), true)
 	requireNoMount(t, spec.Mounts, "/out/results")
 	requireNoMount(t, spec.Mounts, "/tmp/ploy/tool.jar")
 
-	if len(spec.Mounts) != 5 {
-		t.Errorf("got %d mounts, want 5: %+v", len(spec.Mounts), spec.Mounts)
+	if len(spec.Mounts) != 10 {
+		t.Errorf("got %d mounts, want 10: %+v", len(spec.Mounts), spec.Mounts)
 	}
 }
 

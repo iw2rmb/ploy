@@ -583,7 +583,6 @@ func TestHydraResources_MixedMaterializationAndMountPlanning(t *testing.T) {
 		readOnly bool
 	}
 	wantMounts := []wantMount{
-		{hash: inHash, field: "in", target: "/in/config.json", readOnly: true},
 		{hash: homeHash, field: "home", target: "/root/.auth.json", readOnly: true},
 	}
 	for _, w := range wantMounts {
@@ -615,14 +614,26 @@ func TestHydraResources_MixedMaterializationAndMountPlanning(t *testing.T) {
 
 	runner := &step.Runner{Containers: spy}
 	outDir2 := t.TempDir()
+	mountRoot := t.TempDir()
 	_, runErr := runner.Run(t.Context(), step.Request{
-		RunID:      types.RunID("run-integration"),
-		JobID:      types.JobID("job-integration"),
-		Manifest:   fullManifest,
-		Workspace:  t.TempDir(),
-		OutDir:     outDir2,
-		TmpDir:     tmpDir,
-		StagingDir: stagingDir,
+		RunID:     types.RunID("run-integration"),
+		JobID:     types.JobID("job-integration"),
+		Manifest:  fullManifest,
+		Workspace: t.TempDir(),
+		JobMounts: step.JobMounts{
+			Cache:        filepath.Join(mountRoot, "cache"),
+			Home:         filepath.Join(mountRoot, "home"),
+			In:           filepath.Join(mountRoot, "in"),
+			Out:          outDir2,
+			Staging:      stagingDir,
+			Tmp:          tmpDir,
+			Share:        filepath.Join(mountRoot, "share"),
+			RuntimeShare: filepath.Join(mountRoot, "runtime-share"),
+			NodeCache:    filepath.Join(mountRoot, "node-cache"),
+			CommonConfig: filepath.Join(mountRoot, "job-config", "common"),
+			JobConfig:    filepath.Join(mountRoot, "job-config", "mig"),
+			JobType:      types.JobTypeMig,
+		},
 	})
 	if runErr != nil {
 		t.Fatalf("Runner.Run: %v", runErr)
@@ -635,6 +646,13 @@ func TestHydraResources_MixedMaterializationAndMountPlanning(t *testing.T) {
 	}
 	if string(seeded2) != "seed content" {
 		t.Errorf("Runner seeded out = %q, want %q", seeded2, "seed content")
+	}
+	seededIn, err := os.ReadFile(filepath.Join(mountRoot, "in", "config.json"))
+	if err != nil {
+		t.Fatalf("Runner seeded in content missing: %v", err)
+	}
+	if string(seededIn) != `{"config":"value"}` {
+		t.Errorf("Runner seeded in = %q, want config payload", seededIn)
 	}
 
 	// Assert mount targets and modes from captured container spec.

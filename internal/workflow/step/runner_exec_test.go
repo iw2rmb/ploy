@@ -113,9 +113,10 @@ func TestRunner_Run_DoesNotRemoveContainerAfterCompletion(t *testing.T) {
 	}
 	req := Request{
 		RunID:     types.RunID("run-123"),
+		JobID:     types.JobID("job-123"),
 		Manifest:  manifest,
 		Workspace: "/tmp/test-workspace",
-		OutDir:    "/tmp/test-out",
+		JobMounts: newTestMigJobMounts(t),
 	}
 
 	if _, err := runner.Run(context.Background(), req); err != nil {
@@ -168,9 +169,10 @@ func TestRunner_Run_StreamsLogsLiveWhenSupported(t *testing.T) {
 	}
 	req := Request{
 		RunID:     types.RunID("run-123"),
+		JobID:     types.JobID("job-123"),
 		Manifest:  manifest,
 		Workspace: "/tmp/test-workspace",
-		OutDir:    "/tmp/test-out",
+		JobMounts: newTestMigJobMounts(t),
 	}
 
 	if _, err := runner.Run(context.Background(), req); err != nil {

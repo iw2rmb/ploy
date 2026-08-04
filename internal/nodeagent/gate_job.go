@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -18,7 +17,7 @@ import (
 
 // executeGateJob runs a build gate validation job.
 // Reports pass/fail status to server.
-func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest) {
+func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest, mounts step.JobMounts) {
 	startTime := time.Now()
 
 	jobDirs := jobDirectories(req.RunID, req.JobID)
@@ -103,30 +102,14 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
 		return
 	}
-	if err := exposeGateOutDir(workspace, jobDirs.Out); err != nil {
-		uploadRepoArtifactsOnReturn = true
-		slog.Error("failed to expose gate out dir", "run_id", req.RunID, "job_id", req.JobID, "error", err)
-		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
-		return
-	}
-	defer cleanupGateOutLink(workspace)
-	shareDir, err := ensureRunShareDir(req.RunID)
-	if err != nil {
-		uploadRepoArtifactsOnReturn = true
-		slog.Error("failed to ensure run share dir", "run_id", req.RunID, "job_id", req.JobID, "error", err)
-		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
-		return
-	}
-
 	// Run the build gate.
 	ctx = withGateExecutionLabels(ctx, req)
-	ctx = step.WithGateShareDir(ctx, shareDir)
 	ctx = step.WithGateRuntimeImageObserver(ctx, func(obsCtx context.Context, image string) {
 		if err := r.SaveJobImageName(obsCtx, req.JobID, image); err != nil {
 			slog.Warn("failed to save gate job image name", "run_id", req.RunID, "job_id", req.JobID, "error", err)
 		}
 	})
-	gateResult, gateErr := r.runGate(ctx, runner, manifest, workspace)
+	gateResult, gateErr := r.runGate(ctx, runner, manifest, workspace, mounts)
 
 	// Gate execution errors (e.g., Docker pull/create/start failures) are NOT build failures
 	// and are treated as terminal runtime errors for this repo attempt so the
@@ -159,7 +142,7 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 		r.persistFirstGateFailureLog(req.RunID, gateResult)
 	}
 
-	if err := r.persistGateSBOM(ctx, req, shareDir); err != nil {
+	if err := r.persistGateSBOM(ctx, req, mounts.Share); err != nil {
 		duration := time.Since(startTime)
 		uploadRepoArtifactsOnReturn = true
 		slog.Error("gate sbom persistence failed; marking gate job as error",
@@ -242,7 +225,7 @@ func applyGatePhaseOverrides(manifest *contracts.StepManifest, req StartRunReque
 }
 
 // runGate executes the build gate and returns the result.
-func (r *runController) runGate(ctx context.Context, runner step.Runner, manifest contracts.StepManifest, workspace string) (*contracts.BuildGateStageMetadata, error) {
+func (r *runController) runGate(ctx context.Context, runner step.Runner, manifest contracts.StepManifest, workspace string, mounts step.JobMounts) (*contracts.BuildGateStageMetadata, error) {
 	gateSpec := manifest.Gate
 	if runner.Gate == nil || gateSpec == nil || !gateSpec.Enabled {
 		// No gate configured - return success.
@@ -250,7 +233,7 @@ func (r *runController) runGate(ctx context.Context, runner step.Runner, manifes
 			StaticChecks: []contracts.BuildGateStaticCheckReport{{Passed: true, Tool: "none"}},
 		}, nil
 	}
-	return runner.Gate.Execute(step.WithExecutionLogWriter(ctx, runner.LogWriter), gateSpec, workspace)
+	return runner.Gate.Execute(step.WithExecutionLogWriter(ctx, runner.LogWriter), gateSpec, workspace, mounts)
 }
 
 // gateResultPassed reports whether the gate result indicates a passing gate.
@@ -325,27 +308,6 @@ func (r *runController) persistFirstGateFailureLog(runID types.RunID, meta *cont
 		return
 	}
 	persistOnce(runDir(runID), "build-gate-first.log", []byte(logPayload), "first build gate failure log", runID)
-}
-
-func exposeGateOutDir(workspace, outDir string) error {
-	linkPath := filepath.Join(workspace, step.GateWorkspaceOutDir)
-	if err := os.RemoveAll(linkPath); err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("remove previous gate out link: %w", err)
-	}
-	if err := os.MkdirAll(outDir, 0o750); err != nil {
-		return fmt.Errorf("create gate out artifacts dir: %w", err)
-	}
-	if err := os.Symlink(outDir, linkPath); err != nil {
-		return fmt.Errorf("create gate out symlink: %w", err)
-	}
-	return nil
-}
-
-func cleanupGateOutLink(workspace string) {
-	outDir := filepath.Join(workspace, step.GateWorkspaceOutDir)
-	if err := os.RemoveAll(outDir); err != nil && !os.IsNotExist(err) {
-		slog.Warn("failed to remove gate out link", "path", outDir, "error", err)
-	}
 }
 
 // buildGateStats constructs stats payload for gate job completion.

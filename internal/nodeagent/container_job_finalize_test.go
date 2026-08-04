@@ -235,6 +235,10 @@ func TestRunContainerJobNonzeroExitReportsDerivedStatsError(t *testing.T) {
 			}
 			workspace := t.TempDir()
 			initRepoWithFile(t, workspace, "README.md", "base\n")
+			mounts, err := jobMounts(paths, runID, req.JobType)
+			if err != nil {
+				t.Fatalf("jobMounts() error = %v", err)
+			}
 
 			_, err = controller.runContainerJob(
 				context.Background(),
@@ -244,6 +248,7 @@ func TestRunContainerJobNonzeroExitReportsDerivedStatsError(t *testing.T) {
 				workspace,
 				time.Now(),
 				paths,
+				mounts,
 			)
 			if err != nil {
 				t.Fatalf("runContainerJob() error = %v", err)

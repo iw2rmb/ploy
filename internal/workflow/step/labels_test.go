@@ -66,6 +66,7 @@ func TestRunnerRun_ContainerLabels(t *testing.T) {
 				JobID:     tc.jobID,
 				Manifest:  manifest,
 				Workspace: "/tmp/workspace",
+				JobMounts: newTestMigJobMounts(t),
 			}
 
 			if _, err := runner.Run(context.Background(), req); err != nil {

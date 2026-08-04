@@ -23,14 +23,13 @@ func TestBuildContainerSpec_InMountPresent(t *testing.T) {
 		}},
 	}
 
-	spec, err := buildContainerSpec(types.RunID("run-in"), types.JobID("job-in"), manifest, "/tmp/ws", "", "/tmp/in", "", "", "")
+	spec, err := buildContainerSpecForTest(types.RunID("run-in"), types.JobID("job-in"), manifest, "/tmp/ws", "", "/tmp/in", "", "", "")
 	if err != nil {
 		t.Fatalf("buildContainerSpec error: %v", err)
 	}
 
-	// Expect two mounts: workspace RW and /in.
-	if len(spec.Mounts) != 2 {
-		t.Fatalf("got %d mounts, want 2: %+v", len(spec.Mounts), spec.Mounts)
+	if len(spec.Mounts) != 9 {
+		t.Fatalf("got %d mounts, want workspace plus common mounts: %+v", len(spec.Mounts), spec.Mounts)
 	}
 	requireMount(t, spec.Mounts, "/in", "/tmp/in", false)
 }
@@ -49,7 +48,7 @@ func TestBuildContainerSpec_InMountSkipsNestedHydraInMounts(t *testing.T) {
 		In: []string{"abcdef0:/in/amata.yaml"},
 	}
 
-	spec, err := buildContainerSpec(types.RunID("run-in"), types.JobID("job-in"), manifest, "/tmp/ws", "", "/tmp/in", "", "", "/tmp/staging")
+	spec, err := buildContainerSpecForTest(types.RunID("run-in"), types.JobID("job-in"), manifest, "/tmp/ws", "", "/tmp/in", "", "", "/tmp/staging")
 	if err != nil {
 		t.Fatalf("buildContainerSpec error: %v", err)
 	}
@@ -71,7 +70,7 @@ func TestBuildContainerSpec_ShareMountPresent(t *testing.T) {
 		}},
 	}
 
-	spec, err := buildContainerSpec(types.RunID("run-share"), types.JobID("job-share"), manifest, "/tmp/ws", "", "", "/tmp/share", "", "")
+	spec, err := buildContainerSpecForTest(types.RunID("run-share"), types.JobID("job-share"), manifest, "/tmp/ws", "", "", "/tmp/share", "", "")
 	if err != nil {
 		t.Fatalf("buildContainerSpec error: %v", err)
 	}
@@ -98,7 +97,7 @@ func TestBuildContainerSpec_DockerSocketMountOption(t *testing.T) {
 		}},
 	}
 
-	spec, err := buildContainerSpec(types.RunID("run-docker"), types.JobID("job-docker"), manifest, "/tmp/ws", "", "", "", "", "")
+	spec, err := buildContainerSpecForTest(types.RunID("run-docker"), types.JobID("job-docker"), manifest, "/tmp/ws", "", "", "", "", "")
 	if err != nil {
 		t.Fatalf("buildContainerSpec error: %v", err)
 	}

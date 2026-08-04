@@ -26,7 +26,7 @@ func (r *Runner) runGate(ctx context.Context, req Request, failMsg string) (*con
 		return nil, types.Duration(time.Since(stageStart)), nil
 	}
 
-	gateMetadata, err := r.Gate.Execute(ctx, gateSpec, req.Workspace)
+	gateMetadata, err := r.Gate.Execute(ctx, gateSpec, req.Workspace, req.JobMounts)
 	if err != nil {
 		return nil, types.Duration(time.Since(stageStart)), fmt.Errorf("build gate execution failed: %w", err)
 	}

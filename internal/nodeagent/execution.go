@@ -95,21 +95,26 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 		r.uploadFailureStatus(ctx, req, fmt.Errorf("prepare job directories: %w", err), 0)
 		return
 	}
-
 	jobType := req.JobType
+	if err := jobType.Validate(); err != nil {
+		slog.Error("cannot execute job with invalid type", "run_id", req.RunID, "job_id", req.JobID, "job_type", jobType, "error", err)
+		r.uploadFailureStatus(ctx, req, err, 0)
+		return
+	}
+	mounts, err := jobMounts(jobDirs, req.RunID, jobType)
+	if err != nil {
+		r.uploadFailureStatus(ctx, req, fmt.Errorf("prepare job mounts: %w", err), 0)
+		return
+	}
 
 	// Dispatch based on job type from claim payload.
 	switch jobType {
 	case types.JobTypePreGate, types.JobTypePostGate:
 		req.JobType = jobType
-		r.executeGateJob(ctx, req)
+		r.executeGateJob(ctx, req, mounts)
 	case types.JobTypeMig:
 		req.JobType = jobType
-		r.executeMigJob(ctx, req)
-	default:
-		err := fmt.Errorf("invalid job_type %q", jobType)
-		slog.Error("cannot execute job with invalid type", "run_id", req.RunID, "job_id", req.JobID, "job_type", jobType, "error", err)
-		r.uploadFailureStatus(ctx, req, err, 0)
+		r.executeMigJob(ctx, req, mounts)
 	}
 }
 

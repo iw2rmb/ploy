@@ -15,11 +15,6 @@ func appendDockerHostSocketMount(mounts []ContainerMount, env map[string]string)
 	if err != nil || info.IsDir() {
 		return mounts
 	}
-	for _, mount := range mounts {
-		if mount.Target == socketPath {
-			return mounts
-		}
-	}
 	return append(mounts, ContainerMount{
 		Source:   socketPath,
 		Target:   socketPath,

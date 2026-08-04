@@ -24,7 +24,7 @@ import (
 // Stack-aware image selection: The job loads the persisted stack from the
 // pre-gate phase and uses it for manifest building. This ensures mig steps
 // use stack-specific images (e.g., java-maven, java-gradle) when configured.
-func (r *runController) executeMigJob(ctx context.Context, req StartRunRequest) {
+func (r *runController) executeMigJob(ctx context.Context, req StartRunRequest, mounts step.JobMounts) {
 	startTime := time.Now()
 
 	// Load the persisted stack from the pre-gate phase for stack-aware image
@@ -79,7 +79,7 @@ func (r *runController) executeMigJob(ctx context.Context, req StartRunRequest) 
 		StartTime: startTime,
 	}
 
-	r.executeContainerJob(ctx, req, cfg)
+	r.executeContainerJob(ctx, req, cfg, mounts)
 }
 
 // containerJobConfig configures the execution of a standard container job.
@@ -112,8 +112,8 @@ type jobOutcome struct {
 
 // executeContainerJob orchestrates the common lifecycle of a container job:
 // runtime init, sticky workspace preparation, directory prep, execution, and uploading.
-func (r *runController) executeContainerJob(ctx context.Context, req StartRunRequest, cfg containerJobConfig) {
-	outcome, execErr := r.executeContainerWithOutcome(ctx, req, cfg)
+func (r *runController) executeContainerJob(ctx context.Context, req StartRunRequest, cfg containerJobConfig, mounts step.JobMounts) {
+	outcome, execErr := r.executeContainerWithOutcome(ctx, req, cfg, mounts)
 	if execErr == nil {
 		if shouldUploadRepoArtifactsAfterContainerJob(req, outcome) {
 			r.uploadRepoArtifactsIfPresent(req.RunID, req.RepoID, req.JobID)
@@ -138,7 +138,7 @@ func shouldUploadRepoArtifactsAfterContainerJob(req StartRunRequest, outcome job
 		(req.NextID == nil || req.NextID.IsZero())
 }
 
-func (r *runController) executeContainerWithOutcome(ctx context.Context, req StartRunRequest, cfg containerJobConfig) (jobOutcome, error) {
+func (r *runController) executeContainerWithOutcome(ctx context.Context, req StartRunRequest, cfg containerJobConfig, mounts step.JobMounts) (jobOutcome, error) {
 	startTime := cfg.StartTime
 	if startTime.IsZero() {
 		startTime = time.Now()
@@ -175,7 +175,7 @@ func (r *runController) executeContainerWithOutcome(ctx context.Context, req Sta
 			return outcome, fmt.Errorf("populate in dir: %w", err)
 		}
 	}
-	stepOutcome, err := r.runContainerJob(ctx, req, cfg, execCtx, workspace, startTime, jobDirs)
+	stepOutcome, err := r.runContainerJob(ctx, req, cfg, execCtx, workspace, startTime, jobDirs, mounts)
 	if err != nil {
 		return outcome, err
 	}
@@ -193,13 +193,10 @@ func (r *runController) runContainerJob(
 	workspace string,
 	startTime time.Time,
 	jobDirs JobDirectories,
+	mounts step.JobMounts,
 ) (jobOutcome, error) {
 	outcome := jobOutcome{}
-	outDir, inDir, diffPath := jobDirs.Out, jobDirs.In, jobDirs.Diff
-	shareDir, err := ensureRunShareDir(req.RunID)
-	if err != nil {
-		return outcome, err
-	}
+	outDir, diffPath := jobDirs.Out, jobDirs.Diff
 	manifest := cfg.Manifest
 	disableManifestGate(&manifest)
 	clearManifestHydration(&manifest)
@@ -270,27 +267,19 @@ func (r *runController) runContainerJob(
 		preWorkspaceTree = tree
 	}
 
-	stagingDir, err := r.materializeJobResources(ctx, manifest, req.TypedOptions.BundleMap, jobDirs.Staging)
+	_, err := r.materializeJobResources(ctx, manifest, req.TypedOptions.BundleMap, mounts.Staging)
 	if err != nil {
 		return outcome, err
-	}
-	tmpDir := ""
-	if len(manifest.Tmp) > 0 {
-		tmpDir = jobDirs.Tmp
 	}
 
 	// Materialized inputs and writable temporary state stay below the job root.
 	stopOutputSync := r.startOutputSync(ctx, req, cfg, outDir, workspace)
 	result, runErr = execCtx.runner.Run(ctx, step.Request{
-		RunID:      req.RunID,
-		JobID:      req.JobID,
-		Manifest:   manifest,
-		Workspace:  workspace,
-		OutDir:     outDir,
-		InDir:      inDir,
-		ShareDir:   shareDir,
-		TmpDir:     tmpDir,
-		StagingDir: stagingDir,
+		RunID:     req.RunID,
+		JobID:     req.JobID,
+		Manifest:  manifest,
+		Workspace: workspace,
+		JobMounts: mounts,
 	})
 	duration = time.Since(startTime)
 	stopOutputSync()

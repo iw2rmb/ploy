@@ -50,7 +50,7 @@ func TestGateExecutor_UsesImageOwnedCommand(t *testing.T) {
 
 			tmpDir := tc.workspace(t)
 			spec := tc.spec()
-			_, err := executor.Execute(context.Background(), spec, tmpDir)
+			_, err := executor.Execute(context.Background(), spec, tmpDir, newTestGateJobMounts(t))
 			if err != nil {
 				t.Fatalf("Execute() unexpected error: %v", err)
 			}

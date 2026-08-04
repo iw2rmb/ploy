@@ -13,7 +13,7 @@ func TestGateExecutor_DoesNotRemoveContainerAfterExecution(t *testing.T) {
 	executor, rt, workspace := newGateTestHarness(t)
 	spec := &contracts.StepGateSpec{Enabled: true}
 
-	_, err := executor.Execute(context.Background(), spec, workspace)
+	_, err := executor.Execute(context.Background(), spec, workspace, newTestGateJobMounts(t))
 	if err != nil {
 		t.Fatalf("Execute() unexpected error: %v", err)
 	}
@@ -50,7 +50,7 @@ func TestGateExecutor_ReportsRuntimeImageBeforeContainerCreate(t *testing.T) {
 	workspace := createMavenWorkspace(t, "17")
 	spec := &contracts.StepGateSpec{Enabled: true}
 
-	if _, err := executor.Execute(ctx, spec, workspace); err != nil {
+	if _, err := executor.Execute(ctx, spec, workspace, newTestGateJobMounts(t)); err != nil {
 		t.Fatalf("Execute() unexpected error: %v", err)
 	}
 
@@ -70,7 +70,7 @@ func TestGateExecutor_PassesContainerLabelsFromContext(t *testing.T) {
 		types.LabelJobID: "job-456",
 	})
 
-	if _, err := executor.Execute(ctx, spec, workspace); err != nil {
+	if _, err := executor.Execute(ctx, spec, workspace, newTestGateJobMounts(t)); err != nil {
 		t.Fatalf("Execute() unexpected error: %v", err)
 	}
 	if !rt.createCalled {
@@ -102,7 +102,7 @@ func TestGateExecutor_EnvPassthrough(t *testing.T) {
 		},
 	}
 
-	_, err := executor.Execute(context.Background(), spec, workspace)
+	_, err := executor.Execute(context.Background(), spec, workspace, newTestGateJobMounts(t))
 	if err != nil {
 		t.Fatalf("Execute() unexpected error: %v", err)
 	}
@@ -112,8 +112,8 @@ func TestGateExecutor_EnvPassthrough(t *testing.T) {
 	}
 
 	// Verify all env vars from spec.Env are passed verbatim to the container spec.
-	if len(rt.captured.Env) != len(spec.Env) {
-		t.Fatalf("env count = %d, want %d: %v", len(rt.captured.Env), len(spec.Env), rt.captured.Env)
+	if len(rt.captured.Env) != len(spec.Env)+6 {
+		t.Fatalf("env count = %d, want %d: %v", len(rt.captured.Env), len(spec.Env)+6, rt.captured.Env)
 	}
 	for key, want := range spec.Env {
 		if got := rt.captured.Env[key]; got != want {
@@ -147,7 +147,7 @@ func TestGateExecutor_EmptyEnv(t *testing.T) {
 				Env:     tc.env,
 			}
 
-			_, err := executor.Execute(context.Background(), spec, workspace)
+			_, err := executor.Execute(context.Background(), spec, workspace, newTestGateJobMounts(t))
 			if err != nil {
 				t.Fatalf("Execute() unexpected error: %v", err)
 			}
@@ -156,9 +156,8 @@ func TestGateExecutor_EmptyEnv(t *testing.T) {
 				t.Fatal("expected Create to be called")
 			}
 
-			// For nil/empty input, the container spec env should be nil or empty.
-			if len(rt.captured.Env) != 0 {
-				t.Errorf("expected empty env for %s, got %v", tc.name, rt.captured.Env)
+			if len(rt.captured.Env) != 6 {
+				t.Errorf("expected only reserved job env for %s, got %v", tc.name, rt.captured.Env)
 			}
 		})
 	}
@@ -207,7 +206,7 @@ BUILD FAILED in 1s
 				},
 			}
 			executor := NewGateExecutor(rt)
-			meta, err := executor.Execute(context.Background(), &contracts.StepGateSpec{Enabled: true}, workspace)
+			meta, err := executor.Execute(context.Background(), &contracts.StepGateSpec{Enabled: true}, workspace, newTestGateJobMounts(t))
 			if err != nil {
 				t.Fatalf("Execute() unexpected error: %v", err)
 			}

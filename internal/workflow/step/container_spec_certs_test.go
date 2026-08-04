@@ -37,13 +37,13 @@ func TestBuildContainerSpec_CertMountOptions(t *testing.T) {
 		},
 	}
 
-	spec, err := buildContainerSpec(types.RunID("run-certs"), types.JobID("job-certs"), manifest, "/tmp/ws", "", "", "", "", "")
+	spec, err := buildContainerSpecForTest(types.RunID("run-certs"), types.JobID("job-certs"), manifest, "/tmp/ws", "", "", "", "", "")
 	if err != nil {
 		t.Fatalf("buildContainerSpec error: %v", err)
 	}
 
-	if len(spec.Mounts) != 4 {
-		t.Fatalf("got %d mounts, want 4: %+v", len(spec.Mounts), spec.Mounts)
+	if len(spec.Mounts) != 12 {
+		t.Fatalf("got %d mounts, want 12: %+v", len(spec.Mounts), spec.Mounts)
 	}
 
 	requireMount(t, spec.Mounts, "/etc/ploy/certs/ca.crt", caPath, true)
@@ -69,12 +69,12 @@ func TestBuildContainerSpec_CertMountOptionsSkipEmptyOrMissing(t *testing.T) {
 		},
 	}
 
-	spec, err := buildContainerSpec(types.RunID("run-certs-skip"), types.JobID("job-certs-skip"), manifest, "/tmp/ws", "", "", "", "", "")
+	spec, err := buildContainerSpecForTest(types.RunID("run-certs-skip"), types.JobID("job-certs-skip"), manifest, "/tmp/ws", "", "", "", "", "")
 	if err != nil {
 		t.Fatalf("buildContainerSpec error: %v", err)
 	}
 
-	if len(spec.Mounts) != 1 {
-		t.Fatalf("got %d mounts, want 1 (workspace only): %+v", len(spec.Mounts), spec.Mounts)
+	if len(spec.Mounts) != 9 {
+		t.Fatalf("got %d mounts, want workspace plus common mounts: %+v", len(spec.Mounts), spec.Mounts)
 	}
 }

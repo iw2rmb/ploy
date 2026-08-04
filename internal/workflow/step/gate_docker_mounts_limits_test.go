@@ -56,38 +56,6 @@ func TestGateExecutor_Mounts(t *testing.T) {
 			},
 		},
 		{
-			name: "out dir mounted writable",
-			build: func(t *testing.T) (string, *contracts.StepGateSpec, context.Context, expectMount, string) {
-				workspace := createMavenWorkspace(t, "17")
-				return workspace, &contracts.StepGateSpec{Enabled: true}, context.Background(),
-					expectMount{source: filepath.Join(workspace, GateWorkspaceOutDir), target: gateContainerOutDir}, ""
-			},
-			expectMount: true,
-		},
-		{
-			name: "in dir mounted when present",
-			build: func(t *testing.T) (string, *contracts.StepGateSpec, context.Context, expectMount, string) {
-				workspace := createMavenWorkspace(t, "17")
-				inDir := filepath.Join(workspace, gateWorkspaceInDir)
-				if err := os.MkdirAll(inDir, 0o755); err != nil {
-					t.Fatalf("MkdirAll(%q): %v", inDir, err)
-				}
-				return workspace, &contracts.StepGateSpec{Enabled: true}, context.Background(),
-					expectMount{source: inDir, target: gateContainerInDir}, ""
-			},
-			expectMount: true,
-		},
-		{
-			name: "share dir mounted when provided via context",
-			build: func(t *testing.T) (string, *contracts.StepGateSpec, context.Context, expectMount, string) {
-				shareDir := t.TempDir()
-				return createMavenWorkspace(t, "17"), &contracts.StepGateSpec{Enabled: true},
-					WithGateShareDir(context.Background(), shareDir),
-					expectMount{source: shareDir, target: containerShareDir}, ""
-			},
-			expectMount: true,
-		},
-		{
 			name: "gradle workspace mounts native cache",
 			build: func(t *testing.T) (string, *contracts.StepGateSpec, context.Context, expectMount, string) {
 				cacheRoot, err := resolveGateCacheRoot()
@@ -121,7 +89,7 @@ func TestGateExecutor_Mounts(t *testing.T) {
 			executor := NewGateExecutor(rt)
 			workspace, spec, ctx, want, absent := tt.build(t)
 
-			if _, err := executor.Execute(ctx, spec, workspace); err != nil {
+			if _, err := executor.Execute(ctx, spec, workspace, newTestGateJobMounts(t)); err != nil {
 				t.Fatalf("Execute() unexpected error: %v", err)
 			}
 			if !rt.createCalled {
@@ -140,6 +108,26 @@ func TestGateExecutor_Mounts(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGateExecutorUsesCommonJobMounts(t *testing.T) {
+	rt := &testContainerRuntime{}
+	executor := NewGateExecutor(rt)
+	mounts := newTestGateJobMounts(t)
+	workspace := createMavenWorkspace(t, "17")
+
+	if _, err := executor.Execute(context.Background(), &contracts.StepGateSpec{Enabled: true}, workspace, mounts); err != nil {
+		t.Fatalf("Execute() unexpected error: %v", err)
+	}
+
+	requireMount(t, rt.captured.Mounts, jobInContainerDir, mounts.In, false)
+	requireMount(t, rt.captured.Mounts, jobOutContainerDir, mounts.Out, false)
+	requireMount(t, rt.captured.Mounts, jobTmpContainerDir, mounts.Tmp, false)
+	requireMount(t, rt.captured.Mounts, jobCacheContainerDir, mounts.Cache, false)
+	requireMount(t, rt.captured.Mounts, jobShareContainerDir, mounts.Share, false)
+	requireMount(t, rt.captured.Mounts, nodeCacheContainerDir, mounts.NodeCache, true)
+	requireMount(t, rt.captured.Mounts, nodeConfigContainerDir, mounts.CommonConfig, true)
+	requireMount(t, rt.captured.Mounts, jobConfigContainerDir, mounts.JobConfig, true)
 }
 
 func TestResolveBuildGateCacheRoot_UsesOverrideEnv(t *testing.T) {
@@ -234,7 +222,7 @@ func TestGateExecutor_LimitEnvParsing(t *testing.T) {
 			workspace := createMavenWorkspace(t, "17")
 
 			spec := &contracts.StepGateSpec{Enabled: true}
-			if _, err := executor.Execute(context.Background(), spec, workspace); err != nil {
+			if _, err := executor.Execute(context.Background(), spec, workspace, newTestGateJobMounts(t)); err != nil {
 				t.Fatalf("Execute() unexpected error: %v", err)
 			}
 			if !rt.createCalled {

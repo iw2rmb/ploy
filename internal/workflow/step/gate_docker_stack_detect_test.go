@@ -30,7 +30,7 @@ func TestGateDocker_StackDetect_FallbackUsesConfiguredStackOnMissingVersion(t *t
 		},
 	}
 
-	meta, err := executor.Execute(context.Background(), spec, workspace)
+	meta, err := executor.Execute(context.Background(), spec, workspace, newTestGateJobMounts(t))
 	if err != nil {
 		t.Fatalf("Execute() unexpected error: %v", err)
 	}
@@ -67,7 +67,7 @@ func TestGateDocker_StackDetect_StrictCancelsOnDetectionFailure(t *testing.T) {
 		},
 	}
 
-	meta, err := executor.Execute(context.Background(), spec, workspace)
+	meta, err := executor.Execute(context.Background(), spec, workspace, newTestGateJobMounts(t))
 	if err == nil {
 		t.Fatal("expected error")
 	}

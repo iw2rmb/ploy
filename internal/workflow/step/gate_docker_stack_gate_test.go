@@ -31,7 +31,7 @@ func TestGateDocker_StackGate_PreCheckPass(t *testing.T) {
 		},
 	}
 
-	meta, err := executor.Execute(context.Background(), spec, workspace)
+	meta, err := executor.Execute(context.Background(), spec, workspace, newTestGateJobMounts(t))
 	if err != nil {
 		t.Fatalf("Execute() unexpected error: %v", err)
 	}
@@ -147,7 +147,7 @@ java { toolchain { languageVersion = JavaLanguageVersion.of(17) } }`
 				},
 			}
 
-			meta, err := executor.Execute(context.Background(), spec, workspace)
+			meta, err := executor.Execute(context.Background(), spec, workspace, newTestGateJobMounts(t))
 			if err != nil {
 				t.Fatalf("Execute() unexpected error: %v", err)
 			}
@@ -263,7 +263,7 @@ func TestGateDocker_StackGate_ImageResolution(t *testing.T) {
 				},
 			}
 
-			meta, err := executor.Execute(context.Background(), spec, workspace)
+			meta, err := executor.Execute(context.Background(), spec, workspace, newTestGateJobMounts(t))
 			if err != nil {
 				t.Fatalf("Execute() unexpected error: %v", err)
 			}
@@ -302,7 +302,7 @@ func TestGateDocker_StackGate_NoMatchingDefaultRule_ReturnsNoImageRule(t *testin
 		},
 	}
 
-	meta, err := executor.Execute(context.Background(), spec, workspace)
+	meta, err := executor.Execute(context.Background(), spec, workspace, newTestGateJobMounts(t))
 	if err != nil {
 		t.Fatalf("Execute() unexpected error: %v", err)
 	}

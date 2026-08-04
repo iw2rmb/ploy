@@ -61,18 +61,7 @@ type Request struct {
 	JobID     types.JobID
 	Manifest  contracts.StepManifest
 	Workspace string
-	OutDir    string
-	// InDir is an optional directory mounted at /in for cross-phase inputs.
-	InDir string
-	// ShareDir is an optional directory mounted at /share for run-scoped
-	// shared inputs/outputs across job stages.
-	ShareDir string
-	// TmpDir is an optional per-job directory seeded from Manifest.Tmp and
-	// mounted at /tmp for writable, non-artifact temporary files.
-	TmpDir string
-	// StagingDir is an optional path to a directory containing pre-materialized
-	// Hydra resources. Each In/Out/Home/Tmp entry is mounted from StagingDir/<shortHash>.
-	StagingDir string
+	JobMounts JobMounts
 }
 
 // Result contains the outcome of a step execution.
@@ -128,19 +117,16 @@ func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 		return result, err
 	}
 
-	// Seed outDir with materialized Hydra out entries so the single /out mount
-	// covers both pre-seeded content and container writes, ensuring uploads
-	// capture all out artifacts.
-	if err := SeedOutDirFromStaging(req.Manifest, req.StagingDir, req.OutDir); err != nil {
+	// Seed the job output before execution so its single mount contains both
+	// Hydra content and container writes.
+	if err := SeedOutDirFromStaging(req.Manifest, req.JobMounts.Staging, req.JobMounts.Out); err != nil {
 		return Result{}, fmt.Errorf("seed out dir from staging: %w", err)
 	}
-	// Seed inDir with materialized Hydra in entries when /in is mounted as a
-	// parent path. This avoids nested /in/* bind mounts that can be ambiguous on
-	// some Docker environments.
-	if err := SeedInDirFromStaging(req.Manifest, req.StagingDir, req.InDir); err != nil {
+	// Seed the job input before execution to avoid nested /in bind mounts.
+	if err := SeedInDirFromStaging(req.Manifest, req.JobMounts.Staging, req.JobMounts.In); err != nil {
 		return Result{}, fmt.Errorf("seed in dir from staging: %w", err)
 	}
-	if err := SeedTmpDirFromStaging(req.Manifest, req.StagingDir, req.TmpDir); err != nil {
+	if err := SeedTmpDirFromStaging(req.Manifest, req.JobMounts.Staging, req.JobMounts.Tmp); err != nil {
 		return Result{}, fmt.Errorf("seed tmp dir from staging: %w", err)
 	}
 
@@ -153,7 +139,7 @@ func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 		result.ExitCode = 0
 		result.Timings.ExecutionDuration = types.Duration(time.Since(executionStart))
 	} else {
-		spec, err := buildContainerSpec(req.RunID, req.JobID, req.Manifest, req.Workspace, req.OutDir, req.InDir, req.ShareDir, req.TmpDir, req.StagingDir)
+		spec, err := buildContainerSpec(req.RunID, req.JobID, req.Manifest, req.Workspace, req.JobMounts)
 		if err != nil {
 			return Result{}, fmt.Errorf("build container spec: %w", err)
 		}

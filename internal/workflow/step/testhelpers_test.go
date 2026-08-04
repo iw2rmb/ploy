@@ -2,6 +2,7 @@ package step
 
 import (
 	"context"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -122,7 +123,7 @@ type testGateExecutor struct {
 	executeFn func(ctx context.Context, spec *contracts.StepGateSpec, workspace string) (*contracts.BuildGateStageMetadata, error)
 }
 
-func (m *testGateExecutor) Execute(ctx context.Context, spec *contracts.StepGateSpec, workspace string) (*contracts.BuildGateStageMetadata, error) {
+func (m *testGateExecutor) Execute(ctx context.Context, spec *contracts.StepGateSpec, workspace string, mounts JobMounts) (*contracts.BuildGateStageMetadata, error) {
 	if m.executeFn != nil {
 		return m.executeFn(ctx, spec, workspace)
 	}
@@ -184,6 +185,79 @@ func newGateTestRequest(m contracts.StepManifest) Request {
 		Manifest:  m,
 		Workspace: "/tmp/test-workspace",
 	}
+}
+
+func newTestJobMounts(t *testing.T, jobType types.JobType) JobMounts {
+	t.Helper()
+	root := t.TempDir()
+	return JobMounts{
+		Cache:        filepath.Join(root, "cache"),
+		Home:         filepath.Join(root, "home"),
+		In:           filepath.Join(root, "in"),
+		Out:          filepath.Join(root, "out"),
+		Staging:      filepath.Join(root, "staging"),
+		Tmp:          filepath.Join(root, "tmp"),
+		Share:        filepath.Join(root, "share"),
+		RuntimeShare: filepath.Join(root, "runtime-share"),
+		NodeCache:    filepath.Join(root, "node-cache"),
+		CommonConfig: filepath.Join(root, "job-config", "common"),
+		JobConfig:    filepath.Join(root, "job-config", jobType.String()),
+		JobType:      jobType,
+	}
+}
+
+func newTestGateJobMounts(t *testing.T) JobMounts {
+	t.Helper()
+	return newTestJobMounts(t, types.JobTypePreGate)
+}
+
+func newTestMigJobMounts(t *testing.T) JobMounts {
+	t.Helper()
+	return newTestJobMounts(t, types.JobTypeMig)
+}
+
+func buildContainerSpecForTest(
+	runID types.RunID,
+	jobID types.JobID,
+	manifest contracts.StepManifest,
+	workspace string,
+	outDir string,
+	inDir string,
+	shareDir string,
+	tmpDir string,
+	stagingDir string,
+) (ContainerSpec, error) {
+	root := filepath.Join("/tmp", "ploy-step-tests", jobID.String())
+	mounts := JobMounts{
+		Cache:        filepath.Join(root, "cache"),
+		Home:         filepath.Join(root, "home"),
+		In:           filepath.Join(root, "in"),
+		Out:          filepath.Join(root, "out"),
+		Staging:      filepath.Join(root, "staging"),
+		Tmp:          filepath.Join(root, "tmp"),
+		Share:        filepath.Join(root, "share"),
+		RuntimeShare: filepath.Join(root, "runtime-share"),
+		NodeCache:    filepath.Join(root, "node-cache"),
+		CommonConfig: filepath.Join(root, "job-config", "common"),
+		JobConfig:    filepath.Join(root, "job-config", "mig"),
+		JobType:      types.JobTypeMig,
+	}
+	if outDir != "" {
+		mounts.Out = outDir
+	}
+	if inDir != "" {
+		mounts.In = inDir
+	}
+	if shareDir != "" {
+		mounts.Share = shareDir
+	}
+	if tmpDir != "" {
+		mounts.Tmp = tmpDir
+	}
+	if stagingDir != "" {
+		mounts.Staging = stagingDir
+	}
+	return buildContainerSpec(runID, jobID, manifest, workspace, mounts)
 }
 
 // newGateTestHarness creates a GateExecutor backed by a

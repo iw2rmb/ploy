@@ -9,6 +9,12 @@ import (
 	"strings"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/workflow/step"
+)
+
+const (
+	nodeCacheRootEnv     = "PLOY_NODE_CACHE_ROOT"
+	nodeJobConfigRootEnv = "PLOY_NODE_JOB_CONFIG_ROOT"
 )
 
 // cacheRootDir returns the durable run cache root under PLOYD_CACHE_HOME.
@@ -95,6 +101,37 @@ func jobDirectories(runID types.RunID, jobID types.JobID) JobDirectories {
 	}
 }
 
+func jobMounts(dirs JobDirectories, runID types.RunID, jobType types.JobType) (step.JobMounts, error) {
+	if err := validateJobDirectories(dirs); err != nil {
+		return step.JobMounts{}, err
+	}
+	if err := jobType.Validate(); err != nil {
+		return step.JobMounts{}, err
+	}
+	nodeCacheRoot := strings.TrimSpace(os.Getenv(nodeCacheRootEnv))
+	if nodeCacheRoot == "" {
+		return step.JobMounts{}, fmt.Errorf("%s is required", nodeCacheRootEnv)
+	}
+	nodeConfigRoot := strings.TrimSpace(os.Getenv(nodeJobConfigRootEnv))
+	if nodeConfigRoot == "" {
+		return step.JobMounts{}, fmt.Errorf("%s is required", nodeJobConfigRootEnv)
+	}
+	return step.JobMounts{
+		Cache:        dirs.Cache,
+		Home:         dirs.Home,
+		In:           dirs.In,
+		Out:          dirs.Out,
+		Staging:      dirs.Staging,
+		Tmp:          dirs.Tmp,
+		Share:        runShareDir(runID),
+		RuntimeShare: runRuntimeShareDir(runID),
+		NodeCache:    nodeCacheRoot,
+		CommonConfig: filepath.Join(nodeConfigRoot, "common"),
+		JobConfig:    filepath.Join(nodeConfigRoot, jobType.String()),
+		JobType:      jobType,
+	}, nil
+}
+
 func ensureRunDirectories(runID types.RunID) error {
 	for _, dir := range []string{runShareDir(runID), runRuntimeShareDir(runID)} {
 		if strings.TrimSpace(dir) == "" {
@@ -158,13 +195,6 @@ func cleanupJobRuntime(dirs JobDirectories) error {
 		}
 	}
 	return cleanupErr
-}
-
-func ensureRunShareDir(runID types.RunID) (string, error) {
-	if err := ensureRunDirectories(runID); err != nil {
-		return "", err
-	}
-	return runShareDir(runID), nil
 }
 
 func jobOutFile(runID types.RunID, jobID types.JobID, outPath string) (string, error) {

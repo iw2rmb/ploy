@@ -44,7 +44,7 @@ type ContainerRuntime interface {
 // The primary implementation is gateExecutor (gate_docker.go) which runs
 // validation containers locally via the container runtime.
 type GateExecutor interface {
-	Execute(ctx context.Context, spec *contracts.StepGateSpec, workspace string) (*contracts.BuildGateStageMetadata, error)
+	Execute(ctx context.Context, spec *contracts.StepGateSpec, workspace string, mounts JobMounts) (*contracts.BuildGateStageMetadata, error)
 }
 
 // DiffGenerator generates diffs between states.

@@ -31,18 +31,6 @@ const (
 	// the Gradle init script to write cache-hit markers.
 	gradleCacheHitsContainerFile = "/tmp/gradle-build-cache-hits"
 
-	// GateWorkspaceOutDir is a workspace-local host directory mounted
-	// into gate containers as /out for deterministic artifact collection.
-	GateWorkspaceOutDir = ".ploy-gate-out"
-	// gateWorkspaceInDir is an optional workspace-local host directory
-	// mounted into gate containers as /in for orchestrator-provided inputs.
-	gateWorkspaceInDir = ".ploy-gate-in"
-	// gateContainerInDir is the writable input mount path inside gate
-	// containers used by orchestrator-provided runtime inputs.
-	gateContainerInDir = "/in"
-	// gateContainerOutDir is the writable output mount path inside gate
-	// containers used by runtime-generated artifacts (for example Gradle reports).
-	gateContainerOutDir = "/out"
 	// gradleUserHomeDir is the native Gradle home path in gate-gradle images.
 	gradleUserHomeDir = "/root/.gradle"
 	// mavenUserHomeDir is the native Maven repository path in Maven gate images.
@@ -67,7 +55,7 @@ func NewGateExecutor(rt ContainerRuntime) GateExecutor {
 // a container, and returns BuildGateStageMetadata. The workspace is mounted at
 // /workspace; nil spec or Enabled=false yields (nil, nil). A nil runtime fails
 // immediately with errGateRuntimeUnavailable.
-func (e *gateExecutor) Execute(ctx context.Context, spec *contracts.StepGateSpec, workspace string) (*contracts.BuildGateStageMetadata, error) {
+func (e *gateExecutor) Execute(ctx context.Context, spec *contracts.StepGateSpec, workspace string, jobMounts JobMounts) (*contracts.BuildGateStageMetadata, error) {
 	if ctx != nil && ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
@@ -90,7 +78,7 @@ func (e *gateExecutor) Execute(ctx context.Context, spec *contracts.StepGateSpec
 
 	reportGateRuntimeImage(ctx, plan.image)
 
-	mounts, err := assembleGateMounts(ctx, workspace, plan)
+	mounts, err := assembleGateMounts(workspace, plan, jobMounts)
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +87,18 @@ func (e *gateExecutor) Execute(ctx context.Context, spec *contracts.StepGateSpec
 	limitCPUMillis := parseInt64LimitEnv(gateLimitCPUEnv)
 	limitDisk, storageSizeOpt := parseBytesLimitEnv(gateLimitDiskEnv)
 	envCopy := contracts.MergeEnv(spec.Env, plan.env)
+	envCopy, err = applyReservedJobEnv(envCopy, jobMounts)
+	if err != nil {
+		return nil, fmt.Errorf("prepare build gate environment: %w", err)
+	}
 	mounts = appendDockerHostSocketMount(mounts, envCopy)
+	nested := []nestedMountContract(nil)
+	if strings.EqualFold(plan.tool, "gradle") {
+		nested = append(nested, nestedMountContract{parent: jobTmpContainerDir, child: gradleCacheHitsContainerFile})
+	}
+	if err := validateContainerMounts(mounts, nested); err != nil {
+		return nil, fmt.Errorf("validate build gate mounts: %w", err)
+	}
 
 	specC := ContainerSpec{
 		Image:            plan.image,
@@ -150,39 +149,13 @@ func (e *gateExecutor) Execute(ctx context.Context, spec *contracts.StepGateSpec
 	return meta, nil
 }
 
-// assembleGateMounts builds the mount set for a gate container: workspace,
-// /out, optional /in, optional /share, tool cache, and gradle cache-hits file
-// when the tool is gradle.
-func assembleGateMounts(ctx context.Context, workspace string, plan gateExecutionPlan) ([]ContainerMount, error) {
-	gateOutDir := filepath.Join(workspace, GateWorkspaceOutDir)
-	if err := os.MkdirAll(gateOutDir, 0o750); err != nil {
-		return nil, fmt.Errorf("prepare build gate out dir: %w", err)
+// assembleGateMounts adds gate-specific mounts to the common job projection.
+func assembleGateMounts(workspace string, plan gateExecutionPlan, jobMounts JobMounts) ([]ContainerMount, error) {
+	commonMounts, err := buildCommonJobMounts(jobMounts)
+	if err != nil {
+		return nil, fmt.Errorf("prepare common job mounts: %w", err)
 	}
-	mounts := []ContainerMount{
-		{Source: workspace, Target: "/workspace", ReadOnly: false},
-		{Source: gateOutDir, Target: gateContainerOutDir, ReadOnly: false},
-	}
-
-	gateInDir := filepath.Join(workspace, gateWorkspaceInDir)
-	if info, statErr := os.Stat(gateInDir); statErr == nil {
-		if !info.IsDir() {
-			return nil, fmt.Errorf("build gate in path is not a directory: %s", gateInDir)
-		}
-		mounts = append(mounts, ContainerMount{Source: gateInDir, Target: gateContainerInDir, ReadOnly: false})
-	} else if !errors.Is(statErr, os.ErrNotExist) {
-		return nil, fmt.Errorf("stat build gate in dir: %w", statErr)
-	}
-
-	if gateShareDir := gateShareDirFromContext(ctx); gateShareDir != "" {
-		info, statErr := os.Stat(gateShareDir)
-		if statErr != nil {
-			return nil, fmt.Errorf("stat build gate share dir: %w", statErr)
-		}
-		if !info.IsDir() {
-			return nil, fmt.Errorf("build gate share path is not a directory: %s", gateShareDir)
-		}
-		mounts = append(mounts, ContainerMount{Source: gateShareDir, Target: containerShareDir, ReadOnly: false})
-	}
+	mounts := append([]ContainerMount{{Source: workspace, Target: "/workspace", ReadOnly: false}}, commonMounts...)
 
 	toolCacheMounts, err := buildToolCacheMounts(plan.language, plan.tool, plan.release)
 	if err != nil {

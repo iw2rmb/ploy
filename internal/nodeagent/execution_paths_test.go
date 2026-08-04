@@ -56,6 +56,64 @@ func TestJobDirectoriesUseUniversalLayout(t *testing.T) {
 	}
 }
 
+func TestJobMountsUseConfiguredGenericNodeRoots(t *testing.T) {
+	cacheHome := t.TempDir()
+	nodeCache := filepath.Join(t.TempDir(), "node-cache")
+	nodeConfig := filepath.Join(t.TempDir(), "job-config")
+	t.Setenv("PLOYD_CACHE_HOME", cacheHome)
+	t.Setenv(nodeCacheRootEnv, nodeCache)
+	t.Setenv(nodeJobConfigRootEnv, nodeConfig)
+
+	runID := types.RunID("run_mounts")
+	jobID := types.JobID("job_mounts")
+	dirs := jobDirectories(runID, jobID)
+	got, err := jobMounts(dirs, runID, types.JobTypePostGate)
+	if err != nil {
+		t.Fatalf("jobMounts() error = %v", err)
+	}
+
+	if got.Cache != dirs.Cache || got.Home != dirs.Home || got.In != dirs.In || got.Out != dirs.Out || got.Staging != dirs.Staging || got.Tmp != dirs.Tmp {
+		t.Fatalf("jobMounts() job paths do not match JobDirectories: %+v", got)
+	}
+	if got.Share != runShareDir(runID) || got.RuntimeShare != runRuntimeShareDir(runID) {
+		t.Fatalf("jobMounts() run paths = share %q runtime %q", got.Share, got.RuntimeShare)
+	}
+	if got.NodeCache != nodeCache {
+		t.Fatalf("jobMounts().NodeCache = %q, want %q", got.NodeCache, nodeCache)
+	}
+	if got.CommonConfig != filepath.Join(nodeConfig, "common") {
+		t.Fatalf("jobMounts().CommonConfig = %q", got.CommonConfig)
+	}
+	if got.JobConfig != filepath.Join(nodeConfig, "post_gate") {
+		t.Fatalf("jobMounts().JobConfig = %q", got.JobConfig)
+	}
+	if got.JobType != types.JobTypePostGate {
+		t.Fatalf("jobMounts().JobType = %q", got.JobType)
+	}
+}
+
+func TestJobMountsRequireGenericNodeRoots(t *testing.T) {
+	tests := []struct {
+		name    string
+		missing string
+	}{
+		{name: "node cache", missing: nodeCacheRootEnv},
+		{name: "node job config", missing: nodeJobConfigRootEnv},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Setenv(nodeCacheRootEnv, filepath.Join(t.TempDir(), "node-cache"))
+			t.Setenv(nodeJobConfigRootEnv, filepath.Join(t.TempDir(), "job-config"))
+			t.Setenv(test.missing, "")
+			_, err := jobMounts(jobDirectories(types.RunID("run_mounts"), types.JobID("job_mounts")), types.RunID("run_mounts"), types.JobTypeMig)
+			if err == nil || !strings.Contains(err.Error(), test.missing+" is required") {
+				t.Fatalf("jobMounts() error = %v, want missing %s", err, test.missing)
+			}
+		})
+	}
+}
+
 func TestConcurrentJobsHaveDistinctOwnedDirectories(t *testing.T) {
 	cacheHome := t.TempDir()
 	t.Setenv("PLOYD_CACHE_HOME", cacheHome)

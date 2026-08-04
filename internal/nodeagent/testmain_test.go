@@ -12,6 +12,8 @@ func TestMain(m *testing.M) {
 	tokenFile := filepath.Join(tmpDir, "bearer-token")
 	_ = os.WriteFile(tokenFile, []byte("test-token"), 0600)
 	_ = os.Setenv("PLOY_NODE_BEARER_TOKEN_PATH", tokenFile)
+	_ = os.Setenv(nodeCacheRootEnv, filepath.Join(tmpDir, "node-cache"))
+	_ = os.Setenv(nodeJobConfigRootEnv, filepath.Join(tmpDir, "job-config"))
 
 	code := m.Run()
 

@@ -20,7 +20,7 @@ func TestNewGateExecutor_DefaultLocalDocker(t *testing.T) {
 
 	// Verify it's a gateExecutor by executing and checking behavior.
 	// gateExecutor returns nil,nil for nil spec.
-	result, err := executor.Execute(context.Background(), nil, "/workspace")
+	result, err := executor.Execute(context.Background(), nil, "/workspace", newTestGateJobMounts(t))
 	if err != nil {
 		t.Errorf("expected nil error, got: %v", err)
 	}
@@ -40,7 +40,7 @@ func TestNewGateExecutor_NilRuntime(t *testing.T) {
 
 	// gateExecutor with nil runtime fails gate execution.
 	spec := &contracts.StepGateSpec{Enabled: true}
-	result, err := executor.Execute(context.Background(), spec, "/workspace")
+	result, err := executor.Execute(context.Background(), spec, "/workspace", newTestGateJobMounts(t))
 
 	// With nil runtime, gateExecutor must return an explicit error.
 	if err == nil {

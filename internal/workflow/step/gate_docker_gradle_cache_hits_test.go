@@ -39,7 +39,7 @@ func TestGateExecutor_MountsGradleCacheHitsFile(t *testing.T) {
 	workspace := createGradleWorkspace(t, "17")
 
 	spec := &contracts.StepGateSpec{Enabled: true}
-	if _, err := executor.Execute(context.Background(), spec, workspace); err != nil {
+	if _, err := executor.Execute(context.Background(), spec, workspace, newTestGateJobMounts(t)); err != nil {
 		t.Fatalf("Execute() unexpected error: %v", err)
 	}
 	if !rt.createCalled {

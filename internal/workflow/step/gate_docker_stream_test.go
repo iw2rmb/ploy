@@ -44,7 +44,7 @@ func TestGateExecutor_StreamsLogsToExecutionWriter(t *testing.T) {
 	workspace := createMavenWorkspace(t, "17")
 	spec := &contracts.StepGateSpec{Enabled: true}
 
-	meta, err := executor.Execute(WithExecutionLogWriter(context.Background(), &live), spec, workspace)
+	meta, err := executor.Execute(WithExecutionLogWriter(context.Background(), &live), spec, workspace, newTestGateJobMounts(t))
 	if err != nil {
 		t.Fatalf("Execute() unexpected error: %v", err)
 	}
