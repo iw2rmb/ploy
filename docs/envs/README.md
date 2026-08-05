@@ -457,8 +457,6 @@ The `show` and `unset` commands use **`--from`** to specify the target:
 | `home` (spec field) | `codex` | Per-job files relative to `$HOME`; `:ro` keeps a read-only nested mount |
 | `in` (typed) | `codex` | Read-only input file mounts |
 | `OPENAI_API_KEY` | Future OpenAI-integrated migs | API key for LLM operations |
-| `PLOY_GRADLE_BUILD_CACHE_URL` | Build Gate (Gradle) | HTTP URL of the remote Gradle Build Cache endpoint (e.g. `http://gradle-build-cache:5071/cache/`). When unset, remote cache is disabled. |
-| `PLOY_GRADLE_BUILD_CACHE_PUSH` | Build Gate (Gradle) | Whether to push results to the remote cache. Defaults to `true` when `PLOY_GRADLE_BUILD_CACHE_URL` is set. |
 
 ### ORW CLI Contract (Typed)
 

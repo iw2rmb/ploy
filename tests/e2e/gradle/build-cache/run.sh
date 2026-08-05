@@ -12,12 +12,13 @@ set -euo pipefail
 # - post_gate (Gradle build, hits cache in a fresh container)
 #
 # Success signal:
-# - post_gate job meta includes a GRADLE_BUILD_CACHE_HIT finding emitted by the gate executor.
+# - the post_gate artifact bundle contains non-empty cache-hit evidence from /out.
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)"
 export PLOY_CONFIG_HOME="${PLOY_CONFIG_HOME:-$HOME/.config/ploy}"
 source "$REPO_ROOT/tests/e2e/lib/ensure_local_descriptor.sh"
 source "$REPO_ROOT/tests/e2e/lib/harness_mig.sh"
+source "$REPO_ROOT/tests/e2e/lib/harness_codex_artifacts.sh"
 ensure_local_descriptor "$REPO_ROOT" "$PLOY_CONFIG_HOME"
 PLOY_DB_DSN="${PLOY_DB_DSN:-}"
 
@@ -39,7 +40,7 @@ REPO_URL="${REPO_URL:-https://gitlab.com/iw2rmb/ploy-gradle-build-cache.git}"
 # cached clones for moving refs. Use a stable tag for deterministic E2E runs.
 REPO_BASE_REF="${REPO_BASE_REF:-e2e/build-cache}"
 REPO_TARGET_REF="${REPO_TARGET_REF:-e2e/build-cache}"
-SPEC_FILE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/mig.yaml"
+SPEC_FILE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/mod.yaml"
 
 TS=$(date +%y%m%d%H%M%S)
 OUT_BASE=${PLOY_E2E_OUT_BASE:-./tmp/gradle/build-cache}
@@ -79,15 +80,12 @@ done
 cache_entries_before="$(docker exec "${cache_container_id}" sh -c 'find /data/system/cache/artifacts-v2 -type f 2>/dev/null | wc -l' | tr -d '[:space:]' || true)"
 cache_entries_before="${cache_entries_before:-0}"
 
-echo "[e2e] Ensuring gate env config for Gradle build cache..."
-"$PLOY_BIN" config env set --key PLOY_GRADLE_BUILD_CACHE_URL --value "http://gradle-build-cache:5071/cache/" --scope gate >/dev/null
-"$PLOY_BIN" config env set --key PLOY_GRADLE_BUILD_CACHE_PUSH --value "true" --scope gate >/dev/null
-
 echo "[e2e] Submitting run (repo=${REPO_URL}, base=${REPO_BASE_REF})..."
 RUN_JSON="$(e2e_mig_run_json \
   "$SPEC_FILE" \
   "$(e2e_repo_selector "$REPO_URL" "$REPO_BASE_REF")" \
-  --follow)"
+  --follow \
+  --pull "$OUT_DIR")"
 
 RUN_ID="$(printf '%s' "$RUN_JSON" | jq -r '.run_id')"
 if [[ -z "${RUN_ID:-}" || "${RUN_ID}" == "null" ]]; then
@@ -96,16 +94,24 @@ if [[ -z "${RUN_ID:-}" || "${RUN_ID}" == "null" ]]; then
   exit 1
 fi
 
-echo "[e2e] Verifying remote cache hit via structured gate metadata (post_gate)..."
-hit_count="$(
+echo "[e2e] Verifying remote cache hit via the post_gate /out artifact..."
+post_gate_job_id="$(
   psql "$PLOY_DB_DSN" -v ON_ERROR_STOP=1 -qXAt \
-    -c "SET search_path TO ploy, public; SELECT count(*) FROM jobs WHERE run_id='${RUN_ID}' AND job_type='post_gate' AND (meta->'gate'->'log_findings') @> '[{\"code\":\"GRADLE_BUILD_CACHE_HIT\"}]'::jsonb;"
+    -c "SET search_path TO ploy, public; SELECT id FROM jobs WHERE run_id='${RUN_ID}' AND job_type='post_gate';"
 )"
-hit_count="$(echo "$hit_count" | tr -d '[:space:]')"
-if [[ "${hit_count}" != "1" ]]; then
-  echo "Error: expected exactly 1 post_gate cache-hit finding (GRADLE_BUILD_CACHE_HIT), got ${hit_count}" >&2
+post_gate_job_id="$(echo "$post_gate_job_id" | tr -d '[:space:]')"
+if [[ -z "$post_gate_job_id" ]]; then
+  echo "Error: post_gate job not found for run ${RUN_ID}" >&2
   psql "$PLOY_DB_DSN" -v ON_ERROR_STOP=1 -qX \
     -c "SET search_path TO ploy, public; SELECT id, job_type, status, meta FROM jobs WHERE run_id='${RUN_ID}' ORDER BY next_id;" >&2 || true
+  exit 1
+fi
+
+e2e_extract_mig_out_bundles "$OUT_DIR"
+hits_file="${OUT_DIR}/artifacts/${post_gate_job_id}/out/gradle-build-cache-hits.txt"
+if [[ ! -s "$hits_file" ]] || ! grep -q '[^[:space:]]' "$hits_file"; then
+  echo "Error: post_gate cache-hit artifact is missing or empty: ${hits_file}" >&2
+  find "$OUT_DIR" -type f -print >&2 || true
   exit 1
 fi
 

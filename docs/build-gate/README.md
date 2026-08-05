@@ -86,5 +86,6 @@ On failed gate execution, `BuildGateStageMetadata.LogFindings[0]` contains:
 The same capped log text is stored in `BuildGateStageMetadata.LogsText`, and
 `LogDigest` is computed from that capped text.
 
-Successful Gradle gates may still add an informational `GRADLE_BUILD_CACHE_HIT`
-finding when the gate image reports cache-hit tasks.
+Gradle images write cache-hit evidence to `/out/gradle-build-cache-hits.txt`
+and emit `[ploy-gradle-cache] HIT` log markers. The gate executor does not
+translate this evidence into tool-specific metadata.
