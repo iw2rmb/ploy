@@ -24,18 +24,17 @@ const (
 )
 
 const (
-	ployJobCacheDirEnv   = "PLOY_JOB_CACHE_DIR"
-	ployNodeCacheDirEnv  = "PLOY_NODE_CACHE_DIR"
-	ployJobHomeDirEnv    = "PLOY_JOB_HOME_DIR"
-	ployRunShareDirEnv   = "PLOY_RUN_SHARE_DIR"
-	ployNodeConfigDirEnv = "PLOY_NODE_CONFIG_DIR"
-	ployJobConfigDirEnv  = "PLOY_JOB_CONFIG_DIR"
-	ployJobTypeEnv       = "PLOY_JOB_TYPE"
+	ployJobCacheDirEnv        = "PLOY_JOB_CACHE_DIR"
+	ployNodeCacheDirEnv       = "PLOY_NODE_CACHE_DIR"
+	ployJobHomeDirEnv         = "PLOY_JOB_HOME_DIR"
+	ployRunShareDirEnv        = "PLOY_RUN_SHARE_DIR"
+	ployRunRuntimeShareDirEnv = "PLOY_RUN_RUNTIME_SHARE_DIR"
+	ployNodeConfigDirEnv      = "PLOY_NODE_CONFIG_DIR"
+	ployJobConfigDirEnv       = "PLOY_JOB_CONFIG_DIR"
+	ployJobTypeEnv            = "PLOY_JOB_TYPE"
 )
 
 // JobMounts is the workflow boundary for job, run, and node host storage.
-// RuntimeShare is carried now but remains unmounted until its dedicated
-// rollout slice enables that projection.
 type JobMounts struct {
 	Cache        string
 	Home         string
@@ -70,6 +69,7 @@ func buildCommonJobMounts(jobMounts JobMounts, homeTarget string) ([]ContainerMo
 		{Source: jobMounts.Cache, Target: jobCacheContainerDir, ReadOnly: false},
 		{Source: jobMounts.Home, Target: homeTarget, ReadOnly: false},
 		{Source: jobMounts.Share, Target: jobShareContainerDir, ReadOnly: false},
+		{Source: jobMounts.RuntimeShare, Target: jobRuntimeContainerDir, ReadOnly: false},
 		{Source: jobMounts.NodeCache, Target: nodeCacheContainerDir, ReadOnly: true},
 		{Source: jobMounts.CommonConfig, Target: nodeConfigContainerDir, ReadOnly: true},
 		{Source: jobMounts.JobConfig, Target: jobConfigContainerDir, ReadOnly: true},
@@ -117,13 +117,14 @@ func applyReservedJobEnv(base map[string]string, jobMounts JobMounts) (map[strin
 		return nil, err
 	}
 	env := contracts.MergeEnv(base, map[string]string{
-		ployJobCacheDirEnv:   jobCacheContainerDir,
-		ployNodeCacheDirEnv:  nodeCacheContainerDir,
-		ployJobHomeDirEnv:    homeTarget,
-		ployRunShareDirEnv:   jobShareContainerDir,
-		ployNodeConfigDirEnv: nodeConfigContainerDir,
-		ployJobConfigDirEnv:  jobConfigContainerDir,
-		ployJobTypeEnv:       jobMounts.JobType.String(),
+		ployJobCacheDirEnv:        jobCacheContainerDir,
+		ployNodeCacheDirEnv:       nodeCacheContainerDir,
+		ployJobHomeDirEnv:         homeTarget,
+		ployRunShareDirEnv:        jobShareContainerDir,
+		ployRunRuntimeShareDirEnv: jobRuntimeContainerDir,
+		ployNodeConfigDirEnv:      nodeConfigContainerDir,
+		ployJobConfigDirEnv:       jobConfigContainerDir,
+		ployJobTypeEnv:            jobMounts.JobType.String(),
 	})
 	return env, nil
 }

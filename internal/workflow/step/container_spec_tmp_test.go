@@ -155,7 +155,7 @@ func TestBuildContainerSpec_HydraEdgeCases(t *testing.T) {
 			setup: func(m *contracts.StepManifest) (string, string, string) {
 				return "", "", t.TempDir()
 			},
-			wantMounts: 10,
+			wantMounts: 11,
 		},
 		{
 			name: "out invalid entry rejected",
@@ -231,8 +231,8 @@ func TestBuildContainerSpec_HydraMixedMountPlan(t *testing.T) {
 	requireNoMount(t, spec.Mounts, "/out/results")
 	requireNoMount(t, spec.Mounts, "/tmp/ploy/tool.jar")
 
-	if len(spec.Mounts) != 11 {
-		t.Errorf("got %d mounts, want 11: %+v", len(spec.Mounts), spec.Mounts)
+	if len(spec.Mounts) != 12 {
+		t.Errorf("got %d mounts, want 12: %+v", len(spec.Mounts), spec.Mounts)
 	}
 }
 

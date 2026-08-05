@@ -498,7 +498,7 @@ Required typed file input:
 
 | Path | Description |
 |------|-------------|
-| `/share/java.classpath` | Newline-delimited absolute classpath entries produced by SBOM/build-gate and mounted into ORW jobs. Gradle cache entries must use `/root/.gradle/...` (not `/home/gradle/.gradle/...`). |
+| `/share/java.classpath` | Newline-delimited absolute classpath entries produced by SBOM/build-gate and mounted into ORW jobs. Workspace entries stay below `/workspace`. Gradle materializes external entries below `/run-share/java-classpath/<content-sha256>/<file-name>`. |
 
 ORW wrapper behavior:
 - `orw-cli` always passes `--classpath-file /share/java.classpath` to the OpenRewrite runner.
@@ -583,7 +583,7 @@ cache-root policy as Build Gate when stack tuple env is set to Java:
 Runtime mounts:
 - Gradle tuple -> `$PLOY_BUILDGATE_CACHE_ROOT/java/gradle/<release>` to `/root/.gradle`
 - Maven tuple -> `$PLOY_BUILDGATE_CACHE_ROOT/java/maven/<release>` to `/root/.m2`
-- `java.classpath` portability requirement for Gradle entries: `/root/.gradle/...` only.
+- `java.classpath` keeps workspace entries below `/workspace` and materializes external Gradle entries below `/run-share/java-classpath/<content-sha256>/<file-name>`.
 
 An explicit Hydra `home` input below one of these targets takes precedence.
 Ploy omits only the overlapping legacy tool-cache mount for that job.
