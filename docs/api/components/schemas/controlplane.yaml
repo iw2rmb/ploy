@@ -982,7 +982,10 @@ NodeDiagnostic:
     image_ref: { type: string, nullable: true }
     local_image_id: { type: string, nullable: true }
     remote_image_id: { type: string, nullable: true }
-    details: { type: object, additionalProperties: true }
+    details:
+      type: object
+      additionalProperties: true
+      description: For the node component, `storage.paths` reports `/`, `DOCKER_ROOT_DIR`, `PLOYD_CACHE_HOME`, `PLOY_NODE_CACHE_ROOT`, and `TMPDIR` probes.
     last_checked_at: { type: string, format: date-time, nullable: true }
     last_success_at: { type: string, format: date-time, nullable: true }
     updated_at: { type: string, format: date-time }
@@ -999,7 +1002,10 @@ UpsertNodeDiagnosticRequest:
     image_ref: { type: string, nullable: true }
     local_image_id: { type: string, nullable: true }
     remote_image_id: { type: string, nullable: true }
-    details: { type: object, additionalProperties: true }
+    details:
+      type: object
+      additionalProperties: true
+      description: For the node component, `storage.paths` reports `/`, `DOCKER_ROOT_DIR`, `PLOYD_CACHE_HOME`, `PLOY_NODE_CACHE_ROOT`, and `TMPDIR` probes.
     last_checked_at: { type: string, format: date-time, nullable: true }
     last_success_at: { type: string, format: date-time, nullable: true }
   required: [component, status]

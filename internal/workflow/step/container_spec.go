@@ -89,15 +89,6 @@ func buildContainerSpec(runID types.RunID, jobID types.JobID, manifest contracts
 		return ContainerSpec{}, fmt.Errorf("prepare common job mounts: %w", err)
 	}
 	mounts = append(mounts, commonMounts...)
-	javaCacheMounts, err := buildJavaToolCacheMountsFromStackEnv(manifest.Envs)
-	if err != nil {
-		return ContainerSpec{}, fmt.Errorf("prepare java tool cache mounts: %w", err)
-	}
-	javaCacheMounts, err = omitLegacyCacheMountsOverlappingHomeInputs(javaCacheMounts, manifest.Home, homeDir)
-	if err != nil {
-		return ContainerSpec{}, fmt.Errorf("prepare java tool cache mounts: %w", err)
-	}
-	mounts = append(mounts, javaCacheMounts...)
 
 	// In, out, and tmp entries are seeded into their common parent mounts.
 	for _, entry := range manifest.In {
@@ -116,7 +107,7 @@ func buildContainerSpec(runID types.RunID, jobID types.JobID, manifest contracts
 		}
 	}
 
-	nested := make([]nestedMountContract, 0, len(manifest.Home)+len(javaCacheMounts))
+	nested := make([]nestedMountContract, 0, len(manifest.Home))
 	// Writable Hydra home content is copied into the job home before container
 	// creation. Read-only content remains a nested mount so its mode is retained.
 	for _, entry := range manifest.Home {
@@ -134,11 +125,6 @@ func buildContainerSpec(runID types.RunID, jobID types.JobID, manifest contracts
 			ReadOnly: true,
 		})
 		nested = append(nested, nestedMountContract{parent: homeDir, child: target})
-	}
-	for _, mount := range javaCacheMounts {
-		if parent, child, overlaps := mountOverlap(homeDir, mount.Target); overlaps && parent == homeDir {
-			nested = append(nested, nestedMountContract{parent: parent, child: child})
-		}
 	}
 
 	// Optional: mount host Docker socket for containers that request it via manifest options
@@ -202,38 +188,6 @@ func buildContainerSpec(runID types.RunID, jobID types.JobID, manifest contracts
 		LimitDiskBytes:   diskBytes,
 		StorageSizeOpt:   storageSizeOpt,
 	}, nil
-}
-
-func omitLegacyCacheMountsOverlappingHomeInputs(mounts []ContainerMount, entries []string, homeDir string) ([]ContainerMount, error) {
-	if len(mounts) == 0 || len(entries) == 0 {
-		return mounts, nil
-	}
-	homeTargets := make([]string, 0, len(entries))
-	for _, entry := range entries {
-		parsed, err := contracts.ParseStoredHomeEntry(entry)
-		if err != nil {
-			return nil, fmt.Errorf("home entry %q: %w", entry, err)
-		}
-		homeTargets = append(homeTargets, path.Join(homeDir, parsed.Dst))
-	}
-
-	filtered := make([]ContainerMount, 0, len(mounts))
-	for _, mount := range mounts {
-		conflicts := false
-		for _, target := range homeTargets {
-			_, _, overlaps := mountOverlap(mount.Target, target)
-			if mount.Target == target || overlaps {
-				conflicts = true
-				break
-			}
-		}
-		// Hydra owns explicit home inputs while legacy tool caches still use
-		// nested HOME mounts. Later cache slices remove this compatibility case.
-		if !conflicts {
-			filtered = append(filtered, mount)
-		}
-	}
-	return filtered, nil
 }
 
 // SeedOutDirFromStaging copies materialized Hydra out entry content from the

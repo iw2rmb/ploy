@@ -4,8 +4,8 @@
 // language-specific image with the workspace mounted at /workspace, captures
 // logs and resource usage, and returns BuildGateStageMetadata. Concerns are
 // split across sibling files: mounts (gate_docker_mounts.go), log streaming
-// (container_log_streamer.go + gate_docker_logs.go), env-driven resource
-// limits (gate_docker_env.go), and result normalization
+// (container_log_streamer.go), env-driven resource limits
+// (gate_docker_env.go), and result normalization
 // (gate_docker_metadata.go). Stack detection + image resolution live in
 // gate_plan_resolver.go.
 package step
@@ -17,24 +17,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
-)
-
-const (
-	// gradleCacheHitsHostFile is the workspace-local file mounted into
-	// Gradle gate containers for cache-hit signaling from the init script.
-	gradleCacheHitsHostFile = ".ploy-gradle-build-cache-hits"
-	// gradleCacheHitsContainerFile is the in-container path consumed by
-	// the Gradle init script to write cache-hit markers.
-	gradleCacheHitsContainerFile = "/tmp/gradle-build-cache-hits"
-
-	// gradleUserHomeDir is the native Gradle home path in gate-gradle images.
-	gradleUserHomeDir = "/root/.gradle"
-	// mavenUserHomeDir is the native Maven repository path in Maven gate images.
-	mavenUserHomeDir = "/root/.m2"
 )
 
 var errGateRuntimeUnavailable = errors.New("build gate runtime unavailable")
@@ -83,7 +68,7 @@ func (e *gateExecutor) Execute(ctx context.Context, spec *contracts.StepGateSpec
 	if err != nil {
 		return nil, fmt.Errorf("resolve build gate home: %w", err)
 	}
-	mounts, err := assembleGateMounts(workspace, plan, jobMounts, homeDir)
+	mounts, err := assembleGateMounts(workspace, jobMounts, homeDir)
 	if err != nil {
 		return nil, err
 	}
@@ -96,18 +81,7 @@ func (e *gateExecutor) Execute(ctx context.Context, spec *contracts.StepGateSpec
 		return nil, fmt.Errorf("prepare build gate environment: %w", err)
 	}
 	mounts = appendDockerHostSocketMount(mounts, envCopy)
-	nested := []nestedMountContract(nil)
-	if strings.EqualFold(plan.tool, "gradle") {
-		nested = append(nested, nestedMountContract{parent: jobTmpContainerDir, child: gradleCacheHitsContainerFile})
-	}
-	for _, mount := range mounts {
-		if parent, child, overlaps := mountOverlap(homeDir, mount.Target); overlaps && parent == homeDir && child != homeDir {
-			if child == gradleUserHomeDir || child == mavenUserHomeDir {
-				nested = append(nested, nestedMountContract{parent: parent, child: child})
-			}
-		}
-	}
-	if err := validateContainerMounts(mounts, nested); err != nil {
+	if err := validateContainerMounts(mounts, nil); err != nil {
 		return nil, fmt.Errorf("validate build gate mounts: %w", err)
 	}
 
@@ -151,7 +125,7 @@ func (e *gateExecutor) Execute(ctx context.Context, spec *contracts.StepGateSpec
 		}
 	}
 
-	meta := gateExecutionMetadata(workspace, plan.language, plan.tool, plan.release, plan.image, res, logs)
+	meta := gateExecutionMetadata(plan.language, plan.tool, plan.release, plan.image, res, logs)
 	meta.Resources = collectDockerResourceUsage(ctx, e.rt, h, specC)
 
 	if plan.stackGate != nil {
@@ -161,30 +135,12 @@ func (e *gateExecutor) Execute(ctx context.Context, spec *contracts.StepGateSpec
 }
 
 // assembleGateMounts adds gate-specific mounts to the common job projection.
-func assembleGateMounts(workspace string, plan gateExecutionPlan, jobMounts JobMounts, homeDir string) ([]ContainerMount, error) {
+func assembleGateMounts(workspace string, jobMounts JobMounts, homeDir string) ([]ContainerMount, error) {
 	commonMounts, err := buildCommonJobMounts(jobMounts, homeDir)
 	if err != nil {
 		return nil, fmt.Errorf("prepare common job mounts: %w", err)
 	}
 	mounts := append([]ContainerMount{{Source: workspace, Target: "/workspace", ReadOnly: false}}, commonMounts...)
-
-	toolCacheMounts, err := buildToolCacheMounts(plan.language, plan.tool, plan.release)
-	if err != nil {
-		return nil, fmt.Errorf("prepare build gate tool cache mounts: %w", err)
-	}
-	mounts = append(mounts, toolCacheMounts...)
-
-	if strings.EqualFold(plan.tool, "gradle") {
-		gradleCacheHitsHostPath := filepath.Join(workspace, gradleCacheHitsHostFile)
-		if err := os.WriteFile(gradleCacheHitsHostPath, nil, 0o600); err != nil {
-			return nil, fmt.Errorf("prepare gradle cache hits file: %w", err)
-		}
-		mounts = append(mounts, ContainerMount{
-			Source:   gradleCacheHitsHostPath,
-			Target:   gradleCacheHitsContainerFile,
-			ReadOnly: false,
-		})
-	}
 
 	return mounts, nil
 }

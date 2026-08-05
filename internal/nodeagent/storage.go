@@ -101,7 +101,7 @@ func storageProbeTargets(getenv func(string) string) []storageProbeTarget {
 		{source: "root", path: "/"},
 		{source: "DOCKER_ROOT_DIR", path: envOrDefault(getenv, "DOCKER_ROOT_DIR", "/var/lib/docker")},
 		{source: "PLOYD_CACHE_HOME", path: getenv("PLOYD_CACHE_HOME")},
-		{source: "PLOY_BUILDGATE_CACHE_ROOT", path: getenv("PLOY_BUILDGATE_CACHE_ROOT")},
+		{source: "PLOY_NODE_CACHE_ROOT", path: getenv("PLOY_NODE_CACHE_ROOT")},
 		{source: "TMPDIR", path: tmpdir},
 	}
 }

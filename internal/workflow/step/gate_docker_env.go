@@ -12,9 +12,6 @@ const (
 	gateLimitMemoryEnv = "PLOY_BUILDGATE_LIMIT_MEMORY_BYTES"
 	gateLimitCPUEnv    = "PLOY_BUILDGATE_LIMIT_CPU_MILLIS"
 	gateLimitDiskEnv   = "PLOY_BUILDGATE_LIMIT_DISK_SPACE"
-	gateCacheRootEnv   = "PLOY_BUILDGATE_CACHE_ROOT"
-	gateCacheRootDir   = "/var/cache/ploy/gates"
-	gateTmpCacheRoot   = "ploy/gates"
 )
 
 func parseInt64(s string) (int64, error) { return strconv.ParseInt(strings.TrimSpace(s), 10, 64) }

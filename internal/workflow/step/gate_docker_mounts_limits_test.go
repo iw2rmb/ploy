@@ -55,30 +55,6 @@ func TestGateExecutor_Mounts(t *testing.T) {
 					expectMount{}, "docker.sock"
 			},
 		},
-		{
-			name: "gradle workspace mounts native cache",
-			build: func(t *testing.T) (string, *contracts.StepGateSpec, context.Context, expectMount, string) {
-				cacheRoot, err := resolveGateCacheRoot()
-				if err != nil {
-					t.Fatalf("resolveGateCacheRoot() error: %v", err)
-				}
-				return createGradleWorkspace(t, "17"), &contracts.StepGateSpec{Enabled: true}, context.Background(),
-					expectMount{source: filepath.Join(cacheRoot, "java", "gradle", "17"), target: gradleUserHomeDir}, ""
-			},
-			expectMount: true,
-		},
-		{
-			name: "maven workspace mounts native cache",
-			build: func(t *testing.T) (string, *contracts.StepGateSpec, context.Context, expectMount, string) {
-				cacheRoot, err := resolveGateCacheRoot()
-				if err != nil {
-					t.Fatalf("resolveGateCacheRoot() error: %v", err)
-				}
-				return createMavenWorkspace(t, "17"), &contracts.StepGateSpec{Enabled: true}, context.Background(),
-					expectMount{source: filepath.Join(cacheRoot, "java", "maven", "17"), target: mavenUserHomeDir}, ""
-			},
-			expectMount: true,
-		},
 	}
 
 	for _, tt := range tests {
@@ -128,25 +104,6 @@ func TestGateExecutorUsesCommonJobMounts(t *testing.T) {
 	requireMount(t, rt.captured.Mounts, nodeCacheContainerDir, mounts.NodeCache, true)
 	requireMount(t, rt.captured.Mounts, nodeConfigContainerDir, mounts.CommonConfig, true)
 	requireMount(t, rt.captured.Mounts, jobConfigContainerDir, mounts.JobConfig, true)
-}
-
-func TestResolveBuildGateCacheRoot_UsesOverrideEnv(t *testing.T) {
-	override := filepath.Join(t.TempDir(), "gate-cache")
-	t.Setenv(gateCacheRootEnv, override)
-	got, err := resolveGateCacheRoot()
-	if err != nil {
-		t.Fatalf("resolveGateCacheRoot() error: %v", err)
-	}
-	if got != override {
-		t.Fatalf("resolveGateCacheRoot()=%q, want %q", got, override)
-	}
-	info, err := os.Stat(override)
-	if err != nil {
-		t.Fatalf("expected override dir to be created: %v", err)
-	}
-	if !info.IsDir() {
-		t.Fatalf("expected override path to be a directory: %q", override)
-	}
 }
 
 func TestGateExecutor_LimitEnvParsing(t *testing.T) {

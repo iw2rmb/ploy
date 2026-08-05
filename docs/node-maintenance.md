@@ -8,7 +8,7 @@ explicit rollout, and clean local cache state.
 
 Each heartbeat stores disk capacity from the most constrained configured storage
 path, not only `/`. The node checks `/`, `DOCKER_ROOT_DIR`, `PLOYD_CACHE_HOME`,
-`PLOY_BUILDGATE_CACHE_ROOT`, and `TMPDIR`, then uses the lowest-free successful
+`PLOY_NODE_CACHE_ROOT`, and `TMPDIR`, then uses the lowest-free successful
 probe for `disk_free_bytes` and `disk_total_bytes`.
 
 The full breakdown is uploaded as the `node` diagnostic under

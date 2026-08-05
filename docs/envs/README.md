@@ -142,7 +142,7 @@ build_gate:
   - Containers are retained after step/gate completion.
   - Host `ploy-node-cleanup` systemd timers prune completed containers and cache state.
   - Disk telemetry selects the lowest-free configured storage path from `/`,
-    `DOCKER_ROOT_DIR`, `PLOYD_CACHE_HOME`, `PLOY_BUILDGATE_CACHE_ROOT`, and `TMPDIR`.
+    `DOCKER_ROOT_DIR`, `PLOYD_CACHE_HOME`, `PLOY_NODE_CACHE_ROOT`, and `TMPDIR`.
 - Gate status visibility: Use `GET /v1/runs/{id}/status` to view gate results (format: `Gate: passed duration=1234ms` or `Gate: failed pre-gate duration=567ms`) via `Metadata["gate_summary"]`.
 - SBOM persistence contract:
   - Gate post-tasks persist package rows from `/share/sbom.spdx.json` for both `pre_gate` and `post_gate`.
@@ -561,46 +561,57 @@ If `$HOME/.claude-code-router/config.json` exists at startup, `amata` runs:
 - `ccr start`
 - `eval "$(ccr activate)"`
 
-**Build Gate Gradle images (`gate-gradle:*`)**: Store Gradle defaults outside
-`HOME` and install them under the configured `GRADLE_USER_HOME` at startup.
-Current images set `GRADLE_USER_HOME=/root/.gradle`. The init script enables a
-remote Gradle Build Cache when `PLOY_GRADLE_BUILD_CACHE_URL` is set (push
-behavior controlled by `PLOY_GRADLE_BUILD_CACHE_PUSH`).
+**Job storage**: Ploy mounts the same generic storage into each gate and
+migration job. Ploy reserves these variables:
 
-Build Gate jobs also use node-local persistent tool caches under
-`$PLOY_BUILDGATE_CACHE_ROOT/<language>/<tool>/<release>`.
-When `PLOY_BUILDGATE_CACHE_ROOT` is unset, default root is `/var/cache/ploy/gates`
-and, when not writable, the node falls back to `${TMPDIR:-/tmp}/ploy/gates`.
-- Gradle gates mount that path to `/root/.gradle`.
-- Maven gates mount that path to `/root/.m2`.
+- `PLOY_JOB_CACHE_DIR=/ploy/cache/job`
+- `PLOY_NODE_CACHE_DIR=/ploy/cache/node`
+- `PLOY_JOB_HOME_DIR=<resolved-HOME>`
+- `PLOY_RUN_SHARE_DIR=/share`
+- `PLOY_RUN_RUNTIME_SHARE_DIR=/run-share`
+- `PLOY_NODE_CONFIG_DIR=/ploy/config/common`
+- `PLOY_JOB_CONFIG_DIR=/ploy/config/job`
+- `PLOY_JOB_TYPE=<pre_gate|mig|post_gate>`
 
-**Java non-gate jobs (`mig`)**: Use the same centralized
-cache-root policy as Build Gate when stack tuple env is set to Java:
-- `PLOY_STACK_LANGUAGE=java`
-- `PLOY_STACK_TOOL=gradle|maven`
-- `PLOY_STACK_RELEASE=<release>`
+The job cache and job home are writable and private to one job. The node cache
+and node configuration mounts are read-only. Node deployment supplies the host
+roots through `PLOY_NODE_CACHE_ROOT` and `PLOY_NODE_JOB_CONFIG_ROOT`. Ploy does
+not inspect tool-specific children below these roots.
 
-Runtime mounts:
-- Gradle tuple -> `$PLOY_BUILDGATE_CACHE_ROOT/java/gradle/<release>` to `/root/.gradle`
-- Maven tuple -> `$PLOY_BUILDGATE_CACHE_ROOT/java/maven/<release>` to `/root/.m2`
-- `java.classpath` keeps workspace entries below `/workspace` and materializes external Gradle entries below `/run-share/java-classpath/<content-sha256>/<file-name>`.
+**Build Gate Gradle images (`gate-gradle:*`)**: Store immutable Gradle defaults
+outside `HOME`. At startup, the image installs the defaults into
+`$PLOY_JOB_CACHE_DIR/gradle/user-home` and sets that path as
+`GRADLE_USER_HOME`. The image also sets
+`GRADLE_RO_DEP_CACHE=$PLOY_NODE_CACHE_DIR/gradle/dependencies/current`.
 
-An explicit Hydra `home` input below one of these targets takes precedence.
-Ploy omits only the overlapping legacy tool-cache mount for that job.
+The Gradle init script reads the task-output cache endpoint from common node
+configuration. Only a `pre_gate` job receives writer credentials through its
+job-type configuration. Other Gradle jobs can read the remote cache but cannot
+write to it. Gradle records cache-hit evidence in the job log and in
+`/out/gradle-build-cache-hits.txt`.
 
-When `PLOY_STACK_RELEASE` is empty, runtime uses `unknown-release` as the lane key.
-Image-name marker fallback is not used.
+**Maven-capable official images**: Install Maven settings into the mounted job
+home. The image sets Maven's writable local repository to
+`$PLOY_JOB_CACHE_DIR/maven/repository`. The configured artifact repository
+provides cross-job dependency reuse.
 
-**ORW images (`orw-cli-java-17-maven`, `orw-cli-java-17-gradle`)**: Run with the same stack-env-driven cache behavior as other Java lanes while staying isolated from Maven/Gradle project task execution.
+Ploy uses `PLOY_STACK_LANGUAGE`, `PLOY_STACK_TOOL`, and `PLOY_STACK_RELEASE`
+only to select images and build commands. Ploy does not derive or mount Gradle
+or Maven cache paths from these values.
+
+`java.classpath` keeps workspace entries below `/workspace`. Gradle materializes
+external entries below
+`/run-share/java-classpath/<content-sha256>/<file-name>`.
+
+**ORW images (`orw-cli-java-17-maven`, `orw-cli-java-17-gradle`)**: Use the
+same job-private Maven or Gradle writable cache as other official images. ORW
+execution remains isolated from Maven and Gradle project tasks.
 
 Both images ship a bundled `rewrite` executable (`/usr/local/bin/rewrite`) backed
 by an embedded standalone runner JAR. `ORW_CLI_BIN` defaults to this bundled
 binary and should only be overridden for controlled debugging. Recipes are
 resolved dynamically from `RECIPE_GROUP/RECIPE_ARTIFACT` and optional `RECIPE_VERSION`; no
 per-recipe image rebuild is required.
-
-ORW jobs use the same stack-env-driven Java cache mounting behavior as other
-non-gate jobs, with the same cache-root defaults/fallbacks as Build Gate.
 
 ### Security Considerations
 
@@ -636,8 +647,6 @@ The Build Gate executor supports optional resource limits via environment variab
   human suffixes (e.g., `2G`). Passed to Docker as the storage option `size` (driver dependent; requires
   overlay2 with xfs project quotas or equivalent). When unsupported by the driver, container creation may fail.
 - `PLOY_BUILDGATE_LIMIT_CPU_MILLIS` — CPU limit in millicores (e.g., `500` = 0.5 CPU, `1500` = 1.5 CPU).
-- `PLOY_BUILDGATE_CACHE_ROOT` — Host path root for persistent Build Gate tool caches.
-  Default is `/var/cache/ploy/gates`; when unset and not writable, fallback is `${TMPDIR:-/tmp}/ploy/gates`.
 
 Notes:
 - Memory and disk limits accept human‑friendly suffixes; CPU uses numeric millicores only.

@@ -10,10 +10,9 @@ import (
 )
 
 // gateExecutionMetadata normalizes a finished gate container run into
-// BuildGateStageMetadata. On success it surfaces gradle build-cache hits; on
-// failure it preserves the captured output without tool-specific trimming.
+// BuildGateStageMetadata. On failure it preserves the captured output without
+// tool-specific trimming.
 func gateExecutionMetadata(
-	workspace string,
 	language string,
 	tool string,
 	release string,
@@ -34,15 +33,6 @@ func gateExecutionMetadata(
 			Release:  strings.TrimSpace(release),
 		},
 		RuntimeImage: image,
-	}
-	if passed && strings.EqualFold(tool, "gradle") {
-		if hits := readGradleBuildCacheHits(workspace); len(hits) > 0 {
-			meta.LogFindings = append(meta.LogFindings, contracts.BuildGateLogFinding{
-				Severity: "info",
-				Code:     "GRADLE_BUILD_CACHE_HIT",
-				Message:  fmt.Sprintf("gradle build cache hits (%d): %s", len(hits), strings.Join(hits, ", ")),
-			})
-		}
 	}
 	if !passed {
 		msg := string(capGateLogBytes(logs))

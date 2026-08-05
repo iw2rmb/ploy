@@ -87,3 +87,31 @@ func TestForbidFreeFormProtocols(t *testing.T) {
 		t.Fatalf("free-form protocol literals found in: %s", strings.Join(offenders, ", "))
 	}
 }
+
+func TestForbidToolCachePathsInRuntime(t *testing.T) {
+	roots := []string{"internal", "cmd"}
+	rx := regexp.MustCompile(`/root/\.(?:gradle|m2)\b`)
+
+	var offenders []string
+	for _, root := range roots {
+		_ = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if d.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+				return nil
+			}
+			b, err := os.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			if rx.Match(b) {
+				offenders = append(offenders, path)
+			}
+			return nil
+		})
+	}
+	if len(offenders) > 0 {
+		t.Fatalf("tool-cache paths found in runtime code: %s", strings.Join(offenders, ", "))
+	}
+}

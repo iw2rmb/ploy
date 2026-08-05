@@ -132,10 +132,10 @@ func TestContainerMountValidationRejectsInvalidPlans(t *testing.T) {
 
 func TestContainerMountValidationPermitsDeclaredNestedMount(t *testing.T) {
 	mounts := []ContainerMount{
-		{Source: "/job/tmp", Target: jobTmpContainerDir},
-		{Source: "/job/cache-hits", Target: gradleCacheHitsContainerFile},
+		{Source: "/job/home", Target: jobDefaultHomeContainer},
+		{Source: "/job/staging/config", Target: "/root/.config/app.toml", ReadOnly: true},
 	}
-	contracts := []nestedMountContract{{parent: jobTmpContainerDir, child: gradleCacheHitsContainerFile}}
+	contracts := []nestedMountContract{{parent: jobDefaultHomeContainer, child: "/root/.config/app.toml"}}
 	if err := validateContainerMounts(mounts, contracts); err != nil {
 		t.Fatalf("validateContainerMounts() error = %v", err)
 	}

@@ -10,7 +10,7 @@ post:
   description: |
     Updates the node's last heartbeat timestamp and resource snapshot (CPU, memory, disk).
     The disk fields report the most constrained configured node storage path
-    among `/`, `DOCKER_ROOT_DIR`, `PLOYD_CACHE_HOME`, `PLOY_BUILDGATE_CACHE_ROOT`,
+    among `/`, `DOCKER_ROOT_DIR`, `PLOYD_CACHE_HOME`, `PLOY_NODE_CACHE_ROOT`,
     and `TMPDIR`; the full per-path breakdown is published through node diagnostics.
     Node agents call this endpoint periodically to report health and resource availability.
   requestBody:
