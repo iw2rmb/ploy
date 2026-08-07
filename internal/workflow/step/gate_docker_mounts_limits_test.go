@@ -30,7 +30,19 @@ func TestGateExecutor_Mounts(t *testing.T) {
 		{
 			name: "unix docker host mounts socket",
 			build: func(t *testing.T) (string, *contracts.StepGateSpec, context.Context, expectMount, string) {
-				socketDir := t.TempDir()
+				createdDir, err := os.MkdirTemp(".", "docker-host-socket-")
+				if err != nil {
+					t.Fatalf("create docker socket directory: %v", err)
+				}
+				socketDir, err := filepath.Abs(createdDir)
+				if err != nil {
+					t.Fatalf("resolve docker socket directory: %v", err)
+				}
+				t.Cleanup(func() {
+					if err := os.RemoveAll(socketDir); err != nil {
+						t.Errorf("remove docker socket directory: %v", err)
+					}
+				})
 				socketPath := filepath.Join(socketDir, "docker.sock")
 				if err := os.WriteFile(socketPath, []byte("mock socket"), 0o600); err != nil {
 					t.Fatalf("write docker socket placeholder: %v", err)
