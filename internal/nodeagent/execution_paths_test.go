@@ -1,12 +1,16 @@
 package nodeagent
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/workflow/contracts"
+	"github.com/iw2rmb/ploy/internal/workflow/step"
 )
 
 func TestJobDirectoriesUseUniversalLayout(t *testing.T) {
@@ -114,24 +118,136 @@ func TestJobMountsRequireGenericNodeRoots(t *testing.T) {
 	}
 }
 
-func TestConcurrentJobsHaveDistinctOwnedDirectories(t *testing.T) {
+func TestConcurrentSameImageJobsUseDistinctRuntimeStorage(t *testing.T) {
 	cacheHome := t.TempDir()
+	nodeCache := filepath.Join(t.TempDir(), "node-cache")
+	nodeConfig := filepath.Join(t.TempDir(), "job-config")
 	t.Setenv("PLOYD_CACHE_HOME", cacheHome)
+	t.Setenv(nodeCacheRootEnv, nodeCache)
+	t.Setenv(nodeJobConfigRootEnv, nodeConfig)
 
 	runID := types.NewRunID()
-	first := jobDirectories(runID, types.NewJobID())
-	second := jobDirectories(runID, types.NewJobID())
-	for name, paths := range map[string][2]string{
-		"cache":   {first.Cache, second.Cache},
-		"home":    {first.Home, second.Home},
-		"in":      {first.In, second.In},
-		"out":     {first.Out, second.Out},
-		"staging": {first.Staging, second.Staging},
-		"tmp":     {first.Tmp, second.Tmp},
-	} {
-		if paths[0] == paths[1] {
-			t.Errorf("concurrent jobs share %s directory %q", name, paths[0])
+	if err := ensureRunDirectories(runID); err != nil {
+		t.Fatalf("ensureRunDirectories() error = %v", err)
+	}
+
+	type runtimeJob struct {
+		id        types.JobID
+		dirs      JobDirectories
+		mounts    step.JobMounts
+		workspace string
+	}
+	jobs := make([]runtimeJob, 0, 2)
+	for range 2 {
+		jobID := types.NewJobID()
+		dirs := jobDirectories(runID, jobID)
+		if err := ensureJobDirectories(dirs); err != nil {
+			t.Fatalf("ensureJobDirectories() error = %v", err)
 		}
+		mounts, err := jobMounts(dirs, runID, types.JobTypeMig)
+		if err != nil {
+			t.Fatalf("jobMounts() error = %v", err)
+		}
+		jobs = append(jobs, runtimeJob{id: jobID, dirs: dirs, mounts: mounts, workspace: t.TempDir()})
+	}
+
+	specs := make(chan step.ContainerSpec, len(jobs))
+	release := make(chan struct{})
+	runtime := &mockContainerRuntime{
+		createFn: func(_ context.Context, spec step.ContainerSpec) (step.ContainerHandle, error) {
+			specs <- spec
+			return step.ContainerHandle(spec.Labels[types.LabelJobID]), nil
+		},
+		waitFn: func(ctx context.Context, handle step.ContainerHandle) (step.ContainerResult, error) {
+			select {
+			case <-release:
+				return step.ContainerResult{ContainerID: string(handle)}, nil
+			case <-ctx.Done():
+				return step.ContainerResult{}, ctx.Err()
+			}
+		},
+	}
+	runner := &step.Runner{Containers: runtime}
+	manifest := contracts.StepManifest{
+		ID:      "same-image-job",
+		Image:   "example/same-image:latest",
+		Command: []string{"true"},
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	errCh := make(chan error, len(jobs))
+	for _, job := range jobs {
+		job := job
+		go func() {
+			_, err := runner.Run(ctx, step.Request{
+				RunID:     runID,
+				JobID:     job.id,
+				Manifest:  manifest,
+				Workspace: job.workspace,
+				JobMounts: job.mounts,
+			})
+			errCh <- err
+		}()
+	}
+
+	captured := make([]step.ContainerSpec, 0, len(jobs))
+	for range jobs {
+		select {
+		case spec := <-specs:
+			captured = append(captured, spec)
+		case <-ctx.Done():
+			t.Fatal("concurrent jobs did not both reach container creation")
+		}
+	}
+	close(release)
+	for range jobs {
+		if err := <-errCh; err != nil {
+			t.Fatalf("Runner.Run() error = %v", err)
+		}
+	}
+
+	expected := make(map[string]JobDirectories, len(jobs))
+	for _, job := range jobs {
+		expected[job.id.String()] = job.dirs
+	}
+	sources := map[string][]string{"cache": nil, "home": nil, "tmp": nil}
+	for _, spec := range captured {
+		if spec.Image != manifest.Image {
+			t.Fatalf("container image = %q, want %q", spec.Image, manifest.Image)
+		}
+		dirs, ok := expected[spec.Labels[types.LabelJobID]]
+		if !ok {
+			t.Fatalf("container job label = %q, want one of the concurrent jobs", spec.Labels[types.LabelJobID])
+		}
+		wantMounts := map[string]struct {
+			target string
+			source string
+		}{
+			"cache": {target: "/ploy/cache/job", source: dirs.Cache},
+			"home":  {target: "/root", source: dirs.Home},
+			"tmp":   {target: "/tmp", source: dirs.Tmp},
+		}
+		for name, want := range wantMounts {
+			var got string
+			for _, mount := range spec.Mounts {
+				if mount.Target == want.target {
+					got = mount.Source
+					break
+				}
+			}
+			if got != want.source {
+				t.Fatalf("%s mount source = %q, want %q", name, got, want.source)
+			}
+			sources[name] = append(sources[name], got)
+		}
+	}
+	for name, mounted := range sources {
+		if len(mounted) != 2 || mounted[0] == mounted[1] {
+			t.Errorf("concurrent jobs share %s mount source: %v", name, mounted)
+		}
+	}
+	if jobs[0].mounts.Staging == jobs[1].mounts.Staging {
+		t.Errorf("concurrent jobs share staging source %q", jobs[0].mounts.Staging)
 	}
 }
 
