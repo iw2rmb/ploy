@@ -88,6 +88,9 @@ type GitLabConfig struct {
 // SpecRepos contains the startup-only Git repositories used for named-spec discovery.
 type SpecRepos []domaintypes.RepoURL
 
+// NamedSpecEnvAllowlist contains process environment names available during named-spec compilation.
+type NamedSpecEnvAllowlist []string
+
 // ObjectStoreConfig configures S3-compatible object storage (e.g., Garage).
 type ObjectStoreConfig struct {
 	Endpoint  string `yaml:"endpoint"`

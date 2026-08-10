@@ -59,7 +59,10 @@ Role model (bearer token claims):
   reads this to populate creator metadata when submitting runs.
 - `PLOY_CONTAINER_REGISTRY` — Registry/repository prefix used by runner templates.
   Images resolve to `$PLOY_CONTAINER_REGISTRY/<name>:latest`. Runtime compose
-  assets default to `docker-hosted.artifactory.tcsbank.ru/at-scale/ploy`.
+  assets default to `docker-hosted.artifactory.tcsbank.ru/at-scale/ploy`. Local
+  spec compilation reads the CLI process value. Named-spec compilation can read
+  the server process value only when `PLOY_CONTAINER_REGISTRY` is in
+  `PLOY_NAMED_SPECS_ENVS_ALLOWLIST`.
 - `PLOY_OBJECTSTORE_ENDPOINT` — S3-compatible endpoint URL provided by environment.
 - `PLOY_OBJECTSTORE_ACCESS_KEY` — S3 access key ID provided by environment.
 - `PLOY_OBJECTSTORE_SECRET_KEY` — S3 secret access key provided by environment.
@@ -322,6 +325,26 @@ GitLab source hydration:
 - `PLOY_GITLAB_DOMAIN` — GitLab base URL or host. Optional; when set, token auth is scoped to that host.
 - `PLOY_GITLAB_TOKEN` — GitLab Personal Access Token used by `ployd` for source resolution and snapshot materialization.
 - `PLOY_SPECS_REPOS` — Optional comma-separated full Git repository URLs used by `ploy spec ls`. `ployd` reads the list at startup, rejects empty entries and normalized duplicates, and refreshes each repository's default branch beneath `PLOYD_CACHE_HOME`. The cache falls back to the system temporary directory when `PLOYD_CACHE_HOME` is unset.
+
+Named-spec compilation:
+
+- `PLOY_NAMED_SPECS_ENVS_ALLOWLIST` — Optional comma-separated names of server
+  process environment variables that named specs can use in `$NAME` and
+  `${NAME}` placeholders. The allowlist is empty by default and is read at
+  server startup. Empty entries, duplicate names, and invalid environment
+  variable names prevent startup.
+- Each compilation reads every allowed value once. An unset or non-allowlisted
+  placeholder causes the run request to fail. A server-target environment
+  update affects later compilations.
+- Expanded values are stored in the immutable canonical spec snapshot. Add only
+  non-secret variables to the allowlist.
+
+For example, this setting permits named specs to use
+`$PLOY_CONTAINER_REGISTRY`:
+
+```bash
+PLOY_NAMED_SPECS_ENVS_ALLOWLIST=PLOY_CONTAINER_REGISTRY
+```
 
 ### Authentication
 

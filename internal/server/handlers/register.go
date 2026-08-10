@@ -13,35 +13,37 @@ import (
 )
 
 type routeDeps struct {
-	st            store.Store
-	bs            blobstore.Store
-	bp            *blobpersist.Service
-	eventsService *events.Service
-	configHolder  *ConfigHolder
-	tokenSecret   string
-	gitAuth       gitauth.Options
-	gitLabTokens  *gitlabtokens.Registry
-	snapshots     repoSnapshotWriter
-	specCatalog   speccatalog.Catalog
+	st                    store.Store
+	bs                    blobstore.Store
+	bp                    *blobpersist.Service
+	eventsService         *events.Service
+	configHolder          *ConfigHolder
+	tokenSecret           string
+	gitAuth               gitauth.Options
+	gitLabTokens          *gitlabtokens.Registry
+	snapshots             repoSnapshotWriter
+	specCatalog           speccatalog.Catalog
+	namedSpecEnvAllowlist []string
 }
 
 // RegisterRoutes mounts all HTTP endpoints on the given server.
-func RegisterRoutes(s *httpserver.Server, st store.Store, bs blobstore.Store, bp *blobpersist.Service, eventsService *events.Service, configHolder *ConfigHolder, tokenSecret string, gitAuth gitauth.Options, snapshots repoSnapshotWriter, specCatalog speccatalog.Catalog, registries ...*gitlabtokens.Registry) {
+func RegisterRoutes(s *httpserver.Server, st store.Store, bs blobstore.Store, bp *blobpersist.Service, eventsService *events.Service, configHolder *ConfigHolder, tokenSecret string, gitAuth gitauth.Options, snapshots repoSnapshotWriter, specCatalog speccatalog.Catalog, namedSpecEnvAllowlist []string, registries ...*gitlabtokens.Registry) {
 	var registry *gitlabtokens.Registry
 	if len(registries) > 0 {
 		registry = registries[0]
 	}
 	deps := routeDeps{
-		st:            st,
-		bs:            bs,
-		bp:            bp,
-		eventsService: eventsService,
-		configHolder:  configHolder,
-		tokenSecret:   tokenSecret,
-		gitAuth:       gitAuth,
-		gitLabTokens:  registry,
-		snapshots:     snapshots,
-		specCatalog:   specCatalog,
+		st:                    st,
+		bs:                    bs,
+		bp:                    bp,
+		eventsService:         eventsService,
+		configHolder:          configHolder,
+		tokenSecret:           tokenSecret,
+		gitAuth:               gitAuth,
+		gitLabTokens:          registry,
+		snapshots:             snapshots,
+		specCatalog:           specCatalog,
+		namedSpecEnvAllowlist: append([]string(nil), namedSpecEnvAllowlist...),
 	}
 	registerHealthRoutes(s, deps)
 	registerConfigRoutes(s, deps)
@@ -84,8 +86,9 @@ func registerBootstrapRoutes(s *httpserver.Server, deps routeDeps) {
 
 func registerMigRoutes(s *httpserver.Server, deps routeDeps) {
 	s.RegisterRouteFunc("POST /v1/runs", createSingleRepoRunHandler(deps.st, deps.eventsService, deps.gitAuth, runSubmitSpecServices{
-		catalog: deps.specCatalog,
-		bundles: runSpecBundleStore{store: deps.st, blobs: deps.bp},
+		catalog:      deps.specCatalog,
+		bundles:      runSpecBundleStore{store: deps.st, blobs: deps.bp},
+		envAllowlist: deps.namedSpecEnvAllowlist,
 	}, deps.gitLabTokens), auth.RoleControlPlane)
 
 	s.RegisterRouteFunc("POST /v1/migs", createMigHandler(deps.st), auth.RoleControlPlane)

@@ -27,6 +27,10 @@ func LoadFromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	cfg.NamedSpecEnvAllowlist, err = parseNamedSpecEnvAllowlist(os.Getenv("PLOY_NAMED_SPECS_ENVS_ALLOWLIST"))
+	if err != nil {
+		return Config{}, err
+	}
 
 	if secure, ok, err := envBool("PLOY_OBJECTSTORE_SECURE"); err != nil {
 		return Config{}, err

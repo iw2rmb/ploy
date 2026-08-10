@@ -18,7 +18,16 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-var specEnvPlaceholderRE = regexp.MustCompile(`\$\{([A-Za-z_][A-Za-z0-9_]*)\}|\$([A-Za-z_][A-Za-z0-9_]*)`)
+const specEnvNamePattern = `[A-Za-z_][A-Za-z0-9_]*`
+
+var (
+	specEnvNameRE        = regexp.MustCompile(`^` + specEnvNamePattern + `$`)
+	specEnvPlaceholderRE = regexp.MustCompile(`\$\{(` + specEnvNamePattern + `)\}|\$(` + specEnvNamePattern + `)`)
+)
+
+func IsEnvironmentPlaceholderName(name string) bool {
+	return specEnvNameRE.MatchString(name)
+}
 
 // Source owns path policy and file access for one compilation source.
 type Source interface {
@@ -448,18 +457,19 @@ func (c *Compiler) expandSpecEnvValue(raw string) (string, error) {
 
 // Overrides contains caller-supplied values that take precedence over source values.
 type Overrides struct {
-	Envs    []string
-	Image   string
-	Command string
+	Envs     []string
+	StepEnvs map[string][]string
+	Image    string
+	Command  string
 }
 
 // Build loads a spec and compiles it into canonical JSON.
 //
 // Processing order:
-//  1. Load spec file (YAML or JSON format) if provided
-//  2. Preprocess: resolve !include composition, image env, envs expansion
-//  3. Compile Hydra records: in/out/home authoring entries → canonical shortHash:dst form
-//  4. Apply caller overrides (higher precedence than source values) to top-level fields
+//  1. Load and compose the spec, then select a step when requested
+//  2. Apply step environment overrides before source placeholder expansion
+//  3. Expand image and environment placeholders, then apply the optional overlay
+//  4. Apply top-level caller overrides and compile local file records
 //  5. Validate the current spec contract
 //
 // Returns nil payload when neither a spec file nor overrides are provided.
@@ -508,6 +518,10 @@ func (c *Compiler) BuildSelected(ctx context.Context, specFile string, stepSelec
 		return nil, err
 	}
 
+	if err := applyStepEnvOverridesInPlace(specMap, overrides.StepEnvs); err != nil {
+		return nil, err
+	}
+
 	if err := c.preprocessMigsSpecInPlace(specMap); err != nil {
 		return nil, err
 	}
@@ -517,7 +531,7 @@ func (c *Compiler) BuildSelected(ctx context.Context, specFile string, stepSelec
 	}
 
 	// Caller overrides take precedence over source values.
-	hasOverrides := len(overrides.Envs) > 0 || overrides.Image != "" || overrides.Command != ""
+	hasOverrides := len(overrides.Envs) > 0 || len(overrides.StepEnvs) > 0 || overrides.Image != "" || overrides.Command != ""
 
 	// Only proceed if there is a spec file or an override.
 	if len(specMap) == 0 && !hasOverrides {

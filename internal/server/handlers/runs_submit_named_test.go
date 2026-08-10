@@ -74,6 +74,7 @@ func (s *runBundleStoreStub) Ensure(_ context.Context, cid string, archive []byt
 }
 
 func TestRunsCreateSingleRepo_NamedSpecCompilesOverridesAndPersistsSnapshot(t *testing.T) {
+	t.Setenv("PLOY_CONTAINER_REGISTRY", "registry.example.com/ploy")
 	root := t.TempDir()
 	writeNamedRunTestFile(t, filepath.Join(root, "scenarios", "upgrade.yaml"), `
 apiVersion: ploy.mig/v1alpha1
@@ -81,9 +82,9 @@ name: upgrade-java
 description: Upgrade Java
 steps:
   - name: rewrite
-    image: alpine:latest
+    image: $PLOY_CONTAINER_REGISTRY/mig:latest
     envs:
-      MODE: base
+      MODE: $MISSING_MODE
     in:
       - ./input.txt:/in/input.txt
 `)
@@ -98,7 +99,9 @@ steps:
 	}
 	bundles := &runBundleStoreStub{}
 	st := &migStore{}
-	handler := createSingleRepoRunHandler(st, nil, gitauth.Options{}, runSubmitSpecServices{catalog: catalog, bundles: bundles})
+	handler := createSingleRepoRunHandler(st, nil, gitauth.Options{}, runSubmitSpecServices{
+		catalog: catalog, bundles: bundles, envAllowlist: []string{"PLOY_CONTAINER_REGISTRY"},
+	})
 	body := validRunRequestBodyWith(map[string]any{
 		"spec":          nil,
 		"spec_selector": "platform/specs:upgrade-java",
@@ -138,6 +141,9 @@ steps:
 		t.Fatalf("decode canonical spec: %v", err)
 	}
 	step := canonical["steps"].([]any)[0].(map[string]any)
+	if step["image"] != "registry.example.com/ploy/mig:latest" {
+		t.Fatalf("step image = %v", step["image"])
+	}
 	envs := step["envs"].(map[string]any)
 	if envs["MODE"] != "strict" || envs["EXTRA"] != "1" {
 		t.Fatalf("step envs = %#v", envs)
@@ -148,6 +154,61 @@ steps:
 	}
 	if st.createRun.params.SpecID != st.createGitSpecSnapshot.val.ID {
 		t.Fatalf("run spec id = %s, want persisted snapshot %s", st.createRun.params.SpecID, st.createGitSpecSnapshot.val.ID)
+	}
+}
+
+func TestRunsCreateSingleRepo_NamedSpecRejectsNonAllowlistedEnvironment(t *testing.T) {
+	t.Setenv("SERVER_ONLY_IMAGE", "registry.example.com/private/mig:latest")
+	root := t.TempDir()
+	writeNamedRunTestFile(t, filepath.Join(root, "upgrade.yaml"), `
+apiVersion: ploy.mig/v1alpha1
+name: upgrade-java
+steps:
+  - name: rewrite
+    image: $SERVER_ONLY_IMAGE
+`)
+	catalog := &runSpecCatalogStub{root: root, entry: speccatalog.Entry{
+		Name: "upgrade-java", Source: "https://git.example.com/team/specs", Path: "upgrade.yaml",
+		SHA: "0123456789abcdef0123456789abcdef01234567", CommittedAt: time.Now().UTC(),
+	}}
+	st := &migStore{}
+	handler := createSingleRepoRunHandler(st, nil, gitauth.Options{}, runSubmitSpecServices{
+		catalog: catalog, envAllowlist: []string{"PLOY_CONTAINER_REGISTRY"},
+	})
+
+	rr := doRequest(t, handler, http.MethodPost, "/v1/runs", validRunRequestBodyWith(map[string]any{
+		"spec": nil, "spec_selector": "upgrade-java",
+	}))
+
+	assertStatus(t, rr, http.StatusBadRequest)
+	if !strings.Contains(rr.Body.String(), "unresolved environment variables: SERVER_ONLY_IMAGE") {
+		t.Fatalf("body = %q, want unresolved environment variable", rr.Body.String())
+	}
+	if st.createSpec.called || st.createGitSpecSnapshot.called || st.createMig.called || st.createRun.called {
+		t.Fatal("compile failure created durable rows")
+	}
+}
+
+func TestNamedSpecEnvironmentSnapshotIsStable(t *testing.T) {
+	lookups := 0
+	lookup := snapshotNamedSpecEnvironment([]string{"SAFE_NAME"}, func(name string) (string, bool) {
+		lookups++
+		if lookups == 1 {
+			return name + "-first-value", true
+		}
+		return name + "-changed-value", true
+	})
+
+	first, firstOK := lookup("SAFE_NAME")
+	second, secondOK := lookup("SAFE_NAME")
+	if !firstOK || !secondOK || first != second {
+		t.Fatalf("snapshot values = %q/%q, present = %t/%t", first, second, firstOK, secondOK)
+	}
+	if _, ok := lookup("NOT_ALLOWED"); ok {
+		t.Fatal("snapshot exposed non-allowlisted environment variable")
+	}
+	if lookups != 1 {
+		t.Fatalf("source lookups = %d, want 1", lookups)
 	}
 }
 

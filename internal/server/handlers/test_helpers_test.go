@@ -476,7 +476,7 @@ func newTestServerWithRole(t *testing.T, role auth.Role) *httpserver.Server {
 	st := &jobStore{}
 	bs := bsmock.New()
 	bp := blobpersist.New(st, bs)
-	RegisterRoutes(srv, st, bs, bp, ev, NewConfigHolder(nil), "test-secret", gitauth.Options{}, nil, nil)
+	RegisterRoutes(srv, st, bs, bp, ev, NewConfigHolder(nil), "test-secret", gitauth.Options{}, nil, nil, nil)
 	return srv
 }
 

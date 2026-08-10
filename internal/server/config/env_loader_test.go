@@ -41,6 +41,7 @@ func TestLoadFromEnv_Overrides(t *testing.T) {
 	t.Setenv("PLOY_GITLAB_DOMAIN", "https://gitlab.example.com")
 	t.Setenv("PLOY_GITLAB_TOKEN", "glpat-test")
 	t.Setenv("PLOY_SPECS_REPOS", " https://gitlab.example.com/platform/migs.git , ssh://git@gitlab.example.com/team/scenarios.git ")
+	t.Setenv("PLOY_NAMED_SPECS_ENVS_ALLOWLIST", " PLOY_CONTAINER_REGISTRY , RELEASE_CHANNEL ")
 
 	cfg, err := config.LoadFromEnv()
 	if err != nil {
@@ -75,6 +76,9 @@ func TestLoadFromEnv_Overrides(t *testing.T) {
 	}
 	if len(cfg.SpecRepos) != 2 || cfg.SpecRepos[0].String() != "https://gitlab.example.com/platform/migs.git" || cfg.SpecRepos[1].String() != "ssh://git@gitlab.example.com/team/scenarios.git" {
 		t.Fatalf("SpecRepos = %#v, want two trimmed repositories", cfg.SpecRepos)
+	}
+	if got := cfg.NamedSpecEnvAllowlist; len(got) != 2 || got[0] != "PLOY_CONTAINER_REGISTRY" || got[1] != "RELEASE_CHANNEL" {
+		t.Fatalf("NamedSpecEnvAllowlist = %#v, want two trimmed names", got)
 	}
 }
 
@@ -114,6 +118,46 @@ func TestLoadFromEnv_SpecReposValidation(t *testing.T) {
 			}
 			if tt.errNotContains != "" && strings.Contains(err.Error(), tt.errNotContains) {
 				t.Fatalf("LoadFromEnv() error = %q, must not contain %q", err, tt.errNotContains)
+			}
+		})
+	}
+}
+
+func TestLoadFromEnv_NamedSpecEnvAllowlistValidation(t *testing.T) {
+	tests := []struct {
+		name        string
+		value       string
+		want        []string
+		errContains string
+	}{
+		{name: "whitespace configures none", value: "   "},
+		{name: "trimmed names", value: " PLOY_CONTAINER_REGISTRY,RELEASE_CHANNEL ", want: []string{"PLOY_CONTAINER_REGISTRY", "RELEASE_CHANNEL"}},
+		{name: "empty entry", value: "PLOY_CONTAINER_REGISTRY, ,RELEASE_CHANNEL", errContains: "entry 2 is empty"},
+		{name: "invalid name", value: "PLOY_CONTAINER_REGISTRY,NOT-VALID", errContains: "entry 2 is not an environment variable name"},
+		{name: "duplicate name", value: "PLOY_CONTAINER_REGISTRY,PLOY_CONTAINER_REGISTRY", errContains: "duplicate environment variable"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			clearEnvForLoadFromEnv(t)
+			t.Setenv("PLOY_NAMED_SPECS_ENVS_ALLOWLIST", tt.value)
+			cfg, err := config.LoadFromEnv()
+			if tt.errContains != "" {
+				if err == nil || !strings.Contains(err.Error(), tt.errContains) {
+					t.Fatalf("LoadFromEnv() error = %v, want containing %q", err, tt.errContains)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("LoadFromEnv() error = %v", err)
+			}
+			if len(cfg.NamedSpecEnvAllowlist) != len(tt.want) {
+				t.Fatalf("NamedSpecEnvAllowlist = %#v, want %#v", cfg.NamedSpecEnvAllowlist, tt.want)
+			}
+			for i := range tt.want {
+				if cfg.NamedSpecEnvAllowlist[i] != tt.want[i] {
+					t.Fatalf("NamedSpecEnvAllowlist = %#v, want %#v", cfg.NamedSpecEnvAllowlist, tt.want)
+				}
 			}
 		})
 	}
@@ -160,6 +204,7 @@ func clearEnvForLoadFromEnv(t *testing.T) {
 		"PLOY_GITLAB_DOMAIN",
 		"PLOY_GITLAB_TOKEN",
 		"PLOY_SPECS_REPOS",
+		"PLOY_NAMED_SPECS_ENVS_ALLOWLIST",
 		"PLOYD_HTTP_LISTEN",
 		"PLOYD_HTTP_READ_TIMEOUT",
 		"PLOYD_HTTP_WRITE_TIMEOUT",

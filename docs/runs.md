@@ -29,7 +29,14 @@ ploy mig run <mig-id|name> [<namespace/repo[:ref]> ... | --failed] [--follow] [-
 - `ploy run ... --env:<step> KEY=VALUE` overrides `steps[].envs` for exactly
   one step named `<step>`. The flag is repeatable, values may be empty, and
   later values win for the same step/key. For named specs, the CLI sends the
-  ordered overrides to the server, which applies them after compilation.
+  ordered overrides to the server. The server applies them after spec
+  composition and before it expands the remaining environment placeholders.
+  An override therefore replaces the selected source value before that source
+  value can cause an unresolved-placeholder error.
+- Named-spec compilation can read only the server process variables named by
+  `PLOY_NAMED_SPECS_ENVS_ALLOWLIST`. The server stores expanded values in the
+  immutable canonical spec snapshot. See [Environment variables](envs/README.md#server-control-plane)
+  for configuration and security constraints.
 - `ploy run ... --build-gate-forced <lang>@<release>[/<tool>]` overrides both
   `build_gate.pre.stack` and `build_gate.post.stack` with `mode: forced`.
   Use `--build-gate-forced-pre` or `--build-gate-forced-post` to override one

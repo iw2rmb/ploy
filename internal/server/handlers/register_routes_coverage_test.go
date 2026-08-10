@@ -61,7 +61,7 @@ func TestRegisterRoutesMatchesOpenAPI(t *testing.T) {
 		bs := bsmock.New()
 		bp := blobpersist.New(st, bs)
 		cfg := NewConfigHolder(nil)
-		RegisterRoutes(srv, st, bs, bp, ev, cfg, "test-secret", gitauth.Options{}, nil, nil)
+		RegisterRoutes(srv, st, bs, bp, ev, cfg, "test-secret", gitauth.Options{}, nil, nil, nil)
 		return srv, ev
 	}
 

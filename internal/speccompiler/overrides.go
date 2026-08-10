@@ -23,43 +23,8 @@ func ApplyStepEnvOverrides(spec json.RawMessage, overrides map[string][]string) 
 	if err := json.Unmarshal(spec, &specMap); err != nil {
 		return nil, fmt.Errorf("run submit: parse spec for env overrides: %w", err)
 	}
-	rawSteps, ok := specMap["steps"].([]any)
-	if !ok {
-		return nil, errors.New("run submit: spec steps must be an array for env overrides")
-	}
-	stepsByName := make(map[string]map[string]any, len(rawSteps))
-	for i, rawStep := range rawSteps {
-		step, ok := rawStep.(map[string]any)
-		if !ok {
-			return nil, fmt.Errorf("run submit: steps[%d] must be an object for env overrides", i)
-		}
-		name, _ := step["name"].(string)
-		name = strings.TrimSpace(name)
-		if name == "" {
-			continue
-		}
-		if _, exists := stepsByName[name]; exists {
-			return nil, fmt.Errorf("run submit: step name %q is not unique", name)
-		}
-		stepsByName[name] = step
-	}
-	for stepName, assignments := range overrides {
-		step, ok := stepsByName[stepName]
-		if !ok {
-			return nil, fmt.Errorf("run submit: step %q not found for env override", stepName)
-		}
-		envs, err := stepEnvMap(step, stepName)
-		if err != nil {
-			return nil, err
-		}
-		for _, assignment := range assignments {
-			key, value, err := splitStepEnvAssignment(assignment)
-			if err != nil {
-				return nil, err
-			}
-			envs[key] = value
-		}
-		step["envs"] = envs
+	if err := applyStepEnvOverridesInPlace(specMap, overrides); err != nil {
+		return nil, err
 	}
 	mutated, err := json.Marshal(specMap)
 	if err != nil {
@@ -69,6 +34,51 @@ func ApplyStepEnvOverrides(spec json.RawMessage, overrides map[string][]string) 
 		return nil, fmt.Errorf("run submit: validate env-overridden spec: %w", err)
 	}
 	return json.RawMessage(mutated), nil
+}
+
+func applyStepEnvOverridesInPlace(specMap map[string]any, overrides map[string][]string) error {
+	if len(overrides) == 0 {
+		return nil
+	}
+	rawSteps, ok := specMap["steps"].([]any)
+	if !ok {
+		return errors.New("run submit: spec steps must be an array for env overrides")
+	}
+	stepsByName := make(map[string]map[string]any, len(rawSteps))
+	for i, rawStep := range rawSteps {
+		step, ok := rawStep.(map[string]any)
+		if !ok {
+			return fmt.Errorf("run submit: steps[%d] must be an object for env overrides", i)
+		}
+		name, _ := step["name"].(string)
+		name = strings.TrimSpace(name)
+		if name == "" {
+			continue
+		}
+		if _, exists := stepsByName[name]; exists {
+			return fmt.Errorf("run submit: step name %q is not unique", name)
+		}
+		stepsByName[name] = step
+	}
+	for stepName, assignments := range overrides {
+		step, ok := stepsByName[stepName]
+		if !ok {
+			return fmt.Errorf("run submit: step %q not found for env override", stepName)
+		}
+		envs, err := stepEnvMap(step, stepName)
+		if err != nil {
+			return err
+		}
+		for _, assignment := range assignments {
+			key, value, err := splitStepEnvAssignment(assignment)
+			if err != nil {
+				return err
+			}
+			envs[key] = value
+		}
+		step["envs"] = envs
+	}
+	return nil
 }
 
 func stepEnvMap(step map[string]any, stepName string) (map[string]any, error) {

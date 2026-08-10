@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -22,8 +23,9 @@ import (
 )
 
 type runSubmitSpecServices struct {
-	catalog specCatalogResolver
-	bundles speccompiler.BundleStore
+	catalog      specCatalogResolver
+	bundles      speccompiler.BundleStore
+	envAllowlist []string
 }
 
 type specCatalogResolver interface {
@@ -111,16 +113,24 @@ func resolveRunSubmissionSpec(ctx context.Context, req domainapi.RunSubmitReques
 
 	var result runSubmissionSpec
 	err := services.catalog.WithResolvedSource(ctx, selector, func(entry speccatalog.Entry, repositoryRoot string) error {
+		stepEnvs, err := namedStepEnvOverrides(req.SpecOverrides)
+		if err != nil {
+			return &namedSpecCompilationError{entry: entry, err: err}
+		}
 		source, err := speccompiler.NewRepositorySource(repositoryRoot)
 		if err != nil {
 			return &namedSpecCompilationError{entry: entry, err: err}
 		}
 		defer func() { _ = source.Close() }()
-		compiler, err := speccompiler.New(speccompiler.Options{Source: source, Bundles: services.bundles})
+		compiler, err := speccompiler.New(speccompiler.Options{
+			Source:    source,
+			LookupEnv: snapshotNamedSpecEnvironment(services.envAllowlist, os.LookupEnv),
+			Bundles:   services.bundles,
+		})
 		if err != nil {
 			return &namedSpecCompilationError{entry: entry, err: err}
 		}
-		canonical, err := compiler.Build(ctx, filepath.FromSlash(entry.Path), speccompiler.Overrides{})
+		canonical, err := compiler.Build(ctx, filepath.FromSlash(entry.Path), speccompiler.Overrides{StepEnvs: stepEnvs})
 		if err != nil {
 			return &namedSpecCompilationError{entry: entry, err: err}
 		}
@@ -154,18 +164,6 @@ func applyNamedRunSpecOverrides(canonical json.RawMessage, overrides *domainapi.
 	if overrides == nil {
 		return canonical, nil
 	}
-	var err error
-	if len(overrides.StepEnvs) > 0 {
-		for step, assignments := range overrides.StepEnvs {
-			if assignments == nil {
-				return nil, fmt.Errorf("spec_overrides.step_envs.%s must be an array", step)
-			}
-		}
-		canonical, err = speccompiler.ApplyStepEnvOverrides(canonical, overrides.StepEnvs)
-		if err != nil {
-			return nil, err
-		}
-	}
 	if overrides.BuildGateForced != nil {
 		forced, err := buildGateForcedCompilerOverrides(*overrides.BuildGateForced)
 		if err != nil {
@@ -179,6 +177,31 @@ func applyNamedRunSpecOverrides(canonical json.RawMessage, overrides *domainapi.
 		}
 	}
 	return canonical, nil
+}
+
+func namedStepEnvOverrides(overrides *domainapi.RunSpecOverrides) (map[string][]string, error) {
+	if overrides == nil || len(overrides.StepEnvs) == 0 {
+		return nil, nil
+	}
+	for step, assignments := range overrides.StepEnvs {
+		if assignments == nil {
+			return nil, fmt.Errorf("spec_overrides.step_envs.%s must be an array", step)
+		}
+	}
+	return overrides.StepEnvs, nil
+}
+
+func snapshotNamedSpecEnvironment(allowlist []string, source func(string) (string, bool)) func(string) (string, bool) {
+	values := make(map[string]string, len(allowlist))
+	for _, name := range allowlist {
+		if value, ok := source(name); ok {
+			values[name] = value
+		}
+	}
+	return func(name string) (string, bool) {
+		value, ok := values[name]
+		return value, ok
+	}
 }
 
 func buildGateForcedCompilerOverrides(raw domainapi.RunBuildGateForcedOverrides) (speccompiler.BuildGateForcedOverrides, error) {

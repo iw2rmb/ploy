@@ -217,7 +217,7 @@ func run(ctx context.Context, cfg config.Config, st store.Store, authorizer *aut
 	})
 
 	// Register HTTP routes.
-	handlers.RegisterRoutes(httpSrv, st, bs, bp, eventsService, configHolder, tokenSecret, gitAuth, snapshotService, specCatalog, gitLabTokenRegistry)
+	handlers.RegisterRoutes(httpSrv, st, bs, bp, eventsService, configHolder, tokenSecret, gitAuth, snapshotService, specCatalog, []string(cfg.NamedSpecEnvAllowlist), gitLabTokenRegistry)
 
 	// Initialize metrics server.
 	metricsSrv := metrics.NewServer(cfg.Metrics.Listen)
