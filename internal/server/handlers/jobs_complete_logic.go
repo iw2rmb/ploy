@@ -43,19 +43,12 @@ type JobStatsPayload struct {
 
 	// JobResources carries per-job container resource consumption metrics.
 	// When present, the handler persists a row in ploy.job_metrics.
-	JobResources *JobResourcesPayload `json:"job_resources,omitempty"`
+	JobResources *domaintypes.RunStatsJobResources `json:"job_resources,omitempty"`
 }
 
 // ErrorMessage returns the terminal error text from stats.error when present.
 func (p JobStatsPayload) ErrorMessage() string {
 	return strings.TrimSpace(p.Error)
-}
-
-// JobResourcesPayload contains per-job container resource consumption metrics.
-type JobResourcesPayload struct {
-	CPUConsumedNs     int64 `json:"cpu_consumed_ns,omitempty"`
-	DiskConsumedBytes int64 `json:"disk_consumed_bytes,omitempty"`
-	MemConsumedBytes  int64 `json:"mem_consumed_bytes,omitempty"`
 }
 
 // HasJobMeta returns true if job_meta is present and non-empty.

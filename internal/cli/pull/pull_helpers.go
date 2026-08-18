@@ -5,15 +5,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/iw2rmb/ploy/internal/cli/common"
 	"io"
-	"net/http"
-	"net/url"
 	"os"
 	"os/exec"
 	"strings"
 
-	"github.com/iw2rmb/ploy/internal/cli/migs"
+	"github.com/iw2rmb/ploy/internal/cli/common"
+	"github.com/iw2rmb/ploy/internal/cli/runs"
 	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
@@ -100,19 +98,9 @@ func ensureHEADMatchesSource(ctx context.Context, sourceCommit string) error {
 	return nil
 }
 
-func ListRunDiffs(ctx context.Context, httpClient *http.Client, baseURL *url.URL, runID domaintypes.RunID, repoID domaintypes.RepoID) ([]domainapi.DiffListItem, error) {
-	cmd := migs.ListRunDiffsCommand{
-		Client:  httpClient,
-		BaseURL: baseURL,
-		RunID:   runID,
-		RepoID:  repoID,
-	}
-	return cmd.Run(ctx)
-}
-
 // downloadAndApplyDiffs downloads and applies all diffs to the working tree.
 // Returns the count of successfully applied diffs (excluding empty patches).
-func downloadAndApplyDiffs(ctx context.Context, runID domaintypes.RunID, repoID domaintypes.RepoID, diffs []domainapi.DiffListItem, stderr io.Writer) (int, error) {
+func downloadAndApplyDiffs(ctx context.Context, runID domaintypes.RunID, diffs []domainapi.DiffListItem, stderr io.Writer) (int, error) {
 	if len(diffs) == 0 {
 		return 0, nil
 	}
@@ -127,11 +115,10 @@ func downloadAndApplyDiffs(ctx context.Context, runID domaintypes.RunID, repoID 
 		_, _ = fmt.Fprintf(stderr, "  applying diff %d/%d: %s...\n",
 			i+1, len(diffs), diff.ID)
 
-		downloadCmd := migs.DownloadDiffCommand{
+		downloadCmd := runs.DownloadDiffCommand{
 			Client:  httpClient,
 			BaseURL: base,
 			RunID:   runID,
-			RepoID:  repoID,
 			DiffID:  diff.ID,
 		}
 		patch, err := downloadCmd.Run(ctx)

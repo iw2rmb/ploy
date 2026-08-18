@@ -32,9 +32,12 @@ func TestCompletionService_Complete_ReturnsConflictForNonRunningJob(t *testing.T
 		Status:     domaintypes.JobStatusSuccess,
 		StatsBytes: []byte("{}"),
 	})
-	var conflict *completionConflict
-	if !errors.As(err, &conflict) {
-		t.Fatalf("expected completionConflict, got %T (%v)", err, err)
+	var completionErr *completionError
+	if !errors.As(err, &completionErr) {
+		t.Fatalf("expected completionError, got %T (%v)", err, err)
+	}
+	if completionErr.status != 409 {
+		t.Fatalf("completionError status = %d, want 409", completionErr.status)
 	}
 }
 

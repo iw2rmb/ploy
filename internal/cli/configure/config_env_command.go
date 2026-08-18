@@ -247,18 +247,7 @@ func runConfigEnvShow(opts envShowOptions, stdout io.Writer) error {
 }
 
 func validateEnvShowOptions(opts envShowOptions) error {
-	if strings.TrimSpace(opts.Key) == "" {
-		return errors.New("--key is required")
-	}
-	if opts.FromSet {
-		if strings.TrimSpace(opts.From) == "" {
-			return errors.New("--from value cannot be empty")
-		}
-		if _, err := domaintypes.ParseGlobalEnvTarget(opts.From); err != nil {
-			return fmt.Errorf("invalid --from target: %w", err)
-		}
-	}
-	return nil
+	return validateEnvKeyAndTarget(opts.Key, opts.From, opts.FromSet)
 }
 
 // validOnSelectors is the set of accepted values for the --on flag.
@@ -463,14 +452,18 @@ func runConfigEnvUnset(opts envUnsetOptions, stdout io.Writer) error {
 }
 
 func validateEnvUnsetOptions(opts envUnsetOptions) error {
-	if strings.TrimSpace(opts.Key) == "" {
+	return validateEnvKeyAndTarget(opts.Key, opts.From, opts.FromSet)
+}
+
+func validateEnvKeyAndTarget(key, target string, targetSet bool) error {
+	if strings.TrimSpace(key) == "" {
 		return errors.New("--key is required")
 	}
-	if opts.FromSet {
-		if strings.TrimSpace(opts.From) == "" {
+	if targetSet {
+		if strings.TrimSpace(target) == "" {
 			return errors.New("--from value cannot be empty")
 		}
-		if _, err := domaintypes.ParseGlobalEnvTarget(opts.From); err != nil {
+		if _, err := domaintypes.ParseGlobalEnvTarget(target); err != nil {
 			return fmt.Errorf("invalid --from target: %w", err)
 		}
 	}

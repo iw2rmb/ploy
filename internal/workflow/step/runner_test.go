@@ -78,3 +78,49 @@ func TestRunner_Run(t *testing.T) {
 		})
 	}
 }
+
+func TestNormalizeContainerResourceUsage(t *testing.T) {
+	disk := int64(4096)
+	maxInt64 := int64(^uint64(0) >> 1)
+
+	tests := []struct {
+		name  string
+		usage *contracts.BuildGateResourceUsage
+		want  *ContainerResourceUsage
+	}{
+		{name: "nil usage", usage: nil, want: nil},
+		{
+			name: "uses peak memory and writable layer size",
+			usage: &contracts.BuildGateResourceUsage{
+				CPUTotalNs:    100,
+				MemUsageBytes: 200,
+				MemMaxBytes:   300,
+				SizeRwBytes:   &disk,
+			},
+			want: &ContainerResourceUsage{CPUConsumedNs: 100, DiskConsumedBytes: disk, MemConsumedBytes: 300},
+		},
+		{
+			name: "falls back to current memory and saturates unsigned counters",
+			usage: &contracts.BuildGateResourceUsage{
+				CPUTotalNs:    ^uint64(0),
+				MemUsageBytes: ^uint64(0),
+			},
+			want: &ContainerResourceUsage{CPUConsumedNs: maxInt64, MemConsumedBytes: maxInt64},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := NormalizeContainerResourceUsage(tt.usage)
+			if got == nil || tt.want == nil {
+				if got != tt.want {
+					t.Fatalf("NormalizeContainerResourceUsage() = %+v, want %+v", got, tt.want)
+				}
+				return
+			}
+			if *got != *tt.want {
+				t.Fatalf("NormalizeContainerResourceUsage() = %+v, want %+v", got, tt.want)
+			}
+		})
+	}
+}

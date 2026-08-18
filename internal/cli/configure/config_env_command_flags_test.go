@@ -12,8 +12,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/testutil/clienv"
 )
 
-// TestHandleConfigEnvShow_FlagValidation verifies flag parsing for the 'show' subcommand.
-func TestHandleConfigEnvShow_FlagValidation(t *testing.T) {
+func TestHandleConfigEnvKeyAndTargetFlagValidation(t *testing.T) {
 	tests := []struct {
 		name            string
 		args            []string
@@ -24,9 +23,22 @@ func TestHandleConfigEnvShow_FlagValidation(t *testing.T) {
 		{"invalid from", []string{"--key", "FOO", "--from", "bogus"}, "invalid --from target"},
 		{"empty from", []string{"--key", "FOO", "--from", ""}, "--from value cannot be empty"},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			clienv.RunExpectError(t, executeConfigEnvShow, tt.args, tt.wantErrContains)
+	commands := []struct {
+		name string
+		run  clienv.RunFn
+	}{
+		{name: "show", run: executeConfigEnvShow},
+		{name: "unset", run: executeConfigEnvUnset},
+	}
+	for _, command := range commands {
+		command := command
+		t.Run(command.name, func(t *testing.T) {
+			for _, tt := range tests {
+				tt := tt
+				t.Run(tt.name, func(t *testing.T) {
+					clienv.RunExpectError(t, command.run, tt.args, tt.wantErrContains)
+				})
+			}
 		})
 	}
 }
@@ -48,25 +60,6 @@ func TestHandleConfigEnvSet_FlagValidation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			clienv.RunExpectError(t, executeConfigEnvSet, tt.args, tt.wantErrContains)
-		})
-	}
-}
-
-// TestHandleConfigEnvUnset_FlagValidation verifies flag parsing for the 'unset' subcommand.
-func TestHandleConfigEnvUnset_FlagValidation(t *testing.T) {
-	tests := []struct {
-		name            string
-		args            []string
-		wantErrContains string
-	}{
-		{"missing key", nil, "--key is required"},
-		{"empty key", []string{"--key", ""}, "--key is required"},
-		{"invalid from", []string{"--key", "FOO", "--from", "bogus"}, "invalid --from target"},
-		{"empty from", []string{"--key", "FOO", "--from", ""}, "--from value cannot be empty"},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			clienv.RunExpectError(t, executeConfigEnvUnset, tt.args, tt.wantErrContains)
 		})
 	}
 }

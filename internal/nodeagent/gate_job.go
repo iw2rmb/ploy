@@ -325,7 +325,7 @@ func (r *runController) buildGateStats(gateResult *contracts.BuildGateStageMetad
 				builder.Error(errorText)
 			}
 		}
-		if resources := runStatsJobResourcesFromGateUsage(gateResult.Resources); resources != nil {
+		if resources := runStatsJobResourcesFromStepUsage(step.NormalizeContainerResourceUsage(gateResult.Resources)); resources != nil {
 			builder.JobResources(resources)
 		}
 

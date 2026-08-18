@@ -86,7 +86,11 @@ func (c GetRunStatusReportCommand) buildRunEntry(
 		return fmt.Errorf("run status report: list run jobs: %w", err)
 	}
 
-	diffs, err := listRunDiffs(ctx, c.Client, c.BaseURL, c.RunID)
+	diffs, err := (ListRunDiffsCommand{
+		Client:  c.Client,
+		BaseURL: c.BaseURL,
+		RunID:   c.RunID,
+	}).Run(ctx)
 	if err != nil {
 		return fmt.Errorf("run status report: list run diffs: %w", err)
 	}
@@ -193,19 +197,6 @@ func listRunStageArtifacts(
 		}
 	}
 	return artifacts, nil
-}
-
-func listRunDiffs(ctx context.Context, httpClient *http.Client, baseURL *url.URL, runID domaintypes.RunID) ([]domainapi.DiffListItem, error) {
-	endpoint := baseURL.JoinPath("v1", "runs", runID.String(), "diffs")
-	result, err := httpx.DoJSON[domainapi.DiffListResponse](ctx, httpClient, http.MethodGet, endpoint.String(), nil, http.StatusOK, "run status report: fetch diffs")
-	if err != nil {
-		return nil, err
-	}
-	if result.Diffs == nil {
-		result.Diffs = make([]domainapi.DiffListItem, 0)
-	}
-
-	return result.Diffs, nil
 }
 
 // latestRunDiff returns the most recent diff entry.

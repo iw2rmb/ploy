@@ -164,7 +164,7 @@ func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 			return Result{}, fmt.Errorf("container wait failed: %w", err)
 		}
 		if usage := collectDockerResourceUsage(ctx, r.Containers, handle, spec); usage != nil {
-			result.ContainerResources = toContainerResourceUsage(usage)
+			result.ContainerResources = NormalizeContainerResourceUsage(usage)
 		}
 		if r.LogWriter != nil {
 			if !awaitStreamWithin(streamDone, 2*time.Second) {
@@ -184,7 +184,8 @@ func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 	return result, nil
 }
 
-func toContainerResourceUsage(usage *contracts.BuildGateResourceUsage) *ContainerResourceUsage {
+// NormalizeContainerResourceUsage converts Docker counters to persisted job metrics.
+func NormalizeContainerResourceUsage(usage *contracts.BuildGateResourceUsage) *ContainerResourceUsage {
 	if usage == nil {
 		return nil
 	}

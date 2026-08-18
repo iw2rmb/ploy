@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -62,27 +63,14 @@ func completeJobHandler(st store.Store, eventsService *events.Service, bp *blobp
 			RepoSHAOut:   repoSHAOut,
 		})
 		if err != nil {
-			switch e := err.(type) {
-			case *completionBadRequest:
-				writeHTTPError(w, http.StatusBadRequest, "%s", e.Message)
-				return
-			case *completionForbidden:
-				writeHTTPError(w, http.StatusForbidden, "%s", e.Message)
-				return
-			case *completionConflict:
-				writeHTTPError(w, http.StatusConflict, "%s", e.Message)
-				return
-			case *completionNotFound:
-				writeHTTPError(w, http.StatusNotFound, "%s", e.Message)
-				return
-			case *completionInternal:
-				writeHTTPError(w, http.StatusInternalServerError, "%s", e.Error())
-				return
-			default:
-				slog.Error("complete job: unhandled service error", "job_id", jobID, "err", err)
-				writeHTTPError(w, http.StatusInternalServerError, "complete job failed: %v", err)
+			var completionErr *completionError
+			if errors.As(err, &completionErr) {
+				writeHTTPError(w, completionErr.status, "%s", completionErr.Error())
 				return
 			}
+			slog.Error("complete job: unhandled service error", "job_id", jobID, "err", err)
+			writeHTTPError(w, http.StatusInternalServerError, "complete job failed: %v", err)
+			return
 		}
 
 		w.WriteHeader(http.StatusNoContent)

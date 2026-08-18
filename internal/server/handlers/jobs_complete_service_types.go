@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"fmt"
+	"net/http"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/server/blobpersist"
@@ -63,57 +64,41 @@ func newCompletionService(st store.Store, eventsService *events.Service, bp *blo
 	}
 }
 
-// completionBadRequest maps to HTTP 400.
-type completionBadRequest struct{ Message string }
-
-func (e *completionBadRequest) Error() string { return e.Message }
-
-// completionForbidden maps to HTTP 403.
-type completionForbidden struct{ Message string }
-
-func (e *completionForbidden) Error() string { return e.Message }
-
-// completionConflict maps to HTTP 409.
-type completionConflict struct{ Message string }
-
-func (e *completionConflict) Error() string { return e.Message }
-
-// completionNotFound maps to HTTP 404.
-type completionNotFound struct{ Message string }
-
-func (e *completionNotFound) Error() string { return e.Message }
-
-// completionInternal maps to HTTP 500.
-type completionInternal struct {
-	Message string
-	Err     error
+type completionError struct {
+	status  int
+	message string
+	cause   error
 }
 
-func (e *completionInternal) Error() string {
-	if e.Err == nil {
-		return e.Message
+func (e *completionError) Error() string {
+	if e.cause == nil {
+		return e.message
 	}
-	return fmt.Sprintf("%s: %v", e.Message, e.Err)
+	return fmt.Sprintf("%s: %v", e.message, e.cause)
 }
 
-func (e *completionInternal) Unwrap() error { return e.Err }
+func (e *completionError) Unwrap() error { return e.cause }
 
 func completeBadRequest(format string, args ...any) error {
-	return &completionBadRequest{Message: fmt.Sprintf(format, args...)}
+	return newCompletionError(http.StatusBadRequest, fmt.Sprintf(format, args...), nil)
 }
 
 func completeForbidden(format string, args ...any) error {
-	return &completionForbidden{Message: fmt.Sprintf(format, args...)}
+	return newCompletionError(http.StatusForbidden, fmt.Sprintf(format, args...), nil)
 }
 
 func completeConflict(format string, args ...any) error {
-	return &completionConflict{Message: fmt.Sprintf(format, args...)}
+	return newCompletionError(http.StatusConflict, fmt.Sprintf(format, args...), nil)
 }
 
 func completeNotFound(format string, args ...any) error {
-	return &completionNotFound{Message: fmt.Sprintf(format, args...)}
+	return newCompletionError(http.StatusNotFound, fmt.Sprintf(format, args...), nil)
 }
 
 func completeInternal(message string, err error) error {
-	return &completionInternal{Message: message, Err: err}
+	return newCompletionError(http.StatusInternalServerError, message, err)
+}
+
+func newCompletionError(status int, message string, cause error) error {
+	return &completionError{status: status, message: message, cause: cause}
 }

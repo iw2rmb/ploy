@@ -54,21 +54,6 @@ func PrepareURL(rawURL string, opts Options) PreparedURL {
 	return prepared
 }
 
-// PrepareBasicURL strips URL credentials and attaches the provided Basic auth pair.
-func PrepareBasicURL(rawURL, username, password string) (PreparedURL, error) {
-	trimmed := strings.TrimSpace(rawURL)
-	parsed, err := url.Parse(trimmed)
-	if err != nil {
-		return PreparedURL{}, fmt.Errorf("parse remote url: %w", err)
-	}
-	clean := *parsed
-	clean.User = nil
-	return PreparedURL{
-		URL: clean.String(),
-		Env: extraHeaderEnv(clean, username, password),
-	}, nil
-}
-
 func extraHeaderEnv(repoURL url.URL, username, password string) []string {
 	scope := fmt.Sprintf("%s://%s/", strings.ToLower(repoURL.Scheme), repoURL.Host)
 	payload := base64.StdEncoding.EncodeToString([]byte(username + ":" + password))

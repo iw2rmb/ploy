@@ -28,6 +28,7 @@ import (
 
 	"github.com/iw2rmb/ploy/internal/cli/common"
 	"github.com/iw2rmb/ploy/internal/cli/migs"
+	"github.com/iw2rmb/ploy/internal/cli/runs"
 	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/httpx"
@@ -179,7 +180,11 @@ func HandleMigPull(args []string, stderr io.Writer) error {
 	_, _ = fmt.Fprintf(stderr, "  source commit: %s\n", sourceCommit)
 
 	// Step 8: Fetch diffs for this run.
-	diffs, err := ListRunDiffs(ctx, httpClient, base, resolution.RunID, resolution.RepoID)
+	diffs, err := (runs.ListRunDiffsCommand{
+		Client:  httpClient,
+		BaseURL: base,
+		RunID:   resolution.RunID,
+	}).Run(ctx)
 	if err != nil {
 		return fmt.Errorf("mig pull: list diffs: %w", err)
 	}
@@ -197,7 +202,7 @@ func HandleMigPull(args []string, stderr io.Writer) error {
 	}
 
 	// Step 10: Download and apply all diffs.
-	appliedCount, err := downloadAndApplyDiffs(ctx, resolution.RunID, resolution.RepoID, diffs, stderr)
+	appliedCount, err := downloadAndApplyDiffs(ctx, resolution.RunID, diffs, stderr)
 	if err != nil {
 		return fmt.Errorf("mig pull: %w", err)
 	}

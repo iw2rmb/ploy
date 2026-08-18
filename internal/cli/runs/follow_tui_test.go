@@ -159,7 +159,7 @@ func TestFollowModelFinalViewUsesStatusSnapshotSemantics(t *testing.T) {
 	}
 }
 
-func TestShouldTrackJobPreview(t *testing.T) {
+func TestIsRunningStatus(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -179,8 +179,8 @@ func TestShouldTrackJobPreview(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			if got := shouldTrackJobPreview(tc.status); got != tc.want {
-				t.Fatalf("shouldTrackJobPreview(%q) = %v, want %v", tc.status, got, tc.want)
+			if got := isRunningStatus(tc.status); got != tc.want {
+				t.Fatalf("isRunningStatus(%q) = %v, want %v", tc.status, got, tc.want)
 			}
 		})
 	}

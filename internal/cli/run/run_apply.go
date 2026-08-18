@@ -15,6 +15,7 @@ import (
 
 	"github.com/iw2rmb/ploy/internal/cli/common"
 	"github.com/iw2rmb/ploy/internal/cli/migs"
+	"github.com/iw2rmb/ploy/internal/cli/runs"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
@@ -75,11 +76,10 @@ func runApply(ctx context.Context, opts ApplyOptions, base *url.URL, httpClient 
 		return fmt.Errorf("run apply: local HEAD %s does not match run source_commit_sha %s; use --force to apply anyway", local.CommitSHA, sourceSHA)
 	}
 
-	diffs, err := migs.ListRunDiffsCommand{
+	diffs, err := runs.ListRunDiffsCommand{
 		Client:  httpClient,
 		BaseURL: base,
 		RunID:   runID,
-		RepoID:  resolved.RepoID,
 	}.Run(ctx)
 	if err != nil {
 		return fmt.Errorf("run apply: list diffs: %w", err)
@@ -90,11 +90,10 @@ func runApply(ctx context.Context, opts ApplyOptions, base *url.URL, httpClient 
 	}
 
 	latest := diffs[len(diffs)-1]
-	patch, err := migs.DownloadDiffCommand{
+	patch, err := runs.DownloadDiffCommand{
 		Client:      httpClient,
 		BaseURL:     base,
 		RunID:       runID,
-		RepoID:      resolved.RepoID,
 		DiffID:      latest.ID,
 		Accumulated: true,
 	}.Run(ctx)

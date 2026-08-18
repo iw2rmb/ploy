@@ -356,7 +356,7 @@ func (c FollowRunCommand) coordinate(
 			}
 		}
 		for jobID, status := range statusByJob {
-			if shouldTrackJobPreview(status) {
+			if isRunningStatus(status) {
 				startJobTracker(jobID)
 				continue
 			}
@@ -488,15 +488,6 @@ func isTTYReader(r io.Reader) bool {
 		return false
 	}
 	return (info.Mode() & os.ModeCharDevice) != 0
-}
-
-func shouldTrackJobPreview(status string) bool {
-	switch normalizeStatus(status) {
-	case "running", "started":
-		return true
-	default:
-		return false
-	}
 }
 
 const clearScreenSequence = "\x1b[2J\x1b[H"

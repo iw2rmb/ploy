@@ -69,17 +69,3 @@ type StageStatus struct {
 	// is currently a chain tail.
 	NextID *domaintypes.JobID `json:"next_id,omitempty"`
 }
-
-// StageMetadata captures job-level metadata for Migs runs.
-// It mirrors information exposed via GET /v1/runs/{id}/status and is derived from
-// jobs and related artifacts rather than being tied to a specific storage
-// layout for jobs.meta JSONB.
-//
-// Each execution unit (pre_gate, mig, post_gate) has a jobs row
-// with job_type identifying the phase type.
-type StageMetadata struct {
-	// JobType identifies the job phase: "pre_gate", "mig", or "post_gate".
-	JobType domaintypes.JobType `json:"job_type,omitempty"`
-	// JobImage is the container image for this job (optional, for diagnostics).
-	JobImage string `json:"job_image,omitempty"`
-}
