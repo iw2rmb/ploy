@@ -7,6 +7,7 @@ import (
 	"log/slog"
 
 	"github.com/iw2rmb/ploy/internal/blobstore"
+	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/server/events"
 	"github.com/iw2rmb/ploy/internal/store"
@@ -15,7 +16,7 @@ import (
 
 // claimResult is the domain output from claim orchestration.
 type claimResult struct {
-	Payload  workClaimPayload
+	Payload  domainapi.NodeClaimResponse
 	Response any
 }
 

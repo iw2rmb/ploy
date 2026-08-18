@@ -13,15 +13,14 @@ package migs
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
 
-	"github.com/iw2rmb/ploy/internal/cli/httpx"
 	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/httpx"
 )
 
 // AddMigRepoCommand adds a repo to a mig's repo set.
@@ -60,35 +59,9 @@ func (c AddMigRepoCommand) Run(ctx context.Context) (domainapi.MigRepoSummary, e
 		BaseRef: baseRef,
 	}
 
-	payload, err := json.Marshal(req)
-	if err != nil {
-		return domainapi.MigRepoSummary{}, fmt.Errorf("mig repo add: marshal request: %w", err)
-	}
-
 	// POST /v1/migs/{mig_id}/repos
 	endpoint := c.BaseURL.JoinPath("v1", "migs", c.MigRef.String(), "repos")
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), bytes.NewReader(payload))
-	if err != nil {
-		return domainapi.MigRepoSummary{}, fmt.Errorf("mig repo add: build request: %w", err)
-	}
-	httpReq.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.Client.Do(httpReq)
-	if err != nil {
-		return domainapi.MigRepoSummary{}, fmt.Errorf("mig repo add: http request failed: %w", err)
-	}
-	defer httpx.DrainAndClose(resp)
-
-	// Handle 201 Created response.
-	if resp.StatusCode == http.StatusCreated {
-		var result domainapi.MigRepoSummary
-		if err := httpx.DecodeResponseJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
-			return domainapi.MigRepoSummary{}, fmt.Errorf("mig repo add: decode response: %w", err)
-		}
-		return result, nil
-	}
-
-	return domainapi.MigRepoSummary{}, httpx.WrapError("mig repo add", resp.Status, resp.Body)
+	return httpx.DoJSON[domainapi.MigRepoSummary](ctx, c.Client, http.MethodPost, endpoint.String(), req, http.StatusCreated, "mig repo add")
 }
 
 // ListMigReposCommand lists repos in a mig's repo set.
@@ -111,24 +84,9 @@ func (c ListMigReposCommand) Run(ctx context.Context) ([]domainapi.MigRepoSummar
 
 	// GET /v1/migs/{mig_id}/repos
 	endpoint := c.BaseURL.JoinPath("v1", "migs", c.MigRef.String(), "repos")
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
+	result, err := httpx.DoJSON[domainapi.MigRepoListResponse](ctx, c.Client, http.MethodGet, endpoint.String(), nil, http.StatusOK, "mig repo list")
 	if err != nil {
-		return nil, fmt.Errorf("mig repo list: build request: %w", err)
-	}
-
-	resp, err := c.Client.Do(httpReq)
-	if err != nil {
-		return nil, fmt.Errorf("mig repo list: http request failed: %w", err)
-	}
-	defer httpx.DrainAndClose(resp)
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, httpx.WrapError("mig repo list", resp.Status, resp.Body)
-	}
-
-	var result domainapi.MigRepoListResponse
-	if err := httpx.DecodeResponseJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
-		return nil, fmt.Errorf("mig repo list: decode response: %w", err)
+		return nil, err
 	}
 
 	return result.Repos, nil

@@ -27,7 +27,7 @@ func TestUploadSpecBundleHandler(t *testing.T) {
 	t.Run("UploadSuccess", func(t *testing.T) {
 		bundleID := domaintypes.NewSpecBundleID()
 		objKey := "spec-bundles/" + bundleID.String() + ".gz"
-		st := &configStore{}
+		st := &handlerStore{}
 		st.getSpecBundleByCID.err = pgx.ErrNoRows // no existing bundle
 		st.createSpecBundle.val = store.SpecBundle{
 			ID:        string(bundleID),
@@ -59,7 +59,7 @@ func TestUploadSpecBundleHandler(t *testing.T) {
 
 	t.Run("Deduplicated", func(t *testing.T) {
 		existingID := domaintypes.NewSpecBundleID()
-		st := &configStore{}
+		st := &handlerStore{}
 		st.getSpecBundleByCID.val = store.SpecBundle{
 			ID:     string(existingID),
 			Cid:    cid,
@@ -88,7 +88,7 @@ func TestUploadSpecBundleHandler(t *testing.T) {
 	})
 
 	t.Run("EmptyBody", func(t *testing.T) {
-		st := &configStore{}
+		st := &handlerStore{}
 		bs := bsmock.New()
 		bp := blobpersist.New(st, bs)
 
@@ -99,7 +99,7 @@ func TestUploadSpecBundleHandler(t *testing.T) {
 	})
 
 	t.Run("ExceedsSizeLimit", func(t *testing.T) {
-		st := &configStore{}
+		st := &handlerStore{}
 		bs := bsmock.New()
 		bp := blobpersist.New(st, bs)
 
@@ -113,7 +113,7 @@ func TestUploadSpecBundleHandler(t *testing.T) {
 	t.Run("CreatedByQueryParam", func(t *testing.T) {
 		bundleID := domaintypes.NewSpecBundleID()
 		objKey := "spec-bundles/" + bundleID.String() + ".gz"
-		st := &configStore{}
+		st := &handlerStore{}
 		st.getSpecBundleByCID.err = pgx.ErrNoRows
 		st.createSpecBundle.val = store.SpecBundle{
 			ID:        string(bundleID),
@@ -142,7 +142,7 @@ func TestDownloadSpecBundleHandler(t *testing.T) {
 	bundleContent := []byte("fake bundle bytes")
 
 	t.Run("DownloadSuccess", func(t *testing.T) {
-		st := &configStore{}
+		st := &handlerStore{}
 		st.getSpecBundle.val = store.SpecBundle{
 			ID:        string(bundleID),
 			ObjectKey: &objectKey,
@@ -168,7 +168,7 @@ func TestDownloadSpecBundleHandler(t *testing.T) {
 	})
 
 	t.Run("NotFound", func(t *testing.T) {
-		st := &configStore{}
+		st := &handlerStore{}
 		st.getSpecBundle.err = pgx.ErrNoRows
 		bs := bsmock.New()
 
@@ -178,7 +178,7 @@ func TestDownloadSpecBundleHandler(t *testing.T) {
 	})
 
 	t.Run("InvalidID", func(t *testing.T) {
-		st := &configStore{}
+		st := &handlerStore{}
 		st.getSpecBundle.err = pgx.ErrNoRows
 		bs := bsmock.New()
 
@@ -189,7 +189,7 @@ func TestDownloadSpecBundleHandler(t *testing.T) {
 
 	t.Run("BlobNotFound", func(t *testing.T) {
 		// Metadata row exists but blob is absent from object store: expect 404, not 503.
-		st := &configStore{}
+		st := &handlerStore{}
 		st.getSpecBundle.val = store.SpecBundle{
 			ID:        string(bundleID),
 			ObjectKey: &objectKey,
@@ -202,7 +202,7 @@ func TestDownloadSpecBundleHandler(t *testing.T) {
 	})
 
 	t.Run("MissingObjectKey", func(t *testing.T) {
-		st := &configStore{}
+		st := &handlerStore{}
 		st.getSpecBundle.val = store.SpecBundle{
 			ID:        string(bundleID),
 			ObjectKey: nil, // no object key
@@ -221,7 +221,7 @@ func TestSpecBundleDownloadLastRefInvokedWhenRequestCanceledImmediatelyAfterResp
 	objectKey := "spec-bundles/" + bundleID.String() + ".gz"
 	bundleContent := []byte("fake bundle bytes")
 
-	st := &configStore{
+	st := &handlerStore{
 		updateSpecBundleLastRefAtStarted: make(chan struct{}),
 		updateSpecBundleLastRefAtProceed: make(chan struct{}),
 		updateSpecBundleLastRefAtDone:    make(chan struct{}),
@@ -272,7 +272,7 @@ func TestSpecBundleDownloadLastRefInvokedWhenRequestCanceledImmediatelyAfterResp
 
 func TestProbeIntegrity(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
-		st := &configStore{}
+		st := &handlerStore{}
 		bs := bsmock.New()
 		bundleID := domaintypes.NewSpecBundleID().String()
 		key := "spec-bundles/" + bundleID + ".tar.gz"
@@ -291,7 +291,7 @@ func TestProbeIntegrity(t *testing.T) {
 	})
 
 	t.Run("MetadataMissing", func(t *testing.T) {
-		st := &configStore{}
+		st := &handlerStore{}
 		st.getSpecBundle.err = pgx.ErrNoRows
 		bs := bsmock.New()
 		bundleID := "bundle_missing_meta"
@@ -313,7 +313,7 @@ func TestProbeIntegrity(t *testing.T) {
 	})
 
 	t.Run("MissingObjectKey", func(t *testing.T) {
-		st := &configStore{}
+		st := &handlerStore{}
 		st.getSpecBundle.val = store.SpecBundle{ID: "bundle_missing_key"}
 		bs := bsmock.New()
 
@@ -331,7 +331,7 @@ func TestProbeIntegrity(t *testing.T) {
 	})
 
 	t.Run("BlobMissing", func(t *testing.T) {
-		st := &configStore{}
+		st := &handlerStore{}
 		key := "spec-bundles/bundle_missing_blob.tar.gz"
 		st.getSpecBundle.val = store.SpecBundle{ID: "bundle_missing_blob", ObjectKey: &key}
 		bs := bsmock.New()

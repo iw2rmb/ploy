@@ -15,6 +15,7 @@ if [[ "${PLOY_E2E_SKIP_WAVE_RUN:-}" == "1" ]]; then
 fi
 
 e2e_artifacts_init "$REPO_ROOT/tmp/migs/wave-run"
+E2E_IMAGE="$(e2e_runtime_image)"
 
 TS="$(date +%y%m%d%H%M%S)"
 WAVE_NAME="e2e-wave-${TS}"
@@ -37,13 +38,13 @@ echo ""
 
 echo "[1/5] Creating mig project: ${WAVE_NAME}"
 SPEC_FILE="${E2E_ARTIFACT_DIR}/wave-spec.yaml"
-cat > "$SPEC_FILE" <<'YAML'
+cat > "$SPEC_FILE" <<YAML
 steps:
-  - image: alpine:3.20
+  - image: ${E2E_IMAGE}
     command: |
       echo "[wave-e2e] Starting repo processing"
-      echo "Repo: $PLOY_REPO_URL"
-      echo "Base: $PLOY_BASE_REF"
+      echo "Repo: \$PLOY_REPO_URL"
+      echo "Base: \$PLOY_BASE_REF"
       sleep 2
       echo "[wave-e2e] Done"
 YAML

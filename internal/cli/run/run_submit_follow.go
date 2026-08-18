@@ -65,7 +65,6 @@ func followRunStatusReports(ctx context.Context, baseURL *url.URL, client *http.
 		RunID:           runID,
 		Output:          out,
 		EnableOSC8:      renderOpts.EnableOSC8,
-		AuthToken:       renderOpts.AuthToken,
 		SpecDisplayName: renderOpts.SpecDisplayName,
 		MaxRetries:      maxRetries,
 		PollInterval:    pollInterval,

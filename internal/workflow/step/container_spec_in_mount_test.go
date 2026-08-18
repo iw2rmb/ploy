@@ -31,7 +31,7 @@ func TestBuildContainerSpec_InMountPresent(t *testing.T) {
 	if len(spec.Mounts) != 11 {
 		t.Fatalf("got %d mounts, want workspace plus common mounts: %+v", len(spec.Mounts), spec.Mounts)
 	}
-	requireMount(t, spec.Mounts, "/in", "/tmp/in", false)
+	requireMount(t, spec.Mounts, "/in", "/tmp/in", true)
 }
 
 func TestBuildContainerSpec_InMountSkipsNestedHydraInMounts(t *testing.T) {
@@ -53,7 +53,7 @@ func TestBuildContainerSpec_InMountSkipsNestedHydraInMounts(t *testing.T) {
 		t.Fatalf("buildContainerSpec error: %v", err)
 	}
 
-	requireMount(t, spec.Mounts, "/in", "/tmp/in", false)
+	requireMount(t, spec.Mounts, "/in", "/tmp/in", true)
 	requireNoMount(t, spec.Mounts, "/in/amata.yaml")
 }
 

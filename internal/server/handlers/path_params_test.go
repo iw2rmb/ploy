@@ -18,7 +18,7 @@ func TestPathParamsUseDomainTypes(t *testing.T) {
 	t.Run("GET /v1/runs/{run_id} rejects empty id before store calls", func(t *testing.T) {
 		t.Parallel()
 
-		st := &runStore{}
+		st := &handlerStore{}
 		h := getRunHandler(st)
 
 		req := httptest.NewRequest(http.MethodGet, "/v1/runs/", nil)
@@ -36,7 +36,7 @@ func TestPathParamsUseDomainTypes(t *testing.T) {
 	t.Run("GET /v1/runs/{run_id} rejects whitespace id before store calls", func(t *testing.T) {
 		t.Parallel()
 
-		st := &runStore{}
+		st := &handlerStore{}
 		h := getRunHandler(st)
 
 		req := httptest.NewRequest(http.MethodGet, "/v1/runs/", nil)
@@ -54,7 +54,7 @@ func TestPathParamsUseDomainTypes(t *testing.T) {
 	t.Run("POST /v1/runs/{run_id}/jobs/{job_id}/diff rejects empty ids before store calls", func(t *testing.T) {
 		t.Parallel()
 
-		st := &runStore{}
+		st := &handlerStore{}
 		bp := blobpersist.New(st, bsmock.New())
 		h := createJobDiffHandler(st, bp)
 
@@ -74,7 +74,7 @@ func TestPathParamsUseDomainTypes(t *testing.T) {
 	t.Run("POST /v1/migs/{mig_id}/waves rejects empty mig_id before store calls", func(t *testing.T) {
 		t.Parallel()
 
-		st := &migStore{}
+		st := &handlerStore{}
 		h := createMigRunHandler(st, gitauth.Options{})
 
 		req := httptest.NewRequest(http.MethodPost, "/v1/migs//waves", nil)
@@ -92,7 +92,7 @@ func TestPathParamsUseDomainTypes(t *testing.T) {
 	t.Run("GET /v1/repos/{repo_id}/runs rejects empty repo_id before store calls", func(t *testing.T) {
 		t.Parallel()
 
-		st := &repoListStore{}
+		st := &handlerStore{}
 		h := listRunsForRepoHandler(st)
 
 		req := httptest.NewRequest(http.MethodGet, "/v1/repos//runs", nil)
@@ -110,7 +110,7 @@ func TestPathParamsUseDomainTypes(t *testing.T) {
 	t.Run("GET /v1/jobs/{job_id}/logs rejects empty job_id before store calls", func(t *testing.T) {
 		t.Parallel()
 
-		st := &jobStore{}
+		st := &handlerStore{}
 		eventsService, err := createTestEventsService()
 		if err != nil {
 			t.Fatalf("events service: %v", err)
@@ -132,7 +132,7 @@ func TestPathParamsUseDomainTypes(t *testing.T) {
 	t.Run("POST /v1/jobs/{job_id}/logs rejects empty job_id before store calls", func(t *testing.T) {
 		t.Parallel()
 
-		st := &jobStore{}
+		st := &handlerStore{}
 		eventsService, err := createTestEventsServiceWithStore(st)
 		if err != nil {
 			t.Fatalf("events service: %v", err)
@@ -155,7 +155,7 @@ func TestPathParamsUseDomainTypes(t *testing.T) {
 	t.Run("POST /v1/nodes/{id}/heartbeat rejects empty node id before store calls", func(t *testing.T) {
 		t.Parallel()
 
-		st := &nodeStore{}
+		st := &handlerStore{}
 		h := heartbeatHandler(st)
 
 		req := httptest.NewRequest(http.MethodPost, "/v1/nodes//heartbeat", nil)

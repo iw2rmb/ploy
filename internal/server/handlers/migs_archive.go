@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
@@ -101,12 +102,8 @@ func unarchiveMigHandler(st store.Store) http.HandlerFunc {
 
 // writeMigArchiveResponse writes the standard archive/unarchive JSON response.
 func writeMigArchiveResponse(w http.ResponseWriter, mig store.Mig, archived bool) {
-	writeJSON(w, http.StatusOK, struct {
-		ID       string `json:"id"`
-		Name     string `json:"name"`
-		Archived bool   `json:"archived"`
-	}{
-		ID:       mig.ID.String(),
+	writeJSON(w, http.StatusOK, domainapi.MigArchiveResponse{
+		ID:       mig.ID,
 		Name:     mig.Name,
 		Archived: archived,
 	})

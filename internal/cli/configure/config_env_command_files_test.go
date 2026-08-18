@@ -482,7 +482,7 @@ func TestHandleConfigEnvSetServerError(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected error from server")
 	}
-	if !strings.Contains(err.Error(), "server returned 500") {
+	if !strings.Contains(err.Error(), "unexpected status 500") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -626,7 +626,7 @@ func TestHandleConfigEnvListServerError(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected error from server")
 	}
-	if !strings.Contains(err.Error(), "server returned 401") {
+	if !strings.Contains(err.Error(), "unexpected status 401") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }

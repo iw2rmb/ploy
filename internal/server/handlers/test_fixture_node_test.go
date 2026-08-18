@@ -7,50 +7,22 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-// nodeStore is a focused mock for node management handler tests.
-type nodeStore struct {
-	store.Store
-	getNode             mockCall[string, store.Node]
-	updateNodeDrained   mockCall[store.UpdateNodeDrainedParams, struct{}]
-	listNodes           mockCall[struct{}, []store.Node]
-	updateNodeHeartbeat mockCall[store.UpdateNodeHeartbeatParams, struct{}]
-	updateCertMetadata  mockResult[struct{}]
-	createLog           mockResult[store.Log]
-	upsertDiagnostic    mockCall[store.UpsertNodeDiagnosticParams, store.NodeDiagnostic]
-	listDiagnostics     mockCall[types.NodeID, []store.NodeDiagnostic]
-	createDaemonLog     mockCallSlice[store.CreateNodeDaemonLogParams, store.NodeDaemonLog]
-	listDaemonLogs      mockCall[store.ListNodeDaemonLogsParams, []store.NodeDaemonLog]
-	trimDaemonLogs      mockCall[store.TrimNodeDaemonLogsParams, struct{}]
-}
-
-func (m *nodeStore) GetNode(ctx context.Context, id types.NodeID) (store.Node, error) {
-	return m.getNode.record(id.String())
-}
-
-func (m *nodeStore) UpdateNodeDrained(ctx context.Context, params store.UpdateNodeDrainedParams) error {
+// Node management store methods.
+func (m *handlerStore) UpdateNodeDrained(ctx context.Context, params store.UpdateNodeDrainedParams) error {
 	_, err := m.updateNodeDrained.record(params)
 	return err
 }
 
-func (m *nodeStore) ListNodes(ctx context.Context) ([]store.Node, error) {
+func (m *handlerStore) ListNodes(ctx context.Context) ([]store.Node, error) {
 	m.listNodes.called = true
 	return m.listNodes.val, m.listNodes.err
 }
 
-func (m *nodeStore) UpdateNodeHeartbeat(ctx context.Context, params store.UpdateNodeHeartbeatParams) error {
-	_, err := m.updateNodeHeartbeat.record(params)
-	return err
-}
-
-func (m *nodeStore) UpdateNodeCertMetadata(ctx context.Context, params store.UpdateNodeCertMetadataParams) error {
+func (m *handlerStore) UpdateNodeCertMetadata(ctx context.Context, params store.UpdateNodeCertMetadataParams) error {
 	return m.updateCertMetadata.err
 }
 
-func (m *nodeStore) CreateLog(ctx context.Context, params store.CreateLogParams) (store.Log, error) {
-	return m.createLog.ret()
-}
-
-func (m *nodeStore) UpsertNodeDiagnostic(ctx context.Context, params store.UpsertNodeDiagnosticParams) (store.NodeDiagnostic, error) {
+func (m *handlerStore) UpsertNodeDiagnostic(ctx context.Context, params store.UpsertNodeDiagnosticParams) (store.NodeDiagnostic, error) {
 	if m.upsertDiagnostic.val.NodeID.IsZero() {
 		m.upsertDiagnostic.val.NodeID = params.NodeID
 		m.upsertDiagnostic.val.Component = params.Component
@@ -67,19 +39,19 @@ func (m *nodeStore) UpsertNodeDiagnostic(ctx context.Context, params store.Upser
 	return m.upsertDiagnostic.record(params)
 }
 
-func (m *nodeStore) ListNodeDiagnostics(ctx context.Context, nodeID types.NodeID) ([]store.NodeDiagnostic, error) {
+func (m *handlerStore) ListNodeDiagnostics(ctx context.Context, nodeID types.NodeID) ([]store.NodeDiagnostic, error) {
 	return m.listDiagnostics.record(nodeID)
 }
 
-func (m *nodeStore) CreateNodeDaemonLog(ctx context.Context, params store.CreateNodeDaemonLogParams) (store.NodeDaemonLog, error) {
+func (m *handlerStore) CreateNodeDaemonLog(ctx context.Context, params store.CreateNodeDaemonLogParams) (store.NodeDaemonLog, error) {
 	return m.createDaemonLog.record(params)
 }
 
-func (m *nodeStore) ListNodeDaemonLogs(ctx context.Context, params store.ListNodeDaemonLogsParams) ([]store.NodeDaemonLog, error) {
+func (m *handlerStore) ListNodeDaemonLogs(ctx context.Context, params store.ListNodeDaemonLogsParams) ([]store.NodeDaemonLog, error) {
 	return m.listDaemonLogs.record(params)
 }
 
-func (m *nodeStore) TrimNodeDaemonLogs(ctx context.Context, params store.TrimNodeDaemonLogsParams) error {
+func (m *handlerStore) TrimNodeDaemonLogs(ctx context.Context, params store.TrimNodeDaemonLogsParams) error {
 	_, err := m.trimDaemonLogs.record(params)
 	return err
 }

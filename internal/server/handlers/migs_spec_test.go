@@ -23,14 +23,14 @@ func TestMigs_GetLatestSpec(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		store      *migStore
+		store      *handlerStore
 		wantStatus int
-		verify     func(t *testing.T, st *migStore, rr *httptest.ResponseRecorder)
+		verify     func(t *testing.T, st *handlerStore, rr *httptest.ResponseRecorder)
 	}{
 		{
 			name: "success",
-			store: func() *migStore {
-				st := &migStore{}
+			store: func() *handlerStore {
+				st := &handlerStore{}
 				st.getMig.val = store.Mig{
 					ID: "mig123", Name: "test-mig",
 					SpecID:     &migSpecID,
@@ -40,7 +40,7 @@ func TestMigs_GetLatestSpec(t *testing.T) {
 				return st
 			}(),
 			wantStatus: http.StatusOK,
-			verify: func(t *testing.T, st *migStore, rr *httptest.ResponseRecorder) {
+			verify: func(t *testing.T, st *handlerStore, rr *httptest.ResponseRecorder) {
 				t.Helper()
 				if got := rr.Header().Get("Content-Type"); got != "application/json" {
 					t.Fatalf("content-type = %q, want application/json", got)
@@ -54,8 +54,8 @@ func TestMigs_GetLatestSpec(t *testing.T) {
 		},
 		{
 			name: "mig without spec",
-			store: func() *migStore {
-				st := &migStore{}
+			store: func() *handlerStore {
+				st := &handlerStore{}
 				st.getMig.val = store.Mig{
 					ID: "mig123", Name: "test-mig",
 					SpecID:     nil,
@@ -64,20 +64,20 @@ func TestMigs_GetLatestSpec(t *testing.T) {
 				return st
 			}(),
 			wantStatus: http.StatusNotFound,
-			verify: func(t *testing.T, st *migStore, _ *httptest.ResponseRecorder) {
+			verify: func(t *testing.T, st *handlerStore, _ *httptest.ResponseRecorder) {
 				t.Helper()
 				assertNotCalled(t, "GetSpec", st.getSpec.called)
 			},
 		},
 		{
 			name: "mig not found",
-			store: func() *migStore {
-				st := &migStore{}
+			store: func() *handlerStore {
+				st := &handlerStore{}
 				st.getMig.err = pgx.ErrNoRows
 				return st
 			}(),
 			wantStatus: http.StatusNotFound,
-			verify: func(t *testing.T, st *migStore, _ *httptest.ResponseRecorder) {
+			verify: func(t *testing.T, st *handlerStore, _ *httptest.ResponseRecorder) {
 				t.Helper()
 				assertNotCalled(t, "GetSpec", st.getSpec.called)
 			},
@@ -108,17 +108,17 @@ func TestMigs_SetSpec(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		store      *migStore // nil = default active mig store
+		store      *handlerStore // nil = default active mig store
 		body       any
 		wantStatus int
-		verify     func(t *testing.T, st *migStore, rr *httptest.ResponseRecorder)
+		verify     func(t *testing.T, st *handlerStore, rr *httptest.ResponseRecorder)
 	}{
 		// Success paths
 		{
 			name:       "success",
 			body:       map[string]any{"spec": validSpecBody()},
 			wantStatus: http.StatusCreated,
-			verify: func(t *testing.T, st *migStore, rr *httptest.ResponseRecorder) {
+			verify: func(t *testing.T, st *handlerStore, rr *httptest.ResponseRecorder) {
 				t.Helper()
 				assertCalled(t, "GetMig", st.getMig.called)
 				assertCalled(t, "CreateSpec", st.createSpec.called)
@@ -139,7 +139,7 @@ func TestMigs_SetSpec(t *testing.T) {
 			name:       "with name",
 			body:       map[string]any{"name": "my-named-spec", "spec": validSpecBody()},
 			wantStatus: http.StatusCreated,
-			verify: func(t *testing.T, st *migStore, _ *httptest.ResponseRecorder) {
+			verify: func(t *testing.T, st *handlerStore, _ *httptest.ResponseRecorder) {
 				t.Helper()
 				if st.createSpec.params.Name != "my-named-spec" {
 					t.Errorf("spec name = %q, want %q", st.createSpec.params.Name, "my-named-spec")
@@ -147,14 +147,14 @@ func TestMigs_SetSpec(t *testing.T) {
 			},
 		},
 		// Error paths
-		{name: "missing spec", store: &migStore{}, body: map[string]any{"name": "no-spec"}, wantStatus: http.StatusBadRequest},
-		{name: "invalid spec", store: &migStore{}, body: map[string]any{"spec": map[string]any{"steps": "not-array"}}, wantStatus: http.StatusBadRequest},
-		{name: "invalid JSON", store: &migStore{}, body: "not json", wantStatus: http.StatusBadRequest},
-		{name: "mig not found", store: func() *migStore { s := &migStore{}; s.getMig.err = pgx.ErrNoRows; return s }(), body: map[string]any{"spec": validSpecBody()}, wantStatus: http.StatusNotFound},
+		{name: "missing spec", store: &handlerStore{}, body: map[string]any{"name": "no-spec"}, wantStatus: http.StatusBadRequest},
+		{name: "invalid spec", store: &handlerStore{}, body: map[string]any{"spec": map[string]any{"steps": "not-array"}}, wantStatus: http.StatusBadRequest},
+		{name: "invalid JSON", store: &handlerStore{}, body: "not json", wantStatus: http.StatusBadRequest},
+		{name: "mig not found", store: func() *handlerStore { s := &handlerStore{}; s.getMig.err = pgx.ErrNoRows; return s }(), body: map[string]any{"spec": validSpecBody()}, wantStatus: http.StatusNotFound},
 		{
 			name: "archived mig",
-			store: func() *migStore {
-				s := &migStore{}
+			store: func() *handlerStore {
+				s := &handlerStore{}
 				s.getMig.val = store.Mig{
 					ID: "mig123", Name: "test-mig",
 					ArchivedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
@@ -165,8 +165,8 @@ func TestMigs_SetSpec(t *testing.T) {
 		},
 		{
 			name: "CreateSpec store error",
-			store: func() *migStore {
-				st := &migStore{}
+			store: func() *handlerStore {
+				st := &handlerStore{}
 				st.getMig.val = activeMig
 				st.createSpec.err = errors.New("database connection failed")
 				return st
@@ -175,8 +175,8 @@ func TestMigs_SetSpec(t *testing.T) {
 		},
 		{
 			name: "UpdateMigSpec store error",
-			store: func() *migStore {
-				st := &migStore{}
+			store: func() *handlerStore {
+				st := &handlerStore{}
 				st.getMig.val = activeMig
 				st.updateMigSpec.err = errors.New("database connection failed")
 				return st
@@ -189,7 +189,7 @@ func TestMigs_SetSpec(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			st := tt.store
 			if st == nil {
-				st = &migStore{}
+				st = &handlerStore{}
 				st.getMig.val = activeMig
 			}
 			handler := setMigSpecHandler(st)
@@ -203,7 +203,7 @@ func TestMigs_SetSpec(t *testing.T) {
 }
 
 func TestMigs_SetSpec_RepeatedCalls(t *testing.T) {
-	st := &migStore{}
+	st := &handlerStore{}
 	st.getMig.val = store.Mig{
 		ID: "mig123", Name: "test-mig",
 		ArchivedAt: pgtype.Timestamptz{Valid: false},

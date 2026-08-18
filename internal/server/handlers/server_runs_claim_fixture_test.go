@@ -31,7 +31,7 @@ type claimJobFixture struct {
 	jobID           domaintypes.JobID
 	sourceCommitSHA string
 
-	store  *jobStore
+	store  *handlerStore
 	config *ConfigHolder
 }
 
@@ -66,7 +66,7 @@ func newClaimJobFixture(t testing.TB, opts claimJobFixtureOptions) *claimJobFixt
 		opts.jobMeta = []byte(`{}`)
 	}
 
-	st := &jobStore{}
+	st := &handlerStore{}
 	st.getNode.val = store.Node{ID: nodeID}
 	st.claimJob.val = store.Job{
 		ID:          jobID,

@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/iw2rmb/ploy/internal/cli/httpx"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/httpx"
 )
 
 // RunTotals holds aggregated repo and job counts for a run.
@@ -35,24 +35,9 @@ func (c GetRunTotalsCommand) Run(ctx context.Context) (RunTotals, error) {
 
 	// Fetch run summary to get repo counts.
 	endpoint := c.BaseURL.JoinPath("v1", "runs", c.RunID.String())
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
+	summary, err := httpx.DoJSON[domaintypes.RunSummary](ctx, c.Client, http.MethodGet, endpoint.String(), nil, http.StatusOK, "get run totals")
 	if err != nil {
-		return RunTotals{}, fmt.Errorf("get run totals: build request: %w", err)
-	}
-
-	resp, err := c.Client.Do(req)
-	if err != nil {
-		return RunTotals{}, fmt.Errorf("get run totals: http request failed: %w", err)
-	}
-	defer httpx.DrainAndClose(resp)
-
-	if resp.StatusCode != http.StatusOK {
-		return RunTotals{}, httpx.WrapError("get run totals", resp.Status, resp.Body)
-	}
-
-	var summary domaintypes.RunSummary
-	if err := httpx.DecodeResponseJSON(resp.Body, &summary, httpx.MaxJSONBodyBytes); err != nil {
-		return RunTotals{}, fmt.Errorf("get run totals: decode response: %w", err)
+		return RunTotals{}, err
 	}
 
 	var repoTotal int32

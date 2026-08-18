@@ -389,6 +389,85 @@ func TestCrashReconcile_RecoveredRunningMonitor_UploadsLogsAndTerminalStatus(t *
 	}
 }
 
+func TestCrashReconcile_RecoveryPathsUploadIdenticalTerminalStatus(t *testing.T) {
+	s := workflowkit.NewRunOrchestrationScenario()
+	containerID := "ctr-recovery-equivalence"
+	type uploadedStatus struct {
+		Status   string `json:"status"`
+		ExitCode int32  `json:"exit_code"`
+		Stats    struct {
+			ExitCode   int               `json:"exit_code"`
+			DurationMs int64             `json:"duration_ms"`
+			Metadata   map[string]string `json:"metadata"`
+		} `json:"stats"`
+	}
+	var uploads []uploadedStatus
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/jobs/"+s.JobID.String()+"/complete" {
+			http.NotFound(w, r)
+			return
+		}
+		var payload uploadedStatus
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Errorf("decode completion payload: %v", err)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		uploads = append(uploads, payload)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer ts.Close()
+
+	fakeDocker := &fakeDockerClient{
+		waitByID: map[string]containertypes.WaitResponse{
+			containerID: {StatusCode: 2},
+		},
+		inspectByID: map[string]client.ContainerInspectResult{
+			containerID: {
+				Container: containertypes.InspectResponse{
+					State: &containertypes.State{
+						ExitCode:   2,
+						Status:     containertypes.ContainerState("exited"),
+						StartedAt:  "2026-02-26T15:00:00Z",
+						FinishedAt: "2026-02-26T15:00:02.345Z",
+					},
+				},
+			},
+		},
+	}
+	claimer := setupClaimer(t, newAgentConfig(ts.URL), &mockRunController{})
+	claimer.startupReconciler = &startupCrashReconciler{docker: fakeDocker}
+
+	if err := claimer.reconcileRecoveredTerminalContainer(context.Background(), recoveredTerminalContainer{
+		ContainerID: containerID,
+		RunID:       s.RunID,
+		JobID:       s.JobID,
+	}); err != nil {
+		t.Fatalf("reconcile recovered terminal: %v", err)
+	}
+	if err := claimer.waitAndUploadRecoveredContainer(context.Background(), recoveredRunningContainer{
+		ContainerID: containerID,
+		RunID:       s.RunID,
+		JobID:       s.JobID,
+	}); err != nil {
+		t.Fatalf("wait recovered running: %v", err)
+	}
+
+	if len(uploads) != 2 {
+		t.Fatalf("completion uploads = %d, want 2", len(uploads))
+	}
+	if !reflect.DeepEqual(uploads[0], uploads[1]) {
+		t.Fatalf("recovery payloads differ: terminal=%+v running=%+v", uploads[0], uploads[1])
+	}
+	got := uploads[0]
+	if got.Status != types.JobStatusError.String() || got.ExitCode != 2 || got.Stats.ExitCode != 2 || got.Stats.DurationMs != 2345 {
+		t.Fatalf("terminal result = %+v, want error exit 2 duration 2345ms", got)
+	}
+	if got.Stats.Metadata["source"] != "startup_reconcile" || got.Stats.Metadata["container_id"] != containerID {
+		t.Fatalf("terminal metadata = %v", got.Stats.Metadata)
+	}
+}
+
 func TestCrashReconcile_RecoveredRunningMonitor_ExitCodeAboveOneReportsError(t *testing.T) {
 	t.Parallel()
 

@@ -286,7 +286,7 @@ func TestArchiveMigCommand_Run(t *testing.T) {
 			t.Errorf("expected path to contain /archive, got %s", r.URL.Path)
 		}
 
-		resp := ArchiveMigResult{ID: types.MigID("mig001"), Name: "test-mig", Archived: true}
+		resp := domainapi.MigArchiveResponse{ID: types.MigID("mig001"), Name: "test-mig", Archived: true}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(resp)
 	}))
@@ -321,7 +321,7 @@ func TestUnarchiveMigCommand_Run(t *testing.T) {
 			t.Errorf("expected path to contain /unarchive, got %s", r.URL.Path)
 		}
 
-		resp := UnarchiveMigResult{ID: types.MigID("mig001"), Name: "test-mig", Archived: false}
+		resp := domainapi.MigArchiveResponse{ID: types.MigID("mig001"), Name: "test-mig", Archived: false}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(resp)
 	}))

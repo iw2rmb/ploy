@@ -39,7 +39,7 @@ func listPaged[T any](items []T, offset, limit int32) []T {
 }
 
 // defaultRun fills zero-valued result fields from CreateRunParams,
-// matching the defaulting semantics shared by runStore and migStore mocks.
+// matching the defaulting semantics shared by handlerStore and handlerStore mocks.
 func defaultRun(result store.Run, params store.CreateRunParams) store.Run {
 	if result.ID.IsZero() {
 		result.ID = params.ID
@@ -104,7 +104,7 @@ func defaultWave(result store.Wave, params store.CreateWaveParams) store.Wave {
 }
 
 // defaultRepo returns a synthetic Repo for a non-zero id, mirroring the
-// convention used by both runStore and migStore GetRepo mocks. Callers should
+// convention used by both handlerStore and handlerStore GetRepo mocks. Callers should
 // consult their own repoByID override map before falling back here.
 func defaultRepo(id types.RepoID) (store.Repo, error) {
 	if !id.IsZero() {

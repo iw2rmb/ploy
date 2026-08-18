@@ -30,21 +30,21 @@ func TestMigs_Archive(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		store      *migStore
+		store      *handlerStore
 		migRef     string
 		wantStatus int
-		verify     func(t *testing.T, st *migStore, rr *httptest.ResponseRecorder)
+		verify     func(t *testing.T, st *handlerStore, rr *httptest.ResponseRecorder)
 	}{
 		{
 			name: "success",
-			store: func() *migStore {
-				st := &migStore{}
+			store: func() *handlerStore {
+				st := &handlerStore{}
 				st.getMig.val = activeMig
 				return st
 			}(),
 			migRef:     "mig123",
 			wantStatus: http.StatusOK,
-			verify: func(t *testing.T, st *migStore, rr *httptest.ResponseRecorder) {
+			verify: func(t *testing.T, st *handlerStore, rr *httptest.ResponseRecorder) {
 				t.Helper()
 				assertCalled(t, "GetMig", st.getMig.called)
 				assertCalled(t, "ArchiveMig", st.archiveMig.called)
@@ -63,22 +63,22 @@ func TestMigs_Archive(t *testing.T) {
 		},
 		{
 			name: "already archived (idempotent)",
-			store: func() *migStore {
-				st := &migStore{}
+			store: func() *handlerStore {
+				st := &handlerStore{}
 				st.getMig.val = archivedMig
 				return st
 			}(),
 			migRef:     "mig123",
 			wantStatus: http.StatusOK,
-			verify: func(t *testing.T, st *migStore, _ *httptest.ResponseRecorder) {
+			verify: func(t *testing.T, st *handlerStore, _ *httptest.ResponseRecorder) {
 				t.Helper()
 				assertNotCalled(t, "ArchiveMig", st.archiveMig.called)
 			},
 		},
 		{
 			name: "not found",
-			store: func() *migStore {
-				st := &migStore{}
+			store: func() *handlerStore {
+				st := &handlerStore{}
 				st.getMig.err = pgx.ErrNoRows
 				return st
 			}(),
@@ -87,8 +87,8 @@ func TestMigs_Archive(t *testing.T) {
 		},
 		{
 			name: "refuses with active jobs",
-			store: func() *migStore {
-				st := &migStore{}
+			store: func() *handlerStore {
+				st := &handlerStore{}
 				st.getMig.val = activeMig
 				st.listRuns.val = []store.Run{{ID: "run1", MigID: "mig123"}}
 				st.listJobsByRun.val = []store.Job{
@@ -98,15 +98,15 @@ func TestMigs_Archive(t *testing.T) {
 			}(),
 			migRef:     "mig123",
 			wantStatus: http.StatusConflict,
-			verify: func(t *testing.T, st *migStore, _ *httptest.ResponseRecorder) {
+			verify: func(t *testing.T, st *handlerStore, _ *httptest.ResponseRecorder) {
 				t.Helper()
 				assertNotCalled(t, "ArchiveMig", st.archiveMig.called)
 			},
 		},
 		{
 			name: "allows with completed jobs",
-			store: func() *migStore {
-				st := &migStore{}
+			store: func() *handlerStore {
+				st := &handlerStore{}
 				st.getMig.val = activeMig
 				st.listRuns.val = []store.Run{{ID: "run1", MigID: "mig123"}}
 				st.listJobsByRun.val = []store.Job{
@@ -117,22 +117,22 @@ func TestMigs_Archive(t *testing.T) {
 			}(),
 			migRef:     "mig123",
 			wantStatus: http.StatusOK,
-			verify: func(t *testing.T, st *migStore, _ *httptest.ResponseRecorder) {
+			verify: func(t *testing.T, st *handlerStore, _ *httptest.ResponseRecorder) {
 				t.Helper()
 				assertCalled(t, "ArchiveMig", st.archiveMig.called)
 			},
 		},
 		{
 			name: "by name",
-			store: func() *migStore {
-				st := &migStore{}
+			store: func() *handlerStore {
+				st := &handlerStore{}
 				st.getMig.err = pgx.ErrNoRows
 				st.getMigByName.val = store.Mig{ID: "mig123", Name: "my-mig", ArchivedAt: pgtype.Timestamptz{Valid: false}}
 				return st
 			}(),
 			migRef:     "my-mig",
 			wantStatus: http.StatusOK,
-			verify: func(t *testing.T, st *migStore, _ *httptest.ResponseRecorder) {
+			verify: func(t *testing.T, st *handlerStore, _ *httptest.ResponseRecorder) {
 				t.Helper()
 				assertCalled(t, "GetMigByName", st.getMigByName.called)
 				if st.archiveMig.params != "mig123" {
@@ -142,8 +142,8 @@ func TestMigs_Archive(t *testing.T) {
 		},
 		{
 			name: "store error",
-			store: func() *migStore {
-				st := &migStore{}
+			store: func() *handlerStore {
+				st := &handlerStore{}
 				st.getMig.val = activeMig
 				st.archiveMig.err = errors.New("database connection failed")
 				return st
@@ -172,14 +172,14 @@ func TestMigs_Archive(t *testing.T) {
 func TestMigs_Unarchive(t *testing.T) {
 	tests := []struct {
 		name       string
-		store      *migStore
+		store      *handlerStore
 		wantStatus int
-		verify     func(t *testing.T, st *migStore, rr *httptest.ResponseRecorder)
+		verify     func(t *testing.T, st *handlerStore, rr *httptest.ResponseRecorder)
 	}{
 		{
 			name: "success",
-			store: func() *migStore {
-				st := &migStore{}
+			store: func() *handlerStore {
+				st := &handlerStore{}
 				st.getMig.val = store.Mig{
 					ID: "mig123", Name: "test-mig",
 					ArchivedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
@@ -187,7 +187,7 @@ func TestMigs_Unarchive(t *testing.T) {
 				return st
 			}(),
 			wantStatus: http.StatusOK,
-			verify: func(t *testing.T, st *migStore, rr *httptest.ResponseRecorder) {
+			verify: func(t *testing.T, st *handlerStore, rr *httptest.ResponseRecorder) {
 				t.Helper()
 				assertCalled(t, "UnarchiveMig", st.unarchiveMig.called)
 				if st.unarchiveMig.params != "mig123" {
@@ -205,8 +205,8 @@ func TestMigs_Unarchive(t *testing.T) {
 		},
 		{
 			name: "already unarchived (idempotent)",
-			store: func() *migStore {
-				st := &migStore{}
+			store: func() *handlerStore {
+				st := &handlerStore{}
 				st.getMig.val = store.Mig{
 					ID: "mig123", Name: "test-mig",
 					ArchivedAt: pgtype.Timestamptz{Valid: false},
@@ -214,15 +214,15 @@ func TestMigs_Unarchive(t *testing.T) {
 				return st
 			}(),
 			wantStatus: http.StatusOK,
-			verify: func(t *testing.T, st *migStore, _ *httptest.ResponseRecorder) {
+			verify: func(t *testing.T, st *handlerStore, _ *httptest.ResponseRecorder) {
 				t.Helper()
 				assertNotCalled(t, "UnarchiveMig", st.unarchiveMig.called)
 			},
 		},
 		{
 			name: "not found",
-			store: func() *migStore {
-				st := &migStore{}
+			store: func() *handlerStore {
+				st := &handlerStore{}
 				st.getMig.err = pgx.ErrNoRows
 				return st
 			}(),
@@ -230,8 +230,8 @@ func TestMigs_Unarchive(t *testing.T) {
 		},
 		{
 			name: "store error",
-			store: func() *migStore {
-				st := &migStore{}
+			store: func() *handlerStore {
+				st := &handlerStore{}
 				st.getMig.val = store.Mig{
 					ID: "mig123", Name: "test-mig",
 					ArchivedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},

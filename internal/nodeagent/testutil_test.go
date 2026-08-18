@@ -16,6 +16,7 @@ import (
 	"testing"
 	"time"
 
+	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	types "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/pki"
 	"github.com/iw2rmb/ploy/internal/workflow/backoff"
@@ -521,39 +522,56 @@ func runAgentUntil(t *testing.T, agent *Agent, startup, shutdownTimeout time.Dur
 // Claim response builders
 // ---------------------------------------------------------------------------
 
-type claimOption func(*ClaimResponse)
+type claimOption func(*domainapi.NodeClaimResponse)
 
 func withClaimNodeID(id types.NodeID) claimOption {
-	return func(c *ClaimResponse) { c.NodeID = id }
+	return func(c *domainapi.NodeClaimResponse) { c.NodeID = id }
 }
 
 func withNextID(id types.JobID) claimOption {
-	return func(c *ClaimResponse) { c.NextID = &id }
+	return func(c *domainapi.NodeClaimResponse) { c.NextID = &id }
 }
 
 func withCommitSHA(sha types.CommitSHA) claimOption {
-	return func(c *ClaimResponse) { c.CommitSha = &sha }
+	return func(c *domainapi.NodeClaimResponse) { c.CommitSHA = sha }
+}
+
+func withClaimName(name string) claimOption {
+	return func(c *domainapi.NodeClaimResponse) { c.Name = &name }
 }
 
 func withClaimJobName(name string) claimOption {
-	return func(c *ClaimResponse) { c.JobName = name }
+	return func(c *domainapi.NodeClaimResponse) { c.JobName = name }
 }
 
 func withClaimDetectedStack(exp *contracts.StackExpectation) claimOption {
-	return func(c *ClaimResponse) { c.DetectedStack = exp }
+	return func(c *domainapi.NodeClaimResponse) { c.DetectedStack = exp }
 }
 
-// newClaimResponse returns a ClaimResponse with generated IDs and sensible defaults.
-func newClaimResponse(opts ...claimOption) ClaimResponse {
+func withMigClaimContext(ctx *contracts.MigClaimContext) claimOption {
+	return func(c *domainapi.NodeClaimResponse) { c.MigContext = ctx }
+}
+
+func withGateClaimContext(ctx *contracts.GateClaimContext) claimOption {
+	return func(c *domainapi.NodeClaimResponse) { c.GateContext = ctx }
+}
+
+// newClaimResponse returns a domainapi.NodeClaimResponse with generated IDs and sensible defaults.
+func newClaimResponse(opts ...claimOption) domainapi.NodeClaimResponse {
 	now := time.Now().UTC().Format(time.RFC3339)
-	c := ClaimResponse{
+	c := domainapi.NodeClaimResponse{
 		RunID:     types.NewRunID(),
-		RepoID:    types.NewMigRepoID(),
+		RepoID:    types.NewRepoID(),
+		Attempt:   3,
 		JobID:     types.NewJobID(),
+		JobName:   "mig-0",
+		JobType:   types.JobTypeMig,
+		JobImage:  "example/mig:latest",
 		RepoURL:   types.RepoURL("https://github.com/test/repo"),
-		Status:    "Started",
+		Status:    types.RunStatusRunning,
 		NodeID:    types.NodeID(testNodeID),
 		BaseRef:   types.GitRef("main"),
+		RepoSHAIn: types.CommitSHA("cafebabe"),
 		StartedAt: now,
 		CreatedAt: now,
 	}

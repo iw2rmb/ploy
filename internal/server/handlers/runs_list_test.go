@@ -22,7 +22,7 @@ func TestListRunsHandlerIncludesRepoMetadata(t *testing.T) {
 	repoID := domaintypes.NewRepoID()
 	sourceSHA := "0123456789abcdef0123456789abcdef01234567"
 	now := pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true}
-	st := &runStore{
+	st := &handlerStore{
 		listRunsWithMetadata: mockCall[store.ListRunsWithMetadataParams, []store.ListRunsWithMetadataRow]{
 			val: []store.ListRunsWithMetadataRow{{
 				ID:               runID,
@@ -109,7 +109,7 @@ func TestListRunsHandlerOwnershipFilter(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			st := &runStore{
+			st := &handlerStore{
 				getAPITokenByID: mockCall[string, store.GetAPITokenByIDRow]{
 					val: store.GetAPITokenByIDRow{Username: tt.tokenUsername},
 				},
@@ -163,7 +163,7 @@ func TestListRunsHandlerRepoURLAppliesOwnershipFilter(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			st := &runStore{}
+			st := &handlerStore{}
 			req := httptest.NewRequest(http.MethodGet, tt.target, nil)
 			rr := httptest.NewRecorder()
 

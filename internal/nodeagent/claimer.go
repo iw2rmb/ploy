@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/backoff"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
@@ -32,34 +31,6 @@ type ClaimManager struct {
 	startupOnce        sync.Once
 	startupErr         error
 	backoff            *backoff.StatefulBackoff
-}
-
-// ClaimResponse represents the response from POST /v1/nodes/{id}/claim.
-// Returned by the server when a job is successfully claimed and assigned to this node.
-// Contains the run metadata plus the claimed job's ID and name.
-// Note: The RunID field uses json:"id" to maintain wire compatibility with the
-// existing API schema while providing type clarity in Go code.
-type ClaimResponse struct {
-	RunID         types.RunID                 `json:"id"` // Run ID (KSUID identifying the parent run)
-	Name          *string                     `json:"name,omitempty"`
-	RepoID        types.MigRepoID             `json:"repo_id"`   // Repo ID (NanoID identifying the repo execution)
-	JobID         types.JobID                 `json:"job_id"`    // Claimed job ID
-	JobName       string                      `json:"job_name"`  // Job name (e.g., "pre-gate", "mig-0")
-	JobType       types.JobType               `json:"job_type"`  // Job phase: pre_gate, mig, post_gate
-	JobImage      string                      `json:"job_image"` // Container image for mig jobs
-	NextID        *types.JobID                `json:"next_id"`
-	RepoURL       types.RepoURL               `json:"repo_url"`
-	Status        string                      `json:"status"`
-	NodeID        types.NodeID                `json:"node_id"`
-	BaseRef       types.GitRef                `json:"base_ref"`
-	CommitSha     *types.CommitSHA            `json:"commit_sha,omitempty"`
-	RepoShaIn     *types.CommitSHA            `json:"repo_sha_in,omitempty"`
-	StartedAt     string                      `json:"started_at"`
-	CreatedAt     string                      `json:"created_at"`
-	Spec          json.RawMessage             `json:"spec,omitempty"`
-	MigContext    *contracts.MigClaimContext  `json:"mig_context,omitempty"`
-	GateContext   *contracts.GateClaimContext `json:"gate_context,omitempty"`
-	DetectedStack *contracts.StackExpectation `json:"detected_stack,omitempty"`
 }
 
 // NewClaimManager constructs a claim manager for the unified jobs queue.

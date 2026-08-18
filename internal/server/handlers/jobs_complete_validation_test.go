@@ -134,7 +134,7 @@ func TestCompletion_PayloadRejection(t *testing.T) {
 	tests := []struct {
 		name       string
 		tweakJob   func(*store.Job)
-		storeOpts  []func(*jobStore)
+		storeOpts  []func(*handlerStore)
 		body       map[string]any
 		wantStatus int
 	}{
@@ -170,7 +170,7 @@ func TestCompletion_PayloadRejection(t *testing.T) {
 		{name: "conflict/cancelled", tweakJob: func(j *store.Job) { j.Status = domaintypes.JobStatusCancelled }, body: map[string]any{"status": "Fail"}, wantStatus: http.StatusConflict},
 		{
 			name:       "job_not_found",
-			storeOpts:  []func(*jobStore){withGetJobErr(pgx.ErrNoRows)},
+			storeOpts:  []func(*handlerStore){withGetJobErr(pgx.ErrNoRows)},
 			body:       map[string]any{"status": "Fail"},
 			wantStatus: http.StatusNotFound,
 		},

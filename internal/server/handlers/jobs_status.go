@@ -4,30 +4,11 @@ import (
 	"net/http"
 	"time"
 
+	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/server/auth"
 	"github.com/iw2rmb/ploy/internal/store"
 )
-
-type jobStatusResponse struct {
-	JobID       domaintypes.JobID     `json:"job_id"`
-	RunID       domaintypes.RunID     `json:"run_id"`
-	RepoID      domaintypes.RepoID    `json:"repo_id"`
-	Attempt     int32                 `json:"attempt"`
-	Name        string                `json:"name"`
-	JobType     domaintypes.JobType   `json:"job_type"`
-	Status      domaintypes.JobStatus `json:"status"`
-	JobImage    string                `json:"job_image"`
-	NodeID      *domaintypes.NodeID   `json:"node_id"`
-	ExitCode    *int32                `json:"exit_code"`
-	StartedAt   *time.Time            `json:"started_at"`
-	FinishedAt  *time.Time            `json:"finished_at"`
-	DurationMs  int64                 `json:"duration_ms"`
-	RepoShaIn   string                `json:"repo_sha_in"`
-	RepoShaOut  string                `json:"repo_sha_out"`
-	RepoShaIn8  string                `json:"repo_sha_in8"`
-	RepoShaOut8 string                `json:"repo_sha_out8"`
-}
 
 // getJobStatusHandler returns canonical job status for worker cancellation
 // polling and operator inspection. Worker callers must prove ownership through
@@ -63,8 +44,8 @@ func getJobStatusHandler(st store.Store) http.HandlerFunc {
 	}
 }
 
-func jobStatusFromStore(job store.Job) jobStatusResponse {
-	return jobStatusResponse{
+func jobStatusFromStore(job store.Job) domainapi.JobStatusResponse {
+	return domainapi.JobStatusResponse{
 		JobID:       job.ID,
 		RunID:       job.RunID,
 		RepoID:      job.RepoID,

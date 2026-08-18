@@ -85,7 +85,7 @@ func TestSaveJobSBOMHandler(t *testing.T) {
 			}
 			jobID := domaintypes.NewJobID()
 			repoID := domaintypes.NewRepoID()
-			st := &jobStore{}
+			st := &handlerStore{}
 			st.getJob.val = store.Job{
 				ID:      jobID,
 				RunID:   domaintypes.NewRunID(),

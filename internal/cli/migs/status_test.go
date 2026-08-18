@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"testing"
 
+	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
@@ -79,8 +80,8 @@ func TestListRunDiffsCommand_EmptyList(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_ = json.NewEncoder(w).Encode(struct {
-			Diffs []DiffEntry `json:"diffs"`
-		}{Diffs: []DiffEntry{}})
+			Diffs []domainapi.DiffListItem `json:"diffs"`
+		}{Diffs: []domainapi.DiffListItem{}})
 	}))
 	defer srv.Close()
 

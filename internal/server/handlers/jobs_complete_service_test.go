@@ -14,7 +14,7 @@ func TestCompletionService_Complete_ReturnsConflictForNonRunningJob(t *testing.T
 
 	nodeID := domaintypes.NodeID(domaintypes.NewNodeKey())
 	jobID := domaintypes.NewJobID()
-	st := &jobStore{}
+	st := &handlerStore{}
 	st.getJob.val = store.Job{
 		ID:        jobID,
 		RunID:     domaintypes.NewRunID(),
@@ -47,7 +47,7 @@ func TestCompletionService_Complete_SuccessPromotesNextJob(t *testing.T) {
 	runID := domaintypes.NewRunID()
 	repoID := domaintypes.NewRepoID()
 
-	st := &jobStore{}
+	st := &handlerStore{}
 	st.getJob.val = store.Job{
 		ID:          jobID,
 		RunID:       runID,

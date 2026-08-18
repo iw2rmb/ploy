@@ -46,6 +46,7 @@ tests/
 3. **For e2e tests, configure control-plane auth:**
    - Export `PLOY_SERVER_URL` and `PLOY_AUTH_TOKEN`, or let the local e2e
      harness mint a token from the local stack secret.
+   - Export `GITLAB_TOKEN` when the source repository is not public.
 
 ### Running Smoke Tests
 
@@ -101,6 +102,9 @@ go test -v ./tests/integration -run=TestSmokeWorkflow_EndToEnd
 
 **E2E tests (require control-plane auth):**
 ```bash
+# Live Hydra runtime suite
+PLOY_E2E_CLUSTER=require go test -count=1 -v ./tests/e2e/migs
+
 # Selftest: minimal container execution
 bash tests/e2e/migs/scenario-selftest.sh
 
@@ -135,9 +139,11 @@ See `tests/e2e/migs/README.md` for detailed e2e documentation.
 
 ### E2E Tests
 - **Location:** `tests/e2e/migs/`
-- **Purpose:** Validate complete workflows with real containers and a control plane
-- **Prerequisites:** `PLOY_SERVER_URL`, `PLOY_AUTH_TOKEN`, Docker images, optional GitLab PAT
+- **Purpose:** Validate complete workflows with a real control plane, node, and containers
+- **Prerequisites:** `PLOY_SERVER_URL`, `PLOY_AUTH_TOKEN`, a node-accessible
+  `PLOY_E2E_IMAGE`, and an optional `GITLAB_TOKEN`
 - **Scenarios:**
+  - Hydra live suite: mount enforcement, input materialization, unsafe bundle rejection, and artifact upload
   - `scenario-selftest.sh`: Minimal container execution (echo test)
   - `scenario-prep-ready.sh`: Prep success lifecycle + run gating
   - `scenario-prep-fail.sh`: Prep failure lifecycle + evidence + run gating

@@ -172,7 +172,7 @@ func TestPrepareStickyWorkspaceWithCleanup_StickyWorkspaceIsNotRemoved(t *testin
 
 	req := StartRunRequest{
 		RunID:  types.RunID("run_sticky_cleanup"),
-		RepoID: types.MigRepoID("repo_sticky_cleanup"),
+		RepoID: types.RepoID("repo_sticky_cleanup"),
 		JobID:  types.JobID("job_sticky_cleanup"),
 	}
 	workspace := workspaceDir(req.RunID)

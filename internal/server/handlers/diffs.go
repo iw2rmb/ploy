@@ -12,37 +12,22 @@ import (
 	"net/http"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
 	"github.com/iw2rmb/ploy/internal/blobstore"
+	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-// diffItem represents a single diff in a list response.
-//
 // Each diff is tagged with job_id and job_type (in summary) to enable unified rehydration.
 // - job_id: References the job that produced this diff; job's next_id provides ordering.
 // - job_type: "mig" for mig diffs.
 // Rehydration queries fetch all diffs ordered by job next_id.
 //
 // NOTE: job_id is now a KSUID-backed JobID type (no UUID parsing).
-type diffItem struct {
-	ID        string                  `json:"id"`
-	JobID     domaintypes.JobID       `json:"job_id"` // Job ID (KSUID-backed)
-	CreatedAt time.Time               `json:"created_at"`
-	Size      int                     `json:"gzipped_size"`
-	Summary   domaintypes.DiffSummary `json:"summary,omitempty"` // Contains job_type, timings.
-}
-
-// diffListResponse is the typed response for listing diffs.
-type diffListResponse struct {
-	Diffs []diffItem `json:"diffs"`
-}
-
 const maxAccumulatedDiffPlainBytes int64 = 64 << 20
 
 // listRunDiffsHandler returns a JSON list of diffs for a specific run.
@@ -119,16 +104,16 @@ func listRunDiffsHandler(st store.Store, bs blobstore.Store) http.HandlerFunc {
 			return
 		}
 
-		// Build response items in the standard list format (diffListResponse).
-		items := make([]diffItem, 0, len(diffs))
+		// Build response items in the canonical list format.
+		items := make([]domainapi.DiffListItem, 0, len(diffs))
 		for _, row := range diffs {
 			d := row.Diff
 			var summary domaintypes.DiffSummary
 			if len(d.Summary) > 0 {
 				_ = json.Unmarshal(d.Summary, &summary)
 			}
-			items = append(items, diffItem{
-				ID:        uuid.UUID(d.ID.Bytes).String(), // diffs.id is still UUID
+			items = append(items, domainapi.DiffListItem{
+				ID:        domaintypes.DiffID(uuid.UUID(d.ID.Bytes).String()),
 				JobID:     row.DisplayJobID,
 				CreatedAt: d.CreatedAt.Time,
 				Size:      int(d.PatchSize),
@@ -136,7 +121,7 @@ func listRunDiffsHandler(st store.Store, bs blobstore.Store) http.HandlerFunc {
 			})
 		}
 
-		writeJSON(w, http.StatusOK, diffListResponse{Diffs: items})
+		writeJSON(w, http.StatusOK, domainapi.DiffListResponse{Diffs: items})
 	}
 }
 

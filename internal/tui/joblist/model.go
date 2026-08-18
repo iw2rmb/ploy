@@ -7,7 +7,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	cliruns "github.com/iw2rmb/ploy/internal/cli/runs"
-	clitui "github.com/iw2rmb/ploy/internal/client/tui"
+	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
@@ -32,7 +32,7 @@ func (r row) FilterValue() string { return r.title }
 // confirmed selected job identity, and job detail payload cache for the jobs pane.
 type Model struct {
 	inner         list.Model
-	jobs          []clitui.JobItem
+	jobs          []domainapi.JobListItem
 	selectedJobID domaintypes.JobID
 	details       *cliruns.RunJobDetailEntry
 }
@@ -47,7 +47,7 @@ func New(title string) Model {
 }
 
 // SetJobs replaces the job items, rebuilds the list rows, and clears the details cache.
-func (m Model) SetJobs(jobs []clitui.JobItem) Model {
+func (m Model) SetJobs(jobs []domainapi.JobListItem) Model {
 	items := make([]list.Item, len(jobs))
 	for i, job := range jobs {
 		items[i] = row{
@@ -62,10 +62,10 @@ func (m Model) SetJobs(jobs []clitui.JobItem) Model {
 }
 
 // SelectedJob returns the job at the current cursor position, if any.
-func (m Model) SelectedJob() (clitui.JobItem, bool) {
+func (m Model) SelectedJob() (domainapi.JobListItem, bool) {
 	idx := m.inner.Index()
 	if idx < 0 || idx >= len(m.jobs) {
-		return clitui.JobItem{}, false
+		return domainapi.JobListItem{}, false
 	}
 	return m.jobs[idx], true
 }
@@ -94,7 +94,7 @@ func (m Model) Items() []list.Item { return m.inner.Items() }
 func (m Model) Index() int { return m.inner.Index() }
 
 // Jobs returns the raw job items backing the list.
-func (m Model) Jobs() []clitui.JobItem { return m.jobs }
+func (m Model) Jobs() []domainapi.JobListItem { return m.jobs }
 
 // SelectedJobID returns the job ID of the currently highlighted job.
 func (m Model) SelectedJobID() domaintypes.JobID {

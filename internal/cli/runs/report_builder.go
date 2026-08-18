@@ -8,8 +8,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/iw2rmb/ploy/internal/cli/httpx"
+	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/httpx"
 	migsapi "github.com/iw2rmb/ploy/internal/migs/api"
 )
 
@@ -168,24 +169,9 @@ func listRunStageArtifacts(
 	runID domaintypes.RunID,
 ) (map[domaintypes.JobID]map[string]string, error) {
 	endpoint := baseURL.JoinPath("v1", "runs", runID.String(), "status")
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
+	summary, err := httpx.DoJSON[migsapi.RunSummary](ctx, httpClient, http.MethodGet, endpoint.String(), nil, http.StatusOK, "run status report: fetch run stage artifacts")
 	if err != nil {
-		return nil, fmt.Errorf("run status report: build run stage artifacts request: %w", err)
-	}
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("run status report: fetch run stage artifacts failed: %w", err)
-	}
-	defer httpx.DrainAndClose(resp)
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, httpx.WrapError("run status report: fetch run stage artifacts", resp.Status, resp.Body)
-	}
-
-	var summary migsapi.RunSummary
-	if err := httpx.DecodeResponseJSON(resp.Body, &summary, httpx.MaxJSONBodyBytes); err != nil {
-		return nil, fmt.Errorf("run status report: decode run stage artifacts: %w", err)
+		return nil, err
 	}
 
 	artifacts := make(map[domaintypes.JobID]map[string]string, len(summary.Stages))
@@ -209,31 +195,14 @@ func listRunStageArtifacts(
 	return artifacts, nil
 }
 
-func listRunDiffs(ctx context.Context, httpClient *http.Client, baseURL *url.URL, runID domaintypes.RunID) ([]RunDiffEntry, error) {
+func listRunDiffs(ctx context.Context, httpClient *http.Client, baseURL *url.URL, runID domaintypes.RunID) ([]domainapi.DiffListItem, error) {
 	endpoint := baseURL.JoinPath("v1", "runs", runID.String(), "diffs")
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
+	result, err := httpx.DoJSON[domainapi.DiffListResponse](ctx, httpClient, http.MethodGet, endpoint.String(), nil, http.StatusOK, "run status report: fetch diffs")
 	if err != nil {
-		return nil, fmt.Errorf("run status report: build diffs request: %w", err)
-	}
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("run status report: fetch diffs failed: %w", err)
-	}
-	defer httpx.DrainAndClose(resp)
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, httpx.WrapError("run status report: fetch diffs", resp.Status, resp.Body)
-	}
-
-	var result struct {
-		Diffs []RunDiffEntry `json:"diffs"`
-	}
-	if err := httpx.DecodeResponseJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
-		return nil, fmt.Errorf("run status report: decode diffs: %w", err)
+		return nil, err
 	}
 	if result.Diffs == nil {
-		result.Diffs = make([]RunDiffEntry, 0)
+		result.Diffs = make([]domainapi.DiffListItem, 0)
 	}
 
 	return result.Diffs, nil
@@ -241,7 +210,7 @@ func listRunDiffs(ctx context.Context, httpClient *http.Client, baseURL *url.URL
 
 // latestRunDiff returns the most recent diff entry.
 // The API returns diffs ordered by created_at ascending, so the last element is the latest.
-func latestRunDiff(diffs []RunDiffEntry) *RunDiffEntry {
+func latestRunDiff(diffs []domainapi.DiffListItem) *domainapi.DiffListItem {
 	if len(diffs) == 0 {
 		return nil
 	}

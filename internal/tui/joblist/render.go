@@ -7,7 +7,7 @@ import (
 
 	"charm.land/lipgloss/v2"
 
-	clitui "github.com/iw2rmb/ploy/internal/client/tui"
+	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
@@ -29,7 +29,7 @@ func StatusGlyph(status domaintypes.JobStatus) string {
 }
 
 // renderPrimaryLine builds the title line for a job row: glyph + name (padded) + duration.
-func renderPrimaryLine(job clitui.JobItem) string {
+func renderPrimaryLine(job domainapi.JobListItem) string {
 	glyph := StatusGlyph(job.Status)
 	name := normalizeLabel(job.Name)
 	duration := formatDurationShort(job.DurationMs)
@@ -44,7 +44,7 @@ func renderPrimaryLine(job clitui.JobItem) string {
 }
 
 // renderSecondaryLine builds the description line for a job row: job ID.
-func renderSecondaryLine(job clitui.JobItem) string {
+func renderSecondaryLine(job domainapi.JobListItem) string {
 	return truncateRunes(normalizeLabel(job.JobID.String()), ListWidth)
 }
 

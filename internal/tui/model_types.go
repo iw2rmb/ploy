@@ -8,7 +8,6 @@ import (
 	"charm.land/bubbles/v2/list"
 
 	cliruns "github.com/iw2rmb/ploy/internal/cli/runs"
-	clitui "github.com/iw2rmb/ploy/internal/client/tui"
 	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/tui/joblist"
@@ -99,7 +98,7 @@ type migsLoadedMsg struct{ migs []domainapi.MigSummary }
 type runsLoadedMsg struct{ runs []runSummary }
 
 // jobsLoadedMsg carries jobs fetched from the API.
-type jobsLoadedMsg struct{ jobs []clitui.JobItem }
+type jobsLoadedMsg struct{ jobs []domainapi.JobListItem }
 
 // jobDetailsLoadedMsg carries the run job detail payload for a confirmed job.
 type jobDetailsLoadedMsg struct{ detail *cliruns.RunJobDetailEntry }

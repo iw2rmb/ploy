@@ -27,7 +27,7 @@ func TestOnSuccess_GateSuccessPromotesLinkedNext(t *testing.T) {
 		Status: domaintypes.JobStatusCreated,
 	}
 
-	st := &jobStore{}
+	st := &handlerStore{}
 	st.promoteJobByIDIfUnblocked.val = next
 	svc := &completionService{
 		store:       st,

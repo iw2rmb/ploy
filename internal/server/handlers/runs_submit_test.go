@@ -49,7 +49,7 @@ func asJSONBytes(t *testing.T, v any) []byte {
 //   - Creates a wave and one run row.
 //   - Response includes wave_id, run_id, mig_id, spec_id.
 func TestRunsCreateSingleRepo_Success(t *testing.T) {
-	st := &migStore{}
+	st := &handlerStore{}
 	eventsService, _ := createTestEventsService()
 	handler := createSingleRepoRunHandler(st, eventsService, gitauth.Options{}, runSubmitSpecServices{})
 
@@ -111,7 +111,7 @@ func TestRunsCreateSingleRepo_Success(t *testing.T) {
 
 // TestRunsCreateSingleRepo_DoesNotCreateJobsImmediately verifies submission defers job materialization.
 func TestRunsCreateSingleRepo_DoesNotCreateJobsImmediately(t *testing.T) {
-	st := &migStore{}
+	st := &handlerStore{}
 	eventsService, _ := createTestEventsService()
 	handler := createSingleRepoRunHandler(st, eventsService, gitauth.Options{}, runSubmitSpecServices{})
 
@@ -126,7 +126,7 @@ func TestRunsCreateSingleRepo_DoesNotCreateJobsImmediately(t *testing.T) {
 // TestRunsCreateSingleRepo_RepoURLNormalized verifies repo URLs are normalized.
 // Uses types.NormalizeRepoURL for URL normalization.
 func TestRunsCreateSingleRepo_RepoURLNormalized(t *testing.T) {
-	st := &migStore{}
+	st := &handlerStore{}
 	eventsService, _ := createTestEventsService()
 	handler := createSingleRepoRunHandler(st, eventsService, gitauth.Options{}, runSubmitSpecServices{})
 
@@ -148,7 +148,7 @@ func TestRunsCreateSingleRepo_RepoURLNormalized(t *testing.T) {
 }
 
 func TestRunsCreateSingleRepo_SSHRepoURLAcceptedWithoutGitLabToken(t *testing.T) {
-	st := &migStore{}
+	st := &handlerStore{}
 	handler := createSingleRepoRunHandler(st, nil, gitauth.Options{}, runSubmitSpecServices{})
 
 	rr := doRequest(t, handler, http.MethodPost, "/v1/runs", validRunRequestBodyWith(map[string]any{
@@ -167,7 +167,7 @@ func TestSubmitGitLabTokenBehavior(t *testing.T) {
 
 	tests := []struct {
 		name              string
-		newHandler        func(st *migStore, registry *gitlabtokens.Registry) http.HandlerFunc
+		newHandler        func(st *handlerStore, registry *gitlabtokens.Registry) http.HandlerFunc
 		path              string
 		body              func() any
 		wantRuns          int
@@ -176,7 +176,7 @@ func TestSubmitGitLabTokenBehavior(t *testing.T) {
 	}{
 		{
 			name: "single run computes marker and registers token",
-			newHandler: func(st *migStore, registry *gitlabtokens.Registry) http.HandlerFunc {
+			newHandler: func(st *handlerStore, registry *gitlabtokens.Registry) http.HandlerFunc {
 				return createSingleRepoRunHandler(st, nil, gitauth.Options{GitLabDomain: "gitlab.example.com"}, runSubmitSpecServices{}, registry)
 			},
 			path: "/v1/runs",
@@ -192,7 +192,7 @@ func TestSubmitGitLabTokenBehavior(t *testing.T) {
 		},
 		{
 			name: "single run releases pre-registered token when create fails",
-			newHandler: func(st *migStore, registry *gitlabtokens.Registry) http.HandlerFunc {
+			newHandler: func(st *handlerStore, registry *gitlabtokens.Registry) http.HandlerFunc {
 				st.createWaveWithRuns.err = errors.New("database connection failed")
 				return createSingleRepoRunHandler(st, nil, gitauth.Options{GitLabDomain: "gitlab.example.com"}, runSubmitSpecServices{}, registry)
 			},
@@ -207,7 +207,7 @@ func TestSubmitGitLabTokenBehavior(t *testing.T) {
 		},
 		{
 			name: "mig wave computes same marker for every run",
-			newHandler: func(st *migStore, registry *gitlabtokens.Registry) http.HandlerFunc {
+			newHandler: func(st *handlerStore, registry *gitlabtokens.Registry) http.HandlerFunc {
 				specID := domaintypes.NewSpecID()
 				migSt := activeMigWithSpec(specID)
 				*st = *migSt
@@ -233,7 +233,7 @@ func TestSubmitGitLabTokenBehavior(t *testing.T) {
 		},
 		{
 			name: "mig wave releases pre-registered token when create fails",
-			newHandler: func(st *migStore, registry *gitlabtokens.Registry) http.HandlerFunc {
+			newHandler: func(st *handlerStore, registry *gitlabtokens.Registry) http.HandlerFunc {
 				specID := domaintypes.NewSpecID()
 				migSt := activeMigWithSpec(specID)
 				*st = *migSt
@@ -260,7 +260,7 @@ func TestSubmitGitLabTokenBehavior(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			st := &migStore{}
+			st := &handlerStore{}
 			registry := gitlabtokens.NewRegistry()
 			handler := tt.newHandler(st, registry)
 			observedDuringCreate := false
@@ -308,14 +308,14 @@ func TestSubmitGitLabTokenDomainValidation(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		newHandler func(st *migStore, registry *gitlabtokens.Registry) http.HandlerFunc
+		newHandler func(st *handlerStore, registry *gitlabtokens.Registry) http.HandlerFunc
 		path       string
 		body       any
 		wantError  string
 	}{
 		{
 			name: "single run rejects token without configured GitLab domain",
-			newHandler: func(st *migStore, registry *gitlabtokens.Registry) http.HandlerFunc {
+			newHandler: func(st *handlerStore, registry *gitlabtokens.Registry) http.HandlerFunc {
 				return createSingleRepoRunHandler(st, nil, gitauth.Options{}, runSubmitSpecServices{}, registry)
 			},
 			path: "/v1/runs",
@@ -327,7 +327,7 @@ func TestSubmitGitLabTokenDomainValidation(t *testing.T) {
 		},
 		{
 			name: "single run rejects token for different repo host",
-			newHandler: func(st *migStore, registry *gitlabtokens.Registry) http.HandlerFunc {
+			newHandler: func(st *handlerStore, registry *gitlabtokens.Registry) http.HandlerFunc {
 				return createSingleRepoRunHandler(st, nil, gitauth.Options{GitLabDomain: "gitlab.example.com"}, runSubmitSpecServices{}, registry)
 			},
 			path: "/v1/runs",
@@ -339,7 +339,7 @@ func TestSubmitGitLabTokenDomainValidation(t *testing.T) {
 		},
 		{
 			name: "single run rejects token for ssh repo on configured GitLab domain",
-			newHandler: func(st *migStore, registry *gitlabtokens.Registry) http.HandlerFunc {
+			newHandler: func(st *handlerStore, registry *gitlabtokens.Registry) http.HandlerFunc {
 				return createSingleRepoRunHandler(st, nil, gitauth.Options{GitLabDomain: "gitlab.example.com"}, runSubmitSpecServices{}, registry)
 			},
 			path: "/v1/runs",
@@ -351,7 +351,7 @@ func TestSubmitGitLabTokenDomainValidation(t *testing.T) {
 		},
 		{
 			name: "single run rejects token for file repo",
-			newHandler: func(st *migStore, registry *gitlabtokens.Registry) http.HandlerFunc {
+			newHandler: func(st *handlerStore, registry *gitlabtokens.Registry) http.HandlerFunc {
 				return createSingleRepoRunHandler(st, nil, gitauth.Options{GitLabDomain: "gitlab.example.com"}, runSubmitSpecServices{}, registry)
 			},
 			path: "/v1/runs",
@@ -363,7 +363,7 @@ func TestSubmitGitLabTokenDomainValidation(t *testing.T) {
 		},
 		{
 			name: "mig wave rejects token when any selected repo is on another host",
-			newHandler: func(st *migStore, registry *gitlabtokens.Registry) http.HandlerFunc {
+			newHandler: func(st *handlerStore, registry *gitlabtokens.Registry) http.HandlerFunc {
 				specID := domaintypes.NewSpecID()
 				migSt := activeMigWithSpec(specID)
 				*st = *migSt
@@ -387,7 +387,7 @@ func TestSubmitGitLabTokenDomainValidation(t *testing.T) {
 		},
 		{
 			name: "mig wave rejects token when selected repo uses ssh",
-			newHandler: func(st *migStore, registry *gitlabtokens.Registry) http.HandlerFunc {
+			newHandler: func(st *handlerStore, registry *gitlabtokens.Registry) http.HandlerFunc {
 				specID := domaintypes.NewSpecID()
 				migSt := activeMigWithSpec(specID)
 				*st = *migSt
@@ -413,7 +413,7 @@ func TestSubmitGitLabTokenDomainValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			st := &migStore{}
+			st := &handlerStore{}
 			registry := gitlabtokens.NewRegistry()
 			handler := tt.newHandler(st, registry)
 
@@ -488,7 +488,7 @@ func TestRunsCreateSingleRepo_ValidationErrors(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			st := &migStore{}
+			st := &handlerStore{}
 			handler := createSingleRepoRunHandler(st, nil, gitauth.Options{}, runSubmitSpecServices{})
 			rr := doRequest(t, handler, http.MethodPost, "/v1/runs", tt.body)
 			assertStatus(t, rr, tt.wantStatus)
@@ -521,7 +521,7 @@ func TestRunsCreateSingleRepoCreatedByResolution(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			st := &migStore{
+			st := &handlerStore{
 				getAPITokenByID: mockCall[string, store.GetAPITokenByIDRow]{
 					val: store.GetAPITokenByIDRow{Username: tt.tokenUsername},
 				},
@@ -558,7 +558,7 @@ func TestRunsCreateSingleRepoCreatedByResolution(t *testing.T) {
 }
 
 func TestRunsCreateSingleRepo_RejectsLegacySpecID(t *testing.T) {
-	st := &migStore{}
+	st := &handlerStore{}
 	handler := createSingleRepoRunHandler(st, nil, gitauth.Options{}, runSubmitSpecServices{})
 
 	rr := doRequest(t, handler, http.MethodPost, "/v1/runs", validRunRequestBodyWith(map[string]any{
@@ -574,7 +574,7 @@ func TestRunsCreateSingleRepo_RejectsLegacySpecID(t *testing.T) {
 
 // TestRunsCreateSingleRepo_MultiStepSpec verifies POST /v1/runs accepts multi-step spec without job creation.
 func TestRunsCreateSingleRepo_MultiStepSpec(t *testing.T) {
-	st := &migStore{}
+	st := &handlerStore{}
 	eventsService, _ := createTestEventsService()
 	handler := createSingleRepoRunHandler(st, eventsService, gitauth.Options{}, runSubmitSpecServices{})
 
@@ -604,29 +604,29 @@ func TestRunsCreateSingleRepo_MultiStepSpec(t *testing.T) {
 func TestRunsCreateSingleRepo_StoreErrors(t *testing.T) {
 	tests := []struct {
 		name    string
-		setupFn func(st *migStore)
+		setupFn func(st *handlerStore)
 	}{
 		{
 			name:    "CreateSpecError",
-			setupFn: func(st *migStore) { st.createSpec.err = errors.New("database connection failed") },
+			setupFn: func(st *handlerStore) { st.createSpec.err = errors.New("database connection failed") },
 		},
 		{
 			name:    "CreateMigError",
-			setupFn: func(st *migStore) { st.createMig.err = errors.New("database connection failed") },
+			setupFn: func(st *handlerStore) { st.createMig.err = errors.New("database connection failed") },
 		},
 		{
 			name:    "CreateMigRepoError",
-			setupFn: func(st *migStore) { st.createMigRepo.err = errors.New("database connection failed") },
+			setupFn: func(st *handlerStore) { st.createMigRepo.err = errors.New("database connection failed") },
 		},
 		{
 			name:    "CreateRunError",
-			setupFn: func(st *migStore) { st.createRunSeq.errs = []error{errors.New("database connection failed")} },
+			setupFn: func(st *handlerStore) { st.createRunSeq.errs = []error{errors.New("database connection failed")} },
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			st := &migStore{}
+			st := &handlerStore{}
 			tt.setupFn(st)
 			handler := createSingleRepoRunHandler(st, nil, gitauth.Options{}, runSubmitSpecServices{})
 			rr := doRequest(t, handler, http.MethodPost, "/v1/runs", validRunRequestBody())
@@ -636,7 +636,7 @@ func TestRunsCreateSingleRepo_StoreErrors(t *testing.T) {
 }
 
 func TestRunsCreateSingleRepo_RejectsWhenSourceCommitSeedFails(t *testing.T) {
-	st := &migStore{}
+	st := &handlerStore{}
 	eventsService, _ := createTestEventsService()
 	handler := createSingleRepoRunHandler(st, eventsService, gitauth.Options{}, runSubmitSpecServices{})
 

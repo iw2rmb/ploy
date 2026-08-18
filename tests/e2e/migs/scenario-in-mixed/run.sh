@@ -20,7 +20,7 @@ e2e_artifacts_init "$REPO_ROOT/tmp/migs/scenario-in-mixed"
 
 REPO="${PLOY_E2E_REPO_OVERRIDE:-https://github.com/octocat/Hello-World.git}"
 BASE_REF="${PLOY_E2E_BASE_REF:-master}"
-TARGET_REF="${PLOY_E2E_TARGET_REF:-e2e/in-mixed}"
+E2E_IMAGE="$(e2e_runtime_image)"
 
 FIXTURES_DIR="${SCRIPT_DIR}/fixtures"
 CONFIG_PATH="${FIXTURES_DIR}/config.json"
@@ -29,9 +29,8 @@ SCRIPTS_PATH="${FIXTURES_DIR}/scripts"
 echo "=========================================="
 echo "Hydra In-Record Mixed Inputs E2E Scenario"
 echo "=========================================="
-echo "Repo:        $REPO"
+echo "Repo:        $(e2e_repo_selector "$REPO")"
 echo "Base ref:    $BASE_REF"
-echo "Target ref:  $TARGET_REF"
 echo "Fixtures:    $FIXTURES_DIR"
 echo "Artifacts:   $E2E_ARTIFACT_DIR"
 echo "=========================================="
@@ -43,8 +42,10 @@ trap 'rm -f "$SPEC_FILE"' EXIT
 cat >"$SPEC_FILE" <<YAML
 apiVersion: ploy.mig/v1alpha1
 kind: MigRunSpec
+build_gate:
+  disabled: true
 steps:
-  - image: alpine:3.20
+  - image: ${E2E_IMAGE}
     command: >-
       sh -c '
         set -e;
@@ -58,8 +59,8 @@ steps:
         cat /in/config.json
       '
     in:
-      - ${CONFIG_PATH}:/in/config.json
-      - ${SCRIPTS_PATH}:/in/scripts
+      - ${CONFIG_PATH}:config.json
+      - ${SCRIPTS_PATH}:scripts
 YAML
 
 RUN_JSON="$(e2e_mig_run_json \

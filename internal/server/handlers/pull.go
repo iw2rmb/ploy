@@ -16,6 +16,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
@@ -38,13 +39,6 @@ type migPullRequest struct {
 // It provides the identifiers needed to fetch diffs:
 //   - run_id: the run containing the execution
 //   - repo_id: the mig_repos.id for the matched repo
-type pullResponse struct {
-	RunID           domaintypes.RunID  `json:"run_id"`
-	RepoID          domaintypes.RepoID `json:"repo_id"`
-	RepoURL         string             `json:"repo_url,omitempty"`
-	SourceCommitSHA string             `json:"source_commit_sha,omitempty"`
-}
-
 // -------------------------------------------------------------------------
 // Handlers
 // -------------------------------------------------------------------------
@@ -71,7 +65,7 @@ func pullRunHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		resp := pullResponse{
+		resp := domainapi.PullResolutionResponse{
 			RunID:           run.ID,
 			RepoID:          run.RepoID,
 			RepoURL:         repoURL,
@@ -200,7 +194,7 @@ func pullMigRepoHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Return the pull response.
-		resp := pullResponse{
+		resp := domainapi.PullResolutionResponse{
 			RunID:  latestRun.RunID,
 			RepoID: latestRun.RepoID,
 		}

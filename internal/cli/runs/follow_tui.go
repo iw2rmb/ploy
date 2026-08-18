@@ -144,7 +144,6 @@ type FollowRunCommand struct {
 	RunID           domaintypes.RunID
 	Output          io.Writer
 	EnableOSC8      bool
-	AuthToken       string
 	SpecDisplayName string
 	MaxRetries      int
 	PollInterval    time.Duration
@@ -182,7 +181,6 @@ func (c FollowRunCommand) Run(ctx context.Context) (migsapi.RunState, error) {
 	program := tea.NewProgram(
 		newFollowModel(TextRenderOptions{
 			EnableOSC8:      c.EnableOSC8,
-			AuthToken:       c.AuthToken,
 			BaseURL:         c.BaseURL,
 			SpecDisplayName: c.SpecDisplayName,
 		}, interactive),

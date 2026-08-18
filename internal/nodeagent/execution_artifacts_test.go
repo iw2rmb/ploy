@@ -70,7 +70,7 @@ func TestUploadRepoArtifactsIfPresent(t *testing.T) {
 	t.Setenv("PLOYD_CACHE_HOME", cacheHome)
 
 	runID := types.NewRunID()
-	repoID := types.NewMigRepoID()
+	repoID := types.NewRepoID()
 	jobID := types.NewJobID()
 	previousJobID := types.NewJobID()
 	env := newUploadTestEnv(t, runID.String(), jobID.String())
@@ -138,6 +138,42 @@ func TestUploadRepoArtifactsIfPresent(t *testing.T) {
 				t.Fatalf("runtime file leaked into repo-artifacts as %q", name)
 			}
 		}
+	}
+}
+
+func TestPersistContainerInspectArtifactRedactsExecutionData(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "container.inspect.json")
+	raw := []byte(`{
+  "Args":["--token","argument-secret"],
+  "State":{"Status":"exited"},
+  "Config":{
+    "Env":["API_TOKEN=environment-secret","PLAIN=value"],
+    "Cmd":["tool","--password=command-secret"],
+    "Entrypoint":["/bin/sh","credential-secret"],
+    "Image":"registry.example.test/runtime:latest"
+  }
+}`)
+
+	persistContainerInspectArtifact(
+		StartRunRequest{RunID: types.RunID("run-redact"), JobID: types.JobID("job-redact")},
+		JobDirectories{ContainerInspect: path},
+		step.Result{ContainerID: "container-redact", ContainerInspectJSON: raw},
+	)
+
+	got := mustReadFile(t, path)
+	for _, secret := range []string{"argument-secret", "environment-secret", "command-secret", "credential-secret"} {
+		if bytes.Contains(got, []byte(secret)) {
+			t.Fatalf("container inspect artifact contains secret %q: %s", secret, got)
+		}
+	}
+	for _, omitted := range []string{`"Args"`, `"Env"`, `"Cmd"`, `"Entrypoint"`} {
+		if bytes.Contains(got, []byte(omitted)) {
+			t.Fatalf("container inspect artifact contains omitted field %s: %s", omitted, got)
+		}
+	}
+	if !bytes.Contains(got, []byte(`"Image":"registry.example.test/runtime:latest"`)) ||
+		!bytes.Contains(got, []byte(`"Status":"exited"`)) {
+		t.Fatalf("container inspect artifact lost diagnostic fields: %s", got)
 	}
 }
 

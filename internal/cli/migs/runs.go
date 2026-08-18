@@ -14,8 +14,8 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/iw2rmb/ploy/internal/cli/httpx"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/httpx"
 )
 
 // ListRunsCommand lists runs from the control plane.
@@ -55,27 +55,13 @@ func (c ListRunsCommand) Run(ctx context.Context) ([]domaintypes.RunSummary, err
 	}
 	endpoint.RawQuery = q.Encode()
 
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
-	if err != nil {
-		return nil, fmt.Errorf("run list: build request: %w", err)
-	}
-
-	resp, err := c.Client.Do(httpReq)
-	if err != nil {
-		return nil, fmt.Errorf("run list: http request failed: %w", err)
-	}
-	defer httpx.DrainAndClose(resp)
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, httpx.WrapError("run list", resp.Status, resp.Body)
-	}
-
 	// Response structure: {"runs": [...]}
-	var result struct {
+	type listRunsResponse struct {
 		Runs []domaintypes.RunSummary `json:"runs"`
 	}
-	if err := httpx.DecodeResponseJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
-		return nil, fmt.Errorf("run list: decode response: %w", err)
+	result, err := httpx.DoJSON[listRunsResponse](ctx, c.Client, http.MethodGet, endpoint.String(), nil, http.StatusOK, "run list")
+	if err != nil {
+		return nil, err
 	}
 
 	return result.Runs, nil

@@ -3,99 +3,32 @@ package handlers
 import (
 	"context"
 
-	"github.com/jackc/pgx/v5/pgtype"
-
 	"github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
 // Run mutation methods
 
-func (m *jobStore) UpdateRunError(ctx context.Context, params store.UpdateRunErrorParams) error {
-	_, err := m.updateRunError.record(params)
-	return err
-}
-
-func (m *jobStore) UpdateRunBaseRef(ctx context.Context, params store.UpdateRunBaseRefParams) error {
-	_, err := m.updateRunBaseRef.record(params)
-	return err
-}
-
-func (m *jobStore) IncrementRunAttempt(ctx context.Context, arg store.IncrementRunAttemptParams) error {
-	_, err := m.incrementRunAttempt.record(arg)
-	return err
-}
-
-func (m *jobStore) ListRunsByWave(ctx context.Context, waveID types.WaveID) ([]store.Run, error) {
-	return m.listRunsByWave.record(waveID.String())
-}
-
-func (m *jobStore) ListQueuedRunsByWave(ctx context.Context, waveID types.WaveID) ([]store.Run, error) {
-	return m.listQueuedRunsByWave.record(waveID.String())
-}
-
-func (m *jobStore) ListRunsWithURLByWave(ctx context.Context, waveID types.WaveID) ([]store.ListRunsWithURLByWaveRow, error) {
-	return m.listRunsWithURLByWave.record(waveID.String())
-}
-
-func (m *jobStore) CountRunsByWaveStatus(ctx context.Context, waveID types.WaveID) ([]store.CountRunsByWaveStatusRow, error) {
-	return m.countRunsByStatus.ret()
-}
-
-func (m *jobStore) CancelActiveJobsByRunAttempt(ctx context.Context, params store.CancelActiveJobsByRunAttemptParams) (int64, error) {
+func (m *handlerStore) CancelActiveJobsByRunAttempt(ctx context.Context, params store.CancelActiveJobsByRunAttemptParams) (int64, error) {
 	return m.cancelActiveJobsByRunAttempt.record(params)
 }
 
-func (m *jobStore) GetLatestRunByMigAndRepoStatus(ctx context.Context, arg store.GetLatestRunByMigAndRepoStatusParams) (store.GetLatestRunByMigAndRepoStatusRow, error) {
-	return m.getLatestRunByMigAndRepoStatus.record(arg)
-}
-
-func (m *jobStore) GetRun(ctx context.Context, id types.RunID) (store.Run, error) {
-	return m.getRun.record(id.String())
-}
-
-func (m *jobStore) GetSpec(ctx context.Context, id types.SpecID) (store.Spec, error) {
-	return m.getSpec.record(id.String())
-}
-
-func (m *jobStore) GetWave(_ context.Context, id types.WaveID) (store.Wave, error) {
-	return m.getWave.record(id.String())
-}
-
-func (m *jobStore) AckRunStart(ctx context.Context, id types.RunID) error {
+func (m *handlerStore) AckRunStart(ctx context.Context, id types.RunID) error {
 	_, err := m.ackRunStart.ret()
 	return err
 }
 
-func (m *jobStore) UpdateRunStatus(ctx context.Context, params store.UpdateRunStatusParams) error {
-	_, err := m.updateRunStatus.record(params)
-	return err
-}
-
-func (m *jobStore) UpdateRunCompletion(ctx context.Context, id types.RunID) error {
+func (m *handlerStore) UpdateRunCompletion(ctx context.Context, id types.RunID) error {
 	_, err := m.updateRunCompletion.ret()
 	return err
 }
 
-func (m *jobStore) UpdateRunResume(ctx context.Context, id types.RunID) error {
+func (m *handlerStore) UpdateRunResume(ctx context.Context, id types.RunID) error {
 	_, err := m.updateRunResume.ret()
 	return err
 }
 
-func (m *jobStore) UpdateWaveStatus(ctx context.Context, params store.UpdateWaveStatusParams) error {
+func (m *handlerStore) UpdateWaveStatus(ctx context.Context, params store.UpdateWaveStatusParams) error {
 	_, err := m.updateWaveStatus.record(params)
-	return err
-}
-
-func (m *jobStore) ListArtifactBundlesByRunAndJob(ctx context.Context, arg store.ListArtifactBundlesByRunAndJobParams) ([]store.ArtifactBundle, error) {
-	return m.listArtifactBundlesByRunAndJob.record(arg)
-}
-
-func (m *jobStore) CreateArtifactBundle(ctx context.Context, arg store.CreateArtifactBundleParams) (store.ArtifactBundle, error) {
-	return m.createArtifactBundle.ret()
-}
-
-func (m *jobStore) DeleteArtifactBundle(ctx context.Context, id pgtype.UUID) error {
-	_, err := m.deleteArtifactBundle.record(id)
 	return err
 }

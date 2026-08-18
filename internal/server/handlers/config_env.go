@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 
+	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
@@ -17,32 +18,6 @@ var (
 	errTargetNotFound = errors.New("target not found")
 	errAmbiguousKey   = errors.New("ambiguous key")
 )
-
-// globalEnvListItem represents an entry in the GET /v1/config/env list response.
-// For secrets, the value is redacted to prevent accidental exposure.
-type globalEnvListItem struct {
-	Key    string `json:"key"`
-	Value  string `json:"value,omitempty"` // Omitted (empty) for secrets in list view.
-	Target string `json:"target"`
-	Secret bool   `json:"secret"`
-}
-
-// globalEnvResponse represents the response for GET /v1/config/env/{key} and PUT /v1/config/env/{key}.
-// Full value is returned since these endpoints are admin-only and accessed via mTLS.
-type globalEnvResponse struct {
-	Key    string `json:"key"`
-	Value  string `json:"value"`
-	Target string `json:"target"`
-	Secret bool   `json:"secret"`
-}
-
-// globalEnvPutRequest represents the request body for PUT /v1/config/env/{key}.
-// Target is parsed and validated at the API boundary using domaintypes.ParseGlobalEnvTarget().
-type globalEnvPutRequest struct {
-	Value  string `json:"value"`
-	Target string `json:"target"` // Raw string from wire; parsed via ParseGlobalEnvTarget.
-	Secret *bool  `json:"secret"` // Pointer to distinguish explicit false from missing (defaults to true).
-}
 
 // listGlobalEnvHandler returns an HTTP handler that lists all global env entries.
 // Returns all key+target pairs as a flat list sorted by key then target.
@@ -59,7 +34,7 @@ func listGlobalEnvHandler(holder *ConfigHolder) http.HandlerFunc {
 		}
 		sort.Strings(keys)
 
-		var items []globalEnvListItem
+		var items []domainapi.GlobalEnvListItem
 		for _, k := range keys {
 			entries := envMap[k]
 			// Sort entries within key by target for deterministic order.
@@ -67,7 +42,7 @@ func listGlobalEnvHandler(holder *ConfigHolder) http.HandlerFunc {
 				return entries[i].Target.String() < entries[j].Target.String()
 			})
 			for _, v := range entries {
-				item := globalEnvListItem{
+				item := domainapi.GlobalEnvListItem{
 					Key:    k,
 					Target: v.Target.String(),
 					Secret: v.Secret,
@@ -117,7 +92,7 @@ func getGlobalEnvHandler(holder *ConfigHolder) http.HandlerFunc {
 			return
 		}
 
-		resp := globalEnvResponse{
+		resp := domainapi.GlobalEnvResponse{
 			Key:    key,
 			Value:  v.Value,
 			Target: v.Target.String(),
@@ -144,7 +119,7 @@ func putGlobalEnvHandler(holder *ConfigHolder, st store.Store) http.HandlerFunc 
 			return
 		}
 
-		var req globalEnvPutRequest
+		var req domainapi.GlobalEnvPutRequest
 		if err := decodeRequestJSON(w, r, &req, DefaultMaxBodySize); err != nil {
 			return
 		}
@@ -188,7 +163,7 @@ func putGlobalEnvHandler(holder *ConfigHolder, st store.Store) http.HandlerFunc 
 			}
 		}
 
-		resp := globalEnvResponse{
+		resp := domainapi.GlobalEnvResponse{
 			Key:    key,
 			Value:  req.Value,
 			Target: target.String(),

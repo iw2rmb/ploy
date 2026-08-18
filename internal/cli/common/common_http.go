@@ -59,12 +59,6 @@ func ResolveControlPlaneHTTP(_ context.Context) (*url.URL, *http.Client, error) 
 	return u, client, nil
 }
 
-// ResolveControlPlaneToken returns the configured bearer token.
-// It is used for rendering browser-friendly artifact links with auth_token query parameters.
-func ResolveControlPlaneToken() (string, error) {
-	return strings.TrimSpace(os.Getenv("PLOY_AUTH_TOKEN")), nil
-}
-
 // bearerTokenTransport wraps an http.RoundTripper and adds Authorization header to all requests.
 type bearerTokenTransport struct {
 	base  http.RoundTripper

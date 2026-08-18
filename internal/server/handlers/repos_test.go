@@ -17,7 +17,7 @@ import (
 func TestListReposHandler_Success_Empty(t *testing.T) {
 	t.Parallel()
 
-	st := &repoListStore{}
+	st := &handlerStore{}
 	st.listDistinctRepos.val = []store.ListDistinctReposRow{}
 	handler := listReposHandler(st)
 
@@ -49,7 +49,7 @@ func TestListReposHandler_Success_WithData(t *testing.T) {
 	t.Parallel()
 
 	now := time.Now().UTC().Truncate(time.Microsecond)
-	st := &repoListStore{}
+	st := &handlerStore{}
 	st.listDistinctRepos.val = []store.ListDistinctReposRow{
 		{
 			RepoID:     "repo0001",
@@ -105,7 +105,7 @@ func TestListReposHandler_Success_WithData(t *testing.T) {
 func TestListReposHandler_WithFilter(t *testing.T) {
 	t.Parallel()
 
-	st := &repoListStore{}
+	st := &handlerStore{}
 	st.listDistinctRepos.val = []store.ListDistinctReposRow{}
 	handler := listReposHandler(st)
 
@@ -122,7 +122,7 @@ func TestListReposHandler_WithFilter(t *testing.T) {
 func TestListReposHandler_StoreError(t *testing.T) {
 	t.Parallel()
 
-	st := &repoListStore{}
+	st := &handlerStore{}
 	st.listDistinctRepos.err = errors.New("database connection failed")
 	handler := listReposHandler(st)
 
@@ -139,7 +139,7 @@ func TestListRunsForRepoHandler_Success(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	runID := domaintypes.NewRunID()
 	migID := domaintypes.NewMigID()
-	st := &repoListStore{}
+	st := &handlerStore{}
 	st.listRunsForRepo.val = []store.ListRunsForRepoRow{
 		{
 			RunID:       runID,
@@ -202,7 +202,7 @@ func TestListRunsForRepoHandler_Success(t *testing.T) {
 func TestListRunsForRepoHandler_WithPagination(t *testing.T) {
 	t.Parallel()
 
-	st := &repoListStore{}
+	st := &handlerStore{}
 	st.listRunsForRepo.val = []store.ListRunsForRepoRow{}
 	handler := listRunsForRepoHandler(st)
 
@@ -232,8 +232,8 @@ func TestListRunsForRepoHandler_InvalidPagination(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			st := func() *repoListStore {
-				st := &repoListStore{}
+			st := func() *handlerStore {
+				st := &handlerStore{}
 				st.listRunsForRepo.err = errors.New("should not be called")
 				return st
 			}()
@@ -249,8 +249,8 @@ func TestListRunsForRepoHandler_InvalidPagination(t *testing.T) {
 func TestListRunsForRepoHandler_MissingRepoID(t *testing.T) {
 	t.Parallel()
 
-	st := func() *repoListStore {
-		st := &repoListStore{}
+	st := func() *handlerStore {
+		st := &handlerStore{}
 		st.listRunsForRepo.err = errors.New("should not be called")
 		return st
 	}()

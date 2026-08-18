@@ -11,8 +11,8 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/iw2rmb/ploy/internal/cli/httpx"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/httpx"
 )
 
 // CancelCommand requests cancellation for a run.

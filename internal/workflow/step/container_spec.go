@@ -217,8 +217,8 @@ func SeedOutDirFromStaging(manifest contracts.StepManifest, stagingDir, outDir s
 }
 
 // SeedInDirFromStaging copies materialized Hydra in entry content from the
-// staging directory into inDir so that the single /in mount can expose both
-// pre-seeded content and runtime-provided cross-phase files.
+// staging directory into inDir before the container receives the directory as
+// one read-only /in mount.
 func SeedInDirFromStaging(manifest contracts.StepManifest, stagingDir, inDir string) error {
 	if stagingDir == "" || inDir == "" {
 		return nil

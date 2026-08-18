@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
@@ -44,7 +45,7 @@ func TestRunPullCommand_Success(t *testing.T) {
 		}
 
 		// Return a valid response.
-		resp := PullResolution{
+		resp := domainapi.PullResolutionResponse{
 			RunID:           runID,
 			RepoID:          repoID,
 			RepoURL:         "https://github.com/example/repo.git",
@@ -195,7 +196,7 @@ func TestMigPullCommand_Success(t *testing.T) {
 		}
 
 		// Return a valid response.
-		resp := PullResolution{
+		resp := domainapi.PullResolutionResponse{
 			RunID:  runID,
 			RepoID: repoID,
 		}
@@ -252,7 +253,7 @@ func TestMigPullCommand_WithLastFailed(t *testing.T) {
 		}
 
 		// Return a valid response.
-		resp := PullResolution{
+		resp := domainapi.PullResolutionResponse{
 			RunID:  runID,
 			RepoID: repoID,
 		}
@@ -305,7 +306,7 @@ func TestMigPullCommand_DefaultMode(t *testing.T) {
 		}
 
 		// Return a valid response.
-		resp := PullResolution{
+		resp := domainapi.PullResolutionResponse{
 			RunID:  runID,
 			RepoID: repoID,
 		}

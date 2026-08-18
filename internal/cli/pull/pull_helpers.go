@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/iw2rmb/ploy/internal/cli/migs"
+	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
@@ -99,7 +100,7 @@ func ensureHEADMatchesSource(ctx context.Context, sourceCommit string) error {
 	return nil
 }
 
-func ListRunDiffs(ctx context.Context, httpClient *http.Client, baseURL *url.URL, runID domaintypes.RunID, repoID domaintypes.RepoID) ([]migs.DiffEntry, error) {
+func ListRunDiffs(ctx context.Context, httpClient *http.Client, baseURL *url.URL, runID domaintypes.RunID, repoID domaintypes.RepoID) ([]domainapi.DiffListItem, error) {
 	cmd := migs.ListRunDiffsCommand{
 		Client:  httpClient,
 		BaseURL: baseURL,
@@ -111,7 +112,7 @@ func ListRunDiffs(ctx context.Context, httpClient *http.Client, baseURL *url.URL
 
 // downloadAndApplyDiffs downloads and applies all diffs to the working tree.
 // Returns the count of successfully applied diffs (excluding empty patches).
-func downloadAndApplyDiffs(ctx context.Context, runID domaintypes.RunID, repoID domaintypes.RepoID, diffs []migs.DiffEntry, stderr io.Writer) (int, error) {
+func downloadAndApplyDiffs(ctx context.Context, runID domaintypes.RunID, repoID domaintypes.RepoID, diffs []domainapi.DiffListItem, stderr io.Writer) (int, error) {
 	if len(diffs) == 0 {
 		return 0, nil
 	}

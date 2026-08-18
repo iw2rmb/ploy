@@ -67,6 +67,10 @@ ploy job status <job-id>
 ploy job log <job-id>
 ```
 
+Text and terminal status output can include browser links. These links never
+include bearer tokens or other URL credentials. The browser must have its own
+authenticated session.
+
 `ploy run ls` shows `ID STATUS SPEC REPO`. Without `--all`, the server filters
 to the authenticated token username, falling back to the CLI user's `$USER`
 when the token has no username. Named specs render as
@@ -144,6 +148,9 @@ The node removes `cache`, `home`, `staging`, and `tmp` after job execution.
 The node retains the other job paths as durable artifacts. Artifact bundles map
 the durable paths to `artifacts/{job_id}/...` and map `share` to
 `artifacts/shared/...`. The bundle format does not expose the host layout.
+The persisted `container.inspect.json` omits the container arguments,
+environment, command, and entrypoint because these fields can contain
+credentials.
 
 The control plane stores launch grouping in `waves`, execution state in `runs`,
 and work units in `jobs`.

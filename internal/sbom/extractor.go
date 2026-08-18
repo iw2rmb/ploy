@@ -165,12 +165,13 @@ func ExtractPackagesFromJSON(raw []byte) ([]Package, error) {
 	return packages, nil
 }
 
-type packageTuple struct {
+// rawPackage preserves source values until format-independent normalization and deduplication.
+type rawPackage struct {
 	Name    string
 	Version string
 }
 
-func parseSBOMJSON(raw []byte) (pkgs []packageTuple, parsed bool, err error) {
+func parseSBOMJSON(raw []byte) (pkgs []rawPackage, parsed bool, err error) {
 	if len(bytes.TrimSpace(raw)) == 0 {
 		return nil, false, nil
 	}
@@ -195,7 +196,7 @@ func parseSBOMJSON(raw []byte) (pkgs []packageTuple, parsed bool, err error) {
 	return nil, false, nil
 }
 
-func parseSPDXPackages(raw []byte) ([]packageTuple, error) {
+func parseSPDXPackages(raw []byte) ([]rawPackage, error) {
 	var doc struct {
 		Packages []struct {
 			Name        string `json:"name"`
@@ -205,14 +206,14 @@ func parseSPDXPackages(raw []byte) ([]packageTuple, error) {
 	if err := json.Unmarshal(raw, &doc); err != nil {
 		return nil, fmt.Errorf("parse spdx json: %w", err)
 	}
-	out := make([]packageTuple, 0, len(doc.Packages))
+	out := make([]rawPackage, 0, len(doc.Packages))
 	for _, pkg := range doc.Packages {
-		out = append(out, packageTuple{Name: pkg.Name, Version: pkg.VersionInfo})
+		out = append(out, rawPackage{Name: pkg.Name, Version: pkg.VersionInfo})
 	}
 	return out, nil
 }
 
-func parseCycloneDXComponents(raw []byte) ([]packageTuple, error) {
+func parseCycloneDXComponents(raw []byte) ([]rawPackage, error) {
 	type component struct {
 		Name       string      `json:"name"`
 		Version    string      `json:"version"`
@@ -224,11 +225,11 @@ func parseCycloneDXComponents(raw []byte) ([]packageTuple, error) {
 	if err := json.Unmarshal(raw, &doc); err != nil {
 		return nil, fmt.Errorf("parse cyclonedx json: %w", err)
 	}
-	out := make([]packageTuple, 0)
+	out := make([]rawPackage, 0)
 	var walk func(items []component)
 	walk = func(items []component) {
 		for _, item := range items {
-			out = append(out, packageTuple{Name: item.Name, Version: item.Version})
+			out = append(out, rawPackage{Name: item.Name, Version: item.Version})
 			if len(item.Components) > 0 {
 				walk(item.Components)
 			}

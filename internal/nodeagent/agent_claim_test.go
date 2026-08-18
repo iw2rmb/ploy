@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	"github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/testutil/workflowkit"
 	"github.com/iw2rmb/ploy/internal/workflow/backoff"
@@ -130,24 +131,32 @@ func TestClaimLoopBackoff(t *testing.T) {
 	}
 }
 
-// TestClaimLoop_FieldMapping verifies ClaimResponse fields map correctly into StartRunRequest.
+// TestClaimLoop_FieldMapping verifies domainapi.NodeClaimResponse fields map correctly into StartRunRequest.
 func TestClaimLoop_FieldMapping(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name       string
 		claimOpts  []claimOption
-		assertions func(t *testing.T, got StartRunRequest, claim ClaimResponse)
+		assertions func(t *testing.T, got StartRunRequest, claim domainapi.NodeClaimResponse)
 	}{
 		{
-			name: "core fields including CommitSHA",
+			name: "claim contract reaches start request",
 			claimOpts: []claimOption{
 				withCommitSHA("deadbeef"),
+				withClaimName("named-run"),
+				withNextID(types.NewJobID()),
+				withMigClaimContext(&contracts.MigClaimContext{StepIndex: 2}),
+				withGateClaimContext(&contracts.GateClaimContext{CycleName: "pre"}),
+				withClaimDetectedStack(&contracts.StackExpectation{Language: "java", Tool: "maven", Release: "17"}),
 			},
-			assertions: func(t *testing.T, got StartRunRequest, claim ClaimResponse) {
+			assertions: func(t *testing.T, got StartRunRequest, claim domainapi.NodeClaimResponse) {
 				t.Helper()
 				if got.RunID != claim.RunID {
 					t.Errorf("RunID=%q want %q", got.RunID, claim.RunID)
+				}
+				if got.JobID != claim.JobID || got.JobName != claim.JobName || got.JobType != claim.JobType || got.JobImage != claim.JobImage {
+					t.Errorf("job fields = %q %q %q %q, want %q %q %q %q", got.JobID, got.JobName, got.JobType, got.JobImage, claim.JobID, claim.JobName, claim.JobType, claim.JobImage)
 				}
 				if got.RepoID != claim.RepoID {
 					t.Errorf("RepoID=%q want %q", got.RepoID, claim.RepoID)
@@ -158,15 +167,30 @@ func TestClaimLoop_FieldMapping(t *testing.T) {
 				if got.BaseRef != claim.BaseRef {
 					t.Errorf("BaseRef=%q want %q", got.BaseRef, claim.BaseRef)
 				}
-				if got.CommitSHA != *claim.CommitSha {
-					t.Errorf("CommitSHA=%q want %q", got.CommitSHA, *claim.CommitSha)
+				if got.CommitSHA != claim.CommitSHA || got.RepoSHAIn != claim.RepoSHAIn {
+					t.Errorf("refs = %q %q, want %q %q", got.CommitSHA, got.RepoSHAIn, claim.CommitSHA, claim.RepoSHAIn)
+				}
+				if got.Attempt != claim.Attempt || got.Name != *claim.Name {
+					t.Errorf("attempt/name = %d %q, want %d %q", got.Attempt, got.Name, claim.Attempt, *claim.Name)
+				}
+				if got.NextID == nil || *got.NextID != *claim.NextID {
+					t.Errorf("NextID=%v want %v", got.NextID, claim.NextID)
+				}
+				if got.MigContext == nil || *got.MigContext != *claim.MigContext {
+					t.Errorf("MigContext=%v want %v", got.MigContext, claim.MigContext)
+				}
+				if got.GateContext == nil || *got.GateContext != *claim.GateContext {
+					t.Errorf("GateContext=%v want %v", got.GateContext, claim.GateContext)
+				}
+				if got.DetectedStack == nil || *got.DetectedStack != *claim.DetectedStack {
+					t.Errorf("DetectedStack=%v want %v", got.DetectedStack, claim.DetectedStack)
 				}
 			},
 		},
 		{
 			name:      "NextID propagation",
 			claimOpts: []claimOption{withNextID(types.NewJobID()), withCommitSHA("abc123")},
-			assertions: func(t *testing.T, got StartRunRequest, claim ClaimResponse) {
+			assertions: func(t *testing.T, got StartRunRequest, claim domainapi.NodeClaimResponse) {
 				t.Helper()
 				if got.NextID == nil || *got.NextID != *claim.NextID {
 					t.Errorf("NextID=%v want %v", got.NextID, claim.NextID)
@@ -182,7 +206,7 @@ func TestClaimLoop_FieldMapping(t *testing.T) {
 					Release:  "17",
 				}),
 			},
-			assertions: func(t *testing.T, got StartRunRequest, claim ClaimResponse) {
+			assertions: func(t *testing.T, got StartRunRequest, claim domainapi.NodeClaimResponse) {
 				t.Helper()
 				if got.DetectedStack == nil {
 					t.Fatal("DetectedStack=nil, want non-nil")

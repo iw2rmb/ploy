@@ -279,12 +279,20 @@ image pulls. Use `PLOY_DOCKER_AUTH_CONFIG_FILE` for private registries.
 ## E2E Harness
 
 - `ploy run` executes Migs against the Ploy control plane; no tenant variable is required.
-- `PLOY_E2E_RUN_PREFIX` — Optional run ID prefix for Migs E2E runs
-  (default `e2e`).
+- `PLOY_E2E_CLUSTER=require` — Runs the live Hydra suite. Without this value,
+  live tests skip and deterministic offline tests continue.
 - `PLOY_E2E_REPO_OVERRIDE` — Optional Git repository override used by the Migs
-  E2E scenarios in place of the default Java sample repo.
-- `PLOY_E2E_LIVE_SCENARIOS` — Optional comma-separated scenario IDs that the
-  live Migs smoke test should execute (defaults to `simple-openrewrite`).
+  E2E scenarios.
+- `PLOY_E2E_BASE_REF` — Optional source ref for the repository override.
+- `PLOY_E2E_IMAGE` — Shell-capable runtime image available to the Ploy nodes.
+  The live suite does not use a Docker Hub default. This image does not select
+  the source stack.
+- `GITLAB_TOKEN` — Optional GitLab token for a non-public E2E repository. The
+  harness sends it as a run-scoped token through `--gitlab-token-env`.
+
+Generic Hydra scenarios set `build_gate.disabled: true`. Stack-aware scenarios
+use their separate Java repository and keep Build Gate enabled. See
+[Migs E2E tests](../../tests/e2e/migs/README.md).
 
 ## GitLab Source Hydration
 

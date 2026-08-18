@@ -46,7 +46,7 @@ func TestSaveJobImageNameHandler(t *testing.T) {
 				jobNodeID = domaintypes.NodeID(domaintypes.NewNodeKey())
 			}
 			jobID := domaintypes.NewJobID()
-			st := &jobStore{}
+			st := &handlerStore{}
 			st.getJob.val = store.Job{
 				ID:      jobID,
 				RunID:   domaintypes.NewRunID(),

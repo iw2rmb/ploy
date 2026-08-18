@@ -23,7 +23,7 @@ func TestCreateSingleRepoRunHandler_SingleRepo(t *testing.T) {
 	t.Parallel()
 
 	now := time.Now().UTC()
-	st := &jobStore{}
+	st := &handlerStore{}
 	st.createRun.val = store.Run{
 		Status:    domaintypes.RunStatusRunning,
 		CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
@@ -143,7 +143,7 @@ func TestCreateJobsFromSpec(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			st := &jobStore{}
+			st := &handlerStore{}
 			repoSHA0 := tt.repoSHA0
 			if repoSHA0 == "" {
 				repoSHA0 = testRepoSHA0
@@ -181,7 +181,7 @@ func TestJobQueueingRules_FirstJobQueued(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			st := &jobStore{}
+			st := &handlerStore{}
 
 			err := createJobsFromSpec(context.Background(), st, domaintypes.RunID("run_123"), domaintypes.RepoID("repo_456"), "main", 1, testRepoSHA0, tc.spec)
 			if err != nil {
@@ -209,7 +209,7 @@ func TestJobQueueingRules_FirstJobQueued(t *testing.T) {
 func TestCreateJobsFromSpec_ChainIntegrity(t *testing.T) {
 	t.Parallel()
 
-	st := &jobStore{}
+	st := &handlerStore{}
 	spec := []byte(`{"steps":[{"image":"a"},{"image":"b"}]}`)
 
 	err := createJobsFromSpec(context.Background(), st, domaintypes.RunID("run_123"), domaintypes.RepoID("repo_456"), "main", 1, testRepoSHA0, spec)
@@ -252,7 +252,7 @@ func TestCreateJobsFromSpec_ChainIntegrity(t *testing.T) {
 func TestCreateSingleRepoRunHandler_ValidationErrors(t *testing.T) {
 	t.Parallel()
 
-	st := &jobStore{}
+	st := &handlerStore{}
 	handler := createSingleRepoRunHandler(st, nil, gitauth.Options{}, runSubmitSpecServices{})
 
 	tests := []struct {
@@ -284,7 +284,7 @@ func TestCreateSingleRepoRunHandler_PublishesEvent(t *testing.T) {
 	t.Parallel()
 
 	now := time.Now().UTC()
-	st := &jobStore{}
+	st := &handlerStore{}
 	st.createRun.val = store.Run{
 		Status:    domaintypes.RunStatusRunning,
 		CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
@@ -333,15 +333,15 @@ func TestGetRunStatusHandler(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		setupStore func() *jobStore
+		setupStore func() *handlerStore
 		reqRunID   string
 		wantStatus int
-		verify     func(t *testing.T, st *jobStore, rr *httptest.ResponseRecorder)
+		verify     func(t *testing.T, st *handlerStore, rr *httptest.ResponseRecorder)
 	}{
 		{
 			name: "success",
-			setupStore: func() *jobStore {
-				st := &jobStore{}
+			setupStore: func() *handlerStore {
+				st := &handlerStore{}
 				st.listJobsByRun.val = []store.Job{
 					{ID: jobID, RunID: runID, Status: domaintypes.JobStatusQueued, NextID: &nextJobID, Meta: withNextIDMeta([]byte(`{}`), float64(1000))},
 				}
@@ -360,7 +360,7 @@ func TestGetRunStatusHandler(t *testing.T) {
 			},
 			reqRunID:   runIDStr,
 			wantStatus: http.StatusOK,
-			verify: func(t *testing.T, st *jobStore, rr *httptest.ResponseRecorder) {
+			verify: func(t *testing.T, st *handlerStore, rr *httptest.ResponseRecorder) {
 				t.Helper()
 				resp := decodeBody[migsapi.RunSummary](t, rr)
 				if resp.RunID.String() != runIDStr {
@@ -390,26 +390,26 @@ func TestGetRunStatusHandler(t *testing.T) {
 		},
 		{
 			name: "not found",
-			setupStore: func() *jobStore {
-				st := &jobStore{}
+			setupStore: func() *handlerStore {
+				st := &handlerStore{}
 				st.getRun.err = pgx.ErrNoRows
 				return st
 			},
 			reqRunID:   domaintypes.NewRunID().String(),
 			wantStatus: http.StatusNotFound,
-			verify: func(t *testing.T, _ *jobStore, rr *httptest.ResponseRecorder) {
+			verify: func(t *testing.T, _ *handlerStore, rr *httptest.ResponseRecorder) {
 				t.Helper()
 				assertBodyContains(t, rr, "not found")
 			},
 		},
 		{
 			name: "empty ID",
-			setupStore: func() *jobStore {
-				return &jobStore{}
+			setupStore: func() *handlerStore {
+				return &handlerStore{}
 			},
 			reqRunID:   "",
 			wantStatus: http.StatusBadRequest,
-			verify: func(t *testing.T, _ *jobStore, rr *httptest.ResponseRecorder) {
+			verify: func(t *testing.T, _ *handlerStore, rr *httptest.ResponseRecorder) {
 				t.Helper()
 				assertBodyContains(t, rr, "path parameter is required")
 			},

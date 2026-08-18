@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/iw2rmb/ploy/internal/cli/httpx"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/httpx"
 	migsapi "github.com/iw2rmb/ploy/internal/migs/api"
 	"github.com/iw2rmb/ploy/internal/workflow/jobchain"
 )
@@ -40,24 +40,9 @@ func (c ListRunJobsCommand) Run(ctx context.Context) (ListRunJobsResult, error) 
 		endpoint.RawQuery = q.Encode()
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
+	result, err := httpx.DoJSON[ListRunJobsResult](ctx, c.Client, http.MethodGet, endpoint.String(), nil, http.StatusOK, "list run jobs")
 	if err != nil {
-		return ListRunJobsResult{}, fmt.Errorf("list run jobs: build request: %w", err)
-	}
-
-	resp, err := c.Client.Do(req)
-	if err != nil {
-		return ListRunJobsResult{}, fmt.Errorf("list run jobs: http request failed: %w", err)
-	}
-	defer httpx.DrainAndClose(resp)
-
-	if resp.StatusCode != http.StatusOK {
-		return ListRunJobsResult{}, httpx.WrapError("list run jobs", resp.Status, resp.Body)
-	}
-
-	var result ListRunJobsResult
-	if err := httpx.DecodeResponseJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
-		return ListRunJobsResult{}, fmt.Errorf("list run jobs: decode response: %w", err)
+		return ListRunJobsResult{}, err
 	}
 
 	result.Jobs = orderRunJobsByChain(result.Jobs)

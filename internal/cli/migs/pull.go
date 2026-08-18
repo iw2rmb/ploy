@@ -9,32 +9,16 @@
 package migs
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
 
-	"github.com/iw2rmb/ploy/internal/cli/httpx"
+	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/httpx"
 )
-
-// =============================================================================
-// Pull Resolution Response Types
-// =============================================================================
-
-// PullResolution is the response from pull resolution endpoints.
-// It provides the identifiers needed to fetch diffs:
-//   - RunID: the run containing the execution
-//   - RepoID: the mig_repos.id for the matched repo
-type PullResolution struct {
-	RunID           domaintypes.RunID  `json:"run_id"`
-	RepoID          domaintypes.RepoID `json:"repo_id"`
-	RepoURL         string             `json:"repo_url,omitempty"`
-	SourceCommitSHA string             `json:"source_commit_sha,omitempty"`
-}
 
 // =============================================================================
 // Run Pull Resolution Command
@@ -49,7 +33,7 @@ type RunPullCommand struct {
 }
 
 // Run executes POST /v1/runs/{run_id}/pull with no request body.
-func (c RunPullCommand) Run(ctx context.Context) (*PullResolution, error) {
+func (c RunPullCommand) Run(ctx context.Context) (*domainapi.PullResolutionResponse, error) {
 	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
 		return nil, fmt.Errorf("run pull: %w", err)
 	}
@@ -59,24 +43,9 @@ func (c RunPullCommand) Run(ctx context.Context) (*PullResolution, error) {
 
 	endpoint := c.BaseURL.JoinPath("v1", "runs", c.RunID.String(), "pull")
 
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), nil)
+	result, err := httpx.DoJSON[domainapi.PullResolutionResponse](ctx, c.Client, http.MethodPost, endpoint.String(), nil, http.StatusOK, "run pull")
 	if err != nil {
-		return nil, fmt.Errorf("run pull: build request: %w", err)
-	}
-
-	resp, err := c.Client.Do(httpReq)
-	if err != nil {
-		return nil, fmt.Errorf("run pull: http request failed: %w", err)
-	}
-	defer httpx.DrainAndClose(resp)
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, httpx.WrapError("run pull", resp.Status, resp.Body)
-	}
-
-	var result PullResolution
-	if err := httpx.DecodeResponseJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
-		return nil, fmt.Errorf("run pull: decode response: %w", err)
+		return nil, err
 	}
 	if result.RepoID.IsZero() {
 		return nil, fmt.Errorf("run pull: empty repo_id in response")
@@ -126,7 +95,7 @@ type MigPullCommand struct {
 
 // Run executes POST /v1/migs/{mig_id}/pull with the provided repo_url and mode.
 // Returns the PullResolution containing run_id and repo_id.
-func (c MigPullCommand) Run(ctx context.Context) (*PullResolution, error) {
+func (c MigPullCommand) Run(ctx context.Context) (*domainapi.PullResolutionResponse, error) {
 	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
 		return nil, fmt.Errorf("mig pull: %w", err)
 	}
@@ -158,30 +127,9 @@ func (c MigPullCommand) Run(ctx context.Context) (*PullResolution, error) {
 		RepoURL: repoURL,
 		Mode:    string(mode),
 	}
-	bodyBytes, err := json.Marshal(reqBody)
+	result, err := httpx.DoJSON[domainapi.PullResolutionResponse](ctx, c.Client, http.MethodPost, endpoint.String(), reqBody, http.StatusOK, "mig pull")
 	if err != nil {
-		return nil, fmt.Errorf("mig pull: marshal request: %w", err)
-	}
-
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), bytes.NewReader(bodyBytes))
-	if err != nil {
-		return nil, fmt.Errorf("mig pull: build request: %w", err)
-	}
-	httpReq.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.Client.Do(httpReq)
-	if err != nil {
-		return nil, fmt.Errorf("mig pull: http request failed: %w", err)
-	}
-	defer httpx.DrainAndClose(resp)
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, httpx.WrapError("mig pull", resp.Status, resp.Body)
-	}
-
-	var result PullResolution
-	if err := httpx.DecodeResponseJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
-		return nil, fmt.Errorf("mig pull: decode response: %w", err)
+		return nil, err
 	}
 
 	return &result, nil

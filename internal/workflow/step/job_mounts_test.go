@@ -16,7 +16,7 @@ func TestCommonJobMountsUseGenericProjection(t *testing.T) {
 		t.Fatalf("buildCommonJobMounts() error = %v", err)
 	}
 
-	requireMount(t, got, jobInContainerDir, mounts.In, false)
+	requireMount(t, got, jobInContainerDir, mounts.In, true)
 	requireMount(t, got, jobOutContainerDir, mounts.Out, false)
 	requireMount(t, got, jobTmpContainerDir, mounts.Tmp, false)
 	requireMount(t, got, jobCacheContainerDir, mounts.Cache, false)

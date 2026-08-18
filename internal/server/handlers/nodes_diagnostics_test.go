@@ -18,12 +18,12 @@ func TestNodeDiagnosticsHandlers_CurrentContract(t *testing.T) {
 
 	tests := []struct {
 		name   string
-		run    func(t *testing.T, st *nodeStore)
-		verify func(t *testing.T, st *nodeStore)
+		run    func(t *testing.T, st *handlerStore)
+		verify func(t *testing.T, st *handlerStore)
 	}{
 		{
 			name: "post diagnostic stores structured state",
-			run: func(t *testing.T, st *nodeStore) {
+			run: func(t *testing.T, st *handlerStore) {
 				h := upsertNodeDiagnosticHandler(st)
 				body := `{
   "component": "node",
@@ -39,7 +39,7 @@ func TestNodeDiagnosticsHandlers_CurrentContract(t *testing.T) {
 				rr := doRequest(t, h, http.MethodPost, "/v1/nodes/"+nodeID.String()+"/diagnostics", body, "id", nodeID.String())
 				assertStatus(t, rr, http.StatusOK)
 			},
-			verify: func(t *testing.T, st *nodeStore) {
+			verify: func(t *testing.T, st *handlerStore) {
 				assertCalled(t, "UpsertNodeDiagnostic", st.upsertDiagnostic.called)
 				got := st.upsertDiagnostic.params
 				if got.NodeID != nodeID || got.Component != "node" || got.Status != "ok" {
@@ -55,7 +55,7 @@ func TestNodeDiagnosticsHandlers_CurrentContract(t *testing.T) {
 		},
 		{
 			name: "list diagnostics returns rows",
-			run: func(t *testing.T, st *nodeStore) {
+			run: func(t *testing.T, st *handlerStore) {
 				st.listDiagnostics.val = []store.NodeDiagnostic{{
 					NodeID:    nodeID,
 					Component: "node",
@@ -74,19 +74,19 @@ func TestNodeDiagnosticsHandlers_CurrentContract(t *testing.T) {
 					t.Fatalf("response = %+v", out)
 				}
 			},
-			verify: func(t *testing.T, st *nodeStore) {
+			verify: func(t *testing.T, st *handlerStore) {
 				assertCalled(t, "ListNodeDiagnostics", st.listDiagnostics.called)
 			},
 		},
 		{
 			name: "post daemon logs stores lines and trims",
-			run: func(t *testing.T, st *nodeStore) {
+			run: func(t *testing.T, st *handlerStore) {
 				h := createNodeDaemonLogsHandler(st)
 				body := `{"component":"node","stream":"stderr","lines":["node ok","heartbeat ok"]}`
 				rr := doRequest(t, h, http.MethodPost, "/v1/nodes/"+nodeID.String()+"/daemon-logs", body, "id", nodeID.String())
 				assertStatus(t, rr, http.StatusCreated)
 			},
-			verify: func(t *testing.T, st *nodeStore) {
+			verify: func(t *testing.T, st *handlerStore) {
 				if len(st.createDaemonLog.calls) != 2 {
 					t.Fatalf("CreateNodeDaemonLog calls = %d, want 2", len(st.createDaemonLog.calls))
 				}
@@ -98,7 +98,7 @@ func TestNodeDiagnosticsHandlers_CurrentContract(t *testing.T) {
 		},
 		{
 			name: "list daemon logs forwards filter and limit",
-			run: func(t *testing.T, st *nodeStore) {
+			run: func(t *testing.T, st *handlerStore) {
 				st.listDaemonLogs.val = []store.NodeDaemonLog{{
 					ID:        7,
 					NodeID:    nodeID,
@@ -111,7 +111,7 @@ func TestNodeDiagnosticsHandlers_CurrentContract(t *testing.T) {
 				rr := doRequest(t, h, http.MethodGet, "/v1/nodes/"+nodeID.String()+"/daemon-logs?component=node&limit=50", "", "id", nodeID.String())
 				assertStatus(t, rr, http.StatusOK)
 			},
-			verify: func(t *testing.T, st *nodeStore) {
+			verify: func(t *testing.T, st *handlerStore) {
 				assertCalled(t, "ListNodeDaemonLogs", st.listDaemonLogs.called)
 				if st.listDaemonLogs.params.Component == nil || *st.listDaemonLogs.params.Component != "node" {
 					t.Fatalf("component filter = %+v", st.listDaemonLogs.params.Component)
@@ -125,7 +125,7 @@ func TestNodeDiagnosticsHandlers_CurrentContract(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			st := &nodeStore{}
+			st := &handlerStore{}
 			st.getNode.val = store.Node{ID: nodeID}
 			tt.run(t, st)
 			tt.verify(t, st)

@@ -7,7 +7,7 @@ import (
 	"charm.land/lipgloss/v2"
 
 	cliruns "github.com/iw2rmb/ploy/internal/cli/runs"
-	clitui "github.com/iw2rmb/ploy/internal/client/tui"
+	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/tui/joblist"
 )
@@ -41,7 +41,7 @@ func TestNewHasCorrectTitleAndWidth(t *testing.T) {
 func TestSetJobsPopulatesItems(t *testing.T) {
 	m := joblist.New("JOBS")
 	nodeID := domaintypes.NodeID("abc123")
-	m = m.SetJobs([]clitui.JobItem{
+	m = m.SetJobs([]domainapi.JobListItem{
 		{
 			JobID:      domaintypes.JobID("job-abc"),
 			Name:       "deploy",
@@ -82,7 +82,7 @@ func TestSetJobsPopulatesItems(t *testing.T) {
 
 func TestSetJobsPreservesOrder(t *testing.T) {
 	m := joblist.New("JOBS")
-	m = m.SetJobs([]clitui.JobItem{
+	m = m.SetJobs([]domainapi.JobListItem{
 		{Name: "first", MigName: "m", RunID: domaintypes.RunID("r"), RepoID: domaintypes.RepoID("repo")},
 		{Name: "second", MigName: "m", RunID: domaintypes.RunID("r"), RepoID: domaintypes.RepoID("repo")},
 		{Name: "third", MigName: "m", RunID: domaintypes.RunID("r"), RepoID: domaintypes.RepoID("repo")},
@@ -102,7 +102,7 @@ func TestSetJobsPreservesOrder(t *testing.T) {
 
 func TestSelectedJobReturnsCurrentCursor(t *testing.T) {
 	m := joblist.New("JOBS")
-	jobs := []clitui.JobItem{
+	jobs := []domainapi.JobListItem{
 		{JobID: domaintypes.JobID("job-1"), Name: "first", MigName: "m", RunID: domaintypes.RunID("r"), RepoID: domaintypes.RepoID("repo")},
 		{JobID: domaintypes.JobID("job-2"), Name: "second", MigName: "m", RunID: domaintypes.RunID("r"), RepoID: domaintypes.RepoID("repo")},
 	}
@@ -173,7 +173,7 @@ func TestSetDetailsRoundTrip(t *testing.T) {
 func TestSetJobsClearsDetails(t *testing.T) {
 	m := joblist.New("JOBS")
 	m = m.SetDetails(&cliruns.RunJobDetailEntry{JobID: domaintypes.JobID("job-1")})
-	m = m.SetJobs([]clitui.JobItem{
+	m = m.SetJobs([]domainapi.JobListItem{
 		{Name: "other", MigName: "m", RunID: domaintypes.RunID("r"), RepoID: domaintypes.RepoID("repo")},
 	})
 	if m.Details() != nil {

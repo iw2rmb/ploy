@@ -1,19 +1,16 @@
 package runs
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"strings"
 
-	"github.com/iw2rmb/ploy/internal/cli/httpx"
 	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/httpx"
 )
 
 // RestartCommand requests a new attempt for a terminal run.
@@ -32,34 +29,10 @@ func (c RestartCommand) Run(ctx context.Context) (domaintypes.RunSummary, error)
 	if c.RunID.IsZero() {
 		return domaintypes.RunSummary{}, errors.New("runs restart: run id required")
 	}
-	var body io.Reader
+	var body any
 	if strings.TrimSpace(c.GitLabToken) != "" {
-		reqBody := domainapi.RunRestartRequest{GitLabToken: &c.GitLabToken}
-		payload, err := json.Marshal(reqBody)
-		if err != nil {
-			return domaintypes.RunSummary{}, fmt.Errorf("runs restart: marshal request: %w", err)
-		}
-		body = bytes.NewReader(payload)
+		body = domainapi.RunRestartRequest{GitLabToken: &c.GitLabToken}
 	}
 	endpoint := c.BaseURL.JoinPath("v1", "runs", c.RunID.String(), "restart")
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), body)
-	if err != nil {
-		return domaintypes.RunSummary{}, fmt.Errorf("runs restart: build request: %w", err)
-	}
-	if body != nil {
-		req.Header.Set("Content-Type", "application/json")
-	}
-	resp, err := c.Client.Do(req)
-	if err != nil {
-		return domaintypes.RunSummary{}, fmt.Errorf("runs restart: http request failed: %w", err)
-	}
-	defer httpx.DrainAndClose(resp)
-	if resp.StatusCode != http.StatusOK {
-		return domaintypes.RunSummary{}, httpx.WrapError("runs restart", resp.Status, resp.Body)
-	}
-	var out domaintypes.RunSummary
-	if err := httpx.DecodeResponseJSON(resp.Body, &out, httpx.MaxJSONBodyBytes); err != nil {
-		return domaintypes.RunSummary{}, fmt.Errorf("runs restart: decode response: %w", err)
-	}
-	return out, nil
+	return httpx.DoJSON[domaintypes.RunSummary](ctx, c.Client, http.MethodPost, endpoint.String(), body, http.StatusOK, "runs restart")
 }

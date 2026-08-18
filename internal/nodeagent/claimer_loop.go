@@ -10,15 +10,14 @@ package nodeagent
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
 	"time"
 
-	"github.com/iw2rmb/ploy/internal/cli/httpx"
-	types "github.com/iw2rmb/ploy/internal/domain/types"
+	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
+	"github.com/iw2rmb/ploy/internal/httpx"
 )
 
 // Start begins the claim loop.
@@ -136,8 +135,8 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 	}
 
 	// Decode claim response.
-	var claim ClaimResponse
-	if err := json.NewDecoder(resp.Body).Decode(&claim); err != nil {
+	var claim domainapi.NodeClaimResponse
+	if err := httpx.DecodeResponseJSON(resp.Body, &claim, httpx.MaxJSONBodyBytes); err != nil {
 		return false, fmt.Errorf("decode claim response: %w", err)
 	}
 
@@ -178,13 +177,15 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 	}
 
 	startReq := StartRunRequest{
-		RunID:         claim.RunID, // Already types.RunID from ClaimResponse
-		JobID:         claim.JobID, // Already types.JobID from ClaimResponse
+		RunID:         claim.RunID,
+		JobID:         claim.JobID,
 		RepoID:        claim.RepoID,
+		Attempt:       claim.Attempt,
 		RepoURL:       claim.RepoURL,
+		Name:          derefString(claim.Name),
 		BaseRef:       claim.BaseRef,
-		CommitSHA:     derefCommitSHA(claim.CommitSha),
-		RepoSHAIn:     derefCommitSHA(claim.RepoShaIn),
+		CommitSHA:     claim.CommitSHA,
+		RepoSHAIn:     claim.RepoSHAIn,
 		JobType:       claim.JobType,
 		JobImage:      claim.JobImage,
 		NextID:        claim.NextID,
@@ -221,7 +222,7 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 	return true, nil
 }
 
-func derefCommitSHA(v *types.CommitSHA) types.CommitSHA {
+func derefString(v *string) string {
 	if v == nil {
 		return ""
 	}

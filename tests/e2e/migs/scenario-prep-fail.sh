@@ -14,14 +14,15 @@ REPO_URL="${PLOY_E2E_REPO_OVERRIDE:-https://github.com/octocat/Hello-World.git}"
 BASE_REF="${PLOY_E2E_BASE_REF:-prep-fail-trigger}"
 TARGET_REF="${PLOY_E2E_TARGET_REF:-master}"
 SPEC_FILE="${E2E_ARTIFACT_DIR}/prep-fail-spec.json"
+E2E_IMAGE="$(e2e_runtime_image)"
 
-cat > "$SPEC_FILE" <<'JSON'
+cat > "$SPEC_FILE" <<JSON
 {
   "version": "0.2.0",
   "env": {},
   "steps": [
     {
-      "image": "alpine:3.20",
+      "image": "${E2E_IMAGE}",
       "command": "echo \"[prep-fail] this step should stay gated\""
     }
   ]

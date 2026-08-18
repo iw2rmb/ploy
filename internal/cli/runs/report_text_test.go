@@ -663,8 +663,9 @@ func TestRenderRunStatusReportTextOSC8OnAndOff(t *testing.T) {
 	migID := domaintypes.NewMigID()
 	repoID := domaintypes.NewRepoID()
 	jobID := domaintypes.NewJobID()
-	jobLogURL := "https://example.test/v1/jobs/" + jobID.String() + "/logs"
-	patchURL := "https://example.test/v1/runs/" + runID.String() + "/diffs?download=true&diff_id=abc"
+	jobLogURL := "https://example.test/v1/jobs/" + jobID.String() + "/logs?auth_token=job-secret&view=raw"
+	safeJobLogURL := "https://example.test/v1/jobs/" + jobID.String() + "/logs?view=raw"
+	patchURL := "https://example.test/v1/runs/" + runID.String() + "/diffs?auth_token=patch-secret&download=true&diff_id=abc"
 	baseURL, err := url.Parse("https://example.test")
 	if err != nil {
 		t.Fatalf("parse base url: %v", err)
@@ -698,29 +699,71 @@ func TestRenderRunStatusReportTextOSC8OnAndOff(t *testing.T) {
 		},
 	}
 
-	plainOut := renderText(t, report, TextRenderOptions{EnableOSC8: false, AuthToken: "test-token", BaseURL: baseURL})
+	plainOut := renderText(t, report, TextRenderOptions{EnableOSC8: false, BaseURL: baseURL})
 	assertx.NotContains(t, plainOut, "Logs (")
-	assertx.Contains(t, plainOut, colorizeNeutralText(jobID.String())+" ("+jobLogURL+"?auth_token=test-token)")
-	assertx.Contains(t, plainOut, report.SpecID.String()+" (https://example.test/v1/migs/"+migID.String()+"/specs/latest?auth_token=test-token)")
+	assertx.Contains(t, plainOut, colorizeNeutralText(jobID.String())+" ("+safeJobLogURL+")")
+	assertx.Contains(t, plainOut, report.SpecID.String()+" (https://example.test/v1/migs/"+migID.String()+"/specs/latest)")
 	assertx.Contains(t, plainOut, "acme/links:")
 	assertx.NotContains(t, plainOut, "github.com/acme/links")
 	assertx.NotContains(t, plainOut, "https://github.com/acme/links.git")
-	assertx.NotContains(t, plainOut, "https://github.com/acme/links.git?auth_token=")
 	assertx.Contains(t, plainOut, "Patch (https://example.test/v1/runs/"+runID.String()+"/diffs?")
-	assertx.Contains(t, plainOut, "auth_token=test-token")
+	assertx.NotContains(t, plainOut, "job-secret")
+	assertx.NotContains(t, plainOut, "patch-secret")
+	assertx.NotContains(t, plainOut, "auth_token")
 	assertx.Contains(t, plainOut, "diff_id=abc")
 	assertx.Contains(t, plainOut, "download=true")
 	if strings.Contains(plainOut, "\x1b]8;;") {
 		t.Fatalf("plain output unexpectedly contains OSC8 sequence: %q", plainOut)
 	}
 
-	linkedOut := renderText(t, report, TextRenderOptions{EnableOSC8: true, AuthToken: "test-token", BaseURL: baseURL})
-	assertx.Contains(t, linkedOut, "\x1b]8;;"+jobLogURL+"?auth_token=test-token\x1b\\"+colorizeNeutralText(jobID.String())+"\x1b]8;;\x1b\\")
-	assertx.Contains(t, linkedOut, "\x1b]8;;https://example.test/v1/migs/"+migID.String()+"/specs/latest?auth_token=test-token")
+	linkedOut := renderText(t, report, TextRenderOptions{EnableOSC8: true, BaseURL: baseURL})
+	assertx.Contains(t, linkedOut, "\x1b]8;;"+safeJobLogURL+"\x1b\\"+colorizeNeutralText(jobID.String())+"\x1b]8;;\x1b\\")
+	assertx.Contains(t, linkedOut, "\x1b]8;;https://example.test/v1/migs/"+migID.String()+"/specs/latest")
 	assertx.Contains(t, linkedOut, "\x1b]8;;https://github.com/acme/links.git\x1b\\acme/links\x1b]8;;\x1b\\")
-	assertx.NotContains(t, linkedOut, "github.com/acme/links.git?auth_token=")
 	assertx.Contains(t, linkedOut, "\x1b]8;;https://example.test/v1/runs/"+runID.String()+"/diffs?")
-	assertx.Contains(t, linkedOut, "auth_token=test-token")
+	assertx.NotContains(t, linkedOut, "job-secret")
+	assertx.NotContains(t, linkedOut, "patch-secret")
+	assertx.NotContains(t, linkedOut, "auth_token")
+}
+
+func TestSanitizeRenderedURLRemovesCredentials(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		raw  string
+		want string
+	}{
+		{
+			name: "userinfo and credential query parameters",
+			raw:  "https://oauth2:password@example.test/logs?auth_token=one&private-token=two&view=raw",
+			want: "https://example.test/logs?view=raw",
+		},
+		{
+			name: "presigned credential parameters",
+			raw:  "https://example.test/artifact?X-Amz-Credential=one&X-Amz-Signature=two&download=true",
+			want: "https://example.test/artifact?download=true",
+		},
+		{
+			name: "noncredential query parameters",
+			raw:  "https://example.test/diffs?download=true&diff_id=abc",
+			want: "https://example.test/diffs?diff_id=abc&download=true",
+		},
+		{
+			name: "malformed url",
+			raw:  "https://example.test/%zz",
+			want: "",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if got := sanitizeRenderedURL(tc.raw); got != tc.want {
+				t.Fatalf("sanitizeRenderedURL() = %q, want %q", got, tc.want)
+			}
+		})
+	}
 }
 
 func TestRenderRunStatusReportTextIOPreviewModes(t *testing.T) {

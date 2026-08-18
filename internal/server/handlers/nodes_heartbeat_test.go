@@ -8,7 +8,7 @@ import (
 )
 
 func TestHeartbeatHandler_BytesContract(t *testing.T) {
-	st := &nodeStore{}
+	st := &handlerStore{}
 	st.getNode.val = store.Node{} // handler only checks err
 
 	h := heartbeatHandler(st)
@@ -58,7 +58,7 @@ func TestHeartbeatHandler_BytesContract(t *testing.T) {
 }
 
 func TestHeartbeatHandler_RejectsUnknownFields(t *testing.T) {
-	st := &nodeStore{}
+	st := &handlerStore{}
 	h := heartbeatHandler(st)
 	nodeID := "aB3xY9"
 

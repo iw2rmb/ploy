@@ -17,7 +17,7 @@ func TestListRunJobsHandler_NextIDContract(t *testing.T) {
 	jobID := domaintypes.NewJobID()
 	nextID := domaintypes.NewJobID()
 
-	st := &runStore{}
+	st := &handlerStore{}
 	st.getRunSeq.vals = []store.Run{{
 		ID:      runID,
 		RepoID:  repoID,
@@ -83,7 +83,7 @@ func TestListRunJobsHandler_ExposesGateAndMigJobTypes(t *testing.T) {
 	preGateID := domaintypes.NewJobID()
 	migID := domaintypes.NewJobID()
 
-	st := &runStore{}
+	st := &handlerStore{}
 	st.getRunSeq.vals = []store.Run{{
 		ID:      runID,
 		RepoID:  repoID,
@@ -145,7 +145,7 @@ func TestListRunJobsHandler_AttemptQueryOverride(t *testing.T) {
 	runID := domaintypes.NewRunID()
 	repoID := domaintypes.NewRepoID()
 
-	st := &runStore{}
+	st := &handlerStore{}
 	st.getRunSeq.vals = []store.Run{{
 		ID:      runID,
 		RepoID:  repoID,
@@ -172,7 +172,7 @@ func TestListRunJobsHandler_OrdersJobsByChain(t *testing.T) {
 	mig1 := domaintypes.NewJobID()
 	post := domaintypes.NewJobID()
 
-	st := &runStore{}
+	st := &handlerStore{}
 	st.getRunSeq.vals = []store.Run{{
 		ID:      runID,
 		RepoID:  repoID,

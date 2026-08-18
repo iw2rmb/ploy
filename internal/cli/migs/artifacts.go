@@ -10,8 +10,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/iw2rmb/ploy/internal/cli/httpx"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/httpx"
 	migsapi "github.com/iw2rmb/ploy/internal/migs/api"
 )
 
@@ -33,21 +33,8 @@ func (c ArtifactsCommand) Run(ctx context.Context) error {
 	}
 	runID := c.RunID.String()
 	endpoint := c.BaseURL.JoinPath("v1", "runs", runID, "status")
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
+	summary, err := httpx.DoJSON[migsapi.RunSummary](ctx, c.Client, http.MethodGet, endpoint.String(), nil, http.StatusOK, "migs artifacts")
 	if err != nil {
-		return err
-	}
-	resp, err := c.Client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer httpx.DrainAndClose(resp)
-	if resp.StatusCode != http.StatusOK {
-		return httpx.WrapError("migs artifacts", resp.Status, resp.Body)
-	}
-	// Decode RunSummary directly — the server returns the canonical type (no wrapper).
-	var summary migsapi.RunSummary
-	if err := httpx.DecodeResponseJSON(resp.Body, &summary, httpx.MaxJSONBodyBytes); err != nil {
 		return err
 	}
 	if c.Output == nil {

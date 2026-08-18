@@ -17,7 +17,7 @@ func TestStaleRecovery_RepoStatusCancelledAndRunCompletionFinished(t *testing.T)
 	runID := domaintypes.NewRunID()
 	waveID := domaintypes.NewWaveID()
 
-	st := &jobStore{}
+	st := &handlerStore{}
 	st.cancelActiveJobsByRunAttempt.val = 2
 	st.listStaleRunningJobs.val = []store.ListStaleRunningJobsRow{
 		{RunID: runID, Attempt: 1, RunningJobs: 2},
@@ -87,7 +87,7 @@ func TestStaleRecovery_RunCompletionNotTriggeredWhenOtherReposNonTerminal(t *tes
 	runID := domaintypes.NewRunID()
 	waveID := domaintypes.NewWaveID()
 
-	st := &jobStore{}
+	st := &handlerStore{}
 	st.cancelActiveJobsByRunAttempt.val = 1
 	st.listStaleRunningJobs.val = []store.ListStaleRunningJobsRow{
 		{RunID: runID, Attempt: 1, RunningJobs: 1},

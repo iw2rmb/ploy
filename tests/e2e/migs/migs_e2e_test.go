@@ -22,26 +22,22 @@ func repoRoot(t *testing.T) string {
 	return strings.TrimSpace(string(out))
 }
 
-// clusterReady reports whether the local Hydra cluster is available for e2e
-// tests. Callers that get false should t.Skip.
-//
-// PLOY_E2E_CLUSTER controls behavior when the cluster is unreachable:
-//   - "require" — t.Fatalf (use in CI to enforce live Hydra coverage)
-//   - unset     — return false and let callers t.Skip (default)
-func clusterReady(t *testing.T, root string) bool {
+// requireLiveCluster keeps external execution opt-in so ordinary unit test
+// runs never create control-plane jobs merely because a server is reachable.
+func requireLiveCluster(t *testing.T, root string) {
 	t.Helper()
 
-	mode := os.Getenv("PLOY_E2E_CLUSTER")
-
-	// 1. Built binary must exist.
-	if _, err := os.Stat(filepath.Join(root, "dist", "ploy")); err != nil {
-		if mode == "require" {
-			t.Fatalf("ploy binary not built (dist/ploy missing); build with `make build` or unset PLOY_E2E_CLUSTER")
-		}
-		return false
+	if os.Getenv("PLOY_E2E_CLUSTER") != "require" {
+		t.Skip("live Hydra e2e disabled; set PLOY_E2E_CLUSTER=require")
+	}
+	if os.Getenv("PLOY_E2E_IMAGE") == "" {
+		t.Fatal("PLOY_E2E_IMAGE is required and must name a shell-capable image available to the Ploy nodes")
 	}
 
-	// 2. Server must be reachable.
+	if _, err := os.Stat(filepath.Join(root, "dist", "ploy")); err != nil {
+		t.Fatalf("ploy binary not built (dist/ploy missing); build with `make build`")
+	}
+
 	serverURL := os.Getenv("PLOY_SERVER_URL")
 	if serverURL == "" {
 		port := os.Getenv("PLOY_SERVER_PORT")
@@ -52,21 +48,19 @@ func clusterReady(t *testing.T, root string) bool {
 	}
 
 	client := &http.Client{Timeout: 2 * time.Second}
-	resp, err := client.Get(serverURL + "/healthz")
+	resp, err := client.Get(strings.TrimRight(serverURL, "/") + "/healthz")
 	if err != nil {
-		if mode == "require" {
-			t.Fatalf("local cluster not reachable at %s: %v; start the cluster or unset PLOY_E2E_CLUSTER", serverURL, err)
-		}
-		return false
+		t.Fatalf("live cluster not reachable at %s: %v", serverURL, err)
 	}
-	resp.Body.Close()
-	return true
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("live cluster health check at %s returned %s", serverURL, resp.Status)
+	}
 }
 
 // TestHydraMountEnforcement runs the Hydra mount-enforcement e2e scenario,
 // validating that /in is read-only and /out is writable. Requires a live
-// cluster; skips when unavailable. Offline contract validation is covered
-// by TestHydraScenarioOfflineValidation.
+// cluster and runs only when PLOY_E2E_CLUSTER=require.
 func TestHydraMountEnforcement(t *testing.T) {
 	if testing.Short() {
 		t.Skip("short mode; skipping e2e scenario")
@@ -77,11 +71,7 @@ func TestHydraMountEnforcement(t *testing.T) {
 		t.Fatalf("scenario script not found: %v", err)
 	}
 
-	if !clusterReady(t, root) {
-		t.Log("cluster unavailable; falling through to offline contract validation")
-		runMountEnforcementOffline(t)
-		return
-	}
+	requireLiveCluster(t, root)
 
 	cmd := exec.Command("bash", script)
 	cmd.Dir = root
@@ -93,44 +83,9 @@ func TestHydraMountEnforcement(t *testing.T) {
 	t.Logf("scenario-hydra-mount-enforcement passed:\n%s", out)
 }
 
-// runMountEnforcementOffline exercises mount enforcement contract rules inline
-// so the test never skips — it either runs live or validates offline.
-func runMountEnforcementOffline(t *testing.T) {
-	t.Helper()
-	// /in must be read-only.
-	p, err := contracts.ParseStoredInEntry("abcdef0123456:/in/config.json")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !p.ReadOnly {
-		t.Error("/in entry must be read-only")
-	}
-	// /in targeting /out must be rejected.
-	if _, err := contracts.ParseStoredInEntry("abcdef0:/out/escape.txt"); err == nil {
-		t.Fatal("in entry targeting /out/ must be rejected")
-	}
-	// Path traversal in /in must be rejected.
-	if _, err := contracts.ParseStoredInEntry("abcdef0:/in/../etc/passwd"); err == nil {
-		t.Fatal("path traversal in /in must be rejected")
-	}
-	// /out must be writable.
-	op, err := contracts.ParseStoredOutEntry("abcdef0123456:/out/result.txt")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if op.ReadOnly {
-		t.Error("/out entry must be writable")
-	}
-	// /out targeting /in must be rejected.
-	if _, err := contracts.ParseStoredOutEntry("abcdef0:/in/escape.txt"); err == nil {
-		t.Fatal("out entry targeting /in/ must be rejected")
-	}
-}
-
 // TestHydraOutUpload runs the Hydra /out upload continuity e2e scenario,
 // validating that files written to /out are uploaded and retrievable as
-// artifacts. Requires a live cluster; skips when unavailable. Offline
-// contract validation is covered by TestHydraScenarioOfflineValidation.
+// artifacts. It runs only when PLOY_E2E_CLUSTER=require.
 func TestHydraOutUpload(t *testing.T) {
 	if testing.Short() {
 		t.Skip("short mode; skipping e2e scenario")
@@ -141,11 +96,7 @@ func TestHydraOutUpload(t *testing.T) {
 		t.Fatalf("scenario script not found: %v", err)
 	}
 
-	if !clusterReady(t, root) {
-		t.Log("cluster unavailable; falling through to offline contract validation")
-		runOutUploadOffline(t)
-		return
-	}
+	requireLiveCluster(t, root)
 
 	cmd := exec.Command("bash", script)
 	cmd.Dir = root
@@ -157,67 +108,10 @@ func TestHydraOutUpload(t *testing.T) {
 	t.Logf("scenario-hydra-out-upload passed:\n%s", out)
 }
 
-// runOutUploadOffline exercises out upload continuity contract rules inline.
-func runOutUploadOffline(t *testing.T) {
-	t.Helper()
-	// Valid out entry preserves hash and destination.
-	p, err := contracts.ParseStoredOutEntry("abcdef0123456:/out/report.json")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if p.Hash != "abcdef0123456" {
-		t.Errorf("expected hash abcdef0123456, got %q", p.Hash)
-	}
-	if p.Dst != "/out/report.json" {
-		t.Errorf("expected /out/report.json, got %q", p.Dst)
-	}
-	if p.ReadOnly {
-		t.Error("out entry must be writable for upload")
-	}
-	// Empty hash must be rejected.
-	if _, err := contracts.ParseStoredOutEntry(":/out/file.txt"); err == nil {
-		t.Fatal("empty hash must be rejected")
-	}
-	// Empty destination must be rejected.
-	if _, err := contracts.ParseStoredOutEntry("abcdef0:"); err == nil {
-		t.Fatal("empty destination must be rejected")
-	}
-	// Multiple distinct out entries must validate.
-	if err := contracts.ValidateHydraOutEntries([]string{
-		"abcdef0:/out/report-a.json",
-		"bbbbbbb:/out/report-b.json",
-	}, "test"); err != nil {
-		t.Fatalf("distinct out entries must be valid: %v", err)
-	}
-}
-
-// runScenarioScriptOffline validates a scenario script exists, is valid bash,
-// and references expected Hydra mount paths — used when cluster is unavailable.
-func runScenarioScriptOffline(t *testing.T, root, dir string, mountPaths []string) {
-	t.Helper()
-	scriptPath := filepath.Join(root, "tests", "e2e", "migs", dir, "run.sh")
-	data, err := os.ReadFile(scriptPath)
-	if err != nil {
-		t.Fatalf("scenario script %s/run.sh missing: %v", dir, err)
-	}
-	content := string(data)
-	// Syntax check.
-	cmd := exec.Command("bash", "-n", scriptPath)
-	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("bash syntax error in %s:\n%s", dir, out)
-	}
-	for _, p := range mountPaths {
-		if !strings.Contains(content, p) {
-			t.Errorf("%s/run.sh: missing expected Hydra mount path %q", dir, p)
-		}
-	}
-}
-
 // TestHydraInMixed runs the Hydra in-record mixed inputs e2e scenario,
 // validating that a spec with both a plain file and a directory in-record
 // entry results in both being visible under /in inside the container.
-// Requires a live cluster; skips when unavailable. Offline contract
-// validation is covered by TestHydraScenarioOfflineValidation.
+// It runs only when PLOY_E2E_CLUSTER=require.
 func TestHydraInMixed(t *testing.T) {
 	if testing.Short() {
 		t.Skip("short mode; skipping e2e scenario")
@@ -228,11 +122,7 @@ func TestHydraInMixed(t *testing.T) {
 		t.Fatalf("scenario script not found: %v", err)
 	}
 
-	if !clusterReady(t, root) {
-		t.Log("cluster unavailable; falling through to offline script validation")
-		runScenarioScriptOffline(t, root, "scenario-in-mixed", []string{"/in/config.json", "/in/scripts"})
-		return
-	}
+	requireLiveCluster(t, root)
 
 	cmd := exec.Command("bash", script)
 	cmd.Dir = root
@@ -246,8 +136,7 @@ func TestHydraInMixed(t *testing.T) {
 
 // TestHydraBundleBlocked runs the Hydra bundle-blocked entries e2e scenario,
 // validating that spec bundles containing traversal paths or symlinks are
-// rejected by the node agent. Requires a live cluster; skips when unavailable.
-// Offline contract validation is covered by TestHydraScenarioOfflineValidation.
+// rejected by the node agent. It runs only when PLOY_E2E_CLUSTER=require.
 func TestHydraBundleBlocked(t *testing.T) {
 	if testing.Short() {
 		t.Skip("short mode; skipping e2e scenario")
@@ -258,11 +147,7 @@ func TestHydraBundleBlocked(t *testing.T) {
 		t.Fatalf("scenario script not found: %v", err)
 	}
 
-	if !clusterReady(t, root) {
-		t.Log("cluster unavailable; falling through to offline script validation")
-		runScenarioScriptOffline(t, root, "scenario-bundle-blocked", []string{"/in/"})
-		return
-	}
+	requireLiveCluster(t, root)
 
 	cmd := exec.Command("bash", script)
 	cmd.Dir = root
@@ -282,12 +167,14 @@ func TestHydraBundleBlocked(t *testing.T) {
 func TestHydraScenarioOfflineValidation(t *testing.T) {
 	root := repoRoot(t)
 	scenarios := []struct {
-		dir   string
-		paths []string // expected Hydra mount paths in the script
+		dir       string
+		paths     []string
+		forbidden []string
 	}{
 		{
-			dir:   "scenario-hydra-mount-enforcement",
-			paths: []string{"/in/", "/out/"},
+			dir:       "scenario-hydra-mount-enforcement",
+			paths:     []string{"/in/", "/out/"},
+			forbidden: []string{"--follow 2>&1", `run status "$run_id" --follow`},
 		},
 		{
 			dir:   "scenario-hydra-out-upload",
@@ -298,8 +185,9 @@ func TestHydraScenarioOfflineValidation(t *testing.T) {
 			paths: []string{"/in/config.json", "/in/scripts"},
 		},
 		{
-			dir:   "scenario-bundle-blocked",
-			paths: []string{"/in/"},
+			dir:       "scenario-bundle-blocked",
+			paths:     []string{"/in/"},
+			forbidden: []string{"e2e_descriptor_address", "e2e_descriptor_token", "--follow 2>&1", `run status "$run_id" --follow`},
 		},
 	}
 
@@ -312,19 +200,74 @@ func TestHydraScenarioOfflineValidation(t *testing.T) {
 			}
 			content := string(data)
 
-			// Syntax check.
 			cmd := exec.Command("bash", "-n", scriptPath)
 			if out, err := cmd.CombinedOutput(); err != nil {
 				t.Fatalf("bash syntax error in %s:\n%s", sc.dir, out)
 			}
 
-			// Verify the script references expected Hydra mount paths.
 			for _, p := range sc.paths {
 				if !strings.Contains(content, p) {
 					t.Errorf("%s/run.sh: missing expected Hydra mount path %q", sc.dir, p)
 				}
 			}
+			if !strings.Contains(content, "build_gate:\n  disabled: true") {
+				t.Errorf("%s/run.sh: generic Hydra scenario must disable Build Gate", sc.dir)
+			}
+			if !strings.Contains(content, "e2e_runtime_image") {
+				t.Errorf("%s/run.sh: live scenario must use the configured E2E runtime image", sc.dir)
+			}
+			if strings.Contains(content, "alpine:3.20") {
+				t.Errorf("%s/run.sh: live scenario must not depend on Docker Hub", sc.dir)
+			}
+			for _, value := range sc.forbidden {
+				if strings.Contains(content, value) {
+					t.Errorf("%s/run.sh: contains retired or unsafe construct %q", sc.dir, value)
+				}
+			}
 		})
+	}
+}
+
+func TestE2EMigRunForwardsGitLabTokenByEnvName(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	tempDir := t.TempDir()
+	fakePloy := filepath.Join(tempDir, "ploy")
+	argsFile := filepath.Join(tempDir, "args")
+	specFile := filepath.Join(tempDir, "spec.yaml")
+	if err := os.WriteFile(fakePloy, []byte(`#!/usr/bin/env bash
+set -euo pipefail
+printf '%s\n' "$@" >"${PLOY_E2E_ARGS_FILE:?}"
+printf 'run_id: run-1\nmig_id: mig-1\n'
+`), 0o700); err != nil {
+		t.Fatalf("write fake ploy: %v", err)
+	}
+	if err := os.WriteFile(specFile, []byte("steps: []\n"), 0o600); err != nil {
+		t.Fatalf("write spec: %v", err)
+	}
+
+	harness := filepath.Join(root, "tests", "e2e", "lib", "harness_mig.sh")
+	cmd := exec.Command("bash", "-c", `source "$1"; PLOY_BIN="$2"; e2e_mig_run_json "$3" "group/repo:master" >/dev/null`, "bash", harness, fakePloy, specFile)
+	cmd.Env = append(os.Environ(),
+		"GITLAB_TOKEN=secret-must-stay-in-env",
+		"PLOY_E2E_ARGS_FILE="+argsFile,
+	)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("e2e_mig_run_json failed: %v\n%s", err, out)
+	}
+
+	args, err := os.ReadFile(argsFile)
+	if err != nil {
+		t.Fatalf("read fake ploy arguments: %v", err)
+	}
+	got := string(args)
+	want := "run\n--gitlab-token-env\nGITLAB_TOKEN\n" + specFile + "\ngroup/repo:master\n"
+	if got != want {
+		t.Fatalf("ploy arguments = %q, want %q", got, want)
+	}
+	if strings.Contains(got, "secret-must-stay-in-env") {
+		t.Fatal("GitLab token value must not appear in process arguments")
 	}
 }
 
@@ -420,7 +363,7 @@ func TestHydraMountEnforcementOffline(t *testing.T) {
 		t.Parallel()
 		spec := `{
 			"steps": [{
-				"image": "alpine:3.20",
+				"image": "registry.invalid/hydra-contract:test",
 				"in":  ["abcdef0123456:/in/config.json"],
 				"out": ["bbbbbbb012345:/out/result.json"]
 			}],
@@ -555,7 +498,7 @@ func TestHydraOutUploadContinuityOffline(t *testing.T) {
 		t.Parallel()
 		spec := `{
 			"steps": [{
-					"image": "alpine:3.20",
+					"image": "registry.invalid/hydra-contract:test",
 					"out": [
 						"abcdef0123456:/out/custom-artifact.json",
 						"bbbbbbb012345:/out/build.log"
@@ -586,91 +529,4 @@ func TestHydraOutUploadContinuityOffline(t *testing.T) {
 			}
 		}
 	})
-}
-
-// TestHydraE2EDefaultCoverageGate runs unconditionally to ensure the default
-// `go test` path proves Hydra-only e2e coverage. When the live cluster is
-// unavailable, this gate validates that each live Hydra scenario has an
-// offline contract equivalent that covers the same enforcement semantics.
-// Set PLOY_E2E_CLUSTER=require to enforce live execution instead.
-func TestHydraE2EDefaultCoverageGate(t *testing.T) {
-	root := repoRoot(t)
-	live := clusterReady(t, root)
-
-	scenarios := []struct {
-		name        string
-		liveTest    string
-		offlineTest string
-		scriptDir   string
-		mountPaths  []string
-	}{
-		{
-			name:        "mount_enforcement",
-			liveTest:    "TestHydraMountEnforcement",
-			offlineTest: "TestHydraMountEnforcementOffline",
-			scriptDir:   "scenario-hydra-mount-enforcement",
-			mountPaths:  []string{"/in/", "/out/"},
-		},
-		{
-			name:        "out_upload",
-			liveTest:    "TestHydraOutUpload",
-			offlineTest: "TestHydraOutUploadContinuityOffline",
-			scriptDir:   "scenario-hydra-out-upload",
-			mountPaths:  []string{"/out/"},
-		},
-		{
-			name:        "in_mixed",
-			liveTest:    "TestHydraInMixed",
-			offlineTest: "TestHydraScenarioOfflineValidation/scenario-in-mixed",
-			scriptDir:   "scenario-in-mixed",
-			mountPaths:  []string{"/in/config.json", "/in/scripts"},
-		},
-		{
-			name:        "bundle_blocked",
-			liveTest:    "TestHydraBundleBlocked",
-			offlineTest: "TestHydraScenarioOfflineValidation/scenario-bundle-blocked",
-			scriptDir:   "scenario-bundle-blocked",
-			mountPaths:  []string{"/in/"},
-		},
-	}
-
-	for _, sc := range scenarios {
-		t.Run(sc.name, func(t *testing.T) {
-			if live {
-				t.Logf("live cluster available; %s will exercise full e2e", sc.liveTest)
-				return
-			}
-			t.Logf("live cluster unavailable; validating offline equivalent (%s)", sc.offlineTest)
-
-			// Verify scenario script exists and references expected Hydra mount paths.
-			scriptPath := filepath.Join(root, "tests", "e2e", "migs", sc.scriptDir, "run.sh")
-			data, err := os.ReadFile(scriptPath)
-			if err != nil {
-				t.Fatalf("scenario script %s/run.sh missing: %v", sc.scriptDir, err)
-			}
-			content := string(data)
-			for _, p := range sc.mountPaths {
-				if !strings.Contains(content, p) {
-					t.Errorf("%s/run.sh: missing Hydra mount path %q", sc.scriptDir, p)
-				}
-			}
-
-			// Validate contract-level parsers accept the mount paths
-			// used by the scenario (same assertions as the offline tests).
-			inEntry, err := contracts.ParseStoredInEntry("abcdef0:/in/config.json")
-			if err != nil {
-				t.Fatalf("contract parser rejects valid /in entry: %v", err)
-			}
-			if !inEntry.ReadOnly {
-				t.Error("/in entry must be read-only in contract")
-			}
-			outEntry, err := contracts.ParseStoredOutEntry("abcdef0:/out/result.txt")
-			if err != nil {
-				t.Fatalf("contract parser rejects valid /out entry: %v", err)
-			}
-			if outEntry.ReadOnly {
-				t.Error("/out entry must be writable in contract")
-			}
-		})
-	}
 }

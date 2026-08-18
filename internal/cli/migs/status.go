@@ -12,20 +12,11 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"time"
 
-	"github.com/iw2rmb/ploy/internal/cli/httpx"
+	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/httpx"
 )
-
-// DiffEntry represents a single diff record from the list diffs response.
-type DiffEntry struct {
-	ID        domaintypes.DiffID      `json:"id"`
-	JobID     domaintypes.JobID       `json:"job_id"`
-	CreatedAt time.Time               `json:"created_at"`
-	Size      int                     `json:"gzipped_size"`
-	Summary   domaintypes.DiffSummary `json:"summary,omitempty"`
-}
 
 // ListRunDiffsCommand fetches run-scoped diffs via GET /v1/runs/{run_id}/diffs.
 //
@@ -41,7 +32,7 @@ type ListRunDiffsCommand struct {
 
 // Run executes GET /v1/runs/{run_id}/diffs and returns all diff entries.
 // Diffs are returned in server-provided order (ordered by next_id, then created_at).
-func (c ListRunDiffsCommand) Run(ctx context.Context) ([]DiffEntry, error) {
+func (c ListRunDiffsCommand) Run(ctx context.Context) ([]domainapi.DiffListItem, error) {
 	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
 		return nil, fmt.Errorf("list run diffs: %w", err)
 	}
@@ -50,27 +41,9 @@ func (c ListRunDiffsCommand) Run(ctx context.Context) ([]DiffEntry, error) {
 	}
 	endpoint := c.BaseURL.JoinPath("v1", "runs", c.RunID.String(), "diffs")
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
+	result, err := httpx.DoJSON[domainapi.DiffListResponse](ctx, c.Client, http.MethodGet, endpoint.String(), nil, http.StatusOK, "list run diffs")
 	if err != nil {
-		return nil, fmt.Errorf("list run diffs: build request: %w", err)
-	}
-
-	resp, err := c.Client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("list run diffs: http request failed: %w", err)
-	}
-	defer httpx.DrainAndClose(resp)
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, httpx.WrapError("list run diffs", resp.Status, resp.Body)
-	}
-
-	// Response structure: {"diffs": [...]}
-	var result struct {
-		Diffs []DiffEntry `json:"diffs"`
-	}
-	if err := httpx.DecodeResponseJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
-		return nil, fmt.Errorf("list run diffs: decode response: %w", err)
+		return nil, err
 	}
 
 	return result.Diffs, nil

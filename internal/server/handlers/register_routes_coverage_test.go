@@ -57,8 +57,13 @@ func TestRegisterRoutesMatchesOpenAPI(t *testing.T) {
 		if err != nil {
 			t.Fatalf("events: %v", err)
 		}
-		st := &jobStore{} // minimal store; handlers may still return 4xx
+		routeProbeObjectKey := "route-probe/spec-bundle"
+		st := &handlerStore{} // minimal store; handlers may still return 4xx
+		st.getSpecBundle.val.ObjectKey = &routeProbeObjectKey
 		bs := bsmock.New()
+		if _, err := bs.Put(context.Background(), routeProbeObjectKey, "application/gzip", []byte("x")); err != nil {
+			t.Fatalf("seed route probe blob: %v", err)
+		}
 		bp := blobpersist.New(st, bs)
 		cfg := NewConfigHolder(nil)
 		RegisterRoutes(srv, st, bs, bp, ev, cfg, "test-secret", gitauth.Options{}, nil, nil, nil)

@@ -20,7 +20,7 @@ func TestWaveRunStarter_StartQueuedRuns_CreatesJobsWhenNone(t *testing.T) {
 	specID := domaintypes.SpecID("spec_1")
 	repoID := domaintypes.RepoID("repo_1")
 
-	st := &runStore{}
+	st := &handlerStore{}
 	st.getWave.val = store.Wave{ID: waveID, SpecID: specID, Status: domaintypes.WaveStatusStarted}
 	st.getRun.val = store.Run{ID: runID, SpecID: specID, Status: domaintypes.RunStatusRunning}
 	st.getSpec.val = store.Spec{ID: specID, Spec: []byte(`{"steps":[{"image":"a"}]}`)}
@@ -63,7 +63,7 @@ func TestWaveRunStarter_StartQueuedRuns_InvalidStoredSpec(t *testing.T) {
 	specID := domaintypes.SpecID("spec_1")
 	repoID := domaintypes.RepoID("repo_1")
 
-	st := &runStore{}
+	st := &handlerStore{}
 	st.getWave.val = store.Wave{ID: waveID, SpecID: specID, Status: domaintypes.WaveStatusStarted}
 	st.getRun.val = store.Run{ID: runID, SpecID: specID, Status: domaintypes.RunStatusRunning}
 	st.getSpec.val = store.Spec{ID: specID, Spec: []byte(`{"steps":`)}
@@ -98,7 +98,7 @@ func TestWaveRunStarter_StartQueuedRuns_SchedulesNextJobWhenNoActive(t *testing.
 	specID := domaintypes.SpecID("spec_1")
 	repoID := domaintypes.RepoID("repo_1")
 
-	st := &runStore{}
+	st := &handlerStore{}
 	st.getWave.val = store.Wave{ID: waveID, SpecID: specID, Status: domaintypes.WaveStatusStarted}
 	st.getRun.val = store.Run{ID: runID, SpecID: specID, Status: domaintypes.RunStatusRunning}
 	st.getSpec.val = store.Spec{ID: specID, Spec: []byte(`{"steps":[{"image":"a"}]}`)}
@@ -141,7 +141,7 @@ func TestWaveRunStarter_StartQueuedRuns_SkipsTerminalRun(t *testing.T) {
 	ctx := context.Background()
 	waveID := domaintypes.WaveID("2tWAVETest000000000000000")
 
-	st := &runStore{}
+	st := &handlerStore{}
 	st.getWave.val = store.Wave{ID: waveID, SpecID: domaintypes.SpecID("spec_1"), Status: domaintypes.WaveStatusFinished}
 
 	starter := NewWaveRunStarter(st, nil)

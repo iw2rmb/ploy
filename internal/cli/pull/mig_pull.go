@@ -17,19 +17,20 @@ package pull
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
-	"github.com/iw2rmb/ploy/internal/cli/common"
 	"io"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
 
+	"github.com/iw2rmb/ploy/internal/cli/common"
 	"github.com/iw2rmb/ploy/internal/cli/migs"
+	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/httpx"
 )
 
 // HandleMigPull implements `ploy mig pull [--origin <remote>] [--dry-run] [--last-failed] [<mig-id|name>]`.
@@ -227,31 +228,9 @@ func inferMigFromRepo(ctx context.Context, httpClient *http.Client, baseURL *url
 	q.Set("archived", "false")
 	endpoint.RawQuery = q.Encode()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
+	result, err := httpx.DoJSON[domainapi.MigListResponse](ctx, httpClient, http.MethodGet, endpoint.String(), nil, http.StatusOK, "infer mig from repo")
 	if err != nil {
-		return "", fmt.Errorf("build request: %w", err)
-	}
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("http request failed: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("unexpected status: %d", resp.StatusCode)
-	}
-
-	// Parse the response.
-	var result struct {
-		Migs []struct {
-			ID   string `json:"id"`
-			Name string `json:"name"`
-		} `json:"migs"`
-	}
-
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return "", fmt.Errorf("decode response: %w", err)
+		return "", err
 	}
 
 	// Handle results based on number of matches.
@@ -261,7 +240,7 @@ func inferMigFromRepo(ctx context.Context, httpClient *http.Client, baseURL *url
 	case 1:
 		mig := result.Migs[0]
 		_, _ = fmt.Fprintf(stderr, "mig pull: inferred mig %q (%s) from repo\n", mig.Name, mig.ID)
-		return mig.ID, nil
+		return mig.ID.String(), nil
 	default:
 		// Multiple migs match — error with list.
 		_, _ = fmt.Fprintf(stderr, "mig pull: multiple migs include this repo:\n")

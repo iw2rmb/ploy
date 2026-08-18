@@ -1,17 +1,15 @@
 package migs
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
 
-	"github.com/iw2rmb/ploy/internal/cli/httpx"
 	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/httpx"
 	migsapi "github.com/iw2rmb/ploy/internal/migs/api"
 )
 
@@ -48,60 +46,22 @@ func (c SubmitCommand) Run(ctx context.Context) (migsapi.RunSummary, error) {
 	// Control-plane submission endpoint: POST /v1/runs
 	endpoint := c.BaseURL.JoinPath("v1", "runs")
 
-	// Marshal the canonical submit request.
-	payload, err := json.Marshal(reqBody)
-	if err != nil {
-		return migsapi.RunSummary{}, fmt.Errorf("migs submit: marshal request: %w", err)
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), bytes.NewReader(payload))
-	if err != nil {
-		return migsapi.RunSummary{}, fmt.Errorf("migs submit: build request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.Client.Do(req)
-	if err != nil {
-		return migsapi.RunSummary{}, fmt.Errorf("migs submit: http request failed: %w", err)
-	}
-	defer httpx.DrainAndClose(resp)
-
 	// Server returns 201 Created with {run_id, mig_id, spec_id}.
-	if resp.StatusCode == http.StatusCreated {
-		var created struct {
-			RunID  string `json:"run_id"`
-			MigID  string `json:"mig_id"`
-			SpecID string `json:"spec_id"`
-		}
-		if err := httpx.DecodeResponseJSON(resp.Body, &created, httpx.MaxJSONBodyBytes); err != nil {
-			return migsapi.RunSummary{}, fmt.Errorf("migs submit: decode response: %w", err)
-		}
-		runID := domaintypes.RunID(strings.TrimSpace(created.RunID))
-		if runID.IsZero() {
-			return migsapi.RunSummary{}, fmt.Errorf("migs submit: empty run_id in response")
-		}
-		return fetchRunSummary(ctx, c.BaseURL, c.Client, runID)
+	created, err := httpx.DoJSON[domainapi.CreateSingleRepoRunResponse](ctx, c.Client, http.MethodPost, endpoint.String(), reqBody, http.StatusCreated, "migs submit")
+	if err != nil {
+		return migsapi.RunSummary{}, err
 	}
-
-	return migsapi.RunSummary{}, httpx.WrapError("migs submit", resp.Status, resp.Body)
+	if created.RunID.IsZero() {
+		return migsapi.RunSummary{}, fmt.Errorf("migs submit: empty run_id in response")
+	}
+	return fetchRunSummary(ctx, c.BaseURL, c.Client, created.RunID)
 }
 
 func fetchRunSummary(ctx context.Context, baseURL *url.URL, httpClient *http.Client, runID domaintypes.RunID) (migsapi.RunSummary, error) {
 	endpoint := baseURL.JoinPath("v1", "runs", runID.String(), "status")
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
+	summary, err := httpx.DoJSON[migsapi.RunSummary](ctx, httpClient, http.MethodGet, endpoint.String(), nil, http.StatusOK, "migs submit")
 	if err != nil {
-		return migsapi.RunSummary{}, fmt.Errorf("migs submit: build status request: %w", err)
-	}
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return migsapi.RunSummary{}, fmt.Errorf("migs submit: http status request failed: %w", err)
-	}
-	defer httpx.DrainAndClose(resp)
-	if resp.StatusCode != http.StatusOK {
-		return migsapi.RunSummary{}, httpx.WrapError("migs submit", resp.Status, resp.Body)
-	}
-	var summary migsapi.RunSummary
-	if err := httpx.DecodeResponseJSON(resp.Body, &summary, httpx.MaxJSONBodyBytes); err != nil {
-		return migsapi.RunSummary{}, fmt.Errorf("migs submit: decode status response: %w", err)
+		return migsapi.RunSummary{}, err
 	}
 	summary.RunID = runID
 	return summary, nil

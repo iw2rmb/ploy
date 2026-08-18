@@ -39,7 +39,7 @@ type runBundleStoreStub struct {
 }
 
 type namedSnapshotStore struct {
-	*migStore
+	*handlerStore
 	snapshots []store.Spec
 }
 
@@ -98,7 +98,7 @@ steps:
 		},
 	}
 	bundles := &runBundleStoreStub{}
-	st := &migStore{}
+	st := &handlerStore{}
 	handler := createSingleRepoRunHandler(st, nil, gitauth.Options{}, runSubmitSpecServices{
 		catalog: catalog, bundles: bundles, envAllowlist: []string{"PLOY_CONTAINER_REGISTRY"},
 	})
@@ -171,7 +171,7 @@ steps:
 		Name: "upgrade-java", Source: "https://git.example.com/team/specs", Path: "upgrade.yaml",
 		SHA: "0123456789abcdef0123456789abcdef01234567", CommittedAt: time.Now().UTC(),
 	}}
-	st := &migStore{}
+	st := &handlerStore{}
 	handler := createSingleRepoRunHandler(st, nil, gitauth.Options{}, runSubmitSpecServices{
 		catalog: catalog, envAllowlist: []string{"PLOY_CONTAINER_REGISTRY"},
 	})
@@ -227,7 +227,7 @@ steps:
 		Name: "upgrade-java", Source: "https://git.example.com/team/specs", Path: "upgrade.yaml",
 		SHA: "0123456789abcdef0123456789abcdef01234567", CommittedAt: time.Now().UTC(),
 	}}
-	st := &namedSnapshotStore{migStore: &migStore{}}
+	st := &namedSnapshotStore{handlerStore: &handlerStore{}}
 	handler := createSingleRepoRunHandler(st, nil, gitauth.Options{}, runSubmitSpecServices{catalog: catalog})
 
 	for _, mode := range []string{"one", "two", "two"} {
@@ -264,7 +264,7 @@ func TestRunsCreateSingleRepo_NamedSpecFailuresDoNotCreateDurableRows(t *testing
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			st := &migStore{}
+			st := &handlerStore{}
 			catalog := &runSpecCatalogStub{err: tc.err}
 			handler := createSingleRepoRunHandler(st, nil, gitauth.Options{}, runSubmitSpecServices{catalog: catalog})
 			rr := doRequest(t, handler, http.MethodPost, "/v1/runs", validRunRequestBodyWith(map[string]any{
@@ -288,7 +288,7 @@ func TestRunsCreateSingleRepo_InvalidNamedSpecDoesNotCreateDurableRows(t *testin
 		Name: "broken", Source: "https://git.example.com/team/specs", Path: "invalid.yaml",
 		SHA: "0123456789abcdef0123456789abcdef01234567", CommittedAt: time.Now(),
 	}}
-	st := &migStore{}
+	st := &handlerStore{}
 	handler := createSingleRepoRunHandler(st, nil, gitauth.Options{}, runSubmitSpecServices{catalog: catalog})
 
 	rr := doRequest(t, handler, http.MethodPost, "/v1/runs", validRunRequestBodyWith(map[string]any{

@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/iw2rmb/ploy/internal/cli/httpx"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/httpx"
 )
 
 // GetStatusCommand retrieves detailed status for a single run using
@@ -28,25 +28,5 @@ func (c GetStatusCommand) Run(ctx context.Context) (domaintypes.RunSummary, erro
 	}
 
 	endpoint := c.BaseURL.JoinPath("v1", "runs", c.RunID.String())
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
-	if err != nil {
-		return domaintypes.RunSummary{}, fmt.Errorf("run status: build request: %w", err)
-	}
-
-	resp, err := c.Client.Do(req)
-	if err != nil {
-		return domaintypes.RunSummary{}, fmt.Errorf("run status: http request failed: %w", err)
-	}
-	defer httpx.DrainAndClose(resp)
-
-	if resp.StatusCode != http.StatusOK {
-		return domaintypes.RunSummary{}, httpx.WrapError("run status", resp.Status, resp.Body)
-	}
-
-	var summary domaintypes.RunSummary
-	if err := httpx.DecodeResponseJSON(resp.Body, &summary, httpx.MaxJSONBodyBytes); err != nil {
-		return domaintypes.RunSummary{}, fmt.Errorf("run status: decode response: %w", err)
-	}
-
-	return summary, nil
+	return httpx.DoJSON[domaintypes.RunSummary](ctx, c.Client, http.MethodGet, endpoint.String(), nil, http.StatusOK, "run status")
 }

@@ -108,7 +108,7 @@ func TestGateExecutorUsesCommonJobMounts(t *testing.T) {
 		t.Fatalf("Execute() unexpected error: %v", err)
 	}
 
-	requireMount(t, rt.captured.Mounts, jobInContainerDir, mounts.In, false)
+	requireMount(t, rt.captured.Mounts, jobInContainerDir, mounts.In, true)
 	requireMount(t, rt.captured.Mounts, jobOutContainerDir, mounts.Out, false)
 	requireMount(t, rt.captured.Mounts, jobTmpContainerDir, mounts.Tmp, false)
 	requireMount(t, rt.captured.Mounts, jobCacheContainerDir, mounts.Cache, false)

@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"testing"
 
+	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
@@ -20,7 +21,7 @@ func TestConfigEnvListReturnsAllEntries(t *testing.T) {
 
 	assertStatus(t, rr, http.StatusOK)
 
-	resp := decodeBody[[]globalEnvListItem](t, rr)
+	resp := decodeBody[[]domainapi.GlobalEnvListItem](t, rr)
 
 	if len(resp) != 2 {
 		t.Fatalf("got %d entries, want 2", len(resp))
@@ -60,7 +61,7 @@ func TestConfigEnvListMultiTarget(t *testing.T) {
 
 	assertStatus(t, rr, http.StatusOK)
 
-	resp := decodeBody[[]globalEnvListItem](t, rr)
+	resp := decodeBody[[]domainapi.GlobalEnvListItem](t, rr)
 
 	if len(resp) != 2 {
 		t.Fatalf("got %d entries, want 2", len(resp))
@@ -88,7 +89,7 @@ func TestConfigEnvGetReturnsEntry(t *testing.T) {
 
 	assertStatus(t, rr, http.StatusOK)
 
-	resp := decodeBody[globalEnvResponse](t, rr)
+	resp := decodeBody[domainapi.GlobalEnvResponse](t, rr)
 
 	if resp.Key != "CODEX_AUTH_JSON" {
 		t.Errorf("Key = %q, want %q", resp.Key, "CODEX_AUTH_JSON")
@@ -117,7 +118,7 @@ func TestConfigEnvGetWithTargetSelector(t *testing.T) {
 
 	assertStatus(t, rr, http.StatusOK)
 
-	resp := decodeBody[globalEnvResponse](t, rr)
+	resp := decodeBody[domainapi.GlobalEnvResponse](t, rr)
 
 	if resp.Value != "steps-val" {
 		t.Errorf("Value = %q, want %q", resp.Value, "steps-val")
@@ -187,7 +188,7 @@ func TestConfigEnvGet_Errors(t *testing.T) {
 // TestConfigEnvPutUpsertsEntry verifies PUT /v1/config/env/{key}
 // persists to store and updates the holder.
 func TestConfigEnvPutUpsertsEntry(t *testing.T) {
-	st := &configStore{}
+	st := &handlerStore{}
 	holder := NewConfigHolder(nil)
 
 	handler := putGlobalEnvHandler(holder, st)
@@ -221,7 +222,7 @@ func TestConfigEnvPutUpsertsEntry(t *testing.T) {
 	}
 
 	// Verify response uses target field.
-	resp := decodeBody[globalEnvResponse](t, rr)
+	resp := decodeBody[domainapi.GlobalEnvResponse](t, rr)
 	if resp.Target != "gates" {
 		t.Errorf("response Target = %q, want %q", resp.Target, "gates")
 	}
@@ -230,7 +231,7 @@ func TestConfigEnvPutUpsertsEntry(t *testing.T) {
 // TestConfigEnvPutDefaultsSecretToTrue verifies that secret defaults to true
 // when not explicitly set in the request.
 func TestConfigEnvPutDefaultsSecretToTrue(t *testing.T) {
-	st := &configStore{}
+	st := &handlerStore{}
 	holder := NewConfigHolder(nil)
 
 	handler := putGlobalEnvHandler(holder, st)
@@ -269,7 +270,7 @@ func TestConfigEnvPut_ValidationErrors(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			st := &configStore{}
+			st := &handlerStore{}
 			holder := NewConfigHolder(nil)
 
 			handler := putGlobalEnvHandler(holder, st)
@@ -286,7 +287,7 @@ func TestConfigEnvPut_ValidationErrors(t *testing.T) {
 // TestConfigEnvPutMultiTarget verifies that PUT with different targets for the same key
 // creates separate entries in the holder.
 func TestConfigEnvPutMultiTarget(t *testing.T) {
-	st := &configStore{}
+	st := &handlerStore{}
 	holder := NewConfigHolder(nil)
 
 	putHandler := putGlobalEnvHandler(holder, st)
@@ -317,7 +318,7 @@ func TestConfigEnvPutMultiTarget(t *testing.T) {
 // TestConfigEnvDeleteRemovesEntry verifies DELETE /v1/config/env/{key}?target=
 // removes from store and holder.
 func TestConfigEnvDeleteRemovesEntry(t *testing.T) {
-	st := &configStore{}
+	st := &handlerStore{}
 	holder := NewConfigHolder(map[string][]GlobalEnvVar{
 		"OLD_KEY": {{Value: "old-value", Target: domaintypes.GlobalEnvTargetGates, Secret: false}},
 	})
@@ -348,7 +349,7 @@ func TestConfigEnvDeleteRemovesEntry(t *testing.T) {
 // TestConfigEnvDeleteInfersTarget verifies DELETE /v1/config/env/{key} without
 // ?target= succeeds when only one target exists for the key.
 func TestConfigEnvDeleteInfersTarget(t *testing.T) {
-	st := &configStore{}
+	st := &handlerStore{}
 	holder := NewConfigHolder(map[string][]GlobalEnvVar{
 		"SINGLE": {{Value: "val", Target: domaintypes.GlobalEnvTargetNodes, Secret: false}},
 	})
@@ -397,7 +398,7 @@ func TestConfigEnvDelete_Errors(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			st := &configStore{}
+			st := &handlerStore{}
 			holder := NewConfigHolder(nil)
 			tt.setup(holder)
 
@@ -414,7 +415,7 @@ func TestConfigEnvDelete_Errors(t *testing.T) {
 
 // TestConfigEnvDeleteNonexistentKey verifies DELETE for non-existent key returns 204.
 func TestConfigEnvDeleteNonexistentKey(t *testing.T) {
-	st := &configStore{}
+	st := &handlerStore{}
 	holder := NewConfigHolder(nil)
 
 	handler := deleteGlobalEnvHandler(holder, st)
@@ -464,7 +465,7 @@ func TestConfigEnvRoundTrip(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			st := &configStore{}
+			st := &handlerStore{}
 			holder := NewConfigHolder(nil)
 
 			// PUT the entry.
@@ -479,7 +480,7 @@ func TestConfigEnvRoundTrip(t *testing.T) {
 			getRR := doRequest(t, getGlobalEnvHandler(holder), http.MethodGet, "/v1/config/env/"+tt.key, nil, "key", tt.key)
 			assertStatus(t, getRR, http.StatusOK)
 
-			resp := decodeBody[globalEnvResponse](t, getRR)
+			resp := decodeBody[domainapi.GlobalEnvResponse](t, getRR)
 
 			if resp.Key != tt.key {
 				t.Errorf("Key = %q, want %q", resp.Key, tt.key)
@@ -504,7 +505,7 @@ func TestConfigEnvStoreErrors(t *testing.T) {
 		path   string
 		body   any
 		key    string
-		setup  func(*ConfigHolder, *configStore)
+		setup  func(*ConfigHolder, *handlerStore)
 		assert func(*testing.T, *ConfigHolder)
 	}{
 		{
@@ -513,7 +514,7 @@ func TestConfigEnvStoreErrors(t *testing.T) {
 			path:   "/v1/config/env/TEST",
 			body:   map[string]any{"value": "test", "target": "gates"},
 			key:    "TEST",
-			setup: func(_ *ConfigHolder, st *configStore) {
+			setup: func(_ *ConfigHolder, st *handlerStore) {
 				st.upsertGlobalEnv.err = errMockDatabase
 			},
 			assert: func(t *testing.T, holder *ConfigHolder) {
@@ -528,7 +529,7 @@ func TestConfigEnvStoreErrors(t *testing.T) {
 			method: http.MethodDelete,
 			path:   "/v1/config/env/OLD_KEY?target=gates",
 			key:    "OLD_KEY",
-			setup: func(holder *ConfigHolder, st *configStore) {
+			setup: func(holder *ConfigHolder, st *handlerStore) {
 				st.deleteGlobalEnv.err = errMockDatabase
 				holder.SetGlobalEnvVar("OLD_KEY", GlobalEnvVar{Value: "val", Target: domaintypes.GlobalEnvTargetGates, Secret: false})
 			},
@@ -542,7 +543,7 @@ func TestConfigEnvStoreErrors(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			st := &configStore{}
+			st := &handlerStore{}
 			holder := NewConfigHolder(nil)
 			tt.setup(holder, st)
 			var handler http.Handler

@@ -34,7 +34,7 @@ func TestListRunArtifactsHandler_Success_FiltersAndOrders(t *testing.T) {
 	digest1 := "sha256:one"
 	digest2 := "sha256:two"
 
-	st := &artifactStore{}
+	st := &handlerStore{}
 	st.getRun.val = store.Run{
 		ID:      runID,
 		RepoID:  repoID,

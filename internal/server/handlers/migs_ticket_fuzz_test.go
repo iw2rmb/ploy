@@ -13,7 +13,7 @@ import (
 // arbitrary inputs and does not panic. It only exercises the decoding/validation
 // path with a nil-backed mock store; success is not required.
 func FuzzCreateSingleRepoRunHandler(f *testing.F) {
-	st := &jobStore{}
+	st := &handlerStore{}
 	h := createSingleRepoRunHandler(st, nil, gitauth.Options{}, runSubmitSpecServices{})
 
 	// Seed with a few typical cases.

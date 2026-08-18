@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
@@ -50,22 +51,9 @@ func listJobsHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		type jobItem struct {
-			JobID      domaintypes.JobID     `json:"job_id"`
-			Name       string                `json:"name"`
-			JobType    domaintypes.JobType   `json:"job_type"`
-			Status     domaintypes.JobStatus `json:"status"`
-			DurationMs int64                 `json:"duration_ms"`
-			JobImage   string                `json:"job_image"`
-			NodeID     *domaintypes.NodeID   `json:"node_id"`
-			MigName    string                `json:"mig_name"`
-			RunID      domaintypes.RunID     `json:"run_id"`
-			RepoID     domaintypes.RepoID    `json:"repo_id"`
-		}
-
-		items := make([]jobItem, 0, len(jobs))
+		items := make([]domainapi.JobListItem, 0, len(jobs))
 		for _, j := range jobs {
-			items = append(items, jobItem{
+			items = append(items, domainapi.JobListItem{
 				JobID:      j.JobID,
 				Name:       j.Name,
 				JobType:    j.JobType,
@@ -79,10 +67,7 @@ func listJobsHandler(st store.Store) http.HandlerFunc {
 			})
 		}
 
-		resp := struct {
-			Jobs  []jobItem `json:"jobs"`
-			Total int64     `json:"total"`
-		}{
+		resp := domainapi.JobListResponse{
 			Jobs:  items,
 			Total: total,
 		}

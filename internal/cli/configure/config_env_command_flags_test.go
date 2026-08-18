@@ -2,11 +2,13 @@ package configure
 
 import (
 	"bytes"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
+	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	"github.com/iw2rmb/ploy/internal/testutil/clienv"
 )
 
@@ -75,7 +77,7 @@ func TestHandleConfigEnvSetValidOnSelectors(t *testing.T) {
 	for _, sel := range validSelectors {
 		t.Run(sel, func(t *testing.T) {
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				w.WriteHeader(http.StatusOK)
+				_ = json.NewEncoder(w).Encode(domainapi.GlobalEnvResponse{Key: "FOO", Value: "bar", Target: "steps", Secret: true})
 			}))
 			defer srv.Close()
 			clienv.UseControlPlaneEnv(t, srv.URL)
@@ -108,7 +110,7 @@ func TestHandleConfigEnvSetOnAllExclusive(t *testing.T) {
 // TestHandleConfigEnvSetMultipleOnSelectors verifies that multiple --on selectors are accepted and deduplicated.
 func TestHandleConfigEnvSetMultipleOnSelectors(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(domainapi.GlobalEnvResponse{Key: "FOO", Value: "bar", Target: "steps", Secret: true})
 	}))
 	defer srv.Close()
 	clienv.UseControlPlaneEnv(t, srv.URL)

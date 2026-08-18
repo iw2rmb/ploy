@@ -28,7 +28,7 @@ func TestHealthProbeHandlers(t *testing.T) {
 		{
 			name:     "readyz_without_db_pool",
 			path:     "/readyz",
-			handler:  readyzHandler(&jobStore{}),
+			handler:  readyzHandler(&handlerStore{}),
 			wantCode: http.StatusServiceUnavailable,
 			wantFields: map[string]string{
 				"status": "degraded",
@@ -68,6 +68,6 @@ func TestHealthProbeHandlers(t *testing.T) {
 	}
 }
 
-func (m *jobStore) Pool() *pgxpool.Pool {
+func (m *handlerStore) Pool() *pgxpool.Pool {
 	return nil
 }

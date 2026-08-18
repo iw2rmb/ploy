@@ -1,9 +1,7 @@
 package configure
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -13,7 +11,9 @@ import (
 	"strings"
 
 	"github.com/iw2rmb/ploy/internal/cli/common"
+	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/httpx"
 	"github.com/spf13/cobra"
 )
 
@@ -128,23 +128,6 @@ func newEnvUnsetCommand() *cobra.Command {
 	return cmd
 }
 
-// globalEnvListItem matches the server's list response structure.
-// For secrets, the value is omitted (empty) in the list view.
-type globalEnvListItem struct {
-	Key    string `json:"key"`
-	Value  string `json:"value,omitempty"`
-	Target string `json:"target"`
-	Secret bool   `json:"secret"`
-}
-
-// globalEnvResponse matches the server's single-entry response structure.
-type globalEnvResponse struct {
-	Key    string `json:"key"`
-	Value  string `json:"value"`
-	Target string `json:"target"`
-	Secret bool   `json:"secret"`
-}
-
 // runConfigEnvList retrieves and displays all global environment variables.
 // Secret values are redacted in the list view unless --raw is passed.
 func runConfigEnvList(stdout io.Writer) error {
@@ -160,27 +143,9 @@ func runConfigEnvList(stdout io.Writer) error {
 	}
 
 	endpoint := strings.TrimSuffix(baseURL.String(), "/") + "/v1/config/env"
-	req, err := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
+	items, err := httpx.DoJSON[[]domainapi.GlobalEnvListItem](ctx, client, http.MethodGet, endpoint, nil, http.StatusOK, "config env list")
 	if err != nil {
-		return fmt.Errorf("create request: %w", err)
-	}
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return fmt.Errorf("GET %s: %w", endpoint, err)
-	}
-	defer func() {
-		_ = resp.Body.Close()
-	}()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
-		return fmt.Errorf("server returned %d: %s", resp.StatusCode, string(body))
-	}
-
-	var items []globalEnvListItem
-	if err := json.NewDecoder(resp.Body).Decode(&items); err != nil {
-		return fmt.Errorf("decode response: %w", err)
+		return err
 	}
 	for _, item := range items {
 		if _, err := domaintypes.ParseGlobalEnvTarget(item.Target); err != nil {
@@ -255,8 +220,8 @@ func runConfigEnvShow(opts envShowOptions, stdout io.Writer) error {
 		return fmt.Errorf("server returned %d: %s", resp.StatusCode, string(body))
 	}
 
-	var entry globalEnvResponse
-	if err := json.NewDecoder(resp.Body).Decode(&entry); err != nil {
+	var entry domainapi.GlobalEnvResponse
+	if err := httpx.DecodeResponseJSON(resp.Body, &entry, httpx.MaxJSONBodyBytes); err != nil {
 		return fmt.Errorf("decode response: %w", err)
 	}
 	if _, err := domaintypes.ParseGlobalEnvTarget(entry.Target); err != nil {
@@ -294,13 +259,6 @@ func validateEnvShowOptions(opts envShowOptions) error {
 		}
 	}
 	return nil
-}
-
-// globalEnvSetRequest is the request body for PUT /v1/config/env/{key}.
-type globalEnvSetRequest struct {
-	Value  string `json:"value"`
-	Target string `json:"target"`
-	Secret *bool  `json:"secret,omitempty"`
 }
 
 // validOnSelectors is the set of accepted values for the --on flag.
@@ -405,34 +363,16 @@ func runConfigEnvSet(opts envSetOptions, stdout io.Writer) error {
 
 	// Send one PUT per expanded target.
 	for _, target := range targets {
-		reqBody := globalEnvSetRequest{
+		reqBody := domainapi.GlobalEnvPutRequest{
 			Value:  actualValue,
 			Target: target.String(),
 			Secret: secretPtr,
 		}
-		bodyJSON, err := json.Marshal(reqBody)
-		if err != nil {
-			return fmt.Errorf("marshal request: %w", err)
-		}
-
 		endpoint := strings.TrimSuffix(baseURL.String(), "/") + "/v1/config/env/" + opts.Key
-		req, err := http.NewRequestWithContext(ctx, "PUT", endpoint, bytes.NewReader(bodyJSON))
+		_, err := httpx.DoJSON[domainapi.GlobalEnvResponse](ctx, client, http.MethodPut, endpoint, reqBody, http.StatusOK, "config env set")
 		if err != nil {
-			return fmt.Errorf("create request: %w", err)
+			return fmt.Errorf("target %s: %w", target, err)
 		}
-		req.Header.Set("Content-Type", "application/json")
-
-		resp, err := client.Do(req)
-		if err != nil {
-			return fmt.Errorf("PUT %s: %w", endpoint, err)
-		}
-
-		if resp.StatusCode != http.StatusOK {
-			body, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
-			_ = resp.Body.Close()
-			return fmt.Errorf("server returned %d for target %s: %s", resp.StatusCode, target, string(body))
-		}
-		_ = resp.Body.Close()
 	}
 
 	if len(targets) == 1 {

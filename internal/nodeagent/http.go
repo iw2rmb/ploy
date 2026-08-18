@@ -18,8 +18,9 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff/v5"
-	"github.com/iw2rmb/ploy/internal/cli/httpx"
+	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	types "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/httpx"
 	wfbackoff "github.com/iw2rmb/ploy/internal/workflow/backoff"
 )
 
@@ -27,11 +28,6 @@ import (
 type baseUploader struct {
 	cfg    Config
 	client *http.Client
-}
-
-type getJobStatusResponse struct {
-	JobID  types.JobID `json:"job_id"`
-	Status string      `json:"status"`
 }
 
 func newBaseUploader(cfg Config) (*baseUploader, error) {
@@ -176,27 +172,11 @@ func buildJobStatusPayload(status string, exitCode *int32, stats types.RunStats,
 // GetJobStatus returns canonical control-plane status for a claimed job.
 func (b *baseUploader) GetJobStatus(ctx context.Context, jobID types.JobID) (string, error) {
 	u := MustBuildURL(b.cfg.ServerURL, fmt.Sprintf("/v1/jobs/%s/status", jobID))
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+	payload, err := httpx.DoJSON[domainapi.JobStatusResponse](ctx, b.client, http.MethodGet, u, nil, http.StatusOK, "get job status")
 	if err != nil {
-		return "", fmt.Errorf("create request: %w", err)
+		return "", err
 	}
-
-	resp, err := b.client.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("send request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("get job status failed: status %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
-	}
-
-	var payload getJobStatusResponse
-	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
-		return "", fmt.Errorf("decode response: %w", err)
-	}
-	status := strings.TrimSpace(payload.Status)
+	status := strings.TrimSpace(payload.Status.String())
 	if status == "" {
 		return "", errors.New("get job status failed: empty status")
 	}

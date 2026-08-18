@@ -14,13 +14,13 @@ import (
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/cli/common"
-	"github.com/iw2rmb/ploy/internal/cli/httpx"
 	"github.com/iw2rmb/ploy/internal/cli/migs"
 	runcli "github.com/iw2rmb/ploy/internal/cli/run"
 	"github.com/iw2rmb/ploy/internal/cli/runs"
 	"github.com/iw2rmb/ploy/internal/cli/specpayload"
 	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/httpx"
 	migsapi "github.com/iw2rmb/ploy/internal/migs/api"
 )
 
@@ -478,7 +478,6 @@ func followMigRunProject(ctx context.Context, baseURL *url.URL, client *http.Cli
 		RunID:      runID,
 		Output:     output,
 		EnableOSC8: renderOpts.EnableOSC8,
-		AuthToken:  renderOpts.AuthToken,
 		MaxRetries: maxRetries,
 	}.Run(followCtx)
 	if err != nil {

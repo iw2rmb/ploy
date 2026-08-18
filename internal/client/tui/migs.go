@@ -7,7 +7,7 @@ import (
 	"net/url"
 
 	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
-	"github.com/iw2rmb/ploy/internal/cli/httpx"
+	"github.com/iw2rmb/ploy/internal/httpx"
 )
 
 // ListMigsCommand fetches a paginated list of migrations.
@@ -36,25 +36,5 @@ func (c ListMigsCommand) Run(ctx context.Context) (domainapi.MigListResponse, er
 		endpoint.RawQuery = q.Encode()
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
-	if err != nil {
-		return domainapi.MigListResponse{}, fmt.Errorf("list migs: build request: %w", err)
-	}
-
-	resp, err := c.Client.Do(req)
-	if err != nil {
-		return domainapi.MigListResponse{}, fmt.Errorf("list migs: http request failed: %w", err)
-	}
-	defer httpx.DrainAndClose(resp)
-
-	if resp.StatusCode != http.StatusOK {
-		return domainapi.MigListResponse{}, httpx.WrapError("list migs", resp.Status, resp.Body)
-	}
-
-	var result domainapi.MigListResponse
-	if err := httpx.DecodeResponseJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
-		return domainapi.MigListResponse{}, fmt.Errorf("list migs: decode response: %w", err)
-	}
-
-	return result, nil
+	return httpx.DoJSON[domainapi.MigListResponse](ctx, c.Client, http.MethodGet, endpoint.String(), nil, http.StatusOK, "list migs")
 }

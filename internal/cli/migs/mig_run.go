@@ -9,17 +9,15 @@
 package migs
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
 
-	"github.com/iw2rmb/ploy/internal/cli/httpx"
 	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/httpx"
 )
 
 // CreateMigRunCommand creates a launch wave from a mig project with repo selection.
@@ -96,32 +94,6 @@ func (c CreateMigRunCommand) Run(ctx context.Context) (CreateMigRunResult, error
 		req.RepoSelector.Repos = repoURLs
 	}
 
-	payload, err := json.Marshal(req)
-	if err != nil {
-		return CreateMigRunResult{}, fmt.Errorf("mig run: marshal request: %w", err)
-	}
-
 	endpoint := c.BaseURL.JoinPath("v1", "migs", c.MigRef.String(), "waves")
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), bytes.NewReader(payload))
-	if err != nil {
-		return CreateMigRunResult{}, fmt.Errorf("mig run: build request: %w", err)
-	}
-	httpReq.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.Client.Do(httpReq)
-	if err != nil {
-		return CreateMigRunResult{}, fmt.Errorf("mig run: http request failed: %w", err)
-	}
-	defer httpx.DrainAndClose(resp)
-
-	// Handle 201 Created response.
-	if resp.StatusCode == http.StatusCreated {
-		var result CreateMigRunResult
-		if err := httpx.DecodeResponseJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
-			return CreateMigRunResult{}, fmt.Errorf("mig run: decode response: %w", err)
-		}
-		return result, nil
-	}
-
-	return CreateMigRunResult{}, httpx.WrapError("mig run", resp.Status, resp.Body)
+	return httpx.DoJSON[CreateMigRunResult](ctx, c.Client, http.MethodPost, endpoint.String(), req, http.StatusCreated, "mig run")
 }

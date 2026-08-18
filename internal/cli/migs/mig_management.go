@@ -12,7 +12,6 @@
 package migs
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -21,9 +20,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/iw2rmb/ploy/internal/cli/httpx"
 	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	"github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/httpx"
 )
 
 // AddMigCommand creates a new mig project.
@@ -60,36 +59,9 @@ func (c AddMigCommand) Run(ctx context.Context) (AddMigResult, error) {
 		CreatedBy: c.CreatedBy,
 	}
 
-	payload, err := json.Marshal(req)
-	if err != nil {
-		return AddMigResult{}, fmt.Errorf("mig add: marshal request: %w", err)
-	}
-
 	// POST /v1/migs to create the mig.
 	endpoint := c.BaseURL.JoinPath("v1", "migs")
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), bytes.NewReader(payload))
-	if err != nil {
-		return AddMigResult{}, fmt.Errorf("mig add: build request: %w", err)
-	}
-	httpReq.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.Client.Do(httpReq)
-	if err != nil {
-		return AddMigResult{}, fmt.Errorf("mig add: http request failed: %w", err)
-	}
-	defer httpx.DrainAndClose(resp)
-
-	// Handle 201 Created response.
-	if resp.StatusCode == http.StatusCreated {
-		var result AddMigResult
-		if err := httpx.DecodeResponseJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
-			return AddMigResult{}, fmt.Errorf("mig add: decode response: %w", err)
-		}
-		return result, nil
-	}
-
-	// Non-success: read error body and return error.
-	return AddMigResult{}, httpx.WrapError("mig add", resp.Status, resp.Body)
+	return httpx.DoJSON[AddMigResult](ctx, c.Client, http.MethodPost, endpoint.String(), req, http.StatusCreated, "mig add")
 }
 
 // ListMigsCommand lists mig projects with optional filters.
@@ -131,24 +103,9 @@ func (c ListMigsCommand) Run(ctx context.Context) ([]domainapi.MigSummary, error
 	}
 	endpoint.RawQuery = q.Encode()
 
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
+	result, err := httpx.DoJSON[domainapi.MigListResponse](ctx, c.Client, http.MethodGet, endpoint.String(), nil, http.StatusOK, "mig list")
 	if err != nil {
-		return nil, fmt.Errorf("mig list: build request: %w", err)
-	}
-
-	resp, err := c.Client.Do(httpReq)
-	if err != nil {
-		return nil, fmt.Errorf("mig list: http request failed: %w", err)
-	}
-	defer httpx.DrainAndClose(resp)
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, httpx.WrapError("mig list", resp.Status, resp.Body)
-	}
-
-	var result domainapi.MigListResponse
-	if err := httpx.DecodeResponseJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
-		return nil, fmt.Errorf("mig list: decode response: %w", err)
+		return nil, err
 	}
 
 	return result.Migs, nil
@@ -202,44 +159,18 @@ type ArchiveMigCommand struct {
 	MigRef  types.MigRef // Required: mig ID or name to archive.
 }
 
-// ArchiveMigResult contains the response from archiving a mig.
-type ArchiveMigResult struct {
-	ID       types.MigID `json:"id"`
-	Name     string      `json:"name"`
-	Archived bool        `json:"archived"`
-}
-
 // Run executes PATCH /v1/migs/{mig_ref}/archive to archive a mig.
-func (c ArchiveMigCommand) Run(ctx context.Context) (ArchiveMigResult, error) {
+func (c ArchiveMigCommand) Run(ctx context.Context) (domainapi.MigArchiveResponse, error) {
 	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
-		return ArchiveMigResult{}, fmt.Errorf("mig archive: %w", err)
+		return domainapi.MigArchiveResponse{}, fmt.Errorf("mig archive: %w", err)
 	}
 	if err := c.MigRef.Validate(); err != nil {
-		return ArchiveMigResult{}, fmt.Errorf("mig archive: mig ref is required")
+		return domainapi.MigArchiveResponse{}, fmt.Errorf("mig archive: mig ref is required")
 	}
 
 	// PATCH /v1/migs/{mig_ref}/archive
 	endpoint := c.BaseURL.JoinPath("v1", "migs", c.MigRef.String(), "archive")
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPatch, endpoint.String(), nil)
-	if err != nil {
-		return ArchiveMigResult{}, fmt.Errorf("mig archive: build request: %w", err)
-	}
-
-	resp, err := c.Client.Do(httpReq)
-	if err != nil {
-		return ArchiveMigResult{}, fmt.Errorf("mig archive: http request failed: %w", err)
-	}
-	defer httpx.DrainAndClose(resp)
-
-	if resp.StatusCode == http.StatusOK {
-		var result ArchiveMigResult
-		if err := httpx.DecodeResponseJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
-			return ArchiveMigResult{}, fmt.Errorf("mig archive: decode response: %w", err)
-		}
-		return result, nil
-	}
-
-	return ArchiveMigResult{}, httpx.WrapError("mig archive", resp.Status, resp.Body)
+	return httpx.DoJSON[domainapi.MigArchiveResponse](ctx, c.Client, http.MethodPatch, endpoint.String(), nil, http.StatusOK, "mig archive")
 }
 
 // UnarchiveMigCommand unarchives a mig project.
@@ -251,44 +182,18 @@ type UnarchiveMigCommand struct {
 	MigRef  types.MigRef // Required: mig ID or name to unarchive.
 }
 
-// UnarchiveMigResult contains the response from unarchiving a mig.
-type UnarchiveMigResult struct {
-	ID       types.MigID `json:"id"`
-	Name     string      `json:"name"`
-	Archived bool        `json:"archived"`
-}
-
 // Run executes PATCH /v1/migs/{mig_ref}/unarchive to unarchive a mig.
-func (c UnarchiveMigCommand) Run(ctx context.Context) (UnarchiveMigResult, error) {
+func (c UnarchiveMigCommand) Run(ctx context.Context) (domainapi.MigArchiveResponse, error) {
 	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
-		return UnarchiveMigResult{}, fmt.Errorf("mig unarchive: %w", err)
+		return domainapi.MigArchiveResponse{}, fmt.Errorf("mig unarchive: %w", err)
 	}
 	if err := c.MigRef.Validate(); err != nil {
-		return UnarchiveMigResult{}, fmt.Errorf("mig unarchive: mig ref is required")
+		return domainapi.MigArchiveResponse{}, fmt.Errorf("mig unarchive: mig ref is required")
 	}
 
 	// PATCH /v1/migs/{mig_ref}/unarchive
 	endpoint := c.BaseURL.JoinPath("v1", "migs", c.MigRef.String(), "unarchive")
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPatch, endpoint.String(), nil)
-	if err != nil {
-		return UnarchiveMigResult{}, fmt.Errorf("mig unarchive: build request: %w", err)
-	}
-
-	resp, err := c.Client.Do(httpReq)
-	if err != nil {
-		return UnarchiveMigResult{}, fmt.Errorf("mig unarchive: http request failed: %w", err)
-	}
-	defer httpx.DrainAndClose(resp)
-
-	if resp.StatusCode == http.StatusOK {
-		var result UnarchiveMigResult
-		if err := httpx.DecodeResponseJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
-			return UnarchiveMigResult{}, fmt.Errorf("mig unarchive: decode response: %w", err)
-		}
-		return result, nil
-	}
-
-	return UnarchiveMigResult{}, httpx.WrapError("mig unarchive", resp.Status, resp.Body)
+	return httpx.DoJSON[domainapi.MigArchiveResponse](ctx, c.Client, http.MethodPatch, endpoint.String(), nil, http.StatusOK, "mig unarchive")
 }
 
 // SetMigSpecCommand creates a new spec row and updates migs.spec_id.
@@ -334,35 +239,9 @@ func (c SetMigSpecCommand) Run(ctx context.Context) (SetMigSpecResult, error) {
 		req.Name = *c.Name
 	}
 
-	payload, err := json.Marshal(req)
-	if err != nil {
-		return SetMigSpecResult{}, fmt.Errorf("mig spec set: marshal request: %w", err)
-	}
-
 	// POST /v1/migs/{mig_ref}/specs
 	endpoint := c.BaseURL.JoinPath("v1", "migs", c.MigRef.String(), "specs")
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), bytes.NewReader(payload))
-	if err != nil {
-		return SetMigSpecResult{}, fmt.Errorf("mig spec set: build request: %w", err)
-	}
-	httpReq.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.Client.Do(httpReq)
-	if err != nil {
-		return SetMigSpecResult{}, fmt.Errorf("mig spec set: http request failed: %w", err)
-	}
-	defer httpx.DrainAndClose(resp)
-
-	// Handle 201 Created response.
-	if resp.StatusCode == http.StatusCreated {
-		var result SetMigSpecResult
-		if err := httpx.DecodeResponseJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
-			return SetMigSpecResult{}, fmt.Errorf("mig spec set: decode response: %w", err)
-		}
-		return result, nil
-	}
-
-	return SetMigSpecResult{}, httpx.WrapError("mig spec set", resp.Status, resp.Body)
+	return httpx.DoJSON[SetMigSpecResult](ctx, c.Client, http.MethodPost, endpoint.String(), req, http.StatusCreated, "mig spec set")
 }
 
 // ResolveMigByNameCommand attempts to resolve a mig reference (ID or name) to a mig ID.

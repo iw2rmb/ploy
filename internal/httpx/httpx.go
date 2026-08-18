@@ -2,8 +2,11 @@ package httpx
 
 import (
 	"bufio"
+	"bytes"
 	"compress/gzip"
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -12,25 +15,82 @@ import (
 )
 
 const (
-	// MaxErrorBodyBytes caps response bodies read on error paths.
-	MaxErrorBodyBytes int64 = 2048
-	// MaxJSONBodyBytes caps JSON response bodies decoded into structs.
-	MaxJSONBodyBytes int64 = 1 << 20 // 1 MiB
-	// MaxDownloadBodyBytes caps large download bodies read into memory.
-	MaxDownloadBodyBytes int64 = 64 << 20 // 64 MiB
-	// MaxGunzipOutputBytes caps decompressed bodies produced by streaming gunzip helpers.
-	// This protects the CLI from gzip "zip bombs" while still allowing large patches.
-	MaxGunzipOutputBytes int64 = 256 << 20 // 256 MiB
+	MaxErrorBodyBytes    int64 = 2048
+	MaxJSONBodyBytes     int64 = 1 << 20
+	MaxDownloadBodyBytes int64 = 64 << 20
+	MaxGunzipOutputBytes int64 = 256 << 20
 )
 
-func DecodeResponseJSON(r io.Reader, out any, limit int64) error {
-	if limit > 0 {
-		r = io.LimitReader(r, limit)
+// DoJSON executes one bounded JSON request and requires exactly one expected status.
+func DoJSON[T any](ctx context.Context, client *http.Client, method, endpoint string, body any, expectedStatus int, action string) (T, error) {
+	var zero T
+	if client == nil {
+		return zero, fmt.Errorf("%s: http client required", action)
 	}
-	dec := json.NewDecoder(r)
-	dec.DisallowUnknownFields()
-	return dec.Decode(out)
+
+	var requestBody io.Reader
+	if body != nil {
+		encoded, err := json.Marshal(body)
+		if err != nil {
+			return zero, fmt.Errorf("%s: encode request: %w", action, err)
+		}
+		requestBody = bytes.NewReader(encoded)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, method, endpoint, requestBody)
+	if err != nil {
+		return zero, fmt.Errorf("%s: build request: %w", action, err)
+	}
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return zero, fmt.Errorf("%s: http request: %w", action, err)
+	}
+	defer DrainAndClose(resp)
+
+	if resp.StatusCode != expectedStatus {
+		msg := ReadErrorMessage(resp.Body, resp.Status, MaxErrorBodyBytes)
+		return zero, fmt.Errorf("%s: unexpected status %d: %s", action, resp.StatusCode, msg)
+	}
+
+	if err := DecodeResponseJSON(resp.Body, &zero, MaxJSONBodyBytes); err != nil {
+		return zero, fmt.Errorf("%s: decode response: %w", action, err)
+	}
+	return zero, nil
 }
+
+func DecodeResponseJSON(r io.Reader, out any, limit int64) error {
+	if limit <= 0 {
+		limit = MaxJSONBodyBytes
+	}
+	lr := &io.LimitedReader{R: r, N: limit + 1}
+	data, err := io.ReadAll(lr)
+	if err != nil {
+		return err
+	}
+	if int64(len(data)) > limit {
+		return fmt.Errorf("response exceeds %d bytes", limit)
+	}
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(out); err != nil {
+		return err
+	}
+	var extra any
+	if err := dec.Decode(&extra); err != io.EOF {
+		if err == nil {
+			return errMultipleJSONValues
+		}
+		return err
+	}
+	return nil
+}
+
+var errMultipleJSONValues = errors.New("response contains multiple JSON values")
 
 func ReadErrorMessage(r io.Reader, status string, limit int64) string {
 	if limit <= 0 {
@@ -60,9 +120,6 @@ func WrapError(prefix string, status string, r io.Reader) error {
 	return fmt.Errorf("%s: %s", prefix, msg)
 }
 
-// GunzipToBytes reads a gzipped stream from r and returns the decompressed bytes.
-// If maxBytes <= 0, MaxGunzipOutputBytes is used.
-// An empty input stream returns an empty slice with no error.
 func GunzipToBytes(r io.Reader, maxBytes int64) ([]byte, error) {
 	if maxBytes <= 0 {
 		maxBytes = MaxGunzipOutputBytes
@@ -93,8 +150,6 @@ func GunzipToBytes(r io.Reader, maxBytes int64) ([]byte, error) {
 	return out, nil
 }
 
-// DrainAndClose drains the response body to io.Discard and then closes it.
-// Safe to call with a nil response or nil body.
 func DrainAndClose(resp *http.Response) {
 	if resp == nil || resp.Body == nil {
 		return
@@ -103,8 +158,6 @@ func DrainAndClose(resp *http.Response) {
 	_ = resp.Body.Close()
 }
 
-// CheckStatus returns nil if resp.StatusCode matches expected.
-// Otherwise it reads the error body and returns a formatted error.
 func CheckStatus(resp *http.Response, expected int, action string) error {
 	if resp.StatusCode == expected {
 		return nil
@@ -113,7 +166,6 @@ func CheckStatus(resp *http.Response, expected int, action string) error {
 	return fmt.Errorf("%s failed: status %d: %s", action, resp.StatusCode, msg)
 }
 
-// RequireClientAndURL validates that both an HTTP client and base URL are set.
 func RequireClientAndURL(client *http.Client, base *url.URL) error {
 	if client == nil {
 		return fmt.Errorf("http client required")

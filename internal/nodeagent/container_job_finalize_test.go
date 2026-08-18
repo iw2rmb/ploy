@@ -200,7 +200,7 @@ func TestRunContainerJobNonzeroExitReportsDerivedStatsError(t *testing.T) {
 			controller := newTestController(t, newAgentConfig(server.URL))
 			req := StartRunRequest{
 				RunID:   runID,
-				RepoID:  types.NewMigRepoID(),
+				RepoID:  types.NewRepoID(),
 				JobID:   jobID,
 				JobType: types.JobTypeMig,
 			}

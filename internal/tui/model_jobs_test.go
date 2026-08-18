@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"charm.land/lipgloss/v2"
-	clitui "github.com/iw2rmb/ploy/internal/client/tui"
+	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/tui/joblist"
 )
@@ -30,7 +30,7 @@ func mustDefaultItem(t *testing.T, v interface{}) defaultItem {
 // TestS6JobsListTitle verifies the JOBS jobList title and width.
 func TestS6JobsListTitle(t *testing.T) {
 	m := InitialModel(nil, nil)
-	next, _ := m.Update(jobsLoadedMsg{jobs: []clitui.JobItem{
+	next, _ := m.Update(jobsLoadedMsg{jobs: []domainapi.JobListItem{
 		{JobID: domaintypes.JobID("job-1"), Name: "deploy", MigName: "alpha", RunID: domaintypes.RunID("run-1"), RepoID: domaintypes.RepoID("repo-1")},
 	}})
 	nm := next.(model)
@@ -46,7 +46,7 @@ func TestS6JobsListTitle(t *testing.T) {
 func TestS6JobsItemsPopulated(t *testing.T) {
 	m := InitialModel(nil, nil)
 	nodeID := domaintypes.NodeID("abc123")
-	next, _ := m.Update(jobsLoadedMsg{jobs: []clitui.JobItem{
+	next, _ := m.Update(jobsLoadedMsg{jobs: []domainapi.JobListItem{
 		{
 			JobID:      domaintypes.JobID("job-abc"),
 			Name:       "deploy",
@@ -96,7 +96,7 @@ func TestS6JobsItemsPopulated(t *testing.T) {
 // TestS6JobsOrderingDeterministic verifies items are rendered in API order (no re-sorting).
 func TestS6JobsOrderingDeterministic(t *testing.T) {
 	m := InitialModel(nil, nil)
-	jobs := []clitui.JobItem{
+	jobs := []domainapi.JobListItem{
 		{Name: "job-first", MigName: "m", RunID: domaintypes.RunID("r"), RepoID: domaintypes.RepoID("repo")},
 		{Name: "job-second", MigName: "m", RunID: domaintypes.RunID("r"), RepoID: domaintypes.RepoID("repo")},
 		{Name: "job-third", MigName: "m", RunID: domaintypes.RunID("r"), RepoID: domaintypes.RepoID("repo")},
@@ -132,7 +132,7 @@ func TestS6EscTransitionsToS1(t *testing.T) {
 func TestS6ViewRendersSideBySide(t *testing.T) {
 	m := InitialModel(nil, nil)
 	m.screen = ScreenJobsList
-	next, _ := m.Update(jobsLoadedMsg{jobs: []clitui.JobItem{
+	next, _ := m.Update(jobsLoadedMsg{jobs: []domainapi.JobListItem{
 		{Name: "deploy", Status: domaintypes.JobStatusRunning, JobID: domaintypes.JobID("job-1"), MigName: "mig", RunID: domaintypes.RunID("run-1"), RepoID: domaintypes.RepoID("repo-1")},
 	}})
 	nm := next.(model)
@@ -164,7 +164,7 @@ func TestS6EnterDefinesAllPloyItems(t *testing.T) {
 	}})
 	m = next.(model)
 	m.screen = ScreenJobsList
-	next, _ = m.Update(jobsLoadedMsg{jobs: []clitui.JobItem{
+	next, _ = m.Update(jobsLoadedMsg{jobs: []domainapi.JobListItem{
 		{JobID: domaintypes.JobID("job-1"), Name: "deploy", MigName: "mig", RunID: domaintypes.RunID("run-1"), RepoID: domaintypes.RepoID("repo-1")},
 	}})
 	nm := next.(model)

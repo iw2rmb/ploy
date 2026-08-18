@@ -9,143 +9,36 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-// migStore is a focused mock for mig CRUD, spec, mig-repo, and run-submit handler tests.
-type migStore struct {
-	store.Store
-
-	// Spec
-	createSpec            mockCall[store.CreateSpecParams, store.Spec]
-	createGitSpecSnapshot mockCall[store.CreateGitSpecSnapshotParams, store.Spec]
-	getGitSpec            mockCall[store.GetGitSpecSnapshotParams, store.Spec]
-
-	getSpec         mockCall[string, store.Spec]
-	getAPITokenByID mockCall[string, store.GetAPITokenByIDRow]
-	updateMigSpec   mockCall[store.UpdateMigSpecParams, struct{}]
-
-	// Mig CRUD
-	createMig mockCall[store.CreateMigParams, store.Mig]
-
-	listMigs mockCall[store.ListMigsParams, []store.Mig]
-
-	getMig mockCall[types.MigID, store.Mig]
-
-	getMigByName mockCall[string, store.Mig]
-
-	deleteMig    mockCall[string, struct{}]
-	archiveMig   mockCall[string, struct{}]
-	unarchiveMig mockCall[string, struct{}]
-
-	// MigRepo
-	createMigRepo mockCall[store.CreateMigRepoParams, store.MigRepo]
-
-	getMigRepo mockResult[store.MigRepo]
-
-	listMigReposByMig        mockCall[types.MigID, []store.MigRepo]
-	listMigReposByMigResults map[string][]store.MigRepo
-
-	getMigRepoByURL mockCall[store.GetMigRepoByURLParams, store.MigRepo]
-
-	upsertMigRepo mockCall[store.UpsertMigRepoParams, store.MigRepo]
-
-	deleteMigRepo        mockResult[struct{}]
-	hasMigRepoHistory    mockResult[bool]
-	updateMigRepoBaseRef mockCall[store.UpdateMigRepoBaseRefParams, struct{}]
-
-	listFailedRepoIDsByMig mockCall[string, []types.RepoID]
-
-	repoByID map[types.RepoID]store.Repo
-
-	// Run creation (for migs_runs, runs_submit). Sequenced for tests that
-	// observe a different result/err for each CreateRun call.
-	createRunSeq mockCallSeq[store.CreateRunParams, store.Run]
-
-	createWaveWithRuns     mockCall[store.CreateWaveWithRunsParams, store.Wave]
-	createWaveWithRunsHook func(store.CreateWaveWithRunsParams)
-	createRun              mockCall[store.CreateRunParams, store.Run]
-	createRunParams        []store.CreateRunParams
-
-	// Run/Job queries (for archive validation and migs_ticket)
-	getRun        mockCall[string, store.Run]
-	listRuns      mockResult[[]store.Run]
-	listJobsByRun mockCall[types.RunID, []store.Job]
-
-	// Job creation (for migs_ticket, runs_submit)
-	createJob mockCallSlice[store.CreateJobParams, store.Job]
-
-	// Artifact (for migs_ticket)
-	listArtifactBundlesByRunAndJob mockResult[[]store.ArtifactBundle]
-
-	// Event
-	createEvent mockResult[store.Event]
-}
-
+// Mig, spec, mig-repo, and run-submit store methods.
 // Spec methods
 
-func (m *migStore) CreateSpec(ctx context.Context, params store.CreateSpecParams) (store.Spec, error) {
-	m.createSpec.called = true
-	m.createSpec.params = params
-	result := store.Spec{ID: params.ID, Spec: params.Spec, CreatedBy: params.CreatedBy}
-	return result, m.createSpec.err
-}
-
-func (m *migStore) CreateGitSpecSnapshot(ctx context.Context, params store.CreateGitSpecSnapshotParams) (store.Spec, error) {
+func (m *handlerStore) CreateGitSpecSnapshot(ctx context.Context, params store.CreateGitSpecSnapshotParams) (store.Spec, error) {
 	result := store.Spec{ID: params.ID, Name: params.Name, Description: params.Description, Source: params.Source, Sha: params.Sha, SourceCommittedAt: params.SourceCommittedAt, Spec: params.Spec, CreatedBy: params.CreatedBy}
 	m.createGitSpecSnapshot.val = result
 	return m.createGitSpecSnapshot.record(params)
 }
 
-func (m *migStore) GetGitSpecSnapshot(ctx context.Context, params store.GetGitSpecSnapshotParams) (store.Spec, error) {
+func (m *handlerStore) GetGitSpecSnapshot(ctx context.Context, params store.GetGitSpecSnapshotParams) (store.Spec, error) {
 	if !m.getGitSpec.called && m.getGitSpec.err == nil && m.getGitSpec.val.ID.IsZero() {
 		m.getGitSpec.err = pgx.ErrNoRows
 	}
 	return m.getGitSpec.record(params)
 }
 
-func (m *migStore) GetSpec(ctx context.Context, id types.SpecID) (store.Spec, error) {
-	return m.getSpec.record(id.String())
-}
-
-func (m *migStore) GetAPITokenByID(ctx context.Context, tokenID string) (store.GetAPITokenByIDRow, error) {
-	return m.getAPITokenByID.record(tokenID)
-}
-
-func (m *migStore) UpdateMigSpec(ctx context.Context, params store.UpdateMigSpecParams) error {
+func (m *handlerStore) UpdateMigSpec(ctx context.Context, params store.UpdateMigSpecParams) error {
 	_, err := m.updateMigSpec.record(params)
 	return err
 }
 
 // Mig CRUD methods
 
-func (m *migStore) CreateMig(ctx context.Context, params store.CreateMigParams) (store.Mig, error) {
-	m.createMig.called = true
-	m.createMig.params = params
-	result := store.Mig{ID: params.ID, Name: params.Name, SpecID: params.SpecID, CreatedBy: params.CreatedBy}
-	return result, m.createMig.err
-}
-
-func (m *migStore) ListMigs(ctx context.Context, params store.ListMigsParams) ([]store.Mig, error) {
+func (m *handlerStore) ListMigs(ctx context.Context, params store.ListMigsParams) ([]store.Mig, error) {
 	m.listMigs.called = true
 	m.listMigs.params = params
 	return listPaged(m.listMigs.val, params.Offset, params.Limit), m.listMigs.err
 }
 
-func (m *migStore) GetMig(ctx context.Context, id types.MigID) (store.Mig, error) {
-	m.getMig.called = true
-	m.getMig.params = id
-	if m.getMig.err != nil {
-		return store.Mig{}, m.getMig.err
-	}
-	result := m.getMig.val
-	if result.ID.IsZero() {
-		result.ID = id
-	}
-	if result.Name == "" {
-		result.Name = "mig-" + id.String()
-	}
-	return result, nil
-}
-
-func (m *migStore) GetMigByName(ctx context.Context, name string) (store.Mig, error) {
+func (m *handlerStore) GetMigByName(ctx context.Context, name string) (store.Mig, error) {
 	m.getMigByName.called = true
 	m.getMigByName.params = name
 	if m.getMigByName.err != nil {
@@ -161,54 +54,28 @@ func (m *migStore) GetMigByName(ctx context.Context, name string) (store.Mig, er
 	return result, nil
 }
 
-func (m *migStore) DeleteMig(ctx context.Context, id types.MigID) error {
+func (m *handlerStore) DeleteMig(ctx context.Context, id types.MigID) error {
 	_, err := m.deleteMig.record(id.String())
 	return err
 }
 
-func (m *migStore) ArchiveMig(ctx context.Context, id types.MigID) error {
+func (m *handlerStore) ArchiveMig(ctx context.Context, id types.MigID) error {
 	_, err := m.archiveMig.record(id.String())
 	return err
 }
 
-func (m *migStore) UnarchiveMig(ctx context.Context, id types.MigID) error {
+func (m *handlerStore) UnarchiveMig(ctx context.Context, id types.MigID) error {
 	_, err := m.unarchiveMig.record(id.String())
 	return err
 }
 
 // MigRepo methods
 
-func (m *migStore) CreateMigRepo(ctx context.Context, params store.CreateMigRepoParams) (store.MigRepo, error) {
-	result := defaultMigRepo(m.createMigRepo.val, params.ID, params.MigID, params.BaseRef)
-	if m.repoByID == nil {
-		m.repoByID = map[types.RepoID]store.Repo{}
-	}
-	m.repoByID[result.RepoID] = store.Repo{ID: result.RepoID, Url: params.Url}
-	m.createMigRepo.val = result
-	_, err := m.createMigRepo.record(params)
-	return result, err
-}
-
-func (m *migStore) GetMigRepo(ctx context.Context, id types.MigRepoID) (store.MigRepo, error) {
-	return m.getMigRepo.ret()
-}
-
-func (m *migStore) ListMigReposByMig(ctx context.Context, migID types.MigID) ([]store.MigRepo, error) {
-	if m.listMigReposByMigResults != nil {
-		if repos, ok := m.listMigReposByMigResults[migID.String()]; ok {
-			m.listMigReposByMig.called = true
-			m.listMigReposByMig.params = migID
-			return repos, m.listMigReposByMig.err
-		}
-	}
-	return m.listMigReposByMig.record(migID)
-}
-
-func (m *migStore) GetMigRepoByURL(ctx context.Context, arg store.GetMigRepoByURLParams) (store.MigRepo, error) {
+func (m *handlerStore) GetMigRepoByURL(ctx context.Context, arg store.GetMigRepoByURLParams) (store.MigRepo, error) {
 	return m.getMigRepoByURL.record(arg)
 }
 
-func (m *migStore) UpsertMigRepo(ctx context.Context, arg store.UpsertMigRepoParams) (store.MigRepo, error) {
+func (m *handlerStore) UpsertMigRepo(ctx context.Context, arg store.UpsertMigRepoParams) (store.MigRepo, error) {
 	result := defaultMigRepo(m.upsertMigRepo.val, arg.ID, arg.MigID, arg.BaseRef)
 	if m.repoByID == nil {
 		m.repoByID = map[types.RepoID]store.Repo{}
@@ -219,101 +86,14 @@ func (m *migStore) UpsertMigRepo(ctx context.Context, arg store.UpsertMigRepoPar
 	return result, err
 }
 
-func (m *migStore) DeleteMigRepo(ctx context.Context, id types.MigRepoID) error {
+func (m *handlerStore) DeleteMigRepo(ctx context.Context, id types.MigRepoID) error {
 	return m.deleteMigRepo.err
 }
 
-func (m *migStore) HasMigRepoHistory(ctx context.Context, repoID types.RepoID) (bool, error) {
+func (m *handlerStore) HasMigRepoHistory(ctx context.Context, repoID types.RepoID) (bool, error) {
 	return m.hasMigRepoHistory.ret()
 }
 
-func (m *migStore) ListFailedRepoIDsByMig(ctx context.Context, migID types.MigID) ([]types.RepoID, error) {
+func (m *handlerStore) ListFailedRepoIDsByMig(ctx context.Context, migID types.MigID) ([]types.RepoID, error) {
 	return m.listFailedRepoIDsByMig.record(migID.String())
-}
-
-func (m *migStore) UpdateMigRepoBaseRef(ctx context.Context, params store.UpdateMigRepoBaseRefParams) error {
-	_, err := m.updateMigRepoBaseRef.record(params)
-	return err
-}
-
-func (m *migStore) GetRepo(ctx context.Context, id types.RepoID) (store.Repo, error) {
-	if m.repoByID != nil {
-		if repo, ok := m.repoByID[id]; ok {
-			return repo, nil
-		}
-	}
-	return defaultRepo(id)
-}
-
-// Run creation methods
-
-func (m *migStore) CreateRun(ctx context.Context, params store.CreateRunParams) (store.Run, error) {
-	if len(m.createRunSeq.vals) > 0 || len(m.createRunSeq.errs) > 0 {
-		return m.createRunSeq.record(params)
-	}
-	result := defaultRun(m.createRun.val, params)
-	m.createRun.val = result
-	_, err := m.createRun.record(params)
-	return result, err
-}
-
-func (m *migStore) CreateWaveWithRuns(ctx context.Context, params store.CreateWaveWithRunsParams) (store.Wave, []store.Run, error) {
-	m.createWaveWithRuns.called = true
-	m.createWaveWithRuns.params = params
-	if m.createWaveWithRunsHook != nil {
-		m.createWaveWithRunsHook(params)
-	}
-	if m.createWaveWithRuns.err != nil {
-		return store.Wave{}, nil, m.createWaveWithRuns.err
-	}
-	wave := m.createWaveWithRuns.val
-	if wave.ID.IsZero() {
-		wave = defaultWave(store.Wave{}, params.Wave)
-	}
-	runs := make([]store.Run, 0, len(params.Runs))
-	for _, runParams := range params.Runs {
-		m.createRunParams = append(m.createRunParams, runParams)
-		m.createRun.called = true
-		m.createRun.params = runParams
-		if m.createRun.err != nil {
-			return store.Wave{}, nil, m.createRun.err
-		}
-		run, err := m.CreateRun(ctx, runParams)
-		if err != nil {
-			return store.Wave{}, nil, err
-		}
-		runs = append(runs, run)
-	}
-	return wave, runs, nil
-}
-
-// Run/Job query methods (for archive validation and migs_ticket)
-
-func (m *migStore) GetRun(ctx context.Context, id types.RunID) (store.Run, error) {
-	return m.getRun.record(id.String())
-}
-
-func (m *migStore) ListRuns(ctx context.Context, params store.ListRunsParams) ([]store.Run, error) {
-	return listPaged(m.listRuns.val, params.Offset, params.Limit), m.listRuns.err
-}
-
-func (m *migStore) ListJobsByRun(ctx context.Context, runID types.RunID) ([]store.Job, error) {
-	m.listJobsByRun.called = true
-	m.listJobsByRun.params = runID
-	return m.listJobsByRun.val, m.listJobsByRun.err
-}
-
-func (m *migStore) CreateJob(ctx context.Context, params store.CreateJobParams) (store.Job, error) {
-	m.createJob.called = true
-	m.createJob.calls = append(m.createJob.calls, params)
-	result := buildCreateJobResult(m.createJob.val, params)
-	return result, m.createJob.err
-}
-
-func (m *migStore) ListArtifactBundlesByRunAndJob(ctx context.Context, arg store.ListArtifactBundlesByRunAndJobParams) ([]store.ArtifactBundle, error) {
-	return m.listArtifactBundlesByRunAndJob.ret()
-}
-
-func (m *migStore) CreateEvent(ctx context.Context, params store.CreateEventParams) (store.Event, error) {
-	return m.createEvent.ret()
 }

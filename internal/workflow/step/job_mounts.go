@@ -63,7 +63,7 @@ func buildCommonJobMounts(jobMounts JobMounts, homeTarget string) ([]ContainerMo
 		return nil, err
 	}
 	mounts := []ContainerMount{
-		{Source: jobMounts.In, Target: jobInContainerDir, ReadOnly: false},
+		{Source: jobMounts.In, Target: jobInContainerDir, ReadOnly: true},
 		{Source: jobMounts.Out, Target: jobOutContainerDir, ReadOnly: false},
 		{Source: jobMounts.Tmp, Target: jobTmpContainerDir, ReadOnly: false},
 		{Source: jobMounts.Cache, Target: jobCacheContainerDir, ReadOnly: false},

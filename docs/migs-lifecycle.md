@@ -111,6 +111,8 @@ The node removes each job's `cache`, `home`, `staging`, and `tmp` directories
 after execution. The node retains `in`, `out`, logs, diffs, and container
 inspection data. Uploaded bundles keep the logical `artifacts/{job_id}/...`
 paths and exclude job runtime directories and `runtime-share`.
+The persisted container inspection data excludes arguments, environment,
+command, and entrypoint fields because they can contain credentials.
 
 The node downloads source snapshots from `GET /v1/runs/{run_id}/snapshot`.
 

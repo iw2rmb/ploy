@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	types "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
@@ -92,7 +93,7 @@ func TestClaimManager_ClaimAndExecute_EmitsRunEventWhenStartRunFails(t *testing.
 
 	runID := types.NewRunID()
 	jobID := types.NewJobID()
-	repoID := types.NewMigRepoID()
+	repoID := types.NewRepoID()
 
 	var (
 		mu                sync.Mutex
@@ -103,7 +104,7 @@ func TestClaimManager_ClaimAndExecute_EmitsRunEventWhenStartRunFails(t *testing.
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/v1/nodes/" + testNodeID + "/claim":
-			resp := ClaimResponse{
+			resp := domainapi.NodeClaimResponse{
 				RunID:   runID,
 				RepoID:  repoID,
 				JobID:   jobID,

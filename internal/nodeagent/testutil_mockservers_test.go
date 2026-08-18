@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 )
 
 // ---------------------------------------------------------------------------
@@ -59,9 +61,9 @@ func newAgentMockServer(t *testing.T, nodeID string, opts ...agentServerOption) 
 // Claim server helpers
 // ---------------------------------------------------------------------------
 
-// newSingleClaimServer returns a server that serves the given ClaimResponse
+// newSingleClaimServer returns a server that serves the given domainapi.NodeClaimResponse
 // on the /v1/nodes/{nodeID}/claim endpoint.
-func newSingleClaimServer(t *testing.T, nodeID string, claim ClaimResponse) *httptest.Server {
+func newSingleClaimServer(t *testing.T, nodeID string, claim domainapi.NodeClaimResponse) *httptest.Server {
 	t.Helper()
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {

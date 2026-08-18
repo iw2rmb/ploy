@@ -274,7 +274,7 @@ func TestRunController_reportTerminalStatus_PreservesSharedArtifactsOnTerminalSu
 	t.Setenv("PLOYD_CACHE_HOME", cacheHome)
 
 	runID := types.NewRunID()
-	repoID := types.NewMigRepoID()
+	repoID := types.NewRepoID()
 	shareDir := runShareDir(runID)
 	if err := os.MkdirAll(shareDir, 0o755); err != nil {
 		t.Fatalf("mkdir share dir: %v", err)

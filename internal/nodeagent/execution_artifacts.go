@@ -2,6 +2,7 @@ package nodeagent
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
@@ -79,7 +80,7 @@ func (w *artifactLogWriter) Close() error {
 	return w.closeErr
 }
 
-func (r *runController) uploadRepoArtifactsIfPresent(runID types.RunID, repoID types.MigRepoID, jobID types.JobID) {
+func (r *runController) uploadRepoArtifactsIfPresent(runID types.RunID, repoID types.RepoID, jobID types.JobID) {
 	if r.artifactUploader == nil {
 		return
 	}
@@ -168,7 +169,34 @@ func persistContainerInspectArtifact(req StartRunRequest, dirs JobDirectories, r
 	if len(result.ContainerInspectJSON) == 0 || dirs.ContainerInspect == "" {
 		return
 	}
-	if err := os.WriteFile(dirs.ContainerInspect, result.ContainerInspectJSON, 0o600); err != nil {
+	inspectJSON, err := redactContainerInspectExecutionData(result.ContainerInspectJSON)
+	if err != nil {
+		slog.Warn("failed to redact container inspect artifact", "run_id", req.RunID, "job_id", req.JobID, "container_id", result.ContainerID, "error", err)
+		return
+	}
+	if err := os.WriteFile(dirs.ContainerInspect, inspectJSON, 0o600); err != nil {
 		slog.Warn("failed to write container inspect artifact", "run_id", req.RunID, "job_id", req.JobID, "container_id", result.ContainerID, "error", err)
 	}
+}
+
+func redactContainerInspectExecutionData(raw []byte) ([]byte, error) {
+	var inspect map[string]any
+	if err := json.Unmarshal(raw, &inspect); err != nil {
+		return nil, fmt.Errorf("decode container inspect JSON: %w", err)
+	}
+
+	// Docker inspect repeats the job environment and command. Both can contain
+	// credentials, while mounts, state, image, and timing remain useful evidence.
+	delete(inspect, "Args")
+	if config, ok := inspect["Config"].(map[string]any); ok {
+		delete(config, "Env")
+		delete(config, "Cmd")
+		delete(config, "Entrypoint")
+	}
+
+	redacted, err := json.Marshal(inspect)
+	if err != nil {
+		return nil, fmt.Errorf("encode redacted container inspect JSON: %w", err)
+	}
+	return redacted, nil
 }

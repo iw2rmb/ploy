@@ -22,27 +22,27 @@ func TestAddMigRepoHandler(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		store          *migStore
+		store          *handlerStore
 		migID          string
 		body           map[string]interface{}
 		wantStatus     int
 		wantBodySubstr string
-		verify         func(t *testing.T, m *migStore)
+		verify         func(t *testing.T, m *handlerStore)
 	}{
 		{
 			name:       "success - adds repo to mig",
-			store:      func() *migStore { s := &migStore{}; s.getMig.val = activeMig; return s }(),
+			store:      func() *handlerStore { s := &handlerStore{}; s.getMig.val = activeMig; return s }(),
 			migID:      "mig123",
 			body:       map[string]interface{}{"repo_url": "https://github.com/org/repo", "base_ref": "main"},
 			wantStatus: http.StatusCreated,
 		},
 		{
 			name:       "success - normalizes repo URL",
-			store:      func() *migStore { s := &migStore{}; s.getMig.val = activeMig; return s }(),
+			store:      func() *handlerStore { s := &handlerStore{}; s.getMig.val = activeMig; return s }(),
 			migID:      "mig123",
 			body:       map[string]interface{}{"repo_url": "https://github.com/org/repo.git/", "base_ref": "main"},
 			wantStatus: http.StatusCreated,
-			verify: func(t *testing.T, m *migStore) {
+			verify: func(t *testing.T, m *handlerStore) {
 				t.Helper()
 				assertCalled(t, "CreateMigRepo", m.createMigRepo.called)
 				if m.createMigRepo.params.Url != "https://github.com/org/repo" {
@@ -52,7 +52,7 @@ func TestAddMigRepoHandler(t *testing.T) {
 		},
 		{
 			name:           "error - mig not found",
-			store:          func() *migStore { s := &migStore{}; s.getMig.err = pgx.ErrNoRows; return s }(),
+			store:          func() *handlerStore { s := &handlerStore{}; s.getMig.err = pgx.ErrNoRows; return s }(),
 			migID:          "mig404",
 			body:           map[string]interface{}{"repo_url": "https://github.com/org/repo", "base_ref": "main"},
 			wantStatus:     http.StatusNotFound,
@@ -60,8 +60,8 @@ func TestAddMigRepoHandler(t *testing.T) {
 		},
 		{
 			name: "error - archived mig",
-			store: func() *migStore {
-				s := &migStore{}
+			store: func() *handlerStore {
+				s := &handlerStore{}
 				s.getMig.val = store.Mig{ID: "modarc", Name: "archived-mig", ArchivedAt: pgtype.Timestamptz{Valid: true}}
 				return s
 			}(),
@@ -72,7 +72,7 @@ func TestAddMigRepoHandler(t *testing.T) {
 		},
 		{
 			name:           "error - missing repo_url",
-			store:          func() *migStore { s := &migStore{}; s.getMig.val = activeMig; return s }(),
+			store:          func() *handlerStore { s := &handlerStore{}; s.getMig.val = activeMig; return s }(),
 			migID:          "mig123",
 			body:           map[string]interface{}{"base_ref": "main"},
 			wantStatus:     http.StatusBadRequest,
@@ -80,7 +80,7 @@ func TestAddMigRepoHandler(t *testing.T) {
 		},
 		{
 			name:           "error - missing base_ref",
-			store:          func() *migStore { s := &migStore{}; s.getMig.val = activeMig; return s }(),
+			store:          func() *handlerStore { s := &handlerStore{}; s.getMig.val = activeMig; return s }(),
 			migID:          "mig123",
 			body:           map[string]interface{}{"repo_url": "https://github.com/org/repo"},
 			wantStatus:     http.StatusBadRequest,
@@ -88,7 +88,7 @@ func TestAddMigRepoHandler(t *testing.T) {
 		},
 		{
 			name:           "error - invalid repo_url scheme",
-			store:          func() *migStore { s := &migStore{}; s.getMig.val = activeMig; return s }(),
+			store:          func() *handlerStore { s := &handlerStore{}; s.getMig.val = activeMig; return s }(),
 			migID:          "mig123",
 			body:           map[string]interface{}{"repo_url": "ftp://invalid.com/repo", "base_ref": "main"},
 			wantStatus:     http.StatusBadRequest,
@@ -116,7 +116,7 @@ func TestAddMigRepoHandler(t *testing.T) {
 func TestListMigReposHandler(t *testing.T) {
 	tests := []struct {
 		name           string
-		store          *migStore
+		store          *handlerStore
 		migID          string
 		wantStatus     int
 		wantBodySubstr string
@@ -125,8 +125,8 @@ func TestListMigReposHandler(t *testing.T) {
 		{
 			name:  "success - lists repos",
 			migID: "mig123",
-			store: func() *migStore {
-				s := &migStore{
+			store: func() *handlerStore {
+				s := &handlerStore{
 					repoByID: map[types.RepoID]store.Repo{
 						"repo0001": {ID: "repo0001", Url: "https://github.com/org/repo1"},
 						"repo0002": {ID: "repo0002", Url: "https://github.com/org/repo2"},
@@ -153,8 +153,8 @@ func TestListMigReposHandler(t *testing.T) {
 		{
 			name:  "success - empty list",
 			migID: "mig123",
-			store: func() *migStore {
-				s := &migStore{}
+			store: func() *handlerStore {
+				s := &handlerStore{}
 				s.getMig.val = store.Mig{ID: "mig123", Name: "test-mig"}
 				s.listMigReposByMig.val = []store.MigRepo{}
 				return s
@@ -173,7 +173,7 @@ func TestListMigReposHandler(t *testing.T) {
 		{
 			name:           "error - mig not found",
 			migID:          "mig404",
-			store:          func() *migStore { s := &migStore{}; s.getMig.err = pgx.ErrNoRows; return s }(),
+			store:          func() *handlerStore { s := &handlerStore{}; s.getMig.err = pgx.ErrNoRows; return s }(),
 			wantStatus:     http.StatusNotFound,
 			wantBodySubstr: "mig not found",
 		},
@@ -201,7 +201,7 @@ func TestDeleteMigRepoHandler(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		store          *migStore
+		store          *handlerStore
 		migID          string
 		repoID         string
 		wantStatus     int
@@ -209,8 +209,8 @@ func TestDeleteMigRepoHandler(t *testing.T) {
 	}{
 		{
 			name: "success - deletes repo",
-			store: func() *migStore {
-				st := func() *migStore { s := &migStore{}; s.getMig.val = activeMig; return s }()
+			store: func() *handlerStore {
+				st := func() *handlerStore { s := &handlerStore{}; s.getMig.val = activeMig; return s }()
 				st.getMigRepo.val = store.MigRepo{ID: "repoX789", MigID: "mig123"}
 				st.hasMigRepoHistory.val = false
 				return st
@@ -221,7 +221,7 @@ func TestDeleteMigRepoHandler(t *testing.T) {
 		},
 		{
 			name:           "error - mig not found",
-			store:          func() *migStore { s := &migStore{}; s.getMig.err = pgx.ErrNoRows; return s }(),
+			store:          func() *handlerStore { s := &handlerStore{}; s.getMig.err = pgx.ErrNoRows; return s }(),
 			migID:          "mig404",
 			repoID:         "repoX789",
 			wantStatus:     http.StatusNotFound,
@@ -229,8 +229,8 @@ func TestDeleteMigRepoHandler(t *testing.T) {
 		},
 		{
 			name: "error - repo not found",
-			store: func() *migStore {
-				st := func() *migStore { s := &migStore{}; s.getMig.val = activeMig; return s }()
+			store: func() *handlerStore {
+				st := func() *handlerStore { s := &handlerStore{}; s.getMig.val = activeMig; return s }()
 				st.getMigRepo.err = pgx.ErrNoRows
 				return st
 			}(),
@@ -241,8 +241,8 @@ func TestDeleteMigRepoHandler(t *testing.T) {
 		},
 		{
 			name: "error - repo belongs to different mig",
-			store: func() *migStore {
-				st := func() *migStore { s := &migStore{}; s.getMig.val = activeMig; return s }()
+			store: func() *handlerStore {
+				st := func() *handlerStore { s := &handlerStore{}; s.getMig.val = activeMig; return s }()
 				st.getMigRepo.val = store.MigRepo{ID: "repo0003", MigID: "migdif"}
 				return st
 			}(),
@@ -253,8 +253,8 @@ func TestDeleteMigRepoHandler(t *testing.T) {
 		},
 		{
 			name: "error - repo has historical executions",
-			store: func() *migStore {
-				st := func() *migStore { s := &migStore{}; s.getMig.val = activeMig; return s }()
+			store: func() *handlerStore {
+				st := func() *handlerStore { s := &handlerStore{}; s.getMig.val = activeMig; return s }()
 				st.getMigRepo.val = store.MigRepo{ID: "repohist", MigID: "mig123"}
 				st.hasMigRepoHistory.val = true
 				return st
@@ -296,7 +296,7 @@ func TestBulkUpsertMigReposHandler(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		store          *migStore
+		store          *handlerStore
 		migID          string
 		contentType    string
 		body           string
@@ -305,12 +305,12 @@ func TestBulkUpsertMigReposHandler(t *testing.T) {
 		wantCreated    int
 		wantUpdated    int
 		wantFailed     int
-		verify         func(t *testing.T, m *migStore)
+		verify         func(t *testing.T, m *handlerStore)
 	}{
 		{
 			name: "success - creates new repos",
-			store: func() *migStore {
-				st := func() *migStore { s := &migStore{}; s.getMig.val = activeMig; return s }()
+			store: func() *handlerStore {
+				st := func() *handlerStore { s := &handlerStore{}; s.getMig.val = activeMig; return s }()
 				st.getMigRepoByURL.err = pgx.ErrNoRows
 				return st
 			}(),
@@ -324,8 +324,8 @@ https://github.com/org/repo2,develop`,
 		},
 		{
 			name: "success - updates existing repos",
-			store: func() *migStore {
-				st := func() *migStore { s := &migStore{}; s.getMig.val = activeMig; return s }()
+			store: func() *handlerStore {
+				st := func() *handlerStore { s := &handlerStore{}; s.getMig.val = activeMig; return s }()
 				st.getMigRepoByURL.val = store.MigRepo{ID: "repoexst", MigID: "mig123"}
 				return st
 			}(),
@@ -338,8 +338,8 @@ https://github.com/org/existing,main`,
 		},
 		{
 			name: "success - parses quoted fields and unicode",
-			store: func() *migStore {
-				st := func() *migStore { s := &migStore{}; s.getMig.val = activeMig; return s }()
+			store: func() *handlerStore {
+				st := func() *handlerStore { s := &handlerStore{}; s.getMig.val = activeMig; return s }()
 				st.getMigRepoByURL.err = pgx.ErrNoRows
 				return st
 			}(),
@@ -351,8 +351,8 @@ https://github.com/org/existing,main`,
 		},
 		{
 			name: "success - normalizes repo URL before upsert",
-			store: func() *migStore {
-				st := func() *migStore { s := &migStore{}; s.getMig.val = activeMig; return s }()
+			store: func() *handlerStore {
+				st := func() *handlerStore { s := &handlerStore{}; s.getMig.val = activeMig; return s }()
 				st.getMigRepoByURL.err = pgx.ErrNoRows
 				return st
 			}(),
@@ -361,7 +361,7 @@ https://github.com/org/existing,main`,
 			body:        "repo_url,base_ref\nhttps://github.com/org/repo.git/,main",
 			wantStatus:  http.StatusOK,
 			wantCreated: 1,
-			verify: func(t *testing.T, m *migStore) {
+			verify: func(t *testing.T, m *handlerStore) {
 				t.Helper()
 				assertCalled(t, "GetMigRepoByURL", m.getMigRepoByURL.called)
 				if m.getMigRepoByURL.params.Url != "https://github.com/org/repo" {
@@ -375,7 +375,7 @@ https://github.com/org/existing,main`,
 		},
 		{
 			name:           "error - wrong content type",
-			store:          func() *migStore { s := &migStore{}; s.getMig.val = activeMig; return s }(),
+			store:          func() *handlerStore { s := &handlerStore{}; s.getMig.val = activeMig; return s }(),
 			migID:          "mig123",
 			contentType:    "application/json",
 			body:           `{}`,
@@ -384,7 +384,7 @@ https://github.com/org/existing,main`,
 		},
 		{
 			name:           "error - mig not found",
-			store:          func() *migStore { s := &migStore{}; s.getMig.err = pgx.ErrNoRows; return s }(),
+			store:          func() *handlerStore { s := &handlerStore{}; s.getMig.err = pgx.ErrNoRows; return s }(),
 			migID:          "mig404",
 			contentType:    "text/csv",
 			body:           "repo_url,base_ref\nhttps://github.com/org/repo,main",
@@ -393,7 +393,7 @@ https://github.com/org/existing,main`,
 		},
 		{
 			name:           "error - archived mig",
-			store:          func() *migStore { s := &migStore{}; s.getMig.val = archivedMig; return s }(),
+			store:          func() *handlerStore { s := &handlerStore{}; s.getMig.val = archivedMig; return s }(),
 			migID:          "modarc",
 			contentType:    "text/csv",
 			body:           "repo_url,base_ref\nhttps://github.com/org/repo,main",
@@ -402,7 +402,7 @@ https://github.com/org/existing,main`,
 		},
 		{
 			name:           "error - invalid header",
-			store:          func() *migStore { s := &migStore{}; s.getMig.val = activeMig; return s }(),
+			store:          func() *handlerStore { s := &handlerStore{}; s.getMig.val = activeMig; return s }(),
 			migID:          "mig123",
 			contentType:    "text/csv",
 			body:           "wrong,headers\nhttps://github.com/org/repo,main",
@@ -411,8 +411,8 @@ https://github.com/org/existing,main`,
 		},
 		{
 			name: "partial success - invalid repo_url on one line",
-			store: func() *migStore {
-				st := func() *migStore { s := &migStore{}; s.getMig.val = activeMig; return s }()
+			store: func() *handlerStore {
+				st := func() *handlerStore { s := &handlerStore{}; s.getMig.val = activeMig; return s }()
 				st.getMigRepoByURL.err = pgx.ErrNoRows
 				return st
 			}(),
@@ -425,7 +425,7 @@ https://github.com/org/existing,main`,
 		},
 		{
 			name:           "partial success - missing fields",
-			store:          func() *migStore { s := &migStore{}; s.getMig.val = activeMig; return s }(),
+			store:          func() *handlerStore { s := &handlerStore{}; s.getMig.val = activeMig; return s }(),
 			migID:          "mig123",
 			contentType:    "text/csv",
 			body:           "repo_url,base_ref\nhttps://github.com/org/repo,",
@@ -435,7 +435,7 @@ https://github.com/org/existing,main`,
 		},
 		{
 			name:        "partial success - strict CSV parse error",
-			store:       func() *migStore { s := &migStore{}; s.getMig.val = activeMig; return s }(),
+			store:       func() *handlerStore { s := &handlerStore{}; s.getMig.val = activeMig; return s }(),
 			migID:       "mig123",
 			contentType: "text/csv",
 			body:        "repo_url,base_ref\nhttps://github.com/org/repo,\"unterminated",
@@ -444,8 +444,8 @@ https://github.com/org/existing,main`,
 		},
 		{
 			name: "partial success - store lookup error is a per-line failure",
-			store: func() *migStore {
-				st := func() *migStore { s := &migStore{}; s.getMig.val = activeMig; return s }()
+			store: func() *handlerStore {
+				st := func() *handlerStore { s := &handlerStore{}; s.getMig.val = activeMig; return s }()
 				st.getMigRepoByURL.err = errors.New("db down")
 				return st
 			}(),
@@ -454,7 +454,7 @@ https://github.com/org/existing,main`,
 			body:        "repo_url,base_ref\nhttps://github.com/org/repo,main",
 			wantStatus:  http.StatusOK,
 			wantFailed:  1,
-			verify: func(t *testing.T, m *migStore) {
+			verify: func(t *testing.T, m *handlerStore) {
 				t.Helper()
 				assertNotCalled(t, "UpsertMigRepo", m.upsertMigRepo.called)
 			},

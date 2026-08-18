@@ -15,12 +15,13 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	bsmock "github.com/iw2rmb/ploy/internal/blobstore/mock"
+	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
 func TestRunDiffs_Download(t *testing.T) {
-	st := &artifactStore{}
+	st := &handlerStore{}
 	runID := domaintypes.NewRunID()
 	repoID := "repoAAAA"
 	jobID := domaintypes.NewJobID()
@@ -72,7 +73,7 @@ func TestRunDiffs_Download(t *testing.T) {
 }
 
 func TestRunDiffs_DownloadAccumulated(t *testing.T) {
-	st := &artifactStore{}
+	st := &handlerStore{}
 	runID := domaintypes.NewRunID()
 	repoID := "repoAAAA"
 	repoIDTyped := domaintypes.RepoID(repoID)
@@ -120,7 +121,7 @@ func TestRunDiffs_DownloadAccumulated(t *testing.T) {
 }
 
 func TestRunDiffs_ReturnsEmptyListWhenRunHasNoDiffJobs(t *testing.T) {
-	st := &artifactStore{}
+	st := &handlerStore{}
 	runID := domaintypes.NewRunID()
 	repoBID := "repoBBBB" // NanoID-backed
 
@@ -143,11 +144,11 @@ func TestRunDiffs_ReturnsEmptyListWhenRunHasNoDiffJobs(t *testing.T) {
 	if !st.getRun.called {
 		t.Fatal("expected GetRun to be called")
 	}
-	if st.getRun.params != runID {
+	if st.getRun.params != runID.String() {
 		t.Errorf("run_id=%q, want %q", st.getRun.params, runID)
 	}
 
-	var resp diffListResponse
+	var resp domainapi.DiffListResponse
 	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
@@ -160,7 +161,7 @@ func TestRunDiffs_ReturnsEmptyListWhenRunHasNoDiffJobs(t *testing.T) {
 // TestRunDiffs_ReturnsOwnDiffs verifies that a repo sees its own diffs.
 // This tests the positive case: querying repo A returns repo A's diffs.
 func TestRunDiffs_ReturnsOwnDiffs(t *testing.T) {
-	st := &artifactStore{}
+	st := &handlerStore{}
 	runID := domaintypes.NewRunID()
 	repoID := "repoAAAA" // NanoID-backed
 	repoIDTyped := domaintypes.RepoID(repoID)
@@ -199,7 +200,7 @@ func TestRunDiffs_ReturnsOwnDiffs(t *testing.T) {
 
 	assertStatus(t, rr, http.StatusOK)
 
-	var resp diffListResponse
+	var resp domainapi.DiffListResponse
 	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
@@ -209,7 +210,7 @@ func TestRunDiffs_ReturnsOwnDiffs(t *testing.T) {
 		t.Fatalf("expected 1 diff, got %d", len(resp.Diffs))
 	}
 	item := resp.Diffs[0]
-	if item.ID != diffID.String() {
+	if item.ID != domaintypes.DiffID(diffID.String()) {
 		t.Errorf("id=%q, want %q", item.ID, diffID.String())
 	}
 	if item.JobID != jobID {
@@ -225,7 +226,7 @@ func TestRunDiffs_ReturnsOwnDiffs(t *testing.T) {
 
 // TestRunDiffs_MissingRunID verifies that missing run_id returns 400.
 func TestRunDiffs_MissingRunID(t *testing.T) {
-	st := &artifactStore{}
+	st := &handlerStore{}
 	bs := bsmock.New()
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/v1/runs//diffs", nil)

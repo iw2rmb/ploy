@@ -10,25 +10,11 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
-	"github.com/iw2rmb/ploy/internal/cli/httpx"
+	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/httpx"
 )
-
-// RunDiffEntry is a single diff item from the run diffs listing.
-type RunDiffEntry struct {
-	ID        domaintypes.DiffID      `json:"id"`
-	JobID     domaintypes.JobID       `json:"job_id"`
-	CreatedAt time.Time               `json:"created_at"`
-	Size      int                     `json:"gzipped_size"`
-	Summary   domaintypes.DiffSummary `json:"summary,omitempty"`
-}
-
-// ListRunDiffsResult is the response from ListRunDiffsCommand.
-type ListRunDiffsResult struct {
-	Diffs []RunDiffEntry
-}
 
 // ListRunDiffsCommand fetches the diff listing for a run.
 // It returns structured data suitable for machine consumption (e.g., TUI).
@@ -39,39 +25,22 @@ type ListRunDiffsCommand struct {
 }
 
 // Run executes GET /v1/runs/{run_id}/diffs and returns structured diffs.
-func (c ListRunDiffsCommand) Run(ctx context.Context) (ListRunDiffsResult, error) {
+func (c ListRunDiffsCommand) Run(ctx context.Context) (domainapi.DiffListResponse, error) {
 	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
-		return ListRunDiffsResult{}, fmt.Errorf("list run diffs: %w", err)
+		return domainapi.DiffListResponse{}, fmt.Errorf("list run diffs: %w", err)
 	}
 	if c.RunID.IsZero() {
-		return ListRunDiffsResult{}, errors.New("list run diffs: run id required")
+		return domainapi.DiffListResponse{}, errors.New("list run diffs: run id required")
 	}
 	endpoint := c.BaseURL.JoinPath("v1", "runs", c.RunID.String(), "diffs")
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
+	result, err := httpx.DoJSON[domainapi.DiffListResponse](ctx, c.Client, http.MethodGet, endpoint.String(), nil, http.StatusOK, "list run diffs")
 	if err != nil {
-		return ListRunDiffsResult{}, fmt.Errorf("list run diffs: build request: %w", err)
+		return domainapi.DiffListResponse{}, err
 	}
-
-	resp, err := c.Client.Do(req)
-	if err != nil {
-		return ListRunDiffsResult{}, fmt.Errorf("list run diffs: http request failed: %w", err)
+	if result.Diffs == nil {
+		result.Diffs = []domainapi.DiffListItem{}
 	}
-	defer httpx.DrainAndClose(resp)
-
-	if resp.StatusCode != http.StatusOK {
-		return ListRunDiffsResult{}, httpx.WrapError("list run diffs", resp.Status, resp.Body)
-	}
-
-	var raw struct {
-		Diffs []RunDiffEntry `json:"diffs"`
-	}
-	if err := httpx.DecodeResponseJSON(resp.Body, &raw, httpx.MaxJSONBodyBytes); err != nil {
-		return ListRunDiffsResult{}, fmt.Errorf("list run diffs: decode response: %w", err)
-	}
-	if raw.Diffs == nil {
-		raw.Diffs = []RunDiffEntry{}
-	}
-	return ListRunDiffsResult{Diffs: raw.Diffs}, nil
+	return result, nil
 }
 
 // RunDiffsCommand lists diffs for a specific run and optionally downloads the newest patch.
@@ -101,22 +70,8 @@ func (c RunDiffsCommand) Run(ctx context.Context) error {
 
 	// List diffs via run endpoint
 	listURL := c.BaseURL.JoinPath("v1", "runs", runID, "diffs")
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, listURL.String(), nil)
+	listing, err := httpx.DoJSON[domainapi.DiffListResponse](ctx, c.Client, http.MethodGet, listURL.String(), nil, http.StatusOK, "run diffs")
 	if err != nil {
-		return err
-	}
-	resp, err := c.Client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer httpx.DrainAndClose(resp)
-	if resp.StatusCode != http.StatusOK {
-		return httpx.WrapError("run diffs", resp.Status, resp.Body)
-	}
-	var listing struct {
-		Diffs []RunDiffEntry `json:"diffs"`
-	}
-	if err := httpx.DecodeResponseJSON(resp.Body, &listing, httpx.MaxJSONBodyBytes); err != nil {
 		return err
 	}
 

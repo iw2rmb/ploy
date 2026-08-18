@@ -16,7 +16,7 @@ func TestGetJobLogsHandler_JobNotFound(t *testing.T) {
 	t.Parallel()
 
 	jobID := domaintypes.NewJobID()
-	st := &jobStore{}
+	st := &handlerStore{}
 	st.getJob.err = pgx.ErrNoRows
 
 	eventsService, err := createTestEventsService()
@@ -32,7 +32,7 @@ func TestGetJobLogsHandler_JobNotFound(t *testing.T) {
 func TestGetJobLogsHandler_InvalidJobID(t *testing.T) {
 	t.Parallel()
 
-	st := &jobStore{}
+	st := &handlerStore{}
 	eventsService, err := createTestEventsService()
 	if err != nil {
 		t.Fatalf("events service: %v", err)
@@ -51,7 +51,7 @@ func TestGetJobLogsHandler_RunNotFound(t *testing.T) {
 
 	runID := domaintypes.NewRunID()
 	jobID := domaintypes.NewJobID()
-	st := &jobStore{}
+	st := &handlerStore{}
 	st.getJob.val = store.Job{ID: jobID, RunID: runID}
 	st.getRun.err = pgx.ErrNoRows
 

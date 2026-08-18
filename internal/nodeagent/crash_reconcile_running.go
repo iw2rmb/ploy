@@ -8,7 +8,6 @@ import (
 	"time"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
-	"github.com/iw2rmb/ploy/internal/workflow/lifecycle"
 )
 
 const recoveredStatusUploadTimeout = 10 * time.Second
@@ -99,24 +98,7 @@ func (c *ClaimManager) waitAndUploadRecoveredContainer(ctx context.Context, reco
 		}
 	}
 
-	exitCode, err := safeExitCodeInt32(terminal.ExitCode)
-	if err != nil {
-		return fmt.Errorf("normalize recovered running exit code: %w", err)
-	}
-	status := lifecycle.JobStatusFromExitCode(int(exitCode))
-
-	durationMs := int64(0)
-	if !terminal.StartedAt.IsZero() && !terminal.FinishedAt.IsZero() && terminal.FinishedAt.After(terminal.StartedAt) {
-		durationMs = terminal.FinishedAt.Sub(terminal.StartedAt).Milliseconds()
-	}
-	stats := types.NewRunStatsBuilder().
-		ExitCode(int(exitCode)).
-		DurationMs(durationMs).
-		MetadataEntry("source", "startup_reconcile").
-		MetadataEntry("container_id", recovered.ContainerID).
-		MustBuild()
-
-	if err := c.uploadRecoveredJobStatus(recovered.JobID, status, &exitCode, stats); err != nil {
+	if err := c.uploadRecoveredTerminalStatus(recovered.JobID, recovered.ContainerID, terminal); err != nil {
 		return fmt.Errorf("upload recovered container terminal status: %w", err)
 	}
 	return nil

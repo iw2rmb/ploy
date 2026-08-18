@@ -31,17 +31,15 @@ e2e_artifacts_init "$REPO_ROOT/tmp/migs/scenario-bundle-blocked"
 
 REPO="${PLOY_E2E_REPO_OVERRIDE:-https://github.com/octocat/Hello-World.git}"
 BASE_REF="${PLOY_E2E_BASE_REF:-master}"
-TARGET_REF="${PLOY_E2E_TARGET_REF:-e2e/bundle-blocked}"
-
-SERVER_URL="$(e2e_descriptor_address)"
-TOKEN="$(e2e_descriptor_token)"
+E2E_IMAGE="$(e2e_runtime_image)"
+SERVER_URL="${PLOY_SERVER_URL:?PLOY_SERVER_URL is required}"
+TOKEN="${PLOY_AUTH_TOKEN:?PLOY_AUTH_TOKEN is required}"
 
 echo "=========================================="
 echo "Bundle Blocked Entries E2E Scenario"
 echo "=========================================="
-echo "Repo:       $REPO"
+echo "Repo:       $(e2e_repo_selector "$REPO")"
 echo "Base ref:   $BASE_REF"
-echo "Target ref: $TARGET_REF"
 echo "Server:     $SERVER_URL"
 echo "Artifacts:  $E2E_ARTIFACT_DIR"
 echo "=========================================="
@@ -102,8 +100,10 @@ apiVersion: ploy.mig/v1alpha1
 kind: MigRunSpec
 bundle_map:
   ${SHORT_HASH}: ${BUNDLE_ID}
+build_gate:
+  disabled: true
 steps:
-  - image: alpine:3.20
+  - image: ${E2E_IMAGE}
     command: echo "should not reach here"
     in:
       - "${SHORT_HASH}:/in/evil.txt"
@@ -115,7 +115,7 @@ set +e
 RUN_JSON="$(e2e_mig_run_json \
   "$SPEC_FILE" \
   "$(e2e_repo_selector "$REPO" "$BASE_REF")" \
-  --follow 2>&1)"
+  --follow)"
 RUN_EXIT=$?
 set -e
 
@@ -227,8 +227,10 @@ apiVersion: ploy.mig/v1alpha1
 kind: MigRunSpec
 bundle_map:
   ${SHORT_HASH_SYM}: ${BUNDLE_ID_SYM}
+build_gate:
+  disabled: true
 steps:
-  - image: alpine:3.20
+  - image: ${E2E_IMAGE}
     command: echo "should not reach here"
     in:
       - "${SHORT_HASH_SYM}:/in/evil.sh"
@@ -240,7 +242,7 @@ set +e
 RUN_JSON_SYM="$(e2e_mig_run_json \
   "$SPEC_FILE_SYM" \
   "$(e2e_repo_selector "$REPO" "$BASE_REF")" \
-  --follow 2>&1)"
+  --follow)"
 RUN_EXIT_SYM=$?
 set -e
 

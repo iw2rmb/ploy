@@ -310,7 +310,7 @@ func TestCompletion_RejectsV0Status(t *testing.T) {
 		t.Run(v0status, func(t *testing.T) {
 			t.Parallel()
 			f := newJobFixture("mig")
-			st := &jobStore{}
+			st := &handlerStore{}
 			handler := completeJobHandler(st, nil, nil)
 
 			req := f.completeJobReq(map[string]any{"status": v0status})

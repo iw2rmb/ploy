@@ -2,7 +2,6 @@ package spec
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -13,6 +12,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/cli/common"
 	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/httpx"
 )
 
 func handleList(args []string, stdout, stderr io.Writer) error {
@@ -44,21 +44,9 @@ func printListUsage(w io.Writer) {
 
 func listNamedSpecs(ctx context.Context, base *url.URL, client *http.Client) ([]domainapi.NamedSpecCatalogEntry, error) {
 	endpoint := base.JoinPath("v1", "specs")
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
+	list, err := httpx.DoJSON[domainapi.NamedSpecListResponse](ctx, client, http.MethodGet, endpoint.String(), nil, http.StatusOK, "list named specs")
 	if err != nil {
-		return nil, fmt.Errorf("list named specs: build request: %w", err)
-	}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("list named specs: http request: %w", err)
-	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, common.ControlPlaneHTTPError(resp)
-	}
-	defer func() { _ = resp.Body.Close() }()
-	var list domainapi.NamedSpecListResponse
-	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
-		return nil, fmt.Errorf("list named specs: decode response: %w", err)
+		return nil, err
 	}
 	return list.Specs, nil
 }

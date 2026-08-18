@@ -59,7 +59,7 @@ func TestCancelRunHandlerV1TokenRelease(t *testing.T) {
 			runID := domaintypes.NewRunID()
 			hash := "hash-" + runID.String()
 			token := "glpat-secret"
-			st := &runStore{}
+			st := &handlerStore{}
 			st.getRun.val = store.Run{
 				ID:        runID,
 				MigID:     domaintypes.NewMigID(),
@@ -102,15 +102,15 @@ func TestRestartRunHandler(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		setup      func(*runStore)
+		setup      func(*handlerStore)
 		body       any
 		wantStatus int
 		wantToken  bool
-		verify     func(*testing.T, *runStore, *gitlabtokens.Registry)
+		verify     func(*testing.T, *handlerStore, *gitlabtokens.Registry)
 	}{
 		{
 			name: "bodyless success",
-			setup: func(st *runStore) {
+			setup: func(st *handlerStore) {
 				st.restartRun.val = store.Run{
 					ID:        runID,
 					MigID:     domaintypes.NewMigID(),
@@ -121,7 +121,7 @@ func TestRestartRunHandler(t *testing.T) {
 				}
 			},
 			wantStatus: http.StatusOK,
-			verify: func(t *testing.T, st *runStore, registry *gitlabtokens.Registry) {
+			verify: func(t *testing.T, st *handlerStore, registry *gitlabtokens.Registry) {
 				t.Helper()
 				if !st.restartRun.called {
 					t.Fatal("expected RestartRun to be called")
@@ -136,7 +136,7 @@ func TestRestartRunHandler(t *testing.T) {
 		},
 		{
 			name: "token success stores marker stats and keeps registry entry",
-			setup: func(st *runStore) {
+			setup: func(st *handlerStore) {
 				st.getRun.val = store.Run{
 					ID:        runID,
 					RepoID:    "repo1",
@@ -161,7 +161,7 @@ func TestRestartRunHandler(t *testing.T) {
 			body:       map[string]any{"gitlab_token": token},
 			wantStatus: http.StatusOK,
 			wantToken:  true,
-			verify: func(t *testing.T, st *runStore, registry *gitlabtokens.Registry) {
+			verify: func(t *testing.T, st *handlerStore, registry *gitlabtokens.Registry) {
 				t.Helper()
 				if got := gitlabtoken.HashFromRunStats(st.restartRun.params.Stats); got != tokenHash {
 					t.Fatalf("RestartRun stats marker=%q, want %q", got, tokenHash)
@@ -170,7 +170,7 @@ func TestRestartRunHandler(t *testing.T) {
 		},
 		{
 			name: "token restart error releases registry entry",
-			setup: func(st *runStore) {
+			setup: func(st *handlerStore) {
 				st.getRun.val = store.Run{ID: runID, RepoID: "repo1"}
 				st.repoByID = map[domaintypes.RepoID]store.Repo{
 					"repo1": {ID: "repo1", Url: "https://gitlab.example.com/acme/service"},
@@ -182,14 +182,14 @@ func TestRestartRunHandler(t *testing.T) {
 		},
 		{
 			name: "active run conflict",
-			setup: func(st *runStore) {
+			setup: func(st *handlerStore) {
 				st.restartRun.err = store.ErrRunRestartActive
 			},
 			wantStatus: http.StatusConflict,
 		},
 		{
 			name: "cancelled wave conflict",
-			setup: func(st *runStore) {
+			setup: func(st *handlerStore) {
 				st.restartRun.err = store.ErrRunRestartWaveCancelled
 			},
 			wantStatus: http.StatusConflict,
@@ -199,7 +199,7 @@ func TestRestartRunHandler(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			st := &runStore{}
+			st := &handlerStore{}
 			tt.setup(st)
 			registry := gitlabtokens.NewRegistry()
 

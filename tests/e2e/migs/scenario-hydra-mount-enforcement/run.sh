@@ -12,7 +12,7 @@ set -euo pipefail
 # Part 1 — in read-only enforcement:
 #   1. Build a spec with an `in` record pointing to a fixture file.
 #   2. The container tries to write to /in/config.json.
-#   3. Assert the run fails (write to read-only mount).
+#   3. The command succeeds only when the write is rejected.
 #
 # Part 2 — out write success:
 #   1. Build a spec with an `out` record.
@@ -28,14 +28,13 @@ e2e_artifacts_init "$REPO_ROOT/tmp/migs/scenario-hydra-mount-enforcement"
 
 REPO="${PLOY_E2E_REPO_OVERRIDE:-https://github.com/octocat/Hello-World.git}"
 BASE_REF="${PLOY_E2E_BASE_REF:-master}"
-TARGET_REF="${PLOY_E2E_TARGET_REF:-e2e/hydra-mount}"
+E2E_IMAGE="$(e2e_runtime_image)"
 
 echo "=========================================="
 echo "Hydra Mount Enforcement E2E Scenario"
 echo "=========================================="
-echo "Repo:       $REPO"
+echo "Repo:       $(e2e_repo_selector "$REPO")"
 echo "Base ref:   $BASE_REF"
-echo "Target ref: $TARGET_REF"
 echo "Artifacts:  $E2E_ARTIFACT_DIR"
 echo "=========================================="
 
@@ -52,8 +51,10 @@ trap 'rm -f "$IN_FIXTURE" "$SPEC_RO"' EXIT
 cat >"$SPEC_RO" <<YAML
 apiVersion: ploy.mig/v1alpha1
 kind: MigRunSpec
+build_gate:
+  disabled: true
 steps:
-  - image: alpine:3.20
+  - image: ${E2E_IMAGE}
     command: >-
       sh -c '
         echo "attempting write to /in/config.json...";
@@ -62,10 +63,10 @@ steps:
           exit 1;
         fi;
         echo "OK: write to /in correctly rejected (read-only mount enforced)";
-        exit 2
+        exit 0
       '
     in:
-      - ${IN_FIXTURE}:/in/config.json
+      - ${IN_FIXTURE}:config.json
 YAML
 
 echo ""
@@ -76,7 +77,7 @@ set +e
 RO_JSON="$(e2e_mig_run_json \
   "$SPEC_RO" \
   "$(e2e_repo_selector "$REPO" "$BASE_REF")" \
-  --follow 2>&1)"
+  --follow)"
 RO_EXIT=$?
 set -e
 
@@ -84,26 +85,11 @@ printf '%s\n' "$RO_JSON" >"${E2E_ARTIFACT_DIR}/run-mount-ro.json"
 
 FAILED=0
 
-# The container should fail because writing to /in/ is rejected (read-only mount).
-# We verify both the run status AND that the rejection message is present in output,
-# proving the failure was caused by the read-only mount (not an unrelated non-zero exit).
 RO_STATUS="$(printf '%s' "$RO_JSON" | jq -r '.repos[0].status // empty' 2>/dev/null || echo "")"
-RO_OUTPUT="$(printf '%s' "$RO_JSON" | jq -r '.repos[0].output // empty' 2>/dev/null || echo "")"
-if [[ "$RO_STATUS" == "Fail" ]]; then
-  echo "  + /in write attempt: run failed as expected (read-only mount enforced)"
-  # Verify the failure was specifically due to read-only rejection, not a coincidental non-zero exit.
-  if printf '%s' "$RO_OUTPUT" | grep -q "read-only mount enforced\|Read-only file system\|Permission denied"; then
-    echo "  + /in write attempt: output confirms read-only rejection"
-  else
-    echo "  ! /in write attempt: run failed but output does not confirm read-only rejection" >&2
-    echo "    output: ${RO_OUTPUT:0:500}" >&2
-    FAILED=1
-  fi
-elif [[ "$RO_STATUS" == "Success" ]]; then
-  echo "  ! /in write attempt: run succeeded unexpectedly" >&2
-  FAILED=1
+if [[ "$RO_STATUS" == "Success" ]]; then
+  echo "  + /in write attempt: write was rejected (read-only mount enforced)"
 else
-  echo "  ! /in write attempt: expected Fail status, got '${RO_STATUS}' exit=${RO_EXIT}" >&2
+  echo "  ! /in write attempt: command detected a writable mount; status='${RO_STATUS}' exit=${RO_EXIT}" >&2
   FAILED=1
 fi
 
@@ -123,8 +109,10 @@ trap 'rm -f "$IN_FIXTURE" "$SPEC_RO" "$SPEC_RW" "$OUT_SEED"' EXIT
 cat >"$SPEC_RW" <<YAML
 apiVersion: ploy.mig/v1alpha1
 kind: MigRunSpec
+build_gate:
+  disabled: true
 steps:
-  - image: alpine:3.20
+  - image: ${E2E_IMAGE}
     command: >-
       sh -c '
         set -e;
@@ -134,13 +122,13 @@ steps:
         echo "OK: /out write succeeded"
       '
     out:
-      - ${OUT_SEED}:/out/result.txt
+      - ${OUT_SEED}:result.txt
 YAML
 
 RW_JSON="$(e2e_mig_run_json \
   "$SPEC_RW" \
   "$(e2e_repo_selector "$REPO" "$BASE_REF")" \
-  --follow 2>&1)" || true
+  --follow)" || true
 
 printf '%s\n' "$RW_JSON" >"${E2E_ARTIFACT_DIR}/run-mount-rw.json"
 

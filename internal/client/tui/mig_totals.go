@@ -7,8 +7,8 @@ import (
 	"net/url"
 
 	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
-	"github.com/iw2rmb/ploy/internal/cli/httpx"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/httpx"
 )
 
 // CountMigReposCommand counts the repos in a migration's repo set.
@@ -28,24 +28,9 @@ func (c CountMigReposCommand) Run(ctx context.Context) (int, error) {
 	}
 
 	endpoint := c.BaseURL.JoinPath("v1", "migs", c.MigID.String(), "repos")
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
+	result, err := httpx.DoJSON[domainapi.MigRepoListResponse](ctx, c.Client, http.MethodGet, endpoint.String(), nil, http.StatusOK, "count mig repos")
 	if err != nil {
-		return 0, fmt.Errorf("count mig repos: build request: %w", err)
-	}
-
-	resp, err := c.Client.Do(req)
-	if err != nil {
-		return 0, fmt.Errorf("count mig repos: http request failed: %w", err)
-	}
-	defer httpx.DrainAndClose(resp)
-
-	if resp.StatusCode != http.StatusOK {
-		return 0, httpx.WrapError("count mig repos", resp.Status, resp.Body)
-	}
-
-	var result domainapi.MigRepoListResponse
-	if err := httpx.DecodeResponseJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
-		return 0, fmt.Errorf("count mig repos: decode response: %w", err)
+		return 0, err
 	}
 
 	return len(result.Repos), nil

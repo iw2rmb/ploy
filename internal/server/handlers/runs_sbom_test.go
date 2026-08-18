@@ -146,7 +146,7 @@ func TestGetRunSBOMHandler_ViewsAndValidation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			st := &runStore{
+			st := &handlerStore{
 				sbomRowsByJobType: tt.rows,
 			}
 			st.getRun.val = store.Run{ID: runID, SpecID: specID, RepoID: repoID, Attempt: 1}

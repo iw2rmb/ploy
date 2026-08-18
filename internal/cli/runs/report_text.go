@@ -17,7 +17,6 @@ import (
 // TextRenderOptions controls optional features for the text report renderer.
 type TextRenderOptions struct {
 	EnableOSC8         bool
-	AuthToken          string
 	BaseURL            *url.URL
 	SpinnerFrame       int
 	LiveDurations      bool
@@ -36,18 +35,11 @@ type RunJobIOPreview struct {
 	Stderr []string
 }
 
-// RunStatusReportDynamicSection represents one mutable block of lines in rendered run text.
-type RunStatusReportDynamicSection struct {
-	StartLine int
-	LineCount int
-	Text      string
-}
-
 // RunStatusReportTextLayout is a rendered run status report with per-repo mutable sections.
 type RunStatusReportTextLayout struct {
 	Text            string
 	LineCount       int
-	DynamicSections []RunStatusReportDynamicSection
+	DynamicSections []FollowDynamicSection
 }
 
 // RenderRunStatusReportText renders a one-shot, follow-style run snapshot.
@@ -98,7 +90,7 @@ func RenderRunStatusReportTextLayout(report RunStatusReport, opts TextRenderOpti
 		"",
 		fmt.Sprintf("   Run:   %s", valueOrDash(report.RunID.String())),
 		fmt.Sprintf("   Repo:  %s", renderRepoHeaderValue(headerRepo, opts)),
-		fmt.Sprintf("   Spec:  %s", renderOptionalLink(renderSpecHeaderValue(report, opts), buildSpecDownloadURL(report, opts.BaseURL), opts.EnableOSC8, opts.AuthToken)),
+		fmt.Sprintf("   Spec:  %s", renderOptionalLink(renderSpecHeaderValue(report, opts), buildSpecDownloadURL(report, opts.BaseURL), opts.EnableOSC8)),
 	}
 
 	if len(repos) == 0 {
@@ -144,7 +136,7 @@ func RenderRunStatusReportTextLayout(report RunStatusReport, opts TextRenderOpti
 			if jobIDLabel != "-" {
 				jobIDLabel = colorizeNeutralText(jobIDLabel)
 			}
-			jobIDCell := renderOptionalLink(jobIDLabel, job.JobLogURL, opts.EnableOSC8, opts.AuthToken)
+			jobIDCell := renderOptionalLink(jobIDLabel, job.JobLogURL, opts.EnableOSC8)
 			duration := FormatDurationForStatus(job.Status.String(), job.DurationMs, job.StartedAt, job.FinishedAt, now)
 			if !opts.LiveDurations && !isTerminalJobStatus(job.Status.String()) {
 				duration = FormatDurationCompact(job.DurationMs)
@@ -184,10 +176,10 @@ func RenderRunStatusReportTextLayout(report RunStatusReport, opts TextRenderOpti
 	}
 	rendered := lipgloss.NewStyle().Render(out.String())
 
-	dynamicSections := make([]RunStatusReportDynamicSection, len(frameLayout.Sections))
+	dynamicSections := make([]FollowDynamicSection, len(frameLayout.Sections))
 	headerLineCount := len(headerLines)
 	for i, section := range frameLayout.Sections {
-		dynamicSections[i] = RunStatusReportDynamicSection{
+		dynamicSections[i] = FollowDynamicSection{
 			StartLine: headerLineCount + section.StartLine,
 			LineCount: section.LineCount,
 			Text:      section.Text,
@@ -201,30 +193,33 @@ func RenderRunStatusReportTextLayout(report RunStatusReport, opts TextRenderOpti
 	}, nil
 }
 
-func renderLink(label, rawURL string, enableOSC8 bool, authToken string) string {
-	url := strings.TrimSpace(rawURL)
-	if url == "" {
+func renderLink(label, rawURL string, enableOSC8 bool) string {
+	safeURL := sanitizeRenderedURL(rawURL)
+	if safeURL == "" {
 		return "-"
 	}
-	url = appendAuthToken(url, authToken)
 	if !enableOSC8 {
-		return fmt.Sprintf("%s (%s)", label, url)
+		return fmt.Sprintf("%s (%s)", label, safeURL)
 	}
-	return "\x1b]8;;" + url + "\x1b\\" + label + "\x1b]8;;\x1b\\"
+	return "\x1b]8;;" + safeURL + "\x1b\\" + label + "\x1b]8;;\x1b\\"
 }
 
-func renderOptionalLink(label, rawURL string, enableOSC8 bool, authToken string) string {
+func renderOptionalLink(label, rawURL string, enableOSC8 bool) string {
 	if strings.TrimSpace(rawURL) == "" {
 		return label
 	}
-	return renderLink(label, rawURL, enableOSC8, authToken)
+	linked := renderLink(label, rawURL, enableOSC8)
+	if linked == "-" {
+		return label
+	}
+	return linked
 }
 
 func renderOptionalOSC8Link(label, rawURL string, enableOSC8 bool) string {
 	if strings.TrimSpace(rawURL) == "" || !enableOSC8 {
 		return label
 	}
-	return renderLink(label, rawURL, true, "")
+	return renderLink(label, rawURL, true)
 }
 
 func renderArtifacts(patchURL string, opts TextRenderOptions) string {
@@ -232,7 +227,7 @@ func renderArtifacts(patchURL string, opts TextRenderOptions) string {
 	if patchURL == "" {
 		return "-"
 	}
-	return renderLink("Patch", patchURL, opts.EnableOSC8, opts.AuthToken)
+	return renderLink("Patch", patchURL, opts.EnableOSC8)
 }
 
 func renderArtifactsForStatus(status, patchURL string, opts TextRenderOptions) string {
@@ -243,22 +238,33 @@ func renderArtifactsForStatus(status, patchURL string, opts TextRenderOptions) s
 	return renderArtifacts(patchURL, opts)
 }
 
-func appendAuthToken(rawURL, token string) string {
-	token = strings.TrimSpace(token)
-	if strings.TrimSpace(rawURL) == "" || token == "" {
-		return rawURL
-	}
-
-	parsed, err := url.Parse(rawURL)
+func sanitizeRenderedURL(rawURL string) string {
+	parsed, err := url.Parse(strings.TrimSpace(rawURL))
 	if err != nil {
-		return rawURL
+		return ""
 	}
+	parsed.User = nil
 	query := parsed.Query()
-	if strings.TrimSpace(query.Get("auth_token")) == "" {
-		query.Set("auth_token", token)
-		parsed.RawQuery = query.Encode()
+	for key := range query {
+		if isCredentialQueryKey(key) {
+			query.Del(key)
+		}
 	}
+	parsed.RawQuery = query.Encode()
+	parsed.ForceQuery = false
 	return parsed.String()
+}
+
+func isCredentialQueryKey(key string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(key))
+	normalized = strings.NewReplacer("-", "_", ".", "_").Replace(normalized)
+	switch normalized {
+	case "token", "password", "signature", "sig", "x_amz_credential":
+		return true
+	}
+	return strings.HasSuffix(normalized, "_token") ||
+		strings.HasSuffix(normalized, "_credential") ||
+		strings.HasSuffix(normalized, "_signature")
 }
 
 func renderStepName(displayName string, jobType string) string {
@@ -280,7 +286,7 @@ func firstRunRepo(repos []RunEntry) RunEntry {
 }
 
 func renderRepoHeaderValue(repo RunEntry, opts TextRenderOptions) string {
-	repoLabel := renderOptionalOSC8Link(renderRepoPathLabel(repo), repo.RepoURL, opts.EnableOSC8)
+	repoLabel := renderOptionalOSC8Link(renderRepoPathLabel(repo), sanitizeRenderedURL(repo.RepoURL), opts.EnableOSC8)
 	shortSHA := formatShortSHA(strings.TrimSpace(repo.SourceCommitSHA))
 	if repoLabel == "-" && shortSHA == "-" {
 		return "-"

@@ -22,18 +22,18 @@ import (
 func TestMigs_Create(t *testing.T) {
 	tests := []struct {
 		name        string
-		store       *migStore
+		store       *handlerStore
 		body        any
 		wantStatus  int
 		wantNoCalls bool
-		verify      func(t *testing.T, st *migStore, rr *httptest.ResponseRecorder)
+		verify      func(t *testing.T, st *handlerStore, rr *httptest.ResponseRecorder)
 	}{
 		{
 			name:       "basic",
-			store:      &migStore{},
+			store:      &handlerStore{},
 			body:       map[string]any{"name": "my-mig"},
 			wantStatus: http.StatusCreated,
-			verify: func(t *testing.T, st *migStore, rr *httptest.ResponseRecorder) {
+			verify: func(t *testing.T, st *handlerStore, rr *httptest.ResponseRecorder) {
 				t.Helper()
 				assertCalled(t, "CreateMig", st.createMig.called)
 				if st.createMig.params.Name != "my-mig" {
@@ -55,10 +55,10 @@ func TestMigs_Create(t *testing.T) {
 		},
 		{
 			name:       "with spec",
-			store:      &migStore{},
+			store:      &handlerStore{},
 			body:       map[string]any{"name": "mig-with-spec", "spec": validSpecBody()},
 			wantStatus: http.StatusCreated,
-			verify: func(t *testing.T, st *migStore, rr *httptest.ResponseRecorder) {
+			verify: func(t *testing.T, st *handlerStore, rr *httptest.ResponseRecorder) {
 				t.Helper()
 				assertCalled(t, "CreateMig", st.createMig.called)
 				assertCalled(t, "CreateSpec", st.createSpec.called)
@@ -74,16 +74,16 @@ func TestMigs_Create(t *testing.T) {
 			},
 		},
 		// Error paths
-		{name: "empty name", store: &migStore{}, body: map[string]any{"name": ""}, wantStatus: http.StatusBadRequest, wantNoCalls: true},
-		{name: "invalid name (spaces)", store: &migStore{}, body: map[string]any{"name": "my mig"}, wantStatus: http.StatusBadRequest, wantNoCalls: true},
-		{name: "invalid JSON", store: &migStore{}, body: "not json", wantStatus: http.StatusBadRequest},
-		{name: "invalid spec", store: &migStore{}, body: map[string]any{
+		{name: "empty name", store: &handlerStore{}, body: map[string]any{"name": ""}, wantStatus: http.StatusBadRequest, wantNoCalls: true},
+		{name: "invalid name (spaces)", store: &handlerStore{}, body: map[string]any{"name": "my mig"}, wantStatus: http.StatusBadRequest, wantNoCalls: true},
+		{name: "invalid JSON", store: &handlerStore{}, body: "not json", wantStatus: http.StatusBadRequest},
+		{name: "invalid spec", store: &handlerStore{}, body: map[string]any{
 			"name": "mig-invalid-spec",
 			"spec": map[string]any{"steps": "not-array"},
 		}, wantStatus: http.StatusBadRequest, wantNoCalls: true},
-		{name: "duplicate name", store: func() *migStore { s := &migStore{}; s.createMig.err = &pgconn.PgError{Code: "23505"}; return s }(), body: map[string]any{"name": "existing-mig"}, wantStatus: http.StatusConflict},
-		{name: "store error", store: func() *migStore {
-			s := &migStore{}
+		{name: "duplicate name", store: func() *handlerStore { s := &handlerStore{}; s.createMig.err = &pgconn.PgError{Code: "23505"}; return s }(), body: map[string]any{"name": "existing-mig"}, wantStatus: http.StatusConflict},
+		{name: "store error", store: func() *handlerStore {
+			s := &handlerStore{}
 			s.createMig.err = errors.New("database connection failed")
 			return s
 		}(), body: map[string]any{"name": "test-mig"}, wantStatus: http.StatusInternalServerError},
@@ -113,16 +113,16 @@ func TestMigs_List(t *testing.T) {
 
 	tests := []struct {
 		name         string
-		store        *migStore
+		store        *handlerStore
 		query        string
 		wantStatus   int
 		wantArchived *bool // when set, asserts listMigsParams.ArchivedOnly
-		verify       func(t *testing.T, st *migStore, rr *httptest.ResponseRecorder)
+		verify       func(t *testing.T, st *handlerStore, rr *httptest.ResponseRecorder)
 	}{
 		{
 			name: "returns migs",
-			store: func() *migStore {
-				st := &migStore{}
+			store: func() *handlerStore {
+				st := &handlerStore{}
 				st.listMigs.val = []store.Mig{
 					{ID: "mig001", Name: "alpha-mig", CreatedAt: pgtype.Timestamptz{Time: now, Valid: true}},
 					{ID: "mig002", Name: "beta-mig", CreatedAt: pgtype.Timestamptz{Time: now.Add(-time.Hour), Valid: true}},
@@ -130,7 +130,7 @@ func TestMigs_List(t *testing.T) {
 				return st
 			}(),
 			wantStatus: http.StatusOK,
-			verify: func(t *testing.T, _ *migStore, rr *httptest.ResponseRecorder) {
+			verify: func(t *testing.T, _ *handlerStore, rr *httptest.ResponseRecorder) {
 				t.Helper()
 				type migItem struct {
 					ID       string `json:"id"`
@@ -148,10 +148,10 @@ func TestMigs_List(t *testing.T) {
 		},
 		{
 			name:       "respects limit/offset",
-			store:      &migStore{},
+			store:      &handlerStore{},
 			query:      "limit=10&offset=5",
 			wantStatus: http.StatusOK,
-			verify: func(t *testing.T, st *migStore, _ *httptest.ResponseRecorder) {
+			verify: func(t *testing.T, st *handlerStore, _ *httptest.ResponseRecorder) {
 				t.Helper()
 				assertCalled(t, "ListMigs", st.listMigs.called)
 				if st.listMigs.params.Limit != 10 {
@@ -164,10 +164,10 @@ func TestMigs_List(t *testing.T) {
 		},
 		{
 			name:       "name_substring filter",
-			store:      &migStore{},
+			store:      &handlerStore{},
 			query:      "name_substring=alpha",
 			wantStatus: http.StatusOK,
-			verify: func(t *testing.T, st *migStore, _ *httptest.ResponseRecorder) {
+			verify: func(t *testing.T, st *handlerStore, _ *httptest.ResponseRecorder) {
 				t.Helper()
 				if st.listMigs.params.NameFilter == nil {
 					t.Fatal("NameFilter is nil, expected pointer to 'alpha'")
@@ -179,22 +179,22 @@ func TestMigs_List(t *testing.T) {
 		},
 		{
 			name:         "archived=true filter",
-			store:        &migStore{},
+			store:        &handlerStore{},
 			query:        "archived=true",
 			wantStatus:   http.StatusOK,
 			wantArchived: ptr(true),
 		},
 		{
 			name:         "archived=false filter",
-			store:        &migStore{},
+			store:        &handlerStore{},
 			query:        "archived=false",
 			wantStatus:   http.StatusOK,
 			wantArchived: ptr(false),
 		},
 		{
 			name: "repo_url filter normalizes",
-			store: func() *migStore {
-				st := &migStore{
+			store: func() *handlerStore {
+				st := &handlerStore{
 					listMigReposByMigResults: map[string][]store.MigRepo{
 						"mig001": {{ID: "repo1", MigID: "mig001", RepoID: "repo1"}},
 						"mig002": {{ID: "repo2", MigID: "mig002", RepoID: "repo2"}},
@@ -212,7 +212,7 @@ func TestMigs_List(t *testing.T) {
 			}(),
 			query:      "repo_url=https://github.com/org/repo.git/",
 			wantStatus: http.StatusOK,
-			verify: func(t *testing.T, _ *migStore, rr *httptest.ResponseRecorder) {
+			verify: func(t *testing.T, _ *handlerStore, rr *httptest.ResponseRecorder) {
 				t.Helper()
 				type migItem struct {
 					ID   string `json:"id"`
@@ -229,8 +229,8 @@ func TestMigs_List(t *testing.T) {
 		},
 		{
 			name: "repo_url filter paginates",
-			store: func() *migStore {
-				st := &migStore{
+			store: func() *handlerStore {
+				st := &handlerStore{
 					listMigReposByMigResults: map[string][]store.MigRepo{
 						"mig00A": {{ID: "repoA", MigID: "mig00A", RepoID: "repoA"}},
 						"mig00B": {{ID: "repoB", MigID: "mig00B", RepoID: "repoB"}},
@@ -251,7 +251,7 @@ func TestMigs_List(t *testing.T) {
 			}(),
 			query:      "repo_url=https://github.com/org/repo&limit=1&offset=1",
 			wantStatus: http.StatusOK,
-			verify: func(t *testing.T, _ *migStore, rr *httptest.ResponseRecorder) {
+			verify: func(t *testing.T, _ *handlerStore, rr *httptest.ResponseRecorder) {
 				t.Helper()
 				type migItem struct {
 					ID string `json:"id"`
@@ -267,8 +267,8 @@ func TestMigs_List(t *testing.T) {
 		},
 		{
 			name: "store error",
-			store: func() *migStore {
-				st := &migStore{}
+			store: func() *handlerStore {
+				st := &handlerStore{}
 				st.listMigs.err = errors.New("database connection failed")
 				return st
 			}(),
@@ -276,13 +276,13 @@ func TestMigs_List(t *testing.T) {
 		},
 		{
 			name:       "invalid limit",
-			store:      &migStore{},
+			store:      &handlerStore{},
 			query:      "limit=notanumber",
 			wantStatus: http.StatusBadRequest,
 		},
 		{
 			name:       "invalid archived",
-			store:      &migStore{},
+			store:      &handlerStore{},
 			query:      "archived=notabool",
 			wantStatus: http.StatusBadRequest,
 		},
@@ -318,17 +318,17 @@ func TestMigs_List(t *testing.T) {
 func TestMigs_Delete(t *testing.T) {
 	tests := []struct {
 		name       string
-		store      *migStore
+		store      *handlerStore
 		migRef     string
 		wantStatus int
-		verify     func(t *testing.T, st *migStore)
+		verify     func(t *testing.T, st *handlerStore)
 	}{
 		{
 			name:       "success",
-			store:      &migStore{},
+			store:      &handlerStore{},
 			migRef:     "mig123",
 			wantStatus: http.StatusNoContent,
-			verify: func(t *testing.T, st *migStore) {
+			verify: func(t *testing.T, st *handlerStore) {
 				t.Helper()
 				assertCalled(t, "GetMig", st.getMig.called)
 				assertCalled(t, "DeleteMig", st.deleteMig.called)
@@ -339,43 +339,43 @@ func TestMigs_Delete(t *testing.T) {
 		},
 		{
 			name: "not found",
-			store: func() *migStore {
-				st := &migStore{}
+			store: func() *handlerStore {
+				st := &handlerStore{}
 				st.getMig.err = pgx.ErrNoRows
 				return st
 			}(),
 			migRef:     "nonexistent",
 			wantStatus: http.StatusNotFound,
-			verify: func(t *testing.T, st *migStore) {
+			verify: func(t *testing.T, st *handlerStore) {
 				t.Helper()
 				assertNotCalled(t, "DeleteMig", st.deleteMig.called)
 			},
 		},
 		{
 			name: "refuses with runs",
-			store: func() *migStore {
-				st := &migStore{}
+			store: func() *handlerStore {
+				st := &handlerStore{}
 				st.listRuns.val = []store.Run{{ID: "run1", MigID: "mig123"}}
 				return st
 			}(),
 			migRef:     "mig123",
 			wantStatus: http.StatusConflict,
-			verify: func(t *testing.T, st *migStore) {
+			verify: func(t *testing.T, st *handlerStore) {
 				t.Helper()
 				assertNotCalled(t, "DeleteMig", st.deleteMig.called)
 			},
 		},
 		{
 			name: "by name",
-			store: func() *migStore {
-				st := &migStore{}
+			store: func() *handlerStore {
+				st := &handlerStore{}
 				st.getMig.err = pgx.ErrNoRows
 				st.getMigByName.val = store.Mig{ID: "mig123", Name: "my-mig"}
 				return st
 			}(),
 			migRef:     "my-mig",
 			wantStatus: http.StatusNoContent,
-			verify: func(t *testing.T, st *migStore) {
+			verify: func(t *testing.T, st *handlerStore) {
 				t.Helper()
 				assertCalled(t, "GetMigByName", st.getMigByName.called)
 				if st.deleteMig.params != "mig123" {
@@ -385,8 +385,8 @@ func TestMigs_Delete(t *testing.T) {
 		},
 		{
 			name: "store error",
-			store: func() *migStore {
-				st := &migStore{}
+			store: func() *handlerStore {
+				st := &handlerStore{}
 				st.deleteMig.err = errors.New("database connection failed")
 				return st
 			}(),

@@ -19,16 +19,16 @@ func TestCreateJobLogsHandler(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		setupStore     func(jobID domaintypes.JobID, runID domaintypes.RunID) *jobStore
+		setupStore     func(jobID domaintypes.JobID, runID domaintypes.RunID) *handlerStore
 		payload        map[string]any
 		wantStatus     int
 		wantGetJobCall bool
 	}{
 		{
 			name: "success",
-			setupStore: func(jobID domaintypes.JobID, runID domaintypes.RunID) *jobStore {
+			setupStore: func(jobID domaintypes.JobID, runID domaintypes.RunID) *handlerStore {
 				objKey := "logs/job/" + jobID.String() + "/log/1.gz"
-				st := &jobStore{}
+				st := &handlerStore{}
 				st.getJob.val = store.Job{ID: jobID, RunID: runID}
 				st.createLog.val = store.Log{ID: 1, RunID: runID, JobID: &jobID, ChunkNo: 2, DataSize: 5, ObjectKey: &objKey}
 				return st
@@ -39,8 +39,8 @@ func TestCreateJobLogsHandler(t *testing.T) {
 		},
 		{
 			name: "job not found",
-			setupStore: func(jobID domaintypes.JobID, runID domaintypes.RunID) *jobStore {
-				st := &jobStore{}
+			setupStore: func(jobID domaintypes.JobID, runID domaintypes.RunID) *handlerStore {
+				st := &handlerStore{}
 				st.getJob.err = pgx.ErrNoRows
 				return st
 			},
@@ -50,8 +50,8 @@ func TestCreateJobLogsHandler(t *testing.T) {
 		},
 		{
 			name: "empty data",
-			setupStore: func(jobID domaintypes.JobID, runID domaintypes.RunID) *jobStore {
-				st := &jobStore{}
+			setupStore: func(jobID domaintypes.JobID, runID domaintypes.RunID) *handlerStore {
+				st := &handlerStore{}
 				st.getJob.val = store.Job{ID: jobID, RunID: runID}
 				return st
 			},
@@ -61,8 +61,8 @@ func TestCreateJobLogsHandler(t *testing.T) {
 		},
 		{
 			name: "too large",
-			setupStore: func(jobID domaintypes.JobID, runID domaintypes.RunID) *jobStore {
-				st := &jobStore{}
+			setupStore: func(jobID domaintypes.JobID, runID domaintypes.RunID) *handlerStore {
+				st := &handlerStore{}
 				st.getJob.val = store.Job{ID: jobID, RunID: runID}
 				return st
 			},

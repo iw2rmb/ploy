@@ -1,15 +1,13 @@
 package common
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
-	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"strings"
+
+	"github.com/iw2rmb/ploy/internal/httpx"
 )
 
 // ResolvedRemoteRepo is the control-plane resolution of a repo selector such as
@@ -30,44 +28,22 @@ func ResolveRemoteRepoSelector(ctx context.Context, base *url.URL, httpClient *h
 
 	namespaceRepo, ref := SplitRemoteRepoSelector(selector)
 	endpoint := base.JoinPath("v1", "repos", "resolve")
-	payload, err := json.Marshal(struct {
+	request := struct {
 		Selector string `json:"selector"`
 		Ref      string `json:"ref"`
 	}{
 		Selector: namespaceRepo,
 		Ref:      ref,
-	})
-	if err != nil {
-		return ResolvedRemoteRepo{}, fmt.Errorf("repo resolve: marshal request: %w", err)
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), bytes.NewReader(payload))
-	if err != nil {
-		return ResolvedRemoteRepo{}, fmt.Errorf("repo resolve: build request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return ResolvedRemoteRepo{}, fmt.Errorf("repo resolve: http request failed: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		var apiErr struct {
-			Error string `json:"error"`
-		}
-		if err := json.Unmarshal(body, &apiErr); err == nil && strings.TrimSpace(apiErr.Error) != "" {
-			return ResolvedRemoteRepo{}, fmt.Errorf("repo resolve: %s", strings.TrimSpace(apiErr.Error))
-		}
-		return ResolvedRemoteRepo{}, fmt.Errorf("repo resolve: %s", strings.TrimSpace(string(body)))
 	}
 
-	var resolved struct {
+	type resolveResponse struct {
 		RepoURL  string `json:"repo_url"`
 		Ref      string `json:"ref"`
 		RefIsSHA bool   `json:"ref_is_sha"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&resolved); err != nil {
-		return ResolvedRemoteRepo{}, fmt.Errorf("repo resolve: decode response: %w", err)
+	resolved, err := httpx.DoJSON[resolveResponse](ctx, httpClient, http.MethodPost, endpoint.String(), request, http.StatusOK, "repo resolve")
+	if err != nil {
+		return ResolvedRemoteRepo{}, err
 	}
 	repoURL := strings.TrimSpace(resolved.RepoURL)
 	if repoURL == "" {

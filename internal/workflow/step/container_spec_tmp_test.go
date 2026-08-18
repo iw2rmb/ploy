@@ -40,13 +40,13 @@ func TestBuildContainerSpec_HydraSingleMount(t *testing.T) {
 		negTarget  string // mount target that must NOT exist
 	}{
 		{
-			name: "in uses single writable mount",
+			name: "in uses single read-only mount",
 			setup: func(m *contracts.StepManifest) (string, string) {
 				m.In = []string{"abcdef0:/in/config.json"}
 				return "", ""
 			},
 			wantTarget: "/in",
-			wantRO:     false,
+			wantRO:     true,
 			negTarget:  "/in/config.json",
 		},
 		{

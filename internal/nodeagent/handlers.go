@@ -32,10 +32,11 @@ const maxRequestBodySize = 10 << 20 // 10 MiB
 //   - Identifies the job type: "pre_gate", "mig", "post_gate".
 //   - Used by orchestrator to dispatch to appropriate execution handler.
 type StartRunRequest struct {
-	RunID   types.RunID     `json:"run_id,omitempty"`
-	JobID   types.JobID     `json:"job_id,omitempty"`   // Job ID for artifact/diff uploads
-	RepoID  types.MigRepoID `json:"repo_id,omitempty"`  // Repo ID (NanoID) for run artifacts (diffs/logs)
-	RepoURL types.RepoURL   `json:"repo_url,omitempty"` // Repository URL for this run
+	RunID   types.RunID   `json:"run_id,omitempty"`
+	JobID   types.JobID   `json:"job_id,omitempty"`   // Job ID for artifact/diff uploads
+	RepoID  types.RepoID  `json:"repo_id,omitempty"`  // Repo ID for run artifacts (diffs/logs)
+	Attempt int32         `json:"attempt,omitempty"`  // Claimed run attempt used for execution correlation
+	RepoURL types.RepoURL `json:"repo_url,omitempty"` // Repository URL for this run
 	// Name is an optional human-friendly run name provided by the control plane.
 	// When set (e.g., for runs), it can be used for branch naming.
 	Name      string          `json:"name,omitempty"`

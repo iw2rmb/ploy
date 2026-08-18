@@ -320,10 +320,6 @@ func RunStatus(ctx context.Context, opts StatusOptions) error {
 		return runcmd.RenderRunStatusReportJSON(out, report)
 	}
 
-	token, err := common.ResolveControlPlaneToken()
-	if err != nil {
-		return err
-	}
 	if opts.Follow {
 		final, err := followRunStatusReports(ctx, base, httpClient, domaintypes.RunID(runID), out, "", 5, time.Second)
 		if err != nil {
@@ -336,7 +332,6 @@ func RunStatus(ctx context.Context, opts StatusOptions) error {
 	}
 	return runcmd.RenderRunStatusSnapshotText(out, report, runcmd.TextRenderOptions{
 		EnableOSC8: common.SupportsOSC8(out),
-		AuthToken:  token,
 		BaseURL:    base,
 	})
 }

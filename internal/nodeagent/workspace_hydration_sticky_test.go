@@ -23,7 +23,7 @@ func TestPrepareStickyWorkspaceForStep_ReusesStickyWorkspaceWhenGitDirExists(t *
 
 	req := StartRunRequest{
 		RunID:  types.RunID("run_sticky_reuse"),
-		RepoID: types.MigRepoID("repo_sticky_reuse"),
+		RepoID: types.RepoID("repo_sticky_reuse"),
 		JobID:  types.JobID("job_sticky_reuse"),
 	}
 	workspace := workspaceDir(req.RunID)
@@ -47,7 +47,7 @@ func TestPrepareStickyWorkspaceForStep_RemovesInvalidChainHeadWorkspaceBeforeHyd
 
 	req := StartRunRequest{
 		RunID:     types.RunID("run_sticky_invalid"),
-		RepoID:    types.MigRepoID("repo_sticky_invalid"),
+		RepoID:    types.RepoID("repo_sticky_invalid"),
 		JobID:     types.JobID("job_sticky_invalid"),
 		JobType:   types.JobTypePreGate,
 		RepoSHAIn: types.CommitSHA("0123456789abcdef0123456789abcdef01234567"),
@@ -76,7 +76,7 @@ func TestPrepareStickyWorkspaceForStep_MissingNonHeadWorkspaceFails(t *testing.T
 
 	req := StartRunRequest{
 		RunID:   types.RunID("run_sticky_missing"),
-		RepoID:  types.MigRepoID("repo_sticky_missing"),
+		RepoID:  types.RepoID("repo_sticky_missing"),
 		JobID:   types.JobID("job_sticky_missing"),
 		JobType: types.JobTypeMig,
 	}
@@ -109,7 +109,7 @@ func TestPrepareStickyWorkspaceForStep_ChainHeadHydratesWorkspaceWithoutRunBase(
 
 			req := StartRunRequest{
 				RunID:     types.RunID("run_sticky_hydrate"),
-				RepoID:    types.MigRepoID("repo_sticky_hydrate"),
+				RepoID:    types.RepoID("repo_sticky_hydrate"),
 				JobID:     types.JobID("job_sticky_hydrate"),
 				JobType:   tt.jobType,
 				CommitSHA: types.CommitSHA(head),

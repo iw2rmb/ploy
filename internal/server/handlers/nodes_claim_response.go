@@ -2,41 +2,17 @@ package handlers
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/blobstore"
+	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
-
-type workClaimPayload struct {
-	RunID         domaintypes.RunID           `json:"id"`
-	Name          *string                     `json:"name,omitempty"`
-	RepoID        domaintypes.RepoID          `json:"repo_id"`
-	Attempt       int32                       `json:"attempt"`
-	JobID         domaintypes.JobID           `json:"job_id"`
-	JobName       string                      `json:"job_name"`
-	JobType       domaintypes.JobType         `json:"job_type"`
-	JobImage      string                      `json:"job_image"`
-	NextID        *domaintypes.JobID          `json:"next_id"`
-	RepoURL       string                      `json:"repo_url"`
-	Status        domaintypes.RunStatus       `json:"status"`
-	NodeID        domaintypes.NodeID          `json:"node_id"`
-	BaseRef       string                      `json:"base_ref"`
-	CommitSHA     string                      `json:"commit_sha,omitempty"`
-	RepoSHAIn     string                      `json:"repo_sha_in,omitempty"`
-	StartedAt     string                      `json:"started_at"`
-	CreatedAt     string                      `json:"created_at"`
-	Spec          json.RawMessage             `json:"spec,omitempty"`
-	MigContext    *contracts.MigClaimContext  `json:"mig_context,omitempty"`
-	GateContext   *contracts.GateClaimContext `json:"gate_context,omitempty"`
-	DetectedStack *contracts.StackExpectation `json:"detected_stack,omitempty"`
-}
 
 func buildJobClaimPayload(
 	ctx context.Context,
@@ -47,10 +23,10 @@ func buildJobClaimPayload(
 	spec []byte,
 	repoURL string,
 	job store.Job,
-) (workClaimPayload, error) {
+) (domainapi.NodeClaimResponse, error) {
 	jobType := domaintypes.JobType(job.JobType)
 	if err := jobType.Validate(); err != nil {
-		return workClaimPayload{}, fmt.Errorf("invalid claimed job job_type %q for job_id=%s: %w", job.JobType, job.ID, err)
+		return domainapi.NodeClaimResponse{}, fmt.Errorf("invalid claimed job job_type %q for job_id=%s: %w", job.JobType, job.ID, err)
 	}
 
 	globalEnv := map[string][]GlobalEnvVar{}
@@ -71,7 +47,7 @@ func buildJobClaimPayload(
 		bundleMap:     bundleMap,
 	})
 	if err != nil {
-		return workClaimPayload{}, err
+		return domainapi.NodeClaimResponse{}, err
 	}
 
 	var migContext *contracts.MigClaimContext
@@ -92,14 +68,14 @@ func buildJobClaimPayload(
 
 	detectedStack, err := resolveClaimDetectedStack(ctx, st, job)
 	if err != nil {
-		return workClaimPayload{}, fmt.Errorf("resolve detected stack for claim: %w", err)
+		return domainapi.NodeClaimResponse{}, fmt.Errorf("resolve detected stack for claim: %w", err)
 	}
 	commitSHA := strings.TrimSpace(run.SourceCommitSha)
 	if commitSHA == "" {
 		commitSHA = strings.TrimSpace(job.RepoShaIn)
 	}
 
-	return workClaimPayload{
+	return domainapi.NodeClaimResponse{
 		RunID:         run.ID,
 		Name:          nil,
 		RepoID:        job.RepoID,
@@ -109,12 +85,12 @@ func buildJobClaimPayload(
 		JobType:       jobType,
 		JobImage:      job.JobImage,
 		NextID:        job.NextID,
-		RepoURL:       repoURL,
+		RepoURL:       domaintypes.RepoURL(repoURL),
 		Status:        run.Status,
 		NodeID:        nodeIDPtrOrZero(job.NodeID),
-		BaseRef:       job.RepoBaseRef,
-		CommitSHA:     commitSHA,
-		RepoSHAIn:     job.RepoShaIn,
+		BaseRef:       domaintypes.GitRef(job.RepoBaseRef),
+		CommitSHA:     domaintypes.CommitSHA(commitSHA),
+		RepoSHAIn:     domaintypes.CommitSHA(job.RepoShaIn),
 		StartedAt:     run.StartedAt.Time.Format(time.RFC3339),
 		CreatedAt:     run.CreatedAt.Time.Format(time.RFC3339),
 		Spec:          mergedSpec,

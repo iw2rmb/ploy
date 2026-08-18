@@ -33,3 +33,9 @@ type MigSummary struct {
 type MigListResponse struct {
 	Migs []MigSummary `json:"migs"`
 }
+
+type MigArchiveResponse struct {
+	ID       domaintypes.MigID `json:"id"`
+	Name     string            `json:"name"`
+	Archived bool              `json:"archived"`
+}

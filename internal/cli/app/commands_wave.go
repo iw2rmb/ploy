@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/cli/common"
-	"github.com/iw2rmb/ploy/internal/cli/httpx"
+	"github.com/iw2rmb/ploy/internal/httpx"
 	"github.com/spf13/cobra"
 )
 

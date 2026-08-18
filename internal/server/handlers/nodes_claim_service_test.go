@@ -17,7 +17,7 @@ func TestClaim_Claim_ReturnsNoWorkWhenQueueEmpty(t *testing.T) {
 	t.Parallel()
 
 	nodeID := domaintypes.NodeID(domaintypes.NewNodeKey())
-	st := &jobStore{}
+	st := &handlerStore{}
 	st.claimJob.err = pgx.ErrNoRows
 	st.getNode.val = store.Node{ID: nodeID}
 
@@ -40,7 +40,7 @@ func TestClaim_Claim_SuccessBuildsPayloadAndTransitionsRepo(t *testing.T) {
 	sourceCommitSHA := "0123456789abcdef0123456789abcdef01234567"
 	now := time.Now().UTC()
 
-	st := &jobStore{}
+	st := &handlerStore{}
 	st.getNode.val = store.Node{ID: nodeID}
 	st.getRun.val = store.Run{
 		ID:              runID,
@@ -87,7 +87,7 @@ func TestClaim_Claim_SuccessBuildsPayloadAndTransitionsRepo(t *testing.T) {
 	if result.Payload.RepoURL == "" {
 		t.Fatal("expected payload.repo_url to be populated")
 	}
-	if result.Payload.CommitSHA != sourceCommitSHA {
+	if result.Payload.CommitSHA != domaintypes.CommitSHA(sourceCommitSHA) {
 		t.Fatalf("payload.commit_sha = %s, want %s", result.Payload.CommitSHA, sourceCommitSHA)
 	}
 }
@@ -102,7 +102,7 @@ func TestClaim_Claim_RequeuesClaimedJobWhenPayloadBuildFails(t *testing.T) {
 	jobID := domaintypes.NewJobID()
 	now := time.Now().UTC()
 
-	st := &jobStore{}
+	st := &handlerStore{}
 	st.getNode.val = store.Node{ID: nodeID}
 	st.getRun.val = store.Run{
 		ID:          runID,

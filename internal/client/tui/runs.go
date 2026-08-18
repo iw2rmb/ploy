@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/iw2rmb/ploy/internal/cli/httpx"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/httpx"
 )
 
 // ListRunsResult is the response from GET /v1/runs.
@@ -41,25 +41,5 @@ func (c ListRunsCommand) Run(ctx context.Context) (ListRunsResult, error) {
 		endpoint.RawQuery = q.Encode()
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
-	if err != nil {
-		return ListRunsResult{}, fmt.Errorf("list runs: build request: %w", err)
-	}
-
-	resp, err := c.Client.Do(req)
-	if err != nil {
-		return ListRunsResult{}, fmt.Errorf("list runs: http request failed: %w", err)
-	}
-	defer httpx.DrainAndClose(resp)
-
-	if resp.StatusCode != http.StatusOK {
-		return ListRunsResult{}, httpx.WrapError("list runs", resp.Status, resp.Body)
-	}
-
-	var result ListRunsResult
-	if err := httpx.DecodeResponseJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
-		return ListRunsResult{}, fmt.Errorf("list runs: decode response: %w", err)
-	}
-
-	return result, nil
+	return httpx.DoJSON[ListRunsResult](ctx, c.Client, http.MethodGet, endpoint.String(), nil, http.StatusOK, "list runs")
 }

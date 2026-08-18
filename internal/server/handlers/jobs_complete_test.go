@@ -187,7 +187,7 @@ func TestCompletion_TerminalErrorsSetLastError(t *testing.T) {
 	tests := []struct {
 		name           string
 		body           map[string]any
-		storeOpts      []func(*jobStore)
+		storeOpts      []func(*handlerStore)
 		wantSubstrings []string
 	}{
 		{
@@ -226,7 +226,7 @@ func TestCompletion_TerminalErrorsSetLastError(t *testing.T) {
 				"status":    "Fail",
 				"exit_code": 137,
 			},
-			storeOpts: []func(*jobStore){
+			storeOpts: []func(*handlerStore){
 				withGetRunErr(errors.New("transient run lookup failure")),
 			},
 			wantSubstrings: []string{"exit code 137", "likely out of memory"},

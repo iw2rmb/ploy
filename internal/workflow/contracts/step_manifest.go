@@ -119,7 +119,7 @@ type StepGateSpec struct {
 
 	// RepoID is the repo identifier for this execution.
 	// Used for gate job/runtime correlation.
-	RepoID types.MigRepoID
+	RepoID types.RepoID
 
 	// Ref is the Git reference (commit SHA, branch, or tag) for remote gate execution.
 	// Derived from CommitSHA > BaseRef precedence when building manifests.

@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
-	clitui "github.com/iw2rmb/ploy/internal/client/tui"
+	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
@@ -99,7 +99,7 @@ func TestS1EscQuits(t *testing.T) {
 func TestPloyListJobsSelectedShowsJobListPanel(t *testing.T) {
 	m := InitialModel(nil, nil)
 	// Populate jobs so the panel has content to render.
-	next, _ := m.Update(jobsLoadedMsg{jobs: []clitui.JobItem{
+	next, _ := m.Update(jobsLoadedMsg{jobs: []domainapi.JobListItem{
 		{JobID: domaintypes.JobID("job-1"), Name: "deploy", MigName: "mig", RunID: domaintypes.RunID("run-1"), RepoID: domaintypes.RepoID("repo-1")},
 	}})
 	m = next.(model)
@@ -149,7 +149,7 @@ func TestPloyListFocusRemainsOnPloy(t *testing.T) {
 	m := InitialModel(nil, nil)
 
 	// Load two jobs so the jobList has multiple items to potentially navigate.
-	next, _ := m.Update(jobsLoadedMsg{jobs: []clitui.JobItem{
+	next, _ := m.Update(jobsLoadedMsg{jobs: []domainapi.JobListItem{
 		{JobID: domaintypes.JobID("job-1"), Name: "alpha", MigName: "mig", RunID: domaintypes.RunID("run-1"), RepoID: domaintypes.RepoID("repo-1")},
 		{JobID: domaintypes.JobID("job-2"), Name: "beta", MigName: "mig", RunID: domaintypes.RunID("run-1"), RepoID: domaintypes.RepoID("repo-1")},
 	}})

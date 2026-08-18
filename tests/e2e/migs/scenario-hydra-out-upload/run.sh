@@ -23,14 +23,13 @@ e2e_artifacts_init "$REPO_ROOT/tmp/migs/scenario-hydra-out-upload"
 
 REPO="${PLOY_E2E_REPO_OVERRIDE:-https://github.com/octocat/Hello-World.git}"
 BASE_REF="${PLOY_E2E_BASE_REF:-master}"
-TARGET_REF="${PLOY_E2E_TARGET_REF:-e2e/hydra-out-upload}"
+E2E_IMAGE="$(e2e_runtime_image)"
 
 echo "=========================================="
 echo "Hydra /out Upload Continuity E2E Scenario"
 echo "=========================================="
-echo "Repo:       $REPO"
+echo "Repo:       $(e2e_repo_selector "$REPO")"
 echo "Base ref:   $BASE_REF"
-echo "Target ref: $TARGET_REF"
 echo "Artifacts:  $E2E_ARTIFACT_DIR"
 echo "=========================================="
 
@@ -45,8 +44,10 @@ trap 'rm -f "$OUT_SEED" "$SPEC_FILE"' EXIT
 cat >"$SPEC_FILE" <<YAML
 apiVersion: ploy.mig/v1alpha1
 kind: MigRunSpec
+build_gate:
+  disabled: true
 steps:
-  - image: alpine:3.20
+  - image: ${E2E_IMAGE}
     command: >-
       sh -c '
         set -e;
@@ -55,7 +56,7 @@ steps:
         echo "OK: wrote /out/report.json"
       '
     out:
-      - ${OUT_SEED}:/out/report.json
+      - ${OUT_SEED}:report.json
 YAML
 
 ARTIFACT_DL_DIR="${E2E_ARTIFACT_DIR}/downloaded"
@@ -88,7 +89,12 @@ else
 fi
 
 # Check artifact content — verify report.json has the expected payload.
-REPORT_FILE="$(find "$ARTIFACT_DL_DIR" -name '*report*' -type f 2>/dev/null | head -1 || echo "")"
+EXTRACTED_DIR="${ARTIFACT_DL_DIR}/extracted"
+mkdir -p "$EXTRACTED_DIR"
+while IFS= read -r bundle; do
+  tar -xzf "$bundle" -C "$EXTRACTED_DIR"
+done < <(find "$ARTIFACT_DL_DIR" -maxdepth 1 -name '*_repo-artifacts.bin' -type f -print)
+REPORT_FILE="$(find "$EXTRACTED_DIR" -name 'report.json' -type f 2>/dev/null | head -1 || echo "")"
 if [[ -z "$REPORT_FILE" ]]; then
   echo "  ! no report artifact found in downloaded artifacts" >&2
   FAILED=1
