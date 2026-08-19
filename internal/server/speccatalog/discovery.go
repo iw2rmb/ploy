@@ -11,7 +11,7 @@ import (
 )
 
 func (r *repository) scan(ctx context.Context, sha string, committedAt time.Time) ([]Entry, error) {
-	paths, err := r.runner.Run(ctx, r.checkout, nil, "ls-files", "-z", "--cached", "--", "*.yaml")
+	paths, err := r.runGit(ctx, r.checkout, nil, "ls-files", "-z", "--cached", "--", "*.yaml")
 	if err != nil {
 		return nil, err
 	}
@@ -25,7 +25,7 @@ func (r *repository) scan(ctx context.Context, sha string, committedAt time.Time
 			return nil, fmt.Errorf("scan spec repository: tracked YAML path is not valid UTF-8")
 		}
 		path := string(rawPath)
-		content, err := r.runner.Run(ctx, r.checkout, nil, "show", "HEAD:"+path)
+		content, err := r.runGit(ctx, r.checkout, nil, "show", "HEAD:"+path)
 		if err != nil {
 			return nil, fmt.Errorf("read tracked YAML %s: %w", path, err)
 		}

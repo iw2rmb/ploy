@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"slices"
 
 	"github.com/iw2rmb/ploy/internal/blobstore"
 	"github.com/iw2rmb/ploy/internal/gitauth"
@@ -49,7 +50,7 @@ func RegisterRoutes(s routeRegistrar, st store.Store, bs blobstore.Store, bp *bl
 		gitLabTokens:          registry,
 		snapshots:             snapshots,
 		specCatalog:           specCatalog,
-		namedSpecEnvAllowlist: append([]string(nil), namedSpecEnvAllowlist...),
+		namedSpecEnvAllowlist: slices.Clone(namedSpecEnvAllowlist),
 	}
 	registerHealthRoutes(s, deps)
 	registerConfigRoutes(s, deps)

@@ -1,16 +1,14 @@
 package git
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
-	"regexp"
 	"strings"
-)
 
-var repoSHA40Pattern = regexp.MustCompile(`^[0-9a-f]{40}$`)
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/gitexec"
+)
 
 const (
 	repoSHAV1AuthorLine  = "author node <node@ploy.local> 0 +0000"
@@ -31,8 +29,7 @@ var workspaceTreeAddArgs = []string{"add", "-A", "--", "."}
 // Optional inputTree may be supplied by caller when repo_sha_in is synthetic and
 // not resolvable as a local git object.
 func ComputeRepoSHAV1(ctx context.Context, repoDir, repoSHAIn string, inputTree ...string) (string, error) {
-	repoSHAIn = strings.TrimSpace(repoSHAIn)
-	if !repoSHA40Pattern.MatchString(repoSHAIn) {
+	if !domaintypes.IsCanonicalFullCommitSHA(repoSHAIn) {
 		return "", fmt.Errorf("repo_sha_in must match ^[0-9a-f]{40}$")
 	}
 
@@ -60,7 +57,7 @@ func ComputeRepoSHAV1(ctx context.Context, repoDir, repoSHAIn string, inputTree 
 	if err != nil {
 		return "", fmt.Errorf("hash synthetic commit: %w", err)
 	}
-	if !repoSHA40Pattern.MatchString(repoSHAOut) {
+	if !domaintypes.IsCanonicalFullCommitSHA(repoSHAOut) {
 		return "", fmt.Errorf("computed repo_sha_out has invalid format")
 	}
 	return repoSHAOut, nil
@@ -103,7 +100,7 @@ func computeWorkspaceTreeSHAWithBaseTree(ctx context.Context, repoDir, baseTree 
 	if err != nil {
 		return "", fmt.Errorf("compute snapshot tree: %w", err)
 	}
-	if !repoSHA40Pattern.MatchString(treeSHA) {
+	if !domaintypes.IsCanonicalFullCommitSHA(treeSHA) {
 		return "", fmt.Errorf("computed snapshot tree has invalid format")
 	}
 	return treeSHA, nil
@@ -111,9 +108,9 @@ func computeWorkspaceTreeSHAWithBaseTree(ctx context.Context, repoDir, baseTree 
 
 func resolveInputTree(ctx context.Context, repoDir, repoSHAIn string, inputTree ...string) (string, error) {
 	if len(inputTree) > 0 {
-		tree := strings.TrimSpace(inputTree[0])
-		if tree != "" {
-			if !repoSHA40Pattern.MatchString(tree) {
+		tree := inputTree[0]
+		if strings.TrimSpace(tree) != "" {
+			if !domaintypes.IsCanonicalFullCommitSHA(tree) {
 				return "", fmt.Errorf("input tree must match ^[0-9a-f]{40}$")
 			}
 			return tree, nil
@@ -135,24 +132,14 @@ func resolveInputTree(ctx context.Context, repoDir, repoSHAIn string, inputTree 
 }
 
 func runGitOutput(ctx context.Context, repoDir string, env []string, stdin []byte, args ...string) (string, error) {
-	cmd := exec.CommandContext(ctx, "git", args...)
-	cmd.Dir = repoDir
-	cmd.Env = append(os.Environ(), env...)
-	if len(stdin) > 0 {
-		cmd.Stdin = bytes.NewReader(stdin)
-	}
-
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	if err := cmd.Run(); err != nil {
+	result, err := gitexec.Execute(ctx, gitexec.Request{Dir: repoDir, Env: env, Args: args, Stdin: stdin})
+	if err != nil {
 		return "", fmt.Errorf(
 			"git %s failed: %w (stderr=%s)",
 			strings.Join(args, " "),
 			err,
-			strings.TrimSpace(stderr.String()),
+			strings.TrimSpace(string(result.Stderr)),
 		)
 	}
-	return strings.TrimSpace(stdout.String()), nil
+	return strings.TrimSpace(string(result.Stdout)), nil
 }

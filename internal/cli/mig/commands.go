@@ -432,7 +432,7 @@ func RunStatus(ctx context.Context, migID string, output io.Writer) error {
 	if err != nil {
 		return err
 	}
-	runs, err := listRunsByMigID(ctx, httpClient, base, migID)
+	migRuns, err := listRunsByMigID(ctx, httpClient, base, migID)
 	if err != nil {
 		return err
 	}
@@ -446,16 +446,16 @@ func RunStatus(ctx context.Context, migID string, output io.Writer) error {
 	_, _ = fmt.Fprintf(output, "Spec:  %s | Download\n", specID)
 	_, _ = fmt.Fprintf(output, "Repos: %d\n", len(repos))
 	_, _ = fmt.Fprintln(output, "")
-	if len(runs) == 0 {
+	if len(migRuns) == 0 {
 		_, _ = fmt.Fprintln(output, "No runs found for this migration.")
 		return nil
 	}
 
 	tw := tabwriter.NewWriter(output, 0, 8, 2, ' ', 0)
 	_, _ = fmt.Fprintln(tw, "Run\tSuccess\tFail")
-	for _, run := range runs {
+	for _, run := range migRuns {
 		success, fail := runSuccessFail(run.Counts)
-		_, _ = fmt.Fprintf(tw, "%s  %s\t%d\t%d\n", migStatusGlyph(run.Status.String()), run.ID.String(), success, fail)
+		_, _ = fmt.Fprintf(tw, "%s  %s\t%d\t%d\n", runs.StatusGlyph(run.Status.String(), -1), run.ID.String(), success, fail)
 	}
 	return tw.Flush()
 }
@@ -566,23 +566,6 @@ func runSuccessFail(counts *domaintypes.RunCounts) (int32, int32) {
 		return 0, 0
 	}
 	return counts.Success, counts.Fail
-}
-
-func migStatusGlyph(status string) string {
-	switch strings.ToLower(strings.TrimSpace(status)) {
-	case "running", "started":
-		return "⣽"
-	case "success", "succeeded":
-		return "✓"
-	case "fail", "failed":
-		return "✗"
-	case "cancelled", "canceled":
-		return "○"
-	case "queued", "created":
-		return "·"
-	default:
-		return " "
-	}
 }
 
 func migValueOrDash(v string) string {

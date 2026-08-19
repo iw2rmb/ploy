@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"fmt"
+	"maps"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -201,9 +202,5 @@ func compareRecordedRoutes(a, b recordedRoute) int {
 }
 
 func cloneRouteSet(routes map[recordedRoute]struct{}) map[recordedRoute]struct{} {
-	clone := make(map[recordedRoute]struct{}, len(routes))
-	for route := range routes {
-		clone[route] = struct{}{}
-	}
-	return clone
+	return maps.Clone(routes)
 }

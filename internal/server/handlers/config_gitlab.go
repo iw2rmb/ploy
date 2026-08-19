@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"maps"
+	"slices"
 	"sort"
 	"sync"
 
@@ -42,9 +44,7 @@ type ConfigHolder struct {
 func NewConfigHolder(globalEnv map[string][]GlobalEnvVar) *ConfigHolder {
 	envCopy := make(map[string][]GlobalEnvVar, len(globalEnv))
 	for k, entries := range globalEnv {
-		cp := make([]GlobalEnvVar, len(entries))
-		copy(cp, entries)
-		envCopy[k] = cp
+		envCopy[k] = slices.Clone(entries)
 	}
 	return &ConfigHolder{
 		globalEnv: envCopy,
@@ -56,9 +56,7 @@ func copySectionSlice[T any](m map[string][]T, section string) []T {
 	if len(entries) == 0 {
 		return nil
 	}
-	cp := make([]T, len(entries))
-	copy(cp, entries)
-	return cp
+	return slices.Clone(entries)
 }
 
 func setSectionSlice[T any](m map[string][]T, section string, entries []T) map[string][]T {
@@ -69,9 +67,7 @@ func setSectionSlice[T any](m map[string][]T, section string, entries []T) map[s
 		delete(m, section)
 		return m
 	}
-	cp := make([]T, len(entries))
-	copy(cp, entries)
-	m[section] = cp
+	m[section] = slices.Clone(entries)
 	return m
 }
 
@@ -133,9 +129,7 @@ func (h *ConfigHolder) GetGlobalEnvEntries(key string) []GlobalEnvVar {
 	if len(entries) == 0 {
 		return nil
 	}
-	cp := make([]GlobalEnvVar, len(entries))
-	copy(cp, entries)
-	return cp
+	return slices.Clone(entries)
 }
 
 // SetGlobalEnvVar sets or updates a global environment variable by key+target.
@@ -185,9 +179,9 @@ func (h *ConfigHolder) GetHydraOverlays() map[string]*HydraJobConfig {
 	cp := make(map[string]*HydraJobConfig, len(h.hydra))
 	for k, v := range h.hydra {
 		cp[k] = &HydraJobConfig{
-			Envs: copyStringMap(v.Envs),
-			In:   copyStringSlice(v.In),
-			Out:  copyStringSlice(v.Out),
+			Envs: maps.Clone(v.Envs),
+			In:   slices.Clone(v.In),
+			Out:  slices.Clone(v.Out),
 		}
 	}
 	return cp
@@ -253,9 +247,5 @@ func (h *ConfigHolder) GetBundleMap() map[string]string {
 	if len(h.bundleMap) == 0 {
 		return nil
 	}
-	cp := make(map[string]string, len(h.bundleMap))
-	for k, v := range h.bundleMap {
-		cp[k] = v
-	}
-	return cp
+	return maps.Clone(h.bundleMap)
 }

@@ -1,24 +1,19 @@
 package git
 
 import (
+	"bytes"
 	"context"
 	"fmt"
-	"os"
-	"os/exec"
 	"strings"
+
+	"github.com/iw2rmb/ploy/internal/gitexec"
 )
 
 // runGitCommand executes a git command in the specified directory with custom environment.
 func runGitCommand(ctx context.Context, dir string, env []string, args ...string) error {
-	cmd := exec.CommandContext(ctx, "git", args...)
-	if dir != "" {
-		cmd.Dir = dir
-	}
-	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GIT_ASKPASS=echo")
-	cmd.Env = append(cmd.Env, env...)
-
-	output, err := cmd.CombinedOutput()
+	result, err := gitexec.Execute(ctx, gitexec.Request{Dir: dir, Env: env, Args: args})
 	if err != nil {
+		output := bytes.Join([][]byte{result.Stdout, result.Stderr}, nil)
 		return fmt.Errorf("git %s failed: %w (output=%s)", strings.Join(args, " "), err, strings.TrimSpace(string(output)))
 	}
 	return nil

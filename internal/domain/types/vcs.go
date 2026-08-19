@@ -142,6 +142,28 @@ func (v CommitSHA) Validate() error {
 	return nil
 }
 
+// NormalizeFullCommitSHA returns the lowercase canonical form of a full Git
+// commit SHA. It accepts surrounding whitespace and uppercase hexadecimal.
+func NormalizeFullCommitSHA(raw string) (CommitSHA, bool) {
+	normalized := strings.ToLower(strings.TrimSpace(raw))
+	if len(normalized) != 40 {
+		return "", false
+	}
+	for _, char := range normalized {
+		if (char < '0' || char > '9') && (char < 'a' || char > 'f') {
+			return "", false
+		}
+	}
+	return CommitSHA(normalized), true
+}
+
+// IsCanonicalFullCommitSHA reports whether raw is an exact lowercase 40-hex
+// Git commit SHA without surrounding whitespace.
+func IsCanonicalFullCommitSHA(raw string) bool {
+	normalized, ok := NormalizeFullCommitSHA(raw)
+	return ok && normalized.String() == raw
+}
+
 // NormalizeRepoURL normalizes a git repository URL for comparison and matching.
 //
 // The normalization applies the following transformations:

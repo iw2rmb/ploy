@@ -3,7 +3,6 @@ package handlers
 import (
 	"log/slog"
 	"net/http"
-	"regexp"
 	"strings"
 	"time"
 
@@ -16,8 +15,6 @@ import (
 	"github.com/iw2rmb/ploy/internal/server/gitlabtokens"
 	"github.com/iw2rmb/ploy/internal/store"
 )
-
-var submitCommitSHARe = regexp.MustCompile(`^[0-9a-f]{40}$`)
 
 // createSingleRepoRunHandler submits a single-repo run and queues it for scheduler-driven execution.
 // Endpoint: POST /v1/runs
@@ -57,7 +54,7 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service, g
 		}
 		sourceRef := req.Ref.String()
 		commitSHA := strings.TrimSpace(req.CommitSHA)
-		if commitSHA != "" && !submitCommitSHARe.MatchString(commitSHA) {
+		if commitSHA != "" && !domaintypes.IsCanonicalFullCommitSHA(req.CommitSHA) {
 			writeHTTPError(w, http.StatusBadRequest, "commit_sha must be a lowercase 40-hex sha")
 			return
 		}

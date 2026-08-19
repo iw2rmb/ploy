@@ -1,6 +1,7 @@
 package hydration
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"log/slog"
@@ -12,6 +13,7 @@ import (
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/gitauth"
+	"github.com/iw2rmb/ploy/internal/gitexec"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
@@ -84,9 +86,9 @@ func (g *gitFetcher) Fetch(ctx context.Context, repo *contracts.RepoMaterializat
 	url := strings.TrimSpace(string(repo.URL))
 	baseRef := strings.TrimSpace(string(repo.BaseRef))
 	commitSHA := strings.TrimSpace(string(repo.Commit))
-	if baseRefCommitSHA := normalizeFullCommitSHA(baseRef); baseRefCommitSHA != "" {
+	if baseRefCommitSHA, ok := domaintypes.NormalizeFullCommitSHA(baseRef); ok {
 		if commitSHA == "" {
-			commitSHA = baseRefCommitSHA
+			commitSHA = baseRefCommitSHA.String()
 		}
 		baseRef = ""
 	}
@@ -96,14 +98,14 @@ func (g *gitFetcher) Fetch(ctx context.Context, repo *contracts.RepoMaterializat
 	// path (for example, when a per-step workspace is a copy of an existing base clone).
 	if dest != "" {
 		if info, err := os.Stat(dest); err == nil && info.IsDir() {
-			fullCommitSHA := normalizeFullCommitSHA(commitSHA)
-			if fullCommitSHA != "" && validateCachedClone(ctx, dest, url, fullCommitSHA) {
+			fullCommitSHA, isFullCommitSHA := domaintypes.NormalizeFullCommitSHA(commitSHA)
+			if isFullCommitSHA && validateCachedClone(ctx, dest, url, fullCommitSHA.String()) {
 				if err := sanitizeCloneOrigin(ctx, dest, url); err != nil {
 					return fmt.Errorf("sanitize hydrated clone origin: %w", err)
 				}
 				return nil
 			}
-			if fullCommitSHA == "" && validateCloneOrigin(ctx, dest, url) {
+			if !isFullCommitSHA && validateCloneOrigin(ctx, dest, url) {
 				if err := sanitizeCloneOrigin(ctx, dest, url); err != nil {
 					return fmt.Errorf("sanitize hydrated clone origin: %w", err)
 				}
@@ -117,16 +119,16 @@ func (g *gitFetcher) Fetch(ctx context.Context, repo *contracts.RepoMaterializat
 
 	// Check if caching is enabled and we have a cached clone.
 	if g.opts.CacheDir != "" {
-		fullCommitSHA := normalizeFullCommitSHA(commitSHA)
-		if fullCommitSHA != "" {
-			cachedClonePath, err := cacheClonePath(g.opts.CacheDir, url, fullCommitSHA)
+		fullCommitSHA, isFullCommitSHA := domaintypes.NormalizeFullCommitSHA(commitSHA)
+		if isFullCommitSHA {
+			cachedClonePath, err := cacheClonePath(g.opts.CacheDir, url, fullCommitSHA.String())
 			if err != nil {
 				return fmt.Errorf("build git clone cache path: %w", err)
 			}
 
 			// If cache exists, copy it to dest and validate before using.
 			if _, err := os.Stat(cachedClonePath); err == nil {
-				if validateCachedClone(ctx, cachedClonePath, url, fullCommitSHA) {
+				if validateCachedClone(ctx, cachedClonePath, url, fullCommitSHA.String()) {
 					if err := sanitizeCloneOrigin(ctx, cachedClonePath, url); err != nil {
 						if removeErr := os.RemoveAll(cachedClonePath); removeErr != nil {
 							return fmt.Errorf("remove unsanitized cached clone %q: %w", cachedClonePath, removeErr)
@@ -134,7 +136,7 @@ func (g *gitFetcher) Fetch(ctx context.Context, repo *contracts.RepoMaterializat
 					}
 				}
 				if err := copyGitClone(cachedClonePath, dest); err == nil {
-					if validateCachedClone(ctx, dest, url, fullCommitSHA) {
+					if validateCachedClone(ctx, dest, url, fullCommitSHA.String()) {
 						if err := sanitizeCloneOrigin(ctx, dest, url); err != nil {
 							return fmt.Errorf("sanitize cached clone destination origin: %w", err)
 						}
@@ -218,8 +220,8 @@ func (g *gitFetcher) cloneAndCheckout(ctx context.Context, rawURL, baseRef, comm
 }
 
 func cacheClonePath(cacheDir, rawURL, commitSHA string) (string, error) {
-	fullCommitSHA := normalizeFullCommitSHA(commitSHA)
-	if fullCommitSHA == "" {
+	fullCommitSHA, ok := domaintypes.NormalizeFullCommitSHA(commitSHA)
+	if !ok {
 		return "", fmt.Errorf("commit sha must be a full 40-character hex sha")
 	}
 
@@ -228,7 +230,7 @@ func cacheClonePath(cacheDir, rawURL, commitSHA string) (string, error) {
 		return "", err
 	}
 	components = append([]string{cacheDir, "git-clones"}, components...)
-	components = append(components, fullCommitSHA)
+	components = append(components, fullCommitSHA.String())
 	return filepath.Join(components...), nil
 }
 
@@ -287,19 +289,6 @@ func safeCachePathComponent(component string) bool {
 	return component != "" && component != "." && component != ".." && !strings.ContainsAny(component, `/\`)
 }
 
-func normalizeFullCommitSHA(commitSHA string) string {
-	commitSHA = strings.ToLower(strings.TrimSpace(commitSHA))
-	if len(commitSHA) != 40 {
-		return ""
-	}
-	for _, r := range commitSHA {
-		if (r < '0' || r > '9') && (r < 'a' || r > 'f') {
-			return ""
-		}
-	}
-	return commitSHA
-}
-
 // validateCloneOrigin checks if dest is a git repository with the expected origin URL.
 // Returns true if the clone is valid and matches the expected URL.
 func validateCloneOrigin(ctx context.Context, dest, expectedURL string) bool {
@@ -307,13 +296,11 @@ func validateCloneOrigin(ctx context.Context, dest, expectedURL string) bool {
 	if _, err := os.Stat(gitDir); err != nil {
 		return false
 	}
-	cmd := exec.CommandContext(ctx, "git", "-C", dest, "remote", "get-url", "origin")
-	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GIT_ASKPASS=echo")
-	output, err := cmd.CombinedOutput()
+	result, err := gitexec.Execute(ctx, gitexec.Request{Dir: dest, Args: []string{"remote", "get-url", "origin"}})
 	if err != nil {
 		return false
 	}
-	remoteURL := strings.TrimSpace(string(output))
+	remoteURL := strings.TrimSpace(string(result.Stdout))
 	return domaintypes.NormalizeRepoURL(remoteURL) == domaintypes.NormalizeRepoURL(expectedURL)
 }
 
@@ -325,21 +312,21 @@ func validateCachedClone(ctx context.Context, dest, expectedURL, expectedCommitS
 	if err != nil {
 		return false
 	}
-	return head == normalizeFullCommitSHA(expectedCommitSHA)
+	normalized, ok := domaintypes.NormalizeFullCommitSHA(expectedCommitSHA)
+	return ok && head == normalized.String()
 }
 
 func resolveCloneHEAD(ctx context.Context, dest string) (string, error) {
-	cmd := exec.CommandContext(ctx, "git", "-C", dest, "rev-parse", "HEAD")
-	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GIT_ASKPASS=echo")
-	output, err := cmd.CombinedOutput()
+	result, err := gitexec.Execute(ctx, gitexec.Request{Dir: dest, Args: []string{"rev-parse", "HEAD"}})
 	if err != nil {
+		output := bytes.Join([][]byte{result.Stdout, result.Stderr}, nil)
 		return "", fmt.Errorf("git rev-parse HEAD: %w (output: %s)", err, string(output))
 	}
-	commitSHA := normalizeFullCommitSHA(string(output))
-	if commitSHA == "" {
-		return "", fmt.Errorf("git rev-parse HEAD returned non-full sha %q", strings.TrimSpace(string(output)))
+	commitSHA, ok := domaintypes.NormalizeFullCommitSHA(string(result.Stdout))
+	if !ok {
+		return "", fmt.Errorf("git rev-parse HEAD returned non-full sha %q", strings.TrimSpace(string(result.Stdout)))
 	}
-	return commitSHA, nil
+	return commitSHA.String(), nil
 }
 
 func sanitizeCloneOrigin(ctx context.Context, dest, expectedURL string) error {
@@ -411,16 +398,9 @@ func copyGitClone(src, dest string) error {
 
 // runGitCommand executes a git command in the specified directory.
 func runGitCommand(ctx context.Context, dir string, env []string, args ...string) error {
-	cmd := exec.CommandContext(ctx, "git", args...)
-	if dir != "" {
-		cmd.Dir = dir
-	}
-	// Disable any interactive credential prompts to avoid hanging in headless runs.
-	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GIT_ASKPASS=echo")
-	cmd.Env = append(cmd.Env, env...)
-
-	output, err := cmd.CombinedOutput()
+	result, err := gitexec.Execute(ctx, gitexec.Request{Dir: dir, Env: env, Args: args})
 	if err != nil {
+		output := bytes.Join([][]byte{result.Stdout, result.Stderr}, nil)
 		return fmt.Errorf("git %s: %w (output: %s)", strings.Join(args, " "), err, string(output))
 	}
 

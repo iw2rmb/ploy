@@ -1,22 +1,24 @@
 package gitrepo
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/iw2rmb/ploy/internal/gitexec"
 )
 
 func Run(t testing.TB, dir string, args ...string) []byte {
 	t.Helper()
-	cmd := exec.Command("git", args...)
-	cmd.Dir = dir
-	output, err := cmd.CombinedOutput()
+	result, err := gitexec.Execute(context.Background(), gitexec.Request{Dir: dir, Args: args})
 	if err != nil {
+		output := append(result.Stdout, result.Stderr...)
 		t.Fatalf("git %v failed: %v (output: %s)", args, err, string(output))
 	}
-	return output
+	return result.Stdout
 }
 
 func Init(t testing.TB, dir string) {
@@ -70,15 +72,14 @@ func AssertRepo(t testing.TB, dir string) {
 
 func DiffHEAD(t testing.TB, workspace string) []byte {
 	t.Helper()
-	cmd := exec.Command("git", "diff", "HEAD")
-	cmd.Dir = workspace
-	output, err := cmd.CombinedOutput()
+	result, err := gitexec.Execute(context.Background(), gitexec.Request{Dir: workspace, Args: []string{"diff", "HEAD"}})
 	if err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() != 0 {
+			output := append(result.Stdout, result.Stderr...)
 			t.Fatalf("git diff failed: %v (output: %s)", err, string(output))
 		}
 	}
-	return output
+	return result.Stdout
 }
 
 func SetupWithChange(t testing.TB, workspace string) {

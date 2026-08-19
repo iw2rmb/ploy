@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -69,7 +70,7 @@ func (s *namedSnapshotStore) GetGitSpecSnapshot(_ context.Context, params store.
 
 func (s *runBundleStoreStub) Ensure(_ context.Context, cid string, archive []byte) (string, error) {
 	s.cids = append(s.cids, cid)
-	s.archives = append(s.archives, append([]byte(nil), archive...))
+	s.archives = append(s.archives, slices.Clone(archive))
 	return "bundle-test", nil
 }
 

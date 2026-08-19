@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"net/http"
+	"slices"
 	"testing"
 
 	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
@@ -65,5 +66,5 @@ type specCatalogStub struct {
 
 func (s *specCatalogStub) List(context.Context) ([]speccatalog.Entry, error) {
 	s.calls++
-	return append([]speccatalog.Entry(nil), s.entries...), s.err
+	return slices.Clone(s.entries), s.err
 }

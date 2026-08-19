@@ -268,7 +268,3 @@ func Load(ctx context.Context, base *url.URL, client *http.Client, path string) 
 	}
 	return Normalize(ctx, base, client, data, baseDir)
 }
-
-func computeArchiveShortHash(data []byte) string { return speccompiler.ArchiveShortHash(data) }
-func computeSpecBundleCID(data []byte) string    { return speccompiler.BundleCID(data) }
-func isArchiveShortHash(value string) bool       { return speccompiler.IsArchiveShortHash(value) }

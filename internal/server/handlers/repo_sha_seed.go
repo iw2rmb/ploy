@@ -5,16 +5,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"os/exec"
-	"regexp"
 	"strings"
 	"time"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/gitauth"
+	"github.com/iw2rmb/ploy/internal/gitexec"
 )
-
-var sha40Pattern = regexp.MustCompile(`^[0-9a-f]{40}$`)
 
 type sourceCommitSHAResolverFunc func(context.Context, string, string) (string, error)
 
@@ -77,11 +75,8 @@ func resolveSourceCommitSHA(ctx context.Context, repoURL, ref string, auth gitau
 
 func gitLSRemote(ctx context.Context, repoURL, ref string, auth gitauth.Options) (string, error) {
 	prepared := gitauth.PrepareURL(repoURL, auth)
-	cmd := exec.CommandContext(ctx, "git", "ls-remote", prepared.URL, ref)
-	configureProcessGroupCancel(cmd)
-	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GIT_ASKPASS=echo")
-	cmd.Env = append(cmd.Env, prepared.Env...)
-	out, err := cmd.CombinedOutput()
+	result, err := gitexec.Execute(ctx, gitexec.Request{Env: prepared.Env, Args: []string{"ls-remote", prepared.URL, ref}})
+	out := append(result.Stdout, result.Stderr...)
 	if err != nil {
 		failureErr := err
 		if ctxErr := ctx.Err(); ctxErr != nil {
@@ -99,9 +94,8 @@ func gitLSRemote(ctx context.Context, repoURL, ref string, auth gitauth.Options)
 		if len(parts) < 1 {
 			continue
 		}
-		sha := strings.ToLower(strings.TrimSpace(string(parts[0])))
-		if sha40Pattern.MatchString(sha) {
-			return sha, nil
+		if sha, ok := domaintypes.NormalizeFullCommitSHA(string(parts[0])); ok {
+			return sha.String(), nil
 		}
 	}
 	return "", fmt.Errorf("no matching commit sha found")

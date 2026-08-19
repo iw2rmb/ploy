@@ -2,7 +2,9 @@ package handlers
 
 import (
 	"fmt"
+	"maps"
 	"path"
+	"slices"
 	"sort"
 	"strings"
 
@@ -93,9 +95,9 @@ func assembleHydraOverlay(
 	base := &HydraJobConfig{}
 	if cfg, ok := overlays[section]; ok && cfg != nil {
 		base = &HydraJobConfig{
-			Envs: copyStringMap(cfg.Envs),
-			In:   copyStringSlice(cfg.In),
-			Out:  copyStringSlice(cfg.Out),
+			Envs: maps.Clone(cfg.Envs),
+			In:   slices.Clone(cfg.In),
+			Out:  slices.Clone(cfg.Out),
 		}
 	}
 
@@ -264,26 +266,6 @@ func findDuplicateDsts(field string, entries []string) []string {
 	}
 	sort.Strings(dups)
 	return dups
-}
-
-func copyStringMap(m map[string]string) map[string]string {
-	if m == nil {
-		return nil
-	}
-	cp := make(map[string]string, len(m))
-	for k, v := range m {
-		cp[k] = v
-	}
-	return cp
-}
-
-func copyStringSlice(s []string) []string {
-	if s == nil {
-		return nil
-	}
-	cp := make([]string, len(s))
-	copy(cp, s)
-	return cp
 }
 
 // applyBundleMapMutator merges server-side bundle mappings (from migration and

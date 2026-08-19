@@ -35,6 +35,12 @@ func ValidateHydraSection(section string) error {
 // shortHashPattern matches a valid shortHash: 7–64 lowercase hex characters.
 var shortHashPattern = regexp.MustCompile(`^[0-9a-f]{7,64}$`)
 
+// IsHydraShortHash reports whether value is a canonical Hydra content-hash
+// prefix.
+func IsHydraShortHash(value string) bool {
+	return shortHashPattern.MatchString(value)
+}
+
 // ParsedStoredEntry holds the result of parsing a canonical stored entry.
 type ParsedStoredEntry struct {
 	Hash     string
@@ -189,7 +195,7 @@ func splitHashDst(s string) (hash, dst string, err error) {
 	}
 	hash = s[:idx]
 	dst = s[idx+1:]
-	if !shortHashPattern.MatchString(hash) {
+	if !IsHydraShortHash(hash) {
 		return "", "", fmt.Errorf("invalid short hash %q (must be 7-64 hex chars)", hash)
 	}
 	if strings.TrimSpace(dst) == "" {

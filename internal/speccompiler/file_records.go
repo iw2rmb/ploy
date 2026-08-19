@@ -21,19 +21,10 @@ import (
 	"fmt"
 	"maps"
 	"path"
-	"regexp"
 	"strings"
 
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
-
-// shortHashPattern matches a valid shortHash: 7–64 lowercase hex characters.
-// Keep this aligned with the stored file-record contract.
-var shortHashPattern = regexp.MustCompile(`^[0-9a-f]{7,64}$`)
-
-func IsArchiveShortHash(value string) bool {
-	return shortHashPattern.MatchString(value)
-}
 
 // shortHashLen is the fixed prefix length for canonical short hashes (12 hex chars).
 const shortHashLen = 12
@@ -232,7 +223,7 @@ func isAlreadyCanonical(s string) bool {
 	if idx <= 0 {
 		return false
 	}
-	return shortHashPattern.MatchString(s[:idx])
+	return contracts.IsHydraShortHash(s[:idx])
 }
 
 type fileRecordHasher func(src string) (string, error)

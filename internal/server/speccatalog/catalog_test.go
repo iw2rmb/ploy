@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -15,6 +14,7 @@ import (
 	"time"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/gitexec"
 )
 
 func TestServiceList_ClonesDiscoversAndRefreshesDefaultBranch(t *testing.T) {
@@ -32,7 +32,7 @@ func TestServiceList_ClonesDiscoversAndRefreshesDefaultBranch(t *testing.T) {
 	if len(first) != 1 || first[0].Name != "upgrade-java" || first[0].Description != "Upgrade Java" || first[0].Path != "scenarios/upgrade.yaml" {
 		t.Fatalf("List() initial = %#v, want one discovered root mapping", first)
 	}
-	if !fullCommitSHA(first[0].SHA) || first[0].CommittedAt.IsZero() || first[0].Source != strings.TrimSuffix(remote.url, ".git") {
+	if !domaintypes.IsCanonicalFullCommitSHA(first[0].SHA) || first[0].CommittedAt.IsZero() || first[0].Source != strings.TrimSuffix(remote.url, ".git") {
 		t.Fatalf("List() source identity = %#v", first[0])
 	}
 
@@ -192,7 +192,7 @@ func TestRepositoryRefresh_ConcurrentCallersShareGitMutation(t *testing.T) {
 	}
 
 	runner := &blockingFetchRunner{
-		delegate: execGitRunner{},
+		delegate: gitexec.ExecRunner{},
 		started:  make(chan struct{}),
 		release:  make(chan struct{}),
 	}
@@ -237,7 +237,7 @@ func TestResolveEntries_RejectsUnsupportedSelectors(t *testing.T) {
 }
 
 type blockingFetchRunner struct {
-	delegate gitRunner
+	delegate gitexec.Runner
 	started  chan struct{}
 	release  chan struct{}
 	once     sync.Once
@@ -249,24 +249,24 @@ type captureFailRunner struct {
 	args []string
 }
 
-func (r *captureFailRunner) Run(_ context.Context, _ string, _ []string, args ...string) ([]byte, error) {
-	r.args = append([]string(nil), args...)
-	return nil, errors.New("remote unavailable")
+func (r *captureFailRunner) Run(_ context.Context, req gitexec.Request) (gitexec.Result, error) {
+	r.args = append([]string(nil), req.Args...)
+	return gitexec.Result{}, errors.New("remote unavailable")
 }
 
-func (r *blockingFetchRunner) Run(ctx context.Context, dir string, env []string, args ...string) ([]byte, error) {
-	if len(args) > 0 && args[0] == "fetch" {
+func (r *blockingFetchRunner) Run(ctx context.Context, req gitexec.Request) (gitexec.Result, error) {
+	if len(req.Args) > 0 && req.Args[0] == "fetch" {
 		r.mu.Lock()
 		r.fetches++
 		r.mu.Unlock()
 		r.once.Do(func() { close(r.started) })
 		select {
 		case <-ctx.Done():
-			return nil, ctx.Err()
+			return gitexec.Result{}, ctx.Err()
 		case <-r.release:
 		}
 	}
-	return r.delegate.Run(ctx, dir, env, args...)
+	return r.delegate.Run(ctx, req)
 }
 
 type specRemote struct {
@@ -346,10 +346,9 @@ func writeTestFile(t *testing.T, path, content string) {
 
 func runTestGit(t *testing.T, dir string, args ...string) {
 	t.Helper()
-	cmd := exec.Command("git", args...)
-	cmd.Dir = dir
-	cmd.Env = append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1", "GIT_TERMINAL_PROMPT=0")
-	if output, err := cmd.CombinedOutput(); err != nil {
+	result, err := gitexec.Execute(t.Context(), gitexec.Request{Dir: dir, Env: []string{"GIT_CONFIG_NOSYSTEM=1"}, Args: args})
+	if err != nil {
+		output := append(result.Stdout, result.Stderr...)
 		t.Fatalf("git %s: %v\n%s", strings.Join(args, " "), err, output)
 	}
 }

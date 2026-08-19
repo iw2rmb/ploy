@@ -23,6 +23,30 @@ func TestHydraFileKindsUseContractOrder(t *testing.T) {
 	}
 }
 
+func TestIsHydraShortHash(t *testing.T) {
+	tests := []struct {
+		name  string
+		value string
+		want  bool
+	}{
+		{name: "minimum length", value: "abcdef0", want: true},
+		{name: "maximum length", value: strings.Repeat("a", 64), want: true},
+		{name: "too short", value: "abcdef"},
+		{name: "too long", value: strings.Repeat("a", 65)},
+		{name: "uppercase", value: "ABCDEF0"},
+		{name: "invalid hexadecimal", value: "abcdefg"},
+		{name: "whitespace", value: " abcdef0"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := IsHydraShortHash(tt.value); got != tt.want {
+				t.Fatalf("IsHydraShortHash(%q) = %v, want %v", tt.value, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestParseStoredEntrySupportsAllHydraFileKinds(t *testing.T) {
 	t.Parallel()
 

@@ -8,12 +8,12 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/gitauth"
+	"github.com/iw2rmb/ploy/internal/gitexec"
 	"github.com/iw2rmb/ploy/internal/gitlabtoken"
 	"github.com/iw2rmb/ploy/internal/server/gitlabtokens"
 	"github.com/iw2rmb/ploy/internal/worker/hydration"
@@ -58,8 +58,8 @@ func (s *Service) WriteTarGz(ctx context.Context, meta Metadata, w io.Writer) er
 	if err := domaintypes.RepoURL(repoURL).Validate(); err != nil {
 		return fmt.Errorf("repo_url: %w", err)
 	}
-	commitSHA := normalizeFullCommitSHA(meta.SourceCommitSHA)
-	if commitSHA == "" {
+	commitSHA := meta.SourceCommitSHA
+	if !domaintypes.IsCanonicalFullCommitSHA(commitSHA) {
 		return fmt.Errorf("source_commit_sha must be a lowercase 40-hex sha")
 	}
 
@@ -113,27 +113,13 @@ func (s *Service) authForMetadata(meta Metadata, repoURL string) (gitauth.Option
 	return auth, nil
 }
 
-func normalizeFullCommitSHA(raw string) string {
-	s := strings.TrimSpace(raw)
-	if len(s) != 40 || strings.ToLower(s) != s {
-		return ""
-	}
-	for _, r := range s {
-		if (r < '0' || r > '9') && (r < 'a' || r > 'f') {
-			return ""
-		}
-	}
-	return s
-}
-
 func verifyHEAD(ctx context.Context, dir, want string) error {
-	cmd := exec.CommandContext(ctx, "git", "-C", dir, "rev-parse", "HEAD")
-	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GIT_ASKPASS=echo")
-	out, err := cmd.CombinedOutput()
+	result, err := gitexec.Execute(ctx, gitexec.Request{Dir: dir, Args: []string{"rev-parse", "HEAD"}})
 	if err != nil {
-		return fmt.Errorf("verify snapshot HEAD: %w (output: %s)", err, string(out))
+		output := append(result.Stdout, result.Stderr...)
+		return fmt.Errorf("verify snapshot HEAD: %w (output: %s)", err, string(output))
 	}
-	if got := strings.TrimSpace(string(out)); got != want {
+	if got := strings.TrimSpace(string(result.Stdout)); got != want {
 		return fmt.Errorf("snapshot HEAD mismatch: got %s want %s", got, want)
 	}
 	return nil

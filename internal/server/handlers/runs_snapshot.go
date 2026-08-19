@@ -5,7 +5,6 @@ import (
 	"errors"
 	"io"
 	"net/http"
-	"strings"
 
 	"github.com/iw2rmb/ploy/internal/gitlabtoken"
 	"github.com/jackc/pgx/v5"
@@ -54,8 +53,8 @@ func getRunSnapshotHandler(st store.Store, snapshots repoSnapshotWriter) http.Ha
 			return
 		}
 
-		sha := strings.TrimSpace(metaRow.SourceCommitSha)
-		if !sha40Pattern.MatchString(sha) {
+		sha := metaRow.SourceCommitSha
+		if !domaintypes.IsCanonicalFullCommitSHA(sha) {
 			writeHTTPError(w, http.StatusConflict, "run is not snapshot-ready")
 			return
 		}

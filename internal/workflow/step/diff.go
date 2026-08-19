@@ -6,8 +6,9 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"strings"
+
+	"github.com/iw2rmb/ploy/internal/gitexec"
 )
 
 // PatchStats holds line-level statistics derived from a unified diff.
@@ -94,18 +95,13 @@ func generateGitDiff(ctx context.Context, workspace string) ([]byte, error) {
 }
 
 func runGitCommandWithEnv(ctx context.Context, workspace string, env []string, args ...string) error {
-	cmd := exec.CommandContext(ctx, "git", args...)
-	cmd.Dir = workspace
-	cmd.Env = append(os.Environ(), env...)
-
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
+	result, err := gitexec.Execute(ctx, gitexec.Request{Dir: workspace, Env: env, Args: args})
+	if err != nil {
 		if ctx.Err() != nil {
 			return fmt.Errorf("cancelled: %w", ctx.Err())
 		}
-		if stderr.Len() > 0 {
-			return fmt.Errorf("%s", strings.TrimSpace(stderr.String()))
+		if len(result.Stderr) > 0 {
+			return fmt.Errorf("%s", strings.TrimSpace(string(result.Stderr)))
 		}
 		return err
 	}
@@ -113,21 +109,15 @@ func runGitCommandWithEnv(ctx context.Context, workspace string, env []string, a
 }
 
 func runGitOutputWithEnv(ctx context.Context, workspace string, env []string, args ...string) ([]byte, error) {
-	cmd := exec.CommandContext(ctx, "git", args...)
-	cmd.Dir = workspace
-	cmd.Env = append(os.Environ(), env...)
-
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
+	result, err := gitexec.Execute(ctx, gitexec.Request{Dir: workspace, Env: env, Args: args})
+	if err != nil {
 		if ctx.Err() != nil {
 			return nil, fmt.Errorf("cancelled: %w", ctx.Err())
 		}
-		if stderr.Len() > 0 {
-			return nil, fmt.Errorf("%s", strings.TrimSpace(stderr.String()))
+		if len(result.Stderr) > 0 {
+			return nil, fmt.Errorf("%s", strings.TrimSpace(string(result.Stderr)))
 		}
 		return nil, err
 	}
-	return stdout.Bytes(), nil
+	return result.Stdout, nil
 }

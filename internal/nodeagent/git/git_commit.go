@@ -1,24 +1,20 @@
 package git
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"os/exec"
 	"strings"
+
+	"github.com/iw2rmb/ploy/internal/gitexec"
 )
 
 // WorkspaceStatus returns the output of `git status --porcelain` for the given directory.
 func WorkspaceStatus(ctx context.Context, repoDir string) (string, error) {
-	cmd := exec.CommandContext(ctx, "git", "status", "--porcelain")
-	cmd.Dir = repoDir
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("git status --porcelain failed: %w (stderr=%s)", err, strings.TrimSpace(stderr.String()))
+	result, err := gitexec.Execute(ctx, gitexec.Request{Dir: repoDir, Args: []string{"status", "--porcelain"}})
+	if err != nil {
+		return "", fmt.Errorf("git status --porcelain failed: %w (stderr=%s)", err, strings.TrimSpace(string(result.Stderr)))
 	}
-	return stdout.String(), nil
+	return string(result.Stdout), nil
 }
 
 // EnsureCommit stages and commits all changes in the repository when any exist.

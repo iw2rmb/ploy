@@ -128,7 +128,7 @@ func validateCompletionRequest(r *http.Request, req completeJobRequest) (
 
 	repoSHAOut := ""
 	if candidate := strings.TrimSpace(req.RepoSHAOut); candidate != "" {
-		if !sha40Pattern.MatchString(candidate) {
+		if !domaintypes.IsCanonicalFullCommitSHA(req.RepoSHAOut) {
 			return "", JobStatsPayload{}, nil, "", "", completeBadRequest("repo_sha_out must match ^[0-9a-f]{40}$")
 		}
 		repoSHAOut = candidate

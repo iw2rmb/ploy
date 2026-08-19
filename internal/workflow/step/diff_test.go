@@ -3,10 +3,11 @@ package step
 import (
 	"context"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/iw2rmb/ploy/internal/gitexec"
 )
 
 func TestCountPatchStats(t *testing.T) {
@@ -83,7 +84,7 @@ func initGitRepo(t *testing.T, content string) (dir, filePath string) {
 		{"-C", dir, "config", "user.email", "test@example.com"},
 		{"-C", dir, "config", "user.name", "Test User"},
 	} {
-		if err := exec.Command("git", args...).Run(); err != nil {
+		if _, err := gitexec.Execute(t.Context(), gitexec.Request{Args: args}); err != nil {
 			t.Fatalf("git %v: %v", args, err)
 		}
 	}
@@ -97,7 +98,7 @@ func initGitRepo(t *testing.T, content string) (dir, filePath string) {
 		{"-C", dir, "add", "test.txt"},
 		{"-C", dir, "commit", "-m", "Initial commit"},
 	} {
-		if err := exec.Command("git", args...).Run(); err != nil {
+		if _, err := gitexec.Execute(t.Context(), gitexec.Request{Args: args}); err != nil {
 			t.Fatalf("git %v: %v", args, err)
 		}
 	}
@@ -271,20 +272,19 @@ func createGenerateDiffTestRepo(t *testing.T) string {
 
 func mustGitOutput(t *testing.T, dir string, args ...string) string {
 	t.Helper()
-	cmdArgs := append([]string{"-C", dir}, args...)
-	cmd := exec.Command("git", cmdArgs...)
-	output, err := cmd.CombinedOutput()
+	result, err := gitexec.Execute(t.Context(), gitexec.Request{Dir: dir, Args: args})
 	if err != nil {
+		output := append(result.Stdout, result.Stderr...)
 		t.Fatalf("git %v failed: %v (output: %s)", args, err, string(output))
 	}
-	return strings.TrimSpace(string(output))
+	return strings.TrimSpace(string(result.Stdout))
 }
 
 func mustRunGit(t *testing.T, dir string, args ...string) {
 	t.Helper()
-	cmdArgs := append([]string{"-C", dir}, args...)
-	cmd := exec.Command("git", cmdArgs...)
-	if output, err := cmd.CombinedOutput(); err != nil {
+	result, err := gitexec.Execute(t.Context(), gitexec.Request{Dir: dir, Args: args})
+	if err != nil {
+		output := append(result.Stdout, result.Stderr...)
 		t.Fatalf("git %v failed: %v (output: %s)", args, err, string(output))
 	}
 }

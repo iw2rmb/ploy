@@ -76,6 +76,37 @@ func TestVCSValuesTrimInput(t *testing.T) {
 	}
 }
 
+func TestFullCommitSHAForms(t *testing.T) {
+	lower := "0123456789abcdef0123456789abcdef01234567"
+	upper := "0123456789ABCDEF0123456789ABCDEF01234567"
+	tests := []struct {
+		name          string
+		raw           string
+		want          CommitSHA
+		wantNormalize bool
+		wantCanonical bool
+	}{
+		{name: "lowercase", raw: lower, want: CommitSHA(lower), wantNormalize: true, wantCanonical: true},
+		{name: "uppercase", raw: upper, want: CommitSHA(lower), wantNormalize: true},
+		{name: "surrounding whitespace", raw: "  " + lower + "\n", want: CommitSHA(lower), wantNormalize: true},
+		{name: "short", raw: lower[:39]},
+		{name: "long", raw: lower + "0"},
+		{name: "invalid hexadecimal", raw: "g" + lower[1:]},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := NormalizeFullCommitSHA(tt.raw)
+			if ok != tt.wantNormalize || got != tt.want {
+				t.Fatalf("NormalizeFullCommitSHA(%q) = (%q, %v), want (%q, %v)", tt.raw, got, ok, tt.want, tt.wantNormalize)
+			}
+			if got := IsCanonicalFullCommitSHA(tt.raw); got != tt.wantCanonical {
+				t.Fatalf("IsCanonicalFullCommitSHA(%q) = %v, want %v", tt.raw, got, tt.wantCanonical)
+			}
+		})
+	}
+}
+
 func TestRepositoryURLNormalization(t *testing.T) {
 	t.Parallel()
 

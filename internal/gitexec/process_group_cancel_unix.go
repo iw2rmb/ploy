@@ -1,6 +1,6 @@
 //go:build !windows
 
-package handlers
+package gitexec
 
 import (
 	"os"

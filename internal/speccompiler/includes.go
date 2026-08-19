@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"gopkg.in/yaml.v3"
 )
 
@@ -410,7 +411,7 @@ func normalizeMountEntries(node *yaml.Node, sourcePath, outputBaseDir string, is
 			body = strings.TrimSuffix(body, ":ro")
 			suffix = ":ro"
 		}
-		if idx := strings.Index(body, ":"); idx > 0 && shortHashPattern.MatchString(body[:idx]) {
+		if idx := strings.Index(body, ":"); idx > 0 && contracts.IsHydraShortHash(body[:idx]) {
 			continue
 		}
 		idx := strings.LastIndex(body, ":")

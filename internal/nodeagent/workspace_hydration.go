@@ -9,10 +9,10 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
+	"github.com/iw2rmb/ploy/internal/gitexec"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
@@ -219,11 +219,10 @@ func verifyWorkspaceHEAD(ctx context.Context, workspace, want string) error {
 }
 
 func resolveGitHEAD(ctx context.Context, workspace string) (string, error) {
-	cmd := exec.CommandContext(ctx, "git", "-C", workspace, "rev-parse", "HEAD")
-	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GIT_ASKPASS=echo")
-	out, err := cmd.CombinedOutput()
+	result, err := gitexec.Execute(ctx, gitexec.Request{Dir: workspace, Args: []string{"rev-parse", "HEAD"}})
 	if err != nil {
-		return "", fmt.Errorf("git rev-parse HEAD: %w (output: %s)", err, string(out))
+		output := append(result.Stdout, result.Stderr...)
+		return "", fmt.Errorf("git rev-parse HEAD: %w (output: %s)", err, string(output))
 	}
-	return strings.TrimSpace(string(out)), nil
+	return strings.TrimSpace(string(result.Stdout)), nil
 }

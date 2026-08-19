@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"slices"
 
 	"github.com/jackc/pgx/v5"
 
@@ -59,7 +60,7 @@ func (s *completionService) Complete(ctx context.Context, input completionInput)
 	}
 
 	if input.Status == domaintypes.JobStatusSuccess && job.NextID != nil {
-		if !sha40Pattern.MatchString(job.RepoShaIn) {
+		if !domaintypes.IsCanonicalFullCommitSHA(job.RepoShaIn) {
 			return completionResult{}, completeConflict("job repo_sha_in must match ^[0-9a-f]{40}$ for chain progression")
 		}
 		if input.RepoSHAOut == "" {
@@ -85,7 +86,7 @@ func (s *completionService) Complete(ctx context.Context, input completionInput)
 		}
 	}
 
-	persistedMeta := append([]byte(nil), job.Meta...)
+	persistedMeta := slices.Clone(job.Meta)
 	if input.StatsPayload.HasJobMeta() {
 		mergedMeta, mergeErr := mergeCompletionJobMeta(job.Meta, input.StatsPayload.JobMeta)
 		if mergeErr != nil {

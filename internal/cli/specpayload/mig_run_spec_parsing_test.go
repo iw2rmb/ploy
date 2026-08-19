@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
 // ---------------------------------------------------------------------------
@@ -865,7 +867,7 @@ steps:
 		t.Fatalf("steps[0].in = %#v, want one entry", steps[0]["in"])
 	}
 	entry, ok := inEntries[0].(string)
-	if !ok || !isArchiveShortHash(strings.Split(entry, ":")[0]) || !strings.HasSuffix(entry, ":/in/input.txt") {
+	if !ok || !contracts.IsHydraShortHash(strings.Split(entry, ":")[0]) || !strings.HasSuffix(entry, ":/in/input.txt") {
 		t.Fatalf("steps[0].in[0] = %q, want canonical input entry", entry)
 	}
 	outEntries, ok := steps[0]["out"].([]any)
@@ -873,7 +875,7 @@ steps:
 		t.Fatalf("steps[0].out = %#v, want one entry", steps[0]["out"])
 	}
 	outEntry, ok := outEntries[0].(string)
-	if !ok || !isArchiveShortHash(strings.Split(outEntry, ":")[0]) || !strings.HasSuffix(outEntry, ":/out/seed.txt") {
+	if !ok || !contracts.IsHydraShortHash(strings.Split(outEntry, ":")[0]) || !strings.HasSuffix(outEntry, ":/out/seed.txt") {
 		t.Fatalf("steps[0].out[0] = %q, want canonical output entry", outEntry)
 	}
 	homeEntries, ok := steps[0]["home"].([]any)
@@ -881,7 +883,7 @@ steps:
 		t.Fatalf("steps[0].home = %#v, want one entry", steps[0]["home"])
 	}
 	homeEntry, ok := homeEntries[0].(string)
-	if !ok || !isArchiveShortHash(strings.Split(homeEntry, ":")[0]) || !strings.HasSuffix(homeEntry, ":.codex/config.toml:ro") {
+	if !ok || !contracts.IsHydraShortHash(strings.Split(homeEntry, ":")[0]) || !strings.HasSuffix(homeEntry, ":.codex/config.toml:ro") {
 		t.Fatalf("steps[0].home[0] = %q, want canonical home entry", homeEntry)
 	}
 	tmpEntries, ok := steps[0]["tmp"].([]any)
@@ -889,7 +891,7 @@ steps:
 		t.Fatalf("steps[0].tmp = %#v, want one entry", steps[0]["tmp"])
 	}
 	tmpEntry, ok := tmpEntries[0].(string)
-	if !ok || !isArchiveShortHash(strings.Split(tmpEntry, ":")[0]) || !strings.HasSuffix(tmpEntry, ":/tmp/lib/tool.jar") {
+	if !ok || !contracts.IsHydraShortHash(strings.Split(tmpEntry, ":")[0]) || !strings.HasSuffix(tmpEntry, ":/tmp/lib/tool.jar") {
 		t.Fatalf("steps[0].tmp[0] = %q, want canonical tmp entry", tmpEntry)
 	}
 }

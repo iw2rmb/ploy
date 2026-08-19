@@ -8,7 +8,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -17,6 +16,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/cli/migs"
 	"github.com/iw2rmb/ploy/internal/cli/runs"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/gitexec"
 )
 
 type ApplyOptions struct {
@@ -112,15 +112,12 @@ func runApply(ctx context.Context, opts ApplyOptions, base *url.URL, httpClient 
 }
 
 func ensureNoGitDiff(ctx context.Context, worktree string) error {
-	cmd := exec.CommandContext(ctx, "git", "-C", worktree, "diff", "--quiet", "HEAD", "--")
-	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GIT_ASKPASS=echo")
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
+	result, err := gitexec.Execute(ctx, gitexec.Request{Dir: worktree, Args: []string{"diff", "--quiet", "HEAD", "--"}})
+	if err != nil {
 		if exit, ok := err.(*exec.ExitError); ok && exit.ExitCode() == 1 {
 			return errors.New("working tree must have no staged or unstaged diff")
 		}
-		msg := strings.TrimSpace(stderr.String())
+		msg := strings.TrimSpace(string(result.Stderr))
 		if msg != "" {
 			return fmt.Errorf("check working tree diff: %w: %s", err, msg)
 		}
@@ -133,13 +130,9 @@ func gitApplyPatch(ctx context.Context, worktree string, patch []byte) error {
 	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "git", "-C", worktree, "apply")
-	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GIT_ASKPASS=echo")
-	cmd.Stdin = bytes.NewReader(patch)
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("git apply failed: %w (stderr: %s)", err, strings.TrimSpace(stderr.String()))
+	result, err := gitexec.Execute(ctx, gitexec.Request{Dir: worktree, Args: []string{"apply"}, Stdin: patch})
+	if err != nil {
+		return fmt.Errorf("git apply failed: %w (stderr: %s)", err, strings.TrimSpace(string(result.Stderr)))
 	}
 	return nil
 }

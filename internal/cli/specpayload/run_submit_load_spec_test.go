@@ -17,6 +17,9 @@ import (
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/iw2rmb/ploy/internal/speccompiler"
+	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
 // newBundleSrvForLoadSpec creates a bundle server for Load tests. It always
@@ -33,7 +36,7 @@ func newBundleSrvForLoadSpec(t *testing.T) (*url.URL, *http.Client, map[string][
 			}
 			if r.Method == http.MethodPost {
 				data, _ := io.ReadAll(r.Body)
-				hash := computeArchiveShortHash(data)
+				hash := speccompiler.ArchiveShortHash(data)
 				mu.Lock()
 				uploads[hash] = append([]byte(nil), data...)
 				mu.Unlock()
@@ -42,7 +45,7 @@ func newBundleSrvForLoadSpec(t *testing.T) (*url.URL, *http.Client, map[string][
 				w.WriteHeader(http.StatusCreated)
 				_ = json.NewEncoder(w).Encode(map[string]any{
 					"bundle_id": "bundle-" + hash,
-					"cid":       computeSpecBundleCID(data),
+					"cid":       speccompiler.BundleCID(data),
 					"digest":    "sha256:" + hex.EncodeToString(fullDigest[:]),
 					"size":      len(data),
 				})
@@ -159,17 +162,17 @@ steps:
 		t.Fatalf("expected steps[0].in[0] to be string, got %T", stepIn[0])
 	}
 	inHash, inDst, ok := strings.Cut(stepInEntry, ":")
-	if !ok || !isArchiveShortHash(inHash) || inDst != "/in/config.txt" {
+	if !ok || !contracts.IsHydraShortHash(inHash) || inDst != "/in/config.txt" {
 		t.Fatalf("steps[0].in[0] = %q, want canonical in entry", stepInEntry)
 	}
 	stepOut := step["out"].([]any)[0].(string)
 	outHash, outDst, ok := strings.Cut(stepOut, ":")
-	if !ok || !isArchiveShortHash(outHash) || outDst != "/out/seed.txt" {
+	if !ok || !contracts.IsHydraShortHash(outHash) || outDst != "/out/seed.txt" {
 		t.Fatalf("steps[0].out[0] = %q, want canonical out entry", stepOut)
 	}
 	stepHome := step["home"].([]any)[0].(string)
 	homeHash, homeDst, ok := strings.Cut(stepHome, ":")
-	if !ok || !isArchiveShortHash(homeHash) || homeDst != ".config/app.toml:ro" {
+	if !ok || !contracts.IsHydraShortHash(homeHash) || homeDst != ".config/app.toml:ro" {
 		t.Fatalf("steps[0].home[0] = %q, want canonical read-only home entry", stepHome)
 	}
 
@@ -185,7 +188,7 @@ steps:
 	if !ok {
 		t.Fatalf("expected steps[0].tmp[0] to be shortHash:dst, got %q", stepTmpEntry)
 	}
-	if !isArchiveShortHash(tmpHash) {
+	if !contracts.IsHydraShortHash(tmpHash) {
 		t.Fatalf("tmp short hash %q is invalid", tmpHash)
 	}
 	if tmpDst != "/tmp/ploy/lib/ploy-java-tools.jar" {

@@ -1,17 +1,16 @@
 package run
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"net/http"
 	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
 	"github.com/iw2rmb/ploy/internal/cli/common"
+	"github.com/iw2rmb/ploy/internal/gitexec"
 )
 
 type resolvedSourceRepo struct {
@@ -75,17 +74,13 @@ func resolveRemoteSourceRepo(ctx context.Context, base *url.URL, httpClient *htt
 }
 
 func gitOutput(ctx context.Context, dir string, args ...string) (string, error) {
-	cmd := exec.CommandContext(ctx, "git", append([]string{"-C", dir}, args...)...)
-	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GIT_ASKPASS=echo")
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	out, err := cmd.Output()
+	result, err := gitexec.Execute(ctx, gitexec.Request{Dir: dir, Args: args})
 	if err != nil {
-		msg := strings.TrimSpace(stderr.String())
+		msg := strings.TrimSpace(string(result.Stderr))
 		if msg != "" {
 			return "", fmt.Errorf("%w: %s", err, msg)
 		}
 		return "", err
 	}
-	return strings.TrimSpace(string(out)), nil
+	return strings.TrimSpace(string(result.Stdout)), nil
 }

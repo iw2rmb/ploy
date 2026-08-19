@@ -14,6 +14,7 @@ import (
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/gitauth"
+	"github.com/iw2rmb/ploy/internal/gitexec"
 )
 
 var (
@@ -55,7 +56,7 @@ type repository struct {
 	source   string
 	checkout string
 	auth     gitauth.Options
-	runner   gitRunner
+	runner   gitexec.Runner
 
 	mu         sync.Mutex
 	inFlight   *refreshCall
@@ -88,7 +89,7 @@ func New(opts Options) (*Service, error) {
 			source:   source,
 			checkout: filepath.Join(cacheDir, "spec-repositories", fmt.Sprintf("%x", digest)),
 			auth:     opts.Auth,
-			runner:   execGitRunner{},
+			runner:   gitexec.ExecRunner{},
 		})
 	}
 	sort.Slice(repositories, func(i, j int) bool {
@@ -158,7 +159,7 @@ func (s *Service) WithResolvedSource(ctx context.Context, selector string, use f
 		}
 
 		repo.checkoutMu.RLock()
-		shaRaw, verifyErr := repo.runner.Run(ctx, repo.checkout, nil, "rev-parse", "--verify", "HEAD^{commit}")
+		shaRaw, verifyErr := repo.runGit(ctx, repo.checkout, nil, "rev-parse", "--verify", "HEAD^{commit}")
 		if verifyErr == nil && strings.TrimSpace(string(shaRaw)) == entry.SHA {
 			return func() error {
 				defer repo.checkoutMu.RUnlock()

@@ -74,7 +74,7 @@ func runOptionsFromSpec(spec *contracts.MigSpec) RunOptions {
 		step := spec.Steps[0]
 		runOpts.Execution.Image = step.Image
 		runOpts.Execution.Command = step.Command
-		runOpts.Execution.Env = copyStringMap(step.Envs)
+		runOpts.Execution.Env = contracts.CopyEnv(step.Envs)
 		runOpts.Execution.Options = manifestOptionsFromStepOptions(step.Options)
 		runOpts.Execution.In = step.In
 		runOpts.Execution.Out = step.Out
@@ -89,7 +89,7 @@ func runOptionsFromSpec(spec *contracts.MigSpec) RunOptions {
 				ContainerSpec: ContainerSpec{
 					Image:   step.Image,
 					Command: step.Command,
-					Env:     copyStringMap(step.Envs),
+					Env:     contracts.CopyEnv(step.Envs),
 					Options: manifestOptionsFromStepOptions(step.Options),
 					In:      step.In,
 					Out:     step.Out,
@@ -117,19 +117,6 @@ func manifestOptionsFromStepOptions(opts contracts.MigStepOptions) map[string]an
 	out := make(map[string]any, 1)
 	if opts.MountDockerSocket {
 		out["mount_docker_socket"] = true
-	}
-	return out
-}
-
-// copyStringMap creates a shallow copy of a string map.
-// Returns nil if the input is nil or empty.
-func copyStringMap(m map[string]string) map[string]string {
-	if len(m) == 0 {
-		return nil
-	}
-	out := make(map[string]string, len(m))
-	for k, v := range m {
-		out[k] = v
 	}
 	return out
 }

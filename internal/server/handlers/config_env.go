@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"slices"
 	"sort"
 	"strings"
 
@@ -293,9 +294,7 @@ func (h *ConfigHolder) GetGlobalEnvAll() map[string][]GlobalEnvVar {
 	defer h.mu.RUnlock()
 	envCopy := make(map[string][]GlobalEnvVar, len(h.globalEnv))
 	for k, entries := range h.globalEnv {
-		cp := make([]GlobalEnvVar, len(entries))
-		copy(cp, entries)
-		envCopy[k] = cp
+		envCopy[k] = slices.Clone(entries)
 	}
 	return envCopy
 }

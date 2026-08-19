@@ -1,13 +1,13 @@
 package handlers
 
-import (
-	"strings"
-
-	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-)
+import domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 
 func normalizeRepoSHA(sha string) string {
-	return strings.TrimSpace(strings.ToLower(sha))
+	normalized, ok := domaintypes.NormalizeFullCommitSHA(sha)
+	if !ok {
+		return ""
+	}
+	return normalized.String()
 }
 
 func isNonChangingJob(jobType domaintypes.JobType) bool {

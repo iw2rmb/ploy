@@ -4,7 +4,6 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
-	"regexp"
 	"strings"
 	"time"
 
@@ -12,8 +11,6 @@ import (
 	"github.com/iw2rmb/ploy/internal/gitauth"
 	"github.com/iw2rmb/ploy/internal/store"
 )
-
-var gitFullSHARe = regexp.MustCompile(`^[0-9a-fA-F]{40}$`)
 
 // RepoSummary is returned by GET /v1/repos.
 type RepoSummary struct {
@@ -70,6 +67,7 @@ func resolveRepoSelectorHandler(gitAuth gitauth.Options) http.HandlerFunc {
 		parsed.RawQuery = ""
 		parsed.Fragment = ""
 
+		_, refIsSHA := domaintypes.NormalizeFullCommitSHA(ref)
 		writeJSON(w, http.StatusOK, struct {
 			RepoURL  string `json:"repo_url"`
 			Ref      string `json:"ref"`
@@ -77,7 +75,7 @@ func resolveRepoSelectorHandler(gitAuth gitauth.Options) http.HandlerFunc {
 		}{
 			RepoURL:  parsed.String(),
 			Ref:      ref,
-			RefIsSHA: gitFullSHARe.MatchString(ref),
+			RefIsSHA: refIsSHA,
 		})
 	}
 }

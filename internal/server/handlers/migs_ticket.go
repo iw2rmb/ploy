@@ -185,10 +185,11 @@ func createJobsFromSpec(
 	if err != nil {
 		return fmt.Errorf("parse migs spec: %w", err)
 	}
-	repoSHA0 = strings.TrimSpace(strings.ToLower(repoSHA0))
-	if !sha40Pattern.MatchString(repoSHA0) {
+	normalizedRepoSHA0, ok := domaintypes.NormalizeFullCommitSHA(repoSHA0)
+	if !ok {
 		return fmt.Errorf("repo_sha0 must match ^[0-9a-f]{40}$")
 	}
+	repoSHA0 = normalizedRepoSHA0.String()
 	type draft struct {
 		name      string
 		jobType   domaintypes.JobType

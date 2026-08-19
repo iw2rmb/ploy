@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
+
+	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
 type specRefStack struct {
@@ -273,7 +275,7 @@ func normalizeMountEntrySource(entry, sourcePath, outputBaseDir string, isHome b
 		body = strings.TrimSuffix(body, ":ro")
 		suffix = ":ro"
 	}
-	if idx := strings.Index(body, ":"); idx > 0 && shortHashPattern.MatchString(body[:idx]) {
+	if idx := strings.Index(body, ":"); idx > 0 && contracts.IsHydraShortHash(body[:idx]) {
 		return entry
 	}
 	idx := strings.LastIndex(body, ":")
