@@ -55,8 +55,9 @@ When the PLOY selection moves away from `Jobs`, the right pane is hidden and onl
 
 ## Data Access
 
-`JobList` fetches job data through the unified CLI command layer:
+The TUI fetches list and detail data through shared client commands:
 
+- Migration and run rows use `internal/client` list commands.
 - Job rows are populated from `internal/client/tui` job items.
 - Job detail payloads are fetched via `internal/cli/runs` run commands (`RunJobEntry`).
-- No TUI-only HTTP client is introduced; `internal/client/tui` acts as a thin adapter.
+- `internal/client/tui` contains only TUI-specific job and aggregate adapters.

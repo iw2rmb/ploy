@@ -42,83 +42,111 @@ type ParsedStoredEntry struct {
 	ReadOnly bool
 }
 
+// HydraFileKind identifies a Hydra file-record field.
+type HydraFileKind string
+
+const (
+	HydraFileIn   HydraFileKind = "in"
+	HydraFileOut  HydraFileKind = "out"
+	HydraFileHome HydraFileKind = "home"
+	HydraFileTmp  HydraFileKind = "tmp"
+)
+
+var hydraFileKinds = [...]HydraFileKind{
+	HydraFileIn,
+	HydraFileOut,
+	HydraFileHome,
+	HydraFileTmp,
+}
+
+// HydraFileKinds returns all file kinds in contract iteration order.
+func HydraFileKinds() []HydraFileKind {
+	kinds := make([]HydraFileKind, len(hydraFileKinds))
+	copy(kinds, hydraFileKinds[:])
+	return kinds
+}
+
+func (k HydraFileKind) String() string {
+	return string(k)
+}
+
+// Entries returns the manifest entries owned by the file kind.
+func (k HydraFileKind) Entries(manifest StepManifest) []string {
+	switch k {
+	case HydraFileIn:
+		return manifest.In
+	case HydraFileOut:
+		return manifest.Out
+	case HydraFileHome:
+		return manifest.Home
+	case HydraFileTmp:
+		return manifest.Tmp
+	default:
+		return nil
+	}
+}
+
+// ParseStoredEntry parses a canonical stored entry for the given file kind.
+func ParseStoredEntry(kind HydraFileKind, s string) (ParsedStoredEntry, error) {
+	readOnly := kind == HydraFileIn
+	body := s
+	if kind == HydraFileHome && strings.HasSuffix(s, ":ro") {
+		readOnly = true
+		body = strings.TrimSuffix(s, ":ro")
+	}
+
+	hash, dst, err := splitHashDst(body)
+	if err != nil {
+		return ParsedStoredEntry{}, fmt.Errorf("%s entry %q: %w", kind, s, err)
+	}
+	dst = path.Clean(dst)
+
+	switch kind {
+	case HydraFileIn, HydraFileOut, HydraFileTmp:
+		root := "/" + kind.String() + "/"
+		if !strings.HasPrefix(dst, root) {
+			return ParsedStoredEntry{}, fmt.Errorf("%s entry %q: destination must start with %s", kind, s, root)
+		}
+	case HydraFileHome:
+		if dst == "" || dst == "." {
+			return ParsedStoredEntry{}, fmt.Errorf("home entry %q: destination required", s)
+		}
+		if strings.HasPrefix(dst, "/") {
+			return ParsedStoredEntry{}, fmt.Errorf("home entry %q: destination must be relative (no leading /)", s)
+		}
+	default:
+		return ParsedStoredEntry{}, fmt.Errorf("invalid Hydra file kind %q", kind)
+	}
+
+	if err := guardPathTraversal(dst); err != nil {
+		return ParsedStoredEntry{}, fmt.Errorf("%s entry %q: %w", kind, s, err)
+	}
+	return ParsedStoredEntry{Hash: hash, Dst: dst, ReadOnly: readOnly}, nil
+}
+
 // ParseStoredInEntry parses a canonical `in` entry: "shortHash:dst".
 // dst must be absolute and start with "/in/".
 func ParseStoredInEntry(s string) (ParsedStoredEntry, error) {
-	hash, dst, err := splitHashDst(s)
-	if err != nil {
-		return ParsedStoredEntry{}, fmt.Errorf("in entry %q: %w", s, err)
-	}
-	dst = path.Clean(dst)
-	if !strings.HasPrefix(dst, "/in/") {
-		return ParsedStoredEntry{}, fmt.Errorf("in entry %q: destination must start with /in/", s)
-	}
-	if err := guardPathTraversal(dst); err != nil {
-		return ParsedStoredEntry{}, fmt.Errorf("in entry %q: %w", s, err)
-	}
-	return ParsedStoredEntry{Hash: hash, Dst: dst, ReadOnly: true}, nil
+	return ParseStoredEntry(HydraFileIn, s)
 }
 
 // ParseStoredOutEntry parses a canonical `out` entry: "shortHash:dst".
 // dst must be absolute and start with "/out/".
 func ParseStoredOutEntry(s string) (ParsedStoredEntry, error) {
-	hash, dst, err := splitHashDst(s)
-	if err != nil {
-		return ParsedStoredEntry{}, fmt.Errorf("out entry %q: %w", s, err)
-	}
-	dst = path.Clean(dst)
-	if !strings.HasPrefix(dst, "/out/") {
-		return ParsedStoredEntry{}, fmt.Errorf("out entry %q: destination must start with /out/", s)
-	}
-	if err := guardPathTraversal(dst); err != nil {
-		return ParsedStoredEntry{}, fmt.Errorf("out entry %q: %w", s, err)
-	}
-	return ParsedStoredEntry{Hash: hash, Dst: dst, ReadOnly: false}, nil
+	return ParseStoredEntry(HydraFileOut, s)
 }
 
 // ParseStoredHomeEntry parses a canonical `home` entry: "shortHash:dst{:ro}".
 // dst must be relative (no leading /) and must not traverse above $HOME.
 // Mode defaults to rw; optional :ro suffix forces read-only.
 func ParseStoredHomeEntry(s string) (ParsedStoredEntry, error) {
-	// Check for trailing :ro suffix.
-	readOnly := false
-	body := s
-	if strings.HasSuffix(s, ":ro") {
-		readOnly = true
-		body = s[:len(s)-3]
-	}
-	hash, dst, err := splitHashDst(body)
-	if err != nil {
-		return ParsedStoredEntry{}, fmt.Errorf("home entry %q: %w", s, err)
-	}
-	dst = path.Clean(dst)
-	if dst == "" || dst == "." {
-		return ParsedStoredEntry{}, fmt.Errorf("home entry %q: destination required", s)
-	}
-	if strings.HasPrefix(dst, "/") {
-		return ParsedStoredEntry{}, fmt.Errorf("home entry %q: destination must be relative (no leading /)", s)
-	}
-	if err := guardPathTraversal(dst); err != nil {
-		return ParsedStoredEntry{}, fmt.Errorf("home entry %q: %w", s, err)
-	}
-	return ParsedStoredEntry{Hash: hash, Dst: dst, ReadOnly: readOnly}, nil
+	return ParseStoredEntry(HydraFileHome, s)
 }
 
 // ParseStoredTmpEntry parses a canonical `tmp` entry: "shortHash:dst".
 // dst must be absolute and start with "/tmp/".
 func ParseStoredTmpEntry(s string) (ParsedStoredEntry, error) {
-	hash, dst, err := splitHashDst(s)
-	if err != nil {
-		return ParsedStoredEntry{}, fmt.Errorf("tmp entry %q: %w", s, err)
-	}
-	dst = path.Clean(dst)
-	if !strings.HasPrefix(dst, "/tmp/") {
-		return ParsedStoredEntry{}, fmt.Errorf("tmp entry %q: destination must start with /tmp/", s)
-	}
-	if err := guardPathTraversal(dst); err != nil {
-		return ParsedStoredEntry{}, fmt.Errorf("tmp entry %q: %w", s, err)
-	}
-	return ParsedStoredEntry{Hash: hash, Dst: dst, ReadOnly: false}, nil
+	return ParseStoredEntry(HydraFileTmp, s)
 }
 
 // CanonicalHomeEntry reconstructs the canonical stored home entry string
@@ -150,57 +178,29 @@ func ValidateHomeDestination(dst string) error {
 
 // ValidateHydraInEntries validates a slice of canonical `in` entries.
 func ValidateHydraInEntries(entries []string, prefix string) error {
-	seen := make(map[string]struct{}, len(entries))
-	for i, entry := range entries {
-		parsed, err := ParseStoredInEntry(entry)
-		if err != nil {
-			return fmt.Errorf("%s[%d]: %w", prefix, i, err)
-		}
-		if _, dup := seen[parsed.Dst]; dup {
-			return fmt.Errorf("%s[%d]: duplicate destination %q", prefix, i, parsed.Dst)
-		}
-		seen[parsed.Dst] = struct{}{}
-	}
-	return nil
+	return ValidateHydraEntries(HydraFileIn, entries, prefix)
 }
 
 // ValidateHydraOutEntries validates a slice of canonical `out` entries.
 func ValidateHydraOutEntries(entries []string, prefix string) error {
-	seen := make(map[string]struct{}, len(entries))
-	for i, entry := range entries {
-		parsed, err := ParseStoredOutEntry(entry)
-		if err != nil {
-			return fmt.Errorf("%s[%d]: %w", prefix, i, err)
-		}
-		if _, dup := seen[parsed.Dst]; dup {
-			return fmt.Errorf("%s[%d]: duplicate destination %q", prefix, i, parsed.Dst)
-		}
-		seen[parsed.Dst] = struct{}{}
-	}
-	return nil
+	return ValidateHydraEntries(HydraFileOut, entries, prefix)
 }
 
 // ValidateHydraHomeEntries validates a slice of canonical `home` entries.
 func ValidateHydraHomeEntries(entries []string, prefix string) error {
-	seen := make(map[string]struct{}, len(entries))
-	for i, entry := range entries {
-		parsed, err := ParseStoredHomeEntry(entry)
-		if err != nil {
-			return fmt.Errorf("%s[%d]: %w", prefix, i, err)
-		}
-		if _, dup := seen[parsed.Dst]; dup {
-			return fmt.Errorf("%s[%d]: duplicate destination %q", prefix, i, parsed.Dst)
-		}
-		seen[parsed.Dst] = struct{}{}
-	}
-	return nil
+	return ValidateHydraEntries(HydraFileHome, entries, prefix)
 }
 
 // ValidateHydraTmpEntries validates a slice of canonical `tmp` entries.
 func ValidateHydraTmpEntries(entries []string, prefix string) error {
+	return ValidateHydraEntries(HydraFileTmp, entries, prefix)
+}
+
+// ValidateHydraEntries validates stored entries and rejects duplicate destinations.
+func ValidateHydraEntries(kind HydraFileKind, entries []string, prefix string) error {
 	seen := make(map[string]struct{}, len(entries))
 	for i, entry := range entries {
-		parsed, err := ParseStoredTmpEntry(entry)
+		parsed, err := ParseStoredEntry(kind, entry)
 		if err != nil {
 			return fmt.Errorf("%s[%d]: %w", prefix, i, err)
 		}
@@ -215,17 +215,13 @@ func ValidateHydraTmpEntries(entries []string, prefix string) error {
 // validateHydraFields validates the Hydra fields (in, out, home, tmp) on a
 // container spec.
 func validateHydraFields(in, out, home, tmp []string, prefix string) error {
-	if err := ValidateHydraInEntries(in, prefix+".in"); err != nil {
-		return err
+	entries := map[HydraFileKind][]string{
+		HydraFileIn: in, HydraFileOut: out, HydraFileHome: home, HydraFileTmp: tmp,
 	}
-	if err := ValidateHydraOutEntries(out, prefix+".out"); err != nil {
-		return err
-	}
-	if err := ValidateHydraHomeEntries(home, prefix+".home"); err != nil {
-		return err
-	}
-	if err := ValidateHydraTmpEntries(tmp, prefix+".tmp"); err != nil {
-		return err
+	for _, kind := range HydraFileKinds() {
+		if err := ValidateHydraEntries(kind, entries[kind], prefix+"."+kind.String()); err != nil {
+			return err
+		}
 	}
 	return nil
 }

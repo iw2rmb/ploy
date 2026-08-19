@@ -3,99 +3,63 @@ package types
 import (
 	"encoding/json"
 	"errors"
-	"strings"
 	"testing"
 )
 
-// sampleLevel is a stub proving JSON/Text and validation behavior.
-type sampleLevel string
+func TestLogLevelCanonicalizationAndJSONRoundTrip(t *testing.T) {
+	t.Parallel()
 
-func (v sampleLevel) MarshalText() ([]byte, error) {
-	s := Normalize(string(v))
-	if IsEmpty(s) {
-		return nil, ErrEmpty
-	}
-	return []byte(s), nil
-}
-func (v *sampleLevel) UnmarshalText(b []byte) error {
-	s := Normalize(string(b))
-	if IsEmpty(s) {
-		return ErrEmpty
-	}
-	*v = sampleLevel(s)
-	return nil
-}
-func (v sampleLevel) MarshalJSON() ([]byte, error)  { return MarshalJSONFromText(v) }
-func (v *sampleLevel) UnmarshalJSON(b []byte) error { return UnmarshalJSONToText(b, v) }
-func (v sampleLevel) Validate() error {
-	if IsEmpty(string(v)) {
-		return ErrEmpty
-	}
-	return nil
-}
-
-func TestLogging_TextAndJSONRoundTrip(t *testing.T) {
-	var v sampleLevel
-	if err := v.UnmarshalText([]byte("  info  ")); err != nil {
-		t.Fatalf("unmarshal text: %v", err)
-	}
-	if string(v) != "info" {
-		t.Fatalf("normalize failed: %q", string(v))
-	}
-	b, err := json.Marshal(v)
-	if err != nil {
-		t.Fatalf("marshal json: %v", err)
-	}
-	var v2 sampleLevel
-	if err := json.Unmarshal(b, &v2); err != nil {
-		t.Fatalf("unmarshal json: %v", err)
-	}
-	if v2 != v {
-		t.Fatalf("roundtrip mismatch")
+	for _, tc := range []struct {
+		input string
+		want  LogLevel
+	}{
+		{input: "debug", want: LogLevelDebug},
+		{input: " INFO ", want: LogLevelInfo},
+		{input: "Warn", want: LogLevelWarn},
+		{input: "ERROR", want: LogLevelError},
+	} {
+		t.Run(tc.input, func(t *testing.T) {
+			var got LogLevel
+			if err := got.UnmarshalText([]byte(tc.input)); err != nil {
+				t.Fatalf("UnmarshalText() error = %v", err)
+			}
+			if got != tc.want {
+				t.Fatalf("UnmarshalText() = %q, want %q", got, tc.want)
+			}
+			data, err := json.Marshal(got)
+			if err != nil {
+				t.Fatalf("Marshal() error = %v", err)
+			}
+			var roundTrip LogLevel
+			if err := json.Unmarshal(data, &roundTrip); err != nil {
+				t.Fatalf("Unmarshal() error = %v", err)
+			}
+			if roundTrip != tc.want {
+				t.Fatalf("JSON round trip = %q, want %q", roundTrip, tc.want)
+			}
+		})
 	}
 }
 
-func TestLogging_Validation(t *testing.T) {
-	var v sampleLevel
-	if err := v.UnmarshalText([]byte("   ")); !errors.Is(err, ErrEmpty) {
-		t.Fatalf("expected ErrEmpty, got %v", err)
-	}
-}
+func TestLogLevelValidationErrors(t *testing.T) {
+	t.Parallel()
 
-func TestLogLevel_AcceptKnown(t *testing.T) {
-	cases := []string{"debug", "info", "warn", "error", "DEBUG", "Warn", " Error "}
-	for _, in := range cases {
-		var lvl LogLevel
-		if err := lvl.UnmarshalText([]byte(in)); err != nil {
-			t.Fatalf("UnmarshalText(%q) error: %v", in, err)
-		}
-		if s := string(lvl); s != strings.ToLower(strings.TrimSpace(in)) {
-			t.Fatalf("canonical form mismatch: got %q for %q", s, in)
-		}
-
-		b, err := json.Marshal(lvl)
-		if err != nil {
-			t.Fatalf("marshal json: %v", err)
-		}
-		var lvl2 LogLevel
-		if err := json.Unmarshal(b, &lvl2); err != nil {
-			t.Fatalf("unmarshal json: %v", err)
-		}
-		if lvl2 != lvl {
-			t.Fatalf("roundtrip mismatch: %v != %v", lvl2, lvl)
-		}
-		if err := lvl2.Validate(); err != nil {
-			t.Fatalf("validate known level: %v", err)
-		}
-	}
-}
-
-func TestLogLevel_RejectUnknown(t *testing.T) {
-	bad := []string{"", " ", "trace", "fatal", "warning", "notice", "err"}
-	for _, in := range bad {
-		var lvl LogLevel
-		if err := lvl.UnmarshalText([]byte(in)); err == nil {
-			t.Fatalf("expected error for %q", in)
-		}
+	for _, tc := range []struct {
+		name  string
+		value string
+		want  error
+	}{
+		{name: "empty", value: " ", want: ErrEmpty},
+		{name: "unknown", value: "trace", want: ErrInvalidLogLevel},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var level LogLevel
+			if err := level.UnmarshalText([]byte(tc.value)); !errors.Is(err, tc.want) {
+				t.Fatalf("UnmarshalText() error = %v, want %v", err, tc.want)
+			}
+			if err := LogLevel(tc.value).Validate(); !errors.Is(err, tc.want) {
+				t.Fatalf("Validate() error = %v, want %v", err, tc.want)
+			}
+		})
 	}
 }

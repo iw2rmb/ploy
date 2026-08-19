@@ -286,15 +286,3 @@ func validateAndDeriveStackGateChaining(steps []StepOptions) error {
 
 	return nil
 }
-
-// stackGatePhaseSpecToStepGate converts a StackGatePhaseSpec to StepGateStackSpec.
-// Returns nil if the input is nil or disabled.
-func stackGatePhaseSpecToStepGate(phase *contracts.StackGatePhaseSpec, _ []contracts.BuildGateImageRule) *contracts.StepGateStackSpec {
-	if phase == nil || !phase.Enabled {
-		return nil
-	}
-	return &contracts.StepGateStackSpec{
-		Enabled: phase.Enabled,
-		Expect:  phase.Expect,
-	}
-}

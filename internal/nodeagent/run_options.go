@@ -13,7 +13,7 @@ type RunOptions struct {
 	Execution      ContainerSpec
 	ServerMetadata ServerMetadataOptions
 	Steps          []StepOptions
-	StackGate      *contracts.StepGateStackSpec
+	StackGate      *contracts.StackGatePhaseSpec
 
 	// BundleMap maps content hashes to spec bundle download identifiers.
 	// Populated from MigSpec.BundleMap during spec-to-run-options conversion.

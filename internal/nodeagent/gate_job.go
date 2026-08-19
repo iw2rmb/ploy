@@ -59,30 +59,8 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest,
 	typedOpts := req.TypedOptions
 
 	// Thread Stack Gate expectation based on gate type without next_id dependence.
-	if len(typedOpts.Steps) > 0 {
-		stepIdx := 0
-		switch req.JobType {
-		case types.JobTypePreGate:
-			stepIdx = 0
-		case types.JobTypePostGate:
-			stepIdx = len(typedOpts.Steps) - 1
-		}
-		step := typedOpts.Steps[stepIdx]
-		if step.Stack != nil {
-			// Get mig-level images from BuildGate config for image resolution.
-			migImages := typedOpts.BuildGate.Images
-
-			switch req.JobType {
-			case types.JobTypePreGate:
-				if step.Stack.Inbound != nil && step.Stack.Inbound.Enabled {
-					typedOpts.StackGate = stackGatePhaseSpecToStepGate(step.Stack.Inbound, migImages)
-				}
-			case types.JobTypePostGate:
-				if step.Stack.Outbound != nil && step.Stack.Outbound.Enabled {
-					typedOpts.StackGate = stackGatePhaseSpecToStepGate(step.Stack.Outbound, migImages)
-				}
-			}
-		}
+	if phase := stackGatePhaseForJob(typedOpts.Steps, req.JobType); phase != nil {
+		typedOpts.StackGate = phase
 	}
 
 	manifest, err := buildGateManifest(req, typedOpts)
@@ -206,6 +184,27 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest,
 	slog.Info("gate job "+logVerb, "run_id", req.RunID, "job_id", req.JobID, "job_type", req.JobType, "duration", duration)
 }
 
+func stackGatePhaseForJob(steps []StepOptions, jobType types.JobType) *contracts.StackGatePhaseSpec {
+	if len(steps) == 0 {
+		return nil
+	}
+	var phase *contracts.StackGatePhaseSpec
+	switch jobType {
+	case types.JobTypePreGate:
+		if steps[0].Stack != nil {
+			phase = steps[0].Stack.Inbound
+		}
+	case types.JobTypePostGate:
+		if steps[len(steps)-1].Stack != nil {
+			phase = steps[len(steps)-1].Stack.Outbound
+		}
+	}
+	if phase == nil || !phase.Enabled {
+		return nil
+	}
+	return phase
+}
+
 func (r *runController) uploadGateErrorStatus(ctx context.Context, req StartRunRequest, err error, duration time.Duration) {
 	r.uploadFailureStatus(ctx, req, err, duration)
 }
@@ -325,7 +324,7 @@ func (r *runController) buildGateStats(gateResult *contracts.BuildGateStageMetad
 				builder.Error(errorText)
 			}
 		}
-		if resources := runStatsJobResourcesFromStepUsage(step.NormalizeContainerResourceUsage(gateResult.Resources)); resources != nil {
+		if resources := step.NormalizeContainerResourceUsage(gateResult.Resources); resources != nil {
 			builder.JobResources(resources)
 		}
 

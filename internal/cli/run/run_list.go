@@ -1,7 +1,6 @@
 // run_list.go implements run listing CLI commands.
 //
-// The command delegates to the internal/cli/migs list client because that client
-// still owns the shared /v1/runs pagination call.
+// The command delegates to the shared control-plane list client.
 //
 // Command structure:
 //   - ploy run ls [--limit N] [--offset N]
@@ -17,7 +16,7 @@ import (
 	"text/tabwriter"
 
 	"github.com/iw2rmb/ploy/internal/cli/common"
-	"github.com/iw2rmb/ploy/internal/cli/migs"
+	sharedclient "github.com/iw2rmb/ploy/internal/client"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
@@ -58,7 +57,7 @@ func RunList(ctx context.Context, opts ListOptions) error {
 	}
 
 	// Execute the list command using the shared runs client.
-	cmd := migs.ListRunsCommand{
+	cmd := sharedclient.ListRunsCommand{
 		Client:  httpClient,
 		BaseURL: base,
 		Limit:   int32(opts.Limit),

@@ -97,11 +97,19 @@ func TestLoadSpec_ResolvesStepHydraRecords(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	stepInFile := filepath.Join(tmpDir, "step-config.txt")
+	stepOutFile := filepath.Join(tmpDir, "step-seed.txt")
+	stepHomeFile := filepath.Join(tmpDir, "step-home.toml")
 	stepTmpFile := filepath.Join(tmpDir, "ploy-java-tools.jar")
 	specPath := filepath.Join(tmpDir, "spec.yaml")
 
 	if err := os.WriteFile(stepInFile, []byte("step-config-data"), 0o644); err != nil {
 		t.Fatalf("write step in file: %v", err)
+	}
+	if err := os.WriteFile(stepOutFile, []byte("step-out-data"), 0o644); err != nil {
+		t.Fatalf("write step out file: %v", err)
+	}
+	if err := os.WriteFile(stepHomeFile, []byte("step-home-data"), 0o644); err != nil {
+		t.Fatalf("write step home file: %v", err)
 	}
 	if err := os.WriteFile(stepTmpFile, []byte("tmp-tool-data"), 0o644); err != nil {
 		t.Fatalf("write step tmp file: %v", err)
@@ -114,6 +122,10 @@ steps:
       STEP_TOKEN: step-token
     in:
       - ` + stepInFile + `:config.txt
+    out:
+      - ` + stepOutFile + `:seed.txt
+    home:
+      - ` + stepHomeFile + `:.config/app.toml:ro
     tmp:
       - ` + stepTmpFile + `:/tmp/ploy/lib/ploy-java-tools.jar
 `)
@@ -146,8 +158,19 @@ steps:
 	if !ok {
 		t.Fatalf("expected steps[0].in[0] to be string, got %T", stepIn[0])
 	}
-	if !strings.Contains(stepInEntry, ":/in/config.txt") {
-		t.Errorf("expected steps[0].in[0] to contain :/in/config.txt, got %q", stepInEntry)
+	inHash, inDst, ok := strings.Cut(stepInEntry, ":")
+	if !ok || !isArchiveShortHash(inHash) || inDst != "/in/config.txt" {
+		t.Fatalf("steps[0].in[0] = %q, want canonical in entry", stepInEntry)
+	}
+	stepOut := step["out"].([]any)[0].(string)
+	outHash, outDst, ok := strings.Cut(stepOut, ":")
+	if !ok || !isArchiveShortHash(outHash) || outDst != "/out/seed.txt" {
+		t.Fatalf("steps[0].out[0] = %q, want canonical out entry", stepOut)
+	}
+	stepHome := step["home"].([]any)[0].(string)
+	homeHash, homeDst, ok := strings.Cut(stepHome, ":")
+	if !ok || !isArchiveShortHash(homeHash) || homeDst != ".config/app.toml:ro" {
+		t.Fatalf("steps[0].home[0] = %q, want canonical read-only home entry", stepHome)
 	}
 
 	stepTmp, ok := step["tmp"].([]any)
@@ -169,6 +192,16 @@ steps:
 		t.Fatalf("tmp destination = %q, want /tmp/ploy/lib/ploy-java-tools.jar", tmpDst)
 	}
 	bundleMap := result["bundle_map"].(map[string]any)
+	for hash, wantContent := range map[string]string{
+		inHash: "step-config-data", outHash: "step-out-data", homeHash: "step-home-data",
+	} {
+		if got, want := bundleMap[hash].(string), "bundle-"+hash; got != want {
+			t.Fatalf("bundle_map[%s] = %q, want %q", hash, got, want)
+		}
+		if got := string(extractSingleContentFileFromArchive(t, uploads[hash])); got != wantContent {
+			t.Fatalf("uploaded content for %s = %q, want %q", hash, got, wantContent)
+		}
+	}
 	if got, want := bundleMap[tmpHash].(string), "bundle-"+tmpHash; got != want {
 		t.Fatalf("bundle_map[%s] = %q, want %q", tmpHash, got, want)
 	}

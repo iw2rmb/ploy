@@ -237,7 +237,7 @@ func TestGatePlanResolver_StackGateTerminalRuntimeImage(t *testing.T) {
 					Stack: contracts.StackExpectation{Language: "java", Tool: "maven", Release: "17"},
 					Image: "planner-test:java17",
 				}},
-				StackGate: &contracts.StepGateStackSpec{
+				StackGate: &contracts.StackGatePhaseSpec{
 					Enabled: true,
 					Expect:  &contracts.StackExpectation{Language: "java", Tool: "maven", Release: "17"},
 				},

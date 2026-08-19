@@ -90,41 +90,26 @@ func buildContainerSpec(runID types.RunID, jobID types.JobID, manifest contracts
 	}
 	mounts = append(mounts, commonMounts...)
 
-	// In, out, and tmp entries are seeded into their common parent mounts.
-	for _, entry := range manifest.In {
-		if _, err := contracts.ParseStoredInEntry(entry); err != nil {
-			return ContainerSpec{}, fmt.Errorf("in entry %q: %w", entry, err)
-		}
-	}
-	for _, entry := range manifest.Out {
-		if _, err := contracts.ParseStoredOutEntry(entry); err != nil {
-			return ContainerSpec{}, fmt.Errorf("out entry %q: %w", entry, err)
-		}
-	}
-	for _, entry := range manifest.Tmp {
-		if _, err := contracts.ParseStoredTmpEntry(entry); err != nil {
-			return ContainerSpec{}, fmt.Errorf("tmp entry %q: %w", entry, err)
-		}
-	}
-
 	nested := make([]nestedMountContract, 0, len(manifest.Home))
-	// Writable Hydra home content is copied into the job home before container
-	// creation. Read-only content remains a nested mount so its mode is retained.
-	for _, entry := range manifest.Home {
-		parsed, err := contracts.ParseStoredHomeEntry(entry)
-		if err != nil {
-			return ContainerSpec{}, fmt.Errorf("home entry %q: %w", entry, err)
+	for _, kind := range contracts.HydraFileKinds() {
+		for _, entry := range kind.Entries(manifest) {
+			parsed, err := contracts.ParseStoredEntry(kind, entry)
+			if err != nil {
+				return ContainerSpec{}, fmt.Errorf("%s entry %q: %w", kind, entry, err)
+			}
+			// Writable Hydra home content is copied into the job home before
+			// creation. Read-only content remains a nested mount to retain its mode.
+			if kind != contracts.HydraFileHome || !parsed.ReadOnly {
+				continue
+			}
+			target := path.Join(homeDir, parsed.Dst)
+			mounts = append(mounts, ContainerMount{
+				Source:   filepath.Join(jobMounts.Staging, parsed.Hash, "content"),
+				Target:   target,
+				ReadOnly: true,
+			})
+			nested = append(nested, nestedMountContract{parent: homeDir, child: target})
 		}
-		if !parsed.ReadOnly {
-			continue
-		}
-		target := path.Join(homeDir, parsed.Dst)
-		mounts = append(mounts, ContainerMount{
-			Source:   filepath.Join(jobMounts.Staging, parsed.Hash, "content"),
-			Target:   target,
-			ReadOnly: true,
-		})
-		nested = append(nested, nestedMountContract{parent: homeDir, child: target})
 	}
 
 	// Optional: mount host Docker socket for containers that request it via manifest options
@@ -194,103 +179,54 @@ func buildContainerSpec(runID types.RunID, jobID types.JobID, manifest contracts
 // staging directory into outDir so that the single /out mount covers both
 // pre-seeded content and container writes.
 func SeedOutDirFromStaging(manifest contracts.StepManifest, stagingDir, outDir string) error {
-	if stagingDir == "" || outDir == "" {
-		return nil
-	}
-	cleanOutDir := filepath.Clean(outDir)
-	for _, entry := range manifest.Out {
-		parsed, err := contracts.ParseStoredOutEntry(entry)
-		if err != nil {
-			return fmt.Errorf("out entry %q: %w", entry, err)
-		}
-		rel := strings.TrimPrefix(parsed.Dst, "/out/")
-		src := filepath.Join(stagingDir, parsed.Hash, "content")
-		dst := filepath.Clean(filepath.Join(outDir, rel))
-		if dst != cleanOutDir && !strings.HasPrefix(dst, cleanOutDir+string(filepath.Separator)) {
-			return fmt.Errorf("out entry %q: resolved path %s escapes outDir", entry, dst)
-		}
-		if err := copyPath(src, dst); err != nil {
-			return fmt.Errorf("seed out %s: %w", parsed.Dst, err)
-		}
-	}
-	return nil
+	return seedDirFromStaging(contracts.HydraFileOut, manifest.Out, stagingDir, outDir)
 }
 
 // SeedInDirFromStaging copies materialized Hydra in entry content from the
 // staging directory into inDir before the container receives the directory as
 // one read-only /in mount.
 func SeedInDirFromStaging(manifest contracts.StepManifest, stagingDir, inDir string) error {
-	if stagingDir == "" || inDir == "" {
-		return nil
-	}
-	cleanInDir := filepath.Clean(inDir)
-	for _, entry := range manifest.In {
-		parsed, err := contracts.ParseStoredInEntry(entry)
-		if err != nil {
-			return fmt.Errorf("in entry %q: %w", entry, err)
-		}
-		rel := strings.TrimPrefix(parsed.Dst, "/in/")
-		src := filepath.Join(stagingDir, parsed.Hash, "content")
-		dst := filepath.Clean(filepath.Join(inDir, rel))
-		if dst != cleanInDir && !strings.HasPrefix(dst, cleanInDir+string(filepath.Separator)) {
-			return fmt.Errorf("in entry %q: resolved path %s escapes inDir", entry, dst)
-		}
-		if err := copyPath(src, dst); err != nil {
-			return fmt.Errorf("seed in %s: %w", parsed.Dst, err)
-		}
-	}
-	return nil
+	return seedDirFromStaging(contracts.HydraFileIn, manifest.In, stagingDir, inDir)
 }
 
 // SeedTmpDirFromStaging copies materialized Hydra tmp entry content from the
 // staging directory into tmpDir so that the single /tmp mount exposes all tmp
 // files while keeping them outside durable repo artifacts.
 func SeedTmpDirFromStaging(manifest contracts.StepManifest, stagingDir, tmpDir string) error {
-	if stagingDir == "" || tmpDir == "" {
-		return nil
-	}
-	cleanTmpDir := filepath.Clean(tmpDir)
-	for _, entry := range manifest.Tmp {
-		parsed, err := contracts.ParseStoredTmpEntry(entry)
-		if err != nil {
-			return fmt.Errorf("tmp entry %q: %w", entry, err)
-		}
-		rel := strings.TrimPrefix(parsed.Dst, "/tmp/")
-		src := filepath.Join(stagingDir, parsed.Hash, "content")
-		dst := filepath.Clean(filepath.Join(tmpDir, rel))
-		if dst != cleanTmpDir && !strings.HasPrefix(dst, cleanTmpDir+string(filepath.Separator)) {
-			return fmt.Errorf("tmp entry %q: resolved path %s escapes tmpDir", entry, dst)
-		}
-		if err := copyPath(src, dst); err != nil {
-			return fmt.Errorf("seed tmp %s: %w", parsed.Dst, err)
-		}
-	}
-	return nil
+	return seedDirFromStaging(contracts.HydraFileTmp, manifest.Tmp, stagingDir, tmpDir)
 }
 
 // SeedHomeDirFromStaging copies writable Hydra home entries into the job-owned
 // home. Read-only entries remain bind mounts so the container cannot mutate
 // their materialized sources.
 func SeedHomeDirFromStaging(manifest contracts.StepManifest, stagingDir, homeDir string) error {
-	if stagingDir == "" || homeDir == "" {
+	return seedDirFromStaging(contracts.HydraFileHome, manifest.Home, stagingDir, homeDir)
+}
+
+func seedDirFromStaging(kind contracts.HydraFileKind, entries []string, stagingDir, targetDir string) error {
+	if stagingDir == "" || targetDir == "" {
 		return nil
 	}
-	cleanHomeDir := filepath.Clean(homeDir)
-	for _, entry := range manifest.Home {
-		parsed, err := contracts.ParseStoredHomeEntry(entry)
+	cleanTargetDir := filepath.Clean(targetDir)
+	for _, entry := range entries {
+		parsed, err := contracts.ParseStoredEntry(kind, entry)
 		if err != nil {
-			return fmt.Errorf("home entry %q: %w", entry, err)
+			return fmt.Errorf("%s entry %q: %w", kind, entry, err)
 		}
-		if parsed.ReadOnly {
+		if kind == contracts.HydraFileHome && parsed.ReadOnly {
 			continue
 		}
+		rel := filepath.FromSlash(parsed.Dst)
+		if kind != contracts.HydraFileHome {
+			rel = strings.TrimPrefix(rel, string(filepath.Separator)+kind.String()+string(filepath.Separator))
+		}
 		src := filepath.Join(stagingDir, parsed.Hash, "content")
-		dst := filepath.Clean(filepath.Join(homeDir, filepath.FromSlash(parsed.Dst)))
-		if dst != cleanHomeDir && !strings.HasPrefix(dst, cleanHomeDir+string(filepath.Separator)) {
-			return fmt.Errorf("home entry %q: resolved path %s escapes homeDir", entry, dst)
+		dst := filepath.Clean(filepath.Join(targetDir, rel))
+		if dst != cleanTargetDir && !strings.HasPrefix(dst, cleanTargetDir+string(filepath.Separator)) {
+			return fmt.Errorf("%s entry %q: resolved path %s escapes %sDir", kind, entry, dst, kind)
 		}
 		if err := copyPath(src, dst); err != nil {
-			return fmt.Errorf("seed home %s: %w", parsed.Dst, err)
+			return fmt.Errorf("seed %s %s: %w", kind, parsed.Dst, err)
 		}
 	}
 	return nil

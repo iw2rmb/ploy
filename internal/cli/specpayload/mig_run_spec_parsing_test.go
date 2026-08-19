@@ -832,6 +832,7 @@ func TestValidateLocal_RefExpansionNormalizesLocalPathsFromSourceSpec(t *testing
 		t.Fatalf("mkdir library: %v", err)
 	}
 	writeFile(t, filepath.Join(libDir, "input.txt"), "hello\n")
+	writeFile(t, filepath.Join(libDir, "seed.txt"), "seed\n")
 	writeFile(t, filepath.Join(libDir, "auth.toml"), "auth\n")
 	writeFile(t, filepath.Join(libDir, "tool.jar"), "tool\n")
 	writeFile(t, filepath.Join(libDir, "mig.yaml"), `
@@ -840,6 +841,8 @@ steps:
     image: docker.io/test/reuse:latest
     in:
       - ./input.txt:input.txt
+    out:
+      - ./seed.txt:seed.txt
     home:
       - ./auth.toml:.codex/config.toml:ro
     tmp:
@@ -864,6 +867,14 @@ steps:
 	entry, ok := inEntries[0].(string)
 	if !ok || !isArchiveShortHash(strings.Split(entry, ":")[0]) || !strings.HasSuffix(entry, ":/in/input.txt") {
 		t.Fatalf("steps[0].in[0] = %q, want canonical input entry", entry)
+	}
+	outEntries, ok := steps[0]["out"].([]any)
+	if !ok || len(outEntries) != 1 {
+		t.Fatalf("steps[0].out = %#v, want one entry", steps[0]["out"])
+	}
+	outEntry, ok := outEntries[0].(string)
+	if !ok || !isArchiveShortHash(strings.Split(outEntry, ":")[0]) || !strings.HasSuffix(outEntry, ":/out/seed.txt") {
+		t.Fatalf("steps[0].out[0] = %q, want canonical output entry", outEntry)
 	}
 	homeEntries, ok := steps[0]["home"].([]any)
 	if !ok || len(homeEntries) != 1 {

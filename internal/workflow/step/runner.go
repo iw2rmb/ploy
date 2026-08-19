@@ -73,14 +73,7 @@ type Result struct {
 	// Per-stage timings captured during execution.
 	Timings            StageTiming
 	Gate               *contracts.BuildGateStageMetadata
-	ContainerResources *ContainerResourceUsage
-}
-
-// ContainerResourceUsage captures per-job container resource consumption.
-type ContainerResourceUsage struct {
-	CPUConsumedNs     int64
-	DiskConsumedBytes int64
-	MemConsumedBytes  int64
+	ContainerResources *types.RunStatsJobResources
 }
 
 // StageTiming captures duration of each execution stage.
@@ -185,7 +178,7 @@ func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 }
 
 // NormalizeContainerResourceUsage converts Docker counters to persisted job metrics.
-func NormalizeContainerResourceUsage(usage *contracts.BuildGateResourceUsage) *ContainerResourceUsage {
+func NormalizeContainerResourceUsage(usage *contracts.BuildGateResourceUsage) *types.RunStatsJobResources {
 	if usage == nil {
 		return nil
 	}
@@ -197,7 +190,7 @@ func NormalizeContainerResourceUsage(usage *contracts.BuildGateResourceUsage) *C
 	if usage.SizeRwBytes != nil && *usage.SizeRwBytes > 0 {
 		diskConsumed = *usage.SizeRwBytes
 	}
-	return &ContainerResourceUsage{
+	return &types.RunStatsJobResources{
 		CPUConsumedNs:     saturatingInt64FromUint64(usage.CPUTotalNs),
 		DiskConsumedBytes: diskConsumed,
 		MemConsumedBytes:  saturatingInt64FromUint64(memConsumed),

@@ -330,8 +330,8 @@ func (r *runController) runContainerJob(
 			time.Duration(result.Timings.DiffDuration).Milliseconds(),
 			time.Duration(result.Timings.TotalDuration).Milliseconds(),
 		)
-	if resources := runStatsJobResourcesFromStepUsage(result.ContainerResources); resources != nil {
-		statsBuilder.JobResources(resources)
+	if result.ContainerResources != nil {
+		statsBuilder.JobResources(result.ContainerResources)
 	}
 
 	if cfg.BuildJobMeta != nil {

@@ -44,147 +44,13 @@ func (c *Compiler) compileHydraRecordsLocalInPlace(spec map[string]any, specBase
 		if !ok {
 			continue
 		}
-		if err := c.compileLocalHydraBlock(step, fmt.Sprintf("steps[%d]", i), specBaseDir); err != nil {
+		hashFile := func(src string) (string, error) {
+			return c.localFileRecordHash(src, specBaseDir)
+		}
+		if err := compileHydraBlock(step, fmt.Sprintf("steps[%d]", i), hashFile); err != nil {
 			return err
 		}
 	}
-	return nil
-}
-
-func (c *Compiler) compileLocalHydraBlock(step map[string]any, prefix, specBaseDir string) error {
-	if err := c.compileLocalInEntries(step, prefix, specBaseDir); err != nil {
-		return err
-	}
-	if err := c.compileLocalOutEntries(step, prefix, specBaseDir); err != nil {
-		return err
-	}
-	if err := c.compileLocalHomeEntries(step, prefix, specBaseDir); err != nil {
-		return err
-	}
-	return c.compileLocalTmpEntries(step, prefix, specBaseDir)
-}
-
-func (c *Compiler) compileLocalInEntries(step map[string]any, prefix, specBaseDir string) error {
-	entries, ok := step["in"].([]any)
-	if !ok || len(entries) == 0 {
-		return nil
-	}
-	compiled := make([]any, len(entries))
-	for i, raw := range entries {
-		entry, ok := raw.(string)
-		if !ok {
-			return fmt.Errorf("%s.in[%d]: expected string, got %T", prefix, i, raw)
-		}
-		if isAlreadyCanonical("in", entry) {
-			compiled[i] = entry
-			continue
-		}
-		src, dst, err := parseAuthoringInEntry(entry)
-		if err != nil {
-			return fmt.Errorf("%s.in[%d]: %w", prefix, i, err)
-		}
-		hash, err := c.localFileRecordHash(src, specBaseDir)
-		if err != nil {
-			return fmt.Errorf("%s.in[%d]: %w", prefix, i, err)
-		}
-		compiled[i] = hash + ":" + dst
-	}
-	step["in"] = compiled
-	return nil
-}
-
-func (c *Compiler) compileLocalOutEntries(step map[string]any, prefix, specBaseDir string) error {
-	entries, ok := step["out"].([]any)
-	if !ok || len(entries) == 0 {
-		return nil
-	}
-	compiled := make([]any, len(entries))
-	for i, raw := range entries {
-		entry, ok := raw.(string)
-		if !ok {
-			return fmt.Errorf("%s.out[%d]: expected string, got %T", prefix, i, raw)
-		}
-		if isAlreadyCanonical("out", entry) {
-			compiled[i] = entry
-			continue
-		}
-		src, dst, err := parseAuthoringOutEntry(entry)
-		if err != nil {
-			return fmt.Errorf("%s.out[%d]: %w", prefix, i, err)
-		}
-		hash, err := c.localFileRecordHash(src, specBaseDir)
-		if err != nil {
-			return fmt.Errorf("%s.out[%d]: %w", prefix, i, err)
-		}
-		compiled[i] = hash + ":" + dst
-	}
-	step["out"] = compiled
-	return nil
-}
-
-func (c *Compiler) compileLocalHomeEntries(step map[string]any, prefix, specBaseDir string) error {
-	entries, ok := step["home"].([]any)
-	if !ok || len(entries) == 0 {
-		return nil
-	}
-	compiled := make([]any, len(entries))
-	for i, raw := range entries {
-		entry, ok := raw.(string)
-		if !ok {
-			return fmt.Errorf("%s.home[%d]: expected string, got %T", prefix, i, raw)
-		}
-		body := entry
-		if strings.HasSuffix(entry, ":ro") {
-			body = entry[:len(entry)-3]
-		}
-		if isAlreadyCanonical("home", body) {
-			compiled[i] = entry
-			continue
-		}
-		src, dst, readOnly, err := parseAuthoringHomeEntry(entry)
-		if err != nil {
-			return fmt.Errorf("%s.home[%d]: %w", prefix, i, err)
-		}
-		hash, err := c.localFileRecordHash(src, specBaseDir)
-		if err != nil {
-			return fmt.Errorf("%s.home[%d]: %w", prefix, i, err)
-		}
-		canonical := hash + ":" + dst
-		if readOnly {
-			canonical += ":ro"
-		}
-		compiled[i] = canonical
-	}
-	step["home"] = compiled
-	return nil
-}
-
-func (c *Compiler) compileLocalTmpEntries(step map[string]any, prefix, specBaseDir string) error {
-	entries, ok := step["tmp"].([]any)
-	if !ok || len(entries) == 0 {
-		return nil
-	}
-	compiled := make([]any, len(entries))
-	for i, raw := range entries {
-		entry, ok := raw.(string)
-		if !ok {
-			return fmt.Errorf("%s.tmp[%d]: expected string, got %T", prefix, i, raw)
-		}
-		if isAlreadyCanonical("tmp", entry) {
-			compiled[i] = entry
-			continue
-		}
-		src, dst, err := parseAuthoringTmpEntry(entry)
-		if err != nil {
-			return fmt.Errorf("%s.tmp[%d]: %w", prefix, i, err)
-		}
-		hash, err := c.localFileRecordHash(src, specBaseDir)
-		if err != nil {
-			return fmt.Errorf("%s.tmp[%d]: %w", prefix, i, err)
-		}
-		compiled[i] = hash + ":" + dst
-	}
-	step["tmp"] = compiled
 	return nil
 }
 
@@ -201,128 +67,50 @@ func (c *Compiler) localFileRecordHash(srcPath, specBaseDir string) (string, err
 }
 
 func (c *Compiler) validateLocalStepFileRecords(step map[string]any, prefix, specBaseDir string) error {
-	mounts, err := c.collectLocalInMounts(step, prefix, specBaseDir)
+	mounts, err := c.validateLocalHydraEntries(step, prefix, specBaseDir)
 	if err != nil {
-		return err
-	}
-	if err := c.validateLocalOutEntries(step, prefix, specBaseDir); err != nil {
-		return err
-	}
-	if err := c.validateLocalHomeEntries(step, prefix, specBaseDir); err != nil {
-		return err
-	}
-	if err := c.validateLocalTmpEntries(step, prefix, specBaseDir); err != nil {
 		return err
 	}
 	return c.validateMountedYAMLIncludes(mounts, prefix)
 }
 
-func (c *Compiler) collectLocalInMounts(step map[string]any, prefix, specBaseDir string) ([]localInMount, error) {
-	entries, ok := step["in"].([]any)
-	if !ok || len(entries) == 0 {
-		return nil, nil
-	}
-	mounts := make([]localInMount, 0, len(entries))
-	for i, raw := range entries {
-		entry, ok := raw.(string)
+func (c *Compiler) validateLocalHydraEntries(step map[string]any, prefix, specBaseDir string) ([]localInMount, error) {
+	var mounts []localInMount
+	for _, kind := range contracts.HydraFileKinds() {
+		field := kind.String()
+		entries, ok := step[field].([]any)
 		if !ok {
-			return nil, fmt.Errorf("%s.in[%d]: expected string, got %T", prefix, i, raw)
-		}
-		if isAlreadyCanonical("in", entry) {
-			parsed, err := contracts.ParseStoredInEntry(entry)
-			if err != nil {
-				return nil, fmt.Errorf("%s.in[%d]: %w", prefix, i, err)
-			}
-			mounts = append(mounts, localInMount{dst: parsed.Dst})
 			continue
 		}
-		src, dst, err := parseAuthoringInEntry(entry)
-		if err != nil {
-			return nil, fmt.Errorf("%s.in[%d]: %w", prefix, i, err)
+		for i, raw := range entries {
+			value, ok := raw.(string)
+			if !ok {
+				return nil, fmt.Errorf("%s.%s[%d]: expected string, got %T", prefix, field, i, raw)
+			}
+			if isAlreadyCanonical(value) {
+				if kind == contracts.HydraFileIn {
+					parsed, err := contracts.ParseStoredEntry(kind, value)
+					if err != nil {
+						return nil, fmt.Errorf("%s.%s[%d]: %w", prefix, field, i, err)
+					}
+					mounts = append(mounts, localInMount{dst: parsed.Dst})
+				}
+				continue
+			}
+			entry, err := parseAuthoringEntry(kind, value)
+			if err != nil {
+				return nil, fmt.Errorf("%s.%s[%d]: %w", prefix, field, i, err)
+			}
+			resolved, info, err := c.statLocalFileRecordSource(entry.src, specBaseDir)
+			if err != nil {
+				return nil, fmt.Errorf("%s.%s[%d]: %w", prefix, field, i, err)
+			}
+			if kind == contracts.HydraFileIn {
+				mounts = append(mounts, localInMount{dst: entry.dst, src: resolved, isDir: info.IsDir()})
+			}
 		}
-		resolved, info, err := c.statLocalFileRecordSource(src, specBaseDir)
-		if err != nil {
-			return nil, fmt.Errorf("%s.in[%d]: %w", prefix, i, err)
-		}
-		mounts = append(mounts, localInMount{dst: dst, src: resolved, isDir: info.IsDir()})
 	}
 	return mounts, nil
-}
-
-func (c *Compiler) validateLocalOutEntries(step map[string]any, prefix, specBaseDir string) error {
-	entries, ok := step["out"].([]any)
-	if !ok || len(entries) == 0 {
-		return nil
-	}
-	for i, raw := range entries {
-		entry, ok := raw.(string)
-		if !ok {
-			return fmt.Errorf("%s.out[%d]: expected string, got %T", prefix, i, raw)
-		}
-		if isAlreadyCanonical("out", entry) {
-			continue
-		}
-		src, _, err := parseAuthoringOutEntry(entry)
-		if err != nil {
-			return fmt.Errorf("%s.out[%d]: %w", prefix, i, err)
-		}
-		if _, _, err := c.statLocalFileRecordSource(src, specBaseDir); err != nil {
-			return fmt.Errorf("%s.out[%d]: %w", prefix, i, err)
-		}
-	}
-	return nil
-}
-
-func (c *Compiler) validateLocalHomeEntries(step map[string]any, prefix, specBaseDir string) error {
-	entries, ok := step["home"].([]any)
-	if !ok || len(entries) == 0 {
-		return nil
-	}
-	for i, raw := range entries {
-		entry, ok := raw.(string)
-		if !ok {
-			return fmt.Errorf("%s.home[%d]: expected string, got %T", prefix, i, raw)
-		}
-		body := entry
-		if strings.HasSuffix(entry, ":ro") {
-			body = entry[:len(entry)-3]
-		}
-		if isAlreadyCanonical("home", body) {
-			continue
-		}
-		src, _, _, err := parseAuthoringHomeEntry(entry)
-		if err != nil {
-			return fmt.Errorf("%s.home[%d]: %w", prefix, i, err)
-		}
-		if _, _, err := c.statLocalFileRecordSource(src, specBaseDir); err != nil {
-			return fmt.Errorf("%s.home[%d]: %w", prefix, i, err)
-		}
-	}
-	return nil
-}
-
-func (c *Compiler) validateLocalTmpEntries(step map[string]any, prefix, specBaseDir string) error {
-	entries, ok := step["tmp"].([]any)
-	if !ok || len(entries) == 0 {
-		return nil
-	}
-	for i, raw := range entries {
-		entry, ok := raw.(string)
-		if !ok {
-			return fmt.Errorf("%s.tmp[%d]: expected string, got %T", prefix, i, raw)
-		}
-		if isAlreadyCanonical("tmp", entry) {
-			continue
-		}
-		src, _, err := parseAuthoringTmpEntry(entry)
-		if err != nil {
-			return fmt.Errorf("%s.tmp[%d]: %w", prefix, i, err)
-		}
-		if _, _, err := c.statLocalFileRecordSource(src, specBaseDir); err != nil {
-			return fmt.Errorf("%s.tmp[%d]: %w", prefix, i, err)
-		}
-	}
-	return nil
 }
 
 func (c *Compiler) statLocalFileRecordSource(srcPath, specBaseDir string) (string, os.FileInfo, error) {

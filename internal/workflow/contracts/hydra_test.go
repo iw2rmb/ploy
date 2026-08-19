@@ -1,9 +1,54 @@
 package contracts
 
 import (
+	"slices"
 	"strings"
 	"testing"
 )
+
+func TestHydraFileKindsUseContractOrder(t *testing.T) {
+	t.Parallel()
+
+	want := []HydraFileKind{HydraFileIn, HydraFileOut, HydraFileHome, HydraFileTmp}
+	if got := HydraFileKinds(); !slices.Equal(got, want) {
+		t.Fatalf("HydraFileKinds() = %v, want %v", got, want)
+	}
+	manifest := StepManifest{
+		In: []string{"in"}, Out: []string{"out"}, Home: []string{"home"}, Tmp: []string{"tmp"},
+	}
+	for _, kind := range want {
+		if got := kind.Entries(manifest); len(got) != 1 || got[0] != kind.String() {
+			t.Fatalf("%s entries = %v, want [%s]", kind, got, kind)
+		}
+	}
+}
+
+func TestParseStoredEntrySupportsAllHydraFileKinds(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		kind     HydraFileKind
+		entry    string
+		wantDst  string
+		wantRead bool
+	}{
+		{kind: HydraFileIn, entry: "abcdef0:/in/input", wantDst: "/in/input", wantRead: true},
+		{kind: HydraFileOut, entry: "abcdef0:/out/output", wantDst: "/out/output"},
+		{kind: HydraFileHome, entry: "abcdef0:.config/app:ro", wantDst: ".config/app", wantRead: true},
+		{kind: HydraFileTmp, entry: "abcdef0:/tmp/cache", wantDst: "/tmp/cache"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.kind.String(), func(t *testing.T) {
+			got, err := ParseStoredEntry(tc.kind, tc.entry)
+			if err != nil {
+				t.Fatalf("ParseStoredEntry() error = %v", err)
+			}
+			if got.Dst != tc.wantDst || got.ReadOnly != tc.wantRead {
+				t.Fatalf("ParseStoredEntry() = %+v, want dst=%q readOnly=%v", got, tc.wantDst, tc.wantRead)
+			}
+		})
+	}
+}
 
 func TestParseStoredInEntry(t *testing.T) {
 	tests := []struct {

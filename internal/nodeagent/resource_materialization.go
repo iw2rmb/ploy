@@ -74,48 +74,17 @@ func collectUniqueHashes(manifest contracts.StepManifest) []string {
 	seen := make(map[string]struct{})
 	var hashes []string
 
-	for _, entry := range manifest.In {
-		parsed, err := contracts.ParseStoredInEntry(entry)
-		if err != nil {
-			slog.Warn("skip invalid In entry during hash collection", "entry", entry, "error", err)
-			continue
-		}
-		if _, ok := seen[parsed.Hash]; !ok {
-			seen[parsed.Hash] = struct{}{}
-			hashes = append(hashes, parsed.Hash)
-		}
-	}
-	for _, entry := range manifest.Out {
-		parsed, err := contracts.ParseStoredOutEntry(entry)
-		if err != nil {
-			slog.Warn("skip invalid Out entry during hash collection", "entry", entry, "error", err)
-			continue
-		}
-		if _, ok := seen[parsed.Hash]; !ok {
-			seen[parsed.Hash] = struct{}{}
-			hashes = append(hashes, parsed.Hash)
-		}
-	}
-	for _, entry := range manifest.Home {
-		parsed, err := contracts.ParseStoredHomeEntry(entry)
-		if err != nil {
-			slog.Warn("skip invalid Home entry during hash collection", "entry", entry, "error", err)
-			continue
-		}
-		if _, ok := seen[parsed.Hash]; !ok {
-			seen[parsed.Hash] = struct{}{}
-			hashes = append(hashes, parsed.Hash)
-		}
-	}
-	for _, entry := range manifest.Tmp {
-		parsed, err := contracts.ParseStoredTmpEntry(entry)
-		if err != nil {
-			slog.Warn("skip invalid Tmp entry during hash collection", "entry", entry, "error", err)
-			continue
-		}
-		if _, ok := seen[parsed.Hash]; !ok {
-			seen[parsed.Hash] = struct{}{}
-			hashes = append(hashes, parsed.Hash)
+	for _, kind := range contracts.HydraFileKinds() {
+		for _, entry := range kind.Entries(manifest) {
+			parsed, err := contracts.ParseStoredEntry(kind, entry)
+			if err != nil {
+				slog.Warn("skip invalid Hydra entry during hash collection", "kind", kind, "entry", entry, "error", err)
+				continue
+			}
+			if _, ok := seen[parsed.Hash]; !ok {
+				seen[parsed.Hash] = struct{}{}
+				hashes = append(hashes, parsed.Hash)
+			}
 		}
 	}
 	return hashes

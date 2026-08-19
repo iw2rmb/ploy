@@ -3,99 +3,61 @@ package types
 import (
 	"encoding/json"
 	"errors"
-	"strings"
 	"testing"
 )
 
-// sampleProtocol is a stub proving JSON/Text and validation behavior.
-type sampleProtocol string
+func TestProtocolCanonicalizationAndJSONRoundTrip(t *testing.T) {
+	t.Parallel()
 
-func (v sampleProtocol) MarshalText() ([]byte, error) {
-	s := Normalize(string(v))
-	if IsEmpty(s) {
-		return nil, ErrEmpty
-	}
-	return []byte(s), nil
-}
-func (v *sampleProtocol) UnmarshalText(b []byte) error {
-	s := Normalize(string(b))
-	if IsEmpty(s) {
-		return ErrEmpty
-	}
-	*v = sampleProtocol(s)
-	return nil
-}
-func (v sampleProtocol) MarshalJSON() ([]byte, error)  { return MarshalJSONFromText(v) }
-func (v *sampleProtocol) UnmarshalJSON(b []byte) error { return UnmarshalJSONToText(b, v) }
-func (v sampleProtocol) Validate() error {
-	if IsEmpty(string(v)) {
-		return ErrEmpty
-	}
-	return nil
-}
-
-func TestNetwork_TextAndJSONRoundTrip(t *testing.T) {
-	var v sampleProtocol
-	if err := v.UnmarshalText([]byte("  tcp  ")); err != nil {
-		t.Fatalf("unmarshal text: %v", err)
-	}
-	if string(v) != "tcp" {
-		t.Fatalf("normalize failed: %q", string(v))
-	}
-	b, err := json.Marshal(v)
-	if err != nil {
-		t.Fatalf("marshal json: %v", err)
-	}
-	var v2 sampleProtocol
-	if err := json.Unmarshal(b, &v2); err != nil {
-		t.Fatalf("unmarshal json: %v", err)
-	}
-	if v2 != v {
-		t.Fatalf("roundtrip mismatch")
+	for _, tc := range []struct {
+		input string
+		want  Protocol
+	}{
+		{input: " tcp ", want: ProtocolTCP},
+		{input: "UDP", want: ProtocolUDP},
+	} {
+		t.Run(tc.input, func(t *testing.T) {
+			var got Protocol
+			if err := got.UnmarshalText([]byte(tc.input)); err != nil {
+				t.Fatalf("UnmarshalText() error = %v", err)
+			}
+			if got != tc.want {
+				t.Fatalf("UnmarshalText() = %q, want %q", got, tc.want)
+			}
+			data, err := json.Marshal(got)
+			if err != nil {
+				t.Fatalf("Marshal() error = %v", err)
+			}
+			var roundTrip Protocol
+			if err := json.Unmarshal(data, &roundTrip); err != nil {
+				t.Fatalf("Unmarshal() error = %v", err)
+			}
+			if roundTrip != tc.want {
+				t.Fatalf("JSON round trip = %q, want %q", roundTrip, tc.want)
+			}
+		})
 	}
 }
 
-func TestNetwork_Validation(t *testing.T) {
-	var v sampleProtocol
-	if err := v.UnmarshalText([]byte("   ")); !errors.Is(err, ErrEmpty) {
-		t.Fatalf("expected ErrEmpty, got %v", err)
-	}
-}
+func TestProtocolValidationErrors(t *testing.T) {
+	t.Parallel()
 
-func TestProtocol_AcceptKnown(t *testing.T) {
-	cases := []string{"tcp", "udp", "TCP", "Udp"}
-	for _, in := range cases {
-		var p Protocol
-		if err := p.UnmarshalText([]byte(in)); err != nil {
-			t.Fatalf("UnmarshalText(%q) error: %v", in, err)
-		}
-		if s := string(p); s != strings.ToLower(strings.TrimSpace(in)) {
-			t.Fatalf("canonical form mismatch: got %q for %q", s, in)
-		}
-
-		b, err := json.Marshal(p)
-		if err != nil {
-			t.Fatalf("marshal json: %v", err)
-		}
-		var p2 Protocol
-		if err := json.Unmarshal(b, &p2); err != nil {
-			t.Fatalf("unmarshal json: %v", err)
-		}
-		if p2 != p {
-			t.Fatalf("roundtrip mismatch: %v != %v", p2, p)
-		}
-		if err := p2.Validate(); err != nil {
-			t.Fatalf("validate known protocol: %v", err)
-		}
-	}
-}
-
-func TestProtocol_RejectUnknown(t *testing.T) {
-	bad := []string{"", " ", "http", "icmp", "tcp/udp", "TLS"}
-	for _, in := range bad {
-		var p Protocol
-		if err := p.UnmarshalText([]byte(in)); err == nil {
-			t.Fatalf("expected error for %q", in)
-		}
+	for _, tc := range []struct {
+		name  string
+		value string
+		want  error
+	}{
+		{name: "empty", value: " ", want: ErrEmpty},
+		{name: "unknown", value: "icmp", want: ErrInvalidProtocol},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var protocol Protocol
+			if err := protocol.UnmarshalText([]byte(tc.value)); !errors.Is(err, tc.want) {
+				t.Fatalf("UnmarshalText() error = %v, want %v", err, tc.want)
+			}
+			if err := Protocol(tc.value).Validate(); !errors.Is(err, tc.want) {
+				t.Fatalf("Validate() error = %v, want %v", err, tc.want)
+			}
+		})
 	}
 }

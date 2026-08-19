@@ -18,6 +18,7 @@ import (
 	runcli "github.com/iw2rmb/ploy/internal/cli/run"
 	"github.com/iw2rmb/ploy/internal/cli/runs"
 	"github.com/iw2rmb/ploy/internal/cli/specpayload"
+	sharedclient "github.com/iw2rmb/ploy/internal/client"
 	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/httpx"
@@ -68,7 +69,7 @@ func RunList(ctx context.Context, output io.Writer) error {
 	if err != nil {
 		return err
 	}
-	results, err := migs.ListMigsCommand{Client: httpClient, BaseURL: base, Limit: 100}.Run(ctx)
+	results, err := sharedclient.ListMigsCommand{Client: httpClient, BaseURL: base, Limit: 100}.Run(ctx)
 	if err != nil {
 		return err
 	}
@@ -508,7 +509,7 @@ func findMigByID(ctx context.Context, httpClient *http.Client, baseURL *url.URL,
 	const pageSize int32 = 100
 	var offset int32
 	for {
-		page, err := migs.ListMigsCommand{
+		page, err := sharedclient.ListMigsCommand{
 			Client:  httpClient,
 			BaseURL: baseURL,
 			Limit:   pageSize,
@@ -534,7 +535,7 @@ func listRunsByMigID(ctx context.Context, httpClient *http.Client, baseURL *url.
 	var offset int32
 	result := make([]domaintypes.RunSummary, 0)
 	for {
-		page, err := migs.ListRunsCommand{
+		page, err := sharedclient.ListRunsCommand{
 			Client:  httpClient,
 			BaseURL: baseURL,
 			Limit:   pageSize,

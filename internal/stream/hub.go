@@ -134,11 +134,7 @@ func (h *Hub) Ensure(runID domaintypes.RunID) error {
 		return ErrInvalidRunID
 	}
 	runID = normalizeRunID(runID)
-	h.mu.Lock()
-	if _, exists := h.streams[runID]; !exists {
-		h.streams[runID] = newStream(h.opts)
-	}
-	h.mu.Unlock()
+	ensureStream(h, h.streams, runID)
 	return nil
 }
 
@@ -192,18 +188,7 @@ func (h *Hub) publish(ctx context.Context, runID domaintypes.RunID, eventType do
 		return nil, ErrInvalidRunID
 	}
 	runID = normalizeRunID(runID)
-	if err := eventType.Validate(); err != nil {
-		return nil, ErrInvalidEventType
-	}
-	if ctx.Err() != nil {
-		return nil, ctx.Err()
-	}
-	s := h.getOrCreate(runID)
-	data, err := json.Marshal(payload)
-	if err != nil {
-		return nil, err
-	}
-	return s, s.publish(Event{Type: eventType, Data: data})
+	return publishStream(ctx, h, h.streams, runID, eventType, payload)
 }
 
 // Subscribe registers a consumer for the stream starting after the provided id.
@@ -217,32 +202,7 @@ func (h *Hub) Subscribe(ctx context.Context, runID domaintypes.RunID, sinceID do
 	if !sinceID.Valid() {
 		return Subscription{}, errors.New("logstream: invalid since id")
 	}
-	if ctx.Err() != nil {
-		return Subscription{}, ctx.Err()
-	}
-	s := h.getOrCreate(runID)
-	sub, history, closed := s.subscribe(sinceID)
-	for _, evt := range history {
-		if !sub.send(evt) {
-			if sub.id >= 0 {
-				s.drop(sub.id)
-			}
-			break
-		}
-	}
-	if closed {
-		sub.close()
-		return Subscription{
-			Events: sub.ch,
-			cancel: func() {},
-		}, nil
-	}
-	return Subscription{
-		Events: sub.ch,
-		cancel: func() {
-			s.drop(sub.id)
-		},
-	}, nil
+	return subscribeStream(ctx, h, h.streams, runID, sinceID)
 }
 
 // Close tears down the stream and removes it from the hub. No-op if the run ID is blank.
@@ -251,29 +211,15 @@ func (h *Hub) Close(runID domaintypes.RunID) {
 		return
 	}
 	runID = normalizeRunID(runID)
-	h.mu.Lock()
-	s, ok := h.streams[runID]
-	if ok {
-		delete(h.streams, runID)
-	}
-	h.mu.Unlock()
-	if ok {
-		s.finish()
-	}
+	closeStream(h, h.streams, runID)
 }
 
 // CloseAll tears down all streams (run and job) and clears the hub. Safe for graceful shutdown.
 func (h *Hub) CloseAll() {
 	h.mu.Lock()
 	streams := make([]*stream, 0, len(h.streams)+len(h.jobStreams))
-	for id, s := range h.streams {
-		streams = append(streams, s)
-		delete(h.streams, id)
-	}
-	for id, s := range h.jobStreams {
-		streams = append(streams, s)
-		delete(h.jobStreams, id)
-	}
+	streams = drainStreams(h.streams, streams)
+	streams = drainStreams(h.jobStreams, streams)
 	h.mu.Unlock()
 	for _, s := range streams {
 		s.finish()
@@ -291,11 +237,7 @@ func (h *Hub) EnsureJob(jobID domaintypes.JobID) error {
 		return ErrInvalidJobID
 	}
 	jobID = normalizeJobID(jobID)
-	h.mu.Lock()
-	if _, exists := h.jobStreams[jobID]; !exists {
-		h.jobStreams[jobID] = newStream(h.opts)
-	}
-	h.mu.Unlock()
+	ensureStream(h, h.jobStreams, jobID)
 	return nil
 }
 
@@ -334,10 +276,90 @@ func (h *Hub) SubscribeJob(ctx context.Context, jobID domaintypes.JobID, sinceID
 	if !sinceID.Valid() {
 		return Subscription{}, errors.New("logstream: invalid since id")
 	}
+	return subscribeStream(ctx, h, h.jobStreams, jobID, sinceID)
+}
+
+// SnapshotJob returns a copy of buffered events for the job stream.
+// Returns nil if the job ID is blank or the stream does not exist.
+func (h *Hub) SnapshotJob(jobID domaintypes.JobID) []Event {
+	if jobID.IsZero() {
+		return nil
+	}
+	jobID = normalizeJobID(jobID)
+	return snapshotStream(h, h.jobStreams, jobID)
+}
+
+// CloseJob tears down the job stream and removes it from the hub.
+func (h *Hub) CloseJob(jobID domaintypes.JobID) {
+	if jobID.IsZero() {
+		return
+	}
+	jobID = normalizeJobID(jobID)
+	closeStream(h, h.jobStreams, jobID)
+}
+
+func (h *Hub) publishJob(ctx context.Context, jobID domaintypes.JobID, eventType domaintypes.SSEEventType, payload any) (*stream, error) {
+	if jobID.IsZero() {
+		return nil, ErrInvalidJobID
+	}
+	jobID = normalizeJobID(jobID)
+	return publishStream(ctx, h, h.jobStreams, jobID, eventType, payload)
+}
+
+// Snapshot returns a copy of buffered events for the stream.
+// Returns nil if the run ID is blank or the stream does not exist.
+func (h *Hub) Snapshot(runID domaintypes.RunID) []Event {
+	if runID.IsZero() {
+		return nil
+	}
+	runID = normalizeRunID(runID)
+	return snapshotStream(h, h.streams, runID)
+}
+
+func ensureStream[K comparable](h *Hub, streams map[K]*stream, key K) {
+	h.mu.Lock()
+	if streams[key] == nil {
+		streams[key] = newStream(h.opts)
+	}
+	h.mu.Unlock()
+}
+
+func getOrCreateStream[K comparable](h *Hub, streams map[K]*stream, key K) *stream {
+	h.mu.RLock()
+	s := streams[key]
+	h.mu.RUnlock()
+	if s != nil {
+		return s
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if s = streams[key]; s == nil {
+		s = newStream(h.opts)
+		streams[key] = s
+	}
+	return s
+}
+
+func publishStream[K comparable](ctx context.Context, h *Hub, streams map[K]*stream, key K, eventType domaintypes.SSEEventType, payload any) (*stream, error) {
+	if err := eventType.Validate(); err != nil {
+		return nil, ErrInvalidEventType
+	}
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
+	s := getOrCreateStream(h, streams, key)
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return nil, err
+	}
+	return s, s.publish(Event{Type: eventType, Data: data})
+}
+
+func subscribeStream[K comparable](ctx context.Context, h *Hub, streams map[K]*stream, key K, sinceID domaintypes.EventID) (Subscription, error) {
 	if ctx.Err() != nil {
 		return Subscription{}, ctx.Err()
 	}
-	s := h.getOrCreateJob(jobID)
+	s := getOrCreateStream(h, streams, key)
 	sub, history, closed := s.subscribe(sinceID)
 	for _, evt := range history {
 		if !sub.send(evt) {
@@ -349,10 +371,7 @@ func (h *Hub) SubscribeJob(ctx context.Context, jobID domaintypes.JobID, sinceID
 	}
 	if closed {
 		sub.close()
-		return Subscription{
-			Events: sub.ch,
-			cancel: func() {},
-		}, nil
+		return Subscription{Events: sub.ch, cancel: func() {}}, nil
 	}
 	return Subscription{
 		Events: sub.ch,
@@ -362,32 +381,26 @@ func (h *Hub) SubscribeJob(ctx context.Context, jobID domaintypes.JobID, sinceID
 	}, nil
 }
 
-// SnapshotJob returns a copy of buffered events for the job stream.
-// Returns nil if the job ID is blank or the stream does not exist.
-func (h *Hub) SnapshotJob(jobID domaintypes.JobID) []Event {
-	if jobID.IsZero() {
-		return nil
-	}
-	jobID = normalizeJobID(jobID)
+func lookupStream[K comparable](h *Hub, streams map[K]*stream, key K) *stream {
 	h.mu.RLock()
-	s := h.jobStreams[jobID]
+	s := streams[key]
 	h.mu.RUnlock()
+	return s
+}
+
+func snapshotStream[K comparable](h *Hub, streams map[K]*stream, key K) []Event {
+	s := lookupStream(h, streams, key)
 	if s == nil {
 		return nil
 	}
 	return s.snapshot()
 }
 
-// CloseJob tears down the job stream and removes it from the hub.
-func (h *Hub) CloseJob(jobID domaintypes.JobID) {
-	if jobID.IsZero() {
-		return
-	}
-	jobID = normalizeJobID(jobID)
+func closeStream[K comparable](h *Hub, streams map[K]*stream, key K) {
 	h.mu.Lock()
-	s, ok := h.jobStreams[jobID]
+	s, ok := streams[key]
 	if ok {
-		delete(h.jobStreams, jobID)
+		delete(streams, key)
 	}
 	h.mu.Unlock()
 	if ok {
@@ -395,78 +408,14 @@ func (h *Hub) CloseJob(jobID domaintypes.JobID) {
 	}
 }
 
-func (h *Hub) publishJob(ctx context.Context, jobID domaintypes.JobID, eventType domaintypes.SSEEventType, payload any) (*stream, error) {
-	if jobID.IsZero() {
-		return nil, ErrInvalidJobID
+// drainStreams runs while the caller holds the hub mutex so CloseAll clears
+// both typed maps atomically before it closes subscribers.
+func drainStreams[K comparable](streams map[K]*stream, dst []*stream) []*stream {
+	for key, s := range streams {
+		dst = append(dst, s)
+		delete(streams, key)
 	}
-	jobID = normalizeJobID(jobID)
-	if err := eventType.Validate(); err != nil {
-		return nil, ErrInvalidEventType
-	}
-	if ctx.Err() != nil {
-		return nil, ctx.Err()
-	}
-	s := h.getOrCreateJob(jobID)
-	data, err := json.Marshal(payload)
-	if err != nil {
-		return nil, err
-	}
-	return s, s.publish(Event{Type: eventType, Data: data})
-}
-
-func (h *Hub) getOrCreateJob(jobID domaintypes.JobID) *stream {
-	h.mu.RLock()
-	s := h.jobStreams[jobID]
-	h.mu.RUnlock()
-	if s != nil {
-		return s
-	}
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	s = h.jobStreams[jobID]
-	if s == nil {
-		s = newStream(h.opts)
-		h.jobStreams[jobID] = s
-	}
-	return s
-}
-
-func (h *Hub) getOrCreate(runID domaintypes.RunID) *stream {
-	h.mu.RLock()
-	s := h.streams[runID]
-	h.mu.RUnlock()
-	if s != nil {
-		return s
-	}
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	s = h.streams[runID]
-	if s == nil {
-		s = newStream(h.opts)
-		h.streams[runID] = s
-	}
-	return s
-}
-
-func (h *Hub) getStream(runID domaintypes.RunID) *stream {
-	h.mu.RLock()
-	s := h.streams[runID]
-	h.mu.RUnlock()
-	return s
-}
-
-// Snapshot returns a copy of buffered events for the stream.
-// Returns nil if the run ID is blank or the stream does not exist.
-func (h *Hub) Snapshot(runID domaintypes.RunID) []Event {
-	if runID.IsZero() {
-		return nil
-	}
-	runID = normalizeRunID(runID)
-	s := h.getStream(runID)
-	if s == nil {
-		return nil
-	}
-	return s.snapshot()
+	return dst
 }
 
 // ---------------------------------------------------------------------------

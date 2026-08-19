@@ -74,7 +74,7 @@ type model struct {
 	hasSelectedRun       bool
 	hasSelectedJob       bool
 
-	// client and baseURL are used to fetch list data via internal/client/tui commands.
+	// client and baseURL are used by shared list commands and TUI-only adapters.
 	client  *http.Client
 	baseURL *url.URL
 

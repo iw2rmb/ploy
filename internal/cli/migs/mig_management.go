@@ -20,6 +20,7 @@ import (
 	"strings"
 	"time"
 
+	sharedclient "github.com/iw2rmb/ploy/internal/client"
 	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	"github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/httpx"
@@ -62,53 +63,6 @@ func (c AddMigCommand) Run(ctx context.Context) (AddMigResult, error) {
 	// POST /v1/migs to create the mig.
 	endpoint := c.BaseURL.JoinPath("v1", "migs")
 	return httpx.DoJSON[AddMigResult](ctx, c.Client, http.MethodPost, endpoint.String(), req, http.StatusCreated, "mig add")
-}
-
-// ListMigsCommand lists mig projects with optional filters.
-// Endpoint: GET /v1/migs
-// Returns migs with ID, NAME, CREATED_AT, ARCHIVED status.
-type ListMigsCommand struct {
-	Client        *http.Client
-	BaseURL       *url.URL
-	Limit         int32   // Max results to return (default 50, max 100).
-	Offset        int32   // Number of results to skip.
-	NameSubstring *string // Optional: filter by name substring.
-	Archived      *bool   // Optional: filter by archived status.
-	RepoURL       *string // Optional: filter by repo URL in repo set.
-}
-
-// Run executes GET /v1/migs to list migs with pagination and filters.
-func (c ListMigsCommand) Run(ctx context.Context) ([]domainapi.MigSummary, error) {
-	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
-		return nil, fmt.Errorf("mig list: %w", err)
-	}
-
-	// Build endpoint with query params.
-	endpoint := c.BaseURL.JoinPath("v1", "migs")
-	q := endpoint.Query()
-	if c.Limit > 0 {
-		q.Set("limit", fmt.Sprintf("%d", c.Limit))
-	}
-	if c.Offset > 0 {
-		q.Set("offset", fmt.Sprintf("%d", c.Offset))
-	}
-	if c.NameSubstring != nil && *c.NameSubstring != "" {
-		q.Set("name_substring", *c.NameSubstring)
-	}
-	if c.Archived != nil {
-		q.Set("archived", fmt.Sprintf("%t", *c.Archived))
-	}
-	if c.RepoURL != nil && *c.RepoURL != "" {
-		q.Set("repo_url", *c.RepoURL)
-	}
-	endpoint.RawQuery = q.Encode()
-
-	result, err := httpx.DoJSON[domainapi.MigListResponse](ctx, c.Client, http.MethodGet, endpoint.String(), nil, http.StatusOK, "mig list")
-	if err != nil {
-		return nil, err
-	}
-
-	return result.Migs, nil
 }
 
 // RemoveMigCommand deletes a mig project.
@@ -268,7 +222,7 @@ func (c ResolveMigByNameCommand) Run(ctx context.Context) (string, error) {
 
 	// Try to find by name using the list endpoint with name filter.
 	// No heuristics - always query the server.
-	listCmd := ListMigsCommand{
+	listCmd := sharedclient.ListMigsCommand{
 		Client:        c.Client,
 		BaseURL:       c.BaseURL,
 		Limit:         100,

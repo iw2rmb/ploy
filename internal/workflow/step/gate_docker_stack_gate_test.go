@@ -21,7 +21,7 @@ func TestGateDocker_StackGate_PreCheckPass(t *testing.T) {
 			Stack: contracts.StackExpectation{Language: "java", Tool: "maven", Release: "17"},
 			Image: "maven:jdk17",
 		}},
-		StackGate: &contracts.StepGateStackSpec{
+		StackGate: &contracts.StackGatePhaseSpec{
 			Enabled: true,
 			Expect: &contracts.StackExpectation{
 				Language: "java",
@@ -137,7 +137,7 @@ java { toolchain { languageVersion = JavaLanguageVersion.of(17) } }`
 
 			spec := &contracts.StepGateSpec{
 				Enabled: true,
-				StackGate: &contracts.StepGateStackSpec{
+				StackGate: &contracts.StackGatePhaseSpec{
 					Enabled: true,
 					Expect: &contracts.StackExpectation{
 						Language: "java",
@@ -253,7 +253,7 @@ func TestGateDocker_StackGate_ImageResolution(t *testing.T) {
 			spec := &contracts.StepGateSpec{
 				Enabled:        true,
 				ImageOverrides: tt.imageOverrides,
-				StackGate: &contracts.StepGateStackSpec{
+				StackGate: &contracts.StackGatePhaseSpec{
 					Enabled: true,
 					Expect: &contracts.StackExpectation{
 						Language: "java",
@@ -292,7 +292,7 @@ func TestGateDocker_StackGate_NoMatchingDefaultRule_ReturnsNoImageRule(t *testin
 
 	spec := &contracts.StepGateSpec{
 		Enabled: true,
-		StackGate: &contracts.StepGateStackSpec{
+		StackGate: &contracts.StackGatePhaseSpec{
 			Enabled: true,
 			Expect: &contracts.StackExpectation{
 				Language: "python",

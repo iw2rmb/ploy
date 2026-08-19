@@ -8,6 +8,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	cliruns "github.com/iw2rmb/ploy/internal/cli/runs"
+	sharedclient "github.com/iw2rmb/ploy/internal/client"
 	clitui "github.com/iw2rmb/ploy/internal/client/tui"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
@@ -15,7 +16,7 @@ import (
 // loadMigsCmd returns a tea.Cmd that fetches the migrations list.
 func loadMigsCmd(client *http.Client, baseURL *url.URL) tea.Cmd {
 	return func() tea.Msg {
-		cmd := clitui.ListMigsCommand{
+		cmd := sharedclient.ListMigsCommand{
 			Client:  client,
 			BaseURL: baseURL,
 			Limit:   100,
@@ -24,14 +25,14 @@ func loadMigsCmd(client *http.Client, baseURL *url.URL) tea.Cmd {
 		if err != nil {
 			return errMsg{err: err}
 		}
-		return migsLoadedMsg{migs: result.Migs}
+		return migsLoadedMsg{migs: result}
 	}
 }
 
 // loadRunsCmd returns a tea.Cmd that fetches the runs list.
 func loadRunsCmd(client *http.Client, baseURL *url.URL) tea.Cmd {
 	return func() tea.Msg {
-		cmd := clitui.ListRunsCommand{
+		cmd := sharedclient.ListRunsCommand{
 			Client:  client,
 			BaseURL: baseURL,
 			Limit:   100,
@@ -40,8 +41,8 @@ func loadRunsCmd(client *http.Client, baseURL *url.URL) tea.Cmd {
 		if err != nil {
 			return errMsg{err: err}
 		}
-		runs := make([]runSummary, len(result.Runs))
-		for i, r := range result.Runs {
+		runs := make([]runSummary, len(result))
+		for i, r := range result {
 			runs[i] = runSummary{ID: r.ID, MigID: r.MigID, MigName: r.MigName, CreatedAt: r.CreatedAt}
 		}
 		return runsLoadedMsg{runs: runs}

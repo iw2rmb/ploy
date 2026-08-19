@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
@@ -171,50 +172,29 @@ func TestValidateAndDeriveStackGateChaining(t *testing.T) {
 	}
 }
 
-// TestStackGatePhaseSpecToStepGate tests the conversion helper.
-func TestStackGatePhaseSpecToStepGate(t *testing.T) {
-	tests := []struct {
-		name        string
-		phase       *contracts.StackGatePhaseSpec
-		wantNil     bool
-		wantLang    string
-		wantRelease string
-	}{
-		{name: "nil input", phase: nil, wantNil: true},
-		{name: "disabled phase", phase: &contracts.StackGatePhaseSpec{Enabled: false}, wantNil: true},
-		{
-			name:        "enabled phase with expect",
-			phase:       &contracts.StackGatePhaseSpec{Enabled: true, Expect: &contracts.StackExpectation{Language: "java", Release: "17"}},
-			wantLang:    "java",
-			wantRelease: "17",
-		},
+func TestStackGatePhaseForJobSelectsEnabledBoundaryPhase(t *testing.T) {
+	t.Parallel()
+
+	firstInbound := inbound("java", "11")
+	lastOutbound := outbound("java", "21")
+	steps := []StepOptions{
+		{Stack: &contracts.StackGateSpec{Inbound: firstInbound, Outbound: outbound("java", "17")}},
+		{Stack: &contracts.StackGateSpec{Inbound: inbound("java", "17"), Outbound: lastOutbound}},
+	}
+	if got := stackGatePhaseForJob(steps, types.JobTypePreGate); got != firstInbound {
+		t.Fatalf("pre-gate phase = %p, want first inbound %p", got, firstInbound)
+	}
+	if got := stackGatePhaseForJob(steps, types.JobTypePostGate); got != lastOutbound {
+		t.Fatalf("post-gate phase = %p, want last outbound %p", got, lastOutbound)
 	}
 
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			result := stackGatePhaseSpecToStepGate(tc.phase, nil)
-			if tc.wantNil {
-				if result != nil {
-					t.Fatalf("expected nil, got %+v", result)
-				}
-				return
-			}
-			if result == nil {
-				t.Fatal("expected non-nil result")
-			}
-			if !result.Enabled {
-				t.Error("Enabled should be true")
-			}
-			if result.Expect == nil {
-				t.Fatal("Expect should not be nil")
-			}
-			if result.Expect.Language != tc.wantLang {
-				t.Errorf("Expect.Language = %q, want %q", result.Expect.Language, tc.wantLang)
-			}
-			if result.Expect.Release != tc.wantRelease {
-				t.Errorf("Expect.Release = %q, want %q", result.Expect.Release, tc.wantRelease)
-			}
-		})
+	steps[0].Stack.Inbound.Enabled = false
+	steps[1].Stack.Outbound.Enabled = false
+	if got := stackGatePhaseForJob(steps, types.JobTypePreGate); got != nil {
+		t.Fatalf("disabled pre-gate phase = %+v, want nil", got)
+	}
+	if got := stackGatePhaseForJob(steps, types.JobTypePostGate); got != nil {
+		t.Fatalf("disabled post-gate phase = %+v, want nil", got)
 	}
 }
 
@@ -229,7 +209,7 @@ func TestBuildGateManifestFromRequest_StackGateThreading(t *testing.T) {
 		{
 			name: "threads StackGate when set",
 			opts: RunOptions{
-				StackGate: &contracts.StepGateStackSpec{
+				StackGate: &contracts.StackGatePhaseSpec{
 					Enabled: true,
 					Expect:  &contracts.StackExpectation{Language: "java", Release: "17"},
 				},
@@ -283,7 +263,7 @@ func TestBuildGateManifestFromRequest_StackGateThreading(t *testing.T) {
 						Outbound: outbound("java", "17"),
 					},
 				}},
-				StackGate: &contracts.StepGateStackSpec{
+				StackGate: &contracts.StackGatePhaseSpec{
 					Enabled: true,
 					Expect:  &contracts.StackExpectation{Language: "java", Release: "17"},
 				},

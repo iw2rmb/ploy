@@ -23,6 +23,8 @@ import (
 	"path"
 	"regexp"
 	"strings"
+
+	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
 // shortHashPattern matches a valid shortHash: 7–64 lowercase hex characters.
@@ -36,83 +38,51 @@ func IsArchiveShortHash(value string) bool {
 // shortHashLen is the fixed prefix length for canonical short hashes (12 hex chars).
 const shortHashLen = 12
 
-// parseAuthoringInEntry parses an authoring `in` entry: "src:dst".
-// Uses right-biased splitting (last colon). dst is normalized under /in.
-func parseAuthoringInEntry(s string) (src, dst string, err error) {
-	src, dst, err = splitRightBiasedColon(s)
-	if err != nil {
-		return "", "", fmt.Errorf("in entry %q: %w", s, err)
-	}
-	dst, err = normalizeAuthoringDestination(dst, "/in/")
-	if err != nil {
-		return "", "", fmt.Errorf("in entry %q: %w", s, err)
-	}
-	if err := guardAuthoringTraversal(dst); err != nil {
-		return "", "", fmt.Errorf("in entry %q: %w", s, err)
-	}
-	return src, dst, nil
+type authoringFileEntry struct {
+	src      string
+	dst      string
+	readOnly bool
 }
 
-// parseAuthoringOutEntry parses an authoring `out` entry: "src:dst".
-// Uses right-biased splitting (last colon). dst is normalized under /out.
-func parseAuthoringOutEntry(s string) (src, dst string, err error) {
-	src, dst, err = splitRightBiasedColon(s)
-	if err != nil {
-		return "", "", fmt.Errorf("out entry %q: %w", s, err)
-	}
-	dst, err = normalizeAuthoringDestination(dst, "/out/")
-	if err != nil {
-		return "", "", fmt.Errorf("out entry %q: %w", s, err)
-	}
-	if err := guardAuthoringTraversal(dst); err != nil {
-		return "", "", fmt.Errorf("out entry %q: %w", s, err)
-	}
-	return src, dst, nil
-}
-
-// parseAuthoringHomeEntry parses an authoring `home` entry: "src:dst{:ro}".
-// Uses right-biased splitting. dst must be relative (no leading /).
-func parseAuthoringHomeEntry(s string) (src, dst string, readOnly bool, err error) {
+// parseAuthoringEntry parses one authoring entry using the destination policy
+// owned by its Hydra file kind.
+func parseAuthoringEntry(kind contracts.HydraFileKind, s string) (authoringFileEntry, error) {
 	body := s
-	if strings.HasSuffix(s, ":ro") {
+	readOnly := false
+	if kind == contracts.HydraFileHome && strings.HasSuffix(s, ":ro") {
 		readOnly = true
-		body = s[:len(s)-3]
+		body = strings.TrimSuffix(s, ":ro")
 	}
-	src, dst, err = splitRightBiasedColon(body)
+	src, dst, err := splitRightBiasedColon(body)
 	if err != nil {
-		return "", "", false, fmt.Errorf("home entry %q: %w", s, err)
+		return authoringFileEntry{}, fmt.Errorf("%s entry %q: %w", kind, s, err)
 	}
-	dst = strings.TrimSpace(dst)
-	if dst == "" {
-		return "", "", false, fmt.Errorf("home entry %q: destination required", s)
-	}
-	dst = strings.TrimPrefix(dst, "/")
-	dst = path.Clean(dst)
-	if dst == "" || dst == "." {
-		return "", "", false, fmt.Errorf("home entry %q: destination required", s)
-	}
-	if err := guardAuthoringTraversal(dst); err != nil {
-		return "", "", false, fmt.Errorf("home entry %q: %w", s, err)
-	}
-	return src, dst, readOnly, nil
-}
 
-// parseAuthoringTmpEntry parses an authoring `tmp` entry: "src:dst".
-// Uses right-biased splitting. Absolute destinations must stay under /tmp;
-// relative destinations are normalized under /tmp.
-func parseAuthoringTmpEntry(s string) (src, dst string, err error) {
-	src, rawDst, err := splitRightBiasedColon(s)
-	if err != nil {
-		return "", "", fmt.Errorf("tmp entry %q: %w", s, err)
+	switch kind {
+	case contracts.HydraFileIn, contracts.HydraFileOut:
+		dst, err = normalizeAuthoringDestination(dst, "/"+kind.String()+"/")
+	case contracts.HydraFileHome:
+		dst = strings.TrimSpace(dst)
+		if dst == "" {
+			err = fmt.Errorf("destination required")
+			break
+		}
+		dst = path.Clean(strings.TrimPrefix(dst, "/"))
+		if dst == "" || dst == "." {
+			err = fmt.Errorf("destination required")
+		}
+	case contracts.HydraFileTmp:
+		dst, err = normalizeAuthoringTmpDestination(dst)
+	default:
+		err = fmt.Errorf("invalid Hydra file kind %q", kind)
 	}
-	dst, err = normalizeAuthoringTmpDestination(rawDst)
 	if err != nil {
-		return "", "", fmt.Errorf("tmp entry %q: %w", s, err)
+		return authoringFileEntry{}, fmt.Errorf("%s entry %q: %w", kind, s, err)
 	}
 	if err := guardAuthoringTraversal(dst); err != nil {
-		return "", "", fmt.Errorf("tmp entry %q: %w", s, err)
+		return authoringFileEntry{}, fmt.Errorf("%s entry %q: %w", kind, s, err)
 	}
-	return src, dst, nil
+	return authoringFileEntry{src: src, dst: dst, readOnly: readOnly}, nil
 }
 
 func normalizeAuthoringDestination(dst, root string) (string, error) {
@@ -222,7 +192,10 @@ func (c *Compiler) compileHydraRecordsInPlace(ctx context.Context, spec map[stri
 		}
 	}
 	for _, ref := range blocks {
-		if err := c.compileHydraBlock(ctx, ref.block, ref.prefix, specBaseDir, seen, bundleMap); err != nil {
+		hashFile := func(src string) (string, error) {
+			return c.compileFileRecord(ctx, src, specBaseDir, seen, bundleMap)
+		}
+		if err := compileHydraBlock(ref.block, ref.prefix, hashFile); err != nil {
 			return err
 		}
 	}
@@ -235,8 +208,8 @@ func (c *Compiler) compileHydraRecordsInPlace(ctx context.Context, spec map[stri
 // hasAuthoringEntries checks whether a block contains any non-canonical entries
 // that require compilation.
 func hasAuthoringEntries(block map[string]any) bool {
-	for _, key := range []string{"in", "out", "home", "tmp"} {
-		entries, ok := block[key].([]any)
+	for _, kind := range contracts.HydraFileKinds() {
+		entries, ok := block[kind.String()].([]any)
 		if !ok {
 			continue
 		}
@@ -245,7 +218,7 @@ func hasAuthoringEntries(block map[string]any) bool {
 			if !ok {
 				continue
 			}
-			if !isAlreadyCanonical(key, s) {
+			if !isAlreadyCanonical(s) {
 				return true
 			}
 		}
@@ -254,8 +227,7 @@ func hasAuthoringEntries(block map[string]any) bool {
 }
 
 // isAlreadyCanonical checks if an entry is already in canonical stored form.
-func isAlreadyCanonical(field, s string) bool {
-	// For in/out/home, check if the first segment before : is a short hash.
+func isAlreadyCanonical(s string) bool {
 	idx := strings.Index(s, ":")
 	if idx <= 0 {
 		return false
@@ -263,146 +235,42 @@ func isAlreadyCanonical(field, s string) bool {
 	return shortHashPattern.MatchString(s[:idx])
 }
 
-// compileHydraBlock compiles authoring entries in a single container block.
-func (c *Compiler) compileHydraBlock(ctx context.Context, block map[string]any, prefix, specBaseDir string, seen map[string]string, bundleMap map[string]string) error {
-	if err := c.compileInEntries(ctx, block, prefix, specBaseDir, seen, bundleMap); err != nil {
-		return err
-	}
-	if err := c.compileOutEntries(ctx, block, prefix, specBaseDir, seen, bundleMap); err != nil {
-		return err
-	}
-	if err := c.compileHomeEntries(ctx, block, prefix, specBaseDir, seen, bundleMap); err != nil {
-		return err
-	}
-	return c.compileTmpEntries(ctx, block, prefix, specBaseDir, seen, bundleMap)
-}
+type fileRecordHasher func(src string) (string, error)
 
-func (c *Compiler) compileInEntries(ctx context.Context, block map[string]any, prefix, specBaseDir string, seen map[string]string, bundleMap map[string]string) error {
-	entries, ok := block["in"].([]any)
-	if !ok || len(entries) == 0 {
-		return nil
-	}
-	compiled := make([]any, len(entries))
-	for i, e := range entries {
-		s, ok := e.(string)
-		if !ok {
-			return fmt.Errorf("%s.in[%d]: expected string, got %T", prefix, i, e)
-		}
-		idx := strings.Index(s, ":")
-		if idx > 0 && shortHashPattern.MatchString(s[:idx]) {
-			compiled[i] = s
+// compileHydraBlock compiles all authoring entries in contract order.
+func compileHydraBlock(block map[string]any, prefix string, hashFile fileRecordHasher) error {
+	for _, kind := range contracts.HydraFileKinds() {
+		field := kind.String()
+		entries, ok := block[field].([]any)
+		if !ok || len(entries) == 0 {
 			continue
 		}
-		src, dst, err := parseAuthoringInEntry(s)
-		if err != nil {
-			return fmt.Errorf("%s.in[%d]: %w", prefix, i, err)
+		compiled := make([]any, len(entries))
+		for i, raw := range entries {
+			s, ok := raw.(string)
+			if !ok {
+				return fmt.Errorf("%s.%s[%d]: expected string, got %T", prefix, field, i, raw)
+			}
+			if isAlreadyCanonical(s) {
+				compiled[i] = s
+				continue
+			}
+			entry, err := parseAuthoringEntry(kind, s)
+			if err != nil {
+				return fmt.Errorf("%s.%s[%d]: %w", prefix, field, i, err)
+			}
+			hash, err := hashFile(entry.src)
+			if err != nil {
+				return fmt.Errorf("%s.%s[%d]: %w", prefix, field, i, err)
+			}
+			canonical := hash + ":" + entry.dst
+			if entry.readOnly {
+				canonical += ":ro"
+			}
+			compiled[i] = canonical
 		}
-		hash, err := c.compileFileRecord(ctx, src, specBaseDir, seen, bundleMap)
-		if err != nil {
-			return fmt.Errorf("%s.in[%d]: %w", prefix, i, err)
-		}
-		compiled[i] = hash + ":" + dst
+		block[field] = compiled
 	}
-	block["in"] = compiled
-	return nil
-}
-
-func (c *Compiler) compileOutEntries(ctx context.Context, block map[string]any, prefix, specBaseDir string, seen map[string]string, bundleMap map[string]string) error {
-	entries, ok := block["out"].([]any)
-	if !ok || len(entries) == 0 {
-		return nil
-	}
-	compiled := make([]any, len(entries))
-	for i, e := range entries {
-		s, ok := e.(string)
-		if !ok {
-			return fmt.Errorf("%s.out[%d]: expected string, got %T", prefix, i, e)
-		}
-		idx := strings.Index(s, ":")
-		if idx > 0 && shortHashPattern.MatchString(s[:idx]) {
-			compiled[i] = s
-			continue
-		}
-		src, dst, err := parseAuthoringOutEntry(s)
-		if err != nil {
-			return fmt.Errorf("%s.out[%d]: %w", prefix, i, err)
-		}
-		hash, err := c.compileFileRecord(ctx, src, specBaseDir, seen, bundleMap)
-		if err != nil {
-			return fmt.Errorf("%s.out[%d]: %w", prefix, i, err)
-		}
-		compiled[i] = hash + ":" + dst
-	}
-	block["out"] = compiled
-	return nil
-}
-
-func (c *Compiler) compileHomeEntries(ctx context.Context, block map[string]any, prefix, specBaseDir string, seen map[string]string, bundleMap map[string]string) error {
-	entries, ok := block["home"].([]any)
-	if !ok || len(entries) == 0 {
-		return nil
-	}
-	compiled := make([]any, len(entries))
-	for i, e := range entries {
-		s, ok := e.(string)
-		if !ok {
-			return fmt.Errorf("%s.home[%d]: expected string, got %T", prefix, i, e)
-		}
-		// Check if already canonical: strip optional :ro, then check first segment.
-		body := s
-		if strings.HasSuffix(s, ":ro") {
-			body = s[:len(s)-3]
-		}
-		idx := strings.Index(body, ":")
-		if idx > 0 && shortHashPattern.MatchString(body[:idx]) {
-			compiled[i] = s
-			continue
-		}
-		src, dst, readOnly, err := parseAuthoringHomeEntry(s)
-		if err != nil {
-			return fmt.Errorf("%s.home[%d]: %w", prefix, i, err)
-		}
-		hash, err := c.compileFileRecord(ctx, src, specBaseDir, seen, bundleMap)
-		if err != nil {
-			return fmt.Errorf("%s.home[%d]: %w", prefix, i, err)
-		}
-		canonical := hash + ":" + dst
-		if readOnly {
-			canonical += ":ro"
-		}
-		compiled[i] = canonical
-	}
-	block["home"] = compiled
-	return nil
-}
-
-func (c *Compiler) compileTmpEntries(ctx context.Context, block map[string]any, prefix, specBaseDir string, seen map[string]string, bundleMap map[string]string) error {
-	entries, ok := block["tmp"].([]any)
-	if !ok || len(entries) == 0 {
-		return nil
-	}
-	compiled := make([]any, len(entries))
-	for i, e := range entries {
-		s, ok := e.(string)
-		if !ok {
-			return fmt.Errorf("%s.tmp[%d]: expected string, got %T", prefix, i, e)
-		}
-		idx := strings.Index(s, ":")
-		if idx > 0 && shortHashPattern.MatchString(s[:idx]) {
-			compiled[i] = s
-			continue
-		}
-		src, dst, err := parseAuthoringTmpEntry(s)
-		if err != nil {
-			return fmt.Errorf("%s.tmp[%d]: %w", prefix, i, err)
-		}
-		hash, err := c.compileFileRecord(ctx, src, specBaseDir, seen, bundleMap)
-		if err != nil {
-			return fmt.Errorf("%s.tmp[%d]: %w", prefix, i, err)
-		}
-		compiled[i] = hash + ":" + dst
-	}
-	block["tmp"] = compiled
 	return nil
 }
 

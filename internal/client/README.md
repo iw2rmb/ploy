@@ -2,4 +2,5 @@
 
 Shared control-plane API client adapters used by UI and command packages.
 
-- `tui/` — thin request/response adapters used by the Bubble Tea TUI data-loading commands.
+- `lists.go` owns migration and run list transport for CLI and TUI consumers.
+- `tui/` contains TUI-only job and aggregate adapters.

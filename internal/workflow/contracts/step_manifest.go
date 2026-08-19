@@ -132,18 +132,7 @@ type StepGateSpec struct {
 
 	// StackGate holds the Stack Gate configuration for this step.
 	// Used for pre/post gate validation of stack expectations.
-	StackGate *StepGateStackSpec
-}
-
-// StepGateStackSpec holds the effective Stack Gate configuration for a gate phase.
-// This is threaded into manifests from the step's StackGateSpec.
-type StepGateStackSpec struct {
-	// Enabled controls whether Stack Gate validation is active for this phase.
-	Enabled bool
-
-	// Expect holds the stack expectations to validate.
-	// Only validated when Enabled is true.
-	Expect *StackExpectation
+	StackGate *StackGatePhaseSpec
 }
 
 // StepInputHydration describes how to materialise repository state for an input.
