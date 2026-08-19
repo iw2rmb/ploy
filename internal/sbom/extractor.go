@@ -1,129 +1,17 @@
 package sbom
 
 import (
-	"archive/tar"
 	"bytes"
-	"compress/gzip"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"io"
-	"path"
 	"sort"
 	"strings"
-
-	"github.com/iw2rmb/ploy/internal/domain/types"
 )
-
-// Row is one normalized SBOM package row bound to producer identity.
-type Row struct {
-	JobID  types.JobID
-	RepoID types.RepoID
-	Lib    string
-	Ver    string
-}
 
 // Package is one normalized package/version pair parsed from an SBOM document.
 type Package struct {
 	Name    string
 	Version string
-}
-
-// ExtractRowsFromBundle parses supported SBOM files from a gzipped tar bundle
-// and returns normalized rows keyed to the provided job/repo provenance.
-func ExtractRowsFromBundle(bundle []byte, jobID types.JobID, repoID types.RepoID) ([]Row, error) {
-	if len(bundle) == 0 {
-		return nil, nil
-	}
-
-	gzReader, err := gzip.NewReader(bytes.NewReader(bundle))
-	if err != nil {
-		return nil, fmt.Errorf("open bundle gzip: %w", err)
-	}
-	defer func() { _ = gzReader.Close() }()
-
-	tr := tar.NewReader(gzReader)
-	seen := map[string]struct{}{}
-	rows := make([]Row, 0)
-	var firstParseErr error
-
-	for {
-		hdr, nextErr := tr.Next()
-		if errors.Is(nextErr, io.EOF) {
-			break
-		}
-		if nextErr != nil {
-			return nil, fmt.Errorf("read tar entry: %w", nextErr)
-		}
-		if hdr == nil || hdr.Typeflag == tar.TypeDir {
-			continue
-		}
-
-		name := normalizeEntryPath(hdr.Name)
-		if name == "" || !strings.HasSuffix(strings.ToLower(name), ".json") {
-			continue
-		}
-
-		raw, readErr := io.ReadAll(tr)
-		if readErr != nil {
-			return nil, fmt.Errorf("read tar payload %q: %w", name, readErr)
-		}
-
-		pkgs, parsed, parseErr := parseSBOMJSON(raw)
-		if parseErr != nil && firstParseErr == nil {
-			firstParseErr = fmt.Errorf("%s: %w", name, parseErr)
-		}
-		if !parsed || len(pkgs) == 0 {
-			continue
-		}
-
-		for _, pkg := range pkgs {
-			lib := normalizeLib(pkg.Name)
-			ver := normalizeVer(pkg.Version)
-			if lib == "" || ver == "" {
-				continue
-			}
-			key := lib + "\x00" + ver
-			if _, exists := seen[key]; exists {
-				continue
-			}
-			seen[key] = struct{}{}
-			rows = append(rows, Row{
-				JobID:  jobID,
-				RepoID: repoID,
-				Lib:    lib,
-				Ver:    ver,
-			})
-		}
-	}
-
-	sort.Slice(rows, func(i, j int) bool {
-		if rows[i].Lib == rows[j].Lib {
-			return rows[i].Ver < rows[j].Ver
-		}
-		return rows[i].Lib < rows[j].Lib
-	})
-	return rows, firstParseErr
-}
-
-// ExtractRowsFromJSON parses one supported SBOM JSON document and returns
-// normalized rows keyed to the provided job/repo provenance.
-func ExtractRowsFromJSON(raw []byte, jobID types.JobID, repoID types.RepoID) ([]Row, error) {
-	packages, err := ExtractPackagesFromJSON(raw)
-	if err != nil {
-		return nil, err
-	}
-
-	rows := make([]Row, 0, len(packages))
-	for _, pkg := range packages {
-		rows = append(rows, Row{
-			JobID:  jobID,
-			RepoID: repoID,
-			Lib:    pkg.Name,
-			Ver:    pkg.Version,
-		})
-	}
-	return rows, nil
 }
 
 // ExtractPackagesFromJSON parses one supported SBOM JSON document and returns
@@ -237,18 +125,6 @@ func parseCycloneDXComponents(raw []byte) ([]rawPackage, error) {
 	}
 	walk(doc.Components)
 	return out, nil
-}
-
-func normalizeEntryPath(name string) string {
-	trimmed := strings.TrimSpace(name)
-	if trimmed == "" {
-		return ""
-	}
-	cleaned := path.Clean("/" + strings.TrimPrefix(trimmed, "/"))
-	if cleaned == "/" || strings.HasPrefix(cleaned, "/../") {
-		return ""
-	}
-	return strings.TrimPrefix(cleaned, "/")
 }
 
 func normalizeLib(name string) string {

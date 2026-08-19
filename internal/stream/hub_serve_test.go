@@ -17,7 +17,7 @@ func TestServeWritesSSEFrames(t *testing.T) {
 
 	go func() {
 		time.Sleep(50 * time.Millisecond)
-		_ = hub.PublishLog(ctx, runID, LogRecord{Timestamp: "2025-10-22T12:10:00Z", Stream: "stdout", Line: "hello"})
+		_ = hub.PublishStage(ctx, runID, LogRecord{Timestamp: "2025-10-22T12:10:00Z", Stream: "stdout", Line: "hello"})
 		_ = hub.PublishStatus(ctx, runID, Status{Status: "completed"})
 	}()
 
@@ -29,7 +29,7 @@ func TestServeWritesSSEFrames(t *testing.T) {
 	}
 
 	body := recorder.Body.String()
-	if !strings.Contains(body, "event: log") || !strings.Contains(body, "event: done") {
+	if !strings.Contains(body, "event: stage") || !strings.Contains(body, "event: done") {
 		t.Fatalf("unexpected SSE payload: %s", body)
 	}
 }

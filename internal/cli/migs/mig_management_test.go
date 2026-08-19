@@ -205,73 +205,46 @@ func TestRemoveMigCommand_Run(t *testing.T) {
 	}
 }
 
-// TestArchiveMigCommand_Run validates ArchiveMigCommand responses.
-func TestArchiveMigCommand_Run(t *testing.T) {
+func TestSetMigArchivedCommand_Run(t *testing.T) {
 	t.Parallel()
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPatch {
-			t.Errorf("expected PATCH, got %s", r.Method)
-		}
-		if !strings.Contains(r.URL.Path, "/archive") {
-			t.Errorf("expected path to contain /archive, got %s", r.URL.Path)
-		}
-
-		resp := domainapi.MigArchiveResponse{ID: types.MigID("mig001"), Name: "test-mig", Archived: true}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
-	}))
-	t.Cleanup(srv.Close)
-
-	baseURL, _ := url.Parse(srv.URL)
-
-	cmd := ArchiveMigCommand{
-		Client:  srv.Client(),
-		BaseURL: baseURL,
-		MigRef:  types.MigRef("mig001"),
+	tests := []struct {
+		name     string
+		archived bool
+		action   string
+	}{
+		{name: "archive", archived: true, action: "archive"},
+		{name: "unarchive", archived: false, action: "unarchive"},
 	}
 
-	result, err := cmd.Run(context.Background())
-	if err != nil {
-		t.Fatalf("Run() error: %v", err)
-	}
-	if !result.Archived {
-		t.Error("expected Archived to be true")
-	}
-}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != http.MethodPatch {
+					t.Errorf("expected PATCH, got %s", r.Method)
+				}
+				if !strings.HasSuffix(r.URL.Path, "/"+tt.action) {
+					t.Errorf("expected path to end in /%s, got %s", tt.action, r.URL.Path)
+				}
 
-// TestUnarchiveMigCommand_Run validates UnarchiveMigCommand responses.
-func TestUnarchiveMigCommand_Run(t *testing.T) {
-	t.Parallel()
+				resp := domainapi.MigArchiveResponse{ID: types.MigID("mig001"), Name: "test-mig", Archived: tt.archived}
+				w.Header().Set("Content-Type", "application/json")
+				_ = json.NewEncoder(w).Encode(resp)
+			}))
+			t.Cleanup(srv.Close)
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPatch {
-			t.Errorf("expected PATCH, got %s", r.Method)
-		}
-		if !strings.Contains(r.URL.Path, "/unarchive") {
-			t.Errorf("expected path to contain /unarchive, got %s", r.URL.Path)
-		}
-
-		resp := domainapi.MigArchiveResponse{ID: types.MigID("mig001"), Name: "test-mig", Archived: false}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
-	}))
-	t.Cleanup(srv.Close)
-
-	baseURL, _ := url.Parse(srv.URL)
-
-	cmd := UnarchiveMigCommand{
-		Client:  srv.Client(),
-		BaseURL: baseURL,
-		MigRef:  types.MigRef("mig001"),
-	}
-
-	result, err := cmd.Run(context.Background())
-	if err != nil {
-		t.Fatalf("Run() error: %v", err)
-	}
-	if result.Archived {
-		t.Error("expected Archived to be false")
+			baseURL, _ := url.Parse(srv.URL)
+			result, err := (SetMigArchivedCommand{
+				Client: srv.Client(), BaseURL: baseURL, MigRef: types.MigRef("mig001"), Archived: tt.archived,
+			}).Run(context.Background())
+			if err != nil {
+				t.Fatalf("Run() error: %v", err)
+			}
+			if result.Archived != tt.archived {
+				t.Errorf("Archived = %v, want %v", result.Archived, tt.archived)
+			}
+		})
 	}
 }
 

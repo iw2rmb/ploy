@@ -1,12 +1,10 @@
 package common
 
 import (
-	"errors"
 	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 )
 
@@ -94,37 +92,6 @@ func ResolveIdentityPath(v StringValue) (string, error) {
 		return "", fmt.Errorf("identity file: %w", err)
 	}
 	return path, nil
-}
-
-// ResolvePloydBinaryPath locates the ployd binary adjacent to the CLI.
-func ResolvePloydBinaryPath(v StringValue) (string, error) {
-	if v.IsSet {
-		path := ExpandPath(v.Value)
-		if err := ValidateFileReadable(path); err != nil {
-			return "", fmt.Errorf("ployd binary: %w", err)
-		}
-		return path, nil
-	}
-	execPath, err := os.Executable()
-	if err != nil {
-		return "", fmt.Errorf("locate ploy executable: %w", err)
-	}
-	dir := filepath.Dir(execPath)
-	osName := runtime.GOOS
-	candidates := make([]string, 0, 3)
-	if osName != "linux" {
-		candidates = append(candidates, filepath.Join(dir, "ployd-linux"))
-	}
-	if osName == "windows" {
-		candidates = append(candidates, filepath.Join(dir, "ployd.exe"))
-	}
-	candidates = append(candidates, filepath.Join(dir, "ployd"))
-	for _, c := range candidates {
-		if info, err := os.Stat(c); err == nil && !info.IsDir() {
-			return c, nil
-		}
-	}
-	return "", errors.New("ployd binary not found alongside CLI; provide --binary")
 }
 
 func ExpandPath(path string) string {

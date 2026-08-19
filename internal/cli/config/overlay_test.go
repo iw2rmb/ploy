@@ -3,7 +3,6 @@ package config
 import (
 	"os"
 	"path/filepath"
-	"reflect"
 	"testing"
 )
 
@@ -130,7 +129,6 @@ func TestOverlay_JobSection(t *testing.T) {
 	}
 }
 
-
 func TestMergeJobConfigIntoSpec_EnvsKeyOverride(t *testing.T) {
 	block := map[string]any{
 		"envs": map[string]any{"SPEC_KEY": "spec_val", "SHARED": "from_spec"},
@@ -235,15 +233,6 @@ func TestExtractDst(t *testing.T) {
 	}
 }
 
-func TestSortedEnvKeys(t *testing.T) {
-	m := map[string]string{"C": "3", "A": "1", "B": "2"}
-	got := SortedEnvKeys(m)
-	want := []string{"A", "B", "C"}
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("SortedEnvKeys = %v, want %v", got, want)
-	}
-}
-
 // TestMergeThreeLayerPrecedence verifies the full server → local → spec merge
 // order by applying each layer sequentially. Server defaults are lowest
 // precedence, local config overrides server, and spec overrides both.
@@ -288,8 +277,8 @@ func TestMergeThreeLayerPrecedence(t *testing.T) {
 
 	// Step 1: local block with server as overlay → local wins for shared keys.
 	localBlock := map[string]any{}
-	MergeJobConfigIntoSpec(localBlock, localCfg)   // local into empty block
-	MergeJobConfigIntoSpec(localBlock, serverCfg)   // server as lower-precedence overlay
+	MergeJobConfigIntoSpec(localBlock, localCfg)  // local into empty block
+	MergeJobConfigIntoSpec(localBlock, serverCfg) // server as lower-precedence overlay
 
 	// Step 2: spec block with server+local as overlay → spec wins for shared keys.
 	MergeJobConfigIntoSpec(specBlock, &JobConfig{

@@ -193,7 +193,7 @@ func TestImportMigReposCommand_Run(t *testing.T) {
 			t.Errorf("expected Content-Type text/csv, got %s", ct)
 		}
 
-		resp := ImportMigReposResult{
+		resp := domainapi.MigRepoImportResponse{
 			Created: 2,
 			Updated: 1,
 			Failed:  0,

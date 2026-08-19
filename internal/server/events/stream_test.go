@@ -16,7 +16,7 @@ import (
 
 // TestServiceHubIntegration verifies that the service hub correctly handles
 // SSE event subscription, publishing, and stream closure. It tests the full
-// lifecycle: publish log event, subscribe to stream, publish status to close
+// lifecycle: publish stage event, subscribe to stream, publish status to close
 // stream, and verify all events are received in order.
 func TestStream_ServiceHubIntegration(t *testing.T) {
 	svc := newTestService(t, nil)
@@ -25,13 +25,13 @@ func TestStream_ServiceHubIntegration(t *testing.T) {
 	hub := svc.Hub()
 	runID := domaintypes.NewRunID()
 
-	// Publish a log event.
-	if err := hub.PublishLog(ctx, runID, logstream.LogRecord{
+	// Publish a stage event.
+	if err := hub.PublishStage(ctx, runID, logstream.LogRecord{
 		Timestamp: time.Now().Format(time.RFC3339),
 		Stream:    "stdout",
 		Line:      "test log line",
 	}); err != nil {
-		t.Fatalf("failed to publish log: %v", err)
+		t.Fatalf("failed to publish stage: %v", err)
 	}
 
 	// Subscribe to the stream.
@@ -61,8 +61,8 @@ func TestStream_ServiceHubIntegration(t *testing.T) {
 	if len(events) != 2 {
 		t.Fatalf("expected 2 events, got %d", len(events))
 	}
-	if events[0].Type != domaintypes.SSEEventLog {
-		t.Fatalf("expected first event type 'log', got %s", events[0].Type)
+	if events[0].Type != domaintypes.SSEEventStage {
+		t.Fatalf("expected first event type 'stage', got %s", events[0].Type)
 	}
 	if events[1].Type != domaintypes.SSEEventDone {
 		t.Fatalf("expected second event type 'done', got %s", events[1].Type)

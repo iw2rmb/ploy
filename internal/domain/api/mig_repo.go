@@ -24,3 +24,17 @@ type MigRepoSummary struct {
 type MigRepoListResponse struct {
 	Repos []MigRepoSummary `json:"repos"`
 }
+
+// MigRepoImportError identifies one failed CSV input line.
+type MigRepoImportError struct {
+	Line    int    `json:"line"`
+	Message string `json:"message"`
+}
+
+// MigRepoImportResponse reports the result of a bulk repository import.
+type MigRepoImportResponse struct {
+	Created int                  `json:"created"`
+	Updated int                  `json:"updated"`
+	Failed  int                  `json:"failed"`
+	Errors  []MigRepoImportError `json:"errors"`
+}

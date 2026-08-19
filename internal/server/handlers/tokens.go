@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	"github.com/iw2rmb/ploy/internal/server/auth"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -22,12 +23,7 @@ import (
 func createAPITokenHandler(st store.Store, tokenSecret string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Parse request with strict validation.
-		var req struct {
-			Role          string `json:"role"`
-			Username      string `json:"username,omitempty"`
-			Description   string `json:"description"`
-			ExpiresInDays int    `json:"expires_in_days"`
-		}
+		var req domainapi.CreateAPITokenRequest
 
 		if err := decodeRequestJSON(w, r, &req, DefaultMaxBodySize); err != nil {
 			return
@@ -101,14 +97,7 @@ func createAPITokenHandler(st store.Store, tokenSecret string) http.HandlerFunc 
 		}
 
 		// Return token (only shown once).
-		resp := struct {
-			Token     string    `json:"token"`
-			TokenID   string    `json:"token_id"`
-			Role      string    `json:"role"`
-			Username  *string   `json:"username,omitempty"`
-			ExpiresAt time.Time `json:"expires_at"`
-			Warning   string    `json:"warning"`
-		}{
+		resp := domainapi.CreateAPITokenResponse{
 			Token:     token,
 			TokenID:   claims.ID,
 			Role:      string(normalizedRole),
@@ -152,19 +141,7 @@ func listAPITokensHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Convert to response format.
-		type tokenResponse struct {
-			TokenID     string     `json:"token_id"`
-			Role        string     `json:"role"`
-			Username    *string    `json:"username,omitempty"`
-			Description *string    `json:"description,omitempty"`
-			IssuedAt    time.Time  `json:"issued_at"`
-			ExpiresAt   time.Time  `json:"expires_at"`
-			LastUsedAt  *time.Time `json:"last_used_at,omitempty"`
-			RevokedAt   *time.Time `json:"revoked_at,omitempty"`
-			CreatedBy   *string    `json:"created_by,omitempty"`
-		}
-
-		responseTokens := make([]tokenResponse, 0, len(tokens))
+		responseTokens := make([]domainapi.APITokenListItem, 0, len(tokens))
 		for _, t := range tokens {
 			var lastUsedAt *time.Time
 			if t.LastUsedAt.Valid {
@@ -175,7 +152,7 @@ func listAPITokensHandler(st store.Store) http.HandlerFunc {
 				revokedAt = &t.RevokedAt.Time
 			}
 
-			responseTokens = append(responseTokens, tokenResponse{
+			responseTokens = append(responseTokens, domainapi.APITokenListItem{
 				TokenID:     t.TokenID,
 				Role:        t.Role,
 				Username:    t.Username,
@@ -188,9 +165,7 @@ func listAPITokensHandler(st store.Store) http.HandlerFunc {
 			})
 		}
 
-		resp := struct {
-			Tokens []tokenResponse `json:"tokens"`
-		}{
+		resp := domainapi.APITokenListResponse{
 			Tokens: responseTokens,
 		}
 

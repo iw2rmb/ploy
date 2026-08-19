@@ -151,54 +151,40 @@ type ImportMigReposCommand struct {
 	CSVData []byte             // Required: CSV content with header: repo_url,base_ref
 }
 
-// ImportMigReposResult contains the response from bulk importing repos.
-type ImportMigReposResult struct {
-	Created int           `json:"created"`
-	Updated int           `json:"updated"`
-	Failed  int           `json:"failed"`
-	Errors  []ImportError `json:"errors"`
-}
-
-// ImportError represents a per-line error from CSV import.
-type ImportError struct {
-	Line    int    `json:"line"`
-	Message string `json:"message"`
-}
-
 // Run executes POST /v1/migs/{mig_id}/repos/bulk to import repos from CSV.
-func (c ImportMigReposCommand) Run(ctx context.Context) (ImportMigReposResult, error) {
+func (c ImportMigReposCommand) Run(ctx context.Context) (domainapi.MigRepoImportResponse, error) {
 	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
-		return ImportMigReposResult{}, fmt.Errorf("mig repo import: %w", err)
+		return domainapi.MigRepoImportResponse{}, fmt.Errorf("mig repo import: %w", err)
 	}
 	if err := c.MigRef.Validate(); err != nil {
-		return ImportMigReposResult{}, fmt.Errorf("mig repo import: mig id is required")
+		return domainapi.MigRepoImportResponse{}, fmt.Errorf("mig repo import: mig id is required")
 	}
 	if len(c.CSVData) == 0 {
-		return ImportMigReposResult{}, fmt.Errorf("mig repo import: csv data is required")
+		return domainapi.MigRepoImportResponse{}, fmt.Errorf("mig repo import: csv data is required")
 	}
 
 	// POST /v1/migs/{mig_id}/repos/bulk with Content-Type: text/csv
 	endpoint := c.BaseURL.JoinPath("v1", "migs", c.MigRef.String(), "repos", "bulk")
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), bytes.NewReader(c.CSVData))
 	if err != nil {
-		return ImportMigReposResult{}, fmt.Errorf("mig repo import: build request: %w", err)
+		return domainapi.MigRepoImportResponse{}, fmt.Errorf("mig repo import: build request: %w", err)
 	}
 	httpReq.Header.Set("Content-Type", "text/csv")
 
 	resp, err := c.Client.Do(httpReq)
 	if err != nil {
-		return ImportMigReposResult{}, fmt.Errorf("mig repo import: http request failed: %w", err)
+		return domainapi.MigRepoImportResponse{}, fmt.Errorf("mig repo import: http request failed: %w", err)
 	}
 	defer httpx.DrainAndClose(resp)
 
 	// Handle 200 OK response (bulk import always returns 200 with counts).
 	if resp.StatusCode == http.StatusOK {
-		var result ImportMigReposResult
+		var result domainapi.MigRepoImportResponse
 		if err := httpx.DecodeResponseJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
-			return ImportMigReposResult{}, fmt.Errorf("mig repo import: decode response: %w", err)
+			return domainapi.MigRepoImportResponse{}, fmt.Errorf("mig repo import: decode response: %w", err)
 		}
 		return result, nil
 	}
 
-	return ImportMigReposResult{}, httpx.WrapError("mig repo import", resp.Status, resp.Body)
+	return domainapi.MigRepoImportResponse{}, httpx.WrapError("mig repo import", resp.Status, resp.Body)
 }

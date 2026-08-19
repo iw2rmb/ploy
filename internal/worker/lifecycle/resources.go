@@ -12,14 +12,6 @@ import (
 	"github.com/shirou/gopsutil/v4/net"
 )
 
-type networkInterfaceSnapshot struct {
-	RXBytesPerSec   float64
-	TXBytesPerSec   float64
-	RXPacketsPerSec float64
-	TXPacketsPerSec float64
-	InitialSample   bool
-}
-
 type diskIOMetrics struct {
 	ReadMBps  float64
 	WriteMBps float64
@@ -33,7 +25,7 @@ type networkMetrics struct {
 	TXBytesPerSec   float64
 	RXPacketsPerSec float64
 	TXPacketsPerSec float64
-	Interfaces      map[string]networkInterfaceSnapshot
+	Interfaces      map[string]NetworkInterface
 	Initial         bool
 }
 
@@ -55,15 +47,10 @@ type resourceSnapshot struct {
 	NetworkRxPps         float64
 	NetworkTxPps         float64
 	NetworkInitialSample bool
-	NetworkInterfaces    map[string]networkInterfaceSnapshot
+	NetworkInterfaces    map[string]NetworkInterface
 }
 
 func (r resourceSnapshot) toNodeResources() NodeResources {
-	interfaces := make(map[string]NetworkInterface, len(r.NetworkInterfaces))
-	for name, iface := range r.NetworkInterfaces {
-		interfaces[name] = NetworkInterface(iface)
-	}
-
 	return NodeResources{
 		CPU: CPUResources{
 			TotalMCores: float64(r.CPUTotalMillis),
@@ -91,7 +78,7 @@ func (r resourceSnapshot) toNodeResources() NodeResources {
 			RXPacketsPerSec: r.NetworkRxPps,
 			TXPacketsPerSec: r.NetworkTxPps,
 			InitialSample:   r.NetworkInitialSample,
-			Interfaces:      interfaces,
+			Interfaces:      r.NetworkInterfaces,
 		},
 	}
 }

@@ -278,29 +278,11 @@ func (b *RunStatsBuilder) MetadataEntry(key, value string) *RunStatsBuilder {
 	return b
 }
 
-// Timings sets the timings field.
-func (b *RunStatsBuilder) Timings(t *runStatsTimings) *RunStatsBuilder {
-	b.acc.Timings = t
-	return b
-}
-
 // TimingsFromDurations sets the timings field from duration values in milliseconds.
 func (b *RunStatsBuilder) TimingsFromDurations(hydration, execution, diff, total int64) *RunStatsBuilder {
 	b.acc.Timings = &runStatsTimings{
 		HydrationDurationMs: hydration,
 		ExecutionDurationMs: execution,
-		DiffDurationMs:      diff,
-		TotalDurationMs:     total,
-	}
-	return b
-}
-
-// TimingsWithGate sets the timings field including build gate duration.
-func (b *RunStatsBuilder) TimingsWithGate(hydration, execution, gate, diff, total int64) *RunStatsBuilder {
-	b.acc.Timings = &runStatsTimings{
-		HydrationDurationMs: hydration,
-		ExecutionDurationMs: execution,
-		BuildGateDurationMs: gate,
 		DiffDurationMs:      diff,
 		TotalDurationMs:     total,
 	}
@@ -318,12 +300,6 @@ func (b *RunStatsBuilder) Gate(passed bool, durationMs int64) *RunStatsBuilder {
 			DurationMs: durationMs,
 		},
 	}
-	return b
-}
-
-// GateDetails sets the full gate object (pre-gate, final gate, resources, etc.).
-func (b *RunStatsBuilder) GateDetails(gate *RunStatsGate) *RunStatsBuilder {
-	b.acc.Gate = gate
 	return b
 }
 

@@ -45,18 +45,6 @@ func (b *baseUploader) UploadDiff(ctx context.Context, runID types.RunID, jobID 
 	return nil
 }
 
-// UploadArtifact creates a tar.gz bundle from the specified paths and uploads it to the server.
-func (b *baseUploader) UploadArtifact(ctx context.Context, runID types.RunID, jobID types.JobID, paths []string, name string) (string, string, error) {
-	if len(paths) == 0 {
-		return "", "", nil
-	}
-	bundleBytes, err := createTarGzBundle(paths)
-	if err != nil {
-		return "", "", fmt.Errorf("create tar.gz bundle: %w", err)
-	}
-	return b.uploadBundle(ctx, runID, jobID, bundleBytes, name)
-}
-
 // UploadArtifactEntries creates a tar.gz bundle from explicit source->archive mappings
 // and uploads it to the server.
 func (b *baseUploader) UploadArtifactEntries(ctx context.Context, runID types.RunID, jobID types.JobID, entries []ArtifactBundleEntry, name string) (string, string, error) {
@@ -145,23 +133,6 @@ func (b *baseUploader) UploadNodeDiagnostic(ctx context.Context, component, stat
 	)
 }
 
-// UploadNodeDaemonLogs stores recent daemon log lines outside run/job log streams.
-func (b *baseUploader) UploadNodeDaemonLogs(ctx context.Context, component, stream string, lines []string) error {
-	if len(lines) == 0 {
-		return nil
-	}
-	resp, err := b.postJSON(ctx, fmt.Sprintf("/v1/nodes/%s/daemon-logs", b.cfg.NodeID.String()), map[string]any{
-		"component": strings.TrimSpace(component),
-		"stream":    strings.TrimSpace(stream),
-		"lines":     lines,
-	}, http.StatusCreated, "upload node daemon logs")
-	if err != nil {
-		return err
-	}
-	_ = resp.Body.Close()
-	return nil
-}
-
 // UploadRunEvent posts a single structured event for a run.
 func (b *baseUploader) UploadRunEvent(
 	ctx context.Context,
@@ -231,25 +202,6 @@ func (b *baseUploader) DownloadSpecBundle(ctx context.Context, bundleID string) 
 	}
 	apiPath := fmt.Sprintf("/v1/spec-bundles/%s", bundleID)
 	return b.getBytesFromURL(ctx, MustBuildURL(b.cfg.ServerURL, apiPath), "download spec bundle "+bundleID)
-}
-
-// DownloadArtifactBundle fetches an artifact bundle archive by artifact ID.
-func (b *baseUploader) DownloadArtifactBundle(ctx context.Context, artifactID string) ([]byte, error) {
-	artifactID = strings.TrimSpace(artifactID)
-	if artifactID == "" {
-		return nil, fmt.Errorf("artifact_id is required")
-	}
-	apiPath := fmt.Sprintf("/v1/artifacts/%s?download=true", artifactID)
-	return b.getBytesFromURL(ctx, MustBuildURL(b.cfg.ServerURL, apiPath), "download artifact bundle "+artifactID)
-}
-
-// createTarGzBundle creates a gzipped tar archive from the given file paths.
-func createTarGzBundle(paths []string) ([]byte, error) {
-	entries := make([]ArtifactBundleEntry, 0, len(paths))
-	for _, p := range paths {
-		entries = append(entries, ArtifactBundleEntry{SourcePath: p})
-	}
-	return createTarGzBundleFromEntries(entries)
 }
 
 func createTarGzBundleFromEntries(entries []ArtifactBundleEntry) ([]byte, error) {

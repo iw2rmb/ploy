@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	"github.com/iw2rmb/ploy/internal/pki"
 	"github.com/iw2rmb/ploy/internal/server/auth"
 	"github.com/iw2rmb/ploy/internal/store"
@@ -32,10 +32,7 @@ var errCANotConfigured = errors.New("CA not configured")
 func createBootstrapTokenHandler(st store.Store, tokenSecret string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Parse request with strict validation.
-		var req struct {
-			NodeID           domaintypes.NodeID `json:"node_id"`
-			ExpiresInMinutes int                `json:"expires_in_minutes"`
-		}
+		var req domainapi.CreateBootstrapTokenRequest
 
 		if err := decodeRequestJSON(w, r, &req, DefaultMaxBodySize); err != nil {
 			return
@@ -101,11 +98,7 @@ func createBootstrapTokenHandler(st store.Store, tokenSecret string) http.Handle
 		}
 
 		// Return token.
-		resp := struct {
-			Token     string             `json:"token"`
-			NodeID    domaintypes.NodeID `json:"node_id"`
-			ExpiresAt time.Time          `json:"expires_at"`
-		}{
+		resp := domainapi.CreateBootstrapTokenResponse{
 			Token:     token,
 			NodeID:    nodeID,
 			ExpiresAt: expiresAt,

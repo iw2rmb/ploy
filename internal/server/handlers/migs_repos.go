@@ -225,11 +225,7 @@ func bulkUpsertMigReposHandler(st store.Store) http.HandlerFunc {
 
 		// Collect results.
 		var created, updated, failed int
-		type lineError struct {
-			Line    int    `json:"line"`
-			Message string `json:"message"`
-		}
-		errs := make([]lineError, 0)
+		errs := make([]domainapi.MigRepoImportError, 0)
 
 		lineNum := 0
 		headerRead := false
@@ -259,7 +255,7 @@ func bulkUpsertMigReposHandler(st store.Store) http.HandlerFunc {
 
 			if err != nil {
 				failed++
-				errs = append(errs, lineError{Line: lineNum, Message: fmt.Sprintf("CSV parse error: %v", err)})
+				errs = append(errs, domainapi.MigRepoImportError{Line: lineNum, Message: fmt.Sprintf("CSV parse error: %v", err)})
 				continue
 			}
 
@@ -270,26 +266,26 @@ func bulkUpsertMigReposHandler(st store.Store) http.HandlerFunc {
 			// Validate UTF-8.
 			if !utf8.ValidString(repoURL) || !utf8.ValidString(baseRef) {
 				failed++
-				errs = append(errs, lineError{Line: lineNum, Message: "invalid UTF-8 encoding"})
+				errs = append(errs, domainapi.MigRepoImportError{Line: lineNum, Message: "invalid UTF-8 encoding"})
 				continue
 			}
 
 			// Validate required fields.
 			if repoURL == "" {
 				failed++
-				errs = append(errs, lineError{Line: lineNum, Message: "repo_url is required"})
+				errs = append(errs, domainapi.MigRepoImportError{Line: lineNum, Message: "repo_url is required"})
 				continue
 			}
 			if baseRef == "" {
 				failed++
-				errs = append(errs, lineError{Line: lineNum, Message: "base_ref is required"})
+				errs = append(errs, domainapi.MigRepoImportError{Line: lineNum, Message: "base_ref is required"})
 				continue
 			}
 			// Normalize and validate repo URL.
 			normalizedURL := domaintypes.NormalizeRepoURL(repoURL)
 			if err := domaintypes.RepoURL(normalizedURL).Validate(); err != nil {
 				failed++
-				errs = append(errs, lineError{Line: lineNum, Message: fmt.Sprintf("invalid repo_url: %v", err)})
+				errs = append(errs, domainapi.MigRepoImportError{Line: lineNum, Message: fmt.Sprintf("invalid repo_url: %v", err)})
 				continue
 			}
 
@@ -301,7 +297,7 @@ func bulkUpsertMigReposHandler(st store.Store) http.HandlerFunc {
 			isUpdate := err == nil
 			if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 				failed++
-				errs = append(errs, lineError{Line: lineNum, Message: fmt.Sprintf("lookup failed: %v", err)})
+				errs = append(errs, domainapi.MigRepoImportError{Line: lineNum, Message: fmt.Sprintf("lookup failed: %v", err)})
 				continue
 			}
 
@@ -314,7 +310,7 @@ func bulkUpsertMigReposHandler(st store.Store) http.HandlerFunc {
 			})
 			if err != nil {
 				failed++
-				errs = append(errs, lineError{Line: lineNum, Message: fmt.Sprintf("upsert failed: %v", err)})
+				errs = append(errs, domainapi.MigRepoImportError{Line: lineNum, Message: fmt.Sprintf("upsert failed: %v", err)})
 				continue
 			}
 
@@ -331,12 +327,7 @@ func bulkUpsertMigReposHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Build response with counts and any errors.
-		resp := struct {
-			Created int         `json:"created"`
-			Updated int         `json:"updated"`
-			Failed  int         `json:"failed"`
-			Errors  []lineError `json:"errors"`
-		}{
+		resp := domainapi.MigRepoImportResponse{
 			Created: created,
 			Updated: updated,
 			Failed:  failed,

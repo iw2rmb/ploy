@@ -37,7 +37,7 @@ func BenchmarkHubPublishEnrichedLog(b *testing.B) {
 	b.ResetTimer()
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		_ = hub.PublishLog(ctx, runID, record)
+		_ = hub.PublishStage(ctx, runID, record)
 	}
 }
 
@@ -59,7 +59,7 @@ func BenchmarkHubPublishMinimalLog(b *testing.B) {
 	b.ResetTimer()
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		_ = hub.PublishLog(ctx, runID, record)
+		_ = hub.PublishStage(ctx, runID, record)
 	}
 }
 
@@ -86,7 +86,7 @@ func BenchmarkHubConcurrentPublishEnrichedLog(b *testing.B) {
 	b.ReportAllocs()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			_ = hub.PublishLog(ctx, runID, record)
+			_ = hub.PublishStage(ctx, runID, record)
 		}
 	})
 }
@@ -164,7 +164,7 @@ func TestHubHighVolumeEnrichedLogs(t *testing.T) {
 			JobID:     jobID,
 			JobType:   "mig",
 		}
-		if err := hub.PublishLog(ctx, runID, record); err != nil {
+		if err := hub.PublishStage(ctx, runID, record); err != nil {
 			t.Fatalf("publish log %d: %v", i, err)
 		}
 	}

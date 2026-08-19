@@ -18,6 +18,7 @@ import (
 
 	"github.com/iw2rmb/ploy/internal/cli/common"
 	"github.com/iw2rmb/ploy/internal/deploy"
+	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
@@ -282,9 +283,9 @@ func requestBootstrapToken(ctx context.Context, serverURL, nodeID string) (token
 		return "", time.Time{}, fmt.Errorf("resolve control plane: %w", err)
 	}
 
-	reqBody := map[string]interface{}{
-		"node_id":            nodeID,
-		"expires_in_minutes": 15, // 15 minute window for provisioning
+	reqBody := domainapi.CreateBootstrapTokenRequest{
+		NodeID:           domaintypes.NodeID(nodeID),
+		ExpiresInMinutes: 15,
 	}
 	bodyJSON, err := json.Marshal(reqBody)
 	if err != nil {
@@ -311,11 +312,7 @@ func requestBootstrapToken(ctx context.Context, serverURL, nodeID string) (token
 		return "", time.Time{}, fmt.Errorf("server returned %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
 	}
 
-	var result struct {
-		Token     string             `json:"token"`
-		NodeID    domaintypes.NodeID `json:"node_id"`
-		ExpiresAt time.Time          `json:"expires_at"`
-	}
+	var result domainapi.CreateBootstrapTokenResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return "", time.Time{}, fmt.Errorf("decode response: %w", err)
 	}

@@ -14,11 +14,11 @@ func TestHubConcurrentSubscribersWithResume(t *testing.T) {
 	runID := domaintypes.NewRunID()
 
 	// Publish initial events before any subscribers join.
-	if err := hub.PublishLog(ctx, runID, LogRecord{Timestamp: "2025-10-22T14:00:00Z", Stream: "stdout", Line: "event 1"}); err != nil {
-		t.Fatalf("publish log 1: %v", err)
+	if err := hub.PublishStage(ctx, runID, LogRecord{Timestamp: "2025-10-22T14:00:00Z", Stream: "stdout", Line: "event 1"}); err != nil {
+		t.Fatalf("publish stage 1: %v", err)
 	}
-	if err := hub.PublishLog(ctx, runID, LogRecord{Timestamp: "2025-10-22T14:00:01Z", Stream: "stdout", Line: "event 2"}); err != nil {
-		t.Fatalf("publish log 2: %v", err)
+	if err := hub.PublishStage(ctx, runID, LogRecord{Timestamp: "2025-10-22T14:00:01Z", Stream: "stdout", Line: "event 2"}); err != nil {
+		t.Fatalf("publish stage 2: %v", err)
 	}
 
 	// First subscriber joins from the start (sinceID=0).
@@ -71,11 +71,11 @@ func TestHubConcurrentSubscribersWithResume(t *testing.T) {
 	}
 
 	// Publish new events that both subscribers should receive concurrently.
-	if err := hub.PublishLog(ctx, runID, LogRecord{Timestamp: "2025-10-22T14:00:02Z", Stream: "stdout", Line: "event 3"}); err != nil {
-		t.Fatalf("publish log 3: %v", err)
+	if err := hub.PublishStage(ctx, runID, LogRecord{Timestamp: "2025-10-22T14:00:02Z", Stream: "stdout", Line: "event 3"}); err != nil {
+		t.Fatalf("publish stage 3: %v", err)
 	}
-	if err := hub.PublishLog(ctx, runID, LogRecord{Timestamp: "2025-10-22T14:00:03Z", Stream: "stdout", Line: "event 4"}); err != nil {
-		t.Fatalf("publish log 4: %v", err)
+	if err := hub.PublishStage(ctx, runID, LogRecord{Timestamp: "2025-10-22T14:00:03Z", Stream: "stdout", Line: "event 4"}); err != nil {
+		t.Fatalf("publish stage 4: %v", err)
 	}
 
 	// Third subscriber joins mid-stream with resumption (sinceID=3, should get event 4+).
@@ -192,8 +192,8 @@ func TestSubscribeClosedStreamFutureSince(t *testing.T) {
 	runID := domaintypes.NewRunID()
 
 	// Publish a couple of events and close the stream.
-	_ = hub.PublishLog(ctx, runID, LogRecord{Timestamp: "2025-10-22T15:00:00Z", Stream: "stdout", Line: "e1"})
-	_ = hub.PublishLog(ctx, runID, LogRecord{Timestamp: "2025-10-22T15:00:01Z", Stream: "stdout", Line: "e2"})
+	_ = hub.PublishStage(ctx, runID, LogRecord{Timestamp: "2025-10-22T15:00:00Z", Stream: "stdout", Line: "e1"})
+	_ = hub.PublishStage(ctx, runID, LogRecord{Timestamp: "2025-10-22T15:00:01Z", Stream: "stdout", Line: "e2"})
 	_ = hub.PublishStatus(ctx, runID, Status{Status: "completed"})
 
 	// Subscribe with sinceID far in the future; expect immediate close and no events.

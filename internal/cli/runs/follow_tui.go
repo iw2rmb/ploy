@@ -20,6 +20,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/cli/stream"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	migsapi "github.com/iw2rmb/ploy/internal/migs/api"
+	logstream "github.com/iw2rmb/ploy/internal/stream"
 )
 
 const defaultFollowPollInterval = 1 * time.Second
@@ -324,10 +325,7 @@ func (c FollowRunCommand) coordinate(
 			err := jobStreamClient.Stream(jobCtx, endpoint, func(evt stream.Event) error {
 				switch normalizeStatus(evt.Type) {
 				case "", "log":
-					var rec struct {
-						Stream string `json:"stream"`
-						Line   string `json:"line"`
-					}
+					var rec logstream.LogRecord
 					if err := json.Unmarshal(evt.Data, &rec); err != nil {
 						return nil
 					}

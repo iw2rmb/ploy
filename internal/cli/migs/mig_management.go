@@ -104,50 +104,30 @@ func (c RemoveMigCommand) Run(ctx context.Context) error {
 	return httpx.WrapError("mig remove", resp.Status, resp.Body)
 }
 
-// ArchiveMigCommand archives a mig project.
-// Endpoint: PATCH /v1/migs/{mig_ref}/archive
-// Refuses archival if the mig has running jobs.
-type ArchiveMigCommand struct {
-	Client  *http.Client
-	BaseURL *url.URL
-	MigRef  types.MigRef // Required: mig ID or name to archive.
+// SetMigArchivedCommand sets the archived state of a mig project.
+type SetMigArchivedCommand struct {
+	Client   *http.Client
+	BaseURL  *url.URL
+	MigRef   types.MigRef // Required: mig ID or name.
+	Archived bool
 }
 
-// Run executes PATCH /v1/migs/{mig_ref}/archive to archive a mig.
-func (c ArchiveMigCommand) Run(ctx context.Context) (domainapi.MigArchiveResponse, error) {
+// Run executes the archive or unarchive endpoint selected by Archived.
+func (c SetMigArchivedCommand) Run(ctx context.Context) (domainapi.MigArchiveResponse, error) {
+	action := "unarchive"
+	if c.Archived {
+		action = "archive"
+	}
+	op := "mig " + action
 	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
-		return domainapi.MigArchiveResponse{}, fmt.Errorf("mig archive: %w", err)
+		return domainapi.MigArchiveResponse{}, fmt.Errorf("%s: %w", op, err)
 	}
 	if err := c.MigRef.Validate(); err != nil {
-		return domainapi.MigArchiveResponse{}, fmt.Errorf("mig archive: mig ref is required")
+		return domainapi.MigArchiveResponse{}, fmt.Errorf("%s: mig ref is required", op)
 	}
 
-	// PATCH /v1/migs/{mig_ref}/archive
-	endpoint := c.BaseURL.JoinPath("v1", "migs", c.MigRef.String(), "archive")
-	return httpx.DoJSON[domainapi.MigArchiveResponse](ctx, c.Client, http.MethodPatch, endpoint.String(), nil, http.StatusOK, "mig archive")
-}
-
-// UnarchiveMigCommand unarchives a mig project.
-// Endpoint: PATCH /v1/migs/{mig_ref}/unarchive
-// Restores an archived mig to active status.
-type UnarchiveMigCommand struct {
-	Client  *http.Client
-	BaseURL *url.URL
-	MigRef  types.MigRef // Required: mig ID or name to unarchive.
-}
-
-// Run executes PATCH /v1/migs/{mig_ref}/unarchive to unarchive a mig.
-func (c UnarchiveMigCommand) Run(ctx context.Context) (domainapi.MigArchiveResponse, error) {
-	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
-		return domainapi.MigArchiveResponse{}, fmt.Errorf("mig unarchive: %w", err)
-	}
-	if err := c.MigRef.Validate(); err != nil {
-		return domainapi.MigArchiveResponse{}, fmt.Errorf("mig unarchive: mig ref is required")
-	}
-
-	// PATCH /v1/migs/{mig_ref}/unarchive
-	endpoint := c.BaseURL.JoinPath("v1", "migs", c.MigRef.String(), "unarchive")
-	return httpx.DoJSON[domainapi.MigArchiveResponse](ctx, c.Client, http.MethodPatch, endpoint.String(), nil, http.StatusOK, "mig unarchive")
+	endpoint := c.BaseURL.JoinPath("v1", "migs", c.MigRef.String(), action)
+	return httpx.DoJSON[domainapi.MigArchiveResponse](ctx, c.Client, http.MethodPatch, endpoint.String(), nil, http.StatusOK, op)
 }
 
 // SetMigSpecCommand creates a new spec row and updates migs.spec_id.

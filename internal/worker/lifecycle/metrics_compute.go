@@ -114,17 +114,17 @@ func computeDiskMetrics(prev, cur map[string]disk.IOCountersStat, elapsed float6
 
 func computeNetworkMetrics(prev, cur map[string]net.IOCountersStat, elapsed float64) (networkMetrics, bool) {
 	metrics := networkMetrics{
-		Interfaces: make(map[string]networkInterfaceSnapshot, len(cur)),
+		Interfaces: make(map[string]NetworkInterface, len(cur)),
 	}
 	var hasBaseline bool
 	for name, current := range cur {
 		if prev == nil {
-			metrics.Interfaces[name] = networkInterfaceSnapshot{InitialSample: true}
+			metrics.Interfaces[name] = NetworkInterface{InitialSample: true}
 			continue
 		}
 		prevStat, ok := prev[name]
 		if !ok {
-			metrics.Interfaces[name] = networkInterfaceSnapshot{InitialSample: true}
+			metrics.Interfaces[name] = NetworkInterface{InitialSample: true}
 			continue
 		}
 		hasBaseline = true
@@ -134,7 +134,7 @@ func computeNetworkMetrics(prev, cur map[string]net.IOCountersStat, elapsed floa
 		rxPackets := deltaUint(prevStat.PacketsRecv, current.PacketsRecv)
 		txPackets := deltaUint(prevStat.PacketsSent, current.PacketsSent)
 
-		iface := networkInterfaceSnapshot{
+		iface := NetworkInterface{
 			RXBytesPerSec:   float64(rxBytes) / elapsed,
 			TXBytesPerSec:   float64(txBytes) / elapsed,
 			RXPacketsPerSec: float64(rxPackets) / elapsed,

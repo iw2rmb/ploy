@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -196,14 +195,4 @@ func extractDst(field, entry string) string {
 		}
 		return entry
 	}
-}
-
-// SortedEnvKeys returns sorted keys from an envs map for deterministic output.
-func SortedEnvKeys(m map[string]string) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	return keys
 }

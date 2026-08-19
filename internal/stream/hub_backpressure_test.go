@@ -19,18 +19,18 @@ func TestHubBackpressureDropsSlowSubscriber(t *testing.T) {
 	}
 	defer sub.Cancel()
 
-	if err := hub.PublishLog(ctx, runID, LogRecord{Timestamp: "2025-10-22T12:05:00Z", Stream: "stdout", Line: "first"}); err != nil {
-		t.Fatalf("publish log first: %v", err)
+	if err := hub.PublishStage(ctx, runID, LogRecord{Timestamp: "2025-10-22T12:05:00Z", Stream: "stdout", Line: "first"}); err != nil {
+		t.Fatalf("publish stage first: %v", err)
 	}
-	if err := hub.PublishLog(ctx, runID, LogRecord{Timestamp: "2025-10-22T12:05:01Z", Stream: "stdout", Line: "second"}); err != nil {
-		t.Fatalf("publish log second: %v", err)
+	if err := hub.PublishStage(ctx, runID, LogRecord{Timestamp: "2025-10-22T12:05:01Z", Stream: "stdout", Line: "second"}); err != nil {
+		t.Fatalf("publish stage second: %v", err)
 	}
 
 	evt, ok := <-sub.Events
 	if !ok {
 		t.Fatal("expected first log event before drop")
 	}
-	if evt.Type != domaintypes.SSEEventLog {
+	if evt.Type != domaintypes.SSEEventStage {
 		t.Fatalf("unexpected event type %s", evt.Type)
 	}
 	if _, ok := <-sub.Events; ok {
@@ -69,8 +69,8 @@ func TestHubBackpressureWithEnrichedLogs(t *testing.T) {
 			JobType:   "mig",
 		}
 		// Should not block; slow subscriber should be dropped.
-		if err := hub.PublishLog(ctx, runID, record); err != nil {
-			t.Fatalf("publish log %d: %v", i, err)
+		if err := hub.PublishStage(ctx, runID, record); err != nil {
+			t.Fatalf("publish stage %d: %v", i, err)
 		}
 	}
 
@@ -81,8 +81,8 @@ func TestHubBackpressureWithEnrichedLogs(t *testing.T) {
 			t.Log("subscriber channel closed (expected due to backpressure)")
 			return
 		}
-		if evt.Type != domaintypes.SSEEventLog {
-			t.Fatalf("expected event type 'log', got %s", evt.Type)
+		if evt.Type != domaintypes.SSEEventStage {
+			t.Fatalf("expected event type 'stage', got %s", evt.Type)
 		}
 	case <-time.After(100 * time.Millisecond):
 		t.Fatal("timeout waiting for first event")

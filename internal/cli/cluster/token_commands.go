@@ -7,13 +7,15 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"github.com/iw2rmb/ploy/internal/cli/common"
 	"io"
 	"net/http"
 	"os"
 	"strings"
 	"text/tabwriter"
 	"time"
+
+	"github.com/iw2rmb/ploy/internal/cli/common"
+	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 )
 
 // handleToken routes token subcommands.
@@ -99,19 +101,19 @@ func handleTokenCreate(args []string, stderr io.Writer) error {
 	}
 
 	// Prepare request
-	reqBody := map[string]interface{}{
-		"role": role.Value,
+	reqBody := domainapi.CreateAPITokenRequest{
+		Role: role.Value,
 	}
 	if username.IsSet && strings.TrimSpace(username.Value) != "" {
-		reqBody["username"] = strings.TrimSpace(username.Value)
+		reqBody.Username = strings.TrimSpace(username.Value)
 	}
 	if description.IsSet && strings.TrimSpace(description.Value) != "" {
-		reqBody["description"] = description.Value
+		reqBody.Description = description.Value
 	}
 	if expiresInDays.IsSet && expiresInDays.Value > 0 {
-		reqBody["expires_in_days"] = expiresInDays.Value
+		reqBody.ExpiresInDays = expiresInDays.Value
 	} else {
-		reqBody["expires_in_days"] = 365 // Default
+		reqBody.ExpiresInDays = 365
 	}
 
 	bodyJSON, err := json.Marshal(reqBody)
@@ -138,14 +140,7 @@ func handleTokenCreate(args []string, stderr io.Writer) error {
 		return common.ControlPlaneHTTPError(resp)
 	}
 
-	var result struct {
-		Token     string    `json:"token"`
-		TokenID   string    `json:"token_id"`
-		Role      string    `json:"role"`
-		Username  *string   `json:"username"`
-		ExpiresAt time.Time `json:"expires_at"`
-		Warning   string    `json:"warning"`
-	}
+	var result domainapi.CreateAPITokenResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return fmt.Errorf("decode response: %w", err)
 	}
@@ -229,18 +224,7 @@ func handleTokenList(args []string, stderr io.Writer) error {
 		return common.ControlPlaneHTTPError(resp)
 	}
 
-	var result struct {
-		Tokens []struct {
-			TokenID     string     `json:"token_id"`
-			Role        string     `json:"role"`
-			Username    *string    `json:"username"`
-			Description *string    `json:"description"`
-			IssuedAt    time.Time  `json:"issued_at"`
-			ExpiresAt   time.Time  `json:"expires_at"`
-			LastUsedAt  *time.Time `json:"last_used_at"`
-			RevokedAt   *time.Time `json:"revoked_at"`
-		} `json:"tokens"`
-	}
+	var result domainapi.APITokenListResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return fmt.Errorf("decode response: %w", err)
 	}

@@ -27,22 +27,8 @@ import (
 //
 // On gate failure, returns ErrGateFailed so callers can detect failures.
 func RunGateOnly(ctx context.Context, r *Runner, req Request) (Result, error) {
-	totalStart := time.Now()
-	var result Result
-
-	// Stage 1: Hydrate workspace (optional).
-	hydrationDuration, err := r.hydrate(ctx, req)
+	result, totalStart, err := r.runHydrationAndGate(ctx, req, "gate validation failed")
 	if err != nil {
-		return Result{}, err
-	}
-	result.Timings.HydrationDuration = hydrationDuration
-
-	// Stage 2: Build Gate validation — the primary purpose of RunGateOnly.
-	gateMetadata, gateDuration, err := r.runGate(ctx, req, "gate validation failed")
-	result.Gate = gateMetadata
-	result.Timings.GateDuration = gateDuration
-	if err != nil {
-		result.Timings.TotalDuration = types.Duration(time.Since(totalStart))
 		return result, err
 	}
 

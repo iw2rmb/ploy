@@ -13,11 +13,11 @@ func TestHubPublishAndResume(t *testing.T) {
 	ctx := context.Background()
 	runID := domaintypes.NewRunID()
 
-	if err := hub.PublishLog(ctx, runID, LogRecord{Timestamp: "2025-10-22T12:00:00Z", Stream: "stdout", Line: "line one"}); err != nil {
-		t.Fatalf("publish log: %v", err)
+	if err := hub.PublishStage(ctx, runID, LogRecord{Timestamp: "2025-10-22T12:00:00Z", Stream: "stdout", Line: "stage one"}); err != nil {
+		t.Fatalf("publish stage: %v", err)
 	}
-	if err := hub.PublishRetention(ctx, runID, RetentionHint{Retained: true, TTL: "72h", Bundle: "bafy-logs"}); err != nil {
-		t.Fatalf("publish retention: %v", err)
+	if err := hub.PublishStage(ctx, runID, LogRecord{Timestamp: "2025-10-22T12:00:01Z", Stream: "stdout", Line: "stage two"}); err != nil {
+		t.Fatalf("publish stage: %v", err)
 	}
 	if err := hub.PublishStatus(ctx, runID, Status{Status: "completed"}); err != nil {
 		t.Fatalf("publish status: %v", err)
@@ -29,7 +29,7 @@ func TestHubPublishAndResume(t *testing.T) {
 	}
 	defer sub.Cancel()
 
-	expect := []domaintypes.SSEEventType{domaintypes.SSEEventLog, domaintypes.SSEEventRetention, domaintypes.SSEEventDone}
+	expect := []domaintypes.SSEEventType{domaintypes.SSEEventStage, domaintypes.SSEEventStage, domaintypes.SSEEventDone}
 	received := make([]domaintypes.SSEEventType, 0, len(expect))
 	for evt := range sub.Events {
 		received = append(received, evt.Type)
@@ -56,11 +56,11 @@ func TestHubPublishAndResume(t *testing.T) {
 	for evt := range resume.Events {
 		resumed = append(resumed, evt.Type)
 	}
-	if len(resumed) != 2 || resumed[0] != domaintypes.SSEEventRetention || resumed[1] != domaintypes.SSEEventDone {
+	if len(resumed) != 2 || resumed[0] != domaintypes.SSEEventStage || resumed[1] != domaintypes.SSEEventDone {
 		t.Fatalf("unexpected resumed events: %v", resumed)
 	}
 
-	if err := hub.PublishLog(ctx, runID, LogRecord{Timestamp: "2025-10-22T12:00:01Z", Stream: "stdout", Line: "late"}); !errors.Is(err, ErrStreamClosed) {
+	if err := hub.PublishStage(ctx, runID, LogRecord{Timestamp: "2025-10-22T12:00:02Z", Stream: "stdout", Line: "late"}); !errors.Is(err, ErrStreamClosed) {
 		t.Fatalf("expected ErrStreamClosed, got %v", err)
 	}
 }

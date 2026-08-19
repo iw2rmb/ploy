@@ -42,18 +42,3 @@ func TestManifestReferenceJSONStable(t *testing.T) {
 		t.Fatalf("roundtrip mismatch: got %+v want %+v", got, want)
 	}
 }
-
-func TestStageNameJSONRoundtrip(t *testing.T) {
-	var want StageName = "migs-plan"
-	payload, err := json.Marshal(want)
-	if err != nil {
-		t.Fatalf("marshal: %v", err)
-	}
-	var got StageName
-	if err := json.Unmarshal(payload, &got); err != nil {
-		t.Fatalf("unmarshal: %v", err)
-	}
-	if got != want {
-		t.Fatalf("roundtrip mismatch: got %q want %q", got, want)
-	}
-}

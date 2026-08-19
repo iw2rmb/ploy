@@ -78,8 +78,8 @@ func TestLogRecordEnrichedFields(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			runID := domaintypes.NewRunID()
 
-			if err := hub.PublishLog(ctx, runID, tt.record); err != nil {
-				t.Fatalf("publish log: %v", err)
+			if err := hub.PublishStage(ctx, runID, tt.record); err != nil {
+				t.Fatalf("publish stage: %v", err)
 			}
 
 			snapshot := hub.Snapshot(runID)
@@ -88,8 +88,8 @@ func TestLogRecordEnrichedFields(t *testing.T) {
 			}
 
 			evt := snapshot[len(snapshot)-1]
-			if evt.Type != domaintypes.SSEEventLog {
-				t.Fatalf("expected event type 'log', got %s", evt.Type)
+			if evt.Type != domaintypes.SSEEventStage {
+				t.Fatalf("expected event type 'stage', got %s", evt.Type)
 			}
 
 			// Unmarshal into a generic map to check exact JSON shape.
@@ -151,15 +151,15 @@ func TestHubEnrichedLogPayloadSize(t *testing.T) {
 	defer sub.Cancel()
 
 	// Publish the large log record.
-	if err := hub.PublishLog(ctx, runID, record); err != nil {
-		t.Fatalf("publish log: %v", err)
+	if err := hub.PublishStage(ctx, runID, record); err != nil {
+		t.Fatalf("publish stage: %v", err)
 	}
 
 	// Verify subscriber receives the full record.
 	select {
 	case evt := <-sub.Events:
-		if evt.Type != domaintypes.SSEEventLog {
-			t.Fatalf("expected event type 'log', got %s", evt.Type)
+		if evt.Type != domaintypes.SSEEventStage {
+			t.Fatalf("expected event type 'stage', got %s", evt.Type)
 		}
 
 		// Verify the JSON payload is valid and contains the full line.

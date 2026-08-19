@@ -91,22 +91,8 @@ var ErrGateFailed = errors.New("build gate failed")
 
 // Run executes a step and returns the result.
 func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
-	totalStart := time.Now()
-	var result Result
-
-	// Stage 1: Hydrate workspace.
-	hydrationDuration, err := r.hydrate(ctx, req)
+	result, totalStart, err := r.runHydrationAndGate(ctx, req, "pre-mig validation failed")
 	if err != nil {
-		return Result{}, err
-	}
-	result.Timings.HydrationDuration = hydrationDuration
-
-	// Stage 2: Pre-mig Build Gate validation.
-	gateMetadata, gateDuration, err := r.runGate(ctx, req, "pre-mig validation failed")
-	result.Gate = gateMetadata
-	result.Timings.GateDuration = gateDuration
-	if err != nil {
-		result.Timings.TotalDuration = types.Duration(time.Since(totalStart))
 		return result, err
 	}
 
@@ -175,6 +161,27 @@ func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 
 	result.Timings.TotalDuration = types.Duration(time.Since(totalStart))
 	return result, nil
+}
+
+func (r *Runner) runHydrationAndGate(ctx context.Context, req Request, gateFailureMessage string) (Result, time.Time, error) {
+	totalStart := time.Now()
+	var result Result
+
+	hydrationDuration, err := r.hydrate(ctx, req)
+	if err != nil {
+		return Result{}, totalStart, err
+	}
+	result.Timings.HydrationDuration = hydrationDuration
+
+	gateMetadata, gateDuration, err := r.runGate(ctx, req, gateFailureMessage)
+	result.Gate = gateMetadata
+	result.Timings.GateDuration = gateDuration
+	if err != nil {
+		result.Timings.TotalDuration = types.Duration(time.Since(totalStart))
+		return result, totalStart, err
+	}
+
+	return result, totalStart, nil
 }
 
 // NormalizeContainerResourceUsage converts Docker counters to persisted job metrics.

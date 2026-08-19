@@ -3,27 +3,12 @@
 package blobpersist
 
 import (
-	"archive/tar"
-	"bytes"
-	"compress/gzip"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
-	"path"
-	"strings"
 
 	"github.com/iw2rmb/ploy/internal/blobstore"
-	"github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
-	"github.com/jackc/pgx/v5"
-)
-
-var (
-	ErrRecoveryArtifactNotFound    = errors.New("recovery artifact not found")
-	ErrRecoveryArtifactUnreadable  = errors.New("recovery artifact unreadable")
-	ErrRecoveryArtifactInvalidJSON = errors.New("recovery artifact invalid json payload")
 )
 
 // Service coordinates database metadata and object storage writes.
@@ -122,58 +107,6 @@ func (s *Service) CreateDiff(ctx context.Context, params store.CreateDiffParams,
 	)
 }
 
-// CloneLatestDiffByJob clones the latest diff produced by sourceJobID into
-// (targetRunID, targetJobID). The operation is idempotent:
-// - If target job already has a diff, it is a no-op.
-// - If source job has no diff, it is a no-op.
-func (s *Service) CloneLatestDiffByJob(ctx context.Context, sourceJobID, targetRunID, targetJobID string) error {
-	if err := s.validate(); err != nil {
-		return err
-	}
-	if strings.TrimSpace(sourceJobID) == "" || strings.TrimSpace(targetRunID) == "" || strings.TrimSpace(targetJobID) == "" {
-		return fmt.Errorf("clone latest diff: source_job_id, target_run_id, and target_job_id are required")
-	}
-
-	targetID := types.JobID(targetJobID)
-	if _, err := s.store.GetLatestDiffByJob(ctx, &targetID); err == nil {
-		return nil
-	} else if !errors.Is(err, pgx.ErrNoRows) {
-		return fmt.Errorf("clone latest diff: lookup target diff: %w", err)
-	}
-
-	sourceID := types.JobID(sourceJobID)
-	sourceDiff, err := s.store.GetLatestDiffByJob(ctx, &sourceID)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil
-	}
-	if err != nil {
-		return fmt.Errorf("clone latest diff: lookup source diff: %w", err)
-	}
-	if sourceDiff.ObjectKey == nil || strings.TrimSpace(*sourceDiff.ObjectKey) == "" {
-		return nil
-	}
-
-	patch, err := blobstore.ReadAll(ctx, s.blobstore, *sourceDiff.ObjectKey)
-	if err != nil {
-		return fmt.Errorf("clone latest diff: read source blob: %w", err)
-	}
-	if len(patch) == 0 {
-		return nil
-	}
-
-	targetRun := types.RunID(targetRunID)
-	targetJob := types.JobID(targetJobID)
-	_, err = s.CreateDiff(ctx, store.CreateDiffParams{
-		RunID:   targetRun,
-		JobID:   &targetJob,
-		Summary: sourceDiff.Summary,
-	}, patch)
-	if err != nil {
-		return fmt.Errorf("clone latest diff: create target diff: %w", err)
-	}
-	return nil
-}
-
 // CreateArtifactBundle creates an artifact bundle entry in the database and uploads the bundle to object storage.
 func (s *Service) CreateArtifactBundle(ctx context.Context, params store.CreateArtifactBundleParams, bundle []byte) (store.ArtifactBundle, error) {
 	return persistBlob(ctx, s, bundle,
@@ -204,118 +137,4 @@ func (s *Service) CreateSpecBundle(ctx context.Context, params store.CreateSpecB
 			return s.store.DeleteSpecBundle(ctx, row.ID)
 		},
 	)
-}
-
-// LoadRecoveryArtifact resolves and reads a specific artifact path from persisted
-// job artifact bundles. expectedPath must use absolute wire form (for example
-// "/out/custom-artifact.json").
-func (s *Service) LoadRecoveryArtifact(ctx context.Context, runID types.RunID, jobID types.JobID, expectedPath string) ([]byte, error) {
-	if err := s.validate(); err != nil {
-		return nil, err
-	}
-	canonicalPath, err := canonicalRecoveryArtifactPath(expectedPath)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrRecoveryArtifactUnreadable, err)
-	}
-
-	bundles, err := s.store.ListArtifactBundlesByRunAndJob(ctx, store.ListArtifactBundlesByRunAndJobParams{
-		RunID: runID,
-		JobID: &jobID,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("%w: list artifact bundles: %v", ErrRecoveryArtifactUnreadable, err)
-	}
-
-	var firstUnreadable error
-	for _, bundle := range bundles {
-		if bundle.ObjectKey == nil || strings.TrimSpace(*bundle.ObjectKey) == "" {
-			if firstUnreadable == nil {
-				firstUnreadable = fmt.Errorf("bundle %x has empty object key", bundle.ID.Bytes)
-			}
-			continue
-		}
-
-		bundleBytes, getErr := blobstore.ReadAll(ctx, s.blobstore, *bundle.ObjectKey)
-		if getErr != nil {
-			if firstUnreadable == nil {
-				firstUnreadable = fmt.Errorf("read bundle %q: %w", *bundle.ObjectKey, getErr)
-			}
-			continue
-		}
-
-		raw, found, readErr := readArtifactFromTarGz(bytes.NewReader(bundleBytes), canonicalPath)
-		if readErr != nil {
-			if firstUnreadable == nil {
-				firstUnreadable = fmt.Errorf("parse bundle %q: %w", *bundle.ObjectKey, readErr)
-			}
-			continue
-		}
-		if !found {
-			continue
-		}
-
-		if !json.Valid(raw) {
-			return nil, fmt.Errorf("%w: path=%s", ErrRecoveryArtifactInvalidJSON, expectedPath)
-		}
-		return raw, nil
-	}
-
-	if firstUnreadable != nil {
-		return nil, fmt.Errorf("%w: %v", ErrRecoveryArtifactUnreadable, firstUnreadable)
-	}
-	return nil, fmt.Errorf("%w: path=%s", ErrRecoveryArtifactNotFound, expectedPath)
-}
-
-func canonicalRecoveryArtifactPath(expectedPath string) (string, error) {
-	p := strings.TrimSpace(expectedPath)
-	if p == "" {
-		return "", fmt.Errorf("expected artifact path is required")
-	}
-	cleaned := path.Clean("/" + strings.TrimPrefix(p, "/"))
-	if cleaned == "/" || strings.HasPrefix(cleaned, "/../") {
-		return "", fmt.Errorf("invalid expected artifact path %q", expectedPath)
-	}
-	return strings.TrimPrefix(cleaned, "/"), nil
-}
-
-func normalizeTarEntryPath(name string) string {
-	n := strings.TrimSpace(name)
-	if n == "" {
-		return ""
-	}
-	cleaned := path.Clean("/" + strings.TrimPrefix(n, "/"))
-	if cleaned == "/" || strings.HasPrefix(cleaned, "/../") {
-		return ""
-	}
-	return strings.TrimPrefix(cleaned, "/")
-}
-
-func readArtifactFromTarGz(r io.Reader, expectedEntry string) ([]byte, bool, error) {
-	gzReader, err := gzip.NewReader(r)
-	if err != nil {
-		return nil, false, fmt.Errorf("open gzip: %w", err)
-	}
-	defer func() { _ = gzReader.Close() }()
-
-	tr := tar.NewReader(gzReader)
-	for {
-		hdr, err := tr.Next()
-		if errors.Is(err, io.EOF) {
-			return nil, false, nil
-		}
-		if err != nil {
-			return nil, false, fmt.Errorf("read tar entry: %w", err)
-		}
-		if hdr == nil || hdr.Typeflag == tar.TypeDir {
-			continue
-		}
-		if normalizeTarEntryPath(hdr.Name) != expectedEntry {
-			continue
-		}
-		data, readErr := io.ReadAll(tr)
-		if readErr != nil {
-			return nil, false, fmt.Errorf("read tar payload: %w", readErr)
-		}
-		return bytes.TrimSpace(data), true, nil
-	}
 }

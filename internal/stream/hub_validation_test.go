@@ -72,32 +72,17 @@ func TestRunIDRejectedAtStreamBoundary(t *testing.T) {
 		{"whitespace-only-mixed", domaintypes.RunID(" \t\n ")},
 	}
 
-	// Test PublishLog rejects invalid run IDs.
-	t.Run("PublishLog", func(t *testing.T) {
+	// Test PublishStage rejects invalid run IDs.
+	t.Run("PublishStage", func(t *testing.T) {
 		for _, tt := range invalidRunIDs {
 			t.Run(tt.name, func(t *testing.T) {
-				err := hub.PublishLog(ctx, tt.runID, LogRecord{
+				err := hub.PublishStage(ctx, tt.runID, LogRecord{
 					Timestamp: "2025-12-01T10:00:00Z",
 					Stream:    "stdout",
 					Line:      "test line",
 				})
 				if !errors.Is(err, ErrInvalidRunID) {
-					t.Errorf("PublishLog: expected ErrInvalidRunID, got %v", err)
-				}
-			})
-		}
-	})
-
-	// Test PublishRetention rejects invalid run IDs.
-	t.Run("PublishRetention", func(t *testing.T) {
-		for _, tt := range invalidRunIDs {
-			t.Run(tt.name, func(t *testing.T) {
-				err := hub.PublishRetention(ctx, tt.runID, RetentionHint{
-					Retained: true,
-					TTL:      "72h",
-				})
-				if !errors.Is(err, ErrInvalidRunID) {
-					t.Errorf("PublishRetention: expected ErrInvalidRunID, got %v", err)
+					t.Errorf("PublishStage: expected ErrInvalidRunID, got %v", err)
 				}
 			})
 		}
@@ -163,13 +148,13 @@ func TestRunIDRejectedAtStreamBoundary(t *testing.T) {
 			t.Errorf("Ensure: unexpected error for valid run ID: %v", err)
 		}
 
-		// PublishLog should succeed.
-		if err := hub.PublishLog(ctx, validRunID, LogRecord{
+		// PublishStage should succeed.
+		if err := hub.PublishStage(ctx, validRunID, LogRecord{
 			Timestamp: "2025-12-01T10:00:00Z",
 			Stream:    "stdout",
 			Line:      "valid log",
 		}); err != nil {
-			t.Errorf("PublishLog: unexpected error for valid run ID: %v", err)
+			t.Errorf("PublishStage: unexpected error for valid run ID: %v", err)
 		}
 
 		// Subscribe should succeed.

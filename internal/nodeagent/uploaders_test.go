@@ -160,7 +160,7 @@ func TestUploader_SizeCap(t *testing.T) {
 				if err := os.WriteFile(f, incompressibleBytes(MaxUploadSize+1), 0600); err != nil {
 					t.Fatalf("write large file: %v", err)
 				}
-				_, _, err := u.UploadArtifact(ctx, "test-run-id", "test-job-id", []string{f}, "")
+				_, _, err := u.UploadArtifactEntries(ctx, "test-run-id", "test-job-id", []ArtifactBundleEntry{{SourcePath: f}}, "")
 				return err
 			},
 		},
@@ -184,7 +184,7 @@ func TestUploader_SizeCap(t *testing.T) {
 
 // --- ArtifactUploader tests ---
 
-func TestArtifactUploader_UploadArtifact(t *testing.T) {
+func TestArtifactUploader_UploadArtifactEntries(t *testing.T) {
 	tests := []struct {
 		name       string
 		files      map[string]string // filename -> content; nil means no files
@@ -223,7 +223,7 @@ func TestArtifactUploader_UploadArtifact(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create temp files from declarative map.
-			var paths []string
+			var entries []ArtifactBundleEntry
 			if tt.files != nil {
 				tmpDir := t.TempDir()
 				for name, content := range tt.files {
@@ -231,7 +231,7 @@ func TestArtifactUploader_UploadArtifact(t *testing.T) {
 					if err := os.WriteFile(p, []byte(content), 0600); err != nil {
 						t.Fatalf("create test file: %v", err)
 					}
-					paths = append(paths, p)
+					entries = append(entries, ArtifactBundleEntry{SourcePath: p})
 				}
 			}
 
@@ -247,8 +247,8 @@ func TestArtifactUploader_UploadArtifact(t *testing.T) {
 			}
 
 			uploader := newTestUploader(t, serverURL)
-			_, _, err := uploader.UploadArtifact(context.Background(),
-				"test-run-id", "test-job-id", paths, "test-bundle")
+			_, _, err := uploader.UploadArtifactEntries(context.Background(),
+				"test-run-id", "test-job-id", entries, "test-bundle")
 			checkErr(t, tt.wantErr, err)
 
 			if tt.verify != nil && calls != nil {
@@ -258,9 +258,9 @@ func TestArtifactUploader_UploadArtifact(t *testing.T) {
 	}
 }
 
-// --- CreateTarGzBundle tests ---
+// --- createTarGzBundleFromEntries tests ---
 
-func TestCreateTarGzBundle_Files(t *testing.T) {
+func TestCreateTarGzBundleFromEntries_Files(t *testing.T) {
 	tests := []struct {
 		name  string
 		files map[string]string // filename -> content
@@ -278,16 +278,16 @@ func TestCreateTarGzBundle_Files(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tmpDir := t.TempDir()
-			var paths []string
+			var entries []ArtifactBundleEntry
 			for name, content := range tt.files {
 				p := filepath.Join(tmpDir, name)
 				if err := os.WriteFile(p, []byte(content), 0600); err != nil {
 					t.Fatalf("create test file: %v", err)
 				}
-				paths = append(paths, p)
+				entries = append(entries, ArtifactBundleEntry{SourcePath: p})
 			}
 
-			bundleBytes, err := createTarGzBundle(paths)
+			bundleBytes, err := createTarGzBundleFromEntries(entries)
 			if err != nil {
 				t.Fatalf("create bundle: %v", err)
 			}
@@ -295,12 +295,12 @@ func TestCreateTarGzBundle_Files(t *testing.T) {
 				t.Fatal("expected non-empty bundle")
 			}
 
-			entries := tarEntriesFromBundle(t, bundleBytes)
+			archiveEntries := tarEntriesFromBundle(t, bundleBytes)
 
 			for name, content := range tt.files {
-				entry, ok := entries[name]
+				entry, ok := archiveEntries[name]
 				if !ok {
-					t.Errorf("expected %s in archive, got keys: %v", name, mapKeys(entries))
+					t.Errorf("expected %s in archive, got keys: %v", name, mapKeys(archiveEntries))
 					continue
 				}
 				if entry.Typeflag != tar.TypeReg {
@@ -314,7 +314,7 @@ func TestCreateTarGzBundle_Files(t *testing.T) {
 	}
 }
 
-func TestCreateTarGzBundle_DirectoryRecursive(t *testing.T) {
+func TestCreateTarGzBundleFromEntries_DirectoryRecursive(t *testing.T) {
 	tmpDir := t.TempDir()
 	rootDir := filepath.Join(tmpDir, "root")
 	if err := os.MkdirAll(filepath.Join(rootDir, "sub"), 0o755); err != nil {
@@ -329,7 +329,7 @@ func TestCreateTarGzBundle_DirectoryRecursive(t *testing.T) {
 		t.Fatalf("write b: %v", err)
 	}
 
-	bundleBytes, err := createTarGzBundle([]string{rootDir})
+	bundleBytes, err := createTarGzBundleFromEntries([]ArtifactBundleEntry{{SourcePath: rootDir}})
 	if err != nil {
 		t.Fatalf("create bundle: %v", err)
 	}
@@ -371,17 +371,17 @@ func TestCreateTarGzBundleFromEntries_CustomArchiveRoot(t *testing.T) {
 	}
 }
 
-func TestCreateTarGzBundle_NonExistentFile(t *testing.T) {
-	_, err := createTarGzBundle([]string{"/nonexistent/file.txt"})
+func TestCreateTarGzBundleFromEntries_NonExistentFile(t *testing.T) {
+	_, err := createTarGzBundleFromEntries([]ArtifactBundleEntry{{SourcePath: "/nonexistent/file.txt"}})
 	if err == nil {
 		t.Error("expected error for non-existent file")
 	}
 }
 
-// TestCreateTarGzBundle_SymlinkPreserved verifies that symlinks in a directory
+// TestCreateTarGzBundleFromEntries_SymlinkPreserved verifies that symlinks in a directory
 // are archived as symlinks (TypeSymlink header), not as regular files with
 // followed content. External symlinks are skipped for security.
-func TestCreateTarGzBundle_SymlinkPreserved(t *testing.T) {
+func TestCreateTarGzBundleFromEntries_SymlinkPreserved(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	workspaceDir := filepath.Join(tmpDir, "workspace")
@@ -405,7 +405,7 @@ func TestCreateTarGzBundle_SymlinkPreserved(t *testing.T) {
 		t.Fatalf("create internal symlink: %v", err)
 	}
 
-	bundleBytes, err := createTarGzBundle([]string{workspaceDir})
+	bundleBytes, err := createTarGzBundleFromEntries([]ArtifactBundleEntry{{SourcePath: workspaceDir}})
 	if err != nil {
 		t.Fatalf("create bundle: %v", err)
 	}

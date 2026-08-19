@@ -138,20 +138,6 @@ func (h *Hub) Ensure(runID domaintypes.RunID) error {
 	return nil
 }
 
-// PublishLog appends a log record to a stream.
-// Returns ErrInvalidRunID if the run ID is blank or whitespace-only.
-func (h *Hub) PublishLog(ctx context.Context, runID domaintypes.RunID, record LogRecord) error {
-	_, err := h.publish(ctx, runID, domaintypes.SSEEventLog, record)
-	return err
-}
-
-// PublishRetention appends a retention hint to a stream.
-// Returns ErrInvalidRunID if the run ID is blank or whitespace-only.
-func (h *Hub) PublishRetention(ctx context.Context, runID domaintypes.RunID, hint RetentionHint) error {
-	_, err := h.publish(ctx, runID, domaintypes.SSEEventRetention, hint)
-	return err
-}
-
 // PublishStatus appends a terminal status event and closes the stream.
 // Returns ErrInvalidRunID if the run ID is blank or whitespace-only.
 func (h *Hub) PublishStatus(ctx context.Context, runID domaintypes.RunID, status Status) error {
@@ -287,15 +273,6 @@ func (h *Hub) SnapshotJob(jobID domaintypes.JobID) []Event {
 	}
 	jobID = normalizeJobID(jobID)
 	return snapshotStream(h, h.jobStreams, jobID)
-}
-
-// CloseJob tears down the job stream and removes it from the hub.
-func (h *Hub) CloseJob(jobID domaintypes.JobID) {
-	if jobID.IsZero() {
-		return
-	}
-	jobID = normalizeJobID(jobID)
-	closeStream(h, h.jobStreams, jobID)
 }
 
 func (h *Hub) publishJob(ctx context.Context, jobID domaintypes.JobID, eventType domaintypes.SSEEventType, payload any) (*stream, error) {

@@ -103,28 +103,32 @@ func RunRemove(ctx context.Context, migRef string, output io.Writer) error {
 }
 
 func RunArchive(ctx context.Context, migRef string, output io.Writer) error {
-	base, httpClient, err := common.ResolveControlPlaneHTTP(ctx)
-	if err != nil {
-		return err
-	}
-	result, err := (migs.ArchiveMigCommand{Client: httpClient, BaseURL: base, MigRef: domaintypes.MigRef(migRef)}).Run(ctx)
-	if err != nil {
-		return err
-	}
-	_, _ = fmt.Fprintf(output, "Mig archived: %s (name: %s)\n", result.ID.String(), result.Name)
-	return nil
+	return runSetArchived(ctx, migRef, output, true)
 }
 
 func RunUnarchive(ctx context.Context, migRef string, output io.Writer) error {
+	return runSetArchived(ctx, migRef, output, false)
+}
+
+func runSetArchived(ctx context.Context, migRef string, output io.Writer, archived bool) error {
 	base, httpClient, err := common.ResolveControlPlaneHTTP(ctx)
 	if err != nil {
 		return err
 	}
-	result, err := (migs.UnarchiveMigCommand{Client: httpClient, BaseURL: base, MigRef: domaintypes.MigRef(migRef)}).Run(ctx)
+	result, err := (migs.SetMigArchivedCommand{
+		Client:   httpClient,
+		BaseURL:  base,
+		MigRef:   domaintypes.MigRef(migRef),
+		Archived: archived,
+	}).Run(ctx)
 	if err != nil {
 		return err
 	}
-	_, _ = fmt.Fprintf(output, "Mig unarchived: %s (name: %s)\n", result.ID.String(), result.Name)
+	action := "unarchived"
+	if archived {
+		action = "archived"
+	}
+	_, _ = fmt.Fprintf(output, "Mig %s: %s (name: %s)\n", action, result.ID.String(), result.Name)
 	return nil
 }
 
