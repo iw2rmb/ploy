@@ -43,14 +43,14 @@ func run(ctx context.Context, cfg config.Config, st store.Store, authorizer *aut
 		return fmt.Errorf("create named spec catalog: %w", err)
 	}
 
-	// Initialize PKI manager for certificate renewal.
+	// Initialize PKI certificate renewal.
 	rotator := pki.NewDefaultRotator(slog.Default())
-	pkiManager, err := pki.New(pki.Options{
+	pkiTask, err := pki.New(pki.Options{
 		Config:  cfg.PKI,
 		Rotator: rotator,
 	})
 	if err != nil {
-		return fmt.Errorf("create pki manager: %w", err)
+		return fmt.Errorf("create pki renewal task: %w", err)
 	}
 
 	// Initialize TTL worker.
@@ -124,14 +124,10 @@ func run(ctx context.Context, cfg config.Config, st store.Store, authorizer *aut
 	if staleRecoveryTask != nil {
 		sched.AddTask(staleRecoveryTask)
 	}
-	// Start PKI manager.
-	if err := pkiManager.Start(ctx); err != nil {
-		return fmt.Errorf("start pki manager: %w", err)
-	}
+	sched.AddTask(pkiTask)
 
 	// Start scheduler.
 	if err := sched.Start(ctx); err != nil {
-		_ = pkiManager.Stop(context.Background())
 		return fmt.Errorf("start scheduler: %w", err)
 	}
 
@@ -226,7 +222,6 @@ func run(ctx context.Context, cfg config.Config, st store.Store, authorizer *aut
 	if err := httpSrv.Start(ctx); err != nil {
 		// Ensure background tasks are stopped on failure.
 		_ = sched.Stop(context.Background())
-		_ = pkiManager.Stop(context.Background())
 		return fmt.Errorf("start http server: %w", err)
 	}
 
@@ -236,7 +231,6 @@ func run(ctx context.Context, cfg config.Config, st store.Store, authorizer *aut
 		_ = httpSrv.Stop(context.Background())
 		// Stop scheduler to avoid leaking background goroutines.
 		_ = sched.Stop(context.Background())
-		_ = pkiManager.Stop(context.Background())
 		return fmt.Errorf("start metrics server: %w", err)
 	}
 
@@ -257,11 +251,6 @@ func run(ctx context.Context, cfg config.Config, st store.Store, authorizer *aut
 	// Stop scheduler.
 	if err := sched.Stop(shutdownCtx); err != nil {
 		slog.Error("stop scheduler", "err", err)
-	}
-
-	// Stop PKI manager.
-	if err := pkiManager.Stop(shutdownCtx); err != nil {
-		slog.Error("stop pki manager", "err", err)
 	}
 
 	// Stop HTTP server.

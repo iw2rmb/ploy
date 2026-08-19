@@ -7,7 +7,6 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/server/gitlabtokens"
 	"github.com/iw2rmb/ploy/internal/store"
-	"github.com/iw2rmb/ploy/internal/workflow/lifecycle"
 )
 
 type WaveSummary struct {
@@ -47,24 +46,7 @@ func getWaveCounts(ctx context.Context, st store.Store, waveID domaintypes.WaveI
 	if err != nil {
 		return nil, err
 	}
-	counts := &domaintypes.RunCounts{}
-	for _, row := range rows {
-		counts.Total += row.Count
-		switch row.Status {
-		case domaintypes.RunStatusQueued:
-			counts.Queued = row.Count
-		case domaintypes.RunStatusRunning:
-			counts.Running = row.Count
-		case domaintypes.RunStatusSuccess:
-			counts.Success = row.Count
-		case domaintypes.RunStatusFail:
-			counts.Fail = row.Count
-		case domaintypes.RunStatusCancelled:
-			counts.Cancelled = row.Count
-		}
-	}
-	counts.DerivedStatus = lifecycle.DeriveWaveStatus(counts)
-	return counts, nil
+	return runCountsFromStatusRows(rows), nil
 }
 
 func getWaveHandler(st store.Store) http.HandlerFunc {

@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	corepki "github.com/iw2rmb/ploy/internal/pki"
 	"github.com/iw2rmb/ploy/internal/server/config"
 )
 
@@ -65,18 +66,20 @@ func (r *DefaultRotator) Renew(ctx context.Context, cfg config.PKIConfig) error 
 	}
 
 	// Attempt self-renew using cluster CA from env, else log a warning.
-	caCertPEM := strings.TrimSpace(os.Getenv("PLOY_SERVER_CA_CERT"))
-	caKeyPEM := strings.TrimSpace(os.Getenv("PLOY_SERVER_CA_KEY"))
-	if caCertPEM == "" || caKeyPEM == "" {
+	caCertBase64 := strings.TrimSpace(os.Getenv("PLOY_SERVER_CA_CERT"))
+	caKeyBase64 := strings.TrimSpace(os.Getenv("PLOY_SERVER_CA_KEY"))
+	if caCertBase64 == "" || caKeyBase64 == "" {
 		r.logger.Warn("pki renewal window reached; CA not configured in env, skipping self-issue",
 			"expires_in", until.String(), "cert", cfg.Certificate)
 		return nil
 	}
 
-	// Parse CA bundle
-	caCert, caKey, err := parseCA([]byte(caCertPEM), []byte(caKeyPEM))
+	ca, err := corepki.LoadBase64CA(caCertBase64, caKeyBase64)
 	if err != nil {
 		return fmt.Errorf("pki: parse CA: %w", err)
+	}
+	if !ca.Cert.IsCA {
+		return errors.New("pki: parse CA: provided CA cert is not a CA")
 	}
 
 	// Load existing private key
@@ -110,7 +113,7 @@ func (r *DefaultRotator) Renew(ctx context.Context, cfg config.PKIConfig) error 
 		IsCA:                  false,
 	}
 
-	der, err := x509.CreateCertificate(rand.Reader, tmpl, caCert, &priv.PublicKey, caKey)
+	der, err := x509.CreateCertificate(rand.Reader, tmpl, ca.Cert, &priv.PublicKey, ca.Key)
 	if err != nil {
 		return fmt.Errorf("pki: create certificate: %w", err)
 	}
@@ -151,22 +154,6 @@ func parseECPrivateKey(pemBytes []byte) (*ecdsa.PrivateKey, error) {
 		return nil, errors.New("unsupported private key type (want ECDSA)")
 	}
 	return ec, nil
-}
-
-func parseCA(certPEM, keyPEM []byte) (*x509.Certificate, *ecdsa.PrivateKey, error) {
-	cert, err := parseCert(certPEM)
-	if err != nil {
-		return nil, nil, err
-	}
-	// Require CA basic constraint
-	if !cert.IsCA {
-		return nil, nil, errors.New("provided CA cert is not a CA")
-	}
-	key, err := parseECPrivateKey(keyPEM)
-	if err != nil {
-		return nil, nil, err
-	}
-	return cert, key, nil
 }
 
 // newBigInt returns a large max for random serial generation (~128-bit).

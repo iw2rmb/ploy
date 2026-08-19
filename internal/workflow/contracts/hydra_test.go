@@ -50,153 +50,10 @@ func TestParseStoredEntrySupportsAllHydraFileKinds(t *testing.T) {
 	}
 }
 
-func TestParseStoredInEntry(t *testing.T) {
+func TestParseStoredEntry(t *testing.T) {
 	tests := []struct {
 		name     string
-		input    string
-		wantHash string
-		wantDst  string
-		wantErr  string
-	}{
-		{
-			name:     "valid entry",
-			input:    "abcdef0:/in/config.json",
-			wantHash: "abcdef0",
-			wantDst:  "/in/config.json",
-		},
-		{
-			name:     "valid with nested path",
-			input:    "1234567890abcdef:/in/subdir/file.txt",
-			wantHash: "1234567890abcdef",
-			wantDst:  "/in/subdir/file.txt",
-		},
-		{
-			name:     "double slash cleaned",
-			input:    "abcdef0:/in//tmp/pwn",
-			wantHash: "abcdef0",
-			wantDst:  "/in/tmp/pwn",
-		},
-		{
-			name:    "wrong domain",
-			input:   "abcdef0:/out/file",
-			wantErr: "destination must start with /in/",
-		},
-		{
-			name:    "invalid hash",
-			input:   "XYZ:/in/file",
-			wantErr: "invalid short hash",
-		},
-		{
-			name:    "path traversal",
-			input:   "abcdef0:/in/../etc/passwd",
-			wantErr: "destination must start with /in/",
-		},
-		{
-			name:    "no colon",
-			input:   "abcdef0",
-			wantErr: "expected format shortHash:dst",
-		},
-		{
-			name:    "hash too short",
-			input:   "abc:/in/x",
-			wantErr: "invalid short hash",
-		},
-	}
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			parsed, err := ParseStoredInEntry(tc.input)
-			if tc.wantErr != "" {
-				if err == nil {
-					t.Fatalf("expected error containing %q, got nil", tc.wantErr)
-				}
-				if !strings.Contains(err.Error(), tc.wantErr) {
-					t.Fatalf("error %q does not contain %q", err.Error(), tc.wantErr)
-				}
-				return
-			}
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if parsed.Hash != tc.wantHash {
-				t.Errorf("hash = %q, want %q", parsed.Hash, tc.wantHash)
-			}
-			if parsed.Dst != tc.wantDst {
-				t.Errorf("dst = %q, want %q", parsed.Dst, tc.wantDst)
-			}
-			if !parsed.ReadOnly {
-				t.Errorf("in entries must be read-only")
-			}
-		})
-	}
-}
-
-func TestParseStoredOutEntry(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    string
-		wantHash string
-		wantDst  string
-		wantErr  string
-	}{
-		{
-			name:     "valid entry",
-			input:    "abcdef0:/out/results",
-			wantHash: "abcdef0",
-			wantDst:  "/out/results",
-		},
-		{
-			name:     "double slash cleaned",
-			input:    "abcdef0:/out//tmp/pwn",
-			wantHash: "abcdef0",
-			wantDst:  "/out/tmp/pwn",
-		},
-		{
-			name:    "double slash escapes domain",
-			input:   "abcdef0:/out/../../etc/shadow",
-			wantErr: "destination must start with /out/",
-		},
-		{
-			name:    "wrong domain",
-			input:   "abcdef0:/in/file",
-			wantErr: "destination must start with /out/",
-		},
-		{
-			name:    "path traversal",
-			input:   "abcdef0:/out/../../etc/passwd",
-			wantErr: "destination must start with /out/",
-		},
-	}
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			parsed, err := ParseStoredOutEntry(tc.input)
-			if tc.wantErr != "" {
-				if err == nil {
-					t.Fatalf("expected error containing %q, got nil", tc.wantErr)
-				}
-				if !strings.Contains(err.Error(), tc.wantErr) {
-					t.Fatalf("error %q does not contain %q", err.Error(), tc.wantErr)
-				}
-				return
-			}
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if parsed.Hash != tc.wantHash {
-				t.Errorf("hash = %q, want %q", parsed.Hash, tc.wantHash)
-			}
-			if parsed.Dst != tc.wantDst {
-				t.Errorf("dst = %q, want %q", parsed.Dst, tc.wantDst)
-			}
-			if parsed.ReadOnly {
-				t.Errorf("out entries must be read-write")
-			}
-		})
-	}
-}
-
-func TestParseStoredHomeEntry(t *testing.T) {
-	tests := []struct {
-		name     string
+		kind     HydraFileKind
 		input    string
 		wantHash string
 		wantDst  string
@@ -204,45 +61,167 @@ func TestParseStoredHomeEntry(t *testing.T) {
 		wantErr  string
 	}{
 		{
-			name:     "rw entry",
+			name:     "in/valid entry",
+			kind:     HydraFileIn,
+			input:    "abcdef0:/in/config.json",
+			wantHash: "abcdef0",
+			wantDst:  "/in/config.json",
+			wantRO:   true,
+		},
+		{
+			name:     "in/valid with nested path",
+			kind:     HydraFileIn,
+			input:    "1234567890abcdef:/in/subdir/file.txt",
+			wantHash: "1234567890abcdef",
+			wantDst:  "/in/subdir/file.txt",
+			wantRO:   true,
+		},
+		{
+			name:     "in/double slash cleaned",
+			kind:     HydraFileIn,
+			input:    "abcdef0:/in//tmp/pwn",
+			wantHash: "abcdef0",
+			wantDst:  "/in/tmp/pwn",
+			wantRO:   true,
+		},
+		{
+			name:    "in/wrong domain",
+			kind:    HydraFileIn,
+			input:   "abcdef0:/out/file",
+			wantErr: "destination must start with /in/",
+		},
+		{
+			name:    "in/invalid hash",
+			kind:    HydraFileIn,
+			input:   "XYZ:/in/file",
+			wantErr: "invalid short hash",
+		},
+		{
+			name:    "in/path traversal",
+			kind:    HydraFileIn,
+			input:   "abcdef0:/in/../etc/passwd",
+			wantErr: "destination must start with /in/",
+		},
+		{
+			name:    "in/no colon",
+			kind:    HydraFileIn,
+			input:   "abcdef0",
+			wantErr: "expected format shortHash:dst",
+		},
+		{
+			name:    "in/hash too short",
+			kind:    HydraFileIn,
+			input:   "abc:/in/x",
+			wantErr: "invalid short hash",
+		},
+		{
+			name:     "out/valid entry",
+			kind:     HydraFileOut,
+			input:    "abcdef0:/out/results",
+			wantHash: "abcdef0",
+			wantDst:  "/out/results",
+		},
+		{
+			name:     "out/double slash cleaned",
+			kind:     HydraFileOut,
+			input:    "abcdef0:/out//tmp/pwn",
+			wantHash: "abcdef0",
+			wantDst:  "/out/tmp/pwn",
+		},
+		{
+			name:    "out/double slash escapes domain",
+			kind:    HydraFileOut,
+			input:   "abcdef0:/out/../../etc/shadow",
+			wantErr: "destination must start with /out/",
+		},
+		{
+			name:    "out/wrong domain",
+			kind:    HydraFileOut,
+			input:   "abcdef0:/in/file",
+			wantErr: "destination must start with /out/",
+		},
+		{
+			name:    "out/path traversal",
+			kind:    HydraFileOut,
+			input:   "abcdef0:/out/../../etc/passwd",
+			wantErr: "destination must start with /out/",
+		},
+		{
+			name:     "home/rw entry",
+			kind:     HydraFileHome,
 			input:    "abcdef0:.codex/auth.json",
 			wantHash: "abcdef0",
 			wantDst:  ".codex/auth.json",
-			wantRO:   false,
 		},
 		{
-			name:     "ro entry",
+			name:     "home/ro entry",
+			kind:     HydraFileHome,
 			input:    "abcdef0:.codex/config.toml:ro",
 			wantHash: "abcdef0",
 			wantDst:  ".codex/config.toml",
 			wantRO:   true,
 		},
 		{
-			name:     "double slash cleaned",
+			name:     "home/double slash cleaned",
+			kind:     HydraFileHome,
 			input:    "abcdef0:.config//app",
 			wantHash: "abcdef0",
 			wantDst:  ".config/app",
-			wantRO:   false,
 		},
 		{
-			name:    "absolute path rejected",
+			name:    "home/absolute path rejected",
+			kind:    HydraFileHome,
 			input:   "abcdef0:/etc/config",
 			wantErr: "destination must be relative",
 		},
 		{
-			name:    "traversal rejected",
+			name:    "home/traversal rejected",
+			kind:    HydraFileHome,
 			input:   "abcdef0:../../etc/passwd",
 			wantErr: "path traversal not allowed",
 		},
 		{
-			name:    "empty destination",
+			name:    "home/empty destination",
+			kind:    HydraFileHome,
+			input:   "abcdef0:",
+			wantErr: "destination required",
+		},
+		{
+			name:     "tmp/valid entry",
+			kind:     HydraFileTmp,
+			input:    "abcdef0:/tmp/ploy/lib.jar",
+			wantHash: "abcdef0",
+			wantDst:  "/tmp/ploy/lib.jar",
+		},
+		{
+			name:     "tmp/double slash cleaned",
+			kind:     HydraFileTmp,
+			input:    "abcdef0:/tmp//ploy/tool",
+			wantHash: "abcdef0",
+			wantDst:  "/tmp/ploy/tool",
+		},
+		{
+			name:    "tmp/outside tmp rejected",
+			kind:    HydraFileTmp,
+			input:   "abcdef0:/var/tmp/tool",
+			wantErr: "destination must start with /tmp/",
+		},
+		{
+			name:    "tmp/traversal rejected",
+			kind:    HydraFileTmp,
+			input:   "abcdef0:/tmp/../../etc/passwd",
+			wantErr: "destination must start with /tmp/",
+		},
+		{
+			name:    "tmp/empty destination",
+			kind:    HydraFileTmp,
 			input:   "abcdef0:",
 			wantErr: "destination required",
 		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			parsed, err := ParseStoredHomeEntry(tc.input)
+			parsed, err := ParseStoredEntry(tc.kind, tc.input)
 			if tc.wantErr != "" {
 				if err == nil {
 					t.Fatalf("expected error containing %q, got nil", tc.wantErr)
@@ -268,70 +247,6 @@ func TestParseStoredHomeEntry(t *testing.T) {
 	}
 }
 
-func TestParseStoredTmpEntry(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    string
-		wantHash string
-		wantDst  string
-		wantErr  string
-	}{
-		{
-			name:     "valid entry",
-			input:    "abcdef0:/tmp/ploy/lib.jar",
-			wantHash: "abcdef0",
-			wantDst:  "/tmp/ploy/lib.jar",
-		},
-		{
-			name:     "double slash cleaned",
-			input:    "abcdef0:/tmp//ploy/tool",
-			wantHash: "abcdef0",
-			wantDst:  "/tmp/ploy/tool",
-		},
-		{
-			name:    "outside tmp rejected",
-			input:   "abcdef0:/var/tmp/tool",
-			wantErr: "destination must start with /tmp/",
-		},
-		{
-			name:    "traversal rejected",
-			input:   "abcdef0:/tmp/../../etc/passwd",
-			wantErr: "destination must start with /tmp/",
-		},
-		{
-			name:    "empty destination",
-			input:   "abcdef0:",
-			wantErr: "destination required",
-		},
-	}
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			parsed, err := ParseStoredTmpEntry(tc.input)
-			if tc.wantErr != "" {
-				if err == nil {
-					t.Fatalf("expected error containing %q, got nil", tc.wantErr)
-				}
-				if !strings.Contains(err.Error(), tc.wantErr) {
-					t.Fatalf("error %q does not contain %q", err.Error(), tc.wantErr)
-				}
-				return
-			}
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if parsed.Hash != tc.wantHash {
-				t.Errorf("hash = %q, want %q", parsed.Hash, tc.wantHash)
-			}
-			if parsed.Dst != tc.wantDst {
-				t.Errorf("dst = %q, want %q", parsed.Dst, tc.wantDst)
-			}
-			if parsed.ReadOnly {
-				t.Errorf("tmp entries must be read-write")
-			}
-		})
-	}
-}
-
 func TestValidateHydraEntriesRejectsDuplicateDestinations(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -339,6 +254,7 @@ func TestValidateHydraEntriesRejectsDuplicateDestinations(t *testing.T) {
 		entries []string
 	}{
 		{name: "in", kind: HydraFileIn, entries: []string{"abcdef0:/in/a", "bbbbbbb:/in/a"}},
+		{name: "out", kind: HydraFileOut, entries: []string{"abcdef0:/out/a", "bbbbbbb:/out/a"}},
 		{name: "tmp", kind: HydraFileTmp, entries: []string{"abcdef0:/tmp/ploy/tool.jar", "bbbbbbb:/tmp/ploy/tool.jar"}},
 		{name: "home modes", kind: HydraFileHome, entries: []string{"abcdef0:.config/a", "bbbbbbb:.config/a:ro"}},
 		{name: "equivalent home paths", kind: HydraFileHome, entries: []string{"abcdef0:.config//app", "bbbbbbb:.config/app"}},

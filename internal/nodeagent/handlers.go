@@ -62,8 +62,8 @@ type StartRunRequest struct {
 	ServerURL    string            `json:"server_url,omitempty"`
 }
 
-// StartRunResponse is returned when a run is accepted.
-type StartRunResponse struct {
+// RunControlResponse is returned after a run start or stop request.
+type RunControlResponse struct {
 	RunID  types.RunID `json:"run_id"`
 	Status string      `json:"status"`
 }
@@ -72,12 +72,6 @@ type StartRunResponse struct {
 type StopRunRequest struct {
 	RunID  types.RunID `json:"run_id"`
 	Reason string      `json:"reason"`
-}
-
-// StopRunResponse is returned when a stop request is processed.
-type StopRunResponse struct {
-	RunID  types.RunID `json:"run_id"`
-	Status string      `json:"status"`
 }
 
 func (s *Server) handleRunStart(w http.ResponseWriter, r *http.Request) {
@@ -129,7 +123,7 @@ func (s *Server) handleRunStart(w http.ResponseWriter, r *http.Request) {
 	// job completes.
 	slotHeld = false
 
-	resp := StartRunResponse{
+	resp := RunControlResponse{
 		RunID:  req.RunID,
 		Status: "accepted",
 	}
@@ -165,7 +159,7 @@ func (s *Server) handleRunStop(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp := StopRunResponse{
+	resp := RunControlResponse{
 		RunID:  req.RunID,
 		Status: "stopped",
 	}

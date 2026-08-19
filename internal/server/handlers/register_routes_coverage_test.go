@@ -1,10 +1,10 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
-	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -38,8 +38,6 @@ func (r *recordingRegistrar) RegisterRouteFunc(pattern string, _ http.HandlerFun
 func (r *recordingRegistrar) RegisterRouteFuncAllowQueryToken(pattern string, _ http.HandlerFunc, _ ...auth.Role) {
 	r.patterns = append(r.patterns, pattern)
 }
-
-var pathParameter = regexp.MustCompile(`\{[^}/]+\}`)
 
 func TestRegisterRoutesMatchesOpenAPI(t *testing.T) {
 	registrar := &recordingRegistrar{}
@@ -83,6 +81,18 @@ func TestRegisterRoutesMatchesOpenAPI(t *testing.T) {
 			t.Fatalf("unregistered documentation drift = (%v, %v), want ([], [%s])", gotUndocumented, gotUnregistered, missing)
 		}
 	})
+
+	t.Run("detects path parameter name drift", func(t *testing.T) {
+		runtimeRoute := recordedRoute{method: http.MethodDelete, path: "/v1/migs/{mig_ref}"}
+		documentedRoute := recordedRoute{method: http.MethodDelete, path: "/v1/migs/{mig_id}"}
+		gotUndocumented, gotUnregistered := routeSetDifferences(
+			map[recordedRoute]struct{}{runtimeRoute: {}},
+			map[recordedRoute]struct{}{documentedRoute: {}},
+		)
+		if !slices.Equal(gotUndocumented, []recordedRoute{runtimeRoute}) || !slices.Equal(gotUnregistered, []recordedRoute{documentedRoute}) {
+			t.Fatalf("parameter drift = (%v, %v), want ([%s], [%s])", gotUndocumented, gotUnregistered, runtimeRoute, documentedRoute)
+		}
+	})
 }
 
 func registeredRouteSet(patterns []string) (map[recordedRoute]struct{}, error) {
@@ -103,9 +113,19 @@ func registeredRouteSet(patterns []string) (map[recordedRoute]struct{}, error) {
 		default:
 			return nil, &routePatternError{pattern: pattern}
 		}
-		routes[normalizeRoute(method, path)] = struct{}{}
+		route := recordedRoute{method: method, path: path}
+		if _, exists := routes[route]; exists {
+			return nil, fmt.Errorf("duplicate registered route %s", route)
+		}
+		routes[route] = struct{}{}
 	}
 	return routes, nil
+}
+
+func TestRegisteredRouteSetRejectsDuplicatePatterns(t *testing.T) {
+	if _, err := registeredRouteSet([]string{"GET /v1/runs", "GET /v1/runs"}); err == nil {
+		t.Fatal("registeredRouteSet() error = nil, want duplicate route error")
+	}
 }
 
 type routePatternError struct {
@@ -144,7 +164,7 @@ func loadOpenAPIRouteSet(specPath string) (map[recordedRoute]struct{}, error) {
 		for method := range methods {
 			method = strings.ToUpper(method)
 			if isHTTPMethod(method) {
-				routes[normalizeRoute(method, path)] = struct{}{}
+				routes[recordedRoute{method: method, path: path}] = struct{}{}
 			}
 		}
 	}
@@ -158,10 +178,6 @@ func isHTTPMethod(method string) bool {
 	default:
 		return false
 	}
-}
-
-func normalizeRoute(method, path string) recordedRoute {
-	return recordedRoute{method: method, path: pathParameter.ReplaceAllString(path, "{}")}
 }
 
 func routeSetDifferences(registered, documented map[recordedRoute]struct{}) (undocumented, unregistered []recordedRoute) {

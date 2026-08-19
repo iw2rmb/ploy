@@ -1,6 +1,6 @@
 get:
   tags: [Control]
-  summary: Download latest mig spec
+  summary: Download latest mig spec by ID or name
   parameters:
     - in: query
       name: auth_token

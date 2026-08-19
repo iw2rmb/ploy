@@ -9,12 +9,14 @@ import (
 	"crypto/sha256"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/pem"
 	"errors"
 	"fmt"
 	"math/big"
 	"net"
+	"strings"
 	"time"
 )
 
@@ -261,6 +263,20 @@ func LoadCA(certPEM, keyPEM string) (*CABundle, error) {
 		Cert:    cert,
 		Key:     key,
 	}, nil
+}
+
+// LoadBase64CA decodes single-line CA environment values before loading the
+// contained PEM certificate and key.
+func LoadBase64CA(certBase64, keyBase64 string) (*CABundle, error) {
+	certPEM, err := base64.StdEncoding.DecodeString(strings.TrimSpace(certBase64))
+	if err != nil {
+		return nil, fmt.Errorf("decode CA cert: %w", err)
+	}
+	keyPEM, err := base64.StdEncoding.DecodeString(strings.TrimSpace(keyBase64))
+	if err != nil {
+		return nil, fmt.Errorf("decode CA key: %w", err)
+	}
+	return LoadCA(string(certPEM), string(keyPEM))
 }
 
 // issueCert is a helper to issue a certificate with the given parameters.

@@ -10,7 +10,7 @@ info:
 
     v1 API surfaces:
     - `/v1/migs` — mig project CRUD (create/list/delete/archive).
-    - `/v1/migs/{mig_id}/specs` and `/v1/migs/{mig_id}/specs/latest` — spec management for mig projects.
+    - `/v1/migs/{mig_ref}/specs` and `/v1/migs/{mig_ref}/specs/latest` — spec management by mig ID or name.
     - `/v1/migs/{mig_id}/repos` — repo set management (add/list/delete repos).
     - `/v1/migs/{mig_id}/waves` — create a launch wave for a mig.
     - `/v1/migs/{mig_id}/pull` — resolve run for `ploy mig pull`.
@@ -69,15 +69,15 @@ paths:
   # Nodes upload logs/diffs/artifacts under /v1/runs/* and complete jobs under /v1/jobs/*.
   /v1/migs:
     $ref: "./paths/migs.yaml"
-  /v1/migs/{mig_id}:
+  /v1/migs/{mig_ref}:
     $ref: "./paths/migs_mig_id.yaml"
-  /v1/migs/{mig_id}/archive:
+  /v1/migs/{mig_ref}/archive:
     $ref: "./paths/migs_mig_id_archive.yaml"
-  /v1/migs/{mig_id}/unarchive:
+  /v1/migs/{mig_ref}/unarchive:
     $ref: "./paths/migs_mig_id_unarchive.yaml"
-  /v1/migs/{mig_id}/specs:
+  /v1/migs/{mig_ref}/specs:
     $ref: "./paths/migs_mig_id_specs.yaml"
-  /v1/migs/{mig_id}/specs/latest:
+  /v1/migs/{mig_ref}/specs/latest:
     $ref: "./paths/migs_mig_id_specs_latest.yaml"
   /v1/migs/{mig_id}/repos:
     $ref: "./paths/migs_mig_id_repos.yaml"
@@ -270,7 +270,7 @@ components:
       $ref: "./components/schemas/controlplane.yaml#/RepoSummary"
     RepoRunSummary:
       $ref: "./components/schemas/controlplane.yaml#/RepoRunSummary"
-    # Mig project CRUD types — POST /v1/migs, GET /v1/migs, DELETE /v1/migs/{mig_id}
+    # Mig project CRUD types — POST /v1/migs, GET /v1/migs, DELETE /v1/migs/{mig_ref}
     CreateMigRequest:
       $ref: "./components/schemas/controlplane.yaml#/CreateMigRequest"
     CreateMigResponse:
@@ -281,7 +281,7 @@ components:
       $ref: "./components/schemas/controlplane.yaml#/ListMigsResponse"
     MigArchiveResponse:
       $ref: "./components/schemas/controlplane.yaml#/MigArchiveResponse"
-    # Spec management types — POST /v1/migs/{mig_id}/specs
+    # Spec management types — POST /v1/migs/{mig_ref}/specs
     SetMigSpecRequest:
       $ref: "./components/schemas/controlplane.yaml#/SetMigSpecRequest"
     SetMigSpecResponse:

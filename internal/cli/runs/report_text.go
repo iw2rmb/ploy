@@ -586,7 +586,7 @@ func renderWrappedExitOneLiner(exitCode, content string, colorizeContent bool) s
 	}
 	prefix := "└  Exit " + exitCode + ": "
 	indent := strings.Repeat(" ", len(prefix))
-	wrapped := wrapFixedWidth(content, wrapWidth)
+	wrapped := wrapRunesFixed(content, wrapWidth)
 	lines := make([]string, 0, len(wrapped))
 	for i, line := range wrapped {
 		if colorizeContent {
@@ -599,26 +599,6 @@ func renderWrappedExitOneLiner(exitCode, content string, colorizeContent bool) s
 		lines = append(lines, indent+line)
 	}
 	return strings.Join(lines, "\n")
-}
-
-func wrapFixedWidth(content string, width int) []string {
-	if width <= 0 {
-		return []string{content}
-	}
-	runes := []rune(content)
-	if len(runes) == 0 {
-		return []string{""}
-	}
-	lines := make([]string, 0, (len(runes)+width-1)/width)
-	for len(runes) > 0 {
-		chunkLen := width
-		if len(runes) < width {
-			chunkLen = len(runes)
-		}
-		lines = append(lines, string(runes[:chunkLen]))
-		runes = runes[chunkLen:]
-	}
-	return lines
 }
 
 func isGateJobType(jobType string) bool {

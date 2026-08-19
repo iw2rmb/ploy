@@ -1,6 +1,6 @@
 post:
   tags: [Control]
-  summary: Set mig spec
+  summary: Set mig spec by ID or name
   description: |
     Create a new specs row (append-only) and update migs.spec_id to point at it.
 

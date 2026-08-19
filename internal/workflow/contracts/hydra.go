@@ -124,31 +124,6 @@ func ParseStoredEntry(kind HydraFileKind, s string) (ParsedStoredEntry, error) {
 	return ParsedStoredEntry{Hash: hash, Dst: dst, ReadOnly: readOnly}, nil
 }
 
-// ParseStoredInEntry parses a canonical `in` entry: "shortHash:dst".
-// dst must be absolute and start with "/in/".
-func ParseStoredInEntry(s string) (ParsedStoredEntry, error) {
-	return ParseStoredEntry(HydraFileIn, s)
-}
-
-// ParseStoredOutEntry parses a canonical `out` entry: "shortHash:dst".
-// dst must be absolute and start with "/out/".
-func ParseStoredOutEntry(s string) (ParsedStoredEntry, error) {
-	return ParseStoredEntry(HydraFileOut, s)
-}
-
-// ParseStoredHomeEntry parses a canonical `home` entry: "shortHash:dst{:ro}".
-// dst must be relative (no leading /) and must not traverse above $HOME.
-// Mode defaults to rw; optional :ro suffix forces read-only.
-func ParseStoredHomeEntry(s string) (ParsedStoredEntry, error) {
-	return ParseStoredEntry(HydraFileHome, s)
-}
-
-// ParseStoredTmpEntry parses a canonical `tmp` entry: "shortHash:dst".
-// dst must be absolute and start with "/tmp/".
-func ParseStoredTmpEntry(s string) (ParsedStoredEntry, error) {
-	return ParseStoredEntry(HydraFileTmp, s)
-}
-
 // CanonicalHomeEntry reconstructs the canonical stored home entry string
 // from parsed fields: "hash:dst" or "hash:dst:ro".
 func (p ParsedStoredEntry) CanonicalHomeEntry() string {
@@ -174,26 +149,6 @@ func ValidateHomeDestination(dst string) error {
 		return fmt.Errorf("home destination %q: %w", dst, err)
 	}
 	return nil
-}
-
-// ValidateHydraInEntries validates a slice of canonical `in` entries.
-func ValidateHydraInEntries(entries []string, prefix string) error {
-	return ValidateHydraEntries(HydraFileIn, entries, prefix)
-}
-
-// ValidateHydraOutEntries validates a slice of canonical `out` entries.
-func ValidateHydraOutEntries(entries []string, prefix string) error {
-	return ValidateHydraEntries(HydraFileOut, entries, prefix)
-}
-
-// ValidateHydraHomeEntries validates a slice of canonical `home` entries.
-func ValidateHydraHomeEntries(entries []string, prefix string) error {
-	return ValidateHydraEntries(HydraFileHome, entries, prefix)
-}
-
-// ValidateHydraTmpEntries validates a slice of canonical `tmp` entries.
-func ValidateHydraTmpEntries(entries []string, prefix string) error {
-	return ValidateHydraEntries(HydraFileTmp, entries, prefix)
 }
 
 // ValidateHydraEntries validates stored entries and rejects duplicate destinations.

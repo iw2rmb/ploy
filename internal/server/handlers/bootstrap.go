@@ -1,10 +1,8 @@
 package handlers
 
 import (
-	"crypto/ecdsa"
 	"crypto/sha256"
 	"crypto/x509"
-	"encoding/base64"
 	"encoding/hex"
 	"encoding/pem"
 	"errors"
@@ -337,7 +335,6 @@ func issueWorkerToken() (string, error) {
 // loadClusterCA loads the cluster CA certificate and private key from environment variables.
 // Returns the parsed CA bundle and the raw CA cert PEM for distribution.
 func loadClusterCA() (*pki.CABundle, string, error) {
-	// Decode base64-encoded PEM from environment (systemd EnvironmentFile doesn't support multi-line)
 	caCertB64 := strings.TrimSpace(os.Getenv("PLOY_SERVER_CA_CERT"))
 	caKeyB64 := strings.TrimSpace(os.Getenv("PLOY_SERVER_CA_KEY"))
 
@@ -345,68 +342,9 @@ func loadClusterCA() (*pki.CABundle, string, error) {
 		return nil, "", errCANotConfigured
 	}
 
-	caCertBytes, err := base64.StdEncoding.DecodeString(caCertB64)
+	ca, err := pki.LoadBase64CA(caCertB64, caKeyB64)
 	if err != nil {
-		return nil, "", fmt.Errorf("decode CA cert: %w", err)
+		return nil, "", err
 	}
-
-	caKeyBytes, err := base64.StdEncoding.DecodeString(caKeyB64)
-	if err != nil {
-		return nil, "", fmt.Errorf("decode CA key: %w", err)
-	}
-
-	caCertPEM := string(caCertBytes)
-	caKeyPEM := string(caKeyBytes)
-
-	if caCertPEM == "" || caKeyPEM == "" {
-		return nil, "", errCANotConfigured
-	}
-
-	// Parse CA certificate
-	block, _ := pem.Decode([]byte(caCertPEM))
-	if block == nil || block.Type != "CERTIFICATE" {
-		return nil, "", fmt.Errorf("invalid CA cert PEM")
-	}
-
-	caCert, err := x509.ParseCertificate(block.Bytes)
-	if err != nil {
-		return nil, "", fmt.Errorf("parse CA cert: %w", err)
-	}
-
-	// Parse CA private key
-	keyBlock, _ := pem.Decode([]byte(caKeyPEM))
-	if keyBlock == nil {
-		return nil, "", fmt.Errorf("invalid CA key PEM")
-	}
-
-	var caKey *ecdsa.PrivateKey
-	switch keyBlock.Type {
-	case "EC PRIVATE KEY":
-		key, err := x509.ParseECPrivateKey(keyBlock.Bytes)
-		if err != nil {
-			return nil, "", fmt.Errorf("parse EC private key: %w", err)
-		}
-		caKey = key
-	case "PRIVATE KEY":
-		key, err := x509.ParsePKCS8PrivateKey(keyBlock.Bytes)
-		if err != nil {
-			return nil, "", fmt.Errorf("parse PKCS8 private key: %w", err)
-		}
-		ecKey, ok := key.(*ecdsa.PrivateKey)
-		if !ok {
-			return nil, "", fmt.Errorf("expected ECDSA private key, got %T", key)
-		}
-		caKey = ecKey
-	default:
-		return nil, "", fmt.Errorf("unsupported key type: %s", keyBlock.Type)
-	}
-
-	ca := &pki.CABundle{
-		CertPEM: caCertPEM,
-		KeyPEM:  caKeyPEM,
-		Cert:    caCert,
-		Key:     caKey,
-	}
-
-	return ca, caCertPEM, nil
+	return ca, ca.CertPEM, nil
 }

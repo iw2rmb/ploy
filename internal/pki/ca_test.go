@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/base64"
 	"encoding/pem"
 	"net"
 	"strings"
@@ -288,6 +289,39 @@ func TestLoadCAInvalidPEM(t *testing.T) {
 			_, err := LoadCA(tt.certPEM, tt.keyPEM)
 			if err == nil {
 				t.Fatal("expected error for invalid PEM")
+			}
+		})
+	}
+}
+
+func TestLoadBase64CA(t *testing.T) {
+	ca, err := GenerateCA(time.Now().UTC())
+	if err != nil {
+		t.Fatalf("GenerateCA() error = %v", err)
+	}
+
+	loaded, err := LoadBase64CA(
+		base64.StdEncoding.EncodeToString([]byte(ca.CertPEM)),
+		base64.StdEncoding.EncodeToString([]byte(ca.KeyPEM)),
+	)
+	if err != nil {
+		t.Fatalf("LoadBase64CA() error = %v", err)
+	}
+	if loaded.Cert.SerialNumber.Cmp(ca.Cert.SerialNumber) != 0 || !loaded.Key.Equal(ca.Key) {
+		t.Fatal("LoadBase64CA() returned different CA material")
+	}
+
+	for _, tc := range []struct {
+		name string
+		cert string
+		key  string
+	}{
+		{name: "invalid cert base64", cert: "%", key: base64.StdEncoding.EncodeToString([]byte(ca.KeyPEM))},
+		{name: "invalid key base64", cert: base64.StdEncoding.EncodeToString([]byte(ca.CertPEM)), key: "%"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := LoadBase64CA(tc.cert, tc.key); err == nil {
+				t.Fatal("LoadBase64CA() error = nil, want error")
 			}
 		})
 	}

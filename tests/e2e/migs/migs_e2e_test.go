@@ -283,7 +283,7 @@ func TestHydraMountEnforcementOffline(t *testing.T) {
 	// --- /in enforcement ---
 	t.Run("in_entries_parsed_readonly", func(t *testing.T) {
 		t.Parallel()
-		p, err := contracts.ParseStoredInEntry("abcdef0123456:/in/config.json")
+		p, err := contracts.ParseStoredEntry(contracts.HydraFileIn, "abcdef0123456:/in/config.json")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -294,7 +294,7 @@ func TestHydraMountEnforcementOffline(t *testing.T) {
 
 	t.Run("in_write_to_out_rejected", func(t *testing.T) {
 		t.Parallel()
-		_, err := contracts.ParseStoredInEntry("abcdef0:/out/escape.txt")
+		_, err := contracts.ParseStoredEntry(contracts.HydraFileIn, "abcdef0:/out/escape.txt")
 		if err == nil {
 			t.Fatal("in entry targeting /out/ must be rejected")
 		}
@@ -302,7 +302,7 @@ func TestHydraMountEnforcementOffline(t *testing.T) {
 
 	t.Run("in_traversal_rejected", func(t *testing.T) {
 		t.Parallel()
-		_, err := contracts.ParseStoredInEntry("abcdef0:/in/../etc/passwd")
+		_, err := contracts.ParseStoredEntry(contracts.HydraFileIn, "abcdef0:/in/../etc/passwd")
 		if err == nil {
 			t.Fatal("path traversal in /in must be rejected")
 		}
@@ -310,7 +310,7 @@ func TestHydraMountEnforcementOffline(t *testing.T) {
 
 	t.Run("in_duplicates_rejected_at_spec_level", func(t *testing.T) {
 		t.Parallel()
-		err := contracts.ValidateHydraInEntries([]string{
+		err := contracts.ValidateHydraEntries(contracts.HydraFileIn, []string{
 			"abcdef0:/in/config.json",
 			"bbbbbbb:/in/config.json",
 		}, "test")
@@ -322,7 +322,7 @@ func TestHydraMountEnforcementOffline(t *testing.T) {
 	// --- /out enforcement ---
 	t.Run("out_entries_parsed_writable", func(t *testing.T) {
 		t.Parallel()
-		p, err := contracts.ParseStoredOutEntry("abcdef0123456:/out/result.txt")
+		p, err := contracts.ParseStoredEntry(contracts.HydraFileOut, "abcdef0123456:/out/result.txt")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -333,7 +333,7 @@ func TestHydraMountEnforcementOffline(t *testing.T) {
 
 	t.Run("out_write_to_in_rejected", func(t *testing.T) {
 		t.Parallel()
-		_, err := contracts.ParseStoredOutEntry("abcdef0:/in/escape.txt")
+		_, err := contracts.ParseStoredEntry(contracts.HydraFileOut, "abcdef0:/in/escape.txt")
 		if err == nil {
 			t.Fatal("out entry targeting /in/ must be rejected")
 		}
@@ -341,7 +341,7 @@ func TestHydraMountEnforcementOffline(t *testing.T) {
 
 	t.Run("out_traversal_rejected", func(t *testing.T) {
 		t.Parallel()
-		_, err := contracts.ParseStoredOutEntry("abcdef0:/out/../../etc/shadow")
+		_, err := contracts.ParseStoredEntry(contracts.HydraFileOut, "abcdef0:/out/../../etc/shadow")
 		if err == nil {
 			t.Fatal("path traversal in /out must be rejected")
 		}
@@ -349,7 +349,7 @@ func TestHydraMountEnforcementOffline(t *testing.T) {
 
 	t.Run("out_duplicates_rejected_at_spec_level", func(t *testing.T) {
 		t.Parallel()
-		err := contracts.ValidateHydraOutEntries([]string{
+		err := contracts.ValidateHydraEntries(contracts.HydraFileOut, []string{
 			"abcdef0:/out/result.json",
 			"bbbbbbb:/out/result.json",
 		}, "test")
@@ -374,7 +374,7 @@ func TestHydraMountEnforcementOffline(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		for _, entry := range parsed.Steps[0].In {
-			p, err := contracts.ParseStoredInEntry(entry)
+			p, err := contracts.ParseStoredEntry(contracts.HydraFileIn, entry)
 			if err != nil {
 				t.Fatalf("in re-parse: %v", err)
 			}
@@ -383,7 +383,7 @@ func TestHydraMountEnforcementOffline(t *testing.T) {
 			}
 		}
 		for _, entry := range parsed.Steps[0].Out {
-			p, err := contracts.ParseStoredOutEntry(entry)
+			p, err := contracts.ParseStoredEntry(contracts.HydraFileOut, entry)
 			if err != nil {
 				t.Fatalf("out re-parse: %v", err)
 			}
@@ -429,7 +429,7 @@ func TestHydraOutUploadContinuityOffline(t *testing.T) {
 
 	t.Run("out_entry_preserves_hash_and_destination", func(t *testing.T) {
 		t.Parallel()
-		p, err := contracts.ParseStoredOutEntry("abcdef0123456:/out/report.json")
+		p, err := contracts.ParseStoredEntry(contracts.HydraFileOut, "abcdef0123456:/out/report.json")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -446,7 +446,7 @@ func TestHydraOutUploadContinuityOffline(t *testing.T) {
 
 	t.Run("out_nested_subdirectory_valid", func(t *testing.T) {
 		t.Parallel()
-		p, err := contracts.ParseStoredOutEntry("abcdef0:/out/deep/nested/artifact.tar.gz")
+		p, err := contracts.ParseStoredEntry(contracts.HydraFileOut, "abcdef0:/out/deep/nested/artifact.tar.gz")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -457,7 +457,7 @@ func TestHydraOutUploadContinuityOffline(t *testing.T) {
 
 	t.Run("out_double_slash_cleaned_for_upload", func(t *testing.T) {
 		t.Parallel()
-		p, err := contracts.ParseStoredOutEntry("abcdef0:/out//report.json")
+		p, err := contracts.ParseStoredEntry(contracts.HydraFileOut, "abcdef0:/out//report.json")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -468,7 +468,7 @@ func TestHydraOutUploadContinuityOffline(t *testing.T) {
 
 	t.Run("out_empty_hash_breaks_upload_pipeline", func(t *testing.T) {
 		t.Parallel()
-		_, err := contracts.ParseStoredOutEntry(":/out/file.txt")
+		_, err := contracts.ParseStoredEntry(contracts.HydraFileOut, ":/out/file.txt")
 		if err == nil {
 			t.Fatal("empty hash must be rejected (upload requires valid bundle ref)")
 		}
@@ -476,7 +476,7 @@ func TestHydraOutUploadContinuityOffline(t *testing.T) {
 
 	t.Run("out_empty_destination_breaks_upload_pipeline", func(t *testing.T) {
 		t.Parallel()
-		_, err := contracts.ParseStoredOutEntry("abcdef0:")
+		_, err := contracts.ParseStoredEntry(contracts.HydraFileOut, "abcdef0:")
 		if err == nil {
 			t.Fatal("empty destination must be rejected (upload target unknown)")
 		}
@@ -484,7 +484,7 @@ func TestHydraOutUploadContinuityOffline(t *testing.T) {
 
 	t.Run("multiple_distinct_out_entries_upload_valid", func(t *testing.T) {
 		t.Parallel()
-		err := contracts.ValidateHydraOutEntries([]string{
+		err := contracts.ValidateHydraEntries(contracts.HydraFileOut, []string{
 			"abcdef0:/out/report-a.json",
 			"bbbbbbb:/out/report-b.json",
 			"ccccccc:/out/nested/report-c.txt",
@@ -514,7 +514,7 @@ func TestHydraOutUploadContinuityOffline(t *testing.T) {
 			t.Fatalf("expected 2 out entries, got %d", len(parsed.Steps[0].Out))
 		}
 		for _, entry := range parsed.Steps[0].Out {
-			p, err := contracts.ParseStoredOutEntry(entry)
+			p, err := contracts.ParseStoredEntry(contracts.HydraFileOut, entry)
 			if err != nil {
 				t.Fatalf("re-parse: %v", err)
 			}

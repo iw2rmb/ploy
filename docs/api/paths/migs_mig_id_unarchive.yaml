@@ -1,6 +1,6 @@
 patch:
   tags: [Control]
-  summary: Unarchive mig
+  summary: Unarchive mig by ID or name
   description: |
     Unarchive a mig project.
   responses:
@@ -11,7 +11,7 @@ patch:
           schema:
             $ref: '../components/schemas/controlplane.yaml#/MigArchiveResponse'
     '400':
-      description: Bad request (invalid mig id)
+      description: Bad request (invalid mig reference)
       content:
         application/json:
           schema:

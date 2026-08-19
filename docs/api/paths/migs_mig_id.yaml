@@ -2,14 +2,14 @@ delete:
   tags: [Control]
   summary: Delete mig
   description: |
-    Delete a mig project.
+    Delete a mig project by ID or name.
 
     Refuses deletion if any runs exist for the mig.
   responses:
     '204':
       description: No Content
     '400':
-      description: Bad request (invalid mig id)
+      description: Bad request (invalid mig reference)
       content:
         application/json:
           schema:

@@ -99,3 +99,20 @@ func TestGetRunCounts(t *testing.T) {
 		})
 	}
 }
+
+func TestRunCountsFromStatusRowsMapsEveryStatus(t *testing.T) {
+	counts := runCountsFromStatusRows([]store.CountRunsByWaveStatusRow{
+		{Status: domaintypes.RunStatusQueued, Count: 1},
+		{Status: domaintypes.RunStatusRunning, Count: 2},
+		{Status: domaintypes.RunStatusSuccess, Count: 3},
+		{Status: domaintypes.RunStatusFail, Count: 4},
+		{Status: domaintypes.RunStatusCancelled, Count: 5},
+	})
+
+	if counts.Total != 15 || counts.Queued != 1 || counts.Running != 2 || counts.Success != 3 || counts.Fail != 4 || counts.Cancelled != 5 {
+		t.Fatalf("counts = %+v, want all status fields populated", counts)
+	}
+	if counts.DerivedStatus != lifecycle.DerivedStatusCancelled {
+		t.Fatalf("derived status = %q, want %q", counts.DerivedStatus, lifecycle.DerivedStatusCancelled)
+	}
+}

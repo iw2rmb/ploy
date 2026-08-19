@@ -126,22 +126,16 @@ func (b *baseUploader) postJSONWithRetry(ctx context.Context, apiPath string, pa
 
 // UploadJobStatus uploads terminal status and stats to the job-level endpoint.
 func (b *baseUploader) UploadJobStatus(ctx context.Context, jobID types.JobID, status string, exitCode *int32, stats types.RunStats, repoSHAOut ...string) error {
-	shaOut := ""
-	if len(repoSHAOut) > 0 {
-		shaOut = strings.TrimSpace(repoSHAOut[0])
-	}
-	return b.postJSONWithRetry(
-		ctx,
-		fmt.Sprintf("/v1/jobs/%s/complete", jobID),
-		buildJobStatusPayload(status, exitCode, stats, shaOut),
-		"upload job status",
-		postJSONRetryModeDefault,
-	)
+	return b.uploadJobStatus(ctx, jobID, status, exitCode, stats, "upload job status", postJSONRetryModeDefault, repoSHAOut...)
 }
 
 // UploadJobStatusReconcile uploads terminal status during startup crash
 // reconciliation. This mode treats 409 conflicts as successful idempotent replay.
 func (b *baseUploader) UploadJobStatusReconcile(ctx context.Context, jobID types.JobID, status string, exitCode *int32, stats types.RunStats, repoSHAOut ...string) error {
+	return b.uploadJobStatus(ctx, jobID, status, exitCode, stats, "upload reconciled job status", postJSONRetryModeStartupReconcile, repoSHAOut...)
+}
+
+func (b *baseUploader) uploadJobStatus(ctx context.Context, jobID types.JobID, status string, exitCode *int32, stats types.RunStats, action string, mode postJSONRetryMode, repoSHAOut ...string) error {
 	shaOut := ""
 	if len(repoSHAOut) > 0 {
 		shaOut = strings.TrimSpace(repoSHAOut[0])
@@ -150,8 +144,8 @@ func (b *baseUploader) UploadJobStatusReconcile(ctx context.Context, jobID types
 		ctx,
 		fmt.Sprintf("/v1/jobs/%s/complete", jobID),
 		buildJobStatusPayload(status, exitCode, stats, shaOut),
-		"upload reconciled job status",
-		postJSONRetryModeStartupReconcile,
+		action,
+		mode,
 	)
 }
 

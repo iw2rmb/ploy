@@ -3,6 +3,7 @@ package pki_test
 import (
 	"context"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/pem"
 	"fmt"
 	"os"
@@ -47,9 +48,8 @@ func TestDefaultRotator_Renew_WithEnvCA(t *testing.T) {
 		RenewBefore: 2 * 365 * 24 * time.Hour,
 	}
 
-	// Provide CA materials via env the rotator expects
-	t.Setenv("PLOY_SERVER_CA_CERT", ca.CertPEM)
-	t.Setenv("PLOY_SERVER_CA_KEY", ca.KeyPEM)
+	t.Setenv("PLOY_SERVER_CA_CERT", base64.StdEncoding.EncodeToString([]byte(ca.CertPEM)))
+	t.Setenv("PLOY_SERVER_CA_KEY", base64.StdEncoding.EncodeToString([]byte(ca.KeyPEM)))
 
 	rot := apipki.NewDefaultRotator(nil)
 	if err := rot.Renew(context.Background(), cfg); err != nil {

@@ -154,27 +154,8 @@ func formatStackGateError(jobType domaintypes.JobType, jobMeta json.RawMessage) 
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("Stack Gate [%s]: %s\n", phase, sg.Result))
 
-	if sg.Expected != nil {
-		sb.WriteString(fmt.Sprintf("  Expected: {language: %s", sg.Expected.Language))
-		if sg.Expected.Tool != "" {
-			sb.WriteString(fmt.Sprintf(", tool: %s", sg.Expected.Tool))
-		}
-		if sg.Expected.Release != "" {
-			sb.WriteString(fmt.Sprintf(", release: %q", sg.Expected.Release))
-		}
-		sb.WriteString("}\n")
-	}
-
-	if sg.Detected != nil {
-		sb.WriteString(fmt.Sprintf("  Detected: {language: %s", sg.Detected.Language))
-		if sg.Detected.Tool != "" {
-			sb.WriteString(fmt.Sprintf(", tool: %s", sg.Detected.Tool))
-		}
-		if sg.Detected.Release != "" {
-			sb.WriteString(fmt.Sprintf(", release: %q", sg.Detected.Release))
-		}
-		sb.WriteString("}\n")
-	}
+	appendStackGateExpectation(&sb, "Expected", sg.Expected)
+	appendStackGateExpectation(&sb, "Detected", sg.Detected)
 
 	// Extract evidence from LogFindings
 	if meta.GateMetadata != nil && len(meta.GateMetadata.LogFindings) > 0 {
@@ -193,6 +174,20 @@ func formatStackGateError(jobType domaintypes.JobType, jobMeta json.RawMessage) 
 
 	result := strings.TrimSuffix(sb.String(), "\n")
 	return &result
+}
+
+func appendStackGateExpectation(sb *strings.Builder, label string, expectation *contracts.StackExpectation) {
+	if expectation == nil {
+		return
+	}
+	sb.WriteString(fmt.Sprintf("  %s: {language: %s", label, expectation.Language))
+	if expectation.Tool != "" {
+		sb.WriteString(fmt.Sprintf(", tool: %s", expectation.Tool))
+	}
+	if expectation.Release != "" {
+		sb.WriteString(fmt.Sprintf(", release: %q", expectation.Release))
+	}
+	sb.WriteString("}\n")
 }
 
 // formatExit137Error formats a deterministic runs.last_error message for

@@ -126,6 +126,15 @@ func TestHandleRunStart(t *testing.T) {
 			if mock.releaseCalls != tt.wantRelease {
 				t.Errorf("controller.ReleaseSlot calls = %d, want %d", mock.releaseCalls, tt.wantRelease)
 			}
+			if tt.wantStatus == http.StatusAccepted {
+				var response RunControlResponse
+				if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+					t.Fatalf("decode response: %v", err)
+				}
+				if response.RunID != tt.request.RunID || response.Status != "accepted" {
+					t.Fatalf("response = %+v, want run_id=%s status=accepted", response, tt.request.RunID)
+				}
+			}
 		})
 	}
 }
@@ -201,6 +210,15 @@ func TestHandleRunStop(t *testing.T) {
 
 			if tt.wantCalled && mock.lastStop.RunID != tt.request.RunID {
 				t.Errorf("controller received RunID = %q, want %q", mock.lastStop.RunID, tt.request.RunID)
+			}
+			if tt.wantStatus == http.StatusOK {
+				var response RunControlResponse
+				if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+					t.Fatalf("decode response: %v", err)
+				}
+				if response.RunID != tt.request.RunID || response.Status != "stopped" {
+					t.Fatalf("response = %+v, want run_id=%s status=stopped", response, tt.request.RunID)
+				}
 			}
 		})
 	}

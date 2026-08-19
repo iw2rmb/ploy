@@ -3,6 +3,7 @@ package handlers
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	corepki "github.com/iw2rmb/ploy/internal/pki"
 	"github.com/iw2rmb/ploy/internal/server/auth"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/jackc/pgx/v5"
@@ -199,6 +201,41 @@ func TestValidateBootstrapToken(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestLoadClusterCAUsesBase64EnvironmentContract(t *testing.T) {
+	ca, err := corepki.GenerateCA(time.Now().UTC())
+	if err != nil {
+		t.Fatalf("GenerateCA() error = %v", err)
+	}
+	t.Setenv("PLOY_SERVER_CA_CERT", base64.StdEncoding.EncodeToString([]byte(ca.CertPEM)))
+	t.Setenv("PLOY_SERVER_CA_KEY", base64.StdEncoding.EncodeToString([]byte(ca.KeyPEM)))
+
+	loaded, rawCert, err := loadClusterCA()
+	if err != nil {
+		t.Fatalf("loadClusterCA() error = %v", err)
+	}
+	if rawCert != ca.CertPEM || loaded.Cert.SerialNumber.Cmp(ca.Cert.SerialNumber) != 0 {
+		t.Fatal("loadClusterCA() returned different CA material")
+	}
+}
+
+func TestLoadClusterCARejectsMissingAndMalformedEnvironment(t *testing.T) {
+	t.Run("missing", func(t *testing.T) {
+		t.Setenv("PLOY_SERVER_CA_CERT", "")
+		t.Setenv("PLOY_SERVER_CA_KEY", "")
+		if _, _, err := loadClusterCA(); !errors.Is(err, errCANotConfigured) {
+			t.Fatalf("loadClusterCA() error = %v, want %v", err, errCANotConfigured)
+		}
+	})
+
+	t.Run("malformed base64", func(t *testing.T) {
+		t.Setenv("PLOY_SERVER_CA_CERT", "%")
+		t.Setenv("PLOY_SERVER_CA_KEY", "%")
+		if _, _, err := loadClusterCA(); err == nil || !strings.Contains(err.Error(), "decode CA cert") {
+			t.Fatalf("loadClusterCA() error = %v, want cert decode error", err)
+		}
+	})
 }
 
 func mustBootstrapTokenForHandlers(t *testing.T, nodeID domaintypes.NodeID) (string, *auth.TokenClaims) {
