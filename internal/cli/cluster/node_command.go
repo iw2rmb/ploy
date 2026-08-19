@@ -275,68 +275,6 @@ func resolvePloydNodeBinaryPath(v common.StringValue) (string, error) {
 	return "", errors.New("ployd-node binary not found alongside CLI; provide --ployd-node-binary (cluster node add)")
 }
 
-// pkiSignRequest is the JSON request body for POST /v1/pki/sign.
-// Uses domain type (NodeID) for type-safe identification.
-type pkiSignRequest struct {
-	NodeID domaintypes.NodeID `json:"node_id"` // URL-safe node ID.
-	CSR    string             `json:"csr"`
-}
-
-// pkiSignResponse is the JSON response body for POST /v1/pki/sign.
-type pkiSignResponse struct {
-	Certificate string `json:"certificate"`
-	CABundle    string `json:"ca_bundle"`
-	Serial      string `json:"serial"`
-	Fingerprint string `json:"fingerprint"`
-	NotBefore   string `json:"not_before"`
-	NotAfter    string `json:"not_after"`
-}
-
-// signNodeCSR calls the server's /v1/pki/sign endpoint to sign the CSR.
-// nodeID parameter is a string that gets converted to domain type for the request.
-func signNodeCSR(ctx context.Context, serverURL, nodeID string, csrPEM []byte) (certPEM, caCertPEM string, err error) {
-	reqBody := pkiSignRequest{
-		NodeID: domaintypes.NodeID(nodeID), // Convert to domain type
-		CSR:    string(csrPEM),
-	}
-	bodyJSON, err := json.Marshal(reqBody)
-	if err != nil {
-		return "", "", fmt.Errorf("marshal request: %w", err)
-	}
-
-	endpoint := strings.TrimSuffix(serverURL, "/") + "/v1/pki/sign"
-	req, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewReader(bodyJSON))
-	if err != nil {
-		return "", "", fmt.Errorf("create request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	// Use the configured control-plane HTTP client.
-	_, client, err := common.ResolveControlPlaneHTTP(ctx)
-	if err != nil {
-		return "", "", fmt.Errorf("resolve control-plane client: %w", err)
-	}
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", "", fmt.Errorf("send request: %w", err)
-	}
-	defer func() {
-		_ = resp.Body.Close()
-	}()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-		return "", "", fmt.Errorf("server returned %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
-	}
-
-	var signResp pkiSignResponse
-	if err := json.NewDecoder(resp.Body).Decode(&signResp); err != nil {
-		return "", "", fmt.Errorf("decode response: %w", err)
-	}
-
-	return signResp.Certificate, signResp.CABundle, nil
-}
-
 // requestBootstrapToken requests a short-lived bootstrap token from the server for node provisioning.
 func requestBootstrapToken(ctx context.Context, serverURL, nodeID string) (token string, expiresAt time.Time, err error) {
 	baseURL, client, err := common.ResolveControlPlaneHTTP(ctx)

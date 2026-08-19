@@ -2,8 +2,6 @@ package tui
 
 import (
 	"testing"
-
-	"github.com/iw2rmb/ploy/internal/tui/joblist"
 )
 
 // TestModelInit verifies that InitialModel produces a well-formed starting state.
@@ -21,80 +19,36 @@ func TestModelInit(t *testing.T) {
 	}
 }
 
-// TestModelPloyListInvariants verifies that the PLOY root list satisfies
-// the shared list invariants.
-func TestModelPloyListInvariants(t *testing.T) {
-	m := InitialModel(nil, nil)
-
-	if m.rootList.Width() != ployListWidth {
-		t.Errorf("ploy list width: got %d, want %d", m.rootList.Width(), ployListWidth)
-	}
-
-	// Filtering must be disabled on the root PLOY list.
-	if m.rootList.FilteringEnabled() {
-		t.Error("ploy list: filtering must be disabled")
-	}
-}
-
-// TestModelPloyListItems verifies the root list has the three required items.
-func TestModelPloyListItems(t *testing.T) {
-	m := InitialModel(nil, nil)
-
-	items := m.rootList.Items()
-	if len(items) != 3 {
-		t.Fatalf("ploy list items: got %d, want 3", len(items))
-	}
-
-	wantTitles := []string{"Migrations", "Runs", "Jobs"}
-	for i, want := range wantTitles {
-		item, ok := items[i].(listItem)
-		if !ok {
-			t.Fatalf("item %d: unexpected type %T", i, items[i])
-		}
-		if item.title != want {
-			t.Errorf("item %d title: got %q, want %q", i, item.title, want)
-		}
-	}
-}
-
-// TestModelEscFromS1Quits verifies that pressing Esc from S1 (root) quits.
-func TestModelEscFromS1Quits(t *testing.T) {
-	m := InitialModel(nil, nil)
-	if m.screen != ScreenPloyList {
-		t.Fatal("expected ScreenPloyList")
-	}
-
-	_, cmd := m.handleEsc()
-	if cmd == nil {
-		t.Error("expected quit cmd from S1 Esc, got nil")
-	}
-}
-
 // TestModelEscTransitions verifies Esc key transitions between screens.
 func TestModelEscTransitions(t *testing.T) {
 	tests := []struct {
-		name string
-		from Screen
-		want Screen
+		name     string
+		from     Screen
+		want     Screen
+		wantQuit bool
 	}{
-		{"S2 -> S1", ScreenMigrationsList, ScreenPloyList},
-		{"S3 -> S2", ScreenMigrationDetails, ScreenMigrationsList},
-		{"S4 -> S1", ScreenRunsList, ScreenPloyList},
-		{"S5 -> S4", ScreenRunDetails, ScreenRunsList},
-		{"S6 -> S1", ScreenJobsList, ScreenPloyList},
+		{"S1 quits", ScreenPloyList, ScreenPloyList, true},
+		{"S2 -> S1", ScreenMigrationsList, ScreenPloyList, false},
+		{"S3 -> S2", ScreenMigrationDetails, ScreenMigrationsList, false},
+		{"S4 -> S1", ScreenRunsList, ScreenPloyList, false},
+		{"S5 -> S4", ScreenRunDetails, ScreenRunsList, false},
+		{"S6 -> S1", ScreenJobsList, ScreenPloyList, false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			m := InitialModel(nil, nil)
 			m.screen = tt.from
-			next, _ := m.handleEsc()
+			next, cmd := m.handleEsc()
 			nm, ok := next.(model)
 			if !ok {
 				t.Fatal("Update did not return model")
 			}
 			if nm.screen != tt.want {
 				t.Errorf("screen after Esc: got %v, want %v", nm.screen, tt.want)
+			}
+			if gotQuit := cmd != nil; gotQuit != tt.wantQuit {
+				t.Errorf("quit command after Esc: got %v, want %v", gotQuit, tt.wantQuit)
 			}
 		})
 	}
@@ -141,17 +95,6 @@ func TestNewListInvariants(t *testing.T) {
 	}
 }
 
-func TestJobListInvariants(t *testing.T) {
-	jl := joblist.New("JOBS")
-
-	if jl.Width() != joblist.ListWidth {
-		t.Errorf("jobList width: got %d, want %d", jl.Width(), joblist.ListWidth)
-	}
-	if jl.Title() != "JOBS" {
-		t.Errorf("jobList title: got %q, want %q", jl.Title(), "JOBS")
-	}
-}
-
 func TestNewRunsListInvariants(t *testing.T) {
 	l := newRunsList("RUNS", nil)
 
@@ -160,6 +103,23 @@ func TestNewRunsListInvariants(t *testing.T) {
 	}
 	if l.Title != "RUNS" {
 		t.Errorf("runs list title: got %q, want %q", l.Title, "RUNS")
+	}
+}
+
+func assertPloyItems(t *testing.T, m model, want []listItem) {
+	t.Helper()
+	items := m.rootList.Items()
+	if len(items) != len(want) {
+		t.Fatalf("PLOY items count = %d, want %d", len(items), len(want))
+	}
+	for i, expected := range want {
+		item, ok := items[i].(listItem)
+		if !ok {
+			t.Fatalf("PLOY item %d has type %T, want listItem", i, items[i])
+		}
+		if item.title != expected.title || item.description != expected.description {
+			t.Errorf("PLOY item %d = %q/%q, want %q/%q", i, item.title, item.description, expected.title, expected.description)
+		}
 	}
 }
 

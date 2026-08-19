@@ -3,10 +3,7 @@ package cluster
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"io"
-	"net/http"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,7 +11,6 @@ import (
 
 	"github.com/iw2rmb/ploy/internal/cli/common"
 	"github.com/iw2rmb/ploy/internal/deploy"
-	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/testutil/assertx"
 	"github.com/iw2rmb/ploy/internal/testutil/clienv"
 )
@@ -146,65 +142,6 @@ func TestRunNodeAddGeneratesNanoIDNodeID(t *testing.T) {
 		if !strings.ContainsRune(nanoIDAlphabet, c) {
 			t.Fatalf("node ID %q contains invalid character %q; expected URL-safe NanoID alphabet", nodeID, c)
 		}
-	}
-}
-
-func TestSignNodeCSR_Success(t *testing.T) {
-	nodeID := domaintypes.NewNodeKey()
-	// Arrange a fake PKI sign endpoint
-	var gotPath, gotContentType string
-	var gotBody pkiSignRequest
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotPath = r.URL.Path
-		gotContentType = r.Header.Get("Content-Type")
-		if err := json.NewDecoder(r.Body).Decode(&gotBody); err != nil {
-			t.Fatalf("decode request body: %v", err)
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]any{
-			"certificate": "CERT-PEM",
-			"ca_bundle":   "CA-PEM",
-			"serial":      "01",
-			"fingerprint": "ff",
-			"not_before":  "2025-11-01T00:00:00Z",
-			"not_after":   "2026-11-01T00:00:00Z",
-		})
-	}))
-	defer srv.Close()
-	clienv.UseControlPlaneEnv(t, srv.URL)
-
-	// Act
-	cert, ca, err := signNodeCSR(context.Background(), srv.URL, nodeID, []byte("CSR-PEM"))
-	if err != nil {
-		t.Fatalf("signNodeCSR error: %v", err)
-	}
-
-	// Assert
-	if gotPath != "/v1/pki/sign" {
-		t.Fatalf("expected path /v1/pki/sign, got: %s", gotPath)
-	}
-	if gotContentType != "application/json" {
-		t.Fatalf("expected application/json, got: %s", gotContentType)
-	}
-	if gotBody.NodeID.String() != nodeID || gotBody.CSR != "CSR-PEM" {
-		t.Fatalf("unexpected body: %+v", gotBody)
-	}
-	if cert != "CERT-PEM" || ca != "CA-PEM" {
-		t.Fatalf("unexpected response: cert=%q ca=%q", cert, ca)
-	}
-}
-
-func TestSignNodeCSR_Non200(t *testing.T) {
-	nodeID := domaintypes.NewNodeKey()
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		http.Error(w, "bad csr", http.StatusBadRequest)
-	}))
-	defer srv.Close()
-	clienv.UseControlPlaneEnv(t, srv.URL)
-
-	_, _, err := signNodeCSR(context.Background(), srv.URL, nodeID, []byte("CSR-PEM"))
-	if err == nil || !strings.Contains(err.Error(), "server returned 400: bad csr") {
-		t.Fatalf("expected status error, got: %v", err)
 	}
 }
 

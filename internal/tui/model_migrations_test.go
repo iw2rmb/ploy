@@ -81,97 +81,17 @@ func TestS2MigrationsOrderingEnforced(t *testing.T) {
 	}
 }
 
-// TestS2EnterTransitionsToS3 verifies Enter on a selected migration transitions to S3.
-func TestS2EnterTransitionsToS3(t *testing.T) {
-	m := InitialModel(nil, nil)
-	m.screen = ScreenMigrationsList
-	next, _ := m.Update(migsLoadedMsg{migs: []domainapi.MigSummary{
-		{ID: domaintypes.MigID("mig-xyz"), Name: "my-migration"},
-	}})
-	nm := next.(model)
-	nm.rightPaneList.Select(0)
-
-	result, _ := nm.handleEnter()
-	rm := result.(model)
+func TestMigrationSelectionUpdatesContext(t *testing.T) {
+	rm := makeS3Model(t)
 	if rm.screen != ScreenMigrationDetails {
 		t.Errorf("Enter(S2): got screen %v, want ScreenMigrationDetails", rm.screen)
 	}
-}
-
-// TestS2EnterSetsSelectedMigID verifies selectedMigID is set from the chosen migration's ID.
-func TestS2EnterSetsSelectedMigID(t *testing.T) {
-	const wantID = "mig-xyz"
-	m := InitialModel(nil, nil)
-	m.screen = ScreenMigrationsList
-	next, _ := m.Update(migsLoadedMsg{migs: []domainapi.MigSummary{
-		{ID: domaintypes.MigID(wantID), Name: "my-migration"},
-	}})
-	nm := next.(model)
-	nm.rightPaneList.Select(0)
-
-	result, _ := nm.handleEnter()
-	rm := result.(model)
-	if rm.selectedMigID.String() != wantID {
-		t.Errorf("selectedMigID: got %q, want %q", rm.selectedMigID.String(), wantID)
+	if rm.selectedMigID != "mig-abc" {
+		t.Errorf("selectedMigID: got %q, want %q", rm.selectedMigID, "mig-abc")
 	}
-}
-
-func TestS2EnterDefinesSelectedMigrationInPloy(t *testing.T) {
-	m := InitialModel(nil, nil)
-	m.screen = ScreenMigrationsList
-	next, _ := m.Update(migsLoadedMsg{migs: []domainapi.MigSummary{
-		{ID: domaintypes.MigID("mig-xyz"), Name: "my-migration"},
-	}})
-	nm := next.(model)
-	nm.rightPaneList.Select(0)
-
-	result, _ := nm.handleEnter()
-	rm := result.(model)
-	items := rm.rootList.Items()
-	if len(items) != 3 {
-		t.Fatalf("ploy items: got %d, want 3", len(items))
-	}
-
-	item0, ok := items[0].(listItem)
-	if !ok {
-		t.Fatalf("item 0: unexpected type %T", items[0])
-	}
-	item1, ok := items[1].(listItem)
-	if !ok {
-		t.Fatalf("item 1: unexpected type %T", items[1])
-	}
-	item2, ok := items[2].(listItem)
-	if !ok {
-		t.Fatalf("item 2: unexpected type %T", items[2])
-	}
-
-	if item0.title != "my-migration" {
-		t.Errorf("item 0 title: got %q, want %q", item0.title, "my-migration")
-	}
-	if item0.description != "mig-xyz" {
-		t.Errorf("item 0 description: got %q, want %q", item0.description, "mig-xyz")
-	}
-	if item1.title != "Runs" {
-		t.Errorf("item 1 title: got %q, want %q", item1.title, "Runs")
-	}
-	if item1.description != "total: —" {
-		t.Errorf("item 1 description: got %q, want %q", item1.description, "total: —")
-	}
-	if item2.title != "Jobs" {
-		t.Errorf("item 2 title: got %q, want %q", item2.title, "Jobs")
-	}
-	if item2.description != "select job" {
-		t.Errorf("item 2 description: got %q, want %q", item2.description, "select job")
-	}
-}
-
-// TestS2EscTransitionsToS1 verifies Esc from S2 returns to S1.
-func TestS2EscTransitionsToS1(t *testing.T) {
-	m := InitialModel(nil, nil)
-	m.screen = ScreenMigrationsList
-	next, _ := m.handleEsc()
-	nm := next.(model)
-	if nm.screen != ScreenPloyList {
-		t.Errorf("Esc(S2): got screen %v, want ScreenPloyList", nm.screen)
-	}
+	assertPloyItems(t, rm, []listItem{
+		{title: "my-mig", description: "mig-abc"},
+		{title: "Runs", description: "total: —"},
+		{title: "Jobs", description: "select job"},
+	})
 }

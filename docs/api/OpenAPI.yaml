@@ -32,7 +32,7 @@ servers:
         description: Control-plane host recorded in the descriptor.
 tags:
   - name: Security
-    description: PKI operations (CA info, CSR signing).
+    description: Bootstrap token management and node certificate enrollment.
   - name: Config
     description: Configuration management for runtime settings.
   - name: Control
@@ -64,13 +64,6 @@ paths:
     $ref: "./paths/bootstrap_tokens.yaml"
   /v1/pki/bootstrap:
     $ref: "./paths/pki_bootstrap.yaml"
-  # PKI endpoints
-  /v1/pki/sign:
-    $ref: "./paths/pki_sign.yaml"
-  /v1/pki/sign/admin:
-    $ref: "./paths/pki_sign_admin.yaml"
-  /v1/pki/sign/client:
-    $ref: "./paths/pki_sign_client.yaml"
   # Control-plane surfaces
   # Run lifecycle and streaming are exposed under /v1/runs/*.
   # Nodes upload logs/diffs/artifacts under /v1/runs/* and complete jobs under /v1/jobs/*.
@@ -210,7 +203,8 @@ components:
       description: |
         Mutual TLS authentication using certificates issued by the cluster CA.
         The server verifies client certificates during the TLS handshake.
-        Node certificates are issued via the `/v1/pki/sign` endpoint.
+        Nodes exchange a short-lived bootstrap token and CSR at
+        `/v1/pki/bootstrap` to receive a certificate and worker bearer token.
     bearerAuth:
       type: http
       scheme: bearer
@@ -219,15 +213,6 @@ components:
         JWT bearer token authentication using `Authorization: Bearer <token>`.
   parameters: {}
   schemas:
-    # PKI schemas
-    PKISignRequest:
-      $ref: "./components/schemas/pki.yaml#/PKISignRequest"
-    PKISignResponse:
-      $ref: "./components/schemas/pki.yaml#/PKISignResponse"
-    PKIAdminSignRequest:
-      $ref: "./components/schemas/pki.yaml#/PKIAdminSignRequest"
-    PKIClientSignRequest:
-      $ref: "./components/schemas/pki.yaml#/PKIClientSignRequest"
     # Config schemas (global env settings)
     GlobalEnvTarget:
       $ref: "./components/schemas/config.yaml#/GlobalEnvTarget"

@@ -1,19 +1,14 @@
 package handlers
 
 import (
-	"bytes"
-	"context"
-	"encoding/json"
-	"io"
 	"net/http"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"regexp"
+	"slices"
 	"strings"
 	"testing"
-	"time"
 
-	"github.com/google/uuid"
 	"gopkg.in/yaml.v3"
 
 	bsmock "github.com/iw2rmb/ploy/internal/blobstore/mock"
@@ -21,143 +16,178 @@ import (
 	"github.com/iw2rmb/ploy/internal/server/auth"
 	"github.com/iw2rmb/ploy/internal/server/blobpersist"
 	"github.com/iw2rmb/ploy/internal/server/events"
-	"github.com/iw2rmb/ploy/internal/server/httpserver"
 )
 
-// TestRegisterRoutesMatchesOpenAPI verifies that all endpoints documented in
-// docs/api/OpenAPI.yaml are actually mounted by RegisterRoutes. It probes each
-// method+path combination and asserts the server does not return 404 Not Found
-// (i.e., the route exists). Authorization and payload validation may still
-// cause 4xx responses, which are acceptable for this coverage check.
+type recordedRoute struct {
+	method string
+	path   string
+}
+
+func (r recordedRoute) String() string {
+	return r.method + " " + r.path
+}
+
+type recordingRegistrar struct {
+	patterns []string
+}
+
+func (r *recordingRegistrar) RegisterRouteFunc(pattern string, _ http.HandlerFunc, _ ...auth.Role) {
+	r.patterns = append(r.patterns, pattern)
+}
+
+func (r *recordingRegistrar) RegisterRouteFuncAllowQueryToken(pattern string, _ http.HandlerFunc, _ ...auth.Role) {
+	r.patterns = append(r.patterns, pattern)
+}
+
+var pathParameter = regexp.MustCompile(`\{[^}/]+\}`)
+
 func TestRegisterRoutesMatchesOpenAPI(t *testing.T) {
-	// Load OpenAPI spec
-	specPath := filepath.Join("..", "..", "..", "docs", "api", "OpenAPI.yaml")
+	registrar := &recordingRegistrar{}
+	st := &handlerStore{}
+	bs := bsmock.New()
+	bp := blobpersist.New(st, bs)
+	eventsService, err := events.NewService(events.Options{})
+	if err != nil {
+		t.Fatalf("events service: %v", err)
+	}
+	RegisterRoutes(registrar, st, bs, bp, eventsService, NewConfigHolder(nil), "test-secret", gitauth.Options{}, nil, nil, nil)
+
+	registered, err := registeredRouteSet(registrar.patterns)
+	if err != nil {
+		t.Fatalf("registered routes: %v", err)
+	}
+	documented, err := loadOpenAPIRouteSet(filepath.Join("..", "..", "..", "docs", "api", "OpenAPI.yaml"))
+	if err != nil {
+		t.Fatalf("OpenAPI routes: %v", err)
+	}
+
+	undocumented, unregistered := routeSetDifferences(registered, documented)
+	if len(undocumented) != 0 || len(unregistered) != 0 {
+		t.Fatalf("route contract mismatch\nregistered but undocumented: %v\ndocumented but unregistered: %v", undocumented, unregistered)
+	}
+
+	t.Run("detects both drift directions", func(t *testing.T) {
+		withExtraRegistration := cloneRouteSet(registered)
+		extra := recordedRoute{method: http.MethodPost, path: "/v1/undocumented"}
+		withExtraRegistration[extra] = struct{}{}
+		gotUndocumented, gotUnregistered := routeSetDifferences(withExtraRegistration, documented)
+		if !slices.Equal(gotUndocumented, []recordedRoute{extra}) || len(gotUnregistered) != 0 {
+			t.Fatalf("undocumented registration drift = (%v, %v), want ([%s], [])", gotUndocumented, gotUnregistered, extra)
+		}
+
+		withoutDocumentedRoute := cloneRouteSet(registered)
+		missing := recordedRoute{method: http.MethodGet, path: "/v1/runs"}
+		delete(withoutDocumentedRoute, missing)
+		gotUndocumented, gotUnregistered = routeSetDifferences(withoutDocumentedRoute, documented)
+		if len(gotUndocumented) != 0 || !slices.Equal(gotUnregistered, []recordedRoute{missing}) {
+			t.Fatalf("unregistered documentation drift = (%v, %v), want ([], [%s])", gotUndocumented, gotUnregistered, missing)
+		}
+	})
+}
+
+func registeredRouteSet(patterns []string) (map[recordedRoute]struct{}, error) {
+	routes := make(map[recordedRoute]struct{}, len(patterns))
+	for _, pattern := range patterns {
+		fields := strings.Fields(pattern)
+		var method, path string
+		switch len(fields) {
+		case 1:
+			path = fields[0]
+			if path != "/health" {
+				return nil, &routePatternError{pattern: pattern}
+			}
+			// /health intentionally remains methodless at runtime for legacy probes.
+			method = http.MethodGet
+		case 2:
+			method, path = strings.ToUpper(fields[0]), fields[1]
+		default:
+			return nil, &routePatternError{pattern: pattern}
+		}
+		routes[normalizeRoute(method, path)] = struct{}{}
+	}
+	return routes, nil
+}
+
+type routePatternError struct {
+	pattern string
+}
+
+func (e *routePatternError) Error() string {
+	return "unsupported route pattern " + e.pattern
+}
+
+func loadOpenAPIRouteSet(specPath string) (map[recordedRoute]struct{}, error) {
 	data, err := os.ReadFile(specPath)
 	if err != nil {
-		t.Fatalf("read OpenAPI.yaml: %v", err)
+		return nil, err
 	}
-	var spec map[string]any
+	var spec struct {
+		Paths map[string]map[string]any `yaml:"paths"`
+	}
 	if err := yaml.Unmarshal(data, &spec); err != nil {
-		t.Fatalf("parse OpenAPI.yaml: %v", err)
-	}
-	paths, ok := spec["paths"].(map[string]any)
-	if !ok {
-		t.Fatalf("paths not found in OpenAPI.yaml")
+		return nil, err
 	}
 
-	// Prepare a test server instance with insecure authorizer so requests
-	// do not require mTLS. We'll exercise three roles to cover all routes.
-	newServer := func(defaultRole auth.Role) (*httpserver.Server, *events.Service) {
-		authz := auth.NewAuthorizer(auth.Options{AllowInsecure: true, DefaultRole: defaultRole})
-		srv, err := httpserver.NewServer(httpserver.Options{Authorizer: authz})
-		if err != nil {
-			t.Fatalf("http server: %v", err)
-		}
-		ev, err := events.NewService(events.Options{})
-		if err != nil {
-			t.Fatalf("events: %v", err)
-		}
-		routeProbeObjectKey := "route-probe/spec-bundle"
-		st := &handlerStore{} // minimal store; handlers may still return 4xx
-		st.getSpecBundle.val.ObjectKey = &routeProbeObjectKey
-		bs := bsmock.New()
-		if _, err := bs.Put(context.Background(), routeProbeObjectKey, "application/gzip", []byte("x")); err != nil {
-			t.Fatalf("seed route probe blob: %v", err)
-		}
-		bp := blobpersist.New(st, bs)
-		cfg := NewConfigHolder(nil)
-		RegisterRoutes(srv, st, bs, bp, ev, cfg, "test-secret", gitauth.Options{}, nil, nil, nil)
-		return srv, ev
-	}
-
-	// Spin three servers for the three role classes.
-	srvCP, _ := newServer(auth.RoleControlPlane)
-	srvWorker, _ := newServer(auth.RoleWorker)
-	srvAdmin, _ := newServer(auth.RoleCLIAdmin)
-
-	// Helper to probe an endpoint against one server.
-	probe := func(srv *httpserver.Server, method, path string) int {
-		// Replace templated vars with sample values.
-		sample := path
-		sample = strings.ReplaceAll(sample, "{id}", uuid.New().String())
-		sample = strings.ReplaceAll(sample, "{stage}", uuid.New().String())
-
-		var body io.Reader
-		if method == http.MethodPost || method == http.MethodDelete || method == http.MethodPut || method == http.MethodPatch {
-			// Minimal JSON body to pass decoder; specific handlers may still 400.
-			body = bytes.NewBufferString("{}")
-		}
-		// Short timeout to avoid blocking SSE streams.
-		ctx, cancel := context.WithTimeout(context.Background(), 25*time.Millisecond)
-		defer cancel()
-		req := httptest.NewRequest(method, sample, body).WithContext(ctx)
-		if body != nil {
-			req.Header.Set("Content-Type", "application/json")
-		}
-		rr := httptest.NewRecorder()
-		handler := srv.Handler()
-		handler.ServeHTTP(rr, req)
-		return rr.Code
-	}
-
-	// allowedMissing contains paths that are documented in OpenAPI but not mounted
-	// in RegisterRoutes (typically PKI endpoints that are mounted separately).
-	// HTTP Build Gate endpoints have been removed from both OpenAPI and code;
-	// gate execution now runs as part of unified jobs queue.
-	allowedMissing := map[string]struct{}{
-		"/v1/pki/sign":        {},
-		"/v1/pki/sign/client": {},
-		"/v1/pki/sign/admin":  {},
-	}
-
-	for p, item := range paths {
-		// Resolve $ref if present; otherwise use the inline methods map.
-		var methods map[string]any
-		if m, ok := item.(map[string]any); ok {
-			if ref, ok := m["$ref"].(string); ok {
-				refPath := filepath.Join("..", "..", "..", "docs", "api", ref)
-				refData, err := os.ReadFile(refPath)
-				if err != nil {
-					t.Fatalf("read %s: %v", refPath, err)
-				}
-				if err := yaml.Unmarshal(refData, &methods); err != nil {
-					t.Fatalf("parse %s: %v", refPath, err)
-				}
-			} else {
-				methods = m
+	routes := make(map[recordedRoute]struct{})
+	for path, pathItem := range spec.Paths {
+		methods := pathItem
+		if ref, ok := pathItem["$ref"].(string); ok {
+			refPath := strings.SplitN(ref, "#", 2)[0]
+			refData, err := os.ReadFile(filepath.Join(filepath.Dir(specPath), refPath))
+			if err != nil {
+				return nil, err
 			}
-		} else {
-			t.Fatalf("invalid path item for %s", p)
+			if err := yaml.Unmarshal(refData, &methods); err != nil {
+				return nil, err
+			}
 		}
-
 		for method := range methods {
-			lm := strings.ToLower(method)
-			if lm != "get" && lm != "post" && lm != "delete" && lm != "put" && lm != "patch" {
-				continue
+			method = strings.ToUpper(method)
+			if isHTTPMethod(method) {
+				routes[normalizeRoute(method, path)] = struct{}{}
 			}
-			if _, skip := allowedMissing[p]; skip {
-				continue
-			}
-			t.Run(strings.ToUpper(lm)+" "+p, func(t *testing.T) {
-				codes := []int{
-					probe(srvCP, strings.ToUpper(lm), p),
-					probe(srvWorker, strings.ToUpper(lm), p),
-					probe(srvAdmin, strings.ToUpper(lm), p),
-				}
-				// Consider any status other than 404 as evidence the route is mounted.
-				ok := false
-				for _, code := range codes {
-					if code != http.StatusNotFound {
-						ok = true
-						break
-					}
-				}
-				if !ok {
-					// Provide debugging info: show codes per role.
-					payload, _ := json.Marshal(codes)
-					t.Fatalf("route not mounted for any role; got codes %s", string(payload))
-				}
-			})
 		}
 	}
+	return routes, nil
+}
+
+func isHTTPMethod(method string) bool {
+	switch method {
+	case http.MethodGet, http.MethodHead, http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodConnect, http.MethodOptions, http.MethodTrace:
+		return true
+	default:
+		return false
+	}
+}
+
+func normalizeRoute(method, path string) recordedRoute {
+	return recordedRoute{method: method, path: pathParameter.ReplaceAllString(path, "{}")}
+}
+
+func routeSetDifferences(registered, documented map[recordedRoute]struct{}) (undocumented, unregistered []recordedRoute) {
+	for route := range registered {
+		if _, ok := documented[route]; !ok {
+			undocumented = append(undocumented, route)
+		}
+	}
+	for route := range documented {
+		if _, ok := registered[route]; !ok {
+			unregistered = append(unregistered, route)
+		}
+	}
+	slices.SortFunc(undocumented, compareRecordedRoutes)
+	slices.SortFunc(unregistered, compareRecordedRoutes)
+	return undocumented, unregistered
+}
+
+func compareRecordedRoutes(a, b recordedRoute) int {
+	return strings.Compare(a.String(), b.String())
+}
+
+func cloneRouteSet(routes map[recordedRoute]struct{}) map[recordedRoute]struct{} {
+	clone := make(map[recordedRoute]struct{}, len(routes))
+	for route := range routes {
+		clone[route] = struct{}{}
+	}
+	return clone
 }

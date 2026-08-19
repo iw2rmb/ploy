@@ -332,55 +332,25 @@ func TestParseStoredTmpEntry(t *testing.T) {
 	}
 }
 
-func TestValidateHydraInEntries_DuplicateDst(t *testing.T) {
-	err := ValidateHydraInEntries([]string{
-		"abcdef0:/in/a",
-		"bbbbbbb:/in/a",
-	}, "test")
-	if err == nil {
-		t.Fatal("expected duplicate destination error")
+func TestValidateHydraEntriesRejectsDuplicateDestinations(t *testing.T) {
+	tests := []struct {
+		name    string
+		kind    HydraFileKind
+		entries []string
+	}{
+		{name: "in", kind: HydraFileIn, entries: []string{"abcdef0:/in/a", "bbbbbbb:/in/a"}},
+		{name: "tmp", kind: HydraFileTmp, entries: []string{"abcdef0:/tmp/ploy/tool.jar", "bbbbbbb:/tmp/ploy/tool.jar"}},
+		{name: "home modes", kind: HydraFileHome, entries: []string{"abcdef0:.config/a", "bbbbbbb:.config/a:ro"}},
+		{name: "equivalent home paths", kind: HydraFileHome, entries: []string{"abcdef0:.config//app", "bbbbbbb:.config/app"}},
 	}
-	if !strings.Contains(err.Error(), "duplicate destination") {
-		t.Fatalf("error %q does not mention duplicate destination", err.Error())
-	}
-}
 
-func TestValidateHydraTmpEntries_DuplicateDst(t *testing.T) {
-	err := ValidateHydraTmpEntries([]string{
-		"abcdef0:/tmp/ploy/tool.jar",
-		"bbbbbbb:/tmp/ploy/tool.jar",
-	}, "test")
-	if err == nil {
-		t.Fatal("expected duplicate destination error")
-	}
-	if !strings.Contains(err.Error(), "duplicate destination") {
-		t.Fatalf("error %q does not mention duplicate destination", err.Error())
-	}
-}
-
-func TestValidateHydraHomeEntries_DuplicateDst(t *testing.T) {
-	err := ValidateHydraHomeEntries([]string{
-		"abcdef0:.config/a",
-		"bbbbbbb:.config/a:ro",
-	}, "test")
-	if err == nil {
-		t.Fatal("expected duplicate destination error")
-	}
-	if !strings.Contains(err.Error(), "duplicate destination") {
-		t.Fatalf("error %q does not mention duplicate destination", err.Error())
-	}
-}
-
-func TestValidateHydraHomeEntries_DuplicateEquivalentPath(t *testing.T) {
-	err := ValidateHydraHomeEntries([]string{
-		"abcdef0:.config//app",
-		"bbbbbbb:.config/app",
-	}, "test")
-	if err == nil {
-		t.Fatal("expected duplicate destination error for equivalent paths")
-	}
-	if !strings.Contains(err.Error(), "duplicate destination") {
-		t.Fatalf("error %q does not mention duplicate destination", err.Error())
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateHydraEntries(tt.kind, tt.entries, "test")
+			if err == nil || !strings.Contains(err.Error(), "duplicate destination") {
+				t.Fatalf("ValidateHydraEntries() error = %v, want duplicate destination", err)
+			}
+		})
 	}
 }
 

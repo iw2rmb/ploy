@@ -83,97 +83,17 @@ func TestS4RunsOrderingEnforced(t *testing.T) {
 	}
 }
 
-// TestS4EnterTransitionsToS5 verifies Enter on a selected run transitions to S5.
-func TestS4EnterTransitionsToS5(t *testing.T) {
-	m := InitialModel(nil, nil)
-	m.screen = ScreenRunsList
-	next, _ := m.Update(runsLoadedMsg{runs: []runSummary{
-		{ID: domaintypes.RunID("run-xyz"), MigName: "mig", CreatedAt: time.Now()},
-	}})
-	nm := next.(model)
-	nm.rightPaneList.Select(0)
-
-	result, _ := nm.handleEnter()
-	rm := result.(model)
+func TestRunSelectionUpdatesContext(t *testing.T) {
+	rm := makeS5Model(t)
 	if rm.screen != ScreenRunDetails {
 		t.Errorf("Enter(S4): got screen %v, want ScreenRunDetails", rm.screen)
 	}
-}
-
-// TestS4EnterSetsSelectedRunID verifies selectedRunID is set from the chosen run's ID.
-func TestS4EnterSetsSelectedRunID(t *testing.T) {
-	const wantID = "run-xyz"
-	m := InitialModel(nil, nil)
-	m.screen = ScreenRunsList
-	next, _ := m.Update(runsLoadedMsg{runs: []runSummary{
-		{ID: domaintypes.RunID(wantID), MigName: "mig", CreatedAt: time.Now()},
-	}})
-	nm := next.(model)
-	nm.rightPaneList.Select(0)
-
-	result, _ := nm.handleEnter()
-	rm := result.(model)
-	if rm.selectedRunID.String() != wantID {
-		t.Errorf("selectedRunID: got %q, want %q", rm.selectedRunID.String(), wantID)
+	if rm.selectedRunID != "run-abc" {
+		t.Errorf("selectedRunID: got %q, want %q", rm.selectedRunID, "run-abc")
 	}
-}
-
-func TestS4EnterDefinesMigrationAndRunInPloy(t *testing.T) {
-	m := InitialModel(nil, nil)
-	m.screen = ScreenRunsList
-	next, _ := m.Update(runsLoadedMsg{runs: []runSummary{
-		{ID: domaintypes.RunID("run-xyz"), MigID: domaintypes.MigID("mig-123"), MigName: "mig", CreatedAt: time.Now()},
-	}})
-	nm := next.(model)
-	nm.rightPaneList.Select(0)
-
-	result, _ := nm.handleEnter()
-	rm := result.(model)
-	items := rm.rootList.Items()
-	if len(items) != 3 {
-		t.Fatalf("ploy items: got %d, want 3", len(items))
-	}
-
-	item0, ok := items[0].(listItem)
-	if !ok {
-		t.Fatalf("item 0: unexpected type %T", items[0])
-	}
-	item1, ok := items[1].(listItem)
-	if !ok {
-		t.Fatalf("item 1: unexpected type %T", items[1])
-	}
-	item2, ok := items[2].(listItem)
-	if !ok {
-		t.Fatalf("item 2: unexpected type %T", items[2])
-	}
-
-	if item0.title != "mig" {
-		t.Errorf("item 0 title: got %q, want %q", item0.title, "mig")
-	}
-	if item0.description != "mig-123" {
-		t.Errorf("item 0 description: got %q, want %q", item0.description, "mig-123")
-	}
-	if item1.title != "Run" {
-		t.Errorf("item 1 title: got %q, want %q", item1.title, "Run")
-	}
-	if item1.description != "run-xyz" {
-		t.Errorf("item 1 description: got %q, want %q", item1.description, "run-xyz")
-	}
-	if item2.title != "Jobs" {
-		t.Errorf("item 2 title: got %q, want %q", item2.title, "Jobs")
-	}
-	if item2.description != "total: —" {
-		t.Errorf("item 2 description: got %q, want %q", item2.description, "total: —")
-	}
-}
-
-// TestS4EscTransitionsToS1 verifies Esc from S4 returns to S1.
-func TestS4EscTransitionsToS1(t *testing.T) {
-	m := InitialModel(nil, nil)
-	m.screen = ScreenRunsList
-	next, _ := m.handleEsc()
-	nm := next.(model)
-	if nm.screen != ScreenPloyList {
-		t.Errorf("Esc(S4): got screen %v, want ScreenPloyList", nm.screen)
-	}
+	assertPloyItems(t, rm, []listItem{
+		{title: "my-mig", description: "mig-abc"},
+		{title: "Run", description: "run-abc"},
+		{title: "Jobs", description: "total: —"},
+	})
 }

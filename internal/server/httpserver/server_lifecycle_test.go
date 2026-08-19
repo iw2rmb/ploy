@@ -8,23 +8,14 @@ import (
 	"time"
 )
 
-func TestNewServer(t *testing.T) {
-	t.Run("success", func(t *testing.T) {
-		srv := newTestServer(t)
-		if srv == nil {
-			t.Fatal("NewServer() returned nil server")
-		}
-	})
-
-	t.Run("error_missing_authorizer", func(t *testing.T) {
-		srv, err := NewServer(Options{})
-		if err == nil {
-			t.Fatal("NewServer() expected error for missing authorizer")
-		}
-		if srv != nil {
-			t.Error("NewServer() should return nil server on error")
-		}
-	})
+func TestNewServerRequiresAuthorizer(t *testing.T) {
+	srv, err := NewServer(Options{})
+	if err == nil {
+		t.Fatal("NewServer() expected error for missing authorizer")
+	}
+	if srv != nil {
+		t.Error("NewServer() should return nil server on error")
+	}
 }
 
 func TestServer_StartStop(t *testing.T) {

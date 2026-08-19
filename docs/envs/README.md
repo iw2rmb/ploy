@@ -236,10 +236,12 @@ image pulls. Use `PLOY_DOCKER_AUTH_CONFIG_FILE` for private registries.
 - Migration status: complete (`github.com/docker/docker` removed)
 
 - `PLOY_CA_CERT_PEM` — Cluster CA certificate presented to the node for mTLS trust (PEM-encoded).
-  Required for node→server and server→node mTLS connections.
-- `PLOY_CA_KEY_PEM` — Cluster CA private key (PEM-encoded). Set during bootstrap on the
-  control-plane node to enable the `/v1/pki/sign` endpoint for signing node CSRs. Should
-  only be present on the control-plane server; worker nodes do not require this variable.
+  A worker uses this certificate to verify the control plane before it exchanges its
+  bootstrap token and CSR at `/v1/pki/bootstrap`.
+- `PLOY_CA_KEY_PEM` — Cluster CA private key (PEM-encoded). Primary-host provisioning
+  writes this value to `/etc/ploy/pki/ca.key`. Do not set this variable on worker nodes.
+  The active bootstrap endpoint signs node CSRs with `PLOY_SERVER_CA_CERT` and
+  `PLOY_SERVER_CA_KEY`, as described in the PKI section below.
 - `PLOY_SERVER_CERT_PEM` / `PLOY_SERVER_KEY_PEM` — The node's TLS certificate and key
   (CSR-signed by the control plane). Despite the name, bootstrap uses these variables
   for both server and node flows and writes to `/etc/ploy/pki/node.crt` and
@@ -363,14 +365,12 @@ PLOY_NAMED_SPECS_ENVS_ALLOWLIST=PLOY_CONTAINER_REGISTRY
 
 ### PKI
 
-- `PLOY_SERVER_CA_CERT` — PEM-encoded CA certificate used to sign node certificates during
-  bootstrap. Required for the `/v1/pki/bootstrap` endpoint to issue certificates.
-- `PLOY_SERVER_CA_KEY` — PEM-encoded CA private key used to sign node CSRs during bootstrap.
-  Required alongside `PLOY_SERVER_CA_CERT`. When either value is missing (empty or whitespace-only),
-  the bootstrap endpoint responds with `503 PKI not configured`.
-  If values are set but invalid (malformed PEM), the server returns `500 Internal Server Error`
-  and logs details; fix the stored CA materials. Can also be configured via `pki.ca_cert_path` and
-  `pki.ca_key_path` in the server config file.
+- `PLOY_SERVER_CA_CERT` — Base64-encoded PEM CA certificate that `/v1/pki/bootstrap`
+  uses to issue node certificates.
+- `PLOY_SERVER_CA_KEY` — Base64-encoded PEM CA private key that `/v1/pki/bootstrap`
+  uses with `PLOY_SERVER_CA_CERT`. If either value is empty, the endpoint responds with
+  `503 PKI not configured`. If a value is not valid base64 or does not contain valid PEM,
+  the endpoint responds with `500 Internal Server Error` and logs the cause.
 
 
 ## PostgreSQL

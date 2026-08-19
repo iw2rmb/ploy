@@ -1,3 +1,24 @@
+head:
+  tags: [Artifacts]
+  summary: Check whether a spec bundle exists
+  description: Checks for an existing spec bundle by content ID before upload.
+  parameters:
+    - in: query
+      name: cid
+      required: true
+      schema: { type: string }
+      description: Content ID of the spec bundle.
+  responses:
+    '200':
+      description: The bundle exists. `X-Bundle-ID` contains its bundle ID.
+      headers:
+        X-Bundle-ID:
+          schema: { type: string }
+          description: Existing bundle ID.
+    '400': { description: Missing content ID }
+    '404': { description: Bundle not found }
+    '500': { description: Internal Server Error }
+
 post:
   tags: [Artifacts]
   summary: Upload a spec bundle (CLI → control plane)
