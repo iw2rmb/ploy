@@ -41,6 +41,17 @@ func IsHydraShortHash(value string) bool {
 	return shortHashPattern.MatchString(value)
 }
 
+// ValidateHydraPathSafety rejects paths that contain a parent-directory
+// component before path normalization can erase it.
+func ValidateHydraPathSafety(p string) error {
+	for _, part := range strings.Split(p, "/") {
+		if part == ".." {
+			return fmt.Errorf("path traversal not allowed: %q", p)
+		}
+	}
+	return nil
+}
+
 // ParsedStoredEntry holds the result of parsing a canonical stored entry.
 type ParsedStoredEntry struct {
 	Hash     string
@@ -105,6 +116,9 @@ func ParseStoredEntry(kind HydraFileKind, s string) (ParsedStoredEntry, error) {
 	if err != nil {
 		return ParsedStoredEntry{}, fmt.Errorf("%s entry %q: %w", kind, s, err)
 	}
+	if err := ValidateHydraPathSafety(dst); err != nil {
+		return ParsedStoredEntry{}, fmt.Errorf("%s entry %q: %w", kind, s, err)
+	}
 	dst = path.Clean(dst)
 
 	switch kind {
@@ -124,9 +138,6 @@ func ParseStoredEntry(kind HydraFileKind, s string) (ParsedStoredEntry, error) {
 		return ParsedStoredEntry{}, fmt.Errorf("invalid Hydra file kind %q", kind)
 	}
 
-	if err := guardPathTraversal(dst); err != nil {
-		return ParsedStoredEntry{}, fmt.Errorf("%s entry %q: %w", kind, s, err)
-	}
 	return ParsedStoredEntry{Hash: hash, Dst: dst, ReadOnly: readOnly}, nil
 }
 
@@ -138,23 +149,6 @@ func (p ParsedStoredEntry) CanonicalHomeEntry() string {
 		s += ":ro"
 	}
 	return s
-}
-
-// ValidateHomeDestination validates a home destination path without requiring
-// a full canonical entry. The destination must be relative, non-empty, cleaned,
-// and free of path traversal.
-func ValidateHomeDestination(dst string) error {
-	cleaned := path.Clean(dst)
-	if cleaned == "" || cleaned == "." {
-		return fmt.Errorf("home destination %q: destination required", dst)
-	}
-	if strings.HasPrefix(cleaned, "/") {
-		return fmt.Errorf("home destination %q: must be relative (no leading /)", dst)
-	}
-	if err := guardPathTraversal(cleaned); err != nil {
-		return fmt.Errorf("home destination %q: %w", dst, err)
-	}
-	return nil
 }
 
 // ValidateHydraEntries validates stored entries and rejects duplicate destinations.
@@ -202,14 +196,4 @@ func splitHashDst(s string) (hash, dst string, err error) {
 		return "", "", fmt.Errorf("destination required")
 	}
 	return hash, dst, nil
-}
-
-// guardPathTraversal rejects paths containing ".." components.
-func guardPathTraversal(p string) error {
-	for _, part := range strings.Split(p, "/") {
-		if part == ".." {
-			return fmt.Errorf("path traversal not allowed: %q", p)
-		}
-	}
-	return nil
 }

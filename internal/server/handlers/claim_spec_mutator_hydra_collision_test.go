@@ -71,7 +71,7 @@ func TestApplyHydraOverlay_DestinationCollision(t *testing.T) {
 			spec:    map[string]any{},
 			jobType: domaintypes.JobTypeMig,
 			overlays: map[string]*HydraJobConfig{
-				"mig": {In: []string{"/a:/in/config.json", "/b:/in/config.json"}},
+				"mig": {In: []string{"aaaaaaa:/in/config.json", "bbbbbbb:/in/config.json"}},
 			},
 			wantErr:   true,
 			errSubstr: "/in/config.json",
@@ -81,7 +81,7 @@ func TestApplyHydraOverlay_DestinationCollision(t *testing.T) {
 			spec:    map[string]any{},
 			jobType: domaintypes.JobTypeMig,
 			overlays: map[string]*HydraJobConfig{
-				"mig": {Out: []string{"/a:/out/result.txt", "/b:/out/result.txt"}},
+				"mig": {Out: []string{"aaaaaaa:/out/result.txt", "bbbbbbb:/out/result.txt"}},
 			},
 			wantErr:   true,
 			errSubstr: "/out/result.txt",
@@ -92,15 +92,15 @@ func TestApplyHydraOverlay_DestinationCollision(t *testing.T) {
 				"steps": []any{
 					map[string]any{
 						"image": "img:latest",
-						"in":    []any{"/spec:/in/config.json"},
+						"in":    []any{"aaaaaaa:/in/config.json"},
 					},
 				},
 			},
 			jobType: domaintypes.JobTypeMig,
 			overlays: map[string]*HydraJobConfig{
-				"mig": {In: []string{"/overlay:/in/config.json"}},
+				"mig": {In: []string{"bbbbbbb:/in/config.json"}},
 			},
-			slices: []sliceCheck{{"in", 1, "/spec:/in/config.json"}},
+			slices: []sliceCheck{{"in", 1, "aaaaaaa:/in/config.json"}},
 		},
 		{
 			name: "spec and overlay share out dst replaces with spec entry",
@@ -108,15 +108,15 @@ func TestApplyHydraOverlay_DestinationCollision(t *testing.T) {
 				"steps": []any{
 					map[string]any{
 						"image": "img:latest",
-						"out":   []any{"/spec:/out/result.txt"},
+						"out":   []any{"aaaaaaa:/out/result.txt"},
 					},
 				},
 			},
 			jobType: domaintypes.JobTypeMig,
 			overlays: map[string]*HydraJobConfig{
-				"mig": {Out: []string{"/overlay:/out/result.txt"}},
+				"mig": {Out: []string{"bbbbbbb:/out/result.txt"}},
 			},
-			slices: []sliceCheck{{"out", 1, "/spec:/out/result.txt"}},
+			slices: []sliceCheck{{"out", 1, "aaaaaaa:/out/result.txt"}},
 		},
 		{
 			name: "overlay appends non-colliding dst to spec",
@@ -124,15 +124,15 @@ func TestApplyHydraOverlay_DestinationCollision(t *testing.T) {
 				"steps": []any{
 					map[string]any{
 						"image": "img:latest",
-						"in":    []any{"/spec:/in/a.json"},
+						"in":    []any{"aaaaaaa:/in/a.json"},
 					},
 				},
 			},
 			jobType: domaintypes.JobTypeMig,
 			overlays: map[string]*HydraJobConfig{
-				"mig": {In: []string{"/overlay:/in/b.json"}},
+				"mig": {In: []string{"bbbbbbb:/in/b.json"}},
 			},
-			slices: []sliceCheck{{"in", 2, "/spec:/in/a.json"}},
+			slices: []sliceCheck{{"in", 2, "aaaaaaa:/in/a.json"}},
 		},
 	}
 
@@ -190,8 +190,8 @@ func TestApplyHydraOverlay_ThreeLayerPrecedence(t *testing.T) {
 				"steps": []any{
 					map[string]any{
 						"image": "img:latest",
-						"in":    []any{"/spec/data:/in/data.json"},
-						"home":  []any{"/spec/auth:.auth/config.json:ro"},
+						"in":    []any{"aaaaaaa:/in/data.json"},
+						"home":  []any{"bbbbbbb:.auth/config.json:ro"},
 					},
 				},
 			},
@@ -202,14 +202,14 @@ func TestApplyHydraOverlay_ThreeLayerPrecedence(t *testing.T) {
 			overlays: map[string]*HydraJobConfig{
 				"mig": {
 					Envs: map[string]string{"OVERLAY_ONLY": "overlay", "SHARED_ALL": "from_overlay", "GLOBAL_ONLY": "overlay_override"},
-					In:   []string{"/overlay/extra:/in/extra.json", "/overlay/data:/in/data.json"},
+					In:   []string{"ccccccc:/in/extra.json", "ddddddd:/in/data.json"},
 				},
 			},
 			jobType:   domaintypes.JobTypeMig,
 			checkEnvs: map[string]string{"SHARED_ALL": "from_spec", "SPEC_ONLY": "spec", "OVERLAY_ONLY": "overlay", "GLOBAL_ONLY": "overlay_override"},
 			slices: []sliceCheck{
-				{"in", 2, "/spec/data:/in/data.json"},
-				{"home", 1, "/spec/auth:.auth/config.json:ro"},
+				{"in", 2, "aaaaaaa:/in/data.json"},
+				{"home", 1, "bbbbbbb:.auth/config.json:ro"},
 			},
 		},
 		{
@@ -235,11 +235,11 @@ func TestApplyHydraOverlay_ThreeLayerPrecedence(t *testing.T) {
 				"ONLY_GLOBAL": {{Value: "g", Target: domaintypes.GlobalEnvTargetSteps}},
 			},
 			overlays: map[string]*HydraJobConfig{
-				"mig": {In: []string{"/f:/in/f.txt"}},
+				"mig": {In: []string{"abcdef0:/in/f.txt"}},
 			},
 			jobType:   domaintypes.JobTypeMig,
 			checkEnvs: map[string]string{"ONLY_GLOBAL": "g"},
-			slices:    []sliceCheck{{"in", 1, "/f:/in/f.txt"}},
+			slices:    []sliceCheck{{"in", 1, "abcdef0:/in/f.txt"}},
 		},
 		{
 			name: "spec envs win when no overlay or global conflict",

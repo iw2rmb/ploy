@@ -37,18 +37,3 @@ func RunExpectOK(t testing.TB, run RunFn, args []string) string {
 	}
 	return buf.String()
 }
-
-// RunHelp asserts that both `--help` and `-h` invocations of baseArgs succeed
-// and emit output containing each wantContains substring.
-func RunHelp(t testing.TB, run RunFn, baseArgs []string, wantContains ...string) {
-	t.Helper()
-	for _, flag := range []string{"--help", "-h"} {
-		args := append(append([]string{}, baseArgs...), flag)
-		out := RunExpectOK(t, run, args)
-		for _, want := range wantContains {
-			if !strings.Contains(out, want) {
-				t.Fatalf("%v: expected output containing %q, got %q", args, want, out)
-			}
-		}
-	}
-}

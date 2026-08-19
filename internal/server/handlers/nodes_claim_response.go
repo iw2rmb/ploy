@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"strings"
 	"time"
 
@@ -98,25 +97,4 @@ func buildJobClaimPayload(
 		GateContext:   gateContext,
 		DetectedStack: detectedStack,
 	}, nil
-}
-
-// buildAndSendJobClaimResponse constructs and sends the claim response for a job.
-// Kept as a test helper wrapper around the response builder.
-func buildAndSendJobClaimResponse(
-	w http.ResponseWriter,
-	r *http.Request,
-	st store.Store,
-	bs blobstore.Store,
-	configHolder *ConfigHolder,
-	run store.Run,
-	spec []byte,
-	repoURL string,
-	job store.Job,
-) error {
-	payload, err := buildJobClaimPayload(r.Context(), st, bs, configHolder, run, spec, repoURL, job)
-	if err != nil {
-		return err
-	}
-	writeJSON(w, http.StatusOK, payload)
-	return nil
 }

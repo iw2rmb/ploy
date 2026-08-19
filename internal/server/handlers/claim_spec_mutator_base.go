@@ -35,16 +35,3 @@ func applyJobIDMutator(m map[string]any, jobID domaintypes.JobID) error {
 	m["job_id"] = jobID.String()
 	return nil
 }
-
-func ensureObjectField(parent map[string]any, key string, prefix string) (map[string]any, error) {
-	if v, ok := parent[key]; ok && v != nil {
-		obj, ok := v.(map[string]any)
-		if !ok {
-			return nil, fmt.Errorf("%s.%s: expected object, got %T", prefix, key, v)
-		}
-		return obj, nil
-	}
-	obj := map[string]any{}
-	parent[key] = obj
-	return obj, nil
-}

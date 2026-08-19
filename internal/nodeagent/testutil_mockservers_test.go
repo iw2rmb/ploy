@@ -25,10 +25,6 @@ func withHeartbeatStatus(code int) agentServerOption {
 	return func(c *agentServerConfig) { c.heartbeatStatus = code }
 }
 
-func withHeartbeatCounter(counter *int) agentServerOption {
-	return func(c *agentServerConfig) { c.heartbeatCounter = counter }
-}
-
 // newAgentMockServer creates an httptest.Server that handles heartbeat and claim
 // endpoints for the given nodeID. By default heartbeat returns 200 and claim
 // returns 200 with an empty JSON object (no work).

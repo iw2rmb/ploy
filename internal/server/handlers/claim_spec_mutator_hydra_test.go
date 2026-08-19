@@ -214,22 +214,22 @@ func TestApplyHydraOverlay_TypedMerge(t *testing.T) {
 				"steps": []any{
 					map[string]any{
 						"image": "img:latest",
-						"in":    []any{"/a.txt:/in/config.json"},
-						"out":   []any{"/b.txt:/out/result.txt"},
-						"home":  []any{"/c.txt:.config/app.toml:ro"},
+						"in":    []any{"aaaaaaa:/in/config.json"},
+						"out":   []any{"bbbbbbb:/out/result.txt"},
+						"home":  []any{"ccccccc:.config/app.toml:ro"},
 					},
 				},
 			},
 			overlays: map[string]*HydraJobConfig{
 				"mig": {
-					In:  []string{"/overlay.txt:/in/config.json", "/overlay2.txt:/in/extra.json"},
-					Out: []string{"/overlay.txt:/out/new.txt"},
+					In:  []string{"ddddddd:/in/config.json", "eeeeeee:/in/extra.json"},
+					Out: []string{"fffffff:/out/new.txt"},
 				},
 			},
 			slices: []sliceCheck{
-				{"in", 2, "/a.txt:/in/config.json"},
+				{"in", 2, "aaaaaaa:/in/config.json"},
 				{"out", 2, ""},
-				{"home", 1, "/c.txt:.config/app.toml:ro"},
+				{"home", 1, "ccccccc:.config/app.toml:ro"},
 			},
 		},
 		{
@@ -240,10 +240,10 @@ func TestApplyHydraOverlay_TypedMerge(t *testing.T) {
 				},
 			},
 			overlays: map[string]*HydraJobConfig{
-				"mig": {Envs: map[string]string{"K": "V"}, In: []string{"/f:/in/f.txt"}},
+				"mig": {Envs: map[string]string{"K": "V"}, In: []string{"abcdef0:/in/f.txt"}},
 			},
 			checkEnvs: map[string]string{"K": "V"},
-			slices:    []sliceCheck{{"in", 1, "/f:/in/f.txt"}},
+			slices:    []sliceCheck{{"in", 1, "abcdef0:/in/f.txt"}},
 		},
 		{
 			name:      "nil overlay does nothing",

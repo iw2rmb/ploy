@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 
@@ -195,22 +194,4 @@ func cleanupJobRuntime(dirs JobDirectories) error {
 		}
 	}
 	return cleanupErr
-}
-
-func jobOutFile(runID types.RunID, jobID types.JobID, outPath string) (string, error) {
-	normalizedOutPath := path.Clean(strings.TrimSpace(outPath))
-	if !strings.HasPrefix(normalizedOutPath, "/out/") || normalizedOutPath == "/out" {
-		return "", fmt.Errorf("source path must stay under /out")
-	}
-	dirs := jobDirectories(runID, jobID)
-	if strings.TrimSpace(dirs.Out) == "" {
-		return "", fmt.Errorf("source job output path is empty")
-	}
-	rel := strings.TrimPrefix(normalizedOutPath, "/out/")
-	sourcePath := filepath.Clean(filepath.Join(dirs.Out, filepath.FromSlash(rel)))
-	cleanOutDir := filepath.Clean(dirs.Out)
-	if sourcePath != cleanOutDir && !strings.HasPrefix(sourcePath, cleanOutDir+string(filepath.Separator)) {
-		return "", fmt.Errorf("source path escapes source /out")
-	}
-	return sourcePath, nil
 }

@@ -251,24 +251,6 @@ func (b *RunStatsBuilder) Error(msg string) *RunStatsBuilder {
 	return b
 }
 
-// ResumeCount sets the resume_count field.
-func (b *RunStatsBuilder) ResumeCount(count int) *RunStatsBuilder {
-	b.acc.ResumeCount = &count
-	return b
-}
-
-// LastResumedAt sets the last_resumed_at field.
-func (b *RunStatsBuilder) LastResumedAt(ts string) *RunStatsBuilder {
-	b.acc.LastResumedAt = &ts
-	return b
-}
-
-// Metadata sets the metadata field.
-func (b *RunStatsBuilder) Metadata(meta map[string]string) *RunStatsBuilder {
-	b.acc.Metadata = meta
-	return b
-}
-
 // MetadataEntry adds a single key-value pair to the metadata field.
 func (b *RunStatsBuilder) MetadataEntry(key, value string) *RunStatsBuilder {
 	if b.acc.Metadata == nil {

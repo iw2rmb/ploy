@@ -3,7 +3,6 @@ package handlers
 import (
 	"maps"
 	"slices"
-	"sort"
 	"sync"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
@@ -51,14 +50,6 @@ func NewConfigHolder(globalEnv map[string][]GlobalEnvVar) *ConfigHolder {
 	}
 }
 
-func copySectionSlice[T any](m map[string][]T, section string) []T {
-	entries := m[section]
-	if len(entries) == 0 {
-		return nil
-	}
-	return slices.Clone(entries)
-}
-
 func setSectionSlice[T any](m map[string][]T, section string, entries []T) map[string][]T {
 	if m == nil {
 		m = make(map[string][]T)
@@ -68,43 +59,6 @@ func setSectionSlice[T any](m map[string][]T, section string, entries []T) map[s
 		return m
 	}
 	m[section] = slices.Clone(entries)
-	return m
-}
-
-func upsertSectionBy[T any](m map[string][]T, section string, entry T, match func(a, b T) bool, less func(a, b T) bool) map[string][]T {
-	if m == nil {
-		m = make(map[string][]T)
-	}
-	entries := m[section]
-	for i := range entries {
-		if match(entries[i], entry) {
-			entries[i] = entry
-			m[section] = entries
-			return m
-		}
-	}
-	entries = append(entries, entry)
-	if less != nil {
-		sort.Slice(entries, func(i, j int) bool { return less(entries[i], entries[j]) })
-	}
-	m[section] = entries
-	return m
-}
-
-func deleteSectionBy[T any](m map[string][]T, section string, match func(T) bool) map[string][]T {
-	entries := m[section]
-	for i := range entries {
-		if !match(entries[i]) {
-			continue
-		}
-		entries = append(entries[:i], entries[i+1:]...)
-		if len(entries) == 0 {
-			delete(m, section)
-		} else {
-			m[section] = entries
-		}
-		return m
-	}
 	return m
 }
 
@@ -192,28 +146,6 @@ func (h *ConfigHolder) SetConfigIn(section string, entries []ConfigInEntry) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.configIn = setSectionSlice(h.configIn, section, entries)
-	h.syncHydraInLocked(section)
-}
-
-// AddConfigIn adds or replaces an in entry by destination in a section (dedup by dst, sort by dst).
-func (h *ConfigHolder) AddConfigIn(section string, entry ConfigInEntry) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	h.configIn = upsertSectionBy(
-		h.configIn,
-		section,
-		entry,
-		func(a, b ConfigInEntry) bool { return a.Dst == b.Dst },
-		func(a, b ConfigInEntry) bool { return a.Dst < b.Dst },
-	)
-	h.syncHydraInLocked(section)
-}
-
-// DeleteConfigIn removes an in entry by destination from a section.
-func (h *ConfigHolder) DeleteConfigIn(section, dst string) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	h.configIn = deleteSectionBy(h.configIn, section, func(e ConfigInEntry) bool { return e.Dst == dst })
 	h.syncHydraInLocked(section)
 }
 

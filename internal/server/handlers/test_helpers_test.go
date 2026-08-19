@@ -1,9 +1,7 @@
 package handlers
 
 import (
-	"archive/tar"
 	"bytes"
-	"compress/gzip"
 	"encoding/json"
 	"errors"
 	"log/slog"
@@ -257,21 +255,6 @@ func withRunStatusCounts(rows []store.CountRunsByWaveStatusRow) func(*handlerSto
 	return func(st *handlerStore) { st.countRunsByStatus.val = rows }
 }
 
-func withSpec(specID domaintypes.SpecID, specBytes []byte) func(*handlerStore) {
-	return func(st *handlerStore) {
-		st.getRun.val.SpecID = specID
-		st.getSpec.val = store.Spec{ID: specID, Spec: specBytes}
-	}
-}
-
-func withRunStatus(status domaintypes.RunStatus) func(*handlerStore) {
-	return func(st *handlerStore) { st.getRun.val.Status = status }
-}
-
-func withJobResults(m map[domaintypes.JobID]store.Job) func(*handlerStore) {
-	return func(st *handlerStore) { st.getJobByID = m }
-}
-
 func withPromoteResult(job store.Job) func(*handlerStore) {
 	return func(st *handlerStore) { st.promoteJobByIDIfUnblocked.val = job }
 }
@@ -292,16 +275,6 @@ func withGetJobErr(err error) func(*handlerStore) {
 
 func withListJobsByRun(jobs []store.Job) func(*handlerStore) {
 	return func(st *handlerStore) { st.listJobsByRun.val = jobs }
-}
-
-func withArtifactBundles(bundles []store.ArtifactBundle) func(*handlerStore) {
-	return func(st *handlerStore) { st.listArtifactBundlesByRunAndJob.val = bundles }
-}
-
-func withGetRunCreatedAt(t time.Time) func(*handlerStore) {
-	return func(st *handlerStore) {
-		st.getRun.val.CreatedAt = pgtype.Timestamptz{Time: t, Valid: true}
-	}
 }
 
 // doRequestWithContentType sends a request with a custom Content-Type and string body.
@@ -478,27 +451,4 @@ func newTestServerWithRole(t *testing.T, role auth.Role) *httpserver.Server {
 	bp := blobpersist.New(st, bs)
 	RegisterRoutes(srv, st, bs, bp, ev, NewConfigHolder(nil), "test-secret", gitauth.Options{}, nil, nil, nil)
 	return srv
-}
-
-// mustTarGzPayload builds a gzipped tar archive from a map of filename → content.
-func mustTarGzPayload(t *testing.T, files map[string][]byte) []byte {
-	t.Helper()
-	var b bytes.Buffer
-	gz := gzip.NewWriter(&b)
-	tw := tar.NewWriter(gz)
-	for name, data := range files {
-		if err := tw.WriteHeader(&tar.Header{Name: name, Mode: 0o644, Size: int64(len(data))}); err != nil {
-			t.Fatalf("write header %q: %v", name, err)
-		}
-		if _, err := tw.Write(data); err != nil {
-			t.Fatalf("write payload %q: %v", name, err)
-		}
-	}
-	if err := tw.Close(); err != nil {
-		t.Fatalf("close tar: %v", err)
-	}
-	if err := gz.Close(); err != nil {
-		t.Fatalf("close gzip: %v", err)
-	}
-	return b.Bytes()
 }

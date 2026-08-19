@@ -103,10 +103,3 @@ func (s *Server) Addr() string {
 	}
 	return s.cfg.Listen
 }
-
-// MetricsConfig returns the current metrics configuration.
-func (s *Server) MetricsConfig() config.MetricsConfig {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.cfg
-}

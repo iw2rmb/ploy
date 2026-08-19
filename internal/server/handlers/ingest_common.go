@@ -21,7 +21,6 @@ import (
 	"github.com/iw2rmb/ploy/internal/server/blobpersist"
 	"github.com/iw2rmb/ploy/internal/server/events"
 	"github.com/iw2rmb/ploy/internal/store"
-	"github.com/iw2rmb/ploy/internal/workflow/lifecycle"
 )
 
 // computeCIDAndDigest computes a content identifier and SHA256 digest for a byte payload.
@@ -41,16 +40,6 @@ func requiredPathParam(r *http.Request, key string) (string, error) {
 	val := strings.TrimSpace(r.PathValue(key))
 	if val == "" {
 		return "", fmt.Errorf("%s path parameter is required", key)
-	}
-	return val, nil
-}
-
-// requiredQueryParam extracts and validates a required query parameter from the request.
-// Returns the trimmed value or an error if the parameter is missing or empty.
-func requiredQueryParam(r *http.Request, key string) (string, error) {
-	val := strings.TrimSpace(r.URL.Query().Get(key))
-	if val == "" {
-		return "", fmt.Errorf("%s query parameter is required", key)
 	}
 	return val, nil
 }
@@ -220,17 +209,6 @@ func requiredPathParamOrWriteError(w http.ResponseWriter, r *http.Request, key s
 	return val, true
 }
 
-// requiredQueryParamOrWriteError extracts a required string query param.
-// On validation failure, it writes a 400 response and returns ok=false.
-func requiredQueryParamOrWriteError(w http.ResponseWriter, r *http.Request, key string) (string, bool) {
-	val, err := requiredQueryParam(r, key)
-	if err != nil {
-		writeHTTPError(w, http.StatusBadRequest, "%s", err)
-		return "", false
-	}
-	return val, true
-}
-
 // optionalParam extracts an optional typed ID from a path parameter.
 // Returns nil if the parameter is missing or empty.
 func optionalParam[T any, PT interface {
@@ -319,19 +297,6 @@ func getRunOrFail(w http.ResponseWriter, r *http.Request, st store.Store, runID 
 		}
 		slog.Error(logPrefix+": database error", "run_id", runID.String(), "err", err)
 		writeHTTPError(w, http.StatusInternalServerError, "failed to get run: %v", err)
-		return store.Run{}, false
-	}
-	return run, true
-}
-
-// getActiveRunOrFail fetches a run and rejects terminal runs with 409 Conflict.
-func getActiveRunOrFail(w http.ResponseWriter, r *http.Request, st store.Store, runID domaintypes.RunID, logPrefix string) (store.Run, bool) {
-	run, ok := getRunOrFail(w, r, st, runID, logPrefix)
-	if !ok {
-		return store.Run{}, false
-	}
-	if lifecycle.IsTerminalRunStatus(run.Status) {
-		writeHTTPError(w, http.StatusConflict, "run is in terminal state")
 		return store.Run{}, false
 	}
 	return run, true

@@ -3,7 +3,6 @@ package gitrepo
 import (
 	"context"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -68,26 +67,6 @@ func AssertRepo(t testing.TB, dir string) {
 	if _, err := os.Stat(filepath.Join(dir, ".git")); err != nil {
 		t.Fatalf("directory %s is not a git repo: %v", dir, err)
 	}
-}
-
-func DiffHEAD(t testing.TB, workspace string) []byte {
-	t.Helper()
-	result, err := gitexec.Execute(context.Background(), gitexec.Request{Dir: workspace, Args: []string{"diff", "HEAD"}})
-	if err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() != 0 {
-			output := append(result.Stdout, result.Stderr...)
-			t.Fatalf("git diff failed: %v (output: %s)", err, string(output))
-		}
-	}
-	return result.Stdout
-}
-
-func SetupWithChange(t testing.TB, workspace string) {
-	t.Helper()
-	Init(t, workspace)
-	WriteFile(t, filepath.Join(workspace, "test.txt"), "initial content\n")
-	CommitAll(t, workspace, "Initial commit")
-	WriteFile(t, filepath.Join(workspace, "test.txt"), "modified content\n")
 }
 
 func SetupBasic(t testing.TB) string {

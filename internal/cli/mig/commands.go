@@ -22,7 +22,6 @@ import (
 	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/httpx"
-	migsapi "github.com/iw2rmb/ploy/internal/migs/api"
 )
 
 type AddOptions struct {
@@ -467,46 +466,6 @@ func resolveMigRef(ctx context.Context, client *http.Client, baseURL *url.URL, m
 		MigRef:  domaintypes.MigRef(migRef),
 	}).Run(ctx)
 	return domaintypes.MigID(id), err
-}
-
-func followMigRunProject(ctx context.Context, baseURL *url.URL, client *http.Client, runID domaintypes.RunID, capDuration time.Duration, cancelOnCap bool, maxRetries int, output io.Writer) error {
-	followCtx := ctx
-	var cancel context.CancelFunc
-	if capDuration > 0 {
-		followCtx, cancel = context.WithTimeout(ctx, capDuration)
-		defer cancel()
-	}
-	renderOpts := common.FollowRunRenderOptions(baseURL, output)
-	final, err := runs.FollowRunCommand{
-		Client:     common.CloneForStream(client),
-		BaseURL:    baseURL,
-		RunID:      runID,
-		Output:     output,
-		EnableOSC8: renderOpts.EnableOSC8,
-		MaxRetries: maxRetries,
-	}.Run(followCtx)
-	if err != nil {
-		if capDuration > 0 && followCtx.Err() == context.DeadlineExceeded {
-			if cancelOnCap {
-				_, _ = fmt.Fprintln(output, "Follow timed out; requesting run cancellation...")
-				_ = runs.CancelCommand{
-					BaseURL: baseURL,
-					Client:  client,
-					RunID:   runID,
-					Reason:  "cap exceeded",
-					Output:  output,
-				}.Run(context.Background())
-			} else {
-				_, _ = fmt.Fprintf(output, "Follow capped after %s; run %s continues running in the background.\n", capDuration.String(), runID)
-			}
-			return nil
-		}
-		return err
-	}
-	if final != migsapi.RunStateSucceeded {
-		return fmt.Errorf("mig run ended in %s", strings.ToLower(string(final)))
-	}
-	return nil
 }
 
 func findMigByID(ctx context.Context, httpClient *http.Client, baseURL *url.URL, migID string) (domainapi.MigSummary, error) {

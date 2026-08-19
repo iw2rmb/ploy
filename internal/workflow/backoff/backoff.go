@@ -268,10 +268,3 @@ func (s *StatefulBackoff) GetDuration() types.Duration {
 	}
 	return s.current
 }
-
-// Permanent wraps the given error in a *PermanentError to prevent retries.
-// Use this to signal that an error should not be retried (e.g., validation errors, 4xx HTTP status).
-// The underlying backoff.Retry will stop immediately when encountering a permanent error.
-func Permanent(err error) error {
-	return backoff.Permanent(err)
-}

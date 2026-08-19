@@ -27,20 +27,6 @@ import (
 // Simple utilities
 // ---------------------------------------------------------------------------
 
-// gzipBytes compresses input bytes using gzip (test helper).
-func gzipBytes(t *testing.T, input []byte) []byte {
-	t.Helper()
-	var buf bytes.Buffer
-	w := gzip.NewWriter(&buf)
-	if _, err := w.Write(input); err != nil {
-		t.Fatalf("gzip write failed: %v", err)
-	}
-	if err := w.Close(); err != nil {
-		t.Fatalf("gzip close failed: %v", err)
-	}
-	return buf.Bytes()
-}
-
 // writeTempFile creates a temporary file with content for testing.
 func writeTempFile(t *testing.T, content []byte) string {
 	t.Helper()
@@ -240,20 +226,6 @@ func bootstrapHandler() http.Handler {
 // File helpers
 // ---------------------------------------------------------------------------
 
-// populateTestFiles creates files with the given content under dir.
-func populateTestFiles(t *testing.T, dir string, files []string, content string) {
-	t.Helper()
-	for _, f := range files {
-		fullPath := filepath.Join(dir, f)
-		if err := os.MkdirAll(filepath.Dir(fullPath), 0o755); err != nil {
-			t.Fatalf("failed to create dir: %v", err)
-		}
-		if err := os.WriteFile(fullPath, []byte(content), 0o644); err != nil {
-			t.Fatalf("failed to create file: %v", err)
-		}
-	}
-}
-
 // ---------------------------------------------------------------------------
 // Tar inspection helpers
 // ---------------------------------------------------------------------------
@@ -329,27 +301,6 @@ func assertUpload(t *testing.T, calls *[]artifactUploadCall, wantUpload bool, wa
 	}
 	if len(wantHeaders) > 0 {
 		assertTarContains(t, (*calls)[0].Bundle, wantHeaders)
-	}
-}
-
-// assertEnv verifies that env contains every key in contains (with matching
-// value) and is missing every key in absent. Either set may be nil.
-func assertEnv(t *testing.T, env map[string]string, contains, absent map[string]string) {
-	t.Helper()
-	for k, want := range contains {
-		got, ok := env[k]
-		if !ok {
-			t.Errorf("env missing key %q", k)
-			continue
-		}
-		if got != want {
-			t.Errorf("env[%q] = %q, want %q", k, got, want)
-		}
-	}
-	for k := range absent {
-		if v, ok := env[k]; ok {
-			t.Errorf("env[%q] = %q, want key absent", k, v)
-		}
 	}
 }
 
@@ -524,10 +475,6 @@ func runAgentUntil(t *testing.T, agent *Agent, startup, shutdownTimeout time.Dur
 
 type claimOption func(*domainapi.NodeClaimResponse)
 
-func withClaimNodeID(id types.NodeID) claimOption {
-	return func(c *domainapi.NodeClaimResponse) { c.NodeID = id }
-}
-
 func withNextID(id types.JobID) claimOption {
 	return func(c *domainapi.NodeClaimResponse) { c.NextID = &id }
 }
@@ -538,10 +485,6 @@ func withCommitSHA(sha types.CommitSHA) claimOption {
 
 func withClaimName(name string) claimOption {
 	return func(c *domainapi.NodeClaimResponse) { c.Name = &name }
-}
-
-func withClaimJobName(name string) claimOption {
-	return func(c *domainapi.NodeClaimResponse) { c.JobName = name }
 }
 
 func withClaimDetectedStack(exp *contracts.StackExpectation) claimOption {

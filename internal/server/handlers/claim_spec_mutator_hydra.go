@@ -3,12 +3,12 @@ package handlers
 import (
 	"fmt"
 	"maps"
-	"path"
 	"slices"
 	"sort"
 	"strings"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
 // HydraJobConfig holds the typed Hydra overlay fields for a single job section.
@@ -18,14 +18,6 @@ type HydraJobConfig struct {
 	Envs map[string]string
 	In   []string
 	Out  []string
-}
-
-// IsEmpty reports whether all fields are empty.
-func (c *HydraJobConfig) IsEmpty() bool {
-	if c == nil {
-		return true
-	}
-	return len(c.Envs) == 0 && len(c.In) == 0 && len(c.Out) == 0
 }
 
 // applyHydraOverlayMutator replaces the legacy env-only merge with a typed merge
@@ -49,38 +41,42 @@ func applyHydraOverlayMutator(m map[string]any, in claimSpecMutatorInput) error 
 
 	// Ensure typed fields are injected into canonical schema locations consumed
 	// by node parsing for each job phase.
-	applyCanonicalHydraOverlay(m, in.jobType, overlay)
-
-	return nil
+	return applyCanonicalHydraOverlay(m, in.jobType, overlay)
 }
 
-func applyCanonicalHydraOverlay(spec map[string]any, jobType domaintypes.JobType, overlay *HydraJobConfig) {
+func applyCanonicalHydraOverlay(spec map[string]any, jobType domaintypes.JobType, overlay *HydraJobConfig) error {
 	if spec == nil || overlay == nil {
-		return
+		return nil
 	}
 	switch jobType {
 	case domaintypes.JobTypeMig:
-		applyOverlayToSteps(spec, overlay)
+		return applyOverlayToSteps(spec, overlay)
 	case domaintypes.JobTypePreGate:
-		return
+		return nil
 	case domaintypes.JobTypePostGate:
-		return
+		return nil
 	}
+	return nil
 }
 
-func applyOverlayToSteps(spec map[string]any, overlay *HydraJobConfig) {
+func applyOverlayToSteps(spec map[string]any, overlay *HydraJobConfig) error {
 	rawSteps, ok := spec["steps"].([]any)
 	if !ok || len(rawSteps) == 0 {
-		return
+		return nil
 	}
 	for i := range rawSteps {
 		step, ok := rawSteps[i].(map[string]any)
 		if !ok || step == nil {
 			continue
 		}
-		mergeRecordsByDstBlock(step, "in", overlay.In)
-		mergeRecordsByDstBlock(step, "out", overlay.Out)
+		if err := mergeRecordsByDstBlock(step, contracts.HydraFileIn, overlay.In); err != nil {
+			return fmt.Errorf("steps[%d].in: %w", i, err)
+		}
+		if err := mergeRecordsByDstBlock(step, contracts.HydraFileOut, overlay.Out); err != nil {
+			return fmt.Errorf("steps[%d].out: %w", i, err)
+		}
 	}
+	return nil
 }
 
 // assembleHydraOverlay builds the complete HydraJobConfig for a job section by
@@ -165,61 +161,44 @@ func mergeEnvsBlock(block map[string]any, overlay map[string]string) {
 
 // mergeRecordsByDstBlock merges overlay entries into block[field] by
 // destination. Block entries win when the destination matches.
-func mergeRecordsByDstBlock(block map[string]any, field string, overlay []string) {
+func mergeRecordsByDstBlock(block map[string]any, kind contracts.HydraFileKind, overlay []string) error {
 	if len(overlay) == 0 {
-		return
+		return nil
 	}
 	specDsts := make(map[string]bool)
 	var merged []any
 
-	if raw, ok := block[field].([]any); ok {
+	if raw, ok := block[kind.String()].([]any); ok {
 		for _, e := range raw {
 			s, ok := e.(string)
 			if !ok {
 				merged = append(merged, e)
 				continue
 			}
-			dst := hydraExtractDst(field, s)
-			specDsts[dst] = true
+			parsed, err := contracts.ParseStoredEntry(kind, s)
+			if err != nil {
+				return err
+			}
+			specDsts[parsed.Dst] = true
 			merged = append(merged, s)
 		}
 	}
 
 	for _, s := range overlay {
-		dst := hydraExtractDst(field, s)
-		if !specDsts[dst] {
-			specDsts[dst] = true
+		parsed, err := contracts.ParseStoredEntry(kind, s)
+		if err != nil {
+			return err
+		}
+		if !specDsts[parsed.Dst] {
+			specDsts[parsed.Dst] = true
 			merged = append(merged, s)
 		}
 	}
 
 	if len(merged) > 0 {
-		block[field] = merged
+		block[kind.String()] = merged
 	}
-}
-
-// hydraExtractDst extracts the normalized destination from a Hydra entry
-// using first-colon split semantics matching contracts.splitHashDst.
-// For in/out: dst is everything after the first colon (shortHash:dst).
-// For home: body after trimming :ro suffix is split at the first colon,
-// then normalized with path.Clean so equivalent paths like ".config//app"
-// and ".config/app" dedup correctly.
-func hydraExtractDst(field, entry string) string {
-	switch field {
-	case "home":
-		body := strings.TrimSuffix(entry, ":ro")
-		idx := strings.Index(body, ":")
-		if idx >= 0 {
-			return path.Clean(body[idx+1:])
-		}
-		return path.Clean(body)
-	default: // in, out
-		idx := strings.Index(entry, ":")
-		if idx >= 0 {
-			return entry[idx+1:]
-		}
-		return entry
-	}
+	return nil
 }
 
 // validateOverlayCollisions checks for duplicate destinations within a single
@@ -237,7 +216,12 @@ func validateOverlayCollisions(cfg *HydraJobConfig, prefix string) error {
 		{"in", cfg.In},
 		{"out", cfg.Out},
 	} {
-		if dups := findDuplicateDsts(f.name, f.entries); len(dups) > 0 {
+		kind := contracts.HydraFileKind(f.name)
+		dups, err := findDuplicateDsts(kind, f.entries)
+		if err != nil {
+			return fmt.Errorf("%s.%s: %w", prefix, f.name, err)
+		}
+		if len(dups) > 0 {
 			for _, dst := range dups {
 				errs = append(errs, fmt.Sprintf("%s.%s: duplicate destination %q", prefix, f.name, dst))
 			}
@@ -252,11 +236,14 @@ func validateOverlayCollisions(cfg *HydraJobConfig, prefix string) error {
 
 // findDuplicateDsts returns sorted destination strings that appear more than
 // once in the given entries.
-func findDuplicateDsts(field string, entries []string) []string {
+func findDuplicateDsts(kind contracts.HydraFileKind, entries []string) ([]string, error) {
 	seen := make(map[string]int)
 	for _, e := range entries {
-		dst := hydraExtractDst(field, e)
-		seen[dst]++
+		parsed, err := contracts.ParseStoredEntry(kind, e)
+		if err != nil {
+			return nil, err
+		}
+		seen[parsed.Dst]++
 	}
 	var dups []string
 	for dst, count := range seen {
@@ -265,7 +252,7 @@ func findDuplicateDsts(field string, entries []string) []string {
 		}
 	}
 	sort.Strings(dups)
-	return dups
+	return dups, nil
 }
 
 // applyBundleMapMutator merges server-side bundle mappings (from migration and

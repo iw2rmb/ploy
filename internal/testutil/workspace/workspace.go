@@ -59,20 +59,6 @@ java {
 	return tmpDir
 }
 
-func GradleWithWrapper(t testing.TB, javaVersion string) string {
-	t.Helper()
-	tmpDir := Gradle(t, javaVersion)
-	wrapperDir := filepath.Join(tmpDir, "gradle", "wrapper")
-	if err := os.MkdirAll(wrapperDir, 0o750); err != nil {
-		t.Fatalf("failed to create gradle wrapper directory: %v", err)
-	}
-	const wrapperProps = "distributionUrl=https\\://services.gradle.org/distributions/gradle-8.8-bin.zip\n"
-	if err := os.WriteFile(filepath.Join(wrapperDir, "gradle-wrapper.properties"), []byte(wrapperProps), 0o600); err != nil {
-		t.Fatalf("failed to create gradle-wrapper.properties: %v", err)
-	}
-	return tmpDir
-}
-
 func Go(t testing.TB, goVersion string) string {
 	t.Helper()
 	tmpDir := t.TempDir()
@@ -80,21 +66,6 @@ func Go(t testing.TB, goVersion string) string {
 	goMod := "module example.com/test\n\ngo " + goVersion + "\n"
 	if err := os.WriteFile(filepath.Join(tmpDir, goModuleFile), []byte(goMod), 0o600); err != nil {
 		t.Fatalf("failed to create go module file: %v", err)
-	}
-	return tmpDir
-}
-
-func Cargo(t testing.TB, rustVersion string) string {
-	t.Helper()
-	tmpDir := t.TempDir()
-	cargo := `[package]
-name = "test"
-version = "0.1.0"
-edition = "2021"
-rust-version = "` + rustVersion + `"
-`
-	if err := os.WriteFile(filepath.Join(tmpDir, "Cargo.toml"), []byte(cargo), 0o600); err != nil {
-		t.Fatalf("failed to create Cargo.toml: %v", err)
 	}
 	return tmpDir
 }

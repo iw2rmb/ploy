@@ -48,6 +48,9 @@ func parseAuthoringEntry(kind contracts.HydraFileKind, s string) (authoringFileE
 	if err != nil {
 		return authoringFileEntry{}, fmt.Errorf("%s entry %q: %w", kind, s, err)
 	}
+	if err := contracts.ValidateHydraPathSafety(dst); err != nil {
+		return authoringFileEntry{}, fmt.Errorf("%s entry %q: %w", kind, s, err)
+	}
 
 	switch kind {
 	case contracts.HydraFileIn, contracts.HydraFileOut:
@@ -68,9 +71,6 @@ func parseAuthoringEntry(kind contracts.HydraFileKind, s string) (authoringFileE
 		err = fmt.Errorf("invalid Hydra file kind %q", kind)
 	}
 	if err != nil {
-		return authoringFileEntry{}, fmt.Errorf("%s entry %q: %w", kind, s, err)
-	}
-	if err := guardAuthoringTraversal(dst); err != nil {
 		return authoringFileEntry{}, fmt.Errorf("%s entry %q: %w", kind, s, err)
 	}
 	return authoringFileEntry{src: src, dst: dst, readOnly: readOnly}, nil
@@ -126,16 +126,6 @@ func splitRightBiasedColon(s string) (left, right string, err error) {
 		return "", "", fmt.Errorf("destination is empty")
 	}
 	return left, right, nil
-}
-
-// guardAuthoringTraversal rejects paths containing ".." components.
-func guardAuthoringTraversal(p string) error {
-	for _, part := range strings.Split(p, "/") {
-		if part == ".." {
-			return fmt.Errorf("path traversal not allowed: %q", p)
-		}
-	}
-	return nil
 }
 
 // compileHydraRecordsInPlace walks all container blocks in the spec and compiles

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 )
 
 // StringValue implements flag.Value with a marker for whether it was set.
@@ -16,14 +15,6 @@ type StringValue struct {
 
 func (v *StringValue) String() string     { return v.Value }
 func (v *StringValue) Set(s string) error { v.Value = s; v.IsSet = true; return nil }
-
-// StringsValue implements flag.Value for accumulating multiple string flag values.
-type StringsValue struct {
-	Values []string
-}
-
-func (v *StringsValue) String() string     { return strings.Join(v.Values, ",") }
-func (v *StringsValue) Set(s string) error { v.Values = append(v.Values, s); return nil }
 
 // IntValue implements flag.Value for integers.
 type IntValue struct {
@@ -43,36 +34,6 @@ func (v *IntValue) Set(s string) error {
 	v.Value = parsed
 	v.IsSet = true
 	return nil
-}
-
-// BoolValue implements flag.Value for booleans.
-type BoolValue struct {
-	IsSet bool
-	Value bool
-}
-
-func (v *BoolValue) String() string { return fmt.Sprintf("%t", v.Value) }
-func (v *BoolValue) Set(s string) error {
-	parsed, err := parseBoolValue(s)
-	if err != nil {
-		return err
-	}
-	v.Value = parsed
-	v.IsSet = true
-	return nil
-}
-func (v *BoolValue) IsBoolFlag() bool { return true }
-
-// parseBoolValue parses a boolean string value (1, t, T, TRUE, true, True, 0, f, F, FALSE, false, False).
-func parseBoolValue(s string) (bool, error) {
-	switch s {
-	case "1", "t", "T", "true", "TRUE", "True":
-		return true, nil
-	case "0", "f", "F", "false", "FALSE", "False":
-		return false, nil
-	default:
-		return false, fmt.Errorf("invalid boolean value: %q", s)
-	}
 }
 
 // ResolveIdentityPath chooses a default SSH identity when not explicitly set.

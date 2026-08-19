@@ -7,8 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"path"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -434,18 +432,6 @@ func (r *runController) startOutputSync(
 				"error", err)
 		}
 	}
-}
-
-func normalizeBundlePath(name string) string {
-	n := strings.TrimSpace(name)
-	if n == "" {
-		return ""
-	}
-	cleaned := path.Clean("/" + strings.TrimPrefix(filepath.ToSlash(n), "/"))
-	if cleaned == "/" || strings.HasPrefix(cleaned, "/../") {
-		return ""
-	}
-	return strings.TrimPrefix(cleaned, "/")
 }
 
 // materializeJobResources returns an empty staging path when the manifest has

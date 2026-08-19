@@ -108,21 +108,7 @@ func serveJobWithBackfill(w http.ResponseWriter, r *http.Request, st store.Store
 			continue
 		}
 		postCursor = evt.ID
-		if evt.Type == domaintypes.SSEEventLog && backfilledLines != nil {
-			var rec logstream.LogRecord
-			if json.Unmarshal(evt.Data, &rec) == nil {
-				key := backfillKey{Timestamp: rec.Timestamp, Stream: rec.Stream, Line: rec.Line}
-				if _, dup := backfilledLines[key]; dup {
-					delete(backfilledLines, key)
-					continue
-				}
-			}
-		}
-		if err := logstream.WriteEventFrame(w, evt); err != nil {
-			return true
-		}
-		flusher.Flush()
-		if evt.Type == domaintypes.SSEEventDone {
+		if consumeBackfilledLogEvent(w, flusher, evt, backfilledLines) {
 			return true
 		}
 	}
@@ -160,25 +146,29 @@ func serveJobWithBackfill(w http.ResponseWriter, r *http.Request, st store.Store
 			if !ok {
 				return true
 			}
-			if evt.Type == domaintypes.SSEEventLog && backfilledLines != nil {
-				var rec logstream.LogRecord
-				if json.Unmarshal(evt.Data, &rec) == nil {
-					key := backfillKey{Timestamp: rec.Timestamp, Stream: rec.Stream, Line: rec.Line}
-					if _, dup := backfilledLines[key]; dup {
-						delete(backfilledLines, key)
-						continue
-					}
-				}
-			}
-			if err := logstream.WriteEventFrame(w, evt); err != nil {
-				return true
-			}
-			flusher.Flush()
-			if evt.Type == domaintypes.SSEEventDone {
+			if consumeBackfilledLogEvent(w, flusher, evt, backfilledLines) {
 				return true
 			}
 		}
 	}
+}
+
+func consumeBackfilledLogEvent(w io.Writer, flusher http.Flusher, evt logstream.Event, backfilledLines map[backfillKey]struct{}) bool {
+	if evt.Type == domaintypes.SSEEventLog && backfilledLines != nil {
+		var rec logstream.LogRecord
+		if json.Unmarshal(evt.Data, &rec) == nil {
+			key := backfillKey{Timestamp: rec.Timestamp, Stream: rec.Stream, Line: rec.Line}
+			if _, duplicate := backfilledLines[key]; duplicate {
+				delete(backfilledLines, key)
+				return false
+			}
+		}
+	}
+	if err := logstream.WriteEventFrame(w, evt); err != nil {
+		return true
+	}
+	flusher.Flush()
+	return evt.Type == domaintypes.SSEEventDone
 }
 
 // hubHighWater returns the ID of the last event in the snapshot, or 0 if empty.

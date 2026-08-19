@@ -1,85 +1,76 @@
 package handlers
 
 import (
+	"slices"
+	"strings"
 	"testing"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
+	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
-// hydraExtractDst uses first-colon split aligned with Hydra parser semantics.
-func TestHydraExtractDst_FirstColonSplit(t *testing.T) {
+func TestFindDuplicateDstsUsesStoredEntryContract(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name  string
-		field string
-		entry string
-		want  string
+		name      string
+		kind      contracts.HydraFileKind
+		entries   []string
+		wantDups  []string
+		wantError string
 	}{
 		{
-			name:  "in simple",
-			field: "in",
-			entry: "abcdef0:/in/data.json",
-			want:  "/in/data.json",
+			name:    "colon in destination is preserved",
+			kind:    contracts.HydraFileIn,
+			entries: []string{"abcdef0:/in/some:path"},
 		},
 		{
-			name:  "out simple",
-			field: "out",
-			entry: "abcdef0:/out/results",
-			want:  "/out/results",
+			name:     "normalized destinations collide",
+			kind:     contracts.HydraFileOut,
+			entries:  []string{"abcdef0:/out/some//path", "bbbbbbb:/out/some/path"},
+			wantDups: []string{"/out/some/path"},
 		},
 		{
-			name:  "in with colon in destination",
-			field: "in",
-			entry: "abcdef0:/in/some:path",
-			want:  "/in/some:path",
-		},
-		{
-			name:  "out with colon in destination",
-			field: "out",
-			entry: "abcdef0:/out/some:path",
-			want:  "/out/some:path",
-		},
-		{
-			name:  "home simple rw",
-			field: "home",
-			entry: "abcdef0:.config/app",
-			want:  ".config/app",
-		},
-		{
-			name:  "home simple ro",
-			field: "home",
-			entry: "abcdef0:.config/app:ro",
-			want:  ".config/app",
-		},
-		{
-			name:  "home with colon in destination",
-			field: "home",
-			entry: "abcdef0:.config/some:dir",
-			want:  ".config/some:dir",
-		},
-		{
-			name:  "home double slash cleaned",
-			field: "home",
-			entry: "abcdef0:.config//app",
-			want:  ".config/app",
-		},
-		{
-			name:  "no colon returns full entry for in",
-			field: "in",
-			entry: "nocolon",
-			want:  "nocolon",
+			name:      "missing separator is rejected",
+			kind:      contracts.HydraFileIn,
+			entries:   []string{"abcdef0"},
+			wantError: "expected format shortHash:dst",
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			got := hydraExtractDst(tc.field, tc.entry)
-			if got != tc.want {
-				t.Errorf("hydraExtractDst(%q, %q) = %q, want %q", tc.field, tc.entry, got, tc.want)
+			got, err := findDuplicateDsts(tc.kind, tc.entries)
+			if tc.wantError != "" {
+				if err == nil || !strings.Contains(err.Error(), tc.wantError) {
+					t.Fatalf("findDuplicateDsts() error = %v, want %q", err, tc.wantError)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("findDuplicateDsts() error = %v", err)
+			}
+			if !slices.Equal(got, tc.wantDups) {
+				t.Errorf("findDuplicateDsts() = %v, want %v", got, tc.wantDups)
 			}
 		})
+	}
+}
+
+func TestMutateClaimSpecRejectsMalformedStoredHydraEntry(t *testing.T) {
+	t.Parallel()
+
+	_, err := mutateClaimSpec(claimSpecMutatorInput{
+		spec:    []byte(`{"steps":[{"image":"img:latest"}]}`),
+		job:     store.Job{ID: domaintypes.NewJobID(), Meta: []byte(`{}`)},
+		jobType: domaintypes.JobTypeMig,
+		hydraOverlays: map[string]*HydraJobConfig{
+			"mig": {In: []string{"abcdef0"}},
+		},
+	})
+	if err == nil || !strings.Contains(err.Error(), "merge hydra overlay into spec: spec.in: in entry \"abcdef0\": expected format shortHash:dst") {
+		t.Fatalf("mutateClaimSpec() error = %v, want malformed stored-entry error", err)
 	}
 }
 
@@ -121,7 +112,7 @@ func TestMutateClaimSpec_HydraOverlayInPipeline(t *testing.T) {
 		},
 		hydraOverlays: map[string]*HydraJobConfig{
 			"mig": {
-				In: []string{"/data:/in/data.json"},
+				In: []string{"abcdef0:/in/data.json"},
 			},
 		},
 	})
@@ -131,6 +122,6 @@ func TestMutateClaimSpec_HydraOverlayInPipeline(t *testing.T) {
 	}
 	assertEnvs(t, out, map[string]string{"EXISTING": "1", "GLOBAL": "g"}, nil, nil)
 	assertSlices(t, firstStepMap(t, out), []sliceCheck{
-		{"in", 1, "/data:/in/data.json"},
+		{"in", 1, "abcdef0:/in/data.json"},
 	})
 }

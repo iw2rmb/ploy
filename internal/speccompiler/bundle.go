@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"time"
 )
 
 // buildSourceArchive creates a deterministic gzip-compressed tar archive from
@@ -70,35 +69,6 @@ func (c *Compiler) buildSourceArchive(resolvedPath string) ([]byte, error) {
 		return nil, fmt.Errorf("close gzip: %w", err)
 	}
 
-	return buf.Bytes(), nil
-}
-
-// buildInlineContentArchive creates a deterministic gzip-compressed tar archive
-// with a single regular file entry named "content".
-func buildInlineContentArchive(content []byte) ([]byte, error) {
-	var buf bytes.Buffer
-	gzw := gzip.NewWriter(&buf)
-	tw := tar.NewWriter(gzw)
-
-	hdr := &tar.Header{
-		Name:     "content",
-		Typeflag: tar.TypeReg,
-		Mode:     0o644,
-		Size:     int64(len(content)),
-		ModTime:  time.Unix(0, 0).UTC(),
-	}
-	if err := tw.WriteHeader(hdr); err != nil {
-		return nil, fmt.Errorf("write header: %w", err)
-	}
-	if _, err := tw.Write(content); err != nil {
-		return nil, fmt.Errorf("write data: %w", err)
-	}
-	if err := tw.Close(); err != nil {
-		return nil, fmt.Errorf("close tar: %w", err)
-	}
-	if err := gzw.Close(); err != nil {
-		return nil, fmt.Errorf("close gzip: %w", err)
-	}
 	return buf.Bytes(), nil
 }
 

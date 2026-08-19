@@ -286,19 +286,9 @@ func createGradleWorkspace(t *testing.T, javaVersion string) string {
 	return workspaceutil.Gradle(t, javaVersion)
 }
 
-func createGradleWorkspaceWithWrapper(t *testing.T, javaVersion string) string {
-	t.Helper()
-	return workspaceutil.GradleWithWrapper(t, javaVersion)
-}
-
 func createGoWorkspace(t *testing.T, goVersion string) string {
 	t.Helper()
 	return workspaceutil.Go(t, goVersion)
-}
-
-func createCargoWorkspace(t *testing.T, rustVersion string) string {
-	t.Helper()
-	return workspaceutil.Cargo(t, rustVersion)
 }
 
 func createPythonWorkspace(t *testing.T, pythonVersion string) string {

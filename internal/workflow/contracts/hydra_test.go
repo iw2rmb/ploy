@@ -124,7 +124,7 @@ func TestParseStoredEntry(t *testing.T) {
 			name:    "in/path traversal",
 			kind:    HydraFileIn,
 			input:   "abcdef0:/in/../etc/passwd",
-			wantErr: "destination must start with /in/",
+			wantErr: "path traversal not allowed",
 		},
 		{
 			name:    "in/no colon",
@@ -156,7 +156,7 @@ func TestParseStoredEntry(t *testing.T) {
 			name:    "out/double slash escapes domain",
 			kind:    HydraFileOut,
 			input:   "abcdef0:/out/../../etc/shadow",
-			wantErr: "destination must start with /out/",
+			wantErr: "path traversal not allowed",
 		},
 		{
 			name:    "out/wrong domain",
@@ -168,7 +168,7 @@ func TestParseStoredEntry(t *testing.T) {
 			name:    "out/path traversal",
 			kind:    HydraFileOut,
 			input:   "abcdef0:/out/../../etc/passwd",
-			wantErr: "destination must start with /out/",
+			wantErr: "path traversal not allowed",
 		},
 		{
 			name:     "home/rw entry",
@@ -234,7 +234,7 @@ func TestParseStoredEntry(t *testing.T) {
 			name:    "tmp/traversal rejected",
 			kind:    HydraFileTmp,
 			input:   "abcdef0:/tmp/../../etc/passwd",
-			wantErr: "destination must start with /tmp/",
+			wantErr: "path traversal not allowed",
 		},
 		{
 			name:    "tmp/empty destination",

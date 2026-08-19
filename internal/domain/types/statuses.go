@@ -6,6 +6,33 @@ import (
 	"strings"
 )
 
+type databaseStatus interface {
+	~string
+	Validate() error
+}
+
+func scanDatabaseStatus[T databaseStatus](dst *T, src interface{}, typeName string) error {
+	switch v := src.(type) {
+	case []byte:
+		*dst = T(v)
+	case string:
+		*dst = T(v)
+	default:
+		return fmt.Errorf("unsupported scan type for %s: %T", typeName, src)
+	}
+	if err := (*dst).Validate(); err != nil {
+		return fmt.Errorf("unknown %s value: %q", typeName, string(*dst))
+	}
+	return nil
+}
+
+func databaseStatusValue[T databaseStatus](status T) (driver.Value, error) {
+	if err := status.Validate(); err != nil {
+		return nil, err
+	}
+	return string(status), nil
+}
+
 // JobStatus is the canonical per-job lifecycle state.
 type JobStatus string
 
@@ -40,25 +67,11 @@ func ParseJobStatus(raw string) (JobStatus, error) {
 }
 
 func (s *JobStatus) Scan(src interface{}) error {
-	switch v := src.(type) {
-	case []byte:
-		*s = JobStatus(v)
-	case string:
-		*s = JobStatus(v)
-	default:
-		return fmt.Errorf("unsupported scan type for JobStatus: %T", src)
-	}
-	if err := s.Validate(); err != nil {
-		return fmt.Errorf("unknown JobStatus value: %q", string(*s))
-	}
-	return nil
+	return scanDatabaseStatus(s, src, "JobStatus")
 }
 
 func (s JobStatus) Value() (driver.Value, error) {
-	if err := s.Validate(); err != nil {
-		return nil, err
-	}
-	return string(s), nil
+	return databaseStatusValue(s)
 }
 
 // RunStatus is the canonical lifecycle status for one repo execution.
@@ -84,25 +97,11 @@ func (s RunStatus) Validate() error {
 }
 
 func (s *RunStatus) Scan(src interface{}) error {
-	switch v := src.(type) {
-	case []byte:
-		*s = RunStatus(v)
-	case string:
-		*s = RunStatus(v)
-	default:
-		return fmt.Errorf("unsupported scan type for RunStatus: %T", src)
-	}
-	if err := s.Validate(); err != nil {
-		return fmt.Errorf("unknown RunStatus value: %q", string(*s))
-	}
-	return nil
+	return scanDatabaseStatus(s, src, "RunStatus")
 }
 
 func (s RunStatus) Value() (driver.Value, error) {
-	if err := s.Validate(); err != nil {
-		return nil, err
-	}
-	return string(s), nil
+	return databaseStatusValue(s)
 }
 
 // WaveStatus is the canonical lifecycle status for a launch wave.
@@ -126,23 +125,9 @@ func (s WaveStatus) Validate() error {
 }
 
 func (s *WaveStatus) Scan(src interface{}) error {
-	switch v := src.(type) {
-	case []byte:
-		*s = WaveStatus(v)
-	case string:
-		*s = WaveStatus(v)
-	default:
-		return fmt.Errorf("unsupported scan type for WaveStatus: %T", src)
-	}
-	if err := s.Validate(); err != nil {
-		return fmt.Errorf("unknown WaveStatus value: %q", string(*s))
-	}
-	return nil
+	return scanDatabaseStatus(s, src, "WaveStatus")
 }
 
 func (s WaveStatus) Value() (driver.Value, error) {
-	if err := s.Validate(); err != nil {
-		return nil, err
-	}
-	return string(s), nil
+	return databaseStatusValue(s)
 }

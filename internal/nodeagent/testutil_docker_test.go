@@ -31,12 +31,6 @@ func (r *callRecorder) Record(name string) {
 	r.mu.Unlock()
 }
 
-func (r *callRecorder) Count() int {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	return len(r.calls)
-}
-
 func (r *callRecorder) All() []string {
 	r.mu.Lock()
 	defer r.mu.Unlock()
