@@ -44,7 +44,7 @@ steps:
     command: |
       echo "[wave-e2e] Starting repo processing"
       echo "Repo: \$PLOY_REPO_URL"
-      echo "Base: \$PLOY_BASE_REF"
+      echo "Ref:  \$PLOY_REPO_REF"
       sleep 2
       echo "[wave-e2e] Done"
 YAML

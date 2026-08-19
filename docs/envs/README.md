@@ -624,9 +624,15 @@ home. The image sets Maven's writable local repository to
 `$PLOY_JOB_CACHE_DIR/maven/repository`. The configured artifact repository
 provides cross-job dependency reuse.
 
-Ploy uses `PLOY_STACK_LANGUAGE`, `PLOY_STACK_TOOL`, and `PLOY_STACK_RELEASE`
-only to select images and build commands. Ploy does not derive or mount Gradle
-or Maven cache paths from these values.
+Ploy injects node-owned repository metadata into every gate and migration
+step:
+
+- `PLOY_REPO_URL` — Source repository URL.
+- `PLOY_REPO_REF` — Git ref selected for the run's source snapshot.
+
+Ploy injects `PLOY_STACK_LANGUAGE`, `PLOY_STACK_TOOL`, and
+`PLOY_STACK_RELEASE` when the corresponding stack values are available. Ploy
+does not derive or mount Gradle or Maven cache paths from these values.
 
 `java.classpath` keeps workspace entries below `/workspace`. Gradle materializes
 external entries below

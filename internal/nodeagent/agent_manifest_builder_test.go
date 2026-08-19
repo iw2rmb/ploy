@@ -63,11 +63,17 @@ func TestBuildManifestFromRequest(t *testing.T) {
 			t.Errorf("expected commit %q, got %q", req.CommitSHA, repo.Commit.String())
 		}
 
-		if len(manifest.Envs) != 1 {
-			t.Errorf("expected 1 env var, got %d", len(manifest.Envs))
+		if len(manifest.Envs) != 3 {
+			t.Errorf("expected 3 env vars, got %d", len(manifest.Envs))
 		}
 		if manifest.Envs["FOO"] != "bar" {
 			t.Errorf("expected env FOO=bar, got %q", manifest.Envs["FOO"])
+		}
+		if got := manifest.Envs["PLOY_REPO_URL"]; got != "https://github.com/example/repo.git" {
+			t.Errorf("PLOY_REPO_URL=%q, want repository URL", got)
+		}
+		if got := manifest.Envs["PLOY_REPO_REF"]; got != "main" {
+			t.Errorf("PLOY_REPO_REF=%q, want main", got)
 		}
 	})
 
@@ -392,6 +398,47 @@ func TestBuildManifestFromRequest(t *testing.T) {
 			}
 			if got := manifest.Envs["PLOY_SERVER_URL"]; got != "https://ploy.example" {
 				t.Fatalf("step %d PLOY_SERVER_URL=%q, want node-owned server URL", step, got)
+			}
+		}
+	})
+
+	t.Run("multi-step run: injects node-owned repository metadata after step env", func(t *testing.T) {
+		req := newStartRunRequest(
+			withRunURL("  https://gitlab.example.com/group/repo.git  "),
+			withRunBaseRef("  feature/repo-env  "),
+			withRunEnv(map[string]string{
+				"PLOY_REPO_URL": "https://user.example/base.git",
+				"PLOY_REPO_REF": "user-base",
+			}),
+			withRunOptions(RunOptions{
+				Steps: []StepOptions{
+					{ContainerSpec: ContainerSpec{
+						Image: contracts.JobImage{Universal: "migs-step0:latest"},
+						Env: map[string]string{
+							"PLOY_REPO_URL": "https://user.example/step0.git",
+							"PLOY_REPO_REF": "user-step0",
+						},
+					}},
+					{ContainerSpec: ContainerSpec{
+						Image: contracts.JobImage{Universal: "migs-step1:latest"},
+						Env: map[string]string{
+							"PLOY_REPO_URL": "https://user.example/step1.git",
+							"PLOY_REPO_REF": "user-step1",
+						},
+					}},
+				},
+			}),
+		)
+		for step := range req.TypedOptions.Steps {
+			manifest, err := buildManifestAtStep(req, step)
+			if err != nil {
+				t.Fatalf("buildManifestAtStep(%d) error: %v", step, err)
+			}
+			if got := manifest.Envs["PLOY_REPO_URL"]; got != "https://gitlab.example.com/group/repo.git" {
+				t.Fatalf("step %d PLOY_REPO_URL=%q, want node-owned repository URL", step, got)
+			}
+			if got := manifest.Envs["PLOY_REPO_REF"]; got != "feature/repo-env" {
+				t.Fatalf("step %d PLOY_REPO_REF=%q, want node-owned repository ref", step, got)
 			}
 		}
 	})

@@ -219,6 +219,8 @@ func TestGlobalEnvPropagation_GateManifest(t *testing.T) {
 		"APP_TLS_CERT":      "gate-test-cert-bundle",
 		"APP_AUTH_JSON":     "gate-codex-auth",
 		"GATE_SPECIFIC_VAR": "gate_value",
+		"PLOY_REPO_URL":     "https://gitlab.com/test/repo.git",
+		"PLOY_REPO_REF":     "main",
 	}
 
 	for key, wantVal := range expectedEnv {
@@ -385,6 +387,8 @@ func TestGlobalEnvPropagation_NoFiltering(t *testing.T) {
 		"PLOY_INTERNAL_VAR",
 		"DOCKER_HOST",
 		"PATH",
+		"PLOY_REPO_URL",
+		"PLOY_REPO_REF",
 	}
 
 	for _, key := range expectedKeys {

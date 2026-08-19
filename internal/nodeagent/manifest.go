@@ -37,18 +37,9 @@ func resolveImage(
 	return resolved, nil
 }
 
-// injectRepoMetadataEnv adds PLOY_REPO_URL, PLOY_BASE_REF, and PLOY_COMMIT_SHA
-// to env from the request. Only non-empty values are set.
-func injectRepoMetadataEnv(env map[string]string, req StartRunRequest) {
-	if v := strings.TrimSpace(req.RepoURL.String()); v != "" {
-		env["PLOY_REPO_URL"] = v
-	}
-	if v := strings.TrimSpace(req.BaseRef.String()); v != "" {
-		env["PLOY_BASE_REF"] = v
-	}
-	if v := strings.TrimSpace(req.CommitSHA.String()); v != "" {
-		env["PLOY_COMMIT_SHA"] = v
-	}
+func injectNodeOwnedRepoEnv(env map[string]string, req StartRunRequest) {
+	env["PLOY_REPO_URL"] = strings.TrimSpace(req.RepoURL.String())
+	env["PLOY_REPO_REF"] = strings.TrimSpace(req.BaseRef.String())
 }
 
 func injectNodeOwnedMigEnv(env map[string]string, req StartRunRequest) {
@@ -133,6 +124,7 @@ func buildMigManifest(req StartRunRequest, typedOpts RunOptions, stepIndex int, 
 	}
 
 	injectStackTupleEnv(env, stackExp)
+	injectNodeOwnedRepoEnv(env, req)
 	injectNodeOwnedMigEnv(env, req)
 
 	// Inject placeholder command only for default ubuntu image.
