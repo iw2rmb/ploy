@@ -2,7 +2,6 @@ package types
 
 import (
 	"encoding/json"
-	"strings"
 )
 
 // DiffSummary represents summary metadata attached to a diff.
@@ -53,31 +52,18 @@ func (d DiffSummary) decode() diffSummaryAccessor {
 
 // MarshalJSON implements json.Marshaler for DiffSummary.
 func (d DiffSummary) MarshalJSON() ([]byte, error) {
-	if len(d) == 0 {
-		return []byte("null"), nil
-	}
-	return json.RawMessage(d).MarshalJSON()
+	return marshalRawJSON(json.RawMessage(d))
 }
 
 // UnmarshalJSON implements json.Unmarshaler for DiffSummary.
 func (d *DiffSummary) UnmarshalJSON(data []byte) error {
-	if data == nil {
-		*d = nil
-		return nil
-	}
-	copied := make([]byte, len(data))
-	copy(copied, data)
-	*d = DiffSummary(copied)
+	*d = DiffSummary(cloneRawJSON(data))
 	return nil
 }
 
 // IsEmpty returns true if the summary payload is nil, empty, or represents null/empty object.
 func (d DiffSummary) IsEmpty() bool {
-	if len(d) == 0 {
-		return true
-	}
-	trimmed := strings.TrimSpace(string(d))
-	return trimmed == "" || trimmed == "null" || trimmed == "{}"
+	return rawJSONIsEmpty(json.RawMessage(d))
 }
 
 // ExitCode returns the exit_code field as an int when present.

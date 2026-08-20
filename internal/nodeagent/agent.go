@@ -92,31 +92,23 @@ func (a *Agent) Run(ctx context.Context) error {
 	var wg sync.WaitGroup
 	errCh := make(chan error, 2)
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		if err := a.heartbeat.Start(ctx); err != nil && !errors.Is(err, context.Canceled) {
-			wrappedErr := fmt.Errorf("heartbeat: %w", err)
-			select {
-			case errCh <- wrappedErr:
-			default:
-				slog.Error("error channel full, dropping error", "component", "heartbeat", "error", err)
+	startComponent := func(name string, run func(context.Context) error) {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := run(ctx); err != nil && !errors.Is(err, context.Canceled) {
+				wrappedErr := fmt.Errorf("%s: %w", name, err)
+				select {
+				case errCh <- wrappedErr:
+				default:
+					slog.Error("error channel full, dropping error", "component", name, "error", err)
+				}
 			}
-		}
-	}()
+		}()
+	}
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		if err := a.claimer.Start(ctx); err != nil && !errors.Is(err, context.Canceled) {
-			wrappedErr := fmt.Errorf("claim loop: %w", err)
-			select {
-			case errCh <- wrappedErr:
-			default:
-				slog.Error("error channel full, dropping error", "component", "claim loop", "error", err)
-			}
-		}
-	}()
+	startComponent("heartbeat", a.heartbeat.Start)
+	startComponent("claim loop", a.claimer.Start)
 
 	<-ctx.Done()
 

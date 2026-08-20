@@ -12,6 +12,41 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
+type migCountTestCase struct {
+	name      string
+	migID     domaintypes.MigID
+	handler   http.HandlerFunc
+	wantErr   bool
+	wantCount int
+}
+
+type migCountCommand func(context.Context, *http.Client, *url.URL, domaintypes.MigID) (int, error)
+
+func runMigCountTestCases(t *testing.T, command migCountCommand, tests []migCountTestCase) {
+	t.Helper()
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			handler := tc.handler
+			if handler == nil {
+				handler = func(http.ResponseWriter, *http.Request) {}
+			}
+			srv := httptest.NewServer(handler)
+			t.Cleanup(srv.Close)
+
+			baseURL, _ := url.Parse(srv.URL)
+			count, err := command(context.Background(), srv.Client(), baseURL, tc.migID)
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("wantErr=%v, got err=%v", tc.wantErr, err)
+			}
+			if !tc.wantErr && count != tc.wantCount {
+				t.Fatalf("got count=%d, want %d", count, tc.wantCount)
+			}
+		})
+	}
+}
+
 func TestCountMigReposCommand(t *testing.T) {
 	t.Parallel()
 
@@ -19,13 +54,7 @@ func TestCountMigReposCommand(t *testing.T) {
 	repoID1 := domaintypes.NewMigRepoID()
 	repoID2 := domaintypes.NewMigRepoID()
 
-	tests := []struct {
-		name      string
-		migID     domaintypes.MigID
-		handler   http.HandlerFunc
-		wantErr   bool
-		wantCount int
-	}{
+	tests := []migCountTestCase{
 		{
 			name:  "success returns repo count",
 			migID: migID,
@@ -68,35 +97,9 @@ func TestCountMigReposCommand(t *testing.T) {
 		},
 	}
 
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
-			var srv *httptest.Server
-			if tc.handler != nil {
-				srv = httptest.NewServer(tc.handler)
-				t.Cleanup(srv.Close)
-			} else {
-				srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
-				t.Cleanup(srv.Close)
-			}
-
-			baseURL, _ := url.Parse(srv.URL)
-			cmd := CountMigReposCommand{
-				Client:  srv.Client(),
-				BaseURL: baseURL,
-				MigID:   tc.migID,
-			}
-
-			count, err := cmd.Run(context.Background())
-			if (err != nil) != tc.wantErr {
-				t.Fatalf("wantErr=%v, got err=%v", tc.wantErr, err)
-			}
-			if !tc.wantErr && count != tc.wantCount {
-				t.Fatalf("got count=%d, want %d", count, tc.wantCount)
-			}
-		})
-	}
+	runMigCountTestCases(t, func(ctx context.Context, client *http.Client, baseURL *url.URL, migID domaintypes.MigID) (int, error) {
+		return (CountMigReposCommand{Client: client, BaseURL: baseURL, MigID: migID}).Run(ctx)
+	}, tests)
 }
 
 func TestCountMigRunsCommand(t *testing.T) {
@@ -119,13 +122,7 @@ func TestCountMigRunsCommand(t *testing.T) {
 		}
 	}
 
-	tests := []struct {
-		name      string
-		migID     domaintypes.MigID
-		handler   http.HandlerFunc
-		wantErr   bool
-		wantCount int
-	}{
+	tests := []migCountTestCase{
 		{
 			name:  "success counts only matching mig runs",
 			migID: migID,
@@ -178,35 +175,9 @@ func TestCountMigRunsCommand(t *testing.T) {
 		},
 	}
 
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
-			var srv *httptest.Server
-			if tc.handler != nil {
-				srv = httptest.NewServer(tc.handler)
-				t.Cleanup(srv.Close)
-			} else {
-				srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
-				t.Cleanup(srv.Close)
-			}
-
-			baseURL, _ := url.Parse(srv.URL)
-			cmd := CountMigRunsCommand{
-				Client:  srv.Client(),
-				BaseURL: baseURL,
-				MigID:   tc.migID,
-			}
-
-			count, err := cmd.Run(context.Background())
-			if (err != nil) != tc.wantErr {
-				t.Fatalf("wantErr=%v, got err=%v", tc.wantErr, err)
-			}
-			if !tc.wantErr && count != tc.wantCount {
-				t.Fatalf("got count=%d, want %d", count, tc.wantCount)
-			}
-		})
-	}
+	runMigCountTestCases(t, func(ctx context.Context, client *http.Client, baseURL *url.URL, migID domaintypes.MigID) (int, error) {
+		return (CountMigRunsCommand{Client: client, BaseURL: baseURL, MigID: migID}).Run(ctx)
+	}, tests)
 }
 
 func TestCountMigRunsCommand_PaginatesAllPages(t *testing.T) {

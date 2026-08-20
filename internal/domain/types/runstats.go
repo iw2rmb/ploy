@@ -101,31 +101,18 @@ func (s RunStats) decode() runStatsAccessor {
 
 // MarshalJSON implements json.Marshaler for RunStats.
 func (s RunStats) MarshalJSON() ([]byte, error) {
-	if len(s) == 0 {
-		return []byte("null"), nil
-	}
-	return json.RawMessage(s).MarshalJSON()
+	return marshalRawJSON(json.RawMessage(s))
 }
 
 // UnmarshalJSON implements json.Unmarshaler for RunStats.
 func (s *RunStats) UnmarshalJSON(data []byte) error {
-	if data == nil {
-		*s = nil
-		return nil
-	}
-	copied := make([]byte, len(data))
-	copy(copied, data)
-	*s = RunStats(copied)
+	*s = RunStats(cloneRawJSON(data))
 	return nil
 }
 
 // IsEmpty returns true if the stats payload is nil, empty, or represents null/empty object.
 func (s RunStats) IsEmpty() bool {
-	if len(s) == 0 {
-		return true
-	}
-	trimmed := strings.TrimSpace(string(s))
-	return trimmed == "" || trimmed == "null" || trimmed == "{}"
+	return rawJSONIsEmpty(json.RawMessage(s))
 }
 
 // ExitCode returns the exit_code field as an int when present.

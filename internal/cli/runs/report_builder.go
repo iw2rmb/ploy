@@ -86,11 +86,7 @@ func (c GetRunStatusReportCommand) buildRunEntry(
 		return fmt.Errorf("run status report: list run jobs: %w", err)
 	}
 
-	diffs, err := (ListRunDiffsCommand{
-		Client:  c.Client,
-		BaseURL: c.BaseURL,
-		RunID:   c.RunID,
-	}).Run(ctx)
+	diffs, err := ListRunDiffsCommand(c).Run(ctx)
 	if err != nil {
 		return fmt.Errorf("run status report: list run diffs: %w", err)
 	}

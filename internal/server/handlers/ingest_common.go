@@ -278,8 +278,7 @@ func getRunOrFail(w http.ResponseWriter, r *http.Request, st store.Store, runID 
 			writeHTTPError(w, http.StatusNotFound, "run not found")
 			return store.Run{}, false
 		}
-		slog.Error(logPrefix+": database error", "run_id", runID.String(), "err", err)
-		writeHTTPError(w, http.StatusInternalServerError, "failed to get run: %v", err)
+		serverError(w, logPrefix, "get run", err, "run_id", runID.String())
 		return store.Run{}, false
 	}
 	return run, true
@@ -301,8 +300,7 @@ func getMigByRefOrFail(w http.ResponseWriter, r *http.Request, st store.Store, l
 			writeHTTPError(w, http.StatusNotFound, "mig not found")
 			return store.Mig{}, false
 		}
-		slog.Error(logPrefix+": get mig failed", "mig_ref", ref, "err", err)
-		writeHTTPError(w, http.StatusInternalServerError, "failed to get mig: %v", err)
+		serverError(w, logPrefix, "get mig", err, "mig_ref", ref)
 		return store.Mig{}, false
 	}
 	return mig, true
@@ -324,8 +322,7 @@ func getMigByIDOrFail(w http.ResponseWriter, r *http.Request, st store.Store, lo
 			writeHTTPError(w, http.StatusNotFound, "mig not found")
 			return store.Mig{}, false
 		}
-		slog.Error(logPrefix+": get mig failed", "mig_id", migID, "err", err)
-		writeHTTPError(w, http.StatusInternalServerError, "failed to get mig: %v", err)
+		serverError(w, logPrefix, "get mig", err, "mig_id", migID)
 		return store.Mig{}, false
 	}
 	return mig, true
@@ -340,8 +337,7 @@ func getNodeOrFail(w http.ResponseWriter, r *http.Request, st store.Store, nodeI
 			writeHTTPError(w, http.StatusNotFound, "node not found")
 			return store.Node{}, false
 		}
-		slog.Error(logPrefix+": get node failed", "node_id", nodeID.String(), "err", err)
-		writeHTTPError(w, http.StatusInternalServerError, "failed to get node: %v", err)
+		serverError(w, logPrefix, "get node", err, "node_id", nodeID.String())
 		return store.Node{}, false
 	}
 	return node, true
@@ -356,8 +352,7 @@ func getJobOrFail(w http.ResponseWriter, r *http.Request, st store.Store, jobID 
 			writeHTTPError(w, http.StatusNotFound, "job not found")
 			return store.Job{}, false
 		}
-		slog.Error(logPrefix+": get job failed", "job_id", jobID.String(), "err", err)
-		writeHTTPError(w, http.StatusInternalServerError, "failed to get job: %v", err)
+		serverError(w, logPrefix, "get job", err, "job_id", jobID.String())
 		return store.Job{}, false
 	}
 	return job, true

@@ -36,6 +36,19 @@ func asJSONBytes(t *testing.T, v any) []byte {
 	}
 }
 
+func migWaveTokenStore(secondRepoURL string) *handlerStore {
+	st := activeMigWithSpec(domaintypes.NewSpecID())
+	st.listMigReposByMig.val = []store.MigRepo{
+		{ID: "migRepo1", MigID: "mig123", RepoID: "repo1", BaseRef: "main"},
+		{ID: "migRepo2", MigID: "mig123", RepoID: "repo2", BaseRef: "main"},
+	}
+	st.repoByID = map[domaintypes.RepoID]store.Repo{
+		"repo1": {ID: "repo1", Url: "https://gitlab.example.com/org/repo1"},
+		"repo2": {ID: "repo2", Url: secondRepoURL},
+	}
+	return st
+}
+
 // =============================================================================
 // POST /v1/runs — Create Single-Repo Run (v1 API)
 // =============================================================================
@@ -208,17 +221,7 @@ func TestSubmitGitLabTokenBehavior(t *testing.T) {
 		{
 			name: "mig wave computes same marker for every run",
 			newHandler: func(st *handlerStore, registry *gitlabtokens.Registry) http.HandlerFunc {
-				specID := domaintypes.NewSpecID()
-				migSt := activeMigWithSpec(specID)
-				*st = *migSt
-				st.listMigReposByMig.val = []store.MigRepo{
-					{ID: "migRepo1", MigID: "mig123", RepoID: "repo1", BaseRef: "main"},
-					{ID: "migRepo2", MigID: "mig123", RepoID: "repo2", BaseRef: "main"},
-				}
-				st.repoByID = map[domaintypes.RepoID]store.Repo{
-					"repo1": {ID: "repo1", Url: "https://gitlab.example.com/org/repo1"},
-					"repo2": {ID: "repo2", Url: "https://gitlab.example.com/org/repo2"},
-				}
+				*st = *migWaveTokenStore("https://gitlab.example.com/org/repo2")
 				return createMigRunHandler(st, gitauth.Options{GitLabDomain: "gitlab.example.com"}, registry)
 			},
 			path: "/v1/migs/mig123/waves",
@@ -234,17 +237,7 @@ func TestSubmitGitLabTokenBehavior(t *testing.T) {
 		{
 			name: "mig wave releases pre-registered token when create fails",
 			newHandler: func(st *handlerStore, registry *gitlabtokens.Registry) http.HandlerFunc {
-				specID := domaintypes.NewSpecID()
-				migSt := activeMigWithSpec(specID)
-				*st = *migSt
-				st.listMigReposByMig.val = []store.MigRepo{
-					{ID: "migRepo1", MigID: "mig123", RepoID: "repo1", BaseRef: "main"},
-					{ID: "migRepo2", MigID: "mig123", RepoID: "repo2", BaseRef: "main"},
-				}
-				st.repoByID = map[domaintypes.RepoID]store.Repo{
-					"repo1": {ID: "repo1", Url: "https://gitlab.example.com/org/repo1"},
-					"repo2": {ID: "repo2", Url: "https://gitlab.example.com/org/repo2"},
-				}
+				*st = *migWaveTokenStore("https://gitlab.example.com/org/repo2")
 				st.createWaveWithRuns.err = errors.New("database connection failed")
 				return createMigRunHandler(st, gitauth.Options{GitLabDomain: "gitlab.example.com"}, registry)
 			},
@@ -364,17 +357,7 @@ func TestSubmitGitLabTokenDomainValidation(t *testing.T) {
 		{
 			name: "mig wave rejects token when any selected repo is on another host",
 			newHandler: func(st *handlerStore, registry *gitlabtokens.Registry) http.HandlerFunc {
-				specID := domaintypes.NewSpecID()
-				migSt := activeMigWithSpec(specID)
-				*st = *migSt
-				st.listMigReposByMig.val = []store.MigRepo{
-					{ID: "migRepo1", MigID: "mig123", RepoID: "repo1", BaseRef: "main"},
-					{ID: "migRepo2", MigID: "mig123", RepoID: "repo2", BaseRef: "main"},
-				}
-				st.repoByID = map[domaintypes.RepoID]store.Repo{
-					"repo1": {ID: "repo1", Url: "https://gitlab.example.com/org/repo1"},
-					"repo2": {ID: "repo2", Url: "https://github.com/org/repo2"},
-				}
+				*st = *migWaveTokenStore("https://github.com/org/repo2")
 				return createMigRunHandler(st, gitauth.Options{GitLabDomain: "gitlab.example.com"}, registry)
 			},
 			path: "/v1/migs/mig123/waves",
@@ -388,17 +371,7 @@ func TestSubmitGitLabTokenDomainValidation(t *testing.T) {
 		{
 			name: "mig wave rejects token when selected repo uses ssh",
 			newHandler: func(st *handlerStore, registry *gitlabtokens.Registry) http.HandlerFunc {
-				specID := domaintypes.NewSpecID()
-				migSt := activeMigWithSpec(specID)
-				*st = *migSt
-				st.listMigReposByMig.val = []store.MigRepo{
-					{ID: "migRepo1", MigID: "mig123", RepoID: "repo1", BaseRef: "main"},
-					{ID: "migRepo2", MigID: "mig123", RepoID: "repo2", BaseRef: "main"},
-				}
-				st.repoByID = map[domaintypes.RepoID]store.Repo{
-					"repo1": {ID: "repo1", Url: "https://gitlab.example.com/org/repo1"},
-					"repo2": {ID: "repo2", Url: "ssh://git@gitlab.example.com/org/repo2"},
-				}
+				*st = *migWaveTokenStore("ssh://git@gitlab.example.com/org/repo2")
 				return createMigRunHandler(st, gitauth.Options{GitLabDomain: "gitlab.example.com"}, registry)
 			},
 			path: "/v1/migs/mig123/waves",
