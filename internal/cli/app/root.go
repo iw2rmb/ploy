@@ -11,12 +11,6 @@ import (
 	iversion "github.com/iw2rmb/ploy/internal/version"
 )
 
-// NewRootCmd constructs the cobra root command with all subcommands.
-// It preserves the existing CLI surface and error reporting behavior.
-func NewRootCmd(stderr io.Writer) *cobra.Command {
-	return NewRootCmdWithIO(stderr, stderr)
-}
-
 // NewRootCmdWithIO constructs the cobra root command with explicit stdout/stderr.
 func NewRootCmdWithIO(stdout, stderr io.Writer) *cobra.Command {
 	root := &cobra.Command{

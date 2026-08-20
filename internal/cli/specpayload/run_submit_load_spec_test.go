@@ -264,7 +264,11 @@ func TestValidateLocal_TmpAuthoringEntries(t *testing.T) {
 				spec += "      - " + entry + "\n"
 			}
 
-			payload, err := ValidateLocal([]byte(spec), tmpDir)
+			specPath := filepath.Join(t.TempDir(), "spec.yaml")
+			if err := os.WriteFile(specPath, []byte(spec), 0o600); err != nil {
+				t.Fatalf("write spec: %v", err)
+			}
+			payload, err := ValidateLocalFile(specPath)
 			if tt.wantErr != "" {
 				if err == nil {
 					t.Fatalf("expected error containing %q, got nil", tt.wantErr)
@@ -275,7 +279,7 @@ func TestValidateLocal_TmpAuthoringEntries(t *testing.T) {
 				return
 			}
 			if err != nil {
-				t.Fatalf("ValidateLocal() error = %v", err)
+				t.Fatalf("ValidateLocalFile() error = %v", err)
 			}
 
 			var result map[string]any

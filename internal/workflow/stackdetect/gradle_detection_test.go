@@ -2,6 +2,7 @@ package stackdetect
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -19,6 +20,7 @@ func TestDetectGradle(t *testing.T) {
 		wantRelease  string
 		wantEvidence []EvidenceItem
 		wantError    bool
+		wantErrorMsg string
 	}{
 		{
 			name:     "ext properties with explicit compatibility",
@@ -33,6 +35,30 @@ targetCompatibility = VERSION_11
 ext['log4j2.version'] = '2.16.0'
 `,
 			wantRelease: "11",
+		},
+		{
+			name:     "source and target compatibility differ",
+			fileName: "build.gradle",
+			content: `sourceCompatibility = 17
+targetCompatibility = 21`,
+			wantError:    true,
+			wantErrorMsg: "sourceCompatibility and targetCompatibility differ",
+			wantEvidence: []EvidenceItem{
+				{Path: "build.gradle", Key: "sourceCompatibility", Value: "17"},
+				{Path: "build.gradle", Key: "targetCompatibility", Value: "21"},
+			},
+		},
+		{
+			name:     "Kotlin JVM target forms differ",
+			fileName: "build.gradle.kts",
+			content: `kotlinOptions.jvmTarget = "17"
+kotlinOptions { jvmTarget = "21" }`,
+			wantError:    true,
+			wantErrorMsg: "kotlinOptions.jvmTarget differs between assignments",
+			wantEvidence: []EvidenceItem{
+				{Path: "build.gradle.kts", Key: "kotlinOptions.jvmTarget", Value: "17"},
+				{Path: "build.gradle.kts", Key: "kotlinOptions.jvmTarget", Value: "21"},
+			},
 		},
 		{
 			name:     "toolchain languageVersion assign",
@@ -217,6 +243,20 @@ dependencyManagerRootExtension {
 			wantRelease: "21",
 		},
 		{
+			name:     "dependency manager javaVersion forms differ",
+			fileName: "build.gradle.kts",
+			content: `dependencyManagerRootExtension {
+    javaVersion = 17
+    javaVersion.set(21)
+}`,
+			wantError:    true,
+			wantErrorMsg: "javaVersion differs between assignments",
+			wantEvidence: []EvidenceItem{
+				{Path: "build.gradle.kts", Key: "javaVersion", Value: "17"},
+				{Path: "build.gradle.kts", Key: "javaVersion", Value: "21"},
+			},
+		},
+		{
 			name:     "toolchain factory setter from Gradle property",
 			fileName: "build.gradle.kts",
 			content: `
@@ -328,7 +368,13 @@ java { toolchain { languageVersion.set(JavaLanguageVersion.of(projectJavaVersion
 			extraFiles: map[string]string{
 				"gradle.properties": "projectJavaVersion=25\n",
 			},
-			wantError: true,
+			wantError:    true,
+			wantErrorMsg: "toolchain languageVersion differs between assignments",
+			wantEvidence: []EvidenceItem{
+				{Path: "build.gradle.kts", Key: "java.toolchain.languageVersion", Value: "17"},
+				{Path: "build.gradle.kts", Key: "java.toolchain.languageVersion", Value: "25"},
+				{Path: "gradle.properties", Key: "projectJavaVersion", Value: "25"},
+			},
 		},
 		{
 			name:     "missing Gradle property",
@@ -412,6 +458,18 @@ jvmTarget = "17"
 			if tt.wantError {
 				if err == nil {
 					t.Fatal("detectGradle error = nil, want non-nil")
+				}
+				if tt.wantErrorMsg != "" {
+					var detectionErr *DetectionError
+					if !errors.As(err, &detectionErr) {
+						t.Fatalf("error = %T, want *DetectionError", err)
+					}
+					if detectionErr.Reason != "unknown" || detectionErr.Message != tt.wantErrorMsg {
+						t.Fatalf("detection error = %#v, want reason unknown and message %q", detectionErr, tt.wantErrorMsg)
+					}
+					if !reflect.DeepEqual(detectionErr.Evidence, tt.wantEvidence) {
+						t.Fatalf("error evidence = %#v, want %#v", detectionErr.Evidence, tt.wantEvidence)
+					}
 				}
 				return
 			}

@@ -219,18 +219,6 @@ func ValidateLocalFile(path string) (json.RawMessage, error) {
 	return compiler.ValidateFile(path)
 }
 
-func ValidateLocal(data []byte, specBaseDir string) (json.RawMessage, error) {
-	compiler, err := newCompiler(nil, nil)
-	if err != nil {
-		return nil, err
-	}
-	return compiler.Validate(data, specBaseDir)
-}
-
-func Build(ctx context.Context, base *url.URL, client *http.Client, specFile string, migEnvs []string, migImage string, retain bool, migCommand string) ([]byte, error) {
-	return BuildSelected(ctx, base, client, specFile, "", migEnvs, migImage, retain, migCommand)
-}
-
 func BuildSelected(ctx context.Context, base *url.URL, client *http.Client, specFile, stepSelector string, migEnvs []string, migImage string, retain bool, migCommand string) ([]byte, error) {
 	_ = retain
 	compiler, err := newCompiler(base, client)

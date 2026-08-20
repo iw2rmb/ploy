@@ -45,12 +45,6 @@ type followDynamicSectionRange struct {
 	count int
 }
 
-// RenderFollowFrameText renders a reusable follow-style text frame and line count.
-func RenderFollowFrameText(frame FollowFrame) (string, int) {
-	layout := RenderFollowFrameTextLayout(frame)
-	return layout.Text, layout.LineCount
-}
-
 // RenderFollowFrameTextLayout renders a follow frame plus per-repo dynamic section metadata.
 func RenderFollowFrameTextLayout(frame FollowFrame) FollowFrameRender {
 

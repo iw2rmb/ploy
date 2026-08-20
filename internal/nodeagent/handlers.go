@@ -32,25 +32,18 @@ const maxRequestBodySize = 10 << 20 // 10 MiB
 //   - Identifies the job type: "pre_gate", "mig", "post_gate".
 //   - Used by orchestrator to dispatch to appropriate execution handler.
 type StartRunRequest struct {
-	RunID   types.RunID   `json:"run_id,omitempty"`
-	JobID   types.JobID   `json:"job_id,omitempty"`   // Job ID for artifact/diff uploads
-	RepoID  types.RepoID  `json:"repo_id,omitempty"`  // Repo ID for run artifacts (diffs/logs)
-	Attempt int32         `json:"attempt,omitempty"`  // Claimed run attempt used for execution correlation
-	RepoURL types.RepoURL `json:"repo_url,omitempty"` // Repository URL for this run
-	// Name is an optional human-friendly run name provided by the control plane.
-	// When set (e.g., for runs), it can be used for branch naming.
-	Name      string          `json:"name,omitempty"`
+	RunID     types.RunID     `json:"run_id,omitempty"`
+	JobID     types.JobID     `json:"job_id,omitempty"`   // Job ID for artifact/diff uploads
+	RepoID    types.RepoID    `json:"repo_id,omitempty"`  // Repo ID for run artifacts (diffs/logs)
+	RepoURL   types.RepoURL   `json:"repo_url,omitempty"` // Repository URL for this run
 	BaseRef   types.GitRef    `json:"base_ref,omitempty"`
 	CommitSHA types.CommitSHA `json:"commit_sha,omitempty"`
 	RepoSHAIn types.CommitSHA `json:"repo_sha_in,omitempty"`
-	JobType   types.JobType   `json:"job_type,omitempty"`  // Job type: pre_gate, mig, post_gate
-	JobImage  string          `json:"job_image,omitempty"` // Container image for this job
-	NextID    *types.JobID    `json:"next_id,omitempty"`   // Linked successor in run chain
-	JobName   string          `json:"job_name,omitempty"`  // Deprecated: kept for wire compatibility during context rollout.
+	JobType   types.JobType   `json:"job_type,omitempty"` // Job type: pre_gate, mig, post_gate
+	NextID    *types.JobID    `json:"next_id,omitempty"`  // Linked successor in run chain
+	JobName   string          `json:"job_name,omitempty"` // Deprecated: kept for wire compatibility during context rollout.
 	// MigContext carries concrete mig step routing.
 	MigContext *contracts.MigClaimContext `json:"mig_context,omitempty"`
-	// GateContext carries concrete gate cycle routing.
-	GateContext *contracts.GateClaimContext `json:"gate_context,omitempty"`
 	// DetectedStack carries the canonical gate-detected stack tuple for this job.
 	DetectedStack *contracts.StackExpectation `json:"detected_stack,omitempty"`
 	// TypedOptions contains strongly-typed run configuration. This is the canonical

@@ -15,7 +15,7 @@ import (
 // Test helpers
 // ---------------------------------------------------------------------------
 
-// specPayloadOpts holds optional Build parameters.
+// specPayloadOpts holds optional payload build parameters.
 // Zero values correspond to the default (nil/empty/false) arguments.
 type specPayloadOpts struct {
 	migEnvs    []string
@@ -33,13 +33,14 @@ func writeFile(t *testing.T, path, content string) {
 
 func callBuildSpecPayload(t *testing.T, specFile string, opts specPayloadOpts) ([]byte, error) {
 	t.Helper()
-	return Build(
+	return BuildSelected(
 		context.Background(), nil, nil, specFile,
+		"",
 		opts.migEnvs, opts.migImage, opts.retain, opts.migCommand,
 	)
 }
 
-// buildAndParseSpec writes specContent to dir/spec{ext}, calls Build,
+// buildAndParseSpec writes specContent to dir/spec{ext}, builds the payload,
 // and returns the parsed JSON map. Use when the caller needs to write auxiliary
 // files (fragments, env files) to the same directory before this call.
 func buildAndParseSpec(t *testing.T, dir, specContent, ext string, opts specPayloadOpts) map[string]any {
@@ -53,8 +54,8 @@ func buildAndParseSpec(t *testing.T, dir, specContent, ext string, opts specPayl
 	return unmarshalPayload(t, payload)
 }
 
-// runBuildSpecPayload creates a temp dir (or passes empty specFile when
-// specContent is empty), calls Build, and returns the parsed map.
+// runBuildSpecPayload creates a temp dir (or passes an empty specFile) and
+// returns the parsed payload.
 func runBuildSpecPayload(t *testing.T, specContent, ext string, opts specPayloadOpts) map[string]any {
 	t.Helper()
 	if specContent == "" {

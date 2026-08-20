@@ -7,7 +7,7 @@ import (
 )
 
 // FuzzBuildSpecPayload_NoPanic fuzzes CLI override inputs to ensure
-// Build never panics and always returns valid JSON when non-nil.
+// payload construction never panics and returns valid JSON when non-nil.
 func FuzzBuildSpecPayload_NoPanic(f *testing.F) {
 	// Seeds cover command-as-array, plain string, and empty values.
 	f.Add("[/bin/sh,-c,echo]", true)
@@ -18,11 +18,12 @@ func FuzzBuildSpecPayload_NoPanic(f *testing.F) {
 		// Provide a small variety of env shapes, including malformed entries.
 		migEnvs := []string{"KEY=VALUE", "A=B=C", "EMPTY=", "ONLYKEY"}
 
-		payload, err := Build(
+		payload, err := BuildSelected(
 			context.Background(), // ctx
 			nil,                  // no base URL
 			nil,                  // no http client
 			"",                   // no spec file
+			"",                   // no step selector
 			migEnvs,              // env overrides
 			"",                   // no image override
 			retain,               // retain flag

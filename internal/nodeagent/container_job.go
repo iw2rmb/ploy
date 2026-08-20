@@ -1,10 +1,8 @@
-// container_job.go contains mig job implementations,
-// the shared container job executor, and workspace lifecycle helpers.
+// container_job.go contains mig container execution and workspace lifecycle helpers.
 package nodeagent
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -68,80 +66,39 @@ func (r *runController) executeMigJob(ctx context.Context, req StartRunRequest, 
 		"resolved_image", manifest.Image,
 	)
 
-	cfg := containerJobConfig{
-		Manifest: manifest,
-		DiffType: types.DiffJobTypeMig,
-		UploadDiff: func(ctx context.Context, runID types.RunID, jobID types.JobID, jobName string, diffGen step.DiffGenerator, workspace string, result step.Result, diffPath string) (bool, error) {
-			return r.uploadDiff(ctx, runID, jobID, diffGen, workspace, result, types.DiffJobTypeMig, diffPath)
-		},
-		StartTime: startTime,
-	}
-
-	r.executeContainerJob(ctx, req, cfg, mounts)
+	r.executeMigContainerJob(ctx, req, manifest, startTime, mounts)
 }
 
-// containerJobConfig configures the execution of a standard container job.
-type containerJobConfig struct {
-	Manifest contracts.StepManifest
-	DiffType types.DiffJobType
-
-	PopulateInDir   func(inDir string) error
-	PrepareManifest func(manifest *contracts.StepManifest, workspace string) error
-	SyncOutputs     func(outDir, workspace string) error
-	ValidateOutputs func(outDir, workspace string) error
-	FinalizeOutputs func(outDir, workspace string) error
-	TrySkip         func(ctx context.Context, manifest contracts.StepManifest, workspace, outDir string) (bool, error)
-
-	UploadDiff    func(ctx context.Context, runID types.RunID, jobID types.JobID, jobName string, diffGen step.DiffGenerator, workspace string, result step.Result, diffPath string) (bool, error)
-	BuildJobMeta  func(outDir string) json.RawMessage
-	BuildMetadata func(outDir string) map[string]string
-
-	SuppressTerminalStatus bool
-
-	StartTime time.Time
-}
-
-type jobOutcome struct {
+type migJobOutcome struct {
 	runErr     error
 	result     step.Result
 	repoSHAOut string
 	duration   time.Duration
 }
 
-// executeContainerJob orchestrates the common lifecycle of a container job:
-// runtime init, sticky workspace preparation, directory prep, execution, and uploading.
-func (r *runController) executeContainerJob(ctx context.Context, req StartRunRequest, cfg containerJobConfig, mounts step.JobMounts) {
-	outcome, execErr := r.executeContainerWithOutcome(ctx, req, cfg, mounts)
+func (r *runController) executeMigContainerJob(ctx context.Context, req StartRunRequest, manifest contracts.StepManifest, startTime time.Time, mounts step.JobMounts) {
+	outcome, execErr := r.executeMigContainerWithOutcome(ctx, req, manifest, startTime, mounts)
 	if execErr == nil {
-		if shouldUploadRepoArtifactsAfterContainerJob(req, outcome) {
+		if shouldUploadRepoArtifactsAfterMigJob(req, outcome) {
 			r.uploadRepoArtifactsIfPresent(req.RunID, req.RepoID, req.JobID)
 		}
 		return
 	}
-	startTime := cfg.StartTime
-	if startTime.IsZero() {
-		startTime = time.Now()
-	}
-	slog.Error("standard job execution failed", "run_id", req.RunID, "job_id", req.JobID, "error", execErr)
+	slog.Error("mig job execution failed", "run_id", req.RunID, "job_id", req.JobID, "error", execErr)
 	r.uploadRepoArtifactsIfPresent(req.RunID, req.RepoID, req.JobID)
 	r.uploadFailureStatus(ctx, req, execErr, time.Since(startTime))
 }
 
-func shouldUploadRepoArtifactsAfterContainerJob(req StartRunRequest, outcome jobOutcome) bool {
+func shouldUploadRepoArtifactsAfterMigJob(req StartRunRequest, outcome migJobOutcome) bool {
 	if outcome.runErr != nil || outcome.result.ExitCode != 0 {
 		return true
 	}
-	return req.JobType == types.JobTypeMig &&
-		req.TypedOptions.BuildGate.Disabled &&
+	return req.TypedOptions.BuildGate.Disabled &&
 		(req.NextID == nil || req.NextID.IsZero())
 }
 
-func (r *runController) executeContainerWithOutcome(ctx context.Context, req StartRunRequest, cfg containerJobConfig, mounts step.JobMounts) (jobOutcome, error) {
-	startTime := cfg.StartTime
-	if startTime.IsZero() {
-		startTime = time.Now()
-	}
-	var outcome jobOutcome
+func (r *runController) executeMigContainerWithOutcome(ctx context.Context, req StartRunRequest, manifest contracts.StepManifest, startTime time.Time, mounts step.JobMounts) (migJobOutcome, error) {
+	var outcome migJobOutcome
 
 	jobDirs := jobDirectories(req.RunID, req.JobID)
 
@@ -162,7 +119,7 @@ func (r *runController) executeContainerWithOutcome(ctx context.Context, req Sta
 	}()
 
 	hydrationStart := time.Now()
-	wsResult, err := r.prepareStickyWorkspaceWithCleanup(ctx, req, cfg.Manifest)
+	wsResult, err := r.prepareStickyWorkspaceWithCleanup(ctx, req, manifest)
 	if err != nil {
 		return outcome, fmt.Errorf("prepare sticky workspace: %w", err)
 	}
@@ -170,12 +127,7 @@ func (r *runController) executeContainerWithOutcome(ctx context.Context, req Sta
 	defer wsResult.cleanup()
 	workspace := wsResult.path
 
-	if cfg.PopulateInDir != nil {
-		if err := cfg.PopulateInDir(jobDirs.In); err != nil {
-			return outcome, fmt.Errorf("populate in dir: %w", err)
-		}
-	}
-	stepOutcome, err := r.runContainerJob(ctx, req, cfg, execCtx, workspace, startTime, hydrationDuration, jobDirs, mounts)
+	stepOutcome, err := r.runMigContainerJob(ctx, req, manifest, execCtx, workspace, startTime, hydrationDuration, jobDirs, mounts)
 	if err != nil {
 		return outcome, err
 	}
@@ -183,29 +135,19 @@ func (r *runController) executeContainerWithOutcome(ctx context.Context, req Sta
 	return outcome, nil
 }
 
-// runContainerJob executes the container, uploads artifacts/diffs, and reports terminal status.
-// Extracted from executeContainerJob to keep function sizes under ~100 lines.
-func (r *runController) runContainerJob(
+func (r *runController) runMigContainerJob(
 	ctx context.Context,
 	req StartRunRequest,
-	cfg containerJobConfig,
+	manifest contracts.StepManifest,
 	execCtx executionContext,
 	workspace string,
 	startTime time.Time,
 	hydrationDuration time.Duration,
 	jobDirs JobDirectories,
 	mounts step.JobMounts,
-) (jobOutcome, error) {
-	outcome := jobOutcome{}
-	outDir, diffPath := jobDirs.Out, jobDirs.Diff
-	manifest := cfg.Manifest
-
-	if cfg.PrepareManifest != nil {
-		if err := cfg.PrepareManifest(&manifest, workspace); err != nil {
-			return outcome, fmt.Errorf("prepare manifest: %w", err)
-		}
-	}
-
+) (migJobOutcome, error) {
+	outcome := migJobOutcome{}
+	diffPath := jobDirs.Diff
 	imageName := strings.TrimSpace(manifest.Image)
 	if imageName == "" {
 		return outcome, fmt.Errorf("resolved job image is empty")
@@ -218,51 +160,6 @@ func (r *runController) runContainerJob(
 		HydrationDuration: types.Duration(hydrationDuration),
 	}}
 	var runErr error
-	var duration time.Duration
-	if cfg.TrySkip != nil {
-		skipped, err := cfg.TrySkip(ctx, manifest, workspace, outDir)
-		if err != nil {
-			return outcome, fmt.Errorf("evaluate skip: %w", err)
-		}
-		if skipped {
-			duration = time.Since(startTime)
-			if runErr == nil && cfg.ValidateOutputs != nil {
-				if validateErr := cfg.ValidateOutputs(outDir, workspace); validateErr != nil {
-					runErr = fmt.Errorf("validate job outputs: %w", validateErr)
-				}
-			}
-			runErr = r.finalizeOutputs(req, cfg, outDir, workspace, runErr, result)
-			duration = time.Since(startTime)
-			result.Timings.TotalDuration = types.Duration(duration)
-			repoSHAOut := ""
-			if runErr == nil {
-				var repoSHAErr error
-				repoSHAOut, repoSHAErr = r.computeRepoSHAOut(ctx, req, workspace, "")
-				if repoSHAErr != nil {
-					runErr = repoSHAErr
-					slog.Error("failed to compute repo_sha_out", "run_id", req.RunID, "job_id", req.JobID, "error", repoSHAErr)
-				}
-			}
-			statsBuilder := types.NewRunStatsBuilder().
-				ExitCode(0).
-				DurationMs(duration.Milliseconds()).
-				TimingsFromDurations(hydrationDuration.Milliseconds(), 0, 0, duration.Milliseconds())
-			if runErr != nil {
-				statsBuilder.Error(normalizedExecutionError(runErr))
-			}
-			stats := statsBuilder.MustBuild()
-			outcome = jobOutcome{
-				runErr:     runErr,
-				result:     result,
-				repoSHAOut: repoSHAOut,
-				duration:   duration,
-			}
-			if !cfg.SuppressTerminalStatus {
-				r.reportTerminalStatus(ctx, req, runErr, result, stats, repoSHAOut, duration)
-			}
-			return outcome, nil
-		}
-	}
 
 	preWorkspaceTree := ""
 	if tree, treeErr := gitpkg.ComputeWorkspaceTreeSHA(ctx, workspace); treeErr != nil {
@@ -277,7 +174,6 @@ func (r *runController) runContainerJob(
 	}
 
 	// Materialized inputs and writable temporary state stay below the job root.
-	stopOutputSync := r.startOutputSync(ctx, req, cfg, outDir, workspace)
 	result, runErr = execCtx.runner.Run(ctx, step.Request{
 		RunID:     req.RunID,
 		JobID:     req.JobID,
@@ -286,31 +182,27 @@ func (r *runController) runContainerJob(
 		JobMounts: mounts,
 	})
 	result.Timings.HydrationDuration = types.Duration(hydrationDuration)
-	duration = time.Since(startTime)
-	stopOutputSync()
-
-	if runErr == nil && result.ExitCode == 0 && cfg.ValidateOutputs != nil {
-		if validateErr := cfg.ValidateOutputs(outDir, workspace); validateErr != nil {
-			runErr = fmt.Errorf("validate job outputs: %w", validateErr)
-		}
-	}
-	runErr = r.finalizeOutputs(req, cfg, outDir, workspace, runErr, result)
-	duration = time.Since(startTime)
+	duration := time.Since(startTime)
 	result.Timings.TotalDuration = types.Duration(duration)
 	if runErr != nil || result.ExitCode != 0 {
 		persistContainerInspectArtifact(req, jobDirs, result)
 	}
 
-	diffUploaded := false
-	if cfg.UploadDiff != nil {
-		var diffErr error
-		diffUploaded, diffErr = cfg.UploadDiff(ctx, req.RunID, req.JobID, req.JobName, execCtx.diffGenerator, workspace, result, diffPath)
-		if diffErr != nil && runErr == nil && result.ExitCode == 0 {
-			runErr = fmt.Errorf("upload job diff: %w", diffErr)
-		}
+	diffUploaded, diffErr := r.uploadDiff(
+		ctx,
+		req.RunID,
+		req.JobID,
+		execCtx.diffGenerator,
+		workspace,
+		result,
+		types.DiffJobTypeMig,
+		diffPath,
+	)
+	if diffErr != nil && runErr == nil && result.ExitCode == 0 {
+		runErr = fmt.Errorf("upload job diff: %w", diffErr)
 	}
 
-	if runErr == nil && result.ExitCode == 0 && req.JobType == types.JobTypeMig {
+	if runErr == nil && result.ExitCode == 0 {
 		if err := advanceWorkspaceBaseline(ctx, workspace, req.RunID, req.JobID, diffUploaded); err != nil {
 			runErr = fmt.Errorf("advance workspace baseline: %w", err)
 			slog.Error("failed to advance workspace baseline", "run_id", req.RunID, "job_id", req.JobID, "error", err)
@@ -340,19 +232,6 @@ func (r *runController) runContainerJob(
 		statsBuilder.JobResources(result.ContainerResources)
 	}
 
-	if cfg.BuildJobMeta != nil {
-		if meta := cfg.BuildJobMeta(outDir); len(meta) > 0 {
-			statsBuilder.JobMeta(meta)
-		}
-	}
-	if cfg.BuildMetadata != nil {
-		for k, v := range cfg.BuildMetadata(outDir) {
-			if strings.TrimSpace(k) == "" || strings.TrimSpace(v) == "" {
-				continue
-			}
-			statsBuilder.MetadataEntry(k, v)
-		}
-	}
 	if runErr != nil {
 		statsBuilder.Error(normalizedExecutionError(runErr))
 	} else if result.ExitCode != 0 {
@@ -360,86 +239,14 @@ func (r *runController) runContainerJob(
 	}
 
 	stats := statsBuilder.MustBuild()
-	outcome = jobOutcome{
+	outcome = migJobOutcome{
 		runErr:     runErr,
 		result:     result,
 		repoSHAOut: repoSHAOut,
 		duration:   duration,
 	}
-	if !cfg.SuppressTerminalStatus {
-		r.reportTerminalStatus(ctx, req, runErr, result, stats, repoSHAOut, duration)
-	}
+	r.reportTerminalStatus(ctx, req, runErr, result, stats, repoSHAOut, duration)
 	return outcome, nil
-}
-
-func (r *runController) finalizeOutputs(
-	req StartRunRequest,
-	cfg containerJobConfig,
-	outDir, workspace string,
-	runErr error,
-	result step.Result,
-) error {
-	if cfg.FinalizeOutputs == nil {
-		return runErr
-	}
-	if finalizeErr := cfg.FinalizeOutputs(outDir, workspace); finalizeErr != nil {
-		// Keep non-zero container exits mapped to their original fail/error
-		// semantics while still attempting lineage finalization.
-		if runErr != nil || result.ExitCode != 0 {
-			slog.Warn("failed to finalize job outputs after non-zero execution",
-				"run_id", req.RunID,
-				"job_id", req.JobID,
-				"error", finalizeErr)
-			return runErr
-		}
-		return fmt.Errorf("finalize job outputs: %w", finalizeErr)
-	}
-	return runErr
-}
-
-func (r *runController) startOutputSync(
-	ctx context.Context,
-	req StartRunRequest,
-	cfg containerJobConfig,
-	outDir, workspace string,
-) func() {
-	if cfg.SyncOutputs == nil {
-		return func() {}
-	}
-
-	done := make(chan struct{})
-	stop := make(chan struct{})
-	go func() {
-		defer close(done)
-		ticker := time.NewTicker(500 * time.Millisecond)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-stop:
-				return
-			case <-ticker.C:
-				if err := cfg.SyncOutputs(outDir, workspace); err != nil {
-					slog.Warn("runtime output sync failed",
-						"run_id", req.RunID,
-						"job_id", req.JobID,
-						"error", err)
-				}
-			}
-		}
-	}()
-
-	return func() {
-		close(stop)
-		<-done
-		if err := cfg.SyncOutputs(outDir, workspace); err != nil {
-			slog.Warn("runtime output sync final pass failed",
-				"run_id", req.RunID,
-				"job_id", req.JobID,
-				"error", err)
-		}
-	}
 }
 
 // materializeJobResources returns an empty staging path when the manifest has

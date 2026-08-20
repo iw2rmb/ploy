@@ -180,7 +180,7 @@ func TestRunSubmitGitLabTokenFlag(t *testing.T) {
 			clienv.UseControlPlaneEnv(t, server.URL)
 
 			var buf bytes.Buffer
-			root := NewRootCmd(&buf)
+			root := NewRootCmdWithIO(&buf, &buf)
 			root.SetArgs(tc.args)
 			if tc.stdin != "" {
 				root.SetIn(strings.NewReader(tc.stdin))

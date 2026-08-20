@@ -177,68 +177,52 @@ func TestPersistContainerInspectArtifactRedactsExecutionData(t *testing.T) {
 	}
 }
 
-func TestShouldUploadRepoArtifactsAfterContainerJob(t *testing.T) {
+func TestShouldUploadRepoArtifactsAfterMigJob(t *testing.T) {
 	nextID := types.NewJobID()
 	tests := []struct {
 		name    string
 		req     StartRunRequest
-		outcome jobOutcome
+		outcome migJobOutcome
 		want    bool
 	}{
 		{
 			name:    "failure uploads",
-			req:     StartRunRequest{JobType: types.JobTypeMig},
-			outcome: jobOutcome{result: step.Result{ExitCode: 1}},
+			outcome: migJobOutcome{result: step.Result{ExitCode: 1}},
 			want:    true,
 		},
 		{
 			name: "terminal mig with disabled build gate uploads",
 			req: StartRunRequest{
-				JobType: types.JobTypeMig,
 				TypedOptions: RunOptions{BuildGate: BuildGateOptions{
 					Disabled: true,
 				}},
 			},
-			outcome: jobOutcome{result: step.Result{ExitCode: 0}},
+			outcome: migJobOutcome{result: step.Result{ExitCode: 0}},
 			want:    true,
 		},
 		{
 			name: "non-terminal mig with disabled build gate waits for successor",
 			req: StartRunRequest{
-				JobType: types.JobTypeMig,
-				NextID:  &nextID,
+				NextID: &nextID,
 				TypedOptions: RunOptions{BuildGate: BuildGateOptions{
 					Disabled: true,
 				}},
 			},
-			outcome: jobOutcome{result: step.Result{ExitCode: 0}},
+			outcome: migJobOutcome{result: step.Result{ExitCode: 0}},
 			want:    false,
 		},
 		{
-			name: "terminal mig with enabled build gate does not upload",
-			req: StartRunRequest{
-				JobType: types.JobTypeMig,
-			},
-			outcome: jobOutcome{result: step.Result{ExitCode: 0}},
-			want:    false,
-		},
-		{
-			name: "terminal non-mig with disabled build gate does not upload",
-			req: StartRunRequest{
-				JobType: types.JobTypePostGate,
-				TypedOptions: RunOptions{BuildGate: BuildGateOptions{
-					Disabled: true,
-				}},
-			},
-			outcome: jobOutcome{result: step.Result{ExitCode: 0}},
+			name:    "terminal mig with enabled build gate does not upload",
+			req:     StartRunRequest{},
+			outcome: migJobOutcome{result: step.Result{ExitCode: 0}},
 			want:    false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := shouldUploadRepoArtifactsAfterContainerJob(tt.req, tt.outcome); got != tt.want {
-				t.Fatalf("shouldUploadRepoArtifactsAfterContainerJob() = %v, want %v", got, tt.want)
+			if got := shouldUploadRepoArtifactsAfterMigJob(tt.req, tt.outcome); got != tt.want {
+				t.Fatalf("shouldUploadRepoArtifactsAfterMigJob() = %v, want %v", got, tt.want)
 			}
 		})
 	}

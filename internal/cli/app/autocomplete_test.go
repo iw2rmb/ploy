@@ -15,7 +15,7 @@ func TestAutocompleteArtifactsUpToDate(t *testing.T) {
 	// Generate completions directly from the Cobra command tree.
 	// We construct the root command in-process to avoid depending on the binary.
 	var stderr bytes.Buffer
-	rootCmd := NewRootCmd(&stderr)
+	rootCmd := NewRootCmdWithIO(&stderr, &stderr)
 
 	// Cobra provides built-in completion generation methods.
 	// We call them directly to generate the expected output.

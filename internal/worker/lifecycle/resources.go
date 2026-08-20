@@ -4,16 +4,9 @@ import (
 	"context"
 	"math"
 	"runtime"
-)
 
-type resourceSnapshot struct {
-	CPUTotalMillis   int32
-	CPUFreeMillis    int32
-	MemoryTotalBytes int64
-	MemoryFreeBytes  int64
-	DiskTotalBytes   int64
-	DiskFreeBytes    int64
-}
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+)
 
 // cpuFreeMillis calculates free CPU millis from load average and total capacity.
 // Clamps result to [0, totalMillis] range.
@@ -29,34 +22,35 @@ func cpuFreeMillis(load1 float64, totalMillis int64) int32 {
 	return int32(freeMillis)
 }
 
-func (c *Collector) collectResources(ctx context.Context) resourceSnapshot {
-	var snapshot resourceSnapshot
+// CollectCapacity builds the resource values consumed by heartbeat reporting.
+func (c *Collector) CollectCapacity(ctx context.Context) NodeCapacity {
+	var capacity NodeCapacity
 
 	totalMillis := int64(runtime.NumCPU()) * 1000
 	if totalMillis > math.MaxInt32 {
-		snapshot.CPUTotalMillis = math.MaxInt32
+		capacity.CPUTotalMillis = domaintypes.CPUmilli(math.MaxInt32)
 	} else {
-		snapshot.CPUTotalMillis = int32(totalMillis)
+		capacity.CPUTotalMillis = domaintypes.CPUmilli(totalMillis)
 	}
-	totalMillis = int64(snapshot.CPUTotalMillis)
+	totalMillis = int64(capacity.CPUTotalMillis)
 
 	if avg, err := c.loadFunc(ctx); err == nil {
-		snapshot.CPUFreeMillis = cpuFreeMillis(avg.Load1, totalMillis)
+		capacity.CPUFreeMillis = domaintypes.CPUmilli(cpuFreeMillis(avg.Load1, totalMillis))
 	} else {
-		snapshot.CPUFreeMillis = snapshot.CPUTotalMillis
+		capacity.CPUFreeMillis = capacity.CPUTotalMillis
 	}
 
 	if vm, err := c.memFunc(ctx); err == nil {
-		snapshot.MemoryTotalBytes = uint64ToInt64(vm.Total)
-		snapshot.MemoryFreeBytes = uint64ToInt64(vm.Available)
+		capacity.MemTotalBytes = domaintypes.Bytes(uint64ToInt64(vm.Total))
+		capacity.MemFreeBytes = domaintypes.Bytes(uint64ToInt64(vm.Available))
 	}
 
 	if usage, err := c.diskUsageFunc(ctx, "/"); err == nil {
-		snapshot.DiskTotalBytes = uint64ToInt64(usage.Total)
-		snapshot.DiskFreeBytes = uint64ToInt64(usage.Free)
+		capacity.DiskTotalBytes = domaintypes.Bytes(uint64ToInt64(usage.Total))
+		capacity.DiskFreeBytes = domaintypes.Bytes(uint64ToInt64(usage.Free))
 	}
 
-	return snapshot
+	return capacity
 }
 
 func uint64ToInt64(value uint64) int64 {

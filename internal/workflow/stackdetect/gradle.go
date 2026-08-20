@@ -89,81 +89,24 @@ func detectGradle(ctx context.Context, workspace, gradlePath string) (*Observati
 	sourceVersion := extractCompatibilityVersion(sourceCompatibilityRegex, text)
 	targetVersion := extractCompatibilityVersion(targetCompatibilityRegex, text)
 
-	if sourceVersion != "" || targetVersion != "" {
-		var evidence []EvidenceItem
-
-		if sourceVersion != "" {
-			evidence = append(evidence, EvidenceItem{
-				Path: relativePath, Key: "sourceCompatibility", Value: sourceVersion,
-			})
-		}
-		if targetVersion != "" {
-			evidence = append(evidence, EvidenceItem{
-				Path: relativePath, Key: "targetCompatibility", Value: targetVersion,
-			})
-		}
-
-		// If both present, they must match.
-		if sourceVersion != "" && targetVersion != "" && sourceVersion != targetVersion {
-			return nil, &DetectionError{
-				Reason:   "unknown",
-				Message:  "sourceCompatibility and targetCompatibility differ",
-				Evidence: evidence,
-			}
-		}
-
-		// Use whichever is present (or the matching value).
-		version := sourceVersion
-		if version == "" {
-			version = targetVersion
-		}
-
-		return &Observation{
-			Language: "java",
-			Tool:     "gradle",
-			Release:  &version,
-			Evidence: evidence,
-		}, nil
+	if observation, err := resolveGradleVersionCandidates(
+		literalGradleVersionCandidate(sourceVersion, relativePath, "sourceCompatibility"),
+		literalGradleVersionCandidate(targetVersion, relativePath, "targetCompatibility"),
+		"sourceCompatibility and targetCompatibility differ",
+	); observation != nil || err != nil {
+		return observation, err
 	}
 
 	// 2. Kotlin JVM hint: kotlinOptions.jvmTarget.
 	jvmTargetDirect := extractCompatibilityVersion(kotlinOptionsJvmTargetDirectRegex, text)
 	jvmTargetBlock := extractCompatibilityVersion(kotlinOptionsJvmTargetBlockRegex, text)
 
-	if jvmTargetDirect != "" || jvmTargetBlock != "" {
-		var evidence []EvidenceItem
-
-		if jvmTargetDirect != "" {
-			evidence = append(evidence, EvidenceItem{
-				Path: relativePath, Key: "kotlinOptions.jvmTarget", Value: jvmTargetDirect,
-			})
-		}
-		if jvmTargetBlock != "" {
-			evidence = append(evidence, EvidenceItem{
-				Path: relativePath, Key: "kotlinOptions.jvmTarget", Value: jvmTargetBlock,
-			})
-		}
-
-		// If both present, they must match.
-		if jvmTargetDirect != "" && jvmTargetBlock != "" && jvmTargetDirect != jvmTargetBlock {
-			return nil, &DetectionError{
-				Reason:   "unknown",
-				Message:  "kotlinOptions.jvmTarget differs between assignments",
-				Evidence: evidence,
-			}
-		}
-
-		version := jvmTargetDirect
-		if version == "" {
-			version = jvmTargetBlock
-		}
-
-		return &Observation{
-			Language: "java",
-			Tool:     "gradle",
-			Release:  &version,
-			Evidence: evidence,
-		}, nil
+	if observation, err := resolveGradleVersionCandidates(
+		literalGradleVersionCandidate(jvmTargetDirect, relativePath, "kotlinOptions.jvmTarget"),
+		literalGradleVersionCandidate(jvmTargetBlock, relativePath, "kotlinOptions.jvmTarget"),
+		"kotlinOptions.jvmTarget differs between assignments",
+	); observation != nil || err != nil {
+		return observation, err
 	}
 
 	// 3. Java toolchain languageVersion.
@@ -190,36 +133,12 @@ func detectGradle(ctx context.Context, workspace, gradlePath string) (*Observati
 	if err != nil {
 		return nil, err
 	}
-	if toolchainVersionAssign != "" || toolchainVersionSet != "" {
-		var evidence []EvidenceItem
-
-		if toolchainVersionAssign != "" {
-			evidence = append(evidence, toolchainAssignEvidence...)
-		}
-		if toolchainVersionSet != "" {
-			evidence = append(evidence, toolchainSetEvidence...)
-		}
-
-		// If both forms are present, they must match.
-		if toolchainVersionAssign != "" && toolchainVersionSet != "" && toolchainVersionAssign != toolchainVersionSet {
-			return nil, &DetectionError{
-				Reason:   "unknown",
-				Message:  "toolchain languageVersion differs between assignments",
-				Evidence: evidence,
-			}
-		}
-
-		version := toolchainVersionAssign
-		if version == "" {
-			version = toolchainVersionSet
-		}
-
-		return &Observation{
-			Language: "java",
-			Tool:     "gradle",
-			Release:  &version,
-			Evidence: evidence,
-		}, nil
+	if observation, err := resolveGradleVersionCandidates(
+		gradleVersionCandidate{value: toolchainVersionAssign, evidence: toolchainAssignEvidence},
+		gradleVersionCandidate{value: toolchainVersionSet, evidence: toolchainSetEvidence},
+		"toolchain languageVersion differs between assignments",
+	); observation != nil || err != nil {
+		return observation, err
 	}
 
 	// 4. Generic javaVersion assignment often used by custom Gradle extensions.
@@ -247,35 +166,12 @@ func detectGradle(ctx context.Context, workspace, gradlePath string) (*Observati
 	if err != nil {
 		return nil, err
 	}
-	if javaVersionAssignment != "" || javaVersionSet != "" {
-		var evidence []EvidenceItem
-
-		if javaVersionAssignment != "" {
-			evidence = append(evidence, javaVersionAssignmentEvidence...)
-		}
-		if javaVersionSet != "" {
-			evidence = append(evidence, javaVersionSetEvidence...)
-		}
-
-		if javaVersionAssignment != "" && javaVersionSet != "" && javaVersionAssignment != javaVersionSet {
-			return nil, &DetectionError{
-				Reason:   "unknown",
-				Message:  "javaVersion differs between assignments",
-				Evidence: evidence,
-			}
-		}
-
-		version := javaVersionAssignment
-		if version == "" {
-			version = javaVersionSet
-		}
-
-		return &Observation{
-			Language: "java",
-			Tool:     "gradle",
-			Release:  &version,
-			Evidence: evidence,
-		}, nil
+	if observation, err := resolveGradleVersionCandidates(
+		gradleVersionCandidate{value: javaVersionAssignment, evidence: javaVersionAssignmentEvidence},
+		gradleVersionCandidate{value: javaVersionSet, evidence: javaVersionSetEvidence},
+		"javaVersion differs between assignments",
+	); observation != nil || err != nil {
+		return observation, err
 	}
 
 	// 5. Version catalog JVM target.
@@ -310,6 +206,50 @@ func detectGradle(ctx context.Context, workspace, gradlePath string) (*Observati
 type gradleVersionRef struct {
 	value    string
 	property string
+}
+
+type gradleVersionCandidate struct {
+	value    string
+	evidence []EvidenceItem
+}
+
+func literalGradleVersionCandidate(value, path, key string) gradleVersionCandidate {
+	return gradleVersionCandidate{
+		value:    value,
+		evidence: []EvidenceItem{{Path: path, Key: key, Value: value}},
+	}
+}
+
+func resolveGradleVersionCandidates(first, second gradleVersionCandidate, conflictMessage string) (*Observation, error) {
+	if first.value == "" && second.value == "" {
+		return nil, nil
+	}
+
+	evidence := make([]EvidenceItem, 0, len(first.evidence)+len(second.evidence))
+	if first.value != "" {
+		evidence = append(evidence, first.evidence...)
+	}
+	if second.value != "" {
+		evidence = append(evidence, second.evidence...)
+	}
+	if first.value != "" && second.value != "" && first.value != second.value {
+		return nil, &DetectionError{
+			Reason:   "unknown",
+			Message:  conflictMessage,
+			Evidence: evidence,
+		}
+	}
+
+	version := first.value
+	if version == "" {
+		version = second.value
+	}
+	return &Observation{
+		Language: "java",
+		Tool:     "gradle",
+		Release:  &version,
+		Evidence: evidence,
+	}, nil
 }
 
 func extractGradleVersionRef(literalRegex *regexp.Regexp, text string, propertyRegexes ...*regexp.Regexp) gradleVersionRef {

@@ -278,9 +278,15 @@ func TestNewPrinter_Defaults(t *testing.T) {
 
 	t.Run("empty format defaults to structured", func(t *testing.T) {
 		t.Parallel()
-		p := NewPrinter("", &bytes.Buffer{})
-		if got := p.Format(); got != FormatStructured {
-			t.Errorf("Format() = %q, want %q", got, FormatStructured)
+		buf := &bytes.Buffer{}
+		p := NewPrinter("", buf)
+		p.PrintLog(logstream.LogRecord{
+			Timestamp: "2025-10-22T10:00:00Z",
+			Stream:    "stdout",
+			Line:      "ready",
+		})
+		if got, want := buf.String(), "2025-10-22T10:00:00Z stdout ready\n"; got != want {
+			t.Errorf("PrintLog() = %q, want %q", got, want)
 		}
 	})
 

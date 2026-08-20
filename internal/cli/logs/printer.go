@@ -159,8 +159,3 @@ func (p *Printer) PrintRetentionSummary() {
 		_, _ = fmt.Fprintln(p.out, "Retention: not retained (bundle expires per default policy)")
 	}
 }
-
-// Format returns the printer's configured format.
-func (p *Printer) Format() Format {
-	return p.format
-}

@@ -483,20 +483,12 @@ func withCommitSHA(sha types.CommitSHA) claimOption {
 	return func(c *domainapi.NodeClaimResponse) { c.CommitSHA = sha }
 }
 
-func withClaimName(name string) claimOption {
-	return func(c *domainapi.NodeClaimResponse) { c.Name = &name }
-}
-
 func withClaimDetectedStack(exp *contracts.StackExpectation) claimOption {
 	return func(c *domainapi.NodeClaimResponse) { c.DetectedStack = exp }
 }
 
 func withMigClaimContext(ctx *contracts.MigClaimContext) claimOption {
 	return func(c *domainapi.NodeClaimResponse) { c.MigContext = ctx }
-}
-
-func withGateClaimContext(ctx *contracts.GateClaimContext) claimOption {
-	return func(c *domainapi.NodeClaimResponse) { c.GateContext = ctx }
 }
 
 // newClaimResponse returns a domainapi.NodeClaimResponse with generated IDs and sensible defaults.

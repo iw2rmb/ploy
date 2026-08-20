@@ -180,18 +180,14 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 		RunID:         claim.RunID,
 		JobID:         claim.JobID,
 		RepoID:        claim.RepoID,
-		Attempt:       claim.Attempt,
 		RepoURL:       claim.RepoURL,
-		Name:          derefString(claim.Name),
 		BaseRef:       claim.BaseRef,
 		CommitSHA:     claim.CommitSHA,
 		RepoSHAIn:     claim.RepoSHAIn,
 		JobType:       claim.JobType,
-		JobImage:      claim.JobImage,
 		NextID:        claim.NextID,
 		JobName:       claim.JobName, // Job name for branch identification
 		MigContext:    claim.MigContext,
-		GateContext:   claim.GateContext,
 		DetectedStack: claim.DetectedStack,
 		TypedOptions:  typedOpts, // Strongly-typed run options (canonical source of truth)
 		Env:           envFromSpec,
@@ -220,11 +216,4 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 	slotHeld = false
 
 	return true, nil
-}
-
-func derefString(v *string) string {
-	if v == nil {
-		return ""
-	}
-	return *v
 }

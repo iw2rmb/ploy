@@ -19,7 +19,7 @@ import (
 //
 // The stderr parameter receives all CLI output (both success and error messages).
 func executeCmd(args []string, stderr io.Writer) error {
-	rootCmd := NewRootCmd(stderr)
+	rootCmd := NewRootCmdWithIO(stderr, stderr)
 	rootCmd.SetArgs(args)
 	return rootCmd.Execute()
 }
@@ -28,7 +28,7 @@ func executeCmd(args []string, stderr io.Writer) error {
 // Cobra routes "help" through the custom help command we defined in root.go.
 func TestExecuteHelpMatchesGolden(t *testing.T) {
 	buf := &bytes.Buffer{}
-	rootCmd := NewRootCmd(buf)
+	rootCmd := NewRootCmdWithIO(buf, buf)
 	rootCmd.SetArgs([]string{"help"})
 	err := rootCmd.Execute()
 	if err != nil {
@@ -43,7 +43,7 @@ func TestExecuteHelpMatchesGolden(t *testing.T) {
 // TestExecuteHelpForMigMatchesGolden verifies that "ploy help mig" produces the expected golden output.
 func TestExecuteHelpForMigMatchesGolden(t *testing.T) {
 	buf := &bytes.Buffer{}
-	rootCmd := NewRootCmd(buf)
+	rootCmd := NewRootCmdWithIO(buf, buf)
 	rootCmd.SetArgs([]string{"help", "mig"})
 	err := rootCmd.Execute()
 	if err != nil {
