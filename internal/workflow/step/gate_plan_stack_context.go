@@ -38,10 +38,15 @@ func resolveStackGateContext(
 	detectErr error,
 	mappingPath string,
 ) (gateStackContext, *gateExecutionTerminal) {
-	expectation := normalizeStackExpectation(spec.StackGate.Expect)
+	expectation := contracts.NormalizeStackExpectation(spec.StackGate.Expect)
 	sgResult := &contracts.StackGateResult{
 		Enabled:  true,
-		Expected: spec.StackGate.Expect,
+		Expected: expectation,
+	}
+	if expectation == nil {
+		return gateStackContext{}, stackGateFailureTerminal(sgResult, "",
+			"STACK_GATE_INVALID_EXPECTATION", "stack gate expectation is empty",
+			"", "unknown", "", nil)
 	}
 
 	if detectErr != nil {
@@ -52,19 +57,19 @@ func resolveStackGateContext(
 			reason = detErr.Message
 			evidence = formatEvidenceForLog(detErr.Evidence)
 		}
-		runtimeImage := resolveStackGateRuntimeImageForTerminal(mappingPath, spec.ImageOverrides, spec.StackGate.Expect)
+		runtimeImage := resolveStackGateRuntimeImageForTerminal(mappingPath, spec.ImageOverrides, expectation)
 		return gateStackContext{}, stackGateFailureTerminal(sgResult, expectation.Language,
 			"STACK_GATE_UNKNOWN", reason, evidence, "unknown", runtimeImage, nil)
 	}
 
 	sgResult.Detected = observationToStackExpectation(obs)
-	if matched, reason := matchStack(obs, spec.StackGate.Expect); !matched {
+	if matched, reason := matchStack(obs, expectation); !matched {
 		var evidenceItems []stackdetect.EvidenceItem
 		if obs != nil {
 			evidenceItems = obs.Evidence
 		}
 		evidence := formatEvidenceForLog(evidenceItems)
-		runtimeImage := resolveStackGateRuntimeImageForTerminal(mappingPath, spec.ImageOverrides, spec.StackGate.Expect)
+		runtimeImage := resolveStackGateRuntimeImageForTerminal(mappingPath, spec.ImageOverrides, expectation)
 		return gateStackContext{}, stackGateFailureTerminal(sgResult, expectation.Language,
 			"STACK_GATE_MISMATCH", reason, evidence, "mismatch", runtimeImage, nil)
 	}
@@ -135,7 +140,11 @@ func resolveDetectedStackContext(
 			"", gateInternalError(code, msg), "")
 	}
 
-	normalized := normalizeStackExpectation(exp)
+	normalized := contracts.NormalizeStackExpectation(exp)
+	if normalized == nil {
+		return gateStackContext{}, stackDetectionFailureTerminal(nil,
+			"stack detection produced incomplete result; language and release are required")
+	}
 	if language == "" {
 		language = normalized.Language
 	}
@@ -163,7 +172,10 @@ func resolveForcedStackDetectContext(
 	if strings.TrimSpace(expected.Tool) == "" {
 		return resolveForcedStackDetectToolContext(ctx, workspace, expected)
 	}
-	normalized := normalizeStackExpectation(expected)
+	normalized := contracts.NormalizeStackExpectation(expected)
+	if normalized == nil {
+		return gateStackContext{}, gateStackConfigTerminal("forced build gate stack mode requires language and release")
+	}
 	return gateStackContext{
 		expectation: normalized,
 		language:    normalized.Language,
@@ -191,10 +203,13 @@ func resolveForcedStackDetectToolContext(
 		return gateStackContext{}, gateFailureTerminal(want, "stackdetect",
 			"BUILD_GATE_STACK_MISMATCH", reason, formatEvidenceForLog(obs.Evidence), nil, "")
 	}
-	normalized := contracts.StackExpectation{
+	normalized := contracts.NormalizeStackExpectation(&contracts.StackExpectation{
 		Language: strings.TrimSpace(expected.Language),
 		Tool:     strings.TrimSpace(obs.Tool),
 		Release:  strings.TrimSpace(expected.Release),
+	})
+	if normalized == nil {
+		return gateStackContext{}, gateStackConfigTerminal("forced build gate stack mode requires language and release")
 	}
 	return gateStackContext{
 		expectation: normalized,
@@ -221,7 +236,11 @@ func resolveStrictStackDetectContext(
 		return gateStackContext{}, gateFailureTerminal(expected.Language, "stackdetect",
 			"BUILD_GATE_STACK_MISMATCH", reason, formatEvidenceForLog(obs.Evidence), nil, "")
 	}
-	normalized := normalizeStackExpectation(observationToStackExpectation(obs))
+	normalized := contracts.NormalizeStackExpectation(observationToStackExpectation(obs))
+	if normalized == nil {
+		return gateStackContext{}, stackDetectionFailureTerminal(nil,
+			"stack detection produced incomplete result; language, tool, and release are required")
+	}
 	return gateStackContext{
 		expectation: normalized,
 		language:    normalized.Language,
@@ -240,7 +259,10 @@ func resolveFallbackStackDetectContext(
 		return gateStackContext{}, gateStackConfigTerminal("build gate stack mode requires language, tool, and release")
 	}
 	if detectErr != nil || !observationComplete(obs) {
-		normalized := normalizeStackExpectation(expected)
+		normalized := contracts.NormalizeStackExpectation(expected)
+		if normalized == nil {
+			return gateStackContext{}, gateStackConfigTerminal("build gate stack mode requires language, tool, and release")
+		}
 		return gateStackContext{
 			expectation: normalized,
 			language:    normalized.Language,
@@ -248,7 +270,11 @@ func resolveFallbackStackDetectContext(
 			release:     normalized.Release,
 		}, nil
 	}
-	detected := normalizeStackExpectation(observationToStackExpectation(obs))
+	detected := contracts.NormalizeStackExpectation(observationToStackExpectation(obs))
+	if detected == nil {
+		return gateStackContext{}, stackDetectionFailureTerminal(nil,
+			"stack detection produced incomplete result; language, tool, and release are required")
+	}
 	return gateStackContext{
 		expectation: detected,
 		language:    detected.Language,
@@ -268,11 +294,11 @@ func configuredStackExpectation(stackDetectCfg *contracts.BuildGateStackConfig) 
 	if stackDetectCfg == nil {
 		return nil
 	}
-	return &contracts.StackExpectation{
+	return contracts.NormalizeStackExpectation(&contracts.StackExpectation{
 		Language: strings.TrimSpace(stackDetectCfg.Language),
 		Tool:     strings.TrimSpace(stackDetectCfg.Tool),
 		Release:  strings.TrimSpace(stackDetectCfg.Release),
-	}
+	})
 }
 
 func observationComplete(obs *stackdetect.Observation) bool {
@@ -321,15 +347,4 @@ func resolveStackGateRuntimeImageForTerminal(
 		return ""
 	}
 	return strings.TrimSpace(image)
-}
-
-func normalizeStackExpectation(expect *contracts.StackExpectation) contracts.StackExpectation {
-	if expect == nil {
-		return contracts.StackExpectation{}
-	}
-	return contracts.StackExpectation{
-		Language: strings.TrimSpace(expect.Language),
-		Tool:     strings.TrimSpace(expect.Tool),
-		Release:  strings.TrimSpace(expect.Release),
-	}
 }

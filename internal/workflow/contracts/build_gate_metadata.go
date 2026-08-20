@@ -63,30 +63,27 @@ func (m BuildGateStageMetadata) DetectedStack() MigStack {
 // static_checks[0] when detected_stack is absent.
 func (m BuildGateStageMetadata) DetectedStackExpectation() *StackExpectation {
 	if m.Detected != nil {
-		language := strings.TrimSpace(m.Detected.Language)
-		tool := strings.TrimSpace(m.Detected.Tool)
-		release := strings.TrimSpace(m.Detected.Release)
-		if language == "" || tool == "" {
+		expectation := NormalizeStackExpectation(&StackExpectation{
+			Language: m.Detected.Language,
+			Tool:     m.Detected.Tool,
+			Release:  m.Detected.Release,
+		})
+		if expectation == nil || expectation.Language == "" || expectation.Tool == "" {
 			return nil
 		}
-		return &StackExpectation{
-			Language: language,
-			Tool:     tool,
-			Release:  release,
-		}
+		return expectation
 	}
 	if len(m.StaticChecks) == 0 {
 		return nil
 	}
-	language := strings.TrimSpace(m.StaticChecks[0].Language)
-	tool := strings.TrimSpace(m.StaticChecks[0].Tool)
-	if language == "" || tool == "" {
+	expectation := NormalizeStackExpectation(&StackExpectation{
+		Language: m.StaticChecks[0].Language,
+		Tool:     m.StaticChecks[0].Tool,
+	})
+	if expectation == nil || expectation.Language == "" || expectation.Tool == "" {
 		return nil
 	}
-	return &StackExpectation{
-		Language: language,
-		Tool:     tool,
-	}
+	return expectation
 }
 
 // Validate ensures build gate metadata entries are well formed.

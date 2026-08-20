@@ -58,61 +58,10 @@ func NewClaimManager(cfg Config, controller RunController) (*ClaimManager, error
 	}, nil
 }
 
-// parseSpec parses a spec JSON payload into environment variables and typed options.
-// It uses the canonical contracts.ParseMigSpecJSON parser for structured
-// validation, then converts to the internal RunOptions format.
-//
-// ## Return Values
-//
-// Returns:
-//   - env: map[string]string containing merged environment variables (global env,
-//     plus step env for single-step runs; multi-step step env is handled per-step
-//     during manifest building).
-//   - typedOpts: RunOptions with typed accessors for all understood option keys.
-//   - err: non-nil if spec parsing fails.
-//
-// If the spec is empty, returns an empty env map and zero RunOptions with nil error.
-func parseSpec(spec json.RawMessage) (map[string]string, RunOptions, error) {
-	env := map[string]string{}
-	var typedOpts RunOptions
+// parseSpec parses and validates the canonical migration specification.
+func parseSpec(spec json.RawMessage) (*contracts.MigSpec, error) {
 	if len(spec) == 0 {
-		return env, typedOpts, nil
+		return nil, nil
 	}
-
-	// Parse using the canonical parser for structural validation.
-	migsSpec, err := contracts.ParseMigSpecJSON(spec)
-	if err != nil {
-		return env, typedOpts, err
-	}
-
-	// Derive env with legacy semantics:
-	// - Global env applies to every step.
-	// - For single-step runs, step env is merged into env (step overrides).
-	// - For multi-step runs, env contains only the global env; step env is applied
-	//   at manifest build time via typedOpts.Steps[stepIndex].Env.
-	env = envFromSpec(migsSpec)
-
-	// Direct conversion from typed MigSpec to RunOptions.
-	typedOpts = runOptionsFromSpec(migsSpec)
-
-	return env, typedOpts, nil
-}
-
-func envFromSpec(spec *contracts.MigSpec) map[string]string {
-	if spec == nil {
-		return map[string]string{}
-	}
-
-	env := make(map[string]string, len(spec.Envs))
-	for k, v := range spec.Envs {
-		env[k] = v
-	}
-
-	if len(spec.Steps) == 1 {
-		for k, v := range spec.Steps[0].Envs {
-			env[k] = v
-		}
-	}
-
-	return env
+	return contracts.ParseMigSpecJSON(spec)
 }

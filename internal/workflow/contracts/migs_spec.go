@@ -34,6 +34,7 @@ import (
 	"strings"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
+	"gopkg.in/yaml.v3"
 )
 
 // MigSpec is the canonical typed representation of a mig run specification.
@@ -123,6 +124,24 @@ type MigStep struct {
 	// Stack configures Stack Gate validation for this step.
 	// Inbound validates pre-mig expectations; Outbound validates post-mig expectations.
 	Stack *StackGateSpec `json:"stack,omitempty" yaml:"stack,omitempty"`
+}
+
+// UnmarshalYAML decodes through a fresh value so YAML null fields replace
+// reused polymorphic values instead of retaining their previous state.
+func (s *MigStep) UnmarshalYAML(node *yaml.Node) error {
+	type rawMigStep MigStep
+	var decoded rawMigStep
+	if err := node.Decode(&decoded); err != nil {
+		return err
+	}
+	*s = MigStep(decoded)
+	for i := 0; i+1 < len(node.Content); i += 2 {
+		if node.Content[i].Value == "command" && node.Content[i+1].Tag == "!!null" {
+			s.Command.assign("", nil)
+			break
+		}
+	}
+	return nil
 }
 
 // MigStepOptions describes strict runtime options accepted under steps[].options.

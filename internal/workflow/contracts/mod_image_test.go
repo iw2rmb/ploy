@@ -272,77 +272,34 @@ image:
 	}
 }
 
-// TestJobImage_IsEmpty verifies the IsEmpty method.
-func TestJobImage_IsEmpty(t *testing.T) {
+func TestJobImageClassification(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name  string
-		image JobImage
-		want  bool
+		name          string
+		image         JobImage
+		wantEmpty     bool
+		wantUniversal bool
+		wantByStack   bool
 	}{
-		{name: "empty", image: JobImage{}, want: true},
-		{name: "universal", image: JobImage{Universal: "img:v1"}, want: false},
-		{name: "stack map", image: JobImage{ByStack: map[MigStack]string{"default": "img:v1"}}, want: false},
-		{name: "empty stack map", image: JobImage{ByStack: map[MigStack]string{}}, want: true},
+		{name: "empty", image: JobImage{}, wantEmpty: true},
+		{name: "empty stack map", image: JobImage{ByStack: map[MigStack]string{}}, wantEmpty: true},
+		{name: "universal", image: JobImage{Universal: "img:v1"}, wantUniversal: true},
+		{name: "stack map", image: JobImage{ByStack: map[MigStack]string{"default": "img:v1"}}, wantByStack: true},
+		{name: "both prefer stack map", image: JobImage{Universal: "img:v1", ByStack: map[MigStack]string{"default": "img:v2"}}, wantByStack: true},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			if got := tt.image.IsEmpty(); got != tt.want {
-				t.Errorf("IsEmpty() = %v, want %v", got, tt.want)
+			if got := tt.image.IsEmpty(); got != tt.wantEmpty {
+				t.Errorf("IsEmpty() = %v, want %v", got, tt.wantEmpty)
 			}
-		})
-	}
-}
-
-// TestJobImage_IsUniversal verifies the IsUniversal method.
-func TestJobImage_IsUniversal(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name  string
-		image JobImage
-		want  bool
-	}{
-		{name: "universal only", image: JobImage{Universal: "img:v1"}, want: true},
-		{name: "empty", image: JobImage{}, want: false},
-		{name: "stack map only", image: JobImage{ByStack: map[MigStack]string{"default": "img:v1"}}, want: false},
-		// When both are set, ByStack takes precedence (not universal).
-		{name: "both set", image: JobImage{Universal: "img:v1", ByStack: map[MigStack]string{"default": "img:v2"}}, want: false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			if got := tt.image.IsUniversal(); got != tt.want {
-				t.Errorf("IsUniversal() = %v, want %v", got, tt.want)
+			if got := tt.image.IsUniversal(); got != tt.wantUniversal {
+				t.Errorf("IsUniversal() = %v, want %v", got, tt.wantUniversal)
 			}
-		})
-	}
-}
-
-// TestJobImage_IsStackSpecific verifies the IsStackSpecific method.
-func TestJobImage_IsStackSpecific(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name  string
-		image JobImage
-		want  bool
-	}{
-		{name: "stack map", image: JobImage{ByStack: map[MigStack]string{"default": "img:v1"}}, want: true},
-		{name: "empty", image: JobImage{}, want: false},
-		{name: "universal only", image: JobImage{Universal: "img:v1"}, want: false},
-		{name: "empty stack map", image: JobImage{ByStack: map[MigStack]string{}}, want: false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			if got := tt.image.IsStackSpecific(); got != tt.want {
-				t.Errorf("IsStackSpecific() = %v, want %v", got, tt.want)
+			if got := tt.image.IsStackSpecific(); got != tt.wantByStack {
+				t.Errorf("IsStackSpecific() = %v, want %v", got, tt.wantByStack)
 			}
 		})
 	}

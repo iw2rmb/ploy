@@ -95,45 +95,35 @@ func detectPython(ctx context.Context, s scanResult) (*Observation, error) {
 
 	// 3 & 4. Check pyproject.toml.
 	if s.pyprojectLoaded {
-		// Check PEP 621 requires-python in [project] section.
-		if s.pyprojectHasProjectSection && s.pyprojectRequiresPython != "" {
-			specifier := strings.TrimSpace(s.pyprojectRequiresPython)
-			version, err := reduceSpecifier(specifier)
-			if err != nil {
-				return nil, &DetectionError{
-					Reason:  "unknown",
-					Message: err.Error(),
-					Evidence: []EvidenceItem{
-						{Path: "pyproject.toml", Key: "requires-python", Value: specifier},
-					},
-				}
-			}
-			detections = append(detections, pythonDetection{
-				version:  version,
-				path:     "pyproject.toml",
-				key:      "requires-python",
-				priority: 3,
-			})
+		specifierSources := []struct {
+			enabled  bool
+			value    string
+			key      string
+			priority int
+		}{
+			{enabled: s.pyprojectHasProjectSection, value: s.pyprojectRequiresPython, key: "requires-python", priority: 3},
+			{enabled: s.pyprojectHasPoetryTool && s.pyprojectHasPoetryDeps, value: s.pyprojectPoetryPython, key: "tool.poetry.dependencies.python", priority: 4},
 		}
-
-		// Check Poetry python dependency.
-		if s.pyprojectHasPoetryTool && s.pyprojectHasPoetryDeps && s.pyprojectPoetryPython != "" {
-			specifier := strings.TrimSpace(s.pyprojectPoetryPython)
+		for _, source := range specifierSources {
+			specifier := strings.TrimSpace(source.value)
+			if !source.enabled || specifier == "" {
+				continue
+			}
 			version, err := reduceSpecifier(specifier)
 			if err != nil {
 				return nil, &DetectionError{
 					Reason:  "unknown",
 					Message: err.Error(),
 					Evidence: []EvidenceItem{
-						{Path: "pyproject.toml", Key: "tool.poetry.dependencies.python", Value: specifier},
+						{Path: "pyproject.toml", Key: source.key, Value: specifier},
 					},
 				}
 			}
 			detections = append(detections, pythonDetection{
 				version:  version,
 				path:     "pyproject.toml",
-				key:      "tool.poetry.dependencies.python",
-				priority: 4,
+				key:      source.key,
+				priority: source.priority,
 			})
 		}
 	}

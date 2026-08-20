@@ -23,7 +23,7 @@ var manifestBuilders = []manifestBuilder{
 	{
 		name: "gate",
 		build: func(r StartRunRequest) (contracts.StepManifest, error) {
-			return buildGateManifest(r, r.TypedOptions)
+			return buildGateManifest(r, nil)
 		},
 		wantID: func(r StartRunRequest) string { return r.JobID.String() },
 	},
@@ -84,8 +84,9 @@ func TestBuildManifestFromRequest_PropagatesJobID(t *testing.T) {
 	req := newStartRunRequest(
 		withRunID("run-opts-1"),
 		withJobID("6ba7b810-9dad-11d1-80b4-00c04fd430c8"),
-		withRunOptions(RunOptions{
-			ServerMetadata: ServerMetadataOptions{JobID: types.JobID("6ba7b810-9dad-11d1-80b4-00c04fd430c8")},
+		withMigSpec(contracts.MigSpec{
+			JobID: types.JobID("6ba7b810-9dad-11d1-80b4-00c04fd430c8"),
+			Steps: []contracts.MigStep{{Image: contracts.JobImage{Universal: "ubuntu:latest"}}},
 		}),
 	)
 

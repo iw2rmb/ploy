@@ -40,6 +40,11 @@ type CommandSpec struct {
 	Exec []string
 }
 
+func (c *CommandSpec) assign(shell string, exec []string) {
+	c.Shell = shell
+	c.Exec = exec
+}
+
 // IsEmpty returns true if no command is specified.
 func (c CommandSpec) IsEmpty() bool {
 	return c.Shell == "" && len(c.Exec) == 0
@@ -85,20 +90,21 @@ func (c CommandSpec) MarshalJSON() ([]byte, error) {
 func (c *CommandSpec) UnmarshalJSON(data []byte) error {
 	// Handle null
 	if string(data) == "null" {
+		c.assign("", nil)
 		return nil
 	}
 
 	// Try string first (shell form).
 	var s string
 	if err := json.Unmarshal(data, &s); err == nil {
-		c.Shell = strings.TrimSpace(s)
+		c.assign(strings.TrimSpace(s), nil)
 		return nil
 	}
 
 	// Try array (exec form).
 	var arr []string
 	if err := json.Unmarshal(data, &arr); err == nil {
-		c.Exec = arr
+		c.assign("", arr)
 		return nil
 	}
 
@@ -118,9 +124,13 @@ func (c CommandSpec) MarshalYAML() (interface{}, error) {
 
 // UnmarshalYAML implements yaml.Unmarshaler for CommandSpec.
 func (c *CommandSpec) UnmarshalYAML(node *yaml.Node) error {
+	if node.Tag == "!!null" {
+		c.assign("", nil)
+		return nil
+	}
 	// Handle scalar (string form).
 	if node.Kind == yaml.ScalarNode {
-		c.Shell = strings.TrimSpace(node.Value)
+		c.assign(strings.TrimSpace(node.Value), nil)
 		return nil
 	}
 
@@ -130,7 +140,7 @@ func (c *CommandSpec) UnmarshalYAML(node *yaml.Node) error {
 		if err := node.Decode(&arr); err != nil {
 			return fmt.Errorf("command array: %w", err)
 		}
-		c.Exec = arr
+		c.assign("", arr)
 		return nil
 	}
 

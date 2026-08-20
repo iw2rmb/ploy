@@ -53,16 +53,12 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest,
 		}
 	}
 
-	// Build manifest using typed options from request.
-	// stepIndex=0 is used for manifest building; job configuration comes from req.TypedOptions.
-	typedOpts := req.TypedOptions
-
 	// Thread Stack Gate expectation based on gate type without next_id dependence.
-	if phase := stackGatePhaseForJob(typedOpts.Steps, req.JobType); phase != nil {
-		typedOpts.StackGate = phase
+	var steps []contracts.MigStep
+	if req.MigSpec != nil {
+		steps = req.MigSpec.Steps
 	}
-
-	manifest, err := buildGateManifest(req, typedOpts)
+	manifest, err := buildGateManifest(req, stackGatePhaseForJob(steps, req.JobType))
 	if err != nil {
 		uploadRepoArtifactsOnReturn = true
 		slog.Error("failed to build manifest", "run_id", req.RunID, "error", err)
@@ -70,7 +66,7 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest,
 		return
 	}
 
-	applyGatePhaseOverrides(&manifest, req, typedOpts)
+	applyGatePhaseOverrides(&manifest, req)
 
 	workspace, err := r.prepareStickyWorkspace(ctx, req, manifest)
 	if err != nil {
@@ -185,7 +181,7 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest,
 	slog.Info("gate job "+logVerb, "run_id", req.RunID, "job_id", req.JobID, "job_type", req.JobType, "duration", duration)
 }
 
-func stackGatePhaseForJob(steps []StepOptions, jobType types.JobType) *contracts.StackGatePhaseSpec {
+func stackGatePhaseForJob(steps []contracts.MigStep, jobType types.JobType) *contracts.StackGatePhaseSpec {
 	if len(steps) == 0 {
 		return nil
 	}
@@ -211,16 +207,16 @@ func (r *runController) uploadGateErrorStatus(ctx context.Context, req StartRunR
 }
 
 // applyGatePhaseOverrides wires optional per-phase stack policy into the gate manifest.
-func applyGatePhaseOverrides(manifest *contracts.StepManifest, req StartRunRequest, typedOpts RunOptions) {
-	if manifest == nil || manifest.Gate == nil {
+func applyGatePhaseOverrides(manifest *contracts.StepManifest, req StartRunRequest) {
+	if manifest == nil || manifest.Gate == nil || req.MigSpec == nil || req.MigSpec.BuildGate == nil {
 		return
 	}
 
 	switch req.JobType {
 	case types.JobTypePreGate:
-		contracts.ApplyBuildGatePhaseToGateSpec(manifest.Gate, typedOpts.BuildGate.Pre)
+		contracts.ApplyBuildGatePhaseToGateSpec(manifest.Gate, req.MigSpec.BuildGate.Pre)
 	case types.JobTypePostGate:
-		contracts.ApplyBuildGatePhaseToGateSpec(manifest.Gate, typedOpts.BuildGate.Post)
+		contracts.ApplyBuildGatePhaseToGateSpec(manifest.Gate, req.MigSpec.BuildGate.Post)
 	}
 }
 

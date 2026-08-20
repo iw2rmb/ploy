@@ -38,87 +38,49 @@ func detectRust(ctx context.Context, workspace string) (*Observation, error) {
 		if err == nil {
 			if matches := rustVersionRegex.FindStringSubmatch(string(content)); matches != nil {
 				version := canonicalizeRustVersion(matches[1])
-				return &Observation{
-					Language: "rust",
-					Tool:     "cargo",
-					Release:  &version,
-					Evidence: []EvidenceItem{
-						{Path: "Cargo.toml", Key: "rust-version", Value: version},
-					},
-				}, nil
+				return rustObservation("Cargo.toml", "rust-version", version), nil
 			}
 		}
 	}
 
-	// 2. Check rust-toolchain.toml for channel.
-	if fileExists(toolchainTomlPath) {
-		content, err := os.ReadFile(toolchainTomlPath)
-		if err == nil {
-			if matches := rustToolchainChannelRegex.FindStringSubmatch(string(content)); matches != nil {
-				channel := strings.TrimSpace(matches[1])
-
-				// Check for non-deterministic channels.
-				if isNonDeterministicChannel(channel) {
-					return nil, &DetectionError{
-						Reason:  "unknown",
-						Message: "rust-toolchain.toml specifies non-deterministic channel: " + channel,
-						Evidence: []EvidenceItem{
-							{Path: "rust-toolchain.toml", Key: "channel", Value: channel},
-						},
-					}
-				}
-
-				// Check if channel is a numeric version.
-				if version := extractNumericRustVersion(channel); version != "" {
-					return &Observation{
-						Language: "rust",
-						Tool:     "cargo",
-						Release:  &version,
-						Evidence: []EvidenceItem{
-							{Path: "rust-toolchain.toml", Key: "channel", Value: version},
-						},
-					}, nil
-				}
-
-				// Non-numeric, non-standard channel.
-				return nil, &DetectionError{
-					Reason:  "unknown",
-					Message: "rust-toolchain.toml specifies non-numeric channel: " + channel,
-					Evidence: []EvidenceItem{
-						{Path: "rust-toolchain.toml", Key: "channel", Value: channel},
-					},
-				}
+	toolchainSources := []struct {
+		path             string
+		name             string
+		channel          func([]byte) string
+		reportNonNumeric bool
+	}{
+		{path: toolchainTomlPath, name: "rust-toolchain.toml", channel: func(content []byte) string {
+			matches := rustToolchainChannelRegex.FindStringSubmatch(string(content))
+			if matches == nil {
+				return ""
 			}
-		}
+			return strings.TrimSpace(matches[1])
+		}, reportNonNumeric: true},
+		{path: toolchainPath, name: "rust-toolchain", channel: func(content []byte) string {
+			return strings.TrimSpace(string(content))
+		}},
 	}
-
-	// 3. Check rust-toolchain plain file.
-	if fileExists(toolchainPath) {
-		content, err := os.ReadFile(toolchainPath)
-		if err == nil {
-			channel := strings.TrimSpace(string(content))
-
-			// Check for non-deterministic channels.
-			if isNonDeterministicChannel(channel) {
-				return nil, &DetectionError{
-					Reason:  "unknown",
-					Message: "rust-toolchain specifies non-deterministic channel: " + channel,
-					Evidence: []EvidenceItem{
-						{Path: "rust-toolchain", Key: "channel", Value: channel},
-					},
-				}
-			}
-
-			// Check if channel is a numeric version.
-			if version := extractNumericRustVersion(channel); version != "" {
-				return &Observation{
-					Language: "rust",
-					Tool:     "cargo",
-					Release:  &version,
-					Evidence: []EvidenceItem{
-						{Path: "rust-toolchain", Key: "channel", Value: version},
-					},
-				}, nil
+	for _, source := range toolchainSources {
+		if !fileExists(source.path) {
+			continue
+		}
+		content, err := os.ReadFile(source.path)
+		if err != nil {
+			continue
+		}
+		channel := source.channel(content)
+		if channel == "" {
+			continue
+		}
+		version, channelType := classifyRustToolchainChannel(channel)
+		switch channelType {
+		case rustChannelNumeric:
+			return rustObservation(source.name, "channel", version), nil
+		case rustChannelNonDeterministic:
+			return nil, rustChannelError(source.name, "non-deterministic", channel)
+		case rustChannelNonNumeric:
+			if source.reportNonNumeric {
+				return nil, rustChannelError(source.name, "non-numeric", channel)
 			}
 		}
 	}
@@ -127,6 +89,41 @@ func detectRust(ctx context.Context, workspace string) (*Observation, error) {
 	return nil, &DetectionError{
 		Reason:  "unknown",
 		Message: "no rust-version in Cargo.toml and no numeric channel in rust-toolchain",
+	}
+}
+
+type rustChannelType uint8
+
+const (
+	rustChannelNonNumeric rustChannelType = iota
+	rustChannelNumeric
+	rustChannelNonDeterministic
+)
+
+func classifyRustToolchainChannel(channel string) (string, rustChannelType) {
+	if isNonDeterministicChannel(channel) {
+		return "", rustChannelNonDeterministic
+	}
+	if version := extractNumericRustVersion(channel); version != "" {
+		return version, rustChannelNumeric
+	}
+	return "", rustChannelNonNumeric
+}
+
+func rustObservation(path, key, version string) *Observation {
+	return &Observation{
+		Language: "rust",
+		Tool:     "cargo",
+		Release:  &version,
+		Evidence: []EvidenceItem{{Path: path, Key: key, Value: version}},
+	}
+}
+
+func rustChannelError(path, classification, channel string) error {
+	return &DetectionError{
+		Reason:   "unknown",
+		Message:  path + " specifies " + classification + " channel: " + channel,
+		Evidence: []EvidenceItem{{Path: path, Key: "channel", Value: channel}},
 	}
 }
 

@@ -142,11 +142,8 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 
 	slog.Info("claimed job", "run_id", claim.RunID, "job_id", claim.JobID, "repo_url", claim.RepoURL)
 
-	// Map claim response to StartRunRequest.
-	// Parse spec into typed RunOptions and environment variables.
-	// The typed RunOptions is the canonical source of truth; no raw map[string]any
-	// is passed to StartRunRequest.
-	envFromSpec, typedOpts, err := parseSpec(claim.Spec)
+	// Map claim response to StartRunRequest using the validated canonical spec.
+	migSpec, err := parseSpec(claim.Spec)
 	if err != nil {
 		c.emitRunException(
 			claim.RunID,
@@ -162,7 +159,10 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 	}
 
 	// Validate and derive Stack Gate chaining for multi-step runs.
-	if err := validateAndDeriveStackGateChaining(typedOpts.Steps); err != nil {
+	if migSpec != nil {
+		err = validateAndDeriveStackGateChaining(migSpec.Steps)
+	}
+	if err != nil {
 		c.emitRunException(
 			claim.RunID,
 			jobIDPtr(claim.JobID),
@@ -189,8 +189,7 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 		JobName:       claim.JobName, // Job name for branch identification
 		MigContext:    claim.MigContext,
 		DetectedStack: claim.DetectedStack,
-		TypedOptions:  typedOpts, // Strongly-typed run options (canonical source of truth)
-		Env:           envFromSpec,
+		MigSpec:       migSpec,
 		ServerURL:     c.cfg.ServerURL,
 	}
 

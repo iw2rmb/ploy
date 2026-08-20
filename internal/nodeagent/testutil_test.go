@@ -546,8 +546,8 @@ func withRunEnv(env map[string]string) startRunOption {
 	return func(r *StartRunRequest) { r.Env = env }
 }
 
-func withRunOptions(opts RunOptions) startRunOption {
-	return func(r *StartRunRequest) { r.TypedOptions = opts }
+func withMigSpec(spec contracts.MigSpec) startRunOption {
+	return func(r *StartRunRequest) { r.MigSpec = &spec }
 }
 
 func withRunServerURL(serverURL string) startRunOption {
@@ -555,15 +555,14 @@ func withRunServerURL(serverURL string) startRunOption {
 }
 
 // newStartRunRequest returns a StartRunRequest with fixed IDs and sensible
-// defaults (RepoURL, BaseRef "main", empty TypedOptions). Uses fixed IDs that
+// defaults (RepoURL and BaseRef "main"). Uses fixed IDs that
 // satisfy manifest validation (lowercase alphanumeric, 3-64 chars).
 func newStartRunRequest(opts ...startRunOption) StartRunRequest {
 	r := StartRunRequest{
-		RunID:        types.RunID("run-test-001"),
-		JobID:        types.JobID("job-test-001"),
-		RepoURL:      types.RepoURL("https://github.com/example/repo.git"),
-		BaseRef:      types.GitRef("main"),
-		TypedOptions: RunOptions{},
+		RunID:   types.RunID("run-test-001"),
+		JobID:   types.JobID("job-test-001"),
+		RepoURL: types.RepoURL("https://github.com/example/repo.git"),
+		BaseRef: types.GitRef("main"),
 	}
 	for _, o := range opts {
 		o(&r)
@@ -577,12 +576,12 @@ func newStartRunRequest(opts ...startRunOption) StartRunRequest {
 
 // buildManifestDefault calls buildMigManifest with stepIndex=0 and MigStackUnknown.
 func buildManifestDefault(req StartRunRequest) (contracts.StepManifest, error) {
-	return buildMigManifest(req, req.TypedOptions, 0, contracts.MigStackUnknown)
+	return buildMigManifest(req, 0, contracts.MigStackUnknown)
 }
 
 // buildManifestAtStep calls buildMigManifest with the given stepIndex and MigStackUnknown.
 func buildManifestAtStep(req StartRunRequest, step int) (contracts.StepManifest, error) {
-	return buildMigManifest(req, req.TypedOptions, step, contracts.MigStackUnknown)
+	return buildMigManifest(req, step, contracts.MigStackUnknown)
 }
 
 // ---------------------------------------------------------------------------

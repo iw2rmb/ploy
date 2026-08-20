@@ -50,10 +50,35 @@ func injectNodeOwnedMigEnv(env map[string]string, req StartRunRequest) {
 
 // --- Main manifest builders ---
 
-// buildMigManifest converts a StartRunRequest into a StepManifest.
-// For multi-step runs, stepIndex selects the step; for single-step runs it is ignored.
-// The stack parameter resolves stack-specific images (pass MigStackUnknown if unknown).
-func buildMigManifest(req StartRunRequest, typedOpts RunOptions, stepIndex int, stack contracts.MigStack) (contracts.StepManifest, error) {
+// buildMigManifest selects one canonical migration step and assembles its manifest.
+func buildMigManifest(req StartRunRequest, stepIndex int, stack contracts.MigStack) (contracts.StepManifest, error) {
+	var migStep *contracts.MigStep
+	if req.MigSpec != nil {
+		if stepIndex < 0 || stepIndex >= len(req.MigSpec.Steps) {
+			return contracts.StepManifest{}, fmt.Errorf("step index %d out of range (0-%d)", stepIndex, len(req.MigSpec.Steps)-1)
+		}
+		migStep = &req.MigSpec.Steps[stepIndex]
+	}
+	return buildManifest(req, migStep, stack, nil, true)
+}
+
+// buildGateManifest assembles a gate manifest without using a migration
+// image or command.
+func buildGateManifest(req StartRunRequest, stackGate *contracts.StackGatePhaseSpec) (contracts.StepManifest, error) {
+	var migStep *contracts.MigStep
+	if req.MigSpec != nil && len(req.MigSpec.Steps) == 1 {
+		migStep = &req.MigSpec.Steps[0]
+	}
+	return buildManifest(req, migStep, contracts.MigStackUnknown, stackGate, false)
+}
+
+func buildManifest(
+	req StartRunRequest,
+	migStep *contracts.MigStep,
+	stack contracts.MigStack,
+	stackGate *contracts.StackGatePhaseSpec,
+	useMigrationCommand bool,
+) (contracts.StepManifest, error) {
 	if req.RunID.IsZero() {
 		return contracts.StepManifest{}, errors.New("run_id required")
 	}
@@ -67,60 +92,34 @@ func buildMigManifest(req StartRunRequest, typedOpts RunOptions, stepIndex int, 
 	const defaultImage = "ubuntu:latest"
 	image := defaultImage
 	command := []string(nil)
-	env := make(map[string]string, len(req.Env))
+	env := contracts.CopyEnv(req.Env)
+	if req.MigSpec != nil {
+		env = contracts.MergeEnv(env, req.MigSpec.Envs)
+	}
 	stackExp := stackExpectationForRequest(req, stack)
 
 	var hydraIn, hydraOut, hydraHome, hydraTmp []string
-	var stepOptions map[string]any
-	if len(typedOpts.Steps) > 0 {
-		// Multi-step run.
-		if stepIndex < 0 || stepIndex >= len(typedOpts.Steps) {
-			return contracts.StepManifest{}, fmt.Errorf("step index %d out of range (0-%d)", stepIndex, len(typedOpts.Steps)-1)
-		}
-		stepMig := typedOpts.Steps[stepIndex]
-
-		if !stepMig.Image.IsEmpty() {
-			resolved, err := resolveImage(stepMig.Image, stack, stackExp, fmt.Sprintf("step[%d]", stepIndex))
+	var stepOptions contracts.MigStepOptions
+	if migStep != nil {
+		if useMigrationCommand && !migStep.Image.IsEmpty() {
+			resolved, err := resolveImage(migStep.Image, stack, stackExp, "step")
 			if err != nil {
 				return contracts.StepManifest{}, err
 			}
 			image = resolved
 		}
-		command = stepMig.Command.ToSlice()
-		hydraIn = stepMig.In
-		hydraOut = stepMig.Out
-		hydraHome = stepMig.Home
-		hydraTmp = stepMig.Tmp
-		stepOptions = stepMig.Options
-
-		for k, v := range req.Env {
-			env[k] = v
+		if useMigrationCommand {
+			command = migStep.Command.ToSlice()
 		}
-		for k, v := range stepMig.Env {
-			env[k] = v
-		}
-	} else {
-		// Single-step run.
-		if !typedOpts.Execution.Image.IsEmpty() {
-			resolved, err := resolveImage(typedOpts.Execution.Image, stack, stackExp, "execution")
-			if err != nil {
-				return contracts.StepManifest{}, err
-			}
-			image = resolved
-		}
-		command = typedOpts.Execution.Command.ToSlice()
-		hydraIn = typedOpts.Execution.In
-		hydraOut = typedOpts.Execution.Out
-		hydraHome = typedOpts.Execution.Home
-		hydraTmp = typedOpts.Execution.Tmp
-		stepOptions = typedOpts.Execution.Options
-
-		for k, v := range req.Env {
-			env[k] = v
-		}
-		for k, v := range typedOpts.Execution.Env {
-			env[k] = v
-		}
+		hydraIn = migStep.In
+		hydraOut = migStep.Out
+		hydraHome = migStep.Home
+		hydraTmp = migStep.Tmp
+		stepOptions = migStep.Options
+		env = contracts.MergeEnv(env, migStep.Envs)
+	}
+	if env == nil {
+		env = make(map[string]string)
 	}
 
 	injectStackTupleEnv(env, stackExp)
@@ -138,13 +137,12 @@ func buildMigManifest(req StartRunRequest, typedOpts RunOptions, stepIndex int, 
 		Commit:  req.CommitSHA,
 	}
 
-	// Build manifest options from typed accessors.
 	mergedOpts := make(map[string]any)
-	for k, v := range stepOptions {
-		mergedOpts[k] = v
+	if stepOptions.MountDockerSocket {
+		mergedOpts["mount_docker_socket"] = true
 	}
-	if !typedOpts.ServerMetadata.JobID.IsZero() {
-		mergedOpts["job_id"] = typedOpts.ServerMetadata.JobID.String()
+	if req.MigSpec != nil && !req.MigSpec.JobID.IsZero() {
+		mergedOpts["job_id"] = req.MigSpec.JobID.String()
 	}
 
 	// Derive gate ref: CommitSHA > BaseRef.
@@ -174,14 +172,14 @@ func buildMigManifest(req StartRunRequest, typedOpts RunOptions, stepIndex int, 
 		Out:        hydraOut,
 		Home:       hydraHome,
 		Tmp:        hydraTmp,
-		BundleMap:  typedOpts.BundleMap,
+		BundleMap:  nil,
 		Gate: &contracts.StepGateSpec{
-			Enabled:        true,
-			Env:            gateEnv,
-			ImageOverrides: nil,
-			RepoID:         req.RepoID,
-			RepoURL:        types.RepoURL(strings.TrimSpace(req.RepoURL.String())),
-			Ref:            types.GitRef(strings.TrimSpace(gateRef)),
+			Enabled:   true,
+			Env:       gateEnv,
+			StackGate: stackGate,
+			RepoID:    req.RepoID,
+			RepoURL:   types.RepoURL(strings.TrimSpace(req.RepoURL.String())),
+			Ref:       types.GitRef(strings.TrimSpace(gateRef)),
 		},
 		Inputs: []contracts.StepInput{
 			{
@@ -196,28 +194,12 @@ func buildMigManifest(req StartRunRequest, typedOpts RunOptions, stepIndex int, 
 		Options: mergedOpts,
 	}
 
-	manifest.Gate.Enabled = !typedOpts.BuildGate.Disabled
-	manifest.Gate.ImageOverrides = typedOpts.BuildGate.Images
-
-	return manifest, nil
-}
-
-// buildGateManifest builds a StepManifest for gate jobs (pre_gate,
-// post_gate). Gate jobs use the default image since stack detection
-// happens inside the Build Gate itself.
-func buildGateManifest(req StartRunRequest, typedOpts RunOptions) (contracts.StepManifest, error) {
-	sanitized := typedOpts
-	sanitized.Steps = nil
-	sanitized.Execution.Image = contracts.JobImage{}
-	sanitized.Execution.Command = contracts.CommandSpec{}
-
-	manifest, err := buildMigManifest(req, sanitized, 0, contracts.MigStackUnknown)
-	if err != nil {
-		return manifest, err
-	}
-
-	if typedOpts.StackGate != nil {
-		manifest.Gate.StackGate = typedOpts.StackGate
+	if req.MigSpec != nil {
+		manifest.BundleMap = req.MigSpec.BundleMap
+		if req.MigSpec.BuildGate != nil {
+			manifest.Gate.Enabled = !req.MigSpec.BuildGate.Disabled
+			manifest.Gate.ImageOverrides = req.MigSpec.BuildGate.Images
+		}
 	}
 
 	return manifest, nil
@@ -228,7 +210,7 @@ func buildGateManifest(req StartRunRequest, typedOpts RunOptions) (contracts.Ste
 // validateAndDeriveStackGateChaining validates and derives Stack Gate chaining for multi-step runs.
 // For steps after the first, it derives inbound expectations from the previous step's outbound
 // when omitted, and rejects mismatched explicit inbound. Updates steps in place.
-func validateAndDeriveStackGateChaining(steps []StepOptions) error {
+func validateAndDeriveStackGateChaining(steps []contracts.MigStep) error {
 	if len(steps) <= 1 {
 		return nil
 	}

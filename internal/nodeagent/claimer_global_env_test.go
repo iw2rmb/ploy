@@ -3,7 +3,7 @@
 //
 // This test file covers the env propagation path:
 //
-//	spec JSON → parseSpec → StartRunRequest.Env → buildMigManifest → manifest.Env
+//	spec JSON → parseSpec → StartRunRequest.MigSpec → buildMigManifest → manifest.Env
 //
 // The tests ensure that:
 //   - Global env vars (e.g., APP_TLS_CERT, APP_AUTH_JSON, OPENAI_API_KEY)
@@ -88,7 +88,11 @@ func TestParseSpec_GlobalEnvFromServerClaim(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			env, _, _ := parseSpec(tc.spec)
+			spec, err := parseSpec(tc.spec)
+			if err != nil {
+				t.Fatalf("parseSpec() error: %v", err)
+			}
+			env := spec.Envs
 
 			// Verify all expected env vars are present with correct values.
 			for key, wantVal := range tc.wantEnv {
@@ -131,21 +135,23 @@ func TestGlobalEnvPropagation_SpecToManifest(t *testing.T) {
 	}`)
 
 	// Step 1: Parse the spec (simulates claimer_spec.go).
-	env, typedOpts, _ := parseSpec(specJSON)
+	migSpec, err := parseSpec(specJSON)
+	if err != nil {
+		t.Fatalf("parseSpec() error: %v", err)
+	}
 
 	// Step 2: Build StartRunRequest (simulates claimer.go/execution*.go).
 	req := StartRunRequest{
-		RunID:        types.RunID("run-e2e-env-test"),
-		JobID:        types.JobID(testKSUID),
-		RepoURL:      types.RepoURL("https://gitlab.com/test/repo.git"),
-		BaseRef:      types.GitRef("main"),
-		TypedOptions: typedOpts,
-		Env:          env, // Global env vars flow here.
+		RunID:   types.RunID("run-e2e-env-test"),
+		JobID:   types.JobID(testKSUID),
+		RepoURL: types.RepoURL("https://gitlab.com/test/repo.git"),
+		BaseRef: types.GitRef("main"),
+		MigSpec: migSpec,
 	}
 
 	// Step 3: Build manifest (simulates manifest.go).
 	// Pass MigStackUnknown explicitly to indicate tests operate without stack detection.
-	manifest, err := buildMigManifest(req, typedOpts, 0, contracts.MigStackUnknown)
+	manifest, err := buildMigManifest(req, 0, contracts.MigStackUnknown)
 	if err != nil {
 		t.Fatalf("buildMigManifest() error: %v", err)
 	}
@@ -179,7 +185,7 @@ func TestGlobalEnvPropagation_GateManifest(t *testing.T) {
 	t.Parallel()
 
 	// Spec with global env vars and stack-aware image map.
-	// Note: build_gate is specified as a nested object and is consumed via typed options.
+	// Build gate is specified as a nested canonical contract object.
 	specJSON := json.RawMessage(`{
 		"steps": [
 			{
@@ -197,19 +203,21 @@ func TestGlobalEnvPropagation_GateManifest(t *testing.T) {
 		}
 	}`)
 
-	env, typedOpts, _ := parseSpec(specJSON)
+	migSpec, err := parseSpec(specJSON)
+	if err != nil {
+		t.Fatalf("parseSpec() error: %v", err)
+	}
 
 	req := StartRunRequest{
-		RunID:        types.RunID("run-gate-env-test"),
-		JobID:        types.JobID("job-gate-env-test"),
-		RepoURL:      types.RepoURL("https://gitlab.com/test/repo.git"),
-		BaseRef:      types.GitRef("main"),
-		TypedOptions: typedOpts,
-		Env:          env,
+		RunID:   types.RunID("run-gate-env-test"),
+		JobID:   types.JobID("job-gate-env-test"),
+		RepoURL: types.RepoURL("https://gitlab.com/test/repo.git"),
+		BaseRef: types.GitRef("main"),
+		MigSpec: migSpec,
 	}
 
 	// Build gate manifest (should not fail on stack-aware image map).
-	gateManifest, err := buildGateManifest(req, typedOpts)
+	gateManifest, err := buildGateManifest(req, nil)
 	if err != nil {
 		t.Fatalf("buildGateManifest() error: %v", err)
 	}
@@ -261,8 +269,9 @@ func TestGlobalEnvPropagation_GateManifest(t *testing.T) {
 // correctly merged with step-specific env in multi-step runs (steps[] array).
 //
 // The merge semantics are:
-//  1. Base env (req.Env) provides global defaults.
-//  2. Step-specific env (steps[i].env) overrides on conflict.
+//  1. Request env provides base values.
+//  2. Spec globals override request values.
+//  3. Step values override spec globals.
 func TestGlobalEnvPropagation_MultiStepRun(t *testing.T) {
 	t.Parallel()
 
@@ -289,19 +298,25 @@ func TestGlobalEnvPropagation_MultiStepRun(t *testing.T) {
 		]
 	}`)
 
-	env, typedOpts, _ := parseSpec(specJSON)
+	migSpec, err := parseSpec(specJSON)
+	if err != nil {
+		t.Fatalf("parseSpec() error: %v", err)
+	}
 
 	req := StartRunRequest{
-		RunID:        types.RunID("run-multi-step-env"),
-		JobID:        types.JobID("job-multi-step-env"),
-		RepoURL:      types.RepoURL("https://gitlab.com/test/repo.git"),
-		TypedOptions: typedOpts,
-		Env:          env, // Global env from spec.
+		RunID:   types.RunID("run-multi-step-env"),
+		JobID:   types.JobID("job-multi-step-env"),
+		RepoURL: types.RepoURL("https://gitlab.com/test/repo.git"),
+		MigSpec: migSpec,
+		Env: map[string]string{
+			"BASE_ONLY":  "request_value",
+			"SHARED_VAR": "request_default",
+		},
 	}
 
 	// Build manifest for step 0 (should have step override).
 	// Pass MigStackUnknown explicitly to indicate tests operate without stack detection.
-	manifest0, err := buildMigManifest(req, typedOpts, 0, contracts.MigStackUnknown)
+	manifest0, err := buildMigManifest(req, 0, contracts.MigStackUnknown)
 	if err != nil {
 		t.Fatalf("buildMigManifest(step=0) error: %v", err)
 	}
@@ -319,10 +334,13 @@ func TestGlobalEnvPropagation_MultiStepRun(t *testing.T) {
 	if manifest0.Envs["APP_TLS_CERT"] != "global-cert-bundle" {
 		t.Errorf("step0: APP_TLS_CERT=%q, want global-cert-bundle", manifest0.Envs["APP_TLS_CERT"])
 	}
+	if manifest0.Envs["BASE_ONLY"] != "request_value" {
+		t.Errorf("step0: BASE_ONLY=%q, want request_value", manifest0.Envs["BASE_ONLY"])
+	}
 
 	// Build manifest for step 1 (should not have step0 override).
 	// Pass MigStackUnknown explicitly to indicate tests operate without stack detection.
-	manifest1, err := buildMigManifest(req, typedOpts, 1, contracts.MigStackUnknown)
+	manifest1, err := buildMigManifest(req, 1, contracts.MigStackUnknown)
 	if err != nil {
 		t.Fatalf("buildMigManifest(step=1) error: %v", err)
 	}
@@ -360,18 +378,20 @@ func TestGlobalEnvPropagation_NoFiltering(t *testing.T) {
 		}
 	}`)
 
-	env, typedOpts, _ := parseSpec(specJSON)
+	migSpec, err := parseSpec(specJSON)
+	if err != nil {
+		t.Fatalf("parseSpec() error: %v", err)
+	}
 
 	req := StartRunRequest{
-		RunID:        types.RunID("run-no-filter-test"),
-		JobID:        types.JobID("job-no-filter-test"),
-		RepoURL:      types.RepoURL("https://gitlab.com/test/repo.git"),
-		TypedOptions: typedOpts,
-		Env:          env,
+		RunID:   types.RunID("run-no-filter-test"),
+		JobID:   types.JobID("job-no-filter-test"),
+		RepoURL: types.RepoURL("https://gitlab.com/test/repo.git"),
+		MigSpec: migSpec,
 	}
 
 	// Pass MigStackUnknown explicitly to indicate tests operate without stack detection.
-	manifest, err := buildMigManifest(req, typedOpts, 0, contracts.MigStackUnknown)
+	manifest, err := buildMigManifest(req, 0, contracts.MigStackUnknown)
 	if err != nil {
 		t.Fatalf("buildMigManifest() error: %v", err)
 	}
@@ -415,14 +435,14 @@ func TestGlobalEnvPropagation_DetectedStackTupleInjected(t *testing.T) {
 			Tool:     "gradle",
 			Release:  "17",
 		},
-		TypedOptions: RunOptions{
-			Execution: ContainerSpec{
+		MigSpec: &contracts.MigSpec{
+			Steps: []contracts.MigStep{{
 				Image: contracts.JobImage{Universal: "docker.io/test/mig:latest"},
-			},
+			}},
 		},
 	}
 
-	manifest, err := buildMigManifest(req, req.TypedOptions, 0, contracts.MigStackUnknown)
+	manifest, err := buildMigManifest(req, 0, contracts.MigStackUnknown)
 	if err != nil {
 		t.Fatalf("buildMigManifest() error: %v", err)
 	}

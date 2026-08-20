@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"github.com/iw2rmb/ploy/internal/workflow/step"
 )
 
@@ -193,9 +194,7 @@ func TestShouldUploadRepoArtifactsAfterMigJob(t *testing.T) {
 		{
 			name: "terminal mig with disabled build gate uploads",
 			req: StartRunRequest{
-				TypedOptions: RunOptions{BuildGate: BuildGateOptions{
-					Disabled: true,
-				}},
+				MigSpec: &contracts.MigSpec{BuildGate: &contracts.BuildGateConfig{Disabled: true}},
 			},
 			outcome: migJobOutcome{result: step.Result{ExitCode: 0}},
 			want:    true,
@@ -203,10 +202,8 @@ func TestShouldUploadRepoArtifactsAfterMigJob(t *testing.T) {
 		{
 			name: "non-terminal mig with disabled build gate waits for successor",
 			req: StartRunRequest{
-				NextID: &nextID,
-				TypedOptions: RunOptions{BuildGate: BuildGateOptions{
-					Disabled: true,
-				}},
+				NextID:  &nextID,
+				MigSpec: &contracts.MigSpec{BuildGate: &contracts.BuildGateConfig{Disabled: true}},
 			},
 			outcome: migJobOutcome{result: step.Result{ExitCode: 0}},
 			want:    false,

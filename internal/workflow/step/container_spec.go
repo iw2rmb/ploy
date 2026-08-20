@@ -175,32 +175,32 @@ func buildContainerSpec(runID types.RunID, jobID types.JobID, manifest contracts
 	}, nil
 }
 
-// SeedOutDirFromStaging copies materialized Hydra out entry content from the
-// staging directory into outDir so that the single /out mount covers both
-// pre-seeded content and container writes.
-func SeedOutDirFromStaging(manifest contracts.StepManifest, stagingDir, outDir string) error {
-	return seedDirFromStaging(contracts.HydraFileOut, manifest.Out, stagingDir, outDir)
+func seedDirsFromStaging(manifest contracts.StepManifest, mounts JobMounts) error {
+	for _, kind := range contracts.HydraFileKinds() {
+		targetDir, err := hydraSeedTarget(kind, mounts)
+		if err != nil {
+			return err
+		}
+		if err := seedDirFromStaging(kind, kind.Entries(manifest), mounts.Staging, targetDir); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
-// SeedInDirFromStaging copies materialized Hydra in entry content from the
-// staging directory into inDir before the container receives the directory as
-// one read-only /in mount.
-func SeedInDirFromStaging(manifest contracts.StepManifest, stagingDir, inDir string) error {
-	return seedDirFromStaging(contracts.HydraFileIn, manifest.In, stagingDir, inDir)
-}
-
-// SeedTmpDirFromStaging copies materialized Hydra tmp entry content from the
-// staging directory into tmpDir so that the single /tmp mount exposes all tmp
-// files while keeping them outside durable repo artifacts.
-func SeedTmpDirFromStaging(manifest contracts.StepManifest, stagingDir, tmpDir string) error {
-	return seedDirFromStaging(contracts.HydraFileTmp, manifest.Tmp, stagingDir, tmpDir)
-}
-
-// SeedHomeDirFromStaging copies writable Hydra home entries into the job-owned
-// home. Read-only entries remain bind mounts so the container cannot mutate
-// their materialized sources.
-func SeedHomeDirFromStaging(manifest contracts.StepManifest, stagingDir, homeDir string) error {
-	return seedDirFromStaging(contracts.HydraFileHome, manifest.Home, stagingDir, homeDir)
+func hydraSeedTarget(kind contracts.HydraFileKind, mounts JobMounts) (string, error) {
+	switch kind {
+	case contracts.HydraFileIn:
+		return mounts.In, nil
+	case contracts.HydraFileOut:
+		return mounts.Out, nil
+	case contracts.HydraFileHome:
+		return mounts.Home, nil
+	case contracts.HydraFileTmp:
+		return mounts.Tmp, nil
+	default:
+		return "", fmt.Errorf("unsupported Hydra file kind %q", kind)
+	}
 }
 
 func seedDirFromStaging(kind contracts.HydraFileKind, entries []string, stagingDir, targetDir string) error {

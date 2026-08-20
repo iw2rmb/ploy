@@ -17,17 +17,6 @@ const maxRequestBodySize = 10 << 20 // 10 MiB
 
 // StartRunRequest describes a run start request from the server.
 //
-// TypedOptions contains all run configuration options in strongly-typed form.
-// This is the canonical source of truth for all option keys understood by the
-// nodeagent. Callers must use TypedOptions fields instead of raw map[string]any
-// access. The typed options include:
-//
-//   - BuildGate: enabled flag and image overrides for gate validation.
-//   - Execution: container image, command, and retention settings.
-//   - Artifacts: artifact name and workspace-relative paths to upload.
-//   - ServerMetadata: server-injected job ID for upload correlation.
-//   - Steps: multi-step migs array for sequential execution.
-//
 // JobType field:
 //   - Identifies the job type: "pre_gate", "mig", "post_gate".
 //   - Used by orchestrator to dispatch to appropriate execution handler.
@@ -46,13 +35,11 @@ type StartRunRequest struct {
 	MigContext *contracts.MigClaimContext `json:"mig_context,omitempty"`
 	// DetectedStack carries the canonical gate-detected stack tuple for this job.
 	DetectedStack *contracts.StackExpectation `json:"detected_stack,omitempty"`
-	// TypedOptions contains strongly-typed run configuration. This is the canonical
-	// source of truth for all option keys understood by the nodeagent. Execution,
-	// manifest building, and artifact upload paths all consume TypedOptions
-	// directly rather than parsing raw maps.
-	TypedOptions RunOptions        `json:"-"`   // Not serialized; populated by claimer_loop from parsed spec
-	Env          map[string]string `json:"env"` // Environment variables merged from spec
-	ServerURL    string            `json:"server_url,omitempty"`
+	// MigSpec is the validated canonical workflow specification. It is populated
+	// from the claimed spec and is not part of the node start wire contract.
+	MigSpec   *contracts.MigSpec `json:"-"`
+	Env       map[string]string  `json:"env"`
+	ServerURL string             `json:"server_url,omitempty"`
 }
 
 // RunControlResponse is returned after a run start or stop request.

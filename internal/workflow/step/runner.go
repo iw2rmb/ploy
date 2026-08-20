@@ -52,20 +52,8 @@ type StageTiming struct {
 func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 	var result Result
 
-	// Seed the job output before execution so its single mount contains both
-	// Hydra content and container writes.
-	if err := SeedOutDirFromStaging(req.Manifest, req.JobMounts.Staging, req.JobMounts.Out); err != nil {
-		return Result{}, fmt.Errorf("seed out dir from staging: %w", err)
-	}
-	// Seed the job input before execution to avoid nested /in bind mounts.
-	if err := SeedInDirFromStaging(req.Manifest, req.JobMounts.Staging, req.JobMounts.In); err != nil {
-		return Result{}, fmt.Errorf("seed in dir from staging: %w", err)
-	}
-	if err := SeedTmpDirFromStaging(req.Manifest, req.JobMounts.Staging, req.JobMounts.Tmp); err != nil {
-		return Result{}, fmt.Errorf("seed tmp dir from staging: %w", err)
-	}
-	if err := SeedHomeDirFromStaging(req.Manifest, req.JobMounts.Staging, req.JobMounts.Home); err != nil {
-		return Result{}, fmt.Errorf("seed home dir from staging: %w", err)
+	if err := seedDirsFromStaging(req.Manifest, req.JobMounts); err != nil {
+		return Result{}, fmt.Errorf("seed Hydra dirs from staging: %w", err)
 	}
 
 	// Execute the container via the configured runtime.

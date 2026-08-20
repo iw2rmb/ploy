@@ -550,35 +550,10 @@ func TestHydraResources_MixedMaterializationAndMountPlanning(t *testing.T) {
 		t.Errorf("expected 4 unique hashes, got %d: %v", len(hashes), hashes)
 	}
 
-	// 5. Execute out mount planning via SeedOutDirFromStaging and verify
-	//    seeded content at the correct destination-relative path.
-	outDir := t.TempDir()
-	if err := step.SeedOutDirFromStaging(manifest, stagingDir, outDir); err != nil {
-		t.Fatalf("SeedOutDirFromStaging: %v", err)
-	}
-	seededOut, err := os.ReadFile(filepath.Join(outDir, "results", "seed.md"))
-	if err != nil {
-		t.Fatalf("seeded out content missing: %v", err)
-	}
-	if string(seededOut) != "seed content" {
-		t.Errorf("seeded out = %q, want %q", seededOut, "seed content")
-	}
-
-	// 6. Execute tmp seeding and verify seeded content at the correct path
-	//    under the per-job tmp directory.
+	// The runner seeds all Hydra kinds in one pass below.
 	tmpDir := t.TempDir()
-	if err := step.SeedTmpDirFromStaging(manifest, stagingDir, tmpDir); err != nil {
-		t.Fatalf("SeedTmpDirFromStaging: %v", err)
-	}
-	seededTmp, err := os.ReadFile(filepath.Join(tmpDir, "ploy", "tool.jar"))
-	if err != nil {
-		t.Fatalf("seeded tmp content missing: %v", err)
-	}
-	if string(seededTmp) != "tmp tool" {
-		t.Errorf("seeded tmp = %q, want %q", seededTmp, "tmp tool")
-	}
 
-	// 6. Assert mount source layout for in/home matches buildContainerSpec
+	// Assert mount source layout for read-only home entries.
 	//    expectations: each mount source is stagingDir/<hash>/content.
 	type wantMount struct {
 		hash     string
@@ -596,7 +571,7 @@ func TestHydraResources_MixedMaterializationAndMountPlanning(t *testing.T) {
 		}
 	}
 
-	// 7. Build a full manifest and run through Runner with spy runtime to
+	// Build a full manifest and run through Runner with spy runtime to
 	//    verify mount planning produces correct targets and modes.
 	spy := &spyContainerRuntime{}
 	fullManifest := contracts.StepManifest{
@@ -643,7 +618,7 @@ func TestHydraResources_MixedMaterializationAndMountPlanning(t *testing.T) {
 		t.Fatalf("Runner.Run: %v", runErr)
 	}
 
-	// Verify that SeedOutDirFromStaging was executed during Run.
+	// Verify that the consolidated seeding pass was executed during Run.
 	seeded2, err := os.ReadFile(filepath.Join(outDir2, "results", "seed.md"))
 	if err != nil {
 		t.Fatalf("Runner seeded out content missing: %v", err)
@@ -664,6 +639,13 @@ func TestHydraResources_MixedMaterializationAndMountPlanning(t *testing.T) {
 	}
 	if string(seededHome) != `{"auth":"token"}` {
 		t.Errorf("Runner seeded home = %q, want auth payload", seededHome)
+	}
+	seededTmp, err := os.ReadFile(filepath.Join(tmpDir, "ploy", "tool.jar"))
+	if err != nil {
+		t.Fatalf("Runner seeded tmp content missing: %v", err)
+	}
+	if string(seededTmp) != "tmp tool" {
+		t.Errorf("Runner seeded tmp = %q, want tmp tool", seededTmp)
 	}
 	for _, mount := range spy.capturedSpec.Mounts {
 		if mount.Target == "/root/.codex/auth.json" {

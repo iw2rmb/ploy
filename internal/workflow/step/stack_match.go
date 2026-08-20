@@ -25,7 +25,7 @@ func observationToStackExpectation(obs *stackdetect.Observation) *contracts.Stac
 	if obs.Release != nil {
 		exp.Release = *obs.Release
 	}
-	return exp
+	return contracts.NormalizeStackExpectation(exp)
 }
 
 // matchStack compares a detected observation against expected values.

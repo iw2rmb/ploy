@@ -21,7 +21,7 @@ type gateExecutionPlan struct {
 }
 
 type gateStackContext struct {
-	expectation contracts.StackExpectation
+	expectation *contracts.StackExpectation
 	language    string
 	tool        string
 	release     string
@@ -53,7 +53,7 @@ func resolveGateExecutionPlan(
 		return gateExecutionPlan{}, terminal
 	}
 
-	image, err := resolveImageForExpectation(mappingPath, spec.ImageOverrides, stackCtx.expectation, true)
+	image, err := resolveImageForExpectation(mappingPath, spec.ImageOverrides, *stackCtx.expectation, true)
 	if err != nil {
 		return gateExecutionPlan{}, imageResolutionTerminal(stackCtx, err)
 	}

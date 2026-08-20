@@ -111,12 +111,12 @@ func TestBuildManifestFromRequest(t *testing.T) {
 		}{
 			{
 				name:    "missing run_id",
-				req:     StartRunRequest{RepoURL: "https://github.com/example/repo.git", TypedOptions: RunOptions{}},
+				req:     StartRunRequest{RepoURL: "https://github.com/example/repo.git"},
 				wantErr: "run_id required",
 			},
 			{
 				name:    "missing repo_url",
-				req:     StartRunRequest{RunID: "run-123", JobID: "job-123", TypedOptions: RunOptions{}},
+				req:     StartRunRequest{RunID: "run-123", JobID: "job-123"},
 				wantErr: "repo_url required",
 			},
 		}
@@ -156,9 +156,9 @@ func TestBuildManifestFromRequest(t *testing.T) {
 	})
 
 	t.Run("command option string maps to shell", func(t *testing.T) {
-		req := newStartRunRequest(withRunOptions(RunOptions{
-			Execution: ContainerSpec{Command: contracts.CommandSpec{Shell: "echo hi"}},
-		}))
+		req := newStartRunRequest(withMigSpec(contracts.MigSpec{Steps: []contracts.MigStep{{
+			Image: contracts.JobImage{Universal: "ubuntu:latest"}, Command: contracts.CommandSpec{Shell: "echo hi"},
+		}}}))
 		manifest, err := buildManifestDefault(req)
 		if err != nil {
 			t.Fatalf("buildManifestDefault() error: %v", err)
@@ -169,9 +169,9 @@ func TestBuildManifestFromRequest(t *testing.T) {
 	})
 
 	t.Run("no command injected when custom image provided", func(t *testing.T) {
-		req := newStartRunRequest(withRunOptions(RunOptions{
-			Execution: ContainerSpec{Image: contracts.JobImage{Universal: "docker.io/example/migs-openrewrite:latest"}},
-		}))
+		req := newStartRunRequest(withMigSpec(contracts.MigSpec{Steps: []contracts.MigStep{{
+			Image: contracts.JobImage{Universal: "docker.io/example/migs-openrewrite:latest"},
+		}}}))
 		manifest, err := buildManifestDefault(req)
 		if err != nil {
 			t.Fatalf("buildManifestDefault() error: %v", err)
@@ -188,20 +188,18 @@ func TestBuildManifestFromRequest(t *testing.T) {
 		t.Setenv("PLOY_CONTAINER_REGISTRY", "registry.example/ploy")
 		t.Setenv("MIG_TAG", "v2")
 
-		req := newStartRunRequest(withRunOptions(RunOptions{
-			Execution: ContainerSpec{
-				Image: contracts.JobImage{
-					Universal: "${PLOY_CONTAINER_REGISTRY}/my-image-${stack.language}-${stack.release}-${stack.tool}:${MIG_TAG}",
-				},
+		req := newStartRunRequest(withMigSpec(contracts.MigSpec{Steps: []contracts.MigStep{{
+			Image: contracts.JobImage{
+				Universal: "${PLOY_CONTAINER_REGISTRY}/my-image-${stack.language}-${stack.release}-${stack.tool}:${MIG_TAG}",
 			},
-		}))
+		}}}))
 		req.DetectedStack = &contracts.StackExpectation{
 			Language: "java",
 			Release:  "17",
 			Tool:     "maven",
 		}
 
-		manifest, err := buildMigManifest(req, req.TypedOptions, 0, contracts.MigStackJavaMaven)
+		manifest, err := buildMigManifest(req, 0, contracts.MigStackJavaMaven)
 		if err != nil {
 			t.Fatalf("buildMigManifest() error: %v", err)
 		}
@@ -211,23 +209,21 @@ func TestBuildManifestFromRequest(t *testing.T) {
 	})
 
 	t.Run("single-step image template fails when stack value is unavailable", func(t *testing.T) {
-		req := newStartRunRequest(withRunOptions(RunOptions{
-			Execution: ContainerSpec{
-				Image: contracts.JobImage{
-					Universal: "ghcr.io/acme/my-image-${stack.language}-${stack.release}-${stack.tool}:latest",
-				},
+		req := newStartRunRequest(withMigSpec(contracts.MigSpec{Steps: []contracts.MigStep{{
+			Image: contracts.JobImage{
+				Universal: "ghcr.io/acme/my-image-${stack.language}-${stack.release}-${stack.tool}:latest",
 			},
-		}))
+		}}}))
 		req.DetectedStack = &contracts.StackExpectation{
 			Language: "java",
 			Tool:     "maven",
 		}
 
-		_, err := buildMigManifest(req, req.TypedOptions, 0, contracts.MigStackJavaMaven)
+		_, err := buildMigManifest(req, 0, contracts.MigStackJavaMaven)
 		if err == nil {
 			t.Fatal("expected error for missing stack.release placeholder")
 		}
-		if !strings.Contains(err.Error(), "execution image template expansion: unresolved stack placeholders: stack.release") {
+		if !strings.Contains(err.Error(), "step image template expansion: unresolved stack placeholders: stack.release") {
 			t.Fatalf("error=%q, want unresolved stack.release", err.Error())
 		}
 	})
@@ -246,19 +242,19 @@ func TestBuildManifestFromRequest(t *testing.T) {
 	t.Run("multi-step run builds manifest for each step from steps array", func(t *testing.T) {
 		req := newStartRunRequest(
 			withRunEnv(map[string]string{"BASE_VAR": "base_value"}),
-			withRunOptions(RunOptions{
-				Steps: []StepOptions{
-					{ContainerSpec: ContainerSpec{
+			withMigSpec(contracts.MigSpec{
+				Steps: []contracts.MigStep{
+					{
 						Image:   contracts.JobImage{Universal: "migs-orw:latest"},
 						Command: contracts.CommandSpec{Exec: []string{"--apply", "--dir", "/workspace"}},
-						Env:     map[string]string{"STEP_VAR": "step0"},
-						Options: map[string]any{"mount_docker_socket": true},
-					}},
-					{ContainerSpec: ContainerSpec{
+						Envs:    map[string]string{"STEP_VAR": "step0"},
+						Options: contracts.MigStepOptions{MountDockerSocket: true},
+					},
+					{
 						Image:   contracts.JobImage{Universal: "migs-fmt:latest"},
 						Command: contracts.CommandSpec{Shell: "fmt --check"},
-						Env:     map[string]string{"STEP_VAR": "step1"},
-					}},
+						Envs:    map[string]string{"STEP_VAR": "step1"},
+					},
 				},
 			}),
 		)
@@ -309,11 +305,11 @@ func TestBuildManifestFromRequest(t *testing.T) {
 	t.Run("multi-step run: step env overrides base env", func(t *testing.T) {
 		req := newStartRunRequest(
 			withRunEnv(map[string]string{"SHARED_VAR": "base", "UNIQUE_BASE": "base"}),
-			withRunOptions(RunOptions{
-				Steps: []StepOptions{{ContainerSpec: ContainerSpec{
+			withMigSpec(contracts.MigSpec{
+				Steps: []contracts.MigStep{{
 					Image: contracts.JobImage{Universal: "migs-step:latest"},
-					Env:   map[string]string{"SHARED_VAR": "step_override"},
-				}}},
+					Envs:  map[string]string{"SHARED_VAR": "step_override"},
+				}},
 			}),
 		)
 		manifest, err := buildManifestAtStep(req, 0)
@@ -331,12 +327,12 @@ func TestBuildManifestFromRequest(t *testing.T) {
 	t.Run("single-step run: step env and options are forwarded from typed options", func(t *testing.T) {
 		req := newStartRunRequest(
 			withRunEnv(map[string]string{"DOCKER_HOST": "tcp://remote:2375", "BASE_VAR": "base"}),
-			withRunOptions(RunOptions{
-				Execution: ContainerSpec{
+			withMigSpec(contracts.MigSpec{
+				Steps: []contracts.MigStep{{
 					Image:   contracts.JobImage{Universal: "migs-step:latest"},
-					Env:     map[string]string{"DOCKER_HOST": "unix:///var/run/docker.sock", "STEP_VAR": "step"},
-					Options: map[string]any{"mount_docker_socket": true},
-				},
+					Envs:    map[string]string{"DOCKER_HOST": "unix:///var/run/docker.sock", "STEP_VAR": "step"},
+					Options: contracts.MigStepOptions{MountDockerSocket: true},
+				}},
 			}),
 		)
 		manifest, err := buildManifestDefault(req)
@@ -378,20 +374,20 @@ func TestBuildManifestFromRequest(t *testing.T) {
 		req := newStartRunRequest(
 			withRunServerURL("https://ploy.example"),
 			withRunEnv(map[string]string{"PLOY_SERVER_URL": "https://base.example"}),
-			withRunOptions(RunOptions{
-				Steps: []StepOptions{
-					{ContainerSpec: ContainerSpec{
+			withMigSpec(contracts.MigSpec{
+				Steps: []contracts.MigStep{
+					{
 						Image: contracts.JobImage{Universal: "migs-step0:latest"},
-						Env:   map[string]string{"PLOY_SERVER_URL": "https://step0.example"},
-					}},
-					{ContainerSpec: ContainerSpec{
+						Envs:  map[string]string{"PLOY_SERVER_URL": "https://step0.example"},
+					},
+					{
 						Image: contracts.JobImage{Universal: "migs-step1:latest"},
-						Env:   map[string]string{"PLOY_SERVER_URL": "https://step1.example"},
-					}},
+						Envs:  map[string]string{"PLOY_SERVER_URL": "https://step1.example"},
+					},
 				},
 			}),
 		)
-		for step := range req.TypedOptions.Steps {
+		for step := range req.MigSpec.Steps {
 			manifest, err := buildManifestAtStep(req, step)
 			if err != nil {
 				t.Fatalf("buildManifestAtStep(%d) error: %v", step, err)
@@ -410,26 +406,26 @@ func TestBuildManifestFromRequest(t *testing.T) {
 				"PLOY_REPO_URL": "https://user.example/base.git",
 				"PLOY_REPO_REF": "user-base",
 			}),
-			withRunOptions(RunOptions{
-				Steps: []StepOptions{
-					{ContainerSpec: ContainerSpec{
+			withMigSpec(contracts.MigSpec{
+				Steps: []contracts.MigStep{
+					{
 						Image: contracts.JobImage{Universal: "migs-step0:latest"},
-						Env: map[string]string{
+						Envs: map[string]string{
 							"PLOY_REPO_URL": "https://user.example/step0.git",
 							"PLOY_REPO_REF": "user-step0",
 						},
-					}},
-					{ContainerSpec: ContainerSpec{
+					},
+					{
 						Image: contracts.JobImage{Universal: "migs-step1:latest"},
-						Env: map[string]string{
+						Envs: map[string]string{
 							"PLOY_REPO_URL": "https://user.example/step1.git",
 							"PLOY_REPO_REF": "user-step1",
 						},
-					}},
+					},
 				},
 			}),
 		)
-		for step := range req.TypedOptions.Steps {
+		for step := range req.MigSpec.Steps {
 			manifest, err := buildManifestAtStep(req, step)
 			if err != nil {
 				t.Fatalf("buildManifestAtStep(%d) error: %v", step, err)
@@ -444,8 +440,8 @@ func TestBuildManifestFromRequest(t *testing.T) {
 	})
 
 	t.Run("multi-step run: step index out of range returns error", func(t *testing.T) {
-		req := newStartRunRequest(withRunOptions(RunOptions{
-			Steps: []StepOptions{{ContainerSpec: ContainerSpec{Image: contracts.JobImage{Universal: "migs-step:latest"}}}},
+		req := newStartRunRequest(withMigSpec(contracts.MigSpec{
+			Steps: []contracts.MigStep{{Image: contracts.JobImage{Universal: "migs-step:latest"}}},
 		}))
 		_, err := buildManifestAtStep(req, 1)
 		if err == nil {
@@ -456,23 +452,18 @@ func TestBuildManifestFromRequest(t *testing.T) {
 		}
 	})
 
-	t.Run("single-step run: stepIndex is ignored when Steps is empty", func(t *testing.T) {
-		req := newStartRunRequest(withRunOptions(RunOptions{
-			Execution: ContainerSpec{
+	t.Run("single-step run rejects an out-of-range step index", func(t *testing.T) {
+		req := newStartRunRequest(withMigSpec(contracts.MigSpec{
+			Steps: []contracts.MigStep{{
 				Image:   contracts.JobImage{Universal: "single-mig:latest"},
 				Command: contracts.CommandSpec{Shell: "run-single"},
-			},
+			}},
 		}))
 		manifest, err := buildManifestAtStep(req, 42) // arbitrary stepIndex
-		if err != nil {
-			t.Fatalf("buildManifestAtStep() error: %v", err)
+		if err == nil || !strings.Contains(err.Error(), "out of range") {
+			t.Fatalf("buildManifestAtStep() error = %v, want out of range", err)
 		}
-		if manifest.Image != "single-mig:latest" {
-			t.Errorf("expected image single-mig:latest, got %q", manifest.Image)
-		}
-		if want := []string{"/bin/sh", "-c", "run-single"}; !slices.Equal(manifest.Command, want) {
-			t.Fatalf("command = %v, want %v", manifest.Command, want)
-		}
+		_ = manifest
 	})
 }
 
@@ -538,12 +529,15 @@ func TestManifestBuildWithGateRepoMeta(t *testing.T) {
 		t.Parallel()
 		req := newStartRunRequest(
 			withRunURL("https://gitlab.com/iw2rmb/ploy-orw.git"),
-			withRunOptions(RunOptions{BuildGate: BuildGateOptions{
-				Images: []contracts.BuildGateImageRule{{
-					Stack: contracts.StackExpectation{Language: "java", Tool: "maven", Release: "17"},
-					Image: "maven:jdk17",
-				}},
-			}}),
+			withMigSpec(contracts.MigSpec{
+				Steps: []contracts.MigStep{{Image: contracts.JobImage{Universal: "ubuntu:latest"}}},
+				BuildGate: &contracts.BuildGateConfig{
+					Images: []contracts.BuildGateImageRule{{
+						Stack: contracts.StackExpectation{Language: "java", Tool: "maven", Release: "17"},
+						Image: "maven:jdk17",
+					}},
+				},
+			}),
 		)
 		manifest, err := buildManifestDefault(req)
 		if err != nil {
@@ -562,26 +556,62 @@ func TestManifestBuildWithGateRepoMeta(t *testing.T) {
 			t.Errorf("Gate.RepoURL=%q, want %q", manifest.Gate.RepoURL, req.RepoURL.String())
 		}
 	})
+
+	t.Run("build gate disable and bundle map come from canonical spec", func(t *testing.T) {
+		t.Parallel()
+		req := newStartRunRequest(withMigSpec(contracts.MigSpec{
+			Steps:     []contracts.MigStep{{Image: contracts.JobImage{Universal: "ubuntu:latest"}}},
+			BuildGate: &contracts.BuildGateConfig{Disabled: true},
+			BundleMap: map[string]string{"abc1234": "bundle-1"},
+		}))
+		manifest, err := buildManifestDefault(req)
+		if err != nil {
+			t.Fatalf("buildManifestDefault() error: %v", err)
+		}
+		if manifest.Gate.Enabled {
+			t.Fatal("Gate.Enabled = true, want false")
+		}
+		if got := manifest.BundleMap["abc1234"]; got != "bundle-1" {
+			t.Fatalf("BundleMap[abc1234] = %q, want bundle-1", got)
+		}
+	})
 }
 
 func TestBuildGateManifestFromRequest_IgnoresStackAwareJobImages(t *testing.T) {
 	t.Parallel()
 
-	req := newStartRunRequest(withRunOptions(RunOptions{
-		Steps: []StepOptions{{ContainerSpec: ContainerSpec{
+	req := newStartRunRequest(withRunEnv(map[string]string{"SCOPE": "base", "BASE": "yes"}), withMigSpec(contracts.MigSpec{
+		Envs: map[string]string{"SCOPE": "global", "GLOBAL": "yes"},
+		Steps: []contracts.MigStep{{
 			Image: contracts.JobImage{ByStack: map[contracts.MigStack]string{
 				contracts.MigStackJavaMaven:  "docker.io/example/orw-cli:latest",
 				contracts.MigStackJavaGradle: "docker.io/example/orw-cli:latest",
 			}},
-		}}},
+			Command: contracts.CommandSpec{Shell: "must-not-run"},
+			Envs:    map[string]string{"SCOPE": "step"},
+			In:      []string{"abc1234:/in/private"},
+			Options: contracts.MigStepOptions{MountDockerSocket: true},
+		}},
 	}))
 
-	manifest, err := buildGateManifest(req, req.TypedOptions)
+	manifest, err := buildGateManifest(req, nil)
 	if err != nil {
 		t.Fatalf("buildGateManifest() error: %v", err)
 	}
 	if manifest.Image != "ubuntu:latest" {
 		t.Errorf("gate manifest image=%q, want ubuntu:latest", manifest.Image)
+	}
+	if want := []string{"/bin/sh", "-c", "echo 'Build gate placeholder'"}; !slices.Equal(manifest.Command, want) {
+		t.Fatalf("gate manifest command = %v, want %v", manifest.Command, want)
+	}
+	if !slices.Equal(manifest.In, []string{"abc1234:/in/private"}) {
+		t.Fatalf("gate manifest in = %v, want canonical single-step resources", manifest.In)
+	}
+	if got, ok := manifest.OptionBool("mount_docker_socket"); !ok || !got {
+		t.Fatal("gate manifest lost canonical single-step mount_docker_socket")
+	}
+	if got := manifest.Envs["SCOPE"]; got != "step" {
+		t.Fatalf("gate manifest SCOPE = %q, want step", got)
 	}
 	if manifest.Gate == nil {
 		t.Fatal("expected Gate spec to be set")

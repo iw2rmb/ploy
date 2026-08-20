@@ -237,10 +237,10 @@ func TestBuildContainerSpec_HydraMixedMountPlan(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// SeedOutDirFromStaging
+// Consolidated Hydra seeding
 // ---------------------------------------------------------------------------
 
-func TestSeedOutDirFromStaging(t *testing.T) {
+func TestSeedDirsFromStagingOut(t *testing.T) {
 	tests := []struct {
 		name     string
 		hash     string
@@ -281,8 +281,8 @@ func TestSeedOutDirFromStaging(t *testing.T) {
 			}
 
 			manifest := contracts.StepManifest{Out: []string{tt.hash + ":" + tt.outEntry}}
-			if err := SeedOutDirFromStaging(manifest, stagingDir, outDir); err != nil {
-				t.Fatalf("SeedOutDirFromStaging error: %v", err)
+			if err := seedDirsFromStaging(manifest, JobMounts{Staging: stagingDir, Out: outDir}); err != nil {
+				t.Fatalf("seedDirsFromStaging error: %v", err)
 			}
 
 			got, err := os.ReadFile(filepath.Join(outDir, tt.wantRel))
@@ -296,7 +296,7 @@ func TestSeedOutDirFromStaging(t *testing.T) {
 	}
 }
 
-func TestSeedInDirFromStaging(t *testing.T) {
+func TestSeedDirsFromStagingIn(t *testing.T) {
 	stagingDir := t.TempDir()
 	inDir := t.TempDir()
 
@@ -333,8 +333,8 @@ func TestSeedInDirFromStaging(t *testing.T) {
 		},
 	}
 
-	if err := SeedInDirFromStaging(manifest, stagingDir, inDir); err != nil {
-		t.Fatalf("SeedInDirFromStaging error: %v", err)
+	if err := seedDirsFromStaging(manifest, JobMounts{Staging: stagingDir, In: inDir}); err != nil {
+		t.Fatalf("seedDirsFromStaging error: %v", err)
 	}
 
 	fileData, err := os.ReadFile(filepath.Join(inDir, "amata.yaml"))
@@ -364,7 +364,7 @@ func TestSeedInDirFromStaging(t *testing.T) {
 	}
 }
 
-func TestSeedTmpDirFromStaging(t *testing.T) {
+func TestSeedDirsFromStagingTmp(t *testing.T) {
 	stagingDir := t.TempDir()
 	tmpDir := t.TempDir()
 
@@ -381,8 +381,8 @@ func TestSeedTmpDirFromStaging(t *testing.T) {
 		Tmp: []string{fileHash + ":/tmp/ploy/lib/tool.jar"},
 	}
 
-	if err := SeedTmpDirFromStaging(manifest, stagingDir, tmpDir); err != nil {
-		t.Fatalf("SeedTmpDirFromStaging error: %v", err)
+	if err := seedDirsFromStaging(manifest, JobMounts{Staging: stagingDir, Tmp: tmpDir}); err != nil {
+		t.Fatalf("seedDirsFromStaging error: %v", err)
 	}
 
 	got, err := os.ReadFile(filepath.Join(tmpDir, "ploy", "lib", "tool.jar"))
@@ -394,7 +394,7 @@ func TestSeedTmpDirFromStaging(t *testing.T) {
 	}
 }
 
-func TestSeedHomeDirFromStagingCopiesOnlyWritableEntries(t *testing.T) {
+func TestSeedDirsFromStagingCopiesOnlyWritableHomeEntries(t *testing.T) {
 	stagingDir := t.TempDir()
 	homeDir := t.TempDir()
 	for hash, body := range map[string]string{
@@ -414,8 +414,8 @@ func TestSeedHomeDirFromStagingCopiesOnlyWritableEntries(t *testing.T) {
 		"abc0003:.codex/auth.json",
 		"abc0004:.codex/config.toml:ro",
 	}}
-	if err := SeedHomeDirFromStaging(manifest, stagingDir, homeDir); err != nil {
-		t.Fatalf("SeedHomeDirFromStaging() error = %v", err)
+	if err := seedDirsFromStaging(manifest, JobMounts{Staging: stagingDir, Home: homeDir}); err != nil {
+		t.Fatalf("seedDirsFromStaging() error = %v", err)
 	}
 
 	got, err := os.ReadFile(filepath.Join(homeDir, ".codex", "auth.json"))
@@ -427,5 +427,12 @@ func TestSeedHomeDirFromStagingCopiesOnlyWritableEntries(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(homeDir, ".codex", "config.toml")); !os.IsNotExist(err) {
 		t.Fatalf("read-only home entry was copied: %v", err)
+	}
+}
+
+func TestHydraSeedTargetRejectsUnsupportedKind(t *testing.T) {
+	t.Parallel()
+	if _, err := hydraSeedTarget(contracts.HydraFileKind("future"), JobMounts{}); err == nil {
+		t.Fatal("hydraSeedTarget() error = nil, want unsupported kind")
 	}
 }

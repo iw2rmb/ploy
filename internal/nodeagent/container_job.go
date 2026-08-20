@@ -28,14 +28,12 @@ func (r *runController) executeMigJob(ctx context.Context, req StartRunRequest, 
 	// MigStackUnknown which falls back to "default" in stack maps.
 	stack := resolveManifestStack(req, r.loadPersistedStack(req.RunID))
 
-	// Build manifest with stack-aware image resolution using typed options.
-	typedOpts := req.TypedOptions
 	stepIdx := 0
-	if len(typedOpts.Steps) > 0 {
+	if req.MigSpec != nil && len(req.MigSpec.Steps) > 0 {
 		if req.MigContext != nil {
 			stepIdx = req.MigContext.StepIndex
 		} else {
-			idx, err := migStepIndexFromJobName(req.JobName, len(typedOpts.Steps))
+			idx, err := migStepIndexFromJobName(req.JobName, len(req.MigSpec.Steps))
 			if err != nil {
 				err = fmt.Errorf("derive mig step index from job_name: %w", err)
 				slog.Error("failed to derive mig step index", "run_id", req.RunID, "job_id", req.JobID, "error", err)
@@ -44,14 +42,14 @@ func (r *runController) executeMigJob(ctx context.Context, req StartRunRequest, 
 			}
 			stepIdx = idx
 		}
-		if stepIdx < 0 || stepIdx >= len(typedOpts.Steps) {
-			err := fmt.Errorf("derived mig step index out of range: derived=%d steps_len=%d", stepIdx, len(typedOpts.Steps))
-			slog.Error("derived mig step index out of range", "run_id", req.RunID, "job_id", req.JobID, "derived_index", stepIdx, "steps_len", len(typedOpts.Steps))
+		if stepIdx < 0 || stepIdx >= len(req.MigSpec.Steps) {
+			err := fmt.Errorf("derived mig step index out of range: derived=%d steps_len=%d", stepIdx, len(req.MigSpec.Steps))
+			slog.Error("derived mig step index out of range", "run_id", req.RunID, "job_id", req.JobID, "derived_index", stepIdx, "steps_len", len(req.MigSpec.Steps))
 			r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
 			return
 		}
 	}
-	manifest, err := buildMigManifest(req, typedOpts, stepIdx, stack)
+	manifest, err := buildMigManifest(req, stepIdx, stack)
 	if err != nil {
 		slog.Error("failed to build manifest", "run_id", req.RunID, "error", err)
 		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
@@ -93,7 +91,7 @@ func shouldUploadRepoArtifactsAfterMigJob(req StartRunRequest, outcome migJobOut
 	if outcome.runErr != nil || outcome.result.ExitCode != 0 {
 		return true
 	}
-	return req.TypedOptions.BuildGate.Disabled &&
+	return req.MigSpec != nil && req.MigSpec.BuildGate != nil && req.MigSpec.BuildGate.Disabled &&
 		(req.NextID == nil || req.NextID.IsZero())
 }
 
@@ -168,7 +166,7 @@ func (r *runController) runMigContainerJob(
 		preWorkspaceTree = tree
 	}
 
-	_, err := r.materializeJobResources(ctx, manifest, req.TypedOptions.BundleMap, mounts.Staging)
+	_, err := r.materializeJobResources(ctx, manifest, manifest.BundleMap, mounts.Staging)
 	if err != nil {
 		return outcome, err
 	}

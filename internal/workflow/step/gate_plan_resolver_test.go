@@ -192,6 +192,28 @@ func TestGatePlanResolver_StackDetectModePolicy(t *testing.T) {
 	}
 }
 
+func TestResolveGateExecutionPlanRejectsEmptyNormalizedStackGateExpectation(t *testing.T) {
+	t.Parallel()
+	spec := &contracts.StepGateSpec{
+		Enabled: true,
+		StackGate: &contracts.StackGatePhaseSpec{
+			Enabled: true,
+			Expect:  &contracts.StackExpectation{Language: "  ", Tool: "\t", Release: "\n"},
+		},
+	}
+
+	_, terminal := resolveGateExecutionPlan(context.Background(), t.TempDir(), spec, "")
+	if terminal == nil || terminal.meta == nil || terminal.meta.StackGate == nil {
+		t.Fatalf("terminal = %+v, want stack gate invalid-configuration result", terminal)
+	}
+	if got := terminal.meta.LogFindings[0].Code; got != "STACK_GATE_INVALID_EXPECTATION" {
+		t.Fatalf("log code = %q, want STACK_GATE_INVALID_EXPECTATION", got)
+	}
+	if terminal.meta.StackGate.Expected != nil {
+		t.Fatalf("normalized expected stack = %+v, want nil", terminal.meta.StackGate.Expected)
+	}
+}
+
 func TestGatePlanResolver_StackGateTerminalRuntimeImage(t *testing.T) {
 	t.Parallel()
 

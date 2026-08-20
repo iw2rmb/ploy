@@ -89,11 +89,11 @@ func TestEndToEndFlow(t *testing.T) {
 			JobID:   types.JobID("test-job-e2e"),
 			RepoURL: types.RepoURL("https://github.com/iw2rmb/nodeagent-e2e-synthetic.git"),
 			BaseRef: types.GitRef("main"),
-			TypedOptions: RunOptions{
-				Execution: ContainerSpec{
+			MigSpec: &contracts.MigSpec{
+				Steps: []contracts.MigStep{{
 					Image:   contracts.JobImage{Universal: "alpine:latest"},
 					Command: contracts.CommandSpec{Shell: "echo 'test execution'"},
-				},
+				}},
 			},
 		}
 
