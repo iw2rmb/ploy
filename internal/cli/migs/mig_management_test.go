@@ -22,7 +22,7 @@ func TestAddMigCommand_Run(t *testing.T) {
 		name        string
 		migName     string
 		spec        *json.RawMessage
-		serverResp  AddMigResult
+		serverResp  domainapi.MigSummary
 		statusCode  int
 		wantErr     bool
 		wantErrText string
@@ -32,7 +32,7 @@ func TestAddMigCommand_Run(t *testing.T) {
 			migName:    "test-mig",
 			spec:       nil,
 			statusCode: http.StatusCreated,
-			serverResp: AddMigResult{
+			serverResp: domainapi.MigSummary{
 				ID:        types.MigID("mig001"),
 				Name:      "test-mig",
 				SpecID:    nil,
@@ -44,7 +44,7 @@ func TestAddMigCommand_Run(t *testing.T) {
 			migName:    "test-mig-with-spec",
 			spec:       jsonRawPtr([]byte(`{"version":"v1"}`)),
 			statusCode: http.StatusCreated,
-			serverResp: AddMigResult{
+			serverResp: domainapi.MigSummary{
 				ID:        types.MigID("mig002"),
 				Name:      "test-mig-with-spec",
 				SpecID:    specIDPtr(types.SpecID("spec-001")),

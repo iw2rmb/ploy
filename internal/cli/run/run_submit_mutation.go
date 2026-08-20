@@ -9,8 +9,6 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
-type buildGateForcedOverrides = speccompiler.BuildGateForcedOverrides
-
 func parseBuildGateForcedFlags(
 	globalChanged bool,
 	globalValue string,
@@ -18,16 +16,16 @@ func parseBuildGateForcedFlags(
 	preValue string,
 	postChanged bool,
 	postValue string,
-) (buildGateForcedOverrides, error) {
+) (speccompiler.BuildGateForcedOverrides, error) {
 	if globalChanged && (preChanged || postChanged) {
-		return buildGateForcedOverrides{}, errors.New("--build-gate-forced cannot be combined with --build-gate-forced-pre or --build-gate-forced-post")
+		return speccompiler.BuildGateForcedOverrides{}, errors.New("--build-gate-forced cannot be combined with --build-gate-forced-pre or --build-gate-forced-post")
 	}
 
-	var out buildGateForcedOverrides
+	var out speccompiler.BuildGateForcedOverrides
 	if globalChanged {
 		stack, err := parseBuildGateForcedValue("--build-gate-forced", globalValue)
 		if err != nil {
-			return buildGateForcedOverrides{}, err
+			return speccompiler.BuildGateForcedOverrides{}, err
 		}
 		out.Pre = stack
 		out.Post = cloneBuildGateForcedStack(stack)
@@ -36,14 +34,14 @@ func parseBuildGateForcedFlags(
 	if preChanged {
 		stack, err := parseBuildGateForcedValue("--build-gate-forced-pre", preValue)
 		if err != nil {
-			return buildGateForcedOverrides{}, err
+			return speccompiler.BuildGateForcedOverrides{}, err
 		}
 		out.Pre = stack
 	}
 	if postChanged {
 		stack, err := parseBuildGateForcedValue("--build-gate-forced-post", postValue)
 		if err != nil {
-			return buildGateForcedOverrides{}, err
+			return speccompiler.BuildGateForcedOverrides{}, err
 		}
 		out.Post = stack
 	}

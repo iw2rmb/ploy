@@ -5,14 +5,9 @@ import (
 	"io"
 
 	"github.com/iw2rmb/ploy/internal/cli/cluster"
-	"github.com/iw2rmb/ploy/internal/cli/configure"
 	"github.com/iw2rmb/ploy/internal/cli/spec"
 	"github.com/spf13/cobra"
 )
-
-func newConfigCmd(stdout, stderr io.Writer) *cobra.Command {
-	return configure.NewCommand(stdout, stderr)
-}
 
 // newSpecCmd creates the cobra command tree for 'ploy spec' and its subcommands.
 func newSpecCmd(stdout, stderr io.Writer) *cobra.Command {

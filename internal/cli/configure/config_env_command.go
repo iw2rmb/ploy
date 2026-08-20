@@ -58,7 +58,7 @@ func newEnvShowCommand() *cobra.Command {
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.FromSet = cmd.Flags().Changed("from")
-			if err := validateEnvShowOptions(opts); err != nil {
+			if err := validateEnvKeyAndTarget(opts.Key, opts.From, opts.FromSet); err != nil {
 				return err
 			}
 			return runConfigEnvShow(opts, cmd.OutOrStdout())
@@ -117,7 +117,7 @@ func newEnvUnsetCommand() *cobra.Command {
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.FromSet = cmd.Flags().Changed("from")
-			if err := validateEnvUnsetOptions(opts); err != nil {
+			if err := validateEnvKeyAndTarget(opts.Key, opts.From, opts.FromSet); err != nil {
 				return err
 			}
 			return runConfigEnvUnset(opts, cmd.OutOrStdout())
@@ -244,10 +244,6 @@ func runConfigEnvShow(opts envShowOptions, stdout io.Writer) error {
 	_, _ = fmt.Fprintf(stdout, "Target: %s\n", entry.Target)
 	_, _ = fmt.Fprintf(stdout, "Secret: %t\n", entry.Secret)
 	return nil
-}
-
-func validateEnvShowOptions(opts envShowOptions) error {
-	return validateEnvKeyAndTarget(opts.Key, opts.From, opts.FromSet)
 }
 
 // validOnSelectors is the set of accepted values for the --on flag.
@@ -449,10 +445,6 @@ func runConfigEnvUnset(opts envUnsetOptions, stdout io.Writer) error {
 
 	_, _ = fmt.Fprintf(stdout, "Environment variable %q deleted successfully\n", opts.Key)
 	return nil
-}
-
-func validateEnvUnsetOptions(opts envUnsetOptions) error {
-	return validateEnvKeyAndTarget(opts.Key, opts.From, opts.FromSet)
 }
 
 func validateEnvKeyAndTarget(key, target string, targetSet bool) error {

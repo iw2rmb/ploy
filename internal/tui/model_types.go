@@ -7,9 +7,9 @@ import (
 
 	"charm.land/bubbles/v2/list"
 
-	cliruns "github.com/iw2rmb/ploy/internal/cli/runs"
 	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	migsapi "github.com/iw2rmb/ploy/internal/migs/api"
 	"github.com/iw2rmb/ploy/internal/tui/joblist"
 )
 
@@ -101,7 +101,7 @@ type runsLoadedMsg struct{ runs []runSummary }
 type jobsLoadedMsg struct{ jobs []domainapi.JobListItem }
 
 // jobDetailsLoadedMsg carries the run job detail payload for a confirmed job.
-type jobDetailsLoadedMsg struct{ detail *cliruns.RunJobDetailEntry }
+type jobDetailsLoadedMsg struct{ detail *migsapi.RunJob }
 
 // runSummary is a minimal run representation used in the TUI.
 type runSummary struct {

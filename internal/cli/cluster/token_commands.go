@@ -122,7 +122,7 @@ func handleTokenCreate(args []string, stderr io.Writer) error {
 	}
 
 	endpoint := strings.TrimSuffix(baseURL.String(), "/") + "/v1/tokens"
-	req, err := common.MakeAuthenticatedRequest(ctx, "POST", endpoint, bytes.NewReader(bodyJSON))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(bodyJSON))
 	if err != nil {
 		return fmt.Errorf("create request: %w", err)
 	}
@@ -207,7 +207,7 @@ func handleTokenList(args []string, stderr io.Writer) error {
 	}
 
 	endpoint := strings.TrimSuffix(baseURL.String(), "/") + "/v1/tokens"
-	req, err := common.MakeAuthenticatedRequest(ctx, "GET", endpoint, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return fmt.Errorf("create request: %w", err)
 	}
@@ -318,7 +318,7 @@ func handleTokenRevoke(args []string, stderr io.Writer) error {
 	}
 
 	endpoint := strings.TrimSuffix(baseURL.String(), "/") + "/v1/tokens/" + tokenID
-	req, err := common.MakeAuthenticatedRequest(ctx, "DELETE", endpoint, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, endpoint, nil)
 	if err != nil {
 		return fmt.Errorf("create request: %w", err)
 	}

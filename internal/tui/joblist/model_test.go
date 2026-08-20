@@ -6,9 +6,9 @@ import (
 
 	"charm.land/lipgloss/v2"
 
-	cliruns "github.com/iw2rmb/ploy/internal/cli/runs"
 	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	migsapi "github.com/iw2rmb/ploy/internal/migs/api"
 	"github.com/iw2rmb/ploy/internal/tui/joblist"
 )
 
@@ -119,7 +119,7 @@ func TestDetailsCanBeSetAndClearedByRefresh(t *testing.T) {
 	if m.Details() != nil {
 		t.Fatal("initial Details() is non-nil")
 	}
-	m = m.SetDetails(&cliruns.RunJobDetailEntry{JobID: domaintypes.JobID("job-99"), Name: "deploy"})
+	m = m.SetDetails(&migsapi.RunJob{JobID: domaintypes.JobID("job-99"), Name: "deploy"})
 	if got := m.Details(); got == nil || got.JobID != "job-99" {
 		t.Fatalf("Details() after set = %+v, want job-99", got)
 	}

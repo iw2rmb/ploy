@@ -293,7 +293,7 @@ func requestBootstrapToken(ctx context.Context, serverURL, nodeID string) (token
 	}
 
 	endpoint := strings.TrimSuffix(baseURL.String(), "/") + "/v1/bootstrap/tokens"
-	req, err := common.MakeAuthenticatedRequest(ctx, "POST", endpoint, bytes.NewReader(bodyJSON))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(bodyJSON))
 	if err != nil {
 		return "", time.Time{}, fmt.Errorf("create request: %w", err)
 	}

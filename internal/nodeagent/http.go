@@ -283,7 +283,6 @@ func gzipCompress(data []byte, dataType string) ([]byte, error) {
 	return compressed, nil
 }
 
-// createHTTPClient creates an HTTP client with bearer token authentication.
 func createHTTPClient(cfg Config) (*http.Client, error) {
 	transport := &http.Transport{
 		MaxIdleConns:        10,
@@ -321,47 +320,13 @@ func createHTTPClient(cfg Config) (*http.Client, error) {
 	}
 	bearerToken := strings.TrimSpace(string(bearerTokenBytes))
 
-	authenticatedTransport := &bearerTokenTransport{
-		base:   transport,
-		token:  bearerToken,
-		nodeID: cfg.NodeID,
-	}
+	authenticatedTransport := httpx.NewHeaderTransport(transport, http.Header{
+		"Authorization":  []string{"Bearer " + bearerToken},
+		"PLOY_NODE_UUID": []string{cfg.NodeID.String()},
+	})
 
 	return &http.Client{
 		Transport: authenticatedTransport,
 		Timeout:   30 * time.Second,
 	}, nil
-}
-
-// bearerTokenTransport wraps an http.RoundTripper and adds Authorization and
-// PLOY_NODE_UUID headers to all requests.
-type bearerTokenTransport struct {
-	base   http.RoundTripper
-	token  string
-	nodeID types.NodeID
-}
-
-func (t *bearerTokenTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	if req == nil {
-		return nil, fmt.Errorf("request is nil")
-	}
-
-	base := t.base
-	if base == nil {
-		base = http.DefaultTransport
-	}
-
-	// Avoid Request.Clone() here; in our node runtime this path has shown
-	// unstable behavior in Go's map cloning internals under load.
-	reqCopy := new(http.Request)
-	*reqCopy = *req
-	if req.Header != nil {
-		reqCopy.Header = req.Header.Clone()
-	} else {
-		reqCopy.Header = make(http.Header, 2)
-	}
-
-	reqCopy.Header.Set("Authorization", "Bearer "+t.token)
-	reqCopy.Header.Set("PLOY_NODE_UUID", t.nodeID.String())
-	return base.RoundTrip(reqCopy)
 }

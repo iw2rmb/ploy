@@ -114,6 +114,110 @@ type roundTripFunc func(*http.Request) (*http.Response, error)
 
 func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) { return f(req) }
 
+func TestHeaderTransportOverlaysHeadersWithoutMutatingRequest(t *testing.T) {
+	t.Parallel()
+
+	configured := http.Header{
+		"Authorization":  []string{"Bearer test-token"},
+		"PLOY_NODE_UUID": []string{"local1"},
+	}
+	var gotReq *http.Request
+	transport := NewHeaderTransport(roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		gotReq = req
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(strings.NewReader("ok")),
+			Header:     make(http.Header),
+		}, nil
+	}), configured)
+	configured.Set("Authorization", "Bearer changed")
+
+	req, err := http.NewRequest(http.MethodGet, "http://example.test/v1/health", nil)
+	if err != nil {
+		t.Fatalf("NewRequest() failed: %v", err)
+	}
+	req.Header.Set("Authorization", "Bearer original")
+	req.Header.Set("X-Test", "1")
+
+	resp, err := transport.RoundTrip(req)
+	if err != nil {
+		t.Fatalf("RoundTrip() failed: %v", err)
+	}
+	_ = resp.Body.Close()
+
+	if gotReq == nil {
+		t.Fatal("base transport did not receive request")
+	}
+	if got := gotReq.Header.Get("Authorization"); got != "Bearer test-token" {
+		t.Fatalf("Authorization = %q, want %q", got, "Bearer test-token")
+	}
+	if got := gotReq.Header.Get("PLOY_NODE_UUID"); got != "local1" {
+		t.Fatalf("PLOY_NODE_UUID = %q, want %q", got, "local1")
+	}
+	if got := gotReq.Header.Get("X-Test"); got != "1" {
+		t.Fatalf("X-Test = %q, want %q", got, "1")
+	}
+	if got := req.Header.Get("Authorization"); got != "Bearer original" {
+		t.Fatalf("original Authorization = %q, want %q", got, "Bearer original")
+	}
+	if got := req.Header.Get("PLOY_NODE_UUID"); got != "" {
+		t.Fatalf("original PLOY_NODE_UUID = %q, want empty", got)
+	}
+}
+
+func TestHeaderTransportHandlesNilInputState(t *testing.T) {
+	t.Parallel()
+
+	transport := NewHeaderTransport(roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		if got := req.Header.Get("Authorization"); got != "Bearer test-token" {
+			t.Fatalf("Authorization = %q, want %q", got, "Bearer test-token")
+		}
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(strings.NewReader("ok")),
+			Header:     make(http.Header),
+		}, nil
+	}), http.Header{"Authorization": []string{"Bearer test-token"}})
+
+	req, err := http.NewRequest(http.MethodGet, "http://example.test/v1/health", nil)
+	if err != nil {
+		t.Fatalf("NewRequest() failed: %v", err)
+	}
+	req.Header = nil
+	resp, err := transport.RoundTrip(req)
+	if err != nil {
+		t.Fatalf("RoundTrip() failed: %v", err)
+	}
+	_ = resp.Body.Close()
+
+	if _, err := transport.RoundTrip(nil); err == nil || err.Error() != "request is nil" {
+		t.Fatalf("RoundTrip(nil) error = %v, want request is nil", err)
+	}
+}
+
+func TestHeaderTransportDefaultsBaseTransport(t *testing.T) {
+	t.Parallel()
+
+	gotAuth := ""
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotAuth = r.Header.Get("Authorization")
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(server.Close)
+
+	client := &http.Client{Transport: NewHeaderTransport(nil, http.Header{
+		"Authorization": []string{"Bearer test-token"},
+	})}
+	resp, err := client.Get(server.URL)
+	if err != nil {
+		t.Fatalf("Get() failed: %v", err)
+	}
+	_ = resp.Body.Close()
+	if gotAuth != "Bearer test-token" {
+		t.Fatalf("Authorization = %q, want %q", gotAuth, "Bearer test-token")
+	}
+}
+
 func responseClient(status int, body string) func(*testing.T) (*http.Client, string) {
 	return func(t *testing.T) (*http.Client, string) {
 		t.Helper()

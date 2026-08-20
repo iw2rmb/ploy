@@ -6,9 +6,9 @@ import (
 	"charm.land/bubbles/v2/list"
 	tea "charm.land/bubbletea/v2"
 
-	cliruns "github.com/iw2rmb/ploy/internal/cli/runs"
 	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	migsapi "github.com/iw2rmb/ploy/internal/migs/api"
 )
 
 const (
@@ -34,7 +34,7 @@ type Model struct {
 	inner         list.Model
 	jobs          []domainapi.JobListItem
 	selectedJobID domaintypes.JobID
-	details       *cliruns.RunJobDetailEntry
+	details       *migsapi.RunJob
 }
 
 // New creates an initialized JobList with the given title.
@@ -118,13 +118,13 @@ func (m Model) ConfirmedJobID() domaintypes.JobID {
 }
 
 // SetDetails stores the fetched job detail payload for the confirmed selection.
-func (m Model) SetDetails(item *cliruns.RunJobDetailEntry) Model {
+func (m Model) SetDetails(item *migsapi.RunJob) Model {
 	m.details = item
 	return m
 }
 
 // Details returns the cached job detail payload, or nil if not yet loaded.
-func (m Model) Details() *cliruns.RunJobDetailEntry {
+func (m Model) Details() *migsapi.RunJob {
 	return m.details
 }
 

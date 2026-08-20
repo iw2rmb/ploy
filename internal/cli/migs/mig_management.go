@@ -37,16 +37,13 @@ type AddMigCommand struct {
 	CreatedBy *string          // Optional: creator identifier.
 }
 
-// AddMigResult contains the response from creating a mig.
-type AddMigResult = domainapi.MigSummary
-
 // Run executes POST /v1/migs to create a mig project.
-func (c AddMigCommand) Run(ctx context.Context) (AddMigResult, error) {
+func (c AddMigCommand) Run(ctx context.Context) (domainapi.MigSummary, error) {
 	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
-		return AddMigResult{}, fmt.Errorf("mig add: %w", err)
+		return domainapi.MigSummary{}, fmt.Errorf("mig add: %w", err)
 	}
 	if strings.TrimSpace(c.Name) == "" {
-		return AddMigResult{}, fmt.Errorf("mig add: name is required")
+		return domainapi.MigSummary{}, fmt.Errorf("mig add: name is required")
 	}
 
 	// Build request payload with name, optional spec, and optional created_by.
@@ -62,7 +59,7 @@ func (c AddMigCommand) Run(ctx context.Context) (AddMigResult, error) {
 
 	// POST /v1/migs to create the mig.
 	endpoint := c.BaseURL.JoinPath("v1", "migs")
-	return httpx.DoJSON[AddMigResult](ctx, c.Client, http.MethodPost, endpoint.String(), req, http.StatusCreated, "mig add")
+	return httpx.DoJSON[domainapi.MigSummary](ctx, c.Client, http.MethodPost, endpoint.String(), req, http.StatusCreated, "mig add")
 }
 
 // RemoveMigCommand deletes a mig project.

@@ -113,7 +113,7 @@ func (r *startupCrashReconciler) Discover(ctx context.Context) (startupCrashSnap
 		if !isTerminalContainerStatus(string(state.Status)) {
 			continue
 		}
-		finishedAt, ok := parseDockerFinishedAt(state.FinishedAt)
+		finishedAt, ok := parseDockerTimestamp(state.FinishedAt)
 		if !ok {
 			continue
 		}
@@ -220,10 +220,6 @@ func isTerminalContainerStatus(status string) bool {
 	default:
 		return false
 	}
-}
-
-func parseDockerFinishedAt(value string) (time.Time, bool) {
-	return parseDockerTimestamp(value)
 }
 
 func parseDockerTimestamp(value string) (time.Time, bool) {

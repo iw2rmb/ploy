@@ -125,7 +125,7 @@ func getRunStatusHandler(st store.Store) http.HandlerFunc {
 				return
 			}
 			artMap := make(map[string]string)
-			bundles, err := listArtifactBundlesByEffectiveJob(r.Context(), st, job)
+			bundles, err := listArtifactBundlesByJob(r.Context(), st, job)
 			if err != nil {
 				serverError(w, "get run status", "list artifacts", err, "run_id", run.ID, "job_id", jobIDStr)
 				return

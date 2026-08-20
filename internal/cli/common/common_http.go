@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/cli/controlplane"
+	"github.com/iw2rmb/ploy/internal/httpx"
 )
 
 // ResolveControlPlaneHTTP selects the base URL and HTTP client using
@@ -29,7 +30,6 @@ func ResolveControlPlaneHTTP(_ context.Context) (*url.URL, *http.Client, error) 
 		return nil, nil, fmt.Errorf("parse PLOY_SERVER_URL: %w", err)
 	}
 
-	// Build transport: TLS only when using https.
 	var transport http.RoundTripper
 	if u.Scheme == "https" {
 		transport = &http.Transport{
@@ -42,13 +42,11 @@ func ResolveControlPlaneHTTP(_ context.Context) (*url.URL, *http.Client, error) 
 		transport = http.DefaultTransport
 	}
 
-	// Wrap transport with bearer token injector if token is available
 	finalTransport := transport
 	if token := strings.TrimSpace(os.Getenv("PLOY_AUTH_TOKEN")); token != "" {
-		finalTransport = &bearerTokenTransport{
-			base:  transport,
-			token: token,
-		}
+		finalTransport = httpx.NewHeaderTransport(transport, http.Header{
+			"Authorization": []string{"Bearer " + token},
+		})
 	}
 
 	client := &http.Client{
@@ -57,35 +55,6 @@ func ResolveControlPlaneHTTP(_ context.Context) (*url.URL, *http.Client, error) 
 	}
 
 	return u, client, nil
-}
-
-// bearerTokenTransport wraps an http.RoundTripper and adds Authorization header to all requests.
-type bearerTokenTransport struct {
-	base  http.RoundTripper
-	token string
-}
-
-func (t *bearerTokenTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	// Clone request to avoid modifying the original
-	req = req.Clone(req.Context())
-	req.Header.Set("Authorization", "Bearer "+t.token)
-	return t.base.RoundTrip(req)
-}
-
-// makeAuthenticatedRequest creates an HTTP request with bearer token authorization.
-// This helper should be used for all API calls that require authentication.
-func MakeAuthenticatedRequest(ctx context.Context, method, endpoint string, body io.Reader) (*http.Request, error) {
-	req, err := http.NewRequestWithContext(ctx, method, endpoint, body)
-	if err != nil {
-		return nil, err
-	}
-
-	// Add bearer token if available
-	if token := strings.TrimSpace(os.Getenv("PLOY_AUTH_TOKEN")); token != "" {
-		req.Header.Set("Authorization", "Bearer "+token)
-	}
-
-	return req, nil
 }
 
 // controlPlaneHTTPError summarises a non-2xx control-plane response.

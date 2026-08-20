@@ -12,11 +12,6 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/jobchain"
 )
 
-type RunJobDetailEntry = migsapi.RunJob
-
-// ListRunJobsResult contains the response from listing run jobs.
-type ListRunJobsResult = migsapi.ListRunJobsResponse
-
 // ListRunJobsCommand fetches jobs for a run execution.
 type ListRunJobsCommand struct {
 	Client  *http.Client
@@ -26,12 +21,12 @@ type ListRunJobsCommand struct {
 }
 
 // Run executes GET /v1/runs/{run_id}/jobs.
-func (c ListRunJobsCommand) Run(ctx context.Context) (ListRunJobsResult, error) {
+func (c ListRunJobsCommand) Run(ctx context.Context) (migsapi.ListRunJobsResponse, error) {
 	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
-		return ListRunJobsResult{}, fmt.Errorf("list run jobs: %w", err)
+		return migsapi.ListRunJobsResponse{}, fmt.Errorf("list run jobs: %w", err)
 	}
 	if c.RunID.IsZero() {
-		return ListRunJobsResult{}, fmt.Errorf("list run jobs: run id required")
+		return migsapi.ListRunJobsResponse{}, fmt.Errorf("list run jobs: run id required")
 	}
 	endpoint := c.BaseURL.JoinPath("v1", "runs", c.RunID.String(), "jobs")
 	if c.Attempt != nil {
@@ -40,9 +35,9 @@ func (c ListRunJobsCommand) Run(ctx context.Context) (ListRunJobsResult, error) 
 		endpoint.RawQuery = q.Encode()
 	}
 
-	result, err := httpx.DoJSON[ListRunJobsResult](ctx, c.Client, http.MethodGet, endpoint.String(), nil, http.StatusOK, "list run jobs")
+	result, err := httpx.DoJSON[migsapi.ListRunJobsResponse](ctx, c.Client, http.MethodGet, endpoint.String(), nil, http.StatusOK, "list run jobs")
 	if err != nil {
-		return ListRunJobsResult{}, err
+		return migsapi.ListRunJobsResponse{}, err
 	}
 
 	result.Jobs = orderRunJobsByChain(result.Jobs)

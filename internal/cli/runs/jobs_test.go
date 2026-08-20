@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	migsapi "github.com/iw2rmb/ploy/internal/migs/api"
 )
 
 func TestOrderRunJobsByChain_ReconstructsLinkedOrder(t *testing.T) {
@@ -18,7 +19,7 @@ func TestOrderRunJobsByChain_ReconstructsLinkedOrder(t *testing.T) {
 	mig1 := domaintypes.NewJobID()
 	post := domaintypes.NewJobID()
 
-	jobs := []RunJobDetailEntry{
+	jobs := []migsapi.RunJob{
 		// Deliberately out of chain order (mirrors current broken render shape).
 		{JobID: post, JobType: "post_gate", Status: domaintypes.JobStatusCreated, NextID: nil},
 		{JobID: mig1, JobType: "mig", Status: domaintypes.JobStatusCreated, NextID: &post},

@@ -5,6 +5,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/iw2rmb/ploy/internal/cli/configure"
 	runcli "github.com/iw2rmb/ploy/internal/cli/run"
 	"github.com/spf13/cobra"
 
@@ -44,8 +45,8 @@ func NewRootCmdWithIO(stdout, stderr io.Writer) *cobra.Command {
 	root.AddCommand(newWaveCmd(stdout, stderr))
 	root.AddCommand(newJobCmd(stdout, stderr)) // ploy job (status and logs)
 
-	root.AddCommand(newClusterCmd(stderr))        // ploy cluster (node, token)
-	root.AddCommand(newConfigCmd(stdout, stderr)) // ploy config
+	root.AddCommand(newClusterCmd(stderr))                // ploy cluster (node, token)
+	root.AddCommand(configure.NewCommand(stdout, stderr)) // ploy config
 	root.AddCommand(newSpecCmd(stdout, stderr))
 
 	root.AddCommand(newTUICmd(stderr)) // ploy tui (interactive terminal UI)

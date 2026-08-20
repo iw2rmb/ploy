@@ -30,7 +30,7 @@ type SubmitOptions struct {
 	MaxRetries int
 
 	StepEnvOverrides map[string][]string
-	BuildGateForced  buildGateForcedOverrides
+	BuildGateForced  speccompiler.BuildGateForcedOverrides
 
 	GitLabToken string
 

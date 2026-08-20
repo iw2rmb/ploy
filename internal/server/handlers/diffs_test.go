@@ -38,9 +38,6 @@ func TestRunDiffs_Download(t *testing.T) {
 	st.listJobsByRunAttempt.val = []store.Job{
 		{ID: jobID, RunID: runID, RepoID: repoIDTyped, Attempt: 1},
 	}
-	st.getJobByID = map[domaintypes.JobID]store.Job{
-		jobID: {ID: jobID, RunID: runID, RepoID: repoIDTyped, Attempt: 1},
-	}
 	st.getLatestDiffByJob.val = store.Diff{
 		ID:        pgtype.UUID{Bytes: diffID, Valid: true},
 		RunID:     runID,
@@ -67,9 +64,6 @@ func TestRunDiffs_Download(t *testing.T) {
 	if !st.getLatestDiffByJob.called {
 		t.Fatal("expected GetLatestDiffByJob to be called")
 	}
-	if !st.getJob.called {
-		t.Fatal("expected GetJob to be called")
-	}
 }
 
 func TestRunDiffs_DownloadAccumulated(t *testing.T) {
@@ -94,10 +88,6 @@ func TestRunDiffs_DownloadAccumulated(t *testing.T) {
 	st.listJobsByRunAttempt.val = []store.Job{
 		{ID: jobID1, RunID: runID, RepoID: repoIDTyped, Attempt: 1, NextID: &jobID2},
 		{ID: jobID2, RunID: runID, RepoID: repoIDTyped, Attempt: 1},
-	}
-	st.getJobByID = map[domaintypes.JobID]store.Job{
-		jobID1: {ID: jobID1, RunID: runID, RepoID: repoIDTyped, Attempt: 1},
-		jobID2: {ID: jobID2, RunID: runID, RepoID: repoIDTyped, Attempt: 1},
 	}
 	st.getLatestDiffByJobByID = map[domaintypes.JobID]store.Diff{
 		jobID1: {ID: pgtype.UUID{Bytes: diffID1, Valid: true}, RunID: runID, JobID: &jobID1, ObjectKey: &objKey1},
@@ -180,9 +170,6 @@ func TestRunDiffs_ReturnsOwnDiffs(t *testing.T) {
 		RepoID:  repoIDTyped,
 		Attempt: 1,
 	}}
-	st.getJobByID = map[domaintypes.JobID]store.Job{
-		jobID: {ID: jobID, RunID: runID, RepoID: repoIDTyped, Attempt: 1},
-	}
 	st.getLatestDiffByJob.val = store.Diff{
 		ID:        pgtype.UUID{Bytes: diffID, Valid: true},
 		RunID:     runID,

@@ -42,7 +42,7 @@ func listRunArtifactsHandler(st store.Store) http.HandlerFunc {
 			if !ok {
 				continue
 			}
-			bundles, listErr := listArtifactBundlesByEffectiveJob(r.Context(), st, job)
+			bundles, listErr := listArtifactBundlesByJob(r.Context(), st, job)
 			if listErr != nil {
 				writeHTTPError(w, http.StatusInternalServerError, "failed to list artifacts: %v", listErr)
 				slog.Error("list run artifacts: list bundles failed", "run_id", runID.String(), "repo_id", run.RepoID.String(), "job_id", job.ID.String(), "err", listErr)
