@@ -6,94 +6,40 @@ import (
 	types "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-func TestSubjectsForRun(t *testing.T) {
-	subjects := SubjectsForRun(types.RunID("run-123"))
-	if subjects.CheckpointStream != "ploy.workflow.run-123.checkpoints" {
-		t.Fatalf("CheckpointStream mismatch: %s", subjects.CheckpointStream)
-	}
-	if subjects.ArtifactStream != "ploy.artifact.run-123" {
-		t.Fatalf("ArtifactStream mismatch: %s", subjects.ArtifactStream)
-	}
-	if subjects.StatusStream != "jobs.run-123.events" {
-		t.Fatalf("StatusStream mismatch: %s", subjects.StatusStream)
-	}
-}
-
-func TestSubjectsForRunTrimsInput(t *testing.T) {
-	subjects := SubjectsForRun(types.RunID("  run-123  "))
-	if subjects.CheckpointStream != "ploy.workflow.run-123.checkpoints" {
-		t.Fatalf("CheckpointStream mismatch: %s", subjects.CheckpointStream)
-	}
-	if subjects.ArtifactStream != "ploy.artifact.run-123" {
-		t.Fatalf("ArtifactStream mismatch: %s", subjects.ArtifactStream)
-	}
-	if subjects.StatusStream != "jobs.run-123.events" {
-		t.Fatalf("StatusStream mismatch: %s", subjects.StatusStream)
-	}
-}
-
-func TestSubjectsForRunEmptyRunID(t *testing.T) {
-	subjects := SubjectsForRun(types.RunID(""))
-	if subjects.CheckpointStream != "" {
-		t.Fatalf("expected empty checkpoint stream, got %s", subjects.CheckpointStream)
-	}
-	if subjects.ArtifactStream != "" {
-		t.Fatalf("expected empty artifact stream, got %s", subjects.ArtifactStream)
-	}
-	if subjects.StatusStream != "" {
-		t.Fatalf("expected empty status stream, got %s", subjects.StatusStream)
-	}
-}
-
-func TestWorkflowRunValidate(t *testing.T) {
-	run := WorkflowRun{}
-	if err := run.Validate(); err == nil {
-		t.Fatal("expected validation error for empty run envelope")
-	}
-
-	valid := WorkflowRun{
-		SchemaVersion: SchemaVersion,
-		RunID:         types.RunID("run-123"),
-		Manifest:      ManifestReference{Name: "smoke", Version: "2025-09-26"},
-	}
-	if err := valid.Validate(); err != nil {
-		t.Fatalf("expected valid run envelope, got %v", err)
-	}
-
-	withRepo := WorkflowRun{
-		SchemaVersion: SchemaVersion,
-		RunID:         types.RunID("run-456"),
-		Manifest:      ManifestReference{Name: "smoke", Version: "2025-09-26"},
-		Repo: RepoMaterialization{
-			URL:     types.RepoURL("https://gitlab.com/iw2rmb/sample.git"),
-			BaseRef: types.GitRef("main"),
+func TestRepoMaterializationValidate(t *testing.T) {
+	tests := []struct {
+		name    string
+		repo    RepoMaterialization
+		wantErr bool
+	}{
+		{name: "empty is valid"},
+		{
+			name: "base ref",
+			repo: RepoMaterialization{URL: types.RepoURL("https://gitlab.com/iw2rmb/sample.git"), BaseRef: types.GitRef("main")},
+		},
+		{
+			name: "commit",
+			repo: RepoMaterialization{URL: types.RepoURL("https://gitlab.com/iw2rmb/sample.git"), Commit: types.CommitSHA("abcdef1234567890")},
+		},
+		{
+			name:    "URL requires ref or commit",
+			repo:    RepoMaterialization{URL: types.RepoURL("https://example.com/repo.git")},
+			wantErr: true,
+		},
+		{
+			name:    "invalid URL scheme",
+			repo:    RepoMaterialization{URL: types.RepoURL("http://example.com/repo.git")},
+			wantErr: true,
 		},
 	}
-	if err := withRepo.Validate(); err != nil {
-		t.Fatalf("expected run with repo to validate, got %v", err)
-	}
 
-	badRepo := valid
-	badRepo.Repo = RepoMaterialization{URL: types.RepoURL("https://example.com/repo.git")}
-	if err := badRepo.Validate(); err == nil {
-		t.Fatal("expected repo validation error when base ref missing")
-	}
-
-	commitOnly := valid
-	commitOnly.Repo = RepoMaterialization{
-		URL:    types.RepoURL("https://gitlab.com/iw2rmb/sample.git"),
-		Commit: types.CommitSHA("abcdef1234567890"),
-	}
-	if err := commitOnly.Validate(); err != nil {
-		t.Fatalf("expected repo with commit to validate, got %v", err)
-	}
-
-	invalidScheme := valid
-	invalidScheme.Repo = RepoMaterialization{
-		URL: types.RepoURL("http://example.com/repo.git"),
-	}
-	if err := invalidScheme.Validate(); err == nil {
-		t.Fatal("expected validation error for invalid repo url scheme")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.repo.Validate()
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("Validate() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
 	}
 }
 

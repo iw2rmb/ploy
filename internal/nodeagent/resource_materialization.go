@@ -103,20 +103,6 @@ func verifyDigestPrefix(data []byte, prefix string) error {
 	return nil
 }
 
-// verifyBundleDigest checks that the SHA-256 digest of data matches expectedDigest.
-// expectedDigest may be a bare hex string or carry a "sha256:" prefix as returned
-// by the server's upload response.
-func verifyBundleDigest(data []byte, expectedDigest string) error {
-	hash := sha256.Sum256(data)
-	actual := hex.EncodeToString(hash[:])
-	expected := strings.TrimSpace(expectedDigest)
-	expected = strings.TrimPrefix(expected, "sha256:")
-	if !strings.EqualFold(actual, expected) {
-		return fmt.Errorf("digest mismatch: expected %s, got %s", expectedDigest, actual)
-	}
-	return nil
-}
-
 // extractBundle decompresses and extracts a tar.gz bundle into stagingDir.
 // Security rules enforced per entry:
 //   - Symlink entries are rejected (TypeSymlink).

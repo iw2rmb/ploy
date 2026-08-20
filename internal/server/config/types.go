@@ -8,78 +8,77 @@ import (
 
 // HTTPConfig configures the HTTP server.
 type HTTPConfig struct {
-	Listen       string        `yaml:"listen"`
-	ReadTimeout  time.Duration `yaml:"read_timeout"`
-	WriteTimeout time.Duration `yaml:"write_timeout"`
-	IdleTimeout  time.Duration `yaml:"idle_timeout"`
+	Listen       string
+	ReadTimeout  time.Duration
+	WriteTimeout time.Duration
+	IdleTimeout  time.Duration
 }
 
 // AuthConfig configures authentication mechanisms.
 type AuthConfig struct {
-	BearerTokens BearerTokenConfig `yaml:"bearer_tokens"`
+	BearerTokens BearerTokenConfig
 }
 
 // BearerTokenConfig configures JWT bearer token authentication.
 type BearerTokenConfig struct {
-	Enabled bool   `yaml:"enabled"`
-	Secret  string `yaml:"secret"` // JWT signing secret (or load from env)
+	Enabled bool
+	Secret  string
 }
 
 // MetricsConfig configures the Prometheus metrics endpoint.
 type MetricsConfig struct {
-	Listen string `yaml:"listen"`
+	Listen string
 }
 
 // AdminConfig configures the local administrative interface.
 type AdminConfig struct {
-	Socket string `yaml:"socket"`
-	Listen string `yaml:"listen"`
+	Socket string
+	Listen string
 }
 
 // PKIConfig configures PKI renewal.
 type PKIConfig struct {
-	BundleDir   string        `yaml:"bundle_dir"`
-	Certificate string        `yaml:"certificate"`
-	Key         string        `yaml:"key"`
-	RenewBefore time.Duration `yaml:"renew_before"`
-	CAEndpoint  string        `yaml:"ca_endpoint"`
+	BundleDir   string
+	Certificate string
+	Key         string
+	RenewBefore time.Duration
+	CAEndpoint  string
 }
 
 // SchedulerConfig configures background task scheduling.
 type SchedulerConfig struct {
-	HousekeepingInterval time.Duration `yaml:"housekeeping_interval"`
-	DiskPruneInterval    time.Duration `yaml:"disk_prune_interval"`
+	HousekeepingInterval time.Duration
+	DiskPruneInterval    time.Duration
 	// TTL is the retention period for logs, events, diffs, and artifact bundles.
 	// Data older than this will be purged by the TTL worker. Default: 30 days.
-	TTL time.Duration `yaml:"ttl"`
+	TTL time.Duration
 	// TTLInterval is how often the TTL worker runs cleanup. Default: 1 hour.
-	TTLInterval time.Duration `yaml:"ttl_interval"`
+	TTLInterval time.Duration
 	// DropPartitions enables dropping entire monthly partitions for expired data
 	// instead of row-by-row deletion. More efficient for large datasets.
-	DropPartitions bool `yaml:"drop_partitions"`
+	DropPartitions bool
 	// WaveSchedulerInterval is how often the wave scheduler checks for queued runs.
 	// Set to 0 to disable the wave scheduler. Default: 5 seconds.
-	WaveSchedulerInterval time.Duration `yaml:"wave_scheduler_interval"`
+	WaveSchedulerInterval time.Duration
 	// StaleJobRecoveryInterval is how often stale Running jobs are recovered.
 	// Set to 0 to disable stale-job recovery. Default: 30 seconds.
-	StaleJobRecoveryInterval time.Duration `yaml:"stale_job_recovery_interval"`
+	StaleJobRecoveryInterval time.Duration
 	// NodeStaleAfter is the heartbeat age threshold after which a node is considered stale.
 	// Default: 1 minute.
-	NodeStaleAfter time.Duration `yaml:"node_stale_after"`
+	NodeStaleAfter time.Duration
 }
 
 // LoggingConfig configures logging destinations.
 type LoggingConfig struct {
-	Level string `yaml:"level"`
+	Level string
 }
 
 // PostgresConfig configures PostgreSQL connection.
 type PostgresConfig struct {
-	DSN string `yaml:"dsn"`
+	DSN string
 }
 
-// GitLabConfig holds env-only GitLab access requisites for server-owned Git
-// operations. It is intentionally not YAML-mapped.
+// GitLabConfig holds GitLab access requisites for server-owned Git operations.
 type GitLabConfig struct {
 	Domain string
 	Token  string
@@ -93,10 +92,10 @@ type NamedSpecEnvAllowlist []string
 
 // ObjectStoreConfig configures S3-compatible object storage (e.g., Garage).
 type ObjectStoreConfig struct {
-	Endpoint  string `yaml:"endpoint"`
-	Bucket    string `yaml:"bucket"`
-	AccessKey string `yaml:"access_key"`
-	SecretKey string `yaml:"secret_key"`
-	Secure    bool   `yaml:"secure"`
-	Region    string `yaml:"region,omitempty"`
+	Endpoint  string
+	Bucket    string
+	AccessKey string
+	SecretKey string
+	Secure    bool
+	Region    string
 }

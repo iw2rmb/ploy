@@ -2,12 +2,11 @@
 //
 // This package offers helpers for exponential backoff with jitter, context cancellation,
 // structured logging, and metrics hooks. It unifies retry logic across the codebase,
-// replacing bespoke implementations in rollouts, nodeagent, and SSE clients.
+// replacing bespoke implementations in nodeagent and SSE clients.
 package backoff
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"time"
 
@@ -23,18 +22,6 @@ type Policy struct {
 	Multiplier      float64
 	MaxElapsedTime  types.Duration
 	MaxAttempts     int
-}
-
-// RolloutPolicy returns a policy configured for rollout operations.
-// Matches existing rollout backoff defaults: 2s initial, 30s max, 2.0 multiplier.
-func RolloutPolicy() Policy {
-	return Policy{
-		InitialInterval: types.Duration(2 * time.Second),
-		MaxInterval:     types.Duration(30 * time.Second),
-		Multiplier:      2.0,
-		MaxElapsedTime:  types.Duration(5 * time.Minute),
-		MaxAttempts:     10,
-	}
 }
 
 // HeartbeatPolicy returns a policy for nodeagent heartbeat backoff.
@@ -113,37 +100,6 @@ func (p Policy) NewExponentialBackoff() *backoff.ExponentialBackOff {
 	return eb
 }
 
-// retryLoop is the shared retry-loop builder used by RunWithBackoff and PollWithBackoff.
-func retryLoop(ctx context.Context, policy Policy, logger *slog.Logger, notify func(err error, d time.Duration, attempt int), op func() (struct{}, error), exhausted func(attempt int, err error)) error {
-	eb := policy.NewExponentialBackoff()
-
-	opts := []backoff.RetryOption{
-		backoff.WithBackOff(eb),
-	}
-	if policy.MaxAttempts > 0 {
-		opts = append(opts, backoff.WithMaxTries(uint(policy.MaxAttempts)))
-	}
-	if policy.MaxElapsedTime > 0 {
-		opts = append(opts, backoff.WithMaxElapsedTime(time.Duration(policy.MaxElapsedTime)))
-	}
-
-	attempt := 0
-	opts = append(opts, backoff.WithNotify(func(err error, d time.Duration) {
-		notify(err, d, attempt)
-	}))
-
-	wrappedOp := func() (struct{}, error) {
-		attempt++
-		return op()
-	}
-
-	_, err := backoff.Retry(ctx, wrappedOp, opts...)
-	if err != nil {
-		exhausted(attempt, err)
-	}
-	return err
-}
-
 // RunWithBackoff executes an operation with exponential backoff and retries.
 // Uses the configured policy to determine intervals, max attempts, and jitter.
 // Logs each retry attempt with structured fields (attempt, backoff_duration).
@@ -154,64 +110,27 @@ func RunWithBackoff(ctx context.Context, policy Policy, logger *slog.Logger, op 
 		logger = slog.Default()
 	}
 
-	return retryLoop(ctx, policy, logger,
-		func(err error, d time.Duration, attempt int) {
-			logger.Debug("backoff_attempt", "attempt", attempt, "next_backoff", d, "error", err.Error())
-		},
-		func() (struct{}, error) {
-			if err := op(); err != nil {
-				return struct{}{}, err
-			}
-			return struct{}{}, nil
-		},
-		func(attempt int, err error) {
-			logger.Error("backoff_exhausted", "attempt", attempt, "error", err.Error())
-		},
-	)
-}
-
-// PollWithBackoff polls a condition function with exponential backoff until it returns true.
-// Similar to RunWithBackoff but designed for polling: retries when condition returns (false, nil).
-// Logs each poll attempt with structured fields (attempt, status, backoff_duration).
-// Returns nil if condition succeeds, or error if max attempts exhausted or operation fails.
-func PollWithBackoff(ctx context.Context, policy Policy, logger *slog.Logger, condition func() (bool, error)) error {
-	if logger == nil {
-		logger = slog.Default()
+	eb := policy.NewExponentialBackoff()
+	opts := []backoff.RetryOption{backoff.WithBackOff(eb)}
+	if policy.MaxAttempts > 0 {
+		opts = append(opts, backoff.WithMaxTries(uint(policy.MaxAttempts)))
+	}
+	if policy.MaxElapsedTime > 0 {
+		opts = append(opts, backoff.WithMaxElapsedTime(time.Duration(policy.MaxElapsedTime)))
 	}
 
-	var lastStatus string
-	var lastErr error
-
-	return retryLoop(ctx, policy, logger,
-		func(err error, d time.Duration, attempt int) {
-			if lastErr != nil {
-				logger.Debug("poll_backoff_attempt", "attempt", attempt, "next_backoff", d, "status", lastStatus, "error", lastErr.Error())
-			} else {
-				logger.Debug("poll_backoff_attempt", "attempt", attempt, "next_backoff", d, "status", lastStatus)
-			}
-		},
-		func() (struct{}, error) {
-			ok, err := condition()
-			if err != nil {
-				lastStatus = "error"
-				lastErr = err
-				return struct{}{}, err
-			}
-			if ok {
-				return struct{}{}, nil
-			}
-			lastStatus = "retry"
-			lastErr = nil
-			return struct{}{}, fmt.Errorf("condition not met")
-		},
-		func(attempt int, err error) {
-			if lastErr != nil {
-				logger.Error("poll_backoff_exhausted", "attempt", attempt, "status", lastStatus, "error", lastErr.Error())
-			} else {
-				logger.Error("poll_backoff_exhausted", "attempt", attempt, "status", lastStatus)
-			}
-		},
-	)
+	attempt := 0
+	opts = append(opts, backoff.WithNotify(func(err error, delay time.Duration) {
+		logger.Debug("backoff_attempt", "attempt", attempt, "next_backoff", delay, "error", err.Error())
+	}))
+	_, err := backoff.Retry(ctx, func() (struct{}, error) {
+		attempt++
+		return struct{}{}, op()
+	}, opts...)
+	if err != nil {
+		logger.Error("backoff_exhausted", "attempt", attempt, "error", err.Error())
+	}
+	return err
 }
 
 // StatefulBackoff manages exponential backoff state for scenarios where backoff

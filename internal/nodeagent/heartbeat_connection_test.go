@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"os"
 	"path"
 	"strings"
 	"testing"
@@ -218,108 +217,6 @@ func TestSendHeartbeatHandlesServerError(t *testing.T) {
 
 			if !strings.Contains(err.Error(), tt.wantErr) {
 				t.Errorf("error = %v, want substring %q", err, tt.wantErr)
-			}
-		})
-	}
-}
-
-// TestNewHeartbeatManagerParsesNetIgnoreEnv verifies that PLOY_LIFECYCLE_NET_IGNORE
-// is parsed correctly and passed to the lifecycle collector.
-func TestNewHeartbeatManagerParsesNetIgnoreEnv(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name     string
-		envValue string
-		want     []string
-	}{
-		{
-			name:     "empty_env",
-			envValue: "",
-			want:     []string{},
-		},
-		{
-			name:     "whitespace_only",
-			envValue: "   ",
-			want:     []string{},
-		},
-		{
-			name:     "single_pattern",
-			envValue: "docker*",
-			want:     []string{"docker*"},
-		},
-		{
-			name:     "multiple_patterns",
-			envValue: "docker*,veth*,br-*",
-			want:     []string{"docker*", "veth*", "br-*"},
-		},
-		{
-			name:     "patterns_with_whitespace",
-			envValue: " docker* , veth* , br-* ",
-			want:     []string{"docker*", "veth*", "br-*"},
-		},
-		{
-			name:     "empty_patterns_filtered",
-			envValue: "docker*,,veth*,  ,br-*",
-			want:     []string{"docker*", "veth*", "br-*"},
-		},
-		{
-			name:     "complex_patterns",
-			envValue: "lo,cni*,docker0,veth*,flannel*",
-			want:     []string{"lo", "cni*", "docker0", "veth*", "flannel*"},
-		},
-	}
-
-	for _, tt := range tests {
-		tt := tt
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			// Set env var for this test only.
-			oldValue := os.Getenv("PLOY_LIFECYCLE_NET_IGNORE")
-			if tt.envValue != "" {
-				if err := os.Setenv("PLOY_LIFECYCLE_NET_IGNORE", tt.envValue); err != nil {
-					t.Fatalf("setenv error: %v", err)
-				}
-			} else {
-				if err := os.Unsetenv("PLOY_LIFECYCLE_NET_IGNORE"); err != nil {
-					t.Fatalf("unsetenv error: %v", err)
-				}
-			}
-			t.Cleanup(func() {
-				if oldValue != "" {
-					_ = os.Setenv("PLOY_LIFECYCLE_NET_IGNORE", oldValue)
-				} else {
-					_ = os.Unsetenv("PLOY_LIFECYCLE_NET_IGNORE")
-				}
-			})
-
-			cfg := newAgentConfig("http://localhost:8080",
-				withHeartbeatInterval(30*time.Second),
-				withHeartbeatTimeout(10*time.Second))
-
-			mgr, err := NewHeartbeatManager(cfg)
-			if err != nil {
-				t.Fatalf("NewHeartbeatManager error: %v", err)
-			}
-
-			// Verify that the manager and collector are constructed successfully.
-			// The collector's ignoreInterfaces field is unexported, so we verify
-			// that the env var parsing succeeds and the manager is ready to use.
-			// The actual pattern filtering behavior is tested in lifecycle package tests.
-			if mgr == nil {
-				t.Fatal("expected non-nil manager")
-			}
-			if mgr.collector == nil {
-				t.Fatal("expected non-nil collector")
-			}
-
-			// Attempt to collect a snapshot to verify the collector is functional.
-			// This ensures the parsed patterns don't cause any initialization errors.
-			ctx := context.Background()
-			_, err = mgr.collector.Collect(ctx)
-			if err != nil {
-				t.Errorf("collector.Collect error: %v (env=%q)", err, tt.envValue)
 			}
 		})
 	}

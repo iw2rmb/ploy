@@ -275,7 +275,7 @@ func TestExtractBundle_RejectsUnsafePath(t *testing.T) {
 	}
 }
 
-func TestVerifyBundleDigest(t *testing.T) {
+func TestVerifyDigestPrefix(t *testing.T) {
 	t.Parallel()
 
 	data := []byte("hello bundle")
@@ -287,7 +287,8 @@ func TestVerifyBundleDigest(t *testing.T) {
 		digest  string
 		wantErr bool
 	}{
-		{name: "match", data: data, digest: correctDigest},
+		{name: "full digest", data: data, digest: correctDigest},
+		{name: "short digest", data: data, digest: correctDigest[:12]},
 		{name: "mismatch", data: data, digest: "deadbeef", wantErr: true},
 		{name: "case_insensitive", data: []byte("case test"), digest: upper(digestOf([]byte("case test")))},
 		{name: "sha256_prefix", data: []byte("server prefix test"), digest: "sha256:" + digestOf([]byte("server prefix test"))},
@@ -297,7 +298,7 @@ func TestVerifyBundleDigest(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			err := verifyBundleDigest(tt.data, tt.digest)
+			err := verifyDigestPrefix(tt.data, tt.digest)
 			if tt.wantErr && err == nil {
 				t.Fatal("expected error, got nil")
 			}

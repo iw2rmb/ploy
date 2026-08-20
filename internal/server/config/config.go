@@ -2,17 +2,16 @@ package config
 
 // Config represents the ployd daemon configuration.
 type Config struct {
-	HTTP                  HTTPConfig            `yaml:"http"`
-	Metrics               MetricsConfig         `yaml:"metrics"`
-	Auth                  AuthConfig            `yaml:"auth"`
-	Admin                 AdminConfig           `yaml:"admin"`
-	PKI                   PKIConfig             `yaml:"pki"`
-	Scheduler             SchedulerConfig       `yaml:"scheduler"`
-	Logging               LoggingConfig         `yaml:"logging"`
-	Postgres              PostgresConfig        `yaml:"postgres"`
-	GitLab                GitLabConfig          `yaml:"-"`
-	SpecRepos             SpecRepos             `yaml:"-"`
-	NamedSpecEnvAllowlist NamedSpecEnvAllowlist `yaml:"-"`
-	ObjectStore           ObjectStoreConfig     `yaml:"object_store"`
-	FilePath              string                `yaml:"-"`
+	HTTP                  HTTPConfig
+	Metrics               MetricsConfig
+	Auth                  AuthConfig
+	Admin                 AdminConfig
+	PKI                   PKIConfig
+	Scheduler             SchedulerConfig
+	Logging               LoggingConfig
+	Postgres              PostgresConfig
+	GitLab                GitLabConfig
+	SpecRepos             SpecRepos
+	NamedSpecEnvAllowlist NamedSpecEnvAllowlist
+	ObjectStore           ObjectStoreConfig
 }

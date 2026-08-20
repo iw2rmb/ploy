@@ -293,18 +293,3 @@ func TestValidateHydraEntriesRejectsDuplicateDestinations(t *testing.T) {
 		})
 	}
 }
-
-func TestValidateHydraSection(t *testing.T) {
-	t.Parallel()
-
-	for _, s := range []string{"pre_gate", "post_gate", "mig"} {
-		if err := ValidateHydraSection(s); err != nil {
-			t.Errorf("ValidateHydraSection(%q) = %v, want nil", s, err)
-		}
-	}
-	for _, s := range []string{"", "unknown", "mr", "server", "node"} {
-		if err := ValidateHydraSection(s); err == nil {
-			t.Errorf("ValidateHydraSection(%q) = nil, want error", s)
-		}
-	}
-}

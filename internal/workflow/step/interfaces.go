@@ -6,11 +6,6 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
-// WorkspaceHydrator prepares a workspace for execution.
-type WorkspaceHydrator interface {
-	Hydrate(ctx context.Context, manifest contracts.StepManifest, workspace string) error
-}
-
 // ContainerRuntimeOptions holds configuration for Docker runtime.
 type ContainerRuntimeOptions struct {
 	// PullImage controls whether the runtime refreshes the image before container

@@ -44,26 +44,7 @@ type HeartbeatManager struct {
 
 // NewHeartbeatManager constructs a heartbeat manager.
 func NewHeartbeatManager(cfg Config) (*HeartbeatManager, error) {
-	// Read PLOY_LIFECYCLE_NET_IGNORE env var and parse comma-separated patterns.
-	// This allows operators to ignore noisy network interfaces (e.g., docker*, veth*, cni*)
-	// when computing throughput metrics. Empty patterns are filtered out.
-	ignore := []string{}
-	if raw := os.Getenv("PLOY_LIFECYCLE_NET_IGNORE"); strings.TrimSpace(raw) != "" {
-		for _, pattern := range strings.Split(raw, ",") {
-			if trimmed := strings.TrimSpace(pattern); trimmed != "" {
-				ignore = append(ignore, trimmed)
-			}
-		}
-	}
-
-	collector, err := lifecycle.NewCollector(lifecycle.Options{
-		Role:             "node",
-		NodeID:           cfg.NodeID,
-		IgnoreInterfaces: ignore,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("new lifecycle collector: %w", err)
-	}
+	collector := lifecycle.NewCollector()
 
 	// Don't create HTTP client yet - defer until after bootstrap runs.
 	// Client will be lazily initialized on first heartbeat.
@@ -142,14 +123,7 @@ func (h *HeartbeatManager) sendHeartbeat(ctx context.Context) error {
 		return fmt.Errorf("create http client: %w", h.clientErr)
 	}
 
-	snap, err := h.collector.Collect(ctx)
-	if err != nil {
-		return fmt.Errorf("collect snapshot: %w", err)
-	}
-
-	// Use typed NodeCapacity instead of map[string]any casts.
-	// This eliminates unsafe type assertions and provides compile-time safety.
-	capacity := snap.Capacity
+	capacity := h.collector.CollectCapacity(ctx)
 	storage := collectStorageDiagnostics()
 	diskFreeBytes, diskTotalBytes := storage.heartbeatDiskBytes(int64(capacity.DiskFreeBytes), int64(capacity.DiskTotalBytes))
 

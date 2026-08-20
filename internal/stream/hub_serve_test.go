@@ -24,7 +24,7 @@ func TestServeWritesSSEFrames(t *testing.T) {
 	req := httptest.NewRequest("GET", "/", nil)
 	recorder := &flushRecorder{ResponseRecorder: httptest.NewRecorder()}
 
-	if err := Serve(recorder, req, hub, runID, 0); err != nil {
+	if err := ServeFiltered(recorder, req, hub, runID, 0, nil); err != nil {
 		t.Fatalf("serve: %v", err)
 	}
 

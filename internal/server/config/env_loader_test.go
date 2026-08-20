@@ -27,6 +27,18 @@ func TestLoadFromEnv_Defaults(t *testing.T) {
 	if !cfg.Auth.BearerTokens.Enabled {
 		t.Fatal("Auth.BearerTokens.Enabled = false, want true")
 	}
+	if cfg.Scheduler.StaleJobRecoveryInterval != 30*time.Second {
+		t.Fatalf("StaleJobRecoveryInterval = %v, want 30s", cfg.Scheduler.StaleJobRecoveryInterval)
+	}
+	if cfg.Scheduler.WaveSchedulerInterval != 5*time.Second {
+		t.Fatalf("WaveSchedulerInterval = %v, want 5s", cfg.Scheduler.WaveSchedulerInterval)
+	}
+	if cfg.Scheduler.NodeStaleAfter != time.Minute {
+		t.Fatalf("NodeStaleAfter = %v, want 1m", cfg.Scheduler.NodeStaleAfter)
+	}
+	if cfg.PKI.RenewBefore != time.Hour {
+		t.Fatalf("PKI.RenewBefore = %v, want 1h", cfg.PKI.RenewBefore)
+	}
 }
 
 func TestLoadFromEnv_Overrides(t *testing.T) {
@@ -38,6 +50,9 @@ func TestLoadFromEnv_Overrides(t *testing.T) {
 	t.Setenv("PLOYD_LOG_LEVEL", "debug")
 	t.Setenv("PLOYD_SCHEDULER_WAVE_SCHEDULER_INTERVAL", "0s")
 	t.Setenv("PLOYD_SCHEDULER_STALE_JOB_RECOVERY_INTERVAL", "45s")
+	t.Setenv("PLOYD_SCHEDULER_NODE_STALE_AFTER", "2m")
+	t.Setenv("PLOYD_PKI_BUNDLE_DIR", "/var/lib/ploy/pki")
+	t.Setenv("PLOYD_PKI_RENEW_BEFORE", "12m")
 	t.Setenv("PLOY_GITLAB_DOMAIN", "https://gitlab.example.com")
 	t.Setenv("PLOY_GITLAB_TOKEN", "glpat-test")
 	t.Setenv("PLOY_SPECS_REPOS", " https://gitlab.example.com/platform/migs.git , ssh://git@gitlab.example.com/team/scenarios.git ")
@@ -67,6 +82,15 @@ func TestLoadFromEnv_Overrides(t *testing.T) {
 	}
 	if cfg.Scheduler.StaleJobRecoveryInterval != 45*time.Second {
 		t.Fatalf("StaleJobRecoveryInterval = %v, want 45s", cfg.Scheduler.StaleJobRecoveryInterval)
+	}
+	if cfg.Scheduler.NodeStaleAfter != 2*time.Minute {
+		t.Fatalf("NodeStaleAfter = %v, want 2m", cfg.Scheduler.NodeStaleAfter)
+	}
+	if cfg.PKI.BundleDir != "/var/lib/ploy/pki" {
+		t.Fatalf("PKI.BundleDir = %q, want /var/lib/ploy/pki", cfg.PKI.BundleDir)
+	}
+	if cfg.PKI.RenewBefore != 12*time.Minute {
+		t.Fatalf("PKI.RenewBefore = %v, want 12m", cfg.PKI.RenewBefore)
 	}
 	if cfg.GitLab.Domain != "https://gitlab.example.com" {
 		t.Fatalf("GitLab.Domain = %q", cfg.GitLab.Domain)
@@ -172,7 +196,9 @@ func TestLoadFromEnv_ParseErrors(t *testing.T) {
 	}{
 		{name: "bool", key: "PLOYD_AUTH_BEARER_TOKENS_ENABLED", value: "nope", errContains: "PLOYD_AUTH_BEARER_TOKENS_ENABLED"},
 		{name: "duration", key: "PLOYD_HTTP_READ_TIMEOUT", value: "1lightyear", errContains: "PLOYD_HTTP_READ_TIMEOUT"},
-		{name: "listen", key: "PLOYD_HTTP_LISTEN", value: "127.0.0.1", errContains: "http.listen"},
+		{name: "http listen", key: "PLOYD_HTTP_LISTEN", value: "127.0.0.1", errContains: "http.listen"},
+		{name: "metrics listen", key: "PLOYD_METRICS_LISTEN", value: "127.0.0.1:99999", errContains: "metrics.listen"},
+		{name: "admin listen", key: "PLOYD_ADMIN_LISTEN", value: "127.0.0.1", errContains: "admin.listen"},
 	}
 
 	for _, tt := range tests {

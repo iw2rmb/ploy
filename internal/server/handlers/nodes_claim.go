@@ -25,9 +25,6 @@ func claimJobHandlerWithEvents(st store.Store, bs blobstore.Store, eventsService
 		result, err := service.Claim(r.Context(), nodeID)
 		if err != nil {
 			switch e := err.(type) {
-			case *claimBadRequest:
-				writeHTTPError(w, http.StatusBadRequest, "%s", e.Message)
-				return
 			case *claimNotFound:
 				writeHTTPError(w, http.StatusNotFound, "%s", e.Message)
 				return

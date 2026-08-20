@@ -47,7 +47,6 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest,
 		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
 		return
 	}
-	runner.LogWriter = artifactLogs
 	closeArtifactLogs = func() {
 		if err := artifactLogs.Close(); err != nil {
 			slog.Warn("failed to close job artifact logs", "run_id", req.RunID, "job_id", req.JobID, "error", err)
@@ -87,7 +86,9 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest,
 			slog.Warn("failed to save gate job image name", "run_id", req.RunID, "job_id", req.JobID, "error", err)
 		}
 	})
-	gateResult, gateErr := r.runGate(ctx, runner, manifest, workspace, mounts)
+	gateExecutor := step.NewGateExecutor(runner.Containers)
+	gateCtx := step.WithExecutionLogWriter(ctx, artifactLogs)
+	gateResult, gateErr := r.runGate(gateCtx, gateExecutor, manifest, workspace, mounts)
 
 	// Gate execution errors (e.g., Docker pull/create/start failures) are NOT build failures
 	// and are treated as terminal runtime errors for this repo attempt so the
@@ -224,15 +225,15 @@ func applyGatePhaseOverrides(manifest *contracts.StepManifest, req StartRunReque
 }
 
 // runGate executes the build gate and returns the result.
-func (r *runController) runGate(ctx context.Context, runner step.Runner, manifest contracts.StepManifest, workspace string, mounts step.JobMounts) (*contracts.BuildGateStageMetadata, error) {
+func (r *runController) runGate(ctx context.Context, executor step.GateExecutor, manifest contracts.StepManifest, workspace string, mounts step.JobMounts) (*contracts.BuildGateStageMetadata, error) {
 	gateSpec := manifest.Gate
-	if runner.Gate == nil || gateSpec == nil || !gateSpec.Enabled {
+	if executor == nil || gateSpec == nil || !gateSpec.Enabled {
 		// No gate configured - return success.
 		return &contracts.BuildGateStageMetadata{
 			StaticChecks: []contracts.BuildGateStaticCheckReport{{Passed: true, Tool: "none"}},
 		}, nil
 	}
-	return runner.Gate.Execute(step.WithExecutionLogWriter(ctx, runner.LogWriter), gateSpec, workspace, mounts)
+	return executor.Execute(ctx, gateSpec, workspace, mounts)
 }
 
 // gateResultPassed reports whether the gate result indicates a passing gate.

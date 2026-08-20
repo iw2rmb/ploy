@@ -24,15 +24,6 @@ func TestPolicies(t *testing.T) {
 		wantMaxAttempts int
 	}{
 		{
-			name:            "rollout",
-			policy:          RolloutPolicy(),
-			wantInitial:     2 * time.Second,
-			wantMax:         30 * time.Second,
-			wantMultiplier:  2.0,
-			wantMaxElapsed:  5 * time.Minute,
-			wantMaxAttempts: 10,
-		},
-		{
 			name:           "heartbeat",
 			policy:         HeartbeatPolicy(),
 			wantInitial:    5 * time.Second,
@@ -214,82 +205,6 @@ func TestRunWithBackoff(t *testing.T) {
 			}
 			if !tt.wantCalls(calls) {
 				t.Errorf("op called %d times, unexpected", calls)
-			}
-		})
-	}
-}
-
-// TestPollWithBackoff verifies retry behavior for PollWithBackoff across scenarios.
-func TestPollWithBackoff(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name      string
-		policy    Policy
-		logger    *slog.Logger
-		condition func(calls *int) (bool, error)
-		wantErr   bool
-		wantCalls int
-	}{
-		{
-			name:      "condition met immediately",
-			policy:    fastPolicy(3),
-			condition: func(_ *int) (bool, error) { return true, nil },
-			wantCalls: 1,
-		},
-		{
-			name:   "condition eventually met",
-			policy: fastPolicy(5),
-			condition: func(calls *int) (bool, error) {
-				return *calls >= 3, nil
-			},
-			wantCalls: 3,
-		},
-		{
-			name:      "condition error propagated",
-			policy:    fastPolicy(3),
-			condition: func(_ *int) (bool, error) { return false, errors.New("condition error") },
-			wantErr:   true,
-			wantCalls: 3,
-		},
-		{
-			name:      "exhaust attempts (never true)",
-			policy:    fastPolicy(4),
-			condition: func(_ *int) (bool, error) { return false, nil },
-			wantErr:   true,
-			wantCalls: 4,
-		},
-		{
-			name:      "nil logger does not panic",
-			policy:    fastPolicy(2),
-			logger:    nil,
-			condition: func(_ *int) (bool, error) { return true, nil },
-			wantCalls: 1,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			ctx := context.Background()
-			calls := 0
-
-			logger := tt.logger
-			if logger == nil && tt.name != "nil logger does not panic" {
-				logger = slog.Default()
-			}
-
-			condition := func() (bool, error) {
-				calls++
-				return tt.condition(&calls)
-			}
-
-			err := PollWithBackoff(ctx, tt.policy, logger, condition)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("PollWithBackoff() error = %v, wantErr %v", err, tt.wantErr)
-			}
-			if calls != tt.wantCalls {
-				t.Errorf("condition called %d times, want %d", calls, tt.wantCalls)
 			}
 		})
 	}

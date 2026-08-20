@@ -161,10 +161,12 @@ func (r *runController) executeContainerWithOutcome(ctx context.Context, req Sta
 		}
 	}()
 
+	hydrationStart := time.Now()
 	wsResult, err := r.prepareStickyWorkspaceWithCleanup(ctx, req, cfg.Manifest)
 	if err != nil {
 		return outcome, fmt.Errorf("prepare sticky workspace: %w", err)
 	}
+	hydrationDuration := time.Since(hydrationStart)
 	defer wsResult.cleanup()
 	workspace := wsResult.path
 
@@ -173,7 +175,7 @@ func (r *runController) executeContainerWithOutcome(ctx context.Context, req Sta
 			return outcome, fmt.Errorf("populate in dir: %w", err)
 		}
 	}
-	stepOutcome, err := r.runContainerJob(ctx, req, cfg, execCtx, workspace, startTime, jobDirs, mounts)
+	stepOutcome, err := r.runContainerJob(ctx, req, cfg, execCtx, workspace, startTime, hydrationDuration, jobDirs, mounts)
 	if err != nil {
 		return outcome, err
 	}
@@ -190,14 +192,13 @@ func (r *runController) runContainerJob(
 	execCtx executionContext,
 	workspace string,
 	startTime time.Time,
+	hydrationDuration time.Duration,
 	jobDirs JobDirectories,
 	mounts step.JobMounts,
 ) (jobOutcome, error) {
 	outcome := jobOutcome{}
 	outDir, diffPath := jobDirs.Out, jobDirs.Diff
 	manifest := cfg.Manifest
-	disableManifestGate(&manifest)
-	clearManifestHydration(&manifest)
 
 	if cfg.PrepareManifest != nil {
 		if err := cfg.PrepareManifest(&manifest, workspace); err != nil {
@@ -213,7 +214,9 @@ func (r *runController) runContainerJob(
 		return outcome, fmt.Errorf("save job image name: %w", err)
 	}
 
-	var result step.Result
+	result := step.Result{Timings: step.StageTiming{
+		HydrationDuration: types.Duration(hydrationDuration),
+	}}
 	var runErr error
 	var duration time.Duration
 	if cfg.TrySkip != nil {
@@ -222,13 +225,15 @@ func (r *runController) runContainerJob(
 			return outcome, fmt.Errorf("evaluate skip: %w", err)
 		}
 		if skipped {
-			duration := time.Since(startTime)
+			duration = time.Since(startTime)
 			if runErr == nil && cfg.ValidateOutputs != nil {
 				if validateErr := cfg.ValidateOutputs(outDir, workspace); validateErr != nil {
 					runErr = fmt.Errorf("validate job outputs: %w", validateErr)
 				}
 			}
-			runErr = r.finalizeOutputs(req, cfg, outDir, workspace, runErr, step.Result{})
+			runErr = r.finalizeOutputs(req, cfg, outDir, workspace, runErr, result)
+			duration = time.Since(startTime)
+			result.Timings.TotalDuration = types.Duration(duration)
 			repoSHAOut := ""
 			if runErr == nil {
 				var repoSHAErr error
@@ -240,19 +245,20 @@ func (r *runController) runContainerJob(
 			}
 			statsBuilder := types.NewRunStatsBuilder().
 				ExitCode(0).
-				DurationMs(duration.Milliseconds())
+				DurationMs(duration.Milliseconds()).
+				TimingsFromDurations(hydrationDuration.Milliseconds(), 0, 0, duration.Milliseconds())
 			if runErr != nil {
 				statsBuilder.Error(normalizedExecutionError(runErr))
 			}
 			stats := statsBuilder.MustBuild()
 			outcome = jobOutcome{
 				runErr:     runErr,
-				result:     step.Result{},
+				result:     result,
 				repoSHAOut: repoSHAOut,
 				duration:   duration,
 			}
 			if !cfg.SuppressTerminalStatus {
-				r.reportTerminalStatus(ctx, req, runErr, step.Result{}, stats, repoSHAOut, duration)
+				r.reportTerminalStatus(ctx, req, runErr, result, stats, repoSHAOut, duration)
 			}
 			return outcome, nil
 		}
@@ -279,6 +285,7 @@ func (r *runController) runContainerJob(
 		Workspace: workspace,
 		JobMounts: mounts,
 	})
+	result.Timings.HydrationDuration = types.Duration(hydrationDuration)
 	duration = time.Since(startTime)
 	stopOutputSync()
 
@@ -289,6 +296,7 @@ func (r *runController) runContainerJob(
 	}
 	runErr = r.finalizeOutputs(req, cfg, outDir, workspace, runErr, result)
 	duration = time.Since(startTime)
+	result.Timings.TotalDuration = types.Duration(duration)
 	if runErr != nil || result.ExitCode != 0 {
 		persistContainerInspectArtifact(req, jobDirs, result)
 	}
@@ -325,7 +333,7 @@ func (r *runController) runContainerJob(
 		TimingsFromDurations(
 			time.Duration(result.Timings.HydrationDuration).Milliseconds(),
 			time.Duration(result.Timings.ExecutionDuration).Milliseconds(),
-			time.Duration(result.Timings.DiffDuration).Milliseconds(),
+			0,
 			time.Duration(result.Timings.TotalDuration).Milliseconds(),
 		)
 	if result.ContainerResources != nil {
@@ -470,22 +478,4 @@ func (r *runController) prepareStickyWorkspaceWithCleanup(
 		path:    workspace,
 		cleanup: func() {},
 	}, nil
-}
-
-// clearManifestHydration removes hydration config from manifest inputs to prevent double-hydration.
-func clearManifestHydration(manifest *contracts.StepManifest) {
-	if len(manifest.Inputs) == 0 {
-		return
-	}
-	inputs := make([]contracts.StepInput, len(manifest.Inputs))
-	copy(inputs, manifest.Inputs)
-	for i := range inputs {
-		inputs[i].Hydration = nil
-	}
-	manifest.Inputs = inputs
-}
-
-// disableManifestGate sets Gate.Enabled=false on the manifest.
-func disableManifestGate(manifest *contracts.StepManifest) {
-	manifest.Gate = &contracts.StepGateSpec{Enabled: false}
 }

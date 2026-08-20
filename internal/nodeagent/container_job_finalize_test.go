@@ -154,6 +154,7 @@ func TestStartRuntimeOutputSyncLoop(t *testing.T) {
 }
 
 func TestRunContainerJobNonzeroExitReportsDerivedStatsError(t *testing.T) {
+	hydrationDuration := 25 * time.Millisecond
 	testCases := []struct {
 		name      string
 		stdout    string
@@ -246,7 +247,8 @@ func TestRunContainerJobNonzeroExitReportsDerivedStatsError(t *testing.T) {
 				cfg,
 				execCtx,
 				workspace,
-				time.Now(),
+				time.Now().Add(-50*time.Millisecond),
+				hydrationDuration,
 				paths,
 				mounts,
 			)
@@ -263,6 +265,59 @@ func TestRunContainerJobNonzeroExitReportsDerivedStatsError(t *testing.T) {
 			if got := cap.Stats["error"]; got != tc.wantError {
 				t.Fatalf("stats.error = %#v, want %q", got, tc.wantError)
 			}
+			timings, ok := cap.Stats["timings"].(map[string]any)
+			if !ok {
+				t.Fatalf("stats.timings = %#v, want object", cap.Stats["timings"])
+			}
+			if got := timings["hydration_duration_ms"]; got != float64(hydrationDuration.Milliseconds()) {
+				t.Fatalf("hydration_duration_ms = %#v, want %d", got, hydrationDuration.Milliseconds())
+			}
+			if got, ok := timings["total_duration_ms"].(float64); !ok || got < float64(hydrationDuration.Milliseconds()) {
+				t.Fatalf("total_duration_ms = %#v, want at least %d", timings["total_duration_ms"], hydrationDuration.Milliseconds())
+			}
 		})
+	}
+}
+
+func TestRunContainerJobSkippedReportsHydrationTiming(t *testing.T) {
+	t.Setenv("PLOYD_CACHE_HOME", t.TempDir())
+	runID := types.NewRunID()
+	jobID := types.NewJobID()
+	paths := jobDirectories(runID, jobID)
+	if err := ensureJobDirectories(paths); err != nil {
+		t.Fatalf("ensure job directories: %v", err)
+	}
+	server, cap := newStatusCaptureServer(t, jobID.String())
+	controller := newTestController(t, newAgentConfig(server.URL))
+	req := StartRunRequest{RunID: runID, RepoID: types.NewRepoID(), JobID: jobID, JobType: types.JobTypeMig}
+	hydrationDuration := 20 * time.Millisecond
+
+	_, err := controller.runContainerJob(
+		context.Background(),
+		req,
+		containerJobConfig{
+			Manifest:  contracts.StepManifest{ID: "mig-step", Image: "example/mig:latest"},
+			TrySkip:   func(context.Context, contracts.StepManifest, string, string) (bool, error) { return true, nil },
+			StartTime: time.Now().Add(-40 * time.Millisecond),
+		},
+		executionContext{},
+		t.TempDir(),
+		time.Now().Add(-40*time.Millisecond),
+		hydrationDuration,
+		paths,
+		step.JobMounts{},
+	)
+	if err != nil {
+		t.Fatalf("runContainerJob() error = %v", err)
+	}
+	timings, ok := cap.Stats["timings"].(map[string]any)
+	if !ok {
+		t.Fatalf("stats.timings = %#v, want object", cap.Stats["timings"])
+	}
+	if got := timings["hydration_duration_ms"]; got != float64(hydrationDuration.Milliseconds()) {
+		t.Fatalf("hydration_duration_ms = %#v, want %d", got, hydrationDuration.Milliseconds())
+	}
+	if got, ok := timings["total_duration_ms"].(float64); !ok || got < float64(hydrationDuration.Milliseconds()) {
+		t.Fatalf("total_duration_ms = %#v, want at least %d", timings["total_duration_ms"], hydrationDuration.Milliseconds())
 	}
 }

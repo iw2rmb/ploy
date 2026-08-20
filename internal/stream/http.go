@@ -13,13 +13,6 @@ import (
 // ErrNoHub indicates the hub is nil.
 var ErrNoHub = errors.New("logstream: hub unavailable")
 
-// Serve streams events for the provided stream over SSE.
-// sinceID must be a valid EventID (non-negative); callers should validate before calling.
-// Returns ErrInvalidRunID if the run ID is blank or whitespace-only.
-func Serve(w http.ResponseWriter, r *http.Request, hub *Hub, runID domaintypes.RunID, sinceID domaintypes.EventID) error {
-	return ServeFiltered(w, r, hub, runID, sinceID, nil)
-}
-
 // ServeFiltered streams events for the provided stream over SSE, applying an optional
 // filter/transform function before writing frames.
 //

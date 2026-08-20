@@ -2,7 +2,6 @@ package step
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"time"
@@ -11,43 +10,10 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
-// Runner executes workflow steps.
-//
-// # Execution Stages (Pre-mig Gate per Call)
-//
-// Runner.Run processes each step call through the following stages in order:
-//
-//  1. Hydration — Prepare the workspace by fetching repository sources via
-//     WorkspaceHydrator. Errors here abort the run immediately.
-//
-//  2. Pre-mig Build Gate — When Gate is enabled (Manifest.Gate.Enabled), run static validation on the
-//     workspace before executing the mig container. If the gate fails,
-//     Runner.Run returns ErrGateFailed without executing container
-//     stages.
-//
-//  3. Container Execution — Create, start, and wait on the container via
-//     ContainerRuntime. Logs are forwarded to LogWriter if present.
-//     Container cleanup is owned by node-runtime pre-claim disk-pressure flow.
-//
-// # Gate Ownership Contract
-//
-// Runner supports an optional pre-mig gate when Manifest.Gate.Enabled=true.
-// This capability exists for direct invocations (e.g., standalone testing)
-// where Runner manages its own gate lifecycle.
-//
-// However, nodeagent step execution MUST pass manifests with Gate.Enabled=false.
-// The nodeagent orchestration layer owns all gate lifecycle management via
-// the gate job chain, which handles:
-//   - A single pre-run gate before the step loop begins.
-//   - Per-step post-mig gates after each container execution.
-//
-// Passing Gate.Enabled=true from nodeagent would cause duplicate pre-mig gates
-// (one from the nodeagent, one from Runner.Run) and break the single-gate-
-// per-run invariant. The nodeagent is the authoritative gate orchestrator.
+// Runner executes one workflow container. Nodeagent owns workspace preparation,
+// gate orchestration, and whole-job timing around this execution boundary.
 type Runner struct {
-	Workspace  WorkspaceHydrator
 	Containers ContainerRuntime
-	Gate       GateExecutor
 	LogWriter  io.Writer // Optional: streams logs to server as gzipped chunks.
 }
 
@@ -72,7 +38,6 @@ type Result struct {
 	ContainerInspectJSON []byte
 	// Per-stage timings captured during execution.
 	Timings            StageTiming
-	Gate               *contracts.BuildGateStageMetadata
 	ContainerResources *types.RunStatsJobResources
 }
 
@@ -80,21 +45,12 @@ type Result struct {
 type StageTiming struct {
 	HydrationDuration types.Duration
 	ExecutionDuration types.Duration
-	GateDuration      types.Duration
-	DiffDuration      types.Duration
-	PublishDuration   types.Duration
 	TotalDuration     types.Duration
 }
 
-// ErrGateFailed is returned when the pre-mig Build Gate fails.
-var ErrGateFailed = errors.New("build gate failed")
-
 // Run executes a step and returns the result.
 func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
-	result, totalStart, err := r.runHydrationAndGate(ctx, req, "pre-mig validation failed")
-	if err != nil {
-		return result, err
-	}
+	var result Result
 
 	// Seed the job output before execution so its single mount contains both
 	// Hydra content and container writes.
@@ -112,7 +68,7 @@ func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 		return Result{}, fmt.Errorf("seed home dir from staging: %w", err)
 	}
 
-	// Stage 3: Execute container via configured runtime.
+	// Execute the container via the configured runtime.
 	executionStart := time.Now()
 	if r.Containers == nil {
 		if r.LogWriter != nil {
@@ -159,29 +115,7 @@ func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 
 	}
 
-	result.Timings.TotalDuration = types.Duration(time.Since(totalStart))
 	return result, nil
-}
-
-func (r *Runner) runHydrationAndGate(ctx context.Context, req Request, gateFailureMessage string) (Result, time.Time, error) {
-	totalStart := time.Now()
-	var result Result
-
-	hydrationDuration, err := r.hydrate(ctx, req)
-	if err != nil {
-		return Result{}, totalStart, err
-	}
-	result.Timings.HydrationDuration = hydrationDuration
-
-	gateMetadata, gateDuration, err := r.runGate(ctx, req, gateFailureMessage)
-	result.Gate = gateMetadata
-	result.Timings.GateDuration = gateDuration
-	if err != nil {
-		result.Timings.TotalDuration = types.Duration(time.Since(totalStart))
-		return result, totalStart, err
-	}
-
-	return result, totalStart, nil
 }
 
 // NormalizeContainerResourceUsage converts Docker counters to persisted job metrics.

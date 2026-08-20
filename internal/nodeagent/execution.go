@@ -18,16 +18,9 @@ import (
 	"time"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
-	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"github.com/iw2rmb/ploy/internal/workflow/lifecycle"
 	"github.com/iw2rmb/ploy/internal/workflow/step"
 )
-
-type noopWorkspaceHydrator struct{}
-
-func (noopWorkspaceHydrator) Hydrate(context.Context, contracts.StepManifest, string) error {
-	return nil
-}
 
 // executeRun orchestrates job execution based on job type.
 // Dispatches to specialized handlers: gate jobs and mig jobs.
@@ -200,10 +193,6 @@ func (r *runController) initializeRuntime(ctx context.Context, runID types.RunID
 	// Initialize diff generator for workspace change detection.
 	diffGenerator := step.NewFilesystemDiffGenerator()
 
-	// Initialize gate executor using local Docker-based execution.
-	// All gates run via the container runtime.
-	gateExecutor := step.NewGateExecutor(containerRuntime)
-
 	// Initialize log streamer to stream logs as gzipped chunks to the server.
 	// The jobID parameter associates log chunks with a specific job, enabling
 	// per-job log attribution in the control plane.
@@ -214,9 +203,7 @@ func (r *runController) initializeRuntime(ctx context.Context, runID types.RunID
 
 	// Assemble the step runner with all components.
 	runner := step.Runner{
-		Workspace:  noopWorkspaceHydrator{},
 		Containers: containerRuntime,
-		Gate:       gateExecutor,
 		LogWriter:  logStreamer,
 	}
 

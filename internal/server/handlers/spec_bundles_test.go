@@ -3,7 +3,6 @@ package handlers
 import (
 	"bytes"
 	"context"
-	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -268,87 +267,4 @@ func TestSpecBundleDownloadLastRefInvokedWhenRequestCanceledImmediatelyAfterResp
 	if st.updateSpecBundleLastRefAtCtxErr != nil {
 		t.Fatalf("expected detached context to remain active after request cancellation, got %v", st.updateSpecBundleLastRefAtCtxErr)
 	}
-}
-
-func TestProbeIntegrity(t *testing.T) {
-	t.Run("Success", func(t *testing.T) {
-		st := &handlerStore{}
-		bs := bsmock.New()
-		bundleID := domaintypes.NewSpecBundleID().String()
-		key := "spec-bundles/" + bundleID + ".tar.gz"
-		st.getSpecBundle.val = store.SpecBundle{ID: bundleID, ObjectKey: &key}
-		if _, err := bs.Put(context.Background(), key, "application/gzip", []byte("x")); err != nil {
-			t.Fatalf("seed blob store: %v", err)
-		}
-
-		got, err := probeIntegrity(context.Background(), st, bs, bundleID)
-		if err != nil {
-			t.Fatalf("probeIntegrity() error: %v", err)
-		}
-		if got.ID != bundleID {
-			t.Fatalf("bundle id=%q, want %q", got.ID, bundleID)
-		}
-	})
-
-	t.Run("MetadataMissing", func(t *testing.T) {
-		st := &handlerStore{}
-		st.getSpecBundle.err = pgx.ErrNoRows
-		bs := bsmock.New()
-		bundleID := "bundle_missing_meta"
-
-		_, err := probeIntegrity(context.Background(), st, bs, bundleID)
-		if err == nil {
-			t.Fatal("expected metadata missing error")
-		}
-		var integrityErr *integrityError
-		if !errors.As(err, &integrityErr) {
-			t.Fatalf("expected integrityError, got %T (%v)", err, err)
-		}
-		if integrityErr.kind != integrityMetadataMissing {
-			t.Fatalf("kind=%q, want %q", integrityErr.kind, integrityMetadataMissing)
-		}
-		if got := integrityErr.Error(); got != `spec bundle "bundle_missing_meta" metadata is missing` {
-			t.Fatalf("message=%q", got)
-		}
-	})
-
-	t.Run("MissingObjectKey", func(t *testing.T) {
-		st := &handlerStore{}
-		st.getSpecBundle.val = store.SpecBundle{ID: "bundle_missing_key"}
-		bs := bsmock.New()
-
-		_, err := probeIntegrity(context.Background(), st, bs, "bundle_missing_key")
-		if err == nil {
-			t.Fatal("expected object key missing error")
-		}
-		var integrityErr *integrityError
-		if !errors.As(err, &integrityErr) {
-			t.Fatalf("expected integrityError, got %T (%v)", err, err)
-		}
-		if integrityErr.kind != integrityObjectKeyMissing {
-			t.Fatalf("kind=%q, want %q", integrityErr.kind, integrityObjectKeyMissing)
-		}
-	})
-
-	t.Run("BlobMissing", func(t *testing.T) {
-		st := &handlerStore{}
-		key := "spec-bundles/bundle_missing_blob.tar.gz"
-		st.getSpecBundle.val = store.SpecBundle{ID: "bundle_missing_blob", ObjectKey: &key}
-		bs := bsmock.New()
-
-		_, err := probeIntegrity(context.Background(), st, bs, "bundle_missing_blob")
-		if err == nil {
-			t.Fatal("expected blob missing error")
-		}
-		var integrityErr *integrityError
-		if !errors.As(err, &integrityErr) {
-			t.Fatalf("expected integrityError, got %T (%v)", err, err)
-		}
-		if integrityErr.kind != integrityBlobMissing {
-			t.Fatalf("kind=%q, want %q", integrityErr.kind, integrityBlobMissing)
-		}
-		if got := integrityErr.Error(); got != `spec bundle "bundle_missing_blob" blob is missing from object storage` {
-			t.Fatalf("message=%q", got)
-		}
-	})
 }

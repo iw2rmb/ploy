@@ -143,7 +143,7 @@ func (r *runController) uploadDiff(
 		Timings(
 			time.Duration(result.Timings.HydrationDuration).Milliseconds(),
 			time.Duration(result.Timings.ExecutionDuration).Milliseconds(),
-			time.Duration(result.Timings.DiffDuration).Milliseconds(),
+			0,
 			time.Duration(result.Timings.TotalDuration).Milliseconds(),
 		).
 		MustBuild()

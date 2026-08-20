@@ -1,6 +1,7 @@
 package contracts
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -188,113 +189,45 @@ func TestJobImage_ResolveImage_Empty(t *testing.T) {
 	}
 }
 
-// TestParseJobImage_String verifies parsing of string (universal) images.
-func TestParseJobImage_String(t *testing.T) {
+func TestJobImage_UnmarshalJSON(t *testing.T) {
 	t.Parallel()
-
 	tests := []struct {
-		name  string
-		input any
-		want  string
+		name       string
+		wire       string
+		universal  string
+		stackImage string
+		wantEmpty  bool
+		wantErr    bool
 	}{
-		{
-			name:  "simple string",
-			input: "ghcr.io/iw2rmb/ploy/mig:latest",
-			want:  "ghcr.io/iw2rmb/ploy/mig:latest",
-		},
-		{
-			name:  "string with whitespace",
-			input: "  ghcr.io/iw2rmb/ploy/mig:v1  ",
-			want:  "ghcr.io/iw2rmb/ploy/mig:v1",
-		},
-		{
-			name:  "empty string",
-			input: "",
-			want:  "",
-		},
+		{name: "universal", wire: `" ghcr.io/iw2rmb/ploy/mig:latest "`, universal: "ghcr.io/iw2rmb/ploy/mig:latest"},
+		{name: "stack map", wire: `{"default":" img:default "}`, stackImage: "img:default"},
+		{name: "null", wire: `null`, wantEmpty: true},
+		{name: "invalid type", wire: `42`, wantErr: true},
+		{name: "invalid map value", wire: `{"default":42}`, wantErr: true},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := ParseJobImage(tt.input)
+			var image JobImage
+			err := json.Unmarshal([]byte(tt.wire), &image)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("json.Unmarshal() error = %v, wantErr %v", err, tt.wantErr)
+			}
 			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
+				return
 			}
-			if got.Universal != tt.want {
-				t.Errorf("ParseJobImage(%v).Universal = %q, want %q", tt.input, got.Universal, tt.want)
+			if image.Universal != tt.universal {
+				t.Fatalf("Universal = %q, want %q", image.Universal, tt.universal)
 			}
-			if len(got.ByStack) != 0 {
-				t.Errorf("ParseJobImage(%v).ByStack should be empty, got %v", tt.input, got.ByStack)
+			if image.ByStack[MigStackDefault] != tt.stackImage {
+				t.Fatalf("default image = %q, want %q", image.ByStack[MigStackDefault], tt.stackImage)
+			}
+			if tt.wantEmpty && !image.IsEmpty() {
+				t.Fatalf("image = %v, want empty", image)
 			}
 		})
 	}
-}
-
-// TestParseJobImage_Map verifies parsing of map (stack-specific) images.
-func TestParseJobImage_Map(t *testing.T) {
-	t.Parallel()
-
-	t.Run("map[string]any from JSON/YAML", func(t *testing.T) {
-		t.Parallel()
-		input := map[string]any{
-			"default":     "ghcr.io/iw2rmb/ploy/migs-orw:latest",
-			"java-maven":  "ghcr.io/iw2rmb/ploy/orw-cli:latest",
-			"java-gradle": "ghcr.io/iw2rmb/ploy/orw-cli:latest",
-		}
-
-		got, err := ParseJobImage(input)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if got.Universal != "" {
-			t.Errorf("expected empty Universal, got %q", got.Universal)
-		}
-		if len(got.ByStack) != 3 {
-			t.Errorf("expected 3 stack entries, got %d", len(got.ByStack))
-		}
-		if got.ByStack[MigStackDefault] != "ghcr.io/iw2rmb/ploy/migs-orw:latest" {
-			t.Errorf("default image mismatch: %q", got.ByStack[MigStackDefault])
-		}
-		if got.ByStack[MigStackJavaMaven] != "ghcr.io/iw2rmb/ploy/orw-cli:latest" {
-			t.Errorf("java-maven image mismatch: %q", got.ByStack[MigStackJavaMaven])
-		}
-		if got.ByStack[MigStackJavaGradle] != "ghcr.io/iw2rmb/ploy/orw-cli:latest" {
-			t.Errorf("java-gradle image mismatch: %q", got.ByStack[MigStackJavaGradle])
-		}
-	})
-
-	t.Run("map[string]string typed", func(t *testing.T) {
-		t.Parallel()
-		input := map[string]string{
-			"default":    "img:default",
-			"java-maven": "img:maven",
-		}
-
-		got, err := ParseJobImage(input)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if len(got.ByStack) != 2 {
-			t.Errorf("expected 2 stack entries, got %d", len(got.ByStack))
-		}
-		if got.ByStack[MigStackDefault] != "img:default" {
-			t.Errorf("default image mismatch: %q", got.ByStack[MigStackDefault])
-		}
-	})
-
-	t.Run("empty map", func(t *testing.T) {
-		t.Parallel()
-		input := map[string]any{}
-
-		got, err := ParseJobImage(input)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if len(got.ByStack) != 0 {
-			t.Errorf("expected empty ByStack, got %v", got.ByStack)
-		}
-	})
 }
 
 func TestJobImage_UnmarshalYAML_String(t *testing.T) {
@@ -336,66 +269,6 @@ image:
 	}
 	if got.Image.ByStack[MigStackJavaGradle] != "ghcr.io/iw2rmb/ploy/mig:gradle" {
 		t.Fatalf("java-gradle image=%q, want gradle image", got.Image.ByStack[MigStackJavaGradle])
-	}
-}
-
-// TestParseJobImage_Nil verifies that nil input returns empty JobImage.
-func TestParseJobImage_Nil(t *testing.T) {
-	t.Parallel()
-
-	got, err := ParseJobImage(nil)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !got.IsEmpty() {
-		t.Errorf("expected empty JobImage for nil input, got %v", got)
-	}
-}
-
-// TestParseJobImage_InvalidType verifies error handling for invalid types.
-func TestParseJobImage_InvalidType(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name  string
-		input any
-	}{
-		{name: "int", input: 42},
-		{name: "bool", input: true},
-		{name: "slice", input: []string{"a", "b"}},
-		{name: "float64", input: 3.14},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			_, err := ParseJobImage(tt.input)
-			if err == nil {
-				t.Fatal("expected error for invalid type")
-			}
-			if !strings.Contains(err.Error(), "expected string or map") {
-				t.Errorf("unexpected error: %v", err)
-			}
-		})
-	}
-}
-
-// TestParseJobImage_MapWithInvalidValue verifies error handling for maps
-// containing non-string values.
-func TestParseJobImage_MapWithInvalidValue(t *testing.T) {
-	t.Parallel()
-
-	input := map[string]any{
-		"default":    "valid:image",
-		"java-maven": 123, // Invalid: not a string.
-	}
-
-	_, err := ParseJobImage(input)
-	if err == nil {
-		t.Fatal("expected error for map with non-string value")
-	}
-	if !strings.Contains(err.Error(), "expected string") {
-		t.Errorf("unexpected error: %v", err)
 	}
 }
 

@@ -42,11 +42,6 @@ func newClaimer(st store.Store, bs blobstore.Store, configHolder *ConfigHolder, 
 	return svc
 }
 
-// claimBadRequest maps to HTTP 400.
-type claimBadRequest struct{ Message string }
-
-func (e *claimBadRequest) Error() string { return e.Message }
-
 // claimNotFound maps to HTTP 404.
 type claimNotFound struct{ Message string }
 

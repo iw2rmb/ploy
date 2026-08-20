@@ -209,23 +209,6 @@ func requiredPathParamOrWriteError(w http.ResponseWriter, r *http.Request, key s
 	return val, true
 }
 
-// optionalParam extracts an optional typed ID from a path parameter.
-// Returns nil if the parameter is missing or empty.
-func optionalParam[T any, PT interface {
-	*T
-	encoding.TextUnmarshaler
-}](r *http.Request, key string) (*T, error) {
-	val := strings.TrimSpace(r.PathValue(key))
-	if val == "" {
-		return nil, nil
-	}
-	var id T
-	if err := PT(&id).UnmarshalText([]byte(val)); err != nil {
-		return nil, fmt.Errorf("%s: %w", key, err)
-	}
-	return &id, nil
-}
-
 // parseQuery extracts and validates a typed ID from a query parameter.
 // Returns an error if the parameter is missing, empty, or fails validation.
 func parseQuery[T any, PT interface {

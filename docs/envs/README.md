@@ -248,13 +248,6 @@ image pulls. Use `PLOY_DOCKER_AUTH_CONFIG_FILE` for private registries.
   `/etc/ploy/pki/node.key` on worker nodes.
 - `concurrency` (config YAML) — Maximum concurrent runs the node will execute. Set in the
   node YAML under `concurrency`; defaults to `1` if not set.
-- `PLOY_LIFECYCLE_NET_IGNORE` — Optional comma-separated list of network interface patterns (supports `*` globs) that the node lifecycle collector skips when computing throughput metrics. Example: `lo,cni*,docker*`.
-  The nodeagent heartbeat manager reads this environment variable at startup and passes the parsed patterns to the lifecycle collector via `lifecycle.Options.IgnoreInterfaces`.
-  - Pin via systemd drop-in `environment:` e.g.:
-
-    environment:
-      PLOY_LIFECYCLE_NET_IGNORE: "docker*,veth*,br-*"
-
 - ployd-node config path — The node agent reads its YAML config from
   `/etc/ploy/ployd-node.yaml` by default and accepts an override via the
   CLI flag `--config`. There is currently no environment variable override

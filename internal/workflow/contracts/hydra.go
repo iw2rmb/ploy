@@ -17,21 +17,6 @@ import (
 	"strings"
 )
 
-// ValidHydraSections lists the known section names for typed Hydra overlays.
-var ValidHydraSections = map[string]bool{
-	"pre_gate":  true,
-	"post_gate": true,
-	"mig":       true,
-}
-
-// ValidateHydraSection returns an error if section is not a known Hydra section.
-func ValidateHydraSection(section string) error {
-	if !ValidHydraSections[section] {
-		return fmt.Errorf("invalid hydra section %q (must be one of: mig, post_gate, pre_gate)", section)
-	}
-	return nil
-}
-
 // shortHashPattern matches a valid shortHash: 7–64 lowercase hex characters.
 var shortHashPattern = regexp.MustCompile(`^[0-9a-f]{7,64}$`)
 
@@ -139,16 +124,6 @@ func ParseStoredEntry(kind HydraFileKind, s string) (ParsedStoredEntry, error) {
 	}
 
 	return ParsedStoredEntry{Hash: hash, Dst: dst, ReadOnly: readOnly}, nil
-}
-
-// CanonicalHomeEntry reconstructs the canonical stored home entry string
-// from parsed fields: "hash:dst" or "hash:dst:ro".
-func (p ParsedStoredEntry) CanonicalHomeEntry() string {
-	s := p.Hash + ":" + p.Dst
-	if p.ReadOnly {
-		s += ":ro"
-	}
-	return s
 }
 
 // ValidateHydraEntries validates stored entries and rejects duplicate destinations.

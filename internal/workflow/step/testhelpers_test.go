@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
-	"github.com/iw2rmb/ploy/internal/gitauth"
 	workspaceutil "github.com/iw2rmb/ploy/internal/testutil/workspace"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
@@ -116,75 +115,6 @@ func (m *testContainerRuntime) Remove(ctx context.Context, handle ContainerHandl
 		return m.removeFn(ctx, handle)
 	}
 	return nil
-}
-
-// testGateExecutor is a configurable mock for GateExecutor.
-type testGateExecutor struct {
-	executeFn func(ctx context.Context, spec *contracts.StepGateSpec, workspace string) (*contracts.BuildGateStageMetadata, error)
-}
-
-func (m *testGateExecutor) Execute(ctx context.Context, spec *contracts.StepGateSpec, workspace string, mounts JobMounts) (*contracts.BuildGateStageMetadata, error) {
-	if m.executeFn != nil {
-		return m.executeFn(ctx, spec, workspace)
-	}
-	return &contracts.BuildGateStageMetadata{
-		StaticChecks: []contracts.BuildGateStaticCheckReport{{
-			Tool:   "default",
-			Passed: true,
-		}},
-	}, nil
-}
-
-// testWorkspaceHydrator is a configurable mock for WorkspaceHydrator.
-type testWorkspaceHydrator struct {
-	hydrateFn func(ctx context.Context, manifest contracts.StepManifest, workspace string) error
-}
-
-func (m *testWorkspaceHydrator) Hydrate(ctx context.Context, manifest contracts.StepManifest, workspace string) error {
-	if m.hydrateFn != nil {
-		return m.hydrateFn(ctx, manifest, workspace)
-	}
-	return nil
-}
-
-// testGitFetcher is a configurable mock for GitFetcher.
-type testGitFetcher struct {
-	fetchFn func(ctx context.Context, repo *contracts.RepoMaterialization, dest string, auth gitauth.Options) error
-}
-
-func (m *testGitFetcher) Fetch(ctx context.Context, repo *contracts.RepoMaterialization, dest string, auth gitauth.Options) error {
-	if m.fetchFn != nil {
-		return m.fetchFn(ctx, repo, dest, auth)
-	}
-	return nil
-}
-
-// newGateTestManifest returns a StepManifest with a single read-only input and
-// the given gate-enabled flag. Tests that need different fields can override
-// after calling this helper.
-func newGateTestManifest(gateEnabled bool) contracts.StepManifest {
-	return contracts.StepManifest{
-		ID:    types.StepID("test-step"),
-		Name:  "Test Step",
-		Image: "maven:jdk17",
-		Inputs: []contracts.StepInput{{
-			Name:        "source",
-			MountPath:   "/workspace",
-			Mode:        contracts.StepInputModeReadOnly,
-			SnapshotCID: types.CID("bafytest123"),
-		}},
-		Gate: &contracts.StepGateSpec{
-			Enabled: gateEnabled,
-		},
-	}
-}
-
-// newGateTestRequest wraps a manifest into a Request with a fixed workspace path.
-func newGateTestRequest(m contracts.StepManifest) Request {
-	return Request{
-		Manifest:  m,
-		Workspace: "/tmp/test-workspace",
-	}
 }
 
 func newTestJobMounts(t *testing.T, jobType types.JobType) JobMounts {

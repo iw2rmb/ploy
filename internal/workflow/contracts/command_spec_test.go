@@ -5,60 +5,85 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"gopkg.in/yaml.v3"
 )
 
-func TestCommandSpecBehavior(t *testing.T) {
+func TestCommandSpecJSONBehavior(t *testing.T) {
 	t.Parallel()
-
 	tests := []struct {
 		name    string
-		input   any
+		wire    string
 		direct  *CommandSpec
 		want    []string
-		wire    string
 		wantErr string
 	}{
-		{name: "shell string", input: " echo hi ", want: []string{"/bin/sh", "-c", "echo hi"}, wire: `"echo hi"`},
-		{name: "exec string slice", input: []string{"echo", "hi"}, want: []string{"echo", "hi"}, wire: `["echo","hi"]`},
-		{name: "exec interface slice", input: []any{"echo", "hi"}, want: []string{"echo", "hi"}, wire: `["echo","hi"]`},
-		{name: "empty", direct: &CommandSpec{}, wire: "null"},
-		{name: "exec takes precedence", direct: &CommandSpec{Shell: "ignored", Exec: []string{"echo", "used"}}, want: []string{"echo", "used"}, wire: `["echo","used"]`},
-		{name: "invalid interface element", input: []any{"echo", 1}, wantErr: "expected string array element, got int"},
-		{name: "invalid type", input: 42, wantErr: "expected string or array, got int"},
+		{name: "shell string", wire: `" echo hi "`, want: []string{"/bin/sh", "-c", "echo hi"}},
+		{name: "exec array", wire: `["echo","hi"]`, want: []string{"echo", "hi"}},
+		{name: "empty", direct: &CommandSpec{}},
+		{name: "exec takes precedence", direct: &CommandSpec{Shell: "ignored", Exec: []string{"echo", "used"}}, want: []string{"echo", "used"}},
+		{name: "invalid array element", wire: `["echo",1]`, wantErr: "command: expected string or array"},
+		{name: "invalid type", wire: `42`, wantErr: "command: expected string or array"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			var spec CommandSpec
-			var err error
 			if tt.direct != nil {
 				spec = *tt.direct
-			} else {
-				spec, err = ParseCommandSpec(tt.input)
-			}
-			if tt.wantErr != "" {
-				if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
-					t.Fatalf("ParseCommandSpec() error = %v, want error containing %q", err, tt.wantErr)
+			} else if err := json.Unmarshal([]byte(tt.wire), &spec); err != nil {
+				if tt.wantErr == "" || !strings.Contains(err.Error(), tt.wantErr) {
+					t.Fatalf("json.Unmarshal() error = %v, want containing %q", err, tt.wantErr)
 				}
 				return
 			}
-			if err != nil {
-				t.Fatalf("ParseCommandSpec() error = %v", err)
+			if tt.wantErr != "" {
+				t.Fatalf("json.Unmarshal() succeeded, want error containing %q", tt.wantErr)
 			}
 			if got := spec.ToSlice(); !slices.Equal(got, tt.want) {
-				t.Errorf("ToSlice() = %v, want %v", got, tt.want)
+				t.Fatalf("ToSlice() = %v, want %v", got, tt.want)
 			}
 			wire, err := json.Marshal(spec)
-			if err != nil || string(wire) != tt.wire {
-				t.Errorf("json.Marshal() = %s, %v; want %s, nil", wire, err, tt.wire)
+			if err != nil {
+				t.Fatalf("json.Marshal() error = %v", err)
 			}
 			var decoded CommandSpec
-			if err := json.Unmarshal([]byte(tt.wire), &decoded); err != nil {
-				t.Fatalf("json.Unmarshal() error = %v", err)
+			if err := json.Unmarshal(wire, &decoded); err != nil {
+				t.Fatalf("json roundtrip error = %v", err)
 			}
 			if got := decoded.ToSlice(); !slices.Equal(got, tt.want) {
-				t.Errorf("decoded ToSlice() = %v, want %v", got, tt.want)
+				t.Fatalf("roundtrip ToSlice() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestCommandSpecYAMLBehavior(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name    string
+		wire    string
+		want    []string
+		wantErr bool
+	}{
+		{name: "shell string", wire: "command: echo hi\n", want: []string{"/bin/sh", "-c", "echo hi"}},
+		{name: "exec array", wire: "command: [echo, hi]\n", want: []string{"echo", "hi"}},
+		{name: "YAML scalar coercion", wire: "command: [echo, 1]\n", want: []string{"echo", "1"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			var decoded struct {
+				Command CommandSpec `yaml:"command"`
+			}
+			err := yaml.Unmarshal([]byte(tt.wire), &decoded)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("yaml.Unmarshal() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if err == nil && !slices.Equal(decoded.Command.ToSlice(), tt.want) {
+				t.Fatalf("ToSlice() = %v, want %v", decoded.Command.ToSlice(), tt.want)
 			}
 		})
 	}

@@ -140,52 +140,6 @@ func (m JobImage) ResolveImage(stack MigStack) (string, error) {
 	)
 }
 
-// ParseJobImage parses an image specification from an untyped value.
-// Both canonical forms are accepted:
-//   - string: Parsed as a universal image (used for all stacks).
-//   - map[string]any or map[string]string: Parsed as stack-specific images.
-//
-// Returns an empty JobImage for nil input without error.
-func ParseJobImage(v any) (JobImage, error) {
-	if v == nil {
-		return JobImage{}, nil
-	}
-
-	// Case 1: String - universal image.
-	if s, ok := v.(string); ok {
-		return JobImage{Universal: strings.TrimSpace(s)}, nil
-	}
-
-	// Case 2: Map - stack-specific images.
-	// Handle both map[string]any (from JSON/YAML) and map[string]string.
-	switch m := v.(type) {
-	case map[string]any:
-		byStack := make(map[MigStack]string, len(m))
-		for k, val := range m {
-			img, ok := val.(string)
-			if !ok {
-				return JobImage{}, fmt.Errorf(
-					"image[%q]: expected string, got %T", k, val,
-				)
-			}
-			byStack[MigStack(strings.TrimSpace(k))] = strings.TrimSpace(img)
-		}
-		return JobImage{ByStack: byStack}, nil
-
-	case map[string]string:
-		byStack := make(map[MigStack]string, len(m))
-		for k, img := range m {
-			byStack[MigStack(strings.TrimSpace(k))] = strings.TrimSpace(img)
-		}
-		return JobImage{ByStack: byStack}, nil
-
-	default:
-		return JobImage{}, fmt.Errorf(
-			"image: expected string or map, got %T", v,
-		)
-	}
-}
-
 // String returns a human-readable representation for debugging.
 func (m JobImage) String() string {
 	if m.Universal != "" {

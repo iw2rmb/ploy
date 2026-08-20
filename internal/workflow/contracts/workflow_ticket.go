@@ -6,36 +6,6 @@ import (
 	types "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-// WorkflowRun is the envelope used when submitting or claiming a workflow
-// run. It carries the schema version, the opaque run identifier, the
-// manifest reference (name/version), and optional repository materialization
-// details for nodes to hydrate workspaces.
-type WorkflowRun struct {
-	SchemaVersion string              `json:"schema_version"`
-	RunID         types.RunID         `json:"run_id"`
-	Manifest      ManifestReference   `json:"manifest"`
-	Repo          RepoMaterialization `json:"repo,omitempty"`
-}
-
-// Validate checks that required fields are present and that embedded
-// structures are valid. It requires a non‑empty schema version and run ID,
-// a valid `Manifest`, and (when provided) a valid `Repo`.
-func (r WorkflowRun) Validate() error {
-	if r.SchemaVersion == "" {
-		return fmt.Errorf("schema_version is required")
-	}
-	if r.RunID.IsZero() {
-		return fmt.Errorf("run_id is required")
-	}
-	if err := r.Manifest.Validate(); err != nil {
-		return fmt.Errorf("manifest invalid: %w", err)
-	}
-	if err := r.Repo.Validate(); err != nil {
-		return fmt.Errorf("repo invalid: %w", err)
-	}
-	return nil
-}
-
 // RepoMaterialization describes repository inputs required for a workflow run.
 type RepoMaterialization struct {
 	URL           types.RepoURL   `json:"url,omitempty"`

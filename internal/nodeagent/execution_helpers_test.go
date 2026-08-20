@@ -68,60 +68,6 @@ func TestResolveDockerRegistryAuthRefreshSocket(t *testing.T) {
 	}
 }
 
-func TestClearManifestHydration(t *testing.T) {
-	tests := []struct {
-		name   string
-		inputs []contracts.StepInput
-	}{
-		{
-			name: "removes_hydration",
-			inputs: []contracts.StepInput{
-				{Name: "input1", Hydration: &contracts.StepInputHydration{}},
-				{Name: "input2", Hydration: &contracts.StepInputHydration{}},
-			},
-		},
-		{
-			name:   "empty_inputs_noop",
-			inputs: []contracts.StepInput{},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			manifest := contracts.StepManifest{Inputs: tt.inputs}
-			clearManifestHydration(&manifest)
-			for i, input := range manifest.Inputs {
-				if input.Hydration != nil {
-					t.Errorf("input[%d].Hydration should be nil", i)
-				}
-			}
-		})
-	}
-}
-
-func TestDisableManifestGate(t *testing.T) {
-	tests := []struct {
-		name string
-		gate *contracts.StepGateSpec
-	}{
-		{name: "sets_gate_disabled", gate: &contracts.StepGateSpec{Enabled: true}},
-		{name: "nil_gate_sets_disabled", gate: nil},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			manifest := contracts.StepManifest{Gate: tt.gate}
-			disableManifestGate(&manifest)
-			if manifest.Gate == nil {
-				t.Fatal("Gate should not be nil")
-			}
-			if manifest.Gate.Enabled {
-				t.Error("Gate.Enabled should be false")
-			}
-		})
-	}
-}
-
 func TestTempResource_Cleanup(t *testing.T) {
 	t.Parallel()
 
