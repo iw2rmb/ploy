@@ -45,14 +45,14 @@ func (r *runController) emitRunEvent(runID types.RunID, jobID *types.JobID, leve
 		return
 	}
 
-	if r.nodeEventUploader == nil {
+	if r.uploader == nil {
 		slog.Warn("node event uploader is not initialized", "run_id", runID)
 		return
 	}
 
 	eventCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	if err := r.nodeEventUploader.UploadRunEvent(eventCtx, runID, jobID, level, message, meta); err != nil {
+	if err := r.uploader.UploadRunEvent(eventCtx, runID, jobID, level, message, meta); err != nil {
 		slog.Warn("failed to upload node event", "run_id", runID, "job_id", derefJobID(jobID), "error", err)
 	}
 }
@@ -67,7 +67,7 @@ func (c *ClaimManager) emitRunException(runID types.RunID, jobID *types.JobID, m
 		eventMeta["error"] = err.Error()
 	}
 
-	uploader, uploaderErr := c.ensureNodeEventUploader()
+	uploader, uploaderErr := c.ensureUploader()
 	if uploaderErr != nil {
 		slog.Warn("failed to initialize claim-loop node event uploader", "run_id", runID, "error", uploaderErr)
 		return
@@ -78,16 +78,6 @@ func (c *ClaimManager) emitRunException(runID types.RunID, jobID *types.JobID, m
 	if uploadErr := uploader.UploadRunEvent(eventCtx, runID, jobID, eventLevelFromErr(err), message, eventMeta); uploadErr != nil {
 		slog.Warn("failed to upload claim-loop node event", "run_id", runID, "job_id", derefJobID(jobID), "error", uploadErr)
 	}
-}
-
-func (c *ClaimManager) ensureNodeEventUploader() (*baseUploader, error) {
-	c.eventUploaderOnce.Do(func() {
-		c.eventUploader, c.eventUploaderErr = newBaseUploader(c.cfg)
-	})
-	if c.eventUploaderErr != nil {
-		return nil, c.eventUploaderErr
-	}
-	return c.eventUploader, nil
 }
 
 func jobIDPtr(jobID types.JobID) *types.JobID {

@@ -22,7 +22,7 @@ type abandonedRuntimeCandidate struct {
 }
 
 func (r *runController) sweepAbandonedRuntimeIfIdle() {
-	if r == nil || r.statusUploader == nil {
+	if r == nil || r.uploader == nil {
 		return
 	}
 
@@ -43,7 +43,7 @@ func (r *runController) sweepAbandonedRuntimeIfIdle() {
 
 	ctx, cancel := context.WithTimeout(context.Background(), abandonedRuntimeSweepTimeout)
 	defer cancel()
-	terminal, err := terminalRuntimeCandidates(ctx, r.statusUploader, candidates)
+	terminal, err := terminalRuntimeCandidates(ctx, r.uploader, candidates)
 	if err != nil {
 		slog.Warn("abandoned job runtime status check was incomplete", "error", err)
 	}

@@ -277,7 +277,7 @@ func TestClaimAndExecute_WaitsForRecoveredMonitorSlotRelease(t *testing.T) {
 		},
 	}
 
-	claimer.startRecoveredRunningMonitors(context.Background(), []recoveredRunningContainer{
+	claimer.startRecoveredRunningMonitors(context.Background(), []recoveredContainer{
 		{ContainerID: "ctr-recovered", RunID: s.RunID, JobID: s.JobID},
 	})
 

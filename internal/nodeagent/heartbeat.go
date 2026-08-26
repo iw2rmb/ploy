@@ -15,21 +15,11 @@ import (
 	"sync"
 	"time"
 
+	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	iversion "github.com/iw2rmb/ploy/internal/version"
 	"github.com/iw2rmb/ploy/internal/worker/lifecycle"
 	"github.com/iw2rmb/ploy/internal/workflow/backoff"
 )
-
-// HeartbeatPayload contains resource snapshot data sent to the server.
-type HeartbeatPayload struct {
-	CPUFreeMillis  int32  `json:"cpu_free_millis"`
-	CPUTotalMillis int32  `json:"cpu_total_millis"`
-	MemFreeBytes   int64  `json:"mem_free_bytes"`
-	MemTotalBytes  int64  `json:"mem_total_bytes"`
-	DiskFreeBytes  int64  `json:"disk_free_bytes"`
-	DiskTotalBytes int64  `json:"disk_total_bytes"`
-	Version        string `json:"version,omitempty"`
-}
 
 // HeartbeatManager periodically sends resource snapshots to the server.
 type HeartbeatManager struct {
@@ -127,9 +117,9 @@ func (h *HeartbeatManager) sendHeartbeat(ctx context.Context) error {
 	storage := collectStorageDiagnostics()
 	diskFreeBytes, diskTotalBytes := storage.heartbeatDiskBytes(int64(capacity.DiskFreeBytes), int64(capacity.DiskTotalBytes))
 
-	payload := HeartbeatPayload{
-		CPUFreeMillis:  int32(capacity.CPUFreeMillis),
-		CPUTotalMillis: int32(capacity.CPUTotalMillis),
+	payload := domainapi.NodeHeartbeatRequest{
+		CPUFreeMillis:  int64(capacity.CPUFreeMillis),
+		CPUTotalMillis: int64(capacity.CPUTotalMillis),
 		MemFreeBytes:   int64(capacity.MemFreeBytes),
 		MemTotalBytes:  int64(capacity.MemTotalBytes),
 		DiskFreeBytes:  diskFreeBytes,

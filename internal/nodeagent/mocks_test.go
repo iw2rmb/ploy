@@ -81,21 +81,3 @@ func (m *mockRunController) ReleaseCalls() int {
 	defer m.mu.Unlock()
 	return m.releaseCalls
 }
-
-// mockController is a minimal no-op RunController implementation for testing.
-// Use this when you don't need to track method calls or configure behavior.
-type mockController struct{}
-
-func (m *mockController) StartRun(ctx context.Context, req StartRunRequest) error {
-	return nil
-}
-
-func (m *mockController) StopRun(ctx context.Context, req StopRunRequest) error {
-	return nil
-}
-
-func (m *mockController) AcquireSlot(ctx context.Context) error {
-	return nil
-}
-
-func (m *mockController) ReleaseSlot() {}

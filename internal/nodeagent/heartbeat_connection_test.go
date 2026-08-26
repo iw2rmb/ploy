@@ -11,6 +11,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 )
 
 func TestBuildURL(t *testing.T) {
@@ -95,7 +97,7 @@ func TestBuildURLRejectsAbsoluteOrAuthorityPath(t *testing.T) {
 }
 
 func TestSendHeartbeatSuccess(t *testing.T) {
-	var receivedPayload HeartbeatPayload
+	var receivedPayload domainapi.NodeHeartbeatRequest
 	var receivedMap map[string]any
 	heartbeatPath := "/v1/nodes/" + testNodeID + "/heartbeat"
 	diagnosticsPath := "/v1/nodes/" + testNodeID + "/diagnostics"

@@ -3,7 +3,6 @@ package nodeagent
 import (
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"sync"
 
 	"github.com/iw2rmb/ploy/internal/workflow/backoff"
@@ -16,21 +15,15 @@ import (
 // Contains configuration, HTTP client, run controller, and backoff state for
 // polling intervals when no work is available.
 type ClaimManager struct {
-	cfg                Config
-	client             *http.Client
-	clientOnce         sync.Once // Ensures thread-safe lazy HTTP client initialization
-	clientErr          error     // Stores initialization error from clientOnce
-	statusUploader     *baseUploader
-	statusUploaderOnce sync.Once
-	statusUploaderErr  error
-	eventUploader      *baseUploader
-	eventUploaderOnce  sync.Once
-	eventUploaderErr   error
-	controller         RunController
-	startupReconciler  *startupCrashReconciler
-	startupOnce        sync.Once
-	startupErr         error
-	backoff            *backoff.StatefulBackoff
+	cfg               Config
+	uploader          *baseUploader
+	uploaderOnce      sync.Once
+	uploaderErr       error
+	controller        RunController
+	startupReconciler *startupCrashReconciler
+	startupOnce       sync.Once
+	startupErr        error
+	backoff           *backoff.StatefulBackoff
 }
 
 // NewClaimManager constructs a claim manager for the unified jobs queue.
@@ -51,11 +44,22 @@ func NewClaimManager(cfg Config, controller RunController) (*ClaimManager, error
 
 	return &ClaimManager{
 		cfg:               cfg,
-		client:            nil, // Will be initialized lazily
 		controller:        controller,
 		startupReconciler: startupReconciler,
 		backoff:           backoff.NewStatefulBackoff(backoffPolicy),
 	}, nil
+}
+
+// ensureUploader defers credential loading until bootstrap has created the
+// node certificate and bearer token.
+func (c *ClaimManager) ensureUploader() (*baseUploader, error) {
+	c.uploaderOnce.Do(func() {
+		c.uploader, c.uploaderErr = newBaseUploader(c.cfg)
+	})
+	if c.uploaderErr != nil {
+		return nil, c.uploaderErr
+	}
+	return c.uploader, nil
 }
 
 // parseSpec parses and validates the canonical migration specification.

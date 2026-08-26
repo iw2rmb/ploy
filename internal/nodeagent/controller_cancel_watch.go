@@ -16,7 +16,7 @@ const (
 )
 
 func (r *runController) startRemoteCancellationWatch(ctx context.Context, req StartRunRequest, cancel context.CancelFunc) {
-	if r == nil || r.statusUploader == nil || req.JobID.IsZero() || cancel == nil {
+	if r == nil || r.uploader == nil || req.JobID.IsZero() || cancel == nil {
 		return
 	}
 	go r.watchRemoteCancellation(ctx, req, cancel)
@@ -34,7 +34,7 @@ func (r *runController) watchRemoteCancellation(ctx context.Context, req StartRu
 		}
 
 		statusCtx, timeoutCancel := context.WithTimeout(ctx, remoteCancellationPollTimeout)
-		status, err := r.statusUploader.GetJobStatus(statusCtx, req.JobID)
+		status, err := r.uploader.GetJobStatus(statusCtx, req.JobID)
 		timeoutCancel()
 		if err == nil && strings.EqualFold(strings.TrimSpace(status), types.JobStatusCancelled.String()) {
 			slog.Info(

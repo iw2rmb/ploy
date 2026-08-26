@@ -31,7 +31,7 @@ func TestRunController_watchRemoteCancellation_CancelsContext(t *testing.T) {
 	defer server.Close()
 
 	rc := &runController{
-		statusUploader: &baseUploader{
+		uploader: &baseUploader{
 			cfg:    newAgentConfig(server.URL),
 			client: server.Client(),
 		},

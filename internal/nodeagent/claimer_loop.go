@@ -95,14 +95,9 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 		}
 	}()
 
-	// Lazy initialization: create HTTP client if not yet initialized.
-	// This allows bootstrap() to run first and create certificates.
-	// Uses sync.Once for thread-safe initialization.
-	c.clientOnce.Do(func() {
-		c.client, c.clientErr = createHTTPClient(c.cfg)
-	})
-	if c.clientErr != nil {
-		return false, fmt.Errorf("create http client: %w", c.clientErr)
+	uploader, err := c.ensureUploader()
+	if err != nil {
+		return false, fmt.Errorf("create http client: %w", err)
 	}
 
 	// POST /v1/nodes/{id}/claim
@@ -117,7 +112,7 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 		return false, fmt.Errorf("create claim request: %w", err)
 	}
 
-	resp, err := c.client.Do(req)
+	resp, err := uploader.client.Do(req)
 	if err != nil {
 		return false, fmt.Errorf("send claim request: %w", err)
 	}

@@ -175,8 +175,6 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest,
 	stats := r.buildGateStats(gateResult, duration)
 	if uploadErr := r.uploadStatus(ctx, req.RunID.String(), status.String(), &exitCode, stats, req.JobID, repoSHAOut); uploadErr != nil {
 		slog.Error("failed to upload gate status", "run_id", req.RunID, "job_id", req.JobID, "status", status, "error", uploadErr)
-	} else {
-		r.cleanupRunShareOnTerminalSuccess(req, status)
 	}
 	slog.Info("gate job "+logVerb, "run_id", req.RunID, "job_id", req.JobID, "job_type", req.JobType, "duration", duration)
 }

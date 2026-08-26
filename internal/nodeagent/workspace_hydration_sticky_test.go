@@ -131,7 +131,10 @@ func TestPrepareStickyWorkspaceForStep_ChainHeadHydratesWorkspaceWithoutRunBase(
 
 			srv := snapshotFixtureServer(t, repoDir)
 			defer srv.Close()
-			rc := &runController{cfg: Config{ServerURL: srv.URL, NodeID: types.NodeID("node01")}, httpClient: srv.Client()}
+			rc := &runController{
+				cfg:      Config{ServerURL: srv.URL, NodeID: types.NodeID("node01")},
+				uploader: &baseUploader{client: srv.Client()},
+			}
 			workspace, err := rc.prepareStickyWorkspace(context.Background(), req, manifest)
 			if err != nil {
 				t.Fatalf("prepareStickyWorkspace() error = %v", err)

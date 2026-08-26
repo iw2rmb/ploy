@@ -14,7 +14,7 @@ const recoveredStatusUploadTimeout = 10 * time.Second
 
 // startRecoveredRunningMonitors reserves concurrency slots and starts one monitor
 // goroutine per recovered running container.
-func (c *ClaimManager) startRecoveredRunningMonitors(ctx context.Context, recovered []recoveredRunningContainer) {
+func (c *ClaimManager) startRecoveredRunningMonitors(ctx context.Context, recovered []recoveredContainer) {
 	if c == nil || len(recovered) == 0 {
 		return
 	}
@@ -34,7 +34,7 @@ func (c *ClaimManager) startRecoveredRunningMonitors(ctx context.Context, recove
 	}
 }
 
-func (c *ClaimManager) monitorRecoveredRunningContainer(ctx context.Context, recovered recoveredRunningContainer) {
+func (c *ClaimManager) monitorRecoveredRunningContainer(ctx context.Context, recovered recoveredContainer) {
 	defer func() {
 		c.controller.ReleaseSlot()
 		c.sweepAbandonedRuntimeIfIdle()
@@ -60,7 +60,7 @@ func (c *ClaimManager) monitorRecoveredRunningContainer(ctx context.Context, rec
 	}
 }
 
-func (c *ClaimManager) waitAndUploadRecoveredContainer(ctx context.Context, recovered recoveredRunningContainer) error {
+func (c *ClaimManager) waitAndUploadRecoveredContainer(ctx context.Context, recovered recoveredContainer) error {
 	if c == nil || c.startupReconciler == nil {
 		return errors.New("startup crash reconciler not configured")
 	}
@@ -105,7 +105,11 @@ func (c *ClaimManager) waitAndUploadRecoveredContainer(ctx context.Context, reco
 }
 
 func (c *ClaimManager) uploadRecoveredLogs(runID types.RunID, jobID types.JobID, stdoutLogs, stderrLogs []byte) error {
-	logStreamer, err := NewLogStreamer(c.cfg, runID, jobID, nil)
+	uploader, err := c.ensureUploader()
+	if err != nil {
+		return fmt.Errorf("create recovered log streamer: create HTTP client for log streamer: %w", err)
+	}
+	logStreamer, err := NewLogStreamer(c.cfg, runID, jobID, uploader.client)
 	if err != nil {
 		return fmt.Errorf("create recovered log streamer: %w", err)
 	}
@@ -128,7 +132,7 @@ func (c *ClaimManager) uploadRecoveredLogs(runID types.RunID, jobID types.JobID,
 }
 
 func (c *ClaimManager) uploadRecoveredJobStatus(jobID types.JobID, status types.JobStatus, exitCode *int32, stats types.RunStats) error {
-	uploader, err := c.ensureStatusUploader()
+	uploader, err := c.ensureUploader()
 	if err != nil {
 		return err
 	}
@@ -139,14 +143,4 @@ func (c *ClaimManager) uploadRecoveredJobStatus(jobID types.JobID, status types.
 		return fmt.Errorf("upload job status: %w", err)
 	}
 	return nil
-}
-
-func (c *ClaimManager) ensureStatusUploader() (*baseUploader, error) {
-	c.statusUploaderOnce.Do(func() {
-		c.statusUploader, c.statusUploaderErr = newBaseUploader(c.cfg)
-	})
-	if c.statusUploaderErr != nil {
-		return nil, c.statusUploaderErr
-	}
-	return c.statusUploader, nil
 }

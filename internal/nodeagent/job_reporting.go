@@ -31,7 +31,7 @@ func (r *runController) uploadStatus(ctx context.Context, runID, status string, 
 	statusCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	if uploadErr := r.statusUploader.UploadJobStatus(statusCtx, jobID, status, exitCode, stats, loggedRepoSHAOut); uploadErr != nil {
+	if uploadErr := r.uploader.UploadJobStatus(statusCtx, jobID, status, exitCode, stats, loggedRepoSHAOut); uploadErr != nil {
 		return fmt.Errorf("upload job status: %w", uploadErr)
 	}
 
@@ -70,16 +70,9 @@ func (r *runController) reportTerminalStatus(
 
 	if uploadErr := r.uploadStatus(ctx, req.RunID.String(), status.String(), exitCode, stats, req.JobID, repoSHAOut); uploadErr != nil {
 		slog.Error("failed to upload terminal status", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)
-	} else {
-		r.cleanupRunShareOnTerminalSuccess(req, status)
 	}
 	slog.Info("job terminated", "run_id", req.RunID, "job_id", req.JobID, "status", status,
 		"exit_code", result.ExitCode, "duration", duration)
-}
-
-func (r *runController) cleanupRunShareOnTerminalSuccess(req StartRunRequest, status types.JobStatus) {
-	_ = req
-	_ = status
 }
 
 func (r *runController) computeRepoSHAOut(ctx context.Context, req StartRunRequest, workspace string, inputTree string) (string, error) {
@@ -148,7 +141,7 @@ func (r *runController) uploadDiff(
 		).
 		MustBuild()
 
-	if err := r.diffUploader.UploadDiff(ctx, runID, jobID, diffBytes, summary); err != nil {
+	if err := r.uploader.UploadDiff(ctx, runID, jobID, diffBytes, summary); err != nil {
 		slog.Error("failed to upload "+label+" diff", "run_id", runID, "job_id", jobID, "error", err)
 		return false, err
 	}

@@ -121,6 +121,16 @@ func TestJSONWireContracts(t *testing.T) {
 			want:  `{"token":"secret","node_id":"nodeAbCd","expires_at":"2025-06-01T12:00:00Z"}`,
 		},
 		{
+			name: "node heartbeat request",
+			value: NodeHeartbeatRequest{
+				CPUFreeMillis: 1500, CPUTotalMillis: 4000,
+				MemFreeBytes: 2147483648, MemTotalBytes: 8589934592,
+				DiskFreeBytes: 10737418240, DiskTotalBytes: 53687091200,
+				Version: "ployd-node/test",
+			},
+			want: `{"cpu_free_millis":1500,"cpu_total_millis":4000,"mem_free_bytes":2147483648,"mem_total_bytes":8589934592,"disk_free_bytes":10737418240,"disk_total_bytes":53687091200,"version":"ployd-node/test"}`,
+		},
+		{
 			name: "run submit exports populated fields",
 			value: RunSubmitRequest{
 				RepoURL: domaintypes.RepoURL("https://github.com/example/repo.git"),

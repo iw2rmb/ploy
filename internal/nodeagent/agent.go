@@ -40,15 +40,9 @@ func New(cfg Config) (*Agent, error) {
 
 	// Initialize controller with typed JobID keys for compile-time safety.
 	controller := &runController{
-		cfg:               cfg,
-		jobs:              make(map[types.JobID]*jobContext),
-		diffUploader:      uploader,
-		artifactUploader:  uploader,
-		statusUploader:    uploader,
-		jobImageNameSaver: uploader,
-		jobSBOMUploader:   uploader,
-		nodeEventUploader: uploader,
-		httpClient:        uploader.client,
+		cfg:      cfg,
+		jobs:     make(map[types.JobID]*jobContext),
+		uploader: uploader,
 	}
 
 	server, err := NewServer(cfg, controller)

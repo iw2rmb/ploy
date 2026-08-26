@@ -81,7 +81,7 @@ func (w *artifactLogWriter) Close() error {
 }
 
 func (r *runController) uploadRepoArtifactsIfPresent(runID types.RunID, repoID types.RepoID, jobID types.JobID) {
-	if r.artifactUploader == nil {
+	if r.uploader == nil {
 		return
 	}
 	entries, hasFiles, err := repoArtifactBundleEntries(runID)
@@ -92,7 +92,7 @@ func (r *runController) uploadRepoArtifactsIfPresent(runID types.RunID, repoID t
 	if !hasFiles {
 		return
 	}
-	if _, _, err := r.artifactUploader.UploadArtifactEntries(context.Background(), runID, jobID, entries, "repo-artifacts"); err != nil {
+	if _, _, err := r.uploader.UploadArtifactEntries(context.Background(), runID, jobID, entries, "repo-artifacts"); err != nil {
 		slog.Warn("failed to upload repo artifacts", "run_id", runID, "repo_id", repoID, "job_id", jobID, "error", err)
 	}
 }

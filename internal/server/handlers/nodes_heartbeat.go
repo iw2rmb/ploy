@@ -9,6 +9,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgtype"
 
+	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
@@ -21,15 +22,7 @@ func heartbeatHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		var req struct {
-			CPUFreeMillis  int64  `json:"cpu_free_millis"`
-			CPUTotalMillis int64  `json:"cpu_total_millis"`
-			MemFreeBytes   int64  `json:"mem_free_bytes"`
-			MemTotalBytes  int64  `json:"mem_total_bytes"`
-			DiskFreeBytes  int64  `json:"disk_free_bytes"`
-			DiskTotalBytes int64  `json:"disk_total_bytes"`
-			Version        string `json:"version,omitempty"`
-		}
+		var req domainapi.NodeHeartbeatRequest
 
 		if err := decodeRequestJSON(w, r, &req, DefaultMaxBodySize); err != nil {
 			return

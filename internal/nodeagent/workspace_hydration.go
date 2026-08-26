@@ -116,7 +116,7 @@ func (r *runController) downloadSnapshot(ctx context.Context, req StartRunReques
 		return fmt.Errorf("create snapshot request: %w", err)
 	}
 	httpReq.Header.Set("PLOY_NODE_UUID", r.cfg.NodeID.String())
-	resp, err := r.httpClient.Do(httpReq)
+	resp, err := r.uploader.client.Do(httpReq)
 	if err != nil {
 		return fmt.Errorf("download snapshot: %w", err)
 	}

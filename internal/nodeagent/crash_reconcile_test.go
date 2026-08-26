@@ -166,7 +166,7 @@ func TestCrashReconcile_ClassifiesByRuntimeState_Contract(t *testing.T) {
 		t.Fatalf("Discover() error = %v", err)
 	}
 
-	wantRunning := []recoveredRunningContainer{
+	wantRunning := []recoveredContainer{
 		{ContainerID: "running-2", RunID: types.RunID("run-r2"), JobID: types.JobID("job-r2")},
 	}
 	if !reflect.DeepEqual(got.Running, wantRunning) {
@@ -341,7 +341,7 @@ func TestCrashReconcile_RecoveredRunningMonitor_UploadsLogsAndTerminalStatus(t *
 	claimer := setupClaimer(t, newAgentConfig(ts.URL), controller)
 	claimer.startupReconciler = &startupCrashReconciler{docker: fakeDocker}
 
-	claimer.startRecoveredRunningMonitors(context.Background(), []recoveredRunningContainer{
+	claimer.startRecoveredRunningMonitors(context.Background(), []recoveredContainer{
 		{ContainerID: containerID, RunID: s.RunID, JobID: s.JobID},
 	})
 
@@ -438,14 +438,14 @@ func TestCrashReconcile_RecoveryPathsUploadIdenticalTerminalStatus(t *testing.T)
 	claimer := setupClaimer(t, newAgentConfig(ts.URL), &mockRunController{})
 	claimer.startupReconciler = &startupCrashReconciler{docker: fakeDocker}
 
-	if err := claimer.reconcileRecoveredTerminalContainer(context.Background(), recoveredTerminalContainer{
+	if err := claimer.reconcileRecoveredTerminalContainer(context.Background(), recoveredContainer{
 		ContainerID: containerID,
 		RunID:       s.RunID,
 		JobID:       s.JobID,
 	}); err != nil {
 		t.Fatalf("reconcile recovered terminal: %v", err)
 	}
-	if err := claimer.waitAndUploadRecoveredContainer(context.Background(), recoveredRunningContainer{
+	if err := claimer.waitAndUploadRecoveredContainer(context.Background(), recoveredContainer{
 		ContainerID: containerID,
 		RunID:       s.RunID,
 		JobID:       s.JobID,
@@ -524,7 +524,7 @@ func TestCrashReconcile_RecoveredRunningMonitor_ExitCodeAboveOneReportsError(t *
 	claimer := setupClaimer(t, newAgentConfig(ts.URL), controller)
 	claimer.startupReconciler = &startupCrashReconciler{docker: fakeDocker}
 
-	claimer.startRecoveredRunningMonitors(context.Background(), []recoveredRunningContainer{
+	claimer.startRecoveredRunningMonitors(context.Background(), []recoveredContainer{
 		{ContainerID: containerID, RunID: s.RunID, JobID: s.JobID},
 	})
 
@@ -588,7 +588,7 @@ func TestCrashReconcile_RecoveredRunningMonitor_WaitErrorReportsError(t *testing
 	claimer := setupClaimer(t, newAgentConfig(ts.URL), controller)
 	claimer.startupReconciler = &startupCrashReconciler{docker: fakeDocker}
 
-	claimer.startRecoveredRunningMonitors(context.Background(), []recoveredRunningContainer{
+	claimer.startRecoveredRunningMonitors(context.Background(), []recoveredContainer{
 		{ContainerID: containerID, RunID: s.RunID, JobID: s.JobID},
 	})
 
@@ -662,7 +662,7 @@ func TestCrashReconcile_RecoveredTerminalContainer_ExitCodeAboveOneReportsError(
 	claimer := setupClaimer(t, newAgentConfig(ts.URL), controller)
 	claimer.startupReconciler = &startupCrashReconciler{docker: fakeDocker}
 
-	claimer.reconcileRecoveredTerminalContainers(context.Background(), []recoveredTerminalContainer{
+	claimer.reconcileRecoveredTerminalContainers(context.Background(), []recoveredContainer{
 		{ContainerID: containerID, RunID: s.RunID, JobID: s.JobID},
 	})
 
@@ -733,7 +733,7 @@ func TestCrashReconcile_RecoveredRunningMonitor_CompletionConflictIsNonFatal(t *
 	claimer := setupClaimer(t, newAgentConfig(ts.URL), controller)
 	claimer.startupReconciler = &startupCrashReconciler{docker: fakeDocker}
 
-	claimer.startRecoveredRunningMonitors(context.Background(), []recoveredRunningContainer{
+	claimer.startRecoveredRunningMonitors(context.Background(), []recoveredContainer{
 		{ContainerID: containerID, RunID: s.RunID, JobID: s.JobID},
 	})
 
@@ -836,7 +836,7 @@ func TestCrashReconcile_RecoveredRunningMonitor_IsolatedFailures(t *testing.T) {
 	claimer := setupClaimer(t, newAgentConfig(ts.URL), controller)
 	claimer.startupReconciler = &startupCrashReconciler{docker: fakeDocker}
 
-	claimer.startRecoveredRunningMonitors(context.Background(), []recoveredRunningContainer{
+	claimer.startRecoveredRunningMonitors(context.Background(), []recoveredContainer{
 		{ContainerID: failContainer, RunID: runFail, JobID: jobFail},
 		{ContainerID: okContainer, RunID: runOK, JobID: jobOK},
 	})

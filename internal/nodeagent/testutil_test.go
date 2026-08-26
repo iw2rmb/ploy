@@ -191,7 +191,7 @@ func startTestTLSServer(t *testing.T, ca *pki.CABundle, serverCert *pki.IssuedCe
 // startNodeServer creates, starts, and returns a Server with t.Cleanup shutdown.
 func startNodeServer(t *testing.T, cfg Config) *Server {
 	t.Helper()
-	server, err := NewServer(cfg, &mockController{})
+	server, err := NewServer(cfg, &mockRunController{})
 	if err != nil {
 		t.Fatalf("create server: %v", err)
 	}
@@ -387,8 +387,7 @@ func newTestUploader(t *testing.T, serverURL string) *baseUploader {
 	return u
 }
 
-// newTestController creates a runController with all uploaders initialized,
-// suitable for tests that call upload methods.
+// newTestController creates a runController with its uploader initialized.
 func newTestController(t *testing.T, cfg Config) *runController {
 	t.Helper()
 	uploader, err := newBaseUploader(cfg)
@@ -396,15 +395,9 @@ func newTestController(t *testing.T, cfg Config) *runController {
 		t.Fatalf("newBaseUploader: %v", err)
 	}
 	return &runController{
-		cfg:               cfg,
-		jobs:              make(map[types.JobID]*jobContext),
-		diffUploader:      uploader,
-		artifactUploader:  uploader,
-		statusUploader:    uploader,
-		jobImageNameSaver: uploader,
-		jobSBOMUploader:   uploader,
-		nodeEventUploader: uploader,
-		httpClient:        uploader.client,
+		cfg:      cfg,
+		jobs:     make(map[types.JobID]*jobContext),
+		uploader: uploader,
 	}
 }
 

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"net/http"
 	"sync"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
@@ -24,18 +23,7 @@ type runController struct {
 	jobs   map[types.JobID]*jobContext
 	jobSem chan struct{}
 
-	// uploader is the shared HTTP uploader used for all upload operations.
-	// Individual fields exist for clarity at call sites but point to the same instance.
-	diffUploader      *baseUploader
-	artifactUploader  *baseUploader
-	statusUploader    *baseUploader
-	jobImageNameSaver *baseUploader
-	jobSBOMUploader   *baseUploader
-	nodeEventUploader *baseUploader
-
-	// httpClient is the shared HTTP client for components created during job execution
-	// (e.g., log streamer). Created once at init to avoid duplicate TLS/token I/O.
-	httpClient *http.Client
+	uploader *baseUploader
 }
 
 type jobContext struct {

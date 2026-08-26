@@ -13,20 +13,20 @@ import (
 
 // SaveJobImageName persists the resolved container image name for a job to the control plane.
 func (r *runController) SaveJobImageName(ctx context.Context, jobID types.JobID, image string) error {
-	if r.jobImageNameSaver == nil {
+	if r.uploader == nil {
 		return fmt.Errorf("job image name saver not initialized")
 	}
 	image = strings.TrimSpace(image)
 	if image == "" {
 		return fmt.Errorf("image is empty")
 	}
-	return r.jobImageNameSaver.SaveJobImageName(ctx, jobID, image)
+	return r.uploader.SaveJobImageName(ctx, jobID, image)
 }
 
 // SaveJobSBOM persists SBOM package rows for a gate job to the control plane.
 func (r *runController) SaveJobSBOM(ctx context.Context, jobID types.JobID, packages []migsapi.RunSBOMPackage) error {
-	if r.jobSBOMUploader == nil {
+	if r.uploader == nil {
 		return fmt.Errorf("job sbom uploader not initialized")
 	}
-	return r.jobSBOMUploader.UploadJobSBOM(ctx, jobID, packages)
+	return r.uploader.UploadJobSBOM(ctx, jobID, packages)
 }

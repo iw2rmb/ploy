@@ -25,22 +25,15 @@ type crashReconcileDockerClient interface {
 	ContainerLogs(ctx context.Context, containerID string, options client.ContainerLogsOptions) (client.ContainerLogsResult, error)
 }
 
-type recoveredRunningContainer struct {
+type recoveredContainer struct {
 	ContainerID string
 	RunID       types.RunID
 	JobID       types.JobID
-}
-
-type recoveredTerminalContainer struct {
-	ContainerID string
-	RunID       types.RunID
-	JobID       types.JobID
-	FinishedAt  time.Time
 }
 
 type startupCrashSnapshot struct {
-	Running        []recoveredRunningContainer
-	RecentTerminal []recoveredTerminalContainer
+	Running        []recoveredContainer
+	RecentTerminal []recoveredContainer
 }
 
 type startupCrashReconciler struct {
@@ -82,8 +75,8 @@ func (r *startupCrashReconciler) Discover(ctx context.Context) (startupCrashSnap
 	}
 
 	snapshot := startupCrashSnapshot{
-		Running:        make([]recoveredRunningContainer, 0),
-		RecentTerminal: make([]recoveredTerminalContainer, 0),
+		Running:        make([]recoveredContainer, 0),
+		RecentTerminal: make([]recoveredContainer, 0),
 	}
 
 	for _, summary := range listed.Items {
@@ -102,7 +95,7 @@ func (r *startupCrashReconciler) Discover(ctx context.Context) (startupCrashSnap
 
 		state := inspect.Container.State
 		if state.Running {
-			snapshot.Running = append(snapshot.Running, recoveredRunningContainer{
+			snapshot.Running = append(snapshot.Running, recoveredContainer{
 				ContainerID: summary.ID,
 				RunID:       runID,
 				JobID:       jobID,
@@ -121,11 +114,10 @@ func (r *startupCrashReconciler) Discover(ctx context.Context) (startupCrashSnap
 			continue
 		}
 
-		snapshot.RecentTerminal = append(snapshot.RecentTerminal, recoveredTerminalContainer{
+		snapshot.RecentTerminal = append(snapshot.RecentTerminal, recoveredContainer{
 			ContainerID: summary.ID,
 			RunID:       runID,
 			JobID:       jobID,
-			FinishedAt:  finishedAt,
 		})
 	}
 

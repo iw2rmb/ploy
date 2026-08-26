@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/iw2rmb/ploy/internal/store"
@@ -77,4 +78,63 @@ func TestHeartbeatHandler_RejectsUnknownFields(t *testing.T) {
 	assertStatus(t, rr, http.StatusBadRequest)
 	assertNotCalled(t, "GetNode", st.getNode.called)
 	assertNotCalled(t, "UpdateNodeHeartbeat", st.updateNodeHeartbeat.called)
+}
+
+func TestHeartbeatHandler_RejectsInvalidResources(t *testing.T) {
+	tests := []struct {
+		name      string
+		body      string
+		wantError string
+	}{
+		{
+			name:      "negative cpu",
+			body:      `{"cpu_free_millis":-1,"cpu_total_millis":1,"mem_free_bytes":1,"mem_total_bytes":1,"disk_free_bytes":1,"disk_total_bytes":1}`,
+			wantError: "cpu millis must be non-negative",
+		},
+		{
+			name:      "free cpu exceeds total",
+			body:      `{"cpu_free_millis":2,"cpu_total_millis":1,"mem_free_bytes":1,"mem_total_bytes":1,"disk_free_bytes":1,"disk_total_bytes":1}`,
+			wantError: "cpu_free_millis must be <= cpu_total_millis",
+		},
+		{
+			name:      "cpu exceeds persisted range",
+			body:      `{"cpu_free_millis":2147483648,"cpu_total_millis":2147483648,"mem_free_bytes":1,"mem_total_bytes":1,"disk_free_bytes":1,"disk_total_bytes":1}`,
+			wantError: "cpu millis out of range",
+		},
+		{
+			name:      "negative memory",
+			body:      `{"cpu_free_millis":1,"cpu_total_millis":1,"mem_free_bytes":-1,"mem_total_bytes":1,"disk_free_bytes":1,"disk_total_bytes":1}`,
+			wantError: "mem bytes must be non-negative",
+		},
+		{
+			name:      "free memory exceeds total",
+			body:      `{"cpu_free_millis":1,"cpu_total_millis":1,"mem_free_bytes":2,"mem_total_bytes":1,"disk_free_bytes":1,"disk_total_bytes":1}`,
+			wantError: "mem_free_bytes must be <= mem_total_bytes",
+		},
+		{
+			name:      "negative disk",
+			body:      `{"cpu_free_millis":1,"cpu_total_millis":1,"mem_free_bytes":1,"mem_total_bytes":1,"disk_free_bytes":-1,"disk_total_bytes":1}`,
+			wantError: "disk bytes must be non-negative",
+		},
+		{
+			name:      "free disk exceeds total",
+			body:      `{"cpu_free_millis":1,"cpu_total_millis":1,"mem_free_bytes":1,"mem_total_bytes":1,"disk_free_bytes":2,"disk_total_bytes":1}`,
+			wantError: "disk_free_bytes must be <= disk_total_bytes",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			st := &handlerStore{}
+			h := heartbeatHandler(st)
+			rr := doRequest(t, h, http.MethodPost, "/v1/nodes/aB3xY9/heartbeat", tt.body, "id", "aB3xY9")
+
+			assertStatus(t, rr, http.StatusBadRequest)
+			if got := rr.Body.String(); !strings.Contains(got, tt.wantError) {
+				t.Fatalf("response body = %q, want substring %q", got, tt.wantError)
+			}
+			assertNotCalled(t, "GetNode", st.getNode.called)
+			assertNotCalled(t, "UpdateNodeHeartbeat", st.updateNodeHeartbeat.called)
+		})
+	}
 }

@@ -196,7 +196,7 @@ func (r *runController) initializeRuntime(ctx context.Context, runID types.RunID
 	// Initialize log streamer to stream logs as gzipped chunks to the server.
 	// The jobID parameter associates log chunks with a specific job, enabling
 	// per-job log attribution in the control plane.
-	logStreamer, err := NewLogStreamer(r.cfg, runID, jobID, r.httpClient)
+	logStreamer, err := NewLogStreamer(r.cfg, runID, jobID, r.uploader.client)
 	if err != nil {
 		return step.Runner{}, nil, nil, fmt.Errorf("create log streamer: %w", err)
 	}

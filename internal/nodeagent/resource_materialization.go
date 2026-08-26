@@ -32,7 +32,7 @@ func (r *runController) materializeHydraResources(ctx context.Context, manifest 
 	if len(hashes) == 0 {
 		return nil
 	}
-	if r.artifactUploader == nil {
+	if r.uploader == nil {
 		return fmt.Errorf("uploader not initialized")
 	}
 	for _, hash := range hashes {
@@ -51,7 +51,7 @@ func (r *runController) materializeHydraResources(ctx context.Context, manifest 
 // SHA-256 digest starts with the expected hash prefix, and extracts the
 // archive into stagingDir/<hash>.
 func (r *runController) materializeResource(ctx context.Context, bundleID, hash, stagingDir string) error {
-	data, err := r.artifactUploader.DownloadSpecBundle(ctx, bundleID)
+	data, err := r.uploader.DownloadSpecBundle(ctx, bundleID)
 	if err != nil {
 		return fmt.Errorf("download resource %s (bundle %s): %w", hash, bundleID, err)
 	}

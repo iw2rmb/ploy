@@ -47,7 +47,7 @@ func (c *ClaimManager) sweepAbandonedRuntimeIfIdle() {
 	}
 }
 
-func (c *ClaimManager) reconcileRecoveredTerminalContainers(ctx context.Context, recovered []recoveredTerminalContainer) {
+func (c *ClaimManager) reconcileRecoveredTerminalContainers(ctx context.Context, recovered []recoveredContainer) {
 	if c == nil || len(recovered) == 0 {
 		return
 	}
@@ -75,7 +75,7 @@ func (c *ClaimManager) reconcileRecoveredTerminalContainers(ctx context.Context,
 	}
 }
 
-func (c *ClaimManager) reconcileRecoveredTerminalContainer(ctx context.Context, recovered recoveredTerminalContainer) error {
+func (c *ClaimManager) reconcileRecoveredTerminalContainer(ctx context.Context, recovered recoveredContainer) error {
 	if c == nil || c.startupReconciler == nil {
 		return errors.New("startup crash reconciler not configured")
 	}
