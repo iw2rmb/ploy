@@ -189,6 +189,9 @@ func (h *HeartbeatManager) uploadSelfDiagnostic(ctx context.Context, storage sto
 			"storage":         storage,
 		},
 	}
+	if imageRef := strings.TrimSpace(os.Getenv("PLOY_NODE_IMAGE")); imageRef != "" {
+		payload["image_ref"] = imageRef
+	}
 	if err := uploader.UploadNodeDiagnostic(diagCtx, "node", "ok", payload); err != nil {
 		slog.Warn("node diagnostic upload failed", "err", err)
 	}

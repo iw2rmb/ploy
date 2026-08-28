@@ -3,15 +3,16 @@ package handlers
 import (
 	"log/slog"
 	"net/http"
+	"strings"
 
 	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-// listJobsHandler returns a paginated, optionally run-filtered list of jobs with mig context.
+// listJobsHandler returns a paginated, optionally filtered list of jobs with mig context.
 // GET /v1/jobs
-// Query params: ?limit=N&offset=N&run_id=<id> (all optional)
+// Query params: ?limit=N&offset=N&run_id=<id>&node_id=<id>&status=<status> (all optional)
 func listJobsHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		limit, offset, err := parsePagination(r)
@@ -25,18 +26,46 @@ func listJobsHandler(st store.Store) http.HandlerFunc {
 			writeHTTPError(w, http.StatusBadRequest, "%s", err)
 			return
 		}
+		nodeID, err := optionalQuery[domaintypes.NodeID](r, "node_id")
+		if err != nil {
+			writeHTTPError(w, http.StatusBadRequest, "%s", err)
+			return
+		}
+		var status *domaintypes.JobStatus
+		if rawStatus := strings.TrimSpace(r.URL.Query().Get("status")); rawStatus != "" {
+			parsed, err := domaintypes.ParseJobStatus(rawStatus)
+			if err != nil {
+				writeHTTPError(w, http.StatusBadRequest, "status: %s", err)
+				return
+			}
+			status = &parsed
+		}
 
-		// Convert typed RunID pointer to plain string pointer for store query.
-		var runIDStr *string
+		var runIDStr, nodeIDStr, statusStr *string
 		if runID != nil {
 			s := runID.String()
 			runIDStr = &s
 		}
+		if nodeID != nil {
+			s := nodeID.String()
+			nodeIDStr = &s
+		}
+		if status != nil {
+			s := status.String()
+			statusStr = &s
+		}
 
-		jobs, err := st.ListJobsForTUI(r.Context(), store.ListJobsForTUIParams{
+		filters := store.CountJobsPageParams{
+			RunID:  runIDStr,
+			NodeID: nodeIDStr,
+			Status: statusStr,
+		}
+		jobs, err := st.ListJobsPage(r.Context(), store.ListJobsPageParams{
 			Limit:  limit,
 			Offset: offset,
-			RunID:  runIDStr,
+			RunID:  filters.RunID,
+			NodeID: filters.NodeID,
+			Status: filters.Status,
 		})
 		if err != nil {
 			writeHTTPError(w, http.StatusInternalServerError, "failed to list jobs: %v", err)
@@ -44,7 +73,7 @@ func listJobsHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		total, err := st.CountJobsForTUI(r.Context(), runIDStr)
+		total, err := st.CountJobsPage(r.Context(), filters)
 		if err != nil {
 			writeHTTPError(w, http.StatusInternalServerError, "failed to count jobs: %v", err)
 			slog.Error("list jobs: count failed", "err", err)

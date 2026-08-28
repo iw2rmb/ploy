@@ -81,6 +81,8 @@ func TestCobraCommandTreeRouting(t *testing.T) {
 		{name: "help run status", args: []string{"help", "run", "status"}, wantOK: true, wantOut: "ploy run status <run-id> [flags]"},
 		{name: "run status help", args: []string{"run", "status", "--help"}, wantOK: true, wantOut: "ploy run status <run-id> [flags]"},
 		{name: "token list help", args: []string{"cluster", "token", "list", "--help"}, wantOK: true, wantOut: "ploy cluster token list [flags]"},
+		{name: "node list help", args: []string{"cluster", "node", "ls", "--help"}, wantOK: true, wantOut: "ploy cluster node ls [flags]"},
+		{name: "node inspect help", args: []string{"cluster", "node", "inspect", "--help"}, wantOK: true, wantOut: "ploy cluster node inspect <name> [flags]"},
 		{name: "spec validate help", args: []string{"spec", "validate", "--help"}, wantOK: true, wantOut: "ploy spec validate <path> [<path>...] [flags]"},
 	}
 

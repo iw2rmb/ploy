@@ -1,8 +1,8 @@
 get:
   tags: [Control]
-  summary: List jobs (TUI)
+  summary: List jobs
   description: |
-    Return a paginated list of jobs with migration context for the TUI jobs-list screen.
+    Return a paginated list of jobs with migration context for CLI and TUI consumers.
     Each entry includes `job_id`, `name`, `status`, `duration_ms`, `job_image`,
     `node_id`, `mig_name`, `run_id`, and `repo_id`.
 
@@ -33,6 +33,19 @@ get:
       schema:
         type: string
       description: Optional run ID (KSUID) to filter jobs to a single run.
+    - in: query
+      name: node_id
+      required: false
+      schema:
+        type: string
+      description: Optional node ID to filter jobs assigned to one worker node.
+    - in: query
+      name: status
+      required: false
+      schema:
+        type: string
+        enum: [Created, Queued, Running, Success, Fail, Error, Cancelled]
+      description: Optional canonical lifecycle status filter.
   responses:
     '200':
       description: OK

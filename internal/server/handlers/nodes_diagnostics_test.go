@@ -8,6 +8,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgtype"
 
+	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	"github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
@@ -66,7 +67,7 @@ func TestNodeDiagnosticsHandlers_CurrentContract(t *testing.T) {
 				h := listNodeDiagnosticsHandler(st)
 				rr := doRequest(t, h, http.MethodGet, "/v1/nodes/"+nodeID.String()+"/diagnostics", "", "id", nodeID.String())
 				assertStatus(t, rr, http.StatusOK)
-				var out []nodeDiagnosticResponse
+				var out []domainapi.NodeDiagnostic
 				if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
 					t.Fatalf("decode response: %v", err)
 				}

@@ -3,7 +3,10 @@ package cluster
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,9 +14,138 @@ import (
 
 	"github.com/iw2rmb/ploy/internal/cli/common"
 	"github.com/iw2rmb/ploy/internal/deploy"
+	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	"github.com/iw2rmb/ploy/internal/testutil/assertx"
 	"github.com/iw2rmb/ploy/internal/testutil/clienv"
 )
+
+func TestHandleNodeListPrintsHostNameAndAddress(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/nodes" {
+			http.NotFound(w, r)
+			return
+		}
+		_ = json.NewEncoder(w).Encode([]map[string]any{
+			{"id": "alpha", "name": "node-alpha", "ip_address": "10.0.0.1", "concurrency": 2},
+			{"id": "beta", "name": "node-beta", "ip_address": "10.0.0.2", "concurrency": 1},
+		})
+	}))
+	t.Cleanup(server.Close)
+	clienv.UseControlPlaneEnv(t, server.URL)
+
+	stdout := &bytes.Buffer{}
+	if err := handleNode([]string{"ls"}, stdout, io.Discard); err != nil {
+		t.Fatalf("node ls: %v", err)
+	}
+	for _, want := range []string{"HOST", "NAME", "ADDRESS", "alpha", "node-alpha", "10.0.0.2"} {
+		assertx.Contains(t, stdout.String(), want)
+	}
+}
+
+func TestHandleNodeListPrintsEmptyState(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_ = json.NewEncoder(w).Encode([]any{})
+	}))
+	t.Cleanup(server.Close)
+	clienv.UseControlPlaneEnv(t, server.URL)
+
+	stdout := &bytes.Buffer{}
+	if err := handleNode([]string{"ls"}, stdout, io.Discard); err != nil {
+		t.Fatalf("node ls: %v", err)
+	}
+	if got := stdout.String(); got != "No nodes found.\n" {
+		t.Fatalf("output = %q, want empty state", got)
+	}
+}
+
+func TestHandleNodeInspectPrintsCapacityResourcesImageAndRunningJobs(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v1/nodes":
+			_ = json.NewEncoder(w).Encode([]map[string]any{{
+				"id": "alpha", "name": "node-alpha", "ip_address": "10.0.0.1", "concurrency": 1,
+				"cpu_total_millis": 16000, "cpu_free_millis": 8000,
+				"mem_total_bytes": 8589934592, "mem_free_bytes": 4294967296,
+				"disk_total_bytes": 107374182400, "disk_free_bytes": 53687091200,
+				"last_heartbeat": "2026-08-28T06:09:52Z",
+			}})
+		case "/v1/nodes/alpha/diagnostics":
+			_ = json.NewEncoder(w).Encode([]map[string]any{{
+				"node_id": "alpha", "component": "node", "status": "ok",
+				"image_ref": "registry.example/ploy/node:latest", "details": map[string]any{"concurrency": 3},
+				"updated_at": "2026-08-28T06:09:52Z",
+			}})
+		case "/v1/jobs":
+			if got := r.URL.Query().Get("node_id"); got != "alpha" {
+				t.Errorf("node_id = %q, want alpha", got)
+			}
+			if got := r.URL.Query().Get("status"); got != "Running" {
+				t.Errorf("status = %q, want Running", got)
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"jobs": []map[string]any{{
+					"job_id": "3IX3mmup1S4DZadb2ukhr7Rxm3q", "name": "pre-gate", "job_type": "pre_gate",
+					"status": "Running", "duration_ms": 0, "job_image": "gate:latest", "node_id": "alpha",
+					"mig_name": "upgrade", "run_id": "3IX3mXbI8PEvIfjLeNRkFHuMYSX", "repo_id": "8dj0K11g",
+				}},
+				"total": 1,
+			})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(server.Close)
+	clienv.UseControlPlaneEnv(t, server.URL)
+
+	stdout := &bytes.Buffer{}
+	if err := handleNode([]string{"inspect", "node-alpha"}, stdout, io.Discard); err != nil {
+		t.Fatalf("node inspect: %v", err)
+	}
+	for _, want := range []string{
+		"Name:             node-alpha",
+		"Host:             alpha",
+		"Image:            registry.example/ploy/node:latest",
+		"Queue:            1/3 active (2 available)",
+		"CPU available:    8.00 / 16.00 cores",
+		"Memory available: 4.00 GiB / 8.00 GiB",
+		"Disk available:   50.00 GiB / 100.00 GiB",
+		"3IX3mmup1S4DZadb2ukhr7Rxm3q",
+	} {
+		assertx.Contains(t, stdout.String(), want)
+	}
+}
+
+func TestHandleNodeInspectMissingNameReturnsNotFound(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_ = json.NewEncoder(w).Encode([]map[string]any{{"id": "alpha", "name": "node-alpha", "ip_address": "10.0.0.1"}})
+	}))
+	t.Cleanup(server.Close)
+	clienv.UseControlPlaneEnv(t, server.URL)
+
+	err := handleNode([]string{"inspect", "missing"}, io.Discard, io.Discard)
+	if err == nil || !strings.Contains(err.Error(), `node "missing" not found`) {
+		t.Fatalf("error = %v, want not found", err)
+	}
+}
+
+func TestRenderNodeInspectHandlesMissingTelemetryAndNoJobs(t *testing.T) {
+	stdout := &bytes.Buffer{}
+	renderNodeInspect(stdout, domainapi.Node{
+		ID: "alpha", Name: "node-alpha", IPAddress: "0.0.0.0", Concurrency: 2,
+	}, nil, nil)
+
+	for _, want := range []string{
+		"Image:            unknown",
+		"Last heartbeat:   unknown",
+		"Queue:            0/2 active (2 available)",
+		"CPU available:    unknown",
+		"Memory available: unknown",
+		"Disk available:   unknown",
+		"Active jobs:\n  none",
+	} {
+		assertx.Contains(t, stdout.String(), want)
+	}
+}
 
 // newTestNodeAddConfig returns a nodeAddConfig wired up with stub identity and
 // ployd-node binary files under t.TempDir(). Callers set SSHPort/DryRun as needed.

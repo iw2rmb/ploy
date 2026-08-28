@@ -48,30 +48,46 @@ func newSpecCmd(stdout, stderr io.Writer) *cobra.Command {
 // newClusterCmd creates the cobra command for 'ploy cluster' and its subcommands.
 // This wires the cluster router into a proper cobra command hierarchy.
 // The cluster command provides a unified namespace for node and token operations.
-func newClusterCmd(stderr io.Writer) *cobra.Command {
+func newClusterCmd(stdout, stderr io.Writer) *cobra.Command {
 	clusterCmd := &cobra.Command{
 		Use:   "cluster",
 		Short: "Manage nodes and API tokens",
 		Args:  cobra.NoArgs,
 		RunE:  func(cmd *cobra.Command, args []string) error { return cmd.Help() },
 	}
-	clusterCmd.AddCommand(newClusterNodeCmd(stderr))
-	clusterCmd.AddCommand(newClusterTokenCmd(stderr))
+	clusterCmd.AddCommand(newClusterNodeCmd(stdout, stderr))
+	clusterCmd.AddCommand(newClusterTokenCmd(stdout, stderr))
 	return clusterCmd
 }
 
-func newClusterNodeCmd(stderr io.Writer) *cobra.Command {
+func newClusterNodeCmd(stdout, stderr io.Writer) *cobra.Command {
 	nodeCmd := &cobra.Command{
 		Use:   "node",
 		Short: "Manage worker nodes",
 		Args:  cobra.NoArgs,
 		RunE:  func(cmd *cobra.Command, args []string) error { return cmd.Help() },
 	}
-	nodeCmd.AddCommand(newClusterNodeAddCmd(stderr))
+	nodeCmd.AddCommand(newClusterNodeAddCmd(stdout, stderr))
+	nodeCmd.AddCommand(&cobra.Command{
+		Use:   "ls",
+		Short: "List worker nodes",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return cluster.Handle([]string{"node", "ls"}, stdout, stderr)
+		},
+	})
+	nodeCmd.AddCommand(&cobra.Command{
+		Use:   "inspect <name>",
+		Short: "Inspect a worker node",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return cluster.Handle([]string{"node", "inspect", args[0]}, stdout, stderr)
+		},
+	})
 	return nodeCmd
 }
 
-func newClusterNodeAddCmd(stderr io.Writer) *cobra.Command {
+func newClusterNodeAddCmd(stdout, stderr io.Writer) *cobra.Command {
 	var address, serverURL, identity, user, ploydNodeBinary string
 	var sshPort int
 	var dryRun bool
@@ -88,7 +104,7 @@ func newClusterNodeAddCmd(stderr io.Writer) *cobra.Command {
 			runArgs = addChangedString(cmd, runArgs, "ployd-node-binary", ploydNodeBinary)
 			runArgs = addChangedInt(cmd, runArgs, "ssh-port", sshPort)
 			runArgs = addChangedBool(cmd, runArgs, "dry-run", dryRun)
-			return cluster.Handle(runArgs, stderr)
+			return cluster.Handle(runArgs, stdout, stderr)
 		},
 	}
 	cmd.Flags().StringVar(&address, "address", "", "Node IP or hostname")
@@ -101,20 +117,20 @@ func newClusterNodeAddCmd(stderr io.Writer) *cobra.Command {
 	return cmd
 }
 
-func newClusterTokenCmd(stderr io.Writer) *cobra.Command {
+func newClusterTokenCmd(stdout, stderr io.Writer) *cobra.Command {
 	tokenCmd := &cobra.Command{
 		Use:   "token",
 		Short: "Manage API tokens",
 		Args:  cobra.NoArgs,
 		RunE:  func(cmd *cobra.Command, args []string) error { return cmd.Help() },
 	}
-	tokenCmd.AddCommand(newClusterTokenCreateCmd(stderr))
+	tokenCmd.AddCommand(newClusterTokenCreateCmd(stdout, stderr))
 	tokenCmd.AddCommand(&cobra.Command{
 		Use:   "list",
 		Short: "List all API tokens",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return cluster.Handle([]string{"token", "list"}, stderr)
+			return cluster.Handle([]string{"token", "list"}, stdout, stderr)
 		},
 	})
 	tokenCmd.AddCommand(&cobra.Command{
@@ -122,13 +138,13 @@ func newClusterTokenCmd(stderr io.Writer) *cobra.Command {
 		Short: "Revoke an API token",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return cluster.Handle(append([]string{"token", "revoke"}, args...), stderr)
+			return cluster.Handle(append([]string{"token", "revoke"}, args...), stdout, stderr)
 		},
 	})
 	return tokenCmd
 }
 
-func newClusterTokenCreateCmd(stderr io.Writer) *cobra.Command {
+func newClusterTokenCreateCmd(stdout, stderr io.Writer) *cobra.Command {
 	var role, username, description string
 	var expires int
 	cmd := &cobra.Command{
@@ -143,7 +159,7 @@ func newClusterTokenCreateCmd(stderr io.Writer) *cobra.Command {
 			if cmd.Flags().Changed("expires") {
 				runArgs = append(runArgs, "--expires", fmt.Sprintf("%d", expires))
 			}
-			return cluster.Handle(runArgs, stderr)
+			return cluster.Handle(runArgs, stdout, stderr)
 		},
 	}
 	cmd.Flags().StringVar(&role, "role", "", "Token role: cli-admin, control-plane, or worker")

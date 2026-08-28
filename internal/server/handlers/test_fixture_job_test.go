@@ -33,8 +33,8 @@ type handlerStore struct {
 	countJobsByRun                     mockResult[int64]
 	countJobsByRunAndStatus            mockResult[int64]
 	countJobsByRunAttemptGroupByStatus mockResult[[]store.CountJobsByRunAttemptGroupByStatusRow]
-	listJobsForTUI                     mockCall[store.ListJobsForTUIParams, []store.ListJobsForTUIRow]
-	countJobsForTUI                    mockCall[*string, int64]
+	listJobsPage                       mockCall[store.ListJobsPageParams, []store.ListJobsPageRow]
+	countJobsPage                      mockCall[store.CountJobsPageParams, int64]
 	claimJob                           mockCall[types.NodeID, store.Job]
 	unclaimJob                         mockCall[store.UnclaimJobParams, struct{}]
 	claimRun                           mockResult[store.Run]
@@ -287,12 +287,12 @@ func (m *handlerStore) CountJobsByRunAttemptGroupByStatus(ctx context.Context, a
 
 // Job listing methods
 
-func (m *handlerStore) ListJobsForTUI(ctx context.Context, arg store.ListJobsForTUIParams) ([]store.ListJobsForTUIRow, error) {
-	return m.listJobsForTUI.record(arg)
+func (m *handlerStore) ListJobsPage(ctx context.Context, arg store.ListJobsPageParams) ([]store.ListJobsPageRow, error) {
+	return m.listJobsPage.record(arg)
 }
 
-func (m *handlerStore) CountJobsForTUI(ctx context.Context, runID *string) (int64, error) {
-	return m.countJobsForTUI.record(runID)
+func (m *handlerStore) CountJobsPage(ctx context.Context, arg store.CountJobsPageParams) (int64, error) {
+	return m.countJobsPage.record(arg)
 }
 
 // Claim methods

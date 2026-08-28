@@ -52,7 +52,7 @@ func loadRunsCmd(client *http.Client, baseURL *url.URL) tea.Cmd {
 // loadJobsCmd returns a tea.Cmd that fetches the jobs list.
 func loadJobsCmd(client *http.Client, baseURL *url.URL, runID *domaintypes.RunID) tea.Cmd {
 	return func() tea.Msg {
-		cmd := clitui.ListJobsCommand{
+		cmd := sharedclient.ListJobsCommand{
 			Client:  client,
 			BaseURL: baseURL,
 			Limit:   100,

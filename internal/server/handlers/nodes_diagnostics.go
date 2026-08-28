@@ -10,6 +10,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgtype"
 
+	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
@@ -30,21 +31,6 @@ var validNodeDaemonStreams = map[string]bool{
 	"stdout": true,
 	"stderr": true,
 	"system": true,
-}
-
-type nodeDiagnosticResponse struct {
-	NodeID        string          `json:"node_id"`
-	Component     string          `json:"component"`
-	Status        string          `json:"status"`
-	LastError     *string         `json:"last_error,omitempty"`
-	Version       *string         `json:"version,omitempty"`
-	ImageRef      *string         `json:"image_ref,omitempty"`
-	LocalImageID  *string         `json:"local_image_id,omitempty"`
-	RemoteImageID *string         `json:"remote_image_id,omitempty"`
-	Details       json.RawMessage `json:"details"`
-	LastCheckedAt *string         `json:"last_checked_at,omitempty"`
-	LastSuccessAt *string         `json:"last_success_at,omitempty"`
-	UpdatedAt     string          `json:"updated_at"`
 }
 
 type nodeDaemonLogResponse struct {
@@ -145,7 +131,7 @@ func listNodeDiagnosticsHandler(st store.Store) http.HandlerFunc {
 			slog.Error("node diagnostics: list failed", "node_id", nodeID.String(), "err", err)
 			return
 		}
-		resp := make([]nodeDiagnosticResponse, 0, len(diagnostics))
+		resp := make([]domainapi.NodeDiagnostic, 0, len(diagnostics))
 		for _, diag := range diagnostics {
 			resp = append(resp, nodeDiagnosticToResponse(diag))
 		}
@@ -307,9 +293,9 @@ func parseNodeDaemonLogLimit(r *http.Request) int {
 	return limit
 }
 
-func nodeDiagnosticToResponse(diag store.NodeDiagnostic) nodeDiagnosticResponse {
-	resp := nodeDiagnosticResponse{
-		NodeID:        diag.NodeID.String(),
+func nodeDiagnosticToResponse(diag store.NodeDiagnostic) domainapi.NodeDiagnostic {
+	resp := domainapi.NodeDiagnostic{
+		NodeID:        diag.NodeID,
 		Component:     diag.Component,
 		Status:        diag.Status,
 		LastError:     diag.LastError,

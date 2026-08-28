@@ -97,8 +97,10 @@ func TestBuildURLRejectsAbsoluteOrAuthorityPath(t *testing.T) {
 }
 
 func TestSendHeartbeatSuccess(t *testing.T) {
+	t.Setenv("PLOY_NODE_IMAGE", "registry.example/ploy/node:latest")
 	var receivedPayload domainapi.NodeHeartbeatRequest
 	var receivedMap map[string]any
+	var receivedDiagnostic map[string]any
 	heartbeatPath := "/v1/nodes/" + testNodeID + "/heartbeat"
 	diagnosticsPath := "/v1/nodes/" + testNodeID + "/diagnostics"
 	heartbeatRequests := 0
@@ -113,6 +115,9 @@ func TestSendHeartbeatSuccess(t *testing.T) {
 		}
 
 		if r.URL.Path == diagnosticsPath {
+			if err := json.NewDecoder(r.Body).Decode(&receivedDiagnostic); err != nil {
+				t.Fatalf("decode diagnostic: %v", err)
+			}
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
@@ -171,6 +176,9 @@ func TestSendHeartbeatSuccess(t *testing.T) {
 
 	if receivedPayload.DiskTotalBytes <= 0 {
 		t.Error("disk_total_bytes should be > 0")
+	}
+	if got := receivedDiagnostic["image_ref"]; got != "registry.example/ploy/node:latest" {
+		t.Errorf("diagnostic image_ref = %v, want configured image", got)
 	}
 }
 

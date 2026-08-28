@@ -18,7 +18,7 @@ func TestListJobsHandler_Success(t *testing.T) {
 	nodeID := domaintypes.NodeID("abc123")
 
 	st := &handlerStore{}
-	st.listJobsForTUI.val = []store.ListJobsForTUIRow{
+	st.listJobsPage.val = []store.ListJobsPageRow{
 		{
 			JobID:      jobID,
 			Name:       "mig-step",
@@ -32,7 +32,7 @@ func TestListJobsHandler_Success(t *testing.T) {
 			RepoID:     repoID,
 		},
 	}
-	st.countJobsForTUI.val = 1
+	st.countJobsPage.val = 1
 
 	handler := listJobsHandler(st)
 	req := httptest.NewRequest(http.MethodGet, "/v1/jobs", nil)
@@ -41,11 +41,11 @@ func TestListJobsHandler_Success(t *testing.T) {
 	handler.ServeHTTP(rr, req)
 
 	assertStatus(t, rr, http.StatusOK)
-	if !st.listJobsForTUI.called {
-		t.Fatal("expected ListJobsForTUI to be called")
+	if !st.listJobsPage.called {
+		t.Fatal("expected ListJobsPage to be called")
 	}
-	if !st.countJobsForTUI.called {
-		t.Fatal("expected CountJobsForTUI to be called")
+	if !st.countJobsPage.called {
+		t.Fatal("expected CountJobsPage to be called")
 	}
 
 	resp := decodeBody[map[string]any](t, rr)
@@ -95,8 +95,8 @@ func TestListJobsHandler_EmptyResult(t *testing.T) {
 	t.Parallel()
 
 	st := &handlerStore{}
-	st.listJobsForTUI.val = []store.ListJobsForTUIRow{}
-	st.countJobsForTUI.val = 0
+	st.listJobsPage.val = []store.ListJobsPageRow{}
+	st.countJobsPage.val = 0
 
 	handler := listJobsHandler(st)
 	req := httptest.NewRequest(http.MethodGet, "/v1/jobs", nil)
@@ -121,8 +121,8 @@ func TestListJobsHandler_RunIDFilter(t *testing.T) {
 
 	runID := domaintypes.NewRunID()
 	st := &handlerStore{}
-	st.listJobsForTUI.val = []store.ListJobsForTUIRow{}
-	st.countJobsForTUI.val = 0
+	st.listJobsPage.val = []store.ListJobsPageRow{}
+	st.countJobsPage.val = 0
 
 	handler := listJobsHandler(st)
 	req := httptest.NewRequest(http.MethodGet, "/v1/jobs?run_id="+runID.String(), nil)
@@ -131,14 +131,40 @@ func TestListJobsHandler_RunIDFilter(t *testing.T) {
 	handler.ServeHTTP(rr, req)
 
 	assertStatus(t, rr, http.StatusOK)
-	if !st.listJobsForTUI.called {
-		t.Fatal("expected ListJobsForTUI to be called")
+	if !st.listJobsPage.called {
+		t.Fatal("expected ListJobsPage to be called")
 	}
-	if st.listJobsForTUI.params.RunID == nil || *st.listJobsForTUI.params.RunID != runID.String() {
-		t.Fatalf("expected run_id filter %q, got %v", runID, st.listJobsForTUI.params.RunID)
+	if st.listJobsPage.params.RunID == nil || *st.listJobsPage.params.RunID != runID.String() {
+		t.Fatalf("expected run_id filter %q, got %v", runID, st.listJobsPage.params.RunID)
 	}
-	if st.countJobsForTUI.params == nil || *st.countJobsForTUI.params != runID.String() {
-		t.Fatalf("expected count run_id filter %q, got %v", runID, st.countJobsForTUI.params)
+	if st.countJobsPage.params.RunID == nil || *st.countJobsPage.params.RunID != runID.String() {
+		t.Fatalf("expected count run_id filter %q, got %v", runID, st.countJobsPage.params.RunID)
+	}
+}
+
+func TestListJobsHandler_NodeAndStatusFilters(t *testing.T) {
+	t.Parallel()
+
+	st := &handlerStore{}
+	st.listJobsPage.val = []store.ListJobsPageRow{}
+	handler := listJobsHandler(st)
+	req := httptest.NewRequest(http.MethodGet, "/v1/jobs?node_id=abc123&status=Running", nil)
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	assertStatus(t, rr, http.StatusOK)
+	if got := st.listJobsPage.params.NodeID; got == nil || *got != "abc123" {
+		t.Fatalf("list node_id = %v, want abc123", got)
+	}
+	if got := st.listJobsPage.params.Status; got == nil || *got != "Running" {
+		t.Fatalf("list status = %v, want Running", got)
+	}
+	if got := st.countJobsPage.params.NodeID; got == nil || *got != "abc123" {
+		t.Fatalf("count node_id = %v, want abc123", got)
+	}
+	if got := st.countJobsPage.params.Status; got == nil || *got != "Running" {
+		t.Fatalf("count status = %v, want Running", got)
 	}
 }
 
@@ -146,8 +172,8 @@ func TestListJobsHandler_DefaultPagination(t *testing.T) {
 	t.Parallel()
 
 	st := &handlerStore{}
-	st.listJobsForTUI.val = []store.ListJobsForTUIRow{}
-	st.countJobsForTUI.val = 0
+	st.listJobsPage.val = []store.ListJobsPageRow{}
+	st.countJobsPage.val = 0
 
 	handler := listJobsHandler(st)
 	req := httptest.NewRequest(http.MethodGet, "/v1/jobs", nil)
@@ -156,11 +182,11 @@ func TestListJobsHandler_DefaultPagination(t *testing.T) {
 	handler.ServeHTTP(rr, req)
 
 	assertStatus(t, rr, http.StatusOK)
-	if st.listJobsForTUI.params.Limit != 50 {
-		t.Fatalf("default limit = %d, want 50", st.listJobsForTUI.params.Limit)
+	if st.listJobsPage.params.Limit != 50 {
+		t.Fatalf("default limit = %d, want 50", st.listJobsPage.params.Limit)
 	}
-	if st.listJobsForTUI.params.Offset != 0 {
-		t.Fatalf("default offset = %d, want 0", st.listJobsForTUI.params.Offset)
+	if st.listJobsPage.params.Offset != 0 {
+		t.Fatalf("default offset = %d, want 0", st.listJobsPage.params.Offset)
 	}
 }
 
@@ -189,11 +215,25 @@ func TestListJobsHandler_InvalidPagination(t *testing.T) {
 	}
 }
 
+func TestListJobsHandler_InvalidFilters(t *testing.T) {
+	t.Parallel()
+
+	for _, path := range []string{
+		"/v1/jobs?node_id=invalid%20node",
+		"/v1/jobs?status=running",
+	} {
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		rr := httptest.NewRecorder()
+		listJobsHandler(&handlerStore{}).ServeHTTP(rr, req)
+		assertStatus(t, rr, http.StatusBadRequest)
+	}
+}
+
 func TestListJobsHandler_ListError(t *testing.T) {
 	t.Parallel()
 
 	st := &handlerStore{}
-	st.listJobsForTUI.err = errMockDatabase
+	st.listJobsPage.err = errMockDatabase
 
 	handler := listJobsHandler(st)
 	req := httptest.NewRequest(http.MethodGet, "/v1/jobs", nil)
@@ -208,8 +248,8 @@ func TestListJobsHandler_CountError(t *testing.T) {
 	t.Parallel()
 
 	st := &handlerStore{}
-	st.listJobsForTUI.val = []store.ListJobsForTUIRow{}
-	st.countJobsForTUI.err = errMockDatabase
+	st.listJobsPage.val = []store.ListJobsPageRow{}
+	st.countJobsPage.err = errMockDatabase
 
 	handler := listJobsHandler(st)
 	req := httptest.NewRequest(http.MethodGet, "/v1/jobs", nil)

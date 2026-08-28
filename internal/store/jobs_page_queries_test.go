@@ -7,12 +7,12 @@ import (
 	"github.com/segmentio/ksuid"
 )
 
-func TestListJobsForTUI(t *testing.T) {
+func TestListJobsPage(t *testing.T) {
 	ctx, db := newTestStore(t)
 
 	// Two separate runs so we can test filtered vs unfiltered results.
-	fxA := newV1Fixture(t, ctx, db, "https://github.com/test/tui-a", "main", []byte(`{"type":"test"}`))
-	fxB := newV1Fixture(t, ctx, db, "https://github.com/test/tui-b", "main", []byte(`{"type":"test"}`))
+	fxA := newV1Fixture(t, ctx, db, "https://github.com/test/page-a", "main", []byte(`{"type":"test"}`))
+	fxB := newV1Fixture(t, ctx, db, "https://github.com/test/page-b", "main", []byte(`{"type":"test"}`))
 
 	createJob := func(fx v1Fixture, name string, id types.JobID, jobType types.JobType) types.JobID {
 		t.Helper()
@@ -62,6 +62,11 @@ func TestListJobsForTUI(t *testing.T) {
 	jobA1 := createJob(fxA, "job-a1", idA1, types.JobTypeMig)
 	jobA2 := createJob(fxA, "job-a2", idA2, types.JobTypePreGate)
 	jobB1 := createJob(fxB, "job-b1", idB1, types.JobTypePostGate)
+	node := createTestNode(t, ctx, db)
+	if _, err := db.Pool().Exec(ctx, "UPDATE jobs SET status = 'Running', node_id = $1 WHERE id = $2", node.ID, jobA2); err != nil {
+		t.Fatalf("assign running job: %v", err)
+	}
+	t.Cleanup(func() { _ = db.DeleteNode(ctx, node.ID) })
 	expectedTypeByJobID := map[types.JobID]types.JobType{
 		jobA1: types.JobTypeMig,
 		jobA2: types.JobTypePreGate,
@@ -69,13 +74,13 @@ func TestListJobsForTUI(t *testing.T) {
 	}
 
 	t.Run("NewestToOldestOrdering", func(t *testing.T) {
-		rows, err := db.ListJobsForTUI(ctx, ListJobsForTUIParams{
+		rows, err := db.ListJobsPage(ctx, ListJobsPageParams{
 			Limit:  100,
 			Offset: 0,
 			RunID:  nil,
 		})
 		if err != nil {
-			t.Fatalf("ListJobsForTUI() failed: %v", err)
+			t.Fatalf("ListJobsPage() failed: %v", err)
 		}
 
 		// Find positions of our three jobs among all rows.
@@ -85,7 +90,7 @@ func TestListJobsForTUI(t *testing.T) {
 		}
 		for _, id := range []types.JobID{jobA1, jobA2, jobB1} {
 			if _, ok := pos[id]; !ok {
-				t.Fatalf("job %s not found in ListJobsForTUI results", id)
+				t.Fatalf("job %s not found in ListJobsPage results", id)
 			}
 		}
 		for _, row := range rows {
@@ -109,13 +114,13 @@ func TestListJobsForTUI(t *testing.T) {
 	t.Run("RunIDFilteredResults", func(t *testing.T) {
 		runIDA := fxA.Run.ID
 		runIDAStr := string(runIDA)
-		rows, err := db.ListJobsForTUI(ctx, ListJobsForTUIParams{
+		rows, err := db.ListJobsPage(ctx, ListJobsPageParams{
 			Limit:  100,
 			Offset: 0,
 			RunID:  &runIDAStr,
 		})
 		if err != nil {
-			t.Fatalf("ListJobsForTUI(run_id=A) failed: %v", err)
+			t.Fatalf("ListJobsPage(run_id=A) failed: %v", err)
 		}
 
 		for _, r := range rows {
@@ -140,13 +145,13 @@ func TestListJobsForTUI(t *testing.T) {
 	})
 
 	t.Run("UnfilteredIncludesAllRuns", func(t *testing.T) {
-		rows, err := db.ListJobsForTUI(ctx, ListJobsForTUIParams{
+		rows, err := db.ListJobsPage(ctx, ListJobsPageParams{
 			Limit:  100,
 			Offset: 0,
 			RunID:  nil,
 		})
 		if err != nil {
-			t.Fatalf("ListJobsForTUI(unfiltered) failed: %v", err)
+			t.Fatalf("ListJobsPage(unfiltered) failed: %v", err)
 		}
 
 		found := map[types.JobID]bool{}
@@ -160,39 +165,63 @@ func TestListJobsForTUI(t *testing.T) {
 		}
 	})
 
-	t.Run("CountJobsForTUI_Unfiltered", func(t *testing.T) {
-		count, err := db.CountJobsForTUI(ctx, nil)
+	t.Run("NodeAndStatusFilteredResults", func(t *testing.T) {
+		nodeID := node.ID.String()
+		status := types.JobStatusRunning.String()
+		rows, err := db.ListJobsPage(ctx, ListJobsPageParams{
+			Limit: 100, NodeID: &nodeID, Status: &status,
+		})
 		if err != nil {
-			t.Fatalf("CountJobsForTUI(nil) failed: %v", err)
+			t.Fatalf("ListJobsPage(node/status) failed: %v", err)
+		}
+		if len(rows) != 1 || rows[0].JobID != jobA2 {
+			t.Fatalf("filtered rows = %+v, want job %s", rows, jobA2)
+		}
+		if rows[0].Name != "job-a2" {
+			t.Fatalf("filtered job name = %q, want job-a2", rows[0].Name)
+		}
+		count, err := db.CountJobsPage(ctx, CountJobsPageParams{NodeID: &nodeID, Status: &status})
+		if err != nil {
+			t.Fatalf("CountJobsPage(node/status) failed: %v", err)
+		}
+		if count != 1 {
+			t.Fatalf("filtered count = %d, want 1", count)
+		}
+	})
+
+	t.Run("CountJobsPage_Unfiltered", func(t *testing.T) {
+		count, err := db.CountJobsPage(ctx, CountJobsPageParams{})
+		if err != nil {
+			t.Fatalf("CountJobsPage(unfiltered) failed: %v", err)
 		}
 		if count < 3 {
 			t.Errorf("expected at least 3 jobs, got %d", count)
 		}
 	})
 
-	t.Run("CountJobsForTUI_FilteredByRun", func(t *testing.T) {
+	t.Run("CountJobsPage_FilteredByRun", func(t *testing.T) {
 		runIDAStr := string(fxA.Run.ID)
 
-		countA, err := db.CountJobsForTUI(ctx, &runIDAStr)
+		countA, err := db.CountJobsPage(ctx, CountJobsPageParams{RunID: &runIDAStr})
 		if err != nil {
-			t.Fatalf("CountJobsForTUI(runA) failed: %v", err)
+			t.Fatalf("CountJobsPage(runA) failed: %v", err)
 		}
 		if countA < 2 {
 			t.Errorf("expected at least 2 jobs for run A, got %d", countA)
 		}
 
 		runIDBStr := string(fxB.Run.ID)
-		countB, err := db.CountJobsForTUI(ctx, &runIDBStr)
+		countB, err := db.CountJobsPage(ctx, CountJobsPageParams{RunID: &runIDBStr})
 		if err != nil {
-			t.Fatalf("CountJobsForTUI(runB) failed: %v", err)
+			t.Fatalf("CountJobsPage(runB) failed: %v", err)
 		}
 		if countB < 1 {
 			t.Errorf("expected at least 1 job for run B, got %d", countB)
 		}
 
-		countAll, err := db.CountJobsForTUI(ctx, nil)
+		countAll, err := db.CountJobsPage(ctx, CountJobsPageParams{})
 		if err != nil {
-			t.Fatalf("CountJobsForTUI(nil) for sum check failed: %v", err)
+			t.Fatalf("CountJobsPage(unfiltered) for sum check failed: %v", err)
 		}
 		if countAll < countA+countB {
 			t.Errorf("unfiltered count %d should be >= sum of per-run counts %d+%d=%d", countAll, countA, countB, countA+countB)

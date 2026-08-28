@@ -232,19 +232,25 @@ func (q *Queries) CountJobsByRunAttemptGroupByStatus(ctx context.Context, arg Co
 	return items, nil
 }
 
-const countJobsForTUI = `-- name: CountJobsForTUI :one
+const countJobsPage = `-- name: CountJobsPage :one
 SELECT COUNT(jobs.id)::BIGINT
 FROM jobs
 JOIN runs ON jobs.run_id = runs.id
 JOIN migs ON runs.mig_id = migs.id
 WHERE ($1::text IS NULL OR jobs.run_id = $1::text)
+  AND ($2::text IS NULL OR jobs.node_id = $2::text)
+  AND ($3::text IS NULL OR jobs.status::text = $3::text)
 `
 
-// Counts jobs with optional run_id filter.
-// run_id: if non-null, count jobs for that run; if null, count all jobs.
-// Used with ListJobsForTUI to provide total for TUI pagination.
-func (q *Queries) CountJobsForTUI(ctx context.Context, runID *string) (int64, error) {
-	row := q.db.QueryRow(ctx, countJobsForTUI, runID)
+type CountJobsPageParams struct {
+	RunID  *string `json:"run_id"`
+	NodeID *string `json:"node_id"`
+	Status *string `json:"status"`
+}
+
+// Counts jobs matching the same optional filters as ListJobsPage.
+func (q *Queries) CountJobsPage(ctx context.Context, arg CountJobsPageParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countJobsPage, arg.RunID, arg.NodeID, arg.Status)
 	var column_1 int64
 	err := row.Scan(&column_1)
 	return column_1, err
@@ -668,10 +674,10 @@ func (q *Queries) ListJobsByRunAttempt(ctx context.Context, arg ListJobsByRunAtt
 	return items, nil
 }
 
-const listJobsForTUI = `-- name: ListJobsForTUI :many
+const listJobsPage = `-- name: ListJobsPage :many
 SELECT
-  jobs.id AS job_id,
-  jobs.job_type::text AS name,
+	jobs.id AS job_id,
+	jobs.name,
   jobs.job_type,
   jobs.status,
   jobs.duration_ms,
@@ -684,17 +690,21 @@ FROM jobs
 JOIN runs ON jobs.run_id = runs.id
 JOIN migs ON runs.mig_id = migs.id
 WHERE ($3::text IS NULL OR jobs.run_id = $3::text)
+  AND ($4::text IS NULL OR jobs.node_id = $4::text)
+  AND ($5::text IS NULL OR jobs.status::text = $5::text)
 ORDER BY jobs.id DESC
 LIMIT $1 OFFSET $2
 `
 
-type ListJobsForTUIParams struct {
+type ListJobsPageParams struct {
 	Limit  int32   `json:"limit"`
 	Offset int32   `json:"offset"`
 	RunID  *string `json:"run_id"`
+	NodeID *string `json:"node_id"`
+	Status *string `json:"status"`
 }
 
-type ListJobsForTUIRow struct {
+type ListJobsPageRow struct {
 	JobID      types.JobID     `json:"job_id"`
 	Name       string          `json:"name"`
 	JobType    types.JobType   `json:"job_type"`
@@ -707,18 +717,23 @@ type ListJobsForTUIRow struct {
 	RepoID     types.RepoID    `json:"repo_id"`
 }
 
-// Lists jobs with optional run_id filter, ordered newest-to-oldest by job id.
-// run_id: if non-null, filter to jobs for that run; if null, return all jobs.
-// Joins runs and migs to surface mig_name per job for the TUI jobs-list screen.
-func (q *Queries) ListJobsForTUI(ctx context.Context, arg ListJobsForTUIParams) ([]ListJobsForTUIRow, error) {
-	rows, err := q.db.Query(ctx, listJobsForTUI, arg.Limit, arg.Offset, arg.RunID)
+// Lists jobs with optional run, node, and status filters, ordered newest-to-oldest by job id.
+// Joins runs and migs to surface mig_name for CLI and TUI consumers.
+func (q *Queries) ListJobsPage(ctx context.Context, arg ListJobsPageParams) ([]ListJobsPageRow, error) {
+	rows, err := q.db.Query(ctx, listJobsPage,
+		arg.Limit,
+		arg.Offset,
+		arg.RunID,
+		arg.NodeID,
+		arg.Status,
+	)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []ListJobsForTUIRow{}
+	items := []ListJobsPageRow{}
 	for rows.Next() {
-		var i ListJobsForTUIRow
+		var i ListJobsPageRow
 		if err := rows.Scan(
 			&i.JobID,
 			&i.Name,

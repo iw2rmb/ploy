@@ -5,35 +5,14 @@ import (
 	"net/http"
 	"time"
 
+	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-// nodeResponse is the JSON shape returned by GET /v1/nodes.
-type nodeResponse struct {
-	ID              string  `json:"id"`
-	Name            string  `json:"name"`
-	IPAddress       string  `json:"ip_address"`
-	Version         *string `json:"version,omitempty"`
-	Concurrency     int32   `json:"concurrency"`
-	CPUTotalMillis  int32   `json:"cpu_total_millis"`
-	CPUFreeMillis   int32   `json:"cpu_free_millis"`
-	MemTotalBytes   int64   `json:"mem_total_bytes"`
-	MemFreeBytes    int64   `json:"mem_free_bytes"`
-	DiskTotalBytes  int64   `json:"disk_total_bytes"`
-	DiskFreeBytes   int64   `json:"disk_free_bytes"`
-	CertSerial      *string `json:"cert_serial,omitempty"`
-	CertFingerprint *string `json:"cert_fingerprint,omitempty"`
-	CertNotBefore   *string `json:"cert_not_before,omitempty"`
-	CertNotAfter    *string `json:"cert_not_after,omitempty"`
-	LastHeartbeat   *string `json:"last_heartbeat,omitempty"`
-	Drained         bool    `json:"drained"`
-	CreatedAt       string  `json:"created_at"`
-}
-
-func nodeToResponse(node store.Node) nodeResponse {
-	nr := nodeResponse{
-		ID:              node.ID.String(),
+func nodeToResponse(node store.Node) domainapi.Node {
+	nr := domainapi.Node{
+		ID:              node.ID,
 		Name:            node.Name,
 		IPAddress:       node.IpAddress.String(),
 		Version:         node.Version,
@@ -118,7 +97,7 @@ func listNodesHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		resp := make([]nodeResponse, 0, len(nodes))
+		resp := make([]domainapi.Node, 0, len(nodes))
 		for _, node := range nodes {
 			resp = append(resp, nodeToResponse(node))
 		}

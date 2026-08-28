@@ -14,16 +14,24 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"text/tabwriter"
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/cli/common"
+	sharedclient "github.com/iw2rmb/ploy/internal/client"
 	"github.com/iw2rmb/ploy/internal/deploy"
 	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // handleNode routes node subcommands.
-func handleNode(args []string, stderr io.Writer) error {
+func handleNode(args []string, stdout, stderr io.Writer) error {
+	if stdout == nil {
+		stdout = io.Discard
+	}
+	if stderr == nil {
+		stderr = io.Discard
+	}
 	// Handle --help and -h flags to print usage and exit cleanly.
 	if common.WantsHelp(args) {
 		printNodeUsage(stderr)
@@ -36,6 +44,10 @@ func handleNode(args []string, stderr io.Writer) error {
 	switch args[0] {
 	case "add":
 		return handleNodeAdd(args[1:], stderr)
+	case "ls":
+		return handleNodeList(args[1:], stdout, stderr)
+	case "inspect":
+		return handleNodeInspect(args[1:], stdout, stderr)
 	default:
 		printNodeUsage(stderr)
 		return fmt.Errorf("unknown node subcommand %q", args[0])
@@ -54,6 +66,183 @@ func printNodeUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Commands:")
 	_, _ = fmt.Fprintln(w, "  add       Add a worker node")
+	_, _ = fmt.Fprintln(w, "  ls        List worker nodes")
+	_, _ = fmt.Fprintln(w, "  inspect   Inspect a worker node")
+}
+
+func handleNodeList(args []string, stdout, stderr io.Writer) error {
+	if common.WantsHelp(args) {
+		_, _ = fmt.Fprintln(stderr, "Usage: ploy cluster node ls")
+		return nil
+	}
+	if len(args) != 0 {
+		return fmt.Errorf("node ls takes no arguments")
+	}
+	ctx := context.Background()
+	baseURL, client, err := common.ResolveControlPlaneHTTP(ctx)
+	if err != nil {
+		return fmt.Errorf("resolve control plane: %w", err)
+	}
+	nodes, err := (sharedclient.ListNodesCommand{Client: client, BaseURL: baseURL}).Run(ctx)
+	if err != nil {
+		return err
+	}
+	if len(nodes) == 0 {
+		_, _ = fmt.Fprintln(stdout, "No nodes found.")
+		return nil
+	}
+	tw := tabwriter.NewWriter(stdout, 0, 0, 2, ' ', 0)
+	_, _ = fmt.Fprintln(tw, "HOST\tNAME\tADDRESS")
+	for _, node := range nodes {
+		_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\n", node.ID, node.Name, node.IPAddress)
+	}
+	return tw.Flush()
+}
+
+func handleNodeInspect(args []string, stdout, stderr io.Writer) error {
+	if common.WantsHelp(args) {
+		_, _ = fmt.Fprintln(stderr, "Usage: ploy cluster node inspect <name>")
+		return nil
+	}
+	if len(args) != 1 || strings.TrimSpace(args[0]) == "" {
+		_, _ = fmt.Fprintln(stderr, "Usage: ploy cluster node inspect <name>")
+		return errors.New("node name is required")
+	}
+
+	ctx := context.Background()
+	baseURL, client, err := common.ResolveControlPlaneHTTP(ctx)
+	if err != nil {
+		return fmt.Errorf("resolve control plane: %w", err)
+	}
+	nodes, err := (sharedclient.ListNodesCommand{Client: client, BaseURL: baseURL}).Run(ctx)
+	if err != nil {
+		return err
+	}
+	name := strings.TrimSpace(args[0])
+	var selected *domainapi.Node
+	for i := range nodes {
+		if nodes[i].Name == name {
+			selected = &nodes[i]
+			break
+		}
+	}
+	if selected == nil {
+		return fmt.Errorf("node %q not found", name)
+	}
+
+	diagnostics, err := (sharedclient.ListNodeDiagnosticsCommand{
+		Client: client, BaseURL: baseURL, NodeID: selected.ID,
+	}).Run(ctx)
+	if err != nil {
+		return err
+	}
+	jobs, err := listRunningNodeJobs(ctx, client, baseURL, selected.ID)
+	if err != nil {
+		return err
+	}
+	renderNodeInspect(stdout, *selected, diagnostics, jobs)
+	return nil
+}
+
+func listRunningNodeJobs(ctx context.Context, client *http.Client, baseURL *url.URL, nodeID domaintypes.NodeID) ([]domainapi.JobListItem, error) {
+	const pageSize int32 = 100
+	status := domaintypes.JobStatusRunning
+	jobs := make([]domainapi.JobListItem, 0)
+	for offset := int32(0); ; offset += pageSize {
+		page, err := (sharedclient.ListJobsCommand{
+			Client: client, BaseURL: baseURL, Limit: pageSize, Offset: offset,
+			NodeID: &nodeID, Status: &status,
+		}).Run(ctx)
+		if err != nil {
+			return nil, err
+		}
+		jobs = append(jobs, page.Jobs...)
+		if int64(len(jobs)) >= page.Total || len(page.Jobs) < int(pageSize) {
+			return jobs, nil
+		}
+	}
+}
+
+type nodeDiagnosticDetails struct {
+	Concurrency int32 `json:"concurrency"`
+}
+
+func renderNodeInspect(out io.Writer, node domainapi.Node, diagnostics []domainapi.NodeDiagnostic, jobs []domainapi.JobListItem) {
+	imageRef := "unknown"
+	capacity := node.Concurrency
+	for _, diagnostic := range diagnostics {
+		if diagnostic.Component != "node" {
+			continue
+		}
+		if diagnostic.ImageRef != nil && strings.TrimSpace(*diagnostic.ImageRef) != "" {
+			imageRef = strings.TrimSpace(*diagnostic.ImageRef)
+		}
+		var details nodeDiagnosticDetails
+		if json.Unmarshal(diagnostic.Details, &details) == nil && details.Concurrency > 0 {
+			capacity = details.Concurrency
+		}
+		break
+	}
+
+	heartbeat := "unknown"
+	if node.LastHeartbeat != nil && strings.TrimSpace(*node.LastHeartbeat) != "" {
+		heartbeat = strings.TrimSpace(*node.LastHeartbeat)
+	}
+	available := int(capacity) - len(jobs)
+	if available < 0 {
+		available = 0
+	}
+
+	_, _ = fmt.Fprintf(out, "Name:             %s\n", node.Name)
+	_, _ = fmt.Fprintf(out, "Host:             %s\n", node.ID)
+	_, _ = fmt.Fprintf(out, "Address:          %s\n", node.IPAddress)
+	_, _ = fmt.Fprintf(out, "Image:            %s\n", imageRef)
+	_, _ = fmt.Fprintf(out, "Last heartbeat:   %s\n", heartbeat)
+	_, _ = fmt.Fprintf(out, "Queue:            %d/%d active (%d available)\n", len(jobs), capacity, available)
+	_, _ = fmt.Fprintf(out, "CPU available:    %s\n", formatCPU(node.CPUFreeMillis, node.CPUTotalMillis))
+	_, _ = fmt.Fprintf(out, "Memory available: %s\n", formatBytes(node.MemFreeBytes, node.MemTotalBytes))
+	_, _ = fmt.Fprintf(out, "Disk available:   %s\n", formatBytes(node.DiskFreeBytes, node.DiskTotalBytes))
+	_, _ = fmt.Fprintln(out, "")
+	_, _ = fmt.Fprintln(out, "Active jobs:")
+	if len(jobs) == 0 {
+		_, _ = fmt.Fprintln(out, "  none")
+		return
+	}
+	tw := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
+	_, _ = fmt.Fprintln(tw, "JOB ID\tNAME\tMIG\tRUN ID\tREPO ID\tIMAGE")
+	for _, job := range jobs {
+		_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n",
+			job.JobID, job.Name, job.MigName, job.RunID, job.RepoID, job.JobImage)
+	}
+	_ = tw.Flush()
+}
+
+func formatCPU(free, total int32) string {
+	if total <= 0 {
+		return "unknown"
+	}
+	return fmt.Sprintf("%.2f / %.2f cores", float64(free)/1000, float64(total)/1000)
+}
+
+func formatBytes(free, total int64) string {
+	if total <= 0 {
+		return "unknown"
+	}
+	return fmt.Sprintf("%s / %s", formatByteCount(free), formatByteCount(total))
+}
+
+func formatByteCount(value int64) string {
+	const unit = int64(1024)
+	if value < unit {
+		return fmt.Sprintf("%d B", value)
+	}
+	divisor := unit
+	unitIndex := 0
+	for next := divisor * unit; value >= next && unitIndex < 3; next = divisor * unit {
+		divisor = next
+		unitIndex++
+	}
+	return fmt.Sprintf("%.2f %ciB", float64(value)/float64(divisor), "KMGT"[unitIndex])
 }
 
 // printNodeAddUsage prints usage information for the node add command.

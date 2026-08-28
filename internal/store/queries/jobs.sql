@@ -494,13 +494,12 @@ WHERE run_id = $1
   AND attempt = $2
 GROUP BY status;
 
--- name: ListJobsForTUI :many
--- Lists jobs with optional run_id filter, ordered newest-to-oldest by job id.
--- run_id: if non-null, filter to jobs for that run; if null, return all jobs.
--- Joins runs and migs to surface mig_name per job for the TUI jobs-list screen.
+-- name: ListJobsPage :many
+-- Lists jobs with optional run, node, and status filters, ordered newest-to-oldest by job id.
+-- Joins runs and migs to surface mig_name for CLI and TUI consumers.
 SELECT
-  jobs.id AS job_id,
-  jobs.job_type::text AS name,
+	jobs.id AS job_id,
+	jobs.name,
   jobs.job_type,
   jobs.status,
   jobs.duration_ms,
@@ -513,15 +512,17 @@ FROM jobs
 JOIN runs ON jobs.run_id = runs.id
 JOIN migs ON runs.mig_id = migs.id
 WHERE (sqlc.narg(run_id)::text IS NULL OR jobs.run_id = sqlc.narg(run_id)::text)
+  AND (sqlc.narg(node_id)::text IS NULL OR jobs.node_id = sqlc.narg(node_id)::text)
+  AND (sqlc.narg(status)::text IS NULL OR jobs.status::text = sqlc.narg(status)::text)
 ORDER BY jobs.id DESC
 LIMIT $1 OFFSET $2;
 
--- name: CountJobsForTUI :one
--- Counts jobs with optional run_id filter.
--- run_id: if non-null, count jobs for that run; if null, count all jobs.
--- Used with ListJobsForTUI to provide total for TUI pagination.
+-- name: CountJobsPage :one
+-- Counts jobs matching the same optional filters as ListJobsPage.
 SELECT COUNT(jobs.id)::BIGINT
 FROM jobs
 JOIN runs ON jobs.run_id = runs.id
 JOIN migs ON runs.mig_id = migs.id
-WHERE (sqlc.narg(run_id)::text IS NULL OR jobs.run_id = sqlc.narg(run_id)::text);
+WHERE (sqlc.narg(run_id)::text IS NULL OR jobs.run_id = sqlc.narg(run_id)::text)
+  AND (sqlc.narg(node_id)::text IS NULL OR jobs.node_id = sqlc.narg(node_id)::text)
+  AND (sqlc.narg(status)::text IS NULL OR jobs.status::text = sqlc.narg(status)::text);

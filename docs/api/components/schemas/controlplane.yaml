@@ -979,7 +979,10 @@ NodeDiagnostic:
     status: { type: string }
     last_error: { type: string, nullable: true }
     version: { type: string, nullable: true }
-    image_ref: { type: string, nullable: true }
+    image_ref:
+      type: string
+      nullable: true
+      description: Configured OCI image reference of the running node container.
     local_image_id: { type: string, nullable: true }
     remote_image_id: { type: string, nullable: true }
     details:
@@ -999,7 +1002,10 @@ UpsertNodeDiagnosticRequest:
     status: { type: string }
     last_error: { type: string, nullable: true }
     version: { type: string, nullable: true }
-    image_ref: { type: string, nullable: true }
+    image_ref:
+      type: string
+      nullable: true
+      description: Configured OCI image reference of the running node container.
     local_image_id: { type: string, nullable: true }
     remote_image_id: { type: string, nullable: true }
     details:

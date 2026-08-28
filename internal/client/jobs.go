@@ -1,4 +1,4 @@
-package tui
+package client
 
 import (
 	"context"
@@ -11,16 +11,16 @@ import (
 	"github.com/iw2rmb/ploy/internal/httpx"
 )
 
-// ListJobsCommand fetches a paginated list of jobs with an optional run_id filter.
 type ListJobsCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
 	Limit   int32
 	Offset  int32
-	RunID   *domaintypes.RunID // Optional: filter jobs to a specific run.
+	RunID   *domaintypes.RunID
+	NodeID  *domaintypes.NodeID
+	Status  *domaintypes.JobStatus
 }
 
-// Run executes GET /v1/jobs.
 func (c ListJobsCommand) Run(ctx context.Context) (domainapi.JobListResponse, error) {
 	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
 		return domainapi.JobListResponse{}, fmt.Errorf("list jobs: %w", err)
@@ -37,9 +37,13 @@ func (c ListJobsCommand) Run(ctx context.Context) (domainapi.JobListResponse, er
 	if c.RunID != nil && !c.RunID.IsZero() {
 		q.Set("run_id", c.RunID.String())
 	}
-	if len(q) > 0 {
-		endpoint.RawQuery = q.Encode()
+	if c.NodeID != nil && !c.NodeID.IsZero() {
+		q.Set("node_id", c.NodeID.String())
 	}
+	if c.Status != nil {
+		q.Set("status", c.Status.String())
+	}
+	endpoint.RawQuery = q.Encode()
 
 	return httpx.DoJSON[domainapi.JobListResponse](ctx, c.Client, http.MethodGet, endpoint.String(), nil, http.StatusOK, "list jobs")
 }

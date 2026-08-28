@@ -34,10 +34,8 @@ type Querier interface {
 	// Counts jobs by status for a specific run attempt.
 	// Used by terminal detection to determine runs.status.
 	CountJobsByRunAttemptGroupByStatus(ctx context.Context, arg CountJobsByRunAttemptGroupByStatusParams) ([]CountJobsByRunAttemptGroupByStatusRow, error)
-	// Counts jobs with optional run_id filter.
-	// run_id: if non-null, count jobs for that run; if null, count all jobs.
-	// Used with ListJobsForTUI to provide total for TUI pagination.
-	CountJobsForTUI(ctx context.Context, runID *string) (int64, error)
+	// Counts jobs matching the same optional filters as ListJobsPage.
+	CountJobsPage(ctx context.Context, arg CountJobsPageParams) (int64, error)
 	CountRunsByWaveStatus(ctx context.Context, waveID types.WaveID) ([]CountRunsByWaveStatusRow, error)
 	// Counts distinct stale nodes that currently have at least one running job.
 	// Excludes NULL node_id rows (orphaned running jobs) from node count.
@@ -177,10 +175,9 @@ type Querier interface {
 	ListGlobalEnv(ctx context.Context) ([]ConfigEnv, error)
 	ListJobsByRun(ctx context.Context, runID types.RunID) ([]Job, error)
 	ListJobsByRunAttempt(ctx context.Context, arg ListJobsByRunAttemptParams) ([]Job, error)
-	// Lists jobs with optional run_id filter, ordered newest-to-oldest by job id.
-	// run_id: if non-null, filter to jobs for that run; if null, return all jobs.
-	// Joins runs and migs to surface mig_name per job for the TUI jobs-list screen.
-	ListJobsForTUI(ctx context.Context, arg ListJobsForTUIParams) ([]ListJobsForTUIRow, error)
+	// Lists jobs with optional run, node, and status filters, ordered newest-to-oldest by job id.
+	// Joins runs and migs to surface mig_name for CLI and TUI consumers.
+	ListJobsPage(ctx context.Context, arg ListJobsPageParams) ([]ListJobsPageRow, error)
 	// ListLogPartitions retrieves all partition names for the logs table.
 	ListLogPartitions(ctx context.Context) ([]string, error)
 	// Returns log metadata including object_key for object-storage retrieval.

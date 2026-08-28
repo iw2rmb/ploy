@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 
+	sharedclient "github.com/iw2rmb/ploy/internal/client"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/httpx"
 )
@@ -47,7 +48,7 @@ func (c GetRunTotalsCommand) Run(ctx context.Context) (RunTotals, error) {
 
 	// Fetch job count for this run.
 	runID := c.RunID
-	jobsResult, err := ListJobsCommand{
+	jobsResult, err := sharedclient.ListJobsCommand{
 		Client:  c.Client,
 		BaseURL: c.BaseURL,
 		Limit:   1,

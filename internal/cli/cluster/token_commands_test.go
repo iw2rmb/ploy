@@ -3,6 +3,7 @@ package cluster
 import (
 	"bytes"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -14,7 +15,7 @@ import (
 
 func TestTokenCreateRequiresUsernameForControlPlane(t *testing.T) {
 	var stderr bytes.Buffer
-	err := Handle([]string{"token", "create", "--role", "control-plane"}, &stderr)
+	err := Handle([]string{"token", "create", "--role", "control-plane"}, io.Discard, &stderr)
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -46,7 +47,7 @@ func TestTokenCreateSendsUsername(t *testing.T) {
 	clienv.UseControlPlaneEnv(t, server.URL)
 
 	var stderr bytes.Buffer
-	err := Handle([]string{"token", "create", "--role", "control-plane", "--username", "alice"}, &stderr)
+	err := Handle([]string{"token", "create", "--role", "control-plane", "--username", "alice"}, io.Discard, &stderr)
 	if err != nil {
 		t.Fatalf("token create: %v", err)
 	}
