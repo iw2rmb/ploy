@@ -49,31 +49,38 @@ func runApply(ctx context.Context, opts ApplyOptions, base *url.URL, httpClient 
 		out = io.Discard
 	}
 
-	local, err := resolveLocalSourceRepo(ctx, repoPath)
+	local := resolvedSourceRepo{}
+	var err error
+	if opts.Force {
+		local.Worktree, err = resolveLocalWorktree(ctx, repoPath)
+	} else {
+		local, err = resolveLocalSourceRepo(ctx, repoPath)
+	}
 	if err != nil {
 		return fmt.Errorf("run apply: %w", err)
 	}
-	if err := ensureNoGitDiff(ctx, local.Worktree); err != nil {
-		return fmt.Errorf("run apply: %w", err)
-	}
-
-	resolved, err := migs.RunPullCommand{
-		Client:  httpClient,
-		BaseURL: base,
-		RunID:   runID,
-	}.Run(ctx)
-	if err != nil {
-		return fmt.Errorf("run apply: %w", err)
-	}
-	if domaintypes.NormalizeRepoURL(resolved.RepoURL) != domaintypes.NormalizeRepoURL(local.RepoURL) {
-		return fmt.Errorf("run apply: local origin %s does not match run metadata repo_url %s", local.RepoURL, resolved.RepoURL)
-	}
-	sourceSHA := strings.TrimSpace(resolved.SourceCommitSHA)
-	if sourceSHA == "" {
-		return errors.New("run apply: source_commit_sha is not available for this run")
-	}
-	if !strings.EqualFold(local.CommitSHA, sourceSHA) && !opts.Force {
-		return fmt.Errorf("run apply: local HEAD %s does not match run source_commit_sha %s; use --force to apply anyway", local.CommitSHA, sourceSHA)
+	if !opts.Force {
+		if err := ensureNoGitDiff(ctx, local.Worktree); err != nil {
+			return fmt.Errorf("run apply: %w", err)
+		}
+		resolved, err := migs.RunPullCommand{
+			Client:  httpClient,
+			BaseURL: base,
+			RunID:   runID,
+		}.Run(ctx)
+		if err != nil {
+			return fmt.Errorf("run apply: %w", err)
+		}
+		if !domaintypes.RepoURLsEqual(resolved.RepoURL, local.RepoURL) {
+			return fmt.Errorf("run apply: local origin %s does not match run metadata repo_url %s", local.RepoURL, resolved.RepoURL)
+		}
+		sourceSHA := strings.TrimSpace(resolved.SourceCommitSHA)
+		if sourceSHA == "" {
+			return errors.New("run apply: source_commit_sha is not available for this run")
+		}
+		if !strings.EqualFold(local.CommitSHA, sourceSHA) {
+			return fmt.Errorf("run apply: local HEAD %s does not match run source_commit_sha %s; use --force to apply anyway", local.CommitSHA, sourceSHA)
+		}
 	}
 
 	diffs, err := runs.ListRunDiffsCommand{

@@ -218,8 +218,9 @@ ploy mig pull <mig-id|name>
 - `[<mig-id|name>]` — Mig ID or name (optional), for `ploy mig pull`.
 
 **Flags:**
-- `--force` — For `ploy run apply`, allow local `HEAD` to differ from the run source SHA.
-  This never bypasses dirty worktree checks.
+- `--force` — For `ploy run apply`, skip the clean-worktree, repository URL,
+  and source commit safety checks. Run lookup, patch download, and `git apply`
+  errors still fail the command.
 
 **Examples:**
 
@@ -239,8 +240,10 @@ ploy mig pull --last-failed <mig-id|name>
 
 **Requirements:**
 - Must be run inside a git repository.
-- Working tree must be clean (commit or stash changes first).
-- The origin remote URL must match the `repo_url` used when the run was created.
+- Without `--force`, the working tree must be clean, the origin remote URL must
+  match the run `repo_url`, and local `HEAD` must match the run source commit.
+  Repository matching ignores SSH versus HTTPS transport, the SSH user and
+  port, and the trailing `.git` suffix.
 - The run must exist and have diffs available.
 
 ## Interactive TUI (`ploy tui`)

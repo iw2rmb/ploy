@@ -247,7 +247,7 @@ func newApplyCommand() *cobra.Command {
 			return RunApply(cmd.Context(), opts)
 		},
 	}
-	cmd.Flags().BoolVar(&opts.Force, "force", false, "Apply even if local HEAD differs from the run source SHA")
+	cmd.Flags().BoolVar(&opts.Force, "force", false, "Skip worktree, repository, and source commit safety checks")
 	return cmd
 }
 

@@ -157,3 +157,60 @@ func TestRepositoryURLNormalization(t *testing.T) {
 		})
 	}
 }
+
+func TestRepoURLsEqual(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		left  string
+		right string
+		want  bool
+	}{
+		{
+			name:  "HTTPS and SSH with custom port",
+			left:  "https://gitlab.example.com/acme/service",
+			right: "ssh://git@gitlab.example.com:7999/acme/service.git",
+			want:  true,
+		},
+		{
+			name:  "HTTPS and SCP",
+			left:  "https://gitlab.example.com/acme/service.git",
+			right: "git@gitlab.example.com:acme/service.git",
+			want:  true,
+		},
+		{
+			name:  "different repository path",
+			left:  "https://gitlab.example.com/acme/service",
+			right: "ssh://git@gitlab.example.com:7999/acme/other.git",
+			want:  false,
+		},
+		{
+			name:  "different host",
+			left:  "https://gitlab.example.com/acme/service",
+			right: "ssh://git@other.example.com:7999/acme/service.git",
+			want:  false,
+		},
+		{
+			name:  "different HTTPS service port",
+			left:  "https://gitlab.example.com:8443/acme/service",
+			right: "https://gitlab.example.com/acme/service.git",
+			want:  false,
+		},
+		{
+			name:  "empty values",
+			left:  "",
+			right: "",
+			want:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := RepoURLsEqual(tt.left, tt.right); got != tt.want {
+				t.Fatalf("RepoURLsEqual(%q, %q) = %t, want %t", tt.left, tt.right, got, tt.want)
+			}
+		})
+	}
+}

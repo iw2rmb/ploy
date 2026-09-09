@@ -44,9 +44,9 @@ func pathLooksLocal(selector string) bool {
 }
 
 func resolveLocalSourceRepo(ctx context.Context, path string) (resolvedSourceRepo, error) {
-	worktree, err := gitOutput(ctx, path, "rev-parse", "--show-toplevel")
+	worktree, err := resolveLocalWorktree(ctx, path)
 	if err != nil {
-		return resolvedSourceRepo{}, fmt.Errorf("repo: %s is not a git worktree", path)
+		return resolvedSourceRepo{}, err
 	}
 	repoURL, err := gitOutput(ctx, worktree, "remote", "get-url", "origin")
 	if err != nil {
@@ -63,6 +63,14 @@ func resolveLocalSourceRepo(ctx context.Context, path string) (resolvedSourceRep
 		CommitSHA: head,
 		IsLocal:   true,
 	}, nil
+}
+
+func resolveLocalWorktree(ctx context.Context, path string) (string, error) {
+	worktree, err := gitOutput(ctx, path, "rev-parse", "--show-toplevel")
+	if err != nil {
+		return "", fmt.Errorf("repo: %s is not a git worktree", path)
+	}
+	return worktree, nil
 }
 
 func resolveRemoteSourceRepo(ctx context.Context, base *url.URL, httpClient *http.Client, selector string) (resolvedSourceRepo, error) {

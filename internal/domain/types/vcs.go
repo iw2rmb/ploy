@@ -164,7 +164,8 @@ func IsCanonicalFullCommitSHA(raw string) bool {
 	return ok && normalized.String() == raw
 }
 
-// NormalizeRepoURL normalizes a git repository URL for comparison and matching.
+// NormalizeRepoURL normalizes a Git repository URL while preserving its
+// transport. Use RepoURLsEqual for transport-independent identity comparison.
 //
 // The normalization applies the following transformations:
 //   - Trims leading and trailing whitespace
@@ -182,6 +183,42 @@ func NormalizeRepoURL(raw string) string {
 	normalized = strings.TrimSuffix(normalized, "/")
 	normalized = strings.TrimSuffix(normalized, ".git")
 	return normalized
+}
+
+// RepoURLsEqual compares repository ownership independently of Git transport.
+// SSH users and ports do not identify a different repository when the host and
+// repository path match.
+func RepoURLsEqual(left, right string) bool {
+	leftIdentity := repoURLIdentity(left)
+	return leftIdentity != "" && leftIdentity == repoURLIdentity(right)
+}
+
+func repoURLIdentity(raw string) string {
+	normalized := NormalizeRepoURL(raw)
+	if normalized == "" {
+		return ""
+	}
+
+	lower := strings.ToLower(normalized)
+	if strings.HasPrefix(lower, "file://") {
+		return normalized
+	}
+	if strings.HasPrefix(lower, "https://") || strings.HasPrefix(lower, "ssh://") {
+		if parsed, err := url.Parse(normalized); err == nil && parsed.Hostname() != "" {
+			host := strings.ToLower(parsed.Hostname())
+			if strings.EqualFold(parsed.Scheme, "https") && parsed.Port() != "" && parsed.Port() != "443" {
+				host += ":" + parsed.Port()
+			}
+			return host + "/" + strings.TrimPrefix(parsed.Path, "/")
+		}
+	}
+
+	schemless := NormalizeRepoURLSchemless(normalized)
+	host, path, found := strings.Cut(schemless, "/")
+	if !found {
+		return strings.ToLower(schemless)
+	}
+	return strings.ToLower(host) + "/" + path
 }
 
 // NormalizeRepoURLSchemless returns a scheme-less, display-oriented form of a repository URL.

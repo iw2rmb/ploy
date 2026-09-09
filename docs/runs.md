@@ -123,10 +123,13 @@ ploy run pull <run-id> [artifacts-path]
 ploy run apply <run-id> [path] [--force]
 ```
 
-`run pull` downloads final artifacts into a directory. `run apply` applies the
-accumulated run patch into a clean local git worktree. The local origin must
-match the run `repo_url`. Local `HEAD` must match the run `source_commit_sha`;
-`--force` bypasses only that source-commit guard.
+`run pull` downloads final artifacts into a directory. By default, `run apply`
+applies the accumulated run patch only when the local git worktree is clean,
+the local origin matches the run `repo_url`, and local `HEAD` matches the run
+`source_commit_sha`. Repository matching ignores the SSH or HTTPS transport,
+SSH user and port, and the trailing `.git` suffix. `--force` skips all three
+safety checks. It does not suppress run lookup, patch download, or `git apply`
+errors.
 
 Nodes upload final repo artifacts when a job fails or errors, when `post_gate`
 succeeds, and when a terminal `mig` succeeds for a run with
