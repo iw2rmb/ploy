@@ -39,62 +39,14 @@ func TestSmokeWorkflow_EndToEnd(t *testing.T) {
 
 	t.Logf("✓ Created run: id=%v, status=%s", run.ID, run.Status)
 
-	// Step 2: Create multiple jobs representing the workflow phases.
-	// Stage 1: Build Gate (pre-validation)
-	jobBuildGate, err := db.CreateJob(ctx, store.CreateJobParams{
-		ID:          domaintypes.NewJobID(),
-		RunID:       run.ID,
-		RepoID:      run.RepoID,
-		RepoBaseRef: run.RepoBaseRef,
-		Attempt:     run.Attempt,
-		Name:        "build-gate",
-		Status:      domaintypes.JobStatusRunning,
-		JobType:     domaintypes.JobTypePreGate,
-		JobImage:    "",
-		NextID:      nil,
-		Meta:        []byte(`{"type":"build-gate"}`),
-	})
-	if err != nil {
-		t.Fatalf("CreateJob(build-gate) failed: %v", err)
-	}
+	// Step 2: Use the job chain materialized with the run.
+	jobBuildGate := fixture.Jobs[0]
 	t.Logf("✓ Created job: id=%v, name=%s", jobBuildGate.ID, jobBuildGate.Name)
 
-	// Stage 2: Main mig execution
-	jobMain, err := db.CreateJob(ctx, store.CreateJobParams{
-		ID:          domaintypes.NewJobID(),
-		RunID:       run.ID,
-		RepoID:      run.RepoID,
-		RepoBaseRef: run.RepoBaseRef,
-		Attempt:     run.Attempt,
-		Name:        "main",
-		Status:      domaintypes.JobStatusCreated,
-		JobType:     domaintypes.JobTypeMig,
-		JobImage:    "",
-		NextID:      nil,
-		Meta:        []byte(`{"type":"mig","lane":"main"}`),
-	})
-	if err != nil {
-		t.Fatalf("CreateJob(main) failed: %v", err)
-	}
+	jobMain := fixture.Jobs[1]
 	t.Logf("✓ Created job: id=%v, name=%s", jobMain.ID, jobMain.Name)
 
-	// Stage 3: Post-processing (e.g., artifact upload)
-	jobPost, err := db.CreateJob(ctx, store.CreateJobParams{
-		ID:          domaintypes.NewJobID(),
-		RunID:       run.ID,
-		RepoID:      run.RepoID,
-		RepoBaseRef: run.RepoBaseRef,
-		Attempt:     run.Attempt,
-		Name:        "post-process",
-		Status:      domaintypes.JobStatusCreated,
-		JobType:     domaintypes.JobTypePostGate,
-		JobImage:    "",
-		NextID:      nil,
-		Meta:        []byte(`{"type":"post-process","action":"upload-artifacts"}`),
-	})
-	if err != nil {
-		t.Fatalf("CreateJob(post-process) failed: %v", err)
-	}
+	jobPost := fixture.Jobs[2]
 	t.Logf("✓ Created job: id=%v, name=%s", jobPost.ID, jobPost.Name)
 
 	// Step 3: Simulate log streaming across jobs.

@@ -70,15 +70,22 @@ func TestHappyPath_CreateRepoModRun(t *testing.T) {
 	}
 
 	runID := domaintypes.NewRunID()
-	run, err := db.CreateRun(ctx, store.CreateRunParams{
-		ID:        runID,
-		MigID:     migID,
-		SpecID:    spec.ID,
-		CreatedBy: &createdBy,
+	waveID := domaintypes.NewWaveID()
+	_, materialized, err := db.CreateWaveWithRuns(ctx, store.CreateWaveWithRunsParams{
+		Wave: store.CreateWaveParams{ID: waveID, MigID: migID, SpecID: spec.ID, CreatedBy: &createdBy},
+		Runs: []store.RunPlan{{
+			ID:              runID,
+			RepoID:          repo.RepoID,
+			RepoBaseRef:     repo.BaseRef,
+			SourceCommitSha: "0123456789abcdef0123456789abcdef01234567",
+			RepoSha0:        "0123456789abcdef0123456789abcdef01234567",
+			Jobs:            []store.JobPlan{{Name: "integration", JobType: domaintypes.JobTypeMig, Meta: []byte(`{}`)}},
+		}},
 	})
 	if err != nil {
-		t.Fatalf("CreateRun() failed: %v", err)
+		t.Fatalf("CreateWaveWithRuns() failed: %v", err)
 	}
+	run := materialized[0].Run
 	t.Logf("Created run: id=%v, mig_id=%s, mig_repo_id=%s, repo_id=%s, status=%s", run.ID, run.MigID.String(), repo.ID.String(), repo.RepoID.String(), run.Status)
 
 	// Verify the run was created with expected values.

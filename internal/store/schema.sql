@@ -199,7 +199,7 @@ CREATE TABLE IF NOT EXISTS runs (
   source_commit_sha TEXT NOT NULL DEFAULT '',
   repo_sha0         TEXT NOT NULL DEFAULT '',
   created_by        TEXT,
-  status            run_status NOT NULL DEFAULT 'Running',
+  status            run_status NOT NULL,
   attempt           INTEGER NOT NULL DEFAULT 1 CHECK (attempt >= 1),
   last_error        TEXT,
   created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),

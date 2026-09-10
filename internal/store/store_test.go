@@ -138,11 +138,10 @@ func TestCreateRun_RoundTrip_V1(t *testing.T) {
 	if err != nil {
 		t.Fatalf("build token marker stats: %v", err)
 	}
-	runWithStats, err := db.CreateRun(ctx, CreateRunParams{
+	runWithStats, err := insertRun(ctx, db.(*PgStore).Queries, CreateWaveParams{
+		ID: fx.Wave.ID, MigID: fx.Mig.ID, SpecID: fx.Spec.ID, CreatedBy: fx.Run.CreatedBy,
+	}, RunPlan{
 		ID:              types.NewRunID(),
-		WaveID:          fx.Wave.ID,
-		MigID:           fx.Mig.ID,
-		SpecID:          fx.Spec.ID,
 		RepoID:          fx.MigRepo.RepoID,
 		RepoBaseRef:     "main",
 		SourceCommitSha: testSHA,
@@ -161,10 +160,10 @@ func TestCreateRun_RoundTrip_V1(t *testing.T) {
 	}
 }
 
-func TestRunStatusDefaultIsRunning(t *testing.T) {
+func TestRunStatusHasNoDefault(t *testing.T) {
 	ctx, db := newTestStore(t)
 
-	var defaultExpression string
+	var defaultExpression *string
 	err := db.Pool().QueryRow(ctx, `
 		SELECT column_default
 		FROM information_schema.columns
@@ -173,8 +172,8 @@ func TestRunStatusDefaultIsRunning(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read runs.status default: %v", err)
 	}
-	if defaultExpression != "'Running'::run_status" {
-		t.Fatalf("runs.status default=%q, want Running", defaultExpression)
+	if defaultExpression != nil {
+		t.Fatalf("runs.status default=%q, want no default", *defaultExpression)
 	}
 }
 
@@ -185,30 +184,26 @@ func TestListRunsWithMetadataRepoURLFiltersBeforePagination(t *testing.T) {
 	alice := "alice"
 	bob := "bob"
 
-	ownerRun, err := db.CreateRun(ctx, CreateRunParams{
+	ownerRun, err := insertRun(ctx, db.(*PgStore).Queries, CreateWaveParams{
+		ID: fx.Wave.ID, MigID: fx.Mig.ID, SpecID: fx.Spec.ID, CreatedBy: &alice,
+	}, RunPlan{
 		ID:              types.NewRunID(),
-		WaveID:          fx.Wave.ID,
-		MigID:           fx.Mig.ID,
-		SpecID:          fx.Spec.ID,
 		RepoID:          fx.MigRepo.RepoID,
 		RepoBaseRef:     "main",
 		SourceCommitSha: testSHA,
 		RepoSha0:        testSHA,
-		CreatedBy:       &alice,
 	})
 	if err != nil {
 		t.Fatalf("CreateRun(owner) failed: %v", err)
 	}
-	otherRun, err := db.CreateRun(ctx, CreateRunParams{
+	otherRun, err := insertRun(ctx, db.(*PgStore).Queries, CreateWaveParams{
+		ID: fx.Wave.ID, MigID: fx.Mig.ID, SpecID: fx.Spec.ID, CreatedBy: &bob,
+	}, RunPlan{
 		ID:              types.NewRunID(),
-		WaveID:          fx.Wave.ID,
-		MigID:           fx.Mig.ID,
-		SpecID:          fx.Spec.ID,
 		RepoID:          fx.MigRepo.RepoID,
 		RepoBaseRef:     "main",
 		SourceCommitSha: testSHA,
 		RepoSha0:        testSHA,
-		CreatedBy:       &bob,
 	})
 	if err != nil {
 		t.Fatalf("CreateRun(other) failed: %v", err)
@@ -281,55 +276,49 @@ func TestCreateWaveWithRuns_CreatesWaveAndRunsAtomically(t *testing.T) {
 	}
 
 	waveID := types.NewWaveID()
-	wave, runs, err := db.CreateWaveWithRuns(ctx, CreateWaveWithRunsParams{
+	wave, materialized, err := db.CreateWaveWithRuns(ctx, CreateWaveWithRunsParams{
 		Wave: CreateWaveParams{
 			ID:        waveID,
 			MigID:     fx.Mig.ID,
 			SpecID:    fx.Spec.ID,
 			CreatedBy: fx.Run.CreatedBy,
 		},
-		Runs: []CreateRunWithJobsParams{
+		Runs: []RunPlan{
 			{
-				Run: CreateRunParams{
-					ID:              types.NewRunID(),
-					WaveID:          waveID,
-					MigID:           fx.Mig.ID,
-					SpecID:          fx.Spec.ID,
-					RepoID:          fx.MigRepo.RepoID,
-					RepoBaseRef:     "main",
-					SourceCommitSha: testSHA,
-					RepoSha0:        testSHA,
-				},
-				Jobs: plannedJobsForStoreTest("a-head", "a-tail"),
+				ID:              types.NewRunID(),
+				RepoID:          fx.MigRepo.RepoID,
+				RepoBaseRef:     "main",
+				SourceCommitSha: testSHA,
+				RepoSha0:        testSHA,
+				Jobs:            plannedJobsForStoreTest("a-head", "a-tail"),
 			},
 			{
-				Run: CreateRunParams{
-					ID:              types.NewRunID(),
-					WaveID:          waveID,
-					MigID:           fx.Mig.ID,
-					SpecID:          fx.Spec.ID,
-					RepoID:          repoB.RepoID,
-					RepoBaseRef:     "main",
-					SourceCommitSha: testSHA,
-					RepoSha0:        testSHA,
-				},
-				Jobs: plannedJobsForStoreTest("b-head", "b-tail"),
+				ID:              types.NewRunID(),
+				RepoID:          repoB.RepoID,
+				RepoBaseRef:     "main",
+				SourceCommitSha: testSHA,
+				RepoSha0:        testSHA,
+				Jobs:            plannedJobsForStoreTest("b-head", "b-tail"),
 			},
 		},
 	})
 	if err != nil {
 		t.Fatalf("CreateWaveWithRuns() failed: %v", err)
 	}
-	if wave.ID != waveID || len(runs) != 2 {
-		t.Fatalf("unexpected CreateWaveWithRuns result: wave=%+v runs=%+v", wave, runs)
+	if wave.ID != waveID || len(materialized) != 2 {
+		t.Fatalf("unexpected CreateWaveWithRuns result: wave=%+v runs=%+v", wave, materialized)
 	}
-	for _, run := range runs {
+	for _, result := range materialized {
+		run := result.Run
 		if run.Status != types.RunStatusRunning || !run.StartedAt.Valid {
 			t.Fatalf("run %s was not started atomically: status=%s started_at=%v", run.ID, run.Status, run.StartedAt.Valid)
 		}
 		jobs, err := db.ListJobsByRunAttempt(ctx, ListJobsByRunAttemptParams{RunID: run.ID, Attempt: run.Attempt})
 		if err != nil || len(jobs) != 2 {
 			t.Fatalf("run %s jobs=%d err=%v, want 2 jobs", run.ID, len(jobs), err)
+		}
+		if len(result.Jobs) != len(jobs) {
+			t.Fatalf("run %s returned jobs=%d, want %d", run.ID, len(result.Jobs), len(jobs))
 		}
 		jobsByID := make(map[types.JobID]Job, len(jobs))
 		var head Job
@@ -363,24 +352,18 @@ func TestCreateWaveWithRuns_CreatesWaveAndRunsAtomically(t *testing.T) {
 			SpecID:    fx.Spec.ID,
 			CreatedBy: fx.Run.CreatedBy,
 		},
-		Runs: []CreateRunWithJobsParams{
+		Runs: []RunPlan{
 			{
-				Run: CreateRunParams{
-					ID:              rollbackRunID,
-					WaveID:          rollbackWaveID,
-					MigID:           fx.Mig.ID,
-					SpecID:          fx.Spec.ID,
-					RepoID:          "missing1",
-					RepoBaseRef:     "main",
-					SourceCommitSha: testSHA,
-					RepoSha0:        testSHA,
-				},
-				Jobs: plannedJobsForStoreTest(),
+				ID:              rollbackRunID,
+				RepoID:          fx.MigRepo.RepoID,
+				RepoBaseRef:     "main",
+				SourceCommitSha: testSHA,
+				RepoSha0:        testSHA,
 			},
 		},
 	})
 	if err == nil {
-		t.Fatal("CreateWaveWithRuns() with invalid repo unexpectedly succeeded")
+		t.Fatal("CreateWaveWithRuns() without jobs unexpectedly succeeded")
 	}
 	if _, err := db.GetWave(ctx, rollbackWaveID); err != pgx.ErrNoRows {
 		t.Fatalf("GetWave(rollback) err = %v, want pgx.ErrNoRows", err)
@@ -390,7 +373,7 @@ func TestCreateWaveWithRuns_CreatesWaveAndRunsAtomically(t *testing.T) {
 	}
 }
 
-func TestCreateWaveWithRuns_RollsBackWhenAJobInsertFails(t *testing.T) {
+func TestCreateWaveWithRuns_AssignsDistinctJobIDsPerRun(t *testing.T) {
 	ctx, db := newTestStore(t)
 
 	fx := newV1Fixture(t, ctx, db, "https://github.com/org/repo-job-rollback-a", "main", []byte(`{"type":"test"}`))
@@ -407,33 +390,28 @@ func TestCreateWaveWithRuns_RollsBackWhenAJobInsertFails(t *testing.T) {
 	waveID := types.NewWaveID()
 	runAID := types.NewRunID()
 	runBID := types.NewRunID()
-	duplicateJobIDs := plannedJobsForStoreTest("head", "tail")
-	_, _, err = db.CreateWaveWithRuns(ctx, CreateWaveWithRunsParams{
+	sharedPlan := plannedJobsForStoreTest("head", "tail")
+	_, materialized, err := db.CreateWaveWithRuns(ctx, CreateWaveWithRunsParams{
 		Wave: CreateWaveParams{ID: waveID, MigID: fx.Mig.ID, SpecID: fx.Spec.ID},
-		Runs: []CreateRunWithJobsParams{
+		Runs: []RunPlan{
 			{
-				Run:  CreateRunParams{ID: runAID, WaveID: waveID, MigID: fx.Mig.ID, SpecID: fx.Spec.ID, RepoID: fx.MigRepo.RepoID, RepoBaseRef: "main", SourceCommitSha: testSHA, RepoSha0: testSHA},
-				Jobs: duplicateJobIDs,
+				ID: runAID, RepoID: fx.MigRepo.RepoID, RepoBaseRef: "main", SourceCommitSha: testSHA, RepoSha0: testSHA, Jobs: sharedPlan,
 			},
 			{
-				Run:  CreateRunParams{ID: runBID, WaveID: waveID, MigID: fx.Mig.ID, SpecID: fx.Spec.ID, RepoID: repoB.RepoID, RepoBaseRef: "main", SourceCommitSha: testSHA, RepoSha0: testSHA},
-				Jobs: duplicateJobIDs,
+				ID: runBID, RepoID: repoB.RepoID, RepoBaseRef: "main", SourceCommitSha: testSHA, RepoSha0: testSHA, Jobs: sharedPlan,
 			},
 		},
 	})
-	if err == nil {
-		t.Fatal("CreateWaveWithRuns() with duplicate job IDs unexpectedly succeeded")
+	if err != nil {
+		t.Fatalf("CreateWaveWithRuns() failed: %v", err)
 	}
-	for _, runID := range []types.RunID{runAID, runBID} {
-		if _, err := db.GetRun(ctx, runID); err != pgx.ErrNoRows {
-			t.Fatalf("GetRun(%s) err = %v, want pgx.ErrNoRows", runID, err)
+	if len(materialized) != 2 || len(materialized[0].Jobs) != 2 || len(materialized[1].Jobs) != 2 {
+		t.Fatalf("unexpected materialization shape: %+v", materialized)
+	}
+	for i := range materialized[0].Jobs {
+		if materialized[0].Jobs[i].ID == materialized[1].Jobs[i].ID {
+			t.Fatalf("job %d reused id %s across runs", i, materialized[0].Jobs[i].ID)
 		}
-	}
-	if _, err := db.GetWave(ctx, waveID); err != pgx.ErrNoRows {
-		t.Fatalf("GetWave() err = %v, want pgx.ErrNoRows", err)
-	}
-	if _, err := db.GetJob(ctx, duplicateJobIDs[0].ID); err != pgx.ErrNoRows {
-		t.Fatalf("GetJob() err = %v, want pgx.ErrNoRows", err)
 	}
 }
 
@@ -478,7 +456,7 @@ func TestRun_CRUDAndStateTransitions_V1(t *testing.T) {
 	}
 
 	// Attempt increment resets run state.
-	if err := db.IncrementRunAttempt(ctx, IncrementRunAttemptParams{ID: fx.Run.ID}); err != nil {
+	if err := incrementRunAttempt(ctx, db.(*PgStore).Queries, fx.Run.ID, nil); err != nil {
 		t.Fatalf("IncrementRunAttempt() failed: %v", err)
 	}
 	retry, err := db.GetRun(ctx, fx.Run.ID)
@@ -532,11 +510,10 @@ func TestListRunsWithURLByWave_ReturnsRepoURLAndOrdering_V1(t *testing.T) {
 		t.Fatalf("CreateMigRepo() for repo-b failed: %v", err)
 	}
 
-	_, err = db.CreateRun(ctx, CreateRunParams{
+	_, err = insertRun(ctx, db.(*PgStore).Queries, CreateWaveParams{
+		ID: fx.Wave.ID, MigID: fx.Mig.ID, SpecID: fx.Spec.ID, CreatedBy: fx.Run.CreatedBy,
+	}, RunPlan{
 		ID:              types.NewRunID(),
-		WaveID:          fx.Wave.ID,
-		MigID:           fx.Mig.ID,
-		SpecID:          fx.Spec.ID,
 		RepoID:          migRepo2.RepoID,
 		RepoBaseRef:     migRepo2.BaseRef,
 		SourceCommitSha: testSHA,

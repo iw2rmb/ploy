@@ -231,7 +231,7 @@ func TestClaimJob_PinsRunAttemptToFirstClaimingNode(t *testing.T) {
 		t.Fatalf("ClaimJob(nodeA second) = %s, want remaining same-attempt job", claimedSecond.ID)
 	}
 
-	if err := db.IncrementRunAttempt(ctx, IncrementRunAttemptParams{ID: fx.Run.ID}); err != nil {
+	if err := incrementRunAttempt(ctx, db.(*PgStore).Queries, fx.Run.ID, nil); err != nil {
 		t.Fatalf("IncrementRunAttempt() failed: %v", err)
 	}
 	fx.Run.Attempt++

@@ -40,20 +40,20 @@ func listPaged[T any](items []T, offset, limit int32) []T {
 	return items[offset:end]
 }
 
-// defaultRun fills zero-valued result fields from CreateRunParams,
+// defaultRun fills zero-valued result fields from the wave and run plan,
 // matching the defaulting semantics shared by handlerStore and handlerStore mocks.
-func defaultRun(result store.Run, params store.CreateRunParams) store.Run {
+func defaultRun(result store.Run, wave store.CreateWaveParams, params store.RunPlan) store.Run {
 	if result.ID.IsZero() {
 		result.ID = params.ID
 	}
 	if result.WaveID.IsZero() {
-		result.WaveID = params.WaveID
+		result.WaveID = wave.ID
 	}
 	if result.MigID.IsZero() {
-		result.MigID = params.MigID
+		result.MigID = wave.MigID
 	}
 	if result.SpecID.IsZero() {
-		result.SpecID = params.SpecID
+		result.SpecID = wave.SpecID
 	}
 	if result.RepoID.IsZero() {
 		result.RepoID = params.RepoID

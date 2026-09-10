@@ -83,25 +83,6 @@ WHERE runs.repo_id = $1
 ORDER BY runs.created_at DESC, runs.id DESC
 LIMIT $2 OFFSET $3;
 
--- name: CreateRun :one
-INSERT INTO runs (
-  id,
-  wave_id,
-  mig_id,
-  spec_id,
-  repo_id,
-  repo_base_ref,
-  source_commit_sha,
-  repo_sha0,
-  created_by,
-  status,
-  started_at,
-  stats
-)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'Running', now(), COALESCE(sqlc.narg(stats), '{}'::jsonb))
-RETURNING id, wave_id, mig_id, spec_id, repo_id, repo_base_ref, source_commit_sha, repo_sha0,
-          created_by, status, attempt, last_error, created_at, started_at, finished_at, stats;
-
 -- name: UpdateRunStatus :exec
 UPDATE runs
 SET status = $2,
@@ -112,16 +93,6 @@ WHERE id = $1;
 -- name: UpdateRunError :exec
 UPDATE runs
 SET last_error = $2
-WHERE id = $1;
-
--- name: IncrementRunAttempt :exec
-UPDATE runs
-SET attempt = attempt + 1,
-    status = 'Running',
-    last_error = NULL,
-    started_at = now(),
-    finished_at = NULL,
-    stats = COALESCE($2, '{}'::jsonb)
 WHERE id = $1;
 
 -- name: UpdateRunBaseRef :exec

@@ -154,7 +154,7 @@ func getRunStatusHandler(st store.Store) http.HandlerFunc {
 	}
 }
 
-func planJobsFromSpec(spec []byte) ([]store.PlannedJob, error) {
+func planJobsFromSpec(spec []byte) ([]store.JobPlan, error) {
 	migsSpec, err := contracts.ParseMigSpecJSON(spec)
 	if err != nil {
 		return nil, fmt.Errorf("parse migs spec: %w", err)
@@ -215,7 +215,7 @@ func planJobsFromSpec(spec []byte) ([]store.PlannedJob, error) {
 		drafts = append(drafts, draft{name: "post-gate", jobType: domaintypes.JobTypePostGate, gateCycle: "post-gate"})
 	}
 
-	planned := make([]store.PlannedJob, 0, len(drafts))
+	planned := make([]store.JobPlan, 0, len(drafts))
 	for _, d := range drafts {
 		var meta *contracts.JobMeta
 		if d.stepName != "" {
@@ -229,8 +229,7 @@ func planJobsFromSpec(spec []byte) ([]store.PlannedJob, error) {
 		if err != nil {
 			return nil, fmt.Errorf("marshal job %q meta: %w", d.name, err)
 		}
-		planned = append(planned, store.PlannedJob{
-			ID:       domaintypes.NewJobID(),
+		planned = append(planned, store.JobPlan{
 			Name:     d.name,
 			JobType:  d.jobType,
 			JobImage: d.jobImage,

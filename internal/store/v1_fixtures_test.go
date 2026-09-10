@@ -32,11 +32,10 @@ func createRunForStoreTest(
 		t.Fatalf("CreateMigRepo(%s) failed: %v", repoURL, err)
 	}
 
-	run, err := db.CreateRun(ctx, CreateRunParams{
+	run, err := insertRun(ctx, db.(*PgStore).Queries, CreateWaveParams{
+		ID: waveID, MigID: migID, SpecID: specID,
+	}, RunPlan{
 		ID:              types.NewRunID(),
-		WaveID:          waveID,
-		MigID:           migID,
-		SpecID:          specID,
 		RepoID:          mr.RepoID,
 		RepoBaseRef:     mr.BaseRef,
 		SourceCommitSha: testSHA,
@@ -62,14 +61,13 @@ func createRunForStoreTest(
 	return out
 }
 
-func plannedJobsForStoreTest(names ...string) []PlannedJob {
+func plannedJobsForStoreTest(names ...string) []JobPlan {
 	if len(names) == 0 {
 		names = []string{"head", "tail"}
 	}
-	jobs := make([]PlannedJob, len(names))
+	jobs := make([]JobPlan, len(names))
 	for i, name := range names {
-		jobs[i] = PlannedJob{
-			ID:       types.NewJobID(),
+		jobs[i] = JobPlan{
 			Name:     name,
 			JobType:  types.JobTypeMig,
 			JobImage: "test-image",
@@ -167,16 +165,14 @@ func newV1Fixture(t *testing.T, ctx context.Context, db Store, repoURL, baseRef 
 		t.Fatalf("CreateWave() failed: %v", err)
 	}
 
-	run, err := db.CreateRun(ctx, CreateRunParams{
+	run, err := insertRun(ctx, db.(*PgStore).Queries, CreateWaveParams{
+		ID: waveID, MigID: migID, SpecID: specID, CreatedBy: &createdBy,
+	}, RunPlan{
 		ID:              types.NewRunID(),
-		WaveID:          waveID,
-		MigID:           migID,
-		SpecID:          specID,
 		RepoID:          migRepo.RepoID,
 		RepoBaseRef:     baseRef,
 		SourceCommitSha: testSHA,
 		RepoSha0:        testSHA,
-		CreatedBy:       &createdBy,
 	})
 	if err != nil {
 		t.Fatalf("CreateRun() failed: %v", err)

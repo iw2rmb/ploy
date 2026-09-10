@@ -71,6 +71,11 @@ func createMigRunHandler(st store.Store, gitAuth gitauth.Options, registries ...
 			serverError(w, "create mig run", "get spec", err, "mig_id", migID.String(), "spec_id", *mig.SpecID)
 			return
 		}
+		jobPlan, err := planJobsFromSpec(spec.Spec)
+		if err != nil {
+			serverError(w, "create mig run", "plan jobs", err, "mig_id", migID.String())
+			return
+		}
 
 		// Select repos based on mode.
 		repoSelectors := make([]string, 0, len(req.RepoSelector.Repos))
@@ -114,7 +119,7 @@ func createMigRunHandler(st store.Store, gitAuth gitauth.Options, registries ...
 		}
 
 		waveID := domaintypes.NewWaveID()
-		runs := make([]store.CreateRunWithJobsParams, 0, len(selectedRepos))
+		runs := make([]store.RunPlan, 0, len(selectedRepos))
 		runIDs := make([]domaintypes.RunID, 0, len(selectedRepos))
 		for _, migRepo := range selectedRepos {
 			runID := domaintypes.NewRunID()
@@ -137,24 +142,14 @@ func createMigRunHandler(st store.Store, gitAuth gitauth.Options, registries ...
 				)
 				return
 			}
-			plannedJobs, planErr := planJobsFromSpec(spec.Spec)
-			if planErr != nil {
-				serverError(w, "create mig run", "plan jobs", planErr, "mig_id", migID.String(), "repo_id", migRepo.RepoID)
-				return
-			}
-			runs = append(runs, store.CreateRunWithJobsParams{
-				Run: store.CreateRunParams{
-					ID:              runID,
-					WaveID:          waveID,
-					MigID:           migID,
-					SpecID:          *mig.SpecID,
-					RepoID:          migRepo.RepoID,
-					RepoBaseRef:     migRepo.BaseRef,
-					SourceCommitSha: sourceCommitSHA,
-					RepoSha0:        sourceCommitSHA,
-					Stats:           runStats,
-				},
-				Jobs: plannedJobs,
+			runs = append(runs, store.RunPlan{
+				ID:              runID,
+				RepoID:          migRepo.RepoID,
+				RepoBaseRef:     migRepo.BaseRef,
+				SourceCommitSha: sourceCommitSHA,
+				RepoSha0:        sourceCommitSHA,
+				Stats:           runStats,
+				Jobs:            jobPlan,
 			})
 		}
 

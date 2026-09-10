@@ -523,8 +523,8 @@ func TestRunsCreateSingleRepoCreatedByResolution(t *testing.T) {
 			if st.createMig.params.CreatedBy == nil || *st.createMig.params.CreatedBy != tt.wantCreatedBy {
 				t.Fatalf("mig created_by = %v, want %q", st.createMig.params.CreatedBy, tt.wantCreatedBy)
 			}
-			if st.createRun.params.CreatedBy == nil || *st.createRun.params.CreatedBy != tt.wantCreatedBy {
-				t.Fatalf("run created_by = %v, want %q", st.createRun.params.CreatedBy, tt.wantCreatedBy)
+			if st.createWaveWithRuns.params.Wave.CreatedBy == nil || *st.createWaveWithRuns.params.Wave.CreatedBy != tt.wantCreatedBy {
+				t.Fatalf("run created_by = %v, want %q", st.createWaveWithRuns.params.Wave.CreatedBy, tt.wantCreatedBy)
 			}
 		})
 	}

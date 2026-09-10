@@ -156,7 +156,7 @@ func TestRestartRun_ConcurrentCallsCreateOneAttempt(t *testing.T) {
 		t.Fatalf("UpdateRunStatus(fail) failed: %v", err)
 	}
 
-	plans := [][]PlannedJob{
+	plans := [][]JobPlan{
 		plannedJobsForStoreTest("first-head", "first-tail"),
 		plannedJobsForStoreTest("second-head", "second-tail"),
 	}

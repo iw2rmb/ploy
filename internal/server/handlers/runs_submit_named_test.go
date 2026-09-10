@@ -153,8 +153,8 @@ steps:
 	if pre["mode"] != "forced" || pre["language"] != "java" || pre["release"] != "21" || pre["tool"] != "gradle" {
 		t.Fatalf("forced pre stack = %#v", pre)
 	}
-	if st.createRun.params.SpecID != st.createGitSpecSnapshot.val.ID {
-		t.Fatalf("run spec id = %s, want persisted snapshot %s", st.createRun.params.SpecID, st.createGitSpecSnapshot.val.ID)
+	if st.createWaveWithRuns.params.Wave.SpecID != st.createGitSpecSnapshot.val.ID {
+		t.Fatalf("run spec id = %s, want persisted snapshot %s", st.createWaveWithRuns.params.Wave.SpecID, st.createGitSpecSnapshot.val.ID)
 	}
 }
 

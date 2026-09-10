@@ -73,11 +73,6 @@ func (m *handlerStore) UpdateRunBaseRef(_ context.Context, params store.UpdateRu
 	return err
 }
 
-func (m *handlerStore) IncrementRunAttempt(_ context.Context, params store.IncrementRunAttemptParams) error {
-	_, err := m.incrementRunAttempt.record(params)
-	return err
-}
-
 func (m *handlerStore) ListRuns(_ context.Context, params store.ListRunsParams) ([]store.Run, error) {
 	return listPaged(m.listRuns.val, params.Offset, params.Limit), m.listRuns.err
 }
@@ -98,18 +93,18 @@ func (m *handlerStore) GetLatestRunByMigAndRepoStatus(_ context.Context, params 
 	return m.getLatestRunByMigAndRepoStatus.record(params)
 }
 
-func (m *handlerStore) CreateRun(_ context.Context, params store.CreateRunParams) (store.Run, error) {
+func (m *handlerStore) materializeRun(wave store.CreateWaveParams, params store.RunPlan) (store.Run, error) {
 	m.createRunCalled = true
 	if len(m.createRunSeq.vals) > 0 || len(m.createRunSeq.errs) > 0 {
 		return m.createRunSeq.record(params)
 	}
-	result := defaultRun(m.createRun.val, params)
+	result := defaultRun(m.createRun.val, wave, params)
 	m.createRun.val = result
 	_, err := m.createRun.record(params)
 	return result, err
 }
 
-func (m *handlerStore) CreateWaveWithRuns(ctx context.Context, params store.CreateWaveWithRunsParams) (store.Wave, []store.Run, error) {
+func (m *handlerStore) CreateWaveWithRuns(ctx context.Context, params store.CreateWaveWithRunsParams) (store.Wave, []store.RunMaterialization, error) {
 	m.createWaveWithRuns.called = true
 	m.createWaveWithRuns.params = params
 	if m.createWaveWithRunsHook != nil {
@@ -119,13 +114,18 @@ func (m *handlerStore) CreateWaveWithRuns(ctx context.Context, params store.Crea
 		return store.Wave{}, nil, m.createWaveWithRuns.err
 	}
 	wave := defaultWave(m.createWaveWithRuns.val, params.Wave)
-	runs := make([]store.Run, 0, len(params.Runs))
+	runs := make([]store.RunMaterialization, 0, len(params.Runs))
 	for _, runPlan := range params.Runs {
-		m.createRunParams = append(m.createRunParams, runPlan.Run)
-		run, err := m.CreateRun(ctx, runPlan.Run)
+		m.createRunParams = append(m.createRunParams, runPlan)
+		run, err := m.materializeRun(params.Wave, runPlan)
 		if err != nil {
 			return store.Wave{}, nil, err
 		}
+		jobIDs := make([]types.JobID, len(runPlan.Jobs))
+		for i := range jobIDs {
+			jobIDs[i] = types.NewJobID()
+		}
+		jobs := make([]store.Job, len(runPlan.Jobs))
 		for i := len(runPlan.Jobs) - 1; i >= 0; i-- {
 			job := runPlan.Jobs[i]
 			status := types.JobStatusCreated
@@ -134,14 +134,14 @@ func (m *handlerStore) CreateWaveWithRuns(ctx context.Context, params store.Crea
 			}
 			var nextID *types.JobID
 			if i+1 < len(runPlan.Jobs) {
-				nextID = &runPlan.Jobs[i+1].ID
+				nextID = &jobIDs[i+1]
 			}
 			repoSHAIn := ""
 			if i == 0 {
 				repoSHAIn = run.RepoSha0
 			}
-			if _, err := m.CreateJob(ctx, store.CreateJobParams{
-				ID:          job.ID,
+			created, err := m.CreateJob(ctx, store.CreateJobParams{
+				ID:          jobIDs[i],
 				RunID:       run.ID,
 				RepoID:      run.RepoID,
 				RepoBaseRef: run.RepoBaseRef,
@@ -153,11 +153,13 @@ func (m *handlerStore) CreateWaveWithRuns(ctx context.Context, params store.Crea
 				Name:        job.Name,
 				Meta:        job.Meta,
 				RepoShaIn:   repoSHAIn,
-			}); err != nil {
+			})
+			if err != nil {
 				return store.Wave{}, nil, err
 			}
+			jobs[i] = created
 		}
-		runs = append(runs, run)
+		runs = append(runs, store.RunMaterialization{Run: run, Jobs: jobs})
 	}
 	return wave, runs, nil
 }

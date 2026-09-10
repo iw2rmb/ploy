@@ -79,7 +79,7 @@ func (m *mockStore) RestartRun(ctx context.Context, arg store.RestartRunParams) 
 	return store.Run{}, nil
 }
 
-func (m *mockStore) CreateWaveWithRuns(ctx context.Context, arg store.CreateWaveWithRunsParams) (store.Wave, []store.Run, error) {
+func (m *mockStore) CreateWaveWithRuns(ctx context.Context, arg store.CreateWaveWithRunsParams) (store.Wave, []store.RunMaterialization, error) {
 	return store.Wave{}, nil, nil
 }
 

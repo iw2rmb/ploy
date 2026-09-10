@@ -1,5 +1,5 @@
 ALTER TABLE ploy.runs
-  ALTER COLUMN status SET DEFAULT 'Running';
+  ALTER COLUMN status DROP DEFAULT;
 
 ---- create above / drop below ----
 

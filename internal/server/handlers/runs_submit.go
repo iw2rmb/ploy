@@ -150,20 +150,14 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service, g
 				SpecID:    specID,
 				CreatedBy: createdByPtr,
 			},
-			Runs: []store.CreateRunWithJobsParams{{
-				Run: store.CreateRunParams{
-					ID:              runID,
-					WaveID:          waveID,
-					MigID:           migID,
-					SpecID:          specID,
-					RepoID:          migRepo.RepoID,
-					RepoBaseRef:     migRepo.BaseRef,
-					SourceCommitSha: sourceCommitSHA,
-					RepoSha0:        sourceCommitSHA,
-					CreatedBy:       createdByPtr,
-					Stats:           runStats,
-				},
-				Jobs: plannedJobs,
+			Runs: []store.RunPlan{{
+				ID:              runID,
+				RepoID:          migRepo.RepoID,
+				RepoBaseRef:     migRepo.BaseRef,
+				SourceCommitSha: sourceCommitSHA,
+				RepoSha0:        sourceCommitSHA,
+				Stats:           runStats,
+				Jobs:            plannedJobs,
 			}},
 		})
 		if err != nil {
@@ -173,7 +167,8 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service, g
 			serverError(w, "create single-repo run", "create run", err, "run_id", runID)
 			return
 		}
-		run := runs[0]
+		materialized := runs[0]
+		run := materialized.Run
 
 		resp := domainapi.CreateSingleRepoRunResponse{
 			WaveID: wave.ID,
@@ -203,28 +198,20 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service, g
 				},
 				CreatedAt: timeOrZero(run.CreatedAt),
 				UpdatedAt: time.Now().UTC(),
-				Stages:    make(map[domaintypes.JobID]migsapi.StageStatus, len(plannedJobs)),
+				Stages:    make(map[domaintypes.JobID]migsapi.StageStatus, len(materialized.Jobs)),
 			}
-			for i, job := range plannedJobs {
-				jobStatus := domaintypes.JobStatusCreated
-				if i == 0 {
-					jobStatus = domaintypes.JobStatusQueued
-				}
-				stageState, convErr := migsapi.StageStatusFromDomain(jobStatus)
+			for _, job := range materialized.Jobs {
+				stageState, convErr := migsapi.StageStatusFromDomain(job.Status)
 				if convErr != nil {
-					slog.Error("create single-repo run: invalid job status for publish payload", "run_id", run.ID, "job_id", job.ID, "status", jobStatus, "err", convErr)
+					slog.Error("create single-repo run: invalid job status for publish payload", "run_id", run.ID, "job_id", job.ID, "status", job.Status, "err", convErr)
 					continue
-				}
-				var nextID *domaintypes.JobID
-				if i+1 < len(plannedJobs) {
-					nextID = &plannedJobs[i+1].ID
 				}
 				summary.Stages[job.ID] = migsapi.StageStatus{
 					State:       stageState,
 					Attempts:    1,
 					MaxAttempts: 1,
 					Artifacts:   map[string]string{},
-					NextID:      nextID,
+					NextID:      job.NextID,
 				}
 			}
 			if err := eventsService.PublishRun(r.Context(), run.ID, summary); err != nil {

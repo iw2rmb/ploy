@@ -112,7 +112,7 @@ func TestPlanJobsFromSpec(t *testing.T) {
 			}
 			for i, want := range tt.expected {
 				got := planned[i]
-				if got.ID.IsZero() || got.Name != want.name || got.JobType != want.jobType || got.JobImage != want.jobImage {
+				if got.Name != want.name || got.JobType != want.jobType || got.JobImage != want.jobImage {
 					t.Fatalf("planned job %d=%+v, want name=%q type=%q image=%q", i, got, want.name, want.jobType, want.jobImage)
 				}
 			}

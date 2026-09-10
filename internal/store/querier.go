@@ -57,7 +57,6 @@ type Querier interface {
 	// Creates a new node with an application-supplied URL-safe ID as the primary key.
 	CreateNode(ctx context.Context, arg CreateNodeParams) (Node, error)
 	CreateNodeDaemonLog(ctx context.Context, arg CreateNodeDaemonLogParams) (NodeDaemonLog, error)
-	CreateRun(ctx context.Context, arg CreateRunParams) (Run, error)
 	CreateSpec(ctx context.Context, arg CreateSpecParams) (Spec, error)
 	// Creates a new spec bundle metadata row. Blob data is stored in object storage.
 	CreateSpecBundle(ctx context.Context, arg CreateSpecBundleParams) (SpecBundle, error)
@@ -136,7 +135,6 @@ type Querier interface {
 	// Returns true if the repo cannot be deleted due to history, false otherwise.
 	HasMigRepoHistory(ctx context.Context, repoID types.RepoID) (bool, error)
 	HasRunningJobForRunNode(ctx context.Context, arg HasRunningJobForRunNodeParams) (bool, error)
-	IncrementRunAttempt(ctx context.Context, arg IncrementRunAttemptParams) error
 	InsertAPIToken(ctx context.Context, arg InsertAPITokenParams) error
 	InsertBootstrapToken(ctx context.Context, arg InsertBootstrapTokenParams) error
 	ListAPITokens(ctx context.Context) ([]ListAPITokensRow, error)

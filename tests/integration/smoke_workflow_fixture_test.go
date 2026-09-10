@@ -14,6 +14,7 @@ type v1RunFixture struct {
 	MigRepo store.MigRepo
 	Wave    store.Wave
 	Run     store.Run
+	Jobs    []store.Job
 }
 
 func newV1RunFixture(t *testing.T, ctx context.Context, db store.Store, repoURL, baseRef string, specJSON []byte) v1RunFixture {
@@ -56,37 +57,33 @@ func newV1RunFixture(t *testing.T, ctx context.Context, db store.Store, repoURL,
 
 	runID := domaintypes.NewRunID()
 	waveID := domaintypes.WaveID(runID.String())
-	wave, err := db.CreateWave(ctx, store.CreateWaveParams{
-		ID:        waveID,
-		MigID:     migID,
-		SpecID:    spec.ID,
-		CreatedBy: &createdBy,
+	wave, materialized, err := db.CreateWaveWithRuns(ctx, store.CreateWaveWithRunsParams{
+		Wave: store.CreateWaveParams{ID: waveID, MigID: migID, SpecID: spec.ID, CreatedBy: &createdBy},
+		Runs: []store.RunPlan{{
+			ID:              runID,
+			RepoID:          migRepo.RepoID,
+			RepoBaseRef:     baseRef,
+			SourceCommitSha: "0123456789abcdef0123456789abcdef01234567",
+			RepoSha0:        "0123456789abcdef0123456789abcdef01234567",
+			Jobs: []store.JobPlan{
+				{Name: "build-gate", JobType: domaintypes.JobTypePreGate, Meta: []byte(`{"type":"build-gate"}`)},
+				{Name: "main", JobType: domaintypes.JobTypeMig, Meta: []byte(`{"type":"mig","lane":"main"}`)},
+				{Name: "post-process", JobType: domaintypes.JobTypePostGate, Meta: []byte(`{"type":"post-process","action":"upload-artifacts"}`)},
+			},
+		}},
 	})
 	if err != nil {
-		t.Fatalf("CreateWave() failed: %v", err)
+		t.Fatalf("CreateWaveWithRuns() failed: %v", err)
 	}
-
-	run, err := db.CreateRun(ctx, store.CreateRunParams{
-		ID:              runID,
-		WaveID:          wave.ID,
-		MigID:           migID,
-		SpecID:          spec.ID,
-		RepoID:          migRepo.RepoID,
-		RepoBaseRef:     baseRef,
-		SourceCommitSha: "0123456789abcdef0123456789abcdef01234567",
-		RepoSha0:        "0123456789abcdef0123456789abcdef01234567",
-		CreatedBy:       &createdBy,
-	})
-	if err != nil {
-		t.Fatalf("CreateRun() failed: %v", err)
-	}
+	run := materialized[0]
 
 	return v1RunFixture{
 		Spec:    spec,
 		Mig:     mig,
 		MigRepo: migRepo,
 		Wave:    wave,
-		Run:     run,
+		Run:     run.Run,
+		Jobs:    run.Jobs,
 	}
 }
 

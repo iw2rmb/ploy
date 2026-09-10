@@ -43,7 +43,7 @@ type Store interface {
 	CancelRun(ctx context.Context, runID types.RunID) error
 	CancelWave(ctx context.Context, waveID types.WaveID) error
 	CompleteBootstrapEnrollment(ctx context.Context, arg CompleteBootstrapEnrollmentParams) error
-	CreateWaveWithRuns(ctx context.Context, arg CreateWaveWithRunsParams) (Wave, []Run, error)
+	CreateWaveWithRuns(ctx context.Context, arg CreateWaveWithRunsParams) (Wave, []RunMaterialization, error)
 	RestartRun(ctx context.Context, arg RestartRunParams) (Run, error)
 	Close()
 	Pool() *pgxpool.Pool
@@ -60,32 +60,44 @@ type CompleteBootstrapEnrollmentParams struct {
 	CertNotAfter    time.Time
 }
 
-// PlannedJob contains intrinsic job data. Its position in a Jobs slice defines
+// JobPlan contains intrinsic job data. Its position in a Jobs slice defines
 // the initial status and next-job link when the store materializes the chain.
-type PlannedJob struct {
-	ID       types.JobID
+type JobPlan struct {
 	Name     string
 	JobType  types.JobType
 	JobImage string
 	Meta     []byte
 }
 
-type CreateRunWithJobsParams struct {
-	Run  CreateRunParams
-	Jobs []PlannedJob
+// RunPlan contains repository-specific run data and its reusable job template.
+// CreateWaveWithRuns supplies wave-wide fields and materializes job identities.
+type RunPlan struct {
+	ID              types.RunID
+	RepoID          types.RepoID
+	RepoBaseRef     string
+	SourceCommitSha string
+	RepoSha0        string
+	Stats           []byte
+	Jobs            []JobPlan
+}
+
+// RunMaterialization contains the persisted run and its ordered job chain.
+type RunMaterialization struct {
+	Run  Run
+	Jobs []Job
 }
 
 // CreateWaveWithRunsParams contains the complete durable materialization for one launch.
 type CreateWaveWithRunsParams struct {
 	Wave CreateWaveParams
-	Runs []CreateRunWithJobsParams
+	Runs []RunPlan
 }
 
 type RestartRunParams struct {
 	RunID           types.RunID
 	ExpectedAttempt int32
 	Stats           []byte
-	Jobs            []PlannedJob
+	Jobs            []JobPlan
 }
 
 // PgStore wraps a pgxpool connection pool and implements Store.
@@ -238,14 +250,9 @@ func isNodeIdentityUniqueViolation(err error) bool {
 }
 
 // CreateWaveWithRuns atomically creates a wave and every selected run job chain.
-func (s *PgStore) CreateWaveWithRuns(ctx context.Context, arg CreateWaveWithRunsParams) (Wave, []Run, error) {
+func (s *PgStore) CreateWaveWithRuns(ctx context.Context, arg CreateWaveWithRunsParams) (Wave, []RunMaterialization, error) {
 	if len(arg.Runs) == 0 {
 		return Wave{}, nil, errors.New("create wave with runs: runs required")
-	}
-	for _, runPlan := range arg.Runs {
-		if err := validateJSONBValue(runPlan.Run.Stats); err != nil {
-			return Wave{}, nil, fmt.Errorf("create wave with runs: runs.stats: %w", err)
-		}
 	}
 
 	tx, err := s.pool.Begin(ctx)
@@ -267,16 +274,17 @@ func (s *PgStore) CreateWaveWithRuns(ctx context.Context, arg CreateWaveWithRuns
 		return Wave{}, nil, fmt.Errorf("create wave with runs: create wave: %w", err)
 	}
 
-	runs := make([]Run, 0, len(arg.Runs))
+	materialized := make([]RunMaterialization, 0, len(arg.Runs))
 	for _, runPlan := range arg.Runs {
-		run, err := qtx.CreateRun(ctx, runPlan.Run)
+		run, err := insertRun(ctx, qtx, arg.Wave, runPlan)
 		if err != nil {
-			return Wave{}, nil, fmt.Errorf("create wave with runs: create run %s: %w", runPlan.Run.ID, err)
+			return Wave{}, nil, fmt.Errorf("create wave with runs: create run %s: %w", runPlan.ID, err)
 		}
-		if err := createPlannedJobs(ctx, qtx, run, run.Attempt, runPlan.Jobs); err != nil {
+		jobs, err := createPlannedJobs(ctx, qtx, run, runPlan.Jobs)
+		if err != nil {
 			return Wave{}, nil, fmt.Errorf("create wave with runs: create jobs for run %s: %w", run.ID, err)
 		}
-		runs = append(runs, run)
+		materialized = append(materialized, RunMaterialization{Run: run, Jobs: jobs})
 	}
 
 	if err := tx.Commit(ctx); err != nil {
@@ -284,7 +292,46 @@ func (s *PgStore) CreateWaveWithRuns(ctx context.Context, arg CreateWaveWithRuns
 	}
 
 	committed = true
-	return wave, runs, nil
+	return wave, materialized, nil
+}
+
+// Keep run insertion private so every production caller must materialize the
+// run and its job chain through one transaction.
+func insertRun(ctx context.Context, q *Queries, wave CreateWaveParams, arg RunPlan) (Run, error) {
+	if err := validateJSONB(arg.Stats); err != nil {
+		return Run{}, fmt.Errorf("runs.stats: %w", err)
+	}
+	row := q.db.QueryRow(ctx, `
+		INSERT INTO runs (
+			id, wave_id, mig_id, spec_id, repo_id, repo_base_ref,
+			source_commit_sha, repo_sha0, created_by, status, started_at, stats
+		)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'Running', now(), COALESCE($10::jsonb, '{}'::jsonb))
+		RETURNING id, wave_id, mig_id, spec_id, repo_id, repo_base_ref, source_commit_sha, repo_sha0,
+			created_by, status, attempt, last_error, created_at, started_at, finished_at, stats
+	`, arg.ID, wave.ID, wave.MigID, wave.SpecID, arg.RepoID, arg.RepoBaseRef,
+		arg.SourceCommitSha, arg.RepoSha0, wave.CreatedBy, arg.Stats)
+
+	var run Run
+	err := row.Scan(
+		&run.ID,
+		&run.WaveID,
+		&run.MigID,
+		&run.SpecID,
+		&run.RepoID,
+		&run.RepoBaseRef,
+		&run.SourceCommitSha,
+		&run.RepoSha0,
+		&run.CreatedBy,
+		&run.Status,
+		&run.Attempt,
+		&run.LastError,
+		&run.CreatedAt,
+		&run.StartedAt,
+		&run.FinishedAt,
+		&run.Stats,
+	)
+	return run, err
 }
 
 // CancelRun atomically cancels one run and all active child jobs.
@@ -376,7 +423,7 @@ func (s *PgStore) RestartRun(ctx context.Context, arg RestartRunParams) (Run, er
 		return Run{}, fmt.Errorf("restart run: cancel active jobs: %w", err)
 	}
 
-	if err := qtx.IncrementRunAttempt(ctx, IncrementRunAttemptParams{ID: runID, Stats: stats}); err != nil {
+	if err := incrementRunAttempt(ctx, qtx, runID, stats); err != nil {
 		return Run{}, fmt.Errorf("restart run: increment attempt: %w", err)
 	}
 
@@ -390,7 +437,7 @@ func (s *PgStore) RestartRun(ctx context.Context, arg RestartRunParams) (Run, er
 	if err != nil {
 		return Run{}, fmt.Errorf("restart run: reload run: %w", err)
 	}
-	if err := createPlannedJobs(ctx, qtx, updated, updated.Attempt, arg.Jobs); err != nil {
+	if _, err := createPlannedJobs(ctx, qtx, updated, arg.Jobs); err != nil {
 		return Run{}, fmt.Errorf("restart run: create jobs: %w", err)
 	}
 
@@ -402,23 +449,34 @@ func (s *PgStore) RestartRun(ctx context.Context, arg RestartRunParams) (Run, er
 	return updated, nil
 }
 
-func createPlannedJobs(ctx context.Context, q *Queries, run Run, attempt int32, jobs []PlannedJob) error {
+func incrementRunAttempt(ctx context.Context, q *Queries, runID types.RunID, stats []byte) error {
+	_, err := q.db.Exec(ctx, `
+		UPDATE runs
+		SET attempt = attempt + 1,
+			status = 'Running',
+			last_error = NULL,
+			started_at = now(),
+			finished_at = NULL,
+			stats = COALESCE($2, '{}'::jsonb)
+		WHERE id = $1
+	`, runID, stats)
+	return err
+}
+
+func createPlannedJobs(ctx context.Context, q *Queries, run Run, jobs []JobPlan) ([]Job, error) {
 	if len(jobs) == 0 {
-		return errors.New("jobs required")
+		return nil, errors.New("jobs required")
 	}
-	seen := make(map[types.JobID]struct{}, len(jobs))
 	for i, job := range jobs {
-		if job.ID.IsZero() {
-			return fmt.Errorf("job %d: id required", i)
-		}
-		if _, exists := seen[job.ID]; exists {
-			return fmt.Errorf("job %d: duplicate id %s", i, job.ID)
-		}
-		seen[job.ID] = struct{}{}
 		if err := validateJSONB(job.Meta); err != nil {
-			return fmt.Errorf("job %d meta: %w", i, err)
+			return nil, fmt.Errorf("job %d meta: %w", i, err)
 		}
 	}
+	jobIDs := make([]types.JobID, len(jobs))
+	for i := range jobIDs {
+		jobIDs[i] = types.NewJobID()
+	}
+	materialized := make([]Job, len(jobs))
 	// Insert tail-first because jobs.next_id references a row in the same table.
 	for i := len(jobs) - 1; i >= 0; i-- {
 		job := jobs[i]
@@ -428,18 +486,18 @@ func createPlannedJobs(ctx context.Context, q *Queries, run Run, attempt int32, 
 		}
 		var nextID *types.JobID
 		if i+1 < len(jobs) {
-			nextID = &jobs[i+1].ID
+			nextID = &jobIDs[i+1]
 		}
 		repoSHAIn := ""
 		if i == 0 {
 			repoSHAIn = run.RepoSha0
 		}
-		if _, err := q.CreateJob(ctx, CreateJobParams{
-			ID:          job.ID,
+		created, err := q.CreateJob(ctx, CreateJobParams{
+			ID:          jobIDs[i],
 			RunID:       run.ID,
 			RepoID:      run.RepoID,
 			RepoBaseRef: run.RepoBaseRef,
-			Attempt:     attempt,
+			Attempt:     run.Attempt,
 			Status:      status,
 			JobType:     job.JobType,
 			JobImage:    job.JobImage,
@@ -447,11 +505,13 @@ func createPlannedJobs(ctx context.Context, q *Queries, run Run, attempt int32, 
 			Name:        job.Name,
 			Meta:        job.Meta,
 			RepoShaIn:   repoSHAIn,
-		}); err != nil {
-			return fmt.Errorf("create job %q type=%s id=%s: %w", job.Name, job.JobType, job.ID, err)
+		})
+		if err != nil {
+			return nil, fmt.Errorf("create job %q type=%s id=%s: %w", job.Name, job.JobType, jobIDs[i], err)
 		}
+		materialized[i] = created
 	}
-	return nil
+	return materialized, nil
 }
 
 // CancelWave atomically cancels one wave and all active child runs/jobs.
@@ -531,21 +591,6 @@ func validateJSONB(raw []byte) error {
 	return nil
 }
 
-func validateJSONBValue(raw any) error {
-	switch v := raw.(type) {
-	case nil:
-		return nil
-	case []byte:
-		return validateJSONB(v)
-	case json.RawMessage:
-		return validateJSONB(v)
-	case string:
-		return validateJSONB([]byte(v))
-	default:
-		return nil
-	}
-}
-
 // CreateJob validates the Meta JSONB field and creates a new job.
 func (s *PgStore) CreateJob(ctx context.Context, arg CreateJobParams) (Job, error) {
 	if err := validateJSONB(arg.Meta); err != nil {
@@ -560,14 +605,6 @@ func (s *PgStore) CreateSpec(ctx context.Context, arg CreateSpecParams) (Spec, e
 		return Spec{}, fmt.Errorf("specs.spec: %w", err)
 	}
 	return s.Queries.CreateSpec(ctx, arg)
-}
-
-// CreateRun validates the Stats JSONB field and creates a run.
-func (s *PgStore) CreateRun(ctx context.Context, arg CreateRunParams) (Run, error) {
-	if err := validateJSONBValue(arg.Stats); err != nil {
-		return Run{}, fmt.Errorf("runs.stats: %w", err)
-	}
-	return s.Queries.CreateRun(ctx, arg)
 }
 
 // CreateGitSpecSnapshot validates JSONB fields and creates an immutable snapshot.

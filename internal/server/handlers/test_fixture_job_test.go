@@ -74,7 +74,6 @@ type handlerStore struct {
 	updateRunResume                mockResult[struct{}]
 	updateRunError                 mockCall[store.UpdateRunErrorParams, struct{}]
 	updateRunBaseRef               mockCall[store.UpdateRunBaseRefParams, struct{}]
-	incrementRunAttempt            mockCall[store.IncrementRunAttemptParams, struct{}]
 	listRunsByWave                 mockCall[string, []store.Run]
 	listRunsWithURLByWave          mockCall[string, []store.ListRunsWithURLByWaveRow]
 	countRunsByStatus              mockResult[[]store.CountRunsByWaveStatusRow]
@@ -82,9 +81,9 @@ type handlerStore struct {
 	getLatestRunByMigAndRepoStatus mockCall[store.GetLatestRunByMigAndRepoStatusParams, store.GetLatestRunByMigAndRepoStatusRow]
 	listStaleRunningJobs           mockCall[pgtype.Timestamptz, []store.ListStaleRunningJobsRow]
 	countStaleNodesWithRunningJobs mockResult[int64]
-	createRun                      mockCall[store.CreateRunParams, store.Run]
-	createRunSeq                   mockCallSeq[store.CreateRunParams, store.Run]
-	createRunParams                []store.CreateRunParams
+	createRun                      mockCall[store.RunPlan, store.Run]
+	createRunSeq                   mockCallSeq[store.RunPlan, store.Run]
+	createRunParams                []store.RunPlan
 	createRunCalled                bool
 	createWaveWithRuns             mockCall[store.CreateWaveWithRunsParams, store.Wave]
 	createWaveWithRunsHook         func(store.CreateWaveWithRunsParams)

@@ -60,9 +60,6 @@ func TestMigRuns_Create(t *testing.T) {
 					t.Fatalf("second run repo_id = %q, want global02", got)
 				}
 				for _, params := range st.createRunParams {
-					if params.WaveID != st.createWaveWithRuns.params.Wave.ID {
-						t.Fatalf("run wave_id = %q, want %q", params.WaveID, st.createWaveWithRuns.params.Wave.ID)
-					}
 					if params.SourceCommitSha != testSourceCommitSHA || params.RepoSha0 != testSourceCommitSHA {
 						t.Fatalf("run SHA seed mismatch: source=%q sha0=%q", params.SourceCommitSha, params.RepoSha0)
 					}

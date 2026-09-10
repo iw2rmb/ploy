@@ -77,49 +77,25 @@ func TestLabSmoke(t *testing.T) {
 
 	runID := domaintypes.NewRunID()
 	waveID := domaintypes.WaveID(runID.String())
-	wave, err := db.CreateWave(ctx, store.CreateWaveParams{
-		ID:        waveID,
-		MigID:     migID,
-		SpecID:    spec.ID,
-		CreatedBy: &createdBy,
+	_, materialized, err := db.CreateWaveWithRuns(ctx, store.CreateWaveWithRunsParams{
+		Wave: store.CreateWaveParams{ID: waveID, MigID: migID, SpecID: spec.ID, CreatedBy: &createdBy},
+		Runs: []store.RunPlan{{
+			ID:              runID,
+			RepoID:          migRepo.RepoID,
+			RepoBaseRef:     migRepo.BaseRef,
+			SourceCommitSha: "0123456789abcdef0123456789abcdef01234567",
+			RepoSha0:        "0123456789abcdef0123456789abcdef01234567",
+			Jobs:            []store.JobPlan{{Name: "build", JobType: domaintypes.JobTypeMig, Meta: []byte(`{"type":"build","tool":"make"}`)}},
+		}},
 	})
 	if err != nil {
-		t.Fatalf("CreateWave() failed: %v", err)
+		t.Fatalf("CreateWaveWithRuns() failed: %v", err)
 	}
-
-	run, err := db.CreateRun(ctx, store.CreateRunParams{
-		ID:              runID,
-		WaveID:          wave.ID,
-		MigID:           migID,
-		SpecID:          spec.ID,
-		RepoID:          migRepo.RepoID,
-		RepoBaseRef:     migRepo.BaseRef,
-		SourceCommitSha: "0123456789abcdef0123456789abcdef01234567",
-		RepoSha0:        "0123456789abcdef0123456789abcdef01234567",
-		CreatedBy:       &createdBy,
-	})
-	if err != nil {
-		t.Fatalf("CreateRun() failed: %v", err)
-	}
+	run := materialized[0].Run
 	t.Logf("Created run: id=%v, mig_id=%s, spec_id=%s, status=%s", run.ID, run.MigID, run.SpecID, run.Status)
 
-	// Step 4: Simulate node operations - Create a job for the run.
-	job, err := db.CreateJob(ctx, store.CreateJobParams{
-		ID:          domaintypes.NewJobID(),
-		RunID:       run.ID,
-		RepoID:      run.RepoID,
-		RepoBaseRef: run.RepoBaseRef,
-		Attempt:     run.Attempt,
-		Name:        "build",
-		Status:      domaintypes.JobStatusRunning,
-		JobType:     domaintypes.JobTypeMig,
-		JobImage:    "",
-		NextID:      nil,
-		Meta:        []byte(`{"type":"build","tool":"make"}`),
-	})
-	if err != nil {
-		t.Fatalf("CreateJob() failed: %v", err)
-	}
+	// Step 4: Simulate node operations for the materialized job.
+	job := materialized[0].Jobs[0]
 	t.Logf("Created job: id=%v, run_id=%v, name=%s", job.ID, job.RunID, job.Name)
 
 	// Step 5: Simulate node appends - Create logs (simulating log streaming from node).

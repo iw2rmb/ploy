@@ -60,74 +60,6 @@ func (q *Queries) CountRunsByWaveStatus(ctx context.Context, waveID types.WaveID
 	return items, nil
 }
 
-const createRun = `-- name: CreateRun :one
-INSERT INTO runs (
-  id,
-  wave_id,
-  mig_id,
-  spec_id,
-  repo_id,
-  repo_base_ref,
-  source_commit_sha,
-  repo_sha0,
-  created_by,
-  status,
-  started_at,
-  stats
-)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'Running', now(), COALESCE($10, '{}'::jsonb))
-RETURNING id, wave_id, mig_id, spec_id, repo_id, repo_base_ref, source_commit_sha, repo_sha0,
-          created_by, status, attempt, last_error, created_at, started_at, finished_at, stats
-`
-
-type CreateRunParams struct {
-	ID              types.RunID  `json:"id"`
-	WaveID          types.WaveID `json:"wave_id"`
-	MigID           types.MigID  `json:"mig_id"`
-	SpecID          types.SpecID `json:"spec_id"`
-	RepoID          types.RepoID `json:"repo_id"`
-	RepoBaseRef     string       `json:"repo_base_ref"`
-	SourceCommitSha string       `json:"source_commit_sha"`
-	RepoSha0        string       `json:"repo_sha0"`
-	CreatedBy       *string      `json:"created_by"`
-	Stats           interface{}  `json:"stats"`
-}
-
-func (q *Queries) CreateRun(ctx context.Context, arg CreateRunParams) (Run, error) {
-	row := q.db.QueryRow(ctx, createRun,
-		arg.ID,
-		arg.WaveID,
-		arg.MigID,
-		arg.SpecID,
-		arg.RepoID,
-		arg.RepoBaseRef,
-		arg.SourceCommitSha,
-		arg.RepoSha0,
-		arg.CreatedBy,
-		arg.Stats,
-	)
-	var i Run
-	err := row.Scan(
-		&i.ID,
-		&i.WaveID,
-		&i.MigID,
-		&i.SpecID,
-		&i.RepoID,
-		&i.RepoBaseRef,
-		&i.SourceCommitSha,
-		&i.RepoSha0,
-		&i.CreatedBy,
-		&i.Status,
-		&i.Attempt,
-		&i.LastError,
-		&i.CreatedAt,
-		&i.StartedAt,
-		&i.FinishedAt,
-		&i.Stats,
-	)
-	return i, err
-}
-
 const deleteRun = `-- name: DeleteRun :exec
 DELETE FROM runs
 WHERE id = $1
@@ -300,27 +232,6 @@ func (q *Queries) HasRunningJobForRunNode(ctx context.Context, arg HasRunningJob
 	var column_1 bool
 	err := row.Scan(&column_1)
 	return column_1, err
-}
-
-const incrementRunAttempt = `-- name: IncrementRunAttempt :exec
-UPDATE runs
-SET attempt = attempt + 1,
-    status = 'Running',
-    last_error = NULL,
-    started_at = now(),
-    finished_at = NULL,
-    stats = COALESCE($2, '{}'::jsonb)
-WHERE id = $1
-`
-
-type IncrementRunAttemptParams struct {
-	ID    types.RunID `json:"id"`
-	Stats []byte      `json:"stats"`
-}
-
-func (q *Queries) IncrementRunAttempt(ctx context.Context, arg IncrementRunAttemptParams) error {
-	_, err := q.db.Exec(ctx, incrementRunAttempt, arg.ID, arg.Stats)
-	return err
 }
 
 const listFailedRepoIDsByMig = `-- name: ListFailedRepoIDsByMig :many
