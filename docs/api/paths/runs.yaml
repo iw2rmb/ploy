@@ -2,15 +2,16 @@ post:
   tags: [Control]
   summary: Submit single-repo run
   description: |
-    Submit a single-repo run. Repo jobs are materialized by the scheduler after
-    submission, not started directly by this request.
+    Submit a single-repo run. The request atomically materializes the wave, the
+    running run, and its complete job chain before it returns.
 
     Side-effects:
     - Creates a mig project (mig name == mig id).
     - Compiles a named `spec_selector` on the server or accepts a canonical
       local `spec`, then stores the immutable snapshot and sets migs.spec_id.
     - Creates a mig repo row for the provided repo_url.
-    - Creates a wave and a queued run row.
+    - Creates a wave, a running run row, and the complete job chain in one
+      transaction.
   requestBody:
     required: true
     content:
@@ -19,7 +20,7 @@ post:
           $ref: "../components/schemas/controlplane.yaml#/RunSubmitRequest"
   responses:
     "201":
-      description: Created — run accepted for scheduler materialization.
+      description: Created — run and job chain materialized.
       content:
         application/json:
           schema:
