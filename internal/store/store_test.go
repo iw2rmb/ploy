@@ -344,6 +344,7 @@ func TestCreateWaveWithRuns_CreatesWaveAndRunsAtomically(t *testing.T) {
 	}
 
 	rollbackWaveID := types.NewWaveID()
+	materializedBeforeFailureRunID := types.NewRunID()
 	rollbackRunID := types.NewRunID()
 	_, _, err = db.CreateWaveWithRuns(ctx, CreateWaveWithRunsParams{
 		Wave: CreateWaveParams{
@@ -353,6 +354,14 @@ func TestCreateWaveWithRuns_CreatesWaveAndRunsAtomically(t *testing.T) {
 			CreatedBy: fx.Run.CreatedBy,
 		},
 		Runs: []RunPlan{
+			{
+				ID:              materializedBeforeFailureRunID,
+				RepoID:          fx.MigRepo.RepoID,
+				RepoBaseRef:     "main",
+				SourceCommitSha: testSHA,
+				RepoSha0:        testSHA,
+				Jobs:            plannedJobsForStoreTest(),
+			},
 			{
 				ID:              rollbackRunID,
 				RepoID:          fx.MigRepo.RepoID,
@@ -368,8 +377,13 @@ func TestCreateWaveWithRuns_CreatesWaveAndRunsAtomically(t *testing.T) {
 	if _, err := db.GetWave(ctx, rollbackWaveID); err != pgx.ErrNoRows {
 		t.Fatalf("GetWave(rollback) err = %v, want pgx.ErrNoRows", err)
 	}
-	if _, err := db.GetRun(ctx, rollbackRunID); err != pgx.ErrNoRows {
-		t.Fatalf("GetRun(rollback) err = %v, want pgx.ErrNoRows", err)
+	for _, runID := range []types.RunID{materializedBeforeFailureRunID, rollbackRunID} {
+		if _, err := db.GetRun(ctx, runID); err != pgx.ErrNoRows {
+			t.Fatalf("GetRun(%s) err = %v, want pgx.ErrNoRows", runID, err)
+		}
+	}
+	if jobs, err := db.ListJobsByRun(ctx, materializedBeforeFailureRunID); err != nil || len(jobs) != 0 {
+		t.Fatalf("ListJobsByRun(%s) jobs=%d err=%v, want no jobs", materializedBeforeFailureRunID, len(jobs), err)
 	}
 }
 
