@@ -26,8 +26,7 @@ import (
 // - Must use migs.spec_id; if NULL, return error.
 // - Archived migs cannot be executed.
 // - Copies migs.spec_id → runs.spec_id for immutability.
-// - Creates run rows snapshotting source refs from mig_repos.
-// - Job materialization is deferred to the wave scheduler and gated on prep readiness.
+// - Atomically creates running run rows and their job chains.
 func createMigRunHandler(st store.Store, gitAuth gitauth.Options, registries ...*gitlabtokens.Registry) http.HandlerFunc {
 	tokenRegistry := optionalGitLabTokenRegistry(registries)
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -65,6 +64,11 @@ func createMigRunHandler(st store.Store, gitAuth gitauth.Options, registries ...
 		// Validate migs.spec_id is non-NULL.
 		if mig.SpecID == nil {
 			writeHTTPError(w, http.StatusBadRequest, "mig has no spec; set a spec before creating runs")
+			return
+		}
+		spec, err := st.GetSpec(r.Context(), *mig.SpecID)
+		if err != nil {
+			serverError(w, "create mig run", "get spec", err, "mig_id", migID.String(), "spec_id", *mig.SpecID)
 			return
 		}
 
@@ -110,7 +114,7 @@ func createMigRunHandler(st store.Store, gitAuth gitauth.Options, registries ...
 		}
 
 		waveID := domaintypes.NewWaveID()
-		runs := make([]store.CreateRunParams, 0, len(selectedRepos))
+		runs := make([]store.CreateRunWithJobsParams, 0, len(selectedRepos))
 		runIDs := make([]domaintypes.RunID, 0, len(selectedRepos))
 		for _, migRepo := range selectedRepos {
 			runID := domaintypes.NewRunID()
@@ -133,16 +137,24 @@ func createMigRunHandler(st store.Store, gitAuth gitauth.Options, registries ...
 				)
 				return
 			}
-			runs = append(runs, store.CreateRunParams{
-				ID:              runID,
-				WaveID:          waveID,
-				MigID:           migID,
-				SpecID:          *mig.SpecID,
-				RepoID:          migRepo.RepoID,
-				RepoBaseRef:     migRepo.BaseRef,
-				SourceCommitSha: sourceCommitSHA,
-				RepoSha0:        sourceCommitSHA,
-				Stats:           runStats,
+			plannedJobs, planErr := planJobsFromSpec(spec.Spec)
+			if planErr != nil {
+				serverError(w, "create mig run", "plan jobs", planErr, "mig_id", migID.String(), "repo_id", migRepo.RepoID)
+				return
+			}
+			runs = append(runs, store.CreateRunWithJobsParams{
+				Run: store.CreateRunParams{
+					ID:              runID,
+					WaveID:          waveID,
+					MigID:           migID,
+					SpecID:          *mig.SpecID,
+					RepoID:          migRepo.RepoID,
+					RepoBaseRef:     migRepo.BaseRef,
+					SourceCommitSha: sourceCommitSHA,
+					RepoSha0:        sourceCommitSHA,
+					Stats:           runStats,
+				},
+				Jobs: plannedJobs,
 			})
 		}
 

@@ -25,7 +25,7 @@ Started -> Finished | Cancelled
 Run status:
 
 ```text
-Queued -> Running -> Success | Fail | Cancelled
+Running -> Success | Fail | Cancelled
 ```
 
 Job status:
@@ -34,10 +34,14 @@ Job status:
 Created -> Queued -> Running -> Success | Fail | Error | Cancelled
 ```
 
-The scheduler finds waves with queued runs, creates the run job chain when
-needed, and marks the run `Running` before jobs are claimed. A run reaches a
-terminal state when its current attempt's jobs are terminal. A wave reaches
-`Finished` when all child runs are terminal, unless it is explicitly cancelled.
+The create-run request builds every selected job chain and commits the wave,
+runs, and jobs in one transaction. Each run is `Running` when the transaction
+commits. `Running` means that the job chain is materialized and eligible for
+execution; the job state shows whether a node has claimed work.
+
+A run reaches a terminal state when its current attempt's jobs are terminal. A
+wave reaches `Finished` when all child runs are terminal, unless it is
+explicitly cancelled.
 
 ## Schema
 
@@ -46,11 +50,15 @@ Durable execution state lives in:
 - `migs`: project identity and current spec pointer.
 - `mig_repos`: managed repo membership and mutable source ref.
 - `waves`: one launch grouping row.
-- `runs`: one repo execution row, including `wave_id`, `repo_id`,
+- `runs`: one materialized repo execution row, including `wave_id`, `repo_id`,
   `repo_base_ref`, `source_commit_sha`, `repo_sha0`, `attempt`, `status`, and
   `last_error`.
 - `jobs`: job chain rows scoped operationally by `(run_id, attempt)`; `repo_id`
   remains on each row for attribution.
+
+Restart locks the terminal run, increments its attempt, and creates the new job
+chain in the same transaction. Concurrent restart requests cannot create two
+attempts or two chains.
 
 `run_id` is sufficient for run operations. The repo selector is stored on the
 run and is not part of public run routes.

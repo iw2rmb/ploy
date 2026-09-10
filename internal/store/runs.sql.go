@@ -72,9 +72,10 @@ INSERT INTO runs (
   repo_sha0,
   created_by,
   status,
+  started_at,
   stats
 )
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'Queued', COALESCE($10, '{}'::jsonb))
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'Running', now(), COALESCE($10, '{}'::jsonb))
 RETURNING id, wave_id, mig_id, spec_id, repo_id, repo_base_ref, source_commit_sha, repo_sha0,
           created_by, status, attempt, last_error, created_at, started_at, finished_at, stats
 `
@@ -196,6 +197,38 @@ func (q *Queries) GetRun(ctx context.Context, id types.RunID) (Run, error) {
 	return i, err
 }
 
+const getRunForUpdate = `-- name: GetRunForUpdate :one
+SELECT id, wave_id, mig_id, spec_id, repo_id, repo_base_ref, source_commit_sha, repo_sha0,
+       created_by, status, attempt, last_error, created_at, started_at, finished_at, stats
+FROM runs
+WHERE id = $1
+FOR UPDATE
+`
+
+func (q *Queries) GetRunForUpdate(ctx context.Context, id types.RunID) (Run, error) {
+	row := q.db.QueryRow(ctx, getRunForUpdate, id)
+	var i Run
+	err := row.Scan(
+		&i.ID,
+		&i.WaveID,
+		&i.MigID,
+		&i.SpecID,
+		&i.RepoID,
+		&i.RepoBaseRef,
+		&i.SourceCommitSha,
+		&i.RepoSha0,
+		&i.CreatedBy,
+		&i.Status,
+		&i.Attempt,
+		&i.LastError,
+		&i.CreatedAt,
+		&i.StartedAt,
+		&i.FinishedAt,
+		&i.Stats,
+	)
+	return i, err
+}
+
 const getRunSnapshotMetadata = `-- name: GetRunSnapshotMetadata :one
 SELECT
   runs.id AS run_id,
@@ -272,9 +305,9 @@ func (q *Queries) HasRunningJobForRunNode(ctx context.Context, arg HasRunningJob
 const incrementRunAttempt = `-- name: IncrementRunAttempt :exec
 UPDATE runs
 SET attempt = attempt + 1,
-    status = 'Queued',
+    status = 'Running',
     last_error = NULL,
-    started_at = NULL,
+    started_at = now(),
     finished_at = NULL,
     stats = COALESCE($2, '{}'::jsonb)
 WHERE id = $1
@@ -314,52 +347,6 @@ func (q *Queries) ListFailedRepoIDsByMig(ctx context.Context, migID types.MigID)
 			return nil, err
 		}
 		items = append(items, repo_id)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listQueuedRunsByWave = `-- name: ListQueuedRunsByWave :many
-SELECT id, wave_id, mig_id, spec_id, repo_id, repo_base_ref, source_commit_sha, repo_sha0,
-       created_by, status, attempt, last_error, created_at, started_at, finished_at, stats
-FROM runs
-WHERE wave_id = $1
-  AND status = 'Queued'
-ORDER BY created_at ASC, id ASC
-`
-
-func (q *Queries) ListQueuedRunsByWave(ctx context.Context, waveID types.WaveID) ([]Run, error) {
-	rows, err := q.db.Query(ctx, listQueuedRunsByWave, waveID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []Run{}
-	for rows.Next() {
-		var i Run
-		if err := rows.Scan(
-			&i.ID,
-			&i.WaveID,
-			&i.MigID,
-			&i.SpecID,
-			&i.RepoID,
-			&i.RepoBaseRef,
-			&i.SourceCommitSha,
-			&i.RepoSha0,
-			&i.CreatedBy,
-			&i.Status,
-			&i.Attempt,
-			&i.LastError,
-			&i.CreatedAt,
-			&i.StartedAt,
-			&i.FinishedAt,
-			&i.Stats,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -732,35 +719,6 @@ func (q *Queries) ListRunsWithURLByWave(ctx context.Context, waveID types.WaveID
 			return nil, err
 		}
 		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listWavesWithQueuedRuns = `-- name: ListWavesWithQueuedRuns :many
-SELECT DISTINCT wave_id
-FROM runs
-JOIN waves ON waves.id = runs.wave_id
-WHERE waves.status = 'Started'
-  AND runs.status = 'Queued'
-ORDER BY wave_id
-`
-
-func (q *Queries) ListWavesWithQueuedRuns(ctx context.Context) ([]types.WaveID, error) {
-	rows, err := q.db.Query(ctx, listWavesWithQueuedRuns)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []types.WaveID{}
-	for rows.Next() {
-		var wave_id types.WaveID
-		if err := rows.Scan(&wave_id); err != nil {
-			return nil, err
-		}
-		items = append(items, wave_id)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

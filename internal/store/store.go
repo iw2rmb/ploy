@@ -60,15 +60,32 @@ type CompleteBootstrapEnrollmentParams struct {
 	CertNotAfter    time.Time
 }
 
-// CreateWaveWithRunsParams contains the complete DB materialization for one launch.
+// PlannedJob contains intrinsic job data. Its position in a Jobs slice defines
+// the initial status and next-job link when the store materializes the chain.
+type PlannedJob struct {
+	ID       types.JobID
+	Name     string
+	JobType  types.JobType
+	JobImage string
+	Meta     []byte
+}
+
+type CreateRunWithJobsParams struct {
+	Run  CreateRunParams
+	Jobs []PlannedJob
+}
+
+// CreateWaveWithRunsParams contains the complete durable materialization for one launch.
 type CreateWaveWithRunsParams struct {
 	Wave CreateWaveParams
-	Runs []CreateRunParams
+	Runs []CreateRunWithJobsParams
 }
 
 type RestartRunParams struct {
-	RunID types.RunID
-	Stats []byte
+	RunID           types.RunID
+	ExpectedAttempt int32
+	Stats           []byte
+	Jobs            []PlannedJob
 }
 
 // PgStore wraps a pgxpool connection pool and implements Store.
@@ -220,10 +237,15 @@ func isNodeIdentityUniqueViolation(err error) bool {
 	return pgErr.ConstraintName == "nodes_pkey" || pgErr.ConstraintName == "nodes_name_key"
 }
 
-// CreateWaveWithRuns atomically creates a wave and its selected run rows.
+// CreateWaveWithRuns atomically creates a wave and every selected run job chain.
 func (s *PgStore) CreateWaveWithRuns(ctx context.Context, arg CreateWaveWithRunsParams) (Wave, []Run, error) {
 	if len(arg.Runs) == 0 {
 		return Wave{}, nil, errors.New("create wave with runs: runs required")
+	}
+	for _, runPlan := range arg.Runs {
+		if err := validateJSONBValue(runPlan.Run.Stats); err != nil {
+			return Wave{}, nil, fmt.Errorf("create wave with runs: runs.stats: %w", err)
+		}
 	}
 
 	tx, err := s.pool.Begin(ctx)
@@ -240,22 +262,19 @@ func (s *PgStore) CreateWaveWithRuns(ctx context.Context, arg CreateWaveWithRuns
 
 	qtx := s.Queries.WithTx(tx)
 
-	for _, runParams := range arg.Runs {
-		if err := validateJSONBValue(runParams.Stats); err != nil {
-			return Wave{}, nil, fmt.Errorf("create wave with runs: runs.stats: %w", err)
-		}
-	}
-
 	wave, err := qtx.CreateWave(ctx, arg.Wave)
 	if err != nil {
 		return Wave{}, nil, fmt.Errorf("create wave with runs: create wave: %w", err)
 	}
 
 	runs := make([]Run, 0, len(arg.Runs))
-	for _, runParams := range arg.Runs {
-		run, err := qtx.CreateRun(ctx, runParams)
+	for _, runPlan := range arg.Runs {
+		run, err := qtx.CreateRun(ctx, runPlan.Run)
 		if err != nil {
-			return Wave{}, nil, fmt.Errorf("create wave with runs: create run %s: %w", runParams.ID, err)
+			return Wave{}, nil, fmt.Errorf("create wave with runs: create run %s: %w", runPlan.Run.ID, err)
+		}
+		if err := createPlannedJobs(ctx, qtx, run, run.Attempt, runPlan.Jobs); err != nil {
+			return Wave{}, nil, fmt.Errorf("create wave with runs: create jobs for run %s: %w", run.ID, err)
 		}
 		runs = append(runs, run)
 	}
@@ -310,7 +329,7 @@ func (s *PgStore) CancelRun(ctx context.Context, runID types.RunID) error {
 	return nil
 }
 
-// RestartRun atomically resets one terminal run to Queued on the next attempt.
+// RestartRun atomically resets one terminal run and creates its next-attempt job chain.
 func (s *PgStore) RestartRun(ctx context.Context, arg RestartRunParams) (Run, error) {
 	runID := arg.RunID
 	stats := arg.Stats
@@ -320,7 +339,6 @@ func (s *PgStore) RestartRun(ctx context.Context, arg RestartRunParams) (Run, er
 	if err := validateJSONB(stats); err != nil {
 		return Run{}, fmt.Errorf("restart run: runs.stats: %w", err)
 	}
-
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return Run{}, fmt.Errorf("restart run: begin tx: %w", err)
@@ -335,11 +353,11 @@ func (s *PgStore) RestartRun(ctx context.Context, arg RestartRunParams) (Run, er
 
 	qtx := s.Queries.WithTx(tx)
 
-	run, err := qtx.GetRun(ctx, runID)
+	run, err := qtx.GetRunForUpdate(ctx, runID)
 	if err != nil {
 		return Run{}, fmt.Errorf("restart run: get run: %w", err)
 	}
-	if run.Status != types.RunStatusSuccess && run.Status != types.RunStatusFail && run.Status != types.RunStatusCancelled {
+	if run.Attempt != arg.ExpectedAttempt || (run.Status != types.RunStatusSuccess && run.Status != types.RunStatusFail && run.Status != types.RunStatusCancelled) {
 		return Run{}, ErrRunRestartActive
 	}
 
@@ -372,6 +390,9 @@ func (s *PgStore) RestartRun(ctx context.Context, arg RestartRunParams) (Run, er
 	if err != nil {
 		return Run{}, fmt.Errorf("restart run: reload run: %w", err)
 	}
+	if err := createPlannedJobs(ctx, qtx, updated, updated.Attempt, arg.Jobs); err != nil {
+		return Run{}, fmt.Errorf("restart run: create jobs: %w", err)
+	}
 
 	if err := tx.Commit(ctx); err != nil {
 		return Run{}, fmt.Errorf("restart run: commit tx: %w", err)
@@ -379,6 +400,58 @@ func (s *PgStore) RestartRun(ctx context.Context, arg RestartRunParams) (Run, er
 
 	committed = true
 	return updated, nil
+}
+
+func createPlannedJobs(ctx context.Context, q *Queries, run Run, attempt int32, jobs []PlannedJob) error {
+	if len(jobs) == 0 {
+		return errors.New("jobs required")
+	}
+	seen := make(map[types.JobID]struct{}, len(jobs))
+	for i, job := range jobs {
+		if job.ID.IsZero() {
+			return fmt.Errorf("job %d: id required", i)
+		}
+		if _, exists := seen[job.ID]; exists {
+			return fmt.Errorf("job %d: duplicate id %s", i, job.ID)
+		}
+		seen[job.ID] = struct{}{}
+		if err := validateJSONB(job.Meta); err != nil {
+			return fmt.Errorf("job %d meta: %w", i, err)
+		}
+	}
+	// Insert tail-first because jobs.next_id references a row in the same table.
+	for i := len(jobs) - 1; i >= 0; i-- {
+		job := jobs[i]
+		status := types.JobStatusCreated
+		if i == 0 {
+			status = types.JobStatusQueued
+		}
+		var nextID *types.JobID
+		if i+1 < len(jobs) {
+			nextID = &jobs[i+1].ID
+		}
+		repoSHAIn := ""
+		if i == 0 {
+			repoSHAIn = run.RepoSha0
+		}
+		if _, err := q.CreateJob(ctx, CreateJobParams{
+			ID:          job.ID,
+			RunID:       run.ID,
+			RepoID:      run.RepoID,
+			RepoBaseRef: run.RepoBaseRef,
+			Attempt:     attempt,
+			Status:      status,
+			JobType:     job.JobType,
+			JobImage:    job.JobImage,
+			NextID:      nextID,
+			Name:        job.Name,
+			Meta:        job.Meta,
+			RepoShaIn:   repoSHAIn,
+		}); err != nil {
+			return fmt.Errorf("create job %q type=%s id=%s: %w", job.Name, job.JobType, job.ID, err)
+		}
+	}
+	return nil
 }
 
 // CancelWave atomically cancels one wave and all active child runs/jobs.

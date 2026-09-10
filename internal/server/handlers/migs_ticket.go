@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -155,41 +154,11 @@ func getRunStatusHandler(st store.Store) http.HandlerFunc {
 	}
 }
 
-type plannedJob struct {
-	ID        domaintypes.JobID
-	Name      string
-	JobType   domaintypes.JobType
-	JobImage  string
-	Status    domaintypes.JobStatus
-	StepName  string
-	StepIndex *int
-	GateCycle string
-	NextID    *domaintypes.JobID
-	RepoSHAIn string
-}
-
-// createJobsFromSpec parses the run spec and creates an explicit next_id-linked job chain.
-// Queue semantics are head-only: the first job is Queued, all successors are Created.
-func createJobsFromSpec(
-	ctx context.Context,
-	st store.Store,
-	runID domaintypes.RunID,
-	repoID domaintypes.RepoID,
-	repoBaseRef string,
-	attempt int32,
-	repoSHA0 string,
-	spec []byte,
-	_ ...any,
-) error {
+func planJobsFromSpec(spec []byte) ([]store.PlannedJob, error) {
 	migsSpec, err := contracts.ParseMigSpecJSON(spec)
 	if err != nil {
-		return fmt.Errorf("parse migs spec: %w", err)
+		return nil, fmt.Errorf("parse migs spec: %w", err)
 	}
-	normalizedRepoSHA0, ok := domaintypes.NormalizeFullCommitSHA(repoSHA0)
-	if !ok {
-		return fmt.Errorf("repo_sha0 must match ^[0-9a-f]{40}$")
-	}
-	repoSHA0 = normalizedRepoSHA0.String()
 	type draft struct {
 		name      string
 		jobType   domaintypes.JobType
@@ -246,71 +215,29 @@ func createJobsFromSpec(
 		drafts = append(drafts, draft{name: "post-gate", jobType: domaintypes.JobTypePostGate, gateCycle: "post-gate"})
 	}
 
-	planned := make([]plannedJob, 0, len(drafts))
-	for i, d := range drafts {
-		status := domaintypes.JobStatusCreated
-		if i == 0 {
-			status = domaintypes.JobStatusQueued
+	planned := make([]store.PlannedJob, 0, len(drafts))
+	for _, d := range drafts {
+		var meta *contracts.JobMeta
+		if d.stepName != "" {
+			meta = contracts.NewMigJobMetaWithStepName(d.stepName)
+		} else {
+			meta = contracts.NewMigJobMeta()
 		}
-		planned = append(planned, plannedJob{
-			ID:        domaintypes.NewJobID(),
-			Name:      d.name,
-			JobType:   d.jobType,
-			JobImage:  d.jobImage,
-			Status:    status,
-			StepName:  d.stepName,
-			StepIndex: d.stepIndex,
-			GateCycle: d.gateCycle,
+		meta.MigStepIndex = d.stepIndex
+		meta.GateCycleName = strings.TrimSpace(d.gateCycle)
+		metaBytes, err := contracts.MarshalJobMeta(meta)
+		if err != nil {
+			return nil, fmt.Errorf("marshal job %q meta: %w", d.name, err)
+		}
+		planned = append(planned, store.PlannedJob{
+			ID:       domaintypes.NewJobID(),
+			Name:     d.name,
+			JobType:  d.jobType,
+			JobImage: d.jobImage,
+			Meta:     metaBytes,
 		})
 	}
-	// Seed deterministic SHA chain from runs.repo_sha0 at chain head.
-	planned[0].RepoSHAIn = repoSHA0
-	for i := range planned {
-		if i+1 < len(planned) {
-			nextID := planned[i+1].ID
-			planned[i].NextID = &nextID
-		}
-	}
-
-	// Insert chain tail-first to satisfy jobs.next_id -> jobs.id FK at insert time.
-	for i := len(planned) - 1; i >= 0; i-- {
-		if err := createPlannedJob(ctx, st, runID, repoID, repoBaseRef, attempt, planned[i]); err != nil {
-			return fmt.Errorf("create job %q type=%s id=%s: %w", planned[i].Name, planned[i].JobType, planned[i].ID, err)
-		}
-	}
-	return nil
-}
-
-func createPlannedJob(ctx context.Context, st store.Store, runID domaintypes.RunID, repoID domaintypes.RepoID, repoBaseRef string, attempt int32, planned plannedJob) error {
-	// Build job metadata with step name for mig jobs.
-	var meta *contracts.JobMeta
-	if planned.StepName != "" {
-		meta = contracts.NewMigJobMetaWithStepName(planned.StepName)
-	} else {
-		meta = contracts.NewMigJobMeta()
-	}
-	meta.MigStepIndex = planned.StepIndex
-	meta.GateCycleName = strings.TrimSpace(planned.GateCycle)
-	metaBytes, err := contracts.MarshalJobMeta(meta)
-	if err != nil {
-		return fmt.Errorf("marshal job meta: %w", err)
-	}
-
-	_, err = st.CreateJob(ctx, store.CreateJobParams{
-		ID:          planned.ID,
-		RunID:       runID,
-		RepoID:      repoID,
-		RepoBaseRef: repoBaseRef,
-		Attempt:     attempt,
-		Name:        planned.Name,
-		Status:      planned.Status,
-		JobType:     planned.JobType,
-		JobImage:    planned.JobImage,
-		NextID:      planned.NextID,
-		Meta:        metaBytes,
-		RepoShaIn:   planned.RepoSHAIn,
-	})
-	return err
+	return planned, nil
 }
 
 // helpers

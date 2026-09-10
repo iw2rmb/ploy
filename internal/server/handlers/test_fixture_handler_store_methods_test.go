@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/iw2rmb/ploy/internal/domain/types"
@@ -41,18 +40,6 @@ func (m *handlerStore) ListJobsByRun(_ context.Context, runID types.RunID) ([]st
 
 func (m *handlerStore) ListJobsByRunAttempt(_ context.Context, params store.ListJobsByRunAttemptParams) ([]store.Job, error) {
 	return m.listJobsByRunAttempt.record(params)
-}
-
-func (m *handlerStore) ScheduleNextJob(_ context.Context, params store.ScheduleNextJobParams) (store.Job, error) {
-	m.scheduleNextJob.called = true
-	m.scheduleNextJob.params = params
-	if m.scheduleNextJob.err != nil {
-		return store.Job{}, m.scheduleNextJob.err
-	}
-	if m.scheduleNextJob.val.ID.IsZero() {
-		return store.Job{}, pgx.ErrNoRows
-	}
-	return m.scheduleNextJob.val, nil
 }
 
 func (m *handlerStore) GetRun(_ context.Context, id types.RunID) (store.Run, error) {
@@ -99,10 +86,6 @@ func (m *handlerStore) ListRunsByWave(_ context.Context, waveID types.WaveID) ([
 	return m.listRunsByWave.record(waveID.String())
 }
 
-func (m *handlerStore) ListQueuedRunsByWave(_ context.Context, waveID types.WaveID) ([]store.Run, error) {
-	return m.listQueuedRunsByWave.record(waveID.String())
-}
-
 func (m *handlerStore) ListRunsWithURLByWave(_ context.Context, waveID types.WaveID) ([]store.ListRunsWithURLByWaveRow, error) {
 	return m.listRunsWithURLByWave.record(waveID.String())
 }
@@ -137,11 +120,42 @@ func (m *handlerStore) CreateWaveWithRuns(ctx context.Context, params store.Crea
 	}
 	wave := defaultWave(m.createWaveWithRuns.val, params.Wave)
 	runs := make([]store.Run, 0, len(params.Runs))
-	for _, runParams := range params.Runs {
-		m.createRunParams = append(m.createRunParams, runParams)
-		run, err := m.CreateRun(ctx, runParams)
+	for _, runPlan := range params.Runs {
+		m.createRunParams = append(m.createRunParams, runPlan.Run)
+		run, err := m.CreateRun(ctx, runPlan.Run)
 		if err != nil {
 			return store.Wave{}, nil, err
+		}
+		for i := len(runPlan.Jobs) - 1; i >= 0; i-- {
+			job := runPlan.Jobs[i]
+			status := types.JobStatusCreated
+			if i == 0 {
+				status = types.JobStatusQueued
+			}
+			var nextID *types.JobID
+			if i+1 < len(runPlan.Jobs) {
+				nextID = &runPlan.Jobs[i+1].ID
+			}
+			repoSHAIn := ""
+			if i == 0 {
+				repoSHAIn = run.RepoSha0
+			}
+			if _, err := m.CreateJob(ctx, store.CreateJobParams{
+				ID:          job.ID,
+				RunID:       run.ID,
+				RepoID:      run.RepoID,
+				RepoBaseRef: run.RepoBaseRef,
+				Attempt:     run.Attempt,
+				Status:      status,
+				JobType:     job.JobType,
+				JobImage:    job.JobImage,
+				NextID:      nextID,
+				Name:        job.Name,
+				Meta:        job.Meta,
+				RepoShaIn:   repoSHAIn,
+			}); err != nil {
+				return store.Wave{}, nil, err
+			}
 		}
 		runs = append(runs, run)
 	}

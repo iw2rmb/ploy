@@ -41,22 +41,6 @@ func JobStatusFromExitCodeForJobType(jobType domaintypes.JobType, exitCode int) 
 	return JobStatusFromExitCode(exitCode)
 }
 
-// ========== Claim Decision ==========
-
-// ClaimDecision is the pure output of claim transition evaluation.
-type ClaimDecision struct {
-	// AdvanceRunToRunning is true when the run should be transitioned
-	// from Queued to Running.
-	AdvanceRunToRunning bool
-}
-
-// EvaluateClaimDecision computes whether the run should advance to Running.
-func EvaluateClaimDecision(jobType domaintypes.JobType, runStatus domaintypes.RunStatus) ClaimDecision {
-	return ClaimDecision{
-		AdvanceRunToRunning: !jobType.IsZero() && runStatus == domaintypes.RunStatusQueued,
-	}
-}
-
 // ========== Completion Decision ==========
 
 // CompletionChainAction is the chain management action required after a job completes.

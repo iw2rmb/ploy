@@ -199,7 +199,7 @@ CREATE TABLE IF NOT EXISTS runs (
   source_commit_sha TEXT NOT NULL DEFAULT '',
   repo_sha0         TEXT NOT NULL DEFAULT '',
   created_by        TEXT,
-  status            run_status NOT NULL DEFAULT 'Queued',
+  status            run_status NOT NULL DEFAULT 'Running',
   attempt           INTEGER NOT NULL DEFAULT 1 CHECK (attempt >= 1),
   last_error        TEXT,
   created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -523,7 +523,7 @@ CREATE INDEX IF NOT EXISTS spec_bundles_cid_idx ON spec_bundles(cid);
 CREATE INDEX IF NOT EXISTS spec_bundles_last_ref_idx ON spec_bundles(last_ref_at);
 
 -- Advisory lock usage (documentation only)
--- Note: v1 model does not use run-level assignment; runs are created with status='Started'.
+-- Note: v1 model does not use run-level assignment; runs are created with status='Running'.
 -- Jobs are claimed individually at the job level; see ClaimJob query in jobs.sql.
 
 -- Optional convenience view for timing

@@ -115,7 +115,7 @@ func TestRestartRunHandler(t *testing.T) {
 					ID:        runID,
 					MigID:     domaintypes.NewMigID(),
 					SpecID:    domaintypes.NewSpecID(),
-					Status:    domaintypes.RunStatusQueued,
+					Status:    domaintypes.RunStatusRunning,
 					Attempt:   2,
 					CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
 				}
@@ -131,6 +131,9 @@ func TestRestartRunHandler(t *testing.T) {
 				}
 				if st.restartRun.params.Stats != nil {
 					t.Fatalf("RestartRun stats=%s, want nil", string(st.restartRun.params.Stats))
+				}
+				if st.restartRun.params.ExpectedAttempt != 1 || len(st.restartRun.params.Jobs) != 3 {
+					t.Fatalf("unexpected restart materialization params: attempt=%d jobs=%d", st.restartRun.params.ExpectedAttempt, len(st.restartRun.params.Jobs))
 				}
 			},
 		},
@@ -152,7 +155,7 @@ func TestRestartRunHandler(t *testing.T) {
 					ID:        runID,
 					MigID:     domaintypes.NewMigID(),
 					SpecID:    domaintypes.NewSpecID(),
-					Status:    domaintypes.RunStatusQueued,
+					Status:    domaintypes.RunStatusRunning,
 					Attempt:   2,
 					Stats:     tokenStats,
 					CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
@@ -201,6 +204,22 @@ func TestRestartRunHandler(t *testing.T) {
 			t.Parallel()
 			st := &handlerStore{}
 			tt.setup(st)
+			if st.getRun.val.ID.IsZero() {
+				st.getRun.val.ID = runID
+			}
+			if st.getRun.val.SpecID.IsZero() {
+				st.getRun.val.SpecID = domaintypes.NewSpecID()
+			}
+			if st.getRun.val.RepoID.IsZero() {
+				st.getRun.val.RepoID = domaintypes.NewRepoID()
+			}
+			if st.getRun.val.RepoSha0 == "" {
+				st.getRun.val.RepoSha0 = testRepoSHA0
+			}
+			if st.getRun.val.Attempt == 0 {
+				st.getRun.val.Attempt = 1
+			}
+			st.getSpec.val = store.Spec{ID: st.getRun.val.SpecID, Spec: []byte(`{"steps":[{"image":"a"}]}`)}
 			registry := gitlabtokens.NewRegistry()
 
 			var body *bytes.Reader

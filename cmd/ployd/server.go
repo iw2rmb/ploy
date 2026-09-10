@@ -25,7 +25,6 @@ import (
 	"github.com/iw2rmb/ploy/internal/server/speccatalog"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/store/ttlworker"
-	"github.com/iw2rmb/ploy/internal/store/wavescheduler"
 )
 
 // run executes the main server loop and blocks until the context is canceled.
@@ -80,22 +79,6 @@ func run(ctx context.Context, cfg config.Config, st store.Store, authorizer *aut
 	}
 	gitLabTokenRegistry := gitlabtokens.NewRegistry()
 
-	// Initialize wave scheduler for processing queued runs in waves.
-	// The scheduler is disabled when WaveSchedulerInterval is 0.
-	var waveSched *wavescheduler.Scheduler
-	if cfg.Scheduler.WaveSchedulerInterval > 0 {
-		runStarter := handlers.NewWaveRunStarter(st, bs)
-		waveSched, err = wavescheduler.New(wavescheduler.Options{
-			Store:      st,
-			RunStarter: runStarter,
-			Interval:   cfg.Scheduler.WaveSchedulerInterval,
-			Logger:     slog.Default(),
-		})
-		if err != nil {
-			return fmt.Errorf("create wave scheduler: %w", err)
-		}
-	}
-
 	// Initialize stale running-job recovery task.
 	// The task is disabled when StaleJobRecoveryInterval is explicitly set to 0.
 	var staleRecoveryTask *recovery.StaleJobRecoveryTask
@@ -117,9 +100,6 @@ func run(ctx context.Context, cfg config.Config, st store.Store, authorizer *aut
 	sched := scheduler.New()
 	if ttlWorker != nil {
 		sched.AddTask(ttlWorker)
-	}
-	if waveSched != nil {
-		sched.AddTask(waveSched)
 	}
 	if staleRecoveryTask != nil {
 		sched.AddTask(staleRecoveryTask)

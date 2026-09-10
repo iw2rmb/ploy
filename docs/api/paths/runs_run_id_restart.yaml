@@ -2,10 +2,11 @@ post:
   tags: [Control]
   summary: Restart a run
   description: |
-    Restarts a terminal run by incrementing its attempt and setting it back to
-    `Queued`. Active runs and runs whose owning wave is `Cancelled` return
-    `409 Conflict`. The optional request body can provide a request-only
-    ephemeral GitLab token for the restarted attempt.
+    Restarts a terminal run by atomically incrementing its attempt, clearing
+    prior run stats, creating the new job chain, and setting it to `Running`.
+    Active runs and runs whose owning wave is `Cancelled` return `409 Conflict`.
+    The optional request body can provide a request-only ephemeral GitLab token
+    for the restarted attempt.
   parameters:
     - in: path
       name: run_id

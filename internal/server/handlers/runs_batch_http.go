@@ -56,14 +56,28 @@ func restartRunHandler(st store.Store, gitAuth gitauth.Options, registry *gitlab
 		if err := decodeOptionalRequestJSON(w, r, &req, DefaultMaxBodySize); err != nil {
 			return
 		}
+		existingRun, ok := getRunOrFail(w, r, st, runID, "restart run")
+		if !ok {
+			return
+		}
 		var runStats []byte
-		gitLabTokenHash, gitLabToken, err := validateRestartGitLabTokenRequest(r, st, runID, req.GitLabToken, gitAuth)
+		gitLabTokenHash, gitLabToken, err := validateRestartGitLabTokenRequest(r, st, existingRun, req.GitLabToken, gitAuth)
 		if err != nil {
 			status := http.StatusBadRequest
 			if isNoRowsError(err) {
 				status = http.StatusNotFound
 			}
 			writeHTTPError(w, status, "%v", err)
+			return
+		}
+		spec, err := st.GetSpec(r.Context(), existingRun.SpecID)
+		if err != nil {
+			writeHTTPError(w, http.StatusInternalServerError, "failed to load run spec: %v", err)
+			return
+		}
+		plannedJobs, err := planJobsFromSpec(spec.Spec)
+		if err != nil {
+			writeHTTPError(w, http.StatusInternalServerError, "failed to plan restarted run jobs: %v", err)
 			return
 		}
 		if gitLabTokenHash != "" {
@@ -74,7 +88,12 @@ func restartRunHandler(st store.Store, gitAuth gitauth.Options, registry *gitlab
 			}
 			registry.Register(gitLabTokenHash, gitLabToken, []domaintypes.RunID{runID})
 		}
-		run, err := st.RestartRun(r.Context(), store.RestartRunParams{RunID: runID, Stats: runStats})
+		run, err := st.RestartRun(r.Context(), store.RestartRunParams{
+			RunID:           runID,
+			ExpectedAttempt: existingRun.Attempt,
+			Stats:           runStats,
+			Jobs:            plannedJobs,
+		})
 		if err != nil {
 			if gitLabTokenHash != "" {
 				registry.ReleaseRuns([]domaintypes.RunID{runID})
@@ -129,13 +148,9 @@ func decodeOptionalRequestJSON(w http.ResponseWriter, r *http.Request, v any, ma
 	return nil
 }
 
-func validateRestartGitLabTokenRequest(r *http.Request, st store.Store, runID domaintypes.RunID, token *string, gitAuth gitauth.Options) (string, string, error) {
+func validateRestartGitLabTokenRequest(r *http.Request, st store.Store, run store.Run, token *string, gitAuth gitauth.Options) (string, string, error) {
 	if token == nil {
 		return "", "", nil
-	}
-	run, err := st.GetRun(r.Context(), runID)
-	if err != nil {
-		return "", "", err
 	}
 	repo, err := st.GetRepo(r.Context(), run.RepoID)
 	if err != nil {

@@ -47,7 +47,9 @@ func TestMigRuns_Create(t *testing.T) {
 				assertCalled(t, "GetMig", st.getMig.called)
 				assertCalled(t, "ListMigReposByMig", st.listMigReposByMig.called)
 				assertCalled(t, "CreateWaveWithRuns", st.createWaveWithRuns.called)
-				assertNotCalled(t, "CreateJob", st.createJob.called)
+				if len(st.createJob.calls) != 6 {
+					t.Fatalf("CreateJob calls = %d, want 6", len(st.createJob.calls))
+				}
 				if len(st.createRunParams) != 2 {
 					t.Fatalf("CreateRun calls = %d, want 2", len(st.createRunParams))
 				}

@@ -16,7 +16,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-// createSingleRepoRunHandler submits a single-repo run and queues it for scheduler-driven execution.
+// createSingleRepoRunHandler submits a single-repo run with its complete job chain.
 // Endpoint: POST /v1/runs
 // Request: {repo_url, ref, commit_sha?, spec|spec_selector, spec_overrides?}
 // Response: 201 Created with {wave_id, run_id, mig_id, spec_id}
@@ -26,8 +26,7 @@ import (
 // - Creates a mig project as a side-effect; mig name == mig id.
 // - Creates an initial spec row and sets migs.spec_id.
 // - Creates a mig repo row for the provided repo_url.
-// - Creates a wave and one queued run row.
-// - Job materialization is deferred to the wave scheduler and gated on prep readiness.
+// - Atomically creates a wave, one running run row, and its job chain.
 //
 // This handler replaces the previous POST /v1/migs endpoint for run submission.
 func createSingleRepoRunHandler(st store.Store, eventsService *events.Service, gitAuth gitauth.Options, specServices runSubmitSpecServices, registries ...*gitlabtokens.Registry) http.HandlerFunc {
@@ -97,6 +96,11 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service, g
 			writeRunSubmissionSpecError(w, err)
 			return
 		}
+		plannedJobs, err := planJobsFromSpec(submissionSpec.canonical)
+		if err != nil {
+			writeHTTPError(w, http.StatusBadRequest, "invalid run job plan: %v", err)
+			return
+		}
 		specID, err := persistRunSubmissionSpec(r.Context(), st, submissionSpec, createdByPtr)
 		if err != nil {
 			serverError(w, "create single-repo run", "persist spec snapshot", err)
@@ -146,17 +150,20 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service, g
 				SpecID:    specID,
 				CreatedBy: createdByPtr,
 			},
-			Runs: []store.CreateRunParams{{
-				ID:              runID,
-				WaveID:          waveID,
-				MigID:           migID,
-				SpecID:          specID,
-				RepoID:          migRepo.RepoID,
-				RepoBaseRef:     migRepo.BaseRef,
-				SourceCommitSha: sourceCommitSHA,
-				RepoSha0:        sourceCommitSHA,
-				CreatedBy:       createdByPtr,
-				Stats:           runStats,
+			Runs: []store.CreateRunWithJobsParams{{
+				Run: store.CreateRunParams{
+					ID:              runID,
+					WaveID:          waveID,
+					MigID:           migID,
+					SpecID:          specID,
+					RepoID:          migRepo.RepoID,
+					RepoBaseRef:     migRepo.BaseRef,
+					SourceCommitSha: sourceCommitSHA,
+					RepoSha0:        sourceCommitSHA,
+					CreatedBy:       createdByPtr,
+					Stats:           runStats,
+				},
+				Jobs: plannedJobs,
 			}},
 		})
 		if err != nil {
@@ -175,7 +182,7 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service, g
 			SpecID: specID,
 		}
 
-		// Publish queued event to SSE hub for the run
+		// Publish the materialized run to the SSE hub.
 		if eventsService != nil {
 			// Build a minimal run summary for the event using migsapi.RunSummary
 			// (matching the event structure expected by eventsService.PublishRun)
@@ -196,7 +203,29 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service, g
 				},
 				CreatedAt: timeOrZero(run.CreatedAt),
 				UpdatedAt: time.Now().UTC(),
-				Stages:    make(map[domaintypes.JobID]migsapi.StageStatus),
+				Stages:    make(map[domaintypes.JobID]migsapi.StageStatus, len(plannedJobs)),
+			}
+			for i, job := range plannedJobs {
+				jobStatus := domaintypes.JobStatusCreated
+				if i == 0 {
+					jobStatus = domaintypes.JobStatusQueued
+				}
+				stageState, convErr := migsapi.StageStatusFromDomain(jobStatus)
+				if convErr != nil {
+					slog.Error("create single-repo run: invalid job status for publish payload", "run_id", run.ID, "job_id", job.ID, "status", jobStatus, "err", convErr)
+					continue
+				}
+				var nextID *domaintypes.JobID
+				if i+1 < len(plannedJobs) {
+					nextID = &plannedJobs[i+1].ID
+				}
+				summary.Stages[job.ID] = migsapi.StageStatus{
+					State:       stageState,
+					Attempts:    1,
+					MaxAttempts: 1,
+					Artifacts:   map[string]string{},
+					NextID:      nextID,
+				}
 			}
 			if err := eventsService.PublishRun(r.Context(), run.ID, summary); err != nil {
 				slog.Error("create single-repo run: publish run event failed", "run_id", run.ID, "err", err)

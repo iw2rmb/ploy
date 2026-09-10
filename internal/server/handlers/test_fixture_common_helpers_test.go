@@ -7,6 +7,8 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
+func ptr[T any](value T) *T { return &value }
+
 func buildCreateJobResult(result store.Job, params store.CreateJobParams) store.Job {
 	if result.ID.IsZero() {
 		result.ID = types.NewJobID()
@@ -60,7 +62,7 @@ func defaultRun(result store.Run, params store.CreateRunParams) store.Run {
 		result.RepoBaseRef = params.RepoBaseRef
 	}
 	if result.Status == "" {
-		result.Status = types.RunStatusQueued
+		result.Status = types.RunStatusRunning
 	}
 	if result.Attempt == 0 {
 		result.Attempt = 1

@@ -30,9 +30,6 @@ func TestLoadFromEnv_Defaults(t *testing.T) {
 	if cfg.Scheduler.StaleJobRecoveryInterval != 30*time.Second {
 		t.Fatalf("StaleJobRecoveryInterval = %v, want 30s", cfg.Scheduler.StaleJobRecoveryInterval)
 	}
-	if cfg.Scheduler.WaveSchedulerInterval != 5*time.Second {
-		t.Fatalf("WaveSchedulerInterval = %v, want 5s", cfg.Scheduler.WaveSchedulerInterval)
-	}
 	if cfg.Scheduler.NodeStaleAfter != time.Minute {
 		t.Fatalf("NodeStaleAfter = %v, want 1m", cfg.Scheduler.NodeStaleAfter)
 	}
@@ -48,7 +45,6 @@ func TestLoadFromEnv_Overrides(t *testing.T) {
 	t.Setenv("PLOYD_HTTP_READ_TIMEOUT", "21s")
 	t.Setenv("PLOYD_AUTH_BEARER_TOKENS_ENABLED", "false")
 	t.Setenv("PLOYD_LOG_LEVEL", "debug")
-	t.Setenv("PLOYD_SCHEDULER_WAVE_SCHEDULER_INTERVAL", "0s")
 	t.Setenv("PLOYD_SCHEDULER_STALE_JOB_RECOVERY_INTERVAL", "45s")
 	t.Setenv("PLOYD_SCHEDULER_NODE_STALE_AFTER", "2m")
 	t.Setenv("PLOYD_PKI_BUNDLE_DIR", "/var/lib/ploy/pki")
@@ -76,9 +72,6 @@ func TestLoadFromEnv_Overrides(t *testing.T) {
 	}
 	if cfg.Logging.Level != "debug" {
 		t.Fatalf("Logging.Level = %q, want debug", cfg.Logging.Level)
-	}
-	if cfg.Scheduler.WaveSchedulerInterval != 0 {
-		t.Fatalf("WaveSchedulerInterval = %v, want 0", cfg.Scheduler.WaveSchedulerInterval)
 	}
 	if cfg.Scheduler.StaleJobRecoveryInterval != 45*time.Second {
 		t.Fatalf("StaleJobRecoveryInterval = %v, want 45s", cfg.Scheduler.StaleJobRecoveryInterval)
@@ -248,7 +241,6 @@ func clearEnvForLoadFromEnv(t *testing.T) {
 		"PLOYD_SCHEDULER_TTL",
 		"PLOYD_SCHEDULER_TTL_INTERVAL",
 		"PLOYD_SCHEDULER_DROP_PARTITIONS",
-		"PLOYD_SCHEDULER_WAVE_SCHEDULER_INTERVAL",
 		"PLOYD_SCHEDULER_STALE_JOB_RECOVERY_INTERVAL",
 		"PLOYD_SCHEDULER_NODE_STALE_AFTER",
 		"PLOYD_LOG_LEVEL",

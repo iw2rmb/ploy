@@ -46,7 +46,7 @@ func createRunForStoreTest(
 		t.Fatalf("CreateRun(%s) failed: %v", repoURL, err)
 	}
 
-	if status != types.RunStatusQueued {
+	if status != types.RunStatusRunning {
 		if err := db.UpdateRunStatus(ctx, UpdateRunStatusParams{
 			ID:     run.ID,
 			Status: status,
@@ -60,6 +60,23 @@ func createRunForStoreTest(
 		t.Fatalf("GetRun(%s) failed: %v", repoURL, err)
 	}
 	return out
+}
+
+func plannedJobsForStoreTest(names ...string) []PlannedJob {
+	if len(names) == 0 {
+		names = []string{"head", "tail"}
+	}
+	jobs := make([]PlannedJob, len(names))
+	for i, name := range names {
+		jobs[i] = PlannedJob{
+			ID:       types.NewJobID(),
+			Name:     name,
+			JobType:  types.JobTypeMig,
+			JobImage: "test-image",
+			Meta:     []byte(`{}`),
+		}
+	}
+	return jobs
 }
 
 func createJobForStoreTest(

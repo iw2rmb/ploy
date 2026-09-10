@@ -49,7 +49,7 @@ func TestClaim_Claim_SuccessBuildsPayloadAndTransitionsRepo(t *testing.T) {
 		RepoBaseRef:     "main",
 		SourceCommitSha: sourceCommitSHA,
 		RepoSha0:        sourceCommitSHA,
-		Status:          domaintypes.RunStatusQueued,
+		Status:          domaintypes.RunStatusRunning,
 		Attempt:         1,
 		CreatedAt:       pgtype.Timestamptz{Time: now, Valid: true},
 	}
@@ -72,8 +72,8 @@ func TestClaim_Claim_SuccessBuildsPayloadAndTransitionsRepo(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Claim() error = %v", err)
 	}
-	if !st.updateRunStatus.called {
-		t.Fatal("expected UpdateRunStatus to be called")
+	if st.updateRunStatus.called {
+		t.Fatal("claim must not change the already materialized run status")
 	}
 	if st.unclaimJob.called {
 		t.Fatal("expected UnclaimJob to not be called on successful claim")
@@ -109,7 +109,7 @@ func TestClaim_Claim_RequeuesClaimedJobWhenPayloadBuildFails(t *testing.T) {
 		SpecID:      specID,
 		RepoID:      repoID,
 		RepoBaseRef: "main",
-		Status:      domaintypes.RunStatusQueued,
+		Status:      domaintypes.RunStatusRunning,
 		Attempt:     1,
 		CreatedAt:   pgtype.Timestamptz{Time: now, Valid: true},
 	}

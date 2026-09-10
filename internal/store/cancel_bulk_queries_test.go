@@ -276,8 +276,8 @@ func TestCancelBulkQueries_AreScopedToRunID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetRun(run B) failed: %v", err)
 	}
-	if runBRepoAfter.Status != types.RunStatusQueued {
-		t.Fatalf("run B repo status=%q, want %q", runBRepoAfter.Status, types.RunStatusQueued)
+	if runBRepoAfter.Status != types.RunStatusRunning {
+		t.Fatalf("run B repo status=%q, want %q", runBRepoAfter.Status, types.RunStatusRunning)
 	}
 
 	jobAAfter, err := db.GetJob(ctx, jobA.ID)

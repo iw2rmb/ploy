@@ -154,8 +154,8 @@ func TestCancelRun_IsScopedToRunID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetRun(run B) failed: %v", err)
 	}
-	if runBAfter.Status != types.RunStatusQueued {
-		t.Fatalf("run B status=%q, want %q", runBAfter.Status, types.RunStatusQueued)
+	if runBAfter.Status != types.RunStatusRunning {
+		t.Fatalf("run B status=%q, want %q", runBAfter.Status, types.RunStatusRunning)
 	}
 
 	jobAAfter, err := db.GetJob(ctx, jobA.ID)

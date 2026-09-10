@@ -100,9 +100,6 @@ func LoadFromEnv() (Config, error) {
 	if err := applyEnvDuration(&cfg.Scheduler.TTLInterval, "PLOYD_SCHEDULER_TTL_INTERVAL"); err != nil {
 		return Config{}, err
 	}
-	if err := applyEnvDuration(&cfg.Scheduler.WaveSchedulerInterval, "PLOYD_SCHEDULER_WAVE_SCHEDULER_INTERVAL"); err != nil {
-		return Config{}, err
-	}
 	if err := applyEnvDuration(&cfg.Scheduler.StaleJobRecoveryInterval, "PLOYD_SCHEDULER_STALE_JOB_RECOVERY_INTERVAL"); err != nil {
 		return Config{}, err
 	}

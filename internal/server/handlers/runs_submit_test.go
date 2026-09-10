@@ -59,7 +59,7 @@ func migWaveTokenStore(secondRepoURL string) *handlerStore {
 //   - Creates a mig project (mig name == mig id).
 //   - Creates a spec row and sets migs.spec_id.
 //   - Creates a mig repo row for the provided repo_url.
-//   - Creates a wave and one run row.
+//   - Creates a wave, one running run row, and its complete job chain.
 //   - Response includes wave_id, run_id, mig_id, spec_id.
 func TestRunsCreateSingleRepo_Success(t *testing.T) {
 	st := &handlerStore{}
@@ -83,8 +83,8 @@ func TestRunsCreateSingleRepo_Success(t *testing.T) {
 	if !st.createRun.called {
 		t.Error("store.CreateRun was not called")
 	}
-	if st.createJob.called {
-		t.Error("store.CreateJob should not be called during submission")
+	if len(st.createJob.calls) != 3 {
+		t.Errorf("store.CreateJob calls = %d, want 3", len(st.createJob.calls))
 	}
 
 	// Verify mig name == mig id (v1 contract).
@@ -122,8 +122,8 @@ func TestRunsCreateSingleRepo_Success(t *testing.T) {
 	}
 }
 
-// TestRunsCreateSingleRepo_DoesNotCreateJobsImmediately verifies submission defers job materialization.
-func TestRunsCreateSingleRepo_DoesNotCreateJobsImmediately(t *testing.T) {
+// TestRunsCreateSingleRepo_MaterializesJobsImmediately verifies submission includes its complete job chain.
+func TestRunsCreateSingleRepo_MaterializesJobsImmediately(t *testing.T) {
 	st := &handlerStore{}
 	eventsService, _ := createTestEventsService()
 	handler := createSingleRepoRunHandler(st, eventsService, gitauth.Options{}, runSubmitSpecServices{})
@@ -131,8 +131,8 @@ func TestRunsCreateSingleRepo_DoesNotCreateJobsImmediately(t *testing.T) {
 	rr := doRequest(t, handler, http.MethodPost, "/v1/runs", validRunRequestBody())
 	assertStatus(t, rr, http.StatusCreated)
 
-	if len(st.createJob.calls) != 0 {
-		t.Fatalf("expected no jobs to be created during submission, got %d", len(st.createJob.calls))
+	if len(st.createJob.calls) != 3 {
+		t.Fatalf("expected 3 jobs to be created during submission, got %d", len(st.createJob.calls))
 	}
 }
 
@@ -545,7 +545,7 @@ func TestRunsCreateSingleRepo_RejectsLegacySpecID(t *testing.T) {
 	}
 }
 
-// TestRunsCreateSingleRepo_MultiStepSpec verifies POST /v1/runs accepts multi-step spec without job creation.
+// TestRunsCreateSingleRepo_MultiStepSpec verifies POST /v1/runs materializes every spec step.
 func TestRunsCreateSingleRepo_MultiStepSpec(t *testing.T) {
 	st := &handlerStore{}
 	eventsService, _ := createTestEventsService()
@@ -564,8 +564,8 @@ func TestRunsCreateSingleRepo_MultiStepSpec(t *testing.T) {
 	}))
 	assertStatus(t, rr, http.StatusCreated)
 
-	if len(st.createJob.calls) != 0 {
-		t.Errorf("createJobCallCount = %d, want 0", len(st.createJob.calls))
+	if len(st.createJob.calls) != 4 {
+		t.Errorf("createJobCallCount = %d, want 4", len(st.createJob.calls))
 	}
 }
 

@@ -67,8 +67,8 @@ RunExecutionStatus:
   type: string
   description: |
     Execution status for a run.
-    - Queued: The run is queued and waiting to start execution.
-    - Running: Execution is in progress (claimed by a node).
+    - Queued: Reserved compatibility value; the server does not create queued runs.
+    - Running: The job chain is materialized and eligible for node execution.
     - Success: The run completed successfully.
     - Fail: The run failed.
     - Cancelled: The run was cancelled.
@@ -80,7 +80,7 @@ WaveDerivedStatus:
   type: string
   description: |
     Wave-level status derived from aggregated run states.
-    - pending: No runs have started (all queued or no runs).
+    - pending: No runs exist, or all reported runs use the reserved queued value.
     - running: At least one run is currently running.
     - completed: All runs are terminal with no failures.
     - failed: At least one run failed (and none running).
@@ -149,7 +149,7 @@ RunCounts:
     queued:
       type: integer
       format: int32
-      description: Runs waiting to start execution.
+      description: Runs reported with the reserved Queued compatibility value.
     running:
       type: integer
       format: int32

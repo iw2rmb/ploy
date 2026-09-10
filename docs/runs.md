@@ -106,7 +106,9 @@ Run inspection, artifacts, diffs, jobs, logs, cancellation, restart, and pull
 resolution are all addressed by `run_id`; `repo_id` is returned only as
 attribution metadata.
 
-`ploy run restart` increments the run attempt and clears previous run stats.
+`ploy run restart` locks the terminal run, increments the attempt, clears
+previous run stats, and creates the new job chain in one transaction. The
+returned run is `Running` and eligible for node execution.
 When a new ephemeral GitLab token is provided, the restarted attempt receives a
 new server-generated SHA-256 marker. Ephemeral GitLab tokens require a
 configured GitLab domain and are accepted only when every target repo uses

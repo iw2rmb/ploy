@@ -122,6 +122,7 @@ type Querier interface {
 	GetNode(ctx context.Context, id types.NodeID) (Node, error)
 	GetRepo(ctx context.Context, id types.RepoID) (Repo, error)
 	GetRun(ctx context.Context, id types.RunID) (Run, error)
+	GetRunForUpdate(ctx context.Context, id types.RunID) (Run, error)
 	GetRunSnapshotMetadata(ctx context.Context, id types.RunID) (GetRunSnapshotMetadataRow, error)
 	GetRunTiming(ctx context.Context, id types.RunID) (RunsTiming, error)
 	GetSpec(ctx context.Context, id types.SpecID) (Spec, error)
@@ -198,7 +199,6 @@ type Querier interface {
 	// ListNodeMetricsPartitions retrieves all partition names for the node_metrics table.
 	ListNodeMetricsPartitions(ctx context.Context) ([]string, error)
 	ListNodes(ctx context.Context) ([]Node, error)
-	ListQueuedRunsByWave(ctx context.Context, waveID types.WaveID) ([]Run, error)
 	ListRunSBOMRowsByJobType(ctx context.Context, arg ListRunSBOMRowsByJobTypeParams) ([]ListRunSBOMRowsByJobTypeRow, error)
 	ListRuns(ctx context.Context, arg ListRunsParams) ([]Run, error)
 	ListRunsByWave(ctx context.Context, waveID types.WaveID) ([]Run, error)
@@ -219,15 +219,11 @@ type Querier interface {
 	ListStaleRunningJobs(ctx context.Context, lastHeartbeat pgtype.Timestamptz) ([]ListStaleRunningJobsRow, error)
 	ListWaves(ctx context.Context, arg ListWavesParams) ([]Wave, error)
 	ListWavesByMig(ctx context.Context, arg ListWavesByMigParams) ([]Wave, error)
-	ListWavesWithQueuedRuns(ctx context.Context) ([]types.WaveID, error)
 	MarkBootstrapTokenCertIssued(ctx context.Context, tokenID string) error
 	// Atomically promote a specific linked successor job: Created -> Queued.
 	// The candidate is eligible only when every predecessor that points to it is Success.
 	PromoteJobByIDIfUnblocked(ctx context.Context, id types.JobID) (Job, error)
 	RevokeAPIToken(ctx context.Context, tokenID string) error
-	// Atomically promote the next unblocked job in a run attempt: Created -> Queued.
-	// A created job is unblocked when all predecessor jobs that point to it are Success.
-	ScheduleNextJob(ctx context.Context, arg ScheduleNextJobParams) (Job, error)
 	TrimNodeDaemonLogs(ctx context.Context, arg TrimNodeDaemonLogsParams) error
 	// Unarchives a mig by clearing archived_at.
 	UnarchiveMig(ctx context.Context, id types.MigID) error

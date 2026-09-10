@@ -44,7 +44,6 @@ func TestListQueriesDeterministicOrder(t *testing.T) {
 
 		// runs.sql - created_at needs id tie-breakers.
 		{"ListRunsByWave", listRunsByWave, "ORDER BY created_at ASC, id ASC"},
-		{"ListQueuedRunsByWave", listQueuedRunsByWave, "ORDER BY created_at ASC, id ASC"},
 		{"ListRunsWithURLByWave", listRunsWithURLByWave, "ORDER BY runs.created_at ASC, runs.id ASC"},
 		{"ListRunsForRepo", listRunsForRepo, "ORDER BY runs.created_at DESC, runs.id DESC"},
 		{"ListFailedRepoIDsByMig", listFailedRepoIDsByMig, "ORDER BY repo_id, created_at DESC, id DESC"},

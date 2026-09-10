@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -18,6 +17,12 @@ import (
 )
 
 const testRepoSHA0 = "0123456789abcdef0123456789abcdef01234567"
+
+type expectedPlannedJob struct {
+	name     string
+	jobType  domaintypes.JobType
+	jobImage string
+}
 
 func TestCreateSingleRepoRunHandler_SingleRepo(t *testing.T) {
 	t.Parallel()
@@ -53,199 +58,65 @@ func TestCreateSingleRepoRunHandler_SingleRepo(t *testing.T) {
 	if !st.createSpec.called || !st.createMig.called || !st.createMigRepo.called || !st.createRun.called {
 		t.Fatal("expected spec/mig/repo/run creation calls to be made")
 	}
-	if len(st.createJob.calls) != 0 {
-		t.Fatalf("expected no jobs on submission, got %d", len(st.createJob.calls))
+	if len(st.createJob.calls) != 3 {
+		t.Fatalf("expected the complete job chain on submission, got %d jobs", len(st.createJob.calls))
 	}
 }
 
-func TestCreateJobsFromSpec(t *testing.T) {
+func TestPlanJobsFromSpec(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name        string
-		runID       domaintypes.RunID
-		repoID      domaintypes.RepoID
-		repoBaseRef string
-		attempt     int32
-		repoSHA0    string
-		spec        []byte
-		expected    []expectedJob
-		wantErr     string
+		name     string
+		spec     []byte
+		expected []expectedPlannedJob
 	}{
 		{
-			name:        "SingleMig",
-			runID:       domaintypes.RunID("run_test_12345678901234567"),
-			repoID:      domaintypes.RepoID("repo_abc"),
-			repoBaseRef: "main",
-			attempt:     1,
-			repoSHA0:    testRepoSHA0,
-			spec:        []byte(`{"steps":[{"image":"mig1:v1"}]}`),
-			expected: []expectedJob{
-				{"pre-gate", domaintypes.JobTypePreGate, domaintypes.JobStatusQueued, "", testRepoSHA0},
-				{"mig-0", domaintypes.JobTypeMig, domaintypes.JobStatusCreated, "mig1:v1", ""},
-				{"post-gate", domaintypes.JobTypePostGate, domaintypes.JobStatusCreated, "", ""},
+			name: "SingleMig",
+			spec: []byte(`{"steps":[{"image":"mig1:v1"}]}`),
+			expected: []expectedPlannedJob{
+				{"pre-gate", domaintypes.JobTypePreGate, ""},
+				{"mig-0", domaintypes.JobTypeMig, "mig1:v1"},
+				{"post-gate", domaintypes.JobTypePostGate, ""},
 			},
 		},
 		{
-			name:        "MultiStep",
-			runID:       domaintypes.RunID("run_multistep_0123456789"),
-			repoID:      domaintypes.RepoID("repo_multi"),
-			repoBaseRef: "develop",
-			attempt:     2,
-			repoSHA0:    testRepoSHA0,
-			spec:        []byte(`{"steps":[{"image":"mig1:v1"},{"image":"mig2:v2"},{"image":"mig3:v3"}]}`),
-			expected: []expectedJob{
-				{"pre-gate", domaintypes.JobTypePreGate, domaintypes.JobStatusQueued, "", testRepoSHA0},
-				{"mig-0", domaintypes.JobTypeMig, domaintypes.JobStatusCreated, "mig1:v1", ""},
-				{"mig-1", domaintypes.JobTypeMig, domaintypes.JobStatusCreated, "mig2:v2", ""},
-				{"mig-2", domaintypes.JobTypeMig, domaintypes.JobStatusCreated, "mig3:v3", ""},
-				{"post-gate", domaintypes.JobTypePostGate, domaintypes.JobStatusCreated, "", ""},
+			name: "MultiStep",
+			spec: []byte(`{"steps":[{"image":"mig1:v1"},{"image":"mig2:v2"},{"image":"mig3:v3"}]}`),
+			expected: []expectedPlannedJob{
+				{"pre-gate", domaintypes.JobTypePreGate, ""},
+				{"mig-0", domaintypes.JobTypeMig, "mig1:v1"},
+				{"mig-1", domaintypes.JobTypeMig, "mig2:v2"},
+				{"mig-2", domaintypes.JobTypeMig, "mig3:v3"},
+				{"post-gate", domaintypes.JobTypePostGate, ""},
 			},
 		},
 		{
-			name:        "CustomAttemptAndRef",
-			runID:       domaintypes.RunID("run_v1_direct_addressing_12"),
-			repoID:      domaintypes.RepoID("repo_direct_addr"),
-			repoBaseRef: "feature/test",
-			attempt:     3,
-			repoSHA0:    testRepoSHA0,
-			spec:        []byte(`{"steps":[{"image":"a"}]}`),
-			expected: []expectedJob{
-				{"pre-gate", domaintypes.JobTypePreGate, domaintypes.JobStatusQueued, "", testRepoSHA0},
-				{"mig-0", domaintypes.JobTypeMig, domaintypes.JobStatusCreated, "a", ""},
-				{"post-gate", domaintypes.JobTypePostGate, domaintypes.JobStatusCreated, "", ""},
+			name: "BuildGateDisabled",
+			spec: []byte(`{"steps":[{"image":"a"},{"image":"b"}],"build_gate":{"disabled":true}}`),
+			expected: []expectedPlannedJob{
+				{"mig-0", domaintypes.JobTypeMig, "a"},
+				{"mig-1", domaintypes.JobTypeMig, "b"},
 			},
-		},
-		{
-			name:        "BuildGateDisabled",
-			runID:       domaintypes.RunID("run_gate_disabled_123"),
-			repoID:      domaintypes.RepoID("repo_gate_disabled"),
-			repoBaseRef: "main",
-			attempt:     1,
-			repoSHA0:    testRepoSHA0,
-			spec:        []byte(`{"steps":[{"image":"a"},{"image":"b"}],"build_gate":{"disabled":true}}`),
-			expected: []expectedJob{
-				{"mig-0", domaintypes.JobTypeMig, domaintypes.JobStatusQueued, "a", testRepoSHA0},
-				{"mig-1", domaintypes.JobTypeMig, domaintypes.JobStatusCreated, "b", ""},
-			},
-		},
-		{
-			name:        "InvalidRepoSHA0",
-			runID:       domaintypes.RunID("run_123"),
-			repoID:      domaintypes.RepoID("repo_456"),
-			repoBaseRef: "main",
-			attempt:     1,
-			repoSHA0:    "not-a-sha",
-			spec:        []byte(`{"steps":[{"image":"a"}]}`),
-			wantErr:     "repo_sha0 must match",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			st := &handlerStore{}
-			repoSHA0 := tt.repoSHA0
-			if repoSHA0 == "" {
-				repoSHA0 = testRepoSHA0
-			}
-
-			err := createJobsFromSpec(context.Background(), st, tt.runID, tt.repoID, tt.repoBaseRef, tt.attempt, repoSHA0, tt.spec)
-
-			if tt.wantErr != "" {
-				if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
-					t.Fatalf("expected error containing %q, got %v", tt.wantErr, err)
-				}
-				return
-			}
+			planned, err := planJobsFromSpec(tt.spec)
 			if err != nil {
-				t.Fatalf("createJobsFromSpec failed: %v", err)
+				t.Fatalf("planJobsFromSpec failed: %v", err)
 			}
-
-			assertJobChain(t, st.createJob.calls, tt.runID, tt.repoID, tt.repoBaseRef, tt.attempt, tt.expected)
-		})
-	}
-}
-
-func TestJobQueueingRules_FirstJobQueued(t *testing.T) {
-	t.Parallel()
-
-	testCases := []struct {
-		name         string
-		spec         []byte
-		expectedJobs int
-	}{
-		{"single_mod", []byte(`{"steps":[{"image":"a"}]}`), 3},
-		{"two_migs", []byte(`{"steps":[{"image":"a"},{"image":"b"}]}`), 4},
-		{"five_migs", []byte(`{"steps":[{"image":"a"},{"image":"b"},{"image":"c"},{"image":"d"},{"image":"e"}]}`), 7},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			st := &handlerStore{}
-
-			err := createJobsFromSpec(context.Background(), st, domaintypes.RunID("run_123"), domaintypes.RepoID("repo_456"), "main", 1, testRepoSHA0, tc.spec)
-			if err != nil {
-				t.Fatalf("createJobsFromSpec failed: %v", err)
+			if len(planned) != len(tt.expected) {
+				t.Fatalf("planned jobs=%d, want %d", len(planned), len(tt.expected))
 			}
-
-			if len(st.createJob.calls) != tc.expectedJobs {
-				t.Fatalf("expected %d jobs, got %d", tc.expectedJobs, len(st.createJob.calls))
-			}
-
-			byName := createJobsByName(st.createJob.calls)
-			if byName["pre-gate"].Status != domaintypes.JobStatusQueued {
-				t.Errorf("expected pre-gate to be Queued, got %s", byName["pre-gate"].Status)
-			}
-
-			for _, p := range st.createJob.calls {
-				if p.Name != "pre-gate" && p.Status != domaintypes.JobStatusCreated {
-					t.Errorf("job %q: expected status Created, got %s", p.Name, p.Status)
+			for i, want := range tt.expected {
+				got := planned[i]
+				if got.ID.IsZero() || got.Name != want.name || got.JobType != want.jobType || got.JobImage != want.jobImage {
+					t.Fatalf("planned job %d=%+v, want name=%q type=%q image=%q", i, got, want.name, want.jobType, want.jobImage)
 				}
 			}
 		})
-	}
-}
-
-func TestCreateJobsFromSpec_ChainIntegrity(t *testing.T) {
-	t.Parallel()
-
-	st := &handlerStore{}
-	spec := []byte(`{"steps":[{"image":"a"},{"image":"b"}]}`)
-
-	err := createJobsFromSpec(context.Background(), st, domaintypes.RunID("run_123"), domaintypes.RepoID("repo_456"), "main", 1, testRepoSHA0, spec)
-	if err != nil {
-		t.Fatalf("createJobsFromSpec failed: %v", err)
-	}
-
-	// Verify next_id chain ordering.
-	byName := createJobsByName(st.createJob.calls)
-	preGate := byName["pre-gate"]
-	mig0 := byName["mig-0"]
-	mig1 := byName["mig-1"]
-	postGate := byName["post-gate"]
-
-	if preGate.NextID == nil || *preGate.NextID != mig0.ID {
-		t.Fatalf("pre-gate next_id = %v, want %s", preGate.NextID, mig0.ID)
-	}
-	if mig0.NextID == nil || *mig0.NextID != mig1.ID {
-		t.Fatalf("mig-0 next_id = %v, want %s", mig0.NextID, mig1.ID)
-	}
-	if mig1.NextID == nil || *mig1.NextID != postGate.ID {
-		t.Fatalf("mig-1 next_id = %v, want %s", mig1.NextID, postGate.ID)
-	}
-	if postGate.NextID != nil {
-		t.Fatalf("post-gate next_id = %s, want nil", *postGate.NextID)
-	}
-
-	// Verify insert order satisfies immediate next_id FK constraint.
-	inserted := make(map[domaintypes.JobID]struct{}, len(st.createJob.calls))
-	for i, p := range st.createJob.calls {
-		if p.NextID != nil {
-			if _, ok := inserted[*p.NextID]; !ok {
-				t.Fatalf("insert %d (%s) references next_id %s before it was inserted", i, p.Name, *p.NextID)
-			}
-		}
-		inserted[p.ID] = struct{}{}
 	}
 }
 

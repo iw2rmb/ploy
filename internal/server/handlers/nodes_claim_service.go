@@ -11,7 +11,6 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/server/events"
 	"github.com/iw2rmb/ploy/internal/store"
-	"github.com/iw2rmb/ploy/internal/workflow/lifecycle"
 )
 
 // claimResult is the domain output from claim orchestration.
@@ -132,8 +131,6 @@ func (s *claimService) Claim(ctx context.Context, nodeID domaintypes.NodeID) (cl
 		return claimResult{}, claimInternal("failed to get run for claimed job", err)
 	}
 
-	claimDecision := lifecycle.EvaluateClaimDecision(domaintypes.JobType(job.JobType), run.Status)
-
 	repoURL, err := repoURLForID(ctx, s.store, job.RepoID)
 	if err != nil {
 		slog.Error("claim: get repo failed for job", "node_id", nodeID, "job_id", job.ID, "repo_id", job.RepoID, "err", err)
@@ -182,14 +179,6 @@ func (s *claimService) Claim(ctx context.Context, nodeID domaintypes.NodeID) (cl
 			slog.Error("claim: failed to unclaim job after payload build error", "job_id", job.ID, "run_id", run.ID, "node_id", nodeID, "err", unclaimErr)
 		}
 		return claimResult{}, claimInternal("failed to build claim response", err)
-	}
-	if claimDecision.AdvanceRunToRunning {
-		if err := s.store.UpdateRunStatus(ctx, store.UpdateRunStatusParams{
-			ID:     job.RunID,
-			Status: domaintypes.RunStatusRunning,
-		}); err != nil {
-			slog.Error("claim: failed to transition run to Running", "node_id", nodeID, "job_id", job.ID, "run_id", job.RunID, "repo_id", job.RepoID, "err", err)
-		}
 	}
 	slog.Info("job claimed",
 		"job_id", job.ID,

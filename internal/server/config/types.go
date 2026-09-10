@@ -57,9 +57,6 @@ type SchedulerConfig struct {
 	// DropPartitions enables dropping entire monthly partitions for expired data
 	// instead of row-by-row deletion. More efficient for large datasets.
 	DropPartitions bool
-	// WaveSchedulerInterval is how often the wave scheduler checks for queued runs.
-	// Set to 0 to disable the wave scheduler. Default: 5 seconds.
-	WaveSchedulerInterval time.Duration
 	// StaleJobRecoveryInterval is how often stale Running jobs are recovered.
 	// Set to 0 to disable stale-job recovery. Default: 30 seconds.
 	StaleJobRecoveryInterval time.Duration

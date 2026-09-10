@@ -53,10 +53,7 @@ func newClaimJobFixture(t testing.TB, opts claimJobFixtureOptions) *claimJobFixt
 		opts.jobName = "mig-0"
 	}
 	if opts.runStatus == "" {
-		opts.runStatus = domaintypes.RunStatusQueued
-	}
-	if opts.runStatus == "" {
-		opts.runStatus = domaintypes.RunStatusQueued
+		opts.runStatus = domaintypes.RunStatusRunning
 	}
 	if len(opts.specJSON) == 0 {
 		opts.specJSON = []byte(`{"steps":[{"image":"a"}]}`)

@@ -4,6 +4,13 @@ SELECT id, wave_id, mig_id, spec_id, repo_id, repo_base_ref, source_commit_sha, 
 FROM runs
 WHERE id = $1;
 
+-- name: GetRunForUpdate :one
+SELECT id, wave_id, mig_id, spec_id, repo_id, repo_base_ref, source_commit_sha, repo_sha0,
+       created_by, status, attempt, last_error, created_at, started_at, finished_at, stats
+FROM runs
+WHERE id = $1
+FOR UPDATE;
+
 -- name: ListRuns :many
 SELECT id, wave_id, mig_id, spec_id, repo_id, repo_base_ref, source_commit_sha, repo_sha0,
        created_by, status, attempt, last_error, created_at, started_at, finished_at, stats
@@ -88,9 +95,10 @@ INSERT INTO runs (
   repo_sha0,
   created_by,
   status,
+  started_at,
   stats
 )
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'Queued', COALESCE(sqlc.narg(stats), '{}'::jsonb))
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'Running', now(), COALESCE(sqlc.narg(stats), '{}'::jsonb))
 RETURNING id, wave_id, mig_id, spec_id, repo_id, repo_base_ref, source_commit_sha, repo_sha0,
           created_by, status, attempt, last_error, created_at, started_at, finished_at, stats;
 
@@ -109,9 +117,9 @@ WHERE id = $1;
 -- name: IncrementRunAttempt :exec
 UPDATE runs
 SET attempt = attempt + 1,
-    status = 'Queued',
+    status = 'Running',
     last_error = NULL,
-    started_at = NULL,
+    started_at = now(),
     finished_at = NULL,
     stats = COALESCE($2, '{}'::jsonb)
 WHERE id = $1;
@@ -137,22 +145,6 @@ WHERE wave_id = $1
 -- name: DeleteRun :exec
 DELETE FROM runs
 WHERE id = $1;
-
--- name: ListQueuedRunsByWave :many
-SELECT id, wave_id, mig_id, spec_id, repo_id, repo_base_ref, source_commit_sha, repo_sha0,
-       created_by, status, attempt, last_error, created_at, started_at, finished_at, stats
-FROM runs
-WHERE wave_id = $1
-  AND status = 'Queued'
-ORDER BY created_at ASC, id ASC;
-
--- name: ListWavesWithQueuedRuns :many
-SELECT DISTINCT wave_id
-FROM runs
-JOIN waves ON waves.id = runs.wave_id
-WHERE waves.status = 'Started'
-  AND runs.status = 'Queued'
-ORDER BY wave_id;
 
 -- name: ListFailedRepoIDsByMig :many
 SELECT repo_id FROM (
