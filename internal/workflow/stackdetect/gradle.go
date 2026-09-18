@@ -71,7 +71,7 @@ var (
 //  2. kotlinOptions.jvmTarget (best-effort; used only if source/target are absent)
 //  3. java.toolchain.languageVersion
 //  4. javaVersion assignment (e.g. dependencyManagerRootExtension.javaVersion)
-//  5. gradle/libs.versions.toml [versions].jvmTarget
+//  5. gradle/libs.versions.toml [versions].jvmTarget or [versions].jdk
 func detectGradle(ctx context.Context, workspace, gradlePath string) (*Observation, error) {
 	content, err := os.ReadFile(gradlePath)
 	if err != nil {
@@ -174,18 +174,9 @@ func detectGradle(ctx context.Context, workspace, gradlePath string) (*Observati
 		return observation, err
 	}
 
-	// 5. Version catalog JVM target.
-	versionCatalogTarget, versionCatalogEvidence, err := detectGradleVersionCatalogJvmTarget(workspace)
-	if err != nil {
-		return nil, err
-	}
-	if versionCatalogTarget != "" {
-		return &Observation{
-			Language: "java",
-			Tool:     "gradle",
-			Release:  &versionCatalogTarget,
-			Evidence: versionCatalogEvidence,
-		}, nil
+	// 5. Version catalog Java release.
+	if observation, err := detectGradleVersionCatalogJavaVersion(workspace); observation != nil || err != nil {
+		return observation, err
 	}
 
 	// No Java version found.
@@ -286,18 +277,19 @@ func resolveGradleVersionRef(
 type gradleVersionCatalog struct {
 	Versions struct {
 		JVMTarget string `toml:"jvmTarget"`
+		JDK       string `toml:"jdk"`
 	} `toml:"versions"`
 }
 
-func detectGradleVersionCatalogJvmTarget(workspace string) (string, []EvidenceItem, error) {
+func detectGradleVersionCatalogJavaVersion(workspace string) (*Observation, error) {
 	const rel = "gradle/libs.versions.toml"
 	path := filepath.Join(workspace, rel)
 	content, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return "", nil, nil
+			return nil, nil
 		}
-		return "", nil, &DetectionError{
+		return nil, &DetectionError{
 			Reason:  "unknown",
 			Message: "failed to read " + rel + ": " + err.Error(),
 		}
@@ -305,23 +297,21 @@ func detectGradleVersionCatalogJvmTarget(workspace string) (string, []EvidenceIt
 
 	var catalog gradleVersionCatalog
 	if err := toml.Unmarshal(content, &catalog); err != nil {
-		return "", nil, &DetectionError{
+		return nil, &DetectionError{
 			Reason:  "unknown",
 			Message: "failed to parse " + rel + ": " + err.Error(),
 		}
 	}
 
-	value := strings.TrimSpace(catalog.Versions.JVMTarget)
-	if value == "" {
-		return "", nil, nil
-	}
-
-	version := normalizeJavaVersion(value)
-	return version, []EvidenceItem{{
-		Path:  rel,
-		Key:   "versions.jvmTarget",
-		Value: version,
-	}}, nil
+	return resolveGradleVersionCandidates(
+		literalGradleVersionCandidate(
+			normalizeJavaVersion(catalog.Versions.JVMTarget), rel, "versions.jvmTarget",
+		),
+		literalGradleVersionCandidate(
+			normalizeJavaVersion(catalog.Versions.JDK), rel, "versions.jdk",
+		),
+		"version catalog jvmTarget and jdk differ",
+	)
 }
 
 // extractCompatibilityVersion extracts version from sourceCompatibility or targetCompatibility patterns.

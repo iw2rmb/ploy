@@ -421,6 +421,58 @@ jvmTarget = "17"
 			},
 		},
 		{
+			name:     "version catalog JDK",
+			fileName: "build.gradle.kts",
+			content: `
+plugins { id("convention.kotlin") }
+`,
+			extraFiles: map[string]string{
+				"gradle/libs.versions.toml": `
+[versions]
+jdk = "21"
+`,
+			},
+			wantRelease: "21",
+			wantEvidence: []EvidenceItem{
+				{Path: "gradle/libs.versions.toml", Key: "versions.jdk", Value: "21"},
+			},
+		},
+		{
+			name:     "matching version catalog Java keys",
+			fileName: "build.gradle.kts",
+			content:  `plugins { java }`,
+			extraFiles: map[string]string{
+				"gradle/libs.versions.toml": `
+[versions]
+jvmTarget = "21"
+jdk = "21"
+`,
+			},
+			wantRelease: "21",
+			wantEvidence: []EvidenceItem{
+				{Path: "gradle/libs.versions.toml", Key: "versions.jvmTarget", Value: "21"},
+				{Path: "gradle/libs.versions.toml", Key: "versions.jdk", Value: "21"},
+			},
+		},
+		{
+			name:     "conflicting version catalog Java keys",
+			fileName: "build.gradle.kts",
+			content:  `plugins { java }`,
+			extraFiles: map[string]string{
+				"gradle/libs.versions.toml": `
+[versions]
+jvmTarget = "17"
+jdk = "21"
+`,
+			},
+			wantError:    true,
+			wantErrorMsg: "version catalog jvmTarget and jdk differ",
+			wantEvidence: []EvidenceItem{
+				{Path: "gradle/libs.versions.toml", Key: "versions.jvmTarget", Value: "17"},
+				{Path: "gradle/libs.versions.toml", Key: "versions.jdk", Value: "21"},
+			},
+		},
+		{
 			name:     "malformed version catalog",
 			fileName: "build.gradle",
 			content: `
