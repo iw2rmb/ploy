@@ -25,10 +25,14 @@ Private-registry auth is read only from that file in `DOCKER_AUTH_CONFIG`
 format. The file is read for every Docker pull, so host refreshes take effect
 without recreating the node container.
 
+Every 5 minutes, the host obtains a fresh credential, validates it, and
+replaces the canonical auth file. Periodic refresh uses a dedicated auth lock,
+so node updates, cleanup, and active jobs do not block credential rotation.
+
 Job containers that mount `/var/run/docker.sock` also receive
 `/etc/ploy/docker-auth-config` read-only as `/root/.docker`. Docker clients
-inside those job containers, including Testcontainers, therefore use the same
-host-refreshed credentials as node-owned image pulls.
+inside those job containers therefore use the same host-refreshed credentials
+as node-owned image pulls.
 
 Do not inject `PLOY_DOCKER_AUTH_CONFIG` or `DOCKER_AUTH_CONFIG` into the node
 container for job image pulls. Inline env values are immutable for the lifetime
@@ -47,18 +51,19 @@ The deploy service bundle provides:
   auth file cannot pull the target node image, retries the pull once after
   refresh, drains the node, waits for active job containers, recreates the node
   service, and undrains.
+- `ploy-node-auth-refresh.timer` — forces a fresh, validated registry
+  credential every 5 minutes independently of other host maintenance.
 - `ploy-node-auth-refreshd.service` — serves a local Unix socket for explicit
-  auth-refresh requests after Docker reports unauthorized. It has no timer.
+  auth-refresh requests after Docker reports unauthorized.
 - `ploy-node-cleanup.timer` — prunes exited containers, unused images, and old
   Ploy cache directories.
 
 The tracked source for these host scripts lives in
 `/Users/v.v.kovalev/@gitlab/ploy/deploy/services` in this workspace. The auth
 refresh helper is invoked manually with
-`sudo /usr/local/lib/ploy/ploy-node-auth-refresh refresh-for-pull <image-ref>`
-or by `ploy-node-update.service` and `ploy-node-auth-refreshd.service` after an
-auth failure. Do not install or enable standalone `ploy-node-auth-refresh.timer`
-or `ploy-node-update.timer`.
+`sudo /usr/local/lib/ploy/ploy-node-auth-refresh refresh <image-ref>` or by the
+periodic timer. `ploy-node-update.service` and
+`ploy-node-auth-refreshd.service` also refresh after an auth failure.
 
 ## CLI and API
 

@@ -520,7 +520,7 @@ Required typed file input:
 
 | Path | Description |
 |------|-------------|
-| `/share/java.classpath` | Newline-delimited absolute classpath entries produced by SBOM/build-gate and mounted into ORW jobs. Workspace entries stay below `/workspace`. Gradle materializes external entries below `/run-share/java-classpath/<content-sha256>/<file-name>`. |
+| `/share/java.classpath` | Newline-delimited absolute classpath entries produced by SBOM/build-gate and mounted into ORW jobs. Workspace entries stay below `/workspace`. Gradle and Maven materialize external entries below `/run-share/java-classpath/<content-sha256>/`. Recognized cache coordinate suffixes remain intact; other entries use the source file name. |
 
 ORW wrapper behavior:
 - `orw-cli` always passes `--classpath-file /share/java.classpath` to the OpenRewrite runner.
@@ -627,9 +627,11 @@ Ploy injects `PLOY_STACK_LANGUAGE`, `PLOY_STACK_TOOL`, and
 `PLOY_STACK_RELEASE` when the corresponding stack values are available. Ploy
 does not derive or mount Gradle or Maven cache paths from these values.
 
-`java.classpath` keeps workspace entries below `/workspace`. Gradle materializes
-external entries below
-`/run-share/java-classpath/<content-sha256>/<file-name>`.
+`java.classpath` keeps workspace entries below `/workspace`. Gradle and Maven
+materialize external entries below `/run-share/java-classpath/<content-sha256>/`.
+They retain Gradle `modules-2/files-2.1/...` and Maven `repository/...` suffixes
+so downstream tools can recover dependency coordinates when JAR metadata is
+absent. Other external entries use the source file name.
 
 **ORW images (`orw-cli-java-17-maven`, `orw-cli-java-17-gradle`)**: Use the
 same job-private Maven or Gradle writable cache as other official images. ORW
