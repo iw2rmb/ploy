@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	cerrdefs "github.com/containerd/errdefs"
+	"github.com/moby/moby/api/types/jsonstream"
 	"github.com/moby/moby/client"
 )
 
@@ -195,6 +196,31 @@ func TestContainerRuntimeCreate(t *testing.T) {
 				t.Fatalf("image pull calls = %d, want %d", fake.pullCalls, tc.wantPulls)
 			}
 		})
+	}
+}
+
+func TestContainerRuntimeCreate_ImagePullStreamErrorStopsBeforeCreate(t *testing.T) {
+	t.Parallel()
+
+	fake := &fakeDockerClient{
+		createResult: client.ContainerCreateResult{ID: "stale-image-container"},
+		pullMessages: []jsonstream.Message{
+			{Status: "Pulling image"},
+			{Error: &jsonstream.Error{Message: "manifest unknown"}},
+		},
+	}
+	rt := newContainerRuntimeWithClient(fake, ContainerRuntimeOptions{
+		PullImage: true,
+	})
+
+	_, err := rt.Create(context.Background(), ContainerSpec{
+		Image: "registry.example/ploy/amata:latest",
+	})
+
+	requireErrContains(t, err, "pull image")
+	requireErrContains(t, err, "manifest unknown")
+	if fake.createCalled {
+		t.Fatal("container creation must not continue after a streamed pull error")
 	}
 }
 

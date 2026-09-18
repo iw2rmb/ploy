@@ -331,12 +331,13 @@ func (r *containerRuntime) pullImageOnce(ctx context.Context, imageRef string) e
 		return err
 	}
 	defer func() { _ = reader.Close() }()
-	// Drain the response to ensure the pull completes before returning.
-	if _, err := io.Copy(io.Discard, reader); err != nil {
-		return err
-	}
-	if err := reader.Wait(ctx); err != nil {
-		return err
+	for message, streamErr := range reader.JSONMessages(ctx) {
+		if streamErr != nil {
+			return streamErr
+		}
+		if message.Error != nil {
+			return message.Error
+		}
 	}
 	return nil
 }

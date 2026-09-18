@@ -77,6 +77,7 @@ type fakeDockerClient struct {
 	pullErrs       []error
 	pullWaitErr    error
 	pullWaitErrs   []error
+	pullMessages   []jsonstream.Message
 	pullCalled     bool
 	pullCalls      int
 	pullRef        string // captured image reference
@@ -179,7 +180,11 @@ func (f *fakeDockerClient) ImagePull(ctx context.Context, refStr string, options
 		waitErr = f.pullWaitErrs[idx]
 	}
 	// Return a type that satisfies client.ImagePullResponse (io.ReadCloser + extra methods).
-	return &fakeImagePullResponse{Reader: strings.NewReader(""), WaitErr: waitErr}, nil
+	return &fakeImagePullResponse{
+		Reader:   strings.NewReader(""),
+		Messages: f.pullMessages,
+		WaitErr:  waitErr,
+	}, nil
 }
 
 // ImageInspect simulates inspecting an image reference.
@@ -200,13 +205,23 @@ func (f *fakeDockerClient) ImageInspect(ctx context.Context, imageID string, ins
 // fakeImagePullResponse implements client.ImagePullResponse for testing.
 // It provides minimal implementations for io.ReadCloser, JSONMessages, and Wait.
 type fakeImagePullResponse struct {
-	Reader  io.Reader
-	WaitErr error
+	Reader   io.Reader
+	Messages []jsonstream.Message
+	WaitErr  error
 }
 
 func (f *fakeImagePullResponse) Read(p []byte) (n int, err error) { return f.Reader.Read(p) }
 func (f *fakeImagePullResponse) Close() error                     { return nil }
 func (f *fakeImagePullResponse) JSONMessages(ctx context.Context) iter.Seq2[jsonstream.Message, error] {
-	return func(yield func(jsonstream.Message, error) bool) {}
+	return func(yield func(jsonstream.Message, error) bool) {
+		for _, message := range f.Messages {
+			if !yield(message, nil) {
+				return
+			}
+		}
+		if f.WaitErr != nil {
+			yield(jsonstream.Message{}, f.WaitErr)
+		}
+	}
 }
 func (f *fakeImagePullResponse) Wait(ctx context.Context) error { return f.WaitErr }
