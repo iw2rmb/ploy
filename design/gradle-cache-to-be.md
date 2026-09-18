@@ -354,11 +354,16 @@ names into gate metadata.
 
 ### Run-local classpath handoff
 
-The Gradle gate script copies external classpath entries to:
+The Gradle gate script copies external classpath entries below:
 
 ```text
-/run-share/java-classpath/<content-sha256>/<file-name>
+/run-share/java-classpath/<content-sha256>/
 ```
+
+For Gradle cache entries, the script retains the
+`modules-2/files-2.1/<group>/<artifact>/<version>/<source-hash>/<file-name>`
+suffix. This suffix lets downstream tools recover dependency coordinates when
+JAR metadata is absent. Other external entries use `<file-name>`.
 
 The Gradle gate script writes the materialized paths to
 `/share/java.classpath`. Workspace paths remain below `/workspace`.
