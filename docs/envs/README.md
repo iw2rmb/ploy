@@ -520,11 +520,11 @@ Required typed file input:
 
 | Path | Description |
 |------|-------------|
-| `/share/java.classpath` | Newline-delimited absolute classpath entries produced by SBOM/build-gate and mounted into ORW jobs. Workspace entries stay below `/workspace`. Gradle and Maven materialize external entries below `/run-share/java-classpath/<content-sha256>/`. Recognized cache coordinate suffixes remain intact; other entries use the source file name. |
+| `/share/java.classpath` | Required newline-delimited absolute classpath entries produced by SBOM/build-gate and mounted into ORW jobs. The file can contain zero entries for metadata-only builds. Workspace entries stay below `/workspace`. Gradle and Maven materialize external entries below `/run-share/java-classpath/<content-sha256>/`. Recognized cache coordinate suffixes remain intact; other entries use the source file name. |
 
 ORW wrapper behavior:
 - `orw-cli` always passes `--classpath-file /share/java.classpath` to the OpenRewrite runner.
-- Missing/invalid `/share/java.classpath` is treated as deterministic `input` failure.
+- Missing/invalid `/share/java.classpath` is treated as deterministic `input` failure. An existing zero-entry file is valid.
 - `rewrite.yml` support:
   - Config resolution order is: `ORW_CONFIG_PATH` -> `/out/rewrite.yml`.
   - When a config file is found, ORW activates top-level `name:` by default.
