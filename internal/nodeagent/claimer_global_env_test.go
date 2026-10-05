@@ -409,6 +409,7 @@ func TestGlobalEnvPropagation_NoFiltering(t *testing.T) {
 		"PATH",
 		"PLOY_REPO_URL",
 		"PLOY_REPO_REF",
+		"PLOY_JOB_ID",
 	}
 
 	for _, key := range expectedKeys {

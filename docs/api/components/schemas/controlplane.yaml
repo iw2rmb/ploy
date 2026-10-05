@@ -1286,6 +1286,9 @@ RunJobItem:
     Job entry for a run within a run.
     Used by the --follow job graph display in CLI.
   properties:
+    report:
+      type: string
+      description: Latest posted text report, omitted when empty
     job_id:
       type: string
       description: Job identifier (KSUID string)

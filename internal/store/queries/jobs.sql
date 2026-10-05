@@ -406,6 +406,11 @@ UPDATE jobs
 SET job_image = $2
 WHERE id = $1;
 
+-- name: UpdateJobReport :execrows
+UPDATE jobs
+SET meta = jsonb_set(meta, '{report}', to_jsonb(sqlc.arg(report)::text), true)
+WHERE id = sqlc.arg(id);
+
 -- name: UpdateJobCompletionWithMeta :exec
 WITH completed AS (
   UPDATE jobs
@@ -421,7 +426,12 @@ WITH completed AS (
       END,
       finished_at = now(),
       duration_ms = COALESCE(EXTRACT(EPOCH FROM (now() - started_at)) * 1000, 0)::BIGINT,
-      meta = sqlc.arg(meta)
+      -- Reports have their own writer. Preserve the latest value under this
+      -- row lock, not a stale copy read before completion.
+      meta = (sqlc.arg(meta)::jsonb - 'report') ||
+        CASE WHEN jobs.meta ? 'report'
+          THEN jsonb_build_object('report', jobs.meta->'report')
+          ELSE '{}'::jsonb END
   WHERE jobs.id = sqlc.arg(id)
   RETURNING next_id, repo_sha_out
 )

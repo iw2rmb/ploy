@@ -125,6 +125,7 @@ func buildManifest(
 	injectStackTupleEnv(env, stackExp)
 	injectNodeOwnedRepoEnv(env, req)
 	injectNodeOwnedMigEnv(env, req)
+	env["PLOY_JOB_ID"] = req.JobID.String()
 
 	// Inject placeholder command only for default ubuntu image.
 	if len(command) == 0 && image == defaultImage {

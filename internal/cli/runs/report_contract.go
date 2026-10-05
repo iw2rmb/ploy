@@ -33,6 +33,7 @@ type RunEntry struct {
 
 // RunJobEntry is one row in the follow-style job graph.
 type RunJobEntry struct {
+	Report      string                `json:"report,omitempty"`
 	JobID       domaintypes.JobID     `json:"job_id"`
 	JobType     domaintypes.JobType   `json:"job_type"`
 	JobImage    string                `json:"job_image"`

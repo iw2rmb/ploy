@@ -238,6 +238,7 @@ type Querier interface {
 	UpdateJobMeta(ctx context.Context, arg UpdateJobMetaParams) error
 	UpdateJobNextID(ctx context.Context, arg UpdateJobNextIDParams) error
 	UpdateJobRepoSHAIn(ctx context.Context, arg UpdateJobRepoSHAInParams) error
+	UpdateJobReport(ctx context.Context, arg UpdateJobReportParams) (int64, error)
 	UpdateJobStatus(ctx context.Context, arg UpdateJobStatusParams) error
 	UpdateMigRepoBaseRef(ctx context.Context, arg UpdateMigRepoBaseRefParams) error
 	UpdateMigSpec(ctx context.Context, arg UpdateMigSpecParams) error

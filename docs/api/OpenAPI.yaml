@@ -123,6 +123,8 @@ paths:
   # Job-level status polling endpoint — workers use this to detect remote cancellation.
   /v1/jobs/{job_id}/status:
     $ref: "./paths/jobs_job_id_status.yaml"
+  /v1/jobs/{job_id}/report:
+    $ref: "./paths/jobs_job_id_report.yaml"
   # Job-level runtime image persistence — nodes persist the resolved container image name (jobs.job_image)
   /v1/jobs/{job_id}/image:
     $ref: "./paths/jobs_job_id_image.yaml"

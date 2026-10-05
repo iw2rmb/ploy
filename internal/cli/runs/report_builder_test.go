@@ -82,6 +82,7 @@ func TestGetRunStatusReportCommandAssemblesCanonicalReport(t *testing.T) {
 						"status":       "Success",
 						"duration_ms":  50,
 						"display_name": "scan",
+						"report":       "first\nsecond\n",
 					},
 					{
 						"job_id":       jobID2.String(),
@@ -160,6 +161,9 @@ func TestGetRunStatusReportCommandAssemblesCanonicalReport(t *testing.T) {
 	}
 
 	job0 := entry.Jobs[0]
+	if job0.Report != "first\nsecond\n" {
+		t.Fatalf("report not propagated: %q", job0.Report)
+	}
 	assertURL(t, job0.JobLogURL, "/api/v1/jobs/"+jobID1.String()+"/logs", nil)
 	assertURL(t, job0.PatchURL, "/api/v1/runs/"+runID.String()+"/diffs", map[string]string{
 		"download":    "true",

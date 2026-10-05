@@ -97,6 +97,11 @@ func shouldUploadRepoArtifactsAfterMigJob(req StartRunRequest, outcome migJobOut
 
 func (r *runController) executeMigContainerWithOutcome(ctx context.Context, req StartRunRequest, manifest contracts.StepManifest, startTime time.Time, mounts step.JobMounts) (migJobOutcome, error) {
 	var outcome migJobOutcome
+	cleanupReportAccess, err := r.configureJobReportAccess(&manifest, mounts.Staging)
+	if err != nil {
+		return outcome, err
+	}
+	defer cleanupReportAccess()
 
 	jobDirs := jobDirectories(req.RunID, req.JobID)
 

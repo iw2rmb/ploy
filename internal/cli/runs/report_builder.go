@@ -118,6 +118,7 @@ func (c GetRunStatusReportCommand) buildRunEntry(
 
 	for _, job := range jobsResult.Jobs {
 		out.Jobs = append(out.Jobs, RunJobEntry{
+			Report:      job.Report,
 			JobID:       job.JobID,
 			JobType:     job.JobType,
 			JobImage:    job.JobImage,

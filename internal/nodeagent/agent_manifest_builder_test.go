@@ -63,8 +63,8 @@ func TestBuildManifestFromRequest(t *testing.T) {
 			t.Errorf("expected commit %q, got %q", req.CommitSHA, repo.Commit.String())
 		}
 
-		if len(manifest.Envs) != 3 {
-			t.Errorf("expected 3 env vars, got %d", len(manifest.Envs))
+		if len(manifest.Envs) != 4 {
+			t.Errorf("expected 4 env vars, got %d", len(manifest.Envs))
 		}
 		if manifest.Envs["FOO"] != "bar" {
 			t.Errorf("expected env FOO=bar, got %q", manifest.Envs["FOO"])

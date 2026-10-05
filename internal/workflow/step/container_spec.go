@@ -13,13 +13,14 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
-type certMountOption struct {
+type credentialMountOption struct {
 	key      string
 	target   string
 	readOnly bool
 }
 
-var certMountOptions = []certMountOption{
+var credentialMountOptions = []credentialMountOption{
+	{key: "ploy_worker_auth_path", target: "/etc/ploy/worker-auth-header", readOnly: true},
 	{key: "ploy_ca_cert_path", target: "/etc/ploy/certs/ca.crt", readOnly: true},
 	{key: "ploy_client_cert_path", target: "/etc/ploy/certs/client.crt", readOnly: true},
 	{key: "ploy_client_key_path", target: "/etc/ploy/certs/client.key", readOnly: true},
@@ -120,8 +121,8 @@ func buildContainerSpec(runID types.RunID, jobID types.JobID, manifest contracts
 		}
 	}
 
-	// Optional: mount TLS certificates for control-plane API access from containers.
-	for _, opt := range certMountOptions {
+	// Optional: mount worker credentials for control-plane API access from containers.
+	for _, opt := range credentialMountOptions {
 		certPath, ok := manifest.OptionString(opt.key)
 		if !ok || certPath == "" {
 			continue

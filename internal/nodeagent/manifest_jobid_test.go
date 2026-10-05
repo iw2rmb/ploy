@@ -40,12 +40,16 @@ func TestManifestStepID(t *testing.T) {
 			req := newStartRunRequest(
 				withRunID("run-shared-123"), withJobID("job-unique-456"),
 			)
+			req.Env = map[string]string{"PLOY_JOB_ID": "spoofed"}
 			manifest, err := b.build(req)
 			if err != nil {
 				t.Fatalf("build error: %v", err)
 			}
 			if got, want := manifest.ID.String(), b.wantID(req); got != want {
 				t.Errorf("manifest.ID = %q, want %q", got, want)
+			}
+			if manifest.Envs["PLOY_JOB_ID"] != req.JobID.String() || manifest.Gate.Env["PLOY_JOB_ID"] != req.JobID.String() {
+				t.Fatal("job identity must override caller environment in mig and gate containers")
 			}
 		})
 

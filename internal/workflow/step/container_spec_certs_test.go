@@ -14,7 +14,8 @@ func TestBuildContainerSpec_CertMountOptions(t *testing.T) {
 	caPath := filepath.Join(tmpDir, "ca.crt")
 	clientCertPath := filepath.Join(tmpDir, "client.crt")
 	clientKeyPath := filepath.Join(tmpDir, "client.key")
-	for _, p := range []string{caPath, clientCertPath, clientKeyPath} {
+	workerAuthPath := filepath.Join(tmpDir, "worker-auth-header")
+	for _, p := range []string{caPath, clientCertPath, clientKeyPath, workerAuthPath} {
 		if err := os.WriteFile(p, []byte("cert"), 0o644); err != nil {
 			t.Fatalf("write %s: %v", p, err)
 		}
@@ -31,6 +32,7 @@ func TestBuildContainerSpec_CertMountOptions(t *testing.T) {
 			SnapshotCID: types.CID("bafy123"),
 		}},
 		Options: map[string]any{
+			"ploy_worker_auth_path": workerAuthPath,
 			"ploy_ca_cert_path":     caPath,
 			"ploy_client_cert_path": clientCertPath,
 			"ploy_client_key_path":  clientKeyPath,
@@ -42,13 +44,14 @@ func TestBuildContainerSpec_CertMountOptions(t *testing.T) {
 		t.Fatalf("buildContainerSpec error: %v", err)
 	}
 
-	if len(spec.Mounts) != 14 {
-		t.Fatalf("got %d mounts, want 14: %+v", len(spec.Mounts), spec.Mounts)
+	if len(spec.Mounts) != 15 {
+		t.Fatalf("got %d mounts, want 15: %+v", len(spec.Mounts), spec.Mounts)
 	}
 
 	requireMount(t, spec.Mounts, "/etc/ploy/certs/ca.crt", caPath, true)
 	requireMount(t, spec.Mounts, "/etc/ploy/certs/client.crt", clientCertPath, true)
 	requireMount(t, spec.Mounts, "/etc/ploy/certs/client.key", clientKeyPath, true)
+	requireMount(t, spec.Mounts, "/etc/ploy/worker-auth-header", workerAuthPath, true)
 }
 
 func TestBuildContainerSpec_CertMountOptionsSkipEmptyOrMissing(t *testing.T) {

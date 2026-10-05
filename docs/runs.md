@@ -101,6 +101,22 @@ Job-scoped API surfaces:
 
 - `GET /v1/jobs/{job_id}/status`
 - `GET /v1/jobs/{job_id}/logs`
+- `POST /v1/jobs/{job_id}/report`
+
+Jobs can POST raw UTF-8 text to the report endpoint using worker authentication
+and the `PLOY_NODE_UUID` header. Each POST replaces `jobs.meta.report`; an empty
+body clears it. Reports are limited to 1 MiB and survive job completion.
+`ploy run status` shows a `[R]EPORT` preview for running and completed jobs.
+In follow mode, press `r` to expand or collapse the full report. Status JSON
+contains the original report text. Terminal rendering removes control characters
+other than newlines and tabs.
+
+Every job receives its authoritative `PLOY_JOB_ID`. Migration containers also
+receive the node-owned server URL, node identity, and a read-only worker bearer
+header file at `PLOY_WORKER_AUTH_HEADER_FILE`. The node stages this private file
+outside uploaded artifacts and removes it after execution. Configured worker
+TLS files are also mounted read-only. These credentials use
+the existing worker trust boundary; they are not job-scoped credentials.
 
 Run inspection, artifacts, diffs, jobs, logs, cancellation, restart, and pull
 resolution are all addressed by `run_id`; `repo_id` is returned only as

@@ -54,6 +54,7 @@ type followModel struct {
 	jobIOPreviews   map[domaintypes.JobID]RunJobIOPreview
 	expandStdout    bool
 	expandStderr    bool
+	expandReport    bool
 	interactiveMode bool
 }
 
@@ -89,6 +90,8 @@ func (m followModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.expandStdout = !m.expandStdout
 		case "e":
 			m.expandStderr = !m.expandStderr
+		case "r":
+			m.expandReport = !m.expandReport
 		}
 		return m, nil
 	case followReportMsg:
@@ -127,6 +130,7 @@ func (m followModel) View() tea.View {
 	opts.JobIOPreviews = m.jobIOPreviews
 	opts.ExpandStdout = m.expandStdout
 	opts.ExpandStderr = m.expandStderr
+	opts.ExpandReport = m.expandReport
 	if m.finalState == "" {
 		opts.FilterRunningRepos = len(m.report.Repos) > 1
 		opts.EmptyReposLine = "No repos with in-progress jobs."

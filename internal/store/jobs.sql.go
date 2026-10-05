@@ -964,7 +964,12 @@ WITH completed AS (
       END,
       finished_at = now(),
       duration_ms = COALESCE(EXTRACT(EPOCH FROM (now() - started_at)) * 1000, 0)::BIGINT,
-      meta = $4
+      -- Reports have their own writer. Preserve the latest value under this
+      -- row lock, not a stale copy read before completion.
+      meta = ($4::jsonb - 'report') ||
+        CASE WHEN jobs.meta ? 'report'
+          THEN jsonb_build_object('report', jobs.meta->'report')
+          ELSE '{}'::jsonb END
   WHERE jobs.id = $5
   RETURNING next_id, repo_sha_out
 )
@@ -1068,6 +1073,25 @@ type UpdateJobRepoSHAInParams struct {
 func (q *Queries) UpdateJobRepoSHAIn(ctx context.Context, arg UpdateJobRepoSHAInParams) error {
 	_, err := q.db.Exec(ctx, updateJobRepoSHAIn, arg.ID, arg.RepoShaIn)
 	return err
+}
+
+const updateJobReport = `-- name: UpdateJobReport :execrows
+UPDATE jobs
+SET meta = jsonb_set(meta, '{report}', to_jsonb($1::text), true)
+WHERE id = $2
+`
+
+type UpdateJobReportParams struct {
+	Report string      `json:"report"`
+	ID     types.JobID `json:"id"`
+}
+
+func (q *Queries) UpdateJobReport(ctx context.Context, arg UpdateJobReportParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateJobReport, arg.Report, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const updateJobStatus = `-- name: UpdateJobStatus :exec

@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"charm.land/lipgloss/v2"
@@ -24,6 +25,7 @@ type TextRenderOptions struct {
 	JobIOPreviews      map[domaintypes.JobID]RunJobIOPreview
 	ExpandStdout       bool
 	ExpandStderr       bool
+	ExpandReport       bool
 	FilterRunningRepos bool
 	EmptyReposLine     string
 	SpecDisplayName    string
@@ -153,7 +155,7 @@ func RenderRunStatusReportTextLayout(report RunStatusReport, opts TextRenderOpti
 					valueOrDash(strings.TrimSpace(job.JobImage)),
 				},
 				ExitOneLiner: renderExitOneLiner(job, repo.LastError, jobIdx == repoErrorOwnerIdx),
-				DetailLines:  renderJobIOPreviewLines(job, opts),
+				DetailLines:  append(renderJobIOPreviewLines(job, opts), renderJobReportLines(job.Report, opts.ExpandReport)...),
 			})
 		}
 		frame.Repos = append(frame.Repos, repoFrame)
@@ -391,6 +393,38 @@ func renderJobIOPreviewLines(job RunJobEntry, opts TextRenderOptions) []string {
 	expandStdout := opts.ExpandStdout
 	expandStderr := opts.ExpandStderr
 	return renderStreamPreviewLines(preview, expandStdout, expandStderr)
+}
+
+func renderJobReportLines(report string, expanded bool) []string {
+	if report == "" {
+		return nil
+	}
+	// Reports are untrusted text, not terminal escape sequences or markup.
+	safe := strings.Map(func(r rune) rune {
+		if r == '\n' || r == '\t' {
+			return r
+		}
+		if unicode.IsControl(r) || unicode.Is(unicode.Cf, r) {
+			return -1
+		}
+		return r
+	}, report)
+	label := "    " + renderStreamPreviewLabel("[R]EPORT")
+	if !expanded {
+		first := strings.SplitN(strings.TrimSpace(safe), "\n", 2)[0]
+		return []string{label + " " + truncateRunesWithEllipsis(first, 80)}
+	}
+	lines := []string{label}
+	for _, line := range strings.Split(safe, "\n") {
+		if line == "" {
+			lines = append(lines, "      ")
+			continue
+		}
+		for _, row := range wrapRunesFixed(line, 80) {
+			lines = append(lines, "      "+row)
+		}
+	}
+	return lines
 }
 
 func filterRunningRepos(repos []RunEntry) []RunEntry {
