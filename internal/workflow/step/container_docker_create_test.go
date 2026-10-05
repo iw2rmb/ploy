@@ -412,6 +412,11 @@ func TestContainerRuntimeCreate_DockerSocketMountGetsRegistryAuthConfig(t *testi
 			rt := newContainerRuntimeWithClient(fake, ContainerRuntimeOptions{
 				RegistryAuthConfigFile: tc.registryAuthConfigFile,
 			})
+			rt.startDockerProxy = func(context.Context, []ContainerMount, string, string) (*dockerSocketProxy, error) {
+				return &dockerSocketProxy{socketPath: "/job/docker.sock", close: func() {}}, nil
+			}
+			tc.mounts = append(append([]ContainerMount(nil), tc.mounts...), ContainerMount{Source: t.TempDir(), Target: "/tmp"})
+			t.Cleanup(func() { _ = rt.Close() })
 
 			_, err := rt.Create(context.Background(), ContainerSpec{
 				Image:  "alpine:latest",

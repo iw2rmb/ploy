@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"runtime/debug"
 	"strings"
+	"sync"
 	"time"
 
 	cerrdefs "github.com/containerd/errdefs"
@@ -44,10 +45,12 @@ type dockerStatsAPI interface {
 
 // containerRuntime executes containers using the local Docker daemon.
 type containerRuntime struct {
-	client dockerClientAPI
-	images dockerImageAPI
-	stats  dockerStatsAPI
-	opts   ContainerRuntimeOptions
+	client           dockerClientAPI
+	images           dockerImageAPI
+	stats            dockerStatsAPI
+	opts             ContainerRuntimeOptions
+	dockerProxies    sync.Map
+	startDockerProxy func(context.Context, []ContainerMount, string, string) (*dockerSocketProxy, error)
 }
 
 // NewContainerRuntime constructs a Docker-backed container runtime.
@@ -105,9 +108,19 @@ func (r *containerRuntime) Create(ctx context.Context, spec ContainerSpec) (hand
 		Env:        flattenEnv(spec.Env),
 		Labels:     spec.Labels,
 	}
+	mounts, proxy, err := r.prepareDockerSocket(ctx, spec)
+	if err != nil {
+		return "", fmt.Errorf("step: prepare job Docker socket: %w", err)
+	}
+	proxyOwned := false
+	defer func() {
+		if proxy != nil && !proxyOwned {
+			proxy.Close()
+		}
+	}()
 	hostCfg := &container.HostConfig{
 		AutoRemove: false,
-		Mounts:     convertMounts(r.withDockerAuthMount(spec.Mounts)),
+		Mounts:     convertMounts(mounts),
 	}
 	if spec.LimitNanoCPUs > 0 || spec.LimitMemoryBytes > 0 {
 		hostCfg.NanoCPUs = spec.LimitNanoCPUs
@@ -128,6 +141,10 @@ func (r *containerRuntime) Create(ctx context.Context, spec ContainerSpec) (hand
 	})
 	if err != nil {
 		return "", fmt.Errorf("step: create container: %w", err)
+	}
+	if proxy != nil {
+		r.dockerProxies.Store(ContainerHandle(created.ID), proxy)
+		proxyOwned = true
 	}
 	return ContainerHandle(created.ID), nil
 }
@@ -163,6 +180,9 @@ func (r *containerRuntime) Start(ctx context.Context, handle ContainerHandle) er
 		return errors.New("step: docker runtime not configured")
 	}
 	_, err := r.client.ContainerStart(ctx, string(handle), client.ContainerStartOptions{})
+	if err != nil {
+		r.closeDockerProxy(handle)
+	}
 	return err
 }
 
@@ -170,6 +190,7 @@ func (r *containerRuntime) Start(ctx context.Context, handle ContainerHandle) er
 // then inspects the container to extract start/finish timestamps. On context
 // cancellation the container is force-removed so callers don't leak resources.
 func (r *containerRuntime) Wait(ctx context.Context, handle ContainerHandle) (ContainerResult, error) {
+	defer r.closeDockerProxy(handle)
 	if r == nil || r.client == nil {
 		return ContainerResult{}, errors.New("step: docker runtime not configured")
 	}
@@ -285,6 +306,7 @@ func (r *containerRuntime) StreamLogs(ctx context.Context, handle ContainerHandl
 // Remove deletes the container with Force=true. Removing an already-removed
 // container may return a 404 error; the operation is idempotent in effect.
 func (r *containerRuntime) Remove(ctx context.Context, handle ContainerHandle) error {
+	defer r.closeDockerProxy(handle)
 	if r == nil || r.client == nil {
 		return errors.New("step: docker runtime not configured")
 	}

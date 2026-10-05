@@ -27,6 +27,8 @@ type ContainerRuntimeOptions struct {
 }
 
 // ContainerRuntime executes containers.
+// Docker-socket specs require job-owned /tmp storage. Their socket proxy uses
+// the spec's mount projection and lasts for one Create/Start/Wait execution.
 type ContainerRuntime interface {
 	Create(ctx context.Context, spec ContainerSpec) (ContainerHandle, error)
 	Start(ctx context.Context, handle ContainerHandle) error

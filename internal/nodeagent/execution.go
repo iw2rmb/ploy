@@ -10,6 +10,7 @@ package nodeagent
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"runtime/debug"
@@ -240,6 +241,11 @@ func (r *runController) initExecutionContext(ctx context.Context, runID types.Ru
 	}
 
 	cleanup := func() {
+		if closer, ok := runner.Containers.(io.Closer); ok {
+			if err := closer.Close(); err != nil {
+				slog.Warn("failed to close container runtime", "run_id", runID, "job_id", jobID, "error", err)
+			}
+		}
 		if err := logStreamer.Close(); err != nil {
 			slog.Warn("failed to close log streamer", "run_id", runID, "job_id", jobID, "error", err)
 		}

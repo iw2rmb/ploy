@@ -79,7 +79,7 @@ spec supports:
   - `tmp` — Per-job writable temporary files (`src:/tmp/dst` or `src:dst`; CLI compiles to `shortHash:/tmp/dst`)
   - `steps[]` — Multi-step spec steps (each with its own `image`/`command`/`envs`/`options`/`in`/`out`/`home`/`tmp`)
   - `steps[].ref` — CLI-only step reference (`path/to/mig.yaml:step-name`). A ref wrapper may include `image` and `envs`; `image` replaces the imported step image, and `envs` are merged into the imported step with wrapper values winning before submission.
-  - `steps[].options.mount_docker_socket` — Optional boolean. When true, the node mounts the host Docker socket at `/var/run/docker.sock` if that socket exists.
+  - `steps[].options.mount_docker_socket` — Optional boolean. When true and the host socket exists, the node exposes Docker through a per-job socket proxy at `/var/run/docker.sock`. See [Worker Nodes](#worker-nodes) for bind-mount behavior.
   - `build_gate.pre.stack` / `build_gate.post.stack` — Stack-detection policy for gate phases
   - `build_gate.images` — Build Gate image overrides selected by stack rules
   - See [mig.example.yaml](../schemas/mig.example.yaml) for the full schema.
@@ -204,6 +204,14 @@ setting on typical deployments where Docker runs on the default Unix socket.
 | `DOCKER_API_VERSION` | (auto-negotiated)                | Override API version; normally unnecessary with v29+         |
 
 Runtime behavior: the node's Docker client is created from standard Docker env vars with API version negotiation enabled.
+
+Jobs with a Unix Docker socket use a proxy that translates bind-mount sources
+from job paths, such as `/workspace/docker/init.sql`, to their actual host paths.
+The proxy uses the job's mount table, so concurrent jobs use their own storage.
+Sources under job mounts must exist; missing sources fail before container
+creation. Named volumes and host paths outside job mounts retain their existing
+behavior. Helper containers that mount the Docker socket receive the host
+socket, so cleanup can continue after the job exits.
 
 - `PLOY_DOCKER_AUTH_CONFIG_FILE` — Optional path to a Docker auth config JSON
   file. Production nodes use `/etc/ploy/docker-auth-config/config.json`. When
