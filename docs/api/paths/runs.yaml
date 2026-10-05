@@ -5,6 +5,10 @@ post:
     Submit a single-repo run. The request atomically materializes the wave, the
     running run, and its complete job chain before it returns.
 
+    If the repository has a Queued or Running run, reject the submission with
+    409 Conflict. Branch and mig project do not affect this check. The error
+    message includes the repository URL and current Run ID.
+
     Side-effects:
     - Creates a mig project (mig name == mig id).
     - Compiles a named `spec_selector` on the server or accepts a canonical
@@ -38,7 +42,7 @@ post:
           schema:
             $ref: "../components/schemas/common.yaml#/Error"
     "409":
-      description: Named spec selector matched more than one repository source.
+      description: Repository has an active run (error includes current Run ID), or named spec selector matched more than one repository source.
       content:
         application/json:
           schema:

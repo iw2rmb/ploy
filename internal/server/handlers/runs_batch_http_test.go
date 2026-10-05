@@ -239,6 +239,9 @@ func TestRestartRunHandler(t *testing.T) {
 			restartRunHandler(st, gitauth.Options{GitLabDomain: "gitlab.example.com"}, registry).ServeHTTP(rr, req)
 
 			assertStatus(t, rr, tt.wantStatus)
+			if errors.Is(st.restartRun.err, store.ErrRunRestartActive) {
+				assertBodyContains(t, rr, "current Run ID: "+runID.String())
+			}
 			_, gotToken := registry.Token(tokenHash)
 			if gotToken != tt.wantToken {
 				t.Fatalf("registry token present = %v, want %v", gotToken, tt.wantToken)

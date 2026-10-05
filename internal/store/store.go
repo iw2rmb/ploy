@@ -269,6 +269,14 @@ func (s *PgStore) CreateWaveWithRuns(ctx context.Context, arg CreateWaveWithRuns
 
 	qtx := s.Queries.WithTx(tx)
 
+	repoIDs := make([]types.RepoID, len(arg.Runs))
+	for i, run := range arg.Runs {
+		repoIDs[i] = run.RepoID
+	}
+	if err := lockRunRepositories(ctx, qtx, repoIDs); err != nil {
+		return Wave{}, nil, fmt.Errorf("create wave with runs: lock repositories: %w", err)
+	}
+
 	wave, err := qtx.CreateWave(ctx, arg.Wave)
 	if err != nil {
 		return Wave{}, nil, fmt.Errorf("create wave with runs: create wave: %w", err)
@@ -276,6 +284,9 @@ func (s *PgStore) CreateWaveWithRuns(ctx context.Context, arg CreateWaveWithRuns
 
 	materialized := make([]RunMaterialization, 0, len(arg.Runs))
 	for _, runPlan := range arg.Runs {
+		if err := requireRepoWithoutActiveRun(ctx, qtx, runPlan.RepoID); err != nil {
+			return Wave{}, nil, err
+		}
 		run, err := insertRun(ctx, qtx, arg.Wave, runPlan)
 		if err != nil {
 			return Wave{}, nil, fmt.Errorf("create wave with runs: create run %s: %w", runPlan.ID, err)
@@ -414,6 +425,13 @@ func (s *PgStore) RestartRun(ctx context.Context, arg RestartRunParams) (Run, er
 	}
 	if wave.Status == types.WaveStatusCancelled {
 		return Run{}, ErrRunRestartWaveCancelled
+	}
+
+	if err := lockRunRepositories(ctx, qtx, []types.RepoID{run.RepoID}); err != nil {
+		return Run{}, fmt.Errorf("restart run: lock repository: %w", err)
+	}
+	if err := requireRepoWithoutActiveRun(ctx, qtx, run.RepoID); err != nil {
+		return Run{}, err
 	}
 
 	if _, err := qtx.CancelActiveJobsByRunAttempt(ctx, CancelActiveJobsByRunAttemptParams{

@@ -7,11 +7,46 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/testutil/clienv"
 )
+
+func TestRunCommand_RepoConflictReportsCurrentRunID(t *testing.T) {
+	specPath := filepath.Join(t.TempDir(), "spec.yaml")
+	if err := os.WriteFile(specPath, []byte("steps:\n  - image: alpine\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runID := domaintypes.NewRunID()
+	message := "repository https://gitlab.example.com/team/repo already has an active migration; current Run ID: " + runID.String()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v1/repos/resolve":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"repo_url": "https://gitlab.example.com/team/repo.git", "ref": "feature/other", "ref_is_sha": false,
+			})
+		case "/v1/runs":
+			http.Error(w, message, http.StatusConflict)
+		default:
+			t.Errorf("unexpected request after conflict: %s", r.URL.Path)
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	clienv.UseControlPlaneEnv(t, server.URL)
+
+	var stdout, stderr bytes.Buffer
+	err := executeRunCommand([]string{specPath, "team/repo:feature/other"}, &stdout, &stderr)
+	// Submission fails and displays the existing Run ID instead of creating a run.
+	if err == nil || !strings.Contains(err.Error(), message) {
+		t.Fatalf("CLI error=%v, want %q", err, message)
+	}
+	if strings.Contains(stdout.String(), "run_id:") {
+		t.Fatalf("conflict printed successful submission: %q", stdout.String())
+	}
+}
 
 func executeRunCommand(args []string, stdout, stderr *bytes.Buffer) error {
 	cmd := NewCommand()

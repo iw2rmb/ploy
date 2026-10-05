@@ -169,6 +169,9 @@ func createMigRunHandler(st store.Store, gitAuth gitauth.Options, registries ...
 			if gitLabTokenHash != "" {
 				tokenRegistry.ReleaseRuns(runIDs)
 			}
+			if writeActiveRepoRunConflict(w, err) {
+				return
+			}
 			serverError(w, "create mig wave", "create wave with runs", err, "mig_id", migID.String(), "wave_id", waveID)
 			return
 		}

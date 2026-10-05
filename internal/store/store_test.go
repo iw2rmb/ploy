@@ -265,6 +265,9 @@ func TestCreateWaveWithRuns_CreatesWaveAndRunsAtomically(t *testing.T) {
 	ctx, db := newTestStore(t)
 
 	fx := newV1Fixture(t, ctx, db, "https://github.com/org/repo-atomic-a", "main", []byte(`{"type":"test"}`))
+	if err := db.CancelRun(ctx, fx.Run.ID); err != nil {
+		t.Fatalf("CancelRun(fixture): %v", err)
+	}
 	repoB, err := db.CreateMigRepo(ctx, CreateMigRepoParams{
 		ID:      types.NewMigRepoID(),
 		MigID:   fx.Mig.ID,
@@ -344,6 +347,11 @@ func TestCreateWaveWithRuns_CreatesWaveAndRunsAtomically(t *testing.T) {
 	}
 
 	rollbackWaveID := types.NewWaveID()
+	for _, result := range materialized {
+		if err := db.CancelRun(ctx, result.Run.ID); err != nil {
+			t.Fatalf("CancelRun(%s): %v", result.Run.ID, err)
+		}
+	}
 	materializedBeforeFailureRunID := types.NewRunID()
 	rollbackRunID := types.NewRunID()
 	_, _, err = db.CreateWaveWithRuns(ctx, CreateWaveWithRunsParams{
@@ -364,7 +372,7 @@ func TestCreateWaveWithRuns_CreatesWaveAndRunsAtomically(t *testing.T) {
 			},
 			{
 				ID:              rollbackRunID,
-				RepoID:          fx.MigRepo.RepoID,
+				RepoID:          repoB.RepoID,
 				RepoBaseRef:     "main",
 				SourceCommitSha: testSHA,
 				RepoSha0:        testSHA,
@@ -391,6 +399,9 @@ func TestCreateWaveWithRuns_AssignsDistinctJobIDsPerRun(t *testing.T) {
 	ctx, db := newTestStore(t)
 
 	fx := newV1Fixture(t, ctx, db, "https://github.com/org/repo-job-rollback-a", "main", []byte(`{"type":"test"}`))
+	if err := db.CancelRun(ctx, fx.Run.ID); err != nil {
+		t.Fatalf("CancelRun(fixture): %v", err)
+	}
 	repoB, err := db.CreateMigRepo(ctx, CreateMigRepoParams{
 		ID:      types.NewMigRepoID(),
 		MigID:   fx.Mig.ID,

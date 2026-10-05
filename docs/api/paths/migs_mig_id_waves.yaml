@@ -3,8 +3,12 @@ post:
   summary: Create a launch wave for a mig
   description: |
     Create a launch wave from the mig's current spec over a selected set of repos.
-    Each selected repo becomes one run in the wave and jobs are materialized by the
-    scheduler after repo prep is ready.
+    Each selected repo becomes one run in the wave. The wave, runs, and complete
+    job chains are materialized in one transaction.
+
+    If any selected repository has a Queued or Running run, reject the whole
+    wave with 409 Conflict. Branch and mig project do not affect this check.
+    The error message includes the repository URL and current Run ID.
 
     Repo selection modes:
     - all: all repos in the mig repo set
@@ -36,7 +40,7 @@ post:
           schema:
             $ref: "../components/schemas/common.yaml#/Error"
     "409":
-      description: Mig is archived.
+      description: Mig is archived, or a selected repository has an active run (error includes current Run ID).
       content:
         application/json:
           schema:

@@ -17,6 +17,7 @@ func TestCreateMigRunCommand_Run(t *testing.T) {
 	t.Parallel()
 
 	migID := domaintypes.NewMigID().String()
+	currentRunID := domaintypes.NewRunID().String()
 
 	tests := []struct {
 		name        string
@@ -27,6 +28,13 @@ func TestCreateMigRunCommand_Run(t *testing.T) {
 		wantErr     bool
 		wantErrText string
 	}{
+		{
+			name:        "active repository returns current Run ID",
+			migID:       migID,
+			statusCode:  http.StatusConflict,
+			wantErr:     true,
+			wantErrText: "current Run ID: " + currentRunID,
+		},
 		{
 			name:       "run all repos",
 			migID:      migID,
@@ -103,6 +111,10 @@ func TestCreateMigRunCommand_Run(t *testing.T) {
 
 				resp := CreateMigRunResult{WaveID: waveID, MigID: domaintypes.MigID(tc.migID), SpecID: specID, RunCount: 2}
 
+				if tc.statusCode == http.StatusConflict {
+					http.Error(w, "repository https://github.com/a/b already has an active migration; current Run ID: "+currentRunID, http.StatusConflict)
+					return
+				}
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(tc.statusCode)
 				_ = json.NewEncoder(w).Encode(resp)

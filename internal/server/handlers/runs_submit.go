@@ -164,6 +164,9 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service, g
 			if gitLabTokenHash != "" {
 				tokenRegistry.ReleaseRuns([]domaintypes.RunID{runID})
 			}
+			if writeActiveRepoRunConflict(w, err) {
+				return
+			}
 			serverError(w, "create single-repo run", "create run", err, "run_id", runID)
 			return
 		}

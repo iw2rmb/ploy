@@ -98,9 +98,12 @@ func restartRunHandler(st store.Store, gitAuth gitauth.Options, registry *gitlab
 			if gitLabTokenHash != "" {
 				registry.ReleaseRuns([]domaintypes.RunID{runID})
 			}
+			if writeActiveRepoRunConflict(w, err) {
+				return
+			}
 			switch {
 			case errors.Is(err, store.ErrRunRestartActive):
-				writeHTTPError(w, http.StatusConflict, "run is not terminal")
+				writeHTTPError(w, http.StatusConflict, "run is not terminal; current Run ID: %s", runID)
 			case errors.Is(err, store.ErrRunRestartWaveCancelled):
 				writeHTTPError(w, http.StatusConflict, "owning wave is cancelled")
 			case isNoRowsError(err):
