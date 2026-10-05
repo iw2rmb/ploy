@@ -7,7 +7,7 @@ import (
 )
 
 func TestUpsertJobMetric_InsertsAndUpdatesByJobID(t *testing.T) {
-	ctx, db := openStoreForCancelBulkTests(t)
+	ctx, db := newTestStore(t)
 
 	fx := newV1Fixture(t, ctx, db, "https://github.com/test/job-metrics", "main", []byte(`{"type":"job-metrics"}`))
 	job := createJobForStoreTest(t, ctx, db, fx.Run.ID, fx.Run.RepoID, fx.Run.RepoBaseRef, 1, "job-metrics", types.JobStatusCreated)

@@ -125,11 +125,8 @@ func TestParseMigSpecJSON_StackSpecificImage(t *testing.T) {
 		t.Fatalf("ParseMigSpecJSON failed: %v", err)
 	}
 
-	if spec.Steps[0].Image.IsUniversal() {
-		t.Errorf("expected stack-specific image, got universal")
-	}
-	if !spec.Steps[0].Image.IsStackSpecific() {
-		t.Errorf("expected IsStackSpecific() = true")
+	if spec.Steps[0].Image.Universal != "" || len(spec.Steps[0].Image.ByStack) == 0 {
+		t.Errorf("expected stack-specific image, got %+v", spec.Steps[0].Image)
 	}
 
 	// Verify resolution.

@@ -22,9 +22,6 @@ type completionInput struct {
 	RepoSHAOut   string
 }
 
-// completionResult is returned on successful completion.
-type completionResult struct{}
-
 // completionService orchestrates job completion workflow.
 type completionService struct {
 	store         store.Store
@@ -33,21 +30,13 @@ type completionService struct {
 	gitLabTokens  *gitlabtokens.Registry
 }
 
-type completionServiceType string
-
-const (
-	completionServiceTypeGate completionServiceType = "gate"
-	completionServiceTypeStep completionServiceType = "step"
-)
-
-func routeCompletionServiceType(jobType domaintypes.JobType) (completionServiceType, bool) {
+// knownCompletionJobType reports whether post-completion routing recognizes jobType.
+func knownCompletionJobType(jobType domaintypes.JobType) bool {
 	switch jobType {
-	case domaintypes.JobTypePreGate, domaintypes.JobTypePostGate:
-		return completionServiceTypeGate, true
-	case domaintypes.JobTypeMig:
-		return completionServiceTypeStep, true
+	case domaintypes.JobTypePreGate, domaintypes.JobTypePostGate, domaintypes.JobTypeMig:
+		return true
 	default:
-		return "", false
+		return false
 	}
 }
 

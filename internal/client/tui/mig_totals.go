@@ -7,35 +7,9 @@ import (
 	"net/url"
 
 	sharedclient "github.com/iw2rmb/ploy/internal/client"
-	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/httpx"
 )
-
-// CountMigReposCommand counts the repos in a migration's repo set.
-type CountMigReposCommand struct {
-	Client  *http.Client
-	BaseURL *url.URL
-	MigID   domaintypes.MigID
-}
-
-// Run executes GET /v1/migs/{mig_id}/repos and returns the total repo count.
-func (c CountMigReposCommand) Run(ctx context.Context) (int, error) {
-	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
-		return 0, fmt.Errorf("count mig repos: %w", err)
-	}
-	if c.MigID.IsZero() {
-		return 0, fmt.Errorf("count mig repos: mig id required")
-	}
-
-	endpoint := c.BaseURL.JoinPath("v1", "migs", c.MigID.String(), "repos")
-	result, err := httpx.DoJSON[domainapi.MigRepoListResponse](ctx, c.Client, http.MethodGet, endpoint.String(), nil, http.StatusOK, "count mig repos")
-	if err != nil {
-		return 0, err
-	}
-
-	return len(result.Repos), nil
-}
 
 // CountMigRunsCommand counts runs belonging to a specific migration by scanning the runs list.
 type CountMigRunsCommand struct {

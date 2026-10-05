@@ -13,7 +13,7 @@ import (
 )
 
 func TestListStaleRunningJobs_FiltersByHeartbeatAndStatus(t *testing.T) {
-	ctx, db := openStoreForCancelBulkTests(t)
+	ctx, db := newTestStore(t)
 
 	// Cancel all leftover Running jobs so the count assertions below are not
 	// polluted by prior test runs sharing the same database.
@@ -78,7 +78,7 @@ func TestListStaleRunningJobs_FiltersByHeartbeatAndStatus(t *testing.T) {
 }
 
 func TestCountStaleNodesWithRunningJobs_CountsDistinctAssignedStaleNodes(t *testing.T) {
-	ctx, db := openStoreForCancelBulkTests(t)
+	ctx, db := newTestStore(t)
 
 	// Ensure no leftover Running jobs or stale nodes from prior test runs
 	// affect the exact count assertion below.
@@ -125,7 +125,7 @@ func TestCountStaleNodesWithRunningJobs_CountsDistinctAssignedStaleNodes(t *test
 }
 
 func TestCancelActiveJobsByRunAttempt_TransitionsOnlyTargetAttempt(t *testing.T) {
-	ctx, db := openStoreForCancelBulkTests(t)
+	ctx, db := newTestStore(t)
 
 	fx := newV1Fixture(t, ctx, db, "https://github.com/test/stale-cancel-a", "main", []byte(`{"type":"stale-cancel"}`))
 	runB := createRunForStoreTest(t, ctx, db, fx.Wave.ID, fx.Mig.ID, fx.Spec.ID, "https://github.com/test/stale-cancel-b", "feature-b", types.RunStatusQueued)

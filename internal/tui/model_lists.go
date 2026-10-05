@@ -47,7 +47,6 @@ func (m *model) applyWindowHeight() {
 	}
 	m.rootList.SetHeight(m.windowHeight)
 	m.rightPaneList.SetHeight(m.windowHeight)
-	m.detailsList.SetHeight(m.windowHeight)
 	m.jobList.SetHeight(m.windowHeight)
 }
 
@@ -86,10 +85,6 @@ func buildDetailsPloyItems(entries []ployEntry) []list.Item {
 
 // setPloySelectionState applies root item label state while preserving cursor.
 func (m *model) setPloySelectionState(hasMigration, hasRun, hasJob bool) {
-	m.hasSelectedMigration = hasMigration
-	m.hasSelectedRun = hasRun
-	m.hasSelectedJob = hasJob
-
 	selectedIdx := m.rootList.Index()
 	m.rootList.SetItems(buildPloyItems(hasMigration, hasRun, hasJob))
 	if selectedIdx < 0 {

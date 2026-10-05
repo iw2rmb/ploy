@@ -93,10 +93,7 @@ func createNodeLogsHandler(st store.Store, bp *blobpersist.Service, eventsServic
 		}
 
 		// Publish to SSE hub for real-time streaming.
-		if err := eventsService.CreateAndPublishLog(r.Context(), log, req.Data); err != nil {
-			// Log the error but don't fail the operation since DB/blob write succeeded.
-			slog.Error("node logs: SSE fanout failed", "log_id", log.ID, "err", err)
-		}
+		eventsService.CreateAndPublishLog(r.Context(), log, req.Data)
 
 		writeJSON(w, http.StatusCreated, nodeLogCreateResponse{
 			ID:      log.ID,

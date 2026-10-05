@@ -9,7 +9,6 @@ import (
 	"context"
 
 	"github.com/iw2rmb/ploy/internal/domain/types"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createLog = `-- name: CreateLog :one
@@ -57,37 +56,6 @@ func (q *Queries) DeleteLog(ctx context.Context, id int64) error {
 	return err
 }
 
-const deleteLogsOlderThan = `-- name: DeleteLogsOlderThan :exec
-DELETE FROM logs
-WHERE created_at < $1
-`
-
-func (q *Queries) DeleteLogsOlderThan(ctx context.Context, createdAt pgtype.Timestamptz) error {
-	_, err := q.db.Exec(ctx, deleteLogsOlderThan, createdAt)
-	return err
-}
-
-const getLog = `-- name: GetLog :one
-SELECT id, run_id, job_id, chunk_no, data_size, object_key, created_at FROM logs
-WHERE id = $1
-`
-
-// Returns log metadata including object_key for object-storage retrieval.
-func (q *Queries) GetLog(ctx context.Context, id int64) (Log, error) {
-	row := q.db.QueryRow(ctx, getLog, id)
-	var i Log
-	err := row.Scan(
-		&i.ID,
-		&i.RunID,
-		&i.JobID,
-		&i.ChunkNo,
-		&i.DataSize,
-		&i.ObjectKey,
-		&i.CreatedAt,
-	)
-	return i, err
-}
-
 const listLogsByRun = `-- name: ListLogsByRun :many
 SELECT
   id,
@@ -105,103 +73,6 @@ ORDER BY chunk_no ASC, id ASC
 // Returns log metadata including object_key for object-storage retrieval.
 func (q *Queries) ListLogsByRun(ctx context.Context, runID types.RunID) ([]Log, error) {
 	rows, err := q.db.Query(ctx, listLogsByRun, runID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []Log{}
-	for rows.Next() {
-		var i Log
-		if err := rows.Scan(
-			&i.ID,
-			&i.RunID,
-			&i.JobID,
-			&i.ChunkNo,
-			&i.DataSize,
-			&i.ObjectKey,
-			&i.CreatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listLogsByRunAndJob = `-- name: ListLogsByRunAndJob :many
-SELECT
-  id,
-  run_id,
-  job_id,
-  chunk_no,
-  data_size,
-  object_key,
-  created_at
-FROM logs
-WHERE run_id = $1 AND job_id = $2
-ORDER BY chunk_no ASC, id ASC
-`
-
-type ListLogsByRunAndJobParams struct {
-	RunID types.RunID  `json:"run_id"`
-	JobID *types.JobID `json:"job_id"`
-}
-
-// Returns log metadata including object_key for object-storage retrieval.
-func (q *Queries) ListLogsByRunAndJob(ctx context.Context, arg ListLogsByRunAndJobParams) ([]Log, error) {
-	rows, err := q.db.Query(ctx, listLogsByRunAndJob, arg.RunID, arg.JobID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []Log{}
-	for rows.Next() {
-		var i Log
-		if err := rows.Scan(
-			&i.ID,
-			&i.RunID,
-			&i.JobID,
-			&i.ChunkNo,
-			&i.DataSize,
-			&i.ObjectKey,
-			&i.CreatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listLogsByRunAndJobSince = `-- name: ListLogsByRunAndJobSince :many
-SELECT
-  id,
-  run_id,
-  job_id,
-  chunk_no,
-  data_size,
-  object_key,
-  created_at
-FROM logs
-WHERE run_id = $1 AND job_id = $2 AND id > $3
-ORDER BY chunk_no ASC, id ASC
-`
-
-type ListLogsByRunAndJobSinceParams struct {
-	RunID types.RunID  `json:"run_id"`
-	JobID *types.JobID `json:"job_id"`
-	ID    int64        `json:"id"`
-}
-
-// Returns log metadata including object_key for object-storage retrieval.
-func (q *Queries) ListLogsByRunAndJobSince(ctx context.Context, arg ListLogsByRunAndJobSinceParams) ([]Log, error) {
-	rows, err := q.db.Query(ctx, listLogsByRunAndJobSince, arg.RunID, arg.JobID, arg.ID)
 	if err != nil {
 		return nil, err
 	}

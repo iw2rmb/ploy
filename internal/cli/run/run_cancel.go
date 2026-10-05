@@ -13,7 +13,6 @@ import (
 
 type CancelOptions struct {
 	RunID  string
-	Reason string
 	Output io.Writer
 }
 
@@ -35,7 +34,6 @@ func RunCancel(ctx context.Context, opts CancelOptions) error {
 		BaseURL: base,
 		Client:  httpClient,
 		RunID:   domaintypes.RunID(runID),
-		Reason:  strings.TrimSpace(opts.Reason),
 		Output:  out,
 	}
 	return cmd.Run(ctx)

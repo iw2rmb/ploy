@@ -46,16 +46,6 @@ func (q *Queries) CreateWave(ctx context.Context, arg CreateWaveParams) (Wave, e
 	return i, err
 }
 
-const deleteWave = `-- name: DeleteWave :exec
-DELETE FROM waves
-WHERE id = $1
-`
-
-func (q *Queries) DeleteWave(ctx context.Context, id types.WaveID) error {
-	_, err := q.db.Exec(ctx, deleteWave, id)
-	return err
-}
-
 const getWave = `-- name: GetWave :one
 SELECT id, mig_id, spec_id, created_by, status, created_at, started_at, finished_at, stats
 FROM waves
@@ -77,92 +67,6 @@ func (q *Queries) GetWave(ctx context.Context, id types.WaveID) (Wave, error) {
 		&i.Stats,
 	)
 	return i, err
-}
-
-const listWaves = `-- name: ListWaves :many
-SELECT id, mig_id, spec_id, created_by, status, created_at, started_at, finished_at, stats
-FROM waves
-ORDER BY created_at DESC, id DESC
-LIMIT $1 OFFSET $2
-`
-
-type ListWavesParams struct {
-	Limit  int32 `json:"limit"`
-	Offset int32 `json:"offset"`
-}
-
-func (q *Queries) ListWaves(ctx context.Context, arg ListWavesParams) ([]Wave, error) {
-	rows, err := q.db.Query(ctx, listWaves, arg.Limit, arg.Offset)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []Wave{}
-	for rows.Next() {
-		var i Wave
-		if err := rows.Scan(
-			&i.ID,
-			&i.MigID,
-			&i.SpecID,
-			&i.CreatedBy,
-			&i.Status,
-			&i.CreatedAt,
-			&i.StartedAt,
-			&i.FinishedAt,
-			&i.Stats,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listWavesByMig = `-- name: ListWavesByMig :many
-SELECT id, mig_id, spec_id, created_by, status, created_at, started_at, finished_at, stats
-FROM waves
-WHERE mig_id = $1
-ORDER BY created_at DESC, id DESC
-LIMIT $2 OFFSET $3
-`
-
-type ListWavesByMigParams struct {
-	MigID  types.MigID `json:"mig_id"`
-	Limit  int32       `json:"limit"`
-	Offset int32       `json:"offset"`
-}
-
-func (q *Queries) ListWavesByMig(ctx context.Context, arg ListWavesByMigParams) ([]Wave, error) {
-	rows, err := q.db.Query(ctx, listWavesByMig, arg.MigID, arg.Limit, arg.Offset)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []Wave{}
-	for rows.Next() {
-		var i Wave
-		if err := rows.Scan(
-			&i.ID,
-			&i.MigID,
-			&i.SpecID,
-			&i.CreatedBy,
-			&i.Status,
-			&i.CreatedAt,
-			&i.StartedAt,
-			&i.FinishedAt,
-			&i.Stats,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
 }
 
 const updateWaveCompletion = `-- name: UpdateWaveCompletion :exec

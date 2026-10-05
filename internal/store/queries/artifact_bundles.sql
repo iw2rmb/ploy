@@ -3,12 +3,6 @@
 SELECT id, run_id, job_id, name, bundle_size, object_key, cid, digest, created_at FROM artifact_bundles
 WHERE id = $1;
 
--- name: ListArtifactBundlesByRun :many
--- Returns artifact bundle metadata including object_key for object-storage retrieval.
-SELECT id, run_id, job_id, name, bundle_size, object_key, cid, digest, created_at FROM artifact_bundles
-WHERE run_id = sqlc.arg(run_id)
-ORDER BY created_at DESC, id DESC;
-
 -- name: ListArtifactBundlesByRunAndJob :many
 -- Returns artifact bundle metadata including object_key for object-storage retrieval.
 SELECT id, run_id, job_id, name, bundle_size, object_key, cid, digest, created_at FROM artifact_bundles
@@ -25,10 +19,6 @@ RETURNING *;
 -- name: DeleteArtifactBundle :exec
 DELETE FROM artifact_bundles
 WHERE id = $1;
-
--- name: DeleteArtifactBundlesOlderThan :exec
-DELETE FROM artifact_bundles
-WHERE created_at < $1;
 
 -- name: ListArtifactBundlesByCID :many
 -- Returns artifact bundle metadata including object_key for object-storage retrieval.

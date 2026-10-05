@@ -28,12 +28,6 @@ type Querier interface {
 	CheckBootstrapTokenRevoked(ctx context.Context, tokenID string) (pgtype.Timestamptz, error)
 	// Atomically claim the next claimable job for a node.
 	ClaimJob(ctx context.Context, nodeID types.NodeID) (Job, error)
-	ClearRepoSHAChainFromJob(ctx context.Context, arg ClearRepoSHAChainFromJobParams) (int64, error)
-	CountJobsByRun(ctx context.Context, runID types.RunID) (int64, error)
-	CountJobsByRunAndStatus(ctx context.Context, arg CountJobsByRunAndStatusParams) (int64, error)
-	// Counts jobs by status for a specific run attempt.
-	// Used by terminal detection to determine runs.status.
-	CountJobsByRunAttemptGroupByStatus(ctx context.Context, arg CountJobsByRunAttemptGroupByStatusParams) ([]CountJobsByRunAttemptGroupByStatusRow, error)
 	// Counts jobs matching the same optional filters as ListJobsPage.
 	CountJobsPage(ctx context.Context, arg CountJobsPageParams) (int64, error)
 	CountRunsByWaveStatus(ctx context.Context, waveID types.WaveID) ([]CountRunsByWaveStatusRow, error)
@@ -62,15 +56,7 @@ type Querier interface {
 	CreateSpecBundle(ctx context.Context, arg CreateSpecBundleParams) (SpecBundle, error)
 	CreateWave(ctx context.Context, arg CreateWaveParams) (Wave, error)
 	DeleteArtifactBundle(ctx context.Context, id pgtype.UUID) error
-	DeleteArtifactBundlesOlderThan(ctx context.Context, createdAt pgtype.Timestamptz) error
-	// Removes a bundle map entry by hash.
-	DeleteConfigBundleMap(ctx context.Context, hash string) error
-	// Removes an in entry by dst and section.
-	DeleteConfigIn(ctx context.Context, arg DeleteConfigInParams) error
-	// Removes all in entries for a section.
-	DeleteConfigInBySection(ctx context.Context, section string) error
 	DeleteDiff(ctx context.Context, id pgtype.UUID) error
-	DeleteDiffsOlderThan(ctx context.Context, createdAt pgtype.Timestamptz) error
 	// DeleteExpiredArtifactBundles removes artifact bundle rows older than the specified timestamp.
 	DeleteExpiredArtifactBundles(ctx context.Context, createdAt pgtype.Timestamptz) (int64, error)
 	// DeleteExpiredDiffs removes diff rows older than the specified timestamp.
@@ -84,7 +70,6 @@ type Querier interface {
 	DeleteGlobalEnv(ctx context.Context, arg DeleteGlobalEnvParams) error
 	DeleteJob(ctx context.Context, id types.JobID) error
 	DeleteLog(ctx context.Context, id int64) error
-	DeleteLogsOlderThan(ctx context.Context, createdAt pgtype.Timestamptz) error
 	// Deletes a mig. Use with caution; should only be called when safe to remove.
 	DeleteMig(ctx context.Context, id types.MigID) error
 	// Deletes a mig_repo by id.
@@ -96,14 +81,10 @@ type Querier interface {
 	// Deletes a spec bundle metadata row by ID.
 	// Called by blobpersist as rollback when object storage upload fails.
 	DeleteSpecBundle(ctx context.Context, id string) error
-	DeleteWave(ctx context.Context, id types.WaveID) error
 	GetAPITokenByID(ctx context.Context, tokenID string) (GetAPITokenByIDRow, error)
-	// Transitional: returns current job id and linked successor id.
-	GetAdjacentJobIndices(ctx context.Context, id types.JobID) (GetAdjacentJobIndicesRow, error)
 	// Returns artifact bundle metadata including object_key for object-storage retrieval.
 	GetArtifactBundle(ctx context.Context, id pgtype.UUID) (ArtifactBundle, error)
 	GetBootstrapToken(ctx context.Context, tokenID string) (GetBootstrapTokenRow, error)
-	GetEvent(ctx context.Context, id int64) (Event, error)
 	GetGitSpecSnapshot(ctx context.Context, arg GetGitSpecSnapshotParams) (Spec, error)
 	// Retrieves a single environment entry by key and target.
 	// Returns pgx.ErrNoRows if the (key, target) pair does not exist.
@@ -111,8 +92,6 @@ type Querier interface {
 	GetJob(ctx context.Context, id types.JobID) (Job, error)
 	GetLatestDiffByJob(ctx context.Context, jobID *types.JobID) (Diff, error)
 	GetLatestRunByMigAndRepoStatus(ctx context.Context, arg GetLatestRunByMigAndRepoStatusParams) (GetLatestRunByMigAndRepoStatusRow, error)
-	// Returns log metadata including object_key for object-storage retrieval.
-	GetLog(ctx context.Context, id int64) (Log, error)
 	GetMig(ctx context.Context, id types.MigID) (Mig, error)
 	GetMigByName(ctx context.Context, name string) (Mig, error)
 	GetMigRepo(ctx context.Context, id types.MigRepoID) (MigRepo, error)
@@ -123,7 +102,6 @@ type Querier interface {
 	GetRun(ctx context.Context, id types.RunID) (Run, error)
 	GetRunForUpdate(ctx context.Context, id types.RunID) (Run, error)
 	GetRunSnapshotMetadata(ctx context.Context, id types.RunID) (GetRunSnapshotMetadataRow, error)
-	GetRunTiming(ctx context.Context, id types.RunID) (RunsTiming, error)
 	GetSpec(ctx context.Context, id types.SpecID) (Spec, error)
 	// Returns spec bundle metadata including object_key for object-storage retrieval.
 	GetSpecBundle(ctx context.Context, id string) (SpecBundle, error)
@@ -143,20 +121,15 @@ type Querier interface {
 	// Returns artifact bundle metadata including object_key for object-storage retrieval.
 	ListArtifactBundlesByCID(ctx context.Context, cid *string) ([]ArtifactBundle, error)
 	// Returns artifact bundle metadata including object_key for object-storage retrieval.
-	ListArtifactBundlesByRun(ctx context.Context, runID types.RunID) ([]ArtifactBundle, error)
-	// Returns artifact bundle metadata including object_key for object-storage retrieval.
 	ListArtifactBundlesByRunAndJob(ctx context.Context, arg ListArtifactBundlesByRunAndJobParams) ([]ArtifactBundle, error)
-	// config_bundle_map.sql — CRUD queries for global bundle map entries (config_bundle_map table).
-	// Provides ListConfigBundleMap, UpsertConfigBundleMap, DeleteConfigBundleMap.
+	// config_bundle_map.sql — read queries for global bundle map entries (config_bundle_map table).
+	// Provides ListConfigBundleMap.
 	// Returns all bundle map entries ordered by hash for deterministic iteration.
 	ListConfigBundleMap(ctx context.Context) ([]ConfigBundleMap, error)
-	// config_in.sql — CRUD queries for global in mount entries (config_in table).
-	// Provides ListConfigIn, UpsertConfigIn, DeleteConfigIn, DeleteConfigInBySection.
+	// config_in.sql — read queries for global in mount entries (config_in table).
+	// Provides ListConfigIn.
 	// Returns all in entries ordered by section then dst for deterministic iteration.
 	ListConfigIn(ctx context.Context) ([]ConfigIn, error)
-	// Returns in entries for a specific section ordered by dst.
-	ListConfigInBySection(ctx context.Context, section string) ([]ConfigIn, error)
-	ListCreatedJobsByRunAttempt(ctx context.Context, arg ListCreatedJobsByRunAttemptParams) ([]Job, error)
 	// Returns diff metadata for a run.
 	ListDiffsByRun(ctx context.Context, runID types.RunID) ([]Diff, error)
 	// Lists distinct repos for a mig with last known run metadata,
@@ -182,10 +155,6 @@ type Querier interface {
 	// Returns log metadata including object_key for object-storage retrieval.
 	ListLogsByRun(ctx context.Context, runID types.RunID) ([]Log, error)
 	// Returns log metadata including object_key for object-storage retrieval.
-	ListLogsByRunAndJob(ctx context.Context, arg ListLogsByRunAndJobParams) ([]Log, error)
-	// Returns log metadata including object_key for object-storage retrieval.
-	ListLogsByRunAndJobSince(ctx context.Context, arg ListLogsByRunAndJobSinceParams) ([]Log, error)
-	// Returns log metadata including object_key for object-storage retrieval.
 	ListLogsByRunSince(ctx context.Context, arg ListLogsByRunSinceParams) ([]Log, error)
 	ListMigReposByMig(ctx context.Context, migID types.MigID) ([]MigRepo, error)
 	// Lists migs with optional filtering by archived status and name substring.
@@ -201,7 +170,6 @@ type Querier interface {
 	ListRuns(ctx context.Context, arg ListRunsParams) ([]Run, error)
 	ListRunsByWave(ctx context.Context, waveID types.WaveID) ([]Run, error)
 	ListRunsForRepo(ctx context.Context, arg ListRunsForRepoParams) ([]ListRunsForRepoRow, error)
-	ListRunsTimings(ctx context.Context, arg ListRunsTimingsParams) ([]RunsTiming, error)
 	ListRunsWithMetadata(ctx context.Context, arg ListRunsWithMetadataParams) ([]ListRunsWithMetadataRow, error)
 	ListRunsWithURLByWave(ctx context.Context, waveID types.WaveID) ([]ListRunsWithURLByWaveRow, error)
 	// Lists spec bundles ordered by created_at descending (most recent first).
@@ -215,9 +183,6 @@ type Querier interface {
 	// Lists running jobs whose assigned node is stale at the provided cutoff.
 	// Rows are grouped by (run_id, attempt) for deterministic recovery processing.
 	ListStaleRunningJobs(ctx context.Context, lastHeartbeat pgtype.Timestamptz) ([]ListStaleRunningJobsRow, error)
-	ListWaves(ctx context.Context, arg ListWavesParams) ([]Wave, error)
-	ListWavesByMig(ctx context.Context, arg ListWavesByMigParams) ([]Wave, error)
-	MarkBootstrapTokenCertIssued(ctx context.Context, tokenID string) error
 	// Atomically promote a specific linked successor job: Created -> Queued.
 	// The candidate is eligible only when every predecessor that points to it is Success.
 	PromoteJobByIDIfUnblocked(ctx context.Context, id types.JobID) (Job, error)
@@ -229,37 +194,25 @@ type Querier interface {
 	// Guarded by both job id and node id so a foreign node cannot steal the slot.
 	UnclaimJob(ctx context.Context, arg UnclaimJobParams) error
 	UpdateAPITokenLastUsed(ctx context.Context, tokenID string) error
-	UpdateBootstrapTokenLastUsed(ctx context.Context, tokenID string) error
 	UpdateJobCompletion(ctx context.Context, arg UpdateJobCompletionParams) error
 	UpdateJobCompletionWithMeta(ctx context.Context, arg UpdateJobCompletionWithMetaParams) error
 	// Persist the container image name used to execute a job.
 	// This is set by the node immediately before job execution starts.
 	UpdateJobImageName(ctx context.Context, arg UpdateJobImageNameParams) error
 	UpdateJobMeta(ctx context.Context, arg UpdateJobMetaParams) error
-	UpdateJobNextID(ctx context.Context, arg UpdateJobNextIDParams) error
-	UpdateJobRepoSHAIn(ctx context.Context, arg UpdateJobRepoSHAInParams) error
 	UpdateJobReport(ctx context.Context, arg UpdateJobReportParams) (int64, error)
 	UpdateJobStatus(ctx context.Context, arg UpdateJobStatusParams) error
-	UpdateMigRepoBaseRef(ctx context.Context, arg UpdateMigRepoBaseRefParams) error
 	UpdateMigSpec(ctx context.Context, arg UpdateMigSpecParams) error
 	UpdateNodeCertMetadata(ctx context.Context, arg UpdateNodeCertMetadataParams) error
 	UpdateNodeDrained(ctx context.Context, arg UpdateNodeDrainedParams) error
 	UpdateNodeHeartbeat(ctx context.Context, arg UpdateNodeHeartbeatParams) error
-	UpdateRunBaseRef(ctx context.Context, arg UpdateRunBaseRefParams) error
 	UpdateRunError(ctx context.Context, arg UpdateRunErrorParams) error
-	UpdateRunResume(ctx context.Context, id types.RunID) error
 	UpdateRunStatus(ctx context.Context, arg UpdateRunStatusParams) error
 	// Updates last_ref_at to now() for the given spec bundle.
 	// Call this whenever a spec or run references the bundle to keep GC metadata fresh.
 	UpdateSpecBundleLastRefAt(ctx context.Context, id string) error
 	UpdateWaveCompletion(ctx context.Context, arg UpdateWaveCompletionParams) error
 	UpdateWaveStatus(ctx context.Context, arg UpdateWaveStatusParams) error
-	// Inserts or updates a bundle map entry (upsert on primary key hash).
-	// Refreshes bundle_id and updated_at on conflict.
-	UpsertConfigBundleMap(ctx context.Context, arg UpsertConfigBundleMapParams) error
-	// Inserts or updates an in entry (upsert on composite key (dst, section)).
-	// Refreshes entry and updated_at on conflict (entry may change if hash changes).
-	UpsertConfigIn(ctx context.Context, arg UpsertConfigInParams) error
 	// Inserts or updates an environment entry (upsert on composite key (key, target)).
 	// Updates value, secret, and refreshes updated_at on conflict.
 	// This ensures idempotent set operations from the CLI or API.

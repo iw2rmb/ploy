@@ -67,19 +67,4 @@ func (m *handlerStore) DeleteSpecBundle(ctx context.Context, id string) error {
 
 // Config In methods
 
-func (m *handlerStore) UpsertConfigIn(ctx context.Context, params store.UpsertConfigInParams) error {
-	_, err := m.upsertConfigIn.record(params)
-	return err
-}
-
-func (m *handlerStore) DeleteConfigIn(ctx context.Context, arg store.DeleteConfigInParams) error {
-	_, err := m.deleteConfigIn.record(arg)
-	return err
-}
-
 // Bundle Map methods
-
-func (m *handlerStore) UpsertConfigBundleMap(ctx context.Context, params store.UpsertConfigBundleMapParams) error {
-	_, err := m.upsertConfigBundleMap.record(params)
-	return err
-}

@@ -85,7 +85,7 @@ func TestCrossPathParity_StandardJobErrorToChainAction(t *testing.T) {
 			status := lifecycle.JobStatusFromRunError(tc.err)
 
 			// Server path: drive completionService.Complete with the status emitted by the nodeagent.
-			_, err := svc.Complete(context.Background(), completionInput{
+			err := svc.Complete(context.Background(), completionInput{
 				JobID:      jobID,
 				NodeID:     nodeID,
 				Status:     status,
@@ -224,7 +224,7 @@ func TestCrossPathParity_GateJobStatusToChainAction(t *testing.T) {
 				input.RepoSHAOut = sha40
 			}
 
-			_, err := svc.Complete(context.Background(), input)
+			err := svc.Complete(context.Background(), input)
 			if err != nil {
 				t.Fatalf("Complete() error = %v", err)
 			}

@@ -72,9 +72,7 @@ func TestStorage_LogStreamPreservesStderr(t *testing.T) {
 		logchunk.Record{Stream: logchunk.StreamStderr, Line: "err"},
 	)
 
-	if err := svc.CreateAndPublishLog(context.Background(), logRow, payload); err != nil {
-		t.Fatalf("CreateAndPublishLog failed: %v", err)
-	}
+	svc.CreateAndPublishLog(context.Background(), logRow, payload)
 
 	snapshot := svc.Hub().SnapshotJob(jobID)
 	if len(snapshot) < 2 {
@@ -150,9 +148,7 @@ func TestStorage_LogEnrichmentWithJobMetadata(t *testing.T) {
 				CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
 			}
 
-			if err := svc.CreateAndPublishLog(ctx, logRow, gzippedLog); err != nil {
-				t.Fatalf("CreateAndPublishLog failed: %v", err)
-			}
+			svc.CreateAndPublishLog(ctx, logRow, gzippedLog)
 
 			snapshot := svc.Hub().SnapshotJob(jobID)
 			if len(snapshot) == 0 {
@@ -216,9 +212,7 @@ func TestStorage_LogEnrichmentWithoutJobID(t *testing.T) {
 		CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
 	}
 
-	if err := svc.CreateAndPublishLog(ctx, logRow, gzippedLog); err != nil {
-		t.Fatalf("CreateAndPublishLog failed: %v", err)
-	}
+	svc.CreateAndPublishLog(ctx, logRow, gzippedLog)
 
 	if getJobCalled {
 		t.Error("GetJob should not be called when JobID is nil")
@@ -259,9 +253,7 @@ func TestStorage_LogEnrichmentJobLookupFailure(t *testing.T) {
 		CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
 	}
 
-	if err := svc.CreateAndPublishLog(ctx, logRow, gzippedLog); err != nil {
-		t.Fatalf("CreateAndPublishLog should succeed despite job lookup failure: %v", err)
-	}
+	svc.CreateAndPublishLog(ctx, logRow, gzippedLog)
 
 	snapshot := svc.Hub().SnapshotJob(jobID)
 	if len(snapshot) == 0 {
@@ -323,9 +315,7 @@ func TestStorage_LogEnrichmentJobContextCacheEvictsLRU(t *testing.T) {
 			DataSize:  int64(len(gzippedLog)),
 			CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
 		}
-		if err := svc.CreateAndPublishLog(ctx, logRow, gzippedLog); err != nil {
-			t.Fatalf("CreateAndPublishLog failed for job %s: %v", jobID, err)
-		}
+		svc.CreateAndPublishLog(ctx, logRow, gzippedLog)
 	}
 
 	publish(jobID1)

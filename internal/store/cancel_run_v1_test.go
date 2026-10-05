@@ -9,7 +9,7 @@ import (
 )
 
 func TestCancelRun_CancelsRunAndActiveJobs(t *testing.T) {
-	ctx, db := openStoreForCancelBulkTests(t)
+	ctx, db := newTestStore(t)
 
 	fx := newV1Fixture(t, ctx, db, "https://github.com/test/cancel-run-a", "main", []byte(`{"type":"cancel-run"}`))
 
@@ -65,7 +65,7 @@ func TestCancelRun_CancelsRunAndActiveJobs(t *testing.T) {
 }
 
 func TestCancelRun_RollsBackOnFailure(t *testing.T) {
-	ctx, db := openStoreForCancelBulkTests(t)
+	ctx, db := newTestStore(t)
 
 	fx := newV1Fixture(t, ctx, db, "https://github.com/test/cancel-run-rollback", "main", []byte(`{"type":"cancel-run-rollback"}`))
 	if err := db.UpdateRunStatus(ctx, UpdateRunStatusParams{ID: fx.Run.ID, Status: types.RunStatusRunning}); err != nil {
@@ -130,7 +130,7 @@ EXECUTE FUNCTION ploy.%s();
 }
 
 func TestCancelRun_IsScopedToRunID(t *testing.T) {
-	ctx, db := openStoreForCancelBulkTests(t)
+	ctx, db := newTestStore(t)
 
 	fxA := newV1Fixture(t, ctx, db, "https://github.com/test/cancel-run-scope-a", "main", []byte(`{"type":"cancel-run-scope-a"}`))
 	fxB := newV1Fixture(t, ctx, db, "https://github.com/test/cancel-run-scope-b", "main", []byte(`{"type":"cancel-run-scope-b"}`))
@@ -176,7 +176,7 @@ func TestCancelRun_IsScopedToRunID(t *testing.T) {
 }
 
 func TestCancelRun_CancelledRunIsIdempotent(t *testing.T) {
-	ctx, db := openStoreForCancelBulkTests(t)
+	ctx, db := newTestStore(t)
 
 	fx := newV1Fixture(t, ctx, db, "https://github.com/test/cancel-run-idempotent", "main", []byte(`{"type":"cancel-run-idempotent"}`))
 	if err := db.UpdateRunStatus(ctx, UpdateRunStatusParams{ID: fx.Run.ID, Status: types.RunStatusCancelled}); err != nil {

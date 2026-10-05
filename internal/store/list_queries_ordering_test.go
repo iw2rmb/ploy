@@ -20,7 +20,6 @@ func TestListQueriesDeterministicOrder(t *testing.T) {
 		// jobs.sql - run/attempt scopes keep deterministic id tie-breakers
 		{"ListJobsByRun", listJobsByRun, "ORDER BY attempt ASC, id ASC"},
 		{"ListJobsByRunAttempt", listJobsByRunAttempt, "ORDER BY id ASC"},
-		{"ListCreatedJobsByRunAttempt", listCreatedJobsByRunAttempt, "ORDER BY id ASC"},
 
 		// runs.sql - created_at needs id tie-breaker
 		{"ListRuns", listRuns, "ORDER BY created_at DESC, id DESC"},
@@ -51,8 +50,6 @@ func TestListQueriesDeterministicOrder(t *testing.T) {
 		// logs.sql - chunk order needs id tie-breaker.
 		{"ListLogsByRun", listLogsByRun, "ORDER BY chunk_no ASC, id ASC"},
 		{"ListLogsByRunSince", listLogsByRunSince, "ORDER BY chunk_no ASC, id ASC"},
-		{"ListLogsByRunAndJob", listLogsByRunAndJob, "ORDER BY chunk_no ASC, id ASC"},
-		{"ListLogsByRunAndJobSince", listLogsByRunAndJobSince, "ORDER BY chunk_no ASC, id ASC"},
 
 		// diffs/artifact_bundles/events ordering is verified in list_meta_queries_test.go.
 	}

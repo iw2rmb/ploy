@@ -14,7 +14,7 @@ import (
 )
 
 func (state *completeJobState) routedJobType() domaintypes.JobType {
-	if state.serviceTypeOK {
+	if state.jobTypeKnown {
 		return state.jobType
 	}
 	return ""
@@ -54,7 +54,7 @@ func (s *completionService) onFail(ctx context.Context, state *completeJobState)
 		}
 	}
 
-	decision := lifecycle.EvaluateCompletionDecision(jobType, state.input.Status, state.job.NextID != nil)
+	decision := lifecycle.EvaluateCompletionDecision(state.input.Status, state.job.NextID != nil)
 	switch decision.ChainAction {
 	case lifecycle.CompletionChainNoAction:
 		return
@@ -84,8 +84,7 @@ func (s *completionService) onCancelled(ctx context.Context, state *completeJobS
 	if state.input.Status != domaintypes.JobStatusCancelled {
 		return
 	}
-	jobType := state.routedJobType()
-	decision := lifecycle.EvaluateCompletionDecision(jobType, state.input.Status, state.job.NextID != nil)
+	decision := lifecycle.EvaluateCompletionDecision(state.input.Status, state.job.NextID != nil)
 	if decision.ChainAction == lifecycle.CompletionChainNoAction {
 		return
 	}
@@ -103,9 +102,7 @@ func (s *completionService) onSuccess(ctx context.Context, state *completeJobSta
 		return
 	}
 
-	jobType := state.routedJobType()
-
-	decision := lifecycle.EvaluateCompletionDecision(jobType, state.input.Status, state.job.NextID != nil)
+	decision := lifecycle.EvaluateCompletionDecision(state.input.Status, state.job.NextID != nil)
 	if decision.ChainAction == lifecycle.CompletionChainAdvanceNext {
 		if state.job.NextID == nil {
 			return

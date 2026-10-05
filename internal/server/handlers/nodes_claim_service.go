@@ -149,7 +149,7 @@ func (s *claimService) Claim(ctx context.Context, nodeID domaintypes.NodeID) (cl
 		var terminalErr *claimTerminalError
 		if errors.As(err, &terminalErr) {
 			completeSvc := newCompletionService(s.store, nil, nil)
-			_, completeErr := completeSvc.Complete(ctx, completionInput{
+			completeErr := completeSvc.Complete(ctx, completionInput{
 				JobID:        job.ID,
 				NodeID:       nodeID,
 				Status:       domaintypes.JobStatusError,

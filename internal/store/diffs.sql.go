@@ -56,16 +56,6 @@ func (q *Queries) DeleteDiff(ctx context.Context, id pgtype.UUID) error {
 	return err
 }
 
-const deleteDiffsOlderThan = `-- name: DeleteDiffsOlderThan :exec
-DELETE FROM diffs
-WHERE created_at < $1
-`
-
-func (q *Queries) DeleteDiffsOlderThan(ctx context.Context, createdAt pgtype.Timestamptz) error {
-	_, err := q.db.Exec(ctx, deleteDiffsOlderThan, createdAt)
-	return err
-}
-
 const getLatestDiffByJob = `-- name: GetLatestDiffByJob :one
 SELECT id, run_id, job_id, patch_size, object_key, summary, created_at
 FROM diffs

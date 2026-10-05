@@ -13,7 +13,6 @@ func TestStepManifestValidate(t *testing.T) {
 		Name:       "Sample Apply",
 		Image:      "ghcr.io/ploy/migs/openrewrite:latest",
 		Command:    []string{"/bin/run"},
-		Args:       []string{"--execute"},
 		WorkingDir: "/workspace",
 		Envs: map[string]string{
 			"JAVA_TOOL_OPTIONS": "-Xmx2g",
@@ -187,9 +186,6 @@ func cloneManifest(src StepManifest) StepManifest {
 	clone := src
 	if len(src.Command) > 0 {
 		clone.Command = append([]string(nil), src.Command...)
-	}
-	if len(src.Args) > 0 {
-		clone.Args = append([]string(nil), src.Args...)
 	}
 	if len(src.Inputs) > 0 {
 		clone.Inputs = make([]StepInput, len(src.Inputs))

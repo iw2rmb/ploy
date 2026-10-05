@@ -25,7 +25,7 @@ func TestAdvanceWorkspaceBaseline(t *testing.T) {
 			name: "commits workspace changes",
 			setupWorkspace: func(t *testing.T, dir string) {
 				initRepoWithFile(t, dir, "base.txt", "base content\n")
-				writeFile(t, filepath.Join(dir, "step0.txt"), "step 0 changes\n")
+				gitrepo.WriteFile(t, filepath.Join(dir, "step0.txt"), "step 0 changes\n")
 			},
 			wantCommit:  true,
 			wantMessage: "Ploy: apply changes",
@@ -104,9 +104,9 @@ func TestStickyWorkspaceDiffsStayIncrementalAfterBaselineAdvance(t *testing.T) {
 	}
 
 	for i, change := range steps {
-		writeFile(t, filepath.Join(workspace, "counter.txt"), change.counterValue)
+		gitrepo.WriteFile(t, filepath.Join(workspace, "counter.txt"), change.counterValue)
 		for file, content := range change.extraFiles {
-			writeFile(t, filepath.Join(workspace, file), content)
+			gitrepo.WriteFile(t, filepath.Join(workspace, file), content)
 		}
 
 		diff, err := step.NewFilesystemDiffGenerator().Generate(ctx, workspace)
@@ -129,6 +129,6 @@ func TestStickyWorkspaceDiffsStayIncrementalAfterBaselineAdvance(t *testing.T) {
 		}
 	}
 
-	assertFileContent(t, filepath.Join(workspace, "counter.txt"), "3\n")
-	assertFileContent(t, filepath.Join(workspace, "added.txt"), "hello from step 2\n")
+	gitrepo.AssertFileContent(t, filepath.Join(workspace, "counter.txt"), "3\n")
+	gitrepo.AssertFileContent(t, filepath.Join(workspace, "added.txt"), "hello from step 2\n")
 }

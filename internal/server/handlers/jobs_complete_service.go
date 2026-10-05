@@ -22,30 +22,29 @@ type completeJobState struct {
 	input         completionInput
 	job           store.Job
 	jobType       domaintypes.JobType
-	serviceType   completionServiceType
-	serviceTypeOK bool
+	jobTypeKnown  bool
 	persistedMeta []byte
 	runCache      completeRunCache
 }
 
-func (s *completionService) Complete(ctx context.Context, input completionInput) (completionResult, error) {
+func (s *completionService) Complete(ctx context.Context, input completionInput) error {
 	job, err := s.store.GetJob(ctx, input.JobID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return completionResult{}, completeNotFound("job not found")
+			return completeNotFound("job not found")
 		}
-		return completionResult{}, completeInternal("failed to get job", err)
+		return completeInternal("failed to get job", err)
 	}
 
 	if job.NodeID == nil || *job.NodeID != input.NodeID {
-		return completionResult{}, completeForbidden("job not assigned to this node")
+		return completeForbidden("job not assigned to this node")
 	}
 	if job.Status != domaintypes.JobStatusRunning {
-		return completionResult{}, completeConflict("job status is %s, expected Running", job.Status)
+		return completeConflict("job status is %s, expected Running", job.Status)
 	}
 	jobType := domaintypes.JobType(job.JobType)
-	serviceType, serviceTypeOK := routeCompletionServiceType(jobType)
-	if !serviceTypeOK {
+	jobTypeKnown := knownCompletionJobType(jobType)
+	if !jobTypeKnown {
 		slog.Error("complete job: invalid job_type in job record; treating as non-gate for post-completion routing",
 			"job_id", input.JobID,
 			"job_type", job.JobType,
@@ -61,10 +60,10 @@ func (s *completionService) Complete(ctx context.Context, input completionInput)
 
 	if input.Status == domaintypes.JobStatusSuccess && job.NextID != nil {
 		if !domaintypes.IsCanonicalFullCommitSHA(job.RepoShaIn) {
-			return completionResult{}, completeConflict("job repo_sha_in must match ^[0-9a-f]{40}$ for chain progression")
+			return completeConflict("job repo_sha_in must match ^[0-9a-f]{40}$ for chain progression")
 		}
 		if input.RepoSHAOut == "" {
-			return completionResult{}, completeBadRequest("repo_sha_out is required for successful jobs with next_id")
+			return completeBadRequest("repo_sha_out is required for successful jobs with next_id")
 		}
 	}
 
@@ -82,16 +81,16 @@ func (s *completionService) Complete(ctx context.Context, input completionInput)
 				"node_id", input.NodeID,
 				"err", err,
 			)
-			return completionResult{}, completeInternal("failed to persist job metrics", err)
+			return completeInternal("failed to persist job metrics", err)
 		}
 	}
 
 	persistedMeta := slices.Clone(job.Meta)
 	if input.StatsPayload.HasJobMeta() {
-		mergedMeta, mergeErr := mergeCompletionJobMeta(job.Meta, input.StatsPayload.JobMeta)
+		mergedMeta, mergeErr := mergeCompletionJobMeta(input.StatsPayload.JobMeta)
 		if mergeErr != nil {
 			slog.Error("complete job: merge metadata failed", "job_id", input.JobID, "err", mergeErr)
-			return completionResult{}, completeInternal("failed to merge job metadata", mergeErr)
+			return completeInternal("failed to merge job metadata", mergeErr)
 		}
 		if err := s.store.UpdateJobCompletionWithMeta(ctx, store.UpdateJobCompletionWithMetaParams{
 			ID:         job.ID,
@@ -106,7 +105,7 @@ func (s *completionService) Complete(ctx context.Context, input completionInput)
 				"node_id", input.NodeID,
 				"err", err,
 			)
-			return completionResult{}, completeInternal("failed to complete job", err)
+			return completeInternal("failed to complete job", err)
 		}
 		persistedMeta = mergedMeta
 	} else {
@@ -122,7 +121,7 @@ func (s *completionService) Complete(ctx context.Context, input completionInput)
 				"node_id", input.NodeID,
 				"err", err,
 			)
-			return completionResult{}, completeInternal("failed to complete job", err)
+			return completeInternal("failed to complete job", err)
 		}
 	}
 
@@ -158,8 +157,7 @@ func (s *completionService) Complete(ctx context.Context, input completionInput)
 		input:         input,
 		job:           job,
 		jobType:       jobType,
-		serviceType:   serviceType,
-		serviceTypeOK: serviceTypeOK,
+		jobTypeKnown:  jobTypeKnown,
 		persistedMeta: persistedMeta,
 	}
 
@@ -168,7 +166,7 @@ func (s *completionService) Complete(ctx context.Context, input completionInput)
 	s.onSuccess(ctx, state)
 	s.reconcileRepoRun(ctx, state)
 
-	return completionResult{}, nil
+	return nil
 }
 
 func (s *completionService) loadRunForPostCompletion(ctx context.Context, state *completeJobState, purpose string) (store.Run, bool) {

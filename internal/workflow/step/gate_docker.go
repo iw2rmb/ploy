@@ -63,7 +63,7 @@ func (e *gateExecutor) Execute(ctx context.Context, spec *contracts.StepGateSpec
 
 	reportGateRuntimeImage(ctx, plan.image)
 
-	envCopy := contracts.MergeEnv(spec.Env, plan.env)
+	envCopy := contracts.CopyEnv(spec.Env)
 	homeDir, err := resolveJobHome(envCopy)
 	if err != nil {
 		return nil, fmt.Errorf("resolve build gate home: %w", err)
@@ -87,7 +87,6 @@ func (e *gateExecutor) Execute(ctx context.Context, spec *contracts.StepGateSpec
 
 	specC := ContainerSpec{
 		Image:            plan.image,
-		Command:          plan.cmd,
 		WorkingDir:       "/workspace",
 		Mounts:           mounts,
 		Env:              envCopy,

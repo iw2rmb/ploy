@@ -68,11 +68,6 @@ func (m *handlerStore) UpdateRunError(_ context.Context, params store.UpdateRunE
 	return err
 }
 
-func (m *handlerStore) UpdateRunBaseRef(_ context.Context, params store.UpdateRunBaseRefParams) error {
-	_, err := m.updateRunBaseRef.record(params)
-	return err
-}
-
 func (m *handlerStore) ListRuns(_ context.Context, params store.ListRunsParams) ([]store.Run, error) {
 	return listPaged(m.listRuns.val, params.Offset, params.Limit), m.listRuns.err
 }
@@ -222,11 +217,6 @@ func (m *handlerStore) ListMigReposByMig(_ context.Context, migID types.MigID) (
 		return result, nil
 	}
 	return m.listMigReposByMig.record(migID)
-}
-
-func (m *handlerStore) UpdateMigRepoBaseRef(_ context.Context, params store.UpdateMigRepoBaseRefParams) error {
-	_, err := m.updateMigRepoBaseRef.record(params)
-	return err
 }
 
 func (m *handlerStore) GetRepo(_ context.Context, id types.RepoID) (store.Repo, error) {

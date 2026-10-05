@@ -7,27 +7,25 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/lifecycle"
 )
 
-func TestJobStatusFromExitCodeForJobType(t *testing.T) {
+func TestJobStatusFromExitCode(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name     string
-		jobType  domaintypes.JobType
 		exitCode int
 		want     domaintypes.JobStatus
 	}{
-		{name: "pre_gate non-zero is fail", jobType: domaintypes.JobTypePreGate, exitCode: 1, want: domaintypes.JobStatusFail},
-		{name: "mig non-zero is fail", jobType: domaintypes.JobTypeMig, exitCode: 1, want: domaintypes.JobStatusFail},
-		{name: "gate non-zero is fail", jobType: domaintypes.JobTypePostGate, exitCode: 1, want: domaintypes.JobStatusFail},
-		{name: "exit above one is error", jobType: domaintypes.JobTypeMig, exitCode: 2, want: domaintypes.JobStatusError},
+		{name: "zero is success", exitCode: 0, want: domaintypes.JobStatusSuccess},
+		{name: "one is fail", exitCode: 1, want: domaintypes.JobStatusFail},
+		{name: "exit above one is error", exitCode: 2, want: domaintypes.JobStatusError},
 	}
 
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			if got := lifecycle.JobStatusFromExitCodeForJobType(tt.jobType, tt.exitCode); got != tt.want {
-				t.Fatalf("JobStatusFromExitCodeForJobType(%q, %d) = %q, want %q", tt.jobType, tt.exitCode, got, tt.want)
+			if got := lifecycle.JobStatusFromExitCode(tt.exitCode); got != tt.want {
+				t.Fatalf("JobStatusFromExitCode(%d) = %q, want %q", tt.exitCode, got, tt.want)
 			}
 		})
 	}
@@ -38,22 +36,21 @@ func TestEvaluateCompletionDecision(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		jobType    domaintypes.JobType
 		status     domaintypes.JobStatus
 		hasNext    bool
 		wantAction lifecycle.CompletionChainAction
 	}{
-		{name: "success advances to next", jobType: domaintypes.JobTypeMig, status: domaintypes.JobStatusSuccess, hasNext: true, wantAction: lifecycle.CompletionChainAdvanceNext},
-		{name: "success terminal no action", jobType: domaintypes.JobTypeMig, status: domaintypes.JobStatusSuccess, hasNext: false, wantAction: lifecycle.CompletionChainNoAction},
-		{name: "failed gate cancels remainder", jobType: domaintypes.JobTypePostGate, status: domaintypes.JobStatusFail, hasNext: true, wantAction: lifecycle.CompletionChainCancelRemainder},
-		{name: "errored job cancels remainder", jobType: domaintypes.JobTypeMig, status: domaintypes.JobStatusError, hasNext: true, wantAction: lifecycle.CompletionChainCancelRemainder},
+		{name: "success advances to next", status: domaintypes.JobStatusSuccess, hasNext: true, wantAction: lifecycle.CompletionChainAdvanceNext},
+		{name: "success terminal no action", status: domaintypes.JobStatusSuccess, hasNext: false, wantAction: lifecycle.CompletionChainNoAction},
+		{name: "failed gate cancels remainder", status: domaintypes.JobStatusFail, hasNext: true, wantAction: lifecycle.CompletionChainCancelRemainder},
+		{name: "errored job cancels remainder", status: domaintypes.JobStatusError, hasNext: true, wantAction: lifecycle.CompletionChainCancelRemainder},
 	}
 
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := lifecycle.EvaluateCompletionDecision(tt.jobType, tt.status, tt.hasNext)
+			got := lifecycle.EvaluateCompletionDecision(tt.status, tt.hasNext)
 			if got.ChainAction != tt.wantAction {
 				t.Fatalf("ChainAction = %v, want %v", got.ChainAction, tt.wantAction)
 			}

@@ -153,7 +153,7 @@ func TestStream_PublishRun(t *testing.T) {
 				UpdatedAt: now,
 				Stages: map[domaintypes.JobID]migsapi.StageStatus{
 					stageJobID: {
-						State:       migsapi.StageStateQueued,
+						State:       migsapi.StageStatePending,
 						Attempts:    0,
 						MaxAttempts: 3,
 					},

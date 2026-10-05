@@ -23,11 +23,6 @@ func (m *handlerStore) UpdateRunCompletion(ctx context.Context, id types.RunID) 
 	return err
 }
 
-func (m *handlerStore) UpdateRunResume(ctx context.Context, id types.RunID) error {
-	_, err := m.updateRunResume.ret()
-	return err
-}
-
 func (m *handlerStore) UpdateWaveStatus(ctx context.Context, params store.UpdateWaveStatusParams) error {
 	_, err := m.updateWaveStatus.record(params)
 	return err

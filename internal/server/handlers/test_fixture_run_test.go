@@ -9,14 +9,6 @@ import (
 
 // Run query methods
 
-func (m *handlerStore) GetRunTiming(ctx context.Context, id types.RunID) (store.RunsTiming, error) {
-	return m.getRunTiming.record(id.String())
-}
-
-func (m *handlerStore) ListRunsTimings(ctx context.Context, arg store.ListRunsTimingsParams) ([]store.RunsTiming, error) {
-	return m.listRunsTimings.ret()
-}
-
 func (m *handlerStore) ListRunsWithMetadata(ctx context.Context, params store.ListRunsWithMetadataParams) ([]store.ListRunsWithMetadataRow, error) {
 	return m.listRunsWithMetadata.record(params)
 }

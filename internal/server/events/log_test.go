@@ -59,9 +59,7 @@ func TestStorage_CreateAndPublishLog(t *testing.T) {
 			svc := newTestService(t, mock)
 
 			ctx := context.Background()
-			if err := svc.CreateAndPublishLog(ctx, tt.log, tt.data); err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
+			svc.CreateAndPublishLog(ctx, tt.log, tt.data)
 
 			if tt.checkJobEvents {
 				snapshot := svc.Hub().SnapshotJob(*tt.log.JobID)

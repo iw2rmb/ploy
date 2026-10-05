@@ -37,11 +37,9 @@ type RunJobIOPreview struct {
 	Stderr []string
 }
 
-// RunStatusReportTextLayout is a rendered run status report with per-repo mutable sections.
+// RunStatusReportTextLayout is a rendered run status report.
 type RunStatusReportTextLayout struct {
-	Text            string
-	LineCount       int
-	DynamicSections []FollowDynamicSection
+	Text string
 }
 
 // RenderRunStatusReportText renders a one-shot, follow-style run snapshot.
@@ -104,11 +102,7 @@ func RenderRunStatusReportTextLayout(report RunStatusReport, opts TextRenderOpti
 		headerLines = append(headerLines, "")
 		block := strings.Join(append(headerLines, emptyReposLine), "\n")
 		rendered := lipgloss.NewStyle().Render(block) + "\n"
-		return RunStatusReportTextLayout{
-			Text:            rendered,
-			LineCount:       strings.Count(rendered, "\n"),
-			DynamicSections: nil,
-		}, nil
+		return RunStatusReportTextLayout{Text: rendered}, nil
 	}
 
 	frame := FollowFrame{
@@ -178,21 +172,7 @@ func RenderRunStatusReportTextLayout(report RunStatusReport, opts TextRenderOpti
 	}
 	rendered := lipgloss.NewStyle().Render(out.String())
 
-	dynamicSections := make([]FollowDynamicSection, len(frameLayout.Sections))
-	headerLineCount := len(headerLines)
-	for i, section := range frameLayout.Sections {
-		dynamicSections[i] = FollowDynamicSection{
-			StartLine: headerLineCount + section.StartLine,
-			LineCount: section.LineCount,
-			Text:      section.Text,
-		}
-	}
-
-	return RunStatusReportTextLayout{
-		Text:            rendered,
-		LineCount:       strings.Count(rendered, "\n"),
-		DynamicSections: dynamicSections,
-	}, nil
+	return RunStatusReportTextLayout{Text: rendered}, nil
 }
 
 func renderLink(label, rawURL string, enableOSC8 bool) string {

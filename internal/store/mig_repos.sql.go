@@ -229,22 +229,6 @@ func (q *Queries) ListMigReposByMig(ctx context.Context, migID types.MigID) ([]M
 	return items, nil
 }
 
-const updateMigRepoBaseRef = `-- name: UpdateMigRepoBaseRef :exec
-UPDATE mig_repos
-SET base_ref = $2
-WHERE id = $1
-`
-
-type UpdateMigRepoBaseRefParams struct {
-	ID      types.MigRepoID `json:"id"`
-	BaseRef string          `json:"base_ref"`
-}
-
-func (q *Queries) UpdateMigRepoBaseRef(ctx context.Context, arg UpdateMigRepoBaseRefParams) error {
-	_, err := q.db.Exec(ctx, updateMigRepoBaseRef, arg.ID, arg.BaseRef)
-	return err
-}
-
 const upsertMigRepo = `-- name: UpsertMigRepo :one
 WITH existing_repo AS (
   SELECT id

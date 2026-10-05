@@ -56,10 +56,6 @@ type model struct {
 	// (RUNS), and S6 (JOBS).
 	rightPaneList list.Model
 
-	// detailsList is the single-list rendered in S3 (migration details) and S5
-	// (run details) as the right panel.
-	detailsList list.Model
-
 	// selectedMigID tracks the migration chosen in S2 for drill-down to S3.
 	selectedMigID domaintypes.MigID
 
@@ -68,11 +64,6 @@ type model struct {
 
 	// selectedRunID tracks the run chosen in S4 for drill-down to S5.
 	selectedRunID domaintypes.RunID
-
-	// Selected entity flags control root PLOY item labels (plural vs singular).
-	hasSelectedMigration bool
-	hasSelectedRun       bool
-	hasSelectedJob       bool
 
 	// client and baseURL are used by shared list commands and TUI-only adapters.
 	client  *http.Client

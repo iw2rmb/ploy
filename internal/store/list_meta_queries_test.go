@@ -73,12 +73,6 @@ func TestArtifactSelectorBehavior(t *testing.T) {
 		wantOrder       string
 	}{
 		{
-			name:            "ListArtifactBundlesByRun",
-			sql:             listArtifactBundlesByRun,
-			requiredColumns: []string{"object_key", "bundle_size", "cid", "digest", "created_at"},
-			wantOrder:       "ORDER BY created_at DESC, id DESC",
-		},
-		{
 			name:            "ListArtifactBundlesByRunAndJob",
 			sql:             listArtifactBundlesByRunAndJob,
 			requiredColumns: []string{"object_key", "bundle_size", "cid", "digest", "created_at"},

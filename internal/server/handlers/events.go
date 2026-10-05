@@ -281,7 +281,7 @@ func timestampToString(ts pgtype.Timestamptz) string {
 //
 // Container log frames are not emitted on this stream (logs moved to job-scoped
 // streams). Only run, stage, and done events are returned.
-func getRunLogsHandler(st store.Store, _ blobstore.Store, eventsService *events.Service) http.HandlerFunc {
+func getRunLogsHandler(st store.Store, eventsService *events.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		runID, ok := parseRequiredPathIDOrWriteError[domaintypes.RunID](w, r, "run_id")
 		if !ok {

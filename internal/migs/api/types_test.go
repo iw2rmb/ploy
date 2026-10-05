@@ -20,7 +20,7 @@ func TestJSONRoundTrip(t *testing.T) {
 		RunID: runID,
 		State: RunStateRunning,
 		Stages: map[domaintypes.JobID]StageStatus{
-			stageKey: {State: StageStateQueued, CurrentJobID: jobID, NextID: &nextID},
+			stageKey: {State: StageStatePending, CurrentJobID: jobID, NextID: &nextID},
 		},
 	}
 

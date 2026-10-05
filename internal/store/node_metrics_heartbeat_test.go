@@ -11,7 +11,7 @@ import (
 )
 
 func TestUpdateNodeHeartbeat_AppendsNodeMetricsHistory(t *testing.T) {
-	ctx, db := openStoreForCancelBulkTests(t)
+	ctx, db := newTestStore(t)
 
 	nodeID := types.NewNodeKey()
 	node, err := db.CreateNode(ctx, CreateNodeParams{

@@ -191,27 +191,6 @@ func (h *Hub) Subscribe(ctx context.Context, runID domaintypes.RunID, sinceID do
 	return subscribeStream(ctx, h, h.streams, runID, sinceID)
 }
 
-// Close tears down the stream and removes it from the hub. No-op if the run ID is blank.
-func (h *Hub) Close(runID domaintypes.RunID) {
-	if runID.IsZero() {
-		return
-	}
-	runID = normalizeRunID(runID)
-	closeStream(h, h.streams, runID)
-}
-
-// CloseAll tears down all streams (run and job) and clears the hub. Safe for graceful shutdown.
-func (h *Hub) CloseAll() {
-	h.mu.Lock()
-	streams := make([]*stream, 0, len(h.streams)+len(h.jobStreams))
-	streams = drainStreams(h.streams, streams)
-	streams = drainStreams(h.jobStreams, streams)
-	h.mu.Unlock()
-	for _, s := range streams {
-		s.finish()
-	}
-}
-
 // ---------------------------------------------------------------------------
 // Job-keyed stream methods (container log fanout).
 // ---------------------------------------------------------------------------
@@ -371,28 +350,6 @@ func snapshotStream[K comparable](h *Hub, streams map[K]*stream, key K) []Event 
 		return nil
 	}
 	return s.snapshot()
-}
-
-func closeStream[K comparable](h *Hub, streams map[K]*stream, key K) {
-	h.mu.Lock()
-	s, ok := streams[key]
-	if ok {
-		delete(streams, key)
-	}
-	h.mu.Unlock()
-	if ok {
-		s.finish()
-	}
-}
-
-// drainStreams runs while the caller holds the hub mutex so CloseAll clears
-// both typed maps atomically before it closes subscribers.
-func drainStreams[K comparable](streams map[K]*stream, dst []*stream) []*stream {
-	for key, s := range streams {
-		dst = append(dst, s)
-		delete(streams, key)
-	}
-	return dst
 }
 
 // ---------------------------------------------------------------------------

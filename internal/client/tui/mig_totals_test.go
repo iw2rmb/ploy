@@ -47,61 +47,6 @@ func runMigCountTestCases(t *testing.T, command migCountCommand, tests []migCoun
 	}
 }
 
-func TestCountMigReposCommand(t *testing.T) {
-	t.Parallel()
-
-	migID := domaintypes.NewMigID()
-	repoID1 := domaintypes.NewMigRepoID()
-	repoID2 := domaintypes.NewMigRepoID()
-
-	tests := []migCountTestCase{
-		{
-			name:  "success returns repo count",
-			migID: migID,
-			handler: func(w http.ResponseWriter, r *http.Request) {
-				wantPath := "/v1/migs/" + migID.String() + "/repos"
-				if r.URL.Path != wantPath {
-					t.Errorf("path=%q, want %q", r.URL.Path, wantPath)
-				}
-				w.Header().Set("Content-Type", "application/json")
-				_ = json.NewEncoder(w).Encode(map[string]any{
-					"repos": []map[string]any{
-						{"id": repoID1.String(), "mig_id": migID.String(), "repo_url": "https://github.com/org/a", "base_ref": "main", "created_at": "2026-01-01T00:00:00Z"},
-						{"id": repoID2.String(), "mig_id": migID.String(), "repo_url": "https://github.com/org/b", "base_ref": "main", "created_at": "2026-01-01T00:00:00Z"},
-					},
-				})
-			},
-			wantCount: 2,
-		},
-		{
-			name:  "success empty repo set returns zero",
-			migID: migID,
-			handler: func(w http.ResponseWriter, r *http.Request) {
-				w.Header().Set("Content-Type", "application/json")
-				_ = json.NewEncoder(w).Encode(map[string]any{"repos": []any{}})
-			},
-			wantCount: 0,
-		},
-		{
-			name:  "http error returns error",
-			migID: migID,
-			handler: func(w http.ResponseWriter, r *http.Request) {
-				http.Error(w, `{"error":"not found"}`, http.StatusNotFound)
-			},
-			wantErr: true,
-		},
-		{
-			name:    "zero mig id returns error",
-			migID:   domaintypes.MigID(""),
-			wantErr: true,
-		},
-	}
-
-	runMigCountTestCases(t, func(ctx context.Context, client *http.Client, baseURL *url.URL, migID domaintypes.MigID) (int, error) {
-		return (CountMigReposCommand{Client: client, BaseURL: baseURL, MigID: migID}).Run(ctx)
-	}, tests)
-}
-
 func TestCountMigRunsCommand(t *testing.T) {
 	t.Parallel()
 

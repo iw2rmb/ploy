@@ -124,114 +124,6 @@ func (q *Queries) ClaimJob(ctx context.Context, nodeID types.NodeID) (Job, error
 	return i, err
 }
 
-const clearRepoSHAChainFromJob = `-- name: ClearRepoSHAChainFromJob :execrows
-WITH RECURSIVE chain AS (
-  SELECT j.id, j.next_id
-  FROM jobs j
-  WHERE j.id = $1
-    AND j.run_id = $2
-    AND j.attempt = $3
-    AND j.status IN ('Created', 'Queued')
-  UNION ALL
-  SELECT n.id, n.next_id
-  FROM jobs n
-  JOIN chain c ON n.id = c.next_id
-  WHERE n.run_id = $2
-    AND n.attempt = $3
-    AND n.status IN ('Created', 'Queued')
-)
-UPDATE jobs AS j
-SET repo_sha_in = '',
-    repo_sha_out = '',
-    repo_sha_in8 = '',
-    repo_sha_out8 = ''
-FROM chain
-WHERE j.id = chain.id
-`
-
-type ClearRepoSHAChainFromJobParams struct {
-	ID      types.JobID `json:"id"`
-	RunID   types.RunID `json:"run_id"`
-	Attempt int32       `json:"attempt"`
-}
-
-func (q *Queries) ClearRepoSHAChainFromJob(ctx context.Context, arg ClearRepoSHAChainFromJobParams) (int64, error) {
-	result, err := q.db.Exec(ctx, clearRepoSHAChainFromJob, arg.ID, arg.RunID, arg.Attempt)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
-}
-
-const countJobsByRun = `-- name: CountJobsByRun :one
-SELECT COUNT(*) FROM jobs
-WHERE run_id = $1
-`
-
-func (q *Queries) CountJobsByRun(ctx context.Context, runID types.RunID) (int64, error) {
-	row := q.db.QueryRow(ctx, countJobsByRun, runID)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
-}
-
-const countJobsByRunAndStatus = `-- name: CountJobsByRunAndStatus :one
-SELECT COUNT(*) FROM jobs
-WHERE run_id = $1 AND status = $2
-`
-
-type CountJobsByRunAndStatusParams struct {
-	RunID  types.RunID     `json:"run_id"`
-	Status types.JobStatus `json:"status"`
-}
-
-func (q *Queries) CountJobsByRunAndStatus(ctx context.Context, arg CountJobsByRunAndStatusParams) (int64, error) {
-	row := q.db.QueryRow(ctx, countJobsByRunAndStatus, arg.RunID, arg.Status)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
-}
-
-const countJobsByRunAttemptGroupByStatus = `-- name: CountJobsByRunAttemptGroupByStatus :many
-SELECT status, COUNT(*)::int AS count
-FROM jobs
-WHERE run_id = $1
-  AND attempt = $2
-GROUP BY status
-`
-
-type CountJobsByRunAttemptGroupByStatusParams struct {
-	RunID   types.RunID `json:"run_id"`
-	Attempt int32       `json:"attempt"`
-}
-
-type CountJobsByRunAttemptGroupByStatusRow struct {
-	Status types.JobStatus `json:"status"`
-	Count  int32           `json:"count"`
-}
-
-// Counts jobs by status for a specific run attempt.
-// Used by terminal detection to determine runs.status.
-func (q *Queries) CountJobsByRunAttemptGroupByStatus(ctx context.Context, arg CountJobsByRunAttemptGroupByStatusParams) ([]CountJobsByRunAttemptGroupByStatusRow, error) {
-	rows, err := q.db.Query(ctx, countJobsByRunAttemptGroupByStatus, arg.RunID, arg.Attempt)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []CountJobsByRunAttemptGroupByStatusRow{}
-	for rows.Next() {
-		var i CountJobsByRunAttemptGroupByStatusRow
-		if err := rows.Scan(&i.Status, &i.Count); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const countJobsPage = `-- name: CountJobsPage :one
 SELECT COUNT(jobs.id)::BIGINT
 FROM jobs
@@ -385,27 +277,6 @@ func (q *Queries) DeleteJob(ctx context.Context, id types.JobID) error {
 	return err
 }
 
-const getAdjacentJobIndices = `-- name: GetAdjacentJobIndices :one
-SELECT
-  j1.id AS prev_id,
-  j1.next_id AS next_id
-FROM jobs j1
-WHERE j1.id = $1
-`
-
-type GetAdjacentJobIndicesRow struct {
-	PrevID types.JobID  `json:"prev_id"`
-	NextID *types.JobID `json:"next_id"`
-}
-
-// Transitional: returns current job id and linked successor id.
-func (q *Queries) GetAdjacentJobIndices(ctx context.Context, id types.JobID) (GetAdjacentJobIndicesRow, error) {
-	row := q.db.QueryRow(ctx, getAdjacentJobIndices, id)
-	var i GetAdjacentJobIndicesRow
-	err := row.Scan(&i.PrevID, &i.NextID)
-	return i, err
-}
-
 const getJob = `-- name: GetJob :one
 SELECT
   id,
@@ -458,79 +329,6 @@ func (q *Queries) GetJob(ctx context.Context, id types.JobID) (Job, error) {
 		&i.Meta,
 	)
 	return i, err
-}
-
-const listCreatedJobsByRunAttempt = `-- name: ListCreatedJobsByRunAttempt :many
-SELECT
-  id,
-  run_id,
-  repo_id,
-  repo_base_ref,
-  attempt,
-  status,
-  job_type,
-  job_image,
-  next_id,
-  name,
-  node_id,
-  exit_code,
-  started_at,
-  finished_at,
-  duration_ms,
-  repo_sha_in,
-  repo_sha_out,
-  repo_sha_in8,
-  repo_sha_out8,
-  meta
-FROM jobs
-WHERE run_id = $1 AND attempt = $2 AND status = 'Created'
-ORDER BY id ASC
-`
-
-type ListCreatedJobsByRunAttemptParams struct {
-	RunID   types.RunID `json:"run_id"`
-	Attempt int32       `json:"attempt"`
-}
-
-func (q *Queries) ListCreatedJobsByRunAttempt(ctx context.Context, arg ListCreatedJobsByRunAttemptParams) ([]Job, error) {
-	rows, err := q.db.Query(ctx, listCreatedJobsByRunAttempt, arg.RunID, arg.Attempt)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []Job{}
-	for rows.Next() {
-		var i Job
-		if err := rows.Scan(
-			&i.ID,
-			&i.RunID,
-			&i.RepoID,
-			&i.RepoBaseRef,
-			&i.Attempt,
-			&i.Status,
-			&i.JobType,
-			&i.JobImage,
-			&i.NextID,
-			&i.Name,
-			&i.NodeID,
-			&i.ExitCode,
-			&i.StartedAt,
-			&i.FinishedAt,
-			&i.DurationMs,
-			&i.RepoShaIn,
-			&i.RepoShaOut,
-			&i.RepoShaIn8,
-			&i.RepoShaOut8,
-			&i.Meta,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
 }
 
 const listJobsByRun = `-- name: ListJobsByRun :many
@@ -1036,42 +834,6 @@ type UpdateJobMetaParams struct {
 
 func (q *Queries) UpdateJobMeta(ctx context.Context, arg UpdateJobMetaParams) error {
 	_, err := q.db.Exec(ctx, updateJobMeta, arg.ID, arg.Meta)
-	return err
-}
-
-const updateJobNextID = `-- name: UpdateJobNextID :exec
-UPDATE jobs
-SET next_id = $2
-WHERE id = $1
-`
-
-type UpdateJobNextIDParams struct {
-	ID     types.JobID  `json:"id"`
-	NextID *types.JobID `json:"next_id"`
-}
-
-func (q *Queries) UpdateJobNextID(ctx context.Context, arg UpdateJobNextIDParams) error {
-	_, err := q.db.Exec(ctx, updateJobNextID, arg.ID, arg.NextID)
-	return err
-}
-
-const updateJobRepoSHAIn = `-- name: UpdateJobRepoSHAIn :exec
-UPDATE jobs
-SET repo_sha_in = $2,
-    repo_sha_in8 = CASE
-      WHEN $2::TEXT = '' THEN ''
-      ELSE SUBSTRING($2::TEXT, 1, 8)
-    END
-WHERE id = $1
-`
-
-type UpdateJobRepoSHAInParams struct {
-	ID        types.JobID `json:"id"`
-	RepoShaIn string      `json:"repo_sha_in"`
-}
-
-func (q *Queries) UpdateJobRepoSHAIn(ctx context.Context, arg UpdateJobRepoSHAInParams) error {
-	_, err := q.db.Exec(ctx, updateJobRepoSHAIn, arg.ID, arg.RepoShaIn)
 	return err
 }
 

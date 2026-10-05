@@ -63,16 +63,6 @@ func (q *Queries) DeleteArtifactBundle(ctx context.Context, id pgtype.UUID) erro
 	return err
 }
 
-const deleteArtifactBundlesOlderThan = `-- name: DeleteArtifactBundlesOlderThan :exec
-DELETE FROM artifact_bundles
-WHERE created_at < $1
-`
-
-func (q *Queries) DeleteArtifactBundlesOlderThan(ctx context.Context, createdAt pgtype.Timestamptz) error {
-	_, err := q.db.Exec(ctx, deleteArtifactBundlesOlderThan, createdAt)
-	return err
-}
-
 const getArtifactBundle = `-- name: GetArtifactBundle :one
 SELECT id, run_id, job_id, name, bundle_size, object_key, cid, digest, created_at FROM artifact_bundles
 WHERE id = $1
@@ -105,43 +95,6 @@ ORDER BY created_at DESC, id DESC
 // Returns artifact bundle metadata including object_key for object-storage retrieval.
 func (q *Queries) ListArtifactBundlesByCID(ctx context.Context, cid *string) ([]ArtifactBundle, error) {
 	rows, err := q.db.Query(ctx, listArtifactBundlesByCID, cid)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ArtifactBundle{}
-	for rows.Next() {
-		var i ArtifactBundle
-		if err := rows.Scan(
-			&i.ID,
-			&i.RunID,
-			&i.JobID,
-			&i.Name,
-			&i.BundleSize,
-			&i.ObjectKey,
-			&i.Cid,
-			&i.Digest,
-			&i.CreatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listArtifactBundlesByRun = `-- name: ListArtifactBundlesByRun :many
-SELECT id, run_id, job_id, name, bundle_size, object_key, cid, digest, created_at FROM artifact_bundles
-WHERE run_id = $1
-ORDER BY created_at DESC, id DESC
-`
-
-// Returns artifact bundle metadata including object_key for object-storage retrieval.
-func (q *Queries) ListArtifactBundlesByRun(ctx context.Context, runID types.RunID) ([]ArtifactBundle, error) {
-	rows, err := q.db.Query(ctx, listArtifactBundlesByRun, runID)
 	if err != nil {
 		return nil, err
 	}

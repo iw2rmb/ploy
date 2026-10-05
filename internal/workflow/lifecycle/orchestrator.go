@@ -34,13 +34,6 @@ func JobStatusFromExitCode(exitCode int) domaintypes.JobStatus {
 	return domaintypes.JobStatusError
 }
 
-// JobStatusFromExitCodeForJobType maps process exit codes to terminal status with
-// job-type-specific overrides.
-func JobStatusFromExitCodeForJobType(jobType domaintypes.JobType, exitCode int) domaintypes.JobStatus {
-	_ = jobType
-	return JobStatusFromExitCode(exitCode)
-}
-
 // ========== Completion Decision ==========
 
 // CompletionChainAction is the chain management action required after a job completes.
@@ -64,11 +57,9 @@ type CompletionDecision struct {
 // completes. It is pure: no I/O is performed.
 // hasNext should be true when the completed job has a linked successor (NextID != nil).
 func EvaluateCompletionDecision(
-	jobType domaintypes.JobType,
 	jobStatus domaintypes.JobStatus,
 	hasNext bool,
 ) CompletionDecision {
-	_ = jobType
 	switch jobStatus {
 	case domaintypes.JobStatusSuccess:
 		if hasNext {

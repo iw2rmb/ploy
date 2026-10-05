@@ -22,7 +22,6 @@ func InitialModel(client *http.Client, baseURL *url.URL) model {
 		screen:        ScreenPloyList,
 		rootList:      ploy,
 		rightPaneList: newList("", nil),
-		detailsList:   newList("", nil),
 		jobList:       joblist.New("JOBS"),
 		client:        client,
 		baseURL:       baseURL,
@@ -116,13 +115,6 @@ func (m model) handleMigDetailsLoaded(msg migDetailsLoadedMsg) model {
 			{title: "Jobs", desc: "select job"},
 		}))
 		m.rootList.Select(0)
-		return m
-	}
-	items := m.detailsList.Items()
-	if len(items) >= 2 {
-		items[0] = listItem{title: "repositories", description: fmt.Sprintf("total: %d", msg.repoTotal)}
-		items[1] = listItem{title: "runs", description: fmt.Sprintf("total: %d", msg.runTotal)}
-		m.detailsList.SetItems(items)
 	}
 	return m
 }
@@ -135,13 +127,6 @@ func (m model) handleRunDetailsLoaded(msg runDetailsLoadedMsg) model {
 			{title: "Jobs", desc: fmt.Sprintf("total: %d", msg.jobTotal)},
 		}))
 		m.rootList.Select(1)
-		return m
-	}
-	items := m.detailsList.Items()
-	if len(items) >= 2 {
-		items[0] = listItem{title: "Repositories", description: fmt.Sprintf("total: %d", msg.repoTotal)}
-		items[1] = listItem{title: "Jobs", description: fmt.Sprintf("total: %d", msg.jobTotal)}
-		m.detailsList.SetItems(items)
 	}
 	return m
 }

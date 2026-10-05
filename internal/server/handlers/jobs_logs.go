@@ -117,9 +117,7 @@ func createJobLogsHandler(st store.Store, bp *blobpersist.Service, eventsService
 			return
 		}
 
-		if err := eventsService.CreateAndPublishLog(r.Context(), logRow, req.Data); err != nil {
-			slog.Error("job logs ingest: SSE fanout failed", "log_id", logRow.ID, "err", err)
-		}
+		eventsService.CreateAndPublishLog(r.Context(), logRow, req.Data)
 
 		writeJSON(w, http.StatusCreated, map[string]any{"id": logRow.ID, "chunk_no": logRow.ChunkNo})
 	}

@@ -53,7 +53,7 @@ func completeJobHandler(st store.Store, eventsService *events.Service, bp *blobp
 			return
 		}
 
-		_, err = service.Complete(ctx, completionInput{
+		err = service.Complete(ctx, completionInput{
 			JobID:        jobID,
 			NodeID:       nodeID,
 			Status:       normalizedStatus,

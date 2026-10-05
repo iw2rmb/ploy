@@ -95,11 +95,6 @@ UPDATE runs
 SET last_error = $2
 WHERE id = $1;
 
--- name: UpdateRunBaseRef :exec
-UPDATE runs
-SET repo_base_ref = $2
-WHERE id = $1;
-
 -- name: CountRunsByWaveStatus :many
 SELECT status, COUNT(*)::int AS count
 FROM runs
@@ -156,26 +151,3 @@ WHERE mig_id = $1
   AND status = $3
 ORDER BY created_at DESC
 LIMIT 1;
-
--- name: UpdateRunResume :exec
-UPDATE runs
-SET stats = stats || jsonb_build_object(
-    'resume_count', COALESCE((stats->>'resume_count')::int, 0) + 1,
-    'last_resumed_at', to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
-)
-WHERE id = $1;
-
--- name: GetRunTiming :one
-SELECT id,
-       COALESCE(queue_ms, 0) AS queue_ms,
-       COALESCE(run_ms, 0)   AS run_ms
-FROM runs_timing
-WHERE id = $1;
-
--- name: ListRunsTimings :many
-SELECT id,
-       COALESCE(queue_ms, 0) AS queue_ms,
-       COALESCE(run_ms, 0)   AS run_ms
-FROM runs_timing
-ORDER BY id DESC
-LIMIT $1 OFFSET $2;

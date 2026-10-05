@@ -38,8 +38,7 @@ func TestRenderFollowFrameText_RendersRowsAndExitOneLiner(t *testing.T) {
 		},
 	}
 
-	layout := RenderFollowFrameTextLayout(frame)
-	out, lines := layout.Text, layout.LineCount
+	out := RenderFollowFrameTextLayout(frame).Text
 
 	assertx.Contains(t, out, "Repo 1/1: example.com/acme/repo")
 	assertx.Contains(t, out, "Step")
@@ -48,9 +47,6 @@ func TestRenderFollowFrameText_RendersRowsAndExitOneLiner(t *testing.T) {
 	assertx.Contains(t, out, "mig")
 	assertx.Contains(t, out, "└ build failed")
 	assertx.Contains(t, out, "\n\x1b[31m└ build failed\x1b[0m\n")
-	if lines != strings.Count(out, "\n") {
-		t.Fatalf("line count mismatch: got %d want %d", lines, strings.Count(out, "\n"))
-	}
 }
 
 func TestRenderFollowFrameText_RendersMultiLineExitOneLiner(t *testing.T) {
@@ -70,13 +66,9 @@ func TestRenderFollowFrameText_RendersMultiLineExitOneLiner(t *testing.T) {
 		},
 	}
 
-	layout := RenderFollowFrameTextLayout(frame)
-	out, lines := layout.Text, layout.LineCount
+	out := RenderFollowFrameTextLayout(frame).Text
 	assertx.Contains(t, out, "└  Exit 1: first line")
 	assertx.Contains(t, out, "             second line")
-	if lines != strings.Count(out, "\n") {
-		t.Fatalf("line count mismatch: got %d want %d", lines, strings.Count(out, "\n"))
-	}
 }
 
 func TestRenderFollowFrameText_RightAlignsDurationColumn(t *testing.T) {

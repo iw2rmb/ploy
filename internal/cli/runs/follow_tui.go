@@ -3,7 +3,6 @@ package runs
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -252,7 +251,6 @@ func (c FollowRunCommand) coordinate(
 	defer close(stateCh)
 	defer close(errCh)
 
-	refreshCh := make(chan struct{}, 1)
 	pollTicker := time.NewTicker(pollInterval)
 	defer pollTicker.Stop()
 
@@ -326,7 +324,8 @@ func (c FollowRunCommand) coordinate(
 
 		endpoint := strings.TrimRight(c.BaseURL.String(), "/") + "/v1/jobs/" + jobID.String() + "/logs"
 		go func() {
-			err := jobStreamClient.Stream(jobCtx, endpoint, func(evt stream.Event) error {
+			// Polling stays authoritative; preview stream failures are non-fatal.
+			_ = jobStreamClient.Stream(jobCtx, endpoint, func(evt stream.Event) error {
 				switch normalizeStatus(evt.Type) {
 				case "", "log":
 					var rec logstream.LogRecord
@@ -341,9 +340,6 @@ func (c FollowRunCommand) coordinate(
 					return nil
 				}
 			})
-			if err != nil && !errors.Is(err, context.Canceled) {
-				// Polling stays authoritative; preview stream failures are non-fatal.
-			}
 			stopTracker(jobID)
 		}()
 	}
@@ -415,10 +411,6 @@ func (c FollowRunCommand) coordinate(
 			errCh <- ctx.Err()
 			program.Send(followErrMsg{err: ctx.Err()})
 			return
-		case <-refreshCh:
-			if done := fetch(); done {
-				return
-			}
 		case <-pollTicker.C:
 			if done := fetch(); done {
 				return

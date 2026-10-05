@@ -46,11 +46,6 @@ FROM mig_repos
 WHERE mig_id = $1
 ORDER BY created_at ASC, id ASC;
 
--- name: UpdateMigRepoBaseRef :exec
-UPDATE mig_repos
-SET base_ref = $2
-WHERE id = $1;
-
 -- name: DeleteMigRepo :exec
 -- Deletes a mig_repo by id.
 -- Note: mig_repos.id remains referenced by API-level repo membership records.

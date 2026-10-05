@@ -22,7 +22,7 @@ func makeS3Model(t *testing.T) model {
 
 func TestS3MigDetailsLoadedUpdatesRunsTotalInPloy(t *testing.T) {
 	s3m := makeS3Model(t)
-	afterLoad, _ := s3m.Update(migDetailsLoadedMsg{repoTotal: 5, runTotal: 3})
+	afterLoad, _ := s3m.Update(migDetailsLoadedMsg{runTotal: 3})
 	lm := afterLoad.(model)
 
 	items := lm.rootList.Items()

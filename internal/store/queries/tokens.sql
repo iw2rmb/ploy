@@ -13,11 +13,6 @@ UPDATE api_tokens
 SET last_used_at = NOW()
 WHERE token_id = $1;
 
--- name: UpdateBootstrapTokenLastUsed :exec
-UPDATE bootstrap_tokens
-SET used_at = NOW()
-WHERE token_id = $1 AND used_at IS NULL;
-
 -- name: InsertAPIToken :exec
 INSERT INTO api_tokens (
     token_hash,
@@ -89,8 +84,3 @@ SELECT
 FROM bootstrap_tokens
 WHERE token_id = $1
 LIMIT 1;
-
--- name: MarkBootstrapTokenCertIssued :exec
-UPDATE bootstrap_tokens
-SET cert_issued_at = NOW()
-WHERE token_id = $1;

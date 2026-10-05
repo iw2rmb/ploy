@@ -250,17 +250,6 @@ func (q *Queries) ListAPITokens(ctx context.Context) ([]ListAPITokensRow, error)
 	return items, nil
 }
 
-const markBootstrapTokenCertIssued = `-- name: MarkBootstrapTokenCertIssued :exec
-UPDATE bootstrap_tokens
-SET cert_issued_at = NOW()
-WHERE token_id = $1
-`
-
-func (q *Queries) MarkBootstrapTokenCertIssued(ctx context.Context, tokenID string) error {
-	_, err := q.db.Exec(ctx, markBootstrapTokenCertIssued, tokenID)
-	return err
-}
-
 const revokeAPIToken = `-- name: RevokeAPIToken :exec
 UPDATE api_tokens
 SET revoked_at = NOW()
@@ -280,16 +269,5 @@ WHERE token_id = $1
 
 func (q *Queries) UpdateAPITokenLastUsed(ctx context.Context, tokenID string) error {
 	_, err := q.db.Exec(ctx, updateAPITokenLastUsed, tokenID)
-	return err
-}
-
-const updateBootstrapTokenLastUsed = `-- name: UpdateBootstrapTokenLastUsed :exec
-UPDATE bootstrap_tokens
-SET used_at = NOW()
-WHERE token_id = $1 AND used_at IS NULL
-`
-
-func (q *Queries) UpdateBootstrapTokenLastUsed(ctx context.Context, tokenID string) error {
-	_, err := q.db.Exec(ctx, updateBootstrapTokenLastUsed, tokenID)
 	return err
 }

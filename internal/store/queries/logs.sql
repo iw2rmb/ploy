@@ -1,8 +1,3 @@
--- name: GetLog :one
--- Returns log metadata including object_key for object-storage retrieval.
-SELECT id, run_id, job_id, chunk_no, data_size, object_key, created_at FROM logs
-WHERE id = $1;
-
 -- name: ListLogsByRun :many
 -- Returns log metadata including object_key for object-storage retrieval.
 SELECT
@@ -31,34 +26,6 @@ FROM logs
 WHERE run_id = sqlc.arg(run_id) AND id > sqlc.arg(id)
 ORDER BY chunk_no ASC, id ASC;
 
--- name: ListLogsByRunAndJob :many
--- Returns log metadata including object_key for object-storage retrieval.
-SELECT
-  id,
-  run_id,
-  job_id,
-  chunk_no,
-  data_size,
-  object_key,
-  created_at
-FROM logs
-WHERE run_id = sqlc.arg(run_id) AND job_id = sqlc.arg(job_id)
-ORDER BY chunk_no ASC, id ASC;
-
--- name: ListLogsByRunAndJobSince :many
--- Returns log metadata including object_key for object-storage retrieval.
-SELECT
-  id,
-  run_id,
-  job_id,
-  chunk_no,
-  data_size,
-  object_key,
-  created_at
-FROM logs
-WHERE run_id = sqlc.arg(run_id) AND job_id = sqlc.arg(job_id) AND id > sqlc.arg(id)
-ORDER BY chunk_no ASC, id ASC;
-
 -- name: CreateLog :one
 -- Creates a new log chunk metadata. Blob data is stored in object storage.
 -- Logs are grouped at the job level only (build_id removed).
@@ -69,7 +36,3 @@ RETURNING *;
 -- name: DeleteLog :exec
 DELETE FROM logs
 WHERE id = $1;
-
--- name: DeleteLogsOlderThan :exec
-DELETE FROM logs
-WHERE created_at < $1;

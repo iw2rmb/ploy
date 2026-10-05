@@ -32,9 +32,7 @@ func TestFanout_LogsGoToJobStreamOnly(t *testing.T) {
 		CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
 	}
 
-	if err := svc.CreateAndPublishLog(ctx, logRow, gzipData(t, "hello\n")); err != nil {
-		t.Fatalf("CreateAndPublishLog: %v", err)
-	}
+	svc.CreateAndPublishLog(ctx, logRow, gzipData(t, "hello\n"))
 
 	// Job stream must have the log event.
 	jobSnap := svc.Hub().SnapshotJob(jobID)
@@ -116,9 +114,7 @@ func TestFanout_NilJobIDSkipsFanout(t *testing.T) {
 		CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
 	}
 
-	if err := svc.CreateAndPublishLog(ctx, logRow, []byte("data")); err != nil {
-		t.Fatalf("CreateAndPublishLog: %v", err)
-	}
+	svc.CreateAndPublishLog(ctx, logRow, []byte("data"))
 
 	// Neither stream should have events.
 	if snap := svc.Hub().Snapshot(runID); len(snap) != 0 {

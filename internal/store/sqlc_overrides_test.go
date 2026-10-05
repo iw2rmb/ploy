@@ -26,7 +26,6 @@ func TestSQLCOverridesCompile(t *testing.T) {
 	// This ensures sqlc overrides apply not only to models, but also to query args/returns.
 	type typedIDQuerier interface {
 		GetRun(ctx context.Context, id types.RunID) (Run, error)
-		GetRunTiming(ctx context.Context, id types.RunID) (RunsTiming, error)
 		GetJob(ctx context.Context, id types.JobID) (Job, error)
 		GetNode(ctx context.Context, id types.NodeID) (Node, error)
 		GetMig(ctx context.Context, id types.MigID) (Mig, error)

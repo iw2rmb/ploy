@@ -241,40 +241,6 @@ WHERE jobs.status = 'Running'
     OR nodes.last_heartbeat < $1
   );
 
--- name: GetAdjacentJobIndices :one
--- Transitional: returns current job id and linked successor id.
-SELECT
-  j1.id AS prev_id,
-  j1.next_id AS next_id
-FROM jobs j1
-WHERE j1.id = $1;
-
--- name: ListCreatedJobsByRunAttempt :many
-SELECT
-  id,
-  run_id,
-  repo_id,
-  repo_base_ref,
-  attempt,
-  status,
-  job_type,
-  job_image,
-  next_id,
-  name,
-  node_id,
-  exit_code,
-  started_at,
-  finished_at,
-  duration_ms,
-  repo_sha_in,
-  repo_sha_out,
-  repo_sha_in8,
-  repo_sha_out8,
-  meta
-FROM jobs
-WHERE run_id = $1 AND attempt = $2 AND status = 'Created'
-ORDER BY id ASC;
-
 -- name: PromoteJobByIDIfUnblocked :one
 -- Atomically promote a specific linked successor job: Created -> Queued.
 -- The candidate is eligible only when every predecessor that points to it is Success.
@@ -317,52 +283,6 @@ RETURNING
   jobs.repo_sha_in8,
   jobs.repo_sha_out8,
   jobs.meta;
-
--- name: UpdateJobNextID :exec
-UPDATE jobs
-SET next_id = $2
-WHERE id = $1;
-
--- name: UpdateJobRepoSHAIn :exec
-UPDATE jobs
-SET repo_sha_in = $2,
-    repo_sha_in8 = CASE
-      WHEN $2::TEXT = '' THEN ''
-      ELSE SUBSTRING($2::TEXT, 1, 8)
-    END
-WHERE id = $1;
-
--- name: ClearRepoSHAChainFromJob :execrows
-WITH RECURSIVE chain AS (
-  SELECT j.id, j.next_id
-  FROM jobs j
-  WHERE j.id = $1
-    AND j.run_id = $2
-    AND j.attempt = $3
-    AND j.status IN ('Created', 'Queued')
-  UNION ALL
-  SELECT n.id, n.next_id
-  FROM jobs n
-  JOIN chain c ON n.id = c.next_id
-  WHERE n.run_id = $2
-    AND n.attempt = $3
-    AND n.status IN ('Created', 'Queued')
-)
-UPDATE jobs AS j
-SET repo_sha_in = '',
-    repo_sha_out = '',
-    repo_sha_in8 = '',
-    repo_sha_out8 = ''
-FROM chain
-WHERE j.id = chain.id;
-
--- name: CountJobsByRun :one
-SELECT COUNT(*) FROM jobs
-WHERE run_id = $1;
-
--- name: CountJobsByRunAndStatus :one
-SELECT COUNT(*) FROM jobs
-WHERE run_id = $1 AND status = $2;
 
 -- name: UpdateJobCompletion :exec
 WITH completed AS (
@@ -446,15 +366,6 @@ SET repo_sha_in = CASE
     END
 FROM completed
 WHERE next_job.id = completed.next_id;
-
--- name: CountJobsByRunAttemptGroupByStatus :many
--- Counts jobs by status for a specific run attempt.
--- Used by terminal detection to determine runs.status.
-SELECT status, COUNT(*)::int AS count
-FROM jobs
-WHERE run_id = $1
-  AND attempt = $2
-GROUP BY status;
 
 -- name: ListJobsPage :many
 -- Lists jobs with optional run, node, and status filters, ordered newest-to-oldest by job id.

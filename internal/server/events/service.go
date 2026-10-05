@@ -121,18 +121,16 @@ func (s *Service) CreateAndPublishEvent(ctx context.Context, params store.Create
 // frames and published to the job stream keyed by JobID.
 //
 // If the log has no JobID, SSE fanout is skipped (job-stream requires a job key).
-func (s *Service) CreateAndPublishLog(ctx context.Context, log store.Log, data []byte) error {
+func (s *Service) CreateAndPublishLog(ctx context.Context, log store.Log, data []byte) {
 	if log.JobID == nil || log.JobID.IsZero() {
 		s.logger.Debug("log has no job_id, skipping job-stream SSE fanout", "log_id", log.ID)
-		return nil
+		return
 	}
 	jobID := *log.JobID
 
 	if err := s.publishLogToJobStream(ctx, jobID, log, data); err != nil {
 		s.logger.Error("job SSE fanout failed", "log_id", log.ID, "job_id", jobID.String(), "error", err)
 	}
-
-	return nil
 }
 
 // PublishRun publishes a run lifecycle event (queued/running/succeeded/failed/cancelled)

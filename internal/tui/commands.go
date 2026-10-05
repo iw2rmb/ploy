@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/url"
 
@@ -66,18 +67,10 @@ func loadJobsCmd(client *http.Client, baseURL *url.URL, runID *domaintypes.RunID
 	}
 }
 
-// loadMigDetailsCmd returns a tea.Cmd that fetches repo and run totals for the
+// loadMigDetailsCmd returns a tea.Cmd that fetches the run total for the
 // given migration, used to populate the S3 detail list.
 func loadMigDetailsCmd(client *http.Client, baseURL *url.URL, migID domaintypes.MigID) tea.Cmd {
 	return func() tea.Msg {
-		repoCount, err := clitui.CountMigReposCommand{
-			Client:  client,
-			BaseURL: baseURL,
-			MigID:   migID,
-		}.Run(context.Background())
-		if err != nil {
-			return errMsg{err: err}
-		}
 		runCount, err := clitui.CountMigRunsCommand{
 			Client:  client,
 			BaseURL: baseURL,
@@ -86,36 +79,35 @@ func loadMigDetailsCmd(client *http.Client, baseURL *url.URL, migID domaintypes.
 		if err != nil {
 			return errMsg{err: err}
 		}
-		return migDetailsLoadedMsg{repoTotal: repoCount, runTotal: runCount}
+		return migDetailsLoadedMsg{runTotal: runCount}
 	}
 }
 
 // migDetailsLoadedMsg carries migration detail totals from async fetch.
 type migDetailsLoadedMsg struct {
-	repoTotal int
-	runTotal  int
+	runTotal int
 }
 
-// loadRunDetailsCmd returns a tea.Cmd that fetches repo and job totals for the
+// loadRunDetailsCmd returns a tea.Cmd that fetches the job total for the
 // given run, used to populate the S5 detail list.
 func loadRunDetailsCmd(client *http.Client, baseURL *url.URL, runID domaintypes.RunID) tea.Cmd {
 	return func() tea.Msg {
-		totals, err := clitui.GetRunTotalsCommand{
+		jobs, err := sharedclient.ListJobsCommand{
 			Client:  client,
 			BaseURL: baseURL,
-			RunID:   runID,
+			Limit:   1,
+			RunID:   &runID,
 		}.Run(context.Background())
 		if err != nil {
-			return errMsg{err: err}
+			return errMsg{err: fmt.Errorf("get run totals: %w", err)}
 		}
-		return runDetailsLoadedMsg{repoTotal: int(totals.RepoTotal), jobTotal: int(totals.JobTotal)}
+		return runDetailsLoadedMsg{jobTotal: int(jobs.Total)}
 	}
 }
 
 // runDetailsLoadedMsg carries run detail totals from async fetch.
 type runDetailsLoadedMsg struct {
-	repoTotal int
-	jobTotal  int
+	jobTotal int
 }
 
 // loadJobDetailsCmd fetches run job details for the confirmed job.

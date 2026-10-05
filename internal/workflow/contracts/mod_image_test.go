@@ -276,17 +276,15 @@ func TestJobImageClassification(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name          string
-		image         JobImage
-		wantEmpty     bool
-		wantUniversal bool
-		wantByStack   bool
+		name      string
+		image     JobImage
+		wantEmpty bool
 	}{
 		{name: "empty", image: JobImage{}, wantEmpty: true},
 		{name: "empty stack map", image: JobImage{ByStack: map[MigStack]string{}}, wantEmpty: true},
-		{name: "universal", image: JobImage{Universal: "img:v1"}, wantUniversal: true},
-		{name: "stack map", image: JobImage{ByStack: map[MigStack]string{"default": "img:v1"}}, wantByStack: true},
-		{name: "both prefer stack map", image: JobImage{Universal: "img:v1", ByStack: map[MigStack]string{"default": "img:v2"}}, wantByStack: true},
+		{name: "universal", image: JobImage{Universal: "img:v1"}},
+		{name: "stack map", image: JobImage{ByStack: map[MigStack]string{"default": "img:v1"}}},
+		{name: "both", image: JobImage{Universal: "img:v1", ByStack: map[MigStack]string{"default": "img:v2"}}},
 	}
 
 	for _, tt := range tests {
@@ -294,12 +292,6 @@ func TestJobImageClassification(t *testing.T) {
 			t.Parallel()
 			if got := tt.image.IsEmpty(); got != tt.wantEmpty {
 				t.Errorf("IsEmpty() = %v, want %v", got, tt.wantEmpty)
-			}
-			if got := tt.image.IsUniversal(); got != tt.wantUniversal {
-				t.Errorf("IsUniversal() = %v, want %v", got, tt.wantUniversal)
-			}
-			if got := tt.image.IsStackSpecific(); got != tt.wantByStack {
-				t.Errorf("IsStackSpecific() = %v, want %v", got, tt.wantByStack)
 			}
 		})
 	}

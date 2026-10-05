@@ -6,18 +6,9 @@ import (
 	"unicode/utf8"
 )
 
-// FollowDynamicSection describes one mutable line block in a rendered follow frame.
-type FollowDynamicSection struct {
-	StartLine int
-	LineCount int
-	Text      string
-}
-
-// FollowFrameRender is the rendered follow frame with dynamic section metadata.
+// FollowFrameRender is the rendered follow frame.
 type FollowFrameRender struct {
-	Text      string
-	LineCount int
-	Sections  []FollowDynamicSection
+	Text string
 }
 
 // FollowFrame is a reusable follow-style text frame.
@@ -40,21 +31,12 @@ type FollowStepRow struct {
 	DetailLines  []string
 }
 
-type followDynamicSectionRange struct {
-	start int
-	count int
-}
-
-// RenderFollowFrameTextLayout renders a follow frame plus per-repo dynamic section metadata.
+// RenderFollowFrameTextLayout renders a follow frame.
 func RenderFollowFrameTextLayout(frame FollowFrame) FollowFrameRender {
-
 	var buf bytes.Buffer
-	lineNo := 0
-	sectionRanges := make([]followDynamicSectionRange, len(frame.Repos))
 	appendLine := func(line string) {
 		_, _ = buf.WriteString(line)
 		_ = buf.WriteByte('\n')
-		lineNo++
 	}
 
 	for i, repo := range frame.Repos {
@@ -66,10 +48,8 @@ func RenderFollowFrameTextLayout(frame FollowFrame) FollowFrameRender {
 		}
 
 		if len(repo.Rows) == 0 {
-			sectionRanges[i] = followDynamicSectionRange{start: lineNo, count: 0}
 			if strings.TrimSpace(repo.EmptyLine) != "" {
 				appendLine(repo.EmptyLine)
-				sectionRanges[i] = followDynamicSectionRange{start: lineNo, count: 1}
 			}
 			continue
 		}
@@ -80,7 +60,6 @@ func RenderFollowFrameTextLayout(frame FollowFrame) FollowFrameRender {
 			appendLine(tableLines[0])
 			tableLineOffset = 1
 		}
-		sectionStart := lineNo
 		for rowIndex, row := range repo.Rows {
 			if idx := tableLineOffset + rowIndex; idx < len(tableLines) {
 				appendLine(tableLines[idx])
@@ -88,8 +67,7 @@ func RenderFollowFrameTextLayout(frame FollowFrame) FollowFrameRender {
 				appendLine("")
 			}
 
-			if strings.TrimSpace(row.ExitOneLiner) == "" {
-			} else {
+			if strings.TrimSpace(row.ExitOneLiner) != "" {
 				for _, exitLine := range strings.Split(row.ExitOneLiner, "\n") {
 					appendLine(exitLine)
 				}
@@ -98,26 +76,9 @@ func RenderFollowFrameTextLayout(frame FollowFrame) FollowFrameRender {
 				appendLine(detailLine)
 			}
 		}
-		sectionRanges[i] = followDynamicSectionRange{start: sectionStart, count: lineNo - sectionStart}
 	}
 
-	rendered := buf.String()
-	renderedLines := strings.Count(rendered, "\n")
-	lines := splitRenderedLines(rendered)
-	sections := make([]FollowDynamicSection, len(sectionRanges))
-	for i, section := range sectionRanges {
-		sections[i] = FollowDynamicSection{
-			StartLine: section.start,
-			LineCount: section.count,
-			Text:      joinRenderedLineRange(lines, section.start, section.count),
-		}
-	}
-
-	return FollowFrameRender{
-		Text:      rendered,
-		LineCount: renderedLines,
-		Sections:  sections,
-	}
+	return FollowFrameRender{Text: buf.String()}
 }
 
 func renderFollowRepoTableLines(repo FollowRepoFrame) []string {
@@ -190,28 +151,6 @@ func followDurationColumnIndex(columns []string) int {
 		}
 	}
 	return -1
-}
-
-func splitRenderedLines(rendered string) []string {
-	if rendered == "" {
-		return nil
-	}
-	lines := strings.Split(rendered, "\n")
-	if len(lines) > 0 && lines[len(lines)-1] == "" {
-		lines = lines[:len(lines)-1]
-	}
-	return lines
-}
-
-func joinRenderedLineRange(lines []string, start int, count int) string {
-	if count <= 0 || start < 0 || start >= len(lines) {
-		return ""
-	}
-	end := start + count
-	if end > len(lines) {
-		end = len(lines)
-	}
-	return strings.Join(lines[start:end], "\n") + "\n"
 }
 
 func terminalEscapeSeqEnd(value string, escPos int) int {

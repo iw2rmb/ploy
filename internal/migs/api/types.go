@@ -13,26 +13,22 @@ import (
 type StageState string
 
 const (
-	StageStatePending    StageState = "pending"
-	StageStateQueued     StageState = "queued"
-	StageStateRunning    StageState = "running"
-	StageStateSucceeded  StageState = "succeeded"
-	StageStateFailed     StageState = "failed"
-	StageStateCancelling StageState = "cancelling"
-	StageStateCancelled  StageState = "cancelled"
+	StageStatePending   StageState = "pending"
+	StageStateRunning   StageState = "running"
+	StageStateSucceeded StageState = "succeeded"
+	StageStateFailed    StageState = "failed"
+	StageStateCancelled StageState = "cancelled"
 )
 
 // RunState mirrors Migs run lifecycle states exposed over the API.
 type RunState string
 
 const (
-	RunStatePending    RunState = "pending"
-	RunStateRunning    RunState = "running"
-	RunStateSucceeded  RunState = "succeeded"
-	RunStateFailed     RunState = "failed"
-	RunStateError      RunState = "error"
-	RunStateCancelling RunState = "cancelling"
-	RunStateCancelled  RunState = "cancelled"
+	RunStatePending   RunState = "pending"
+	RunStateRunning   RunState = "running"
+	RunStateSucceeded RunState = "succeeded"
+	RunStateFailed    RunState = "failed"
+	RunStateCancelled RunState = "cancelled"
 )
 
 // RunSummary is the canonical response type for GET /v1/runs/{id}/status (status)

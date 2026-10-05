@@ -27,7 +27,7 @@ func makeS5Model(t *testing.T) model {
 
 func TestS5RunDetailsLoadedUpdatesJobsTotalInPloy(t *testing.T) {
 	s5m := makeS5Model(t)
-	afterLoad, _ := s5m.Update(runDetailsLoadedMsg{repoTotal: 4, jobTotal: 7})
+	afterLoad, _ := s5m.Update(runDetailsLoadedMsg{jobTotal: 7})
 	lm := afterLoad.(model)
 
 	items := lm.rootList.Items()

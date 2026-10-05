@@ -1,7 +1,6 @@
 package store
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -10,13 +9,8 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-func openStoreForSpecBundleTests(t *testing.T) (context.Context, Store) {
-	t.Helper()
-	return newTestStore(t)
-}
-
 func TestSpecBundle_CreateAndGet(t *testing.T) {
-	ctx, db := openStoreForSpecBundleTests(t)
+	ctx, db := newTestStore(t)
 
 	createdBy := "test-user"
 	id := string(string(types.NewSpecBundleID()))
@@ -75,7 +69,7 @@ func TestSpecBundle_CreateAndGet(t *testing.T) {
 }
 
 func TestSpecBundle_GetByID_NotFound(t *testing.T) {
-	ctx, db := openStoreForSpecBundleTests(t)
+	ctx, db := newTestStore(t)
 
 	_, err := db.GetSpecBundle(ctx, string(types.NewSpecBundleID()))
 	if err != pgx.ErrNoRows {
@@ -84,7 +78,7 @@ func TestSpecBundle_GetByID_NotFound(t *testing.T) {
 }
 
 func TestSpecBundle_GetByCID(t *testing.T) {
-	ctx, db := openStoreForSpecBundleTests(t)
+	ctx, db := newTestStore(t)
 
 	cid := "bafybeid-test-cid-" + string(types.NewSpecBundleID())
 
@@ -109,7 +103,7 @@ func TestSpecBundle_GetByCID(t *testing.T) {
 }
 
 func TestSpecBundle_GetByCID_NotFound(t *testing.T) {
-	ctx, db := openStoreForSpecBundleTests(t)
+	ctx, db := newTestStore(t)
 
 	_, err := db.GetSpecBundleByCID(ctx, "nonexistent-cid-"+string(types.NewSpecBundleID()))
 	if err != pgx.ErrNoRows {
@@ -118,7 +112,7 @@ func TestSpecBundle_GetByCID_NotFound(t *testing.T) {
 }
 
 func TestSpecBundle_List(t *testing.T) {
-	ctx, db := openStoreForSpecBundleTests(t)
+	ctx, db := newTestStore(t)
 
 	suffix := string(types.NewSpecBundleID())
 	for i := range 3 {
@@ -153,7 +147,7 @@ func TestSpecBundle_List(t *testing.T) {
 }
 
 func TestSpecBundle_UpdateLastRefAt(t *testing.T) {
-	ctx, db := openStoreForSpecBundleTests(t)
+	ctx, db := newTestStore(t)
 
 	id := string(types.NewSpecBundleID())
 	original, err := db.CreateSpecBundle(ctx, CreateSpecBundleParams{
@@ -184,7 +178,7 @@ func TestSpecBundle_UpdateLastRefAt(t *testing.T) {
 }
 
 func TestSpecBundle_ListUnreferencedBefore(t *testing.T) {
-	ctx, db := openStoreForSpecBundleTests(t)
+	ctx, db := newTestStore(t)
 
 	id := string(types.NewSpecBundleID())
 	_, err := db.CreateSpecBundle(ctx, CreateSpecBundleParams{
@@ -231,7 +225,7 @@ func TestSpecBundle_ListUnreferencedBefore(t *testing.T) {
 }
 
 func TestSpecBundle_SizeConstraint(t *testing.T) {
-	ctx, db := openStoreForSpecBundleTests(t)
+	ctx, db := newTestStore(t)
 
 	// Zero size violates CHECK (size > 0).
 	_, err := db.CreateSpecBundle(ctx, CreateSpecBundleParams{

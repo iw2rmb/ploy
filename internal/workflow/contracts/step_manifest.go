@@ -24,12 +24,9 @@ type StepManifest struct {
 	Name       string
 	Image      string
 	Command    []string
-	Args       []string
 	WorkingDir string
 	Envs       map[string]string
 	Inputs     []StepInput
-	Outputs    []StepOutput
-	Artifacts  []StepArtifact
 	Gate       *StepGateSpec
 	Resources  StepResourceSpec
 	// Options holds arbitrary run-specific options.
@@ -74,19 +71,6 @@ type StepInput struct {
 	SnapshotCID types.CID
 	DiffCID     types.CID
 	Hydration   *StepInputHydration
-}
-
-// StepOutput describes expected paths produced by the container.
-type StepOutput struct {
-	Name string
-	Path string
-	Type string
-}
-
-// StepArtifact describes an artifact emitted after execution.
-type StepArtifact struct {
-	Name string
-	Type string
 }
 
 // StepGateSpec configures Build Gate validation post step execution.

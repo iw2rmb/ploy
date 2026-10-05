@@ -12,8 +12,6 @@ import (
 
 type gateExecutionPlan struct {
 	image     string
-	cmd       []string
-	env       map[string]string
 	language  string
 	tool      string
 	release   string
@@ -58,19 +56,12 @@ func resolveGateExecutionPlan(
 		return gateExecutionPlan{}, imageResolutionTerminal(stackCtx, err)
 	}
 
-	cmd, prepEnv, err := resolveGateCommand(workspace, stackCtx.language, stackCtx.tool, stackCtx.release)
-	if err != nil {
-		return gateExecutionPlan{}, commandResolutionTerminal(stackCtx, err, image)
-	}
-
 	if stackCtx.stackGate != nil {
 		stackCtx.stackGate.RuntimeImage = image
 	}
 
 	return gateExecutionPlan{
 		image:     image,
-		cmd:       cmd,
-		env:       prepEnv,
 		language:  stackCtx.language,
 		tool:      stackCtx.tool,
 		release:   stackCtx.release,
@@ -96,23 +87,6 @@ func imageResolutionTerminal(stackCtx gateStackContext, err error) *gateExecutio
 	}
 	return gateFailureTerminal(stackCtx.language, stackCtx.tool, code, err.Error(), "",
 		gateInternalError(code, err.Error()), "")
-}
-
-func commandResolutionTerminal(
-	stackCtx gateStackContext,
-	err error,
-	runtimeImage string,
-) *gateExecutionTerminal {
-	unknownCode := "BUILD_GATE_COMMAND_RESOLUTION_ERROR"
-	if stackCtx.stackGate != nil {
-		unknownCode = "STACK_GATE_COMMAND_RESOLUTION_ERROR"
-	}
-
-	if stackCtx.stackGate != nil {
-		return stackGateFailureTerminal(stackCtx.stackGate, stackCtx.language, unknownCode, err.Error(), "", "unknown", runtimeImage, nil)
-	}
-	return gateFailureTerminal(stackCtx.language, stackCtx.tool, unknownCode, err.Error(), "",
-		gateInternalError(unknownCode, err.Error()), runtimeImage)
 }
 
 func gateInternalError(code string, message string) error {

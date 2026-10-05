@@ -87,16 +87,6 @@ func (m JobImage) IsEmpty() bool {
 	return m.Universal == "" && len(m.ByStack) == 0
 }
 
-// IsUniversal returns true if the image is specified as a universal string.
-func (m JobImage) IsUniversal() bool {
-	return m.Universal != "" && len(m.ByStack) == 0
-}
-
-// IsStackSpecific returns true if the image is specified as a stack map.
-func (m JobImage) IsStackSpecific() bool {
-	return len(m.ByStack) > 0
-}
-
 // ResolveImage resolves the image for the given stack using resolution rules:
 //  1. If JobImage is a universal string, return that string.
 //  2. If JobImage is a stack map:

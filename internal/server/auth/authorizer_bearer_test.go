@@ -58,16 +58,6 @@ func (m *mockQuerier) UpdateAPITokenLastUsed(ctx context.Context, tokenID string
 	return nil
 }
 
-func (m *mockQuerier) UpdateBootstrapTokenLastUsed(ctx context.Context, tokenID string) error {
-	m.mu.Lock()
-	m.updateBootstrapTokenLastUsedCalled = true
-	m.mu.Unlock()
-	if m.updateBootstrapTokenLastUsedFunc != nil {
-		return m.updateBootstrapTokenLastUsedFunc(ctx, tokenID)
-	}
-	return nil
-}
-
 func (m *mockQuerier) APITokenLastUsedCalled() bool {
 	m.mu.Lock()
 	defer m.mu.Unlock()

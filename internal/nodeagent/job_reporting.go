@@ -63,7 +63,7 @@ func (r *runController) reportTerminalStatus(
 			"component": "run_controller", "status": status.String(), "duration_ms": duration.Milliseconds(),
 		})
 	} else {
-		status = lifecycle.JobStatusFromExitCodeForJobType(req.JobType, result.ExitCode)
+		status = lifecycle.JobStatusFromExitCode(result.ExitCode)
 		ec := int32(result.ExitCode)
 		exitCode = &ec
 	}

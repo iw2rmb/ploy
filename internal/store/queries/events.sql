@@ -1,7 +1,3 @@
--- name: GetEvent :one
-SELECT * FROM events
-WHERE id = $1;
-
 -- name: ListEventsByRun :many
 SELECT id, run_id, job_id, time, level, message, meta FROM events
 WHERE run_id = sqlc.arg(run_id)

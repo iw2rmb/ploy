@@ -1,15 +1,12 @@
 package runs
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
-	"strings"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/httpx"
@@ -20,7 +17,6 @@ type CancelCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
 	RunID   domaintypes.RunID
-	Reason  string
 	Output  io.Writer
 }
 
@@ -33,21 +29,9 @@ func (c CancelCommand) Run(ctx context.Context) error {
 		return errors.New("runs cancel: run id required")
 	}
 	endpoint := c.BaseURL.JoinPath("v1", "runs", c.RunID.String(), "cancel")
-	payload := map[string]string{}
-	if r := strings.TrimSpace(c.Reason); r != "" {
-		payload["reason"] = r
-	}
-	var body io.Reader
-	if len(payload) > 0 {
-		b, _ := json.Marshal(payload)
-		body = bytes.NewReader(b)
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), body)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), nil)
 	if err != nil {
 		return err
-	}
-	if body != nil {
-		req.Header.Set("Content-Type", "application/json")
 	}
 	resp, err := c.Client.Do(req)
 	if err != nil {

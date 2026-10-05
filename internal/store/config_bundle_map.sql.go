@@ -9,17 +9,6 @@ import (
 	"context"
 )
 
-const deleteConfigBundleMap = `-- name: DeleteConfigBundleMap :exec
-DELETE FROM config_bundle_map
-WHERE hash = $1
-`
-
-// Removes a bundle map entry by hash.
-func (q *Queries) DeleteConfigBundleMap(ctx context.Context, hash string) error {
-	_, err := q.db.Exec(ctx, deleteConfigBundleMap, hash)
-	return err
-}
-
 const listConfigBundleMap = `-- name: ListConfigBundleMap :many
 
 SELECT hash, bundle_id, updated_at
@@ -27,8 +16,8 @@ FROM config_bundle_map
 ORDER BY hash ASC
 `
 
-// config_bundle_map.sql — CRUD queries for global bundle map entries (config_bundle_map table).
-// Provides ListConfigBundleMap, UpsertConfigBundleMap, DeleteConfigBundleMap.
+// config_bundle_map.sql — read queries for global bundle map entries (config_bundle_map table).
+// Provides ListConfigBundleMap.
 // Returns all bundle map entries ordered by hash for deterministic iteration.
 func (q *Queries) ListConfigBundleMap(ctx context.Context) ([]ConfigBundleMap, error) {
 	rows, err := q.db.Query(ctx, listConfigBundleMap)
@@ -48,24 +37,4 @@ func (q *Queries) ListConfigBundleMap(ctx context.Context) ([]ConfigBundleMap, e
 		return nil, err
 	}
 	return items, nil
-}
-
-const upsertConfigBundleMap = `-- name: UpsertConfigBundleMap :exec
-INSERT INTO config_bundle_map (hash, bundle_id, updated_at)
-VALUES ($1, $2, now())
-ON CONFLICT (hash) DO UPDATE SET
-  bundle_id  = EXCLUDED.bundle_id,
-  updated_at = now()
-`
-
-type UpsertConfigBundleMapParams struct {
-	Hash     string `json:"hash"`
-	BundleID string `json:"bundle_id"`
-}
-
-// Inserts or updates a bundle map entry (upsert on primary key hash).
-// Refreshes bundle_id and updated_at on conflict.
-func (q *Queries) UpsertConfigBundleMap(ctx context.Context, arg UpsertConfigBundleMapParams) error {
-	_, err := q.db.Exec(ctx, upsertConfigBundleMap, arg.Hash, arg.BundleID)
-	return err
 }

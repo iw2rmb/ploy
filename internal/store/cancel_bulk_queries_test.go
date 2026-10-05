@@ -10,7 +10,7 @@ import (
 )
 
 func TestCancelActiveRunsByWave_TransitionsOnlyQueuedRunning(t *testing.T) {
-	ctx, db := openStoreForCancelBulkTests(t)
+	ctx, db := newTestStore(t)
 
 	fx := newV1Fixture(t, ctx, db, "https://github.com/test/cancel-repos-a", "main", []byte(`{"type":"cancel-repos"}`))
 
@@ -97,7 +97,7 @@ func TestCancelActiveRunsByWave_TransitionsOnlyQueuedRunning(t *testing.T) {
 }
 
 func TestCancelActiveJobsByRun_TransitionsOnlyCreatedQueuedRunning(t *testing.T) {
-	ctx, db := openStoreForCancelBulkTests(t)
+	ctx, db := newTestStore(t)
 
 	fx := newV1Fixture(t, ctx, db, "https://github.com/test/cancel-jobs-a", "main", []byte(`{"type":"cancel-jobs"}`))
 
@@ -240,7 +240,7 @@ func TestCancelActiveJobsByRun_TransitionsOnlyCreatedQueuedRunning(t *testing.T)
 }
 
 func TestCancelBulkQueries_AreScopedToRunID(t *testing.T) {
-	ctx, db := openStoreForCancelBulkTests(t)
+	ctx, db := newTestStore(t)
 
 	fxA := newV1Fixture(t, ctx, db, "https://github.com/test/cancel-scope-a", "main", []byte(`{"type":"cancel-scope-a"}`))
 	fxB := newV1Fixture(t, ctx, db, "https://github.com/test/cancel-scope-b", "main", []byte(`{"type":"cancel-scope-b"}`))
@@ -295,11 +295,6 @@ func TestCancelBulkQueries_AreScopedToRunID(t *testing.T) {
 	if jobBAfter.Status != types.JobStatusCreated {
 		t.Fatalf("run B job status=%q, want %q", jobBAfter.Status, types.JobStatusCreated)
 	}
-}
-
-func openStoreForCancelBulkTests(t *testing.T) (context.Context, Store) {
-	t.Helper()
-	return newTestStore(t)
 }
 
 func setJobRunningForCancelBulkTest(t *testing.T, ctx context.Context, db Store, jobID types.JobID) {

@@ -35,22 +35,6 @@ func bearerTokenPath() string {
 	return defaultBearerTokenPath
 }
 
-// createWorkspaceDir creates a temporary workspace directory for a single run.
-func createWorkspaceDir() (string, error) {
-	base := os.Getenv("PLOYD_CACHE_HOME")
-	if base == "" {
-		base = os.TempDir()
-	}
-	if err := os.MkdirAll(base, 0o750); err != nil {
-		return "", err
-	}
-	absBase, err := filepath.Abs(base)
-	if err == nil {
-		base = absBase
-	}
-	return os.MkdirTemp(base, "ploy-run-*")
-}
-
 // listFilesRecursive returns whether directory has any files and a slice of absolute file paths.
 func listFilesRecursive(root string) (bool, []string) {
 	var out []string

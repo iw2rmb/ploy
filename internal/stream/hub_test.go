@@ -160,38 +160,3 @@ func TestHubJobStreamIsolatedFromRunStream(t *testing.T) {
 		t.Fatalf("job stream: expected 1 log event, got %d events", len(jobSnap))
 	}
 }
-
-func TestHubCloseAllIncludesJobStreams(t *testing.T) {
-	hub := NewHub(Options{BufferSize: 4, HistorySize: 8})
-	ctx := context.Background()
-	runID := domaintypes.NewRunID()
-	jobID := domaintypes.NewJobID()
-
-	_ = hub.PublishStage(ctx, runID, LogRecord{Line: "stage"})
-	_ = hub.PublishJobLog(ctx, jobID, LogRecord{Line: "log"})
-
-	// Subscribe to both streams before CloseAll.
-	runSub, err := hub.Subscribe(ctx, runID, 0)
-	if err != nil {
-		t.Fatalf("subscribe run: %v", err)
-	}
-	jobSub, err := hub.SubscribeJob(ctx, jobID, 0)
-	if err != nil {
-		t.Fatalf("subscribe job: %v", err)
-	}
-
-	hub.CloseAll()
-
-	// Both subscriber channels should be closed.
-	drained := 0
-	for range runSub.Events {
-		drained++
-	}
-	for range jobSub.Events {
-		drained++
-	}
-	// Should have drained the history events and then channels closed.
-	if drained != 2 {
-		t.Fatalf("expected 2 drained events (1 run + 1 job), got %d", drained)
-	}
-}

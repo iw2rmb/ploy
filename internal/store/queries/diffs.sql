@@ -8,10 +8,6 @@ RETURNING *;
 DELETE FROM diffs
 WHERE id = $1;
 
--- name: DeleteDiffsOlderThan :exec
-DELETE FROM diffs
-WHERE created_at < $1;
-
 -- name: ListDiffsByRun :many
 -- Returns diff metadata for a run.
 SELECT

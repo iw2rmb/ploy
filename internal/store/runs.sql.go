@@ -197,21 +197,6 @@ func (q *Queries) GetRunSnapshotMetadata(ctx context.Context, id types.RunID) (G
 	return i, err
 }
 
-const getRunTiming = `-- name: GetRunTiming :one
-SELECT id,
-       COALESCE(queue_ms, 0) AS queue_ms,
-       COALESCE(run_ms, 0)   AS run_ms
-FROM runs_timing
-WHERE id = $1
-`
-
-func (q *Queries) GetRunTiming(ctx context.Context, id types.RunID) (RunsTiming, error) {
-	row := q.db.QueryRow(ctx, getRunTiming, id)
-	var i RunsTiming
-	err := row.Scan(&i.ID, &i.QueueMs, &i.RunMs)
-	return i, err
-}
-
 const hasRunningJobForRunNode = `-- name: HasRunningJobForRunNode :one
 SELECT EXISTS (
   SELECT 1
@@ -422,40 +407,6 @@ func (q *Queries) ListRunsForRepo(ctx context.Context, arg ListRunsForRepoParams
 	return items, nil
 }
 
-const listRunsTimings = `-- name: ListRunsTimings :many
-SELECT id,
-       COALESCE(queue_ms, 0) AS queue_ms,
-       COALESCE(run_ms, 0)   AS run_ms
-FROM runs_timing
-ORDER BY id DESC
-LIMIT $1 OFFSET $2
-`
-
-type ListRunsTimingsParams struct {
-	Limit  int32 `json:"limit"`
-	Offset int32 `json:"offset"`
-}
-
-func (q *Queries) ListRunsTimings(ctx context.Context, arg ListRunsTimingsParams) ([]RunsTiming, error) {
-	rows, err := q.db.Query(ctx, listRunsTimings, arg.Limit, arg.Offset)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []RunsTiming{}
-	for rows.Next() {
-		var i RunsTiming
-		if err := rows.Scan(&i.ID, &i.QueueMs, &i.RunMs); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const listRunsWithMetadata = `-- name: ListRunsWithMetadata :many
 SELECT
   runs.id,
@@ -637,22 +588,6 @@ func (q *Queries) ListRunsWithURLByWave(ctx context.Context, waveID types.WaveID
 	return items, nil
 }
 
-const updateRunBaseRef = `-- name: UpdateRunBaseRef :exec
-UPDATE runs
-SET repo_base_ref = $2
-WHERE id = $1
-`
-
-type UpdateRunBaseRefParams struct {
-	ID          types.RunID `json:"id"`
-	RepoBaseRef string      `json:"repo_base_ref"`
-}
-
-func (q *Queries) UpdateRunBaseRef(ctx context.Context, arg UpdateRunBaseRefParams) error {
-	_, err := q.db.Exec(ctx, updateRunBaseRef, arg.ID, arg.RepoBaseRef)
-	return err
-}
-
 const updateRunError = `-- name: UpdateRunError :exec
 UPDATE runs
 SET last_error = $2
@@ -666,20 +601,6 @@ type UpdateRunErrorParams struct {
 
 func (q *Queries) UpdateRunError(ctx context.Context, arg UpdateRunErrorParams) error {
 	_, err := q.db.Exec(ctx, updateRunError, arg.ID, arg.LastError)
-	return err
-}
-
-const updateRunResume = `-- name: UpdateRunResume :exec
-UPDATE runs
-SET stats = stats || jsonb_build_object(
-    'resume_count', COALESCE((stats->>'resume_count')::int, 0) + 1,
-    'last_resumed_at', to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
-)
-WHERE id = $1
-`
-
-func (q *Queries) UpdateRunResume(ctx context.Context, id types.RunID) error {
-	_, err := q.db.Exec(ctx, updateRunResume, id)
 	return err
 }
 

@@ -25,8 +25,4 @@ func (m *handlerStore) ListLogsByRun(ctx context.Context, runID types.RunID) ([]
 	return m.listLogsByRun.record(runID.String())
 }
 
-func (m *handlerStore) ListLogsByRunAndJob(ctx context.Context, arg store.ListLogsByRunAndJobParams) ([]store.Log, error) {
-	return m.listLogsByRunAndJob.record(arg)
-}
-
 // Spec/Mig/Run creation methods (for migs_ticket flow)

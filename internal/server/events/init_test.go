@@ -104,7 +104,5 @@ func TestStorage_WithoutStore(t *testing.T) {
 	}
 
 	// CreateAndPublishLog without store should NOT fail (SSE fanout only).
-	if err := svc.CreateAndPublishLog(ctx, store.Log{}, []byte{}); err != nil {
-		t.Fatalf("expected no error for CreateAndPublishLog (SSE-only), got: %v", err)
-	}
+	svc.CreateAndPublishLog(ctx, store.Log{}, []byte{})
 }
