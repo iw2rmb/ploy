@@ -38,9 +38,8 @@ func TestOnSuccess_GateSuccessPromotesLinkedNext(t *testing.T) {
 			Status:     domaintypes.JobStatusSuccess,
 			RepoSHAOut: "0123456789abcdef0123456789abcdef01234567",
 		},
-		job:          job,
-		jobType:      domaintypes.JobTypePostGate,
-		jobTypeKnown: true,
+		job:     job,
+		jobType: domaintypes.JobTypePostGate,
 	}
 
 	svc.onSuccess(context.Background(), state)

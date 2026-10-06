@@ -6,11 +6,6 @@ import (
 	"unicode/utf8"
 )
 
-// FollowFrameRender is the rendered follow frame.
-type FollowFrameRender struct {
-	Text string
-}
-
 // FollowFrame is a reusable follow-style text frame.
 type FollowFrame struct {
 	Repos []FollowRepoFrame
@@ -31,8 +26,7 @@ type FollowStepRow struct {
 	DetailLines  []string
 }
 
-// RenderFollowFrameTextLayout renders a follow frame.
-func RenderFollowFrameTextLayout(frame FollowFrame) FollowFrameRender {
+func RenderFollowFrameText(frame FollowFrame) string {
 	var buf bytes.Buffer
 	appendLine := func(line string) {
 		_, _ = buf.WriteString(line)
@@ -78,7 +72,7 @@ func RenderFollowFrameTextLayout(frame FollowFrame) FollowFrameRender {
 		}
 	}
 
-	return FollowFrameRender{Text: buf.String()}
+	return buf.String()
 }
 
 func renderFollowRepoTableLines(repo FollowRepoFrame) []string {

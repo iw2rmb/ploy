@@ -37,8 +37,8 @@ func TestReportRemainsVisibleOnFinishedJobsAndRToggles(t *testing.T) {
 	if !m.expandReport {
 		t.Fatal("r did not expand report")
 	}
-	layout, err := RenderRunStatusReportTextLayout(report, TextRenderOptions{ExpandReport: m.expandReport, Now: time.Now()})
-	if err != nil || !strings.Contains(layout.Text, "first") || !strings.Contains(layout.Text, "last") {
-		t.Fatalf("finished report: %s, %v", layout.Text, err)
+	text := FormatRunStatusReportText(report, TextRenderOptions{ExpandReport: m.expandReport, Now: time.Now()})
+	if !strings.Contains(text, "first") || !strings.Contains(text, "last") {
+		t.Fatalf("finished report: %s", text)
 	}
 }

@@ -38,7 +38,7 @@ func TestRenderFollowFrameText_RendersRowsAndExitOneLiner(t *testing.T) {
 		},
 	}
 
-	out := RenderFollowFrameTextLayout(frame).Text
+	out := RenderFollowFrameText(frame)
 
 	assertx.Contains(t, out, "Repo 1/1: example.com/acme/repo")
 	assertx.Contains(t, out, "Step")
@@ -66,7 +66,7 @@ func TestRenderFollowFrameText_RendersMultiLineExitOneLiner(t *testing.T) {
 		},
 	}
 
-	out := RenderFollowFrameTextLayout(frame).Text
+	out := RenderFollowFrameText(frame)
 	assertx.Contains(t, out, "└  Exit 1: first line")
 	assertx.Contains(t, out, "             second line")
 }
@@ -86,7 +86,7 @@ func TestRenderFollowFrameText_RightAlignsDurationColumn(t *testing.T) {
 		},
 	}
 
-	out := RenderFollowFrameTextLayout(frame).Text
+	out := RenderFollowFrameText(frame)
 	lines := strings.Split(strings.TrimSuffix(out, "\n"), "\n")
 	if len(lines) < 3 {
 		t.Fatalf("expected at least header + 2 rows, got %q", out)
@@ -121,7 +121,7 @@ func TestRenderFollowFrameText_DoesNotInflatePaddingForANSIStateGlyphs(t *testin
 		},
 	}
 
-	out := RenderFollowFrameTextLayout(frame).Text
+	out := RenderFollowFrameText(frame)
 	lines := strings.Split(strings.TrimSuffix(out, "\n"), "\n")
 	if len(lines) < 3 {
 		t.Fatalf("expected header + 2 rows, got %q", out)
@@ -171,7 +171,7 @@ func TestRenderFollowFrameText_ExitRowsDoNotShiftColumns(t *testing.T) {
 		},
 	}
 
-	out := RenderFollowFrameTextLayout(frame).Text
+	out := RenderFollowFrameText(frame)
 	lines := strings.Split(strings.TrimSuffix(out, "\n"), "\n")
 	if len(lines) < 5 {
 		t.Fatalf("expected header + rows + exit line, got %q", out)
@@ -211,7 +211,7 @@ func TestRenderFollowFrameText_RendersEmptyLineForRepoWithoutRows(t *testing.T) 
 		},
 	}
 
-	out := RenderFollowFrameTextLayout(frame).Text
+	out := RenderFollowFrameText(frame)
 	assertx.Contains(t, out, "Repo:  [1/1] example.com/acme/repo main -> feature")
 	assertx.Contains(t, out, "Jobs: none")
 }
@@ -233,7 +233,7 @@ func TestRenderFollowFrameText_OSC8LinkDoesNotInflateSiblingColumnPadding(t *tes
 		},
 	}
 
-	out := RenderFollowFrameTextLayout(frame).Text
+	out := RenderFollowFrameText(frame)
 	plain := stripOSC8(stripCSI(out))
 	lines := strings.Split(strings.TrimSuffix(plain, "\n"), "\n")
 	if len(lines) < 3 {

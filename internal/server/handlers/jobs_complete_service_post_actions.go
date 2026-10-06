@@ -13,13 +13,6 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/lifecycle"
 )
 
-func (state *completeJobState) routedJobType() domaintypes.JobType {
-	if state.jobTypeKnown {
-		return state.jobType
-	}
-	return ""
-}
-
 func (s *completionService) onFail(ctx context.Context, state *completeJobState) {
 	if state.input.Status != domaintypes.JobStatusFail && state.input.Status != domaintypes.JobStatusError {
 		return
@@ -38,7 +31,7 @@ func (s *completionService) onFail(ctx context.Context, state *completeJobState)
 		}
 	}
 
-	jobType := state.routedJobType()
+	jobType := state.jobType
 	if state.input.Status == domaintypes.JobStatusFail && lifecycle.IsGateJobType(jobType) {
 		if errMsg := formatStackGateError(jobType, state.persistedMeta); errMsg != nil {
 			if updateErr := s.store.UpdateRunError(ctx, store.UpdateRunErrorParams{

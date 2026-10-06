@@ -347,7 +347,7 @@ func TestRenderRunStatusReportTextVisibilityRules(t *testing.T) {
 	}
 }
 
-func TestRenderRunStatusReportTextLayout_FilterRunningRepos(t *testing.T) {
+func TestFormatRunStatusReportText_FilterRunningRepos(t *testing.T) {
 	t.Parallel()
 
 	runningJobID := domaintypes.NewJobID()
@@ -387,19 +387,16 @@ func TestRenderRunStatusReportTextLayout_FilterRunningRepos(t *testing.T) {
 		},
 	}
 
-	layout, err := RenderRunStatusReportTextLayout(report, TextRenderOptions{
+	text := FormatRunStatusReportText(report, TextRenderOptions{
 		FilterRunningRepos: true,
 		EnableOSC8:         false,
 	})
-	if err != nil {
-		t.Fatalf("RenderRunStatusReportTextLayout error: %v", err)
-	}
-	assertx.NotContains(t, layout.Text, "   Repos:")
-	assertx.Contains(t, layout.Text, "acme/running")
-	assertx.NotContains(t, layout.Text, "acme/done")
+	assertx.NotContains(t, text, "   Repos:")
+	assertx.Contains(t, text, "acme/running")
+	assertx.NotContains(t, text, "acme/done")
 }
 
-func TestRenderRunStatusReportTextLayout_FilterRunningReposEmptyMessages(t *testing.T) {
+func TestFormatRunStatusReportText_FilterRunningReposEmptyMessages(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -486,19 +483,16 @@ func TestRenderRunStatusReportTextLayout_FilterRunningReposEmptyMessages(t *test
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			layout, err := RenderRunStatusReportTextLayout(tc.report, TextRenderOptions{
+			text := FormatRunStatusReportText(tc.report, TextRenderOptions{
 				FilterRunningRepos: true,
 				EmptyReposLine:     "No repos with in-progress jobs.",
 				EnableOSC8:         false,
 			})
-			if err != nil {
-				t.Fatalf("RenderRunStatusReportTextLayout error: %v", err)
-			}
 			for _, needle := range tc.contains {
-				assertx.Contains(t, layout.Text, needle)
+				assertx.Contains(t, text, needle)
 			}
 			for _, needle := range tc.notContain {
-				assertx.NotContains(t, layout.Text, needle)
+				assertx.NotContains(t, text, needle)
 			}
 		})
 	}

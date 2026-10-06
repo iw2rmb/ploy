@@ -134,11 +134,7 @@ func (m followModel) View() tea.View {
 		opts.FilterRunningRepos = len(m.report.Repos) > 1
 		opts.EmptyReposLine = "No repos with in-progress jobs."
 	}
-	layout, err := RenderRunStatusReportTextLayout(*m.report, opts)
-	if err != nil {
-		return tea.NewView("")
-	}
-	return tea.NewView(layout.Text)
+	return tea.NewView(FormatRunStatusReportText(*m.report, opts))
 }
 
 // FollowRunCommand drives `run --follow` rendering with Bubble Tea v2.

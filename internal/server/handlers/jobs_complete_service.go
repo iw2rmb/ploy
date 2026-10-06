@@ -22,7 +22,6 @@ type completeJobState struct {
 	input         completionInput
 	job           store.Job
 	jobType       domaintypes.JobType
-	jobTypeKnown  bool
 	persistedMeta []byte
 	runCache      completeRunCache
 }
@@ -43,8 +42,7 @@ func (s *completionService) Complete(ctx context.Context, input completionInput)
 		return completeConflict("job status is %s, expected Running", job.Status)
 	}
 	jobType := domaintypes.JobType(job.JobType)
-	jobTypeKnown := knownCompletionJobType(jobType)
-	if !jobTypeKnown {
+	if err := jobType.Validate(); err != nil {
 		slog.Error("complete job: invalid job_type in job record; treating as non-gate for post-completion routing",
 			"job_id", input.JobID,
 			"job_type", job.JobType,
@@ -87,16 +85,15 @@ func (s *completionService) Complete(ctx context.Context, input completionInput)
 
 	persistedMeta := slices.Clone(job.Meta)
 	if input.StatsPayload.HasJobMeta() {
-		mergedMeta, mergeErr := mergeCompletionJobMeta(input.StatsPayload.JobMeta)
-		if mergeErr != nil {
-			slog.Error("complete job: merge metadata failed", "job_id", input.JobID, "err", mergeErr)
-			return completeInternal("failed to merge job metadata", mergeErr)
+		if err := input.StatsPayload.ValidateJobMeta(); err != nil {
+			slog.Error("complete job: invalid metadata", "job_id", input.JobID, "err", err)
+			return completeInternal("invalid job metadata", err)
 		}
 		if err := s.store.UpdateJobCompletionWithMeta(ctx, store.UpdateJobCompletionWithMetaParams{
 			ID:         job.ID,
 			Status:     input.Status,
 			ExitCode:   input.ExitCode,
-			Meta:       mergedMeta,
+			Meta:       input.StatsPayload.JobMeta,
 			RepoShaOut: input.RepoSHAOut,
 		}); err != nil {
 			slog.Error("complete job: update failed",
@@ -107,7 +104,7 @@ func (s *completionService) Complete(ctx context.Context, input completionInput)
 			)
 			return completeInternal("failed to complete job", err)
 		}
-		persistedMeta = mergedMeta
+		persistedMeta = input.StatsPayload.JobMeta
 	} else {
 		if err := s.store.UpdateJobCompletion(ctx, store.UpdateJobCompletionParams{
 			ID:         job.ID,
@@ -157,7 +154,6 @@ func (s *completionService) Complete(ctx context.Context, input completionInput)
 		input:         input,
 		job:           job,
 		jobType:       jobType,
-		jobTypeKnown:  jobTypeKnown,
 		persistedMeta: persistedMeta,
 	}
 

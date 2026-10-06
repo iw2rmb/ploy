@@ -37,22 +37,13 @@ type RunJobIOPreview struct {
 	Stderr []string
 }
 
-// RunStatusReportTextLayout is a rendered run status report.
-type RunStatusReportTextLayout struct {
-	Text string
-}
-
 // RenderRunStatusReportText renders a one-shot, follow-style run snapshot.
 func RenderRunStatusReportText(w io.Writer, report RunStatusReport, opts TextRenderOptions) error {
 	if w == nil {
 		return fmt.Errorf("run status report text: output writer required")
 	}
 
-	layout, err := RenderRunStatusReportTextLayout(report, opts)
-	if err != nil {
-		return err
-	}
-	_, _ = io.WriteString(w, layout.Text)
+	_, _ = io.WriteString(w, FormatRunStatusReportText(report, opts))
 	return nil
 }
 
@@ -70,8 +61,7 @@ func RenderRunStatusSnapshotText(w io.Writer, report RunStatusReport, opts TextR
 	return RenderRunStatusReportText(w, report, opts)
 }
 
-// RenderRunStatusReportTextLayout renders run status report text plus mutable per-repo row sections.
-func RenderRunStatusReportTextLayout(report RunStatusReport, opts TextRenderOptions) (RunStatusReportTextLayout, error) {
+func FormatRunStatusReportText(report RunStatusReport, opts TextRenderOptions) string {
 	now := opts.Now
 	if now.IsZero() {
 		now = time.Now()
@@ -102,7 +92,7 @@ func RenderRunStatusReportTextLayout(report RunStatusReport, opts TextRenderOpti
 		headerLines = append(headerLines, "")
 		block := strings.Join(append(headerLines, emptyReposLine), "\n")
 		rendered := lipgloss.NewStyle().Render(block) + "\n"
-		return RunStatusReportTextLayout{Text: rendered}, nil
+		return rendered
 	}
 
 	frame := FollowFrame{
@@ -155,7 +145,7 @@ func RenderRunStatusReportTextLayout(report RunStatusReport, opts TextRenderOpti
 		frame.Repos = append(frame.Repos, repoFrame)
 	}
 
-	frameLayout := RenderFollowFrameTextLayout(frame)
+	frameText := RenderFollowFrameText(frame)
 
 	var out strings.Builder
 	headerLines = append(headerLines, fmt.Sprintf("   Node:  %s", colorizeNeutralText(repoNodeID(headerRepo))), "")
@@ -163,7 +153,7 @@ func RenderRunStatusReportTextLayout(report RunStatusReport, opts TextRenderOpti
 		out.WriteString(line)
 		out.WriteByte('\n')
 	}
-	out.WriteString(frameLayout.Text)
+	out.WriteString(frameText)
 	if len(report.SBOMDiff) > 0 {
 		out.WriteByte('\n')
 		out.WriteString(formatSBOMDiffBlock(report.SBOMDiff))
@@ -172,7 +162,7 @@ func RenderRunStatusReportTextLayout(report RunStatusReport, opts TextRenderOpti
 	}
 	rendered := lipgloss.NewStyle().Render(out.String())
 
-	return RunStatusReportTextLayout{Text: rendered}, nil
+	return rendered
 }
 
 func renderLink(label, rawURL string, enableOSC8 bool) string {

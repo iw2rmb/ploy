@@ -30,16 +30,6 @@ type completionService struct {
 	gitLabTokens  *gitlabtokens.Registry
 }
 
-// knownCompletionJobType reports whether post-completion routing recognizes jobType.
-func knownCompletionJobType(jobType domaintypes.JobType) bool {
-	switch jobType {
-	case domaintypes.JobTypePreGate, domaintypes.JobTypePostGate, domaintypes.JobTypeMig:
-		return true
-	default:
-		return false
-	}
-}
-
 func newCompletionService(st store.Store, eventsService *events.Service, bp *blobpersist.Service, registries ...*gitlabtokens.Registry) *completionService {
 	var registry *gitlabtokens.Registry
 	if len(registries) > 0 {
