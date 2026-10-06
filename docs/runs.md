@@ -59,7 +59,7 @@ ploy run ls [--all] [--limit N] [--offset N]
 ploy run status <run-id> [--json|--follow]
 ploy run sbom {pre|post|diff} <run-id>
 ploy run cancel <run-id>
-ploy run restart <run-id> [--gitlab-token-env ENV_NAME|--gitlab-token-prompt]
+ploy run restart <run-id> [--from-failed] [--gitlab-token-env ENV_NAME|--gitlab-token-prompt]
 ploy wave status <wave-id> [--follow]
 ploy wave runs <wave-id>
 ploy wave cancel <wave-id>
@@ -129,6 +129,25 @@ When a new ephemeral GitLab token is provided, the restarted attempt receives a
 new server-generated SHA-256 marker. Ephemeral GitLab tokens require a
 configured GitLab domain and are accepted only when every target repo uses
 HTTPS and its host matches that configured domain.
+
+`ploy run restart <run-id> --from-failed` retries the failed step in the
+current attempt. It preserves successful jobs and queues only the failed job.
+Its cancelled, unexecuted successors return to `Created` and advance normally.
+The server rejects active runs, cancelled waves, inconsistent job chains, and
+another active run for the repository. A run with status `Cancelled` is eligible only when an actual failed step
+caused cancellation of its successors. An explicitly cancelled chain is rejected.
+
+This mode requires the retained workspace on the original node. It preserves
+partial edits left by the failed step; it does not restore the step's original
+input. If the workspace is missing, the node fails the retry without downloading
+the original source snapshot. Use a full restart in that case. Both the server
+and node must support `from_failed` before using this mode.
+
+A retry keeps job IDs and increments `resume_count` in run stats. It clears the
+retried jobs' current logs, metrics, SBOM rows, and execution results. Existing
+uploaded artifact bundles remain available. New log streams start a new
+execution; nodes echo the resume count in log uploads and completion statistics.
+The server rejects requests from an earlier execution.
 
 `ploy run sbom pre|post|diff <run-id>` reads persisted package rows from the
 current run attempt. The `diff` view omits unchanged package versions and marks

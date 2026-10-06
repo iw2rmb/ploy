@@ -68,6 +68,7 @@ func (c *ClaimManager) waitAndUploadRecoveredContainer(ctx context.Context, reco
 	terminal, err := c.startupReconciler.WaitRecoveredContainer(ctx, recovered.ContainerID)
 	if err != nil {
 		stats := types.NewRunStatsBuilder().
+			ResumeCount(recovered.ResumeCount).
 			ExitCode(-1).
 			Error(err.Error()).
 			MetadataEntry("source", "startup_reconcile").
@@ -88,7 +89,7 @@ func (c *ClaimManager) waitAndUploadRecoveredContainer(ctx context.Context, reco
 			"error", logsErr,
 		)
 	} else if len(stdoutLogs) > 0 || len(stderrLogs) > 0 {
-		if err := c.uploadRecoveredLogs(recovered.RunID, recovered.JobID, stdoutLogs, stderrLogs); err != nil {
+		if err := c.uploadRecoveredLogs(recovered.RunID, recovered.JobID, stdoutLogs, stderrLogs, recovered.ResumeCount); err != nil {
 			slog.Warn("failed to upload recovered container logs",
 				"run_id", recovered.RunID,
 				"job_id", recovered.JobID,
@@ -98,18 +99,18 @@ func (c *ClaimManager) waitAndUploadRecoveredContainer(ctx context.Context, reco
 		}
 	}
 
-	if err := c.uploadRecoveredTerminalStatus(recovered.JobID, recovered.ContainerID, terminal); err != nil {
+	if err := c.uploadRecoveredTerminalStatus(recovered.JobID, recovered.ContainerID, terminal, recovered.ResumeCount); err != nil {
 		return fmt.Errorf("upload recovered container terminal status: %w", err)
 	}
 	return nil
 }
 
-func (c *ClaimManager) uploadRecoveredLogs(runID types.RunID, jobID types.JobID, stdoutLogs, stderrLogs []byte) error {
+func (c *ClaimManager) uploadRecoveredLogs(runID types.RunID, jobID types.JobID, stdoutLogs, stderrLogs []byte, resumeCount ...int) error {
 	uploader, err := c.ensureUploader()
 	if err != nil {
 		return fmt.Errorf("create recovered log streamer: create HTTP client for log streamer: %w", err)
 	}
-	logStreamer, err := NewLogStreamer(c.cfg, runID, jobID, uploader.client)
+	logStreamer, err := NewLogStreamer(c.cfg, runID, jobID, uploader.client, resumeCount...)
 	if err != nil {
 		return fmt.Errorf("create recovered log streamer: %w", err)
 	}

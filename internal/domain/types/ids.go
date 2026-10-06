@@ -366,3 +366,6 @@ const LabelRunID = "com.ploy.run_id"
 
 // LabelJobID is the container label key storing the job identifier.
 const LabelJobID = "com.ploy.job_id"
+
+// LabelResumeCount fences recovered containers against later retries of the same job.
+const LabelResumeCount = "com.ploy.resume_count"

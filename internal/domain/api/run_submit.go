@@ -57,6 +57,7 @@ type CreateMigRunRequest struct {
 }
 
 type RunRestartRequest struct {
+	FromFailed  bool    `json:"from_failed,omitempty"`
 	GitLabToken *string `json:"gitlab_token,omitempty"`
 }
 

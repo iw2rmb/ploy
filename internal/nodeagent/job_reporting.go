@@ -4,6 +4,7 @@ package nodeagent
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
@@ -18,7 +19,25 @@ import (
 
 // uploadStatus uploads terminal status and execution statistics to the control plane.
 // Uses a detached context to ensure reporting even if the run context is cancelled.
-func (r *runController) uploadStatus(ctx context.Context, runID, status string, exitCode *int32, stats types.RunStats, jobID types.JobID, repoSHAOut ...string) error {
+func (r *runController) uploadStatus(ctx context.Context, req StartRunRequest, status string, exitCode *int32, stats types.RunStats, repoSHAOut ...string) error {
+	runID, jobID := req.RunID.String(), req.JobID
+	if req.ResumeCount > 0 {
+		var fields map[string]json.RawMessage
+		if len(stats) > 0 {
+			if err := json.Unmarshal(stats, &fields); err != nil {
+				return err
+			}
+		}
+		if fields == nil {
+			fields = make(map[string]json.RawMessage)
+		}
+		fields["resume_count"], _ = json.Marshal(req.ResumeCount)
+		var err error
+		stats, err = json.Marshal(fields)
+		if err != nil {
+			return err
+		}
+	}
 	var loggedExitCode any
 	if exitCode != nil {
 		loggedExitCode = *exitCode
@@ -68,7 +87,7 @@ func (r *runController) reportTerminalStatus(
 		exitCode = &ec
 	}
 
-	if uploadErr := r.uploadStatus(ctx, req.RunID.String(), status.String(), exitCode, stats, req.JobID, repoSHAOut); uploadErr != nil {
+	if uploadErr := r.uploadStatus(ctx, req, status.String(), exitCode, stats, repoSHAOut); uploadErr != nil {
 		slog.Error("failed to upload terminal status", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)
 	}
 	slog.Info("job terminated", "run_id", req.RunID, "job_id", req.JobID, "status", status,

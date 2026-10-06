@@ -85,7 +85,7 @@ func (c *ClaimManager) reconcileRecoveredTerminalContainer(ctx context.Context, 
 		return fmt.Errorf("wait recovered terminal container: %w", err)
 	}
 
-	if err := c.uploadRecoveredTerminalStatus(recovered.JobID, recovered.ContainerID, terminal); err != nil {
+	if err := c.uploadRecoveredTerminalStatus(recovered.JobID, recovered.ContainerID, terminal, recovered.ResumeCount); err != nil {
 		return fmt.Errorf("upload recovered terminal status: %w", err)
 	}
 	return nil

@@ -8,7 +8,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/lifecycle"
 )
 
-func (c *ClaimManager) uploadRecoveredTerminalStatus(jobID types.JobID, containerID string, terminal recoveredContainerTerminal) error {
+func (c *ClaimManager) uploadRecoveredTerminalStatus(jobID types.JobID, containerID string, terminal recoveredContainerTerminal, resumeCount ...int) error {
 	exitCode, err := safeExitCodeInt32(terminal.ExitCode)
 	if err != nil {
 		return fmt.Errorf("normalize exit code: %w", err)
@@ -18,7 +18,12 @@ func (c *ClaimManager) uploadRecoveredTerminalStatus(jobID types.JobID, containe
 	if !terminal.StartedAt.IsZero() && !terminal.FinishedAt.IsZero() && terminal.FinishedAt.After(terminal.StartedAt) {
 		durationMs = terminal.FinishedAt.Sub(terminal.StartedAt).Milliseconds()
 	}
+	count := 0
+	if len(resumeCount) > 0 {
+		count = resumeCount[0]
+	}
 	stats := types.NewRunStatsBuilder().
+		ResumeCount(count).
 		ExitCode(int(exitCode)).
 		DurationMs(durationMs).
 		MetadataEntry("source", "startup_reconcile").

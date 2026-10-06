@@ -9,6 +9,7 @@ import (
 
 // NodeClaimResponse is the control-plane contract returned to a node after a successful claim.
 type NodeClaimResponse struct {
+	ResumeCount   int                         `json:"resume_count,omitempty"`
 	RunID         types.RunID                 `json:"id"`
 	Name          *string                     `json:"name,omitempty"`
 	RepoID        types.RepoID                `json:"repo_id"`

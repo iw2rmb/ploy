@@ -160,3 +160,30 @@ func TestHubJobStreamIsolatedFromRunStream(t *testing.T) {
 		t.Fatalf("job stream: expected 1 log event, got %d events", len(jobSnap))
 	}
 }
+
+// Reused job IDs accept fresh logs without replaying the previous terminal frame.
+func TestHub_ResumeJobReopensOnce(t *testing.T) {
+	h := NewHub(Options{})
+	ctx := context.Background()
+	id := domaintypes.NewJobID()
+	if err := h.PublishJobStatus(ctx, id, Status{Status: "Error"}); err != nil {
+		t.Fatal(err)
+	}
+	old := h.SnapshotJob(id)
+	h.ResumeJob(id, 1)
+	if err := h.PublishJobLog(ctx, id, LogRecord{}); err != nil {
+		t.Fatal(err)
+	}
+	h.ResumeJob(id, 1)
+	current := h.SnapshotJob(id)
+	if len(current) != 1 || current[0].Type != domaintypes.SSEEventLog || current[0].ID <= old[0].ID {
+		t.Fatalf("invalid resumed history: %+v", current)
+	}
+	if err := h.PublishJobStatus(ctx, id, Status{Status: "Success"}); err != nil {
+		t.Fatal(err)
+	}
+	h.ResumeJob(id, 1)
+	if err := h.PublishJobLog(ctx, id, LogRecord{}); err != ErrStreamClosed {
+		t.Fatalf("same generation reopened completed stream: %v", err)
+	}
+}

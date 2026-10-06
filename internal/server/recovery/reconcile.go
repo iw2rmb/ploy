@@ -89,6 +89,7 @@ func MaybeCompleteRunIfAllReposTerminal(ctx context.Context, st store.Store, eve
 	}
 
 	if eventsService != nil {
+		eventsService.Hub().ResumeRun(runID, run.Attempt, domaintypes.RunStats(run.Stats).ResumeCount())
 		repoURL, _ := repoURLForID(ctx, st, run.RepoID)
 
 		summary := migsapi.RunSummary{

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -26,6 +27,7 @@ type crashReconcileDockerClient interface {
 }
 
 type recoveredContainer struct {
+	ResumeCount int
 	ContainerID string
 	RunID       types.RunID
 	JobID       types.JobID
@@ -85,6 +87,14 @@ func (r *startupCrashReconciler) Discover(ctx context.Context) (startupCrashSnap
 			continue
 		}
 
+		resumeCount := 0
+		if raw := summary.Labels[types.LabelResumeCount]; raw != "" {
+			count, err := strconv.Atoi(raw)
+			if err != nil || count < 0 {
+				return startupCrashSnapshot{}, fmt.Errorf("invalid resume count on container %s", summary.ID)
+			}
+			resumeCount = count
+		}
 		inspect, err := r.docker.ContainerInspect(ctx, summary.ID, client.ContainerInspectOptions{})
 		if err != nil {
 			return startupCrashSnapshot{}, fmt.Errorf("inspect container %s: %w", summary.ID, err)
@@ -96,6 +106,7 @@ func (r *startupCrashReconciler) Discover(ctx context.Context) (startupCrashSnap
 		state := inspect.Container.State
 		if state.Running {
 			snapshot.Running = append(snapshot.Running, recoveredContainer{
+				ResumeCount: resumeCount,
 				ContainerID: summary.ID,
 				RunID:       runID,
 				JobID:       jobID,
@@ -115,6 +126,7 @@ func (r *startupCrashReconciler) Discover(ctx context.Context) (startupCrashSnap
 		}
 
 		snapshot.RecentTerminal = append(snapshot.RecentTerminal, recoveredContainer{
+			ResumeCount: resumeCount,
 			ContainerID: summary.ID,
 			RunID:       runID,
 			JobID:       jobID,

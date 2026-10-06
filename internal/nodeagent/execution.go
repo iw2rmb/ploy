@@ -163,7 +163,7 @@ func (r *runController) uploadFailureStatus(ctx context.Context, req StartRunReq
 		DurationMs(duration.Milliseconds()).
 		Error(errText).
 		MustBuild()
-	if uploadErr := r.uploadStatus(ctx, req.RunID.String(), status.String(), exitCode, stats, req.JobID); uploadErr != nil {
+	if uploadErr := r.uploadStatus(ctx, req, status.String(), exitCode, stats); uploadErr != nil {
 		slog.Error("failed to upload failure status", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)
 	}
 }
@@ -176,7 +176,7 @@ func (r *runController) uploadFailureStatus(ctx context.Context, req StartRunReq
 //   - runID: run identifier for logging and telemetry
 //   - jobID: job identifier for associating log chunks with specific jobs; pass a zero value
 //     only when job attribution is not available
-func (r *runController) initializeRuntime(ctx context.Context, runID types.RunID, jobID types.JobID) (step.Runner, step.DiffGenerator, *LogStreamer, error) {
+func (r *runController) initializeRuntime(ctx context.Context, runID types.RunID, jobID types.JobID, resumeCount ...int) (step.Runner, step.DiffGenerator, *LogStreamer, error) {
 	// Initialize container runtime with image pull enabled.
 	// Fallback to nil if Docker is unavailable (simulated execution mode).
 	network := os.Getenv("PLOY_DOCKER_NETWORK")
@@ -197,7 +197,7 @@ func (r *runController) initializeRuntime(ctx context.Context, runID types.RunID
 	// Initialize log streamer to stream logs as gzipped chunks to the server.
 	// The jobID parameter associates log chunks with a specific job, enabling
 	// per-job log attribution in the control plane.
-	logStreamer, err := NewLogStreamer(r.cfg, runID, jobID, r.uploader.client)
+	logStreamer, err := NewLogStreamer(r.cfg, runID, jobID, r.uploader.client, resumeCount...)
 	if err != nil {
 		return step.Runner{}, nil, nil, fmt.Errorf("create log streamer: %w", err)
 	}
@@ -228,8 +228,8 @@ type executionContext struct {
 
 // initExecutionContext initializes runtime components and returns a cleanup function
 // that closes the logStreamer (must be deferred).
-func (r *runController) initExecutionContext(ctx context.Context, runID types.RunID, jobID types.JobID) (executionContext, func(), error) {
-	runner, diffGenerator, logStreamer, err := r.initializeRuntime(ctx, runID, jobID)
+func (r *runController) initExecutionContext(ctx context.Context, runID types.RunID, jobID types.JobID, resumeCount ...int) (executionContext, func(), error) {
+	runner, diffGenerator, logStreamer, err := r.initializeRuntime(ctx, runID, jobID, resumeCount...)
 	if err != nil {
 		return executionContext{}, nil, err
 	}

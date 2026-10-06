@@ -243,3 +243,14 @@ func (m *handlerStore) ClaimRun(ctx context.Context, nodeID *string) (store.Run,
 }
 
 // SBOM methods
+
+func (m *handlerStore) WithJobExecution(ctx context.Context, id types.JobID, count int, complete func(store.Store, store.Job) error) error {
+	job, err := m.GetJob(ctx, id)
+	if err != nil {
+		return err
+	}
+	if types.RunStats(m.getRun.val.Stats).ResumeCount() != count {
+		return store.ErrJobExecutionStale
+	}
+	return complete(m, job)
+}

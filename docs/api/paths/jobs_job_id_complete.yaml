@@ -56,6 +56,11 @@ post:
                 non-object values (string/number/array) are rejected.
               additionalProperties: true
               properties:
+                resume_count:
+                  type: integer
+                  minimum: 0
+                  default: 0
+                  description: Resume count received in the claim. A stale value returns 409 without changing the job.
                 duration_ms:
                   type: integer
                   format: int64

@@ -25,6 +25,18 @@ func TestCreateJobLogsHandler(t *testing.T) {
 		wantGetJobCall bool
 	}{
 		{
+			name: "stale resume generation",
+			setupStore: func(jobID domaintypes.JobID, runID domaintypes.RunID) *handlerStore {
+				st := &handlerStore{}
+				st.getJob.val = store.Job{ID: jobID, RunID: runID}
+				st.getRun.val.Stats = []byte(`{"resume_count":1}`)
+				return st
+			},
+			payload:        map[string]any{"chunk_no": 0, "data": []byte("old")},
+			wantStatus:     http.StatusConflict,
+			wantGetJobCall: true,
+		},
+		{
 			name: "success",
 			setupStore: func(jobID domaintypes.JobID, runID domaintypes.RunID) *handlerStore {
 				objKey := "logs/job/" + jobID.String() + "/log/1.gz"

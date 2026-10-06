@@ -25,6 +25,11 @@ func New(st store.Store, bs blobstore.Store) *Service {
 	}
 }
 
+// WithStore binds blob metadata operations to the caller's database transaction.
+func (s *Service) WithStore(st store.Store) *Service {
+	return &Service{store: st, blobstore: s.blobstore}
+}
+
 func (s *Service) validate() error {
 	if s == nil {
 		return errors.New("blobpersist: service is nil")

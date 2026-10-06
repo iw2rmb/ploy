@@ -22,6 +22,9 @@ var ErrEmptyNodeID = errors.New("store: ClaimJob requires non-empty nodeID")
 // ErrInvalidJSON is returned when a JSONB column receives invalid JSON bytes.
 var ErrInvalidJSON = errors.New("store: invalid JSON for JSONB column")
 
+var ErrRunResumeInvalid = errors.New("store: run has no resumable failed job chain")
+var ErrJobExecutionStale = errors.New("store: request belongs to an earlier execution")
+
 // ErrRunRestartActive is returned when a non-terminal run is restarted.
 var ErrRunRestartActive = errors.New("store: only terminal runs can be restarted")
 
@@ -45,6 +48,7 @@ type Store interface {
 	CompleteBootstrapEnrollment(ctx context.Context, arg CompleteBootstrapEnrollmentParams) error
 	CreateWaveWithRuns(ctx context.Context, arg CreateWaveWithRunsParams) (Wave, []RunMaterialization, error)
 	RestartRun(ctx context.Context, arg RestartRunParams) (Run, error)
+	WithJobExecution(ctx context.Context, jobID types.JobID, resumeCount int, complete func(Store, Job) error) error
 	Close()
 	Pool() *pgxpool.Pool
 }
@@ -94,10 +98,12 @@ type CreateWaveWithRunsParams struct {
 }
 
 type RestartRunParams struct {
-	RunID           types.RunID
-	ExpectedAttempt int32
-	Stats           []byte
-	Jobs            []JobPlan
+	FromFailed          bool
+	ExpectedResumeCount int
+	RunID               types.RunID
+	ExpectedAttempt     int32
+	Stats               []byte
+	Jobs                []JobPlan
 }
 
 // PgStore wraps a pgxpool connection pool and implements Store.
@@ -387,7 +393,7 @@ func (s *PgStore) CancelRun(ctx context.Context, runID types.RunID) error {
 	return nil
 }
 
-// RestartRun atomically resets one terminal run and creates its next-attempt job chain.
+// RestartRun atomically starts a full attempt or retries the failed suffix in place.
 func (s *PgStore) RestartRun(ctx context.Context, arg RestartRunParams) (Run, error) {
 	runID := arg.RunID
 	stats := arg.Stats
@@ -434,17 +440,22 @@ func (s *PgStore) RestartRun(ctx context.Context, arg RestartRunParams) (Run, er
 		return Run{}, err
 	}
 
-	if _, err := qtx.CancelActiveJobsByRunAttempt(ctx, CancelActiveJobsByRunAttemptParams{
-		RunID:   runID,
-		Attempt: run.Attempt,
-	}); err != nil {
-		return Run{}, fmt.Errorf("restart run: cancel active jobs: %w", err)
-	}
+	if arg.FromFailed {
+		if err := resumeFailedJobs(ctx, qtx, run, arg); err != nil {
+			return Run{}, err
+		}
+	} else {
+		if _, err := qtx.CancelActiveJobsByRunAttempt(ctx, CancelActiveJobsByRunAttemptParams{
+			RunID:   runID,
+			Attempt: run.Attempt,
+		}); err != nil {
+			return Run{}, fmt.Errorf("restart run: cancel active jobs: %w", err)
+		}
 
-	if err := incrementRunAttempt(ctx, qtx, runID, stats); err != nil {
-		return Run{}, fmt.Errorf("restart run: increment attempt: %w", err)
+		if err := incrementRunAttempt(ctx, qtx, runID, stats); err != nil {
+			return Run{}, fmt.Errorf("restart run: increment attempt: %w", err)
+		}
 	}
-
 	if wave.Status == types.WaveStatusFinished {
 		if err := qtx.UpdateWaveStatus(ctx, UpdateWaveStatusParams{ID: wave.ID, Status: types.WaveStatusStarted}); err != nil {
 			return Run{}, fmt.Errorf("restart run: revive wave: %w", err)
@@ -455,10 +466,11 @@ func (s *PgStore) RestartRun(ctx context.Context, arg RestartRunParams) (Run, er
 	if err != nil {
 		return Run{}, fmt.Errorf("restart run: reload run: %w", err)
 	}
-	if _, err := createPlannedJobs(ctx, qtx, updated, arg.Jobs); err != nil {
-		return Run{}, fmt.Errorf("restart run: create jobs: %w", err)
+	if !arg.FromFailed {
+		if _, err := createPlannedJobs(ctx, qtx, updated, arg.Jobs); err != nil {
+			return Run{}, fmt.Errorf("restart run: create jobs: %w", err)
+		}
 	}
-
 	if err := tx.Commit(ctx); err != nil {
 		return Run{}, fmt.Errorf("restart run: commit tx: %w", err)
 	}

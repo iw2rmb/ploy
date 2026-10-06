@@ -32,7 +32,7 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest,
 
 	// Initialize runtime components.
 	// Pass jobID to associate log chunks with this specific gate job.
-	runner, _, logStreamer, err := r.initializeRuntime(ctx, req.RunID, req.JobID)
+	runner, _, logStreamer, err := r.initializeRuntime(ctx, req.RunID, req.JobID, req.ResumeCount)
 	if err != nil {
 		uploadRepoArtifactsOnReturn = true
 		slog.Error("failed to initialize runtime", "run_id", req.RunID, "error", err)
@@ -151,7 +151,7 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest,
 			uploadRepoArtifactsOnReturn = true
 			stats := r.buildGateStats(gateResult, duration)
 			var errorExitCode int32 = -1
-			if uploadErr := r.uploadStatus(ctx, req.RunID.String(), types.JobStatusError.String(), &errorExitCode, stats, req.JobID); uploadErr != nil {
+			if uploadErr := r.uploadStatus(ctx, req, types.JobStatusError.String(), &errorExitCode, stats); uploadErr != nil {
 				slog.Error("failed to upload gate error status after repo_sha_out failure",
 					"run_id", req.RunID,
 					"job_id", req.JobID,
@@ -173,7 +173,7 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest,
 
 	// Build stats with gate metadata.
 	stats := r.buildGateStats(gateResult, duration)
-	if uploadErr := r.uploadStatus(ctx, req.RunID.String(), status.String(), &exitCode, stats, req.JobID, repoSHAOut); uploadErr != nil {
+	if uploadErr := r.uploadStatus(ctx, req, status.String(), &exitCode, stats, repoSHAOut); uploadErr != nil {
 		slog.Error("failed to upload gate status", "run_id", req.RunID, "job_id", req.JobID, "status", status, "error", uploadErr)
 	}
 	slog.Info("gate job "+logVerb, "run_id", req.RunID, "job_id", req.JobID, "job_type", req.JobType, "duration", duration)

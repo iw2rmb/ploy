@@ -82,3 +82,19 @@ func TestCompletionService_Complete_SuccessPromotesNextJob(t *testing.T) {
 		t.Fatalf("promoted next_id = %s, want %s", st.promoteJobByIDIfUnblocked.params, nextID)
 	}
 }
+
+// A delayed completion cannot change the retried job or advance its successor.
+func TestCompletionService_RejectsEarlierResumeGeneration(t *testing.T) {
+	st := &handlerStore{}
+	node := domaintypes.NodeID("node")
+	st.getRun.val.Stats = []byte(`{"resume_count":1}`)
+	st.getJob.val = store.Job{ID: domaintypes.NewJobID(), NodeID: &node, Status: domaintypes.JobStatusRunning}
+	err := newCompletionService(st, nil, nil).Complete(context.Background(), completionInput{JobID: st.getJob.val.ID, NodeID: node, Status: domaintypes.JobStatusSuccess})
+	var completionErr *completionError
+	if !errors.As(err, &completionErr) || completionErr.status != 409 {
+		t.Fatalf("expected conflict: %v", err)
+	}
+	if st.updateJobCompletion.called || st.promoteJobByIDIfUnblocked.called {
+		t.Fatal("stale completion changed execution")
+	}
+}

@@ -56,12 +56,17 @@ Durable execution state lives in:
 - `jobs`: job chain rows scoped operationally by `(run_id, attempt)`; `repo_id`
   remains on each row for attribution.
 
-Restart locks the terminal run, increments its attempt, and creates the new job
+Full restart locks the terminal run, increments its attempt, and creates the new job
 chain in the same transaction. Concurrent restart requests cannot create two
 attempts or two chains.
 
 `run_id` is sufficient for run operations. The repo selector is stored on the
 run and is not part of public run routes.
+
+With `from_failed`, the restart transaction preserves the attempt and successful
+prefix. It queues the failed job, restores its unexecuted successors, and
+increments the existing resume count. Job ingestion and restart serialize on
+the run row. See [runs.md](runs.md) for retained-workspace requirements.
 
 ## APIs
 

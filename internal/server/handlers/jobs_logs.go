@@ -35,11 +35,15 @@ func getJobLogsHandler(st store.Store, bs blobstore.Store, eventsService *events
 			return
 		}
 
-		if _, ok := getRunOrFail(w, r, st, job.RunID, "get job logs"); !ok {
+		run, ok := getRunOrFail(w, r, st, job.RunID, "get job logs")
+		if !ok {
 			return
 		}
 
 		hub := eventsService.Hub()
+		if job.Status == domaintypes.JobStatusRunning || job.Status == domaintypes.JobStatusQueued {
+			hub.ResumeJob(job.ID, domaintypes.RunStats(run.Stats).ResumeCount())
+		}
 		if err := hub.EnsureJob(job.ID); err != nil {
 			slog.Error("ensure job stream failed", "job_id", jobID.String(), "err", err)
 			writeHTTPError(w, http.StatusBadRequest, "invalid job id")
@@ -87,8 +91,9 @@ func createJobLogsHandler(st store.Store, bp *blobpersist.Service, eventsService
 		}
 
 		var req struct {
-			ChunkNo int32  `json:"chunk_no"`
-			Data    []byte `json:"data"`
+			ResumeCount int    `json:"resume_count,omitempty"`
+			ChunkNo     int32  `json:"chunk_no"`
+			Data        []byte `json:"data"`
 		}
 
 		if err := decodeRequestJSON(w, r, &req, ingestMaxBodySize); err != nil {
@@ -110,13 +115,23 @@ func createJobLogsHandler(st store.Store, bp *blobpersist.Service, eventsService
 			ChunkNo: req.ChunkNo,
 		}
 
-		logRow, err := bp.CreateLog(r.Context(), params, req.Data)
+		var logRow store.Log
+		err := st.WithJobExecution(r.Context(), jobID, req.ResumeCount, func(scoped store.Store, _ store.Job) error {
+			var err error
+			logRow, err = bp.WithStore(scoped).CreateLog(r.Context(), params, req.Data)
+			return err
+		})
+		if errors.Is(err, store.ErrJobExecutionStale) {
+			writeHTTPError(w, http.StatusConflict, "log chunk belongs to an earlier execution")
+			return
+		}
 		if err != nil {
 			writeHTTPError(w, http.StatusInternalServerError, "failed to create log: %v", err)
 			slog.Error("job logs ingest: create failed", "job_id", jobID.String(), "chunk_no", req.ChunkNo, "err", err)
 			return
 		}
 
+		eventsService.Hub().ResumeJob(jobID, req.ResumeCount)
 		eventsService.CreateAndPublishLog(r.Context(), logRow, req.Data)
 
 		writeJSON(w, http.StatusCreated, map[string]any{"id": logRow.ID, "chunk_no": logRow.ChunkNo})

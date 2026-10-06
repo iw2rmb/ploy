@@ -144,12 +144,16 @@ func TestClaimLoop_FieldMapping(t *testing.T) {
 			name: "claim contract reaches start request",
 			claimOpts: []claimOption{
 				withCommitSHA("deadbeef"),
+				func(c *domainapi.NodeClaimResponse) { c.ResumeCount = 2 },
 				withNextID(types.NewJobID()),
 				withMigClaimContext(&contracts.MigClaimContext{StepIndex: 2}),
 				withClaimDetectedStack(&contracts.StackExpectation{Language: "java", Tool: "maven", Release: "17"}),
 			},
 			assertions: func(t *testing.T, got StartRunRequest, claim domainapi.NodeClaimResponse) {
 				t.Helper()
+				if got.ResumeCount != claim.ResumeCount {
+					t.Errorf("resume count=%d, want %d", got.ResumeCount, claim.ResumeCount)
+				}
 				if got.RunID != claim.RunID {
 					t.Errorf("RunID=%q want %q", got.RunID, claim.RunID)
 				}

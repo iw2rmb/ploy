@@ -8,6 +8,16 @@ post:
     A Queued or Running run for the same repository also blocks a restart,
     regardless of branch or mig project. The error message includes the
     repository URL and current Run ID.
+    With `from_failed: true`, the run must contain a failed job after a successful
+    prefix. `Cancelled` runs qualify only when their successors were cancelled
+    after that failure. The transaction keeps the
+    attempt and successful jobs, queues the failed job, restores its cancelled,
+    unexecuted successors to `Created`, and increments `stats.resume_count`.
+    The retry stays on the original node and requires its retained workspace.
+    Partial workspace edits are preserved. Missing workspace fails the job;
+    it does not trigger source hydration. Invalid chains return `409 Conflict`.
+    Current logs, metrics, SBOM rows, and results for retried jobs are cleared;
+    uploaded artifact bundles are retained.
     The optional request body can provide a request-only ephemeral GitLab token
     for the restarted attempt.
   parameters:

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strconv"
 	"time"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
@@ -19,6 +20,7 @@ type Runner struct {
 
 // Request describes a step execution request.
 type Request struct {
+	ResumeCount int
 	// RunID threads the workflow run identifier for correlation/labels.
 	// Container labels and telemetry use this value via LabelRunID.
 	RunID types.RunID
@@ -68,6 +70,12 @@ func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 		spec, err := buildContainerSpec(req.RunID, req.JobID, req.Manifest, req.Workspace, req.JobMounts)
 		if err != nil {
 			return Result{}, fmt.Errorf("build container spec: %w", err)
+		}
+		if req.ResumeCount > 0 {
+			if spec.Labels == nil {
+				spec.Labels = make(map[string]string)
+			}
+			spec.Labels[types.LabelResumeCount] = strconv.Itoa(req.ResumeCount)
 		}
 		handle, err := r.Containers.Create(ctx, spec)
 		if err != nil {

@@ -27,13 +27,21 @@ type completeJobState struct {
 }
 
 func (s *completionService) Complete(ctx context.Context, input completionInput) error {
-	job, err := s.store.GetJob(ctx, input.JobID)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return completeNotFound("job not found")
-		}
-		return completeInternal("failed to get job", err)
+	err := s.store.WithJobExecution(ctx, input.JobID, input.StatsPayload.ResumeCount, func(st store.Store, job store.Job) error {
+		scoped := *s
+		scoped.store = st
+		return scoped.complete(ctx, input, job)
+	})
+	if errors.Is(err, store.ErrJobExecutionStale) {
+		return completeConflict("completion belongs to an earlier execution")
 	}
+	if errors.Is(err, pgx.ErrNoRows) {
+		return completeNotFound("job not found")
+	}
+	return err
+}
+
+func (s *completionService) complete(ctx context.Context, input completionInput, job store.Job) error {
 
 	if job.NodeID == nil || *job.NodeID != input.NodeID {
 		return completeForbidden("job not assigned to this node")
@@ -134,6 +142,7 @@ func (s *completionService) Complete(ctx context.Context, input completionInput)
 	// Emit retention hint followed by done sentinel on the job-scoped SSE
 	// stream so clients receive log retention metadata before the stream closes.
 	if s.eventsService != nil {
+		s.eventsService.Hub().ResumeJob(input.JobID, input.StatsPayload.ResumeCount)
 		if err := s.eventsService.PublishJobRetention(ctx, input.JobID, logstream.RetentionHint{
 			Retained: true,
 		}); err != nil {

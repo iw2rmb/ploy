@@ -43,14 +43,17 @@ func TestRunController_uploadStatus(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			server, _ := newStatusCaptureServer(t, "test-job-id", withStatusHTTPCode(tt.serverStatus))
+			server, captured := newStatusCaptureServer(t, "test-job-id", withStatusHTTPCode(tt.serverStatus))
 			controller := newTestController(t, newAgentConfig(server.URL))
 
 			var exitCode int32 = 0
 			stats := types.NewRunStatsBuilder().ExitCode(0).MustBuild()
-			err := controller.uploadStatus(context.Background(), "test-run", types.JobStatusSuccess.String(), &exitCode, stats, "test-job-id")
+			err := controller.uploadStatus(context.Background(), StartRunRequest{RunID: "test-run", JobID: "test-job-id", ResumeCount: 2}, types.JobStatusSuccess.String(), &exitCode, stats)
 
 			checkErr(t, tt.wantErr, err)
+			if captured.Stats["resume_count"] != float64(2) {
+				t.Fatalf("completion omitted resume count: %+v", captured.Stats)
+			}
 		})
 	}
 }

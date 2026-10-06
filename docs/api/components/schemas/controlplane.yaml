@@ -393,6 +393,10 @@ RunBuildGateForcedStack:
 RunRestartRequest:
   type: object
   properties:
+    from_failed:
+      type: boolean
+      default: false
+      description: Retry the failed step in the current attempt using the retained workspace on its original node.
     gitlab_token:
       type: string
       description: Request-only ephemeral GitLab token for the restarted attempt. Accepted only when the run repo is HTTPS and its host matches the configured GitLab domain; the server stores only a server-generated SHA-256 marker in run metadata.
@@ -746,6 +750,11 @@ StageStatus:
 NodeClaimResponse:
   type: object
   properties:
+    resume_count:
+      type: integer
+      minimum: 0
+      default: 0
+      description: Execution generation. A positive value requires the retained workspace. Echo it in log uploads and completion stats.
     id:
       type: string
       description: Run ID (parent run of the claimed job, KSUID string)

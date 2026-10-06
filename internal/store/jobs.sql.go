@@ -73,7 +73,7 @@ WITH eligible AS (
   WHERE n.id = $1
     AND $1::TEXT != ''
     AND j.status = 'Queued'
-    AND j.node_id IS NULL
+    AND (j.node_id IS NULL OR j.node_id = n.id)
     AND r.status = 'Running'
     AND w.status = 'Started'
     AND NOT EXISTS (
@@ -674,7 +674,9 @@ func (q *Queries) PromoteJobByIDIfUnblocked(ctx context.Context, id types.JobID)
 const unclaimJob = `-- name: UnclaimJob :exec
 UPDATE jobs
 SET status = 'Queued',
-    node_id = NULL,
+    node_id = CASE WHEN EXISTS (SELECT 1 FROM runs WHERE runs.id=jobs.run_id
+      AND COALESCE((runs.stats->>'resume_count')::int, 0) > 0)
+      THEN jobs.node_id ELSE NULL END,
     started_at = NULL
 FROM (
   SELECT nodes.id AS node_id

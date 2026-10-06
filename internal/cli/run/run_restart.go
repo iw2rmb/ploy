@@ -13,6 +13,7 @@ import (
 )
 
 type RestartOptions struct {
+	FromFailed  bool
 	RunID       string
 	GitLabToken string
 	Output      io.Writer
@@ -37,6 +38,7 @@ func RunRestart(ctx context.Context, opts RestartOptions) error {
 		Client:      httpClient,
 		RunID:       domaintypes.RunID(runID),
 		GitLabToken: opts.GitLabToken,
+		FromFailed:  opts.FromFailed,
 	}.Run(ctx)
 	if err != nil {
 		return err

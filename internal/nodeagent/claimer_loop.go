@@ -173,6 +173,7 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 
 	startReq := StartRunRequest{
 		RunID:         claim.RunID,
+		ResumeCount:   claim.ResumeCount,
 		JobID:         claim.JobID,
 		RepoID:        claim.RepoID,
 		RepoURL:       claim.RepoURL,

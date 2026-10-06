@@ -35,27 +35,28 @@ type LogHook func(p []byte) ([]byte, error)
 
 // LogStreamer buffers logs and streams them as gzipped chunks to the server.
 type LogStreamer struct {
-	cfg        Config
-	runID      types.RunID
-	jobID      types.JobID
-	chunkNo    int32
-	buffer     bytes.Buffer
-	gzWriter   *gzip.Writer
-	mu         sync.Mutex
-	flushDone  chan struct{}
-	closeOnce  sync.Once
-	stopCh     chan struct{}
-	closed     bool    // Set to true when Close() is called to prevent sending during shutdown.
-	hook       LogHook // Optional hook to process logs before compression.
-	httpClient *http.Client
-	pendingOut string
-	pendingErr string
+	resumeCount int
+	cfg         Config
+	runID       types.RunID
+	jobID       types.JobID
+	chunkNo     int32
+	buffer      bytes.Buffer
+	gzWriter    *gzip.Writer
+	mu          sync.Mutex
+	flushDone   chan struct{}
+	closeOnce   sync.Once
+	stopCh      chan struct{}
+	closed      bool    // Set to true when Close() is called to prevent sending during shutdown.
+	hook        LogHook // Optional hook to process logs before compression.
+	httpClient  *http.Client
+	pendingOut  string
+	pendingErr  string
 }
 
 // NewLogStreamer creates a new log streamer for a specific run and (optionally) job.
 // When client is non-nil it is reused; otherwise a new HTTP client is created.
 // Returns an error if HTTP client creation fails (e.g., missing bearer token).
-func NewLogStreamer(cfg Config, runID types.RunID, jobID types.JobID, client *http.Client) (*LogStreamer, error) {
+func NewLogStreamer(cfg Config, runID types.RunID, jobID types.JobID, client *http.Client, resumeCount ...int) (*LogStreamer, error) {
 	ls := &LogStreamer{
 		cfg:       cfg,
 		runID:     runID,
@@ -63,6 +64,9 @@ func NewLogStreamer(cfg Config, runID types.RunID, jobID types.JobID, client *ht
 		chunkNo:   0,
 		flushDone: make(chan struct{}),
 		stopCh:    make(chan struct{}),
+	}
+	if len(resumeCount) > 0 {
+		ls.resumeCount = resumeCount[0]
 	}
 	ls.gzWriter = gzip.NewWriter(&ls.buffer)
 
@@ -296,14 +300,16 @@ func (ls *LogStreamer) sendChunk(data []byte, chunkNo int32) error {
 
 	// Prepare request payload.
 	payload := struct {
-		RunID   types.RunID  `json:"run_id"`
-		JobID   *types.JobID `json:"job_id,omitempty"`
-		ChunkNo int32        `json:"chunk_no"`
-		Data    []byte       `json:"data"`
+		ResumeCount int          `json:"resume_count,omitempty"`
+		RunID       types.RunID  `json:"run_id"`
+		JobID       *types.JobID `json:"job_id,omitempty"`
+		ChunkNo     int32        `json:"chunk_no"`
+		Data        []byte       `json:"data"`
 	}{
-		RunID:   ls.runID,
-		ChunkNo: chunkNo,
-		Data:    data,
+		ResumeCount: ls.resumeCount,
+		RunID:       ls.runID,
+		ChunkNo:     chunkNo,
+		Data:        data,
 	}
 	if !ls.jobID.IsZero() {
 		payload.JobID = &ls.jobID

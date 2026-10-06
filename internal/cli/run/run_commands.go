@@ -175,6 +175,7 @@ func newRestartCommand() *cobra.Command {
 			return RunRestart(cmd.Context(), opts)
 		},
 	}
+	cmd.Flags().BoolVar(&opts.FromFailed, "from-failed", false, "Retry the failed step using the retained workspace on its original node")
 	cmd.Flags().StringVar(&gitLabTokenEnv, "gitlab-token-env", "", "Read run-scoped ephemeral GitLab token from this environment variable")
 	cmd.Flags().BoolVar(&gitLabTokenPrompt, "gitlab-token-prompt", false, "Prompt for a run-scoped ephemeral GitLab token")
 	return cmd

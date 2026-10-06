@@ -86,3 +86,11 @@ func (m *mockStore) CreateWaveWithRuns(ctx context.Context, arg store.CreateWave
 func (m *mockStore) UnclaimJob(ctx context.Context, arg store.UnclaimJobParams) error {
 	return nil
 }
+
+func (m *mockStore) WithJobExecution(ctx context.Context, id domaintypes.JobID, count int, complete func(store.Store, store.Job) error) error {
+	job, err := m.GetJob(ctx, id)
+	if err != nil {
+		return err
+	}
+	return complete(m, job)
+}

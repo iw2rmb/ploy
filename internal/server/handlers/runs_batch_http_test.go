@@ -109,6 +109,26 @@ func TestRestartRunHandler(t *testing.T) {
 		verify     func(*testing.T, *handlerStore, *gitlabtokens.Registry)
 	}{
 		{
+			name: "from failed keeps resume generation",
+			setup: func(st *handlerStore) {
+				st.getRun.val = store.Run{ID: runID, Attempt: 1, Stats: []byte(`{"resume_count":2}`)}
+				st.restartRun.val = store.Run{ID: runID, Attempt: 1, Status: domaintypes.RunStatusRunning}
+			},
+			body:       map[string]any{"from_failed": true},
+			wantStatus: http.StatusOK,
+			verify: func(t *testing.T, st *handlerStore, _ *gitlabtokens.Registry) {
+				if !st.restartRun.params.FromFailed || st.restartRun.params.ExpectedResumeCount != 2 {
+					t.Fatalf("retry params: %+v", st.restartRun.params)
+				}
+			},
+		},
+		{
+			name:       "invalid resume returns conflict",
+			setup:      func(st *handlerStore) { st.restartRun.err = store.ErrRunResumeInvalid },
+			body:       map[string]any{"from_failed": true},
+			wantStatus: http.StatusConflict,
+		},
+		{
 			name: "bodyless success",
 			setup: func(st *handlerStore) {
 				st.restartRun.val = store.Run{

@@ -105,7 +105,7 @@ func (r *runController) executeMigContainerWithOutcome(ctx context.Context, req 
 
 	jobDirs := jobDirectories(req.RunID, req.JobID)
 
-	execCtx, cleanup, err := r.initExecutionContext(ctx, req.RunID, req.JobID)
+	execCtx, cleanup, err := r.initExecutionContext(ctx, req.RunID, req.JobID, req.ResumeCount)
 	if err != nil {
 		return outcome, fmt.Errorf("initialize runtime: %w", err)
 	}
@@ -178,11 +178,12 @@ func (r *runController) runMigContainerJob(
 
 	// Materialized inputs and writable temporary state stay below the job root.
 	result, runErr = execCtx.runner.Run(ctx, step.Request{
-		RunID:     req.RunID,
-		JobID:     req.JobID,
-		Manifest:  manifest,
-		Workspace: workspace,
-		JobMounts: mounts,
+		ResumeCount: req.ResumeCount,
+		RunID:       req.RunID,
+		JobID:       req.JobID,
+		Manifest:    manifest,
+		Workspace:   workspace,
+		JobMounts:   mounts,
 	})
 	result.Timings.HydrationDuration = types.Duration(hydrationDuration)
 	duration := time.Since(startTime)

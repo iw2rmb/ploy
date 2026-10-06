@@ -305,6 +305,7 @@ func getRunLogsHandler(st store.Store, eventsService *events.Service) http.Handl
 
 		sinceID := parseLastEventID(r.Header.Get("Last-Event-ID"))
 		hub := eventsService.Hub()
+		hub.ResumeRun(runID, run.Attempt, domaintypes.RunStats(run.Stats).ResumeCount())
 		if err := hub.Ensure(runID); err != nil {
 			slog.Error("ensure stream failed", "run_id", runID.String(), "err", err)
 			writeHTTPError(w, http.StatusBadRequest, "invalid run id")

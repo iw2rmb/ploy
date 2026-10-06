@@ -20,6 +20,7 @@ type RestartCommand struct {
 	RunID   domaintypes.RunID
 
 	GitLabToken string
+	FromFailed  bool
 }
 
 func (c RestartCommand) Run(ctx context.Context) (domaintypes.RunSummary, error) {
@@ -30,8 +31,12 @@ func (c RestartCommand) Run(ctx context.Context) (domaintypes.RunSummary, error)
 		return domaintypes.RunSummary{}, errors.New("runs restart: run id required")
 	}
 	var body any
+	req := domainapi.RunRestartRequest{FromFailed: c.FromFailed}
 	if strings.TrimSpace(c.GitLabToken) != "" {
-		body = domainapi.RunRestartRequest{GitLabToken: &c.GitLabToken}
+		req.GitLabToken = &c.GitLabToken
+	}
+	if req.FromFailed || req.GitLabToken != nil {
+		body = req
 	}
 	endpoint := c.BaseURL.JoinPath("v1", "runs", c.RunID.String(), "restart")
 	return httpx.DoJSON[domaintypes.RunSummary](ctx, c.Client, http.MethodPost, endpoint.String(), body, http.StatusOK, "runs restart")

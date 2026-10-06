@@ -41,6 +41,10 @@ func (r *runController) prepareStickyWorkspace(
 		return workspacePath, nil
 	}
 
+	if req.ResumeCount > 0 {
+		return "", fmt.Errorf("cannot resume: retained workspace is missing on the original node; use a full restart")
+	}
+
 	if strings.TrimSpace(req.RepoSHAIn.String()) == "" {
 		return "", fmt.Errorf("sticky workspace missing for %s job; linear repo chains must continue on the node that hydrated the chain head", req.JobType)
 	}

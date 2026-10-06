@@ -173,7 +173,7 @@ WITH eligible AS (
   WHERE n.id = @node_id
     AND @node_id::TEXT != ''
     AND j.status = 'Queued'
-    AND j.node_id IS NULL
+    AND (j.node_id IS NULL OR j.node_id = n.id)
     AND r.status = 'Running'
     AND w.status = 'Started'
     AND NOT EXISTS (
@@ -199,7 +199,9 @@ RETURNING jobs.*;
 -- Guarded by both job id and node id so a foreign node cannot steal the slot.
 UPDATE jobs
 SET status = 'Queued',
-    node_id = NULL,
+    node_id = CASE WHEN EXISTS (SELECT 1 FROM runs WHERE runs.id=jobs.run_id
+      AND COALESCE((runs.stats->>'resume_count')::int, 0) > 0)
+      THEN jobs.node_id ELSE NULL END,
     started_at = NULL
 FROM (
   SELECT nodes.id AS node_id

@@ -112,7 +112,7 @@ func TestCrashReconcile_ClassifiesByRuntimeState_Contract(t *testing.T) {
 			{
 				ID:     "running-2",
 				State:  containertypes.ContainerState("exited"), // Summary state must not decide classification.
-				Labels: map[string]string{types.LabelRunID: "run-r2", types.LabelJobID: "job-r2"},
+				Labels: map[string]string{types.LabelRunID: "run-r2", types.LabelJobID: "job-r2", types.LabelResumeCount: "2"},
 			},
 			{
 				ID:     "terminal-1",
@@ -167,7 +167,7 @@ func TestCrashReconcile_ClassifiesByRuntimeState_Contract(t *testing.T) {
 	}
 
 	wantRunning := []recoveredContainer{
-		{ContainerID: "running-2", RunID: types.RunID("run-r2"), JobID: types.JobID("job-r2")},
+		{ResumeCount: 2, ContainerID: "running-2", RunID: types.RunID("run-r2"), JobID: types.JobID("job-r2")},
 	}
 	if !reflect.DeepEqual(got.Running, wantRunning) {
 		t.Fatalf("Running = %#v, want %#v", got.Running, wantRunning)

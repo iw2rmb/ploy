@@ -432,13 +432,15 @@ func (r *ring) after(since domaintypes.EventID) []Event {
 // ---------------------------------------------------------------------------
 
 type stream struct {
-	opts        Options
-	mu          sync.Mutex
-	history     ring
-	subscribers map[int]*subscriber
-	nextEventID domaintypes.EventID
-	nextSubID   int
-	closed      bool
+	opts          Options
+	mu            sync.Mutex
+	history       ring
+	subscribers   map[int]*subscriber
+	nextEventID   domaintypes.EventID
+	nextSubID     int
+	closed        bool
+	resumeCount   int
+	resumeAttempt int32
 }
 
 func (s *stream) snapshot() []Event {
@@ -565,4 +567,32 @@ func (s *subscriber) close() {
 	s.once.Do(func() {
 		close(s.ch)
 	})
+}
+
+// ResumeJob discards terminal frames from an earlier execution without reusing
+// event IDs. Each API replica learns the generation from durable run state.
+func (h *Hub) ResumeJob(id domaintypes.JobID, count int) {
+	if id.IsZero() || count <= 0 {
+		return
+	}
+	getOrCreateStream(h, h.jobStreams, normalizeJobID(id)).resume(0, count)
+}
+
+func (h *Hub) ResumeRun(id domaintypes.RunID, attempt int32, count int) {
+	if id.IsZero() || count <= 0 {
+		return
+	}
+	getOrCreateStream(h, h.streams, normalizeRunID(id)).resume(attempt, count)
+}
+
+func (s *stream) resume(attempt int32, count int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if attempt < s.resumeAttempt || (attempt == s.resumeAttempt && count <= s.resumeCount) {
+		return
+	}
+	s.resumeAttempt = attempt
+	s.resumeCount = count
+	s.closed = false
+	s.history = newRing(s.opts.HistorySize)
 }

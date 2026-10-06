@@ -76,6 +76,7 @@ func buildJobClaimPayload(
 
 	return domainapi.NodeClaimResponse{
 		RunID:         run.ID,
+		ResumeCount:   domaintypes.RunStats(run.Stats).ResumeCount(),
 		Name:          nil,
 		RepoID:        job.RepoID,
 		Attempt:       job.Attempt,

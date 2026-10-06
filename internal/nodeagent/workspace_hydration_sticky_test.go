@@ -215,3 +215,33 @@ func snapshotFixtureServer(t *testing.T, repoDir string) *httptest.Server {
 		}
 	}))
 }
+
+// Resuming never replaces missing work with a source snapshot, even with a valid input SHA.
+func TestPrepareStickyWorkspace_ResumeRequiresRetainedWorkspace(t *testing.T) {
+	t.Setenv("PLOYD_CACHE_HOME", t.TempDir())
+	requests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { requests++; w.WriteHeader(500) }))
+	defer server.Close()
+	req := StartRunRequest{RunID: "resumed-run", JobID: "failed-job", ResumeCount: 1, RepoSHAIn: types.CommitSHA("0123456789abcdef0123456789abcdef01234567")}
+	rc := newTestController(t, newAgentConfig(server.URL))
+	if _, err := rc.prepareStickyWorkspace(context.Background(), req, contracts.StepManifest{}); err == nil {
+		t.Fatal("missing resumed workspace accepted")
+	}
+	if requests != 0 {
+		t.Fatal("resume requested source hydration")
+	}
+	workspace := workspaceDir(req.RunID)
+	if err := os.MkdirAll(filepath.Join(workspace, ".git"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	marker := filepath.Join(workspace, "partial-edit")
+	if err := os.WriteFile(marker, []byte("keep"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := rc.prepareStickyWorkspace(context.Background(), req, contracts.StepManifest{}); err != nil || got != workspace {
+		t.Fatalf("retained workspace: %s %v", got, err)
+	}
+	if b, err := os.ReadFile(marker); err != nil || string(b) != "keep" {
+		t.Fatal("resume discarded partial changes")
+	}
+}

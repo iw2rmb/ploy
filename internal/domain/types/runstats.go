@@ -220,6 +220,13 @@ func NewRunStatsBuilder() *RunStatsBuilder {
 	return &RunStatsBuilder{}
 }
 
+func (b *RunStatsBuilder) ResumeCount(count int) *RunStatsBuilder {
+	if count > 0 {
+		b.acc.ResumeCount = &count
+	}
+	return b
+}
+
 // ExitCode sets the exit_code field.
 func (b *RunStatsBuilder) ExitCode(code int) *RunStatsBuilder {
 	b.acc.ExitCode = &code

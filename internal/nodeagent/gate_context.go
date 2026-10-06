@@ -2,6 +2,7 @@ package nodeagent
 
 import (
 	"context"
+	"strconv"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/step"
@@ -14,6 +15,9 @@ func withGateExecutionLabels(ctx context.Context, req StartRunRequest) context.C
 	}
 	if !req.JobID.IsZero() {
 		labels[types.LabelJobID] = req.JobID.String()
+	}
+	if req.ResumeCount > 0 {
+		labels[types.LabelResumeCount] = strconv.Itoa(req.ResumeCount)
 	}
 	return step.WithGateContainerLabels(ctx, labels)
 }
