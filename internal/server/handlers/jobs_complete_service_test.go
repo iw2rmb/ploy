@@ -98,3 +98,57 @@ func TestCompletionService_RejectsEarlierResumeGeneration(t *testing.T) {
 		t.Fatal("stale completion changed execution")
 	}
 }
+
+// Wave aggregation must see committed statuses from concurrent run completions.
+func TestCompletionService_ReconcilesWaveAfterCommit(t *testing.T) {
+	for _, failCommit := range []bool{false, true} {
+		t.Run(map[bool]string{false: "committed", true: "rollback"}[failCommit], func(t *testing.T) {
+			f := newRepoScopedFixture("mig")
+			terminal := f.Job
+			terminal.Status = domaintypes.JobStatusSuccess
+			base := newJobStoreForFixture(f,
+				withRepoAttemptJobs([]store.Job{terminal}),
+				withRunStatusCounts([]store.CountRunsByWaveStatusRow{{Status: domaintypes.RunStatusSuccess, Count: 2}}),
+			)
+			st := &completionCommitStore{handlerStore: base, failCommit: failCommit}
+			err := newCompletionService(st, nil, nil).Complete(context.Background(), completionInput{
+				JobID: f.JobID, NodeID: *f.Job.NodeID, Status: domaintypes.JobStatusSuccess,
+				RepoSHAOut: "0123456789abcdef0123456789abcdef01234567",
+			})
+			if (err != nil) != failCommit {
+				t.Fatalf("Complete error = %v, failCommit = %v", err, failCommit)
+			}
+			if st.countedBeforeCommit {
+				t.Fatal("wave aggregation used uncommitted run statuses")
+			}
+			if base.updateWaveStatus.called == failCommit {
+				t.Fatalf("wave completion called = %v, failCommit = %v", base.updateWaveStatus.called, failCommit)
+			}
+		})
+	}
+}
+
+type completionCommitStore struct {
+	*handlerStore
+	committed           bool
+	failCommit          bool
+	countedBeforeCommit bool
+}
+
+func (s *completionCommitStore) WithJobExecution(ctx context.Context, id domaintypes.JobID, count int, complete func(store.Store, store.Job) error) error {
+	if err := s.handlerStore.WithJobExecution(ctx, id, count, func(_ store.Store, job store.Job) error {
+		return complete(s, job)
+	}); err != nil {
+		return err
+	}
+	if s.failCommit {
+		return errors.New("commit failed")
+	}
+	s.committed = true
+	return nil
+}
+
+func (s *completionCommitStore) CountRunsByWaveStatus(ctx context.Context, id domaintypes.WaveID) ([]store.CountRunsByWaveStatusRow, error) {
+	s.countedBeforeCommit = !s.committed
+	return s.handlerStore.CountRunsByWaveStatus(ctx, id)
+}

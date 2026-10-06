@@ -110,7 +110,7 @@ func (s *completionService) onSuccess(ctx context.Context, state *completeJobSta
 	}
 }
 
-func (s *completionService) reconcileRepoRun(ctx context.Context, state *completeJobState) {
+func (s *completionService) reconcileRepoRun(ctx context.Context, state *completeJobState) *store.Run {
 	repoUpdated, repoErr := recovery.MaybeUpdateRunStatus(ctx, s.store, state.job.RunID, state.job.Attempt)
 	if repoErr != nil {
 		slog.Error("complete job: failed to check repo completion",
@@ -119,21 +119,25 @@ func (s *completionService) reconcileRepoRun(ctx context.Context, state *complet
 			"attempt", state.job.Attempt,
 			"err", repoErr,
 		)
-		return
+		return nil
 	}
 	if !repoUpdated {
-		return
+		return nil
 	}
 
 	run, ok := s.loadRunForPostCompletion(ctx, state, "run completion reconciliation")
 	if !ok {
-		return
+		return nil
 	}
+	return &run
+}
+
+// Reconcile the wave after commit so concurrent final jobs see committed run statuses.
+func (s *completionService) reconcileWave(ctx context.Context, run store.Run) {
 	completed, completeErr := recovery.MaybeCompleteRunIfAllReposTerminal(ctx, s.store, s.eventsService, run)
 	if completeErr != nil {
 		slog.Error("complete job: failed to check run completion",
-			"job_id", state.job.ID,
-			"next_id", state.job.NextID,
+			"run_id", run.ID,
 			"err", completeErr,
 		)
 		return

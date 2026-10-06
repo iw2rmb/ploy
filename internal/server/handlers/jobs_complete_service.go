@@ -27,10 +27,13 @@ type completeJobState struct {
 }
 
 func (s *completionService) Complete(ctx context.Context, input completionInput) error {
+	var completedRun *store.Run
 	err := s.store.WithJobExecution(ctx, input.JobID, input.StatsPayload.ResumeCount, func(st store.Store, job store.Job) error {
 		scoped := *s
 		scoped.store = st
-		return scoped.complete(ctx, input, job)
+		var err error
+		completedRun, err = scoped.complete(ctx, input, job)
+		return err
 	})
 	if errors.Is(err, store.ErrJobExecutionStale) {
 		return completeConflict("completion belongs to an earlier execution")
@@ -38,16 +41,19 @@ func (s *completionService) Complete(ctx context.Context, input completionInput)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return completeNotFound("job not found")
 	}
+	if err == nil && completedRun != nil {
+		s.reconcileWave(ctx, *completedRun)
+	}
 	return err
 }
 
-func (s *completionService) complete(ctx context.Context, input completionInput, job store.Job) error {
+func (s *completionService) complete(ctx context.Context, input completionInput, job store.Job) (*store.Run, error) {
 
 	if job.NodeID == nil || *job.NodeID != input.NodeID {
-		return completeForbidden("job not assigned to this node")
+		return nil, completeForbidden("job not assigned to this node")
 	}
 	if job.Status != domaintypes.JobStatusRunning {
-		return completeConflict("job status is %s, expected Running", job.Status)
+		return nil, completeConflict("job status is %s, expected Running", job.Status)
 	}
 	jobType := domaintypes.JobType(job.JobType)
 	if err := jobType.Validate(); err != nil {
@@ -66,10 +72,10 @@ func (s *completionService) complete(ctx context.Context, input completionInput,
 
 	if input.Status == domaintypes.JobStatusSuccess && job.NextID != nil {
 		if !domaintypes.IsCanonicalFullCommitSHA(job.RepoShaIn) {
-			return completeConflict("job repo_sha_in must match ^[0-9a-f]{40}$ for chain progression")
+			return nil, completeConflict("job repo_sha_in must match ^[0-9a-f]{40}$ for chain progression")
 		}
 		if input.RepoSHAOut == "" {
-			return completeBadRequest("repo_sha_out is required for successful jobs with next_id")
+			return nil, completeBadRequest("repo_sha_out is required for successful jobs with next_id")
 		}
 	}
 
@@ -87,7 +93,7 @@ func (s *completionService) complete(ctx context.Context, input completionInput,
 				"node_id", input.NodeID,
 				"err", err,
 			)
-			return completeInternal("failed to persist job metrics", err)
+			return nil, completeInternal("failed to persist job metrics", err)
 		}
 	}
 
@@ -95,7 +101,7 @@ func (s *completionService) complete(ctx context.Context, input completionInput,
 	if input.StatsPayload.HasJobMeta() {
 		if err := input.StatsPayload.ValidateJobMeta(); err != nil {
 			slog.Error("complete job: invalid metadata", "job_id", input.JobID, "err", err)
-			return completeInternal("invalid job metadata", err)
+			return nil, completeInternal("invalid job metadata", err)
 		}
 		if err := s.store.UpdateJobCompletionWithMeta(ctx, store.UpdateJobCompletionWithMetaParams{
 			ID:         job.ID,
@@ -110,7 +116,7 @@ func (s *completionService) complete(ctx context.Context, input completionInput,
 				"node_id", input.NodeID,
 				"err", err,
 			)
-			return completeInternal("failed to complete job", err)
+			return nil, completeInternal("failed to complete job", err)
 		}
 		persistedMeta = input.StatsPayload.JobMeta
 	} else {
@@ -126,7 +132,7 @@ func (s *completionService) complete(ctx context.Context, input completionInput,
 				"node_id", input.NodeID,
 				"err", err,
 			)
-			return completeInternal("failed to complete job", err)
+			return nil, completeInternal("failed to complete job", err)
 		}
 	}
 
@@ -169,9 +175,7 @@ func (s *completionService) complete(ctx context.Context, input completionInput,
 	s.onFail(ctx, state)
 	s.onCancelled(ctx, state)
 	s.onSuccess(ctx, state)
-	s.reconcileRepoRun(ctx, state)
-
-	return nil
+	return s.reconcileRepoRun(ctx, state), nil
 }
 
 func (s *completionService) loadRunForPostCompletion(ctx context.Context, state *completeJobState, purpose string) (store.Run, bool) {
