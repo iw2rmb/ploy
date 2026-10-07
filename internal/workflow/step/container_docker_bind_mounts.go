@@ -11,15 +11,15 @@ import (
 	"strings"
 )
 
-func dockerBindMountHandler(mounts []ContainerMount, next http.Handler) http.Handler {
+func dockerJobRequestHandler(mounts []ContainerMount, owner DockerJobOwner, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		if req.Method == http.MethodPost && isDockerContainerCreatePath(req.URL.Path) {
-			body, err := rewriteDockerBindMounts(req.Body, mounts)
+		if req.Method == http.MethodPost && dockerCreateResource(req.URL.Path) != "" {
+			body, err := rewriteDockerCreate(req.Body, mounts, owner)
 			_ = req.Body.Close()
 			if err != nil {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusBadRequest)
-				_ = json.NewEncoder(w).Encode(map[string]string{"message": "Ploy job Docker mount: " + err.Error()})
+				_ = json.NewEncoder(w).Encode(map[string]string{"message": "Ploy job Docker request: " + err.Error()})
 				return
 			}
 			req.Body = io.NopCloser(bytes.NewReader(body))
@@ -31,16 +31,25 @@ func dockerBindMountHandler(mounts []ContainerMount, next http.Handler) http.Han
 	})
 }
 
-func isDockerContainerCreatePath(p string) bool {
-	if p == "/containers/create" {
-		return true
+func dockerCreateResource(p string) string {
+	p = strings.TrimPrefix(p, "/")
+	if version, rest, ok := strings.Cut(p, "/"); ok && len(version) > 1 && version[0] == 'v' && version[1] >= '0' && version[1] <= '9' {
+		major, minor, valid := strings.Cut(strings.TrimPrefix(version, "v"), ".")
+		if !valid || !allDigits(major) || !allDigits(minor) {
+			return ""
+		}
+		p = rest
 	}
-	version, rest, ok := strings.Cut(strings.TrimPrefix(p, "/"), "/")
-	if !ok || !strings.HasPrefix(version, "v") || rest != "containers/create" {
-		return false
+	switch p {
+	case "containers/create":
+		return "container"
+	case "networks/create":
+		return "network"
+	case "volumes/create":
+		return "volume"
+	default:
+		return ""
 	}
-	major, minor, ok := strings.Cut(strings.TrimPrefix(version, "v"), ".")
-	return ok && allDigits(major) && allDigits(minor)
 }
 
 func allDigits(s string) bool {
@@ -55,9 +64,8 @@ func allDigits(s string) bool {
 	return true
 }
 
-func rewriteDockerBindMounts(body io.Reader, mounts []ContainerMount) ([]byte, error) {
-	// Preserve fields outside bind sources, including API extensions and large
-	// resource-limit integers, when forwarding requests from arbitrary clients.
+func rewriteDockerCreate(body io.Reader, mounts []ContainerMount, owner DockerJobOwner) ([]byte, error) {
+	// Preserve Docker API extensions and integer precision while stamping ownership.
 	decoder := json.NewDecoder(body)
 	decoder.UseNumber()
 	var config map[string]any
@@ -80,6 +88,31 @@ func rewriteDockerBindMounts(body io.Reader, mounts []ContainerMount) ([]byte, e
 			return nil, err
 		}
 	}
+	labels := map[string]any{}
+	// Docker decodes JSON field names without regard to case. Remove every
+	// spelling so a later lowercase field cannot replace the injected identity.
+	labelsSeen := false
+	for key, raw := range config {
+		if !strings.EqualFold(key, "Labels") {
+			continue
+		}
+		if labelsSeen {
+			return nil, fmt.Errorf("duplicate Labels fields")
+		}
+		labelsSeen = true
+		if raw != nil {
+			var ok bool
+			labels, ok = raw.(map[string]any)
+			if !ok {
+				return nil, fmt.Errorf("Labels must be an object")
+			}
+		}
+		delete(config, key)
+	}
+	for key, value := range owner.labels() {
+		labels[key] = value
+	}
+	config["Labels"] = labels
 	return json.Marshal(config)
 }
 

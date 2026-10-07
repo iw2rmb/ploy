@@ -12,6 +12,7 @@ import (
 	"time"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/workflow/step"
 	"github.com/moby/moby/api/pkg/stdcopy"
 	containertypes "github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
@@ -40,6 +41,7 @@ type startupCrashSnapshot struct {
 
 type startupCrashReconciler struct {
 	docker         crashReconcileDockerClient
+	resources      step.DockerJobResourceClient
 	now            func() time.Time
 	terminalWindow time.Duration
 }
@@ -51,6 +53,7 @@ func newStartupCrashReconciler() (*startupCrashReconciler, error) {
 	}
 	return &startupCrashReconciler{
 		docker:         dockerClient,
+		resources:      dockerClient,
 		now:            time.Now,
 		terminalWindow: crashTerminalReconcileWindow,
 	}, nil
@@ -82,6 +85,9 @@ func (r *startupCrashReconciler) Discover(ctx context.Context) (startupCrashSnap
 	}
 
 	for _, summary := range listed.Items {
+		if summary.Labels[types.LabelJobResource] == "true" {
+			continue
+		}
 		runID, jobID, ok := ployContainerIdentity(summary.Labels)
 		if !ok {
 			continue

@@ -19,11 +19,15 @@ import (
 
 func TestContainerRuntime_DockerProxyUsesJobMountsAndClosesWithContainer(t *testing.T) {
 	t.Parallel()
-	for _, outcome := range []string{"wait", "wait error", "start error", "create error", "create panic", "remove", "runtime close"} {
+	for _, outcome := range []string{"wait", "wait failure", "wait cancelled", "wait error", "start error", "create error", "create panic", "remove", "runtime close"} {
 		t.Run(outcome, func(t *testing.T) {
 			t.Parallel()
 			fake := &fakeDockerClient{createResult: client.ContainerCreateResult{ID: outcome}}
 			switch outcome {
+			case "wait failure":
+				fake.waitStatusCode = 1
+			case "wait cancelled":
+				fake.waitErr = context.Canceled
 			case "wait error":
 				fake.waitErr = errors.New("wait failed")
 			case "start error":
@@ -42,16 +46,16 @@ func TestContainerRuntime_DockerProxyUsesJobMountsAndClosesWithContainer(t *test
 			rt := newContainerRuntimeWithClient(fake, ContainerRuntimeOptions{RegistryAuthConfigFile: "/host/auth/config.json"})
 			closed := 0
 			socketPath := filepath.Join(root, "socket")
-			rt.startDockerProxy = func(_ context.Context, projection []ContainerMount, upstream, tmpDir string) (*dockerSocketProxy, error) {
+			rt.startDockerProxy = func(_ context.Context, projection []ContainerMount, upstream, tmpDir string, owner DockerJobOwner) (*dockerSocketProxy, error) {
 				if upstream != "/host/docker.sock" || tmpDir != root {
 					t.Fatalf("proxy received wrong upstream/storage: %s %s", upstream, tmpDir)
 				}
 				if len(projection) != 4 || projection[0] != mounts[0] || projection[3].Target != "/root/.docker" {
 					t.Fatalf("proxy must use existing mounts plus Docker credentials: %v", projection)
 				}
-				return &dockerSocketProxy{socketPath: socketPath, close: func() { closed++ }}, nil
+				return &dockerSocketProxy{socketPath: socketPath, close: func() error { closed++; return nil }}, nil
 			}
-			handle, err := rt.Create(context.Background(), ContainerSpec{Image: "job", Mounts: mounts})
+			handle, err := rt.Create(context.Background(), ContainerSpec{Image: "job", Labels: testDockerJobOwner.labels(), Mounts: mounts})
 			if outcome == "create error" || outcome == "create panic" {
 				if err == nil || closed != 1 {
 					t.Fatalf("failed creation must close proxy: err=%v closed=%d", err, closed)
@@ -65,7 +69,7 @@ func TestContainerRuntime_DockerProxyUsesJobMountsAndClosesWithContainer(t *test
 				t.Fatal("job must get proxy socket without mutating the authoritative mount table")
 			}
 			switch outcome {
-			case "wait", "wait error":
+			case "wait", "wait failure", "wait cancelled", "wait error":
 				_, _ = rt.Wait(context.Background(), handle)
 			case "start error":
 				_ = rt.Start(context.Background(), handle)
@@ -86,10 +90,10 @@ func TestContainerRuntime_DockerProxyPreparationFailureStopsContainerCreation(t 
 	t.Parallel()
 	fake := &fakeDockerClient{}
 	rt := newContainerRuntimeWithClient(fake, ContainerRuntimeOptions{})
-	rt.startDockerProxy = func(context.Context, []ContainerMount, string, string) (*dockerSocketProxy, error) {
+	rt.startDockerProxy = func(context.Context, []ContainerMount, string, string, DockerJobOwner) (*dockerSocketProxy, error) {
 		return nil, errors.New("listen failed")
 	}
-	_, err := rt.Create(context.Background(), ContainerSpec{Image: "job", Mounts: []ContainerMount{
+	_, err := rt.Create(context.Background(), ContainerSpec{Image: "job", Labels: testDockerJobOwner.labels(), Mounts: []ContainerMount{
 		{Source: t.TempDir(), Target: "/tmp"},
 		{Source: "/host/docker.sock", Target: "/var/run/docker.sock"},
 	}})
@@ -103,15 +107,15 @@ func TestContainerRuntime_DockerProxyHonorsCustomUnixEndpoint(t *testing.T) {
 	fake := &fakeDockerClient{createResult: client.ContainerCreateResult{ID: "custom"}}
 	rt := newContainerRuntimeWithClient(fake, ContainerRuntimeOptions{})
 	t.Cleanup(func() { _ = rt.Close() })
-	rt.startDockerProxy = func(_ context.Context, _ []ContainerMount, upstream, _ string) (*dockerSocketProxy, error) {
+	rt.startDockerProxy = func(_ context.Context, _ []ContainerMount, upstream, _ string, _ DockerJobOwner) (*dockerSocketProxy, error) {
 		if upstream != "/host/custom.sock" {
 			t.Fatalf("upstream=%s", upstream)
 		}
-		return &dockerSocketProxy{socketPath: "/job/proxy.sock", close: func() {}}, nil
+		return &dockerSocketProxy{socketPath: "/job/proxy.sock", close: func() error { return nil }}, nil
 	}
 	_, err := rt.Create(context.Background(), ContainerSpec{
-		Image: "job",
-		Env:   map[string]string{"DOCKER_HOST": "unix:///custom/docker.sock"},
+		Image: "job", Labels: testDockerJobOwner.labels(),
+		Env: map[string]string{"DOCKER_HOST": "unix:///custom/docker.sock"},
 		Mounts: []ContainerMount{
 			{Source: t.TempDir(), Target: "/tmp"},
 			{Source: "/host/custom.sock", Target: "/custom/docker.sock"},
@@ -136,6 +140,19 @@ func TestDockerSocketProxyUnix_TranslatesRealRequestsAndClosesOnCancellation(t *
 	}
 	requests := make(chan string, 1)
 	daemon := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if req.Method == http.MethodHead {
+			w.Header().Set("API-Version", "1.52")
+			return
+		}
+		if req.Method == http.MethodGet {
+			w.Header().Set("Content-Type", "application/json")
+			if strings.HasSuffix(req.URL.Path, "/volumes") {
+				_, _ = io.WriteString(w, `{"Volumes":[]}`)
+			} else {
+				_, _ = io.WriteString(w, `[]`)
+			}
+			return
+		}
 		body, _ := io.ReadAll(req.Body)
 		requests <- string(body)
 		w.WriteHeader(http.StatusCreated)
@@ -151,11 +168,11 @@ func TestDockerSocketProxyUnix_TranslatesRealRequestsAndClosesOnCancellation(t *
 	proxy, err := startDockerSocketProxy(ctx, []ContainerMount{
 		{Source: root, Target: "/workspace"},
 		{Source: upstreamPath, Target: "/var/run/docker.sock"},
-	}, upstreamPath, root)
+	}, upstreamPath, root, testDockerJobOwner)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(proxy.Close)
+	t.Cleanup(func() { _ = proxy.Close() })
 	transport := &http.Transport{DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
 		return (&net.Dialer{}).DialContext(ctx, "unix", proxy.socketPath)
 	}}
@@ -171,7 +188,7 @@ func TestDockerSocketProxyUnix_TranslatesRealRequestsAndClosesOnCancellation(t *
 	}
 	select {
 	case body := <-requests:
-		if !strings.Contains(body, root+"/init.sql:/init.sql:ro") || !strings.Contains(body, upstreamPath+":/var/run/docker.sock") {
+		if !strings.Contains(body, root+"/init.sql:/init.sql:ro") || !strings.Contains(body, proxy.socketPath+":/var/run/docker.sock") {
 			t.Fatalf("daemon received wrong bind paths: %s", body)
 		}
 	case <-time.After(time.Second):

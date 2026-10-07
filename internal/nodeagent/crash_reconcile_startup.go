@@ -35,6 +35,7 @@ func (c *ClaimManager) runStartupReconcilePass(ctx context.Context) error {
 		"recent_terminal_count", len(snapshot.RecentTerminal),
 	)
 
+	c.reconcileDockerJobResources(ctx)
 	c.startRecoveredRunningMonitors(ctx, snapshot.Running)
 	c.reconcileRecoveredTerminalContainers(ctx, snapshot.RecentTerminal)
 	c.sweepAbandonedRuntimeIfIdle()
@@ -42,6 +43,12 @@ func (c *ClaimManager) runStartupReconcilePass(ctx context.Context) error {
 }
 
 func (c *ClaimManager) sweepAbandonedRuntimeIfIdle() {
+	if idle, ok := c.controller.(interface{ nodeIsIdle() bool }); ok && !idle.nodeIsIdle() {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), abandonedRuntimeSweepTimeout)
+	defer cancel()
+	c.reconcileDockerJobResources(ctx)
 	if sweeper, ok := c.controller.(interface{ sweepAbandonedRuntimeIfIdle() }); ok {
 		sweeper.sweepAbandonedRuntimeIfIdle()
 	}

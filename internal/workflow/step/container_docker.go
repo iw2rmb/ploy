@@ -50,7 +50,7 @@ type containerRuntime struct {
 	stats            dockerStatsAPI
 	opts             ContainerRuntimeOptions
 	dockerProxies    sync.Map
-	startDockerProxy func(context.Context, []ContainerMount, string, string) (*dockerSocketProxy, error)
+	startDockerProxy func(context.Context, []ContainerMount, string, string, DockerJobOwner) (*dockerSocketProxy, error)
 }
 
 // NewContainerRuntime constructs a Docker-backed container runtime.
@@ -115,7 +115,7 @@ func (r *containerRuntime) Create(ctx context.Context, spec ContainerSpec) (hand
 	proxyOwned := false
 	defer func() {
 		if proxy != nil && !proxyOwned {
-			proxy.Close()
+			err = errors.Join(err, proxy.Close())
 		}
 	}()
 	hostCfg := &container.HostConfig{
@@ -181,7 +181,7 @@ func (r *containerRuntime) Start(ctx context.Context, handle ContainerHandle) er
 	}
 	_, err := r.client.ContainerStart(ctx, string(handle), client.ContainerStartOptions{})
 	if err != nil {
-		r.closeDockerProxy(handle)
+		err = errors.Join(err, r.closeDockerProxy(handle))
 	}
 	return err
 }
@@ -189,8 +189,8 @@ func (r *containerRuntime) Start(ctx context.Context, handle ContainerHandle) er
 // Wait blocks until the container reaches WaitConditionNotRunning (fully stopped),
 // then inspects the container to extract start/finish timestamps. On context
 // cancellation the container is force-removed so callers don't leak resources.
-func (r *containerRuntime) Wait(ctx context.Context, handle ContainerHandle) (ContainerResult, error) {
-	defer r.closeDockerProxy(handle)
+func (r *containerRuntime) Wait(ctx context.Context, handle ContainerHandle) (result ContainerResult, err error) {
+	defer func() { err = errors.Join(err, r.closeDockerProxy(handle)) }()
 	if r == nil || r.client == nil {
 		return ContainerResult{}, errors.New("step: docker runtime not configured")
 	}
@@ -305,12 +305,12 @@ func (r *containerRuntime) StreamLogs(ctx context.Context, handle ContainerHandl
 
 // Remove deletes the container with Force=true. Removing an already-removed
 // container may return a 404 error; the operation is idempotent in effect.
-func (r *containerRuntime) Remove(ctx context.Context, handle ContainerHandle) error {
-	defer r.closeDockerProxy(handle)
+func (r *containerRuntime) Remove(ctx context.Context, handle ContainerHandle) (err error) {
+	defer func() { err = errors.Join(err, r.closeDockerProxy(handle)) }()
 	if r == nil || r.client == nil {
 		return errors.New("step: docker runtime not configured")
 	}
-	_, err := r.client.ContainerRemove(ctx, string(handle), client.ContainerRemoveOptions{Force: true})
+	_, err = r.client.ContainerRemove(ctx, string(handle), client.ContainerRemoveOptions{Force: true})
 	return err
 }
 

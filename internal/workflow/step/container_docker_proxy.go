@@ -12,16 +12,20 @@ import (
 	"runtime"
 	"sync"
 	"time"
+
+	"github.com/moby/moby/client"
 )
 
 type dockerSocketProxy struct {
 	socketPath string
-	close      func()
+	close      func() error
+	err        error
 	once       sync.Once
 }
 
-func (p *dockerSocketProxy) Close() {
-	p.once.Do(p.close)
+func (p *dockerSocketProxy) Close() error {
+	p.once.Do(func() { p.err = p.close() })
+	return p.err
 }
 
 func (r *containerRuntime) prepareDockerSocket(ctx context.Context, spec ContainerSpec) ([]ContainerMount, *dockerSocketProxy, error) {
@@ -50,7 +54,11 @@ func (r *containerRuntime) prepareDockerSocket(ctx context.Context, spec Contain
 	if start == nil {
 		start = startDockerSocketProxy
 	}
-	proxy, err := start(ctx, mounts, mounts[socketIndex].Source, tmpDir)
+	owner, err := DockerJobOwnerFromLabels(spec.Labels)
+	if err != nil {
+		return nil, nil, err
+	}
+	proxy, err := start(ctx, mounts, mounts[socketIndex].Source, tmpDir, owner)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -58,28 +66,30 @@ func (r *containerRuntime) prepareDockerSocket(ctx context.Context, spec Contain
 	return mounts, proxy, nil
 }
 
-func (r *containerRuntime) closeDockerProxy(handle ContainerHandle) {
+func (r *containerRuntime) closeDockerProxy(handle ContainerHandle) error {
 	if r == nil {
-		return
+		return nil
 	}
 	if p, ok := r.dockerProxies.LoadAndDelete(handle); ok {
-		p.(*dockerSocketProxy).Close()
-	}
-}
-
-// Close also covers containers that never reach Wait, such as interrupted setup.
-func (r *containerRuntime) Close() error {
-	r.dockerProxies.Range(func(key, _ any) bool {
-		r.closeDockerProxy(key.(ContainerHandle))
-		return true
-	})
-	if closer, ok := r.client.(interface{ Close() error }); ok {
-		return closer.Close()
+		return p.(*dockerSocketProxy).Close()
 	}
 	return nil
 }
 
-func startDockerSocketProxy(ctx context.Context, mounts []ContainerMount, upstream, tmpDir string) (*dockerSocketProxy, error) {
+// Close also covers containers that never reach Wait, such as interrupted setup.
+func (r *containerRuntime) Close() error {
+	var errs []error
+	r.dockerProxies.Range(func(key, _ any) bool {
+		errs = append(errs, r.closeDockerProxy(key.(ContainerHandle)))
+		return true
+	})
+	if closer, ok := r.client.(interface{ Close() error }); ok {
+		errs = append(errs, closer.Close())
+	}
+	return errors.Join(errs...)
+}
+
+func startDockerSocketProxy(ctx context.Context, mounts []ContainerMount, upstream, tmpDir string, owner DockerJobOwner) (*dockerSocketProxy, error) {
 	dir, err := os.MkdirTemp(tmpDir, "docker-")
 	if err != nil {
 		return nil, fmt.Errorf("create Docker proxy directory: %w", err)
@@ -102,9 +112,22 @@ func startDockerSocketProxy(ctx context.Context, mounts []ContainerMount, upstre
 		return nil, fmt.Errorf("protect job Docker socket: %w", err)
 	}
 
-	// Helper containers such as Ryuk must retain the host socket so their
-	// cleanup can continue after the parent job and its proxy have exited.
+	// Nested Docker clients must retain this job's ownership boundary. The node
+	// performs final cleanup even if a helper such as Ryuk can no longer connect.
 	projection := append([]ContainerMount(nil), mounts...)
+	for i := range projection {
+		if projection[i].Source == upstream {
+			projection[i].Source = socketPath
+		}
+	}
+	docker, err := client.New(client.WithHost("unix://" + upstream))
+	if err != nil {
+		_ = listener.Close()
+		return nil, err
+	}
+	var admission sync.Mutex
+	var pending sync.WaitGroup
+	closing := false
 	transport := &http.Transport{
 		DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
 			return (&net.Dialer{Timeout: 10 * time.Second}).DialContext(ctx, "unix", upstream)
@@ -118,10 +141,28 @@ func startDockerSocketProxy(ctx context.Context, mounts []ContainerMount, upstre
 		Transport:     transport,
 		FlushInterval: -1,
 	}
+	handler := dockerJobRequestHandler(projection, owner, forward)
 	var mu sync.Mutex
 	connections := make(map[net.Conn]struct{})
 	server := &http.Server{
-		Handler: dockerBindMountHandler(projection, forward),
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			admission.Lock()
+			if closing {
+				admission.Unlock()
+				http.Error(w, "job Docker access closed", http.StatusServiceUnavailable)
+				return
+			}
+			pending.Add(1)
+			admission.Unlock()
+			defer pending.Done()
+			if req.Method == http.MethodPost && dockerCreateResource(req.URL.Path) != "" {
+				// A disconnected caller must not hide a creation still in flight at teardown.
+				requestCtx, cancel := context.WithTimeout(context.WithoutCancel(req.Context()), 30*time.Second)
+				defer cancel()
+				req = req.WithContext(requestCtx)
+			}
+			handler.ServeHTTP(w, req)
+		}),
 		ConnState: func(conn net.Conn, state http.ConnState) {
 			mu.Lock()
 			defer mu.Unlock()
@@ -133,7 +174,10 @@ func startDockerSocketProxy(ctx context.Context, mounts []ContainerMount, upstre
 		},
 	}
 	p := &dockerSocketProxy{socketPath: socketPath}
-	p.close = func() {
+	p.close = func() error {
+		admission.Lock()
+		closing = true
+		admission.Unlock()
 		_ = server.Close()
 		// http.Server.Close leaves hijacked exec/attach connections open.
 		mu.Lock()
@@ -141,10 +185,14 @@ func startDockerSocketProxy(ctx context.Context, mounts []ContainerMount, upstre
 			_ = conn.Close()
 		}
 		mu.Unlock()
+		pending.Wait()
+		cleanupCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		cleanupErr := RemoveDockerJobResources(cleanupCtx, docker, owner)
 		transport.CloseIdleConnections()
-		_ = os.RemoveAll(dir)
+		return errors.Join(cleanupErr, docker.Close(), os.RemoveAll(dir))
 	}
-	stopCancel := context.AfterFunc(ctx, p.Close)
+	stopCancel := context.AfterFunc(ctx, func() { _ = p.Close() })
 	go func() {
 		_ = server.Serve(listener)
 		stopCancel()

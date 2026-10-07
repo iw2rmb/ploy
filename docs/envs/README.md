@@ -210,8 +210,18 @@ from job paths, such as `/workspace/docker/init.sql`, to their actual host paths
 The proxy uses the job's mount table, so concurrent jobs use their own storage.
 Sources under job mounts must exist; missing sources fail before container
 creation. Named volumes and host paths outside job mounts retain their existing
-behavior. Helper containers that mount the Docker socket receive the host
-socket, so cleanup can continue after the job exits.
+behavior. Helper containers that mount the Docker socket receive the same job
+proxy, including when they create further containers.
+
+The proxy assigns run, job, and retry ownership labels to newly created
+containers, networks, and volumes. Application labels are preserved; callers
+cannot override Ploy ownership. On completion or cancellation, the node closes
+Docker access, waits for in-flight creation requests, and removes the owned
+resources. Main job containers retain their existing log-retention behavior.
+Existing external resources are not adopted, and volumes in use are not forced
+out. Startup recovery and idle reconciliation retry cleanup for terminal jobs;
+unknown job status preserves resources. Resources created before ownership
+labelling was introduced require separate inspection and cleanup.
 
 - `PLOY_DOCKER_AUTH_CONFIG_FILE` — Optional path to a Docker auth config JSON
   file. Production nodes use `/etc/ploy/docker-auth-config/config.json`. When

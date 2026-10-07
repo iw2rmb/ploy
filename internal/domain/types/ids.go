@@ -369,3 +369,7 @@ const LabelJobID = "com.ploy.job_id"
 
 // LabelResumeCount fences recovered containers against later retries of the same job.
 const LabelResumeCount = "com.ploy.resume_count"
+
+// LabelJobResource distinguishes job-created Docker resources from the main
+// container whose exit status drives job recovery.
+const LabelJobResource = "com.ploy.job_resource"

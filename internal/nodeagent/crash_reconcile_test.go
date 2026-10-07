@@ -135,13 +135,23 @@ func TestCrashReconcile_ClassifiesByRuntimeState_Contract(t *testing.T) {
 				Labels: map[string]string{types.LabelRunID: "run-missing"},
 			},
 			{
+				ID:     "child-running",
+				Labels: map[string]string{types.LabelRunID: "run-r2", types.LabelJobID: "job-r2", types.LabelJobResource: "true"},
+			},
+			{
+				ID:     "child-exited",
+				Labels: map[string]string{types.LabelRunID: "run-t1", types.LabelJobID: "job-t1", types.LabelJobResource: "true"},
+			},
+			{
 				ID:     "unmanaged",
 				State:  containertypes.StateRunning,
 				Labels: map[string]string{},
 			},
 		}},
 		inspectByID: map[string]client.ContainerInspectResult{
-			"running-2": inspectWithState(true, containertypes.StateRunning, ""),
+			"child-running": inspectWithState(true, containertypes.StateRunning, ""),
+			"child-exited":  inspectWithState(false, containertypes.ContainerState("exited"), now.Format(time.RFC3339Nano)),
+			"running-2":     inspectWithState(true, containertypes.StateRunning, ""),
 			"terminal-1": inspectWithState(
 				false,
 				containertypes.ContainerState("exited"),

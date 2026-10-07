@@ -50,6 +50,8 @@ func (c *ClaimManager) Start(ctx context.Context) error {
 				// Work was claimed and executed; reset backoff to initial interval.
 				c.backoff.Reset()
 			default:
+				// Retry failed resource cleanup while the node is idle.
+				c.sweepAbandonedRuntimeIfIdle()
 				// No work available (204); apply backoff to increase polling interval.
 				c.backoff.Apply()
 			}

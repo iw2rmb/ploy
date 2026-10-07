@@ -13,7 +13,9 @@ import (
 	"testing"
 )
 
-func TestDockerBindMountHandler_TranslatesJobSourcesAndPreservesRequest(t *testing.T) {
+var testDockerJobOwner = DockerJobOwner{RunID: "run-proxy", JobID: "job-proxy"}
+
+func TestDockerJobRequestHandler_TranslatesJobSourcesAndPreservesRequest(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	workspace := filepath.Join(root, "workspace")
@@ -73,13 +75,19 @@ func TestDockerBindMountHandler_TranslatesJobSourcesAndPreservesRequest(t *testi
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			called := false
-			handler := dockerBindMountHandler(mounts, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			handler := dockerJobRequestHandler(mounts, testDockerJobOwner, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 				called = true
 				body, err := io.ReadAll(req.Body)
 				if err != nil {
 					t.Fatal(err)
 				}
-				if !reflect.DeepEqual(decodeDockerRequest(t, body), decodeDockerRequest(t, []byte(tt.want))) {
+				want := decodeDockerRequest(t, []byte(tt.want))
+				wantLabels := make(map[string]any)
+				for k, v := range testDockerJobOwner.labels() {
+					wantLabels[k] = v
+				}
+				want["Labels"] = wantLabels
+				if !reflect.DeepEqual(decodeDockerRequest(t, body), want) {
 					t.Fatalf("forwarded body = %s, want %s", body, tt.want)
 				}
 				if req.ContentLength != int64(len(body)) || len(req.TransferEncoding) != 0 {
@@ -103,11 +111,11 @@ func TestDockerBindMountHandler_TranslatesJobSourcesAndPreservesRequest(t *testi
 	}
 }
 
-func TestDockerBindMountHandler_RejectsMissingSourceBeforeDockerCreatesDirectory(t *testing.T) {
+func TestDockerJobRequestHandler_RejectsMissingSourceBeforeDockerCreatesDirectory(t *testing.T) {
 	t.Parallel()
 	workspace := t.TempDir()
 	called := false
-	handler := dockerBindMountHandler([]ContainerMount{{Source: workspace, Target: "/workspace"}}, http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+	handler := dockerJobRequestHandler([]ContainerMount{{Source: workspace, Target: "/workspace"}}, testDockerJobOwner, http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 		called = true
 	}))
 	for _, body := range []string{
@@ -125,12 +133,12 @@ func TestDockerBindMountHandler_RejectsMissingSourceBeforeDockerCreatesDirectory
 	}
 }
 
-func TestDockerBindMountHandler_PassesOtherDockerRequestsAndStreams(t *testing.T) {
+func TestDockerJobRequestHandler_PassesOtherDockerRequestsAndStreams(t *testing.T) {
 	t.Parallel()
 	for _, endpoint := range []string{"/v1.52/build", "/v1.52/containers/db/attach", "/v1.52/exec/id/start", "/vfoo/containers/create"} {
 		t.Run(endpoint, func(t *testing.T) {
 			body := []byte("arbitrary binary\x00payload")
-			handler := dockerBindMountHandler(nil, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			handler := dockerJobRequestHandler(nil, testDockerJobOwner, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 				got, _ := io.ReadAll(req.Body)
 				if !bytes.Equal(got, body) {
 					t.Fatalf("body changed: %q", got)
@@ -147,7 +155,7 @@ func TestDockerBindMountHandler_PassesOtherDockerRequestsAndStreams(t *testing.T
 	}
 }
 
-func TestDockerBindMountHandler_ConcurrentJobsUseSeparateMappings(t *testing.T) {
+func TestDockerJobRequestHandler_ConcurrentJobsUseSeparateMappings(t *testing.T) {
 	t.Parallel()
 	for _, job := range []string{"a", "b"} {
 		t.Run(job, func(t *testing.T) {
@@ -156,7 +164,7 @@ func TestDockerBindMountHandler_ConcurrentJobsUseSeparateMappings(t *testing.T) 
 			if err := os.WriteFile(filepath.Join(workspace, "init.sql"), []byte(job), 0o600); err != nil {
 				t.Fatal(err)
 			}
-			handler := dockerBindMountHandler([]ContainerMount{{Source: workspace, Target: "/workspace"}}, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			handler := dockerJobRequestHandler([]ContainerMount{{Source: workspace, Target: "/workspace"}}, testDockerJobOwner, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 				config := decodeDockerRequest(t, mustReadDockerBody(t, req.Body))
 				bind := config["HostConfig"].(map[string]any)["Binds"].([]any)[0].(string)
 				source, _, _ := strings.Cut(bind, ":")
@@ -170,11 +178,11 @@ func TestDockerBindMountHandler_ConcurrentJobsUseSeparateMappings(t *testing.T) 
 	}
 }
 
-func TestDockerBindMountHandler_RejectsMalformedCreateRequests(t *testing.T) {
+func TestDockerJobRequestHandler_RejectsMalformedCreateRequests(t *testing.T) {
 	t.Parallel()
-	for _, body := range []string{"null", "{}{}", `{`, `{"HostConfig":[]}`, `{"HostConfig":{"Binds":[1]}}`, `{"HostConfig":{"Mounts":[null]}}`} {
+	for _, body := range []string{"null", "{}{}", `{`, `{"Labels":{},"labels":{"com.ploy.job_id":"forged"}}`, `{"Labels":[]}`, `{"HostConfig":[]}`, `{"HostConfig":{"Binds":[1]}}`, `{"HostConfig":{"Mounts":[null]}}`} {
 		t.Run(body, func(t *testing.T) {
-			handler := dockerBindMountHandler(nil, http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+			handler := dockerJobRequestHandler(nil, testDockerJobOwner, http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 				t.Fatal("invalid request reached Docker")
 			}))
 			response := httptest.NewRecorder()
