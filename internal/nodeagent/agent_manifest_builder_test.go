@@ -63,8 +63,8 @@ func TestBuildManifestFromRequest(t *testing.T) {
 			t.Errorf("expected commit %q, got %q", req.CommitSHA, repo.Commit.String())
 		}
 
-		if len(manifest.Envs) != 4 {
-			t.Errorf("expected 4 env vars, got %d", len(manifest.Envs))
+		if len(manifest.Envs) != 5 {
+			t.Errorf("expected 5 env vars, got %d", len(manifest.Envs))
 		}
 		if manifest.Envs["FOO"] != "bar" {
 			t.Errorf("expected env FOO=bar, got %q", manifest.Envs["FOO"])
@@ -402,24 +402,28 @@ func TestBuildManifestFromRequest(t *testing.T) {
 		req := newStartRunRequest(
 			withRunURL("  https://gitlab.example.com/group/repo.git  "),
 			withRunBaseRef("  feature/repo-env  "),
+			withRunCommitSHA("  0123456789abcdef0123456789abcdef01234567  "),
 			withRunEnv(map[string]string{
-				"PLOY_REPO_URL": "https://user.example/base.git",
-				"PLOY_REPO_REF": "user-base",
+				"PLOY_REPO_URL":        "https://user.example/base.git",
+				"PLOY_REPO_REF":        "user-base",
+				"PLOY_REPO_SOURCE_SHA": "user-base-sha",
 			}),
 			withMigSpec(contracts.MigSpec{
 				Steps: []contracts.MigStep{
 					{
 						Image: contracts.JobImage{Universal: "migs-step0:latest"},
 						Envs: map[string]string{
-							"PLOY_REPO_URL": "https://user.example/step0.git",
-							"PLOY_REPO_REF": "user-step0",
+							"PLOY_REPO_URL":        "https://user.example/step0.git",
+							"PLOY_REPO_REF":        "user-step0",
+							"PLOY_REPO_SOURCE_SHA": "user-step0-sha",
 						},
 					},
 					{
 						Image: contracts.JobImage{Universal: "migs-step1:latest"},
 						Envs: map[string]string{
-							"PLOY_REPO_URL": "https://user.example/step1.git",
-							"PLOY_REPO_REF": "user-step1",
+							"PLOY_REPO_URL":        "https://user.example/step1.git",
+							"PLOY_REPO_REF":        "user-step1",
+							"PLOY_REPO_SOURCE_SHA": "user-step1-sha",
 						},
 					},
 				},
@@ -432,6 +436,9 @@ func TestBuildManifestFromRequest(t *testing.T) {
 			}
 			if got := manifest.Envs["PLOY_REPO_URL"]; got != "https://gitlab.example.com/group/repo.git" {
 				t.Fatalf("step %d PLOY_REPO_URL=%q, want node-owned repository URL", step, got)
+			}
+			if got := manifest.Envs["PLOY_REPO_SOURCE_SHA"]; got != "0123456789abcdef0123456789abcdef01234567" {
+				t.Fatalf("step %d PLOY_REPO_SOURCE_SHA=%q, want pinned source commit", step, got)
 			}
 			if got := manifest.Envs["PLOY_REPO_REF"]; got != "feature/repo-env" {
 				t.Fatalf("step %d PLOY_REPO_REF=%q, want node-owned repository ref", step, got)
@@ -493,6 +500,9 @@ func TestManifestBuildWithGateRepoMeta(t *testing.T) {
 				manifest, err := buildManifestDefault(req)
 				if err != nil {
 					t.Fatalf("buildManifestDefault() error: %v", err)
+				}
+				if got := manifest.Envs["PLOY_REPO_SOURCE_SHA"]; got != tt.commitSHA {
+					t.Fatalf("PLOY_REPO_SOURCE_SHA=%q, want %q", got, tt.commitSHA)
 				}
 				if manifest.Gate == nil {
 					t.Fatal("expected Gate spec to be set")

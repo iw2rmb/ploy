@@ -647,6 +647,9 @@ step:
 
 - `PLOY_REPO_URL` — Source repository URL.
 - `PLOY_REPO_REF` — Git ref selected for the run's source snapshot.
+- `PLOY_REPO_SOURCE_SHA` — Pinned source commit used to hydrate the run. It stays
+  fixed when successful migration steps advance the workspace HEAD. Run and
+  step environment settings cannot override it.
 
 Ploy injects `PLOY_STACK_LANGUAGE`, `PLOY_STACK_TOOL`, and
 `PLOY_STACK_RELEASE` when the corresponding stack values are available. Ploy

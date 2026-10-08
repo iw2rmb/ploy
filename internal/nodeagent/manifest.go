@@ -40,6 +40,7 @@ func resolveImage(
 func injectNodeOwnedRepoEnv(env map[string]string, req StartRunRequest) {
 	env["PLOY_REPO_URL"] = strings.TrimSpace(req.RepoURL.String())
 	env["PLOY_REPO_REF"] = strings.TrimSpace(req.BaseRef.String())
+	env["PLOY_REPO_SOURCE_SHA"] = strings.TrimSpace(req.CommitSHA.String())
 }
 
 func injectNodeOwnedMigEnv(env map[string]string, req StartRunRequest) {

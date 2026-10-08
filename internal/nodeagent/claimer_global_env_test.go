@@ -409,6 +409,7 @@ func TestGlobalEnvPropagation_NoFiltering(t *testing.T) {
 		"PATH",
 		"PLOY_REPO_URL",
 		"PLOY_REPO_REF",
+		"PLOY_REPO_SOURCE_SHA",
 		"PLOY_JOB_ID",
 	}
 
