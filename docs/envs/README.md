@@ -618,6 +618,13 @@ and node configuration mounts are read-only. Node deployment supplies the host
 roots through `PLOY_NODE_CACHE_ROOT` and `PLOY_NODE_JOB_CONFIG_ROOT`. Ploy does
 not inspect tool-specific children below these roots.
 
+Official Java gate images run Grype after collecting the SBOM. They read the
+operator-provided database at `$PLOY_NODE_CACHE_DIR/grype/db` without updates
+or age validation. Each gate saves `sbom.spdx.json` and `grype.json` in its
+`/out` and in `/share/<PLOY_JOB_TYPE>/` (`pre_gate` or `post_gate`). The Java
+CVE migration consumes only the pre-gate pair. Database distribution belongs
+to the deploy repository's manual `scripts/copy-grype-db.sh` script.
+
 **Build Gate Gradle images (`gate-gradle:*`)**: Store immutable Gradle defaults
 outside `HOME`. At startup, the image installs the defaults into
 `$PLOY_JOB_CACHE_DIR/gradle/user-home` and sets that path as
