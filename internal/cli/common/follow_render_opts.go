@@ -2,20 +2,9 @@ package common
 
 import (
 	"io"
-	"net/url"
 	"os"
 	"strings"
-
-	"github.com/iw2rmb/ploy/internal/cli/runs"
 )
-
-// FollowRunRenderOptions returns shared render options for follow-mode output.
-func FollowRunRenderOptions(baseURL *url.URL, output io.Writer) runs.TextRenderOptions {
-	return runs.TextRenderOptions{
-		EnableOSC8: SupportsOSC8(output),
-		BaseURL:    baseURL,
-	}
-}
 
 func SupportsOSC8(w io.Writer) bool {
 	term := strings.TrimSpace(os.Getenv("TERM"))

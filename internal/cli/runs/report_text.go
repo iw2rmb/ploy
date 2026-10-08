@@ -25,7 +25,8 @@ type TextRenderOptions struct {
 	JobIOPreviews      map[domaintypes.JobID]RunJobIOPreview
 	ExpandStdout       bool
 	ExpandStderr       bool
-	ExpandReport       bool
+	ReportsCollapsed   bool
+	SBOMDiffCollapsed  bool
 	FilterRunningRepos bool
 	EmptyReposLine     string
 	SpecDisplayName    string
@@ -139,7 +140,7 @@ func FormatRunStatusReportText(report RunStatusReport, opts TextRenderOptions) s
 					valueOrDash(strings.TrimSpace(job.JobImage)),
 				},
 				ExitOneLiner: renderExitOneLiner(job, repo.LastError, jobIdx == repoErrorOwnerIdx),
-				DetailLines:  append(renderJobIOPreviewLines(job, opts), renderJobReportLines(job.Report, opts.ExpandReport)...),
+				DetailLines:  append(renderJobIOPreviewLines(job, opts), renderJobReportLines(job.Report, !opts.ReportsCollapsed, isTerminalJobStatus(job.Status.String()))...),
 			})
 		}
 		frame.Repos = append(frame.Repos, repoFrame)
@@ -156,7 +157,7 @@ func FormatRunStatusReportText(report RunStatusReport, opts TextRenderOptions) s
 	out.WriteString(frameText)
 	if len(report.SBOMDiff) > 0 {
 		out.WriteByte('\n')
-		out.WriteString(formatSBOMDiffBlock(report.SBOMDiff))
+		out.WriteString(formatSBOMDiffBlock(report.SBOMDiff, opts.SBOMDiffCollapsed))
 		out.WriteByte('\n')
 		out.WriteByte('\n')
 	}
@@ -365,7 +366,7 @@ func renderJobIOPreviewLines(job RunJobEntry, opts TextRenderOptions) []string {
 	return renderStreamPreviewLines(preview, expandStdout, expandStderr)
 }
 
-func renderJobReportLines(report string, expanded bool) []string {
+func renderJobReportLines(report string, expanded, completed bool) []string {
 	if report == "" {
 		return nil
 	}
@@ -379,13 +380,17 @@ func renderJobReportLines(report string, expanded bool) []string {
 		}
 		return r
 	}, report)
-	label := "    " + renderStreamPreviewLabel("[R]EPORT")
+	labelText := "[R]EPORT"
+	if completed {
+		labelText = "REPORT"
+	}
+	label := "    " + renderStreamPreviewLabel(labelText)
 	if !expanded {
 		first := strings.SplitN(strings.TrimSpace(safe), "\n", 2)[0]
-		return []string{label + " " + truncateRunesWithEllipsis(first, 80)}
+		return []string{"", label + " " + truncateRunesWithEllipsis(first, 80), ""}
 	}
-	lines := []string{label}
-	for _, line := range strings.Split(safe, "\n") {
+	lines := []string{"", label, ""}
+	for _, line := range strings.Split(strings.Trim(safe, "\n"), "\n") {
 		if line == "" {
 			lines = append(lines, "      ")
 			continue
@@ -394,7 +399,7 @@ func renderJobReportLines(report string, expanded bool) []string {
 			lines = append(lines, "      "+row)
 		}
 	}
-	return lines
+	return append(lines, "")
 }
 
 func filterRunningRepos(repos []RunEntry) []RunEntry {

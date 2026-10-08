@@ -53,7 +53,6 @@ type followModel struct {
 	jobIOPreviews   map[domaintypes.JobID]RunJobIOPreview
 	expandStdout    bool
 	expandStderr    bool
-	expandReport    bool
 	interactiveMode bool
 }
 
@@ -90,7 +89,7 @@ func (m followModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "e":
 			m.expandStderr = !m.expandStderr
 		case "r":
-			m.expandReport = !m.expandReport
+			m.renderOpts.ReportsCollapsed = !m.renderOpts.ReportsCollapsed
 		}
 		return m, nil
 	case followReportMsg:
@@ -129,7 +128,6 @@ func (m followModel) View() tea.View {
 	opts.JobIOPreviews = m.jobIOPreviews
 	opts.ExpandStdout = m.expandStdout
 	opts.ExpandStderr = m.expandStderr
-	opts.ExpandReport = m.expandReport
 	if m.finalState == "" {
 		opts.FilterRunningRepos = len(m.report.Repos) > 1
 		opts.EmptyReposLine = "No repos with in-progress jobs."
@@ -139,14 +137,16 @@ func (m followModel) View() tea.View {
 
 // FollowRunCommand drives `run --follow` rendering with Bubble Tea v2.
 type FollowRunCommand struct {
-	Client          *http.Client
-	BaseURL         *url.URL
-	RunID           domaintypes.RunID
-	Output          io.Writer
-	EnableOSC8      bool
-	SpecDisplayName string
-	MaxRetries      int
-	PollInterval    time.Duration
+	Client            *http.Client
+	BaseURL           *url.URL
+	RunID             domaintypes.RunID
+	Output            io.Writer
+	EnableOSC8        bool
+	SpecDisplayName   string
+	ReportsCollapsed  bool
+	SBOMDiffCollapsed bool
+	MaxRetries        int
+	PollInterval      time.Duration
 }
 
 // Run executes follow-mode rendering until the run reaches a terminal state.
@@ -180,9 +180,11 @@ func (c FollowRunCommand) Run(ctx context.Context) (migsapi.RunState, error) {
 
 	program := tea.NewProgram(
 		newFollowModel(TextRenderOptions{
-			EnableOSC8:      c.EnableOSC8,
-			BaseURL:         c.BaseURL,
-			SpecDisplayName: c.SpecDisplayName,
+			EnableOSC8:        c.EnableOSC8,
+			BaseURL:           c.BaseURL,
+			SpecDisplayName:   c.SpecDisplayName,
+			ReportsCollapsed:  c.ReportsCollapsed,
+			SBOMDiffCollapsed: c.SBOMDiffCollapsed,
 		}, interactive),
 		tea.WithContext(coordCtx),
 		tea.WithInput(input),

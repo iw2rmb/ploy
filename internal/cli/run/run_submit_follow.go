@@ -25,7 +25,7 @@ func finalizeRunSubmit(
 	httpClient *http.Client,
 	opts SubmitOptions,
 ) error {
-	final, err := followRunStatusReports(ctx, base, httpClient, runID, out, specDisplayName, opts.MaxRetries, time.Second)
+	final, err := followRunStatusReports(ctx, base, httpClient, runID, out, runs.TextRenderOptions{SpecDisplayName: specDisplayName, ReportsCollapsed: opts.ReportsCollapsed, SBOMDiffCollapsed: opts.SBOMDiffCollapsed}, opts.MaxRetries, time.Second)
 	if err != nil {
 		return err
 	}
@@ -53,20 +53,21 @@ func finalizeRunSubmit(
 	return nil
 }
 
-func followRunStatusReports(ctx context.Context, baseURL *url.URL, client *http.Client, runID domaintypes.RunID, out io.Writer, specDisplayName string, maxRetries int, pollInterval time.Duration) (migsapi.RunState, error) {
-	renderOpts := common.FollowRunRenderOptions(baseURL, out)
-	renderOpts.SpecDisplayName = specDisplayName
+func followRunStatusReports(ctx context.Context, baseURL *url.URL, client *http.Client, runID domaintypes.RunID, out io.Writer, renderOpts runs.TextRenderOptions, maxRetries int, pollInterval time.Duration) (migsapi.RunState, error) {
+	renderOpts.EnableOSC8 = common.SupportsOSC8(out)
 	if maxRetries == 0 {
 		maxRetries = 5
 	}
 	return runs.FollowRunCommand{
-		Client:          client,
-		BaseURL:         baseURL,
-		RunID:           runID,
-		Output:          out,
-		EnableOSC8:      renderOpts.EnableOSC8,
-		SpecDisplayName: renderOpts.SpecDisplayName,
-		MaxRetries:      maxRetries,
-		PollInterval:    pollInterval,
+		Client:            client,
+		BaseURL:           baseURL,
+		RunID:             runID,
+		Output:            out,
+		EnableOSC8:        renderOpts.EnableOSC8,
+		SpecDisplayName:   renderOpts.SpecDisplayName,
+		ReportsCollapsed:  renderOpts.ReportsCollapsed,
+		SBOMDiffCollapsed: renderOpts.SBOMDiffCollapsed,
+		MaxRetries:        maxRetries,
+		PollInterval:      pollInterval,
 	}.Run(ctx)
 }

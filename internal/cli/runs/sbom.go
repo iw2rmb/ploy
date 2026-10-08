@@ -75,22 +75,22 @@ func (c GetRunSBOMCommand) Run(ctx context.Context) (RunSBOMResult, error) {
 	return RunSBOMResult{RunID: result.RunID, View: result.View, Packages: result.Packages}, nil
 }
 
-func RenderRunSBOM(w io.Writer, result RunSBOMResult) error {
+func RenderRunSBOM(w io.Writer, result RunSBOMResult, collapsed bool) error {
 	if w == nil {
 		w = io.Discard
 	}
 	if result.View == "diff" {
-		return RenderSBOMDiff(w, result.DiffPackages)
+		return RenderSBOMDiff(w, result.DiffPackages, collapsed)
 	}
 	_, err := fmt.Fprintln(w, formatSBOMPackageTable(result.Packages))
 	return err
 }
 
-func RenderSBOMDiff(w io.Writer, packages []migsapi.RunSBOMDiffPackage) error {
+func RenderSBOMDiff(w io.Writer, packages []migsapi.RunSBOMDiffPackage, collapsed bool) error {
 	if w == nil {
 		w = io.Discard
 	}
-	_, err := fmt.Fprintln(w, formatSBOMDiffBlock(packages))
+	_, err := fmt.Fprintln(w, formatSBOMDiffBlock(packages, collapsed))
 	return err
 }
 
@@ -103,7 +103,10 @@ func formatSBOMPackageTable(packages []migsapi.RunSBOMPackage) string {
 	return strings.TrimRight(b.String(), "\n")
 }
 
-func formatSBOMDiffBlock(packages []migsapi.RunSBOMDiffPackage) string {
+func formatSBOMDiffBlock(packages []migsapi.RunSBOMDiffPackage, collapsed bool) string {
+	if collapsed {
+		return fmt.Sprintf("SBOM diff %d changes.", len(packages))
+	}
 	var b strings.Builder
 	b.WriteString("SBOM diff\n")
 	packageWidth := maxSBOMDiffPackageWidth(packages)

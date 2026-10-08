@@ -106,9 +106,13 @@ Job-scoped API surfaces:
 Jobs can POST raw UTF-8 text to the report endpoint using worker authentication
 and the `PLOY_NODE_UUID` header. Each POST replaces `jobs.meta.report`; an empty
 body clears it. Reports are limited to 1 MiB and survive job completion.
-`ploy run status` shows a `[R]EPORT` preview for running and completed jobs.
-In follow mode, press `r` to expand or collapse the full report. Status JSON
-contains the original report text. Terminal rendering removes control characters
+`ploy run ... --follow` and `ploy run status <run-id> [--follow]` print full
+reports by default. `--reports-collapsed` prints the first non-empty report line,
+limited to 80 characters. Completed jobs use `REPORT` without brackets; blank
+lines separate the label, report content, and adjacent steps. Running jobs keep
+the `[R]EPORT` key hint. In follow mode, press `r` to expand or collapse reports;
+the selection also applies to the final snapshot. Status JSON contains the
+original report text, regardless of collapse flags. Terminal rendering removes control characters
 other than newlines and tabs.
 
 Every job receives its authoritative `PLOY_JOB_ID`. Migration containers also
@@ -152,6 +156,12 @@ The server rejects requests from an earlier execution.
 `ploy run sbom pre|post|diff <run-id>` reads persisted package rows from the
 current run attempt. The `diff` view omits unchanged package versions and marks
 changed, added, and removed package versions.
+
+`--sbom-diff-collapsed` replaces the full SBOM diff with
+`SBOM diff <N> changes.`, where `N` counts changed, added, and removed rows.
+The flag is available on `run`, `run status`, and `run sbom diff`. It changes
+text output only and can be combined with `--reports-collapsed`. Status displays
+an SBOM diff after a successful `post_gate` when dependency changes exist.
 
 ## Artifacts And Apply
 

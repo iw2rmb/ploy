@@ -19,10 +19,12 @@ const osTempArtifactDirSentinel = "__ploy_os_tmp__"
 
 // SubmitOptions contains Cobra-parsed options for `ploy run <spec-path> [repo]`.
 type SubmitOptions struct {
-	SpecPath     string
-	RepoSelector string
-	Follow       bool
-	Apply        bool
+	SpecPath          string
+	RepoSelector      string
+	ReportsCollapsed  bool
+	SBOMDiffCollapsed bool
+	Follow            bool
+	Apply             bool
 
 	PullArtifacts bool
 	PullPath      string
