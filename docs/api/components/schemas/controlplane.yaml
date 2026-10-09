@@ -1295,9 +1295,6 @@ RunJobItem:
     Job entry for a run within a run.
     Used by the --follow job graph display in CLI.
   properties:
-    report:
-      type: string
-      description: Latest posted text report, omitted when empty
     job_id:
       type: string
       description: Job identifier (KSUID string)
@@ -1503,3 +1500,20 @@ NamedSpecCatalogEntry:
       type: string
       pattern: "^[0-9a-f]{40}$"
   required: [name, description, source, path, sha]
+
+JobSBOMDiffResponse:
+  type: object
+  required: [job_id, baseline_job_id, packages]
+  properties:
+    job_id: { type: string }
+    baseline_job_id: { type: string }
+    packages:
+      type: array
+      items:
+        type: object
+        required: [package, version_pre, version_post, change]
+        properties:
+          package: { type: string }
+          version_pre: { type: string }
+          version_post: { type: string }
+          change: { type: string, enum: [added, removed, changed] }

@@ -7,7 +7,6 @@ import (
 )
 
 type JobStatusResponse struct {
-	Report      string          `json:"report,omitempty"`
 	JobID       types.JobID     `json:"job_id"`
 	RunID       types.RunID     `json:"run_id"`
 	RepoID      types.RepoID    `json:"repo_id"`

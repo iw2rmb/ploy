@@ -47,7 +47,7 @@ func TestRenderRunStatusReportJSON(t *testing.T) {
 							},
 						},
 						JobLogURL: "https://example.test/v1/jobs/" + jobID.String() + "/logs",
-						PatchURL:  "https://example.test/patch",
+						Outcome:   []RunJobOutcome{{Label: "Patch", URL: "https://example.test/patch"}},
 					},
 				},
 			},
@@ -84,6 +84,15 @@ func TestRenderRunStatusReportJSON(t *testing.T) {
 	job0, ok := jobs[0].(map[string]any)
 	if !ok {
 		t.Fatalf("expected job object, got %T", jobs[0])
+	}
+
+	outcomes, ok := job0["outcome"].([]any)
+	if !ok || len(outcomes) != 1 {
+		t.Fatalf("expected outcome links: %v", job0["outcome"])
+	}
+	item := outcomes[0].(map[string]any)
+	if item["label"] != "Patch" || item["url"] != "https://example.test/patch" {
+		t.Fatalf("unexpected outcome: %v", item)
 	}
 	artifacts, ok := job0["artifacts"].([]any)
 	if !ok || len(artifacts) != 1 {

@@ -13,19 +13,6 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
-type credentialMountOption struct {
-	key      string
-	target   string
-	readOnly bool
-}
-
-var credentialMountOptions = []credentialMountOption{
-	{key: "ploy_worker_auth_path", target: "/etc/ploy/worker-auth-header", readOnly: true},
-	{key: "ploy_ca_cert_path", target: "/etc/ploy/certs/ca.crt", readOnly: true},
-	{key: "ploy_client_cert_path", target: "/etc/ploy/certs/client.crt", readOnly: true},
-	{key: "ploy_client_key_path", target: "/etc/ploy/certs/client.key", readOnly: true},
-}
-
 // ContainerSpec describes a container execution request.
 type ContainerSpec struct {
 	Image      string
@@ -121,20 +108,6 @@ func buildContainerSpec(runID types.RunID, jobID types.JobID, manifest contracts
 		}
 	}
 
-	// Optional: mount worker credentials for control-plane API access from containers.
-	for _, opt := range credentialMountOptions {
-		certPath, ok := manifest.OptionString(opt.key)
-		if !ok || certPath == "" {
-			continue
-		}
-		if fi, err := os.Stat(certPath); err == nil && !fi.IsDir() {
-			mounts = append(mounts, ContainerMount{
-				Source:   certPath,
-				Target:   opt.target,
-				ReadOnly: opt.readOnly,
-			})
-		}
-	}
 	if err := validateContainerMounts(mounts, nested); err != nil {
 		return ContainerSpec{}, fmt.Errorf("validate container mounts: %w", err)
 	}

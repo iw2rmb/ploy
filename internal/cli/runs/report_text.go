@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"unicode"
 	"unicode/utf8"
 
 	"charm.land/lipgloss/v2"
@@ -25,8 +24,6 @@ type TextRenderOptions struct {
 	JobIOPreviews      map[domaintypes.JobID]RunJobIOPreview
 	ExpandStdout       bool
 	ExpandStderr       bool
-	ReportsCollapsed   bool
-	SBOMDiffCollapsed  bool
 	FilterRunningRepos bool
 	EmptyReposLine     string
 	SpecDisplayName    string
@@ -116,7 +113,6 @@ func FormatRunStatusReportText(report RunStatusReport, opts TextRenderOptions) s
 		repoErrorOwnerIdx := lastFailedOrCrashedJobIndex(repo.Jobs)
 		for _, job := range repo.Jobs {
 			jobIdx := len(repoFrame.Rows)
-			patchURL := strings.TrimSpace(job.PatchURL)
 			state := ColoredStatusGlyph(job.Status.String(), opts.SpinnerFrame)
 			step := renderStepName(job.DisplayName, job.JobType.String())
 			jobIDLabel := valueOrDash(job.JobID.String())
@@ -135,12 +131,11 @@ func FormatRunStatusReportText(report RunStatusReport, opts TextRenderOptions) s
 					state,
 					durationCell,
 					step,
-					renderArtifactsForStatus(job.Status.String(), patchURL, opts),
 					jobIDCell,
-					valueOrDash(strings.TrimSpace(job.JobImage)),
+					renderOutcome(job.Outcome, opts),
 				},
 				ExitOneLiner: renderExitOneLiner(job, repo.LastError, jobIdx == repoErrorOwnerIdx),
-				DetailLines:  append(renderJobIOPreviewLines(job, opts), renderJobReportLines(job.Report, !opts.ReportsCollapsed, isTerminalJobStatus(job.Status.String()))...),
+				DetailLines:  renderJobIOPreviewLines(job, opts),
 			})
 		}
 		frame.Repos = append(frame.Repos, repoFrame)
@@ -155,15 +150,8 @@ func FormatRunStatusReportText(report RunStatusReport, opts TextRenderOptions) s
 		out.WriteByte('\n')
 	}
 	out.WriteString(frameText)
-	if len(report.SBOMDiff) > 0 {
-		out.WriteByte('\n')
-		out.WriteString(formatSBOMDiffBlock(report.SBOMDiff, opts.SBOMDiffCollapsed))
-		out.WriteByte('\n')
-		out.WriteByte('\n')
-	}
-	rendered := lipgloss.NewStyle().Render(out.String())
 
-	return rendered
+	return lipgloss.NewStyle().Render(out.String())
 }
 
 func renderLink(label, rawURL string, enableOSC8 bool) string {
@@ -195,20 +183,15 @@ func renderOptionalOSC8Link(label, rawURL string, enableOSC8 bool) string {
 	return renderLink(label, rawURL, true)
 }
 
-func renderArtifacts(patchURL string, opts TextRenderOptions) string {
-	patchURL = strings.TrimSpace(patchURL)
-	if patchURL == "" {
+func renderOutcome(outcome []RunJobOutcome, opts TextRenderOptions) string {
+	links := make([]string, 0, len(outcome))
+	for _, item := range outcome {
+		links = append(links, renderLink(item.Label, item.URL, opts.EnableOSC8))
+	}
+	if len(links) == 0 {
 		return "-"
 	}
-	return renderLink("Patch", patchURL, opts.EnableOSC8)
-}
-
-func renderArtifactsForStatus(status, patchURL string, opts TextRenderOptions) string {
-	s := normalizeStatus(status)
-	if s == "cancelled" || s == "canceled" || !isTerminalJobStatus(status) {
-		return "-"
-	}
-	return renderArtifacts(patchURL, opts)
+	return strings.Join(links, " | ")
 }
 
 func sanitizeRenderedURL(rawURL string) string {
@@ -219,7 +202,7 @@ func sanitizeRenderedURL(rawURL string) string {
 	parsed.User = nil
 	query := parsed.Query()
 	for key := range query {
-		if isCredentialQueryKey(key) {
+		if key != "auth_token" && isCredentialQueryKey(key) {
 			query.Del(key)
 		}
 	}
@@ -364,42 +347,6 @@ func renderJobIOPreviewLines(job RunJobEntry, opts TextRenderOptions) []string {
 	expandStdout := opts.ExpandStdout
 	expandStderr := opts.ExpandStderr
 	return renderStreamPreviewLines(preview, expandStdout, expandStderr)
-}
-
-func renderJobReportLines(report string, expanded, completed bool) []string {
-	if report == "" {
-		return nil
-	}
-	// Reports are untrusted text, not terminal escape sequences or markup.
-	safe := strings.Map(func(r rune) rune {
-		if r == '\n' || r == '\t' {
-			return r
-		}
-		if unicode.IsControl(r) || unicode.Is(unicode.Cf, r) {
-			return -1
-		}
-		return r
-	}, report)
-	labelText := "[R]EPORT"
-	if completed {
-		labelText = "REPORT"
-	}
-	label := "    " + renderStreamPreviewLabel(labelText)
-	if !expanded {
-		first := strings.SplitN(strings.TrimSpace(safe), "\n", 2)[0]
-		return []string{"", label + " " + truncateRunesWithEllipsis(first, 80), ""}
-	}
-	lines := []string{"", label, ""}
-	for _, line := range strings.Split(strings.Trim(safe, "\n"), "\n") {
-		if line == "" {
-			lines = append(lines, "      ")
-			continue
-		}
-		for _, row := range wrapRunesFixed(line, 80) {
-			lines = append(lines, "      "+row)
-		}
-	}
-	return append(lines, "")
 }
 
 func filterRunningRepos(repos []RunEntry) []RunEntry {

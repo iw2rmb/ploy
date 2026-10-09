@@ -134,7 +134,7 @@ func getRunStatusHandler(st store.Store) http.HandlerFunc {
 				if b.Name != nil && strings.TrimSpace(*b.Name) != "" {
 					name = strings.TrimSpace(*b.Name)
 				}
-				if b.Cid != nil && strings.TrimSpace(*b.Cid) != "" {
+				if b.Cid != nil && strings.TrimSpace(*b.Cid) != "" && artMap[name] == "" {
 					artMap[name] = strings.TrimSpace(*b.Cid)
 				}
 			}

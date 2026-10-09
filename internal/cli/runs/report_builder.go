@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 	"sort"
 	"strings"
 
@@ -53,18 +54,6 @@ func (c GetRunStatusReportCommand) Run(ctx context.Context) (RunStatusReport, er
 
 	if err := c.buildRunEntry(ctx, statusReportSourceFromSummary(c.RunID, summary), stageArtifacts, &report.Repos[0]); err != nil {
 		return RunStatusReport{}, err
-	}
-	if hasSuccessfulPostGate(report.Repos[0].Jobs) {
-		sbom, err := GetRunSBOMCommand{
-			Client:  c.Client,
-			BaseURL: c.BaseURL,
-			RunID:   c.RunID,
-			View:    "diff",
-		}.Run(ctx)
-		if err != nil {
-			return RunStatusReport{}, fmt.Errorf("run status report: fetch sbom diff: %w", err)
-		}
-		report.SBOMDiff = sbom.DiffPackages
 	}
 
 	return report, nil
@@ -118,7 +107,6 @@ func (c GetRunStatusReportCommand) buildRunEntry(
 
 	for _, job := range jobsResult.Jobs {
 		out.Jobs = append(out.Jobs, RunJobEntry{
-			Report:      job.Report,
 			JobID:       job.JobID,
 			JobType:     job.JobType,
 			JobImage:    job.JobImage,
@@ -132,7 +120,7 @@ func (c GetRunStatusReportCommand) buildRunEntry(
 			BugSummary:  job.BugSummary,
 			Artifacts:   buildJobArtifacts(c.BaseURL, stageArtifacts[job.JobID]),
 			JobLogURL:   buildJobLogURL(c.BaseURL, job.JobID),
-			PatchURL:    jobPatchByID[job.JobID],
+			Outcome:     buildJobOutcome(c.BaseURL, job, stageArtifacts, jobPatchByID[job.JobID], jobsResult.Jobs),
 		})
 	}
 
@@ -210,7 +198,7 @@ func buildJobLogURL(baseURL *url.URL, jobID domaintypes.JobID) string {
 	if baseURL == nil || jobID.IsZero() {
 		return ""
 	}
-	return baseURL.JoinPath("v1", "jobs", jobID.String(), "logs").String()
+	return authenticatedLink(baseURL.JoinPath("v1", "jobs", jobID.String(), "logs"))
 }
 
 func buildRunPatchURL(baseURL *url.URL, runID domaintypes.RunID, diffID domaintypes.DiffID, accumulated bool) string {
@@ -222,7 +210,7 @@ func buildRunPatchURL(baseURL *url.URL, runID domaintypes.RunID, diffID domainty
 		q.Set("accumulated", "true")
 	}
 	u.RawQuery = q.Encode()
-	return u.String()
+	return authenticatedLink(u)
 }
 
 func buildJobArtifacts(baseURL *url.URL, stageArtifacts map[string]string) []RunJobArtifact {
@@ -265,11 +253,41 @@ func buildArtifactLookupURL(baseURL *url.URL, cid string) string {
 	return u.String()
 }
 
-func hasSuccessfulPostGate(jobs []RunJobEntry) bool {
-	for _, job := range jobs {
-		if job.JobType == domaintypes.JobTypePostGate && isSuccessfulStatus(job.Status.String()) {
-			return true
+func authenticatedLink(u *url.URL) string {
+	q := u.Query()
+	if token := os.Getenv("PLOY_AUTH_TOKEN"); token != "" {
+		q.Set("auth_token", token)
+	}
+	u.RawQuery = q.Encode()
+	return u.String()
+}
+
+func buildJobOutcome(base *url.URL, job migsapi.RunJob, artifacts map[domaintypes.JobID]map[string]string, patch string, jobs []migsapi.RunJob) []RunJobOutcome {
+	var outcome []RunJobOutcome
+	add := func(label, endpoint string) {
+		outcome = append(outcome, RunJobOutcome{Label: label, URL: authenticatedLink(base.JoinPath("v1", "jobs", job.JobID.String(), endpoint))})
+	}
+	switch job.JobType {
+	case domaintypes.JobTypePreGate:
+		if artifacts[job.JobID]["sbom"] != "" {
+			add("SBOM", "sbom")
+		}
+	case domaintypes.JobTypePostGate:
+		if artifacts[job.JobID]["sbom"] != "" {
+			for _, baseline := range jobs {
+				if baseline.JobType == domaintypes.JobTypePreGate && artifacts[baseline.JobID]["sbom"] != "" {
+					add("DIFF", "sbom-diff")
+					break
+				}
+			}
+		}
+	default:
+		if patch != "" && isTerminalJobStatus(job.Status.String()) && job.Status != domaintypes.JobStatusCancelled {
+			outcome = append(outcome, RunJobOutcome{Label: "Patch", URL: patch})
 		}
 	}
-	return false
+	if (job.JobType == domaintypes.JobTypePreGate || job.JobType == domaintypes.JobTypePostGate) && artifacts[job.JobID]["cves"] != "" {
+		add("CVEs", "cves")
+	}
+	return outcome
 }

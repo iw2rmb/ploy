@@ -34,3 +34,12 @@ type RunSBOMDiffResponse struct {
 	View     string               `json:"view"`
 	Packages []RunSBOMDiffPackage `json:"packages"`
 }
+
+type JobSBOMDiffResponse struct {
+	JobID         domaintypes.JobID    `json:"job_id"`
+	BaselineJobID domaintypes.JobID    `json:"baseline_job_id"`
+	Packages      []RunSBOMDiffPackage `json:"packages"`
+}
+
+// MaxGateOutcomeBytes bounds decompressed report downloads and node publication.
+const MaxGateOutcomeBytes = 64 << 20

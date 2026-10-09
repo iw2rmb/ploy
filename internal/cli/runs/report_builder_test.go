@@ -75,14 +75,13 @@ func TestGetRunStatusReportCommandAssemblesCanonicalReport(t *testing.T) {
 					{
 						"job_id":       jobID1.String(),
 						"name":         "step-1",
-						"job_type":     "pre_gate",
+						"job_type":     "mig",
 						"job_image":    "ghcr.io/acme/runner:1",
 						"next_id":      jobID2.String(),
 						"node_id":      nil,
 						"status":       "Success",
 						"duration_ms":  50,
 						"display_name": "scan",
-						"report":       "first\nsecond\n",
 					},
 					{
 						"job_id":       jobID2.String(),
@@ -161,11 +160,8 @@ func TestGetRunStatusReportCommandAssemblesCanonicalReport(t *testing.T) {
 	}
 
 	job0 := entry.Jobs[0]
-	if job0.Report != "first\nsecond\n" {
-		t.Fatalf("report not propagated: %q", job0.Report)
-	}
 	assertURL(t, job0.JobLogURL, "/api/v1/jobs/"+jobID1.String()+"/logs", nil)
-	assertURL(t, job0.PatchURL, "/api/v1/runs/"+runID.String()+"/diffs", map[string]string{
+	assertURL(t, job0.Outcome[0].URL, "/api/v1/runs/"+runID.String()+"/diffs", map[string]string{
 		"download":    "true",
 		"diff_id":     diffID2.String(),
 		"accumulated": "true",
@@ -181,8 +177,8 @@ func TestGetRunStatusReportCommandAssemblesCanonicalReport(t *testing.T) {
 	})
 
 	job1 := entry.Jobs[1]
-	if strings.TrimSpace(job1.PatchURL) != "" {
-		t.Fatalf("expected no patch URL for job without diffs, got %q", job1.PatchURL)
+	if len(job1.Outcome) != 0 {
+		t.Fatalf("expected no patch URL for job without diffs, got %q", job1.Outcome)
 	}
 	if len(job1.Artifacts) != 1 {
 		t.Fatalf("expected one artifact for job1, got %d", len(job1.Artifacts))
@@ -277,8 +273,8 @@ func TestGetRunStatusReportCommandMissingOptionalFields(t *testing.T) {
 	if report.Repos[0].PatchURL != "" {
 		t.Fatalf("expected empty repo patch URL, got %q", report.Repos[0].PatchURL)
 	}
-	if report.Repos[0].Jobs[0].PatchURL != "" {
-		t.Fatalf("expected empty job patch URL, got %q", report.Repos[0].Jobs[0].PatchURL)
+	if len(report.Repos[0].Jobs[0].Outcome) != 0 {
+		t.Fatalf("expected empty job patch URL, got %q", report.Repos[0].Jobs[0].Outcome)
 	}
 	if report.Repos[0].Jobs[0].JobLogURL == "" {
 		t.Fatalf("expected job log URL to be populated")
@@ -341,92 +337,6 @@ func TestGetRunStatusReportCommandEmptyReposUsesEmptySlices(t *testing.T) {
 
 	if len(report.Repos) != 1 {
 		t.Fatalf("expected one run entry, got %d", len(report.Repos))
-	}
-}
-
-func TestGetRunStatusReportCommandFetchesSBOMDiffAfterSuccessfulPostGate(t *testing.T) {
-	t.Parallel()
-
-	runID := domaintypes.NewRunID()
-	migID := domaintypes.NewMigID()
-	specID := domaintypes.NewSpecID()
-	repoID := domaintypes.NewRepoID()
-	postGateID := domaintypes.NewJobID()
-	sbomCalled := false
-
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/runs/"+runID.String():
-			_ = json.NewEncoder(w).Encode(map[string]any{
-				"id":         runID.String(),
-				"status":     "Succeeded",
-				"mig_id":     migID.String(),
-				"mig_name":   "sbom-diff",
-				"spec_id":    specID.String(),
-				"repo_id":    repoID.String(),
-				"repo_url":   "https://github.com/acme/sbom.git",
-				"base_ref":   "main",
-				"attempt":    1,
-				"created_at": "2026-02-24T10:00:00Z",
-			})
-		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/runs/"+runID.String()+"/status":
-			_ = json.NewEncoder(w).Encode(map[string]any{
-				"run_id": runID.String(),
-				"state":  "succeeded",
-				"stages": map[string]any{},
-			})
-		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/runs/"+runID.String()+"/jobs":
-			_ = json.NewEncoder(w).Encode(map[string]any{
-				"run_id":  runID.String(),
-				"repo_id": repoID.String(),
-				"attempt": 1,
-				"jobs": []map[string]any{
-					{
-						"job_id":      postGateID.String(),
-						"name":        "post-gate",
-						"job_type":    "post_gate",
-						"job_image":   "gate:latest",
-						"next_id":     nil,
-						"node_id":     nil,
-						"status":      "Success",
-						"duration_ms": 100,
-					},
-				},
-			})
-		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/runs/"+runID.String()+"/diffs":
-			_ = json.NewEncoder(w).Encode(map[string]any{"diffs": []map[string]any{}})
-		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/runs/"+runID.String()+"/sbom/diff":
-			sbomCalled = true
-			_ = json.NewEncoder(w).Encode(map[string]any{
-				"run_id": runID.String(),
-				"view":   "diff",
-				"packages": []map[string]any{
-					{"package": "alpha", "version_pre": "1.0", "version_post": "2.0", "change": "changed"},
-				},
-			})
-		default:
-			http.NotFound(w, r)
-		}
-	}))
-	t.Cleanup(server.Close)
-
-	baseURL, err := url.Parse(server.URL + "/api")
-	if err != nil {
-		t.Fatalf("parse base URL: %v", err)
-	}
-	report, err := GetRunStatusReportCommand{
-		Client:  server.Client(),
-		BaseURL: baseURL,
-		RunID:   runID,
-	}.Run(context.Background())
-	if err != nil {
-		t.Fatalf("GetRunStatusReportCommand.Run error: %v", err)
-	}
-	if !sbomCalled {
-		t.Fatal("expected sbom diff endpoint to be called")
-	}
-	if len(report.SBOMDiff) != 1 || report.SBOMDiff[0].Package != "alpha" {
-		t.Fatalf("SBOMDiff=%+v, want alpha diff", report.SBOMDiff)
 	}
 }
 

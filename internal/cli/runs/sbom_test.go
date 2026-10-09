@@ -53,7 +53,7 @@ func TestGetRunSBOMCommandDiffAndRender(t *testing.T) {
 	}
 
 	var out bytes.Buffer
-	if err := RenderRunSBOM(&out, result, false); err != nil {
+	if err := RenderRunSBOM(&out, result); err != nil {
 		t.Fatalf("RenderRunSBOM error: %v", err)
 	}
 	packageWidth := len("com.example:very-long-package")
@@ -107,7 +107,7 @@ func TestRenderRunSBOMPackageTable(t *testing.T) {
 			{Package: "alpha", Version: "1.0.0"},
 			{Package: "beta", Version: "2.0.0"},
 		},
-	}, false)
+	})
 	if err != nil {
 		t.Fatalf("RenderRunSBOM error: %v", err)
 	}
@@ -123,12 +123,12 @@ func TestRenderRunSBOMPackageTable(t *testing.T) {
 }
 
 // An empty diff still has a numeric summary when explicitly requested.
-func TestRenderRunSBOMCollapsedEmptyDiff(t *testing.T) {
+func TestRenderRunSBOMEmptyDiff(t *testing.T) {
 	var out bytes.Buffer
-	if err := RenderRunSBOM(&out, RunSBOMResult{View: "diff"}, true); err != nil {
+	if err := RenderRunSBOM(&out, RunSBOMResult{View: "diff"}); err != nil {
 		t.Fatal(err)
 	}
-	if out.String() != "SBOM diff 0 changes.\n" {
+	if out.String() != "SBOM diff\n" {
 		t.Fatalf("unexpected empty summary: %q", out.String())
 	}
 }

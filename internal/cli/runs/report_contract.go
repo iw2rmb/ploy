@@ -4,18 +4,16 @@ import (
 	"time"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	migsapi "github.com/iw2rmb/ploy/internal/migs/api"
 )
 
 // RunStatusReport is the canonical status report contract shared by all status renderers.
 type RunStatusReport struct {
-	RunID       domaintypes.RunID            `json:"run_id"`
-	MigID       domaintypes.MigID            `json:"mig_id"`
-	MigName     string                       `json:"mig_name"`
-	SpecID      domaintypes.SpecID           `json:"spec_id"`
-	Repos       []RunEntry                   `json:"repos"`
-	WaitingRuns int                          `json:"waiting_runs,omitempty"`
-	SBOMDiff    []migsapi.RunSBOMDiffPackage `json:"sbom_diff,omitempty"`
+	RunID       domaintypes.RunID  `json:"run_id"`
+	MigID       domaintypes.MigID  `json:"mig_id"`
+	MigName     string             `json:"mig_name"`
+	SpecID      domaintypes.SpecID `json:"spec_id"`
+	Repos       []RunEntry         `json:"repos"`
+	WaitingRuns int                `json:"waiting_runs,omitempty"`
 }
 
 // RunEntry captures repo-level status, job graph data, and report links for a single repo attempt.
@@ -33,7 +31,6 @@ type RunEntry struct {
 
 // RunJobEntry is one row in the follow-style job graph.
 type RunJobEntry struct {
-	Report      string                `json:"report,omitempty"`
 	JobID       domaintypes.JobID     `json:"job_id"`
 	JobType     domaintypes.JobType   `json:"job_type"`
 	JobImage    string                `json:"job_image"`
@@ -47,7 +44,7 @@ type RunJobEntry struct {
 	BugSummary  string                `json:"bug_summary,omitempty"`
 	Artifacts   []RunJobArtifact      `json:"artifacts,omitempty"`
 	JobLogURL   string                `json:"job_log_url,omitempty"`
-	PatchURL    string                `json:"patch_url,omitempty"`
+	Outcome     []RunJobOutcome       `json:"outcome,omitempty"`
 }
 
 // RunJobArtifact is the per-job artifact view emitted by run status JSON.
@@ -56,4 +53,10 @@ type RunJobArtifact struct {
 	Name      string `json:"name"`
 	CID       string `json:"cid"`
 	LookupURL string `json:"lookup_url,omitempty"`
+}
+
+// RunJobOutcome links a job's available output to its download endpoint.
+type RunJobOutcome struct {
+	Label string `json:"label"`
+	URL   string `json:"url"`
 }

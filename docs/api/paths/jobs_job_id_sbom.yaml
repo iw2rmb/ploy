@@ -6,13 +6,14 @@ parameters:
     required: true
     schema: { type: string }
     description: Job ID (KSUID string)
-  - in: header
-    name: PLOY_NODE_UUID
-    required: true
-    schema: { type: string }
-    description: Worker node ID saving SBOM rows
 
 post:
+  parameters:
+    - in: header
+      name: PLOY_NODE_UUID
+      required: true
+      schema: { type: string }
+      description: Worker node ID saving SBOM rows
   tags: [Control]
   summary: Replace persisted SBOM package rows for a gate job
   description: |
@@ -50,3 +51,33 @@ post:
       description: Conflict — job is not `Running` or is not a gate job
     '500':
       description: Internal server error
+
+get:
+  tags: [Control]
+  summary: Download the full SPDX JSON for a pre-gate or post-gate job
+  description: |
+    Requires control-plane authentication. The auth_token query parameter is
+    accepted for download links. Available outputs from failed gates can also
+    be downloaded. A missing output returns 404, including outputs from an
+    earlier execution of a retried job. Reports are limited to 64 MiB uncompressed.
+  parameters:
+    - in: query
+      name: auth_token
+      schema: { type: string }
+  responses:
+    '200':
+      description: JSON download with Content-Disposition attachment
+      content:
+        application/json:
+          schema:
+            type: object
+    '400':
+      description: Invalid job ID or unsupported job type
+    '401':
+      description: Authentication required
+    '403':
+      description: Control-plane role required
+    '404':
+      description: Job, report, or pre-gate baseline unavailable
+    '500':
+      description: Invalid stored report or internal server error

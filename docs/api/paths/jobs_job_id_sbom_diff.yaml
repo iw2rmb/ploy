@@ -1,0 +1,39 @@
+parameters:
+  - in: path
+    name: job_id
+    required: true
+    schema: { type: string }
+
+get:
+  tags: [Control]
+  summary: Download dependency changes between this post-gate and its pre-gate baseline
+  description: |
+    Requires control-plane authentication. The auth_token query parameter is
+    accepted for download links. Available outputs from failed gates can also
+    be downloaded. A missing output returns 404, including outputs from an
+    earlier execution of a retried job. Reports are limited to 64 MiB uncompressed.
+    The baseline belongs to the same run, repository, and attempt as the
+    requested post-gate. The response includes job_id, baseline_job_id, and
+    packages. Each package has package, version_pre, version_post, and change
+    (added, removed, or changed). A valid empty diff has packages: [].
+  parameters:
+    - in: query
+      name: auth_token
+      schema: { type: string }
+  responses:
+    '200':
+      description: JSON download with Content-Disposition attachment
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/controlplane.yaml#/JobSBOMDiffResponse"
+    '400':
+      description: Invalid job ID or unsupported job type
+    '401':
+      description: Authentication required
+    '403':
+      description: Control-plane role required
+    '404':
+      description: Job, report, or pre-gate baseline unavailable
+    '500':
+      description: Invalid stored report or internal server error

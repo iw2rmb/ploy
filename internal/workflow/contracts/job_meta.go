@@ -51,7 +51,6 @@ func (k JobKind) Valid() bool {
 // metadata section (gate/build) is populated. Mig jobs typically
 // have kind="mig" with no gate or build metadata.
 type JobMeta struct {
-	Report string `json:"report,omitempty"`
 	// Kind identifies the job type: "mig", "gate", or "build".
 	Kind JobKind `json:"kind"`
 

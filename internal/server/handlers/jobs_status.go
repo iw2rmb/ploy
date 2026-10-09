@@ -8,7 +8,6 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/server/auth"
 	"github.com/iw2rmb/ploy/internal/store"
-	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
 // getJobStatusHandler returns canonical job status for worker cancellation
@@ -46,12 +45,7 @@ func getJobStatusHandler(st store.Store) http.HandlerFunc {
 }
 
 func jobStatusFromStore(job store.Job) domainapi.JobStatusResponse {
-	var report string
-	if meta, err := contracts.UnmarshalJobMeta(job.Meta); err == nil {
-		report = meta.Report
-	}
 	return domainapi.JobStatusResponse{
-		Report:      report,
 		JobID:       job.ID,
 		RunID:       job.RunID,
 		RepoID:      job.RepoID,

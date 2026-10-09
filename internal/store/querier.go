@@ -200,7 +200,6 @@ type Querier interface {
 	// This is set by the node immediately before job execution starts.
 	UpdateJobImageName(ctx context.Context, arg UpdateJobImageNameParams) error
 	UpdateJobMeta(ctx context.Context, arg UpdateJobMetaParams) error
-	UpdateJobReport(ctx context.Context, arg UpdateJobReportParams) (int64, error)
 	UpdateJobStatus(ctx context.Context, arg UpdateJobStatusParams) error
 	UpdateMigSpec(ctx context.Context, arg UpdateMigSpecParams) error
 	UpdateNodeCertMetadata(ctx context.Context, arg UpdateNodeCertMetadataParams) error

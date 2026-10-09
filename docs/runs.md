@@ -101,26 +101,35 @@ Job-scoped API surfaces:
 
 - `GET /v1/jobs/{job_id}/status`
 - `GET /v1/jobs/{job_id}/logs`
-- `POST /v1/jobs/{job_id}/report`
+- `GET /v1/jobs/{job_id}/sbom` — full SPDX JSON for either gate.
+- `GET /v1/jobs/{job_id}/cves` — original Grype JSON for either gate.
+- `GET /v1/jobs/{job_id}/sbom-diff` — dependency changes for a post-gate.
 
-Jobs can POST raw UTF-8 text to the report endpoint using worker authentication
-and the `PLOY_NODE_UUID` header. Each POST replaces `jobs.meta.report`; an empty
-body clears it. Reports are limited to 1 MiB and survive job completion.
-`ploy run ... --follow` and `ploy run status <run-id> [--follow]` print full
-reports by default. `--reports-collapsed` prints the first non-empty report line,
-limited to 80 characters. Completed jobs use `REPORT` without brackets; blank
-lines separate the label, report content, and adjacent steps. Running jobs keep
-the `[R]EPORT` key hint. In follow mode, press `r` to expand or collapse reports;
-the selection also applies to the final snapshot. Status JSON contains the
-original report text, regardless of collapse flags. Terminal rendering removes control characters
-other than newlines and tabs.
+Gate jobs publish `/out/sbom.spdx.json` and `/out/grype.json` as named `sbom`
+and `cves` artifact bundles before terminal status. This contract is independent
+of the stack. Available files are also published when a gate fails. Downloads
+return JSON attachments, with a 64 MiB uncompressed limit. Missing reports return
+404; an empty report or zero-change diff is a valid result.
 
-Every job receives its authoritative `PLOY_JOB_ID`. Migration containers also
-receive the node-owned server URL, node identity, and a read-only worker bearer
-header file at `PLOY_WORKER_AUTH_HEADER_FILE`. The node stages this private file
-outside uploaded artifacts and removes it after execution. Configured worker
-TLS files are also mounted read-only. These credentials use
-the existing worker trust boundary; they are not job-scoped credentials.
+The job diff uses the pre-gate from the requested job's run, repository, and
+attempt. It returns `job_id`, `baseline_job_id`, and `packages` with added,
+removed, and changed dependencies. A retry cannot expose reports uploaded before
+its new execution started. Historical bundles remain available through artifact APIs.
+
+`ploy run ... --follow` and `ploy run status <run-id> [--follow]` display steps
+as status, duration, step, job ID, and Outcome. The image column is omitted.
+Pre-gates show `SBOM | CVEs`; post-gates show `DIFF | CVEs`. Migration jobs show
+`Patch` when a patch is available. Only available outcomes have links; missing
+outcomes use `-` when no link exists. Status JSON contains an `outcome` array
+with `label` and `url` for each link. It retains job image metadata.
+
+Outcome, Patch, and job-log links include the URL-encoded `PLOY_AUTH_TOKEN`
+environment value as `auth_token`, preserving other query parameters. Both
+terminal hyperlinks and plain-text URLs carry the token. Inline job reports
+and inline status SBOM diffs are removed. In follow mode, `o` and `e` toggle
+stdout and stderr previews.
+
+Every job receives its authoritative `PLOY_JOB_ID`.
 
 Run inspection, artifacts, diffs, jobs, logs, cancellation, restart, and pull
 resolution are all addressed by `run_id`; `repo_id` is returned only as
@@ -156,12 +165,6 @@ The server rejects requests from an earlier execution.
 `ploy run sbom pre|post|diff <run-id>` reads persisted package rows from the
 current run attempt. The `diff` view omits unchanged package versions and marks
 changed, added, and removed package versions.
-
-`--sbom-diff-collapsed` replaces the full SBOM diff with
-`SBOM diff <N> changes.`, where `N` counts changed, added, and removed rows.
-The flag is available on `run`, `run status`, and `run sbom diff`. It changes
-text output only and can be combined with `--reports-collapsed`. Status displays
-an SBOM diff after a successful `post_gate` when dependency changes exist.
 
 ## Artifacts And Apply
 

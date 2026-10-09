@@ -3,7 +3,6 @@ package run
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -11,7 +10,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/charmbracelet/x/ansi"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/testutil/clienv"
 )
@@ -119,13 +117,9 @@ func TestRunCommandSBOMDiff(t *testing.T) {
 	defer server.Close()
 	clienv.UseControlPlaneEnv(t, server.URL)
 
-	for _, collapsed := range []bool{false, true} {
+	{
 		args := []string{"sbom", "diff", runID.String()}
 		want := "SBOM diff\nalpha 1.0              -> 2.0\n"
-		if collapsed {
-			args = append(args, "--sbom-diff-collapsed")
-			want = "SBOM diff 1 changes.\n"
-		}
 		var stdout, stderr bytes.Buffer
 		if err := executeRunCommand(args, &stdout, &stderr); err != nil {
 			t.Fatal(err)
@@ -157,14 +151,15 @@ func TestRunCommandSBOMDisabledBuildGateError(t *testing.T) {
 	}
 }
 
-// Submit-follow, status, and status-follow must honor both flags independently.
-func TestRunCommandsReportAndSBOMCollapseOptions(t *testing.T) {
+// All three entry points render the same available gate outcomes.
+func TestRunCommandsGateOutcomeLinks(t *testing.T) {
 	specPath := filepath.Join(t.TempDir(), "spec.yaml")
-	if err := os.WriteFile(specPath, []byte("steps:\n  - image: alpine\n"), 0o644); err != nil {
+	if err := os.WriteFile(specPath, []byte("steps:\n  - image: alpine\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
 	runID := domaintypes.NewRunID()
-	jobID := domaintypes.NewJobID()
+	preID := domaintypes.NewJobID()
+	postID := domaintypes.NewJobID()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var body any
 		switch r.URL.Path {
@@ -176,17 +171,17 @@ func TestRunCommandsReportAndSBOMCollapseOptions(t *testing.T) {
 		case "/v1/runs/" + runID.String():
 			body = map[string]any{"id": runID, "status": "Success", "attempt": 1}
 		case "/v1/runs/" + runID.String() + "/status":
-			body = map[string]any{"run_id": runID, "state": "succeeded", "stages": map[string]any{}}
+			body = map[string]any{"run_id": runID, "state": "succeeded", "stages": map[string]any{
+				preID.String():  map[string]any{"state": "succeeded", "artifacts": map[string]string{"sbom": "pre-sbom", "cves": "pre-cves"}},
+				postID.String(): map[string]any{"state": "succeeded", "artifacts": map[string]string{"sbom": "post-sbom", "cves": "post-cves"}},
+			}}
 		case "/v1/runs/" + runID.String() + "/jobs":
-			body = map[string]any{"jobs": []map[string]any{{"job_id": jobID, "job_type": "post_gate", "status": "Success", "report": "summary\nCVE-2026-1234\nlast finding"}}}
+			body = map[string]any{"jobs": []map[string]any{
+				{"job_id": preID, "job_type": "pre_gate", "status": "Success", "next_id": postID},
+				{"job_id": postID, "job_type": "post_gate", "status": "Success"},
+			}}
 		case "/v1/runs/" + runID.String() + "/diffs":
 			body = map[string]any{"diffs": []any{}}
-		case "/v1/runs/" + runID.String() + "/sbom/diff":
-			body = map[string]any{"view": "diff", "packages": []map[string]any{
-				{"package": "changed", "version_pre": "1", "version_post": "2", "change": "changed"},
-				{"package": "added", "version_post": "1", "change": "added"},
-				{"package": "removed", "version_pre": "1", "change": "removed"},
-			}}
 		default:
 			t.Errorf("unexpected request: %s", r.URL.Path)
 			http.NotFound(w, r)
@@ -196,48 +191,20 @@ func TestRunCommandsReportAndSBOMCollapseOptions(t *testing.T) {
 	}))
 	defer server.Close()
 	clienv.UseControlPlaneEnv(t, server.URL)
-
-	for _, command := range []struct {
-		name string
-		args []string
-	}{
-		{"submit-follow", []string{specPath, "team/repo", "--follow"}},
-		{"status", []string{"status", runID.String()}},
-		{"status-follow", []string{"status", runID.String(), "--follow"}},
-	} {
-		for _, reportsCollapsed := range []bool{false, true} {
-			for _, sbomCollapsed := range []bool{false, true} {
-				t.Run(fmt.Sprintf("%s/reports=%v/sbom=%v", command.name, reportsCollapsed, sbomCollapsed), func(t *testing.T) {
-					args := append([]string{}, command.args...)
-					if reportsCollapsed {
-						args = append(args, "--reports-collapsed")
-					}
-					if sbomCollapsed {
-						args = append(args, "--sbom-diff-collapsed")
-					}
-					var out, errOut bytes.Buffer
-					if err := executeRunCommand(args, &out, &errOut); err != nil {
-						t.Fatal(err)
-					}
-					text := ansi.Strip(out.String())
-					wantReport := "\n\n    REPORT\n\n      summary\n      CVE-2026-1234\n      last finding\n\n"
-					if reportsCollapsed {
-						wantReport = "\n\n    REPORT summary\n\n"
-					}
-					if !strings.Contains(text, wantReport) {
-						t.Fatalf("missing report %q in %q", wantReport, text)
-					}
-					if strings.Contains(text, "last finding") == reportsCollapsed {
-						t.Fatalf("report collapse mismatch: %q", text)
-					}
-					if sbomCollapsed {
-						if !strings.Contains(text, "SBOM diff 3 changes.") || strings.Contains(text, " -> ") {
-							t.Fatalf("SBOM collapse mismatch: %q", text)
-						}
-					} else if !strings.Contains(text, "SBOM diff\n") || !strings.Contains(text, " -> ") {
-						t.Fatalf("missing full SBOM: %q", text)
-					}
-				})
+	t.Setenv("PLOY_AUTH_TOKEN", "fixture+token")
+	for _, args := range [][]string{{specPath, "team/repo", "--follow"}, {"status", runID.String()}, {"status", runID.String(), "--follow"}} {
+		var out, errOut bytes.Buffer
+		if err := executeRunCommand(args, &out, &errOut); err != nil {
+			t.Fatal(err)
+		}
+		for _, link := range []string{
+			"SBOM (" + server.URL + "/v1/jobs/" + preID.String() + "/sbom?auth_token=fixture%2Btoken)",
+			"DIFF (" + server.URL + "/v1/jobs/" + postID.String() + "/sbom-diff?auth_token=fixture%2Btoken)",
+			"CVEs (" + server.URL + "/v1/jobs/" + postID.String() + "/cves?auth_token=fixture%2Btoken)",
+			server.URL + "/v1/jobs/" + preID.String() + "/logs?auth_token=fixture%2Btoken",
+		} {
+			if !strings.Contains(out.String(), link) {
+				t.Fatalf("args=%v: missing %s in %q", args, link, out.String())
 			}
 		}
 	}

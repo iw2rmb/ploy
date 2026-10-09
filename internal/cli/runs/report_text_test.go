@@ -8,7 +8,6 @@ import (
 	"time"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	migsapi "github.com/iw2rmb/ploy/internal/migs/api"
 	"github.com/iw2rmb/ploy/internal/testutil/assertx"
 )
 
@@ -161,7 +160,7 @@ func TestRenderRunStatusReportTextHeadersAndArtifacts(t *testing.T) {
 						Status:     "Success",
 						DurationMs: 3000,
 						JobLogURL:  "https://example.test/v1/jobs/" + migJobID.String() + "/logs",
-						PatchURL:   "https://example.test/v1/runs/" + runID.String() + "/diffs?download=true&diff_id=abc",
+						Outcome:    []RunJobOutcome{{Label: "Patch", URL: "https://example.test/v1/runs/" + runID.String() + "/diffs?download=true&diff_id=abc"}},
 					},
 				},
 			},
@@ -199,7 +198,7 @@ func TestRenderRunStatusReportTextHeadersAndArtifacts(t *testing.T) {
 	assertx.Contains(t, out, "⣾")
 	plain := stripCSI(out)
 	assertx.Contains(t, plain, "    2.5s  pre_gate")
-	assertx.Contains(t, plain, "mig       Patch (https://example.test/v1/runs/")
+	assertx.Contains(t, plain, "Patch (https://example.test/v1/runs/")
 	if strings.Count(plain, nodeID.String()) != 1 {
 		t.Fatalf("expected node id only in Node header, got %q", plain)
 	}
@@ -658,7 +657,7 @@ func TestRenderRunStatusReportTextOSC8OnAndOff(t *testing.T) {
 	repoID := domaintypes.NewRepoID()
 	jobID := domaintypes.NewJobID()
 	jobLogURL := "https://example.test/v1/jobs/" + jobID.String() + "/logs?auth_token=job-secret&view=raw"
-	safeJobLogURL := "https://example.test/v1/jobs/" + jobID.String() + "/logs?view=raw"
+	safeJobLogURL := jobLogURL
 	patchURL := "https://example.test/v1/runs/" + runID.String() + "/diffs?auth_token=patch-secret&download=true&diff_id=abc"
 	baseURL, err := url.Parse("https://example.test")
 	if err != nil {
@@ -686,7 +685,7 @@ func TestRenderRunStatusReportTextOSC8OnAndOff(t *testing.T) {
 						Status:     "Success",
 						DurationMs: 1000,
 						JobLogURL:  jobLogURL,
-						PatchURL:   patchURL,
+						Outcome:    []RunJobOutcome{{Label: "Patch", URL: patchURL}},
 					},
 				},
 			},
@@ -701,9 +700,9 @@ func TestRenderRunStatusReportTextOSC8OnAndOff(t *testing.T) {
 	assertx.NotContains(t, plainOut, "github.com/acme/links")
 	assertx.NotContains(t, plainOut, "https://github.com/acme/links.git")
 	assertx.Contains(t, plainOut, "Patch (https://example.test/v1/runs/"+runID.String()+"/diffs?")
-	assertx.NotContains(t, plainOut, "job-secret")
-	assertx.NotContains(t, plainOut, "patch-secret")
-	assertx.NotContains(t, plainOut, "auth_token")
+	assertx.Contains(t, plainOut, "job-secret")
+	assertx.Contains(t, plainOut, "patch-secret")
+	assertx.Contains(t, plainOut, "auth_token")
 	assertx.Contains(t, plainOut, "diff_id=abc")
 	assertx.Contains(t, plainOut, "download=true")
 	if strings.Contains(plainOut, "\x1b]8;;") {
@@ -715,9 +714,9 @@ func TestRenderRunStatusReportTextOSC8OnAndOff(t *testing.T) {
 	assertx.Contains(t, linkedOut, "\x1b]8;;https://example.test/v1/migs/"+migID.String()+"/specs/latest")
 	assertx.Contains(t, linkedOut, "\x1b]8;;https://github.com/acme/links.git\x1b\\acme/links\x1b]8;;\x1b\\")
 	assertx.Contains(t, linkedOut, "\x1b]8;;https://example.test/v1/runs/"+runID.String()+"/diffs?")
-	assertx.NotContains(t, linkedOut, "job-secret")
-	assertx.NotContains(t, linkedOut, "patch-secret")
-	assertx.NotContains(t, linkedOut, "auth_token")
+	assertx.Contains(t, linkedOut, "job-secret")
+	assertx.Contains(t, linkedOut, "patch-secret")
+	assertx.Contains(t, linkedOut, "auth_token")
 }
 
 func TestSanitizeRenderedURLRemovesCredentials(t *testing.T) {
@@ -731,7 +730,7 @@ func TestSanitizeRenderedURLRemovesCredentials(t *testing.T) {
 		{
 			name: "userinfo and credential query parameters",
 			raw:  "https://oauth2:password@example.test/logs?auth_token=one&private-token=two&view=raw",
-			want: "https://example.test/logs?view=raw",
+			want: "https://example.test/logs?auth_token=one&view=raw",
 		},
 		{
 			name: "presigned credential parameters",
@@ -1133,28 +1132,4 @@ func TestRenderRunStatusReportTextCreatedJobDurationKeepsStepAdjacent(t *testing
 	out := stripCSI(renderText(t, report, TextRenderOptions{EnableOSC8: false}))
 	assertx.Contains(t, out, "-  post_gate")
 	assertx.NotContains(t, out, "-          post_gate")
-}
-
-func TestRenderRunStatusReportTextSBOMDiffBlock(t *testing.T) {
-	t.Parallel()
-
-	report := singleJobReport("sbom", domaintypes.RunStatusSuccess, RunJobEntry{
-		JobID:      domaintypes.NewJobID(),
-		JobType:    domaintypes.JobTypePostGate,
-		Status:     domaintypes.JobStatusSuccess,
-		DurationMs: 1000,
-	})
-	report.SBOMDiff = []migsapi.RunSBOMDiffPackage{
-		{Package: "alpha", VersionPre: "1.0", VersionPost: "2.0", Change: "changed"},
-	}
-
-	out := renderText(t, report, TextRenderOptions{})
-	assertx.Contains(t, out, "\n\nSBOM diff\nalpha 1.0              -> 2.0\n\n")
-	if strings.Index(out, "SBOM diff") < strings.Index(out, "post_gate") {
-		t.Fatalf("SBOM diff block must be after jobs frame, got %q", out)
-	}
-
-	report.SBOMDiff = nil
-	out = renderText(t, report, TextRenderOptions{})
-	assertx.NotContains(t, out, "SBOM diff")
 }

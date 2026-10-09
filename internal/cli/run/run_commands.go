@@ -61,8 +61,6 @@ func NewCommand() *cobra.Command {
 	}
 
 	cmd.Flags().BoolVar(&submit.Follow, "follow", false, "Follow run status until completion")
-	cmd.Flags().BoolVar(&submit.ReportsCollapsed, "reports-collapsed", false, "Print each step report as one line")
-	cmd.Flags().BoolVar(&submit.SBOMDiffCollapsed, "sbom-diff-collapsed", false, "Print only the number of SBOM changes")
 	cmd.Flags().BoolVar(&submit.Apply, "apply", false, "Apply the resulting patch to a local repo after success")
 	cmd.Flags().StringVar(&submit.PullPath, "pull", "", "Download final artifacts after success; optional path")
 	cmd.Flags().StringVar(&gitLabTokenEnv, "gitlab-token-env", "", "Read run-scoped ephemeral GitLab token from this environment variable")
@@ -195,8 +193,6 @@ func newStatusCommand() *cobra.Command {
 			return RunStatus(cmd.Context(), opts)
 		},
 	}
-	cmd.Flags().BoolVar(&opts.ReportsCollapsed, "reports-collapsed", false, "Print each step report as one line")
-	cmd.Flags().BoolVar(&opts.SBOMDiffCollapsed, "sbom-diff-collapsed", false, "Print only the number of SBOM changes")
 	cmd.Flags().BoolVar(&opts.JSONOut, "json", false, "Print machine-readable JSON report")
 	cmd.Flags().BoolVar(&opts.Follow, "follow", false, "Follow run status until completion")
 	return cmd
@@ -216,7 +212,6 @@ func newSBOMCommand() *cobra.Command {
 			return RunSBOM(cmd.Context(), opts)
 		},
 	}
-	cmd.Flags().BoolVar(&opts.SBOMDiffCollapsed, "sbom-diff-collapsed", false, "Print only the number of SBOM changes")
 	return cmd
 }
 
@@ -258,19 +253,16 @@ func newApplyCommand() *cobra.Command {
 }
 
 type StatusOptions struct {
-	ReportsCollapsed  bool
-	SBOMDiffCollapsed bool
-	RunID             string
-	JSONOut           bool
-	Follow            bool
-	Output            io.Writer
+	RunID   string
+	JSONOut bool
+	Follow  bool
+	Output  io.Writer
 }
 
 type SBOMOptions struct {
-	SBOMDiffCollapsed bool
-	View              string
-	RunID             string
-	Output            io.Writer
+	View   string
+	RunID  string
+	Output io.Writer
 }
 
 func RunSBOM(ctx context.Context, opts SBOMOptions) error {
@@ -296,7 +288,7 @@ func RunSBOM(ctx context.Context, opts SBOMOptions) error {
 	if err != nil {
 		return err
 	}
-	return runcmd.RenderRunSBOM(out, result, opts.SBOMDiffCollapsed)
+	return runcmd.RenderRunSBOM(out, result)
 }
 
 func RunStatus(ctx context.Context, opts StatusOptions) error {
@@ -330,7 +322,7 @@ func RunStatus(ctx context.Context, opts StatusOptions) error {
 	}
 
 	if opts.Follow {
-		final, err := followRunStatusReports(ctx, base, httpClient, domaintypes.RunID(runID), out, runcmd.TextRenderOptions{ReportsCollapsed: opts.ReportsCollapsed, SBOMDiffCollapsed: opts.SBOMDiffCollapsed}, 5, time.Second)
+		final, err := followRunStatusReports(ctx, base, httpClient, domaintypes.RunID(runID), out, runcmd.TextRenderOptions{}, 5, time.Second)
 		if err != nil {
 			return err
 		}
@@ -340,9 +332,7 @@ func RunStatus(ctx context.Context, opts StatusOptions) error {
 		return nil
 	}
 	return runcmd.RenderRunStatusSnapshotText(out, report, runcmd.TextRenderOptions{
-		ReportsCollapsed:  opts.ReportsCollapsed,
-		SBOMDiffCollapsed: opts.SBOMDiffCollapsed,
-		EnableOSC8:        common.SupportsOSC8(out),
-		BaseURL:           base,
+		EnableOSC8: common.SupportsOSC8(out),
+		BaseURL:    base,
 	})
 }

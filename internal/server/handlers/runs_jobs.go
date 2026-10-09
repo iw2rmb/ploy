@@ -83,7 +83,6 @@ func runJobFromStore(job store.Job) migsapi.RunJob {
 
 	if len(job.Meta) > 0 {
 		if meta, err := contracts.UnmarshalJobMeta(job.Meta); err == nil {
-			jr.Report = meta.Report
 			if resolvedName := deriveRunJobName(job, meta); resolvedName != "" {
 				jr.Name = resolvedName
 			}

@@ -75,6 +75,12 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest,
 		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
 		return
 	}
+	if err := clearGateOutcomes(mounts.Out); err != nil {
+		uploadRepoArtifactsOnReturn = true
+		r.uploadGateErrorStatus(ctx, req, err, time.Since(startTime))
+		return
+	}
+
 	// Run the build gate.
 	ctx = withGateExecutionLabels(ctx, req)
 	ctx = step.WithGateRuntimeImageObserver(ctx, func(obsCtx context.Context, image string) {
@@ -85,6 +91,14 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest,
 	gateExecutor := step.NewGateExecutor(runner.Containers)
 	gateCtx := step.WithExecutionLogWriter(ctx, artifactLogs)
 	gateResult, gateErr := r.runGate(gateCtx, gateExecutor, manifest, workspace, mounts)
+
+	// Publish available output even when the gate fails, before terminal status.
+	outcomeCtx, cancelOutcomes := context.WithTimeout(context.Background(), 2*time.Minute)
+	outcomeErr := r.persistGateOutcomes(outcomeCtx, req, mounts)
+	cancelOutcomes()
+	if outcomeErr != nil {
+		gateErr = errors.Join(gateErr, outcomeErr)
+	}
 
 	// Gate execution errors (e.g., Docker pull/create/start failures) are NOT build failures
 	// and are treated as terminal runtime errors for this repo attempt so the
@@ -115,20 +129,6 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest,
 	// Persist the first failing gate log for this run.
 	if !gateResultPassed(gateResult) {
 		r.persistFirstGateFailureLog(req.RunID, gateResult)
-	}
-
-	if err := r.persistGateSBOM(ctx, req, mounts.Share); err != nil {
-		duration := time.Since(startTime)
-		uploadRepoArtifactsOnReturn = true
-		slog.Error("gate sbom persistence failed; marking gate job as error",
-			"run_id", req.RunID,
-			"job_id", req.JobID,
-			"job_type", req.JobType,
-			"duration", duration,
-			"error", err,
-		)
-		r.uploadGateErrorStatus(ctx, req, err, duration)
-		return
 	}
 
 	duration := time.Since(startTime)

@@ -8,7 +8,6 @@ import (
 
 // RunJob represents a job within a run.
 type RunJob struct {
-	Report      string                `json:"report,omitempty"`
 	JobID       domaintypes.JobID     `json:"job_id"`
 	Name        string                `json:"name"`
 	JobType     domaintypes.JobType   `json:"job_type"`

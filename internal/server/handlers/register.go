@@ -174,7 +174,9 @@ func registerJobArtifactRoutes(s routeRegistrar, deps routeDeps) {
 }
 
 func registerJobRoutes(s routeRegistrar, deps routeDeps) {
-	s.RegisterRouteFunc("POST /v1/jobs/{job_id}/report", saveJobReportHandler(deps.st), auth.RoleWorker)
+	for _, outcome := range []string{"sbom", "cves", "sbom-diff"} {
+		s.RegisterRouteFuncAllowQueryToken("GET /v1/jobs/{job_id}/"+outcome, getJobOutcomeHandler(deps.st, deps.bs, outcome), auth.RoleControlPlane)
+	}
 	s.RegisterRouteFunc("GET /v1/jobs", listJobsHandler(deps.st), auth.RoleControlPlane)
 	s.RegisterRouteFuncAllowQueryToken("GET /v1/jobs/{job_id}/logs", getJobLogsHandler(deps.st, deps.bs, deps.eventsService), auth.RoleControlPlane)
 	s.RegisterRouteFunc("POST /v1/jobs/{job_id}/logs", createJobLogsHandler(deps.st, deps.bp, deps.eventsService), auth.RoleWorker)

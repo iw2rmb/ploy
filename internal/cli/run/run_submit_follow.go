@@ -25,7 +25,7 @@ func finalizeRunSubmit(
 	httpClient *http.Client,
 	opts SubmitOptions,
 ) error {
-	final, err := followRunStatusReports(ctx, base, httpClient, runID, out, runs.TextRenderOptions{SpecDisplayName: specDisplayName, ReportsCollapsed: opts.ReportsCollapsed, SBOMDiffCollapsed: opts.SBOMDiffCollapsed}, opts.MaxRetries, time.Second)
+	final, err := followRunStatusReports(ctx, base, httpClient, runID, out, runs.TextRenderOptions{SpecDisplayName: specDisplayName}, opts.MaxRetries, time.Second)
 	if err != nil {
 		return err
 	}
@@ -59,15 +59,13 @@ func followRunStatusReports(ctx context.Context, baseURL *url.URL, client *http.
 		maxRetries = 5
 	}
 	return runs.FollowRunCommand{
-		Client:            client,
-		BaseURL:           baseURL,
-		RunID:             runID,
-		Output:            out,
-		EnableOSC8:        renderOpts.EnableOSC8,
-		SpecDisplayName:   renderOpts.SpecDisplayName,
-		ReportsCollapsed:  renderOpts.ReportsCollapsed,
-		SBOMDiffCollapsed: renderOpts.SBOMDiffCollapsed,
-		MaxRetries:        maxRetries,
-		PollInterval:      pollInterval,
+		Client:          client,
+		BaseURL:         baseURL,
+		RunID:           runID,
+		Output:          out,
+		EnableOSC8:      renderOpts.EnableOSC8,
+		SpecDisplayName: renderOpts.SpecDisplayName,
+		MaxRetries:      maxRetries,
+		PollInterval:    pollInterval,
 	}.Run(ctx)
 }

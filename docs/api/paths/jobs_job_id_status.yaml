@@ -54,9 +54,6 @@ get:
               - repo_sha_in8
               - repo_sha_out8
             properties:
-              report:
-                type: string
-                description: Latest posted text report, omitted when empty
               job_id:
                 type: string
                 description: Job ID (KSUID string)
