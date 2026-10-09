@@ -9,6 +9,10 @@
 - Automation:
   - GoReleaser updates the Homebrew cask during releases.
   - Required secret in `iw2rmb/ploy`: `HOMEBREW_TAP_GITHUB_TOKEN` (token must permit tap repo updates).
+  - macOS CLI releases use Developer ID signing and Apple notarization before archive publication.
+  - Required signing secrets: `MACOS_SIGN_P12` (base64 PKCS#12) and `MACOS_SIGN_PASSWORD`.
+  - Required notarization secrets: `MACOS_NOTARY_KEY` (base64 team API key), `MACOS_NOTARY_KEY_ID`, and `MACOS_NOTARY_ISSUER_ID`.
+  - Releases fail if credentials are missing or notarization fails or times out. Snapshot builds do not require Apple credentials.
 - Source of truth for config:
   - `.goreleaser.yml` (`homebrew_casks` section).
 - Verification checks after a release:

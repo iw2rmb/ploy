@@ -5,6 +5,7 @@ version: 2
 
 before:
   hooks:
+    - sh .github/scripts/check-macos-signing.sh {{ .IsSnapshot }}
     # Ensure dependencies are up to date
     - go mod tidy
     # Note: Tests are run by GitHub Actions pre-release-checks job
@@ -119,6 +120,22 @@ archives:
       - LICENSE*
       - README*
       - CHANGELOG*
+
+notarize:
+  macos:
+    - enabled: '{{ not .IsSnapshot }}'
+      ids:
+        - ploy
+      sign:
+        certificate: '{{ .Env.MACOS_SIGN_P12 }}'
+        password: '{{ .Env.MACOS_SIGN_PASSWORD }}'
+      notarize:
+        issuer_id: '{{ .Env.MACOS_NOTARY_ISSUER_ID }}'
+        key_id: '{{ .Env.MACOS_NOTARY_KEY_ID }}'
+        key: '{{ .Env.MACOS_NOTARY_KEY }}'
+        wait: true
+        # The pinned signing library adds two minutes to the API token lifetime.
+        timeout: 15m
 
 checksum:
   name_template: 'checksums.txt'
