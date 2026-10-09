@@ -34,7 +34,6 @@ type ContainerRuntime interface {
 	Start(ctx context.Context, handle ContainerHandle) error
 	Wait(ctx context.Context, handle ContainerHandle) (ContainerResult, error)
 	Logs(ctx context.Context, handle ContainerHandle) ([]byte, error)
-	Remove(ctx context.Context, handle ContainerHandle) error
 }
 
 // GateExecutor validates build artifacts.

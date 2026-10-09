@@ -24,12 +24,26 @@ import (
 // This interface enables dependency injection for testing without requiring a live
 // Docker daemon.
 type dockerClientAPI interface {
+	dockerContainerRemover
 	ContainerCreate(ctx context.Context, options client.ContainerCreateOptions) (client.ContainerCreateResult, error)
 	ContainerStart(ctx context.Context, containerID string, options client.ContainerStartOptions) (client.ContainerStartResult, error)
 	ContainerWait(ctx context.Context, containerID string, options client.ContainerWaitOptions) client.ContainerWaitResult
 	ContainerInspect(ctx context.Context, containerID string, options client.ContainerInspectOptions) (client.ContainerInspectResult, error)
 	ContainerLogs(ctx context.Context, containerID string, options client.ContainerLogsOptions) (client.ContainerLogsResult, error)
-	ContainerRemove(ctx context.Context, containerID string, options client.ContainerRemoveOptions) (client.ContainerRemoveResult, error)
+}
+
+type dockerContainerRemover interface {
+	ContainerRemove(context.Context, string, client.ContainerRemoveOptions) (client.ContainerRemoveResult, error)
+}
+
+// Callers own deletion timing. Anonymous volumes follow their container;
+// named volumes remain subject to job ownership checks.
+func removeDockerContainer(ctx context.Context, docker dockerContainerRemover, id string) error {
+	_, err := docker.ContainerRemove(ctx, id, client.ContainerRemoveOptions{Force: true, RemoveVolumes: true})
+	if isContainerNotFound(err) {
+		return nil
+	}
+	return err
 }
 
 // dockerImageAPI abstracts image operations for Docker image fetching.
@@ -228,11 +242,8 @@ func (r *containerRuntime) Wait(ctx context.Context, handle ContainerHandle) (re
 func (r *containerRuntime) forceRemoveOnWaitCancel(handle ContainerHandle) {
 	cleanupCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	_, err := r.client.ContainerRemove(cleanupCtx, string(handle), client.ContainerRemoveOptions{Force: true})
-	if err != nil && !isContainerNotFound(err) {
-		// Best-effort cleanup: cancellation must return promptly even when remove fails.
-		return
-	}
+	// Best-effort cleanup: cancellation must return promptly even when remove fails.
+	_ = removeDockerContainer(cleanupCtx, r.client, string(handle))
 }
 
 func isContainerNotFound(err error) bool {
@@ -301,17 +312,6 @@ func (r *containerRuntime) StreamLogs(ctx context.Context, handle ContainerHandl
 		return err
 	}
 	return nil
-}
-
-// Remove deletes the container with Force=true. Removing an already-removed
-// container may return a 404 error; the operation is idempotent in effect.
-func (r *containerRuntime) Remove(ctx context.Context, handle ContainerHandle) (err error) {
-	defer func() { err = errors.Join(err, r.closeDockerProxy(handle)) }()
-	if r == nil || r.client == nil {
-		return errors.New("step: docker runtime not configured")
-	}
-	_, err = r.client.ContainerRemove(ctx, string(handle), client.ContainerRemoveOptions{Force: true})
-	return err
 }
 
 // ensureImageAvailable refreshes the image before container creation. Job images

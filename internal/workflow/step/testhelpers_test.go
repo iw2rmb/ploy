@@ -65,7 +65,6 @@ type testContainerRuntime struct {
 	startFn  func(ctx context.Context, handle ContainerHandle) error
 	waitFn   func(ctx context.Context, handle ContainerHandle) (ContainerResult, error)
 	logsFn   func(ctx context.Context, handle ContainerHandle) ([]byte, error)
-	removeFn func(ctx context.Context, handle ContainerHandle) error
 
 	// captured holds the last ContainerSpec passed to Create.
 	captured     ContainerSpec
@@ -73,7 +72,6 @@ type testContainerRuntime struct {
 	startCalled  bool
 	waitCalled   bool
 	logsCalled   bool
-	removeCalled bool
 }
 
 func (m *testContainerRuntime) Create(ctx context.Context, spec ContainerSpec) (ContainerHandle, error) {
@@ -107,14 +105,6 @@ func (m *testContainerRuntime) Logs(ctx context.Context, handle ContainerHandle)
 		return m.logsFn(ctx, handle)
 	}
 	return nil, nil
-}
-
-func (m *testContainerRuntime) Remove(ctx context.Context, handle ContainerHandle) error {
-	m.removeCalled = true
-	if m.removeFn != nil {
-		return m.removeFn(ctx, handle)
-	}
-	return nil
 }
 
 func newTestJobMounts(t *testing.T, jobType types.JobType) JobMounts {

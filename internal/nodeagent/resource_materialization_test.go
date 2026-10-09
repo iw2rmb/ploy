@@ -41,10 +41,6 @@ func (s *spyContainerRuntime) Logs(_ context.Context, _ step.ContainerHandle) ([
 	return nil, nil
 }
 
-func (s *spyContainerRuntime) Remove(_ context.Context, _ step.ContainerHandle) error {
-	return nil
-}
-
 // buildTestTarGz creates a minimal tar.gz archive with the given entries for testing.
 // Each entry is map[archivePath]content; directories have nil content.
 func buildTestTarGz(t *testing.T, entries map[string][]byte, typeflagOverrides map[string]byte) []byte {

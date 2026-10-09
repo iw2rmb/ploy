@@ -19,7 +19,7 @@ import (
 
 func TestContainerRuntime_DockerProxyUsesJobMountsAndClosesWithContainer(t *testing.T) {
 	t.Parallel()
-	for _, outcome := range []string{"wait", "wait failure", "wait cancelled", "wait error", "start error", "create error", "create panic", "remove", "runtime close"} {
+	for _, outcome := range []string{"wait", "wait failure", "wait cancelled", "wait error", "start error", "create error", "create panic", "runtime close"} {
 		t.Run(outcome, func(t *testing.T) {
 			t.Parallel()
 			fake := &fakeDockerClient{createResult: client.ContainerCreateResult{ID: outcome}}
@@ -73,8 +73,6 @@ func TestContainerRuntime_DockerProxyUsesJobMountsAndClosesWithContainer(t *test
 				_, _ = rt.Wait(context.Background(), handle)
 			case "start error":
 				_ = rt.Start(context.Background(), handle)
-			case "remove":
-				_ = rt.Remove(context.Background(), handle)
 			case "runtime close":
 				_ = rt.Close()
 			}

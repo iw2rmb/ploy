@@ -48,7 +48,7 @@ func (o DockerJobOwner) owns(labels map[string]string) bool {
 
 type DockerJobResourceClient interface {
 	ContainerList(context.Context, client.ContainerListOptions) (client.ContainerListResult, error)
-	ContainerRemove(context.Context, string, client.ContainerRemoveOptions) (client.ContainerRemoveResult, error)
+	dockerContainerRemover
 	NetworkList(context.Context, client.NetworkListOptions) (client.NetworkListResult, error)
 	NetworkRemove(context.Context, string, client.NetworkRemoveOptions) (client.NetworkRemoveResult, error)
 	VolumeList(context.Context, client.VolumeListOptions) (client.VolumeListResult, error)
@@ -130,7 +130,7 @@ func RemoveDockerJobResources(ctx context.Context, docker DockerJobResourceClien
 		var err error
 		switch resource.kind {
 		case "container":
-			_, err = docker.ContainerRemove(ctx, resource.id, client.ContainerRemoveOptions{Force: true, RemoveVolumes: true})
+			err = removeDockerContainer(ctx, docker, resource.id)
 		case "network":
 			_, err = docker.NetworkRemove(ctx, resource.id, client.NetworkRemoveOptions{})
 		case "volume":

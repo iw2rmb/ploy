@@ -9,7 +9,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
-func TestGateExecutor_DoesNotRemoveContainerAfterExecution(t *testing.T) {
+func TestGateExecutor_CollectsLogsAfterExecution(t *testing.T) {
 	executor, rt, workspace := newGateTestHarness(t)
 	spec := &contracts.StepGateSpec{Enabled: true}
 
@@ -18,9 +18,6 @@ func TestGateExecutor_DoesNotRemoveContainerAfterExecution(t *testing.T) {
 		t.Fatalf("Execute() unexpected error: %v", err)
 	}
 
-	if rt.removeCalled {
-		t.Fatalf("expected Remove not to be called on container runtime after gate execution")
-	}
 	if !rt.createCalled || !rt.startCalled || !rt.waitCalled || !rt.logsCalled {
 		t.Fatalf("expected create/start/wait/logs to be called; got %+v", rt)
 	}

@@ -164,7 +164,6 @@ type mockContainerRuntime struct {
 	waitFn       func(ctx context.Context, handle step.ContainerHandle) (step.ContainerResult, error)
 	logsFn       func(ctx context.Context, handle step.ContainerHandle) ([]byte, error)
 	streamLogsFn func(ctx context.Context, handle step.ContainerHandle, stdout, stderr io.Writer) error
-	removeFn     func(ctx context.Context, handle step.ContainerHandle) error
 }
 
 func (m *mockContainerRuntime) Create(ctx context.Context, spec step.ContainerSpec) (step.ContainerHandle, error) {
@@ -198,13 +197,6 @@ func (m *mockContainerRuntime) Logs(ctx context.Context, handle step.ContainerHa
 func (m *mockContainerRuntime) StreamLogs(ctx context.Context, handle step.ContainerHandle, stdout, stderr io.Writer) error {
 	if m.streamLogsFn != nil {
 		return m.streamLogsFn(ctx, handle, stdout, stderr)
-	}
-	return nil
-}
-
-func (m *mockContainerRuntime) Remove(ctx context.Context, handle step.ContainerHandle) error {
-	if m.removeFn != nil {
-		return m.removeFn(ctx, handle)
 	}
 	return nil
 }

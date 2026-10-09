@@ -64,9 +64,10 @@ type fakeDockerClient struct {
 	logsErr  error
 
 	// ContainerRemove behavior
-	removeErr    error
-	removeCalled bool
-	removeID     string // captured container ID
+	removeErr     error
+	removeCalled  bool
+	removeID      string // captured container ID
+	removeOptions client.ContainerRemoveOptions
 
 	// ContainerStats behavior
 	statsResult client.ContainerStatsResult
@@ -143,6 +144,7 @@ func (f *fakeDockerClient) ContainerLogs(ctx context.Context, containerID string
 func (f *fakeDockerClient) ContainerRemove(ctx context.Context, containerID string, options client.ContainerRemoveOptions) (client.ContainerRemoveResult, error) {
 	f.removeCalled = true
 	f.removeID = containerID
+	f.removeOptions = options
 	return client.ContainerRemoveResult{}, f.removeErr
 }
 

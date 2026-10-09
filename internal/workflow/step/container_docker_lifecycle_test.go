@@ -7,12 +7,13 @@ import (
 	"testing"
 	"time"
 
+	cerrdefs "github.com/containerd/errdefs"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
 )
 
 // -----------------------------------------------------------------------------
-// containerRuntime basic lifecycle tests (start, wait, remove)
+// containerRuntime basic lifecycle tests (start, wait)
 // -----------------------------------------------------------------------------
 
 // TestContainerRuntimeStart verifies container start with moby client.
@@ -153,6 +154,9 @@ func TestContainerRuntimeWait(t *testing.T) {
 					if !fake.removeCalled {
 						t.Fatal("expected Wait() to force-remove container on error")
 					}
+					if !fake.removeOptions.Force || !fake.removeOptions.RemoveVolumes {
+						t.Fatalf("cancellation must remove anonymous volumes: %+v", fake.removeOptions)
+					}
 					if fake.removeID != string(tc.handle) {
 						t.Fatalf("removed container %q, want %q", fake.removeID, string(tc.handle))
 					}
@@ -164,6 +168,9 @@ func TestContainerRuntimeWait(t *testing.T) {
 			}
 			if result.ExitCode != tc.wantCode {
 				t.Errorf("got exit code %d, want %d", result.ExitCode, tc.wantCode)
+			}
+			if fake.removeCalled {
+				t.Fatal("completed containers must remain available for logs")
 			}
 			// Verify timestamps were parsed (if inspect succeeded).
 			if tc.inspectErr == nil && tc.startedAt != "" {
@@ -178,8 +185,8 @@ func TestContainerRuntimeWait(t *testing.T) {
 	}
 }
 
-// TestContainerRuntimeRemove verifies container removal with moby client.
-func TestContainerRuntimeRemove(t *testing.T) {
+// TestRemoveDockerContainer removes anonymous volumes and tolerates an absent container.
+func TestRemoveDockerContainer(t *testing.T) {
 	t.Parallel()
 	testCases := []struct {
 		name      string
@@ -191,6 +198,11 @@ func TestContainerRuntimeRemove(t *testing.T) {
 			name:    "success",
 			handle:  ContainerHandle("container123"),
 			wantErr: false,
+		},
+		{
+			name:      "already_removed",
+			handle:    ContainerHandle("missing"),
+			removeErr: cerrdefs.ErrNotFound,
 		},
 		{
 			name:      "error_remove_fails",
@@ -205,9 +217,10 @@ func TestContainerRuntimeRemove(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			fake := &fakeDockerClient{removeErr: tc.removeErr}
-			rt := newContainerRuntimeWithClient(fake, ContainerRuntimeOptions{})
-
-			err := rt.Remove(context.Background(), tc.handle)
+			err := removeDockerContainer(context.Background(), fake, string(tc.handle))
+			if !fake.removeOptions.Force || !fake.removeOptions.RemoveVolumes {
+				t.Fatalf("removal must include anonymous volumes: %+v", fake.removeOptions)
+			}
 
 			if tc.wantErr {
 				if err == nil {
@@ -270,12 +283,6 @@ func TestContainerRuntimeNilClient(t *testing.T) {
 			name: "stream_logs",
 			call: func() error {
 				return rt.StreamLogs(ctx, ContainerHandle("x"), &bytes.Buffer{}, &bytes.Buffer{})
-			},
-		},
-		{
-			name: "remove",
-			call: func() error {
-				return rt.Remove(ctx, ContainerHandle("x"))
 			},
 		},
 	}

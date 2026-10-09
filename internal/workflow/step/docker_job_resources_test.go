@@ -93,6 +93,10 @@ func (d *resourceDaemon) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "volume must not be forced", 500)
 			return
 		}
+		if strings.HasPrefix(p, "/containers/") && (r.URL.Query().Get("force") != "1" || r.URL.Query().Get("v") != "1") {
+			http.Error(w, "container removal must include anonymous volumes", 500)
+			return
+		}
 		delete(d.resources, id)
 		d.removed = append(d.removed, id)
 		w.WriteHeader(http.StatusNoContent)

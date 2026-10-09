@@ -77,9 +77,6 @@ func TestRunner_Run_DoesNotRemoveContainerAfterCompletion(t *testing.T) {
 	if !rt.createCalled || !rt.startCalled || !rt.waitCalled || !rt.logsCalled {
 		t.Fatalf("expected create/start/wait/logs to be called; got %+v", rt)
 	}
-	if rt.removeCalled {
-		t.Fatalf("expected Remove not to be called")
-	}
 	if got := logBuf.String(); got == "" {
 		t.Fatalf("expected log output to be written")
 	}
