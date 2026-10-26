@@ -21,7 +21,6 @@ import (
 	sharedclient "github.com/iw2rmb/ploy/internal/client"
 	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	"github.com/iw2rmb/ploy/internal/httpx"
 )
 
 type AddOptions struct {
@@ -321,9 +320,42 @@ func RunProject(ctx context.Context, opts RunOptions) error {
 		_, _ = fmt.Fprintln(opts.Output, result.WaveID)
 	}
 
-	if opts.Follow {
-		return followMigWaveProject(ctx, base, httpClient, result.WaveID, opts.Cap, opts.CancelOnCap, opts.Output)
+	if !opts.Follow {
+		return nil
 	}
+	followCtx := ctx
+	if opts.Cap > 0 {
+		var cancel context.CancelFunc
+		followCtx, cancel = context.WithTimeout(ctx, opts.Cap)
+		defer cancel()
+	}
+	wave, err := (sharedclient.FollowWaveCommand{
+		Get: sharedclient.GetWaveCommand{Client: httpClient, BaseURL: base, WaveID: result.WaveID},
+		OnUpdate: func(wave domainapi.WaveSummary) error {
+			_, err := fmt.Fprintf(opts.Output, "wave %s %s\n", result.WaveID, wave.Status)
+			return err
+		},
+	}).Run(followCtx)
+	if err != nil {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		if opts.Cap > 0 && followCtx.Err() == context.DeadlineExceeded && errors.Is(err, context.DeadlineExceeded) {
+			if !opts.CancelOnCap {
+				return nil
+			}
+			_, _ = fmt.Fprintln(opts.Output, "Follow timed out; requesting wave cancellation...")
+			// The local follow deadline has expired. Use the parent context so cancellation
+			// can complete while still respecting the caller's cancellation.
+			_, err = (sharedclient.CancelWaveCommand{Client: httpClient, BaseURL: base, WaveID: result.WaveID}).Run(ctx)
+			return err
+		}
+		return err
+	}
+	if wave.Status == domaintypes.WaveStatusCancelled {
+		return fmt.Errorf("mig wave ended in cancelled")
+	}
+	// Finished means every child run is terminal; it does not imply all succeeded.
 	return nil
 }
 
@@ -340,53 +372,6 @@ func resolveMigRunRepoSelectors(ctx context.Context, base *url.URL, client *http
 		repoURLs = append(repoURLs, resolved.RepoURL)
 	}
 	return repoURLs, nil
-}
-
-func followMigWaveProject(ctx context.Context, baseURL *url.URL, client *http.Client, waveID domaintypes.WaveID, capDuration time.Duration, cancelOnCap bool, output io.Writer) error {
-	followCtx := ctx
-	var cancel context.CancelFunc
-	if capDuration > 0 {
-		followCtx, cancel = context.WithTimeout(ctx, capDuration)
-		defer cancel()
-	}
-	for {
-		req, err := http.NewRequestWithContext(followCtx, http.MethodGet, baseURL.JoinPath("v1", "waves", waveID.String()).String(), nil)
-		if err != nil {
-			return err
-		}
-		resp, err := client.Do(req)
-		if err != nil {
-			if capDuration > 0 && followCtx.Err() == context.DeadlineExceeded {
-				if cancelOnCap {
-					_, _ = fmt.Fprintln(output, "Follow timed out; requesting wave cancellation...")
-					cancelReq, _ := http.NewRequestWithContext(context.Background(), http.MethodPost, baseURL.JoinPath("v1", "waves", waveID.String(), "cancel").String(), nil)
-					if cancelReq != nil {
-						if cancelResp, cancelErr := client.Do(cancelReq); cancelErr == nil {
-							_ = cancelResp.Body.Close()
-						}
-					}
-				}
-				return nil
-			}
-			return err
-		}
-		var body struct {
-			Status string `json:"status"`
-		}
-		decodeErr := httpx.DecodeResponseJSON(resp.Body, &body, httpx.MaxJSONBodyBytes)
-		_ = resp.Body.Close()
-		if decodeErr != nil {
-			return decodeErr
-		}
-		_, _ = fmt.Fprintf(output, "wave %s %s\n", waveID, body.Status)
-		if body.Status == "Finished" {
-			return nil
-		}
-		if body.Status == "Cancelled" {
-			return fmt.Errorf("mig wave ended in cancelled")
-		}
-		time.Sleep(time.Second)
-	}
 }
 
 func RunFetch(ctx context.Context, runID, artifactDir string, output io.Writer) error {

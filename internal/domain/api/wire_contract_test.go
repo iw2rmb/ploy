@@ -17,6 +17,8 @@ func TestJSONWireContracts(t *testing.T) {
 	username := "alice"
 	description := "automation token"
 	lastUsedAt := now.Add(time.Hour)
+	waveCreatedAt := "Sun, 01 Jun 2025 12:00:00 GMT"
+	waveFinishedAt := "Sun, 01 Jun 2025 13:00:00 GMT"
 	mig := MigSummary{
 		ID:        domaintypes.MigID("migAbc"),
 		Name:      "my-mig",
@@ -38,6 +40,24 @@ func TestJSONWireContracts(t *testing.T) {
 		value any
 		want  string
 	}{
+		{
+			name: "wave summary exports optional fields and timestamp strings",
+			value: WaveSummary{
+				ID: domaintypes.WaveID("3LE6kRJ96q6Iz40omktQctSD3Os"), MigID: domaintypes.MigID("migAbc"), SpecID: specID,
+				CreatedBy: &createdBy, Status: domaintypes.WaveStatusFinished, CreatedAt: waveCreatedAt,
+				StartedAt: &waveCreatedAt, FinishedAt: &waveFinishedAt,
+				Counts: &domaintypes.RunCounts{Total: 1, Fail: 1},
+			},
+			want: `{"id":"3LE6kRJ96q6Iz40omktQctSD3Os","mig_id":"migAbc","spec_id":"specAbCd","created_by":"ci-bot","status":"Finished","created_at":"Sun, 01 Jun 2025 12:00:00 GMT","started_at":"Sun, 01 Jun 2025 12:00:00 GMT","finished_at":"Sun, 01 Jun 2025 13:00:00 GMT","run_counts":{"total":1,"queued":0,"running":0,"success":0,"fail":1,"cancelled":0,"derived_status":""}}`,
+		},
+		{
+			name: "wave summary omits absent optional fields",
+			value: WaveSummary{
+				ID: domaintypes.WaveID("3LE6kRJ96q6Iz40omktQctSD3Os"), MigID: domaintypes.MigID("migAbc"), SpecID: specID,
+				Status: domaintypes.WaveStatusCancelled, CreatedAt: waveCreatedAt,
+			},
+			want: `{"id":"3LE6kRJ96q6Iz40omktQctSD3Os","mig_id":"migAbc","spec_id":"specAbCd","status":"Cancelled","created_at":"Sun, 01 Jun 2025 12:00:00 GMT"}`,
+		},
 		{
 			name:  "mig summary exports optional fields",
 			value: mig,

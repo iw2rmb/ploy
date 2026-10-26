@@ -9,12 +9,11 @@ import (
 
 	"github.com/iw2rmb/ploy/internal/blobstore"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	"github.com/iw2rmb/ploy/internal/server/events"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-func claimJobHandlerWithEvents(st store.Store, bs blobstore.Store, eventsService *events.Service, configHolder *ConfigHolder) http.HandlerFunc {
-	service := newClaimer(st, bs, configHolder, eventsService)
+func claimJobHandler(st store.Store, bs blobstore.Store, configHolder *ConfigHolder) http.HandlerFunc {
+	service := newClaimer(st, bs, configHolder)
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		nodeID, ok := parseRequiredPathIDOrWriteError[domaintypes.NodeID](w, r, "id")
@@ -40,11 +39,7 @@ func claimJobHandlerWithEvents(st store.Store, bs blobstore.Store, eventsService
 			}
 		}
 
-		if result.Response != nil {
-			writeJSON(w, http.StatusOK, result.Response)
-			return
-		}
-		writeJSON(w, http.StatusOK, result.Payload)
+		writeJSON(w, http.StatusOK, result)
 	}
 }
 

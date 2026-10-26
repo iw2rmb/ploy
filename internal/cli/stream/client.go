@@ -46,14 +46,14 @@ type reconnectState struct {
 // counter, applies exponential backoff, and waits. Returns a non-nil error to signal
 // the caller should return (either retries exhausted or context cancelled).
 // A nil return means the caller should continue (retry the connection).
-func (rs *reconnectState) backoffOrFail(ctx context.Context, retriesMsg string, logAttrs ...any) error {
+func (rs *reconnectState) backoffOrFail(ctx context.Context, retriesMsg string) error {
 	if rs.maxRetries >= 0 && rs.retries >= rs.maxRetries {
 		rs.logger.Error("stream_max_retries_exhausted", "retries", rs.retries)
 		return fmt.Errorf("stream: %s", retriesMsg)
 	}
 	rs.retries++
 	d := time.Duration(rs.sb.Apply())
-	rs.logger.Log(ctx, slog.LevelDebug, "stream_reconnect_backoff", append([]any{"attempt", rs.retries, "backoff", d}, logAttrs...)...)
+	rs.logger.Log(ctx, slog.LevelDebug, "stream_reconnect_backoff", "attempt", rs.retries, "backoff", d)
 	return waitWithBackoff(ctx, d)
 }
 
@@ -86,145 +86,133 @@ func (c Client) Stream(ctx context.Context, endpoint string, handler func(Event)
 	var lastEventID domaintypes.EventID
 
 	for {
-		connCtx, cancelConn := context.WithCancel(ctx)
-		defer cancelConn()
-
-		req, err := http.NewRequestWithContext(connCtx, http.MethodGet, endpoint, nil)
-		if err != nil {
-			return fmt.Errorf("stream: build request: %w", err)
-		}
-		req.Header.Set("Accept", "text/event-stream")
-		if lastEventID > 0 {
-			req.Header.Set("Last-Event-ID", lastEventID.String())
-		}
-
-		resp, err := c.HTTPClient.Do(req)
-		if err != nil {
-			if connCtx.Err() != nil {
-				if c.IdleTimeout > 0 {
-					logger.Error("stream_idle_timeout", "timeout", c.IdleTimeout, "endpoint", endpoint)
-					return fmt.Errorf("stream: idle timeout after %s", c.IdleTimeout)
-				}
-				return connCtx.Err()
-			}
-			if err := rs.backoffOrFail(ctx, fmt.Sprintf("connect failed after %d retries: %v", rs.retries, err), "error", err.Error()); err != nil {
-				return err
-			}
-			continue
-		}
-
-		if resp.StatusCode != http.StatusOK {
-			body, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
-			_ = resp.Body.Close()
-			logger.Error("stream_unexpected_status", "status", resp.StatusCode, "body", strings.TrimSpace(string(body)))
-			return fmt.Errorf("stream: unexpected status %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
-		}
-
-		var idle *time.Timer
-		if c.IdleTimeout > 0 {
-			idle = time.AfterFunc(c.IdleTimeout, func() {
-				logger.Debug("stream_idle_timeout_triggered", "timeout", c.IdleTimeout)
-				cancelConn()
-			})
-		}
-		var sawEvent bool
-		var connectionFailed bool
-		var handlerErr error
-		var gotDone bool
-
-		readConfig := &sse.ReadConfig{
-			MaxEventSize: 1 << 20,
-		}
-
-		sse.Read(resp.Body, readConfig)(func(sseEvent sse.Event, err error) bool {
-			if err != nil {
-				if connCtx.Err() != nil {
-					if c.IdleTimeout > 0 {
-						handlerErr = fmt.Errorf("stream: idle timeout after %s", c.IdleTimeout)
-						logger.Error("stream_idle_timeout", "timeout", c.IdleTimeout, "endpoint", endpoint)
-						return false
-					}
-					handlerErr = connCtx.Err()
-					return false
-				}
-				// Treat read errors as transient and trigger a reconnect loop
-				// instead of failing the entire stream immediately. This
-				// improves resilience on flaky TLS/HTTP/2 links.
-				logger.Debug("stream_read_error", "error", err.Error())
-				connectionFailed = true
-				return false
-			}
-
-			sawEvent = true
-			if idle != nil {
-				idle.Reset(c.IdleTimeout)
-			}
-
-			event := Event{
-				ID:   sseEvent.LastEventID,
-				Type: sseEvent.Type,
-				Data: []byte(sseEvent.Data),
-			}
-
-			if event.ID != "" {
-				var eid domaintypes.EventID
-				if err := eid.UnmarshalText([]byte(event.ID)); err == nil && eid.Valid() {
-					lastEventID = eid
-				}
-			}
-
-			if err := handler(event); err != nil {
-				if errors.Is(err, ErrDone) {
-					logger.Debug("stream_done", "endpoint", endpoint)
-					gotDone = true
-					return false
-				}
-				logger.Error("stream_handler_error", "error", err.Error())
-				handlerErr = err
-				return false
-			}
-
-			return true
-		})
-
-		if !gotDone && handlerErr == nil && !connectionFailed {
-			logger.Debug("stream_eof", "endpoint", endpoint)
-		}
-		_ = resp.Body.Close()
-		if idle != nil {
-			idle.Stop()
-		}
-
-		if gotDone {
-			return nil
-		}
-		if handlerErr != nil {
-			return handlerErr
+		attempt := c.streamConnection(ctx, endpoint, lastEventID, handler, logger)
+		lastEventID = attempt.lastEventID
+		if !attempt.reconnect {
+			return attempt.err
 		}
 		if ctx.Err() != nil {
-			logger.Debug("stream_context_cancelled", "error", ctx.Err().Error())
 			return ctx.Err()
 		}
-
-		if sawEvent {
+		if attempt.sawEvent {
 			logger.Debug("stream_reset_backoff", "endpoint", endpoint)
 			rs.sb.Reset()
 			rs.retries = 0
 		}
 
 		msg := fmt.Sprintf("exceeded max retries (%d)", rs.retries)
-		if connectionFailed {
-			if err := rs.backoffOrFail(ctx, msg); err != nil {
-				return err
-			}
-			continue
+		if attempt.err != nil {
+			msg = fmt.Sprintf("%v after %d retries", attempt.err, rs.retries)
 		}
-
-		// EOF without events
 		if err := rs.backoffOrFail(ctx, msg); err != nil {
 			return err
 		}
 	}
+}
+
+type connectionResult struct {
+	reconnect   bool
+	err         error
+	sawEvent    bool
+	lastEventID domaintypes.EventID
+}
+
+func (c Client) streamConnection(ctx context.Context, endpoint string, lastEventID domaintypes.EventID, handler func(Event) error, logger *slog.Logger) connectionResult {
+	result := connectionResult{lastEventID: lastEventID}
+	connCtx, cancelConn := context.WithCancelCause(ctx)
+	// A stream can reconnect indefinitely. Release this connection's context before
+	// backoff so completed attempts do not remain attached to the caller.
+	defer cancelConn(nil)
+
+	req, err := http.NewRequestWithContext(connCtx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		result.err = fmt.Errorf("stream: build request: %w", err)
+		return result
+	}
+	req.Header.Set("Accept", "text/event-stream")
+	if lastEventID > 0 {
+		req.Header.Set("Last-Event-ID", lastEventID.String())
+	}
+
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		if ctx.Err() != nil {
+			result.err = ctx.Err()
+		} else {
+			result.reconnect = true
+			result.err = fmt.Errorf("connect failed: %w", err)
+		}
+		return result
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
+		logger.Error("stream_unexpected_status", "status", resp.StatusCode, "body", strings.TrimSpace(string(body)))
+		result.err = fmt.Errorf("stream: unexpected status %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+		return result
+	}
+
+	var idle *time.Timer
+	if c.IdleTimeout > 0 {
+		idle = time.AfterFunc(c.IdleTimeout, func() {
+			logger.Debug("stream_idle_timeout_triggered", "timeout", c.IdleTimeout)
+			cancelConn(fmt.Errorf("stream: idle timeout after %s", c.IdleTimeout))
+		})
+		defer idle.Stop()
+	}
+
+	result.reconnect = true
+	sse.Read(resp.Body, &sse.ReadConfig{MaxEventSize: 1 << 20})(func(sseEvent sse.Event, err error) bool {
+		if err != nil {
+			// Read errors can come from transient TLS/HTTP/2 failures.
+			logger.Debug("stream_read_error", "error", err.Error())
+			result.err = err
+			return false
+		}
+
+		result.sawEvent = true
+		if idle != nil {
+			idle.Reset(c.IdleTimeout)
+		}
+		event := Event{
+			ID:   sseEvent.LastEventID,
+			Type: sseEvent.Type,
+			Data: []byte(sseEvent.Data),
+		}
+		if event.ID != "" {
+			var eventID domaintypes.EventID
+			if err := eventID.UnmarshalText([]byte(event.ID)); err == nil && eventID.Valid() {
+				result.lastEventID = eventID
+			}
+		}
+
+		if err := handler(event); err != nil {
+			result.reconnect = false
+			if errors.Is(err, ErrDone) {
+				logger.Debug("stream_done", "endpoint", endpoint)
+			} else {
+				logger.Error("stream_handler_error", "error", err.Error())
+				result.err = err
+			}
+			return false
+		}
+		return true
+	})
+
+	if result.reconnect {
+		if ctx.Err() != nil {
+			result.reconnect = false
+			result.err = ctx.Err()
+		} else if connCtx.Err() != nil {
+			result.reconnect = false
+			result.err = context.Cause(connCtx)
+			logger.Error("stream_idle_timeout", "timeout", c.IdleTimeout, "endpoint", endpoint)
+		} else if result.err == nil {
+			logger.Debug("stream_eof", "endpoint", endpoint)
+		}
+	}
+	return result
 }
 
 // waitWithBackoff waits for the specified duration or until context is cancelled.

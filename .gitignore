@@ -71,3 +71,5 @@ tests/e2e/deploy/e2e-logs/
 /ployd-node
 
 AGENTS.md
+
+/application.yaml

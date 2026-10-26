@@ -90,6 +90,20 @@ Run-scoped API surfaces:
 - `GET /v1/runs/{run_id}/snapshot`
 - `GET /v1/runs/{run_id}/sbom/{pre|post|diff}`
 
+`ploy wave status` and `ploy wave cancel` print the full wave JSON summary.
+`ploy wave status --follow` prints each summary until the wave is `Finished`
+or `Cancelled`. Both terminal states are successful observations.
+
+`ploy mig run --follow` prints `wave <id> <status>` for each summary.
+`Finished` ends the command successfully even when some child runs failed.
+`Cancelled` returns an error. Both follow commands fetch immediately, then poll
+once per second. Request, response, and caller cancellation errors stop polling.
+
+For `ploy mig run --follow`, `--cap <duration>` stops watching after the local
+deadline and returns success. With `--cancel-on-cap`, the command also requests
+wave cancellation and returns success only if that request succeeds. Caller
+cancellation or a caller deadline returns an error and does not cancel the wave.
+
 Wave-scoped API surfaces:
 
 - `POST /v1/migs/{mig_id}/waves`

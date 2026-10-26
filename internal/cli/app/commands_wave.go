@@ -7,9 +7,11 @@ import (
 	"io"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/iw2rmb/ploy/internal/cli/common"
+	sharedclient "github.com/iw2rmb/ploy/internal/client"
+	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/httpx"
 	"github.com/spf13/cobra"
 )
@@ -25,17 +27,22 @@ func newWaveCmd(stdout, _ io.Writer) *cobra.Command {
 func newWaveStatusCmd(out io.Writer) *cobra.Command {
 	var follow bool
 	cmd := &cobra.Command{Use: "status <wave-id>", Short: "Show wave status", Args: cobra.ExactArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
-		for {
-			body, terminal, err := fetchWaveJSON(cmd.Context(), args[0], "")
-			if err != nil {
-				return err
-			}
-			_, _ = fmt.Fprintln(out, string(body))
-			if !follow || terminal {
-				return nil
-			}
-			time.Sleep(time.Second)
+		base, client, err := common.ResolveControlPlaneHTTP(cmd.Context())
+		if err != nil {
+			return err
 		}
+		get := sharedclient.GetWaveCommand{Client: client, BaseURL: base, WaveID: domaintypes.WaveID(strings.TrimSpace(args[0]))}
+		if follow {
+			_, err := (sharedclient.FollowWaveCommand{Get: get, OnUpdate: func(wave domainapi.WaveSummary) error {
+				return writeWaveSummary(out, wave)
+			}}).Run(cmd.Context())
+			return err
+		}
+		wave, err := get.Run(cmd.Context())
+		if err != nil {
+			return err
+		}
+		return writeWaveSummary(out, wave)
 	}}
 	cmd.Flags().BoolVar(&follow, "follow", false, "Poll until the wave reaches a terminal state")
 	return cmd
@@ -43,7 +50,7 @@ func newWaveStatusCmd(out io.Writer) *cobra.Command {
 
 func newWaveRunsCmd(out io.Writer) *cobra.Command {
 	return &cobra.Command{Use: "runs <wave-id>", Short: "List runs in a wave", Args: cobra.ExactArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
-		body, _, err := fetchWaveJSON(cmd.Context(), args[0], "runs")
+		body, err := fetchWaveRunsJSON(cmd.Context(), args[0])
 		if err != nil {
 			return err
 		}
@@ -58,58 +65,46 @@ func newWaveCancelCmd(out io.Writer) *cobra.Command {
 		if err != nil {
 			return err
 		}
-		endpoint := base.JoinPath("v1", "waves", strings.TrimSpace(args[0]), "cancel")
-		req, err := http.NewRequestWithContext(cmd.Context(), http.MethodPost, endpoint.String(), nil)
+		wave, err := (sharedclient.CancelWaveCommand{
+			Client: client, BaseURL: base, WaveID: domaintypes.WaveID(strings.TrimSpace(args[0])),
+		}).Run(cmd.Context())
 		if err != nil {
 			return err
 		}
-		resp, err := client.Do(req)
-		if err != nil {
-			return err
-		}
-		defer httpx.DrainAndClose(resp)
-		if resp.StatusCode != http.StatusOK {
-			return httpx.WrapError("wave cancel", resp.Status, resp.Body)
-		}
-		body, err := io.ReadAll(io.LimitReader(resp.Body, httpx.MaxJSONBodyBytes))
-		if err != nil {
-			return err
-		}
-		_, _ = fmt.Fprintln(out, string(body))
-		return nil
+		return writeWaveSummary(out, wave)
 	}}
 }
 
-func fetchWaveJSON(ctx context.Context, waveID, suffix string) ([]byte, bool, error) {
+func fetchWaveRunsJSON(ctx context.Context, waveID string) ([]byte, error) {
 	base, client, err := common.ResolveControlPlaneHTTP(ctx)
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
-	parts := []string{"v1", "waves", strings.TrimSpace(waveID)}
-	if strings.TrimSpace(suffix) != "" {
-		parts = append(parts, strings.TrimSpace(suffix))
-	}
-	endpoint := base.JoinPath(parts...)
+	endpoint := base.JoinPath("v1", "waves", strings.TrimSpace(waveID), "runs")
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
 	defer httpx.DrainAndClose(resp)
 	if resp.StatusCode != http.StatusOK {
-		return nil, false, httpx.WrapError("wave status", resp.Status, resp.Body)
+		return nil, httpx.WrapError("wave runs", resp.Status, resp.Body)
 	}
 	body, err := io.ReadAll(io.LimitReader(resp.Body, httpx.MaxJSONBodyBytes))
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
-	var envelope struct {
-		Status string `json:"status"`
+	return body, nil
+}
+
+func writeWaveSummary(out io.Writer, wave domainapi.WaveSummary) error {
+	body, err := json.Marshal(wave)
+	if err != nil {
+		return err
 	}
-	_ = json.Unmarshal(body, &envelope)
-	terminal := envelope.Status == "Finished" || envelope.Status == "Cancelled"
-	return body, terminal, nil
+	_, err = fmt.Fprintf(out, "%s\n\n", body)
+	return err
 }

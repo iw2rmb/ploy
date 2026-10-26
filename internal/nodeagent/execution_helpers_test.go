@@ -1,13 +1,7 @@
 package nodeagent
 
 import (
-	"context"
-	"os"
-	"path/filepath"
 	"testing"
-
-	types "github.com/iw2rmb/ploy/internal/domain/types"
-	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
 func TestResolveDockerRegistryAuthConfigFile(t *testing.T) {
@@ -65,78 +59,5 @@ func TestResolveDockerRegistryAuthRefreshSocket(t *testing.T) {
 				t.Fatalf("resolveDockerRegistryAuthRefreshSocket() = %q, want %q", got, tt.want)
 			}
 		})
-	}
-}
-
-func TestTempResource_Cleanup(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name  string
-		setup func(t *testing.T) tempResource
-		check func(t *testing.T, tr tempResource)
-	}{
-		{
-			name: "removes directory",
-			setup: func(t *testing.T) tempResource {
-				dir := t.TempDir()
-				if err := os.WriteFile(filepath.Join(dir, "test.txt"), []byte("test"), 0o644); err != nil {
-					t.Fatalf("create test file: %v", err)
-				}
-				return tempResource{path: dir, cleanup: func() { _ = os.RemoveAll(dir) }}
-			},
-			check: func(t *testing.T, tr tempResource) {
-				tr.cleanup()
-				if _, err := os.Stat(tr.path); !os.IsNotExist(err) {
-					t.Fatalf("directory was not cleaned up: %s", tr.path)
-				}
-			},
-		},
-		{
-			name: "noop cleanup is safe",
-			setup: func(t *testing.T) tempResource {
-				return tempResource{path: "", cleanup: func() {}}
-			},
-			check: func(t *testing.T, tr tempResource) {
-				tr.cleanup() // must not panic
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			tr := tt.setup(t)
-			tt.check(t, tr)
-		})
-	}
-}
-
-func TestPrepareStickyWorkspaceWithCleanup_StickyWorkspaceIsNotRemoved(t *testing.T) {
-	cacheHome := t.TempDir()
-	t.Setenv("PLOYD_CACHE_HOME", cacheHome)
-
-	req := StartRunRequest{
-		RunID:  types.RunID("run_sticky_cleanup"),
-		RepoID: types.RepoID("repo_sticky_cleanup"),
-		JobID:  types.JobID("job_sticky_cleanup"),
-	}
-	workspace := workspaceDir(req.RunID)
-	if err := os.MkdirAll(filepath.Join(workspace, ".git"), 0o755); err != nil {
-		t.Fatalf("mkdir sticky .git dir: %v", err)
-	}
-
-	rc := &runController{cfg: Config{}}
-	result, err := rc.prepareStickyWorkspaceWithCleanup(context.Background(), req, contracts.StepManifest{})
-	if err != nil {
-		t.Fatalf("prepareStickyWorkspaceWithCleanup() error = %v", err)
-	}
-	if result.path != workspace {
-		t.Fatalf("prepareStickyWorkspaceWithCleanup() path = %q, want %q", result.path, workspace)
-	}
-
-	result.cleanup()
-	if _, err := os.Stat(workspace); err != nil {
-		t.Fatalf("sticky workspace should not be removed by cleanup, stat err = %v", err)
 	}
 }

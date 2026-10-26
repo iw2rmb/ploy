@@ -13,26 +13,13 @@ import (
 	"strings"
 
 	"github.com/iw2rmb/ploy/internal/gitexec"
-	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
-// prepareStickyWorkspace returns the single mutable per-run workspace
-// for a linear job chain. The chain head hydrates sources directly
-// into the sticky workspace; later jobs require that workspace to already exist
-// on this node.
-//
-// Parameters:
-//   - ctx: Context for cancellation and deadlines.
-//   - req: StartRunRequest containing repo URL, base_ref, commit_sha, and job_name.
-//   - manifest: StepManifest for this step.
-//
-// Returns:
-//   - workspacePath: Path to the sticky workspace ready for execution.
-//   - error: Non-nil if workspace preparation fails.
+// The workspace belongs to the run: successor jobs and retained resume reuse
+// it. Per-job cleanup must not remove it.
 func (r *runController) prepareStickyWorkspace(
 	ctx context.Context,
 	req StartRunRequest,
-	manifest contracts.StepManifest,
 ) (string, error) {
 	runID := req.RunID.String()
 	workspacePath := workspaceDir(req.RunID)
@@ -61,32 +48,10 @@ func (r *runController) prepareStickyWorkspace(
 		return "", fmt.Errorf("create sticky workspace parent dir: %w", err)
 	}
 
-	// Determine repo materialization:
-	// - Prefer manifest inputs that already carry hydration.Repo.
-	// - Fallback to StartRunRequest repo fields for callers without hydration.
-	var repo *contracts.RepoMaterialization
-	for _, input := range manifest.Inputs {
-		if input.Hydration != nil && input.Hydration.Repo != nil {
-			repo = input.Hydration.Repo
-			break
-		}
-	}
-
-	if repo == nil {
-		// Derive repo materialization from StartRunRequest, mirroring
-		// buildMigManifest semantics.
-		tmp := contracts.RepoMaterialization{
-			URL:     req.RepoURL,
-			BaseRef: req.BaseRef,
-			Commit:  req.CommitSHA,
-		}
-		repo = &tmp
-	}
-
 	if err := os.RemoveAll(workspacePath); err != nil && !os.IsNotExist(err) {
 		return "", fmt.Errorf("remove stale sticky workspace before hydration: %w", err)
 	}
-	if err := r.downloadSnapshot(ctx, req, repo, workspacePath); err != nil {
+	if err := r.downloadSnapshot(ctx, req, workspacePath); err != nil {
 		if removeErr := os.RemoveAll(workspacePath); removeErr != nil {
 			slog.Warn("failed to clean up workspace after error", "path", workspacePath, "error", removeErr)
 		}
@@ -102,10 +67,7 @@ func hasGitDir(path string) bool {
 	return err == nil && info.IsDir()
 }
 
-func (r *runController) downloadSnapshot(ctx context.Context, req StartRunRequest, repo *contracts.RepoMaterialization, workspacePath string) error {
-	if repo == nil {
-		return fmt.Errorf("repo materialization is required")
-	}
+func (r *runController) downloadSnapshot(ctx context.Context, req StartRunRequest, workspacePath string) error {
 	if strings.TrimSpace(req.CommitSHA.String()) == "" {
 		return fmt.Errorf("commit_sha is required for snapshot hydration")
 	}

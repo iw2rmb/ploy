@@ -14,7 +14,6 @@ import (
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/testutil/gitrepo"
-	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
 func TestPrepareStickyWorkspaceForStep_ReusesStickyWorkspaceWhenGitDirExists(t *testing.T) {
@@ -32,7 +31,7 @@ func TestPrepareStickyWorkspaceForStep_ReusesStickyWorkspaceWhenGitDirExists(t *
 	}
 
 	rc := &runController{cfg: Config{}}
-	got, err := rc.prepareStickyWorkspace(context.Background(), req, contracts.StepManifest{})
+	got, err := rc.prepareStickyWorkspace(context.Background(), req)
 	if err != nil {
 		t.Fatalf("prepareStickyWorkspace() error = %v, want nil", err)
 	}
@@ -62,8 +61,8 @@ func TestPrepareStickyWorkspaceForStep_RemovesInvalidChainHeadWorkspaceBeforeHyd
 	}
 
 	rc := &runController{cfg: Config{}}
-	if _, err := rc.prepareStickyWorkspace(context.Background(), req, contracts.StepManifest{}); err == nil {
-		t.Fatal("prepareStickyWorkspace() error = nil, want non-nil due to missing repo hydration input")
+	if _, err := rc.prepareStickyWorkspace(context.Background(), req); err == nil {
+		t.Fatal("prepareStickyWorkspace() error = nil, want non-nil due to missing commit SHA")
 	}
 	if _, err := os.Stat(invalidMarker); !os.IsNotExist(err) {
 		t.Fatalf("invalid sticky marker should be removed before rebuild, stat err = %v", err)
@@ -82,7 +81,7 @@ func TestPrepareStickyWorkspaceForStep_MissingNonHeadWorkspaceFails(t *testing.T
 	}
 
 	rc := &runController{cfg: Config{}}
-	if _, err := rc.prepareStickyWorkspace(context.Background(), req, contracts.StepManifest{}); err == nil {
+	if _, err := rc.prepareStickyWorkspace(context.Background(), req); err == nil {
 		t.Fatal("prepareStickyWorkspace() error = nil, want missing sticky workspace error")
 	}
 }
@@ -115,19 +114,6 @@ func TestPrepareStickyWorkspaceForStep_ChainHeadHydratesWorkspaceWithoutRunBase(
 				CommitSHA: types.CommitSHA(head),
 				RepoSHAIn: types.CommitSHA(head),
 			}
-			manifest := contracts.StepManifest{
-				Inputs: []contracts.StepInput{
-					{
-						Name: "workspace",
-						Hydration: &contracts.StepInputHydration{
-							Repo: &contracts.RepoMaterialization{
-								URL:     types.RepoURL("file://" + repoDir),
-								BaseRef: types.GitRef("main"),
-							},
-						},
-					},
-				},
-			}
 
 			srv := snapshotFixtureServer(t, repoDir)
 			defer srv.Close()
@@ -135,7 +121,7 @@ func TestPrepareStickyWorkspaceForStep_ChainHeadHydratesWorkspaceWithoutRunBase(
 				cfg:      Config{ServerURL: srv.URL, NodeID: types.NodeID("node01")},
 				uploader: &baseUploader{client: srv.Client()},
 			}
-			workspace, err := rc.prepareStickyWorkspace(context.Background(), req, manifest)
+			workspace, err := rc.prepareStickyWorkspace(context.Background(), req)
 			if err != nil {
 				t.Fatalf("prepareStickyWorkspace() error = %v", err)
 			}
@@ -224,7 +210,7 @@ func TestPrepareStickyWorkspace_ResumeRequiresRetainedWorkspace(t *testing.T) {
 	defer server.Close()
 	req := StartRunRequest{RunID: "resumed-run", JobID: "failed-job", ResumeCount: 1, RepoSHAIn: types.CommitSHA("0123456789abcdef0123456789abcdef01234567")}
 	rc := newTestController(t, newAgentConfig(server.URL))
-	if _, err := rc.prepareStickyWorkspace(context.Background(), req, contracts.StepManifest{}); err == nil {
+	if _, err := rc.prepareStickyWorkspace(context.Background(), req); err == nil {
 		t.Fatal("missing resumed workspace accepted")
 	}
 	if requests != 0 {
@@ -238,10 +224,56 @@ func TestPrepareStickyWorkspace_ResumeRequiresRetainedWorkspace(t *testing.T) {
 	if err := os.WriteFile(marker, []byte("keep"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if got, err := rc.prepareStickyWorkspace(context.Background(), req, contracts.StepManifest{}); err != nil || got != workspace {
+	if got, err := rc.prepareStickyWorkspace(context.Background(), req); err != nil || got != workspace {
 		t.Fatalf("retained workspace: %s %v", got, err)
 	}
 	if b, err := os.ReadFile(marker); err != nil || string(b) != "keep" {
 		t.Fatal("resume discarded partial changes")
+	}
+}
+
+// Failed extraction and commit verification both remove the unusable workspace.
+func TestPrepareStickyWorkspaceRemovesFailedSnapshot(t *testing.T) {
+	for _, failure := range []string{"archive path escape", "commit mismatch"} {
+		t.Run(failure, func(t *testing.T) {
+			t.Setenv("PLOYD_CACHE_HOME", t.TempDir())
+			req := newStartRunRequest()
+			req.CommitSHA = "0123456789abcdef0123456789abcdef01234567"
+			req.RepoSHAIn = req.CommitSHA
+			var server *httptest.Server
+			if failure == "commit mismatch" {
+				server = snapshotFixtureServer(t, gitrepo.SetupBasic(t))
+			} else {
+				server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					if r.URL.Path != "/v1/runs/"+req.RunID.String()+"/snapshot" || r.Header.Get("PLOY_NODE_UUID") != "node01" {
+						t.Errorf("snapshot request has wrong route or node authentication: %s", r.URL.Path)
+					}
+					gz := gzip.NewWriter(w)
+					tw := tar.NewWriter(gz)
+					for _, name := range []string{"partial-file", "../escape"} {
+						if err := tw.WriteHeader(&tar.Header{Name: name, Mode: 0600, Size: 1}); err != nil {
+							t.Error(err)
+						}
+						_, _ = tw.Write([]byte("x"))
+					}
+					_ = tw.Close()
+					_ = gz.Close()
+				}))
+			}
+			defer server.Close()
+			controller := &runController{
+				cfg:      Config{ServerURL: server.URL, NodeID: "node01"},
+				uploader: &baseUploader{client: server.Client()},
+			}
+			if _, err := controller.prepareStickyWorkspace(context.Background(), req); err == nil {
+				t.Fatal("invalid snapshot accepted")
+			}
+			if _, err := os.Stat(workspaceDir(req.RunID)); !os.IsNotExist(err) {
+				t.Fatalf("failed snapshot workspace retained: %v", err)
+			}
+			if _, err := os.Stat(filepath.Join(runDir(req.RunID), "escape")); !os.IsNotExist(err) {
+				t.Fatalf("archive escaped workspace: %v", err)
+			}
+		})
 	}
 }

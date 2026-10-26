@@ -2,6 +2,7 @@ package speccompiler
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -112,38 +113,83 @@ func TestRepositoryCompilerDoesNotReadAmbientEnvironment(t *testing.T) {
 	}
 }
 
-func TestRepositoryCompilerReadsIncludedFilesWithinRoot(t *testing.T) {
-	repository := t.TempDir()
-	fragmentDir := filepath.Join(repository, "fragments")
-	if err := os.Mkdir(fragmentDir, 0o755); err != nil {
-		t.Fatalf("create fragment directory: %v", err)
-	}
-	files := map[string]string{
-		filepath.Join(repository, "spec.yaml"):  "steps:\n  - !include ./fragments/step.yaml\n",
-		filepath.Join(fragmentDir, "step.yaml"): "image: docker.io/test/mig:latest\nin:\n  - ./input.txt:input.txt\n",
-		filepath.Join(fragmentDir, "input.txt"): "input\n",
-	}
-	for path, content := range files {
-		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
-			t.Fatalf("write %s: %v", filepath.Base(path), err)
-		}
-	}
-
-	source, err := NewRepositorySource(repository)
-	if err != nil {
-		t.Fatalf("NewRepositorySource: %v", err)
-	}
-	t.Cleanup(func() { _ = source.Close() })
-	compiler, err := New(Options{Source: source})
-	if err != nil {
-		t.Fatalf("New: %v", err)
-	}
-
-	payload, err := compiler.Validate([]byte(files[filepath.Join(repository, "spec.yaml")]), repository)
-	if err != nil {
-		t.Fatalf("Validate: %v", err)
-	}
-	if !strings.Contains(string(payload), `:/in/input.txt`) {
-		t.Fatalf("payload = %s, want canonical included input", payload)
+// Every mount kind uses the declaring file, even when the root has a same-named source.
+func TestRepositoryCompilerReadsMountsFromDeclaringFile(t *testing.T) {
+	for _, form := range []string{"include", "nested include", "ref", "ref with include", "included ref"} {
+		t.Run(form, func(t *testing.T) {
+			repository := t.TempDir()
+			if err := os.MkdirAll(filepath.Join(repository, "fragments", "nested"), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			step := `name: rewrite
+image: docker.io/test/mig:latest
+in: [./input.txt:input.txt]
+out: [./input.txt:input.txt]
+home: [./input.txt:input.txt:ro]
+tmp: [./input.txt:input.txt]
+`
+			files := map[string]string{
+				"input.txt":                  "root file must not be selected\n",
+				"fragments/input.txt":        "declared source\n",
+				"fragments/nested/input.txt": "nested source\n",
+				"fragments/step.yaml":        step,
+				"fragments/nested/step.yaml": step,
+				"fragments/mig.yaml":         "steps:\n  - !include ./step.yaml\n",
+			}
+			root := "steps:\n  - !include ./fragments/step.yaml\n"
+			sourcePath := "fragments/input.txt"
+			switch form {
+			case "nested include":
+				files["fragments/step.yaml"] = "!include ./nested/step.yaml\n"
+				sourcePath = "fragments/nested/input.txt"
+			case "ref":
+				files["fragments/mig.yaml"] = "steps:\n  - " + strings.ReplaceAll(strings.TrimSuffix(step, "\n"), "\n", "\n    ") + "\n"
+				root = "steps:\n  - ref: ./fragments/mig.yaml:rewrite\n"
+			case "ref with include":
+				root = "steps:\n  - ref: ./fragments/mig.yaml:rewrite\n"
+			case "included ref":
+				files["fragments/wrapper.yaml"] = "ref: ./mig.yaml:rewrite\n"
+				root = "steps:\n  - !include ./fragments/wrapper.yaml\n"
+			}
+			for path, content := range files {
+				if err := os.WriteFile(filepath.Join(repository, path), []byte(content), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			source, err := NewRepositorySource(repository)
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { _ = source.Close() })
+			compiler, err := New(Options{Source: source})
+			if err != nil {
+				t.Fatal(err)
+			}
+			payload, err := compiler.Validate([]byte(root), repository)
+			if err != nil {
+				t.Fatalf("Validate: %v", err)
+			}
+			var decoded struct {
+				Steps []map[string]json.RawMessage `json:"steps"`
+			}
+			if err := json.Unmarshal(payload, &decoded); err != nil {
+				t.Fatal(err)
+			}
+			hash, err := compiler.localFileRecordHash(sourcePath, "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			for kind, destination := range map[string]string{
+				"in": "/in/input.txt", "out": "/out/input.txt", "home": "input.txt:ro", "tmp": "/tmp/input.txt",
+			} {
+				var entries []string
+				if err := json.Unmarshal(decoded.Steps[0][kind], &entries); err != nil {
+					t.Fatal(err)
+				}
+				if want := hash + ":" + destination; len(entries) != 1 || entries[0] != want {
+					t.Fatalf("%s mounts = %v, want [%s]", kind, entries, want)
+				}
+			}
+		})
 	}
 }

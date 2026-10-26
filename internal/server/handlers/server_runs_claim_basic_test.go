@@ -108,7 +108,7 @@ func TestClaimJob_NoJobsAvailable(t *testing.T) {
 	st := &handlerStore{}
 	st.getNode.val = store.Node{ID: nodeID}
 
-	handler := claimJobHandlerWithEvents(st, nil, nil, &ConfigHolder{})
+	handler := claimJobHandler(st, nil, &ConfigHolder{})
 	rr := doRequest(t, handler, http.MethodPost, "/v1/nodes/"+nodeID.String()+"/claim", nil, "id", nodeID.String())
 
 	assertStatus(t, rr, http.StatusNoContent)
@@ -120,7 +120,7 @@ func TestClaimJob_NodeNotFound(t *testing.T) {
 	nodeID := domaintypes.NewNodeKey()
 	st := func() *handlerStore { st := &handlerStore{}; st.getNode.err = pgx.ErrNoRows; return st }()
 
-	handler := claimJobHandlerWithEvents(st, nil, nil, &ConfigHolder{})
+	handler := claimJobHandler(st, nil, &ConfigHolder{})
 	rr := doRequest(t, handler, http.MethodPost, "/v1/nodes/"+nodeID+"/claim", nil, "id", nodeID)
 
 	assertStatus(t, rr, http.StatusNotFound)

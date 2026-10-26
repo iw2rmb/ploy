@@ -89,7 +89,8 @@ spec supports:
 The CLI compiles local file paths in `in`, `out`, `home`, and `tmp` fields into
 canonical `shortHash:dst` records before spec submission:
 
-1. Resolves each source path relative to the spec file directory.
+1. Resolves each relative source path from the file that declares it, including
+   included fragments and referenced steps.
 2. Computes a content hash, uploads the archive when missing, and rewrites
    the entry to `shortHash:dst` form.
 3. The node agent downloads bundles by hash and mounts or seeds them at the

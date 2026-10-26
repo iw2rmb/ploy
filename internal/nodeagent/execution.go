@@ -168,49 +168,6 @@ func (r *runController) uploadFailureStatus(ctx context.Context, req StartRunReq
 	}
 }
 
-// initializeRuntime creates and configures all runtime components needed for step execution.
-// Returns a configured step.Runner, diff generator, and log streamer.
-//
-// Parameters:
-//   - ctx: context for initialization operations
-//   - runID: run identifier for logging and telemetry
-//   - jobID: job identifier for associating log chunks with specific jobs; pass a zero value
-//     only when job attribution is not available
-func (r *runController) initializeRuntime(ctx context.Context, runID types.RunID, jobID types.JobID, resumeCount ...int) (step.Runner, step.DiffGenerator, *LogStreamer, error) {
-	// Initialize container runtime with image pull enabled.
-	// Fallback to nil if Docker is unavailable (simulated execution mode).
-	network := os.Getenv("PLOY_DOCKER_NETWORK")
-	containerRuntime, err := step.NewContainerRuntime(step.ContainerRuntimeOptions{
-		PullImage:                 true,
-		Network:                   network,
-		RegistryAuthConfigFile:    resolveDockerRegistryAuthConfigFile(),
-		RegistryAuthRefreshSocket: resolveDockerRegistryAuthRefreshSocket(),
-	})
-	if err != nil {
-		slog.Warn("docker unavailable; falling back to stub runtime", "run_id", runID, "error", err)
-		containerRuntime = nil
-	}
-
-	// Initialize diff generator for workspace change detection.
-	diffGenerator := step.NewFilesystemDiffGenerator()
-
-	// Initialize log streamer to stream logs as gzipped chunks to the server.
-	// The jobID parameter associates log chunks with a specific job, enabling
-	// per-job log attribution in the control plane.
-	logStreamer, err := NewLogStreamer(r.cfg, runID, jobID, r.uploader.client, resumeCount...)
-	if err != nil {
-		return step.Runner{}, nil, nil, fmt.Errorf("create log streamer: %w", err)
-	}
-
-	// Assemble the step runner with all components.
-	runner := step.Runner{
-		Containers: containerRuntime,
-		LogWriter:  logStreamer,
-	}
-
-	return runner, diffGenerator, logStreamer, nil
-}
-
 func resolveDockerRegistryAuthConfigFile() string {
 	return strings.TrimSpace(os.Getenv("PLOY_DOCKER_AUTH_CONFIG_FILE"))
 }
@@ -226,30 +183,44 @@ type executionContext struct {
 	logStreamer   *LogStreamer
 }
 
-// initExecutionContext initializes runtime components and returns a cleanup function
-// that closes the logStreamer (must be deferred).
-func (r *runController) initExecutionContext(ctx context.Context, runID types.RunID, jobID types.JobID, resumeCount ...int) (executionContext, func(), error) {
-	runner, diffGenerator, logStreamer, err := r.initializeRuntime(ctx, runID, jobID, resumeCount...)
+// initExecutionContext transfers ownership of the runtime and log streamer to
+// the caller, which must defer the returned cleanup before collecting artifacts.
+func (r *runController) initExecutionContext(
+	ctx context.Context, runID types.RunID, jobID types.JobID,
+	newRuntime func(step.ContainerRuntimeOptions) (step.ContainerRuntime, error),
+	resumeCount ...int,
+) (executionContext, func(), error) {
+	containerRuntime, err := newRuntime(step.ContainerRuntimeOptions{
+		PullImage:                 true,
+		Network:                   os.Getenv("PLOY_DOCKER_NETWORK"),
+		RegistryAuthConfigFile:    resolveDockerRegistryAuthConfigFile(),
+		RegistryAuthRefreshSocket: resolveDockerRegistryAuthRefreshSocket(),
+	})
 	if err != nil {
-		return executionContext{}, nil, err
+		return executionContext{}, nil, fmt.Errorf("create container runtime: %w", err)
 	}
-
-	execCtx := executionContext{
-		runner:        runner,
-		diffGenerator: diffGenerator,
-		logStreamer:   logStreamer,
-	}
-
-	cleanup := func() {
-		if closer, ok := runner.Containers.(io.Closer); ok {
+	closeRuntime := func() {
+		if closer, ok := containerRuntime.(io.Closer); ok {
 			if err := closer.Close(); err != nil {
 				slog.Warn("failed to close container runtime", "run_id", runID, "job_id", jobID, "error", err)
 			}
 		}
+	}
+	logStreamer, err := NewLogStreamer(r.cfg, runID, jobID, r.uploader.client, resumeCount...)
+	if err != nil {
+		closeRuntime()
+		return executionContext{}, nil, fmt.Errorf("create log streamer: %w", err)
+	}
+	execCtx := executionContext{
+		runner:        step.Runner{Containers: containerRuntime, LogWriter: logStreamer},
+		diffGenerator: step.NewFilesystemDiffGenerator(),
+		logStreamer:   logStreamer,
+	}
+	cleanup := func() {
+		closeRuntime()
 		if err := logStreamer.Close(); err != nil {
 			slog.Warn("failed to close log streamer", "run_id", runID, "job_id", jobID, "error", err)
 		}
 	}
-
 	return execCtx, cleanup, nil
 }

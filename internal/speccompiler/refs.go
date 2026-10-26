@@ -245,14 +245,13 @@ func cloneSpecValue(v any) any {
 }
 
 func normalizeStepLocalPaths(step map[string]any, sourcePath, outputBaseDir string) {
-	normalizeStepMountList(step, "in", sourcePath, outputBaseDir, false)
-	normalizeStepMountList(step, "out", sourcePath, outputBaseDir, false)
-	normalizeStepMountList(step, "home", sourcePath, outputBaseDir, true)
-	normalizeStepMountList(step, "tmp", sourcePath, outputBaseDir, false)
+	for _, kind := range contracts.HydraFileKinds() {
+		normalizeStepMountList(step, kind, sourcePath, outputBaseDir)
+	}
 }
 
-func normalizeStepMountList(step map[string]any, key, sourcePath, outputBaseDir string, isHome bool) {
-	raw, ok := step[key].([]any)
+func normalizeStepMountList(step map[string]any, kind contracts.HydraFileKind, sourcePath, outputBaseDir string) {
+	raw, ok := step[kind.String()].([]any)
 	if !ok {
 		return
 	}
@@ -261,17 +260,19 @@ func normalizeStepMountList(step map[string]any, key, sourcePath, outputBaseDir 
 		if !ok {
 			continue
 		}
-		raw[i] = normalizeMountEntrySource(entry, sourcePath, outputBaseDir, isHome)
+		raw[i] = rebaseMountEntrySource(kind, entry, sourcePath, outputBaseDir)
 	}
 }
 
-func normalizeMountEntrySource(entry, sourcePath, outputBaseDir string, isHome bool) string {
+// Relative sources belong to the file that declares them. Rebase only the
+// source because the destination names a path inside the job container.
+func rebaseMountEntrySource(kind contracts.HydraFileKind, entry, sourcePath, outputBaseDir string) string {
 	body := strings.TrimSpace(entry)
 	if body == "" {
 		return entry
 	}
 	suffix := ""
-	if isHome && strings.HasSuffix(body, ":ro") {
+	if kind == contracts.HydraFileHome && strings.HasSuffix(body, ":ro") {
 		body = strings.TrimSuffix(body, ":ro")
 		suffix = ":ro"
 	}

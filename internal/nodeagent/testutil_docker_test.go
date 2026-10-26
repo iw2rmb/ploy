@@ -159,6 +159,7 @@ func multiplexedDockerLogs(payload string, stream stdcopy.StdType) []byte {
 // mockContainerRuntime is a composable test double for the step.ContainerRuntime
 // interface. Each method delegates to a configurable function field.
 type mockContainerRuntime struct {
+	closeFn      func() error
 	createFn     func(ctx context.Context, spec step.ContainerSpec) (step.ContainerHandle, error)
 	startFn      func(ctx context.Context, handle step.ContainerHandle) error
 	waitFn       func(ctx context.Context, handle step.ContainerHandle) (step.ContainerResult, error)
@@ -197,6 +198,13 @@ func (m *mockContainerRuntime) Logs(ctx context.Context, handle step.ContainerHa
 func (m *mockContainerRuntime) StreamLogs(ctx context.Context, handle step.ContainerHandle, stdout, stderr io.Writer) error {
 	if m.streamLogsFn != nil {
 		return m.streamLogsFn(ctx, handle, stdout, stderr)
+	}
+	return nil
+}
+
+func (m *mockContainerRuntime) Close() error {
+	if m.closeFn != nil {
+		return m.closeFn()
 	}
 	return nil
 }

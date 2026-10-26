@@ -127,6 +127,11 @@ paths and exclude job runtime directories and `runtime-share`.
 The persisted container inspection data excludes arguments, environment,
 command, and entrypoint fields because they can contain credentials.
 
+A runtime configuration error fails the job before container execution. Gates
+and migrations close their per-job runtime and flush logs before the final
+artifact upload. Per-job cleanup preserves the run workspace for successor
+jobs and retained resume.
+
 The node downloads source snapshots from `GET /v1/runs/{run_id}/snapshot`.
 
 ## Production Migration

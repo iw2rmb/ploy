@@ -936,33 +936,44 @@ steps: !include ./a.yaml#/steps
 	}
 }
 
-func TestBuildSpecPayload_InPathInIncludedFragment(t *testing.T) {
-	specDir := t.TempDir()
-	fragmentsDir := filepath.Join(specDir, "fragments")
-	if err := os.MkdirAll(fragmentsDir, 0o755); err != nil {
-		t.Fatalf("mkdir fragments: %v", err)
-	}
-
-	writeFile(t, filepath.Join(fragmentsDir, "step.fragment.yaml"), `
-step:
-  image: docker.io/test/mig:latest
-  in:
-    - 0123456789ab:/in/input.txt
-`)
-
-	result := buildAndParseSpec(t, specDir, `
+func TestBuildSpecPayload_CanonicalMountsRemainUnchanged(t *testing.T) {
+	for _, form := range []string{"include", "ref"} {
+		t.Run(form, func(t *testing.T) {
+			specDir := t.TempDir()
+			fragmentsDir := filepath.Join(specDir, "fragments")
+			if err := os.MkdirAll(fragmentsDir, 0o755); err != nil {
+				t.Fatalf("mkdir fragments: %v", err)
+			}
+			writeFile(t, filepath.Join(fragmentsDir, "mig.yaml"), `
 steps:
-  - <<: !include ./fragments/step.fragment.yaml#/step
-`, ".yaml", specPayloadOpts{})
-
-	steps := mustSteps(t, result, 1)
-	inRaw, ok := steps[0]["in"].([]any)
-	if !ok || len(inRaw) != 1 {
-		t.Fatalf("expected one in entry, got %v", steps[0]["in"])
-	}
-	inEntry, _ := inRaw[0].(string)
-	if inEntry != "0123456789ab:/in/input.txt" {
-		t.Fatalf("expected canonical in entry to stay unchanged, got %q", inEntry)
+  - name: rewrite
+    image: docker.io/test/mig:latest
+    in:
+      - 0123456789ab:/in/input.txt
+    out:
+      - 0123456789ab:/out/input.txt
+    home:
+      - 0123456789ab:input.txt:ro
+    tmp:
+      - 0123456789ab:/tmp/input.txt
+`)
+			root := "steps:\n  - !include ./fragments/mig.yaml#/steps/0\n"
+			if form == "ref" {
+				root = "steps:\n  - ref: ./fragments/mig.yaml:rewrite\n"
+			}
+			result := buildAndParseSpec(t, specDir, root, ".yaml", specPayloadOpts{})
+			step := mustSteps(t, result, 1)[0]
+			for _, kind := range contracts.HydraFileKinds() {
+				want := "0123456789ab:/" + kind.String() + "/input.txt"
+				if kind == contracts.HydraFileHome {
+					want = "0123456789ab:input.txt:ro"
+				}
+				entries, ok := step[kind.String()].([]any)
+				if !ok || len(entries) != 1 || entries[0] != want {
+					t.Fatalf("%s = %v, want [%s]", kind, entries, want)
+				}
+			}
+		})
 	}
 }
 

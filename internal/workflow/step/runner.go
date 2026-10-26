@@ -52,6 +52,10 @@ type StageTiming struct {
 
 // Run executes a step and returns the result.
 func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
+	// Success advances the job chain, so an absent runtime must not simulate a run.
+	if r.Containers == nil {
+		return Result{}, fmt.Errorf("container runtime is required")
+	}
 	var result Result
 
 	if err := seedDirsFromStaging(req.Manifest, req.JobMounts); err != nil {
@@ -60,56 +64,47 @@ func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 
 	// Execute the container via the configured runtime.
 	executionStart := time.Now()
-	if r.Containers == nil {
-		if r.LogWriter != nil {
-			_, _ = fmt.Fprintf(r.LogWriter, "Starting execution for manifest %s\n", req.Manifest.ID)
-		}
-		result.ExitCode = 0
-		result.Timings.ExecutionDuration = types.Duration(time.Since(executionStart))
-	} else {
-		spec, err := buildContainerSpec(req.RunID, req.JobID, req.Manifest, req.Workspace, req.JobMounts)
-		if err != nil {
-			return Result{}, fmt.Errorf("build container spec: %w", err)
-		}
-		if req.ResumeCount > 0 {
-			if spec.Labels == nil {
-				spec.Labels = make(map[string]string)
-			}
-			spec.Labels[types.LabelResumeCount] = strconv.Itoa(req.ResumeCount)
-		}
-		handle, err := r.Containers.Create(ctx, spec)
-		if err != nil {
-			return Result{}, fmt.Errorf("container create failed: %w", err)
-		}
-		if err := r.Containers.Start(ctx, handle); err != nil {
-			return Result{}, fmt.Errorf("container start failed: %w", err)
-		}
-
-		var streamDone <-chan error
-		if r.LogWriter != nil {
-			streamDone = streamContainerLogs(ctx, r.Containers, handle, nil, r.LogWriter)
-		}
-
-		cRes, err := r.Containers.Wait(ctx, handle)
-		if err != nil {
-			return Result{}, fmt.Errorf("container wait failed: %w", err)
-		}
-		if usage := collectDockerResourceUsage(ctx, r.Containers, handle, spec); usage != nil {
-			result.ContainerResources = NormalizeContainerResourceUsage(usage)
-		}
-		if r.LogWriter != nil {
-			if !awaitStreamWithin(streamDone, 2*time.Second) {
-				if logs, err := r.Containers.Logs(ctx, handle); err == nil && len(logs) > 0 {
-					_, _ = r.LogWriter.Write(logs)
-				}
-			}
-		}
-		result.ExitCode = cRes.ExitCode
-		result.ContainerID = cRes.ContainerID
-		result.ContainerInspectJSON = cRes.InspectJSON
-		result.Timings.ExecutionDuration = types.Duration(time.Since(executionStart))
-
+	spec, err := buildContainerSpec(req.RunID, req.JobID, req.Manifest, req.Workspace, req.JobMounts)
+	if err != nil {
+		return Result{}, fmt.Errorf("build container spec: %w", err)
 	}
+	if req.ResumeCount > 0 {
+		if spec.Labels == nil {
+			spec.Labels = make(map[string]string)
+		}
+		spec.Labels[types.LabelResumeCount] = strconv.Itoa(req.ResumeCount)
+	}
+	handle, err := r.Containers.Create(ctx, spec)
+	if err != nil {
+		return Result{}, fmt.Errorf("container create failed: %w", err)
+	}
+	if err := r.Containers.Start(ctx, handle); err != nil {
+		return Result{}, fmt.Errorf("container start failed: %w", err)
+	}
+
+	var streamDone <-chan error
+	if r.LogWriter != nil {
+		streamDone = streamContainerLogs(ctx, r.Containers, handle, nil, r.LogWriter)
+	}
+
+	cRes, err := r.Containers.Wait(ctx, handle)
+	if err != nil {
+		return Result{}, fmt.Errorf("container wait failed: %w", err)
+	}
+	if usage := collectDockerResourceUsage(ctx, r.Containers, handle, spec); usage != nil {
+		result.ContainerResources = NormalizeContainerResourceUsage(usage)
+	}
+	if r.LogWriter != nil {
+		if !awaitStreamWithin(streamDone, 2*time.Second) {
+			if logs, err := r.Containers.Logs(ctx, handle); err == nil && len(logs) > 0 {
+				_, _ = r.LogWriter.Write(logs)
+			}
+		}
+	}
+	result.ExitCode = cRes.ExitCode
+	result.ContainerID = cRes.ContainerID
+	result.ContainerInspectJSON = cRes.InspectJSON
+	result.Timings.ExecutionDuration = types.Duration(time.Since(executionStart))
 
 	return result, nil
 }

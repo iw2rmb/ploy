@@ -2,6 +2,7 @@ package step
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
@@ -9,19 +10,32 @@ import (
 )
 
 func TestRunner_Run(t *testing.T) {
-	runner := Runner{}
+	runtime := &testContainerRuntime{}
+	runner := Runner{Containers: runtime}
 	manifest := contracts.StepManifest{
 		ID:    types.StepID("test-step"),
 		Name:  "Test Step",
 		Image: "test:latest",
 	}
 
-	result, err := runner.Run(context.Background(), Request{Manifest: manifest})
+	result, err := runner.Run(context.Background(), Request{Manifest: manifest, Workspace: t.TempDir(), JobMounts: newTestMigJobMounts(t)})
 	if err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 	if result.ExitCode != 0 {
 		t.Fatalf("ExitCode = %d, want 0", result.ExitCode)
+	}
+	if !runtime.createCalled || !runtime.startCalled || !runtime.waitCalled {
+		t.Fatal("successful execution must create, start, and wait for a container")
+	}
+}
+
+// A missing runtime fails before mount preparation can alter the workspace.
+func TestRunner_RunRequiresRuntime(t *testing.T) {
+	runner := Runner{}
+	_, err := runner.Run(context.Background(), Request{})
+	if err == nil || !strings.Contains(err.Error(), "container runtime is required") {
+		t.Fatalf("Run() error = %v, want missing runtime", err)
 	}
 }
 

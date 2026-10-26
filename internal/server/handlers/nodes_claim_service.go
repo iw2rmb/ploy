@@ -9,36 +9,21 @@ import (
 	"github.com/iw2rmb/ploy/internal/blobstore"
 	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	"github.com/iw2rmb/ploy/internal/server/events"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-// claimResult is the domain output from claim orchestration.
-type claimResult struct {
-	Payload  domainapi.NodeClaimResponse
-	Response any
-}
-
-// claimService orchestrates the claim pipeline.
 type claimService struct {
-	store         store.Store
-	blobStore     blobstore.Store
-	configHolder  *ConfigHolder
-	eventsService *events.Service
+	store        store.Store
+	blobStore    blobstore.Store
+	configHolder *ConfigHolder
 }
 
-func newClaimer(st store.Store, bs blobstore.Store, configHolder *ConfigHolder, eventsService ...*events.Service) *claimService {
-	var evtSvc *events.Service
-	if len(eventsService) > 0 {
-		evtSvc = eventsService[0]
+func newClaimer(st store.Store, bs blobstore.Store, configHolder *ConfigHolder) *claimService {
+	return &claimService{
+		store:        st,
+		blobStore:    bs,
+		configHolder: configHolder,
 	}
-	svc := &claimService{
-		store:         st,
-		blobStore:     bs,
-		configHolder:  configHolder,
-		eventsService: evtSvc,
-	}
-	return svc
 }
 
 // claimNotFound maps to HTTP 404.
@@ -105,42 +90,42 @@ func claimInternal(message string, err error) error {
 	}
 }
 
-func (s *claimService) Claim(ctx context.Context, nodeID domaintypes.NodeID) (claimResult, error) {
+func (s *claimService) Claim(ctx context.Context, nodeID domaintypes.NodeID) (domainapi.NodeClaimResponse, error) {
 	_, err := s.store.GetNode(ctx, nodeID)
 	if err != nil {
 		if isNoRowsError(err) {
-			return claimResult{}, &claimNotFound{Message: "node not found"}
+			return domainapi.NodeClaimResponse{}, &claimNotFound{Message: "node not found"}
 		}
 		slog.Error("claim: node check failed", "node_id", nodeID, "err_type", fmt.Sprintf("%T", err), "err", safeErrorString(err))
-		return claimResult{}, claimInternal("failed to check node", err)
+		return domainapi.NodeClaimResponse{}, claimInternal("failed to check node", err)
 	}
 
 	job, err := s.store.ClaimJob(ctx, nodeID)
 	if err != nil {
 		if isNoRowsError(err) {
 			slog.Debug("claim: no work available", "node_id", nodeID)
-			return claimResult{}, &claimNoWork{}
+			return domainapi.NodeClaimResponse{}, &claimNoWork{}
 		}
 		slog.Error("claim: database error", "node_id", nodeID, "err_type", fmt.Sprintf("%T", err), "err", safeErrorString(err))
-		return claimResult{}, claimInternal("failed to claim job", err)
+		return domainapi.NodeClaimResponse{}, claimInternal("failed to claim job", err)
 	}
 
 	run, err := s.store.GetRun(ctx, job.RunID)
 	if err != nil {
 		slog.Error("claim: get run failed for job", "node_id", nodeID, "job_id", job.ID, "err", err)
-		return claimResult{}, claimInternal("failed to get run for claimed job", err)
+		return domainapi.NodeClaimResponse{}, claimInternal("failed to get run for claimed job", err)
 	}
 
 	repoURL, err := repoURLForID(ctx, s.store, job.RepoID)
 	if err != nil {
 		slog.Error("claim: get repo failed for job", "node_id", nodeID, "job_id", job.ID, "repo_id", job.RepoID, "err", err)
-		return claimResult{}, claimInternal("failed to get repo for claimed job", err)
+		return domainapi.NodeClaimResponse{}, claimInternal("failed to get repo for claimed job", err)
 	}
 
 	spec, err := s.store.GetSpec(ctx, run.SpecID)
 	if err != nil {
 		slog.Error("claim: get spec failed for job", "node_id", nodeID, "job_id", job.ID, "spec_id", run.SpecID, "err", err)
-		return claimResult{}, claimInternal("failed to get spec for claimed job", err)
+		return domainapi.NodeClaimResponse{}, claimInternal("failed to get spec for claimed job", err)
 	}
 
 	payload, err := buildJobClaimPayload(ctx, s.store, s.blobStore, s.configHolder, run, spec.Spec, repoURL, job)
@@ -162,7 +147,7 @@ func (s *claimService) Claim(ctx context.Context, nodeID domaintypes.NodeID) (cl
 					"node_id", nodeID,
 					"error", terminalErr.Error(),
 				)
-				return claimResult{}, &claimNoWork{}
+				return domainapi.NodeClaimResponse{}, &claimNoWork{}
 			}
 			slog.Error("claim: failed to mark claimed job as Error after terminal payload error",
 				"job_id", job.ID,
@@ -178,7 +163,7 @@ func (s *claimService) Claim(ctx context.Context, nodeID domaintypes.NodeID) (cl
 		}); unclaimErr != nil {
 			slog.Error("claim: failed to unclaim job after payload build error", "job_id", job.ID, "run_id", run.ID, "node_id", nodeID, "err", unclaimErr)
 		}
-		return claimResult{}, claimInternal("failed to build claim response", err)
+		return domainapi.NodeClaimResponse{}, claimInternal("failed to build claim response", err)
 	}
 	slog.Info("job claimed",
 		"job_id", job.ID,
@@ -186,5 +171,5 @@ func (s *claimService) Claim(ctx context.Context, nodeID domaintypes.NodeID) (cl
 		"next_id", job.NextID,
 		"node_id", nodeID,
 	)
-	return claimResult{Payload: payload}, nil
+	return payload, nil
 }

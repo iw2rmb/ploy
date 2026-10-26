@@ -2,12 +2,17 @@ package stream
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"testing/synctest"
 	"time"
+
+	"github.com/iw2rmb/ploy/internal/workflow/backoff"
 )
 
 func TestClientWaitWithBackoffHonorsContext(t *testing.T) {
@@ -33,7 +38,7 @@ func TestClientStreamRequiresHTTPClientAndHandler(t *testing.T) {
 	}
 }
 
-func TestClientStreamHappyAndIdleTimeout(t *testing.T) {
+func TestClientStreamDeliversEventUntilDone(t *testing.T) {
 	// Happy path: server emits a single event; handler returns ErrDone to stop.
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
@@ -61,22 +66,6 @@ func TestClientStreamHappyAndIdleTimeout(t *testing.T) {
 	}
 	if seen != 1 {
 		t.Fatalf("expected 1 event, got %d", seen)
-	}
-
-	// Idle timeout path: server that never sends data.
-	idleSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/event-stream")
-		if f, ok := w.(http.Flusher); ok {
-			// Flush headers so the client connection is established and Do returns.
-			f.Flush()
-		}
-		<-r.Context().Done()
-	}))
-	defer idleSrv.Close()
-	c = Client{HTTPClient: idleSrv.Client(), IdleTimeout: 25 * time.Millisecond, MaxRetries: 0}
-	err := c.Stream(context.Background(), idleSrv.URL, func(e Event) error { return nil })
-	if err == nil || !strings.Contains(err.Error(), "idle timeout") {
-		t.Fatalf("expected idle timeout error, got %v", err)
 	}
 }
 
@@ -134,6 +123,7 @@ func TestClientStreamSendsLastEventIDOnReconnect(t *testing.T) {
 			_, _ = w.Write([]byte("id: 7\n"))
 			_, _ = w.Write([]byte("event: x\n"))
 			_, _ = w.Write([]byte("data: y\n\n"))
+			_, _ = w.Write([]byte("id: invalid\ndata: z\n\n"))
 			return
 		}
 		sawLastID = r.Header.Get("Last-Event-ID")
@@ -142,158 +132,59 @@ func TestClientStreamSendsLastEventIDOnReconnect(t *testing.T) {
 	defer srv.Close()
 	// MaxRetries=1 allows reconnection after first EOF. Backoff is handled by the shared policy.
 	c := Client{HTTPClient: srv.Client(), MaxRetries: 1}
-	_ = c.Stream(context.Background(), srv.URL, func(e Event) error {
+	if err := c.Stream(context.Background(), srv.URL, func(e Event) error {
 		if e.Type == "done" {
 			return ErrDone
 		}
 		return nil
-	})
+	}); err != nil {
+		t.Fatalf("Stream error: %v", err)
+	}
 	if sawLastID != "7" {
 		t.Fatalf("expected Last-Event-ID 7, got %q", sawLastID)
 	}
 }
 
-// TestClientStreamReconnectBackoffGrowth verifies that reconnect delays grow exponentially
-// with jitter when the server repeatedly closes the connection (EOF without events).
-func TestClientStreamReconnectBackoffGrowth(t *testing.T) {
-	t.Parallel()
-	attempts := 0
-	reconnectTimes := []time.Time{}
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		reconnectTimes = append(reconnectTimes, time.Now())
-		attempts++
-		w.Header().Set("Content-Type", "text/event-stream")
-		if f, ok := w.(http.Flusher); ok {
-			f.Flush()
+// Empty connections increase the delay; receiving an event resets both delay and retry budget.
+func TestClientStreamBackoffGrowsAndResetsAfterEvent(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		initial := time.Duration(backoff.SSEStreamPolicy().InitialInterval)
+		wantDelays := []time.Duration{initial, 2 * initial, 4 * initial, initial}
+		attempts := 0
+		var previousAttempt time.Time
+		client := &http.Client{Transport: streamTransport(func(*http.Request) (*http.Response, error) {
+			if attempts > 0 {
+				delay := time.Since(previousAttempt)
+				want := wantDelays[attempts-1]
+				// The virtual clock excludes scheduler delays; only the policy's 50% jitter remains.
+				if delay < want/2 || delay > want*3/2 {
+					t.Fatalf("reconnect %d delay = %s, want %s with 50%% jitter", attempts, delay, want)
+				}
+			}
+			previousAttempt = time.Now()
+			attempts++
+			data := ""
+			switch attempts {
+			case 4:
+				data = "event: data\ndata: test\n\n"
+			case 5:
+				data = "event: done\n\n"
+			}
+			return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(data))}, nil
+		})}
+		c := Client{HTTPClient: client, MaxRetries: 3}
+		if err := c.Stream(context.Background(), "http://stream.test", func(event Event) error {
+			if event.Type == "done" {
+				return ErrDone
+			}
+			return nil
+		}); err != nil {
+			t.Fatalf("Stream error: %v", err)
 		}
-		// Server immediately closes connection (EOF without events) to trigger backoff.
-		// After 3 reconnects, send done event to stop.
-		if attempts >= 3 {
-			_, _ = w.Write([]byte("event: done\n\n"))
+		if attempts != 5 {
+			t.Fatalf("connection attempts = %d, want 5", attempts)
 		}
-	}))
-	defer srv.Close()
-
-	// Use shared SSE backoff policy (250ms initial with exponential growth).
-	// Allow enough retries for the test to complete.
-	c := Client{
-		HTTPClient: srv.Client(),
-		MaxRetries: 10,
-	}
-
-	err := c.Stream(context.Background(), srv.URL, func(e Event) error {
-		if e.Type == "done" {
-			return ErrDone
-		}
-		return nil
 	})
-	if err != nil {
-		t.Fatalf("Stream error: %v", err)
-	}
-
-	// We expect at least 3 reconnects (initial + 2 retries before the final success).
-	if len(reconnectTimes) < 3 {
-		t.Fatalf("expected at least 3 connection attempts, got %d", len(reconnectTimes))
-	}
-
-	// Verify backoff delay between first and second reconnect is >= initial backoff (250ms from SSE policy)
-	// with jitter tolerance. The backoff grows: 250ms, 500ms, 1s, etc.
-	// We allow jitter (±50%) so minimum delay is ~125ms and maximum is ~375ms for first backoff.
-	if len(reconnectTimes) >= 2 {
-		delay1 := reconnectTimes[1].Sub(reconnectTimes[0])
-		// Allow jitter tolerance: expect delay in range [100ms, 500ms] for first backoff.
-		if delay1 < 100*time.Millisecond || delay1 > 500*time.Millisecond {
-			t.Logf("warning: first backoff delay %v outside expected range [100ms, 500ms]", delay1)
-		}
-	}
-
-	// Verify that the second backoff is longer than the first (exponential growth).
-	if len(reconnectTimes) >= 3 {
-		delay1 := reconnectTimes[1].Sub(reconnectTimes[0])
-		delay2 := reconnectTimes[2].Sub(reconnectTimes[1])
-		// Second delay should be roughly 2x first delay, with jitter tolerance.
-		// We don't enforce strict ordering due to jitter, but log if suspicious.
-		if delay2 < delay1/2 {
-			t.Logf("warning: second backoff delay %v not growing as expected (first was %v)", delay2, delay1)
-		}
-	}
-}
-
-// TestClientStreamBackoffResetAfterSuccessfulEvent verifies that backoff state is reset
-// after successfully receiving an event, so subsequent reconnects start fresh.
-func TestClientStreamBackoffResetAfterSuccessfulEvent(t *testing.T) {
-	t.Parallel()
-	attempts := 0
-	reconnectTimes := []time.Time{}
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		reconnectTimes = append(reconnectTimes, time.Now())
-		attempts++
-		w.Header().Set("Content-Type", "text/event-stream")
-		if f, ok := w.(http.Flusher); ok {
-			f.Flush()
-		}
-		// First connection: send an event then EOF to trigger reconnect.
-		// Second connection: immediately EOF (no event) to trigger backoff.
-		// Third connection: send done event to stop.
-		if attempts == 1 {
-			_, _ = w.Write([]byte("event: data\ndata: test\n\n"))
-			return
-		}
-		if attempts == 2 {
-			// EOF without event: should apply backoff.
-			return
-		}
-		if attempts >= 3 {
-			_, _ = w.Write([]byte("event: done\n\n"))
-		}
-	}))
-	defer srv.Close()
-
-	// Use shared SSE backoff policy (250ms initial with exponential growth).
-	c := Client{
-		HTTPClient: srv.Client(),
-		MaxRetries: 10,
-	}
-
-	err := c.Stream(context.Background(), srv.URL, func(e Event) error {
-		if e.Type == "done" {
-			return ErrDone
-		}
-		return nil
-	})
-	if err != nil {
-		t.Fatalf("Stream error: %v", err)
-	}
-
-	// We expect 3 connection attempts: initial (with event), retry (EOF), retry (done).
-	if len(reconnectTimes) != 3 {
-		t.Fatalf("expected 3 connection attempts, got %d", len(reconnectTimes))
-	}
-
-	// After first connection with event, backoff should reset.
-	// The second reconnect should use initial backoff again (not doubled).
-	delay1 := reconnectTimes[1].Sub(reconnectTimes[0])
-	delay2 := reconnectTimes[2].Sub(reconnectTimes[1])
-
-	// First delay after event should be small (initial backoff ~250ms from SSE policy with jitter).
-	// Second delay should also be small because backoff was reset after the event.
-	// We verify both are within the initial backoff range (100ms-500ms with jitter).
-	if delay1 < 50*time.Millisecond || delay1 > 600*time.Millisecond {
-		t.Logf("warning: first delay %v outside expected range", delay1)
-	}
-	if delay2 < 50*time.Millisecond || delay2 > 600*time.Millisecond {
-		t.Logf("warning: second delay %v outside expected range", delay2)
-	}
-
-	// The key expectation is that the second delay remains in the same order
-	// of magnitude as the first, indicating that backoff was reset after the
-	// event and did not explode to very large values. Because the underlying
-	// backoff uses jitter and the test can run on contended CI runners, we
-	// keep this as a soft assertion: log suspicious ratios instead of failing
-	// the test to avoid flakes.
-	if delay2 > 6*delay1 {
-		t.Logf("suspicious backoff growth after event (non-fatal): delay1=%v, delay2=%v", delay1, delay2)
-	}
 }
 
 // TestClientStreamMaxRetriesExhausted verifies that Stream returns an error
@@ -352,20 +243,12 @@ func TestClientStreamIdleTimeoutCancelsConnection(t *testing.T) {
 		MaxRetries:  0, // No retries; fail immediately on idle timeout.
 	}
 
-	start := time.Now()
 	err := c.Stream(context.Background(), srv.URL, func(e Event) error {
 		return nil
 	})
-	elapsed := time.Since(start)
 
 	if err == nil || !strings.Contains(err.Error(), "idle timeout") {
 		t.Fatalf("expected idle timeout error, got %v", err)
-	}
-
-	// Verify that the stream was cancelled around the idle timeout duration.
-	// Allow some tolerance for scheduling and timing jitter.
-	if elapsed < 30*time.Millisecond || elapsed > 150*time.Millisecond {
-		t.Logf("warning: idle timeout took %v, expected ~50ms", elapsed)
 	}
 }
 
@@ -375,4 +258,127 @@ func TestClientStreamIdleTimeoutCancelsConnection(t *testing.T) {
 // This is a known limitation documented in the migration to go-sse.
 func TestClientStreamServerRetryHint(t *testing.T) {
 	t.Skip("go-sse Read API does not expose retry field; use Client/Connection API for retry hints")
+}
+
+type streamTransport func(*http.Request) (*http.Response, error)
+
+func (transport streamTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	return transport(req)
+}
+
+type recordedStreamBody struct {
+	io.Reader
+	closed chan struct{}
+}
+
+func (body *recordedStreamBody) Close() error {
+	close(body.closed)
+	return nil
+}
+
+type streamErrorReader struct{}
+
+func (streamErrorReader) Read([]byte) (int, error) {
+	return 0, io.ErrUnexpectedEOF
+}
+
+// Both connection resources are released before another request can start.
+func TestClientStreamReleasesConnectionBeforeReconnect(t *testing.T) {
+	for _, failure := range []string{"eof", "read", "connect"} {
+		t.Run(failure, func(t *testing.T) {
+			t.Parallel()
+			var previousContext context.Context
+			var previousBody *recordedStreamBody
+			assertReleased := func() {
+				t.Helper()
+				if previousContext.Err() != context.Canceled {
+					t.Fatal("previous connection context remains active")
+				}
+				if previousBody != nil {
+					select {
+					case <-previousBody.closed:
+					default:
+						t.Fatal("previous response body remains open")
+					}
+				}
+			}
+			attempts := 0
+			client := &http.Client{Transport: streamTransport(func(req *http.Request) (*http.Response, error) {
+				if attempts > 0 {
+					assertReleased()
+				}
+				attempts++
+				previousContext = req.Context()
+				if attempts == 1 && failure == "connect" {
+					return nil, errors.New("connection failed")
+				}
+				var reader io.Reader = strings.NewReader("event: done\n\n")
+				if attempts == 1 {
+					reader = strings.NewReader("")
+					if failure == "read" {
+						reader = streamErrorReader{}
+					}
+				}
+				previousBody = &recordedStreamBody{Reader: reader, closed: make(chan struct{})}
+				return &http.Response{StatusCode: http.StatusOK, Body: previousBody}, nil
+			})}
+			c := Client{HTTPClient: client, MaxRetries: 1, IdleTimeout: time.Hour}
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			if err := c.Stream(ctx, "http://stream.test", func(Event) error {
+				return fmt.Errorf("finished: %w", ErrDone)
+			}); err != nil {
+				t.Fatalf("Stream error: %v", err)
+			}
+			assertReleased()
+			if attempts != 2 || ctx.Err() != nil {
+				t.Fatalf("attempts = %d, caller error = %v", attempts, ctx.Err())
+			}
+		})
+	}
+}
+
+// Caller cancellation retains its identity when the idle timer is enabled.
+func TestClientStreamCallerCancellationIsNotIdleTimeout(t *testing.T) {
+	for _, phase := range []string{"connect", "read"} {
+		t.Run(phase, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			var body *recordedStreamBody
+			client := &http.Client{Transport: streamTransport(func(req *http.Request) (*http.Response, error) {
+				if phase == "connect" {
+					cancel()
+					return nil, req.Context().Err()
+				}
+				body = &recordedStreamBody{
+					Reader: cancelStreamReader{cancel: cancel, ctx: req.Context()},
+					closed: make(chan struct{}),
+				}
+				return &http.Response{StatusCode: http.StatusOK, Body: body}, nil
+			})}
+			c := Client{HTTPClient: client, MaxRetries: -1, IdleTimeout: time.Hour}
+			err := c.Stream(ctx, "http://stream.test", func(Event) error { return nil })
+			if !errors.Is(err, context.Canceled) {
+				t.Fatalf("Stream error = %v, want context.Canceled", err)
+			}
+			if body != nil {
+				select {
+				case <-body.closed:
+				default:
+					t.Fatal("cancelled stream body remains open")
+				}
+			}
+		})
+	}
+}
+
+type cancelStreamReader struct {
+	cancel context.CancelFunc
+	ctx    context.Context
+}
+
+func (reader cancelStreamReader) Read([]byte) (int, error) {
+	reader.cancel()
+	<-reader.ctx.Done()
+	return 0, reader.ctx.Err()
 }

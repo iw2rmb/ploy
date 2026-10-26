@@ -355,14 +355,13 @@ func normalizeIncludedLocalPaths(node *yaml.Node, sourcePath, outputBaseDir stri
 			continue
 		}
 
-		switch key.Value {
-		case "in":
-			normalizeMountEntries(value, sourcePath, outputBaseDir, false)
-		case "out":
-			normalizeMountEntries(value, sourcePath, outputBaseDir, false)
-		case "home":
-			normalizeMountEntries(value, sourcePath, outputBaseDir, true)
-		case "ref":
+		for _, kind := range contracts.HydraFileKinds() {
+			if key.Value == kind.String() {
+				normalizeMountEntries(value, kind, sourcePath, outputBaseDir)
+				break
+			}
+		}
+		if key.Value == "ref" {
 			normalizeRefEntry(value, sourcePath, outputBaseDir)
 		}
 
@@ -391,7 +390,7 @@ func normalizeRefEntry(node *yaml.Node, sourcePath, outputBaseDir string) {
 	node.Value = rebaseLocalSourcePath(sourcePath, outputBaseDir, pathPart) + ":" + stepName
 }
 
-func normalizeMountEntries(node *yaml.Node, sourcePath, outputBaseDir string, isHome bool) {
+func normalizeMountEntries(node *yaml.Node, kind contracts.HydraFileKind, sourcePath, outputBaseDir string) {
 	if node.Kind != yaml.SequenceNode {
 		return
 	}
@@ -400,28 +399,7 @@ func normalizeMountEntries(node *yaml.Node, sourcePath, outputBaseDir string, is
 		if entry.Kind != yaml.ScalarNode {
 			continue
 		}
-		s := strings.TrimSpace(entry.Value)
-		if s == "" {
-			continue
-		}
-
-		body := s
-		suffix := ""
-		if isHome && strings.HasSuffix(body, ":ro") {
-			body = strings.TrimSuffix(body, ":ro")
-			suffix = ":ro"
-		}
-		if idx := strings.Index(body, ":"); idx > 0 && contracts.IsHydraShortHash(body[:idx]) {
-			continue
-		}
-		idx := strings.LastIndex(body, ":")
-		if idx <= 0 {
-			continue
-		}
-
-		src := strings.TrimSpace(body[:idx])
-		dst := body[idx:]
-		entry.Value = normalizeLocalSourcePath(sourcePath, outputBaseDir, src) + dst + suffix
+		entry.Value = rebaseMountEntrySource(kind, entry.Value, sourcePath, outputBaseDir)
 	}
 }
 

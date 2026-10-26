@@ -24,23 +24,22 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest,
 	uploadRepoArtifactsOnReturn := false
 	closeArtifactLogs := func() {}
 	defer func() {
+		// Finalize log writers before bundling so the upload contains their last bytes.
 		closeArtifactLogs()
 		if uploadRepoArtifactsOnReturn {
 			r.uploadRepoArtifactsIfPresent(req.RunID, req.RepoID, req.JobID)
 		}
 	}()
 
-	// Initialize runtime components.
-	// Pass jobID to associate log chunks with this specific gate job.
-	runner, _, logStreamer, err := r.initializeRuntime(ctx, req.RunID, req.JobID, req.ResumeCount)
+	execCtx, cleanup, err := r.initExecutionContext(ctx, req.RunID, req.JobID, step.NewContainerRuntime, req.ResumeCount)
 	if err != nil {
 		uploadRepoArtifactsOnReturn = true
 		slog.Error("failed to initialize runtime", "run_id", req.RunID, "error", err)
 		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
 		return
 	}
-	defer func() { _ = logStreamer.Close() }()
-	artifactLogs, err := newArtifactLogWriter(logStreamer, jobDirs)
+	defer cleanup()
+	artifactLogs, err := newArtifactLogWriter(execCtx.logStreamer, jobDirs)
 	if err != nil {
 		uploadRepoArtifactsOnReturn = true
 		slog.Error("failed to prepare job artifact logs", "run_id", req.RunID, "job_id", req.JobID, "error", err)
@@ -68,7 +67,7 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest,
 
 	applyGatePhaseOverrides(&manifest, req)
 
-	workspace, err := r.prepareStickyWorkspace(ctx, req, manifest)
+	workspace, err := r.prepareStickyWorkspace(ctx, req)
 	if err != nil {
 		uploadRepoArtifactsOnReturn = true
 		slog.Error("failed to prepare sticky workspace", "run_id", req.RunID, "error", err)
@@ -88,7 +87,7 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest,
 			slog.Warn("failed to save gate job image name", "run_id", req.RunID, "job_id", req.JobID, "error", err)
 		}
 	})
-	gateExecutor := step.NewGateExecutor(runner.Containers)
+	gateExecutor := step.NewGateExecutor(execCtx.runner.Containers)
 	gateCtx := step.WithExecutionLogWriter(ctx, artifactLogs)
 	gateResult, gateErr := r.runGate(gateCtx, gateExecutor, manifest, workspace, mounts)
 

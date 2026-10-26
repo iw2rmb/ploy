@@ -149,7 +149,7 @@ func registerNodeRoutes(s routeRegistrar, deps routeDeps) {
 	s.RegisterRouteFunc("POST /v1/nodes/{id}/undrain", undrainNodeHandler(deps.st), auth.RoleControlPlane)
 
 	s.RegisterRouteFunc("POST /v1/nodes/{id}/heartbeat", heartbeatHandler(deps.st), auth.RoleWorker)
-	s.RegisterRouteFunc("POST /v1/nodes/{id}/claim", claimJobHandlerWithEvents(deps.st, deps.bs, deps.eventsService, deps.configHolder), auth.RoleWorker)
+	s.RegisterRouteFunc("POST /v1/nodes/{id}/claim", claimJobHandler(deps.st, deps.bs, deps.configHolder), auth.RoleWorker)
 	s.RegisterRouteFunc("POST /v1/nodes/{id}/events", createNodeEventsHandler(deps.st, deps.eventsService), auth.RoleWorker)
 	s.RegisterRouteFunc("POST /v1/nodes/{id}/logs", createNodeLogsHandler(deps.st, deps.bp, deps.eventsService), auth.RoleWorker)
 	s.RegisterRouteFunc("POST /v1/nodes/{id}/diagnostics", upsertNodeDiagnosticHandler(deps.st), auth.RoleWorker, auth.RoleControlPlane)

@@ -99,31 +99,33 @@ func (r *runController) executeMigContainerWithOutcome(ctx context.Context, req 
 	var outcome migJobOutcome
 
 	jobDirs := jobDirectories(req.RunID, req.JobID)
+	var artifactLogs *artifactLogWriter
+	// Finalize log writers before bundling so the upload contains their last bytes.
+	defer func() {
+		if artifactLogs != nil {
+			if err := artifactLogs.Close(); err != nil {
+				slog.Warn("failed to close job artifact logs", "run_id", req.RunID, "job_id", req.JobID, "error", err)
+			}
+		}
+	}()
 
-	execCtx, cleanup, err := r.initExecutionContext(ctx, req.RunID, req.JobID, req.ResumeCount)
+	execCtx, cleanup, err := r.initExecutionContext(ctx, req.RunID, req.JobID, step.NewContainerRuntime, req.ResumeCount)
 	if err != nil {
 		return outcome, fmt.Errorf("initialize runtime: %w", err)
 	}
 	defer cleanup()
-	artifactLogs, err := newArtifactLogWriter(execCtx.logStreamer, jobDirs)
+	artifactLogs, err = newArtifactLogWriter(execCtx.logStreamer, jobDirs)
 	if err != nil {
 		return outcome, fmt.Errorf("prepare job artifact logs: %w", err)
 	}
 	execCtx.runner.LogWriter = artifactLogs
-	defer func() {
-		if err := artifactLogs.Close(); err != nil {
-			slog.Warn("failed to close job artifact logs", "run_id", req.RunID, "job_id", req.JobID, "error", err)
-		}
-	}()
 
 	hydrationStart := time.Now()
-	wsResult, err := r.prepareStickyWorkspaceWithCleanup(ctx, req, manifest)
+	workspace, err := r.prepareStickyWorkspace(ctx, req)
 	if err != nil {
 		return outcome, fmt.Errorf("prepare sticky workspace: %w", err)
 	}
 	hydrationDuration := time.Since(hydrationStart)
-	defer wsResult.cleanup()
-	workspace := wsResult.path
 
 	stepOutcome, err := r.runMigContainerJob(ctx, req, manifest, execCtx, workspace, startTime, hydrationDuration, jobDirs, mounts)
 	if err != nil {
@@ -259,29 +261,4 @@ func (r *runController) materializeJobResources(ctx context.Context, manifest co
 		return "", fmt.Errorf("materialize hydra resources: %w", err)
 	}
 	return stagingDir, nil
-}
-
-// tempResource holds a temporary path and its cleanup function.
-// Used for workspace snapshots, sticky workspaces, and similar lifecycle-scoped directories.
-type tempResource struct {
-	path    string
-	cleanup func()
-}
-
-// prepareStickyWorkspaceWithCleanup wraps prepareStickyWorkspace and returns a no-op
-// cleanup for sticky run workspaces.
-func (r *runController) prepareStickyWorkspaceWithCleanup(
-	ctx context.Context,
-	req StartRunRequest,
-	manifest contracts.StepManifest,
-) (tempResource, error) {
-	workspace, err := r.prepareStickyWorkspace(ctx, req, manifest)
-	if err != nil {
-		return tempResource{}, err
-	}
-
-	return tempResource{
-		path:    workspace,
-		cleanup: func() {},
-	}, nil
 }

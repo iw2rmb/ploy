@@ -21,7 +21,7 @@ func TestClaim_Claim_ReturnsNoWorkWhenQueueEmpty(t *testing.T) {
 	st.claimJob.err = pgx.ErrNoRows
 	st.getNode.val = store.Node{ID: nodeID}
 
-	svc := newClaimer(st, nil, &ConfigHolder{}, nil)
+	svc := newClaimer(st, nil, &ConfigHolder{})
 	_, err := svc.Claim(context.Background(), nodeID)
 	var noWork *claimNoWork
 	if !errors.As(err, &noWork) {
@@ -67,7 +67,7 @@ func TestClaim_Claim_SuccessBuildsPayloadAndTransitionsRepo(t *testing.T) {
 		Meta:        []byte(`{}`),
 	}
 
-	svc := newClaimer(st, nil, &ConfigHolder{}, nil)
+	svc := newClaimer(st, nil, &ConfigHolder{})
 	result, err := svc.Claim(context.Background(), nodeID)
 	if err != nil {
 		t.Fatalf("Claim() error = %v", err)
@@ -78,17 +78,17 @@ func TestClaim_Claim_SuccessBuildsPayloadAndTransitionsRepo(t *testing.T) {
 	if st.unclaimJob.called {
 		t.Fatal("expected UnclaimJob to not be called on successful claim")
 	}
-	if result.Payload.JobID != jobID {
-		t.Fatalf("payload.job_id = %s, want %s", result.Payload.JobID, jobID)
+	if result.JobID != jobID {
+		t.Fatalf("payload.job_id = %s, want %s", result.JobID, jobID)
 	}
-	if result.Payload.RunID != runID {
-		t.Fatalf("payload.run_id = %s, want %s", result.Payload.RunID, runID)
+	if result.RunID != runID {
+		t.Fatalf("payload.run_id = %s, want %s", result.RunID, runID)
 	}
-	if result.Payload.RepoURL == "" {
+	if result.RepoURL == "" {
 		t.Fatal("expected payload.repo_url to be populated")
 	}
-	if result.Payload.CommitSHA != domaintypes.CommitSHA(sourceCommitSHA) {
-		t.Fatalf("payload.commit_sha = %s, want %s", result.Payload.CommitSHA, sourceCommitSHA)
+	if result.CommitSHA != domaintypes.CommitSHA(sourceCommitSHA) {
+		t.Fatalf("payload.commit_sha = %s, want %s", result.CommitSHA, sourceCommitSHA)
 	}
 }
 
@@ -127,7 +127,7 @@ func TestClaim_Claim_RequeuesClaimedJobWhenPayloadBuildFails(t *testing.T) {
 		Meta:        []byte(`{}`),
 	}
 
-	svc := newClaimer(st, nil, &ConfigHolder{}, nil)
+	svc := newClaimer(st, nil, &ConfigHolder{})
 	_, err := svc.Claim(context.Background(), nodeID)
 	if err == nil {
 		t.Fatal("expected Claim() to fail")
