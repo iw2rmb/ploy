@@ -1,9 +1,13 @@
 package handlers
 
 import (
+	"errors"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 
 	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
@@ -26,6 +30,7 @@ func nodeToResponse(node store.Node) domainapi.Node {
 		CertSerial:      node.CertSerial,
 		CertFingerprint: node.CertFingerprint,
 		Drained:         node.Drained,
+		DrainRevision:   node.DrainRevision,
 		CreatedAt:       node.CreatedAt.Time.Format(time.RFC3339),
 	}
 	if node.CertNotBefore.Valid {
@@ -49,41 +54,37 @@ func drainNodeHandler(st store.Store) http.HandlerFunc { return setNodeDrainHand
 // undrainNodeHandler marks a node as undrained (active).
 func undrainNodeHandler(st store.Store) http.HandlerFunc { return setNodeDrainHandler(st, false) }
 
-// setNodeDrainHandler returns a handler that toggles a node's drained flag.
-// When drain=true it sets drained=true (409 if already drained); when false it clears it.
+// Conditional maintenance releases cannot override a later operator decision.
 func setNodeDrainHandler(st store.Store, drain bool) http.HandlerFunc {
-	action := "drain"
-	conflictMsg := "node is already drained"
-	logDone := "node drained"
-	if !drain {
-		action = "undrain"
-		conflictMsg = "node is not drained"
-		logDone = "node undrained"
-	}
 	return func(w http.ResponseWriter, r *http.Request) {
 		nodeID, ok := parseRequiredPathIDOrWriteError[domaintypes.NodeID](w, r, "id")
 		if !ok {
 			return
 		}
-
-		node, ok := getNodeOrFail(w, r, st, nodeID, action+" node")
-		if !ok {
+		var revision *int64
+		if raw, present := r.URL.Query()["expected_revision"]; present {
+			value, err := strconv.ParseInt(raw[0], 10, 64)
+			if err != nil || value < 0 {
+				writeHTTPError(w, http.StatusBadRequest, "invalid expected_revision")
+				return
+			}
+			revision = &value
+		}
+		node, err := st.UpdateNodeDrained(r.Context(), store.UpdateNodeDrainedParams{ID: nodeID, Drained: drain, ExpectedRevision: revision})
+		if errors.Is(err, pgx.ErrNoRows) {
+			if _, ok := getNodeOrFail(w, r, st, nodeID, "set drain"); !ok {
+				return
+			}
+			writeHTTPError(w, http.StatusConflict, "node drain revision or state changed")
 			return
 		}
-
-		if node.Drained == drain {
-			writeHTTPError(w, http.StatusConflict, "%s", conflictMsg)
+		if err != nil {
+			writeHTTPError(w, http.StatusInternalServerError, "update node drain: %v", err)
 			return
 		}
-
-		if err := st.UpdateNodeDrained(r.Context(), store.UpdateNodeDrainedParams{ID: nodeID, Drained: drain}); err != nil {
-			writeHTTPError(w, http.StatusInternalServerError, "failed to %s node: %v", action, err)
-			slog.Error(action+" node: update failed", "node_id", nodeID, "err", err)
-			return
-		}
-
+		w.Header().Set("X-Ploy-Drain-Revision", strconv.FormatInt(node.DrainRevision, 10))
 		w.WriteHeader(http.StatusNoContent)
-		slog.Info(logDone, "node_id", nodeID, "name", node.Name)
+		slog.Info("node drain updated", "node_id", nodeID, "drained", drain, "drain_revision", node.DrainRevision)
 	}
 }
 

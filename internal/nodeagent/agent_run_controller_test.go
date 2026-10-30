@@ -20,7 +20,7 @@ func TestRunController(t *testing.T) {
 
 	t.Run("StartRun registers job", func(t *testing.T) {
 		rc := newRC()
-		if err := rc.StartRun(context.Background(), baseReq); err != nil {
+		if err := rc.StartRun(context.Background(), baseReq, testRunSlot(t, rc)); err != nil {
 			t.Fatalf("StartRun() error = %v", err)
 		}
 		rc.mu.Lock()
@@ -33,10 +33,10 @@ func TestRunController(t *testing.T) {
 	t.Run("StartRun rejects duplicate", func(t *testing.T) {
 		rc := newRC()
 		ctx := context.Background()
-		if err := rc.StartRun(ctx, baseReq); err != nil {
-			t.Fatalf("first StartRun() error = %v", err)
-		}
-		if err := rc.StartRun(ctx, baseReq); err == nil {
+		rc.jobs[baseReq.JobID] = &jobContext{runID: baseReq.RunID}
+		slot := testRunSlot(t, rc)
+		defer rc.ReleaseSlot(slot)
+		if err := rc.StartRun(ctx, baseReq, slot); err == nil {
 			t.Error("expected error for duplicate job, got nil")
 		}
 	})
@@ -44,7 +44,7 @@ func TestRunController(t *testing.T) {
 	t.Run("StopRun removes job", func(t *testing.T) {
 		rc := newRC()
 		ctx := context.Background()
-		if err := rc.StartRun(ctx, baseReq); err != nil {
+		if err := rc.StartRun(ctx, baseReq, testRunSlot(t, rc)); err != nil {
 			t.Fatalf("StartRun() error = %v", err)
 		}
 		if err := rc.StopRun(ctx, StopRunRequest{RunID: baseReq.RunID, Reason: "test"}); err != nil {

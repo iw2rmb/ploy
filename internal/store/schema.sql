@@ -84,6 +84,7 @@ CREATE TABLE IF NOT EXISTS nodes (
   disk_free_bytes  BIGINT  NOT NULL DEFAULT 0 CHECK (disk_free_bytes >= 0 AND disk_free_bytes <= disk_total_bytes),
   -- Node rollout control: when true, scheduler must not assign new runs
   drained          BOOLEAN NOT NULL DEFAULT false,
+  drain_revision   BIGINT NOT NULL DEFAULT 0,
   -- mTLS certificate metadata for audit/rotation
   cert_serial       TEXT,
   cert_fingerprint  TEXT,

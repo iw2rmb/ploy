@@ -24,7 +24,7 @@ type mockRunController struct {
 	slotSem chan struct{}
 }
 
-func (m *mockRunController) StartRun(ctx context.Context, req StartRunRequest) error {
+func (m *mockRunController) StartRun(ctx context.Context, req StartRunRequest, slot *RunSlot) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.startCalled = true
@@ -42,24 +42,24 @@ func (m *mockRunController) StopRun(ctx context.Context, req StopRunRequest) err
 
 // AcquireSlot implements RunController. If slotSem is set, blocks until a slot
 // is available; otherwise returns immediately.
-func (m *mockRunController) AcquireSlot(ctx context.Context) error {
+func (m *mockRunController) AcquireSlot(ctx context.Context) (*RunSlot, error) {
 	m.mu.Lock()
 	m.acquireCalls++
 	slotSem := m.slotSem
 	m.mu.Unlock()
 	if slotSem == nil {
-		return nil
+		return &RunSlot{}, nil
 	}
 	select {
 	case slotSem <- struct{}{}:
-		return nil
+		return &RunSlot{}, nil
 	case <-ctx.Done():
-		return ctx.Err()
+		return nil, ctx.Err()
 	}
 }
 
 // ReleaseSlot implements RunController. If slotSem is set, releases a slot.
-func (m *mockRunController) ReleaseSlot() {
+func (m *mockRunController) ReleaseSlot(slot *RunSlot) {
 	m.mu.Lock()
 	m.releaseCalls++
 	slotSem := m.slotSem

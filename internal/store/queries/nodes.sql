@@ -67,7 +67,12 @@ SET
   cert_not_after = $5
 WHERE id = $1;
 
--- name: UpdateNodeDrained :exec
+-- name: UpdateNodeDrained :one
+-- Conditional callers can only change the observed state; operator reassertions
+-- advance the revision so stale maintenance cannot restore admission.
 UPDATE nodes
-SET drained = $2
-WHERE id = $1;
+SET drained = sqlc.arg(drained), drain_revision = drain_revision + 1
+WHERE id = sqlc.arg(id)
+  AND (sqlc.narg(expected_revision)::bigint IS NULL OR
+       (drain_revision = sqlc.narg(expected_revision)::bigint AND drained <> sqlc.arg(drained)))
+RETURNING *;

@@ -8,9 +8,12 @@ import (
 )
 
 // Node management store methods.
-func (m *handlerStore) UpdateNodeDrained(ctx context.Context, params store.UpdateNodeDrainedParams) error {
+func (m *handlerStore) UpdateNodeDrained(ctx context.Context, params store.UpdateNodeDrainedParams) (store.Node, error) {
 	_, err := m.updateNodeDrained.record(params)
-	return err
+	if m.getNode.err != nil {
+		return store.Node{}, m.getNode.err
+	}
+	return m.getNode.val, err
 }
 
 func (m *handlerStore) ListNodes(ctx context.Context) ([]store.Node, error) {

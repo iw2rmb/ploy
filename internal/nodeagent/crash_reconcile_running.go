@@ -19,7 +19,8 @@ func (c *ClaimManager) startRecoveredRunningMonitors(ctx context.Context, recove
 		return
 	}
 	for _, item := range recovered {
-		if err := c.controller.AcquireSlot(ctx); err != nil {
+		slot, err := c.controller.AcquireSlot(ctx)
+		if err != nil {
 			slog.Warn("skip recovered running container monitor: acquire slot failed",
 				"run_id", item.RunID,
 				"job_id", item.JobID,
@@ -30,13 +31,13 @@ func (c *ClaimManager) startRecoveredRunningMonitors(ctx context.Context, recove
 		}
 
 		recoveredItem := item
-		go c.monitorRecoveredRunningContainer(ctx, recoveredItem)
+		go c.monitorRecoveredRunningContainer(ctx, recoveredItem, slot)
 	}
 }
 
-func (c *ClaimManager) monitorRecoveredRunningContainer(ctx context.Context, recovered recoveredContainer) {
+func (c *ClaimManager) monitorRecoveredRunningContainer(ctx context.Context, recovered recoveredContainer, slot *RunSlot) {
 	defer func() {
-		c.controller.ReleaseSlot()
+		c.controller.ReleaseSlot(slot)
 		c.sweepAbandonedRuntimeIfIdle()
 	}()
 

@@ -101,7 +101,7 @@ func TestEndToEndFlow(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
-		if err := rc.StartRun(ctx, req); err != nil {
+		if err := rc.StartRun(ctx, req, testRunSlot(t, rc)); err != nil {
 			t.Fatalf("StartRun() failed: %v", err)
 		}
 

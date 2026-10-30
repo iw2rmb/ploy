@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"os"
 	"sync"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
@@ -47,35 +48,46 @@ func (r *runController) initJobSem() {
 	r.jobSem = make(chan struct{}, capacity)
 }
 
-// AcquireSlot blocks until a concurrency slot is available or the context is canceled.
-func (r *runController) AcquireSlot(ctx context.Context) error {
+// RunSlot owns a concurrency permit and an independent shared maintenance lock.
+// The caller releases it unless StartRun succeeds and transfers ownership.
+type RunSlot struct {
+	owner *runController
+	lock  *os.File
+}
+
+func (r *runController) AcquireSlot(ctx context.Context) (*RunSlot, error) {
 	r.mu.Lock()
 	r.initJobSem()
 	sem := r.jobSem
 	r.mu.Unlock()
-
 	select {
 	case sem <- struct{}{}:
-		return nil
 	case <-ctx.Done():
-		return ctx.Err()
+		return nil, ctx.Err()
 	}
+	lock, err := acquireMaintenanceActivity(ctx)
+	if err != nil {
+		<-sem
+		return nil, err
+	}
+	return &RunSlot{owner: r, lock: lock}, nil
 }
 
-// ReleaseSlot frees a previously acquired concurrency slot.
-func (r *runController) ReleaseSlot() {
-	r.mu.Lock()
-	sem := r.jobSem
-	r.mu.Unlock()
-
-	if sem == nil {
-		return
+func (r *runController) ReleaseSlot(slot *RunSlot) {
+	if slot == nil || slot.owner != r {
+		panic("invalid run slot owner")
 	}
-	<-sem
+	if err := slot.lock.Close(); err != nil {
+		slog.Error("release maintenance activity", "error", err)
+	}
+	<-r.jobSem
 }
 
 // StartRun accepts a run start request and initiates execution.
-func (r *runController) StartRun(ctx context.Context, req StartRunRequest) error {
+func (r *runController) StartRun(ctx context.Context, req StartRunRequest, slot *RunSlot) error {
+	if slot == nil || slot.owner != r {
+		return fmt.Errorf("run slot belongs to another controller")
+	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -93,6 +105,7 @@ func (r *runController) StartRun(ctx context.Context, req StartRunRequest) error
 	r.startRemoteCancellationWatch(runCtx, req, cancel)
 	go func() {
 		defer cancel()
+		defer r.ReleaseSlot(slot)
 		r.executeRun(runCtx, req)
 	}()
 

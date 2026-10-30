@@ -187,6 +187,7 @@ func (h *HeartbeatManager) uploadSelfDiagnostic(ctx context.Context, storage sto
 			"server_url":      h.cfg.ServerURL,
 			"heartbeat_every": h.cfg.Heartbeat.Interval.String(),
 			"storage":         storage,
+			"maintenance":     maintenanceCapability(),
 		},
 	}
 	if imageRef := strings.TrimSpace(os.Getenv("PLOY_NODE_IMAGE")); imageRef != "" {

@@ -15,25 +15,13 @@ import (
 	"time"
 )
 
-// RunController manages run lifecycle on the node.
+// RunController transfers slot ownership only when StartRun succeeds.
+// Callers must release slots on claim, validation, or start failures.
 type RunController interface {
-	StartRun(ctx context.Context, req StartRunRequest) error
-	StopRun(ctx context.Context, req StopRunRequest) error
-
-	// AcquireSlot blocks until a concurrency slot is available or the context
-	// is canceled. Returns nil when a slot is acquired, or ctx.Err() if the
-	// context was canceled while waiting.
-	//
-	// Slot ownership:
-	//   - On StartRun success (nil error), the controller is responsible for
-	//     releasing the slot when the job completes.
-	//   - On StartRun failure (non-nil error), the caller must ReleaseSlot()
-	//     before returning.
-	AcquireSlot(ctx context.Context) error
-
-	// ReleaseSlot frees a previously acquired concurrency slot.
-	// Must be called exactly once for each successful AcquireSlot call.
-	ReleaseSlot()
+	StartRun(context.Context, StartRunRequest, *RunSlot) error
+	StopRun(context.Context, StopRunRequest) error
+	AcquireSlot(context.Context) (*RunSlot, error)
+	ReleaseSlot(*RunSlot)
 }
 
 // Server exposes the node agent API over HTTPS with mTLS.

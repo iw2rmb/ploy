@@ -26,6 +26,14 @@ func (r *runController) sweepAbandonedRuntimeIfIdle() {
 		return
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), abandonedRuntimeSweepTimeout)
+	defer cancel()
+	lock, err := acquireMaintenanceActivity(ctx)
+	if err != nil {
+		slog.Warn("skip runtime sweep", "error", err)
+		return
+	}
+	defer lock.Close()
 	r.sweepMu.Lock()
 	defer r.sweepMu.Unlock()
 	if !r.nodeIsIdle() {
@@ -41,8 +49,6 @@ func (r *runController) sweepAbandonedRuntimeIfIdle() {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), abandonedRuntimeSweepTimeout)
-	defer cancel()
 	terminal, err := terminalRuntimeCandidates(ctx, r.uploader, candidates)
 	if err != nil {
 		slog.Warn("abandoned job runtime status check was incomplete", "error", err)

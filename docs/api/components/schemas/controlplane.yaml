@@ -1111,6 +1111,7 @@ Node:
     cert_not_after: { type: string, format: date-time, nullable: true }
     last_heartbeat: { type: string, format: date-time, nullable: true }
     drained: { type: boolean }
+    drain_revision: { type: integer, format: int64, minimum: 0 }
     created_at: { type: string, format: date-time }
   required:
     - id
@@ -1124,6 +1125,7 @@ Node:
     - disk_total_bytes
     - disk_free_bytes
     - drained
+    - drain_revision
     - created_at
 
 WorkflowGraphNode:

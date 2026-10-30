@@ -307,9 +307,10 @@ the exact Gradle wrappers for all configured seed projects. The seeder copies
 The seeder verifies the new generation with offline resolution. It publishes
 the generation only after every configured check succeeds.
 
-The deploy maintenance lock waits until no Ploy job container is running. The
-seeder then switches `current` atomically. The same idle interval permits
-removal of retired generations.
+The deploy seeder uses the revision-owned drain and exclusive maintenance lock
+described in [Node maintenance](../docs/node-maintenance.md). The lock excludes
+claims, pulls, jobs, and finalization while the seeder switches `current`
+atomically and removes retired generations.
 
 Deploy never changes or removes a generation while a job is running. Ploy does
 not select, mutate, or clean a Gradle generation.
@@ -613,7 +614,7 @@ The design is complete when all of these statements are true:
 - [`internal/nodeagent/execution_artifacts.go`](../internal/nodeagent/execution_artifacts.go)
 - [`internal/workflow/step/container_spec.go`](../internal/workflow/step/container_spec.go)
 - [`internal/workflow/step/gate_docker_mounts.go`](../internal/workflow/step/gate_docker_mounts.go)
-- [`internal/workflow/step/java_tool_cache_mounts.go`](../internal/workflow/step/java_tool_cache_mounts.go)
+- [`internal/workflow/step/job_mounts.go`](../internal/workflow/step/job_mounts.go)
 - `/Users/v.v.kovalev/@gitlab/ploy/deploy/images/docker-compose.yml`
 - `/Users/v.v.kovalev/@gitlab/ploy/deploy/images/gates/gradle/cache.init.gradle`
 - `/Users/v.v.kovalev/@gitlab/ploy/deploy/services/bin/ploy-node-cleanup`

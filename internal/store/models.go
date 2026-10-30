@@ -165,6 +165,7 @@ type Node struct {
 	DiskTotalBytes  int64              `json:"disk_total_bytes"`
 	DiskFreeBytes   int64              `json:"disk_free_bytes"`
 	Drained         bool               `json:"drained"`
+	DrainRevision   int64              `json:"drain_revision"`
 	CertSerial      *string            `json:"cert_serial"`
 	CertFingerprint *string            `json:"cert_fingerprint"`
 	CertNotBefore   pgtype.Timestamptz `json:"cert_not_before"`

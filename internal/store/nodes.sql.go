@@ -23,7 +23,7 @@ INSERT INTO nodes (
 ) VALUES (
   $1, $2, $3, $4, $5
 )
-RETURNING id, name, ip_address, version, concurrency, cpu_total_millis, cpu_free_millis, mem_total_bytes, mem_free_bytes, disk_total_bytes, disk_free_bytes, drained, cert_serial, cert_fingerprint, cert_not_before, cert_not_after, last_heartbeat, created_at
+RETURNING id, name, ip_address, version, concurrency, cpu_total_millis, cpu_free_millis, mem_total_bytes, mem_free_bytes, disk_total_bytes, disk_free_bytes, drained, drain_revision, cert_serial, cert_fingerprint, cert_not_before, cert_not_after, last_heartbeat, created_at
 `
 
 type CreateNodeParams struct {
@@ -57,6 +57,7 @@ func (q *Queries) CreateNode(ctx context.Context, arg CreateNodeParams) (Node, e
 		&i.DiskTotalBytes,
 		&i.DiskFreeBytes,
 		&i.Drained,
+		&i.DrainRevision,
 		&i.CertSerial,
 		&i.CertFingerprint,
 		&i.CertNotBefore,
@@ -78,7 +79,7 @@ func (q *Queries) DeleteNode(ctx context.Context, id types.NodeID) error {
 }
 
 const getNode = `-- name: GetNode :one
-SELECT id, name, ip_address, version, concurrency, cpu_total_millis, cpu_free_millis, mem_total_bytes, mem_free_bytes, disk_total_bytes, disk_free_bytes, drained, cert_serial, cert_fingerprint, cert_not_before, cert_not_after, last_heartbeat, created_at FROM nodes
+SELECT id, name, ip_address, version, concurrency, cpu_total_millis, cpu_free_millis, mem_total_bytes, mem_free_bytes, disk_total_bytes, disk_free_bytes, drained, drain_revision, cert_serial, cert_fingerprint, cert_not_before, cert_not_after, last_heartbeat, created_at FROM nodes
 WHERE id = $1
 `
 
@@ -98,6 +99,7 @@ func (q *Queries) GetNode(ctx context.Context, id types.NodeID) (Node, error) {
 		&i.DiskTotalBytes,
 		&i.DiskFreeBytes,
 		&i.Drained,
+		&i.DrainRevision,
 		&i.CertSerial,
 		&i.CertFingerprint,
 		&i.CertNotBefore,
@@ -109,7 +111,7 @@ func (q *Queries) GetNode(ctx context.Context, id types.NodeID) (Node, error) {
 }
 
 const listNodes = `-- name: ListNodes :many
-SELECT id, name, ip_address, version, concurrency, cpu_total_millis, cpu_free_millis, mem_total_bytes, mem_free_bytes, disk_total_bytes, disk_free_bytes, drained, cert_serial, cert_fingerprint, cert_not_before, cert_not_after, last_heartbeat, created_at FROM nodes
+SELECT id, name, ip_address, version, concurrency, cpu_total_millis, cpu_free_millis, mem_total_bytes, mem_free_bytes, disk_total_bytes, disk_free_bytes, drained, drain_revision, cert_serial, cert_fingerprint, cert_not_before, cert_not_after, last_heartbeat, created_at FROM nodes
 ORDER BY created_at DESC, id DESC
 `
 
@@ -135,6 +137,7 @@ func (q *Queries) ListNodes(ctx context.Context) ([]Node, error) {
 			&i.DiskTotalBytes,
 			&i.DiskFreeBytes,
 			&i.Drained,
+			&i.DrainRevision,
 			&i.CertSerial,
 			&i.CertFingerprint,
 			&i.CertNotBefore,
@@ -181,20 +184,48 @@ func (q *Queries) UpdateNodeCertMetadata(ctx context.Context, arg UpdateNodeCert
 	return err
 }
 
-const updateNodeDrained = `-- name: UpdateNodeDrained :exec
+const updateNodeDrained = `-- name: UpdateNodeDrained :one
 UPDATE nodes
-SET drained = $2
-WHERE id = $1
+SET drained = $1, drain_revision = drain_revision + 1
+WHERE id = $2
+  AND ($3::bigint IS NULL OR
+       (drain_revision = $3::bigint AND drained <> $1))
+RETURNING id, name, ip_address, version, concurrency, cpu_total_millis, cpu_free_millis, mem_total_bytes, mem_free_bytes, disk_total_bytes, disk_free_bytes, drained, drain_revision, cert_serial, cert_fingerprint, cert_not_before, cert_not_after, last_heartbeat, created_at
 `
 
 type UpdateNodeDrainedParams struct {
-	ID      types.NodeID `json:"id"`
-	Drained bool         `json:"drained"`
+	Drained          bool         `json:"drained"`
+	ID               types.NodeID `json:"id"`
+	ExpectedRevision *int64       `json:"expected_revision"`
 }
 
-func (q *Queries) UpdateNodeDrained(ctx context.Context, arg UpdateNodeDrainedParams) error {
-	_, err := q.db.Exec(ctx, updateNodeDrained, arg.ID, arg.Drained)
-	return err
+// Conditional callers can only change the observed state; operator reassertions
+// advance the revision so stale maintenance cannot restore admission.
+func (q *Queries) UpdateNodeDrained(ctx context.Context, arg UpdateNodeDrainedParams) (Node, error) {
+	row := q.db.QueryRow(ctx, updateNodeDrained, arg.Drained, arg.ID, arg.ExpectedRevision)
+	var i Node
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.IpAddress,
+		&i.Version,
+		&i.Concurrency,
+		&i.CpuTotalMillis,
+		&i.CpuFreeMillis,
+		&i.MemTotalBytes,
+		&i.MemFreeBytes,
+		&i.DiskTotalBytes,
+		&i.DiskFreeBytes,
+		&i.Drained,
+		&i.DrainRevision,
+		&i.CertSerial,
+		&i.CertFingerprint,
+		&i.CertNotBefore,
+		&i.CertNotAfter,
+		&i.LastHeartbeat,
+		&i.CreatedAt,
+	)
+	return i, err
 }
 
 const updateNodeHeartbeat = `-- name: UpdateNodeHeartbeat :exec

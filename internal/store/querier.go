@@ -203,7 +203,9 @@ type Querier interface {
 	UpdateJobStatus(ctx context.Context, arg UpdateJobStatusParams) error
 	UpdateMigSpec(ctx context.Context, arg UpdateMigSpecParams) error
 	UpdateNodeCertMetadata(ctx context.Context, arg UpdateNodeCertMetadataParams) error
-	UpdateNodeDrained(ctx context.Context, arg UpdateNodeDrainedParams) error
+	// Conditional callers can only change the observed state; operator reassertions
+	// advance the revision so stale maintenance cannot restore admission.
+	UpdateNodeDrained(ctx context.Context, arg UpdateNodeDrainedParams) (Node, error)
 	UpdateNodeHeartbeat(ctx context.Context, arg UpdateNodeHeartbeatParams) error
 	UpdateRunError(ctx context.Context, arg UpdateRunErrorParams) error
 	UpdateRunStatus(ctx context.Context, arg UpdateRunStatusParams) error

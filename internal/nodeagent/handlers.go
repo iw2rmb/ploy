@@ -77,7 +77,8 @@ func (s *Server) handleRunStart(w http.ResponseWriter, r *http.Request) {
 	req.ServerURL = s.cfg.ServerURL
 
 	ctx := r.Context()
-	if err := s.controller.AcquireSlot(ctx); err != nil {
+	slot, err := s.controller.AcquireSlot(ctx)
+	if err != nil {
 		// If the request is canceled or times out while waiting, treat it as a
 		// client-side timeout.
 		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
@@ -91,11 +92,11 @@ func (s *Server) handleRunStart(w http.ResponseWriter, r *http.Request) {
 	slotHeld := true
 	defer func() {
 		if slotHeld {
-			s.controller.ReleaseSlot()
+			s.controller.ReleaseSlot(slot)
 		}
 	}()
 
-	if err := s.controller.StartRun(ctx, req); err != nil {
+	if err := s.controller.StartRun(ctx, req, slot); err != nil {
 		http.Error(w, fmt.Sprintf("start run failed: %v", err), http.StatusInternalServerError)
 		return
 	}

@@ -4,6 +4,11 @@ parameters:
     required: true
     schema: { type: string }
     description: Unique URL-safe node ID
+  - in: query
+    name: expected_revision
+    required: false
+    schema: { type: integer, format: int64, minimum: 0 }
+    description: Change only this revision and the opposite drain state. Omit for an operator update or reassertion.
 post:
   tags: [Control]
   summary: Mark node as drained
@@ -12,11 +17,15 @@ post:
   responses:
     '204':
       description: Node drained
+      headers:
+        X-Ploy-Drain-Revision:
+          description: Revision after this update, including operator reassertions.
+          schema: { type: integer, format: int64 }
     '400':
-      description: Bad Request (invalid node ID)
+      description: Bad Request (invalid node ID or expected revision)
     '404':
       description: Node not found
     '409':
-      description: Node already drained
+      description: Conditional revision or drain state changed
     '500':
       description: Internal server error

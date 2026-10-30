@@ -44,7 +44,8 @@ func TestConcurrency_LimitsJobExecution(t *testing.T) {
 			ctx := context.Background()
 
 			// Acquire a concurrency slot (blocks if at capacity).
-			if err := rc.AcquireSlot(ctx); err != nil {
+			slot, err := rc.AcquireSlot(ctx)
+			if err != nil {
 				t.Errorf("job %d: AcquireSlot failed: %v", jobNum, err)
 				return
 			}
@@ -71,7 +72,7 @@ func TestConcurrency_LimitsJobExecution(t *testing.T) {
 			completedJobs.Add(1)
 
 			// Release the slot.
-			rc.ReleaseSlot()
+			rc.ReleaseSlot(slot)
 		}(i)
 	}
 
@@ -148,7 +149,8 @@ func TestConcurrency_DefaultsToOne(t *testing.T) {
 			defer wg.Done()
 
 			ctx := context.Background()
-			if err := rc.AcquireSlot(ctx); err != nil {
+			slot, err := rc.AcquireSlot(ctx)
+			if err != nil {
 				t.Errorf("job %d: AcquireSlot failed: %v", jobNum, err)
 				return
 			}
@@ -165,7 +167,7 @@ func TestConcurrency_DefaultsToOne(t *testing.T) {
 			<-jobRelease
 
 			currentConcurrency.Add(-1)
-			rc.ReleaseSlot()
+			rc.ReleaseSlot(slot)
 		}(i)
 	}
 
@@ -219,7 +221,8 @@ func TestConcurrency_ContextCancellation(t *testing.T) {
 
 	// Acquire the only slot.
 	ctx := context.Background()
-	if err := rc.AcquireSlot(ctx); err != nil {
+	slot, err := rc.AcquireSlot(ctx)
+	if err != nil {
 		t.Fatalf("initial AcquireSlot failed: %v", err)
 	}
 
@@ -229,7 +232,8 @@ func TestConcurrency_ContextCancellation(t *testing.T) {
 	// Start a goroutine that tries to acquire (will block).
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- rc.AcquireSlot(cancelCtx)
+		_, err := rc.AcquireSlot(cancelCtx)
+		errCh <- err
 	}()
 
 	// Give the goroutine time to block on acquire.
@@ -249,7 +253,7 @@ func TestConcurrency_ContextCancellation(t *testing.T) {
 	}
 
 	// Release the original slot.
-	rc.ReleaseSlot()
+	rc.ReleaseSlot(slot)
 }
 
 func TestConcurrency_SlotReleasedOnJobCompletion(t *testing.T) {
@@ -265,10 +269,11 @@ func TestConcurrency_SlotReleasedOnJobCompletion(t *testing.T) {
 	// Acquire and release a slot multiple times.
 	for i := 0; i < 5; i++ {
 		ctx := context.Background()
-		if err := rc.AcquireSlot(ctx); err != nil {
+		slot, err := rc.AcquireSlot(ctx)
+		if err != nil {
 			t.Fatalf("iteration %d: AcquireSlot failed: %v", i, err)
 		}
-		rc.ReleaseSlot()
+		rc.ReleaseSlot(slot)
 	}
 
 	// All iterations should complete without blocking indefinitely.

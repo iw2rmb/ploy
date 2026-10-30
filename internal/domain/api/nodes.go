@@ -23,6 +23,7 @@ type Node struct {
 	CertNotBefore   *string      `json:"cert_not_before,omitempty"`
 	CertNotAfter    *string      `json:"cert_not_after,omitempty"`
 	LastHeartbeat   *string      `json:"last_heartbeat,omitempty"`
+	DrainRevision   int64        `json:"drain_revision"`
 	Drained         bool         `json:"drained"`
 	CreatedAt       string       `json:"created_at"`
 }

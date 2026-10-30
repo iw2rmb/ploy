@@ -63,10 +63,6 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 		delete(r.jobs, req.JobID)
 		r.mu.Unlock()
 
-		// Release the concurrency slot acquired in claimAndExecute.
-		// This frees the slot for the next job to be claimed.
-		r.ReleaseSlot()
-		r.sweepAbandonedRuntimeIfIdle()
 	}()
 
 	slog.Info("starting job execution",

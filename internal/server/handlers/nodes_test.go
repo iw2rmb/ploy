@@ -50,6 +50,7 @@ func TestDrainUndrain(t *testing.T) {
 			handler:          drainNodeHandler,
 			action:           "drain",
 			nodeErr:          pgx.ErrNoRows,
+			wantDrainCalled:  true,
 			wantStatus:       http.StatusNotFound,
 			wantBodyContains: "node not found",
 		},
@@ -58,24 +59,25 @@ func TestDrainUndrain(t *testing.T) {
 			handler:          undrainNodeHandler,
 			action:           "undrain",
 			nodeErr:          pgx.ErrNoRows,
+			wantDrainCalled:  true,
 			wantStatus:       http.StatusNotFound,
 			wantBodyContains: "node not found",
 		},
 		{
-			name:             "drain/already_drained",
-			handler:          drainNodeHandler,
-			action:           "drain",
-			initialDrained:   true,
-			wantStatus:       http.StatusConflict,
-			wantBodyContains: "already drained",
+			name:            "drain/already_drained",
+			handler:         drainNodeHandler,
+			action:          "drain",
+			initialDrained:  true,
+			wantStatus:      http.StatusNoContent,
+			wantDrainCalled: true,
 		},
 		{
-			name:             "undrain/not_drained",
-			handler:          undrainNodeHandler,
-			action:           "undrain",
-			initialDrained:   false,
-			wantStatus:       http.StatusConflict,
-			wantBodyContains: "not drained",
+			name:            "undrain/not_drained",
+			handler:         undrainNodeHandler,
+			action:          "undrain",
+			initialDrained:  false,
+			wantStatus:      http.StatusNoContent,
+			wantDrainCalled: true,
 		},
 	}
 
@@ -244,6 +246,39 @@ func TestListNodesHandler(t *testing.T) {
 			assertStatus(t, rr, http.StatusOK)
 			resp := decodeBody[[]map[string]any](t, rr)
 			tc.assert(t, resp)
+		})
+	}
+}
+
+// Conditional updates forward the revision; stale owners cannot release drain.
+func TestConditionalNodeDrain(t *testing.T) {
+	for _, tc := range []struct {
+		name, revision string
+		updateErr      error
+		status         int
+	}{
+		{"owned", "7", nil, http.StatusNoContent},
+		{"stale", "6", pgx.ErrNoRows, http.StatusConflict},
+		{"invalid", "-1", nil, http.StatusBadRequest},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			id, node := newNodeFixture(true)
+			node.DrainRevision = 8
+			st := &handlerStore{}
+			st.getNode.val = node
+			st.updateNodeDrained.err = tc.updateErr
+			rr := doRequest(t, undrainNodeHandler(st), http.MethodPost, "/v1/nodes/"+id+"/undrain?expected_revision="+tc.revision, nil, "id", id)
+			assertStatus(t, rr, tc.status)
+			if tc.status == http.StatusBadRequest {
+				assertNotCalled(t, "update drain", st.updateNodeDrained.called)
+				return
+			}
+			if st.updateNodeDrained.params.ExpectedRevision == nil {
+				t.Fatal("missing conditional revision")
+			}
+			if tc.status == http.StatusNoContent && rr.Header().Get("X-Ploy-Drain-Revision") != "8" {
+				t.Fatal("missing resulting revision")
+			}
 		})
 	}
 }

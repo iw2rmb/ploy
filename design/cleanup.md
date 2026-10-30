@@ -5,10 +5,9 @@
 Host maintenance cannot establish an idle interval while job admission remains
 open, and age-only retention cannot prevent disk exhaustion.
 
-Enforce draining at job admission. Extend the existing host maintenance lock
-across job execution. Add pressure-based cleanup and terminal-run retention.
-Keep four delivery slices in this document, as requested. Each slice has one
-observable outcome and a complete enforcement boundary.
+The admission and maintenance boundary is implemented in
+[Node maintenance](../docs/node-maintenance.md). The remaining delivery slices
+add pressure-based cleanup (C3) and terminal-run retention (C4).
 
 ## Scope
 
@@ -29,19 +28,6 @@ changes are outside this design.
 
 ## Observed Constraint
 
-- `claimService.Claim` checks node existence. `ClaimJob` does not check
-  `nodes.drained` or free space. It locks the selected job, not the node.
-  The drain handler reads and updates the node in separate operations.
-- `ploy-node-cleanup` holds `ploy-node-maintenance.lock`, but jobs do not.
-  `wait_for_jobs` sees running labelled containers only. It misses claims,
-  image pulls, artifact uploads, and the interval between linked jobs.
-- `executeGateJob` can upload terminal status before its deferred artifact
-  upload. `executeRun` also has deferred runtime cleanup. A terminal database
-  status therefore does not establish local quiescence.
-- `runController` already owns execution slots and active jobs.
-  `sweepAbandonedRuntimeIfIdle` already checks terminal job status and deletes
-  job-owned `cache`, `home`, `staging`, and `tmp` directories. Startup recovery
-  already discovers and monitors surviving job containers.
 - Cleanup applies a 24-hour age filter to Docker pruning. Run-directory
   deletion uses access time. It has no free-space target. Node storage probes
   already report configured paths, capacity, inode counts, and probe errors.
@@ -53,76 +39,11 @@ changes are outside this design.
 
 ## Target Contract
 
-### C1: Drain excludes new claims
+### Prerequisite: admission and local quiescence
 
-Drain and claim serialize on the same node row. A claim that commits first is
-an existing job which maintenance must await. After drain commits, subsequent
-claims return the existing no-work response. A drained node never receives a
-new assignment. Job ordering, job locks, and sticky placement remain unchanged.
-
-Retain `nodes.drained` as the admission authority. Extend the node row with a
-monotonic `drain_revision` for conditional restoration. This revision is not a
-second admission flag. Every accepted operator drain or undrain advances it,
-including a reasserted drain. Expose the revision through the existing node
-representation and drain endpoints. Reassertions return success; update the
-current already-drained/already-undrained conflict contract accordingly.
-
-A maintenance caller acquires a drain only by conditionally changing an
-undrained node at the observed revision. It releases only its returned
-revision. Concurrent operator changes invalidate that release. A pre-existing
-drain remains untouched. A revision conflict causes the service to stop and
-report the conflict. A crash does not automatically clear the drain.
-
-### C2: Maintenance excludes local job activity
-
-Use the existing maintenance lock file as the local activity boundary. Jobs
-hold shared locks; maintenance holds an exclusive lock. Bind-mount the same
-host lock directory into the node. Never unlink or replace the lock inode.
-
-Acquire the shared lock before a claim request and transfer its ownership to
-the execution lifecycle with the existing concurrency slot. Hold it through
-image pulls, payload execution, artifact upload, terminal reporting, and final
-runtime cleanup. Release it on every no-work, rejection, cancellation, panic,
-and completed-execution path. Heartbeats and auth refresh remain independent.
-Use independent lock handles for concurrent lifecycles. The existing
-`/v1/run/start` entry point must use the same lifecycle boundary. It must not
-acquire a second handle for an already guarded execution. Put handle ownership
-in the controller contract, not in callers' flags.
-
-Maintenance uses this order:
-
-1. Acquire its conditional drain through C1.
-2. Acquire the exclusive maintenance lock with a bounded wait.
-3. Recheck drain ownership and reconcile runtime activity.
-4. Perform the host operation and verify its result.
-5. Conditionally restore admission, then release the exclusive lock.
-
-The drain closes admission while existing jobs finish. The lock proves local
-quiescence after deferred work finishes. Neither is a substitute for the other.
-Do not hold the exclusive lock before draining and then wait for jobs which
-need that lock. New claim attempts must not block heartbeat delivery.
-
-Extend startup recovery and the existing runtime sweeper to participate in
-this lock. A node crash releases its locks, but can leave Docker workloads
-alive. Under the exclusive lock, surviving running or restarting job
-containers and unaccounted Docker activity prevent pruning. Recover them
-through the existing reconciler before a later maintenance attempt. Do not
-infer permission to delete a running sidecar or volume from an idle parent.
-
-All deploy image pulls, prunes, update replacement, and dependency-generation
-publication use this boundary. Keep the update service's final image prune
-inside the exclusive interval. Move its undrain after that prune. Replace
-duplicated `wait_for_jobs` and unconditional EXIT-undrain traps with one shared
-deploy helper. Preserve the separate registry-auth lock.
-
-Timeout, recovery uncertainty, or operation failure leaves the node drained
-and emits an actionable journal error. A missing or inaccessible lock fails
-closed. Node replacement keeps the same host lock inode. The replacement can
-start and send heartbeats while its claim loop waits for maintenance to exit.
-
-Until C4 ships, disable host deletion of whole run directories and broad
-`TMPDIR` children. This prevents C2 from creating a false safety guarantee for
-unfinished runs between jobs. Keep the node's existing job-runtime cleanup.
+Use the existing revision-owned drain and shared/exclusive host lock described
+in [Node maintenance](../docs/node-maintenance.md). Preserve that ordering for
+C3 and C4. Whole-run and broad TMPDIR deletion remain disabled until C4.
 
 ### C3: Free space controls admission and cleanup
 
@@ -143,7 +64,7 @@ or stale results cannot authorize admission restoration. A post-prune decision
 requires a sample collected after that prune phase. Keep an explicit
 normal age-based mode and a pressure mode in the same service.
 
-Pressure mode enters C2, then removes stopped containers and unused images
+Pressure mode enters the maintenance boundary, then removes stopped containers and unused images
 without the normal age floor. Recheck actual filesystem free space after each
 phase. Once every required path reaches `target`, cleanup can restore only its
 own drain. If eligible data is exhausted below the target, leave the node
@@ -162,7 +83,7 @@ action even after all eligible data has been removed.
 
 ### C4: Run deletion requires terminal state and retained evidence
 
-Replace `run_has_recent_access` as the deletion authority. Under C2, a run
+Replace `run_has_recent_access` as the deletion authority. Under the maintenance boundary, a run
 directory is eligible only when the control plane reports the current run
 attempt terminal, no job of that run remains active, and all durable local
 artifacts are represented by a confirmed downloadable bundle. Age is measured
@@ -217,53 +138,18 @@ that sweeper or change dependency-cache generation ownership.
 
 | Boundary | Reuse and extension | Competing machinery removed |
 | --- | --- | --- |
-| Admission | `PgStore.ClaimJob`, `nodes.sql`, drain handlers; shared node-row transaction discipline and revision comparison | Separate read/check/write drain decisions |
-| Local activity | `RunController.AcquireSlot`/`ReleaseSlot`, `claimAndExecute`, `executeRun`, startup recovery; one shared-lock handle per admitted lifecycle | Container-list polling as proof of quiescence |
-| Host maintenance | Existing maintenance lock and service scripts; one common helper for conditional drain, exclusive lock, and release | Three copies of idle polling and unconditional undrain |
 | Capacity | `storage.go`, heartbeat diagnostics, node config, existing cleanup timer | Independent shell path lists and stale-heartbeat admission rules |
 | Retention | `repoArtifactBundleEntries`, uploader, `artifact_bundles`, blob reads, existing node API | Access time as liveness; duplicate retention registry |
 
-Introduce only the typed lifecycle handle, conditional-drain revision, and
-artifact coverage manifest needed for the stated invariants. Derive active
+Introduce only the artifact coverage manifest needed for retention. Derive active
 work from the existing controller and recovery machinery. Do not add another
 active-job counter. Missing runtime evidence blocks maintenance.
 
 ## Implementation Slice
 
-### C1 — Transactional drain admission
-
-- In `ploy`, extend the node schema, generated store/API types, `ClaimJob`,
-  drain/undrain operations, and their API contracts. Acquire the node row lock
-  before selecting a job. Reuse the current job selection and skip-locked logic.
-- Deliver conditional revision acquisition/release in the existing endpoints.
-  Update callers affected by the idempotent drain response contract.
-- Verify concurrent claim/drain ordering, stale revision rejection, operator
-  reassertion, sticky placement, and claims on different nodes proceeding
-  independently. Use real PostgreSQL concurrency tests, not SQL-text assertions.
-- Healthy exit: drain return is an admission barrier. Defer local quiescence,
-  pressure policy, and retention to C2–C4. This slice alone does not authorize
-  pruning after a terminal job status.
-
-### C2 — Exclusive host maintenance
-
-- Requires C1. Deliver `ploy` lifecycle lock integration and `deploy` lock
-  mount, shared helper, cleanup, update, and Gradle publication changes together.
-  Retire `wait_for_jobs` as the enforcing boundary in every consumer.
-- Cover claims before container creation, deferred uploads, runtime cleanup,
-  recovered containers, crashes, and replacement-node startup. Disable unsafe
-  whole-run and broad temporary-directory pruning until C4.
-- Verify a blocked image pull and a blocked deferred artifact upload each
-  prevent exclusive maintenance. Verify maintenance blocks new claims, normal
-  jobs still run concurrently, failures preserve drain, and auth refresh works.
-- Healthy exit: no participating Docker pull or job writer overlaps pruning.
-  Extend `services/tests/test_services.sh` and node lifecycle tests; both
-  worktrees must pass before rollout. Upgrade nodes before enabling the new
-  host protocol; old nodes without lock participation must fail preflight.
-  Defer pressure thresholds and terminal-run retention.
-
 ### C3 — Pressure-based cleanup
 
-- Requires C2. Extend `storage.go`, node pre-claim checks, config validation,
+- Requires the maintenance boundary. Extend `storage.go`, node pre-claim checks, config validation,
   deploy configuration, and the existing cleanup service/timer together.
 - Use the same path observations and thresholds for the capacity check and
   cleanup target. Document the monitoring interval and production sizing data.
@@ -276,7 +162,7 @@ active-job counter. Missing runtime evidence blocks maintenance.
 
 ### C4 — Terminal-run retention
 
-- Requires C2 and C3. Extend the existing node API, artifact selection/upload,
+- Requires the maintenance boundary and C3. Extend the existing node API, artifact selection/upload,
   bundle coverage validation, and deploy run pruning as one delivery boundary.
   Reuse the existing store/blob contracts and runtime sweeper.
 - Enable whole-run deletion only through typed eligibility. Handle old bundles
@@ -308,9 +194,8 @@ Logs identify the drain revision, operation, constrained path, before/after
 bytes, and reason for any preserved directory without exposing credentials.
 
 Update `docs/node-maintenance.md` and deploy service documentation as each slice
-ships. Reconcile the maintenance consumer in `design/gradle-cache-to-be.md`
-with C2 without redefining its cache contract. Remove shipped slice details
-from this DD while preserving prerequisites needed by remaining slices.
+ships. Remove shipped slice details while preserving prerequisites for the
+remaining slices.
 
 ## References
 

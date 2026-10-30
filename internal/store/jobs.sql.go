@@ -64,13 +64,16 @@ func (q *Queries) CancelActiveJobsByRunAttempt(ctx context.Context, arg CancelAc
 }
 
 const claimJob = `-- name: ClaimJob :one
-WITH eligible AS (
+WITH claiming_node AS MATERIALIZED (
+  SELECT nodes.id, nodes.drained FROM nodes WHERE nodes.id = $1
+  FOR NO KEY UPDATE
+), eligible AS (
   SELECT j.id, n.id AS node_id
-  FROM nodes n
+  FROM claiming_node n
   JOIN jobs j ON TRUE
   JOIN runs r ON j.run_id = r.id
   JOIN waves w ON w.id = r.wave_id
-  WHERE n.id = $1
+  WHERE NOT n.drained
     AND $1::TEXT != ''
     AND j.status = 'Queued'
     AND (j.node_id IS NULL OR j.node_id = n.id)

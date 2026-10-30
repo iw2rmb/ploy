@@ -81,9 +81,10 @@ func (c *ClaimManager) Start(ctx context.Context) error {
 func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 	// Acquire a concurrency slot before claiming. This ensures the node does not
 	// claim more work than it can execute concurrently (Config.Concurrency).
-	// The slot is released in executeRun's defer when the job completes.
-	if err := c.controller.AcquireSlot(ctx); err != nil {
-		// Context was canceled while waiting for a slot.
+	// The slot is released in the controller's execution wrapper when the job completes.
+	slot, err := c.controller.AcquireSlot(ctx)
+	if err != nil {
+		// Admission fails closed when the host lock cannot be acquired.
 		return false, err
 	}
 
@@ -93,7 +94,7 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 	defer func() {
 		// Release the slot if we still hold it (claim failed or no work available).
 		if slotHeld {
-			c.controller.ReleaseSlot()
+			c.controller.ReleaseSlot(slot)
 		}
 	}()
 
@@ -192,7 +193,7 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 	}
 
 	// Invoke controller.StartRun to execute the claimed job.
-	if err := c.controller.StartRun(ctx, startReq); err != nil {
+	if err := c.controller.StartRun(ctx, startReq, slot); err != nil {
 		// Even if StartRun fails, we've already claimed the work.
 		// The node cannot execute this job, so the claim loop surfaces an error.
 		c.emitRunException(
@@ -209,7 +210,7 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 	}
 
 	// Transfer slot ownership to the controller. The slot will be released
-	// in executeRun's defer when the job completes.
+	// in the controller's execution wrapper when the job completes.
 	slotHeld = false
 
 	return true, nil

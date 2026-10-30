@@ -24,6 +24,11 @@ func (c *ClaimManager) runStartupReconcilePass(ctx context.Context) error {
 		return errors.New("startup crash reconciler not configured")
 	}
 
+	lock, err := acquireMaintenanceActivity(ctx)
+	if err != nil {
+		return err
+	}
+	defer lock.Close()
 	snapshot, err := c.startupReconciler.Discover(ctx)
 	if err != nil {
 		return fmt.Errorf("discover startup crash containers: %w", err)
@@ -48,6 +53,12 @@ func (c *ClaimManager) sweepAbandonedRuntimeIfIdle() {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), abandonedRuntimeSweepTimeout)
 	defer cancel()
+	lock, err := acquireMaintenanceActivity(ctx)
+	if err != nil {
+		slog.Warn("skip runtime sweep", "error", err)
+		return
+	}
+	defer lock.Close()
 	c.reconcileDockerJobResources(ctx)
 	if sweeper, ok := c.controller.(interface{ sweepAbandonedRuntimeIfIdle() }); ok {
 		sweeper.sweepAbandonedRuntimeIfIdle()
