@@ -74,6 +74,7 @@ func TestExecuteJobInvalidRuntimeFailsWithoutAdvancingWorkspace(t *testing.T) {
 
 // Both job paths release Docker connections and flush the final log before the artifact upload.
 func TestExecuteJobReleasesRuntimeBeforeArtifactUpload(t *testing.T) {
+	t.Setenv("PLOY_CONTAINER_REGISTRY", "registry.example/ploy")
 	for _, jobType := range []types.JobType{types.JobTypeMig, types.JobTypePostGate} {
 		for _, outcome := range []string{"success", "execution failure", "cancelled", "setup failure"} {
 			t.Run(jobType.String()+"/"+outcome, func(t *testing.T) {
