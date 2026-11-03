@@ -87,7 +87,7 @@ func generateGitDiff(ctx context.Context, workspace string) ([]byte, error) {
 		return nil, fmt.Errorf("git add failed: %w", err)
 	}
 
-	diff, err := runGitOutputWithEnv(ctx, workspace, env, "diff", "--cached", "HEAD")
+	diff, err := runGitOutputWithEnv(ctx, workspace, env, "diff", "--cached", "--binary", "--full-index", "HEAD")
 	if err != nil {
 		return nil, fmt.Errorf("git diff --cached failed: %w", err)
 	}

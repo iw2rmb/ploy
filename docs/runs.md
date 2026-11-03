@@ -195,6 +195,15 @@ SSH user and port, and the trailing `.git` suffix. `--force` skips all three
 safety checks. It does not suppress run lookup, patch download, or `git apply`
 errors.
 
+Accumulated downloads replay stored patches against the original source snapshot
+and return one source-to-result patch. They include committed changes from prior
+attempts when the node retained the workspace. Earlier failed uploads are excluded
+because the successful retry patch already includes their retained edits. A fresh
+attempt starts a new replay prefix. For successful results, the server verifies
+the reconstructed tree against the recorded output SHA. Missing patches, failed
+replay, or a mismatched result return an error instead of a partial patch. Export
+requires access to the source snapshot through the existing Git credentials.
+
 Nodes upload final repo artifacts when a job fails or errors, when `post_gate`
 succeeds, and when a terminal `mig` succeeds for a run with
 `build_gate.disabled: true`.

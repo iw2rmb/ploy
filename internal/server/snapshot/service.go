@@ -51,6 +51,14 @@ func NewService(opts Options) *Service {
 }
 
 func (s *Service) WriteTarGz(ctx context.Context, meta Metadata, w io.Writer) error {
+	return s.WithWorkspace(ctx, meta, func(workspace string) error {
+		return writeDirectoryTarGz(workspace, w)
+	})
+}
+
+// WithWorkspace materializes the immutable source in an isolated directory and
+// removes it after use. Callers must not retain the path.
+func (s *Service) WithWorkspace(ctx context.Context, meta Metadata, use func(string) error) error {
 	repoURL := domaintypes.NormalizeRepoURL(meta.RepoURL)
 	if repoURL == "" {
 		return fmt.Errorf("repo_url is empty")
@@ -96,7 +104,7 @@ func (s *Service) WriteTarGz(ctx context.Context, meta Metadata, w io.Writer) er
 	if err := verifyHEAD(ctx, workspace, commitSHA); err != nil {
 		return err
 	}
-	return writeDirectoryTarGz(workspace, w)
+	return use(workspace)
 }
 
 func (s *Service) authForMetadata(meta Metadata, repoURL string) (gitauth.Options, error) {

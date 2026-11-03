@@ -127,6 +127,17 @@ func TestFilesystemDiffGenerator(t *testing.T) {
 			wantContains: []string{"test.txt", "-initial content", "+modified content"},
 		},
 		{
+			name: "binary change contains replayable data",
+			setup: func(t *testing.T) string {
+				dir, file := initGitRepo(t, "original\x00binary")
+				if err := os.WriteFile(file, []byte("modified\x00binary"), 0600); err != nil {
+					t.Fatal(err)
+				}
+				return dir
+			},
+			wantContains: []string{"GIT binary patch", "literal"},
+		},
+		{
 			name: "empty diff when no changes",
 			setup: func(t *testing.T) string {
 				dir, _ := initGitRepo(t, "content\n")

@@ -16,6 +16,7 @@ import (
 
 type repoSnapshotWriter interface {
 	WriteTarGz(ctx context.Context, meta snapshot.Metadata, w io.Writer) error
+	WithWorkspace(ctx context.Context, meta snapshot.Metadata, use func(string) error) error
 }
 
 func getRunSnapshotHandler(st store.Store, snapshots repoSnapshotWriter) http.HandlerFunc {

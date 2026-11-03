@@ -126,7 +126,7 @@ func registerRunRoutes(s routeRegistrar, deps routeDeps) {
 	s.RegisterRouteFunc("POST /v1/runs/{run_id}/restart", restartRunHandler(deps.st, deps.gitAuth, deps.gitLabTokens), auth.RoleControlPlane)
 	s.RegisterRouteFunc("POST /v1/runs/{run_id}/pull", pullRunHandler(deps.st), auth.RoleControlPlane)
 	s.RegisterRouteFunc("GET /v1/runs/{run_id}/snapshot", getRunSnapshotHandler(deps.st, deps.snapshots), auth.RoleWorker)
-	s.RegisterRouteFuncAllowQueryToken("GET /v1/runs/{run_id}/diffs", listRunDiffsHandler(deps.st, deps.bs), auth.RoleControlPlane, auth.RoleWorker)
+	s.RegisterRouteFuncAllowQueryToken("GET /v1/runs/{run_id}/diffs", listRunDiffsHandler(deps.st, deps.bs, deps.snapshots), auth.RoleControlPlane, auth.RoleWorker)
 	s.RegisterRouteFuncAllowQueryToken("GET /v1/runs/{run_id}/logs", getRunLogsHandler(deps.st, deps.eventsService), auth.RoleControlPlane)
 	s.RegisterRouteFunc("GET /v1/runs/{run_id}/artifacts", listRunArtifactsHandler(deps.st), auth.RoleControlPlane)
 	s.RegisterRouteFunc("GET /v1/runs/{run_id}/jobs", listRunJobsHandler(deps.st), auth.RoleControlPlane)

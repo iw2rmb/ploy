@@ -10,12 +10,6 @@ import (
 	"github.com/iw2rmb/ploy/internal/gitexec"
 )
 
-const (
-	repoSHAV1AuthorLine  = "author node <node@ploy.local> 0 +0000"
-	repoSHAV1CommitLine  = "committer node <node@ploy.local> 0 +0000"
-	repoSHAV1CommitTitle = "ploy repo_sha_v1"
-)
-
 var workspaceTreeAddArgs = []string{"add", "-A", "--", "."}
 
 // ComputeRepoSHAV1 calculates deterministic repo_sha_out for a workspace.
@@ -45,21 +39,7 @@ func ComputeRepoSHAV1(ctx context.Context, repoDir, repoSHAIn string, inputTree 
 		return repoSHAIn, nil
 	}
 
-	commitData := fmt.Sprintf(
-		"tree %s\nparent %s\n%s\n%s\n\n%s\n",
-		snapshotTree,
-		repoSHAIn,
-		repoSHAV1AuthorLine,
-		repoSHAV1CommitLine,
-		repoSHAV1CommitTitle,
-	)
-	repoSHAOut, err := runGitOutput(ctx, repoDir, nil, []byte(commitData), "hash-object", "-t", "commit", "--stdin")
-	if err != nil {
-		return "", fmt.Errorf("hash synthetic commit: %w", err)
-	}
-	if !domaintypes.IsCanonicalFullCommitSHA(repoSHAOut) {
-		return "", fmt.Errorf("computed repo_sha_out has invalid format")
-	}
+	repoSHAOut := gitexec.RepositorySHA(snapshotTree, repoSHAIn)
 	return repoSHAOut, nil
 }
 

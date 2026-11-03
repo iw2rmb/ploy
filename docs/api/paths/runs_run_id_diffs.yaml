@@ -1,6 +1,13 @@
 get:
   tags: [Artifacts]
   summary: List or download diffs for a run
+  description: >-
+    With download=true and accumulated=true, replay the committed patch history
+    against the original source snapshot and return one gzipped source-to-result
+    patch. Retained attempts include their earlier committed prefix. Successful
+    results are verified against their recorded output SHA.
   responses:
     "200":
       description: Diff list or patch stream.
+    "409":
+      description: Source snapshot or patch history cannot reconstruct the selected result.

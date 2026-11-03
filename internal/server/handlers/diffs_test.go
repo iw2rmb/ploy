@@ -35,7 +35,7 @@ func TestRunDiffs_Download(t *testing.T) {
 		RepoID:  repoIDTyped,
 		Attempt: 1,
 	}
-	st.listJobsByRunAttempt.val = []store.Job{
+	st.listJobsByRun.val = []store.Job{
 		{ID: jobID, RunID: runID, RepoID: repoIDTyped, Attempt: 1},
 	}
 	st.getLatestDiffByJob.val = store.Diff{
@@ -53,7 +53,7 @@ func TestRunDiffs_Download(t *testing.T) {
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID.String()+"/diffs?download=true&diff_id="+diffID.String(), nil)
 	req.SetPathValue("run_id", runID.String())
-	listRunDiffsHandler(st, bs).ServeHTTP(rr, req)
+	listRunDiffsHandler(st, bs, nil).ServeHTTP(rr, req)
 	assertStatus(t, rr, http.StatusOK)
 	if ct := rr.Header().Get("Content-Type"); ct != "application/gzip" {
 		t.Fatalf("content-type=%s, want application/gzip", ct)
@@ -63,50 +63,6 @@ func TestRunDiffs_Download(t *testing.T) {
 	}
 	if !st.getLatestDiffByJob.called {
 		t.Fatal("expected GetLatestDiffByJob to be called")
-	}
-}
-
-func TestRunDiffs_DownloadAccumulated(t *testing.T) {
-	st := &handlerStore{}
-	runID := domaintypes.NewRunID()
-	repoID := "repoAAAA"
-	repoIDTyped := domaintypes.RepoID(repoID)
-	jobID1 := domaintypes.NewJobID()
-	jobID2 := domaintypes.NewJobID()
-	diffID1 := uuid.New()
-	diffID2 := uuid.New()
-	objKey1 := "diffs/run/" + runID.String() + "/diff/" + diffID1.String() + ".patch.gz"
-	objKey2 := "diffs/run/" + runID.String() + "/diff/" + diffID2.String() + ".patch.gz"
-	patch1 := "diff --git a/a.txt b/a.txt\n+one\n"
-	patch2 := "diff --git a/b.txt b/b.txt\n+two\n"
-
-	st.getRun.val = store.Run{
-		ID:      runID,
-		RepoID:  repoIDTyped,
-		Attempt: 1,
-	}
-	st.listJobsByRunAttempt.val = []store.Job{
-		{ID: jobID1, RunID: runID, RepoID: repoIDTyped, Attempt: 1, NextID: &jobID2},
-		{ID: jobID2, RunID: runID, RepoID: repoIDTyped, Attempt: 1},
-	}
-	st.getLatestDiffByJobByID = map[domaintypes.JobID]store.Diff{
-		jobID1: {ID: pgtype.UUID{Bytes: diffID1, Valid: true}, RunID: runID, JobID: &jobID1, ObjectKey: &objKey1},
-		jobID2: {ID: pgtype.UUID{Bytes: diffID2, Valid: true}, RunID: runID, JobID: &jobID2, ObjectKey: &objKey2},
-	}
-
-	bs := bsmock.New()
-	_, _ = bs.Put(context.TODO(), objKey1, "application/gzip", gzipTestBytes(t, []byte(patch1)))
-	_, _ = bs.Put(context.TODO(), objKey2, "application/gzip", gzipTestBytes(t, []byte(patch2)))
-
-	rr := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID.String()+"/diffs?download=true&accumulated=true&diff_id="+diffID2.String(), nil)
-	req.SetPathValue("run_id", runID.String())
-	listRunDiffsHandler(st, bs).ServeHTTP(rr, req)
-
-	assertStatus(t, rr, http.StatusOK)
-	gotPlain := gunzipTestBytes(t, rr.Body.Bytes())
-	if string(gotPlain) != patch1+patch2 {
-		t.Fatalf("accumulated patch mismatch: got %q, want %q", string(gotPlain), patch1+patch2)
 	}
 }
 
@@ -120,13 +76,13 @@ func TestRunDiffs_ReturnsEmptyListWhenRunHasNoDiffJobs(t *testing.T) {
 		RepoID:  domaintypes.RepoID(repoBID),
 		Attempt: 1,
 	}
-	st.listJobsByRunAttempt.val = []store.Job{}
+	st.listJobsByRun.val = []store.Job{}
 
 	bs := bsmock.New()
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID.String()+"/diffs", nil)
 	req.SetPathValue("run_id", runID.String())
-	listRunDiffsHandler(st, bs).ServeHTTP(rr, req)
+	listRunDiffsHandler(st, bs, nil).ServeHTTP(rr, req)
 
 	assertStatus(t, rr, http.StatusOK)
 
@@ -164,7 +120,7 @@ func TestRunDiffs_ReturnsOwnDiffs(t *testing.T) {
 		RepoID:  repoIDTyped,
 		Attempt: 1,
 	}
-	st.listJobsByRunAttempt.val = []store.Job{{
+	st.listJobsByRun.val = []store.Job{{
 		ID:      jobID,
 		RunID:   runID,
 		RepoID:  repoIDTyped,
@@ -183,7 +139,7 @@ func TestRunDiffs_ReturnsOwnDiffs(t *testing.T) {
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID.String()+"/diffs", nil)
 	req.SetPathValue("run_id", runID.String())
-	listRunDiffsHandler(st, bs).ServeHTTP(rr, req)
+	listRunDiffsHandler(st, bs, nil).ServeHTTP(rr, req)
 
 	assertStatus(t, rr, http.StatusOK)
 
@@ -218,7 +174,7 @@ func TestRunDiffs_MissingRunID(t *testing.T) {
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/v1/runs//diffs", nil)
 	req.SetPathValue("run_id", "")
-	listRunDiffsHandler(st, bs).ServeHTTP(rr, req)
+	listRunDiffsHandler(st, bs, nil).ServeHTTP(rr, req)
 
 	assertStatus(t, rr, http.StatusBadRequest)
 }

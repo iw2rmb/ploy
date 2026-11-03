@@ -184,9 +184,9 @@ func syntheticCommitHashOnly(t *testing.T, repoDir, parentSHA, treeSHA string) s
 
 	commitData := "tree " + treeSHA + "\n" +
 		"parent " + parentSHA + "\n" +
-		repoSHAV1AuthorLine + "\n" +
-		repoSHAV1CommitLine + "\n\n" +
-		repoSHAV1CommitTitle + "\n"
+		"author node <node@ploy.local> 0 +0000" + "\n" +
+		"committer node <node@ploy.local> 0 +0000" + "\n\n" +
+		"ploy repo_sha_v1" + "\n"
 	syntheticSHA, err := runGitOutput(context.Background(), repoDir, nil, []byte(commitData), "hash-object", "-t", "commit", "--stdin")
 	if err != nil {
 		t.Fatalf("hash synthetic commit: %v", err)

@@ -211,7 +211,7 @@ ploy mig pull <mig-id|name>
 2. Verifies the working tree is clean (no uncommitted changes).
 3. Resolves the run via `POST /v1/runs/{run_id}/pull` (or `POST /v1/migs/{mig_id}/pull` for mig-based pull).
 4. Fetches repo details and verifies local `HEAD` matches the run's `source_commit_sha`.
-5. Downloads and applies all stored Migs diffs via `git apply`.
+5. For `run apply`, downloads one reconstructed source-to-result patch and applies it via `git apply`.
 
 **Arguments:**
 - `<run-id>` — Run ID (KSUID string), for `ploy run apply`.
