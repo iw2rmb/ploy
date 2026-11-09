@@ -3,10 +3,13 @@ package nodeagent
 import (
 	"context"
 	"io"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/testutil/gitrepo"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"github.com/iw2rmb/ploy/internal/workflow/step"
 )
@@ -130,6 +133,61 @@ func TestRunMigContainerJobNonzeroExitReportsDerivedStatsError(t *testing.T) {
 			}
 			if got, ok := timings["total_duration_ms"].(float64); !ok || got < float64(hydrationDuration.Milliseconds()) {
 				t.Fatalf("total_duration_ms = %#v, want at least %d", timings["total_duration_ms"], hydrationDuration.Milliseconds())
+			}
+		})
+	}
+}
+
+// Successful steps report the real commit, including when a resumed input SHA is synthetic.
+func TestRunMigContainerJobReportsGitHEAD(t *testing.T) {
+	for _, changed := range []bool{false, true} {
+		name := "unchanged workspace retains HEAD"
+		if changed {
+			name = "changed workspace reports new commit"
+		}
+		t.Run(name, func(t *testing.T) {
+			t.Setenv("PLOYD_CACHE_HOME", t.TempDir())
+			req := StartRunRequest{RunID: types.NewRunID(), JobID: types.NewJobID(), RepoID: types.NewRepoID(), JobType: types.JobTypeMig, RepoSHAIn: types.CommitSHA(strings.Repeat("f", 40))}
+			paths := jobDirectories(req.RunID, req.JobID)
+			if err := ensureJobDirectories(paths); err != nil {
+				t.Fatal(err)
+			}
+			workspace := t.TempDir()
+			initRepoWithFile(t, workspace, "tracked.bin", "original\n")
+			gitrepo.WriteFile(t, filepath.Join(workspace, ".gitignore"), "tracked.bin\n")
+			gitrepo.CommitAll(t, workspace, "ignore tracked file")
+			before := gitrepo.RevParse(t, workspace, "HEAD")
+			server, captured := newStatusCaptureServer(t, req.JobID.String())
+			controller := newTestController(t, newAgentConfig(server.URL))
+			execCtx := executionContext{runner: step.Runner{Containers: &mockContainerRuntime{
+				waitFn: func(context.Context, step.ContainerHandle) (step.ContainerResult, error) {
+					if changed {
+						gitrepo.WriteFile(t, filepath.Join(workspace, "tracked.bin"), "changed\n")
+					}
+					return step.ContainerResult{ExitCode: 0}, nil
+				},
+			}}}
+			mounts, err := jobMounts(paths, req.RunID, req.JobType)
+			if err != nil {
+				t.Fatal(err)
+			}
+			outcome, err := controller.runMigContainerJob(context.Background(), req, contracts.StepManifest{ID: "mig", Image: "example/mig:latest"}, execCtx, workspace, time.Now(), 0, paths, mounts)
+			if err != nil || outcome.runErr != nil {
+				t.Fatalf("execution: %v; outcome: %v", err, outcome.runErr)
+			}
+			head := gitrepo.RevParse(t, workspace, "HEAD")
+			if (head != before) != changed {
+				t.Fatalf("HEAD changed = %v, want %v", head != before, changed)
+			}
+			if outcome.repoSHAOut != head || captured.Payload["repo_sha_out"] != head {
+				t.Fatalf("reported SHA = %q / %v, want %s", outcome.repoSHAOut, captured.Payload["repo_sha_out"], head)
+			}
+			want := "original\n"
+			if changed {
+				want = "changed\n"
+			}
+			if got := string(gitrepo.Run(t, workspace, "show", head+":tracked.bin")); got != want {
+				t.Fatalf("committed tracked file = %q, want %q", got, want)
 			}
 		})
 	}

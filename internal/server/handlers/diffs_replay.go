@@ -54,7 +54,7 @@ func downloadAccumulatedRunDiff(w http.ResponseWriter, r *http.Request, st store
 		serverError(w, "download accumulated diff", "snapshot metadata", err)
 		return false
 	}
-	sequence, targetJob, err := selectReplayDiffs(jobs, diffs, *target, meta.SourceCommitSha)
+	sequence, err := selectReplayDiffs(jobs, diffs, *target, meta.SourceCommitSha)
 	if err != nil {
 		writeHTTPError(w, http.StatusConflict, "cannot reconstruct run patch: %v", err)
 		return false
@@ -65,7 +65,7 @@ func downloadAccumulatedRunDiff(w http.ResponseWriter, r *http.Request, st store
 		SourceCommitSHA: meta.SourceCommitSha, GitLabTokenHash: gitlabtoken.HashFromRunStats(meta.Stats),
 	}, func(workspace string) error {
 		var replayErr error
-		patch, replayErr = replayRunDiffs(r.Context(), bs, workspace, meta.SourceCommitSha, jobs, sequence, targetJob)
+		patch, replayErr = replayRunDiffs(r.Context(), bs, workspace, meta.SourceCommitSha, sequence)
 		return replayErr
 	})
 	if err != nil {
@@ -87,17 +87,17 @@ func downloadAccumulatedRunDiff(w http.ResponseWriter, r *http.Request, st store
 
 // Failed executions do not advance HEAD. Their edits are included in the next
 // successful patch, so replaying both would apply the same changes twice.
-func selectReplayDiffs(jobs []store.Job, diffs []store.Diff, target store.Diff, source string) ([]store.Diff, store.Job, error) {
+func selectReplayDiffs(jobs []store.Job, diffs []store.Diff, target store.Diff, source string) ([]store.Diff, error) {
 	byID := make(map[types.JobID]store.Job, len(jobs))
 	for _, job := range jobs {
 		byID[job.ID] = job
 	}
 	if target.JobID == nil {
-		return nil, store.Job{}, fmt.Errorf("target diff has no job")
+		return nil, fmt.Errorf("target diff has no job")
 	}
 	targetJob, ok := byID[*target.JobID]
 	if !ok {
-		return nil, store.Job{}, fmt.Errorf("target job is missing")
+		return nil, fmt.Errorf("target job is missing")
 	}
 	firstAttempt := replayFirstAttempt(jobs, targetJob.Attempt, source)
 	latest := make(map[types.JobID]store.Diff)
@@ -120,7 +120,7 @@ func selectReplayDiffs(jobs []store.Job, diffs []store.Diff, target store.Diff, 
 		}
 	}
 	if !found {
-		return nil, targetJob, fmt.Errorf("target diff is missing from history")
+		return nil, fmt.Errorf("target diff is missing from history")
 	}
 	// The target replaces earlier uploads for its job, including failed attempts.
 	delete(latest, targetJob.ID)
@@ -133,10 +133,10 @@ func selectReplayDiffs(jobs []store.Job, diffs []store.Diff, target store.Diff, 
 			sequence = append(sequence, diff)
 		}
 	}
-	return append(sequence, target), targetJob, nil
+	return append(sequence, target), nil
 }
 
-func replayRunDiffs(ctx context.Context, bs blobstore.Store, workspace, source string, jobs []store.Job, sequence []store.Diff, target store.Job) ([]byte, error) {
+func replayRunDiffs(ctx context.Context, bs blobstore.Store, workspace, source string, sequence []store.Diff) ([]byte, error) {
 	git := func(input []byte, args ...string) ([]byte, error) {
 		result, err := gitexec.Execute(ctx, gitexec.Request{Dir: workspace, Args: args, Stdin: input})
 		if err != nil {
@@ -178,19 +178,6 @@ func replayRunDiffs(ctx context.Context, bs blobstore.Store, workspace, source s
 			return nil, fmt.Errorf("diff %s: %w", uuid.UUID(diff.ID.Bytes), err)
 		}
 	}
-	tree, err := git(nil, "write-tree")
-	if err != nil {
-		return nil, err
-	}
-	if target.Status == types.JobStatusSuccess {
-		sourceTree, err := git(nil, "rev-parse", source+"^{tree}")
-		if err != nil {
-			return nil, err
-		}
-		if !matchesReplayTree(string(tree), string(sourceTree), source, target.RepoShaOut, jobs) {
-			return nil, fmt.Errorf("replayed tree does not match recorded result %s", target.RepoShaOut)
-		}
-	}
 	// Emit one patch; concatenated incremental patches are not a source-to-result diff.
 	result, err := gitexec.Execute(ctx, gitexec.Request{Dir: workspace, Args: []string{"diff", "--cached", "--binary", "--full-index", source, "--"}})
 	if err != nil {
@@ -200,20 +187,6 @@ func replayRunDiffs(ctx context.Context, bs blobstore.Store, workspace, source s
 		return nil, fmt.Errorf("result patch exceeds size limit")
 	}
 	return result.Stdout, nil
-}
-
-func matchesReplayTree(tree, sourceTree, source, result string, jobs []store.Job) bool {
-	if result == source {
-		return tree == sourceTree
-	}
-	for _, job := range jobs {
-		if job.RepoShaOut == result && job.RepoShaIn != result && types.IsCanonicalFullCommitSHA(job.RepoShaIn) {
-			if gitexec.RepositorySHA(tree, job.RepoShaIn) == result {
-				return true
-			}
-		}
-	}
-	return false
 }
 
 // A fresh chain head reports the source SHA. Retained workspaces require the

@@ -146,6 +146,11 @@ func newRunApplyServer(t *testing.T, runID, repoID, jobID, sourceSHA string, pat
 				}},
 			})
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/runs/"+runID+"/diffs" && r.URL.Query().Get("download") == "true":
+			if r.URL.Query().Get("accumulated") != "true" {
+				t.Errorf("unexpected download query: %s", r.URL.RawQuery)
+				http.Error(w, "unexpected download query", http.StatusBadRequest)
+				return
+			}
 			w.Header().Set("Content-Type", "application/gzip")
 			gz := gzip.NewWriter(w)
 			_, _ = gz.Write(patch)

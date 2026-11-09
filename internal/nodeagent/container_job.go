@@ -9,7 +9,6 @@ import (
 	"time"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
-	gitpkg "github.com/iw2rmb/ploy/internal/nodeagent/git"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"github.com/iw2rmb/ploy/internal/workflow/step"
 )
@@ -161,13 +160,6 @@ func (r *runController) runMigContainerJob(
 	}}
 	var runErr error
 
-	preWorkspaceTree := ""
-	if tree, treeErr := gitpkg.ComputeWorkspaceTreeSHA(ctx, workspace); treeErr != nil {
-		return outcome, fmt.Errorf("compute pre-execution workspace tree: %w", treeErr)
-	} else {
-		preWorkspaceTree = tree
-	}
-
 	_, err := r.materializeJobResources(ctx, manifest, manifest.BundleMap, mounts.Staging)
 	if err != nil {
 		return outcome, err
@@ -213,10 +205,10 @@ func (r *runController) runMigContainerJob(
 	repoSHAOut := ""
 	if runErr == nil && result.ExitCode == 0 {
 		var repoSHAErr error
-		repoSHAOut, repoSHAErr = r.computeRepoSHAOut(ctx, req, workspace, preWorkspaceTree)
+		repoSHAOut, repoSHAErr = resolveGitHEAD(ctx, workspace)
 		if repoSHAErr != nil {
 			runErr = repoSHAErr
-			slog.Error("failed to compute repo_sha_out", "run_id", req.RunID, "job_id", req.JobID, "error", repoSHAErr)
+			slog.Error("failed to resolve repo_sha_out", "run_id", req.RunID, "job_id", req.JobID, "error", repoSHAErr)
 		}
 	}
 

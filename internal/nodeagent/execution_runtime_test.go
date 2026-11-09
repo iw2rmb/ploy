@@ -207,6 +207,11 @@ func TestExecuteJobReleasesRuntimeBeforeArtifactUpload(t *testing.T) {
 				if status.Status != wantStatus.String() {
 					t.Errorf("status = %s, want %s; stats=%v", status.Status, wantStatus, status.Stats)
 				}
+				if outcome == "success" {
+					if got, want := status.Payload["repo_sha_out"], gitrepo.RevParse(t, workspace, "HEAD"); got != want {
+						t.Errorf("repo_sha_out = %v, want Git HEAD %s", got, want)
+					}
+				}
 				if requests.Load() == 0 || !uploaded.Load() {
 					t.Fatalf("execution or final upload missing: Docker requests=%d uploaded=%v", requests.Load(), uploaded.Load())
 				}

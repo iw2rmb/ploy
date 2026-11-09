@@ -5,14 +5,20 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/iw2rmb/ploy/internal/testutil/gitrepo"
 )
 
 func TestEnsureCommit_IgnoresRootTargetDirectory(t *testing.T) {
 	t.Parallel()
 
-	repoDir := initTestRepoWithSingleCommit(t)
+	repoDir := t.TempDir()
+	gitrepo.Init(t, repoDir)
+	gitrepo.WriteFile(t, filepath.Join(repoDir, "main.txt"), "base\n")
+	gitrepo.CommitAll(t, repoDir, "initial")
 	ctx := context.Background()
-	_ = prepareRepoWithTargetIgnore(t, ctx, repoDir)
+	gitrepo.WriteFile(t, filepath.Join(repoDir, ".gitignore"), "target/\n")
+	gitrepo.CommitAll(t, repoDir, "ignore build output")
 
 	if err := os.MkdirAll(filepath.Join(repoDir, "target"), 0o755); err != nil {
 		t.Fatalf("mkdir target: %v", err)
@@ -36,7 +42,10 @@ func TestEnsureCommit_IgnoresRootTargetDirectory(t *testing.T) {
 func TestEnsureCommit_SkipsRepositoryHooks(t *testing.T) {
 	t.Parallel()
 
-	repoDir := initTestRepoWithSingleCommit(t)
+	repoDir := t.TempDir()
+	gitrepo.Init(t, repoDir)
+	gitrepo.WriteFile(t, filepath.Join(repoDir, "main.txt"), "base\n")
+	gitrepo.CommitAll(t, repoDir, "initial")
 	ctx := context.Background()
 	if err := runGitCommand(ctx, repoDir, nil, "config", "--unset", "core.hooksPath"); err != nil {
 		t.Fatalf("git config --unset core.hooksPath: %v", err)

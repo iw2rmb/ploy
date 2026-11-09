@@ -12,7 +12,6 @@ import (
 	"time"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
-	gitpkg "github.com/iw2rmb/ploy/internal/nodeagent/git"
 	"github.com/iw2rmb/ploy/internal/workflow/lifecycle"
 	"github.com/iw2rmb/ploy/internal/workflow/step"
 )
@@ -92,19 +91,6 @@ func (r *runController) reportTerminalStatus(
 	}
 	slog.Info("job terminated", "run_id", req.RunID, "job_id", req.JobID, "status", status,
 		"exit_code", result.ExitCode, "duration", duration)
-}
-
-func (r *runController) computeRepoSHAOut(ctx context.Context, req StartRunRequest, workspace string, inputTree string) (string, error) {
-	repoSHAIn := strings.TrimSpace(req.RepoSHAIn.String())
-	if repoSHAIn == "" {
-		return "", fmt.Errorf("repo_sha_in missing on claimed job")
-	}
-	preTree := strings.TrimSpace(inputTree)
-	repoSHAOut, err := gitpkg.ComputeRepoSHAV1(ctx, workspace, repoSHAIn, preTree)
-	if err != nil {
-		return "", fmt.Errorf("compute repo_sha_out: %w", err)
-	}
-	return repoSHAOut, nil
 }
 
 // uploadDiff is the shared implementation for generating, summarizing, and uploading

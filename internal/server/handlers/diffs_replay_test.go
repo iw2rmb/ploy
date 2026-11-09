@@ -47,12 +47,16 @@ func (s replaySnapshot) WithWorkspace(_ context.Context, _ snapshot.Metadata, us
 // Replay preserves earlier-attempt commits, replaces failed uploads, and emits
 // an applicable source-to-result patch including binaries and reversions.
 func TestRunDiffs_ReplayRetainedAttempt(t *testing.T) {
-	for _, mismatch := range []bool{false, true} {
-		name := "verified result applies to source"
-		if mismatch {
-			name = "wrong result is rejected"
-		}
-		t.Run(name, func(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		outputSHA   string
+		brokenPatch bool
+	}{
+		{name: "missing output SHA still exports applicable patch"},
+		{name: "unrelated output SHA still exports applicable patch", outputSHA: strings.Repeat("f", 40)},
+		{name: "invalid patch fails replay", brokenPatch: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
 			workspace := t.TempDir()
 			gitrepo.Init(t, workspace)
@@ -80,8 +84,7 @@ func TestRunDiffs_ReplayRetainedAttempt(t *testing.T) {
 			gitrepo.WriteFile(t, filepath.Join(workspace, "pom.xml"), "intermediate\n")
 			first := addDiff(firstID, 0)
 			gitrepo.CommitAll(t, workspace, "first attempt")
-			firstTree := strings.TrimSpace(string(gitrepo.Run(t, workspace, "rev-parse", "HEAD^{tree}")))
-			firstSHA := gitexec.RepositorySHA(firstTree, source)
+			firstSHA := strings.TrimSpace(string(gitrepo.Run(t, workspace, "rev-parse", "HEAD")))
 			gitrepo.WriteFile(t, filepath.Join(workspace, "pom.xml"), "failed edit\n")
 			addDiff(targetID, 1)
 			gitrepo.WriteFile(t, filepath.Join(workspace, "pom.xml"), "original\n")
@@ -91,12 +94,13 @@ func TestRunDiffs_ReplayRetainedAttempt(t *testing.T) {
 			}
 			gitrepo.Run(t, workspace, "add", "-A")
 			targetDiff := addDiff(targetID, 0)
-			tree := strings.TrimSpace(string(gitrepo.Run(t, workspace, "write-tree")))
-			out := gitexec.RepositorySHA(tree, firstSHA)
-			if mismatch {
-				out = strings.Repeat("f", 40)
+			if tc.brokenPatch {
+				if _, err := bs.Put(ctx, *targetDiff.ObjectKey, "application/gzip", gzipTestBytes(t, []byte("invalid patch"))); err != nil {
+					t.Fatal(err)
+				}
 			}
-			target := store.Job{ID: targetID, RunID: runID, Attempt: 2, Status: types.JobStatusSuccess, RepoShaIn: firstSHA, RepoShaOut: out}
+			tree := strings.TrimSpace(string(gitrepo.Run(t, workspace, "write-tree")))
+			target := store.Job{ID: targetID, RunID: runID, Attempt: 2, Status: types.JobStatusSuccess, RepoShaIn: firstSHA, RepoShaOut: tc.outputSHA}
 			st := &replayStore{handlerStore: &handlerStore{}, diffs: diffs, source: source}
 			st.getRun.val = store.Run{ID: runID, Attempt: 2}
 			st.listJobsByRun.val = []store.Job{{ID: firstID, Attempt: 1, Status: types.JobStatusSuccess, RepoShaIn: source, RepoShaOut: firstSHA}, target}
@@ -107,8 +111,11 @@ func TestRunDiffs_ReplayRetainedAttempt(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID.String()+"/diffs?download=true&accumulated=true&diff_id="+uuid.UUID(targetDiff.ID.Bytes).String(), nil)
 			req.SetPathValue("run_id", runID.String())
 			listRunDiffsHandler(st, bs, replaySnapshot{workspace}).ServeHTTP(rr, req)
-			if mismatch {
+			if tc.brokenPatch {
 				assertStatus(t, rr, http.StatusConflict)
+				if !strings.Contains(rr.Body.String(), "cannot reconstruct run patch") || !strings.Contains(rr.Body.String(), "git apply") {
+					t.Fatalf("unexpected replay error: %s", rr.Body.String())
+				}
 				return
 			}
 			assertStatus(t, rr, http.StatusOK)
@@ -149,7 +156,7 @@ func TestSelectReplayDiffs(t *testing.T) {
 				headOut = source
 			}
 			jobs := []store.Job{{ID: oldID, Attempt: 1, Status: types.JobStatusSuccess}, {ID: headID, Attempt: 2, JobType: types.JobTypePreGate, Status: types.JobStatusSuccess, RepoShaOut: headOut}, {ID: newID, Attempt: 2, Status: types.JobStatusFail}}
-			got, _, err := selectReplayDiffs(jobs, []store.Diff{old, failed, target}, target, source)
+			got, err := selectReplayDiffs(jobs, []store.Diff{old, failed, target}, target, source)
 			if err != nil {
 				t.Fatal(err)
 			}

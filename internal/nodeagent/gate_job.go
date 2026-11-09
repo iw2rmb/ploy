@@ -145,7 +145,7 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest,
 	repoSHAOut := ""
 	if status == types.JobStatusSuccess {
 		var repoSHAErr error
-		repoSHAOut, repoSHAErr = r.computeRepoSHAOut(ctx, req, workspace, "")
+		repoSHAOut, repoSHAErr = resolveGitHEAD(ctx, workspace)
 		if repoSHAErr != nil {
 			uploadRepoArtifactsOnReturn = true
 			stats := r.buildGateStats(gateResult, duration)

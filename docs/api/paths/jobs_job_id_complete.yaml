@@ -95,7 +95,8 @@ post:
             repo_sha_out:
               type: string
               description: |
-                Optional deterministic output repository SHA for this job.
+                Git HEAD commit SHA after this job. Successful migration jobs commit
+                their changes before reporting; gates report the current HEAD.
                 Must match lowercase 40-hex format (`^[0-9a-f]{40}$`).
               pattern: '^[0-9a-f]{40}$'
   responses:
