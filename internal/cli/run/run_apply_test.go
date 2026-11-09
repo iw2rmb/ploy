@@ -5,8 +5,10 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -16,7 +18,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/testutil/gitrepo"
 )
 
-func TestRunApplyAppliesAccumulatedPatch(t *testing.T) {
+func TestRunApplyAppliesStoredPatch(t *testing.T) {
 	repoDir := gitrepo.SetupWithRemote(t, "https://gitlab.example.com/acme/service.git")
 	runID := domaintypes.NewRunID().String()
 	repoID := domaintypes.NewRepoID().String()
@@ -109,6 +111,8 @@ func TestRunApplyForceBypassesAllSafetyChecks(t *testing.T) {
 	gitrepo.Run(t, repoDir, "remote", "remove", "origin")
 	gitrepo.WriteFile(t, filepath.Join(repoDir, "LOCAL.txt"), "staged local change\n")
 	gitrepo.Run(t, repoDir, "add", "LOCAL.txt")
+	staged := gitrepo.Run(t, repoDir, "diff", "--cached", "--binary")
+	gitrepo.WriteFile(t, filepath.Join(repoDir, "LOCAL.txt"), "unstaged local change\n")
 	runID := domaintypes.NewRunID().String()
 	repoID := domaintypes.NewRepoID().String()
 	jobID := domaintypes.NewJobID().String()
@@ -121,12 +125,21 @@ func TestRunApplyForceBypassesAllSafetyChecks(t *testing.T) {
 		t.Fatalf("RunApply --force: %v", err)
 	}
 	gitrepo.AssertFileContent(t, filepath.Join(repoDir, "README.md"), "# Forced Repo\n")
-	gitrepo.AssertFileContent(t, filepath.Join(repoDir, "LOCAL.txt"), "staged local change\n")
+	gitrepo.AssertFileContent(t, filepath.Join(repoDir, "LOCAL.txt"), "unstaged local change\n")
+	if got := gitrepo.Run(t, repoDir, "diff", "--cached", "--binary"); !bytes.Equal(got, staged) {
+		t.Fatalf("staged changes changed: %s", got)
+	}
 }
 
-func newRunApplyServer(t *testing.T, runID, repoID, jobID, sourceSHA string, patch []byte) *httptest.Server {
+func newRunApplyServer(t *testing.T, runID, repoID, jobID, sourceSHA string, patches ...[]byte) *httptest.Server {
 	t.Helper()
-	diffID := "11111111-1111-1111-1111-111111111111"
+	items := make([]map[string]any, 0, len(patches))
+	byID := make(map[string][]byte, len(patches))
+	for i, patch := range patches {
+		id := fmt.Sprintf("%08d-1111-1111-1111-111111111111", i+1)
+		items = append(items, map[string]any{"id": id, "job_id": jobID, "created_at": "2026-05-28T00:00:00Z", "gzipped_size": len(patch)})
+		byID[id] = patch
+	}
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.Method == http.MethodPost && r.URL.Path == "/v1/runs/"+runID+"/pull":
@@ -137,18 +150,20 @@ func newRunApplyServer(t *testing.T, runID, repoID, jobID, sourceSHA string, pat
 				"source_commit_sha": sourceSHA,
 			})
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/runs/"+runID+"/diffs" && r.URL.Query().Get("download") != "true":
-			_ = json.NewEncoder(w).Encode(map[string]any{
-				"diffs": []map[string]any{{
-					"id":           diffID,
-					"job_id":       jobID,
-					"created_at":   "2026-05-28T00:00:00Z",
-					"gzipped_size": len(patch),
-				}},
-			})
+			_ = json.NewEncoder(w).Encode(map[string]any{"diffs": items})
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/runs/"+runID+"/diffs" && r.URL.Query().Get("download") == "true":
-			if r.URL.Query().Get("accumulated") != "true" {
+			if r.URL.Query().Get("accumulated") != "" {
 				t.Errorf("unexpected download query: %s", r.URL.RawQuery)
 				http.Error(w, "unexpected download query", http.StatusBadRequest)
+				return
+			}
+			patch, ok := byID[r.URL.Query().Get("diff_id")]
+			if !ok {
+				http.NotFound(w, r)
+				return
+			}
+			if patch == nil {
+				http.Error(w, "patch storage unavailable", http.StatusServiceUnavailable)
 				return
 			}
 			w.Header().Set("Content-Type", "application/gzip")
@@ -159,4 +174,73 @@ func newRunApplyServer(t *testing.T, runID, repoID, jobID, sourceSHA string, pat
 			http.NotFound(w, r)
 		}
 	}))
+}
+
+// Dependent edits, reversions, binaries, and deletions are replayed in list order.
+func TestRunApplyReplaysStoredPatchesLocally(t *testing.T) {
+	repo := gitrepo.SetupWithRemote(t, "https://gitlab.example.com/acme/service.git")
+	source := gitrepo.RevParse(t, repo, "HEAD")
+	var patches [][]byte
+	for _, text := range []string{"intermediate\n", "final\n", "# Test Repo\n"} {
+		gitrepo.WriteFile(t, filepath.Join(repo, "README.md"), text)
+		gitrepo.WriteFile(t, filepath.Join(repo, "binary.dat"), "\x00"+text)
+		gitrepo.Run(t, repo, "add", "-A")
+		patches = append(patches, gitrepo.Run(t, repo, "diff", "--cached", "--binary", "--full-index", "HEAD"))
+		gitrepo.CommitAll(t, repo, "step")
+	}
+	if err := os.Remove(filepath.Join(repo, "README.md")); err != nil {
+		t.Fatal(err)
+	}
+	gitrepo.Run(t, repo, "add", "-A")
+	patches = append(patches, gitrepo.Run(t, repo, "diff", "--cached", "--binary", "HEAD"))
+	wantTree := strings.TrimSpace(string(gitrepo.Run(t, repo, "write-tree")))
+	gitrepo.Run(t, repo, "reset", "--hard", source)
+	runID := domaintypes.NewRunID().String()
+	server := newRunApplyServer(t, runID, domaintypes.NewRepoID().String(), domaintypes.NewJobID().String(), source, patches...)
+	defer server.Close()
+	clienv.UseControlPlaneEnv(t, server.URL)
+	if err := RunApply(context.Background(), ApplyOptions{RunID: runID, RepoPath: repo}); err != nil {
+		t.Fatal(err)
+	}
+	if staged := gitrepo.Run(t, repo, "diff", "--cached"); len(staged) != 0 {
+		t.Fatalf("index changed: %s", staged)
+	}
+	gitrepo.Run(t, repo, "add", "-A")
+	if got := strings.TrimSpace(string(gitrepo.Run(t, repo, "write-tree"))); got != wantTree {
+		t.Fatalf("tree = %s, want %s", got, wantTree)
+	}
+}
+
+// A failed later patch or download preserves both local files and the staging area.
+func TestRunApplySequenceFailurePreservesCheckout(t *testing.T) {
+	for _, failure := range []string{"replay", "download"} {
+		t.Run(failure, func(t *testing.T) {
+			repo := gitrepo.SetupWithRemote(t, "https://gitlab.example.com/acme/service.git")
+			source := gitrepo.RevParse(t, repo, "HEAD")
+			gitrepo.WriteFile(t, filepath.Join(repo, "README.md"), "first change\n")
+			first := gitrepo.Run(t, repo, "diff", "--binary", "HEAD")
+			gitrepo.Run(t, repo, "reset", "--hard", source)
+			gitrepo.WriteFile(t, filepath.Join(repo, "LOCAL.txt"), "staged\n")
+			gitrepo.Run(t, repo, "add", "LOCAL.txt")
+			gitrepo.WriteFile(t, filepath.Join(repo, "LOCAL.txt"), "unstaged\n")
+			before := gitrepo.Run(t, repo, "diff", "--cached", "--binary")
+			second := []byte("invalid patch")
+			if failure == "download" {
+				second = nil
+			}
+			runID := domaintypes.NewRunID().String()
+			server := newRunApplyServer(t, runID, domaintypes.NewRepoID().String(), domaintypes.NewJobID().String(), source, first, second)
+			defer server.Close()
+			clienv.UseControlPlaneEnv(t, server.URL)
+			err := RunApply(context.Background(), ApplyOptions{RunID: runID, RepoPath: repo, Force: true})
+			if err == nil || !strings.Contains(err.Error(), "00000002-1111-1111-1111-111111111111") {
+				t.Fatalf("expected second patch failure, got %v", err)
+			}
+			gitrepo.AssertFileContent(t, filepath.Join(repo, "README.md"), "# Test Repo\n")
+			gitrepo.AssertFileContent(t, filepath.Join(repo, "LOCAL.txt"), "unstaged\n")
+			if got := gitrepo.Run(t, repo, "diff", "--cached", "--binary"); !bytes.Equal(got, before) {
+				t.Fatalf("index changed: %s", got)
+			}
+		})
+	}
 }

@@ -8,7 +8,9 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -96,16 +98,49 @@ func runApply(ctx context.Context, opts ApplyOptions, base *url.URL, httpClient 
 		return nil
 	}
 
-	latest := diffs[len(diffs)-1]
-	patch, err := runs.DownloadDiffCommand{
-		Client:      httpClient,
-		BaseURL:     base,
-		RunID:       runID,
-		DiffID:      latest.ID,
-		Accumulated: true,
-	}.Run(ctx)
+	indexDir, err := os.MkdirTemp("", "ploy-apply-*")
 	if err != nil {
-		return fmt.Errorf("run apply: download patch: %w", err)
+		return fmt.Errorf("run apply: create temporary index: %w", err)
+	}
+	defer os.RemoveAll(indexDir)
+	// Replay against the current files without changing the user's staging area.
+	git := func(input []byte, args ...string) ([]byte, error) {
+		result, err := gitexec.Execute(ctx, gitexec.Request{
+			Dir: local.Worktree, Env: []string{"GIT_INDEX_FILE=" + filepath.Join(indexDir, "index")}, Args: args, Stdin: input,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("git %s failed: %w: %s", args[0], err, strings.TrimSpace(string(result.Stderr)))
+		}
+		return result.Stdout, nil
+	}
+	if _, err := git(nil, "read-tree", "HEAD"); err != nil {
+		return fmt.Errorf("run apply: %w", err)
+	}
+	if _, err := git(nil, "add", "-A", "--", "."); err != nil {
+		return fmt.Errorf("run apply: %w", err)
+	}
+	before, err := git(nil, "write-tree")
+	if err != nil {
+		return fmt.Errorf("run apply: %w", err)
+	}
+	for _, diff := range diffs {
+		patch, err := (runs.DownloadDiffCommand{
+			Client: httpClient, BaseURL: base, RunID: runID, DiffID: diff.ID,
+		}).Run(ctx)
+		if err != nil {
+			return fmt.Errorf("run apply: download patch %s: %w", diff.ID, err)
+		}
+		if len(bytes.TrimSpace(patch)) == 0 {
+			continue
+		}
+		if _, err := git(patch, "apply", "--cached", "--whitespace=nowarn", "-"); err != nil {
+			return fmt.Errorf("run apply: patch %s: %w", diff.ID, err)
+		}
+	}
+	// Publish only the replay's net changes after every patch has succeeded.
+	patch, err := git(nil, "diff", "--cached", "--binary", "--full-index", strings.TrimSpace(string(before)), "--")
+	if err != nil {
+		return fmt.Errorf("run apply: %w", err)
 	}
 	if len(bytes.TrimSpace(patch)) == 0 {
 		_, _ = fmt.Fprintf(out, "Patch for run %s is empty.\n", runID.String())

@@ -188,14 +188,20 @@ ploy run apply <run-id> [path] [--force]
 ```
 
 `run pull` downloads final artifacts into a directory. By default, `run apply`
-applies the accumulated run patch only when the local git worktree is clean,
+applies the run patches only when the local git worktree is clean,
 the local origin matches the run `repo_url`, and local `HEAD` matches the run
 `source_commit_sha`. Repository matching ignores the SSH or HTTPS transport,
 SSH user and port, and the trailing `.git` suffix. `--force` skips these local
 checks. It does not suppress run lookup, patch download, patch replay, or
 `git apply` errors.
 
-Accumulated downloads replay stored patches against the original source snapshot
+`run apply` lists patches with `GET /v1/runs/<id>/diffs` and downloads each patch
+with `?download=true&diff_id=<id>`. It replays them locally in the returned order
+through a temporary Git index. The checkout receives the net changes only after
+all downloads and patches succeed; the user's staging area stays unchanged.
+This path does not clone the source on the server or download artifact bundles.
+
+Direct accumulated downloads replay stored patches against the original source snapshot
 and return one source-to-result patch. They include committed changes from prior
 attempts when the node retained the workspace. Earlier failed uploads are excluded
 because the successful retry patch already includes their retained edits. A fresh

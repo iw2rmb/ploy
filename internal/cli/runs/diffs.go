@@ -40,11 +40,10 @@ func (c ListRunDiffsCommand) Run(ctx context.Context) ([]domainapi.DiffListItem,
 
 // DownloadDiffCommand downloads and decompresses one run diff.
 type DownloadDiffCommand struct {
-	Client      *http.Client
-	BaseURL     *url.URL
-	RunID       domaintypes.RunID
-	DiffID      domaintypes.DiffID
-	Accumulated bool
+	Client  *http.Client
+	BaseURL *url.URL
+	RunID   domaintypes.RunID
+	DiffID  domaintypes.DiffID
 }
 
 func (c DownloadDiffCommand) Run(ctx context.Context) ([]byte, error) {
@@ -76,9 +75,6 @@ func (c DownloadDiffCommand) download(ctx context.Context, operation string) (*h
 	query := endpoint.Query()
 	query.Set("download", "true")
 	query.Set("diff_id", c.DiffID.String())
-	if c.Accumulated {
-		query.Set("accumulated", "true")
-	}
 	endpoint.RawQuery = query.Encode()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
