@@ -138,7 +138,7 @@ func runApply(ctx context.Context, opts ApplyOptions, base *url.URL, httpClient 
 		}
 	}
 	// Publish only the replay's net changes after every patch has succeeded.
-	patch, err := git(nil, "diff", "--cached", "--binary", "--full-index", strings.TrimSpace(string(before)), "--")
+	patch, err := git(nil, "diff", "--cached", "--binary", "--full-index", "--no-color", "--no-ext-diff", "--no-textconv", "--src-prefix=a/", "--dst-prefix=b/", strings.TrimSpace(string(before)), "--")
 	if err != nil {
 		return fmt.Errorf("run apply: %w", err)
 	}

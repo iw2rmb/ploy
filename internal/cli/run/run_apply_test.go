@@ -195,6 +195,10 @@ func TestRunApplyReplaysStoredPatchesLocally(t *testing.T) {
 	patches = append(patches, gitrepo.Run(t, repo, "diff", "--cached", "--binary", "HEAD"))
 	wantTree := strings.TrimSpace(string(gitrepo.Run(t, repo, "write-tree")))
 	gitrepo.Run(t, repo, "reset", "--hard", source)
+	// Machine-readable export must ignore the user's display settings.
+	gitrepo.Run(t, repo, "config", "color.ui", "always")
+	gitrepo.Run(t, repo, "config", "diff.noprefix", "true")
+	gitrepo.Run(t, repo, "config", "diff.external", "false")
 	runID := domaintypes.NewRunID().String()
 	server := newRunApplyServer(t, runID, domaintypes.NewRepoID().String(), domaintypes.NewJobID().String(), source, patches...)
 	defer server.Close()
@@ -202,7 +206,7 @@ func TestRunApplyReplaysStoredPatchesLocally(t *testing.T) {
 	if err := RunApply(context.Background(), ApplyOptions{RunID: runID, RepoPath: repo}); err != nil {
 		t.Fatal(err)
 	}
-	if staged := gitrepo.Run(t, repo, "diff", "--cached"); len(staged) != 0 {
+	if staged := gitrepo.Run(t, repo, "diff", "--cached", "--no-ext-diff"); len(staged) != 0 {
 		t.Fatalf("index changed: %s", staged)
 	}
 	gitrepo.Run(t, repo, "add", "-A")
