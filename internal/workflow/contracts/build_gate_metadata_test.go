@@ -5,21 +5,23 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	types "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-// TestBuildGateStageMetadata_DetectedStack verifies that DetectedStack correctly
+// TestBuildGateMetadata_DetectedStack verifies that DetectedStack correctly
 // derives the MigStack from the first static check's tool name.
-func TestBuildGateStageMetadata_DetectedStack(t *testing.T) {
+func TestBuildGateMetadata_DetectedStack(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name string
-		meta BuildGateStageMetadata
+		meta BuildGateMetadata
 		want MigStack
 	}{
 		{
 			name: "maven tool detected",
-			meta: BuildGateStageMetadata{
+			meta: BuildGateMetadata{
 				StaticChecks: []BuildGateStaticCheckReport{
 					{Language: "java", Tool: "maven", Passed: true},
 				},
@@ -28,7 +30,7 @@ func TestBuildGateStageMetadata_DetectedStack(t *testing.T) {
 		},
 		{
 			name: "gradle tool detected",
-			meta: BuildGateStageMetadata{
+			meta: BuildGateMetadata{
 				StaticChecks: []BuildGateStaticCheckReport{
 					{Language: "java", Tool: "gradle", Passed: false},
 				},
@@ -37,7 +39,7 @@ func TestBuildGateStageMetadata_DetectedStack(t *testing.T) {
 		},
 		{
 			name: "java tool detected",
-			meta: BuildGateStageMetadata{
+			meta: BuildGateMetadata{
 				StaticChecks: []BuildGateStaticCheckReport{
 					{Language: "java", Tool: "java", Passed: true},
 				},
@@ -46,7 +48,7 @@ func TestBuildGateStageMetadata_DetectedStack(t *testing.T) {
 		},
 		{
 			name: "none tool (gate skipped)",
-			meta: BuildGateStageMetadata{
+			meta: BuildGateMetadata{
 				StaticChecks: []BuildGateStaticCheckReport{
 					{Tool: "none", Passed: true},
 				},
@@ -55,19 +57,19 @@ func TestBuildGateStageMetadata_DetectedStack(t *testing.T) {
 		},
 		{
 			name: "empty static checks",
-			meta: BuildGateStageMetadata{
+			meta: BuildGateMetadata{
 				StaticChecks: []BuildGateStaticCheckReport{},
 			},
 			want: MigStackUnknown,
 		},
 		{
 			name: "nil static checks",
-			meta: BuildGateStageMetadata{},
+			meta: BuildGateMetadata{},
 			want: MigStackUnknown,
 		},
 		{
 			name: "multiple checks uses first",
-			meta: BuildGateStageMetadata{
+			meta: BuildGateMetadata{
 				StaticChecks: []BuildGateStaticCheckReport{
 					{Language: "java", Tool: "maven", Passed: true},
 					{Language: "java", Tool: "gradle", Passed: true},
@@ -77,7 +79,7 @@ func TestBuildGateStageMetadata_DetectedStack(t *testing.T) {
 		},
 		{
 			name: "detected_stack tool takes precedence",
-			meta: BuildGateStageMetadata{
+			meta: BuildGateMetadata{
 				Detected: &StackExpectation{
 					Language: "java",
 					Tool:     "gradle",
@@ -102,12 +104,12 @@ func TestBuildGateStageMetadata_DetectedStack(t *testing.T) {
 	}
 }
 
-func TestBuildGateStageMetadata_DetectedStackExpectation(t *testing.T) {
+func TestBuildGateMetadata_DetectedStackExpectation(t *testing.T) {
 	t.Parallel()
 
 	t.Run("from detected_stack", func(t *testing.T) {
 		t.Parallel()
-		meta := BuildGateStageMetadata{
+		meta := BuildGateMetadata{
 			Detected: &StackExpectation{
 				Language: "java",
 				Tool:     "gradle",
@@ -125,7 +127,7 @@ func TestBuildGateStageMetadata_DetectedStackExpectation(t *testing.T) {
 
 	t.Run("fallback to static checks", func(t *testing.T) {
 		t.Parallel()
-		meta := BuildGateStageMetadata{
+		meta := BuildGateMetadata{
 			StaticChecks: []BuildGateStaticCheckReport{
 				{Language: "java", Tool: "maven", Passed: true},
 			},
@@ -140,30 +142,30 @@ func TestBuildGateStageMetadata_DetectedStackExpectation(t *testing.T) {
 	})
 }
 
-func TestBuildGateStageMetadata_Validate_DetectedStack(t *testing.T) {
+func TestBuildGateMetadata_Validate_DetectedStack(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name    string
-		meta    BuildGateStageMetadata
+		meta    BuildGateMetadata
 		wantErr string
 	}{
 		{
 			name: "valid detected stack",
-			meta: BuildGateStageMetadata{
+			meta: BuildGateMetadata{
 				Detected: &StackExpectation{Language: "java", Tool: "gradle", Release: "11"},
 			},
 		},
 		{
 			name: "missing detected language",
-			meta: BuildGateStageMetadata{
+			meta: BuildGateMetadata{
 				Detected: &StackExpectation{Tool: "gradle", Release: "11"},
 			},
 			wantErr: "detected_stack.language",
 		},
 		{
 			name: "missing detected tool",
-			meta: BuildGateStageMetadata{
+			meta: BuildGateMetadata{
 				Detected: &StackExpectation{Language: "java", Release: "11"},
 			},
 			wantErr: "detected_stack.tool",
@@ -205,32 +207,32 @@ func TestStackGateResult_Validate(t *testing.T) {
 	}
 }
 
-// TestBuildGateStageMetadata_Validate_StackGate verifies that metadata validation
+// TestBuildGateMetadata_Validate_StackGate verifies that metadata validation
 // includes stack gate result validation.
-func TestBuildGateStageMetadata_Validate_StackGate(t *testing.T) {
+func TestBuildGateMetadata_Validate_StackGate(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name      string
-		meta      BuildGateStageMetadata
+		meta      BuildGateMetadata
 		errSubstr string
 	}{
 		{
 			name: "nil stack gate is valid",
-			meta: BuildGateStageMetadata{
+			meta: BuildGateMetadata{
 				StaticChecks: []BuildGateStaticCheckReport{{Tool: "maven", Passed: true}},
 			},
 		},
 		{
 			name: "valid stack gate result is valid",
-			meta: BuildGateStageMetadata{
+			meta: BuildGateMetadata{
 				StaticChecks: []BuildGateStaticCheckReport{{Tool: "stack-gate", Passed: true}},
 				StackGate:    &StackGateResult{Enabled: true, Result: "pass"},
 			},
 		},
 		{
 			name: "invalid stack gate result causes validation failure",
-			meta: BuildGateStageMetadata{
+			meta: BuildGateMetadata{
 				StaticChecks: []BuildGateStaticCheckReport{{Tool: "stack-gate", Passed: false}},
 				StackGate:    &StackGateResult{Enabled: true, Result: ""},
 			},
@@ -246,12 +248,12 @@ func TestBuildGateStageMetadata_Validate_StackGate(t *testing.T) {
 	}
 }
 
-func TestBuildGateStageMetadata_JSONRoundTrip(t *testing.T) {
+func TestBuildGateMetadata_JSONRoundTrip(t *testing.T) {
 	t.Parallel()
 
 	t.Run("stack gate fields", func(t *testing.T) {
 		t.Parallel()
-		original := BuildGateStageMetadata{
+		original := BuildGateMetadata{
 			StaticChecks: []BuildGateStaticCheckReport{{
 				Language: "java",
 				Tool:     "stack-gate",
@@ -283,19 +285,19 @@ func TestBuildGateStageMetadata_JSONRoundTrip(t *testing.T) {
 
 	t.Run("bug summary", func(t *testing.T) {
 		t.Parallel()
-		requireJSONRoundTrip(t, BuildGateStageMetadata{
+		requireJSONRoundTrip(t, BuildGateMetadata{
 			BugSummary: "Missing semicolon on line 42",
 		})
 	})
 }
 
-func requireJSONRoundTrip(t *testing.T, original BuildGateStageMetadata) {
+func requireJSONRoundTrip(t *testing.T, original BuildGateMetadata) {
 	t.Helper()
 	data, err := json.Marshal(original)
 	if err != nil {
 		t.Fatalf("Marshal() error: %v", err)
 	}
-	var decoded BuildGateStageMetadata
+	var decoded BuildGateMetadata
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		t.Fatalf("Unmarshal() error: %v", err)
 	}
@@ -304,7 +306,7 @@ func requireJSONRoundTrip(t *testing.T, original BuildGateStageMetadata) {
 	}
 }
 
-func TestBuildGateStageMetadata_BugSummary_Validation(t *testing.T) {
+func TestBuildGateMetadata_BugSummary_Validation(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -320,8 +322,76 @@ func TestBuildGateStageMetadata_BugSummary_Validation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			meta := BuildGateStageMetadata{BugSummary: tt.bugSummary}
+			meta := BuildGateMetadata{BugSummary: tt.bugSummary}
 			requireValidationErr(t, meta.Validate(), tt.wantSubstr)
+		})
+	}
+}
+
+func TestBuildGateMetadataValidate(t *testing.T) {
+	tests := []struct {
+		name    string
+		meta    BuildGateMetadata
+		wantErr bool
+	}{
+		{
+			name: "static check failure and log finding",
+			meta: BuildGateMetadata{
+				LogDigest: types.Sha256Digest("sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
+				StaticChecks: []BuildGateStaticCheckReport{{
+					Language: "go",
+					Tool:     "go vet",
+					Passed:   false,
+					Failures: []BuildGateStaticCheckFailure{{
+						RuleID:   "GOVET001",
+						File:     "internal/pkg/main.go",
+						Line:     12,
+						Column:   4,
+						Severity: "warning",
+						Message:  "unused result",
+					}},
+				}},
+				LogFindings: []BuildGateLogFinding{{
+					Code:     "git.auth",
+					Severity: "error",
+					Message:  "Authenticate Git fetch credentials for remote repository access.",
+					Evidence: "fatal: unable to access 'https://example.com/repo'",
+				}},
+			},
+		},
+		{
+			name: "failure without message",
+			meta: BuildGateMetadata{
+				StaticChecks: []BuildGateStaticCheckReport{{
+					Language: "go",
+					Tool:     "go vet",
+					Failures: []BuildGateStaticCheckFailure{{
+						RuleID:   "GOVET001",
+						File:     "main.go",
+						Severity: "error",
+					}},
+				}},
+			},
+			wantErr: true,
+		},
+		{
+			name: "log finding without severity",
+			meta: BuildGateMetadata{
+				LogFindings: []BuildGateLogFinding{{
+					Code:    "git.auth",
+					Message: "missing severity",
+				}},
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.meta.Validate()
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("Validate() error = %v, wantErr %v", err, tt.wantErr)
+			}
 		})
 	}
 }

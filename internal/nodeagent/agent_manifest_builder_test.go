@@ -144,17 +144,6 @@ func TestBuildManifestFromRequest(t *testing.T) {
 		}
 	})
 
-	t.Run("validates manifest", func(t *testing.T) {
-		req := newStartRunRequest()
-		manifest, err := buildManifestDefault(req)
-		if err != nil {
-			t.Fatalf("buildManifestDefault() error: %v", err)
-		}
-		if err := manifest.Validate(); err != nil {
-			t.Errorf("manifest validation failed: %v", err)
-		}
-	})
-
 	t.Run("command option string maps to shell", func(t *testing.T) {
 		req := newStartRunRequest(withMigSpec(contracts.MigSpec{Steps: []contracts.MigStep{{
 			Image: contracts.JobImage{Universal: "ubuntu:latest"}, Command: contracts.CommandSpec{Shell: "echo hi"},

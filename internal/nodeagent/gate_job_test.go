@@ -43,12 +43,12 @@ func TestRunController_buildGateStats_GateFailureError(t *testing.T) {
 	longLogLine := "generic\t" + strings.Repeat("x", maxDerivedJobErrorText)
 	tests := []struct {
 		name      string
-		metadata  *contracts.BuildGateStageMetadata
+		metadata  *contracts.BuildGateMetadata
 		wantError string
 	}{
 		{
 			name: "failed gradle gate prefers remediation line",
-			metadata: &contracts.BuildGateStageMetadata{
+			metadata: &contracts.BuildGateMetadata{
 				StaticChecks: []contracts.BuildGateStaticCheckReport{{Passed: false, Tool: "gradle"}},
 				LogFindings: []contracts.BuildGateLogFinding{{
 					Severity: "error",
@@ -60,7 +60,7 @@ func TestRunController_buildGateStats_GateFailureError(t *testing.T) {
 		},
 		{
 			name: "failed gate normalizes and bounds first log line",
-			metadata: &contracts.BuildGateStageMetadata{
+			metadata: &contracts.BuildGateMetadata{
 				StaticChecks: []contracts.BuildGateStaticCheckReport{{Passed: false, Tool: "gradle"}},
 				LogsText:     "\n  " + longLogLine + "  \nsecond failure\n",
 			},
@@ -68,14 +68,14 @@ func TestRunController_buildGateStats_GateFailureError(t *testing.T) {
 		},
 		{
 			name: "successful gate omits error",
-			metadata: &contracts.BuildGateStageMetadata{
+			metadata: &contracts.BuildGateMetadata{
 				StaticChecks: []contracts.BuildGateStaticCheckReport{{Passed: true, Tool: "gradle"}},
 				LogsText:     gradleError,
 			},
 		},
 		{
 			name: "failed gate with empty metadata omits error",
-			metadata: &contracts.BuildGateStageMetadata{
+			metadata: &contracts.BuildGateMetadata{
 				StaticChecks: []contracts.BuildGateStaticCheckReport{{Passed: false, Tool: "gradle"}},
 			},
 		},

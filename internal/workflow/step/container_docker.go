@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
-	"runtime/debug"
 	"strings"
 	"sync"
 	"time"
@@ -19,6 +18,33 @@ import (
 	"github.com/moby/moby/api/types/mount"
 	"github.com/moby/moby/client"
 )
+
+// ContainerRuntimeOptions holds configuration for Docker runtime.
+type ContainerRuntimeOptions struct {
+	// PullImage controls whether the runtime refreshes the image before container
+	// creation.
+	PullImage bool
+	// Network is optional Docker network name (empty => default bridge).
+	Network string
+	// RegistryAuthConfigFile is a Docker auth config JSON file path
+	// (DOCKER_AUTH_CONFIG format). When set, each image pull reads current
+	// credentials from this file.
+	RegistryAuthConfigFile string
+	// RegistryAuthRefreshSocket is an optional Unix socket owned by the host.
+	// When set, an auth failure on image pull asks the host to refresh registry
+	// auth before retrying the same pull once.
+	RegistryAuthRefreshSocket string
+}
+
+// ContainerRuntime executes containers.
+// Docker-socket specs require job-owned /tmp storage. Their socket proxy uses
+// the spec's mount projection and lasts for one Create/Start/Wait execution.
+type ContainerRuntime interface {
+	Create(ctx context.Context, spec ContainerSpec) (ContainerHandle, error)
+	Start(ctx context.Context, handle ContainerHandle) error
+	Wait(ctx context.Context, handle ContainerHandle) (ContainerResult, error)
+	Logs(ctx context.Context, handle ContainerHandle) ([]byte, error)
+}
 
 // dockerClientAPI abstracts the core moby client methods used by containerRuntime.
 // This interface enables dependency injection for testing without requiring a live
@@ -52,7 +78,7 @@ type dockerImageAPI interface {
 	ImageInspect(ctx context.Context, imageID string, inspectOpts ...client.ImageInspectOption) (client.ImageInspectResult, error)
 }
 
-// dockerStatsAPI abstracts container stats retrieval, used by gate resource telemetry.
+// dockerStatsAPI abstracts container stats retrieval, used by container resource telemetry.
 type dockerStatsAPI interface {
 	ContainerStats(ctx context.Context, containerID string, options client.ContainerStatsOptions) (client.ContainerStatsResult, error)
 }
@@ -95,23 +121,13 @@ func newContainerRuntimeWithClient(cli dockerClientAPI, opts ContainerRuntimeOpt
 // HostConfig.AutoRemove is set to false so logs remain retrievable after exit;
 // explicit removal is owned by the caller (node-runtime disk-pressure flow).
 func (r *containerRuntime) Create(ctx context.Context, spec ContainerSpec) (handle ContainerHandle, err error) {
-	// Guard against unexpected panics inside the Docker SDK JSON/request path.
-	// Panics here must not terminate the node process.
-	defer func() {
-		if p := recover(); p != nil {
-			err = fmt.Errorf("step: create container panic: %v\n%s", p, string(debug.Stack()))
-			handle = ""
-		}
-	}()
-
-	if r == nil || r.client == nil {
-		return "", errors.New("step: docker runtime not configured")
-	}
 	if strings.TrimSpace(spec.Image) == "" {
 		return "", errors.New("step: container image required")
 	}
+	// Job images commonly use mutable tags such as latest, so local presence
+	// is not enough.
 	if r.opts.PullImage {
-		if err := r.ensureImageAvailable(ctx, spec.Image); err != nil {
+		if err := r.pullImage(ctx, spec.Image); err != nil {
 			return "", err
 		}
 	}
@@ -190,9 +206,6 @@ func hasMountTarget(mounts []ContainerMount, target string) bool {
 // Start launches the container. ContainerStart is async — the container may still
 // be initializing when Start returns successfully. Use Wait to block until exit.
 func (r *containerRuntime) Start(ctx context.Context, handle ContainerHandle) error {
-	if r == nil || r.client == nil {
-		return errors.New("step: docker runtime not configured")
-	}
 	_, err := r.client.ContainerStart(ctx, string(handle), client.ContainerStartOptions{})
 	if err != nil {
 		err = errors.Join(err, r.closeDockerProxy(handle))
@@ -205,9 +218,6 @@ func (r *containerRuntime) Start(ctx context.Context, handle ContainerHandle) er
 // cancellation the container is force-removed so callers don't leak resources.
 func (r *containerRuntime) Wait(ctx context.Context, handle ContainerHandle) (result ContainerResult, err error) {
 	defer func() { err = errors.Join(err, r.closeDockerProxy(handle)) }()
-	if r == nil || r.client == nil {
-		return ContainerResult{}, errors.New("step: docker runtime not configured")
-	}
 	waitResult := r.client.ContainerWait(ctx, string(handle), client.ContainerWaitOptions{
 		Condition: container.WaitConditionNotRunning,
 	})
@@ -239,6 +249,19 @@ func (r *containerRuntime) Wait(ctx context.Context, handle ContainerHandle) (re
 	return ContainerResult{}, errors.New("step: container wait interrupted")
 }
 
+// Close also covers containers that never reach Wait, such as interrupted setup.
+func (r *containerRuntime) Close() error {
+	var errs []error
+	r.dockerProxies.Range(func(key, _ any) bool {
+		errs = append(errs, r.closeDockerProxy(key.(ContainerHandle)))
+		return true
+	})
+	if closer, ok := r.client.(interface{ Close() error }); ok {
+		errs = append(errs, closer.Close())
+	}
+	return errors.Join(errs...)
+}
+
 func (r *containerRuntime) forceRemoveOnWaitCancel(handle ContainerHandle) {
 	cleanupCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -264,9 +287,6 @@ func isContainerNotFound(err error) bool {
 // multiplexed) we fall back to ReadAll on the remaining bytes to avoid total
 // data loss.
 func (r *containerRuntime) Logs(ctx context.Context, handle ContainerHandle) ([]byte, error) {
-	if r == nil || r.client == nil {
-		return nil, errors.New("step: docker runtime not configured")
-	}
 	reader, err := r.client.ContainerLogs(ctx, string(handle), client.ContainerLogsOptions{
 		ShowStdout: true,
 		ShowStderr: true,
@@ -289,9 +309,6 @@ func (r *containerRuntime) Logs(ctx context.Context, handle ContainerHandle) ([]
 // the provided writers. This is used for live job log uploads while a container
 // is still running.
 func (r *containerRuntime) StreamLogs(ctx context.Context, handle ContainerHandle, stdout, stderr io.Writer) error {
-	if r == nil || r.client == nil {
-		return errors.New("step: docker runtime not configured")
-	}
 	if stdout == nil {
 		stdout = io.Discard
 	}
@@ -314,12 +331,6 @@ func (r *containerRuntime) StreamLogs(ctx context.Context, handle ContainerHandl
 	return nil
 }
 
-// ensureImageAvailable refreshes the image before container creation. Job images
-// commonly use mutable tags such as latest, so local presence is not enough.
-func (r *containerRuntime) ensureImageAvailable(ctx context.Context, imageRef string) error {
-	return r.pullImage(ctx, imageRef)
-}
-
 func (r *containerRuntime) pullImage(ctx context.Context, imageRef string) error {
 	err := r.pullImageOnce(ctx, imageRef)
 	if err == nil {
@@ -328,10 +339,11 @@ func (r *containerRuntime) pullImage(ctx context.Context, imageRef string) error
 	if !isDockerAuthPullError(err) {
 		return fmt.Errorf("step: pull image %s: %w", imageRef, err)
 	}
-	if strings.TrimSpace(r.opts.RegistryAuthRefreshSocket) == "" {
+	refreshSocket := strings.TrimSpace(r.opts.RegistryAuthRefreshSocket)
+	if refreshSocket == "" {
 		return fmt.Errorf("step: pull image %s: %w", imageRef, err)
 	}
-	if refreshErr := r.refreshRegistryAuth(ctx, imageRef); refreshErr != nil {
+	if refreshErr := r.refreshRegistryAuth(ctx, refreshSocket, imageRef); refreshErr != nil {
 		return fmt.Errorf("step: refresh registry auth after pull image %s unauthorized: %w", imageRef, refreshErr)
 	}
 	if retryErr := r.pullImageOnce(ctx, imageRef); retryErr != nil {

@@ -110,7 +110,7 @@ func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 }
 
 // NormalizeContainerResourceUsage converts Docker counters to persisted job metrics.
-func NormalizeContainerResourceUsage(usage *contracts.BuildGateResourceUsage) *types.RunStatsJobResources {
+func NormalizeContainerResourceUsage(usage *contracts.ContainerResourceUsage) *types.RunStatsJobResources {
 	if usage == nil {
 		return nil
 	}

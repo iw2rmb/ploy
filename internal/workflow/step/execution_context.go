@@ -2,6 +2,8 @@ package step
 
 import (
 	"context"
+	"io"
+	"maps"
 	"strings"
 )
 
@@ -23,12 +25,14 @@ func WithGateRuntimeImageObserver(ctx context.Context, obs GateRuntimeImageObser
 }
 
 // WithGateContainerLabels attaches container labels to gate execution context.
-// Labels are copied and merged with existing gate labels in the context.
+// Labels are trimmed, copied, and merged with existing gate labels in the
+// context. Entries with an empty key or value are dropped.
 func WithGateContainerLabels(ctx context.Context, labels map[string]string) context.Context {
 	if len(labels) == 0 {
 		return ctx
 	}
-	merged := gateContainerLabels(ctx)
+	// The stored map is shared by every derived context, so it is never mutated.
+	merged := maps.Clone(gateContainerLabels(ctx))
 	if merged == nil {
 		merged = make(map[string]string, len(labels))
 	}
@@ -66,20 +70,25 @@ func gateContainerLabels(ctx context.Context) map[string]string {
 		return nil
 	}
 	labels, _ := ctx.Value(gateContainerLabelsKey{}).(map[string]string)
-	if len(labels) == 0 {
+	return labels
+}
+
+type logWriterContextKey struct{}
+
+// WithExecutionLogWriter stores an optional live log sink in context so
+// lower-level executors (for example gate runtime) can stream container output
+// through the standard node log uploader path.
+func WithExecutionLogWriter(ctx context.Context, w io.Writer) context.Context {
+	if w == nil {
+		return ctx
+	}
+	return context.WithValue(ctx, logWriterContextKey{}, w)
+}
+
+func executionLogWriterFromContext(ctx context.Context) io.Writer {
+	if ctx == nil {
 		return nil
 	}
-	copied := make(map[string]string, len(labels))
-	for key, value := range labels {
-		key = strings.TrimSpace(key)
-		value = strings.TrimSpace(value)
-		if key == "" || value == "" {
-			continue
-		}
-		copied[key] = value
-	}
-	if len(copied) == 0 {
-		return nil
-	}
-	return copied
+	w, _ := ctx.Value(logWriterContextKey{}).(io.Writer)
+	return w
 }

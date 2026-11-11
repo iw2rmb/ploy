@@ -20,7 +20,6 @@ type Policy struct {
 	InitialInterval types.Duration
 	MaxInterval     types.Duration
 	Multiplier      float64
-	MaxElapsedTime  types.Duration
 	MaxAttempts     int
 }
 
@@ -31,7 +30,6 @@ func HeartbeatPolicy() Policy {
 		InitialInterval: types.Duration(5 * time.Second),
 		MaxInterval:     types.Duration(5 * time.Minute),
 		Multiplier:      2.0,
-		MaxElapsedTime:  0, // No time limit, only 5xx errors trigger backoff.
 		MaxAttempts:     0, // No attempt limit for heartbeat backoff.
 	}
 }
@@ -43,7 +41,6 @@ func ClaimLoopPolicy() Policy {
 		InitialInterval: types.Duration(250 * time.Millisecond),
 		MaxInterval:     types.Duration(5 * time.Second),
 		Multiplier:      2.0,
-		MaxElapsedTime:  0, // No time limit for claim loop backoff.
 		MaxAttempts:     0, // No attempt limit for claim loop backoff.
 	}
 }
@@ -56,7 +53,6 @@ func StatusUploaderPolicy() Policy {
 		InitialInterval: types.Duration(100 * time.Millisecond),
 		MaxInterval:     types.Duration(400 * time.Millisecond), // 100ms * 2^2 = 400ms (won't exceed this).
 		Multiplier:      2.0,
-		MaxElapsedTime:  0, // No time limit for status upload retries.
 		MaxAttempts:     4, // Initial attempt + 3 retries.
 	}
 }
@@ -69,7 +65,6 @@ func CertificateBootstrapPolicy() Policy {
 		InitialInterval: types.Duration(1 * time.Second),
 		MaxInterval:     types.Duration(16 * time.Second), // 1s * 2^4 = 16s max.
 		Multiplier:      2.0,
-		MaxElapsedTime:  0, // No time limit for certificate bootstrap retries.
 		MaxAttempts:     5, // Initial attempt + 4 retries.
 	}
 }
@@ -83,14 +78,13 @@ func SSEStreamPolicy() Policy {
 		InitialInterval: types.Duration(250 * time.Millisecond),
 		MaxInterval:     types.Duration(30 * time.Second), // Cap reconnect delay at 30s.
 		Multiplier:      2.0,
-		MaxElapsedTime:  0, // No time limit; rely on MaxRetries or context cancellation.
 		MaxAttempts:     0, // Unlimited by default; use Client.MaxRetries to cap.
 	}
 }
 
 // NewExponentialBackoff creates a backoff.ExponentialBackOff from the policy.
 // Configures initial interval, max interval, multiplier, randomization factor (jitter).
-// Callers use this with backoff.Retry and options like WithMaxTries, WithMaxElapsedTime.
+// Callers use this with backoff.Retry and options like WithMaxTries.
 func (p Policy) NewExponentialBackoff() *backoff.ExponentialBackOff {
 	eb := backoff.NewExponentialBackOff()
 	eb.InitialInterval = time.Duration(p.InitialInterval)
@@ -106,17 +100,10 @@ func (p Policy) NewExponentialBackoff() *backoff.ExponentialBackOff {
 // Honors context cancellation and returns early if context is done.
 // Returns nil if the operation succeeds, or the last error if max attempts exhausted.
 func RunWithBackoff(ctx context.Context, policy Policy, logger *slog.Logger, op func() error) error {
-	if logger == nil {
-		logger = slog.Default()
-	}
-
 	eb := policy.NewExponentialBackoff()
 	opts := []backoff.RetryOption{backoff.WithBackOff(eb)}
 	if policy.MaxAttempts > 0 {
 		opts = append(opts, backoff.WithMaxTries(uint(policy.MaxAttempts)))
-	}
-	if policy.MaxElapsedTime > 0 {
-		opts = append(opts, backoff.WithMaxElapsedTime(time.Duration(policy.MaxElapsedTime)))
 	}
 
 	attempt := 0
@@ -140,16 +127,13 @@ func RunWithBackoff(ctx context.Context, policy Policy, logger *slog.Logger, op 
 type StatefulBackoff struct {
 	eb      *backoff.ExponentialBackOff
 	current types.Duration
-	started bool
 }
 
 // NewStatefulBackoff creates a StatefulBackoff from a policy.
 // Useful for long-running loops that maintain backoff state across iterations.
 func NewStatefulBackoff(policy Policy) *StatefulBackoff {
 	return &StatefulBackoff{
-		eb:      policy.NewExponentialBackoff(),
-		current: 0,
-		started: false,
+		eb: policy.NewExponentialBackoff(),
 	}
 }
 
@@ -157,17 +141,7 @@ func NewStatefulBackoff(policy Policy) *StatefulBackoff {
 // Should be called on retry-triggering events (errors, no work available).
 // Returns the new backoff duration.
 func (s *StatefulBackoff) Apply() types.Duration {
-	// Always get the next backoff duration (this advances the internal state).
-	next := s.eb.NextBackOff()
-	if next == backoff.Stop {
-		// Max elapsed time reached or stopped; keep current or use max interval.
-		if s.current > 0 {
-			return s.current
-		}
-		return types.Duration(s.eb.MaxInterval)
-	}
-	s.current = types.Duration(next)
-	s.started = true
+	s.current = types.Duration(s.eb.NextBackOff())
 	return s.current
 }
 
@@ -176,13 +150,12 @@ func (s *StatefulBackoff) Apply() types.Duration {
 func (s *StatefulBackoff) Reset() {
 	s.eb.Reset()
 	s.current = 0
-	s.started = false
 }
 
 // GetDuration returns the current backoff duration.
 // If backoff has not been applied, returns the initial interval.
 func (s *StatefulBackoff) GetDuration() types.Duration {
-	if !s.started {
+	if s.current == 0 {
 		return types.Duration(s.eb.InitialInterval)
 	}
 	return s.current

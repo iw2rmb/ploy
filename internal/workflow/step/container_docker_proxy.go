@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -67,26 +68,25 @@ func (r *containerRuntime) prepareDockerSocket(ctx context.Context, spec Contain
 }
 
 func (r *containerRuntime) closeDockerProxy(handle ContainerHandle) error {
-	if r == nil {
-		return nil
-	}
 	if p, ok := r.dockerProxies.LoadAndDelete(handle); ok {
 		return p.(*dockerSocketProxy).Close()
 	}
 	return nil
 }
 
-// Close also covers containers that never reach Wait, such as interrupted setup.
-func (r *containerRuntime) Close() error {
-	var errs []error
-	r.dockerProxies.Range(func(key, _ any) bool {
-		errs = append(errs, r.closeDockerProxy(key.(ContainerHandle)))
-		return true
-	})
-	if closer, ok := r.client.(interface{ Close() error }); ok {
-		errs = append(errs, closer.Close())
+func dockerHostSocketPathFromEnv(env map[string]string) string {
+	if len(env) == 0 {
+		return ""
 	}
-	return errors.Join(errs...)
+	dockerHost := strings.TrimSpace(env["DOCKER_HOST"])
+	if dockerHost == "" || !strings.HasPrefix(dockerHost, "unix://") {
+		return ""
+	}
+	socketPath := strings.TrimSpace(strings.TrimPrefix(dockerHost, "unix://"))
+	if socketPath == "" || !filepath.IsAbs(socketPath) {
+		return ""
+	}
+	return socketPath
 }
 
 func startDockerSocketProxy(ctx context.Context, mounts []ContainerMount, upstream, tmpDir string, owner DockerJobOwner) (*dockerSocketProxy, error) {

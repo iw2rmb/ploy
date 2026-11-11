@@ -54,9 +54,9 @@ type JobMeta struct {
 	// Kind identifies the job type: "mig", "gate", or "build".
 	Kind JobKind `json:"kind"`
 
-	// GateMetadata contains build gate validation metadata when Kind is JobKindGate.
+	// Gate contains build gate validation metadata when Kind is JobKindGate.
 	// This includes static check results, log findings, and digest information.
-	GateMetadata *BuildGateStageMetadata `json:"gate,omitempty"`
+	Gate *BuildGateMetadata `json:"gate,omitempty"`
 
 	// Build contains build tool metadata when Kind is JobKindBuild.
 	// This includes tool name, command, status details, and metrics.
@@ -94,8 +94,8 @@ func (m JobMeta) Validate() error {
 	if !m.Kind.Valid() {
 		return fmt.Errorf("invalid job kind: %q", m.Kind)
 	}
-	// GateMetadata is only valid for gate jobs.
-	if m.GateMetadata != nil && m.Kind != JobKindGate {
+	// Gate is only valid for gate jobs.
+	if m.Gate != nil && m.Kind != JobKindGate {
 		return fmt.Errorf("gate metadata present but kind is %q", m.Kind)
 	}
 	// Build metadata is only valid for build jobs.
@@ -103,8 +103,8 @@ func (m JobMeta) Validate() error {
 		return fmt.Errorf("build metadata present but kind is %q", m.Kind)
 	}
 	// Validate nested gate metadata if present.
-	if m.GateMetadata != nil {
-		if err := m.GateMetadata.Validate(); err != nil {
+	if m.Gate != nil {
+		if err := m.Gate.Validate(); err != nil {
 			return fmt.Errorf("gate metadata invalid: %w", err)
 		}
 	}
@@ -137,7 +137,7 @@ func (m JobMeta) Validate() error {
 // Callers must provide a valid JobMeta with a recognized Kind field.
 func MarshalJobMeta(m *JobMeta) ([]byte, error) {
 	if m == nil {
-		return nil, fmt.Errorf("job meta is nil; use NewMigJobMeta/NewGateJobMeta/NewBuildJobMeta to create valid metadata")
+		return nil, fmt.Errorf("job meta is nil; use NewMigJobMeta/NewGateJobMeta to create valid metadata")
 	}
 	// Validate before marshaling to catch invalid state early.
 	if err := m.Validate(); err != nil {
@@ -154,7 +154,7 @@ func MarshalJobMeta(m *JobMeta) ([]byte, error) {
 //   - Payloads that fail JobMeta.Validate() are rejected.
 //
 // All job metadata must now be structured with an explicit kind field.
-// Use NewMigJobMeta/NewGateJobMeta/NewBuildJobMeta to create valid metadata.
+// Use NewMigJobMeta/NewGateJobMeta to create valid metadata.
 func UnmarshalJobMeta(data []byte) (*JobMeta, error) {
 	// Reject empty/null payloads - structured metadata is now required.
 	if len(data) == 0 {
@@ -200,17 +200,9 @@ func NewMigJobMetaWithStepName(stepName string) *JobMeta {
 
 // NewGateJobMeta creates a JobMeta for gate validation jobs.
 // The gate metadata can be populated later via UpdateGateMeta.
-func NewGateJobMeta(gate *BuildGateStageMetadata) *JobMeta {
+func NewGateJobMeta(gate *BuildGateMetadata) *JobMeta {
 	return &JobMeta{
-		Kind:         JobKindGate,
-		GateMetadata: gate,
-	}
-}
-
-// NewBuildJobMeta creates a JobMeta for build tool invocation jobs.
-func NewBuildJobMeta(build *BuildMeta) *JobMeta {
-	return &JobMeta{
-		Kind:  JobKindBuild,
-		Build: build,
+		Kind: JobKindGate,
+		Gate: gate,
 	}
 }

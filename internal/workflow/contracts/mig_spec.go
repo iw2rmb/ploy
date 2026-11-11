@@ -1,8 +1,8 @@
 // Package contracts defines shared workflow types.
 //
-// migs_spec.go provides the core typed model for Mig run specifications.
-// This eliminates drift between CLI/server/nodeagent spec parsing by providing
-// a single source of truth for spec structure.
+// mig_spec.go provides the core typed model for Mig run specifications and
+// its JSON parser. This eliminates drift between CLI/server/nodeagent spec
+// parsing by providing a single source of truth for spec structure.
 //
 // ## Canonical Spec Shape
 //
@@ -13,23 +13,26 @@
 // ## Related Files
 //
 // The Mig spec implementation is split across several files:
-//   - migs_spec.go: Core types (MigSpec, MigStep) and validation
+//   - mig_spec.go: Core types (MigSpec, MigStep), parsing, and validation
 //   - command_spec.go: Polymorphic command handling (CommandSpec)
 //   - build_gate_config.go: Build gate configuration types
-//   - migs_spec_parse.go: JSON parsing functions
 //
 // ## Usage
 //
-// Parse specs using ParseMigSpecJSON (in migs_spec_parse.go):
+// Parse specs using ParseMigSpecJSON:
 //
 //	spec, err := contracts.ParseMigSpecJSON(jsonBytes)
 //	if err != nil {
-//	    return err // structured validation error
+//	    return err // structured validation error with field paths
 //	}
 //	// Use typed fields: spec.Steps, spec.BuildGate, etc.
+//
+// YAML files are accepted at the CLI boundary by loading into map[string]any,
+// marshaling to JSON, and validating via ParseMigSpecJSON.
 package contracts
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -44,9 +47,8 @@ import (
 // that match the existing spec schema. The JSON tags are the source of truth
 // for wire format compatibility.
 //
-// Validation: Use Validate() to check structural correctness after parsing.
-// ParseMigSpecJSON calls Validate() automatically and returns structured
-// errors for invalid input.
+// Validation: ParseMigSpecJSON runs the mig schema and then Validate(), and
+// returns structured errors for invalid input.
 type MigSpec struct {
 	// --- Server-injected metadata (claim-time) ---
 	//
@@ -153,12 +155,40 @@ func (o MigStepOptions) IsZero() bool {
 	return !o.MountDockerSocket
 }
 
+// ParseMigSpecJSON parses a mig specification from JSON bytes.
+// Returns a validated MigSpec or an error for invalid/malformed input.
+func ParseMigSpecJSON(data []byte) (*MigSpec, error) {
+	if len(data) == 0 {
+		return nil, fmt.Errorf("steps: required")
+	}
+
+	// Validate raw contract shape through embedded MIG schema before typed unmarshaling.
+	if err := ValidateMigSpecJSON(data); err != nil {
+		return nil, err
+	}
+
+	// Unmarshal into typed struct.
+	var spec MigSpec
+	if err := json.Unmarshal(data, &spec); err != nil {
+		return nil, fmt.Errorf("parse mig spec json: %w", err)
+	}
+
+	if err := spec.Validate(); err != nil {
+		return nil, err
+	}
+
+	return &spec, nil
+}
+
 // Validate checks that the spec is structurally valid.
 // Returns nil if valid, or a descriptive error for invalid specs.
 //
 // Validation rules:
 //   - steps must be non-empty and each step must have a non-empty image.
 //   - Stack Gate phases must not be disabled with expectations set.
+//
+// Validate covers only rules the mig schema cannot express, so it assumes the
+// input already passed ValidateMigSpecJSON, as ParseMigSpecJSON guarantees.
 func (s MigSpec) Validate() error {
 	// Validate steps.
 	if len(s.Steps) == 0 {
@@ -207,26 +237,15 @@ func (s MigSpec) Validate() error {
 	return nil
 }
 
+// validateBuildGateStackConfig rejects blank stack fields. ParseMigSpecJSON
+// runs the mig schema first, which already enforces the mode enum and the
+// per-mode required keys; the schema cannot reject present-but-blank values.
 func validateBuildGateStackConfig(stack *BuildGateStackConfig, prefix string) error {
-	if stack == nil {
+	if stack == nil || stack.Mode == "" {
 		return nil
 	}
 
-	mode := BuildGateStackMode(strings.TrimSpace(string(stack.Mode)))
-	if mode == "" {
-		if strings.TrimSpace(stack.Language) != "" || strings.TrimSpace(stack.Tool) != "" || strings.TrimSpace(stack.Release) != "" {
-			return fmt.Errorf("%s.mode: required when language, tool, or release is set", prefix)
-		}
-		return nil
-	}
-
-	switch mode {
-	case BuildGateStackModeForced, BuildGateStackModeStrict, BuildGateStackModeFallback:
-	default:
-		return fmt.Errorf("%s.mode: must be one of forced, strict, fallback", prefix)
-	}
-
-	if mode == BuildGateStackModeStrict {
+	if stack.Mode == BuildGateStackModeStrict {
 		if strings.TrimSpace(stack.Language) == "" && strings.TrimSpace(stack.Tool) == "" && strings.TrimSpace(stack.Release) == "" {
 			return fmt.Errorf("%s: strict mode requires language, tool, or release", prefix)
 		}
@@ -236,7 +255,7 @@ func validateBuildGateStackConfig(stack *BuildGateStackConfig, prefix string) er
 	if strings.TrimSpace(stack.Language) == "" {
 		return fmt.Errorf("%s.language: required", prefix)
 	}
-	if mode == BuildGateStackModeFallback && strings.TrimSpace(stack.Tool) == "" {
+	if stack.Mode == BuildGateStackModeFallback && strings.TrimSpace(stack.Tool) == "" {
 		return fmt.Errorf("%s.tool: required", prefix)
 	}
 	if strings.TrimSpace(stack.Release) == "" {

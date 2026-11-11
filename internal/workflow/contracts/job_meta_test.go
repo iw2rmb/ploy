@@ -47,7 +47,7 @@ func TestJobMeta_Validate(t *testing.T) {
 			name: "valid gate job with metadata",
 			meta: JobMeta{
 				Kind: JobKindGate,
-				GateMetadata: &BuildGateStageMetadata{
+				Gate: &BuildGateMetadata{
 					LogDigest: types.Sha256Digest(testDigestA),
 					StaticChecks: []BuildGateStaticCheckReport{
 						{Tool: "maven", Passed: true},
@@ -75,8 +75,8 @@ func TestJobMeta_Validate(t *testing.T) {
 		{
 			name: "gate metadata on mig job",
 			meta: JobMeta{
-				Kind:         JobKindMig,
-				GateMetadata: &BuildGateStageMetadata{},
+				Kind: JobKindMig,
+				Gate: &BuildGateMetadata{},
 			},
 			wantErr: true,
 		},
@@ -91,8 +91,8 @@ func TestJobMeta_Validate(t *testing.T) {
 		{
 			name: "gate metadata on build job",
 			meta: JobMeta{
-				Kind:         JobKindBuild,
-				GateMetadata: &BuildGateStageMetadata{},
+				Kind: JobKindBuild,
+				Gate: &BuildGateMetadata{},
 			},
 			wantErr: true,
 		},
@@ -127,8 +127,8 @@ func TestMarshalJobMeta(t *testing.T) {
 		{
 			name: "gate metadata on mig job returns error",
 			meta: &JobMeta{
-				Kind:         JobKindMig,
-				GateMetadata: &BuildGateStageMetadata{},
+				Kind: JobKindMig,
+				Gate: &BuildGateMetadata{},
 			},
 			wantErr: true,
 		},
@@ -141,7 +141,7 @@ func TestMarshalJobMeta(t *testing.T) {
 			name: "gate job with metadata",
 			meta: &JobMeta{
 				Kind: JobKindGate,
-				GateMetadata: &BuildGateStageMetadata{
+				Gate: &BuildGateMetadata{
 					LogDigest: types.Sha256Digest(testDigestA),
 				},
 			},
@@ -262,7 +262,7 @@ func TestJobMeta_RoundTrip(t *testing.T) {
 	// Test that marshaling and unmarshaling preserves data.
 	original := &JobMeta{
 		Kind: JobKindGate,
-		GateMetadata: &BuildGateStageMetadata{
+		Gate: &BuildGateMetadata{
 			LogDigest: types.Sha256Digest(testDigestB),
 			StaticChecks: []BuildGateStaticCheckReport{
 				{
@@ -304,17 +304,17 @@ func TestJobMeta_RoundTrip(t *testing.T) {
 	if got.Kind != original.Kind {
 		t.Errorf("Kind = %v, want %v", got.Kind, original.Kind)
 	}
-	if got.GateMetadata == nil {
-		t.Fatal("GateMetadata = nil, want non-nil")
+	if got.Gate == nil {
+		t.Fatal("Gate = nil, want non-nil")
 	}
-	if got.GateMetadata.LogDigest != original.GateMetadata.LogDigest {
-		t.Errorf("GateMetadata.LogDigest = %v, want %v", got.GateMetadata.LogDigest, original.GateMetadata.LogDigest)
+	if got.Gate.LogDigest != original.Gate.LogDigest {
+		t.Errorf("Gate.LogDigest = %v, want %v", got.Gate.LogDigest, original.Gate.LogDigest)
 	}
-	if len(got.GateMetadata.StaticChecks) != len(original.GateMetadata.StaticChecks) {
-		t.Errorf("GateMetadata.StaticChecks len = %d, want %d", len(got.GateMetadata.StaticChecks), len(original.GateMetadata.StaticChecks))
+	if len(got.Gate.StaticChecks) != len(original.Gate.StaticChecks) {
+		t.Errorf("Gate.StaticChecks len = %d, want %d", len(got.Gate.StaticChecks), len(original.Gate.StaticChecks))
 	}
-	if len(got.GateMetadata.LogFindings) != len(original.GateMetadata.LogFindings) {
-		t.Errorf("GateMetadata.LogFindings len = %d, want %d", len(got.GateMetadata.LogFindings), len(original.GateMetadata.LogFindings))
+	if len(got.Gate.LogFindings) != len(original.Gate.LogFindings) {
+		t.Errorf("Gate.LogFindings len = %d, want %d", len(got.Gate.LogFindings), len(original.Gate.LogFindings))
 	}
 }
 
@@ -324,8 +324,8 @@ func TestNewJobMetaConstructors(t *testing.T) {
 		if m.Kind != JobKindMig {
 			t.Errorf("Kind = %v, want %v", m.Kind, JobKindMig)
 		}
-		if m.GateMetadata != nil {
-			t.Error("GateMetadata should be nil")
+		if m.Gate != nil {
+			t.Error("Gate should be nil")
 		}
 		if m.Build != nil {
 			t.Error("Build should be nil")
@@ -333,30 +333,16 @@ func TestNewJobMetaConstructors(t *testing.T) {
 	})
 
 	t.Run("NewGateJobMeta", func(t *testing.T) {
-		gate := &BuildGateStageMetadata{LogDigest: types.Sha256Digest(testDigestA)}
+		gate := &BuildGateMetadata{LogDigest: types.Sha256Digest(testDigestA)}
 		m := NewGateJobMeta(gate)
 		if m.Kind != JobKindGate {
 			t.Errorf("Kind = %v, want %v", m.Kind, JobKindGate)
 		}
-		if m.GateMetadata != gate {
-			t.Error("GateMetadata should be the provided metadata")
+		if m.Gate != gate {
+			t.Error("Gate should be the provided metadata")
 		}
 		if m.Build != nil {
 			t.Error("Build should be nil")
-		}
-	})
-
-	t.Run("NewBuildJobMeta", func(t *testing.T) {
-		build := &BuildMeta{Tool: "maven", Command: "mvn clean"}
-		m := NewBuildJobMeta(build)
-		if m.Kind != JobKindBuild {
-			t.Errorf("Kind = %v, want %v", m.Kind, JobKindBuild)
-		}
-		if m.Build != build {
-			t.Error("Build should be the provided metadata")
-		}
-		if m.GateMetadata != nil {
-			t.Error("GateMetadata should be nil")
 		}
 	})
 }

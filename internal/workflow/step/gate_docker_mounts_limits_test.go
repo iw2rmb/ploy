@@ -49,7 +49,7 @@ func TestGateExecutor_Mounts(t *testing.T) {
 				}
 				spec := &contracts.StepGateSpec{
 					Enabled: true,
-					Env:     map[string]string{"DOCKER_HOST": "unix://" + socketPath},
+					Envs:    map[string]string{"DOCKER_HOST": "unix://" + socketPath},
 				}
 				return createMavenWorkspace(t, "17"), spec, context.Background(),
 					expectMount{source: socketPath, target: socketPath, readOnly: false}, ""
@@ -61,7 +61,7 @@ func TestGateExecutor_Mounts(t *testing.T) {
 			build: func(t *testing.T) (string, *contracts.StepGateSpec, context.Context, expectMount, string) {
 				spec := &contracts.StepGateSpec{
 					Enabled: true,
-					Env:     map[string]string{"DOCKER_HOST": "tcp://prep-dind:2375"},
+					Envs:    map[string]string{"DOCKER_HOST": "tcp://prep-dind:2375"},
 				}
 				return createMavenWorkspace(t, "17"), spec, context.Background(),
 					expectMount{}, "docker.sock"

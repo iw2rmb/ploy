@@ -2,10 +2,9 @@
 //
 // This executor is the canonical source of gate validation results: it runs a
 // language-specific image with the workspace mounted at /workspace, captures
-// logs and resource usage, and returns BuildGateStageMetadata. Concerns are
-// split across sibling files: mounts (gate_docker_mounts.go), log streaming
-// (container_log_streamer.go), env-driven resource limits
-// (gate_docker_env.go), and result normalization
+// logs and resource usage, and returns BuildGateMetadata. Concerns are
+// split across sibling files: common job mounts (job_mounts.go), log streaming
+// (container_log_streamer.go), and result normalization
 // (gate_docker_metadata.go). Stack detection + image resolution live in
 // gate_plan_resolver.go.
 package step
@@ -13,58 +12,56 @@ package step
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
+	"strconv"
+	"strings"
 	"time"
 
+	units "github.com/docker/go-units"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
-var errGateRuntimeUnavailable = errors.New("build gate runtime unavailable")
+const (
+	gateLimitMemoryEnv = "PLOY_BUILDGATE_LIMIT_MEMORY_BYTES"
+	gateLimitCPUEnv    = "PLOY_BUILDGATE_LIMIT_CPU_MILLIS"
+	gateLimitDiskEnv   = "PLOY_BUILDGATE_LIMIT_DISK_SPACE"
+)
 
-// gateExecutor runs build validation inside language images using the
+// GateExecutor runs build validation inside language images using the
 // same container runtime as step execution.
-type gateExecutor struct {
+type GateExecutor struct {
 	rt ContainerRuntime
 }
 
 // NewGateExecutor constructs a GateExecutor that uses the provided
 // ContainerRuntime to run build commands.
-func NewGateExecutor(rt ContainerRuntime) GateExecutor {
-	return &gateExecutor{rt: rt}
+func NewGateExecutor(rt ContainerRuntime) *GateExecutor {
+	return &GateExecutor{rt: rt}
 }
 
 // Execute resolves the gate plan (stack, image, command), runs the command in
-// a container, and returns BuildGateStageMetadata. The workspace is mounted at
-// /workspace; nil spec or Enabled=false yields (nil, nil). A nil runtime fails
-// immediately with errGateRuntimeUnavailable.
-func (e *gateExecutor) Execute(ctx context.Context, spec *contracts.StepGateSpec, workspace string, jobMounts JobMounts) (*contracts.BuildGateStageMetadata, error) {
+// a container, and returns BuildGateMetadata. The workspace is mounted at
+// /workspace; nil spec or Enabled=false yields (nil, nil).
+func (e *GateExecutor) Execute(ctx context.Context, spec *contracts.StepGateSpec, workspace string, jobMounts JobMounts) (*contracts.BuildGateMetadata, error) {
 	if ctx != nil && ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
 	if spec == nil || !spec.Enabled {
 		return nil, nil
 	}
-	if e.rt == nil {
-		return nil, errGateRuntimeUnavailable
-	}
 
 	catalogPath := defaultCatalogFilePath()
 
 	plan, terminal := resolveGateExecutionPlan(ctx, workspace, spec, catalogPath)
 	if terminal != nil {
-		if terminal.reportRuntimeImage {
-			reportGateRuntimeImage(ctx, terminal.runtimeImage)
-		}
+		reportGateRuntimeImage(ctx, terminal.meta.RuntimeImage)
 		return terminal.meta, terminal.err
 	}
 
 	reportGateRuntimeImage(ctx, plan.image)
 
-	envCopy := contracts.CopyEnv(spec.Env)
-	homeDir, err := resolveJobHome(envCopy)
+	homeDir, err := resolveJobHome(spec.Envs)
 	if err != nil {
 		return nil, fmt.Errorf("resolve build gate home: %w", err)
 	}
@@ -76,11 +73,8 @@ func (e *gateExecutor) Execute(ctx context.Context, spec *contracts.StepGateSpec
 	limitMem, _ := parseBytesLimitEnv(gateLimitMemoryEnv)
 	limitCPUMillis := parseInt64LimitEnv(gateLimitCPUEnv)
 	limitDisk, storageSizeOpt := parseBytesLimitEnv(gateLimitDiskEnv)
-	envCopy, err = applyReservedJobEnv(envCopy, jobMounts)
-	if err != nil {
-		return nil, fmt.Errorf("prepare build gate environment: %w", err)
-	}
-	mounts = appendDockerHostSocketMount(mounts, envCopy)
+	env := applyReservedJobEnv(spec.Envs, jobMounts, homeDir)
+	mounts = appendHostSocketMount(mounts, dockerHostSocketPathFromEnv(env))
 	if err := validateContainerMounts(mounts, nil); err != nil {
 		return nil, fmt.Errorf("validate build gate mounts: %w", err)
 	}
@@ -89,7 +83,7 @@ func (e *gateExecutor) Execute(ctx context.Context, spec *contracts.StepGateSpec
 		Image:            plan.image,
 		WorkingDir:       "/workspace",
 		Mounts:           mounts,
-		Env:              envCopy,
+		Env:              env,
 		Labels:           gateContainerLabels(ctx),
 		LimitMemoryBytes: limitMem,
 		LimitNanoCPUs:    limitCPUMillis * 1_000_000, // millis -> nanos
@@ -144,32 +138,35 @@ func assembleGateMounts(workspace string, jobMounts JobMounts, homeDir string) (
 	return mounts, nil
 }
 
-// defaultCatalogFilePath resolves the active gates catalog file:
-// the installed copy at /etc/ploy/gates/gates.yaml when present, otherwise
-// the repo-relative defaultCatalogPath discovered by walking up to a
-// go.mod ancestor.
-func defaultCatalogFilePath() string {
-	installed := "/etc/ploy/gates/gates.yaml"
-	if info, err := os.Stat(installed); err == nil && !info.IsDir() {
-		return installed
+func parseInt64LimitEnv(key string) int64 {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return 0
 	}
-	wd, err := os.Getwd()
-	if err == nil {
-		dir := wd
-		for {
-			if info, serr := os.Stat(filepath.Join(dir, "go.mod")); serr == nil && !info.IsDir() {
-				candidate := filepath.Join(dir, defaultCatalogPath)
-				if info, serr := os.Stat(candidate); serr == nil && !info.IsDir() {
-					return candidate
-				}
-				break
-			}
-			parent := filepath.Dir(dir)
-			if parent == dir {
-				break
-			}
-			dir = parent
-		}
+	n, err := strconv.ParseInt(value, 10, 64)
+	if err != nil {
+		return 0
 	}
-	return defaultCatalogPath
+	return n
+}
+
+// parseBytesLimitEnv reads a byte-quantity env var. Accepts RAM (e.g. "2g"),
+// human size ("2GB"), or a raw int64. Returns the parsed bytes and the original
+// string for passthrough to Docker --storage-opt size=.
+func parseBytesLimitEnv(key string) (int64, string) {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return 0, ""
+	}
+
+	if n, err := units.RAMInBytes(value); err == nil {
+		return n, value
+	}
+	if n, err := units.FromHumanSize(value); err == nil {
+		return n, value
+	}
+	if n, err := strconv.ParseInt(value, 10, 64); err == nil {
+		return n, value
+	}
+	return 0, value
 }

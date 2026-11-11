@@ -40,7 +40,6 @@ type fakeDockerClient struct {
 	// ContainerCreate behavior
 	createResult client.ContainerCreateResult
 	createErr    error
-	createPanic  any
 	createCalled bool
 	createOpts   client.ContainerCreateOptions // captured for assertions
 
@@ -98,9 +97,6 @@ type fakeDockerClient struct {
 func (f *fakeDockerClient) ContainerCreate(ctx context.Context, options client.ContainerCreateOptions) (client.ContainerCreateResult, error) {
 	f.createCalled = true
 	f.createOpts = options
-	if f.createPanic != nil {
-		panic(f.createPanic)
-	}
 	return f.createResult, f.createErr
 }
 

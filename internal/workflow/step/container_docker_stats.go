@@ -14,13 +14,13 @@ func collectDockerResourceUsage(
 	rt ContainerRuntime,
 	h ContainerHandle,
 	spec ContainerSpec,
-) *contracts.BuildGateResourceUsage {
+) *contracts.ContainerResourceUsage {
 	d, ok := rt.(*containerRuntime)
 	if !ok || d == nil || d.stats == nil {
 		return nil
 	}
 
-	stats, err := d.stats.ContainerStats(ctx, string(h), dockerStatsOptions())
+	stats, err := d.stats.ContainerStats(ctx, string(h), client.ContainerStatsOptions{Stream: false})
 	if err != nil || stats.Body == nil {
 		return nil
 	}
@@ -51,14 +51,14 @@ func collectDockerResourceUsage(
 	}
 
 	var sizeRw *int64
-	if inspect, ierr := d.client.ContainerInspect(ctx, string(h), dockerInspectOptionsWithSize()); ierr == nil {
+	if inspect, ierr := d.client.ContainerInspect(ctx, string(h), client.ContainerInspectOptions{Size: true}); ierr == nil {
 		if inspect.Container.SizeRw != nil {
 			size := *inspect.Container.SizeRw
 			sizeRw = &size
 		}
 	}
 
-	return &contracts.BuildGateResourceUsage{
+	return &contracts.ContainerResourceUsage{
 		LimitNanoCPUs:    spec.LimitNanoCPUs,
 		LimitMemoryBytes: spec.LimitMemoryBytes,
 		CPUTotalNs:       sj.CPUStats.CPUUsage.TotalUsage,
@@ -68,12 +68,4 @@ func collectDockerResourceUsage(
 		BlkioWriteBytes:  writeBytes,
 		SizeRwBytes:      sizeRw,
 	}
-}
-
-func dockerStatsOptions() client.ContainerStatsOptions {
-	return client.ContainerStatsOptions{Stream: false}
-}
-
-func dockerInspectOptionsWithSize() client.ContainerInspectOptions {
-	return client.ContainerInspectOptions{Size: true}
 }

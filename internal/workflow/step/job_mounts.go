@@ -55,14 +55,13 @@ type nestedMountContract struct {
 	child  string
 }
 
+// buildCommonJobMounts expects homeTarget from resolveJobHome. Callers validate
+// the complete mount set once, after they add their own mounts.
 func buildCommonJobMounts(jobMounts JobMounts, homeTarget string) ([]ContainerMount, error) {
 	if err := validateJobMountSources(jobMounts); err != nil {
 		return nil, err
 	}
-	if err := validateJobHomeTarget(homeTarget); err != nil {
-		return nil, err
-	}
-	mounts := []ContainerMount{
+	return []ContainerMount{
 		{Source: jobMounts.In, Target: jobInContainerDir, ReadOnly: true},
 		{Source: jobMounts.Out, Target: jobOutContainerDir, ReadOnly: false},
 		{Source: jobMounts.Tmp, Target: jobTmpContainerDir, ReadOnly: false},
@@ -73,11 +72,7 @@ func buildCommonJobMounts(jobMounts JobMounts, homeTarget string) ([]ContainerMo
 		{Source: jobMounts.NodeCache, Target: nodeCacheContainerDir, ReadOnly: true},
 		{Source: jobMounts.CommonConfig, Target: nodeConfigContainerDir, ReadOnly: true},
 		{Source: jobMounts.JobConfig, Target: jobConfigContainerDir, ReadOnly: true},
-	}
-	if err := validateContainerMounts(mounts, nil); err != nil {
-		return nil, err
-	}
-	return mounts, nil
+	}, nil
 }
 
 func validateJobMountSources(jobMounts JobMounts) error {
@@ -108,15 +103,10 @@ func validateJobMountSources(jobMounts JobMounts) error {
 	return nil
 }
 
-func applyReservedJobEnv(base map[string]string, jobMounts JobMounts) (map[string]string, error) {
-	if err := validateJobMountSources(jobMounts); err != nil {
-		return nil, err
-	}
-	homeTarget, err := resolveJobHome(base)
-	if err != nil {
-		return nil, err
-	}
-	env := contracts.MergeEnv(base, map[string]string{
+// applyReservedJobEnv expects jobMounts accepted by buildCommonJobMounts and
+// homeTarget from resolveJobHome. The result is a new map.
+func applyReservedJobEnv(base map[string]string, jobMounts JobMounts, homeTarget string) map[string]string {
+	return contracts.MergeEnv(base, map[string]string{
 		ployJobCacheDirEnv:        jobCacheContainerDir,
 		ployNodeCacheDirEnv:       nodeCacheContainerDir,
 		ployJobHomeDirEnv:         homeTarget,
@@ -126,7 +116,6 @@ func applyReservedJobEnv(base map[string]string, jobMounts JobMounts) (map[strin
 		ployJobConfigDirEnv:       jobConfigContainerDir,
 		ployJobTypeEnv:            jobMounts.JobType.String(),
 	})
-	return env, nil
 }
 
 func resolveJobHome(env map[string]string) (string, error) {
@@ -134,20 +123,13 @@ func resolveJobHome(env map[string]string) (string, error) {
 	if configured := env["HOME"]; configured != "" {
 		homeTarget = configured
 	}
-	if err := validateJobHomeTarget(homeTarget); err != nil {
-		return "", err
-	}
-	return homeTarget, nil
-}
-
-func validateJobHomeTarget(homeTarget string) error {
 	if !path.IsAbs(homeTarget) {
-		return fmt.Errorf("job HOME target %q is not absolute", homeTarget)
+		return "", fmt.Errorf("job HOME target %q is not absolute", homeTarget)
 	}
 	if clean := path.Clean(homeTarget); clean != homeTarget {
-		return fmt.Errorf("job HOME target %q is not canonical", homeTarget)
+		return "", fmt.Errorf("job HOME target %q is not canonical", homeTarget)
 	}
-	return nil
+	return homeTarget, nil
 }
 
 func validateContainerMounts(mounts []ContainerMount, nested []nestedMountContract) error {

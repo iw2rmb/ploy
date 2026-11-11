@@ -414,7 +414,6 @@ func setupClaimer(t *testing.T, cfg Config, controller RunController) *ClaimMana
 		InitialInterval: types.Duration(10 * time.Millisecond),
 		MaxInterval:     types.Duration(100 * time.Millisecond),
 		Multiplier:      2.0,
-		MaxElapsedTime:  0,
 		MaxAttempts:     0,
 	})
 	return claimer

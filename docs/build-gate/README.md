@@ -77,13 +77,13 @@ Set `build_gate.disabled: true` when no Build Gate jobs should be created.
 Build Gate preserves captured gate logs as execution metadata. It does not run
 Maven, Gradle, or other tool-specific log processors.
 
-On failed gate execution, `BuildGateStageMetadata.LogFindings[0]` contains:
+On failed gate execution, `BuildGateMetadata.LogFindings[0]` contains:
 
 - `severity: error`
 - `message`: the raw canonical container logs, capped at 10 MiB
 - no structured `evidence`
 
-The same capped log text is stored in `BuildGateStageMetadata.LogsText`, and
+The same capped log text is stored in `BuildGateMetadata.LogsText`, and
 `LogDigest` is computed from that capped text.
 
 Gradle images write cache-hit evidence to `/out/gradle-build-cache-hits.txt`

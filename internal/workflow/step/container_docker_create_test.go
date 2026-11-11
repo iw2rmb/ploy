@@ -2,8 +2,6 @@ package step
 
 import (
 	"context"
-	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
@@ -25,7 +23,6 @@ func TestContainerRuntimeCreate(t *testing.T) {
 		spec        ContainerSpec
 		createRes   client.ContainerCreateResult
 		createErr   error
-		createPanic any
 		pullImage   bool
 		inspectErr  error
 		pullErr     error
@@ -100,15 +97,6 @@ func TestContainerRuntimeCreate(t *testing.T) {
 			errContains: "create container",
 		},
 		{
-			name: "error_create_panics",
-			spec: ContainerSpec{
-				Image: "alpine:latest",
-			},
-			createPanic: "json encoder panic",
-			wantErr:     true,
-			errContains: "create container panic",
-		},
-		{
 			name: "success_with_image_pull",
 			spec: ContainerSpec{
 				Image: "alpine:latest",
@@ -148,7 +136,6 @@ func TestContainerRuntimeCreate(t *testing.T) {
 			fake := &fakeDockerClient{
 				createResult:    tc.createRes,
 				createErr:       tc.createErr,
-				createPanic:     tc.createPanic,
 				imageInspectErr: tc.inspectErr,
 				pullErr:         tc.pullErr,
 			}
@@ -221,115 +208,6 @@ func TestContainerRuntimeCreate_ImagePullStreamErrorStopsBeforeCreate(t *testing
 	requireErrContains(t, err, "manifest unknown")
 	if fake.createCalled {
 		t.Fatal("container creation must not continue after a streamed pull error")
-	}
-}
-
-func TestContainerRuntimeCreate_ImagePullUsesRegistryAuth(t *testing.T) {
-	t.Parallel()
-
-	authJSON := `{"auths":{"ghcr.io":{"username":"octocat","password":"secret"}}}`
-	fake := &fakeDockerClient{
-		createResult:    client.ContainerCreateResult{ID: "pulled-container"},
-		imageInspectErr: cerrdefs.ErrNotFound,
-	}
-	rt := newContainerRuntimeWithClient(fake, ContainerRuntimeOptions{
-		PullImage:              true,
-		RegistryAuthConfigJSON: authJSON,
-	})
-
-	_, err := rt.Create(context.Background(), ContainerSpec{
-		Image: "ghcr.io/iw2rmb/ploy/amata-codex-java-17-maven:latest",
-	})
-	if err != nil {
-		t.Fatalf("Create() error = %v", err)
-	}
-	if !fake.pullCalled {
-		t.Fatal("expected image pull to be called")
-	}
-	if strings.TrimSpace(fake.pullOpts.RegistryAuth) == "" {
-		t.Fatal("expected image pull RegistryAuth to be populated")
-	}
-
-	decodedJSON, err := base64.URLEncoding.DecodeString(fake.pullOpts.RegistryAuth)
-	if err != nil {
-		t.Fatalf("decode registry auth: %v", err)
-	}
-	var payload map[string]any
-	if err := json.Unmarshal(decodedJSON, &payload); err != nil {
-		t.Fatalf("unmarshal registry auth payload: %v", err)
-	}
-	if got := payload["username"]; got != "octocat" {
-		t.Fatalf("registry auth username = %v, want octocat", got)
-	}
-	if got := payload["password"]; got != "secret" {
-		t.Fatalf("registry auth password = %v, want secret", got)
-	}
-	if got := payload["serveraddress"]; got != "ghcr.io" {
-		t.Fatalf("registry auth serveraddress = %v, want ghcr.io", got)
-	}
-}
-
-func TestContainerRuntimeCreate_InvalidRegistryAuthConfig(t *testing.T) {
-	t.Parallel()
-
-	fake := &fakeDockerClient{
-		createResult:    client.ContainerCreateResult{ID: "pulled-container"},
-		imageInspectErr: cerrdefs.ErrNotFound,
-	}
-	rt := newContainerRuntimeWithClient(fake, ContainerRuntimeOptions{
-		PullImage:              true,
-		RegistryAuthConfigJSON: `{"auths":`,
-	})
-
-	_, err := rt.Create(context.Background(), ContainerSpec{
-		Image: "ghcr.io/iw2rmb/ploy/amata-codex-java-17-maven:latest",
-	})
-	requireErrContains(t, err, "parse registry auth config")
-	if fake.pullCalled {
-		t.Fatal("did not expect image pull when auth config is invalid")
-	}
-}
-
-func TestContainerRuntimeCreate_DockerHubRegistryAuthAlias(t *testing.T) {
-	t.Parallel()
-
-	encodedUserPass := base64.StdEncoding.EncodeToString([]byte("hub-user:hub-token"))
-	authJSON := `{"auths":{"https://index.docker.io/v1/":{"auth":"` + encodedUserPass + `"}}}`
-	fake := &fakeDockerClient{
-		createResult:    client.ContainerCreateResult{ID: "pulled-container"},
-		imageInspectErr: cerrdefs.ErrNotFound,
-	}
-	rt := newContainerRuntimeWithClient(fake, ContainerRuntimeOptions{
-		PullImage:              true,
-		RegistryAuthConfigJSON: authJSON,
-	})
-
-	_, err := rt.Create(context.Background(), ContainerSpec{
-		Image: "alpine:3.20",
-	})
-	if err != nil {
-		t.Fatalf("Create() error = %v", err)
-	}
-	if !fake.pullCalled {
-		t.Fatal("expected image pull to be called")
-	}
-	if strings.TrimSpace(fake.pullOpts.RegistryAuth) == "" {
-		t.Fatal("expected image pull RegistryAuth to be populated")
-	}
-
-	decodedJSON, err := base64.URLEncoding.DecodeString(fake.pullOpts.RegistryAuth)
-	if err != nil {
-		t.Fatalf("decode registry auth: %v", err)
-	}
-	var payload map[string]any
-	if err := json.Unmarshal(decodedJSON, &payload); err != nil {
-		t.Fatalf("unmarshal registry auth payload: %v", err)
-	}
-	if got := payload["username"]; got != "hub-user" {
-		t.Fatalf("registry auth username = %v, want hub-user", got)
-	}
-	if got := payload["password"]; got != "hub-token" {
-		t.Fatalf("registry auth password = %v, want hub-token", got)
 	}
 }
 

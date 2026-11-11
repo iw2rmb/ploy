@@ -149,7 +149,7 @@ func TestGatePlanResolver_StackDetectModePolicy(t *testing.T) {
 						Image: "planner-test:gradle17",
 					},
 				},
-				StackDetect: tc.stackDetect,
+				Stack: tc.stackDetect,
 			}
 
 			plan, terminal := resolveGateExecutionPlan(context.Background(), tc.workspace(t), spec, "")
@@ -196,7 +196,7 @@ func TestResolveGateExecutionPlanRejectsEmptyNormalizedStackGateExpectation(t *t
 	t.Parallel()
 	spec := &contracts.StepGateSpec{
 		Enabled: true,
-		StackGate: &contracts.StackGatePhaseSpec{
+		StackGatePhase: &contracts.StackGatePhaseSpec{
 			Enabled: true,
 			Expect:  &contracts.StackExpectation{Language: "  ", Tool: "\t", Release: "\n"},
 		},
@@ -259,7 +259,7 @@ func TestGatePlanResolver_StackGateTerminalRuntimeImage(t *testing.T) {
 					Stack: contracts.StackExpectation{Language: "java", Tool: "maven", Release: "17"},
 					Image: "planner-test:java17",
 				}},
-				StackGate: &contracts.StackGatePhaseSpec{
+				StackGatePhase: &contracts.StackGatePhaseSpec{
 					Enabled: true,
 					Expect:  &contracts.StackExpectation{Language: "java", Tool: "maven", Release: "17"},
 				},
@@ -277,9 +277,6 @@ func TestGatePlanResolver_StackGateTerminalRuntimeImage(t *testing.T) {
 			}
 			if got := terminal.meta.StackGate.Result; got != tc.wantState {
 				t.Fatalf("stack gate result = %q, want %q", got, tc.wantState)
-			}
-			if !terminal.reportRuntimeImage {
-				t.Fatal("expected runtime image reporting on stack gate terminal")
 			}
 			if got, want := terminal.meta.RuntimeImage, "planner-test:java17"; got != want {
 				t.Fatalf("meta runtime image = %q, want %q", got, want)

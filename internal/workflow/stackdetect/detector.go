@@ -15,6 +15,15 @@ func fileExists(path string) bool {
 	return err == nil && !info.IsDir()
 }
 
+// relPath returns the relative path from workspace to the given path.
+func relPath(workspace, path string) string {
+	rel, err := filepath.Rel(workspace, path)
+	if err != nil {
+		return filepath.Base(path)
+	}
+	return rel
+}
+
 // scanResult holds the filesystem scan state shared between Detect and DetectTool.
 type scanResult struct {
 	workspace string
@@ -24,7 +33,6 @@ type scanResult struct {
 	hasGradleKts     bool
 	hasGradle        bool
 	hasJava          bool
-	hasGoMod         bool
 	hasGo            bool
 	hasCargo         bool
 	hasRustToolchain bool
@@ -69,8 +77,7 @@ func scanWorkspace(workspace string) scanResult {
 	s.hasGradle = s.hasGradleGroovy || s.hasGradleKts
 	s.hasJava = s.hasPom || s.hasGradle
 
-	s.hasGoMod = fileExists(goModPath)
-	s.hasGo = s.hasGoMod
+	s.hasGo = fileExists(goModPath)
 
 	s.hasCargo = fileExists(cargoPath)
 	hasRustToolchainToml := fileExists(rustToolchainTomlPath)
@@ -187,14 +194,9 @@ func Detect(ctx context.Context, workspace string) (*Observation, error) {
 		return detectGo(ctx, workspace, filepath.Join(workspace, goModuleFile))
 	case "rust":
 		return detectRust(ctx, workspace)
-	case "python":
-		return detectPython(ctx, s)
-	default:
-		return nil, &DetectionError{
-			Reason:  "unknown",
-			Message: "unsupported language: " + s.languages[0],
-		}
 	}
+	// scanWorkspace emits only java, go, rust, and python.
+	return detectPython(ctx, s)
 }
 
 // DetectTool performs deterministic tool/language detection from build files in the
@@ -236,23 +238,18 @@ func DetectTool(ctx context.Context, workspace string) (*Observation, error) {
 			Release:  nil,
 			Evidence: s.evidence,
 		}, nil
-	case "python":
-		tool := "pip"
-		if s.pyprojectHasPoetryTool {
-			tool = "poetry"
-		}
-		return &Observation{
-			Language: "python",
-			Tool:     tool,
-			Release:  nil,
-			Evidence: s.evidence,
-		}, nil
-	default:
-		return nil, &DetectionError{
-			Reason:  "unknown",
-			Message: "unsupported language: " + lang,
-		}
 	}
+	// scanWorkspace emits only java, go, rust, and python.
+	tool := "pip"
+	if s.pyprojectHasPoetryTool {
+		tool = "poetry"
+	}
+	return &Observation{
+		Language: "python",
+		Tool:     tool,
+		Release:  nil,
+		Evidence: s.evidence,
+	}, nil
 }
 
 // detectJava handles Java detection with Maven/Gradle disambiguation.

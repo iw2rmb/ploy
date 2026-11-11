@@ -62,8 +62,8 @@ func DeriveWaveStatus(counts *domaintypes.RunCounts) string {
 	return DerivedStatusPending
 }
 
-// RunCompletionEval is the pure evaluation result for run completion.
-type RunCompletionEval struct {
+// WaveCompletionEval is the pure evaluation result for wave completion.
+type WaveCompletionEval struct {
 	ShouldFinish bool
 	RunState     migsapi.RunState
 }
@@ -71,7 +71,7 @@ type RunCompletionEval struct {
 // EvaluateWaveCompletionFromRunCounts determines whether a wave can be marked Finished.
 // Returns ShouldFinish=true when all runs are in terminal states, along with the
 // derived run state (succeeded, failed, or cancelled).
-func EvaluateWaveCompletionFromRunCounts(counts []store.CountRunsByWaveStatusRow) RunCompletionEval {
+func EvaluateWaveCompletionFromRunCounts(counts []store.CountRunsByWaveStatusRow) WaveCompletionEval {
 	var (
 		total        int32
 		terminal     int32
@@ -80,8 +80,7 @@ func EvaluateWaveCompletionFromRunCounts(counts []store.CountRunsByWaveStatusRow
 	)
 	for _, row := range counts {
 		total += row.Count
-		switch row.Status {
-		case domaintypes.RunStatusSuccess, domaintypes.RunStatusFail, domaintypes.RunStatusCancelled:
+		if IsTerminalRunStatus(row.Status) {
 			terminal += row.Count
 		}
 		if row.Status == domaintypes.RunStatusFail && row.Count > 0 {
@@ -93,7 +92,7 @@ func EvaluateWaveCompletionFromRunCounts(counts []store.CountRunsByWaveStatusRow
 	}
 
 	if total == 0 || terminal < total {
-		return RunCompletionEval{ShouldFinish: false}
+		return WaveCompletionEval{ShouldFinish: false}
 	}
 
 	runState := migsapi.RunStateSucceeded
@@ -103,7 +102,7 @@ func EvaluateWaveCompletionFromRunCounts(counts []store.CountRunsByWaveStatusRow
 		runState = migsapi.RunStateCancelled
 	}
 
-	return RunCompletionEval{
+	return WaveCompletionEval{
 		ShouldFinish: true,
 		RunState:     runState,
 	}

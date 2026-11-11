@@ -10,7 +10,7 @@ import (
 )
 
 // gateExecutionMetadata normalizes a finished gate container run into
-// BuildGateStageMetadata. On failure it preserves the captured output without
+// BuildGateMetadata. On failure it preserves the captured output without
 // tool-specific trimming.
 func gateExecutionMetadata(
 	language string,
@@ -19,9 +19,9 @@ func gateExecutionMetadata(
 	image string,
 	res ContainerResult,
 	logs []byte,
-) *contracts.BuildGateStageMetadata {
+) *contracts.BuildGateMetadata {
 	passed := res.ExitCode == 0
-	meta := &contracts.BuildGateStageMetadata{
+	meta := &contracts.BuildGateMetadata{
 		StaticChecks: []contracts.BuildGateStaticCheckReport{{
 			Language: language,
 			Tool:     tool,
@@ -45,7 +45,7 @@ func gateExecutionMetadata(
 	return meta
 }
 
-func attachLogsTextAndDigest(meta *contracts.BuildGateStageMetadata, logs []byte) {
+func attachLogsTextAndDigest(meta *contracts.BuildGateMetadata, logs []byte) {
 	logs = capGateLogBytes(logs)
 	meta.LogsText = string(logs)
 	meta.LogDigest = sha256Digest(logs)

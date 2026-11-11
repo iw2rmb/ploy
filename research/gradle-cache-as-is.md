@@ -59,7 +59,7 @@ The mounted directory contains several different types of state:
 - Ploy cleanup init scripts under `init.d`.
 
 The complete mount is created by
-[`buildToolCacheMounts`](../internal/workflow/step/gate_docker_mounts.go). The
+[`buildToolCacheMounts`](../internal/workflow/step/gate_docker.go). The
 same mount policy is used for non-gate Java jobs by
 [`buildJavaToolCacheMountsFromStackEnv`](../internal/workflow/step/java_tool_cache_mounts.go).
 

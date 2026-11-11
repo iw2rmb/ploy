@@ -92,7 +92,7 @@ func TestGateExecutor_EnvPassthrough(t *testing.T) {
 
 	spec := &contracts.StepGateSpec{
 		Enabled: true,
-		Env: map[string]string{
+		Envs: map[string]string{
 			"APP_TLS_CERT":  "-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----",
 			"APP_AUTH_JSON": `{"token":"secret"}`,
 			"CUSTOM_VAR":    "custom-value",
@@ -109,10 +109,10 @@ func TestGateExecutor_EnvPassthrough(t *testing.T) {
 	}
 
 	// Verify all env vars from spec.Env are passed verbatim to the container spec.
-	if len(rt.captured.Env) != len(spec.Env)+8 {
-		t.Fatalf("env count = %d, want %d: %v", len(rt.captured.Env), len(spec.Env)+8, rt.captured.Env)
+	if len(rt.captured.Env) != len(spec.Envs)+8 {
+		t.Fatalf("env count = %d, want %d: %v", len(rt.captured.Env), len(spec.Envs)+8, rt.captured.Env)
 	}
-	for key, want := range spec.Env {
+	for key, want := range spec.Envs {
 		if got := rt.captured.Env[key]; got != want {
 			t.Errorf("env[%s] = %q, want %q", key, got, want)
 		}
@@ -141,7 +141,7 @@ func TestGateExecutor_EmptyEnv(t *testing.T) {
 
 			spec := &contracts.StepGateSpec{
 				Enabled: true,
-				Env:     tc.env,
+				Envs:    tc.env,
 			}
 
 			_, err := executor.Execute(context.Background(), spec, workspace, newTestGateJobMounts(t))

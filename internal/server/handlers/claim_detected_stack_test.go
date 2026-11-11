@@ -82,7 +82,7 @@ func mustMarshalGateMeta(t *testing.T, language, tool, release string) []byte {
 	t.Helper()
 	raw, err := contracts.MarshalJobMeta(&contracts.JobMeta{
 		Kind: contracts.JobKindGate,
-		GateMetadata: &contracts.BuildGateStageMetadata{
+		Gate: &contracts.BuildGateMetadata{
 			Detected: &contracts.StackExpectation{
 				Language: language,
 				Tool:     tool,

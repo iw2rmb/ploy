@@ -228,10 +228,10 @@ CREATE INDEX IF NOT EXISTS runs_mig_repo_created_idx ON runs(mig_id, repo_id, cr
 -- defined by internal/workflow/contracts.JobMeta with the following shape:
 --   {
 --     "kind": "mig"|"gate"|"build",
---     "gate": { ... BuildGateStageMetadata ... },   // present when kind="gate"
+--     "gate": { ... BuildGateMetadata ... },   // present when kind="gate"
 --     "build": { "tool": "...", "command": "...", "metrics": {...} }  // present when kind="build"
 --   }
--- See internal/workflow/contracts.BuildGateStageMetadata for gate metadata fields.
+-- See internal/workflow/contracts.BuildGateMetadata for gate metadata fields.
 -- See internal/workflow/contracts.BuildMeta for build metadata fields.
 CREATE TABLE IF NOT EXISTS jobs (
   id              TEXT PRIMARY KEY,  -- KSUID-backed string ID (27 chars); no default, app-generated.

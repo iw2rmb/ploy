@@ -176,12 +176,12 @@ func buildManifest(
 		Tmp:        hydraTmp,
 		BundleMap:  nil,
 		Gate: &contracts.StepGateSpec{
-			Enabled:   true,
-			Env:       gateEnv,
-			StackGate: stackGate,
-			RepoID:    req.RepoID,
-			RepoURL:   types.RepoURL(strings.TrimSpace(req.RepoURL.String())),
-			Ref:       types.GitRef(strings.TrimSpace(gateRef)),
+			Enabled:        true,
+			Envs:           gateEnv,
+			StackGatePhase: stackGate,
+			RepoID:         req.RepoID,
+			RepoURL:        types.RepoURL(strings.TrimSpace(req.RepoURL.String())),
+			Ref:            types.GitRef(strings.TrimSpace(gateRef)),
 		},
 		Inputs: []contracts.StepInput{
 			{

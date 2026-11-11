@@ -8,7 +8,7 @@ import (
 
 const nonExecutableGradlewErrorPrefix = "Non-executable gradlew:"
 
-func gateLogPayloadFromMetadata(gateMetadata *contracts.BuildGateStageMetadata) string {
+func gateLogPayloadFromMetadata(gateMetadata *contracts.BuildGateMetadata) string {
 	if gateMetadata == nil {
 		return ""
 	}
@@ -24,7 +24,7 @@ func gateLogPayloadFromMetadata(gateMetadata *contracts.BuildGateStageMetadata) 
 	return logPayload
 }
 
-func gateFailureErrorFromMetadata(gateMetadata *contracts.BuildGateStageMetadata) string {
+func gateFailureErrorFromMetadata(gateMetadata *contracts.BuildGateMetadata) string {
 	if gateMetadata == nil {
 		return ""
 	}

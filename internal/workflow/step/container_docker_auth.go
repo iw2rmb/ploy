@@ -58,14 +58,15 @@ func (r *containerRuntime) registryAuthForImage(imageRef string) (string, error)
 }
 
 func (r *containerRuntime) registryAuthConfigJSON() (string, error) {
-	if path := strings.TrimSpace(r.opts.RegistryAuthConfigFile); path != "" {
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return "", fmt.Errorf("read registry auth config file %q: %w", path, err)
-		}
-		return strings.TrimSpace(string(data)), nil
+	path := strings.TrimSpace(r.opts.RegistryAuthConfigFile)
+	if path == "" {
+		return "", nil
 	}
-	return strings.TrimSpace(r.opts.RegistryAuthConfigJSON), nil
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", fmt.Errorf("read registry auth config file %q: %w", path, err)
+	}
+	return strings.TrimSpace(string(data)), nil
 }
 
 func toDockerAuthConfig(entry dockerAuthEntry, serverAddress string) (registry.AuthConfig, bool) {

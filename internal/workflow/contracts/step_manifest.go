@@ -1,21 +1,9 @@
 package contracts
 
 import (
-	"errors"
 	"fmt"
-	"path/filepath"
-	"regexp"
-	"sort"
-	"strings"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
-)
-
-var (
-	stepIDPattern   = regexp.MustCompile(`^[a-z0-9][a-z0-9\-]{2,63}$`)
-	imagePattern    = regexp.MustCompile(`^[\w][\w./:@+-]{2,}$`)
-	envKeyPattern   = regexp.MustCompile(`^[A-Z0-9_]+$`)
-	stepInputNameRe = regexp.MustCompile(`^[a-z0-9][a-z0-9\-]{2,63}$`)
 )
 
 // StepManifest defines the execution contract for a single Mig step.
@@ -85,17 +73,17 @@ type StepInput struct {
 //  2. BaseRef — fallback for baseline validations.
 type StepGateSpec struct {
 	Enabled bool
-	Env     map[string]string
+	Envs    map[string]string
 
 	// ImageOverrides holds mig-level image mapping overrides for gate execution.
 	// These rules override the default mapping file.
 	ImageOverrides []BuildGateImageRule
 
-	// StackDetect configures stack detection behavior for this gate.
+	// Stack configures stack detection behavior for this gate.
 	// mode=forced uses the configured language/release and detects tool when omitted.
 	// mode=strict requires detection to match the configured stack.
 	// mode=fallback uses detection when complete, otherwise the configured stack.
-	StackDetect *BuildGateStackConfig
+	Stack *BuildGateStackConfig
 
 	// RepoURL is the Git repository URL for remote gate execution.
 	// Populated from StartRunRequest.RepoURL when building manifests.
@@ -114,9 +102,9 @@ type StepGateSpec struct {
 	// The diff captures all changes relative to the initial repo_url+ref clone.
 	DiffPatch []byte
 
-	// StackGate holds the Stack Gate configuration for this step.
+	// StackGatePhase holds the Stack Gate configuration for this step.
 	// Used for pre/post gate validation of stack expectations.
-	StackGate *StackGatePhaseSpec
+	StackGatePhase *StackGatePhaseSpec
 }
 
 // StepInputHydration describes how to materialise repository state for an input.
@@ -164,184 +152,34 @@ func (s StepResourceSpec) ToLimits() (nanoCPUs int64, memoryBytes int64, diskByt
 	return
 }
 
-// Validate ensures the manifest is well-formed.
-func (m StepManifest) Validate() error {
-	if err := m.validateIdentity(); err != nil {
-		return err
+// OptionString returns the option value for key when it is of type string.
+// It returns the string and true on exact type match; otherwise it returns
+// an empty string and false. The lookup is safe on a zero-value manifest
+// or when Options is nil.
+func (m StepManifest) OptionString(key string) (string, bool) {
+	if m.Options == nil {
+		return "", false
 	}
-	if err := m.validateEnv(); err != nil {
-		return err
+	v, ok := m.Options[key]
+	if !ok {
+		return "", false
 	}
-	if err := m.validateInputs(); err != nil {
-		return err
-	}
-	if err := m.validateGate(); err != nil {
-		return err
-	}
-	if err := m.validateResources(); err != nil {
-		return err
-	}
-	return nil
+	s, ok := v.(string)
+	return s, ok
 }
 
-func (m StepManifest) validateIdentity() error {
-	if m.ID.IsZero() {
-		return errors.New("step manifest id required")
+// OptionBool returns the option value for key when it is of type bool.
+// It returns the bool and true on exact type match; otherwise it returns
+// false and false. The lookup is safe on a zero-value manifest or when
+// Options is nil.
+func (m StepManifest) OptionBool(key string) (bool, bool) {
+	if m.Options == nil {
+		return false, false
 	}
-	if !stepIDPattern.MatchString(m.ID.String()) {
-		return fmt.Errorf("step manifest id invalid: %q", m.ID)
+	v, ok := m.Options[key]
+	if !ok {
+		return false, false
 	}
-	if strings.TrimSpace(m.Name) == "" {
-		return errors.New("step manifest name required")
-	}
-	if strings.TrimSpace(m.Image) == "" {
-		return errors.New("step manifest image required")
-	}
-	if !imagePattern.MatchString(m.Image) {
-		return fmt.Errorf("step manifest image invalid: %q", m.Image)
-	}
-	if m.WorkingDir != "" && !filepath.IsAbs(m.WorkingDir) {
-		return fmt.Errorf("step manifest working dir must be absolute: %q", m.WorkingDir)
-	}
-	return nil
-}
-
-func (m StepManifest) validateEnv() error {
-	if len(m.Envs) == 0 {
-		return nil
-	}
-	keys := make([]string, 0, len(m.Envs))
-	for key := range m.Envs {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-	for _, key := range keys {
-		if strings.TrimSpace(key) == "" {
-			return errors.New("step manifest environment key required")
-		}
-		if !envKeyPattern.MatchString(key) {
-			return fmt.Errorf("step manifest environment key invalid: %q", key)
-		}
-	}
-	return nil
-}
-
-func (m StepManifest) validateInputs() error {
-	if len(m.Inputs) == 0 {
-		return errors.New("step manifest inputs required")
-	}
-	seenInputs := make(map[string]struct{}, len(m.Inputs))
-	for idx, input := range m.Inputs {
-		position := fmt.Sprintf("inputs[%d]", idx)
-		if strings.TrimSpace(input.Name) == "" {
-			return fmt.Errorf("%s name required", position)
-		}
-		if !stepInputNameRe.MatchString(input.Name) {
-			return fmt.Errorf("%s name invalid: %q", position, input.Name)
-		}
-		if _, exists := seenInputs[input.Name]; exists {
-			return fmt.Errorf("%s duplicate name %q", position, input.Name)
-		}
-		seenInputs[input.Name] = struct{}{}
-		if strings.TrimSpace(input.MountPath) == "" {
-			return fmt.Errorf("%s mount path required", position)
-		}
-		if !filepath.IsAbs(input.MountPath) {
-			return fmt.Errorf("%s mount path must be absolute: %q", position, input.MountPath)
-		}
-		switch input.Mode {
-		case StepInputModeReadOnly, StepInputModeReadWrite:
-			// ok
-		default:
-			return fmt.Errorf("%s mount mode invalid: %q", position, input.Mode)
-		}
-
-		hasSnapshot := strings.TrimSpace(string(input.SnapshotCID)) != ""
-		hasDiff := strings.TrimSpace(string(input.DiffCID)) != ""
-		if input.Hydration != nil {
-			if err := input.Hydration.validate(fmt.Sprintf("%s hydration", position)); err != nil {
-				return err
-			}
-			if !hasSnapshot && !hasDiff && !input.Hydration.hasSource() {
-				return fmt.Errorf("%s hydration requires base snapshot, diff, or repo metadata", position)
-			}
-		} else if hasSnapshot == hasDiff {
-			// No hydration: must have exactly one of snapshot or diff.
-			return fmt.Errorf("%s must reference exactly one source (snapshot or diff)", position)
-		}
-	}
-	return nil
-}
-
-func (m StepManifest) validateGate() error {
-	if m.Gate == nil {
-		return nil
-	}
-	if !m.Gate.Enabled {
-		return nil
-	}
-	for key := range m.Gate.Env {
-		if !envKeyPattern.MatchString(key) {
-			return fmt.Errorf("gate environment key invalid: %q", key)
-		}
-	}
-	return nil
-}
-
-func (m StepManifest) validateResources() error {
-	if err := m.Resources.CPU.Validate(); err != nil {
-		return fmt.Errorf("resources cpu invalid: %w", err)
-	}
-	if err := m.Resources.Memory.Validate(); err != nil {
-		return fmt.Errorf("resources memory invalid: %w", err)
-	}
-	if err := m.Resources.Disk.Validate(); err != nil {
-		return fmt.Errorf("resources disk invalid: %w", err)
-	}
-	return nil
-}
-
-func (h StepInputHydration) hasSource() bool {
-	if strings.TrimSpace(string(h.BaseSnapshot.CID)) != "" {
-		return true
-	}
-	if len(h.Diffs) > 0 {
-		return true
-	}
-	if h.Repo != nil && strings.TrimSpace(string(h.Repo.URL)) != "" {
-		return true
-	}
-	return false
-}
-
-func (h StepInputHydration) validate(position string) error {
-	hasBase := strings.TrimSpace(string(h.BaseSnapshot.CID)) != ""
-	for idx, diff := range h.Diffs {
-		if strings.TrimSpace(string(diff.CID)) == "" {
-			return fmt.Errorf("%s diff[%d] cid required", position, idx)
-		}
-		if strings.TrimSpace(string(diff.Digest)) != "" {
-			if err := diff.Digest.Validate(); err != nil {
-				return fmt.Errorf("%s diff[%d] digest invalid: %v", position, idx, err)
-			}
-		}
-	}
-	if hasBase {
-		if strings.TrimSpace(string(h.BaseSnapshot.Digest)) != "" {
-			if err := h.BaseSnapshot.Digest.Validate(); err != nil {
-				return fmt.Errorf("%s base snapshot digest invalid: %v", position, err)
-			}
-		}
-	} else if len(h.Diffs) > 0 && (h.Repo == nil || strings.TrimSpace(string(h.Repo.URL)) == "") {
-		return fmt.Errorf("%s base snapshot cid required when diffs are provided", position)
-	}
-	if h.Repo != nil {
-		if err := h.Repo.Validate(); err != nil {
-			return fmt.Errorf("%s repo invalid: %w", position, err)
-		}
-	}
-	if !hasBase && len(h.Diffs) == 0 && (h.Repo == nil || strings.TrimSpace(string(h.Repo.URL)) == "") {
-		return fmt.Errorf("%s requires base snapshot, diffs, or repo metadata", position)
-	}
-	return nil
+	b, ok := v.(bool)
+	return b, ok
 }

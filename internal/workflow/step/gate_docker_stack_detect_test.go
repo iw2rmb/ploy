@@ -22,7 +22,7 @@ func TestGateDocker_StackDetect_FallbackUsesConfiguredStackOnMissingVersion(t *t
 			Stack: contracts.StackExpectation{Language: "java", Tool: "maven", Release: "17"},
 			Image: "custom-maven:java17",
 		}},
-		StackDetect: &contracts.BuildGateStackConfig{
+		Stack: &contracts.BuildGateStackConfig{
 			Mode:     contracts.BuildGateStackModeFallback,
 			Language: "java",
 			Tool:     "maven",
@@ -59,7 +59,7 @@ func TestGateDocker_StackDetect_StrictCancelsOnDetectionFailure(t *testing.T) {
 
 	spec := &contracts.StepGateSpec{
 		Enabled: true,
-		StackDetect: &contracts.BuildGateStackConfig{
+		Stack: &contracts.BuildGateStackConfig{
 			Mode:     contracts.BuildGateStackModeStrict,
 			Language: "java",
 			Tool:     "maven",

@@ -47,13 +47,13 @@ func TestNormalizeContainerResourceUsage(t *testing.T) {
 
 	tests := []struct {
 		name  string
-		usage *contracts.BuildGateResourceUsage
+		usage *contracts.ContainerResourceUsage
 		want  *types.RunStatsJobResources
 	}{
 		{name: "nil usage", usage: nil, want: nil},
 		{
 			name: "uses peak memory and writable layer size",
-			usage: &contracts.BuildGateResourceUsage{
+			usage: &contracts.ContainerResourceUsage{
 				CPUTotalNs:    100,
 				MemUsageBytes: 200,
 				MemMaxBytes:   300,
@@ -63,7 +63,7 @@ func TestNormalizeContainerResourceUsage(t *testing.T) {
 		},
 		{
 			name: "falls back to current memory and saturates unsigned counters",
-			usage: &contracts.BuildGateResourceUsage{
+			usage: &contracts.ContainerResourceUsage{
 				CPUTotalNs:    ^uint64(0),
 				MemUsageBytes: ^uint64(0),
 			},
@@ -71,12 +71,12 @@ func TestNormalizeContainerResourceUsage(t *testing.T) {
 		},
 		{
 			name:  "ignores zero writable layer size",
-			usage: &contracts.BuildGateResourceUsage{SizeRwBytes: &zeroDisk},
+			usage: &contracts.ContainerResourceUsage{SizeRwBytes: &zeroDisk},
 			want:  &types.RunStatsJobResources{},
 		},
 		{
 			name:  "ignores negative writable layer size",
-			usage: &contracts.BuildGateResourceUsage{SizeRwBytes: &negativeDisk},
+			usage: &contracts.ContainerResourceUsage{SizeRwBytes: &negativeDisk},
 			want:  &types.RunStatsJobResources{},
 		},
 	}

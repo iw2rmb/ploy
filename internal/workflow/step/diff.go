@@ -46,6 +46,11 @@ func CountPatchStats(patchBytes []byte) PatchStats {
 	return stats
 }
 
+// DiffGenerator generates diffs between states.
+type DiffGenerator interface {
+	Generate(ctx context.Context, workspace string) ([]byte, error)
+}
+
 type filesystemDiffGenerator struct{}
 
 func (d *filesystemDiffGenerator) Generate(ctx context.Context, workspace string) ([]byte, error) {
@@ -95,17 +100,8 @@ func generateGitDiff(ctx context.Context, workspace string) ([]byte, error) {
 }
 
 func runGitCommandWithEnv(ctx context.Context, workspace string, env []string, args ...string) error {
-	result, err := gitexec.Execute(ctx, gitexec.Request{Dir: workspace, Env: env, Args: args})
-	if err != nil {
-		if ctx.Err() != nil {
-			return fmt.Errorf("cancelled: %w", ctx.Err())
-		}
-		if len(result.Stderr) > 0 {
-			return fmt.Errorf("%s", strings.TrimSpace(string(result.Stderr)))
-		}
-		return err
-	}
-	return nil
+	_, err := runGitOutputWithEnv(ctx, workspace, env, args...)
+	return err
 }
 
 func runGitOutputWithEnv(ctx context.Context, workspace string, env []string, args ...string) ([]byte, error) {

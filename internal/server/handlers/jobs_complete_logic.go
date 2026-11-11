@@ -135,10 +135,10 @@ func formatStackGateError(jobType domaintypes.JobType, jobMeta json.RawMessage) 
 		return nil
 	}
 	meta, err := contracts.UnmarshalJobMeta(jobMeta)
-	if err != nil || meta.Kind != "gate" || meta.GateMetadata == nil || meta.GateMetadata.StackGate == nil {
+	if err != nil || meta.Kind != "gate" || meta.Gate == nil || meta.Gate.StackGate == nil {
 		return nil
 	}
-	sg := meta.GateMetadata.StackGate
+	sg := meta.Gate.StackGate
 	if sg.Result == "pass" {
 		return nil
 	}
@@ -159,8 +159,8 @@ func formatStackGateError(jobType domaintypes.JobType, jobMeta json.RawMessage) 
 	appendStackGateExpectation(&sb, "Detected", sg.Detected)
 
 	// Extract evidence from LogFindings
-	if meta.GateMetadata != nil && len(meta.GateMetadata.LogFindings) > 0 {
-		for _, finding := range meta.GateMetadata.LogFindings {
+	if meta.Gate != nil && len(meta.Gate.LogFindings) > 0 {
+		for _, finding := range meta.Gate.LogFindings {
 			if finding.Evidence != "" {
 				sb.WriteString("  Evidence:\n")
 				for _, line := range strings.Split(finding.Evidence, "\n") {

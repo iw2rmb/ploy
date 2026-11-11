@@ -47,10 +47,10 @@ func resolveDetectedStackExpectationFromJobs(
 			continue
 		}
 		meta, err := contracts.UnmarshalJobMeta(prev.Meta)
-		if err != nil || meta.GateMetadata == nil {
+		if err != nil || meta.Gate == nil {
 			continue
 		}
-		exp := contracts.NormalizeStackExpectation(meta.GateMetadata.DetectedStackExpectation())
+		exp := contracts.NormalizeStackExpectation(meta.Gate.DetectedStackExpectation())
 		if exp != nil {
 			return exp
 		}

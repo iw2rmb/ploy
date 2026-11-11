@@ -62,13 +62,13 @@ func TestInjectStackTupleEnv(t *testing.T) {
 		Release:  "21",
 	})
 
-	if got := env[contracts.PLOYStackLanguageEnv]; got != "java" {
-		t.Fatalf("%s=%q, want java", contracts.PLOYStackLanguageEnv, got)
+	if got := env[ployStackLanguageEnv]; got != "java" {
+		t.Fatalf("%s=%q, want java", ployStackLanguageEnv, got)
 	}
-	if got := env[contracts.PLOYStackToolEnv]; got != "maven" {
-		t.Fatalf("%s=%q, want maven", contracts.PLOYStackToolEnv, got)
+	if got := env[ployStackToolEnv]; got != "maven" {
+		t.Fatalf("%s=%q, want maven", ployStackToolEnv, got)
 	}
-	if got := env[contracts.PLOYStackReleaseEnv]; got != "21" {
-		t.Fatalf("%s=%q, want 21", contracts.PLOYStackReleaseEnv, got)
+	if got := env[ployStackReleaseEnv]; got != "21" {
+		t.Fatalf("%s=%q, want 21", ployStackReleaseEnv, got)
 	}
 }

@@ -263,7 +263,6 @@ func TestHeartbeatStart_BackoffOverridesInterval(t *testing.T) {
 		InitialInterval: types.Duration(10 * time.Millisecond),
 		MaxInterval:     types.Duration(10 * time.Millisecond),
 		Multiplier:      1.0,
-		MaxElapsedTime:  0,
 		MaxAttempts:     0,
 	})
 

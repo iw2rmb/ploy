@@ -1,40 +1,9 @@
 package lifecycle
 
 import (
-	"context"
-	"errors"
-
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
-	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
-
-// ========== Execution Error Classification ==========
-
-// JobStatusFromRunError maps a job execution error to the appropriate terminal job status.
-// context.Canceled and context.DeadlineExceeded produce Cancelled; all other
-// errors produce Error. This is the canonical status-from-error mapping consumed
-// across all nodeagent execution paths.
-func JobStatusFromRunError(err error) domaintypes.JobStatus {
-	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-		return domaintypes.JobStatusCancelled
-	}
-	return domaintypes.JobStatusError
-}
-
-// JobStatusFromExitCode maps a completed process exit code to terminal status.
-// 0 => Success, 1 => Fail, any other value => Error.
-func JobStatusFromExitCode(exitCode int) domaintypes.JobStatus {
-	if exitCode == 0 {
-		return domaintypes.JobStatusSuccess
-	}
-	if exitCode == 1 {
-		return domaintypes.JobStatusFail
-	}
-	return domaintypes.JobStatusError
-}
-
-// ========== Completion Decision ==========
 
 // CompletionChainAction is the chain management action required after a job completes.
 type CompletionChainAction int
@@ -88,19 +57,4 @@ func ChainPredecessor(jobID domaintypes.JobID, jobsByID map[domaintypes.JobID]st
 		}
 	}
 	return nil
-}
-
-// StackExpectationFromMigStack converts a detected MigStack to a StackExpectation,
-// or returns nil for unknown stacks.
-func StackExpectationFromMigStack(stack contracts.MigStack) *contracts.StackExpectation {
-	switch stack {
-	case contracts.MigStackJavaMaven:
-		return &contracts.StackExpectation{Language: "java", Tool: "maven"}
-	case contracts.MigStackJavaGradle:
-		return &contracts.StackExpectation{Language: "java", Tool: "gradle"}
-	case contracts.MigStackJava:
-		return &contracts.StackExpectation{Language: "java", Tool: "java"}
-	default:
-		return nil
-	}
 }

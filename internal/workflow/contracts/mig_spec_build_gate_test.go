@@ -126,6 +126,38 @@ func TestParseMigSpecJSON_BuildGateStackConfig_Invalid(t *testing.T) {
 			}`,
 			wantErr: "build_gate.pre.stack.mode",
 		},
+		{
+			name: "forced with blank language",
+			input: `{
+				"steps": [{"image": "ghcr.io/iw2rmb/ploy/mig:latest"}],
+				"build_gate": {"pre": {"stack": {"mode": "forced", "language": " ", "release": "17"}}}
+			}`,
+			wantErr: "build_gate.pre.stack.language: required",
+		},
+		{
+			name: "fallback with blank tool",
+			input: `{
+				"steps": [{"image": "ghcr.io/iw2rmb/ploy/mig:latest"}],
+				"build_gate": {"pre": {"stack": {"mode": "fallback", "language": "java", "tool": "", "release": "17"}}}
+			}`,
+			wantErr: "build_gate.pre.stack.tool: required",
+		},
+		{
+			name: "forced with blank release",
+			input: `{
+				"steps": [{"image": "ghcr.io/iw2rmb/ploy/mig:latest"}],
+				"build_gate": {"post": {"stack": {"mode": "forced", "language": "java", "release": ""}}}
+			}`,
+			wantErr: "build_gate.post.stack.release: required",
+		},
+		{
+			name: "strict with only blank fields",
+			input: `{
+				"steps": [{"image": "ghcr.io/iw2rmb/ploy/mig:latest"}],
+				"build_gate": {"post": {"stack": {"mode": "strict", "language": "", "tool": " "}}}
+			}`,
+			wantErr: "build_gate.post.stack: strict mode requires language, tool, or release",
+		},
 	}
 
 	for _, tt := range tests {

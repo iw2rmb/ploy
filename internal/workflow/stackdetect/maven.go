@@ -334,12 +334,3 @@ func isValidVersion(v string) bool {
 	}
 	return true
 }
-
-// relPath returns the relative path from workspace to the given path.
-func relPath(workspace, path string) string {
-	rel, err := filepath.Rel(workspace, path)
-	if err != nil {
-		return filepath.Base(path)
-	}
-	return rel
-}

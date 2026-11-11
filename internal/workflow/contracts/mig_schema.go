@@ -42,10 +42,10 @@ func ValidateMigSpecJSON(raw []byte) error {
 	dec := json.NewDecoder(bytes.NewReader(raw))
 	dec.UseNumber()
 	if err := dec.Decode(&instance); err != nil {
-		return fmt.Errorf("parse migs spec json: %w", err)
+		return fmt.Errorf("parse mig spec json: %w", err)
 	}
 	if dec.More() {
-		return fmt.Errorf("parse migs spec json: multiple JSON values")
+		return fmt.Errorf("parse mig spec json: multiple JSON values")
 	}
 
 	if err := migSpecSchemaObj.Validate(instance); err != nil {

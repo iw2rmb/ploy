@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
-	"github.com/iw2rmb/ploy/internal/workflow/stackdetect"
 )
 
 type gateExecutionPlan struct {
@@ -27,10 +26,8 @@ type gateStackContext struct {
 }
 
 type gateExecutionTerminal struct {
-	meta               *contracts.BuildGateStageMetadata
-	err                error
-	reportRuntimeImage bool
-	runtimeImage       string
+	meta *contracts.BuildGateMetadata
+	err  error
 }
 
 func resolveGateExecutionPlan(
@@ -39,19 +36,12 @@ func resolveGateExecutionPlan(
 	spec *contracts.StepGateSpec,
 	mappingPath string,
 ) (gateExecutionPlan, *gateExecutionTerminal) {
-	var stackCtx gateStackContext
-	var terminal *gateExecutionTerminal
-	if useForcedStackDetect(spec) {
-		stackCtx, terminal = resolveForcedStackDetectContext(ctx, workspace, spec.StackDetect)
-	} else {
-		obs, detectErr := stackdetect.Detect(ctx, workspace)
-		stackCtx, terminal = resolveGateStackContext(ctx, workspace, spec, obs, detectErr, mappingPath)
-	}
+	stackCtx, terminal := resolveGateStackContext(ctx, workspace, spec, mappingPath)
 	if terminal != nil {
 		return gateExecutionPlan{}, terminal
 	}
 
-	image, err := resolveImageForExpectation(mappingPath, spec.ImageOverrides, *stackCtx.expectation, true)
+	image, err := resolveImageForExpectation(mappingPath, spec.ImageOverrides, *stackCtx.expectation)
 	if err != nil {
 		return gateExecutionPlan{}, imageResolutionTerminal(stackCtx, err)
 	}
@@ -78,7 +68,7 @@ func imageResolutionTerminal(stackCtx gateStackContext, err error) *gateExecutio
 			prefix = "no matching image rule"
 		}
 		return stackGateFailureTerminal(stackCtx.stackGate, stackCtx.language, code,
-			fmt.Sprintf("%s: %s", prefix, err.Error()), "", "unknown", "", nil)
+			fmt.Sprintf("%s: %s", prefix, err.Error()), "", "unknown", "")
 	}
 
 	code := "BUILD_GATE_IMAGE_MAPPING_ERROR"
@@ -86,7 +76,7 @@ func imageResolutionTerminal(stackCtx gateStackContext, err error) *gateExecutio
 		code = "BUILD_GATE_NO_IMAGE_RULE"
 	}
 	return gateFailureTerminal(stackCtx.language, stackCtx.tool, code, err.Error(), "",
-		gateInternalError(code, err.Error()), "")
+		gateInternalError(code, err.Error()))
 }
 
 func gateInternalError(code string, message string) error {
@@ -102,59 +92,37 @@ func gateInternalError(code string, message string) error {
 }
 
 // gateFailureTerminal builds a terminal for non-stack-gate (build-gate) failures.
-// runtimeImage may be empty; when non-empty it is recorded on the metadata and
-// reported to the runtime-image observer.
 func gateFailureTerminal(
 	language, tool, code, message, evidence string,
 	err error,
-	runtimeImage string,
 ) *gateExecutionTerminal {
-	meta := gateFailureMetadata(language, tool, code, message, evidence)
-	runtimeImage = strings.TrimSpace(runtimeImage)
-	if runtimeImage != "" {
-		meta.RuntimeImage = runtimeImage
-	}
 	return &gateExecutionTerminal{
-		meta:               meta,
-		err:                err,
-		reportRuntimeImage: runtimeImage != "",
-		runtimeImage:       runtimeImage,
+		meta: gateFailureMetadata(language, tool, code, message, evidence),
+		err:  err,
 	}
 }
 
-// stackGateFailureTerminal builds a terminal for stack-gate failures. The
-// supplied StackGateResult is mutated to record result+reason+runtimeImage.
-// stackGateResult ("unknown" / "mismatch" / "pass") may be empty to leave the
-// existing value untouched.
+// stackGateFailureTerminal builds a terminal for stack-gate failures. It
+// records stackGateResult ("unknown" / "mismatch"), the reason, and the
+// runtime image on sg. The terminal carries no error: the failure reaches the
+// caller only through meta.
 func stackGateFailureTerminal(
 	sg *contracts.StackGateResult,
 	language, code, message, evidence, stackGateResult, runtimeImage string,
-	err error,
 ) *gateExecutionTerminal {
 	runtimeImage = strings.TrimSpace(runtimeImage)
-	if sg != nil {
-		if stackGateResult != "" {
-			sg.Result = stackGateResult
-			sg.Reason = message
-		}
-		if runtimeImage != "" {
-			sg.RuntimeImage = runtimeImage
-		}
+	sg.Result = stackGateResult
+	sg.Reason = message
+	if runtimeImage != "" {
+		sg.RuntimeImage = runtimeImage
 	}
 
 	meta := gateFailureMetadata(language, "stack-gate", code, message, evidence)
-	if sg != nil {
-		meta.StackGate = sg
-	}
+	meta.StackGate = sg
 	if runtimeImage != "" {
 		meta.RuntimeImage = runtimeImage
 	}
-	return &gateExecutionTerminal{
-		meta:               meta,
-		err:                err,
-		reportRuntimeImage: true,
-		runtimeImage:       runtimeImage,
-	}
+	return &gateExecutionTerminal{meta: meta}
 }
 
 func gateFailureMetadata(
@@ -163,8 +131,8 @@ func gateFailureMetadata(
 	code string,
 	message string,
 	evidence string,
-) *contracts.BuildGateStageMetadata {
-	return &contracts.BuildGateStageMetadata{
+) *contracts.BuildGateMetadata {
+	return &contracts.BuildGateMetadata{
 		StaticChecks: []contracts.BuildGateStaticCheckReport{{
 			Language: language,
 			Tool:     tool,

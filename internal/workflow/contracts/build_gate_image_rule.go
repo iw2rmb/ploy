@@ -15,11 +15,7 @@
 // When multiple rules match, the highest specificity wins. Ties at the same
 // specificity level with different images are configuration errors.
 //
-// ## Related Files
-//
-//   - build_gate_image_rule_parse.go: Parsing from map[string]any
-//   - build_gate_image_rule_wire.go: Wire serialization to map[string]any
-//   - build_gate_image_resolver.go: Runtime resolution implementation
+// Runtime resolution lives in the internal/workflow/step gate image resolver.
 package contracts
 
 import (

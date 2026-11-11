@@ -66,10 +66,9 @@ func detectPython(ctx context.Context, s scanResult) (*Observation, error) {
 			version := strings.TrimSpace(string(content))
 			if canonical := canonicalizePythonVersion(version); canonical != "" {
 				detections = append(detections, pythonDetection{
-					version:  canonical,
-					path:     ".python-version",
-					key:      "python",
-					priority: 1,
+					version: canonical,
+					path:    ".python-version",
+					key:     "python",
 				})
 			}
 		}
@@ -83,10 +82,9 @@ func detectPython(ctx context.Context, s scanResult) (*Observation, error) {
 			if matches := runtimeTxtRegex.FindStringSubmatch(line); matches != nil {
 				if canonical := canonicalizePythonVersion(matches[1]); canonical != "" {
 					detections = append(detections, pythonDetection{
-						version:  canonical,
-						path:     "runtime.txt",
-						key:      "python",
-						priority: 2,
+						version: canonical,
+						path:    "runtime.txt",
+						key:     "python",
 					})
 				}
 			}
@@ -96,13 +94,12 @@ func detectPython(ctx context.Context, s scanResult) (*Observation, error) {
 	// 3 & 4. Check pyproject.toml.
 	if s.pyprojectLoaded {
 		specifierSources := []struct {
-			enabled  bool
-			value    string
-			key      string
-			priority int
+			enabled bool
+			value   string
+			key     string
 		}{
-			{enabled: s.pyprojectHasProjectSection, value: s.pyprojectRequiresPython, key: "requires-python", priority: 3},
-			{enabled: s.pyprojectHasPoetryTool && s.pyprojectHasPoetryDeps, value: s.pyprojectPoetryPython, key: "tool.poetry.dependencies.python", priority: 4},
+			{enabled: s.pyprojectHasProjectSection, value: s.pyprojectRequiresPython, key: "requires-python"},
+			{enabled: s.pyprojectHasPoetryTool && s.pyprojectHasPoetryDeps, value: s.pyprojectPoetryPython, key: "tool.poetry.dependencies.python"},
 		}
 		for _, source := range specifierSources {
 			specifier := strings.TrimSpace(source.value)
@@ -120,10 +117,9 @@ func detectPython(ctx context.Context, s scanResult) (*Observation, error) {
 				}
 			}
 			detections = append(detections, pythonDetection{
-				version:  version,
-				path:     "pyproject.toml",
-				key:      source.key,
-				priority: source.priority,
+				version: version,
+				path:    "pyproject.toml",
+				key:     source.key,
 			})
 		}
 	}
@@ -158,13 +154,8 @@ func detectPython(ctx context.Context, s scanResult) (*Observation, error) {
 		}
 	}
 
-	// Use the highest-priority detection.
+	// Sources are appended in precedence order, so the first one wins.
 	best := detections[0]
-	for _, d := range detections[1:] {
-		if d.priority < best.priority {
-			best = d
-		}
-	}
 
 	// Determine tool.
 	tool := "pip"
@@ -184,10 +175,9 @@ func detectPython(ctx context.Context, s scanResult) (*Observation, error) {
 
 // pythonDetection represents a detected Python version from a specific source.
 type pythonDetection struct {
-	version  string
-	path     string
-	key      string
-	priority int // lower is higher priority
+	version string
+	path    string
+	key     string
 }
 
 // canonicalizePythonVersion normalizes "3.11.6" to "3.11".

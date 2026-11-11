@@ -75,6 +75,6 @@ func ApplyBuildGatePhaseToGateSpec(spec *StepGateSpec, phase *BuildGatePhaseConf
 		return
 	}
 	if phase.Stack != nil && phase.Stack.Mode != "" {
-		spec.StackDetect = phase.Stack
+		spec.Stack = phase.Stack
 	}
 }

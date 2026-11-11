@@ -48,7 +48,7 @@ func TestManifestStepID(t *testing.T) {
 			if got, want := manifest.ID.String(), b.wantID(req); got != want {
 				t.Errorf("manifest.ID = %q, want %q", got, want)
 			}
-			if manifest.Envs["PLOY_JOB_ID"] != req.JobID.String() || manifest.Gate.Env["PLOY_JOB_ID"] != req.JobID.String() {
+			if manifest.Envs["PLOY_JOB_ID"] != req.JobID.String() || manifest.Gate.Envs["PLOY_JOB_ID"] != req.JobID.String() {
 				t.Fatal("job identity must override caller environment in mig and gate containers")
 			}
 		})

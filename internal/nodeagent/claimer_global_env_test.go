@@ -254,7 +254,7 @@ func TestGlobalEnvPropagation_GateManifest(t *testing.T) {
 	// Gate manifests must mirror job env vars into Gate.Env so build images (e.g. Gradle)
 	// can consume injected settings like PLOY_GRADLE_BUILD_CACHE_*.
 	for key, wantVal := range expectedEnv {
-		gotVal, ok := gateManifest.Gate.Env[key]
+		gotVal, ok := gateManifest.Gate.Envs[key]
 		if !ok {
 			t.Errorf("gateManifest.Gate.Env missing key %q", key)
 			continue
@@ -448,13 +448,13 @@ func TestGlobalEnvPropagation_DetectedStackTupleInjected(t *testing.T) {
 	if err != nil {
 		t.Fatalf("buildMigManifest() error: %v", err)
 	}
-	if got := manifest.Envs[contracts.PLOYStackLanguageEnv]; got != "java" {
-		t.Fatalf("manifest.Envs[%s]=%q, want java", contracts.PLOYStackLanguageEnv, got)
+	if got := manifest.Envs[ployStackLanguageEnv]; got != "java" {
+		t.Fatalf("manifest.Envs[%s]=%q, want java", ployStackLanguageEnv, got)
 	}
-	if got := manifest.Envs[contracts.PLOYStackToolEnv]; got != "gradle" {
-		t.Fatalf("manifest.Envs[%s]=%q, want gradle", contracts.PLOYStackToolEnv, got)
+	if got := manifest.Envs[ployStackToolEnv]; got != "gradle" {
+		t.Fatalf("manifest.Envs[%s]=%q, want gradle", ployStackToolEnv, got)
 	}
-	if got := manifest.Envs[contracts.PLOYStackReleaseEnv]; got != "17" {
-		t.Fatalf("manifest.Envs[%s]=%q, want 17", contracts.PLOYStackReleaseEnv, got)
+	if got := manifest.Envs[ployStackReleaseEnv]; got != "17" {
+		t.Fatalf("manifest.Envs[%s]=%q, want 17", ployStackReleaseEnv, got)
 	}
 }

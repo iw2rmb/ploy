@@ -89,16 +89,16 @@ func runJobFromStore(job store.Job) migsapi.RunJob {
 			if meta.MigStepName != "" {
 				jr.DisplayName = meta.MigStepName
 			}
-			if jr.BugSummary == "" && meta.GateMetadata != nil && strings.TrimSpace(meta.GateMetadata.BugSummary) != "" {
-				jr.BugSummary = strings.TrimSpace(meta.GateMetadata.BugSummary)
+			if jr.BugSummary == "" && meta.Gate != nil && strings.TrimSpace(meta.Gate.BugSummary) != "" {
+				jr.BugSummary = strings.TrimSpace(meta.Gate.BugSummary)
 			}
-			if meta.GateMetadata != nil && meta.GateMetadata.StackGate != nil {
-				if runtimeImage := strings.TrimSpace(meta.GateMetadata.StackGate.RuntimeImage); runtimeImage != "" {
+			if meta.Gate != nil && meta.Gate.StackGate != nil {
+				if runtimeImage := strings.TrimSpace(meta.Gate.StackGate.RuntimeImage); runtimeImage != "" {
 					jr.JobImage = runtimeImage
 				}
 			}
-			if meta.GateMetadata != nil {
-				if exp := meta.GateMetadata.DetectedStackExpectation(); exp != nil {
+			if meta.Gate != nil {
+				if exp := meta.Gate.DetectedStackExpectation(); exp != nil {
 					jr.Lang = exp.Language
 					jr.Tooling = exp.Tool
 					jr.Version = exp.Release

@@ -43,10 +43,7 @@ func TestReservedJobEnvironmentOverridesCallerValues(t *testing.T) {
 		ployJobTypeEnv:            "mig",
 	}
 
-	got, err := applyReservedJobEnv(base, mounts)
-	if err != nil {
-		t.Fatalf("applyReservedJobEnv() error = %v", err)
-	}
+	got := applyReservedJobEnv(base, mounts, "/home/job")
 	want := map[string]string{
 		"CALLER_VALUE":            "preserved",
 		"HOME":                    "/home/job",
@@ -68,11 +65,10 @@ func TestReservedJobEnvironmentOverridesCallerValues(t *testing.T) {
 }
 
 func TestJobHomeRejectsInvalidTarget(t *testing.T) {
-	mounts := newTestMigJobMounts(t)
 	for _, home := range []string{"relative/home", "/home/../root"} {
 		t.Run(home, func(t *testing.T) {
-			if _, err := buildCommonJobMounts(mounts, home); err == nil {
-				t.Fatalf("buildCommonJobMounts(%q) error = nil", home)
+			if _, err := resolveJobHome(map[string]string{"HOME": home}); err == nil {
+				t.Fatalf("resolveJobHome(%q) error = nil", home)
 			}
 		})
 	}

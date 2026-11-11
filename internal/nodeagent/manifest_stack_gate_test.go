@@ -213,21 +213,21 @@ func TestBuildGateManifestFromRequest_StackGateThreading(t *testing.T) {
 				Expect:  &contracts.StackExpectation{Language: "java", Release: "17"},
 			},
 			check: func(t *testing.T, m contracts.StepManifest) {
-				if m.Gate.StackGate == nil {
+				if m.Gate.StackGatePhase == nil {
 					t.Fatal("manifest.Gate.StackGate should be threaded")
 				}
-				if !m.Gate.StackGate.Enabled {
+				if !m.Gate.StackGatePhase.Enabled {
 					t.Error("StackGate.Enabled should be true")
 				}
-				if m.Gate.StackGate.Expect.Language != "java" || m.Gate.StackGate.Expect.Release != "17" {
-					t.Errorf("StackGate.Expect = %+v, want java/17", m.Gate.StackGate.Expect)
+				if m.Gate.StackGatePhase.Expect.Language != "java" || m.Gate.StackGatePhase.Expect.Release != "17" {
+					t.Errorf("StackGate.Expect = %+v, want java/17", m.Gate.StackGatePhase.Expect)
 				}
 			},
 		},
 		{
 			name: "no StackGate when not set",
 			check: func(t *testing.T, m contracts.StepManifest) {
-				if m.Gate.StackGate != nil {
+				if m.Gate.StackGatePhase != nil {
 					t.Error("manifest.Gate.StackGate should be nil when not set")
 				}
 			},
@@ -263,11 +263,11 @@ func TestBuildGateManifestFromRequest_StackGateThreading(t *testing.T) {
 			},
 			phase: outbound("java", "17"),
 			check: func(t *testing.T, m contracts.StepManifest) {
-				if m.Gate.StackGate == nil {
+				if m.Gate.StackGatePhase == nil {
 					t.Fatal("manifest.Gate.StackGate should be set")
 				}
-				if m.Gate.StackGate.Expect.Release != "17" {
-					t.Errorf("StackGate.Expect.Release = %q, want 17", m.Gate.StackGate.Expect.Release)
+				if m.Gate.StackGatePhase.Expect.Release != "17" {
+					t.Errorf("StackGate.Expect.Release = %q, want 17", m.Gate.StackGatePhase.Expect.Release)
 				}
 			},
 		},
@@ -313,8 +313,8 @@ func TestApplyGatePhaseOverridesUsesCanonicalBuildGatePhase(t *testing.T) {
 				t.Fatalf("buildGateManifest() error: %v", err)
 			}
 			applyGatePhaseOverrides(&manifest, req)
-			if manifest.Gate.StackDetect != tt.want {
-				t.Fatalf("StackDetect = %+v, want %+v", manifest.Gate.StackDetect, tt.want)
+			if manifest.Gate.Stack != tt.want {
+				t.Fatalf("StackDetect = %+v, want %+v", manifest.Gate.Stack, tt.want)
 			}
 		})
 	}

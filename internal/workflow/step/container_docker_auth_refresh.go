@@ -19,12 +19,7 @@ type registryAuthRefreshResponse struct {
 	Error string `json:"error,omitempty"`
 }
 
-func (r *containerRuntime) refreshRegistryAuth(ctx context.Context, imageRef string) error {
-	socketPath := strings.TrimSpace(r.opts.RegistryAuthRefreshSocket)
-	if socketPath == "" {
-		return nil
-	}
-
+func (r *containerRuntime) refreshRegistryAuth(ctx context.Context, socketPath, imageRef string) error {
 	var dialer net.Dialer
 	conn, err := dialer.DialContext(ctx, "unix", socketPath)
 	if err != nil {

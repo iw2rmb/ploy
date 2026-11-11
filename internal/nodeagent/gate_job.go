@@ -218,11 +218,11 @@ func applyGatePhaseOverrides(manifest *contracts.StepManifest, req StartRunReque
 }
 
 // runGate executes the build gate and returns the result.
-func (r *runController) runGate(ctx context.Context, executor step.GateExecutor, manifest contracts.StepManifest, workspace string, mounts step.JobMounts) (*contracts.BuildGateStageMetadata, error) {
+func (r *runController) runGate(ctx context.Context, executor *step.GateExecutor, manifest contracts.StepManifest, workspace string, mounts step.JobMounts) (*contracts.BuildGateMetadata, error) {
 	gateSpec := manifest.Gate
-	if executor == nil || gateSpec == nil || !gateSpec.Enabled {
+	if gateSpec == nil || !gateSpec.Enabled {
 		// No gate configured - return success.
-		return &contracts.BuildGateStageMetadata{
+		return &contracts.BuildGateMetadata{
 			StaticChecks: []contracts.BuildGateStaticCheckReport{{Passed: true, Tool: "none"}},
 		}, nil
 	}
@@ -230,7 +230,7 @@ func (r *runController) runGate(ctx context.Context, executor step.GateExecutor,
 }
 
 // gateResultPassed reports whether the gate result indicates a passing gate.
-func gateResultPassed(gateResult *contracts.BuildGateStageMetadata) bool {
+func gateResultPassed(gateResult *contracts.BuildGateMetadata) bool {
 	if gateResult == nil {
 		return false
 	}
@@ -260,7 +260,7 @@ func persistOnce(dir, filename string, data []byte, label string, runID types.Ru
 
 // persistGateStack writes the detected stack from a gate result to a stable
 // per-run path. Idempotent: preserves the first detection result.
-func (r *runController) persistGateStack(runID types.RunID, meta *contracts.BuildGateStageMetadata) {
+func (r *runController) persistGateStack(runID types.RunID, meta *contracts.BuildGateMetadata) {
 	if meta == nil {
 		return
 	}
@@ -292,7 +292,7 @@ func (r *runController) loadPersistedStack(runID types.RunID) contracts.MigStack
 
 // persistFirstGateFailureLog writes the first failing gate log for a run.
 // Idempotent: preserves the original failure context.
-func (r *runController) persistFirstGateFailureLog(runID types.RunID, meta *contracts.BuildGateStageMetadata) {
+func (r *runController) persistFirstGateFailureLog(runID types.RunID, meta *contracts.BuildGateMetadata) {
 	if meta == nil {
 		return
 	}
@@ -305,7 +305,7 @@ func (r *runController) persistFirstGateFailureLog(runID types.RunID, meta *cont
 
 // buildGateStats constructs stats payload for gate job completion.
 // Uses typed builder to eliminate map[string]any construction.
-func (r *runController) buildGateStats(gateResult *contracts.BuildGateStageMetadata, duration time.Duration) types.RunStats {
+func (r *runController) buildGateStats(gateResult *contracts.BuildGateMetadata, duration time.Duration) types.RunStats {
 	builder := types.NewRunStatsBuilder().
 		DurationMs(duration.Milliseconds())
 

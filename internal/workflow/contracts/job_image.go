@@ -269,3 +269,18 @@ func ToolToMigStack(tool string) MigStack {
 		return MigStackUnknown
 	}
 }
+
+// StackExpectationFromMigStack converts a detected MigStack to a StackExpectation,
+// or returns nil for unknown stacks.
+func StackExpectationFromMigStack(stack MigStack) *StackExpectation {
+	switch stack {
+	case MigStackJavaMaven:
+		return &StackExpectation{Language: "java", Tool: "maven"}
+	case MigStackJavaGradle:
+		return &StackExpectation{Language: "java", Tool: "gradle"}
+	case MigStackJava:
+		return &StackExpectation{Language: "java", Tool: "java"}
+	default:
+		return nil
+	}
+}

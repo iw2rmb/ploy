@@ -1,7 +1,6 @@
 package step
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"testing"
@@ -237,60 +236,6 @@ func TestRemoveDockerContainer(t *testing.T) {
 			if fake.removeID != string(tc.handle) {
 				t.Errorf("removed container %q, want %q", fake.removeID, string(tc.handle))
 			}
-		})
-	}
-}
-
-// TestContainerRuntimeNilClient verifies misconfigured runtime methods
-// fail with a clear error instead of panicking.
-func TestContainerRuntimeNilClient(t *testing.T) {
-	t.Parallel()
-	rt := &containerRuntime{client: nil}
-	ctx := context.Background()
-
-	testCases := []struct {
-		name string
-		call func() error
-	}{
-		{
-			name: "create",
-			call: func() error {
-				_, err := rt.Create(ctx, ContainerSpec{Image: "alpine"})
-				return err
-			},
-		},
-		{
-			name: "start",
-			call: func() error {
-				return rt.Start(ctx, ContainerHandle("x"))
-			},
-		},
-		{
-			name: "wait",
-			call: func() error {
-				_, err := rt.Wait(ctx, ContainerHandle("x"))
-				return err
-			},
-		},
-		{
-			name: "logs",
-			call: func() error {
-				_, err := rt.Logs(ctx, ContainerHandle("x"))
-				return err
-			},
-		},
-		{
-			name: "stream_logs",
-			call: func() error {
-				return rt.StreamLogs(ctx, ContainerHandle("x"), &bytes.Buffer{}, &bytes.Buffer{})
-			},
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-			requireErrContains(t, tc.call(), "docker runtime not configured")
 		})
 	}
 }

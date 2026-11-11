@@ -613,7 +613,7 @@ The design is complete when all of these statements are true:
 - [`internal/nodeagent/execution_paths.go`](../internal/nodeagent/execution_paths.go)
 - [`internal/nodeagent/execution_artifacts.go`](../internal/nodeagent/execution_artifacts.go)
 - [`internal/workflow/step/container_spec.go`](../internal/workflow/step/container_spec.go)
-- [`internal/workflow/step/gate_docker_mounts.go`](../internal/workflow/step/gate_docker_mounts.go)
+- [`internal/workflow/step/gate_docker.go`](../internal/workflow/step/gate_docker.go)
 - [`internal/workflow/step/job_mounts.go`](../internal/workflow/step/job_mounts.go)
 - `/Users/v.v.kovalev/@gitlab/ploy/deploy/images/docker-compose.yml`
 - `/Users/v.v.kovalev/@gitlab/ploy/deploy/images/gates/gradle/cache.init.gradle`

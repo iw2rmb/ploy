@@ -183,7 +183,7 @@ func buildContainerSpecForTest(
 // newGateTestHarness creates a GateExecutor backed by a
 // testContainerRuntime and a temporary Maven workspace. Returns the executor,
 // the runtime (for assertions), and the workspace path.
-func newGateTestHarness(t *testing.T) (GateExecutor, *testContainerRuntime, string) {
+func newGateTestHarness(t *testing.T) (*GateExecutor, *testContainerRuntime, string) {
 	t.Helper()
 	rt := &testContainerRuntime{}
 	executor := NewGateExecutor(rt)

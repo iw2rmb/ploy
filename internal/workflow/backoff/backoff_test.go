@@ -20,7 +20,6 @@ func TestPolicies(t *testing.T) {
 		wantInitial     time.Duration
 		wantMax         time.Duration
 		wantMultiplier  float64
-		wantMaxElapsed  time.Duration
 		wantMaxAttempts int
 	}{
 		{
@@ -52,9 +51,6 @@ func TestPolicies(t *testing.T) {
 			if p.Multiplier != tt.wantMultiplier {
 				t.Errorf("Multiplier = %v, want %v", p.Multiplier, tt.wantMultiplier)
 			}
-			if got := time.Duration(p.MaxElapsedTime); got != tt.wantMaxElapsed {
-				t.Errorf("MaxElapsedTime = %v, want %v", got, tt.wantMaxElapsed)
-			}
 			if p.MaxAttempts != tt.wantMaxAttempts {
 				t.Errorf("MaxAttempts = %d, want %d", p.MaxAttempts, tt.wantMaxAttempts)
 			}
@@ -69,7 +65,6 @@ func TestNewExponentialBackoff(t *testing.T) {
 		InitialInterval: domaintypes.Duration(1 * time.Second),
 		MaxInterval:     domaintypes.Duration(10 * time.Second),
 		Multiplier:      2.0,
-		MaxElapsedTime:  domaintypes.Duration(1 * time.Minute),
 		MaxAttempts:     5,
 	}
 
@@ -105,7 +100,6 @@ func TestRunWithBackoff(t *testing.T) {
 	tests := []struct {
 		name      string
 		policy    Policy
-		logger    *slog.Logger
 		op        func(calls *int) error
 		ctx       func() (context.Context, context.CancelFunc)
 		wantErr   bool
@@ -151,13 +145,6 @@ func TestRunWithBackoff(t *testing.T) {
 			wantCalls: func(c int) bool { return c <= 4 },
 		},
 		{
-			name:      "nil logger does not panic",
-			policy:    fastPolicy(2),
-			logger:    nil,
-			op:        func(_ *int) error { return nil },
-			wantCalls: func(c int) bool { return c == 1 },
-		},
-		{
 			name: "zero max attempts retries until context timeout",
 			policy: Policy{
 				InitialInterval: domaintypes.Duration(10 * time.Millisecond),
@@ -185,10 +172,6 @@ func TestRunWithBackoff(t *testing.T) {
 			}
 
 			calls := 0
-			logger := tt.logger
-			if logger == nil && tt.name != "nil logger does not panic" {
-				logger = slog.Default()
-			}
 
 			// For context cancellation test, cancel on second call.
 			op := func() error {
@@ -199,7 +182,7 @@ func TestRunWithBackoff(t *testing.T) {
 				return tt.op(&calls)
 			}
 
-			err := RunWithBackoff(ctx, tt.policy, logger, op)
+			err := RunWithBackoff(ctx, tt.policy, slog.Default(), op)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("RunWithBackoff() error = %v, wantErr %v", err, tt.wantErr)
 			}

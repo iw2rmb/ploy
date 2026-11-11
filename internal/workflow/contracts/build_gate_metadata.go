@@ -8,8 +8,8 @@ import (
 	types "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-// BuildGateStageMetadata captures build gate metadata published with checkpoints.
-type BuildGateStageMetadata struct {
+// BuildGateMetadata captures build gate metadata published with checkpoints.
+type BuildGateMetadata struct {
 	LogDigest    types.Sha256Digest           `json:"log_digest,omitempty"`
 	StaticChecks []BuildGateStaticCheckReport `json:"static_checks,omitempty"`
 	// ExecutedCommand is the exact gate command shell payload executed by the
@@ -30,7 +30,7 @@ type BuildGateStageMetadata struct {
 	LogsText string `json:"-"`
 	// Resources summarizes container limits and observed usage for the gate run.
 	// Not serialized in JSON APIs.
-	Resources *BuildGateResourceUsage `json:"-"`
+	Resources *ContainerResourceUsage `json:"-"`
 	// BugSummary is a short one-line description of the gate failure.
 	// Max 200 chars, no newlines.
 	BugSummary string `json:"bug_summary,omitempty"`
@@ -48,7 +48,7 @@ type BuildGateStageMetadata struct {
 //
 // This method ensures the same stack value is visible to mig executions,
 // enabling consistent image resolution.
-func (m BuildGateStageMetadata) DetectedStack() MigStack {
+func (m BuildGateMetadata) DetectedStack() MigStack {
 	if m.Detected != nil && strings.TrimSpace(m.Detected.Tool) != "" {
 		return ToolToMigStack(m.Detected.Tool)
 	}
@@ -61,7 +61,7 @@ func (m BuildGateStageMetadata) DetectedStack() MigStack {
 // DetectedStackExpectation returns the normalized detected stack expectation.
 // For backward compatibility with older metadata payloads, it falls back to
 // static_checks[0] when detected_stack is absent.
-func (m BuildGateStageMetadata) DetectedStackExpectation() *StackExpectation {
+func (m BuildGateMetadata) DetectedStackExpectation() *StackExpectation {
 	if m.Detected != nil {
 		expectation := NormalizeStackExpectation(&StackExpectation{
 			Language: m.Detected.Language,
@@ -87,7 +87,7 @@ func (m BuildGateStageMetadata) DetectedStackExpectation() *StackExpectation {
 }
 
 // Validate ensures build gate metadata entries are well formed.
-func (m BuildGateStageMetadata) Validate() error {
+func (m BuildGateMetadata) Validate() error {
 	if m.Detected != nil {
 		if strings.TrimSpace(m.Detected.Language) == "" {
 			return fmt.Errorf("detected_stack.language: required")
@@ -122,9 +122,9 @@ func (m BuildGateStageMetadata) Validate() error {
 	return nil
 }
 
-// BuildGateResourceUsage captures container limits and observed usage metrics
+// ContainerResourceUsage captures container limits and observed usage metrics
 // from the gate execution container.
-type BuildGateResourceUsage struct {
+type ContainerResourceUsage struct {
 	// Limits configured for the container (0 means unlimited/not set).
 	LimitNanoCPUs    int64 `json:"limit_nano_cpus"`
 	LimitMemoryBytes int64 `json:"limit_memory_bytes"`

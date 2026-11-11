@@ -23,7 +23,10 @@
 //	        expect: { language: java, tool: maven, release: "17" }
 package contracts
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"strings"
+)
 
 // StackExpectation describes expected stack characteristics.
 // All fields are optional; omitted fields indicate "any" for that dimension.
@@ -69,6 +72,23 @@ func (e StackExpectation) Equal(other StackExpectation) bool {
 	return e.Language == other.Language &&
 		e.Tool == other.Tool &&
 		e.Release == other.Release
+}
+
+// NormalizeStackExpectation returns a trimmed copy of expect.
+// Nil or fully-empty values normalize to nil.
+func NormalizeStackExpectation(expect *StackExpectation) *StackExpectation {
+	if expect == nil {
+		return nil
+	}
+	out := &StackExpectation{
+		Language: strings.TrimSpace(expect.Language),
+		Tool:     strings.TrimSpace(expect.Tool),
+		Release:  strings.TrimSpace(expect.Release),
+	}
+	if out.Language == "" && out.Tool == "" && out.Release == "" {
+		return nil
+	}
+	return out
 }
 
 // StackGatePhaseSpec configures a single phase (inbound or outbound) of Stack Gate.

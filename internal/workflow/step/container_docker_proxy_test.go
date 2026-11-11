@@ -19,7 +19,7 @@ import (
 
 func TestContainerRuntime_DockerProxyUsesJobMountsAndClosesWithContainer(t *testing.T) {
 	t.Parallel()
-	for _, outcome := range []string{"wait", "wait failure", "wait cancelled", "wait error", "start error", "create error", "create panic", "runtime close"} {
+	for _, outcome := range []string{"wait", "wait failure", "wait cancelled", "wait error", "start error", "create error", "runtime close"} {
 		t.Run(outcome, func(t *testing.T) {
 			t.Parallel()
 			fake := &fakeDockerClient{createResult: client.ContainerCreateResult{ID: outcome}}
@@ -34,8 +34,6 @@ func TestContainerRuntime_DockerProxyUsesJobMountsAndClosesWithContainer(t *test
 				fake.startErr = errors.New("start failed")
 			case "create error":
 				fake.createErr = errors.New("create failed")
-			case "create panic":
-				fake.createPanic = "create panic"
 			}
 			root := t.TempDir()
 			mounts := []ContainerMount{
@@ -56,7 +54,7 @@ func TestContainerRuntime_DockerProxyUsesJobMountsAndClosesWithContainer(t *test
 				return &dockerSocketProxy{socketPath: socketPath, close: func() error { closed++; return nil }}, nil
 			}
 			handle, err := rt.Create(context.Background(), ContainerSpec{Image: "job", Labels: testDockerJobOwner.labels(), Mounts: mounts})
-			if outcome == "create error" || outcome == "create panic" {
+			if outcome == "create error" {
 				if err == nil || closed != 1 {
 					t.Fatalf("failed creation must close proxy: err=%v closed=%d", err, closed)
 				}
