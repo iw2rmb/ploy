@@ -6,8 +6,9 @@ Host maintenance cannot establish an idle interval while job admission remains
 open, and age-only retention cannot prevent disk exhaustion.
 
 The admission and maintenance boundary is implemented in
-[Node maintenance](../docs/node-maintenance.md). The remaining delivery slices
-add pressure-based cleanup (C3) and terminal-run retention (C4).
+[Node maintenance](../docs/node-maintenance.md), including age-based
+`runtime-share` cleanup for successful runs. The remaining delivery slices add
+pressure-based cleanup (C3) and whole-run terminal retention (C4).
 
 ## Scope
 
@@ -28,8 +29,9 @@ changes are outside this design.
 
 ## Observed Constraint
 
-- Cleanup applies a 24-hour age filter to Docker pruning. Run-directory
-  deletion uses access time. It has no free-space target. Node storage probes
+- Cleanup applies a configured age filter to Docker pruning and successful-run
+  `runtime-share` cleanup. It preserves whole-run directories and has no
+  free-space target. Node storage probes
   already report configured paths, capacity, inode counts, and probe errors.
 - `uploadRepoArtifactsIfPresent` selects durable files through
   `repoArtifactBundleEntries`, but discards successful artifact identifiers

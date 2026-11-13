@@ -56,7 +56,9 @@ The deploy service bundle provides:
 - `ploy-node-auth-refreshd.service` — serves a local Unix socket for explicit
   auth-refresh requests after Docker reports unauthorized.
 - `ploy-node-cleanup.timer` — prunes exited containers, unused images, and old
-  Git clones. Whole-run directories and broad TMPDIR children are preserved.
+  Git clones. Under the maintenance lock, it also removes `runtime-share` from
+  successful runs after the configured retention period. Whole-run directories
+  and broad TMPDIR children are preserved.
 
 The tracked source for these host scripts lives in
 `/Users/v.v.kovalev/@gitlab/ploy/deploy/services` in this workspace. The auth
