@@ -1,223 +1,139 @@
-# Workspace retention and disk pressure
+# Disk pressure
 
 ## Summary
 
-Retained workspaces accumulate while cleanup can restore admission without
-recovering sufficient free space. Extend node-triggered cleanup with workspace
-expiry and capacity checks before new work.
+Job-boundary cleanup can skip busy nodes and cannot guarantee enough free
+space for the next job. Add local capacity checks and pressure recovery.
 
 ## Scope
 
-Requires [Node-triggered cleanup](node-triggered-cleanup.md). That DD owns the
-node admission checkpoint, global maintenance boundary, transferred deletion
-policies, and retirement of the host cleanup service and timer.
+Requires [Node-triggered cleanup](node-triggered-cleanup.md). That DD owns job
+hooks, the one-hour cooldown, maintenance locking, 6h/24h workspace retention,
+retained-resume expiry, and retirement of host cleanup.
 
 The owning worktrees are `ploy` and `deploy`
-(`/Users/v.v.kovalev/@gitlab/ploy/deploy`). Ploy owns retention and capacity
-checks. Deploy supplies capacity configuration through the node deployment.
+(`/Users/v.v.kovalev/@gitlab/ploy/deploy`). The node owns capacity decisions.
+Deploy supplies capacity configuration. The server keeps run state and
+operator drains.
 
-Delete only `workspace` and `runtime-share`: six hours after successful run
-completion, or 24 hours after failed/cancelled run completion. Preserve
-`jobs`, `share`, logs, patches, outputs, artifact records, and remote blobs.
-Whole-run deletion and durable-artifact retention remain deferred and require
-a separate preservation contract.
-
-Preserve job concurrency, sticky placement, startup recovery, tool-owned cache
-internals, and the default prohibition on broad volume pruning. Do not add
-another cleanup owner, active-run registry, scheduler, or per-job disk
-reservation system.
+Extend the before-job hook. Add no cleanup hook to the claim loop. Preserve
+the prerequisite's retention periods, deletion guards, and artifact boundary.
+Whole-run deletion, disk reservations, and reclaimed-byte reporting remain
+outside this DD. Reuse existing disk-space diagnostics.
 
 ## Observed Constraint
 
-- `collectStorageDiagnostics` reports capacity but does not gate claims.
-  Existing cleanup has no recovery target or aggregate reclaimed-byte result.
-- `cleanupJobRuntime` and the abandoned-runtime sweep remove only job
-  `cache`, `home`, `staging`, and `tmp`. Current run retention removes only
-  aged successful `runtime-share`; whole workspaces remain.
-- `prepareStickyWorkspace` requires local state for retained resume.
-  `resumeFailedJobs` has no retention deadline and reuses the attempt and job
-  IDs. `RestartRun` serializes state changes with the existing run-row lock.
-- `StopRun` removes job-map entries before execution necessarily finishes.
-  The job map alone cannot prove that a workspace has no remaining writer.
-- `repoArtifactBundleEntries` excludes workspace data and selects durable
-  job files plus `share`. Preserving those paths avoids whole-run artifact
-  finalization in this slice. Stored patches are not a complete workspace
-  backup.
+- `collectStorageDiagnostics` reports capacity but does not block execution.
+- The prerequisite skips cleanup during its cooldown or when the exclusive
+  maintenance lock is busy. Overlapping jobs can prevent cleanup indefinitely.
+- `RunSlot` combines a concurrency permit with a shared maintenance lock.
+  A job waiting for pressure recovery must release its shared lock so cleanup
+  can acquire exclusive access.
 
 ## Target Contract
 
-### Workspace retention
+### Capacity check
 
-Eligibility belongs to the current run, because successor jobs share its
-workspace. A completed job does not make an unfinished run eligible.
+Before job execution, read fresh capacity through `collectStorageDiagnostics`.
+Check every required storage path. A failed probe blocks new execution.
+Keep the check in the before-job hook for claimed jobs and direct starts.
 
-| Current run status | Workspace retention from `finished_at` |
-| --- | --- |
-| `Success` | 6 hours |
-| `Fail`, `Cancelled` | 24 hours |
-| Nonterminal or unknown | Preserve |
+Deploy configures a low free-byte threshold and a higher recovery target.
+Validate `0 < low < target` against storage capacity. Size these values from
+concurrent job growth, image extraction, and cleanup delay.
 
-The node deletes only canonical `workspace` and `runtime-share` children of
-its configured run directory. Missing completion time, unavailable run state,
-symlinks, path escapes, mounts, or container references preserve the data.
-Directory access and modification times do not determine eligibility.
+At or above the low threshold, normal execution can continue unless pressure
+recovery is pending. Below the threshold, the controller starts pressure
+recovery. Server heartbeat values do not control this decision.
 
-Local admission and execution ownership exclude pending claims, hydration,
-recovery, and finalization for the selected run during deletion. Cancelling a
-job does not release that protection before its execution exits. Unrelated
-jobs can continue while eligible workspace data is deleted. Extend the
-existing controller synchronization; do not maintain another active-run list.
-A shared maintenance lock excludes conflicting host maintenance during this
-local operation.
+### Pressure recovery
 
-Immediately before deletion, recheck current status, attempt, `resume_count`,
-and `finished_at`. Retained resume can change execution identity without
-changing attempt or job ID. A changed identity invalidates the observation.
+The existing controller owns one local pressure-recovery operation. Waiting
+jobs retain their concurrency permits but release their shared maintenance
+locks. They perform no hydration, pulls, or writes. Occupied permits limit
+further claims through the existing concurrency mechanism.
 
-### Retained resume and restart
+Running jobs retain their shared locks through finalization. Pressure recovery
+waits for the exclusive lock while those jobs finish. New execution remains
+blocked. Operator drains and host maintenance ownership remain unchanged.
 
-One retention policy governs cleanup eligibility and retained-resume expiry.
-The control plane evaluates expiry through its existing run read and restart
-boundaries. Cleanup eligibility uses a short transaction with the same run-row
-lock as `RestartRun`. Both decisions evaluate server wall-clock time after
-acquiring that lock. Transaction-start time and an unlocked metadata read
-cannot authorize deletion. An in-progress retained resume must commit or roll
-back before cleanup observes eligibility.
+Pressure recovery bypasses the one-hour cleanup cooldown. It uses the
+prerequisite's cleanup owner and maintenance lock. It may relax Docker age
+filters for otherwise unused data. It never shortens workspace retention or
+changes container, resource, lease, and volume safeguards.
 
-The node consumes that eligibility with the run identity; it does not shorten
-retention using its local clock. Release the database lock before filesystem
-deletion. Do not persist a second expiration timestamp or eligibility row.
+Read fresh free space after each cleanup phase. Resume waiting jobs only when
+all required paths reach the recovery target and required cleanup succeeds.
+Each job reacquires its shared lock before execution.
 
-The `RestartRun` transaction rejects retained resume of a failed or cancelled
-run at or beyond 24 hours after completion. This applies even if the files
-have not yet been removed. The response directs the caller to full restart.
-A retained resume accepted before expiry changes the current run state and
-invalidates cleanup eligibility. Expiry must be enforced inside the existing
-transaction before jobs or logs are changed.
+If eligible data is exhausted, report the constrained path and keep execution
+blocked. Retry with bounded backoff while waiting jobs remain. Use their
+existing cancellation handling to stop waiting. Do not loop without delay or
+delete protected data to reach the target. Release every cancelled job's
+concurrency permit through the existing lifecycle.
 
-A full restart remains available after expiry. Local admission prevents new
-hydration from overlapping deletion. If a full restart commits after the last
-eligibility observation, its execution waits for deletion and reconstructs
-missing workspace data through the existing snapshot path. Retained resume
-cannot win that expired-run race because the server rejects it.
+On process restart, require the recovery target at the first before-job check.
+This avoids a persisted pressure flag. It can delay execution after a healthy
+restart when free space lies between the low threshold and recovery target.
+Startup reconciliation still precedes new execution.
 
-Keep the existing missing-workspace error for retained resume. Do not silently
-convert retained resume into a full restart. Deploy the server expiry contract
-before enabling node deletion of failed or cancelled workspace data.
+Already running jobs can consume more space. These checks do not guarantee
+completion of jobs with unbounded disk use.
 
-### Capacity and pressure recovery
+### Reporting
 
-Extend the admission checkpoint defined by the prerequisite DD. Use
-`collectStorageDiagnostics` for fresh observations of every required path.
-Configure one low free-byte threshold and one higher recovery target through
-node deployment. Validate `0 < low < target` against storage capacity. Size
-these values from concurrent job growth, image extraction, and cleanup delay.
-Do not add a second SQL threshold based on stale heartbeat data.
-
-Every admission attempt checks free space after workspace retention. A probe
-failure blocks new work. If all required paths are healthy and above the low
-threshold, admission can continue without global Docker pruning only when no
-cleanup-owned recovery is pending. Resume existing recovery before admitting
-new work, including after node restart.
-
-Under pressure, stop new admission and enter the prerequisite's revision-owned
-cleanup drain and exclusive maintenance boundary. Release any local shared
-lock before waiting. Existing jobs finish while admission remains stopped.
-Unlike normal opportunistic cleanup, a busy pressure pass does not reopen
-admission below the recovery target. Preserve operator and host maintenance
-ownership.
-
-Pressure mode can relax the Docker age floor for otherwise unused data. It
-never shortens the six-hour or 24-hour workspace retention periods. Preserve
-the prerequisite's container/resource/lease checks and existing cache owners.
-
-Measure filesystem free space after each global cleanup phase. Restore only
-the operation's own drain after every required path reaches the recovery
-target. If eligible data is exhausted, keep admission blocked and report the
-constrained path and preserved data classes. Do not loop indefinitely or
-remove protected data to reach the target.
-
-Already admitted jobs can consume additional space. This contract limits new
-admission; it does not guarantee completion of unbounded jobs.
-
-### Observable result
-
-Each cleanup pass reports free bytes before and after, reclaimed bytes by
-phase, and preserved candidates with reasons. An empty eligible set reports
-zero reclamation. Report a capacity result separately from successful execution
-of the deletion procedure. Identify the run execution identity or drain
-revision without exposing credentials.
+Use existing disk-space diagnostics and error logs. Report the constrained
+path and why execution remains blocked. Add no reclaimed-byte counters or
+before/after reclamation reports.
 
 ## Enforcement
 
 | Concern | Existing authority to extend |
 | --- | --- |
-| Admission | Node checkpoint from the prerequisite DD |
-| Retention eligibility | Current run state, run read API, `RestartRun`, `resumeFailedJobs` |
-| Local execution exclusion | Controller synchronization, startup recovery, maintenance lock |
-| Capacity | `collectStorageDiagnostics`, node configuration, deploy configuration |
-| Reclamation | Node directory helpers and existing cleanup phases |
+| Capacity checks and waiting jobs | Controller and before-job hook |
+| Free-space observations | `collectStorageDiagnostics` |
+| Recovery exclusion | Prerequisite cleanup owner and maintenance lock |
+| Policy values | Node configuration and deploy configuration |
 
-Preserve one owner for each deletion path and the job-runtime sweeper's
-ownership. Do not add artifact manifests, artifact finalizers, or a
-cleanup-eligibility node endpoint for this workspace-only scope.
+The node owns pressure recovery. Server diagnostics report capacity; they do
+not authorize cleanup or resume execution.
 
 ## Implementation Slice
 
-After the prerequisite ships, deliver retention and capacity enforcement
-across both worktrees as one self-sufficient slice:
+After the prerequisite ships, deliver capacity enforcement across both worktrees:
 
-- Define shared retention eligibility and enforce the 24-hour retained-resume
-  deadline in the existing server transaction and API response.
-- Extend local execution protection for workspace deletion, including direct
-  starts, cancellation, recovery, and full restart.
-- Add workspace and `runtime-share` expiry with the fixed 6h/24h policy.
-- Extend storage observations into admission and pressure recovery. Preserve
-  recovery-target enforcement after timeout, cancellation, and node restart.
-- Deploy the server expiry contract before enabling failed/cancelled workspace
-  deletion. Supply validated capacity configuration through deploy.
-- Update shipped API, run-resume, deployment, and maintenance documentation.
+- Add validated low-threshold and recovery-target configuration.
+- Extend the before-job hook with fresh storage checks.
+- Coordinate waiting jobs through the existing controller and cleanup owner.
+- Bypass cooldown during pressure recovery while preserving deletion guards.
+- Preserve recovery-target enforcement across cancellation and restart.
+- Update node and deployment documentation.
 
-The healthy exit is bounded workspace retention and admission blocked when
-capacity remains insufficient. No duplicate cleanup owner remains.
-Durable-artifact and whole-run retention remain deferred.
+The completed slice blocks job execution while storage remains insufficient.
+It adds no cleanup trigger to claims and no server drain changes.
 
 ## Completion
 
-The Ploy and deploy changes must build and pass focused lifecycle, store, API,
-and service tests. Verify these boundaries:
+Run focused node lifecycle, storage, and deploy tests. Verify these outcomes:
 
-- Success at six hours; failure and cancellation at 24 hours; missing or
-  changed status preserves workspace data.
-- A locally idle run between jobs remains protected. Other runs can execute
-  concurrently with eligible workspace deletion.
-- Cancellation and recovery retain writer protection until execution exits.
-- Retained resume before expiry invalidates eligibility. An uncommitted resume
-  spanning the deadline cannot race an unlocked eligibility observation.
-  Expired resume fails before state mutation. A racing full restart
-  reconstructs missing data.
-- `jobs`, `share`, logs, patches, outputs, and remote artifacts survive cleanup.
-- Pressure blocks new claims, waits for existing jobs without self-deadlock,
-  and preserves operator drains. Probe failure and insufficient reclaimable
-  data do not reopen admission. Restarting recovery between the low threshold
-  and recovery target preserves the recovery target.
-- Required-path checks work across separate filesystems. Cleanup reports zero
-  bytes when nothing is eligible and actual free space after deletion.
-- Disposable Docker integration verifies pressure recovery while preserving
-  the prerequisite's pull/finalization exclusion and resource/lease checks.
+- Claimed jobs and direct starts check capacity before execution.
+- Required-path probe failure blocks execution, including across separate filesystems.
+- Pressure recovery bypasses cooldown and waits for active jobs without deadlock.
+- Waiting jobs hold no shared lock and retain balanced concurrency permits.
+- Cleanup below the recovery target does not release waiting jobs.
+- Cancellation releases waiting jobs. Retry backoff prevents a tight loop.
+- Restart requires the recovery target even between the low threshold and target.
+- Recovery preserves 6h/24h retention, operator drains, and the prerequisite's
+  container, resource, lease, volume, and artifact safeguards.
+- Existing diagnostics report free space without new reclaimed-byte reporting.
 
-Do not validate destructive concurrency behavior on production nodes.
+Use disposable storage and Docker instances for destructive tests.
 
 ## References
 
 - [Node-triggered cleanup prerequisite](node-triggered-cleanup.md).
 - [Node maintenance](../docs/node-maintenance.md).
-- [Run resume and restart](../docs/runs.md).
-- [Controller](../internal/nodeagent/controller.go),
-  [workspace hydration](../internal/nodeagent/workspace_hydration.go),
-  [runtime sweeper](../internal/nodeagent/job_runtime_cleanup.go).
 - [Storage observations](../internal/nodeagent/storage.go),
-  [artifact selection](../internal/nodeagent/execution_artifacts.go),
-  [retained resume](../internal/store/resume_run.go),
-  [restart transaction](../internal/store/store.go).
+  [controller](../internal/nodeagent/controller.go),
+  [maintenance lock](../internal/nodeagent/maintenance.go).
 - Deploy: node configuration, Compose, installer, and service tests.

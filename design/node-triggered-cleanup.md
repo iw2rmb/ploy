@@ -2,192 +2,270 @@
 
 ## Summary
 
-The host cleanup timer can miss idle intervals between jobs. The node will
-attempt cleanup before admitting new work, using the existing maintenance
-boundary and deletion policies.
+The host cleanup timer can miss idle intervals between jobs. Move cleanup into
+node job hooks. Delete expired workspaces and limit successful cleanup to once
+per hour in each node process.
 
 ## Scope
 
 The owning worktrees are `ploy` and `deploy`
-(`/Users/v.v.kovalev/@gitlab/ploy/deploy`). Transfer cleanup decisions and
-execution to the node. Deploy provisions storage and runtime permissions.
-Retire the host cleanup service, timer, script, and installer start calls.
+(`/Users/v.v.kovalev/@gitlab/ploy/deploy`). The node owns cleanup decisions and
+execution. Deploy provisions storage and runtime permissions.
 
-This DD has no dependency on [workspace retention and disk pressure](cleanup.md).
-That DD extends this boundary with the 6h/24h workspace policy, retained-resume
-expiry, capacity thresholds, recovery targets, and reclamation measurements.
-Those changes are not part of this slice.
+Replace host cleanup with hooks before job execution and after finalization.
+Include workspace retention: six hours for successful runs and 24 hours for
+failed or cancelled runs. Include the matching `--from-failed` deadline.
 
-Preserve the existing `PLOY_NODE_CLEANUP_AGE` policy, successful-run
-`runtime-share` eligibility, and optional volume-pruning setting. The default
-prohibition on broad volume pruning remains. Preserve host maintenance for
-node updates and Gradle dependency publication, job concurrency, sticky
-placement, startup recovery, and independent registry auth.
+The server keeps run state, resume rules, and operator drains. Node cleanup
+does not acquire or release server drains. Host updates and Gradle dependency
+publication keep their existing maintenance protocol.
 
-Do not add a cleanup daemon, timer, job queue, scheduler, or host command
-service. Do not add another deletion owner or active-run registry.
+Preserve Docker and Git-clone deletion policies. Keep optional volume pruning
+disabled by default. Preserve job concurrency, sticky placement, startup
+recovery, registry auth, durable artifacts, and tool-owned cache internals.
+
+[Disk pressure](cleanup.md) remains a separate follow-up. This slice adds no
+free-space threshold or recovery target. Reuse existing disk-space diagnostics
+and cleanup error logs. Reclaimed-byte reporting is outside both DDs.
+
+Do not add UDP coordination, persisted cleanup state, a cleanup timer, a
+scheduler, a host command service, or an active-run registry.
 
 ## Observed Constraint
 
 - Deploy's `ploy-node-cleanup.timer` starts cleanup hourly. The host helper
-  waits up to 300 seconds for the exclusive maintenance lock. A busy node can
-  miss that window and continue processing work until the next timer event.
-- `ClaimManager.claimAndExecute` acquires a `RunSlot` before requesting work.
-  `runController.AcquireSlot` takes a shared maintenance lock. Exclusive
-  cleanup inside that slot would wait on its own lock.
-- The direct-start handler also acquires a `RunSlot`. Startup reconciliation
-  attaches monitors to existing work. Cleanup cannot infer inactivity before
-  that reconciliation.
-- `ploy-node-cleanup` owns Docker pruning, old Git-clone removal, and aged
-  successful-run `runtime-share` removal. It preserves whole workspaces,
-  failed/cancelled run data, and durable artifacts.
-- The host script requires tools unavailable in the node image. The node has
-  Docker clients, path helpers, controller state, and maintenance-lock access,
-  but no host command-dispatch path.
+  waits up to 300 seconds for the exclusive maintenance lock. Busy nodes can
+  miss that interval.
+- `runController.StartRun` wraps `executeRun` and releases the job's `RunSlot`
+  afterward. Both claimed jobs and direct starts use this execution path.
+- `RunSlot` holds a concurrency permit and a shared maintenance lock. Cleanup
+  cannot acquire the exclusive lock while holding its own shared lock.
+- `Agent.Run` starts the HTTP server before claim-loop startup reconciliation
+  finishes. Direct starts need protection from incomplete reconciliation.
+- Recovered-container monitors acquire shared locks. The node must attach
+  these monitors before cleanup can classify local data as unused.
+- Host cleanup removes aged successful-run `runtime-share`, but preserves
+  workspaces and failed/cancelled run data.
+- `prepareStickyWorkspace` needs retained workspace data for `--from-failed`.
+  `resumeFailedJobs` has no deadline. `RestartRun` already locks the run row.
+- `StopRun` removes job-map entries before execution necessarily finishes.
+  The job map alone cannot prove that all writers have stopped.
+- `repoArtifactBundleEntries` selects durable job files and `share`. It
+  excludes workspace data. Stored patches are not a complete workspace backup.
 
 ## Target Contract
 
-### Trigger and ordering
+### Job hooks
 
-The node runs a cleanup admission checkpoint before every new claim and before
-acquiring that job's `RunSlot`. Direct job starts use the same boundary.
-Startup recovery attaches to existing work before normal cleanup can classify
-local data as unused. Attaching to recovered work must not invoke the new-work
-checkpoint or wait for cleanup of that same work.
+Run the same cleanup function immediately before `executeRun` and after it
+returns. The first hook precedes workspace hydration, image pulls, and job
+writes. The second follows finalization and per-job runtime cleanup.
 
-The checkpoint serializes cleanup with new local admission. Existing jobs
-retain their shared locks through finalization and runtime cleanup. Host
-updates and dependency publication retain the same shared/exclusive lock
-contract. Never create or replace the lock inode.
+Both claimed jobs and direct starts use these hooks. Cleanup adds no hook to
+the claim loop. Empty polls do not trigger cleanup.
 
-A node attempts cleanup through the existing claim loop, including its normal
-no-work polling. It does not introduce a separate periodic trigger. Existing
-claim-loop retry and backoff handle transient failures.
+New work waits for startup reconciliation before acquiring a concurrency
+permit. The claim loop already waits for reconciliation. Direct starts must
+wait before acquiring `RunSlot`, so recovery can obtain its own permits.
+Recovery attachment bypasses this startup wait and the before-job hook.
+Recovered jobs retain shared locks through finalization. Their monitors run the after-job hook when
+finalization ends.
 
-### Normal cleanup and busy nodes
+Startup itself does not trigger cleanup. The first job hook after restart
+can attempt cleanup because the in-memory completion time is empty.
 
-Normal cleanup uses the existing revision-owned drain before attempting the
-exclusive maintenance lock. Preserve preflight validation and operator-owned
-drains. A normal checkpoint does not wait for running jobs to finish.
+### In-memory state
 
-If the exclusive lock is unavailable, perform no deletion. Conditionally
-release only a fresh drain acquired by this checkpoint, then allow normal
-admission checks to continue. If drain ownership changed, preserve the newer
-state. Direct starts must not bypass an operator or maintenance drain.
+The existing controller owns `cleanupRunning` and `lastCleanupSuccess`.
+A mutex protects both fields. Check the fields and set `cleanupRunning` in
+one critical section. Do not hold that mutex during cleanup I/O.
 
-If the exclusive lock is acquired, recheck drain ownership and runtime
-activity before deletion. Restore only the operation's own drain after a
-successful pass. Preserve existing cleanup ownership on failure so a later
-checkpoint can recover it.
+A hook skips its cleanup attempt when cleanup is already running or the last
+successful cleanup ended less than one hour ago. At one hour, the next hook
+can attempt cleanup. The interval creates no timer or deadline.
 
-This checkpoint must not serialize all jobs behind a full global prune.
-Sustained concurrent activity can still defer normal cleanup. Retained
-workspaces and low-space admission remain limitations until the follow-up DD.
+Clear `cleanupRunning` on every exit, including cancellation and failure.
+Update `lastCleanupSuccess` only after a successful pass. A busy lock, failed
+inspection, or incomplete cleanup does not start the cooldown. A complete
+pass with no eligible data counts as success.
 
-### Recovery of failed cleanup
+A skipped hook does not authorize execution without a shared maintenance
+lock. That lock keeps jobs from executing during cleanup.
 
-An existing cleanup-owned drain is recovery work, not a normal busy skip.
-Recover it before admitting new work. Observe the revision, obtain the
-exclusive lock, renew the revision, and recheck ownership and runtime activity.
-Only a successful existing-policy cleanup pass can release that drain.
+The cooldown belongs to one process. A restart or another process can cause
+an extra cleanup pass. The host lock still prevents overlap. Different hosts
+clean their own storage independently.
 
-On timeout or cancellation while waiting, a fresh acquisition releases only
-its own revision. A resumed operation preserves the inherited drain. Reuse
-the existing cleanup ownership and revision-renewal protocol across node
-restart. Preserve operator reassertions and other host maintenance ownership.
+### Maintenance lock and failures
 
-The node's authenticated identity may operate only its own cleanup drain
-through the existing control-plane API. Preserve authorization for host
-maintenance callers. Job containers receive no administrator token.
+Use the existing host maintenance lock for the complete cleanup pass,
+including workspace deletion. Keep its inode unchanged.
 
-### Deletion policy and ownership
+Before attempting cleanup, release only the hook's own shared lock. Retain
+the concurrency permit. Try the exclusive lock without waiting. If another
+job or host operation holds the lock, skip this attempt.
 
-The node becomes the sole owner of the current host cleanup operations:
+Before job execution, reacquire the shared lock after the hook finishes or
+skips. If reacquisition fails, do not execute the job. Preserve the existing
+job failure and cancellation paths. Keep shared protection throughout job
+execution, finalization, and per-job runtime cleanup.
 
-- Remove eligible stopped containers without force. Preserve the existing
-  anonymous-volume removal behavior.
-- Prune unused images and build cache using the configured age filter.
-- Preserve the existing optional volume-pruning setting and its disabled
-  default.
-- Remove old Git clones using the existing eligibility policy.
-- Remove aged successful-run `runtime-share` only after the existing run,
-  current-attempt job, path, mount, container-reference, and completion checks.
+After finalization, release the shared lock before the cleanup attempt.
+Release the concurrency permit after the hook finishes. Use a bounded cleanup
+context that is independent of the completed job's cancellation. Node shutdown
+still cancels cleanup.
 
-Keep the existing per-job runtime sweeper as the owner of abandoned job
-runtime directories. Preserve workspace directories, failed/cancelled
-`runtime-share`, durable job files, `share`, remote artifacts, and tool-owned
-cache internals in this slice.
+Under the exclusive lock, check containers, job resources, and inactive
+BuildKit leases. Unknown activity or failed inspection prevents deletion.
+Never remove containerd leases directly.
 
-Use native node storage and Docker APIs. Preserve authoritative container
-inspection, job-resource checks, and inactive BuildKit lease accounting.
-Deploy must expose the runtime inspection required by those checks. Unknown
-activity or unavailable inspection blocks deletion. Never remove containerd
-leases directly.
+Cleanup errors preserve affected data and produce an error log. They do not
+mark the pass successful or create a lasting block on job execution. A later
+job hook can retry. Free-space enforcement belongs to the follow-up DD.
 
-Log whether the checkpoint executed cleanup, deferred because of activity, or
-failed. A deferred pass must not be reported as completed reclamation.
+Continuous overlapping jobs can prevent cleanup indefinitely. This slice
+accepts that limit to preserve concurrency and reuse the existing lock.
+
+### Workspace retention
+
+Eligibility belongs to the current run because successive jobs share its
+workspace. A completed job does not make an unfinished run eligible.
+
+| Current run status | Retention from `finished_at` |
+| --- | --- |
+| `Success` | 6 hours |
+| `Fail`, `Cancelled` | 24 hours |
+| Nonterminal or unknown | Preserve |
+
+Delete only canonical `workspace` and `runtime-share` children of the run
+directory. Preserve `jobs`, `share`, logs, patches, outputs, artifact records,
+and remote blobs. Whole-run deletion remains outside this DD.
+
+Preserve data when completion time or run state is unavailable. Reject
+symlinks, path escapes, mounted descendants, and container references.
+Directory access and modification times do not determine retention.
+
+The exclusive maintenance lock excludes hydration, execution, recovery, and
+finalization during deletion. Cancellation must retain shared protection until
+the writer exits. Pending jobs cannot write before acquiring their shared lock.
+
+Immediately before deletion, recheck status, attempt, `resume_count`, and
+`finished_at`. A changed run identity invalidates the earlier observation.
+Keep existing current-attempt terminal-job checks.
+
+### Retained resume and restart
+
+One policy defines retention and retained-resume expiry. Extend the existing
+run read API to return cleanup eligibility with run identity. The server
+computes eligibility in a short transaction under the same run-row lock as
+`RestartRun`. Use server wall-clock time after acquiring the lock.
+
+An in-progress resume must commit or roll back before the eligibility read.
+An unlocked read or transaction-start timestamp cannot authorize deletion.
+The node uses the returned eligibility; its local clock cannot shorten
+retention. Release the database lock before filesystem deletion.
+
+Inside `RestartRun`, reject `--from-failed` at or beyond 24 hours after run
+completion. Check expiry before changing jobs or logs. Apply the deadline
+even when workspace files still exist. Direct the caller to full restart.
+A resume accepted before expiry changes run identity and invalidates cleanup
+eligibility.
+
+Full restart remains available. If it commits after the final eligibility
+read, new execution waits for the maintenance lock. Full restart reconstructs
+missing workspace data through the existing snapshot path.
+
+Keep the existing missing-workspace error for retained resume. Do not silently
+convert retained resume to full restart. Add no expiration row, artifact
+manifest, or artifact-finalization endpoint.
+
+### Existing deletion policies and deployment
+
+Transfer Docker pruning and old Git-clone removal into native node code.
+Preserve their existing eligibility checks, age filters, and volume settings.
+Replace successful-only `runtime-share` retention with the fixed policy above.
+The per-job sweeper keeps ownership of abandoned job runtime directories.
+
+Deploy supplies the runtime access needed for container and lease inspection.
+Deploy the server retention and resume contract before enabling node workspace
+deletion.
+
+Stop host cleanup before the node takes ownership. Resolve legacy
+cleanup-owned server drains through the old host maintenance helper. Preserve
+its revision checks and operator changes. Report unresolved drains and block
+the handoff until they are resolved.
+
+Remove the host cleanup service, timer, script, and installer calls at handoff.
+Keep the host maintenance helper for updates and dependency publication.
+Host and node cleanup must never act as competing owners.
 
 ## Enforcement
 
 | Concern | Existing authority to extend |
 | --- | --- |
-| New-work checkpoint | `ClaimManager`, `runController`, direct-start handler |
-| Local activity | `RunSlot`, startup recovery, existing controller synchronization |
-| Global exclusion | Existing drain API, cleanup ownership, maintenance lock |
-| Deletion | Node Docker clients and path helpers; transferred host policies |
-| Deployment | Node image/Compose permissions and host service installer |
+| Job hooks and cooldown | `runController`, `StartRun`, recovered-container monitors |
+| Startup protection | Startup reconciliation and direct-start execution |
+| Exclusion and concurrency | `RunSlot`, shared/exclusive maintenance lock |
+| Retention and resume | Run read API, `RestartRun`, `resumeFailedJobs` |
+| Deletion | Node Docker clients and path helpers; transferred host checks |
+| Deployment | Node image, Compose permissions, host service installer |
 
-Retire the host deletion implementation when node cleanup takes ownership.
-Keep the host maintenance helper for updates and dependency publication.
-No fallback may leave both host and node cleanup enabled.
+The node owns cleanup. Server run state defines retention eligibility; it does
+not schedule cleanup or control local free space.
 
 ## Implementation Slice
 
-Deliver the ownership and trigger transfer across both worktrees as one
-self-sufficient slice:
+Deliver hooks and retention across both worktrees as one slice:
 
-- Add the node checkpoint before claims and direct starts, outside the new
-  job's shared lock. Preserve recovery attachment and concurrency.
-- Transfer current deletion policies and activity checks to native node code.
-- Extend existing authorization so the node can manage only its own cleanup
-  drain. Preserve failed-cleanup recovery and revision fencing.
-- Update the node image, Compose access, and installer. Quiesce active host
-  cleanup before replacement. Disable and remove its timer, service, script,
-  and installer calls when the participating node takes ownership.
-- Update shipped maintenance and deployment documentation.
+- Add shared before/after job hooks and the in-memory one-hour cooldown.
+- Adjust `RunSlot` lock handling without losing its concurrency permit.
+- Protect startup reconciliation and recovered-job finalization.
+- Transfer Docker and Git-clone cleanup with existing activity checks.
+- Add 6h/24h workspace retention and the matching retained-resume deadline.
+- Deploy the server contract before node workspace deletion.
+- Resolve legacy cleanup drains and retire host cleanup.
+- Update run-resume, maintenance, API, and deployment documentation.
 
-The healthy exit is an independently deployable node checkpoint with the same
-eligible deletion set, protected active work, and no timed host cleanup owner.
-The 6h/24h workspace policy and disk-pressure controls remain deferred to the
-follow-up DD.
+The completed slice attempts cleanup at job boundaries, preserves active work,
+and deletes eligible workspace data. It needs no cleanup calls from the claim
+loop and no node drain API permission.
 
 ## Completion
 
-The Ploy and deploy changes must build and pass focused lifecycle, API,
-maintenance, and service tests. Verify these boundaries:
+Run focused node lifecycle, store, API, and deploy tests. Verify these outcomes:
 
-- A claim and a direct start pass through the checkpoint before their shared
-  lock. Recovery attachment cannot deadlock on the checkpoint.
-- An idle node performs existing-policy cleanup before new work starts.
-- A busy node performs no global deletion and retains job concurrency. A
-  skipped fresh checkpoint leaves no owned drain behind.
-- Failed-cleanup recovery renews its revision under the exclusive lock.
-  Timeout, cancellation, restart, and operator reassertion preserve ownership.
-- Existing Docker, Git-clone, and successful `runtime-share` eligibility
-  remains unchanged. Workspaces and durable artifacts remain protected.
-- Disposable Docker integration proves exclusion from pulls and finalization,
-  authoritative state/lease checks, and retired host cleanup wiring.
+- Claimed jobs and direct starts run both hooks. Empty polls run neither hook.
+- Simultaneous hooks start at most one local cleanup pass.
+- Success starts the one-hour cooldown. Failure, cancellation, and a busy lock
+  do not. Restart clears the cooldown without allowing overlapping cleanup.
+- Hooks never wait for an exclusive lock while holding their own shared lock.
+  Jobs reacquire shared protection before execution. Concurrency permits remain balanced.
+- With capacity one, a direct start during reconciliation cannot take the
+  permit needed by a recovered-container monitor. Recovery bypasses the startup wait.
+- Recovered finalization retains writer protection and reaches the after-job hook.
+- Retention starts at six hours for success and 24 hours for failure/cancellation.
+  Nonterminal runs, unknown state, changed identity, and unsafe paths preserve data.
+- An uncommitted resume spanning expiry cannot race deletion. Expired resume
+  fails before mutation. Full restart can reconstruct a deleted workspace.
+- Durable job files, `share`, artifact records, and remote blobs survive cleanup.
+- Cleanup leaves operator drains unchanged. Deployment resolves legacy cleanup
+  drains without overriding operator changes.
+- Disposable Docker tests verify pull/finalization exclusion, resource/lease
+  checks, cross-process locking, and retired host cleanup wiring.
 
-Do not validate destructive concurrency behavior on production nodes.
+Do not run destructive concurrency tests on production nodes.
 
 ## References
 
-- [Node maintenance](../docs/node-maintenance.md).
-- [Claim lifecycle](../internal/nodeagent/claimer_loop.go),
-  [controller](../internal/nodeagent/controller.go),
+- [Node maintenance](../docs/node-maintenance.md), [run resume](../docs/runs.md).
+- [Controller](../internal/nodeagent/controller.go),
+  [job execution](../internal/nodeagent/execution.go),
   [direct starts](../internal/nodeagent/handlers.go).
-- [Maintenance lock](../internal/nodeagent/maintenance.go),
-  [startup recovery](../internal/nodeagent/crash_reconcile_startup.go),
-  [runtime sweeper](../internal/nodeagent/job_runtime_cleanup.go).
+- [Startup reconciliation](../internal/nodeagent/crash_reconcile_startup.go),
+  [recovered containers](../internal/nodeagent/crash_reconcile_running.go),
+  [maintenance lock](../internal/nodeagent/maintenance.go).
+- [Workspace hydration](../internal/nodeagent/workspace_hydration.go),
+  [retained resume](../internal/store/resume_run.go),
+  [restart transaction](../internal/store/store.go).
 - Deploy: `services/bin/ploy-node-cleanup`, `ploy-node-maintenance`, cleanup
   service/timer, Compose, installer, and service tests.
