@@ -150,6 +150,28 @@ updated host helper and cleanup script. Verify that `/v1/nodes` includes
 node images need no protocol change. Resolve legacy retained drains from their
 host journals; do not assign cleanup ownership based only on `drained=true`.
 
+## Cache deployment verification
+
+The generic job storage and image cache contracts are documented in
+[Job storage](migs-lifecycle.md#runtime-paths) and
+[environment settings](envs/README.md). Deploy owns Gradle policy and cache
+publication. Ploy owns job storage isolation and runtime-directory removal.
+
+For a node or image rollout, verify the following operational outcomes:
+
+- Two concurrent Gradle runs use distinct writable job caches and complete
+  without cache deserialization errors.
+- Each official image starts with an empty mounted job home and loads its
+  defaults. Supplied read-only home inputs remain read-only.
+- Old shared writable Gradle and Maven homes are no longer mounted. Quarantine
+  them only after checking container references and active work.
+
+Deploy provides `images/shared/gradle-read-only-dependency-cache_test.sh` and
+`images/shared/gradle-task-output-cache_test.sh` for Docker integration checks.
+The former verifies dependency reuse and isolated misses. The latter verifies
+task-output reuse and rejection of anonymous writes. Record run IDs and image
+revisions with the verification results.
+
 ## CLI and API
 
 Node maintenance actions are not enqueued or listed through the control plane.
