@@ -8,12 +8,19 @@ parameters:
     name: expected_revision
     required: false
     schema: { type: integer, format: int64, minimum: 0 }
-    description: Change only this revision and the opposite drain state. Omit for an operator update or reassertion.
+    description: Change only this revision. Same-state renewal requires existing and requested cleanup ownership. Omit for an operator update or reassertion.
+  - in: query
+    name: owner
+    required: false
+    schema: { type: string, enum: [cleanup] }
+    description: Assign or renew cleanup ownership. Requires expected_revision. Omit to clear ownership.
 post:
   tags: [Control]
   summary: Mark node as drained
   description: |
     Marks the specified node as drained. Drained nodes do not accept new run claims.
+    A conditional cleanup-owned drain can renew an existing cleanup-owned drain.
+    Renewal advances the revision. Owner-less drain requests clear ownership.
   responses:
     '204':
       description: Node drained
@@ -22,7 +29,7 @@ post:
           description: Revision after this update, including operator reassertions.
           schema: { type: integer, format: int64 }
     '400':
-      description: Bad Request (invalid node ID or expected revision)
+      description: Bad Request (invalid node ID, expected revision, or owner)
     '404':
       description: Node not found
     '409':

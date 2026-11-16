@@ -21,7 +21,7 @@ const (
 	ternVersionTable                 = "ploy.tern_schema_version"
 
 	// TargetSchemaVersion is the highest embedded Tern migration version.
-	TargetSchemaVersion int32 = 11
+	TargetSchemaVersion int32 = 12
 )
 
 // ErrUnsupportedSchema is returned when an existing database cannot be safely

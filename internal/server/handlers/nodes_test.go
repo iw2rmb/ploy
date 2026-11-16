@@ -282,3 +282,53 @@ func TestConditionalNodeDrain(t *testing.T) {
 		})
 	}
 }
+
+// Cleanup ownership requires a conditional drain and remains visible when absent.
+func TestNodeDrainOwner(t *testing.T) {
+	for _, tc := range []struct {
+		name, action, query string
+		status              int
+		owner               *string
+	}{
+		{"cleanup acquisition", "drain", "?owner=cleanup&expected_revision=7", http.StatusNoContent, ptr("cleanup")},
+		{"legacy conditional drain", "drain", "?expected_revision=7", http.StatusNoContent, nil},
+		{"operator reassertion", "drain", "", http.StatusNoContent, nil},
+		{"cleanup release", "undrain", "?expected_revision=7", http.StatusNoContent, nil},
+		{"missing revision", "drain", "?owner=cleanup", http.StatusBadRequest, nil},
+		{"empty owner", "drain", "?owner=&expected_revision=7", http.StatusBadRequest, nil},
+		{"unknown owner", "drain", "?owner=update&expected_revision=7", http.StatusBadRequest, nil},
+		{"multiple owners", "drain", "?owner=cleanup&owner=cleanup&expected_revision=7", http.StatusBadRequest, nil},
+		{"owner on undrain", "undrain", "?owner=cleanup&expected_revision=7", http.StatusBadRequest, nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			id, node := newNodeFixture(true)
+			node.DrainRevision = 8
+			st := &handlerStore{}
+			st.getNode.val = node
+			rr := doRequest(t, setNodeDrainHandler(st, tc.action == "drain"), http.MethodPost,
+				"/v1/nodes/"+id+"/"+tc.action+tc.query, nil, "id", id)
+			assertStatus(t, rr, tc.status)
+			if tc.status == http.StatusBadRequest {
+				assertNotCalled(t, "UpdateNodeDrained", st.updateNodeDrained.called)
+				return
+			}
+			got := st.updateNodeDrained.params.DrainOwner
+			if (got == nil) != (tc.owner == nil) || (got != nil && *got != *tc.owner) {
+				t.Fatalf("drain owner = %v, want %v", got, tc.owner)
+			}
+		})
+	}
+
+	for _, owner := range []*string{nil, ptr("cleanup")} {
+		_, node := newNodeFixture(true)
+		node.DrainOwner = owner
+		st := &handlerStore{}
+		st.listNodes.val = []store.Node{node}
+		rr := doRequest(t, listNodesHandler(st), http.MethodGet, "/v1/nodes", nil)
+		assertStatus(t, rr, http.StatusOK)
+		got, present := decodeBody[[]map[string]any](t, rr)[0]["drain_owner"]
+		if !present || (owner == nil && got != nil) || (owner != nil && got != *owner) {
+			t.Fatalf("node JSON drain_owner = %v (present=%v), want %v", got, present, owner)
+		}
+	}
+}

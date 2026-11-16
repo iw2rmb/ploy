@@ -1112,6 +1112,11 @@ Node:
     last_heartbeat: { type: string, format: date-time, nullable: true }
     drained: { type: boolean }
     drain_revision: { type: integer, format: int64, minimum: 0 }
+    drain_owner:
+      type: string
+      nullable: true
+      enum: [cleanup, null]
+      description: Cleanup ownership, or null when cleanup cannot adopt the drain. Always present.
     created_at: { type: string, format: date-time }
   required:
     - id
@@ -1126,6 +1131,7 @@ Node:
     - disk_free_bytes
     - drained
     - drain_revision
+    - drain_owner
     - created_at
 
 WorkflowGraphNode:

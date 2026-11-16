@@ -6,7 +6,7 @@ CREATE UNIQUE INDEX specs_named_source_sha_name_idx
 ON ploy.specs (name, (source->>'domain'), (source->>'repo'), sha)
 WHERE name <> '' AND sha <> '' AND COALESCE(source->>'path', '') = '';
 
-CREATE INDEX specs_git_snapshot_lookup_idx
+CREATE INDEX IF NOT EXISTS specs_git_snapshot_lookup_idx
 ON ploy.specs (name, (source->>'domain'), (source->>'repo'), (source->>'path'), sha)
 WHERE name <> '' AND sha <> '' AND COALESCE(source->>'path', '') <> '';
 

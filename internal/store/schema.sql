@@ -85,6 +85,7 @@ CREATE TABLE IF NOT EXISTS nodes (
   -- Node rollout control: when true, scheduler must not assign new runs
   drained          BOOLEAN NOT NULL DEFAULT false,
   drain_revision   BIGINT NOT NULL DEFAULT 0,
+  drain_owner      TEXT CHECK (drain_owner IS NULL OR (drained AND drain_owner = 'cleanup')),
   -- mTLS certificate metadata for audit/rotation
   cert_serial       TEXT,
   cert_fingerprint  TEXT,

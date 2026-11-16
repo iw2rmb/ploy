@@ -68,6 +68,29 @@ func TestRunMigrationsTernStates(t *testing.T) {
 			},
 		},
 		{
+			name: "version 11 preserves existing drains without assigning cleanup ownership",
+			setup: func(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
+				setupTernSchemaVersion(t, ctx, pool, 11)
+				if _, err := pool.Exec(ctx, `INSERT INTO ploy.nodes (id, name, ip_address, drained, drain_revision)
+VALUES ('legacy-drained', 'legacy-drained', '127.0.0.11', true, 17),
+       ('legacy-enabled', 'legacy-enabled', '127.0.0.12', false, 18)`); err != nil {
+					t.Fatal(err)
+				}
+			},
+			assert: func(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
+				assertTernVersion(t, ctx, pool, TargetSchemaVersion)
+				var preserved bool
+				if err := pool.QueryRow(ctx, `SELECT COUNT(*) = 2 AND bool_and(drain_owner IS NULL)
+AND bool_and(CASE id WHEN 'legacy-drained' THEN drained AND drain_revision = 17
+                    ELSE NOT drained AND drain_revision = 18 END) FROM ploy.nodes`).Scan(&preserved); err != nil {
+					t.Fatal(err)
+				}
+				if !preserved {
+					t.Fatal("migration changed legacy drain state or assigned cleanup ownership")
+				}
+			},
+		},
+		{
 			name:    "unsupported existing database fails clearly",
 			setup:   setupUnsupportedExistingSchema,
 			wantErr: ErrUnsupportedSchema,
@@ -97,11 +120,7 @@ func TestRunMigrationsTernStates(t *testing.T) {
 
 func setupTernVersion4WithStaleBootstrapTokenFK(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
 	t.Helper()
-	resetPloySchema(t, ctx, pool)
-	if err := RunMigrations(ctx, pool); err != nil {
-		t.Fatalf("create version 5 schema fixture: %v", err)
-	}
-	setTernVersion(t, ctx, pool, 4)
+	setupTernSchemaVersion(t, ctx, pool, 4)
 	if _, err := pool.Exec(ctx, `
 ALTER TABLE ploy.bootstrap_tokens
   ADD CONSTRAINT bootstrap_tokens_node_id_fkey
@@ -112,8 +131,12 @@ ALTER TABLE ploy.bootstrap_tokens
 	assertTernVersion(t, ctx, pool, 4)
 }
 
-func setTernVersion(t *testing.T, ctx context.Context, pool *pgxpool.Pool, version int32) {
+func setupTernSchemaVersion(t *testing.T, ctx context.Context, pool *pgxpool.Pool, version int32) {
 	t.Helper()
+	resetPloySchema(t, ctx, pool)
+	if _, err := pool.Exec(ctx, `CREATE SCHEMA ploy`); err != nil {
+		t.Fatal(err)
+	}
 	acquired, err := pool.Acquire(ctx)
 	if err != nil {
 		t.Fatalf("acquire migration connection: %v", err)
@@ -123,8 +146,8 @@ func setTernVersion(t *testing.T, ctx context.Context, pool *pgxpool.Pool, versi
 	if err != nil {
 		t.Fatalf("new Tern migrator: %v", err)
 	}
-	if err := migrator.SetVersion(ctx, version); err != nil {
-		t.Fatalf("set Tern version %d: %v", version, err)
+	if err := migrator.MigrateTo(ctx, version); err != nil {
+		t.Fatalf("create Tern version %d: %v", version, err)
 	}
 }
 
@@ -188,10 +211,7 @@ func resetPloySchema(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
 
 func setupKnownCurrentLegacySchema(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
 	t.Helper()
-	resetPloySchema(t, ctx, pool)
-	if err := RunMigrations(ctx, pool); err != nil {
-		t.Fatalf("create current schema fixture: %v", err)
-	}
+	setupTernSchemaVersion(t, ctx, pool, 1)
 
 	nodeID := types.NodeID(types.NewNodeKey())
 	if _, err := pool.Exec(ctx, `

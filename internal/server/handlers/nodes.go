@@ -31,6 +31,7 @@ func nodeToResponse(node store.Node) domainapi.Node {
 		CertFingerprint: node.CertFingerprint,
 		Drained:         node.Drained,
 		DrainRevision:   node.DrainRevision,
+		DrainOwner:      node.DrainOwner,
 		CreatedAt:       node.CreatedAt.Time.Format(time.RFC3339),
 	}
 	if node.CertNotBefore.Valid {
@@ -70,7 +71,15 @@ func setNodeDrainHandler(st store.Store, drain bool) http.HandlerFunc {
 			}
 			revision = &value
 		}
-		node, err := st.UpdateNodeDrained(r.Context(), store.UpdateNodeDrainedParams{ID: nodeID, Drained: drain, ExpectedRevision: revision})
+		var owner *string
+		if values, present := r.URL.Query()["owner"]; present {
+			if !drain || revision == nil || len(values) != 1 || values[0] != "cleanup" {
+				writeHTTPError(w, http.StatusBadRequest, "owner must be cleanup on a conditional drain request")
+				return
+			}
+			owner = &values[0]
+		}
+		node, err := st.UpdateNodeDrained(r.Context(), store.UpdateNodeDrainedParams{ID: nodeID, Drained: drain, ExpectedRevision: revision, DrainOwner: owner})
 		if errors.Is(err, pgx.ErrNoRows) {
 			if _, ok := getNodeOrFail(w, r, st, nodeID, "set drain"); !ok {
 				return
@@ -84,7 +93,7 @@ func setNodeDrainHandler(st store.Store, drain bool) http.HandlerFunc {
 		}
 		w.Header().Set("X-Ploy-Drain-Revision", strconv.FormatInt(node.DrainRevision, 10))
 		w.WriteHeader(http.StatusNoContent)
-		slog.Info("node drain updated", "node_id", nodeID, "drained", drain, "drain_revision", node.DrainRevision)
+		slog.Info("node drain updated", "node_id", nodeID, "drained", drain, "drain_revision", node.DrainRevision, "drain_owner", node.DrainOwner)
 	}
 }
 

@@ -72,9 +72,19 @@ periodic timer. `ploy-node-update.service` and
 Claims lock the selected node row before selecting a job. A committed drain
 blocks new claims. Every drain or undrain, including an operator reassertion,
 increments `drain_revision`. Conditional callers use `?expected_revision=N`.
-A stale revision or an unchanged conditional state returns HTTP 409. Successful
-updates return HTTP 204 with `X-Ploy-Drain-Revision`. Unconditional reassertions
-succeed and invalidate any older maintenance ownership.
+A stale revision returns HTTP 409. Successful updates return HTTP 204 with
+`X-Ploy-Drain-Revision`. Unconditional reassertions invalidate older maintenance
+ownership.
+
+The node record also exposes nullable `drain_owner`. Cleanup acquires its drain
+with `?expected_revision=N&owner=cleanup`. Other callers omit `owner`.
+An owner-less drain or any undrain clears ownership. Existing drains have no
+owner after migration; cleanup cannot adopt them.
+
+A cleanup retry can renew an existing cleanup-owned drain with the same query.
+This conditional same-state update advances the revision. Other conditional
+same-state updates return HTTP 409. Cleanup requires the ownership field before
+changing admission.
 
 The host provisions `/run/lock/ploy-node-maintenance.lock` through systemd
 `tmpfiles.d`. The node bind-mounts the host lock directory at the same path.
@@ -92,17 +102,37 @@ helper in this order:
 
 1. Verify a fresh diagnostic from the current node container, its protocol,
    lock inode, and host directory mount.
-2. Conditionally acquire drain, preserving an existing operator drain.
+2. Conditionally acquire drain, or observe an existing cleanup-owned drain for
+   a cleanup retry. Preserve other existing drains.
 3. Acquire the exclusive lock within `PLOY_NODE_MAINTENANCE_LOCK_TIMEOUT`
    seconds (default 300).
-4. Recheck drain ownership. Reject surviving job containers, job resources,
+4. Recheck drain ownership. A cleanup retry renews its revision under the lock.
+5. Inspect job containers and job resources. Reject active or uncertain state
    and unaccounted containerd leases.
-5. Perform and verify the operation. Conditionally restore admission before
+6. Perform and verify the operation. Conditionally restore admission before
    releasing the lock.
 
-Failure, timeout, or uncertain recovery preserves drain and reports the reason
-in the host journal. A crashed node can leave Docker activity alive; an empty
-container list alone never authorizes maintenance. Startup recovery must finish
+Docker inspection determines container state. Cleanup enumerates all containers
+before checking their inspected state and age. A stale Docker listing cannot
+hide an eligible stopped container. Removal remains non-forced.
+
+The lease check accounts for Docker containers and inactive BuildKit cache.
+BuildKit is Docker's build engine. The helper reads cache ownership from the
+local Docker Engine and accepts exact cache IDs and their `-view` and
+`-variants` leases. Active cache, unknown leases, and unavailable inspection
+block maintenance. These checks do not replace the exclusive lock.
+
+Failed checks or operations retain drain and report the reason in the host
+journal. Cleanup retains `drain_owner=cleanup`, so its next hourly attempt can
+retry. Revision renewal prevents an older waiter from releasing that retry's
+drain. Operator reassertions clear ownership and invalidate pending cleanup.
+
+On a lock timeout or cancellation while waiting, a fresh acquisition releases
+only its own drain revision. A retry preserves the inherited drain. Lock
+timeouts exit with status 75 (deferred). Other maintenance operations preserve
+their existing failure behavior and cannot adopt cleanup-owned drains.
+
+A crashed node can leave Docker activity alive. Startup recovery must finish
 before maintenance can proceed. Heartbeats remain available while jobs wait.
 Registry auth uses its separate lock and daemon-free manifest inspection.
 
@@ -113,6 +143,12 @@ with the shared mount. An offline bootstrap uses the same conditional drain and
 exclusive lock and rejects any surviving job activity. Wait for the new node's
 `details.maintenance` diagnostic before enabling maintenance. Node replacement
 preserves the lock inode.
+
+For cleanup ownership, deploy the control-plane migration and API before the
+updated host helper and cleanup script. Verify that `/v1/nodes` includes
+`drain_owner`, including explicit `null` values. Existing lock-participating
+node images need no protocol change. Resolve legacy retained drains from their
+host journals; do not assign cleanup ownership based only on `drained=true`.
 
 ## CLI and API
 

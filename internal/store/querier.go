@@ -203,8 +203,8 @@ type Querier interface {
 	UpdateJobStatus(ctx context.Context, arg UpdateJobStatusParams) error
 	UpdateMigSpec(ctx context.Context, arg UpdateMigSpecParams) error
 	UpdateNodeCertMetadata(ctx context.Context, arg UpdateNodeCertMetadataParams) error
-	// Conditional callers can only change the observed state; operator reassertions
-	// advance the revision so stale maintenance cannot restore admission.
+	// Cleanup renews its revision under the host lock so an earlier waiter's timeout
+	// cannot restore admission during recovery. Operator reassertions clear ownership.
 	UpdateNodeDrained(ctx context.Context, arg UpdateNodeDrainedParams) (Node, error)
 	UpdateNodeHeartbeat(ctx context.Context, arg UpdateNodeHeartbeatParams) error
 	UpdateRunError(ctx context.Context, arg UpdateRunErrorParams) error

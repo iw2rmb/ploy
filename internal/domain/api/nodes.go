@@ -24,6 +24,7 @@ type Node struct {
 	CertNotAfter    *string      `json:"cert_not_after,omitempty"`
 	LastHeartbeat   *string      `json:"last_heartbeat,omitempty"`
 	DrainRevision   int64        `json:"drain_revision"`
+	DrainOwner      *string      `json:"drain_owner"`
 	Drained         bool         `json:"drained"`
 	CreatedAt       string       `json:"created_at"`
 }

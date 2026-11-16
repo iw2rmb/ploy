@@ -68,11 +68,14 @@ SET
 WHERE id = $1;
 
 -- name: UpdateNodeDrained :one
--- Conditional callers can only change the observed state; operator reassertions
--- advance the revision so stale maintenance cannot restore admission.
+-- Cleanup renews its revision under the host lock so an earlier waiter's timeout
+-- cannot restore admission during recovery. Operator reassertions clear ownership.
 UPDATE nodes
-SET drained = sqlc.arg(drained), drain_revision = drain_revision + 1
+SET drained = sqlc.arg(drained), drain_revision = drain_revision + 1,
+    drain_owner = CASE WHEN sqlc.arg(drained) THEN sqlc.narg(drain_owner)::text ELSE NULL END
 WHERE id = sqlc.arg(id)
   AND (sqlc.narg(expected_revision)::bigint IS NULL OR
-       (drain_revision = sqlc.narg(expected_revision)::bigint AND drained <> sqlc.arg(drained)))
+       (drain_revision = sqlc.narg(expected_revision)::bigint AND
+        (drained <> sqlc.arg(drained) OR
+         (drained AND sqlc.arg(drained) AND drain_owner = 'cleanup' AND sqlc.narg(drain_owner)::text = 'cleanup'))))
 RETURNING *;

@@ -96,7 +96,8 @@ func TestDrainSerializesWithClaim(t *testing.T) {
 func TestDrainRevisionPreservesOperatorDecision(t *testing.T) {
 	ctx, db := newTestStore(t)
 	node := createTestNode(t, ctx, db)
-	acquired, err := db.UpdateNodeDrained(ctx, UpdateNodeDrainedParams{ID: node.ID, Drained: true, ExpectedRevision: &node.DrainRevision})
+	owner := "cleanup"
+	acquired, err := db.UpdateNodeDrained(ctx, UpdateNodeDrainedParams{ID: node.ID, Drained: true, ExpectedRevision: &node.DrainRevision, DrainOwner: &owner})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -107,12 +108,100 @@ func TestDrainRevisionPreservesOperatorDecision(t *testing.T) {
 	if reasserted.DrainRevision != acquired.DrainRevision+1 {
 		t.Fatal("revision did not advance")
 	}
+	if reasserted.DrainOwner != nil {
+		t.Fatal("operator reassertion retained cleanup ownership")
+	}
+	if _, err := db.UpdateNodeDrained(ctx, UpdateNodeDrainedParams{ID: node.ID, Drained: true, ExpectedRevision: &reasserted.DrainRevision, DrainOwner: &owner}); !errors.Is(err, pgx.ErrNoRows) {
+		t.Fatalf("cleanup adopted operator drain: %v", err)
+	}
 	if _, err := db.UpdateNodeDrained(ctx, UpdateNodeDrainedParams{ID: node.ID, Drained: false, ExpectedRevision: &acquired.DrainRevision}); !errors.Is(err, pgx.ErrNoRows) {
 		t.Fatalf("stale undrain: %v", err)
 	}
 	released, err := db.UpdateNodeDrained(ctx, UpdateNodeDrainedParams{ID: node.ID, Drained: false, ExpectedRevision: &reasserted.DrainRevision})
 	if err != nil || released.Drained {
 		t.Fatalf("owned undrain: %v", err)
+	}
+}
+
+// Recovery renewal fences a waiting acquisition's release in either transaction order.
+func TestCleanupDrainRecoveryRevision(t *testing.T) {
+	for _, renewalFirst := range []bool{true, false} {
+		name := "timeout release wins"
+		if renewalFirst {
+			name = "recovery renewal wins"
+		}
+		t.Run(name, func(t *testing.T) {
+			ctx, db := newTestStore(t)
+			node := createTestNode(t, ctx, db)
+			owner := "cleanup"
+			acquired, err := db.UpdateNodeDrained(ctx, UpdateNodeDrainedParams{
+				ID: node.ID, Drained: true, ExpectedRevision: &node.DrainRevision, DrainOwner: &owner,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !acquired.Drained || acquired.DrainOwner == nil || *acquired.DrainOwner != owner {
+				t.Fatal("cleanup did not acquire a recoverable drain")
+			}
+			renew := UpdateNodeDrainedParams{ID: node.ID, Drained: true, ExpectedRevision: &acquired.DrainRevision, DrainOwner: &owner}
+			release := UpdateNodeDrainedParams{ID: node.ID, Drained: false, ExpectedRevision: &acquired.DrainRevision}
+			first, second := release, renew
+			if renewalFirst {
+				first, second = renew, release
+			}
+			updated, err := db.UpdateNodeDrained(ctx, first)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if updated.DrainRevision != acquired.DrainRevision+1 {
+				t.Fatal("winning update did not advance the revision")
+			}
+			if _, err := db.UpdateNodeDrained(ctx, second); !errors.Is(err, pgx.ErrNoRows) {
+				t.Fatalf("stale competing update: %v", err)
+			}
+			if renewalFirst {
+				release.ExpectedRevision = &updated.DrainRevision
+				updated, err = db.UpdateNodeDrained(ctx, release)
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			if updated.Drained || updated.DrainOwner != nil {
+				t.Fatal("release retained drain or cleanup ownership")
+			}
+		})
+	}
+}
+
+// Legacy maintenance drains cannot be converted into cleanup-owned drains.
+func TestCleanupDrainPreservesLegacyMaintenance(t *testing.T) {
+	ctx, db := newTestStore(t)
+	node := createTestNode(t, ctx, db)
+	acquired, err := db.UpdateNodeDrained(ctx, UpdateNodeDrainedParams{ID: node.ID, Drained: true, ExpectedRevision: &node.DrainRevision})
+	if err != nil {
+		t.Fatal(err)
+	}
+	owner := "cleanup"
+	for _, requestedOwner := range []*string{nil, &owner} {
+		if _, err := db.UpdateNodeDrained(ctx, UpdateNodeDrainedParams{
+			ID: node.ID, Drained: true, ExpectedRevision: &acquired.DrainRevision, DrainOwner: requestedOwner,
+		}); !errors.Is(err, pgx.ErrNoRows) {
+			t.Fatalf("same-state update adopted a legacy drain: %v", err)
+		}
+	}
+}
+
+// The database rejects unsupported owners and ownership on enabled nodes.
+func TestNodeDrainOwnerConstraint(t *testing.T) {
+	ctx, db := newTestStore(t)
+	node := createTestNode(t, ctx, db)
+	for _, tc := range []struct {
+		drained bool
+		owner   string
+	}{{true, "update"}, {false, "cleanup"}} {
+		if _, err := db.Pool().Exec(ctx, `UPDATE nodes SET drained=$2, drain_owner=$3 WHERE id=$1`, node.ID, tc.drained, tc.owner); err == nil {
+			t.Fatalf("accepted drained=%v owner=%q", tc.drained, tc.owner)
+		}
 	}
 }
 

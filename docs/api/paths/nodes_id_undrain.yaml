@@ -14,6 +14,7 @@ post:
   summary: Mark node as active (undrain)
   description: |
     Clears the drained flag for the specified node, allowing it to accept new run claims.
+    Clears drain ownership. The owner query parameter is not accepted.
   responses:
     '204':
       description: Node undrained
@@ -22,7 +23,7 @@ post:
           description: Revision after this update, including operator reassertions.
           schema: { type: integer, format: int64 }
     '400':
-      description: Bad Request (invalid node ID or expected revision)
+      description: Bad Request (invalid node ID or expected revision, or owner supplied)
     '404':
       description: Node not found
     '409':
