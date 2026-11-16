@@ -1,29 +1,6 @@
 module github.com/iw2rmb/ploy
 
-go 1.26.10
-
-require (
-	github.com/cenkalti/backoff/v5 v5.0.3
-	// NOTE: github.com/docker/docker removed — use moby Engine v29 SDK modules only.
-	github.com/docker/go-units v0.5.0
-	github.com/golang-jwt/jwt/v5 v5.3.0
-	github.com/google/uuid v1.6.0
-	github.com/jackc/pgx/v5 v5.9.2
-	// KSUID for time-sortable, globally unique identifiers (waves, runs, jobs).
-	// NanoID for compact, human-friendly identifiers (migs, repos, node keys).
-	github.com/matoous/go-nanoid/v2 v2.1.0
-	// Docker Engine v29 SDK modules (moby). Worker nodes require Docker Engine v29.0+.
-	// See docs/envs/README.md for environment and engine requirements.
-	github.com/moby/moby/api v1.52.0
-	github.com/moby/moby/client v0.2.1
-	github.com/pelletier/go-toml/v2 v2.2.4
-	github.com/prometheus/client_golang v1.23.2
-	github.com/segmentio/ksuid v1.0.4
-	github.com/shirou/gopsutil/v4 v4.25.10
-	github.com/spf13/cobra v1.10.2
-	github.com/tmaxmax/go-sse v0.11.0
-	gopkg.in/yaml.v3 v3.0.1
-)
+go 1.27.4
 
 require (
 	charm.land/bubbles/v2 v2.0.0
@@ -33,12 +10,32 @@ require (
 	github.com/aws/aws-sdk-go-v2/config v1.32.8
 	github.com/aws/aws-sdk-go-v2/credentials v1.19.8
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.97.3
+	github.com/cenkalti/backoff/v5 v5.0.3
 	github.com/charmbracelet/x/ansi v0.11.6
 	github.com/containerd/errdefs v1.0.0
+	// NOTE: github.com/docker/docker removed — use moby Engine v29 SDK modules only.
+	github.com/docker/go-units v0.5.0
+	github.com/golang-jwt/jwt/v5 v5.3.0
+	github.com/google/uuid v1.6.0
+	github.com/jackc/pgx/v5 v5.9.2
 	github.com/jackc/tern/v2 v2.4.1
+	// KSUID for time-sortable, globally unique identifiers (waves, runs, jobs).
+	// NanoID for compact, human-friendly identifiers (migs, repos, node keys).
+	github.com/matoous/go-nanoid/v2 v2.1.0
+	// Docker Engine v29 SDK modules (moby). Worker nodes require Docker Engine v29.0+.
+	// See docs/envs/README.md for environment and engine requirements.
+	github.com/moby/moby/api v1.52.0
+	github.com/moby/moby/client v0.2.1
+	github.com/pelletier/go-toml/v2 v2.2.4
+	github.com/prometheus/client_golang v1.23.2
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
+	github.com/segmentio/ksuid v1.0.4
+	github.com/shirou/gopsutil/v4 v4.25.10
+	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
+	github.com/tmaxmax/go-sse v0.11.0
 	golang.org/x/sys v0.45.0
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
