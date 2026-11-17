@@ -147,7 +147,7 @@ See [cleanup environment settings](envs/README.md) for age and volume options.
 `PLOY_NODE_CLEANUP_AGE` measures image retention from the last Ploy-managed use.
 The controller records immutable image IDs for direct job containers and nested
 containers created through the per-job Docker socket proxy. It refreshes these
-records at job or proxy completion.
+records at job completion.
 
 An unknown image receives the full retention interval from its first observation.
 Node restart clears the in-memory records, granting fresh grace when images are

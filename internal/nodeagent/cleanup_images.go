@@ -19,7 +19,7 @@ func (r *runController) recordImageUse(id string) {
 	r.imageLastUsed[id] = time.Now()
 }
 
-func (r *runController) invalidateImageUsage() {
+func (r *runController) invalidateImageUse() {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	// A failed inspection can hide use of an already tracked image. Restarting

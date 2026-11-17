@@ -119,7 +119,7 @@ func TestCleanupLockSubprocess(t *testing.T) {
 		t.Skip("subprocess helper")
 	}
 	t.Setenv("PLOY_NODE_MAINTENANCE_LOCK_FILE", path)
-	lock, err := tryMaintenanceCleanup(context.Background())
+	lock, err := tryAcquireMaintenanceExclusive(context.Background())
 	if err != nil || lock != nil {
 		t.Fatalf("parent lock not respected: lock=%v err=%v", lock, err)
 	}

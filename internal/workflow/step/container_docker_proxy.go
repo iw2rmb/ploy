@@ -54,7 +54,7 @@ func (r *containerRuntime) prepareDockerSocket(ctx context.Context, spec Contain
 	start := r.startDockerProxy
 	if start == nil {
 		start = func(ctx context.Context, mounts []ContainerMount, upstream, tmpDir string, owner DockerJobOwner) (*dockerSocketProxy, error) {
-			return startDockerSocketProxy(ctx, mounts, upstream, tmpDir, owner, r.imageUsage)
+			return startDockerSocketProxy(ctx, mounts, upstream, tmpDir, owner, r.imageUse)
 		}
 	}
 	owner, err := DockerJobOwnerFromLabels(spec.Labels)
@@ -91,7 +91,7 @@ func dockerHostSocketPathFromEnv(env map[string]string) string {
 	return socketPath
 }
 
-func startDockerSocketProxy(ctx context.Context, mounts []ContainerMount, upstream, tmpDir string, owner DockerJobOwner, usage *dockerImageUseSession) (*dockerSocketProxy, error) {
+func startDockerSocketProxy(ctx context.Context, mounts []ContainerMount, upstream, tmpDir string, owner DockerJobOwner, imageUse *dockerImageUseSession) (*dockerSocketProxy, error) {
 	dir, err := os.MkdirTemp(tmpDir, "docker-")
 	if err != nil {
 		return nil, fmt.Errorf("create Docker proxy directory: %w", err)
@@ -143,12 +143,10 @@ func startDockerSocketProxy(ctx context.Context, mounts []ContainerMount, upstre
 		Transport:     transport,
 		FlushInterval: -1,
 	}
-	var imageUsage *dockerImageUseSession
-	if usage != nil {
-		imageUsage = newDockerImageUseSession(usage.note, usage.invalidate)
-		forward.ModifyResponse = imageUsage.inspectCreateResponse(docker)
+	if imageUse != nil {
+		forward.ModifyResponse = imageUse.inspectCreateResponse(docker)
 	}
-	handler := dockerJobRequestHandler(projection, owner, imageUsage.requestHandler(docker, forward))
+	handler := dockerJobRequestHandler(projection, owner, imageUse.requestHandler(docker, forward))
 	var mu sync.Mutex
 	connections := make(map[net.Conn]struct{})
 	server := &http.Server{
@@ -196,7 +194,6 @@ func startDockerSocketProxy(ctx context.Context, mounts []ContainerMount, upstre
 		cleanupCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 		cleanupErr := RemoveDockerJobResources(cleanupCtx, docker, owner)
-		imageUsage.close()
 		transport.CloseIdleConnections()
 		return errors.Join(cleanupErr, docker.Close(), os.RemoveAll(dir))
 	}

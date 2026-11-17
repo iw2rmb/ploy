@@ -34,7 +34,7 @@ func (r *runController) tryCleanup() {
 	// suppress the only cleanup opportunity after finalization.
 	ctx, cancel := context.WithTimeout(r.nodeCtx, nodeCleanupTimeout)
 	defer cancel()
-	lock, err := tryMaintenanceCleanup(ctx)
+	lock, err := tryAcquireMaintenanceExclusive(ctx)
 	if err != nil {
 		slog.Error("node cleanup maintenance lock failed", "error", err)
 		return

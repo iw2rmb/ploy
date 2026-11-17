@@ -69,7 +69,7 @@ func TestContainerRuntimeImageUseRefreshesAtClose(t *testing.T) {
 		t.Run(fmt.Sprint(pull), func(t *testing.T) {
 			fake := &imageUseDocker{fakeDockerClient: &fakeDockerClient{createResult: client.ContainerCreateResult{ID: "job"}, inspectResult: client.ContainerInspectResult{Container: container.InspectResponse{Image: "platform-id"}}}, ids: map[string]string{"job:latest": "sha256:before", "platform-id": "sha256:actual"}}
 			recorder := &imageUseRecorder{}
-			runtime := newContainerRuntimeWithClient(fake, ContainerRuntimeOptions{PullImage: pull, RecordImageUse: recorder.record, InvalidateImageUsage: recorder.reset})
+			runtime := newContainerRuntimeWithClient(fake, ContainerRuntimeOptions{PullImage: pull, RecordImageUse: recorder.record, InvalidateImageUse: recorder.reset})
 			if _, err := runtime.Create(context.Background(), ContainerSpec{Image: "job:latest"}); err != nil {
 				t.Fatal(err)
 			}
@@ -105,7 +105,7 @@ func TestContainerRuntimeSuccessfulPullMissingIdentityInvalidatesUsage(t *testin
 		inspectImageErr:  errdefs.ErrNotFound.WithMessage("image disappeared after pull"),
 	}
 	recorder := &imageUseRecorder{}
-	runtime := newContainerRuntimeWithClient(fake, ContainerRuntimeOptions{PullImage: true, RecordImageUse: recorder.record, InvalidateImageUsage: recorder.reset})
+	runtime := newContainerRuntimeWithClient(fake, ContainerRuntimeOptions{PullImage: true, RecordImageUse: recorder.record, InvalidateImageUse: recorder.reset})
 	if _, err := runtime.Create(context.Background(), ContainerSpec{Image: "job:latest"}); err == nil {
 		t.Fatal("create failure was lost")
 	}
@@ -124,7 +124,7 @@ func TestContainerRuntimeSuccessfulPullMissingIdentityInvalidatesUsage(t *testin
 }
 
 // An uncertain session resets all observations again before refreshing its known identities at close.
-func TestDockerImageUsageUncertaintySurvivesUntilClose(t *testing.T) {
+func TestDockerImageUseUncertaintySurvivesUntilClose(t *testing.T) {
 	recorder := &imageUseRecorder{}
 	session := newDockerImageUseSession(recorder.record, recorder.reset)
 	session.observeImage(context.Background(), &imageUseDocker{fakeDockerClient: &fakeDockerClient{}, inspectImageErr: errors.New("Docker unavailable")}, "unknown:latest", false)
@@ -142,7 +142,7 @@ func TestDockerImageUsageUncertaintySurvivesUntilClose(t *testing.T) {
 	}
 }
 
-func imageUsageTestProxy(t *testing.T, handler http.HandlerFunc, session *dockerImageUseSession) (*dockerSocketProxy, *http.Client) {
+func imageUseTestProxy(t *testing.T, handler http.HandlerFunc, session *dockerImageUseSession) (*dockerSocketProxy, *http.Client) {
 	t.Helper()
 	root, err := os.MkdirTemp("/tmp", "ploy-iu-")
 	if err != nil {
@@ -184,7 +184,7 @@ func imageUsageTestProxy(t *testing.T, handler http.HandlerFunc, session *docker
 	return proxy, &http.Client{Transport: transport, Timeout: 5 * time.Second}
 }
 
-func imageUsagePost(t *testing.T, httpClient *http.Client, path, body string) string {
+func imageUsePost(t *testing.T, httpClient *http.Client, path, body string) string {
 	t.Helper()
 	response, err := httpClient.Post("http://docker/v1.52/"+path, "application/json", strings.NewReader(body))
 	if err != nil {
@@ -210,7 +210,7 @@ func TestDockerProxyImageUseSurvivesAutoRemove(t *testing.T) {
 			var mu sync.Mutex
 			removed := false
 			receivedImage := ""
-			proxy, httpClient := imageUsageTestProxy(t, func(w http.ResponseWriter, r *http.Request) {
+			proxy, httpClient := imageUseTestProxy(t, func(w http.ResponseWriter, r *http.Request) {
 				mu.Lock()
 				defer mu.Unlock()
 				switch dockerAPIPath(r.URL.Path) {
@@ -238,7 +238,7 @@ func TestDockerProxyImageUseSurvivesAutoRemove(t *testing.T) {
 					http.NotFound(w, r)
 				}
 			}, session)
-			body := imageUsagePost(t, httpClient, "containers/create", `{"Image":"db:latest","HostConfig":{"AutoRemove":true}}`)
+			body := imageUsePost(t, httpClient, "containers/create", `{"Image":"db:latest","HostConfig":{"AutoRemove":true}}`)
 			if !strings.Contains(body, `"Id":"nested"`) {
 				t.Fatalf("create response changed: %s", body)
 			}
@@ -250,15 +250,15 @@ func TestDockerProxyImageUseSurvivesAutoRemove(t *testing.T) {
 				t.Errorf("forwarded image=%q", receivedImage)
 			}
 			mu.Unlock()
-			imageUsagePost(t, httpClient, "containers/nested/"+action, "")
+			imageUsePost(t, httpClient, "containers/nested/"+action, "")
 			if err := proxy.Close(); err != nil {
 				t.Fatal(err)
 			}
-			if count, resets := recorder.counts("sha256:actual"); count != 3 || resets != 0 {
+			if count, resets := recorder.counts("sha256:actual"); count != 2 || resets != 0 {
 				t.Fatalf("proxy completion records=%d resets=%d", count, resets)
 			}
 			session.close()
-			if count, resets := recorder.counts("sha256:actual"); count != 4 || resets != 0 {
+			if count, resets := recorder.counts("sha256:actual"); count != 3 || resets != 0 {
 				t.Fatalf("runtime completion records=%d resets=%d", count, resets)
 			}
 		})
@@ -273,7 +273,7 @@ func TestDockerProxyImagePullRecordsResolvedImage(t *testing.T) {
 			session := newDockerImageUseSession(recorder.record, recorder.reset)
 			var mu sync.Mutex
 			pulled := false
-			proxy, httpClient := imageUsageTestProxy(t, func(w http.ResponseWriter, r *http.Request) {
+			proxy, httpClient := imageUseTestProxy(t, func(w http.ResponseWriter, r *http.Request) {
 				mu.Lock()
 				defer mu.Unlock()
 				switch dockerAPIPath(r.URL.Path) {
@@ -292,13 +292,13 @@ func TestDockerProxyImagePullRecordsResolvedImage(t *testing.T) {
 					http.NotFound(w, r)
 				}
 			}, session)
-			imageUsagePost(t, httpClient, "images/create?fromImage=db&tag=latest", "")
+			imageUsePost(t, httpClient, "images/create?fromImage=db&tag=latest", "")
 			if err := proxy.Close(); err != nil {
 				t.Fatal(err)
 			}
-			want := 2
+			want := 1
 			if cached {
-				want = 3
+				want = 2
 			}
 			if count, resets := recorder.counts("sha256:downloaded"); count != want || resets != 0 {
 				t.Fatalf("pull records=%d want=%d resets=%d", count, want, resets)

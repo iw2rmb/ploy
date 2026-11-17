@@ -21,7 +21,7 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-func (r *runController) cleanupRunState(ctx context.Context, runID types.RunID) (types.RunSummary, error) {
+func (r *runController) fetchRunCleanupState(ctx context.Context, runID types.RunID) (types.RunSummary, error) {
 	if r.uploader == nil {
 		return types.RunSummary{}, fmt.Errorf("cleanup run reader is unavailable")
 	}
@@ -41,7 +41,9 @@ func (r *runController) cleanupRunState(ctx context.Context, runID types.RunID) 
 	return run, nil
 }
 
-func (r *runController) pruneExpiredRunData(ctx context.Context, docker cleanupDockerClient, mountInfoPath string) error {
+// pruneExpiredRunData reuses one container and host-mount snapshot. The exclusive
+// maintenance lock held by the pass excludes Ploy writers and host maintenance.
+func (r *runController) pruneExpiredRunData(ctx context.Context, containers []container.InspectResponse, mountInfoPath string) error {
 	root := cacheRootDir()
 	if _, err := os.Lstat(root); os.IsNotExist(err) {
 		return nil
@@ -55,6 +57,10 @@ func (r *runController) pruneExpiredRunData(ctx context.Context, docker cleanupD
 	if err != nil {
 		return err
 	}
+	mounts, err := readHostMountTargets(mountInfoPath)
+	if err != nil {
+		return err
+	}
 	var passErr error
 	for _, entry := range entries {
 		if err := ctx.Err(); err != nil {
@@ -64,7 +70,7 @@ func (r *runController) pruneExpiredRunData(ctx context.Context, docker cleanupD
 		if err := runID.UnmarshalText([]byte(entry.Name())); err != nil {
 			continue
 		}
-		if err := r.pruneRunData(ctx, runID, docker, mountInfoPath); err != nil {
+		if err := r.pruneRunData(ctx, runID, containers, mounts); err != nil {
 			slog.Error("preserve run cleanup data", "run_id", runID, "error", err)
 			passErr = errors.Join(passErr, err)
 		}
@@ -72,7 +78,7 @@ func (r *runController) pruneExpiredRunData(ctx context.Context, docker cleanupD
 	return passErr
 }
 
-func (r *runController) pruneRunData(ctx context.Context, runID types.RunID, docker cleanupDockerClient, mountInfoPath string) error {
+func (r *runController) pruneRunData(ctx context.Context, runID types.RunID, containers []container.InspectResponse, mounts []string) error {
 	var paths []string
 	for _, path := range []string{workspaceDir(runID), runRuntimeShareDir(runID)} {
 		if _, err := os.Lstat(path); os.IsNotExist(err) {
@@ -88,23 +94,15 @@ func (r *runController) pruneRunData(ctx context.Context, runID types.RunID, doc
 	if len(paths) == 0 {
 		return nil
 	}
-	observed, err := r.cleanupRunState(ctx, runID)
+	observed, err := r.fetchRunCleanupState(ctx, runID)
 	if err != nil || !observed.CleanupEligible {
 		return err
 	}
 	for _, path := range paths {
-		mounts, err := cleanupMountTargets(mountInfoPath)
-		if err != nil {
-			return err
-		}
-		containers, err := inspectCleanupContainers(ctx, docker)
-		if err != nil {
-			return err
-		}
 		if err := checkCleanupPath(path, mounts, containers, r.cfg.NodeID.String()); err != nil {
 			return err
 		}
-		current, err := r.cleanupRunState(ctx, runID)
+		current, err := r.fetchRunCleanupState(ctx, runID)
 		if err != nil {
 			return err
 		}
@@ -141,7 +139,7 @@ func cleanupCanonicalDirectory(path string) error {
 	return nil
 }
 
-func cleanupMountTargets(path string) ([]string, error) {
+func readHostMountTargets(path string) ([]string, error) {
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, fmt.Errorf("read cleanup host mounts: %w", err)

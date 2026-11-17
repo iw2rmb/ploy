@@ -130,7 +130,8 @@ func TestCleanupActivityPreservesUnknownActivity(t *testing.T) {
 	}{
 		{name: "stopped", state: container.State{Status: container.StateExited}},
 		{name: "running", state: container.State{Status: container.StateRunning, Running: true}, wantErr: true},
-		{name: "created job", state: container.State{Status: container.StateCreated}, wantErr: true},
+		{name: "created job", state: container.State{Status: container.StateCreated}},
+		{name: "created job with task", state: container.State{Status: container.StateCreated}, tasks: map[string]bool{"job": true}, wantErr: true},
 		{name: "stale pid", state: container.State{Status: container.StateExited, Pid: 42}, wantErr: true},
 		{name: "remaining task", state: container.State{Status: container.StateExited}, tasks: map[string]bool{"job": true}, wantErr: true},
 		{name: "container lease", state: container.State{Status: container.StateExited}, leases: map[string]bool{"job": true}},
@@ -167,8 +168,12 @@ func TestCleanupDockerPreservesDeletionPolicy(t *testing.T) {
 			} {
 				f.containers = append(f.containers, container.InspectResponse{ID: tc.id, State: &container.State{Status: tc.status}, Created: now.Add(-tc.age).Format(time.RFC3339Nano)})
 			}
-			if err := pruneCleanupDocker(context.Background(), f, f.containers, now, 24*time.Hour, "24h", volumes); err != nil {
+			remaining, err := pruneCleanupDocker(context.Background(), f, f.containers, now, 24*time.Hour, "24h", volumes)
+			if err != nil {
 				t.Fatal(err)
+			}
+			if len(remaining) != 3 || remaining[0].ID != "boundary" || remaining[1].ID != "recent" || remaining[2].ID != "running" {
+				t.Fatalf("remaining %+v", remaining)
 			}
 			if !reflect.DeepEqual(f.removed, []string{"old exited", "old created", "old dead"}) {
 				t.Fatalf("removed %v", f.removed)
@@ -246,7 +251,7 @@ func TestCleanupRunDataUsesServerEligibilityAndIdentity(t *testing.T) {
 			}))
 			defer server.Close()
 			r := &runController{cfg: Config{ServerURL: server.URL}, uploader: &baseUploader{client: server.Client()}}
-			err := r.pruneExpiredRunData(context.Background(), &cleanupDockerFixture{}, mountInfo)
+			err := r.pruneExpiredRunData(context.Background(), nil, mountInfo)
 			if (err != nil) != tc.wantErr {
 				t.Fatalf("error=%v, want=%v", err, tc.wantErr)
 			}
@@ -316,7 +321,7 @@ func TestCleanupMountTargets(t *testing.T) {
 			if err := os.WriteFile(path, []byte(tc.data), 0600); err != nil {
 				t.Fatal(err)
 			}
-			got, err := cleanupMountTargets(path)
+			got, err := readHostMountTargets(path)
 			if (err != nil) != tc.wantErr || !reflect.DeepEqual(got, tc.want) {
 				t.Fatalf("got=%v error=%v", got, err)
 			}

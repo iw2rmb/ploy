@@ -192,7 +192,7 @@ func (r *runController) initExecutionContext(
 		RegistryAuthConfigFile:    resolveDockerRegistryAuthConfigFile(),
 		RegistryAuthRefreshSocket: resolveDockerRegistryAuthRefreshSocket(),
 		RecordImageUse:            r.recordImageUse,
-		InvalidateImageUsage:      r.invalidateImageUsage,
+		InvalidateImageUse:        r.invalidateImageUse,
 	})
 	if err != nil {
 		return executionContext{}, nil, fmt.Errorf("create container runtime: %w", err)

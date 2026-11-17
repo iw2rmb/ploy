@@ -47,7 +47,7 @@ func acquireMaintenanceActivity(ctx context.Context) (*os.File, error) {
 }
 
 // A busy lock is a skipped attempt. Cleanup never waits for other writers.
-func tryMaintenanceCleanup(ctx context.Context) (*os.File, error) {
+func tryAcquireMaintenanceExclusive(ctx context.Context) (*os.File, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}

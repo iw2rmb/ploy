@@ -44,16 +44,16 @@ func TestCleanupDockerActivityInspection(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		tasks, err := cleanupContainerdIDs(ctx, "tasks")
+		tasks, err := listContainerdIDs(ctx, "tasks")
 		if err != nil {
 			return err
 		}
-		leases, err := cleanupContainerdIDs(ctx, "leases")
+		leases, err := listContainerdIDs(ctx, "leases")
 		if err != nil {
 			return err
 		}
 		return checkCleanupActivity(ctx, containers, tasks, leases, func(ctx context.Context) ([]cleanupBuildCacheRecord, error) {
-			return cleanupBuildCache(ctx, docker)
+			return inspectBuildCacheUsage(ctx, docker)
 		})
 	}
 	if err := inspect(); err == nil || !strings.Contains(err.Error(), "unreconciled job container") {
@@ -63,7 +63,7 @@ func TestCleanupDockerActivityInspection(t *testing.T) {
 	if err := inspect(); err != nil {
 		t.Fatalf("stopped resource inspection: %v", err)
 	}
-	if _, err := cleanupBuildCache(ctx, docker); err != nil {
+	if _, err := inspectBuildCacheUsage(ctx, docker); err != nil {
 		t.Fatalf("real BuildKit inspection: %v", err)
 	}
 	root := t.TempDir()
@@ -81,7 +81,7 @@ func TestCleanupDockerActivityInspection(t *testing.T) {
 			t.Errorf("unmount test descendant: %v: %s", err, out)
 		}
 	}()
-	targets, err := cleanupMountTargets(cleanupHostMountInfo)
+	targets, err := readHostMountTargets(cleanupHostMountInfo)
 	if err != nil {
 		t.Fatal(err)
 	}

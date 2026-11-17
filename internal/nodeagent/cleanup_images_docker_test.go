@@ -21,12 +21,12 @@ import (
 	"github.com/moby/moby/client"
 )
 
-type imageUsageDockerRecorder struct {
+type imageUseDockerRecorder struct {
 	*client.Client
 	removals []client.ImageRemoveOptions
 }
 
-func (d *imageUsageDockerRecorder) ImageRemove(ctx context.Context, image string, options client.ImageRemoveOptions) (client.ImageRemoveResult, error) {
+func (d *imageUseDockerRecorder) ImageRemove(ctx context.Context, image string, options client.ImageRemoveOptions) (client.ImageRemoveResult, error) {
 	d.removals = append(d.removals, options)
 	return d.Client.ImageRemove(ctx, image, options)
 }
@@ -79,7 +79,7 @@ func TestCleanupImagesDockerLastUseAndAliases(t *testing.T) {
 	case "x86_64":
 		architecture = "amd64"
 	}
-	writeImageUsageArchive(t, archive, tags, architecture)
+	writeImageUseArchive(t, archive, tags, architecture)
 	command("load", "--input", archive)
 	registry := command("run", "--pull=never", "-d", "--publish", "127.0.0.1::5000", "registry:2")
 	removeContainer(registry)
@@ -126,7 +126,7 @@ func TestCleanupImagesDockerLastUseAndAliases(t *testing.T) {
 	t.Logf("container.Image=%s resolves to canonical image %s; aliases=%v digests=%v", inspected.Container.Image, canonical.ID, image.RepoTags, image.RepoDigests)
 	now := time.Now()
 	r := &runController{imageLastUsed: map[string]time.Time{image.ID: now.Add(-25 * time.Hour)}}
-	recorder := &imageUsageDockerRecorder{Client: docker}
+	recorder := &imageUseDockerRecorder{Client: docker}
 	if err := r.pruneCleanupImages(ctx, recorder, []container.InspectResponse{inspected.Container}, now, 24*time.Hour); err != nil {
 		t.Fatal(err)
 	}
@@ -160,7 +160,7 @@ func TestCleanupImagesDockerLastUseAndAliases(t *testing.T) {
 	}
 }
 
-func writeImageUsageArchive(t *testing.T, path string, tags []string, architecture string) {
+func writeImageUseArchive(t *testing.T, path string, tags []string, architecture string) {
 	t.Helper()
 	layer := new(bytes.Buffer)
 	writer := tar.NewWriter(layer)

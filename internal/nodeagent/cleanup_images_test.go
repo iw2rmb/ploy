@@ -76,7 +76,7 @@ func TestCleanupImagesGraceAndInvalidation(t *testing.T) {
 		t.Fatal("recently used image removed")
 	}
 	r.imageLastUsed["image"] = now.Add(-48 * time.Hour)
-	r.invalidateImageUsage()
+	r.invalidateImageUse()
 	if err := r.pruneCleanupImages(context.Background(), f, nil, now, 24*time.Hour); err != nil {
 		t.Fatal(err)
 	}

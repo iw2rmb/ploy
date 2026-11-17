@@ -51,11 +51,11 @@ func (r *runController) cleanupNode(ctx context.Context) error {
 		return fmt.Errorf("create cleanup Docker client: %w", err)
 	}
 	defer docker.Close()
-	tasks, err := cleanupContainerdIDs(ctx, "tasks")
+	tasks, err := listContainerdIDs(ctx, "tasks")
 	if err != nil {
 		return err
 	}
-	leases, err := cleanupContainerdIDs(ctx, "leases")
+	leases, err := listContainerdIDs(ctx, "leases")
 	if err != nil {
 		return err
 	}
@@ -64,20 +64,22 @@ func (r *runController) cleanupNode(ctx context.Context) error {
 		return err
 	}
 	if err := checkCleanupActivity(ctx, containers, tasks, leases, func(ctx context.Context) ([]cleanupBuildCacheRecord, error) {
-		return cleanupBuildCache(ctx, docker)
+		return inspectBuildCacheUsage(ctx, docker)
 	}); err != nil {
 		return err
 	}
-	if err := pruneCleanupDocker(ctx, docker, containers, time.Now(), age, ageText, os.Getenv("PLOY_NODE_PRUNE_DOCKER_VOLUMES") == "true"); err != nil {
+	now := time.Now()
+	containers, err = pruneCleanupDocker(ctx, docker, containers, now, age, ageText, os.Getenv("PLOY_NODE_PRUNE_DOCKER_VOLUMES") == "true")
+	if err != nil {
 		return err
 	}
-	if err := r.pruneCleanupImages(ctx, docker, containers, time.Now(), age); err != nil {
+	if err := r.pruneCleanupImages(ctx, docker, containers, now, age); err != nil {
 		return err
 	}
-	if err := pruneCleanupGitClones(ctx, age, time.Now()); err != nil {
+	if err := pruneCleanupGitClones(ctx, age, now); err != nil {
 		return err
 	}
-	return r.pruneExpiredRunData(ctx, docker, cleanupHostMountInfo)
+	return r.pruneExpiredRunData(ctx, containers, cleanupHostMountInfo)
 }
 
 func parseCleanupAge(value string) (time.Duration, error) {
@@ -92,19 +94,14 @@ func parseCleanupAge(value string) (time.Duration, error) {
 	default:
 		return 0, fmt.Errorf("cleanup age must use h or m suffix: %q", value)
 	}
-	for _, digit := range value[:len(value)-1] {
-		if digit < '0' || digit > '9' {
-			return 0, fmt.Errorf("invalid cleanup age: %q", value)
-		}
-	}
-	count, err := strconv.ParseInt(value[:len(value)-1], 10, 64)
-	if err != nil || count <= 0 || count > int64((1<<63-1)/unit) {
+	count, err := strconv.ParseUint(value[:len(value)-1], 10, 63)
+	if err != nil || count == 0 || count > uint64((1<<63-1)/unit) {
 		return 0, fmt.Errorf("invalid cleanup age: %q", value)
 	}
 	return time.Duration(count) * unit, nil
 }
 
-func cleanupContainerdIDs(ctx context.Context, kind string) (map[string]bool, error) {
+func listContainerdIDs(ctx context.Context, kind string) (map[string]bool, error) {
 	out, err := exec.CommandContext(ctx, "/usr/bin/ctr", "--address", "/run/containerd/containerd.sock", "--namespace", "moby", kind, "list", "-q").Output()
 	if err != nil {
 		return nil, fmt.Errorf("inspect containerd %s: %w", kind, err)
@@ -155,7 +152,9 @@ func checkCleanupActivity(ctx context.Context, containers []container.InspectRes
 			continue
 		}
 		s := c.State
-		if (s.Status != container.StateExited && s.Status != container.StateDead) || s.Running || s.Restarting || s.Paused || s.Pid != 0 || tasks[c.ID] {
+		// A failed start leaves a created container. The exclusive lock excludes
+		// an in-flight create, and rejecting it would block its own removal.
+		if (s.Status != container.StateCreated && s.Status != container.StateExited && s.Status != container.StateDead) || s.Running || s.Restarting || s.Paused || s.Pid != 0 || tasks[c.ID] {
 			return fmt.Errorf("unreconciled job container: %s", c.ID)
 		}
 	}
@@ -196,7 +195,7 @@ func checkCleanupActivity(ctx context.Context, containers []container.InspectRes
 	return nil
 }
 
-func cleanupBuildCache(ctx context.Context, docker *client.Client) ([]cleanupBuildCacheRecord, error) {
+func inspectBuildCacheUsage(ctx context.Context, docker *client.Client) ([]cleanupBuildCacheRecord, error) {
 	transport := &http.Transport{DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
 		return docker.Dialer()(ctx)
 	}}
@@ -216,29 +215,31 @@ func cleanupBuildCache(ctx context.Context, docker *client.Client) ([]cleanupBui
 	return response.BuildCacheUsage.Items, nil
 }
 
-func pruneCleanupDocker(ctx context.Context, docker cleanupDockerClient, containers []container.InspectResponse, now time.Time, age time.Duration, ageText string, volumes bool) error {
+// pruneCleanupDocker returns the containers that remain, so later phases do not
+// treat a removed container as an image or path reference.
+func pruneCleanupDocker(ctx context.Context, docker cleanupDockerClient, containers []container.InspectResponse, now time.Time, age time.Duration, ageText string, volumes bool) ([]container.InspectResponse, error) {
+	remaining := make([]container.InspectResponse, 0, len(containers))
 	for _, c := range containers {
 		created, err := time.Parse(time.RFC3339Nano, c.Created)
 		if err != nil {
-			return fmt.Errorf("parse container %s creation time: %w", c.ID, err)
+			return nil, fmt.Errorf("parse container %s creation time: %w", c.ID, err)
 		}
-		if c.State.Status != container.StateCreated && c.State.Status != container.StateExited && c.State.Status != container.StateDead {
-			continue
-		}
-		if !created.Before(now.Add(-age)) {
+		removable := c.State.Status == container.StateCreated || c.State.Status == container.StateExited || c.State.Status == container.StateDead
+		if !removable || !created.Before(now.Add(-age)) {
+			remaining = append(remaining, c)
 			continue
 		}
 		if _, err := docker.ContainerRemove(ctx, c.ID, client.ContainerRemoveOptions{RemoveVolumes: true}); err != nil {
-			return fmt.Errorf("remove expired container %s: %w", c.ID, err)
+			return nil, fmt.Errorf("remove expired container %s: %w", c.ID, err)
 		}
 	}
 	if _, err := docker.BuildCachePrune(ctx, client.BuildCachePruneOptions{All: true, Filters: make(client.Filters).Add("until", ageText)}); err != nil {
-		return fmt.Errorf("prune cleanup build cache: %w", err)
+		return nil, fmt.Errorf("prune cleanup build cache: %w", err)
 	}
 	if volumes {
 		if _, err := docker.VolumePrune(ctx, client.VolumePruneOptions{}); err != nil {
-			return fmt.Errorf("prune cleanup volumes: %w", err)
+			return nil, fmt.Errorf("prune cleanup volumes: %w", err)
 		}
 	}
-	return nil
+	return remaining, nil
 }

@@ -36,8 +36,8 @@ type ContainerRuntimeOptions struct {
 	RegistryAuthRefreshSocket string
 	// RecordImageUse receives immutable image IDs at use and runtime completion.
 	RecordImageUse func(imageID string)
-	// InvalidateImageUsage refreshes retention for all images when identity is uncertain.
-	InvalidateImageUsage func()
+	// InvalidateImageUse refreshes retention for all images when identity is uncertain.
+	InvalidateImageUse func()
 }
 
 // ContainerRuntime executes containers.
@@ -95,7 +95,7 @@ type containerRuntime struct {
 	opts             ContainerRuntimeOptions
 	dockerProxies    sync.Map
 	startDockerProxy func(context.Context, []ContainerMount, string, string, DockerJobOwner) (*dockerSocketProxy, error)
-	imageUsage       *dockerImageUseSession
+	imageUse         *dockerImageUseSession
 }
 
 // NewContainerRuntime constructs a Docker-backed container runtime.
@@ -106,13 +106,13 @@ func NewContainerRuntime(opts ContainerRuntimeOptions) (ContainerRuntime, error)
 	if err != nil {
 		return nil, fmt.Errorf("step: configure docker runtime: %w", err)
 	}
-	return &containerRuntime{client: cli, images: cli, stats: cli, opts: opts, imageUsage: newDockerImageUseSession(opts.RecordImageUse, opts.InvalidateImageUsage)}, nil
+	return &containerRuntime{client: cli, images: cli, stats: cli, opts: opts, imageUse: newDockerImageUseSession(opts.RecordImageUse, opts.InvalidateImageUse)}, nil
 }
 
 // newContainerRuntimeWithClient constructs a containerRuntime with
 // an injected dockerClientAPI. Used for testing with fake Docker clients.
 func newContainerRuntimeWithClient(cli dockerClientAPI, opts ContainerRuntimeOptions) *containerRuntime {
-	rt := &containerRuntime{client: cli, opts: opts, imageUsage: newDockerImageUseSession(opts.RecordImageUse, opts.InvalidateImageUsage)}
+	rt := &containerRuntime{client: cli, opts: opts, imageUse: newDockerImageUseSession(opts.RecordImageUse, opts.InvalidateImageUse)}
 	if img, ok := cli.(dockerImageAPI); ok {
 		rt.images = img
 	}
@@ -133,11 +133,11 @@ func (r *containerRuntime) Create(ctx context.Context, spec ContainerSpec) (hand
 	// is not enough.
 	if r.opts.PullImage {
 		if err := r.pullImage(ctx, spec.Image); err != nil {
-			r.imageUsage.invalidate()
+			r.imageUse.invalidate()
 			return "", err
 		}
 	}
-	r.imageUsage.observeImage(ctx, r.images, spec.Image, !r.opts.PullImage)
+	r.imageUse.observeImage(ctx, r.images, spec.Image, !r.opts.PullImage)
 	config := &container.Config{
 		Image:      spec.Image,
 		Cmd:        append([]string{}, spec.Command...),
@@ -179,7 +179,7 @@ func (r *containerRuntime) Create(ctx context.Context, spec ContainerSpec) (hand
 	if err != nil {
 		return "", fmt.Errorf("step: create container: %w", err)
 	}
-	r.imageUsage.observeContainer(ctx, r.client, r.images, created.ID)
+	r.imageUse.observeContainer(ctx, r.client, r.images, created.ID)
 	if proxy != nil {
 		r.dockerProxies.Store(ContainerHandle(created.ID), proxy)
 		proxyOwned = true
@@ -214,7 +214,6 @@ func hasMountTarget(mounts []ContainerMount, target string) bool {
 // Start launches the container. ContainerStart is async — the container may still
 // be initializing when Start returns successfully. Use Wait to block until exit.
 func (r *containerRuntime) Start(ctx context.Context, handle ContainerHandle) error {
-	r.imageUsage.observeContainer(ctx, r.client, r.images, string(handle))
 	_, err := r.client.ContainerStart(ctx, string(handle), client.ContainerStartOptions{})
 	if err != nil {
 		err = errors.Join(err, r.closeDockerProxy(handle))
@@ -265,7 +264,7 @@ func (r *containerRuntime) Close() error {
 		errs = append(errs, r.closeDockerProxy(key.(ContainerHandle)))
 		return true
 	})
-	r.imageUsage.close()
+	r.imageUse.close()
 	if closer, ok := r.client.(interface{ Close() error }); ok {
 		errs = append(errs, closer.Close())
 	}
