@@ -229,9 +229,15 @@ func TestClaimLoop_FieldMapping(t *testing.T) {
 			cfg := newAgentConfig(ts.URL)
 			claimer := setupClaimer(t, cfg, mock)
 
-			ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
-			_ = claimer.Start(ctx)
+			claimed, err := claimer.claimAndExecute(ctx)
+			if err != nil {
+				t.Fatalf("claimAndExecute: %v", err)
+			}
+			if !claimed {
+				t.Fatal("claimAndExecute did not claim work")
+			}
 
 			if !mock.startCalled {
 				t.Fatalf("controller.StartRun not called")
