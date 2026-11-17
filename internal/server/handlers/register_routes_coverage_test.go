@@ -49,7 +49,7 @@ func TestRegisterRoutesMatchesOpenAPI(t *testing.T) {
 	if err != nil {
 		t.Fatalf("events service: %v", err)
 	}
-	RegisterRoutes(registrar, st, bs, bp, eventsService, NewConfigHolder(nil), "test-secret", gitauth.Options{}, nil, nil, nil)
+	RegisterRoutes(registrar, st, bs, bp, eventsService, NewConfigHolder(nil), "test-secret", gitauth.Options{}, nil, nil, nil, nil)
 
 	registered, err := registeredRouteSet(registrar.patterns)
 	if err != nil {

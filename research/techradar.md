@@ -402,7 +402,7 @@ If metadata may contain several rows per repository and type, prefer repository-
 
 ## Implementation Contract
 
-The [Java dependency versions design](../design/techradar.md) defines the server endpoint.
+The [Java dependency versions API](../docs/api/paths/deployments_java_versions.yaml) defines the server endpoint.
 It replaces the standalone `ploy-java-tools` command proposed by this research.
 
 The endpoint searches all retained observations and joins JDK metadata by exact commit.

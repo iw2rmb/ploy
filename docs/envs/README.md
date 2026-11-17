@@ -358,6 +358,19 @@ GitLab source hydration:
 - `PLOY_GITLAB_TOKEN` — GitLab Personal Access Token used by `ployd` for source resolution and snapshot materialization.
 - `PLOY_SPECS_REPOS` — Optional comma-separated full Git repository URLs used by `ploy spec ls`. `ployd` reads the list at startup, rejects empty entries and normalized duplicates, and refreshes each repository's default branch beneath `PLOYD_CACHE_HOME`. The cache falls back to the system temporary directory when `PLOYD_CACHE_HOME` is unset.
 
+Trino dependency lookup:
+
+- `PLOY_TRINO_USER` — Trino user and HTTPS Basic authentication user for
+  `https://trino.dlh.t-infra.ru`.
+- `PLOY_TRINO_PASSWORD` — HTTPS Basic authentication password for that user.
+- `ployd` reads both credentials after server-target environment projection at
+  startup. Restart `ployd` after changing either credential.
+- If either credential is missing, the
+  [Java versions endpoint](../api/paths/deployments_java_versions.yaml) returns
+  `503`. Other routes remain available.
+- Configure these credentials for the server only. Keep them out of agent
+  environments and the named-spec environment allowlist.
+
 Named-spec compilation:
 
 - `PLOY_NAMED_SPECS_ENVS_ALLOWLIST` — Optional comma-separated names of server

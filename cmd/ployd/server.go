@@ -23,6 +23,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/server/scheduler"
 	"github.com/iw2rmb/ploy/internal/server/snapshot"
 	"github.com/iw2rmb/ploy/internal/server/speccatalog"
+	"github.com/iw2rmb/ploy/internal/server/techradar"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/store/ttlworker"
 )
@@ -142,6 +143,17 @@ func run(ctx context.Context, cfg config.Config, st store.Store, authorizer *aut
 	// Server-target consumption: apply server-target entries to process environment on startup.
 	applyServerTargetEnv(globalEnvMap)
 
+	trinoConfig := config.LoadTrinoFromEnv()
+	var javaVersions handlers.JavaVersionsLookup
+	if trinoConfig.User != "" && trinoConfig.Password != "" {
+		trinoDB, openErr := techradar.Open(trinoConfig.User, trinoConfig.Password)
+		if openErr != nil {
+			return fmt.Errorf("initialize Trino lookup")
+		}
+		defer trinoDB.Close()
+		javaVersions = techradar.New(trinoDB)
+	}
+
 	// Load global in entries from the store for ConfigHolder initialization.
 	var globalInEntries []store.ConfigIn
 	if st != nil {
@@ -193,7 +205,7 @@ func run(ctx context.Context, cfg config.Config, st store.Store, authorizer *aut
 	})
 
 	// Register HTTP routes.
-	handlers.RegisterRoutes(httpSrv, st, bs, bp, eventsService, configHolder, tokenSecret, gitAuth, snapshotService, specCatalog, []string(cfg.NamedSpecEnvAllowlist), gitLabTokenRegistry)
+	handlers.RegisterRoutes(httpSrv, st, bs, bp, eventsService, configHolder, tokenSecret, gitAuth, snapshotService, specCatalog, []string(cfg.NamedSpecEnvAllowlist), javaVersions, gitLabTokenRegistry)
 
 	// Initialize metrics server.
 	metricsSrv := metrics.NewServer(cfg.Metrics.Listen)

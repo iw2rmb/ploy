@@ -31,10 +31,11 @@ type routeDeps struct {
 	snapshots             repoSnapshotWriter
 	specCatalog           speccatalog.Catalog
 	namedSpecEnvAllowlist []string
+	javaVersions          JavaVersionsLookup
 }
 
 // RegisterRoutes mounts all HTTP endpoints on the given server.
-func RegisterRoutes(s routeRegistrar, st store.Store, bs blobstore.Store, bp *blobpersist.Service, eventsService *events.Service, configHolder *ConfigHolder, tokenSecret string, gitAuth gitauth.Options, snapshots repoSnapshotWriter, specCatalog speccatalog.Catalog, namedSpecEnvAllowlist []string, registries ...*gitlabtokens.Registry) {
+func RegisterRoutes(s routeRegistrar, st store.Store, bs blobstore.Store, bp *blobpersist.Service, eventsService *events.Service, configHolder *ConfigHolder, tokenSecret string, gitAuth gitauth.Options, snapshots repoSnapshotWriter, specCatalog speccatalog.Catalog, namedSpecEnvAllowlist []string, javaVersions JavaVersionsLookup, registries ...*gitlabtokens.Registry) {
 	var registry *gitlabtokens.Registry
 	if len(registries) > 0 {
 		registry = registries[0]
@@ -51,8 +52,10 @@ func RegisterRoutes(s routeRegistrar, st store.Store, bs blobstore.Store, bp *bl
 		snapshots:             snapshots,
 		specCatalog:           specCatalog,
 		namedSpecEnvAllowlist: slices.Clone(namedSpecEnvAllowlist),
+		javaVersions:          javaVersions,
 	}
 	registerHealthRoutes(s, deps)
+	s.RegisterRouteFunc("GET /v1/deployments/java/versions", javaVersionsHandler(deps.javaVersions), auth.RoleControlPlane)
 	registerConfigRoutes(s, deps)
 	registerTokenRoutes(s, deps)
 	registerBootstrapRoutes(s, deps)
