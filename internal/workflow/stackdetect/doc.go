@@ -12,7 +12,7 @@
 //
 // Currently supported:
 //   - Java with Maven (pom.xml)
-//   - Java with Gradle (build.gradle, build.gradle.kts)
+//   - Java with Gradle (build.gradle, build.gradle.kts, settings.gradle, settings.gradle.kts)
 //   - Go (go.mod)
 //   - Rust with Cargo (Cargo.toml, rust-toolchain.toml, rust-toolchain)
 //   - Python with pip or Poetry (.python-version, runtime.txt, pyproject.toml)
@@ -45,7 +45,10 @@
 //  2. kotlinOptions.jvmTarget (best-effort; used only if source/target are absent)
 //  3. java.toolchain.languageVersion
 //  4. javaVersion assignment
-//  5. gradle/libs.versions.toml [versions].jvmTarget
+//  5. gradle/libs.versions.toml [versions].jvmTarget or [versions].jdk
+//
+// A root settings.gradle(.kts) identifies Gradle without a root build script.
+// In that layout, Java release detection uses only the version catalog.
 //
 // # Error Handling
 //

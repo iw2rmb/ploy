@@ -28,19 +28,21 @@ func relPath(workspace, path string) string {
 type scanResult struct {
 	workspace string
 
-	hasPom           bool
-	hasGradleGroovy  bool
-	hasGradleKts     bool
-	hasGradle        bool
-	hasJava          bool
-	hasGo            bool
-	hasCargo         bool
-	hasRustToolchain bool
-	hasRust          bool
-	hasPyproject     bool
-	hasPythonVersion bool
-	hasRuntimeTxt    bool
-	hasPython        bool
+	hasPom                  bool
+	hasGradleGroovy         bool
+	hasGradleKts            bool
+	hasGradleSettingsGroovy bool
+	hasGradleSettingsKts    bool
+	hasGradle               bool
+	hasJava                 bool
+	hasGo                   bool
+	hasCargo                bool
+	hasRustToolchain        bool
+	hasRust                 bool
+	hasPyproject            bool
+	hasPythonVersion        bool
+	hasRuntimeTxt           bool
+	hasPython               bool
 
 	pyprojectLoaded            bool
 	pyprojectHasProjectSection bool
@@ -74,7 +76,9 @@ func scanWorkspace(workspace string) scanResult {
 	s.hasPom = fileExists(pomPath)
 	s.hasGradleGroovy = fileExists(gradleGroovyPath)
 	s.hasGradleKts = fileExists(gradleKtsPath)
-	s.hasGradle = s.hasGradleGroovy || s.hasGradleKts
+	s.hasGradleSettingsGroovy = fileExists(filepath.Join(workspace, "settings.gradle"))
+	s.hasGradleSettingsKts = fileExists(filepath.Join(workspace, "settings.gradle.kts"))
+	s.hasGradle = s.hasGradleGroovy || s.hasGradleKts || s.hasGradleSettingsGroovy || s.hasGradleSettingsKts
 	s.hasJava = s.hasPom || s.hasGradle
 
 	s.hasGo = fileExists(goModPath)
@@ -113,10 +117,8 @@ func scanWorkspace(workspace string) scanResult {
 		if s.hasPom {
 			s.evidence = append(s.evidence, EvidenceItem{Path: "pom.xml", Key: "build.file", Value: "exists"})
 		}
-		if s.hasGradleGroovy {
-			s.evidence = append(s.evidence, EvidenceItem{Path: "build.gradle", Key: "build.file", Value: "exists"})
-		} else if s.hasGradleKts {
-			s.evidence = append(s.evidence, EvidenceItem{Path: "build.gradle.kts", Key: "build.file", Value: "exists"})
+		if s.hasGradle {
+			s.evidence = append(s.evidence, EvidenceItem{Path: gradleRootFile(s), Key: "build.file", Value: "exists"})
 		}
 	}
 	if s.hasGo {
@@ -172,7 +174,7 @@ func (s *scanResult) checkAmbiguousOrUnknown() error {
 // from build files in the workspace.
 //
 // Supported languages (in detection order):
-//   - Java: pom.xml (Maven), build.gradle or build.gradle.kts (Gradle)
+//   - Java: pom.xml (Maven), build.gradle(.kts) or settings.gradle(.kts) (Gradle)
 //   - Go: Go module file
 //   - Rust: Cargo.toml, rust-toolchain.toml, rust-toolchain
 //   - Python: .python-version, runtime.txt, or pyproject.toml with Python markers
@@ -263,8 +265,19 @@ func detectJava(ctx context.Context, s scanResult) (*Observation, error) {
 		return detectMaven(ctx, s.workspace, filepath.Join(s.workspace, "pom.xml"))
 	}
 
-	// Prefer Kotlin DSL if present.
-	gradlePath := filepath.Join(s.workspace, gradleBuildFile(s))
+	// Settings-only roots can declare the Java release in the shared version catalog.
+	if !s.hasGradleGroovy && !s.hasGradleKts {
+		if observation, err := detectGradleVersionCatalogJavaVersion(s.workspace); observation != nil || err != nil {
+			return observation, err
+		}
+		return nil, &DetectionError{
+			Reason:   "unknown",
+			Message:  "no supported Java version configuration found in gradle/libs.versions.toml",
+			Evidence: s.evidence,
+		}
+	}
+
+	gradlePath := filepath.Join(s.workspace, gradleRootFile(s))
 	return detectGradle(ctx, s.workspace, gradlePath)
 }
 
@@ -281,17 +294,23 @@ func detectJavaTool(s scanResult) (string, error) {
 func javaAmbiguityError(s scanResult) *DetectionError {
 	return &DetectionError{
 		Reason:  "ambiguous",
-		Message: "both pom.xml and build.gradle(.kts) present; tool selection is ambiguous",
+		Message: "both pom.xml and " + gradleRootFile(s) + " present; tool selection is ambiguous",
 		Evidence: []EvidenceItem{
 			{Path: "pom.xml", Key: "build.file", Value: "exists"},
-			{Path: gradleBuildFile(s), Key: "build.file", Value: "exists"},
+			{Path: gradleRootFile(s), Key: "build.file", Value: "exists"},
 		},
 	}
 }
 
-func gradleBuildFile(s scanResult) string {
+func gradleRootFile(s scanResult) string {
 	if s.hasGradleKts {
 		return "build.gradle.kts"
 	}
-	return "build.gradle"
+	if s.hasGradleGroovy {
+		return "build.gradle"
+	}
+	if s.hasGradleSettingsKts {
+		return "settings.gradle.kts"
+	}
+	return "settings.gradle"
 }

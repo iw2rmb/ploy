@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -135,6 +136,103 @@ func TestDetect_Unknown(t *testing.T) {
 	}
 }
 
+func TestDetect_GradleSettingsRoot(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name          string
+		files         map[string]string
+		wantRelease   string
+		wantEvidence  EvidenceItem
+		wantErrorText string
+	}{
+		{
+			name: "included modules use catalog JVM target",
+			files: map[string]string{
+				"gradle/libs.versions.toml":                   "[versions]\njvmTarget = \"21\"\n",
+				"bom/build.gradle.kts":                        "plugins { `java-platform` }",
+				"le-credit-conveyor-camunda/build.gradle.kts": "val projectJvmTarget = libs.versions.jvmTarget.get()",
+			},
+			wantRelease:  "21",
+			wantEvidence: EvidenceItem{Path: "gradle/libs.versions.toml", Key: "versions.jvmTarget", Value: "21"},
+		},
+		{
+			name:         "catalog JDK normalizes legacy Java version",
+			files:        map[string]string{"gradle/libs.versions.toml": "[versions]\njdk = \"1.8\"\n"},
+			wantRelease:  "8",
+			wantEvidence: EvidenceItem{Path: "gradle/libs.versions.toml", Key: "versions.jdk", Value: "8"},
+		},
+		{
+			name:          "missing catalog leaves release unknown",
+			wantErrorText: "no supported Java version configuration",
+		},
+		{
+			name:          "catalog without Java keys leaves release unknown",
+			files:         map[string]string{"gradle/libs.versions.toml": "[versions]\nkotlin = \"2.3.21\"\n"},
+			wantErrorText: "no supported Java version configuration",
+		},
+		{
+			name:          "malformed catalog preserves parse error",
+			files:         map[string]string{"gradle/libs.versions.toml": "[versions\njvmTarget = \"21\"\n"},
+			wantErrorText: "failed to parse gradle/libs.versions.toml",
+		},
+		{
+			name:          "conflicting catalog values preserve conflict error",
+			files:         map[string]string{"gradle/libs.versions.toml": "[versions]\njvmTarget = \"17\"\njdk = \"21\"\n"},
+			wantErrorText: "version catalog jvmTarget and jdk differ",
+		},
+		{
+			name: "root Groovy build overrides catalog",
+			files: map[string]string{
+				"build.gradle":              "sourceCompatibility = 17",
+				"gradle/libs.versions.toml": "[versions]\njvmTarget = \"21\"\n",
+			},
+			wantRelease:  "17",
+			wantEvidence: EvidenceItem{Path: "build.gradle", Key: "sourceCompatibility", Value: "17"},
+		},
+		{
+			name: "root Kotlin build overrides Groovy build and catalog",
+			files: map[string]string{
+				"build.gradle":              "sourceCompatibility = 17",
+				"build.gradle.kts":          "sourceCompatibility = JavaVersion.VERSION_11",
+				"gradle/libs.versions.toml": "[versions]\njvmTarget = \"21\"\n",
+			},
+			wantRelease:  "11",
+			wantEvidence: EvidenceItem{Path: "build.gradle.kts", Key: "sourceCompatibility", Value: "11"},
+		},
+	}
+
+	for _, settingsFile := range []string{"settings.gradle", "settings.gradle.kts"} {
+		for _, tc := range cases {
+			t.Run(settingsFile+"/"+tc.name, func(t *testing.T) {
+				t.Parallel()
+				workspace := t.TempDir()
+				// Build-script expressions in settings must not override the catalog or supply a missing release.
+				writeDetectFile(t, workspace, settingsFile, "include(\"bom\", \"le-credit-conveyor-camunda\")\n// sourceCompatibility = 25\n")
+				for name, body := range tc.files {
+					writeDetectFile(t, workspace, name, body)
+				}
+
+				obs, err := Detect(context.Background(), workspace)
+				if tc.wantErrorText != "" {
+					detErr := assertDetectionError(t, err, "unknown")
+					if !strings.Contains(detErr.Message, tc.wantErrorText) {
+						t.Fatalf("error = %q, want %q", detErr.Message, tc.wantErrorText)
+					}
+					return
+				}
+				if err != nil {
+					t.Fatalf("Detect() error: %v", err)
+				}
+				assertObservation(t, obs, "java", "gradle", tc.wantRelease)
+				if len(obs.Evidence) != 1 || obs.Evidence[0] != tc.wantEvidence {
+					t.Fatalf("evidence = %+v, want %+v", obs.Evidence, tc.wantEvidence)
+				}
+			})
+		}
+	}
+}
+
 func TestDetect_Ambiguous(t *testing.T) {
 	type detectFunc = func(context.Context, string) (*Observation, error)
 
@@ -188,6 +286,30 @@ func TestDetect_Ambiguous(t *testing.T) {
 			tempFiles:    map[string]string{"pom.xml": "<project/>", "build.gradle.kts": "plugins {}"},
 			wantEvidence: []string{"pom.xml", "build.gradle.kts"},
 		},
+		{
+			name:         "Detect/maven-and-settings.gradle",
+			fn:           Detect,
+			tempFiles:    map[string]string{"pom.xml": "<project/>", "settings.gradle": ""},
+			wantEvidence: []string{"pom.xml", "settings.gradle"},
+		},
+		{
+			name:         "Detect/maven-and-settings.gradle.kts",
+			fn:           Detect,
+			tempFiles:    map[string]string{"pom.xml": "<project/>", "settings.gradle.kts": ""},
+			wantEvidence: []string{"pom.xml", "settings.gradle.kts"},
+		},
+		{
+			name:         "DetectTool/maven-and-settings.gradle",
+			fn:           DetectTool,
+			tempFiles:    map[string]string{"pom.xml": "<project/>", "settings.gradle": ""},
+			wantEvidence: []string{"pom.xml", "settings.gradle"},
+		},
+		{
+			name:         "DetectTool/maven-and-settings.gradle.kts",
+			fn:           DetectTool,
+			tempFiles:    map[string]string{"pom.xml": "<project/>", "settings.gradle.kts": ""},
+			wantEvidence: []string{"pom.xml", "settings.gradle.kts"},
+		},
 	}
 
 	ctx := context.Background()
@@ -216,10 +338,12 @@ func TestDetect_Ambiguous(t *testing.T) {
 
 func TestDetectTool_Success(t *testing.T) {
 	cases := []struct {
-		name      string
-		workspace string
-		wantLang  string
-		wantTool  string
+		name         string
+		workspace    string
+		tempFiles    map[string]string
+		wantEvidence string
+		wantLang     string
+		wantTool     string
 	}{
 		{
 			name:      "maven/no-java-version",
@@ -236,12 +360,31 @@ func TestDetectTool_Success(t *testing.T) {
 			workspace: filepath.Join("testdata", "python", "python310-pyproject"),
 			wantLang:  "python", wantTool: "pip",
 		},
+		{
+			name:      "gradle/settings.gradle-without-release",
+			tempFiles: map[string]string{"settings.gradle": ""},
+			wantLang:  "java", wantTool: "gradle",
+			wantEvidence: "settings.gradle",
+		},
+		{
+			name:      "gradle/settings.gradle.kts-without-release",
+			tempFiles: map[string]string{"settings.gradle.kts": ""},
+			wantLang:  "java", wantTool: "gradle",
+			wantEvidence: "settings.gradle.kts",
+		},
 	}
 
 	ctx := context.Background()
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			obs, err := DetectTool(ctx, tc.workspace)
+			workspace := tc.workspace
+			if tc.tempFiles != nil {
+				workspace = t.TempDir()
+				for name, body := range tc.tempFiles {
+					writeDetectFile(t, workspace, name, body)
+				}
+			}
+			obs, err := DetectTool(ctx, workspace)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -250,6 +393,9 @@ func TestDetectTool_Success(t *testing.T) {
 			}
 			if obs.Tool != tc.wantTool {
 				t.Errorf("Tool = %q, want %q", obs.Tool, tc.wantTool)
+			}
+			if tc.wantEvidence != "" {
+				assertEvidencePath(t, obs.Evidence, tc.wantEvidence)
 			}
 			if obs.Release != nil {
 				t.Errorf("Release = %v, want nil", *obs.Release)
@@ -333,6 +479,9 @@ func assertEvidencePath(t *testing.T, evidence []EvidenceItem, path string) {
 func writeDetectFile(t *testing.T, dir, name, body string) {
 	t.Helper()
 	path := filepath.Join(dir, name)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatalf("create parent for %s: %v", path, err)
+	}
 	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
 		t.Fatalf("write file %s: %v", path, err)
 	}
