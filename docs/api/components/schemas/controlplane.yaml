@@ -1121,10 +1121,9 @@ Node:
     drained: { type: boolean }
     drain_revision: { type: integer, format: int64, minimum: 0 }
     drain_owner:
-      type: string
-      nullable: true
+      type: [string, "null"]
       enum: [cleanup, null]
-      description: Cleanup ownership, or null when cleanup cannot adopt the drain. Always present.
+      description: The value is `cleanup` when cleanup owns the current drain; otherwise null. Always present.
     created_at: { type: string, format: date-time }
   required:
     - id

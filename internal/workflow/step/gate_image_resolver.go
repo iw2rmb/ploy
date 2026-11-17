@@ -73,15 +73,26 @@ func resolveImageForExpectation(
 	if err != nil {
 		return "", fmt.Errorf("%w: %w", errImageMapping, err)
 	}
-	image, err := selectImage(rules, exp)
+	rule, err := selectImageRule(rules, exp)
 	if err != nil {
 		return "", fmt.Errorf("%w: %w", errImageRuleMatch, err)
+	}
+	// The runtime stack fills the placeholders: short rules (for example
+	// language-only selectors) cannot fill them from their own selector.
+	image, err := contracts.ExpandImageTemplate(rule.Image, &exp)
+	if err != nil {
+		return "", fmt.Errorf("%w: resolve image template: %w", errImageMapping, err)
+	}
+	image = strings.TrimSpace(image)
+	if image == "" {
+		return "", fmt.Errorf("%w: image template %q resolves to an empty image", errImageMapping, rule.Image)
 	}
 	return image, nil
 }
 
 // loadImageRules returns the catalog rules followed by the override rules, so
 // later rules have higher precedence. An empty catalogPath skips the catalog.
+// The overrides come from a validated MigSpec (build_gate.images).
 func loadImageRules(
 	catalogPath string,
 	overrides []contracts.BuildGateImageRule,
@@ -98,22 +109,14 @@ func loadImageRules(
 		}
 		rules = append(rules, catalogRules...)
 	}
-	mapping := contracts.BuildGateImageMapping{Images: overrides}
-	if err := mapping.Validate("mig_override"); err != nil {
-		return nil, fmt.Errorf("mig override: %w", err)
-	}
 	return append(rules, overrides...), nil
 }
 
-// selectImage returns the expanded image of the highest-specificity rule that
-// matches exp. Among rules at that specificity, the last rule wins.
-//
-// The image template expands only for the selected rule and with the runtime
-// stack: short rules (for example language-only selectors) cannot fill stack
-// placeholders from their own selector.
-func selectImage(rules []contracts.BuildGateImageRule, exp contracts.StackExpectation) (string, error) {
+// selectImageRule returns the highest-specificity rule that matches exp. Among
+// rules at that specificity, the last rule wins.
+func selectImageRule(rules []contracts.BuildGateImageRule, exp contracts.StackExpectation) (contracts.BuildGateImageRule, error) {
 	if len(rules) == 0 {
-		return "", fmt.Errorf("no image mapping rules available for stack %s:%s:%s",
+		return contracts.BuildGateImageRule{}, fmt.Errorf("no image mapping rules available for stack %s:%s:%s",
 			exp.Language, exp.Release, exp.Tool)
 	}
 
@@ -128,15 +131,10 @@ func selectImage(rules []contracts.BuildGateImageRule, exp contracts.StackExpect
 		}
 	}
 	if best == nil {
-		return "", fmt.Errorf("no image rule matches stack %s:%s:%s",
+		return contracts.BuildGateImageRule{}, fmt.Errorf("no image rule matches stack %s:%s:%s",
 			exp.Language, exp.Release, exp.Tool)
 	}
-
-	expanded, err := contracts.ExpandImageTemplate(best.Image, &exp)
-	if err != nil {
-		return "", fmt.Errorf("resolve image template: %w", err)
-	}
-	return strings.TrimSpace(expanded), nil
+	return *best, nil
 }
 
 // loadCatalogFile loads image rules from a YAML gates catalog.
@@ -144,7 +142,7 @@ func loadCatalogFile(path string) ([]contracts.BuildGateImageRule, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, fmt.Errorf("gates catalog file required but not found: %s", path)
+			return nil, fmt.Errorf("gates catalog file not found: %s", path)
 		}
 		return nil, fmt.Errorf("read gates catalog file: %w", err)
 	}

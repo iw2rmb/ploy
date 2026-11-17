@@ -69,7 +69,7 @@ func (s *BuildGateStackConfig) UnmarshalJSON(data []byte) error {
 
 // ApplyBuildGatePhaseToGateSpec copies the gate execution fields from a
 // BuildGatePhaseConfig into the corresponding fields of a StepGateSpec.
-// StackDetect is set only when phase.Stack has a non-empty mode.
+// spec.Stack is set only when phase.Stack has a non-empty mode.
 func ApplyBuildGatePhaseToGateSpec(spec *StepGateSpec, phase *BuildGatePhaseConfig) {
 	if spec == nil || phase == nil {
 		return

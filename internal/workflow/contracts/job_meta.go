@@ -199,7 +199,6 @@ func NewMigJobMetaWithStepName(stepName string) *JobMeta {
 }
 
 // NewGateJobMeta creates a JobMeta for gate validation jobs.
-// The gate metadata can be populated later via UpdateGateMeta.
 func NewGateJobMeta(gate *BuildGateMetadata) *JobMeta {
 	return &JobMeta{
 		Kind: JobKindGate,

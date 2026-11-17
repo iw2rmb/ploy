@@ -85,10 +85,10 @@ func generateGitDiff(ctx context.Context, workspace string) ([]byte, error) {
 	}()
 
 	env := []string{"GIT_INDEX_FILE=" + indexPath}
-	if err := runGitCommandWithEnv(ctx, workspace, env, "read-tree", "HEAD"); err != nil {
+	if _, err := runGitOutputWithEnv(ctx, workspace, env, "read-tree", "HEAD"); err != nil {
 		return nil, fmt.Errorf("git read-tree failed: %w", err)
 	}
-	if err := runGitCommandWithEnv(ctx, workspace, env, "add", "-A", "--", "."); err != nil {
+	if _, err := runGitOutputWithEnv(ctx, workspace, env, "add", "-A", "--", "."); err != nil {
 		return nil, fmt.Errorf("git add failed: %w", err)
 	}
 
@@ -97,11 +97,6 @@ func generateGitDiff(ctx context.Context, workspace string) ([]byte, error) {
 		return nil, fmt.Errorf("git diff --cached failed: %w", err)
 	}
 	return diff, nil
-}
-
-func runGitCommandWithEnv(ctx context.Context, workspace string, env []string, args ...string) error {
-	_, err := runGitOutputWithEnv(ctx, workspace, env, args...)
-	return err
 }
 
 func runGitOutputWithEnv(ctx context.Context, workspace string, env []string, args ...string) ([]byte, error) {

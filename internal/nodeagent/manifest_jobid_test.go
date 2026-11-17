@@ -99,7 +99,7 @@ func TestBuildManifestFromRequest_PropagatesJobID(t *testing.T) {
 		t.Fatalf("buildMigManifest error: %v", err)
 	}
 
-	if jid, ok := m.OptionString("job_id"); !ok || jid == "" {
+	if jid, _ := m.Options["job_id"].(string); jid == "" {
 		t.Fatalf("manifest.Options missing job_id")
 	}
 }

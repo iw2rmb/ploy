@@ -18,9 +18,7 @@ type StepManifest struct {
 	Gate       *StepGateSpec
 	Resources  StepResourceSpec
 	// Options holds arbitrary run-specific options.
-	// Read options via OptionString/OptionBool helpers to avoid scattered type
-	// assertions in callers. This field is not validated and values are never
-	// logged.
+	// This field is not validated and values are never logged.
 	Options map[string]any
 
 	// In lists canonical read-only input entries ("shortHash:/in/dst").
@@ -150,22 +148,6 @@ func (s StepResourceSpec) ToLimits() (nanoCPUs int64, memoryBytes int64, diskByt
 		storageSizeOpt = fmt.Sprintf("%d", diskBytes)
 	}
 	return
-}
-
-// OptionString returns the option value for key when it is of type string.
-// It returns the string and true on exact type match; otherwise it returns
-// an empty string and false. The lookup is safe on a zero-value manifest
-// or when Options is nil.
-func (m StepManifest) OptionString(key string) (string, bool) {
-	if m.Options == nil {
-		return "", false
-	}
-	v, ok := m.Options[key]
-	if !ok {
-		return "", false
-	}
-	s, ok := v.(string)
-	return s, ok
 }
 
 // OptionBool returns the option value for key when it is of type bool.

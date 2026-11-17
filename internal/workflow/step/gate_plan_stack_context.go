@@ -12,7 +12,7 @@ import (
 // resolveGateStackContext selects the stack policy for the gate and resolves
 // the stack it runs with. Forced stack-detect mode skips workspace detection.
 //
-// spec.StackDetect comes from a validated MigSpec (contracts
+// spec.Stack comes from a validated MigSpec (contracts
 // validateBuildGateStackConfig), so each mode receives the fields it requires.
 func resolveGateStackContext(
 	ctx context.Context,

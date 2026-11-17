@@ -1,7 +1,7 @@
 // Package backoff provides centralized retry and backoff utilities using github.com/cenkalti/backoff/v5.
 //
 // This package offers helpers for exponential backoff with jitter, context cancellation,
-// structured logging, and metrics hooks. It unifies retry logic across the codebase,
+// and structured logging. It unifies retry logic across the codebase,
 // replacing bespoke implementations in nodeagent and SSE clients.
 package backoff
 

@@ -222,12 +222,15 @@ func TestGatePlanResolver_StackGateTerminalRuntimeImage(t *testing.T) {
 		workspace func(t *testing.T) string
 		wantCode  string
 		wantState string
+		// wantEvidence: the server builds the run error from the finding's evidence.
+		wantEvidence bool
 	}{
 		{
-			name:      "mismatch",
-			workspace: func(t *testing.T) string { return createMavenWorkspace(t, "11") },
-			wantCode:  "STACK_GATE_MISMATCH",
-			wantState: "mismatch",
+			name:         "mismatch",
+			workspace:    func(t *testing.T) string { return createMavenWorkspace(t, "11") },
+			wantCode:     "STACK_GATE_MISMATCH",
+			wantState:    "mismatch",
+			wantEvidence: true,
 		},
 		{
 			name: "unknown_ambiguous",
@@ -274,6 +277,9 @@ func TestGatePlanResolver_StackGateTerminalRuntimeImage(t *testing.T) {
 			}
 			if got := terminal.meta.LogFindings[0].Code; got != tc.wantCode {
 				t.Fatalf("log code = %q, want %q", got, tc.wantCode)
+			}
+			if got := terminal.meta.LogFindings[0].Evidence; tc.wantEvidence && got == "" {
+				t.Fatal("log finding has no evidence")
 			}
 			if got := terminal.meta.StackGate.Result; got != tc.wantState {
 				t.Fatalf("stack gate result = %q, want %q", got, tc.wantState)

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
@@ -25,9 +26,9 @@ func writeCatalog(t *testing.T, content string) string {
 	return path
 }
 
-// TestSelectImage covers rule selection over an already merged rule list:
+// TestSelectImageRule covers rule selection over an already merged rule list:
 // specificity ordering, tool-agnostic fallback, and last-rule-wins precedence.
-func TestSelectImage(t *testing.T) {
+func TestSelectImageRule(t *testing.T) {
 	defaultRules := []contracts.BuildGateImageRule{
 		imageRule("java", "17", "maven", "maven:jdk17"),
 		imageRule("java", "17", "gradle", "gradle:8.8-jdk17"),
@@ -66,12 +67,12 @@ func TestSelectImage(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := selectImage(tt.rules, tt.exp)
+			got, err := selectImageRule(tt.rules, tt.exp)
 			if err != nil {
-				t.Fatalf("selectImage() error: %v", err)
+				t.Fatalf("selectImageRule() error: %v", err)
 			}
-			if got != tt.wantImage {
-				t.Errorf("selectImage() = %q, want %q", got, tt.wantImage)
+			if got.Image != tt.wantImage {
+				t.Errorf("selectImageRule() image = %q, want %q", got.Image, tt.wantImage)
 			}
 		})
 	}
@@ -170,11 +171,12 @@ gates:
 }
 
 // TestResolveImageForExpectation_Errors covers every error path. Rule sources
-// that fail to load or validate wrap errImageMapping; selection and template
-// failures wrap errImageRuleMatch.
+// that fail to load or validate and image templates that fail to expand wrap
+// errImageMapping; selection failures wrap errImageRuleMatch.
 func TestResolveImageForExpectation_Errors(t *testing.T) {
 	tests := []struct {
 		name        string
+		env         map[string]string
 		catalogPath string
 		overrides   []contracts.BuildGateImageRule
 		exp         contracts.StackExpectation
@@ -205,23 +207,22 @@ func TestResolveImageForExpectation_Errors(t *testing.T) {
 			name:        "missing catalog file",
 			catalogPath: "/nonexistent/path/gates.yaml",
 			wantIs:      errImageMapping,
-			wantErr:     "required but not found",
-		},
-		{
-			name: "duplicate selector within same level",
-			overrides: []contracts.BuildGateImageRule{
-				imageRule("java", "17", "", "image1:17"),
-				imageRule("java", "17", "", "image2:17"),
-			},
-			wantIs:  errImageMapping,
-			wantErr: "duplicate selector",
+			wantErr:     "gates catalog file not found",
 		},
 		{
 			name:      "selected rule with unset env var",
 			overrides: []contracts.BuildGateImageRule{imageRule("java", "17", "maven", "$PLOY_TEST_UNSET_GATE_REGISTRY/maven:jdk17")},
 			exp:       contracts.StackExpectation{Language: "java", Release: "17", Tool: "maven"},
-			wantIs:    errImageRuleMatch,
+			wantIs:    errImageMapping,
 			wantErr:   "unresolved environment variables: PLOY_TEST_UNSET_GATE_REGISTRY",
+		},
+		{
+			name:      "selected rule expands to an empty image",
+			env:       map[string]string{"PLOY_TEST_EMPTY_GATE_IMAGE": ""},
+			overrides: []contracts.BuildGateImageRule{imageRule("java", "17", "maven", "$PLOY_TEST_EMPTY_GATE_IMAGE")},
+			exp:       contracts.StackExpectation{Language: "java", Release: "17", Tool: "maven"},
+			wantIs:    errImageMapping,
+			wantErr:   "resolves to an empty image",
 		},
 		{
 			name:        "file missing language",
@@ -239,6 +240,9 @@ func TestResolveImageForExpectation_Errors(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			for k, v := range tt.env {
+				t.Setenv(k, v)
+			}
 			_, err := resolveImageForExpectation(tt.catalogPath, tt.overrides, tt.exp)
 			requireErrContains(t, err, tt.wantErr)
 			if !errors.Is(err, tt.wantIs) {
@@ -255,5 +259,13 @@ func TestDefaultCatalogAssetsAreValid(t *testing.T) {
 	}
 	if len(rules) == 0 {
 		t.Fatal("default gates catalog has no rules")
+	}
+	// A rule may leave stack placeholders for the runtime stack; any other
+	// template error would fail every gate that selects the rule.
+	for _, rule := range rules {
+		_, err := contracts.ExpandImageTemplate(rule.Image, &rule.Stack)
+		if err != nil && !strings.Contains(err.Error(), "unresolved stack placeholders:") {
+			t.Errorf("rule %+v image %q: %v", rule.Stack, rule.Image, err)
+		}
 	}
 }

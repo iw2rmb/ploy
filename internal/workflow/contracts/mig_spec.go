@@ -173,27 +173,17 @@ func ParseMigSpecJSON(data []byte) (*MigSpec, error) {
 		return nil, fmt.Errorf("parse mig spec json: %w", err)
 	}
 
-	if err := spec.Validate(); err != nil {
+	if err := spec.validate(); err != nil {
 		return nil, err
 	}
 
 	return &spec, nil
 }
 
-// Validate checks that the spec is structurally valid.
-// Returns nil if valid, or a descriptive error for invalid specs.
-//
-// Validation rules:
-//   - steps must be non-empty and each step must have a non-empty image.
-//   - Stack Gate phases must not be disabled with expectations set.
-//
-// Validate covers only rules the mig schema cannot express, so it assumes the
-// input already passed ValidateMigSpecJSON, as ParseMigSpecJSON guarantees.
-func (s MigSpec) Validate() error {
-	// Validate steps.
-	if len(s.Steps) == 0 {
-		return fmt.Errorf("steps: required")
-	}
+// validate checks the rules the mig schema cannot express. It assumes the
+// input already passed ValidateMigSpecJSON: the stack configuration checks
+// rely on the schema's mode rules.
+func (s MigSpec) validate() error {
 	for i, mig := range s.Steps {
 		if mig.Image.IsEmpty() {
 			return fmt.Errorf("steps[%d].image: required", i)

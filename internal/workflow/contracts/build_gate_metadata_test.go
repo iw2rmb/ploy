@@ -328,11 +328,12 @@ func TestBuildGateMetadata_BugSummary_Validation(t *testing.T) {
 	}
 }
 
-func TestBuildGateMetadataValidate(t *testing.T) {
+func TestBuildGateMetadata_Validate_StaticChecksAndLogFindings(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
-		name    string
-		meta    BuildGateMetadata
-		wantErr bool
+		name       string
+		meta       BuildGateMetadata
+		wantSubstr string
 	}{
 		{
 			name: "static check failure and log finding",
@@ -372,7 +373,7 @@ func TestBuildGateMetadataValidate(t *testing.T) {
 					}},
 				}},
 			},
-			wantErr: true,
+			wantSubstr: "message",
 		},
 		{
 			name: "log finding without severity",
@@ -382,16 +383,14 @@ func TestBuildGateMetadataValidate(t *testing.T) {
 					Message: "missing severity",
 				}},
 			},
-			wantErr: true,
+			wantSubstr: "severity",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := tt.meta.Validate()
-			if (err != nil) != tt.wantErr {
-				t.Fatalf("Validate() error = %v, wantErr %v", err, tt.wantErr)
-			}
+			t.Parallel()
+			requireValidationErr(t, tt.meta.Validate(), tt.wantSubstr)
 		})
 	}
 }

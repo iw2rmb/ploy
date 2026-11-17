@@ -207,28 +207,28 @@ func TestBuildGateManifestFromRequest_StackGateThreading(t *testing.T) {
 		check func(t *testing.T, m contracts.StepManifest)
 	}{
 		{
-			name: "threads StackGate when set",
+			name: "threads StackGatePhase when set",
 			phase: &contracts.StackGatePhaseSpec{
 				Enabled: true,
 				Expect:  &contracts.StackExpectation{Language: "java", Release: "17"},
 			},
 			check: func(t *testing.T, m contracts.StepManifest) {
 				if m.Gate.StackGatePhase == nil {
-					t.Fatal("manifest.Gate.StackGate should be threaded")
+					t.Fatal("manifest.Gate.StackGatePhase should be threaded")
 				}
 				if !m.Gate.StackGatePhase.Enabled {
-					t.Error("StackGate.Enabled should be true")
+					t.Error("StackGatePhase.Enabled should be true")
 				}
 				if m.Gate.StackGatePhase.Expect.Language != "java" || m.Gate.StackGatePhase.Expect.Release != "17" {
-					t.Errorf("StackGate.Expect = %+v, want java/17", m.Gate.StackGatePhase.Expect)
+					t.Errorf("StackGatePhase.Expect = %+v, want java/17", m.Gate.StackGatePhase.Expect)
 				}
 			},
 		},
 		{
-			name: "no StackGate when not set",
+			name: "no StackGatePhase when not set",
 			check: func(t *testing.T, m contracts.StepManifest) {
 				if m.Gate.StackGatePhase != nil {
-					t.Error("manifest.Gate.StackGate should be nil when not set")
+					t.Error("manifest.Gate.StackGatePhase should be nil when not set")
 				}
 			},
 		},
@@ -264,10 +264,10 @@ func TestBuildGateManifestFromRequest_StackGateThreading(t *testing.T) {
 			phase: outbound("java", "17"),
 			check: func(t *testing.T, m contracts.StepManifest) {
 				if m.Gate.StackGatePhase == nil {
-					t.Fatal("manifest.Gate.StackGate should be set")
+					t.Fatal("manifest.Gate.StackGatePhase should be set")
 				}
 				if m.Gate.StackGatePhase.Expect.Release != "17" {
-					t.Errorf("StackGate.Expect.Release = %q, want 17", m.Gate.StackGatePhase.Expect.Release)
+					t.Errorf("StackGatePhase.Expect.Release = %q, want 17", m.Gate.StackGatePhase.Expect.Release)
 				}
 			},
 		},
@@ -314,7 +314,7 @@ func TestApplyGatePhaseOverridesUsesCanonicalBuildGatePhase(t *testing.T) {
 			}
 			applyGatePhaseOverrides(&manifest, req)
 			if manifest.Gate.Stack != tt.want {
-				t.Fatalf("StackDetect = %+v, want %+v", manifest.Gate.Stack, tt.want)
+				t.Fatalf("Gate.Stack = %+v, want %+v", manifest.Gate.Stack, tt.want)
 			}
 		})
 	}

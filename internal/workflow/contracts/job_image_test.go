@@ -331,8 +331,8 @@ func TestJobImage_String(t *testing.T) {
 	})
 }
 
-// TestToolToModStack verifies conversion from Build Gate tool names to MigStack.
-func TestToolToModStack(t *testing.T) {
+// TestToolToMigStack verifies conversion from Build Gate tool names to MigStack.
+func TestToolToMigStack(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {

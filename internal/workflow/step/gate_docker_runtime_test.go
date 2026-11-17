@@ -82,7 +82,7 @@ func TestGateExecutor_PassesContainerLabelsFromContext(t *testing.T) {
 }
 
 // TestGateExecutor_EnvPassthrough verifies that environment variables from
-// StepGateSpec.Env are passed through to the Docker container. This ensures that
+// StepGateSpec.Envs are passed through to the Docker container. This ensures that
 // global env vars injected by the control plane are available to image-level
 // startup hooks.
 func TestGateExecutor_EnvPassthrough(t *testing.T) {
@@ -108,7 +108,7 @@ func TestGateExecutor_EnvPassthrough(t *testing.T) {
 		t.Fatal("expected Create to be called")
 	}
 
-	// Verify all env vars from spec.Env are passed verbatim to the container spec.
+	// Verify all env vars from spec.Envs are passed verbatim to the container spec.
 	if len(rt.captured.Env) != len(spec.Envs)+8 {
 		t.Fatalf("env count = %d, want %d: %v", len(rt.captured.Env), len(spec.Envs)+8, rt.captured.Env)
 	}

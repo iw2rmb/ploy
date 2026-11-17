@@ -123,7 +123,7 @@ func (m BuildGateMetadata) Validate() error {
 }
 
 // ContainerResourceUsage captures container limits and observed usage metrics
-// from the gate execution container.
+// from a job container.
 type ContainerResourceUsage struct {
 	// Limits configured for the container (0 means unlimited/not set).
 	LimitNanoCPUs    int64 `json:"limit_nano_cpus"`

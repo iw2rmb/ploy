@@ -58,11 +58,6 @@ The mounted directory contains several different types of state:
 - locks, access records, and cache cleanup state;
 - Ploy cleanup init scripts under `init.d`.
 
-The complete mount is created by
-[`buildToolCacheMounts`](../internal/workflow/step/gate_docker.go). The
-same mount policy is used for non-gate Java jobs by
-[`buildJavaToolCacheMountsFromStackEnv`](../internal/workflow/step/java_tool_cache_mounts.go).
-
 The gate writes absolute dependency paths to `/share/java.classpath`. The ORW
 Gradle-lane image does not run Gradle, but it reads this classpath file. Its
 mount of the same `/root/.gradle` directory keeps the dependency paths valid.

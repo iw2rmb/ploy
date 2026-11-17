@@ -10,12 +10,12 @@ func TestDetectPython_Success(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name         string
-		workspace    string
-		wantTool     string
-		wantRelease  string
-		evidenceKey  string
-		evidenceVal  string
+		name        string
+		workspace   string
+		wantTool    string
+		wantRelease string
+		evidenceKey string
+		evidenceVal string
 	}{
 		{
 			name:        "version file",
@@ -40,6 +40,15 @@ func TestDetectPython_Success(t *testing.T) {
 			wantRelease: "3.9",
 			evidenceKey: "python",
 			evidenceVal: "3.9",
+		},
+		{
+			// .python-version precedes pyproject.toml, so its evidence is reported.
+			name:        "agreeing sources report the first source",
+			workspace:   filepath.Join("testdata", "python", "python311-agreeing-sources"),
+			wantTool:    "pip",
+			wantRelease: "3.11",
+			evidenceKey: "python",
+			evidenceVal: "3.11",
 		},
 	}
 

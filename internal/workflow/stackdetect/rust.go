@@ -104,7 +104,7 @@ func classifyRustToolchainChannel(channel string) (string, rustChannelType) {
 	if isNonDeterministicChannel(channel) {
 		return "", rustChannelNonDeterministic
 	}
-	if version := canonicalizeVersion(channel, rustNumericVersionRegex, ""); version != "" {
+	if version := rustNumericVersion(channel); version != "" {
 		return version, rustChannelNumeric
 	}
 	return "", rustChannelNonNumeric
@@ -137,15 +137,18 @@ func isNonDeterministicChannel(channel string) bool {
 
 // canonicalizeRustVersion normalizes "1.76.0" to "1.76".
 func canonicalizeRustVersion(v string) string {
-	return canonicalizeVersion(v, rustNumericVersionRegex, v)
+	if version := rustNumericVersion(v); version != "" {
+		return version
+	}
+	return v
 }
 
-// canonicalizeVersion trims whitespace, applies the regex, and returns the
-// first submatch group. Returns fallback when the regex does not match.
-func canonicalizeVersion(v string, re *regexp.Regexp, fallback string) string {
-	m := re.FindStringSubmatch(strings.TrimSpace(v))
+// rustNumericVersion returns the "1.N" part of a numeric Rust version, or ""
+// when v is not numeric.
+func rustNumericVersion(v string) string {
+	m := rustNumericVersionRegex.FindStringSubmatch(strings.TrimSpace(v))
 	if m == nil {
-		return fallback
+		return ""
 	}
 	return m[1]
 }

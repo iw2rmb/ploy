@@ -5,8 +5,8 @@
 // logs and resource usage, and returns BuildGateMetadata. Concerns are
 // split across sibling files: common job mounts (job_mounts.go), log streaming
 // (container_log_streamer.go), and result normalization
-// (gate_docker_metadata.go). Stack detection + image resolution live in
-// gate_plan_resolver.go.
+// (gate_docker_metadata.go). Stack detection lives in
+// gate_plan_stack_context.go and image resolution in gate_image_resolver.go.
 package step
 
 import (
@@ -42,15 +42,11 @@ func NewGateExecutor(rt ContainerRuntime) *GateExecutor {
 
 // Execute resolves the gate plan (stack, image, command), runs the command in
 // a container, and returns BuildGateMetadata. The workspace is mounted at
-// /workspace; nil spec or Enabled=false yields (nil, nil).
+// /workspace. The caller passes an enabled spec.
 func (e *GateExecutor) Execute(ctx context.Context, spec *contracts.StepGateSpec, workspace string, jobMounts JobMounts) (*contracts.BuildGateMetadata, error) {
 	if ctx != nil && ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
-	if spec == nil || !spec.Enabled {
-		return nil, nil
-	}
-
 	catalogPath := defaultCatalogFilePath()
 
 	plan, terminal := resolveGateExecutionPlan(ctx, workspace, spec, catalogPath)
