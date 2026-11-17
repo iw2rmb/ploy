@@ -1,31 +1,16 @@
 package store
 
 import (
-	"context"
 	"errors"
-	"os"
 	"testing"
 
 	"github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
-// TestClaimJobLocksJobAndRunOnly verifies that ClaimJob does not lock rows
-// in `runs`. It locks the selected `jobs` row plus the owning `runs` row,
-// so concurrent nodes cannot split one repo attempt across nodes.
-func TestClaimJobLocksJobAndRunOnly(t *testing.T) {
-	dsn := os.Getenv("PLOY_TEST_DB_DSN")
-	if dsn == "" {
-		t.Skip("PLOY_TEST_DB_DSN not set; skipping integration test")
-	}
-
-	ctx := context.Background()
-	db, err := NewStore(ctx, dsn)
-	if err != nil {
-		t.Fatalf("NewStore() failed: %v", err)
-	}
-	defer db.Close()
-	cleanTestTables(t, ctx, db)
+// ClaimJob protects the selected job and node without locking joined run or wave rows.
+func TestClaimJobLocksJobAndNodeOnly(t *testing.T) {
+	ctx, db := newTestStore(t)
 
 	if db.Pool().Config().MaxConns < 2 {
 		t.Skipf("pgxpool max_conns=%d; need >=2 to exercise concurrent transactions", db.Pool().Config().MaxConns)
@@ -78,35 +63,40 @@ func TestClaimJobLocksJobAndRunOnly(t *testing.T) {
 		t.Fatalf("ClaimJob(tx) claimed %s, want %s", claimedJob.ID, createdJob.ID)
 	}
 
-	// If ClaimJob incorrectly locks `runs` rows (i.e. plain `FOR UPDATE SKIP LOCKED`
-	// on a join), this NOWAIT lock attempt will fail with 55P03 (lock_not_available).
-	txCheck, err := db.Pool().Begin(ctx)
-	if err != nil {
-		t.Fatalf("Begin(txCheck) failed: %v", err)
-	}
-	defer func() {
-		_ = txCheck.Rollback(ctx)
-	}()
+	for _, tc := range []struct {
+		name       string
+		query      string
+		id         string
+		wantLocked bool
+	}{
+		{"selected job", `SELECT id FROM jobs WHERE id=$1 FOR UPDATE NOWAIT`, createdJob.ID.String(), true},
+		{"claiming node", `SELECT id FROM nodes WHERE id=$1 FOR UPDATE NOWAIT`, node.ID.String(), true},
+		{"joined run", `SELECT id FROM runs WHERE id=$1 FOR UPDATE NOWAIT`, fx.Run.ID.String(), false},
+		{"joined wave", `SELECT id FROM waves WHERE id=$1 FOR UPDATE NOWAIT`, fx.Wave.ID.String(), false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			// A rejected NOWAIT statement aborts its transaction, so each check needs a new one.
+			txCheck, err := db.Pool().Begin(ctx)
+			if err != nil {
+				t.Fatalf("Begin(txCheck) failed: %v", err)
+			}
+			defer txCheck.Rollback(ctx)
 
-	var runID types.RunID
-	err = txCheck.QueryRow(ctx, `SELECT id FROM runs WHERE id = $1 FOR UPDATE NOWAIT`, fx.Run.ID).Scan(&runID)
-	if err != nil {
-		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == "55P03" {
-			t.Fatalf("runs row was locked by ClaimJob; expected ClaimJob to lock jobs only (use `FOR UPDATE OF j SKIP LOCKED`): %v", err)
-		}
-		t.Fatalf("failed to lock run row NOWAIT: %v", err)
-	}
-	if runID != fx.Run.ID {
-		t.Fatalf("locked run %s, want %s", runID, fx.Run.ID)
-	}
-
-	err = txCheck.QueryRow(ctx, `SELECT run_id FROM runs WHERE run_id = $1 AND repo_id = $2 FOR UPDATE NOWAIT`, fx.Run.ID, fx.MigRepo.RepoID).Scan(&runID)
-	if err == nil {
-		t.Fatalf("runs row was not locked by ClaimJob; expected repo-attempt lock for node affinity")
-	}
-	var pgErr *pgconn.PgError
-	if !errors.As(err, &pgErr) || pgErr.Code != "55P03" {
-		t.Fatalf("runs NOWAIT lock failed with %v, want lock_not_available", err)
+			var id string
+			err = txCheck.QueryRow(ctx, tc.query, tc.id).Scan(&id)
+			if tc.wantLocked {
+				var pgErr *pgconn.PgError
+				if !errors.As(err, &pgErr) || pgErr.Code != "55P03" {
+					t.Fatalf("NOWAIT error=%v, want lock_not_available", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("joined row must remain lockable: %v", err)
+			}
+			if id != tc.id {
+				t.Fatalf("locked row %s, want %s", id, tc.id)
+			}
+		})
 	}
 }

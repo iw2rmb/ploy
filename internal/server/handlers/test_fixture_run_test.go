@@ -45,3 +45,8 @@ func (m *handlerStore) ListRunSBOMRowsByJobType(ctx context.Context, arg store.L
 func (m *handlerStore) CreateDiff(ctx context.Context, params store.CreateDiffParams) (store.Diff, error) {
 	return m.createDiff.record(params)
 }
+
+func (m *handlerStore) GetRunCleanupState(ctx context.Context, id types.RunID) (store.RunCleanupState, error) {
+	run, err := m.GetRun(ctx, id)
+	return store.RunCleanupState{Run: run, CleanupEligible: m.cleanupEligible}, err
+}

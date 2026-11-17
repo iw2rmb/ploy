@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"errors"
+	"reflect"
 	"testing"
 	"time"
 
@@ -90,6 +91,14 @@ func TestCompleteBootstrapEnrollment(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			cleanTestTables(t, ctx, db)
 			tokenID, nodeID, tokenInserted := tt.setup(t, ctx, db)
+			var before GetBootstrapTokenRow
+			if tokenInserted && tt.wantErr != nil {
+				var err error
+				before, err = db.GetBootstrapToken(ctx, tokenID)
+				if err != nil {
+					t.Fatalf("GetBootstrapToken before enrollment: %v", err)
+				}
+			}
 
 			err := db.CompleteBootstrapEnrollment(ctx, CompleteBootstrapEnrollmentParams{
 				TokenID:         tokenID,
@@ -104,7 +113,7 @@ func TestCompleteBootstrapEnrollment(t *testing.T) {
 					t.Fatalf("CompleteBootstrapEnrollment error = %v, want %v", err, tt.wantErr)
 				}
 				if tokenInserted {
-					assertBootstrapTokenNotConsumed(t, ctx, db, tokenID)
+					assertBootstrapTokenUnchanged(t, ctx, db, tokenID, before)
 				}
 				return
 			}
@@ -149,13 +158,13 @@ func insertBootstrapTokenForTest(t *testing.T, ctx context.Context, db Store, to
 	}
 }
 
-func assertBootstrapTokenNotConsumed(t *testing.T, ctx context.Context, db Store, tokenID string) {
+func assertBootstrapTokenUnchanged(t *testing.T, ctx context.Context, db Store, tokenID string, before GetBootstrapTokenRow) {
 	t.Helper()
 	row, err := db.GetBootstrapToken(ctx, tokenID)
 	if err != nil {
 		t.Fatalf("GetBootstrapToken(%s): %v", tokenID, err)
 	}
-	if row.UsedAt.Valid || row.CertIssuedAt.Valid {
-		t.Fatalf("bootstrap token %s consumed unexpectedly: used=%v cert=%v", tokenID, row.UsedAt, row.CertIssuedAt)
+	if !reflect.DeepEqual(row, before) {
+		t.Fatalf("bootstrap token %s changed after rejected enrollment: before=%+v after=%+v", tokenID, before, row)
 	}
 }

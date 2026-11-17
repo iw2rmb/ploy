@@ -23,6 +23,7 @@ type ClaimManager struct {
 	startupReconciler *startupCrashReconciler
 	startupOnce       sync.Once
 	startupErr        error
+	startupDone       chan struct{}
 	backoff           *backoff.StatefulBackoff
 }
 
@@ -46,6 +47,7 @@ func NewClaimManager(cfg Config, controller RunController) (*ClaimManager, error
 		cfg:               cfg,
 		controller:        controller,
 		startupReconciler: startupReconciler,
+		startupDone:       make(chan struct{}),
 		backoff:           backoff.NewStatefulBackoff(backoffPolicy),
 	}, nil
 }

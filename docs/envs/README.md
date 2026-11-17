@@ -144,9 +144,19 @@ build_gate:
   See [Migs lifecycle](../migs-lifecycle.md) for full usage.
 - Container cleanup model:
   - Containers are retained after step/gate completion.
-  - Host `ploy-node-cleanup` systemd timers prune completed containers and cache state.
+  - The node attempts cleanup before job execution and after finalization.
+    See [Node maintenance](../node-maintenance.md#job-boundary-cleanup).
   - Disk telemetry selects the lowest-free configured storage path from `/`,
     `DOCKER_ROOT_DIR`, `PLOYD_CACHE_HOME`, `PLOY_NODE_CACHE_ROOT`, and `TMPDIR`.
+- `PLOY_NODE_CLEANUP_AGE` — Docker and Git-clone retention interval, using a positive
+  integer with an `h` or `m` suffix. Default: `24h`. Images use their last
+  Ploy-managed use; see [image retention](../node-maintenance.md#image-retention)
+  for first-observation grace and tracking scope. Containers use creation time;
+  build cache keeps its age filter, and Git clones use `.git` access time.
+  Workspace retention follows the server's fixed six-hour and 24-hour policy.
+- `PLOY_NODE_PRUNE_DOCKER_VOLUMES` — Set `true` to prune unused anonymous Docker
+  volumes during cleanup. Default: `false`. Expired container removal includes
+  its anonymous volumes independently of this option.
 - Gate status visibility: Use `GET /v1/runs/{id}/status` to view gate results (format: `Gate: passed duration=1234ms` or `Gate: failed pre-gate duration=567ms`) via `Metadata["gate_summary"]`.
 - SBOM persistence contract:
   - Gate post-tasks persist package rows from `/share/sbom.spdx.json` for both `pre_gate` and `post_gate`.

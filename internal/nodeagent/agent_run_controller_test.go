@@ -2,19 +2,32 @@ package nodeagent
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"testing"
-
-	types "github.com/iw2rmb/ploy/internal/domain/types"
+	"time"
 )
 
 func TestRunController(t *testing.T) {
 	t.Parallel()
 
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(server.Close)
 	newRC := func() *runController {
-		return &runController{
-			cfg:  newAgentConfig("http://127.0.0.1:8080"),
-			jobs: make(map[types.JobID]*jobContext),
-		}
+		r := newTestController(t, newAgentConfig(server.URL))
+		t.Cleanup(func() {
+			deadline := time.Now().Add(5 * time.Second)
+			for len(r.jobSem) != 0 {
+				if time.Now().After(deadline) {
+					t.Error("execution did not release permit")
+					return
+				}
+				time.Sleep(time.Millisecond)
+			}
+		})
+		return r
 	}
 	baseReq := newStartRunRequest()
 

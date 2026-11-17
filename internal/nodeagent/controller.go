@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"sync"
+	"time"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
 )
@@ -25,6 +26,12 @@ type runController struct {
 	jobSem chan struct{}
 
 	uploader *baseUploader
+
+	nodeCtx            context.Context
+	cleanupPass        func(context.Context) error
+	cleanupRunning     bool
+	lastCleanupSuccess time.Time
+	imageLastUsed      map[string]time.Time
 }
 
 type jobContext struct {
@@ -77,10 +84,43 @@ func (r *runController) ReleaseSlot(slot *RunSlot) {
 	if slot == nil || slot.owner != r {
 		panic("invalid run slot owner")
 	}
-	if err := slot.lock.Close(); err != nil {
+	if err := slot.releaseActivity(); err != nil {
 		slog.Error("release maintenance activity", "error", err)
 	}
 	<-r.jobSem
+}
+
+func (slot *RunSlot) releaseActivity() error {
+	if slot.lock == nil {
+		return nil
+	}
+	err := slot.lock.Close()
+	slot.lock = nil
+	return err
+}
+
+// FinishRunSlot keeps the permit until the after-job hook finishes. Empty
+// claims use ReleaseSlot instead, so polling cannot trigger cleanup.
+func (r *runController) FinishRunSlot(slot *RunSlot) {
+	defer r.ReleaseSlot(slot)
+	if err := slot.releaseActivity(); err != nil {
+		slog.Error("release maintenance activity before cleanup", "error", err)
+		return
+	}
+	r.tryCleanup()
+}
+
+func (r *runController) beforeJob(ctx context.Context, slot *RunSlot) error {
+	if err := slot.releaseActivity(); err != nil {
+		return fmt.Errorf("release maintenance activity before cleanup: %w", err)
+	}
+	r.tryCleanup()
+	lock, err := acquireMaintenanceActivity(ctx)
+	if err != nil {
+		return err
+	}
+	slot.lock = lock
+	return nil
 }
 
 // StartRun accepts a run start request and initiates execution.
@@ -105,7 +145,14 @@ func (r *runController) StartRun(ctx context.Context, req StartRunRequest, slot 
 	r.startRemoteCancellationWatch(runCtx, req, cancel)
 	go func() {
 		defer cancel()
-		defer r.ReleaseSlot(slot)
+		defer r.FinishRunSlot(slot)
+		if err := r.beforeJob(runCtx, slot); err != nil {
+			r.uploadFailureStatus(runCtx, req, err, 0)
+			r.mu.Lock()
+			delete(r.jobs, req.JobID)
+			r.mu.Unlock()
+			return
+		}
 		r.executeRun(runCtx, req)
 	}()
 

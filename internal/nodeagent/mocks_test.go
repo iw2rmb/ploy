@@ -70,6 +70,10 @@ func (m *mockRunController) ReleaseSlot(slot *RunSlot) {
 	<-slotSem
 }
 
+func (m *mockRunController) FinishRunSlot(slot *RunSlot) {
+	m.ReleaseSlot(slot)
+}
+
 func (m *mockRunController) AcquireCalls() int {
 	m.mu.Lock()
 	defer m.mu.Unlock()

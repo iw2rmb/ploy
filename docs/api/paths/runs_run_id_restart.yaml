@@ -14,6 +14,8 @@ post:
     attempt and successful jobs, queues the failed job, restores its cancelled,
     unexecuted successors to `Created`, and increments `stats.resume_count`.
     The retry stays on the original node and requires its retained workspace.
+    At or beyond 24 hours after run completion, `from_failed` returns `409 Conflict`
+    before changing jobs or logs. The caller must use a full restart instead.
     Partial workspace edits are preserved. Missing workspace fails the job;
     it does not trigger source hydration. Invalid chains return `409 Conflict`.
     Current logs, metrics, SBOM rows, and results for retried jobs are cleared;

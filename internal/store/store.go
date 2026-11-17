@@ -22,6 +22,7 @@ var ErrEmptyNodeID = errors.New("store: ClaimJob requires non-empty nodeID")
 // ErrInvalidJSON is returned when a JSONB column receives invalid JSON bytes.
 var ErrInvalidJSON = errors.New("store: invalid JSON for JSONB column")
 
+var ErrRunResumeExpired = errors.New("store: retained resume expired; use a full restart without --from-failed")
 var ErrRunResumeInvalid = errors.New("store: run has no resumable failed job chain")
 var ErrJobExecutionStale = errors.New("store: request belongs to an earlier execution")
 
@@ -47,6 +48,7 @@ type Store interface {
 	CancelWave(ctx context.Context, waveID types.WaveID) error
 	CompleteBootstrapEnrollment(ctx context.Context, arg CompleteBootstrapEnrollmentParams) error
 	CreateWaveWithRuns(ctx context.Context, arg CreateWaveWithRunsParams) (Wave, []RunMaterialization, error)
+	GetRunCleanupState(ctx context.Context, runID types.RunID) (RunCleanupState, error)
 	RestartRun(ctx context.Context, arg RestartRunParams) (Run, error)
 	WithJobExecution(ctx context.Context, jobID types.JobID, resumeCount int, complete func(Store, Job) error) error
 	Close()
@@ -441,6 +443,16 @@ func (s *PgStore) RestartRun(ctx context.Context, arg RestartRunParams) (Run, er
 	}
 
 	if arg.FromFailed {
+		var now time.Time
+		if err := tx.QueryRow(ctx, `SELECT clock_timestamp()`).Scan(&now); err != nil {
+			return Run{}, fmt.Errorf("restart run: read clock: %w", err)
+		}
+		if !run.FinishedAt.Valid {
+			return Run{}, ErrRunResumeInvalid
+		}
+		if runRetentionExpired(run, now) {
+			return Run{}, ErrRunResumeExpired
+		}
 		if err := resumeFailedJobs(ctx, qtx, run, arg); err != nil {
 			return Run{}, err
 		}

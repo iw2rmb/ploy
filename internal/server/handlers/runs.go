@@ -30,6 +30,7 @@ func runToSummary(run store.Run) domaintypes.RunSummary {
 		BaseRef:         run.RepoBaseRef,
 		SourceCommitSHA: run.SourceCommitSha,
 		Attempt:         run.Attempt,
+		ResumeCount:     domaintypes.RunStats(run.Stats).ResumeCount(),
 		LastError:       run.LastError,
 		CreatedBy:       run.CreatedBy,
 		CreatedAt:       run.CreatedAt.Time,
@@ -59,6 +60,7 @@ func runMetadataToSummary(run store.ListRunsWithMetadataRow) domaintypes.RunSumm
 		BaseRef:          run.RepoBaseRef,
 		SourceCommitSHA:  run.SourceCommitSha,
 		Attempt:          run.Attempt,
+		ResumeCount:      domaintypes.RunStats(run.Stats).ResumeCount(),
 		LastError:        run.LastError,
 		CreatedBy:        run.CreatedBy,
 		CreatedAt:        run.CreatedAt.Time,
@@ -206,12 +208,18 @@ func getRunHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		run, ok := getRunOrFail(w, r, st, runID, "get run")
-		if !ok {
+		state, err := st.GetRunCleanupState(r.Context(), runID)
+		if err != nil {
+			if isNoRowsError(err) {
+				writeHTTPError(w, http.StatusNotFound, "run not found")
+			} else {
+				writeHTTPError(w, http.StatusInternalServerError, "get run: %v", err)
+			}
 			return
 		}
-
+		run := state.Run
 		summary := runToSummary(run)
+		summary.CleanupEligible = state.CleanupEligible
 		if !run.MigID.IsZero() {
 			if mig, err := st.GetMig(r.Context(), run.MigID); err == nil {
 				summary.MigName = mig.Name

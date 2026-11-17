@@ -278,6 +278,14 @@ RunSummary:
       type: integer
       format: int32
       description: Current attempt number for this run.
+    resume_count:
+      type: integer
+      description: Retained-resume generation within the current attempt.
+    cleanup_eligible:
+      type: boolean
+      description: |
+        True only on GET /v1/runs/{run_id} when server retention has expired and
+        all current-attempt jobs are terminal. Missing or false preserves local data.
     last_error:
       type: string
       nullable: true

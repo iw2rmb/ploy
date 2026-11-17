@@ -77,6 +77,12 @@ func (s *Server) handleRunStart(w http.ResponseWriter, r *http.Request) {
 	req.ServerURL = s.cfg.ServerURL
 
 	ctx := r.Context()
+	if s.waitStartup != nil {
+		if err := s.waitStartup(ctx); err != nil {
+			http.Error(w, fmt.Sprintf("startup reconciliation unavailable: %v", err), http.StatusServiceUnavailable)
+			return
+		}
+	}
 	slot, err := s.controller.AcquireSlot(ctx)
 	if err != nil {
 		// If the request is canceled or times out while waiting, treat it as a

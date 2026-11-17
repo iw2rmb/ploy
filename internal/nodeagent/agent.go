@@ -44,6 +44,7 @@ func New(cfg Config) (*Agent, error) {
 		jobs:     make(map[types.JobID]*jobContext),
 		uploader: uploader,
 	}
+	controller.cleanupPass = controller.cleanupNode
 
 	server, err := NewServer(cfg, controller)
 	if err != nil {
@@ -59,6 +60,7 @@ func New(cfg Config) (*Agent, error) {
 	if err != nil {
 		return nil, fmt.Errorf("create claim manager: %w", err)
 	}
+	server.waitStartup = claimer.waitStartup
 
 	return &Agent{
 		cfg:        cfg,
@@ -71,6 +73,7 @@ func New(cfg Config) (*Agent, error) {
 
 // Run starts the node agent and blocks until the context is canceled.
 func (a *Agent) Run(ctx context.Context) error {
+	a.controller.nodeCtx = ctx
 	// Perform bootstrap if needed (exchange token for certificate)
 	if a.cfg.HTTP.TLS.Enabled {
 		if err := a.bootstrap(ctx); err != nil {

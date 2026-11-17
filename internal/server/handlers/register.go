@@ -120,7 +120,7 @@ func registerArtifactReadRoutes(s routeRegistrar, deps routeDeps) {
 
 func registerRunRoutes(s routeRegistrar, deps routeDeps) {
 	s.RegisterRouteFunc("GET /v1/runs", listRunsHandler(deps.st), auth.RoleControlPlane)
-	s.RegisterRouteFunc("GET /v1/runs/{run_id}", getRunHandler(deps.st), auth.RoleControlPlane)
+	s.RegisterRouteFunc("GET /v1/runs/{run_id}", getRunHandler(deps.st), auth.RoleControlPlane, auth.RoleWorker)
 	s.RegisterRouteFunc("GET /v1/runs/{run_id}/status", getRunStatusHandler(deps.st), auth.RoleControlPlane)
 	s.RegisterRouteFunc("POST /v1/runs/{run_id}/cancel", cancelRunHandlerV1(deps.st, deps.gitLabTokens), auth.RoleControlPlane)
 	s.RegisterRouteFunc("POST /v1/runs/{run_id}/restart", restartRunHandler(deps.st, deps.gitAuth, deps.gitLabTokens), auth.RoleControlPlane)

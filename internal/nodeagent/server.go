@@ -22,16 +22,18 @@ type RunController interface {
 	StopRun(context.Context, StopRunRequest) error
 	AcquireSlot(context.Context) (*RunSlot, error)
 	ReleaseSlot(*RunSlot)
+	FinishRunSlot(*RunSlot)
 }
 
 // Server exposes the node agent API over HTTPS with mTLS.
 type Server struct {
-	mu         sync.Mutex
-	cfg        Config
-	controller RunController
-	httpServer *http.Server
-	listener   net.Listener
-	running    bool
+	mu          sync.Mutex
+	cfg         Config
+	controller  RunController
+	httpServer  *http.Server
+	listener    net.Listener
+	running     bool
+	waitStartup func(context.Context) error
 }
 
 // NewServer constructs a new node agent HTTP server.

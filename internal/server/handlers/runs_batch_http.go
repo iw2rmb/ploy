@@ -106,7 +106,7 @@ func restartRunHandler(st store.Store, gitAuth gitauth.Options, registry *gitlab
 			switch {
 			case errors.Is(err, store.ErrRunRestartActive):
 				writeHTTPError(w, http.StatusConflict, "run is not terminal; current Run ID: %s", runID)
-			case errors.Is(err, store.ErrRunResumeInvalid):
+			case errors.Is(err, store.ErrRunResumeInvalid), errors.Is(err, store.ErrRunResumeExpired):
 				writeHTTPError(w, http.StatusConflict, "%v", err)
 			case errors.Is(err, store.ErrRunRestartWaveCancelled):
 				writeHTTPError(w, http.StatusConflict, "owning wave is cancelled")

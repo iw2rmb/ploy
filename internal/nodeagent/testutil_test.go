@@ -395,9 +395,11 @@ func newTestController(t *testing.T, cfg Config) *runController {
 		t.Fatalf("newBaseUploader: %v", err)
 	}
 	return &runController{
-		cfg:      cfg,
-		jobs:     make(map[types.JobID]*jobContext),
-		uploader: uploader,
+		cfg:         cfg,
+		jobs:        make(map[types.JobID]*jobContext),
+		uploader:    uploader,
+		nodeCtx:     context.Background(),
+		cleanupPass: func(context.Context) error { return nil },
 	}
 }
 

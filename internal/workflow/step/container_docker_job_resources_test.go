@@ -192,7 +192,7 @@ func TestDockerProxyCancellationWaitsForCreationThenRemovesChild(t *testing.T) {
 	root, socket, _ := startResourceDaemon(t, daemon)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	proxy, err := startDockerSocketProxy(ctx, nil, socket, root, testDockerJobOwner)
+	proxy, err := startDockerSocketProxy(ctx, nil, socket, root, testDockerJobOwner, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -244,7 +244,7 @@ func TestDockerProxyReturnsCleanupFailureForRetry(t *testing.T) {
 	// Failed removal is visible to the caller and leaves ownership for recovery.
 	daemon := &resourceDaemon{resources: map[string]dockerJobResource{"child": {"container", "child", testDockerJobOwner.labels()}}, failRemove: true}
 	root, socket, _ := startResourceDaemon(t, daemon)
-	proxy, err := startDockerSocketProxy(context.Background(), nil, socket, root, testDockerJobOwner)
+	proxy, err := startDockerSocketProxy(context.Background(), nil, socket, root, testDockerJobOwner, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

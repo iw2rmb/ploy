@@ -46,11 +46,31 @@ func acquireMaintenanceActivity(ctx context.Context) (*os.File, error) {
 	return nil, fmt.Errorf("acquire maintenance activity: %w", err)
 }
 
+// A busy lock is a skipped attempt. Cleanup never waits for other writers.
+func tryMaintenanceCleanup(ctx context.Context) (*os.File, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	file, err := os.OpenFile(maintenanceLockPath(), os.O_RDWR, 0)
+	if err != nil {
+		return nil, fmt.Errorf("open maintenance lock: %w", err)
+	}
+	err = unix.Flock(int(file.Fd()), unix.LOCK_EX|unix.LOCK_NB)
+	if err == nil {
+		return file, nil
+	}
+	_ = file.Close()
+	if errors.Is(err, unix.EWOULDBLOCK) || errors.Is(err, unix.EAGAIN) {
+		return nil, nil
+	}
+	return nil, fmt.Errorf("acquire cleanup maintenance lock: %w", err)
+}
+
 func maintenanceCapability() map[string]any {
 	hostname, _ := os.Hostname()
 	var stat unix.Stat_t
 	if err := unix.Stat(maintenanceLockPath(), &stat); err != nil {
 		return map[string]any{"error": err.Error()}
 	}
-	return map[string]any{"protocol": 1, "lock_path": maintenanceLockPath(), "lock_inode": stat.Ino, "hostname": hostname}
+	return map[string]any{"protocol": 2, "lock_path": maintenanceLockPath(), "lock_inode": stat.Ino, "hostname": hostname}
 }

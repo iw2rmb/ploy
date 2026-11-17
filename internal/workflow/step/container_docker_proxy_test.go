@@ -164,7 +164,7 @@ func TestDockerSocketProxyUnix_TranslatesRealRequestsAndClosesOnCancellation(t *
 	proxy, err := startDockerSocketProxy(ctx, []ContainerMount{
 		{Source: root, Target: "/workspace"},
 		{Source: upstreamPath, Target: "/var/run/docker.sock"},
-	}, upstreamPath, root, testDockerJobOwner)
+	}, upstreamPath, root, testDockerJobOwner, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

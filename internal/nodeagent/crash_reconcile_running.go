@@ -37,7 +37,7 @@ func (c *ClaimManager) startRecoveredRunningMonitors(ctx context.Context, recove
 
 func (c *ClaimManager) monitorRecoveredRunningContainer(ctx context.Context, recovered recoveredContainer, slot *RunSlot) {
 	defer func() {
-		c.controller.ReleaseSlot(slot)
+		c.controller.FinishRunSlot(slot)
 		c.sweepAbandonedRuntimeIfIdle()
 	}()
 

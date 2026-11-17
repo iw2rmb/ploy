@@ -4,7 +4,12 @@ get:
   description: |
     Return a detailed summary for one repository execution identified by its run ID.
     The response includes run metadata, repository identity, refs, execution status,
-    timestamps, and optional wave-level run counts.
+    timestamps, and optional wave-level run counts. Workers can read this endpoint.
+    The server returns `resume_count` and `cleanup_eligible` with the run identity.
+    Cleanup eligibility uses server wall-clock time after acquiring the run-row lock.
+    Retention expires six hours after successful completion or 24 hours after failure
+    or cancellation. Eligibility also requires nonempty terminal current-attempt jobs.
+    The node rechecks status, attempt, resume_count, and finished_at before deletion.
   parameters:
     - in: path
       name: id

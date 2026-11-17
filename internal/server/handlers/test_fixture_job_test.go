@@ -12,6 +12,7 @@ import (
 
 // handlerStore is the canonical configurable store for handler tests.
 type handlerStore struct {
+	cleanupEligible bool
 	store.Store
 
 	getJob                      mockCall[types.JobID, store.Job]

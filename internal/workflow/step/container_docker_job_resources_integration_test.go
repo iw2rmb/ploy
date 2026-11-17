@@ -43,7 +43,7 @@ func TestDockerJobResourcesLive(t *testing.T) {
 			root := t.TempDir()
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			proxy, err := startDockerSocketProxy(ctx, []ContainerMount{{Source: upstream, Target: "/var/run/docker.sock"}, {Source: executable, Target: "/smoke/step.test"}}, upstream, root, owner)
+			proxy, err := startDockerSocketProxy(ctx, []ContainerMount{{Source: upstream, Target: "/var/run/docker.sock"}, {Source: executable, Target: "/smoke/step.test"}}, upstream, root, owner, nil)
 			if err != nil {
 				t.Fatal(err)
 			}

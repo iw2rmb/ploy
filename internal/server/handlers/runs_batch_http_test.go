@@ -123,6 +123,12 @@ func TestRestartRunHandler(t *testing.T) {
 			},
 		},
 		{
+			name:       "expired resume returns conflict",
+			setup:      func(st *handlerStore) { st.restartRun.err = store.ErrRunResumeExpired },
+			body:       map[string]any{"from_failed": true},
+			wantStatus: http.StatusConflict,
+		},
+		{
 			name:       "invalid resume returns conflict",
 			setup:      func(st *handlerStore) { st.restartRun.err = store.ErrRunResumeInvalid },
 			body:       map[string]any{"from_failed": true},
@@ -261,6 +267,9 @@ func TestRestartRunHandler(t *testing.T) {
 			assertStatus(t, rr, tt.wantStatus)
 			if errors.Is(st.restartRun.err, store.ErrRunRestartActive) {
 				assertBodyContains(t, rr, "current Run ID: "+runID.String())
+			}
+			if errors.Is(st.restartRun.err, store.ErrRunResumeExpired) {
+				assertBodyContains(t, rr, "full restart without --from-failed")
 			}
 			_, gotToken := registry.Token(tokenHash)
 			if gotToken != tt.wantToken {

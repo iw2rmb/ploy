@@ -18,6 +18,8 @@ type RunSummary struct {
 	RepoURL          string     `json:"repo_url,omitempty"`
 	BaseRef          string     `json:"base_ref,omitempty"`
 	SourceCommitSHA  string     `json:"source_commit_sha,omitempty"`
+	ResumeCount      int        `json:"resume_count"`
+	CleanupEligible  bool       `json:"cleanup_eligible"`
 	Attempt          int32      `json:"attempt,omitempty"`
 	LastError        *string    `json:"last_error,omitempty"`
 	CreatedBy        *string    `json:"created_by,omitempty"`

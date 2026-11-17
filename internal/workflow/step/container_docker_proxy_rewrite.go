@@ -32,15 +32,7 @@ func dockerJobRequestHandler(mounts []ContainerMount, owner DockerJobOwner, next
 }
 
 func dockerCreateResource(p string) string {
-	p = strings.TrimPrefix(p, "/")
-	if version, rest, ok := strings.Cut(p, "/"); ok && len(version) > 1 && version[0] == 'v' && version[1] >= '0' && version[1] <= '9' {
-		major, minor, valid := strings.Cut(strings.TrimPrefix(version, "v"), ".")
-		if !valid || !allDigits(major) || !allDigits(minor) {
-			return ""
-		}
-		p = rest
-	}
-	switch p {
+	switch dockerAPIPath(p) {
 	case "containers/create":
 		return "container"
 	case "networks/create":
@@ -50,6 +42,18 @@ func dockerCreateResource(p string) string {
 	default:
 		return ""
 	}
+}
+
+func dockerAPIPath(p string) string {
+	p = strings.TrimPrefix(p, "/")
+	if version, rest, ok := strings.Cut(p, "/"); ok && len(version) > 1 && version[0] == 'v' && version[1] >= '0' && version[1] <= '9' {
+		major, minor, valid := strings.Cut(strings.TrimPrefix(version, "v"), ".")
+		if !valid || !allDigits(major) || !allDigits(minor) {
+			return ""
+		}
+		p = rest
+	}
+	return p
 }
 
 func allDigits(s string) bool {

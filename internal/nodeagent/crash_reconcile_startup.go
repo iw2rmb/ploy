@@ -13,10 +13,20 @@ func (c *ClaimManager) runStartupReconcile(ctx context.Context) error {
 	}
 
 	c.startupOnce.Do(func() {
+		defer close(c.startupDone)
 		c.startupErr = c.runStartupReconcilePass(ctx)
 	})
 
 	return c.startupErr
+}
+
+func (c *ClaimManager) waitStartup(ctx context.Context) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-c.startupDone:
+		return c.startupErr
+	}
 }
 
 func (c *ClaimManager) runStartupReconcilePass(ctx context.Context) error {

@@ -7,9 +7,10 @@ space for the next job. Add local capacity checks and pressure recovery.
 
 ## Scope
 
-Requires [Node-triggered cleanup](node-triggered-cleanup.md). That DD owns job
-hooks, the one-hour cooldown, maintenance locking, 6h/24h workspace retention,
-retained-resume expiry, and retirement of host cleanup.
+Extend [job-boundary cleanup](../docs/node-maintenance.md#job-boundary-cleanup).
+The existing controller owns job hooks, the one-hour cooldown, maintenance
+locking, and workspace deletion. The server owns 6h/24h retention and
+retained-resume expiry.
 
 The owning worktrees are `ploy` and `deploy`
 (`/Users/v.v.kovalev/@gitlab/ploy/deploy`). The node owns capacity decisions.
@@ -17,14 +18,14 @@ Deploy supplies capacity configuration. The server keeps run state and
 operator drains.
 
 Extend the before-job hook. Add no cleanup hook to the claim loop. Preserve
-the prerequisite's retention periods, deletion guards, and artifact boundary.
+the existing retention periods, deletion guards, and artifact boundary.
 Whole-run deletion, disk reservations, and reclaimed-byte reporting remain
 outside this DD. Reuse existing disk-space diagnostics.
 
 ## Observed Constraint
 
 - `collectStorageDiagnostics` reports capacity but does not block execution.
-- The prerequisite skips cleanup during its cooldown or when the exclusive
+- Job-boundary cleanup skips attempts during its cooldown or when the exclusive
   maintenance lock is busy. Overlapping jobs can prevent cleanup indefinitely.
 - `RunSlot` combines a concurrency permit with a shared maintenance lock.
   A job waiting for pressure recovery must release its shared lock so cleanup
@@ -58,7 +59,7 @@ waits for the exclusive lock while those jobs finish. New execution remains
 blocked. Operator drains and host maintenance ownership remain unchanged.
 
 Pressure recovery bypasses the one-hour cleanup cooldown. It uses the
-prerequisite's cleanup owner and maintenance lock. It may relax Docker age
+existing cleanup owner and maintenance lock. It may relax Docker age
 filters for otherwise unused data. It never shortens workspace retention or
 changes container, resource, lease, and volume safeguards.
 
@@ -92,7 +93,7 @@ before/after reclamation reports.
 | --- | --- |
 | Capacity checks and waiting jobs | Controller and before-job hook |
 | Free-space observations | `collectStorageDiagnostics` |
-| Recovery exclusion | Prerequisite cleanup owner and maintenance lock |
+| Recovery exclusion | Existing cleanup owner and maintenance lock |
 | Policy values | Node configuration and deploy configuration |
 
 The node owns pressure recovery. Server diagnostics report capacity; they do
@@ -100,7 +101,7 @@ not authorize cleanup or resume execution.
 
 ## Implementation Slice
 
-After the prerequisite ships, deliver capacity enforcement across both worktrees:
+Deliver capacity enforcement across both worktrees:
 
 - Add validated low-threshold and recovery-target configuration.
 - Extend the before-job hook with fresh storage checks.
@@ -123,7 +124,7 @@ Run focused node lifecycle, storage, and deploy tests. Verify these outcomes:
 - Cleanup below the recovery target does not release waiting jobs.
 - Cancellation releases waiting jobs. Retry backoff prevents a tight loop.
 - Restart requires the recovery target even between the low threshold and target.
-- Recovery preserves 6h/24h retention, operator drains, and the prerequisite's
+- Recovery preserves 6h/24h retention, operator drains, and the existing
   container, resource, lease, volume, and artifact safeguards.
 - Existing diagnostics report free space without new reclaimed-byte reporting.
 
@@ -131,7 +132,6 @@ Use disposable storage and Docker instances for destructive tests.
 
 ## References
 
-- [Node-triggered cleanup prerequisite](node-triggered-cleanup.md).
 - [Node maintenance](../docs/node-maintenance.md).
 - [Storage observations](../internal/nodeagent/storage.go),
   [controller](../internal/nodeagent/controller.go),

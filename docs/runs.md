@@ -164,6 +164,9 @@ The server rejects active runs, cancelled waves, inconsistent job chains, and
 another active run for the repository. A run with status `Cancelled` is eligible only when an actual failed step
 caused cancellation of its successors. An explicitly cancelled chain is rejected.
 
+The server rejects `--from-failed` at or beyond 24 hours after run completion,
+even when the workspace still exists. Use a full restart after this deadline.
+
 This mode requires the retained workspace on the original node. It preserves
 partial edits left by the failed step; it does not restore the step's original
 input. If the workspace is missing, the node fails the retry without downloading
