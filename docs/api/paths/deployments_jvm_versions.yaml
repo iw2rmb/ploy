@@ -1,41 +1,49 @@
 get:
   tags: [Control]
-  summary: Find observed Java dependency combinations
-  operationId: getJavaVersions
+  summary: Find observed JVM dependency combinations
+  operationId: getJVMVersions
   description: |
     Returns dependency combinations observed in Tech Radar software bills of
     materials (SBOMs). Requires the control-plane role; cli-admin includes this role.
 
-    The server searches all retained JVM observations. Each observation is one
-    (tenant, project, commit_sha, module_id, created_at) group. Every requested
-    coordinate and constraint must occur within that observation. The server
-    excludes rows with null tenant, project, module, or snapshot time, and rows
-    with empty coordinates, versions, or commit SHAs.
+    The server searches JVM observations whose SBOM created_at is at or after
+    the cutoff nine calendar months before the Trino query starts, using UTC.
+    The created_at field records when the SBOM file was created. Each observation
+    is one (commit_sha, created_at, module_id) group across tenants and projects.
+    Every requested coordinate and constraint must occur within that observation.
 
-    The server matches java_version metadata by tenant, project = repository,
-    and exact nonempty commit SHA. All matching metadata rows must contain the
-    requested positive decimal integer after whitespace trimming. Missing,
-    invalid, or conflicting metadata excludes the observation. Other Java
-    metadata types do not participate in this filter.
+    The server includes an observation when at least one JVM metadata row matches
+    its exact commit SHA. The metadata
+    type must be jvm_version_yml, jvm_version_dockerfile, jvm_version_gradle,
+    jvm_version_maven, or java_version. The value must equal the requested JVM's
+    decimal string exactly. For JVM 21, the matching value is '21'. The matching
+    metadata row's created_at must be at or after the same cutoff.
 
-    Each returned set contains every distinct version selected by for within
-    one matching observation. The server preserves multiple versions of one
-    coordinate. The server sorts each set lexicographically, deduplicates
+    Each returned set contains every distinct observed version of the coordinates
+    selected by for within one matching observation. Constraints in with filter
+    matching observations and do not appear in the returned sets.
+    A null version uses an empty suffix, such as group:artifact@.
+    The server sorts each set lexicographically, deduplicates
     identical sets, and sorts the resulting sets lexicographically. Results
     include every distinct matching set without truncation or partial results.
 
     SBOM observations can combine dependency configurations, including test
     and tools dependencies. Results establish co-occurrence, not a resolved
-    runtime classpath, deployment success, or runtime compatibility. The JDK
-    filter uses the reported repository JDK major for the commit.
+    runtime classpath, deployment success, or runtime compatibility. The JVM
+    filter uses the reported JVM major for the commit.
 
-    Use with for the migration's fixed dependency baseline and jdk for its JDK
-    major. Treat returned versions as candidates for application validation.
+    Use with for the migration's fixed dependency baseline and the jvm path
+    parameter for its JVM major. Treat returned versions as candidates for
+    application validation.
     Preserve the baseline and rerun the failing check after a version change.
 
     The server trims list items and deduplicates identical items. Empty items,
     malformed coordinates, repeated parameters, unknown parameter names, and
-    an explicitly empty optional parameter produce 400. Package versions are
+    an explicitly empty optional parameter produce 400. A group:artifact coordinate
+    cannot occur in both for and with. The with list can specify only one version
+    per coordinate. Coordinate conflicts produce 400 before the lookup.
+    Coordinates with the same artifact name and different groups are distinct.
+    Package versions are
     opaque exact strings; ranges and wildcard matching are unsupported.
     URL-encode query values, including literal + characters in versions.
 
@@ -46,54 +54,56 @@ get:
     timeout remains unchanged. Errors use plain text without upstream details
     or credentials. A timeout remains 504 when upstream cancellation fails.
   parameters:
+    - name: jvm
+      in: path
+      required: true
+      description: |
+        One positive integer JVM major. Non-integer, non-positive, and
+        comma-separated values are invalid. Query parameters cannot supply the JVM.
+      schema:
+        type: integer
+        format: int64
+        minimum: 1
+      example: 21
     - name: for
       in: query
       required: true
       description: |
         Nonempty comma-separated group:artifact coordinates. Every coordinate
-        must occur in a matching observation. A coordinate can also occur in with.
+        must occur in a matching observation. These coordinates cannot occur in with.
       schema:
         type: string
         minLength: 1
-      example: example:client,example:starter
+      example: ru.tinkoff.top.core:top-tracing-starter
     - name: with
       in: query
       required: false
       description: |
         Comma-separated group:artifact@version constraints. Every constraint
         must occur in the same observation. An explicitly empty value is invalid.
+        Each coordinate permits one version and cannot occur in for.
+        These constraints do not appear in the returned sets.
       schema:
         type: string
         minLength: 1
-      example: org.springframework.boot:spring-boot@4.0.7
-    - name: jdk
-      in: query
-      required: true
-      description: |
-        One positive integer JDK major. Missing, empty, non-integer,
-        non-positive, and comma-separated values are invalid.
-      schema:
-        type: integer
-        minimum: 1
-      example: 21
+      example: org.springframework.boot:spring-boot@3.3.0
   responses:
     "200":
       description: Complete observed dependency sets, or an empty array when none match.
       content:
         application/json:
           schema:
-            $ref: "../components/schemas/techradar.yaml#/JavaVersionsResponse"
+            $ref: "../components/schemas/deployments.yaml#/JVMVersionsResponse"
           examples:
             matches:
               value:
                 versions:
-                  - ["example:client@1.2.0", "example:starter@2.0.1"]
-                  - ["example:client@1.3.0", "example:starter@2.0.2"]
+                  - ["ru.tinkoff.top.core:top-tracing-starter@1.6.1"]
             noMatches:
               value:
                 versions: []
     "400":
-      description: Invalid query parameters.
+      description: Invalid JVM path value or query parameters.
       content:
         text/plain:
           schema:

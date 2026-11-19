@@ -14,18 +14,18 @@ import (
 	"github.com/trinodb/trino-go-client/trino"
 
 	"github.com/iw2rmb/ploy/internal/domain/api"
-	"github.com/iw2rmb/ploy/internal/server/techradar"
+	"github.com/iw2rmb/ploy/internal/server/deployments"
 )
 
-const javaVersionsLookupTimeout = 60 * time.Second
+const jvmVersionsLookupTimeout = 60 * time.Second
 
-type JavaVersionsLookup interface {
-	Lookup(context.Context, techradar.Request) ([][]string, error)
+type JVMVersionsLookup interface {
+	Lookup(context.Context, deployments.Request) ([][]string, error)
 }
 
-func javaVersionsHandler(lookup JavaVersionsLookup) http.HandlerFunc {
+func jvmVersionsHandler(lookup JVMVersionsLookup) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		request, err := parseJavaVersionsRequest(r.URL.RawQuery)
+		request, err := parseJVMVersionsRequest(r.PathValue("jvm"), r.URL.RawQuery)
 		if err != nil {
 			writeHTTPError(w, http.StatusBadRequest, "%s", err)
 			return
@@ -34,7 +34,7 @@ func javaVersionsHandler(lookup JavaVersionsLookup) http.HandlerFunc {
 			writeHTTPError(w, http.StatusServiceUnavailable, "Tech Radar is not configured")
 			return
 		}
-		ctx, cancel := context.WithTimeout(r.Context(), javaVersionsLookupTimeout)
+		ctx, cancel := context.WithTimeout(r.Context(), jvmVersionsLookupTimeout)
 		defer cancel()
 		deadline, _ := ctx.Deadline()
 		// The driver can synchronously cancel twice before returning a timeout.
@@ -52,36 +52,35 @@ func javaVersionsHandler(lookup JavaVersionsLookup) http.HandlerFunc {
 		case err != nil:
 			writeHTTPError(w, http.StatusBadGateway, "Tech Radar lookup failed")
 		default:
-			writeJSON(w, http.StatusOK, api.JavaVersionsResponse{Versions: versions})
+			writeJSON(w, http.StatusOK, api.JVMVersionsResponse{Versions: versions})
 		}
 	}
 }
 
-func parseJavaVersionsRequest(rawQuery string) (techradar.Request, error) {
-	var request techradar.Request
+func parseJVMVersionsRequest(pathJVM, rawQuery string) (deployments.Request, error) {
+	var request deployments.Request
 	values, err := url.ParseQuery(rawQuery)
 	if err != nil {
 		return request, errors.New("invalid query encoding")
 	}
 	for key, items := range values {
-		if key != "for" && key != "with" && key != "jdk" {
+		if key != "for" && key != "with" {
 			return request, errors.New("unknown query parameter")
 		}
 		if len(items) != 1 {
 			return request, fmt.Errorf("%s must occur once", key)
 		}
 	}
-	jdk := values.Get("jdk")
-	if jdk == "" || strings.IndexFunc(jdk, func(r rune) bool { return r < '0' || r > '9' }) >= 0 {
-		return request, errors.New("jdk must be a positive integer")
+	if pathJVM == "" || strings.IndexFunc(pathJVM, func(r rune) bool { return r < '0' || r > '9' }) >= 0 {
+		return request, errors.New("jvm must be a positive integer")
 	}
-	request.JDK, err = strconv.ParseInt(jdk, 10, 64)
-	if err != nil || request.JDK <= 0 {
-		return request, errors.New("jdk must be a positive integer")
+	request.JVM, err = strconv.ParseInt(pathJVM, 10, 64)
+	if err != nil || request.JVM <= 0 {
+		return request, errors.New("jvm must be a positive integer")
 	}
-	seenFor := make(map[techradar.Coordinate]bool)
+	seenFor := make(map[deployments.Coordinate]bool)
 	for _, item := range strings.Split(values.Get("for"), ",") {
-		coordinate, err := parseJavaCoordinate(strings.TrimSpace(item))
+		coordinate, err := parseJVMCoordinate(strings.TrimSpace(item))
 		if err != nil {
 			return request, errors.New("for must contain group:artifact coordinates")
 		}
@@ -91,27 +90,34 @@ func parseJavaVersionsRequest(rawQuery string) (techradar.Request, error) {
 		}
 	}
 	if items, present := values["with"]; present {
-		seenWith := make(map[techradar.Constraint]bool)
+		seenWith := make(map[deployments.Coordinate]string)
 		for _, item := range strings.Split(items[0], ",") {
 			coordinateText, version, found := strings.Cut(strings.TrimSpace(item), "@")
-			coordinate, err := parseJavaCoordinate(coordinateText)
+			coordinate, err := parseJVMCoordinate(coordinateText)
 			if !found || err != nil || version == "" {
 				return request, errors.New("with must contain group:artifact@version constraints")
 			}
-			constraint := techradar.Constraint{Group: coordinate.Group, Artifact: coordinate.Artifact, Version: version}
-			if !seenWith[constraint] {
-				request.With = append(request.With, constraint)
-				seenWith[constraint] = true
+			if seenFor[coordinate] {
+				return request, errors.New("for and with must contain different coordinates")
 			}
+			if previous, exists := seenWith[coordinate]; exists {
+				if previous != version {
+					return request, errors.New("with must specify one version per coordinate")
+				}
+				continue
+			}
+			constraint := deployments.Constraint{Group: coordinate.Group, Artifact: coordinate.Artifact, Version: version}
+			request.With = append(request.With, constraint)
+			seenWith[coordinate] = version
 		}
 	}
 	return request, nil
 }
 
-func parseJavaCoordinate(value string) (techradar.Coordinate, error) {
+func parseJVMCoordinate(value string) (deployments.Coordinate, error) {
 	group, artifact, found := strings.Cut(value, ":")
 	if !found || group == "" || artifact == "" || strings.ContainsAny(group+artifact, ":@") || strings.ContainsFunc(value, unicode.IsSpace) {
-		return techradar.Coordinate{}, errors.New("invalid coordinate")
+		return deployments.Coordinate{}, errors.New("invalid coordinate")
 	}
-	return techradar.Coordinate{Group: group, Artifact: artifact}, nil
+	return deployments.Coordinate{Group: group, Artifact: artifact}, nil
 }

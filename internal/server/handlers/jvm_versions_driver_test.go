@@ -16,10 +16,10 @@ import (
 
 	"github.com/iw2rmb/ploy/internal/domain/api"
 	"github.com/iw2rmb/ploy/internal/server/auth"
-	"github.com/iw2rmb/ploy/internal/server/techradar"
+	"github.com/iw2rmb/ploy/internal/server/deployments"
 )
 
-func TestJavaVersionsTimeoutSurvivesStalledDriverCancellation(t *testing.T) {
+func TestJVMVersionsTimeoutSurvivesStalledDriverCancellation(t *testing.T) {
 	for _, phase := range []string{"initial rows", "row iteration"} {
 		t.Run(phase, func(t *testing.T) {
 			t.Parallel()
@@ -54,7 +54,8 @@ func TestJavaVersionsTimeoutSurvivesStalledDriverCancellation(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer db.Close()
-			handler := javaVersionsHandler(techradar.New(db))
+			handler := http.NewServeMux()
+			handler.HandleFunc("GET /v1/deployments/jvm/{jvm}/versions", jvmVersionsHandler(deployments.New(db)))
 			server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				ctx, cancel := context.WithTimeout(r.Context(), 200*time.Millisecond)
 				defer cancel()
@@ -66,7 +67,7 @@ func TestJavaVersionsTimeoutSurvivesStalledDriverCancellation(t *testing.T) {
 			client := server.Client()
 			client.Timeout = 2*trino.DefaultCancelQueryTimeout + 5*time.Second
 			started := time.Now()
-			response, err := client.Get(server.URL + "/?for=a:b&jdk=21")
+			response, err := client.Get(server.URL + "/v1/deployments/jvm/21/versions?for=a:b")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -86,7 +87,7 @@ func TestJavaVersionsTimeoutSurvivesStalledDriverCancellation(t *testing.T) {
 	}
 }
 
-func TestJavaVersionsClientDisconnectCancelsTrino(t *testing.T) {
+func TestJVMVersionsClientDisconnectCancelsTrino(t *testing.T) {
 	// Closing the HTTP request cancels upstream work after a result page has arrived.
 	started := make(chan struct{})
 	cancelled := make(chan struct{}, 2)
@@ -109,11 +110,13 @@ func TestJavaVersionsClientDisconnectCancelsTrino(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	server := httptest.NewServer(javaVersionsHandler(techradar.New(db)))
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /v1/deployments/jvm/{jvm}/versions", jvmVersionsHandler(deployments.New(db)))
+	server := httptest.NewServer(mux)
 	defer server.Close()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, server.URL+"/?for=a:b&jdk=21", nil)
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, server.URL+"/v1/deployments/jvm/21/versions?for=a:b", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -139,7 +142,7 @@ func TestJavaVersionsClientDisconnectCancelsTrino(t *testing.T) {
 	<-done
 }
 
-func TestJavaVersionsLiveServiceAccount(t *testing.T) {
+func TestJVMVersionsLiveServiceAccount(t *testing.T) {
 	// An explicit opt-in keeps normal unit tests independent of production credentials.
 	if os.Getenv("PLOY_TRINO_INTEGRATION") != "1" {
 		t.Skip("set PLOY_TRINO_INTEGRATION=1 for live Trino verification")
@@ -148,7 +151,7 @@ func TestJavaVersionsLiveServiceAccount(t *testing.T) {
 	if user == "" || password == "" {
 		t.Fatal("live verification requires Trino service-account credentials")
 	}
-	db, err := techradar.Open(user, password)
+	db, err := deployments.Open(user, password)
 	if err != nil {
 		t.Fatal("initialize live Trino lookup")
 	}
@@ -156,14 +159,16 @@ func TestJavaVersionsLiveServiceAccount(t *testing.T) {
 	const tokenSecret = "local-techradar-verification"
 	authorizer := auth.NewAuthorizer(auth.Options{TokenSecret: tokenSecret})
 	defer authorizer.Wait()
-	server := httptest.NewServer(authorizer.Middleware(auth.RoleControlPlane)(javaVersionsHandler(techradar.New(db))))
+	mux := http.NewServeMux()
+	mux.Handle("GET /v1/deployments/jvm/{jvm}/versions", authorizer.Middleware(auth.RoleControlPlane)(jvmVersionsHandler(deployments.New(db))))
+	server := httptest.NewServer(mux)
 	defer server.Close()
 	server.Client().Timeout = 130 * time.Second
 	token, err := auth.GenerateAPIToken(tokenSecret, string(auth.RoleControlPlane), time.Now().Add(5*time.Minute))
 	if err != nil {
 		t.Fatal("create local authentication token")
 	}
-	request, err := http.NewRequest(http.MethodGet, server.URL+"/?for=ru.tinkoff.top.core:top-tracing-starter&with=org.springframework.boot:spring-boot@4.0.7&jdk=21", nil)
+	request, err := http.NewRequest(http.MethodGet, server.URL+"/v1/deployments/jvm/21/versions?for=ru.tinkoff.top.core:top-tracing-starter&with=org.springframework.boot:spring-boot@3.3.0", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -176,7 +181,7 @@ func TestJavaVersionsLiveServiceAccount(t *testing.T) {
 	if response.StatusCode != http.StatusOK {
 		t.Fatalf("live endpoint status = %d", response.StatusCode)
 	}
-	var result api.JavaVersionsResponse
+	var result api.JVMVersionsResponse
 	if err := json.NewDecoder(response.Body).Decode(&result); err != nil || result.Versions == nil {
 		t.Fatal("live endpoint returned an invalid response shape")
 	}

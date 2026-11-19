@@ -54,7 +54,7 @@ func TestOpenAPIRootSchemas(t *testing.T) {
 		"RepoRunSummary",
 		"NamedSpecCatalogEntry",
 		"NamedSpecListResponse",
-		"JavaVersionsResponse",
+		"JVMVersionsResponse",
 	}
 
 	for _, schema := range requiredSchemas {
@@ -117,7 +117,7 @@ func TestSchemaFilesValid(t *testing.T) {
 		"components/schemas/common.yaml",
 		"components/schemas/config.yaml",
 		"components/schemas/controlplane.yaml",
-		"components/schemas/techradar.yaml",
+		"components/schemas/deployments.yaml",
 	}
 
 	for _, file := range schemaFiles {

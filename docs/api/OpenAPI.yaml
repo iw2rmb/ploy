@@ -18,7 +18,7 @@ info:
     - `/v1/runs` — single-repo run submission and run listing.
     - `/v1/runs/{run_id}/*` — run lifecycle, pull resolution, logs, diffs, artifacts, jobs, SBOM views, and worker snapshots.
     - `/v1/waves/{wave_id}/*` — wave inspect, run listing, and wave cancellation.
-    - `/v1/deployments/java/versions` — observed Java dependency combinations from Tech Radar.
+    - `/v1/deployments/jvm/{jvm}/versions` — observed JVM dependency combinations from Tech Radar.
 
     Type semantics and labels:
     - The server and node use strong domain types in code (e.g., `RepoURL`, `GitRef`, `CommitSHA`, `RunID`, resource units). On the wire these remain JSON strings; run, job, and build IDs are KSUID-backed strings, repo and node IDs use NanoID, and only selected resources (diffs, artifact bundles, API/bootstrap tokens) remain UUID-backed.
@@ -66,8 +66,8 @@ paths:
   /v1/pki/bootstrap:
     $ref: "./paths/pki_bootstrap.yaml"
   # Control-plane surfaces
-  /v1/deployments/java/versions:
-    $ref: "./paths/deployments_java_versions.yaml"
+  /v1/deployments/jvm/{jvm}/versions:
+    $ref: "./paths/deployments_jvm_versions.yaml"
   # Run lifecycle and streaming are exposed under /v1/runs/*.
   # Nodes upload logs/diffs/artifacts under /v1/runs/* and complete jobs under /v1/jobs/*.
   /v1/migs:
@@ -230,8 +230,8 @@ components:
     GlobalEnvPutRequest:
       $ref: "./components/schemas/config.yaml#/GlobalEnvPutRequest"
     # Control-plane schemas
-    JavaVersionsResponse:
-      $ref: "./components/schemas/techradar.yaml#/JavaVersionsResponse"
+    JVMVersionsResponse:
+      $ref: "./components/schemas/deployments.yaml#/JVMVersionsResponse"
     Error:
       $ref: "./components/schemas/common.yaml#/Error"
     Run:

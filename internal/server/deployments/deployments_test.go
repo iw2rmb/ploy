@@ -1,4 +1,4 @@
-package techradar
+package deployments
 
 import (
 	"context"
@@ -37,7 +37,7 @@ func TestOpenUsesOneUserForTrinoAndBasicAuthentication(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	if _, err := New(db).Lookup(context.Background(), Request{For: []Coordinate{{"g", "a"}}, JDK: 21}); err != nil {
+	if _, err := New(db).Lookup(context.Background(), Request{For: []Coordinate{{"g", "a"}}, JVM: 21}); err != nil {
 		t.Fatal(err)
 	}
 	if calls.Load() == 0 {
@@ -65,7 +65,7 @@ func TestLookupReturnsSortedDistinctObservedSets(t *testing.T) {
 	}))
 	defer server.Close()
 	db := openTestDB(t, server.URL)
-	got, err := New(db).Lookup(context.Background(), Request{For: []Coordinate{{"g", "a"}}, JDK: 21})
+	got, err := New(db).Lookup(context.Background(), Request{For: []Coordinate{{"g", "a"}}, JVM: 21})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,7 +81,7 @@ func TestLookupReturnsEmptyArrayWhenNoRowsMatch(t *testing.T) {
 		writePage(t, w, "")
 	}))
 	defer server.Close()
-	got, err := New(openTestDB(t, server.URL)).Lookup(context.Background(), Request{For: []Coordinate{{"g", "a"}}, JDK: 21})
+	got, err := New(openTestDB(t, server.URL)).Lookup(context.Background(), Request{For: []Coordinate{{"g", "a"}}, JVM: 21})
 	if err != nil || got == nil || len(got) != 0 {
 		t.Fatalf("Lookup = %v, %v; want empty non-nil result", got, err)
 	}
@@ -117,7 +117,7 @@ func TestLookupDiscardsRowsOnFailure(t *testing.T) {
 				}
 			}))
 			defer server.Close()
-			got, err := New(openTestDB(t, server.URL)).Lookup(context.Background(), Request{For: []Coordinate{{"g", "a"}}, JDK: 21})
+			got, err := New(openTestDB(t, server.URL)).Lookup(context.Background(), Request{For: []Coordinate{{"g", "a"}}, JVM: 21})
 			if err == nil || got != nil {
 				t.Fatalf("Lookup = %v, %v; want error without observations", got, err)
 			}
@@ -159,7 +159,7 @@ func TestLookupCancelsUpstreamWhenContextEnds(t *testing.T) {
 				go func() { <-started; cancel() }()
 			}
 			defer cancel()
-			got, err := New(openTestDB(t, server.URL)).Lookup(ctx, Request{For: []Coordinate{{"g", "a"}}, JDK: 21})
+			got, err := New(openTestDB(t, server.URL)).Lookup(ctx, Request{For: []Coordinate{{"g", "a"}}, JVM: 21})
 			if !errors.Is(err, wantErr) || got != nil || cancelled.Load() == 0 {
 				t.Fatalf("Lookup = %v, %v; cancellations = %d", got, err, cancelled.Load())
 			}

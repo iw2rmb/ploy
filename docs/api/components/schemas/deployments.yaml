@@ -1,4 +1,4 @@
-JavaVersionsResponse:
+JVMVersionsResponse:
   type: object
   required: [versions]
   additionalProperties: false
@@ -7,7 +7,7 @@ JavaVersionsResponse:
       type: array
       uniqueItems: true
       description: |
-        Every distinct observed set for the requested coordinates, sorted
+        Every distinct observed set for coordinates selected by the for parameter, sorted
         lexicographically. An empty array means no observation matched.
         Ordering expresses neither popularity nor compatibility.
       items:
@@ -15,10 +15,10 @@ JavaVersionsResponse:
         minItems: 1
         uniqueItems: true
         description: |
-          Complete observed set of group:artifact@version values, sorted
-          lexicographically. Multiple versions of one coordinate are preserved.
+          Complete observed set of group:artifact@version values for coordinates
+          selected by the for parameter, sorted lexicographically. Each coordinate preserves every
+          observed version. Constraints in with do not appear in the returned sets.
         items:
           type: string
       example:
-        - ["example:client@1.2.0", "example:starter@2.0.1"]
-        - ["example:client@1.3.0", "example:starter@2.0.2"]
+        - ["ru.tinkoff.top.core:top-tracing-starter@1.6.1"]

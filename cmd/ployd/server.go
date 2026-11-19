@@ -13,6 +13,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/server/auth"
 	"github.com/iw2rmb/ploy/internal/server/blobpersist"
 	"github.com/iw2rmb/ploy/internal/server/config"
+	"github.com/iw2rmb/ploy/internal/server/deployments"
 	"github.com/iw2rmb/ploy/internal/server/events"
 	"github.com/iw2rmb/ploy/internal/server/gitlabtokens"
 	"github.com/iw2rmb/ploy/internal/server/handlers"
@@ -23,7 +24,6 @@ import (
 	"github.com/iw2rmb/ploy/internal/server/scheduler"
 	"github.com/iw2rmb/ploy/internal/server/snapshot"
 	"github.com/iw2rmb/ploy/internal/server/speccatalog"
-	"github.com/iw2rmb/ploy/internal/server/techradar"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/store/ttlworker"
 )
@@ -144,14 +144,14 @@ func run(ctx context.Context, cfg config.Config, st store.Store, authorizer *aut
 	applyServerTargetEnv(globalEnvMap)
 
 	trinoConfig := config.LoadTrinoFromEnv()
-	var javaVersions handlers.JavaVersionsLookup
+	var jvmVersions handlers.JVMVersionsLookup
 	if trinoConfig.User != "" && trinoConfig.Password != "" {
-		trinoDB, openErr := techradar.Open(trinoConfig.User, trinoConfig.Password)
+		trinoDB, openErr := deployments.Open(trinoConfig.User, trinoConfig.Password)
 		if openErr != nil {
 			return fmt.Errorf("initialize Trino lookup")
 		}
 		defer trinoDB.Close()
-		javaVersions = techradar.New(trinoDB)
+		jvmVersions = deployments.New(trinoDB)
 	}
 
 	// Load global in entries from the store for ConfigHolder initialization.
@@ -205,7 +205,7 @@ func run(ctx context.Context, cfg config.Config, st store.Store, authorizer *aut
 	})
 
 	// Register HTTP routes.
-	handlers.RegisterRoutes(httpSrv, st, bs, bp, eventsService, configHolder, tokenSecret, gitAuth, snapshotService, specCatalog, []string(cfg.NamedSpecEnvAllowlist), javaVersions, gitLabTokenRegistry)
+	handlers.RegisterRoutes(httpSrv, st, bs, bp, eventsService, configHolder, tokenSecret, gitAuth, snapshotService, specCatalog, []string(cfg.NamedSpecEnvAllowlist), jvmVersions, gitLabTokenRegistry)
 
 	// Initialize metrics server.
 	metricsSrv := metrics.NewServer(cfg.Metrics.Listen)

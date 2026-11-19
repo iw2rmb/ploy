@@ -366,7 +366,7 @@ Trino dependency lookup:
 - `ployd` reads both credentials after server-target environment projection at
   startup. Restart `ployd` after changing either credential.
 - If either credential is missing, the
-  [Java versions endpoint](../api/paths/deployments_java_versions.yaml) returns
+  [JVM versions endpoint](../api/paths/deployments_jvm_versions.yaml) returns
   `503`. Other routes remain available.
 - Configure these credentials for the server only. Keep them out of agent
   environments and the named-spec environment allowlist.
