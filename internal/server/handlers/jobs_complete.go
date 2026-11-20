@@ -25,6 +25,8 @@ type completeJobRequest struct {
 	RepoSHAOut string          `json:"repo_sha_out,omitempty"` // Optional lowercase 40-hex output SHA reported by node.
 }
 
+const maxCompletionBodySize = 64 << 20
+
 // completeJobHandler marks a job as completed with terminal status and stats.
 func completeJobHandler(st store.Store, eventsService *events.Service, bp *blobpersist.Service, registries ...*gitlabtokens.Registry) http.HandlerFunc {
 	service := newCompletionService(st, eventsService, bp, registries...)
@@ -43,7 +45,7 @@ func completeJobHandler(st store.Store, eventsService *events.Service, bp *blobp
 		}
 
 		var req completeJobRequest
-		if err := decodeRequestJSON(w, r, &req, DefaultMaxBodySize); err != nil {
+		if err := decodeRequestJSON(w, r, &req, maxCompletionBodySize); err != nil {
 			return
 		}
 
