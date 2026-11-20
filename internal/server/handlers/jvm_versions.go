@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -14,13 +15,13 @@ import (
 	"github.com/trinodb/trino-go-client/trino"
 
 	"github.com/iw2rmb/ploy/internal/domain/api"
-	"github.com/iw2rmb/ploy/internal/server/deployments"
+	"github.com/iw2rmb/ploy/internal/domain/jvmversions"
 )
 
 const jvmVersionsLookupTimeout = 60 * time.Second
 
 type JVMVersionsLookup interface {
-	Lookup(context.Context, deployments.Request) ([][]string, error)
+	Lookup(context.Context, jvmversions.Request) ([]jvmversions.Observation, error)
 }
 
 func jvmVersionsHandler(lookup JVMVersionsLookup) http.HandlerFunc {
@@ -44,6 +45,9 @@ func jvmVersionsHandler(lookup JVMVersionsLookup) http.HandlerFunc {
 			return
 		}
 		versions, err := lookup.Lookup(ctx, request)
+		if err == nil && ctx.Err() == nil {
+			versions = normalizeJVMVersions(versions)
+		}
 		switch {
 		case errors.Is(ctx.Err(), context.DeadlineExceeded):
 			writeHTTPError(w, http.StatusGatewayTimeout, "Tech Radar lookup timed out")
@@ -57,8 +61,8 @@ func jvmVersionsHandler(lookup JVMVersionsLookup) http.HandlerFunc {
 	}
 }
 
-func parseJVMVersionsRequest(pathJVM, rawQuery string) (deployments.Request, error) {
-	var request deployments.Request
+func parseJVMVersionsRequest(pathJVM, rawQuery string) (jvmversions.Request, error) {
+	var request jvmversions.Request
 	values, err := url.ParseQuery(rawQuery)
 	if err != nil {
 		return request, errors.New("invalid query encoding")
@@ -78,7 +82,7 @@ func parseJVMVersionsRequest(pathJVM, rawQuery string) (deployments.Request, err
 	if err != nil || request.JVM <= 0 {
 		return request, errors.New("jvm must be a positive integer")
 	}
-	seenFor := make(map[deployments.Coordinate]bool)
+	seenFor := make(map[jvmversions.Coordinate]bool)
 	for _, item := range strings.Split(values.Get("for"), ",") {
 		coordinate, err := parseJVMCoordinate(strings.TrimSpace(item))
 		if err != nil {
@@ -90,34 +94,88 @@ func parseJVMVersionsRequest(pathJVM, rawQuery string) (deployments.Request, err
 		}
 	}
 	if items, present := values["with"]; present {
-		seenWith := make(map[deployments.Coordinate]string)
+		seenWith := make(map[jvmversions.Coordinate]jvmversions.Selector)
 		for _, item := range strings.Split(items[0], ",") {
-			coordinateText, version, found := strings.Cut(strings.TrimSpace(item), "@")
+			coordinateText, version, versioned := strings.Cut(strings.TrimSpace(item), "@")
 			coordinate, err := parseJVMCoordinate(coordinateText)
-			if !found || err != nil || version == "" {
-				return request, errors.New("with must contain group:artifact@version constraints")
+			if err != nil {
+				return request, errors.New("with must contain group:artifact or group:artifact@version constraints")
+			}
+			selector := jvmversions.Selector{Kind: jvmversions.Any}
+			if versioned {
+				selector, err = parseJVMVersionSelector(version)
+				if err != nil {
+					return request, err
+				}
 			}
 			if seenFor[coordinate] {
 				return request, errors.New("for and with must contain different coordinates")
 			}
 			if previous, exists := seenWith[coordinate]; exists {
-				if previous != version {
-					return request, errors.New("with must specify one version per coordinate")
+				if previous != selector {
+					return request, errors.New("with must specify one selector per coordinate")
 				}
 				continue
 			}
-			constraint := deployments.Constraint{Group: coordinate.Group, Artifact: coordinate.Artifact, Version: version}
+			constraint := jvmversions.Constraint{Coordinate: coordinate, Selector: selector}
 			request.With = append(request.With, constraint)
-			seenWith[coordinate] = version
+			seenWith[coordinate] = selector
 		}
 	}
 	return request, nil
 }
 
-func parseJVMCoordinate(value string) (deployments.Coordinate, error) {
+func parseJVMCoordinate(value string) (jvmversions.Coordinate, error) {
 	group, artifact, found := strings.Cut(value, ":")
 	if !found || group == "" || artifact == "" || strings.ContainsAny(group+artifact, ":@") || strings.ContainsFunc(value, unicode.IsSpace) {
-		return deployments.Coordinate{}, errors.New("invalid coordinate")
+		return jvmversions.Coordinate{}, errors.New("invalid coordinate")
 	}
-	return deployments.Coordinate{Group: group, Artifact: artifact}, nil
+	return jvmversions.Coordinate{Group: group, Artifact: artifact}, nil
+}
+
+func parseJVMVersionSelector(version string) (jvmversions.Selector, error) {
+	if version == "" {
+		return jvmversions.Selector{}, errors.New("with version must not be empty")
+	}
+	parts := strings.Split(version, ".")
+	if !slices.Contains(parts, "x") {
+		return jvmversions.Selector{Kind: jvmversions.Exact, Value: version}, nil
+	}
+	decimal := func(value string) bool {
+		return value != "" && strings.IndexFunc(value, func(r rune) bool { return r < '0' || r > '9' }) < 0
+	}
+	if len(parts) == 3 && decimal(parts[0]) && parts[2] == "x" {
+		if parts[1] == "x" {
+			return jvmversions.Selector{Kind: jvmversions.Prefix, Value: parts[0] + "."}, nil
+		}
+		if decimal(parts[1]) {
+			return jvmversions.Selector{Kind: jvmversions.Prefix, Value: parts[0] + "." + parts[1] + "."}, nil
+		}
+	}
+	return jvmversions.Selector{}, errors.New("with masks must have the form M.x.x or M.N.x with decimal components")
+}
+
+func normalizeJVMVersions(observations []jvmversions.Observation) []jvmversions.Observation {
+	normalize := func(values []string) []string {
+		if values == nil {
+			return []string{}
+		}
+		slices.Sort(values)
+		return slices.Compact(values)
+	}
+	if observations == nil {
+		return []jvmversions.Observation{}
+	}
+	for i := range observations {
+		observations[i].Found = normalize(observations[i].Found)
+		observations[i].With = normalize(observations[i].With)
+	}
+	compare := func(a, b jvmversions.Observation) int {
+		if order := slices.Compare(a.Found, b.Found); order != 0 {
+			return order
+		}
+		return slices.Compare(a.With, b.With)
+	}
+	slices.SortFunc(observations, compare)
+	return slices.CompactFunc(observations, func(a, b jvmversions.Observation) bool { return compare(a, b) == 0 })
 }

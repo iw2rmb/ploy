@@ -1,6 +1,8 @@
 package api
 
-// JVMVersionsResponse contains observed dependency sets, without compatibility claims.
+import "github.com/iw2rmb/ploy/internal/domain/jvmversions"
+
+// JVMVersionsResponse reports co-occurrence within observations, without compatibility claims.
 type JVMVersionsResponse struct {
-	Versions [][]string `json:"versions"`
+	Versions []jvmversions.Observation `json:"versions"`
 }

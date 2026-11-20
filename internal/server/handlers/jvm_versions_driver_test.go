@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -37,10 +38,13 @@ func TestJVMVersionsTimeoutSurvivesStalledDriverCancellation(t *testing.T) {
 					}
 					page := map[string]any{
 						"id": "timeout-test", "nextUri": upstream.URL + "/next",
-						"columns": []map[string]any{{"name": "versions", "type": "varchar", "typeSignature": map[string]any{"rawType": "varchar", "arguments": []any{}}}},
+						"columns": []map[string]any{
+							{"name": "found", "type": "varchar", "typeSignature": map[string]any{"rawType": "varchar", "arguments": []any{}}},
+							{"name": "with", "type": "varchar", "typeSignature": map[string]any{"rawType": "varchar", "arguments": []any{}}},
+						},
 					}
 					if phase == "row iteration" {
-						page["data"] = [][]string{{`["a:b@1"]`}}
+						page["data"] = [][]string{{`["a:b@1"]`, `[]`}}
 					}
 					_ = json.NewEncoder(w).Encode(page)
 				case http.MethodDelete:
@@ -185,5 +189,15 @@ func TestJVMVersionsLiveServiceAccount(t *testing.T) {
 	if err := json.NewDecoder(response.Body).Decode(&result); err != nil || result.Versions == nil {
 		t.Fatal("live endpoint returned an invalid response shape")
 	}
-	t.Logf("live service-account lookup returned %d observed sets", len(result.Versions))
+	for _, observation := range result.Versions {
+		if len(observation.Found) == 0 || len(observation.With) != 1 || observation.With[0] != "org.springframework.boot:spring-boot@3.3.0" {
+			t.Fatalf("live endpoint returned invalid observation: %+v", observation)
+		}
+		for _, found := range observation.Found {
+			if !strings.HasPrefix(found, "ru.tinkoff.top.core:top-tracing-starter@") {
+				t.Fatalf("live endpoint returned unexpected found coordinate: %q", found)
+			}
+		}
+	}
+	t.Logf("live service-account lookup returned %d observations", len(result.Versions))
 }

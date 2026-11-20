@@ -19,13 +19,21 @@ get:
     decimal string exactly. For JVM 21, the matching value is '21'. The matching
     metadata row's created_at must be at or after the same cutoff.
 
-    Each returned set contains every distinct observed version of the coordinates
-    selected by for within one matching observation. Constraints in with filter
-    matching observations and do not appear in the returned sets.
+    Each object in versions contains two required arrays of group:artifact@version
+    strings from one matching observation. The found array contains every observed
+    version of each for coordinate. The with array contains every matching version
+    of each with coordinate, including exact, masked, and unversioned selectors.
+    An unversioned selector contributes every observed version of its coordinate.
+    A masked selector contributes only versions matching its literal prefix.
     A null version uses an empty suffix, such as group:artifact@.
-    The server sorts each set lexicographically, deduplicates
-    identical sets, and sorts the resulting sets lexicographically. Results
-    include every distinct matching set without truncation or partial results.
+    Multiple matching versions remain together within their observation.
+
+    The server sorts and deduplicates each array lexicographically. It deduplicates
+    complete objects using both arrays, then sorts objects by found followed by with.
+    Objects with identical found arrays and different with arrays remain separate.
+    An omitted with parameter produces an empty with array. Neither array is null
+    or omitted. No matches return {"versions":[]}. Results include every distinct
+    matching object without truncation or partial results.
 
     SBOM observations can combine dependency configurations, including test
     and tools dependencies. Results establish co-occurrence, not a resolved
@@ -40,11 +48,21 @@ get:
     The server trims list items and deduplicates identical items. Empty items,
     malformed coordinates, repeated parameters, unknown parameter names, and
     an explicitly empty optional parameter produce 400. A group:artifact coordinate
-    cannot occur in both for and with. The with list can specify only one version
-    per coordinate. Coordinate conflicts produce 400 before the lookup.
+    cannot occur in both for and with. The with list permits one selector per
+    coordinate. Different selectors for the same coordinate produce 400 before
+    lookup, including unversioned entries combined with exact or masked entries.
     Coordinates with the same artifact name and different groups are distinct.
-    Package versions are
-    opaque exact strings; ranges and wildcard matching are unsupported.
+
+    The with parameter accepts group:artifact, group:artifact@version,
+    group:artifact@M.x.x, and group:artifact@M.N.x. M and N contain one or more
+    ASCII decimal digits; their spelling is preserved. Masks match literal dotted
+    prefixes: 4.x.x matches 4., and 4.0.x matches 4.0. Qualifiers such as
+    4.0.7-RC1 and 4.0.7-SNAPSHOT match. The mask 4.x.x also matches 4.0 and 4.foo,
+    but excludes 40.1. The mask 4.0.x excludes 4.01.1.
+    Standalone lowercase x dot-components are reserved for these two mask forms.
+    Other forms containing those components, including 4.x and 4.x.7, produce 400.
+    An empty version after @ produces 400. Other versions use opaque exact
+    matching; wildcard and range characters have no special meaning.
     URL-encode query values, including literal + characters in versions.
 
     Each lookup uses the request context with a 60-second timeout. Request
@@ -79,26 +97,55 @@ get:
       in: query
       required: false
       description: |
-        Comma-separated group:artifact@version constraints. Every constraint
-        must occur in the same observation. An explicitly empty value is invalid.
-        Each coordinate permits one version and cannot occur in for.
-        These constraints do not appear in the returned sets.
+        Comma-separated group:artifact constraints with optional @version,
+        @M.x.x, or @M.N.x selectors. Every constraint must match in the same
+        observation. An explicitly empty value is invalid. Each coordinate permits
+        one selector and cannot occur in for. The response's with array contains
+        actual observed versions matching these selectors.
       schema:
         type: string
         minLength: 1
-      example: org.springframework.boot:spring-boot@3.3.0
+      examples:
+        exact:
+          value: org.springframework.boot:spring-boot@3.3.0
+        majorMask:
+          value: org.springframework.boot:spring-boot@3.x.x
+        minorMask:
+          value: org.springframework.boot:spring-boot@3.3.x
+        unversioned:
+          value: org.springframework.boot:spring-boot
   responses:
     "200":
-      description: Complete observed dependency sets, or an empty array when none match.
+      description: Complete matching observations, or an empty versions array when none match.
       content:
         application/json:
           schema:
             $ref: "../components/schemas/deployments.yaml#/JVMVersionsResponse"
           examples:
-            matches:
+            exact:
               value:
                 versions:
-                  - ["ru.tinkoff.top.core:top-tracing-starter@1.6.1"]
+                  - found: ["ru.tinkoff.top.core:top-tracing-starter@1.6.1"]
+                    with: ["org.springframework.boot:spring-boot@3.3.0"]
+            masked:
+              summary: A 3.3.x constraint preserves observations with different matched versions.
+              value:
+                versions:
+                  - found: ["ru.tinkoff.top.core:top-tracing-starter@1.6.1"]
+                    with: ["org.springframework.boot:spring-boot@3.3.0"]
+                  - found: ["ru.tinkoff.top.core:top-tracing-starter@1.6.1"]
+                    with: ["org.springframework.boot:spring-boot@3.3.1"]
+            unversioned:
+              summary: An unversioned constraint includes every observed version in one observation.
+              value:
+                versions:
+                  - found: ["ru.tinkoff.top.core:top-tracing-starter@1.6.1"]
+                    with: ["org.springframework.boot:spring-boot@3.3.0", "org.springframework.boot:spring-boot@3.3.1"]
+            withoutConstraints:
+              value:
+                versions:
+                  - found: ["ru.tinkoff.top.core:top-tracing-starter@1.6.1"]
+                    with: []
             noMatches:
               value:
                 versions: []

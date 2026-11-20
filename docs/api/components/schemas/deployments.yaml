@@ -7,18 +7,35 @@ JVMVersionsResponse:
       type: array
       uniqueItems: true
       description: |
-        Every distinct observed set for coordinates selected by the for parameter, sorted
-        lexicographically. An empty array means no observation matched.
-        Ordering expresses neither popularity nor compatibility.
+        Complete matching observations, sorted lexicographically by found followed
+        by with. Identical complete objects collapse. Objects with identical found
+        arrays and different with arrays remain separate. An empty array means
+        no observation matched. Ordering expresses neither popularity nor compatibility.
       items:
-        type: array
-        minItems: 1
-        uniqueItems: true
-        description: |
-          Complete observed set of group:artifact@version values for coordinates
-          selected by the for parameter, sorted lexicographically. Each coordinate preserves every
-          observed version. Constraints in with do not appear in the returned sets.
-        items:
-          type: string
+        type: object
+        required: [found, with]
+        additionalProperties: false
+        properties:
+          found:
+            type: array
+            uniqueItems: true
+            description: |
+              Every observed group:artifact@version value for each for coordinate
+              in one matching observation, sorted lexicographically.
+              A null version uses an empty suffix, such as group:artifact@.
+            items:
+              type: string
+          with:
+            type: array
+            uniqueItems: true
+            description: |
+              Every matching group:artifact@version value for each with coordinate
+              in the same observation, sorted lexicographically. Exact, masked,
+              and unversioned selectors contribute actual observed versions.
+              An omitted with parameter produces an empty array.
+              A null version uses an empty suffix, such as group:artifact@.
+            items:
+              type: string
       example:
-        - ["ru.tinkoff.top.core:top-tracing-starter@1.6.1"]
+        - found: ["ru.tinkoff.top.core:top-tracing-starter@1.6.1"]
+          with: ["org.springframework.boot:spring-boot@3.3.0"]

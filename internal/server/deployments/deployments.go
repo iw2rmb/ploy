@@ -6,29 +6,13 @@ import (
 	"encoding/json"
 	"errors"
 	"net/url"
-	"slices"
 	"strconv"
 	"strings"
 
 	"github.com/trinodb/trino-go-client/trino"
+
+	"github.com/iw2rmb/ploy/internal/domain/jvmversions"
 )
-
-type Coordinate struct {
-	Group    string
-	Artifact string
-}
-
-type Constraint struct {
-	Group    string
-	Artifact string
-	Version  string
-}
-
-type Request struct {
-	For  []Coordinate
-	With []Constraint
-	JVM  int64
-}
 
 type Service struct {
 	db *sql.DB
@@ -52,12 +36,12 @@ func Open(user, password string) (*sql.DB, error) {
 
 // Lookup requires validated inputs with unique, disjoint For and With coordinates.
 // The caller owns the lookup deadline.
-func (s *Service) Lookup(ctx context.Context, request Request) ([][]string, error) {
+func (s *Service) Lookup(ctx context.Context, request jvmversions.Request) ([]jvmversions.Observation, error) {
 	query, args := buildQuery(request)
 	return lookup(ctx, s.db, query, args)
 }
 
-func lookup(ctx context.Context, db *sql.DB, query string, args []any) ([][]string, error) {
+func lookup(ctx context.Context, db *sql.DB, query string, args []any) ([]jvmversions.Observation, error) {
 	rows, err := db.QueryContext(ctx, query, args...)
 	if err != nil {
 		if ctx.Err() != nil {
@@ -66,27 +50,20 @@ func lookup(ctx context.Context, db *sql.DB, query string, args []any) ([][]stri
 		return nil, err
 	}
 	defer rows.Close()
-	versions := make([][]string, 0)
-	seen := make(map[string]struct{})
+	versions := make([]jvmversions.Observation, 0)
 	for rows.Next() {
-		var encoded string
-		if err := rows.Scan(&encoded); err != nil {
+		var found, with string
+		if err := rows.Scan(&found, &with); err != nil {
 			return nil, err
 		}
-		var observed []string
-		if err := json.Unmarshal([]byte(encoded), &observed); err != nil {
+		var observed jvmversions.Observation
+		if err := json.Unmarshal([]byte(found), &observed.Found); err != nil {
 			return nil, err
 		}
-		slices.Sort(observed)
-		observed = slices.Compact(observed)
-		key, err := json.Marshal(observed)
-		if err != nil {
+		if err := json.Unmarshal([]byte(with), &observed.With); err != nil {
 			return nil, err
 		}
-		if _, exists := seen[string(key)]; !exists {
-			seen[string(key)] = struct{}{}
-			versions = append(versions, observed)
-		}
+		versions = append(versions, observed)
 	}
 	iterationErr := rows.Err()
 	closeErr := rows.Close()
@@ -100,11 +77,10 @@ func lookup(ctx context.Context, db *sql.DB, query string, args []any) ([][]stri
 	if closeErr != nil {
 		return nil, closeErr
 	}
-	slices.SortFunc(versions, slices.Compare[[]string])
 	return versions, nil
 }
 
-func buildQuery(request Request) (string, []any) {
+func buildQuery(request jvmversions.Request) (string, []any) {
 	var query strings.Builder
 	args := []any{strconv.FormatInt(request.JVM, 10)}
 	// UTC keeps the observation window independent of the driver's local session time zone.
@@ -121,35 +97,55 @@ func buildQuery(request Request) (string, []any) {
     WHERE c.platform = 'jvm'
       AND c.created_at >= date_add('month', -9, CAST(current_timestamp(6) AT TIME ZONE 'UTC' AS timestamp(6)))
       AND (`)
-	appendPair := func(groupColumn string, coordinate Coordinate) {
-		query.WriteString("(" + groupColumn + " = CAST(? AS VARCHAR) AND name = CAST(? AS VARCHAR))")
+	appendPredicate := func(groupColumn, versionColumn string, coordinate jvmversions.Coordinate, selector jvmversions.Selector) {
+		query.WriteString("(" + groupColumn + " = CAST(? AS VARCHAR) AND name = CAST(? AS VARCHAR)")
 		args = append(args, coordinate.Group, coordinate.Artifact)
+		switch selector.Kind {
+		case jvmversions.Exact:
+			query.WriteString(" AND " + versionColumn + " = CAST(? AS VARCHAR)")
+			args = append(args, selector.Value)
+		case jvmversions.Prefix:
+			query.WriteString(" AND starts_with(" + versionColumn + ", CAST(? AS VARCHAR))")
+			args = append(args, selector.Value)
+		}
+		query.WriteString(")")
 	}
 	for i, coordinate := range request.For {
 		if i > 0 {
 			query.WriteString(" OR ")
 		}
-		appendPair(`c."group"`, coordinate)
+		appendPredicate(`c."group"`, "c.version", coordinate, jvmversions.Selector{Kind: jvmversions.Any})
 	}
 	for _, constraint := range request.With {
-		query.WriteString(" OR (")
-		appendPair(`c."group"`, Coordinate{constraint.Group, constraint.Artifact})
-		query.WriteString(" AND c.version = CAST(? AS VARCHAR))")
-		args = append(args, constraint.Version)
+		query.WriteString(" OR ")
+		appendPredicate(`c."group"`, "c.version", constraint.Coordinate, constraint.Selector)
 	}
 	// Module and snapshot boundaries prevent unrelated components from completing an observation.
 	query.WriteString(`)
 ), observations AS (
     SELECT commit_sha, created_at, module_id,
-        array_sort(array_distinct(array_agg(group_id || ':' || name || '@' || coalesce(version, ''))
+        coalesce(array_agg(group_id || ':' || name || '@' || coalesce(version, ''))
             FILTER (WHERE `)
 	for i, coordinate := range request.For {
 		if i > 0 {
 			query.WriteString(" OR ")
 		}
-		appendPair("group_id", coordinate)
+		appendPredicate("group_id", "version", coordinate, jvmversions.Selector{Kind: jvmversions.Any})
 	}
-	query.WriteString(`))) AS versions
+	query.WriteString(`), CAST(ARRAY[] AS ARRAY(VARCHAR))) AS found,
+        coalesce(array_agg(group_id || ':' || name || '@' || coalesce(version, ''))
+            FILTER (WHERE `)
+	if len(request.With) == 0 {
+		query.WriteString("false")
+	}
+	for i, constraint := range request.With {
+		if i > 0 {
+			query.WriteString(" OR ")
+		}
+		// Source filtering already applied selectors; list membership determines projection.
+		appendPredicate("group_id", "version", constraint.Coordinate, jvmversions.Selector{Kind: jvmversions.Any})
+	}
+	query.WriteString(`), CAST(ARRAY[] AS ARRAY(VARCHAR))) AS matched_with
     FROM components
     GROUP BY commit_sha, created_at, module_id
     HAVING `)
@@ -158,18 +154,17 @@ func buildQuery(request Request) (string, []any) {
 			query.WriteString("\n       AND ")
 		}
 		query.WriteString("count_if(")
-		appendPair("group_id", coordinate)
+		appendPredicate("group_id", "version", coordinate, jvmversions.Selector{Kind: jvmversions.Any})
 		query.WriteString(") > 0")
 	}
 	for _, constraint := range request.With {
 		query.WriteString("\n       AND count_if(")
-		appendPair("group_id", Coordinate{constraint.Group, constraint.Artifact})
-		query.WriteString(" AND version = CAST(? AS VARCHAR)) > 0")
-		args = append(args, constraint.Version)
+		appendPredicate("group_id", "version", constraint.Coordinate, constraint.Selector)
+		query.WriteString(") > 0")
 	}
 	query.WriteString(`
 )
-SELECT json_format(CAST(versions AS JSON))
+SELECT json_format(CAST(found AS JSON)), json_format(CAST(matched_with AS JSON))
 FROM observations
 `)
 	return query.String(), args

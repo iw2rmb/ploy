@@ -7,8 +7,8 @@ version lookup. Add `GET /v1/sbom/jvm/{jvm}/versions?for=&with=`.
 
 ## Scope
 
-Requires [Flexible JVM dependency constraints](jvm-version-selectors.md).
-Reuse its selectors and response contract.
+Reuse the [JVM version lookup contract](../docs/api/paths/deployments_jvm_versions.yaml)
+and its [response schema](../docs/api/components/schemas/deployments.yaml).
 
 Search existing storage at gate-job granularity. One job can contain packages
 from multiple modules. The user selected this observation boundary for the
@@ -40,7 +40,7 @@ new index is included.
 ### Request and observations
 
 Use the shared JVM path, query validation, selectors, projection, ordering,
-and JSON response from the prerequisite DD. `for` remains required.
+and JSON response from the shared JVM version lookup contract. `for` remains required.
 
 A qualifying observation is one job satisfying all these conditions:
 
@@ -101,7 +101,7 @@ The query:
 Parser-enforced coordinate uniqueness makes the count sufficient. Apply exact
 or literal prefix version predicates before grouping. Return both text arrays
 per qualifying job as one shared `Observation`, with `Found` from `for` and
-`With` from `with`. Apply the prerequisite DD's normalization and response
+`With` from `with`. Apply the shared normalization and response
 contract, including an empty `with` array when the request omits constraints.
 
 Subtract nine calendar months from the query-start timestamp in UTC, then
@@ -123,7 +123,7 @@ Deliver the store query and HTTP route together:
 
 - Add the query and regenerate sqlc bindings.
 - Add the lookup adapter and register the control-plane route.
-- Reuse the parser, request types, response schema, and normalization from DD 1.
+- Reuse the parser, request types, response schema, and normalization from the deployments endpoint.
 - Separate source-specific HTTP policy while preserving deployments behavior.
 - Document gate-job observations and add PostgreSQL integration coverage.
 - Correct the SBOM time-attribution comment and its corresponding test message
@@ -149,8 +149,8 @@ Verify these behaviors with PostgreSQL integration and shared HTTP tests:
 - `found` contains requested versions; `with` contains matching exact, masked,
   and unversioned constraints. Both arrays preserve the same job observation.
 - Identical `found` arrays with different `with` arrays remain separate.
-  Empty arrays and complete-object deduplication follow the prerequisite DD.
-- Stored coordinate identity, exact versions, and mask boundaries follow DD 1.
+  Empty arrays and complete-object deduplication follow the shared response contract.
+- Stored coordinate identity, exact versions, and mask boundaries follow the shared selector contract.
 - The route works without Trino configuration and enforces authentication,
   cancellation, timeout status, and its explicit write deadline.
 
