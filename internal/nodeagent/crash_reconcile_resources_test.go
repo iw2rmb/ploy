@@ -22,7 +22,7 @@ func TestDockerResourceRecoveryRemovesTerminalOwnersAndPreservesUnknownJobs(t *t
 		id := types.NewJobID().String()
 		statuses[id] = status
 		if status != "Running" && status != "" {
-			want = append(want, id)
+			want = append(want, id, id+"-retry")
 		}
 	}
 	sort.Strings(want)
@@ -34,7 +34,10 @@ func TestDockerResourceRecoveryRemovesTerminalOwnersAndPreservesUnknownJobs(t *t
 		case p == "/containers/json":
 			var containers []map[string]any
 			for job := range statuses {
-				containers = append(containers, map[string]any{"Id": job, "Labels": map[string]string{types.LabelRunID: "run", types.LabelJobID: job, types.LabelResumeCount: "0", types.LabelJobResource: "true"}})
+				for id, resume := range map[string]string{job: "0", job + "-retry": "1"} {
+					containers = append(containers, map[string]any{"Id": id, "Labels": map[string]string{types.LabelRunID: "run", types.LabelJobID: job, types.LabelResumeCount: resume, types.LabelJobResource: "true"}})
+				}
+				containers = append(containers, map[string]any{"Id": job + "-parent", "Labels": map[string]string{types.LabelRunID: "run", types.LabelJobID: job, types.LabelResumeCount: "0"}})
 			}
 			_ = json.NewEncoder(w).Encode(containers)
 		case p == "/networks":

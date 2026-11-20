@@ -172,7 +172,7 @@ func imageUseTestProxy(t *testing.T, handler http.HandlerFunc, session *dockerIm
 	})}
 	go func() { _ = daemon.Serve(listener) }()
 	t.Cleanup(func() { _ = daemon.Close() })
-	proxy, err := startDockerSocketProxy(context.Background(), nil, socket, root, testDockerJobOwner, session)
+	proxy, err := startDockerSocketProxy(context.Background(), nil, socket, root, testDockerJobOwner, session, time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}

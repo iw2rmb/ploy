@@ -54,7 +54,7 @@ func (r *containerRuntime) prepareDockerSocket(ctx context.Context, spec Contain
 	start := r.startDockerProxy
 	if start == nil {
 		start = func(ctx context.Context, mounts []ContainerMount, upstream, tmpDir string, owner DockerJobOwner) (*dockerSocketProxy, error) {
-			return startDockerSocketProxy(ctx, mounts, upstream, tmpDir, owner, r.imageUse)
+			return startDockerSocketProxy(ctx, mounts, upstream, tmpDir, owner, r.imageUse, 30*time.Second)
 		}
 	}
 	owner, err := DockerJobOwnerFromLabels(spec.Labels)
@@ -91,7 +91,7 @@ func dockerHostSocketPathFromEnv(env map[string]string) string {
 	return socketPath
 }
 
-func startDockerSocketProxy(ctx context.Context, mounts []ContainerMount, upstream, tmpDir string, owner DockerJobOwner, imageUse *dockerImageUseSession) (*dockerSocketProxy, error) {
+func startDockerSocketProxy(ctx context.Context, mounts []ContainerMount, upstream, tmpDir string, owner DockerJobOwner, imageUse *dockerImageUseSession, drainTimeout time.Duration) (*dockerSocketProxy, error) {
 	dir, err := os.MkdirTemp(tmpDir, "docker-")
 	if err != nil {
 		return nil, fmt.Errorf("create Docker proxy directory: %w", err)
@@ -127,6 +127,7 @@ func startDockerSocketProxy(ctx context.Context, mounts []ContainerMount, upstre
 		_ = listener.Close()
 		return nil, err
 	}
+	createCtx, cancelCreates := context.WithCancel(context.WithoutCancel(ctx))
 	var admission sync.Mutex
 	var pending sync.WaitGroup
 	closing := false
@@ -162,9 +163,7 @@ func startDockerSocketProxy(ctx context.Context, mounts []ContainerMount, upstre
 			defer pending.Done()
 			if req.Method == http.MethodPost && dockerCreateResource(req.URL.Path) != "" {
 				// A disconnected caller must not hide a creation still in flight at teardown.
-				requestCtx, cancel := context.WithTimeout(context.WithoutCancel(req.Context()), 30*time.Second)
-				defer cancel()
-				req = req.WithContext(requestCtx)
+				req = req.WithContext(createCtx)
 			}
 			handler.ServeHTTP(w, req)
 		}),
@@ -190,7 +189,22 @@ func startDockerSocketProxy(ctx context.Context, mounts []ContainerMount, upstre
 			_ = conn.Close()
 		}
 		mu.Unlock()
-		pending.Wait()
+		drained := make(chan struct{})
+		go func() {
+			pending.Wait()
+			close(drained)
+		}()
+		timer := time.NewTimer(drainTimeout)
+		defer timer.Stop()
+		select {
+		case <-drained:
+			cancelCreates()
+		case <-timer.C:
+			cancelCreates()
+			transport.CloseIdleConnections()
+			// Cancellation cannot guarantee that the daemon stopped creating resources.
+			return errors.Join(errors.New("Docker create drain incomplete; owned resources require reconciliation"), docker.Close(), os.RemoveAll(dir))
+		}
 		cleanupCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 		cleanupErr := RemoveDockerJobResources(cleanupCtx, docker, owner)

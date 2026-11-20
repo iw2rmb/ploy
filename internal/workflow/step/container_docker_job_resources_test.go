@@ -48,12 +48,14 @@ func TestDockerJobRequestStampsTrustedOwnerAndPreservesApplicationLabels(t *test
 }
 
 type resourceDaemon struct {
-	mu            sync.Mutex
-	resources     map[string]dockerJobResource
-	removed       []string
-	createEntered chan struct{}
-	releaseCreate chan struct{}
-	failRemove    bool
+	mu              sync.Mutex
+	resources       map[string]dockerJobResource
+	removed         []string
+	createEntered   chan struct{}
+	releaseCreate   chan struct{}
+	createCancelled chan struct{}
+	createFinished  chan struct{}
+	failRemove      bool
 }
 
 func (d *resourceDaemon) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -71,11 +73,18 @@ func (d *resourceDaemon) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		if d.createEntered != nil {
 			close(d.createEntered)
+			if d.createCancelled != nil {
+				<-r.Context().Done()
+				close(d.createCancelled)
+			}
 			<-d.releaseCreate
 		}
 		d.mu.Lock()
 		d.resources["created"] = dockerJobResource{dockerCreateResource(p), "created", body.Labels}
 		d.mu.Unlock()
+		if d.createFinished != nil {
+			close(d.createFinished)
+		}
 		w.WriteHeader(http.StatusCreated)
 		_, _ = io.WriteString(w, `{"Id":"created"}`)
 		return
@@ -192,7 +201,7 @@ func TestDockerProxyCancellationWaitsForCreationThenRemovesChild(t *testing.T) {
 	root, socket, _ := startResourceDaemon(t, daemon)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	proxy, err := startDockerSocketProxy(ctx, nil, socket, root, testDockerJobOwner, nil)
+	proxy, err := startDockerSocketProxy(ctx, nil, socket, root, testDockerJobOwner, nil, time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -215,6 +224,19 @@ func TestDockerProxyCancellationWaitsForCreationThenRemovesChild(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("create did not reach daemon")
 	}
+	// Race admission against shutdown while the first creation is still in flight.
+	var callers sync.WaitGroup
+	start := make(chan struct{})
+	for range 8 {
+		callers.Go(func() {
+			<-start
+			resp, err := httpClient.Get("http://docker/_ping")
+			if err == nil {
+				_ = resp.Body.Close()
+			}
+		})
+	}
+	close(start)
 	cancel()
 	done := make(chan error, 1)
 	go func() { done <- proxy.Close() }()
@@ -232,6 +254,7 @@ func TestDockerProxyCancellationWaitsForCreationThenRemovesChild(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("cleanup did not complete")
 	}
+	callers.Wait()
 	<-requestDone
 	daemon.mu.Lock()
 	defer daemon.mu.Unlock()
@@ -240,11 +263,78 @@ func TestDockerProxyCancellationWaitsForCreationThenRemovesChild(t *testing.T) {
 	}
 }
 
+func TestDockerProxyDrainTimeoutLeavesLateCreationForReconciliation(t *testing.T) {
+	daemon := &resourceDaemon{
+		resources:     map[string]dockerJobResource{"child": {"container", "child", testDockerJobOwner.labels()}},
+		createEntered: make(chan struct{}), createCancelled: make(chan struct{}),
+		releaseCreate: make(chan struct{}), createFinished: make(chan struct{}),
+	}
+	root, socket, _ := startResourceDaemon(t, daemon)
+	proxy, err := startDockerSocketProxy(context.Background(), nil, socket, root, testDockerJobOwner, nil, 50*time.Millisecond)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer proxy.Close()
+	release := sync.OnceFunc(func() { close(daemon.releaseCreate) })
+	defer release()
+	transport := &http.Transport{DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
+		return (&net.Dialer{}).DialContext(ctx, "unix", proxy.socketPath)
+	}}
+	defer transport.CloseIdleConnections()
+	ctx, disconnect := context.WithCancel(context.Background())
+	defer disconnect()
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "http://docker/volumes/create", strings.NewReader("{}"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	go func() {
+		resp, err := transport.RoundTrip(req)
+		if err == nil {
+			_ = resp.Body.Close()
+		}
+	}()
+	select {
+	case <-daemon.createEntered:
+	case <-time.After(5 * time.Second):
+		t.Fatal("create did not reach daemon")
+	}
+	disconnect()
+	// Cross the former per-request deadline while the proxy is still accepting requests.
+	select {
+	case <-daemon.createCancelled:
+		t.Fatal("active proxy cancelled admitted creation")
+	case <-time.After(31 * time.Second):
+	}
+	err = proxy.Close()
+	if err == nil || !strings.Contains(err.Error(), "Docker create drain incomplete") {
+		t.Fatalf("Close: %v", err)
+	}
+	if proxy.Close() != err {
+		t.Fatal("repeated Close lost drain error")
+	}
+	select {
+	case <-daemon.createCancelled:
+	case <-time.After(5 * time.Second):
+		t.Fatal("drain timeout did not cancel creation")
+	}
+	release()
+	select {
+	case <-daemon.createFinished:
+	case <-time.After(5 * time.Second):
+		t.Fatal("daemon did not finish late creation")
+	}
+	daemon.mu.Lock()
+	defer daemon.mu.Unlock()
+	if len(daemon.resources) != 2 || len(daemon.removed) != 0 || !testDockerJobOwner.owns(daemon.resources["created"].labels) {
+		t.Fatalf("resources=%v removed=%v", daemon.resources, daemon.removed)
+	}
+}
+
 func TestDockerProxyReturnsCleanupFailureForRetry(t *testing.T) {
 	// Failed removal is visible to the caller and leaves ownership for recovery.
 	daemon := &resourceDaemon{resources: map[string]dockerJobResource{"child": {"container", "child", testDockerJobOwner.labels()}}, failRemove: true}
 	root, socket, _ := startResourceDaemon(t, daemon)
-	proxy, err := startDockerSocketProxy(context.Background(), nil, socket, root, testDockerJobOwner, nil)
+	proxy, err := startDockerSocketProxy(context.Background(), nil, socket, root, testDockerJobOwner, nil, time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}

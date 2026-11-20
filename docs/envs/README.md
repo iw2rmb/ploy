@@ -226,9 +226,11 @@ proxy, including when they create further containers.
 
 The proxy assigns run, job, and retry ownership labels to newly created
 containers, networks, and volumes. Application labels are preserved; callers
-cannot override Ploy ownership. On completion or cancellation, the node closes
-Docker access, waits for in-flight creation requests, and removes the owned
-resources. Main job containers retain their existing log-retention behavior.
+cannot override Ploy ownership. Creation continues after caller disconnect and has no proxy deadline.
+On completion or cancellation, the node closes Docker access and waits up to
+30 seconds for active handlers. After they finish, the node removes owned
+resources. If the wait expires, the node cancels creation requests and leaves
+owned resources for reconciliation. The daemon can still finish a cancelled request. Main job containers retain their existing log-retention behavior.
 Existing external resources are not adopted, and volumes in use are not forced
 out. Startup recovery and idle reconciliation retry cleanup for terminal jobs;
 unknown job status preserves resources. Resources created before ownership
