@@ -27,16 +27,19 @@ type JobStatusResponse struct {
 }
 
 type JobListItem struct {
-	JobID      types.JobID     `json:"job_id"`
-	Name       string          `json:"name"`
-	JobType    types.JobType   `json:"job_type"`
-	Status     types.JobStatus `json:"status"`
-	DurationMs int64           `json:"duration_ms"`
-	JobImage   string          `json:"job_image"`
-	NodeID     *types.NodeID   `json:"node_id"`
-	MigName    string          `json:"mig_name"`
-	RunID      types.RunID     `json:"run_id"`
-	RepoID     types.RepoID    `json:"repo_id"`
+	JobID       types.JobID     `json:"job_id"`
+	Name        string          `json:"name"`
+	DisplayName string          `json:"display_name,omitempty"`
+	JobType     types.JobType   `json:"job_type"`
+	Status      types.JobStatus `json:"status"`
+	DurationMs  int64           `json:"duration_ms"`
+	StartedAt   *time.Time      `json:"started_at,omitempty"`
+	FinishedAt  *time.Time      `json:"finished_at,omitempty"`
+	JobImage    string          `json:"job_image"`
+	NodeID      *types.NodeID   `json:"node_id"`
+	MigName     string          `json:"mig_name"`
+	RunID       types.RunID     `json:"run_id"`
+	RepoID      types.RepoID    `json:"repo_id"`
 }
 
 type JobListResponse struct {

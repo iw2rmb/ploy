@@ -363,7 +363,7 @@ FROM completed
 WHERE next_job.id = completed.next_id;
 
 -- name: ListJobsPage :many
--- Lists jobs with optional run, node, and status filters, ordered newest-to-oldest by job id.
+-- Lists jobs with optional run, node, status, and creator filters, ordered newest-to-oldest by job id.
 -- Joins runs and migs to surface mig_name for CLI and TUI consumers.
 SELECT
 	jobs.id AS job_id,
@@ -375,13 +375,17 @@ SELECT
   jobs.node_id,
   migs.name AS mig_name,
   jobs.run_id,
-  jobs.repo_id
+  jobs.repo_id,
+  jobs.meta,
+  jobs.started_at,
+  jobs.finished_at
 FROM jobs
 JOIN runs ON jobs.run_id = runs.id
 JOIN migs ON runs.mig_id = migs.id
 WHERE (sqlc.narg(run_id)::text IS NULL OR jobs.run_id = sqlc.narg(run_id)::text)
   AND (sqlc.narg(node_id)::text IS NULL OR jobs.node_id = sqlc.narg(node_id)::text)
   AND (sqlc.narg(status)::text IS NULL OR jobs.status::text = sqlc.narg(status)::text)
+  AND (sqlc.narg(created_by)::text IS NULL OR runs.created_by = sqlc.narg(created_by)::text)
 ORDER BY jobs.id DESC
 LIMIT $1 OFFSET $2;
 
@@ -393,4 +397,5 @@ JOIN runs ON jobs.run_id = runs.id
 JOIN migs ON runs.mig_id = migs.id
 WHERE (sqlc.narg(run_id)::text IS NULL OR jobs.run_id = sqlc.narg(run_id)::text)
   AND (sqlc.narg(node_id)::text IS NULL OR jobs.node_id = sqlc.narg(node_id)::text)
-  AND (sqlc.narg(status)::text IS NULL OR jobs.status::text = sqlc.narg(status)::text);
+  AND (sqlc.narg(status)::text IS NULL OR jobs.status::text = sqlc.narg(status)::text)
+  AND (sqlc.narg(created_by)::text IS NULL OR runs.created_by = sqlc.narg(created_by)::text);

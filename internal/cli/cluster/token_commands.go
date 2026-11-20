@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/cli/common"
+	sharedclient "github.com/iw2rmb/ploy/internal/client"
 	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 )
 
@@ -206,27 +207,9 @@ func handleTokenList(args []string, stderr io.Writer) error {
 		return fmt.Errorf("resolve control plane: %w", err)
 	}
 
-	endpoint := strings.TrimSuffix(baseURL.String(), "/") + "/v1/tokens"
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	result, err := (sharedclient.ListTokensCommand{Client: client, BaseURL: baseURL}).Run(ctx)
 	if err != nil {
-		return fmt.Errorf("create request: %w", err)
-	}
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return fmt.Errorf("GET %s: %w", endpoint, err)
-	}
-	defer func() {
-		_ = resp.Body.Close()
-	}()
-
-	if resp.StatusCode != http.StatusOK {
-		return common.ControlPlaneHTTPError(resp)
-	}
-
-	var result domainapi.APITokenListResponse
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return fmt.Errorf("decode response: %w", err)
+		return err
 	}
 
 	if len(result.Tokens) == 0 {

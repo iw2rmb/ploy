@@ -1,144 +1,208 @@
 package tui
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/url"
-	"sort"
+	"time"
 
+	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/list"
 	tea "charm.land/bubbletea/v2"
-
-	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/tui/joblist"
 )
 
-// InitialModel constructs the starting model for the TUI session.
-func InitialModel(client *http.Client, baseURL *url.URL) model {
-	ploy := newPloyList("PLOY", buildPloyItems(false, false, false))
-	ploy.SetFilteringEnabled(false)
+var quitKey = key.NewBinding(key.WithKeys("ctrl+c"), key.WithHelp("ctrl+c", "quit"))
 
+func InitialModel(ctx context.Context, client *http.Client, baseURL *url.URL) model {
+	ploy := newPloyList("PLOY", buildPloyItems(false, "", nil))
+	ploy.SetFilteringEnabled(false)
 	return model{
 		screen:        ScreenPloyList,
 		rootList:      ploy,
-		rightPaneList: newList("", nil),
+		rightPaneList: newRunsList("RUNS", nil),
 		jobList:       joblist.New("JOBS"),
+		usersList:     newListWithWidth("USERS", nil, runsListWidth),
+		usersLoading:  true,
+		ctx:           ctx,
 		client:        client,
 		baseURL:       baseURL,
+		now:           time.Now(),
+		// Reserve the startup request while the token capability determines its creator scope.
+		runsRequest: 1,
+		runsLoading: true,
 	}
 }
 
-// Init satisfies tea.Model. The base shell issues no async commands on start.
 func (m model) Init() tea.Cmd {
-	return nil
+	return loadUsersCmd(m.ctx, m.client, m.baseURL)
 }
 
-// Update satisfies tea.Model and implements the six-screen navigation contract.
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if press, ok := msg.(tea.KeyPressMsg); ok && key.Matches(press, quitKey) {
+		return m, tea.Quit
+	}
+	next, cmd := m.update(msg)
+	m = next.(model)
+	refresh := m.scheduleRefresh()
+	return m, tea.Batch(cmd, refresh)
+}
+
+func (m model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
+		if m.settingFilter() || (msg.String() == "esc" && m.isFiltered()) {
+			return m.updateActiveList(msg)
+		}
 		switch msg.String() {
-		case "ctrl+c", "q":
-			return m, tea.Quit
 		case "enter":
 			return m.handleEnter()
 		case "esc":
 			return m.handleEsc()
 		}
-
+	case refreshTickMsg:
+		return m.handleRefreshTick(time.Time(msg))
 	case tea.WindowSizeMsg:
-		m.setWindowHeight(msg.Height)
+		if msg.Width > 0 {
+			m.windowWidth = msg.Width
+		}
+		if msg.Height > 0 {
+			m.windowHeight = msg.Height
+		}
+		m.applyWindowSize()
 		return m, nil
-
-	case migsLoadedMsg:
-		return m.handleMigsLoaded(msg), nil
+	case usersLoadedMsg:
+		return m.handleUsersLoaded(msg)
 	case runsLoadedMsg:
 		return m.handleRunsLoaded(msg), nil
-	case migDetailsLoadedMsg:
-		return m.handleMigDetailsLoaded(msg), nil
 	case runDetailsLoadedMsg:
 		return m.handleRunDetailsLoaded(msg), nil
 	case jobsLoadedMsg:
 		return m.handleJobsLoaded(msg), nil
-	case jobDetailsLoadedMsg:
-		return m.handleJobDetailsLoaded(msg), nil
 	case errMsg:
 		m.lastErr = msg.err
 		return m, nil
 	}
-
 	return m.updateActiveList(msg)
 }
 
-func (m model) handleMigsLoaded(msg migsLoadedMsg) model {
-	sorted := make([]domainapi.MigSummary, len(msg.migs))
-	copy(sorted, msg.migs)
-	sort.Slice(sorted, func(i, j int) bool {
-		return sorted[i].CreatedAt.After(sorted[j].CreatedAt)
-	})
-	items := make([]list.Item, len(sorted))
-	for i, mig := range sorted {
-		items[i] = listItem{
-			title:       mig.Name,
-			description: mig.ID.String(),
-		}
+func (m model) settingFilter() bool {
+	switch m.screen {
+	case ScreenRunsList:
+		return m.rightPaneList.SettingFilter()
+	case ScreenJobsList:
+		return m.jobList.SettingFilter()
+	case ScreenUsersList:
+		return m.usersList.SettingFilter()
 	}
-	m.rightPaneList = newList("MIGRATIONS", items)
-	m.applyWindowHeight()
-	return m
+	return false
+}
+
+func (m model) isFiltered() bool {
+	switch m.screen {
+	case ScreenRunsList:
+		return m.rightPaneList.IsFiltered()
+	case ScreenJobsList:
+		return m.jobList.IsFiltered()
+	case ScreenUsersList:
+		return m.usersList.IsFiltered()
+	}
+	return false
 }
 
 func (m model) handleRunsLoaded(msg runsLoadedMsg) model {
-	sorted := make([]runSummary, len(msg.runs))
-	copy(sorted, msg.runs)
-	sort.Slice(sorted, func(i, j int) bool {
-		return sorted[i].CreatedAt.After(sorted[j].CreatedAt)
-	})
-	items := make([]list.Item, len(sorted))
-	for i, run := range sorted {
-		items[i] = listItem{
-			title:       run.ID.String(),
-			description: run.MigName + "  " + run.CreatedAt.Format("02 01 15:04"),
+	if msg.requestID != m.runsRequest {
+		return m
+	}
+	m.runsLoading = false
+	if msg.err != nil {
+		m.lastErr = msg.err
+		return m
+	}
+	items := make([]list.Item, len(msg.runs))
+	for i, run := range msg.runs {
+		items[i] = runItem{run: run}
+	}
+	selectedID := domaintypes.RunID("")
+	if selected, ok := m.rightPaneList.SelectedItem().(runItem); ok {
+		selectedID = selected.run.ID
+	}
+	m.rightPaneList.SetItems(items)
+	m.refilterRuns()
+	for index, item := range m.rightPaneList.VisibleItems() {
+		if item.(runItem).run.ID == selectedID {
+			m.rightPaneList.Select(index)
+			break
 		}
 	}
-	m.runs = sorted
-	m.rightPaneList = newRunsList("RUNS", items)
-	m.applyWindowHeight()
+	m.applyWindowSize()
 	return m
 }
 
-func (m model) handleMigDetailsLoaded(msg migDetailsLoadedMsg) model {
-	if m.screen == ScreenMigrationDetails {
-		m.rootList.SetItems(buildDetailsPloyItems([]ployEntry{
-			{title: m.selectedMigName, desc: m.selectedMigID.String()},
-			{title: "Runs", desc: fmt.Sprintf("total: %d", msg.runTotal)},
-			{title: "Jobs", desc: "select job"},
-		}))
-		m.rootList.Select(0)
+func (m *model) refilterRuns() {
+	state := m.rightPaneList.FilterState()
+	if state == list.Unfiltered {
+		return
 	}
-	return m
+	input := m.rightPaneList.FilterInput
+	selectedID := domaintypes.RunID("")
+	if selected, ok := m.rightPaneList.SelectedItem().(runItem); ok {
+		selectedID = selected.run.ID
+	}
+	m.rightPaneList.SetFilterText(input.Value())
+	m.rightPaneList.SetFilterState(state)
+	m.rightPaneList.FilterInput = input
+	for index, item := range m.rightPaneList.VisibleItems() {
+		if item.(runItem).run.ID == selectedID {
+			m.rightPaneList.Select(index)
+			break
+		}
+	}
 }
 
 func (m model) handleRunDetailsLoaded(msg runDetailsLoadedMsg) model {
+	if msg.runID != m.selectedRunID || msg.runID.IsZero() {
+		return m
+	}
+	m.runJobTotal = &msg.jobTotal
 	if m.screen == ScreenRunDetails {
-		m.rootList.SetItems(buildDetailsPloyItems([]ployEntry{
-			{title: m.selectedMigName, desc: m.selectedMigID.String()},
-			{title: "Run", desc: m.selectedRunID.String()},
-			{title: "Jobs", desc: fmt.Sprintf("total: %d", msg.jobTotal)},
-		}))
-		m.rootList.Select(1)
+		m.showRunDetails()
 	}
 	return m
 }
 
-func (m model) handleJobsLoaded(msg jobsLoadedMsg) model {
-	m.jobList = m.jobList.SetJobs(msg.jobs)
-	m.applyWindowHeight()
-	return m
+func (m *model) showRunDetails() {
+	total := "total: —"
+	if m.runJobTotal != nil {
+		total = fmt.Sprintf("total: %d", *m.runJobTotal)
+	}
+	selected := m.rootList.Index()
+	m.rootList.SetItems(buildDetailsPloyItems([]ployEntry{
+		{title: "Run", desc: m.selectedRunID.String()},
+		{title: "Jobs", desc: total},
+	}))
+	m.rootList.Select(selected)
 }
 
-func (m model) handleJobDetailsLoaded(msg jobDetailsLoadedMsg) model {
-	m.jobList = m.jobList.SetDetails(msg.detail)
+func (m model) handleJobsLoaded(msg jobsLoadedMsg) model {
+	if msg.requestID != m.jobsRequest {
+		return m
+	}
+	m.jobsLoading = false
+	if msg.runID != m.selectedRunID {
+		return m
+	}
+	if msg.err != nil {
+		m.lastErr = msg.err
+		if msg.jobs == nil {
+			return m
+		}
+	}
+	m.now = time.Now()
+	m.jobList = m.jobList.RefreshJobs(msg.jobs)
+	m.applyWindowSize()
 	return m
 }
 
@@ -148,19 +212,41 @@ func (m model) updateActiveList(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case ScreenPloyList:
 		prevIdx := m.rootList.Index()
 		m.rootList, cmd = m.rootList.Update(msg)
-		if m.rootList.Index() == 2 && prevIdx != 2 && len(m.jobList.Jobs()) == 0 {
-			cmd = tea.Batch(cmd, loadJobsCmd(m.client, m.baseURL, nil), loadRunsCmd(m.client, m.baseURL))
+		if m.rootList.Index() != prevIdx {
+			cmd = tea.Batch(cmd, m.loadRootPreview())
 		}
-	case ScreenMigrationsList:
-		m.rightPaneList, cmd = m.rightPaneList.Update(msg)
-	case ScreenMigrationDetails:
-		m.rootList, cmd = m.rootList.Update(msg)
-	case ScreenRunsList:
-		m.rightPaneList, cmd = m.rightPaneList.Update(msg)
 	case ScreenRunDetails:
 		m.rootList, cmd = m.rootList.Update(msg)
+	case ScreenRunsList:
+		if _, ok := msg.(list.FilterMatchesMsg); ok {
+			// Filter results carry row snapshots that may predate a periodic refresh.
+			m.refilterRuns()
+			return m, nil
+		}
+		m.rightPaneList, cmd = m.rightPaneList.Update(msg)
 	case ScreenJobsList:
 		m.jobList, cmd = m.jobList.Update(msg)
+	case ScreenUsersList:
+		if _, ok := msg.(list.FilterMatchesMsg); ok {
+			// Filter commands from another list can finish after focus changes.
+			state, input := m.usersList.FilterState(), m.usersList.FilterInput
+			selected, selectedOK := m.usersList.SelectedItem().(userItem)
+			if state != list.Unfiltered {
+				m.usersList.SetFilterText(input.Value())
+				m.usersList.SetFilterState(state)
+				m.usersList.FilterInput = input
+				if selectedOK {
+					for index, item := range m.usersList.VisibleItems() {
+						if item.(userItem).username == selected.username {
+							m.usersList.Select(index)
+							break
+						}
+					}
+				}
+			}
+			return m, nil
+		}
+		m.usersList, cmd = m.usersList.Update(msg)
 	}
 	return m, cmd
 }

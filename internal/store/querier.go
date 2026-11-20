@@ -147,7 +147,7 @@ type Querier interface {
 	ListGlobalEnv(ctx context.Context) ([]ConfigEnv, error)
 	ListJobsByRun(ctx context.Context, runID types.RunID) ([]Job, error)
 	ListJobsByRunAttempt(ctx context.Context, arg ListJobsByRunAttemptParams) ([]Job, error)
-	// Lists jobs with optional run, node, and status filters, ordered newest-to-oldest by job id.
+	// Lists jobs with optional run, node, status, and creator filters, ordered newest-to-oldest by job id.
 	// Joins runs and migs to surface mig_name for CLI and TUI consumers.
 	ListJobsPage(ctx context.Context, arg ListJobsPageParams) ([]ListJobsPageRow, error)
 	// ListLogPartitions retrieves all partition names for the logs table.

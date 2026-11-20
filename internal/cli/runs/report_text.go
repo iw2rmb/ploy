@@ -224,6 +224,10 @@ func isCredentialQueryKey(key string) bool {
 }
 
 func renderStepName(displayName string, jobType string) string {
+	return lipgloss.NewStyle().Bold(true).Render(FormatStepName(displayName, jobType))
+}
+
+func FormatStepName(displayName string, jobType string) string {
 	step := strings.TrimSpace(displayName)
 	if step == "" {
 		step = normalizeStatus(jobType)
@@ -231,7 +235,7 @@ func renderStepName(displayName string, jobType string) string {
 	if step == "" {
 		step = "-"
 	}
-	return lipgloss.NewStyle().Bold(true).Render(step)
+	return step
 }
 
 func firstRunRepo(repos []RunEntry) RunEntry {

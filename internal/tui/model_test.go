@@ -1,97 +1,139 @@
 package tui
 
 import (
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"testing"
+
+	tea "charm.land/bubbletea/v2"
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-// TestModelInit verifies that InitialModel produces a well-formed starting state.
+// Startup resolves Users capability before choosing the Runs creator scope.
 func TestModelInit(t *testing.T) {
-	m := InitialModel(nil, nil)
-
-	if m.screen != ScreenPloyList {
-		t.Errorf("initial screen: got %v, want ScreenPloyList", m.screen)
-	}
-
-	// Init must return nil for the base shell (no async commands on start).
-	cmd := m.Init()
-	if cmd != nil {
-		t.Error("Init: expected nil cmd for base shell")
-	}
-}
-
-// TestModelEscTransitions verifies Esc key transitions between screens.
-func TestModelEscTransitions(t *testing.T) {
-	tests := []struct {
-		name     string
-		from     Screen
-		want     Screen
-		wantQuit bool
-	}{
-		{"S1 quits", ScreenPloyList, ScreenPloyList, true},
-		{"S2 -> S1", ScreenMigrationsList, ScreenPloyList, false},
-		{"S3 -> S2", ScreenMigrationDetails, ScreenMigrationsList, false},
-		{"S4 -> S1", ScreenRunsList, ScreenPloyList, false},
-		{"S5 -> S4", ScreenRunDetails, ScreenRunsList, false},
-		{"S6 -> S1", ScreenJobsList, ScreenPloyList, false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			m := InitialModel(nil, nil)
-			m.screen = tt.from
-			next, cmd := m.handleEsc()
-			nm, ok := next.(model)
-			if !ok {
-				t.Fatal("Update did not return model")
+	for _, admin := range []bool{false, true} {
+		t.Run(fmt.Sprint("admin=", admin), func(t *testing.T) {
+			t.Setenv("USER", "alice")
+			requests := []string{}
+			runID := domaintypes.NewRunID()
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				requests = append(requests, r.URL.Path)
+				switch r.URL.Path {
+				case "/v1/tokens":
+					if !admin {
+						http.Error(w, "forbidden", http.StatusForbidden)
+						return
+					}
+					fmt.Fprint(w, `{"tokens":[{"username":"alice"}]}`)
+				case "/v1/runs":
+					if r.URL.Query().Get("limit") != "100" || (r.URL.Query().Get("all") == "true") != admin || (!admin && r.URL.Query().Get("created_by") != "alice") {
+						t.Errorf("unexpected startup scope: %s", r.URL)
+					}
+					fmt.Fprintf(w, `{"runs":[{"id":%q,"status":"Success"}]}`, runID.String())
+				default:
+					t.Errorf("unexpected startup request: %s", r.URL)
+				}
+			}))
+			defer server.Close()
+			base, _ := url.Parse(server.URL)
+			m := InitialModel(t.Context(), server.Client(), base)
+			if m.screen != ScreenPloyList || m.rootList.Index() != runsIndex || !m.usersLoading || !m.runsLoading || m.runsRequest != 1 {
+				t.Fatal("unexpected startup state")
 			}
-			if nm.screen != tt.want {
-				t.Errorf("screen after Esc: got %v, want %v", nm.screen, tt.want)
+			msg, ok := m.Init()().(usersLoadedMsg)
+			if !ok || msg.err != nil || msg.enabled != admin || len(requests) != 1 || requests[0] != "/v1/tokens" || !m.usersLoading {
+				t.Fatalf("capability result = %+v, requests = %v", msg, requests)
 			}
-			if gotQuit := cmd != nil; gotQuit != tt.wantQuit {
-				t.Errorf("quit command after Esc: got %v, want %v", gotQuit, tt.wantQuit)
+			next, cmd := m.Update(msg)
+			m = next.(model)
+			if m.usersLoading || m.usersEnabled != admin || cmd == nil {
+				t.Fatal("capability did not start the Runs load")
+			}
+			runs, ok := cmd().(runsLoadedMsg)
+			if !ok || runs.err != nil || runs.requestID != m.runsRequest || len(requests) != 2 || requests[1] != "/v1/runs" {
+				t.Fatalf("Runs startup result = %+v, requests = %v", runs, requests)
+			}
+			next, _ = m.Update(runs)
+			m = next.(model)
+			if m.runsLoading || len(m.rightPaneList.Items()) != 1 || m.rightPaneList.Items()[0].(runItem).run.ID != runID {
+				t.Fatal("startup result did not populate the root preview")
 			}
 		})
 	}
 }
 
-// TestModelEnterTransitionsFromRoot verifies Enter from S1 transitions to the
-// correct secondary screen based on selected root item index.
-func TestModelEnterTransitionsFromRoot(t *testing.T) {
+// Esc returns to the parent screen without quitting.
+func TestModelEscTransitions(t *testing.T) {
 	tests := []struct {
+		name       string
+		from, want Screen
+		scope      domaintypes.RunID
+	}{
+		{"root", ScreenPloyList, ScreenPloyList, ""},
+		{"runs", ScreenRunsList, ScreenPloyList, ""},
+		{"run details", ScreenRunDetails, ScreenRunsList, "run-1"},
+		{"global jobs", ScreenJobsList, ScreenPloyList, ""},
+		{"users", ScreenUsersList, ScreenPloyList, ""},
+		{"scoped jobs", ScreenJobsList, ScreenRunDetails, "run-1"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := InitialModel(t.Context(), nil, nil)
+			m.screen = tt.from
+			m.selectedRunID = tt.scope
+			next, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+			nm := next.(model)
+			if nm.screen != tt.want || cmd != nil {
+				t.Fatalf("Esc = screen %v, command %v; want screen %v without command", nm.screen, cmd, tt.want)
+			}
+			if tt.want == ScreenPloyList || tt.want == ScreenRunsList {
+				assertPloyItems(t, nm, []listItem{{title: "Runs", description: "select run"}, {title: "Jobs", description: "select job"}, {title: "Users", description: "cli-admin only"}})
+			}
+		})
+	}
+}
+
+// Ctrl+C quits on every screen; q remains a normal key.
+func TestModelQuitKeys(t *testing.T) {
+	for _, screen := range []Screen{ScreenPloyList, ScreenRunsList, ScreenRunDetails, ScreenJobsList, ScreenUsersList} {
+		m := InitialModel(t.Context(), nil, nil)
+		m.screen = screen
+		_, cmd := m.Update(tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl})
+		if cmd == nil {
+			t.Fatalf("screen %v: Ctrl+C returned no command", screen)
+		}
+		if _, ok := cmd().(tea.QuitMsg); !ok {
+			t.Fatalf("screen %v: Ctrl+C did not quit", screen)
+		}
+		next, cmd := m.Update(tea.KeyPressMsg{Code: 'q', Text: "q"})
+		if next.(model).screen != screen {
+			t.Fatalf("q changed screen %v", screen)
+		}
+		if cmd != nil {
+			if _, ok := cmd().(tea.QuitMsg); ok {
+				t.Fatalf("screen %v: q quit", screen)
+			}
+		}
+	}
+}
+
+// Enter opens the root entry's list.
+func TestModelEnterTransitionsFromRoot(t *testing.T) {
+	for _, tt := range []struct {
 		name  string
 		index int
 		want  Screen
-	}{
-		{"Migrations", 0, ScreenMigrationsList},
-		{"Runs", 1, ScreenRunsList},
-		{"Jobs", 2, ScreenJobsList},
-	}
-
-	for _, tt := range tests {
+	}{{"Runs", 0, ScreenRunsList}, {"Jobs", 1, ScreenJobsList}} {
 		t.Run(tt.name, func(t *testing.T) {
-			m := InitialModel(nil, nil)
+			m := InitialModel(t.Context(), nil, nil)
 			m.rootList.Select(tt.index)
-			next, _ := m.handleEnter()
-			nm, ok := next.(model)
-			if !ok {
-				t.Fatal("handleEnter did not return model")
-			}
-			if nm.screen != tt.want {
-				t.Errorf("screen after Enter(%s): got %v, want %v", tt.name, nm.screen, tt.want)
+			next, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+			if next.(model).screen != tt.want || cmd != nil {
+				t.Fatalf("Enter = screen %v, cmd %v; want %v without another load", next.(model).screen, cmd, tt.want)
 			}
 		})
-	}
-}
-
-// TestNewListInvariants verifies that newList enforces width=24 and help=false.
-func TestNewListInvariants(t *testing.T) {
-	l := newList("TEST", nil)
-
-	if l.Width() != listWidth {
-		t.Errorf("list width: got %d, want %d", l.Width(), listWidth)
-	}
-	if l.Title != "TEST" {
-		t.Errorf("list title: got %q, want %q", l.Title, "TEST")
 	}
 }
 

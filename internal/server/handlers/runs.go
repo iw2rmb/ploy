@@ -160,7 +160,21 @@ func listRunsHandler(st store.Store) http.HandlerFunc {
 
 		allRuns := strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("all")), "true")
 		createdBy := strings.TrimSpace(r.URL.Query().Get("created_by"))
-		if !allRuns {
+		creator := strings.TrimSpace(r.URL.Query().Get("creator"))
+		if creator != "" {
+			identity, _ := auth.IdentityFromContext(r.Context())
+			if identity.Role != auth.RoleCLIAdmin {
+				writeHTTPError(w, http.StatusForbidden, "creator requires cli-admin role")
+				return
+			}
+			if allRuns {
+				writeHTTPError(w, http.StatusBadRequest, "creator cannot be combined with all=true")
+				return
+			}
+			createdBy = creator
+		} else if allRuns {
+			createdBy = ""
+		} else {
 			resolved, err := resolvedCreatedBy(r.Context(), st, createdBy)
 			if err != nil {
 				writeHTTPError(w, http.StatusInternalServerError, "failed to resolve caller identity: %v", err)
@@ -169,8 +183,6 @@ func listRunsHandler(st store.Store) http.HandlerFunc {
 			if resolved != nil {
 				createdBy = *resolved
 			}
-		} else {
-			createdBy = ""
 		}
 
 		repoURL := strings.TrimSpace(r.URL.Query().Get("repo_url"))

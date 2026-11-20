@@ -7,12 +7,12 @@ import (
 
 	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/server/auth"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
 // listJobsHandler returns a paginated, optionally filtered list of jobs with mig context.
 // GET /v1/jobs
-// Query params: ?limit=N&offset=N&run_id=<id>&node_id=<id>&status=<status> (all optional)
 func listJobsHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		limit, offset, err := parsePagination(r)
@@ -41,6 +41,15 @@ func listJobsHandler(st store.Store) http.HandlerFunc {
 			status = &parsed
 		}
 
+		creator := strings.TrimSpace(r.URL.Query().Get("creator"))
+		if creator != "" {
+			identity, _ := auth.IdentityFromContext(r.Context())
+			if identity.Role != auth.RoleCLIAdmin {
+				writeHTTPError(w, http.StatusForbidden, "creator requires cli-admin role")
+				return
+			}
+		}
+
 		var runIDStr, nodeIDStr, statusStr *string
 		if runID != nil {
 			s := runID.String()
@@ -56,16 +65,18 @@ func listJobsHandler(st store.Store) http.HandlerFunc {
 		}
 
 		filters := store.CountJobsPageParams{
-			RunID:  runIDStr,
-			NodeID: nodeIDStr,
-			Status: statusStr,
+			RunID:     runIDStr,
+			NodeID:    nodeIDStr,
+			Status:    statusStr,
+			CreatedBy: stringPtrOrNil(creator),
 		}
 		jobs, err := st.ListJobsPage(r.Context(), store.ListJobsPageParams{
-			Limit:  limit,
-			Offset: offset,
-			RunID:  filters.RunID,
-			NodeID: filters.NodeID,
-			Status: filters.Status,
+			Limit:     limit,
+			Offset:    offset,
+			RunID:     filters.RunID,
+			NodeID:    filters.NodeID,
+			Status:    filters.Status,
+			CreatedBy: filters.CreatedBy,
 		})
 		if err != nil {
 			writeHTTPError(w, http.StatusInternalServerError, "failed to list jobs: %v", err)
@@ -82,17 +93,26 @@ func listJobsHandler(st store.Store) http.HandlerFunc {
 
 		items := make([]domainapi.JobListItem, 0, len(jobs))
 		for _, j := range jobs {
-			items = append(items, domainapi.JobListItem{
-				JobID:      j.JobID,
-				Name:       j.Name,
+			presentation := runJobFromStore(store.Job{
 				JobType:    j.JobType,
-				Status:     j.Status,
-				DurationMs: j.DurationMs,
-				JobImage:   j.JobImage,
-				NodeID:     j.NodeID,
-				MigName:    j.MigName,
-				RunID:      j.RunID,
-				RepoID:     j.RepoID,
+				Meta:       j.Meta,
+				StartedAt:  j.StartedAt,
+				FinishedAt: j.FinishedAt,
+			})
+			items = append(items, domainapi.JobListItem{
+				JobID:       j.JobID,
+				DisplayName: presentation.DisplayName,
+				StartedAt:   presentation.StartedAt,
+				FinishedAt:  presentation.FinishedAt,
+				Name:        j.Name,
+				JobType:     j.JobType,
+				Status:      j.Status,
+				DurationMs:  j.DurationMs,
+				JobImage:    j.JobImage,
+				NodeID:      j.NodeID,
+				MigName:     j.MigName,
+				RunID:       j.RunID,
+				RepoID:      j.RepoID,
 			})
 		}
 

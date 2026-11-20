@@ -3,12 +3,16 @@ get:
   summary: List jobs
   description: |
     Return a paginated list of jobs with migration context for CLI and TUI consumers.
-    Each entry includes `job_id`, `name`, `status`, `duration_ms`, `job_image`,
+    Each entry includes `job_id`, `name`, `job_type`, `status`, `duration_ms`, `job_image`,
     `node_id`, `mig_name`, `run_id`, and `repo_id`.
+    Entries include `display_name` when job metadata contains a step name.
+    Entries include `started_at` and `finished_at` when those timestamps are available.
+    Display names match the run jobs endpoint; `name` retains the stored job name.
 
     Results are ordered newest-to-oldest by job ID (KSUID).
     An optional `run_id` filter scopes results to a single run (used for run-detail job totals).
     The `total` field reflects the total count for the applied filter, enabling pagination.
+    An optional `creator` filter selects the run creator before pagination and requires `cli-admin`.
   parameters:
     - in: query
       name: limit
@@ -33,6 +37,12 @@ get:
       schema:
         type: string
       description: Optional run ID (KSUID) to filter jobs to a single run.
+    - in: query
+      name: creator
+      required: false
+      schema:
+        type: string
+      description: Optional run creator filter. Requires cli-admin; omitted or blank includes all creators.
     - in: query
       name: node_id
       required: false
@@ -65,6 +75,20 @@ get:
                     name:
                       type: string
                       description: Job name
+                    display_name:
+                      type: string
+                      description: User-defined step name from job metadata, when available.
+                    job_type:
+                      type: string
+                      description: Canonical job type, used as the display label when display_name is empty.
+                    started_at:
+                      type: string
+                      format: date-time
+                      description: Job execution start time in UTC, omitted before execution starts.
+                    finished_at:
+                      type: string
+                      format: date-time
+                      description: Job execution finish time in UTC, omitted until available.
                     status:
                       type: string
                       description: Job lifecycle status (`Created|Queued|Running|Success|Fail|Error|Cancelled`).
@@ -88,7 +112,7 @@ get:
                     repo_id:
                       type: string
                       description: Repo ID (NanoID 8-character string)
-                  required: [job_id, name, status, duration_ms, job_image, mig_name, run_id, repo_id]
+                  required: [job_id, name, job_type, status, duration_ms, job_image, mig_name, run_id, repo_id]
               total:
                 type: integer
                 format: int64
@@ -100,6 +124,8 @@ get:
         application/json:
           schema:
             $ref: '../components/schemas/common.yaml#/Error'
+    '403':
+      description: Forbidden (creator requires cli-admin).
     '500':
       description: Internal server error
       content:

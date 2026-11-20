@@ -189,6 +189,36 @@ func TestListJobsPage(t *testing.T) {
 		}
 	})
 
+	// Creator filtering excludes newer jobs from other creators before applying the page offset.
+	t.Run("CreatorFilterBeforePagination", func(t *testing.T) {
+		creator := "creator-" + fxA.Run.ID.String()
+		if _, err := db.Pool().Exec(ctx, "UPDATE runs SET created_by = $1 WHERE id = $2", creator, fxA.Run.ID); err != nil {
+			t.Fatal(err)
+		}
+		for offset, want := range []types.JobID{jobA2, jobA1} {
+			rows, err := db.ListJobsPage(ctx, ListJobsPageParams{Limit: 1, Offset: int32(offset), CreatedBy: &creator})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(rows) != 1 || rows[0].JobID != want {
+				t.Fatalf("creator page %d = %+v, want %s", offset, rows, want)
+			}
+		}
+		count, err := db.CountJobsPage(ctx, CountJobsPageParams{CreatedBy: &creator})
+		if err != nil || count != 2 {
+			t.Fatalf("creator total = %d, error %v; want 2", count, err)
+		}
+		runB := fxB.Run.ID.String()
+		rows, err := db.ListJobsPage(ctx, ListJobsPageParams{Limit: 100, RunID: &runB, CreatedBy: &creator})
+		if err != nil || len(rows) != 0 {
+			t.Fatalf("other creator's run = %+v, error %v; want empty", rows, err)
+		}
+		count, err = db.CountJobsPage(ctx, CountJobsPageParams{RunID: &runB, CreatedBy: &creator})
+		if err != nil || count != 0 {
+			t.Fatalf("other creator's run total = %d, error %v; want 0", count, err)
+		}
+	})
+
 	t.Run("CountJobsPage_Unfiltered", func(t *testing.T) {
 		count, err := db.CountJobsPage(ctx, CountJobsPageParams{})
 		if err != nil {

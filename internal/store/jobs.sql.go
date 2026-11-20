@@ -135,17 +135,24 @@ JOIN migs ON runs.mig_id = migs.id
 WHERE ($1::text IS NULL OR jobs.run_id = $1::text)
   AND ($2::text IS NULL OR jobs.node_id = $2::text)
   AND ($3::text IS NULL OR jobs.status::text = $3::text)
+  AND ($4::text IS NULL OR runs.created_by = $4::text)
 `
 
 type CountJobsPageParams struct {
-	RunID  *string `json:"run_id"`
-	NodeID *string `json:"node_id"`
-	Status *string `json:"status"`
+	RunID     *string `json:"run_id"`
+	NodeID    *string `json:"node_id"`
+	Status    *string `json:"status"`
+	CreatedBy *string `json:"created_by"`
 }
 
 // Counts jobs matching the same optional filters as ListJobsPage.
 func (q *Queries) CountJobsPage(ctx context.Context, arg CountJobsPageParams) (int64, error) {
-	row := q.db.QueryRow(ctx, countJobsPage, arg.RunID, arg.NodeID, arg.Status)
+	row := q.db.QueryRow(ctx, countJobsPage,
+		arg.RunID,
+		arg.NodeID,
+		arg.Status,
+		arg.CreatedBy,
+	)
 	var column_1 int64
 	err := row.Scan(&column_1)
 	return column_1, err
@@ -486,39 +493,47 @@ SELECT
   jobs.node_id,
   migs.name AS mig_name,
   jobs.run_id,
-  jobs.repo_id
+  jobs.repo_id,
+  jobs.meta,
+  jobs.started_at,
+  jobs.finished_at
 FROM jobs
 JOIN runs ON jobs.run_id = runs.id
 JOIN migs ON runs.mig_id = migs.id
 WHERE ($3::text IS NULL OR jobs.run_id = $3::text)
   AND ($4::text IS NULL OR jobs.node_id = $4::text)
   AND ($5::text IS NULL OR jobs.status::text = $5::text)
+  AND ($6::text IS NULL OR runs.created_by = $6::text)
 ORDER BY jobs.id DESC
 LIMIT $1 OFFSET $2
 `
 
 type ListJobsPageParams struct {
-	Limit  int32   `json:"limit"`
-	Offset int32   `json:"offset"`
-	RunID  *string `json:"run_id"`
-	NodeID *string `json:"node_id"`
-	Status *string `json:"status"`
+	Limit     int32   `json:"limit"`
+	Offset    int32   `json:"offset"`
+	RunID     *string `json:"run_id"`
+	NodeID    *string `json:"node_id"`
+	Status    *string `json:"status"`
+	CreatedBy *string `json:"created_by"`
 }
 
 type ListJobsPageRow struct {
-	JobID      types.JobID     `json:"job_id"`
-	Name       string          `json:"name"`
-	JobType    types.JobType   `json:"job_type"`
-	Status     types.JobStatus `json:"status"`
-	DurationMs int64           `json:"duration_ms"`
-	JobImage   string          `json:"job_image"`
-	NodeID     *types.NodeID   `json:"node_id"`
-	MigName    string          `json:"mig_name"`
-	RunID      types.RunID     `json:"run_id"`
-	RepoID     types.RepoID    `json:"repo_id"`
+	JobID      types.JobID        `json:"job_id"`
+	Name       string             `json:"name"`
+	JobType    types.JobType      `json:"job_type"`
+	Status     types.JobStatus    `json:"status"`
+	DurationMs int64              `json:"duration_ms"`
+	JobImage   string             `json:"job_image"`
+	NodeID     *types.NodeID      `json:"node_id"`
+	MigName    string             `json:"mig_name"`
+	RunID      types.RunID        `json:"run_id"`
+	RepoID     types.RepoID       `json:"repo_id"`
+	Meta       []byte             `json:"meta"`
+	StartedAt  pgtype.Timestamptz `json:"started_at"`
+	FinishedAt pgtype.Timestamptz `json:"finished_at"`
 }
 
-// Lists jobs with optional run, node, and status filters, ordered newest-to-oldest by job id.
+// Lists jobs with optional run, node, status, and creator filters, ordered newest-to-oldest by job id.
 // Joins runs and migs to surface mig_name for CLI and TUI consumers.
 func (q *Queries) ListJobsPage(ctx context.Context, arg ListJobsPageParams) ([]ListJobsPageRow, error) {
 	rows, err := q.db.Query(ctx, listJobsPage,
@@ -527,6 +542,7 @@ func (q *Queries) ListJobsPage(ctx context.Context, arg ListJobsPageParams) ([]L
 		arg.RunID,
 		arg.NodeID,
 		arg.Status,
+		arg.CreatedBy,
 	)
 	if err != nil {
 		return nil, err
@@ -546,6 +562,9 @@ func (q *Queries) ListJobsPage(ctx context.Context, arg ListJobsPageParams) ([]L
 			&i.MigName,
 			&i.RunID,
 			&i.RepoID,
+			&i.Meta,
+			&i.StartedAt,
+			&i.FinishedAt,
 		); err != nil {
 			return nil, err
 		}

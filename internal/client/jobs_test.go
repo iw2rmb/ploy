@@ -25,7 +25,7 @@ func TestListJobsCommandSendsFiltersAndDecodesResponse(t *testing.T) {
 		}
 		for key, want := range map[string]string{
 			"limit": "5", "offset": "10", "run_id": runID.String(),
-			"node_id": nodeID.String(), "status": status.String(),
+			"node_id": nodeID.String(), "status": status.String(), "creator": "alice",
 		} {
 			if got := r.URL.Query().Get(key); got != want {
 				t.Errorf("%s = %q, want %q", key, got, want)
@@ -45,7 +45,7 @@ func TestListJobsCommandSendsFiltersAndDecodesResponse(t *testing.T) {
 
 	result, err := (ListJobsCommand{
 		Client: server.Client(), BaseURL: baseURL, Limit: 5, Offset: 10,
-		RunID: &runID, NodeID: &nodeID, Status: &status,
+		RunID: &runID, NodeID: &nodeID, Status: &status, Creator: " alice ",
 	}).Run(context.Background())
 	if err != nil {
 		t.Fatalf("Run() error = %v", err)

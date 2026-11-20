@@ -17,7 +17,6 @@ import (
 
 	"github.com/iw2rmb/ploy/internal/cli/common"
 	sharedclient "github.com/iw2rmb/ploy/internal/client"
-	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 type ListOptions struct {
@@ -84,49 +83,8 @@ func RunList(ctx context.Context, opts ListOptions) error {
 	_, _ = fmt.Fprintln(tw, "ID\tSTATUS\tSPEC\tREPO")
 	for _, b := range runs {
 		_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n",
-			b.ID, b.Status, formatRunListSpec(b), formatRunListRepo(b.RepoURL, b.SourceCommitSHA))
+			b.ID, b.Status, common.FormatRunListSpec(b), common.FormatRunListRepo(b.RepoURL, b.SourceCommitSHA))
 	}
 	_ = tw.Flush()
 	return nil
-}
-
-func formatRunListSpec(summary domaintypes.RunSummary) string {
-	domain := strings.Trim(strings.TrimSpace(summary.SpecSourceDomain), "/")
-	repo := strings.Trim(strings.TrimSpace(summary.SpecSourceRepo), "/")
-	name := strings.TrimSpace(summary.SpecName)
-	if domain != "" && repo != "" && name != "" {
-		return domain + "/" + repo + ":" + name
-	}
-	if !summary.SpecID.IsZero() {
-		return summary.SpecID.String()
-	}
-	return "-"
-}
-
-func formatRunListRepo(repoURL, sourceCommitSHA string) string {
-	repo := formatRepoNamespace(repoURL)
-	sha := strings.TrimSpace(sourceCommitSHA)
-	if len(sha) > 8 {
-		sha = sha[:8]
-	}
-	if repo == "" {
-		return "-"
-	}
-	if sha == "" {
-		return repo
-	}
-	return repo + ":" + sha
-}
-
-func formatRepoNamespace(repoURL string) string {
-	display := domaintypes.NormalizeRepoURLSchemless(repoURL)
-	display = strings.Trim(display, "/")
-	if display == "" {
-		return ""
-	}
-	parts := strings.Split(display, "/")
-	if len(parts) <= 2 {
-		return display
-	}
-	return strings.Join(parts[1:], "/")
 }

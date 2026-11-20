@@ -110,14 +110,17 @@ func StatusGlyph(status string, spinnerFrame int) string {
 
 // ColoredStatusGlyph returns status glyphs with semantic colors.
 func ColoredStatusGlyph(status string, spinnerFrame int) string {
-	glyph := StatusGlyph(status, spinnerFrame)
+	return StatusGlyphStyle(status).Render(StatusGlyph(status, spinnerFrame))
+}
+
+func StatusGlyphStyle(status string) lipgloss.Style {
 	if isFailedOrCrashedStatus(status) {
-		return errorGlyphStyle.Render(glyph)
+		return errorGlyphStyle
 	}
 	if isSuccessfulStatus(status) || isRunningStatus(status) {
-		return successGlyphStyle.Render(glyph)
+		return successGlyphStyle
 	}
-	return neutralGlyphStyle.Render(glyph)
+	return neutralGlyphStyle
 }
 
 func colorizeErrorText(value string) string {

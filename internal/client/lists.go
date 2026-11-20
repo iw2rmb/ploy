@@ -63,7 +63,8 @@ type ListRunsCommand struct {
 	Limit     int32
 	Offset    int32
 	RepoURL   string
-	CreatedBy string
+	CreatedBy string // Fallback when the authenticated token has no username.
+	Creator   string // Explicit cli-admin selection; cannot be combined with All.
 	All       bool
 }
 
@@ -86,6 +87,9 @@ func (c ListRunsCommand) Run(ctx context.Context) ([]domaintypes.RunSummary, err
 	}
 	if createdBy := strings.TrimSpace(c.CreatedBy); createdBy != "" {
 		q.Set("created_by", createdBy)
+	}
+	if creator := strings.TrimSpace(c.Creator); creator != "" {
+		q.Set("creator", creator)
 	}
 	if c.All {
 		q.Set("all", "true")

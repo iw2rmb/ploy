@@ -1,48 +1,63 @@
 package tui
 
 import (
-	"testing"
-	"time"
-
+	tea "charm.land/bubbletea/v2"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"testing"
 )
 
-func makeS5Model(t *testing.T) model {
+func makeRunDetailsModel(t *testing.T) model {
 	t.Helper()
-	m := InitialModel(nil, nil)
+	m := InitialModel(t.Context(), nil, nil)
+	m.usersLoading = false
 	m.screen = ScreenRunsList
-	next, _ := m.Update(runsLoadedMsg{runs: []runSummary{
-		{
-			ID:        domaintypes.RunID("run-abc"),
-			MigID:     domaintypes.MigID("mig-abc"),
-			MigName:   "my-mig",
-			CreatedAt: time.Now(),
-		},
-	}})
-	nm := next.(model)
-	nm.rightPaneList.Select(0)
-	result, _ := nm.handleEnter()
-	return result.(model)
+	next, _ := m.Update(runsLoadedMsg{requestID: m.runsRequest, runs: []domaintypes.RunSummary{{ID: "run-abc"}}})
+	next, _ = next.(model).Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	return next.(model)
 }
 
-func TestS5RunDetailsLoadedUpdatesJobsTotalInPloy(t *testing.T) {
-	s5m := makeS5Model(t)
-	afterLoad, _ := s5m.Update(runDetailsLoadedMsg{jobTotal: 7})
-	lm := afterLoad.(model)
+// Only the selected run's total updates its Jobs entry, preserving the cursor.
+func TestRunDetailsLoadedUpdatesSelectedRunTotal(t *testing.T) {
+	m := makeRunDetailsModel(t)
+	m.rootList.Select(jobsIndex)
+	next, _ := m.Update(runDetailsLoadedMsg{runID: "run-other", jobTotal: 99})
+	m = next.(model)
+	if m.runJobTotal != nil {
+		t.Fatal("stale run total was accepted")
+	}
+	next, _ = m.Update(runDetailsLoadedMsg{runID: "run-abc", jobTotal: 7})
+	m = next.(model)
+	assertPloyItems(t, m, []listItem{{title: "Run", description: "run-abc"}, {title: "Jobs", description: "total: 7"}})
+	if m.rootList.Index() != jobsIndex {
+		t.Fatal("total response moved the cursor")
+	}
+}
 
-	items := lm.rootList.Items()
-	if len(items) != 3 {
-		t.Fatalf("ploy items count: got %d, want 3", len(items))
+// Scoped Jobs returns to the selected run and retains its latest total.
+func TestRunJobsNavigationRestoresDetails(t *testing.T) {
+	m := makeRunDetailsModel(t)
+	m.rootList.Select(jobsIndex)
+	next, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = next.(model)
+	if m.screen != ScreenJobsList || m.selectedRunID != "run-abc" || cmd == nil {
+		t.Fatalf("run Jobs = screen %v, scope %q", m.screen, m.selectedRunID)
 	}
-
-	item, ok := items[2].(listItem)
-	if !ok {
-		t.Fatalf("item 2: unexpected type %T", items[2])
+	next, _ = m.Update(runDetailsLoadedMsg{runID: "run-abc", jobTotal: 3})
+	m = next.(model)
+	next, cmd = m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+	m = next.(model)
+	if m.screen != ScreenRunDetails || cmd != nil || m.rootList.Index() != jobsIndex {
+		t.Fatal("Esc failed to restore run details")
 	}
-	if item.title != "Jobs" {
-		t.Errorf("item 2 title: got %q, want %q", item.title, "Jobs")
+	assertPloyItems(t, m, []listItem{{title: "Run", description: "run-abc"}, {title: "Jobs", description: "total: 3"}})
+	next, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+	m = next.(model)
+	if m.screen != ScreenRunsList || !m.selectedRunID.IsZero() {
+		t.Fatal("Esc failed to return to runs")
 	}
-	if item.description != "total: 7" {
-		t.Errorf("item 2 description: got %q, want %q", item.description, "total: 7")
+	next, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+	m = next.(model)
+	if m.screen != ScreenPloyList {
+		t.Fatal("Esc failed to return to root")
 	}
 }

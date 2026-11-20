@@ -53,37 +53,53 @@ func TestListMigsCommand(t *testing.T) {
 func TestListRunsCommand(t *testing.T) {
 	t.Parallel()
 
-	runID := domaintypes.NewRunID()
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet || r.URL.Path != "/api/v1/runs" {
-			t.Fatalf("request = %s %s, want GET /api/v1/runs", r.Method, r.URL.Path)
-		}
-		wantQuery := map[string]string{
-			"limit": "20", "offset": "40", "repo_url": "https://example.com/repo.git",
-			"created_by": "alice", "all": "true",
-		}
-		for key, want := range wantQuery {
-			if got := r.URL.Query().Get(key); got != want {
-				t.Errorf("%s = %q, want %q", key, got, want)
-			}
-		}
-		_ = json.NewEncoder(w).Encode(map[string]any{"runs": []domaintypes.RunSummary{{
-			ID: runID, Status: domaintypes.RunStatusQueued,
-			MigID: domaintypes.NewMigID(), SpecID: domaintypes.NewSpecID(),
-		}}})
-	}))
-	t.Cleanup(srv.Close)
-	baseURL, _ := url.Parse(srv.URL + "/api")
+	for _, tc := range []struct {
+		name    string
+		creator string
+		all     bool
+	}{
+		{name: "legacy all with creator fallback", all: true},
+		{name: "selected creator", creator: " selected-user "},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			runID := domaintypes.NewRunID()
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != http.MethodGet || r.URL.Path != "/api/v1/runs" {
+					t.Fatalf("request = %s %s, want GET /api/v1/runs", r.Method, r.URL.Path)
+				}
+				wantQuery := map[string]string{
+					"limit": "20", "offset": "40", "repo_url": "https://example.com/repo.git",
+					"created_by": "alice", "creator": strings.TrimSpace(tc.creator),
+				}
+				if tc.all {
+					wantQuery["all"] = "true"
+				} else {
+					wantQuery["all"] = ""
+				}
+				for key, want := range wantQuery {
+					if got := r.URL.Query().Get(key); got != want {
+						t.Errorf("%s = %q, want %q", key, got, want)
+					}
+				}
+				_ = json.NewEncoder(w).Encode(map[string]any{"runs": []domaintypes.RunSummary{{
+					ID: runID, Status: domaintypes.RunStatusQueued,
+					MigID: domaintypes.NewMigID(), SpecID: domaintypes.NewSpecID(),
+				}}})
+			}))
+			t.Cleanup(srv.Close)
+			baseURL, _ := url.Parse(srv.URL + "/api")
 
-	got, err := (ListRunsCommand{
-		Client: srv.Client(), BaseURL: baseURL, Limit: 20, Offset: 40,
-		RepoURL: " https://example.com/repo.git ", CreatedBy: " alice ", All: true,
-	}).Run(context.Background())
-	if err != nil {
-		t.Fatalf("Run() error = %v", err)
-	}
-	if len(got) != 1 || got[0].ID != runID {
-		t.Fatalf("Run() = %+v, want run %s", got, runID)
+			got, err := (ListRunsCommand{
+				Client: srv.Client(), BaseURL: baseURL, Limit: 20, Offset: 40,
+				RepoURL: " https://example.com/repo.git ", CreatedBy: " alice ", Creator: tc.creator, All: tc.all,
+			}).Run(context.Background())
+			if err != nil {
+				t.Fatalf("Run() error = %v", err)
+			}
+			if len(got) != 1 || got[0].ID != runID {
+				t.Fatalf("Run() = %+v, want run %s", got, runID)
+			}
+		})
 	}
 }
 

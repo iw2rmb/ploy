@@ -100,6 +100,12 @@ get:
         type: string
       description: Fallback creator filter used when the authenticated token has no username.
     - in: query
+      name: creator
+      required: false
+      schema:
+        type: string
+      description: Explicit run creator filter. Requires cli-admin and cannot be combined with all=true.
+    - in: query
       name: all
       required: false
       schema:
@@ -119,11 +125,13 @@ get:
                   $ref: "../components/schemas/controlplane.yaml#/RunSummary"
             required: [runs]
     "400":
-      description: Bad request (invalid pagination parameters)
+      description: Bad request (invalid pagination or creator combined with all=true)
       content:
         application/json:
           schema:
             $ref: "../components/schemas/common.yaml#/Error"
+    "403":
+      description: Forbidden (creator requires cli-admin).
     "500":
       description: Internal server error
       content:

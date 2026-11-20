@@ -2,82 +2,91 @@ package joblist
 
 import (
 	"fmt"
-	"strings"
-	"unicode/utf8"
+	"io"
+	"time"
 
+	"charm.land/bubbles/v2/list"
 	"charm.land/lipgloss/v2"
 
+	cliruns "github.com/iw2rmb/ploy/internal/cli/runs"
 	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-var (
-	completeGlyphStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#98c379"))
-	failedGlyphStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("#e06c75"))
-)
-
-// StatusGlyph returns a terminal-status colored glyph for the given job status.
-func StatusGlyph(status domaintypes.JobStatus) string {
-	switch status {
-	case domaintypes.JobStatusSuccess:
-		return completeGlyphStyle.Render("⏺")
-	case domaintypes.JobStatusFail, domaintypes.JobStatusCancelled:
-		return failedGlyphStyle.Render("⏺")
-	default:
-		return "⣾"
-	}
+type delegate struct {
+	list.DefaultDelegate
+	now          time.Time
+	spinnerFrame int
 }
 
-// renderPrimaryLine builds the title line for a job row: glyph + name (padded) + duration.
-func renderPrimaryLine(job domainapi.JobListItem) string {
-	glyph := StatusGlyph(job.Status)
-	name := normalizeLabel(job.Name)
-	duration := formatDurationShort(job.DurationMs)
-	prefix := glyph + " "
-	availableNameWidth := ContentWidth - lipgloss.Width(prefix) - 1 - lipgloss.Width(duration)
-	if availableNameWidth < 1 {
-		availableNameWidth = 1
+func newDelegate(focused bool, now time.Time, spinnerFrame int) delegate {
+	d := list.NewDefaultDelegate()
+	if !focused {
+		d.Styles.SelectedTitle = d.Styles.SelectedTitle.BorderStyle(lipgloss.HiddenBorder())
+		d.Styles.SelectedDesc = d.Styles.SelectedDesc.BorderStyle(lipgloss.HiddenBorder())
 	}
-	name = truncateRunes(name, availableNameWidth)
-	name = name + strings.Repeat(" ", availableNameWidth-lipgloss.Width(name))
-	return prefix + name + " " + duration
+	return delegate{DefaultDelegate: d, now: now, spinnerFrame: spinnerFrame}
 }
 
-// renderSecondaryLine builds the description line for a job row: job ID.
+func (d delegate) Render(w io.Writer, m list.Model, index int, item list.Item) {
+	r, ok := item.(row)
+	if !ok {
+		return
+	}
+	d.DefaultDelegate.Render(w, m, index, displayRow{row: r, title: renderPrimaryLine(r.job, d.now, d.spinnerFrame)})
+}
+
+type displayRow struct {
+	row
+	title string
+}
+
+func (r displayRow) Title() string { return r.title }
+
+func renderPrimaryLine(job domainapi.JobListItem, now time.Time, spinnerFrame int) string {
+	glyph := cliruns.StatusGlyph(job.Status.String(), spinnerFrame)
+	if job.StartedAt == nil && (job.Status == domaintypes.JobStatusCreated || job.Status == domaintypes.JobStatusQueued) {
+		glyph = "-"
+	}
+	duration := formatDuration(jobDuration(job, now))
+	if job.Status == domaintypes.JobStatusRunning && job.StartedAt == nil {
+		duration = "--h --m --s"
+	}
+	return glyph + " " + duration + " " + cliruns.FormatStepName(job.DisplayName, job.JobType.String())
+}
+
 func renderSecondaryLine(job domainapi.JobListItem) string {
-	return truncateRunes(normalizeLabel(job.JobID.String()), ListWidth)
+	return job.JobID.String()
 }
 
-func normalizeLabel(s string) string {
-	if t := strings.TrimSpace(s); t != "" {
-		return t
+func jobDuration(job domainapi.JobListItem, now time.Time) time.Duration {
+	switch job.Status {
+	case domaintypes.JobStatusCreated, domaintypes.JobStatusQueued:
+		return 0
+	case domaintypes.JobStatusRunning:
+		if job.StartedAt != nil {
+			return max(time.Duration(0), now.Sub(*job.StartedAt))
+		}
+		return 0
+	default:
+		if job.DurationMs > 0 {
+			return time.Duration(job.DurationMs) * time.Millisecond
+		}
+		if job.StartedAt != nil && job.FinishedAt != nil {
+			return max(time.Duration(0), job.FinishedAt.Sub(*job.StartedAt))
+		}
+		return 0
 	}
-	return "-"
 }
 
-func formatDurationShort(durationMs int64) string {
-	if durationMs <= 0 {
-		return "-"
+func formatDuration(duration time.Duration) string {
+	seconds := max(int64(0), int64(duration/time.Second))
+	hours, minutes := "   ", "   "
+	if value := seconds / 3600; value > 0 {
+		hours = fmt.Sprintf("%2dh", value)
 	}
-	if durationMs < 1000 {
-		return fmt.Sprintf("%dms", durationMs)
+	if value := seconds % 3600 / 60; value > 0 {
+		minutes = fmt.Sprintf("%2dm", value)
 	}
-	if durationMs < 60000 {
-		return fmt.Sprintf("%ds", durationMs/1000)
-	}
-	if durationMs < 3600000 {
-		return fmt.Sprintf("%dm", durationMs/60000)
-	}
-	return fmt.Sprintf("%dh", durationMs/3600000)
-}
-
-func truncateRunes(s string, max int) string {
-	if max <= 0 {
-		return ""
-	}
-	if utf8.RuneCountInString(s) <= max {
-		return s
-	}
-	r := []rune(s)
-	return string(r[:max])
+	return fmt.Sprintf("%s %s %2ds", hours, minutes, seconds%60)
 }

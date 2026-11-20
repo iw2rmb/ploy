@@ -3,38 +3,31 @@
 package joblist
 
 import (
+	"sort"
+	"time"
+
 	"charm.land/bubbles/v2/list"
+	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 
 	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	migsapi "github.com/iw2rmb/ploy/internal/migs/api"
 )
 
-const (
-	// ListWidth is the fixed column width for the jobs list panel.
-	ListWidth = 30
-	// ContentWidth is the text budget per row (excluding list delegate chrome).
-	ContentWidth = 26
-)
+const ListWidth = 50
 
-// row is a list.Item implementation for a single job entry.
-type row struct {
-	title string
-	desc  string
-}
+type row struct{ job domainapi.JobListItem }
 
-func (r row) Title() string       { return r.title }
-func (r row) Description() string { return r.desc }
-func (r row) FilterValue() string { return r.title }
+func (r row) Title() string       { return renderPrimaryLine(r.job, time.Time{}, 0) }
+func (r row) Description() string { return renderSecondaryLine(r.job) }
+func (r row) FilterValue() string { return r.Title() + " " + r.Description() }
 
 // Model is the JobList domain component. It owns job row state, list cursor,
-// confirmed selected job identity, and job detail payload cache for the jobs pane.
+// and confirmed selected job identity for the jobs pane.
 type Model struct {
 	inner         list.Model
 	jobs          []domainapi.JobListItem
 	selectedJobID domaintypes.JobID
-	details       *migsapi.RunJob
 }
 
 // New creates an initialized JobList with the given title.
@@ -43,31 +36,88 @@ func New(title string) Model {
 	l.Title = title
 	l.SetShowHelp(false)
 	l.DisableQuitKeybindings()
+	l.Filter = list.UnsortedFilter
 	return Model{inner: l}
 }
 
-// SetJobs replaces the job items, rebuilds the list rows, and clears the details cache.
 func (m Model) SetJobs(jobs []domainapi.JobListItem) Model {
-	items := make([]list.Item, len(jobs))
-	for i, job := range jobs {
-		items[i] = row{
-			title: renderPrimaryLine(job),
-			desc:  renderSecondaryLine(job),
+	m.jobs = append([]domainapi.JobListItem(nil), jobs...)
+	sort.SliceStable(m.jobs, func(i, j int) bool {
+		a, b := m.jobs[i].StartedAt, m.jobs[j].StartedAt
+		if a == nil {
+			return false
+		}
+		if b == nil {
+			return true
+		}
+		return a.After(*b)
+	})
+	items := make([]list.Item, len(m.jobs))
+	for i, job := range m.jobs {
+		items[i] = row{job: job}
+	}
+	m.selectedJobID = ""
+	m.inner.ResetFilter()
+	m.inner.SetItems(items)
+	m.inner.Select(0)
+	return m
+}
+
+func (m Model) RefreshJobs(jobs []domainapi.JobListItem) Model {
+	highlighted, confirmed := m.SelectedJobID(), m.selectedJobID
+	index := m.inner.Index()
+	state, input := m.inner.FilterState(), m.inner.FilterInput
+	m = m.SetJobs(jobs)
+	m.refilter(state, input)
+	m.restoreHighlight(highlighted, index)
+	for _, job := range m.jobs {
+		if job.JobID == confirmed {
+			m.selectedJobID = confirmed
+			break
 		}
 	}
-	m.jobs = jobs
-	m.details = nil
-	m.inner.SetItems(items)
 	return m
+}
+
+func (m *Model) refilter(state list.FilterState, input textinput.Model) {
+	if state == list.Unfiltered {
+		return
+	}
+	m.inner.SetFilterText(input.Value())
+	m.inner.SetFilterState(state)
+	m.inner.FilterInput = input
+}
+
+func (m *Model) restoreHighlight(id domaintypes.JobID, index int) {
+	visible := m.inner.VisibleItems()
+	if len(visible) > 0 {
+		m.inner.Select(min(index, len(visible)-1))
+	}
+	for i, item := range visible {
+		if item.(row).job.JobID == id {
+			m.inner.Select(i)
+			break
+		}
+	}
+}
+
+func (m Model) HasActiveJobs() bool {
+	for _, job := range m.jobs {
+		switch job.Status {
+		case domaintypes.JobStatusCreated, domaintypes.JobStatusQueued, domaintypes.JobStatusRunning:
+			return true
+		}
+	}
+	return false
 }
 
 // SelectedJob returns the job at the current cursor position, if any.
 func (m Model) SelectedJob() (domainapi.JobListItem, bool) {
-	idx := m.inner.Index()
-	if idx < 0 || idx >= len(m.jobs) {
+	item, ok := m.inner.SelectedItem().(row)
+	if !ok {
 		return domainapi.JobListItem{}, false
 	}
-	return m.jobs[idx], true
+	return item.job, true
 }
 
 // Select moves the list cursor to the given index.
@@ -81,6 +131,8 @@ func (m *Model) SetHeight(h int) {
 	m.inner.SetHeight(h)
 }
 
+func (m *Model) SetWidth(width int) { m.inner.SetWidth(width) }
+
 // Title returns the list title.
 func (m Model) Title() string { return m.inner.Title }
 
@@ -92,6 +144,10 @@ func (m Model) Items() []list.Item { return m.inner.Items() }
 
 // Index returns the current cursor index.
 func (m Model) Index() int { return m.inner.Index() }
+
+func (m Model) SettingFilter() bool { return m.inner.SettingFilter() }
+
+func (m Model) IsFiltered() bool { return m.inner.IsFiltered() }
 
 // Jobs returns the raw job items backing the list.
 func (m Model) Jobs() []domainapi.JobListItem { return m.jobs }
@@ -117,23 +173,24 @@ func (m Model) ConfirmedJobID() domaintypes.JobID {
 	return m.selectedJobID
 }
 
-// SetDetails stores the fetched job detail payload for the confirmed selection.
-func (m Model) SetDetails(item *migsapi.RunJob) Model {
-	m.details = item
-	return m
-}
-
-// Details returns the cached job detail payload, or nil if not yet loaded.
-func (m Model) Details() *migsapi.RunJob {
-	return m.details
-}
-
 // Update routes messages into the inner list.
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
+	if _, ok := msg.(list.FilterMatchesMsg); ok {
+		// Async filter results can contain rows replaced by a newer jobs response.
+		// Recompute from current items while retaining the user's input and selection.
+		if m.inner.FilterState() != list.Unfiltered {
+			highlighted, index := m.SelectedJobID(), m.inner.Index()
+			m.refilter(m.inner.FilterState(), m.inner.FilterInput)
+			m.restoreHighlight(highlighted, index)
+		}
+		return m, nil
+	}
 	var cmd tea.Cmd
 	m.inner, cmd = m.inner.Update(msg)
 	return m, cmd
 }
 
-// View renders the jobs list.
-func (m Model) View() string { return m.inner.View() }
+func (m Model) View(focused bool, now time.Time, spinnerFrame int) string {
+	m.inner.SetDelegate(newDelegate(focused, now, spinnerFrame))
+	return m.inner.View()
+}

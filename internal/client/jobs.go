@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 
 	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
@@ -19,6 +20,7 @@ type ListJobsCommand struct {
 	RunID   *domaintypes.RunID
 	NodeID  *domaintypes.NodeID
 	Status  *domaintypes.JobStatus
+	Creator string
 }
 
 func (c ListJobsCommand) Run(ctx context.Context) (domainapi.JobListResponse, error) {
@@ -42,6 +44,9 @@ func (c ListJobsCommand) Run(ctx context.Context) (domainapi.JobListResponse, er
 	}
 	if c.Status != nil {
 		q.Set("status", c.Status.String())
+	}
+	if creator := strings.TrimSpace(c.Creator); creator != "" {
+		q.Set("creator", creator)
 	}
 	endpoint.RawQuery = q.Encode()
 

@@ -1,45 +1,42 @@
 package tui
 
 import (
+	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
-
-	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
+	"charm.land/lipgloss/v2"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-func TestWindowSizeSetsAllListHeights(t *testing.T) {
-	m := InitialModel(nil, nil)
-
-	next, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 33})
-	nm := next.(model)
-
-	if nm.rootList.Height() != 33 {
-		t.Fatalf("ploy height = %d, want 33", nm.rootList.Height())
-	}
-	if nm.rightPaneList.Height() != 33 {
-		t.Fatalf("secondary height = %d, want 33", nm.rightPaneList.Height())
+// Resize keeps PLOY fixed and gives RUNS the remaining terminal width.
+func TestWindowSizeUpdatesRunWidthAndListHeights(t *testing.T) {
+	for _, tt := range []struct{ width, want int }{{120, 88}, {60, 28}, {20, 1}} {
+		m := InitialModel(t.Context(), nil, nil)
+		next, _ := m.Update(tea.WindowSizeMsg{Width: tt.width, Height: 33})
+		m = next.(model)
+		if m.rootList.Width() != 30 || m.rightPaneList.Width() != tt.want || m.rootList.Height() != 33 || m.rightPaneList.Height() != 33 || m.usersList.Width() != tt.want || m.usersList.Height() != 33 {
+			t.Fatalf("terminal %d: PLOY width %d, RUNS width %d, heights %d/%d", tt.width, m.rootList.Width(), m.rightPaneList.Width(), m.rootList.Height(), m.rightPaneList.Height())
+		}
 	}
 }
 
-func TestWindowHeightPersistsAcrossListRecreation(t *testing.T) {
-	m := InitialModel(nil, nil)
-	next, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 29})
-	nm := next.(model)
-
-	nm.rootList.Select(0)
-	next, _ = nm.handleEnter()
-	nm = next.(model)
-	if nm.rightPaneList.Height() != 29 {
-		t.Fatalf("secondary height after enter = %d, want 29", nm.rightPaneList.Height())
+// List recreation retains the terminal dimensions and bounds long labels.
+func TestWindowSizePersistsAcrossRunListRecreation(t *testing.T) {
+	m := InitialModel(t.Context(), nil, nil)
+	next, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 29})
+	m = next.(model)
+	next, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = next.(model)
+	if m.rightPaneList.Height() != 29 || m.rightPaneList.Width() != 48 {
+		t.Fatal("Enter lost terminal dimensions")
 	}
-
-	next, _ = nm.Update(migsLoadedMsg{migs: []domainapi.MigSummary{
-		{ID: domaintypes.MigID("mig-1"), Name: "alpha"},
-	}})
-	nm = next.(model)
-	if nm.rightPaneList.Height() != 29 {
-		t.Fatalf("secondary height after migs load = %d, want 29", nm.rightPaneList.Height())
+	next, _ = m.Update(runsLoadedMsg{requestID: m.runsRequest, runs: []domaintypes.RunSummary{{ID: "run-1", SpecID: domaintypes.SpecID(strings.Repeat("s", 100)), RepoURL: "https://example.com/team/" + strings.Repeat("r", 100)}}})
+	m = next.(model)
+	if m.rightPaneList.Height() != 29 || m.rightPaneList.Width() != 48 || len(m.rightPaneList.Items()) != 1 {
+		t.Fatal("loaded rows lost terminal dimensions or were not accepted")
+	}
+	if got := lipgloss.Width(m.rightPaneList.View()); got > 48 {
+		t.Fatalf("RUNS render width = %d, limit 48", got)
 	}
 }

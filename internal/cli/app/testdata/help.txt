@@ -13,7 +13,7 @@ Available Commands:
   mig         Plan and run Migs workflows
   run         Submit and inspect runs
   spec        Inspect and validate mig specs
-  tui         Interactive TUI for migrations, runs, and jobs
+  tui         Interactive TUI for runs and jobs
   version     Print version information
   wave        Inspect and control launch waves
 

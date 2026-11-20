@@ -1,85 +1,74 @@
 package tui
 
 import (
-	tea "charm.land/bubbletea/v2"
+	"slices"
 
+	tea "charm.land/bubbletea/v2"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-// handleEnter implements Enter-key transitions per the state machine contract.
 func (m model) handleEnter() (tea.Model, tea.Cmd) {
 	switch m.screen {
 	case ScreenPloyList:
 		return m.handleEnterFromRoot()
-	case ScreenMigrationsList:
-		return m.handleEnterFromMigrationsList()
 	case ScreenRunsList:
 		return m.handleEnterFromRunsList()
+	case ScreenRunDetails:
+		if m.rootList.Index() == jobsIndex {
+			m.screen = ScreenJobsList
+			m.jobList = m.jobList.SetJobs(nil)
+			cmd := m.loadJobs()
+			return m, cmd
+		}
 	case ScreenJobsList:
 		return m.handleEnterFromJobsList()
+	case ScreenUsersList:
+		return m.handleEnterFromUsersList()
 	}
 	return m, nil
 }
 
 func (m model) handleEnterFromRoot() (tea.Model, tea.Cmd) {
 	switch m.rootList.Index() {
-	case 0: // Migrations
-		m.screen = ScreenMigrationsList
-		m.rightPaneList = newList("MIGRATIONS", nil)
-		m.applyWindowHeight()
-		return m, loadMigsCmd(m.client, m.baseURL)
-	case 1: // Runs
+	case runsIndex:
 		m.screen = ScreenRunsList
-		m.rightPaneList = newRunsList("RUNS", nil)
-		m.applyWindowHeight()
-		return m, loadRunsCmd(m.client, m.baseURL)
-	case 2: // Jobs
+	case jobsIndex:
 		m.screen = ScreenJobsList
-		m.applyWindowHeight()
-		return m, tea.Batch(loadJobsCmd(m.client, m.baseURL, nil), loadRunsCmd(m.client, m.baseURL))
+	case usersIndex:
+		if m.usersEnabled {
+			m.screen = ScreenUsersList
+		}
 	}
 	return m, nil
 }
 
-func (m model) handleEnterFromMigrationsList() (tea.Model, tea.Cmd) {
-	item, ok := m.rightPaneList.SelectedItem().(listItem)
-	if !ok {
-		return m, nil
+func (m *model) loadRootPreview() tea.Cmd {
+	if m.usersLoading || m.screen != ScreenPloyList || !m.selectedRunID.IsZero() {
+		return nil
 	}
-	m.selectedMigID = domaintypes.MigID(item.description)
-	m.selectedMigName = item.title
-	m.selectedRunID = ""
-	m.jobList = m.jobList.SetSelectedJobID("")
-	m.rootList.SetItems(buildDetailsPloyItems([]ployEntry{
-		{title: m.selectedMigName, desc: m.selectedMigID.String()},
-		{title: "Runs", desc: "total: —"},
-		{title: "Jobs", desc: "select job"},
-	}))
-	m.rootList.Select(0)
-	m.applyWindowHeight()
-	m.screen = ScreenMigrationDetails
-	return m, loadMigDetailsCmd(m.client, m.baseURL, m.selectedMigID)
+	switch m.rootList.Index() {
+	case runsIndex:
+		if !m.runsLoading {
+			return m.loadRuns()
+		}
+	case jobsIndex:
+		if !m.jobsLoading {
+			return m.loadJobs()
+		}
+	}
+	return nil
 }
 
 func (m model) handleEnterFromRunsList() (tea.Model, tea.Cmd) {
-	item, ok := m.rightPaneList.SelectedItem().(listItem)
+	item, ok := m.rightPaneList.SelectedItem().(runItem)
 	if !ok {
 		return m, nil
 	}
-	m.selectedRunID = domaintypes.RunID(item.title)
-	m.jobList = m.jobList.SetSelectedJobID("")
-	m.selectedMigID = ""
-	m.selectedMigName = ""
-	m.resolveMigContext(m.selectedRunID)
-	m.rootList.SetItems(buildDetailsPloyItems([]ployEntry{
-		{title: m.selectedMigName, desc: m.selectedMigID.String()},
-		{title: "Run", desc: m.selectedRunID.String()},
-		{title: "Jobs", desc: "total: —"},
-	}))
-	m.rootList.Select(1)
-	m.applyWindowHeight()
+	m.setRun(item.run.ID)
+	m.rootList.Select(runsIndex)
+	m.showRunDetails()
 	m.screen = ScreenRunDetails
-	return m, loadRunDetailsCmd(m.client, m.baseURL, m.selectedRunID)
+	return m, loadRunDetailsCmd(m.ctx, m.client, m.baseURL, m.selectedRunID)
 }
 
 func (m model) handleEnterFromJobsList() (tea.Model, tea.Cmd) {
@@ -88,47 +77,59 @@ func (m model) handleEnterFromJobsList() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	m.jobList = m.jobList.SetSelectedJobID(selectedJob.JobID)
-	m.selectedRunID = selectedJob.RunID
-	m.selectedMigName = selectedJob.MigName
-	m.selectedMigID = ""
-	m.resolveMigContext(m.selectedRunID)
 	m.rootList.SetItems(buildDetailsPloyItems([]ployEntry{
-		{title: m.selectedMigName, desc: m.selectedMigID.String()},
-		{title: "Run", desc: m.selectedRunID.String()},
-		{title: "Job", desc: m.jobList.ConfirmedJobID().String()},
+		{title: "Run", desc: selectedJob.RunID.String()},
+		{title: "Job", desc: selectedJob.JobID.String()},
 	}))
-	m.rootList.Select(2)
-	return m, loadJobDetailsCmd(m.client, m.baseURL, selectedJob.RunID, selectedJob.JobID)
+	m.rootList.Select(jobsIndex)
+	return m, nil
 }
 
-// resolveMigContext populates selectedMigID and selectedMigName from the runs cache.
-func (m *model) resolveMigContext(runID domaintypes.RunID) {
-	for _, run := range m.runs {
-		if run.ID == runID {
-			m.selectedMigID = run.MigID
-			m.selectedMigName = run.MigName
-			return
-		}
+func (m *model) setRun(runID domaintypes.RunID) {
+	if m.selectedRunID != runID {
+		m.jobList = m.jobList.SetJobs(nil)
+		m.selectedRunID = runID
+		m.runJobTotal = nil
+		m.jobsLoading = false
 	}
 }
 
-// handleEsc implements Esc-key transitions per the state machine contract.
+func (m *model) loadJobs() tea.Cmd {
+	if m.usersLoading {
+		return nil
+	}
+	m.jobsRequest++
+	m.jobsLoading = true
+	return loadJobsCmd(m.ctx, m.client, m.baseURL, m.selectedRunID, m.jobsRequest, slices.Clone(m.jobList.Jobs()), m.jobsCreatedBy())
+}
+
+func (m *model) resetRoot() {
+	selected := m.rootList.Index()
+	m.rootList.SetItems(buildPloyItems(m.usersEnabled, m.selectedUser, m.usersErr))
+	m.rootList.Select(selected)
+	m.setRun("")
+	m.jobList = m.jobList.SetSelectedJobID("")
+}
+
 func (m model) handleEsc() (tea.Model, tea.Cmd) {
 	switch m.screen {
-	case ScreenMigrationsList:
+	case ScreenRunsList, ScreenUsersList:
 		m.screen = ScreenPloyList
-	case ScreenMigrationDetails:
-		m.screen = ScreenMigrationsList
-		m.setPloySelectionState(true, false, false)
-	case ScreenRunsList:
-		m.screen = ScreenPloyList
+		m.resetRoot()
 	case ScreenRunDetails:
 		m.screen = ScreenRunsList
-		m.setPloySelectionState(true, true, false)
+		m.resetRoot()
+		m.rootList.Select(runsIndex)
 	case ScreenJobsList:
-		m.screen = ScreenPloyList
-	case ScreenPloyList:
-		return m, tea.Quit
+		m.jobList = m.jobList.SetSelectedJobID("")
+		if !m.selectedRunID.IsZero() {
+			m.screen = ScreenRunDetails
+			m.showRunDetails()
+			m.rootList.Select(jobsIndex)
+		} else {
+			m.screen = ScreenPloyList
+			m.resetRoot()
+		}
 	}
 	return m, nil
 }

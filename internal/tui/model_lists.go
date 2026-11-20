@@ -25,49 +25,45 @@ func newListWithWidth(title string, items []list.Item, width int) list.Model {
 	return l
 }
 
-// newList creates a standard-width list (24 columns).
-func newList(title string, items []list.Item) list.Model {
-	return newListWithWidth(title, items, listWidth)
-}
-
 // newPloyList creates the left PLOY list with fixed width.
 func newPloyList(title string, items []list.Item) list.Model {
 	return newListWithWidth(title, items, ployListWidth)
 }
 
-// newRunsList creates a runs list with a 30-column width.
+// The initial width is replaced when the terminal size arrives.
 func newRunsList(title string, items []list.Item) list.Model {
-	return newListWithWidth(title, items, runsListWidth)
+	l := newListWithWidth(title, items, runsListWidth)
+	l.SetDelegate(newRunDelegate(true, 0))
+	return l
 }
 
-// applyWindowHeight reapplies the cached terminal height to all lists.
-func (m *model) applyWindowHeight() {
+func (m *model) applyWindowSize() {
+	if m.windowWidth > 0 {
+		m.rightPaneList.SetWidth(max(1, m.windowWidth-ployListWidth-2))
+		m.jobList.SetWidth(max(1, m.windowWidth-ployListWidth-2))
+		m.usersList.SetWidth(max(1, m.windowWidth-ployListWidth-2))
+	}
 	if m.windowHeight <= 0 {
 		return
 	}
 	m.rootList.SetHeight(m.windowHeight)
 	m.rightPaneList.SetHeight(m.windowHeight)
 	m.jobList.SetHeight(m.windowHeight)
+	m.usersList.SetHeight(m.windowHeight)
 }
 
-// buildPloyItems constructs the left PLOY list with context-aware labels.
-func buildPloyItems(hasMigration, hasRun, hasJob bool) []list.Item {
-	migrationsTitle := "Migrations"
-	if hasMigration {
-		migrationsTitle = "Migration"
+func buildPloyItems(usersEnabled bool, selectedUser string, usersErr error) []list.Item {
+	user := "cli-admin only"
+	if usersErr != nil {
+		user = "unavailable"
 	}
-	runsTitle := "Runs"
-	if hasRun {
-		runsTitle = "Run"
-	}
-	jobsTitle := "Jobs"
-	if hasJob {
-		jobsTitle = "Job"
+	if usersEnabled {
+		user = (userItem{username: selectedUser}).Title()
 	}
 	return []list.Item{
-		listItem{title: migrationsTitle, description: "select migration"},
-		listItem{title: runsTitle, description: "select run"},
-		listItem{title: jobsTitle, description: "select job"},
+		listItem{title: "Runs", description: "select run"},
+		listItem{title: "Jobs", description: "select job"},
+		listItem{title: "Users", description: user},
 	}
 }
 
@@ -81,28 +77,4 @@ func buildDetailsPloyItems(entries []ployEntry) []list.Item {
 		items[i] = listItem{title: normalizeLabel(e.title), description: normalizeLabel(e.desc)}
 	}
 	return items
-}
-
-// setPloySelectionState applies root item label state while preserving cursor.
-func (m *model) setPloySelectionState(hasMigration, hasRun, hasJob bool) {
-	selectedIdx := m.rootList.Index()
-	m.rootList.SetItems(buildPloyItems(hasMigration, hasRun, hasJob))
-	if selectedIdx < 0 {
-		selectedIdx = 0
-	}
-	if itemCount := len(m.rootList.Items()); itemCount > 0 {
-		if selectedIdx >= itemCount {
-			selectedIdx = itemCount - 1
-		}
-		m.rootList.Select(selectedIdx)
-	}
-}
-
-// setWindowHeight updates cached terminal height and applies it to all lists.
-func (m *model) setWindowHeight(height int) {
-	if height <= 0 {
-		return
-	}
-	m.windowHeight = height
-	m.applyWindowHeight()
 }

@@ -83,6 +83,7 @@ func TestListRunsHandlerOwnershipFilter(t *testing.T) {
 		wantAll        bool
 		wantCreatedBy  string
 		wantTokenQuery bool
+		wantStatus     int
 	}{
 		{
 			name:           "token username wins over query fallback",
@@ -98,6 +99,49 @@ func TestListRunsHandlerOwnershipFilter(t *testing.T) {
 			identity:       auth.Identity{Role: auth.RoleControlPlane, TokenID: "token-1"},
 			wantCreatedBy:  "request-user",
 			wantTokenQuery: true,
+		},
+		{
+			name:          "admin selects another creator",
+			target:        "/v1/runs?creator=%20request-user%20",
+			identity:      auth.Identity{Role: auth.RoleCLIAdmin, TokenID: "token-1"},
+			tokenUsername: stringPtrOrNil("token-user"),
+			wantCreatedBy: "request-user",
+		},
+		{
+			name:           "admin token username wins over CLI fallback",
+			target:         "/v1/runs?created_by=request-user",
+			identity:       auth.Identity{Role: auth.RoleCLIAdmin, TokenID: "token-1"},
+			tokenUsername:  stringPtrOrNil("token-user"),
+			wantCreatedBy:  "token-user",
+			wantTokenQuery: true,
+		},
+		{
+			name:          "control-plane cannot select a creator",
+			target:        "/v1/runs?creator=request-user",
+			identity:      auth.Identity{Role: auth.RoleControlPlane, TokenID: "token-1"},
+			tokenUsername: stringPtrOrNil("token-user"),
+			wantStatus:    http.StatusForbidden,
+		},
+		{
+			name:       "admin creator conflicts with all",
+			target:     "/v1/runs?creator=request-user&all=true",
+			identity:   auth.Identity{Role: auth.RoleCLIAdmin, TokenID: "token-1"},
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:           "admin default retains token username",
+			target:         "/v1/runs",
+			identity:       auth.Identity{Role: auth.RoleCLIAdmin, TokenID: "token-1"},
+			tokenUsername:  stringPtrOrNil("token-user"),
+			wantCreatedBy:  "token-user",
+			wantTokenQuery: true,
+		},
+		{
+			name:          "admin all disables creator fallback",
+			target:        "/v1/runs?created_by=request-user&all=true",
+			identity:      auth.Identity{Role: auth.RoleCLIAdmin, TokenID: "token-1"},
+			tokenUsername: stringPtrOrNil("token-user"),
+			wantAll:       true,
 		},
 		{
 			name:          "all disables ownership filter",
@@ -121,8 +165,18 @@ func TestListRunsHandlerOwnershipFilter(t *testing.T) {
 
 			listRunsHandler(st).ServeHTTP(rr, req)
 
-			if rr.Code != http.StatusOK {
-				t.Fatalf("status = %d, body = %s", rr.Code, rr.Body.String())
+			wantStatus := tt.wantStatus
+			if wantStatus == 0 {
+				wantStatus = http.StatusOK
+			}
+			if rr.Code != wantStatus {
+				t.Fatalf("status = %d, want %d, body = %s", rr.Code, wantStatus, rr.Body.String())
+			}
+			if wantStatus != http.StatusOK {
+				if st.getAPITokenByID.called || st.listRunsWithMetadata.called {
+					t.Fatal("invalid creator filter reached the store")
+				}
+				return
 			}
 			if st.getAPITokenByID.called != tt.wantTokenQuery {
 				t.Fatalf("GetAPITokenByID called = %v, want %v", st.getAPITokenByID.called, tt.wantTokenQuery)
