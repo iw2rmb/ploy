@@ -219,6 +219,16 @@ func TestGetJobLogsHandler_BackfillLiveNoDuplicates(t *testing.T) {
 	}
 }
 
+type jobLogsBackfillStore struct {
+	*handlerStore
+	onBackfill func()
+}
+
+func (s *jobLogsBackfillStore) ListLogsByRun(ctx context.Context, runID domaintypes.RunID) ([]store.Log, error) {
+	s.onBackfill()
+	return s.handlerStore.ListLogsByRun(ctx, runID)
+}
+
 // TestGetJobLogsHandler_GapLogEventsDelivered verifies that log events published
 // to the hub during backfill are delivered to the client.
 func TestGetJobLogsHandler_GapLogEventsDelivered(t *testing.T) {
@@ -229,7 +239,7 @@ func TestGetJobLogsHandler_GapLogEventsDelivered(t *testing.T) {
 
 	objKey := "logs/gap-job.gz"
 
-	st := &handlerStore{}
+	st := &jobLogsBackfillStore{handlerStore: &handlerStore{}}
 	st.getJob.val = store.Job{ID: jobID, RunID: runID, Status: domaintypes.JobStatusRunning}
 	st.getRun.val = store.Run{ID: runID, Status: domaintypes.RunStatusRunning}
 	st.listLogsByRun.val = []store.Log{
@@ -245,41 +255,31 @@ func TestGetJobLogsHandler_GapLogEventsDelivered(t *testing.T) {
 	}
 	hub := eventsService.Hub()
 
-	h := getJobLogsHandler(st, bs, eventsService)
+	// Publish inside backfill so scheduler delays cannot move gap events before its cursor.
+	st.onBackfill = func() {
+		ctx := context.Background()
+		for _, line := range []string{"gap-log-line", "live-line"} {
+			if err := hub.PublishJobLog(ctx, jobID, logstream.LogRecord{
+				Timestamp: "2026-01-01T00:00:00Z",
+				Stream:    "stdout",
+				Line:      line,
+				JobID:     jobID,
+			}); err != nil {
+				t.Fatalf("publish gap log: %v", err)
+			}
+		}
+		if err := hub.PublishJobStatus(ctx, jobID, logstream.Status{Status: "completed"}); err != nil {
+			t.Fatalf("publish completed status: %v", err)
+		}
+	}
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/jobs/"+jobID.String()+"/logs", nil)
+	h := getJobLogsHandler(st, bs, eventsService)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	req := httptest.NewRequest(http.MethodGet, "/v1/jobs/"+jobID.String()+"/logs", nil).WithContext(ctx)
 	req.SetPathValue("job_id", jobID.String())
 	rr := &flushRecorder{httptest.NewRecorder()}
-
-	done := make(chan struct{})
-	go func() {
-		h.ServeHTTP(rr, req)
-		close(done)
-	}()
-
-	time.Sleep(50 * time.Millisecond)
-	ctx := context.Background()
-	_ = hub.PublishJobLog(ctx, jobID, logstream.LogRecord{
-		Timestamp: "2026-01-01T00:00:00Z",
-		Stream:    "stdout",
-		Line:      "gap-log-line",
-		JobID:     jobID,
-	})
-
-	time.Sleep(20 * time.Millisecond)
-	_ = hub.PublishJobLog(ctx, jobID, logstream.LogRecord{
-		Timestamp: "2026-01-01T00:00:01Z",
-		Stream:    "stdout",
-		Line:      "live-line",
-		JobID:     jobID,
-	})
-	_ = hub.PublishJobStatus(ctx, jobID, logstream.Status{Status: "completed"})
-
-	select {
-	case <-done:
-	case <-time.After(500 * time.Millisecond):
-		t.Fatal("timeout waiting for gap log delivery stream")
-	}
+	h.ServeHTTP(rr, req)
 
 	body := rr.Body.String()
 	if !strings.Contains(body, "backfill-line") {
