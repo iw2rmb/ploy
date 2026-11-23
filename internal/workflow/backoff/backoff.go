@@ -30,7 +30,6 @@ func HeartbeatPolicy() Policy {
 		InitialInterval: types.Duration(5 * time.Second),
 		MaxInterval:     types.Duration(5 * time.Minute),
 		Multiplier:      2.0,
-		MaxAttempts:     0, // No attempt limit for heartbeat backoff.
 	}
 }
 
