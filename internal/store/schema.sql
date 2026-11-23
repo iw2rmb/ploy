@@ -274,7 +274,7 @@ CREATE INDEX IF NOT EXISTS jobs_repo_idx ON jobs(repo_id);
 DROP INDEX IF EXISTS jobs_cache_lookup_idx;
 
 -- SBOM package rows persisted by gate job post-task uploads.
--- Time attribution is available via sboms.job_id -> jobs.created_at.
+-- Time attribution is available via sboms.job_id -> jobs.finished_at.
 CREATE TABLE IF NOT EXISTS sboms (
   job_id      TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
   repo_id     TEXT NOT NULL REFERENCES repos(id) ON DELETE CASCADE,

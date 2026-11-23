@@ -1,0 +1,40 @@
+get:
+  tags: [Control]
+  summary: Find JVM dependency combinations in Ploy gate SBOMs
+  operationId: getSBOMJVMVersions
+  description: |
+    Each observation contains packages from one successful pre_gate or post_gate
+    job. A gate job can include multiple modules. Every requested coordinate
+    and selector must match within that job. Coordinates match stored package
+    names exactly, including case.
+
+    The server searches all retained attempts, regardless of run status. A job
+    qualifies when its detected stack reports java and the requested JVM release.
+    Its completion time must be at or after the cutoff nine calendar months
+    before query start, calculated in UTC.
+
+    This operation shares the deployments JVM versions request and response
+    contract. It requires the control-plane role, which cli-admin includes.
+    The PostgreSQL lookup has a 60-second timeout and a 65-second write deadline.
+    Request cancellation cancels database work.
+  parameters:
+    - $ref: "./deployments_jvm_versions.yaml#/get/parameters/0"
+    - $ref: "./deployments_jvm_versions.yaml#/get/parameters/1"
+    - $ref: "./deployments_jvm_versions.yaml#/get/parameters/2"
+  responses:
+    "200":
+      $ref: "./deployments_jvm_versions.yaml#/get/responses/200"
+    "400":
+      $ref: "./deployments_jvm_versions.yaml#/get/responses/400"
+    "401":
+      $ref: "./deployments_jvm_versions.yaml#/get/responses/401"
+    "403":
+      $ref: "./deployments_jvm_versions.yaml#/get/responses/403"
+    "500":
+      description: PostgreSQL lookup or server failure.
+      content:
+        text/plain:
+          schema:
+            type: string
+    "504":
+      $ref: "./deployments_jvm_versions.yaml#/get/responses/504"

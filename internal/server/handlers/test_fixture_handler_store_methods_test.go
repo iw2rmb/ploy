@@ -275,6 +275,10 @@ func (m *handlerStore) DeleteSBOMRowsByJob(_ context.Context, jobID types.JobID)
 	return err
 }
 
+func (m *handlerStore) ListSBOMJVMVersions(_ context.Context, params store.ListSBOMJVMVersionsParams) ([]store.ListSBOMJVMVersionsRow, error) {
+	return m.listSBOMJVMVersions.record(params)
+}
+
 func (m *handlerStore) UpsertSBOMRow(_ context.Context, params store.UpsertSBOMRowParams) error {
 	_, err := m.upsertSBOMRow.record(params)
 	return err

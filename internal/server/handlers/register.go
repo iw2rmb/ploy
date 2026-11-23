@@ -55,7 +55,8 @@ func RegisterRoutes(s routeRegistrar, st store.Store, bs blobstore.Store, bp *bl
 		jvmVersions:           jvmVersions,
 	}
 	registerHealthRoutes(s, deps)
-	s.RegisterRouteFunc("GET /v1/deployments/jvm/{jvm}/versions", jvmVersionsHandler(deps.jvmVersions), auth.RoleControlPlane)
+	s.RegisterRouteFunc("GET /v1/deployments/jvm/{jvm}/versions", jvmVersionsHandler(techRadarJVMVersions, deps.jvmVersions), auth.RoleControlPlane)
+	s.RegisterRouteFunc("GET /v1/sbom/jvm/{jvm}/versions", jvmVersionsHandler(sbomJVMVersions, sbomJVMVersionsLookup{deps.st}), auth.RoleControlPlane)
 	registerConfigRoutes(s, deps)
 	registerTokenRoutes(s, deps)
 	registerBootstrapRoutes(s, deps)

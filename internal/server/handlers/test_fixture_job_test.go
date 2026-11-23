@@ -33,6 +33,7 @@ type handlerStore struct {
 	unclaimJob                  mockCall[store.UnclaimJobParams, struct{}]
 	claimRun                    mockResult[store.Run]
 
+	listSBOMJVMVersions      mockCall[store.ListSBOMJVMVersionsParams, []store.ListSBOMJVMVersionsRow]
 	deleteSBOMRowsByJob      mockCallSlice[types.JobID, struct{}]
 	upsertSBOMRow            mockCallSlice[store.UpsertSBOMRowParams, struct{}]
 	listRunSBOMRowsByJobType mockCallSlice[store.ListRunSBOMRowsByJobTypeParams, []store.ListRunSBOMRowsByJobTypeRow]

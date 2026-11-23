@@ -59,7 +59,7 @@ func TestJVMVersionsTimeoutSurvivesStalledDriverCancellation(t *testing.T) {
 			}
 			defer db.Close()
 			handler := http.NewServeMux()
-			handler.HandleFunc("GET /v1/deployments/jvm/{jvm}/versions", jvmVersionsHandler(deployments.New(db)))
+			handler.HandleFunc("GET /v1/deployments/jvm/{jvm}/versions", jvmVersionsHandler(techRadarJVMVersions, deployments.New(db)))
 			server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				ctx, cancel := context.WithTimeout(r.Context(), 200*time.Millisecond)
 				defer cancel()
@@ -115,7 +115,7 @@ func TestJVMVersionsClientDisconnectCancelsTrino(t *testing.T) {
 	}
 	defer db.Close()
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /v1/deployments/jvm/{jvm}/versions", jvmVersionsHandler(deployments.New(db)))
+	mux.HandleFunc("GET /v1/deployments/jvm/{jvm}/versions", jvmVersionsHandler(techRadarJVMVersions, deployments.New(db)))
 	server := httptest.NewServer(mux)
 	defer server.Close()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -164,7 +164,7 @@ func TestJVMVersionsLiveServiceAccount(t *testing.T) {
 	authorizer := auth.NewAuthorizer(auth.Options{TokenSecret: tokenSecret})
 	defer authorizer.Wait()
 	mux := http.NewServeMux()
-	mux.Handle("GET /v1/deployments/jvm/{jvm}/versions", authorizer.Middleware(auth.RoleControlPlane)(jvmVersionsHandler(deployments.New(db))))
+	mux.Handle("GET /v1/deployments/jvm/{jvm}/versions", authorizer.Middleware(auth.RoleControlPlane)(jvmVersionsHandler(techRadarJVMVersions, deployments.New(db))))
 	server := httptest.NewServer(mux)
 	defer server.Close()
 	server.Client().Timeout = 130 * time.Second

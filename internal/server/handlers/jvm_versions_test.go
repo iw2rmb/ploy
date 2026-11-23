@@ -81,7 +81,7 @@ func TestJVMVersionsInvalidRequestsDoNotQuery(t *testing.T) {
 	for _, query := range queries {
 		t.Run(query, func(t *testing.T) {
 			called := false
-			handler := jvmVersionsHandler(jvmVersionsLookupFunc(func(context.Context, jvmversions.Request) ([]jvmversions.Observation, error) {
+			handler := jvmVersionsHandler(techRadarJVMVersions, jvmVersionsLookupFunc(func(context.Context, jvmversions.Request) ([]jvmversions.Observation, error) {
 				called = true
 				return nil, nil
 			}))
@@ -134,7 +134,7 @@ func TestJVMVersionsResponses(t *testing.T) {
 				request = request.WithContext(ctx)
 			}
 			w := &jvmVersionsRecorder{ResponseRecorder: httptest.NewRecorder()}
-			jvmVersionsHandler(tt.lookup).ServeHTTP(w, request)
+			jvmVersionsHandler(techRadarJVMVersions, tt.lookup).ServeHTTP(w, request)
 			if w.Code != tt.status || w.Body.String() != tt.body {
 				t.Fatalf("response = %d %q; want %d %q", w.Code, w.Body.String(), tt.status, tt.body)
 			}
@@ -158,25 +158,26 @@ func TestJVMVersionsDeadlineIncludesDriverCancellation(t *testing.T) {
 		}
 		return []jvmversions.Observation{}, nil
 	})
-	jvmVersionsHandler(lookup).ServeHTTP(w, request)
+	jvmVersionsHandler(techRadarJVMVersions, lookup).ServeHTTP(w, request)
 }
 
 func TestJVMVersionsRouteAuthorization(t *testing.T) {
-	// Control-plane and cli-admin roles reach the route; worker access is denied.
+	// Only the deployments route requires Tech Radar configuration.
 	for _, role := range []auth.Role{auth.RoleControlPlane, auth.RoleCLIAdmin, auth.RoleWorker} {
 		t.Run(string(role), func(t *testing.T) {
 			srv := newTestServerWithRole(t, role)
-			w := httptest.NewRecorder()
-			srv.Handler().ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/v1/deployments/jvm/21/versions?for=a:b", nil))
-			want := http.StatusServiceUnavailable
-			if role == auth.RoleWorker {
-				want = http.StatusForbidden
-			}
-			if w.Code != want {
-				t.Fatalf("status = %d, want %d", w.Code, want)
-			}
-			if strings.Contains(w.Body.String(), "password") {
-				t.Fatal("response exposed credentials")
+			for source, want := range map[string]int{"deployments": http.StatusServiceUnavailable, "sbom": http.StatusOK} {
+				w := &jvmVersionsRecorder{ResponseRecorder: httptest.NewRecorder()}
+				srv.Handler().ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/v1/"+source+"/jvm/21/versions?for=a:b", nil))
+				if role == auth.RoleWorker {
+					want = http.StatusForbidden
+				}
+				if w.Code != want {
+					t.Errorf("%s status = %d, want %d", source, w.Code, want)
+				}
+				if strings.Contains(w.Body.String(), "password") {
+					t.Fatal("response exposed credentials")
+				}
 			}
 		})
 	}
@@ -220,7 +221,7 @@ func TestJVMVersionsRouteValidatesPathAndQuery(t *testing.T) {
 func TestJVMVersionsMissingPathValueDoesNotQuery(t *testing.T) {
 	// Direct callers must supply the path value normally extracted by ServeMux.
 	called := false
-	handler := jvmVersionsHandler(jvmVersionsLookupFunc(func(context.Context, jvmversions.Request) ([]jvmversions.Observation, error) {
+	handler := jvmVersionsHandler(techRadarJVMVersions, jvmVersionsLookupFunc(func(context.Context, jvmversions.Request) ([]jvmversions.Observation, error) {
 		called = true
 		return nil, nil
 	}))
@@ -266,7 +267,7 @@ func TestJVMVersionsSelectorsReachLookup(t *testing.T) {
 				return nil, nil
 			})
 			w := &jvmVersionsRecorder{ResponseRecorder: httptest.NewRecorder()}
-			jvmVersionsHandler(lookup).ServeHTTP(w, request)
+			jvmVersionsHandler(techRadarJVMVersions, lookup).ServeHTTP(w, request)
 			if w.Code != http.StatusOK || !called {
 				t.Fatalf("status = %d, queried = %v; want 200 and lookup", w.Code, called)
 			}
@@ -287,19 +288,23 @@ func TestJVMVersionsNormalizesCompleteObservations(t *testing.T) {
 	})
 	request := httptest.NewRequest(http.MethodGet, "/?for=g:a,g:b&with=c:d@4.0.x", nil)
 	request.SetPathValue("jvm", "21")
-	w := &jvmVersionsRecorder{ResponseRecorder: httptest.NewRecorder()}
-	jvmVersionsHandler(lookup).ServeHTTP(w, request)
-	var got api.JVMVersionsResponse
-	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil || w.Code != http.StatusOK {
-		t.Fatalf("response = %d %q, %v", w.Code, w.Body.String(), err)
-	}
 	want := []jvmversions.Observation{
 		{Found: []string{"g:a@0", "g:b@3"}, With: []string{"c:d@4.0.9"}},
 		{Found: []string{"g:a@1", "g:b@1"}, With: []string{"c:d@4.0.8"}},
 		{Found: []string{"g:a@1", "g:b@2"}, With: []string{"c:d@4.0.6", "c:d@4.0.7"}},
 		{Found: []string{"g:a@1", "g:b@2"}, With: []string{"c:d@4.0.7"}},
 	}
-	if !reflect.DeepEqual(got.Versions, want) {
-		t.Fatalf("versions = %+v, want %+v", got.Versions, want)
+	for _, policy := range []jvmVersionsHTTPPolicy{techRadarJVMVersions, sbomJVMVersions} {
+		t.Run(policy.source, func(t *testing.T) {
+			w := &jvmVersionsRecorder{ResponseRecorder: httptest.NewRecorder()}
+			jvmVersionsHandler(policy, lookup).ServeHTTP(w, request)
+			var got api.JVMVersionsResponse
+			if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil || w.Code != http.StatusOK {
+				t.Fatalf("response = %d %q, %v", w.Code, w.Body.String(), err)
+			}
+			if !reflect.DeepEqual(got.Versions, want) {
+				t.Fatalf("versions = %+v, want %+v", got.Versions, want)
+			}
+		})
 	}
 }

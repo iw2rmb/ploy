@@ -24,7 +24,25 @@ type JVMVersionsLookup interface {
 	Lookup(context.Context, jvmversions.Request) ([]jvmversions.Observation, error)
 }
 
-func jvmVersionsHandler(lookup JVMVersionsLookup) http.HandlerFunc {
+type jvmVersionsHTTPPolicy struct {
+	source            string
+	failureStatus     int
+	responseAllowance time.Duration
+}
+
+var (
+	techRadarJVMVersions = jvmVersionsHTTPPolicy{
+		source: "Tech Radar", failureStatus: http.StatusBadGateway,
+		// Trino can synchronously cancel twice before the lookup returns.
+		responseAllowance: 2*trino.DefaultCancelQueryTimeout + 5*time.Second,
+	}
+	sbomJVMVersions = jvmVersionsHTTPPolicy{
+		source: "Ploy SBOM", failureStatus: http.StatusInternalServerError,
+		responseAllowance: 5 * time.Second,
+	}
+)
+
+func jvmVersionsHandler(policy jvmVersionsHTTPPolicy, lookup JVMVersionsLookup) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		request, err := parseJVMVersionsRequest(r.PathValue("jvm"), r.URL.RawQuery)
 		if err != nil {
@@ -32,14 +50,13 @@ func jvmVersionsHandler(lookup JVMVersionsLookup) http.HandlerFunc {
 			return
 		}
 		if lookup == nil {
-			writeHTTPError(w, http.StatusServiceUnavailable, "Tech Radar is not configured")
+			writeHTTPError(w, http.StatusServiceUnavailable, "%s is not configured", policy.source)
 			return
 		}
 		ctx, cancel := context.WithTimeout(r.Context(), jvmVersionsLookupTimeout)
 		defer cancel()
 		deadline, _ := ctx.Deadline()
-		// The driver can synchronously cancel twice before returning a timeout.
-		deadline = deadline.Add(2*trino.DefaultCancelQueryTimeout + 5*time.Second)
+		deadline = deadline.Add(policy.responseAllowance)
 		if err := http.NewResponseController(w).SetWriteDeadline(deadline); err != nil {
 			writeHTTPError(w, http.StatusInternalServerError, "failed to set response deadline")
 			return
@@ -50,11 +67,11 @@ func jvmVersionsHandler(lookup JVMVersionsLookup) http.HandlerFunc {
 		}
 		switch {
 		case errors.Is(ctx.Err(), context.DeadlineExceeded):
-			writeHTTPError(w, http.StatusGatewayTimeout, "Tech Radar lookup timed out")
+			writeHTTPError(w, http.StatusGatewayTimeout, "%s lookup timed out", policy.source)
 		case ctx.Err() != nil:
 			return
 		case err != nil:
-			writeHTTPError(w, http.StatusBadGateway, "Tech Radar lookup failed")
+			writeHTTPError(w, policy.failureStatus, "%s lookup failed", policy.source)
 		default:
 			writeJSON(w, http.StatusOK, api.JVMVersionsResponse{Versions: versions})
 		}

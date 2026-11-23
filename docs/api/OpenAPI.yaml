@@ -18,6 +18,7 @@ info:
     - `/v1/runs` — single-repo run submission and run listing.
     - `/v1/runs/{run_id}/*` — run lifecycle, pull resolution, logs, diffs, artifacts, jobs, SBOM views, and worker snapshots.
     - `/v1/waves/{wave_id}/*` — wave inspect, run listing, and wave cancellation.
+    - `/v1/sbom/jvm/{jvm}/versions` — observed JVM dependency combinations from successful Ploy gate jobs.
     - `/v1/deployments/jvm/{jvm}/versions` — observed JVM dependency combinations from Tech Radar.
 
     Type semantics and labels:
@@ -66,6 +67,8 @@ paths:
   /v1/pki/bootstrap:
     $ref: "./paths/pki_bootstrap.yaml"
   # Control-plane surfaces
+  /v1/sbom/jvm/{jvm}/versions:
+    $ref: "./paths/sbom_jvm_versions.yaml"
   /v1/deployments/jvm/{jvm}/versions:
     $ref: "./paths/deployments_jvm_versions.yaml"
   # Run lifecycle and streaming are exposed under /v1/runs/*.

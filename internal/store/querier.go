@@ -172,6 +172,7 @@ type Querier interface {
 	ListRunsForRepo(ctx context.Context, arg ListRunsForRepoParams) ([]ListRunsForRepoRow, error)
 	ListRunsWithMetadata(ctx context.Context, arg ListRunsWithMetadataParams) ([]ListRunsWithMetadataRow, error)
 	ListRunsWithURLByWave(ctx context.Context, waveID types.WaveID) ([]ListRunsWithURLByWaveRow, error)
+	ListSBOMJVMVersions(ctx context.Context, arg ListSBOMJVMVersionsParams) ([]ListSBOMJVMVersionsRow, error)
 	// Lists spec bundles ordered by created_at descending (most recent first).
 	ListSpecBundles(ctx context.Context, arg ListSpecBundlesParams) ([]SpecBundle, error)
 	// Lists spec bundles whose last_ref_at is before the given threshold.
