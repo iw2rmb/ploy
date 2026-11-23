@@ -395,6 +395,10 @@ PLOY_NAMED_SPECS_ENVS_ALLOWLIST=PLOY_CONTAINER_REGISTRY
 
 ### Authentication
 
+- `PLOY_AUTH_TOKEN` — Optional bearer token forwarded from the server process to
+  migration and Build Gate containers at claim time. Explicit global, overlay,
+  run, and step environment values take precedence. The stored run spec remains
+  unchanged. Use a `control-plane` token for JVM dependency lookups.
 - `PLOY_AUTH_SECRET` — JWT signing secret used by the server to generate and validate bearer tokens.
   Required when bearer token authentication is enabled. This should be a strong random string
   (e.g., generated via `openssl rand -hex 32`). The same secret must be used consistently across

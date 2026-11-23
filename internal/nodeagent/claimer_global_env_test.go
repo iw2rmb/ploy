@@ -130,6 +130,7 @@ func TestGlobalEnvPropagation_SpecToManifest(t *testing.T) {
 			"APP_TLS_CERT": "-----BEGIN CERTIFICATE-----\ntest-cert\n-----END CERTIFICATE-----",
 			"APP_AUTH_JSON": "{\"token\":\"test-codex-token\"}",
 			"OPENAI_API_KEY": "sk-test-openai-key",
+			"PLOY_AUTH_TOKEN": "test-ploy-token",
 			"CUSTOM_GLOBAL_VAR": "custom_value"
 		}
 	}`)
@@ -161,6 +162,7 @@ func TestGlobalEnvPropagation_SpecToManifest(t *testing.T) {
 		"APP_TLS_CERT":      "-----BEGIN CERTIFICATE-----\ntest-cert\n-----END CERTIFICATE-----",
 		"APP_AUTH_JSON":     `{"token":"test-codex-token"}`,
 		"OPENAI_API_KEY":    "sk-test-openai-key",
+		"PLOY_AUTH_TOKEN":   "test-ploy-token",
 		"CUSTOM_GLOBAL_VAR": "custom_value",
 	}
 
@@ -199,6 +201,7 @@ func TestGlobalEnvPropagation_GateManifest(t *testing.T) {
 		"envs": {
 			"APP_TLS_CERT": "gate-test-cert-bundle",
 			"APP_AUTH_JSON": "gate-codex-auth",
+			"PLOY_AUTH_TOKEN": "test-ploy-token",
 			"GATE_SPECIFIC_VAR": "gate_value"
 		}
 	}`)
@@ -226,6 +229,7 @@ func TestGlobalEnvPropagation_GateManifest(t *testing.T) {
 	expectedEnv := map[string]string{
 		"APP_TLS_CERT":      "gate-test-cert-bundle",
 		"APP_AUTH_JSON":     "gate-codex-auth",
+		"PLOY_AUTH_TOKEN":   "test-ploy-token",
 		"GATE_SPECIFIC_VAR": "gate_value",
 		"PLOY_REPO_URL":     "https://gitlab.com/test/repo.git",
 		"PLOY_REPO_REF":     "main",
