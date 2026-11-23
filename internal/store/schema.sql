@@ -430,6 +430,8 @@ CREATE TABLE IF NOT EXISTS api_tokens (
   token_hash   TEXT NOT NULL UNIQUE,
   token_id     TEXT NOT NULL UNIQUE,
   role         TEXT NOT NULL,
+  job_id       TEXT UNIQUE REFERENCES jobs(id) ON DELETE CASCADE,
+  CONSTRAINT api_tokens_job_role CHECK ((role = 'job') = (job_id IS NOT NULL)),
   username     TEXT,
   description  TEXT,
   issued_at    TIMESTAMPTZ NOT NULL DEFAULT now(),

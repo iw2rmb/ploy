@@ -758,6 +758,9 @@ StageStatus:
 NodeClaimResponse:
   type: object
   properties:
+    job_token:
+      type: string
+      description: Bearer token for JVM version lookups during this job.
     resume_count:
       type: integer
       minimum: 0

@@ -18,7 +18,7 @@ const (
 
 // TokenClaims is the JWT claims structure used by API and bootstrap bearer tokens.
 type TokenClaims struct {
-	Role      string             `json:"role"`              // "cli-admin", "control-plane", "worker"
+	Role      string             `json:"role"`              // "cli-admin", "control-plane", "worker", "job"
 	TokenType string             `json:"token_type"`        // "api" or "bootstrap"
 	NodeID    domaintypes.NodeID `json:"node_id,omitempty"` // Only for bootstrap tokens
 	jwt.RegisteredClaims

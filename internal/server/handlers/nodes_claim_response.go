@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -36,12 +35,6 @@ func buildJobClaimPayload(
 		globalEnv = configHolder.GetGlobalEnvAll()
 		hydraOverlays = configHolder.GetHydraOverlays()
 		bundleMap = configHolder.GetBundleMap()
-	}
-	if token := strings.TrimSpace(os.Getenv("PLOY_AUTH_TOKEN")); token != "" {
-		// Keep explicit job configuration ahead of the server process default.
-		globalEnv["PLOY_AUTH_TOKEN"] = append([]GlobalEnvVar{{
-			Value: token, Target: domaintypes.GlobalEnvTargetNodes, Secret: true,
-		}}, globalEnv["PLOY_AUTH_TOKEN"]...)
 	}
 
 	mergedSpec, err := mutateClaimSpec(claimSpecMutatorInput{

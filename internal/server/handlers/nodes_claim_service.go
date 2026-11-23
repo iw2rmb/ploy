@@ -2,13 +2,19 @@ package handlers
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"log/slog"
+	"time"
+
+	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/iw2rmb/ploy/internal/blobstore"
 	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/server/auth"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -16,13 +22,15 @@ type claimService struct {
 	store        store.Store
 	blobStore    blobstore.Store
 	configHolder *ConfigHolder
+	tokenSecret  string
 }
 
-func newClaimer(st store.Store, bs blobstore.Store, configHolder *ConfigHolder) *claimService {
+func newClaimer(st store.Store, bs blobstore.Store, configHolder *ConfigHolder, tokenSecret string) *claimService {
 	return &claimService{
 		store:        st,
 		blobStore:    bs,
 		configHolder: configHolder,
+		tokenSecret:  tokenSecret,
 	}
 }
 
@@ -129,6 +137,12 @@ func (s *claimService) Claim(ctx context.Context, nodeID domaintypes.NodeID) (do
 	}
 
 	payload, err := buildJobClaimPayload(ctx, s.store, s.blobStore, s.configHolder, run, spec.Spec, repoURL, job)
+	if err == nil {
+		payload.JobToken, err = s.issueJobToken(ctx, job)
+		if isNoRowsError(err) {
+			return domainapi.NodeClaimResponse{}, &claimNoWork{}
+		}
+	}
 	if err != nil {
 		slog.Error("claim: failed to build response", "job_id", job.ID, "run_id", run.ID, "err", err)
 		var terminalErr *claimTerminalError
@@ -158,8 +172,9 @@ func (s *claimService) Claim(ctx context.Context, nodeID domaintypes.NodeID) (do
 			)
 		}
 		if unclaimErr := s.store.UnclaimJob(ctx, store.UnclaimJobParams{
-			ID:     job.ID,
-			NodeID: nodeID,
+			ID:        job.ID,
+			NodeID:    nodeID,
+			StartedAt: job.StartedAt,
 		}); unclaimErr != nil {
 			slog.Error("claim: failed to unclaim job after payload build error", "job_id", job.ID, "run_id", run.ID, "node_id", nodeID, "err", unclaimErr)
 		}
@@ -172,4 +187,28 @@ func (s *claimService) Claim(ctx context.Context, nodeID domaintypes.NodeID) (do
 		"node_id", nodeID,
 	)
 	return payload, nil
+}
+
+func (s *claimService) issueJobToken(ctx context.Context, job store.Job) (string, error) {
+	expiresAt := time.Now().AddDate(1, 0, 0)
+	token, err := auth.GenerateAPIToken(s.tokenSecret, string(auth.RoleJob), expiresAt)
+	if err != nil {
+		return "", err
+	}
+	claims, err := auth.ValidateToken(token, s.tokenSecret)
+	if err != nil {
+		return "", err
+	}
+	hash := sha256.Sum256([]byte(token))
+	_, err = s.store.UpsertJobToken(ctx, store.UpsertJobTokenParams{
+		JobID:     job.ID,
+		StartedAt: job.StartedAt,
+		TokenID:   claims.ID,
+		TokenHash: hex.EncodeToString(hash[:]),
+		ExpiresAt: pgtype.Timestamptz{Time: claims.ExpiresAt.Time, Valid: true},
+	})
+	if err != nil {
+		return "", fmt.Errorf("persist job token: %w", err)
+	}
+	return token, nil
 }

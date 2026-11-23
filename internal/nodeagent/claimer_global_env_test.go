@@ -130,7 +130,9 @@ func TestGlobalEnvPropagation_SpecToManifest(t *testing.T) {
 			"APP_TLS_CERT": "-----BEGIN CERTIFICATE-----\ntest-cert\n-----END CERTIFICATE-----",
 			"APP_AUTH_JSON": "{\"token\":\"test-codex-token\"}",
 			"OPENAI_API_KEY": "sk-test-openai-key",
-			"PLOY_AUTH_TOKEN": "test-ploy-token",
+			"PLOY_JOB_TOKEN": "spec-token",
+			" PLOY_JOB_TOKEN ": "alias",
+			"PLOY_JOB_TOKEN=alias": "alias",
 			"CUSTOM_GLOBAL_VAR": "custom_value"
 		}
 	}`)
@@ -143,11 +145,12 @@ func TestGlobalEnvPropagation_SpecToManifest(t *testing.T) {
 
 	// Step 2: Build StartRunRequest (simulates claimer.go/execution*.go).
 	req := StartRunRequest{
-		RunID:   types.RunID("run-e2e-env-test"),
-		JobID:   types.JobID(testKSUID),
-		RepoURL: types.RepoURL("https://gitlab.com/test/repo.git"),
-		BaseRef: types.GitRef("main"),
-		MigSpec: migSpec,
+		RunID:    types.RunID("run-e2e-env-test"),
+		JobToken: "claim-token",
+		JobID:    types.JobID(testKSUID),
+		RepoURL:  types.RepoURL("https://gitlab.com/test/repo.git"),
+		BaseRef:  types.GitRef("main"),
+		MigSpec:  migSpec,
 	}
 
 	// Step 3: Build manifest (simulates manifest.go).
@@ -157,12 +160,19 @@ func TestGlobalEnvPropagation_SpecToManifest(t *testing.T) {
 		t.Fatalf("buildMigManifest() error: %v", err)
 	}
 
+	if _, ok := manifest.Envs[" PLOY_JOB_TOKEN "]; ok {
+		t.Fatal("manifest retained alias for job token")
+	}
+	if _, ok := manifest.Envs["PLOY_JOB_TOKEN=alias"]; ok {
+		t.Fatal("manifest retained assignment alias for job token")
+	}
+
 	// Verify all global env vars are present in the manifest.
 	expectedEnv := map[string]string{
 		"APP_TLS_CERT":      "-----BEGIN CERTIFICATE-----\ntest-cert\n-----END CERTIFICATE-----",
 		"APP_AUTH_JSON":     `{"token":"test-codex-token"}`,
 		"OPENAI_API_KEY":    "sk-test-openai-key",
-		"PLOY_AUTH_TOKEN":   "test-ploy-token",
+		"PLOY_JOB_TOKEN":    "claim-token",
 		"CUSTOM_GLOBAL_VAR": "custom_value",
 	}
 
@@ -201,7 +211,9 @@ func TestGlobalEnvPropagation_GateManifest(t *testing.T) {
 		"envs": {
 			"APP_TLS_CERT": "gate-test-cert-bundle",
 			"APP_AUTH_JSON": "gate-codex-auth",
-			"PLOY_AUTH_TOKEN": "test-ploy-token",
+			"PLOY_JOB_TOKEN": "spec-token",
+			" PLOY_JOB_TOKEN ": "alias",
+			"PLOY_JOB_TOKEN=alias": "alias",
 			"GATE_SPECIFIC_VAR": "gate_value"
 		}
 	}`)
@@ -212,11 +224,12 @@ func TestGlobalEnvPropagation_GateManifest(t *testing.T) {
 	}
 
 	req := StartRunRequest{
-		RunID:   types.RunID("run-gate-env-test"),
-		JobID:   types.JobID("job-gate-env-test"),
-		RepoURL: types.RepoURL("https://gitlab.com/test/repo.git"),
-		BaseRef: types.GitRef("main"),
-		MigSpec: migSpec,
+		RunID:    types.RunID("run-gate-env-test"),
+		JobToken: "claim-token",
+		JobID:    types.JobID("job-gate-env-test"),
+		RepoURL:  types.RepoURL("https://gitlab.com/test/repo.git"),
+		BaseRef:  types.GitRef("main"),
+		MigSpec:  migSpec,
 	}
 
 	// Build gate manifest (should not fail on stack-aware image map).
@@ -229,7 +242,7 @@ func TestGlobalEnvPropagation_GateManifest(t *testing.T) {
 	expectedEnv := map[string]string{
 		"APP_TLS_CERT":      "gate-test-cert-bundle",
 		"APP_AUTH_JSON":     "gate-codex-auth",
-		"PLOY_AUTH_TOKEN":   "test-ploy-token",
+		"PLOY_JOB_TOKEN":    "claim-token",
 		"GATE_SPECIFIC_VAR": "gate_value",
 		"PLOY_REPO_URL":     "https://gitlab.com/test/repo.git",
 		"PLOY_REPO_REF":     "main",

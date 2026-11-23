@@ -8,16 +8,22 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/iw2rmb/ploy/internal/blobstore"
+	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-func claimJobHandler(st store.Store, bs blobstore.Store, configHolder *ConfigHolder) http.HandlerFunc {
-	service := newClaimer(st, bs, configHolder)
+func claimJobHandler(st store.Store, bs blobstore.Store, configHolder *ConfigHolder, tokenSecret string) http.HandlerFunc {
+	service := newClaimer(st, bs, configHolder, tokenSecret)
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		nodeID, ok := parseRequiredPathIDOrWriteError[domaintypes.NodeID](w, r, "id")
 		if !ok {
+			return
+		}
+
+		if r.Header.Get(domainapi.JobTokenCapabilityHeader) != "1" {
+			writeHTTPError(w, http.StatusUpgradeRequired, "upgrade the node to support job tokens")
 			return
 		}
 

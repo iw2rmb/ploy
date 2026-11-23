@@ -193,6 +193,21 @@ func (q *Queries) InsertBootstrapToken(ctx context.Context, arg InsertBootstrapT
 	return err
 }
 
+const isJobTokenActive = `-- name: IsJobTokenActive :one
+SELECT EXISTS (
+  SELECT 1 FROM api_tokens t JOIN jobs j ON t.job_id = j.id
+  WHERE t.token_id = $1 AND t.role = 'job' AND t.revoked_at IS NULL
+    AND j.status = 'Running' AND t.issued_at = j.started_at AND t.expires_at > now()
+)
+`
+
+func (q *Queries) IsJobTokenActive(ctx context.Context, tokenID string) (bool, error) {
+	row := q.db.QueryRow(ctx, isJobTokenActive, tokenID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const listAPITokens = `-- name: ListAPITokens :many
 SELECT
     token_id,
@@ -205,6 +220,7 @@ SELECT
     revoked_at,
     created_by
 FROM api_tokens
+WHERE job_id IS NULL
 ORDER BY created_at DESC, token_id DESC
 `
 
@@ -270,4 +286,40 @@ WHERE token_id = $1
 func (q *Queries) UpdateAPITokenLastUsed(ctx context.Context, tokenID string) error {
 	_, err := q.db.Exec(ctx, updateAPITokenLastUsed, tokenID)
 	return err
+}
+
+const upsertJobToken = `-- name: UpsertJobToken :one
+INSERT INTO api_tokens (job_id, role, token_id, token_hash, expires_at, issued_at)
+SELECT j.id, 'job', $1, $2, $3, j.started_at
+FROM jobs j
+WHERE j.id = $4 AND j.status = 'Running' AND j.started_at = $5
+FOR UPDATE OF j
+ON CONFLICT (job_id) DO UPDATE
+SET token_id = EXCLUDED.token_id, token_hash = EXCLUDED.token_hash,
+    expires_at = EXCLUDED.expires_at, issued_at = EXCLUDED.issued_at,
+    revoked_at = NULL, last_used_at = NULL
+RETURNING token_id
+`
+
+type UpsertJobTokenParams struct {
+	TokenID   string             `json:"token_id"`
+	TokenHash string             `json:"token_hash"`
+	ExpiresAt pgtype.Timestamptz `json:"expires_at"`
+	JobID     types.JobID        `json:"job_id"`
+	StartedAt pgtype.Timestamptz `json:"started_at"`
+}
+
+// Bind issued_at to this claim so a later claim invalidates the previous token
+// immediately, including the interval before the new token is issued.
+func (q *Queries) UpsertJobToken(ctx context.Context, arg UpsertJobTokenParams) (string, error) {
+	row := q.db.QueryRow(ctx, upsertJobToken,
+		arg.TokenID,
+		arg.TokenHash,
+		arg.ExpiresAt,
+		arg.JobID,
+		arg.StartedAt,
+	)
+	var token_id string
+	err := row.Scan(&token_id)
+	return token_id, err
 }

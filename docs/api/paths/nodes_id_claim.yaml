@@ -13,6 +13,12 @@ post:
     unified `jobs` queue and returns job + parent run
     details when work is available. When no jobs are available, the server
     returns `204 No Content`.
+  parameters:
+    - in: header
+      name: X-Ploy-Job-Token
+      required: true
+      schema: { type: string, enum: ["1"] }
+      description: The node delivers job_token to job containers as PLOY_JOB_TOKEN.
   responses:
     '200':
       description: Job successfully claimed and assigned to the node
@@ -26,5 +32,7 @@ post:
       description: Bad Request (invalid node ID)
     '404':
       description: Node not found
+    '426':
+      description: The node must support job tokens before it can claim work.
     '500':
       description: Internal server error

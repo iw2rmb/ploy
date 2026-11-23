@@ -23,11 +23,12 @@ API tokens are stored in the `api_tokens` table in PostgreSQL.
 
 ## Roles
 
-Ploy supports three roles:
+Ploy supports four roles:
 
 - **`cli-admin`**: Full administrative access, including token management
 - **`control-plane`**: Standard CLI access for running Migs and viewing control-plane state
 - **`worker`**: Node agent role
+- **`job`**: The server issues this role when a node claims a job. The container receives `PLOY_JOB_TOKEN` for JVM version lookups while its job runs.
 
 ## Managing API Tokens
 

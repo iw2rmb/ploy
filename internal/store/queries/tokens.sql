@@ -54,6 +54,7 @@ SELECT
     revoked_at,
     created_by
 FROM api_tokens
+WHERE job_id IS NULL
 ORDER BY created_at DESC, token_id DESC;
 
 -- name: RevokeAPIToken :exec
@@ -84,3 +85,24 @@ SELECT
 FROM bootstrap_tokens
 WHERE token_id = $1
 LIMIT 1;
+
+-- name: UpsertJobToken :one
+-- Bind issued_at to this claim so a later claim invalidates the previous token
+-- immediately, including the interval before the new token is issued.
+INSERT INTO api_tokens (job_id, role, token_id, token_hash, expires_at, issued_at)
+SELECT j.id, 'job', @token_id, @token_hash, @expires_at, j.started_at
+FROM jobs j
+WHERE j.id = @job_id AND j.status = 'Running' AND j.started_at = @started_at
+FOR UPDATE OF j
+ON CONFLICT (job_id) DO UPDATE
+SET token_id = EXCLUDED.token_id, token_hash = EXCLUDED.token_hash,
+    expires_at = EXCLUDED.expires_at, issued_at = EXCLUDED.issued_at,
+    revoked_at = NULL, last_used_at = NULL
+RETURNING token_id;
+
+-- name: IsJobTokenActive :one
+SELECT EXISTS (
+  SELECT 1 FROM api_tokens t JOIN jobs j ON t.job_id = j.id
+  WHERE t.token_id = @token_id AND t.role = 'job' AND t.revoked_at IS NULL
+    AND j.status = 'Running' AND t.issued_at = j.started_at AND t.expires_at > now()
+);

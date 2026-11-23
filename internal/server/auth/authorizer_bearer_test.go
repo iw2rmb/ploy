@@ -25,6 +25,8 @@ type mockQuerier struct {
 
 	mu sync.Mutex
 
+	activeJobTokenID string
+
 	checkAPITokenRevokedFunc         func(ctx context.Context, tokenID string) (pgtype.Timestamptz, error)
 	checkBootstrapTokenRevokedFunc   func(ctx context.Context, tokenID string) (pgtype.Timestamptz, error)
 	updateAPITokenLastUsedFunc       func(ctx context.Context, tokenID string) error
@@ -32,6 +34,10 @@ type mockQuerier struct {
 
 	updateAPITokenLastUsedCalled       bool
 	updateBootstrapTokenLastUsedCalled bool
+}
+
+func (m *mockQuerier) IsJobTokenActive(_ context.Context, tokenID string) (bool, error) {
+	return tokenID == m.activeJobTokenID, nil
 }
 
 func (m *mockQuerier) CheckAPITokenRevoked(ctx context.Context, tokenID string) (pgtype.Timestamptz, error) {
@@ -362,6 +368,36 @@ func TestAuthorizerQueryToken(t *testing.T) {
 
 			if rr.Code != tt.wantCode {
 				t.Errorf("got status %d, want %d", rr.Code, tt.wantCode)
+			}
+		})
+	}
+}
+
+func TestJobBearerTokenRequiresCurrentClaim(t *testing.T) {
+	token := mustGenerateAPIToken(t, string(RoleJob), time.Now().Add(time.Hour))
+	claims, err := ValidateToken(token, testSecret)
+	if err != nil {
+		t.Fatal(err)
+	}
+	active := &mockQuerier{activeJobTokenID: claims.ID}
+	for _, tc := range []struct {
+		name    string
+		store   store.Querier
+		allowed Role
+		status  int
+	}{
+		{"running job", active, RoleJob, http.StatusOK},
+		{"missing active claim", &mockQuerier{}, RoleJob, http.StatusUnauthorized},
+		{"unconfigured store", nil, RoleJob, http.StatusUnauthorized},
+		{"control plane route", active, RoleControlPlane, http.StatusForbidden},
+		{"worker route", active, RoleWorker, http.StatusForbidden},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			h := newBearerHarness(t, Options{Querier: tc.store, TokenSecret: testSecret})
+			defer h.auth.Wait()
+			rr, _ := h.do(http.MethodGet, "/v1/test", "Bearer "+token, []Role{tc.allowed}, nil)
+			if rr.Code != tc.status {
+				t.Fatalf("status = %d, want %d", rr.Code, tc.status)
 			}
 		})
 	}

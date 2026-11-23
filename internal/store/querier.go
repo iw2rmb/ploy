@@ -115,6 +115,7 @@ type Querier interface {
 	HasRunningJobForRunNode(ctx context.Context, arg HasRunningJobForRunNodeParams) (bool, error)
 	InsertAPIToken(ctx context.Context, arg InsertAPITokenParams) error
 	InsertBootstrapToken(ctx context.Context, arg InsertBootstrapTokenParams) error
+	IsJobTokenActive(ctx context.Context, tokenID string) (bool, error)
 	ListAPITokens(ctx context.Context) ([]ListAPITokensRow, error)
 	// ListArtifactBundlePartitions retrieves all partition names for the artifact_bundles table.
 	ListArtifactBundlePartitions(ctx context.Context) ([]string, error)
@@ -220,6 +221,9 @@ type Querier interface {
 	// This ensures idempotent set operations from the CLI or API.
 	UpsertGlobalEnv(ctx context.Context, arg UpsertGlobalEnvParams) error
 	UpsertJobMetric(ctx context.Context, arg UpsertJobMetricParams) error
+	// Bind issued_at to this claim so a later claim invalidates the previous token
+	// immediately, including the interval before the new token is issued.
+	UpsertJobToken(ctx context.Context, arg UpsertJobTokenParams) (string, error)
 	// Bulk upsert a mig_repo by normalized repo_url.
 	// Uniqueness is on (mig_id, repo_id) to prevent duplicate repo membership per mig.
 	UpsertMigRepo(ctx context.Context, arg UpsertMigRepoParams) (MigRepo, error)

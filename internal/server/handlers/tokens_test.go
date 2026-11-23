@@ -40,6 +40,16 @@ func TestCreateAPITokenRequiresUsernameForControlPlane(t *testing.T) {
 	}
 }
 
+func TestCreateAPITokenRejectsJobRole(t *testing.T) {
+	st := &tokenStore{}
+	handler := createAPITokenHandler(st, "test-secret")
+	rr := doRequest(t, handler, http.MethodPost, "/v1/tokens", map[string]any{"role": "job"})
+	assertStatus(t, rr, http.StatusBadRequest)
+	if st.insertAPIToken.called {
+		t.Fatal("unexpected job token insertion")
+	}
+}
+
 func TestCreateAPITokenStoresUsername(t *testing.T) {
 	st := &tokenStore{}
 	handler := createAPITokenHandler(st, "test-secret-12345678901234567890")

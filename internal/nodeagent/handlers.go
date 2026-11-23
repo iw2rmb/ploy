@@ -21,6 +21,7 @@ const maxRequestBodySize = 10 << 20 // 10 MiB
 //   - Identifies the job type: "pre_gate", "mig", "post_gate".
 //   - Used by orchestrator to dispatch to appropriate execution handler.
 type StartRunRequest struct {
+	JobToken    string          `json:"-"`
 	ResumeCount int             `json:"resume_count,omitempty"`
 	RunID       types.RunID     `json:"run_id,omitempty"`
 	JobID       types.JobID     `json:"job_id,omitempty"`   // Job ID for artifact/diff uploads

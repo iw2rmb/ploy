@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"bytes"
 	"encoding/json"
 	"net/http"
 	"reflect"
@@ -9,59 +8,6 @@ import (
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
-
-func TestClaimJob_ServerAuthToken(t *testing.T) {
-	for _, jobType := range []domaintypes.JobType{domaintypes.JobTypeMig, domaintypes.JobTypePreGate, domaintypes.JobTypePostGate} {
-		for _, tc := range []struct {
-			name       string
-			server     string
-			configured string
-			run        string
-			want       string
-		}{
-			{name: "server default", server: " server-token ", want: "server-token"},
-			{name: "global override", server: "server-token", configured: "configured-token", want: "configured-token"},
-			{name: "run override", server: "server-token", configured: "configured-token", run: "run-token", want: "run-token"},
-			{name: "unset server", configured: "configured-token", want: "configured-token"},
-			{name: "empty server", server: "  "},
-		} {
-			t.Run(string(jobType)+"/"+tc.name, func(t *testing.T) {
-				t.Setenv("PLOY_AUTH_TOKEN", tc.server)
-				spec := map[string]any{"steps": []any{map[string]any{"image": "test-image"}}}
-				if tc.run != "" {
-					spec["envs"] = map[string]string{"PLOY_AUTH_TOKEN": tc.run}
-				}
-				raw, err := json.Marshal(spec)
-				if err != nil {
-					t.Fatal(err)
-				}
-				f := newClaimJobFixture(t, claimJobFixtureOptions{jobType: jobType, specJSON: raw})
-				if tc.configured != "" {
-					f.config.SetGlobalEnvVar("PLOY_AUTH_TOKEN", GlobalEnvVar{
-						Value: tc.configured, Target: domaintypes.GlobalEnvTargetNodes, Secret: true,
-					})
-				}
-				configuredBefore := f.config.GetGlobalEnvAll()
-				storedBefore := bytes.Clone(f.store.getSpec.val.Spec)
-				rr := f.serve()
-				assertStatus(t, rr, http.StatusOK)
-				resp := decodeBody[map[string]any](t, rr)
-				envs, _ := resp["spec"].(map[string]any)["envs"].(map[string]any)
-				got, present := envs["PLOY_AUTH_TOKEN"]
-				if tc.want == "" {
-					if present {
-						t.Fatal("claim unexpectedly contains PLOY_AUTH_TOKEN")
-					}
-				} else if got != tc.want {
-					t.Fatal("claim PLOY_AUTH_TOKEN does not match the selected source")
-				}
-				if !bytes.Equal(f.store.getSpec.val.Spec, storedBefore) || !reflect.DeepEqual(f.config.GetGlobalEnvAll(), configuredBefore) {
-					t.Fatal("claim changed stored specification or global configuration")
-				}
-			})
-		}
-	}
-}
 
 func TestClaimJob_MergesGlobalEnvIntoSpec(t *testing.T) {
 	t.Parallel()

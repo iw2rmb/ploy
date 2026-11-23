@@ -4,7 +4,7 @@ get:
   operationId: getJVMVersions
   description: |
     Returns dependency combinations observed in Tech Radar software bills of
-    materials (SBOMs). Requires the control-plane role; cli-admin includes this role.
+    materials (SBOMs). Accepts the job, control-plane, and cli-admin roles.
 
     The server searches JVM observations whose SBOM created_at is at or after
     the cutoff nine calendar months before the Trino query starts, using UTC.
@@ -158,7 +158,7 @@ get:
     "401":
       description: Authentication is required.
     "403":
-      description: The caller lacks control-plane access.
+      description: The caller lacks access to JVM version lookups.
     "502":
       description: Trino authentication, permission, transport, or query failure.
       content:

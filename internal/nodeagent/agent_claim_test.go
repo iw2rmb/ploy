@@ -30,6 +30,9 @@ func TestClaimLoop(t *testing.T) {
 
 		switch r.URL.Path {
 		case "/v1/nodes/" + testNodeID + "/claim":
+			if r.Header.Get(domainapi.JobTokenCapabilityHeader) != "1" {
+				t.Error("claim must advertise job token support")
+			}
 			resp := newClaimResponse()
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
@@ -145,12 +148,16 @@ func TestClaimLoop_FieldMapping(t *testing.T) {
 			claimOpts: []claimOption{
 				withCommitSHA("deadbeef"),
 				func(c *domainapi.NodeClaimResponse) { c.ResumeCount = 2 },
+				func(c *domainapi.NodeClaimResponse) { c.JobToken = "claim-token" },
 				withNextID(types.NewJobID()),
 				withMigClaimContext(&contracts.MigClaimContext{StepIndex: 2}),
 				withClaimDetectedStack(&contracts.StackExpectation{Language: "java", Tool: "maven", Release: "17"}),
 			},
 			assertions: func(t *testing.T, got StartRunRequest, claim domainapi.NodeClaimResponse) {
 				t.Helper()
+				if got.JobToken != claim.JobToken {
+					t.Fatal("job token missing from start request")
+				}
 				if got.ResumeCount != claim.ResumeCount {
 					t.Errorf("resume count=%d, want %d", got.ResumeCount, claim.ResumeCount)
 				}

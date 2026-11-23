@@ -45,7 +45,20 @@ func injectNodeOwnedRepoEnv(env map[string]string, req StartRunRequest) {
 
 func injectNodeOwnedMigEnv(env map[string]string, req StartRunRequest) {
 	if v := strings.TrimSpace(req.ServerURL); v != "" {
-		env["PLOY_SERVER_URL"] = v
+		setContainerCredentialEnv(env, "PLOY_SERVER_URL", v)
+	}
+}
+
+// flattenEnv trims keys before Docker splits assignments at the first equals sign.
+func setContainerCredentialEnv(env map[string]string, key, value string) {
+	for candidate := range env {
+		name, _, _ := strings.Cut(strings.TrimSpace(candidate), "=")
+		if name == key {
+			delete(env, candidate)
+		}
+	}
+	if value != "" {
+		env[key] = value
 	}
 }
 
@@ -127,6 +140,7 @@ func buildManifest(
 	injectNodeOwnedRepoEnv(env, req)
 	injectNodeOwnedMigEnv(env, req)
 	env["PLOY_JOB_ID"] = req.JobID.String()
+	setContainerCredentialEnv(env, "PLOY_JOB_TOKEN", req.JobToken)
 
 	// Inject placeholder command only for default ubuntu image.
 	if len(command) == 0 && image == defaultImage {

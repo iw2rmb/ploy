@@ -14,7 +14,7 @@ get:
     before query start, calculated in UTC.
 
     This operation shares the deployments JVM versions request and response
-    contract. It requires the control-plane role, which cli-admin includes.
+    contract. It accepts the job, control-plane, and cli-admin roles.
     The PostgreSQL lookup has a 60-second timeout and a 65-second write deadline.
     Request cancellation cancels database work.
   parameters:

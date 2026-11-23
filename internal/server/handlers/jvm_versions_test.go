@@ -163,7 +163,7 @@ func TestJVMVersionsDeadlineIncludesDriverCancellation(t *testing.T) {
 
 func TestJVMVersionsRouteAuthorization(t *testing.T) {
 	// Only the deployments route requires Tech Radar configuration.
-	for _, role := range []auth.Role{auth.RoleControlPlane, auth.RoleCLIAdmin, auth.RoleWorker} {
+	for _, role := range []auth.Role{auth.RoleControlPlane, auth.RoleCLIAdmin, auth.RoleWorker, auth.RoleJob} {
 		t.Run(string(role), func(t *testing.T) {
 			srv := newTestServerWithRole(t, role)
 			for source, want := range map[string]int{"deployments": http.StatusServiceUnavailable, "sbom": http.StatusOK} {

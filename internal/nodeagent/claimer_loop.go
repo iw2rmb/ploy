@@ -115,6 +115,7 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 		return false, fmt.Errorf("create claim request: %w", err)
 	}
 
+	req.Header.Set(domainapi.JobTokenCapabilityHeader, "1")
 	resp, err := uploader.client.Do(req)
 	if err != nil {
 		return false, fmt.Errorf("send claim request: %w", err)
@@ -178,6 +179,7 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 		RunID:         claim.RunID,
 		ResumeCount:   claim.ResumeCount,
 		JobID:         claim.JobID,
+		JobToken:      claim.JobToken,
 		RepoID:        claim.RepoID,
 		RepoURL:       claim.RepoURL,
 		BaseRef:       claim.BaseRef,

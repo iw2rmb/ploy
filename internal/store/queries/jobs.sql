@@ -214,6 +214,7 @@ FROM (
 ) AS claiming_node
 WHERE jobs.id = sqlc.arg(id)
   AND jobs.node_id = claiming_node.node_id
+  AND jobs.started_at = @started_at
   AND status = 'Running';
 
 -- name: ListStaleRunningJobs :many

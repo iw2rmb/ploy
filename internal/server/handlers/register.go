@@ -55,8 +55,8 @@ func RegisterRoutes(s routeRegistrar, st store.Store, bs blobstore.Store, bp *bl
 		jvmVersions:           jvmVersions,
 	}
 	registerHealthRoutes(s, deps)
-	s.RegisterRouteFunc("GET /v1/deployments/jvm/{jvm}/versions", jvmVersionsHandler(techRadarJVMVersions, deps.jvmVersions), auth.RoleControlPlane)
-	s.RegisterRouteFunc("GET /v1/sbom/jvm/{jvm}/versions", jvmVersionsHandler(sbomJVMVersions, sbomJVMVersionsLookup{deps.st}), auth.RoleControlPlane)
+	s.RegisterRouteFunc("GET /v1/deployments/jvm/{jvm}/versions", jvmVersionsHandler(techRadarJVMVersions, deps.jvmVersions), auth.RoleControlPlane, auth.RoleJob)
+	s.RegisterRouteFunc("GET /v1/sbom/jvm/{jvm}/versions", jvmVersionsHandler(sbomJVMVersions, sbomJVMVersionsLookup{deps.st}), auth.RoleControlPlane, auth.RoleJob)
 	registerConfigRoutes(s, deps)
 	registerTokenRoutes(s, deps)
 	registerBootstrapRoutes(s, deps)
@@ -153,7 +153,7 @@ func registerNodeRoutes(s routeRegistrar, deps routeDeps) {
 	s.RegisterRouteFunc("POST /v1/nodes/{id}/undrain", undrainNodeHandler(deps.st), auth.RoleControlPlane)
 
 	s.RegisterRouteFunc("POST /v1/nodes/{id}/heartbeat", heartbeatHandler(deps.st), auth.RoleWorker)
-	s.RegisterRouteFunc("POST /v1/nodes/{id}/claim", claimJobHandler(deps.st, deps.bs, deps.configHolder), auth.RoleWorker)
+	s.RegisterRouteFunc("POST /v1/nodes/{id}/claim", claimJobHandler(deps.st, deps.bs, deps.configHolder, deps.tokenSecret), auth.RoleWorker)
 	s.RegisterRouteFunc("POST /v1/nodes/{id}/events", createNodeEventsHandler(deps.st, deps.eventsService), auth.RoleWorker)
 	s.RegisterRouteFunc("POST /v1/nodes/{id}/logs", createNodeLogsHandler(deps.st, deps.bp, deps.eventsService), auth.RoleWorker)
 	s.RegisterRouteFunc("POST /v1/nodes/{id}/diagnostics", upsertNodeDiagnosticHandler(deps.st), auth.RoleWorker, auth.RoleControlPlane)

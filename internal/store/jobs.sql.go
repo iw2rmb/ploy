@@ -703,23 +703,25 @@ SET status = 'Queued',
 FROM (
   SELECT nodes.id AS node_id
   FROM nodes
-  WHERE nodes.id = $2
-    AND $2::TEXT != ''
+  WHERE nodes.id = $3
+    AND $3::TEXT != ''
 ) AS claiming_node
 WHERE jobs.id = $1
   AND jobs.node_id = claiming_node.node_id
+  AND jobs.started_at = $2
   AND status = 'Running'
 `
 
 type UnclaimJobParams struct {
-	ID     types.JobID  `json:"id"`
-	NodeID types.NodeID `json:"node_id"`
+	ID        types.JobID        `json:"id"`
+	StartedAt pgtype.Timestamptz `json:"started_at"`
+	NodeID    types.NodeID       `json:"node_id"`
 }
 
 // Revert a claimed Running job back to claimable Queued state.
 // Guarded by both job id and node id so a foreign node cannot steal the slot.
 func (q *Queries) UnclaimJob(ctx context.Context, arg UnclaimJobParams) error {
-	_, err := q.db.Exec(ctx, unclaimJob, arg.ID, arg.NodeID)
+	_, err := q.db.Exec(ctx, unclaimJob, arg.ID, arg.StartedAt, arg.NodeID)
 	return err
 }
 

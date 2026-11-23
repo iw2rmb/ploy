@@ -16,6 +16,7 @@ type ApiToken struct {
 	TokenHash   string             `json:"token_hash"`
 	TokenID     string             `json:"token_id"`
 	Role        string             `json:"role"`
+	JobID       *types.JobID       `json:"job_id"`
 	Username    *string            `json:"username"`
 	Description *string            `json:"description"`
 	IssuedAt    pgtype.Timestamptz `json:"issued_at"`

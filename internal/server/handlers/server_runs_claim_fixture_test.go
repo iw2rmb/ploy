@@ -8,6 +8,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgtype"
 
+	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
@@ -105,9 +106,19 @@ func newClaimJobFixture(t testing.TB, opts claimJobFixtureOptions) *claimJobFixt
 }
 
 func (f *claimJobFixture) serve() *httptest.ResponseRecorder {
-	handler := claimJobHandler(f.store, nil, f.config)
-	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+f.nodeKey+"/claim", nil)
-	req.SetPathValue("id", f.nodeKey)
+	handler := claimJobHandler(f.store, nil, f.config, "test-secret")
+	return serveClaim(handler, f.nodeKey)
+}
+
+func newClaimRequest(nodeID string) *http.Request {
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/claim", nil)
+	req.SetPathValue("id", nodeID)
+	req.Header.Set(domainapi.JobTokenCapabilityHeader, "1")
+	return req
+}
+
+func serveClaim(handler http.Handler, nodeID string) *httptest.ResponseRecorder {
+	req := newClaimRequest(nodeID)
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
 	return rr

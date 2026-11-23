@@ -4,6 +4,7 @@
 // and enforces access via a simple role allowlist. The recognized roles are:
 //
 //   - RoleControlPlane: control-plane callers (CLI and automation)
+//   - RoleJob: running job containers reading JVM versions
 //   - RoleWorker: node agents pushing heartbeats/logs/diffs/artifacts
 //   - RoleCLIAdmin: privileged CLI operations (e.g., PKI endpoints)
 //
@@ -38,6 +39,7 @@ type Role string
 const (
 	RoleControlPlane Role = "control-plane"
 	RoleWorker       Role = "worker"
+	RoleJob          Role = "job"
 	RoleCLIAdmin     Role = "cli-admin"
 )
 
@@ -186,8 +188,7 @@ func (a *Authorizer) identityFromRequest(r *http.Request) (Identity, error) {
 			token := strings.TrimPrefix(authHeader, "Bearer ")
 			a.logger.Debug("auth: attempting bearer token authentication",
 				"method", r.Method,
-				"path", r.URL.Path,
-				"token_prefix", token[:min(8, len(token))])
+				"path", r.URL.Path)
 			return a.identityFromBearerToken(r.Context(), token)
 		}
 	}
@@ -199,8 +200,7 @@ func (a *Authorizer) identityFromRequest(r *http.Request) (Identity, error) {
 		if token := strings.TrimSpace(r.URL.Query().Get("auth_token")); token != "" {
 			a.logger.Debug("auth: attempting query token authentication",
 				"method", r.Method,
-				"path", r.URL.Path,
-				"token_prefix", token[:min(8, len(token))])
+				"path", r.URL.Path)
 			return a.identityFromBearerToken(r.Context(), token)
 		}
 	}
@@ -277,8 +277,7 @@ func (a *Authorizer) identityFromBearerToken(ctx context.Context, tokenString st
 	claims, err := ValidateToken(tokenString, a.tokenSecret)
 	if err != nil {
 		a.logger.Warn("auth: bearer token validation failed",
-			"error", err.Error(),
-			"token_prefix", tokenString[:min(8, len(tokenString))])
+			"error", err.Error())
 		return Identity{}, fmt.Errorf("invalid token: %w", err)
 	}
 
@@ -292,21 +291,8 @@ func (a *Authorizer) identityFromBearerToken(ctx context.Context, tokenString st
 		return Identity{}, errors.New("token expired")
 	}
 
-	// Check if token is revoked (query database)
-	revoked, err := a.isTokenRevoked(ctx, claims.ID, claims.TokenType)
-	if err != nil {
-		a.logger.Error("auth: failed to check token revocation",
-			"error", err.Error(),
-			"token_id", claims.ID,
-			"token_type", claims.TokenType)
-		return Identity{}, fmt.Errorf("check token revocation: %w", err)
-	}
-	if revoked {
-		a.logger.Warn("auth: bearer token revoked",
-			"token_id", claims.ID,
-			"token_type", claims.TokenType,
-			"role", claims.Role)
-		return Identity{}, errors.New("token revoked")
+	if err := a.checkTokenStatus(ctx, claims); err != nil {
+		return Identity{}, err
 	}
 
 	// API token last_used_at is telemetry. Bootstrap token used_at is the
@@ -331,32 +317,41 @@ func (a *Authorizer) identityFromBearerToken(ctx context.Context, tokenString st
 	}, nil
 }
 
-// isTokenRevoked checks if a token has been revoked by querying the database.
-func (a *Authorizer) isTokenRevoked(ctx context.Context, tokenID, tokenType string) (bool, error) {
+func (a *Authorizer) checkTokenStatus(ctx context.Context, claims *TokenClaims) error {
+	if claims.Role == string(RoleJob) {
+		if a.querier == nil || claims.TokenType != TokenTypeAPI {
+			return errors.New("job token requires an active job")
+		}
+		active, err := a.querier.IsJobTokenActive(ctx, claims.ID)
+		if err != nil {
+			return fmt.Errorf("check job token: %w", err)
+		}
+		if !active {
+			return errors.New("job token is inactive")
+		}
+		return nil
+	}
+
 	if a.querier == nil {
-		// If no database configured, tokens cannot be revoked
-		return false, nil
+		return nil
 	}
 
 	var err error
-	switch tokenType {
+	switch claims.TokenType {
 	case TokenTypeAPI:
-		_, err = a.querier.CheckAPITokenRevoked(ctx, tokenID)
+		_, err = a.querier.CheckAPITokenRevoked(ctx, claims.ID)
 	case TokenTypeBootstrap:
-		_, err = a.querier.CheckBootstrapTokenRevoked(ctx, tokenID)
+		_, err = a.querier.CheckBootstrapTokenRevoked(ctx, claims.ID)
 	default:
-		return false, fmt.Errorf("unknown token type: %s", tokenType)
+		return fmt.Errorf("unknown token type: %s", claims.TokenType)
 	}
-
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil
+	}
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return false, nil
-		}
-		return false, fmt.Errorf("query token revocation: %w", err)
+		return fmt.Errorf("query token revocation: %w", err)
 	}
-
-	// If we got a result, the token is revoked
-	return true, nil
+	return errors.New("token revoked")
 }
 
 // updateTokenLastUsed updates the last_used_at timestamp for a token.
@@ -383,7 +378,8 @@ func (a *Authorizer) updateTokenLastUsed(ctx context.Context, tokenID, tokenType
 	}
 }
 
-// NormalizeRole normalizes a role string to one of the standard role constants.
+// NormalizeRole identifies roles accepted for certificates and user-issued tokens.
+// Job credentials can only be issued through a job claim.
 // It accepts common aliases and returns the canonical role name.
 // Returns empty Role if the value doesn't match any known role.
 //

@@ -7,6 +7,9 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
+// JobTokenCapabilityHeader is set to "1" by nodes that deliver the claim token to job containers.
+const JobTokenCapabilityHeader = "X-Ploy-Job-Token"
+
 // NodeClaimResponse is the control-plane contract returned to a node after a successful claim.
 type NodeClaimResponse struct {
 	ResumeCount   int                         `json:"resume_count,omitempty"`
@@ -15,6 +18,7 @@ type NodeClaimResponse struct {
 	RepoID        types.RepoID                `json:"repo_id"`
 	Attempt       int32                       `json:"attempt"`
 	JobID         types.JobID                 `json:"job_id"`
+	JobToken      string                      `json:"job_token,omitempty"`
 	JobName       string                      `json:"job_name"`
 	JobType       types.JobType               `json:"job_type"`
 	JobImage      string                      `json:"job_image"`

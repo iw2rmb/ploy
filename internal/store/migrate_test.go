@@ -91,6 +91,32 @@ AND bool_and(CASE id WHEN 'legacy-drained' THEN drained AND drain_revision = 17
 			},
 		},
 		{
+			name: "version 12 preserves API tokens and queued jobs",
+			setup: func(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
+				setupTernSchemaVersion(t, ctx, pool, 12)
+				db := &PgStore{pool: pool, Queries: New(pool)}
+				fx := newV1Fixture(t, ctx, db, "https://github.com/test/migration", "main", []byte("{}"))
+				createTestJob(t, ctx, db, fx, "queued-before-upgrade")
+				if _, err := pool.Exec(ctx, `INSERT INTO ploy.api_tokens(token_hash,token_id,role)
+VALUES ('existing-hash','existing-id','worker')`); err != nil {
+					t.Fatal(err)
+				}
+			},
+			assert: func(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
+				var preserved bool
+				if err := pool.QueryRow(ctx, `SELECT job_id IS NULL AND role='worker'
+FROM ploy.api_tokens WHERE token_id='existing-id'`).Scan(&preserved); err != nil || !preserved {
+					t.Fatalf("existing token preserved = %t, %v", preserved, err)
+				}
+				db := &PgStore{pool: pool, Queries: New(pool)}
+				node := createTestNode(t, ctx, db)
+				job, err := db.ClaimJob(ctx, node.ID)
+				if err != nil || job.Name != "queued-before-upgrade" {
+					t.Fatalf("claim pre-upgrade job: %q, %v", job.Name, err)
+				}
+			},
+		},
+		{
 			name:    "unsupported existing database fails clearly",
 			setup:   setupUnsupportedExistingSchema,
 			wantErr: ErrUnsupportedSchema,

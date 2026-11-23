@@ -31,6 +31,7 @@ type handlerStore struct {
 	countJobsPage               mockCall[store.CountJobsPageParams, int64]
 	claimJob                    mockCall[types.NodeID, store.Job]
 	unclaimJob                  mockCall[store.UnclaimJobParams, struct{}]
+	upsertJobToken              mockCall[store.UpsertJobTokenParams, string]
 	claimRun                    mockResult[store.Run]
 
 	listSBOMJVMVersions      mockCall[store.ListSBOMJVMVersionsParams, []store.ListSBOMJVMVersionsRow]
@@ -219,6 +220,12 @@ func (m *handlerStore) CountJobsPage(ctx context.Context, arg store.CountJobsPag
 }
 
 // Claim methods
+
+func (m *handlerStore) UpsertJobToken(ctx context.Context, params store.UpsertJobTokenParams) (string, error) {
+	m.upsertJobToken.called = true
+	m.upsertJobToken.params = params
+	return params.TokenID, m.upsertJobToken.err
+}
 
 func (m *handlerStore) ClaimJob(ctx context.Context, nodeID types.NodeID) (store.Job, error) {
 	m.claimJob.called = true

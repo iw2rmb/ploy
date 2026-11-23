@@ -104,7 +104,7 @@ func TestRestartRun_FromFailedResumesLinkedSuffix(t *testing.T) {
 			if err != nil || claimed.ID != jobs[failed].ID {
 				t.Fatalf("claim: %+v %v", claimed, err)
 			}
-			if err = db.UnclaimJob(ctx, UnclaimJobParams{ID: claimed.ID, NodeID: node.ID}); err != nil {
+			if err = db.UnclaimJob(ctx, UnclaimJobParams{ID: claimed.ID, NodeID: node.ID, StartedAt: claimed.StartedAt}); err != nil {
 				t.Fatal(err)
 			}
 			if _, err = db.ClaimJob(ctx, other.ID); !errors.Is(err, pgx.ErrNoRows) {
