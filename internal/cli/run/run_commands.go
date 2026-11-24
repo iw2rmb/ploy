@@ -69,7 +69,6 @@ func NewCommand() *cobra.Command {
 	cmd.Flags().StringVar(&buildGateForcedPre, "build-gate-forced-pre", "", "Force Build Gate pre stack as <lang>@<release>[/<tool>]")
 	cmd.Flags().StringVar(&buildGateForcedPost, "build-gate-forced-post", "", "Force Build Gate post stack as <lang>@<release>[/<tool>]")
 	cmd.Flags().Var(envFlags, "env", "Step-scoped environment override; use --env:<step> KEY=VALUE")
-	_ = cmd.Flags().MarkHidden("env")
 	cmd.Flags().SetNormalizeFunc(func(_ *pflag.FlagSet, name string) pflag.NormalizedName {
 		if strings.HasPrefix(name, "env:") {
 			envFlags.currentStep = strings.TrimPrefix(name, "env:")
