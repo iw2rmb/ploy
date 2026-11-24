@@ -13,12 +13,13 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-// Run rows show execution identity and shared spec/repository labels.
+// Run rows show the spec, repository and creator while retaining searchable execution metadata.
 func TestRunsItemsShowCurrentModel(t *testing.T) {
 	m := InitialModel(t.Context(), nil, nil)
 	m.usersLoading = false
+	creator := "alice"
 	next, _ := m.Update(runsLoadedMsg{requestID: m.runsRequest, runs: []domaintypes.RunSummary{
-		{ID: "run-abc", Status: domaintypes.RunStatusRunning, SpecName: "java", SpecSourceDomain: "example.com", SpecSourceRepo: "team/specs", RepoURL: "https://example.com/team/app.git", SourceCommitSHA: "1234567890"},
+		{CreatedBy: &creator, ID: "run-abc", Status: domaintypes.RunStatusRunning, SpecName: "java", SpecSourceDomain: "example.com", SpecSourceRepo: "team/specs", RepoURL: "https://example.com/team/app.git", SourceCommitSHA: "1234567890"},
 		{ID: "run-anon", SpecID: "spec-1"},
 	}})
 	m = next.(model)
@@ -30,21 +31,26 @@ func TestRunsItemsShowCurrentModel(t *testing.T) {
 		t.Fatalf("items = %d, want 2", len(items))
 	}
 	named := items[0].(runItem)
-	if named.Title() != cliruns.StatusGlyph("Running", 0)+" run-abc" || named.Description() != "team/app:12345678\nexample.com/team/specs:java" {
+	if named.Title() != cliruns.StatusGlyph("Running", 0)+" java" || named.Description() != "team/app\n@alice" {
 		t.Fatalf("run row = %q / %q", named.Title(), named.Description())
 	}
-	if got := items[1].(runItem).Description(); got != "-\nspec-1" {
+	if got := items[1].(runItem).Description(); got != "-\n" {
 		t.Fatalf("anonymous description = %q", got)
 	}
 	if strings.Contains(named.FilterValue(), "\x1b") || !strings.Contains(named.FilterValue(), "Running") {
 		t.Fatalf("filter text must retain status without color escapes: %q", named.FilterValue())
 	}
 
+	for _, query := range []string{"run-abc", "team/app:12345678", "example.com/team/specs:java", "@alice"} {
+		if !strings.Contains(named.FilterValue(), query) {
+			t.Errorf("run missing filter text %q", query)
+		}
+	}
 	m.rightPaneList.SetSize(90, 24)
 	lines := strings.Split(ansi.Strip(m.rightPaneList.View()), "\n")
 	for _, row := range [][]string{
-		{cliruns.StatusGlyph("Running", 0) + " run-abc", "team/app:12345678", "example.com/team/specs:java"},
-		{"run-anon", "-", "spec-1"},
+		{cliruns.StatusGlyph("Running", 0) + " java", "team/app", "@alice"},
+		{"spec-1", "-", ""},
 	} {
 		start := -1
 		for n, line := range lines {
@@ -68,8 +74,8 @@ func TestRunsItemsShowCurrentModel(t *testing.T) {
 		m = applyRunFilterCommands(next.(model), cmd)
 	}
 	filtered := ansi.Strip(m.rightPaneList.View())
-	if !strings.Contains(filtered, cliruns.StatusGlyph("Running", 0)+" run-abc") {
-		t.Fatalf("filter corrupted the status icon or run ID: %q", filtered)
+	if !strings.Contains(filtered, cliruns.StatusGlyph("Running", 0)+" java") {
+		t.Fatalf("filter corrupted the status icon or spec name: %q", filtered)
 	}
 }
 
@@ -112,7 +118,7 @@ func TestFilteredRunSelectionUsesVisibleIdentity(t *testing.T) {
 	if m.screen != ScreenRunDetails || m.selectedRunID != "run-q" || cmd == nil {
 		t.Fatalf("selected run = %s, screen = %v", m.selectedRunID, m.screen)
 	}
-	assertPloyItems(t, m, []listItem{{title: "Run", description: "run-q"}, {title: "Jobs", description: "total: —"}})
+	assertPloyItems(t, m, []listItem{{title: "  -", description: "-\n"}, {title: "Jobs", description: "total: —\n"}})
 }
 
 // Esc cancels an active or applied filter before returning to the root.

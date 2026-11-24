@@ -32,6 +32,7 @@ type RunJob struct {
 
 // ListRunJobsResponse is the response for GET /v1/runs/{run_id}/jobs.
 type ListRunJobsResponse struct {
+	RepoURL string             `json:"repo_url"`
 	RunID   domaintypes.RunID  `json:"run_id"`
 	RepoID  domaintypes.RepoID `json:"repo_id"`
 	Attempt int32              `json:"attempt"`

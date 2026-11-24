@@ -47,6 +47,9 @@ func (m model) handleRefreshTick(now time.Time) (tea.Model, tea.Cmd) {
 	m.refreshScheduled = false
 	m.now = now
 	m.spinnerFrame = (m.spinnerFrame + 1) % len(cliruns.SpinnerFrames)
+	if item, ok := m.jobList.ConfirmedItem(m.now, m.spinnerFrame); ok {
+		m.rootList.SetItem(jobsIndex, item)
+	}
 	var commands []tea.Cmd
 	if m.activeRunsVisible() && !m.runsLoading {
 		commands = append(commands, m.loadRuns())

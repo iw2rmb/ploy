@@ -124,6 +124,9 @@ func (m model) handleRunsLoaded(msg runsLoadedMsg) model {
 	items := make([]list.Item, len(msg.runs))
 	for i, run := range msg.runs {
 		items[i] = runItem{run: run}
+		if run.ID == m.selectedRunID && !run.ID.IsZero() {
+			m.rootList.SetItem(runsIndex, items[i])
+		}
 	}
 	selectedID := domaintypes.RunID("")
 	if selected, ok := m.rightPaneList.SelectedItem().(runItem); ok {
@@ -168,22 +171,17 @@ func (m model) handleRunDetailsLoaded(msg runDetailsLoadedMsg) model {
 	}
 	m.runJobTotal = &msg.jobTotal
 	if m.screen == ScreenRunDetails {
-		m.showRunDetails()
+		m.rootList.SetItem(jobsIndex, m.runJobsEntry())
 	}
 	return m
 }
 
-func (m *model) showRunDetails() {
+func (m model) runJobsEntry() listItem {
 	total := "total: —"
 	if m.runJobTotal != nil {
 		total = fmt.Sprintf("total: %d", *m.runJobTotal)
 	}
-	selected := m.rootList.Index()
-	m.rootList.SetItems(buildDetailsPloyItems([]ployEntry{
-		{title: "Run", desc: m.selectedRunID.String()},
-		{title: "Jobs", desc: total},
-	}))
-	m.rootList.Select(selected)
+	return listItem{title: "Jobs", description: total}
 }
 
 func (m model) handleJobsLoaded(msg jobsLoadedMsg) model {
@@ -201,7 +199,17 @@ func (m model) handleJobsLoaded(msg jobsLoadedMsg) model {
 		}
 	}
 	m.now = time.Now()
+	hadSelection := !m.jobList.ConfirmedJobID().IsZero()
 	m.jobList = m.jobList.RefreshJobs(msg.jobs)
+	if hadSelection {
+		if item, ok := m.jobList.ConfirmedItem(m.now, m.spinnerFrame); ok {
+			m.rootList.SetItem(jobsIndex, item)
+		} else if m.selectedRunID.IsZero() {
+			m.resetRoot()
+		} else {
+			m.rootList.SetItem(jobsIndex, m.runJobsEntry())
+		}
+	}
 	m.applyWindowSize()
 	return m
 }

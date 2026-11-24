@@ -1402,6 +1402,9 @@ ListRunJobsResponse:
     repo_id:
       type: string
       description: Repository identifier (NanoID string)
+    repo_url:
+      type: string
+      description: Repository URL
     attempt:
       type: integer
       format: int32

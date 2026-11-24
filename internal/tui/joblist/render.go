@@ -3,11 +3,13 @@ package joblist
 import (
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	"charm.land/bubbles/v2/list"
 	"charm.land/lipgloss/v2"
 
+	"github.com/iw2rmb/ploy/internal/cli/common"
 	cliruns "github.com/iw2rmb/ploy/internal/cli/runs"
 	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
@@ -21,6 +23,7 @@ type delegate struct {
 
 func newDelegate(focused bool, now time.Time, spinnerFrame int) delegate {
 	d := list.NewDefaultDelegate()
+	d.SetHeight(3)
 	if !focused {
 		d.Styles.SelectedTitle = d.Styles.SelectedTitle.BorderStyle(lipgloss.HiddenBorder())
 		d.Styles.SelectedDesc = d.Styles.SelectedDesc.BorderStyle(lipgloss.HiddenBorder())
@@ -33,30 +36,24 @@ func (d delegate) Render(w io.Writer, m list.Model, index int, item list.Item) {
 	if !ok {
 		return
 	}
-	d.DefaultDelegate.Render(w, m, index, displayRow{row: r, title: renderPrimaryLine(r.job, d.now, d.spinnerFrame)})
+	r.now, r.spinnerFrame = d.now, d.spinnerFrame
+	d.DefaultDelegate.Render(w, m, index, r)
 }
 
-type displayRow struct {
-	row
-	title string
-}
-
-func (r displayRow) Title() string { return r.title }
-
-func renderPrimaryLine(job domainapi.JobListItem, now time.Time, spinnerFrame int) string {
+func renderPrimaryLine(job domainapi.JobListItem, spinnerFrame int) string {
 	glyph := cliruns.StatusGlyph(job.Status.String(), spinnerFrame)
 	if job.StartedAt == nil && (job.Status == domaintypes.JobStatusCreated || job.Status == domaintypes.JobStatusQueued) {
 		glyph = "-"
 	}
+	return glyph + " " + cliruns.FormatStepName(job.DisplayName, job.JobType.String())
+}
+
+func renderDescription(job domainapi.JobListItem, now time.Time) string {
 	duration := formatDuration(jobDuration(job, now))
 	if job.Status == domaintypes.JobStatusRunning && job.StartedAt == nil {
 		duration = "--h --m --s"
 	}
-	return glyph + " " + duration + " " + cliruns.FormatStepName(job.DisplayName, job.JobType.String())
-}
-
-func renderSecondaryLine(job domainapi.JobListItem) string {
-	return job.JobID.String()
+	return common.FormatRunListRepo(job.RepoURL, "") + "\n" + strings.TrimSpace(duration)
 }
 
 func jobDuration(job domainapi.JobListItem, now time.Time) time.Duration {

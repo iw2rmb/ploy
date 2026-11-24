@@ -29,8 +29,8 @@ func TestRunStatusIconColorsFollowSelection(t *testing.T) {
 					m := InitialModel(t.Context(), nil, nil)
 					m.screen = ScreenRunsList
 					next, _ := m.Update(runsLoadedMsg{requestID: m.runsRequest, runs: []domaintypes.RunSummary{
-						{ID: "run-first", Status: tc.status},
-						{ID: "run-second", Status: tc.status},
+						{ID: "1", SpecName: "run-first", Status: tc.status},
+						{ID: "2", SpecName: "run-second", Status: tc.status},
 					}})
 					m = next.(model)
 					m.rightPaneList.SetSize(80, 24)
@@ -64,7 +64,7 @@ func TestRunStatusIconColorsFollowSelection(t *testing.T) {
 								}
 								titleColor := ansi.NewStyle().ForegroundColor(profile.Convert(lipgloss.Color("#dddddd"))).String()
 								if colored && !strings.Contains(line, tc.glyph+titleColor+"\x1b[22m") {
-									t.Fatalf("status color or bold leaked into run ID: %q", line)
+									t.Fatalf("status color or bold leaked into spec name: %q", line)
 								}
 								if filter == tc.glyph && index != selected && profile >= colorprofile.ANSI {
 									underline := ansi.NewStyle().Underline(true).ForegroundColor(profile.Convert(lipgloss.Color("#dddddd"))).Underline(true).String()
@@ -110,7 +110,7 @@ func TestRunDelegateFocusPreservesLayout(t *testing.T) {
 	if strings.ReplaceAll(focused, "│", " ") != preview {
 		t.Fatalf("preview moved row text: %q / %q", focused, preview)
 	}
-	want := cliruns.StatusGlyph("running", 1) + " run-preview"
+	want := cliruns.StatusGlyph("running", 1) + " spec-1"
 	if !strings.Contains(preview, want) {
 		t.Fatalf("preview missing spinner frame %q: %q", want, preview)
 	}

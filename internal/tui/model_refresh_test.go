@@ -106,7 +106,7 @@ func TestJobsLoadedUpdatesElapsedClock(t *testing.T) {
 	before := time.Now()
 	next, _ := m.Update(jobsLoadedMsg{jobs: []domainapi.JobListItem{{JobID: "job-1", Status: domaintypes.JobStatusRunning, StartedAt: &started}}})
 	m = next.(model)
-	if m.now.Before(before) || !strings.Contains(m.View().Content, " 1h    ") {
+	if m.now.Before(before) || !strings.Contains(m.View().Content, "1h    ") {
 		t.Fatal("loaded job used the old idle clock")
 	}
 }

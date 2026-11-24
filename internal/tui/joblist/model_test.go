@@ -40,15 +40,15 @@ func TestNewHasCorrectTitleAndWidth(t *testing.T) {
 	}
 }
 
-// Rows carry plain status, fixed duration, job identity, and stdout display names.
+// Each row shows the status and step name, repository path, and duration.
 func TestSetJobsFormatsRows(t *testing.T) {
 	m := joblist.New("JOBS").SetJobs([]domainapi.JobListItem{
-		{JobID: "job-abc", Name: "internal-name", DisplayName: "  Deploy  ", Status: domaintypes.JobStatusSuccess, DurationMs: 2500},
+		{JobID: "job-abc", Name: "internal-name", DisplayName: "  Deploy  ", RepoURL: "https://git.example.com/team/backend/app.git", Status: domaintypes.JobStatusSuccess, DurationMs: 2500},
 		{JobID: "job-type", Name: "internal-name", JobType: domaintypes.JobType("PRE_GATE"), Status: domaintypes.JobStatusQueued},
 		{JobID: "job-empty", Name: "internal-name", Status: domaintypes.JobStatusCreated},
 	})
-	wantTitles := []string{"✓          2s Deploy", "-          0s pre_gate", "-          0s -"}
-	wantDescriptions := []string{"job-abc", "job-type", "job-empty"}
+	wantTitles := []string{"✓ Deploy", "- pre_gate", "- -"}
+	wantDescriptions := []string{"team/backend/app\n2s", "-\n0s", "-\n0s"}
 	for i, item := range m.Items() {
 		r := mustDefaultItem(t, item)
 		if r.Title() != wantTitles[i] || r.Description() != wantDescriptions[i] {
@@ -163,7 +163,7 @@ func TestViewUsesStdoutGlyphsAndLiveDuration(t *testing.T) {
 	for _, status := range []domaintypes.JobStatus{domaintypes.JobStatusSuccess, domaintypes.JobStatusFail, domaintypes.JobStatusError, domaintypes.JobStatusCancelled} {
 		m := joblist.New("JOBS").SetJobs([]domainapi.JobListItem{{JobID: "job-terminal", DisplayName: "deploy", Status: status, DurationMs: 2500}})
 		text := ansi.Strip(m.View(true, start, 0))
-		want := cliruns.StatusGlyph(status.String(), 0) + "          2s deploy"
+		want := cliruns.StatusGlyph(status.String(), 0) + " deploy"
 		if !strings.Contains(text, want) {
 			t.Fatalf("terminal %s: missing %q in %q", status, want, text)
 		}
@@ -171,8 +171,8 @@ func TestViewUsesStdoutGlyphsAndLiveDuration(t *testing.T) {
 	m := joblist.New("JOBS").SetJobs([]domainapi.JobListItem{{JobID: "job-running", DisplayName: "healing", Status: domaintypes.JobStatusRunning, StartedAt: &start}})
 	for _, frame := range []int{0, 1} {
 		text := ansi.Strip(m.View(true, start.Add(time.Duration(frame+1)*time.Second), frame))
-		want := cliruns.StatusGlyph("running", frame) + "          " + string(rune('1'+frame)) + "s healing"
-		if !strings.Contains(text, want) {
+		want := cliruns.StatusGlyph("running", frame) + " healing"
+		if !strings.Contains(text, want) || !strings.Contains(text, "│ "+string(rune('1'+frame))+"s") {
 			t.Fatalf("frame %d: missing %q in %q", frame, want, text)
 		}
 	}
@@ -201,7 +201,7 @@ func TestJobDurations(t *testing.T) {
 			tt.job.JobID = "job-duration"
 			tt.job.DisplayName = "healing"
 			m := joblist.New("JOBS").SetJobs([]domainapi.JobListItem{tt.job})
-			if view := ansi.Strip(m.View(true, tt.now, 0)); !strings.Contains(view, tt.want+" healing") {
+			if view := ansi.Strip(m.View(true, tt.now, 0)); !strings.Contains(view, "│ "+strings.TrimSpace(tt.want)) {
 				t.Fatalf("missing duration %q in %q", tt.want, view)
 			}
 		})

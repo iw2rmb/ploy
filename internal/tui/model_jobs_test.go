@@ -25,7 +25,7 @@ func TestJobsLoadedWiresComponentAndRenderedView(t *testing.T) {
 		t.Fatalf("job component state = %+v, want job %q", got, jobs[0].JobID)
 	}
 	rendered := nm.View().Content
-	for _, want := range []string{"PLOY", "JOBS", "job-1"} {
+	for _, want := range []string{"PLOY", "JOBS", "deploy"} {
 		if !strings.Contains(rendered, want) {
 			t.Errorf("rendered view missing %q", want)
 		}
@@ -59,17 +59,24 @@ func TestJobsLoadedKeepsAvailableRowsWhenMetadataFails(t *testing.T) {
 
 // Enter confirms the selected row and preserves its identity through refresh.
 func TestJobSelectionUpdatesContext(t *testing.T) {
-	for _, runID := range []domaintypes.RunID{"", "run-1"} {
+	for _, runID := range []domaintypes.RunID{"", "run-abc"} {
 		t.Run("scope="+runID.String(), func(t *testing.T) {
 			m := InitialModel(t.Context(), nil, nil)
 			m.usersLoading = false
 			m.screen = ScreenJobsList
-			m.selectedRunID = runID
-			jobs := []domainapi.JobListItem{
-				{JobID: "job-1", DisplayName: "deploy", RunID: "run-1", RepoID: "repo-1", Status: domaintypes.JobStatusSuccess},
-				{JobID: "job-2", DisplayName: "verify", RunID: "run-1", RepoID: "repo-1", Status: domaintypes.JobStatusSuccess},
+			runEntry := listItem{title: "Run", description: "run-abc\n"}
+			if !runID.IsZero() {
+				m = makeRunDetailsModel(t)
+				m.rootList.Select(jobsIndex)
+				next, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+				m = next.(model)
+				runEntry = listItem{title: "✓ java", description: "team/app\n@alice"}
 			}
-			next, _ := m.Update(jobsLoadedMsg{runID: runID, jobs: jobs})
+			jobs := []domainapi.JobListItem{
+				{JobID: "job-1", DisplayName: "deploy", RunID: "run-abc", RepoURL: "https://example.com/team/app.git", Status: domaintypes.JobStatusSuccess},
+				{JobID: "job-2", DisplayName: "verify", RunID: "run-abc", RepoURL: "https://example.com/team/app.git", Status: domaintypes.JobStatusSuccess},
+			}
+			next, _ := m.Update(jobsLoadedMsg{requestID: m.jobsRequest, runID: runID, jobs: jobs})
 			m = next.(model)
 			result, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 			if cmd != nil {
@@ -83,18 +90,19 @@ func TestJobSelectionUpdatesContext(t *testing.T) {
 				t.Errorf("confirmed job ID = %q, want job-1", got)
 			}
 			assertPloyItems(t, selected, []listItem{
-				{title: "Run", description: "run-1"},
-				{title: "Job", description: "job-1"},
+				runEntry,
+				{title: "✓ deploy", description: "team/app\n0s"},
 			})
 			selected.jobList = selected.jobList.Select(1)
-			result, _ = selected.Update(jobsLoadedMsg{runID: runID, jobs: []domainapi.JobListItem{jobs[1], jobs[0]}})
+			jobs[0].DurationMs = 6500
+			result, _ = selected.Update(jobsLoadedMsg{requestID: m.jobsRequest, runID: runID, jobs: []domainapi.JobListItem{jobs[1], jobs[0]}})
 			refreshed := result.(model)
 			if refreshed.jobList.ConfirmedJobID() != "job-1" || refreshed.jobList.SelectedJobID() != "job-2" {
 				t.Fatal("refresh changed highlighted or confirmed job identity")
 			}
 			assertPloyItems(t, refreshed, []listItem{
-				{title: "Run", description: "run-1"},
-				{title: "Job", description: "job-1"},
+				runEntry,
+				{title: "✓ deploy", description: "team/app\n6s"},
 			})
 		})
 	}
@@ -172,7 +180,7 @@ func TestFilteredGlobalJobSelectionKeepsGlobalScope(t *testing.T) {
 	if m.screen != ScreenPloyList {
 		t.Fatal("global Jobs returned to run details")
 	}
-	assertPloyItems(t, m, []listItem{{title: "Runs", description: "select run"}, {title: "Jobs", description: "select job"}, {title: "Users", description: "cli-admin only"}})
+	assertPloyItems(t, m, []listItem{{title: "Runs", description: "select run\n"}, {title: "Jobs", description: "select job\n"}, {title: "Users", description: "cli-admin only\n"}})
 }
 
 // A response from an earlier root visit cannot reset the selected job.
@@ -211,5 +219,5 @@ func TestJobsLatestRequestPreservesSelection(t *testing.T) {
 	if m.jobList.ConfirmedJobID() != "job-current" || len(m.jobList.Jobs()) != 1 || m.jobList.Jobs()[0].JobID != "job-current" {
 		t.Fatal("late preview reset the current selection")
 	}
-	assertPloyItems(t, m, []listItem{{title: "Run", description: "run-current"}, {title: "Job", description: "job-current"}})
+	assertPloyItems(t, m, []listItem{{title: "Run", description: "run-current\n"}, {title: "  -", description: "-\n0s"}})
 }

@@ -8,29 +8,26 @@ import (
 
 // View satisfies tea.Model and renders the current screen.
 func (m model) View() tea.View {
-	var content string
-	if m.screen == ScreenRunsList || m.screen == ScreenJobsList || m.screen == ScreenUsersList {
-		delegate := list.NewDefaultDelegate()
-		delegate.Styles.SelectedTitle = delegate.Styles.SelectedTitle.BorderStyle(lipgloss.HiddenBorder())
-		delegate.Styles.SelectedDesc = delegate.Styles.SelectedDesc.BorderStyle(lipgloss.HiddenBorder())
-		m.rootList.SetDelegate(delegate)
-	}
-	content = m.rootList.View()
+	rootFocused := m.screen == ScreenPloyList || m.screen == ScreenRunDetails
+	m.rootList.SetDelegate(newRunDelegate(rootFocused, m.spinnerFrame))
+	content := renderList(m.rootList, rootFocused)
 	var right string
 	switch {
 	case m.runsVisible():
-		m.rightPaneList.SetDelegate(newRunDelegate(m.screen == ScreenRunsList, m.spinnerFrame))
-		right = m.rightPaneList.View()
+		focused := m.screen == ScreenRunsList
+		m.rightPaneList.SetDelegate(newRunDelegate(focused, m.spinnerFrame))
+		right = renderList(m.rightPaneList, focused)
 	case m.jobsVisible():
 		right = m.jobList.View(m.screen == ScreenJobsList, m.now, m.spinnerFrame)
 	case m.usersVisible():
 		delegate := list.NewDefaultDelegate()
-		if m.screen != ScreenUsersList {
+		focused := m.screen == ScreenUsersList
+		if !focused {
 			delegate.Styles.SelectedTitle = delegate.Styles.SelectedTitle.BorderStyle(lipgloss.HiddenBorder())
 			delegate.Styles.SelectedDesc = delegate.Styles.SelectedDesc.BorderStyle(lipgloss.HiddenBorder())
 		}
 		m.usersList.SetDelegate(delegate)
-		right = m.usersList.View()
+		right = renderList(m.usersList, focused)
 	}
 	if right != "" {
 		ploy := lipgloss.NewStyle().Width(ployListWidth).Render(content)
@@ -39,4 +36,11 @@ func (m model) View() tea.View {
 	view := tea.NewView(content)
 	view.AltScreen = true
 	return view
+}
+
+func renderList(l list.Model, focused bool) string {
+	if !focused {
+		l.Styles.Title = l.Styles.Title.UnsetBackground().UnsetForeground()
+	}
+	return l.View()
 }

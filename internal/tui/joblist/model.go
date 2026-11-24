@@ -16,11 +16,17 @@ import (
 
 const ListWidth = 50
 
-type row struct{ job domainapi.JobListItem }
+type row struct {
+	job          domainapi.JobListItem
+	now          time.Time
+	spinnerFrame int
+}
 
-func (r row) Title() string       { return renderPrimaryLine(r.job, time.Time{}, 0) }
-func (r row) Description() string { return renderSecondaryLine(r.job) }
-func (r row) FilterValue() string { return r.Title() + " " + r.Description() }
+func (r row) Title() string       { return renderPrimaryLine(r.job, r.spinnerFrame) }
+func (r row) Description() string { return renderDescription(r.job, r.now) }
+func (r row) FilterValue() string {
+	return r.Title() + " " + r.Description() + " " + r.job.JobID.String()
+}
 
 // Model is the JobList domain component. It owns job row state, list cursor,
 // and confirmed selected job identity for the jobs pane.
@@ -32,7 +38,7 @@ type Model struct {
 
 // New creates an initialized JobList with the given title.
 func New(title string) Model {
-	l := list.New(nil, list.NewDefaultDelegate(), ListWidth, 0)
+	l := list.New(nil, newDelegate(true, time.Time{}, 0), ListWidth, 0)
 	l.Title = title
 	l.SetShowHelp(false)
 	l.DisableQuitKeybindings()
@@ -173,6 +179,17 @@ func (m Model) ConfirmedJobID() domaintypes.JobID {
 	return m.selectedJobID
 }
 
+func (m Model) ConfirmedItem(now time.Time, frame int) (list.DefaultItem, bool) {
+	if !m.selectedJobID.IsZero() {
+		for _, job := range m.jobs {
+			if job.JobID == m.selectedJobID {
+				return row{job: job, now: now, spinnerFrame: frame}, true
+			}
+		}
+	}
+	return nil, false
+}
+
 // Update routes messages into the inner list.
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	if _, ok := msg.(list.FilterMatchesMsg); ok {
@@ -191,6 +208,9 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 }
 
 func (m Model) View(focused bool, now time.Time, spinnerFrame int) string {
+	if !focused {
+		m.inner.Styles.Title = m.inner.Styles.Title.UnsetBackground().UnsetForeground()
+	}
 	m.inner.SetDelegate(newDelegate(focused, now, spinnerFrame))
 	return m.inner.View()
 }

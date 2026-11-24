@@ -49,7 +49,13 @@ func listRunJobsHandler(st store.Store) http.HandlerFunc {
 			func(job store.Job) *domaintypes.JobID { return job.NextID },
 		)
 
+		repoURL, err := repoURLForID(r.Context(), st, run.RepoID)
+		if err != nil {
+			serverError(w, "list run jobs", "get repo", err, "run_id", runID, "repo_id", run.RepoID)
+			return
+		}
 		resp := migsapi.ListRunJobsResponse{
+			RepoURL: repoURL,
 			RunID:   runID,
 			RepoID:  run.RepoID,
 			Attempt: attempt,

@@ -27,7 +27,9 @@ func newListWithWidth(title string, items []list.Item, width int) list.Model {
 
 // newPloyList creates the left PLOY list with fixed width.
 func newPloyList(title string, items []list.Item) list.Model {
-	return newListWithWidth(title, items, ployListWidth)
+	l := newListWithWidth(title, items, ployListWidth)
+	l.SetDelegate(newRunDelegate(true, 0))
+	return l
 }
 
 // The initial width is replaced when the terminal size arrives.
@@ -65,16 +67,4 @@ func buildPloyItems(usersEnabled bool, selectedUser string, usersErr error) []li
 		listItem{title: "Jobs", description: "select job"},
 		listItem{title: "Users", description: user},
 	}
-}
-
-// ployEntry holds a title-description pair for the PLOY detail list.
-type ployEntry struct{ title, desc string }
-
-// buildDetailsPloyItems constructs a PLOY detail list, normalizing each entry.
-func buildDetailsPloyItems(entries []ployEntry) []list.Item {
-	items := make([]list.Item, len(entries))
-	for i, e := range entries {
-		items[i] = listItem{title: normalizeLabel(e.title), description: normalizeLabel(e.desc)}
-	}
-	return items
 }

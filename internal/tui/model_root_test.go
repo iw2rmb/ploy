@@ -25,9 +25,9 @@ func TestRootListContract(t *testing.T) {
 		t.Error("root list filtering must be disabled")
 	}
 	assertPloyItems(t, m, []listItem{
-		{title: "Runs", description: "select run"},
-		{title: "Jobs", description: "select job"},
-		{title: "Users", description: "cli-admin only"},
+		{title: "Runs", description: "select run\n"},
+		{title: "Jobs", description: "select job\n"},
+		{title: "Users", description: "cli-admin only\n"},
 	})
 }
 
@@ -57,10 +57,10 @@ func TestPloyListJobsSelectedShowsJobListPanel(t *testing.T) {
 func TestPloyListRunsSelectedShowsRunsPanel(t *testing.T) {
 	m := InitialModel(t.Context(), nil, nil)
 	m.usersLoading = false
-	next, _ := m.Update(runsLoadedMsg{requestID: m.runsRequest, runs: []domaintypes.RunSummary{{ID: "run-preview"}}})
+	next, _ := m.Update(runsLoadedMsg{requestID: m.runsRequest, runs: []domaintypes.RunSummary{{ID: "run-id", SpecID: "spec-preview"}}})
 	m = next.(model)
 	view := m.View().Content
-	for _, want := range []string{"PLOY", "RUNS", "run-preview"} {
+	for _, want := range []string{"PLOY", "RUNS", "spec-preview"} {
 		if !strings.Contains(view, want) {
 			t.Fatalf("root Runs preview missing %q", want)
 		}

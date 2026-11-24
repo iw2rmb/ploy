@@ -118,8 +118,8 @@ func TestRunsPaneStartsAfterFixedPloyWidth(t *testing.T) {
 	}
 }
 
-// Only the active column draws a border; inactive selections retain the same text position.
-func TestSelectionBorderFollowsColumnFocus(t *testing.T) {
+// The title background and selection border identify the focused column.
+func TestSelectionBorderAndTitleFollowColumnFocus(t *testing.T) {
 	for _, tc := range []struct {
 		name         string
 		screen       Screen
@@ -127,13 +127,13 @@ func TestSelectionBorderFollowsColumnFocus(t *testing.T) {
 		leftBorders  int
 		rightBorders int
 	}{
-		{"runs preview", ScreenPloyList, runsIndex, 2, 0},
-		{"jobs preview", ScreenPloyList, jobsIndex, 2, 0},
-		{"users preview", ScreenPloyList, usersIndex, 2, 0},
+		{"runs preview", ScreenPloyList, runsIndex, 3, 0},
+		{"jobs preview", ScreenPloyList, jobsIndex, 3, 0},
+		{"users preview", ScreenPloyList, usersIndex, 3, 0},
 		{"runs", ScreenRunsList, runsIndex, 0, 3},
-		{"jobs", ScreenJobsList, jobsIndex, 0, 2},
+		{"jobs", ScreenJobsList, jobsIndex, 0, 3},
 		{"users", ScreenUsersList, usersIndex, 0, 2},
-		{"run details", ScreenRunDetails, jobsIndex, 2, 0},
+		{"run details", ScreenRunDetails, jobsIndex, 3, 0},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			m := InitialModel(t.Context(), nil, nil)
@@ -141,12 +141,24 @@ func TestSelectionBorderFollowsColumnFocus(t *testing.T) {
 			m.usersEnabled = true
 			m.usersList.SetItems([]list.Item{userItem{}})
 			m.rootList.Select(tc.rootIndex)
-			m.jobList = m.jobList.SetJobs([]domainapi.JobListItem{{JobID: "job-1", DisplayName: "deploy│step"}})
-			m.rightPaneList = newRunsList("RUNS", []list.Item{runItem{run: domaintypes.RunSummary{ID: "run-1"}}})
+			m.jobList = m.jobList.SetJobs([]domainapi.JobListItem{{JobID: "job-1", DisplayName: "deploy│step", Status: domaintypes.JobStatusSuccess}})
+			m.rightPaneList = newRunsList("RUNS", []list.Item{runItem{run: domaintypes.RunSummary{ID: "run-1", SpecName: "spec-1"}}})
 			next, _ := m.Update(tea.WindowSizeMsg{Width: 100, Height: 24})
 			m = next.(model)
+			rendered := m.View().Content
+			titleStyle := list.DefaultStyles(true).Title
+			focusedTitle := "PLOY"
+			if tc.rightBorders > 0 {
+				focusedTitle = []string{"RUNS", "JOBS", "USERS"}[tc.rootIndex]
+			}
+			for _, title := range []string{"PLOY", "RUNS", "JOBS", "USERS"} {
+				focused := title == focusedTitle
+				if got := strings.Contains(rendered, titleStyle.Render(title)); got != focused {
+					t.Errorf("%s title has focused style = %v, want %v", title, got, focused)
+				}
+			}
 			left, right := 0, 0
-			for _, line := range strings.Split(ansi.Strip(m.View().Content), "\n") {
+			for _, line := range strings.Split(ansi.Strip(rendered), "\n") {
 				if ansi.Cut(line, 0, 1) == "│" {
 					left++
 				}
@@ -159,7 +171,7 @@ func TestSelectionBorderFollowsColumnFocus(t *testing.T) {
 			}
 			if tc.screen == ScreenRunsList || tc.name == "runs preview" {
 				view := ansi.Strip(m.View().Content)
-				if !strings.Contains(view, "RUNS") || !strings.Contains(view, "run-1") {
+				if !strings.Contains(view, "RUNS") || !strings.Contains(view, "spec-1") {
 					t.Fatalf("Runs pane missing: %q", view)
 				}
 			}
@@ -176,12 +188,12 @@ func TestSelectionBorderFollowsColumnFocus(t *testing.T) {
 			}
 			m.screen = ScreenRunsList
 			focusedRun := ansi.Strip(m.View().Content)
-			if !strings.Contains(focusedRun, "│   run-1") {
+			if !strings.Contains(focusedRun, "│   spec-1") {
 				t.Fatalf("Runs selection border was not restored: %q", focusedRun)
 			}
 			m.screen = ScreenJobsList
 			focused := ansi.Strip(m.View().Content)
-			if !strings.Contains(focused, "│ job-1") {
+			if !strings.Contains(focused, "│ ✓ deploy│step") {
 				t.Fatal("Jobs selection border was not restored")
 			}
 		})

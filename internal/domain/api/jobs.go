@@ -27,6 +27,7 @@ type JobStatusResponse struct {
 }
 
 type JobListItem struct {
+	RepoURL     string          `json:"repo_url,omitempty"`
 	JobID       types.JobID     `json:"job_id"`
 	Name        string          `json:"name"`
 	DisplayName string          `json:"display_name,omitempty"`

@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"charm.land/bubbles/v2/list"
@@ -38,7 +39,7 @@ type listItem struct {
 }
 
 func (i listItem) Title() string       { return i.title }
-func (i listItem) Description() string { return i.description }
+func (i listItem) Description() string { return i.description + "\n" }
 func (i listItem) FilterValue() string { return i.title }
 
 type runItem struct {
@@ -47,13 +48,26 @@ type runItem struct {
 }
 
 func (i runItem) Title() string {
-	return cliruns.StatusGlyph(string(i.run.Status), i.spinnerFrame) + " " + i.run.ID.String()
+	spec := strings.TrimSpace(i.run.SpecName)
+	if spec == "" {
+		spec = normalizeLabel(i.run.SpecID.String())
+	}
+	return cliruns.StatusGlyph(string(i.run.Status), i.spinnerFrame) + " " + spec
 }
 func (i runItem) Description() string {
-	return common.FormatRunListRepo(i.run.RepoURL, i.run.SourceCommitSHA) + "\n" + common.FormatRunListSpec(i.run)
+	var creator string
+	if i.run.CreatedBy != nil {
+		if username := strings.TrimSpace(*i.run.CreatedBy); username != "" {
+			creator = "@" + username
+		}
+	}
+	return common.FormatRunListRepo(i.run.RepoURL, "") + "\n" + creator
 }
 func (i runItem) FilterValue() string {
-	return i.Title() + " " + string(i.run.Status) + " " + i.Description()
+	return strings.Join([]string{
+		i.Title(), string(i.run.Status), i.Description(), i.run.ID.String(),
+		common.FormatRunListRepo(i.run.RepoURL, i.run.SourceCommitSHA), common.FormatRunListSpec(i.run),
+	}, " ")
 }
 
 type model struct {

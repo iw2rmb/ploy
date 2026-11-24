@@ -22,7 +22,7 @@ func runJobItems(result migsapi.ListRunJobsResponse) []domainapi.JobListItem {
 	jobs := make([]domainapi.JobListItem, len(result.Jobs))
 	for i, job := range result.Jobs {
 		jobs[i] = domainapi.JobListItem{
-			JobID: job.JobID, RunID: result.RunID, RepoID: result.RepoID,
+			JobID: job.JobID, RunID: result.RunID, RepoID: result.RepoID, RepoURL: result.RepoURL,
 			Name: job.Name, DisplayName: job.DisplayName, JobType: job.JobType,
 			Status: job.Status, DurationMs: job.DurationMs,
 			StartedAt: job.StartedAt, FinishedAt: job.FinishedAt,
@@ -53,6 +53,7 @@ func loadGlobalJobs(ctx context.Context, client *http.Client, baseURL *url.URL, 
 	for index, job := range jobs {
 		if old, ok := prior[job.JobID]; ok && old.RunID == job.RunID {
 			jobs[index].DisplayName = old.DisplayName
+			jobs[index].RepoURL = old.RepoURL
 		}
 		terminal := job.Status == domaintypes.JobStatusSuccess || job.Status == domaintypes.JobStatusFail || job.Status == domaintypes.JobStatusError || job.Status == domaintypes.JobStatusCancelled
 		if old, ok := prior[job.JobID]; terminal && ok && old.RunID == job.RunID && old.Status == job.Status && old.StartedAt != nil {
@@ -84,6 +85,7 @@ func loadGlobalJobs(ctx context.Context, client *http.Client, baseURL *url.URL, 
 			}
 			attempts := map[int32]error{snapshot.Attempt: nil}
 			for _, index := range indices {
+				jobs[index].RepoURL = snapshot.RepoURL
 				listed := page.Jobs[index]
 				job, found := byID[listed.JobID]
 				if !found {

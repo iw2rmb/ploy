@@ -3,6 +3,8 @@ package tui
 import (
 	"slices"
 
+	"charm.land/bubbles/v2/list"
+
 	tea "charm.land/bubbletea/v2"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
@@ -65,8 +67,8 @@ func (m model) handleEnterFromRunsList() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	m.setRun(item.run.ID)
+	m.rootList.SetItems([]list.Item{item, m.runJobsEntry()})
 	m.rootList.Select(runsIndex)
-	m.showRunDetails()
 	m.screen = ScreenRunDetails
 	return m, loadRunDetailsCmd(m.ctx, m.client, m.baseURL, m.selectedRunID)
 }
@@ -77,10 +79,12 @@ func (m model) handleEnterFromJobsList() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	m.jobList = m.jobList.SetSelectedJobID(selectedJob.JobID)
-	m.rootList.SetItems(buildDetailsPloyItems([]ployEntry{
-		{title: "Run", desc: selectedJob.RunID.String()},
-		{title: "Job", desc: selectedJob.JobID.String()},
-	}))
+	item, _ := m.jobList.ConfirmedItem(m.now, m.spinnerFrame)
+	run := m.rootList.Items()[runsIndex]
+	if m.selectedRunID.IsZero() {
+		run = listItem{title: "Run", description: selectedJob.RunID.String()}
+	}
+	m.rootList.SetItems([]list.Item{run, item})
 	m.rootList.Select(jobsIndex)
 	return m, nil
 }
@@ -124,7 +128,7 @@ func (m model) handleEsc() (tea.Model, tea.Cmd) {
 		m.jobList = m.jobList.SetSelectedJobID("")
 		if !m.selectedRunID.IsZero() {
 			m.screen = ScreenRunDetails
-			m.showRunDetails()
+			m.rootList.SetItem(jobsIndex, m.runJobsEntry())
 			m.rootList.Select(jobsIndex)
 		} else {
 			m.screen = ScreenPloyList

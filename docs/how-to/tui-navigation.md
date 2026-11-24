@@ -8,10 +8,10 @@ The root screen (`ScreenPloyList`) shows `Runs`, `Jobs`, and `Users` in the `PLO
 `Runs` is item 0. `Jobs` is item 1. `Users` is item 2.
 
 - Enter on root `Runs` moves focus into the runs list.
-- Enter on a run opens its details in `PLOY`: `Run` / `<run-id>` and `Jobs` / `total: <n>`.
+- Enter on a run shows its three-line row and the Jobs total in `PLOY`.
 - Enter on the run's `Jobs` item opens `PLOY | JOBS` for that run.
 - Enter on root `Jobs` moves focus into the global jobs list.
-- Enter on a job selects that row. `PLOY` shows its `Run` / `<run-id>` and `Job` / `<job-id>`.
+- Enter on a job shows its three-line row in `PLOY`. For global jobs, the Run entry shows the run ID and an empty third line.
 
 Highlighting an active root item shows its list in the right pane.
 The TUI checks access to Users before loading the Runs preview at startup.
@@ -21,7 +21,7 @@ Esc returns focus to `PLOY` and keeps the list visible.
 Changing the highlighted root item refreshes its preview while retaining loaded rows.
 Revisit a root item to retry a failed load.
 
-Only the focused column shows the `│` selection border. Other columns reserve a blank cell in its place.
+The focused column shows a colored title background and the `│` selection border. The other column uses a transparent title background and reserves a blank cell for the border.
 
 `PLOY` uses 30 columns.
 `RUNS`, `JOBS`, and `USERS` use the remaining terminal width after `PLOY` and the two-column separator.
@@ -40,17 +40,14 @@ After accepting a filter, Enter selects the highlighted result.
 
 ## RUNS Rows
 
-Each run represents one repository execution. Each row uses three lines:
+Each run represents one repository execution. Each row uses three lines.
 
-- First line: the CLI status icon and run ID.
-- Second line: repository namespace and name, followed by the short source commit SHA.
-- Third line: spec ID or named spec source.
+1. The status icon and the spec name from `ploy spec ls`, or the spec ID for anonymous specs.
+2. The repository as `<namespace>/<repo>`.
+3. The creator as `@<username>`. This line is empty when the run has no creator.
 
 Unselected rows show a bold green `✓` for success and a bold red `✗` for failure.
 Selected rows use the list's selection color.
-
-Named specs use `domain/namespace/repo:spec-name`. Anonymous specs use `spec_id`.
-The repository label uses its namespace and repository name, followed by up to eight SHA characters.
 
 The list loads up to 100 runs in server order, newest first.
 For `cli-admin` tokens, the Users selection determines the creator filter.
@@ -58,10 +55,11 @@ For other tokens, the server filters runs by the authenticated token username, w
 
 ## JOBS Rows
 
-Each job row uses two lines:
+Each job row uses three lines.
 
-- Primary line: status icon, aligned duration, and the step name shown by `ploy run status`.
-- Secondary line: job ID.
+1. The status icon and the step name from `ploy run status`.
+2. The repository as `<namespace>/<repo>`.
+3. The duration.
 
 The step name uses `display_name` when available, otherwise `job_type`.
 The list sorts jobs by `started_at`, newest first. Jobs without a start time appear last.
@@ -72,7 +70,7 @@ Opening jobs from run details loads the selected run's current attempt, includin
 The root jobs list uses the Users selection for `cli-admin` tokens.
 Other tokens retain the global jobs list.
 
-Duration fields use spaces for leading zeros. Zero hours and minutes, including their units, occupy blank cells.
+The duration starts with the first nonzero unit.
 Seconds remain visible, including `0s`.
 
 ## Users
@@ -113,7 +111,7 @@ The TUI uses shared client commands:
   Job rows include `display_name`, `started_at`, and `finished_at` when available.
 - `internal/cli/runs.ListRunJobsCommand` returns run jobs, totals, and job metadata.
 - `internal/cli/job.GetStatusCommand` identifies the attempt for historical global jobs.
-- `internal/cli/common` owns spec and repository labels shared with `ploy run ls`.
+- `internal/cli/common` formats repository labels.
 
 Global job names and timestamps come from each job's run attempt.
 The TUI reuses loaded names and timestamps for terminal jobs while their status stays unchanged and a start time is available.

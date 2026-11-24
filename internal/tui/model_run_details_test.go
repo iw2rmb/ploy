@@ -1,9 +1,10 @@
 package tui
 
 import (
+	"testing"
+
 	tea "charm.land/bubbletea/v2"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	"testing"
 )
 
 func makeRunDetailsModel(t *testing.T) model {
@@ -11,7 +12,8 @@ func makeRunDetailsModel(t *testing.T) model {
 	m := InitialModel(t.Context(), nil, nil)
 	m.usersLoading = false
 	m.screen = ScreenRunsList
-	next, _ := m.Update(runsLoadedMsg{requestID: m.runsRequest, runs: []domaintypes.RunSummary{{ID: "run-abc"}}})
+	creator := "alice"
+	next, _ := m.Update(runsLoadedMsg{requestID: m.runsRequest, runs: []domaintypes.RunSummary{{ID: "run-abc", SpecName: "java", Status: domaintypes.RunStatusSuccess, RepoURL: "https://example.com/team/app.git", CreatedBy: &creator}}})
 	next, _ = next.(model).Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	return next.(model)
 }
@@ -27,7 +29,7 @@ func TestRunDetailsLoadedUpdatesSelectedRunTotal(t *testing.T) {
 	}
 	next, _ = m.Update(runDetailsLoadedMsg{runID: "run-abc", jobTotal: 7})
 	m = next.(model)
-	assertPloyItems(t, m, []listItem{{title: "Run", description: "run-abc"}, {title: "Jobs", description: "total: 7"}})
+	assertPloyItems(t, m, []listItem{{title: "✓ java", description: "team/app\n@alice"}, {title: "Jobs", description: "total: 7\n"}})
 	if m.rootList.Index() != jobsIndex {
 		t.Fatal("total response moved the cursor")
 	}
@@ -49,7 +51,7 @@ func TestRunJobsNavigationRestoresDetails(t *testing.T) {
 	if m.screen != ScreenRunDetails || cmd != nil || m.rootList.Index() != jobsIndex {
 		t.Fatal("Esc failed to restore run details")
 	}
-	assertPloyItems(t, m, []listItem{{title: "Run", description: "run-abc"}, {title: "Jobs", description: "total: 3"}})
+	assertPloyItems(t, m, []listItem{{title: "✓ java", description: "team/app\n@alice"}, {title: "Jobs", description: "total: 3\n"}})
 	next, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
 	m = next.(model)
 	if m.screen != ScreenRunsList || !m.selectedRunID.IsZero() {

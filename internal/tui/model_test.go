@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"testing"
 
+	"charm.land/bubbles/v2/list"
 	tea "charm.land/bubbletea/v2"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
@@ -89,7 +90,7 @@ func TestModelEscTransitions(t *testing.T) {
 				t.Fatalf("Esc = screen %v, command %v; want screen %v without command", nm.screen, cmd, tt.want)
 			}
 			if tt.want == ScreenPloyList || tt.want == ScreenRunsList {
-				assertPloyItems(t, nm, []listItem{{title: "Runs", description: "select run"}, {title: "Jobs", description: "select job"}, {title: "Users", description: "cli-admin only"}})
+				assertPloyItems(t, nm, []listItem{{title: "Runs", description: "select run\n"}, {title: "Jobs", description: "select job\n"}, {title: "Users", description: "cli-admin only\n"}})
 			}
 		})
 	}
@@ -155,12 +156,12 @@ func assertPloyItems(t *testing.T, m model, want []listItem) {
 		t.Fatalf("PLOY items count = %d, want %d", len(items), len(want))
 	}
 	for i, expected := range want {
-		item, ok := items[i].(listItem)
+		item, ok := items[i].(list.DefaultItem)
 		if !ok {
-			t.Fatalf("PLOY item %d has type %T, want listItem", i, items[i])
+			t.Fatalf("PLOY item %d has type %T, want list.DefaultItem", i, items[i])
 		}
-		if item.title != expected.title || item.description != expected.description {
-			t.Errorf("PLOY item %d = %q/%q, want %q/%q", i, item.title, item.description, expected.title, expected.description)
+		if item.Title() != expected.title || item.Description() != expected.description {
+			t.Errorf("PLOY item %d = %q/%q, want %q/%q", i, item.Title(), item.Description(), expected.title, expected.description)
 		}
 	}
 }

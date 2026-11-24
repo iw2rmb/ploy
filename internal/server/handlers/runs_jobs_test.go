@@ -17,7 +17,7 @@ func TestListRunJobsHandler_NextIDContract(t *testing.T) {
 	jobID := domaintypes.NewJobID()
 	nextID := domaintypes.NewJobID()
 
-	st := &handlerStore{}
+	st := &handlerStore{repoByID: map[domaintypes.RepoID]store.Repo{repoID: {ID: repoID, Url: "https://git.example.com/team/app.git"}}}
 	st.getRunSeq.vals = []store.Run{{
 		ID:      runID,
 		RepoID:  repoID,
@@ -49,6 +49,10 @@ func TestListRunJobsHandler_NextIDContract(t *testing.T) {
 	}
 
 	resp := decodeBody[map[string]any](t, rr)
+
+	if got := resp["repo_url"]; got != "https://git.example.com/team/app.git" {
+		t.Fatalf("repo_url = %v", got)
+	}
 
 	jobs, ok := resp["jobs"].([]any)
 	if !ok || len(jobs) != 1 {

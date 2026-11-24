@@ -41,17 +41,17 @@ func TestGlobalJobsHydratesExactJobsAndReusesRunAttempts(t *testing.T) {
 			payload = domainapi.JobListResponse{Jobs: page, Total: 4}
 		case "/v1/runs/" + runA.String() + "/jobs":
 			if r.URL.Query().Get("attempt") == "1" {
-				payload = migsapi.ListRunJobsResponse{RunID: runA, RepoID: repoID, Attempt: 1, Jobs: []migsapi.RunJob{
+				payload = migsapi.ListRunJobsResponse{RunID: runA, RepoID: repoID, RepoURL: "https://git.example.com/team/app.git", Attempt: 1, Jobs: []migsapi.RunJob{
 					{JobID: olderA, DisplayName: "old-step-a", JobType: domaintypes.JobTypeMig, Status: domaintypes.JobStatusSuccess, StartedAt: &started},
 					{JobID: olderB, DisplayName: "old-step-b", JobType: domaintypes.JobTypeMig, Status: domaintypes.JobStatusSuccess, StartedAt: &started},
 				}}
 			} else {
-				payload = migsapi.ListRunJobsResponse{RunID: runA, RepoID: repoID, Attempt: 2, Jobs: []migsapi.RunJob{
+				payload = migsapi.ListRunJobsResponse{RunID: runA, RepoID: repoID, RepoURL: "https://git.example.com/team/app.git", Attempt: 2, Jobs: []migsapi.RunJob{
 					{JobID: current, DisplayName: "healing", JobType: domaintypes.JobTypeMig, Status: domaintypes.JobStatusRunning, StartedAt: &started},
 				}}
 			}
 		case "/v1/runs/" + runB.String() + "/jobs":
-			payload = migsapi.ListRunJobsResponse{RunID: runB, RepoID: repoID, Attempt: 1, Jobs: []migsapi.RunJob{
+			payload = migsapi.ListRunJobsResponse{RunID: runB, RepoID: repoID, RepoURL: "https://git.example.com/team/app.git", Attempt: 1, Jobs: []migsapi.RunJob{
 				{JobID: other, DisplayName: "deprecations", JobType: domaintypes.JobTypeMig, Status: domaintypes.JobStatusRunning, StartedAt: &started},
 			}}
 		case "/v1/jobs/" + olderA.String() + "/status":
@@ -76,7 +76,7 @@ func TestGlobalJobsHydratesExactJobsAndReusesRunAttempts(t *testing.T) {
 		t.Fatalf("jobs count = %d, want %d", len(jobs), len(page))
 	}
 	for i, job := range jobs {
-		if job.JobID != page[i].JobID || job.RunID != page[i].RunID || job.RepoID != repoID || job.DisplayName != wantNames[i] || job.StartedAt == nil || !job.StartedAt.Equal(started) {
+		if job.JobID != page[i].JobID || job.RunID != page[i].RunID || job.RepoID != repoID || job.RepoURL != "https://git.example.com/team/app.git" || job.DisplayName != wantNames[i] || job.StartedAt == nil || !job.StartedAt.Equal(started) {
 			t.Fatalf("job %d lost page order or exact metadata: %+v", i, job)
 		}
 	}
