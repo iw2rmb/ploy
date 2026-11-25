@@ -10,6 +10,6 @@ The healing workspace for `ms/cb-platform-gateway:f197631e` shows repeated Sprin
 
 ## Proposed experiment
 
-First establish which Java files reach the recipes. The November 24 run applied zero OpenRewrite changes. That run alone cannot establish a gap in recipe coverage. [Maven source discovery](maven-target-source-discovery.md)
+First establish which Java files reach the recipes. The November 24 run applied zero OpenRewrite changes. That run alone cannot establish a gap in recipe coverage.
 
 Replay `UpgradeSpringBoot_4_0` and the existing `spring-boot/3.5-to-4.0/followup/rewrite.yaml` on a module with these usages. Compare the resulting diff with the observed repairs. Extend the followup recipe only for cases the existing recipes leave behind. Verify test compilation and execute the affected test classes to check that mock registration and MVC test configuration still work.
