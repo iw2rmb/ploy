@@ -57,7 +57,9 @@ func TestPloyListJobsSelectedShowsJobListPanel(t *testing.T) {
 func TestPloyListRunsSelectedShowsRunsPanel(t *testing.T) {
 	m := InitialModel(t.Context(), nil, nil)
 	m.usersLoading = false
-	next, _ := m.Update(runsLoadedMsg{requestID: m.runsRequest, runs: []domaintypes.RunSummary{{ID: "run-id", SpecID: "spec-preview"}}})
+	next, _ := m.Update(tea.WindowSizeMsg{Width: 100, Height: 24})
+	m = next.(model)
+	next, _ = m.Update(runsLoadedMsg{requestID: m.runsRequest, runs: []domaintypes.RunSummary{{ID: "run-id", SpecID: "spec-preview"}}})
 	m = next.(model)
 	view := m.View().Content
 	for _, want := range []string{"PLOY", "RUNS", "spec-preview"} {
@@ -143,6 +145,7 @@ func TestRootEnterPreservesPreviewListState(t *testing.T) {
 			m.rightPaneList.SetFilterText("run")
 			m.rightPaneList.SetFilterState(list.FilterApplied)
 			m.rightPaneList.Select(1)
+			m.syncRunDetails(false, false)
 		} else {
 			m.screen = ScreenJobsList
 			m.jobList = m.jobList.SetJobs([]domainapi.JobListItem{{JobID: "job-first", DisplayName: "step"}, {JobID: "job-second", DisplayName: "step"}})
@@ -208,6 +211,7 @@ func TestRootPreviewSurvivesEnterAndEsc(t *testing.T) {
 			next, _ := m.Update(runsLoadedMsg{requestID: m.runsRequest, runs: []domaintypes.RunSummary{{ID: "first"}, {ID: "second"}}})
 			m = next.(model)
 			m.rightPaneList.Select(1)
+			m.syncRunDetails(false, false)
 		} else {
 			m.jobList = m.jobList.SetJobs([]domainapi.JobListItem{{JobID: "first"}, {JobID: "second"}}).Select(1)
 		}

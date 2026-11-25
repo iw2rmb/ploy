@@ -92,3 +92,15 @@ func TestFormatRunListSpec(t *testing.T) {
 		})
 	}
 }
+
+func TestFormatRunListSpecDetail(t *testing.T) {
+	run := domaintypes.RunSummary{SpecSourceDomain: "gitlab.example", SpecSourceRepo: "team/specs", SpecID: "abcdefgh"}
+	if got := FormatRunListSpecDetail(run); got != "gitlab.example/team/specs:abcdefgh" {
+		t.Fatalf("anonymous spec = %q", got)
+	}
+	run.SpecName = "upgrade"
+	run.SpecSourceRepo = ""
+	if got := FormatRunListSpecDetail(run); got != "upgrade" {
+		t.Fatalf("spec without source = %q", got)
+	}
+}

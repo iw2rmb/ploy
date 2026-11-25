@@ -2,7 +2,6 @@ package tui
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"net/url"
 
@@ -15,7 +14,7 @@ import (
 )
 
 // loadRunsCmd returns a tea.Cmd that fetches the runs list.
-func loadRunsCmd(ctx context.Context, client *http.Client, baseURL *url.URL, requestID uint64, createdBy, creator string, all bool) tea.Cmd {
+func loadRunsCmd(ctx context.Context, client *http.Client, baseURL *url.URL, requestID uint64, createdBy, creator string, all bool, selectedRunID domaintypes.RunID) tea.Cmd {
 	return func() tea.Msg {
 		cmd := sharedclient.ListRunsCommand{
 			CreatedBy: createdBy,
@@ -26,7 +25,29 @@ func loadRunsCmd(ctx context.Context, client *http.Client, baseURL *url.URL, req
 			Limit:     100,
 		}
 		result, err := cmd.Run(ctx)
-		return runsLoadedMsg{runs: result, requestID: requestID, err: err}
+		msg := runsLoadedMsg{runs: result, requestID: requestID, err: err}
+		if selectedRunID.IsZero() || err != nil {
+			return msg
+		}
+		// RUNS keeps its first page even when a confirmed RUN moves to an older page.
+		for page := result; ; {
+			for _, run := range page {
+				if run.ID == selectedRunID {
+					if cmd.Offset > 0 {
+						msg.offPageRun = &run
+					}
+					return msg
+				}
+			}
+			if len(page) < int(cmd.Limit) {
+				return msg
+			}
+			cmd.Offset += cmd.Limit
+			page, msg.err = cmd.Run(ctx)
+			if msg.err != nil {
+				return msg
+			}
+		}
 	}
 }
 
@@ -46,27 +67,50 @@ func loadJobsCmd(ctx context.Context, client *http.Client, baseURL *url.URL, run
 	}
 }
 
-// loadRunDetailsCmd returns a tea.Cmd that fetches the job total for the
-// given run, used to populate its detail list.
-func loadRunDetailsCmd(ctx context.Context, client *http.Client, baseURL *url.URL, runID domaintypes.RunID) tea.Cmd {
+type runDetails struct {
+	runID    domaintypes.RunID
+	attempt  int32
+	jobTotal *int
+	nodeName string
+}
+
+type runDetailsLoadedMsg struct {
+	runDetails
+	requestID uint64
+	err       error
+}
+
+func loadRunDetailsCmd(ctx context.Context, client *http.Client, baseURL *url.URL, details runDetails, requestID uint64) tea.Cmd {
 	return func() tea.Msg {
-		jobs, err := cliruns.ListRunJobsCommand{
-			Client:  client,
-			BaseURL: baseURL,
-			RunID:   runID,
-		}.Run(ctx)
-		if err != nil {
-			return errMsg{err: fmt.Errorf("get run totals: %w", err)}
+		msg := runDetailsLoadedMsg{runDetails: details, requestID: requestID}
+		cmd := cliruns.ListRunJobsCommand{Client: client, BaseURL: baseURL, RunID: details.runID}
+		if details.attempt > 0 {
+			cmd.Attempt = &details.attempt
 		}
-		return runDetailsLoadedMsg{runID: runID, jobTotal: len(jobs.Jobs)}
+		jobs, err := cmd.Run(ctx)
+		if err != nil {
+			msg.err = err
+			return msg
+		}
+		total := len(jobs.Jobs)
+		msg.jobTotal = &total
+		if details.nodeName != "" {
+			return msg
+		}
+		for _, job := range jobs.Jobs {
+			if job.NodeID == nil || job.NodeID.IsZero() {
+				continue
+			}
+			nodes, err := (sharedclient.ListNodesCommand{Client: client, BaseURL: baseURL}).Run(ctx)
+			msg.err = err
+			for _, node := range nodes {
+				if node.ID == *job.NodeID {
+					msg.nodeName = node.Name
+					break
+				}
+			}
+			break
+		}
+		return msg
 	}
 }
-
-// runDetailsLoadedMsg carries run detail totals from async fetch.
-type runDetailsLoadedMsg struct {
-	runID    domaintypes.RunID
-	jobTotal int
-}
-
-// errMsg carries an error from an async command.
-type errMsg struct{ err error }

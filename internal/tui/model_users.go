@@ -34,7 +34,7 @@ func (m model) handleUsersLoaded(msg usersLoadedMsg) (tea.Model, tea.Cmd) {
 	m.resetRoot()
 	m.applyWindowSize()
 	createdBy, creator, all := m.runsCreatorScope()
-	commands := []tea.Cmd{loadRunsCmd(m.ctx, m.client, m.baseURL, m.runsRequest, createdBy, creator, all)}
+	commands := []tea.Cmd{loadRunsCmd(m.ctx, m.client, m.baseURL, m.runsRequest, createdBy, creator, all, m.selectedRunID)}
 	if m.jobsVisible() {
 		commands = append(commands, m.loadJobs())
 	}
@@ -74,7 +74,6 @@ func (m model) handleEnterFromUsersList() (tea.Model, tea.Cmd) {
 	m.rightPaneList = newRunsList("RUNS", nil)
 	m.jobList = m.jobList.SetJobs(nil)
 	m.selectedRunID = ""
-	m.runJobTotal = nil
 	m.resetRoot()
 	m.rootList.Select(usersIndex)
 	m.applyWindowSize()

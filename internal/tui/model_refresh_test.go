@@ -174,7 +174,7 @@ func TestRunsRefreshPreservesFilterAndSelection(t *testing.T) {
 	}
 }
 
-// Returning from run details exposes active cached runs without creating duplicate timers.
+// The confirmed run refreshes while its row is highlighted in PLOY.
 func TestRunsRefreshResumesAfterDetails(t *testing.T) {
 	m := InitialModel(t.Context(), nil, nil)
 	m.usersLoading = false
@@ -185,8 +185,20 @@ func TestRunsRefreshResumesAfterDetails(t *testing.T) {
 	m = next.(model)
 	next, cmd := m.Update(refreshTickMsg(time.Now()))
 	m = next.(model)
+	if cmd == nil || !m.runsLoading {
+		t.Fatal("visible confirmed run did not refresh")
+	}
+	next, _ = m.Update(runsLoadedMsg{requestID: m.runsRequest, runs: []domaintypes.RunSummary{{ID: "run-1", Status: domaintypes.RunStatusRunning, SourceCommitSHA: "12345678"}}})
+	m = next.(model)
+	if item, ok := m.visibleRun(); !ok || item.run.SourceCommitSHA != "12345678" {
+		t.Fatal("confirmed run retained its old summary")
+	}
+	next, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
+	m = next.(model)
+	next, cmd = m.Update(refreshTickMsg(time.Now()))
+	m = next.(model)
 	if cmd != nil || m.refreshScheduled || m.runsLoading {
-		t.Fatal("details polled hidden runs")
+		t.Fatal("highlighting Jobs continued polling hidden runs")
 	}
 	next, cmd = m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
 	m = next.(model)

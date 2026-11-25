@@ -8,7 +8,7 @@ The root screen (`ScreenPloyList`) shows `Runs`, `Jobs`, and `Users` in the `PLO
 `Runs` is item 0. `Jobs` is item 1. `Users` is item 2.
 
 - Enter on root `Runs` moves focus into the runs list.
-- Enter on a run shows its three-line row and the Jobs total in `PLOY`.
+- Enter on a run confirms it in `PLOY`, shows its Jobs total, and replaces `RUNS` with `RUN`.
 - Enter on the run's `Jobs` item opens `PLOY | JOBS` for that run.
 - Enter on root `Jobs` moves focus into the global jobs list.
 - Enter on a job shows its three-line row in `PLOY`. For global jobs, the Run entry shows the run ID and an empty third line.
@@ -21,14 +21,16 @@ Esc returns focus to `PLOY` and keeps the list visible.
 Changing the highlighted root item refreshes its preview while retaining loaded rows.
 Revisit a root item to retry a failed load.
 
-The focused column shows a colored title background and the `│` selection border. The other column uses a transparent title background and reserves a blank cell for the border.
+The focused column shows a colored title background and the `│` selection border. Each unfocused list uses a transparent title background and reserves a blank cell for the border.
 
 `PLOY` uses 30 columns.
-`RUNS`, `JOBS`, and `USERS` use the remaining terminal width after `PLOY` and the two-column separator.
+When all three lists appear, `RUNS` uses up to 30 columns and `RUN` uses the remaining width.
+In a two-list layout, the second list uses the remaining width. Adjacent lists have a two-column separator.
 
 ## Keys
 
 - `Ctrl+C` closes the TUI from every screen.
+- Backspace clears the confirmed run when its row is highlighted in `PLOY`. Focus stays on `Runs` in `PLOY`.
 - `Esc` returns from a run's jobs to run details, then to the runs list, then to the root.
 - `Esc` returns from global jobs or Users to the root.
 - `Esc` at the root keeps the TUI open.
@@ -52,6 +54,22 @@ Selected rows use the list's selection color.
 The list loads up to 100 runs in server order, newest first.
 For `cli-admin` tokens, the Users selection determines the creator filter.
 For other tokens, the server filters runs by the authenticated token username, with `$USER` as the fallback.
+
+## RUN Details
+
+The read-only `RUN` list follows the highlighted row in `RUNS`, even when `PLOY` has focus.
+An empty or filtered list with no matching run hides `RUN`.
+Highlighting the confirmed run in `PLOY` shows its details beside `PLOY`.
+
+| Field | Value |
+|---|---|
+| ID | Full run ID |
+| STATUS | Run status text |
+| SPEC | Source domain and repository followed by the spec name or ID. Specs without a source show the name or ID. |
+| REPO | Repository namespace, repository name, and short source commit SHA. The terminal link opens the source commit. |
+| NODE | Name of the node assigned to the current attempt, or `-` until assignment |
+
+Commit links use the GitHub path on `github.com` and the GitLab path on other remote hosts.
 
 ## JOBS Rows
 
@@ -94,8 +112,8 @@ The selected user persists through navigation.
 ## Refresh
 
 Visible lists refresh once per second while they contain nonterminal runs or jobs.
-This includes the `RUNS` list, the `JOBS` list, and both root previews.
-Each refresh updates status icons and elapsed durations while preserving the filter and selected identity.
+This includes `RUNS`, `JOBS`, their root previews, and the confirmed run in `RUN`.
+Each refresh updates status icons and elapsed durations while preserving the filter and selection.
 Refresh stops when every row is terminal or the active list is hidden.
 
 ## Data Access And Components
@@ -109,7 +127,8 @@ The TUI uses shared client commands:
 - `internal/client.ListRunsCommand` returns `internal/domain/types.RunSummary` values.
 - `internal/client.ListJobsCommand` returns global job rows.
   Job rows include `display_name`, `started_at`, and `finished_at` when available.
-- `internal/cli/runs.ListRunJobsCommand` returns run jobs, totals, and job metadata.
+- `internal/cli/runs.ListRunJobsCommand` returns jobs for the current attempt, including the assigned node ID.
+- `internal/client.ListNodesCommand` resolves the assigned node ID to the name shown in `RUN`.
 - `internal/cli/job.GetStatusCommand` identifies the attempt for historical global jobs.
 - `internal/cli/common` formats repository labels.
 

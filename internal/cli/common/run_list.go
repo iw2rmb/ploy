@@ -7,16 +7,37 @@ import (
 )
 
 func FormatRunListSpec(summary domaintypes.RunSummary) string {
-	domain := strings.Trim(strings.TrimSpace(summary.SpecSourceDomain), "/")
-	repo := strings.Trim(strings.TrimSpace(summary.SpecSourceRepo), "/")
 	name := strings.TrimSpace(summary.SpecName)
-	if domain != "" && repo != "" && name != "" {
-		return domain + "/" + repo + ":" + name
+	if qualified := qualifiedRunSpec(summary, name); qualified != "" {
+		return qualified
 	}
 	if !summary.SpecID.IsZero() {
 		return summary.SpecID.String()
 	}
 	return "-"
+}
+
+func FormatRunListSpecDetail(summary domaintypes.RunSummary) string {
+	name := strings.TrimSpace(summary.SpecName)
+	if name == "" {
+		name = summary.SpecID.String()
+	}
+	if qualified := qualifiedRunSpec(summary, name); qualified != "" {
+		return qualified
+	}
+	if name == "" {
+		return "-"
+	}
+	return name
+}
+
+func qualifiedRunSpec(summary domaintypes.RunSummary, name string) string {
+	domain := strings.Trim(strings.TrimSpace(summary.SpecSourceDomain), "/")
+	repo := strings.Trim(strings.TrimSpace(summary.SpecSourceRepo), "/")
+	if domain == "" || repo == "" || name == "" {
+		return ""
+	}
+	return domain + "/" + repo + ":" + name
 }
 
 func FormatRunListRepo(repoURL, sourceCommitSHA string) string {

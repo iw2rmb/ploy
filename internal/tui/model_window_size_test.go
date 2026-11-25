@@ -36,7 +36,15 @@ func TestWindowSizePersistsAcrossRunListRecreation(t *testing.T) {
 	if m.rightPaneList.Height() != 29 || m.rightPaneList.Width() != 48 || len(m.rightPaneList.Items()) != 1 {
 		t.Fatal("loaded rows lost terminal dimensions or were not accepted")
 	}
-	if got := lipgloss.Width(m.rightPaneList.View()); got > 48 {
-		t.Fatalf("RUNS render width = %d, limit 48", got)
+	for _, width := range []int{120, 80, 65, 64, 60, 30, 15} {
+		next, _ = m.Update(tea.WindowSizeMsg{Width: width, Height: 29})
+		m = next.(model)
+		view := m.View().Content
+		if width >= 60 && !strings.Contains(view, "STATUS") {
+			t.Fatalf("missing RUN fields at width %d", width)
+		}
+		if got := lipgloss.Width(view); got > width {
+			t.Fatalf("rendered width = %d, limit %d", got, width)
+		}
 	}
 }

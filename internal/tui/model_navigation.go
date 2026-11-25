@@ -9,6 +9,18 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
+func (m model) visibleRun() (runItem, bool) {
+	var item list.Item
+	switch {
+	case m.runsVisible():
+		item = m.rightPaneList.SelectedItem()
+	case m.screen == ScreenRunDetails:
+		item = m.rootList.SelectedItem()
+	}
+	run, ok := item.(runItem)
+	return run, ok
+}
+
 func (m model) handleEnter() (tea.Model, tea.Cmd) {
 	switch m.screen {
 	case ScreenPloyList:
@@ -70,7 +82,7 @@ func (m model) handleEnterFromRunsList() (tea.Model, tea.Cmd) {
 	m.rootList.SetItems([]list.Item{item, m.runJobsEntry()})
 	m.rootList.Select(runsIndex)
 	m.screen = ScreenRunDetails
-	return m, loadRunDetailsCmd(m.ctx, m.client, m.baseURL, m.selectedRunID)
+	return m, nil
 }
 
 func (m model) handleEnterFromJobsList() (tea.Model, tea.Cmd) {
@@ -93,7 +105,6 @@ func (m *model) setRun(runID domaintypes.RunID) {
 	if m.selectedRunID != runID {
 		m.jobList = m.jobList.SetJobs(nil)
 		m.selectedRunID = runID
-		m.runJobTotal = nil
 		m.jobsLoading = false
 	}
 }

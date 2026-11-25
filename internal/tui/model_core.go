@@ -19,17 +19,23 @@ var quitKey = key.NewBinding(key.WithKeys("ctrl+c"), key.WithHelp("ctrl+c", "qui
 func InitialModel(ctx context.Context, client *http.Client, baseURL *url.URL) model {
 	ploy := newPloyList("PLOY", buildPloyItems(false, "", nil))
 	ploy.SetFilteringEnabled(false)
+	details := newListWithWidth("RUN", nil, runsListWidth)
+	details.SetFilteringEnabled(false)
+	detailRows := newRunDelegate(false, 0)
+	detailRows.SetHeight(2)
+	details.SetDelegate(detailRows)
 	return model{
-		screen:        ScreenPloyList,
-		rootList:      ploy,
-		rightPaneList: newRunsList("RUNS", nil),
-		jobList:       joblist.New("JOBS"),
-		usersList:     newListWithWidth("USERS", nil, runsListWidth),
-		usersLoading:  true,
-		ctx:           ctx,
-		client:        client,
-		baseURL:       baseURL,
-		now:           time.Now(),
+		screen:         ScreenPloyList,
+		rootList:       ploy,
+		rightPaneList:  newRunsList("RUNS", nil),
+		runDetailsList: details,
+		jobList:        joblist.New("JOBS"),
+		usersList:      newListWithWidth("USERS", nil, runsListWidth),
+		usersLoading:   true,
+		ctx:            ctx,
+		client:         client,
+		baseURL:        baseURL,
+		now:            time.Now(),
 		// Reserve the startup request while the token capability determines its creator scope.
 		runsRequest: 1,
 		runsLoading: true,
@@ -44,10 +50,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if press, ok := msg.(tea.KeyPressMsg); ok && key.Matches(press, quitKey) {
 		return m, tea.Quit
 	}
+	wasBrowsingRuns := m.screen == ScreenRunsList
 	next, cmd := m.update(msg)
 	m = next.(model)
 	refresh := m.scheduleRefresh()
-	return m, tea.Batch(cmd, refresh)
+	loaded, ok := msg.(runsLoadedMsg)
+	details := m.syncRunDetails(ok && loaded.requestID == m.runsRequest && loaded.err == nil, wasBrowsingRuns && m.screen == ScreenRunDetails)
+	return m, tea.Batch(cmd, refresh, details)
 }
 
 func (m model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -61,6 +70,12 @@ func (m model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.handleEnter()
 		case "esc":
 			return m.handleEsc()
+		case "backspace":
+			if m.screen == ScreenRunDetails && m.rootList.Index() == runsIndex {
+				m.resetRoot()
+				m.screen = ScreenPloyList
+				return m, nil
+			}
 		}
 	case refreshTickMsg:
 		return m.handleRefreshTick(time.Time(msg))
@@ -81,9 +96,6 @@ func (m model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleRunDetailsLoaded(msg), nil
 	case jobsLoadedMsg:
 		return m.handleJobsLoaded(msg), nil
-	case errMsg:
-		m.lastErr = msg.err
-		return m, nil
 	}
 	return m.updateActiveList(msg)
 }
@@ -119,7 +131,12 @@ func (m model) handleRunsLoaded(msg runsLoadedMsg) model {
 	m.runsLoading = false
 	if msg.err != nil {
 		m.lastErr = msg.err
-		return m
+		if msg.runs == nil {
+			return m
+		}
+	}
+	if msg.offPageRun != nil && msg.offPageRun.ID == m.selectedRunID {
+		m.rootList.SetItem(runsIndex, runItem{run: *msg.offPageRun})
 	}
 	items := make([]list.Item, len(msg.runs))
 	for i, run := range msg.runs {
@@ -165,11 +182,44 @@ func (m *model) refilterRuns() {
 	}
 }
 
+func (m *model) syncRunDetails(refresh, confirmed bool) tea.Cmd {
+	item, visible := m.visibleRun()
+	if !visible {
+		if m.selectedRunID.IsZero() {
+			m.runDetails = runDetails{}
+			m.detailsLoading = false
+		}
+		return nil
+	}
+	run := item.run
+	if run.ID != m.runDetails.runID || run.Attempt != m.runDetails.attempt {
+		m.runDetails = runDetails{runID: run.ID, attempt: run.Attempt}
+		if m.screen == ScreenRunDetails {
+			m.rootList.SetItem(jobsIndex, m.runJobsEntry())
+		}
+	} else {
+		retry := m.detailsStatus != run.Status || refresh && runNeedsRefresh(run.Status)
+		if m.detailsLoading || (!confirmed && (m.runDetails.nodeName != "" || !retry)) {
+			return nil
+		}
+	}
+	m.detailsRequest++
+	m.detailsLoading = true
+	m.detailsStatus = run.Status
+	return loadRunDetailsCmd(m.ctx, m.client, m.baseURL, m.runDetails, m.detailsRequest)
+}
+
 func (m model) handleRunDetailsLoaded(msg runDetailsLoadedMsg) model {
-	if msg.runID != m.selectedRunID || msg.runID.IsZero() {
+	if msg.requestID != m.detailsRequest || msg.runID != m.runDetails.runID || msg.attempt != m.runDetails.attempt {
 		return m
 	}
-	m.runJobTotal = &msg.jobTotal
+	m.detailsLoading = false
+	if msg.err != nil {
+		m.lastErr = msg.err
+	}
+	if msg.jobTotal != nil {
+		m.runDetails = msg.runDetails
+	}
 	if m.screen == ScreenRunDetails {
 		m.rootList.SetItem(jobsIndex, m.runJobsEntry())
 	}
@@ -178,8 +228,8 @@ func (m model) handleRunDetailsLoaded(msg runDetailsLoadedMsg) model {
 
 func (m model) runJobsEntry() listItem {
 	total := "total: —"
-	if m.runJobTotal != nil {
-		total = fmt.Sprintf("total: %d", *m.runJobTotal)
+	if m.selectedRunID == m.runDetails.runID && m.runDetails.jobTotal != nil {
+		total = fmt.Sprintf("total: %d", *m.runDetails.jobTotal)
 	}
 	return listItem{title: "Jobs", description: total}
 }

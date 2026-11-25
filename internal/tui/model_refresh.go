@@ -20,15 +20,19 @@ func (m model) jobsVisible() bool {
 
 func (m model) activeRunsVisible() bool {
 	if !m.runsVisible() {
-		return false
+		item, ok := m.visibleRun()
+		return ok && runNeedsRefresh(item.run.Status)
 	}
 	for _, item := range m.rightPaneList.Items() {
-		run := item.(runItem).run
-		if run.Status == domaintypes.RunStatusRunning || run.Status == domaintypes.RunStatusQueued {
+		if runNeedsRefresh(item.(runItem).run.Status) {
 			return true
 		}
 	}
 	return false
+}
+
+func runNeedsRefresh(status domaintypes.RunStatus) bool {
+	return status == domaintypes.RunStatusRunning || status == domaintypes.RunStatusQueued
 }
 
 func (m model) activeJobsVisible() bool {
@@ -67,5 +71,5 @@ func (m *model) loadRuns() tea.Cmd {
 	m.runsRequest++
 	m.runsLoading = true
 	createdBy, creator, all := m.runsCreatorScope()
-	return loadRunsCmd(m.ctx, m.client, m.baseURL, m.runsRequest, createdBy, creator, all)
+	return loadRunsCmd(m.ctx, m.client, m.baseURL, m.runsRequest, createdBy, creator, all, m.selectedRunID)
 }

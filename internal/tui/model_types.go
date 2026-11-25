@@ -79,8 +79,12 @@ type model struct {
 	usersErr         error
 	selectedUser     string
 	rightPaneList    list.Model
+	runDetailsList   list.Model
 	selectedRunID    domaintypes.RunID
-	runJobTotal      *int
+	runDetails       runDetails
+	detailsRequest   uint64
+	detailsLoading   bool
+	detailsStatus    domaintypes.RunStatus
 	jobsRequest      uint64
 	runsRequest      uint64
 	runsLoading      bool
@@ -98,9 +102,10 @@ type model struct {
 }
 
 type runsLoadedMsg struct {
-	runs      []domaintypes.RunSummary
-	requestID uint64
-	err       error
+	offPageRun *domaintypes.RunSummary
+	runs       []domaintypes.RunSummary
+	requestID  uint64
+	err        error
 }
 type jobsLoadedMsg struct {
 	requestID uint64

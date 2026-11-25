@@ -37,12 +37,119 @@ func TestLoadRunsPreservesModelAndCreatorFilter(t *testing.T) {
 	}))
 	defer server.Close()
 	base, _ := url.Parse(server.URL)
-	msg, ok := loadRunsCmd(t.Context(), server.Client(), base, 4, "alice", "", false)().(runsLoadedMsg)
+	msg, ok := loadRunsCmd(t.Context(), server.Client(), base, 4, "alice", "", false, "")().(runsLoadedMsg)
 	if !ok || msg.requestID != 4 || msg.err != nil || len(msg.runs) != 2 {
 		t.Fatalf("runs response = %+v, error = %v", msg, msg.err)
 	}
 	if !reflect.DeepEqual(msg.runs, expected) {
 		t.Fatalf("run model or API order was lost: got %+v, want %+v", msg.runs, expected)
+	}
+}
+
+// A confirmed RUN follows its status beyond the first page while RUNS retains its 100 newest rows.
+func TestRefreshConfirmedRunBeyondFirstPage(t *testing.T) {
+	run := domaintypes.RunSummary{
+		ID: domaintypes.NewRunID(), MigID: domaintypes.NewMigID(), SpecID: domaintypes.NewSpecID(),
+		Status: domaintypes.RunStatusRunning,
+	}
+	firstPage := make([]domaintypes.RunSummary, 100)
+	for i := range firstPage {
+		firstPage[i] = domaintypes.RunSummary{ID: domaintypes.NewRunID(), MigID: run.MigID, SpecID: run.SpecID}
+	}
+	completed := run
+	completed.Status = domaintypes.RunStatusSuccess
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		page := firstPage
+		switch offset := r.URL.Query().Get("offset"); offset {
+		case "":
+		case "100":
+			page = []domaintypes.RunSummary{completed}
+		default:
+			t.Errorf("unexpected offset %q", offset)
+			page = nil
+		}
+		if err := json.NewEncoder(w).Encode(map[string]any{"runs": page}); err != nil {
+			t.Error(err)
+		}
+	}))
+	defer server.Close()
+	base, _ := url.Parse(server.URL)
+	m := InitialModel(t.Context(), server.Client(), base)
+	m.usersLoading = false
+	m.screen = ScreenRunsList
+	m = m.handleRunsLoaded(runsLoadedMsg{requestID: m.runsRequest, runs: []domaintypes.RunSummary{run}})
+	next, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = next.(model)
+	msg := m.loadRuns()().(runsLoadedMsg)
+	m = m.handleRunsLoaded(msg)
+	if item, ok := m.visibleRun(); !ok || item.run.ID != run.ID || item.run.Status != domaintypes.RunStatusSuccess {
+		t.Fatalf("confirmed run did not refresh: %+v", item.run)
+	}
+	rows := m.rightPaneList.Items()
+	if len(rows) != 100 || rows[99].(runItem).run.ID != firstPage[99].ID {
+		t.Fatal("lookup replaced RUNS with an older page")
+	}
+	next, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyBackspace})
+	m = next.(model).handleRunsLoaded(msg)
+	if _, ok := m.rootList.Items()[runsIndex].(runItem); ok {
+		t.Fatal("late response restored the cleared run")
+	}
+}
+
+// The preview resolves only its highlighted run and confirming it refreshes the total using the cached node.
+func TestPreviewResolvesNodeAndConfirmationRefreshesJobs(t *testing.T) {
+	run := domaintypes.RunSummary{ID: domaintypes.NewRunID(), Attempt: 2, Status: domaintypes.RunStatusSuccess}
+	nodeID := domaintypes.NodeID(domaintypes.NewNodeKey())
+	job := migsapi.RunJob{JobID: domaintypes.NewJobID(), NodeID: &nodeID}
+	unassigned := migsapi.RunJob{JobID: domaintypes.NewJobID()}
+	totalRequests, nodeRequests := 0, 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.RequestURI() {
+		case "/v1/runs/" + run.ID.String() + "/jobs?attempt=2":
+			totalRequests++
+			jobs := []migsapi.RunJob{unassigned, job}
+			if totalRequests == 2 {
+				jobs = append(jobs, migsapi.RunJob{JobID: domaintypes.NewJobID()})
+			}
+			if err := json.NewEncoder(w).Encode(migsapi.ListRunJobsResponse{RunID: run.ID, RepoID: domaintypes.NewRepoID(), Attempt: 2, Jobs: jobs}); err != nil {
+				t.Error(err)
+			}
+		case "/v1/nodes":
+			nodeRequests++
+			fmt.Fprintf(w, `[{"id":%q,"name":"alpha"}]`, nodeID.String())
+		default:
+			t.Errorf("unexpected request %s", r.URL)
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	base, _ := url.Parse(server.URL)
+	m := InitialModel(t.Context(), server.Client(), base)
+	m.usersLoading = false
+	next, lookup := m.Update(runsLoadedMsg{requestID: m.runsRequest, runs: []domaintypes.RunSummary{run, {ID: domaintypes.NewRunID()}}})
+	m = next.(model)
+	next, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = next.(model)
+	next, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = next.(model)
+	if lookup == nil || cmd != nil {
+		t.Fatal("confirmation did not reuse the pending preview request")
+	}
+	next, _ = m.Update(lookup())
+	m = next.(model)
+	if m.runDetails.nodeName != "alpha" || m.runJobsEntry().description != "total: 2" {
+		t.Fatalf("initial details = %+v", m.runDetails)
+	}
+	next, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+	next, cmd = next.(model).Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = next.(model)
+	if cmd == nil || m.runDetails.nodeName != "alpha" || m.runJobsEntry().description != "total: 2" {
+		t.Fatal("confirmation did not retain cached details during refresh")
+	}
+	next, _ = m.Update(cmd())
+	m = next.(model)
+	if m.runJobsEntry().description != "total: 3" || totalRequests != 2 || nodeRequests != 1 {
+		t.Fatalf("jobs = %s, jobs requests = %d, node requests = %d", m.runJobsEntry().description, totalRequests, nodeRequests)
 	}
 }
 
@@ -68,7 +175,7 @@ func TestLoadCommandsApplyUserScope(t *testing.T) {
 			}))
 			defer server.Close()
 			base, _ := url.Parse(server.URL)
-			runs := loadRunsCmd(t.Context(), server.Client(), base, 1, "", username, username == "")().(runsLoadedMsg)
+			runs := loadRunsCmd(t.Context(), server.Client(), base, 1, "", username, username == "", "")().(runsLoadedMsg)
 			jobs := loadJobsCmd(t.Context(), server.Client(), base, "", 1, nil, username)().(jobsLoadedMsg)
 			if runs.err != nil || jobs.err != nil {
 				t.Fatalf("list errors: %v / %v", runs.err, jobs.err)
@@ -120,8 +227,8 @@ func TestJobCommandsUseRequestedScope(t *testing.T) {
 			defer server.Close()
 			base, _ := url.Parse(server.URL)
 			if tc.total {
-				msg, ok := loadRunDetailsCmd(t.Context(), server.Client(), base, tc.runID)().(runDetailsLoadedMsg)
-				if !ok || msg.runID != runID || msg.jobTotal != len(jobs) {
+				msg, ok := loadRunDetailsCmd(t.Context(), server.Client(), base, runDetails{runID: tc.runID}, 0)().(runDetailsLoadedMsg)
+				if !ok || msg.runID != runID || msg.jobTotal == nil || *msg.jobTotal != len(jobs) {
 					t.Fatalf("current attempt total = %+v", msg)
 				}
 			} else {
@@ -166,9 +273,9 @@ func TestLoadCommandsReturnRequestErrors(t *testing.T) {
 	defer server.Close()
 	base, _ := url.Parse(server.URL)
 	for name, cmd := range map[string]tea.Cmd{
-		"runs":        loadRunsCmd(t.Context(), server.Client(), base, 4, "alice", "", false),
+		"runs":        loadRunsCmd(t.Context(), server.Client(), base, 4, "alice", "", false, ""),
 		"jobs":        loadJobsCmd(t.Context(), server.Client(), base, "run-1", 3, nil, ""),
-		"run details": loadRunDetailsCmd(t.Context(), server.Client(), base, "run-1"),
+		"run details": loadRunDetailsCmd(t.Context(), server.Client(), base, runDetails{runID: "run-1"}, 0),
 	} {
 		t.Run(name, func(t *testing.T) {
 			msg := cmd()
@@ -183,7 +290,7 @@ func TestLoadCommandsReturnRequestErrors(t *testing.T) {
 					t.Fatalf("runs error lost request identity: %+v", msg)
 				}
 			} else {
-				result, ok := msg.(errMsg)
+				result, ok := msg.(runDetailsLoadedMsg)
 				if !ok || result.err == nil {
 					t.Fatalf("command must return its request error: %+v", msg)
 				}
@@ -201,7 +308,7 @@ func TestSessionCancellationStopsBlockedRequests(t *testing.T) {
 		load        func(model) tea.Cmd
 	}{
 		{name: "initial runs", blockedPath: "/v1/runs", load: func(m model) tea.Cmd {
-			return loadRunsCmd(m.ctx, m.client, m.baseURL, m.runsRequest, "alice", "", false)
+			return loadRunsCmd(m.ctx, m.client, m.baseURL, m.runsRequest, "alice", "", false, "")
 		}},
 		{name: "refreshed runs", blockedPath: "/v1/runs", load: func(m model) tea.Cmd { return m.loadRuns() }},
 		{name: "run jobs", blockedPath: "/v1/runs/3LwwG1Z0WzQIVtw5r5WE93j0t8M/jobs", load: func(m model) tea.Cmd {
@@ -209,7 +316,7 @@ func TestSessionCancellationStopsBlockedRequests(t *testing.T) {
 			return m.loadJobs()
 		}},
 		{name: "run total", blockedPath: "/v1/runs/3LwwG1Z0WzQIVtw5r5WE93j0t8M/jobs", load: func(m model) tea.Cmd {
-			return loadRunDetailsCmd(m.ctx, m.client, m.baseURL, "3LwwG1Z0WzQIVtw5r5WE93j0t8M")
+			return loadRunDetailsCmd(m.ctx, m.client, m.baseURL, runDetails{runID: "3LwwG1Z0WzQIVtw5r5WE93j0t8M"}, 0)
 		}},
 		{name: "global jobs", blockedPath: "/v1/jobs", load: func(m model) tea.Cmd { return m.loadJobs() }},
 		{name: "global current attempt", blockedPath: "/v1/runs/3LwwG1Z0WzQIVtw5r5WE93j0t8M/jobs", load: func(m model) tea.Cmd { return m.loadJobs() }},
@@ -272,7 +379,7 @@ func TestSessionCancellationStopsBlockedRequests(t *testing.T) {
 					err = msg.err
 				case jobsLoadedMsg:
 					err = msg.err
-				case errMsg:
+				case runDetailsLoadedMsg:
 					err = msg.err
 				default:
 					t.Fatalf("unexpected response: %#v", msg)

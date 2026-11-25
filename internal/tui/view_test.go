@@ -73,20 +73,57 @@ func TestSplitScreensRenderColumns(t *testing.T) {
 	}
 }
 
-func TestRunDetailsRendersOnlyPloy(t *testing.T) {
-	m := InitialModel(t.Context(), nil, nil)
-	m.screen = ScreenRunDetails
-	m.rootList.SetItems([]list.Item{
-		listItem{title: "Run", description: "run-abc"},
-		listItem{title: "Jobs", description: "total: 8"},
-	})
-
-	rendered := m.View().Content
-	if !strings.Contains(rendered, "PLOY") {
-		t.Fatalf("rendered view missing PLOY title")
+// RUN follows the highlighted run in each focus state.
+func TestRunPreviewShowsSelectedFields(t *testing.T) {
+	run := runItem{run: domaintypes.RunSummary{
+		ID: "run-abc", Status: domaintypes.RunStatusSuccess, SpecName: "spec",
+		SpecSourceDomain: "host", SpecSourceRepo: "group/specs",
+		RepoURL: "https://github.com/group/repo.git", SourceCommitSHA: strings.Repeat("a", 40),
+	}}
+	for _, screen := range []Screen{ScreenPloyList, ScreenRunsList, ScreenRunDetails} {
+		m := InitialModel(t.Context(), nil, nil)
+		m.screen = screen
+		m.rightPaneList.SetItems([]list.Item{run})
+		if screen == ScreenRunDetails {
+			m.selectedRunID = run.run.ID
+			m.rootList.SetItems([]list.Item{run, m.runJobsEntry()})
+		}
+		next, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 20})
+		m = next.(model)
+		m.runDetails.nodeName = "node-alpha"
+		view := ansi.Strip(m.View().Content)
+		if got := strings.Contains(view, "RUNS"); got != (screen != ScreenRunDetails) {
+			t.Fatalf("screen %d shows RUNS = %v", screen, got)
+		}
+		col := ployListWidth + 2
+		if screen != ScreenRunDetails {
+			col += runsListWidth + 2
+		}
+		var fields []string
+		for _, line := range strings.Split(view, "\n") {
+			if field := strings.TrimSpace(ansi.Cut(line, col, 120)); field != "" {
+				fields = append(fields, field)
+			}
+		}
+		want := "RUN|5 items|ID|run-abc|STATUS|Success|SPEC|host/group/specs:spec|REPO|group/repo:aaaaaaaa|NODE|node-alpha"
+		if got := strings.Join(fields, "|"); got != want {
+			t.Fatalf("screen %d: got %q, want %q", screen, got, want)
+		}
 	}
-	if strings.Contains(rendered, "RUN\n") {
-		t.Fatalf("rendered view unexpectedly contains RUN pane title")
+}
+
+// Web links target the full commit and discard clone credentials.
+func TestRunCommitURL(t *testing.T) {
+	sha := strings.Repeat("a", 40)
+	for _, tc := range []struct{ repo, sha, want string }{
+		{"https://user:secret@github.com/team/repo.git", sha, "https://github.com/team/repo/commit/" + sha},
+		{"ssh://git@gitlab.example:2222/team/sub/repo.git", sha, "https://gitlab.example/team/sub/repo/-/commit/" + sha},
+		{"git@gitlab.example:team/repo.git", sha, "https://gitlab.example/team/repo/-/commit/" + sha},
+		{"file:///tmp/repo", sha, ""}, {"https://github.com/team/repo", "", ""},
+	} {
+		if got := runCommitURL(tc.repo, tc.sha); got != tc.want {
+			t.Errorf("commit URL = %q, want %q", got, tc.want)
+		}
 	}
 }
 
@@ -197,5 +234,32 @@ func TestSelectionBorderAndTitleFollowColumnFocus(t *testing.T) {
 				t.Fatal("Jobs selection border was not restored")
 			}
 		})
+	}
+}
+
+// The list keeps the commit target when it truncates the repository label.
+func TestRunListTruncatesLabelWithFullCommitTarget(t *testing.T) {
+	sha := strings.Repeat("b", 40)
+	run := domaintypes.RunSummary{RepoURL: "https://github.com/group/repository-name", SourceCommitSHA: sha}
+	details := InitialModel(t.Context(), nil, nil).runDetailsList
+	details.SetSize(15, 30)
+	details.SetItems(runDetailItems(run, "", true))
+	rendered := renderList(details, false)
+	if !strings.Contains(rendered, "https://github.com/group/repository-name/commit/"+sha) || !strings.Contains(ansi.Strip(rendered), "group/repo") {
+		t.Fatalf("list link: %q", rendered)
+	}
+}
+
+// A filter with no matching run leaves the RUNS list visible.
+func TestRunPreviewHiddenWhenFilterHasNoMatches(t *testing.T) {
+	m := InitialModel(t.Context(), nil, nil)
+	m.rightPaneList.SetItems([]list.Item{runItem{run: domaintypes.RunSummary{ID: "run-abc"}}})
+	m.rightPaneList.SetFilterText("unmatched")
+	for _, screen := range []Screen{ScreenPloyList, ScreenRunsList} {
+		m.screen = screen
+		rendered := ansi.Strip(m.View().Content)
+		if !strings.Contains(rendered, "RUNS") || strings.Contains(rendered, "STATUS") {
+			t.Fatalf("screen %d shows unexpected panes: %q", screen, rendered)
+		}
 	}
 }

@@ -115,7 +115,7 @@ func TestFilteredRunSelectionUsesVisibleIdentity(t *testing.T) {
 	m = applyRunFilterCommands(m, cmd)
 	next, cmd = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = next.(model)
-	if m.screen != ScreenRunDetails || m.selectedRunID != "run-q" || cmd == nil {
+	if m.screen != ScreenRunDetails || m.selectedRunID != "run-q" || cmd != nil {
 		t.Fatalf("selected run = %s, screen = %v", m.selectedRunID, m.screen)
 	}
 	assertPloyItems(t, m, []listItem{{title: "  -", description: "-\n"}, {title: "Jobs", description: "total: —\n"}})

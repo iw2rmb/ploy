@@ -96,13 +96,13 @@ func TestUsersSelectionScopesListsAndRejectsPriorResponses(t *testing.T) {
 		for _, late := range []tea.Msg{
 			runsLoadedMsg{requestID: oldRuns, runs: []domaintypes.RunSummary{{ID: "stale-run"}}, err: errors.New("old error")},
 			jobsLoadedMsg{requestID: oldJobs, jobs: []domainapi.JobListItem{{JobID: "stale-job"}}},
-			runDetailsLoadedMsg{runID: "old-run", jobTotal: 99},
+			runDetailsLoadedMsg{requestID: m.detailsRequest, runDetails: runDetails{runID: "old-run", jobTotal: new(99)}},
 		} {
 			next, _ = m.Update(late)
 			m = next.(model)
 		}
-		if len(m.rightPaneList.Items()) != 0 || len(m.jobList.Jobs()) != 0 || m.lastErr != nil || m.runJobTotal != nil || !m.runsLoading || !m.jobsLoading {
-			t.Fatalf("prior creator response: runs=%d jobs=%d error=%v total=%v loading=%v/%v", len(m.rightPaneList.Items()), len(m.jobList.Jobs()), m.lastErr, m.runJobTotal, m.runsLoading, m.jobsLoading)
+		if len(m.rightPaneList.Items()) != 0 || len(m.jobList.Jobs()) != 0 || m.lastErr != nil || m.runDetails.jobTotal != nil || !m.runsLoading || !m.jobsLoading {
+			t.Fatalf("prior creator response: runs=%d jobs=%d error=%v total=%v loading=%v/%v", len(m.rightPaneList.Items()), len(m.jobList.Jobs()), m.lastErr, m.runDetails.jobTotal, m.runsLoading, m.jobsLoading)
 		}
 		batch, ok := cmd().(tea.BatchMsg)
 		if !ok || len(batch) != 2 {
