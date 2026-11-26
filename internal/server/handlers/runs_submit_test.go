@@ -616,8 +616,8 @@ func TestRunsCreateSingleRepo_RejectsWhenSourceCommitSeedFails(t *testing.T) {
 	body, _ := json.Marshal(validRunRequestBody())
 	req := httptest.NewRequest(http.MethodPost, "/v1/runs", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	req = req.WithContext(withSourceCommitSHAResolver(req.Context(), func(_ context.Context, _, _ string) (string, error) {
-		return "", errors.New("seed lookup failed")
+	req = req.WithContext(withSourceCommitSHAResolver(req.Context(), func(_ context.Context, _, _ string) (resolvedSourceCommit, error) {
+		return resolvedSourceCommit{}, errors.New("seed lookup failed")
 	}))
 	rr := httptest.NewRecorder()
 

@@ -73,9 +73,8 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service, g
 		}
 		sourceCommitSHA := commitSHA
 		if sourceCommitSHA == "" {
-			var seedErr error
 			resolveAuth := gitAuthWithEphemeralToken(gitAuth, gitLabToken)
-			sourceCommitSHA, seedErr = resolveSourceCommitSHAFromContext(r.Context(), rawRepoURL, sourceRef, resolveAuth)
+			resolved, seedErr := resolveSourceCommitSHAFromContext(r.Context(), rawRepoURL, sourceRef, resolveAuth)
 			if seedErr != nil {
 				if gitLabToken != "" {
 					writeHTTPError(w, http.StatusBadRequest, "failed to resolve source commit for repo %s ref %s using provided GitLab token: %v", normalizedRepoURL, sourceRef, seedErr)
@@ -89,6 +88,7 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service, g
 				)
 				return
 			}
+			sourceRef, sourceCommitSHA = resolved.BaseRef, resolved.SHA
 		}
 
 		submissionSpec, err := resolveRunSubmissionSpec(r.Context(), req, specServices)

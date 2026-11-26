@@ -16,8 +16,8 @@ func TestGitLSRemoteUsesCleanURLAndAuthEnv(t *testing.T) {
 	sha, err := gitLSRemote(
 		context.Background(),
 		"https://oauth2:glpat-secret@gitlab.example.com/group/repo.git",
-		"refs/heads/main",
 		gitauth.Options{},
+		"refs/heads/main",
 	)
 	if err != nil {
 		t.Fatalf("gitLSRemote() error: %v", err)

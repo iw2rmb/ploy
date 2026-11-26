@@ -47,9 +47,10 @@ Build Gate phases with `mode: forced`; use `--build-gate-forced-pre` and
 `--build-gate-forced-post` for phase-specific overrides. The global flag is
 mutually exclusive with phase-specific flags. These overrides preserve
 `build_gate.images` and set `build_gate.disabled: false`. The server applies
-named-spec overrides after it compiles the selected YAML. Local repo paths submit `HEAD`; remote
-selectors use `namespace/repo`, optionally suffixed with `:<branch>` or
-`:<sha>`. Use `--follow` to wait for the run's terminal status,
+named-spec overrides after it compiles the selected YAML. Local repo paths submit `HEAD`.
+See [run targets](../../docs/runs.md#submit) for remote selector syntax and examples.
+
+Use `--follow` to wait for the run's terminal status,
 `--pull[=path]` to wait for success and download artifacts, or `--apply` to
 wait for success and apply the resulting patch to a clean local worktree. Use
 `--gitlab-token-env ENV_NAME` to submit a run-scoped ephemeral GitLab token from

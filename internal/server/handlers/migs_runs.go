@@ -126,7 +126,7 @@ func createMigRunHandler(st store.Store, gitAuth gitauth.Options, registries ...
 			runIDs = append(runIDs, runID)
 			repoURL := selectedRepoURLs[migRepo.RepoID]
 			resolveAuth := gitAuthWithEphemeralToken(gitAuth, gitLabToken)
-			sourceCommitSHA, seedErr := resolveSourceCommitSHAFromContext(r.Context(), repoURL, migRepo.BaseRef, resolveAuth)
+			resolved, seedErr := resolveSourceCommitSHAFromContext(r.Context(), repoURL, migRepo.BaseRef, resolveAuth)
 			if seedErr != nil {
 				if gitLabToken != "" {
 					writeHTTPError(w, http.StatusBadRequest, "failed to resolve source commit for repo %s ref %s using provided GitLab token: %v", repoURL, migRepo.BaseRef, seedErr)
@@ -145,9 +145,9 @@ func createMigRunHandler(st store.Store, gitAuth gitauth.Options, registries ...
 			runs = append(runs, store.RunPlan{
 				ID:              runID,
 				RepoID:          migRepo.RepoID,
-				RepoBaseRef:     migRepo.BaseRef,
-				SourceCommitSha: sourceCommitSHA,
-				RepoSha0:        sourceCommitSHA,
+				RepoBaseRef:     resolved.BaseRef,
+				SourceCommitSha: resolved.SHA,
+				RepoSha0:        resolved.SHA,
 				Stats:           runStats,
 				Jobs:            jobPlan,
 			})

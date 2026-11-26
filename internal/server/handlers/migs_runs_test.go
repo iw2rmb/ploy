@@ -245,8 +245,8 @@ func TestMigRuns_Create_RejectsWhenSourceCommitSeedFails(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/v1/migs/mig123/waves", bytes.NewReader(body))
 	req.SetPathValue("mig_id", "mig123")
 	req.Header.Set("Content-Type", "application/json")
-	req = req.WithContext(withSourceCommitSHAResolver(req.Context(), func(_ context.Context, _, _ string) (string, error) {
-		return "", errors.New("seed lookup failed")
+	req = req.WithContext(withSourceCommitSHAResolver(req.Context(), func(_ context.Context, _, _ string) (resolvedSourceCommit, error) {
+		return resolvedSourceCommit{}, errors.New("seed lookup failed")
 	}))
 	rr := httptest.NewRecorder()
 

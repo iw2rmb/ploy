@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
+	"regexp"
 	"strings"
 	"time"
 
@@ -14,7 +15,14 @@ import (
 	"github.com/iw2rmb/ploy/internal/gitexec"
 )
 
-type sourceCommitSHAResolverFunc func(context.Context, string, string) (string, error)
+type resolvedSourceCommit struct {
+	BaseRef string
+	SHA     string
+}
+
+var shortCommitPrefix = regexp.MustCompile(`^[0-9a-fA-F]{4,39}$`)
+
+type sourceCommitSHAResolverFunc func(context.Context, string, string) (resolvedSourceCommit, error)
 
 type sourceCommitSHAResolverContextKey struct{}
 
@@ -25,7 +33,7 @@ func withSourceCommitSHAResolver(ctx context.Context, resolver sourceCommitSHARe
 	return context.WithValue(ctx, sourceCommitSHAResolverContextKey{}, resolver)
 }
 
-func resolveSourceCommitSHAFromContext(ctx context.Context, repoURL, ref string, auth gitauth.Options) (string, error) {
+func resolveSourceCommitSHAFromContext(ctx context.Context, repoURL, ref string, auth gitauth.Options) (resolvedSourceCommit, error) {
 	resolveCtx, cancel := withSourceCommitResolveTimeout(ctx)
 	defer cancel()
 	if resolver, ok := ctx.Value(sourceCommitSHAResolverContextKey{}).(sourceCommitSHAResolverFunc); ok && resolver != nil {
@@ -47,35 +55,44 @@ func withSourceCommitResolveTimeout(ctx context.Context) (context.Context, conte
 	return context.WithTimeout(ctx, sourceCommitResolveTimeout)
 }
 
-func resolveSourceCommitSHA(ctx context.Context, repoURL, ref string, auth gitauth.Options) (string, error) {
+func resolveSourceCommitSHA(ctx context.Context, repoURL, ref string, auth gitauth.Options) (resolvedSourceCommit, error) {
 	repoURL = strings.TrimSpace(repoURL)
 	ref = strings.TrimSpace(ref)
 	if repoURL == "" {
-		return "", fmt.Errorf("repo_url is empty")
+		return resolvedSourceCommit{}, fmt.Errorf("repo_url is empty")
 	}
 	if ref == "" {
-		return "", fmt.Errorf("base_ref is empty")
+		return resolvedSourceCommit{}, fmt.Errorf("base_ref is empty")
 	}
 
-	candidates := []string{ref}
-	if !strings.HasPrefix(ref, "refs/") {
-		candidates = append(candidates, "refs/heads/"+ref, "refs/tags/"+ref)
+	if sha, ok := domaintypes.NormalizeFullCommitSHA(ref); ok {
+		return resolvedSourceCommit{BaseRef: sha.String(), SHA: sha.String()}, nil
 	}
-
-	attemptErrs := make([]string, 0, len(candidates))
-	for _, candidate := range candidates {
-		sha, err := gitLSRemote(ctx, repoURL, candidate, auth)
-		if err == nil {
-			return sha, nil
+	candidates := []string{"refs/heads/" + ref, "refs/tags/" + ref + "^{}", "refs/tags/" + ref}
+	if strings.HasPrefix(ref, "refs/tags/") {
+		candidates = append(candidates, ref+"^{}")
+	}
+	candidates = append(candidates, ref)
+	sha, err := gitLSRemote(ctx, repoURL, auth, candidates...)
+	if err != nil {
+		return resolvedSourceCommit{}, err
+	}
+	if sha != "" {
+		return resolvedSourceCommit{BaseRef: ref, SHA: sha}, nil
+	}
+	if shortCommitPrefix.MatchString(ref) {
+		sha, err = resolveGitLabShortSHA(ctx, repoURL, ref, auth)
+		if err != nil {
+			return resolvedSourceCommit{}, err
 		}
-		attemptErrs = append(attemptErrs, fmt.Sprintf("%s: %v", candidate, err))
+		return resolvedSourceCommit{BaseRef: sha, SHA: sha}, nil
 	}
-	return "", fmt.Errorf("resolve source commit sha for ref %q: %s", ref, strings.Join(attemptErrs, "; "))
+	return resolvedSourceCommit{}, fmt.Errorf("ref %q not found on remote", ref)
 }
 
-func gitLSRemote(ctx context.Context, repoURL, ref string, auth gitauth.Options) (string, error) {
+func gitLSRemote(ctx context.Context, repoURL string, auth gitauth.Options, refs ...string) (string, error) {
 	prepared := gitauth.PrepareURL(repoURL, auth)
-	result, err := gitexec.Execute(ctx, gitexec.Request{Env: prepared.Env, Args: []string{"ls-remote", prepared.URL, ref}})
+	result, err := gitexec.Execute(ctx, gitexec.Request{Env: prepared.Env, Args: append([]string{"ls-remote", "--", prepared.URL}, refs...)})
 	out := append(result.Stdout, result.Stderr...)
 	if err != nil {
 		failureErr := err
@@ -84,21 +101,23 @@ func gitLSRemote(ctx context.Context, repoURL, ref string, auth gitauth.Options)
 		}
 		return "", fmt.Errorf("git ls-remote failed (%s)", classifyGitLSRemoteFailure(failureErr, out))
 	}
-	lines := bytes.Split(bytes.TrimSpace(out), []byte("\n"))
-	for _, line := range lines {
-		line = bytes.TrimSpace(line)
-		if len(line) == 0 {
-			continue
-		}
-		parts := bytes.Fields(line)
-		if len(parts) < 1 {
-			continue
-		}
-		if sha, ok := domaintypes.NormalizeFullCommitSHA(string(parts[0])); ok {
-			return sha.String(), nil
+	// ls-remote patterns also match ref suffixes. Compare complete ref names
+	// and honor caller precedence even when the remote lists tags first.
+	matches := make(map[string]string)
+	for _, line := range bytes.Split(result.Stdout, []byte("\n")) {
+		fields := bytes.Fields(line)
+		if len(fields) == 2 {
+			if sha, ok := domaintypes.NormalizeFullCommitSHA(string(fields[0])); ok {
+				matches[string(fields[1])] = sha.String()
+			}
 		}
 	}
-	return "", fmt.Errorf("no matching commit sha found")
+	for _, ref := range refs {
+		if sha := matches[ref]; sha != "" {
+			return sha, nil
+		}
+	}
+	return "", nil
 }
 
 func classifyGitLSRemoteFailure(err error, out []byte) string {

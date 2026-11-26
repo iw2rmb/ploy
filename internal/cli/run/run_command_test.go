@@ -62,40 +62,59 @@ func TestRunCommandSubmitRemoteSelector(t *testing.T) {
 		t.Fatalf("write spec file: %v", err)
 	}
 
-	runID := domaintypes.NewRunID()
-	migID := domaintypes.NewMigID()
-	specID := domaintypes.NewSpecID()
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case r.Method == http.MethodPost && r.URL.Path == "/v1/repos/resolve":
-			_ = json.NewEncoder(w).Encode(map[string]any{
-				"repo_url":   "https://gitlab.example.com/team/repo.git",
-				"ref":        "master",
-				"ref_is_sha": false,
-			})
-		case r.Method == http.MethodPost && r.URL.Path == "/v1/runs":
-			w.WriteHeader(http.StatusCreated)
-			_ = json.NewEncoder(w).Encode(map[string]string{
-				"run_id":  runID.String(),
-				"mig_id":  migID.String(),
-				"spec_id": specID.String(),
-			})
-		default:
-			http.NotFound(w, r)
-		}
-	}))
-	defer server.Close()
-	clienv.UseControlPlaneEnv(t, server.URL)
+	for _, tc := range []struct{ selector, ref string }{
+		{"team/repo", "master"},
+		{"team/repo:feature/login", "feature/login"},
+		{"team/repo:d72ec8f", "d72ec8f"},
+	} {
+		t.Run(tc.ref, func(t *testing.T) {
+			runID := domaintypes.NewRunID()
+			migID := domaintypes.NewMigID()
+			specID := domaintypes.NewSpecID()
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch {
+				case r.Method == http.MethodPost && r.URL.Path == "/v1/repos/resolve":
+					var body map[string]string
+					if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body["selector"] != "team/repo" || body["ref"] != tc.ref {
+						t.Errorf("resolve request = %v, error = %v", body, err)
+					}
+					_ = json.NewEncoder(w).Encode(map[string]any{
+						"repo_url":   "https://gitlab.example.com/team/repo.git",
+						"ref":        tc.ref,
+						"ref_is_sha": false,
+					})
+				case r.Method == http.MethodPost && r.URL.Path == "/v1/runs":
+					var body struct {
+						Ref       string `json:"ref"`
+						CommitSHA string `json:"commit_sha"`
+					}
+					if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Ref != tc.ref || body.CommitSHA != "" {
+						t.Errorf("submit request = %+v, error = %v", body, err)
+					}
+					w.WriteHeader(http.StatusCreated)
+					_ = json.NewEncoder(w).Encode(map[string]string{
+						"run_id":  runID.String(),
+						"mig_id":  migID.String(),
+						"spec_id": specID.String(),
+					})
+				default:
+					http.NotFound(w, r)
+				}
+			}))
+			defer server.Close()
+			clienv.UseControlPlaneEnv(t, server.URL)
 
-	var stdout, stderr bytes.Buffer
-	if err := executeRunCommand([]string{specPath, "team/repo"}, &stdout, &stderr); err != nil {
-		t.Fatalf("run submit: %v", err)
-	}
-	if stderr.Len() != 0 {
-		t.Fatalf("expected empty stderr, got %q", stderr.String())
-	}
-	if !bytes.Contains(stdout.Bytes(), []byte("run_id: "+runID.String())) {
-		t.Fatalf("expected run id in stdout, got %q", stdout.String())
+			var stdout, stderr bytes.Buffer
+			if err := executeRunCommand([]string{specPath, tc.selector}, &stdout, &stderr); err != nil {
+				t.Fatalf("run submit: %v", err)
+			}
+			if stderr.Len() != 0 {
+				t.Fatalf("expected empty stderr, got %q", stderr.String())
+			}
+			if !bytes.Contains(stdout.Bytes(), []byte("run_id: "+runID.String())) {
+				t.Fatalf("expected run id in stdout, got %q", stdout.String())
+			}
+		})
 	}
 }
 

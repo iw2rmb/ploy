@@ -102,9 +102,9 @@ func TestResolveSourceCommitSHAFromContextAppliesTimeout(t *testing.T) {
 	sourceCommitResolveTimeout = 10 * time.Millisecond
 	t.Cleanup(func() { sourceCommitResolveTimeout = oldTimeout })
 
-	ctx := withSourceCommitSHAResolver(context.Background(), func(ctx context.Context, _, _ string) (string, error) {
+	ctx := withSourceCommitSHAResolver(context.Background(), func(ctx context.Context, _, _ string) (resolvedSourceCommit, error) {
 		<-ctx.Done()
-		return "", ctx.Err()
+		return resolvedSourceCommit{}, ctx.Err()
 	})
 
 	start := time.Now()

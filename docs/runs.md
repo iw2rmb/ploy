@@ -14,6 +14,16 @@ ploy run <spec-path>|<named-spec> [<repo-path>|<namespace/repo[:ref]>] [--apply]
 ploy mig run <mig-id|name> [<namespace/repo[:ref]> ... | --failed] [--follow] [--json] [--gitlab-token-env ENV_NAME|--gitlab-token-prompt]
 ```
 
+Remote selectors accept a branch, tag, full commit SHA, or unique short SHA (4–39 hexadecimal digits).
+
+```sh
+ploy run ./spec.yaml team/repo:feature/login
+ploy run ./spec.yaml team/repo:d72ec8f
+```
+
+The server pins the commit at submission. It matches an exact branch first, then an exact tag, then a short SHA.
+For a short SHA in a private repository, the GitLab token needs access to the Commits API, such as the `read_api` scope.
+
 - `ploy run` prints `run_id` and `mig_id`.
 - `--gitlab-token-env ENV_NAME` reads a run-scoped ephemeral GitLab token from
   the named environment variable. `--gitlab-token-prompt` prompts for the token.

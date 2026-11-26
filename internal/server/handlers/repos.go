@@ -3,7 +3,7 @@ package handlers
 import (
 	"log/slog"
 	"net/http"
-	"net/url"
+
 	"strings"
 	"time"
 
@@ -49,20 +49,11 @@ func resolveRepoSelectorHandler(gitAuth gitauth.Options) http.HandlerFunc {
 		if ref == "" {
 			ref = "master"
 		}
-		domain := strings.TrimSpace(gitAuth.GitLabDomain)
-		if domain == "" {
-			writeHTTPError(w, http.StatusBadRequest, "gitlab domain is not configured")
+		parsed, err := parseGitLabOrigin(gitAuth.GitLabDomain)
+		if err != nil {
+			writeHTTPError(w, http.StatusBadRequest, "%v", err)
 			return
 		}
-		if !strings.Contains(domain, "://") {
-			domain = "https://" + domain
-		}
-		parsed, err := url.Parse(domain)
-		if err != nil || parsed.Host == "" {
-			writeHTTPError(w, http.StatusBadRequest, "gitlab domain is invalid")
-			return
-		}
-		parsed.User = nil
 		parsed.Path = "/" + selector + ".git"
 		parsed.RawQuery = ""
 		parsed.Fragment = ""

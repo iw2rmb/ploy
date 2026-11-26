@@ -26,9 +26,10 @@ func NewCommand() *cobra.Command {
 	var buildGateForcedPre string
 	var buildGateForcedPost string
 	cmd := &cobra.Command{
-		Use:   "run (<spec-path>[:<step-name>]|<name>|<namespace/repo>:<name>|<domain>/<namespace/repo>:<name>) [<repo-path>|<namespace/repo[:ref]>]",
-		Short: "Submit and inspect runs",
-		Args:  cobra.RangeArgs(1, 2),
+		Use:     "run (<spec-path>[:<step-name>]|<name>|<namespace/repo>:<name>|<domain>/<namespace/repo>:<name>) [<repo-path>|<namespace/repo[:ref]>]",
+		Short:   "Submit and inspect runs",
+		Example: "  ploy run ./spec.yaml team/repo:feature/login\n  ploy run ./spec.yaml team/repo:d72ec8f",
+		Args:    cobra.RangeArgs(1, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			submit.RepoSelector = ""
 			submit.SpecPath = args[0]
