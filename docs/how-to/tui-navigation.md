@@ -102,7 +102,7 @@ A failed access check shows `unavailable`.
 `All` shows runs and jobs for all users, within each list's existing page limit.
 The remaining entries contain unique usernames from the API token registry, sorted alphabetically.
 The list includes usernames from expired and revoked tokens.
-Usernames have the label `User: <username>` to distinguish them from the `All` option.
+Usernames have the label `@<username>` to distinguish them from the `All` option.
 
 Enter on root `Users` moves focus into the Users list.
 Enter on a username selects that creator for both Runs and the root Jobs list.

@@ -14,7 +14,7 @@ func (i userItem) Title() string {
 	if i.username == "" {
 		return "All"
 	}
-	return "User: " + i.username
+	return "@" + i.username
 }
 
 func (i userItem) Description() string { return "" }

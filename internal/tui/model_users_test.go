@@ -72,7 +72,7 @@ func TestUsersSelectionScopesListsAndRejectsPriorResponses(t *testing.T) {
 	m := InitialModel(t.Context(), server.Client(), base)
 	next, _ := m.Update(usersLoadedMsg{enabled: true, users: []string{"All", "alice", "bob", "All (user)"}})
 	m = next.(model)
-	if m.usersList.Items()[0].(userItem).Title() != "All" || m.usersList.Items()[1].(userItem).Title() != "User: All" {
+	if m.usersList.Items()[0].(userItem).Title() != "All" || m.usersList.Items()[1].(userItem).Title() != "@All" {
 		t.Fatal("All creators and the username All have ambiguous labels")
 	}
 	for _, selection := range []struct {
@@ -124,7 +124,7 @@ func TestUsersSelectionScopesListsAndRejectsPriorResponses(t *testing.T) {
 		}
 		label := "All"
 		if selection.user != "" {
-			label = "User: " + selection.user
+			label = "@" + selection.user
 		}
 		if got := m.rootList.Items()[usersIndex].(listItem).description; got != label {
 			t.Fatalf("Users context = %q, want %q", got, label)
