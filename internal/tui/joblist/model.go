@@ -49,6 +49,11 @@ func New(title string) Model {
 func (m Model) SetJobs(jobs []domainapi.JobListItem) Model {
 	m.jobs = append([]domainapi.JobListItem(nil), jobs...)
 	sort.SliceStable(m.jobs, func(i, j int) bool {
+		runningI := m.jobs[i].Status == domaintypes.JobStatusRunning
+		runningJ := m.jobs[j].Status == domaintypes.JobStatusRunning
+		if runningI != runningJ {
+			return runningI
+		}
 		a, b := m.jobs[i].StartedAt, m.jobs[j].StartedAt
 		if a == nil {
 			return false

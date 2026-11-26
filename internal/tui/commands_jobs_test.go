@@ -98,6 +98,66 @@ func TestGlobalJobsHydratesExactJobsAndReusesRunAttempts(t *testing.T) {
 	}
 }
 
+func TestGlobalJobsIncludesRunningJobsOutsideFirstPage(t *testing.T) {
+	runID, repoID := domaintypes.NewRunID(), domaintypes.NewRepoID()
+	start := time.Now()
+	job := func(status domaintypes.JobStatus) domainapi.JobListItem {
+		return domainapi.JobListItem{JobID: domaintypes.NewJobID(), RepoID: repoID, RunID: runID, Status: status, StartedAt: &start}
+	}
+	firstPage := []domainapi.JobListItem{job(domaintypes.JobStatusRunning)}
+	for i := 1; i < 100; i++ {
+		firstPage = append(firstPage, job(domaintypes.JobStatusSuccess))
+	}
+	running := []domainapi.JobListItem{firstPage[0], job(domaintypes.JobStatusRunning)}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v1/jobs":
+			creator := r.URL.Query().Get("creator")
+			if creator != "alice" && creator != "bob" {
+				t.Error("missing creator filter")
+			}
+			response := domainapi.JobListResponse{Jobs: firstPage, Total: 101}
+			if r.URL.Query().Get("status") == "Running" {
+				if creator == "bob" {
+					http.Error(w, "unavailable", http.StatusServiceUnavailable)
+					return
+				}
+				response = domainapi.JobListResponse{Jobs: running, Total: 2}
+			}
+			if err := json.NewEncoder(w).Encode(response); err != nil {
+				t.Error(err)
+			}
+		case "/v1/runs/" + runID.String() + "/jobs":
+			if err := json.NewEncoder(w).Encode(migsapi.ListRunJobsResponse{RunID: runID, RepoID: repoID, Jobs: []migsapi.RunJob{
+				{JobID: running[0].JobID}, {JobID: running[1].JobID},
+			}}); err != nil {
+				t.Error(err)
+			}
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	base, _ := url.Parse(server.URL)
+	jobs, err := loadGlobalJobs(t.Context(), server.Client(), base, firstPage, "alice")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := append(running, firstPage[1:99]...)
+	if len(jobs) != len(want) {
+		t.Fatalf("got %d jobs, want %d", len(jobs), len(want))
+	}
+	for i := range want {
+		if jobs[i].JobID != want[i].JobID {
+			t.Fatalf("job %d = %s, want %s", i, jobs[i].JobID, want[i].JobID)
+		}
+	}
+	jobs, err = loadGlobalJobs(t.Context(), server.Client(), base, firstPage, "bob")
+	if err == nil || len(jobs) != len(firstPage) || jobs[len(jobs)-1].JobID != firstPage[99].JobID {
+		t.Fatalf("running query failure returned %d jobs, err = %v", len(jobs), err)
+	}
+}
+
 func TestGlobalJobsPreservesMembershipWhenExactMetadataFails(t *testing.T) {
 	for _, failure := range []string{"current", "status", "historical", "missing job"} {
 		t.Run(failure, func(t *testing.T) {

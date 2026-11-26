@@ -81,11 +81,12 @@ Each job row uses three lines.
 
 Job status icons use the same colors as `RUNS`.
 The step name uses `display_name` when available, otherwise `job_type`.
-The list sorts jobs by `started_at`, newest first. Jobs without a start time appear last.
+The list shows running jobs first. Within each group, jobs with a `started_at` appear newest first, followed by jobs without a start time.
 Created and queued jobs without a start time show `-` as their status icon.
 Running jobs show elapsed time from `started_at`.
 
 Opening jobs from run details loads the selected run's current attempt, including start times and display names.
+The root jobs list reserves space for running jobs within its 100-row limit.
 The root jobs list uses the Users selection for `cli-admin` tokens.
 Other tokens retain the global jobs list.
 

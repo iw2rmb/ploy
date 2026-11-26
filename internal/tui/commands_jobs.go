@@ -35,9 +35,34 @@ func runJobItems(result migsapi.ListRunJobsResponse) []domainapi.JobListItem {
 // The global page owns membership and lifecycle state; run snapshots own names and timestamps.
 // Only unchanged terminal rows can reuse timestamps: a running job can be claimed again between polls.
 func loadGlobalJobs(ctx context.Context, client *http.Client, baseURL *url.URL, previous []domainapi.JobListItem, createdBy string) ([]domainapi.JobListItem, error) {
-	page, err := (sharedclient.ListJobsCommand{Client: client, BaseURL: baseURL, Limit: 100, Creator: createdBy}).Run(ctx)
+	command := sharedclient.ListJobsCommand{Client: client, BaseURL: baseURL, Limit: 100, Creator: createdBy}
+	page, err := command.Run(ctx)
 	if err != nil {
 		return nil, err
+	}
+	// The unfiltered page can omit running jobs once the result exceeds the page limit.
+	var failures []error
+	if page.Total > int64(command.Limit) {
+		status := domaintypes.JobStatusRunning
+		command.Status = &status
+		running, err := command.Run(ctx)
+		if err != nil {
+			failures = append(failures, err)
+		} else {
+			seen := make(map[domaintypes.JobID]bool, len(running.Jobs))
+			for _, job := range running.Jobs {
+				seen[job.JobID] = true
+			}
+			for _, job := range page.Jobs {
+				if len(running.Jobs) >= int(command.Limit) {
+					break
+				}
+				if !seen[job.JobID] {
+					running.Jobs = append(running.Jobs, job)
+				}
+			}
+			page.Jobs = running.Jobs
+		}
 	}
 	prior := make(map[domaintypes.JobID]domainapi.JobListItem, len(previous))
 	for _, job := range previous {
@@ -62,7 +87,6 @@ func loadGlobalJobs(ctx context.Context, client *http.Client, baseURL *url.URL, 
 	var group errgroup.Group
 	group.SetLimit(4)
 	var mu sync.Mutex
-	var failures []error
 	recordFailure := func(err error) {
 		mu.Lock()
 		failures = append(failures, err)

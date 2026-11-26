@@ -64,9 +64,9 @@ func TestSetJobsFormatsRows(t *testing.T) {
 func TestSetJobsSortsStartedNewestFirst(t *testing.T) {
 	older := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	newer := older.Add(time.Hour)
-	jobs := []domainapi.JobListItem{{JobID: "pending-1"}, {JobID: "old", StartedAt: &older}, {JobID: "new-1", StartedAt: &newer}, {JobID: "pending-2"}, {JobID: "new-2", StartedAt: &newer}}
+	jobs := []domainapi.JobListItem{{JobID: "pending-1"}, {JobID: "old", StartedAt: &older}, {JobID: "new-1", StartedAt: &newer}, {JobID: "pending-2"}, {JobID: "new-2", StartedAt: &newer}, {JobID: "active", Status: domaintypes.JobStatusRunning, StartedAt: &older}}
 	m := joblist.New("JOBS").SetJobs(jobs)
-	for i, id := range []domaintypes.JobID{"new-1", "new-2", "old", "pending-1", "pending-2"} {
+	for i, id := range []domaintypes.JobID{"active", "new-1", "new-2", "old", "pending-1", "pending-2"} {
 		if m.Jobs()[i].JobID != id {
 			t.Fatalf("job %d = %q, want %q", i, m.Jobs()[i].JobID, id)
 		}
