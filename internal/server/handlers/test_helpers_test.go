@@ -437,7 +437,11 @@ func newNodeFixture(drained bool) (string, store.Node) {
 // the given auth role as the default for all requests.
 func newTestServerWithRole(t *testing.T, role auth.Role) *httpserver.Server {
 	t.Helper()
-	authz := auth.NewAuthorizer(auth.Options{AllowInsecure: true, DefaultRole: role})
+	return newTestServerWithAuthorizer(t, auth.NewAuthorizer(auth.Options{AllowInsecure: true, DefaultRole: role}))
+}
+
+func newTestServerWithAuthorizer(t *testing.T, authz *auth.Authorizer) *httpserver.Server {
+	t.Helper()
 	srv, err := httpserver.NewServer(httpserver.Options{Authorizer: authz})
 	if err != nil {
 		t.Fatalf("http server: %v", err)

@@ -12,6 +12,10 @@ func withPanicRecovery(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			if recovered := recover(); recovered != nil {
+				// Let net/http abort the stream so clients detect an incomplete response.
+				if recovered == http.ErrAbortHandler {
+					panic(recovered)
+				}
 				slog.Error("http handler panic recovered",
 					"method", r.Method,
 					"path", r.URL.Path,

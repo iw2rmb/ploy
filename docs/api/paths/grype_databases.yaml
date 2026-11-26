@@ -1,0 +1,30 @@
+get:
+  tags: [Control]
+  summary: Fetch a Grype vulnerability database listing or archive
+  description: |
+    The proxy accepts the cli-admin, control-plane, worker, and job roles.
+    A job bearer token must belong to an active job.
+    Ploy streams the response from the corresponding path under
+    `https://grype.anchore.io/databases/`. Clients can also issue HEAD
+    requests, request byte ranges, and send cache validators.
+  parameters:
+    - in: path
+      name: path...
+      required: true
+      description: Path relative to the upstream databases directory, including any subdirectories.
+      schema: { type: string }
+      example: v6/latest.json
+  responses:
+    '200':
+      description: Grype database listing or archive
+      content:
+        application/json:
+          schema: { type: object }
+        application/octet-stream:
+          schema: { type: string, format: binary }
+    '206': { description: Requested byte range }
+    '304': { description: Cached representation is current }
+    '401': { description: Authentication required or credentials invalid }
+    '403': { description: The caller lacks access to the Grype database proxy }
+    '502': { description: The proxy could not obtain a response from Anchore }
+    default: { description: Upstream response }

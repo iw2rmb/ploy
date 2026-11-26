@@ -20,6 +20,7 @@ info:
     - `/v1/waves/{wave_id}/*` — wave inspect, run listing, and wave cancellation.
     - `/v1/sbom/jvm/{jvm}/versions` — observed JVM dependency combinations from successful Ploy gate jobs.
     - `/v1/deployments/jvm/{jvm}/versions` — observed JVM dependency combinations from Tech Radar.
+    - `/v1/grype/databases/*` — Grype vulnerability database listings and archives from Anchore.
 
     Type semantics and labels:
     - The server and node use strong domain types in code (e.g., `RepoURL`, `GitRef`, `CommitSHA`, `RunID`, resource units). On the wire these remain JSON strings; run, job, and build IDs are KSUID-backed strings, repo and node IDs use NanoID, and only selected resources (diffs, artifact bundles, API/bootstrap tokens) remain UUID-backed.
@@ -67,6 +68,8 @@ paths:
   /v1/pki/bootstrap:
     $ref: "./paths/pki_bootstrap.yaml"
   # Control-plane surfaces
+  /v1/grype/databases/{path...}:
+    $ref: "./paths/grype_databases.yaml"
   /v1/sbom/jvm/{jvm}/versions:
     $ref: "./paths/sbom_jvm_versions.yaml"
   /v1/deployments/jvm/{jvm}/versions:

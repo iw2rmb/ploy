@@ -2,6 +2,7 @@ package httpserver
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"testing"
@@ -80,6 +81,31 @@ func TestServer_RegisterRoute(t *testing.T) {
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("expected status 200, got %d", resp.StatusCode)
+	}
+}
+
+func TestServer_AbortsIncompleteChunkedResponse(t *testing.T) {
+	srv := newTestServer(t)
+	const prefix = "partial archive"
+	srv.RegisterRouteFunc("/stream", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, prefix)
+		w.(http.Flusher).Flush()
+		panic(http.ErrAbortHandler)
+	})
+	ctx := context.Background()
+	if err := srv.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = srv.Stop(ctx) }()
+
+	resp, err := http.Get("http://" + srv.Addr() + "/stream")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if string(body) != prefix || !errors.Is(err, io.ErrUnexpectedEOF) {
+		t.Fatalf("read body = %q, %v; want %q, unexpected EOF", body, err, prefix)
 	}
 }
 

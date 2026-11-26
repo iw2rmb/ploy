@@ -55,6 +55,7 @@ func RegisterRoutes(s routeRegistrar, st store.Store, bs blobstore.Store, bp *bl
 		jvmVersions:           jvmVersions,
 	}
 	registerHealthRoutes(s, deps)
+	s.RegisterRouteFunc("GET /v1/grype/databases/{path...}", grypeDatabaseHandler(nil), auth.RoleControlPlane, auth.RoleWorker, auth.RoleJob)
 	s.RegisterRouteFunc("GET /v1/deployments/jvm/{jvm}/versions", jvmVersionsHandler(techRadarJVMVersions, deps.jvmVersions), auth.RoleControlPlane, auth.RoleJob)
 	s.RegisterRouteFunc("GET /v1/sbom/jvm/{jvm}/versions", jvmVersionsHandler(sbomJVMVersions, sbomJVMVersionsLookup{deps.st}), auth.RoleControlPlane, auth.RoleJob)
 	registerConfigRoutes(s, deps)
