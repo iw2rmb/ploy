@@ -149,6 +149,11 @@ func scanWorkspace(workspace string) scanResult {
 		}
 	}
 
+	if evidence := dotnetProjectEvidence(workspace); len(evidence) > 0 {
+		s.languages = append(s.languages, "dotnet")
+		s.evidence = append(s.evidence, evidence...)
+	}
+
 	return s
 }
 
@@ -178,6 +183,7 @@ func (s *scanResult) checkAmbiguousOrUnknown() error {
 //   - Go: Go module file
 //   - Rust: Cargo.toml, rust-toolchain.toml, rust-toolchain
 //   - Python: .python-version, runtime.txt, or pyproject.toml with Python markers
+//   - .NET: SDK-style project at the root or referenced by a root solution
 //
 // It returns an Observation on success, or a DetectionError when:
 //   - Multiple languages detected (reason: "ambiguous")
@@ -190,6 +196,8 @@ func Detect(ctx context.Context, workspace string) (*Observation, error) {
 	}
 
 	switch s.languages[0] {
+	case "dotnet":
+		return detectDotnet(s)
 	case "java":
 		return detectJava(ctx, s)
 	case "go":
@@ -197,7 +205,7 @@ func Detect(ctx context.Context, workspace string) (*Observation, error) {
 	case "rust":
 		return detectRust(ctx, workspace)
 	}
-	// scanWorkspace emits only java, go, rust, and python.
+	// The remaining recognized language is Python.
 	return detectPython(ctx, s)
 }
 
@@ -215,6 +223,8 @@ func DetectTool(ctx context.Context, workspace string) (*Observation, error) {
 
 	lang := s.languages[0]
 	switch lang {
+	case "dotnet":
+		return &Observation{Language: lang, Tool: "dotnet", Evidence: s.evidence}, nil
 	case "java":
 		tool, err := detectJavaTool(s)
 		if err != nil {
@@ -241,7 +251,7 @@ func DetectTool(ctx context.Context, workspace string) (*Observation, error) {
 			Evidence: s.evidence,
 		}, nil
 	}
-	// scanWorkspace emits only java, go, rust, and python.
+	// The remaining recognized language is Python.
 	tool := "pip"
 	if s.pyprojectHasPoetryTool {
 		tool = "poetry"

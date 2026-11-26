@@ -293,3 +293,36 @@ func TestGatePlanResolver_StackGateTerminalRuntimeImage(t *testing.T) {
 		})
 	}
 }
+
+func TestGatePlanDotnetImage(t *testing.T) {
+	for _, pinned := range []bool{true, false} {
+		name := "configured release"
+		if pinned {
+			name = "detected release"
+		}
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			if err := os.WriteFile(filepath.Join(dir, "App.csproj"), []byte(`<Project Sdk="Microsoft.NET.Sdk"/>`), 0600); err != nil {
+				t.Fatal(err)
+			}
+			spec := &contracts.StepGateSpec{
+				Enabled: true,
+				ImageOverrides: []contracts.BuildGateImageRule{{
+					Stack: contracts.StackExpectation{Language: "dotnet", Tool: "dotnet", Release: "8.0.302"},
+					Image: "test/gate-dotnet:8.0.302",
+				}},
+			}
+			if pinned {
+				if err := os.WriteFile(filepath.Join(dir, "global.json"), []byte(`{"sdk":{"version":"8.0.302"}}`), 0600); err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				spec.Stack = &contracts.BuildGateStackConfig{Mode: contracts.BuildGateStackModeForced, Language: "dotnet", Release: "8.0.302"}
+			}
+			plan, terminal := resolveGateExecutionPlan(t.Context(), dir, spec, "")
+			if terminal != nil || plan.image != "test/gate-dotnet:8.0.302" {
+				t.Fatalf("plan = %+v, terminal = %+v", plan, terminal)
+			}
+		})
+	}
+}

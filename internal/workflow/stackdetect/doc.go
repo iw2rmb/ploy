@@ -13,6 +13,7 @@
 // Currently supported:
 //   - Java with Maven (pom.xml)
 //   - Java with Gradle (build.gradle, build.gradle.kts, settings.gradle, settings.gradle.kts)
+//   - .NET SDK-style projects (SDK release from global.json)
 //   - Go (go.mod)
 //   - Rust with Cargo (Cargo.toml, rust-toolchain.toml, rust-toolchain)
 //   - Python with pip or Poetry (.python-version, runtime.txt, pyproject.toml)
