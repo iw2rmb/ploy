@@ -21,29 +21,39 @@ func (q *Queries) DeleteSBOMRowsByJob(ctx context.Context, jobID types.JobID) er
 	return err
 }
 
+type InsertSBOMRowsParams struct {
+	JobID    types.JobID  `json:"job_id"`
+	RepoID   types.RepoID `json:"repo_id"`
+	ModuleID *string      `json:"module_id"`
+	Lib      string       `json:"lib"`
+	Ver      string       `json:"ver"`
+}
+
 const listRunSBOMRowsByJobType = `-- name: ListRunSBOMRowsByJobType :many
-SELECT DISTINCT s.lib, s.ver
+SELECT DISTINCT CASE WHEN $1::boolean THEN coalesce(s.module_id, '') ELSE '' END::text AS module_id, s.lib, s.ver
 FROM sboms s
 JOIN jobs j ON j.id = s.job_id
 JOIN runs r ON r.id = j.run_id
-WHERE j.run_id = $1
+WHERE j.run_id = $2
   AND j.attempt = r.attempt
-  AND j.job_type = $2
-ORDER BY s.lib ASC, s.ver ASC
+  AND j.job_type = $3
+ORDER BY module_id, s.lib, s.ver
 `
 
 type ListRunSBOMRowsByJobTypeParams struct {
-	RunID   types.RunID   `json:"run_id"`
-	JobType types.JobType `json:"job_type"`
+	ByModule bool          `json:"by_module"`
+	RunID    types.RunID   `json:"run_id"`
+	JobType  types.JobType `json:"job_type"`
 }
 
 type ListRunSBOMRowsByJobTypeRow struct {
-	Lib string `json:"lib"`
-	Ver string `json:"ver"`
+	ModuleID string `json:"module_id"`
+	Lib      string `json:"lib"`
+	Ver      string `json:"ver"`
 }
 
 func (q *Queries) ListRunSBOMRowsByJobType(ctx context.Context, arg ListRunSBOMRowsByJobTypeParams) ([]ListRunSBOMRowsByJobTypeRow, error) {
-	rows, err := q.db.Query(ctx, listRunSBOMRowsByJobType, arg.RunID, arg.JobType)
+	rows, err := q.db.Query(ctx, listRunSBOMRowsByJobType, arg.ByModule, arg.RunID, arg.JobType)
 	if err != nil {
 		return nil, err
 	}
@@ -51,7 +61,7 @@ func (q *Queries) ListRunSBOMRowsByJobType(ctx context.Context, arg ListRunSBOMR
 	items := []ListRunSBOMRowsByJobTypeRow{}
 	for rows.Next() {
 		var i ListRunSBOMRowsByJobTypeRow
-		if err := rows.Scan(&i.Lib, &i.Ver); err != nil {
+		if err := rows.Scan(&i.ModuleID, &i.Lib, &i.Ver); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -83,7 +93,7 @@ JOIN sboms s ON s.job_id = j.id
 JOIN requested q ON q.lib = s.lib
   AND (q.kind = 'any' OR (q.kind = 'exact' AND s.ver = q.value)
     OR (q.kind = 'prefix' AND starts_with(s.ver, q.value)))
-GROUP BY s.job_id
+GROUP BY s.job_id, s.module_id
 HAVING count(DISTINCT s.lib) = (SELECT count(*) FROM requested)
 `
 
@@ -117,25 +127,35 @@ func (q *Queries) ListSBOMJVMVersions(ctx context.Context, arg ListSBOMJVMVersio
 	return items, nil
 }
 
-const upsertSBOMRow = `-- name: UpsertSBOMRow :exec
-INSERT INTO sboms (job_id, repo_id, lib, ver)
-VALUES ($1, $2, $3, $4)
-ON CONFLICT (job_id, repo_id, lib, ver) DO NOTHING
+const listSBOMRowsByJob = `-- name: ListSBOMRowsByJob :many
+SELECT coalesce(module_id, '')::text AS module_id, lib, ver
+FROM sboms
+WHERE job_id = $1
+ORDER BY module_id, lib, ver
 `
 
-type UpsertSBOMRowParams struct {
-	JobID  types.JobID  `json:"job_id"`
-	RepoID types.RepoID `json:"repo_id"`
-	Lib    string       `json:"lib"`
-	Ver    string       `json:"ver"`
+type ListSBOMRowsByJobRow struct {
+	ModuleID string `json:"module_id"`
+	Lib      string `json:"lib"`
+	Ver      string `json:"ver"`
 }
 
-func (q *Queries) UpsertSBOMRow(ctx context.Context, arg UpsertSBOMRowParams) error {
-	_, err := q.db.Exec(ctx, upsertSBOMRow,
-		arg.JobID,
-		arg.RepoID,
-		arg.Lib,
-		arg.Ver,
-	)
-	return err
+func (q *Queries) ListSBOMRowsByJob(ctx context.Context, jobID types.JobID) ([]ListSBOMRowsByJobRow, error) {
+	rows, err := q.db.Query(ctx, listSBOMRowsByJob, jobID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListSBOMRowsByJobRow{}
+	for rows.Next() {
+		var i ListSBOMRowsByJobRow
+		if err := rows.Scan(&i.ModuleID, &i.Lib, &i.Ver); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }

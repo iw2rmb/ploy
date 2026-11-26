@@ -3,12 +3,14 @@ package api
 import domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 
 type RunSBOMPackage struct {
-	Package string `json:"package"`
-	Version string `json:"version"`
+	ModuleID string `json:"module_id,omitempty"`
+	Package  string `json:"package"`
+	Version  string `json:"version"`
 }
 
 type JobSBOMUploadRequest struct {
-	Packages []RunSBOMPackage `json:"packages"`
+	ResumeCount int              `json:"resume_count,omitempty"`
+	Packages    []RunSBOMPackage `json:"packages"`
 }
 
 type JobSBOMUploadResponse struct {
@@ -23,6 +25,7 @@ type RunSBOMPackagesResponse struct {
 }
 
 type RunSBOMDiffPackage struct {
+	ModuleID    string `json:"module_id,omitempty"`
 	Package     string `json:"package"`
 	VersionPre  string `json:"version_pre"`
 	VersionPost string `json:"version_post"`

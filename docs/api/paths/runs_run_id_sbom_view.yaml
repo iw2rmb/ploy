@@ -1,6 +1,11 @@
 get:
   tags: [Control]
   summary: Show persisted SBOM packages for a run
+  description: |
+    The diff view compares package versions within each module in the current
+    run attempt. If either gate has packages without module attribution, it
+    returns an aggregate diff. The pre and post views list distinct package
+    and version pairs across the repository.
   parameters:
     - in: path
       name: run_id

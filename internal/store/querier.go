@@ -90,6 +90,7 @@ type Querier interface {
 	// Returns pgx.ErrNoRows if the (key, target) pair does not exist.
 	GetGlobalEnv(ctx context.Context, arg GetGlobalEnvParams) (ConfigEnv, error)
 	GetJob(ctx context.Context, id types.JobID) (Job, error)
+	GetJobForUpdate(ctx context.Context, id types.JobID) (Job, error)
 	GetLatestDiffByJob(ctx context.Context, jobID *types.JobID) (Diff, error)
 	GetLatestRunByMigAndRepoStatus(ctx context.Context, arg GetLatestRunByMigAndRepoStatusParams) (GetLatestRunByMigAndRepoStatusRow, error)
 	GetMig(ctx context.Context, id types.MigID) (Mig, error)
@@ -115,6 +116,7 @@ type Querier interface {
 	HasRunningJobForRunNode(ctx context.Context, arg HasRunningJobForRunNodeParams) (bool, error)
 	InsertAPIToken(ctx context.Context, arg InsertAPITokenParams) error
 	InsertBootstrapToken(ctx context.Context, arg InsertBootstrapTokenParams) error
+	InsertSBOMRows(ctx context.Context, arg []InsertSBOMRowsParams) (int64, error)
 	IsJobTokenActive(ctx context.Context, tokenID string) (bool, error)
 	ListAPITokens(ctx context.Context) ([]ListAPITokensRow, error)
 	// ListArtifactBundlePartitions retrieves all partition names for the artifact_bundles table.
@@ -174,6 +176,7 @@ type Querier interface {
 	ListRunsWithMetadata(ctx context.Context, arg ListRunsWithMetadataParams) ([]ListRunsWithMetadataRow, error)
 	ListRunsWithURLByWave(ctx context.Context, waveID types.WaveID) ([]ListRunsWithURLByWaveRow, error)
 	ListSBOMJVMVersions(ctx context.Context, arg ListSBOMJVMVersionsParams) ([]ListSBOMJVMVersionsRow, error)
+	ListSBOMRowsByJob(ctx context.Context, jobID types.JobID) ([]ListSBOMRowsByJobRow, error)
 	// Lists spec bundles ordered by created_at descending (most recent first).
 	ListSpecBundles(ctx context.Context, arg ListSpecBundlesParams) ([]SpecBundle, error)
 	// Lists spec bundles whose last_ref_at is before the given threshold.
@@ -228,7 +231,6 @@ type Querier interface {
 	// Uniqueness is on (mig_id, repo_id) to prevent duplicate repo membership per mig.
 	UpsertMigRepo(ctx context.Context, arg UpsertMigRepoParams) (MigRepo, error)
 	UpsertNodeDiagnostic(ctx context.Context, arg UpsertNodeDiagnosticParams) (NodeDiagnostic, error)
-	UpsertSBOMRow(ctx context.Context, arg UpsertSBOMRowParams) error
 }
 
 var _ Querier = (*Queries)(nil)

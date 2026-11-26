@@ -3,13 +3,15 @@ get:
   summary: Find JVM dependency combinations in Ploy gate SBOMs
   operationId: getSBOMJVMVersions
   description: |
-    Each observation contains packages from one successful pre_gate or post_gate
-    job. A gate job can include multiple modules. Every requested coordinate
-    and selector must match within that job. Coordinates match stored package
-    names exactly, including case.
+    The lookup groups packages by gate job and module. Rows with unknown module
+    IDs form one group within their gate job. A match in this group can include
+    dependencies from different modules. After repair, each module forms its own group.
+    Every requested coordinate and selector must match within one group.
+    Coordinates match stored package names exactly, including case.
 
     The server searches all retained attempts, regardless of run status. A job
-    qualifies when its detected stack reports java and the requested JVM release.
+    qualifies when it is a successful pre_gate or post_gate and its detected
+    stack reports java and the requested JVM release.
     Its completion time must be at or after the cutoff nine calendar months
     before query start, calculated in UTC.
 

@@ -109,11 +109,16 @@ func TestGateOutcomesPublishJobLocalJSONAndKeepPartialResults(t *testing.T) {
 			if tc.wantUploads == 2 && uploads["cves"] != tc.cves {
 				t.Fatal("changed CVE JSON")
 			}
+			if err := os.WriteFile(filepath.Join(out, gateModuleSBOMFilename), []byte("[]"), 0600); err != nil {
+				t.Fatal(err)
+			}
 			if err := clearGateOutcomes(out); err != nil {
 				t.Fatal(err)
 			}
-			if _, err := os.Stat(filepath.Join(out, gateSBOMFilename)); !os.IsNotExist(err) {
-				t.Fatal("old SBOM survived retry cleanup")
+			for _, filename := range []string{gateSBOMFilename, gateModuleSBOMFilename} {
+				if _, err := os.Stat(filepath.Join(out, filename)); !os.IsNotExist(err) {
+					t.Fatalf("%s survived retry cleanup", filename)
+				}
 			}
 		})
 	}

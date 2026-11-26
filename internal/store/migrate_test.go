@@ -117,6 +117,24 @@ FROM ploy.api_tokens WHERE token_id='existing-id'`).Scan(&preserved); err != nil
 			},
 		},
 		{
+			name: "version 13 preserves unattributed SBOM packages",
+			setup: func(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
+				setupTernSchemaVersion(t, ctx, pool, 13)
+				db := &PgStore{pool: pool, Queries: New(pool)}
+				fx := newV1Fixture(t, ctx, db, "https://github.com/test/sbom-upgrade", "main", []byte("{}"))
+				job := createSBOMJobForStoreTest(t, ctx, db, fx.Run, types.JobTypePreGate, 1, "pre")
+				if _, err := pool.Exec(ctx, `INSERT INTO ploy.sboms(job_id,repo_id,lib,ver) VALUES($1,$2,'g:existing','1')`, job.ID, job.RepoID); err != nil {
+					t.Fatal(err)
+				}
+			},
+			assert: func(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
+				var count int
+				if err := pool.QueryRow(ctx, `SELECT count(*) FROM ploy.sboms WHERE lib='g:existing' AND ver='1' AND module_id IS NULL`).Scan(&count); err != nil || count != 1 {
+					t.Fatalf("preserved legacy count=%d, err=%v", count, err)
+				}
+			},
+		},
+		{
 			name:    "unsupported existing database fails clearly",
 			setup:   setupUnsupportedExistingSchema,
 			wantErr: ErrUnsupportedSchema,

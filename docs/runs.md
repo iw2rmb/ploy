@@ -126,8 +126,10 @@ return JSON attachments, with a 64 MiB uncompressed limit. Missing reports retur
 404; an empty report or zero-change diff is a valid result.
 
 The job diff uses the pre-gate from the requested job's run, repository, and
-attempt. It returns `job_id`, `baseline_job_id`, and `packages` with added,
-removed, and changed dependencies. A retry cannot expose reports uploaded before
+attempt. It returns `job_id`, `baseline_job_id`, and `packages`. Each change
+identifies the module directory in `module_id`. The root module uses `.`.
+If either gate has packages without module attribution, the diff compares
+package versions across the repository and omits `module_id`. A retry cannot expose reports uploaded before
 its new execution started. Historical bundles remain available through artifact APIs.
 
 `ploy run ... --follow` and `ploy run status <run-id> [--follow]` display steps
@@ -180,8 +182,10 @@ execution; nodes echo the resume count in log uploads and completion statistics.
 The server rejects requests from an earlier execution.
 
 `ploy run sbom pre|post|diff <run-id>` reads persisted package rows from the
-current run attempt. The `diff` view omits unchanged package versions and marks
-changed, added, and removed package versions.
+current run attempt. The `diff` view compares each package within its module.
+Moving a package between modules produces a removal in the source module
+and an addition in the destination module. The CLI prints the module directory
+in brackets after the version change. Historical aggregate diffs omit that label.
 
 ## Artifacts And Apply
 

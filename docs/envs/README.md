@@ -159,7 +159,9 @@ build_gate:
   its anonymous volumes independently of this option.
 - Gate status visibility: Use `GET /v1/runs/{id}/status` to view gate results (format: `Gate: passed duration=1234ms` or `Gate: failed pre-gate duration=567ms`) via `Metadata["gate_summary"]`.
 - SBOM persistence contract:
-  - Gate post-tasks persist package rows from `/share/sbom.spdx.json` for both `pre_gate` and `post_gate`.
+  - Updated Java gate images write both `/out/sbom.modules.json` and `/out/sbom.spdx.json` during `pre_gate` and `post_gate`.
+  - The node reads `sbom.modules.json` to store each package and version under its module. The gate combines those rows into the repository-wide `sbom.spdx.json` for Grype and SBOM downloads.
+  - Older gate images produce only the SPDX file. The node reads it when the module file is absent. Those package rows have a NULL `module_id` because the aggregate file does not identify the owning modules.
   - SBOM row persistence is independent from artifact bundle upload.
   - No dedicated SBOM environment variables exist in this slice; stack identity comes from gate metadata (`lang`, `release`, `tool`) and claim context.
 

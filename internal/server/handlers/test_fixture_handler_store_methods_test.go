@@ -270,18 +270,8 @@ func (m *handlerStore) DeleteArtifactBundle(_ context.Context, id pgtype.UUID) e
 	return err
 }
 
-func (m *handlerStore) DeleteSBOMRowsByJob(_ context.Context, jobID types.JobID) error {
-	_, err := m.deleteSBOMRowsByJob.record(jobID)
-	return err
-}
-
 func (m *handlerStore) ListSBOMJVMVersions(_ context.Context, params store.ListSBOMJVMVersionsParams) ([]store.ListSBOMJVMVersionsRow, error) {
 	return m.listSBOMJVMVersions.record(params)
-}
-
-func (m *handlerStore) UpsertSBOMRow(_ context.Context, params store.UpsertSBOMRowParams) error {
-	_, err := m.upsertSBOMRow.record(params)
-	return err
 }
 
 func (m *handlerStore) CreateLog(_ context.Context, _ store.CreateLogParams) (store.Log, error) {

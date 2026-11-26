@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 
 	"github.com/iw2rmb/ploy/internal/blobstore"
 	types "github.com/iw2rmb/ploy/internal/domain/types"
@@ -133,6 +134,24 @@ func jobSBOMDiff(ctx context.Context, st store.Store, bs blobstore.Store, post s
 }
 
 func gateSBOMPackages(ctx context.Context, st store.Store, bs blobstore.Store, job store.Job) ([]migsapi.RunSBOMPackage, error) {
+	if !job.StartedAt.Valid {
+		return nil, errOutcomeUnavailable
+	}
+	stored, err := st.ListSBOMRowsByJob(ctx, job.ID)
+	if err != nil {
+		return nil, err
+	}
+	// Legacy rows can predate failed-step resume cleanup. The named artifact
+	// identifies the execution by its creation time.
+	if slices.ContainsFunc(stored, func(row store.ListSBOMRowsByJobRow) bool { return row.ModuleID != "" }) {
+		packages := make([]migsapi.RunSBOMPackage, 0, len(stored))
+		for _, row := range stored {
+			packages = append(packages, migsapi.RunSBOMPackage{
+				ModuleID: row.ModuleID, Package: row.Lib, Version: row.Ver,
+			})
+		}
+		return packages, nil
+	}
 	body, err := readGateOutcome(ctx, st, bs, job, "sbom", "sbom.spdx.json")
 	if err != nil {
 		return nil, err

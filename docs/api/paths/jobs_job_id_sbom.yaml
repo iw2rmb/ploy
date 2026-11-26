@@ -19,14 +19,16 @@ post:
   description: |
     Nodes call this endpoint as a gate post-task for both `pre_gate` and
     `post_gate`. The server deletes existing SBOM rows for the job and inserts
-    the supplied package/version rows.
+    the supplied module, package, and version rows in one transaction. An omitted
+    module_id identifies a package from a producer that supplied no module attribution.
 
     This endpoint is independent from artifact bundle upload. Artifact bundles
     may be uploaded or retained separately, but they are not the source of DB
     SBOM persistence.
 
     Ownership is enforced: only the node that claimed the job may save SBOM
-    rows while the job is `Running`, and only gate jobs (`pre_gate`,
+    rows while the job is `Running`. The supplied resume count must match
+    the current execution. Only gate jobs (`pre_gate`,
     `post_gate`) are accepted.
   requestBody:
     required: true
@@ -48,7 +50,7 @@ post:
     '404':
       description: Job not found (invalid job ID)
     '409':
-      description: Conflict — job is not `Running` or is not a gate job
+      description: Conflict — stale execution, non-running job, or non-gate job
     '500':
       description: Internal server error
 

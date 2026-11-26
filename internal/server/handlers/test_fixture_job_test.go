@@ -12,6 +12,8 @@ import (
 
 // handlerStore is the canonical configurable store for handler tests.
 type handlerStore struct {
+	savedGateSBOM   []store.InsertSBOMRowsParams
+	savedGateJob    types.JobID
 	cleanupEligible bool
 	store.Store
 
@@ -35,8 +37,6 @@ type handlerStore struct {
 	claimRun                    mockResult[store.Run]
 
 	listSBOMJVMVersions      mockCall[store.ListSBOMJVMVersionsParams, []store.ListSBOMJVMVersionsRow]
-	deleteSBOMRowsByJob      mockCallSlice[types.JobID, struct{}]
-	upsertSBOMRow            mockCallSlice[store.UpsertSBOMRowParams, struct{}]
 	listRunSBOMRowsByJobType mockCallSlice[store.ListRunSBOMRowsByJobTypeParams, []store.ListRunSBOMRowsByJobTypeRow]
 	sbomRowsByJobType        map[types.JobType][]store.ListRunSBOMRowsByJobTypeRow
 
@@ -262,4 +262,13 @@ func (m *handlerStore) WithJobExecution(ctx context.Context, id types.JobID, cou
 		return store.ErrJobExecutionStale
 	}
 	return complete(m, job)
+}
+
+func (m *handlerStore) DeleteSBOMRowsByJob(_ context.Context, jobID types.JobID) error {
+	m.savedGateJob = jobID
+	return nil
+}
+func (m *handlerStore) InsertSBOMRows(_ context.Context, rows []store.InsertSBOMRowsParams) (int64, error) {
+	m.savedGateSBOM = rows
+	return int64(len(rows)), nil
 }

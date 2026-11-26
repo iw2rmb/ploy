@@ -24,9 +24,9 @@ func (r *runController) SaveJobImageName(ctx context.Context, jobID types.JobID,
 }
 
 // SaveJobSBOM persists SBOM package rows for a gate job to the control plane.
-func (r *runController) SaveJobSBOM(ctx context.Context, jobID types.JobID, packages []migsapi.RunSBOMPackage) error {
+func (r *runController) SaveJobSBOM(ctx context.Context, jobID types.JobID, resumeCount int, packages []migsapi.RunSBOMPackage) error {
 	if r.uploader == nil {
 		return fmt.Errorf("job sbom uploader not initialized")
 	}
-	return r.uploader.UploadJobSBOM(ctx, jobID, packages)
+	return r.uploader.UploadJobSBOM(ctx, jobID, resumeCount, packages)
 }

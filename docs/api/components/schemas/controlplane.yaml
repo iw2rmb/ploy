@@ -1432,10 +1432,21 @@ RunSBOMPackage:
 JobSBOMUploadRequest:
   type: object
   properties:
+    resume_count:
+      type: integer
+      minimum: 0
+      default: 0
+      description: Resume count from the job claim.
     packages:
       type: array
       items:
-        $ref: "#/RunSBOMPackage"
+        allOf:
+          - $ref: "#/RunSBOMPackage"
+          - type: object
+            properties:
+              module_id:
+                type: string
+                description: Repository-relative module directory. The root module uses ".".
   required: [packages]
 
 JobSBOMUploadResponse:
@@ -1465,6 +1476,9 @@ RunSBOMPackagesResponse:
 RunSBOMDiffPackage:
   type: object
   properties:
+    module_id:
+      type: string
+      description: Repository-relative module directory. Aggregate comparisons omit this field.
     package:
       type: string
     version_pre:
@@ -1531,10 +1545,4 @@ JobSBOMDiffResponse:
     packages:
       type: array
       items:
-        type: object
-        required: [package, version_pre, version_post, change]
-        properties:
-          package: { type: string }
-          version_pre: { type: string }
-          version_post: { type: string }
-          change: { type: string, enum: [added, removed, changed] }
+        $ref: "#/RunSBOMDiffPackage"

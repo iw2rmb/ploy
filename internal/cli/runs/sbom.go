@@ -116,7 +116,11 @@ func formatSBOMDiffBlock(packages []migsapi.RunSBOMDiffPackage) string {
 		if post == "" {
 			post = "-"
 		}
-		_, _ = fmt.Fprintf(&b, "%-*s %-16s -> %s\n", packageWidth, pkg.Package, pre, post)
+		_, _ = fmt.Fprintf(&b, "%-*s %-16s -> %s", packageWidth, pkg.Package, pre, post)
+		if pkg.ModuleID != "" {
+			_, _ = fmt.Fprintf(&b, "  [module_id=%q]", pkg.ModuleID)
+		}
+		b.WriteByte('\n')
 	}
 	return strings.TrimRight(b.String(), "\n")
 }

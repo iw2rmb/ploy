@@ -341,6 +341,38 @@ func (q *Queries) GetJob(ctx context.Context, id types.JobID) (Job, error) {
 	return i, err
 }
 
+const getJobForUpdate = `-- name: GetJobForUpdate :one
+SELECT id, run_id, repo_id, repo_base_ref, attempt, status, job_type, job_image, next_id, name, node_id, exit_code, started_at, finished_at, duration_ms, repo_sha_in, repo_sha_out, repo_sha_in8, repo_sha_out8, meta FROM jobs WHERE id = $1 FOR NO KEY UPDATE
+`
+
+func (q *Queries) GetJobForUpdate(ctx context.Context, id types.JobID) (Job, error) {
+	row := q.db.QueryRow(ctx, getJobForUpdate, id)
+	var i Job
+	err := row.Scan(
+		&i.ID,
+		&i.RunID,
+		&i.RepoID,
+		&i.RepoBaseRef,
+		&i.Attempt,
+		&i.Status,
+		&i.JobType,
+		&i.JobImage,
+		&i.NextID,
+		&i.Name,
+		&i.NodeID,
+		&i.ExitCode,
+		&i.StartedAt,
+		&i.FinishedAt,
+		&i.DurationMs,
+		&i.RepoShaIn,
+		&i.RepoShaOut,
+		&i.RepoShaIn8,
+		&i.RepoShaOut8,
+		&i.Meta,
+	)
+	return i, err
+}
+
 const listJobsByRun = `-- name: ListJobsByRun :many
 SELECT
   id,

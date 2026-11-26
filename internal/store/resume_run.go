@@ -134,7 +134,7 @@ func (s *PgStore) WithJobExecution(ctx context.Context, jobID types.JobID, resum
 	if types.RunStats(run.Stats).ResumeCount() != resumeCount || job.Attempt != run.Attempt {
 		return ErrJobExecutionStale
 	}
-	job, err = q.GetJob(ctx, jobID)
+	job, err = q.GetJobForUpdate(ctx, jobID)
 	if err != nil {
 		return err
 	}

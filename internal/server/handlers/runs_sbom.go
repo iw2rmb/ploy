@@ -1,8 +1,11 @@
 package handlers
 
 import (
+	"cmp"
 	"errors"
+	"maps"
 	"net/http"
+	"slices"
 	"sort"
 	"strings"
 
@@ -51,26 +54,26 @@ func getRunSBOMHandler(st store.Store) http.HandlerFunc {
 
 		switch view {
 		case "pre":
-			packages, err := listRunSBOMPackages(r, st, run.ID, domaintypes.JobTypePreGate)
+			packages, err := listRunSBOMPackages(r, st, run.ID, domaintypes.JobTypePreGate, false)
 			if err != nil {
 				serverError(w, "get run sbom", "list pre sbom rows", err, "run_id", runID.String())
 				return
 			}
 			writeJSON(w, http.StatusOK, migsapi.RunSBOMPackagesResponse{RunID: runID, View: view, Packages: packages})
 		case "post":
-			packages, err := listRunSBOMPackages(r, st, run.ID, domaintypes.JobTypePostGate)
+			packages, err := listRunSBOMPackages(r, st, run.ID, domaintypes.JobTypePostGate, false)
 			if err != nil {
 				serverError(w, "get run sbom", "list post sbom rows", err, "run_id", runID.String())
 				return
 			}
 			writeJSON(w, http.StatusOK, migsapi.RunSBOMPackagesResponse{RunID: runID, View: view, Packages: packages})
 		case "diff":
-			pre, err := listRunSBOMPackages(r, st, run.ID, domaintypes.JobTypePreGate)
+			pre, err := listRunSBOMPackages(r, st, run.ID, domaintypes.JobTypePreGate, true)
 			if err != nil {
 				serverError(w, "get run sbom", "list pre sbom rows", err, "run_id", runID.String())
 				return
 			}
-			post, err := listRunSBOMPackages(r, st, run.ID, domaintypes.JobTypePostGate)
+			post, err := listRunSBOMPackages(r, st, run.ID, domaintypes.JobTypePostGate, true)
 			if err != nil {
 				serverError(w, "get run sbom", "list post sbom rows", err, "run_id", runID.String())
 				return
@@ -80,33 +83,36 @@ func getRunSBOMHandler(st store.Store) http.HandlerFunc {
 	}
 }
 
-func listRunSBOMPackages(r *http.Request, st store.Store, runID domaintypes.RunID, jobType domaintypes.JobType) ([]migsapi.RunSBOMPackage, error) {
-	rows, err := listRunSBOMRows(r, st, runID, jobType)
+func listRunSBOMPackages(r *http.Request, st store.Store, runID domaintypes.RunID, jobType domaintypes.JobType, byModule bool) ([]migsapi.RunSBOMPackage, error) {
+	rows, err := st.ListRunSBOMRowsByJobType(r.Context(), store.ListRunSBOMRowsByJobTypeParams{RunID: runID, JobType: jobType, ByModule: byModule})
 	if err != nil {
 		return nil, err
 	}
 	packages := make([]migsapi.RunSBOMPackage, 0, len(rows))
 	for _, row := range rows {
 		packages = append(packages, migsapi.RunSBOMPackage{
-			Package: row.Lib,
-			Version: row.Ver,
+			ModuleID: row.ModuleID,
+			Package:  row.Lib,
+			Version:  row.Ver,
 		})
 	}
 	return packages, nil
 }
 
-func listRunSBOMRows(r *http.Request, st store.Store, runID domaintypes.RunID, jobType domaintypes.JobType) ([]store.ListRunSBOMRowsByJobTypeRow, error) {
-	return st.ListRunSBOMRowsByJobType(r.Context(), store.ListRunSBOMRowsByJobTypeParams{
-		RunID:   runID,
-		JobType: jobType,
-	})
+type sbomPackageID struct {
+	moduleID string
+	name     string
 }
 
 func diffSBOMPackages(pre, post []migsapi.RunSBOMPackage) []migsapi.RunSBOMDiffPackage {
-	preByPackage := sbomVersionsByPackage(pre)
-	postByPackage := sbomVersionsByPackage(post)
+	// A legacy gate supplies only aggregate rows. Comparing module keys against
+	// those rows would report a module change for every shared package.
+	unknownModule := func(p migsapi.RunSBOMPackage) bool { return p.ModuleID == "" }
+	byModule := !slices.ContainsFunc(pre, unknownModule) && !slices.ContainsFunc(post, unknownModule)
+	preByPackage := sbomVersionsByPackage(pre, byModule)
+	postByPackage := sbomVersionsByPackage(post, byModule)
 
-	packageSet := make(map[string]struct{}, len(preByPackage)+len(postByPackage))
+	packageSet := make(map[sbomPackageID]struct{}, len(preByPackage)+len(postByPackage))
 	for pkg := range preByPackage {
 		packageSet[pkg] = struct{}{}
 	}
@@ -114,11 +120,9 @@ func diffSBOMPackages(pre, post []migsapi.RunSBOMPackage) []migsapi.RunSBOMDiffP
 		packageSet[pkg] = struct{}{}
 	}
 
-	packages := make([]string, 0, len(packageSet))
-	for pkg := range packageSet {
-		packages = append(packages, pkg)
-	}
-	sort.Strings(packages)
+	packages := slices.SortedFunc(maps.Keys(packageSet), func(a, b sbomPackageID) int {
+		return cmp.Or(cmp.Compare(a.moduleID, b.moduleID), cmp.Compare(a.name, b.name))
+	})
 
 	out := make([]migsapi.RunSBOMDiffPackage, 0)
 	for _, pkg := range packages {
@@ -132,20 +136,23 @@ func diffSBOMPackages(pre, post []migsapi.RunSBOMPackage) []migsapi.RunSBOMDiffP
 			pairedPost := postOnly[len(postOnly)-1]
 			for _, version := range preOnly[:len(preOnly)-1] {
 				out = append(out, migsapi.RunSBOMDiffPackage{
-					Package:    pkg,
+					ModuleID:   pkg.moduleID,
+					Package:    pkg.name,
 					VersionPre: version,
 					Change:     "removed",
 				})
 			}
 			out = append(out, migsapi.RunSBOMDiffPackage{
-				Package:     pkg,
+				ModuleID:    pkg.moduleID,
+				Package:     pkg.name,
 				VersionPre:  pairedPre,
 				VersionPost: pairedPost,
 				Change:      "changed",
 			})
 			for _, version := range postOnly[:len(postOnly)-1] {
 				out = append(out, migsapi.RunSBOMDiffPackage{
-					Package:     pkg,
+					ModuleID:    pkg.moduleID,
+					Package:     pkg.name,
 					VersionPost: version,
 					Change:      "added",
 				})
@@ -154,14 +161,16 @@ func diffSBOMPackages(pre, post []migsapi.RunSBOMPackage) []migsapi.RunSBOMDiffP
 		}
 		for _, version := range preOnly {
 			out = append(out, migsapi.RunSBOMDiffPackage{
-				Package:    pkg,
+				ModuleID:   pkg.moduleID,
+				Package:    pkg.name,
 				VersionPre: version,
 				Change:     "removed",
 			})
 		}
 		for _, version := range postOnly {
 			out = append(out, migsapi.RunSBOMDiffPackage{
-				Package:     pkg,
+				ModuleID:    pkg.moduleID,
+				Package:     pkg.name,
 				VersionPost: version,
 				Change:      "added",
 			})
@@ -181,18 +190,22 @@ func versionsAbsentFrom(sortedVersions []string, other map[string]struct{}) []st
 	return out
 }
 
-func sbomVersionsByPackage(packages []migsapi.RunSBOMPackage) map[string]map[string]struct{} {
-	out := make(map[string]map[string]struct{})
+func sbomVersionsByPackage(packages []migsapi.RunSBOMPackage, byModule bool) map[sbomPackageID]map[string]struct{} {
+	out := make(map[sbomPackageID]map[string]struct{})
 	for _, pkg := range packages {
 		name := strings.TrimSpace(pkg.Package)
 		version := strings.TrimSpace(pkg.Version)
 		if name == "" || version == "" {
 			continue
 		}
-		if out[name] == nil {
-			out[name] = map[string]struct{}{}
+		key := sbomPackageID{name: name}
+		if byModule {
+			key.moduleID = pkg.ModuleID
 		}
-		out[name][version] = struct{}{}
+		if out[key] == nil {
+			out[key] = map[string]struct{}{}
+		}
+		out[key][version] = struct{}{}
 	}
 	return out
 }

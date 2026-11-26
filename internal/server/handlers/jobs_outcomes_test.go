@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -25,7 +26,12 @@ import (
 
 type outcomeStore struct {
 	*handlerStore
-	bundles map[types.JobID][]store.ArtifactBundle
+	bundles  map[types.JobID][]store.ArtifactBundle
+	sbomRows map[types.JobID][]store.ListSBOMRowsByJobRow
+}
+
+func (s *outcomeStore) ListSBOMRowsByJob(_ context.Context, id types.JobID) ([]store.ListSBOMRowsByJobRow, error) {
+	return s.sbomRows[id], nil
 }
 
 func (s *outcomeStore) ListArtifactBundlesByRunAndJob(_ context.Context, p store.ListArtifactBundlesByRunAndJobParams) ([]store.ArtifactBundle, error) {
@@ -122,6 +128,8 @@ func TestPostGateDiffUsesRequestedAttemptAndHandlesEmptyOrMissingBaseline(t *tes
 			st := &outcomeStore{handlerStore: &handlerStore{}, bundles: map[types.JobID][]store.ArtifactBundle{}}
 			st.getJob.val = post
 			st.listJobsByRunAttempt.val = []store.Job{pre, post}
+			// Legacy records can survive an earlier execution of the same job.
+			st.sbomRows = map[types.JobID][]store.ListSBOMRowsByJobRow{pre.ID: {{Lib: "previous", Ver: "3"}}}
 			bs := bsmock.New()
 			st.bundles[post.ID] = []store.ArtifactBundle{outcomeBundle(t, bs, post, "sbom", "sbom.spdx.json", tc.after, now)}
 			if !tc.missing {
@@ -148,6 +156,35 @@ func TestPostGateDiffUsesRequestedAttemptAndHandlesEmptyOrMissingBaseline(t *tes
 				}
 			}
 		})
+	}
+}
+
+func TestPostGateDiffUsesStoredModuleRowsFromBothGateJobs(t *testing.T) {
+	t.Parallel()
+	post := store.Job{ID: types.NewJobID(), RunID: types.NewRunID(), RepoID: types.NewRepoID(), Attempt: 2,
+		JobType: types.JobTypePostGate, StartedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true}}
+	pre := post
+	pre.ID = types.NewJobID()
+	pre.JobType = types.JobTypePreGate
+	st := &outcomeStore{handlerStore: &handlerStore{}, sbomRows: map[types.JobID][]store.ListSBOMRowsByJobRow{
+		pre.ID:  {{ModuleID: "app", Lib: "g:a", Ver: "1"}},
+		post.ID: {{ModuleID: "lib", Lib: "g:a", Ver: "1"}},
+	}}
+	st.listJobsByRunAttempt.val = []store.Job{pre, post}
+	body, err := jobSBOMDiff(context.Background(), st, nil, post)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got migsapi.JobSBOMDiffResponse
+	if err := json.Unmarshal(body, &got); err != nil {
+		t.Fatal(err)
+	}
+	want := []migsapi.RunSBOMDiffPackage{
+		{ModuleID: "app", Package: "g:a", VersionPre: "1", Change: "removed"},
+		{ModuleID: "lib", Package: "g:a", VersionPost: "1", Change: "added"},
+	}
+	if got.JobID != post.ID || got.BaselineJobID != pre.ID || !slices.Equal(got.Packages, want) {
+		t.Fatalf("module diff = %+v, want packages %+v", got, want)
 	}
 }
 

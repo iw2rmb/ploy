@@ -278,10 +278,12 @@ DROP INDEX IF EXISTS jobs_cache_lookup_idx;
 CREATE TABLE IF NOT EXISTS sboms (
   job_id      TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
   repo_id     TEXT NOT NULL REFERENCES repos(id) ON DELETE CASCADE,
+  module_id   TEXT CHECK (module_id <> ''),
   lib         TEXT NOT NULL,
-  ver         TEXT NOT NULL,
-  PRIMARY KEY (job_id, repo_id, lib, ver)
+  ver         TEXT NOT NULL
 );
+CREATE UNIQUE INDEX IF NOT EXISTS sboms_job_module_package_idx
+  ON sboms(job_id, repo_id, COALESCE(module_id, ''), lib, ver);
 CREATE INDEX IF NOT EXISTS sboms_repo_lib_ver_idx ON sboms(repo_id, lib, ver);
 CREATE INDEX IF NOT EXISTS sboms_job_idx ON sboms(job_id);
 

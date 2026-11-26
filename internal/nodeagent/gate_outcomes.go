@@ -50,7 +50,7 @@ func (r *runController) persistGateOutcomes(ctx context.Context, req StartRunReq
 
 func clearGateOutcomes(outDir string) error {
 	// Retried jobs reuse /out; only fresh gate output may be published.
-	for _, filename := range []string{gateSBOMFilename, "grype.json"} {
+	for _, filename := range []string{gateSBOMFilename, gateModuleSBOMFilename, "grype.json"} {
 		if err := os.Remove(filepath.Join(outDir, filename)); err != nil && !os.IsNotExist(err) {
 			return err
 		}

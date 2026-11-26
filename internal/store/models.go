@@ -244,10 +244,11 @@ type RunsTiming struct {
 }
 
 type Sbom struct {
-	JobID  types.JobID  `json:"job_id"`
-	RepoID types.RepoID `json:"repo_id"`
-	Lib    string       `json:"lib"`
-	Ver    string       `json:"ver"`
+	JobID    types.JobID  `json:"job_id"`
+	RepoID   types.RepoID `json:"repo_id"`
+	ModuleID *string      `json:"module_id"`
+	Lib      string       `json:"lib"`
+	Ver      string       `json:"ver"`
 }
 
 type Spec struct {

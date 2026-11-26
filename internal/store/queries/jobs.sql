@@ -23,6 +23,9 @@ SELECT
 FROM jobs
 WHERE id = $1;
 
+-- name: GetJobForUpdate :one
+SELECT * FROM jobs WHERE id = $1 FOR NO KEY UPDATE;
+
 -- name: ListJobsByRun :many
 SELECT
   id,

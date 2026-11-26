@@ -26,7 +26,8 @@ func TestGetRunSBOMCommandDiffAndRender(t *testing.T) {
 			RunID: runID,
 			View:  "diff",
 			Packages: []migsapi.RunSBOMDiffPackage{
-				{Package: "alpha", VersionPre: "1.0", VersionPost: "2.0", Change: "changed"},
+				{ModuleID: ".", Package: "alpha", VersionPre: "1.0", VersionPost: "2.0", Change: "changed"},
+				{ModuleID: "services/api", Package: "alpha", VersionPre: "1.0", Change: "removed"},
 				{Package: "com.example:very-long-package", VersionPost: "4.0", Change: "added"},
 				{Package: "beta", VersionPost: "1.0", Change: "added"},
 				{Package: "gamma", VersionPre: "3.0", Change: "removed"},
@@ -59,7 +60,8 @@ func TestGetRunSBOMCommandDiffAndRender(t *testing.T) {
 	packageWidth := len("com.example:very-long-package")
 	want := strings.Join([]string{
 		"SBOM diff",
-		fmt.Sprintf("%-*s %-16s -> %s", packageWidth, "alpha", "1.0", "2.0"),
+		fmt.Sprintf(`%-*s %-16s -> 2.0  [module_id="."]`, packageWidth, "alpha", "1.0"),
+		fmt.Sprintf(`%-*s %-16s -> -  [module_id="services/api"]`, packageWidth, "alpha", "1.0"),
 		fmt.Sprintf("%-*s %-16s -> %s", packageWidth, "com.example:very-long-package", "-", "4.0"),
 		fmt.Sprintf("%-*s %-16s -> %s", packageWidth, "beta", "-", "1.0"),
 		fmt.Sprintf("%-*s %-16s -> %s", packageWidth, "gamma", "3.0", "-"),

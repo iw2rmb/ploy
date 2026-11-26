@@ -19,6 +19,7 @@ func TestRunControllerPersistGateSBOM(t *testing.T) {
 	tests := []struct {
 		name       string
 		fileBody   string
+		moduleBody string
 		wantUpload bool
 		wantRows   []migsapi.RunSBOMPackage
 	}{
@@ -39,6 +40,12 @@ func TestRunControllerPersistGateSBOM(t *testing.T) {
 			},
 		},
 		{
+			name:       "module sbom preserves shared packages",
+			moduleBody: `[{"module_id":".","package":"a:b","version":"1"},{"module_id":"app","package":"a:b","version":"1"}]`,
+			wantUpload: true,
+			wantRows:   []migsapi.RunSBOMPackage{{ModuleID: ".", Package: "a:b", Version: "1"}, {ModuleID: "app", Package: "a:b", Version: "1"}},
+		},
+		{
 			name: "missing sbom skips upload",
 		},
 	}
@@ -54,6 +61,11 @@ func TestRunControllerPersistGateSBOM(t *testing.T) {
 				}
 			}
 
+			if tt.moduleBody != "" {
+				if err := os.WriteFile(filepath.Join(shareDir, "sbom.modules.json"), []byte(tt.moduleBody), 0600); err != nil {
+					t.Fatal(err)
+				}
+			}
 			var gotPath string
 			var gotPackages []migsapi.RunSBOMPackage
 			uploads := 0
@@ -70,6 +82,9 @@ func TestRunControllerPersistGateSBOM(t *testing.T) {
 				if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 					t.Fatalf("decode request: %v", err)
 				}
+				if payload.ResumeCount != 2 {
+					t.Errorf("resume_count = %d, want 2", payload.ResumeCount)
+				}
 				gotPackages = payload.Packages
 				w.WriteHeader(http.StatusOK)
 			}))
@@ -77,9 +92,10 @@ func TestRunControllerPersistGateSBOM(t *testing.T) {
 
 			controller := newTestController(t, newAgentConfig(server.URL))
 			req := StartRunRequest{
-				RunID:   types.NewRunID(),
-				JobID:   types.JobID("job-sbom-test"),
-				JobType: types.JobTypePreGate,
+				RunID:       types.NewRunID(),
+				JobID:       types.JobID("job-sbom-test"),
+				JobType:     types.JobTypePreGate,
+				ResumeCount: 2,
 			}
 
 			if err := controller.persistGateSBOM(context.Background(), req, shareDir); err != nil {

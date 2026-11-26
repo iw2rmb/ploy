@@ -127,6 +127,36 @@ func TestGetRunSBOMHandler_ViewsAndValidation(t *testing.T) {
 			},
 		},
 		{
+			name: "same coordinate changes independently in each module",
+			view: "diff",
+			spec: []byte(`{"steps":[{"image":"docker.io/test/mig:latest"}]}`),
+			rows: map[domaintypes.JobType][]store.ListRunSBOMRowsByJobTypeRow{
+				domaintypes.JobTypePreGate:  {{ModuleID: "api", Lib: "lib", Ver: "1"}, {ModuleID: "ui", Lib: "lib", Ver: "2"}},
+				domaintypes.JobTypePostGate: {{ModuleID: "api", Lib: "lib", Ver: "2"}, {ModuleID: "ui", Lib: "lib", Ver: "1"}},
+			},
+			wantStatus: http.StatusOK,
+			wantCalls:  []domaintypes.JobType{domaintypes.JobTypePreGate, domaintypes.JobTypePostGate},
+			want: func(t *testing.T, body map[string]any) {
+				assertSBOMDiffPackages(t, body,
+					map[string]string{"module_id": "api", "package": "lib", "version_pre": "1", "version_post": "2", "change": "changed"},
+					map[string]string{"module_id": "ui", "package": "lib", "version_pre": "2", "version_post": "1", "change": "changed"})
+			},
+		},
+		{
+			name: "unattributed baseline compares the aggregate versions",
+			view: "diff",
+			spec: []byte(`{"steps":[{"image":"docker.io/test/mig:latest"}]}`),
+			rows: map[domaintypes.JobType][]store.ListRunSBOMRowsByJobTypeRow{
+				domaintypes.JobTypePreGate:  {{Lib: "lib", Ver: "1"}, {Lib: "same", Ver: "3"}},
+				domaintypes.JobTypePostGate: {{ModuleID: "api", Lib: "lib", Ver: "2"}, {ModuleID: "ui", Lib: "same", Ver: "3"}},
+			},
+			wantStatus: http.StatusOK,
+			wantCalls:  []domaintypes.JobType{domaintypes.JobTypePreGate, domaintypes.JobTypePostGate},
+			want: func(t *testing.T, body map[string]any) {
+				assertSBOMDiffPackages(t, body, map[string]string{"package": "lib", "version_pre": "1", "version_post": "2", "change": "changed"})
+			},
+		},
+		{
 			name:       "disabled build gate returns bad request",
 			view:       "diff",
 			spec:       []byte(`{"steps":[{"image":"docker.io/test/mig:latest"}],"build_gate":{"disabled":true}}`),
@@ -166,6 +196,9 @@ func TestGetRunSBOMHandler_ViewsAndValidation(t *testing.T) {
 				t.Fatalf("ListRunSBOMRowsByJobType calls=%d, want %d", len(st.listRunSBOMRowsByJobType.calls), len(tt.wantCalls))
 			}
 			for i, want := range tt.wantCalls {
+				if got := st.listRunSBOMRowsByJobType.calls[i].ByModule; got != (tt.view == "diff") {
+					t.Fatalf("call %d by_module=%v for %s", i, got, tt.view)
+				}
 				if got := st.listRunSBOMRowsByJobType.calls[i].JobType; got != want {
 					t.Fatalf("call %d job_type=%s, want %s", i, got, want)
 				}
@@ -191,6 +224,9 @@ func assertSBOMDiffPackages(t *testing.T, body map[string]any, want ...map[strin
 	}
 	for i, item := range packages {
 		got := item.(map[string]any)
+		if len(got) != len(want[i]) {
+			t.Fatalf("packages[%d]=%v, want %v", i, got, want[i])
+		}
 		for key, value := range want[i] {
 			if got[key] != value {
 				t.Fatalf("packages[%d][%s]=%v, want %q; package=%v", i, key, got[key], value, got)

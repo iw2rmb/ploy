@@ -101,11 +101,11 @@ func (b *baseUploader) SaveJobImageName(ctx context.Context, jobID types.JobID, 
 }
 
 // UploadJobSBOM replaces persisted SBOM package rows for a gate job.
-func (b *baseUploader) UploadJobSBOM(ctx context.Context, jobID types.JobID, packages []migsapi.RunSBOMPackage) error {
+func (b *baseUploader) UploadJobSBOM(ctx context.Context, jobID types.JobID, resumeCount int, packages []migsapi.RunSBOMPackage) error {
 	return b.postJSONWithRetry(
 		ctx,
 		fmt.Sprintf("/v1/jobs/%s/sbom", jobID.String()),
-		migsapi.JobSBOMUploadRequest{Packages: packages},
+		migsapi.JobSBOMUploadRequest{ResumeCount: resumeCount, Packages: packages},
 		"upload job sbom",
 		postJSONRetryModeDefault,
 	)
