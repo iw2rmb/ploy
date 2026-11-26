@@ -79,6 +79,7 @@ Each job row uses three lines.
 2. The repository as `<namespace>/<repo>`.
 3. The duration.
 
+Job status icons use the same colors as `RUNS`.
 The step name uses `display_name` when available, otherwise `job_type`.
 The list sorts jobs by `started_at`, newest first. Jobs without a start time appear last.
 Created and queued jobs without a start time show `-` as their status icon.
@@ -132,6 +133,7 @@ The TUI uses shared client commands:
 - `internal/cli/job.GetStatusCommand` identifies the attempt for historical global jobs.
 - `internal/cli/common` formats repository labels.
 
+The TUI uses the run summary for the repository label when job responses omit the repository URL.
 Global job names and timestamps come from each job's run attempt.
 The TUI reuses loaded names and timestamps for terminal jobs while their status stays unchanged and a start time is available.
 Running jobs show `--h --m --s` when their start time is unavailable.

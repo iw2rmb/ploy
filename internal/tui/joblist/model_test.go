@@ -375,3 +375,34 @@ func captureFilterMatches(t *testing.T, cmd tea.Cmd) list.FilterMatchesMsg {
 	t.Fatal("filter command returned no FilterMatchesMsg")
 	return nil
 }
+
+// Only unselected success and failure glyphs use semantic colors in either focus state.
+func TestJobStatusGlyphColorsFollowSelection(t *testing.T) {
+	for _, tc := range []struct {
+		status domaintypes.JobStatus
+		color  string
+	}{
+		{domaintypes.JobStatusSuccess, "\x1b[92m"},
+		{domaintypes.JobStatusFail, "\x1b[91m"},
+		{domaintypes.JobStatusError, "\x1b[91m"},
+	} {
+		m := joblist.New("JOBS").SetJobs([]domainapi.JobListItem{
+			{JobID: "1", DisplayName: "first", Status: tc.status},
+			{JobID: "2", DisplayName: "second", Status: tc.status},
+		})
+		m.SetHeight(24)
+		for _, focused := range []bool{false, true} {
+			output := m.View(focused, time.Time{}, 0)
+			glyph := cliruns.StatusGlyph(tc.status.String(), 0)
+			colored := "\x1b[1m" + tc.color + glyph
+			if strings.Count(output, colored) != 1 {
+				t.Fatalf("status %s focus %t: expected one colored glyph in %q", tc.status, focused, output)
+			}
+			_, after, _ := strings.Cut(output, colored)
+			title, _, _ := strings.Cut(after, "\n")
+			if !strings.Contains(ansi.Strip(title), "second") {
+				t.Fatalf("status %s focus %t: colored the wrong row: %q", tc.status, focused, title)
+			}
+		}
+	}
+}

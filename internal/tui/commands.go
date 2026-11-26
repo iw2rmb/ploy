@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/url"
 
@@ -52,18 +53,27 @@ func loadRunsCmd(ctx context.Context, client *http.Client, baseURL *url.URL, req
 }
 
 // loadJobsCmd returns a tea.Cmd that fetches the jobs list.
-func loadJobsCmd(ctx context.Context, client *http.Client, baseURL *url.URL, runID domaintypes.RunID, requestID uint64, previous []domainapi.JobListItem, createdBy string) tea.Cmd {
+func loadJobsCmd(ctx context.Context, client *http.Client, baseURL *url.URL, runID domaintypes.RunID, requestID uint64, previous []domainapi.JobListItem, createdBy string, repos map[domaintypes.RunID]string) tea.Cmd {
 	return func() tea.Msg {
-		if !runID.IsZero() {
+		msg := jobsLoadedMsg{runID: runID, requestID: requestID}
+		if client != nil && client.Timeout > 0 {
+			var cancel context.CancelFunc
+			ctx, cancel = context.WithTimeout(ctx, client.Timeout)
+			defer cancel()
+		}
+		if runID.IsZero() {
+			msg.jobs, msg.err = loadGlobalJobs(ctx, client, baseURL, previous, createdBy)
+		} else {
 			result, err := (cliruns.ListRunJobsCommand{Client: client, BaseURL: baseURL, RunID: runID}).Run(ctx)
 			if err != nil {
-				return jobsLoadedMsg{runID: runID, requestID: requestID, err: err}
+				msg.err = err
+				return msg
 			}
-			jobs := runJobItems(result)
-			return jobsLoadedMsg{runID: runID, requestID: requestID, jobs: jobs}
+			msg.jobs = runJobItems(result)
 		}
-		jobs, err := loadGlobalJobs(ctx, client, baseURL, previous, createdBy)
-		return jobsLoadedMsg{runID: runID, requestID: requestID, jobs: jobs, err: err}
+		repoErr := fillJobRepoURLs(ctx, client, baseURL, msg.jobs, repos)
+		msg.err = errors.Join(msg.err, repoErr)
+		return msg
 	}
 }
 

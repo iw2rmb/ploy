@@ -13,6 +13,7 @@ import (
 	cliruns "github.com/iw2rmb/ploy/internal/cli/runs"
 	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/tui/statusrow"
 )
 
 type delegate struct {
@@ -37,7 +38,7 @@ func (d delegate) Render(w io.Writer, m list.Model, index int, item list.Item) {
 		return
 	}
 	r.now, r.spinnerFrame = d.now, d.spinnerFrame
-	d.DefaultDelegate.Render(w, m, index, r)
+	statusrow.Render(w, d.DefaultDelegate, m, index, r, r.job.Status.String())
 }
 
 func renderPrimaryLine(job domainapi.JobListItem, spinnerFrame int) string {

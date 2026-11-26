@@ -39,11 +39,6 @@ func loadGlobalJobs(ctx context.Context, client *http.Client, baseURL *url.URL, 
 	if err != nil {
 		return nil, err
 	}
-	if client.Timeout > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, client.Timeout)
-		defer cancel()
-	}
 	prior := make(map[domaintypes.JobID]domainapi.JobListItem, len(previous))
 	for _, job := range previous {
 		prior[job.JobID] = job
@@ -53,7 +48,9 @@ func loadGlobalJobs(ctx context.Context, client *http.Client, baseURL *url.URL, 
 	for index, job := range jobs {
 		if old, ok := prior[job.JobID]; ok && old.RunID == job.RunID {
 			jobs[index].DisplayName = old.DisplayName
-			jobs[index].RepoURL = old.RepoURL
+			if jobs[index].RepoURL == "" {
+				jobs[index].RepoURL = old.RepoURL
+			}
 		}
 		terminal := job.Status == domaintypes.JobStatusSuccess || job.Status == domaintypes.JobStatusFail || job.Status == domaintypes.JobStatusError || job.Status == domaintypes.JobStatusCancelled
 		if old, ok := prior[job.JobID]; terminal && ok && old.RunID == job.RunID && old.Status == job.Status && old.StartedAt != nil {
@@ -85,7 +82,9 @@ func loadGlobalJobs(ctx context.Context, client *http.Client, baseURL *url.URL, 
 			}
 			attempts := map[int32]error{snapshot.Attempt: nil}
 			for _, index := range indices {
-				jobs[index].RepoURL = snapshot.RepoURL
+				if page.Jobs[index].RepoURL == "" && snapshot.RepoURL != "" {
+					jobs[index].RepoURL = snapshot.RepoURL
+				}
 				listed := page.Jobs[index]
 				job, found := byID[listed.JobID]
 				if !found {
@@ -126,10 +125,50 @@ func loadGlobalJobs(ctx context.Context, client *http.Client, baseURL *url.URL, 
 
 func copyJobPresentation(dst *domainapi.JobListItem, source domainapi.JobListItem) {
 	dst.DisplayName = source.DisplayName
+	if dst.RepoURL == "" {
+		dst.RepoURL = source.RepoURL
+	}
 	if dst.Status == domaintypes.JobStatusCreated || dst.Status == domaintypes.JobStatusQueued {
 		dst.StartedAt, dst.FinishedAt = nil, nil
 		return
 	}
 	dst.StartedAt = source.StartedAt
 	dst.FinishedAt = source.FinishedAt
+}
+
+// Jobs responses can omit repo_url. Each run summary identifies the repository for all of its jobs.
+func fillJobRepoURLs(ctx context.Context, client *http.Client, baseURL *url.URL, jobs []domainapi.JobListItem, repos map[domaintypes.RunID]string) error {
+	if repos == nil {
+		repos = make(map[domaintypes.RunID]string)
+	}
+	for _, job := range jobs {
+		if job.RepoURL != "" {
+			repos[job.RunID] = job.RepoURL
+		}
+	}
+	missing := make(map[domaintypes.RunID][]int)
+	for index := range jobs {
+		job := &jobs[index]
+		if job.RepoURL == "" {
+			job.RepoURL = repos[job.RunID]
+			if job.RepoURL == "" {
+				missing[job.RunID] = append(missing[job.RunID], index)
+			}
+		}
+	}
+	var group errgroup.Group
+	group.SetLimit(4)
+	for runID, indices := range missing {
+		group.Go(func() error {
+			run, err := (cliruns.GetStatusCommand{Client: client, BaseURL: baseURL, RunID: runID}).Run(ctx)
+			if err != nil {
+				return err
+			}
+			for _, index := range indices {
+				jobs[index].RepoURL = run.RepoURL
+			}
+			return nil
+		})
+	}
+	return group.Wait()
 }

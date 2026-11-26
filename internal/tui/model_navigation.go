@@ -115,7 +115,23 @@ func (m *model) loadJobs() tea.Cmd {
 	}
 	m.jobsRequest++
 	m.jobsLoading = true
-	return loadJobsCmd(m.ctx, m.client, m.baseURL, m.selectedRunID, m.jobsRequest, slices.Clone(m.jobList.Jobs()), m.jobsCreatedBy())
+	previous := slices.Clone(m.jobList.Jobs())
+	repos := make(map[domaintypes.RunID]string)
+	for _, job := range previous {
+		if job.RepoURL != "" {
+			repos[job.RunID] = job.RepoURL
+		}
+	}
+	for _, item := range m.rightPaneList.Items() {
+		run := item.(runItem).run
+		if run.RepoURL != "" {
+			repos[run.ID] = run.RepoURL
+		}
+	}
+	if item, ok := m.rootList.Items()[runsIndex].(runItem); ok && item.run.RepoURL != "" {
+		repos[item.run.ID] = item.run.RepoURL
+	}
+	return loadJobsCmd(m.ctx, m.client, m.baseURL, m.selectedRunID, m.jobsRequest, previous, m.jobsCreatedBy(), repos)
 }
 
 func (m *model) resetRoot() {

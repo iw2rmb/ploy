@@ -25,7 +25,7 @@ func TestGlobalJobsHydratesExactJobsAndReusesRunAttempts(t *testing.T) {
 	started := time.Date(2026, 11, 20, 12, 36, 33, 0, time.UTC)
 	page := []domainapi.JobListItem{
 		{JobID: olderA, RunID: runA, RepoID: repoID, Name: "mig-0"},
-		{JobID: other, RunID: runB, RepoID: repoID, Name: "mig-0"},
+		{JobID: other, RunID: runB, RepoID: repoID, RepoURL: "https://git.example.com/team/app.git", Name: "mig-0"},
 		{JobID: current, RunID: runA, RepoID: repoID, Name: "mig-0"},
 		{JobID: olderB, RunID: runA, RepoID: repoID, Name: "mig-1"},
 	}
@@ -41,19 +41,21 @@ func TestGlobalJobsHydratesExactJobsAndReusesRunAttempts(t *testing.T) {
 			payload = domainapi.JobListResponse{Jobs: page, Total: 4}
 		case "/v1/runs/" + runA.String() + "/jobs":
 			if r.URL.Query().Get("attempt") == "1" {
-				payload = migsapi.ListRunJobsResponse{RunID: runA, RepoID: repoID, RepoURL: "https://git.example.com/team/app.git", Attempt: 1, Jobs: []migsapi.RunJob{
+				payload = migsapi.ListRunJobsResponse{RunID: runA, RepoID: repoID, Attempt: 1, Jobs: []migsapi.RunJob{
 					{JobID: olderA, DisplayName: "old-step-a", JobType: domaintypes.JobTypeMig, Status: domaintypes.JobStatusSuccess, StartedAt: &started},
 					{JobID: olderB, DisplayName: "old-step-b", JobType: domaintypes.JobTypeMig, Status: domaintypes.JobStatusSuccess, StartedAt: &started},
 				}}
 			} else {
-				payload = migsapi.ListRunJobsResponse{RunID: runA, RepoID: repoID, RepoURL: "https://git.example.com/team/app.git", Attempt: 2, Jobs: []migsapi.RunJob{
+				payload = migsapi.ListRunJobsResponse{RunID: runA, RepoID: repoID, Attempt: 2, Jobs: []migsapi.RunJob{
 					{JobID: current, DisplayName: "healing", JobType: domaintypes.JobTypeMig, Status: domaintypes.JobStatusRunning, StartedAt: &started},
 				}}
 			}
 		case "/v1/runs/" + runB.String() + "/jobs":
-			payload = migsapi.ListRunJobsResponse{RunID: runB, RepoID: repoID, RepoURL: "https://git.example.com/team/app.git", Attempt: 1, Jobs: []migsapi.RunJob{
+			payload = migsapi.ListRunJobsResponse{RunID: runB, RepoID: repoID, Attempt: 1, Jobs: []migsapi.RunJob{
 				{JobID: other, DisplayName: "deprecations", JobType: domaintypes.JobTypeMig, Status: domaintypes.JobStatusRunning, StartedAt: &started},
 			}}
+		case "/v1/runs/" + runA.String():
+			payload = domaintypes.RunSummary{ID: runA, SpecID: domaintypes.NewSpecID(), MigID: domaintypes.NewMigID(), RepoURL: "https://git.example.com/team/app.git"}
 		case "/v1/jobs/" + olderA.String() + "/status":
 			payload = domainapi.JobStatusResponse{JobID: olderA, RunID: runA, RepoID: repoID, Attempt: 1}
 		default:
@@ -67,9 +69,10 @@ func TestGlobalJobsHydratesExactJobsAndReusesRunAttempts(t *testing.T) {
 	}))
 	defer server.Close()
 	base, _ := url.Parse(server.URL)
-	jobs, err := loadGlobalJobs(context.Background(), server.Client(), base, nil, "")
-	if err != nil {
-		t.Fatal(err)
+	msg := loadJobsCmd(t.Context(), server.Client(), base, "", 1, nil, "", nil)().(jobsLoadedMsg)
+	jobs := msg.jobs
+	if msg.err != nil {
+		t.Fatal(msg.err)
 	}
 	wantNames := []string{"old-step-a", "deprecations", "healing", "old-step-b"}
 	if len(jobs) != len(page) {
@@ -81,6 +84,7 @@ func TestGlobalJobsHydratesExactJobsAndReusesRunAttempts(t *testing.T) {
 		}
 	}
 	wantRequests := map[string]int{
+		"/v1/runs/" + runA.String():                     1,
 		"/v1/jobs?limit=100":                            1,
 		"/v1/runs/" + runA.String() + "/jobs":           1,
 		"/v1/runs/" + runB.String() + "/jobs":           1,

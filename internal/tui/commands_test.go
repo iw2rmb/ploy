@@ -176,7 +176,7 @@ func TestLoadCommandsApplyUserScope(t *testing.T) {
 			defer server.Close()
 			base, _ := url.Parse(server.URL)
 			runs := loadRunsCmd(t.Context(), server.Client(), base, 1, "", username, username == "", "")().(runsLoadedMsg)
-			jobs := loadJobsCmd(t.Context(), server.Client(), base, "", 1, nil, username)().(jobsLoadedMsg)
+			jobs := loadJobsCmd(t.Context(), server.Client(), base, "", 1, nil, username, nil)().(jobsLoadedMsg)
 			if runs.err != nil || jobs.err != nil {
 				t.Fatalf("list errors: %v / %v", runs.err, jobs.err)
 			}
@@ -232,7 +232,7 @@ func TestJobCommandsUseRequestedScope(t *testing.T) {
 					t.Fatalf("current attempt total = %+v", msg)
 				}
 			} else {
-				msg, ok := loadJobsCmd(t.Context(), server.Client(), base, tc.runID, 3, nil, "")().(jobsLoadedMsg)
+				msg, ok := loadJobsCmd(t.Context(), server.Client(), base, tc.runID, 3, nil, "", map[domaintypes.RunID]string{runID: "https://git.example/team/app"})().(jobsLoadedMsg)
 				if !ok || msg.runID != tc.runID || msg.requestID != 3 || msg.err != nil {
 					t.Fatalf("job load = %+v, err = %v", msg, msg.err)
 				}
@@ -250,7 +250,7 @@ func TestJobCommandsUseRequestedScope(t *testing.T) {
 							continue
 						}
 						found = true
-						if job.RunID != runID || job.RepoID != repoID || job.DisplayName != "healing" || job.JobType != domaintypes.JobTypeMig || job.StartedAt == nil || !job.StartedAt.Equal(started) || job.DurationMs != 0 {
+						if job.RunID != runID || job.RepoID != repoID || job.RepoURL != "https://git.example/team/app" || job.DisplayName != "healing" || job.JobType != domaintypes.JobTypeMig || job.StartedAt == nil || !job.StartedAt.Equal(started) || job.DurationMs != 0 {
 							t.Fatalf("running job metadata lost: %+v", job)
 						}
 					}
@@ -274,7 +274,7 @@ func TestLoadCommandsReturnRequestErrors(t *testing.T) {
 	base, _ := url.Parse(server.URL)
 	for name, cmd := range map[string]tea.Cmd{
 		"runs":        loadRunsCmd(t.Context(), server.Client(), base, 4, "alice", "", false, ""),
-		"jobs":        loadJobsCmd(t.Context(), server.Client(), base, "run-1", 3, nil, ""),
+		"jobs":        loadJobsCmd(t.Context(), server.Client(), base, "run-1", 3, nil, "", nil),
 		"run details": loadRunDetailsCmd(t.Context(), server.Client(), base, runDetails{runID: "run-1"}, 0),
 	} {
 		t.Run(name, func(t *testing.T) {
