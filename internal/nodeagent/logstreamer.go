@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/iw2rmb/ploy/internal/domain/api"
 	types "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/logchunk"
 )
@@ -53,10 +54,13 @@ type LogStreamer struct {
 	pendingErr  string
 }
 
-// NewLogStreamer creates a new log streamer for a specific run and (optionally) job.
+// NewLogStreamer creates a new log streamer for a job.
 // When client is non-nil it is reused; otherwise a new HTTP client is created.
 // Returns an error if HTTP client creation fails (e.g., missing bearer token).
 func NewLogStreamer(cfg Config, runID types.RunID, jobID types.JobID, client *http.Client, resumeCount ...int) (*LogStreamer, error) {
+	if jobID.IsZero() {
+		return nil, errors.New("job ID is required for log uploads")
+	}
 	ls := &LogStreamer{
 		cfg:       cfg,
 		runID:     runID,
@@ -294,25 +298,10 @@ func (ls *LogStreamer) sendChunk(data []byte, chunkNo int32) error {
 		return nil
 	}
 
-	// Use cfg.NodeID directly as a string. Node IDs are URL-safe strings.
-	// that don't require UUID parsing.
-	nodeID := ls.cfg.NodeID
-
-	// Prepare request payload.
-	payload := struct {
-		ResumeCount int          `json:"resume_count,omitempty"`
-		RunID       types.RunID  `json:"run_id"`
-		JobID       *types.JobID `json:"job_id,omitempty"`
-		ChunkNo     int32        `json:"chunk_no"`
-		Data        []byte       `json:"data"`
-	}{
+	payload := api.JobLogChunkRequest{
 		ResumeCount: ls.resumeCount,
-		RunID:       ls.runID,
 		ChunkNo:     chunkNo,
 		Data:        data,
-	}
-	if !ls.jobID.IsZero() {
-		payload.JobID = &ls.jobID
 	}
 
 	body, err := json.Marshal(payload)
@@ -320,8 +309,7 @@ func (ls *LogStreamer) sendChunk(data []byte, chunkNo int32) error {
 		return fmt.Errorf("marshal payload: %w", err)
 	}
 
-	// Send to server endpoint using the node ID string directly.
-	apiPath := fmt.Sprintf("/v1/nodes/%s/logs", nodeID.String())
+	apiPath := fmt.Sprintf("/v1/jobs/%s/logs", ls.jobID.String())
 	url := MustBuildURL(ls.cfg.ServerURL, apiPath)
 	// Create per-request context with timeout. We intentionally use context.Background()
 	// rather than a parent context because:

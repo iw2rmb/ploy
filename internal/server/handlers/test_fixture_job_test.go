@@ -124,7 +124,7 @@ type handlerStore struct {
 	listRunsForRepo          mockCall[store.ListRunsForRepoParams, []store.ListRunsForRepoRow]
 
 	createEvent   mockCall[store.CreateEventParams, store.Event]
-	createLog     mockResult[store.Log]
+	createLog     mockCall[store.CreateLogParams, store.Log]
 	listLogsByRun mockCall[string, []store.Log]
 
 	listGlobalEnv   mockResult[[]store.ConfigEnv]

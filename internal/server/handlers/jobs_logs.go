@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/iw2rmb/ploy/internal/blobstore"
+	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/server/blobpersist"
 	"github.com/iw2rmb/ploy/internal/server/events"
@@ -69,9 +70,6 @@ func getJobLogsHandler(st store.Store, bs blobstore.Store, eventsService *events
 	}
 }
 
-// createJobLogsHandler handles POST /v1/jobs/{job_id}/logs for receiving gzipped
-// log chunks scoped to a specific job. Resolves run context from the job row and
-// reuses the same chunk validation and persistence semantics as other log endpoints.
 func createJobLogsHandler(st store.Store, bp *blobpersist.Service, eventsService *events.Service) http.HandlerFunc {
 	requireBlobPersist("createJobLogsHandler", bp)
 	requireEventsService("createJobLogsHandler", eventsService)
@@ -90,12 +88,7 @@ func createJobLogsHandler(st store.Store, bp *blobpersist.Service, eventsService
 			return
 		}
 
-		var req struct {
-			ResumeCount int    `json:"resume_count,omitempty"`
-			ChunkNo     int32  `json:"chunk_no"`
-			Data        []byte `json:"data"`
-		}
-
+		var req domainapi.JobLogChunkRequest
 		if err := decodeRequestJSON(w, r, &req, ingestMaxBodySize); err != nil {
 			return
 		}

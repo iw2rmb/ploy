@@ -303,7 +303,7 @@ func TestCrashReconcile_RecoveredRunningMonitor_UploadsLogsAndTerminalStatus(t *
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
-		case r.URL.Path == "/v1/nodes/"+testNodeID+"/logs":
+		case r.URL.Path == "/v1/jobs/"+s.JobID.String()+"/logs":
 			select {
 			case logsCh <- struct{}{}:
 			default:
@@ -490,7 +490,7 @@ func TestCrashReconcile_RecoveredRunningMonitor_ExitCodeAboveOneReportsError(t *
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
-		case r.URL.Path == "/v1/nodes/"+testNodeID+"/logs":
+		case r.URL.Path == "/v1/jobs/"+s.JobID.String()+"/logs":
 			w.WriteHeader(http.StatusCreated)
 		case r.URL.Path == "/v1/jobs/"+s.JobID.String()+"/complete":
 			var completePayload struct {
@@ -580,7 +580,7 @@ func TestCrashReconcile_RecoveredRunningMonitor_WaitErrorReportsError(t *testing
 			default:
 			}
 			w.WriteHeader(http.StatusOK)
-		case r.URL.Path == "/v1/nodes/"+testNodeID+"/logs":
+		case r.URL.Path == "/v1/jobs/"+s.JobID.String()+"/logs":
 			w.WriteHeader(http.StatusCreated)
 		default:
 			http.NotFound(w, r)
@@ -702,7 +702,7 @@ func TestCrashReconcile_RecoveredRunningMonitor_CompletionConflictIsNonFatal(t *
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
-		case r.URL.Path == "/v1/nodes/"+testNodeID+"/logs":
+		case r.URL.Path == "/v1/jobs/"+s.JobID.String()+"/logs":
 			mu.Lock()
 			logsCalled = true
 			mu.Unlock()
@@ -800,7 +800,7 @@ func TestCrashReconcile_RecoveredRunningMonitor_IsolatedFailures(t *testing.T) {
 	completedJobs := make(map[string]bool)
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
-		case r.URL.Path == "/v1/nodes/"+testNodeID+"/logs":
+		case r.URL.Path == "/v1/jobs/"+jobFail.String()+"/logs", r.URL.Path == "/v1/jobs/"+jobOK.String()+"/logs":
 			w.WriteHeader(http.StatusCreated)
 		case r.URL.Path == "/v1/jobs/"+jobFail.String()+"/complete":
 			mu.Lock()

@@ -274,8 +274,8 @@ func (m *handlerStore) ListSBOMJVMVersions(_ context.Context, params store.ListS
 	return m.listSBOMJVMVersions.record(params)
 }
 
-func (m *handlerStore) CreateLog(_ context.Context, _ store.CreateLogParams) (store.Log, error) {
-	return m.createLog.ret()
+func (m *handlerStore) CreateLog(_ context.Context, params store.CreateLogParams) (store.Log, error) {
+	return m.createLog.record(params)
 }
 
 func (m *handlerStore) CreateEvent(_ context.Context, params store.CreateEventParams) (store.Event, error) {

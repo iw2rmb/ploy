@@ -266,7 +266,7 @@ func TestClaimAndExecute_WaitsForRecoveredMonitorSlotRelease(t *testing.T) {
 		case r.URL.Path == "/v1/nodes/"+testNodeID+"/claim":
 			atomic.AddInt32(&claimCalls, 1)
 			w.WriteHeader(http.StatusNoContent)
-		case r.URL.Path == "/v1/nodes/"+testNodeID+"/logs":
+		case r.URL.Path == "/v1/jobs/"+s.JobID.String()+"/logs":
 			w.WriteHeader(http.StatusCreated)
 		case r.URL.Path == "/v1/jobs/"+s.JobID.String()+"/complete":
 			w.WriteHeader(http.StatusOK)

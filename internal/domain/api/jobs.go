@@ -6,6 +6,12 @@ import (
 	"github.com/iw2rmb/ploy/internal/domain/types"
 )
 
+type JobLogChunkRequest struct {
+	ResumeCount int    `json:"resume_count,omitempty"`
+	ChunkNo     int32  `json:"chunk_no"`
+	Data        []byte `json:"data"`
+}
+
 type JobStatusResponse struct {
 	JobID       types.JobID     `json:"job_id"`
 	RunID       types.RunID     `json:"run_id"`

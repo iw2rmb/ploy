@@ -3,7 +3,6 @@ package nodeagent
 import (
 	"encoding/json"
 	"errors"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -15,10 +14,9 @@ import (
 )
 
 type capturedLogChunk struct {
-	RunID   types.RunID  `json:"run_id"`
-	JobID   *types.JobID `json:"job_id,omitempty"`
-	ChunkNo int32        `json:"chunk_no"`
-	Data    []byte       `json:"data"`
+	ResumeCount int    `json:"resume_count"`
+	ChunkNo     *int32 `json:"chunk_no"`
+	Data        []byte `json:"data"`
 }
 
 type capturedLogUpload struct {
@@ -26,7 +24,7 @@ type capturedLogUpload struct {
 	Records []logchunk.Record
 }
 
-func newLogCaptureServer(t *testing.T) (*httptest.Server, func() []capturedLogUpload) {
+func newLogCaptureServer(t *testing.T, jobID types.JobID) (*httptest.Server, func() []capturedLogUpload) {
 	t.Helper()
 
 	var (
@@ -40,21 +38,17 @@ func newLogCaptureServer(t *testing.T) (*httptest.Server, func() []capturedLogUp
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
-		if !strings.HasSuffix(r.URL.Path, "/logs") {
-			t.Errorf("path = %s, want suffix /logs", r.URL.Path)
+		if want := "/v1/jobs/" + jobID.String() + "/logs"; r.URL.Path != want {
+			t.Errorf("path = %s, want %s", r.URL.Path, want)
 			http.Error(w, "not found", http.StatusNotFound)
 			return
 		}
 
-		body, err := io.ReadAll(r.Body)
-		if err != nil {
-			t.Errorf("read request body: %v", err)
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
 		var payload capturedLogChunk
-		if err := json.Unmarshal(body, &payload); err != nil {
-			t.Errorf("unmarshal payload: %v", err)
+		dec := json.NewDecoder(r.Body)
+		dec.DisallowUnknownFields()
+		if err := dec.Decode(&payload); err != nil {
+			t.Errorf("decode payload: %v", err)
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
@@ -121,10 +115,10 @@ func TestLogStreamer_Write(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			server, uploads := newLogCaptureServer(t)
+			jobID := types.NewJobID()
+			server, uploads := newLogCaptureServer(t, jobID)
 			cfg := newAgentConfig(server.URL)
 			runID := types.NewRunID()
-			jobID := types.NewJobID()
 			ls, err := NewLogStreamer(cfg, runID, jobID, nil)
 			if err != nil {
 				t.Fatalf("NewLogStreamer() failed: %v", err)
@@ -158,10 +152,11 @@ func TestLogStreamer_Write(t *testing.T) {
 func TestLogStreamer_Close(t *testing.T) {
 	t.Parallel()
 
-	server, uploads := newLogCaptureServer(t)
+	jobID := types.NewJobID()
+	server, uploads := newLogCaptureServer(t, jobID)
 	cfg := newAgentConfig(server.URL)
 	runID := types.NewRunID()
-	ls, err := NewLogStreamer(cfg, runID, types.JobID(""), nil)
+	ls, err := NewLogStreamer(cfg, runID, jobID, nil)
 	if err != nil {
 		t.Fatalf("NewLogStreamer() failed: %v", err)
 	}
@@ -185,79 +180,36 @@ func TestLogStreamer_Close(t *testing.T) {
 	}
 }
 
-// TestLogStreamer_JobIDInPayload verifies that the log streamer includes job_id
-// in the payload when a job ID is provided.
-//
-// The server uses job_id to associate log chunks with specific jobs, enabling
-// per-job log retrieval and enrichment.
-func TestLogStreamer_JobIDInPayload(t *testing.T) {
+// Both initial and resumed executions upload chunks with their current resume count.
+func TestLogStreamer_UploadsForJobExecution(t *testing.T) {
 	t.Parallel()
-
-	runID := types.NewRunID()
-	jobID := types.NewJobID()
-
-	tests := []struct {
-		name       string
-		jobID      types.JobID
-		wantJobID  bool   // Whether job_id should be present in payload
-		wantJobIDV string // Expected job_id value (if wantJobID is true)
-	}{
-		{
-			name:       "with job_id",
-			jobID:      jobID,
-			wantJobID:  true,
-			wantJobIDV: jobID.String(),
-		},
-		{
-			name:       "without job_id (empty string)",
-			jobID:      "",
-			wantJobID:  false,
-			wantJobIDV: "",
-		},
-	}
-
-	for _, tt := range tests {
-		tt := tt // capture loop variable for t.Parallel
+	for _, tt := range []struct {
+		name        string
+		resumeCount int
+	}{{"initial", 0}, {"resumed", 4}} {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			server, uploads := newLogCaptureServer(t)
-
-			cfg := newAgentConfig(server.URL)
-			ls, err := NewLogStreamer(cfg, runID, tt.jobID, nil)
+			jobID := types.NewJobID()
+			server, uploads := newLogCaptureServer(t, jobID)
+			ls, err := NewLogStreamer(newAgentConfig(server.URL), types.NewRunID(), jobID, server.Client(), tt.resumeCount)
 			if err != nil {
-				t.Fatalf("NewLogStreamer() failed: %v", err)
+				t.Fatal(err)
 			}
-
-			if _, err := ls.Write([]byte("test log line for job_id verification\n")); err != nil {
-				t.Fatalf("Write() failed: %v", err)
+			if _, err := ls.Write([]byte("job log\n")); err != nil {
+				t.Fatal(err)
 			}
 			if err := ls.Close(); err != nil {
-				t.Fatalf("Close() failed: %v", err)
+				t.Fatal(err)
 			}
-
-			receivedPayloads := uploads()
-			if len(receivedPayloads) == 0 {
-				t.Fatal("expected at least one log chunk payload, got none")
+			got := uploads()
+			if len(got) != 1 {
+				t.Fatalf("uploads = %d, want 1", len(got))
 			}
-
-			payload := receivedPayloads[0].Payload
-
-			if tt.wantJobID {
-				if payload.JobID == nil {
-					t.Errorf("expected job_id to be present in payload, but it was nil")
-				} else if payload.JobID.String() != tt.wantJobIDV {
-					t.Errorf("job_id = %q, want %q", payload.JobID.String(), tt.wantJobIDV)
-				}
-			} else {
-				// Expect job_id to be absent (nil).
-				if payload.JobID != nil {
-					t.Errorf("expected job_id to be nil in payload, but got %q", payload.JobID.String())
-				}
+			payload := got[0].Payload
+			if payload.ResumeCount != tt.resumeCount {
+				t.Errorf("resume_count = %d, want %d", payload.ResumeCount, tt.resumeCount)
 			}
-
-			if payload.RunID != runID {
-				t.Errorf("run_id = %q, want %q", payload.RunID.String(), runID.String())
+			if payload.ChunkNo == nil || *payload.ChunkNo != 0 {
+				t.Error("first upload must include chunk_no=0")
 			}
 		})
 	}
@@ -266,9 +218,10 @@ func TestLogStreamer_JobIDInPayload(t *testing.T) {
 func TestLogStreamer_PreservesStdoutAndStderrFrames(t *testing.T) {
 	t.Parallel()
 
-	server, uploads := newLogCaptureServer(t)
+	jobID := types.NewJobID()
+	server, uploads := newLogCaptureServer(t, jobID)
 
-	ls, err := NewLogStreamer(newAgentConfig(server.URL), types.NewRunID(), types.NewJobID(), nil)
+	ls, err := NewLogStreamer(newAgentConfig(server.URL), types.NewRunID(), jobID, nil)
 	if err != nil {
 		t.Fatalf("NewLogStreamer() failed: %v", err)
 	}
@@ -335,8 +288,9 @@ func TestLogStreamer_Hook(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			server, uploads := newLogCaptureServer(t)
-			ls, err := NewLogStreamer(newAgentConfig(server.URL), types.NewRunID(), types.NewJobID(), nil)
+			jobID := types.NewJobID()
+			server, uploads := newLogCaptureServer(t, jobID)
+			ls, err := NewLogStreamer(newAgentConfig(server.URL), types.NewRunID(), jobID, nil)
 			if err != nil {
 				t.Fatalf("NewLogStreamer() failed: %v", err)
 			}

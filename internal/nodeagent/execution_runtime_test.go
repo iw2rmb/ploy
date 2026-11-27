@@ -163,7 +163,7 @@ func TestExecuteJobReleasesRuntimeBeforeArtifactUpload(t *testing.T) {
 				var uploaded atomic.Bool
 				server, status := newStatusCaptureServer(t, req.JobID.String(), withStatusExtraHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					switch {
-					case strings.HasSuffix(r.URL.Path, "/logs"):
+					case r.URL.Path == "/v1/jobs/"+req.JobID.String()+"/logs":
 						logsFlushed.Store(true)
 					case strings.HasSuffix(r.URL.Path, "/artifact"):
 						closed := make(chan struct{})

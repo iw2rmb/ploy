@@ -104,8 +104,7 @@ post:
   tags: [Worker]
   summary: Upload job log chunk
   description: |
-    Uploads a gzipped log chunk scoped to a specific job. The run context is
-    resolved from the job record; callers do not need to supply a run ID.
+    The node uploads a gzipped log chunk for the job. The server looks up the run from the job ID.
     The gzip payload must contain stream-aware framed lines:
     JSON per line with `stream` (`stdout|stderr`) and `line`.
   requestBody:
@@ -114,6 +113,7 @@ post:
       application/json:
         schema:
           type: object
+          additionalProperties: false
           properties:
             resume_count:
               type: integer
