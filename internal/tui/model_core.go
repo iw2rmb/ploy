@@ -56,7 +56,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	refresh := m.scheduleRefresh()
 	loaded, ok := msg.(runsLoadedMsg)
 	details := m.syncRunDetails(ok && loaded.requestID == m.runsRequest && loaded.err == nil, wasBrowsingRuns && m.screen == ScreenRunDetails)
-	return m, tea.Batch(cmd, refresh, details)
+	logCmd := m.syncJobLog()
+	return m, tea.Batch(cmd, refresh, details, logCmd)
 }
 
 func (m model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -94,6 +95,9 @@ func (m model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleRunsLoaded(msg), nil
 	case runDetailsLoadedMsg:
 		return m.handleRunDetailsLoaded(msg), nil
+	case jobLogMsg:
+		cmd := m.applyJobLog(msg)
+		return m, cmd
 	case jobsLoadedMsg:
 		return m.handleJobsLoaded(msg), nil
 	}
@@ -250,7 +254,13 @@ func (m model) handleJobsLoaded(msg jobsLoadedMsg) model {
 	}
 	m.now = time.Now()
 	hadSelection := !m.jobList.ConfirmedJobID().IsZero()
+	previous, _ := m.jobList.SelectedJob()
 	m.jobList = m.jobList.RefreshJobs(msg.jobs)
+	current, _ := m.jobList.SelectedJob()
+	if m.jobLog.sub != nil && previous.JobID == current.JobID && jobLogRestarted(previous.Status, current.Status) {
+		m.jobLog.sub.cancel()
+		m.jobLog = jobLogState{}
+	}
 	if hadSelection {
 		if item, ok := m.jobList.ConfirmedItem(m.now, m.spinnerFrame); ok {
 			m.rootList.SetItem(jobsIndex, item)

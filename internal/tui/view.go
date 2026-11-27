@@ -7,6 +7,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/iw2rmb/ploy/internal/cli/common"
+	"github.com/iw2rmb/ploy/internal/tui/joblist"
 )
 
 // View satisfies tea.Model and renders the current screen.
@@ -31,7 +32,17 @@ func (m model) View() tea.View {
 			right = lipgloss.NewStyle().Width(m.rightPaneList.Width()).MaxWidth(m.rightPaneList.Width()).Render(right)
 		}
 	case m.jobsVisible():
+		showLog := !m.highlightedLogJob().IsZero()
+		if showLog {
+			width := min(joblist.ListWidth, max(1, (remaining-2)/2))
+			m.jobList.SetWidth(width)
+			remaining -= width + 2
+		}
 		right = m.jobList.View(m.screen == ScreenJobsList, m.now, m.spinnerFrame)
+		if showLog && remaining > 0 {
+			right = lipgloss.NewStyle().Width(m.jobList.Width()).MaxWidth(m.jobList.Width()).Render(right)
+			right = lipgloss.JoinHorizontal(lipgloss.Top, right, "  ", m.renderJobLog(remaining))
+		}
 	case m.usersVisible():
 		delegate := list.NewDefaultDelegate()
 		focused := m.screen == ScreenUsersList

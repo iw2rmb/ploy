@@ -98,6 +98,7 @@ type model struct {
 	windowHeight     int
 	windowWidth      int
 	jobList          joblist.Model
+	jobLog           jobLogState
 	lastErr          error
 }
 

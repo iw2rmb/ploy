@@ -93,6 +93,12 @@ Other tokens retain the global jobs list.
 The duration starts with the first nonzero unit.
 Seconds remain visible, including `0s`.
 
+## Job log
+
+The LOG panel follows the highlighted `post_gate` job in global and run-scoped JOBS.
+It shows the latest output with UTC timestamps. Stderr timestamps appear red.
+Wrapped lines align under the output.
+
 ## Users
 
 `Users` is active for tokens with role `cli-admin`.
